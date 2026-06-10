@@ -365,3 +365,9 @@ body.dragging::after{
 .diff-rem{color:var(--red)}
 .diff-chg{color:var(--amber)}
 .diff-section{margin-top:14px}
+
+/* register sortable headers */
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{background:var(--light)}
+[data-theme="dark"] th.sortable:hover{background:#26304a}
+th.sortable:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
