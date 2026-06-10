@@ -4,7 +4,7 @@
   const C = window.QICalc, S = window.QIStore, CH = window.QICharts;
   const $ = sel => document.querySelector(sel);
   const content = $("#content");
-  const uiState = { caseFilter: { q: "", status: "", priority: "", owner: "", sort: "rpn" }, regFilter: {}, selected: new Set() };
+  const uiState = { caseFilter: { q: "", status: "", priority: "", owner: "", sort: "rpn" }, regFilter: {}, regSelected: {}, regSort: {}, selected: new Set() };
 
   // ---------- helpers ----------
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
@@ -857,44 +857,121 @@
   function renderRegister(reg) {
     const ctx = regCtx();
     const q = (uiState.regFilter[reg.id] || "").toLowerCase();
+    const sort = uiState.regSort && uiState.regSort[reg.id] || { key: "", dir: "" };
+    const sel = (uiState.regSelected[reg.id] = uiState.regSelected[reg.id] || new Set());
     let rows = S.regRows(reg.id);
     if (q) rows = rows.filter(r => reg.columns.some(c => String(r[c.key] || "").toLowerCase().includes(q)));
-    const head = `<th>ID</th>` + reg.columns.map(c => `<th${c.type === "text" && c.w >= 200 ? " class='wrap'" : ""}>${esc(c.label)}</th>`).join("") + "<th></th>";
+    // sort while keeping pinned rows on top
+    const sortKey = sort.key, sortDir = sort.dir === "desc" ? -1 : 1;
+    rows = rows.slice();
+    if (sortKey) {
+      rows.sort((a, b) => {
+        const col = reg.columns.find(c => c.key === sortKey);
+        let va = col && col.type === "computed" ? col.compute(a) : a[sortKey];
+        let vb = col && col.type === "computed" ? col.compute(b) : b[sortKey];
+        if (va == null) va = "";
+        if (vb == null) vb = "";
+        const na = Number(va), nb = Number(vb);
+        if (!isNaN(na) && !isNaN(nb) && va !== "" && vb !== "") return (na - nb) * sortDir;
+        return String(va).localeCompare(String(vb)) * sortDir;
+      });
+    }
+    rows.sort((a, b) => (b._pinned ? 1 : 0) - (a._pinned ? 1 : 0));
+    // header
+    const allChecked = rows.length > 0 && rows.every(r => sel.has(r._id));
+    const sortIcon = (k) => sortKey === k ? (sort.dir === "desc" ? " ▼" : " ▲") : "";
+    const head = `<th class="center"><input type="checkbox" data-reg-bulk="all" data-reg="${reg.id}" ${allChecked ? "checked" : ""} aria-label="Select all"></th>` +
+      `<th aria-label="Pinned"></th><th>ID</th>` +
+      reg.columns.map(c => `<th data-reg-sort="${reg.id}" data-key="${c.key}" tabindex="0" class="${c.type === "text" && c.w >= 200 ? "wrap" : ""} sortable">${esc(c.label)}${sortIcon(c.key)}</th>`).join("") + "<th></th>";
     const body = rows.map(r => {
-      const idx = S.regRows(reg.id).indexOf(r);
-      const tds = reg.columns.map(c => {
-        if (c.type === "computed") return `<td class="center">${cellComputed(c, r)}</td>`;
-        if (c.badge && (c.type === "select")) {
-          // editable select but show colour cue via wrapper; keep editor for usability
-          return `<td>${cellEditor(reg, r, c, ctx)}</td>`;
-        }
-        return `<td${c.w >= 200 ? " class='wrap'" : ""}>${cellEditor(reg, r, c, ctx)}</td>`;
+      const trueIdx = S.regRows(reg.id).indexOf(r);
+      const tds = reg.columns.map((c, ci) => {
+        if (c.type === "computed") return `<td class="center" data-col="${c.key}">${cellComputed(c, r)}</td>`;
+        return `<td${c.w >= 200 ? " class='wrap'" : ""} data-col="${c.key}">${cellEditor(reg, r, c, ctx)}</td>`;
       }).join("");
-      return `<tr><td>${reg.idPrefix}-${String(idx + 1).padStart(3, "0")}</td>${tds}
-        <td class="center"><button class="btn btn-sm btn-danger" data-act="regdel" data-reg="${reg.id}" data-id="${r._id}">Del</button></td></tr>`;
+      const pinned = !!r._pinned;
+      return `<tr data-row-id="${r._id}" class="${pinned ? "pinned-row" : ""}${sel.has(r._id) ? " row-selected" : ""}">
+        <td class="center"><input type="checkbox" data-reg-bulk="row" data-reg="${reg.id}" data-id="${r._id}" ${sel.has(r._id) ? "checked" : ""}></td>
+        <td class="pin-cell ${pinned ? "pin-on" : ""}" data-act="regpin" data-reg="${reg.id}" data-id="${r._id}" title="${pinned ? "Unpin" : "Pin to top"}">${pinned ? "📌" : "<span class='muted'>📍</span>"}</td>
+        <td>${reg.idPrefix}-${String(trueIdx + 1).padStart(3, "0")}</td>
+        ${tds}
+        <td class="center"><button class="btn btn-sm btn-danger" data-act="regdel" data-reg="${reg.id}" data-id="${r._id}">Del</button></td>
+      </tr>`;
     }).join("");
-    for (let i = 0; i < reg.columns.length; i++) { } // (widths set via colgroup below)
-    const colg = `<colgroup><col style="width:80px">` + reg.columns.map(c => `<col style="width:${c.w || 120}px">`).join("") + `<col style="width:64px"></colgroup>`;
+    const colg = `<colgroup><col style="width:34px"><col style="width:30px"><col style="width:80px">` +
+      reg.columns.map(c => `<col style="width:${c.w || 120}px">`).join("") + `<col style="width:64px"></colgroup>`;
+    const someSelected = sel.size > 0;
     return `<div class="toolbar">
         <button class="btn btn-primary" data-act="regadd" data-reg="${reg.id}">+ Add row</button>
-        <span class="grow"></span><span class="muted">${rows.length} row(s) · choose-only</span>
+        <span class="grow"></span>
+        <span class="muted">${rows.length} row(s) · choose-only</span>
       </div>
-      <div class="table-wrap"><table>${colg}<thead><tr>${head}</tr></thead><tbody>${body || `<tr><td colspan="${reg.columns.length + 2}" class="muted center" style="padding:24px">No rows yet — click <b>+ Add row</b>.</td></tr>`}</tbody></table></div>`;
+      <div class="bulkbar" id="regBulkBar" data-reg="${reg.id}" ${someSelected ? "" : "hidden"}>
+        <span><b>${sel.size}</b> selected</span>
+        <span class="grow"></span>
+        <button class="btn btn-sm btn-danger" data-act="regbulkdel" data-reg="${reg.id}">Delete selected</button>
+        <button class="btn btn-sm" data-act="regbulkclear" data-reg="${reg.id}">Clear</button>
+      </div>
+      <div class="table-wrap"><table>${colg}<thead><tr>${head}</tr></thead><tbody>${body || `<tr><td colspan="${reg.columns.length + 4}" class="muted center" style="padding:24px">No rows yet — click <b>+ Add row</b>.</td></tr>`}</tbody></table></div>`;
   }
   function afterRegister(reg) {
+    const sel = uiState.regSelected[reg.id] = uiState.regSelected[reg.id] || new Set();
+    const refreshBar = () => {
+      const bar = $("#regBulkBar"); if (!bar) return;
+      bar.hidden = sel.size === 0;
+      const lbl = bar.querySelector("span"); if (lbl) lbl.innerHTML = `<b>${sel.size}</b> selected`;
+    };
+    // Cell change → patch only the affected row's computed cells (no full re-render).
     content.querySelectorAll(`[data-reg="${reg.id}"][data-row]`).forEach(el => {
       el.addEventListener("change", () => {
         const key = el.dataset.key, col = reg.columns.find(c => c.key === key);
         let val = el.value;
         if (col && col.type === "num") val = val === "" ? "" : Number(val);
         S.regUpdate(reg.id, el.dataset.row, { [key]: val });
-        go(reg.id);
+        const tr = el.closest("tr");
+        if (tr) {
+          const row = S.regRows(reg.id).find(r => r._id === el.dataset.row);
+          if (row) {
+            // refresh every computed cell on this row
+            reg.columns.forEach(c => {
+              if (c.type !== "computed") return;
+              const td = tr.querySelector(`td[data-col="${c.key}"]`);
+              if (td) td.innerHTML = cellComputed(c, row);
+            });
+          }
+        }
       });
     });
-    const sb = $("#regQ");
-    if (sb) sb.addEventListener("input", () => {
-      uiState.regFilter[reg.id] = sb.value; const pos = sb.selectionStart;
-      go(reg.id); const n = $("#regQ"); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} }
+    // Bulk select
+    content.querySelectorAll(`input[data-reg-bulk="row"][data-reg="${reg.id}"]`).forEach(cb => {
+      cb.addEventListener("change", () => {
+        if (cb.checked) sel.add(cb.dataset.id); else sel.delete(cb.dataset.id);
+        const tr = cb.closest("tr"); if (tr) tr.classList.toggle("row-selected", cb.checked);
+        refreshBar();
+      });
+    });
+    const allCb = content.querySelector(`input[data-reg-bulk="all"][data-reg="${reg.id}"]`);
+    if (allCb) allCb.addEventListener("change", () => {
+      content.querySelectorAll(`input[data-reg-bulk="row"][data-reg="${reg.id}"]`).forEach(cb => {
+        cb.checked = allCb.checked;
+        if (allCb.checked) sel.add(cb.dataset.id); else sel.delete(cb.dataset.id);
+        const tr = cb.closest("tr"); if (tr) tr.classList.toggle("row-selected", cb.checked);
+      });
+      refreshBar();
+    });
+    // Sort by clicking a header
+    const sortHandler = (th) => {
+      const key = th.dataset.key;
+      uiState.regSort = uiState.regSort || {};
+      const cur = uiState.regSort[reg.id] || { key: "", dir: "" };
+      uiState.regSort[reg.id] = (cur.key === key)
+        ? (cur.dir === "asc" ? { key, dir: "desc" } : { key: "", dir: "" })
+        : { key, dir: "asc" };
+      go(reg.id);
+    };
+    content.querySelectorAll(`th[data-reg-sort="${reg.id}"]`).forEach(th => {
+      th.addEventListener("click", () => sortHandler(th));
+      th.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); sortHandler(th); } });
     });
   }
   C.REGISTERS.forEach(reg => { RENDER[reg.id] = () => renderRegister(reg); AFTER[reg.id] = () => afterRegister(reg); });
@@ -1697,6 +1774,17 @@
     else if (act === "regadd") { S.regAdd(b.dataset.reg, {}); go(b.dataset.reg); }
     else if (act === "regdel") { S.regDelete(b.dataset.reg, id); go(b.dataset.reg); }
     else if (act === "regclear") { uiState.regFilter[b.dataset.reg] = ""; go(b.dataset.reg); }
+    else if (act === "regpin") { S.regTogglePin(b.dataset.reg, id); go(b.dataset.reg); }
+    else if (act === "regbulkclear") { (uiState.regSelected[b.dataset.reg] || new Set()).clear(); uiState.regSelected[b.dataset.reg] = new Set(); go(b.dataset.reg); }
+    else if (act === "regbulkdel") {
+      const sel = uiState.regSelected[b.dataset.reg] || new Set();
+      const ids = [...sel];
+      if (!ids.length) return;
+      if (!confirm("Delete " + ids.length + " selected row(s)?")) return;
+      S.regBulkDelete(b.dataset.reg, ids);
+      sel.clear(); uiState.regSelected[b.dataset.reg] = new Set();
+      toast("Deleted " + ids.length + " row(s)."); go(b.dataset.reg);
+    }
     else if (act === "reset") { if (confirm("Reset to sample data? Your current data will be replaced.")) { S.reset(); setBrand(); go("dashboard"); toast("Reset to sample data."); } }
     else if (act === "addsk") { S.get().stakeholders.push({ name: "", role: "", influence: "", interest: "", raci: "" }); S.save(); go("stakeholders"); }
     else if (act === "delsk") { S.get().stakeholders.splice(+id, 1); S.save(); go("stakeholders"); }

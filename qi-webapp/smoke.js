@@ -415,5 +415,57 @@ ok(/Snapshot diff/.test(doc.getElementById("modal").innerHTML), "diff modal open
 ok(/Removed cases/.test(doc.getElementById("modal").innerHTML), "diff modal shows removed cases section");
 doc.querySelector("#modal [data-act=cancel]").click();
 
+// 31) Register polish: pin + bulk delete + sortable headers + row-patch on cell change
+S.reset();
+doc.querySelector('.nav-item[data-view="hazop"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const beforeAdd = S.regRows("hazop").length;
+// each click re-renders; re-query to avoid a detached button reference
+for (let i = 0; i < 3; i++) {
+  doc.querySelector('[data-act=regadd][data-reg="hazop"]').click();
+}
+ok(S.regRows("hazop").length === beforeAdd + 3, "regAdd added 3 rows");
+
+// pin column toggles correctly
+const lastRow = S.regRows("hazop").slice(-1)[0];
+const pinCell = doc.querySelector(`td.pin-cell[data-id="${lastRow._id}"]`);
+ok(pinCell != null, "register has pin column");
+pinCell.click();
+ok(S.regRows("hazop").find(r => r._id === lastRow._id)._pinned === true, "regTogglePin via UI sets _pinned");
+const firstTr = doc.querySelector('tr[data-row-id]');
+ok(firstTr.dataset.rowId === lastRow._id, "pinned register row floats to top");
+
+// bulk select + delete
+const cbs = doc.querySelectorAll('input[data-reg-bulk="row"][data-reg="hazop"]');
+ok(cbs.length >= 2, "register bulk-select checkboxes present");
+cbs[0].checked = true; cbs[0].dispatchEvent(new window.Event("change", { bubbles: true }));
+cbs[1].checked = true; cbs[1].dispatchEvent(new window.Event("change", { bubbles: true }));
+ok(/2.*selected/.test(doc.getElementById("regBulkBar").textContent), "register bulk bar shows selected count");
+window.__confirmAnswer = true;
+const realConfirm2 = window.confirm; window.confirm = () => true;
+const beforeDel2 = S.regRows("hazop").length;
+doc.querySelector('[data-act=regbulkdel][data-reg="hazop"]').click();
+window.confirm = realConfirm2;
+ok(S.regRows("hazop").length === beforeDel2 - 2, "register bulk delete removed 2 rows");
+
+// sortable headers — clicking sorts ascending then descending
+doc.querySelector('.nav-item[data-view="hazop"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const sortableTh = doc.querySelector('th[data-reg-sort="hazop"][data-key="risk"]');
+ok(sortableTh != null && sortableTh.classList.contains("sortable"), "register column header is sortable");
+sortableTh.click();
+ok(/▲|▼/.test(doc.querySelector('th[data-reg-sort="hazop"][data-key="risk"]').textContent), "clicking header shows sort icon");
+sortableTh.click(); // toggle desc
+sortableTh.click(); // unsort
+
+// row-patch on cell change — refreshing computed cell without full re-render
+doc.querySelector('.nav-item[data-view="hazop"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const tr = doc.querySelector('tbody tr[data-row-id]');
+const trIdentity = tr;
+const sevSel = tr.querySelector('select[data-reg="hazop"][data-key="sev"]');
+if (sevSel) {
+  sevSel.value = "5"; sevSel.dispatchEvent(new window.Event("change", { bubbles: true }));
+  const stillSameTr = doc.querySelector(`tbody tr[data-row-id="${trIdentity.dataset.rowId}"]`);
+  ok(stillSameTr === trIdentity, "register cell change patches row in place (no full re-render)");
+}
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

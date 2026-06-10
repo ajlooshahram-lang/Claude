@@ -78,7 +78,9 @@ Every operational field in the app is a **dropdown or picker** — there is no f
 
 - **Click-only by design.** No `prompt()`/free-text dialogs anywhere — even creating or renaming a project uses a dropdown picker. The smoke test stubs `window.prompt` and asserts it never fires.
 - **Drag-and-drop import.** Drop a JSON backup anywhere on the page to import it as a new project — a full-page overlay confirms the action.
-- **Pin important cases.** Click the pin column on the Cases list to keep your most important items at the top of every sort.
+- **Pin important cases & register rows.** Click the pin column on the Cases list **or any engineering/business register** to keep your priorities at the top of every sort.
+- **Sort any register by any column.** Click a column header to sort ascending; click again for descending; click a third time to clear. Pinned rows stay on top.
+- **Bulk operations on registers.** Select rows with checkboxes; the bulk bar lets you delete many at once — same UX as the Cases list.
 - **Compare snapshots.** On *History & Backups*, pick any two snapshots (or compare a snapshot to live data) and see exactly what was added, removed and field-by-field changed.
 - **Sidebar collapse.** Squeeze the sidebar to icons-only with the `«` button — preference is saved per workspace.
 - **Keyboard-friendly.** All buttons, nav items and dropdowns have visible `:focus-visible` outlines. Modals auto-focus their first field and **trap focus** so Tab/Shift+Tab cycle inside the dialog. Use `↑ / ↓` to move between sidebar items, and on Kanban cards use `←/→` to move a focused card across columns and `↑/↓` to move within a column.
@@ -91,7 +93,7 @@ Every operational field in the app is a **dropdown or picker** — there is no f
 - **Print-ready.** Print or save-as-PDF (top-bar Print, or the dedicated **Report Pack** view): the print stylesheet hides the chrome, keeps tables and KPI cards from breaking across pages, repeats table headers, and forces colour fidelity for badges.
 - **Screen-reader hints.** Active sidebar items expose `aria-current="page"`; modals are `role="dialog"`; icon-only topbar buttons carry `aria-label`s.
 - **Themed charts.** Chart.js axis ticks, grid lines, legends and tooltips re-colour automatically when you toggle dark mode.
-- **Verified.** 6/6 engine test suites and **156/156** jsdom smoke checks across 43 views, including regression checks for hash routing, focus trap, inline edit, bulk ops, undo toast, tour, print CSS, drag-and-drop import, pinning, Kanban keyboard, sidebar collapse, snapshot diff, empty-state CTA and the storage-quota event.
+- **Verified.** 6/6 engine test suites and **166/166** jsdom smoke checks across 43 views, including regression checks for register pinning, bulk-delete, sortable headers, row-patch perf, hash routing, focus trap, inline edit, bulk ops, undo toast, tour, print CSS, drag-and-drop import, snapshot diff, sidebar collapse, empty-state CTA and the storage-quota event.
 
 ## Files
 

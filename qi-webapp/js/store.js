@@ -312,7 +312,7 @@
   // ---- generic registers ----
   function regLabel(regId) { const r = C.REGISTERS.find(x => x.id === regId); return r ? r.label : regId; }
   function regRows(regId) { const s = get(); s.registers = s.registers || {}; return s.registers[regId] || (s.registers[regId] = []); }
-  function regAdd(regId, row) { row = row || {}; row._id = row._id || uid(); regRows(regId).push(row); logAudit("Added", regLabel(regId), ""); save(); return row; }
+  function regAdd(regId, row) { row = row || {}; row._id = row._id || uid(); if (typeof row._pinned !== "boolean") row._pinned = false; regRows(regId).push(row); logAudit("Added", regLabel(regId), ""); save(); return row; }
   function regUpdate(regId, rowId, patch) {
     const rows = regRows(regId), i = rows.findIndex(r => r._id === rowId); if (i < 0) return null;
     const changed = Object.keys(patch).filter(k => String(rows[i][k]) !== String(patch[k]));
@@ -323,6 +323,18 @@
   function regDelete(regId, rowId) {
     const rows = regRows(regId), i = rows.findIndex(r => r._id === rowId); if (i < 0) return false;
     rows.splice(i, 1); logAudit("Deleted", regLabel(regId), ""); save(); return true;
+  }
+  function regBulkDelete(regId, ids) {
+    const rows = regRows(regId);
+    let n = 0;
+    ids.slice().sort((a, b) => rows.findIndex(r => r._id === b) - rows.findIndex(r => r._id === a)).forEach(id => { if (regDelete(regId, id)) n++; });
+    return n;
+  }
+  function regTogglePin(regId, rowId) {
+    const r = regRows(regId).find(x => x._id === rowId); if (!r) return false;
+    r._pinned = !r._pinned;
+    logAudit(r._pinned ? "Pinned" : "Unpinned", regLabel(regId), "");
+    save(); return r._pinned;
   }
 
   // ---- Gage R&R + cash flow ----
@@ -495,7 +507,7 @@
     auditList, clearAudit, takeSnapshot, snapshots, restoreSnapshot, deleteSnapshot, diffSnapshots, paretoRPN, controlChartData,
     listProjects, activeProjectId, switchProject, addProject, renameProject, duplicateProject, deleteProject, importAsProject,
     brand, setBrand, aiSettings, setAi, portfolio,
-    regRows, regAdd, regUpdate, regDelete, regLabel, evm: () => C.evm(validCases(), get().project),
+    regRows, regAdd, regUpdate, regDelete, regLabel, regBulkDelete, regTogglePin, evm: () => C.evm(validCases(), get().project),
     gage, setGageCell, setGageConfig, gageResult, cashflow, setCashflow,
     xbar, setXbarCell, setXbarConfig, xbarResult, scorecard,
     spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy };
