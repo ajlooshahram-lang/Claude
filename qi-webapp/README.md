@@ -31,9 +31,18 @@ No install, no build step, no server, works offline.
 
 ## Views
 
-Dashboard · Cases (Master) · PM Tasks · Timeline (Gantt) · Risk Register · FMEA ·
-Six Sigma · PDCA · Action Log · Stakeholders (RACI) · Budget · AI Assistant ·
-Data Health · Settings · Help
+Dashboard · Cases (Master) · PM Tasks · **Kanban Board** · Timeline (Gantt) · Risk Register ·
+FMEA · Six Sigma · PDCA · Action Log · Stakeholders (RACI) · Budget · AI Assistant ·
+Data Health · **History & Backups** · Settings · Help
+
+## Highlights
+
+- **Search, filter & sort** on the Cases list (text, status, priority, owner).
+- **Kanban board** — drag cases between status columns to update them.
+- **Pareto chart** (80/20) on the dashboard and **SPC control chart** (with UCL/LCL) on Six Sigma.
+- **5-Whys** capture on each case and a one-click **A3 report** (printable).
+- **Change history (audit log)** — timestamped record of every add/edit/delete.
+- **Snapshots / restore points** — save a full copy and roll back anytime (auto-backup before a restore).
 
 ## Files
 

@@ -152,7 +152,42 @@
     });
   }
 
-  const API = { LISTS, SUGGEST, num, rpn, rpnBand, estDays, estEnd, health, aiRecommendation, sigmaFromDpmo, stakeholderStrategy, fmtDate, enrich };
+  // Pareto: sorted descending with cumulative %.
+  function pareto(pairs) {
+    const sorted = pairs.filter(p => p.value > 0).sort((a, b) => b.value - a.value);
+    const total = sorted.reduce((a, p) => a + p.value, 0) || 1;
+    let run = 0;
+    return sorted.map(p => { run += p.value; return { label: p.label, value: p.value, cum: (run / total) * 100 }; });
+  }
+
+  // Control chart stats for a numeric series (ignores null). Center + 3-sigma limits.
+  function controlStats(series) {
+    const vals = series.filter(v => v !== null && v !== undefined && !isNaN(v));
+    if (!vals.length) return { mean: null, ucl: null, lcl: null, sd: 0 };
+    const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const sd = Math.sqrt(vals.reduce((a, b) => a + (b - mean) * (b - mean), 0) / vals.length);
+    return { mean, sd, ucl: mean + 3 * sd, lcl: Math.max(mean - 3 * sd, 0) };
+  }
+
+  // Build an A3 one-pager (plain object) from a case.
+  function a3(c) {
+    const e = enrich(c);
+    const whys = (c.whys || []).filter(Boolean);
+    return {
+      title: c.problem || "(untitled case)",
+      owner: c.owner || "(unassigned)",
+      background: `Category: ${c.category || "-"} | Priority: ${c.priority || "-"} | Status: ${c.status || "-"}`,
+      current: `RPN ${e.rpn ?? "-"} (${e.rpnBand || "-"}). ${c.problem || ""}`,
+      goal: c.target || "(define a measurable target)",
+      rootCause: c.rootCause || "(run a root-cause analysis)",
+      whys,
+      countermeasure: `Method: ${c.leanMethod || "(choose a Lean method)"}. ${e.ai}`,
+      plan: `Start ${fmtDate(c.startDate) || "-"} -> due ${fmtDate(e.estEnd) || "-"} (est. ${e.estDays ?? "-"} days). Owner: ${c.owner || "-"}.`,
+      followup: "Verify the target metric weekly; standardise once stable; close with lessons learned."
+    };
+  }
+
+  const API = { LISTS, SUGGEST, num, rpn, rpnBand, estDays, estEnd, health, aiRecommendation, sigmaFromDpmo, stakeholderStrategy, fmtDate, enrich, pareto, controlStats, a3 };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QICalc = API;
 })(typeof window !== "undefined" ? window : globalThis);
