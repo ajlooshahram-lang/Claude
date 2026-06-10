@@ -181,3 +181,15 @@ input[type=color]{padding:2px;height:38px}
 table.gage th,table.gage td{text-align:center;padding:6px 8px}
 table.gage td:first-child,table.gage th:first-child{text-align:left;font-weight:600;white-space:nowrap}
 .card-head label{display:inline-flex;align-items:center;gap:6px;margin-left:10px}
+
+
+/* risk matrix */
+table.riskmatrix{border-collapse:collapse}
+table.riskmatrix th{background:#f0f3f9;font-size:11px}
+.rmcell{width:64px;height:46px;text-align:center;font-weight:700;font-size:15px;border:1px solid #fff;color:#1f2733}
+.rmrow{white-space:nowrap;text-align:right;padding-right:8px;font-size:11px}
+.rm-red{background:#f4a3a3}.rm-amber{background:#ffd28a}.rm-green{background:#aed99f}
+/* report */
+.report h3{margin:16px 0 8px;border-bottom:2px solid var(--line);padding-bottom:4px}
+.report .kpi .value{font-size:20px}
+@media print{ .no-print{display:none!important} }
