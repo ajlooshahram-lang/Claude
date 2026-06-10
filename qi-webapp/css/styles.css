@@ -175,3 +175,9 @@ select,input[list]{background:var(--input)}
 .brand-mark.has-logo{background:#fff}
 .brand-mark img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff}
 input[type=color]{padding:2px;height:38px}
+
+
+/* gage r&r */
+table.gage th,table.gage td{text-align:center;padding:6px 8px}
+table.gage td:first-child,table.gage th:first-child{text-align:left;font-weight:600;white-space:nowrap}
+.card-head label{display:inline-flex;align-items:center;gap:6px;margin-left:10px}

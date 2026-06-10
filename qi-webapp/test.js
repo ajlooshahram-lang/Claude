@@ -104,3 +104,26 @@ const ncrBack = S.regRows("ncr").length === 1;
 console.log("Registers restored via snapshot:", ncrBack);
 const ok4 = C.REGISTERS.length >= 11 && hzRisk === 10 && ev.bac === 42500 && ncrBack && calState === "Overdue";
 console.log(ok4 ? "REGISTER/EVM TESTS PASS" : "REGISTER/EVM TESTS FAIL");
+
+
+// --- Gage R&R, cash flow, resources, HAZOP guidewords ---
+console.log("\n-- MSA / cashflow / resources --");
+S.reset();
+const gr = S.gageResult();
+console.log("Gage %GRR:", gr.pctGRR.toFixed(1), "ndc:", gr.ndc, "verdict:", gr.verdict);
+S.setGageConfig({ parts: 5, operators: 3, trials: 2 });
+S.setGageCell(0, 0, 0, 0.30);
+console.log("Gage cell set ok:", S.gage().data["0_0_0"] === 0.30);
+const cf = S.cashflow();
+console.log("Cashflow months:", cf.length, "M1 planned:", cf[0].planned);
+S.setCashflow(0, "planned", 12345);
+console.log("Cashflow edit:", S.cashflow()[0].planned === 12345);
+const res = S.regRows("resources");
+const resCol = C.REGISTERS.find(r => r.id === "resources").columns;
+const utilCol = resCol.find(c => c.key === "util");
+const u = utilCol.compute(res[1]); // QA Lead 84/80 = 1.05 over
+console.log("Resource util (84/80):", (u * 100).toFixed(0) + "%", "over:", u > 1);
+const hzKeys = C.REGISTERS.find(r => r.id === "hazop").columns.map(c => c.key);
+console.log("HAZOP has guideword+parameter:", hzKeys.includes("guideword") && hzKeys.includes("parameter"));
+const ok5 = gr.verdict && gr.ndc >= 1 && cf.length === 12 && u > 1 && hzKeys.includes("guideword");
+console.log(ok5 ? "MSA/CASHFLOW/RESOURCE TESTS PASS" : "TESTS FAIL");

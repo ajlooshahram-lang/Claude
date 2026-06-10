@@ -25,7 +25,7 @@ ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard rende
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 
 // 2) navigate every view (simulate clicks)
-const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","pdca","log","stakeholders","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","evm","milestones","decisions","procurement","ai","health","audit","config","help"];
+const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","pdca","log","stakeholders","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","evm","cashflow","milestones","decisions","procurement","resources","ai","health","audit","config","help"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -98,6 +98,13 @@ ok(/CPI|Earned/.test(doc.getElementById("content").innerHTML), "EVM view renders
 doc.querySelector('.nav-item[data-view="calibration"]').dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(doc.querySelectorAll("table").length > 0, "Calibration register renders");
 ok(C.REGISTERS.length >= 11, "11+ registers defined");
+ok(typeof S.gageResult === "function" && S.gageResult().verdict, "Gage R&R computes a verdict");
+doc.querySelector('.nav-item[data-view="gage"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(/Gage|Repeatability|Verdict/.test(doc.getElementById("content").innerHTML), "Gage R&R view renders");
+doc.querySelector('.nav-item[data-view="cashflow"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(/S-curve|Cumulative|Cash/.test(doc.getElementById("content").innerHTML), "Cash flow view renders");
+doc.querySelector('.nav-item[data-view="resources"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector("#chRes") != null, "Resources view renders utilisation chart");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

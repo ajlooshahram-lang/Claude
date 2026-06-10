@@ -45,6 +45,7 @@
     { id: "risks", label: "Risk Register", icon: "⚠" },
     { id: "fmea", label: "FMEA", icon: "⌖" },
     { id: "sigma", label: "Six Sigma", icon: "∿" },
+    { id: "gage", label: "Gage R&R (MSA)", icon: "📐" },
     { g: "Improve" },
     { id: "pdca", label: "PDCA", icon: "↻" },
     { id: "log", label: "Action Log", icon: "✎" },
@@ -63,7 +64,7 @@
   (function insertRegisters() {
     const items = [{ g: "Engineering" }];
     C.REGISTERS.filter(r => r.group === "Engineering").forEach(r => items.push({ id: r.id, label: r.label, icon: r.icon }));
-    items.push({ g: "Business" }, { id: "evm", label: "Earned Value (EVM)", icon: "∑" });
+    items.push({ g: "Business" }, { id: "evm", label: "Earned Value (EVM)", icon: "∑" }, { id: "cashflow", label: "Cash Flow / S-curve", icon: "〽" });
     C.REGISTERS.filter(r => r.group === "Business").forEach(r => items.push({ id: r.id, label: r.label, icon: r.icon }));
     const idx = VIEWS.findIndex(v => v.g === "Intelligence");
     VIEWS.splice(idx, 0, ...items);
@@ -716,6 +717,91 @@
     const e = S.evm();
     CH.bar("chEvm", ["PV", "EV", "AC", "BAC"], [Math.round(e.pv), Math.round(e.ev), Math.round(e.ac), Math.round(e.bac)]);
   };
+
+  // ---------- Gage R&R (MSA) ----------
+  RENDER.gage = function () {
+    const g = S.gage(), r = S.gageResult();
+    const opt = (n, sel) => Array.from({ length: n }, (_, i) => i + 1).map(v => `<option ${v === sel ? "selected" : ""}>${v}</option>`).join("");
+    let grid = `<table class="gage"><thead><tr><th>Operator / Trial</th>${Array.from({ length: g.parts }, (_, p) => `<th>Part ${p + 1}</th>`).join("")}</tr></thead><tbody>`;
+    const opName = i => String.fromCharCode(65 + i);
+    for (let o = 0; o < g.operators; o++) {
+      for (let t = 0; t < g.trials; t++) {
+        grid += `<tr><td>Op ${opName(o)} · trial ${t + 1}</td>` +
+          Array.from({ length: g.parts }, (_, p) => {
+            const v = g.data[`${o}_${p}_${t}`]; return `<td><input type="number" step="any" data-go="${o}" data-gp="${p}" data-gt="${t}" value="${v == null ? "" : v}" style="width:72px"></td>`;
+          }).join("") + `</tr>`;
+      }
+    }
+    grid += "</tbody></table>";
+    const vClass = r.verdict === "Acceptable" ? "green" : r.verdict === "Marginal" ? "gold" : "red";
+    const kpi = (cls, l, v) => `<div class="kpi ${cls}"><div class="label">${l}</div><div class="value">${v}</div></div>`;
+    return `<div class="card"><div class="card-head"><h3>Study setup</h3>
+        <label class="muted">Parts <select id="gParts" style="width:64px">${opt(10, g.parts)}</select></label>
+        <label class="muted">Operators <select id="gOps" style="width:64px">${opt(3, g.operators)}</select></label>
+        <label class="muted">Trials <select id="gTrials" style="width:64px">${opt(3, g.trials)}</select></label></div>
+        <div class="table-wrap">${grid}</div></div>
+      <div class="grid kpis" style="margin-bottom:16px">
+        ${kpi("blue", "% Repeatability (EV)", r.pctEV.toFixed(1) + "%")}
+        ${kpi("teal", "% Reproducibility (AV)", r.pctAV.toFixed(1) + "%")}
+        ${kpi(vClass, "% Gage R&R", r.pctGRR.toFixed(1) + "%")}
+        ${kpi("navy", "% Part variation (PV)", r.pctPV.toFixed(1) + "%")}
+        ${kpi("gold", "ndc (distinct categories)", r.ndc)}</div>
+      <div class="card"><div class="card-head"><h3>Verdict</h3><span class="badge ${vClass === "green" ? "b-ontrack" : vClass === "gold" ? "b-high" : "b-critical"}">${esc(r.verdict)}</span></div>
+        <p class="muted">AIAG guide: %GRR &lt; 10% acceptable · 10–30% marginal (consider improving) · &gt; 30% unacceptable. ndc should be ≥ 5. Computed by the average &amp; range method.</p>
+        <div class="chart-box sm"><canvas id="chGage"></canvas></div></div>`;
+  };
+  AFTER.gage = function () {
+    content.querySelectorAll("input[data-go]").forEach(inp => inp.addEventListener("change", () => {
+      S.setGageCell(+inp.dataset.go, +inp.dataset.gp, +inp.dataset.gt, inp.value); go("gage");
+    }));
+    const cfg = (id, key) => { const el = $("#" + id); if (el) el.addEventListener("change", () => { S.setGageConfig({ [key]: +el.value }); go("gage"); }); };
+    cfg("gParts", "parts"); cfg("gOps", "operators"); cfg("gTrials", "trials");
+    const r = S.gageResult();
+    CH.bar("chGage", ["%EV", "%AV", "%GRR", "%PV"], [r.pctEV, r.pctAV, r.pctGRR, r.pctPV].map(x => +x.toFixed(1)));
+  };
+
+  // ---------- Cash flow / S-curve ----------
+  RENDER.cashflow = function () {
+    const cf = S.cashflow();
+    let pc = 0, ac = 0; const rows = cf.map((m, i) => {
+      pc += Number(m.planned) || 0; ac += (m.actual == null ? 0 : Number(m.actual));
+      const hasA = m.actual != null;
+      return `<tr><td><input data-cf="${i}" data-f="month" value="${esc(m.month)}" style="width:70px"></td>
+        <td><input type="number" data-cf="${i}" data-f="planned" value="${m.planned == null ? "" : m.planned}" style="width:110px"></td>
+        <td><input type="number" data-cf="${i}" data-f="actual" value="${m.actual == null ? "" : m.actual}" style="width:110px"></td>
+        <td class="right">${money(pc)}</td><td class="right">${hasA ? money(ac) : "—"}</td></tr>`;
+    }).join("");
+    return `<div class="card"><h3>Cash-flow S-curve — cumulative planned vs actual</h3>
+        <div class="chart-box"><canvas id="chScurve"></canvas></div></div>
+      <div class="card"><h3>Monthly spend</h3>
+        <div class="table-wrap"><table><thead><tr><th>Period</th><th>Planned</th><th>Actual</th><th>Cum. planned</th><th>Cum. actual</th></tr></thead>
+        <tbody>${rows}</tbody></table></div></div>`;
+  };
+  AFTER.cashflow = function () {
+    content.querySelectorAll("[data-cf]").forEach(inp => inp.addEventListener("change", () => {
+      S.setCashflow(+inp.dataset.cf, inp.dataset.f, inp.value); go("cashflow");
+    }));
+    const cf = S.cashflow(); let pc = 0, ac = 0; const labels = [], plan = [], act = [];
+    let lastActual = true;
+    cf.forEach(m => {
+      pc += Number(m.planned) || 0; labels.push(m.month); plan.push(pc);
+      if (m.actual == null) lastActual = false;
+      if (lastActual) { ac += Number(m.actual) || 0; act.push(ac); } else act.push(null);
+    });
+    CH.lines("chScurve", labels, [{ label: "Cumulative planned", data: plan }, { label: "Cumulative actual", data: act }], "");
+  };
+
+  // resources register gets a custom view (table + utilisation chart)
+  (function () {
+    const reg = C.REGISTERS.find(r => r.id === "resources");
+    if (!reg) return;
+    RENDER.resources = () => renderRegister(reg) + `<div class="card"><h3>Utilisation by person</h3><div class="chart-box sm"><canvas id="chRes"></canvas></div></div>`;
+    AFTER.resources = () => {
+      afterRegister(reg);
+      const rows = S.regRows("resources").filter(r => r.person);
+      CH.bar("chRes", rows.map(r => r.person), rows.map(r => r.capacity ? Math.round((Number(r.allocated) || 0) / Number(r.capacity) * 100) : 0), "Utilisation %");
+    };
+  })();
 
   // ---------- case form ----------
   function blankCase() {

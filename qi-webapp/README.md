@@ -33,19 +33,23 @@ No install, no build step, no server, works offline.
 
 **Overview:** Portfolio · Dashboard · Cases (Master)
 **Delivery:** PM Tasks · Kanban Board · Timeline (Gantt)
-**Risk & Quality:** Risk Register · FMEA · Six Sigma
+**Risk & Quality:** Risk Register · FMEA · Six Sigma · Gage R&R (MSA)
 **Improve:** PDCA · Action Log
 **People & Cost:** Stakeholders (RACI) · Budget
-**Engineering registers:** HAZOP / Hazards · Calibration · Punch List · SIL / Functional Safety · Requirements Traceability · Document Register · Non-Conformance (NCR) · Management of Change (MOC)
-**Business management:** Earned Value (EVM) · Milestones · Decision Log · Procurement
+**Engineering registers:** HAZOP (with guidewords & parameters) · Calibration · Punch List · SIL / Functional Safety · Requirements Traceability · Document Register · Non-Conformance (NCR) · Management of Change (MOC)
+**Business management:** Earned Value (EVM) · Cash Flow / S-curve · Milestones · Decision Log · Procurement · Resources / Capacity
 **Intelligence:** AI Assistant · Data Health
 **Setup:** History & Backups · Settings · Help
 
 ## Engineering & business management
 
-- **Engineering registers** (schema-driven, choose-only where sensible): HAZOP with auto risk = Severity × Likelihood; **Calibration** with auto next-due date and Overdue/Due-soon status; Punch List (A/B/C); **SIL / functional safety** with auto "meets target?"; **Requirements traceability**; Document register; NCR; and **Management of Change**.
-- **Earned Value Management (EVM)** — BAC, PV, EV, AC plus **CPI, SPI, CV, SV, EAC, VAC**, computed from each case's estimated/actual cost, % complete and the project schedule, with a Planned-vs-Earned-vs-Actual chart.
-- **Milestones** (baseline vs forecast vs actual with auto slip), **Decision Log**, and **Procurement** register.
+- **HAZOP worksheet** with standard **guidewords** (No/More/Less/Reverse/As-well-as/Part-of/Other-than/Early/Late…) and **process parameters** (Flow, Pressure, Temperature, Level…), auto risk = Severity × Likelihood.
+- **Gage R&R (Measurement System Analysis)** — parts × operators × trials data grid; AIAG average-&-range method computes **%EV (repeatability), %AV (reproducibility), %GRR, %PV and ndc** with an Acceptable/Marginal/Unacceptable verdict and a contribution chart.
+- **Calibration** (auto next-due + Overdue/Due-soon), Punch List, **SIL** (auto meets-target), Requirements Traceability, Document register, NCR, MOC.
+- **Earned Value (EVM)** — BAC/PV/EV/AC + CPI/SPI/CV/SV/EAC/VAC.
+- **Cash Flow / S-curve** — monthly planned vs actual with a cumulative S-curve chart.
+- **Resources / Capacity** — capacity vs allocated hours with auto utilisation %, over-allocation flags and a utilisation chart.
+- **Milestones** (baseline/forecast/actual slip), **Decision Log**, **Procurement**.
 - Every register supports add/edit/delete, search, computed columns, audit logging and is included in snapshots/exports.
 
 ## Highlights
