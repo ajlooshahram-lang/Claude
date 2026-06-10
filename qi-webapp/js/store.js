@@ -266,12 +266,39 @@
     if (changes.length) logAudit("Updated", codeOf(i), changes.slice(0, 4).join("; ").slice(0, 120));
     save(); return get().cases[i];
   }
+  let __lastDelete = null;
   function deleteCase(id) {
     const i = caseIndex(id); if (i < 0) return false;
     const code = codeOf(i), prob = (get().cases[i].problem || "").slice(0, 60);
+    __lastDelete = { record: get().cases[i], index: i, code };
     get().cases.splice(i, 1);
     logAudit("Deleted", code, prob);
     save(); return true;
+  }
+  // Soft-undo of the last deletion. Restores the record at its original index.
+  function undoDelete() {
+    if (!__lastDelete) return false;
+    const { record, index, code } = __lastDelete;
+    const cases = get().cases;
+    cases.splice(Math.min(index, cases.length), 0, record);
+    logAudit("Restored", code, "Undone delete");
+    __lastDelete = null;
+    save(); return true;
+  }
+  function clearUndo() { __lastDelete = null; }
+  function hasUndo() { return !!__lastDelete; }
+  // Bulk operations across many cases at once.
+  function bulkUpdate(ids, patch) {
+    const map = {};
+    ids.forEach(id => { const c = get().cases.find(x => x.id === id); if (c) Object.assign(c, patch); map[id] = !!c; });
+    const k = Object.keys(patch)[0];
+    if (k) logAudit("Bulk updated", "", `${ids.length} case(s) · ${k}=${patch[k]}`);
+    save(); return map;
+  }
+  function bulkDelete(ids) {
+    let n = 0;
+    ids.slice().sort((a, b) => caseIndex(b) - caseIndex(a)).forEach(id => { if (deleteCase(id)) n++; });
+    return n;
   }
   function moveStatus(id, status) { return updateCase(id, { status }); }
 
@@ -436,6 +463,7 @@
   }
 
   const API = { uid, seed, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
+    undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete,
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
     auditList, clearAudit, takeSnapshot, snapshots, restoreSnapshot, deleteSnapshot, paretoRPN, controlChartData,
     listProjects, activeProjectId, switchProject, addProject, renameProject, duplicateProject, deleteProject, importAsProject,

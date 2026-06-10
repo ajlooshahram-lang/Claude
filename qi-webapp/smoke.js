@@ -276,5 +276,79 @@ modal.dispatchEvent(tabEvt);
 ok(tabEvt.defaultPrevented === true, "Tab on last focusable is intercepted (focus trap)");
 doc.querySelector("#modal [data-act=cancel]").click();
 
+// 19) Bulk operations on the Cases list
+S.reset();
+doc.querySelector('.nav-item[data-view="cases"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const rowChecks = doc.querySelectorAll('input[data-bulk="row"]');
+ok(rowChecks.length >= 3, "Cases table has bulk-select checkboxes (" + rowChecks.length + ")");
+rowChecks[0].checked = true; rowChecks[0].dispatchEvent(new window.Event("change", { bubbles: true }));
+rowChecks[1].checked = true; rowChecks[1].dispatchEvent(new window.Event("change", { bubbles: true }));
+ok(doc.getElementById("bulkBar") && !doc.getElementById("bulkBar").hidden, "bulk bar visible after selection");
+ok(/2.*selected/.test(doc.getElementById("bulkBar").textContent), "bulk bar shows count");
+const beforeBulk = S.validCases().filter(c => c.status === "BLOCKED").length;
+const bulkStatus = doc.getElementById("bulkStatus");
+bulkStatus.value = "BLOCKED"; bulkStatus.dispatchEvent(new window.Event("change", { bubbles: true }));
+const afterBulk = S.validCases().filter(c => c.status === "BLOCKED").length;
+ok(afterBulk >= beforeBulk + 2, "bulk status apply updated cases (" + beforeBulk + " -> " + afterBulk + ")");
+
+// 20) Select-all checkbox toggles every row
+doc.querySelector('.nav-item[data-view="cases"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const allCb = doc.getElementById("bulkAll");
+allCb.checked = true; allCb.dispatchEvent(new window.Event("change", { bubbles: true }));
+const totalRows = doc.querySelectorAll('input[data-bulk="row"]').length;
+ok(Array.from(doc.querySelectorAll('input[data-bulk="row"]')).every(c => c.checked), "select-all checks every row (" + totalRows + ")");
+
+// 21) Bulk delete with confirm()
+window.__confirmAnswer = true;
+const origConfirm = window.confirm; window.confirm = () => window.__confirmAnswer;
+const beforeDel = S.validCases().length;
+doc.querySelector("[data-act=bulkdel]").click();
+window.confirm = origConfirm;
+ok(S.validCases().length < beforeDel, "bulk delete removed selected cases");
+
+// 22) Undo toast — delete a single case via the modal flow, then click Undo
+S.reset();
+doc.querySelector('.nav-item[data-view="cases"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const firstDelBtn = doc.querySelector("[data-act=del]");
+firstDelBtn.click();   // opens confirm modal
+const confirmDel = doc.querySelector("#modal [data-act=confirmdel]");
+ok(confirmDel != null, "delete-confirm modal opens");
+const cntBefore = S.validCases().length;
+confirmDel.click();
+ok(S.validCases().length === cntBefore - 1, "case removed");
+ok(S.hasUndo() === true, "undo handle stashed in store");
+const undoBtn = doc.getElementById("toastAct");
+ok(undoBtn && /undo/i.test(undoBtn.textContent), "Undo button on toast");
+undoBtn.click();
+ok(S.validCases().length === cntBefore, "undo restored the case");
+
+// 23) Inline-edit row patch (perf): only the health cell mutates, no full re-render
+S.reset();
+doc.querySelector('.nav-item[data-view="cases"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const tbody = doc.querySelector("table tbody");
+const trBefore = tbody.firstElementChild;
+const sel2 = doc.querySelector('select[data-edit="status"]');
+sel2.value = "BLOCKED"; sel2.dispatchEvent(new window.Event("change", { bubbles: true }));
+ok(doc.querySelector("table tbody").firstElementChild === trBefore, "inline edit patches in place (no full re-render)");
+
+// 24) Tour banner appears on first run, dismisses & persists
+S.setBrand({ tourDone: false });
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".tour-banner") != null, "tour banner shows when tourDone is false");
+doc.querySelector("[data-act=startTour]").click();
+ok(doc.querySelector(".tour-steps") != null, "tour modal renders step indicator");
+ok(/Welcome/.test(doc.getElementById("modal").textContent), "tour step 1 shown");
+doc.querySelector("#modal [data-act=tourNext]").click();
+ok(/Add a case once/.test(doc.getElementById("modal").textContent), "tour advances to step 2");
+doc.querySelector("#modal [data-act=tourSkip]").click();
+ok(S.brand().tourDone === true, "tour skip persists tourDone=true");
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".tour-banner") == null, "tour banner does NOT show again after dismissal");
+
+// 25) Print CSS — the @media print rules are present in the stylesheet
+const cssAll = Array.from(doc.styleSheets).map(s => { try { return Array.from(s.cssRules || []).map(r => r.cssText).join("\n"); } catch (e) { return ""; } }).join("\n");
+ok(/@media\s+print/.test(cssAll), "print stylesheet present");
+ok(/page-break-inside\s*:\s*avoid/.test(cssAll), "print CSS includes page-break-inside:avoid");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

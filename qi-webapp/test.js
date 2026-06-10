@@ -151,3 +151,20 @@ S.setBrand({ theme: "dark" });
 console.log("Brand.theme set:", S.brand().theme);
 const ok6 = cap.st.cpk > 1.0 && rRanked[0]._score && wRanked[0]._score && ncrP.length >= 2 && S.brand().theme === "dark";
 console.log(ok6 ? "CAPABILITY/PRIORITY/THEME TESTS PASS" : "TESTS FAIL");
+
+// --- soft-delete undo + bulk ops ---
+console.log("\n-- soft-delete + bulk ops --");
+S.reset();
+const aliveBefore = S.validCases().length;
+const idA = S.validCases()[0].id, idB = S.validCases()[1].id, idC = S.validCases()[2].id;
+S.deleteCase(idA);
+console.log("After single delete:", S.validCases().length, "hasUndo:", S.hasUndo());
+S.undoDelete();
+console.log("After undo:", S.validCases().length, "hasUndo:", S.hasUndo());
+S.bulkUpdate([idA, idB, idC], { status: "BLOCKED" });
+const blockedNow = S.validCases().filter(c => c.status === "BLOCKED").length;
+console.log("After bulkUpdate to BLOCKED, count:", blockedNow);
+S.bulkDelete([idB, idC]);
+console.log("After bulkDelete (2):", S.validCases().length, "(was", aliveBefore + ")");
+const ok7 = S.validCases().length === aliveBefore - 2 && blockedNow >= 3;
+console.log(ok7 ? "SOFT-DELETE/BULK TESTS PASS" : "TESTS FAIL");
