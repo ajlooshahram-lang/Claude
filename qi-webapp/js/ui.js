@@ -88,7 +88,8 @@
   }
 
   let current = "dashboard";
-  function go(view) {
+  function go(view, opts) {
+    if (!RENDER[view]) view = "dashboard";
     current = view;
     $("#viewTitle").textContent = TITLES[view] || "QI Platform";
     document.querySelectorAll(".nav-item").forEach(b => {
@@ -100,6 +101,13 @@
     CH.destroyAll();
     content.innerHTML = (RENDER[view] || (() => "<div class='empty'>Not found</div>"))();
     if (AFTER[view]) AFTER[view]();
+    // Reflect the current view in the URL so back/forward and bookmarks work.
+    if (!(opts && opts.skipHash)) {
+      const target = "#" + view;
+      if (location.hash !== target) {
+        try { history.pushState(null, "", target); } catch (e) { try { location.hash = target; } catch (_) {} }
+      }
+    }
     window.scrollTo(0, 0);
   }
 
@@ -110,6 +118,17 @@
   RENDER.dashboard = function () {
     const k = S.kpis();
     const kpi = (cls, label, val) => `<div class="kpi ${cls}"><div class="label">${label}</div><div class="value">${val}</div></div>`;
+    if (k.total === 0) {
+      return `<div class="card empty-cta">
+          <h2>You haven't added any cases yet</h2>
+          <p>Get started by adding your first case. It will automatically populate every other view — PM tasks, scored risk, FMEA line, PDCA cycle, action-log entry, Gantt bar and budget line — all live.</p>
+          <div class="empty-cta-actions">
+            <button class="btn btn-primary" data-act="add">+ Add your first case</button>
+            <button class="btn" data-act="goHelp">How it works</button>
+          </div>
+        </div>
+        <p class="muted" style="text-align:center;margin-top:14px">Tip — press <span class="kbd">n</span> any time to add a new case, or <span class="kbd">?</span> to see all keyboard shortcuts.</p>`;
+    }
     return `
       <div class="grid kpis" style="margin-bottom:16px">
         ${kpi("navy", "Total Cases", k.total)}
@@ -137,6 +156,7 @@
       <div class="card"><h3>Pareto — where the risk concentrates (80/20)</h3><div class="chart-box"><canvas id="chPareto"></canvas></div></div>`;
   };
   AFTER.dashboard = function () {
+    if (!$("#groupSel")) return;   // empty-state branch — nothing to wire
     const drawGroup = () => {
       const f = $("#groupSel").value;
       const m = S.groupCounts(f); CH.bar("chGroup", Object.keys(m), Object.values(m));
@@ -163,15 +183,15 @@
     list.sort(sorters[f.sort] || sorters.rpn);
     const names = S.get().roster.map(r => r.name).filter(Boolean);
     const rows = list.map(c => `
-      <tr>
+      <tr data-id="${c.id}">
         <td>${esc(c.code)}</td>
         <td class="wrap">${esc(c.problem)}</td>
         <td>${esc(c.category)}</td>
-        <td><span class="pill">${esc(c.priority || "")}</span></td>
+        <td><select data-edit="priority" data-id="${c.id}" class="inline-sel">${opts(C.LISTS.priority, c.priority, "—")}</select></td>
         <td class="center">${c.rpn == null ? "" : c.rpn}</td>
         <td>${healthBadge(c.health)}</td>
-        <td>${esc(c.owner || "")}</td>
-        <td>${statusBadge(c.status)}</td>
+        <td><select data-edit="owner" data-id="${c.id}" class="inline-sel">${opts(names, c.owner, "—")}</select></td>
+        <td><select data-edit="status" data-id="${c.id}" class="inline-sel">${opts(C.LISTS.status, c.status, "—")}</select></td>
         <td>${barCell(c.percent)}</td>
         <td class="center">
           <button class="btn btn-sm" data-act="edit" data-id="${c.id}">Edit</button>
@@ -197,6 +217,15 @@
   AFTER.cases = function () {
     const bind = (id, key) => { const el = $("#" + id); if (el) el.addEventListener("change", () => { uiState.caseFilter[key] = el.value; go("cases"); }); };
     bind("fltStatus", "status"); bind("fltPriority", "priority"); bind("fltOwner", "owner"); bind("fltSort", "sort");
+    // inline-edit: change priority / owner / status without opening the form
+    content.querySelectorAll("select[data-edit]").forEach(sel => {
+      sel.addEventListener("change", () => {
+        const cid = sel.dataset.id, field = sel.dataset.edit;
+        S.updateCase(cid, { [field]: sel.value });
+        toast("Updated " + field);
+        go("cases");
+      });
+    });
   };
 
   RENDER.pm = function () {
@@ -1204,6 +1233,17 @@
     };
     new MutationObserver(focusFirst).observe(overlay, { attributes: true, attributeFilter: ["hidden"] });
     new MutationObserver(focusFirst).observe(modal, { childList: true });
+    // Focus trap — keep Tab cycling inside the modal while it's open.
+    modal.addEventListener("keydown", e => {
+      if (e.key !== "Tab" || overlay.hidden) return;
+      const list = Array.from(modal.querySelectorAll("input:not([type=hidden]),select,textarea,button,a[href]"))
+        .filter(f => !f.disabled && f.tabIndex !== -1);
+      if (!list.length) return;
+      const first = list[0], last = list[list.length - 1];
+      const a = document.activeElement;
+      if (e.shiftKey && (a === first || !modal.contains(a))) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && (a === last || !modal.contains(a))) { e.preventDefault(); first.focus(); }
+    });
   })();
 
   // Open a click-only project-name picker modal (no prompt())
@@ -1368,10 +1408,12 @@
       ["r", "Report Pack"],
       ["c", "Run checks"],
       ["t", "Toggle theme"],
+      ["↑ / ↓", "Move between sidebar items (when nav is focused)"],
+      ["Tab / Shift+Tab", "Move focus inside a dialog (focus is trapped)"],
       ["Esc", "Close dialog"]
     ].map(([k, m]) => `<div class="shortcut-row"><span>${m}</span><span><span class="kbd">${esc(k)}</span></span></div>`).join("");
     $("#modal").innerHTML = `<h2>Keyboard shortcuts</h2>
-      <div class="sub">Single-letter shortcuts work when no field is focused.</div>
+      <div class="sub">Single-letter shortcuts work when no field is focused. Bookmarkable URLs: every view appears in the URL hash (e.g. <code>#kanban</code>) — back/forward works.</div>
       <div>${rows}</div>
       <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
         <button class="btn btn-primary" data-act="cancel">Close</button></div></div>`;
@@ -1401,6 +1443,7 @@
   content.addEventListener("click", e => {
     const b = e.target.closest("[data-act]"); if (!b) return;
     const act = b.dataset.act, id = b.dataset.id;
+    if (act === "goHelp") return go("help");
     if (act === "add") openCaseForm();
     else if (act === "edit") openCaseForm(id);
     else if (act === "del") confirmDelete(id);
@@ -1450,6 +1493,7 @@
     const act = b.dataset.act, id = b.dataset.id;
     if (act === "cancel") closeModal();
     else if (act === "goHealth") { closeModal(); go("health"); }
+    else if (act === "goHelp") { go("help"); }
     else if (act === "a3") openA3(id);
     else if (act === "del") { closeModal(); confirmDelete(id); }
     else if (act === "confirmdel") { S.deleteCase(id); closeModal(); toast("Case deleted."); go(current === "help" ? "cases" : current); }
@@ -1488,6 +1532,30 @@
     if (map[k]) { e.preventDefault(); map[k](); }
   });
 
+  // Hash routing — back/forward buttons & bookmarkable view URLs.
+  window.addEventListener("hashchange", () => {
+    const id = (location.hash || "").replace(/^#/, "");
+    if (id && RENDER[id]) go(id, { skipHash: true });
+  });
+
+  // Sidebar arrow-key navigation (Up/Down between items)
+  $("#nav").addEventListener("keydown", e => {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    const items = Array.from(document.querySelectorAll(".nav-item"));
+    const idx = items.indexOf(document.activeElement);
+    if (idx === -1) return;
+    e.preventDefault();
+    const next = e.key === "ArrowDown" ? Math.min(idx + 1, items.length - 1) : Math.max(idx - 1, 0);
+    items[next].focus();
+  });
+
+  // Surface localStorage quota errors as a friendly toast.
+  window.addEventListener("qi-storage-error", () => {
+    toast("Storage full — export a JSON backup and delete old snapshots.");
+  });
+
   // ---------- init ----------
-  S.load(); checkShareHash(); buildNav(); applyTheme(); refreshHeader(); go("dashboard");
+  S.load(); checkShareHash(); buildNav(); applyTheme(); refreshHeader();
+  const initialHash = (location.hash || "").replace(/^#/, "");
+  go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
 })();
