@@ -467,5 +467,75 @@ if (sevSel) {
   ok(stillSameTr === trIdentity, "register cell change patches row in place (no full re-render)");
 }
 
+// 32) Floating action button — opens the case form from any view
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const fab = doc.getElementById("fab");
+ok(fab != null, "FAB present in shell");
+ok(fab.getAttribute("aria-label") === "Add new case", "FAB has accessible label");
+fab.click();
+ok(/New case|f_problem/.test(doc.getElementById("modal").innerHTML), "FAB opens the case form");
+doc.querySelector("#modal [data-act=cancel]").click();
+
+// 33) Saved views — save, recall, delete (click-only via dropdowns)
+S.reset();
+doc.querySelector('.nav-item[data-view="cases"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+// set a filter combo
+const fStatus = doc.getElementById("fltStatus");
+fStatus.value = "OPEN"; fStatus.dispatchEvent(new window.Event("change", { bubbles: true }));
+const fPriority = doc.getElementById("fltPriority");
+fPriority.value = "1-CRITICAL"; fPriority.dispatchEvent(new window.Event("change", { bubbles: true }));
+// open save-view modal
+doc.querySelector('[data-act=saveview]').click();
+ok(/Save current view/.test(doc.getElementById("modal").innerHTML), "Save view modal opens");
+ok(doc.getElementById("sv_name_pick") != null, "Save view modal has a curated dropdown");
+ok(doc.querySelectorAll("#modal input[type=text]").length === 0, "Save view modal has no free-text inputs");
+const namePick = doc.getElementById("sv_name_pick");
+namePick.value = "Critical & high";
+doc.getElementById("sv_save_ok").click();
+ok(S.savedViews().length === 1, "saveView created a saved view");
+ok(S.savedViews()[0].name === "Critical & high", "saved view name persisted");
+// recall a view by clearing and picking from dropdown
+const fStatus2 = doc.getElementById("fltStatus");
+fStatus2.value = ""; fStatus2.dispatchEvent(new window.Event("change", { bubbles: true }));
+const svPick = doc.getElementById("savedViewPick");
+ok(svPick && svPick.querySelector('option[value="' + S.savedViews()[0].id + '"]'), "saved view appears in toolbar dropdown");
+svPick.value = S.savedViews()[0].id;
+svPick.dispatchEvent(new window.Event("change", { bubbles: true }));
+ok(doc.getElementById("fltPriority").value === "1-CRITICAL", "recalling view restores filter");
+
+// 34) Snapshot rename — uses a curated label dropdown (click-only)
+S.reset();
+const sn = S.takeSnapshot("Auto");
+doc.querySelector('.nav-item[data-view="audit"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const renameBtn = doc.querySelector('[data-act=snaprename]');
+ok(renameBtn != null, "Rename button on snapshot rows");
+renameBtn.click();
+ok(/Rename snapshot/.test(doc.getElementById("modal").innerHTML), "Snapshot rename modal opens");
+ok(doc.getElementById("sn_label_pick") != null, "Snapshot rename modal has curated dropdown");
+ok(doc.querySelectorAll("#modal input[type=text]").length === 0, "Snapshot rename modal has no free-text inputs");
+const labelPick = doc.getElementById("sn_label_pick");
+labelPick.value = "Pre-deployment";
+doc.getElementById("sn_label_ok").click();
+ok((S.snapshots().find(s => s.id === sn.id) || {}).label === "Pre-deployment", "renameSnapshot persisted new label");
+
+// 35) Pagination — when the case list exceeds page size, only the first N render with a "Load more" button
+S.reset();
+// add ~110 cases to trip the default pageSize=100
+const extra = 110 - S.validCases().length;
+for (let i = 0; i < extra; i++) {
+  S.addCase({ problem: "Bulk seed " + i, category: "Quality / Defects", priority: "3-MEDIUM", sev: 4, occ: 4, det: 4, owner: "PM", leanMethod: "5S", target: "x", startDate: "2026-06-01", status: "OPEN", percent: 0 });
+}
+ok(S.validCases().length >= 110, "added enough cases to trigger pagination (have " + S.validCases().length + ")");
+doc.querySelector('.nav-item[data-view="cases"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+// clear any filters the previous tests left active so we see the full list
+const clearF = doc.querySelector('[data-act=clearflt]');
+if (clearF) clearF.click();
+const renderedRows = doc.querySelectorAll('tr[data-id]').length;
+ok(renderedRows === 100, "first page renders 100 rows (got " + renderedRows + ")");
+ok(doc.querySelector('[data-act=pagemore]') != null, "Load-more button is present");
+doc.querySelector('[data-act=pageall]').click();
+const allShownRows = doc.querySelectorAll('tr[data-id]').length;
+ok(allShownRows >= S.validCases().length, "Show-all renders every row (got " + allShownRows + ")");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

@@ -205,12 +205,17 @@
     // Pinned cases always float to the top within the current sort.
     list.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
     const names = S.get().roster.map(r => r.name).filter(Boolean);
+    // saved views (per-project) and pagination
+    const views = S.savedViews();
+    const pageSize = (f.pageSize === 0 || f.pageSize) ? f.pageSize : 100;   // 0 means "All"
+    const rendered = pageSize === 0 ? list.length : Math.min(pageSize, list.length);
+    const visibleCases = list.slice(0, rendered);
     // Drop selections that no longer exist in the filtered list (defensive cleanup).
     const visibleIds = new Set(list.map(c => c.id));
     [...uiState.selected].forEach(id => { if (!visibleIds.has(id)) uiState.selected.delete(id); });
-    const allSelected = list.length > 0 && list.every(c => uiState.selected.has(c.id));
+    const allSelected = visibleCases.length > 0 && visibleCases.every(c => uiState.selected.has(c.id));
     const someSelected = uiState.selected.size > 0;
-    const rows = list.map(c => `
+    const rows = visibleCases.map(c => `
       <tr data-id="${c.id}" class="${uiState.selected.has(c.id) ? "row-selected" : ""} ${c.pinned ? "pinned-row" : ""}">
         <td class="center"><input type="checkbox" data-bulk="row" data-id="${c.id}" ${uiState.selected.has(c.id) ? "checked" : ""} aria-label="Select ${esc(c.code)}"></td>
         <td class="pin-cell ${c.pinned ? "pin-on" : ""}" data-act="pin" data-id="${c.id}" title="${c.pinned ? "Unpin" : "Pin to top"}">${c.pinned ? "📌" : "<span class='muted'>📍</span>"}</td>
@@ -240,9 +245,21 @@
           <option value="rpn">Sort: RPN</option><option value="priority" ${f.sort==="priority"?"selected":""}>Sort: Priority</option>
           <option value="status" ${f.sort==="status"?"selected":""}>Sort: Status</option><option value="code" ${f.sort==="code"?"selected":""}>Sort: ID</option>
         </select>
+        <select id="pageSize" style="max-width:100px" title="Rows per page">
+          <option value="50" ${f.pageSize===50?"selected":""}>50</option>
+          <option value="100" ${(!f.pageSize||f.pageSize===100)?"selected":""}>100</option>
+          <option value="200" ${f.pageSize===200?"selected":""}>200</option>
+          <option value="0" ${f.pageSize===0?"selected":""}>All</option>
+        </select>
         ${(f.status||f.priority||f.owner)?'<button class="btn btn-sm" data-act="clearflt">Clear</button>':''}
+        <select id="savedViewPick" title="Saved view" style="max-width:180px">
+          <option value="">Saved views…</option>
+          ${views.map(v => `<option value="${v.id}">${esc(v.name)}</option>`).join("")}
+        </select>
+        <button class="btn btn-sm" data-act="saveview" title="Save current filter as a saved view">Save view</button>
+        ${(f.savedViewId)?`<button class="btn btn-sm btn-danger" data-act="delsavedview" data-id="${f.savedViewId}">Delete view</button>`:''}
         <span class="grow"></span><button class="btn" data-act="csv">Export CSV</button>
-        <span class="muted">${list.length} shown</span>
+        <span class="muted">${list.length} shown${rows === "" ? "" : list.length > rendered ? ` (first ${rendered})` : ""}</span>
       </div>
       <div class="bulkbar" id="bulkBar" ${someSelected ? "" : "hidden"}>
         <span><b>${uiState.selected.size}</b> selected</span>
@@ -253,11 +270,25 @@
         <button class="btn btn-sm btn-danger" data-act="bulkdel">Delete selected</button>
         <button class="btn btn-sm" data-act="bulkclear">Clear</button>
       </div>
-      ${tableWrap(head, rows)}`;
+      ${tableWrap(head, rows)}
+      ${rendered < list.length ? `<div class="loadmore"><span class="muted">Showing first ${rendered} of ${list.length}.</span> <button class="btn btn-sm" data-act="pagemore">Load next ${pageSize}</button> <button class="btn btn-sm" data-act="pageall">Show all</button></div>` : ""}`;
   };
   AFTER.cases = function () {
     const bind = (id, key) => { const el = $("#" + id); if (el) el.addEventListener("change", () => { uiState.caseFilter[key] = el.value; go("cases"); }); };
     bind("fltStatus", "status"); bind("fltPriority", "priority"); bind("fltOwner", "owner"); bind("fltSort", "sort");
+    // Page size dropdown
+    const ps = $("#pageSize");
+    if (ps) ps.addEventListener("change", () => { uiState.caseFilter.pageSize = Number(ps.value); go("cases"); });
+    // Saved views — pick one to apply its filter, or use Save view to capture the current combo
+    const sv = $("#savedViewPick");
+    if (sv) sv.addEventListener("change", () => {
+      const view = S.savedViews().find(v => v.id === sv.value);
+      if (view) {
+        uiState.caseFilter = Object.assign({ q: "", status: "", priority: "", owner: "", sort: uiState.caseFilter.sort, pageSize: uiState.caseFilter.pageSize }, view.filter, { savedViewId: view.id });
+        toast("View: " + view.name);
+        go("cases");
+      }
+    });
     // inline-edit: change priority / owner / status without opening the form.
     // Patch only the health badge cell instead of re-rendering the whole view.
     content.querySelectorAll("select[data-edit]").forEach(sel => {
@@ -755,6 +786,7 @@
       <td>${esc(new Date(s.ts).toLocaleString())}</td><td>${esc(s.label)}</td>
       <td class="center">${(s.data.cases || []).filter(c => c.problem).length}</td>
       <td class="center"><button class="btn btn-sm" data-act="restore" data-id="${s.id}">Restore</button>
+        <button class="btn btn-sm" data-act="snaprename" data-id="${s.id}">Rename</button>
         <button class="btn btn-sm btn-danger" data-act="delsnap" data-id="${s.id}">Del</button></td></tr>`).join("")
       : `<tr><td colspan="4" class="muted center">No snapshots yet — take one to create a restore point.</td></tr>`;
     const log = S.auditList();
@@ -1499,6 +1531,55 @@
   // tiny shim because opts() shadows the option-list builder; keep one global
   const optsList = (arr, sel, blank) => opts(arr, sel, blank);
 
+  // Save the current Cases filter as a named view (click-only)
+  function openSaveViewModal() {
+    const f = uiState.caseFilter || {};
+    const summary = [
+      f.status ? "Status=" + f.status : "Any status",
+      f.priority ? "Priority=" + f.priority : "Any priority",
+      f.owner ? "Owner=" + f.owner : "Any owner",
+      "Sort=" + (f.sort || "rpn")
+    ].join(" · ");
+    const sel = `<select id="sv_name_pick">${optsList(C.LISTS.savedViewNames, "", "— choose a name —")}</select>`;
+    $("#modal").innerHTML = `<h2>Save current view</h2>
+      <div class="sub">Pick a name. Choosing an existing name overwrites that view.</div>
+      <div class="readout"><b>Filter:</b> ${esc(summary)}</div>
+      <div class="field full" style="margin-top:12px"><label>View name</label>${sel}</div>
+      <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
+        <button class="btn" data-act="cancel">Cancel</button>
+        <button class="btn btn-primary" id="sv_save_ok">Save</button>
+      </div></div>`;
+    $("#modalOverlay").hidden = false;
+    const picker = $("#sv_name_pick"); if (picker) picker.focus();
+    $("#sv_save_ok").addEventListener("click", () => {
+      const v = picker.value;
+      if (!v) { toast("Please choose a name."); return; }
+      const filter = { status: f.status || "", priority: f.priority || "", owner: f.owner || "", sort: f.sort || "rpn" };
+      const saved = S.saveView(v, filter);
+      uiState.caseFilter.savedViewId = saved.id;
+      closeModal(); toast("View saved: " + v); go("cases");
+    });
+  }
+
+  // Pick a snapshot label from the curated list (used by the Rename action on History & Backups)
+  function openSnapshotRenameModal(id, currentLabel) {
+    const sel = `<select id="sn_label_pick">${optsList(C.LISTS.snapshotLabels, currentLabel || "", "— choose a label —")}</select>`;
+    $("#modal").innerHTML = `<h2>Rename snapshot</h2>
+      <div class="sub">Pick a label that describes this restore point.</div>
+      <div class="field full"><label>Label</label>${sel}</div>
+      <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
+        <button class="btn" data-act="cancel">Cancel</button>
+        <button class="btn btn-primary" id="sn_label_ok">Rename</button>
+      </div></div>`;
+    $("#modalOverlay").hidden = false;
+    const picker = $("#sn_label_pick"); if (picker) picker.focus();
+    $("#sn_label_ok").addEventListener("click", () => {
+      const v = picker.value;
+      if (!v) { toast("Please choose a label."); return; }
+      S.renameSnapshot(id, v); closeModal(); toast("Renamed."); go("audit");
+    });
+  }
+
   function openA3(id) {
     const c = S.get().cases.find(x => x.id === id); if (!c) return;
     const a = C.a3(c);
@@ -1744,6 +1825,10 @@
     else if (act === "export") exportJSON();
     else if (act === "import") importJSON();
     else if (act === "clearflt") { uiState.caseFilter = { q: "", status: "", priority: "", owner: "", sort: uiState.caseFilter.sort }; go("cases"); }
+    else if (act === "saveview") openSaveViewModal();
+    else if (act === "delsavedview") { S.deleteSavedView(id); uiState.caseFilter.savedViewId = ""; toast("View deleted."); go("cases"); }
+    else if (act === "pagemore") { const cur = uiState.caseFilter.pageSize || 100; uiState.caseFilter.pageSize = cur === 0 ? 0 : cur + 100; go("cases"); }
+    else if (act === "pageall") { uiState.caseFilter.pageSize = 0; go("cases"); }
     else if (act === "bulkclear") { uiState.selected.clear(); go("cases"); }
     else if (act === "bulkdel") {
       const ids = [...uiState.selected]; if (!ids.length) return;
@@ -1753,6 +1838,7 @@
     }
     else if (act === "pin") { S.togglePin(id); go("cases"); }
     else if (act === "snap") { S.takeSnapshot(); toast("Snapshot saved."); go("audit"); }
+    else if (act === "snaprename") { const cur = (S.snapshots().find(s => s.id === id) || {}).label; openSnapshotRenameModal(id, cur); }
     else if (act === "restore") { if (confirm("Restore this snapshot? Current data is auto-backed-up first.")) { S.restoreSnapshot(id); setBrand(); toast("Snapshot restored."); go("dashboard"); } }
     else if (act === "delsnap") { S.deleteSnapshot(id); go("audit"); }
     else if (act === "clearaudit") { if (confirm("Clear the change-history log?")) { S.clearAudit(); go("audit"); } }
@@ -1830,6 +1916,7 @@
   $("#btnHelp").addEventListener("click", showShortcuts);
   $("#fileImport").addEventListener("change", e => { if (e.target.files[0]) handleImport(e.target.files[0]); e.target.value = ""; });
   $("#hamburger").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
+  const fab = $("#fab"); if (fab) fab.addEventListener("click", () => openCaseForm());
   const btnSb = $("#btnSidebar"); if (btnSb) btnSb.addEventListener("click", toggleSidebar);
   $("#projectSwitch").addEventListener("change", e => {
     const v = e.target.value;
