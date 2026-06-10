@@ -4,7 +4,7 @@
   const C = window.QICalc, S = window.QIStore, CH = window.QICharts;
   const $ = sel => document.querySelector(sel);
   const content = $("#content");
-  const uiState = { caseFilter: { q: "", status: "", priority: "", owner: "", sort: "rpn" } };
+  const uiState = { caseFilter: { q: "", status: "", priority: "", owner: "", sort: "rpn" }, regFilter: {} };
 
   // ---------- helpers ----------
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
@@ -59,6 +59,15 @@
     { id: "config", label: "Settings", icon: "⚙" },
     { id: "help", label: "Help", icon: "?" }
   ];
+  // splice in schema-driven Engineering & Business registers (+ EVM)
+  (function insertRegisters() {
+    const items = [{ g: "Engineering" }];
+    C.REGISTERS.filter(r => r.group === "Engineering").forEach(r => items.push({ id: r.id, label: r.label, icon: r.icon }));
+    items.push({ g: "Business" }, { id: "evm", label: "Earned Value (EVM)", icon: "∑" });
+    C.REGISTERS.filter(r => r.group === "Business").forEach(r => items.push({ id: r.id, label: r.label, icon: r.icon }));
+    const idx = VIEWS.findIndex(v => v.g === "Intelligence");
+    VIEWS.splice(idx, 0, ...items);
+  })();
   const TITLES = {}; VIEWS.forEach(v => { if (v.id) TITLES[v.id] = v.label; });
 
   function buildNav() {
@@ -587,6 +596,127 @@
         ${tableWrap("<th>When</th><th>Action</th><th>Case</th><th class='wrap'>Detail</th>", arows)}</div>`;
   };
 
+  // ---------- generic registers ----------
+  function regBadgeClass(v) {
+    const s = String(v).toLowerCase();
+    if (/(overdue|gap|critical|fail|reject|slipped|major)/.test(s)) return "b-critical";
+    if (/(due soon|at risk|under review|partial|requested|rfq|draft)/.test(s)) return "b-high";
+    if (/(ok|met|approved|done|pass|verified|delivered|implemented|as-built)/.test(s)) return "b-ontrack";
+    return "";
+  }
+  function regCtx() {
+    return {
+      owners: S.get().roster.map(r => r.name).filter(Boolean),
+      caseCodes: S.enriched().filter(c => c.problem).map(c => c.code)
+    };
+  }
+  function colOptions(col, ctx) {
+    if (col.dyn === "owners") return ctx.owners;
+    if (col.dyn === "cases") return ctx.caseCodes;
+    if (col.list) return C.LISTS[col.list] || [];
+    if (col.opts) return col.opts;
+    return [];
+  }
+  function cellEditor(reg, row, col, ctx) {
+    const v = row[col.key] == null ? "" : row[col.key];
+    const a = `data-reg="${reg.id}" data-row="${row._id}" data-key="${col.key}"`;
+    if (col.type === "select") return `<select ${a}>${opts(colOptions(col, ctx), v, "—")}</select>`;
+    if (col.type === "date") return `<input type="date" ${a} value="${esc(v)}">`;
+    if (col.type === "num") return `<input type="number" step="any" ${a} value="${v === "" ? "" : esc(v)}">`;
+    return `<input type="text" ${a} value="${esc(v)}">`;
+  }
+  function cellComputed(col, row) {
+    let val = col.compute ? col.compute(row) : "";
+    if (val === null || val === undefined) val = "";
+    let disp = val;
+    if (col.fmt === "date") disp = C.fmtDate(val) || "";
+    else if (col.fmt === "money" && val !== "") disp = money(val);
+    if (col.badge === "raw" && val !== "") return `<span class="badge ${regBadgeClass(val)}">${esc(val)}</span>`;
+    if (typeof col.badge === "function" && val !== "") { const cls = { crit: "b-critical", high: "b-high", ok: "b-ontrack" }[col.badge(val)] || ""; return `<span class="badge ${cls}">${esc(disp)}</span>`; }
+    return esc(disp);
+  }
+  function dispBadge(col, v) {
+    if (v === "" || v == null) return "";
+    if (col.badge === "status") return statusBadge(v);
+    if (col.badge === "raw") return `<span class="badge ${regBadgeClass(v)}">${esc(v)}</span>`;
+    return esc(v);
+  }
+  function renderRegister(reg) {
+    const ctx = regCtx();
+    const q = (uiState.regFilter[reg.id] || "").toLowerCase();
+    let rows = S.regRows(reg.id);
+    if (q) rows = rows.filter(r => reg.columns.some(c => String(r[c.key] || "").toLowerCase().includes(q)));
+    const head = `<th>ID</th>` + reg.columns.map(c => `<th${c.type === "text" && c.w >= 200 ? " class='wrap'" : ""}>${esc(c.label)}</th>`).join("") + "<th></th>";
+    const body = rows.map(r => {
+      const idx = S.regRows(reg.id).indexOf(r);
+      const tds = reg.columns.map(c => {
+        if (c.type === "computed") return `<td class="center">${cellComputed(c, r)}</td>`;
+        if (c.badge && (c.type === "select")) {
+          // editable select but show colour cue via wrapper; keep editor for usability
+          return `<td>${cellEditor(reg, r, c, ctx)}</td>`;
+        }
+        return `<td${c.w >= 200 ? " class='wrap'" : ""}>${cellEditor(reg, r, c, ctx)}</td>`;
+      }).join("");
+      return `<tr><td>${reg.idPrefix}-${String(idx + 1).padStart(3, "0")}</td>${tds}
+        <td class="center"><button class="btn btn-sm btn-danger" data-act="regdel" data-reg="${reg.id}" data-id="${r._id}">Del</button></td></tr>`;
+    }).join("");
+    for (let i = 0; i < reg.columns.length; i++) { } // (widths set via colgroup below)
+    const colg = `<colgroup><col style="width:80px">` + reg.columns.map(c => `<col style="width:${c.w || 120}px">`).join("") + `<col style="width:64px"></colgroup>`;
+    return `<div class="toolbar">
+        <button class="btn btn-primary" data-act="regadd" data-reg="${reg.id}">+ Add row</button>
+        <input id="regQ" placeholder="Search…" value="${esc(uiState.regFilter[reg.id] || "")}" style="max-width:220px">
+        ${q ? '<button class="btn btn-sm" data-act="regclear" data-reg="' + reg.id + '">Clear</button>' : ''}
+        <span class="grow"></span><span class="muted">${rows.length} row(s)</span>
+      </div>
+      <div class="table-wrap"><table>${colg}<thead><tr>${head}</tr></thead><tbody>${body || `<tr><td colspan="${reg.columns.length + 2}" class="muted center" style="padding:24px">No rows yet — click <b>+ Add row</b>.</td></tr>`}</tbody></table></div>`;
+  }
+  function afterRegister(reg) {
+    content.querySelectorAll(`[data-reg="${reg.id}"][data-row]`).forEach(el => {
+      el.addEventListener("change", () => {
+        const key = el.dataset.key, col = reg.columns.find(c => c.key === key);
+        let val = el.value;
+        if (col && col.type === "num") val = val === "" ? "" : Number(val);
+        S.regUpdate(reg.id, el.dataset.row, { [key]: val });
+        go(reg.id);
+      });
+    });
+    const sb = $("#regQ");
+    if (sb) sb.addEventListener("input", () => {
+      uiState.regFilter[reg.id] = sb.value; const pos = sb.selectionStart;
+      go(reg.id); const n = $("#regQ"); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} }
+    });
+  }
+  C.REGISTERS.forEach(reg => { RENDER[reg.id] = () => renderRegister(reg); AFTER[reg.id] = () => afterRegister(reg); });
+
+  // ---------- Earned Value (EVM) ----------
+  RENDER.evm = function () {
+    const e = S.evm();
+    const kpi = (cls, l, v, sub) => `<div class="kpi ${cls}"><div class="label">${l}</div><div class="value">${v}</div>${sub ? `<div class="muted" style="font-size:11px">${sub}</div>` : ""}</div>`;
+    const idx = (v) => v >= 1 ? "green" : v >= 0.9 ? "gold" : "red";
+    const f = v => money(Math.round(v));
+    return `<div class="grid kpis" style="margin-bottom:16px">
+        ${kpi("navy", "BAC — Budget at completion", f(e.bac))}
+        ${kpi("blue", "PV — Planned value", f(e.pv), Math.round(e.frac * 100) + "% of schedule elapsed")}
+        ${kpi("teal", "EV — Earned value", f(e.ev))}
+        ${kpi("purple", "AC — Actual cost", f(e.ac))}</div>
+      <div class="grid kpis" style="margin-bottom:16px">
+        ${kpi(idx(e.cpi), "CPI — Cost performance", e.cpi.toFixed(2), e.cpi >= 1 ? "On/under budget" : "Over budget")}
+        ${kpi(idx(e.spi), "SPI — Schedule performance", e.spi.toFixed(2), e.spi >= 1 ? "On/ahead of schedule" : "Behind schedule")}
+        ${kpi(e.cv >= 0 ? "green" : "red", "CV — Cost variance", f(e.cv))}
+        ${kpi(e.sv >= 0 ? "green" : "red", "SV — Schedule variance", f(e.sv))}
+        ${kpi("amber", "EAC — Est. at completion", f(e.eac))}
+        ${kpi(e.vac >= 0 ? "green" : "red", "VAC — Variance at completion", f(e.vac))}</div>
+      <div class="card"><h3>Planned vs Earned vs Actual</h3><div class="chart-box"><canvas id="chEvm"></canvas></div></div>
+      <div class="card"><h3>How to read this</h3><p class="muted">
+        EV is budgeted cost of work actually done (Σ est × %done). <b>CPI = EV/AC</b> (≥1 good) shows cost efficiency;
+        <b>SPI = EV/PV</b> (≥1 good) shows schedule efficiency. EAC forecasts the final cost at the current efficiency.
+        Figures use each case's estimated/actual cost, % done, and the project start/end dates from Settings.</p></div>`;
+  };
+  AFTER.evm = function () {
+    const e = S.evm();
+    CH.bar("chEvm", ["PV", "EV", "AC", "BAC"], [Math.round(e.pv), Math.round(e.ev), Math.round(e.ac), Math.round(e.bac)]);
+  };
+
   // ---------- case form ----------
   function blankCase() {
     const t = new Date().toISOString().slice(0, 10);
@@ -798,6 +928,9 @@
       S.setAi({ provider: $("#ai_provider").value, baseUrl: $("#ai_base").value, model: $("#ai_model").value, key: $("#ai_key").value });
       toast("AI settings saved.");
     }
+    else if (act === "regadd") { S.regAdd(b.dataset.reg, {}); go(b.dataset.reg); }
+    else if (act === "regdel") { S.regDelete(b.dataset.reg, id); go(b.dataset.reg); }
+    else if (act === "regclear") { uiState.regFilter[b.dataset.reg] = ""; go(b.dataset.reg); }
     else if (act === "reset") { if (confirm("Reset to sample data? Your current data will be replaced.")) { S.reset(); setBrand(); go("dashboard"); toast("Reset to sample data."); } }
     else if (act === "addsk") { S.get().stakeholders.push({ name: "", role: "", influence: "", interest: "", raci: "" }); S.save(); go("stakeholders"); }
     else if (act === "delsk") { S.get().stakeholders.splice(+id, 1); S.save(); go("stakeholders"); }

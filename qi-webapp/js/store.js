@@ -51,7 +51,43 @@
         { name: "PM", role: "Project Manager", influence: "High", interest: "High", raci: "A - Accountable" },
         { name: "Sponsor", role: "Sponsor", influence: "High", interest: "Medium", raci: "I - Informed" },
         { name: "QA Lead", role: "QA Lead", influence: "Medium", interest: "High", raci: "R - Responsible" }
-      ]
+      ],
+      registers: {
+        hazop: [
+          { _id: uid(), node: "Feed line to reactor", deviation: "High pressure", cause: "Control valve fails open", consequence: "Overpressure / relief lift", sev: 5, lik: 2, safeguard: "PSV + high-pressure trip", action: "Verify trip setpoint at commissioning", owner: "Commissioning Engineer", status: "OPEN", case: "" },
+          { _id: uid(), node: "Cooling water", deviation: "No flow", cause: "Pump trip", consequence: "Loss of cooling / high temp", sev: 4, lik: 3, safeguard: "Standby pump auto-start", action: "Test auto-start logic", owner: "Ops Lead", status: "IN PROGRESS", case: "" }
+        ],
+        calibration: [
+          { _id: uid(), tag: "PT-1001", instrument: "Pressure transmitter", range: "0-25 barg", discipline: "Instrumentation / Control", lastCal: "2026-01-15", interval: 12, technician: "Tech Lead", result: "Pass" },
+          { _id: uid(), tag: "TT-2003", instrument: "Temperature transmitter", range: "0-400 C", discipline: "Instrumentation / Control", lastCal: "2025-12-01", interval: 6, technician: "Tech Lead", result: "Adjusted" }
+        ],
+        punch: [
+          { _id: uid(), item: "Missing pipe support on line 200", system: "Unit 200", discipline: "Piping", category: "B - Before handover", raisedBy: "QA Lead", responsible: "Ops Lead", due: "2026-07-15", status: "OPEN" }
+        ],
+        sil: [
+          { _id: uid(), sif: "SIF-01", function: "Reactor high-pressure trip", required: "SIL 2", achieved: "SIL 2", proofTest: 12, verified: "Partial", owner: "Engineering Lead", status: "IN PROGRESS" }
+        ],
+        rtm: [
+          { _id: uid(), req: "System shall trip on high pressure within 1s", source: "FDS-3.2", discipline: "Instrumentation / Control", design: "Logic diagram L-12", test: "FAT-07", verify: "In progress", case: "" }
+        ],
+        docs: [
+          { _id: uid(), docNo: "P&ID-200-01", title: "P&ID Unit 200", discipline: "Process", rev: "B", status: "Issued for review", due: "2026-07-01", owner: "Architect" }
+        ],
+        ncr: [],
+        moc: [
+          { _id: uid(), change: "Upsize relief valve PSV-1001", reason: "Revised relief load", impact: "Schedule + cost", risk: "Medium", approver: "Engineering Lead", status: "Under review", date: "2026-06-05" }
+        ],
+        milestones: [
+          { _id: uid(), milestone: "Design freeze", baseline: "2026-07-05", forecast: "2026-07-12", actual: "", status: "At risk", owner: "PM" },
+          { _id: uid(), milestone: "Mechanical completion", baseline: "2026-09-30", forecast: "2026-09-30", actual: "", status: "On track", owner: "Ops Lead" }
+        ],
+        decisions: [
+          { _id: uid(), decision: "Adopt Kanban for delivery team", context: "WIP too high; chose Kanban over Scrum", owner: "PM", date: "2026-05-20", status: "Approved" }
+        ],
+        procurement: [
+          { _id: uid(), package: "Control system (DCS)", vendor: "TBD", value: 250000, poStatus: "RFQ", delivery: "2026-08-15", owner: "PM" }
+        ]
+      }
     };
   }
 
@@ -62,6 +98,8 @@
     s.audit = s.audit || [];
     s.snapshots = s.snapshots || [];
     (s.cases || []).forEach(c => { if (!c.whys) c.whys = ["", "", "", "", ""]; });
+    s.registers = s.registers || {};
+    C.REGISTERS.forEach(reg => { if (!Array.isArray(s.registers[reg.id])) s.registers[reg.id] = []; });
     return s;
   }
   function defaultWorkspace() {
@@ -176,10 +214,26 @@
   }
   function moveStatus(id, status) { return updateCase(id, { status }); }
 
+  // ---- generic registers ----
+  function regLabel(regId) { const r = C.REGISTERS.find(x => x.id === regId); return r ? r.label : regId; }
+  function regRows(regId) { const s = get(); s.registers = s.registers || {}; return s.registers[regId] || (s.registers[regId] = []); }
+  function regAdd(regId, row) { row = row || {}; row._id = row._id || uid(); regRows(regId).push(row); logAudit("Added", regLabel(regId), ""); save(); return row; }
+  function regUpdate(regId, rowId, patch) {
+    const rows = regRows(regId), i = rows.findIndex(r => r._id === rowId); if (i < 0) return null;
+    const changed = Object.keys(patch).filter(k => String(rows[i][k]) !== String(patch[k]));
+    Object.assign(rows[i], patch);
+    if (changed.length) logAudit("Updated", regLabel(regId), changed.slice(0, 3).map(k => `${k}→${patch[k]}`).join("; ").slice(0, 100));
+    save(); return rows[i];
+  }
+  function regDelete(regId, rowId) {
+    const rows = regRows(regId), i = rows.findIndex(r => r._id === rowId); if (i < 0) return false;
+    rows.splice(i, 1); logAudit("Deleted", regLabel(regId), ""); save(); return true;
+  }
+
   // ---- snapshots (restore points) ----
   function takeSnapshot(label) {
     const s = get();
-    const copy = JSON.parse(JSON.stringify({ project: s.project, roster: s.roster, cases: s.cases, sigma: s.sigma, stakeholders: s.stakeholders }));
+    const copy = JSON.parse(JSON.stringify({ project: s.project, roster: s.roster, cases: s.cases, sigma: s.sigma, stakeholders: s.stakeholders, registers: s.registers }));
     s.snapshots.unshift({ id: uid(), ts: new Date().toISOString(), label: label || ("Snapshot " + new Date().toLocaleString()), data: copy });
     if (s.snapshots.length > 25) s.snapshots.length = 25;
     logAudit("Snapshot", "", label || "manual"); save();
@@ -190,7 +244,7 @@
     const snap = get().snapshots.find(x => x.id === id); if (!snap) return false;
     takeSnapshot("Auto-backup before restore");
     const s = get(), d = JSON.parse(JSON.stringify(snap.data));
-    s.project = d.project; s.roster = d.roster; s.cases = d.cases; s.sigma = d.sigma; s.stakeholders = d.stakeholders;
+    s.project = d.project; s.roster = d.roster; s.cases = d.cases; s.sigma = d.sigma; s.stakeholders = d.stakeholders; if (d.registers) s.registers = d.registers;
     normalize(s); logAudit("Restored", "", snap.label); save(); return true;
   }
   function deleteSnapshot(id) {
@@ -280,7 +334,8 @@
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
     auditList, clearAudit, takeSnapshot, snapshots, restoreSnapshot, deleteSnapshot, paretoRPN, controlChartData,
     listProjects, activeProjectId, switchProject, addProject, renameProject, duplicateProject, deleteProject, importAsProject,
-    brand, setBrand, aiSettings, setAi, portfolio };
+    brand, setBrand, aiSettings, setAi, portfolio,
+    regRows, regAdd, regUpdate, regDelete, regLabel, evm: () => C.evm(validCases(), get().project) };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -31,9 +31,22 @@ No install, no build step, no server, works offline.
 
 ## Views
 
-Portfolio · Dashboard · Cases (Master) · PM Tasks · Kanban Board · Timeline (Gantt) ·
-Risk Register · FMEA · Six Sigma · PDCA · Action Log · Stakeholders (RACI) · Budget ·
-AI Assistant · Data Health · History & Backups · Settings · Help
+**Overview:** Portfolio · Dashboard · Cases (Master)
+**Delivery:** PM Tasks · Kanban Board · Timeline (Gantt)
+**Risk & Quality:** Risk Register · FMEA · Six Sigma
+**Improve:** PDCA · Action Log
+**People & Cost:** Stakeholders (RACI) · Budget
+**Engineering registers:** HAZOP / Hazards · Calibration · Punch List · SIL / Functional Safety · Requirements Traceability · Document Register · Non-Conformance (NCR) · Management of Change (MOC)
+**Business management:** Earned Value (EVM) · Milestones · Decision Log · Procurement
+**Intelligence:** AI Assistant · Data Health
+**Setup:** History & Backups · Settings · Help
+
+## Engineering & business management
+
+- **Engineering registers** (schema-driven, choose-only where sensible): HAZOP with auto risk = Severity × Likelihood; **Calibration** with auto next-due date and Overdue/Due-soon status; Punch List (A/B/C); **SIL / functional safety** with auto "meets target?"; **Requirements traceability**; Document register; NCR; and **Management of Change**.
+- **Earned Value Management (EVM)** — BAC, PV, EV, AC plus **CPI, SPI, CV, SV, EAC, VAC**, computed from each case's estimated/actual cost, % complete and the project schedule, with a Planned-vs-Earned-vs-Actual chart.
+- **Milestones** (baseline vs forecast vs actual with auto slip), **Decision Log**, and **Procurement** register.
+- Every register supports add/edit/delete, search, computed columns, audit logging and is included in snapshots/exports.
 
 ## Highlights
 
