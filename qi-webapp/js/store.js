@@ -146,6 +146,7 @@
     if (!s.project.spec) s.project.spec = { usl: 11, lsl: 9, target: 10 };
     (s.cases || []).forEach(c => {
       if (!c.whys) c.whys = ["", "", "", "", ""];
+      if (typeof c.pinned !== "boolean") c.pinned = false;
       ["reach", "impact", "confidence", "effort", "userValue", "timeCrit", "riskRed", "jobSize"].forEach(k => { if (c[k] === undefined) c[k] = ""; });
     });
     s.registers = s.registers || {};
@@ -301,6 +302,12 @@
     return n;
   }
   function moveStatus(id, status) { return updateCase(id, { status }); }
+  function togglePin(id) {
+    const c = get().cases.find(x => x.id === id); if (!c) return false;
+    c.pinned = !c.pinned;
+    logAudit(c.pinned ? "Pinned" : "Unpinned", codeOf(get().cases.indexOf(c)), "");
+    save(); return c.pinned;
+  }
 
   // ---- generic registers ----
   function regLabel(regId) { const r = C.REGISTERS.find(x => x.id === regId); return r ? r.label : regId; }
@@ -383,6 +390,26 @@
     const i = get().snapshots.findIndex(x => x.id === id); if (i < 0) return false;
     get().snapshots.splice(i, 1); save(); return true;
   }
+  // Pure data diff between two snapshots (or between a snapshot and the live project).
+  function diffSnapshots(idA, idB) {
+    const snaps = get().snapshots;
+    const liveData = () => ({ project: get().project, cases: get().cases });
+    const pickFor = (id) => id === "live" ? { ts: "live", label: "Current data", data: liveData() } : snaps.find(s => s.id === id);
+    const a = pickFor(idA), b = pickFor(idB);
+    if (!a || !b) return null;
+    const aCases = (a.data && a.data.cases) || [], bCases = (b.data && b.data.cases) || [];
+    const aIds = new Set(aCases.map(c => c.id)), bIds = new Set(bCases.map(c => c.id));
+    const added = bCases.filter(c => !aIds.has(c.id));
+    const removed = aCases.filter(c => !bIds.has(c.id));
+    const tracked = ["status", "priority", "owner", "percent", "estCost", "actCost", "sev", "occ", "det", "leanMethod", "target", "pinned"];
+    const changed = [];
+    bCases.forEach(nb => {
+      const old = aCases.find(c => c.id === nb.id); if (!old) return;
+      const fields = tracked.filter(k => String(old[k] == null ? "" : old[k]) !== String(nb[k] == null ? "" : nb[k]));
+      if (fields.length) changed.push({ id: nb.id, problem: nb.problem, fields: fields.map(f => ({ field: f, before: old[f], after: nb[f] })) });
+    });
+    return { a, b, added, removed, changed };
+  }
 
   // ---- derived ----
   function enriched() { return get().cases.map((c, i) => Object.assign(C.enrich(c), { num: i + 1, code: "CASE-" + String(i + 1).padStart(3, "0") })); }
@@ -463,9 +490,9 @@
   }
 
   const API = { uid, seed, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
-    undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete,
+    undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete, togglePin,
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
-    auditList, clearAudit, takeSnapshot, snapshots, restoreSnapshot, deleteSnapshot, paretoRPN, controlChartData,
+    auditList, clearAudit, takeSnapshot, snapshots, restoreSnapshot, deleteSnapshot, diffSnapshots, paretoRPN, controlChartData,
     listProjects, activeProjectId, switchProject, addProject, renameProject, duplicateProject, deleteProject, importAsProject,
     brand, setBrand, aiSettings, setAi, portfolio,
     regRows, regAdd, regUpdate, regDelete, regLabel, evm: () => C.evm(validCases(), get().project),

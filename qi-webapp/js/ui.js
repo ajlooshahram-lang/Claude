@@ -98,7 +98,7 @@
     const nav = $("#nav");
     nav.innerHTML = VIEWS.map(v => v.g
       ? `<div class="nav-sep">${esc(v.g)}</div>`
-      : `<button class="nav-item" data-view="${v.id}"><span class="ico">${v.icon}</span>${esc(v.label)}</button>`).join("");
+      : `<button class="nav-item" data-view="${v.id}"><span class="ico">${v.icon}</span><span class="lab">${esc(v.label)}</span></button>`).join("");
     nav.querySelectorAll(".nav-item").forEach(b => b.addEventListener("click", () => go(b.dataset.view)));
   }
 
@@ -202,6 +202,8 @@
       code: (a, b) => a.num - b.num
     };
     list.sort(sorters[f.sort] || sorters.rpn);
+    // Pinned cases always float to the top within the current sort.
+    list.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
     const names = S.get().roster.map(r => r.name).filter(Boolean);
     // Drop selections that no longer exist in the filtered list (defensive cleanup).
     const visibleIds = new Set(list.map(c => c.id));
@@ -209,8 +211,9 @@
     const allSelected = list.length > 0 && list.every(c => uiState.selected.has(c.id));
     const someSelected = uiState.selected.size > 0;
     const rows = list.map(c => `
-      <tr data-id="${c.id}" class="${uiState.selected.has(c.id) ? "row-selected" : ""}">
+      <tr data-id="${c.id}" class="${uiState.selected.has(c.id) ? "row-selected" : ""} ${c.pinned ? "pinned-row" : ""}">
         <td class="center"><input type="checkbox" data-bulk="row" data-id="${c.id}" ${uiState.selected.has(c.id) ? "checked" : ""} aria-label="Select ${esc(c.code)}"></td>
+        <td class="pin-cell ${c.pinned ? "pin-on" : ""}" data-act="pin" data-id="${c.id}" title="${c.pinned ? "Unpin" : "Pin to top"}">${c.pinned ? "📌" : "<span class='muted'>📍</span>"}</td>
         <td>${esc(c.code)}</td>
         <td class="wrap">${esc(c.problem)}</td>
         <td>${esc(c.category)}</td>
@@ -226,7 +229,7 @@
         </td>
       </tr>`).join("");
     const head = `<th class="center"><input type="checkbox" id="bulkAll" ${allSelected ? "checked" : ""} aria-label="Select all"></th>` +
-      `<th>ID</th><th class='wrap'>Problem</th><th>Category</th><th>Priority</th><th>RPN</th><th>Health</th><th>Owner</th><th>Status</th><th>% Done</th><th></th>`;
+      `<th aria-label="Pinned"></th><th>ID</th><th class='wrap'>Problem</th><th>Category</th><th>Priority</th><th>RPN</th><th>Health</th><th>Owner</th><th>Status</th><th>% Done</th><th></th>`;
     return `
       <div class="toolbar">
         <button class="btn btn-primary" data-act="add">+ New Case</button>
@@ -265,8 +268,8 @@
         const tr = sel.closest("tr");
         if (tr) {
           const c = S.enriched().find(x => x.id === cid);
-          // Health is the cell after RPN (index 6 with checkbox col + ID + problem + category + priority + RPN)
-          const healthCell = tr.querySelector("td:nth-child(7)");
+          // Health is the cell after RPN. With the pin column inserted, that's nth-child(8).
+          const healthCell = tr.querySelector("td:nth-child(8)");
           if (healthCell && c) healthCell.innerHTML = healthBadge(c.health);
         }
       });
@@ -689,7 +692,7 @@
     const e = S.validCases();
     const cols = KCOLS.map(st => {
       const cards = e.filter(c => c.status === st).map(c => `
-        <div class="kcard" draggable="true" data-id="${c.id}">
+        <div class="kcard" draggable="true" tabindex="0" data-id="${c.id}" aria-label="${esc(c.code)} · ${esc(c.problem)}">
           <div class="kcard-top"><span class="pill">${esc(c.priority || "")}</span><b>RPN ${c.rpn ?? "—"}</b></div>
           <div class="kcard-title" data-act="edit" data-id="${c.id}">${esc(c.problem)}</div>
           <div class="kcard-foot"><span>${esc(c.owner || "—")}</span>${healthBadge(c.health)}</div>
@@ -703,9 +706,33 @@
   };
   AFTER.kanban = function () {
     let dragId = null;
+    const KCOLS_LIST = KCOLS;
     content.querySelectorAll(".kcard").forEach(card => {
       card.addEventListener("dragstart", e => { dragId = card.dataset.id; if (e.dataTransfer) e.dataTransfer.setData("text/plain", dragId); card.style.opacity = ".5"; });
       card.addEventListener("dragend", () => { card.style.opacity = "1"; });
+      // Keyboard reach: Left/Right move the card across columns; Up/Down move focus within the column.
+      card.addEventListener("keydown", e => {
+        const id = card.dataset.id;
+        if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+          e.preventDefault();
+          const cur = card.closest(".kcol"); if (!cur) return;
+          const cols = Array.from(content.querySelectorAll(".kcol"));
+          const idx = cols.indexOf(cur);
+          const next = e.key === "ArrowRight" ? Math.min(idx + 1, cols.length - 1) : Math.max(idx - 1, 0);
+          if (next === idx) return;
+          S.moveStatus(id, cols[next].dataset.status);
+          toast("Moved to " + cols[next].dataset.status);
+          go("kanban");
+          const restored = document.querySelector('.kcard[data-id="' + id + '"]');
+          if (restored) restored.focus();
+        } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          const sib = e.key === "ArrowDown" ? card.nextElementSibling : card.previousElementSibling;
+          if (sib && sib.classList.contains("kcard")) sib.focus();
+        } else if (e.key === "Enter") {
+          e.preventDefault(); openCaseForm(id);
+        }
+      });
     });
     content.querySelectorAll(".kcol-body").forEach(col => {
       col.addEventListener("dragover", e => { e.preventDefault(); col.classList.add("kover"); });
@@ -721,6 +748,9 @@
   // ---------- History & Backups (audit) ----------
   RENDER.audit = function () {
     const snaps = S.snapshots();
+    const cmp = uiState.cmp || { a: "", b: "" };
+    const opts2 = (sel) => `<option value="">— pick —</option><option value="live" ${sel === "live" ? "selected" : ""}>Current data (live)</option>` +
+      snaps.map(s => `<option value="${s.id}" ${s.id === sel ? "selected" : ""}>${esc(new Date(s.ts).toLocaleString())} · ${esc(s.label)}</option>`).join("");
     const srows = snaps.length ? snaps.map(s => `<tr>
       <td>${esc(new Date(s.ts).toLocaleString())}</td><td>${esc(s.label)}</td>
       <td class="center">${(s.data.cases || []).filter(c => c.problem).length}</td>
@@ -736,10 +766,46 @@
         <button class="btn btn-sm btn-primary" data-act="snap">+ Take snapshot</button></div>
         <p class="muted" style="margin-top:-6px">A snapshot saves a full copy you can roll back to. The latest 25 are kept.</p>
         ${tableWrap("<th>When</th><th>Label</th><th>Cases</th><th></th>", srows)}</div>
+      <div class="card"><h3>Compare two restore points</h3>
+        <p class="muted" style="margin-top:-6px">Pick any two snapshots (or compare a snapshot to the current live data) to see exactly what changed.</p>
+        <div class="form-grid">
+          <div class="field"><label>From</label><select id="cmpA">${opts2(cmp.a)}</select></div>
+          <div class="field"><label>To</label><select id="cmpB">${opts2(cmp.b)}</select></div>
+        </div>
+        <div style="margin-top:14px"><button class="btn btn-primary" data-act="diffSnaps">Show diff</button></div></div>
       <div class="card"><div class="card-head"><h3>Change history</h3>
         <button class="btn btn-sm" data-act="clearaudit">Clear log</button></div>
         ${tableWrap("<th>When</th><th>Action</th><th>Case</th><th class='wrap'>Detail</th>", arows)}</div>`;
   };
+  AFTER.audit = function () {
+    const cA = $("#cmpA"), cB = $("#cmpB");
+    if (cA) cA.addEventListener("change", () => { uiState.cmp = uiState.cmp || {}; uiState.cmp.a = cA.value; });
+    if (cB) cB.addEventListener("change", () => { uiState.cmp = uiState.cmp || {}; uiState.cmp.b = cB.value; });
+  };
+  function showDiffModal() {
+    const c = uiState.cmp || {};
+    if (!c.a || !c.b) { toast("Pick two snapshots first."); return; }
+    const d = S.diffSnapshots(c.a, c.b);
+    if (!d) { toast("Could not compute diff."); return; }
+    const fmt = (s) => s.ts === "live" ? "Current data (live)" : new Date(s.ts).toLocaleString() + " · " + s.label;
+    const sec = (label, items, cls, render) => items.length
+      ? `<div class="diff-section"><h4>${label} (${items.length})</h4>${render(items)}</div>`
+      : `<div class="diff-section"><h4 class="muted">${label} (0)</h4></div>`;
+    const addList = sec("Added cases", d.added, "diff-add", (xs) =>
+      `<ul>${xs.map(x => `<li class="diff-add">+ ${esc(x.problem || "(no problem)")}</li>`).join("")}</ul>`);
+    const remList = sec("Removed cases", d.removed, "diff-rem", (xs) =>
+      `<ul>${xs.map(x => `<li class="diff-rem">− ${esc(x.problem || "(no problem)")}</li>`).join("")}</ul>`);
+    const chgList = sec("Changed cases", d.changed, "diff-chg", (xs) =>
+      `<div class="table-wrap" style="max-height:300px;overflow:auto"><table><thead><tr><th class="wrap">Case</th><th>Field</th><th>Before</th><th>After</th></tr></thead><tbody>` +
+      xs.map(c => c.fields.map((f, i) => `<tr>${i === 0 ? `<td rowspan="${c.fields.length}" class="wrap">${esc(c.problem)}</td>` : ""}<td>${esc(f.field)}</td><td class="diff-rem">${esc(String(f.before == null ? "—" : f.before))}</td><td class="diff-add">${esc(String(f.after == null ? "—" : f.after))}</td></tr>`).join("")).join("") +
+      `</tbody></table></div>`);
+    $("#modal").innerHTML = `<h2>Snapshot diff</h2>
+      <div class="sub"><b>From:</b> ${esc(fmt(d.a))} → <b>To:</b> ${esc(fmt(d.b))}</div>
+      ${addList}${remList}${chgList}
+      <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
+        <button class="btn btn-primary" data-act="cancel">Close</button></div></div>`;
+    $("#modalOverlay").hidden = false;
+  }
 
   // ---------- generic registers ----------
   function regBadgeClass(v) {
@@ -1418,6 +1484,22 @@
     };
     fr.readAsText(file);
   }
+  // Page-wide drag-and-drop: drop a JSON backup anywhere to import it as a new project.
+  (function setupDragDrop() {
+    let depth = 0;
+    const looksLikeFiles = e => e.dataTransfer && Array.from(e.dataTransfer.types || []).indexOf("Files") !== -1;
+    window.addEventListener("dragenter", e => { if (!looksLikeFiles(e)) return; e.preventDefault(); depth++; document.body.classList.add("dragging"); });
+    window.addEventListener("dragover", e => { if (!looksLikeFiles(e)) return; e.preventDefault(); });
+    window.addEventListener("dragleave", e => { if (!looksLikeFiles(e)) return; depth = Math.max(0, depth - 1); if (depth === 0) document.body.classList.remove("dragging"); });
+    window.addEventListener("drop", e => {
+      if (!looksLikeFiles(e)) return; e.preventDefault();
+      depth = 0; document.body.classList.remove("dragging");
+      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!f) return;
+      if (!/\.json$/i.test(f.name)) { toast("Only JSON backups are supported."); return; }
+      handleImport(f);
+    });
+  })();
   function b64enc(s) { return btoa(unescape(encodeURIComponent(s))); }
   function b64dec(s) { return decodeURIComponent(escape(atob(s))); }
   function shareLink() {
@@ -1462,6 +1544,20 @@
     document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
     const btn = $("#btnTheme"); if (btn) btn.textContent = dark ? "☼" : "◐";
     if (window.QICharts && QICharts.refresh) QICharts.refresh();
+  }
+  function applySidebar() {
+    const collapsed = !!(S.brand() && S.brand().sidebarCollapsed);
+    const sb = $("#sidebar"); if (sb) sb.classList.toggle("collapsed", collapsed);
+    const btn = $("#btnSidebar"); if (btn) {
+      btn.textContent = collapsed ? "»" : "«";
+      btn.title = collapsed ? "Expand sidebar" : "Collapse sidebar";
+      btn.setAttribute("aria-label", btn.title);
+    }
+  }
+  function toggleSidebar() {
+    const cur = !!(S.brand() && S.brand().sidebarCollapsed);
+    S.setBrand({ sidebarCollapsed: !cur });
+    applySidebar();
   }
   function toggleTheme() {
     const cur = (S.brand() && S.brand().theme) || "light";
@@ -1578,10 +1674,12 @@
       S.bulkDelete(ids); uiState.selected.clear();
       toast("Deleted " + ids.length + " case(s)."); go("cases");
     }
+    else if (act === "pin") { S.togglePin(id); go("cases"); }
     else if (act === "snap") { S.takeSnapshot(); toast("Snapshot saved."); go("audit"); }
     else if (act === "restore") { if (confirm("Restore this snapshot? Current data is auto-backed-up first.")) { S.restoreSnapshot(id); setBrand(); toast("Snapshot restored."); go("dashboard"); } }
     else if (act === "delsnap") { S.deleteSnapshot(id); go("audit"); }
     else if (act === "clearaudit") { if (confirm("Clear the change-history log?")) { S.clearAudit(); go("audit"); } }
+    else if (act === "diffSnaps") showDiffModal();
     else if (act === "openproj") { S.switchProject(id); refreshHeader(); go("dashboard"); toast("Switched project."); }
     else if (act === "newproj") { openProjectNameModal({ title: "New project", okLabel: "Create", onPick: n => { S.addProject(n); refreshHeader(); go("dashboard"); toast("Project created."); } }); }
     else if (act === "renproj") { const cur = S.listProjects().find(x => x.id === id); openProjectNameModal({ title: "Rename project", current: cur ? cur.name : "", okLabel: "Rename", onPick: n => { S.renameProject(id, n); refreshHeader(); go("portfolio"); toast("Renamed."); } }); }
@@ -1644,6 +1742,7 @@
   $("#btnHelp").addEventListener("click", showShortcuts);
   $("#fileImport").addEventListener("change", e => { if (e.target.files[0]) handleImport(e.target.files[0]); e.target.value = ""; });
   $("#hamburger").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
+  const btnSb = $("#btnSidebar"); if (btnSb) btnSb.addEventListener("click", toggleSidebar);
   $("#projectSwitch").addEventListener("change", e => {
     const v = e.target.value;
     if (v === "__new") {
@@ -1690,7 +1789,7 @@
   });
 
   // ---------- init ----------
-  S.load(); checkShareHash(); buildNav(); applyTheme(); refreshHeader();
+  S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
   const initialHash = (location.hash || "").replace(/^#/, "");
   go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
 })();
