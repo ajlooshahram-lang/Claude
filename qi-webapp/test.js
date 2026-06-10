@@ -69,3 +69,38 @@ S.switchProject(npId); const delOk = S.deleteProject(npId);
 console.log("Delete project B:", delOk, "-> projects now:", S.listProjects().length);
 const ok3 = S.listProjects().length === projs0 && port.length === projs0 + 1 && S.brand().company === "Acme Eng";
 console.log(ok3 ? "WORKSPACE TESTS PASS" : "WORKSPACE TESTS FAIL");
+
+
+// --- engineering registers + EVM ---
+console.log("\n-- registers & EVM --");
+S.reset();
+console.log("Register types:", C.REGISTERS.length, C.REGISTERS.map(r => r.id).join(","));
+console.log("HAZOP seeded rows:", S.regRows("hazop").length);
+const nr = S.regAdd("calibration", { tag: "FT-9", instrument: "Flow", lastCal: "2025-01-01", interval: 12 });
+const calRows = S.regRows("calibration");
+console.log("Calibration rows after add:", calRows.length);
+// computed: next due + status for the new row (lastCal 2025-01-01 + 12mo = 2026-01-01 -> overdue today 2026)
+const calCol = C.REGISTERS.find(r => r.id === "calibration").columns;
+const nextDue = calCol.find(c => c.key === "nextDue").compute(nr);
+const calState = calCol.find(c => c.key === "calState").compute(nr);
+console.log("Calibration nextDue:", nextDue, "state:", calState);
+S.regUpdate("calibration", nr._id, { result: "Pass" });
+console.log("Update result:", S.regRows("calibration").find(r => r._id === nr._id).result);
+S.regDelete("calibration", nr._id);
+console.log("Rows after delete:", S.regRows("calibration").length);
+// HAZOP risk compute
+const hz = S.regRows("hazop")[0];
+const hzRisk = C.REGISTERS.find(r => r.id === "hazop").columns.find(c => c.key === "risk").compute(hz);
+console.log("HAZOP row1 risk (5x2):", hzRisk);
+// EVM
+const ev = S.evm();
+console.log("EVM bac/ev/ac:", Math.round(ev.bac), Math.round(ev.ev), Math.round(ev.ac), "CPI:", ev.cpi.toFixed(2), "SPI:", ev.spi.toFixed(2));
+// snapshot includes registers
+S.regAdd("ncr", { desc: "snap test", severity: "Major" });
+const snapN = S.takeSnapshot("reg snap");
+S.regDelete("ncr", S.regRows("ncr")[0]._id);
+S.restoreSnapshot(snapN.id);
+const ncrBack = S.regRows("ncr").length === 1;
+console.log("Registers restored via snapshot:", ncrBack);
+const ok4 = C.REGISTERS.length >= 11 && hzRisk === 10 && ev.bac === 42500 && ncrBack && calState === "Overdue";
+console.log(ok4 ? "REGISTER/EVM TESTS PASS" : "REGISTER/EVM TESTS FAIL");

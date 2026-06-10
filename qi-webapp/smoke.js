@@ -25,7 +25,7 @@ ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard rende
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 
 // 2) navigate every view (simulate clicks)
-const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","pdca","log","stakeholders","budget","ai","health","audit","config","help"];
+const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","pdca","log","stakeholders","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","evm","milestones","decisions","procurement","ai","health","audit","config","help"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -36,6 +36,7 @@ views.forEach(v => {
 
 // 3) data integrity via exposed globals
 const S = window.QIStore;
+const C = window.QICalc;
 ok(S.validCases().length === 6, "6 seed cases");
 ok(S.kpis().crit === 5, "5 critical");
 ok(S.kpis().estTotal === 42500, "budget est total 42500");
@@ -84,6 +85,19 @@ ok(S.brand().company === "Acme", "brand saved");
 const enc = window.btoa(unescape(encodeURIComponent(JSON.stringify(S.get()))));
 const dec = JSON.parse(decodeURIComponent(escape(window.atob(enc))));
 ok(Array.isArray(dec.cases), "share-link encode/decode round-trips");
+
+// 9) registers + EVM
+ok(doc.querySelector('.nav-item[data-view="hazop"]') != null, "HAZOP nav item present");
+doc.querySelector('.nav-item[data-view="hazop"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelectorAll("table").length > 0, "HAZOP register renders a table");
+const hzBefore = S.regRows("hazop").length;
+S.regAdd("hazop", { node: "smoke", sev: 3, lik: 3 });
+ok(S.regRows("hazop").length === hzBefore + 1, "regAdd works");
+doc.querySelector('.nav-item[data-view="evm"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(/CPI|Earned/.test(doc.getElementById("content").innerHTML), "EVM view renders");
+doc.querySelector('.nav-item[data-view="calibration"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelectorAll("table").length > 0, "Calibration register renders");
+ok(C.REGISTERS.length >= 11, "11+ registers defined");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
