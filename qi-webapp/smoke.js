@@ -25,7 +25,7 @@ ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard rende
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 
 // 2) navigate every view (simulate clicks)
-const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","pdca","log","stakeholders","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","report","audit","config","help"];
+const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","report","audit","config","help"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -125,7 +125,7 @@ ok(doc.querySelectorAll(".rag").length >= 6, "KPI scorecard renders RAG indicato
 ok(S.regRows("okr").length >= 1, "OKR register seeded");
 
 // CLICK-ONLY: walk every data-entry view and assert there are NO free text/number inputs
-const dataViews = ["cases","hazop","calibration","punch","sil","rtm","docs","ncr","moc","milestones","decisions","procurement","resources","okr","cashflow","gage","xbarr","sigma"];
+const dataViews = ["cases","hazop","calibration","punch","sil","rtm","docs","ncr","moc","milestones","decisions","procurement","resources","okr","cashflow","gage","xbarr","sigma","capability","prioritise"];
 let freeText = 0, offenders = [];
 dataViews.forEach(v => {
   doc.querySelector(`.nav-item[data-view="${v}"]`).dispatchEvent(new window.Event("click", { bubbles: true }));
@@ -138,6 +138,34 @@ ok(freeText === 0, "no free-text/number inputs in any data view (click-only)" + 
 // open the case form and confirm problem/cost are dropdowns
 doc.querySelector('.nav-item[data-view="cases"]').dispatchEvent(new window.Event("click", { bubbles: true }));
 S.addCase || 0;
+
+// 11) capability + NCR Pareto + RICE/WSJF prioritisation views
+doc.querySelector('.nav-item[data-view="capability"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(/Cp\b|Cpk\b|Spec limits/.test(doc.getElementById("content").innerHTML), "Capability view renders Cp/Cpk");
+ok(typeof S.capabilityResult === "function" && S.capabilityResult().st.cpk > 0, "capabilityResult returns Cpk");
+S.regAdd("ncr", { desc: "test ncr", severity: "Major", disposition: "Rework", status: "OPEN", discipline: "Process" });
+doc.querySelector('.nav-item[data-view="ncrpareto"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(/Pareto by severity|Pareto by disposition/.test(doc.getElementById("content").innerHTML), "NCR Pareto view renders");
+doc.querySelector('.nav-item[data-view="prioritise"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(/RICE|WSJF/.test(doc.getElementById("content").innerHTML), "Prioritisation view renders");
+ok(doc.querySelector('select[data-prio]') != null, "Prioritisation table has dropdown editors");
+ok(typeof C.rice === "function" && C.rice({ reach: 1000, impact: 3, confidence: 80, effort: 5 }) === 480, "RICE math correct");
+ok(typeof C.wsjf === "function" && C.wsjf({ userValue: 8, timeCrit: 5, riskRed: 3, jobSize: 5 }) === 3.2, "WSJF math correct");
+
+// 12) polish: dark mode toggle, run-checks dialog, shortcuts overlay
+ok(doc.documentElement.getAttribute("data-theme") === "light", "theme starts light");
+doc.getElementById("btnTheme").click();
+ok(doc.documentElement.getAttribute("data-theme") === "dark", "theme toggles to dark");
+ok(S.brand().theme === "dark", "theme persisted to brand");
+doc.getElementById("btnTheme").click();
+ok(doc.documentElement.getAttribute("data-theme") === "light", "theme toggles back to light");
+doc.getElementById("btnHelp").click();
+ok(/Keyboard shortcuts/.test(doc.getElementById("modal").innerHTML), "shortcut overlay opens");
+doc.querySelector("#modal [data-act=cancel]").click();
+ok(doc.getElementById("modalOverlay").hidden === true, "shortcut overlay closes");
+doc.getElementById("btnChecks").click();
+ok(/Project checks/.test(doc.getElementById("modal").innerHTML), "run-checks dialog opens");
+doc.querySelector("#modal [data-act=cancel]").click();
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

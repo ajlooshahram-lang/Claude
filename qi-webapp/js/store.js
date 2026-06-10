@@ -8,34 +8,43 @@
   function uid() { return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
   function seed() {
-    const mk = (problem, category, priority, sev, occ, det, root, method, target, status, percent, cost) => ({
+    const mk = (problem, category, priority, sev, occ, det, root, method, target, status, percent, cost, prio) => ({
       id: uid(), dateLogged: "2026-05-15", problem, category, priority,
       sev, occ, det, rootCause: root, leanMethod: method, owner: "PM",
       target, startDate: "2026-06-01", status, percent,
-      costCat: cost[0], estCost: cost[1], actCost: cost[2]
+      costCat: cost[0], estCost: cost[1], actCost: cost[2],
+      reach: prio[0], impact: prio[1], confidence: prio[2], effort: prio[3],
+      userValue: prio[4], timeCrit: prio[5], riskRed: prio[6], jobSize: prio[7]
     });
     return {
       project: {
         name: "QI Intelligence Program", sponsor: "", manager: "",
         org: "Engineering", start: "2026-06-01", end: "2026-12-31",
-        status: "IN PROGRESS", version: "v9.0", currency: "$"
+        status: "IN PROGRESS", version: "v9.0", currency: "$",
+        spec: { usl: 11, lsl: 9, target: 10 }   // process-capability spec limits
       },
       roster: ["PM", "Dev Lead", "QA Lead", "Ops Lead", "Architect", "BA",
         "Team Lead", "Process Owner", "DevOps", "Tech Lead", "Engineering Lead", "Quality Manager"]
         .map(n => ({ name: n, role: n, email: "" })),
       cases: [
         mk("Delivery targets missed 20% consistently", "Delivery / Schedule", "1-CRITICAL", 8, 7, 6,
-          "Handoff delays invisible; no WIP limits", "Value Stream Mapping", "On-time delivery >95% in 8 weeks", "IN PROGRESS", 0.2, ["Labour / Effort", 15000, 12000]),
+          "Handoff delays invisible; no WIP limits", "Value Stream Mapping", "On-time delivery >95% in 8 weeks", "IN PROGRESS", 0.2, ["Labour / Effort", 15000, 12000],
+          [2000, 5, 80, 8,  8, 8, 5, 8]),
         mk("Defect rate at 12% - customers complaining", "Quality / Defects", "1-CRITICAL", 8, 7, 6,
-          "No quality check at source", "Mistake-Proofing / Poka-Yoke", "Zero defect escapes within 4 weeks", "OPEN", 0, ["Materials", 5000, 7500]),
+          "No quality check at source", "Mistake-Proofing / Poka-Yoke", "Zero defect escapes within 4 weeks", "OPEN", 0, ["Materials", 5000, 7500],
+          [1000, 8, 90, 5,  8, 8, 8, 5]),
         mk("Team overwhelmed, parallel tasks >8 each", "Process / Flow", "2-HIGH", 7, 6, 5,
-          "No WIP limits; everything is priority 1", "Kanban", "Max 3 active tasks per person", "OPEN", 0, ["Training", 3000, 2000]),
+          "No WIP limits; everything is priority 1", "Kanban", "Max 3 active tasks per person", "OPEN", 0, ["Training", 3000, 2000],
+          [500, 3, 80, 3,  5, 5, 3, 3]),
         mk("Approval bottleneck adds 2.3 days per case", "Process / Flow", "2-HIGH", 7, 6, 5,
-          "Wrong routing; unclear decision authority", "Standard Work", "Approval time <4 hours", "OPEN", 0, ["External / Consultant", 10000, 10000]),
+          "Wrong routing; unclear decision authority", "Standard Work", "Approval time <4 hours", "OPEN", 0, ["External / Consultant", 10000, 10000],
+          [500, 5, 70, 5,  5, 5, 3, 5]),
         mk("New hire onboarding takes 6 weeks", "People / Training", "3-MEDIUM", 6, 5, 5,
-          "No documented process; tribal knowledge", "Standard Work", "Onboard in 2 weeks, consistent quality", "OPEN", 0, ["Tooling / Software", 2000, 1500]),
+          "No documented process; tribal knowledge", "Standard Work", "Onboard in 2 weeks, consistent quality", "OPEN", 0, ["Tooling / Software", 2000, 1500],
+          [200, 2, 70, 8,  3, 2, 2, 8]),
         mk("Leader not visible to frontline team", "Process / Flow", "2-HIGH", 7, 6, 5,
-          "No structured Gemba cadence in place", "Gemba Walk", "Weekly Gemba walk every leader", "IN PROGRESS", 0.2, ["Labour / Effort", 7500, 5000])
+          "No structured Gemba cadence in place", "Gemba Walk", "Weekly Gemba walk every leader", "IN PROGRESS", 0.2, ["Labour / Effort", 7500, 5000],
+          [200, 3, 70, 2,  3, 3, 5, 2])
       ],
       sigma: [
         { week: "Week 1", units: 600, defects: 72, opps: 5 },
@@ -133,7 +142,12 @@
   function normalize(s) {                       // migrate older project saves
     s.audit = s.audit || [];
     s.snapshots = s.snapshots || [];
-    (s.cases || []).forEach(c => { if (!c.whys) c.whys = ["", "", "", "", ""]; });
+    s.project = s.project || {};
+    if (!s.project.spec) s.project.spec = { usl: 11, lsl: 9, target: 10 };
+    (s.cases || []).forEach(c => {
+      if (!c.whys) c.whys = ["", "", "", "", ""];
+      ["reach", "impact", "confidence", "effort", "userValue", "timeCrit", "riskRed", "jobSize"].forEach(k => { if (c[k] === undefined) c[k] = ""; });
+    });
     s.registers = s.registers || {};
     C.REGISTERS.forEach(reg => { if (!Array.isArray(s.registers[reg.id])) s.registers[reg.id] = []; });
     if (!s.gage || !s.gage.data) s.gage = defaultGage();
@@ -280,6 +294,20 @@
   function setXbarCell(i, j, v) { xbar().data[`${i}_${j}`] = (v === "" ? "" : Number(v)); save(); }
   function setXbarConfig(patch) { Object.assign(xbar(), patch); save(); }
   function xbarResult() { return C.xbarR(xbar()); }
+  function spec() { const s = get(); s.project.spec = s.project.spec || { usl: "", lsl: "", target: "" }; return s.project.spec; }
+  function setSpec(patch) { Object.assign(spec(), patch); save(); }
+  function capabilityResult() { return C.capability(xbar(), spec()); }
+  function prioritised(method) { return C.prioritise(validCases().map(c => Object.assign({}, c)), method); }
+  function ncrPareto() {
+    const counts = {};
+    regRows("ncr").forEach(r => { const k = r.severity || "(unset)"; counts[k] = (counts[k] || 0) + 1; });
+    return C.pareto(Object.keys(counts).map(k => ({ label: k, value: counts[k] })));
+  }
+  function ncrParetoBy(field) {
+    const counts = {};
+    regRows("ncr").forEach(r => { const k = r[field] || "(unset)"; counts[k] = (counts[k] || 0) + 1; });
+    return C.pareto(Object.keys(counts).map(k => ({ label: k, value: counts[k] })));
+  }
   function scorecard() {
     const k = kpis(), e = C.evm(validCases(), get().project);
     const sr = sigmaRows().filter(x => x.sigma != null); const sigma = sr.length ? sr[sr.length - 1].sigma : null;
@@ -406,7 +434,8 @@
     brand, setBrand, aiSettings, setAi, portfolio,
     regRows, regAdd, regUpdate, regDelete, regLabel, evm: () => C.evm(validCases(), get().project),
     gage, setGageCell, setGageConfig, gageResult, cashflow, setCashflow,
-    xbar, setXbarCell, setXbarConfig, xbarResult, scorecard };
+    xbar, setXbarCell, setXbarConfig, xbarResult, scorecard,
+    spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);

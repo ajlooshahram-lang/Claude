@@ -48,6 +48,8 @@
     { id: "gage", label: "Gage R&R (MSA)", icon: "📐" },
     { id: "riskmatrix", label: "Risk Matrix", icon: "▦" },
     { id: "xbarr", label: "X̄-R Control Chart", icon: "⎍" },
+    { id: "capability", label: "Process Capability", icon: "◊" },
+    { id: "ncrpareto", label: "NCR Pareto", icon: "▟" },
     { g: "Improve" },
     { id: "pdca", label: "PDCA", icon: "↻" },
     { id: "log", label: "Action Log", icon: "✎" },
@@ -70,7 +72,7 @@
     const items = [{ g: "Engineering" }];
     C.REGISTERS.filter(r => r.group === "Engineering").forEach(r => items.push({ id: r.id, label: r.label, icon: r.icon }));
     items.push({ id: "bowtie", label: "Bow-tie (HAZOP)", icon: "🎀" });
-    items.push({ g: "Business" }, { id: "evm", label: "Earned Value (EVM)", icon: "∑" }, { id: "cashflow", label: "Cash Flow / S-curve", icon: "〽" });
+    items.push({ g: "Business" }, { id: "evm", label: "Earned Value (EVM)", icon: "∑" }, { id: "cashflow", label: "Cash Flow / S-curve", icon: "〽" }, { id: "prioritise", label: "Prioritisation (RICE/WSJF)", icon: "⤒" });
     C.REGISTERS.filter(r => r.group === "Business").forEach(r => items.push({ id: r.id, label: r.label, icon: r.icon }));
     const idx = VIEWS.findIndex(v => v.g === "Intelligence");
     VIEWS.splice(idx, 0, ...items);
@@ -966,6 +968,149 @@
         <p class="muted">Auto-calculated live from delivery, cost (EVM), quality (Sigma/NCR), risk and safety data. See the OKR register for objective tracking.</p></div>`;
   };
 
+  // ---------- Process Capability (Cp/Cpk) ----------
+  RENDER.capability = function () {
+    const sp = S.spec();
+    const cap = S.capabilityResult();
+    const usl = sp.usl == null ? "" : sp.usl, lsl = sp.lsl == null ? "" : sp.lsl, tgt = sp.target == null ? "" : sp.target;
+    const range = C.numSeq(0, 20, 0.1);
+    const kpi = (cls, l, v) => `<div class="kpi ${cls}"><div class="label">${l}</div><div class="value">${v}</div></div>`;
+    if (!cap) {
+      return `<div class="card"><h3>Spec limits</h3>
+        <div class="form-grid">
+          <div class="field"><label>USL — upper spec limit</label><select id="cap_usl">${opts(range, usl, "—")}</select></div>
+          <div class="field"><label>LSL — lower spec limit</label><select id="cap_lsl">${opts(range, lsl, "—")}</select></div>
+          <div class="field"><label>Target (optional)</label><select id="cap_target">${opts(range, tgt, "—")}</select></div>
+        </div>
+        <p class="muted">Pick at least USL or LSL, and add data on the <b>X̄-R Control Chart</b> view. Capability is computed from those subgroups.</p></div>`;
+    }
+    const cls = (v) => v == null ? "slate" : v >= 1.33 ? "green" : v >= 1.0 ? "gold" : "red";
+    const fmt = (v) => v == null ? "—" : v.toFixed(2);
+    return `<div class="card"><div class="card-head"><h3>Spec limits</h3>
+        <span class="muted">Mean ${cap.mean.toFixed(2)} · n=${cap.n} · σ̂ ST=${cap.st.sigma.toFixed(3)} · σ̂ LT=${cap.lt.sigma.toFixed(3)}</span></div>
+        <div class="form-grid">
+          <div class="field"><label>USL</label><select id="cap_usl">${opts(range, usl, "—")}</select></div>
+          <div class="field"><label>LSL</label><select id="cap_lsl">${opts(range, lsl, "—")}</select></div>
+          <div class="field"><label>Target</label><select id="cap_target">${opts(range, tgt, "—")}</select></div>
+        </div></div>
+
+      <div class="grid kpis" style="margin-bottom:16px">
+        ${kpi(cls(cap.st.cp), "Cp (short-term)", fmt(cap.st.cp))}
+        ${kpi(cls(cap.st.cpk), "Cpk (short-term)", fmt(cap.st.cpk))}
+        ${kpi(cls(cap.lt.cp), "Pp (long-term)", fmt(cap.lt.cp))}
+        ${kpi(cls(cap.lt.cpk), "Ppk (long-term)", fmt(cap.lt.cpk))}
+        ${kpi("amber", "PPM out of spec", cap.ppmOut.toLocaleString())}
+        ${kpi(cls(cap.st.cpk), "Verdict", cap.verdict)}
+      </div>
+
+      <div class="card"><h3>Histogram with spec limits</h3><div class="chart-box"><canvas id="chCap"></canvas></div>
+        <p class="muted">Cp uses within-subgroup variation (R̄/d2). Cpk also accounts for off-centre process. Pp/Ppk use the overall standard deviation. Targets: Cpk ≥ 1.33 capable; ≥ 1.67 excellent.</p></div>`;
+  };
+  AFTER.capability = function () {
+    const bind = (id, key) => { const el = $("#" + id); if (el) el.addEventListener("change", () => { S.setSpec({ [key]: el.value === "" ? "" : Number(el.value) }); go("capability"); }); };
+    bind("cap_usl", "usl"); bind("cap_lsl", "lsl"); bind("cap_target", "target");
+    const cap = S.capabilityResult();
+    if (!cap) return;
+    // build a histogram
+    const all = [];
+    const g = S.xbar();
+    for (let i = 0; i < g.subgroups; i++) for (let j = 0; j < g.size; j++) {
+      const v = g.data[`${i}_${j}`]; if (v !== "" && v != null && !isNaN(v)) all.push(Number(v));
+    }
+    if (!all.length) return;
+    const min = Math.min(...all), max = Math.max(...all);
+    const buckets = 12, w = (max - min) / buckets || 1;
+    const bins = Array.from({ length: buckets }, () => 0);
+    const labels = Array.from({ length: buckets }, (_, i) => (min + i * w).toFixed(2));
+    all.forEach(v => { const b = Math.min(Math.floor((v - min) / w), buckets - 1); bins[b]++; });
+    if (typeof Chart !== "undefined") {
+      const el = document.getElementById("chCap");
+      const ctx = el && el.getContext("2d");
+      if (!ctx) return;
+      const sets = [{ type: "bar", label: "Frequency", data: bins, backgroundColor: "#2e5496", borderRadius: 2 }];
+      const annot = (val, color, label) => {
+        if (val == null || val === "") return null;
+        return { type: "line", label: label, data: [{ x: +val, y: 0 }, { x: +val, y: Math.max(...bins) }], borderColor: color, borderDash: [6, 4], borderWidth: 2, pointRadius: 0 };
+      };
+      // Use simple vertical lines via separate datasets on category axis index nearest the value
+      const idxFor = v => { if (v === "" || v == null) return null; const i = Math.round((v - min) / w); return Math.min(Math.max(i, 0), buckets - 1); };
+      const uIdx = idxFor(cap.usl), lIdx = idxFor(cap.lsl), tIdx = idxFor(cap.target);
+      const ymax = Math.max(...bins, 1);
+      const lineSet = (idx, color, label) => idx == null ? null : { type: "line", label, data: bins.map((_, i) => i === idx ? ymax : null), borderColor: color, borderDash: [6, 4], pointRadius: 0, spanGaps: false };
+      [lineSet(lIdx, "#c00000", "LSL"), lineSet(uIdx, "#c00000", "USL"), lineSet(tIdx, "#548235", "Target")].forEach(s => { if (s) sets.push(s); });
+      if (window.QICharts && QICharts.destroyAll) QICharts.destroyAll();
+      new Chart(ctx, { data: { labels, datasets: sets }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "top" } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } } });
+    }
+  };
+
+  // ---------- NCR Pareto ----------
+  RENDER.ncrpareto = function () {
+    const total = S.regRows("ncr").length;
+    if (!total) return `<div class="empty">No non-conformances yet. Add some on the <b>Non-Conformance</b> register and they will appear here as a Pareto.</div>`;
+    return `<div class="grid kpis" style="margin-bottom:16px">
+        <div class="kpi navy"><div class="label">Total NCRs</div><div class="value">${total}</div></div>
+        <div class="kpi red"><div class="label">Open</div><div class="value">${S.regRows("ncr").filter(r => r.status !== "CLOSED").length}</div></div>
+        <div class="kpi amber"><div class="label">Critical</div><div class="value">${S.regRows("ncr").filter(r => r.severity === "Critical").length}</div></div></div>
+      <div class="card"><h3>Pareto by severity</h3><div class="chart-box"><canvas id="chNcrSev"></canvas></div></div>
+      <div class="card"><h3>Pareto by disposition</h3><div class="chart-box"><canvas id="chNcrDisp"></canvas></div></div>
+      <div class="card"><h3>Pareto by discipline</h3><div class="chart-box"><canvas id="chNcrDisc"></canvas></div></div>`;
+  };
+  AFTER.ncrpareto = function () {
+    const draw = (id, p) => { if (!p.length) return; CH.pareto(id, p.map(x => x.label), p.map(x => x.value), p.map(x => Math.round(x.cum))); };
+    draw("chNcrSev", S.ncrParetoBy("severity"));
+    draw("chNcrDisp", S.ncrParetoBy("disposition"));
+    draw("chNcrDisc", S.ncrParetoBy("discipline"));
+  };
+
+  // ---------- Prioritisation (RICE / WSJF) ----------
+  RENDER.prioritise = function () {
+    const method = uiState.prioMethod || "rice";
+    const list = S.prioritised(method);
+    const cell = (id, key, optsList) => `<select data-prio="${id}" data-f="${key}">${opts(optsList, list.find(c => c.id === id)[key] === "" ? "" : list.find(c => c.id === id)[key], "—")}</select>`;
+    let head, rows;
+    if (method === "rice") {
+      head = `<th>#</th><th>Case</th><th class="wrap">Problem</th><th>Reach</th><th>Impact</th><th>Confidence%</th><th>Effort</th><th>RICE</th>`;
+      rows = list.map((c, i) => `<tr>
+        <td class="center">${i + 1}</td>
+        <td>${esc(c.code)}</td>
+        <td class="wrap">${esc(c.problem)}</td>
+        <td>${cell(c.id, "reach", C.NUMOPTS["rice.reach"])}</td>
+        <td>${cell(c.id, "impact", C.NUMOPTS["rice.impact"])}</td>
+        <td>${cell(c.id, "confidence", C.NUMOPTS["rice.confidence"])}</td>
+        <td>${cell(c.id, "effort", C.NUMOPTS["rice.effort"])}</td>
+        <td class="center"><b>${c._score == null ? "—" : c._score}</b></td></tr>`).join("");
+    } else {
+      const s = C.NUMOPTS["wsjf.score"];
+      head = `<th>#</th><th>Case</th><th class="wrap">Problem</th><th>User-business value</th><th>Time criticality</th><th>Risk reduction</th><th>Job size</th><th>WSJF</th>`;
+      rows = list.map((c, i) => `<tr>
+        <td class="center">${i + 1}</td>
+        <td>${esc(c.code)}</td>
+        <td class="wrap">${esc(c.problem)}</td>
+        <td>${cell(c.id, "userValue", s)}</td>
+        <td>${cell(c.id, "timeCrit", s)}</td>
+        <td>${cell(c.id, "riskRed", s)}</td>
+        <td>${cell(c.id, "jobSize", s)}</td>
+        <td class="center"><b>${c._score == null ? "—" : c._score}</b></td></tr>`).join("");
+    }
+    return `<div class="card"><div class="card-head"><h3>Prioritisation method</h3>
+        <select id="prioMethod" style="max-width:160px"><option value="rice" ${method==="rice"?"selected":""}>RICE</option><option value="wsjf" ${method==="wsjf"?"selected":""}>WSJF</option></select></div>
+        <p class="muted">RICE = Reach × Impact × (Confidence/100) ÷ Effort. WSJF = (Value + Time-criticality + Risk-reduction) ÷ Job size. Pick a method and adjust the dropdowns — the table re-ranks live.</p></div>
+      <div class="card"><h3>Top 10 by ${method.toUpperCase()}</h3><div class="chart-box sm"><canvas id="chPrio"></canvas></div></div>
+      <div class="card"><h3>All cases ranked</h3>
+        <div class="table-wrap"><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>
+        <p class="muted">All input cells are dropdowns — click-only.</p></div>`;
+  };
+  AFTER.prioritise = function () {
+    const sel = $("#prioMethod"); if (sel) sel.addEventListener("change", () => { uiState.prioMethod = sel.value; go("prioritise"); });
+    content.querySelectorAll("select[data-prio]").forEach(el => el.addEventListener("change", () => {
+      const v = el.value === "" ? "" : Number(el.value);
+      S.updateCase(el.dataset.prio, { [el.dataset.f]: v });
+      go("prioritise");
+    }));
+    const list = S.prioritised(uiState.prioMethod || "rice").slice(0, 10);
+    CH.bar("chPrio", list.map(c => c.code), list.map(c => c._score || 0), (uiState.prioMethod || "rice").toUpperCase() + " score");
+  };
+
   // ---------- case form ----------
   function blankCase() {
     const t = new Date().toISOString().slice(0, 10);
@@ -1129,6 +1274,55 @@
     }
   }
 
+  // ---------- theme / shortcuts / run checks ----------
+  function applyTheme() {
+    const dark = !!(S.brand() && S.brand().theme === "dark");
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    const btn = $("#btnTheme"); if (btn) btn.textContent = dark ? "☼" : "◐";
+  }
+  function toggleTheme() {
+    const cur = (S.brand() && S.brand().theme) || "light";
+    S.setBrand({ theme: cur === "dark" ? "light" : "dark" });
+    applyTheme(); toast("Theme: " + (S.brand().theme === "dark" ? "dark" : "light"));
+  }
+  function runChecks() {
+    const issues = S.health();
+    const k = S.kpis();
+    const sumLines = [
+      `<b>${k.total}</b> case(s) · <b>${k.crit}</b> critical · <b>${k.open}</b> open · <b>${k.blocked}</b> blocked`,
+      issues.length === 0 ? `<span style="color:var(--green)">✓ Data Health: all clear</span>` : `<span style="color:var(--red)">⚠ Data Health: ${issues.length} issue(s)</span>`
+    ];
+    const issueRows = issues.length ? `<div class="table-wrap" style="max-height:260px;overflow:auto"><table>${issues.map(i => `<tr><td><b>${esc(i.code)}</b></td><td class="wrap">${esc(i.msg)}</td></tr>`).join("")}</table></div>` : "";
+    $("#modal").innerHTML = `<h2>Project checks</h2>
+      <div class="sub">A live summary of project status and data integrity.</div>
+      <div class="readout" style="margin-bottom:12px">${sumLines.join("<br>")}</div>
+      ${issueRows}
+      <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
+        ${issues.length ? '<button class="btn" data-act="goHealth">Open Data Health</button>' : ''}
+        <button class="btn btn-primary" data-act="cancel">Close</button>
+      </div></div>`;
+    $("#modalOverlay").hidden = false;
+  }
+  function showShortcuts() {
+    const rows = [
+      ["?", "Show this list"],
+      ["n", "New case"],
+      ["d", "Dashboard"],
+      ["k", "Kanban board"],
+      ["p", "Portfolio"],
+      ["r", "Report Pack"],
+      ["c", "Run checks"],
+      ["t", "Toggle theme"],
+      ["Esc", "Close dialog"]
+    ].map(([k, m]) => `<div class="shortcut-row"><span>${m}</span><span><span class="kbd">${esc(k)}</span></span></div>`).join("");
+    $("#modal").innerHTML = `<h2>Keyboard shortcuts</h2>
+      <div class="sub">Single-letter shortcuts work when no field is focused.</div>
+      <div>${rows}</div>
+      <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
+        <button class="btn btn-primary" data-act="cancel">Close</button></div></div>`;
+    $("#modalOverlay").hidden = false;
+  }
+
   // ---------- global events ----------
   function refreshHeader() {
     const b = S.brand(), p = S.get().project;
@@ -1200,6 +1394,7 @@
     const b = e.target.closest("[data-act]"); if (!b) return;
     const act = b.dataset.act, id = b.dataset.id;
     if (act === "cancel") closeModal();
+    else if (act === "goHealth") { closeModal(); go("health"); }
     else if (act === "a3") openA3(id);
     else if (act === "del") { closeModal(); confirmDelete(id); }
     else if (act === "confirmdel") { S.deleteCase(id); closeModal(); toast("Case deleted."); go(current === "help" ? "cases" : current); }
@@ -1210,6 +1405,9 @@
   $("#btnImport").addEventListener("click", importJSON);
   $("#btnShare").addEventListener("click", shareLink);
   $("#btnPrint").addEventListener("click", () => window.print());
+  $("#btnTheme").addEventListener("click", toggleTheme);
+  $("#btnChecks").addEventListener("click", runChecks);
+  $("#btnHelp").addEventListener("click", showShortcuts);
   $("#fileImport").addEventListener("change", e => { if (e.target.files[0]) handleImport(e.target.files[0]); e.target.value = ""; });
   $("#hamburger").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
   $("#projectSwitch").addEventListener("change", e => {
@@ -1217,8 +1415,20 @@
     if (v === "__new") { const n = prompt("New project name:", "New Project"); if (n) { S.addProject(n); } refreshHeader(); go("dashboard"); }
     else { S.switchProject(v); refreshHeader(); go(current === "portfolio" ? "portfolio" : "dashboard"); }
   });
-  document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") { closeModal(); return; }
+    // single-letter shortcuts when no input/select is focused
+    const t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = e.key.toLowerCase();
+    const map = { "n": () => openCaseForm(), "d": () => go("dashboard"), "c": () => runChecks(),
+      "k": () => go("kanban"), "p": () => go("portfolio"), "r": () => go("report"),
+      "t": () => toggleTheme(), "?": () => showShortcuts() };
+    if (e.key === "?" || e.shiftKey && e.key === "/") { e.preventDefault(); showShortcuts(); return; }
+    if (map[k]) { e.preventDefault(); map[k](); }
+  });
 
   // ---------- init ----------
-  S.load(); checkShareHash(); buildNav(); refreshHeader(); go("dashboard");
+  S.load(); checkShareHash(); buildNav(); applyTheme(); refreshHeader(); go("dashboard");
 })();
