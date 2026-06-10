@@ -61,25 +61,76 @@
       const raw = (typeof localStorage !== "undefined") && localStorage.getItem(KEY);
       state = raw ? JSON.parse(raw) : seed();
     } catch (e) { state = seed(); }
-    return state;
+    return normalize(state);
+  }
+  function normalize(s) {                       // migrate older saves
+    s.audit = s.audit || [];
+    s.snapshots = s.snapshots || [];
+    (s.cases || []).forEach(c => { if (!c.whys) c.whys = ["", "", "", "", ""]; });
+    return s;
   }
   function save() {
     try { if (typeof localStorage !== "undefined") localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
   }
   function get() { return state || load(); }
-  function reset() { state = seed(); save(); return state; }
-  function replace(obj) { state = obj; save(); return state; }
+  function reset() { state = normalize(seed()); save(); return state; }
+  function replace(obj) { state = normalize(obj); save(); return state; }
 
-  // ---- case CRUD ----
+  // ---- audit log ----
+  function codeOf(i) { return "CASE-" + String(i + 1).padStart(3, "0"); }
+  function logAudit(action, code, detail) {
+    get().audit.unshift({ ts: new Date().toISOString(), action, code: code || "", detail: detail || "" });
+    if (get().audit.length > 500) get().audit.length = 500;
+  }
+  function auditList() { return get().audit; }
+  function clearAudit() { get().audit = []; save(); }
+
+  // ---- case CRUD (audited) ----
   function caseIndex(id) { return get().cases.findIndex(c => c.id === id); }
-  function addCase(c) { c.id = c.id || uid(); get().cases.push(c); save(); return c; }
+  function addCase(c) {
+    c.id = c.id || uid(); if (!c.whys) c.whys = ["", "", "", "", ""];
+    get().cases.push(c);
+    logAudit("Added", codeOf(get().cases.length - 1), (c.problem || "").slice(0, 60));
+    save(); return c;
+  }
   function updateCase(id, patch) {
     const i = caseIndex(id); if (i < 0) return null;
-    Object.assign(get().cases[i], patch); save(); return get().cases[i];
+    const old = get().cases[i];
+    const changes = Object.keys(patch).filter(k => k !== "whys" && String(old[k]) !== String(patch[k]))
+      .map(k => `${k}: ${old[k] === "" || old[k] == null ? "—" : old[k]}→${patch[k] === "" || patch[k] == null ? "—" : patch[k]}`);
+    Object.assign(get().cases[i], patch);
+    if (changes.length) logAudit("Updated", codeOf(i), changes.slice(0, 4).join("; ").slice(0, 120));
+    save(); return get().cases[i];
   }
   function deleteCase(id) {
     const i = caseIndex(id); if (i < 0) return false;
-    get().cases.splice(i, 1); save(); return true;
+    const code = codeOf(i), prob = (get().cases[i].problem || "").slice(0, 60);
+    get().cases.splice(i, 1);
+    logAudit("Deleted", code, prob);
+    save(); return true;
+  }
+  function moveStatus(id, status) { return updateCase(id, { status }); }
+
+  // ---- snapshots (restore points) ----
+  function takeSnapshot(label) {
+    const s = get();
+    const copy = JSON.parse(JSON.stringify({ project: s.project, roster: s.roster, cases: s.cases, sigma: s.sigma, stakeholders: s.stakeholders }));
+    s.snapshots.unshift({ id: uid(), ts: new Date().toISOString(), label: label || ("Snapshot " + new Date().toLocaleString()), data: copy });
+    if (s.snapshots.length > 25) s.snapshots.length = 25;
+    logAudit("Snapshot", "", label || "manual"); save();
+    return s.snapshots[0];
+  }
+  function snapshots() { return get().snapshots; }
+  function restoreSnapshot(id) {
+    const snap = get().snapshots.find(x => x.id === id); if (!snap) return false;
+    takeSnapshot("Auto-backup before restore");
+    const s = get(), d = JSON.parse(JSON.stringify(snap.data));
+    s.project = d.project; s.roster = d.roster; s.cases = d.cases; s.sigma = d.sigma; s.stakeholders = d.stakeholders;
+    normalize(s); logAudit("Restored", "", snap.label); save(); return true;
+  }
+  function deleteSnapshot(id) {
+    const i = get().snapshots.findIndex(x => x.id === id); if (i < 0) return false;
+    get().snapshots.splice(i, 1); save(); return true;
   }
 
   // ---- derived ----
@@ -131,6 +182,17 @@
     });
     return { est, act };
   }
+  function paretoRPN() {
+    const m = rpnByCategory();
+    return C.pareto(Object.keys(m).map(k => ({ label: k, value: m[k] })));
+  }
+  function controlChartData() {
+    const rows = sigmaRows();
+    const labels = rows.map(r => r.week);
+    const values = rows.map(r => r.rate == null ? null : +(r.rate * 100).toFixed(3));
+    const st = C.controlStats(values);
+    return { labels, values, mean: st.mean, ucl: st.ucl, lcl: st.lcl };
+  }
 
   // ---- data health checks ----
   function health() {
@@ -149,8 +211,9 @@
     return issues;
   }
 
-  const API = { uid, seed, load, save, get, reset, replace, addCase, updateCase, deleteCase,
-    enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health };
+  const API = { uid, seed, load, save, get, reset, replace, addCase, updateCase, deleteCase, moveStatus,
+    enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
+    auditList, clearAudit, takeSnapshot, snapshots, restoreSnapshot, deleteSnapshot, paretoRPN, controlChartData };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);

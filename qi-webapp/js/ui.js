@@ -4,6 +4,7 @@
   const C = window.QICalc, S = window.QIStore, CH = window.QICharts;
   const $ = sel => document.querySelector(sel);
   const content = $("#content");
+  const uiState = { caseFilter: { q: "", status: "", priority: "", owner: "", sort: "rpn" } };
 
   // ---------- helpers ----------
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
@@ -37,6 +38,7 @@
     { id: "cases", label: "Cases (Master)", icon: "★" },
     { g: "Delivery" },
     { id: "pm", label: "PM Tasks", icon: "✔" },
+    { id: "kanban", label: "Kanban Board", icon: "▥" },
     { id: "timeline", label: "Timeline", icon: "▦" },
     { g: "Risk & Quality" },
     { id: "risks", label: "Risk Register", icon: "⚠" },
@@ -52,6 +54,7 @@
     { id: "ai", label: "AI Assistant", icon: "✦" },
     { id: "health", label: "Data Health", icon: "✚" },
     { g: "Setup" },
+    { id: "audit", label: "History & Backups", icon: "⟲" },
     { id: "config", label: "Settings", icon: "⚙" },
     { id: "help", label: "Help", icon: "?" }
   ];
@@ -107,7 +110,8 @@
       <div class="row2">
         <div class="card"><h3>Status mix</h3><div class="chart-box sm"><canvas id="chStatus"></canvas></div></div>
         <div class="card"><h3>Risk exposure (RPN) by category</h3><div class="chart-box sm"><canvas id="chRpn"></canvas></div></div>
-      </div>`;
+      </div>
+      <div class="card"><h3>Pareto — where the risk concentrates (80/20)</h3><div class="chart-box"><canvas id="chPareto"></canvas></div></div>`;
   };
   AFTER.dashboard = function () {
     const drawGroup = () => {
@@ -117,10 +121,26 @@
     $("#groupSel").addEventListener("change", drawGroup); drawGroup();
     const sm = S.groupCounts("status"); CH.pie("chStatus", Object.keys(sm), Object.values(sm));
     const rm = S.rpnByCategory(); CH.hbar("chRpn", Object.keys(rm), Object.values(rm));
+    const p = S.paretoRPN();
+    CH.pareto("chPareto", p.map(x => x.label), p.map(x => x.value), p.map(x => Math.round(x.cum)));
   };
 
   RENDER.cases = function () {
-    const rows = S.enriched().filter(c => c.problem).map(c => `
+    const f = uiState.caseFilter;
+    let list = S.enriched().filter(c => c.problem);
+    if (f.q) { const q = f.q.toLowerCase(); list = list.filter(c => (c.problem + " " + (c.owner || "") + " " + (c.rootCause || "") + " " + c.code).toLowerCase().includes(q)); }
+    if (f.status) list = list.filter(c => c.status === f.status);
+    if (f.priority) list = list.filter(c => c.priority === f.priority);
+    if (f.owner) list = list.filter(c => c.owner === f.owner);
+    const sorters = {
+      rpn: (a, b) => (b.rpn || 0) - (a.rpn || 0),
+      priority: (a, b) => (a.priority || "z").localeCompare(b.priority || "z"),
+      status: (a, b) => (a.status || "").localeCompare(b.status || ""),
+      code: (a, b) => a.num - b.num
+    };
+    list.sort(sorters[f.sort] || sorters.rpn);
+    const names = S.get().roster.map(r => r.name).filter(Boolean);
+    const rows = list.map(c => `
       <tr>
         <td>${esc(c.code)}</td>
         <td class="wrap">${esc(c.problem)}</td>
@@ -139,10 +159,23 @@
     return `
       <div class="toolbar">
         <button class="btn btn-primary" data-act="add">+ New Case</button>
-        <button class="btn" data-act="csv">Export CSV</button>
-        <span class="grow"></span><span class="muted">${S.validCases().length} case(s)</span>
+        <input id="fltQ" placeholder="Search…" value="${esc(f.q)}" style="max-width:200px">
+        <select id="fltStatus" style="max-width:150px">${opts(C.LISTS.status, f.status, "All status")}</select>
+        <select id="fltPriority" style="max-width:150px">${opts(C.LISTS.priority, f.priority, "All priority")}</select>
+        <select id="fltOwner" style="max-width:150px">${opts(names, f.owner, "All owners")}</select>
+        <select id="fltSort" style="max-width:160px">
+          <option value="rpn">Sort: RPN</option><option value="priority" ${f.sort==="priority"?"selected":""}>Sort: Priority</option>
+          <option value="status" ${f.sort==="status"?"selected":""}>Sort: Status</option><option value="code" ${f.sort==="code"?"selected":""}>Sort: ID</option>
+        </select>
+        ${(f.q||f.status||f.priority||f.owner)?'<button class="btn btn-sm" data-act="clearflt">Clear</button>':''}
+        <span class="grow"></span><button class="btn" data-act="csv">Export CSV</button>
+        <span class="muted">${list.length} shown</span>
       </div>
       ${tableWrap("<th>ID</th><th class='wrap'>Problem</th><th>Category</th><th>Priority</th><th>RPN</th><th>Health</th><th>Owner</th><th>Status</th><th>% Done</th><th></th>", rows)}`;
+  };
+  AFTER.cases = function () {
+    const bind = (id, key) => { const el = $("#" + id); if (el) el.addEventListener(el.tagName === "INPUT" ? "input" : "change", () => { uiState.caseFilter[key] = el.value; if (key === "q") { const v = el.value, pos = el.selectionStart; go("cases"); const n = $("#fltQ"); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} } } else go("cases"); }); };
+    bind("fltQ", "q"); bind("fltStatus", "status"); bind("fltPriority", "priority"); bind("fltOwner", "owner"); bind("fltSort", "sort");
   };
 
   RENDER.pm = function () {
@@ -224,6 +257,8 @@
       <td class="center"><b>${r.sigma ?? ""}</b></td><td class="center">${r.target}</td></tr>`).join("");
     return `<div class="card"><h3>Sigma & defect trend</h3>
       <div class="row2"><div class="chart-box"><canvas id="chSigma"></canvas></div><div class="chart-box"><canvas id="chDefect"></canvas></div></div></div>
+      <div class="card"><h3>Control chart — defect % with control limits (UCL/LCL)</h3><div class="chart-box"><canvas id="chControl"></canvas></div>
+        <p class="muted">Points outside the red limits signal a process shift worth investigating.</p></div>
       <div class="card"><h3>Weekly data (type Units, Defects, Opps/Unit)</h3>
       ${tableWrap("<th>Week</th><th>Units</th><th>Defects</th><th>Opps/Unit</th><th>Defect %</th><th>DPMO</th><th>Sigma</th><th>Target</th>", rows)}</div>`;
   };
@@ -232,6 +267,8 @@
       const r = S.sigmaRows(), labels = r.map(x => x.week);
       CH.lines("chSigma", labels, [{ label: "Sigma", data: r.map(x => x.sigma) }, { label: "Target", data: r.map(x => x.target), dash: [6, 4] }], "Sigma level vs target");
       CH.lines("chDefect", labels, [{ label: "Defect %", data: r.map(x => x.rate == null ? null : +(x.rate * 100).toFixed(2)) }], "Defect % trend");
+      const cc = S.controlChartData();
+      CH.control("chControl", cc.labels, cc.values, cc.mean == null ? null : +cc.mean.toFixed(3), cc.ucl == null ? null : +cc.ucl.toFixed(3), cc.lcl == null ? null : +cc.lcl.toFixed(3));
     };
     draw();
     content.querySelectorAll("input[data-sg]").forEach(inp => inp.addEventListener("change", () => {
@@ -386,10 +423,68 @@
     <div class="card"><h3>Print / share</h3><p>Use the <b>Print</b> button (top right) to print or save the current view as PDF. To share the app itself, host this folder on any static host (e.g. GitHub Pages).</p></div>`;
   };
 
+  // ---------- Kanban board ----------
+  const KCOLS = ["OPEN", "IN PROGRESS", "ON HOLD", "BLOCKED", "RESOLVED", "CLOSED"];
+  RENDER.kanban = function () {
+    const e = S.validCases();
+    const cols = KCOLS.map(st => {
+      const cards = e.filter(c => c.status === st).map(c => `
+        <div class="kcard" draggable="true" data-id="${c.id}">
+          <div class="kcard-top"><span class="pill">${esc(c.priority || "")}</span><b>RPN ${c.rpn ?? "—"}</b></div>
+          <div class="kcard-title" data-act="edit" data-id="${c.id}">${esc(c.problem)}</div>
+          <div class="kcard-foot"><span>${esc(c.owner || "—")}</span>${healthBadge(c.health)}</div>
+        </div>`).join("");
+      return `<div class="kcol" data-status="${st}">
+        <div class="kcol-head">${esc(st)} <span class="kcount">${e.filter(c => c.status === st).length}</span></div>
+        <div class="kcol-body" data-status="${st}">${cards || '<div class="kempty">—</div>'}</div></div>`;
+    }).join("");
+    return `<p class="muted" style="margin-bottom:10px">Drag a card to a new column to change its status. Click a title to edit.</p>
+      <div class="kanban">${cols}</div>`;
+  };
+  AFTER.kanban = function () {
+    let dragId = null;
+    content.querySelectorAll(".kcard").forEach(card => {
+      card.addEventListener("dragstart", e => { dragId = card.dataset.id; if (e.dataTransfer) e.dataTransfer.setData("text/plain", dragId); card.style.opacity = ".5"; });
+      card.addEventListener("dragend", () => { card.style.opacity = "1"; });
+    });
+    content.querySelectorAll(".kcol-body").forEach(col => {
+      col.addEventListener("dragover", e => { e.preventDefault(); col.classList.add("kover"); });
+      col.addEventListener("dragleave", () => col.classList.remove("kover"));
+      col.addEventListener("drop", e => {
+        e.preventDefault(); col.classList.remove("kover");
+        const id = dragId || (e.dataTransfer && e.dataTransfer.getData("text/plain"));
+        if (id) { S.moveStatus(id, col.dataset.status); toast("Moved to " + col.dataset.status); go("kanban"); }
+      });
+    });
+  };
+
+  // ---------- History & Backups (audit) ----------
+  RENDER.audit = function () {
+    const snaps = S.snapshots();
+    const srows = snaps.length ? snaps.map(s => `<tr>
+      <td>${esc(new Date(s.ts).toLocaleString())}</td><td>${esc(s.label)}</td>
+      <td class="center">${(s.data.cases || []).filter(c => c.problem).length}</td>
+      <td class="center"><button class="btn btn-sm" data-act="restore" data-id="${s.id}">Restore</button>
+        <button class="btn btn-sm btn-danger" data-act="delsnap" data-id="${s.id}">Del</button></td></tr>`).join("")
+      : `<tr><td colspan="4" class="muted center">No snapshots yet — take one to create a restore point.</td></tr>`;
+    const log = S.auditList();
+    const arows = log.length ? log.slice(0, 200).map(a => `<tr>
+      <td>${esc(new Date(a.ts).toLocaleString())}</td><td><span class="pill">${esc(a.action)}</span></td>
+      <td>${esc(a.code)}</td><td class="wrap">${esc(a.detail)}</td></tr>`).join("")
+      : `<tr><td colspan="4" class="muted center">No activity yet.</td></tr>`;
+    return `<div class="card"><div class="card-head"><h3>Restore points (snapshots)</h3>
+        <button class="btn btn-sm btn-primary" data-act="snap">+ Take snapshot</button></div>
+        <p class="muted" style="margin-top:-6px">A snapshot saves a full copy you can roll back to. The latest 25 are kept.</p>
+        ${tableWrap("<th>When</th><th>Label</th><th>Cases</th><th></th>", srows)}</div>
+      <div class="card"><div class="card-head"><h3>Change history</h3>
+        <button class="btn btn-sm" data-act="clearaudit">Clear log</button></div>
+        ${tableWrap("<th>When</th><th>Action</th><th>Case</th><th class='wrap'>Detail</th>", arows)}</div>`;
+  };
+
   // ---------- case form ----------
   function blankCase() {
     const t = new Date().toISOString().slice(0, 10);
-    return { problem: "", category: "", priority: "", sev: "", occ: "", det: "", rootCause: "", leanMethod: "", owner: "", target: "", startDate: t, status: "OPEN", percent: 0, dateLogged: t, costCat: "", estCost: "", actCost: "" };
+    return { problem: "", category: "", priority: "", sev: "", occ: "", det: "", rootCause: "", leanMethod: "", owner: "", target: "", startDate: t, status: "OPEN", percent: 0, dateLogged: t, costCat: "", estCost: "", actCost: "", whys: ["", "", "", "", ""] };
   }
   function openCaseForm(id) {
     const editing = !!id;
@@ -421,10 +516,13 @@
           <div class="field"><label>Cost category</label><select id="f_costCat">${opts(C.LISTS.costCat, c.costCat, "—")}</select></div>
           <div class="field"><label>Est. cost</label><input type="number" min="0" step="100" id="f_estCost" value="${c.estCost ?? ""}"></div>
           <div class="field"><label>Actual cost</label><input type="number" min="0" step="100" id="f_actCost" value="${c.actCost ?? ""}"></div>
+          <div class="field full"><label>5 Whys (drill to root cause)</label>
+            ${[0,1,2,3,4].map(i => `<input id="f_why${i}" value="${esc((c.whys||[])[i]||"")}" placeholder="Why ${i+1}?" style="margin-bottom:6px">`).join("")}</div>
           <div class="field full"><label>Auto-calculated</label><div class="readout" id="f_readout"></div></div>
         </div>
         <div class="modal-foot">
-          <div>${editing ? `<button type="button" class="btn btn-danger" data-act="del" data-id="${id}">Delete</button>` : ""}</div>
+          <div style="display:flex;gap:8px">${editing ? `<button type="button" class="btn btn-danger" data-act="del" data-id="${id}">Delete</button>` : ""}
+          ${editing ? `<button type="button" class="btn" data-act="a3" data-id="${id}">A3 report</button>` : ""}</div>
           <div style="display:flex;gap:8px"><button type="button" class="btn" data-act="cancel">Cancel</button>
           <button type="submit" class="btn btn-primary">${editing ? "Save changes" : "Add case"}</button></div>
         </div>
@@ -438,7 +536,8 @@
       startDate: $("#f_startDate").value, status: $("#f_status").value, percent: Number($("#f_percent").value),
       dateLogged: c.dateLogged, costCat: $("#f_costCat").value,
       estCost: $("#f_estCost").value === "" ? "" : Number($("#f_estCost").value),
-      actCost: $("#f_actCost").value === "" ? "" : Number($("#f_actCost").value)
+      actCost: $("#f_actCost").value === "" ? "" : Number($("#f_actCost").value),
+      whys: [0,1,2,3,4].map(i => $("#f_why" + i).value.trim())
     });
     const preview = () => {
       const en = C.enrich(readForm());
@@ -459,6 +558,28 @@
     });
   }
   function closeModal() { $("#modalOverlay").hidden = true; $("#modal").innerHTML = ""; }
+
+  function openA3(id) {
+    const c = S.get().cases.find(x => x.id === id); if (!c) return;
+    const a = C.a3(c);
+    const box = (t, v) => `<div class="a3-box"><h4>${t}</h4><div>${v}</div></div>`;
+    const whys = a.whys.length ? "<ol>" + a.whys.map(w => `<li>${esc(w)}</li>`).join("") + "</ol>" : `<span class="muted">No 5-Whys captured yet.</span>`;
+    $("#modal").innerHTML = `
+      <h2>A3 Report</h2><div class="sub">${esc(a.title)} · Owner: ${esc(a.owner)}</div>
+      <div class="a3">
+        ${box("1. Background", esc(a.background))}
+        ${box("2. Current condition", esc(a.current))}
+        ${box("3. Goal / target", esc(a.goal))}
+        ${box("4. Root-cause analysis", esc(a.rootCause) + whys)}
+        ${box("5. Countermeasures", esc(a.countermeasure))}
+        ${box("6. Plan", esc(a.plan))}
+        ${box("7. Follow-up", esc(a.followup))}
+      </div>
+      <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
+        <button class="btn" data-act="cancel">Close</button>
+        <button class="btn btn-primary" onclick="window.print()">Print A3</button></div></div>`;
+    $("#modalOverlay").hidden = false;
+  }
 
   function confirmDelete(id) {
     const c = S.get().cases.find(x => x.id === id);
@@ -513,6 +634,11 @@
     else if (act === "csv") exportCSV();
     else if (act === "export") exportJSON();
     else if (act === "import") importJSON();
+    else if (act === "clearflt") { uiState.caseFilter = { q: "", status: "", priority: "", owner: "", sort: uiState.caseFilter.sort }; go("cases"); }
+    else if (act === "snap") { S.takeSnapshot(); toast("Snapshot saved."); go("audit"); }
+    else if (act === "restore") { if (confirm("Restore this snapshot? Current data is auto-backed-up first.")) { S.restoreSnapshot(id); setBrand(); toast("Snapshot restored."); go("dashboard"); } }
+    else if (act === "delsnap") { S.deleteSnapshot(id); go("audit"); }
+    else if (act === "clearaudit") { if (confirm("Clear the change-history log?")) { S.clearAudit(); go("audit"); } }
     else if (act === "reset") { if (confirm("Reset to sample data? Your current data will be replaced.")) { S.reset(); setBrand(); go("dashboard"); toast("Reset to sample data."); } }
     else if (act === "addsk") { S.get().stakeholders.push({ name: "", role: "", influence: "", interest: "", raci: "" }); S.save(); go("stakeholders"); }
     else if (act === "delsk") { S.get().stakeholders.splice(+id, 1); S.save(); go("stakeholders"); }
@@ -533,6 +659,7 @@
     const b = e.target.closest("[data-act]"); if (!b) return;
     const act = b.dataset.act, id = b.dataset.id;
     if (act === "cancel") closeModal();
+    else if (act === "a3") openA3(id);
     else if (act === "del") { closeModal(); confirmDelete(id); }
     else if (act === "confirmdel") { S.deleteCase(id); closeModal(); toast("Case deleted."); go(current === "help" ? "cases" : current); }
   });

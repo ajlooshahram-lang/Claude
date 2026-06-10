@@ -25,7 +25,7 @@ ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard rende
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 
 // 2) navigate every view (simulate clicks)
-const views = ["dashboard","cases","pm","timeline","risks","fmea","sigma","pdca","log","stakeholders","budget","ai","health","config","help"];
+const views = ["dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","pdca","log","stakeholders","budget","ai","health","audit","config","help"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -54,6 +54,20 @@ ok(/Smoke test case/.test(doc.getElementById("content").innerHTML), "AI queue sh
 // 6) delete it back
 S.deleteCase(top.id);
 ok(S.validCases().length === before, "deleteCase restores count");
+
+// 7) new features: kanban renders columns, audit logged, snapshot round-trip
+doc.querySelector('.nav-item[data-view="kanban"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelectorAll(".kcol").length === 6, "kanban shows 6 status columns");
+ok(S.auditList().length > 0, "audit log has entries");
+const cnt = S.validCases().length;
+const sp = S.takeSnapshot("smoke snap");
+S.addCase({ problem: "temp", category: "Process / Flow", priority: "4-LOW", sev: 1, occ: 1, det: 1, owner: "PM", leanMethod: "5S", target: "x", startDate: "2026-06-01", status: "OPEN", percent: 0 });
+S.restoreSnapshot(sp.id);
+ok(S.validCases().length === cnt, "snapshot restore reverts changes");
+doc.querySelector('.nav-item[data-view="audit"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(/Change history/.test(doc.getElementById("content").innerHTML), "audit view renders history");
+ok(typeof S.paretoRPN === "function" && S.paretoRPN().length >= 0, "pareto available");
+ok(S.controlChartData().mean !== undefined, "control chart data available");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
