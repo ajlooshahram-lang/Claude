@@ -218,5 +218,63 @@ window.QIStore && window.QIStore.save && (function () {
 const tb = doc.querySelector(".topbar");
 ok(window.getComputedStyle(tb).flexWrap === "wrap", "topbar uses flex-wrap");
 
+// 14) Hash routing — back/forward & bookmarks
+window.location.hash = "#kanban";
+window.dispatchEvent(new window.HashChangeEvent("hashchange"));
+ok(/kanban/i.test(doc.getElementById("viewTitle").textContent.toLowerCase().replace(/\W/g,"")) || doc.querySelector(".kcol") != null,
+  "hashchange '#kanban' navigates to kanban view");
+const nav = doc.querySelector('.nav-item[data-view="risks"]');
+nav.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(window.location.hash === "#risks", "clicking nav updates URL hash (got " + window.location.hash + ")");
+// unknown hashes should fall back to dashboard without crashing
+window.location.hash = "#nope";
+window.dispatchEvent(new window.HashChangeEvent("hashchange"));
+ok(window.location.hash === "#nope", "unknown hash is preserved without crashing");
+
+// 15) Inline edit on the Cases list — change status without opening the form
+S.reset();   // ensure the active project has seeded cases for this section
+doc.querySelector('.nav-item[data-view="cases"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const inlineSel = doc.querySelector('select[data-edit="status"]');
+ok(inlineSel != null, "Cases table has inline status dropdowns");
+const caseId = inlineSel.dataset.id;
+const beforeStatus = (S.get().cases.find(c => c.id === caseId) || {}).status;
+inlineSel.value = beforeStatus === "BLOCKED" ? "OPEN" : "BLOCKED";
+inlineSel.dispatchEvent(new window.Event("change", { bubbles: true }));
+const afterStatus = (S.get().cases.find(c => c.id === caseId) || {}).status;
+ok(afterStatus !== beforeStatus, "inline edit updated case status (" + beforeStatus + " -> " + afterStatus + ")");
+
+// 16) Empty-state CTA appears when a project has zero cases
+const emptyId = S.addProject("Empty Project For Test");
+S.switchProject(emptyId);
+// purge any seeded cases (addProject already starts empty, but be safe)
+S.get().cases.length = 0;
+S.save();
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".empty-cta") != null, "empty-state CTA renders when no cases");
+ok(doc.querySelector(".empty-cta [data-act=add]") != null, "empty-state CTA has + Add button");
+
+// 17) localStorage quota error fires custom event the UI can hook into
+let quotaCaught = false;
+const handler = () => { quotaCaught = true; };
+window.addEventListener("qi-storage-error", handler);
+const proto = Object.getPrototypeOf(window.localStorage);
+const origSet = proto.setItem;
+proto.setItem = function () { const err = new Error("quota"); err.name = "QuotaExceededError"; throw err; };
+try { S.save(); } catch (_) {}
+proto.setItem = origSet;
+window.removeEventListener("qi-storage-error", handler);
+ok(quotaCaught, "qi-storage-error event fires on QuotaExceededError");
+
+// 18) Modal focus trap — Tab cycles within the modal
+doc.getElementById("btnHelp").click();
+const modal = doc.getElementById("modal");
+const focusables = Array.from(modal.querySelectorAll("input,select,textarea,button,a[href]")).filter(f => !f.disabled);
+ok(focusables.length > 0, "modal has focusable elements");
+focusables[focusables.length - 1].focus();
+const tabEvt = new window.KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+modal.dispatchEvent(tabEvt);
+ok(tabEvt.defaultPrevented === true, "Tab on last focusable is intercepted (focus trap)");
+doc.querySelector("#modal [data-act=cancel]").click();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

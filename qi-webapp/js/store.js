@@ -187,7 +187,15 @@
     } catch (e) { ws = defaultWorkspace(); }
     normalizeWs(ws); bind(); save(); return state;
   }
-  function save() { try { if (typeof localStorage !== "undefined") localStorage.setItem(WKEY, JSON.stringify(ws)); } catch (e) {} }
+  function save() {
+    try { if (typeof localStorage !== "undefined") localStorage.setItem(WKEY, JSON.stringify(ws)); }
+    catch (e) {
+      // Surface storage-full errors so the UI can warn the user.
+      if (e && (e.name === "QuotaExceededError" || e.code === 22 || e.code === 1014)) {
+        try { if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("qi-storage-error", { detail: e })); } catch (_) {}
+      }
+    }
+  }
   function get() { if (!state) load(); return state; }
   function workspace() { if (!ws) load(); return ws; }
   function reset() { ws.projects[ws.activeId] = normalize(seed()); bind(); save(); return state; }

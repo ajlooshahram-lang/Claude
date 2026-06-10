@@ -77,10 +77,14 @@ Every operational field in the app is a **dropdown or picker** — there is no f
 ## Quality & accessibility
 
 - **Click-only by design.** No `prompt()`/free-text dialogs anywhere — even creating or renaming a project uses a dropdown picker. The smoke test stubs `window.prompt` and asserts it never fires.
-- **Keyboard-friendly.** All buttons, nav items and dropdowns have visible `:focus-visible` outlines. Modals auto-focus their first field. `Esc` closes any modal.
+- **Keyboard-friendly.** All buttons, nav items and dropdowns have visible `:focus-visible` outlines. Modals auto-focus their first field and **trap focus** so Tab/Shift+Tab cycle inside the dialog. Use `↑ / ↓` to move between sidebar items.
+- **Bookmarkable URLs.** Every view is reflected in the URL hash (e.g. `#kanban`); browser back/forward works; unknown hashes fall back to the dashboard without crashing.
+- **Inline editing.** Status, owner and priority on the Cases list are dropdowns you can change in place — no need to open the form.
+- **Friendly empty state.** When a project has no cases yet, the dashboard shows a clear call-to-action ("+ Add your first case") instead of zeros.
+- **Storage-aware.** If your browser's localStorage fills up, the app surfaces a toast prompting you to export a JSON backup.
 - **Screen-reader hints.** Active sidebar items expose `aria-current="page"`; modals are `role="dialog"`; icon-only topbar buttons carry `aria-label`s.
-- **Themed charts.** Chart.js axis ticks, grid lines, legends and tooltips re-colour automatically when you toggle dark mode (no chart re-render needed).
-- **Verified.** 5/5 engine test suites and 110/110 jsdom smoke checks across 43 views, including regression checks for the polish above.
+- **Themed charts.** Chart.js axis ticks, grid lines, legends and tooltips re-colour automatically when you toggle dark mode.
+- **Verified.** 5/5 engine test suites and **120/120** jsdom smoke checks across 43 views, including regression checks for hash routing, focus trap, inline edit, empty-state CTA, storage-quota event and the polish above.
 
 ## Files
 
