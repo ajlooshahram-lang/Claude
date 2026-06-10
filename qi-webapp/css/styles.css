@@ -165,3 +165,13 @@ select,input[list]{background:var(--input)}
 .a3-box h4{margin:0 0 6px;font-size:12px;color:var(--navy);text-transform:uppercase;letter-spacing:.03em}
 .a3-box div{font-size:13px;line-height:1.5}
 .a3-box ol{margin:6px 0 0;padding-left:20px}
+
+
+/* project switcher + logo */
+.projswitch{padding:0 12px 10px}
+.projswitch select{width:100%;background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.18);font-size:12px}
+.projswitch select option{color:#1f2733}
+.brand-mark{position:relative;overflow:hidden}
+.brand-mark.has-logo{background:#fff}
+.brand-mark img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff}
+input[type=color]{padding:2px;height:38px}

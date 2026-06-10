@@ -10,11 +10,14 @@
   <div id="app">
     <aside class="sidebar" id="sidebar">
       <div class="brand">
-        <div class="brand-mark">QI</div>
+        <div class="brand-mark" id="brandMark">QI<img id="brandLogo" alt="" hidden></div>
         <div class="brand-text">
-          <strong>QI Platform</strong>
+          <strong id="brandCompany">QI Platform</strong>
           <span id="brandProject">QI Intelligence Program</span>
         </div>
+      </div>
+      <div class="projswitch">
+        <select id="projectSwitch" title="Switch project"></select>
       </div>
       <nav id="nav"></nav>
       <div class="sidebar-foot">
@@ -28,6 +31,7 @@
         <button class="hamburger" id="hamburger" aria-label="Menu">&#9776;</button>
         <h1 id="viewTitle">Dashboard</h1>
         <div class="topbar-actions">
+          <button class="btn" id="btnShare">Share</button>
           <button class="btn" id="btnPrint">Print</button>
           <button class="btn" id="btnExport">Export</button>
           <button class="btn" id="btnImport">Import</button>

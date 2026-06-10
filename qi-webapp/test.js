@@ -47,3 +47,25 @@ console.log("Restore brought it back:", restored);
 
 const ok2 = par.length > 0 && cc.mean !== null && grew && restored;
 console.log(ok2 ? "FEATURE TESTS PASS" : "FEATURE TESTS FAIL");
+
+
+// --- workspace / multi-project / brand tests ---
+console.log("\n-- workspace --");
+const projs0 = S.listProjects().length;
+const npId = S.addProject("Project B");
+console.log("Projects after add:", S.listProjects().length, "(was", projs0 + ")");
+S.addCase({ problem: "B-only case", category: "Process / Flow", priority: "3-MEDIUM", sev: 4, occ: 4, det: 4, owner: "PM", leanMethod: "5S", target: "x", startDate: "2026-06-01", status: "OPEN", percent: 0 });
+const bCount = S.validCases().length;
+S.switchProject(S.listProjects().find(p => p.name !== "Project B").id);
+const aCount = S.validCases().length;
+console.log("Project A cases:", aCount, "| Project B cases:", bCount, "| isolated:", aCount !== bCount);
+const port = S.portfolio();
+console.log("Portfolio rows:", port.length, "| names:", port.map(p => p.name).join(", "));
+S.setBrand({ company: "Acme Eng", accent: "#7030a0" });
+console.log("Brand:", S.brand().company, S.brand().accent);
+S.setAi({ key: "sk-test", model: "gpt-4o-mini" });
+console.log("AI key stored:", !!S.aiSettings().key);
+S.switchProject(npId); const delOk = S.deleteProject(npId);
+console.log("Delete project B:", delOk, "-> projects now:", S.listProjects().length);
+const ok3 = S.listProjects().length === projs0 && port.length === projs0 + 1 && S.brand().company === "Acme Eng";
+console.log(ok3 ? "WORKSPACE TESTS PASS" : "WORKSPACE TESTS FAIL");
