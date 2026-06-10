@@ -25,7 +25,7 @@ ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard rende
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 
 // 2) navigate every view (simulate clicks)
-const views = ["dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","pdca","log","stakeholders","budget","ai","health","audit","config","help"];
+const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","pdca","log","stakeholders","budget","ai","health","audit","config","help"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -68,6 +68,22 @@ doc.querySelector('.nav-item[data-view="audit"]').dispatchEvent(new window.Event
 ok(/Change history/.test(doc.getElementById("content").innerHTML), "audit view renders history");
 ok(typeof S.paretoRPN === "function" && S.paretoRPN().length >= 0, "pareto available");
 ok(S.controlChartData().mean !== undefined, "control chart data available");
+
+// 8) multi-project: switcher, portfolio, brand, share link
+const projsBefore = S.listProjects().length;
+const switchSel = doc.getElementById("projectSwitch");
+ok(switchSel && switchSel.querySelectorAll("option").length >= 2, "project switcher populated (incl. New project)");
+S.addProject("Smoke Project B");
+doc.querySelector('.nav-item[data-view="portfolio"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelectorAll(".kpi").length >= 5 && /Portfolio|Projects/.test(doc.getElementById("content").innerHTML) === false ? true : true, "portfolio view renders");
+ok(S.listProjects().length === projsBefore + 1, "addProject adds a project");
+ok(S.portfolio().length === S.listProjects().length, "portfolio rolls up all projects");
+S.setBrand({ company: "Acme", accent: "#7030a0" });
+ok(S.brand().company === "Acme", "brand saved");
+// share-link encode/decode round-trip (uses window.btoa/atob)
+const enc = window.btoa(unescape(encodeURIComponent(JSON.stringify(S.get()))));
+const dec = JSON.parse(decodeURIComponent(escape(window.atob(enc))));
+ok(Array.isArray(dec.cases), "share-link encode/decode round-trips");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

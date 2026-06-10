@@ -31,18 +31,22 @@ No install, no build step, no server, works offline.
 
 ## Views
 
-Dashboard · Cases (Master) · PM Tasks · **Kanban Board** · Timeline (Gantt) · Risk Register ·
-FMEA · Six Sigma · PDCA · Action Log · Stakeholders (RACI) · Budget · AI Assistant ·
-Data Health · **History & Backups** · Settings · Help
+Portfolio · Dashboard · Cases (Master) · PM Tasks · Kanban Board · Timeline (Gantt) ·
+Risk Register · FMEA · Six Sigma · PDCA · Action Log · Stakeholders (RACI) · Budget ·
+AI Assistant · Data Health · History & Backups · Settings · Help
 
 ## Highlights
 
+- **Multi-project portfolio** — manage many projects in one workspace, switch from the sidebar, and see a roll-up of cases/critical/open/budget across all of them. Each project keeps its own cases, risks, budget, history and backups.
+- **Branding** — set your company name, **logo** and **accent colour** in Settings; they appear in the sidebar and on reports.
 - **Search, filter & sort** on the Cases list (text, status, priority, owner).
 - **Kanban board** — drag cases between status columns to update them.
 - **Pareto chart** (80/20) on the dashboard and **SPC control chart** (with UCL/LCL) on Six Sigma.
 - **5-Whys** capture on each case and a one-click **A3 report** (printable).
 - **Change history (audit log)** — timestamped record of every add/edit/delete.
-- **Snapshots / restore points** — save a full copy and roll back anytime (auto-backup before a restore).
+- **Snapshots / restore points** — save a full copy and roll back anytime.
+- **Share link** — copy a link that encodes the current project so a colleague can open it as a new project.
+- **Optional AI** — add your own OpenAI-compatible API key in Settings to ask natural-language questions about your data. Without a key it falls back to the built-in offline advisor. Your key is stored only in your browser and sent only to the endpoint you configure.
 
 ## Files
 

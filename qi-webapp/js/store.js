@@ -2,7 +2,8 @@
 (function (root) {
   "use strict";
   const C = root.QICalc;
-  const KEY = "qi_platform_v9";
+  const KEY = "qi_platform_v9";        // legacy single-project key (migrated)
+  const WKEY = "qi_workspace_v9";      // workspace (multi-project) key
 
   function uid() { return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
@@ -54,27 +55,91 @@
     };
   }
 
-  let state = null;
+  let ws = null;     // whole workspace
+  let state = null;  // active project's state (alias into ws.projects[activeId])
 
-  function load() {
-    try {
-      const raw = (typeof localStorage !== "undefined") && localStorage.getItem(KEY);
-      state = raw ? JSON.parse(raw) : seed();
-    } catch (e) { state = seed(); }
-    return normalize(state);
-  }
-  function normalize(s) {                       // migrate older saves
+  function normalize(s) {                       // migrate older project saves
     s.audit = s.audit || [];
     s.snapshots = s.snapshots || [];
     (s.cases || []).forEach(c => { if (!c.whys) c.whys = ["", "", "", "", ""]; });
     return s;
   }
-  function save() {
-    try { if (typeof localStorage !== "undefined") localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  function defaultWorkspace() {
+    const id = uid();
+    return {
+      activeId: id, order: [id], projects: { [id]: seed() },
+      brand: { company: "", logo: "", accent: "#2e5496" },
+      ai: { provider: "openai", baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini", key: "" }
+    };
   }
-  function get() { return state || load(); }
-  function reset() { state = normalize(seed()); save(); return state; }
-  function replace(obj) { state = normalize(obj); save(); return state; }
+  function normalizeWs(w) {
+    w.projects = w.projects || {};
+    w.order = (w.order && w.order.length) ? w.order.filter(id => w.projects[id]) : Object.keys(w.projects);
+    if (!w.order.length) { Object.assign(w, defaultWorkspace()); }
+    if (!w.activeId || !w.projects[w.activeId]) w.activeId = w.order[0];
+    w.brand = w.brand || { company: "", logo: "", accent: "#2e5496" };
+    w.ai = w.ai || { provider: "openai", baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini", key: "" };
+    w.order.forEach(id => normalize(w.projects[id]));
+    return w;
+  }
+  function bind() { state = ws.projects[ws.activeId]; return state; }
+
+  function load() {
+    try {
+      const rawW = (typeof localStorage !== "undefined") && localStorage.getItem(WKEY);
+      if (rawW) ws = JSON.parse(rawW);
+      else {
+        const old = (typeof localStorage !== "undefined") && localStorage.getItem(KEY);
+        ws = defaultWorkspace();
+        if (old) ws.projects[ws.order[0]] = JSON.parse(old);  // migrate legacy single project
+      }
+    } catch (e) { ws = defaultWorkspace(); }
+    normalizeWs(ws); bind(); save(); return state;
+  }
+  function save() { try { if (typeof localStorage !== "undefined") localStorage.setItem(WKEY, JSON.stringify(ws)); } catch (e) {} }
+  function get() { if (!state) load(); return state; }
+  function workspace() { if (!ws) load(); return ws; }
+  function reset() { ws.projects[ws.activeId] = normalize(seed()); bind(); save(); return state; }
+  function replace(obj) { ws.projects[ws.activeId] = normalize(obj); bind(); save(); return state; }
+  function withProject(s, fn) { const prev = state; state = s; try { return fn(); } finally { state = prev; } }
+
+  // ---- projects ----
+  function listProjects() { return workspace().order.map(id => ({ id, name: ws.projects[id].project.name || "Untitled", status: ws.projects[id].project.status, active: id === ws.activeId })); }
+  function activeProjectId() { return workspace().activeId; }
+  function switchProject(id) { if (workspace().projects[id]) { ws.activeId = id; bind(); save(); } return state; }
+  function addProject(name) {
+    const id = uid(), s = seed();
+    s.project.name = name || "New Project"; s.cases = []; s.audit = []; s.snapshots = []; s.stakeholders = [];
+    workspace().projects[id] = normalize(s); ws.order.push(id); ws.activeId = id; bind(); save(); return id;
+  }
+  function renameProject(id, name) { if (workspace().projects[id]) { ws.projects[id].project.name = name; save(); } }
+  function duplicateProject(id) {
+    const src = workspace().projects[id]; if (!src) return null;
+    const nid = uid(), copy = JSON.parse(JSON.stringify(src));
+    copy.project.name = (src.project.name || "Project") + " (copy)";
+    ws.projects[nid] = copy; ws.order.push(nid); ws.activeId = nid; bind(); save(); return nid;
+  }
+  function deleteProject(id) {
+    if (workspace().order.length <= 1) return false;
+    delete ws.projects[id]; ws.order = ws.order.filter(x => x !== id);
+    if (ws.activeId === id) ws.activeId = ws.order[0];
+    bind(); save(); return true;
+  }
+  function importAsProject(obj) { const id = uid(); workspace().projects[id] = normalize(obj); ws.order.push(id); ws.activeId = id; bind(); save(); return id; }
+
+  // ---- brand + AI settings (workspace-level) ----
+  function brand() { return workspace().brand; }
+  function setBrand(patch) { Object.assign(workspace().brand, patch); save(); }
+  function aiSettings() { return workspace().ai; }
+  function setAi(patch) { Object.assign(workspace().ai, patch); save(); }
+
+  // ---- portfolio rollup across all projects ----
+  function portfolio() {
+    return workspace().order.map(id => {
+      const s = ws.projects[id];
+      return { id, name: s.project.name || "Untitled", status: s.project.status, active: id === ws.activeId, kpis: withProject(s, kpis) };
+    });
+  }
 
   // ---- audit log ----
   function codeOf(i) { return "CASE-" + String(i + 1).padStart(3, "0"); }
@@ -211,9 +276,11 @@
     return issues;
   }
 
-  const API = { uid, seed, load, save, get, reset, replace, addCase, updateCase, deleteCase, moveStatus,
+  const API = { uid, seed, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
-    auditList, clearAudit, takeSnapshot, snapshots, restoreSnapshot, deleteSnapshot, paretoRPN, controlChartData };
+    auditList, clearAudit, takeSnapshot, snapshots, restoreSnapshot, deleteSnapshot, paretoRPN, controlChartData,
+    listProjects, activeProjectId, switchProject, addProject, renameProject, duplicateProject, deleteProject, importAsProject,
+    brand, setBrand, aiSettings, setAi, portfolio };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);

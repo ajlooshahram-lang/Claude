@@ -34,6 +34,7 @@
   // ---------- views config ----------
   const VIEWS = [
     { g: "Overview" },
+    { id: "portfolio", label: "Portfolio", icon: "▣" },
     { id: "dashboard", label: "Dashboard", icon: "▤" },
     { id: "cases", label: "Cases (Master)", icon: "★" },
     { g: "Delivery" },
@@ -346,7 +347,11 @@
       ${tableWrap("<th>#</th><th>Case</th><th class='wrap'>Problem</th><th>RPN</th><th>Owner</th><th class='wrap'>AI recommended action</th>", rows)}</div>
       <div class="card"><div class="card-head"><h3>Ask the advisor</h3>
         <select id="advSel" style="max-width:220px">${opts(C.LISTS.category)}</select></div>
-        <div class="readout" id="advOut"></div></div>`;
+        <div class="readout" id="advOut"></div></div>
+      <div class="card"><div class="card-head"><h3>Ask the AI</h3><span class="muted" id="aiMode"></span></div>
+        <div class="toolbar"><input id="aiQ" class="grow" placeholder="e.g. What is blocking delivery and what should we tackle first?">
+          <button class="btn btn-primary" id="aiAsk">Ask</button></div>
+        <div class="readout" id="aiOut"><span class="muted">Ask a question about this project's data.</span></div></div>`;
   };
   AFTER.ai = function () {
     const PLAY = {
@@ -361,6 +366,45 @@
     };
     const upd = () => { $("#advOut").textContent = PLAY[$("#advSel").value] || ""; };
     $("#advSel").addEventListener("change", upd); upd();
+
+    // Ask the AI (BYO key, offline fallback)
+    const ai = S.aiSettings();
+    const modeEl = $("#aiMode");
+    modeEl.textContent = ai.key ? `Live · ${ai.model}` : "Offline mode (add a key in Settings for live answers)";
+    function context() {
+      const k = S.kpis();
+      const top = S.topRisks(20).map(c => `${c.code} | ${c.problem} | RPN ${c.rpn} | ${c.status} | owner ${c.owner || "?"} | method ${c.leanMethod || "?"} | target ${c.target || "?"}`).join("\n");
+      return `Project: ${S.get().project.name}. Cases ${k.total}, critical ${k.crit}, open ${k.open}, avg %done ${Math.round(k.avgDone * 100)}%, budget ${k.actTotal}/${k.estTotal}.\nCases (top by RPN):\n${top}`;
+    }
+    function offlineAnswer(q) {
+      const top = S.topRisks(3);
+      if (!top.length) return "No cases yet — add some on the Cases page.";
+      return "Offline summary (add an API key for tailored answers):\n" +
+        top.map((c, i) => `${i + 1}. ${c.problem} — ${c.ai}`).join("\n");
+    }
+    $("#aiAsk").addEventListener("click", async () => {
+      const q = $("#aiQ").value.trim(); if (!q) return;
+      const out = $("#aiOut");
+      if (!ai.key || typeof fetch !== "function") { out.textContent = offlineAnswer(q); return; }
+      out.textContent = "Thinking…";
+      try {
+        const res = await fetch(ai.baseUrl.replace(/\/$/, "") + "/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ai.key },
+          body: JSON.stringify({
+            model: ai.model,
+            messages: [
+              { role: "system", content: "You are a Lean/Six Sigma quality & project-management advisor. Use the provided project data. Be concise and action-oriented; reference case IDs." },
+              { role: "user", content: context() + "\n\nQuestion: " + q }
+            ],
+            temperature: 0.3
+          })
+        });
+        if (!res.ok) { out.textContent = "AI error (" + res.status + "). Check your key/endpoint in Settings. " + offlineAnswer(q); return; }
+        const data = await res.json();
+        out.textContent = (data.choices && data.choices[0] && data.choices[0].message.content) || "No response.";
+      } catch (e) { out.textContent = "Could not reach the AI endpoint. " + offlineAnswer(q); }
+    });
   };
 
   RENDER.health = function () {
@@ -371,7 +415,7 @@
   };
 
   RENDER.config = function () {
-    const p = S.get().project, roster = S.get().roster;
+    const p = S.get().project, roster = S.get().roster, b = S.brand(), ai = S.aiSettings();
     const rrows = roster.map((r, i) => `<tr>
       <td><input data-ro="${i}" data-f="name" value="${esc(r.name)}"></td>
       <td><select data-ro="${i}" data-f="role">${opts(C.LISTS.roles, r.role, "—")}</select></td>
@@ -398,17 +442,48 @@
       <div class="card"><h3>Data</h3>
         <div class="linkbtns">
           <button class="btn" data-act="export">Export JSON (backup)</button>
-          <button class="btn" data-act="import">Import JSON</button>
+          <button class="btn" data-act="import">Import JSON (as new project)</button>
           <button class="btn" data-act="csv">Export cases CSV</button>
           <button class="btn btn-danger" data-act="reset">Reset to sample data</button>
         </div>
-        <p class="muted" style="margin-top:10px">Your data is saved automatically in this browser. Export a JSON backup to move it to another device.</p></div>`;
+        <p class="muted" style="margin-top:10px">Your data is saved automatically in this browser. Export a JSON backup to move it to another device.</p></div>
+
+      <div class="card"><h3>Branding</h3>
+        <div class="form-grid">
+          <div class="field"><label>Company name</label><input id="b_company" value="${esc(b.company || "")}" placeholder="Your company"></div>
+          <div class="field"><label>Accent colour</label><input type="color" id="b_accent" value="${esc(b.accent || "#2e5496")}"></div>
+          <div class="field full"><label>Logo</label>
+            <div class="linkbtns" style="align-items:center">
+              ${b.logo ? `<img src="${b.logo}" alt="logo" style="height:40px;border:1px solid var(--line);border-radius:6px;background:#fff;padding:2px">` : '<span class="muted">No logo set</span>'}
+              <input type="file" id="logoFile" accept="image/*">
+              ${b.logo ? '<button class="btn btn-sm btn-danger" data-act="rmlogo">Remove logo</button>' : ''}
+            </div><span class="hint">PNG/SVG/JPG, ideally square. Stored locally, shown in the sidebar &amp; reports.</span></div>
+        </div>
+        <div style="margin-top:14px"><button class="btn btn-primary" data-act="savebrand">Save branding</button></div></div>
+
+      <div class="card"><h3>AI assistant (optional — bring your own key)</h3>
+        <p class="muted" style="margin-top:-6px">Leave blank to use the built-in offline advisor. Add an OpenAI-compatible key to enable natural-language Q&amp;A. The key is stored only in this browser and sent only to the endpoint you specify.</p>
+        <div class="form-grid">
+          <div class="field"><label>Provider</label><input id="ai_provider" value="${esc(ai.provider || "openai")}"></div>
+          <div class="field"><label>Model</label><input id="ai_model" value="${esc(ai.model || "gpt-4o-mini")}"></div>
+          <div class="field full"><label>API base URL</label><input id="ai_base" value="${esc(ai.baseUrl || "https://api.openai.com/v1")}"></div>
+          <div class="field full"><label>API key</label><input type="password" id="ai_key" value="${esc(ai.key || "")}" placeholder="sk-…"></div>
+        </div>
+        <div style="margin-top:14px"><button class="btn btn-primary" data-act="saveai">Save AI settings</button></div></div>`;
   };
   AFTER.config = function () {
     content.querySelectorAll("input[data-ro],select[data-ro]").forEach(inp => inp.addEventListener("change", () => {
       const i = +inp.dataset.ro; S.get().roster[i][inp.dataset.f] = inp.value; S.save();
-      if (inp.dataset.f === "name") setBrand();
+      if (inp.dataset.f === "name") refreshHeader();
     }));
+    const lf = $("#logoFile");
+    if (lf) lf.addEventListener("change", e => {
+      const f = e.target.files[0]; if (!f) return;
+      if (f.size > 400000) { toast("Logo too large (max ~400 KB)."); return; }
+      const fr = new FileReader();
+      fr.onload = () => { S.setBrand({ logo: fr.result }); refreshHeader(); go("config"); toast("Logo set."); };
+      fr.readAsDataURL(f);
+    });
   };
 
   RENDER.help = function () {
@@ -421,6 +496,37 @@
     </div></div>
     <div class="card"><h3>Your data is safe</h3><p>Everything is stored locally in your browser and saved automatically as you work — nothing is sent anywhere. Use <b>Export JSON</b> on the Settings page to back up or transfer your data, and <b>Import JSON</b> to restore it.</p></div>
     <div class="card"><h3>Print / share</h3><p>Use the <b>Print</b> button (top right) to print or save the current view as PDF. To share the app itself, host this folder on any static host (e.g. GitHub Pages).</p></div>`;
+  };
+
+  // ---------- Portfolio ----------
+  RENDER.portfolio = function () {
+    const ps = S.portfolio();
+    const rows = ps.map(p => `<tr>
+      <td><b>${esc(p.name)}</b>${p.active ? ' <span class="tag">active</span>' : ''}</td>
+      <td>${statusBadge(p.status)}</td>
+      <td class="center">${p.kpis.total}</td>
+      <td class="center">${p.kpis.crit}</td>
+      <td class="center">${p.kpis.open}</td>
+      <td class="center">${pct(p.kpis.avgDone)}</td>
+      <td class="right">${money(p.kpis.estTotal)}</td>
+      <td class="right">${money(p.kpis.actTotal)}</td>
+      <td class="center">
+        ${p.active ? '' : `<button class="btn btn-sm" data-act="openproj" data-id="${p.id}">Open</button>`}
+        <button class="btn btn-sm" data-act="renproj" data-id="${p.id}">Rename</button>
+        <button class="btn btn-sm" data-act="dupproj" data-id="${p.id}">Duplicate</button>
+        ${ps.length > 1 ? `<button class="btn btn-sm btn-danger" data-act="delproj" data-id="${p.id}">Del</button>` : ''}
+      </td></tr>`).join("");
+    const tot = ps.reduce((a, p) => ({ total: a.total + p.kpis.total, crit: a.crit + p.kpis.crit, open: a.open + p.kpis.open, est: a.est + p.kpis.estTotal, act: a.act + p.kpis.actTotal }), { total: 0, crit: 0, open: 0, est: 0, act: 0 });
+    const kpi = (cls, l, v) => `<div class="kpi ${cls}"><div class="label">${l}</div><div class="value">${v}</div></div>`;
+    return `<div class="grid kpis" style="margin-bottom:16px">
+        ${kpi("navy", "Projects", ps.length)}
+        ${kpi("blue", "All Cases", tot.total)}
+        ${kpi("red", "All Critical", tot.crit)}
+        ${kpi("teal", "All Open", tot.open)}
+        ${kpi("purple", "Total Spend", money(tot.act))}</div>
+      <div class="toolbar"><button class="btn btn-primary" data-act="newproj">+ New project</button>
+        <span class="muted">Each project has its own cases, risks, budget, history and backups.</span></div>
+      ${tableWrap("<th>Project</th><th>Status</th><th>Cases</th><th>Critical</th><th>Open</th><th>% Done</th><th>Est. budget</th><th>Actual</th><th></th>", rows)}`;
   };
 
   // ---------- Kanban board ----------
@@ -616,14 +722,53 @@
       try {
         const obj = JSON.parse(fr.result);
         if (!obj.cases) throw new Error("Not a QI backup");
-        S.replace(obj); setBrand(); toast("Data imported."); go("dashboard");
+        S.importAsProject(obj); refreshHeader(); toast("Imported as a new project."); go("dashboard");
       } catch (e) { toast("Import failed: invalid file."); }
     };
     fr.readAsText(file);
   }
+  function b64enc(s) { return btoa(unescape(encodeURIComponent(s))); }
+  function b64dec(s) { return decodeURIComponent(escape(atob(s))); }
+  function shareLink() {
+    try {
+      const data = b64enc(JSON.stringify(S.get()));
+      const url = location.origin + location.pathname + "#p=" + data;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => toast("Share link copied to clipboard."), () => prompt("Copy this share link:", url));
+      } else { prompt("Copy this share link:", url); }
+    } catch (e) { toast("Could not build link (data too large?)."); }
+  }
+  function checkShareHash() {
+    if (location.hash && location.hash.indexOf("#p=") === 0) {
+      try {
+        const obj = JSON.parse(b64dec(location.hash.slice(3)));
+        if (obj.cases && confirm("Open the shared project from this link as a new project?")) {
+          S.importAsProject(obj); refreshHeader();
+        }
+      } catch (e) { toast("Shared link could not be read."); }
+      try { history.replaceState(null, "", location.pathname); } catch (e) { location.hash = ""; }
+    }
+  }
 
   // ---------- global events ----------
-  function setBrand() { $("#brandProject").textContent = S.get().project.name || "QI Platform"; }
+  function refreshHeader() {
+    const b = S.brand(), p = S.get().project;
+    $("#brandProject").textContent = p.name || "Untitled project";
+    $("#brandCompany").textContent = b.company || "QI Platform";
+    const logo = $("#brandLogo"), mark = $("#brandMark");
+    if (b.logo) { logo.src = b.logo; logo.hidden = false; mark.classList.add("has-logo"); }
+    else { logo.hidden = true; logo.removeAttribute("src"); mark.classList.remove("has-logo"); }
+    const accent = b.accent || "#2e5496";
+    document.documentElement.style.setProperty("--blue", accent);
+    buildProjectSwitch();
+  }
+  function buildProjectSwitch() {
+    const sel = $("#projectSwitch"); if (!sel) return;
+    const ps = S.listProjects();
+    sel.innerHTML = ps.map(p => `<option value="${p.id}" ${p.active ? "selected" : ""}>${esc(p.name)}</option>`).join("")
+      + `<option value="__new">＋ New project…</option>`;
+  }
+  function setBrand() { refreshHeader(); }   // back-compat alias
 
   content.addEventListener("click", e => {
     const b = e.target.closest("[data-act]"); if (!b) return;
@@ -639,6 +784,20 @@
     else if (act === "restore") { if (confirm("Restore this snapshot? Current data is auto-backed-up first.")) { S.restoreSnapshot(id); setBrand(); toast("Snapshot restored."); go("dashboard"); } }
     else if (act === "delsnap") { S.deleteSnapshot(id); go("audit"); }
     else if (act === "clearaudit") { if (confirm("Clear the change-history log?")) { S.clearAudit(); go("audit"); } }
+    else if (act === "openproj") { S.switchProject(id); refreshHeader(); go("dashboard"); toast("Switched project."); }
+    else if (act === "newproj") { const n = prompt("New project name:", "New Project"); if (n) { S.addProject(n); refreshHeader(); go("dashboard"); toast("Project created."); } }
+    else if (act === "renproj") { const cur = S.listProjects().find(x => x.id === id); const n = prompt("Rename project:", cur ? cur.name : ""); if (n) { S.renameProject(id, n); refreshHeader(); go("portfolio"); } }
+    else if (act === "dupproj") { S.duplicateProject(id); refreshHeader(); go("dashboard"); toast("Project duplicated."); }
+    else if (act === "delproj") { if (confirm("Delete this project and all its data? This cannot be undone.")) { S.deleteProject(id); refreshHeader(); go("portfolio"); toast("Project deleted."); } }
+    else if (act === "savebrand") {
+      S.setBrand({ company: $("#b_company").value, accent: $("#b_accent").value });
+      refreshHeader(); toast("Branding saved.");
+    }
+    else if (act === "rmlogo") { S.setBrand({ logo: "" }); refreshHeader(); go("config"); }
+    else if (act === "saveai") {
+      S.setAi({ provider: $("#ai_provider").value, baseUrl: $("#ai_base").value, model: $("#ai_model").value, key: $("#ai_key").value });
+      toast("AI settings saved.");
+    }
     else if (act === "reset") { if (confirm("Reset to sample data? Your current data will be replaced.")) { S.reset(); setBrand(); go("dashboard"); toast("Reset to sample data."); } }
     else if (act === "addsk") { S.get().stakeholders.push({ name: "", role: "", influence: "", interest: "", raci: "" }); S.save(); go("stakeholders"); }
     else if (act === "delsk") { S.get().stakeholders.splice(+id, 1); S.save(); go("stakeholders"); }
@@ -667,11 +826,17 @@
   $("#navAddCase").addEventListener("click", () => openCaseForm());
   $("#btnExport").addEventListener("click", exportJSON);
   $("#btnImport").addEventListener("click", importJSON);
+  $("#btnShare").addEventListener("click", shareLink);
   $("#btnPrint").addEventListener("click", () => window.print());
   $("#fileImport").addEventListener("change", e => { if (e.target.files[0]) handleImport(e.target.files[0]); e.target.value = ""; });
   $("#hamburger").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
+  $("#projectSwitch").addEventListener("change", e => {
+    const v = e.target.value;
+    if (v === "__new") { const n = prompt("New project name:", "New Project"); if (n) { S.addProject(n); } refreshHeader(); go("dashboard"); }
+    else { S.switchProject(v); refreshHeader(); go(current === "portfolio" ? "portfolio" : "dashboard"); }
+  });
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
 
   // ---------- init ----------
-  S.load(); buildNav(); setBrand(); go("dashboard");
+  S.load(); checkShareHash(); buildNav(); refreshHeader(); go("dashboard");
 })();
