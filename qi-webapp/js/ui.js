@@ -47,6 +47,7 @@
     { id: "sigma", label: "Six Sigma", icon: "∿" },
     { id: "gage", label: "Gage R&R (MSA)", icon: "📐" },
     { id: "riskmatrix", label: "Risk Matrix", icon: "▦" },
+    { id: "xbarr", label: "X̄-R Control Chart", icon: "⎍" },
     { g: "Improve" },
     { id: "pdca", label: "PDCA", icon: "↻" },
     { id: "log", label: "Action Log", icon: "✎" },
@@ -56,6 +57,7 @@
     { g: "Intelligence" },
     { id: "ai", label: "AI Assistant", icon: "✦" },
     { id: "impact", label: "Change Impact", icon: "⇄" },
+    { id: "scorecard", label: "KPI Scorecard", icon: "▣" },
     { id: "health", label: "Data Health", icon: "✚" },
     { g: "Setup" },
     { id: "report", label: "Report Pack", icon: "🖨" },
@@ -67,6 +69,7 @@
   (function insertRegisters() {
     const items = [{ g: "Engineering" }];
     C.REGISTERS.filter(r => r.group === "Engineering").forEach(r => items.push({ id: r.id, label: r.label, icon: r.icon }));
+    items.push({ id: "bowtie", label: "Bow-tie (HAZOP)", icon: "🎀" });
     items.push({ g: "Business" }, { id: "evm", label: "Earned Value (EVM)", icon: "∑" }, { id: "cashflow", label: "Cash Flow / S-curve", icon: "〽" });
     C.REGISTERS.filter(r => r.group === "Business").forEach(r => items.push({ id: r.id, label: r.label, icon: r.icon }));
     const idx = VIEWS.findIndex(v => v.g === "Intelligence");
@@ -892,6 +895,75 @@
         <h3>Open non-conformances</h3>${tableWrap("<th class='wrap'>Description</th><th>Severity</th><th>Disposition</th><th>Status</th>", ncrOpen)}
         <h3>HAZOP — high-risk items (S×L ≥ 15)</h3>${tableWrap("<th class='wrap'>Node</th><th class='wrap'>Deviation</th><th>Risk</th><th class='wrap'>Action</th>", hzCrit)}
       </div>`;
+  };
+
+  // ---------- X-bar & R control chart ----------
+  RENDER.xbarr = function () {
+    const g = S.xbar(), r = S.xbarResult();
+    const optN = (n, sel) => Array.from({ length: n }, (_, i) => i + 1).map(v => `<option ${v === sel ? "selected" : ""}>${v}</option>`).join("");
+    let grid = `<table class="gage"><thead><tr><th>Subgroup</th>${Array.from({ length: g.size }, (_, j) => `<th>x${j + 1}</th>`).join("")}<th>Mean</th><th>Range</th></tr></thead><tbody>`;
+    for (let i = 0; i < g.subgroups; i++) {
+      grid += `<tr><td>SG ${i + 1}</td>` + Array.from({ length: g.size }, (_, j) => {
+        const v = g.data[`${i}_${j}`]; return `<td><select data-xb="${i}" data-xj="${j}" style="width:74px">${opts(C.numSeq(0, 20, 0.1), v == null ? "" : v, "—")}</select></td>`;
+      }).join("") + `<td class="center">${r.means[i] == null ? "" : r.means[i].toFixed(2)}</td><td class="center">${r.ranges[i] == null ? "" : r.ranges[i].toFixed(2)}</td></tr>`;
+    }
+    grid += "</tbody></table>";
+    return `<div class="card"><div class="card-head"><h3>Subgroup data</h3>
+        <label class="muted">Subgroups <select id="xbK" style="width:64px">${optN(12, g.subgroups)}</select></label>
+        <label class="muted">Size <select id="xbN" style="width:64px">${optN(6, g.size)}</select></label></div>
+        <div class="table-wrap">${grid}</div>
+        <p class="muted">X̄̄ = ${r.xbb.toFixed(2)} · R̄ = ${r.rbar.toFixed(2)} · X̄ limits ${r.xLcl.toFixed(2)}–${r.xUcl.toFixed(2)} · R UCL ${r.rUcl.toFixed(2)} (constants A2/D4 by subgroup size).</p></div>
+      <div class="row2"><div class="card"><h3>X̄ chart (subgroup means)</h3><div class="chart-box"><canvas id="chXbar"></canvas></div></div>
+        <div class="card"><h3>R chart (subgroup ranges)</h3><div class="chart-box"><canvas id="chR"></canvas></div></div></div>`;
+  };
+  AFTER.xbarr = function () {
+    content.querySelectorAll("[data-xb]").forEach(s => s.addEventListener("change", () => { S.setXbarCell(+s.dataset.xb, +s.dataset.xj, s.value); go("xbarr"); }));
+    const cfg = (id, key) => { const el = $("#" + id); if (el) el.addEventListener("change", () => { S.setXbarConfig({ [key]: +el.value }); go("xbarr"); }); };
+    cfg("xbK", "subgroups"); cfg("xbN", "size");
+    const r = S.xbarResult(); const labels = r.means.map((_, i) => "SG " + (i + 1));
+    CH.control("chXbar", labels, r.means.map(v => v == null ? null : +v.toFixed(3)), +r.xbb.toFixed(3), +r.xUcl.toFixed(3), +r.xLcl.toFixed(3));
+    CH.control("chR", labels, r.ranges.map(v => v == null ? null : +v.toFixed(3)), +r.rbar.toFixed(3), +r.rUcl.toFixed(3), +r.rLcl.toFixed(3));
+  };
+
+  // ---------- HAZOP Bow-tie ----------
+  RENDER.bowtie = function () {
+    const rows = S.regRows("hazop").filter(r => r.node);
+    const nodes = [...new Set(rows.map(r => r.node))];
+    if (!nodes.length) return `<div class="empty">Add HAZOP entries (with a Node) to build a bow-tie.</div>`;
+    const sel = uiState.bowtieNode && nodes.includes(uiState.bowtieNode) ? uiState.bowtieNode : nodes[0];
+    const set = rows.filter(r => r.node === sel);
+    const uniq = (arr) => [...new Set(arr.filter(Boolean))];
+    const threats = uniq(set.map(r => r.cause));
+    const consequences = uniq(set.map(r => r.consequence));
+    const preventive = uniq(set.map(r => r.safeguard));
+    const mitigative = uniq(set.map(r => r.action));
+    const chips = (arr, cls) => arr.length ? arr.map(x => `<div class="bt-chip ${cls}">${esc(x)}</div>`).join("") : `<div class="bt-chip muted">—</div>`;
+    const topEvent = sel + (set[0] && set[0].deviation ? " · " + set[0].deviation : "");
+    return `<div class="card"><div class="card-head"><h3>Bow-tie — barrier analysis</h3>
+        <select id="btSel">${opts(nodes, sel)}</select></div>
+      <div class="bowtie">
+        <div class="bt-col"><div class="bt-h">Threats / causes</div>${chips(threats, "bt-threat")}</div>
+        <div class="bt-col"><div class="bt-h">Preventive barriers</div>${chips(preventive, "bt-bar")}</div>
+        <div class="bt-col bt-center"><div class="bt-top">TOP EVENT<br><b>${esc(topEvent)}</b></div></div>
+        <div class="bt-col"><div class="bt-h">Mitigative barriers</div>${chips(mitigative, "bt-bar")}</div>
+        <div class="bt-col"><div class="bt-h">Consequences</div>${chips(consequences, "bt-cons")}</div>
+      </div>
+      <p class="muted">Left-to-right: causes are stopped by preventive barriers; if the top event still occurs, mitigative barriers limit the consequences. Built from the HAZOP entries for this node.</p></div>`;
+  };
+  AFTER.bowtie = function () { const s = $("#btSel"); if (s) s.addEventListener("change", () => { uiState.bowtieNode = s.value; go("bowtie"); }); };
+
+  // ---------- KPI Scorecard ----------
+  RENDER.scorecard = function () {
+    const sc = S.scorecard();
+    const dot = r => `<span class="rag rag-${r}"></span>`;
+    const rows = sc.map(s => `<tr><td>${esc(s.area)}</td><td>${esc(s.metric)}</td><td class="center"><b>${esc(s.value)}</b></td><td class="center">${dot(s.rag)}</td></tr>`).join("");
+    const g = sc.filter(s => s.rag === "g").length, a = sc.filter(s => s.rag === "a").length, rr = sc.filter(s => s.rag === "r").length;
+    const kpi = (cls, l, v) => `<div class="kpi ${cls}"><div class="label">${l}</div><div class="value">${v}</div></div>`;
+    return `<div class="grid kpis" style="margin-bottom:16px">
+        ${kpi("green", "On track (green)", g)}${kpi("gold", "Watch (amber)", a)}${kpi("red", "Action needed (red)", rr)}</div>
+      <div class="card"><h3>Management KPI scorecard (RAG)</h3>
+        ${tableWrap("<th>Area</th><th>Metric</th><th>Value</th><th>RAG</th>", rows)}
+        <p class="muted">Auto-calculated live from delivery, cost (EVM), quality (Sigma/NCR), risk and safety data. See the OKR register for objective tracking.</p></div>`;
   };
 
   // ---------- case form ----------

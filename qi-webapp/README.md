@@ -33,12 +33,12 @@ No install, no build step, no server, works offline.
 
 **Overview:** Portfolio · Dashboard · Cases (Master)
 **Delivery:** PM Tasks · Kanban Board · Timeline (Gantt)
-**Risk & Quality:** Risk Register · FMEA · Six Sigma (+ SPC I-MR control charts) · Gage R&R (MSA) · Risk Matrix
+**Risk & Quality:** Risk Register · FMEA · Six Sigma (+ SPC I-MR) · Gage R&R (MSA) · Risk Matrix · X̄-R Control Chart
 **Improve:** PDCA · Action Log
 **People & Cost:** Stakeholders (RACI) · Budget
-**Engineering registers:** HAZOP (with guidewords & parameters) · Calibration · Punch List · SIL / Functional Safety · Requirements Traceability · Document Register · Non-Conformance (NCR) · Management of Change (MOC)
-**Business management:** Earned Value (EVM) · Cash Flow / S-curve · Milestones · Decision Log · Procurement · Resources / Capacity
-**Intelligence:** AI Assistant · Change Impact (traceability) · Data Health
+**Engineering registers:** HAZOP (guidewords & parameters) · Bow-tie diagram · Calibration · Punch List · SIL · Requirements Traceability · Document Register · NCR · MOC
+**Business management:** Earned Value (EVM) · Cash Flow / S-curve · Milestones · Decision Log · Procurement · Resources / Capacity · OKR Scorecard
+**Intelligence:** AI Assistant · Change Impact (traceability) · KPI Scorecard (RAG) · Data Health
 **Setup:** Report Pack (printable) · History & Backups · Settings · Help
 
 ## Engineering & business management

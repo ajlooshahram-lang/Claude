@@ -193,3 +193,20 @@ table.riskmatrix th{background:#f0f3f9;font-size:11px}
 .report h3{margin:16px 0 8px;border-bottom:2px solid var(--line);padding-bottom:4px}
 .report .kpi .value{font-size:20px}
 @media print{ .no-print{display:none!important} }
+
+
+/* bow-tie */
+.bowtie{display:grid;grid-template-columns:1fr 1fr 1.1fr 1fr 1fr;gap:10px;align-items:start}
+@media(max-width:900px){.bowtie{grid-template-columns:1fr 1fr 1fr}}
+.bt-col{display:flex;flex-direction:column;gap:8px}
+.bt-h{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#42506a;text-align:center;margin-bottom:2px}
+.bt-chip{background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:12px;text-align:center;box-shadow:var(--shadow)}
+.bt-threat{border-left:4px solid var(--red)}
+.bt-cons{border-left:4px solid var(--amber)}
+.bt-bar{border-left:4px solid var(--teal);background:#f0faf9}
+.bt-center{justify-content:center}
+.bt-top{background:var(--navy);color:#fff;border-radius:12px;padding:18px 12px;text-align:center;font-size:11px;letter-spacing:.04em}
+.bt-top b{font-size:13px}
+/* rag */
+.rag{display:inline-block;width:16px;height:16px;border-radius:50%}
+.rag-g{background:#2faa4e}.rag-a{background:#e6a700}.rag-r{background:#c00000}

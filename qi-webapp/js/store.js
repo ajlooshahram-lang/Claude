@@ -91,11 +91,25 @@
           { _id: uid(), person: "Dev Lead", role: "Software", capacity: 80, allocated: 72 },
           { _id: uid(), person: "QA Lead", role: "Quality", capacity: 80, allocated: 84 },
           { _id: uid(), person: "Ops Lead", role: "Commissioning", capacity: 80, allocated: 60 }
+        ],
+        okr: [
+          { _id: uid(), objective: "Improve on-time delivery", keyResult: "On-time delivery >95%", owner: "PM", baseline: 70, target: 95, current: 80 },
+          { _id: uid(), objective: "Reduce defects", keyResult: "Defect rate <2%", owner: "QA Lead", baseline: 12, target: 2, current: 6 }
         ]
       },
       gage: defaultGage(),
-      cashflow: defaultCashflow()
+      cashflow: defaultCashflow(),
+      xbarR: defaultXbar()
     };
+  }
+  function defaultXbar() {
+    const data = {
+      "0_0": 10.1, "0_1": 9.8, "0_2": 10.0, "0_3": 10.2, "1_0": 9.9, "1_1": 10.3, "1_2": 10.1, "1_3": 9.7,
+      "2_0": 10.4, "2_1": 10.0, "2_2": 9.9, "2_3": 10.2, "3_0": 9.6, "3_1": 9.9, "3_2": 10.1, "3_3": 10.0,
+      "4_0": 10.2, "4_1": 10.5, "4_2": 10.1, "4_3": 9.8, "5_0": 9.7, "5_1": 9.9, "5_2": 10.0, "5_3": 10.1,
+      "6_0": 10.3, "6_1": 10.1, "6_2": 9.8, "6_3": 10.0, "7_0": 9.9, "7_1": 10.2, "7_2": 10.4, "7_3": 10.1
+    };
+    return { subgroups: 8, size: 4, data };
   }
   function defaultGage() {
     // 5 parts x 3 operators x 2 trials, seeded with a realistic dataset
@@ -124,6 +138,7 @@
     C.REGISTERS.forEach(reg => { if (!Array.isArray(s.registers[reg.id])) s.registers[reg.id] = []; });
     if (!s.gage || !s.gage.data) s.gage = defaultGage();
     if (!Array.isArray(s.cashflow)) s.cashflow = defaultCashflow();
+    if (!s.xbarR || !s.xbarR.data) s.xbarR = defaultXbar();
     return s;
   }
   function defaultWorkspace() {
@@ -261,11 +276,33 @@
   function gageResult() { return C.gageRR(gage()); }
   function cashflow() { const s = get(); if (!Array.isArray(s.cashflow)) s.cashflow = defaultCashflow(); return s.cashflow; }
   function setCashflow(i, field, v) { const c = cashflow(); if (c[i]) { c[i][field] = (field === "month") ? v : (v === "" ? null : Number(v)); save(); } }
+  function xbar() { const s = get(); if (!s.xbarR) s.xbarR = defaultXbar(); return s.xbarR; }
+  function setXbarCell(i, j, v) { xbar().data[`${i}_${j}`] = (v === "" ? "" : Number(v)); save(); }
+  function setXbarConfig(patch) { Object.assign(xbar(), patch); save(); }
+  function xbarResult() { return C.xbarR(xbar()); }
+  function scorecard() {
+    const k = kpis(), e = C.evm(validCases(), get().project);
+    const sr = sigmaRows().filter(x => x.sigma != null); const sigma = sr.length ? sr[sr.length - 1].sigma : null;
+    const ncrOpen = regRows("ncr").filter(r => r.status !== "CLOSED").length;
+    const hzHigh = regRows("hazop").filter(r => (Number(r.sev) || 0) * (Number(r.lik) || 0) >= 15).length;
+    const msSlip = regRows("milestones").filter(r => r.status === "Slipped").length;
+    return [
+      { area: "Delivery", metric: "Avg % done", value: Math.round(k.avgDone * 100) + "%", rag: k.avgDone >= 0.66 ? "g" : k.avgDone >= 0.33 ? "a" : "r" },
+      { area: "Schedule", metric: "SPI (schedule perf.)", value: e.spi.toFixed(2), rag: e.spi >= 1 ? "g" : e.spi >= 0.9 ? "a" : "r" },
+      { area: "Cost", metric: "CPI (cost perf.)", value: e.cpi.toFixed(2), rag: e.cpi >= 1 ? "g" : e.cpi >= 0.9 ? "a" : "r" },
+      { area: "Cost", metric: "% budget spent", value: Math.round(k.pctSpent * 100) + "%", rag: k.pctSpent <= 1 ? "g" : "r" },
+      { area: "Quality", metric: "Sigma level", value: sigma == null ? "—" : sigma, rag: sigma == null ? "a" : sigma >= 4 ? "g" : sigma >= 3 ? "a" : "r" },
+      { area: "Quality", metric: "Open NCRs", value: ncrOpen, rag: ncrOpen === 0 ? "g" : ncrOpen <= 2 ? "a" : "r" },
+      { area: "Risk", metric: "Critical risks open", value: k.crit, rag: k.crit === 0 ? "g" : k.crit <= 2 ? "a" : "r" },
+      { area: "Safety", metric: "HAZOP high-risk open", value: hzHigh, rag: hzHigh === 0 ? "g" : hzHigh <= 1 ? "a" : "r" },
+      { area: "Schedule", metric: "Milestones slipped", value: msSlip, rag: msSlip === 0 ? "g" : "r" }
+    ];
+  }
 
   // ---- snapshots (restore points) ----
   function takeSnapshot(label) {
     const s = get();
-    const copy = JSON.parse(JSON.stringify({ project: s.project, roster: s.roster, cases: s.cases, sigma: s.sigma, stakeholders: s.stakeholders, registers: s.registers, gage: s.gage, cashflow: s.cashflow }));
+    const copy = JSON.parse(JSON.stringify({ project: s.project, roster: s.roster, cases: s.cases, sigma: s.sigma, stakeholders: s.stakeholders, registers: s.registers, gage: s.gage, cashflow: s.cashflow, xbarR: s.xbarR }));
     s.snapshots.unshift({ id: uid(), ts: new Date().toISOString(), label: label || ("Snapshot " + new Date().toLocaleString()), data: copy });
     if (s.snapshots.length > 25) s.snapshots.length = 25;
     logAudit("Snapshot", "", label || "manual"); save();
@@ -276,7 +313,7 @@
     const snap = get().snapshots.find(x => x.id === id); if (!snap) return false;
     takeSnapshot("Auto-backup before restore");
     const s = get(), d = JSON.parse(JSON.stringify(snap.data));
-    s.project = d.project; s.roster = d.roster; s.cases = d.cases; s.sigma = d.sigma; s.stakeholders = d.stakeholders; if (d.registers) s.registers = d.registers; if (d.gage) s.gage = d.gage; if (d.cashflow) s.cashflow = d.cashflow;
+    s.project = d.project; s.roster = d.roster; s.cases = d.cases; s.sigma = d.sigma; s.stakeholders = d.stakeholders; if (d.registers) s.registers = d.registers; if (d.gage) s.gage = d.gage; if (d.cashflow) s.cashflow = d.cashflow; if (d.xbarR) s.xbarR = d.xbarR;
     normalize(s); logAudit("Restored", "", snap.label); save(); return true;
   }
   function deleteSnapshot(id) {
@@ -368,7 +405,8 @@
     listProjects, activeProjectId, switchProject, addProject, renameProject, duplicateProject, deleteProject, importAsProject,
     brand, setBrand, aiSettings, setAi, portfolio,
     regRows, regAdd, regUpdate, regDelete, regLabel, evm: () => C.evm(validCases(), get().project),
-    gage, setGageCell, setGageConfig, gageResult, cashflow, setCashflow };
+    gage, setGageCell, setGageConfig, gageResult, cashflow, setCashflow,
+    xbar, setXbarCell, setXbarConfig, xbarResult, scorecard };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);
