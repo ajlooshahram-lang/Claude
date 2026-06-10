@@ -91,7 +91,11 @@
   function go(view) {
     current = view;
     $("#viewTitle").textContent = TITLES[view] || "QI Platform";
-    document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+    document.querySelectorAll(".nav-item").forEach(b => {
+      const active = b.dataset.view === view;
+      b.classList.toggle("active", active);
+      if (active) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+    });
     $("#sidebar").classList.remove("open");
     CH.destroyAll();
     content.innerHTML = (RENDER[view] || (() => "<div class='empty'>Not found</div>"))();
@@ -1188,6 +1192,41 @@
     });
   }
   function closeModal() { $("#modalOverlay").hidden = true; $("#modal").innerHTML = ""; }
+  // After any modal is shown, move keyboard focus into it for accessibility.
+  // Observe the overlay so every code-path that opens a modal benefits.
+  (function setupModalAutoFocus() {
+    const overlay = $("#modalOverlay"), modal = $("#modal");
+    if (!overlay || !modal || typeof MutationObserver === "undefined") return;
+    const focusFirst = () => {
+      if (overlay.hidden) return;
+      const f = modal.querySelector("input:not([type=hidden]),select,textarea,button.btn-primary,.btn");
+      if (f) try { f.focus(); } catch (e) {}
+    };
+    new MutationObserver(focusFirst).observe(overlay, { attributes: true, attributeFilter: ["hidden"] });
+    new MutationObserver(focusFirst).observe(modal, { childList: true });
+  })();
+
+  // Open a click-only project-name picker modal (no prompt())
+  function openProjectNameModal(opts) {
+    const cur = opts.current || "";
+    const sel = `<select id="proj_name_pick">${optsList(C.LISTS.projectNames, cur, "— choose a project name —")}</select>`;
+    $("#modal").innerHTML = `<h2>${esc(opts.title)}</h2>
+      <div class="sub">${esc(opts.subtitle || "Pick a name. The Settings page lets you update it later.")}</div>
+      <div class="field full"><label>Project name</label>${sel}</div>
+      <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
+        <button class="btn" data-act="cancel">Cancel</button>
+        <button class="btn btn-primary" id="proj_name_ok">${esc(opts.okLabel || "OK")}</button>
+      </div></div>`;
+    $("#modalOverlay").hidden = false;
+    const sf = $("#proj_name_pick"); if (sf) sf.focus();
+    $("#proj_name_ok").addEventListener("click", () => {
+      const v = $("#proj_name_pick").value;
+      if (!v) { toast("Please choose a name."); return; }
+      closeModal(); opts.onPick(v);
+    });
+  }
+  // tiny shim because opts() shadows the option-list builder; keep one global
+  const optsList = (arr, sel, blank) => opts(arr, sel, blank);
 
   function openA3(id) {
     const c = S.get().cases.find(x => x.id === id); if (!c) return;
@@ -1258,9 +1297,24 @@
       const data = b64enc(JSON.stringify(S.get()));
       const url = location.origin + location.pathname + "#p=" + data;
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url).then(() => toast("Share link copied to clipboard."), () => prompt("Copy this share link:", url));
-      } else { prompt("Copy this share link:", url); }
+        navigator.clipboard.writeText(url).then(() => toast("Share link copied to clipboard."), () => showShareLinkFallback(url));
+      } else { showShareLinkFallback(url); }
     } catch (e) { toast("Could not build link (data too large?)."); }
+  }
+  function showShareLinkFallback(url) {
+    $("#modal").innerHTML = `<h2>Share link</h2>
+      <div class="sub">Copy this link and paste it to a colleague. They can open it as a new project on their device.</div>
+      <textarea id="shareUrl" readonly rows="3" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px">${esc(url)}</textarea>
+      <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
+        <button class="btn btn-primary" id="copyShare">Copy</button>
+        <button class="btn" data-act="cancel">Close</button>
+      </div></div>`;
+    $("#modalOverlay").hidden = false;
+    const t0 = $("#shareUrl"); if (t0) { t0.focus(); t0.select(); }
+    $("#copyShare").addEventListener("click", () => {
+      const t = $("#shareUrl"); t.select();
+      try { document.execCommand("copy"); toast("Copied."); } catch (e) { toast("Press Ctrl/Cmd+C to copy."); }
+    });
   }
   function checkShareHash() {
     if (location.hash && location.hash.indexOf("#p=") === 0) {
@@ -1279,6 +1333,7 @@
     const dark = !!(S.brand() && S.brand().theme === "dark");
     document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
     const btn = $("#btnTheme"); if (btn) btn.textContent = dark ? "☼" : "◐";
+    if (window.QICharts && QICharts.refresh) QICharts.refresh();
   }
   function toggleTheme() {
     const cur = (S.brand() && S.brand().theme) || "light";
@@ -1358,8 +1413,8 @@
     else if (act === "delsnap") { S.deleteSnapshot(id); go("audit"); }
     else if (act === "clearaudit") { if (confirm("Clear the change-history log?")) { S.clearAudit(); go("audit"); } }
     else if (act === "openproj") { S.switchProject(id); refreshHeader(); go("dashboard"); toast("Switched project."); }
-    else if (act === "newproj") { const n = prompt("New project name:", "New Project"); if (n) { S.addProject(n); refreshHeader(); go("dashboard"); toast("Project created."); } }
-    else if (act === "renproj") { const cur = S.listProjects().find(x => x.id === id); const n = prompt("Rename project:", cur ? cur.name : ""); if (n) { S.renameProject(id, n); refreshHeader(); go("portfolio"); } }
+    else if (act === "newproj") { openProjectNameModal({ title: "New project", okLabel: "Create", onPick: n => { S.addProject(n); refreshHeader(); go("dashboard"); toast("Project created."); } }); }
+    else if (act === "renproj") { const cur = S.listProjects().find(x => x.id === id); openProjectNameModal({ title: "Rename project", current: cur ? cur.name : "", okLabel: "Rename", onPick: n => { S.renameProject(id, n); refreshHeader(); go("portfolio"); toast("Renamed."); } }); }
     else if (act === "dupproj") { S.duplicateProject(id); refreshHeader(); go("dashboard"); toast("Project duplicated."); }
     else if (act === "delproj") { if (confirm("Delete this project and all its data? This cannot be undone.")) { S.deleteProject(id); refreshHeader(); go("portfolio"); toast("Project deleted."); } }
     else if (act === "savebrand") {
@@ -1412,7 +1467,11 @@
   $("#hamburger").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
   $("#projectSwitch").addEventListener("change", e => {
     const v = e.target.value;
-    if (v === "__new") { const n = prompt("New project name:", "New Project"); if (n) { S.addProject(n); } refreshHeader(); go("dashboard"); }
+    if (v === "__new") {
+      // restore previous selection while the modal is open
+      e.target.value = S.activeProjectId();
+      openProjectNameModal({ title: "New project", okLabel: "Create", onPick: n => { S.addProject(n); refreshHeader(); go("dashboard"); toast("Project created."); } });
+    }
     else { S.switchProject(v); refreshHeader(); go(current === "portfolio" ? "portfolio" : "dashboard"); }
   });
   document.addEventListener("keydown", e => {

@@ -571,8 +571,6 @@
   }
 
   // Earned Value Management from cases (budget + % done) and the schedule.
-
-  // Earned Value Management from cases (budget + % done) and the schedule.
   function evm(cases, project) {
     const v = cases.filter(c => c.problem);
     const bac = v.reduce((a, c) => a + (Number(c.estCost) || 0), 0);

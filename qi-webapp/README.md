@@ -74,6 +74,14 @@ Every operational field in the app is a **dropdown or picker** — there is no f
 - **Share link** — encode the current project into a URL.
 - **Optional AI** (bring-your-own-key, OpenAI-compatible) with offline fallback.
 
+## Quality & accessibility
+
+- **Click-only by design.** No `prompt()`/free-text dialogs anywhere — even creating or renaming a project uses a dropdown picker. The smoke test stubs `window.prompt` and asserts it never fires.
+- **Keyboard-friendly.** All buttons, nav items and dropdowns have visible `:focus-visible` outlines. Modals auto-focus their first field. `Esc` closes any modal.
+- **Screen-reader hints.** Active sidebar items expose `aria-current="page"`; modals are `role="dialog"`; icon-only topbar buttons carry `aria-label`s.
+- **Themed charts.** Chart.js axis ticks, grid lines, legends and tooltips re-colour automatically when you toggle dark mode (no chart re-render needed).
+- **Verified.** 5/5 engine test suites and 110/110 jsdom smoke checks across 43 views, including regression checks for the polish above.
+
 ## Files
 
 ```
