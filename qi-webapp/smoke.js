@@ -25,7 +25,7 @@ ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard rende
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 
 // 2) navigate every view (simulate clicks)
-const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","pdca","log","stakeholders","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","evm","cashflow","milestones","decisions","procurement","resources","ai","impact","health","report","audit","config","help"];
+const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","pdca","log","stakeholders","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","report","audit","config","help"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -115,9 +115,17 @@ ok(/Change impact|traceability/i.test(doc.getElementById("content").innerHTML), 
 doc.querySelector('.nav-item[data-view="report"]').dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(/Project Report|Earned value|Top risks/.test(doc.getElementById("content").innerHTML), "Report Pack renders");
 ok(typeof C.imr === "function" && C.imr([1,2,3,2,1]).ucl != null, "SPC I-MR computes limits");
+ok(typeof C.xbarR === "function" && S.xbarResult().xbb > 0, "X-bar R computes grand mean");
+doc.querySelector('.nav-item[data-view="xbarr"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector("#chXbar") != null && doc.querySelector("#chR") != null, "X-bar & R charts render");
+doc.querySelector('.nav-item[data-view="bowtie"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".bowtie") != null && doc.querySelector(".bt-top") != null, "Bow-tie diagram renders");
+doc.querySelector('.nav-item[data-view="scorecard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelectorAll(".rag").length >= 6, "KPI scorecard renders RAG indicators");
+ok(S.regRows("okr").length >= 1, "OKR register seeded");
 
 // CLICK-ONLY: walk every data-entry view and assert there are NO free text/number inputs
-const dataViews = ["cases","hazop","calibration","punch","sil","rtm","docs","ncr","moc","milestones","decisions","procurement","resources","cashflow","gage","sigma"];
+const dataViews = ["cases","hazop","calibration","punch","sil","rtm","docs","ncr","moc","milestones","decisions","procurement","resources","okr","cashflow","gage","xbarr","sigma"];
 let freeText = 0, offenders = [];
 dataViews.forEach(v => {
   doc.querySelector(`.nav-item[data-view="${v}"]`).dispatchEvent(new window.Event("click", { bubbles: true }));

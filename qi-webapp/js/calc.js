@@ -361,6 +361,17 @@
         { key: "available", label: "Available", type: "computed", w: 100, compute: r => (r.capacity === "" || r.capacity == null) ? "" : (Number(r.capacity) - (Number(r.allocated) || 0)) },
         { key: "util", label: "Utilisation", type: "computed", w: 110, fmt: "pct", compute: r => r.capacity ? (Number(r.allocated) || 0) / Number(r.capacity) : "", badge: v => v === "" ? "" : v > 1 ? "crit" : v >= 0.85 ? "high" : "ok" },
         { key: "status", label: "Status", type: "computed", w: 110, badge: "raw", compute: r => { if (!r.capacity) return ""; const u = (Number(r.allocated) || 0) / Number(r.capacity); return u > 1 ? "Over-allocated" : u >= 0.85 ? "Near full" : "OK"; } }
+      ] },
+    { id: "okr", label: "OKR Scorecard", group: "Business", icon: "🎯", idPrefix: "OKR",
+      columns: [
+        { key: "objective", label: "Objective", type: "text", w: 220 },
+        { key: "keyResult", label: "Key result (measurable)", type: "text", w: 220 },
+        { key: "owner", label: "Owner", type: "select", dyn: "owners", w: 120 },
+        { key: "baseline", label: "Baseline", type: "num", w: 90 },
+        { key: "target", label: "Target", type: "num", w: 90 },
+        { key: "current", label: "Current", type: "num", w: 90 },
+        { key: "progress", label: "Progress", type: "computed", w: 110, fmt: "pct", compute: r => { const b = +r.baseline, t = +r.target, c = +r.current; if ([b, t, c].some(x => isNaN(x)) || t === b) return ""; return Math.max(0, Math.min((c - b) / (t - b), 1)); }, badge: v => v === "" ? "" : v >= 1 ? "ok" : v >= 0.7 ? "high" : "crit" },
+        { key: "okrStatus", label: "Status", type: "computed", w: 110, badge: "raw", compute: r => { const b = +r.baseline, t = +r.target, c = +r.current; if ([b, t, c].some(x => isNaN(x)) || t === b) return ""; const p = (c - b) / (t - b); return p >= 1 ? "Achieved" : p >= 0.7 ? "On track" : "At risk"; } }
       ] }
   ];
 
@@ -415,7 +426,8 @@
     "calibration.interval": [3, 6, 12, 18, 24, 36],
     "sil.proofTest": [3, 6, 12, 18, 24, 36],
     "resources.capacity": HOURS, "resources.allocated": HOURS,
-    "procurement.value": MONEY
+    "procurement.value": MONEY,
+    "okr.baseline": numSeq(0, 100, 5), "okr.target": numSeq(0, 100, 5), "okr.current": numSeq(0, 100, 5)
   };
   const OPT = {
     "hazop.node": ["Feed line to reactor", "Reactor", "Cooling water system", "Separator", "Compressor suction", "Storage tank", "Flare header", "Pump discharge", "Heat exchanger", "Control loop"],
@@ -446,7 +458,9 @@
     "decisions.decision": ["Adopt Kanban for delivery team", "Select DCS vendor", "Approve design change", "Defer scope to phase 2", "Outsource fabrication", "Increase test coverage", "Re-baseline schedule"],
     "decisions.context": ["WIP too high; chose Kanban over Scrum", "Best value of three bids", "Risk reduction outweighs cost", "Budget constraint", "Resource availability", "Client preference", "Lessons from prior project"],
     "procurement.package": ["Control system (DCS)", "Field instruments", "Pumps", "Valves", "Cabling & containment", "Switchgear", "Structural steel", "Piping bulks", "Analyser package"],
-    "procurement.vendor": ["TBD", "Vendor A", "Vendor B", "Vendor C", "Framework supplier", "OEM", "Local fabricator"]
+    "procurement.vendor": ["TBD", "Vendor A", "Vendor B", "Vendor C", "Framework supplier", "OEM", "Local fabricator"],
+    "okr.objective": ["Improve on-time delivery", "Reduce defects", "Cut cycle time", "Improve safety performance", "Increase customer satisfaction", "Deliver within budget", "Build team capability"],
+    "okr.keyResult": ["On-time delivery >95%", "Defect rate <2%", "Cycle time reduced 30%", "Zero recordable incidents", "Customer satisfaction >90%", "Cost performance index >=1.0", "100% of staff trained"]
   };
   function imr(series) {
     const v = series.filter(x => x !== null && x !== undefined && !isNaN(x)).map(Number);
@@ -468,6 +482,24 @@
     return m;
   }
 
+  const XBAR_A2 = { 2: 1.88, 3: 1.023, 4: 0.729, 5: 0.577, 6: 0.483 };
+  const XBAR_D4 = { 2: 3.267, 3: 2.574, 4: 2.282, 5: 2.114, 6: 2.004 };
+  function xbarR(g) {
+    const K = g.subgroups, N = g.size;
+    const val = (i, j) => { const v = g.data[`${i}_${j}`]; return (v === "" || v == null || isNaN(v)) ? null : Number(v); };
+    const means = [], ranges = [];
+    for (let i = 0; i < K; i++) {
+      let vs = []; for (let j = 0; j < N; j++) { const v = val(i, j); if (v !== null) vs.push(v); }
+      if (vs.length) { means.push(vs.reduce((a, b) => a + b, 0) / vs.length); ranges.push(Math.max(...vs) - Math.min(...vs)); }
+      else { means.push(null); ranges.push(null); }
+    }
+    const mV = means.filter(x => x !== null), rV = ranges.filter(x => x !== null);
+    const xbb = mV.length ? mV.reduce((a, b) => a + b, 0) / mV.length : 0;
+    const rbar = rV.length ? rV.reduce((a, b) => a + b, 0) / rV.length : 0;
+    const A2 = XBAR_A2[N] || 0.577, D4 = XBAR_D4[N] || 2.114;
+    return { means, ranges, xbb, rbar, xUcl: xbb + A2 * rbar, xLcl: xbb - A2 * rbar, rUcl: D4 * rbar, rLcl: 0 };
+  }
+
   // Earned Value Management from cases (budget + % done) and the schedule.
   function evm(cases, project) {
     const v = cases.filter(c => c.problem);
@@ -485,7 +517,7 @@
     return { bac, ev, ac, pv, cpi, spi, cv: ev - ac, sv: ev - pv, eac, vac: bac - (cpi ? bac / cpi : bac), frac };
   }
 
-  const API = { LISTS, SUGGEST, num, rpn, rpnBand, estDays, estEnd, health, aiRecommendation, sigmaFromDpmo, stakeholderStrategy, fmtDate, enrich, pareto, controlStats, a3, REGISTERS, addMonths, daysBetween, evm, gageRR, numSeq, MONEY, HOURS, GAGEVALS, NUMOPTS, OPT, imr, riskMatrix };
+  const API = { LISTS, SUGGEST, num, rpn, rpnBand, estDays, estEnd, health, aiRecommendation, sigmaFromDpmo, stakeholderStrategy, fmtDate, enrich, pareto, controlStats, a3, REGISTERS, addMonths, daysBetween, evm, gageRR, numSeq, MONEY, HOURS, GAGEVALS, NUMOPTS, OPT, imr, riskMatrix, xbarR };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QICalc = API;
 })(typeof window !== "undefined" ? window : globalThis);
