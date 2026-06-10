@@ -350,5 +350,70 @@ const cssAll = Array.from(doc.styleSheets).map(s => { try { return Array.from(s.
 ok(/@media\s+print/.test(cssAll), "print stylesheet present");
 ok(/page-break-inside\s*:\s*avoid/.test(cssAll), "print CSS includes page-break-inside:avoid");
 
+// 26) Drag-and-drop overlay on file drag
+const dataTransfer = { types: ["Files"], files: [], setData: () => {}, getData: () => "" };
+const dragEnter = new window.Event("dragenter", { bubbles: true, cancelable: true });
+dragEnter.dataTransfer = dataTransfer;
+window.dispatchEvent(dragEnter);
+ok(doc.body.classList.contains("dragging"), "body gains 'dragging' class on file drag-enter");
+const dragLeave = new window.Event("dragleave", { bubbles: true, cancelable: true });
+dragLeave.dataTransfer = dataTransfer;
+window.dispatchEvent(dragLeave);
+ok(!doc.body.classList.contains("dragging"), "dragging class cleared on drag-leave");
+
+// 27) Pinning cases — pinned rows float to the top regardless of sort
+S.reset();
+doc.querySelector('.nav-item[data-view="cases"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const allRows = doc.querySelectorAll('tr[data-id]');
+const lastId = allRows[allRows.length - 1].dataset.id;
+S.togglePin(lastId);
+doc.querySelector('.nav-item[data-view="cases"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const firstRow = doc.querySelector('tr[data-id]');
+ok(firstRow.dataset.id === lastId, "pinned case floats to top");
+ok(firstRow.classList.contains("pinned-row"), "pinned row has pinned-row class");
+ok(doc.querySelector('td.pin-on') != null, "pin indicator visible (📌)");
+
+// 28) Kanban keyboard reach — Right arrow moves card to next column
+doc.querySelector('.nav-item[data-view="kanban"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const card = doc.querySelector('.kcard');
+ok(card != null, "kanban renders cards");
+ok(card.tabIndex === 0, "kanban card is focusable (tabindex=0)");
+const cardId = card.dataset.id;
+const cardStatusBefore = (S.get().cases.find(c => c.id === cardId) || {}).status;
+const colsBefore = Array.from(doc.querySelectorAll('.kcol'));
+const curColBefore = card.closest('.kcol').dataset.status;
+const curIdx = colsBefore.findIndex(c => c.dataset.status === curColBefore);
+const expectedNext = colsBefore[Math.min(curIdx + 1, colsBefore.length - 1)].dataset.status;
+const arrEvt = new window.KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true });
+card.dispatchEvent(arrEvt);
+ok((S.get().cases.find(c => c.id === cardId) || {}).status === expectedNext, "ArrowRight moves card to next column (" + cardStatusBefore + " -> " + expectedNext + ")");
+
+// 29) Sidebar collapse persists in brand
+const sb = doc.getElementById("sidebar");
+ok(sb && !sb.classList.contains("collapsed"), "sidebar starts expanded");
+doc.getElementById("btnSidebar").click();
+ok(sb.classList.contains("collapsed"), "sidebar collapses on toggle");
+ok(S.brand().sidebarCollapsed === true, "sidebar state persists in brand");
+doc.getElementById("btnSidebar").click();
+ok(!sb.classList.contains("collapsed"), "sidebar expands on second toggle");
+
+// 30) Snapshot diff — engine + UI
+S.reset();
+const sA = S.takeSnapshot("Test snap A");
+S.deleteCase(S.validCases()[0].id);
+S.updateCase(S.validCases()[0].id, { status: "BLOCKED" });
+const sB = S.takeSnapshot("Test snap B");
+const diff = S.diffSnapshots(sA.id, sB.id);
+ok(diff && diff.removed.length === 1 && diff.changed.length === 1, "diffSnapshots returns added/removed/changed");
+doc.querySelector('.nav-item[data-view="audit"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("cmpA") != null && doc.getElementById("cmpB") != null, "audit view exposes diff selectors");
+const cA = doc.getElementById("cmpA"), cB = doc.getElementById("cmpB");
+cA.value = sA.id; cA.dispatchEvent(new window.Event("change", { bubbles: true }));
+cB.value = sB.id; cB.dispatchEvent(new window.Event("change", { bubbles: true }));
+doc.querySelector("[data-act=diffSnaps]").click();
+ok(/Snapshot diff/.test(doc.getElementById("modal").innerHTML), "diff modal opens");
+ok(/Removed cases/.test(doc.getElementById("modal").innerHTML), "diff modal shows removed cases section");
+doc.querySelector("#modal [data-act=cancel]").click();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
