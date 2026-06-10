@@ -1,0 +1,20 @@
+global.QICalc = require("./js/calc.js");
+const C = global.QICalc;
+const S = require("./js/store.js");
+S.load();
+const e = S.validCases();
+console.log("Cases:", e.length);
+const c1 = e[0];
+console.log("CASE-001:", c1.code, "RPN", c1.rpn, "band", c1.rpnBand, "estDays", c1.estDays, "end", c1.estEnd, "health", c1.health);
+console.log("AI:", c1.ai.slice(0, 80));
+const k = S.kpis();
+console.log("KPIs:", JSON.stringify(k));
+console.log("Top risk:", S.topRisks(1)[0].rpn);
+const sg = S.sigmaRows();
+console.log("Sigma wk1:", sg[0].dpmo, "->", sg[0].sigma);
+console.log("Strategy High/High:", C.stakeholderStrategy("High", "High"));
+console.log("Health issues:", S.health().length);
+console.log("Budget cat est Labour:", S.budgetByCategory().est["Labour / Effort"]);
+// expected: RPN 336, est 42500/act 38000
+const ok = c1.rpn === 336 && k.estTotal === 42500 && k.actTotal === 38000 && k.crit === 5;
+console.log(ok ? "PASS" : "FAIL");
