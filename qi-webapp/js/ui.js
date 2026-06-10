@@ -46,6 +46,7 @@
     { id: "fmea", label: "FMEA", icon: "⌖" },
     { id: "sigma", label: "Six Sigma", icon: "∿" },
     { id: "gage", label: "Gage R&R (MSA)", icon: "📐" },
+    { id: "riskmatrix", label: "Risk Matrix", icon: "▦" },
     { g: "Improve" },
     { id: "pdca", label: "PDCA", icon: "↻" },
     { id: "log", label: "Action Log", icon: "✎" },
@@ -54,8 +55,10 @@
     { id: "budget", label: "Budget", icon: "$" },
     { g: "Intelligence" },
     { id: "ai", label: "AI Assistant", icon: "✦" },
+    { id: "impact", label: "Change Impact", icon: "⇄" },
     { id: "health", label: "Data Health", icon: "✚" },
     { g: "Setup" },
+    { id: "report", label: "Report Pack", icon: "🖨" },
     { id: "audit", label: "History & Backups", icon: "⟲" },
     { id: "config", label: "Settings", icon: "⚙" },
     { id: "help", label: "Help", icon: "?" }
@@ -139,7 +142,6 @@
   RENDER.cases = function () {
     const f = uiState.caseFilter;
     let list = S.enriched().filter(c => c.problem);
-    if (f.q) { const q = f.q.toLowerCase(); list = list.filter(c => (c.problem + " " + (c.owner || "") + " " + (c.rootCause || "") + " " + c.code).toLowerCase().includes(q)); }
     if (f.status) list = list.filter(c => c.status === f.status);
     if (f.priority) list = list.filter(c => c.priority === f.priority);
     if (f.owner) list = list.filter(c => c.owner === f.owner);
@@ -170,7 +172,6 @@
     return `
       <div class="toolbar">
         <button class="btn btn-primary" data-act="add">+ New Case</button>
-        <input id="fltQ" placeholder="Search…" value="${esc(f.q)}" style="max-width:200px">
         <select id="fltStatus" style="max-width:150px">${opts(C.LISTS.status, f.status, "All status")}</select>
         <select id="fltPriority" style="max-width:150px">${opts(C.LISTS.priority, f.priority, "All priority")}</select>
         <select id="fltOwner" style="max-width:150px">${opts(names, f.owner, "All owners")}</select>
@@ -178,15 +179,15 @@
           <option value="rpn">Sort: RPN</option><option value="priority" ${f.sort==="priority"?"selected":""}>Sort: Priority</option>
           <option value="status" ${f.sort==="status"?"selected":""}>Sort: Status</option><option value="code" ${f.sort==="code"?"selected":""}>Sort: ID</option>
         </select>
-        ${(f.q||f.status||f.priority||f.owner)?'<button class="btn btn-sm" data-act="clearflt">Clear</button>':''}
+        ${(f.status||f.priority||f.owner)?'<button class="btn btn-sm" data-act="clearflt">Clear</button>':''}
         <span class="grow"></span><button class="btn" data-act="csv">Export CSV</button>
         <span class="muted">${list.length} shown</span>
       </div>
       ${tableWrap("<th>ID</th><th class='wrap'>Problem</th><th>Category</th><th>Priority</th><th>RPN</th><th>Health</th><th>Owner</th><th>Status</th><th>% Done</th><th></th>", rows)}`;
   };
   AFTER.cases = function () {
-    const bind = (id, key) => { const el = $("#" + id); if (el) el.addEventListener(el.tagName === "INPUT" ? "input" : "change", () => { uiState.caseFilter[key] = el.value; if (key === "q") { const v = el.value, pos = el.selectionStart; go("cases"); const n = $("#fltQ"); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} } } else go("cases"); }); };
-    bind("fltQ", "q"); bind("fltStatus", "status"); bind("fltPriority", "priority"); bind("fltOwner", "owner"); bind("fltSort", "sort");
+    const bind = (id, key) => { const el = $("#" + id); if (el) el.addEventListener("change", () => { uiState.caseFilter[key] = el.value; go("cases"); }); };
+    bind("fltStatus", "status"); bind("fltPriority", "priority"); bind("fltOwner", "owner"); bind("fltSort", "sort");
   };
 
   RENDER.pm = function () {
@@ -260,9 +261,9 @@
   RENDER.sigma = function () {
     const rows = S.sigmaRows().map((r, i) => `<tr>
       <td>${esc(r.week)}</td>
-      <td><input type="number" min="0" data-sg="${i}" data-f="units" value="${r.units ?? ""}" style="width:90px"></td>
-      <td><input type="number" min="0" data-sg="${i}" data-f="defects" value="${r.defects ?? ""}" style="width:90px"></td>
-      <td><input type="number" min="1" data-sg="${i}" data-f="opps" value="${r.opps ?? ""}" style="width:80px"></td>
+      <td><select data-sg="${i}" data-f="units">${opts(C.numSeq(0, 1000, 10), r.units ?? "", "—")}</select></td>
+      <td><select data-sg="${i}" data-f="defects">${opts(C.numSeq(0, 200, 1), r.defects ?? "", "—")}</select></td>
+      <td><select data-sg="${i}" data-f="opps">${opts(C.numSeq(1, 10, 1), r.opps ?? "", "—")}</select></td>
       <td class="center">${r.rate == null ? "" : (r.rate * 100).toFixed(2) + "%"}</td>
       <td class="center">${r.dpmo == null ? "" : Math.round(r.dpmo).toLocaleString()}</td>
       <td class="center"><b>${r.sigma ?? ""}</b></td><td class="center">${r.target}</td></tr>`).join("");
@@ -270,6 +271,9 @@
       <div class="row2"><div class="chart-box"><canvas id="chSigma"></canvas></div><div class="chart-box"><canvas id="chDefect"></canvas></div></div></div>
       <div class="card"><h3>Control chart — defect % with control limits (UCL/LCL)</h3><div class="chart-box"><canvas id="chControl"></canvas></div>
         <p class="muted">Points outside the red limits signal a process shift worth investigating.</p></div>
+      <div class="card"><h3>SPC — I-MR (individuals & moving range) for variable data</h3>
+        <div class="row2"><div class="chart-box"><canvas id="chImrI"></canvas></div><div class="chart-box"><canvas id="chImrMR"></canvas></div></div>
+        <p class="muted">Individuals chart limits use ±2.66·MR̄; the moving-range chart upper limit is 3.267·MR̄ (standard I-MR constants).</p></div>
       <div class="card"><h3>Weekly data (type Units, Defects, Opps/Unit)</h3>
       ${tableWrap("<th>Week</th><th>Units</th><th>Defects</th><th>Opps/Unit</th><th>Defect %</th><th>DPMO</th><th>Sigma</th><th>Target</th>", rows)}</div>`;
   };
@@ -280,9 +284,15 @@
       CH.lines("chDefect", labels, [{ label: "Defect %", data: r.map(x => x.rate == null ? null : +(x.rate * 100).toFixed(2)) }], "Defect % trend");
       const cc = S.controlChartData();
       CH.control("chControl", cc.labels, cc.values, cc.mean == null ? null : +cc.mean.toFixed(3), cc.ucl == null ? null : +cc.ucl.toFixed(3), cc.lcl == null ? null : +cc.lcl.toFixed(3));
+      const sr = S.sigmaRows();
+      const series = sr.map(x => x.rate == null ? null : +(x.rate * 100).toFixed(3));
+      const im = C.imr(series);
+      const imLabels = sr.map(x => x.week);
+      CH.control("chImrI", imLabels, im.values, im.mean == null ? null : +im.mean.toFixed(3), im.ucl == null ? null : +im.ucl.toFixed(3), im.lcl == null ? null : +im.lcl.toFixed(3));
+      CH.control("chImrMR", imLabels.slice(1), im.mr.filter(x => x !== null), im.mrbar == null ? null : +im.mrbar.toFixed(3), im.mrUcl == null ? null : +im.mrUcl.toFixed(3), 0);
     };
     draw();
-    content.querySelectorAll("input[data-sg]").forEach(inp => inp.addEventListener("change", () => {
+    content.querySelectorAll("[data-sg]").forEach(inp => inp.addEventListener("change", () => {
       const i = +inp.dataset.sg, f = inp.dataset.f;
       S.get().sigma[i][f] = inp.value === "" ? null : Number(inp.value); S.save(); go("sigma");
     }));
@@ -359,9 +369,17 @@
         <select id="advSel" style="max-width:220px">${opts(C.LISTS.category)}</select></div>
         <div class="readout" id="advOut"></div></div>
       <div class="card"><div class="card-head"><h3>Ask the AI</h3><span class="muted" id="aiMode"></span></div>
-        <div class="toolbar"><input id="aiQ" class="grow" placeholder="e.g. What is blocking delivery and what should we tackle first?">
+        <div class="toolbar"><select id="aiQ" class="grow">${opts([
+          "What should we tackle first this week?",
+          "What is blocking delivery and how do we fix it?",
+          "Which risks are most urgent and why?",
+          "Summarise project status for leadership",
+          "Where is the budget overrunning?",
+          "What are the top quality issues?",
+          "Which cases are overdue or at risk?"
+        ], "What should we tackle first this week?")}</select>
           <button class="btn btn-primary" id="aiAsk">Ask</button></div>
-        <div class="readout" id="aiOut"><span class="muted">Ask a question about this project's data.</span></div></div>`;
+        <div class="readout" id="aiOut"><span class="muted">Pick a question and click Ask.</span></div></div>`;
   };
   AFTER.ai = function () {
     const PLAY = {
@@ -426,17 +444,17 @@
 
   RENDER.config = function () {
     const p = S.get().project, roster = S.get().roster, b = S.brand(), ai = S.aiSettings();
+    const names = roster.map(r => r.name).filter(Boolean);
     const rrows = roster.map((r, i) => `<tr>
-      <td><input data-ro="${i}" data-f="name" value="${esc(r.name)}"></td>
+      <td><select data-ro="${i}" data-f="name">${opts(C.LISTS.personNames, r.name, "—")}</select></td>
       <td><select data-ro="${i}" data-f="role">${opts(C.LISTS.roles, r.role, "—")}</select></td>
-      <td><input data-ro="${i}" data-f="email" value="${esc(r.email || "")}" placeholder="optional"></td>
       <td class="center"><button class="btn btn-sm btn-danger" data-act="delro" data-id="${i}">Del</button></td></tr>`).join("");
     return `<div class="card"><h3>Project information</h3>
       <div class="form-grid">
-        <div class="field"><label>Project name</label><input id="p_name" value="${esc(p.name)}"></div>
-        <div class="field"><label>Sponsor</label><input id="p_sponsor" value="${esc(p.sponsor)}"></div>
-        <div class="field"><label>Project manager</label><input id="p_manager" value="${esc(p.manager)}"></div>
-        <div class="field"><label>Organization / Dept</label><input id="p_org" value="${esc(p.org)}"></div>
+        <div class="field"><label>Project name</label><select id="p_name">${opts(C.LISTS.projectNames, p.name, "—")}</select></div>
+        <div class="field"><label>Sponsor</label><select id="p_sponsor">${opts(C.LISTS.personNames, p.sponsor, "—")}</select></div>
+        <div class="field"><label>Project manager</label><select id="p_manager">${opts(C.LISTS.personNames, p.manager, "—")}</select></div>
+        <div class="field"><label>Organization / Dept</label><select id="p_org">${opts(C.LISTS.orgs, p.org, "—")}</select></div>
         <div class="field"><label>Program start</label><input type="date" id="p_start" value="${esc(p.start)}"></div>
         <div class="field"><label>Target end</label><input type="date" id="p_end" value="${esc(p.end)}"></div>
         <div class="field"><label>Overall status</label><select id="p_status">${opts(C.LISTS.status, p.status)}</select></div>
@@ -447,7 +465,7 @@
       <div class="card"><div class="card-head"><h3>Team roster</h3>
         <button class="btn btn-sm btn-primary" data-act="addro">+ Add member</button></div>
         <p class="muted" style="margin-top:-6px">These names populate the Owner &amp; Stakeholder dropdowns.</p>
-        ${tableWrap("<th>Name / Owner</th><th>Role</th><th>Email</th><th></th>", rrows)}</div>
+        ${tableWrap("<th>Name / Owner</th><th>Role</th><th></th>", rrows)}</div>
 
       <div class="card"><h3>Data</h3>
         <div class="linkbtns">
@@ -472,12 +490,12 @@
         <div style="margin-top:14px"><button class="btn btn-primary" data-act="savebrand">Save branding</button></div></div>
 
       <div class="card"><h3>AI assistant (optional — bring your own key)</h3>
-        <p class="muted" style="margin-top:-6px">Leave blank to use the built-in offline advisor. Add an OpenAI-compatible key to enable natural-language Q&amp;A. The key is stored only in this browser and sent only to the endpoint you specify.</p>
+        <p class="muted" style="margin-top:-6px">Leave blank to use the built-in offline advisor. The only field you type anywhere in the app is the secret API key below (it can't be a dropdown). It is stored only in this browser and sent only to the endpoint you choose.</p>
         <div class="form-grid">
-          <div class="field"><label>Provider</label><input id="ai_provider" value="${esc(ai.provider || "openai")}"></div>
-          <div class="field"><label>Model</label><input id="ai_model" value="${esc(ai.model || "gpt-4o-mini")}"></div>
-          <div class="field full"><label>API base URL</label><input id="ai_base" value="${esc(ai.baseUrl || "https://api.openai.com/v1")}"></div>
-          <div class="field full"><label>API key</label><input type="password" id="ai_key" value="${esc(ai.key || "")}" placeholder="sk-…"></div>
+          <div class="field"><label>Provider</label><select id="ai_provider">${opts(["openai", "azure-openai", "openai-compatible"], ai.provider || "openai")}</select></div>
+          <div class="field"><label>Model</label><select id="ai_model">${opts(["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1", "o4-mini"], ai.model || "gpt-4o-mini")}</select></div>
+          <div class="field full"><label>API base URL</label><select id="ai_base">${opts(["https://api.openai.com/v1"], ai.baseUrl || "https://api.openai.com/v1")}</select></div>
+          <div class="field full"><label>API key (the only typed field)</label><input type="password" id="ai_key" value="${esc(ai.key || "")}" placeholder="sk-…"></div>
         </div>
         <div style="margin-top:14px"><button class="btn btn-primary" data-act="saveai">Save AI settings</button></div></div>`;
   };
@@ -621,10 +639,12 @@
   function cellEditor(reg, row, col, ctx) {
     const v = row[col.key] == null ? "" : row[col.key];
     const a = `data-reg="${reg.id}" data-row="${row._id}" data-key="${col.key}"`;
-    if (col.type === "select") return `<select ${a}>${opts(colOptions(col, ctx), v, "—")}</select>`;
     if (col.type === "date") return `<input type="date" ${a} value="${esc(v)}">`;
-    if (col.type === "num") return `<input type="number" step="any" ${a} value="${v === "" ? "" : esc(v)}">`;
-    return `<input type="text" ${a} value="${esc(v)}">`;
+    let list;
+    if (col.type === "select") list = colOptions(col, ctx);
+    else if (col.type === "num") list = C.NUMOPTS[`${reg.id}.${col.key}`] || C.numSeq(0, 100, 5);
+    else list = C.OPT[`${reg.id}.${col.key}`] || [];           // text -> curated dropdown
+    return `<select ${a}>${opts(list, v, "—")}</select>`;
   }
   function cellComputed(col, row) {
     let val = col.compute ? col.compute(row) : "";
@@ -665,9 +685,7 @@
     const colg = `<colgroup><col style="width:80px">` + reg.columns.map(c => `<col style="width:${c.w || 120}px">`).join("") + `<col style="width:64px"></colgroup>`;
     return `<div class="toolbar">
         <button class="btn btn-primary" data-act="regadd" data-reg="${reg.id}">+ Add row</button>
-        <input id="regQ" placeholder="Search…" value="${esc(uiState.regFilter[reg.id] || "")}" style="max-width:220px">
-        ${q ? '<button class="btn btn-sm" data-act="regclear" data-reg="' + reg.id + '">Clear</button>' : ''}
-        <span class="grow"></span><span class="muted">${rows.length} row(s)</span>
+        <span class="grow"></span><span class="muted">${rows.length} row(s) · choose-only</span>
       </div>
       <div class="table-wrap"><table>${colg}<thead><tr>${head}</tr></thead><tbody>${body || `<tr><td colspan="${reg.columns.length + 2}" class="muted center" style="padding:24px">No rows yet — click <b>+ Add row</b>.</td></tr>`}</tbody></table></div>`;
   }
@@ -728,7 +746,7 @@
       for (let t = 0; t < g.trials; t++) {
         grid += `<tr><td>Op ${opName(o)} · trial ${t + 1}</td>` +
           Array.from({ length: g.parts }, (_, p) => {
-            const v = g.data[`${o}_${p}_${t}`]; return `<td><input type="number" step="any" data-go="${o}" data-gp="${p}" data-gt="${t}" value="${v == null ? "" : v}" style="width:72px"></td>`;
+            const v = g.data[`${o}_${p}_${t}`]; return `<td><select data-go="${o}" data-gp="${p}" data-gt="${t}" style="width:78px">${opts(C.GAGEVALS, v == null ? "" : v, "—")}</select></td>`;
           }).join("") + `</tr>`;
       }
     }
@@ -751,7 +769,7 @@
         <div class="chart-box sm"><canvas id="chGage"></canvas></div></div>`;
   };
   AFTER.gage = function () {
-    content.querySelectorAll("input[data-go]").forEach(inp => inp.addEventListener("change", () => {
+    content.querySelectorAll("[data-go]").forEach(inp => inp.addEventListener("change", () => {
       S.setGageCell(+inp.dataset.go, +inp.dataset.gp, +inp.dataset.gt, inp.value); go("gage");
     }));
     const cfg = (id, key) => { const el = $("#" + id); if (el) el.addEventListener("change", () => { S.setGageConfig({ [key]: +el.value }); go("gage"); }); };
@@ -763,12 +781,13 @@
   // ---------- Cash flow / S-curve ----------
   RENDER.cashflow = function () {
     const cf = S.cashflow();
+    const CASHVALS = C.numSeq(0, 300000, 5000);
     let pc = 0, ac = 0; const rows = cf.map((m, i) => {
       pc += Number(m.planned) || 0; ac += (m.actual == null ? 0 : Number(m.actual));
       const hasA = m.actual != null;
-      return `<tr><td><input data-cf="${i}" data-f="month" value="${esc(m.month)}" style="width:70px"></td>
-        <td><input type="number" data-cf="${i}" data-f="planned" value="${m.planned == null ? "" : m.planned}" style="width:110px"></td>
-        <td><input type="number" data-cf="${i}" data-f="actual" value="${m.actual == null ? "" : m.actual}" style="width:110px"></td>
+      return `<tr><td>${esc(m.month)}</td>
+        <td><select data-cf="${i}" data-f="planned">${opts(CASHVALS, m.planned == null ? "" : m.planned, "—")}</select></td>
+        <td><select data-cf="${i}" data-f="actual">${opts(CASHVALS, m.actual == null ? "" : m.actual, "—")}</select></td>
         <td class="right">${money(pc)}</td><td class="right">${hasA ? money(ac) : "—"}</td></tr>`;
     }).join("");
     return `<div class="card"><h3>Cash-flow S-curve — cumulative planned vs actual</h3>
@@ -803,6 +822,78 @@
     };
   })();
 
+  // ---------- Risk Matrix ----------
+  function kpiMini(l, v) { return `<div class="kpi blue"><div class="label">${esc(l)}</div><div class="value" style="font-size:18px">${esc(v)}</div></div>`; }
+  RENDER.riskmatrix = function () {
+    const m = C.riskMatrix(S.validCases());
+    const sevLabels = ["9-10", "7-8", "5-6", "3-4", "1-2"], occLabels = ["1-2", "3-4", "5-6", "7-8", "9-10"];
+    let rows = "";
+    for (let r = 0; r < 5; r++) {
+      const sevBand = 5 - r; let tds = "";
+      for (let c = 0; c < 5; c++) {
+        const occBand = c + 1, score = sevBand * occBand, cell = m[r][c];
+        const cls = score >= 15 ? "rm-red" : score >= 8 ? "rm-amber" : "rm-green";
+        tds += `<td class="rmcell ${cls}" title="${esc(cell.codes.join(', '))}">${cell.n || ""}</td>`;
+      }
+      rows += `<tr><th class="rmrow">Sev ${sevLabels[r]}</th>${tds}</tr>`;
+    }
+    return `<div class="card"><h3>Risk matrix — Severity × Occurrence (count of cases)</h3>
+      <div class="table-wrap"><table class="riskmatrix"><thead><tr><th></th>${occLabels.map(o => `<th>Occ ${o}</th>`).join("")}</tr></thead>
+      <tbody>${rows}</tbody></table></div>
+      <p class="muted">Coloured by risk zone (Severity band × Occurrence band). Hover a cell to see the case IDs in it. Red = high · amber = medium · green = low.</p></div>`;
+  };
+
+  // ---------- Change Impact / Traceability ----------
+  RENDER.impact = function () {
+    const cases = S.validCases();
+    if (!cases.length) return `<div class="empty">Add a case first to see its impact.</div>`;
+    const sel = uiState.impactCase && cases.some(c => c.code === uiState.impactCase) ? uiState.impactCase : cases[0].code;
+    const c = cases.find(x => x.code === sel);
+    const hits = [];
+    C.REGISTERS.forEach(reg => {
+      if (!reg.columns.some(col => col.key === "case")) return;
+      S.regRows(reg.id).forEach(row => { if (row.case === c.code) hits.push({ reg: reg.label, row }); });
+    });
+    const hitRows = hits.length ? hits.map(h => {
+      const summary = h.reg + " values";
+      const txt = h.reg === "HAZOP / Hazards" ? (h.row.deviation || h.row.node) : h.reg === "Non-Conformance" ? h.row.desc : h.reg === "Requirements Traceability" ? h.row.req : Object.values(h.row)[1];
+      return `<tr><td>${esc(h.reg)}</td><td class="wrap">${esc(txt || "—")}</td><td>${esc(h.row.status || h.row.verify || "")}</td></tr>`;
+    }).join("") : `<tr><td colspan="3" class="muted center">No register items linked yet. Use the "Linked case" dropdown in HAZOP, NCR or Requirements to connect them to ${esc(c.code)}.</td></tr>`;
+    return `<div class="card"><div class="card-head"><h3>Change impact / traceability</h3>
+        <select id="impactSel">${opts(cases.map(x => x.code), sel)}</select></div>
+        <p><b>${esc(c.code)}</b> — ${esc(c.problem)}</p>
+        <div class="grid kpis">${kpiMini("RPN", c.rpn ?? "—")}${kpiMini("Priority", c.priority || "—")}${kpiMini("Status", c.status || "—")}${kpiMini("Owner", c.owner || "—")}${kpiMini("Est. end", C.fmtDate(c.estEnd) || "—")}</div>
+        <p class="muted" style="margin-top:10px">This one case automatically drives: a PM task · a scored risk · an FMEA line · a PDCA cycle · an action-log entry · a budget line · a Gantt bar.</p>
+        <h3 style="margin-top:14px">Linked register items</h3>
+        ${tableWrap("<th>Register</th><th class='wrap'>Item</th><th>Status</th>", hitRows)}
+        <div class="readout" style="margin-top:12px"><b>AI recommendation:</b> ${esc(c.ai)}</div></div>`;
+  };
+  AFTER.impact = function () { const s = $("#impactSel"); if (s) s.addEventListener("change", () => { uiState.impactCase = s.value; go("impact"); }); };
+
+  // ---------- Report Pack (printable) ----------
+  RENDER.report = function () {
+    const p = S.get().project, k = S.kpis(), e = S.evm(), b = S.brand();
+    const top = S.topRisks(8).map((c, i) => `<tr><td>${i + 1}</td><td>${esc(c.code)}</td><td class="wrap">${esc(c.problem)}</td><td>${c.rpn ?? ""}</td><td>${esc(c.owner || "")}</td><td>${esc(c.status)}</td></tr>`).join("");
+    const ms = S.regRows("milestones").map(r => `<tr><td class="wrap">${esc(r.milestone || "")}</td><td>${C.fmtDate(r.baseline) || "-"}</td><td>${C.fmtDate(r.forecast) || "-"}</td><td>${C.fmtDate(r.actual) || "-"}</td><td>${esc(r.status || "")}</td></tr>`).join("") || `<tr><td colspan="5" class="muted center">none</td></tr>`;
+    const ncrOpen = S.regRows("ncr").filter(r => r.status !== "CLOSED").map(r => `<tr><td class="wrap">${esc(r.desc || "")}</td><td>${esc(r.severity || "")}</td><td>${esc(r.disposition || "")}</td><td>${esc(r.status || "")}</td></tr>`).join("") || `<tr><td colspan="4" class="muted center">none open</td></tr>`;
+    const hzCrit = S.regRows("hazop").filter(r => (Number(r.sev) || 0) * (Number(r.lik) || 0) >= 15).map(r => `<tr><td class="wrap">${esc(r.node || "")}</td><td class="wrap">${esc(r.deviation || "")}</td><td>${(Number(r.sev) || 0) * (Number(r.lik) || 0)}</td><td class="wrap">${esc(r.action || "")}</td></tr>`).join("") || `<tr><td colspan="4" class="muted center">none high</td></tr>`;
+    const punchOpen = S.regRows("punch").filter(r => r.status !== "CLOSED").length;
+    const card = (l, v) => `<div class="kpi navy"><div class="label">${l}</div><div class="value">${v}</div></div>`;
+    return `<div class="toolbar no-print"><button class="btn btn-primary" onclick="window.print()">Print / Save as PDF</button>
+        <span class="muted">A one-click consolidated pack: status, KPIs, EVM, top risks, milestones, NCRs, HAZOP criticals.</span></div>
+      <div class="report">
+        <h2 style="margin:0">${esc(b.company || "")} ${esc(b.company ? "—" : "")} ${esc(p.name)} — Project Report</h2>
+        <p class="muted">Status: ${esc(p.status)} · Manager: ${esc(p.manager || "—")} · ${C.fmtDate(p.start)} → ${C.fmtDate(p.end)} · Generated ${C.fmtDate(new Date().toISOString().slice(0, 10))}</p>
+        <div class="grid kpis">${card("Cases", k.total)}${card("Critical", k.crit)}${card("Open", k.open)}${card("Avg % done", pct(k.avgDone))}${card("Blocked", k.blocked)}${card("Punch open", punchOpen)}</div>
+        <h3>Earned value</h3>
+        <div class="grid kpis">${card("BAC", money(Math.round(e.bac)))}${card("EV", money(Math.round(e.ev)))}${card("AC", money(Math.round(e.ac)))}${card("CPI", e.cpi.toFixed(2))}${card("SPI", e.spi.toFixed(2))}${card("EAC", money(Math.round(e.eac)))}</div>
+        <h3>Top risks</h3>${tableWrap("<th>#</th><th>Case</th><th class='wrap'>Problem</th><th>RPN</th><th>Owner</th><th>Status</th>", top)}
+        <h3>Milestones</h3>${tableWrap("<th class='wrap'>Milestone</th><th>Baseline</th><th>Forecast</th><th>Actual</th><th>Status</th>", ms)}
+        <h3>Open non-conformances</h3>${tableWrap("<th class='wrap'>Description</th><th>Severity</th><th>Disposition</th><th>Status</th>", ncrOpen)}
+        <h3>HAZOP — high-risk items (S×L ≥ 15)</h3>${tableWrap("<th class='wrap'>Node</th><th class='wrap'>Deviation</th><th>Risk</th><th class='wrap'>Action</th>", hzCrit)}
+      </div>`;
+  };
+
   // ---------- case form ----------
   function blankCase() {
     const t = new Date().toISOString().slice(0, 10);
@@ -820,7 +911,7 @@
       <form id="caseForm">
         <div class="form-grid">
           <div class="field full"><label>Problem / challenge statement *</label>
-            <input list="dl_problem" id="f_problem" value="${esc(c.problem)}" placeholder="Choose or type…" required>${datalist("dl_problem", C.SUGGEST.problem)}</div>
+            <select id="f_problem" required>${opts(C.SUGGEST.problem, c.problem, "— choose —")}</select></div>
           <div class="field"><label>Category</label><select id="f_category">${opts(C.LISTS.category, c.category, "—")}</select></div>
           <div class="field"><label>Priority</label><select id="f_priority">${opts(C.LISTS.priority, c.priority, "—")}</select></div>
           <div class="field"><label>Severity (1-10)</label><select id="f_sev">${opts(C.LISTS.score, c.sev, "—")}</select></div>
@@ -828,18 +919,18 @@
           <div class="field"><label>Detection (1-10)</label><select id="f_det">${opts(C.LISTS.score, c.det, "—")}</select></div>
           <div class="field"><label>Owner</label><select id="f_owner">${opts(names, c.owner, "—")}</select></div>
           <div class="field full"><label>Root cause hypothesis</label>
-            <input list="dl_root" id="f_rootCause" value="${esc(c.rootCause)}" placeholder="Choose or type…">${datalist("dl_root", C.SUGGEST.root)}</div>
+            <select id="f_rootCause">${opts(C.SUGGEST.root, c.rootCause, "— choose —")}</select></div>
           <div class="field"><label>Lean method</label><select id="f_leanMethod">${opts(C.LISTS.leanMethod, c.leanMethod, "—")}</select></div>
           <div class="field full"><label>Target outcome (measurable)</label>
-            <input list="dl_target" id="f_target" value="${esc(c.target)}" placeholder="Choose or type…">${datalist("dl_target", C.SUGGEST.target)}</div>
+            <select id="f_target">${opts(C.SUGGEST.target, c.target, "— choose —")}</select></div>
           <div class="field"><label>Start date</label><input type="date" id="f_startDate" value="${esc(c.startDate)}"></div>
           <div class="field"><label>Status</label><select id="f_status">${opts(C.LISTS.status, c.status)}</select></div>
           <div class="field"><label>% Done</label><select id="f_percent">${pctSel.map(v => `<option value="${v}" ${Number(c.percent) === v ? "selected" : ""}>${Math.round(v * 100)}%</option>`).join("")}</select></div>
           <div class="field"><label>Cost category</label><select id="f_costCat">${opts(C.LISTS.costCat, c.costCat, "—")}</select></div>
-          <div class="field"><label>Est. cost</label><input type="number" min="0" step="100" id="f_estCost" value="${c.estCost ?? ""}"></div>
-          <div class="field"><label>Actual cost</label><input type="number" min="0" step="100" id="f_actCost" value="${c.actCost ?? ""}"></div>
+          <div class="field"><label>Est. cost</label><select id="f_estCost">${opts(C.MONEY, c.estCost === "" || c.estCost == null ? "" : c.estCost, "—")}</select></div>
+          <div class="field"><label>Actual cost</label><select id="f_actCost">${opts(C.MONEY, c.actCost === "" || c.actCost == null ? "" : c.actCost, "—")}</select></div>
           <div class="field full"><label>5 Whys (drill to root cause)</label>
-            ${[0,1,2,3,4].map(i => `<input id="f_why${i}" value="${esc((c.whys||[])[i]||"")}" placeholder="Why ${i+1}?" style="margin-bottom:6px">`).join("")}</div>
+            ${[0,1,2,3,4].map(i => `<select id="f_why${i}" style="margin-bottom:6px">${opts(C.SUGGEST.root, (c.whys||[])[i]||"", "Why "+(i+1)+"? — choose")}</select>`).join("")}</div>
           <div class="field full"><label>Auto-calculated</label><div class="readout" id="f_readout"></div></div>
         </div>
         <div class="modal-foot">

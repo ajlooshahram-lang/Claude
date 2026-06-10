@@ -203,7 +203,10 @@
     poStatus: ["RFQ", "PO placed", "In manufacture", "Shipped", "Delivered", "Closed"],
     verifyStatus: ["Not started", "In progress", "Verified", "Failed"],
     guideword: ["No / None", "More", "Less", "Reverse", "As well as", "Part of", "Other than", "Early", "Late", "Before", "After"],
-    parameter: ["Flow", "Pressure", "Temperature", "Level", "Composition", "Reaction", "Phase", "Mixing", "Time", "Viscosity", "Corrosion", "Voltage", "Signal"]
+    parameter: ["Flow", "Pressure", "Temperature", "Level", "Composition", "Reaction", "Phase", "Mixing", "Time", "Viscosity", "Corrosion", "Voltage", "Signal"],
+    personNames: ["PM", "Sponsor", "Dev Lead", "QA Lead", "Ops Lead", "Architect", "BA", "Team Lead", "Process Owner", "DevOps", "Tech Lead", "Engineering Lead", "Quality Manager", "Commissioning Engineer", "Alex Chen", "Maria Santos", "Sam Patel", "Jordan Lee", "Priya Singh", "Chris Doyle", "Robin Fox", "Dana Cole"],
+    orgs: ["Engineering", "Operations", "Projects", "Quality", "HSE", "Maintenance", "IT / Digital", "Commercial", "R&D"],
+    projectNames: ["QI Intelligence Program", "Plant Upgrade Project", "Commissioning Programme", "Digital Transformation", "New Product Introduction", "Reliability Improvement", "Capital Project Alpha", "Turnaround 2026"]
   });
 
   function addMonths(iso, m) {
@@ -403,6 +406,68 @@
       ndc: GRR ? Math.floor(1.41 * PV / GRR) : 0, verdict };
   }
 
+  // ---- click-only helpers: numeric option sequences + curated text vocabularies ----
+  function numSeq(min, max, step) { const a = []; for (let v = min; v <= max + 1e-9; v += step) a.push(Math.round(v * 100) / 100); return a; }
+  const MONEY = [0, 500, 1000, 2000, 3000, 5000, 7500, 10000, 15000, 20000, 30000, 50000, 75000, 100000, 150000, 200000, 250000, 500000, 1000000];
+  const HOURS = numSeq(0, 200, 8);
+  const GAGEVALS = numSeq(0, 2, 0.01);
+  const NUMOPTS = {
+    "calibration.interval": [3, 6, 12, 18, 24, 36],
+    "sil.proofTest": [3, 6, 12, 18, 24, 36],
+    "resources.capacity": HOURS, "resources.allocated": HOURS,
+    "procurement.value": MONEY
+  };
+  const OPT = {
+    "hazop.node": ["Feed line to reactor", "Reactor", "Cooling water system", "Separator", "Compressor suction", "Storage tank", "Flare header", "Pump discharge", "Heat exchanger", "Control loop"],
+    "hazop.cause": ["Control valve fails open", "Control valve fails closed", "Pump trip", "Power failure", "Blocked outlet", "Operator error", "Instrument failure", "Loss of utilities", "External fire", "Tube rupture"],
+    "hazop.consequence": ["Overpressure / relief lift", "Loss of cooling / high temp", "Loss of containment", "Process upset / trip", "Equipment damage", "Safety incident / injury", "Environmental release", "Production loss", "Quality off-spec"],
+    "hazop.safeguard": ["PSV + high-pressure trip", "Standby pump auto-start", "High/low alarm", "Interlock / SIS trip", "Non-return valve", "Operating procedure", "Bund / containment", "Relief to flare", "Regular inspection"],
+    "hazop.action": ["Verify trip setpoint at commissioning", "Test auto-start logic", "Add independent alarm", "Confirm SIL rating", "Update procedure", "Add interlock", "Schedule inspection", "Review relief sizing", "Operator training"],
+    "hazop.deviation": ["No / low flow", "High flow", "Reverse flow", "High pressure", "Low pressure", "High temperature", "Low temperature", "High level", "Low level", "Wrong composition", "Contamination"],
+    "docs.rev": ["A", "B", "C", "D", "0", "1", "2", "3"],
+    "calibration.tag": ["PT-1001", "PT-1002", "TT-2003", "FT-3001", "LT-4002", "PT-5001", "TT-6004", "FT-7002", "AT-8001", "LT-9003"],
+    "calibration.instrument": ["Pressure transmitter", "Temperature transmitter", "Flow transmitter", "Level transmitter", "Analyser", "Control valve", "Pressure gauge", "Thermocouple", "Vibration probe"],
+    "calibration.range": ["0-10 barg", "0-25 barg", "0-100 barg", "0-150 C", "0-400 C", "0-100 %", "0-500 m3/h", "4-20 mA", "0-10 m"],
+    "punch.item": ["Missing pipe support", "Insulation incomplete", "Cable gland not sealed", "Valve actuator misaligned", "Instrument not calibrated", "Paint / coating damage", "Earthing not connected", "Label / tag missing", "Drain point blocked", "Access platform incomplete"],
+    "punch.system": ["Unit 100", "Unit 200", "Unit 300", "Utilities", "Flare system", "Cooling water", "Electrical room", "Control room", "Tank farm"],
+    "sil.sif": ["SIF-01", "SIF-02", "SIF-03", "SIF-04", "SIF-05", "SIF-06"],
+    "sil.function": ["Reactor high-pressure trip", "High-temperature shutdown", "Low-level pump protection", "Emergency depressurisation", "Fire & gas shutdown", "Overfill protection", "Compressor anti-surge trip"],
+    "rtm.req": ["System shall trip on high pressure within 1s", "System shall log all alarms", "System shall fail safe on power loss", "Throughput shall be >= design rate", "Availability shall be >= 99.5%", "Operator response within 30s", "Data retained for 12 months"],
+    "rtm.source": ["FDS-3.2", "URS-1.1", "SRS-2.4", "Cause & Effect", "P&ID", "Datasheet", "Contract spec", "Standard IEC 61511"],
+    "rtm.design": ["Logic diagram L-12", "C&E matrix", "Architecture A-01", "Loop drawing", "Network diagram", "ERD / data model"],
+    "rtm.test": ["FAT-07", "SAT-03", "Loop test", "Functional test", "Performance test", "Integration test", "Witness test"],
+    "docs.docNo": ["P&ID-100-01", "P&ID-200-01", "PFD-001", "C&E-01", "SLD-01", "DS-PT-1001", "SPEC-MECH-01", "LAYOUT-01", "ITP-01"],
+    "docs.title": ["P&ID Unit 100", "P&ID Unit 200", "Process flow diagram", "Cause & effect matrix", "Single-line diagram", "Instrument datasheet", "Mechanical specification", "Plot plan / layout", "Inspection & test plan"],
+    "ncr.desc": ["Weld defect found on inspection", "Material certificate missing", "Dimension out of tolerance", "Wrong component installed", "Coating thickness below spec", "Calibration out of date", "Procedure not followed", "Documentation incomplete"],
+    "moc.change": ["Upsize relief valve PSV-1001", "Change pump material", "Revise control philosophy", "Add bypass line", "Relocate instrument", "Update trip setpoint", "Change vendor / supplier", "Modify layout"],
+    "moc.reason": ["Revised relief load", "Obsolete component", "Performance improvement", "Safety recommendation", "Cost reduction", "Constructability", "Client request", "Regulatory requirement"],
+    "moc.impact": ["Schedule + cost", "Cost only", "Schedule only", "Safety case update", "Re-validation required", "Documentation only", "No material impact"],
+    "milestones.milestone": ["Project kickoff", "Design freeze", "Procurement complete", "Construction start", "Mechanical completion", "Pre-commissioning", "Commissioning", "Start-up / RFSU", "Handover", "Project close-out"],
+    "decisions.decision": ["Adopt Kanban for delivery team", "Select DCS vendor", "Approve design change", "Defer scope to phase 2", "Outsource fabrication", "Increase test coverage", "Re-baseline schedule"],
+    "decisions.context": ["WIP too high; chose Kanban over Scrum", "Best value of three bids", "Risk reduction outweighs cost", "Budget constraint", "Resource availability", "Client preference", "Lessons from prior project"],
+    "procurement.package": ["Control system (DCS)", "Field instruments", "Pumps", "Valves", "Cabling & containment", "Switchgear", "Structural steel", "Piping bulks", "Analyser package"],
+    "procurement.vendor": ["TBD", "Vendor A", "Vendor B", "Vendor C", "Framework supplier", "OEM", "Local fabricator"]
+  };
+  function imr(series) {
+    const v = series.filter(x => x !== null && x !== undefined && !isNaN(x)).map(Number);
+    if (v.length < 2) return { values: v, mr: [], mean: null, ucl: null, lcl: null, mrbar: null, mrUcl: null };
+    const mr = v.map((x, i) => i === 0 ? null : Math.abs(x - v[i - 1]));
+    const mrVals = mr.filter(x => x !== null);
+    const mrbar = mrVals.reduce((a, b) => a + b, 0) / mrVals.length;
+    const mean = v.reduce((a, b) => a + b, 0) / v.length;
+    return { values: v, mr, mean, ucl: mean + 2.66 * mrbar, lcl: Math.max(mean - 2.66 * mrbar, 0), mrbar, mrUcl: 3.267 * mrbar };
+  }
+  function riskMatrix(cases) {
+    const band = v => Math.min(Math.max(Math.ceil((Number(v) || 1) / 2), 1), 5);
+    const m = Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => ({ n: 0, codes: [] })));
+    cases.forEach(c => {
+      if (c.sev == null || c.occ == null || c.sev === "" || c.occ === "") return;
+      const s = band(c.sev), o = band(c.occ);
+      m[5 - s][o - 1].n++; m[5 - s][o - 1].codes.push(c.code);
+    });
+    return m;
+  }
+
   // Earned Value Management from cases (budget + % done) and the schedule.
   function evm(cases, project) {
     const v = cases.filter(c => c.problem);
@@ -420,7 +485,7 @@
     return { bac, ev, ac, pv, cpi, spi, cv: ev - ac, sv: ev - pv, eac, vac: bac - (cpi ? bac / cpi : bac), frac };
   }
 
-  const API = { LISTS, SUGGEST, num, rpn, rpnBand, estDays, estEnd, health, aiRecommendation, sigmaFromDpmo, stakeholderStrategy, fmtDate, enrich, pareto, controlStats, a3, REGISTERS, addMonths, daysBetween, evm, gageRR };
+  const API = { LISTS, SUGGEST, num, rpn, rpnBand, estDays, estEnd, health, aiRecommendation, sigmaFromDpmo, stakeholderStrategy, fmtDate, enrich, pareto, controlStats, a3, REGISTERS, addMonths, daysBetween, evm, gageRR, numSeq, MONEY, HOURS, GAGEVALS, NUMOPTS, OPT, imr, riskMatrix };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QICalc = API;
 })(typeof window !== "undefined" ? window : globalThis);

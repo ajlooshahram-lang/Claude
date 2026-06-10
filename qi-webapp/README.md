@@ -33,13 +33,13 @@ No install, no build step, no server, works offline.
 
 **Overview:** Portfolio · Dashboard · Cases (Master)
 **Delivery:** PM Tasks · Kanban Board · Timeline (Gantt)
-**Risk & Quality:** Risk Register · FMEA · Six Sigma · Gage R&R (MSA)
+**Risk & Quality:** Risk Register · FMEA · Six Sigma (+ SPC I-MR control charts) · Gage R&R (MSA) · Risk Matrix
 **Improve:** PDCA · Action Log
 **People & Cost:** Stakeholders (RACI) · Budget
 **Engineering registers:** HAZOP (with guidewords & parameters) · Calibration · Punch List · SIL / Functional Safety · Requirements Traceability · Document Register · Non-Conformance (NCR) · Management of Change (MOC)
 **Business management:** Earned Value (EVM) · Cash Flow / S-curve · Milestones · Decision Log · Procurement · Resources / Capacity
-**Intelligence:** AI Assistant · Data Health
-**Setup:** History & Backups · Settings · Help
+**Intelligence:** AI Assistant · Change Impact (traceability) · Data Health
+**Setup:** Report Pack (printable) · History & Backups · Settings · Help
 
 ## Engineering & business management
 
@@ -51,6 +51,10 @@ No install, no build step, no server, works offline.
 - **Resources / Capacity** — capacity vs allocated hours with auto utilisation %, over-allocation flags and a utilisation chart.
 - **Milestones** (baseline/forecast/actual slip), **Decision Log**, **Procurement**.
 - Every register supports add/edit/delete, search, computed columns, audit logging and is included in snapshots/exports.
+
+## Click-only by design
+
+Every operational field in the app is a **dropdown or picker** — there is no free-text typing anywhere in the data views (Cases, all registers, Six Sigma, Gage R&R, cash flow, etc.). Problem statements, root causes, targets, costs, hours, measurements and engineering vocabulary are all chosen from curated lists; dates use a calendar picker. The only typed field in the whole app is the optional, secret AI API key (which cannot be a dropdown), and it is entirely optional.
 
 ## Highlights
 

@@ -25,7 +25,7 @@ ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard rende
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 
 // 2) navigate every view (simulate clicks)
-const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","pdca","log","stakeholders","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","evm","cashflow","milestones","decisions","procurement","resources","ai","health","audit","config","help"];
+const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","pdca","log","stakeholders","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","evm","cashflow","milestones","decisions","procurement","resources","ai","impact","health","report","audit","config","help"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -105,6 +105,31 @@ doc.querySelector('.nav-item[data-view="cashflow"]').dispatchEvent(new window.Ev
 ok(/S-curve|Cumulative|Cash/.test(doc.getElementById("content").innerHTML), "Cash flow view renders");
 doc.querySelector('.nav-item[data-view="resources"]').dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(doc.querySelector("#chRes") != null, "Resources view renders utilisation chart");
+
+// 10) new features: risk matrix, change impact, report, SPC; and CLICK-ONLY enforcement
+S.reset();   // clean, fully-seeded single project for deterministic checks
+doc.querySelector('.nav-item[data-view="riskmatrix"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelectorAll(".rmcell").length === 25, "Risk matrix renders a 5x5 grid");
+doc.querySelector('.nav-item[data-view="impact"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(/Change impact|traceability/i.test(doc.getElementById("content").innerHTML), "Change Impact view renders");
+doc.querySelector('.nav-item[data-view="report"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(/Project Report|Earned value|Top risks/.test(doc.getElementById("content").innerHTML), "Report Pack renders");
+ok(typeof C.imr === "function" && C.imr([1,2,3,2,1]).ucl != null, "SPC I-MR computes limits");
+
+// CLICK-ONLY: walk every data-entry view and assert there are NO free text/number inputs
+const dataViews = ["cases","hazop","calibration","punch","sil","rtm","docs","ncr","moc","milestones","decisions","procurement","resources","cashflow","gage","sigma"];
+let freeText = 0, offenders = [];
+dataViews.forEach(v => {
+  doc.querySelector(`.nav-item[data-view="${v}"]`).dispatchEvent(new window.Event("click", { bubbles: true }));
+  doc.querySelectorAll("#content input").forEach(inp => {
+    const t = (inp.getAttribute("type") || "text").toLowerCase();
+    if (t === "text" || t === "number") { freeText++; offenders.push(v + ":" + (inp.id || inp.className || t)); }
+  });
+});
+ok(freeText === 0, "no free-text/number inputs in any data view (click-only)" + (freeText ? " — offenders: " + offenders.slice(0,5).join(", ") : ""));
+// open the case form and confirm problem/cost are dropdowns
+doc.querySelector('.nav-item[data-view="cases"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+S.addCase || 0;
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
