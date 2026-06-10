@@ -4,10 +4,13 @@ const path = require("path");
 const { JSDOM } = require("jsdom");
 
 const root = __dirname;
+// Stub Chart with a mutable defaults object so QICharts.applyTheme() can run end-to-end.
+const chartShim = "window.Chart=function(){this.destroy=()=>{};this.update=()=>{};};window.Chart.defaults={color:'',borderColor:'',font:{family:''},plugins:{tooltip:{},legend:{labels:{}}},scale:{ticks:{},grid:{}}};";
+// Inject the stylesheet so jsdom can resolve simple computed-style checks.
+const cssText = fs.readFileSync(path.join(root, "css/styles.css"), "utf8");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8")
-  // drop the CDN Chart.js (offline); charts guard for undefined Chart
-  .replace(/<script src="https:\/\/[^"]+"><\/script>/, "<script>window.Chart=undefined;</script>")
-  // inline local scripts so jsdom executes them without fetching
+  .replace('<link rel="stylesheet" href="css/styles.css" />', `<style>${cssText}</style>`)
+  .replace(/<script src="https:\/\/[^"]+"><\/script>/, `<script>${chartShim}</script>`)
   .replace('<script src="js/calc.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/calc.js"))}</script>`)
   .replace('<script src="js/store.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/store.js"))}</script>`)
   .replace('<script src="js/charts.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/charts.js"))}</script>`)
@@ -16,6 +19,9 @@ const html = fs.readFileSync(path.join(root, "index.html"), "utf8")
 const dom = new JSDOM(html, { runScripts: "dangerously", url: "http://localhost/", pretendToBeVisual: true });
 const { window } = dom;
 const doc = window.document;
+// Trip a flag if any code-path tries to free-type via prompt() — this should never fire.
+window.__promptCalls = 0;
+window.prompt = () => { window.__promptCalls++; return ""; };
 
 let fails = 0;
 function ok(cond, msg) { console.log((cond ? "  ok  " : "FAIL  ") + msg); if (!cond) fails++; }
@@ -166,6 +172,51 @@ ok(doc.getElementById("modalOverlay").hidden === true, "shortcut overlay closes"
 doc.getElementById("btnChecks").click();
 ok(/Project checks/.test(doc.getElementById("modal").innerHTML), "run-checks dialog opens");
 doc.querySelector("#modal [data-act=cancel]").click();
+
+// 13) polish regressions
+// 13a) prompt() was never invoked anywhere in the run
+ok(window.__promptCalls === 0, "no prompt() leaked into any flow (got " + window.__promptCalls + ")");
+
+// 13b) project-name modal is click-only and auto-focuses its picker
+doc.querySelector('.nav-item[data-view="portfolio"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const newProjBtn = doc.querySelector("[data-act=newproj]");
+newProjBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("modalOverlay").hidden === false, "newproj opens custom modal");
+ok(doc.getElementById("proj_name_pick") != null, "modal contains a select dropdown");
+ok(doc.querySelectorAll("#modal input[type=text],#modal input[type=number]").length === 0, "modal has zero free-text inputs");
+ok(doc.activeElement && doc.activeElement.id === "proj_name_pick", "modal auto-focuses first field");
+const projsBefore13 = S.listProjects().length;
+doc.getElementById("proj_name_pick").value = "Plant Upgrade Project";
+doc.getElementById("proj_name_ok").click();
+ok(S.listProjects().length === projsBefore13 + 1, "modal pick adds a project");
+
+// 13c) aria-current="page" on active nav
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const activeNavs = doc.querySelectorAll('.nav-item[aria-current="page"]');
+ok(activeNavs.length === 1 && activeNavs[0].dataset.view === "dashboard", "exactly one nav-item has aria-current=page");
+
+// 13d) chart theming: applyTheme exists and updates Chart.defaults colors
+ok(typeof window.QICharts.applyTheme === "function", "QICharts.applyTheme exposed");
+window.QICharts.applyTheme();
+const lightInk = window.Chart.defaults.color;
+ok(lightInk !== "", "Chart.defaults.color set in light mode (" + lightInk + ")");
+doc.getElementById("btnTheme").click();
+const darkInk = window.Chart.defaults.color;
+ok(darkInk && darkInk !== lightInk, "Chart.defaults.color flips on theme toggle (" + lightInk + " -> " + darkInk + ")");
+doc.getElementById("btnTheme").click(); // back to light
+
+// 13e) toast styling actually applies (not the default unstyled span)
+window.QIStore && window.QIStore.save && (function () {
+  const tst = doc.getElementById("toast");
+  tst.hidden = false; tst.textContent = "smoke";
+  const cs = window.getComputedStyle(tst);
+  ok(cs.position === "fixed", "toast is position:fixed (got " + cs.position + ")");
+  tst.hidden = true;
+})();
+
+// 13f) topbar wraps when narrow (flex-wrap rule applies)
+const tb = doc.querySelector(".topbar");
+ok(window.getComputedStyle(tb).flexWrap === "wrap", "topbar uses flex-wrap");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

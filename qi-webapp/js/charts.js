@@ -4,14 +4,47 @@
   const registry = {};
   const PALETTE = ["#2e5496", "#1f8a8a", "#c00000", "#c9a227", "#548235", "#7030a0", "#c55a11", "#44546a"];
 
+  // Read CSS theme tokens so charts visually match light / dark mode.
+  function themeTokens() {
+    if (typeof document === "undefined") return null;
+    const s = getComputedStyle(document.documentElement);
+    const dark = document.documentElement.getAttribute("data-theme") === "dark";
+    return {
+      ink: s.getPropertyValue("--ink").trim() || (dark ? "#e6eaf3" : "#1f2733"),
+      muted: s.getPropertyValue("--muted").trim() || (dark ? "#94a0bc" : "#6b7686"),
+      grid: dark ? "rgba(255,255,255,.08)" : "rgba(20,30,60,.08)",
+      tooltipBg: dark ? "#1e2a44" : "#1f2733",
+      tooltipFg: dark ? "#e6eaf3" : "#fff"
+    };
+  }
+  function applyTheme() {
+    if (typeof Chart === "undefined") return;
+    const t = themeTokens();
+    if (!t) return;
+    Chart.defaults.color = t.ink;
+    Chart.defaults.borderColor = t.grid;
+    Chart.defaults.font.family = '"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif';
+    Chart.defaults.plugins.tooltip.backgroundColor = t.tooltipBg;
+    Chart.defaults.plugins.tooltip.titleColor = t.tooltipFg;
+    Chart.defaults.plugins.tooltip.bodyColor = t.tooltipFg;
+    Chart.defaults.plugins.legend.labels.color = t.ink;
+    Chart.defaults.scale.ticks.color = t.muted;
+    Chart.defaults.scale.grid.color = t.grid;
+  }
+
   function destroyAll() {
     Object.keys(registry).forEach(k => { try { registry[k].destroy(); } catch (e) {} delete registry[k]; });
   }
   function mk(id, config) {
     const el = document.getElementById(id);
     if (!el || typeof Chart === "undefined") return;
+    applyTheme();
     if (registry[id]) { try { registry[id].destroy(); } catch (e) {} }
     registry[id] = new Chart(el.getContext("2d"), config);
+  }
+  function refresh() {
+    applyTheme();
+    Object.values(registry).forEach(ch => { try { ch.update(); } catch (e) {} });
   }
 
   function bar(id, labels, data, title) {
@@ -98,5 +131,5 @@
     });
   }
 
-  root.QICharts = { destroyAll, bar, hbar, pie, grouped, lines, pareto, control, PALETTE };
+  root.QICharts = { destroyAll, bar, hbar, pie, grouped, lines, pareto, control, applyTheme, refresh, PALETTE };
 })(typeof window !== "undefined" ? window : globalThis);

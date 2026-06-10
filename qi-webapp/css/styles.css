@@ -28,18 +28,20 @@ body{font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;colo
 
 /* main */
 .main{flex:1;min-width:0;display:flex;flex-direction:column}
-.topbar{display:flex;align-items:center;gap:14px;padding:14px 22px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
-.topbar h1{font-size:18px;margin:0;flex:1}
-.topbar-actions{display:flex;gap:8px}
+.topbar{display:flex;align-items:center;gap:14px;padding:14px 22px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+.topbar h1{font-size:18px;margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topbar-actions{display:flex;gap:8px;flex-wrap:wrap}
 .hamburger{display:none;background:none;border:none;font-size:20px;cursor:pointer;color:var(--ink)}
 .content{padding:22px;max-width:1280px;width:100%;margin:0 auto}
 
 /* buttons */
-.btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500}
 .btn:hover{border-color:var(--blue);color:var(--blue)}
+.btn:focus-visible,.nav-item:focus-visible,select:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .btn-primary{background:var(--blue);border-color:var(--blue);color:#fff}
 .btn-primary:hover{background:#26467f;color:#fff}
-.btn-danger{background:#fff;border-color:var(--red);color:var(--red)}
+.btn-primary:focus-visible{outline-color:#7da7f0}
+.btn-danger{background:var(--card);border-color:var(--red);color:var(--red)}
 .btn-danger:hover{background:var(--red);color:#fff}
 .btn.block{width:100%}
 .btn-sm{padding:5px 10px;font-size:12px}
@@ -147,7 +149,7 @@ select,input[list]{background:var(--input)}
 @media(max-width:680px){.kanban{grid-template-columns:repeat(2,minmax(150px,1fr))}}
 .kcol{background:#eef2f8;border-radius:10px;padding:8px;min-height:120px}
 .kcol-head{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#42506a;padding:4px 6px 8px;display:flex;justify-content:space-between;align-items:center}
-.kcount{background:#fff;border-radius:999px;padding:1px 8px;font-size:11px}
+.kcount{background:var(--card);color:var(--ink);border-radius:999px;padding:1px 8px;font-size:11px;border:1px solid var(--line)}
 .kcol-body{display:flex;flex-direction:column;gap:8px;min-height:60px;border-radius:8px;padding:2px;transition:background .15s}
 .kcol-body.kover{background:#dbe6f7;outline:2px dashed var(--blue)}
 .kcard{background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px;box-shadow:var(--shadow);cursor:grab}
@@ -203,7 +205,7 @@ table.riskmatrix th{background:#f0f3f9;font-size:11px}
 .bt-chip{background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:12px;text-align:center;box-shadow:var(--shadow)}
 .bt-threat{border-left:4px solid var(--red)}
 .bt-cons{border-left:4px solid var(--amber)}
-.bt-bar{border-left:4px solid var(--teal);background:#f0faf9}
+.bt-bar{border-left:4px solid var(--teal);background:var(--calc)}
 .bt-center{justify-content:center}
 .bt-top{background:var(--navy);color:#fff;border-radius:12px;padding:18px 12px;text-align:center;font-size:11px;letter-spacing:.04em}
 .bt-top b{font-size:13px}
@@ -241,3 +243,22 @@ table.riskmatrix th{background:#f0f3f9;font-size:11px}
 [data-theme="dark"] .kbd{background:#1e2a44;color:#cbd6ee}
 .shortcut-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line);font-size:13px}
 .shortcut-row:last-child{border-bottom:0}
+
+
+
+/* toast notifications */
+.toast{
+  position:fixed;right:20px;bottom:20px;z-index:200;
+  background:var(--ink);color:#fff;padding:12px 18px;border-radius:10px;
+  box-shadow:0 6px 24px rgba(0,0,0,.18);font-size:13px;font-weight:500;
+  max-width:340px;animation:toastIn .18s ease-out
+}
+[data-theme="dark"] .toast{background:#e6eaf3;color:#0e1320}
+@keyframes toastIn{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* dark-mode chart canvas labels (Chart.js reads these via JS defaults) */
+[data-theme="dark"] canvas{filter:none}
+
+/* skip-to-content for keyboard users */
+.skip-link{position:absolute;left:-9999px;top:0;background:var(--blue);color:#fff;padding:8px 14px;border-radius:0 0 8px 0;z-index:300}
+.skip-link:focus{left:0}
