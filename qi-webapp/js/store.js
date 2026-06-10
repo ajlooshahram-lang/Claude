@@ -86,9 +86,31 @@
         ],
         procurement: [
           { _id: uid(), package: "Control system (DCS)", vendor: "TBD", value: 250000, poStatus: "RFQ", delivery: "2026-08-15", owner: "PM" }
+        ],
+        resources: [
+          { _id: uid(), person: "Dev Lead", role: "Software", capacity: 80, allocated: 72 },
+          { _id: uid(), person: "QA Lead", role: "Quality", capacity: 80, allocated: 84 },
+          { _id: uid(), person: "Ops Lead", role: "Commissioning", capacity: 80, allocated: 60 }
         ]
-      }
+      },
+      gage: defaultGage(),
+      cashflow: defaultCashflow()
     };
+  }
+  function defaultGage() {
+    // 5 parts x 3 operators x 2 trials, seeded with a realistic dataset
+    const seedVals = {
+      "0_0_0": 0.29, "0_0_1": 0.41, "0_1_0": 0.64, "0_1_1": 0.58, "0_2_0": 1.34, "0_2_1": 1.26, "0_3_0": 0.47, "0_3_1": 0.50, "0_4_0": 0.02, "0_4_1": 0.10,
+      "1_0_0": 0.08, "1_0_1": 0.25, "1_1_0": 0.45, "1_1_1": 0.50, "1_2_0": 1.07, "1_2_1": 1.19, "1_3_0": 0.40, "1_3_1": 0.39, "1_4_0": 0.04, "1_4_1": 0.06,
+      "2_0_0": 0.04, "2_0_1": 0.11, "2_1_0": 0.50, "2_1_1": 0.44, "2_2_0": 1.15, "2_2_1": 1.08, "2_3_0": 0.38, "2_3_1": 0.36, "2_4_0": 0.01, "2_4_1": 0.08
+    };
+    return { parts: 5, operators: 3, trials: 2, data: seedVals };
+  }
+  function defaultCashflow() {
+    const m = ["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12"];
+    const planned = [10000, 25000, 45000, 70000, 110000, 150000, 190000, 220000, 240000, 250000, 250000, 250000];
+    const actual = [12000, 28000, 50000, 78000, 120000, 160000, null, null, null, null, null, null];
+    return m.map((mm, i) => ({ month: mm, planned: planned[i], actual: actual[i] }));
   }
 
   let ws = null;     // whole workspace
@@ -100,6 +122,8 @@
     (s.cases || []).forEach(c => { if (!c.whys) c.whys = ["", "", "", "", ""]; });
     s.registers = s.registers || {};
     C.REGISTERS.forEach(reg => { if (!Array.isArray(s.registers[reg.id])) s.registers[reg.id] = []; });
+    if (!s.gage || !s.gage.data) s.gage = defaultGage();
+    if (!Array.isArray(s.cashflow)) s.cashflow = defaultCashflow();
     return s;
   }
   function defaultWorkspace() {
@@ -230,10 +254,18 @@
     rows.splice(i, 1); logAudit("Deleted", regLabel(regId), ""); save(); return true;
   }
 
+  // ---- Gage R&R + cash flow ----
+  function gage() { const s = get(); if (!s.gage) s.gage = defaultGage(); return s.gage; }
+  function setGageCell(o, p, t, v) { gage().data[`${o}_${p}_${t}`] = (v === "" ? "" : Number(v)); save(); }
+  function setGageConfig(patch) { Object.assign(gage(), patch); save(); }
+  function gageResult() { return C.gageRR(gage()); }
+  function cashflow() { const s = get(); if (!Array.isArray(s.cashflow)) s.cashflow = defaultCashflow(); return s.cashflow; }
+  function setCashflow(i, field, v) { const c = cashflow(); if (c[i]) { c[i][field] = (field === "month") ? v : (v === "" ? null : Number(v)); save(); } }
+
   // ---- snapshots (restore points) ----
   function takeSnapshot(label) {
     const s = get();
-    const copy = JSON.parse(JSON.stringify({ project: s.project, roster: s.roster, cases: s.cases, sigma: s.sigma, stakeholders: s.stakeholders, registers: s.registers }));
+    const copy = JSON.parse(JSON.stringify({ project: s.project, roster: s.roster, cases: s.cases, sigma: s.sigma, stakeholders: s.stakeholders, registers: s.registers, gage: s.gage, cashflow: s.cashflow }));
     s.snapshots.unshift({ id: uid(), ts: new Date().toISOString(), label: label || ("Snapshot " + new Date().toLocaleString()), data: copy });
     if (s.snapshots.length > 25) s.snapshots.length = 25;
     logAudit("Snapshot", "", label || "manual"); save();
@@ -244,7 +276,7 @@
     const snap = get().snapshots.find(x => x.id === id); if (!snap) return false;
     takeSnapshot("Auto-backup before restore");
     const s = get(), d = JSON.parse(JSON.stringify(snap.data));
-    s.project = d.project; s.roster = d.roster; s.cases = d.cases; s.sigma = d.sigma; s.stakeholders = d.stakeholders; if (d.registers) s.registers = d.registers;
+    s.project = d.project; s.roster = d.roster; s.cases = d.cases; s.sigma = d.sigma; s.stakeholders = d.stakeholders; if (d.registers) s.registers = d.registers; if (d.gage) s.gage = d.gage; if (d.cashflow) s.cashflow = d.cashflow;
     normalize(s); logAudit("Restored", "", snap.label); save(); return true;
   }
   function deleteSnapshot(id) {
@@ -335,7 +367,8 @@
     auditList, clearAudit, takeSnapshot, snapshots, restoreSnapshot, deleteSnapshot, paretoRPN, controlChartData,
     listProjects, activeProjectId, switchProject, addProject, renameProject, duplicateProject, deleteProject, importAsProject,
     brand, setBrand, aiSettings, setAi, portfolio,
-    regRows, regAdd, regUpdate, regDelete, regLabel, evm: () => C.evm(validCases(), get().project) };
+    regRows, regAdd, regUpdate, regDelete, regLabel, evm: () => C.evm(validCases(), get().project),
+    gage, setGageCell, setGageConfig, gageResult, cashflow, setCashflow };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);

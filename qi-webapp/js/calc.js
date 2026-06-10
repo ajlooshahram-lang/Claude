@@ -201,7 +201,9 @@
     docStatus: ["Draft", "Issued for review", "Approved", "As-built", "Superseded"],
     mocStatus: ["Requested", "Under review", "Approved", "Rejected", "Implemented"],
     poStatus: ["RFQ", "PO placed", "In manufacture", "Shipped", "Delivered", "Closed"],
-    verifyStatus: ["Not started", "In progress", "Verified", "Failed"]
+    verifyStatus: ["Not started", "In progress", "Verified", "Failed"],
+    guideword: ["No / None", "More", "Less", "Reverse", "As well as", "Part of", "Other than", "Early", "Late", "Before", "After"],
+    parameter: ["Flow", "Pressure", "Temperature", "Level", "Composition", "Reaction", "Phase", "Mixing", "Time", "Viscosity", "Corrosion", "Voltage", "Signal"]
   });
 
   function addMonths(iso, m) {
@@ -221,6 +223,8 @@
     { id: "hazop", label: "HAZOP / Hazards", group: "Engineering", icon: "☢", idPrefix: "HZ",
       columns: [
         { key: "node", label: "Node / Study point", type: "text", w: 150 },
+        { key: "parameter", label: "Parameter", type: "select", list: "parameter", w: 120 },
+        { key: "guideword", label: "Guideword", type: "select", list: "guideword", w: 120 },
         { key: "deviation", label: "Deviation", type: "text", w: 150 },
         { key: "cause", label: "Cause", type: "text", w: 170 },
         { key: "consequence", label: "Consequence", type: "text", w: 170 },
@@ -344,8 +348,60 @@
         { key: "poStatus", label: "PO status", type: "select", list: "poStatus", w: 130, badge: "raw" },
         { key: "delivery", label: "Delivery date", type: "date", w: 130 },
         { key: "owner", label: "Buyer / Owner", type: "select", dyn: "owners", w: 120 }
+      ] },
+    { id: "resources", label: "Resources / Capacity", group: "Business", icon: "👥", idPrefix: "RES",
+      columns: [
+        { key: "person", label: "Person", type: "select", dyn: "owners", w: 140 },
+        { key: "role", label: "Role", type: "select", list: "discipline", w: 150 },
+        { key: "capacity", label: "Capacity (hrs)", type: "num", w: 110 },
+        { key: "allocated", label: "Allocated (hrs)", type: "num", w: 110 },
+        { key: "available", label: "Available", type: "computed", w: 100, compute: r => (r.capacity === "" || r.capacity == null) ? "" : (Number(r.capacity) - (Number(r.allocated) || 0)) },
+        { key: "util", label: "Utilisation", type: "computed", w: 110, fmt: "pct", compute: r => r.capacity ? (Number(r.allocated) || 0) / Number(r.capacity) : "", badge: v => v === "" ? "" : v > 1 ? "crit" : v >= 0.85 ? "high" : "ok" },
+        { key: "status", label: "Status", type: "computed", w: 110, badge: "raw", compute: r => { if (!r.capacity) return ""; const u = (Number(r.allocated) || 0) / Number(r.capacity); return u > 1 ? "Over-allocated" : u >= 0.85 ? "Near full" : "OK"; } }
       ] }
   ];
+
+  // ---- Gage R&R (Measurement System Analysis, AIAG average-range method) ----
+  const GAGE_K1 = { 2: 0.8862, 3: 0.5908 };                    // trials (repeatability)
+  const GAGE_K2 = { 2: 0.7071, 3: 0.5231 };                    // operators (reproducibility)
+  const GAGE_K3 = { 2: 0.7071, 3: 0.5231, 4: 0.4467, 5: 0.4030, 6: 0.3742, 7: 0.3534, 8: 0.3375, 9: 0.3249, 10: 0.3146 };
+  function gageRR(g) {
+    const P = g.parts, O = g.operators, T = g.trials;
+    const val = (o, p, t) => { const v = g.data[`${o}_${p}_${t}`]; return (v === "" || v == null || isNaN(v)) ? null : Number(v); };
+    // operator part ranges & operator means
+    let opRbar = [], opMean = [];
+    for (let o = 0; o < O; o++) {
+      let ranges = [], all = [];
+      for (let p = 0; p < P; p++) {
+        let vs = [];
+        for (let t = 0; t < T; t++) { const v = val(o, p, t); if (v !== null) { vs.push(v); all.push(v); } }
+        if (vs.length >= 1) ranges.push(Math.max(...vs) - Math.min(...vs));
+      }
+      opRbar.push(ranges.length ? ranges.reduce((a, b) => a + b, 0) / ranges.length : 0);
+      opMean.push(all.length ? all.reduce((a, b) => a + b, 0) / all.length : 0);
+    }
+    const Rbar = opRbar.reduce((a, b) => a + b, 0) / (O || 1);
+    const Xdiff = Math.max(...opMean) - Math.min(...opMean);
+    // part averages across operators+trials
+    let partAvg = [];
+    for (let p = 0; p < P; p++) {
+      let vs = [];
+      for (let o = 0; o < O; o++) for (let t = 0; t < T; t++) { const v = val(o, p, t); if (v !== null) vs.push(v); }
+      if (vs.length) partAvg.push(vs.reduce((a, b) => a + b, 0) / vs.length);
+    }
+    const Rp = partAvg.length ? Math.max(...partAvg) - Math.min(...partAvg) : 0;
+    const k1 = GAGE_K1[T] || 0.5908, k2 = GAGE_K2[O] || 0.5231, k3 = GAGE_K3[P] || 0.3146;
+    const EV = Rbar * k1;
+    const AV = Math.sqrt(Math.max(Math.pow(Xdiff * k2, 2) - (EV * EV) / (P * T), 0));
+    const GRR = Math.sqrt(EV * EV + AV * AV);
+    const PV = Rp * k3;
+    const TV = Math.sqrt(GRR * GRR + PV * PV);
+    const pct = x => TV ? 100 * x / TV : 0;
+    const grrPct = pct(GRR);
+    const verdict = grrPct < 10 ? "Acceptable" : grrPct <= 30 ? "Marginal" : "Unacceptable";
+    return { EV, AV, GRR, PV, TV, pctEV: pct(EV), pctAV: pct(AV), pctGRR: grrPct, pctPV: pct(PV),
+      ndc: GRR ? Math.floor(1.41 * PV / GRR) : 0, verdict };
+  }
 
   // Earned Value Management from cases (budget + % done) and the schedule.
   function evm(cases, project) {
@@ -364,7 +420,7 @@
     return { bac, ev, ac, pv, cpi, spi, cv: ev - ac, sv: ev - pv, eac, vac: bac - (cpi ? bac / cpi : bac), frac };
   }
 
-  const API = { LISTS, SUGGEST, num, rpn, rpnBand, estDays, estEnd, health, aiRecommendation, sigmaFromDpmo, stakeholderStrategy, fmtDate, enrich, pareto, controlStats, a3, REGISTERS, addMonths, daysBetween, evm };
+  const API = { LISTS, SUGGEST, num, rpn, rpnBand, estDays, estEnd, health, aiRecommendation, sigmaFromDpmo, stakeholderStrategy, fmtDate, enrich, pareto, controlStats, a3, REGISTERS, addMonths, daysBetween, evm, gageRR };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QICalc = API;
 })(typeof window !== "undefined" ? window : globalThis);
