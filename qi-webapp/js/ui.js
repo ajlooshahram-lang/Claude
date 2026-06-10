@@ -4,7 +4,7 @@
   const C = window.QICalc, S = window.QIStore, CH = window.QICharts;
   const $ = sel => document.querySelector(sel);
   const content = $("#content");
-  const uiState = { caseFilter: { q: "", status: "", priority: "", owner: "", sort: "rpn" }, regFilter: {} };
+  const uiState = { caseFilter: { q: "", status: "", priority: "", owner: "", sort: "rpn" }, regFilter: {}, selected: new Set() };
 
   // ---------- helpers ----------
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
@@ -25,7 +25,22 @@
     return s ? `<span class="badge ${map[s] || ""}">${esc(s)}</span>` : "";
   }
   function barCell(p) { p = Number(p) || 0; return `<span class="bar"><span style="width:${Math.round(p * 100)}%"></span></span> ${pct(p)}`; }
-  function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(t._t); t._t = setTimeout(() => t.hidden = true, 2200); }
+  function toast(msg, opts) {
+    const t = $("#toast"); if (!t) return;
+    opts = opts || {};
+    const ms = opts.ms || (opts.action ? 5000 : 2200);
+    t.innerHTML = `<span>${esc(msg)}</span>` + (opts.action ? `<button class="toast-action" id="toastAct">${esc(opts.action.label)}</button>` : "");
+    t.hidden = false;
+    clearTimeout(t._t);
+    t._t = setTimeout(() => { t.hidden = true; if (opts.onTimeout) opts.onTimeout(); }, ms);
+    if (opts.action) {
+      const btn = $("#toastAct");
+      if (btn) btn.addEventListener("click", () => {
+        clearTimeout(t._t); t.hidden = true;
+        try { opts.action.handler(); } catch (e) {}
+      });
+    }
+  }
   function tableWrap(head, rows, cls) {
     if (!rows) return `<div class="empty">No data yet. Click <b>+ New Case</b> to start.</div>`;
     return `<div class="table-wrap"><table class="${cls || ""}"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
@@ -118,8 +133,14 @@
   RENDER.dashboard = function () {
     const k = S.kpis();
     const kpi = (cls, label, val) => `<div class="kpi ${cls}"><div class="label">${label}</div><div class="value">${val}</div></div>`;
+    const tourBanner = (S.brand() && S.brand().tourDone) ? "" : `
+      <div class="tour-banner" role="status">
+        <b>👋</b><span>First time? A 4-step tour will show you how the platform works in 30 seconds.</span>
+        <button class="btn btn-sm" data-act="startTour">Take the tour</button>
+        <button class="btn btn-sm" data-act="skipTour">Skip</button>
+      </div>`;
     if (k.total === 0) {
-      return `<div class="card empty-cta">
+      return tourBanner + `<div class="card empty-cta">
           <h2>You haven't added any cases yet</h2>
           <p>Get started by adding your first case. It will automatically populate every other view — PM tasks, scored risk, FMEA line, PDCA cycle, action-log entry, Gantt bar and budget line — all live.</p>
           <div class="empty-cta-actions">
@@ -129,7 +150,7 @@
         </div>
         <p class="muted" style="text-align:center;margin-top:14px">Tip — press <span class="kbd">n</span> any time to add a new case, or <span class="kbd">?</span> to see all keyboard shortcuts.</p>`;
     }
-    return `
+    return tourBanner + `
       <div class="grid kpis" style="margin-bottom:16px">
         ${kpi("navy", "Total Cases", k.total)}
         ${kpi("blue", "Open / Active", k.open)}
@@ -182,8 +203,14 @@
     };
     list.sort(sorters[f.sort] || sorters.rpn);
     const names = S.get().roster.map(r => r.name).filter(Boolean);
+    // Drop selections that no longer exist in the filtered list (defensive cleanup).
+    const visibleIds = new Set(list.map(c => c.id));
+    [...uiState.selected].forEach(id => { if (!visibleIds.has(id)) uiState.selected.delete(id); });
+    const allSelected = list.length > 0 && list.every(c => uiState.selected.has(c.id));
+    const someSelected = uiState.selected.size > 0;
     const rows = list.map(c => `
-      <tr data-id="${c.id}">
+      <tr data-id="${c.id}" class="${uiState.selected.has(c.id) ? "row-selected" : ""}">
+        <td class="center"><input type="checkbox" data-bulk="row" data-id="${c.id}" ${uiState.selected.has(c.id) ? "checked" : ""} aria-label="Select ${esc(c.code)}"></td>
         <td>${esc(c.code)}</td>
         <td class="wrap">${esc(c.problem)}</td>
         <td>${esc(c.category)}</td>
@@ -198,6 +225,8 @@
           <button class="btn btn-sm btn-danger" data-act="del" data-id="${c.id}">Del</button>
         </td>
       </tr>`).join("");
+    const head = `<th class="center"><input type="checkbox" id="bulkAll" ${allSelected ? "checked" : ""} aria-label="Select all"></th>` +
+      `<th>ID</th><th class='wrap'>Problem</th><th>Category</th><th>Priority</th><th>RPN</th><th>Health</th><th>Owner</th><th>Status</th><th>% Done</th><th></th>`;
     return `
       <div class="toolbar">
         <button class="btn btn-primary" data-act="add">+ New Case</button>
@@ -212,20 +241,78 @@
         <span class="grow"></span><button class="btn" data-act="csv">Export CSV</button>
         <span class="muted">${list.length} shown</span>
       </div>
-      ${tableWrap("<th>ID</th><th class='wrap'>Problem</th><th>Category</th><th>Priority</th><th>RPN</th><th>Health</th><th>Owner</th><th>Status</th><th>% Done</th><th></th>", rows)}`;
+      <div class="bulkbar" id="bulkBar" ${someSelected ? "" : "hidden"}>
+        <span><b>${uiState.selected.size}</b> selected</span>
+        <select id="bulkStatus"><option value="">Set status…</option>${opts(C.LISTS.status, "")}</select>
+        <select id="bulkOwner"><option value="">Set owner…</option>${opts(names, "")}</select>
+        <select id="bulkPriority"><option value="">Set priority…</option>${opts(C.LISTS.priority, "")}</select>
+        <span class="grow"></span>
+        <button class="btn btn-sm btn-danger" data-act="bulkdel">Delete selected</button>
+        <button class="btn btn-sm" data-act="bulkclear">Clear</button>
+      </div>
+      ${tableWrap(head, rows)}`;
   };
   AFTER.cases = function () {
     const bind = (id, key) => { const el = $("#" + id); if (el) el.addEventListener("change", () => { uiState.caseFilter[key] = el.value; go("cases"); }); };
     bind("fltStatus", "status"); bind("fltPriority", "priority"); bind("fltOwner", "owner"); bind("fltSort", "sort");
-    // inline-edit: change priority / owner / status without opening the form
+    // inline-edit: change priority / owner / status without opening the form.
+    // Patch only the health badge cell instead of re-rendering the whole view.
     content.querySelectorAll("select[data-edit]").forEach(sel => {
       sel.addEventListener("change", () => {
         const cid = sel.dataset.id, field = sel.dataset.edit;
         S.updateCase(cid, { [field]: sel.value });
         toast("Updated " + field);
-        go("cases");
+        const tr = sel.closest("tr");
+        if (tr) {
+          const c = S.enriched().find(x => x.id === cid);
+          // Health is the cell after RPN (index 6 with checkbox col + ID + problem + category + priority + RPN)
+          const healthCell = tr.querySelector("td:nth-child(7)");
+          if (healthCell && c) healthCell.innerHTML = healthBadge(c.health);
+        }
       });
     });
+    // bulk select
+    const bar = $("#bulkBar");
+    const refreshBar = () => {
+      const n = uiState.selected.size;
+      if (!bar) return;
+      bar.hidden = n === 0;
+      const lbl = bar.querySelector("span"); if (lbl) lbl.innerHTML = `<b>${n}</b> selected`;
+      const all = $("#bulkAll");
+      const list = content.querySelectorAll('input[data-bulk="row"]');
+      if (all) all.checked = list.length > 0 && [...list].every(c => c.checked);
+    };
+    content.querySelectorAll('input[data-bulk="row"]').forEach(cb => {
+      cb.addEventListener("change", () => {
+        if (cb.checked) uiState.selected.add(cb.dataset.id); else uiState.selected.delete(cb.dataset.id);
+        const tr = cb.closest("tr"); if (tr) tr.classList.toggle("row-selected", cb.checked);
+        refreshBar();
+      });
+    });
+    const allCb = $("#bulkAll");
+    if (allCb) allCb.addEventListener("change", () => {
+      content.querySelectorAll('input[data-bulk="row"]').forEach(cb => {
+        cb.checked = allCb.checked;
+        if (allCb.checked) uiState.selected.add(cb.dataset.id); else uiState.selected.delete(cb.dataset.id);
+        const tr = cb.closest("tr"); if (tr) tr.classList.toggle("row-selected", cb.checked);
+      });
+      refreshBar();
+    });
+    // bulk actions
+    const bulkApply = (key) => {
+      const sel = $("#bulk" + key); if (!sel) return;
+      sel.addEventListener("change", () => {
+        if (!sel.value) return;
+        const ids = [...uiState.selected];
+        if (!ids.length) { sel.value = ""; return; }
+        const field = key.toLowerCase();
+        S.bulkUpdate(ids, { [field]: sel.value });
+        toast(`Updated ${ids.length} case(s).`);
+        sel.value = "";
+        go("cases");
+      });
+    };
+    bulkApply("Status"); bulkApply("Owner"); bulkApply("Priority");
   };
 
   RENDER.pm = function () {
@@ -553,7 +640,8 @@
   };
 
   RENDER.help = function () {
-    return `<div class="card"><h3>How it works</h3><div class="steps">
+    return `<div class="card"><div class="card-head"><h3>How it works</h3>
+        <button class="btn btn-sm btn-primary" data-act="startTour">Take the tour</button></div><div class="steps">
       1. Set up your project &amp; team on <b>Settings</b> (names feed the Owner dropdowns).<br>
       2. Click <b>+ New Case</b> and fill the form — pick from dropdowns.<br>
       3. RPN, timing, health &amp; an AI recommendation calculate instantly.<br>
@@ -1398,6 +1486,36 @@
       </div></div>`;
     $("#modalOverlay").hidden = false;
   }
+  // ---------- onboarding tour ----------
+  const TOUR = [
+    { icon: "👋", title: "Welcome to the QI Platform", body: "Your single workspace for quality improvement, project management and engineering assurance — multi-project, click-only and works fully offline." },
+    { icon: "✚", title: "Add a case once, drive everything", body: "Press <b>n</b> or click <b>+ New Case</b>. The single entry auto-populates a PM task, a scored risk, an FMEA line, a PDCA cycle, an action-log entry, a Gantt bar and a budget line." },
+    { icon: "📊", title: "Explore the dashboards", body: "The sidebar is grouped by domain — Risk &amp; Quality, Engineering, Business. Try <b>Kanban</b> (drag cards to change status), <b>Risk Matrix</b>, <b>EVM</b> and the <b>AI Assistant</b>." },
+    { icon: "⚙", title: "Tune it for your team", body: "On <b>Settings</b>, set your project name and team roster. Use the topbar <b>◐</b> for dark mode and <b>?</b> for keyboard shortcuts. Snapshots in <b>History &amp; Backups</b> let you roll back anytime." }
+  ];
+  function showTour(step) {
+    step = Math.max(0, Math.min(step || 0, TOUR.length - 1));
+    const s = TOUR[step];
+    const dots = TOUR.map((_, i) => `<div class="tour-step ${i === step ? "active" : ""}"></div>`).join("");
+    const isLast = step === TOUR.length - 1;
+    $("#modal").innerHTML = `
+      <div class="tour-steps">${dots}</div>
+      <h2>${esc(s.title)}</h2>
+      <div class="tour-image">${s.icon}</div>
+      <div class="sub" style="font-size:14px;line-height:1.6">${s.body}</div>
+      <div class="modal-foot">
+        <button class="btn" data-act="tourSkip">Skip tour</button>
+        <div style="display:flex;gap:8px">
+          ${step > 0 ? `<button class="btn" data-act="tourPrev">Back</button>` : ""}
+          ${isLast
+            ? `<button class="btn btn-primary" data-act="tourDone">Get started</button>`
+            : `<button class="btn btn-primary" data-act="tourNext">Next</button>`}
+        </div>
+      </div>`;
+    $("#modalOverlay").hidden = false;
+    uiState.tourStep = step;
+  }
+
   function showShortcuts() {
     const rows = [
       ["?", "Show this list"],
@@ -1444,6 +1562,8 @@
     const b = e.target.closest("[data-act]"); if (!b) return;
     const act = b.dataset.act, id = b.dataset.id;
     if (act === "goHelp") return go("help");
+    if (act === "startTour") return showTour(0);
+    if (act === "skipTour") { S.setBrand({ tourDone: true }); toast("Tour skipped — open it anytime from Help."); return go("dashboard"); }
     if (act === "add") openCaseForm();
     else if (act === "edit") openCaseForm(id);
     else if (act === "del") confirmDelete(id);
@@ -1451,6 +1571,13 @@
     else if (act === "export") exportJSON();
     else if (act === "import") importJSON();
     else if (act === "clearflt") { uiState.caseFilter = { q: "", status: "", priority: "", owner: "", sort: uiState.caseFilter.sort }; go("cases"); }
+    else if (act === "bulkclear") { uiState.selected.clear(); go("cases"); }
+    else if (act === "bulkdel") {
+      const ids = [...uiState.selected]; if (!ids.length) return;
+      if (!confirm("Delete " + ids.length + " selected case(s)? This cannot be undone via the toast Undo (use Snapshots to restore).")) return;
+      S.bulkDelete(ids); uiState.selected.clear();
+      toast("Deleted " + ids.length + " case(s)."); go("cases");
+    }
     else if (act === "snap") { S.takeSnapshot(); toast("Snapshot saved."); go("audit"); }
     else if (act === "restore") { if (confirm("Restore this snapshot? Current data is auto-backed-up first.")) { S.restoreSnapshot(id); setBrand(); toast("Snapshot restored."); go("dashboard"); } }
     else if (act === "delsnap") { S.deleteSnapshot(id); go("audit"); }
@@ -1494,9 +1621,17 @@
     if (act === "cancel") closeModal();
     else if (act === "goHealth") { closeModal(); go("health"); }
     else if (act === "goHelp") { go("help"); }
+    else if (act === "tourNext") showTour((uiState.tourStep || 0) + 1);
+    else if (act === "tourPrev") showTour((uiState.tourStep || 0) - 1);
+    else if (act === "tourSkip") { S.setBrand({ tourDone: true }); closeModal(); toast("Tour dismissed."); go("dashboard"); }
+    else if (act === "tourDone") { S.setBrand({ tourDone: true }); closeModal(); toast("You're set — happy improving!"); go("dashboard"); }
     else if (act === "a3") openA3(id);
     else if (act === "del") { closeModal(); confirmDelete(id); }
-    else if (act === "confirmdel") { S.deleteCase(id); closeModal(); toast("Case deleted."); go(current === "help" ? "cases" : current); }
+    else if (act === "confirmdel") {
+      S.deleteCase(id); closeModal();
+      toast("Case deleted.", { action: { label: "Undo", handler: () => { S.undoDelete(); go(current === "help" ? "cases" : current); toast("Restored."); } } });
+      go(current === "help" ? "cases" : current);
+    }
   });
 
   $("#navAddCase").addEventListener("click", () => openCaseForm());

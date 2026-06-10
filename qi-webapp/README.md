@@ -79,12 +79,15 @@ Every operational field in the app is a **dropdown or picker** — there is no f
 - **Click-only by design.** No `prompt()`/free-text dialogs anywhere — even creating or renaming a project uses a dropdown picker. The smoke test stubs `window.prompt` and asserts it never fires.
 - **Keyboard-friendly.** All buttons, nav items and dropdowns have visible `:focus-visible` outlines. Modals auto-focus their first field and **trap focus** so Tab/Shift+Tab cycle inside the dialog. Use `↑ / ↓` to move between sidebar items.
 - **Bookmarkable URLs.** Every view is reflected in the URL hash (e.g. `#kanban`); browser back/forward works; unknown hashes fall back to the dashboard without crashing.
-- **Inline editing.** Status, owner and priority on the Cases list are dropdowns you can change in place — no need to open the form.
+- **Inline editing & bulk ops.** Status, owner and priority on the Cases list are dropdowns you can change in place. Tick the checkbox column to **select multiple** cases and use the bulk action bar to set status / owner / priority or delete in one click.
+- **Soft-delete with undo.** When you delete a case, a **5-second toast lets you Undo** before the change is committed. Snapshots remain available for longer-term recovery.
+- **First-run tour.** A 4-step tour shows you what the platform does on first run; skip or replay anytime from the Help view.
 - **Friendly empty state.** When a project has no cases yet, the dashboard shows a clear call-to-action ("+ Add your first case") instead of zeros.
 - **Storage-aware.** If your browser's localStorage fills up, the app surfaces a toast prompting you to export a JSON backup.
+- **Print-ready.** Print or save-as-PDF (top-bar Print, or the dedicated **Report Pack** view): the print stylesheet hides the chrome, keeps tables and KPI cards from breaking across pages, repeats table headers, and forces colour fidelity for badges.
 - **Screen-reader hints.** Active sidebar items expose `aria-current="page"`; modals are `role="dialog"`; icon-only topbar buttons carry `aria-label`s.
 - **Themed charts.** Chart.js axis ticks, grid lines, legends and tooltips re-colour automatically when you toggle dark mode.
-- **Verified.** 5/5 engine test suites and **120/120** jsdom smoke checks across 43 views, including regression checks for hash routing, focus trap, inline edit, empty-state CTA, storage-quota event and the polish above.
+- **Verified.** 6/6 engine test suites and **140/140** jsdom smoke checks across 43 views, including regression checks for hash routing, focus trap, inline edit, bulk ops, undo toast, tour, print CSS, empty-state CTA and storage-quota event.
 
 ## Files
 

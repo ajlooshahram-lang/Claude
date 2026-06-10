@@ -277,3 +277,58 @@ table.riskmatrix th{background:#f0f3f9;font-size:11px}
 
 /* a11y — make tables a little more readable for keyboard users */
 table:focus-within thead th{box-shadow:inset 0 -2px 0 var(--blue)}
+
+/* bulk-action bar on the cases list */
+.bulkbar{display:flex;align-items:center;gap:10px;padding:10px 14px;margin-bottom:12px;background:var(--blue);color:#fff;border-radius:10px;box-shadow:var(--shadow);flex-wrap:wrap}
+.bulkbar select{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.2);min-width:140px}
+.bulkbar select option{color:var(--ink)}
+.bulkbar .btn-sm{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.2);color:#fff}
+.bulkbar .btn-sm:hover{background:rgba(255,255,255,.22);color:#fff}
+.bulkbar .btn-danger{background:rgba(192,0,0,.95);border-color:rgba(192,0,0,.95);color:#fff}
+.row-selected td{background:rgba(46,84,150,.08)}
+[data-theme="dark"] .row-selected td{background:rgba(125,167,240,.12)}
+
+/* toast action button */
+#toast{display:flex;align-items:center;gap:14px}
+.toast-action{margin-left:6px;background:transparent;color:var(--blue);border:0;font-weight:700;cursor:pointer;padding:0;font-size:13px;text-transform:uppercase;letter-spacing:.04em}
+[data-theme="dark"] .toast-action{color:#7da7f0}
+.toast-action:hover{text-decoration:underline}
+
+/* tour banner */
+.tour-banner{display:flex;align-items:center;gap:14px;padding:10px 16px;margin-bottom:14px;background:linear-gradient(90deg,var(--teal),var(--blue));color:#fff;border-radius:10px;box-shadow:var(--shadow);flex-wrap:wrap}
+.tour-banner b{flex:0}
+.tour-banner span{flex:1;font-size:13px}
+.tour-banner .btn{background:rgba(255,255,255,.18);border-color:transparent;color:#fff}
+.tour-banner .btn:hover{background:rgba(255,255,255,.28);color:#fff}
+
+/* tour modal step indicator */
+.tour-steps{display:flex;gap:6px;margin-bottom:10px}
+.tour-step{width:24px;height:6px;background:var(--line);border-radius:3px}
+.tour-step.active{background:var(--blue)}
+.tour-image{margin:14px 0;padding:24px;background:var(--light2);border-radius:10px;text-align:center;font-size:36px}
+
+/* print refinements — better PDF output for the Report Pack & long tables */
+@media print {
+  body{background:#fff;color:#000}
+  .sidebar,.topbar,.topbar-actions,.hamburger,.toolbar,.modal-overlay,.toast,.bulkbar,.tour-banner,#fileImport{display:none!important}
+  .main{display:block;margin:0}
+  .content{max-width:none;padding:0;margin:0}
+  .card{box-shadow:none;border:1px solid #bbb;break-inside:avoid;page-break-inside:avoid;margin-bottom:8px}
+  .table-wrap{overflow:visible;border:none}
+  table{page-break-inside:auto;width:100%}
+  thead{display:table-header-group}
+  tfoot{display:table-footer-group}
+  tr{page-break-inside:avoid;page-break-after:auto}
+  th{background:#eee!important;color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  h2,h3{page-break-after:avoid}
+  .chart-box,.empty-cta{page-break-inside:avoid}
+  .kpi{break-inside:avoid;border:1px solid #aaa;box-shadow:none}
+  .badge{border:1px solid #999;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .report h2,.report h3{margin-top:14px}
+  .report .kpi .value{font-size:18px}
+  /* avoid breaking the cover info onto a second page */
+  .report > h2:first-child + p{page-break-after:avoid}
+  /* hide row checkboxes & inline action selects in print */
+  input[type=checkbox],select[data-edit]{display:none}
+  select[data-edit] + *,td:has(select[data-edit]){display:none}
+}
