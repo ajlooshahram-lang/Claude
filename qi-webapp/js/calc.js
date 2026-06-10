@@ -206,7 +206,9 @@
     parameter: ["Flow", "Pressure", "Temperature", "Level", "Composition", "Reaction", "Phase", "Mixing", "Time", "Viscosity", "Corrosion", "Voltage", "Signal"],
     personNames: ["PM", "Sponsor", "Dev Lead", "QA Lead", "Ops Lead", "Architect", "BA", "Team Lead", "Process Owner", "DevOps", "Tech Lead", "Engineering Lead", "Quality Manager", "Commissioning Engineer", "Alex Chen", "Maria Santos", "Sam Patel", "Jordan Lee", "Priya Singh", "Chris Doyle", "Robin Fox", "Dana Cole"],
     orgs: ["Engineering", "Operations", "Projects", "Quality", "HSE", "Maintenance", "IT / Digital", "Commercial", "R&D"],
-    projectNames: ["QI Intelligence Program", "Plant Upgrade Project", "Commissioning Programme", "Digital Transformation", "New Product Introduction", "Reliability Improvement", "Capital Project Alpha", "Turnaround 2026"]
+    projectNames: ["QI Intelligence Program", "Plant Upgrade Project", "Commissioning Programme", "Digital Transformation", "New Product Introduction", "Reliability Improvement", "Capital Project Alpha", "Turnaround 2026"],
+    savedViewNames: ["My critical open", "Critical & high", "Blocked", "All open", "On hold", "Resolved this week", "High RPN", "Quick wins", "Watch list", "By owner: PM", "By owner: QA Lead", "By owner: Dev Lead"],
+    snapshotLabels: ["Manual checkpoint", "Pre-deployment", "End of sprint", "End of week", "End of month", "Quarterly review", "Before major change", "After bulk update", "Backup"]
   });
 
   function addMonths(iso, m) {

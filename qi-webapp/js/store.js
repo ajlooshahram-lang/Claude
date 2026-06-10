@@ -402,6 +402,30 @@
     const i = get().snapshots.findIndex(x => x.id === id); if (i < 0) return false;
     get().snapshots.splice(i, 1); save(); return true;
   }
+  function renameSnapshot(id, label) {
+    const s = get().snapshots.find(x => x.id === id); if (!s) return false;
+    s.label = label || s.label;
+    logAudit("Renamed snapshot", "", s.label);
+    save(); return true;
+  }
+  // ---- saved views (per-project filter presets, choose-only names) ----
+  function savedViews() { const s = get(); s.savedViews = s.savedViews || []; return s.savedViews; }
+  function saveView(name, filter) {
+    if (!name) return null;
+    const list = savedViews();
+    const existing = list.find(v => v.name === name);
+    const view = { id: existing ? existing.id : uid(), name: name, filter: Object.assign({}, filter || {}), ts: new Date().toISOString() };
+    if (existing) Object.assign(existing, view); else list.push(view);
+    logAudit(existing ? "Updated saved view" : "Saved view", "", name);
+    save(); return view;
+  }
+  function deleteSavedView(id) {
+    const list = savedViews(), i = list.findIndex(v => v.id === id);
+    if (i < 0) return false;
+    const [removed] = list.splice(i, 1);
+    logAudit("Deleted saved view", "", removed && removed.name || "");
+    save(); return true;
+  }
   // Pure data diff between two snapshots (or between a snapshot and the live project).
   function diffSnapshots(idA, idB) {
     const snaps = get().snapshots;
@@ -504,7 +528,8 @@
   const API = { uid, seed, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
     undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete, togglePin,
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
-    auditList, clearAudit, takeSnapshot, snapshots, restoreSnapshot, deleteSnapshot, diffSnapshots, paretoRPN, controlChartData,
+    auditList, clearAudit, takeSnapshot, snapshots, restoreSnapshot, deleteSnapshot, renameSnapshot, diffSnapshots, paretoRPN, controlChartData,
+    savedViews, saveView, deleteSavedView,
     listProjects, activeProjectId, switchProject, addProject, renameProject, duplicateProject, deleteProject, importAsProject,
     brand, setBrand, aiSettings, setAi, portfolio,
     regRows, regAdd, regUpdate, regDelete, regLabel, regBulkDelete, regTogglePin, evm: () => C.evm(validCases(), get().project),

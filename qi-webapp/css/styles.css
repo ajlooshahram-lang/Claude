@@ -371,3 +371,19 @@ th.sortable{cursor:pointer;user-select:none}
 th.sortable:hover{background:var(--light)}
 [data-theme="dark"] th.sortable:hover{background:#26304a}
 th.sortable:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+
+/* floating action button (Quick add) */
+.fab{
+  position:fixed;right:20px;bottom:80px;z-index:60;
+  width:56px;height:56px;border-radius:50%;border:none;
+  background:var(--blue);color:#fff;font-size:28px;font-weight:300;line-height:1;
+  cursor:pointer;box-shadow:0 6px 18px rgba(20,30,60,.22);
+  display:flex;align-items:center;justify-content:center;
+  transition:transform .12s ease,box-shadow .12s ease
+}
+.fab:hover{transform:scale(1.06);box-shadow:0 8px 24px rgba(20,30,60,.28);background:#26467f}
+.fab:focus-visible{outline:3px solid rgba(46,84,150,.35);outline-offset:3px}
+@media print{.fab{display:none}}
+
+/* "Load more" footer below the cases table */
+.loadmore{display:flex;align-items:center;gap:10px;justify-content:center;padding:14px 0;flex-wrap:wrap}
