@@ -210,3 +210,34 @@ table.riskmatrix th{background:#f0f3f9;font-size:11px}
 /* rag */
 .rag{display:inline-block;width:16px;height:16px;border-radius:50%}
 .rag-g{background:#2faa4e}.rag-a{background:#e6a700}.rag-r{background:#c00000}
+
+/* icon-buttons in topbar */
+.btn-icon{padding:6px 10px;font-size:15px;line-height:1;min-width:34px;text-align:center}
+
+/* dark mode */
+[data-theme="dark"]{
+  --bg:#0e1320;--card:#161d2e;--line:#2a3550;--ink:#e6eaf3;--muted:#94a0bc;
+  --light:#1e2a44;--light2:#1a2436;--grey:#1c2538;--input:#3a3018;--calc:#1f2a1c;
+}
+[data-theme="dark"] body{background:var(--bg);color:var(--ink)}
+[data-theme="dark"] .topbar,[data-theme="dark"] .card,[data-theme="dark"] .table-wrap,[data-theme="dark"] .modal,[data-theme="dark"] .kpi{background:var(--card);color:var(--ink)}
+[data-theme="dark"] th{background:#1e2a44;color:#cbd6ee}
+[data-theme="dark"] tr:hover td{background:#1c2538}
+[data-theme="dark"] select,[data-theme="dark"] input,[data-theme="dark"] textarea{background:#1e2a44;color:var(--ink);border-color:var(--line)}
+[data-theme="dark"] select:focus,[data-theme="dark"] input:focus{border-color:#7da7f0;box-shadow:0 0 0 3px rgba(125,167,240,.18)}
+[data-theme="dark"] .pill{background:#26304a;color:#cbd6ee}
+[data-theme="dark"] .gantt-track{background:repeating-linear-gradient(90deg,#161d2e,#161d2e 13.9%,#1a2436 14%,#1a2436 14%)}
+[data-theme="dark"] .kcol{background:#1a2436}
+[data-theme="dark"] .kcard{background:#1e2a44;color:var(--ink)}
+[data-theme="dark"] .a3-box,[data-theme="dark"] .bt-chip{background:#1e2a44;color:var(--ink)}
+[data-theme="dark"] .readout{background:#1f2a1c;border-color:#2a4533}
+[data-theme="dark"] .modal-overlay{background:rgba(0,0,0,.65)}
+[data-theme="dark"] .nav-item:hover{background:rgba(255,255,255,.08)}
+[data-theme="dark"] .savedhint{color:#94a0bc}
+[data-theme="dark"] .empty{color:var(--muted)}
+
+/* shortcut/help overlay */
+.kbd{display:inline-block;background:#fff;border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:1px 7px;font:11px/1.4 ui-monospace,Menlo,Consolas,monospace;color:var(--ink);margin-right:6px}
+[data-theme="dark"] .kbd{background:#1e2a44;color:#cbd6ee}
+.shortcut-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line);font-size:13px}
+.shortcut-row:last-child{border-bottom:0}

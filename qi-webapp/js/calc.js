@@ -427,7 +427,12 @@
     "sil.proofTest": [3, 6, 12, 18, 24, 36],
     "resources.capacity": HOURS, "resources.allocated": HOURS,
     "procurement.value": MONEY,
-    "okr.baseline": numSeq(0, 100, 5), "okr.target": numSeq(0, 100, 5), "okr.current": numSeq(0, 100, 5)
+    "okr.baseline": numSeq(0, 100, 5), "okr.target": numSeq(0, 100, 5), "okr.current": numSeq(0, 100, 5),
+    "rice.reach": [10, 50, 100, 200, 500, 1000, 2000, 5000, 10000],
+    "rice.impact": [0.25, 0.5, 1, 2, 3, 5, 8],
+    "rice.confidence": [50, 60, 70, 80, 90, 100],
+    "rice.effort": [0.5, 1, 2, 3, 5, 8, 13, 21],
+    "wsjf.score": [1, 2, 3, 5, 8, 13, 20]
   };
   const OPT = {
     "hazop.node": ["Feed line to reactor", "Reactor", "Cooling water system", "Separator", "Compressor suction", "Storage tank", "Flare header", "Pump discharge", "Heat exchanger", "Control loop"],
@@ -500,6 +505,73 @@
     return { means, ranges, xbb, rbar, xUcl: xbb + A2 * rbar, xLcl: xbb - A2 * rbar, rUcl: D4 * rbar, rLcl: 0 };
   }
 
+  // ---- Process Capability (Cp/Cpk + Pp/Ppk) ----
+  // Cp/Cpk use the within-subgroup short-term sigma (R̄ / d2);
+  // Pp/Ppk use the overall standard deviation of all observations.
+  const D2 = { 2: 1.128, 3: 1.693, 4: 2.059, 5: 2.326, 6: 2.534, 7: 2.704, 8: 2.847, 9: 2.970, 10: 3.078 };
+  function capability(g, spec) {
+    if (!spec) return null;
+    const usl = num(spec.usl), lsl = num(spec.lsl);
+    if (usl === null && lsl === null) return null;
+    const x = xbarR(g);
+    // gather all observations
+    const all = [];
+    for (let i = 0; i < g.subgroups; i++) for (let j = 0; j < g.size; j++) {
+      const v = g.data[`${i}_${j}`]; if (v !== "" && v != null && !isNaN(v)) all.push(Number(v));
+    }
+    if (all.length < 2) return null;
+    const mean = x.xbb, n = all.length;
+    const overallVar = all.reduce((a, b) => a + (b - mean) * (b - mean), 0) / (n - 1);
+    const sigmaLT = Math.sqrt(overallVar);                   // long-term (overall)
+    const d2 = D2[g.size] || 2.326;
+    const sigmaST = x.rbar > 0 ? x.rbar / d2 : sigmaLT;       // short-term (within)
+    const cap = (sig) => {
+      const cp = (usl !== null && lsl !== null && sig > 0) ? (usl - lsl) / (6 * sig) : null;
+      const cpu = (usl !== null && sig > 0) ? (usl - mean) / (3 * sig) : null;
+      const cpl = (lsl !== null && sig > 0) ? (mean - lsl) / (3 * sig) : null;
+      const cpk = (cpu === null) ? cpl : (cpl === null) ? cpu : Math.min(cpu, cpl);
+      return { cp, cpu, cpl, cpk, sigma: sig };
+    };
+    // % out of spec (assume normal)
+    function nCdf(z) { const t = 1 / (1 + 0.2316419 * Math.abs(z)); const d = 0.3989423 * Math.exp(-z * z / 2); const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274)))); return z > 0 ? 1 - p : p; }
+    const pAbove = (usl !== null && sigmaLT > 0) ? 1 - nCdf((usl - mean) / sigmaLT) : 0;
+    const pBelow = (lsl !== null && sigmaLT > 0) ? nCdf((lsl - mean) / sigmaLT) : 0;
+    return {
+      mean, n, usl, lsl, target: num(spec.target),
+      st: cap(sigmaST), lt: cap(sigmaLT),
+      ppmOut: Math.round((pAbove + pBelow) * 1e6),
+      verdict: (() => {
+        const c = cap(sigmaST).cpk;
+        if (c == null) return "—";
+        if (c >= 1.67) return "Excellent (>=1.67)";
+        if (c >= 1.33) return "Capable (>=1.33)";
+        if (c >= 1.00) return "Marginal (1.00–1.33)";
+        return "Not capable (<1.00)";
+      })()
+    };
+  }
+
+  // ---- Prioritisation: RICE & WSJF ----
+  // RICE = (Reach × Impact × Confidence) / Effort
+  // WSJF = Cost-of-Delay / Job-size; CoD = userValue + timeCriticality + riskReduction
+  function rice(c) {
+    const r = num(c.reach), i = num(c.impact), cf = num(c.confidence), e = num(c.effort);
+    if ([r, i, cf, e].some(x => x === null) || e <= 0) return null;
+    return Math.round((r * i * (cf / 100) / e) * 100) / 100;
+  }
+  function wsjf(c) {
+    const uv = num(c.userValue), tc = num(c.timeCrit), rr = num(c.riskRed), js = num(c.jobSize);
+    if ([uv, tc, rr, js].some(x => x === null) || js <= 0) return null;
+    return Math.round(((uv + tc + rr) / js) * 100) / 100;
+  }
+  function prioritise(cases, method) {
+    const fn = method === "wsjf" ? wsjf : rice;
+    return cases.map(c => Object.assign({}, c, { _score: fn(c) }))
+      .sort((a, b) => (b._score == null ? -Infinity : b._score) - (a._score == null ? -Infinity : a._score));
+  }
+
+  // Earned Value Management from cases (budget + % done) and the schedule.
+
   // Earned Value Management from cases (budget + % done) and the schedule.
   function evm(cases, project) {
     const v = cases.filter(c => c.problem);
@@ -517,7 +589,7 @@
     return { bac, ev, ac, pv, cpi, spi, cv: ev - ac, sv: ev - pv, eac, vac: bac - (cpi ? bac / cpi : bac), frac };
   }
 
-  const API = { LISTS, SUGGEST, num, rpn, rpnBand, estDays, estEnd, health, aiRecommendation, sigmaFromDpmo, stakeholderStrategy, fmtDate, enrich, pareto, controlStats, a3, REGISTERS, addMonths, daysBetween, evm, gageRR, numSeq, MONEY, HOURS, GAGEVALS, NUMOPTS, OPT, imr, riskMatrix, xbarR };
+  const API = { LISTS, SUGGEST, num, rpn, rpnBand, estDays, estEnd, health, aiRecommendation, sigmaFromDpmo, stakeholderStrategy, fmtDate, enrich, pareto, controlStats, a3, REGISTERS, addMonths, daysBetween, evm, gageRR, numSeq, MONEY, HOURS, GAGEVALS, NUMOPTS, OPT, imr, riskMatrix, xbarR, capability, rice, wsjf, prioritise };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QICalc = API;
 })(typeof window !== "undefined" ? window : globalThis);

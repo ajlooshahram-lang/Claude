@@ -127,3 +127,27 @@ const hzKeys = C.REGISTERS.find(r => r.id === "hazop").columns.map(c => c.key);
 console.log("HAZOP has guideword+parameter:", hzKeys.includes("guideword") && hzKeys.includes("parameter"));
 const ok5 = gr.verdict && gr.ndc >= 1 && cf.length === 12 && u > 1 && hzKeys.includes("guideword");
 console.log(ok5 ? "MSA/CASHFLOW/RESOURCE TESTS PASS" : "TESTS FAIL");
+
+
+
+// --- capability + RICE/WSJF + NCR Pareto + theme ---
+console.log("\n-- capability / prioritisation --");
+S.reset();
+const cap = S.capabilityResult();
+console.log("Cp/Cpk:", cap.st.cp.toFixed(3), cap.st.cpk.toFixed(3), "verdict:", cap.verdict, "ppm:", cap.ppmOut);
+S.setSpec({ usl: 11, lsl: 9 });
+console.log("Spec USL/LSL persisted:", S.spec().usl, S.spec().lsl);
+const rRanked = S.prioritised("rice");
+const wRanked = S.prioritised("wsjf");
+console.log("RICE top:", rRanked[0].problem.slice(0, 30), "score", rRanked[0]._score);
+console.log("WSJF top:", wRanked[0].problem.slice(0, 30), "score", wRanked[0]._score);
+// add an NCR and verify ncrPareto
+S.regAdd("ncr", { desc: "test", severity: "Major", disposition: "Rework", status: "OPEN", discipline: "Process" });
+S.regAdd("ncr", { desc: "test2", severity: "Minor", disposition: "Use as is", status: "OPEN", discipline: "Process" });
+const ncrP = S.ncrParetoBy("severity");
+console.log("NCR Pareto (severity):", ncrP.map(p => p.label + ":" + p.value).join(", "));
+// brand theme
+S.setBrand({ theme: "dark" });
+console.log("Brand.theme set:", S.brand().theme);
+const ok6 = cap.st.cpk > 1.0 && rRanked[0]._score && wRanked[0]._score && ncrP.length >= 2 && S.brand().theme === "dark";
+console.log(ok6 ? "CAPABILITY/PRIORITY/THEME TESTS PASS" : "TESTS FAIL");
