@@ -568,7 +568,7 @@ body.dark img { filter: brightness(0.92); }
 <body>
 
 <div class="header">
-  <h1 id="appTitle">El-Dimensionering</h1>
+  <h1 id="appTitle" style="display:flex;align-items:center;gap:8px"><span id="appTitleText">El-Dimensionering</span><span id="verBadge" style="font-size:0.6rem;font-weight:700;background:rgba(255,255,255,0.18);padding:2px 7px;border-radius:10px;letter-spacing:0.5px"></span></h1>
   <div style="display:flex;align-items:center;gap:10px">
     <button id="themeBtn" class="theme-btn" onclick="toggleTheme()" title="Dark / Light">🌙</button>
     <div class="lang-toggle">
@@ -782,7 +782,7 @@ function setLang(l) {
   lang = l;
   document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
   document.querySelector(`.lang-btn[onclick="setLang('${l}')"]`).classList.add('active');
-  document.getElementById('appTitle').textContent = t('appTitle');
+  document.getElementById('appTitleText').textContent = t('appTitle');
   renderNav();
   renderModule(activeModule);
 }
@@ -4089,6 +4089,7 @@ function renderVerify() {
 renderNav();
 renderStatusBar();
 renderModule(activeModule);
+(function(){ var b=document.getElementById('verBadge'); if(b) b.textContent='v'+DATA_VERSION; })();
 </script>
 </body>
 </html>
