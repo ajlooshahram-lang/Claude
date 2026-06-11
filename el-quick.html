@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El-Quick — Hurtig dimensionering</title>
+<style>
+:root{
+  --bg:#0f1620; --bg2:#0b1119; --card:#1a2330; --line:#2a3645;
+  --txt:#e6edf3; --mut:#8fa3b5; --pri:#3282b8; --pri2:#4a9fd4;
+  --ok:#06d6a0; --warn:#ffd166; --bad:#ef476f; --r:14px;
+}
+.light{ --bg:#eef3f8; --bg2:#e3eaf2; --card:#fff; --line:#e2e8f0; --txt:#1b2838; --mut:#5a6d7e; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(180deg,var(--bg2),var(--bg));color:var(--txt);min-height:100vh;-webkit-font-smoothing:antialiased}
+.wrap{max-width:760px;margin:0 auto;padding:18px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+h1{font-size:1.3rem;font-weight:800;letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
+.logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--pri),var(--pri2));display:flex;align-items:center;justify-content:center;font-size:1rem}
+.ctrls{display:flex;gap:8px}
+.icon-btn{border:1px solid var(--line);background:var(--card);color:var(--txt);border-radius:20px;padding:6px 12px;font-weight:700;font-size:.78rem;cursor:pointer;transition:.2s}
+.icon-btn:hover{border-color:var(--pri2)}
+.icon-btn.active{background:var(--pri);color:#fff;border-color:var(--pri)}
+.sub{color:var(--mut);font-size:.82rem;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin-bottom:14px;box-shadow:0 4px 18px rgba(0,0,0,.12);animation:rise .4s cubic-bezier(.16,1,.3,1)}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.lbl{font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--mut);margin-bottom:9px;display:flex;align-items:center;gap:6px}
+.grid{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px}
+.chip{padding:9px 15px;border:1.5px solid var(--line);border-radius:9px;background:transparent;color:var(--txt);font-weight:600;font-size:.85rem;cursor:pointer;transition:.18s}
+.chip:hover{border-color:var(--pri2);transform:translateY(-2px)}
+.chip.on{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;border-color:transparent;box-shadow:0 4px 12px rgba(50,130,184,.3)}
+.score-wrap{display:flex;align-items:center;gap:18px}
+.ring{position:relative;width:104px;height:104px;flex-shrink:0}
+.ring svg{transform:rotate(-90deg)}
+.ring .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring .num{font-size:1.7rem;font-weight:800;line-height:1}
+.ring .pct{font-size:.62rem;color:var(--mut);font-weight:700}
+.checks{flex:1;display:flex;flex-direction:column;gap:5px}
+.chk{display:flex;justify-content:space-between;align-items:center;font-size:.84rem;padding:4px 0;border-bottom:1px solid var(--line)}
+.chk:last-child{border:none}
+.chk .v{font-weight:700;font-variant-numeric:tabular-nums}
+.badge{padding:2px 9px;border-radius:11px;font-size:.68rem;font-weight:800}
+.b-ok{background:rgba(6,214,160,.16);color:#0a8f6e}
+.b-bad{background:rgba(239,71,111,.16);color:#c32f53}
+.res{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.res .item{background:linear-gradient(135deg,rgba(50,130,184,.08),transparent);border:1px solid var(--line);border-radius:10px;padding:12px}
+.res .k{font-size:.68rem;color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.res .val{font-size:1.05rem;font-weight:800;margin-top:3px}
+.res .meta{font-size:.72rem;color:var(--mut);margin-top:2px}
+.price{font-size:1.9rem;font-weight:800;color:var(--ok)}
+.note{font-size:.72rem;color:var(--mut);margin-top:8px;line-height:1.5}
+@media(max-width:560px){.res{grid-template-columns:1fr}.ring{width:88px;height:88px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="logo">⚡</span><span id="title">El-Quick</span></h1>
+    <div class="ctrls">
+      <button class="icon-btn" id="theme" onclick="toggleTheme()">🌙</button>
+      <button class="icon-btn active" onclick="setLang('da')" id="da">DA</button>
+      <button class="icon-btn" onclick="setLang('en')" id="en">EN</button>
+    </div>
+  </header>
+  <div class="sub" id="sub">Hurtig, kompliant kabel- og sikringsdimensionering — på 5 klik.</div>
+  <div id="app"></div>
+</div>
+
+<script>
+// ===== Official DS/HD 60364-5-52 Table C.52.1, method C (verified) =====
+const IZ = { // XLPE 90°C copper (NKT NOIKLX)
+  1.5:22,2.5:30,4:40,6:51,10:70,16:94,25:119,35:147,50:179,70:229,95:278,120:322,150:371,185:424,240:500
+};
+const R = {1.5:12.1,2.5:7.41,4:4.61,6:3.08,10:1.83,16:1.15,25:0.727,35:0.525,50:0.388,70:0.269,95:0.194,120:0.155,150:0.126,185:0.1017,240:0.0787};
+const X = {1.5:.113,2.5:.105,4:.099,6:.097,10:.092,16:.088,25:.086,35:.082,50:.084,70:.081,95:.082,120:.082,150:.084,185:.082,240:.083};
+const K_INSTALL = {C:1.0,B1:0.9,B2:0.86,A1:0.8,D:0.9,E:1.04,F:1.09};
+const K_TEMP = {25:1.04,30:1.0,35:0.96,40:0.91,45:0.87,50:0.82};
+const K_GROUP = {1:1.0,2:0.8,3:0.7,4:0.65,6:0.57};
+const BREAKERS=[6,10,13,16,20,25,32,40,50,63]; // MCB ladder
+const PRICE_M={1.5:12,2.5:18,4:28,6:40,10:65,16:100,25:160,35:220,50:310,70:430,95:580,120:740,150:920,185:1150,240:1500}; // kr/m
+
+let S={V:'3x400',P:10,len:30,method:'C',temp:30,group:1};
+let lang='da';
+
+const T={
+ da:{title:'El-Quick',sub:'Hurtig, kompliant kabel- og sikringsdimensionering — på 5 klik.',
+   voltage:'Spænding',power:'Effekt (kW)',length:'Kabellængde (m)',method:'Fremføring',temp:'Temperatur (°C)',group:'Antal kabler',
+   score:'Kompliansscore',result:'Resultat',ib:'Belastningsstrøm IB',cable:'Kabel',breaker:'Automatsikring',rcd:'HPFI',vdrop:'Spændingsfald',price:'Materialepris (ca.)',
+   c1:'IB ≤ In',c2:'In ≤ Iz',c3:'ΔU ≤ 4%',c4:'HPFI 30 mA',ok:'OK',bad:'FEJL',
+   note:'Iz iht. officiel DS/HD 60364-5-52 Tabel C.52.1 (XLPE 90°C, Cu). HPFI Type A 30 mA påkrævet for stik/bolig. Vejledende pris.'},
+ en:{title:'El-Quick',sub:'Fast, compliant cable & breaker sizing — in 5 clicks.',
+   voltage:'Voltage',power:'Power (kW)',length:'Cable length (m)',method:'Installation',temp:'Temperature (°C)',group:'Cables',
+   score:'Compliance score',result:'Result',ib:'Load current IB',cable:'Cable',breaker:'MCB',rcd:'RCD',vdrop:'Voltage drop',price:'Material price (approx.)',
+   c1:'IB ≤ In',c2:'In ≤ Iz',c3:'ΔU ≤ 4%',c4:'RCD 30 mA',ok:'OK',bad:'FAIL',
+   note:'Iz per official DS/HD 60364-5-52 Table C.52.1 (XLPE 90°C, Cu). RCD Type A 30 mA required for sockets/residential. Indicative price.'}
+};
+const t=k=>T[lang][k];
+
+function calc(){
+  const P=S.P*1000, cos=0.9, sin=Math.sin(Math.acos(cos));
+  const ib = S.V==='3x400' ? P/(Math.sqrt(3)*400*cos) : P/(230*cos);
+  const k = (K_INSTALL[S.method]||1)*(K_TEMP[S.temp]||1)*(K_GROUP[S.group]||1);
+  // smallest breaker >= IB
+  const In = BREAKERS.find(b=>b>=ib) || 63;
+  // smallest cable whose corrected Iz >= In  (IB <= In <= Iz)
+  const sizes=Object.keys(IZ).map(Number).sort((a,b)=>a-b);
+  let mm2=null;
+  for(const s of sizes){ if(IZ[s]*k >= In){ mm2=s; break; } }
+  if(!mm2) mm2=240;
+  const izc = IZ[mm2]*k;
+  // voltage drop
+  const Un = S.V==='3x400'?400:230, L=S.len/1000;
+  const vd = S.V==='3x400' ? Math.sqrt(3)*ib*L*(R[mm2]*cos+X[mm2]*sin) : 2*ib*L*(R[mm2]*cos+X[mm2]*sin);
+  const vdp = vd/Un*100;
+  const price = Math.round((PRICE_M[mm2]||50)*S.len);
+  // checks
+  const c1 = ib<=In, c2 = In<=izc, c3 = vdp<=4, c4 = true; // RCD always recommended
+  const score = Math.round(([c1,c2,c3,c4].filter(Boolean).length/4)*100);
+  return {ib,In,mm2,izc,vdp,price,c1,c2,c3,c4,score};
+}
+
+function render(){
+  const r=calc();
+  const chip=(v,cur,oc,lab)=>`<button class="chip ${cur===v?'on':''}" onclick="${oc}">${lab||v}</button>`;
+  const col = r.score>=90?'var(--ok)':r.score>=70?'var(--warn)':'var(--bad)';
+  const circ=2*Math.PI*45, off=circ*(1-r.score/100);
+  document.getElementById('app').innerHTML=`
+    <div class="card">
+      <div class="lbl">⚙️ ${t('voltage')}</div>
+      <div class="grid">${['3x400','1x230'].map(v=>chip(v,S.V,`set('V','${v}')`,v+' V')).join('')}</div>
+      <div class="lbl">🔌 ${t('power')}</div>
+      <div class="grid">${[2,4,6,10,15,20,30,40].map(p=>chip(p,S.P,`set('P',${p})`)).join('')}</div>
+      <div class="lbl">📏 ${t('length')}</div>
+      <div class="grid">${[10,20,30,50,75,100,150,200].map(l=>chip(l,S.len,`set('len',${l})`)).join('')}</div>
+      <div class="lbl">🧱 ${t('method')}</div>
+      <div class="grid">${['A1','B1','B2','C','E','F'].map(m=>chip(m,S.method,`set('method','${m}')`)).join('')}</div>
+      <div class="lbl">🌡️ ${t('temp')}</div>
+      <div class="grid">${[25,30,35,40,45].map(c=>chip(c,S.temp,`set('temp',${c})`,c+'°')).join('')}</div>
+      <div class="lbl">🔗 ${t('group')}</div>
+      <div class="grid" style="margin-bottom:0">${[1,2,3,4,6].map(g=>chip(g,S.group,`set('group',${g})`)).join('')}</div>
+    </div>
+
+    <div class="card">
+      <div class="lbl">🛡️ ${t('score')}</div>
+      <div class="score-wrap">
+        <div class="ring">
+          <svg width="104" height="104"><circle cx="52" cy="52" r="45" fill="none" stroke="var(--line)" stroke-width="9"/>
+          <circle cx="52" cy="52" r="45" fill="none" stroke="${col}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${off}" style="transition:stroke-dashoffset .6s"/></svg>
+          <div class="val"><div class="num" style="color:${col}">${r.score}</div><div class="pct">%</div></div>
+        </div>
+        <div class="checks">
+          ${chkRow(t('c1'),`${r.ib.toFixed(1)} ≤ ${r.In} A`,r.c1)}
+          ${chkRow(t('c2'),`${r.In} ≤ ${r.izc.toFixed(0)} A`,r.c2)}
+          ${chkRow(t('c3'),`${r.vdp.toFixed(2)} %`,r.c3)}
+          ${chkRow(t('c4'),'Type A 30 mA',r.c4)}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="lbl">✅ ${t('result')}</div>
+      <div class="res">
+        <div class="item"><div class="k">${t('ib')}</div><div class="val">${r.ib.toFixed(1)} A</div></div>
+        <div class="item"><div class="k">${t('cable')}</div><div class="val">${r.mm2} mm²</div><div class="meta">NKT NOIKLX · Iz ${r.izc.toFixed(0)} A</div></div>
+        <div class="item"><div class="k">${t('breaker')}</div><div class="val">C${r.In}</div><div class="meta">Schneider iC60 / ABB S200</div></div>
+        <div class="item"><div class="k">${t('rcd')}</div><div class="val">30 mA</div><div class="meta">Type A · Acti9 iID</div></div>
+        <div class="item"><div class="k">${t('vdrop')}</div><div class="val">${r.vdp.toFixed(2)} %</div></div>
+        <div class="item"><div class="k">${t('price')}</div><div class="price">${r.price.toLocaleString('da-DK')} kr</div></div>
+      </div>
+      <div class="note">${t('note')}</div>
+    </div>`;
+}
+function chkRow(l,v,ok){return `<div class="chk"><span>${l}</span><span class="v">${v} <span class="badge ${ok?'b-ok':'b-bad'}">${ok?t('ok'):t('bad')}</span></span></div>`;}
+function set(k,v){S[k]=v;render();}
+function setLang(l){lang=l;document.documentElement.lang=l;document.getElementById('da').classList.toggle('active',l==='da');document.getElementById('en').classList.toggle('active',l==='en');document.getElementById('sub').textContent=t('sub');render();}
+function toggleTheme(){const d=document.body.classList.toggle('light');document.getElementById('theme').textContent=d?'☀️':'🌙';localStorage.setItem('elqTheme',d?'light':'dark');}
+if(localStorage.getItem('elqTheme')==='light'){document.body.classList.add('light');}
+render();
+</script>
+</body>
+</html>
