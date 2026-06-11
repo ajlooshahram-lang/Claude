@@ -1,0 +1,19 @@
+{
+  "_comment": "Dynamic standards/law manifest for El-Dimensionering. Update the values in 'items' whenever a Danish electrical standard or law is revised, and bump 'checked'. The app fetches this when online and flags any value that differs from its built-in baseline. Keys must match the app's STANDARDS_BASELINE keys.",
+  "checked": "2026-06-11",
+  "source": "Sikkerhedsstyrelsen / Dansk Standard / IEC",
+  "items": {
+    "Elsikkerhedsloven": "LBK nr 26 af 2023",
+    "Installationsbekendtgørelsen": "BEK nr 1082",
+    "DS/HD 60364-5-52": "2011+A12:2022",
+    "DS/HD 60364-4-43": "2023",
+    "IEC 60364-1": "2025",
+    "Fællesregulativet": "2019"
+  },
+  "links": {
+    "Sikkerhedsstyrelsen": "https://www.sik.dk",
+    "Elsikkerhed": "https://www.elsikkerhed.dk",
+    "Dansk Standard": "https://www.ds.dk",
+    "Retsinformation": "https://www.retsinformation.dk"
+  }
+}

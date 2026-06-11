@@ -3312,7 +3312,10 @@ function toggleTheme() {
 // Danish electrical regulations are revised regularly. When online, the app can
 // check a remote JSON manifest for newer standard versions/dates and notify the user.
 // Default manifest is configurable; falls back silently offline.
-const LAW_MANIFEST_URL = localStorage.getItem('lawManifestUrl') || '';
+// Default manifest is hosted in this repo; users can override via configureLawSource().
+const LAW_MANIFEST_DEFAULT = 'https://raw.githubusercontent.com/ajlooshahram-lang/Claude/main/standards-manifest.json';
+const _lawStored = localStorage.getItem('lawManifestUrl');
+const LAW_MANIFEST_URL = _lawStored === 'off' ? '' : (_lawStored || LAW_MANIFEST_DEFAULT);
 // Current built-in standards baseline (what the app was built against)
 const STANDARDS_BASELINE = {
   checked: '2026-06-11',
@@ -3377,7 +3380,7 @@ function configureLawSource() {
     ? 'URL til JSON-manifest med nyeste standarder (lad tom for at sl\u00E5 fra):'
     : 'URL to JSON manifest with latest standards (leave empty to disable):', LAW_MANIFEST_URL);
   if (url === null) return;
-  localStorage.setItem('lawManifestUrl', url.trim());
+  localStorage.setItem('lawManifestUrl', url.trim() === '' ? 'off' : url.trim());
   location.reload();
 }
 
