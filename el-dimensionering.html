@@ -3478,12 +3478,23 @@ function findProduct(cat, id) {
   return (PRODUCTS[cat] || []).find(x => x.id === id);
 }
 
-// Bid state
+// Akkord / montagetid: indicative standard installation time (minutes per unit),
+// like the Danish akkord-tidsfortegnelse that EG Sigma / EG Kalkia use to derive labor.
+// Cables are per metre; everything else per piece.
+const MONTAGETID = {
+  cables: 3, mcbs: 8, mccbs: 25, fuses: 5, rcds: 12, rcbos: 12,
+  spds: 20, contactors: 20, mpcbs: 20, overloadRelays: 12, wiringDevices: 18
+};
+function montagetidFor(cat) { return MONTAGETID[cat] || 10; }
+
+// Bid state (EG Sigma / Kalkia style)
 let bidState = {
   wholesaler: 'Lemvigh-Müller',
-  laborHours: 8,
+  laborMode: 'akkord', // 'akkord' = auto from montagetid, 'fast' = manual hours
+  laborHours: 8,       // used in 'fast' mode
   hourlyRate: 550,
-  markup: 15,
+  rabat: 40,           // wholesaler discount % off list (rabatgruppe)
+  markup: 15,          // dækningsbidrag / avance % on net materials
   basket: [], // { cat, id, qty }
   pickCat: 'cables'
 };
@@ -3517,16 +3528,21 @@ function renderBid() {
   const ws = WHOLESALERS[bidState.wholesaler];
   const hourlyOptions = [450, 500, 550, 600, 650, 750];
   const markupOptions = [0, 10, 15, 20, 25, 30];
-  const laborSteps = true;
+  const rabatOptions = [0, 20, 30, 40, 50, 55, 60];
 
-  // Build itemized lines
-  let materials = 0;
+  // Build itemized lines (EG Sigma/Kalkia style: list price -> rabat -> net)
+  let materialsList = 0;   // sum of list prices
+  let totalMinutes = 0;    // sum of montagetid (akkord)
   const lines = bidState.basket.map((b, i) => {
     const p = findProduct(b.cat, b.id);
     if (!p) return '';
-    const unit = Math.round(priceFor(b.cat, p) * ws.idx);
-    const lineTotal = unit * b.qty;
-    materials += lineTotal;
+    const list = Math.round(priceFor(b.cat, p) * ws.idx);
+    const lineList = list * b.qty;
+    materialsList += lineList;
+    const mins = montagetidFor(b.cat) * b.qty;
+    totalMinutes += mins;
+    const net = Math.round(list * (1 - bidState.rabat / 100));
+    const lineNet = net * b.qty;
     const unitLabel = b.cat === 'cables' ? 'kr/m' : 'kr/stk';
     return `
       <div class="result-row" style="align-items:center;gap:10px">
@@ -3534,23 +3550,29 @@ function renderBid() {
         <div style="flex:1">
           <div style="display:flex;justify-content:space-between;gap:8px">
             <span class="label"><strong>${p.brand}</strong> ${p.model}</span>
-            <span class="value">${lineTotal.toLocaleString('da-DK')} kr</span>
+            <span class="value">${lineNet.toLocaleString('da-DK')} kr</span>
           </div>
           <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
             <button class="sel-btn" style="padding:2px 9px;min-width:0" onclick="bidQty(${i},-1)">\u2212</button>
             <span style="font-weight:700;min-width:50px;text-align:center">${b.qty} ${b.cat === 'cables' ? 'm' : 'stk'}</span>
             <button class="sel-btn" style="padding:2px 9px;min-width:0" onclick="bidQty(${i},1)">+</button>
-            <span style="font-size:0.74rem;color:var(--text-muted)">\u00D7 ${unit} ${unitLabel}</span>
+            <span style="font-size:0.72rem;color:var(--text-muted)">${list} ${unitLabel} \u00F7${bidState.rabat}% \u2192 ${net} | \u23F1\uFE0F ${montagetidFor(b.cat)} min</span>
             <button class="sel-btn" style="padding:2px 9px;min-width:0;margin-left:auto;color:var(--danger)" onclick="bidRemove(${i})">\uD83D\uDDD1\uFE0F</button>
           </div>
         </div>
       </div>`;
   }).join('');
 
-  const labor = bidState.laborHours * bidState.hourlyRate;
-  const subtotal = materials + labor;
-  const markupAmt = subtotal * (bidState.markup / 100);
-  const exVat = subtotal + markupAmt;
+  // EG Sigma / Kalkia calculation:
+  // list -> rabat -> net materials -> +avance(DB) -> materials sale price
+  // labor = akkord (montagetid) or fast (manual hours) x rate
+  const materialsNet = materialsList * (1 - bidState.rabat / 100);
+  const markupAmt = materialsNet * (bidState.markup / 100);
+  const materialsSale = materialsNet + markupAmt;
+  const akkordHours = totalMinutes / 60;
+  const hours = bidState.laborMode === 'akkord' ? akkordHours : bidState.laborHours;
+  const labor = hours * bidState.hourlyRate;
+  const exVat = materialsSale + labor;
   const vat = exVat * 0.25;
   const total = exVat + vat;
   const fmt = n => Math.round(n).toLocaleString('da-DK');
@@ -3602,7 +3624,25 @@ function renderBid() {
     </div>
 
     <div class="card fade-in">
-      <div class="card-title">${lang === 'da' ? 'Arbejdsl\u00F8n & avance' : 'Labor & markup'}</div>
+      <div class="card-title">${lang === 'da' ? 'Rabat, arbejdsl\u00F8n & avance' : 'Discount, labor & markup'}</div>
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Rabat / rabatgruppe (%)' : 'Discount / rabat group (%)'}</div>
+        <div class="select-grid">
+          ${rabatOptions.map(rb => `<button class="sel-btn ${bidState.rabat === rb ? 'selected' : ''}" onclick="bidState.rabat=${rb};renderModule('bid')">${rb}%</button>`).join('')}
+        </div>
+      </div>
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Arbejdsl\u00F8n-metode' : 'Labor method'}</div>
+        <div class="select-grid">
+          <button class="sel-btn ${bidState.laborMode === 'akkord' ? 'selected' : ''}" onclick="bidState.laborMode='akkord';renderModule('bid')">${lang === 'da' ? 'Akkord (montagetid)' : 'Akkord (install time)'}</button>
+          <button class="sel-btn ${bidState.laborMode === 'fast' ? 'selected' : ''}" onclick="bidState.laborMode='fast';renderModule('bid')">${lang === 'da' ? 'Fast timer' : 'Fixed hours'}</button>
+        </div>
+      </div>
+      ${bidState.laborMode === 'akkord' ? `
+      <div class="result-box" style="background:var(--primary-glow);border-color:var(--primary-light)">
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Montagetid i alt' : 'Total install time'}</span><span class="value">${Math.round(totalMinutes)} min = ${akkordHours.toFixed(1)} t</span></div>
+        <div class="result-row"><span class="label" style="font-size:0.72rem;color:var(--text-muted)">${lang === 'da' ? 'Beregnet automatisk fra akkord-tider' : 'Auto-derived from akkord times'}</span></div>
+      </div>` : `
       <div class="select-group">
         <div class="select-label">${lang === 'da' ? 'Arbejdstimer' : 'Labor hours'}</div>
         <div class="select-grid" style="align-items:center">
@@ -3610,7 +3650,7 @@ function renderBid() {
           <span style="font-weight:700;min-width:60px;text-align:center">${bidState.laborHours} t</span>
           <button class="sel-btn" style="min-width:0" onclick="bidState.laborHours+=1;renderModule('bid')">+</button>
         </div>
-      </div>
+      </div>`}
       <div class="select-group">
         <div class="select-label">${lang === 'da' ? 'Timepris' : 'Hourly rate'}</div>
         <div class="select-grid">
@@ -3618,7 +3658,7 @@ function renderBid() {
         </div>
       </div>
       <div class="select-group">
-        <div class="select-label">${lang === 'da' ? 'Avance (%)' : 'Markup (%)'}</div>
+        <div class="select-label">${lang === 'da' ? 'Avance / d\u00E6kningsbidrag (%)' : 'Markup / margin (%)'}</div>
         <div class="select-grid">
           ${markupOptions.map(mk => `<button class="sel-btn ${bidState.markup === mk ? 'selected' : ''}" onclick="bidState.markup=${mk};renderModule('bid')">${mk}%</button>`).join('')}
         </div>
@@ -3628,10 +3668,11 @@ function renderBid() {
     <div class="card fade-in">
       <div class="card-title">${lang === 'da' ? 'Tilbud (indledende projektpris)' : 'Bid (initial project price)'}</div>
       <div class="result-box">
-        <div class="result-row"><span class="label">${lang === 'da' ? 'Materialer' : 'Materials'}</span><span class="value">${fmt(materials)} kr</span></div>
-        <div class="result-row"><span class="label">${lang === 'da' ? 'Arbejdsl\u00F8n' : 'Labor'} (${bidState.laborHours} t \u00D7 ${bidState.hourlyRate})</span><span class="value">${fmt(labor)} kr</span></div>
-        <div class="result-row"><span class="label">${lang === 'da' ? 'Subtotal' : 'Subtotal'}</span><span class="value">${fmt(subtotal)} kr</span></div>
-        <div class="result-row"><span class="label">${lang === 'da' ? 'Avance' : 'Markup'} (${bidState.markup}%)</span><span class="value">${fmt(markupAmt)} kr</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Materialer (listepris)' : 'Materials (list price)'}</span><span class="value">${fmt(materialsList)} kr</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Rabat' : 'Discount'} (\u2212${bidState.rabat}%)</span><span class="value">\u2212${fmt(materialsList - materialsNet)} kr</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Materialer netto' : 'Materials net'}</span><span class="value">${fmt(materialsNet)} kr</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Avance / DB' : 'Markup / margin'} (+${bidState.markup}%)</span><span class="value">${fmt(markupAmt)} kr</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Arbejdsl\u00F8n' : 'Labor'} (${(bidState.laborMode === 'akkord' ? akkordHours : bidState.laborHours).toFixed(1)} t \u00D7 ${bidState.hourlyRate}${bidState.laborMode === 'akkord' ? ', akkord' : ''})</span><span class="value">${fmt(labor)} kr</span></div>
         <div class="result-row"><span class="label">${lang === 'da' ? 'I alt ekskl. moms' : 'Total excl. VAT'}</span><span class="value">${fmt(exVat)} kr</span></div>
         <div class="result-row"><span class="label">${lang === 'da' ? 'Moms 25%' : 'VAT 25%'}</span><span class="value">${fmt(vat)} kr</span></div>
         <div class="result-row" style="border-top:2px solid var(--success);margin-top:6px;padding-top:10px">
