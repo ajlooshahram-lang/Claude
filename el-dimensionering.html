@@ -503,15 +503,64 @@ body {
   background: var(--primary-glow);
   border-color: rgba(50,130,184,0.2);
 }
+
+/* ===== DARK MODE ===== */
+body.dark {
+  --primary: #4a9fd4;
+  --primary-light: #6bb6e0;
+  --primary-glow: rgba(74,159,212,0.18);
+  --accent: #2ec7e0;
+  --bg: #0f1620;
+  --bg-gradient: linear-gradient(180deg, #0b1119 0%, #0f1620 100%);
+  --card: #1a2330;
+  --text: #e6edf3;
+  --text-light: #aab8c5;
+  --text-muted: #718595;
+  --border: #2a3645;
+  --border-light: #232e3b;
+  --success: #2ee6a8;
+  --success-bg: rgba(46,230,168,0.10);
+  --danger: #ff6b8a;
+  --danger-bg: rgba(255,107,138,0.10);
+  --warning: #ffd27a;
+  --warning-bg: rgba(255,210,122,0.12);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow: 0 4px 12px rgba(0,0,0,0.35);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.45);
+}
+body.dark .sel-btn { background: #232e3b; color: var(--text); }
+body.dark .sel-btn:hover { background: #2a3645; }
+body.dark .nav { background: #1a2330; }
+body.dark .nav-btn { background: #232e3b; color: var(--text-light); }
+body.dark .status-bar { background: linear-gradient(135deg, #161f2a, #1a2330); }
+body.dark .status-chip { background: #232e3b; }
+body.dark #aiSearchBox { background: #232e3b; color: var(--text); }
+body.dark .result-box[style*="#fff"] { background: #1a2330 !important; }
+body.dark img { filter: brightness(0.92); }
+.theme-btn {
+  border: none;
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: var(--transition);
+}
+.theme-btn:hover { background: rgba(255,255,255,0.25); }
 </style>
 </head>
 <body>
 
 <div class="header">
   <h1 id="appTitle">El-Dimensionering</h1>
-  <div class="lang-toggle">
-    <button class="lang-btn active" onclick="setLang('da')">DA</button>
-    <button class="lang-btn" onclick="setLang('en')">EN</button>
+  <div style="display:flex;align-items:center;gap:10px">
+    <button id="themeBtn" class="theme-btn" onclick="toggleTheme()" title="Dark / Light">🌙</button>
+    <div class="lang-toggle">
+      <button class="lang-btn active" onclick="setLang('da')">DA</button>
+      <button class="lang-btn" onclick="setLang('en')">EN</button>
+    </div>
   </div>
 </div>
 
@@ -2479,7 +2528,27 @@ function renderTrafo() {
 
 // ===== STANDARDS MODULE =====
 function renderStandards() {
+  const online = (typeof navigator !== 'undefined') && navigator.onLine;
+  const upd = lawUpdateInfo;
+  const hasChanges = upd && upd.changes && upd.changes.length > 0;
+  const updateCard = `
+    <div class="card fade-in" style="border-left:4px solid ${hasChanges ? 'var(--warning)' : 'var(--success)'}">
+      <div class="card-title">\uD83D\uDD04 ${lang === 'da' ? 'Lov-opdateringer (dynamisk)' : 'Law Updates (dynamic)'}</div>
+      <div class="info-row">${lang === 'da' ? 'Danske el-regler revideres l\u00F8bende. Appen kan tjekke for nye versioner, n\u00E5r du er online.' : 'Danish electrical rules are revised regularly. The app can check for newer versions when online.'}</div>
+      <div class="result-box ${hasChanges ? 'warning' : ''}">
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Status' : 'Status'}</span><span class="value">${online ? (lang === 'da' ? '\uD83D\uDFE2 Online' : '\uD83D\uDFE2 Online') : (lang === 'da' ? '\u26AB Offline' : '\u26AB Offline')}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Baseline tjekket' : 'Baseline checked'}</span><span class="value">${STANDARDS_BASELINE.checked}</span></div>
+        ${upd ? `<div class="result-row"><span class="label">${lang === 'da' ? 'Sidst tjekket online' : 'Last online check'}</span><span class="value">${upd.date}</span></div>` : ''}
+        ${hasChanges ? upd.changes.map(c => `<div class="result-row"><span class="label">\u26A0\uFE0F ${c.name}</span><span class="value">${c.from} \u2192 ${c.to}</span></div>`).join('') : `<div class="result-row"><span class="label">${lang === 'da' ? 'Ingen \u00E6ndringer registreret' : 'No changes detected'}</span><span class="value">\u2705</span></div>`}
+      </div>
+      <div class="select-grid" style="margin-top:10px">
+        <button class="sel-btn selected" onclick="checkLawUpdates(true)">\uD83D\uDD0D ${lang === 'da' ? 'Tjek for opdateringer nu' : 'Check for updates now'}</button>
+        <button class="sel-btn" onclick="configureLawSource()">\u2699\uFE0F ${lang === 'da' ? 'Indstil opdateringskilde' : 'Set update source'}</button>
+      </div>
+    </div>`;
+
   return `
+    ${updateCard}
     <div class="card fade-in">
       <div class="card-title">${lang === 'da' ? 'Danske Elstandarder & Lovgivning' : 'Danish Electrical Standards & Legislation'}</div>
       <div class="info-row">${lang === 'da' ? 'Oversigt over gældende standarder brugt i denne app' : 'Overview of applicable standards used in this app'}</div>
@@ -2620,13 +2689,25 @@ let bankBrand = 'all';
 // Per-product photos can be set via the product's `img` field; per-category
 // defaults live in COMPONENT_PHOTOS. Nothing copyrighted is bundled in the file.
 
-let PHOTO_BASE = localStorage.getItem('photoBase') || ''; // e.g. "https://yourfeed.dk/img/"
-let PHOTOS_ENABLED = localStorage.getItem('photosEnabled') === '1';
+let PHOTO_BASE = localStorage.getItem('photoBase') || ''; // optional: your own per-model feed
+let PHOTOS_ENABLED = localStorage.getItem('photosEnabled') !== '0'; // real photos ON by default
 
-// Optional per-category fallback photo (filename relative to PHOTO_BASE, or full URL)
+// Real, Creative-Commons-licensed product photographs (Wikimedia Commons).
+// Special:FilePath redirects to the actual image file; ?width thumbnails for speed.
+// Images CC BY-SA / CC0 via Wikimedia Commons. SVG illustration is the offline fallback.
+const WM = 'https://commons.wikimedia.org/wiki/Special:FilePath/';
 const COMPONENT_PHOTOS = {
-  cables: '', mcbs: '', mccbs: '', fuses: '', rcds: '', rcbos: '',
-  spds: '', contactors: '', mpcbs: '', overloadRelays: '', wiringDevices: ''
+  cables: WM + 'Copper%20cable%205G16.JPG?width=200',
+  mcbs: WM + 'MCB%20Hager%20C10.jpg?width=200',
+  mccbs: WM + 'MCCB%20Merlin%20Gerin%20compact%20NS100N%20(front%20side).jpg?width=200',
+  fuses: WM + 'NH%20000%2000.jpg?width=200',
+  rcds: WM + 'Differential%20residual%20current%20circuit%20interrupter.JPG?width=200',
+  rcbos: WM + 'ABB%20RCBO.jpg?width=200',
+  spds: WM + '1-phase%20surge%20arrester.JPG?width=200',
+  contactors: WM + 'GE%20MC2A310AT1.JPG?width=200',
+  mpcbs: WM + 'Motor%20protective%20circuit%20breaker%20with%20symbol.JPG?width=200',
+  overloadRelays: WM + 'GE%20MTO3N.JPG?width=200',
+  wiringDevices: WM + 'Danish%20type%20K%20Power%20Socket.jpg?width=200'
 };
 
 function photoUrlFor(category, p) {
@@ -2804,10 +2885,10 @@ function renderBank() {
       <div class="select-group">
         <div class="select-label">${lang === 'da' ? 'Billeder' : 'Photos'}</div>
         <div class="select-grid">
-          <button class="sel-btn ${PHOTOS_ENABLED ? 'selected' : ''}" onclick="configurePhotos()">\uD83D\uDCF7 ${PHOTOS_ENABLED ? (lang === 'da' ? 'Rigtige fotos: TIL' : 'Real photos: ON') : (lang === 'da' ? 'Aktiv\u00E9r rigtige fotos' : 'Enable real photos')}</button>
-          ${PHOTOS_ENABLED ? `<button class="sel-btn" onclick="PHOTOS_ENABLED=false;localStorage.setItem('photosEnabled','0');renderModule('bank')">${lang === 'da' ? 'Brug illustrationer' : 'Use illustrations'}</button>` : ''}
+          <button class="sel-btn ${PHOTOS_ENABLED ? 'selected' : ''}" onclick="${PHOTOS_ENABLED ? "PHOTOS_ENABLED=false;localStorage.setItem('photosEnabled','0');renderModule('bank')" : "PHOTOS_ENABLED=true;localStorage.setItem('photosEnabled','1');renderModule('bank')"}">\uD83D\uDCF7 ${PHOTOS_ENABLED ? (lang === 'da' ? 'Rigtige fotos: TIL' : 'Real photos: ON') : (lang === 'da' ? 'Rigtige fotos: FRA' : 'Real photos: OFF')}</button>
+          <button class="sel-btn" onclick="configurePhotos()">\u2699\uFE0F ${lang === 'da' ? 'Eget billedfeed' : 'Own image feed'}</button>
         </div>
-        ${!PHOTOS_ENABLED ? `<div style="font-size:0.74rem;color:var(--text-muted);margin-top:6px">${lang === 'da' ? 'Viser SVG-illustrationer. Tilslut dit licenserede billedfeed for rigtige produktfotos.' : 'Showing SVG illustrations. Connect your licensed image feed for real product photos.'}</div>` : ''}
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px">${PHOTOS_ENABLED ? (lang === 'da' ? 'Viser rigtige fotos (Wikimedia Commons, CC-licens). Tilslut "Eget billedfeed" for eksakte modelfotos.' : 'Showing real photos (Wikimedia Commons, CC-licensed). Connect "Own image feed" for exact model photos.') : (lang === 'da' ? 'Viser SVG-illustrationer.' : 'Showing SVG illustrations.')}</div>
       </div>
 
       <div class="select-group">
@@ -3207,6 +3288,110 @@ function renderAiElectrician() {
     </div>
   `;
 }
+
+// ===== DARK MODE =====
+function applyTheme(theme) {
+  const dark = theme === 'dark';
+  document.body.classList.toggle('dark', dark);
+  const btn = document.getElementById('themeBtn');
+  if (btn) btn.textContent = dark ? '☀️' : '🌙';
+  localStorage.setItem('theme', theme);
+}
+function toggleTheme() {
+  const now = document.body.classList.contains('dark') ? 'light' : 'dark';
+  applyTheme(now);
+}
+// Respect saved preference or OS setting
+(function initTheme() {
+  const saved = localStorage.getItem('theme');
+  if (saved) { applyTheme(saved); }
+  else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) { applyTheme('dark'); }
+})();
+
+// ===== DYNAMIC LAW / STANDARDS UPDATE CHECK =====
+// Danish electrical regulations are revised regularly. When online, the app can
+// check a remote JSON manifest for newer standard versions/dates and notify the user.
+// Default manifest is configurable; falls back silently offline.
+const LAW_MANIFEST_URL = localStorage.getItem('lawManifestUrl') || '';
+// Current built-in standards baseline (what the app was built against)
+const STANDARDS_BASELINE = {
+  checked: '2026-06-11',
+  items: {
+    'Elsikkerhedsloven': 'LBK nr 26 af 2023',
+    'Installationsbekendtgørelsen': 'BEK nr 1082',
+    'DS/HD 60364-5-52': '2011+A12:2022',
+    'DS/HD 60364-4-43': '2023',
+    'IEC 60364-1': '2025',
+    'Fællesregulativet': '2019'
+  }
+};
+let lawUpdateInfo = JSON.parse(localStorage.getItem('lawUpdateInfo') || 'null');
+
+async function checkLawUpdates(manual) {
+  if (!navigator.onLine) {
+    if (manual) alert(lang === 'da' ? 'Ingen internetforbindelse. Pr\u00F8v igen, n\u00E5r du er online.' : 'No internet connection. Try again when online.');
+    return;
+  }
+  const url = LAW_MANIFEST_URL;
+  if (!url) {
+    // No manifest configured: guide the user (no false claims of an update)
+    if (manual) {
+      const set = confirm(lang === 'da'
+        ? 'Der er ikke konfigureret en opdateringskilde endnu.\n\nVil du angive en URL til et JSON-manifest med de nyeste danske standarder/love? (f.eks. fra Sikkerhedsstyrelsen eller din egen server)'
+        : 'No update source is configured yet.\n\nDo you want to set a URL to a JSON manifest with the latest Danish standards/laws? (e.g. from Sikkerhedsstyrelsen or your own server)');
+      if (set) configureLawSource();
+    }
+    return;
+  }
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    const data = await res.json();
+    // Compare manifest items vs baseline
+    const changes = [];
+    if (data && data.items) {
+      Object.keys(data.items).forEach(k => {
+        const latest = data.items[k];
+        const current = STANDARDS_BASELINE.items[k];
+        if (current && latest && latest !== current) {
+          changes.push({ name: k, from: current, to: latest });
+        } else if (!current && latest) {
+          changes.push({ name: k, from: '\u2014', to: latest });
+        }
+      });
+    }
+    lawUpdateInfo = { date: new Date().toISOString().slice(0, 10), source: url, changes, manifestDate: data.checked || null };
+    localStorage.setItem('lawUpdateInfo', JSON.stringify(lawUpdateInfo));
+    if (activeModule === 'standards') renderModule('standards');
+    if (manual) {
+      alert(changes.length
+        ? (lang === 'da' ? changes.length + ' opdatering(er) fundet. Se "Standarder".' : changes.length + ' update(s) found. See "Standards".')
+        : (lang === 'da' ? 'Alle standarder er opdaterede.' : 'All standards are up to date.'));
+    }
+  } catch (e) {
+    if (manual) alert((lang === 'da' ? 'Kunne ikke hente opdateringer: ' : 'Could not fetch updates: ') + e.message);
+  }
+}
+
+function configureLawSource() {
+  const url = prompt(lang === 'da'
+    ? 'URL til JSON-manifest med nyeste standarder (lad tom for at sl\u00E5 fra):'
+    : 'URL to JSON manifest with latest standards (leave empty to disable):', LAW_MANIFEST_URL);
+  if (url === null) return;
+  localStorage.setItem('lawManifestUrl', url.trim());
+  location.reload();
+}
+
+// Auto-check once per day when online
+(function autoLawCheck() {
+  if (!LAW_MANIFEST_URL) return;
+  const last = localStorage.getItem('lawCheckedAt');
+  const today = new Date().toISOString().slice(0, 10);
+  if (last !== today) {
+    localStorage.setItem('lawCheckedAt', today);
+    if (navigator.onLine) checkLawUpdates(false);
+    else window.addEventListener('online', () => checkLawUpdates(false), { once: true });
+  }
+})();
 
 // ===== INIT =====
 renderNav();
