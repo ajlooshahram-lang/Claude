@@ -1256,7 +1256,7 @@ function renderRecommendations(title, products, type) {
 
   const rowWrap = (p, mainLabel, valueText, sub) => `
     <div class="result-row" style="align-items:center;gap:12px">
-      ${getComponentSvg(cat, p)}
+      ${getComponentVisual(cat, p)}
       <div style="flex:1;display:flex;flex-direction:column;gap:2px">
         <div style="display:flex;justify-content:space-between;width:100%;gap:8px">
           <span class="label">${mainLabel}</span>
@@ -2611,7 +2611,63 @@ function renderStandards() {
 let bankCategory = 'cables';
 let bankBrand = 'all';
 
-// ===== COMPONENT VISUALS (code-generated SVG "photos") =====
+// ===== REAL PHOTO SYSTEM =====
+// Shows ACTUAL product photographs via <img>, with SVG illustration as automatic
+// fallback when a photo URL is missing or fails to load (offline/broken link).
+//
+// Photos are loaded from a licensed image source you configure (e.g. your B2B
+// wholesaler product feed - Lemvigh-Müller / Solar - or a folder of licensed photos).
+// Per-product photos can be set via the product's `img` field; per-category
+// defaults live in COMPONENT_PHOTOS. Nothing copyrighted is bundled in the file.
+
+let PHOTO_BASE = localStorage.getItem('photoBase') || ''; // e.g. "https://yourfeed.dk/img/"
+let PHOTOS_ENABLED = localStorage.getItem('photosEnabled') === '1';
+
+// Optional per-category fallback photo (filename relative to PHOTO_BASE, or full URL)
+const COMPONENT_PHOTOS = {
+  cables: '', mcbs: '', mccbs: '', fuses: '', rcds: '', rcbos: '',
+  spds: '', contactors: '', mpcbs: '', overloadRelays: '', wiringDevices: ''
+};
+
+function photoUrlFor(category, p) {
+  if (!PHOTOS_ENABLED) return null;
+  // 1) explicit per-product photo
+  if (p && p.img) return /^https?:/.test(p.img) ? p.img : (PHOTO_BASE + p.img);
+  // 2) build a conventional filename from the product id (e.g. "SE-iC60N-B16.jpg")
+  if (PHOTO_BASE && p && p.id) return PHOTO_BASE + p.id + '.jpg';
+  // 3) per-category default
+  const c = COMPONENT_PHOTOS[category];
+  if (c) return /^https?:/.test(c) ? c : (PHOTO_BASE + c);
+  return null;
+}
+
+// Returns a real <img> photo (with SVG fallback) or the SVG illustration.
+function getComponentVisual(category, p) {
+  const url = photoUrlFor(category, p);
+  const svg = getComponentSvg(category, p);
+  if (!url) return svg;
+  const fid = 'ph' + Math.random().toString(36).slice(2, 9);
+  return `<span style="display:inline-flex;flex-shrink:0">
+    <img src="${url}" alt="${(p && p.model) || ''}" width="56" height="56"
+      style="object-fit:cover;border-radius:8px;border:1px solid var(--border)"
+      onerror="this.style.display='none';var f=document.getElementById('${fid}');if(f)f.style.display='inline-flex'">
+    <span id="${fid}" style="display:none">${svg}</span>
+  </span>`;
+}
+
+function configurePhotos() {
+  const base = prompt(lang === 'da'
+    ? 'Indtast URL til dit licenserede billedfeed (f.eks. https://feed.lemu.dk/img/).\nLad st\u00E5 tomt for at bruge SVG-illustrationer:'
+    : 'Enter the URL of your licensed image feed (e.g. https://feed.lemu.dk/img/).\nLeave empty to use SVG illustrations:', PHOTO_BASE);
+  if (base === null) return;
+  PHOTO_BASE = base.trim();
+  PHOTOS_ENABLED = PHOTO_BASE.length > 0;
+  localStorage.setItem('photoBase', PHOTO_BASE);
+  localStorage.setItem('photosEnabled', PHOTOS_ENABLED ? '1' : '0');
+  renderModule(activeModule);
+}
+
+// ===== COMPONENT VISUALS (code-generated SVG illustrations - fallback) =====
 // License-safe, offline, scalable illustrations of each real component type.
 function getComponentSvg(category, p) {
   const w = 64, h = 64;
@@ -2728,7 +2784,7 @@ function renderBank() {
 
     return `
       <div class="result-row" style="align-items:center;gap:12px">
-        ${getComponentSvg(bankCategory, p)}
+        ${getComponentVisual(bankCategory, p)}
         <div style="flex:1;display:flex;flex-direction:column;gap:2px">
           <div style="display:flex;justify-content:space-between;width:100%;gap:8px">
             <span class="label"><strong>${p.brand}</strong> ${p.model}</span>
@@ -2744,6 +2800,15 @@ function renderBank() {
     <div class="card fade-in">
       <div class="card-title">\uD83D\uDCE6 ${lang === 'da' ? 'Komponentbank' : 'Component Bank'}</div>
       <div class="info-row">${lang === 'da' ? 'Komplet bank over elektriske komponenter tilg\u00E6ngelige i Danmark (NKT, Schneider, ABB, Eaton, Hager, LK). Klik for at filtrere.' : 'Complete bank of electrical components available in Denmark (NKT, Schneider, ABB, Eaton, Hager, LK). Click to filter.'}</div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Billeder' : 'Photos'}</div>
+        <div class="select-grid">
+          <button class="sel-btn ${PHOTOS_ENABLED ? 'selected' : ''}" onclick="configurePhotos()">\uD83D\uDCF7 ${PHOTOS_ENABLED ? (lang === 'da' ? 'Rigtige fotos: TIL' : 'Real photos: ON') : (lang === 'da' ? 'Aktiv\u00E9r rigtige fotos' : 'Enable real photos')}</button>
+          ${PHOTOS_ENABLED ? `<button class="sel-btn" onclick="PHOTOS_ENABLED=false;localStorage.setItem('photosEnabled','0');renderModule('bank')">${lang === 'da' ? 'Brug illustrationer' : 'Use illustrations'}</button>` : ''}
+        </div>
+        ${!PHOTOS_ENABLED ? `<div style="font-size:0.74rem;color:var(--text-muted);margin-top:6px">${lang === 'da' ? 'Viser SVG-illustrationer. Tilslut dit licenserede billedfeed for rigtige produktfotos.' : 'Showing SVG illustrations. Connect your licensed image feed for real product photos.'}</div>` : ''}
+      </div>
 
       <div class="select-group">
         <div class="select-label">${lang === 'da' ? 'Kategori' : 'Category'}</div>
