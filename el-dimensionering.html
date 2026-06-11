@@ -537,7 +537,8 @@ const T = {
       scircuit: 'Kortslutning',
       trafo: 'Trafo',
       standards: 'Standarder',
-      bank: 'Komponentbank'
+      bank: 'Komponentbank',
+      ai: 'Spørg AI-Elektriker'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -630,7 +631,8 @@ const T = {
       scircuit: 'Short Circuit',
       trafo: 'Transformer',
       standards: 'Standards',
-      bank: 'Component Bank'
+      bank: 'Component Bank',
+      ai: 'Ask AI-Electrician'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -1783,12 +1785,13 @@ function renderModule(mod) {
     case 'trafo': content = renderTrafo(); break;
     case 'standards': content = renderStandards(); break;
     case 'bank': content = renderBank(); break;
+    case 'ai': content = renderAiElectrician(); break;
   }
   // Append AI assistant to every module
   content += renderAiAssistant(mod);
   // Append QI validation summary if enough data exists
   const qi = runQiValidation();
-  if (qi.passed.length + qi.issues.length > 0 && mod !== 'standards' && mod !== 'bank') {
+  if (qi.passed.length + qi.issues.length > 0 && mod !== 'standards' && mod !== 'bank' && mod !== 'ai') {
     content += renderQiCard(qi);
   }
   main.innerHTML = content;
@@ -2720,6 +2723,329 @@ function renderBank() {
       <div class="result-box" style="background:#fff;border-color:var(--border)">
         ${rows || '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Ingen produkter' : 'No products') + '</span></div>'}
       </div>
+    </div>
+  `;
+}
+
+// ===== AI-ELECTRICIAN MODULE =====
+// Click-driven expert Q&A knowledge base (no typing - click topics, questions, and keyword tags)
+// Answers grounded in DS/HD 60364, IEC standards, and Danish regulations
+
+const AI_KNOWLEDGE = [
+  // --- Cables ---
+  { topic: 'cable', tags: ['kabel','tværsnit','dimensionering','iz'],
+    q_da: 'Hvordan vælger jeg det rigtige kabeltværsnit?',
+    q_en: 'How do I choose the correct cable cross-section?',
+    a_da: 'Følg 3 trin: 1) Beregn belastningsstrømmen IB. 2) Vælg en beskyttelse hvor IB \u2264 In. 3) Vælg et kabel hvor In \u2264 Iz (korrigeret strømbæreevne). Iz korrigeres for fremføringsmetode, temperatur og gruppering. Brug "Kabler"-modulet — appen viser kun kabler der er sikre for din IB.',
+    a_en: 'Follow 3 steps: 1) Calculate load current IB. 2) Choose protection where IB \u2264 In. 3) Choose a cable where In \u2264 Iz (corrected ampacity). Iz is corrected for installation method, temperature and grouping. Use the "Cables" module — the app only shows cables that are safe for your IB.' },
+  { topic: 'cable', tags: ['kabel','spændingsfald','længde'],
+    q_da: 'Hvornår skal jeg vælge et større kabel pga. spændingsfald?',
+    q_en: 'When should I upsize a cable due to voltage drop?',
+    a_da: 'Hvis spændingsfaldet overstiger grænserne: maks 3% for belysning og maks 5% for andre belastninger (HD 60364). Ved lange kabelruter (>100 m) bliver spændingsfald ofte den afgørende faktor — ikke strømbæreevnen. Tjek "Spændingsfald"-modulet.',
+    a_en: 'If voltage drop exceeds limits: max 3% for lighting and max 5% for other loads (HD 60364). For long cable runs (>100 m), voltage drop often becomes the deciding factor — not ampacity. Check the "Voltage Drop" module.' },
+  // --- Fuses / MCB ---
+  { topic: 'protection', tags: ['sikring','automatsikring','mcb','kurve'],
+    q_da: 'Hvilken kurve (B/C/D) skal jeg vælge på automatsikringen?',
+    q_en: 'Which curve (B/C/D) should I choose for the MCB?',
+    a_da: 'Kurve B (3-5\u00D7In): resistive belastninger — lys, varme, stikkontakter. Kurve C (5-10\u00D7In): induktive belastninger — motorer, transformere, kompressorer. Kurve D (10-20\u00D7In): høje startstrømme — store motorer, svejsemaskiner. I boliger bruges typisk B og C.',
+    a_en: 'Curve B (3-5\u00D7In): resistive loads — lighting, heating, sockets. Curve C (5-10\u00D7In): inductive loads — motors, transformers, compressors. Curve D (10-20\u00D7In): high inrush — large motors, welders. In homes, B and C are typical.' },
+  { topic: 'protection', tags: ['sikring','koordination','ib','in','iz'],
+    q_da: 'Hvad betyder reglen IB \u2264 In \u2264 Iz?',
+    q_en: 'What does the rule IB \u2264 In \u2264 Iz mean?',
+    a_da: 'Det er grundreglen for overbelastningsbeskyttelse (DS/HD 60364-4-43): Belastningsstrømmen (IB) skal være mindre end beskyttelsens mærkestrøm (In), som skal være mindre end kablets strømbæreevne (Iz). Dette sikrer at kablet aldrig overbelastes uden at beskyttelsen udløser. QI-indekset i appen tjekker dette automatisk.',
+    a_en: 'It is the fundamental rule for overload protection (DS/HD 60364-4-43): Load current (IB) must be less than the protective device rating (In), which must be less than the cable ampacity (Iz). This ensures the cable can never be overloaded without the protection tripping. The app QI index checks this automatically.' },
+  { topic: 'protection', tags: ['kortslutning','icu','ikmax','brydeevne'],
+    q_da: 'Hvordan sikrer jeg at beskyttelsen kan klare kortslutningen?',
+    q_en: 'How do I ensure the protection can handle the short-circuit?',
+    a_da: 'Beskyttelsens brydeevne (Icu) skal være større end den maksimale kortslutningsstrøm (Ik max) på monteringsstedet: Icu \u2265 Ik max. Samtidig skal Ik min (mindste kortslutning i kabelenden) være stor nok til at udløse beskyttelsen hurtigt. Brug "Kortslutning"-modulet.',
+    a_en: 'The protective device breaking capacity (Icu) must exceed the maximum short-circuit current (Ik max) at the installation point: Icu \u2265 Ik max. Also, Ik min (minimum short-circuit at cable end) must be large enough to trip the protection quickly. Use the "Short Circuit" module.' },
+  // --- RCD / HPFI ---
+  { topic: 'rcd', tags: ['hpfi','rcd','fejlstrøm','beskyttelse'],
+    q_da: 'Hvornår er HPFI (30 mA) lovpligtigt i Danmark?',
+    q_en: 'When is RCD (30 mA) mandatory in Denmark?',
+    a_da: 'HPFI Type A 30 mA er lovpligtigt på alle nye installationer i boliger, alle stikkontaktkredse, badeværelser (zone 0/1/2) og udendørs stikkontakter (Installationsbekendtgørelsen). For EV-ladere kræves Type B eller Type A + 6 mA DC-detektion.',
+    a_en: 'RCD Type A 30 mA is mandatory on all new residential installations, all socket circuits, bathrooms (zones 0/1/2) and outdoor sockets (Installation Regulations). For EV chargers, Type B or Type A + 6 mA DC detection is required.' },
+  { topic: 'rcd', tags: ['hpfi','rcd','type','ev','lader'],
+    q_da: 'Hvilken RCD-type skal jeg bruge til en EV-lader?',
+    q_en: 'Which RCD type should I use for an EV charger?',
+    a_da: 'EV-ladere kan generere glatte DC-fejlstrømme der "blinder" en almindelig Type A. Brug derfor Type B RCD, ELLER Type A kombineret med 6 mA DC-fejlstrømsdetektion (indbygget i mange ladestandere). Se "Komponentbank" → HPFI/RCD → Type B.',
+    a_en: 'EV chargers can generate smooth DC fault currents that "blind" a standard Type A. Therefore use a Type B RCD, OR Type A combined with 6 mA DC fault detection (built into many charging stations). See "Component Bank" → RCD → Type B.' },
+  // --- Transformer ---
+  { topic: 'trafo', tags: ['trafo','transformer','dimensionering','belastning'],
+    q_da: 'Hvor stor en transformer skal jeg vælge?',
+    q_en: 'How large a transformer should I choose?',
+    a_da: 'Vælg en trafo hvor den summerede tilsyneladende effekt (S i kVA) ligger ved 75-80% belastningsgrad — det er optimalt for levetid og effektivitet. Husk fremtidige udvidelser. Brug "Trafo"-modulet til at se fuldlaststrøm, kortslutningsstrøm og tab.',
+    a_en: 'Choose a transformer where the summed apparent power (S in kVA) sits at 75-80% load level — optimal for lifetime and efficiency. Account for future expansion. Use the "Transformer" module to see full-load current, short-circuit current and losses.' },
+  // --- Motor ---
+  { topic: 'motor', tags: ['motor','motorværn','kontaktor','termorelæ','startstrøm'],
+    q_da: 'Hvordan beskytter jeg en motor korrekt?',
+    q_en: 'How do I correctly protect a motor?',
+    a_da: 'En motorafgang har typisk: 1) Motorværn (MPCB, fx TeSys GV2) eller sikring til kortslutning, 2) Kontaktor (fx LC1D) til til/fra, 3) Termorelæ (fx LRD) til overbelastning indstillet til motorens mærkestrøm. Vælg kurve C eller D pga. startstrøm. Appen anbefaler alle tre i "Belastning"-modulet.',
+    a_en: 'A motor feeder typically has: 1) Motor protection (MPCB, e.g. TeSys GV2) or fuse for short-circuit, 2) Contactor (e.g. LC1D) for on/off, 3) Overload relay (e.g. LRD) set to the motor rated current. Choose curve C or D due to inrush. The app recommends all three in the "Load" module.' },
+  // --- Earthing ---
+  { topic: 'earth', tags: ['jording','tn','tt','it','pe'],
+    q_da: 'Hvilket jordingssystem bruges i Danmark?',
+    q_en: 'Which earthing system is used in Denmark?',
+    a_da: 'TN-C-S er det mest almindelige i Danmark: fælles PEN-leder i forsyningen, der splittes til separat N og PE ved installationens indgang. Nye installationer bruger TN-S (separat N og PE hele vejen). Se "Standarder" → Jordingssystemer for detaljer.',
+    a_en: 'TN-C-S is the most common in Denmark: combined PEN conductor in the supply, split into separate N and PE at the installation entry. New installations use TN-S (separate N and PE throughout). See "Standards" → Earthing Systems for details.' },
+  // --- Surge ---
+  { topic: 'surge', tags: ['overspænding','spd','lyn','beskyttelse'],
+    q_da: 'Har jeg brug for overspændingsbeskyttelse (SPD)?',
+    q_en: 'Do I need surge protection (SPD)?',
+    a_da: 'SPD anbefales kraftigt for at beskytte elektronik mod lyn og koblingsoverspændinger. Type 2 i hovedtavlen er standard. Hvis bygningen har lynafleder eller udsat placering, brug Type 1+2. Se "Komponentbank" → Overspændingsbeskyttelse.',
+    a_en: 'SPD is strongly recommended to protect electronics from lightning and switching surges. Type 2 in the main panel is standard. If the building has a lightning rod or exposed location, use Type 1+2. See "Component Bank" → Surge Protection.' },
+  // --- Power factor ---
+  { topic: 'pf', tags: ['cosfi','effektfaktor','fasekompensering'],
+    q_da: 'Hvad gør jeg ved lav effektfaktor (cos\u03C6)?',
+    q_en: 'What do I do about low power factor (cos\u03C6)?',
+    a_da: 'Lav cos\u03C6 (under 0,85) øger strømmen og dermed tab og kabelstørrelse. Overvej fasekompensering (kondensatorbatterier) for at hæve cos\u03C6 mod 0,95. Det reducerer IB og kan tillade et mindre kabel og mindre beskyttelse.',
+    a_en: 'Low cos\u03C6 (below 0.85) increases current and thus losses and cable size. Consider power factor correction (capacitor banks) to raise cos\u03C6 toward 0.95. This reduces IB and may allow a smaller cable and smaller protection.' },
+
+  // --- Danish EL-law: Authorization ---
+  { topic: 'law', tags: ['autorisation','lov','elinstallatør','tilladelse'],
+    q_da: 'Hvem må udføre elinstallationer i Danmark?',
+    q_en: 'Who may perform electrical installations in Denmark?',
+    a_da: 'Kun autoriserede elinstallatørvirksomheder må udføre fast elinstallationsarbejde (Autorisationsloven / Lov om autorisation af elinstallatører m.v.). Privatpersoner må kun udføre simple arbejder som at montere lamper og udskifte stikkontakter/afbrydere i egen bolig. Alt andet kræver autorisation og registrering hos Sikkerhedsstyrelsen.',
+    a_en: 'Only authorized electrical contractor companies may perform fixed electrical installation work (Authorization Act). Private individuals may only do simple tasks such as mounting lamps and replacing sockets/switches in their own home. Everything else requires authorization and registration with the Danish Safety Authority (Sikkerhedsstyrelsen).' },
+  { topic: 'law', tags: ['elsikkerhedsloven','lov','ansvar','sikkerhed'],
+    q_da: 'Hvad er Elsikkerhedsloven?',
+    q_en: 'What is the Danish Electrical Safety Act?',
+    a_da: 'Elsikkerhedsloven (Lov nr. 525 af 29/04/2015) fastlægger de grundlæggende sikkerhedskrav til elektriske anlæg, installationer og materiel i Danmark. Den administreres af Sikkerhedsstyrelsen og henviser til installationsbekendtgørelsen og standarderne DS/HD 60364-serien. Formålet er at forebygge fare for personer, husdyr og ejendom.',
+    a_en: 'The Electrical Safety Act (Act no. 525 of 29/04/2015) sets the fundamental safety requirements for electrical systems, installations and equipment in Denmark. It is administered by the Danish Safety Authority and references the installation order and the DS/HD 60364 series of standards. Its purpose is to prevent danger to persons, livestock and property.' },
+  { topic: 'law', tags: ['installationsbekendtgørelsen','bek','krav','regler'],
+    q_da: 'Hvad regulerer Installationsbekendtgørelsen?',
+    q_en: 'What does the Installation Order regulate?',
+    a_da: 'Installationsbekendtgørelsen (BEK nr. 1082) stiller krav til udførelsen af elektriske installationer, herunder at de skal udføres efter DS/HD 60364-standarderne. Den dækker bl.a. beskyttelse mod elektrisk stød, overstrøm, dokumentation og afprøvning før idriftsættelse.',
+    a_en: 'The Installation Order (BEK no. 1082) sets requirements for the execution of electrical installations, including that they must be carried out per the DS/HD 60364 standards. It covers protection against electric shock, overcurrent, documentation, and testing before commissioning.' },
+  { topic: 'law', tags: ['dokumentation','afprøvning','idriftsættelse','måling'],
+    q_da: 'Hvilken dokumentation kræves før en installation tages i brug?',
+    q_en: 'What documentation is required before an installation is put into use?',
+    a_da: 'Før idriftsættelse skal installationen afprøves og dokumenteres: kontinuitet af beskyttelsesledere, isolationsmodstand, fejlstrømsafbryderes (HPFI) funktion og udløsetid, og kontrol af effektiv jordforbindelse/sløjfeimpedans. Resultaterne dokumenteres i en afleveringsrapport iht. DS/HD 60364-6.',
+    a_en: 'Before commissioning, the installation must be tested and documented: continuity of protective conductors, insulation resistance, RCD function and trip time, and verification of effective earthing/loop impedance. Results are documented in a handover report per DS/HD 60364-6.' },
+
+  // --- Zones (bathroom) ---
+  { topic: 'zones', tags: ['badeværelse','zone','vådrum','ip'],
+    q_da: 'Hvilke regler gælder for el i badeværelser?',
+    q_en: 'What rules apply to electrics in bathrooms?',
+    a_da: 'Badeværelser er opdelt i zoner (0, 1, 2) iht. DS/HD 60364-7-701. Zone 0 (i karret/bruseren): kun SELV 12V. Zone 1 (over): IPX4, kun fast materiel egnet til formålet. Zone 2 (0,6 m omkring): IPX4. HPFI 30 mA er obligatorisk på alle kredse. Stikkontakter er ikke tilladt i zone 0-1.',
+    a_en: 'Bathrooms are divided into zones (0, 1, 2) per DS/HD 60364-7-701. Zone 0 (inside tub/shower): only SELV 12V. Zone 1 (above): IPX4, only fixed equipment suitable for the purpose. Zone 2 (0.6 m around): IPX4. RCD 30 mA is mandatory on all circuits. Sockets are not permitted in zones 0-1.' },
+  { topic: 'zones', tags: ['udendørs','ip','kapsling','vejr'],
+    q_da: 'Hvilken IP-klasse skal udendørs materiel have?',
+    q_en: 'What IP rating must outdoor equipment have?',
+    a_da: 'Udendørs materiel skal minimum være IP44 (beskyttet mod stænkvand), og ofte IP65/IP67 ved direkte vejrpåvirkning eller nedgravning. Alle udendørs stikkontakter skal beskyttes af HPFI 30 mA. Vælg UV-bestandige materialer.',
+    a_en: 'Outdoor equipment must be at least IP44 (splash-proof), and often IP65/IP67 for direct weather exposure or burial. All outdoor sockets must be protected by RCD 30 mA. Choose UV-resistant materials.' },
+
+  // --- Disconnection time ---
+  { topic: 'protection', tags: ['udløsetid','frakobling','stød','sløjfeimpedans'],
+    q_da: 'Hvad er kravet til frakoblingstid ved fejl?',
+    q_en: 'What is the required disconnection time on a fault?',
+    a_da: 'Iht. DS/HD 60364-4-41: i TN-systemer skal en fejl frakobles inden 0,4 s for endegrupper op til 32 A (230V), og inden 5 s for fordelingskredse. Dette kræver at Ik min er stor nok til at udløse beskyttelsen — derfor kontrolleres sløjfeimpedansen. Brug "Kortslutning"-modulet.',
+    a_en: 'Per DS/HD 60364-4-41: in TN systems a fault must be disconnected within 0.4 s for final circuits up to 32 A (230V), and within 5 s for distribution circuits. This requires Ik min to be large enough to trip the protection — hence the loop impedance is verified. Use the "Short Circuit" module.' },
+
+  // --- Group/circuit sizing ---
+  { topic: 'protection', tags: ['gruppe','stikkontakt','13a','16a','kreds'],
+    q_da: 'Hvor mange stikkontakter må jeg sætte på én gruppe?',
+    q_en: 'How many sockets may I put on one circuit?',
+    a_da: 'Der er ikke et fast maksimum i de danske regler, men kredsen skal dimensioneres efter den forventede samtidige belastning, så IB \u2264 In \u2264 Iz overholdes. Typisk bruges 13A eller 16A grupper med HPFI til stikkontakter. Brug "Belastning"-modulet til at beregne IB med en realistisk samtidighedsfaktor.',
+    a_en: 'There is no fixed maximum in the Danish rules, but the circuit must be sized for the expected simultaneous load so that IB \u2264 In \u2264 Iz is met. Typically 13A or 16A circuits with RCD are used for sockets. Use the "Load" module to calculate IB with a realistic simultaneity factor.' },
+
+  // --- Selectivity ---
+  { topic: 'protection', tags: ['selektivitet','koordination','serieforbindelse'],
+    q_da: 'Hvad er selektivitet mellem sikringer?',
+    q_en: 'What is selectivity between protective devices?',
+    a_da: 'Selektivitet betyder at ved en fejl udløser kun den nærmeste beskyttelse opstrøms for fejlen — ikke hovedsikringen. Det opnås ved at vælge beskyttelser med tilstrækkelig forskel i mærkestrøm og udløsekarakteristik (typisk faktor 1,6:1 for sikringer). Det sikrer at resten af anlægget forbliver i drift.',
+    a_en: 'Selectivity means that on a fault, only the nearest upstream protection trips — not the main fuse. It is achieved by choosing protective devices with sufficient difference in rating and trip characteristic (typically 1.6:1 ratio for fuses). This keeps the rest of the installation operating.' },
+
+  // --- Cable color code ---
+  { topic: 'cable', tags: ['farve','leder','l1','l2','l3','n','pe'],
+    q_da: 'Hvad er farvekoderne for ledere i Danmark?',
+    q_en: 'What are the conductor color codes in Denmark?',
+    a_da: 'Iht. HD 60364-5-51: Beskyttelsesleder (PE) er grøn/gul. Neutralleder (N) er blå. Faseledere (L1, L2, L3) er typisk brun, sort og grå. Grøn/gul må ALDRIG bruges til andet end PE.',
+    a_en: 'Per HD 60364-5-51: Protective conductor (PE) is green/yellow. Neutral (N) is blue. Phase conductors (L1, L2, L3) are typically brown, black and grey. Green/yellow must NEVER be used for anything other than PE.' },
+
+];
+
+const AI_TOPICS = {
+  cable: { da: 'Kabler', en: 'Cables', icon: '\uD83D\uDD17' },
+  protection: { da: 'Beskyttelse', en: 'Protection', icon: '\uD83D\uDEE1\uFE0F' },
+  rcd: { da: 'HPFI/RCD', en: 'RCD', icon: '\u26A1' },
+  trafo: { da: 'Transformer', en: 'Transformer', icon: '\uD83D\uDD0B' },
+  motor: { da: 'Motorer', en: 'Motors', icon: '\u2699\uFE0F' },
+  earth: { da: 'Jording', en: 'Earthing', icon: '\u23DA' },
+  surge: { da: 'Overspænding', en: 'Surge', icon: '\uD83C\uDF29\uFE0F' },
+  pf: { da: 'Effektfaktor', en: 'Power Factor', icon: '\uD83D\uDCC8' },
+  law: { da: 'EL-Lov', en: 'EL-Law', icon: '\u2696\uFE0F' },
+  zones: { da: 'Zoner/IP', en: 'Zones/IP', icon: '\uD83D\uDEBF' }
+};
+
+let aiTopic = 'all';
+let aiTag = null;
+let aiOpenQuestion = null;
+let aiMode = 'offline'; // 'offline' = click-only KB, 'online' = live AI
+let aiChat = []; // online chat history
+let aiBusy = false;
+
+// Call a live AI service for open-ended questions (online mode only)
+async function askOnlineAI(question) {
+  const cfg = JSON.parse(localStorage.getItem('aiElectricianCfg') || '{}');
+  if (!cfg.endpoint || !cfg.key) {
+    aiChat.push({ role: 'assistant', text: lang === 'da'
+      ? 'Online AI er ikke konfigureret. Klik p\u00E5 "Indstil AI" for at tilslutte en AI-tjeneste (OpenAI-kompatibel).'
+      : 'Online AI is not configured. Click "Configure AI" to connect an AI service (OpenAI-compatible).' });
+    aiBusy = false; renderModule('ai'); return;
+  }
+  aiBusy = true; renderModule('ai');
+  const sysPrompt = lang === 'da'
+    ? 'Du er en erfaren dansk autoriseret elektriker og ekspert i DS/HD 60364, Elsikkerhedsloven, Installationsbekendtgørelsen og Fællesregulativet. Svar præcist, sikkert og kortfattet på dansk. Henvis altid til relevante standarder. Hvis noget kræver en autoriseret elinstallatør, sig det.'
+    : 'You are an experienced Danish authorized electrician and expert in DS/HD 60364, the Electrical Safety Act, the Installation Order and Fællesregulativet. Answer precisely, safely and concisely in English. Always reference relevant standards. If something requires an authorized electrician, say so.';
+  try {
+    const res = await fetch(cfg.endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
+      body: JSON.stringify({
+        model: cfg.model || 'gpt-4o-mini',
+        messages: [{ role: 'system', content: sysPrompt }, { role: 'user', content: question }],
+        temperature: 0.2
+      })
+    });
+    const data = await res.json();
+    const answer = data.choices && data.choices[0] && data.choices[0].message
+      ? data.choices[0].message.content
+      : (lang === 'da' ? 'Intet svar modtaget.' : 'No answer received.');
+    aiChat.push({ role: 'assistant', text: answer });
+  } catch (e) {
+    aiChat.push({ role: 'assistant', text: (lang === 'da' ? 'Fejl ved forbindelse: ' : 'Connection error: ') + e.message });
+  }
+  aiBusy = false; renderModule('ai');
+}
+
+function submitAiQuestion() {
+  const inp = document.getElementById('aiQuestionInput');
+  if (!inp || !inp.value.trim()) return;
+  const q = inp.value.trim();
+  aiChat.push({ role: 'user', text: q });
+  askOnlineAI(q);
+}
+
+function configureAI() {
+  const cfg = JSON.parse(localStorage.getItem('aiElectricianCfg') || '{}');
+  const endpoint = prompt(lang === 'da' ? 'AI endpoint URL (OpenAI-kompatibel):' : 'AI endpoint URL (OpenAI-compatible):', cfg.endpoint || 'https://api.openai.com/v1/chat/completions');
+  if (endpoint === null) return;
+  const key = prompt(lang === 'da' ? 'API-nøgle:' : 'API key:', cfg.key || '');
+  if (key === null) return;
+  const model = prompt(lang === 'da' ? 'Model:' : 'Model:', cfg.model || 'gpt-4o-mini');
+  if (model === null) return;
+  localStorage.setItem('aiElectricianCfg', JSON.stringify({ endpoint, key, model }));
+  renderModule('ai');
+}
+
+function renderAiElectrician() {
+  // Collect all tags for clickable "search" chips
+  const allTags = [...new Set(AI_KNOWLEDGE.flatMap(k => k.tags))].sort();
+
+  // Filter questions
+  let questions = AI_KNOWLEDGE;
+  if (aiTopic !== 'all') questions = questions.filter(k => k.topic === aiTopic);
+  if (aiTag) questions = questions.filter(k => k.tags.includes(aiTag));
+
+  const questionList = questions.map((k, idx) => {
+    const globalIdx = AI_KNOWLEDGE.indexOf(k);
+    const isOpen = aiOpenQuestion === globalIdx;
+    return `
+      <div style="margin-bottom:8px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+        <button class="sel-btn" style="width:100%;text-align:left;border:none;border-radius:0;${isOpen ? 'background:linear-gradient(135deg,var(--primary),var(--primary-light));color:white' : ''}" onclick="aiOpenQuestion=${isOpen ? 'null' : globalIdx};renderModule('ai')">
+          ${AI_TOPICS[k.topic].icon} ${lang === 'da' ? k.q_da : k.q_en}
+        </button>
+        ${isOpen ? `
+        <div style="padding:14px 16px;background:var(--success-bg);font-size:0.88rem;line-height:1.7;color:var(--text)">
+          \uD83D\uDC68\u200D\uD83D\uDD27 ${lang === 'da' ? k.a_da : k.a_en}
+        </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+
+  // Mode toggle
+  const modeToggle = `
+    <div class="select-group">
+      <div class="select-label">${lang === 'da' ? 'Tilstand' : 'Mode'}</div>
+      <div class="select-grid">
+        <button class="sel-btn ${aiMode === 'offline' ? 'selected' : ''}" onclick="aiMode='offline';renderModule('ai')">\uD83D\uDDB1\uFE0F ${lang === 'da' ? 'Klik (offline)' : 'Click (offline)'}</button>
+        <button class="sel-btn ${aiMode === 'online' ? 'selected' : ''}" onclick="aiMode='online';renderModule('ai')">\uD83C\uDF10 ${lang === 'da' ? 'Online AI (alle spørgsmål)' : 'Online AI (any question)'}</button>
+      </div>
+    </div>
+  `;
+
+  if (aiMode === 'online') {
+    const cfg = JSON.parse(localStorage.getItem('aiElectricianCfg') || '{}');
+    const configured = cfg.endpoint && cfg.key;
+    const chatHtml = aiChat.map(m => `
+      <div style="margin-bottom:10px;display:flex;${m.role === 'user' ? 'justify-content:flex-end' : 'justify-content:flex-start'}">
+        <div style="max-width:85%;padding:10px 14px;border-radius:14px;font-size:0.88rem;line-height:1.6;${m.role === 'user'
+          ? 'background:linear-gradient(135deg,var(--primary),var(--primary-light));color:white;border-bottom-right-radius:4px'
+          : 'background:var(--success-bg);color:var(--text);border-bottom-left-radius:4px'}">
+          ${m.role === 'assistant' ? '\uD83D\uDC68\u200D\uD83D\uDD27 ' : ''}${m.text.replace(/</g,'&lt;')}
+        </div>
+      </div>
+    `).join('');
+
+    return `
+      <div class="card fade-in">
+        <div class="card-title">\uD83D\uDC68\u200D\uD83D\uDD27 ${lang === 'da' ? 'Spørg AI-Elektrikeren — Online' : 'Ask the AI-Electrician — Online'}</div>
+        <div class="info-row">${lang === 'da' ? 'Online tilstand kan besvare ETHVERT spørgsmål om elinstallation og dansk EL-lov. Kræver en tilsluttet AI-tjeneste.' : 'Online mode can answer ANY question about electrical installation and Danish EL-law. Requires a connected AI service.'}</div>
+        ${modeToggle}
+        ${!configured ? `
+          <div class="result-box warning">
+            <div class="result-title">${lang === 'da' ? 'Opsætning påkrævet' : 'Setup required'}</div>
+            <div class="result-row"><span class="label">${lang === 'da' ? 'Tilslut en OpenAI-kompatibel AI-tjeneste for at stille frie spørgsmål.' : 'Connect an OpenAI-compatible AI service to ask free questions.'}</span></div>
+          </div>
+          <div style="margin-top:12px"><button class="sel-btn selected" onclick="configureAI()">\u2699\uFE0F ${lang === 'da' ? 'Indstil AI' : 'Configure AI'}</button></div>
+        ` : `
+          <div style="margin-top:8px;max-height:340px;overflow-y:auto;padding:4px">${chatHtml || '<div class="info-row">' + (lang === 'da' ? 'Stil dit første spørgsmål nedenfor.' : 'Ask your first question below.') + '</div>'}</div>
+          ${aiBusy ? '<div class="info-row">' + (lang === 'da' ? 'AI tænker…' : 'AI is thinking…') + '</div>' : ''}
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <textarea id="aiQuestionInput" rows="2" placeholder="${lang === 'da' ? 'Skriv dit spørgsmål…' : 'Type your question…'}" style="flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:inherit;font-size:0.88rem;resize:vertical"></textarea>
+            <button class="sel-btn selected" onclick="submitAiQuestion()" style="align-self:stretch">${lang === 'da' ? 'Send' : 'Send'}</button>
+          </div>
+          <div style="margin-top:8px;display:flex;gap:8px">
+            <button class="sel-btn" onclick="configureAI()">\u2699\uFE0F ${lang === 'da' ? 'Indstillinger' : 'Settings'}</button>
+            <button class="sel-btn" onclick="aiChat=[];renderModule('ai')">\uD83D\uDDD1\uFE0F ${lang === 'da' ? 'Ryd' : 'Clear'}</button>
+          </div>
+        `}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">\uD83D\uDC68\u200D\uD83D\uDD27 ${lang === 'da' ? 'Spørg AI-Elektrikeren' : 'Ask the AI-Electrician'}</div>
+      <div class="info-row">${lang === 'da' ? 'Klik p\u00E5 et emne eller et n\u00F8gleord for at finde svar. Alle svar f\u00F8lger DS/HD 60364 og dansk lovgivning.' : 'Click a topic or keyword to find answers. All answers follow DS/HD 60364 and Danish regulations.'}</div>
+      ${modeToggle}
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Emne' : 'Topic'}</div>
+        <div class="select-grid">
+          <button class="sel-btn ${aiTopic === 'all' ? 'selected' : ''}" onclick="aiTopic='all';aiTag=null;aiOpenQuestion=null;renderModule('ai')">${lang === 'da' ? 'Alle' : 'All'}</button>
+          ${Object.keys(AI_TOPICS).map(tp =>
+            `<button class="sel-btn ${aiTopic === tp ? 'selected' : ''}" onclick="aiTopic='${tp}';aiTag=null;aiOpenQuestion=null;renderModule('ai')">${AI_TOPICS[tp].icon} ${lang === 'da' ? AI_TOPICS[tp].da : AI_TOPICS[tp].en}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">\uD83D\uDD0D ${lang === 'da' ? 'S\u00F8g via n\u00F8gleord' : 'Search by keyword'}</div>
+        <div class="select-grid">
+          ${aiTag ? `<button class="sel-btn selected" onclick="aiTag=null;aiOpenQuestion=null;renderModule('ai')">\u2715 ${aiTag}</button>` : ''}
+          ${allTags.filter(tg => tg !== aiTag).map(tg =>
+            `<button class="sel-btn" onclick="aiTag='${tg}';aiOpenQuestion=null;renderModule('ai')">${tg}</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Sp\u00F8rgsm\u00E5l & Svar' : 'Questions & Answers'} (${questions.length})</div>
+      ${questionList || '<div class="info-row">' + (lang === 'da' ? 'Ingen sp\u00F8rgsm\u00E5l matcher. Pr\u00F8v et andet emne.' : 'No questions match. Try another topic.') + '</div>'}
     </div>
   `;
 }
