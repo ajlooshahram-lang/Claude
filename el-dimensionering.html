@@ -528,14 +528,19 @@ body.dark {
   --shadow: 0 4px 12px rgba(0,0,0,0.35);
   --shadow-lg: 0 10px 30px rgba(0,0,0,0.45);
 }
-body.dark .sel-btn { background: #232e3b; color: var(--text); }
-body.dark .sel-btn:hover { background: #2a3645; }
-body.dark .nav { background: #1a2330; }
-body.dark .nav-btn { background: #232e3b; color: var(--text-light); }
+body.dark .sel-btn { background: #1a2535; color: #b8d4e8; border-color: #2a3f55; }
+body.dark .sel-btn:hover { background: #1f3048; border-color: #00e5ff; color: #e0f4ff; box-shadow: 0 0 10px rgba(0,229,255,0.25); }
+body.dark .sel-btn.selected { background: linear-gradient(135deg, #00c8ff, #0080ff); color: #fff; border-color: transparent; box-shadow: 0 0 18px rgba(0,229,255,0.75), 0 0 4px rgba(0,200,255,0.9); text-shadow: 0 0 6px rgba(255,255,255,0.5); }
+body.dark .nav { background: #0f1a26; }
+body.dark .nav-btn { background: #1a2535; color: #8ab4d0; border-color: #2a3f55; }
+body.dark .nav-btn:hover { border-color: #00e5ff; color: #e0f4ff; box-shadow: 0 0 8px rgba(0,229,255,0.3); }
+body.dark .nav-btn.active { background: linear-gradient(135deg, #00c8ff, #0080ff); color: #fff; border-color: transparent; box-shadow: 0 0 14px rgba(0,229,255,0.7); }
 body.dark .status-bar { background: linear-gradient(135deg, #161f2a, #1a2330); }
-body.dark .status-chip { background: #232e3b; }
-body.dark #aiSearchBox { background: #232e3b; color: var(--text); }
-body.dark .result-box[style*="#fff"] { background: #1a2330 !important; }
+body.dark .status-chip { background: #1a2535; border-color: #2a3f55; }
+body.dark .status-chip.has-value { background: rgba(0,200,255,0.12); border-color: rgba(0,229,255,0.4); }
+body.dark #aiSearchBox { background: #1a2535; color: #e0f4ff; border-color: #00c8ff; box-shadow: 0 0 8px rgba(0,200,255,0.2); }
+body.dark .card { border-color: #1f3048; }
+body.dark .card-title { color: #00e5ff; text-shadow: 0 0 8px rgba(0,229,255,0.4); }
 body.dark img { filter: brightness(0.92); }
 .theme-btn {
   border: none;
@@ -4281,22 +4286,77 @@ function configAiImg(){
   alert(lang==='da'?'Gemt. Klik "Generér AI-maleri".':'Saved. Click "Generate AI painting".');
 }
 
+// ===== GENERATIVE 3D INSTALLATION DRAWING (highest quality) =====
+// Data-driven: draws ANY installation from a composable node graph.
+const NODE_TYPES = {
+  grid:{da:'EL-net',en:'Grid',color:'#7fc8ff',icon:'\u26A1'},
+  trafo:{da:'Trafostation',en:'Transformer',color:'#ff8a5c',icon:'\uD83D\uDD0C'},
+  meter:{da:'M\u00E5ler',en:'Meter',color:'#ffd166',icon:'\uD83D\uDCCA'},
+  panel:{da:'Hovedtavle',en:'Main panel',color:'#00ffc8',icon:'\uD83D\uDCCB'},
+  subpan:{da:'Undertavle',en:'Sub-panel',color:'#9fe6ff',icon:'\uD83D\uDCE6'},
+  motor:{da:'Motor',en:'Motor',color:'#00d0ff',icon:'\u2699\uFE0F'},
+  ev:{da:'EV-lader',en:'EV charger',color:'#a0ff80',icon:'\uD83D\uDE97'},
+  pv:{da:'Solcelle/PV',en:'Solar PV',color:'#ffee55',icon:'\u2600\uFE0F'},
+  battery:{da:'Batteri',en:'Battery',color:'#80ffcc',icon:'\uD83D\uDD0B'},
+  gen:{da:'Generator',en:'Generator',color:'#ff9955',icon:'\uD83C\uDFED'},
+  load:{da:'Forbrugere',en:'Consumers',color:'#ffd166',icon:'\uD83C\uDFE0'},
+  custom:{da:'Andet',en:'Custom',color:'#cc88ff',icon:'\uD83D\uDD27'}
+};
+let drawNodes = null;
+function getDrawNodes(){
+  if(drawNodes) return drawNodes;
+  const sch=(typeof calcLoadSchedule==='function')?calcLoadSchedule():{kVA:18.5,ib:30};
+  const trafo=(typeof TRAFO_SIZES!=='undefined')?(TRAFO_SIZES.find(t=>t>=(loadList.length?sch.kVA:18.5))||630):630;
+  const ib=loadList.length?sch.ib:30;
+  return [{type:'grid',label:'60 kV'},{type:'trafo',label:trafo+' kVA'},{type:'panel',label:'IB '+ib.toFixed(0)+' A'},{type:'load',label:(loadList.length||4)+' '+(lang==='da'?'grupper':'circuits')}];
+}
+function drawNodeAdd(type){if(!drawNodes)drawNodes=[...getDrawNodes()];drawNodes.push({type,label:''});renderModule('draw');}
+function drawNodeRemove(i){if(!drawNodes)drawNodes=[...getDrawNodes()];drawNodes.splice(i,1);renderModule('draw');}
+function drawNodeMove(i,d){if(!drawNodes)drawNodes=[...getDrawNodes()];const j=i+d;if(j<0||j>=drawNodes.length)return;[drawNodes[i],drawNodes[j]]=[drawNodes[j],drawNodes[i]];renderModule('draw');}
+function drawNodeReset(){drawNodes=null;renderModule('draw');}
+
+function build3D(){
+  const nodes=getDrawNodes();
+  const W=Math.max(760,nodes.length*170+80),H=400,gY=320;
+  const sp=(W-120)/Math.max(nodes.length-1,1);
+  let svg='';
+  // ground perspective grid
+  for(let i=0;i<12;i++) svg+=`<line x1="0" y1="${gY+i*7}" x2="${W}" y2="${gY+i*7}" stroke="rgba(0,180,255,${0.04-i*0.003})"/>`;
+  svg+=`<line x1="0" y1="${gY}" x2="${W}" y2="${gY}" stroke="rgba(0,225,255,0.3)" stroke-width="2"/>`;
+  // nodes
+  nodes.forEach((n,idx)=>{
+    const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;
+    const cx=60+idx*sp, bw=88, bd=44, bh=105, topY=gY-bh;
+    // 3D box faces
+    const tp=`${cx-bw/2},${topY} ${cx+bw/2},${topY} ${cx+bw/2+bd*.4},${topY-bd*.4} ${cx-bw/2+bd*.4},${topY-bd*.4}`;
+    const lf=`${cx-bw/2},${topY} ${cx-bw/2},${gY} ${cx+bw/2},${gY} ${cx+bw/2},${topY}`;
+    const rf=`${cx+bw/2},${topY} ${cx+bw/2},${gY} ${cx+bw/2+bd*.4},${gY-bd*.4} ${cx+bw/2+bd*.4},${topY-bd*.4}`;
+    // drop shadow
+    svg+=`<ellipse cx="${cx+10}" cy="${gY+6}" rx="${bw/2+5}" ry="8" fill="rgba(0,0,0,0.3)"/>`;
+    // faces with neon glow
+    svg+=`<polygon points="${lf}" fill="rgba(8,18,32,0.92)" stroke="${nt.color}" stroke-width="1.8"/>`;
+    svg+=`<polygon points="${rf}" fill="rgba(5,12,24,0.92)" stroke="${nt.color}" stroke-width="1.8"/>`;
+    svg+=`<polygon points="${tp}" fill="rgba(12,25,45,0.92)" stroke="${nt.color}" stroke-width="1.8"/>`;
+    // neon floor reflection
+    svg+=`<line x1="${cx-bw/2}" y1="${gY}" x2="${cx+bw/2}" y2="${gY}" stroke="${nt.color}" stroke-width="3" opacity="0.4" filter="url(#g3)"/>`;
+    // icon + labels
+    svg+=`<text x="${cx+bd*.2}" y="${topY-bd*.4-16}" text-anchor="middle" font-size="22">${nt.icon}</text>`;
+    svg+=`<text x="${cx+bd*.2}" y="${topY-bd*.4-2}" text-anchor="middle" font-size="11" fill="${nt.color}" font-weight="800">${lang==='da'?nt.da:nt.en}</text>`;
+    if(n.label) svg+=`<text x="${cx}" y="${gY+22}" text-anchor="middle" font-size="10" fill="#8ab4d0">${n.label}</text>`;
+    // cable to next
+    if(idx<nodes.length-1){
+      const nx=60+(idx+1)*sp, cy2=gY-bh*0.5;
+      svg+=`<line x1="${cx+bw/2+bd*.4}" y1="${cy2}" x2="${nx-bw/2}" y2="${cy2}" stroke="${nt.color}" stroke-width="3" stroke-linecap="round" opacity="0.7" filter="url(#g3)"/>`;
+      svg+=`<circle cx="${(cx+bw/2+bd*.4+nx-bw/2)/2}" cy="${cy2}" r="4" fill="${nt.color}" opacity="0.9"/>`;
+    }
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="background:linear-gradient(180deg,#050c18,#020710 65%,#010408);border-radius:14px;border:1px solid var(--line,#2a3645);overflow:visible" xmlns="http://www.w3.org/2000/svg"><defs><filter id="g3"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>${svg}<text x="${W/2}" y="${H-8}" text-anchor="middle" font-size="9" fill="#4a7090">3D ${lang==='da'?'installationsskitse':'installation scene'} \u00B7 ${nodes.length} ${lang==='da'?'noder':'nodes'} \u00B7 El-Dimensionering</text></svg>`;
+}
+
 function renderDrawing(){
-  return `
-    <div class="card fade-in">
-      <div class="card-title">🖼️ ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div>
-      <div class="info-row">${lang==='da'?'Et enstregsdiagram af din installation — genereret fra belastningsskemaet, så du kan forestille dig anlægget. Tilf\u00F8j forbrugere under "Belastning".':'A single-line diagram of your installation — generated from the load schedule so you can picture the system. Add consumers under "Load".'}</div>
-      ${buildSLD()}
-    </div>
-    <div class="card fade-in">
-      <div class="card-title">🎨 ${lang==='da'?'AI-maleri (foto-realistisk, online)':'AI painting (photorealistic, online)'}</div>
-      <div class="info-row">${lang==='da'?'Generér et foto-realistisk billede af installationen via en online billed-AI (kræver tilslutning).':'Generate a photorealistic image of the installation via an online image AI (requires connection).'}</div>
-      <div class="select-grid">
-        <button class="sel-btn selected" onclick="genAiPainting()">🎨 ${lang==='da'?'Generér AI-maleri':'Generate AI painting'}</button>
-        <button class="sel-btn" onclick="configAiImg()">⚙️ ${lang==='da'?'Indstil AI-billede':'Configure AI image'}</button>
-      </div>
-      <div id="aiImgBox" style="margin-top:12px"></div>
-    </div>`;
+  const nodes=getDrawNodes(), typeKeys=Object.keys(NODE_TYPES);
+  const nodeEditor=`<div class="select-group"><div class="select-label">${lang==='da'?'Installationens noder (tilf\u00F8j/fjern/flyt)':'Installation nodes (add/remove/move)'}</div>${nodes.map((n,i)=>{const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;return `<div style="display:inline-flex;align-items:center;gap:4px;margin:3px 4px;padding:5px 9px;border:1.5px solid ${nt.color};border-radius:8px;font-size:.78rem;background:rgba(0,0,0,0.25)"><span>${nt.icon}</span><span style="color:${nt.color};font-weight:700">${lang==='da'?nt.da:nt.en}</span><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},-1)">\u25C0</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},1)">\u25B6</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem;color:var(--danger)" onclick="drawNodeRemove(${i})">\u2715</button></div>`;}).join('')}</div><div class="select-group"><div class="select-label">${lang==='da'?'Tilf\u00F8j node':'Add node'}</div><div class="select-grid">${typeKeys.map(k=>`<button class="sel-btn" onclick="drawNodeAdd('${k}')">${NODE_TYPES[k].icon} ${lang==='da'?NODE_TYPES[k].da:NODE_TYPES[k].en}</button>`).join('')}<button class="sel-btn" onclick="drawNodeReset()">\u21BA ${lang==='da'?'Nulstil':'Reset'}</button></div></div>`;
+  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram':'Single-line'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='iso'?build3D():buildSLD()}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
 }
 
 // ===== INIT =====
