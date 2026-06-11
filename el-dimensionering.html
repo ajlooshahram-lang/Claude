@@ -1251,67 +1251,38 @@ function recommendOverloadRelays(ib) {
 function renderRecommendations(title, products, type) {
   if (!products || products.length === 0) return '';
 
+  const typeToCat = { cable:'cables', mcb:'mcbs', mccb:'mccbs', fuse:'fuses', contactor:'contactors', rcd:'rcds', mpcb:'mpcbs', relay:'overloadRelays' };
+  const cat = typeToCat[type] || type;
+
+  const rowWrap = (p, mainLabel, valueText, sub) => `
+    <div class="result-row" style="align-items:center;gap:12px">
+      ${getComponentSvg(cat, p)}
+      <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+        <div style="display:flex;justify-content:space-between;width:100%;gap:8px">
+          <span class="label">${mainLabel}</span>
+          <span class="value">${valueText}</span>
+        </div>
+        ${sub ? `<span style="font-size:0.75rem;color:var(--text-muted)">${sub}</span>` : ''}
+      </div>
+    </div>`;
+
   let rows = '';
   if (type === 'cable') {
-    rows = products.map(p => `
-      <div class="result-row" style="flex-wrap:wrap;gap:4px">
-        <span class="label"><strong>${p.brand}</strong> ${p.model} ${p.cores} ${p.mm2} mm\u00B2</span>
-        <span class="value">Iz = ${p.iz} A</span>
-      </div>
-      <div class="result-row" style="padding-left:12px;font-size:0.78rem;color:var(--text-muted)">
-        <span>${lang === 'da' ? p.use_da : p.use_en}</span>
-        <span>R=${p.r} | X=${p.x} \u03A9/km</span>
-      </div>
-    `).join('');
+    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.cores} ${p.mm2} mm\u00B2`, `Iz = ${p.iz} A`, `${lang === 'da' ? p.use_da : p.use_en} | R=${p.r} X=${p.x} \u03A9/km`)).join('');
   } else if (type === 'mcb') {
-    rows = products.map(p => `
-      <div class="result-row">
-        <span class="label"><strong>${p.brand}</strong> ${p.model} ${p.curve}${p.rating} (${p.poles})</span>
-        <span class="value">Icu = ${p.icu} kA</span>
-      </div>
-    `).join('');
+    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.curve}${p.rating} (${p.poles})`, `Icu = ${p.icu} kA`)).join('');
   } else if (type === 'mccb') {
-    rows = products.map(p => `
-      <div class="result-row">
-        <span class="label"><strong>${p.brand}</strong> ${p.model}</span>
-        <span class="value">Icu = ${p.icu} kA | In: ${p.inOptions.join(', ')} A</span>
-      </div>
-    `).join('');
+    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model}`, `Icu = ${p.icu} kA`, `In: ${p.inOptions.join(', ')} A`)).join('');
   } else if (type === 'fuse') {
-    rows = products.map(p => `
-      <div class="result-row">
-        <span class="label"><strong>${p.brand}</strong> ${p.model} ${p.rating} A</span>
-        <span class="value">${p.size} | Icu=${p.icu} kA | I5s=${p.i5s} A</span>
-      </div>
-    `).join('');
+    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.rating} A`, `${p.size}`, `Icu=${p.icu} kA | I5s=${p.i5s} A`)).join('');
   } else if (type === 'contactor') {
-    rows = products.map(p => `
-      <div class="result-row">
-        <span class="label"><strong>${p.brand}</strong> ${p.model} (${p.series})</span>
-        <span class="value">AC-3: ${p.ac3_A} A / ${p.ac3_kW} kW</span>
-      </div>
-    `).join('');
+    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} (${p.series})`, `AC-3: ${p.ac3_A} A`, `${p.ac3_kW} kW`)).join('');
   } else if (type === 'rcd') {
-    rows = products.map(p => `
-      <div class="result-row">
-        <span class="label"><strong>${p.brand}</strong> ${p.model} ${p.poles} ${p.rating}A</span>
-        <span class="value">${p.sensitivity} mA / Type ${p.rcdType}</span>
-      </div>
-    `).join('');
+    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.poles} ${p.rating}A`, `${p.sensitivity} mA`, `Type ${p.rcdType}`)).join('');
   } else if (type === 'mpcb') {
-    rows = products.map(p => `
-      <div class="result-row">
-        <span class="label"><strong>${p.brand}</strong> ${p.model} (${p.series})</span>
-        <span class="value">${p.rangeMin}-${p.rangeMax} A / ${p.kW} kW</span>
-      </div>
-    `).join('');
+    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} (${p.series})`, `${p.rangeMin}-${p.rangeMax} A`, `${p.kW} kW`)).join('');
   } else if (type === 'relay') {
-    rows = products.map(p => `
-      <div class="result-row">
-        <span class="label"><strong>${p.brand}</strong> ${p.model} (${p.series})</span>
-        <span class="value">${p.rangeMin}-${p.rangeMax} A</span>
-      </div>
-    `).join('');
+    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} (${p.series})`, `${p.rangeMin}-${p.rangeMax} A`)).join('');
   }
 
   return `
@@ -2640,6 +2611,78 @@ function renderStandards() {
 let bankCategory = 'cables';
 let bankBrand = 'all';
 
+// ===== COMPONENT VISUALS (code-generated SVG "photos") =====
+// License-safe, offline, scalable illustrations of each real component type.
+function getComponentSvg(category, p) {
+  const w = 64, h = 64;
+  const wrap = (inner) => `<svg viewBox="0 0 ${w} ${h}" width="56" height="56" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;border-radius:8px;background:linear-gradient(135deg,#f8fafc,#eef3f8);border:1px solid var(--border)">${inner}</svg>`;
+
+  switch (category) {
+    case 'cables': {
+      // Cable cross-section: sheath + colored cores
+      const coreColors = ['#8b5a2b', '#1b2838', '#9aa5b1', '#2980b9', '#27ae60']; // L1,L2,L3,N,PE(green)
+      const isAl = p.material === 'Al';
+      const sheath = isAl ? '#000' : '#1b1b1b';
+      let cores = '';
+      const positions = [[26,26],[38,26],[26,38],[38,38],[32,32]];
+      for (let i = 0; i < 5; i++) {
+        const c = i === 4 ? '#27ae60' : coreColors[i];
+        cores += `<circle cx="${positions[i][0]}" cy="${positions[i][1]}" r="5" fill="${c}" stroke="#fff" stroke-width="0.8"/>`;
+      }
+      return wrap(`<circle cx="32" cy="32" r="22" fill="${sheath}"/><circle cx="32" cy="32" r="22" fill="none" stroke="#444" stroke-width="1"/>${cores}<text x="32" y="58" font-size="7" fill="${isAl?'#888':'#b87333'}" text-anchor="middle" font-family="monospace">${isAl?'Al':'Cu'}</text>`);
+    }
+    case 'mcbs':
+    case 'rcbos': {
+      // DIN-rail module with toggle
+      const body = category === 'rcbos' ? '#e8eef5' : '#f5f5f0';
+      return wrap(`<rect x="22" y="8" width="20" height="48" rx="2" fill="${body}" stroke="#9aa5b1"/><rect x="26" y="12" width="12" height="14" rx="1" fill="#1a5276"/><rect x="29" y="16" width="6" height="14" rx="1" fill="#fff" stroke="#1a5276"/><rect x="24" y="44" width="16" height="3" fill="#c0c0c0"/><rect x="24" y="49" width="16" height="3" fill="#c0c0c0"/><text x="32" y="40" font-size="6" fill="#333" text-anchor="middle" font-family="monospace">${(p.curve||'')+(p.rating||'')}</text>`);
+    }
+    case 'mccbs': {
+      // Moulded case breaker (larger black block)
+      return wrap(`<rect x="14" y="10" width="36" height="44" rx="3" fill="#222" stroke="#000"/><rect x="20" y="16" width="24" height="18" rx="2" fill="#333"/><circle cx="32" cy="25" r="6" fill="#1a5276"/><rect x="29" y="20" width="6" height="10" rx="1" fill="#ffd166"/><rect x="20" y="40" width="24" height="6" rx="1" fill="#444"/><text x="32" y="51" font-size="6" fill="#fff" text-anchor="middle" font-family="monospace">NSX</text>`);
+    }
+    case 'fuses': {
+      const isNH = (p.size||'').indexOf('NH') === 0;
+      if (isNH) {
+        // NH knife-blade fuse
+        return wrap(`<rect x="20" y="16" width="24" height="32" rx="2" fill="#d9c8a0" stroke="#a89668"/><rect x="26" y="10" width="5" height="8" fill="#888"/><rect x="33" y="10" width="5" height="8" fill="#888"/><rect x="26" y="46" width="5" height="8" fill="#888"/><rect x="33" y="46" width="5" height="8" fill="#888"/><circle cx="32" cy="32" r="4" fill="#c0392b"/><text x="32" y="34" font-size="5" fill="#fff" text-anchor="middle" font-family="monospace">${p.rating}</text>`);
+      }
+      // D-fuse (screw-in, ceramic)
+      return wrap(`<circle cx="32" cy="32" r="18" fill="#e8dcc0" stroke="#a89668"/><circle cx="32" cy="32" r="10" fill="#fff" stroke="#a89668"/><circle cx="32" cy="32" r="4" fill="${p.rating<=16?'#27ae60':p.rating<=25?'#9aa5b1':'#c0392b'}"/><text x="32" y="54" font-size="7" fill="#7a6a45" text-anchor="middle" font-family="monospace">D${p.rating}A</text>`);
+    }
+    case 'rcds': {
+      // RCD module with test button
+      return wrap(`<rect x="18" y="8" width="28" height="48" rx="2" fill="#f5f5f0" stroke="#9aa5b1"/><rect x="22" y="12" width="20" height="12" rx="1" fill="#1a5276"/><rect x="26" y="14" width="5" height="16" rx="1" fill="#fff" stroke="#1a5276"/><rect x="34" y="27" width="7" height="5" rx="1" fill="#27ae60"/><text x="37.5" y="31" font-size="3.5" fill="#fff" text-anchor="middle" font-family="monospace">T</text><text x="32" y="44" font-size="6" fill="#333" text-anchor="middle" font-family="monospace">${p.sensitivity}mA</text>`);
+    }
+    case 'spds': {
+      // SPD with status window (green)
+      return wrap(`<rect x="18" y="8" width="28" height="48" rx="2" fill="#2c3e50" stroke="#1b2838"/><rect x="23" y="14" width="18" height="12" rx="1" fill="#27ae60"/><rect x="23" y="30" width="18" height="12" rx="1" fill="#27ae60"/><text x="32" y="51" font-size="6" fill="#fff" text-anchor="middle" font-family="monospace">${(p.spdType||'').replace('Type ','T')}</text>`);
+    }
+    case 'contactors': {
+      // Contactor block
+      return wrap(`<rect x="16" y="10" width="32" height="44" rx="2" fill="#2b2b2b" stroke="#000"/><rect x="20" y="6" width="6" height="6" fill="#888"/><rect x="29" y="6" width="6" height="6" fill="#888"/><rect x="38" y="6" width="6" height="6" fill="#888"/><rect x="20" y="52" width="6" height="6" fill="#888"/><rect x="29" y="52" width="6" height="6" fill="#888"/><rect x="38" y="52" width="6" height="6" fill="#888"/><rect x="22" y="22" width="20" height="20" rx="1" fill="#3a3a3a"/><text x="32" y="35" font-size="7" fill="#ffd166" text-anchor="middle" font-family="monospace">${p.ac3_A}A</text>`);
+    }
+    case 'mpcbs': {
+      // Motor protector with rotary dial
+      return wrap(`<rect x="20" y="8" width="24" height="48" rx="2" fill="#1a1a1a" stroke="#000"/><circle cx="32" cy="24" r="9" fill="#333" stroke="#666"/><circle cx="32" cy="24" r="2" fill="#ffd166"/><line x1="32" y1="24" x2="32" y2="17" stroke="#ffd166" stroke-width="1.5"/><rect x="27" y="40" width="10" height="8" rx="1" fill="#c0392b"/><text x="32" y="46" font-size="4.5" fill="#fff" text-anchor="middle" font-family="monospace">M</text></svg>`.replace('</svg>',''));
+    }
+    case 'overloadRelays': {
+      // Overload relay block
+      return wrap(`<rect x="18" y="12" width="28" height="40" rx="2" fill="#2b2b2b" stroke="#000"/><circle cx="28" cy="26" r="6" fill="#333" stroke="#666"/><circle cx="28" cy="26" r="1.5" fill="#ffd166"/><rect x="37" y="22" width="6" height="5" rx="1" fill="#27ae60"/><rect x="37" y="30" width="6" height="5" rx="1" fill="#c0392b"/><text x="32" y="46" font-size="5.5" fill="#ffd166" text-anchor="middle" font-family="monospace">${p.rangeMax}A</text>`);
+    }
+    case 'wiringDevices': {
+      if (p.cat === 'socket') {
+        // Danish socket face (round, 2 holes + earth pins)
+        return wrap(`<circle cx="32" cy="32" r="24" fill="#fff" stroke="#d0d6dd" stroke-width="2"/><circle cx="24" cy="30" r="3" fill="#333"/><circle cx="40" cy="30" r="3" fill="#333"/><path d="M28 42 h8" stroke="#888" stroke-width="3" stroke-linecap="round"/><path d="M22 40 v4 M42 40 v4" stroke="#888" stroke-width="2.5" stroke-linecap="round"/>`);
+      }
+      // Switch face
+      return wrap(`<rect x="14" y="10" width="36" height="44" rx="4" fill="#fff" stroke="#d0d6dd" stroke-width="2"/><rect x="22" y="18" width="20" height="28" rx="3" fill="#f0f3f7" stroke="#c0c8d0"/><rect x="22" y="18" width="20" height="14" rx="3" fill="#e2e8f0"/>`);
+    }
+    default:
+      return wrap(`<rect x="16" y="16" width="32" height="32" rx="4" fill="#9aa5b1"/>`);
+  }
+}
+
 function renderBank() {
   const categories = {
     cables: { da: 'Kabler', en: 'Cables', data: PRODUCTS.cables },
@@ -2684,12 +2727,15 @@ function renderBank() {
     const useText = p.use_da ? (lang === 'da' ? p.use_da : p.use_en) : '';
 
     return `
-      <div class="result-row" style="flex-direction:column;align-items:flex-start;gap:2px">
-        <div style="display:flex;justify-content:space-between;width:100%">
-          <span class="label"><strong>${p.brand}</strong> ${p.model}</span>
-          <span class="value">${spec}</span>
+      <div class="result-row" style="align-items:center;gap:12px">
+        ${getComponentSvg(bankCategory, p)}
+        <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+          <div style="display:flex;justify-content:space-between;width:100%;gap:8px">
+            <span class="label"><strong>${p.brand}</strong> ${p.model}</span>
+            <span class="value">${spec}</span>
+          </div>
+          ${useText ? `<span style="font-size:0.75rem;color:var(--text-muted)">${useText}</span>` : ''}
         </div>
-        ${useText ? `<span style="font-size:0.75rem;color:var(--text-muted)">${useText}</span>` : ''}
       </div>
     `;
   }).join('');
