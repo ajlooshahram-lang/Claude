@@ -2710,41 +2710,63 @@ const COMPONENT_PHOTOS = {
   wiringDevices: WM + 'Danish%20type%20K%20Power%20Socket.jpg?width=200'
 };
 
+// Resolves a photo URL and whether it is the EXACT product photo or a
+// REPRESENTATIVE category photo. Returns { url, exact } or null.
 function photoUrlFor(category, p) {
   if (!PHOTOS_ENABLED) return null;
-  // 1) explicit per-product photo
-  if (p && p.img) return /^https?:/.test(p.img) ? p.img : (PHOTO_BASE + p.img);
-  // 2) build a conventional filename from the product id (e.g. "SE-iC60N-B16.jpg")
-  if (PHOTO_BASE && p && p.id) return PHOTO_BASE + p.id + '.jpg';
-  // 3) per-category default
+  // 1) explicit per-product photo (exact)
+  if (p && p.img) return { url: /^https?:/.test(p.img) ? p.img : (PHOTO_BASE + p.img), exact: true };
+  // 2) connected feed -> resolve the EXACT photo per model.
+  //    PHOTO_BASE may be a pattern with placeholders {id} {ref} {brand} {model},
+  //    or a plain base URL to which "<id>.jpg" is appended.
+  if (PHOTO_BASE && p) {
+    let url;
+    if (PHOTO_BASE.indexOf('{') >= 0) {
+      url = PHOTO_BASE
+        .replace(/\{id\}/g, encodeURIComponent(p.id || ''))
+        .replace(/\{ref\}/g, encodeURIComponent(p.ref || p.id || ''))
+        .replace(/\{brand\}/g, encodeURIComponent(p.brand || ''))
+        .replace(/\{model\}/g, encodeURIComponent(p.model || ''));
+    } else {
+      url = PHOTO_BASE + encodeURIComponent(p.ref || p.id || '') + '.jpg';
+    }
+    return { url, exact: true };
+  }
+  // 3) per-category default (representative, not the exact model)
   const c = COMPONENT_PHOTOS[category];
-  if (c) return /^https?:/.test(c) ? c : (PHOTO_BASE + c);
+  if (c) return { url: /^https?:/.test(c) ? c : (PHOTO_BASE + c), exact: false };
   return null;
 }
 
 // Returns a real <img> photo (with SVG fallback) or the SVG illustration.
+// Representative (non-exact) photos get an honest "~" badge.
 function getComponentVisual(category, p) {
-  const url = photoUrlFor(category, p);
+  const res = photoUrlFor(category, p);
   const svg = getComponentSvg(category, p);
-  if (!url) return svg;
+  if (!res) return svg;
   const fid = 'ph' + Math.random().toString(36).slice(2, 9);
-  return `<span style="display:inline-flex;flex-shrink:0">
-    <img src="${url}" alt="${(p && p.model) || ''}" width="56" height="56"
+  const badge = res.exact ? '' :
+    `<span title="${lang === 'da' ? 'Repr\u00E6sentativt billede (ikke n\u00F8jagtig model)' : 'Representative image (not the exact model)'}"
+       style="position:absolute;bottom:-3px;right:-3px;background:var(--warning);color:#5a4500;font-size:8px;font-weight:700;padding:1px 3px;border-radius:4px;line-height:1.2">~</span>`;
+  return `<span style="position:relative;display:inline-flex;flex-shrink:0">
+    <img src="${res.url}" alt="${(p && p.model) || ''}" width="56" height="56" loading="lazy"
       style="object-fit:cover;border-radius:8px;border:1px solid var(--border)"
       onerror="this.style.display='none';var f=document.getElementById('${fid}');if(f)f.style.display='inline-flex'">
     <span id="${fid}" style="display:none">${svg}</span>
+    ${badge}
   </span>`;
 }
 
 function configurePhotos() {
-  const base = prompt(lang === 'da'
-    ? 'Indtast URL til dit licenserede billedfeed (f.eks. https://feed.lemu.dk/img/).\nLad st\u00E5 tomt for at bruge SVG-illustrationer:'
-    : 'Enter the URL of your licensed image feed (e.g. https://feed.lemu.dk/img/).\nLeave empty to use SVG illustrations:', PHOTO_BASE);
+  const msg = lang === 'da'
+    ? 'Indtast URL-m\u00F8nster til dit licenserede billedfeed, s\u00E5 hvert produkt viser SIT eget foto.\n\nBrug pladsholdere: {ref} {id} {brand} {model}\nEksempel: https://feed.lemu.dk/img/{ref}.jpg\n\n(Tomt = brug repr\u00E6sentative fotos)'
+    : 'Enter a URL pattern for your licensed image feed so each product shows ITS OWN photo.\n\nUse placeholders: {ref} {id} {brand} {model}\nExample: https://feed.lemu.dk/img/{ref}.jpg\n\n(Empty = use representative photos)';
+  const base = prompt(msg, PHOTO_BASE);
   if (base === null) return;
   PHOTO_BASE = base.trim();
-  PHOTOS_ENABLED = PHOTO_BASE.length > 0;
+  PHOTOS_ENABLED = true; // representative photos still show when base is empty
   localStorage.setItem('photoBase', PHOTO_BASE);
-  localStorage.setItem('photosEnabled', PHOTOS_ENABLED ? '1' : '0');
+  localStorage.setItem('photosEnabled', '1');
   renderModule(activeModule);
 }
 
