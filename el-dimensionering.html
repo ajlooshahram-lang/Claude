@@ -951,16 +951,32 @@ const CABLES_ALU = {
   }
 };
 
-// Current carrying capacity (Iz) per cross-section (installation method C, 3-phase copper)
+// Current carrying capacity (Iz) - OFFICIAL values from DS/HD 60364-5-52
+// Table C.52.1, reference method C, 3 loaded conductors, PVC 70°C.
+// Verified against the user's own "Installations ark V3.0" (DS/HD 60364) sheet.
 const IZ_COPPER = {
-  1.5: 17.5, 2.5: 24, 4: 32, 6: 41, 10: 57, 16: 76, 25: 101, 35: 125,
-  50: 151, 70: 192, 95: 232, 120: 269, 150: 300, 185: 341, 240: 400, 300: 458
+  1.5: 17, 2.5: 23, 4: 31, 6: 40, 10: 54, 16: 73, 25: 95, 35: 117,
+  50: 141, 70: 179, 95: 216, 120: 249, 150: 285, 185: 324, 240: 380
+};
+// XLPE 90°C alternative (e.g. NKT NOIKLX halogen-free) - Table C.52.1 col J
+const IZ_COPPER_XLPE = {
+  1.5: 22, 2.5: 30, 4: 40, 6: 51, 10: 70, 16: 94, 25: 119, 35: 147,
+  50: 179, 70: 229, 95: 278, 120: 322, 150: 371, 185: 424, 240: 500
 };
 
-// Aluminium Iz (approx 78% of copper)
+// Aluminium Iz - DS/HD 60364-5-52 Table C.52.1, method C, PVC 70°C
 const IZ_ALU = {
-  16: 60, 25: 78, 35: 96, 50: 117, 70: 150, 95: 181, 120: 210, 150: 234, 185: 266, 240: 312
+  16: 58, 25: 73, 35: 90, 50: 110, 70: 140, 95: 170, 120: 197, 150: 226, 185: 256, 240: 300
 };
+const IZ_ALU_XLPE = {
+  16: 73, 25: 90, 35: 112, 50: 136, 70: 174, 95: 211, 120: 245, 150: 283, 185: 323, 240: 382
+};
+// Pick the correct official Iz table based on cable insulation (XLPE 90°C vs PVC 70°C)
+function izTableFor() {
+  const xlpe = /NOIKLX|NOIKX|NOIK-AL|NOSP/i.test((typeof cableState !== 'undefined' && cableState.type) || '');
+  if (cableState.material === 'copper') return xlpe ? IZ_COPPER_XLPE : IZ_COPPER;
+  return xlpe ? IZ_ALU_XLPE : IZ_ALU;
+}
 
 // Correction factors from installation methods (simplified)
 const INSTALL_METHODS = {
@@ -1225,14 +1241,22 @@ const PRODUCTS = {
 // Only returns products that are SAFE and CORRECT for the given parameters
 // Rules per IEC 60364-4-43: IB <= In <= Iz, Icu >= Ikmax
 
+// Official Iz (DS/HD 60364-5-52 Table C.52.1, method C). NKT NOIKLX/NOIKX-Flex
+// are halogen-free XLPE 90°C -> use XLPE column; others use conservative PVC 70°C.
+function officialIz(product) {
+  const xlpe = /NOIKLX|NOIKX|NOIK-AL|NOSP/i.test(product.model || '');
+  if (product.material === 'Al') return (xlpe ? IZ_ALU_XLPE : IZ_ALU)[product.mm2] || product.iz;
+  return (xlpe ? IZ_COPPER_XLPE : IZ_COPPER)[product.mm2] || product.iz;
+}
+
 function recommendCables(ib, material) {
-  // Filter cables: Iz must be >= IB (the cable must handle the load)
+  // Filter cables: official Iz must be >= IB (the cable must handle the load)
   const mat = material || cableState.material;
   return PRODUCTS.cables
     .filter(c => c.material === (mat === 'copper' ? 'Cu' : 'Al'))
-    .filter(c => c.iz >= ib)
-    .sort((a, b) => a.iz - b.iz) // Smallest suitable first (most economical)
-    .slice(0, 5); // Top 5 recommendations
+    .filter(c => officialIz(c) >= ib)
+    .sort((a, b) => officialIz(a) - officialIz(b)) // Smallest suitable first
+    .slice(0, 5);
 }
 
 function recommendMCBs(ib, ikmax) {
@@ -1319,7 +1343,7 @@ function renderRecommendations(title, products, type) {
 
   let rows = '';
   if (type === 'cable') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.cores} ${p.mm2} mm\u00B2`, `Iz = ${p.iz} A`, `${lang === 'da' ? p.use_da : p.use_en} | R=${p.r} X=${p.x} \u03A9/km`)).join('');
+    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.cores} ${p.mm2} mm\u00B2`, `Iz = ${officialIz(p)} A`, `${lang === 'da' ? p.use_da : p.use_en} | R=${p.r} X=${p.x} \u03A9/km`)).join('');
   } else if (type === 'mcb') {
     rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.curve}${p.rating} (${p.poles})`, `Icu = ${p.icu} kA`)).join('');
   } else if (type === 'mccb') {
@@ -1417,7 +1441,7 @@ function getAiAssistant(module) {
 
     case 'cable':
       if (cableState.crossSection) {
-        const izTable = cableState.material === 'copper' ? IZ_COPPER : IZ_ALU;
+        const izTable = izTableFor();
         const baseIz = izTable[parseFloat(cableState.crossSection)] || 0;
         const kInstall = INSTALL_METHODS[cableState.installMethod] || 1.0;
         const kTemp = TEMP_FACTORS[cableState.temp] || 1.0;
@@ -1540,7 +1564,7 @@ function runQiValidation() {
 
   // 2. Check In <= Iz (protection device <= cable capacity)
   if (mcbState.rating && cableState.crossSection) {
-    const izTable = cableState.material === 'copper' ? IZ_COPPER : IZ_ALU;
+    const izTable = izTableFor();
     const baseIz = izTable[parseFloat(cableState.crossSection)] || 0;
     const kTotal = (INSTALL_METHODS[cableState.installMethod] || 1) * (TEMP_FACTORS[cableState.temp] || 1) * (GROUP_FACTORS[cableState.grouping] || 1);
     const corrIz = baseIz * kTotal;
@@ -1574,7 +1598,7 @@ function runQiValidation() {
 
   // 4. Coordination check: IB <= In <= Iz
   if (mcbState.rating && cableState.crossSection) {
-    const izTable = cableState.material === 'copper' ? IZ_COPPER : IZ_ALU;
+    const izTable = izTableFor();
     const corrIz = (izTable[parseFloat(cableState.crossSection)] || 0) *
       (INSTALL_METHODS[cableState.installMethod] || 1) *
       (TEMP_FACTORS[cableState.temp] || 1) *
@@ -1605,7 +1629,7 @@ function syncAxes() {
 
   // If no cable selected yet, auto-find smallest suitable
   if (!cableState.crossSection && ib > 0) {
-    const izTable = cableState.material === 'copper' ? IZ_COPPER : IZ_ALU;
+    const izTable = izTableFor();
     const sizes = Object.keys(izTable).map(Number).sort((a,b) => a - b);
     for (const sz of sizes) {
       if (izTable[sz] >= ib) {
@@ -2147,7 +2171,7 @@ function renderCable() {
   const currentCores = currentType && currentType[cableState.cores] ? currentType[cableState.cores] : {};
   const crossSections = Object.keys(currentCores);
 
-  const izTable = cableState.material === 'copper' ? IZ_COPPER : IZ_ALU;
+  const izTable = izTableFor();
   const selectedCable = currentCores[cableState.crossSection];
 
   // Correction factors
@@ -2874,7 +2898,7 @@ function renderBank() {
   // Build rows based on category
   const rows = items.map(p => {
     let spec = '';
-    if (bankCategory === 'cables') spec = `${p.cores} ${p.mm2} mm\u00B2 ${p.material} | Iz=${p.iz}A`;
+    if (bankCategory === 'cables') spec = `${p.cores} ${p.mm2} mm\u00B2 ${p.material} | Iz=${officialIz(p)}A`;
     else if (bankCategory === 'mcbs') spec = `${p.curve}${p.rating} ${p.poles} | Icu=${p.icu}kA | ${p.standard}`;
     else if (bankCategory === 'mccbs') spec = `${p.trip} | Icu=${p.icu}kA | In: ${p.inOptions.join('/')}A`;
     else if (bankCategory === 'fuses') spec = `${p.rating}A | ${p.size} | Icu=${p.icu}kA`;
