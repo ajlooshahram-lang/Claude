@@ -1073,6 +1073,7 @@ const PRODUCTS = {
     { id: 'SE-iC60H-C25', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'C', rating: 25, poles: '3P', icu: 10, standard: 'EN 60898-1' },
     { id: 'SE-iC60H-C32', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'C', rating: 32, poles: '3P', icu: 10, standard: 'EN 60898-1' },
     { id: 'SE-iC60H-C40', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'C', rating: 40, poles: '3P', icu: 10, standard: 'EN 60898-1' },
+    { id: 'SE-iC60H-C50', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'C', rating: 50, poles: '3P', icu: 10, standard: 'EN 60898-1' },
     { id: 'SE-iC60H-C63', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'C', rating: 63, poles: '3P', icu: 10, standard: 'EN 60898-1' },
     // Schneider C60N (Multi9 industrial, IEC 60947-2)
     { id: 'SE-C60N-B10', brand: 'Schneider', model: 'C60N', series: 'Multi9', curve: 'B', rating: 10, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
@@ -1099,6 +1100,7 @@ const PRODUCTS = {
     { id: 'ABB-S203M-C16', brand: 'ABB', model: 'S203M', series: 'S200M', curve: 'C', rating: 16, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
     { id: 'ABB-S203M-C25', brand: 'ABB', model: 'S203M', series: 'S200M', curve: 'C', rating: 25, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
     { id: 'ABB-S203M-C32', brand: 'ABB', model: 'S203M', series: 'S200M', curve: 'C', rating: 32, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
+    { id: 'ABB-S203M-C50', brand: 'ABB', model: 'S203M', series: 'S200M', curve: 'C', rating: 50, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
     { id: 'ABB-S203M-C63', brand: 'ABB', model: 'S203M', series: 'S200M', curve: 'C', rating: 63, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
   ],
 
@@ -1281,11 +1283,14 @@ function officialIz(product) {
 }
 
 function recommendCables(ib, material) {
-  // Filter cables: official Iz must be >= IB (the cable must handle the load)
+  // Proper coordination IB <= In <= Iz: the cable must carry at least the
+  // protection rating (next standard size >= IB), not just IB itself.
   const mat = material || cableState.material;
+  const stdRatings = [6,10,13,16,20,25,32,40,50,63,80,100,125,160,200,250,315,400,500,630];
+  const inMin = stdRatings.find(r => r >= ib) || ib;
   return PRODUCTS.cables
     .filter(c => c.material === (mat === 'copper' ? 'Cu' : 'Al'))
-    .filter(c => officialIz(c) >= ib)
+    .filter(c => officialIz(c) >= inMin) // Iz >= In >= IB
     .sort((a, b) => officialIz(a) - officialIz(b)) // Smallest suitable first
     .slice(0, 5);
 }
