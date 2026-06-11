@@ -2448,6 +2448,11 @@ function renderShortCircuit() {
 
   const check1 = deviceIcu >= ikMax3ph;
   const check2 = deviceIsd <= ikMin2ph;
+  // Disconnection time per DS/HD 60364-4-41: final circuits <=32A must clear
+  // within 0.4s (TN), distribution within 5s. Met if Ik min trips the magnetic element.
+  const ibForTime = calcIB();
+  const reqTime = (ibForTime <= 32 && loadState.voltage !== '3x400') ? 0.4 : (ibForTime <= 32 ? 0.4 : 5);
+  const discOk = ikMin2ph >= deviceIsd; // Ik min reaches the instantaneous/magnetic trip
 
   return `
     <div class="card fade-in">
@@ -2508,6 +2513,13 @@ function renderShortCircuit() {
           <span class="value">
             ${deviceIsd.toFixed(0)} A \u2264 ${ikMin2ph.toFixed(0)} A
             <span class="verify-badge ${check2 ? 'ok' : 'fail'}">${check2 ? t('ok') : t('fail')}</span>
+          </span>
+        </div>
+        <div class="result-row">
+          <span class="label">${lang === 'da' ? 'Frakoblingstid' : 'Disconnection time'} (DS/HD 60364-4-41)</span>
+          <span class="value">
+            \u2264 ${reqTime.toFixed(1)} s
+            <span class="verify-badge ${discOk ? 'ok' : 'fail'}">${discOk ? (lang==='da'?'OK <0,4s':'OK <0.4s') : (lang==='da'?'For langsom':'Too slow')}</span>
           </span>
         </div>
       </div>
@@ -3882,6 +3894,12 @@ function renderProjekt() {
         <div class="result-row"><span class="label">L1 / L2 / L3</span><span class="value">${phases.L1.toFixed(1)} / ${phases.L2.toFixed(1)} / ${phases.L3.toFixed(1)} A</span></div>
         <div class="result-row"><span class="label">${lang==='da'?'Mest belastede fase':'Most loaded phase'}</span><span class="value">${maxPhase.toFixed(1)} A</span></div>
         <div class="result-row"><span class="label">${lang==='da'?'Anbefalet hovedafbryder':'Recommended main breaker'}</span><span class="value">${mainProt}</span></div>
+        ${(() => {
+          const mainRating = (maxPhase <= 63 && mainMcb) ? mainMcb.rating : (mainMccb ? Math.min.apply(null, mainMccb.inOptions.filter(x=>x>=maxPhase)) : 0);
+          const maxGroupIb = projectState.circuits.reduce((m,c)=>Math.max(m,c.ib),0);
+          const sel = mainRating >= maxGroupIb * 1.6;
+          return `<div class="result-row"><span class="label">${lang==='da'?'Selektivitet (\u22651,6:1)':'Selectivity (\u22651.6:1)'}</span><span class="value">${mainRating} A / ${maxGroupIb.toFixed(0)} A <span class="verify-badge ${sel?'ok':'fail'}">${sel?(lang==='da'?'OK':'OK'):(lang==='da'?'Tjek':'Check')}</span></span></div>`;
+        })()}
       </div>
       ` : '<div class="info-row">' + (lang==='da'?'Ingen grupper endnu. G\u00E5 til "Belastning", dimensionér, og klik "Tilf\u00F8j aktuel gruppe".':'No circuits yet. Go to "Load", dimension, and click "Add current circuit".') + '</div>'}
     </div>`;
