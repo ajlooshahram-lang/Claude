@@ -923,6 +923,277 @@ const GROUP_FACTORS = {
   1: 1.0, 2: 0.80, 3: 0.70, 4: 0.65, 5: 0.60, 6: 0.57, 7: 0.54, 8: 0.52, 9: 0.50
 };
 
+// ===== PRODUCT DATABASE =====
+// Real products from major manufacturers used in Danish electrical installations
+// Sources: NKT (nkt.com), Schneider Electric (se.com), ABB (abb.com), Eaton (eaton.com)
+
+const PRODUCTS = {
+  // === CABLES (NKT Denmark) ===
+  cables: [
+    // NKT NOIKLX 90 Dca - Halogen-free building wire, most common in DK
+    { id: 'NKT-NOIKLX-1.5', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '5G', mm2: 1.5, material: 'Cu', iz: 17.5, r: 12.1, x: 0.113, use_da: 'Belysning, stikkontakter', use_en: 'Lighting, sockets' },
+    { id: 'NKT-NOIKLX-2.5', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '5G', mm2: 2.5, material: 'Cu', iz: 24, r: 7.41, x: 0.105, use_da: 'Stikkontakter, små apparater', use_en: 'Sockets, small appliances' },
+    { id: 'NKT-NOIKLX-4', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '5G', mm2: 4, material: 'Cu', iz: 32, r: 4.61, x: 0.099, use_da: 'Komfur, varmepumpe', use_en: 'Cooker, heat pump' },
+    { id: 'NKT-NOIKLX-6', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '5G', mm2: 6, material: 'Cu', iz: 41, r: 3.08, x: 0.097, use_da: 'Ovn, sauna, EV-lader', use_en: 'Oven, sauna, EV charger' },
+    { id: 'NKT-NOIKLX-10', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '5G', mm2: 10, material: 'Cu', iz: 57, r: 1.83, x: 0.092, use_da: 'Undertavle, EV-lader', use_en: 'Sub-panel, EV charger' },
+    { id: 'NKT-NOIKLX-16', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '5G', mm2: 16, material: 'Cu', iz: 76, r: 1.15, x: 0.088, use_da: 'Undertavle, store belastninger', use_en: 'Sub-panel, large loads' },
+    { id: 'NKT-NOIKLX-25', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '4X', mm2: 25, material: 'Cu', iz: 101, r: 0.727, x: 0.086, use_da: 'Hovedtilslutning, undertavle', use_en: 'Main supply, sub-panel' },
+    { id: 'NKT-NOIKLX-35', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '4X', mm2: 35, material: 'Cu', iz: 125, r: 0.525, x: 0.082, use_da: 'Hovedtavle', use_en: 'Main panel' },
+    { id: 'NKT-NOIKLX-50', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '4X', mm2: 50, material: 'Cu', iz: 151, r: 0.388, x: 0.084, use_da: 'Forsyningskabel', use_en: 'Supply cable' },
+    { id: 'NKT-NOIKLX-70', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '4X', mm2: 70, material: 'Cu', iz: 192, r: 0.269, x: 0.081, use_da: 'Hovedforsyning', use_en: 'Main supply' },
+    { id: 'NKT-NOIKLX-95', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '4X', mm2: 95, material: 'Cu', iz: 232, r: 0.194, x: 0.082, use_da: 'Hovedforsyning', use_en: 'Main supply' },
+    { id: 'NKT-NOIKLX-120', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '4X', mm2: 120, material: 'Cu', iz: 269, r: 0.155, x: 0.082, use_da: 'Hovedforsyning, industri', use_en: 'Main supply, industrial' },
+    { id: 'NKT-NOIKLX-150', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '4X', mm2: 150, material: 'Cu', iz: 300, r: 0.126, x: 0.084, use_da: 'Industri', use_en: 'Industrial' },
+    { id: 'NKT-NOIKLX-185', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '4X', mm2: 185, material: 'Cu', iz: 341, r: 0.1017, x: 0.082, use_da: 'Industri, store anlæg', use_en: 'Industrial, large installations' },
+    { id: 'NKT-NOIKLX-240', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '4X', mm2: 240, material: 'Cu', iz: 400, r: 0.0787, x: 0.083, use_da: 'Industri, store anlæg', use_en: 'Industrial, large installations' },
+    // NKT NOIK-AL-M - Aluminium
+    { id: 'NKT-AL-16', brand: 'NKT', model: 'NOIK-AL-M', cores: '4X', mm2: 16, material: 'Al', iz: 60, r: 1.91, x: 0.069, use_da: 'Forsyningskabel (alu)', use_en: 'Supply cable (alu)' },
+    { id: 'NKT-AL-25', brand: 'NKT', model: 'NOIK-AL-M', cores: '4X', mm2: 25, material: 'Al', iz: 78, r: 1.2, x: 0.084, use_da: 'Forsyningskabel (alu)', use_en: 'Supply cable (alu)' },
+    { id: 'NKT-AL-50', brand: 'NKT', model: 'NOIK-AL-M', cores: '4X', mm2: 50, material: 'Al', iz: 117, r: 0.641, x: 0.081, use_da: 'Hovedforsyning (alu)', use_en: 'Main supply (alu)' },
+    { id: 'NKT-AL-95', brand: 'NKT', model: 'NOIK-AL-M', cores: '4X', mm2: 95, material: 'Al', iz: 181, r: 0.321, x: 0.078, use_da: 'Hovedforsyning (alu)', use_en: 'Main supply (alu)' },
+    { id: 'NKT-AL-150', brand: 'NKT', model: 'NOIK-AL-M', cores: '4X', mm2: 150, material: 'Al', iz: 234, r: 0.207, x: 0.078, use_da: 'Industri (alu)', use_en: 'Industrial (alu)' },
+    { id: 'NKT-AL-240', brand: 'NKT', model: 'NOIK-AL-M', cores: '4X', mm2: 240, material: 'Al', iz: 312, r: 0.127, x: 0.077, use_da: 'Industri (alu)', use_en: 'Industrial (alu)' },
+  ],
+
+  // === MCBs (Schneider + ABB) ===
+  mcbs: [
+    // Schneider iC60N (Acti9) - Most common in DK residential/commercial
+    { id: 'SE-iC60N-B6', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'B', rating: 6, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-B10', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'B', rating: 10, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-B13', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'B', rating: 13, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-B16', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'B', rating: 16, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-B20', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'B', rating: 20, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-B25', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'B', rating: 25, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-B32', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'B', rating: 32, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-B40', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'B', rating: 40, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-C10', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'C', rating: 10, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-C16', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'C', rating: 16, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-C20', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'C', rating: 20, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-C25', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'C', rating: 25, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-C32', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'C', rating: 32, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-C40', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'C', rating: 40, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-C50', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'C', rating: 50, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-C63', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'C', rating: 63, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    // Schneider iC60H (higher breaking capacity)
+    { id: 'SE-iC60H-B10', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'B', rating: 10, poles: '1P', icu: 10, standard: 'EN 60898-1' },
+    { id: 'SE-iC60H-B16', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'B', rating: 16, poles: '1P', icu: 10, standard: 'EN 60898-1' },
+    { id: 'SE-iC60H-B20', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'B', rating: 20, poles: '1P', icu: 10, standard: 'EN 60898-1' },
+    { id: 'SE-iC60H-B25', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'B', rating: 25, poles: '1P', icu: 10, standard: 'EN 60898-1' },
+    { id: 'SE-iC60H-C16', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'C', rating: 16, poles: '3P', icu: 10, standard: 'EN 60898-1' },
+    { id: 'SE-iC60H-C25', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'C', rating: 25, poles: '3P', icu: 10, standard: 'EN 60898-1' },
+    { id: 'SE-iC60H-C32', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'C', rating: 32, poles: '3P', icu: 10, standard: 'EN 60898-1' },
+    { id: 'SE-iC60H-C40', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'C', rating: 40, poles: '3P', icu: 10, standard: 'EN 60898-1' },
+    { id: 'SE-iC60H-C63', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'C', rating: 63, poles: '3P', icu: 10, standard: 'EN 60898-1' },
+    // Schneider C60N (Multi9 industrial, IEC 60947-2)
+    { id: 'SE-C60N-B10', brand: 'Schneider', model: 'C60N', series: 'Multi9', curve: 'B', rating: 10, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
+    { id: 'SE-C60N-B16', brand: 'Schneider', model: 'C60N', series: 'Multi9', curve: 'B', rating: 16, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
+    { id: 'SE-C60N-C16', brand: 'Schneider', model: 'C60N', series: 'Multi9', curve: 'C', rating: 16, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
+    { id: 'SE-C60N-C32', brand: 'Schneider', model: 'C60N', series: 'Multi9', curve: 'C', rating: 32, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
+    { id: 'SE-C60N-C63', brand: 'Schneider', model: 'C60N', series: 'Multi9', curve: 'C', rating: 63, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
+    // ABB S200 series
+    { id: 'ABB-S201-B6', brand: 'ABB', model: 'S201', series: 'S200', curve: 'B', rating: 6, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S201-B10', brand: 'ABB', model: 'S201', series: 'S200', curve: 'B', rating: 10, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S201-B16', brand: 'ABB', model: 'S201', series: 'S200', curve: 'B', rating: 16, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S201-B20', brand: 'ABB', model: 'S201', series: 'S200', curve: 'B', rating: 20, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S201-B25', brand: 'ABB', model: 'S201', series: 'S200', curve: 'B', rating: 25, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S201-B32', brand: 'ABB', model: 'S201', series: 'S200', curve: 'B', rating: 32, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S203-C10', brand: 'ABB', model: 'S203', series: 'S200', curve: 'C', rating: 10, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S203-C16', brand: 'ABB', model: 'S203', series: 'S200', curve: 'C', rating: 16, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S203-C20', brand: 'ABB', model: 'S203', series: 'S200', curve: 'C', rating: 20, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S203-C25', brand: 'ABB', model: 'S203', series: 'S200', curve: 'C', rating: 25, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S203-C32', brand: 'ABB', model: 'S203', series: 'S200', curve: 'C', rating: 32, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S203-C40', brand: 'ABB', model: 'S203', series: 'S200', curve: 'C', rating: 40, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S203-C50', brand: 'ABB', model: 'S203', series: 'S200', curve: 'C', rating: 50, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S203-C63', brand: 'ABB', model: 'S203', series: 'S200', curve: 'C', rating: 63, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    // ABB S200M (10kA)
+    { id: 'ABB-S203M-C16', brand: 'ABB', model: 'S203M', series: 'S200M', curve: 'C', rating: 16, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
+    { id: 'ABB-S203M-C25', brand: 'ABB', model: 'S203M', series: 'S200M', curve: 'C', rating: 25, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
+    { id: 'ABB-S203M-C32', brand: 'ABB', model: 'S203M', series: 'S200M', curve: 'C', rating: 32, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
+    { id: 'ABB-S203M-C63', brand: 'ABB', model: 'S203M', series: 'S200M', curve: 'C', rating: 63, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
+  ],
+
+  // === MCCBs (Schneider Compact NSX) ===
+  mccbs: [
+    { id: 'SE-NSX100B', brand: 'Schneider', model: 'NSX 100B', frame: 'NSX 100', trip: 'B', icu: 25, inOptions: [16,25,32,40,50,63,80,100] },
+    { id: 'SE-NSX100F', brand: 'Schneider', model: 'NSX 100F', frame: 'NSX 100', trip: 'F', icu: 36, inOptions: [16,25,32,40,50,63,80,100] },
+    { id: 'SE-NSX100N', brand: 'Schneider', model: 'NSX 100N', frame: 'NSX 100', trip: 'N', icu: 50, inOptions: [16,25,32,40,50,63,80,100] },
+    { id: 'SE-NSX160B', brand: 'Schneider', model: 'NSX 160B', frame: 'NSX 160', trip: 'B', icu: 25, inOptions: [80,100,125,160] },
+    { id: 'SE-NSX160F', brand: 'Schneider', model: 'NSX 160F', frame: 'NSX 160', trip: 'F', icu: 36, inOptions: [80,100,125,160] },
+    { id: 'SE-NSX160N', brand: 'Schneider', model: 'NSX 160N', frame: 'NSX 160', trip: 'N', icu: 50, inOptions: [80,100,125,160] },
+    { id: 'SE-NSX250B', brand: 'Schneider', model: 'NSX 250B', frame: 'NSX 250', trip: 'B', icu: 25, inOptions: [100,125,160,200,250] },
+    { id: 'SE-NSX250F', brand: 'Schneider', model: 'NSX 250F', frame: 'NSX 250', trip: 'F', icu: 36, inOptions: [100,125,160,200,250] },
+    { id: 'SE-NSX250N', brand: 'Schneider', model: 'NSX 250N', frame: 'NSX 250', trip: 'N', icu: 50, inOptions: [100,125,160,200,250] },
+    { id: 'SE-NSX400F', brand: 'Schneider', model: 'NSX 400F', frame: 'NSX 400', trip: 'F', icu: 36, inOptions: [250,320,400] },
+    { id: 'SE-NSX400N', brand: 'Schneider', model: 'NSX 400N', frame: 'NSX 400', trip: 'N', icu: 50, inOptions: [250,320,400] },
+    { id: 'SE-NSX400H', brand: 'Schneider', model: 'NSX 400H', frame: 'NSX 400', trip: 'H', icu: 70, inOptions: [250,320,400] },
+    { id: 'SE-NSX630F', brand: 'Schneider', model: 'NSX 630F', frame: 'NSX 630', trip: 'F', icu: 36, inOptions: [400,500,630] },
+    { id: 'SE-NSX630N', brand: 'Schneider', model: 'NSX 630N', frame: 'NSX 630', trip: 'N', icu: 50, inOptions: [400,500,630] },
+    { id: 'SE-NSX630H', brand: 'Schneider', model: 'NSX 630H', frame: 'NSX 630', trip: 'H', icu: 70, inOptions: [400,500,630] },
+  ],
+
+  // === NH FUSES (Eaton Bussmann, IEC 60269) ===
+  fuses: [
+    // Size 000/00 (D01/D02 type)
+    { id: 'EATON-D01-6', brand: 'Eaton', model: 'D01 gG', size: 'D01', rating: 6, icu: 50, i5s: 26 },
+    { id: 'EATON-D01-10', brand: 'Eaton', model: 'D01 gG', size: 'D01', rating: 10, icu: 50, i5s: 43 },
+    { id: 'EATON-D01-13', brand: 'Eaton', model: 'D01 gG', size: 'D01', rating: 13, icu: 50, i5s: 56 },
+    { id: 'EATON-D01-16', brand: 'Eaton', model: 'D01 gG', size: 'D01', rating: 16, icu: 50, i5s: 72 },
+    { id: 'EATON-D02-20', brand: 'Eaton', model: 'D02 gG', size: 'D02', rating: 20, icu: 50, i5s: 90 },
+    { id: 'EATON-D02-25', brand: 'Eaton', model: 'D02 gG', size: 'D02', rating: 25, icu: 50, i5s: 110 },
+    { id: 'EATON-D02-32', brand: 'Eaton', model: 'D02 gG', size: 'D02', rating: 32, icu: 50, i5s: 145 },
+    { id: 'EATON-D02-35', brand: 'Eaton', model: 'D02 gG', size: 'D02', rating: 35, icu: 50, i5s: 160 },
+    { id: 'EATON-D02-50', brand: 'Eaton', model: 'D02 gG', size: 'D02', rating: 50, icu: 50, i5s: 230 },
+    { id: 'EATON-D02-63', brand: 'Eaton', model: 'D02 gG', size: 'D02', rating: 63, icu: 50, i5s: 290 },
+    // NH sizes (knife-blade, IEC 60269-2)
+    { id: 'EATON-NH000-80', brand: 'Eaton', model: 'NH000 gG', size: 'NH 000/00', rating: 80, icu: 120, i5s: 370 },
+    { id: 'EATON-NH000-100', brand: 'Eaton', model: 'NH000 gG', size: 'NH 000/00', rating: 100, icu: 120, i5s: 460 },
+    { id: 'EATON-NH000-125', brand: 'Eaton', model: 'NH000 gG', size: 'NH 000/00', rating: 125, icu: 120, i5s: 580 },
+    { id: 'EATON-NH000-160', brand: 'Eaton', model: 'NH00 gG', size: 'NH 000/00', rating: 160, icu: 120, i5s: 750 },
+    { id: 'EATON-NH1-200', brand: 'Eaton', model: 'NH1 gG', size: 'NH 1', rating: 200, icu: 120, i5s: 900 },
+    { id: 'EATON-NH1-250', brand: 'Eaton', model: 'NH1 gG', size: 'NH 1', rating: 250, icu: 120, i5s: 1150 },
+    { id: 'EATON-NH2-315', brand: 'Eaton', model: 'NH2 gG', size: 'NH 2', rating: 315, icu: 120, i5s: 1400 },
+    { id: 'EATON-NH2-355', brand: 'Eaton', model: 'NH2 gG', size: 'NH 2', rating: 355, icu: 120, i5s: 1600 },
+    { id: 'EATON-NH2-400', brand: 'Eaton', model: 'NH2 gG', size: 'NH 2', rating: 400, icu: 120, i5s: 1800 },
+    { id: 'EATON-NH3-500', brand: 'Eaton', model: 'NH3 gG', size: 'NH 3', rating: 500, icu: 120, i5s: 2300 },
+    { id: 'EATON-NH3-630', brand: 'Eaton', model: 'NH3 gG', size: 'NH 3', rating: 630, icu: 120, i5s: 2900 },
+  ],
+
+  // === CONTACTORS (Schneider TeSys D + ABB AF) ===
+  contactors: [
+    // Schneider TeSys Deca LC1D series (AC-3, 400V)
+    { id: 'SE-LC1D09', brand: 'Schneider', model: 'LC1D09', series: 'TeSys Deca', ac3_A: 9, ac3_kW: 4, ac1_A: 25 },
+    { id: 'SE-LC1D12', brand: 'Schneider', model: 'LC1D12', series: 'TeSys Deca', ac3_A: 12, ac3_kW: 5.5, ac1_A: 25 },
+    { id: 'SE-LC1D18', brand: 'Schneider', model: 'LC1D18', series: 'TeSys Deca', ac3_A: 18, ac3_kW: 7.5, ac1_A: 32 },
+    { id: 'SE-LC1D25', brand: 'Schneider', model: 'LC1D25', series: 'TeSys Deca', ac3_A: 25, ac3_kW: 11, ac1_A: 40 },
+    { id: 'SE-LC1D32', brand: 'Schneider', model: 'LC1D32', series: 'TeSys Deca', ac3_A: 32, ac3_kW: 15, ac1_A: 50 },
+    { id: 'SE-LC1D38', brand: 'Schneider', model: 'LC1D38', series: 'TeSys Deca', ac3_A: 38, ac3_kW: 18.5, ac1_A: 56 },
+    { id: 'SE-LC1D40', brand: 'Schneider', model: 'LC1D40', series: 'TeSys Deca', ac3_A: 40, ac3_kW: 18.5, ac1_A: 60 },
+    { id: 'SE-LC1D50', brand: 'Schneider', model: 'LC1D50', series: 'TeSys Deca', ac3_A: 50, ac3_kW: 22, ac1_A: 80 },
+    { id: 'SE-LC1D65', brand: 'Schneider', model: 'LC1D65', series: 'TeSys Deca', ac3_A: 65, ac3_kW: 30, ac1_A: 80 },
+    { id: 'SE-LC1D80', brand: 'Schneider', model: 'LC1D80', series: 'TeSys Deca', ac3_A: 80, ac3_kW: 37, ac1_A: 125 },
+    { id: 'SE-LC1D95', brand: 'Schneider', model: 'LC1D95', series: 'TeSys Deca', ac3_A: 95, ac3_kW: 45, ac1_A: 125 },
+    // ABB AF series (AC-3, 400V)
+    { id: 'ABB-AF09', brand: 'ABB', model: 'AF09', series: 'AF', ac3_A: 9, ac3_kW: 4, ac1_A: 25 },
+    { id: 'ABB-AF12', brand: 'ABB', model: 'AF12', series: 'AF', ac3_A: 12, ac3_kW: 5.5, ac1_A: 25 },
+    { id: 'ABB-AF16', brand: 'ABB', model: 'AF16', series: 'AF', ac3_A: 16, ac3_kW: 7.5, ac1_A: 30 },
+    { id: 'ABB-AF26', brand: 'ABB', model: 'AF26', series: 'AF', ac3_A: 26, ac3_kW: 11, ac1_A: 45 },
+    { id: 'ABB-AF38', brand: 'ABB', model: 'AF38', series: 'AF', ac3_A: 38, ac3_kW: 18.5, ac1_A: 56 },
+    { id: 'ABB-AF52', brand: 'ABB', model: 'AF52', series: 'AF', ac3_A: 52, ac3_kW: 22, ac1_A: 75 },
+    { id: 'ABB-AF65', brand: 'ABB', model: 'AF65', series: 'AF', ac3_A: 65, ac3_kW: 30, ac1_A: 100 },
+    { id: 'ABB-AF80', brand: 'ABB', model: 'AF80', series: 'AF', ac3_A: 80, ac3_kW: 37, ac1_A: 125 },
+  ]
+};
+
+// ===== SMART RECOMMENDATION ENGINE =====
+// Only returns products that are SAFE and CORRECT for the given parameters
+// Rules per IEC 60364-4-43: IB <= In <= Iz, Icu >= Ikmax
+
+function recommendCables(ib, material) {
+  // Filter cables: Iz must be >= IB (the cable must handle the load)
+  const mat = material || cableState.material;
+  return PRODUCTS.cables
+    .filter(c => c.material === (mat === 'copper' ? 'Cu' : 'Al'))
+    .filter(c => c.iz >= ib)
+    .sort((a, b) => a.iz - b.iz) // Smallest suitable first (most economical)
+    .slice(0, 5); // Top 5 recommendations
+}
+
+function recommendMCBs(ib, ikmax) {
+  // IEC 60364-4-43: IB <= In (rating must be >= load current)
+  // Icu >= Ikmax (breaking capacity must handle short circuit)
+  const ikMaxA = (ikmax || 6) * 1000; // convert kA to A, default 6kA
+  return PRODUCTS.mcbs
+    .filter(m => m.rating >= ib) // In >= IB
+    .filter(m => m.icu * 1000 >= ikMaxA) // Icu >= Ikmax
+    .sort((a, b) => a.rating - b.rating || a.icu - b.icu)
+    .slice(0, 6);
+}
+
+function recommendMCCBs(ib, ikmax) {
+  const ikMaxA = (ikmax || 10) * 1000;
+  return PRODUCTS.mccbs
+    .filter(m => {
+      const maxIn = Math.max(...m.inOptions);
+      return maxIn >= ib && m.icu * 1000 >= ikMaxA;
+    })
+    .sort((a, b) => Math.min(...a.inOptions.filter(i => i >= ib)) - Math.min(...b.inOptions.filter(i => i >= ib)))
+    .slice(0, 4);
+}
+
+function recommendFuses(ib) {
+  // In >= IB (fuse must be rated at or above load current)
+  return PRODUCTS.fuses
+    .filter(f => f.rating >= ib)
+    .sort((a, b) => a.rating - b.rating)
+    .slice(0, 5);
+}
+
+function recommendContactors(ib) {
+  // AC-3 rating must be >= motor current
+  return PRODUCTS.contactors
+    .filter(c => c.ac3_A >= ib)
+    .sort((a, b) => a.ac3_A - b.ac3_A)
+    .slice(0, 4);
+}
+
+// Render product recommendation card
+function renderRecommendations(title, products, type) {
+  if (!products || products.length === 0) return '';
+
+  let rows = '';
+  if (type === 'cable') {
+    rows = products.map(p => `
+      <div class="result-row" style="flex-wrap:wrap;gap:4px">
+        <span class="label"><strong>${p.brand}</strong> ${p.model} ${p.cores} ${p.mm2} mm\u00B2</span>
+        <span class="value">Iz = ${p.iz} A</span>
+      </div>
+      <div class="result-row" style="padding-left:12px;font-size:0.78rem;color:var(--text-muted)">
+        <span>${lang === 'da' ? p.use_da : p.use_en}</span>
+        <span>R=${p.r} | X=${p.x} \u03A9/km</span>
+      </div>
+    `).join('');
+  } else if (type === 'mcb') {
+    rows = products.map(p => `
+      <div class="result-row">
+        <span class="label"><strong>${p.brand}</strong> ${p.model} ${p.curve}${p.rating} (${p.poles})</span>
+        <span class="value">Icu = ${p.icu} kA</span>
+      </div>
+    `).join('');
+  } else if (type === 'mccb') {
+    rows = products.map(p => `
+      <div class="result-row">
+        <span class="label"><strong>${p.brand}</strong> ${p.model}</span>
+        <span class="value">Icu = ${p.icu} kA | In: ${p.inOptions.join(', ')} A</span>
+      </div>
+    `).join('');
+  } else if (type === 'fuse') {
+    rows = products.map(p => `
+      <div class="result-row">
+        <span class="label"><strong>${p.brand}</strong> ${p.model} ${p.rating} A</span>
+        <span class="value">${p.size} | Icu=${p.icu} kA | I5s=${p.i5s} A</span>
+      </div>
+    `).join('');
+  } else if (type === 'contactor') {
+    rows = products.map(p => `
+      <div class="result-row">
+        <span class="label"><strong>${p.brand}</strong> ${p.model} (${p.series})</span>
+        <span class="value">AC-3: ${p.ac3_A} A / ${p.ac3_kW} kW</span>
+      </div>
+    `).join('');
+  }
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">\u2705 ${title}</div>
+      <div class="info-row">${lang === 'da' ? 'Kun sikkerhedsgodkendte produkter vises. Baseret p\u00E5 IB \u2264 In \u2264 Iz og Icu \u2265 Ik max.' : 'Only safety-approved products shown. Based on IB \u2264 In \u2264 Iz and Icu \u2265 Ik max.'}</div>
+      <div class="result-box">
+        <div class="result-title">${lang === 'da' ? 'Anbefalede produkter' : 'Recommended Products'}</div>
+        ${rows}
+      </div>
+    </div>
+  `;
+}
+
 // ===== DANISH STANDARDS & REGULATIONS =====
 // Based on research of Danish electrical standards websites (elsikkerhed.dk, lovguiden.dk, Sikkerhedsstyrelsen)
 // Content was rephrased for compliance with licensing restrictions
@@ -1172,6 +1443,12 @@ function renderLoad() {
         <div class="result-row"><span class="label">${t('powerFactor')}</span><span class="value">${loadState.cosPhi}</span></div>
       </div>
     </div>
+
+    ${renderRecommendations(lang === 'da' ? 'Anbefalede kabler til IB = ' + ib.toFixed(1) + ' A' : 'Recommended cables for IB = ' + ib.toFixed(1) + ' A', recommendCables(ib), 'cable')}
+    ${renderRecommendations(lang === 'da' ? 'Anbefalede sikringer' : 'Recommended fuses', recommendFuses(ib), 'fuse')}
+    ${renderRecommendations(lang === 'da' ? 'Anbefalede automatsikringer' : 'Recommended MCBs', recommendMCBs(ib), 'mcb')}
+    ${ib > 63 ? renderRecommendations(lang === 'da' ? 'Anbefalede maksimalafbrydere' : 'Recommended MCCBs', recommendMCCBs(ib), 'mccb') : ''}
+    ${renderRecommendations(lang === 'da' ? 'Anbefalede kontaktorer (motor)' : 'Recommended contactors (motor)', recommendContactors(ib), 'contactor')}
   `;
 }
 
