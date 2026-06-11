@@ -2523,7 +2523,7 @@ function renderVdrop() {
           <div class="result-row"><span class="label">${lang === 'da' ? 'V\u00E6lg kabel i "Kabler"-modulet f\u00F8rst' : 'Select a cable in the "Cables" module first'}</span></div>
         </div>
       ` : `
-        <div class="result-box" style="margin-bottom:16px;background:#eaf2f8;border-color:var(--primary-light)">
+        <div class="result-box" style="margin-bottom:16px;background:var(--primary-glow);border-color:var(--primary-light)">
           <div class="result-row"><span class="label">${t('cableType')}</span><span class="value">${cableState.type} ${cableState.cores} ${cableState.crossSection} mm\u00B2</span></div>
           <div class="result-row"><span class="label">IB</span><span class="value">${calcIB().toFixed(1)} A</span></div>
         </div>
@@ -2635,7 +2635,7 @@ function renderShortCircuit() {
       </div>
 
       ${selectedCable ? `
-        <div class="result-box" style="margin-top:12px;background:#eaf2f8;border-color:var(--primary-light)">
+        <div class="result-box" style="margin-top:12px;background:var(--primary-glow);border-color:var(--primary-light)">
           <div class="result-row"><span class="label">${lang === 'da' ? 'Kabelimpedans' : 'Cable impedance'}</span><span class="value">${zCable.toFixed(2)} m\u03A9</span></div>
           <div class="result-row"><span class="label">${lang === 'da' ? 'Kabel' : 'Cable'}</span><span class="value">${cableState.type} ${cableState.crossSection} mm\u00B2 \u00D7 ${vdropState.length} m</span></div>
         </div>
@@ -2765,7 +2765,7 @@ function renderTrafo() {
 
     <div class="card fade-in">
       <div class="card-title">${lang === 'da' ? 'Strømtransformer til måling' : 'Current Transformer for Metering'}</div>
-      <div class="result-box" style="background:#eaf2f8;border-color:var(--primary-light)">
+      <div class="result-box" style="background:var(--primary-glow);border-color:var(--primary-light)">
         <div class="result-title">${lang === 'da' ? 'Anbefaling' : 'Recommendation'}</div>
         <div class="result-row"><span class="label">${lang === 'da' ? 'CT primær' : 'CT primary'}</span><span class="value">${Math.ceil(Ifl / 50) * 50} / 5 A</span></div>
         <div class="result-row"><span class="label">${lang === 'da' ? 'CT klasse' : 'CT class'}</span><span class="value">0.5 (${lang === 'da' ? 'måling' : 'metering'})</span></div>
@@ -2802,7 +2802,7 @@ function renderStandards() {
       <div class="card-title">${lang === 'da' ? 'Danske Elstandarder & Lovgivning' : 'Danish Electrical Standards & Legislation'}</div>
       <div class="info-row">${lang === 'da' ? 'Oversigt over gældende standarder brugt i denne app' : 'Overview of applicable standards used in this app'}</div>
 
-      <div class="result-box" style="background:#eaf2f8;border-color:var(--primary-light)">
+      <div class="result-box" style="background:var(--primary-glow);border-color:var(--primary-light)">
         <div class="result-title">${lang === 'da' ? 'Lovgrundlag' : 'Legal Framework'}</div>
         <div class="result-row"><span class="label">${lang === 'da' ? 'Hovedlov' : 'Main Act'}</span><span class="value">${DK_STANDARDS.law}</span></div>
         <div class="result-row"><span class="label">${lang === 'da' ? 'Installation' : 'Installation'}</span><span class="value">${DK_STANDARDS.installBek}</span></div>
@@ -2913,7 +2913,7 @@ function renderStandards() {
 
     <div class="card fade-in">
       <div class="card-title">${lang === 'da' ? 'Kilder & Links' : 'Sources & Links'}</div>
-      <div class="result-box" style="background:#eaf2f8;border-color:var(--primary-light)">
+      <div class="result-box" style="background:var(--primary-glow);border-color:var(--primary-light)">
         <div class="result-row"><span class="label">Sikkerhedsstyrelsen</span><span class="value">sik.dk</span></div>
         <div class="result-row"><span class="label">Elsikkerhed.dk</span><span class="value">elsikkerhed.dk</span></div>
         <div class="result-row"><span class="label">Dansk Standard</span><span class="value">ds.dk</span></div>
@@ -3183,7 +3183,7 @@ function renderBank() {
 
     <div class="card fade-in">
       <div class="card-title">${lang === 'da' ? cat.da : cat.en} (${items.length})</div>
-      <div class="result-box" style="background:#fff;border-color:var(--border)">
+      <div class="result-box" style="background:var(--card);border-color:var(--border)">
         ${rows || '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Ingen produkter' : 'No products') + '</span></div>'}
       </div>
     </div>
@@ -4177,7 +4177,7 @@ function renderVerify() {
     </div>
     <div class="card fade-in">
       <div class="card-title">${lang==='da'?'Datakilder & sporbarhed':'Data sources & traceability'}</div>
-      <div class="result-box" style="background:#eaf2f8;border-color:var(--primary-light)">
+      <div class="result-box" style="background:var(--primary-glow);border-color:var(--primary-light)">
         <div class="result-row"><span class="label">Kabel Iz</span><span class="value">DS/HD 60364-5-52 Tabel C.52.1</span></div>
         <div class="result-row"><span class="label">Overstr\u00F8m</span><span class="value">DS/HD 60364-4-43:2023</span></div>
         <div class="result-row"><span class="label">Kortslutning</span><span class="value">IEC 60909-0:2016 (c=1.05)</span></div>
