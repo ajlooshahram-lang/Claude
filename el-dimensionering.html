@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El-Dimensionering / Electrical Dimensioning</title>
+<style>
+:root {
+  --primary: #1a5276;
+  --primary-light: #2980b9;
+  --accent: #e67e22;
+  --success: #27ae60;
+  --danger: #c0392b;
+  --warning: #f39c12;
+  --bg: #f4f6f9;
+  --card: #ffffff;
+  --text: #2c3e50;
+  --text-light: #7f8c8d;
+  --border: #dce1e7;
+  --shadow: 0 2px 8px rgba(0,0,0,0.08);
+  --radius: 8px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* Header */
+.header {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: white;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+}
+
+.header h1 {
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.lang-toggle {
+  display: flex;
+  gap: 4px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 20px;
+  padding: 3px;
+}
+
+.lang-btn {
+  padding: 5px 14px;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: transparent;
+  color: rgba(255,255,255,0.7);
+  transition: all 0.2s;
+}
+
+.lang-btn.active {
+  background: white;
+  color: var(--primary);
+}
+
+/* Navigation */
+.nav {
+  display: flex;
+  gap: 6px;
+  padding: 12px 16px;
+  background: white;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.nav-btn {
+  padding: 8px 16px;
+  border: 2px solid var(--border);
+  border-radius: 20px;
+  background: white;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.nav-btn:hover { border-color: var(--primary-light); color: var(--primary); }
+.nav-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+/* Main Content */
+.main { padding: 16px; max-width: 900px; margin: 0 auto; }
+
+.module { display: none; }
+.module.active { display: block; }
+
+/* Cards */
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+}
+
+.card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--bg);
+}
+
+/* Selection Grid */
+.select-group { margin-bottom: 16px; }
+
+.select-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.select-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sel-btn {
+  padding: 8px 14px;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  background: white;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  min-width: 48px;
+  text-align: center;
+}
+
+.sel-btn:hover { border-color: var(--primary-light); background: #eaf2f8; }
+.sel-btn.selected { background: var(--primary); color: white; border-color: var(--primary); }
+.sel-btn.disabled { opacity: 0.4; pointer-events: none; }
+
+/* Slider */
+.slider-group { margin-bottom: 16px; }
+
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.slider-container input[type="range"] {
+  flex: 1;
+  height: 6px;
+  -webkit-appearance: none;
+  background: var(--border);
+  border-radius: 3px;
+  outline: none;
+}
+
+.slider-container input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+.slider-value {
+  min-width: 60px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--primary);
+  background: var(--bg);
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+/* Stepper */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step-btn {
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  background: white;
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  transition: all 0.15s;
+}
+
+.step-btn:hover { background: var(--primary); color: white; }
+
+.step-value {
+  min-width: 80px;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* Results */
+.result-box {
+  background: linear-gradient(135deg, #eafaf1, #d5f5e3);
+  border: 2px solid var(--success);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.result-box.warning {
+  background: linear-gradient(135deg, #fef9e7, #fdebd0);
+  border-color: var(--warning);
+}
+
+.result-box.error {
+  background: linear-gradient(135deg, #fdedec, #fadbd8);
+  border-color: var(--danger);
+}
+
+.result-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  color: var(--success);
+}
+
+.result-box.warning .result-title { color: var(--warning); }
+.result-box.error .result-title { color: var(--danger); }
+
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  font-size: 0.9rem;
+}
+
+.result-row:last-child { border-bottom: none; }
+.result-row .label { color: var(--text-light); }
+.result-row .value { font-weight: 700; color: var(--text); }
+
+/* Verification badges */
+.verify-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.verify-badge.ok { background: #d5f5e3; color: #1e8449; }
+.verify-badge.fail { background: #fadbd8; color: #922b21; }
+
+/* Table */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  margin-top: 10px;
+}
+
+.data-table th {
+  background: var(--primary);
+  color: white;
+  padding: 8px 10px;
+  text-align: left;
+  font-weight: 600;
+}
+
+.data-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table tr:hover td { background: #eaf2f8; }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .header h1 { font-size: 1rem; }
+  .nav-btn { font-size: 0.75rem; padding: 6px 12px; }
+  .card { padding: 14px; }
+  .sel-btn { padding: 6px 10px; font-size: 0.8rem; }
+}
+
+/* Animate */
+.fade-in { animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Info tooltip */
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #eaf2f8;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 0.82rem;
+  color: var(--primary);
+}
+
+.info-row::before { content: "i"; font-weight: bold; background: var(--primary); color: white; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1 id="appTitle">El-Dimensionering</h1>
+  <div class="lang-toggle">
+    <button class="lang-btn active" onclick="setLang('da')">DA</button>
+    <button class="lang-btn" onclick="setLang('en')">EN</button>
+  </div>
+</div>
+
+<div class="nav" id="mainNav"></div>
+
+<div class="main" id="mainContent"></div>
+
+<script>
+// ===== LANGUAGE SYSTEM =====
+let lang = 'da';
+
+const T = {
+  da: {
+    appTitle: 'El-Dimensionering',
+    modules: {
+      load: 'Belastning',
+      fuse: 'Sikringer',
+      mcb: 'Automatsikring',
+      mccb: 'Maksimalafbryder',
+      cable: 'Kabler',
+      vdrop: 'Spændingsfald',
+      scircuit: 'Kortslutning'
+    },
+    // Load module
+    loadTitle: 'Belastningsberegning',
+    voltage: 'Spænding',
+    power: 'Effekt [kW]',
+    powerFactor: 'Effektfaktor (cos\u03C6)',
+    phases: 'Faser',
+    simultaneity: 'Samtidighedsfaktor',
+    expansion: 'Udvidelsesfaktor',
+    loadResult: 'Beregnet belastningsstrøm',
+    ib: 'IB (Belastningsstrøm)',
+    sApparent: 'S (Tilsyneladende effekt)',
+    // Fuse module
+    fuseTitle: 'Valg af smeltesikring',
+    fuseHolder: 'Sikringsholder',
+    fuseSize: 'Sikringsstørrelse',
+    fuseIkmax: 'Maks. kortslutning',
+    fuseCurrent5s: 'Strøm i 5 sek.',
+    fuseResult: 'Valgt sikring',
+    fuseCurrentRange: 'Strømområde',
+    fuseBreaker: 'Afbryder',
+    // MCB module
+    mcbTitle: 'Valg af automatsikring',
+    mcbType: 'Type',
+    mcbCurve: 'Kurve',
+    mcbRating: 'Mærkestrøm [A]',
+    mcbPoles: 'Poler',
+    mcbIcu: 'Icu [kA]',
+    mcbIsd: 'Isd-område',
+    mcbResult: 'Valgt automatsikring',
+    mcbStandard: 'Standard',
+    // MCCB module
+    mccbTitle: 'Maksimalafbryder (NSX)',
+    mccbFrame: 'Ramme',
+    mccbTrip: 'Udløserkurve',
+    mccbIn: 'Mærkestrøm In [A]',
+    mccbIo: 'Langsom udløser Io',
+    mccbIsd2: 'Isd multiplikator',
+    mccbIcu2: 'Icu [kA]',
+    mccbResult: 'Indstillinger',
+    mccbIr: 'Ir (indstillet)',
+    mccbIsdCalc: 'Isd (beregnet)',
+    mccbIi: 'Ii (momentan)',
+    // Cable module
+    cableTitle: 'Kabeldimensionering',
+    cableMaterial: 'Materiale',
+    cableCopper: 'Kobber',
+    cableAluminium: 'Aluminium',
+    cableType: 'Kabeltype',
+    cableCores: 'Antal ledere',
+    cableCrossSection: 'Tværsnit [mm\u00B2]',
+    cableR: 'R [\u03A9/km]',
+    cableX: 'X [\u03A9/km]',
+    cableResult: 'Valgt kabel',
+    cableIz: 'Iz (strømb\u00E6reevne)',
+    // Voltage drop
+    vdropTitle: 'Spændingsfald',
+    cableLength: 'Kabellængde [m]',
+    vdropResult: 'Beregnet spændingsfald',
+    vdropPercent: 'Spændingsfald [%]',
+    vdropVolts: 'Spændingsfald [V]',
+    vdropRemaining: 'Restspænding [V]',
+    vdropLimit: 'Grænse: maks 4%',
+    // Short circuit
+    scTitle: 'Kortslutningskontrol',
+    scZnet: 'Znet [m\u03A9]',
+    scZtrafo: 'Ztrafo [m\u03A9]',
+    scIkmax: 'Ik max [kA]',
+    scIkmin: 'Ik min [A]',
+    scResult: 'Kortslutningskontrol',
+    scCheck1: 'Icu \u2265 Ik max',
+    scCheck2: 'Isd \u2264 Ik min',
+    // General
+    select: 'V\u00E6lg',
+    result: 'Resultat',
+    ok: 'OK',
+    fail: 'FEJL',
+    infoClick: 'V\u00E6lg v\u00E6rdier ved at klikke - ingen indtastning n\u00F8dvendig',
+    calculate: 'Beregn'
+  },
+  en: {
+    appTitle: 'Electrical Dimensioning',
+    modules: {
+      load: 'Load Calc',
+      fuse: 'Fuses',
+      mcb: 'MCB',
+      mccb: 'MCCB',
+      cable: 'Cables',
+      vdrop: 'Voltage Drop',
+      scircuit: 'Short Circuit'
+    },
+    loadTitle: 'Load Calculation',
+    voltage: 'Voltage',
+    power: 'Power [kW]',
+    powerFactor: 'Power Factor (cos\u03C6)',
+    phases: 'Phases',
+    simultaneity: 'Simultaneity Factor',
+    expansion: 'Expansion Factor',
+    loadResult: 'Calculated Load Current',
+    ib: 'IB (Load Current)',
+    sApparent: 'S (Apparent Power)',
+    fuseTitle: 'Fuse Selection',
+    fuseHolder: 'Fuse Holder',
+    fuseSize: 'Fuse Size',
+    fuseIkmax: 'Max. Short Circuit',
+    fuseCurrent5s: 'Current at 5 sec.',
+    fuseResult: 'Selected Fuse',
+    fuseCurrentRange: 'Current Range',
+    fuseBreaker: 'Breaker',
+    mcbTitle: 'MCB Selection',
+    mcbType: 'Type',
+    mcbCurve: 'Curve',
+    mcbRating: 'Rated Current [A]',
+    mcbPoles: 'Poles',
+    mcbIcu: 'Icu [kA]',
+    mcbIsd: 'Isd Range',
+    mcbResult: 'Selected MCB',
+    mcbStandard: 'Standard',
+    mccbTitle: 'MCCB (NSX)',
+    mccbFrame: 'Frame',
+    mccbTrip: 'Trip Curve',
+    mccbIn: 'Rated Current In [A]',
+    mccbIo: 'Long-time Io',
+    mccbIsd2: 'Isd Multiplier',
+    mccbIcu2: 'Icu [kA]',
+    mccbResult: 'Settings',
+    mccbIr: 'Ir (set)',
+    mccbIsdCalc: 'Isd (calculated)',
+    mccbIi: 'Ii (instantaneous)',
+    cableTitle: 'Cable Dimensioning',
+    cableMaterial: 'Material',
+    cableCopper: 'Copper',
+    cableAluminium: 'Aluminium',
+    cableType: 'Cable Type',
+    cableCores: 'Cores',
+    cableCrossSection: 'Cross-section [mm\u00B2]',
+    cableR: 'R [\u03A9/km]',
+    cableX: 'X [\u03A9/km]',
+    cableResult: 'Selected Cable',
+    cableIz: 'Iz (Current Capacity)',
+    vdropTitle: 'Voltage Drop',
+    cableLength: 'Cable Length [m]',
+    vdropResult: 'Calculated Voltage Drop',
+    vdropPercent: 'Voltage Drop [%]',
+    vdropVolts: 'Voltage Drop [V]',
+    vdropRemaining: 'Remaining Voltage [V]',
+    vdropLimit: 'Limit: max 4%',
+    scTitle: 'Short Circuit Check',
+    scZnet: 'Znet [m\u03A9]',
+    scZtrafo: 'Ztrafo [m\u03A9]',
+    scIkmax: 'Ik max [kA]',
+    scIkmin: 'Ik min [A]',
+    scResult: 'Short Circuit Check',
+    scCheck1: 'Icu \u2265 Ik max',
+    scCheck2: 'Isd \u2264 Ik min',
+    select: 'Select',
+    result: 'Result',
+    ok: 'OK',
+    fail: 'FAIL',
+    infoClick: 'Select values by clicking - no typing required',
+    calculate: 'Calculate'
+  }
+};
+
+function t(key) { return T[lang][key] || key; }
+
+function setLang(l) {
+  lang = l;
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.lang-btn[onclick="setLang('${l}')"]`).classList.add('active');
+  document.getElementById('appTitle').textContent = t('appTitle');
+  renderNav();
+  renderModule(activeModule);
+}
+
+// ===== DATA FROM UPLOADED FILES =====
+
+// Fuse holders and their max short-circuit ratings
+const FUSE_HOLDERS = {
+  'D01': { ikMax: 50, range: '2 - 16 A', breaker: 'Gruppe afbryder', sizes: [2, 4, 6, 10, 13, 16] },
+  'D02': { ikMax: 50, range: '20 - 63 A', breaker: 'Tytan (2)', sizes: [20, 25, 32, 35, 40, 50, 63] },
+  'NH 000/00': { ikMax: 22, range: '80 - 160 A', breaker: 'INFD 160', sizes: [80, 100, 125, 160] },
+  'NH 1': { ikMax: 40, range: '200 - 250 A', breaker: 'INFD 250', sizes: [200, 224, 250] },
+  'NH 2': { ikMax: 47, range: '300 - 400 A', breaker: 'INFD 400', sizes: [300, 315, 355, 400] },
+  'NH 3': { ikMax: 75, range: '425 - 630 A', breaker: 'INFD 630', sizes: [425, 500, 630] }
+};
+
+// NH fuse 5-second currents (approximate per standard tables)
+const FUSE_5S = {
+  2: 9, 4: 17, 6: 26, 10: 43, 13: 56, 16: 72,
+  20: 90, 25: 110, 32: 145, 35: 160, 40: 180, 50: 230, 63: 290,
+  80: 370, 100: 460, 125: 580, 160: 750,
+  200: 900, 224: 1020, 250: 1150,
+  300: 1350, 315: 1400, 355: 1600, 400: 1800,
+  425: 1950, 500: 2300, 630: 2900
+};
+
+// MCB data (from sheet 6)
+const MCB_TYPES = {
+  'C60N': { standard: 'IEC 947-2', icu1p: 3, icuMp: 10, ics: 0.75, ratings: [0.5, 1, 2, 3, 4, 6, 10, 13, 16, 20, 25, 32, 40, 50, 63] },
+  'C60H': { standard: 'IEC 947-2', icu1p: 3, icuMp: 15, ics: 0.5, ratings: [1, 2, 3, 4, 6, 10, 13, 16, 20, 25, 32, 40, 50, 63] },
+  'C60L': { standard: 'IEC 947-2', icu1p: 6, icuMp: 25, ics: 0.5, ratings: [0.5, 1, 2, 3, 4, 6, 10, 13, 16, 20, 25, 32, 40, 50, 63] },
+  'C120N': { standard: 'IEC 947-2', icu1p: 3, icuMp: 10, ics: 0.75, ratings: [63, 80, 100, 125] },
+  'C120H': { standard: 'IEC 947-2', icu1p: 15, icuMp: 30, ics: 0.5, ratings: [1, 2, 3, 4, 6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125] },
+  'NG125N': { standard: 'IEC 947-2', icu1p: 4.5, icuMp: 25, ics: 0.75, ratings: [10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125] }
+};
+
+const MCB_CURVES = {
+  'B': { isdMin: 3.2, isdMax: 4.8 },
+  'C': { isdMin: 7, isdMax: 10 },
+  'D': { isdMin: 10, isdMax: 20 }
+};
+
+// MCCB NSX data
+const MCCB_FRAMES = {
+  'NSX 100': { inOptions: [16, 25, 32, 40, 50, 63, 80, 100] },
+  'NSX 160': { inOptions: [80, 100, 125, 160] },
+  'NSX 250': { inOptions: [100, 125, 160, 200, 250] },
+  'NSX 400': { inOptions: [250, 320, 400] },
+  'NSX 630': { inOptions: [400, 500, 630] }
+};
+
+const MCCB_TRIPS = {
+  'B': 25, 'F': 36, 'N': 50, 'H': 70, 'S': 100, 'L': 150
+};
+
+// Micrologic 2.2 settings
+const MCCB_IO_RANGE = [0.4, 0.5, 0.6, 0.63, 0.7, 0.8, 0.9, 0.95, 1.0];
+const MCCB_ISD_MULT = [1.5, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+// Cable data from the spreadsheets
+const CABLES_COPPER = {
+  'NOIKLX': {
+    '5G': {
+      1.5: { r: 12.1, x: 0.113 },
+      2.5: { r: 7.41, x: 0.105 },
+      4: { r: 4.61, x: 0.099 },
+      6: { r: 3.08, x: 0.097 },
+      10: { r: 1.83, x: 0.092 },
+      16: { r: 1.15, x: 0.088 },
+      25: { r: 0.727, x: 0.086 }
+    },
+    '4X': {
+      4: { r: 4.61, x: 0.096 },
+      6: { r: 3.08, x: 0.094 },
+      10: { r: 1.83, x: 0.089 },
+      16: { r: 1.15, x: 0.085 },
+      25: { r: 0.727, x: 0.086 },
+      35: { r: 0.525, x: 0.082 },
+      50: { r: 0.388, x: 0.084 },
+      70: { r: 0.269, x: 0.081 },
+      95: { r: 0.194, x: 0.082 },
+      120: { r: 0.155, x: 0.082 },
+      150: { r: 0.126, x: 0.084 },
+      185: { r: 0.1017, x: 0.082 },
+      240: { r: 0.0787, x: 0.083 }
+    }
+  },
+  'NOIKX-Flex': {
+    '5G': {
+      6: { r: 3.08, x: 0.097 },
+      10: { r: 1.83, x: 0.092 },
+      16: { r: 1.15, x: 0.088 },
+      25: { r: 0.727, x: 0.089 },
+      35: { r: 0.525, x: 0.085 }
+    },
+    '4X': {
+      6: { r: 3.08, x: 0.094 },
+      10: { r: 1.83, x: 0.089 },
+      16: { r: 1.15, x: 0.085 },
+      25: { r: 0.727, x: 0.086 },
+      35: { r: 0.525, x: 0.082 },
+      50: { r: 0.388, x: 0.084 },
+      70: { r: 0.269, x: 0.081 },
+      95: { r: 0.194, x: 0.082 },
+      120: { r: 0.155, x: 0.082 },
+      150: { r: 0.126, x: 0.084 },
+      185: { r: 0.1017, x: 0.082 },
+      240: { r: 0.0787, x: 0.083 }
+    }
+  },
+  'NOSP-CU': {
+    '3X': {
+      '70+35': { r: 0.269, x: 0.079 },
+      '95+50': { r: 0.194, x: 0.077 },
+      '120+70': { r: 0.155, x: 0.077 },
+      '185+95': { r: 0.1017, x: 0.077 }
+    }
+  },
+  'H07RN-F': {
+    '5G': {
+      1.5: { r: 12.1, x: 0.113 },
+      2.5: { r: 7.41, x: 0.105 },
+      4: { r: 4.61, x: 0.099 },
+      6: { r: 3.08, x: 0.097 },
+      10: { r: 1.83, x: 0.092 },
+      16: { r: 1.15, x: 0.088 },
+      25: { r: 0.727, x: 0.086 },
+      35: { r: 0.525, x: 0.082 }
+    },
+    '3G': {
+      1.5: { r: 12.1, x: 0.113 },
+      2.5: { r: 7.41, x: 0.105 },
+      4: { r: 4.61, x: 0.099 },
+      6: { r: 3.08, x: 0.097 }
+    }
+  },
+  'PVL H07V-R': {
+    '1G': {
+      1.5: { r: 12.1, x: 0.113 },
+      2.5: { r: 7.41, x: 0.105 },
+      4: { r: 4.61, x: 0.099 },
+      6: { r: 3.08, x: 0.097 },
+      10: { r: 1.83, x: 0.092 },
+      16: { r: 1.15, x: 0.088 }
+    }
+  }
+};
+
+const CABLES_ALU = {
+  'NOIK-AL-M': {
+    '4X': {
+      16: { r: 1.91, x: 0.069 },
+      25: { r: 1.2, x: 0.084 },
+      50: { r: 0.641, x: 0.081 },
+      95: { r: 0.321, x: 0.078 },
+      150: { r: 0.207, x: 0.078 },
+      240: { r: 0.127, x: 0.077 }
+    },
+    '5G': {
+      16: { r: 1.91, x: 0.072 },
+      25: { r: 1.2, x: 0.087 }
+    }
+  },
+  'NOIK-AL-S': {
+    '4X': {
+      50: { r: 0.641, x: 0.080 },
+      70: { r: 0.444, x: 0.079 },
+      95: { r: 0.321, x: 0.077 },
+      120: { r: 0.253, x: 0.077 },
+      150: { r: 0.207, x: 0.077 },
+      185: { r: 0.166, x: 0.077 }
+    }
+  },
+  'NOSP-AL': {
+    '4X': {
+      50: { r: 0.641, x: 0.080 },
+      70: { r: 0.444, x: 0.079 },
+      95: { r: 0.321, x: 0.077 },
+      120: { r: 0.253, x: 0.077 },
+      150: { r: 0.207, x: 0.077 },
+      185: { r: 0.166, x: 0.077 },
+      240: { r: 0.127, x: 0.077 }
+    }
+  }
+};
+
+// Current carrying capacity (Iz) per cross-section (installation method C, 3-phase copper)
+const IZ_COPPER = {
+  1.5: 17.5, 2.5: 24, 4: 32, 6: 41, 10: 57, 16: 76, 25: 101, 35: 125,
+  50: 151, 70: 192, 95: 232, 120: 269, 150: 300, 185: 341, 240: 400, 300: 458
+};
+
+// Aluminium Iz (approx 78% of copper)
+const IZ_ALU = {
+  16: 60, 25: 78, 35: 96, 50: 117, 70: 150, 95: 181, 120: 210, 150: 234, 185: 266, 240: 312
+};
+
+// Correction factors from installation methods (simplified)
+const INSTALL_METHODS = {
+  'A1': 0.87, 'A2': 0.83, 'B1': 1.0, 'B2': 0.96,
+  'C': 1.0, 'D': 1.0, 'E': 1.04, 'F': 1.09, 'G': 1.17
+};
+
+// Temperature correction
+const TEMP_FACTORS = {
+  10: 1.22, 15: 1.17, 20: 1.12, 25: 1.06, 30: 1.0, 35: 0.94, 40: 0.87, 45: 0.79, 50: 0.71
+};
+
+// Grouping correction
+const GROUP_FACTORS = {
+  1: 1.0, 2: 0.80, 3: 0.70, 4: 0.65, 5: 0.60, 6: 0.57, 7: 0.54, 8: 0.52, 9: 0.50
+};
+
+// ===== STATE =====
+let activeModule = 'load';
+
+// Load state
+let loadState = { voltage: '3x400', power: 10, cosPhi: 0.9, simFactor: 1.0, expFactor: 1.0 };
+// Fuse state
+let fuseState = { holder: 'D02', size: null };
+// MCB state
+let mcbState = { type: 'C60N', curve: 'B', rating: null, poles: 'multi' };
+// MCCB state
+let mccbState = { frame: 'NSX 400', trip: 'F', inVal: 400, ioMult: 0.8, isdMult: 2 };
+// Cable state
+let cableState = { material: 'copper', type: 'NOIKLX', cores: '5G', crossSection: null, installMethod: 'C', temp: 30, grouping: 1 };
+// Voltage drop state
+let vdropState = { length: 50 };
+// Short circuit state
+let scState = { zNet: 1, zTrafo: 5 };
+
+// ===== RENDERING =====
+function renderNav() {
+  const nav = document.getElementById('mainNav');
+  const mods = t('modules');
+  nav.innerHTML = Object.keys(mods).map(key =>
+    `<button class="nav-btn ${key === activeModule ? 'active' : ''}" onclick="switchModule('${key}')">${mods[key]}</button>`
+  ).join('');
+}
+
+function switchModule(mod) {
+  activeModule = mod;
+  renderNav();
+  renderModule(mod);
+}
+
+function renderModule(mod) {
+  const main = document.getElementById('mainContent');
+  switch(mod) {
+    case 'load': main.innerHTML = renderLoad(); break;
+    case 'fuse': main.innerHTML = renderFuse(); break;
+    case 'mcb': main.innerHTML = renderMCB(); break;
+    case 'mccb': main.innerHTML = renderMCCB(); break;
+    case 'cable': main.innerHTML = renderCable(); break;
+    case 'vdrop': main.innerHTML = renderVdrop(); break;
+    case 'scircuit': main.innerHTML = renderShortCircuit(); break;
+  }
+}
+
+// ===== LOAD MODULE =====
+function renderLoad() {
+  const ib = calcIB();
+  const S = calcS();
+  const powerSteps = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 120, 150, 180, 200, 250, 300, 400, 500];
+  const cosPhiSteps = [0.7, 0.75, 0.8, 0.85, 0.87, 0.9, 0.92, 0.95, 0.97, 1.0];
+  const sfSteps = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
+  const efSteps = [1.0, 1.1, 1.2, 1.3, 1.4, 1.5];
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">${t('loadTitle')}</div>
+      <div class="info-row">${t('infoClick')}</div>
+
+      <div class="select-group">
+        <div class="select-label">${t('voltage')}</div>
+        <div class="select-grid">
+          ${['3x400', '1x230'].map(v =>
+            `<button class="sel-btn ${loadState.voltage === v ? 'selected' : ''}" onclick="loadState.voltage='${v}';renderModule('load')">${v} V</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('power')}</div>
+        <div class="select-grid">
+          ${powerSteps.map(p =>
+            `<button class="sel-btn ${loadState.power === p ? 'selected' : ''}" onclick="loadState.power=${p};renderModule('load')">${p}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('powerFactor')}</div>
+        <div class="select-grid">
+          ${cosPhiSteps.map(c =>
+            `<button class="sel-btn ${loadState.cosPhi === c ? 'selected' : ''}" onclick="loadState.cosPhi=${c};renderModule('load')">${c}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('simultaneity')}</div>
+        <div class="select-grid">
+          ${sfSteps.map(s =>
+            `<button class="sel-btn ${loadState.simFactor === s ? 'selected' : ''}" onclick="loadState.simFactor=${s};renderModule('load')">${s}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('expansion')}</div>
+        <div class="select-grid">
+          ${efSteps.map(e =>
+            `<button class="sel-btn ${loadState.expFactor === e ? 'selected' : ''}" onclick="loadState.expFactor=${e};renderModule('load')">${e}</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${t('loadResult')}</div>
+      <div class="result-box">
+        <div class="result-title">${t('result')}</div>
+        <div class="result-row"><span class="label">${t('ib')}</span><span class="value">${ib.toFixed(1)} A</span></div>
+        <div class="result-row"><span class="label">${t('sApparent')}</span><span class="value">${S.toFixed(2)} kVA</span></div>
+        <div class="result-row"><span class="label">${t('voltage')}</span><span class="value">${loadState.voltage} V</span></div>
+        <div class="result-row"><span class="label">${t('powerFactor')}</span><span class="value">${loadState.cosPhi}</span></div>
+      </div>
+    </div>
+  `;
+}
+
+function calcIB() {
+  const P = loadState.power * 1000; // W
+  const cosP = loadState.cosPhi;
+  const sf = loadState.simFactor;
+  const ef = loadState.expFactor;
+  let ib;
+  if (loadState.voltage === '3x400') {
+    ib = P / (Math.sqrt(3) * 400 * cosP);
+  } else {
+    ib = P / (230 * cosP);
+  }
+  return ib * sf * ef;
+}
+
+function calcS() {
+  return loadState.power / loadState.cosPhi;
+}
+
+// ===== FUSE MODULE =====
+function renderFuse() {
+  const holder = FUSE_HOLDERS[fuseState.holder];
+  const sizes = holder.sizes;
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">${t('fuseTitle')}</div>
+      <div class="info-row">${t('infoClick')}</div>
+
+      <div class="select-group">
+        <div class="select-label">${t('fuseHolder')}</div>
+        <div class="select-grid">
+          ${Object.keys(FUSE_HOLDERS).map(h =>
+            `<button class="sel-btn ${fuseState.holder === h ? 'selected' : ''}" onclick="fuseState.holder='${h}';fuseState.size=null;renderModule('fuse')">${h}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('fuseSize')} [A]</div>
+        <div class="select-grid">
+          ${sizes.map(s =>
+            `<button class="sel-btn ${fuseState.size === s ? 'selected' : ''}" onclick="fuseState.size=${s};renderModule('fuse')">${s} A</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    ${fuseState.size ? `
+    <div class="card fade-in">
+      <div class="card-title">${t('fuseResult')}</div>
+      <div class="result-box">
+        <div class="result-title">${t('result')}</div>
+        <div class="result-row"><span class="label">${t('fuseHolder')}</span><span class="value">${fuseState.holder}</span></div>
+        <div class="result-row"><span class="label">${t('fuseSize')}</span><span class="value">${fuseState.size} A</span></div>
+        <div class="result-row"><span class="label">${t('fuseIkmax')}</span><span class="value">${holder.ikMax} kA</span></div>
+        <div class="result-row"><span class="label">${t('fuseCurrent5s')}</span><span class="value">${FUSE_5S[fuseState.size] || '—'} A</span></div>
+        <div class="result-row"><span class="label">${t('fuseCurrentRange')}</span><span class="value">${holder.range}</span></div>
+        <div class="result-row"><span class="label">${t('fuseBreaker')}</span><span class="value">${holder.breaker}</span></div>
+      </div>
+    </div>
+    ` : ''}
+  `;
+}
+
+// ===== MCB MODULE =====
+function renderMCB() {
+  const mcb = MCB_TYPES[mcbState.type];
+  const curve = MCB_CURVES[mcbState.curve];
+  const icu = mcbState.poles === '1p' ? mcb.icu1p : mcb.icuMp;
+  const isdMin = mcbState.rating ? (curve.isdMin * mcbState.rating).toFixed(0) : '—';
+  const isdMax = mcbState.rating ? (curve.isdMax * mcbState.rating).toFixed(0) : '—';
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">${t('mcbTitle')}</div>
+      <div class="info-row">${t('infoClick')}</div>
+
+      <div class="select-group">
+        <div class="select-label">${t('mcbType')}</div>
+        <div class="select-grid">
+          ${Object.keys(MCB_TYPES).map(tp =>
+            `<button class="sel-btn ${mcbState.type === tp ? 'selected' : ''}" onclick="mcbState.type='${tp}';mcbState.rating=null;renderModule('mcb')">${tp}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('mcbCurve')}</div>
+        <div class="select-grid">
+          ${Object.keys(MCB_CURVES).map(c =>
+            `<button class="sel-btn ${mcbState.curve === c ? 'selected' : ''}" onclick="mcbState.curve='${c}';renderModule('mcb')">${c}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('mcbPoles')}</div>
+        <div class="select-grid">
+          <button class="sel-btn ${mcbState.poles === '1p' ? 'selected' : ''}" onclick="mcbState.poles='1p';renderModule('mcb')">1P</button>
+          <button class="sel-btn ${mcbState.poles === 'multi' ? 'selected' : ''}" onclick="mcbState.poles='multi';renderModule('mcb')">2P / 3P / 4P</button>
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('mcbRating')}</div>
+        <div class="select-grid">
+          ${mcb.ratings.map(r =>
+            `<button class="sel-btn ${mcbState.rating === r ? 'selected' : ''}" onclick="mcbState.rating=${r};renderModule('mcb')">${r}</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    ${mcbState.rating ? `
+    <div class="card fade-in">
+      <div class="card-title">${t('mcbResult')}</div>
+      <div class="result-box">
+        <div class="result-title">${t('result')}</div>
+        <div class="result-row"><span class="label">${t('mcbType')}</span><span class="value">${mcbState.type} ${mcbState.curve}${mcbState.rating}</span></div>
+        <div class="result-row"><span class="label">${t('mcbStandard')}</span><span class="value">${mcb.standard}</span></div>
+        <div class="result-row"><span class="label">${t('mcbRating')}</span><span class="value">${mcbState.rating} A</span></div>
+        <div class="result-row"><span class="label">${t('mcbIcu')}</span><span class="value">${icu} kA</span></div>
+        <div class="result-row"><span class="label">Ics</span><span class="value">${(icu * mcb.ics).toFixed(1)} kA</span></div>
+        <div class="result-row"><span class="label">${t('mcbIsd')}</span><span class="value">${isdMin} - ${isdMax} A</span></div>
+        <div class="result-row"><span class="label">${t('mcbPoles')}</span><span class="value">${mcbState.poles === '1p' ? '1P' : 'Multi-pole'}</span></div>
+      </div>
+    </div>
+    ` : ''}
+  `;
+}
+
+// ===== MCCB MODULE =====
+function renderMCCB() {
+  const frame = MCCB_FRAMES[mccbState.frame];
+  const icu = MCCB_TRIPS[mccbState.trip];
+  const io = mccbState.inVal * mccbState.ioMult;
+  const isdCalc = io * mccbState.isdMult;
+  const isdMin = isdCalc * 0.9;
+  const isdMax = isdCalc * 1.1;
+  const ii = mccbState.inVal * 12; // Ii typically 12x In for Micrologic
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">${t('mccbTitle')}</div>
+      <div class="info-row">${t('infoClick')}</div>
+
+      <div class="select-group">
+        <div class="select-label">${t('mccbFrame')}</div>
+        <div class="select-grid">
+          ${Object.keys(MCCB_FRAMES).map(f =>
+            `<button class="sel-btn ${mccbState.frame === f ? 'selected' : ''}" onclick="mccbState.frame='${f}';mccbState.inVal=MCCB_FRAMES['${f}'].inOptions[0];renderModule('mccb')">${f}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('mccbTrip')} (Icu)</div>
+        <div class="select-grid">
+          ${Object.entries(MCCB_TRIPS).map(([k,v]) =>
+            `<button class="sel-btn ${mccbState.trip === k ? 'selected' : ''}" onclick="mccbState.trip='${k}';renderModule('mccb')">${k} (${v} kA)</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('mccbIn')}</div>
+        <div class="select-grid">
+          ${frame.inOptions.map(i =>
+            `<button class="sel-btn ${mccbState.inVal === i ? 'selected' : ''}" onclick="mccbState.inVal=${i};renderModule('mccb')">${i}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('mccbIo')} (Io = x \u00D7 In)</div>
+        <div class="select-grid">
+          ${MCCB_IO_RANGE.map(m =>
+            `<button class="sel-btn ${mccbState.ioMult === m ? 'selected' : ''}" onclick="mccbState.ioMult=${m};renderModule('mccb')">${m}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('mccbIsd2')} (Isd = x \u00D7 Io)</div>
+        <div class="select-grid">
+          ${MCCB_ISD_MULT.map(m =>
+            `<button class="sel-btn ${mccbState.isdMult === m ? 'selected' : ''}" onclick="mccbState.isdMult=${m};renderModule('mccb')">${m}</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${t('mccbResult')} — Micrologic 2.2</div>
+      <div class="result-box">
+        <div class="result-title">${mccbState.frame} ${mccbState.trip}</div>
+        <div class="result-row"><span class="label">In</span><span class="value">${mccbState.inVal} A</span></div>
+        <div class="result-row"><span class="label">${t('mccbIcu2')}</span><span class="value">${icu} kA</span></div>
+        <div class="result-row"><span class="label">Io</span><span class="value">${io.toFixed(0)} A</span></div>
+        <div class="result-row"><span class="label">${t('mccbIr')}</span><span class="value">${(mccbState.inVal * 0.4).toFixed(0)} - ${io.toFixed(0)} A</span></div>
+        <div class="result-row"><span class="label">${t('mccbIsdCalc')}</span><span class="value">${isdMin.toFixed(0)} - ${isdMax.toFixed(0)} A (\u00B110%)</span></div>
+        <div class="result-row"><span class="label">${t('mccbIi')}</span><span class="value">${ii} A</span></div>
+      </div>
+    </div>
+  `;
+}
+
+// ===== CABLE MODULE =====
+function renderCable() {
+  const cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
+  const types = Object.keys(cables);
+  const currentType = cables[cableState.type];
+  const cores = currentType ? Object.keys(currentType) : [];
+  const currentCores = currentType && currentType[cableState.cores] ? currentType[cableState.cores] : {};
+  const crossSections = Object.keys(currentCores);
+
+  const izTable = cableState.material === 'copper' ? IZ_COPPER : IZ_ALU;
+  const selectedCable = currentCores[cableState.crossSection];
+
+  // Correction factors
+  const kInstall = INSTALL_METHODS[cableState.installMethod] || 1.0;
+  const kTemp = TEMP_FACTORS[cableState.temp] || 1.0;
+  const kGroup = GROUP_FACTORS[cableState.grouping] || 1.0;
+  const kTotal = kInstall * kTemp * kGroup;
+
+  const baseIz = izTable[parseFloat(cableState.crossSection)] || 0;
+  const correctedIz = baseIz * kTotal;
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">${t('cableTitle')}</div>
+      <div class="info-row">${t('infoClick')}</div>
+
+      <div class="select-group">
+        <div class="select-label">${t('cableMaterial')}</div>
+        <div class="select-grid">
+          <button class="sel-btn ${cableState.material === 'copper' ? 'selected' : ''}" onclick="cableState.material='copper';cableState.type=Object.keys(CABLES_COPPER)[0];cableState.cores=Object.keys(CABLES_COPPER[cableState.type])[0];cableState.crossSection=null;renderModule('cable')">${t('cableCopper')}</button>
+          <button class="sel-btn ${cableState.material === 'aluminium' ? 'selected' : ''}" onclick="cableState.material='aluminium';cableState.type=Object.keys(CABLES_ALU)[0];cableState.cores=Object.keys(CABLES_ALU[cableState.type])[0];cableState.crossSection=null;renderModule('cable')">${t('cableAluminium')}</button>
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('cableType')}</div>
+        <div class="select-grid">
+          ${types.map(tp =>
+            `<button class="sel-btn ${cableState.type === tp ? 'selected' : ''}" onclick="cableState.type='${tp}';cableState.cores=Object.keys(${cableState.material === 'copper' ? 'CABLES_COPPER' : 'CABLES_ALU'}['${tp}'])[0];cableState.crossSection=null;renderModule('cable')">${tp}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('cableCores')}</div>
+        <div class="select-grid">
+          ${cores.map(c =>
+            `<button class="sel-btn ${cableState.cores === c ? 'selected' : ''}" onclick="cableState.cores='${c}';cableState.crossSection=null;renderModule('cable')">${c}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('cableCrossSection')}</div>
+        <div class="select-grid">
+          ${crossSections.map(cs =>
+            `<button class="sel-btn ${cableState.crossSection === cs ? 'selected' : ''}" onclick="cableState.crossSection='${cs}';renderModule('cable')">${cs}</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Korrektionsfaktorer' : 'Correction Factors'}</div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Fremf\u00F8ringsmetode' : 'Installation Method'}</div>
+        <div class="select-grid">
+          ${Object.entries(INSTALL_METHODS).map(([k,v]) =>
+            `<button class="sel-btn ${cableState.installMethod === k ? 'selected' : ''}" onclick="cableState.installMethod='${k}';renderModule('cable')">${k} (${v})</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Temperatur [\u00B0C]' : 'Temperature [\u00B0C]'}</div>
+        <div class="select-grid">
+          ${Object.entries(TEMP_FACTORS).map(([k,v]) =>
+            `<button class="sel-btn ${cableState.temp === parseInt(k) ? 'selected' : ''}" onclick="cableState.temp=${k};renderModule('cable')">${k}\u00B0 (${v})</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Gruppering (antal kabler)' : 'Grouping (number of cables)'}</div>
+        <div class="select-grid">
+          ${Object.entries(GROUP_FACTORS).map(([k,v]) =>
+            `<button class="sel-btn ${cableState.grouping === parseInt(k) ? 'selected' : ''}" onclick="cableState.grouping=${k};renderModule('cable')">${k} (${v})</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    ${cableState.crossSection && selectedCable ? `
+    <div class="card fade-in">
+      <div class="card-title">${t('cableResult')}</div>
+      <div class="result-box">
+        <div class="result-title">${t('result')}</div>
+        <div class="result-row"><span class="label">${t('cableType')}</span><span class="value">${cableState.type} ${cableState.cores} ${cableState.crossSection} mm\u00B2</span></div>
+        <div class="result-row"><span class="label">${t('cableMaterial')}</span><span class="value">${cableState.material === 'copper' ? t('cableCopper') : t('cableAluminium')}</span></div>
+        <div class="result-row"><span class="label">${t('cableR')}</span><span class="value">${selectedCable.r} \u03A9/km</span></div>
+        <div class="result-row"><span class="label">${t('cableX')}</span><span class="value">${selectedCable.x} \u03A9/km</span></div>
+        <div class="result-row"><span class="label">Iz (${lang === 'da' ? 'basis' : 'base'})</span><span class="value">${baseIz} A</span></div>
+        <div class="result-row"><span class="label">K (total)</span><span class="value">${kTotal.toFixed(3)}</span></div>
+        <div class="result-row"><span class="label">${t('cableIz')} (${lang === 'da' ? 'korrigeret' : 'corrected'})</span><span class="value">${correctedIz.toFixed(1)} A</span></div>
+      </div>
+    </div>
+    ` : ''}
+  `;
+}
+
+// ===== VOLTAGE DROP MODULE =====
+function renderVdrop() {
+  const cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
+  const currentType = cables[cableState.type];
+  const currentCores = currentType && currentType[cableState.cores] ? currentType[cableState.cores] : {};
+  const selectedCable = currentCores[cableState.crossSection];
+
+  const lengthSteps = [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 125, 150, 175, 200, 250, 300, 400, 500];
+
+  let vdrop = 0, vdropPercent = 0, Un = 400;
+  if (selectedCable) {
+    const ib = calcIB();
+    const L = vdropState.length / 1000; // km
+    const cosP = loadState.cosPhi;
+    const sinP = Math.sin(Math.acos(cosP));
+    Un = loadState.voltage === '3x400' ? 400 : 230;
+
+    if (loadState.voltage === '3x400') {
+      vdrop = Math.sqrt(3) * ib * L * (selectedCable.r * cosP + selectedCable.x * sinP);
+    } else {
+      vdrop = 2 * ib * L * (selectedCable.r * cosP + selectedCable.x * sinP);
+    }
+    vdropPercent = (vdrop / Un) * 100;
+  }
+
+  const isOk = vdropPercent <= 4;
+  const boxClass = !selectedCable ? '' : (isOk ? '' : 'error');
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">${t('vdropTitle')}</div>
+      <div class="info-row">${lang === 'da' ? 'V\u00E6lg kabel under "Kabler" f\u00F8rst, derefter l\u00E6ngde her' : 'Select cable under "Cables" first, then length here'}</div>
+
+      ${!selectedCable ? `
+        <div class="result-box warning">
+          <div class="result-title">${lang === 'da' ? 'Advarsel' : 'Warning'}</div>
+          <div class="result-row"><span class="label">${lang === 'da' ? 'V\u00E6lg kabel i "Kabler"-modulet f\u00F8rst' : 'Select a cable in the "Cables" module first'}</span></div>
+        </div>
+      ` : `
+        <div class="result-box" style="margin-bottom:16px;background:#eaf2f8;border-color:var(--primary-light)">
+          <div class="result-row"><span class="label">${t('cableType')}</span><span class="value">${cableState.type} ${cableState.cores} ${cableState.crossSection} mm\u00B2</span></div>
+          <div class="result-row"><span class="label">IB</span><span class="value">${calcIB().toFixed(1)} A</span></div>
+        </div>
+      `}
+
+      <div class="select-group">
+        <div class="select-label">${t('cableLength')}</div>
+        <div class="select-grid">
+          ${lengthSteps.map(l =>
+            `<button class="sel-btn ${vdropState.length === l ? 'selected' : ''}" onclick="vdropState.length=${l};renderModule('vdrop')">${l}</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    ${selectedCable ? `
+    <div class="card fade-in">
+      <div class="card-title">${t('vdropResult')}</div>
+      <div class="result-box ${boxClass}">
+        <div class="result-title">${t('result')} ${isOk ? '<span class="verify-badge ok">\u2713 OK</span>' : '<span class="verify-badge fail">\u2717 > 4%</span>'}</div>
+        <div class="result-row"><span class="label">${t('vdropVolts')}</span><span class="value">${vdrop.toFixed(2)} V</span></div>
+        <div class="result-row"><span class="label">${t('vdropPercent')}</span><span class="value">${vdropPercent.toFixed(2)} %</span></div>
+        <div class="result-row"><span class="label">${t('vdropRemaining')}</span><span class="value">${(Un - vdrop).toFixed(1)} V</span></div>
+        <div class="result-row"><span class="label">${t('vdropLimit')}</span><span class="value">${isOk ? '\u2713' : '\u2717'}</span></div>
+      </div>
+    </div>
+    ` : ''}
+  `;
+}
+
+// ===== SHORT CIRCUIT MODULE =====
+function renderShortCircuit() {
+  const zNetSteps = [0.5, 1, 1.5, 2, 3, 4, 5, 7, 10, 15, 20];
+  const zTrafoSteps = [2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30, 40, 50];
+
+  // Cable impedance
+  const cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
+  const currentType = cables[cableState.type];
+  const currentCores = currentType && currentType[cableState.cores] ? currentType[cableState.cores] : {};
+  const selectedCable = currentCores[cableState.crossSection];
+
+  let zCable = 0;
+  if (selectedCable) {
+    const L = vdropState.length / 1000; // km
+    const rCable = selectedCable.r * L;
+    const xCable = selectedCable.x * L;
+    zCable = Math.sqrt(rCable * rCable + xCable * xCable) * 1000; // mOhm
+  }
+
+  const zTotal = scState.zNet + scState.zTrafo + zCable;
+  const Un = loadState.voltage === '3x400' ? 400 : 230;
+  const cFactor = 1.05; // voltage factor per IEC 60909
+
+  // Ik max (3-phase, at busbar)
+  const ikMax3ph = (cFactor * Un) / (Math.sqrt(3) * (scState.zNet + scState.zTrafo) / 1000);
+  // Ik min (2-phase at end of cable, factor 0.95)
+  const ikMin2ph = (0.95 * Un) / (2 * zTotal / 1000);
+
+  // Get protection device Icu and Isd for check
+  let deviceIcu = 0, deviceIsd = 0;
+  if (activeModule === 'scircuit') {
+    // Try MCCB first
+    deviceIcu = MCCB_TRIPS[mccbState.trip] * 1000; // A
+    const io = mccbState.inVal * mccbState.ioMult;
+    deviceIsd = io * mccbState.isdMult * 1.1;
+
+    // Or MCB
+    if (mcbState.rating) {
+      const mcb = MCB_TYPES[mcbState.type];
+      const mcbIcu = (mcbState.poles === '1p' ? mcb.icu1p : mcb.icuMp) * 1000;
+      if (mcbIcu > 0) {
+        deviceIcu = mcbIcu;
+        deviceIsd = MCB_CURVES[mcbState.curve].isdMax * mcbState.rating;
+      }
+    }
+  }
+
+  const check1 = deviceIcu >= ikMax3ph;
+  const check2 = deviceIsd <= ikMin2ph;
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">${t('scTitle')}</div>
+      <div class="info-row">${lang === 'da' ? 'V\u00E6lg netimpedans og trafoimpedans. Kabelimpedans beregnes fra kabelmodulet.' : 'Select network impedance and transformer impedance. Cable impedance is calculated from the cable module.'}</div>
+
+      <div class="select-group">
+        <div class="select-label">${t('scZnet')}</div>
+        <div class="select-grid">
+          ${zNetSteps.map(z =>
+            `<button class="sel-btn ${scState.zNet === z ? 'selected' : ''}" onclick="scState.zNet=${z};renderModule('scircuit')">${z}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('scZtrafo')}</div>
+        <div class="select-grid">
+          ${zTrafoSteps.map(z =>
+            `<button class="sel-btn ${scState.zTrafo === z ? 'selected' : ''}" onclick="scState.zTrafo=${z};renderModule('scircuit')">${z}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      ${selectedCable ? `
+        <div class="result-box" style="margin-top:12px;background:#eaf2f8;border-color:var(--primary-light)">
+          <div class="result-row"><span class="label">${lang === 'da' ? 'Kabelimpedans' : 'Cable impedance'}</span><span class="value">${zCable.toFixed(2)} m\u03A9</span></div>
+          <div class="result-row"><span class="label">${lang === 'da' ? 'Kabel' : 'Cable'}</span><span class="value">${cableState.type} ${cableState.crossSection} mm\u00B2 \u00D7 ${vdropState.length} m</span></div>
+        </div>
+      ` : `
+        <div class="result-box warning" style="margin-top:12px">
+          <div class="result-row"><span class="label">${lang === 'da' ? 'V\u00E6lg kabel i "Kabler"-modulet for fuld beregning' : 'Select cable in "Cables" module for full calculation'}</span></div>
+        </div>
+      `}
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${t('scResult')}</div>
+      <div class="result-box">
+        <div class="result-title">${t('result')}</div>
+        <div class="result-row"><span class="label">${t('scIkmax')} (3-${lang === 'da' ? 'faset' : 'phase'})</span><span class="value">${(ikMax3ph/1000).toFixed(2)} kA</span></div>
+        <div class="result-row"><span class="label">${t('scIkmin')} (2-${lang === 'da' ? 'faset' : 'phase'})</span><span class="value">${ikMin2ph.toFixed(0)} A</span></div>
+        <div class="result-row"><span class="label">Z total</span><span class="value">${zTotal.toFixed(2)} m\u03A9</span></div>
+      </div>
+
+      ${deviceIcu > 0 ? `
+      <div class="result-box ${check1 && check2 ? '' : 'error'}" style="margin-top:12px">
+        <div class="result-title">${lang === 'da' ? 'Kontrol' : 'Verification'}</div>
+        <div class="result-row">
+          <span class="label">${t('scCheck1')}</span>
+          <span class="value">
+            ${(deviceIcu/1000).toFixed(1)} kA \u2265 ${(ikMax3ph/1000).toFixed(2)} kA
+            <span class="verify-badge ${check1 ? 'ok' : 'fail'}">${check1 ? t('ok') : t('fail')}</span>
+          </span>
+        </div>
+        <div class="result-row">
+          <span class="label">${t('scCheck2')}</span>
+          <span class="value">
+            ${deviceIsd.toFixed(0)} A \u2264 ${ikMin2ph.toFixed(0)} A
+            <span class="verify-badge ${check2 ? 'ok' : 'fail'}">${check2 ? t('ok') : t('fail')}</span>
+          </span>
+        </div>
+      </div>
+      ` : `
+      <div class="result-box warning" style="margin-top:12px">
+        <div class="result-row"><span class="label">${lang === 'da' ? 'V\u00E6lg beskyttelsesenhed (MCB/MCCB) for kontrolberegning' : 'Select protection device (MCB/MCCB) for verification'}</span></div>
+      </div>
+      `}
+    </div>
+  `;
+}
+
+// ===== INIT =====
+renderNav();
+renderModule(activeModule);
+</script>
+</body>
+</html>
