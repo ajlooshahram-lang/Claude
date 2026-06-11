@@ -793,6 +793,7 @@ function setLang(l) {
 const FUSE_HOLDERS = {
   'D01': { ikMax: 50, range: '2 - 16 A', breaker: 'Gruppe afbryder', sizes: [2, 4, 6, 10, 13, 16] },
   'D02': { ikMax: 50, range: '20 - 63 A', breaker: 'Tytan (2)', sizes: [20, 25, 32, 35, 40, 50, 63] },
+  'D03': { ikMax: 50, range: '80 - 100 A', breaker: 'Tytan (3)', sizes: [80, 100] },
   'NH 000/00': { ikMax: 22, range: '80 - 160 A', breaker: 'INFD 160', sizes: [80, 100, 125, 160] },
   'NH 1': { ikMax: 40, range: '200 - 250 A', breaker: 'INFD 250', sizes: [200, 224, 250] },
   'NH 2': { ikMax: 47, range: '300 - 400 A', breaker: 'INFD 400', sizes: [300, 315, 355, 400] },
@@ -1145,6 +1146,18 @@ const PRODUCTS = {
     { id: 'EATON-NH2-400', brand: 'Eaton', model: 'NH2 gG', size: 'NH 2', rating: 400, icu: 120, i5s: 1800 },
     { id: 'EATON-NH3-500', brand: 'Eaton', model: 'NH3 gG', size: 'NH 3', rating: 500, icu: 120, i5s: 2300 },
     { id: 'EATON-NH3-630', brand: 'Eaton', model: 'NH3 gG', size: 'NH 3', rating: 630, icu: 120, i5s: 2900 },
+    // Siemens 5SE2 D-system (gG) - from Siemens smeltesikringer 2015 catalog (verified)
+    { id: 'SIE-5SE2-D01-16', brand: 'Siemens', model: '5SE2 D01 gG', size: 'D01', rating: 16, icu: 50, i5s: 72 },
+    { id: 'SIE-5SE2-D02-63', brand: 'Siemens', model: '5SE2 D02 gG', size: 'D02', rating: 63, icu: 50, i5s: 290 },
+    { id: 'SIE-5SE2-D03-100', brand: 'Siemens', model: '5SE2 D03 gG', size: 'D03', rating: 100, icu: 50, i5s: 460 },
+    // Siemens 3NA NH fuses (gG) - from Siemens catalog (verified)
+    { id: 'SIE-3NA-NH00-160', brand: 'Siemens', model: '3NA NH00 gG', size: 'NH 000/00', rating: 160, icu: 120, i5s: 750 },
+    { id: 'SIE-3NA-NH1-250', brand: 'Siemens', model: '3NA NH1 gG', size: 'NH 1', rating: 250, icu: 120, i5s: 1150 },
+    { id: 'SIE-3NA-NH2-400', brand: 'Siemens', model: '3NA NH2 gG', size: 'NH 2', rating: 400, icu: 120, i5s: 1800 },
+    { id: 'SIE-3NA-NH3-630', brand: 'Siemens', model: '3NA NH3 gG', size: 'NH 3', rating: 630, icu: 120, i5s: 2900 },
+    // TYTAN fuse-switch (D02/D03 screw fuses in a switch-disconnector) - from TYTAN catalog
+    { id: 'TYTAN-D02-63', brand: 'TYTAN', model: 'TYTAN II D02', size: 'D02', rating: 63, icu: 50, i5s: 290 },
+    { id: 'TYTAN-D03-100', brand: 'TYTAN', model: 'TYTAN III D03', size: 'D03', rating: 100, icu: 50, i5s: 460 },
   ],
 
   // === CONTACTORS (Schneider TeSys D + ABB AF) ===
@@ -3797,8 +3810,9 @@ function configurePriceFeed() {
 })();
 
 // ===== DATA VERSION & CHANGELOG =====
-const DATA_VERSION = '2026.1';
+const DATA_VERSION = '2026.2';
 const DATA_CHANGELOG = [
+  { v: '2026.2', date: '2026-06-11', da: 'Sikringer hardet mod Siemens 5SE2/3NA & TYTAN katalogerne (IEC 60269). D03-størrelse tilføjet. Frakoblingstid- og selektivitetskontrol.', en: 'Fuses hardened against Siemens 5SE2/3NA & TYTAN catalogs (IEC 60269). D03 size added. Disconnection-time and selectivity checks.' },
   { v: '2026.1', date: '2026-06-11', da: 'Kabel-Iz hardet til officiel DS/HD 60364 Tabel C.52.1. Tilbud (EG Sigma/Kalkia-stil), komponentbank, AI-elektriker.', en: 'Cable Iz hardened to official DS/HD 60364 Table C.52.1. Bid (EG Sigma/Kalkia style), component bank, AI-electrician.' },
   { v: '2025.2', date: '2025-12-01', da: 'IEC 60364-1:2025, DS/HD 60364-4-43:2023 indarbejdet.', en: 'IEC 60364-1:2025, DS/HD 60364-4-43:2023 incorporated.' }
 ];
