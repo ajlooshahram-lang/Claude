@@ -235,6 +235,16 @@
       </tr>`).join("");
     const head = `<th class="center"><input type="checkbox" id="bulkAll" ${allSelected ? "checked" : ""} aria-label="Select all"></th>` +
       `<th aria-label="Pinned"></th><th>ID</th><th class='wrap'>Problem</th><th>Category</th><th>Priority</th><th>RPN</th><th>Health</th><th>Owner</th><th>Status</th><th>% Done</th><th></th>`;
+    // quick filter chips — one-click presets (still click-only)
+    const chipDefs = [
+      { id: "all", label: "All", on: !f.status && !f.priority && !f.owner },
+      { id: "open", label: "Open", on: f.status === "OPEN" },
+      { id: "inprogress", label: "In progress", on: f.status === "IN PROGRESS" },
+      { id: "blocked", label: "Blocked", on: f.status === "BLOCKED" },
+      { id: "critical", label: "Critical", on: f.priority === "1-CRITICAL" },
+      { id: "resolved", label: "Resolved", on: f.status === "RESOLVED" }
+    ];
+    const chips = `<div class="chips">${chipDefs.map(c => `<button class="chip ${c.on ? "on" : ""}" data-act="chip" data-chip="${c.id}">${esc(c.label)}</button>`).join("")}</div>`;
     return `
       <div class="toolbar">
         <button class="btn btn-primary" data-act="add">+ New Case</button>
@@ -257,10 +267,12 @@
           ${views.map(v => `<option value="${v.id}">${esc(v.name)}</option>`).join("")}
         </select>
         <button class="btn btn-sm" data-act="saveview" title="Save current filter as a saved view">Save view</button>
+        <button class="btn btn-sm" data-act="manageviews" title="Manage saved views">Manage</button>
         ${(f.savedViewId)?`<button class="btn btn-sm btn-danger" data-act="delsavedview" data-id="${f.savedViewId}">Delete view</button>`:''}
         <span class="grow"></span><button class="btn" data-act="csv">Export CSV</button>
         <span class="muted">${list.length} shown${rows === "" ? "" : list.length > rendered ? ` (first ${rendered})` : ""}</span>
       </div>
+      ${chips}
       <div class="bulkbar" id="bulkBar" ${someSelected ? "" : "hidden"}>
         <span><b>${uiState.selected.size}</b> selected</span>
         <select id="bulkStatus"><option value="">Set status…</option>${opts(C.LISTS.status, "")}</select>
@@ -1531,6 +1543,25 @@
   // tiny shim because opts() shadows the option-list builder; keep one global
   const optsList = (arr, sel, blank) => opts(arr, sel, blank);
 
+  function openManageViewsModal() {
+    const views = S.savedViews();
+    const fmtFilter = (fl) => [fl.status, fl.priority, fl.owner].filter(Boolean).join(" · ") || "All";
+    const rows = views.length ? views.map(v => `<tr>
+        <td><b>${esc(v.name)}</b></td>
+        <td class="muted">${esc(fmtFilter(v.filter || {}))}</td>
+        <td class="center">
+          <button class="btn btn-sm" data-act="applyview" data-id="${v.id}">Apply</button>
+          <button class="btn btn-sm btn-danger" data-act="rmview" data-id="${v.id}">Delete</button>
+        </td></tr>`).join("")
+      : `<tr><td colspan="3" class="muted center" style="padding:20px">No saved views yet. Set a filter on the Cases list and click <b>Save view</b>.</td></tr>`;
+    $("#modal").innerHTML = `<h2>Manage saved views</h2>
+      <div class="sub">Saved views are stored per project.</div>
+      ${tableWrap("<th>Name</th><th>Filter</th><th></th>", rows)}
+      <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
+        <button class="btn btn-primary" data-act="cancel">Close</button></div></div>`;
+    $("#modalOverlay").hidden = false;
+  }
+
   // Save the current Cases filter as a named view (click-only)
   function openSaveViewModal() {
     const f = uiState.caseFilter || {};
@@ -1773,6 +1804,7 @@
   function showShortcuts() {
     const rows = [
       ["?", "Show this list"],
+      ["⌘/Ctrl K", "Command palette (jump to a view / run an action)"],
       ["n", "New case"],
       ["d", "Dashboard"],
       ["k", "Kanban board"],
@@ -1790,6 +1822,61 @@
       <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
         <button class="btn btn-primary" data-act="cancel">Close</button></div></div>`;
     $("#modalOverlay").hidden = false;
+  }
+
+  // ---------- command palette (Cmd/Ctrl+K) ----------
+  function paletteCommands() {
+    const cmds = [];
+    VIEWS.forEach(v => { if (v.id) cmds.push({ label: "Go to " + v.label, icon: v.icon || "▸", run: () => go(v.id) }); });
+    cmds.push(
+      { label: "New case", icon: "＋", run: () => openCaseForm() },
+      { label: "Run all checks", icon: "✓", run: () => runChecks() },
+      { label: "Take snapshot", icon: "⟲", run: () => { S.takeSnapshot(); toast("Snapshot saved."); go("audit"); } },
+      { label: "Toggle dark mode", icon: "◐", run: () => toggleTheme() },
+      { label: "Collapse / expand sidebar", icon: "«", run: () => toggleSidebar() },
+      { label: "Export JSON backup", icon: "⭳", run: () => exportJSON() },
+      { label: "Share link", icon: "🔗", run: () => shareLink() },
+      { label: "Take the tour", icon: "👋", run: () => showTour(0) },
+      { label: "Keyboard shortcuts", icon: "⌨", run: () => showShortcuts() }
+    );
+    S.savedViews().forEach(v => cmds.push({ label: "View: " + v.name, icon: "★", run: () => { uiState.caseFilter = Object.assign({ q: "", status: "", priority: "", owner: "", sort: uiState.caseFilter.sort, pageSize: uiState.caseFilter.pageSize }, v.filter, { savedViewId: v.id }); go("cases"); } }));
+    return cmds;
+  }
+  function openCommandPalette() {
+    const cmds = paletteCommands();
+    uiState.palette = { items: cmds, active: 0, q: "" };
+    const render = () => {
+      const q = uiState.palette.q.toLowerCase();
+      const matches = cmds.filter(c => c.label.toLowerCase().includes(q));
+      uiState.palette.matches = matches;
+      if (uiState.palette.active >= matches.length) uiState.palette.active = Math.max(0, matches.length - 1);
+      const list = matches.map((c, i) => `<div class="cmd-item ${i === uiState.palette.active ? "active" : ""}" data-cmd="${i}"><span class="cmd-ico">${c.icon}</span><span>${esc(c.label)}</span></div>`).join("") || `<div class="cmd-empty muted">No matching commands</div>`;
+      const body = $("#cmdList"); if (body) body.innerHTML = list;
+    };
+    $("#modal").innerHTML = `<h2 style="margin-bottom:8px">Command palette</h2>
+      <input id="cmdInput" class="cmd-input" placeholder="Type to filter… then Enter" autocomplete="off">
+      <div class="cmd-list" id="cmdList"></div>
+      <div class="sub" style="margin-top:8px">↑/↓ to move · Enter to run · Esc to close</div>`;
+    $("#modalOverlay").hidden = false;
+    const input = $("#cmdInput");
+    render();
+    if (input) input.focus();
+    const runActive = () => {
+      const m = uiState.palette.matches || [];
+      const c = m[uiState.palette.active];
+      if (c) { closeModal(); c.run(); }
+    };
+    input.addEventListener("input", () => { uiState.palette.q = input.value; uiState.palette.active = 0; render(); });
+    input.addEventListener("keydown", e => {
+      const m = uiState.palette.matches || [];
+      if (e.key === "ArrowDown") { e.preventDefault(); uiState.palette.active = Math.min(uiState.palette.active + 1, m.length - 1); render(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); uiState.palette.active = Math.max(uiState.palette.active - 1, 0); render(); }
+      else if (e.key === "Enter") { e.preventDefault(); runActive(); }
+    });
+    $("#cmdList").addEventListener("click", e => {
+      const it = e.target.closest("[data-cmd]"); if (!it) return;
+      uiState.palette.active = +it.dataset.cmd; runActive();
+    });
   }
 
   // ---------- global events ----------
@@ -1825,7 +1912,15 @@
     else if (act === "export") exportJSON();
     else if (act === "import") importJSON();
     else if (act === "clearflt") { uiState.caseFilter = { q: "", status: "", priority: "", owner: "", sort: uiState.caseFilter.sort }; go("cases"); }
+    else if (act === "chip") {
+      const f = uiState.caseFilter; const sort = f.sort, pageSize = f.pageSize;
+      const base = { q: "", status: "", priority: "", owner: "", sort, pageSize };
+      const m = { all: {}, open: { status: "OPEN" }, inprogress: { status: "IN PROGRESS" }, blocked: { status: "BLOCKED" }, critical: { priority: "1-CRITICAL" }, resolved: { status: "RESOLVED" } };
+      uiState.caseFilter = Object.assign(base, m[b.dataset.chip] || {});
+      go("cases");
+    }
     else if (act === "saveview") openSaveViewModal();
+    else if (act === "manageviews") openManageViewsModal();
     else if (act === "delsavedview") { S.deleteSavedView(id); uiState.caseFilter.savedViewId = ""; toast("View deleted."); go("cases"); }
     else if (act === "pagemore") { const cur = uiState.caseFilter.pageSize || 100; uiState.caseFilter.pageSize = cur === 0 ? 0 : cur + 100; go("cases"); }
     else if (act === "pageall") { uiState.caseFilter.pageSize = 0; go("cases"); }
@@ -1892,6 +1987,12 @@
     const act = b.dataset.act, id = b.dataset.id;
     if (act === "cancel") closeModal();
     else if (act === "goHealth") { closeModal(); go("health"); }
+    else if (act === "applyview") {
+      const v = S.savedViews().find(x => x.id === id);
+      if (v) { uiState.caseFilter = Object.assign({ q: "", status: "", priority: "", owner: "", sort: uiState.caseFilter.sort, pageSize: uiState.caseFilter.pageSize }, v.filter, { savedViewId: v.id }); }
+      closeModal(); go("cases");
+    }
+    else if (act === "rmview") { S.deleteSavedView(id); if (uiState.caseFilter.savedViewId === id) uiState.caseFilter.savedViewId = ""; toast("View deleted."); openManageViewsModal(); }
     else if (act === "goHelp") { go("help"); }
     else if (act === "tourNext") showTour((uiState.tourStep || 0) + 1);
     else if (act === "tourPrev") showTour((uiState.tourStep || 0) - 1);
@@ -1929,6 +2030,8 @@
   });
   document.addEventListener("keydown", e => {
     if (e.key === "Escape") { closeModal(); return; }
+    // Command palette: Cmd/Ctrl+K works even from inside inputs.
+    if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) { e.preventDefault(); openCommandPalette(); return; }
     // single-letter shortcuts when no input/select is focused
     const t = e.target;
     if (t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;

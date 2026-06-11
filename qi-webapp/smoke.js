@@ -537,5 +537,47 @@ doc.querySelector('[data-act=pageall]').click();
 const allShownRows = doc.querySelectorAll('tr[data-id]').length;
 ok(allShownRows >= S.validCases().length, "Show-all renders every row (got " + allShownRows + ")");
 
+// 36) Command palette (Cmd/Ctrl+K)
+S.reset();
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const cmdKey = new window.KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true, cancelable: true });
+doc.dispatchEvent(cmdKey);
+ok(doc.getElementById("cmdInput") != null, "Cmd/Ctrl+K opens command palette");
+ok(doc.querySelectorAll("#cmdList .cmd-item").length > 10, "palette lists commands (views + actions)");
+const cmdInput = doc.getElementById("cmdInput");
+cmdInput.value = "kanban"; cmdInput.dispatchEvent(new window.Event("input", { bubbles: true }));
+const matches = doc.querySelectorAll("#cmdList .cmd-item");
+ok(matches.length >= 1 && /kanban/i.test(matches[0].textContent), "palette filters by query");
+matches[0].dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("modalOverlay").hidden === true, "running a palette command closes it");
+ok(window.location.hash === "#kanban", "palette 'Go to Kanban' navigates (hash " + window.location.hash + ")");
+
+// 37) Quick filter chips
+doc.querySelector('.nav-item[data-view="cases"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelectorAll(".chip").length >= 5, "quick filter chips render");
+const blockedChip = Array.from(doc.querySelectorAll(".chip")).find(c => /Blocked/.test(c.textContent));
+blockedChip.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("fltStatus").value === "BLOCKED", "Blocked chip sets status filter");
+const criticalChip = Array.from(doc.querySelectorAll(".chip")).find(c => /Critical/.test(c.textContent));
+criticalChip.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("fltPriority").value === "1-CRITICAL" && doc.getElementById("fltStatus").value === "", "Critical chip swaps to priority filter");
+const allChip = Array.from(doc.querySelectorAll(".chip")).find(c => c.textContent.trim() === "All");
+allChip.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("fltStatus").value === "" && doc.getElementById("fltPriority").value === "", "All chip clears filters");
+ok(Array.from(doc.querySelectorAll(".chip")).some(c => c.classList.contains("on")), "active chip shows 'on' state");
+
+// 38) Manage saved views modal
+S.reset();
+S.saveView("Critical & high", { status: "", priority: "1-CRITICAL", owner: "", sort: "rpn" });
+doc.querySelector('.nav-item[data-view="cases"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+doc.querySelector('[data-act=manageviews]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(/Manage saved views/.test(doc.getElementById("modal").innerHTML), "Manage views modal opens");
+ok(/Critical/.test(doc.getElementById("modal").innerHTML) && /high/.test(doc.getElementById("modal").innerHTML), "saved view listed in manager");
+const rmBtn = doc.querySelector('#modal [data-act=rmview]');
+ok(rmBtn != null, "manager has delete buttons");
+rmBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(S.savedViews().length === 0, "deleting from manager removes the saved view");
+doc.querySelector("#modal [data-act=cancel]") && doc.querySelector("#modal [data-act=cancel]").click();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
