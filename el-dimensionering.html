@@ -536,7 +536,8 @@ const T = {
       vdrop: 'Spændingsfald',
       scircuit: 'Kortslutning',
       trafo: 'Trafo',
-      standards: 'Standarder'
+      standards: 'Standarder',
+      bank: 'Komponentbank'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -628,7 +629,8 @@ const T = {
       vdrop: 'Voltage Drop',
       scircuit: 'Short Circuit',
       trafo: 'Transformer',
-      standards: 'Standards'
+      standards: 'Standards',
+      bank: 'Component Bank'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -1081,6 +1083,88 @@ const PRODUCTS = {
     { id: 'ABB-AF52', brand: 'ABB', model: 'AF52', series: 'AF', ac3_A: 52, ac3_kW: 22, ac1_A: 75 },
     { id: 'ABB-AF65', brand: 'ABB', model: 'AF65', series: 'AF', ac3_A: 65, ac3_kW: 30, ac1_A: 100 },
     { id: 'ABB-AF80', brand: 'ABB', model: 'AF80', series: 'AF', ac3_A: 80, ac3_kW: 37, ac1_A: 125 },
+  ],
+
+  // === RCD / HPFI (Residual Current Devices) - Danish requirement ===
+  // Sources: Schneider Acti9 iID (se.com), Hager (hager.com)
+  rcds: [
+    { id: 'SE-A9R-2P25-30', brand: 'Schneider', model: 'Acti9 iID', poles: '2P', rating: 25, sensitivity: 30, rcdType: 'A', use_da: 'Bolig 1-faset', use_en: 'Residential 1-phase' },
+    { id: 'SE-A9R-2P40-30', brand: 'Schneider', model: 'Acti9 iID', poles: '2P', rating: 40, sensitivity: 30, rcdType: 'A', use_da: 'Bolig 1-faset (standard)', use_en: 'Residential 1-phase (standard)' },
+    { id: 'SE-A9R-2P63-30', brand: 'Schneider', model: 'Acti9 iID', poles: '2P', rating: 63, sensitivity: 30, rcdType: 'A', use_da: 'Bolig stor 1-faset', use_en: 'Large residential 1-phase' },
+    { id: 'SE-A9R-4P25-30', brand: 'Schneider', model: 'Acti9 iID', poles: '4P', rating: 25, sensitivity: 30, rcdType: 'A', use_da: 'Bolig/erhverv 3-faset', use_en: 'Residential/commercial 3-phase' },
+    { id: 'SE-A9R-4P40-30', brand: 'Schneider', model: 'Acti9 iID', poles: '4P', rating: 40, sensitivity: 30, rcdType: 'A', use_da: 'Erhverv 3-faset (standard)', use_en: 'Commercial 3-phase (standard)' },
+    { id: 'SE-A9R-4P63-30', brand: 'Schneider', model: 'Acti9 iID', poles: '4P', rating: 63, sensitivity: 30, rcdType: 'A', use_da: 'Erhverv stor 3-faset', use_en: 'Large commercial 3-phase' },
+    { id: 'SE-A9R-4P63-300', brand: 'Schneider', model: 'Acti9 iID', poles: '4P', rating: 63, sensitivity: 300, rcdType: 'A', use_da: 'Brandbeskyttelse industri', use_en: 'Fire protection industrial' },
+    { id: 'SE-A9R-4P40-B30', brand: 'Schneider', model: 'Acti9 iID Type B', poles: '4P', rating: 40, sensitivity: 30, rcdType: 'B', use_da: 'EV-ladere, frekvensomformere', use_en: 'EV chargers, VFDs' },
+    { id: 'HAGER-CDA240D', brand: 'Hager', model: 'CDA240D', poles: '2P', rating: 40, sensitivity: 30, rcdType: 'A', use_da: 'Bolig 1-faset', use_en: 'Residential 1-phase' },
+    { id: 'HAGER-CDA263D', brand: 'Hager', model: 'CDA263D', poles: '2P', rating: 63, sensitivity: 30, rcdType: 'A', use_da: 'Bolig stor 1-faset', use_en: 'Large residential 1-phase' },
+    { id: 'HAGER-CDC440D', brand: 'Hager', model: 'CDC440D', poles: '4P', rating: 40, sensitivity: 30, rcdType: 'A', use_da: 'Erhverv 3-faset', use_en: 'Commercial 3-phase' },
+    { id: 'HAGER-CDC463D', brand: 'Hager', model: 'CDC463D', poles: '4P', rating: 63, sensitivity: 30, rcdType: 'A', use_da: 'Erhverv stor 3-faset', use_en: 'Large commercial 3-phase' },
+  ],
+
+  // === RCBO (combined MCB + RCD) ===
+  rcbos: [
+    { id: 'SE-A9DC3610', brand: 'Schneider', model: 'Acti9 iCV40', poles: '1P+N', rating: 10, curve: 'C', icu: 6, sensitivity: 30, rcdType: 'A', use_da: 'Belysningsgruppe m. HPFI', use_en: 'Lighting circuit with RCD' },
+    { id: 'SE-A9DC3616', brand: 'Schneider', model: 'Acti9 iCV40', poles: '1P+N', rating: 16, curve: 'C', icu: 6, sensitivity: 30, rcdType: 'A', use_da: 'Stikkontaktgruppe m. HPFI', use_en: 'Socket circuit with RCD' },
+    { id: 'SE-A9DC3620', brand: 'Schneider', model: 'Acti9 iCV40', poles: '1P+N', rating: 20, curve: 'C', icu: 6, sensitivity: 30, rcdType: 'A', use_da: 'Stikkontaktgruppe m. HPFI', use_en: 'Socket circuit with RCD' },
+    { id: 'SE-A9DC3632', brand: 'Schneider', model: 'Acti9 iCV40', poles: '1P+N', rating: 32, curve: 'C', icu: 6, sensitivity: 30, rcdType: 'A', use_da: 'Komfur/ovn m. HPFI', use_en: 'Cooker/oven with RCD' },
+    { id: 'SE-A9D05840', brand: 'Schneider', model: 'Acti9 iC60H RCBO', poles: '1P+N', rating: 40, curve: 'C', icu: 10, sensitivity: 30, rcdType: 'A', use_da: 'Stor gruppe m. HPFI (10kA)', use_en: 'Large circuit with RCD (10kA)' },
+    { id: 'HAGER-ADA516D', brand: 'Hager', model: 'ADA516D', poles: '1P+N', rating: 16, curve: 'C', icu: 6, sensitivity: 30, rcdType: 'A', use_da: 'Stikkontaktgruppe m. HPFI', use_en: 'Socket circuit with RCD' },
+    { id: 'HAGER-ADA532D', brand: 'Hager', model: 'ADA532D', poles: '1P+N', rating: 32, curve: 'C', icu: 6, sensitivity: 30, rcdType: 'A', use_da: 'Komfur/ovn m. HPFI', use_en: 'Cooker/oven with RCD' },
+  ],
+
+  // === SURGE PROTECTION DEVICES (SPD) ===
+  spds: [
+    { id: 'SE-iPRD40-T2', brand: 'Schneider', model: 'Acti9 iPRD 40r', spdType: 'Type 2', poles: '3P+N', imax: 40, up: 1.5, use_da: 'Overspændingsbeskyttelse hovedtavle', use_en: 'Main panel surge protection' },
+    { id: 'SE-iPRD20-T2', brand: 'Schneider', model: 'Acti9 iPRD 20r', spdType: 'Type 2', poles: '1P+N', imax: 20, up: 1.4, use_da: 'Overspændingsbeskyttelse undertavle', use_en: 'Sub-panel surge protection' },
+    { id: 'SE-iPRF1-T1T2', brand: 'Schneider', model: 'Acti9 iPRF1', spdType: 'Type 1+2', poles: '3P+N', imax: 100, up: 1.5, use_da: 'Lynbeskyttelse + overspænding', use_en: 'Lightning + surge protection' },
+    { id: 'ABB-OVR-T2-3N', brand: 'ABB', model: 'OVR T2 3N', spdType: 'Type 2', poles: '3P+N', imax: 40, up: 1.5, use_da: 'Overspændingsbeskyttelse 3-faset', use_en: '3-phase surge protection' },
+    { id: 'ABB-OVR-T1-T2', brand: 'ABB', model: 'OVR T1-T2', spdType: 'Type 1+2', poles: '3P+N', imax: 100, up: 1.5, use_da: 'Kombineret lyn + overspænding', use_en: 'Combined lightning + surge' },
+  ],
+
+  // === MOTOR PROTECTION CIRCUIT BREAKERS (MPCB) ===
+  // Schneider TeSys GV2/GV3 (se.com)
+  mpcbs: [
+    { id: 'SE-GV2ME05', brand: 'Schneider', model: 'GV2ME05', series: 'TeSys GV2', rangeMin: 0.4, rangeMax: 0.63, kW: 0.12 },
+    { id: 'SE-GV2ME06', brand: 'Schneider', model: 'GV2ME06', series: 'TeSys GV2', rangeMin: 1, rangeMax: 1.6, kW: 0.55 },
+    { id: 'SE-GV2ME08', brand: 'Schneider', model: 'GV2ME08', series: 'TeSys GV2', rangeMin: 2.5, rangeMax: 4, kW: 1.5 },
+    { id: 'SE-GV2ME10', brand: 'Schneider', model: 'GV2ME10', series: 'TeSys GV2', rangeMin: 4, rangeMax: 6.3, kW: 2.2 },
+    { id: 'SE-GV2ME14', brand: 'Schneider', model: 'GV2ME14', series: 'TeSys GV2', rangeMin: 6, rangeMax: 10, kW: 4 },
+    { id: 'SE-GV2ME16', brand: 'Schneider', model: 'GV2ME16', series: 'TeSys GV2', rangeMin: 9, rangeMax: 14, kW: 5.5 },
+    { id: 'SE-GV2ME20', brand: 'Schneider', model: 'GV2ME20', series: 'TeSys GV2', rangeMin: 13, rangeMax: 18, kW: 7.5 },
+    { id: 'SE-GV2ME22', brand: 'Schneider', model: 'GV2ME22', series: 'TeSys GV2', rangeMin: 20, rangeMax: 25, kW: 11 },
+    { id: 'SE-GV2ME32', brand: 'Schneider', model: 'GV2ME32', series: 'TeSys GV2', rangeMin: 24, rangeMax: 32, kW: 15 },
+    { id: 'SE-GV3P40', brand: 'Schneider', model: 'GV3P40', series: 'TeSys GV3', rangeMin: 30, rangeMax: 40, kW: 18.5 },
+    { id: 'SE-GV3P50', brand: 'Schneider', model: 'GV3P50', series: 'TeSys GV3', rangeMin: 37, rangeMax: 50, kW: 22 },
+    { id: 'SE-GV3P65', brand: 'Schneider', model: 'GV3P65', series: 'TeSys GV3', rangeMin: 48, rangeMax: 65, kW: 30 },
+    { id: 'SE-GV3P80', brand: 'Schneider', model: 'GV3P80', series: 'TeSys GV3', rangeMin: 56, rangeMax: 80, kW: 37 },
+  ],
+
+  // === THERMAL OVERLOAD RELAYS ===
+  overloadRelays: [
+    { id: 'SE-LRD06', brand: 'Schneider', model: 'LRD06', series: 'TeSys Deca', rangeMin: 1, rangeMax: 1.6 },
+    { id: 'SE-LRD07', brand: 'Schneider', model: 'LRD07', series: 'TeSys Deca', rangeMin: 1.6, rangeMax: 2.5 },
+    { id: 'SE-LRD10', brand: 'Schneider', model: 'LRD10', series: 'TeSys Deca', rangeMin: 4, rangeMax: 6 },
+    { id: 'SE-LRD12', brand: 'Schneider', model: 'LRD12', series: 'TeSys Deca', rangeMin: 5.5, rangeMax: 8 },
+    { id: 'SE-LRD14', brand: 'Schneider', model: 'LRD14', series: 'TeSys Deca', rangeMin: 7, rangeMax: 10 },
+    { id: 'SE-LRD16', brand: 'Schneider', model: 'LRD16', series: 'TeSys Deca', rangeMin: 9, rangeMax: 13 },
+    { id: 'SE-LRD21', brand: 'Schneider', model: 'LRD21', series: 'TeSys Deca', rangeMin: 12, rangeMax: 18 },
+    { id: 'SE-LRD22', brand: 'Schneider', model: 'LRD22', series: 'TeSys Deca', rangeMin: 16, rangeMax: 24 },
+    { id: 'SE-LRD32', brand: 'Schneider', model: 'LRD32', series: 'TeSys Deca', rangeMin: 23, rangeMax: 32 },
+    { id: 'SE-LRD35', brand: 'Schneider', model: 'LRD35', series: 'TeSys Deca', rangeMin: 30, rangeMax: 38 },
+  ],
+
+  // === SOCKETS & SWITCHES (LK FUGA - Danish standard) ===
+  // Lauritz Knudsen / Schneider LK FUGA range
+  wiringDevices: [
+    { id: 'LK-FUGA-STIK1', brand: 'LK (Lauritz Knudsen)', model: 'FUGA Stikkontakt 1 modul', cat: 'socket', rating: 16, desc_da: '1-modul stikkontakt m. jord', desc_en: '1-module socket with earth' },
+    { id: 'LK-FUGA-STIK2', brand: 'LK (Lauritz Knudsen)', model: 'FUGA Stikkontakt 2 modul', cat: 'socket', rating: 16, desc_da: 'Dobbelt stikkontakt m. jord', desc_en: 'Double socket with earth' },
+    { id: 'LK-FUGA-STIKUSB', brand: 'LK (Lauritz Knudsen)', model: 'FUGA Stikkontakt m. USB', cat: 'socket', rating: 16, desc_da: 'Stikkontakt m. USB-A/C', desc_en: 'Socket with USB-A/C' },
+    { id: 'LK-FUGA-AFB', brand: 'LK (Lauritz Knudsen)', model: 'FUGA Afbryder', cat: 'switch', rating: 10, desc_da: 'Enkelt afbryder', desc_en: 'Single switch' },
+    { id: 'LK-FUGA-KORS', brand: 'LK (Lauritz Knudsen)', model: 'FUGA Korrespondance', cat: 'switch', rating: 10, desc_da: 'Korrespondanceafbryder (trappe)', desc_en: 'Two-way switch (stairs)' },
+    { id: 'LK-FUGA-LYSDÆMP', brand: 'LK (Lauritz Knudsen)', model: 'FUGA Lysdæmper', cat: 'switch', rating: 10, desc_da: 'LED lysdæmper', desc_en: 'LED dimmer' },
+    { id: 'LK-OPUS-STIK', brand: 'LK (Lauritz Knudsen)', model: 'OPUS Stikkontakt', cat: 'socket', rating: 16, desc_da: 'Premium stikkontakt', desc_en: 'Premium socket' },
+    { id: 'LK-IHC-AFB', brand: 'LK (Lauritz Knudsen)', model: 'IHC Wireless afbryder', cat: 'switch', rating: 10, desc_da: 'Trådløs intelligent afbryder', desc_en: 'Wireless smart switch' },
   ]
 };
 
@@ -1136,6 +1220,31 @@ function recommendContactors(ib) {
     .slice(0, 4);
 }
 
+function recommendRCDs(ib, phases) {
+  // RCD rating must be >= load current; match pole count to phase count
+  const poles = phases === '3x400' ? '4P' : '2P';
+  return PRODUCTS.rcds
+    .filter(r => r.poles === poles && r.rating >= ib && r.sensitivity === 30)
+    .sort((a, b) => a.rating - b.rating)
+    .slice(0, 4);
+}
+
+function recommendMPCBs(ib) {
+  // Motor protection: IB must fall within adjustment range
+  return PRODUCTS.mpcbs
+    .filter(m => ib <= m.rangeMax && ib >= m.rangeMin * 0.7)
+    .sort((a, b) => a.rangeMax - b.rangeMax)
+    .slice(0, 3);
+}
+
+function recommendOverloadRelays(ib) {
+  // Overload relay: IB must fall within range
+  return PRODUCTS.overloadRelays
+    .filter(r => ib <= r.rangeMax && ib >= r.rangeMin * 0.7)
+    .sort((a, b) => a.rangeMax - b.rangeMax)
+    .slice(0, 3);
+}
+
 // Render product recommendation card
 function renderRecommendations(title, products, type) {
   if (!products || products.length === 0) return '';
@@ -1178,6 +1287,27 @@ function renderRecommendations(title, products, type) {
       <div class="result-row">
         <span class="label"><strong>${p.brand}</strong> ${p.model} (${p.series})</span>
         <span class="value">AC-3: ${p.ac3_A} A / ${p.ac3_kW} kW</span>
+      </div>
+    `).join('');
+  } else if (type === 'rcd') {
+    rows = products.map(p => `
+      <div class="result-row">
+        <span class="label"><strong>${p.brand}</strong> ${p.model} ${p.poles} ${p.rating}A</span>
+        <span class="value">${p.sensitivity} mA / Type ${p.rcdType}</span>
+      </div>
+    `).join('');
+  } else if (type === 'mpcb') {
+    rows = products.map(p => `
+      <div class="result-row">
+        <span class="label"><strong>${p.brand}</strong> ${p.model} (${p.series})</span>
+        <span class="value">${p.rangeMin}-${p.rangeMax} A / ${p.kW} kW</span>
+      </div>
+    `).join('');
+  } else if (type === 'relay') {
+    rows = products.map(p => `
+      <div class="result-row">
+        <span class="label"><strong>${p.brand}</strong> ${p.model} (${p.series})</span>
+        <span class="value">${p.rangeMin}-${p.rangeMax} A</span>
       </div>
     `).join('');
   }
@@ -1652,12 +1782,13 @@ function renderModule(mod) {
     case 'scircuit': content = renderShortCircuit(); break;
     case 'trafo': content = renderTrafo(); break;
     case 'standards': content = renderStandards(); break;
+    case 'bank': content = renderBank(); break;
   }
   // Append AI assistant to every module
   content += renderAiAssistant(mod);
   // Append QI validation summary if enough data exists
   const qi = runQiValidation();
-  if (qi.passed.length + qi.issues.length > 0 && mod !== 'standards') {
+  if (qi.passed.length + qi.issues.length > 0 && mod !== 'standards' && mod !== 'bank') {
     content += renderQiCard(qi);
   }
   main.innerHTML = content;
@@ -1767,7 +1898,10 @@ function renderLoad() {
     ${renderRecommendations(lang === 'da' ? 'Anbefalede sikringer' : 'Recommended fuses', recommendFuses(ib), 'fuse')}
     ${renderRecommendations(lang === 'da' ? 'Anbefalede automatsikringer' : 'Recommended MCBs', recommendMCBs(ib), 'mcb')}
     ${ib > 63 ? renderRecommendations(lang === 'da' ? 'Anbefalede maksimalafbrydere' : 'Recommended MCCBs', recommendMCCBs(ib), 'mccb') : ''}
+    ${renderRecommendations(lang === 'da' ? 'Anbefalet HPFI/RCD' : 'Recommended RCD', recommendRCDs(ib, loadState.voltage), 'rcd')}
     ${renderRecommendations(lang === 'da' ? 'Anbefalede kontaktorer (motor)' : 'Recommended contactors (motor)', recommendContactors(ib), 'contactor')}
+    ${renderRecommendations(lang === 'da' ? 'Anbefalet motorv\u00E6rn' : 'Recommended motor protection', recommendMPCBs(ib), 'mpcb')}
+    ${renderRecommendations(lang === 'da' ? 'Anbefalet termorel\u00E6' : 'Recommended overload relay', recommendOverloadRelays(ib), 'relay')}
   `;
 }
 
@@ -2493,6 +2627,98 @@ function renderStandards() {
         <div class="result-row"><span class="label">Dansk Standard</span><span class="value">ds.dk</span></div>
         <div class="result-row"><span class="label">IEC Webstore</span><span class="value">webstore.iec.ch</span></div>
         <div class="result-row"><span class="label">${lang === 'da' ? 'Schneider El-guide' : 'Schneider EI Guide'}</span><span class="value">electrical-installation.org</span></div>
+      </div>
+    </div>
+  `;
+}
+
+// ===== COMPONENT BANK MODULE =====
+// Browsable bank of ALL electrical components available in the Danish market
+let bankCategory = 'cables';
+let bankBrand = 'all';
+
+function renderBank() {
+  const categories = {
+    cables: { da: 'Kabler', en: 'Cables', data: PRODUCTS.cables },
+    mcbs: { da: 'Automatsikringer', en: 'MCBs', data: PRODUCTS.mcbs },
+    mccbs: { da: 'Maksimalafbrydere', en: 'MCCBs', data: PRODUCTS.mccbs },
+    fuses: { da: 'Smeltesikringer', en: 'Fuses', data: PRODUCTS.fuses },
+    rcds: { da: 'HPFI / RCD', en: 'RCDs', data: PRODUCTS.rcds },
+    rcbos: { da: 'HPFI-automater', en: 'RCBOs', data: PRODUCTS.rcbos },
+    spds: { da: 'Overspændingsbeskyttelse', en: 'Surge Protection', data: PRODUCTS.spds },
+    contactors: { da: 'Kontaktorer', en: 'Contactors', data: PRODUCTS.contactors },
+    mpcbs: { da: 'Motorværn', en: 'Motor Protection', data: PRODUCTS.mpcbs },
+    overloadRelays: { da: 'Termorelæer', en: 'Overload Relays', data: PRODUCTS.overloadRelays },
+    wiringDevices: { da: 'Stik & Afbrydere', en: 'Sockets & Switches', data: PRODUCTS.wiringDevices }
+  };
+
+  const cat = categories[bankCategory];
+  let items = cat.data;
+
+  // Get unique brands for filter
+  const brands = ['all', ...new Set(cat.data.map(p => p.brand))];
+
+  // Filter by brand
+  if (bankBrand !== 'all') {
+    items = items.filter(p => p.brand === bankBrand);
+  }
+
+  // Build rows based on category
+  const rows = items.map(p => {
+    let spec = '';
+    if (bankCategory === 'cables') spec = `${p.cores} ${p.mm2} mm\u00B2 ${p.material} | Iz=${p.iz}A`;
+    else if (bankCategory === 'mcbs') spec = `${p.curve}${p.rating} ${p.poles} | Icu=${p.icu}kA | ${p.standard}`;
+    else if (bankCategory === 'mccbs') spec = `${p.trip} | Icu=${p.icu}kA | In: ${p.inOptions.join('/')}A`;
+    else if (bankCategory === 'fuses') spec = `${p.rating}A | ${p.size} | Icu=${p.icu}kA`;
+    else if (bankCategory === 'rcds') spec = `${p.poles} ${p.rating}A | ${p.sensitivity}mA Type ${p.rcdType}`;
+    else if (bankCategory === 'rcbos') spec = `${p.poles} ${p.curve}${p.rating} | ${p.sensitivity}mA | Icu=${p.icu}kA`;
+    else if (bankCategory === 'spds') spec = `${p.spdType} ${p.poles} | Imax=${p.imax}kA | Up=${p.up}kV`;
+    else if (bankCategory === 'contactors') spec = `AC-3: ${p.ac3_A}A / ${p.ac3_kW}kW`;
+    else if (bankCategory === 'mpcbs') spec = `${p.rangeMin}-${p.rangeMax}A / ${p.kW}kW`;
+    else if (bankCategory === 'overloadRelays') spec = `${p.rangeMin}-${p.rangeMax}A`;
+    else if (bankCategory === 'wiringDevices') spec = `${p.rating}A | ${lang === 'da' ? p.desc_da : p.desc_en}`;
+
+    const useText = p.use_da ? (lang === 'da' ? p.use_da : p.use_en) : '';
+
+    return `
+      <div class="result-row" style="flex-direction:column;align-items:flex-start;gap:2px">
+        <div style="display:flex;justify-content:space-between;width:100%">
+          <span class="label"><strong>${p.brand}</strong> ${p.model}</span>
+          <span class="value">${spec}</span>
+        </div>
+        ${useText ? `<span style="font-size:0.75rem;color:var(--text-muted)">${useText}</span>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">\uD83D\uDCE6 ${lang === 'da' ? 'Komponentbank' : 'Component Bank'}</div>
+      <div class="info-row">${lang === 'da' ? 'Komplet bank over elektriske komponenter tilg\u00E6ngelige i Danmark (NKT, Schneider, ABB, Eaton, Hager, LK). Klik for at filtrere.' : 'Complete bank of electrical components available in Denmark (NKT, Schneider, ABB, Eaton, Hager, LK). Click to filter.'}</div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Kategori' : 'Category'}</div>
+        <div class="select-grid">
+          ${Object.keys(categories).map(k =>
+            `<button class="sel-btn ${bankCategory === k ? 'selected' : ''}" onclick="bankCategory='${k}';bankBrand='all';renderModule('bank')">${lang === 'da' ? categories[k].da : categories[k].en}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'M\u00E6rke' : 'Brand'}</div>
+        <div class="select-grid">
+          ${brands.map(b =>
+            `<button class="sel-btn ${bankBrand === b ? 'selected' : ''}" onclick="bankBrand='${b}';renderModule('bank')">${b === 'all' ? (lang === 'da' ? 'Alle' : 'All') : b}</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? cat.da : cat.en} (${items.length})</div>
+      <div class="result-box" style="background:#fff;border-color:var(--border)">
+        ${rows || '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Ingen produkter' : 'No products') + '</span></div>'}
       </div>
     </div>
   `;
