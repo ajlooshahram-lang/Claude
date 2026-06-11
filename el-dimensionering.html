@@ -371,7 +371,9 @@ const T = {
       mccb: 'Maksimalafbryder',
       cable: 'Kabler',
       vdrop: 'Spændingsfald',
-      scircuit: 'Kortslutning'
+      scircuit: 'Kortslutning',
+      trafo: 'Trafo',
+      standards: 'Standarder'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -461,7 +463,9 @@ const T = {
       mccb: 'MCCB',
       cable: 'Cables',
       vdrop: 'Voltage Drop',
-      scircuit: 'Short Circuit'
+      scircuit: 'Short Circuit',
+      trafo: 'Transformer',
+      standards: 'Standards'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -756,6 +760,49 @@ const GROUP_FACTORS = {
   1: 1.0, 2: 0.80, 3: 0.70, 4: 0.65, 5: 0.60, 6: 0.57, 7: 0.54, 8: 0.52, 9: 0.50
 };
 
+// ===== DANISH STANDARDS & REGULATIONS =====
+// Based on research of Danish electrical standards websites (elsikkerhed.dk, lovguiden.dk, Sikkerhedsstyrelsen)
+// Content was rephrased for compliance with licensing restrictions
+const DK_STANDARDS = {
+  law: 'Elsikkerhedsloven (Lov nr. 525 af 29/04/2015)',
+  installBek: 'Installationsbekendtgørelsen (BEK nr. 1082)',
+  cableSizing: 'DS/HD 60364-5-52:2011+A11+Ret.1+Till.1+Ret.2+A12:2022',
+  overcurrent: 'DS/HD 60364-4-43:2023',
+  general: 'IEC 60364-1:2025',
+  shortCircuit: 'IEC 60909-0:2016',
+  mcb: 'IEC 60898-1 / EN 60898-1 (MCB)',
+  mccb: 'IEC 60947-2 (MCCB)',
+  fuse: 'IEC 60269 (Smeltesikringer)',
+  rcd: 'DS/HD 60364-4-41 (Beskyttelse mod elektrisk stød)',
+  faellesreg: 'Fællesregulativet 2019 (Elforsyningsregler)',
+  vdropLighting: 3, // % max for belysning
+  vdropOther: 5,    // % max for andre
+  vdropGeneral: 4   // % general limit
+};
+
+// Transformer data (from Dim-af-trafo.ppx)
+const TRAFO_SIZES = [50, 100, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500];
+// Standard transformer impedance in % (uk%)
+const TRAFO_UK = {
+  50: 4, 100: 4, 160: 4, 200: 4, 250: 4, 315: 4, 400: 4, 500: 4, 630: 6, 800: 6, 1000: 6, 1250: 6, 1600: 6, 2000: 6, 2500: 6
+};
+// Transformer losses (no-load / load in W, approximate)
+const TRAFO_LOSSES = {
+  50: { p0: 145, pk: 1350 }, 100: { p0: 210, pk: 2150 }, 160: { p0: 300, pk: 3100 },
+  200: { p0: 350, pk: 3800 }, 250: { p0: 420, pk: 4600 }, 315: { p0: 500, pk: 5600 },
+  400: { p0: 610, pk: 6900 }, 500: { p0: 720, pk: 8400 }, 630: { p0: 860, pk: 10500 },
+  800: { p0: 1030, pk: 13000 }, 1000: { p0: 1200, pk: 15000 }, 1250: { p0: 1450, pk: 18500 },
+  1600: { p0: 1750, pk: 22000 }, 2000: { p0: 2100, pk: 27000 }, 2500: { p0: 2500, pk: 33000 }
+};
+
+// RCD/HPFI types (Danish requirement)
+const RCD_TYPES = {
+  'Type A': { desc_da: 'Vekselstrøm + pulserende DC', desc_en: 'AC + pulsating DC', sensitivity: [30, 100, 300, 500] },
+  'Type B': { desc_da: 'Alle strømformer inkl. glat DC', desc_en: 'All current types incl. smooth DC', sensitivity: [30, 100, 300, 500] },
+  'Type F': { desc_da: 'Type A + højfrekvent', desc_en: 'Type A + high frequency', sensitivity: [30, 100, 300] },
+  'Type AC': { desc_da: 'Kun ren vekselstrøm', desc_en: 'Pure AC only', sensitivity: [30, 100, 300, 500] }
+};
+
 // ===== STATE =====
 let activeModule = 'load';
 
@@ -799,6 +846,8 @@ function renderModule(mod) {
     case 'cable': main.innerHTML = renderCable(); break;
     case 'vdrop': main.innerHTML = renderVdrop(); break;
     case 'scircuit': main.innerHTML = renderShortCircuit(); break;
+    case 'trafo': main.innerHTML = renderTrafo(); break;
+    case 'standards': main.innerHTML = renderStandards(); break;
   }
 }
 
@@ -1219,6 +1268,7 @@ function renderVdrop() {
   }
 
   const isOk = vdropPercent <= 4;
+  const isLighting = vdropPercent <= 3;
   const boxClass = !selectedCable ? '' : (isOk ? '' : 'error');
 
   return `
@@ -1257,6 +1307,8 @@ function renderVdrop() {
         <div class="result-row"><span class="label">${t('vdropPercent')}</span><span class="value">${vdropPercent.toFixed(2)} %</span></div>
         <div class="result-row"><span class="label">${t('vdropRemaining')}</span><span class="value">${(Un - vdrop).toFixed(1)} V</span></div>
         <div class="result-row"><span class="label">${t('vdropLimit')}</span><span class="value">${isOk ? '\u2713' : '\u2717'}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Belysning ≤3%' : 'Lighting ≤3%'}</span><span class="value"><span class="verify-badge ${isLighting ? 'ok' : 'fail'}">${isLighting ? (lang==='da'?'OK':'OK') : (lang==='da'?'Over 3%':'Over 3%')}</span></span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Andre ≤5%' : 'Other ≤5%'}</span><span class="value"><span class="verify-badge ${vdropPercent <= 5 ? 'ok' : 'fail'}">${vdropPercent <= 5 ? 'OK' : (lang==='da'?'Over 5%':'Over 5%')}</span></span></div>
       </div>
     </div>
     ` : ''}
@@ -1380,6 +1432,214 @@ function renderShortCircuit() {
         <div class="result-row"><span class="label">${lang === 'da' ? 'V\u00E6lg beskyttelsesenhed (MCB/MCCB) for kontrolberegning' : 'Select protection device (MCB/MCCB) for verification'}</span></div>
       </div>
       `}
+    </div>
+  `;
+}
+
+// ===== TRANSFORMER MODULE =====
+// Data from 1.-Dim-af-trafo.ppx.pptx
+let trafoState = { size: 400, voltage: '10/0.4', loadPercent: 75 };
+
+function renderTrafo() {
+  const S = trafoState.size;
+  const uk = TRAFO_UK[S] || 4;
+  const losses = TRAFO_LOSSES[S] || { p0: 0, pk: 0 };
+  const loadFactor = trafoState.loadPercent / 100;
+
+  // Full load current (secondary)
+  const Ifl = (S * 1000) / (Math.sqrt(3) * 400);
+  // Actual load current
+  const Iload = Ifl * loadFactor;
+  // Transformer impedance in mOhm (secondary side)
+  const Ztrafo = (uk / 100) * (400 * 400) / (S * 1000) * 1000; // mOhm
+  // Short-circuit current at secondary busbar
+  const Ik = (S * 1000) / (Math.sqrt(3) * 400 * (uk / 100));
+  // Total losses at given load
+  const Ploss = losses.p0 + losses.pk * loadFactor * loadFactor;
+
+  const voltageOptions = ['10/0.4', '20/0.4', '50/10', '30/10'];
+  const loadSteps = [25, 50, 60, 70, 75, 80, 85, 90, 95, 100];
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Transformerdimensionering' : 'Transformer Dimensioning'}</div>
+      <div class="info-row">${lang === 'da' ? 'Vælg trafostørrelse og belastningsgrad. Baseret på Fællesregulativet 2019.' : 'Select transformer size and load level. Based on Fællesregulativet 2019.'}</div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Trafostørrelse [kVA]' : 'Transformer Size [kVA]'}</div>
+        <div class="select-grid">
+          ${TRAFO_SIZES.map(s =>
+            `<button class="sel-btn ${trafoState.size === s ? 'selected' : ''}" onclick="trafoState.size=${s};renderModule('trafo')">${s}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Omsætningsforhold [kV]' : 'Voltage Ratio [kV]'}</div>
+        <div class="select-grid">
+          ${voltageOptions.map(v =>
+            `<button class="sel-btn ${trafoState.voltage === v ? 'selected' : ''}" onclick="trafoState.voltage='${v}';renderModule('trafo')">${v}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Belastningsgrad [%]' : 'Load Level [%]'}</div>
+        <div class="select-grid">
+          ${loadSteps.map(l =>
+            `<button class="sel-btn ${trafoState.loadPercent === l ? 'selected' : ''}" onclick="trafoState.loadPercent=${l};renderModule('trafo')">${l}%</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Trafodata' : 'Transformer Data'}</div>
+      <div class="result-box">
+        <div class="result-title">${lang === 'da' ? 'Resultat' : 'Result'}</div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Størrelse' : 'Size'}</span><span class="value">${S} kVA</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Omsætning' : 'Ratio'}</span><span class="value">${trafoState.voltage} kV</span></div>
+        <div class="result-row"><span class="label">uk%</span><span class="value">${uk} %</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Fuldlaststrøm (sek.)' : 'Full-load current (sec.)'}</span><span class="value">${Ifl.toFixed(1)} A</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Aktuel belastning' : 'Actual load'}</span><span class="value">${Iload.toFixed(1)} A (${trafoState.loadPercent}%)</span></div>
+        <div class="result-row"><span class="label">Z trafo</span><span class="value">${Ztrafo.toFixed(2)} mΩ</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Ik (sekundær skinne)' : 'Ik (secondary busbar)'}</span><span class="value">${(Ik/1000).toFixed(2)} kA</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Tab (tomgang)' : 'Losses (no-load)'}</span><span class="value">${losses.p0} W</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Tab (belastning)' : 'Losses (load)'}</span><span class="value">${(losses.pk * loadFactor * loadFactor).toFixed(0)} W</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Totale tab' : 'Total losses'}</span><span class="value">${Ploss.toFixed(0)} W</span></div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Strømtransformer til måling' : 'Current Transformer for Metering'}</div>
+      <div class="result-box" style="background:#eaf2f8;border-color:var(--primary-light)">
+        <div class="result-title">${lang === 'da' ? 'Anbefaling' : 'Recommendation'}</div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'CT primær' : 'CT primary'}</span><span class="value">${Math.ceil(Ifl / 50) * 50} / 5 A</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'CT klasse' : 'CT class'}</span><span class="value">0.5 (${lang === 'da' ? 'måling' : 'metering'})</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Sikringselement' : 'Fuse element'}</span><span class="value">${lang === 'da' ? 'NH sikring' : 'NH fuse'} ${Math.ceil(Ifl / 50) * 50 > 250 ? 'NH 2' : 'NH 1'}</span></div>
+      </div>
+    </div>
+  `;
+}
+
+// ===== STANDARDS MODULE =====
+function renderStandards() {
+  return `
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Danske Elstandarder & Lovgivning' : 'Danish Electrical Standards & Legislation'}</div>
+      <div class="info-row">${lang === 'da' ? 'Oversigt over gældende standarder brugt i denne app' : 'Overview of applicable standards used in this app'}</div>
+
+      <div class="result-box" style="background:#eaf2f8;border-color:var(--primary-light)">
+        <div class="result-title">${lang === 'da' ? 'Lovgrundlag' : 'Legal Framework'}</div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Hovedlov' : 'Main Act'}</span><span class="value">${DK_STANDARDS.law}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Installation' : 'Installation'}</span><span class="value">${DK_STANDARDS.installBek}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Forsyningsregler' : 'Supply Rules'}</span><span class="value">${DK_STANDARDS.faellesreg}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Myndighed' : 'Authority'}</span><span class="value">Sikkerhedsstyrelsen</span></div>
+      </div>
+
+      <div class="result-box" style="margin-top:12px;background:linear-gradient(135deg,#eafaf1,#d5f5e3);border-color:var(--success)">
+        <div class="result-title">${lang === 'da' ? 'Tekniske Standarder' : 'Technical Standards'}</div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Kabeldimensionering' : 'Cable Sizing'}</span><span class="value">${DK_STANDARDS.cableSizing}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Overstrømsbeskyttelse' : 'Overcurrent Protection'}</span><span class="value">${DK_STANDARDS.overcurrent}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Generelle krav' : 'General Requirements'}</span><span class="value">${DK_STANDARDS.general}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Kortslutning' : 'Short Circuit'}</span><span class="value">${DK_STANDARDS.shortCircuit}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Beskyttelse mod stød' : 'Shock Protection'}</span><span class="value">${DK_STANDARDS.rcd}</span></div>
+      </div>
+
+      <div class="result-box" style="margin-top:12px;background:linear-gradient(135deg,#fef9e7,#fdebd0);border-color:var(--warning)">
+        <div class="result-title">${lang === 'da' ? 'Komponentstandarder' : 'Component Standards'}</div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Automatsikring (MCB)' : 'MCB'}</span><span class="value">${DK_STANDARDS.mcb}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Maksimalafbryder (MCCB)' : 'MCCB'}</span><span class="value">${DK_STANDARDS.mccb}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Smeltesikringer' : 'Fuses'}</span><span class="value">${DK_STANDARDS.fuse}</span></div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Spændingsfald — Krav' : 'Voltage Drop — Requirements'}</div>
+      <div class="result-box">
+        <div class="result-title">${lang === 'da' ? 'Grænseværdier iht. HD 60364' : 'Limits per HD 60364'}</div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Belysning' : 'Lighting'}</span><span class="value">≤ ${DK_STANDARDS.vdropLighting}%</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Andre forbrugere' : 'Other loads'}</span><span class="value">≤ ${DK_STANDARDS.vdropOther}%</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Generel grænse' : 'General limit'}</span><span class="value">≤ ${DK_STANDARDS.vdropGeneral}%</span></div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'RCD/HPFI Krav (DS/HD 60364-4-41)' : 'RCD/RCCB Requirements (DS/HD 60364-4-41)'}</div>
+      <div class="info-row">${lang === 'da' ? 'I Danmark kræves HPFI (30 mA) på alle nye installationer i boliger.' : 'In Denmark, RCD (30 mA) is required on all new residential installations.'}</div>
+
+      <table class="data-table">
+        <tr>
+          <th>${lang === 'da' ? 'Type' : 'Type'}</th>
+          <th>${lang === 'da' ? 'Beskrivelse' : 'Description'}</th>
+          <th>${lang === 'da' ? 'Følsomhed [mA]' : 'Sensitivity [mA]'}</th>
+        </tr>
+        ${Object.entries(RCD_TYPES).map(([type, data]) => `
+          <tr>
+            <td><strong>${type}</strong></td>
+            <td>${lang === 'da' ? data.desc_da : data.desc_en}</td>
+            <td>${data.sensitivity.join(', ')}</td>
+          </tr>
+        `).join('')}
+      </table>
+
+      <div class="result-box" style="margin-top:12px">
+        <div class="result-title">${lang === 'da' ? 'Danske Krav' : 'Danish Requirements'}</div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Boliger (nye)' : 'Residential (new)'}</span><span class="value">${lang === 'da' ? 'HPFI Type A, 30 mA påkrævet' : 'RCD Type A, 30 mA required'}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Badeværelse' : 'Bathroom'}</span><span class="value">${lang === 'da' ? 'HPFI 30 mA obligatorisk' : 'RCD 30 mA mandatory'}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Udendørs stik' : 'Outdoor sockets'}</span><span class="value">${lang === 'da' ? 'HPFI 30 mA obligatorisk' : 'RCD 30 mA mandatory'}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Industri (TN-system)' : 'Industrial (TN system)'}</span><span class="value">${lang === 'da' ? 'RCD 300 mA anbefales' : 'RCD 300 mA recommended'}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'EV-ladere' : 'EV chargers'}</span><span class="value">${lang === 'da' ? 'Type B eller Type A + 6 mA DC' : 'Type B or Type A + 6 mA DC'}</span></div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Jordingssystemer' : 'Earthing Systems'}</div>
+      <div class="info-row">${lang === 'da' ? 'Baseret på DS/HD 60364-4-41 og 5.-Jordingssystem.ppx' : 'Based on DS/HD 60364-4-41 and grounding system materials'}</div>
+
+      <table class="data-table">
+        <tr>
+          <th>${lang === 'da' ? 'System' : 'System'}</th>
+          <th>${lang === 'da' ? 'Beskrivelse' : 'Description'}</th>
+          <th>${lang === 'da' ? 'Typisk brug i DK' : 'Typical use in DK'}</th>
+        </tr>
+        <tr>
+          <td><strong>TN-S</strong></td>
+          <td>${lang === 'da' ? 'Separat N og PE hele vejen' : 'Separate N and PE throughout'}</td>
+          <td>${lang === 'da' ? 'Nye installationer' : 'New installations'}</td>
+        </tr>
+        <tr>
+          <td><strong>TN-C-S</strong></td>
+          <td>${lang === 'da' ? 'Fælles PEN i forsyning, split i installation' : 'Combined PEN in supply, split in installation'}</td>
+          <td>${lang === 'da' ? 'Mest almindelig i DK' : 'Most common in DK'}</td>
+        </tr>
+        <tr>
+          <td><strong>TN-C</strong></td>
+          <td>${lang === 'da' ? 'Fælles PEN-leder hele vejen' : 'Combined PEN conductor throughout'}</td>
+          <td>${lang === 'da' ? 'Kun forsyningsnet (>16mm²)' : 'Supply network only (>16mm²)'}</td>
+        </tr>
+        <tr>
+          <td><strong>TT</strong></td>
+          <td>${lang === 'da' ? 'Lokal jordspyd, ingen PE fra forsyning' : 'Local earth rod, no PE from supply'}</td>
+          <td>${lang === 'da' ? 'Sjælden i DK' : 'Rare in DK'}</td>
+        </tr>
+        <tr>
+          <td><strong>IT</strong></td>
+          <td>${lang === 'da' ? 'Isoleret stjerneunkt' : 'Isolated neutral'}</td>
+          <td>${lang === 'da' ? 'Hospitaler, skibe' : 'Hospitals, ships'}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Kilder & Links' : 'Sources & Links'}</div>
+      <div class="result-box" style="background:#eaf2f8;border-color:var(--primary-light)">
+        <div class="result-row"><span class="label">Sikkerhedsstyrelsen</span><span class="value">sik.dk</span></div>
+        <div class="result-row"><span class="label">Elsikkerhed.dk</span><span class="value">elsikkerhed.dk</span></div>
+        <div class="result-row"><span class="label">Dansk Standard</span><span class="value">ds.dk</span></div>
+        <div class="result-row"><span class="label">IEC Webstore</span><span class="value">webstore.iec.ch</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Schneider El-guide' : 'Schneider EI Guide'}</span><span class="value">electrical-installation.org</span></div>
+      </div>
     </div>
   `;
 }
