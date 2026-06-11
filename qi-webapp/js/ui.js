@@ -202,8 +202,11 @@
       code: (a, b) => a.num - b.num
     };
     list.sort(sorters[f.sort] || sorters.rpn);
-    // Pinned cases always float to the top within the current sort.
-    list.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+    // Pinned cases always float to the top, ordered by pinOrder (drag-to-reorder).
+    list.sort((a, b) => {
+      if (a.pinned && b.pinned) return (a.pinOrder || 0) - (b.pinOrder || 0);
+      return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
+    });
     const names = S.get().roster.map(r => r.name).filter(Boolean);
     // saved views (per-project) and pagination
     const views = S.savedViews();
@@ -216,9 +219,9 @@
     const allSelected = visibleCases.length > 0 && visibleCases.every(c => uiState.selected.has(c.id));
     const someSelected = uiState.selected.size > 0;
     const rows = visibleCases.map(c => `
-      <tr data-id="${c.id}" class="${uiState.selected.has(c.id) ? "row-selected" : ""} ${c.pinned ? "pinned-row" : ""}">
+      <tr data-id="${c.id}" class="${uiState.selected.has(c.id) ? "row-selected" : ""} ${c.pinned ? "pinned-row" : ""}" ${c.pinned ? 'draggable="true"' : ""}>
         <td class="center"><input type="checkbox" data-bulk="row" data-id="${c.id}" ${uiState.selected.has(c.id) ? "checked" : ""} aria-label="Select ${esc(c.code)}"></td>
-        <td class="pin-cell ${c.pinned ? "pin-on" : ""}" data-act="pin" data-id="${c.id}" title="${c.pinned ? "Unpin" : "Pin to top"}">${c.pinned ? "📌" : "<span class='muted'>📍</span>"}</td>
+        <td class="pin-cell ${c.pinned ? "pin-on" : ""}" data-act="pin" data-id="${c.id}" title="${c.pinned ? "Unpin (drag to reorder)" : "Pin to top"}">${c.pinned ? "📌" : "<span class='muted'>📍</span>"}</td>
         <td>${esc(c.code)}</td>
         <td class="wrap">${esc(c.problem)}</td>
         <td>${esc(c.category)}</td>
@@ -283,7 +286,7 @@
         <button class="btn btn-sm" data-act="bulkclear">Clear</button>
       </div>
       ${tableWrap(head, rows)}
-      ${rendered < list.length ? `<div class="loadmore"><span class="muted">Showing first ${rendered} of ${list.length}.</span> <button class="btn btn-sm" data-act="pagemore">Load next ${pageSize}</button> <button class="btn btn-sm" data-act="pageall">Show all</button></div>` : ""}`;
+      ${rendered < list.length ? `<div class="loadmore" id="loadmore"><span class="muted">Showing first ${rendered} of ${list.length}.</span> <button class="btn btn-sm" data-act="pagemore">Load next ${pageSize}</button> <button class="btn btn-sm" data-act="pageall">Show all</button></div>` : ""}`;
   };
   AFTER.cases = function () {
     const bind = (id, key) => { const el = $("#" + id); if (el) el.addEventListener("change", () => { uiState.caseFilter[key] = el.value; go("cases"); }); };
@@ -359,6 +362,41 @@
       });
     };
     bulkApply("Status"); bulkApply("Owner"); bulkApply("Priority");
+    // Auto-load more rows when scrolling near the bottom (infinite scroll).
+    const lm = $("#loadmore");
+    if (lm && typeof IntersectionObserver !== "undefined") {
+      const io = new IntersectionObserver(entries => {
+        if (entries[0] && entries[0].isIntersecting) {
+          io.disconnect();
+          const cur = uiState.caseFilter.pageSize || 100;
+          uiState.caseFilter.pageSize = cur + 100;
+          go("cases");
+        }
+      }, { rootMargin: "200px" });
+      io.observe(lm);
+    }
+    // Drag-to-reorder pinned rows
+    let dragRowId = null;
+    content.querySelectorAll("tr.pinned-row[draggable]").forEach(tr => {
+      tr.addEventListener("dragstart", e => {
+        dragRowId = tr.dataset.id;
+        if (e.dataTransfer) e.dataTransfer.setData("text/plain", dragRowId);
+        tr.style.opacity = ".5";
+      });
+      tr.addEventListener("dragend", () => { tr.style.opacity = "1"; });
+      tr.addEventListener("dragover", e => { e.preventDefault(); tr.classList.add("row-dragover"); });
+      tr.addEventListener("dragleave", () => { tr.classList.remove("row-dragover"); });
+      tr.addEventListener("drop", e => {
+        e.preventDefault(); tr.classList.remove("row-dragover");
+        const fromId = dragRowId || (e.dataTransfer && e.dataTransfer.getData("text/plain"));
+        const toId = tr.dataset.id;
+        if (fromId && toId && fromId !== toId) {
+          S.reorderPin(fromId, toId);
+          toast("Pin order updated");
+          go("cases");
+        }
+      });
+    });
   };
 
   RENDER.pm = function () {
