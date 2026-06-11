@@ -1,0 +1,3106 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El-Dimensionering / Electrical Dimensioning</title>
+<style>
+:root {
+  --primary: #0f4c75;
+  --primary-light: #3282b8;
+  --primary-glow: rgba(50,130,184,0.15);
+  --accent: #00b4d8;
+  --accent-soft: #90e0ef;
+  --success: #06d6a0;
+  --success-bg: rgba(6,214,160,0.08);
+  --danger: #ef476f;
+  --danger-bg: rgba(239,71,111,0.08);
+  --warning: #ffd166;
+  --warning-bg: rgba(255,209,102,0.1);
+  --bg: #f0f4f8;
+  --bg-gradient: linear-gradient(180deg, #e8eef5 0%, #f0f4f8 100%);
+  --card: #ffffff;
+  --text: #1b2838;
+  --text-light: #5a6d7e;
+  --text-muted: #8fa3b5;
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+  --shadow-sm: 0 1px 3px rgba(15,76,117,0.04), 0 1px 2px rgba(15,76,117,0.06);
+  --shadow: 0 4px 12px rgba(15,76,117,0.06), 0 1px 3px rgba(15,76,117,0.08);
+  --shadow-lg: 0 10px 30px rgba(15,76,117,0.08), 0 4px 10px rgba(15,76,117,0.05);
+  --shadow-glow: 0 0 20px rgba(50,130,184,0.12);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+  background: var(--bg-gradient);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Header */
+.header {
+  background: linear-gradient(135deg, #0a2e4d 0%, var(--primary) 50%, var(--primary-light) 100%);
+  color: white;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 4px 20px rgba(10,46,77,0.25);
+  backdrop-filter: blur(10px);
+}
+
+.header h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.lang-toggle {
+  display: flex;
+  gap: 3px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 22px;
+  padding: 3px;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.lang-btn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 18px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: transparent;
+  color: rgba(255,255,255,0.6);
+  transition: var(--transition);
+  letter-spacing: 0.5px;
+}
+
+.lang-btn:hover { color: rgba(255,255,255,0.9); }
+.lang-btn.active {
+  background: white;
+  color: var(--primary);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* Navigation */
+.nav {
+  display: flex;
+  gap: 8px;
+  padding: 14px 20px;
+  background: white;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  box-shadow: var(--shadow-sm);
+}
+.nav::-webkit-scrollbar { display: none; }
+
+.nav-btn {
+  padding: 9px 18px;
+  border: 1.5px solid var(--border);
+  border-radius: 22px;
+  background: var(--bg);
+  color: var(--text-light);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition);
+  letter-spacing: 0.2px;
+}
+
+.nav-btn:hover {
+  border-color: var(--primary-light);
+  color: var(--primary);
+  background: var(--primary-glow);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.nav-btn.active {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 3px 12px rgba(15,76,117,0.3);
+  transform: translateY(-1px);
+}
+
+/* Main Content */
+.main {
+  padding: 20px;
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+/* Cards */
+.card {
+  background: var(--card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border-light);
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  opacity: 0;
+  transition: var(--transition);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.card:hover::before { opacity: 1; }
+
+.card-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--border-light);
+  letter-spacing: -0.2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Selection Grid */
+.select-group {
+  margin-bottom: 20px;
+}
+
+.select-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.select-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sel-btn {
+  padding: 10px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: white;
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  min-width: 52px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.sel-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--primary-glow);
+  opacity: 0;
+  transition: var(--transition);
+}
+
+.sel-btn:hover {
+  border-color: var(--primary-light);
+  background: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(50,130,184,0.12);
+}
+
+.sel-btn:hover::after { opacity: 1; }
+
+.sel-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.sel-btn.selected {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(15,76,117,0.25);
+  transform: translateY(-1px);
+}
+
+.sel-btn.selected::after { display: none; }
+.sel-btn.disabled { opacity: 0.35; pointer-events: none; filter: grayscale(0.5); }
+
+/* Results */
+.result-box {
+  background: linear-gradient(135deg, rgba(6,214,160,0.05), rgba(6,214,160,0.02));
+  border: 1.5px solid var(--success);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-top: 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+.result-box::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--success);
+  border-radius: 2px;
+}
+
+.result-box.warning {
+  background: linear-gradient(135deg, rgba(255,209,102,0.06), rgba(255,209,102,0.02));
+  border-color: var(--warning);
+}
+.result-box.warning::before { background: var(--warning); }
+
+.result-box.error {
+  background: linear-gradient(135deg, rgba(239,71,111,0.04), rgba(239,71,111,0.02));
+  border-color: var(--danger);
+}
+.result-box.error::before { background: var(--danger); }
+
+.result-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+  color: var(--success);
+  padding-left: 8px;
+}
+
+.result-box.warning .result-title { color: #b8860b; }
+.result-box.error .result-title { color: var(--danger); }
+
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 8px 8px 12px;
+  margin: 2px 0;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  transition: var(--transition);
+}
+
+.result-row:hover { background: rgba(15,76,117,0.03); }
+.result-row .label { color: var(--text-light); font-weight: 500; }
+.result-row .value { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* Verification badges */
+.verify-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 14px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.verify-badge.ok {
+  background: linear-gradient(135deg, rgba(6,214,160,0.15), rgba(6,214,160,0.08));
+  color: #047857;
+  border: 1px solid rgba(6,214,160,0.3);
+}
+
+.verify-badge.fail {
+  background: linear-gradient(135deg, rgba(239,71,111,0.12), rgba(239,71,111,0.06));
+  color: #b91c46;
+  border: 1px solid rgba(239,71,111,0.3);
+}
+
+/* Table */
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.82rem;
+  margin-top: 12px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.data-table th {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: white;
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.data-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-light);
+  transition: var(--transition);
+}
+
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: var(--primary-glow); }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .header { padding: 12px 16px; }
+  .header h1 { font-size: 1.05rem; }
+  .nav { padding: 10px 12px; gap: 6px; }
+  .nav-btn { font-size: 0.72rem; padding: 7px 12px; }
+  .card { padding: 16px; margin-bottom: 14px; border-radius: var(--radius); }
+  .sel-btn { padding: 8px 12px; font-size: 0.8rem; min-width: 44px; }
+  .main { padding: 14px; }
+  .select-grid { gap: 6px; }
+}
+
+/* Animations */
+.fade-in {
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.card:nth-child(2) { animation-delay: 0.05s; }
+.card:nth-child(3) { animation-delay: 0.1s; }
+.card:nth-child(4) { animation-delay: 0.15s; }
+
+/* Info tooltip */
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, var(--primary-glow), rgba(50,130,184,0.05));
+  border: 1px solid rgba(50,130,184,0.12);
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+  font-size: 0.8rem;
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.info-row::before {
+  content: "\2139";
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: white;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(15,76,117,0.2);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* Status Bar */
+.status-bar {
+  display: flex;
+  gap: 6px;
+  padding: 8px 20px;
+  background: linear-gradient(135deg, #f8fafc, #edf2f7);
+  border-bottom: 1px solid var(--border-light);
+  overflow-x: auto;
+  scrollbar-width: none;
+  align-items: center;
+  min-height: 40px;
+}
+.status-bar::-webkit-scrollbar { display: none; }
+.status-bar:empty { display: none; }
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-light);
+  white-space: nowrap;
+  transition: var(--transition);
+  cursor: pointer;
+}
+
+.status-chip:hover {
+  border-color: var(--primary-light);
+  color: var(--primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.status-chip .chip-label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.status-chip .chip-value {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.status-chip.has-value {
+  background: var(--primary-glow);
+  border-color: rgba(50,130,184,0.2);
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1 id="appTitle">El-Dimensionering</h1>
+  <div class="lang-toggle">
+    <button class="lang-btn active" onclick="setLang('da')">DA</button>
+    <button class="lang-btn" onclick="setLang('en')">EN</button>
+  </div>
+</div>
+
+<div class="nav" id="mainNav"></div>
+<div class="status-bar" id="statusBar"></div>
+
+<div class="main" id="mainContent"></div>
+
+<script>
+// ===== LANGUAGE SYSTEM =====
+let lang = 'da';
+
+const T = {
+  da: {
+    appTitle: 'El-Dimensionering',
+    modules: {
+      load: 'Belastning',
+      fuse: 'Sikringer',
+      mcb: 'Automatsikring',
+      mccb: 'Maksimalafbryder',
+      cable: 'Kabler',
+      vdrop: 'Spændingsfald',
+      scircuit: 'Kortslutning',
+      trafo: 'Trafo',
+      standards: 'Standarder',
+      bank: 'Komponentbank',
+      ai: 'Spørg AI-Elektriker'
+    },
+    // Load module
+    loadTitle: 'Belastningsberegning',
+    voltage: 'Spænding',
+    power: 'Effekt [kW]',
+    powerFactor: 'Effektfaktor (cos\u03C6)',
+    phases: 'Faser',
+    simultaneity: 'Samtidighedsfaktor',
+    expansion: 'Udvidelsesfaktor',
+    loadResult: 'Beregnet belastningsstrøm',
+    ib: 'IB (Belastningsstrøm)',
+    sApparent: 'S (Tilsyneladende effekt)',
+    // Fuse module
+    fuseTitle: 'Valg af smeltesikring',
+    fuseHolder: 'Sikringsholder',
+    fuseSize: 'Sikringsstørrelse',
+    fuseIkmax: 'Maks. kortslutning',
+    fuseCurrent5s: 'Strøm i 5 sek.',
+    fuseResult: 'Valgt sikring',
+    fuseCurrentRange: 'Strømområde',
+    fuseBreaker: 'Afbryder',
+    // MCB module
+    mcbTitle: 'Valg af automatsikring',
+    mcbType: 'Type',
+    mcbCurve: 'Kurve',
+    mcbRating: 'Mærkestrøm [A]',
+    mcbPoles: 'Poler',
+    mcbIcu: 'Icu [kA]',
+    mcbIsd: 'Isd-område',
+    mcbResult: 'Valgt automatsikring',
+    mcbStandard: 'Standard',
+    // MCCB module
+    mccbTitle: 'Maksimalafbryder (NSX)',
+    mccbFrame: 'Ramme',
+    mccbTrip: 'Udløserkurve',
+    mccbIn: 'Mærkestrøm In [A]',
+    mccbIo: 'Langsom udløser Io',
+    mccbIsd2: 'Isd multiplikator',
+    mccbIcu2: 'Icu [kA]',
+    mccbResult: 'Indstillinger',
+    mccbIr: 'Ir (indstillet)',
+    mccbIsdCalc: 'Isd (beregnet)',
+    mccbIi: 'Ii (momentan)',
+    // Cable module
+    cableTitle: 'Kabeldimensionering',
+    cableMaterial: 'Materiale',
+    cableCopper: 'Kobber',
+    cableAluminium: 'Aluminium',
+    cableType: 'Kabeltype',
+    cableCores: 'Antal ledere',
+    cableCrossSection: 'Tværsnit [mm\u00B2]',
+    cableR: 'R [\u03A9/km]',
+    cableX: 'X [\u03A9/km]',
+    cableResult: 'Valgt kabel',
+    cableIz: 'Iz (strømb\u00E6reevne)',
+    // Voltage drop
+    vdropTitle: 'Spændingsfald',
+    cableLength: 'Kabellængde [m]',
+    vdropResult: 'Beregnet spændingsfald',
+    vdropPercent: 'Spændingsfald [%]',
+    vdropVolts: 'Spændingsfald [V]',
+    vdropRemaining: 'Restspænding [V]',
+    vdropLimit: 'Grænse: maks 4%',
+    // Short circuit
+    scTitle: 'Kortslutningskontrol',
+    scZnet: 'Znet [m\u03A9]',
+    scZtrafo: 'Ztrafo [m\u03A9]',
+    scIkmax: 'Ik max [kA]',
+    scIkmin: 'Ik min [A]',
+    scResult: 'Kortslutningskontrol',
+    scCheck1: 'Icu \u2265 Ik max',
+    scCheck2: 'Isd \u2264 Ik min',
+    // General
+    select: 'V\u00E6lg',
+    result: 'Resultat',
+    ok: 'OK',
+    fail: 'FEJL',
+    infoClick: 'V\u00E6lg v\u00E6rdier ved at klikke - ingen indtastning n\u00F8dvendig',
+    calculate: 'Beregn'
+  },
+  en: {
+    appTitle: 'Electrical Dimensioning',
+    modules: {
+      load: 'Load Calc',
+      fuse: 'Fuses',
+      mcb: 'MCB',
+      mccb: 'MCCB',
+      cable: 'Cables',
+      vdrop: 'Voltage Drop',
+      scircuit: 'Short Circuit',
+      trafo: 'Transformer',
+      standards: 'Standards',
+      bank: 'Component Bank',
+      ai: 'Ask AI-Electrician'
+    },
+    loadTitle: 'Load Calculation',
+    voltage: 'Voltage',
+    power: 'Power [kW]',
+    powerFactor: 'Power Factor (cos\u03C6)',
+    phases: 'Phases',
+    simultaneity: 'Simultaneity Factor',
+    expansion: 'Expansion Factor',
+    loadResult: 'Calculated Load Current',
+    ib: 'IB (Load Current)',
+    sApparent: 'S (Apparent Power)',
+    fuseTitle: 'Fuse Selection',
+    fuseHolder: 'Fuse Holder',
+    fuseSize: 'Fuse Size',
+    fuseIkmax: 'Max. Short Circuit',
+    fuseCurrent5s: 'Current at 5 sec.',
+    fuseResult: 'Selected Fuse',
+    fuseCurrentRange: 'Current Range',
+    fuseBreaker: 'Breaker',
+    mcbTitle: 'MCB Selection',
+    mcbType: 'Type',
+    mcbCurve: 'Curve',
+    mcbRating: 'Rated Current [A]',
+    mcbPoles: 'Poles',
+    mcbIcu: 'Icu [kA]',
+    mcbIsd: 'Isd Range',
+    mcbResult: 'Selected MCB',
+    mcbStandard: 'Standard',
+    mccbTitle: 'MCCB (NSX)',
+    mccbFrame: 'Frame',
+    mccbTrip: 'Trip Curve',
+    mccbIn: 'Rated Current In [A]',
+    mccbIo: 'Long-time Io',
+    mccbIsd2: 'Isd Multiplier',
+    mccbIcu2: 'Icu [kA]',
+    mccbResult: 'Settings',
+    mccbIr: 'Ir (set)',
+    mccbIsdCalc: 'Isd (calculated)',
+    mccbIi: 'Ii (instantaneous)',
+    cableTitle: 'Cable Dimensioning',
+    cableMaterial: 'Material',
+    cableCopper: 'Copper',
+    cableAluminium: 'Aluminium',
+    cableType: 'Cable Type',
+    cableCores: 'Cores',
+    cableCrossSection: 'Cross-section [mm\u00B2]',
+    cableR: 'R [\u03A9/km]',
+    cableX: 'X [\u03A9/km]',
+    cableResult: 'Selected Cable',
+    cableIz: 'Iz (Current Capacity)',
+    vdropTitle: 'Voltage Drop',
+    cableLength: 'Cable Length [m]',
+    vdropResult: 'Calculated Voltage Drop',
+    vdropPercent: 'Voltage Drop [%]',
+    vdropVolts: 'Voltage Drop [V]',
+    vdropRemaining: 'Remaining Voltage [V]',
+    vdropLimit: 'Limit: max 4%',
+    scTitle: 'Short Circuit Check',
+    scZnet: 'Znet [m\u03A9]',
+    scZtrafo: 'Ztrafo [m\u03A9]',
+    scIkmax: 'Ik max [kA]',
+    scIkmin: 'Ik min [A]',
+    scResult: 'Short Circuit Check',
+    scCheck1: 'Icu \u2265 Ik max',
+    scCheck2: 'Isd \u2264 Ik min',
+    select: 'Select',
+    result: 'Result',
+    ok: 'OK',
+    fail: 'FAIL',
+    infoClick: 'Select values by clicking - no typing required',
+    calculate: 'Calculate'
+  }
+};
+
+function t(key) { return T[lang][key] || key; }
+
+function setLang(l) {
+  lang = l;
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.lang-btn[onclick="setLang('${l}')"]`).classList.add('active');
+  document.getElementById('appTitle').textContent = t('appTitle');
+  renderNav();
+  renderModule(activeModule);
+}
+
+// ===== DATA FROM UPLOADED FILES =====
+
+// Fuse holders and their max short-circuit ratings
+const FUSE_HOLDERS = {
+  'D01': { ikMax: 50, range: '2 - 16 A', breaker: 'Gruppe afbryder', sizes: [2, 4, 6, 10, 13, 16] },
+  'D02': { ikMax: 50, range: '20 - 63 A', breaker: 'Tytan (2)', sizes: [20, 25, 32, 35, 40, 50, 63] },
+  'NH 000/00': { ikMax: 22, range: '80 - 160 A', breaker: 'INFD 160', sizes: [80, 100, 125, 160] },
+  'NH 1': { ikMax: 40, range: '200 - 250 A', breaker: 'INFD 250', sizes: [200, 224, 250] },
+  'NH 2': { ikMax: 47, range: '300 - 400 A', breaker: 'INFD 400', sizes: [300, 315, 355, 400] },
+  'NH 3': { ikMax: 75, range: '425 - 630 A', breaker: 'INFD 630', sizes: [425, 500, 630] }
+};
+
+// NH fuse 5-second currents (approximate per standard tables)
+const FUSE_5S = {
+  2: 9, 4: 17, 6: 26, 10: 43, 13: 56, 16: 72,
+  20: 90, 25: 110, 32: 145, 35: 160, 40: 180, 50: 230, 63: 290,
+  80: 370, 100: 460, 125: 580, 160: 750,
+  200: 900, 224: 1020, 250: 1150,
+  300: 1350, 315: 1400, 355: 1600, 400: 1800,
+  425: 1950, 500: 2300, 630: 2900
+};
+
+// MCB data (from sheet 6)
+const MCB_TYPES = {
+  'C60N': { standard: 'IEC 947-2', icu1p: 3, icuMp: 10, ics: 0.75, ratings: [0.5, 1, 2, 3, 4, 6, 10, 13, 16, 20, 25, 32, 40, 50, 63] },
+  'C60H': { standard: 'IEC 947-2', icu1p: 3, icuMp: 15, ics: 0.5, ratings: [1, 2, 3, 4, 6, 10, 13, 16, 20, 25, 32, 40, 50, 63] },
+  'C60L': { standard: 'IEC 947-2', icu1p: 6, icuMp: 25, ics: 0.5, ratings: [0.5, 1, 2, 3, 4, 6, 10, 13, 16, 20, 25, 32, 40, 50, 63] },
+  'C120N': { standard: 'IEC 947-2', icu1p: 3, icuMp: 10, ics: 0.75, ratings: [63, 80, 100, 125] },
+  'C120H': { standard: 'IEC 947-2', icu1p: 15, icuMp: 30, ics: 0.5, ratings: [1, 2, 3, 4, 6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125] },
+  'NG125N': { standard: 'IEC 947-2', icu1p: 4.5, icuMp: 25, ics: 0.75, ratings: [10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125] }
+};
+
+const MCB_CURVES = {
+  'B': { isdMin: 3.2, isdMax: 4.8 },
+  'C': { isdMin: 7, isdMax: 10 },
+  'D': { isdMin: 10, isdMax: 20 }
+};
+
+// MCCB NSX data
+const MCCB_FRAMES = {
+  'NSX 100': { inOptions: [16, 25, 32, 40, 50, 63, 80, 100] },
+  'NSX 160': { inOptions: [80, 100, 125, 160] },
+  'NSX 250': { inOptions: [100, 125, 160, 200, 250] },
+  'NSX 400': { inOptions: [250, 320, 400] },
+  'NSX 630': { inOptions: [400, 500, 630] }
+};
+
+const MCCB_TRIPS = {
+  'B': 25, 'F': 36, 'N': 50, 'H': 70, 'S': 100, 'L': 150
+};
+
+// Micrologic 2.2 settings
+const MCCB_IO_RANGE = [0.4, 0.5, 0.6, 0.63, 0.7, 0.8, 0.9, 0.95, 1.0];
+const MCCB_ISD_MULT = [1.5, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+// Cable data from the spreadsheets
+const CABLES_COPPER = {
+  'NOIKLX': {
+    '5G': {
+      1.5: { r: 12.1, x: 0.113 },
+      2.5: { r: 7.41, x: 0.105 },
+      4: { r: 4.61, x: 0.099 },
+      6: { r: 3.08, x: 0.097 },
+      10: { r: 1.83, x: 0.092 },
+      16: { r: 1.15, x: 0.088 },
+      25: { r: 0.727, x: 0.086 }
+    },
+    '4X': {
+      4: { r: 4.61, x: 0.096 },
+      6: { r: 3.08, x: 0.094 },
+      10: { r: 1.83, x: 0.089 },
+      16: { r: 1.15, x: 0.085 },
+      25: { r: 0.727, x: 0.086 },
+      35: { r: 0.525, x: 0.082 },
+      50: { r: 0.388, x: 0.084 },
+      70: { r: 0.269, x: 0.081 },
+      95: { r: 0.194, x: 0.082 },
+      120: { r: 0.155, x: 0.082 },
+      150: { r: 0.126, x: 0.084 },
+      185: { r: 0.1017, x: 0.082 },
+      240: { r: 0.0787, x: 0.083 }
+    }
+  },
+  'NOIKX-Flex': {
+    '5G': {
+      6: { r: 3.08, x: 0.097 },
+      10: { r: 1.83, x: 0.092 },
+      16: { r: 1.15, x: 0.088 },
+      25: { r: 0.727, x: 0.089 },
+      35: { r: 0.525, x: 0.085 }
+    },
+    '4X': {
+      6: { r: 3.08, x: 0.094 },
+      10: { r: 1.83, x: 0.089 },
+      16: { r: 1.15, x: 0.085 },
+      25: { r: 0.727, x: 0.086 },
+      35: { r: 0.525, x: 0.082 },
+      50: { r: 0.388, x: 0.084 },
+      70: { r: 0.269, x: 0.081 },
+      95: { r: 0.194, x: 0.082 },
+      120: { r: 0.155, x: 0.082 },
+      150: { r: 0.126, x: 0.084 },
+      185: { r: 0.1017, x: 0.082 },
+      240: { r: 0.0787, x: 0.083 }
+    }
+  },
+  'NOSP-CU': {
+    '3X': {
+      '70+35': { r: 0.269, x: 0.079 },
+      '95+50': { r: 0.194, x: 0.077 },
+      '120+70': { r: 0.155, x: 0.077 },
+      '185+95': { r: 0.1017, x: 0.077 }
+    }
+  },
+  'H07RN-F': {
+    '5G': {
+      1.5: { r: 12.1, x: 0.113 },
+      2.5: { r: 7.41, x: 0.105 },
+      4: { r: 4.61, x: 0.099 },
+      6: { r: 3.08, x: 0.097 },
+      10: { r: 1.83, x: 0.092 },
+      16: { r: 1.15, x: 0.088 },
+      25: { r: 0.727, x: 0.086 },
+      35: { r: 0.525, x: 0.082 }
+    },
+    '3G': {
+      1.5: { r: 12.1, x: 0.113 },
+      2.5: { r: 7.41, x: 0.105 },
+      4: { r: 4.61, x: 0.099 },
+      6: { r: 3.08, x: 0.097 }
+    }
+  },
+  'PVL H07V-R': {
+    '1G': {
+      1.5: { r: 12.1, x: 0.113 },
+      2.5: { r: 7.41, x: 0.105 },
+      4: { r: 4.61, x: 0.099 },
+      6: { r: 3.08, x: 0.097 },
+      10: { r: 1.83, x: 0.092 },
+      16: { r: 1.15, x: 0.088 }
+    }
+  }
+};
+
+const CABLES_ALU = {
+  'NOIK-AL-M': {
+    '4X': {
+      16: { r: 1.91, x: 0.069 },
+      25: { r: 1.2, x: 0.084 },
+      50: { r: 0.641, x: 0.081 },
+      95: { r: 0.321, x: 0.078 },
+      150: { r: 0.207, x: 0.078 },
+      240: { r: 0.127, x: 0.077 }
+    },
+    '5G': {
+      16: { r: 1.91, x: 0.072 },
+      25: { r: 1.2, x: 0.087 }
+    }
+  },
+  'NOIK-AL-S': {
+    '4X': {
+      50: { r: 0.641, x: 0.080 },
+      70: { r: 0.444, x: 0.079 },
+      95: { r: 0.321, x: 0.077 },
+      120: { r: 0.253, x: 0.077 },
+      150: { r: 0.207, x: 0.077 },
+      185: { r: 0.166, x: 0.077 }
+    }
+  },
+  'NOSP-AL': {
+    '4X': {
+      50: { r: 0.641, x: 0.080 },
+      70: { r: 0.444, x: 0.079 },
+      95: { r: 0.321, x: 0.077 },
+      120: { r: 0.253, x: 0.077 },
+      150: { r: 0.207, x: 0.077 },
+      185: { r: 0.166, x: 0.077 },
+      240: { r: 0.127, x: 0.077 }
+    }
+  }
+};
+
+// Current carrying capacity (Iz) per cross-section (installation method C, 3-phase copper)
+const IZ_COPPER = {
+  1.5: 17.5, 2.5: 24, 4: 32, 6: 41, 10: 57, 16: 76, 25: 101, 35: 125,
+  50: 151, 70: 192, 95: 232, 120: 269, 150: 300, 185: 341, 240: 400, 300: 458
+};
+
+// Aluminium Iz (approx 78% of copper)
+const IZ_ALU = {
+  16: 60, 25: 78, 35: 96, 50: 117, 70: 150, 95: 181, 120: 210, 150: 234, 185: 266, 240: 312
+};
+
+// Correction factors from installation methods (simplified)
+const INSTALL_METHODS = {
+  'A1': 0.87, 'A2': 0.83, 'B1': 1.0, 'B2': 0.96,
+  'C': 1.0, 'D': 1.0, 'E': 1.04, 'F': 1.09, 'G': 1.17
+};
+
+// Temperature correction
+const TEMP_FACTORS = {
+  10: 1.22, 15: 1.17, 20: 1.12, 25: 1.06, 30: 1.0, 35: 0.94, 40: 0.87, 45: 0.79, 50: 0.71
+};
+
+// Grouping correction
+const GROUP_FACTORS = {
+  1: 1.0, 2: 0.80, 3: 0.70, 4: 0.65, 5: 0.60, 6: 0.57, 7: 0.54, 8: 0.52, 9: 0.50
+};
+
+// ===== PRODUCT DATABASE =====
+// Real products from major manufacturers used in Danish electrical installations
+// Sources: NKT (nkt.com), Schneider Electric (se.com), ABB (abb.com), Eaton (eaton.com)
+
+const PRODUCTS = {
+  // === CABLES (NKT Denmark) ===
+  cables: [
+    // NKT NOIKLX 90 Dca - Halogen-free building wire, most common in DK
+    { id: 'NKT-NOIKLX-1.5', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '5G', mm2: 1.5, material: 'Cu', iz: 17.5, r: 12.1, x: 0.113, use_da: 'Belysning, stikkontakter', use_en: 'Lighting, sockets' },
+    { id: 'NKT-NOIKLX-2.5', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '5G', mm2: 2.5, material: 'Cu', iz: 24, r: 7.41, x: 0.105, use_da: 'Stikkontakter, små apparater', use_en: 'Sockets, small appliances' },
+    { id: 'NKT-NOIKLX-4', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '5G', mm2: 4, material: 'Cu', iz: 32, r: 4.61, x: 0.099, use_da: 'Komfur, varmepumpe', use_en: 'Cooker, heat pump' },
+    { id: 'NKT-NOIKLX-6', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '5G', mm2: 6, material: 'Cu', iz: 41, r: 3.08, x: 0.097, use_da: 'Ovn, sauna, EV-lader', use_en: 'Oven, sauna, EV charger' },
+    { id: 'NKT-NOIKLX-10', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '5G', mm2: 10, material: 'Cu', iz: 57, r: 1.83, x: 0.092, use_da: 'Undertavle, EV-lader', use_en: 'Sub-panel, EV charger' },
+    { id: 'NKT-NOIKLX-16', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '5G', mm2: 16, material: 'Cu', iz: 76, r: 1.15, x: 0.088, use_da: 'Undertavle, store belastninger', use_en: 'Sub-panel, large loads' },
+    { id: 'NKT-NOIKLX-25', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '4X', mm2: 25, material: 'Cu', iz: 101, r: 0.727, x: 0.086, use_da: 'Hovedtilslutning, undertavle', use_en: 'Main supply, sub-panel' },
+    { id: 'NKT-NOIKLX-35', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '4X', mm2: 35, material: 'Cu', iz: 125, r: 0.525, x: 0.082, use_da: 'Hovedtavle', use_en: 'Main panel' },
+    { id: 'NKT-NOIKLX-50', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '4X', mm2: 50, material: 'Cu', iz: 151, r: 0.388, x: 0.084, use_da: 'Forsyningskabel', use_en: 'Supply cable' },
+    { id: 'NKT-NOIKLX-70', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '4X', mm2: 70, material: 'Cu', iz: 192, r: 0.269, x: 0.081, use_da: 'Hovedforsyning', use_en: 'Main supply' },
+    { id: 'NKT-NOIKLX-95', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '4X', mm2: 95, material: 'Cu', iz: 232, r: 0.194, x: 0.082, use_da: 'Hovedforsyning', use_en: 'Main supply' },
+    { id: 'NKT-NOIKLX-120', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '4X', mm2: 120, material: 'Cu', iz: 269, r: 0.155, x: 0.082, use_da: 'Hovedforsyning, industri', use_en: 'Main supply, industrial' },
+    { id: 'NKT-NOIKLX-150', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '4X', mm2: 150, material: 'Cu', iz: 300, r: 0.126, x: 0.084, use_da: 'Industri', use_en: 'Industrial' },
+    { id: 'NKT-NOIKLX-185', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '4X', mm2: 185, material: 'Cu', iz: 341, r: 0.1017, x: 0.082, use_da: 'Industri, store anlæg', use_en: 'Industrial, large installations' },
+    { id: 'NKT-NOIKLX-240', brand: 'NKT', model: 'NOIKLX 90 Dca', cores: '4X', mm2: 240, material: 'Cu', iz: 400, r: 0.0787, x: 0.083, use_da: 'Industri, store anlæg', use_en: 'Industrial, large installations' },
+    // NKT NOIK-AL-M - Aluminium
+    { id: 'NKT-AL-16', brand: 'NKT', model: 'NOIK-AL-M', cores: '4X', mm2: 16, material: 'Al', iz: 60, r: 1.91, x: 0.069, use_da: 'Forsyningskabel (alu)', use_en: 'Supply cable (alu)' },
+    { id: 'NKT-AL-25', brand: 'NKT', model: 'NOIK-AL-M', cores: '4X', mm2: 25, material: 'Al', iz: 78, r: 1.2, x: 0.084, use_da: 'Forsyningskabel (alu)', use_en: 'Supply cable (alu)' },
+    { id: 'NKT-AL-50', brand: 'NKT', model: 'NOIK-AL-M', cores: '4X', mm2: 50, material: 'Al', iz: 117, r: 0.641, x: 0.081, use_da: 'Hovedforsyning (alu)', use_en: 'Main supply (alu)' },
+    { id: 'NKT-AL-95', brand: 'NKT', model: 'NOIK-AL-M', cores: '4X', mm2: 95, material: 'Al', iz: 181, r: 0.321, x: 0.078, use_da: 'Hovedforsyning (alu)', use_en: 'Main supply (alu)' },
+    { id: 'NKT-AL-150', brand: 'NKT', model: 'NOIK-AL-M', cores: '4X', mm2: 150, material: 'Al', iz: 234, r: 0.207, x: 0.078, use_da: 'Industri (alu)', use_en: 'Industrial (alu)' },
+    { id: 'NKT-AL-240', brand: 'NKT', model: 'NOIK-AL-M', cores: '4X', mm2: 240, material: 'Al', iz: 312, r: 0.127, x: 0.077, use_da: 'Industri (alu)', use_en: 'Industrial (alu)' },
+  ],
+
+  // === MCBs (Schneider + ABB) ===
+  mcbs: [
+    // Schneider iC60N (Acti9) - Most common in DK residential/commercial
+    { id: 'SE-iC60N-B6', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'B', rating: 6, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-B10', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'B', rating: 10, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-B13', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'B', rating: 13, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-B16', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'B', rating: 16, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-B20', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'B', rating: 20, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-B25', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'B', rating: 25, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-B32', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'B', rating: 32, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-B40', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'B', rating: 40, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-C10', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'C', rating: 10, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-C16', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'C', rating: 16, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-C20', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'C', rating: 20, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-C25', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'C', rating: 25, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-C32', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'C', rating: 32, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-C40', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'C', rating: 40, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-C50', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'C', rating: 50, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'SE-iC60N-C63', brand: 'Schneider', model: 'iC60N', series: 'Acti9', curve: 'C', rating: 63, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    // Schneider iC60H (higher breaking capacity)
+    { id: 'SE-iC60H-B10', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'B', rating: 10, poles: '1P', icu: 10, standard: 'EN 60898-1' },
+    { id: 'SE-iC60H-B16', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'B', rating: 16, poles: '1P', icu: 10, standard: 'EN 60898-1' },
+    { id: 'SE-iC60H-B20', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'B', rating: 20, poles: '1P', icu: 10, standard: 'EN 60898-1' },
+    { id: 'SE-iC60H-B25', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'B', rating: 25, poles: '1P', icu: 10, standard: 'EN 60898-1' },
+    { id: 'SE-iC60H-C16', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'C', rating: 16, poles: '3P', icu: 10, standard: 'EN 60898-1' },
+    { id: 'SE-iC60H-C25', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'C', rating: 25, poles: '3P', icu: 10, standard: 'EN 60898-1' },
+    { id: 'SE-iC60H-C32', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'C', rating: 32, poles: '3P', icu: 10, standard: 'EN 60898-1' },
+    { id: 'SE-iC60H-C40', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'C', rating: 40, poles: '3P', icu: 10, standard: 'EN 60898-1' },
+    { id: 'SE-iC60H-C63', brand: 'Schneider', model: 'iC60H', series: 'Acti9', curve: 'C', rating: 63, poles: '3P', icu: 10, standard: 'EN 60898-1' },
+    // Schneider C60N (Multi9 industrial, IEC 60947-2)
+    { id: 'SE-C60N-B10', brand: 'Schneider', model: 'C60N', series: 'Multi9', curve: 'B', rating: 10, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
+    { id: 'SE-C60N-B16', brand: 'Schneider', model: 'C60N', series: 'Multi9', curve: 'B', rating: 16, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
+    { id: 'SE-C60N-C16', brand: 'Schneider', model: 'C60N', series: 'Multi9', curve: 'C', rating: 16, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
+    { id: 'SE-C60N-C32', brand: 'Schneider', model: 'C60N', series: 'Multi9', curve: 'C', rating: 32, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
+    { id: 'SE-C60N-C63', brand: 'Schneider', model: 'C60N', series: 'Multi9', curve: 'C', rating: 63, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
+    // ABB S200 series
+    { id: 'ABB-S201-B6', brand: 'ABB', model: 'S201', series: 'S200', curve: 'B', rating: 6, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S201-B10', brand: 'ABB', model: 'S201', series: 'S200', curve: 'B', rating: 10, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S201-B16', brand: 'ABB', model: 'S201', series: 'S200', curve: 'B', rating: 16, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S201-B20', brand: 'ABB', model: 'S201', series: 'S200', curve: 'B', rating: 20, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S201-B25', brand: 'ABB', model: 'S201', series: 'S200', curve: 'B', rating: 25, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S201-B32', brand: 'ABB', model: 'S201', series: 'S200', curve: 'B', rating: 32, poles: '1P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S203-C10', brand: 'ABB', model: 'S203', series: 'S200', curve: 'C', rating: 10, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S203-C16', brand: 'ABB', model: 'S203', series: 'S200', curve: 'C', rating: 16, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S203-C20', brand: 'ABB', model: 'S203', series: 'S200', curve: 'C', rating: 20, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S203-C25', brand: 'ABB', model: 'S203', series: 'S200', curve: 'C', rating: 25, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S203-C32', brand: 'ABB', model: 'S203', series: 'S200', curve: 'C', rating: 32, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S203-C40', brand: 'ABB', model: 'S203', series: 'S200', curve: 'C', rating: 40, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S203-C50', brand: 'ABB', model: 'S203', series: 'S200', curve: 'C', rating: 50, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    { id: 'ABB-S203-C63', brand: 'ABB', model: 'S203', series: 'S200', curve: 'C', rating: 63, poles: '3P', icu: 6, standard: 'EN 60898-1' },
+    // ABB S200M (10kA)
+    { id: 'ABB-S203M-C16', brand: 'ABB', model: 'S203M', series: 'S200M', curve: 'C', rating: 16, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
+    { id: 'ABB-S203M-C25', brand: 'ABB', model: 'S203M', series: 'S200M', curve: 'C', rating: 25, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
+    { id: 'ABB-S203M-C32', brand: 'ABB', model: 'S203M', series: 'S200M', curve: 'C', rating: 32, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
+    { id: 'ABB-S203M-C63', brand: 'ABB', model: 'S203M', series: 'S200M', curve: 'C', rating: 63, poles: '3P', icu: 10, standard: 'IEC 60947-2' },
+  ],
+
+  // === MCCBs (Schneider Compact NSX) ===
+  mccbs: [
+    { id: 'SE-NSX100B', brand: 'Schneider', model: 'NSX 100B', frame: 'NSX 100', trip: 'B', icu: 25, inOptions: [16,25,32,40,50,63,80,100] },
+    { id: 'SE-NSX100F', brand: 'Schneider', model: 'NSX 100F', frame: 'NSX 100', trip: 'F', icu: 36, inOptions: [16,25,32,40,50,63,80,100] },
+    { id: 'SE-NSX100N', brand: 'Schneider', model: 'NSX 100N', frame: 'NSX 100', trip: 'N', icu: 50, inOptions: [16,25,32,40,50,63,80,100] },
+    { id: 'SE-NSX160B', brand: 'Schneider', model: 'NSX 160B', frame: 'NSX 160', trip: 'B', icu: 25, inOptions: [80,100,125,160] },
+    { id: 'SE-NSX160F', brand: 'Schneider', model: 'NSX 160F', frame: 'NSX 160', trip: 'F', icu: 36, inOptions: [80,100,125,160] },
+    { id: 'SE-NSX160N', brand: 'Schneider', model: 'NSX 160N', frame: 'NSX 160', trip: 'N', icu: 50, inOptions: [80,100,125,160] },
+    { id: 'SE-NSX250B', brand: 'Schneider', model: 'NSX 250B', frame: 'NSX 250', trip: 'B', icu: 25, inOptions: [100,125,160,200,250] },
+    { id: 'SE-NSX250F', brand: 'Schneider', model: 'NSX 250F', frame: 'NSX 250', trip: 'F', icu: 36, inOptions: [100,125,160,200,250] },
+    { id: 'SE-NSX250N', brand: 'Schneider', model: 'NSX 250N', frame: 'NSX 250', trip: 'N', icu: 50, inOptions: [100,125,160,200,250] },
+    { id: 'SE-NSX400F', brand: 'Schneider', model: 'NSX 400F', frame: 'NSX 400', trip: 'F', icu: 36, inOptions: [250,320,400] },
+    { id: 'SE-NSX400N', brand: 'Schneider', model: 'NSX 400N', frame: 'NSX 400', trip: 'N', icu: 50, inOptions: [250,320,400] },
+    { id: 'SE-NSX400H', brand: 'Schneider', model: 'NSX 400H', frame: 'NSX 400', trip: 'H', icu: 70, inOptions: [250,320,400] },
+    { id: 'SE-NSX630F', brand: 'Schneider', model: 'NSX 630F', frame: 'NSX 630', trip: 'F', icu: 36, inOptions: [400,500,630] },
+    { id: 'SE-NSX630N', brand: 'Schneider', model: 'NSX 630N', frame: 'NSX 630', trip: 'N', icu: 50, inOptions: [400,500,630] },
+    { id: 'SE-NSX630H', brand: 'Schneider', model: 'NSX 630H', frame: 'NSX 630', trip: 'H', icu: 70, inOptions: [400,500,630] },
+  ],
+
+  // === NH FUSES (Eaton Bussmann, IEC 60269) ===
+  fuses: [
+    // Size 000/00 (D01/D02 type)
+    { id: 'EATON-D01-6', brand: 'Eaton', model: 'D01 gG', size: 'D01', rating: 6, icu: 50, i5s: 26 },
+    { id: 'EATON-D01-10', brand: 'Eaton', model: 'D01 gG', size: 'D01', rating: 10, icu: 50, i5s: 43 },
+    { id: 'EATON-D01-13', brand: 'Eaton', model: 'D01 gG', size: 'D01', rating: 13, icu: 50, i5s: 56 },
+    { id: 'EATON-D01-16', brand: 'Eaton', model: 'D01 gG', size: 'D01', rating: 16, icu: 50, i5s: 72 },
+    { id: 'EATON-D02-20', brand: 'Eaton', model: 'D02 gG', size: 'D02', rating: 20, icu: 50, i5s: 90 },
+    { id: 'EATON-D02-25', brand: 'Eaton', model: 'D02 gG', size: 'D02', rating: 25, icu: 50, i5s: 110 },
+    { id: 'EATON-D02-32', brand: 'Eaton', model: 'D02 gG', size: 'D02', rating: 32, icu: 50, i5s: 145 },
+    { id: 'EATON-D02-35', brand: 'Eaton', model: 'D02 gG', size: 'D02', rating: 35, icu: 50, i5s: 160 },
+    { id: 'EATON-D02-50', brand: 'Eaton', model: 'D02 gG', size: 'D02', rating: 50, icu: 50, i5s: 230 },
+    { id: 'EATON-D02-63', brand: 'Eaton', model: 'D02 gG', size: 'D02', rating: 63, icu: 50, i5s: 290 },
+    // NH sizes (knife-blade, IEC 60269-2)
+    { id: 'EATON-NH000-80', brand: 'Eaton', model: 'NH000 gG', size: 'NH 000/00', rating: 80, icu: 120, i5s: 370 },
+    { id: 'EATON-NH000-100', brand: 'Eaton', model: 'NH000 gG', size: 'NH 000/00', rating: 100, icu: 120, i5s: 460 },
+    { id: 'EATON-NH000-125', brand: 'Eaton', model: 'NH000 gG', size: 'NH 000/00', rating: 125, icu: 120, i5s: 580 },
+    { id: 'EATON-NH000-160', brand: 'Eaton', model: 'NH00 gG', size: 'NH 000/00', rating: 160, icu: 120, i5s: 750 },
+    { id: 'EATON-NH1-200', brand: 'Eaton', model: 'NH1 gG', size: 'NH 1', rating: 200, icu: 120, i5s: 900 },
+    { id: 'EATON-NH1-250', brand: 'Eaton', model: 'NH1 gG', size: 'NH 1', rating: 250, icu: 120, i5s: 1150 },
+    { id: 'EATON-NH2-315', brand: 'Eaton', model: 'NH2 gG', size: 'NH 2', rating: 315, icu: 120, i5s: 1400 },
+    { id: 'EATON-NH2-355', brand: 'Eaton', model: 'NH2 gG', size: 'NH 2', rating: 355, icu: 120, i5s: 1600 },
+    { id: 'EATON-NH2-400', brand: 'Eaton', model: 'NH2 gG', size: 'NH 2', rating: 400, icu: 120, i5s: 1800 },
+    { id: 'EATON-NH3-500', brand: 'Eaton', model: 'NH3 gG', size: 'NH 3', rating: 500, icu: 120, i5s: 2300 },
+    { id: 'EATON-NH3-630', brand: 'Eaton', model: 'NH3 gG', size: 'NH 3', rating: 630, icu: 120, i5s: 2900 },
+  ],
+
+  // === CONTACTORS (Schneider TeSys D + ABB AF) ===
+  contactors: [
+    // Schneider TeSys Deca LC1D series (AC-3, 400V)
+    { id: 'SE-LC1D09', brand: 'Schneider', model: 'LC1D09', series: 'TeSys Deca', ac3_A: 9, ac3_kW: 4, ac1_A: 25 },
+    { id: 'SE-LC1D12', brand: 'Schneider', model: 'LC1D12', series: 'TeSys Deca', ac3_A: 12, ac3_kW: 5.5, ac1_A: 25 },
+    { id: 'SE-LC1D18', brand: 'Schneider', model: 'LC1D18', series: 'TeSys Deca', ac3_A: 18, ac3_kW: 7.5, ac1_A: 32 },
+    { id: 'SE-LC1D25', brand: 'Schneider', model: 'LC1D25', series: 'TeSys Deca', ac3_A: 25, ac3_kW: 11, ac1_A: 40 },
+    { id: 'SE-LC1D32', brand: 'Schneider', model: 'LC1D32', series: 'TeSys Deca', ac3_A: 32, ac3_kW: 15, ac1_A: 50 },
+    { id: 'SE-LC1D38', brand: 'Schneider', model: 'LC1D38', series: 'TeSys Deca', ac3_A: 38, ac3_kW: 18.5, ac1_A: 56 },
+    { id: 'SE-LC1D40', brand: 'Schneider', model: 'LC1D40', series: 'TeSys Deca', ac3_A: 40, ac3_kW: 18.5, ac1_A: 60 },
+    { id: 'SE-LC1D50', brand: 'Schneider', model: 'LC1D50', series: 'TeSys Deca', ac3_A: 50, ac3_kW: 22, ac1_A: 80 },
+    { id: 'SE-LC1D65', brand: 'Schneider', model: 'LC1D65', series: 'TeSys Deca', ac3_A: 65, ac3_kW: 30, ac1_A: 80 },
+    { id: 'SE-LC1D80', brand: 'Schneider', model: 'LC1D80', series: 'TeSys Deca', ac3_A: 80, ac3_kW: 37, ac1_A: 125 },
+    { id: 'SE-LC1D95', brand: 'Schneider', model: 'LC1D95', series: 'TeSys Deca', ac3_A: 95, ac3_kW: 45, ac1_A: 125 },
+    // ABB AF series (AC-3, 400V)
+    { id: 'ABB-AF09', brand: 'ABB', model: 'AF09', series: 'AF', ac3_A: 9, ac3_kW: 4, ac1_A: 25 },
+    { id: 'ABB-AF12', brand: 'ABB', model: 'AF12', series: 'AF', ac3_A: 12, ac3_kW: 5.5, ac1_A: 25 },
+    { id: 'ABB-AF16', brand: 'ABB', model: 'AF16', series: 'AF', ac3_A: 16, ac3_kW: 7.5, ac1_A: 30 },
+    { id: 'ABB-AF26', brand: 'ABB', model: 'AF26', series: 'AF', ac3_A: 26, ac3_kW: 11, ac1_A: 45 },
+    { id: 'ABB-AF38', brand: 'ABB', model: 'AF38', series: 'AF', ac3_A: 38, ac3_kW: 18.5, ac1_A: 56 },
+    { id: 'ABB-AF52', brand: 'ABB', model: 'AF52', series: 'AF', ac3_A: 52, ac3_kW: 22, ac1_A: 75 },
+    { id: 'ABB-AF65', brand: 'ABB', model: 'AF65', series: 'AF', ac3_A: 65, ac3_kW: 30, ac1_A: 100 },
+    { id: 'ABB-AF80', brand: 'ABB', model: 'AF80', series: 'AF', ac3_A: 80, ac3_kW: 37, ac1_A: 125 },
+  ],
+
+  // === RCD / HPFI (Residual Current Devices) - Danish requirement ===
+  // Sources: Schneider Acti9 iID (se.com), Hager (hager.com)
+  rcds: [
+    { id: 'SE-A9R-2P25-30', brand: 'Schneider', model: 'Acti9 iID', poles: '2P', rating: 25, sensitivity: 30, rcdType: 'A', use_da: 'Bolig 1-faset', use_en: 'Residential 1-phase' },
+    { id: 'SE-A9R-2P40-30', brand: 'Schneider', model: 'Acti9 iID', poles: '2P', rating: 40, sensitivity: 30, rcdType: 'A', use_da: 'Bolig 1-faset (standard)', use_en: 'Residential 1-phase (standard)' },
+    { id: 'SE-A9R-2P63-30', brand: 'Schneider', model: 'Acti9 iID', poles: '2P', rating: 63, sensitivity: 30, rcdType: 'A', use_da: 'Bolig stor 1-faset', use_en: 'Large residential 1-phase' },
+    { id: 'SE-A9R-4P25-30', brand: 'Schneider', model: 'Acti9 iID', poles: '4P', rating: 25, sensitivity: 30, rcdType: 'A', use_da: 'Bolig/erhverv 3-faset', use_en: 'Residential/commercial 3-phase' },
+    { id: 'SE-A9R-4P40-30', brand: 'Schneider', model: 'Acti9 iID', poles: '4P', rating: 40, sensitivity: 30, rcdType: 'A', use_da: 'Erhverv 3-faset (standard)', use_en: 'Commercial 3-phase (standard)' },
+    { id: 'SE-A9R-4P63-30', brand: 'Schneider', model: 'Acti9 iID', poles: '4P', rating: 63, sensitivity: 30, rcdType: 'A', use_da: 'Erhverv stor 3-faset', use_en: 'Large commercial 3-phase' },
+    { id: 'SE-A9R-4P63-300', brand: 'Schneider', model: 'Acti9 iID', poles: '4P', rating: 63, sensitivity: 300, rcdType: 'A', use_da: 'Brandbeskyttelse industri', use_en: 'Fire protection industrial' },
+    { id: 'SE-A9R-4P40-B30', brand: 'Schneider', model: 'Acti9 iID Type B', poles: '4P', rating: 40, sensitivity: 30, rcdType: 'B', use_da: 'EV-ladere, frekvensomformere', use_en: 'EV chargers, VFDs' },
+    { id: 'HAGER-CDA240D', brand: 'Hager', model: 'CDA240D', poles: '2P', rating: 40, sensitivity: 30, rcdType: 'A', use_da: 'Bolig 1-faset', use_en: 'Residential 1-phase' },
+    { id: 'HAGER-CDA263D', brand: 'Hager', model: 'CDA263D', poles: '2P', rating: 63, sensitivity: 30, rcdType: 'A', use_da: 'Bolig stor 1-faset', use_en: 'Large residential 1-phase' },
+    { id: 'HAGER-CDC440D', brand: 'Hager', model: 'CDC440D', poles: '4P', rating: 40, sensitivity: 30, rcdType: 'A', use_da: 'Erhverv 3-faset', use_en: 'Commercial 3-phase' },
+    { id: 'HAGER-CDC463D', brand: 'Hager', model: 'CDC463D', poles: '4P', rating: 63, sensitivity: 30, rcdType: 'A', use_da: 'Erhverv stor 3-faset', use_en: 'Large commercial 3-phase' },
+  ],
+
+  // === RCBO (combined MCB + RCD) ===
+  rcbos: [
+    { id: 'SE-A9DC3610', brand: 'Schneider', model: 'Acti9 iCV40', poles: '1P+N', rating: 10, curve: 'C', icu: 6, sensitivity: 30, rcdType: 'A', use_da: 'Belysningsgruppe m. HPFI', use_en: 'Lighting circuit with RCD' },
+    { id: 'SE-A9DC3616', brand: 'Schneider', model: 'Acti9 iCV40', poles: '1P+N', rating: 16, curve: 'C', icu: 6, sensitivity: 30, rcdType: 'A', use_da: 'Stikkontaktgruppe m. HPFI', use_en: 'Socket circuit with RCD' },
+    { id: 'SE-A9DC3620', brand: 'Schneider', model: 'Acti9 iCV40', poles: '1P+N', rating: 20, curve: 'C', icu: 6, sensitivity: 30, rcdType: 'A', use_da: 'Stikkontaktgruppe m. HPFI', use_en: 'Socket circuit with RCD' },
+    { id: 'SE-A9DC3632', brand: 'Schneider', model: 'Acti9 iCV40', poles: '1P+N', rating: 32, curve: 'C', icu: 6, sensitivity: 30, rcdType: 'A', use_da: 'Komfur/ovn m. HPFI', use_en: 'Cooker/oven with RCD' },
+    { id: 'SE-A9D05840', brand: 'Schneider', model: 'Acti9 iC60H RCBO', poles: '1P+N', rating: 40, curve: 'C', icu: 10, sensitivity: 30, rcdType: 'A', use_da: 'Stor gruppe m. HPFI (10kA)', use_en: 'Large circuit with RCD (10kA)' },
+    { id: 'HAGER-ADA516D', brand: 'Hager', model: 'ADA516D', poles: '1P+N', rating: 16, curve: 'C', icu: 6, sensitivity: 30, rcdType: 'A', use_da: 'Stikkontaktgruppe m. HPFI', use_en: 'Socket circuit with RCD' },
+    { id: 'HAGER-ADA532D', brand: 'Hager', model: 'ADA532D', poles: '1P+N', rating: 32, curve: 'C', icu: 6, sensitivity: 30, rcdType: 'A', use_da: 'Komfur/ovn m. HPFI', use_en: 'Cooker/oven with RCD' },
+  ],
+
+  // === SURGE PROTECTION DEVICES (SPD) ===
+  spds: [
+    { id: 'SE-iPRD40-T2', brand: 'Schneider', model: 'Acti9 iPRD 40r', spdType: 'Type 2', poles: '3P+N', imax: 40, up: 1.5, use_da: 'Overspændingsbeskyttelse hovedtavle', use_en: 'Main panel surge protection' },
+    { id: 'SE-iPRD20-T2', brand: 'Schneider', model: 'Acti9 iPRD 20r', spdType: 'Type 2', poles: '1P+N', imax: 20, up: 1.4, use_da: 'Overspændingsbeskyttelse undertavle', use_en: 'Sub-panel surge protection' },
+    { id: 'SE-iPRF1-T1T2', brand: 'Schneider', model: 'Acti9 iPRF1', spdType: 'Type 1+2', poles: '3P+N', imax: 100, up: 1.5, use_da: 'Lynbeskyttelse + overspænding', use_en: 'Lightning + surge protection' },
+    { id: 'ABB-OVR-T2-3N', brand: 'ABB', model: 'OVR T2 3N', spdType: 'Type 2', poles: '3P+N', imax: 40, up: 1.5, use_da: 'Overspændingsbeskyttelse 3-faset', use_en: '3-phase surge protection' },
+    { id: 'ABB-OVR-T1-T2', brand: 'ABB', model: 'OVR T1-T2', spdType: 'Type 1+2', poles: '3P+N', imax: 100, up: 1.5, use_da: 'Kombineret lyn + overspænding', use_en: 'Combined lightning + surge' },
+  ],
+
+  // === MOTOR PROTECTION CIRCUIT BREAKERS (MPCB) ===
+  // Schneider TeSys GV2/GV3 (se.com)
+  mpcbs: [
+    { id: 'SE-GV2ME05', brand: 'Schneider', model: 'GV2ME05', series: 'TeSys GV2', rangeMin: 0.4, rangeMax: 0.63, kW: 0.12 },
+    { id: 'SE-GV2ME06', brand: 'Schneider', model: 'GV2ME06', series: 'TeSys GV2', rangeMin: 1, rangeMax: 1.6, kW: 0.55 },
+    { id: 'SE-GV2ME08', brand: 'Schneider', model: 'GV2ME08', series: 'TeSys GV2', rangeMin: 2.5, rangeMax: 4, kW: 1.5 },
+    { id: 'SE-GV2ME10', brand: 'Schneider', model: 'GV2ME10', series: 'TeSys GV2', rangeMin: 4, rangeMax: 6.3, kW: 2.2 },
+    { id: 'SE-GV2ME14', brand: 'Schneider', model: 'GV2ME14', series: 'TeSys GV2', rangeMin: 6, rangeMax: 10, kW: 4 },
+    { id: 'SE-GV2ME16', brand: 'Schneider', model: 'GV2ME16', series: 'TeSys GV2', rangeMin: 9, rangeMax: 14, kW: 5.5 },
+    { id: 'SE-GV2ME20', brand: 'Schneider', model: 'GV2ME20', series: 'TeSys GV2', rangeMin: 13, rangeMax: 18, kW: 7.5 },
+    { id: 'SE-GV2ME22', brand: 'Schneider', model: 'GV2ME22', series: 'TeSys GV2', rangeMin: 20, rangeMax: 25, kW: 11 },
+    { id: 'SE-GV2ME32', brand: 'Schneider', model: 'GV2ME32', series: 'TeSys GV2', rangeMin: 24, rangeMax: 32, kW: 15 },
+    { id: 'SE-GV3P40', brand: 'Schneider', model: 'GV3P40', series: 'TeSys GV3', rangeMin: 30, rangeMax: 40, kW: 18.5 },
+    { id: 'SE-GV3P50', brand: 'Schneider', model: 'GV3P50', series: 'TeSys GV3', rangeMin: 37, rangeMax: 50, kW: 22 },
+    { id: 'SE-GV3P65', brand: 'Schneider', model: 'GV3P65', series: 'TeSys GV3', rangeMin: 48, rangeMax: 65, kW: 30 },
+    { id: 'SE-GV3P80', brand: 'Schneider', model: 'GV3P80', series: 'TeSys GV3', rangeMin: 56, rangeMax: 80, kW: 37 },
+  ],
+
+  // === THERMAL OVERLOAD RELAYS ===
+  overloadRelays: [
+    { id: 'SE-LRD06', brand: 'Schneider', model: 'LRD06', series: 'TeSys Deca', rangeMin: 1, rangeMax: 1.6 },
+    { id: 'SE-LRD07', brand: 'Schneider', model: 'LRD07', series: 'TeSys Deca', rangeMin: 1.6, rangeMax: 2.5 },
+    { id: 'SE-LRD10', brand: 'Schneider', model: 'LRD10', series: 'TeSys Deca', rangeMin: 4, rangeMax: 6 },
+    { id: 'SE-LRD12', brand: 'Schneider', model: 'LRD12', series: 'TeSys Deca', rangeMin: 5.5, rangeMax: 8 },
+    { id: 'SE-LRD14', brand: 'Schneider', model: 'LRD14', series: 'TeSys Deca', rangeMin: 7, rangeMax: 10 },
+    { id: 'SE-LRD16', brand: 'Schneider', model: 'LRD16', series: 'TeSys Deca', rangeMin: 9, rangeMax: 13 },
+    { id: 'SE-LRD21', brand: 'Schneider', model: 'LRD21', series: 'TeSys Deca', rangeMin: 12, rangeMax: 18 },
+    { id: 'SE-LRD22', brand: 'Schneider', model: 'LRD22', series: 'TeSys Deca', rangeMin: 16, rangeMax: 24 },
+    { id: 'SE-LRD32', brand: 'Schneider', model: 'LRD32', series: 'TeSys Deca', rangeMin: 23, rangeMax: 32 },
+    { id: 'SE-LRD35', brand: 'Schneider', model: 'LRD35', series: 'TeSys Deca', rangeMin: 30, rangeMax: 38 },
+  ],
+
+  // === SOCKETS & SWITCHES (LK FUGA - Danish standard) ===
+  // Lauritz Knudsen / Schneider LK FUGA range
+  wiringDevices: [
+    { id: 'LK-FUGA-STIK1', brand: 'LK (Lauritz Knudsen)', model: 'FUGA Stikkontakt 1 modul', cat: 'socket', rating: 16, desc_da: '1-modul stikkontakt m. jord', desc_en: '1-module socket with earth' },
+    { id: 'LK-FUGA-STIK2', brand: 'LK (Lauritz Knudsen)', model: 'FUGA Stikkontakt 2 modul', cat: 'socket', rating: 16, desc_da: 'Dobbelt stikkontakt m. jord', desc_en: 'Double socket with earth' },
+    { id: 'LK-FUGA-STIKUSB', brand: 'LK (Lauritz Knudsen)', model: 'FUGA Stikkontakt m. USB', cat: 'socket', rating: 16, desc_da: 'Stikkontakt m. USB-A/C', desc_en: 'Socket with USB-A/C' },
+    { id: 'LK-FUGA-AFB', brand: 'LK (Lauritz Knudsen)', model: 'FUGA Afbryder', cat: 'switch', rating: 10, desc_da: 'Enkelt afbryder', desc_en: 'Single switch' },
+    { id: 'LK-FUGA-KORS', brand: 'LK (Lauritz Knudsen)', model: 'FUGA Korrespondance', cat: 'switch', rating: 10, desc_da: 'Korrespondanceafbryder (trappe)', desc_en: 'Two-way switch (stairs)' },
+    { id: 'LK-FUGA-LYSDÆMP', brand: 'LK (Lauritz Knudsen)', model: 'FUGA Lysdæmper', cat: 'switch', rating: 10, desc_da: 'LED lysdæmper', desc_en: 'LED dimmer' },
+    { id: 'LK-OPUS-STIK', brand: 'LK (Lauritz Knudsen)', model: 'OPUS Stikkontakt', cat: 'socket', rating: 16, desc_da: 'Premium stikkontakt', desc_en: 'Premium socket' },
+    { id: 'LK-IHC-AFB', brand: 'LK (Lauritz Knudsen)', model: 'IHC Wireless afbryder', cat: 'switch', rating: 10, desc_da: 'Trådløs intelligent afbryder', desc_en: 'Wireless smart switch' },
+  ]
+};
+
+// ===== SMART RECOMMENDATION ENGINE =====
+// Only returns products that are SAFE and CORRECT for the given parameters
+// Rules per IEC 60364-4-43: IB <= In <= Iz, Icu >= Ikmax
+
+function recommendCables(ib, material) {
+  // Filter cables: Iz must be >= IB (the cable must handle the load)
+  const mat = material || cableState.material;
+  return PRODUCTS.cables
+    .filter(c => c.material === (mat === 'copper' ? 'Cu' : 'Al'))
+    .filter(c => c.iz >= ib)
+    .sort((a, b) => a.iz - b.iz) // Smallest suitable first (most economical)
+    .slice(0, 5); // Top 5 recommendations
+}
+
+function recommendMCBs(ib, ikmax) {
+  // IEC 60364-4-43: IB <= In (rating must be >= load current)
+  // Icu >= Ikmax (breaking capacity must handle short circuit)
+  const ikMaxA = (ikmax || 6) * 1000; // convert kA to A, default 6kA
+  return PRODUCTS.mcbs
+    .filter(m => m.rating >= ib) // In >= IB
+    .filter(m => m.icu * 1000 >= ikMaxA) // Icu >= Ikmax
+    .sort((a, b) => a.rating - b.rating || a.icu - b.icu)
+    .slice(0, 6);
+}
+
+function recommendMCCBs(ib, ikmax) {
+  const ikMaxA = (ikmax || 10) * 1000;
+  return PRODUCTS.mccbs
+    .filter(m => {
+      const maxIn = Math.max(...m.inOptions);
+      return maxIn >= ib && m.icu * 1000 >= ikMaxA;
+    })
+    .sort((a, b) => Math.min(...a.inOptions.filter(i => i >= ib)) - Math.min(...b.inOptions.filter(i => i >= ib)))
+    .slice(0, 4);
+}
+
+function recommendFuses(ib) {
+  // In >= IB (fuse must be rated at or above load current)
+  return PRODUCTS.fuses
+    .filter(f => f.rating >= ib)
+    .sort((a, b) => a.rating - b.rating)
+    .slice(0, 5);
+}
+
+function recommendContactors(ib) {
+  // AC-3 rating must be >= motor current
+  return PRODUCTS.contactors
+    .filter(c => c.ac3_A >= ib)
+    .sort((a, b) => a.ac3_A - b.ac3_A)
+    .slice(0, 4);
+}
+
+function recommendRCDs(ib, phases) {
+  // RCD rating must be >= load current; match pole count to phase count
+  const poles = phases === '3x400' ? '4P' : '2P';
+  return PRODUCTS.rcds
+    .filter(r => r.poles === poles && r.rating >= ib && r.sensitivity === 30)
+    .sort((a, b) => a.rating - b.rating)
+    .slice(0, 4);
+}
+
+function recommendMPCBs(ib) {
+  // Motor protection: IB must fall within adjustment range
+  return PRODUCTS.mpcbs
+    .filter(m => ib <= m.rangeMax && ib >= m.rangeMin * 0.7)
+    .sort((a, b) => a.rangeMax - b.rangeMax)
+    .slice(0, 3);
+}
+
+function recommendOverloadRelays(ib) {
+  // Overload relay: IB must fall within range
+  return PRODUCTS.overloadRelays
+    .filter(r => ib <= r.rangeMax && ib >= r.rangeMin * 0.7)
+    .sort((a, b) => a.rangeMax - b.rangeMax)
+    .slice(0, 3);
+}
+
+// Render product recommendation card
+function renderRecommendations(title, products, type) {
+  if (!products || products.length === 0) return '';
+
+  let rows = '';
+  if (type === 'cable') {
+    rows = products.map(p => `
+      <div class="result-row" style="flex-wrap:wrap;gap:4px">
+        <span class="label"><strong>${p.brand}</strong> ${p.model} ${p.cores} ${p.mm2} mm\u00B2</span>
+        <span class="value">Iz = ${p.iz} A</span>
+      </div>
+      <div class="result-row" style="padding-left:12px;font-size:0.78rem;color:var(--text-muted)">
+        <span>${lang === 'da' ? p.use_da : p.use_en}</span>
+        <span>R=${p.r} | X=${p.x} \u03A9/km</span>
+      </div>
+    `).join('');
+  } else if (type === 'mcb') {
+    rows = products.map(p => `
+      <div class="result-row">
+        <span class="label"><strong>${p.brand}</strong> ${p.model} ${p.curve}${p.rating} (${p.poles})</span>
+        <span class="value">Icu = ${p.icu} kA</span>
+      </div>
+    `).join('');
+  } else if (type === 'mccb') {
+    rows = products.map(p => `
+      <div class="result-row">
+        <span class="label"><strong>${p.brand}</strong> ${p.model}</span>
+        <span class="value">Icu = ${p.icu} kA | In: ${p.inOptions.join(', ')} A</span>
+      </div>
+    `).join('');
+  } else if (type === 'fuse') {
+    rows = products.map(p => `
+      <div class="result-row">
+        <span class="label"><strong>${p.brand}</strong> ${p.model} ${p.rating} A</span>
+        <span class="value">${p.size} | Icu=${p.icu} kA | I5s=${p.i5s} A</span>
+      </div>
+    `).join('');
+  } else if (type === 'contactor') {
+    rows = products.map(p => `
+      <div class="result-row">
+        <span class="label"><strong>${p.brand}</strong> ${p.model} (${p.series})</span>
+        <span class="value">AC-3: ${p.ac3_A} A / ${p.ac3_kW} kW</span>
+      </div>
+    `).join('');
+  } else if (type === 'rcd') {
+    rows = products.map(p => `
+      <div class="result-row">
+        <span class="label"><strong>${p.brand}</strong> ${p.model} ${p.poles} ${p.rating}A</span>
+        <span class="value">${p.sensitivity} mA / Type ${p.rcdType}</span>
+      </div>
+    `).join('');
+  } else if (type === 'mpcb') {
+    rows = products.map(p => `
+      <div class="result-row">
+        <span class="label"><strong>${p.brand}</strong> ${p.model} (${p.series})</span>
+        <span class="value">${p.rangeMin}-${p.rangeMax} A / ${p.kW} kW</span>
+      </div>
+    `).join('');
+  } else if (type === 'relay') {
+    rows = products.map(p => `
+      <div class="result-row">
+        <span class="label"><strong>${p.brand}</strong> ${p.model} (${p.series})</span>
+        <span class="value">${p.rangeMin}-${p.rangeMax} A</span>
+      </div>
+    `).join('');
+  }
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">\u2705 ${title}</div>
+      <div class="info-row">${lang === 'da' ? 'Kun sikkerhedsgodkendte produkter vises. Baseret p\u00E5 IB \u2264 In \u2264 Iz og Icu \u2265 Ik max.' : 'Only safety-approved products shown. Based on IB \u2264 In \u2264 Iz and Icu \u2265 Ik max.'}</div>
+      <div class="result-box">
+        <div class="result-title">${lang === 'da' ? 'Anbefalede produkter' : 'Recommended Products'}</div>
+        ${rows}
+      </div>
+    </div>
+  `;
+}
+
+// ===== AI ASSISTANT - Contextual Guidance =====
+// Provides intelligent tips and warnings in each module based on current state
+
+function getAiAssistant(module) {
+  const ib = calcIB();
+  const tips = [];
+  const warnings = [];
+  const errors = [];
+
+  switch(module) {
+    case 'load':
+      if (loadState.power === 1) {
+        tips.push(lang === 'da' ? 'Tip: Vælg den faktiske effekt for din belastning.' : 'Tip: Select the actual power for your load.');
+      }
+      if (ib > 63 && ib <= 125) {
+        tips.push(lang === 'da' ? 'IB > 63 A: Overvej C120N/H MCB eller NH-sikring.' : 'IB > 63 A: Consider C120N/H MCB or NH fuse.');
+      }
+      if (ib > 125) {
+        tips.push(lang === 'da' ? 'IB > 125 A: Brug maksimalafbryder (MCCB) eller NH-sikring.' : 'IB > 125 A: Use MCCB or NH fuse.');
+      }
+      if (loadState.cosPhi < 0.85) {
+        tips.push(lang === 'da' ? 'Lav cos\u03C6: Overvej fasekompensering for at reducere strømmen.' : 'Low cos\u03C6: Consider power factor correction to reduce current.');
+      }
+      if (loadState.simFactor < 0.7) {
+        tips.push(lang === 'da' ? 'Lav samtidighedsfaktor: Kontroll\u00E9r at dette er korrekt for anlægstypen.' : 'Low simultaneity factor: Verify this is correct for the installation type.');
+      }
+      break;
+
+    case 'fuse':
+      if (fuseState.size && fuseState.size < ib) {
+        errors.push(lang === 'da' ? '\u26A0\uFE0F FEJL: Sikringsstørrelse (' + fuseState.size + ' A) er MINDRE end IB (' + ib.toFixed(1) + ' A)! Vælg en større sikring.' : '\u26A0\uFE0F ERROR: Fuse rating (' + fuseState.size + ' A) is LESS than IB (' + ib.toFixed(1) + ' A)! Select a larger fuse.');
+      }
+      if (fuseState.size && fuseState.size >= ib) {
+        tips.push(lang === 'da' ? '\u2705 IB (' + ib.toFixed(1) + ' A) \u2264 In (' + fuseState.size + ' A) — korrekt dimensioneret.' : '\u2705 IB (' + ib.toFixed(1) + ' A) \u2264 In (' + fuseState.size + ' A) — correctly dimensioned.');
+      }
+      if (!fuseState.size) {
+        tips.push(lang === 'da' ? 'Vælg sikringsholder og størrelse. IB = ' + ib.toFixed(1) + ' A.' : 'Select fuse holder and size. IB = ' + ib.toFixed(1) + ' A.');
+      }
+      break;
+
+    case 'mcb':
+      if (mcbState.rating && mcbState.rating < ib) {
+        errors.push(lang === 'da' ? '\u26A0\uFE0F FEJL: MCB mærkestrøm (' + mcbState.rating + ' A) < IB (' + ib.toFixed(1) + ' A)! Oversikret kabel!' : '\u26A0\uFE0F ERROR: MCB rating (' + mcbState.rating + ' A) < IB (' + ib.toFixed(1) + ' A)! Cable overloaded!');
+      }
+      if (mcbState.rating && mcbState.rating >= ib) {
+        tips.push(lang === 'da' ? '\u2705 IB \u2264 In — korrekt.' : '\u2705 IB \u2264 In — correct.');
+      }
+      if (mcbState.curve === 'B') {
+        tips.push(lang === 'da' ? 'Kurve B: Bedst til resistive belastninger (lys, varme, stikkontakter).' : 'Curve B: Best for resistive loads (lighting, heating, sockets).');
+      } else if (mcbState.curve === 'C') {
+        tips.push(lang === 'da' ? 'Kurve C: Til induktive belastninger (motorer, transformere, kompressorer).' : 'Curve C: For inductive loads (motors, transformers, compressors).');
+      } else if (mcbState.curve === 'D') {
+        tips.push(lang === 'da' ? 'Kurve D: Til høje startstrømme (store motorer, svejsemaskiner).' : 'Curve D: For high inrush (large motors, welding machines).');
+      }
+      break;
+
+    case 'mccb':
+      const io = mccbState.inVal * mccbState.ioMult;
+      if (io < ib) {
+        errors.push(lang === 'da' ? '\u26A0\uFE0F FEJL: Io (' + io.toFixed(0) + ' A) < IB (' + ib.toFixed(1) + ' A)! Utilstrækkelig beskyttelse.' : '\u26A0\uFE0F ERROR: Io (' + io.toFixed(0) + ' A) < IB (' + ib.toFixed(1) + ' A)! Insufficient protection.');
+      }
+      if (io >= ib) {
+        tips.push(lang === 'da' ? '\u2705 IB \u2264 Io — langsom udløser korrekt indstillet.' : '\u2705 IB \u2264 Io — long-time protection correctly set.');
+      }
+      tips.push(lang === 'da' ? 'Micrologic 2.2: Indstil Io \u2265 IB, og Isd baseret p\u00E5 Ik min.' : 'Micrologic 2.2: Set Io \u2265 IB, and Isd based on Ik min.');
+      break;
+
+    case 'cable':
+      if (cableState.crossSection) {
+        const izTable = cableState.material === 'copper' ? IZ_COPPER : IZ_ALU;
+        const baseIz = izTable[parseFloat(cableState.crossSection)] || 0;
+        const kInstall = INSTALL_METHODS[cableState.installMethod] || 1.0;
+        const kTemp = TEMP_FACTORS[cableState.temp] || 1.0;
+        const kGroup = GROUP_FACTORS[cableState.grouping] || 1.0;
+        const correctedIz = baseIz * kInstall * kTemp * kGroup;
+
+        if (correctedIz < ib) {
+          errors.push(lang === 'da' ? '\u26A0\uFE0F FEJL: Korrigeret Iz (' + correctedIz.toFixed(1) + ' A) < IB (' + ib.toFixed(1) + ' A)! Kablet er UNDERDIMENSIONERET!' : '\u26A0\uFE0F ERROR: Corrected Iz (' + correctedIz.toFixed(1) + ' A) < IB (' + ib.toFixed(1) + ' A)! Cable is UNDERSIZED!');
+        } else {
+          tips.push(lang === 'da' ? '\u2705 Iz (' + correctedIz.toFixed(1) + ' A) \u2265 IB (' + ib.toFixed(1) + ' A) — kabel korrekt dimensioneret.' : '\u2705 Iz (' + correctedIz.toFixed(1) + ' A) \u2265 IB (' + ib.toFixed(1) + ' A) — cable correctly sized.');
+        }
+        if (cableState.grouping > 3) {
+          warnings.push(lang === 'da' ? 'H\u00F8j gruppering reducerer kapaciteten kraftigt. Overvej større tværsnit.' : 'High grouping significantly reduces capacity. Consider larger cross-section.');
+        }
+        if (cableState.temp > 35) {
+          warnings.push(lang === 'da' ? 'Forhøjet temperatur: Kablets kapacitet er reduceret.' : 'Elevated temperature: Cable capacity is reduced.');
+        }
+      } else {
+        tips.push(lang === 'da' ? 'Vælg kabeltype og tværsnit. Krævet Iz \u2265 ' + ib.toFixed(1) + ' A.' : 'Select cable type and cross-section. Required Iz \u2265 ' + ib.toFixed(1) + ' A.');
+      }
+      break;
+
+    case 'vdrop':
+      const cables2 = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
+      const ct2 = cables2[cableState.type];
+      const cc2 = ct2 && ct2[cableState.cores] ? ct2[cableState.cores] : {};
+      const sc2 = cc2[cableState.crossSection];
+      if (sc2) {
+        const L = vdropState.length / 1000;
+        const cosP = loadState.cosPhi;
+        const sinP = Math.sin(Math.acos(cosP));
+        const Un = loadState.voltage === '3x400' ? 400 : 230;
+        let vd;
+        if (loadState.voltage === '3x400') {
+          vd = Math.sqrt(3) * ib * L * (sc2.r * cosP + sc2.x * sinP);
+        } else {
+          vd = 2 * ib * L * (sc2.r * cosP + sc2.x * sinP);
+        }
+        const vdP = (vd / Un) * 100;
+        if (vdP > 5) {
+          errors.push(lang === 'da' ? '\u26A0\uFE0F Spændingsfald ' + vdP.toFixed(1) + '% OVERSTIGER 5%! Vælg større kabel eller kortere kabelrute.' : '\u26A0\uFE0F Voltage drop ' + vdP.toFixed(1) + '% EXCEEDS 5%! Choose larger cable or shorter route.');
+        } else if (vdP > 3) {
+          warnings.push(lang === 'da' ? 'Spændingsfald ' + vdP.toFixed(1) + '% — uegnet til belysning (maks 3%).' : 'Voltage drop ' + vdP.toFixed(1) + '% — unsuitable for lighting (max 3%).');
+        } else {
+          tips.push(lang === 'da' ? '\u2705 Spændingsfald ' + vdP.toFixed(1) + '% — OK for alle belastningstyper.' : '\u2705 Voltage drop ' + vdP.toFixed(1) + '% — OK for all load types.');
+        }
+      }
+      if (vdropState.length > 100) {
+        tips.push(lang === 'da' ? 'Lang kabelrute: Kontroller spændingsfald og kortslutningsstrøm i enden.' : 'Long cable run: Check voltage drop and short-circuit current at end.');
+      }
+      break;
+
+    case 'scircuit':
+      tips.push(lang === 'da' ? 'Kontroll\u00E9r: Icu \u2265 Ik max OG Isd \u2264 Ik min for korrekt beskyttelse.' : 'Verify: Icu \u2265 Ik max AND Isd \u2264 Ik min for correct protection.');
+      tips.push(lang === 'da' ? 'IEC 60909: c = 1,05 (maks) for lavspænding. Ik min beregnes med 0,95 faktor.' : 'IEC 60909: c = 1.05 (max) for LV. Ik min calculated with 0.95 factor.');
+      break;
+
+    case 'trafo':
+      tips.push(lang === 'da' ? 'Belastningsgrad 75-80% er optimal for levetid og effektivitet.' : 'Load level 75-80% is optimal for lifetime and efficiency.');
+      if (trafoState.loadPercent > 90) {
+        warnings.push(lang === 'da' ? 'Belastning over 90%: Overvej større trafo for fremtidige udvidelser.' : 'Load above 90%: Consider larger transformer for future expansion.');
+      }
+      break;
+
+    case 'standards':
+      tips.push(lang === 'da' ? 'Alle beregninger f\u00F8lger DS/HD 60364 og IEC 60909.' : 'All calculations follow DS/HD 60364 and IEC 60909.');
+      break;
+  }
+
+  return { tips, warnings, errors };
+}
+
+// Render AI assistant card
+function renderAiAssistant(module) {
+  const ai = getAiAssistant(module);
+  if (ai.tips.length === 0 && ai.warnings.length === 0 && ai.errors.length === 0) return '';
+
+  let html = '<div class="card fade-in" style="border-left:4px solid var(--accent);"><div class="card-title">\uD83E\uDD16 ' + (lang === 'da' ? 'AI-Assistent' : 'AI Assistant') + '</div>';
+
+  if (ai.errors.length > 0) {
+    html += '<div class="result-box error" style="margin-top:0">';
+    html += '<div class="result-title">' + (lang === 'da' ? 'FEJL — Korrektion påkrævet' : 'ERROR — Correction required') + '</div>';
+    ai.errors.forEach(e => { html += '<div class="result-row"><span class="label" style="color:var(--danger);font-weight:600">' + e + '</span></div>'; });
+    html += '</div>';
+  }
+
+  if (ai.warnings.length > 0) {
+    html += '<div class="result-box warning" style="margin-top:8px">';
+    html += '<div class="result-title">' + (lang === 'da' ? 'Advarsel' : 'Warning') + '</div>';
+    ai.warnings.forEach(w => { html += '<div class="result-row"><span class="label" style="color:#b8860b">\u26A0\uFE0F ' + w + '</span></div>'; });
+    html += '</div>';
+  }
+
+  if (ai.tips.length > 0) {
+    html += '<div style="margin-top:8px;padding:10px 12px;background:var(--primary-glow);border-radius:var(--radius-sm)">';
+    ai.tips.forEach(t => { html += '<div style="padding:4px 0;font-size:0.82rem;color:var(--primary);">\uD83D\uDCA1 ' + t + '</div>'; });
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+// ===== QI VALIDATION SYSTEM =====
+// Quality Index: Checks coordination between all modules and flags issues
+
+function runQiValidation() {
+  const ib = calcIB();
+  const issues = [];
+  const passed = [];
+
+  // 1. Check IB <= In (protection device rating)
+  if (mcbState.rating) {
+    if (mcbState.rating >= ib) {
+      passed.push({ rule: 'IB \u2264 In (MCB)', detail: ib.toFixed(1) + ' A \u2264 ' + mcbState.rating + ' A' });
+    } else {
+      issues.push({ rule: 'IB \u2264 In (MCB)', detail: ib.toFixed(1) + ' A > ' + mcbState.rating + ' A', severity: 'error' });
+    }
+  }
+
+  // 2. Check In <= Iz (protection device <= cable capacity)
+  if (mcbState.rating && cableState.crossSection) {
+    const izTable = cableState.material === 'copper' ? IZ_COPPER : IZ_ALU;
+    const baseIz = izTable[parseFloat(cableState.crossSection)] || 0;
+    const kTotal = (INSTALL_METHODS[cableState.installMethod] || 1) * (TEMP_FACTORS[cableState.temp] || 1) * (GROUP_FACTORS[cableState.grouping] || 1);
+    const corrIz = baseIz * kTotal;
+    if (mcbState.rating <= corrIz) {
+      passed.push({ rule: 'In \u2264 Iz', detail: mcbState.rating + ' A \u2264 ' + corrIz.toFixed(1) + ' A' });
+    } else {
+      issues.push({ rule: 'In \u2264 Iz', detail: mcbState.rating + ' A > ' + corrIz.toFixed(1) + ' A', severity: 'error' });
+    }
+  }
+
+  // 3. Check voltage drop
+  const cables3 = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
+  const ct3 = cables3[cableState.type];
+  const cc3 = ct3 && ct3[cableState.cores] ? ct3[cableState.cores] : {};
+  const sc3 = cc3[cableState.crossSection];
+  if (sc3 && vdropState.length) {
+    const L = vdropState.length / 1000;
+    const cosP = loadState.cosPhi;
+    const sinP = Math.sin(Math.acos(cosP));
+    const Un = loadState.voltage === '3x400' ? 400 : 230;
+    const vd = loadState.voltage === '3x400'
+      ? Math.sqrt(3) * ib * L * (sc3.r * cosP + sc3.x * sinP)
+      : 2 * ib * L * (sc3.r * cosP + sc3.x * sinP);
+    const vdP = (vd / Un) * 100;
+    if (vdP <= 4) {
+      passed.push({ rule: '\u0394U \u2264 4%', detail: vdP.toFixed(2) + '%' });
+    } else {
+      issues.push({ rule: '\u0394U \u2264 4%', detail: vdP.toFixed(2) + '% > 4%', severity: vdP > 5 ? 'error' : 'warning' });
+    }
+  }
+
+  // 4. Coordination check: IB <= In <= Iz
+  if (mcbState.rating && cableState.crossSection) {
+    const izTable = cableState.material === 'copper' ? IZ_COPPER : IZ_ALU;
+    const corrIz = (izTable[parseFloat(cableState.crossSection)] || 0) *
+      (INSTALL_METHODS[cableState.installMethod] || 1) *
+      (TEMP_FACTORS[cableState.temp] || 1) *
+      (GROUP_FACTORS[cableState.grouping] || 1);
+    if (ib <= mcbState.rating && mcbState.rating <= corrIz) {
+      passed.push({ rule: 'IB \u2264 In \u2264 Iz (koordination)', detail: ib.toFixed(1) + ' \u2264 ' + mcbState.rating + ' \u2264 ' + corrIz.toFixed(1) + ' A' });
+    }
+  }
+
+  // 5. Fuse coordination
+  if (fuseState.size) {
+    if (fuseState.size >= ib) {
+      passed.push({ rule: 'IB \u2264 In (sikring)', detail: ib.toFixed(1) + ' A \u2264 ' + fuseState.size + ' A' });
+    } else {
+      issues.push({ rule: 'IB \u2264 In (sikring)', detail: ib.toFixed(1) + ' A > ' + fuseState.size + ' A', severity: 'error' });
+    }
+  }
+
+  return { issues, passed, score: passed.length > 0 ? Math.round((passed.length / (passed.length + issues.length)) * 100) : 0 };
+}
+
+// ===== DYNAMIC COORDINATE AXES =====
+// When a value changes in one module, propagate relevant data to other modules
+
+function syncAxes() {
+  // Auto-suggest cable based on IB
+  const ib = calcIB();
+
+  // If no cable selected yet, auto-find smallest suitable
+  if (!cableState.crossSection && ib > 0) {
+    const izTable = cableState.material === 'copper' ? IZ_COPPER : IZ_ALU;
+    const sizes = Object.keys(izTable).map(Number).sort((a,b) => a - b);
+    for (const sz of sizes) {
+      if (izTable[sz] >= ib) {
+        // Don't auto-set, but store suggestion
+        cableState._suggested = sz;
+        break;
+      }
+    }
+  }
+
+  // Auto-suggest fuse based on IB
+  if (!fuseState.size && ib > 0) {
+    const allSizes = [6,10,13,16,20,25,32,35,40,50,63,80,100,125,160,200,250,315,400,500,630];
+    fuseState._suggested = allSizes.find(s => s >= ib) || null;
+  }
+
+  // Auto-suggest MCB based on IB
+  if (!mcbState.rating && ib > 0) {
+    const stdRatings = [6,10,13,16,20,25,32,40,50,63];
+    mcbState._suggested = stdRatings.find(r => r >= ib) || null;
+  }
+}
+
+// ===== DANISH STANDARDS & REGULATIONS =====
+// Based on research of Danish electrical standards websites (elsikkerhed.dk, lovguiden.dk, Sikkerhedsstyrelsen)
+// Content was rephrased for compliance with licensing restrictions
+const DK_STANDARDS = {
+  law: 'Elsikkerhedsloven (Lov nr. 525 af 29/04/2015)',
+  installBek: 'Installationsbekendtgørelsen (BEK nr. 1082)',
+  cableSizing: 'DS/HD 60364-5-52:2011+A11+Ret.1+Till.1+Ret.2+A12:2022',
+  overcurrent: 'DS/HD 60364-4-43:2023',
+  general: 'IEC 60364-1:2025',
+  shortCircuit: 'IEC 60909-0:2016',
+  mcb: 'IEC 60898-1 / EN 60898-1 (MCB)',
+  mccb: 'IEC 60947-2 (MCCB)',
+  fuse: 'IEC 60269 (Smeltesikringer)',
+  rcd: 'DS/HD 60364-4-41 (Beskyttelse mod elektrisk stød)',
+  faellesreg: 'Fællesregulativet 2019 (Elforsyningsregler)',
+  vdropLighting: 3, // % max for belysning
+  vdropOther: 5,    // % max for andre
+  vdropGeneral: 4   // % general limit
+};
+
+// Transformer data (from Dim-af-trafo.ppx)
+const TRAFO_SIZES = [50, 100, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500];
+// Standard transformer impedance in % (uk%)
+const TRAFO_UK = {
+  50: 4, 100: 4, 160: 4, 200: 4, 250: 4, 315: 4, 400: 4, 500: 4, 630: 6, 800: 6, 1000: 6, 1250: 6, 1600: 6, 2000: 6, 2500: 6
+};
+// Transformer losses (no-load / load in W, approximate)
+const TRAFO_LOSSES = {
+  50: { p0: 145, pk: 1350 }, 100: { p0: 210, pk: 2150 }, 160: { p0: 300, pk: 3100 },
+  200: { p0: 350, pk: 3800 }, 250: { p0: 420, pk: 4600 }, 315: { p0: 500, pk: 5600 },
+  400: { p0: 610, pk: 6900 }, 500: { p0: 720, pk: 8400 }, 630: { p0: 860, pk: 10500 },
+  800: { p0: 1030, pk: 13000 }, 1000: { p0: 1200, pk: 15000 }, 1250: { p0: 1450, pk: 18500 },
+  1600: { p0: 1750, pk: 22000 }, 2000: { p0: 2100, pk: 27000 }, 2500: { p0: 2500, pk: 33000 }
+};
+
+// RCD/HPFI types (Danish requirement)
+const RCD_TYPES = {
+  'Type A': { desc_da: 'Vekselstrøm + pulserende DC', desc_en: 'AC + pulsating DC', sensitivity: [30, 100, 300, 500] },
+  'Type B': { desc_da: 'Alle strømformer inkl. glat DC', desc_en: 'All current types incl. smooth DC', sensitivity: [30, 100, 300, 500] },
+  'Type F': { desc_da: 'Type A + højfrekvent', desc_en: 'Type A + high frequency', sensitivity: [30, 100, 300] },
+  'Type AC': { desc_da: 'Kun ren vekselstrøm', desc_en: 'Pure AC only', sensitivity: [30, 100, 300, 500] }
+};
+
+// ===== STATE =====
+let activeModule = 'load';
+
+// Load state
+let loadState = { voltage: '3x400', power: 10, cosPhi: 0.9, simFactor: 1.0, expFactor: 1.0 };
+// Fuse state
+let fuseState = { holder: 'D02', size: null };
+// MCB state
+let mcbState = { type: 'C60N', curve: 'B', rating: null, poles: 'multi' };
+// MCCB state
+let mccbState = { frame: 'NSX 400', trip: 'F', inVal: 400, ioMult: 0.8, isdMult: 2 };
+// Cable state
+let cableState = { material: 'copper', type: 'NOIKLX', cores: '5G', crossSection: null, installMethod: 'C', temp: 30, grouping: 1 };
+// Voltage drop state
+let vdropState = { length: 50 };
+// Short circuit state
+let scState = { zNet: 1, zTrafo: 5 };
+// Standards state
+let rcdSelected = null;
+let rcdSensitivity = null;
+let rcdApplication = null;
+let earthSelected = null;
+
+// Helper functions for standards module
+function getRcdRecommendation() {
+  const recommendations = {
+    bolig: { type: 'Type A', sensitivity: '30 mA', note: lang === 'da' ? 'Obligatorisk iht. Installationsbekendtgørelsen' : 'Mandatory per Installation Regulations' },
+    bad: { type: 'Type A', sensitivity: '30 mA', note: lang === 'da' ? 'Obligatorisk - zone 0, 1, 2' : 'Mandatory - zones 0, 1, 2' },
+    udendors: { type: 'Type A', sensitivity: '30 mA', note: lang === 'da' ? 'Obligatorisk for alle udendørs stikkontakter' : 'Mandatory for all outdoor socket outlets' },
+    industri: { type: 'Type A', sensitivity: '300 mA', note: lang === 'da' ? 'Anbefales for TN-systemer' : 'Recommended for TN systems' },
+    ev: { type: 'Type B / Type A + 6mA DC', sensitivity: '30 mA', note: lang === 'da' ? 'Type B påkrævet ved DC-fejlstrøm >6 mA' : 'Type B required for DC fault current >6 mA' }
+  };
+  return recommendations[rcdApplication] || { type: '-', sensitivity: '-', note: '-' };
+}
+
+function getEarthInfo(sys) {
+  const info = {
+    'TN-S': {
+      desc: lang === 'da' ? 'Separat N og PE hele vejen fra trafo til forbruger' : 'Separate N and PE throughout from transformer to consumer',
+      use: lang === 'da' ? 'Nye installationer, EMC-følsomt udstyr' : 'New installations, EMC-sensitive equipment',
+      protection: lang === 'da' ? 'Overstrømsudstyr + evt. RCD' : 'Overcurrent device + optional RCD'
+    },
+    'TN-C-S': {
+      desc: lang === 'da' ? 'PEN-leder i forsyningsnet, splittes til N+PE ved indgang' : 'PEN conductor in supply, split to N+PE at entry point',
+      use: lang === 'da' ? 'Mest almindelig i danske installationer' : 'Most common in Danish installations',
+      protection: lang === 'da' ? 'Overstrømsudstyr, RCD efter splitpunkt' : 'Overcurrent device, RCD after split point'
+    },
+    'TN-C': {
+      desc: lang === 'da' ? 'Fælles PEN-leder (N+PE kombineret) hele vejen' : 'Combined PEN conductor (N+PE) throughout',
+      use: lang === 'da' ? 'Kun forsyningsnet, min. 10 mm² Cu / 16 mm² Al' : 'Supply network only, min. 10 mm² Cu / 16 mm² Al',
+      protection: lang === 'da' ? 'Kun overstrømsudstyr (RCD virker ikke)' : 'Overcurrent device only (RCD does not work)'
+    },
+    'TT': {
+      desc: lang === 'da' ? 'Lokal jordspyd, ingen PE forbindelse fra forsyning' : 'Local earth rod, no PE connection from supply',
+      use: lang === 'da' ? 'Sjælden i DK, bruges i landområder' : 'Rare in DK, used in rural areas',
+      protection: lang === 'da' ? 'RCD obligatorisk (overstrøm utilstrækkelig)' : 'RCD mandatory (overcurrent insufficient)'
+    },
+    'IT': {
+      desc: lang === 'da' ? 'Isoleret eller impedansforb. stjerneunkt' : 'Isolated or impedance-connected neutral',
+      use: lang === 'da' ? 'Hospitaler, skibe, kritiske systemer' : 'Hospitals, ships, critical systems',
+      protection: lang === 'da' ? 'Isolationsovervågning + RCD ved 2. fejl' : 'Insulation monitoring + RCD on 2nd fault'
+    }
+  };
+  return info[sys] || { desc: '-', use: '-', protection: '-' };
+}
+
+// ===== RENDERING =====
+function renderNav() {
+  const nav = document.getElementById('mainNav');
+  const mods = t('modules');
+  nav.innerHTML = Object.keys(mods).map(key =>
+    `<button class="nav-btn ${key === activeModule ? 'active' : ''}" onclick="switchModule('${key}')">${mods[key]}</button>`
+  ).join('');
+}
+
+function switchModule(mod) {
+  activeModule = mod;
+  renderNav();
+  renderStatusBar();
+  renderModule(mod);
+}
+
+function renderStatusBar() {
+  const bar = document.getElementById('statusBar');
+  const chips = [];
+
+  // IB from load module
+  const ib = calcIB();
+  if (loadState.power > 0) {
+    chips.push({ label: 'IB', value: `${ib.toFixed(1)} A`, mod: 'load' });
+    chips.push({ label: loadState.voltage === '3x400' ? '3~' : '1~', value: `${loadState.voltage}V`, mod: 'load' });
+  }
+
+  // Protection device
+  if (mcbState.rating) {
+    chips.push({ label: 'MCB', value: `${mcbState.type} ${mcbState.curve}${mcbState.rating}`, mod: 'mcb' });
+  } else if (mccbState.inVal) {
+    chips.push({ label: 'MCCB', value: `${mccbState.frame} ${mccbState.inVal}A`, mod: 'mccb' });
+  }
+
+  // Fuse
+  if (fuseState.size) {
+    chips.push({ label: lang === 'da' ? 'Sikring' : 'Fuse', value: `${fuseState.holder} ${fuseState.size}A`, mod: 'fuse' });
+  }
+
+  // Cable
+  if (cableState.crossSection) {
+    chips.push({ label: lang === 'da' ? 'Kabel' : 'Cable', value: `${cableState.crossSection} mm²`, mod: 'cable' });
+  }
+
+  // Length
+  if (vdropState.length && cableState.crossSection) {
+    chips.push({ label: 'L', value: `${vdropState.length} m`, mod: 'vdrop' });
+  }
+
+  bar.innerHTML = chips.map(c =>
+    `<span class="status-chip has-value" onclick="switchModule('${c.mod}')"><span class="chip-label">${c.label}:</span><span class="chip-value">${c.value}</span></span>`
+  ).join('');
+}
+
+function renderModule(mod) {
+  syncAxes(); // Dynamic coordination
+  const main = document.getElementById('mainContent');
+  let content = '';
+  switch(mod) {
+    case 'load': content = renderLoad(); break;
+    case 'fuse': content = renderFuse(); break;
+    case 'mcb': content = renderMCB(); break;
+    case 'mccb': content = renderMCCB(); break;
+    case 'cable': content = renderCable(); break;
+    case 'vdrop': content = renderVdrop(); break;
+    case 'scircuit': content = renderShortCircuit(); break;
+    case 'trafo': content = renderTrafo(); break;
+    case 'standards': content = renderStandards(); break;
+    case 'bank': content = renderBank(); break;
+    case 'ai': content = renderAiElectrician(); break;
+  }
+  // Append AI assistant to every module
+  content += renderAiAssistant(mod);
+  // Append QI validation summary if enough data exists
+  const qi = runQiValidation();
+  if (qi.passed.length + qi.issues.length > 0 && mod !== 'standards' && mod !== 'bank' && mod !== 'ai') {
+    content += renderQiCard(qi);
+  }
+  main.innerHTML = content;
+  renderStatusBar();
+}
+
+function renderQiCard(qi) {
+  const scoreColor = qi.score >= 80 ? 'var(--success)' : qi.score >= 50 ? '#b8860b' : 'var(--danger)';
+  let html = '<div class="card fade-in" style="border-left:4px solid ' + scoreColor + ';">';
+  html += '<div class="card-title">\uD83D\uDCCA ' + (lang === 'da' ? 'QI Kvalitetsindeks' : 'QI Quality Index') + ' \u2014 ' + qi.score + '%</div>';
+
+  if (qi.issues.length > 0) {
+    html += '<div class="result-box ' + (qi.issues.some(i => i.severity === 'error') ? 'error' : 'warning') + '" style="margin-top:0">';
+    html += '<div class="result-title">' + (lang === 'da' ? 'Problemer fundet' : 'Issues found') + '</div>';
+    qi.issues.forEach(i => {
+      const icon = i.severity === 'error' ? '\u274C' : '\u26A0\uFE0F';
+      html += '<div class="result-row"><span class="label">' + icon + ' ' + i.rule + '</span><span class="value">' + i.detail + '</span></div>';
+    });
+    html += '</div>';
+  }
+
+  if (qi.passed.length > 0) {
+    html += '<div class="result-box" style="margin-top:8px">';
+    html += '<div class="result-title">' + (lang === 'da' ? 'Bestået' : 'Passed') + '</div>';
+    qi.passed.forEach(p => {
+      html += '<div class="result-row"><span class="label">\u2705 ' + p.rule + '</span><span class="value">' + p.detail + '</span></div>';
+    });
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+// ===== LOAD MODULE =====
+function renderLoad() {
+  const ib = calcIB();
+  const S = calcS();
+  const powerSteps = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 120, 150, 180, 200, 250, 300, 400, 500];
+  const cosPhiSteps = [0.7, 0.75, 0.8, 0.85, 0.87, 0.9, 0.92, 0.95, 0.97, 1.0];
+  const sfSteps = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
+  const efSteps = [1.0, 1.1, 1.2, 1.3, 1.4, 1.5];
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">${t('loadTitle')}</div>
+      <div class="info-row">${t('infoClick')}</div>
+
+      <div class="select-group">
+        <div class="select-label">${t('voltage')}</div>
+        <div class="select-grid">
+          ${['3x400', '1x230'].map(v =>
+            `<button class="sel-btn ${loadState.voltage === v ? 'selected' : ''}" onclick="loadState.voltage='${v}';renderModule('load')">${v} V</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('power')}</div>
+        <div class="select-grid">
+          ${powerSteps.map(p =>
+            `<button class="sel-btn ${loadState.power === p ? 'selected' : ''}" onclick="loadState.power=${p};renderModule('load')">${p}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('powerFactor')}</div>
+        <div class="select-grid">
+          ${cosPhiSteps.map(c =>
+            `<button class="sel-btn ${loadState.cosPhi === c ? 'selected' : ''}" onclick="loadState.cosPhi=${c};renderModule('load')">${c}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('simultaneity')}</div>
+        <div class="select-grid">
+          ${sfSteps.map(s =>
+            `<button class="sel-btn ${loadState.simFactor === s ? 'selected' : ''}" onclick="loadState.simFactor=${s};renderModule('load')">${s}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('expansion')}</div>
+        <div class="select-grid">
+          ${efSteps.map(e =>
+            `<button class="sel-btn ${loadState.expFactor === e ? 'selected' : ''}" onclick="loadState.expFactor=${e};renderModule('load')">${e}</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${t('loadResult')}</div>
+      <div class="result-box">
+        <div class="result-title">${t('result')}</div>
+        <div class="result-row"><span class="label">${t('ib')}</span><span class="value">${ib.toFixed(1)} A</span></div>
+        <div class="result-row"><span class="label">${t('sApparent')}</span><span class="value">${S.toFixed(2)} kVA</span></div>
+        <div class="result-row"><span class="label">${t('voltage')}</span><span class="value">${loadState.voltage} V</span></div>
+        <div class="result-row"><span class="label">${t('powerFactor')}</span><span class="value">${loadState.cosPhi}</span></div>
+      </div>
+    </div>
+
+    ${renderRecommendations(lang === 'da' ? 'Anbefalede kabler til IB = ' + ib.toFixed(1) + ' A' : 'Recommended cables for IB = ' + ib.toFixed(1) + ' A', recommendCables(ib), 'cable')}
+    ${renderRecommendations(lang === 'da' ? 'Anbefalede sikringer' : 'Recommended fuses', recommendFuses(ib), 'fuse')}
+    ${renderRecommendations(lang === 'da' ? 'Anbefalede automatsikringer' : 'Recommended MCBs', recommendMCBs(ib), 'mcb')}
+    ${ib > 63 ? renderRecommendations(lang === 'da' ? 'Anbefalede maksimalafbrydere' : 'Recommended MCCBs', recommendMCCBs(ib), 'mccb') : ''}
+    ${renderRecommendations(lang === 'da' ? 'Anbefalet HPFI/RCD' : 'Recommended RCD', recommendRCDs(ib, loadState.voltage), 'rcd')}
+    ${renderRecommendations(lang === 'da' ? 'Anbefalede kontaktorer (motor)' : 'Recommended contactors (motor)', recommendContactors(ib), 'contactor')}
+    ${renderRecommendations(lang === 'da' ? 'Anbefalet motorv\u00E6rn' : 'Recommended motor protection', recommendMPCBs(ib), 'mpcb')}
+    ${renderRecommendations(lang === 'da' ? 'Anbefalet termorel\u00E6' : 'Recommended overload relay', recommendOverloadRelays(ib), 'relay')}
+  `;
+}
+
+function calcIB() {
+  const P = loadState.power * 1000; // W
+  const cosP = loadState.cosPhi;
+  const sf = loadState.simFactor;
+  const ef = loadState.expFactor;
+  let ib;
+  if (loadState.voltage === '3x400') {
+    ib = P / (Math.sqrt(3) * 400 * cosP);
+  } else {
+    ib = P / (230 * cosP);
+  }
+  return ib * sf * ef;
+}
+
+function calcS() {
+  return loadState.power / loadState.cosPhi;
+}
+
+// ===== FUSE MODULE =====
+function renderFuse() {
+  const holder = FUSE_HOLDERS[fuseState.holder];
+  const sizes = holder.sizes;
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">${t('fuseTitle')}</div>
+      <div class="info-row">${t('infoClick')}</div>
+
+      <div class="select-group">
+        <div class="select-label">${t('fuseHolder')}</div>
+        <div class="select-grid">
+          ${Object.keys(FUSE_HOLDERS).map(h =>
+            `<button class="sel-btn ${fuseState.holder === h ? 'selected' : ''}" onclick="fuseState.holder='${h}';fuseState.size=null;renderModule('fuse')">${h}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('fuseSize')} [A]</div>
+        <div class="select-grid">
+          ${sizes.map(s =>
+            `<button class="sel-btn ${fuseState.size === s ? 'selected' : ''}" onclick="fuseState.size=${s};renderModule('fuse')">${s} A</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    ${fuseState.size ? `
+    <div class="card fade-in">
+      <div class="card-title">${t('fuseResult')}</div>
+      <div class="result-box">
+        <div class="result-title">${t('result')}</div>
+        <div class="result-row"><span class="label">${t('fuseHolder')}</span><span class="value">${fuseState.holder}</span></div>
+        <div class="result-row"><span class="label">${t('fuseSize')}</span><span class="value">${fuseState.size} A</span></div>
+        <div class="result-row"><span class="label">${t('fuseIkmax')}</span><span class="value">${holder.ikMax} kA</span></div>
+        <div class="result-row"><span class="label">${t('fuseCurrent5s')}</span><span class="value">${FUSE_5S[fuseState.size] || '—'} A</span></div>
+        <div class="result-row"><span class="label">${t('fuseCurrentRange')}</span><span class="value">${holder.range}</span></div>
+        <div class="result-row"><span class="label">${t('fuseBreaker')}</span><span class="value">${holder.breaker}</span></div>
+      </div>
+    </div>
+    ` : ''}
+  `;
+}
+
+// ===== MCB MODULE =====
+function renderMCB() {
+  const mcb = MCB_TYPES[mcbState.type];
+  const curve = MCB_CURVES[mcbState.curve];
+  const icu = mcbState.poles === '1p' ? mcb.icu1p : mcb.icuMp;
+  const isdMin = mcbState.rating ? (curve.isdMin * mcbState.rating).toFixed(0) : '—';
+  const isdMax = mcbState.rating ? (curve.isdMax * mcbState.rating).toFixed(0) : '—';
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">${t('mcbTitle')}</div>
+      <div class="info-row">${t('infoClick')}</div>
+
+      <div class="select-group">
+        <div class="select-label">${t('mcbType')}</div>
+        <div class="select-grid">
+          ${Object.keys(MCB_TYPES).map(tp =>
+            `<button class="sel-btn ${mcbState.type === tp ? 'selected' : ''}" onclick="mcbState.type='${tp}';mcbState.rating=null;renderModule('mcb')">${tp}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('mcbCurve')}</div>
+        <div class="select-grid">
+          ${Object.keys(MCB_CURVES).map(c =>
+            `<button class="sel-btn ${mcbState.curve === c ? 'selected' : ''}" onclick="mcbState.curve='${c}';renderModule('mcb')">${c}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('mcbPoles')}</div>
+        <div class="select-grid">
+          <button class="sel-btn ${mcbState.poles === '1p' ? 'selected' : ''}" onclick="mcbState.poles='1p';renderModule('mcb')">1P</button>
+          <button class="sel-btn ${mcbState.poles === 'multi' ? 'selected' : ''}" onclick="mcbState.poles='multi';renderModule('mcb')">2P / 3P / 4P</button>
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('mcbRating')}</div>
+        <div class="select-grid">
+          ${mcb.ratings.map(r =>
+            `<button class="sel-btn ${mcbState.rating === r ? 'selected' : ''}" onclick="mcbState.rating=${r};renderModule('mcb')">${r}</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    ${mcbState.rating ? `
+    <div class="card fade-in">
+      <div class="card-title">${t('mcbResult')}</div>
+      <div class="result-box">
+        <div class="result-title">${t('result')}</div>
+        <div class="result-row"><span class="label">${t('mcbType')}</span><span class="value">${mcbState.type} ${mcbState.curve}${mcbState.rating}</span></div>
+        <div class="result-row"><span class="label">${t('mcbStandard')}</span><span class="value">${mcb.standard}</span></div>
+        <div class="result-row"><span class="label">${t('mcbRating')}</span><span class="value">${mcbState.rating} A</span></div>
+        <div class="result-row"><span class="label">${t('mcbIcu')}</span><span class="value">${icu} kA</span></div>
+        <div class="result-row"><span class="label">Ics</span><span class="value">${(icu * mcb.ics).toFixed(1)} kA</span></div>
+        <div class="result-row"><span class="label">${t('mcbIsd')}</span><span class="value">${isdMin} - ${isdMax} A</span></div>
+        <div class="result-row"><span class="label">${t('mcbPoles')}</span><span class="value">${mcbState.poles === '1p' ? '1P' : 'Multi-pole'}</span></div>
+      </div>
+    </div>
+    ` : ''}
+  `;
+}
+
+// ===== MCCB MODULE =====
+function renderMCCB() {
+  const frame = MCCB_FRAMES[mccbState.frame];
+  const icu = MCCB_TRIPS[mccbState.trip];
+  const io = mccbState.inVal * mccbState.ioMult;
+  const isdCalc = io * mccbState.isdMult;
+  const isdMin = isdCalc * 0.9;
+  const isdMax = isdCalc * 1.1;
+  const ii = mccbState.inVal * 12; // Ii typically 12x In for Micrologic
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">${t('mccbTitle')}</div>
+      <div class="info-row">${t('infoClick')}</div>
+
+      <div class="select-group">
+        <div class="select-label">${t('mccbFrame')}</div>
+        <div class="select-grid">
+          ${Object.keys(MCCB_FRAMES).map(f =>
+            `<button class="sel-btn ${mccbState.frame === f ? 'selected' : ''}" onclick="mccbState.frame='${f}';mccbState.inVal=MCCB_FRAMES['${f}'].inOptions[0];renderModule('mccb')">${f}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('mccbTrip')} (Icu)</div>
+        <div class="select-grid">
+          ${Object.entries(MCCB_TRIPS).map(([k,v]) =>
+            `<button class="sel-btn ${mccbState.trip === k ? 'selected' : ''}" onclick="mccbState.trip='${k}';renderModule('mccb')">${k} (${v} kA)</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('mccbIn')}</div>
+        <div class="select-grid">
+          ${frame.inOptions.map(i =>
+            `<button class="sel-btn ${mccbState.inVal === i ? 'selected' : ''}" onclick="mccbState.inVal=${i};renderModule('mccb')">${i}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('mccbIo')} (Io = x \u00D7 In)</div>
+        <div class="select-grid">
+          ${MCCB_IO_RANGE.map(m =>
+            `<button class="sel-btn ${mccbState.ioMult === m ? 'selected' : ''}" onclick="mccbState.ioMult=${m};renderModule('mccb')">${m}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('mccbIsd2')} (Isd = x \u00D7 Io)</div>
+        <div class="select-grid">
+          ${MCCB_ISD_MULT.map(m =>
+            `<button class="sel-btn ${mccbState.isdMult === m ? 'selected' : ''}" onclick="mccbState.isdMult=${m};renderModule('mccb')">${m}</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${t('mccbResult')} — Micrologic 2.2</div>
+      <div class="result-box">
+        <div class="result-title">${mccbState.frame} ${mccbState.trip}</div>
+        <div class="result-row"><span class="label">In</span><span class="value">${mccbState.inVal} A</span></div>
+        <div class="result-row"><span class="label">${t('mccbIcu2')}</span><span class="value">${icu} kA</span></div>
+        <div class="result-row"><span class="label">Io</span><span class="value">${io.toFixed(0)} A</span></div>
+        <div class="result-row"><span class="label">${t('mccbIr')}</span><span class="value">${(mccbState.inVal * 0.4).toFixed(0)} - ${io.toFixed(0)} A</span></div>
+        <div class="result-row"><span class="label">${t('mccbIsdCalc')}</span><span class="value">${isdMin.toFixed(0)} - ${isdMax.toFixed(0)} A (\u00B110%)</span></div>
+        <div class="result-row"><span class="label">${t('mccbIi')}</span><span class="value">${ii} A</span></div>
+      </div>
+    </div>
+  `;
+}
+
+// ===== CABLE MODULE =====
+function renderCable() {
+  const cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
+  const types = Object.keys(cables);
+  const currentType = cables[cableState.type];
+  const cores = currentType ? Object.keys(currentType) : [];
+  const currentCores = currentType && currentType[cableState.cores] ? currentType[cableState.cores] : {};
+  const crossSections = Object.keys(currentCores);
+
+  const izTable = cableState.material === 'copper' ? IZ_COPPER : IZ_ALU;
+  const selectedCable = currentCores[cableState.crossSection];
+
+  // Correction factors
+  const kInstall = INSTALL_METHODS[cableState.installMethod] || 1.0;
+  const kTemp = TEMP_FACTORS[cableState.temp] || 1.0;
+  const kGroup = GROUP_FACTORS[cableState.grouping] || 1.0;
+  const kTotal = kInstall * kTemp * kGroup;
+
+  const baseIz = izTable[parseFloat(cableState.crossSection)] || 0;
+  const correctedIz = baseIz * kTotal;
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">${t('cableTitle')}</div>
+      <div class="info-row">${t('infoClick')}</div>
+
+      <div class="select-group">
+        <div class="select-label">${t('cableMaterial')}</div>
+        <div class="select-grid">
+          <button class="sel-btn ${cableState.material === 'copper' ? 'selected' : ''}" onclick="cableState.material='copper';cableState.type=Object.keys(CABLES_COPPER)[0];cableState.cores=Object.keys(CABLES_COPPER[cableState.type])[0];cableState.crossSection=null;renderModule('cable')">${t('cableCopper')}</button>
+          <button class="sel-btn ${cableState.material === 'aluminium' ? 'selected' : ''}" onclick="cableState.material='aluminium';cableState.type=Object.keys(CABLES_ALU)[0];cableState.cores=Object.keys(CABLES_ALU[cableState.type])[0];cableState.crossSection=null;renderModule('cable')">${t('cableAluminium')}</button>
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('cableType')}</div>
+        <div class="select-grid">
+          ${types.map(tp =>
+            `<button class="sel-btn ${cableState.type === tp ? 'selected' : ''}" onclick="cableState.type='${tp}';cableState.cores=Object.keys(${cableState.material === 'copper' ? 'CABLES_COPPER' : 'CABLES_ALU'}['${tp}'])[0];cableState.crossSection=null;renderModule('cable')">${tp}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('cableCores')}</div>
+        <div class="select-grid">
+          ${cores.map(c =>
+            `<button class="sel-btn ${cableState.cores === c ? 'selected' : ''}" onclick="cableState.cores='${c}';cableState.crossSection=null;renderModule('cable')">${c}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('cableCrossSection')}</div>
+        <div class="select-grid">
+          ${crossSections.map(cs =>
+            `<button class="sel-btn ${cableState.crossSection === cs ? 'selected' : ''}" onclick="cableState.crossSection='${cs}';renderModule('cable')">${cs}</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Korrektionsfaktorer' : 'Correction Factors'}</div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Fremf\u00F8ringsmetode' : 'Installation Method'}</div>
+        <div class="select-grid">
+          ${Object.entries(INSTALL_METHODS).map(([k,v]) =>
+            `<button class="sel-btn ${cableState.installMethod === k ? 'selected' : ''}" onclick="cableState.installMethod='${k}';renderModule('cable')">${k} (${v})</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Temperatur [\u00B0C]' : 'Temperature [\u00B0C]'}</div>
+        <div class="select-grid">
+          ${Object.entries(TEMP_FACTORS).map(([k,v]) =>
+            `<button class="sel-btn ${cableState.temp === parseInt(k) ? 'selected' : ''}" onclick="cableState.temp=${k};renderModule('cable')">${k}\u00B0 (${v})</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Gruppering (antal kabler)' : 'Grouping (number of cables)'}</div>
+        <div class="select-grid">
+          ${Object.entries(GROUP_FACTORS).map(([k,v]) =>
+            `<button class="sel-btn ${cableState.grouping === parseInt(k) ? 'selected' : ''}" onclick="cableState.grouping=${k};renderModule('cable')">${k} (${v})</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    ${cableState.crossSection && selectedCable ? `
+    <div class="card fade-in">
+      <div class="card-title">${t('cableResult')}</div>
+      <div class="result-box">
+        <div class="result-title">${t('result')}</div>
+        <div class="result-row"><span class="label">${t('cableType')}</span><span class="value">${cableState.type} ${cableState.cores} ${cableState.crossSection} mm\u00B2</span></div>
+        <div class="result-row"><span class="label">${t('cableMaterial')}</span><span class="value">${cableState.material === 'copper' ? t('cableCopper') : t('cableAluminium')}</span></div>
+        <div class="result-row"><span class="label">${t('cableR')}</span><span class="value">${selectedCable.r} \u03A9/km</span></div>
+        <div class="result-row"><span class="label">${t('cableX')}</span><span class="value">${selectedCable.x} \u03A9/km</span></div>
+        <div class="result-row"><span class="label">Iz (${lang === 'da' ? 'basis' : 'base'})</span><span class="value">${baseIz} A</span></div>
+        <div class="result-row"><span class="label">K (total)</span><span class="value">${kTotal.toFixed(3)}</span></div>
+        <div class="result-row"><span class="label">${t('cableIz')} (${lang === 'da' ? 'korrigeret' : 'corrected'})</span><span class="value">${correctedIz.toFixed(1)} A</span></div>
+      </div>
+    </div>
+    ` : ''}
+  `;
+}
+
+// ===== VOLTAGE DROP MODULE =====
+function renderVdrop() {
+  const cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
+  const currentType = cables[cableState.type];
+  const currentCores = currentType && currentType[cableState.cores] ? currentType[cableState.cores] : {};
+  const selectedCable = currentCores[cableState.crossSection];
+
+  const lengthSteps = [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 125, 150, 175, 200, 250, 300, 400, 500];
+
+  let vdrop = 0, vdropPercent = 0, Un = 400;
+  if (selectedCable) {
+    const ib = calcIB();
+    const L = vdropState.length / 1000; // km
+    const cosP = loadState.cosPhi;
+    const sinP = Math.sin(Math.acos(cosP));
+    Un = loadState.voltage === '3x400' ? 400 : 230;
+
+    if (loadState.voltage === '3x400') {
+      vdrop = Math.sqrt(3) * ib * L * (selectedCable.r * cosP + selectedCable.x * sinP);
+    } else {
+      vdrop = 2 * ib * L * (selectedCable.r * cosP + selectedCable.x * sinP);
+    }
+    vdropPercent = (vdrop / Un) * 100;
+  }
+
+  const isOk = vdropPercent <= 4;
+  const isLighting = vdropPercent <= 3;
+  const boxClass = !selectedCable ? '' : (isOk ? '' : 'error');
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">${t('vdropTitle')}</div>
+      <div class="info-row">${lang === 'da' ? 'V\u00E6lg kabel under "Kabler" f\u00F8rst, derefter l\u00E6ngde her' : 'Select cable under "Cables" first, then length here'}</div>
+
+      ${!selectedCable ? `
+        <div class="result-box warning">
+          <div class="result-title">${lang === 'da' ? 'Advarsel' : 'Warning'}</div>
+          <div class="result-row"><span class="label">${lang === 'da' ? 'V\u00E6lg kabel i "Kabler"-modulet f\u00F8rst' : 'Select a cable in the "Cables" module first'}</span></div>
+        </div>
+      ` : `
+        <div class="result-box" style="margin-bottom:16px;background:#eaf2f8;border-color:var(--primary-light)">
+          <div class="result-row"><span class="label">${t('cableType')}</span><span class="value">${cableState.type} ${cableState.cores} ${cableState.crossSection} mm\u00B2</span></div>
+          <div class="result-row"><span class="label">IB</span><span class="value">${calcIB().toFixed(1)} A</span></div>
+        </div>
+      `}
+
+      <div class="select-group">
+        <div class="select-label">${t('cableLength')}</div>
+        <div class="select-grid">
+          ${lengthSteps.map(l =>
+            `<button class="sel-btn ${vdropState.length === l ? 'selected' : ''}" onclick="vdropState.length=${l};renderModule('vdrop')">${l}</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    ${selectedCable ? `
+    <div class="card fade-in">
+      <div class="card-title">${t('vdropResult')}</div>
+      <div class="result-box ${boxClass}">
+        <div class="result-title">${t('result')} ${isOk ? '<span class="verify-badge ok">\u2713 OK</span>' : '<span class="verify-badge fail">\u2717 > 4%</span>'}</div>
+        <div class="result-row"><span class="label">${t('vdropVolts')}</span><span class="value">${vdrop.toFixed(2)} V</span></div>
+        <div class="result-row"><span class="label">${t('vdropPercent')}</span><span class="value">${vdropPercent.toFixed(2)} %</span></div>
+        <div class="result-row"><span class="label">${t('vdropRemaining')}</span><span class="value">${(Un - vdrop).toFixed(1)} V</span></div>
+        <div class="result-row"><span class="label">${t('vdropLimit')}</span><span class="value">${isOk ? '\u2713' : '\u2717'}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Belysning ≤3%' : 'Lighting ≤3%'}</span><span class="value"><span class="verify-badge ${isLighting ? 'ok' : 'fail'}">${isLighting ? (lang==='da'?'OK':'OK') : (lang==='da'?'Over 3%':'Over 3%')}</span></span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Andre ≤5%' : 'Other ≤5%'}</span><span class="value"><span class="verify-badge ${vdropPercent <= 5 ? 'ok' : 'fail'}">${vdropPercent <= 5 ? 'OK' : (lang==='da'?'Over 5%':'Over 5%')}</span></span></div>
+      </div>
+    </div>
+    ` : ''}
+  `;
+}
+
+// ===== SHORT CIRCUIT MODULE =====
+function renderShortCircuit() {
+  const zNetSteps = [0.5, 1, 1.5, 2, 3, 4, 5, 7, 10, 15, 20];
+  const zTrafoSteps = [2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30, 40, 50];
+
+  // Cable impedance
+  const cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
+  const currentType = cables[cableState.type];
+  const currentCores = currentType && currentType[cableState.cores] ? currentType[cableState.cores] : {};
+  const selectedCable = currentCores[cableState.crossSection];
+
+  let zCable = 0;
+  if (selectedCable) {
+    const L = vdropState.length / 1000; // km
+    const rCable = selectedCable.r * L;
+    const xCable = selectedCable.x * L;
+    zCable = Math.sqrt(rCable * rCable + xCable * xCable) * 1000; // mOhm
+  }
+
+  const zTotal = scState.zNet + scState.zTrafo + zCable;
+  const Un = loadState.voltage === '3x400' ? 400 : 230;
+  const cFactor = 1.05; // voltage factor per IEC 60909
+
+  // Ik max (3-phase, at busbar)
+  const ikMax3ph = (cFactor * Un) / (Math.sqrt(3) * (scState.zNet + scState.zTrafo) / 1000);
+  // Ik min (2-phase at end of cable, factor 0.95)
+  const ikMin2ph = (0.95 * Un) / (2 * zTotal / 1000);
+
+  // Get protection device Icu and Isd for check
+  let deviceIcu = 0, deviceIsd = 0;
+  if (activeModule === 'scircuit') {
+    // Try MCCB first
+    deviceIcu = MCCB_TRIPS[mccbState.trip] * 1000; // A
+    const io = mccbState.inVal * mccbState.ioMult;
+    deviceIsd = io * mccbState.isdMult * 1.1;
+
+    // Or MCB
+    if (mcbState.rating) {
+      const mcb = MCB_TYPES[mcbState.type];
+      const mcbIcu = (mcbState.poles === '1p' ? mcb.icu1p : mcb.icuMp) * 1000;
+      if (mcbIcu > 0) {
+        deviceIcu = mcbIcu;
+        deviceIsd = MCB_CURVES[mcbState.curve].isdMax * mcbState.rating;
+      }
+    }
+  }
+
+  const check1 = deviceIcu >= ikMax3ph;
+  const check2 = deviceIsd <= ikMin2ph;
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">${t('scTitle')}</div>
+      <div class="info-row">${lang === 'da' ? 'V\u00E6lg netimpedans og trafoimpedans. Kabelimpedans beregnes fra kabelmodulet.' : 'Select network impedance and transformer impedance. Cable impedance is calculated from the cable module.'}</div>
+
+      <div class="select-group">
+        <div class="select-label">${t('scZnet')}</div>
+        <div class="select-grid">
+          ${zNetSteps.map(z =>
+            `<button class="sel-btn ${scState.zNet === z ? 'selected' : ''}" onclick="scState.zNet=${z};renderModule('scircuit')">${z}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${t('scZtrafo')}</div>
+        <div class="select-grid">
+          ${zTrafoSteps.map(z =>
+            `<button class="sel-btn ${scState.zTrafo === z ? 'selected' : ''}" onclick="scState.zTrafo=${z};renderModule('scircuit')">${z}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      ${selectedCable ? `
+        <div class="result-box" style="margin-top:12px;background:#eaf2f8;border-color:var(--primary-light)">
+          <div class="result-row"><span class="label">${lang === 'da' ? 'Kabelimpedans' : 'Cable impedance'}</span><span class="value">${zCable.toFixed(2)} m\u03A9</span></div>
+          <div class="result-row"><span class="label">${lang === 'da' ? 'Kabel' : 'Cable'}</span><span class="value">${cableState.type} ${cableState.crossSection} mm\u00B2 \u00D7 ${vdropState.length} m</span></div>
+        </div>
+      ` : `
+        <div class="result-box warning" style="margin-top:12px">
+          <div class="result-row"><span class="label">${lang === 'da' ? 'V\u00E6lg kabel i "Kabler"-modulet for fuld beregning' : 'Select cable in "Cables" module for full calculation'}</span></div>
+        </div>
+      `}
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${t('scResult')}</div>
+      <div class="result-box">
+        <div class="result-title">${t('result')}</div>
+        <div class="result-row"><span class="label">${t('scIkmax')} (3-${lang === 'da' ? 'faset' : 'phase'})</span><span class="value">${(ikMax3ph/1000).toFixed(2)} kA</span></div>
+        <div class="result-row"><span class="label">${t('scIkmin')} (2-${lang === 'da' ? 'faset' : 'phase'})</span><span class="value">${ikMin2ph.toFixed(0)} A</span></div>
+        <div class="result-row"><span class="label">Z total</span><span class="value">${zTotal.toFixed(2)} m\u03A9</span></div>
+      </div>
+
+      ${deviceIcu > 0 ? `
+      <div class="result-box ${check1 && check2 ? '' : 'error'}" style="margin-top:12px">
+        <div class="result-title">${lang === 'da' ? 'Kontrol' : 'Verification'}</div>
+        <div class="result-row">
+          <span class="label">${t('scCheck1')}</span>
+          <span class="value">
+            ${(deviceIcu/1000).toFixed(1)} kA \u2265 ${(ikMax3ph/1000).toFixed(2)} kA
+            <span class="verify-badge ${check1 ? 'ok' : 'fail'}">${check1 ? t('ok') : t('fail')}</span>
+          </span>
+        </div>
+        <div class="result-row">
+          <span class="label">${t('scCheck2')}</span>
+          <span class="value">
+            ${deviceIsd.toFixed(0)} A \u2264 ${ikMin2ph.toFixed(0)} A
+            <span class="verify-badge ${check2 ? 'ok' : 'fail'}">${check2 ? t('ok') : t('fail')}</span>
+          </span>
+        </div>
+      </div>
+      ` : `
+      <div class="result-box warning" style="margin-top:12px">
+        <div class="result-row"><span class="label">${lang === 'da' ? 'V\u00E6lg beskyttelsesenhed (MCB/MCCB) for kontrolberegning' : 'Select protection device (MCB/MCCB) for verification'}</span></div>
+      </div>
+      `}
+    </div>
+  `;
+}
+
+// ===== TRANSFORMER MODULE =====
+// Data from 1.-Dim-af-trafo.ppx.pptx
+let trafoState = { size: 400, voltage: '10/0.4', loadPercent: 75 };
+
+function renderTrafo() {
+  const S = trafoState.size;
+  const uk = TRAFO_UK[S] || 4;
+  const losses = TRAFO_LOSSES[S] || { p0: 0, pk: 0 };
+  const loadFactor = trafoState.loadPercent / 100;
+
+  // Full load current (secondary)
+  const Ifl = (S * 1000) / (Math.sqrt(3) * 400);
+  // Actual load current
+  const Iload = Ifl * loadFactor;
+  // Transformer impedance in mOhm (secondary side)
+  const Ztrafo = (uk / 100) * (400 * 400) / (S * 1000) * 1000; // mOhm
+  // Short-circuit current at secondary busbar
+  const Ik = (S * 1000) / (Math.sqrt(3) * 400 * (uk / 100));
+  // Total losses at given load
+  const Ploss = losses.p0 + losses.pk * loadFactor * loadFactor;
+
+  const voltageOptions = ['10/0.4', '20/0.4', '50/10', '30/10'];
+  const loadSteps = [25, 50, 60, 70, 75, 80, 85, 90, 95, 100];
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Transformerdimensionering' : 'Transformer Dimensioning'}</div>
+      <div class="info-row">${lang === 'da' ? 'Vælg trafostørrelse og belastningsgrad. Baseret på Fællesregulativet 2019.' : 'Select transformer size and load level. Based on Fællesregulativet 2019.'}</div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Trafostørrelse [kVA]' : 'Transformer Size [kVA]'}</div>
+        <div class="select-grid">
+          ${TRAFO_SIZES.map(s =>
+            `<button class="sel-btn ${trafoState.size === s ? 'selected' : ''}" onclick="trafoState.size=${s};renderModule('trafo')">${s}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Omsætningsforhold [kV]' : 'Voltage Ratio [kV]'}</div>
+        <div class="select-grid">
+          ${voltageOptions.map(v =>
+            `<button class="sel-btn ${trafoState.voltage === v ? 'selected' : ''}" onclick="trafoState.voltage='${v}';renderModule('trafo')">${v}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Belastningsgrad [%]' : 'Load Level [%]'}</div>
+        <div class="select-grid">
+          ${loadSteps.map(l =>
+            `<button class="sel-btn ${trafoState.loadPercent === l ? 'selected' : ''}" onclick="trafoState.loadPercent=${l};renderModule('trafo')">${l}%</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Trafodata' : 'Transformer Data'}</div>
+      <div class="result-box">
+        <div class="result-title">${lang === 'da' ? 'Resultat' : 'Result'}</div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Størrelse' : 'Size'}</span><span class="value">${S} kVA</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Omsætning' : 'Ratio'}</span><span class="value">${trafoState.voltage} kV</span></div>
+        <div class="result-row"><span class="label">uk%</span><span class="value">${uk} %</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Fuldlaststrøm (sek.)' : 'Full-load current (sec.)'}</span><span class="value">${Ifl.toFixed(1)} A</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Aktuel belastning' : 'Actual load'}</span><span class="value">${Iload.toFixed(1)} A (${trafoState.loadPercent}%)</span></div>
+        <div class="result-row"><span class="label">Z trafo</span><span class="value">${Ztrafo.toFixed(2)} mΩ</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Ik (sekundær skinne)' : 'Ik (secondary busbar)'}</span><span class="value">${(Ik/1000).toFixed(2)} kA</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Tab (tomgang)' : 'Losses (no-load)'}</span><span class="value">${losses.p0} W</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Tab (belastning)' : 'Losses (load)'}</span><span class="value">${(losses.pk * loadFactor * loadFactor).toFixed(0)} W</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Totale tab' : 'Total losses'}</span><span class="value">${Ploss.toFixed(0)} W</span></div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Strømtransformer til måling' : 'Current Transformer for Metering'}</div>
+      <div class="result-box" style="background:#eaf2f8;border-color:var(--primary-light)">
+        <div class="result-title">${lang === 'da' ? 'Anbefaling' : 'Recommendation'}</div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'CT primær' : 'CT primary'}</span><span class="value">${Math.ceil(Ifl / 50) * 50} / 5 A</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'CT klasse' : 'CT class'}</span><span class="value">0.5 (${lang === 'da' ? 'måling' : 'metering'})</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Sikringselement' : 'Fuse element'}</span><span class="value">${lang === 'da' ? 'NH sikring' : 'NH fuse'} ${Math.ceil(Ifl / 50) * 50 > 250 ? 'NH 2' : 'NH 1'}</span></div>
+      </div>
+    </div>
+  `;
+}
+
+// ===== STANDARDS MODULE =====
+function renderStandards() {
+  return `
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Danske Elstandarder & Lovgivning' : 'Danish Electrical Standards & Legislation'}</div>
+      <div class="info-row">${lang === 'da' ? 'Oversigt over gældende standarder brugt i denne app' : 'Overview of applicable standards used in this app'}</div>
+
+      <div class="result-box" style="background:#eaf2f8;border-color:var(--primary-light)">
+        <div class="result-title">${lang === 'da' ? 'Lovgrundlag' : 'Legal Framework'}</div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Hovedlov' : 'Main Act'}</span><span class="value">${DK_STANDARDS.law}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Installation' : 'Installation'}</span><span class="value">${DK_STANDARDS.installBek}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Forsyningsregler' : 'Supply Rules'}</span><span class="value">${DK_STANDARDS.faellesreg}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Myndighed' : 'Authority'}</span><span class="value">Sikkerhedsstyrelsen</span></div>
+      </div>
+
+      <div class="result-box" style="margin-top:12px;background:linear-gradient(135deg,#eafaf1,#d5f5e3);border-color:var(--success)">
+        <div class="result-title">${lang === 'da' ? 'Tekniske Standarder' : 'Technical Standards'}</div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Kabeldimensionering' : 'Cable Sizing'}</span><span class="value">${DK_STANDARDS.cableSizing}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Overstrømsbeskyttelse' : 'Overcurrent Protection'}</span><span class="value">${DK_STANDARDS.overcurrent}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Generelle krav' : 'General Requirements'}</span><span class="value">${DK_STANDARDS.general}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Kortslutning' : 'Short Circuit'}</span><span class="value">${DK_STANDARDS.shortCircuit}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Beskyttelse mod stød' : 'Shock Protection'}</span><span class="value">${DK_STANDARDS.rcd}</span></div>
+      </div>
+
+      <div class="result-box" style="margin-top:12px;background:linear-gradient(135deg,#fef9e7,#fdebd0);border-color:var(--warning)">
+        <div class="result-title">${lang === 'da' ? 'Komponentstandarder' : 'Component Standards'}</div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Automatsikring (MCB)' : 'MCB'}</span><span class="value">${DK_STANDARDS.mcb}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Maksimalafbryder (MCCB)' : 'MCCB'}</span><span class="value">${DK_STANDARDS.mccb}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Smeltesikringer' : 'Fuses'}</span><span class="value">${DK_STANDARDS.fuse}</span></div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Spændingsfald — Krav' : 'Voltage Drop — Requirements'}</div>
+      <div class="result-box">
+        <div class="result-title">${lang === 'da' ? 'Grænseværdier iht. HD 60364' : 'Limits per HD 60364'}</div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Belysning' : 'Lighting'}</span><span class="value">≤ ${DK_STANDARDS.vdropLighting}%</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Andre forbrugere' : 'Other loads'}</span><span class="value">≤ ${DK_STANDARDS.vdropOther}%</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Generel grænse' : 'General limit'}</span><span class="value">≤ ${DK_STANDARDS.vdropGeneral}%</span></div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'RCD/HPFI Krav (DS/HD 60364-4-41)' : 'RCD/RCCB Requirements (DS/HD 60364-4-41)'}</div>
+      <div class="info-row">${lang === 'da' ? 'I Danmark kræves HPFI (30 mA) på alle nye installationer i boliger. Klik for detaljer.' : 'In Denmark, RCD (30 mA) is required on all new residential installations. Click for details.'}</div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Vælg RCD-type' : 'Select RCD Type'}</div>
+        <div class="select-grid">
+          ${Object.keys(RCD_TYPES).map(type =>
+            `<button class="sel-btn ${rcdSelected === type ? 'selected' : ''}" onclick="rcdSelected='${type}';renderModule('standards')">${type}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      ${rcdSelected ? `
+      <div class="result-box">
+        <div class="result-title">${rcdSelected}</div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Beskrivelse' : 'Description'}</span><span class="value">${lang === 'da' ? RCD_TYPES[rcdSelected].desc_da : RCD_TYPES[rcdSelected].desc_en}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Følsomhed' : 'Sensitivity'}</span><span class="value">${RCD_TYPES[rcdSelected].sensitivity.join(', ')} mA</span></div>
+      </div>
+
+      <div class="select-group" style="margin-top:12px">
+        <div class="select-label">${lang === 'da' ? 'Vælg følsomhed [mA]' : 'Select Sensitivity [mA]'}</div>
+        <div class="select-grid">
+          ${RCD_TYPES[rcdSelected].sensitivity.map(s =>
+            `<button class="sel-btn ${rcdSensitivity === s ? 'selected' : ''}" onclick="rcdSensitivity=${s};renderModule('standards')">${s} mA</button>`
+          ).join('')}
+        </div>
+      </div>
+      ` : ''}
+
+      <div class="select-group" style="margin-top:12px">
+        <div class="select-label">${lang === 'da' ? 'Vælg installationstype' : 'Select Installation Type'}</div>
+        <div class="select-grid">
+          <button class="sel-btn ${rcdApplication === 'bolig' ? 'selected' : ''}" onclick="rcdApplication='bolig';renderModule('standards')">${lang === 'da' ? 'Bolig (ny)' : 'Residential (new)'}</button>
+          <button class="sel-btn ${rcdApplication === 'bad' ? 'selected' : ''}" onclick="rcdApplication='bad';renderModule('standards')">${lang === 'da' ? 'Badeværelse' : 'Bathroom'}</button>
+          <button class="sel-btn ${rcdApplication === 'udendors' ? 'selected' : ''}" onclick="rcdApplication='udendors';renderModule('standards')">${lang === 'da' ? 'Udendørs stik' : 'Outdoor sockets'}</button>
+          <button class="sel-btn ${rcdApplication === 'industri' ? 'selected' : ''}" onclick="rcdApplication='industri';renderModule('standards')">${lang === 'da' ? 'Industri' : 'Industrial'}</button>
+          <button class="sel-btn ${rcdApplication === 'ev' ? 'selected' : ''}" onclick="rcdApplication='ev';renderModule('standards')">${lang === 'da' ? 'EV-lader' : 'EV Charger'}</button>
+        </div>
+      </div>
+
+      ${rcdApplication ? `
+      <div class="result-box" style="margin-top:12px">
+        <div class="result-title">${lang === 'da' ? 'Krav' : 'Requirement'}</div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Anbefalet type' : 'Recommended type'}</span><span class="value">${getRcdRecommendation().type}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Følsomhed' : 'Sensitivity'}</span><span class="value">${getRcdRecommendation().sensitivity}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Krav' : 'Requirement'}</span><span class="value">${getRcdRecommendation().note}</span></div>
+      </div>
+      ` : ''}
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Jordingssystemer' : 'Earthing Systems'}</div>
+      <div class="info-row">${lang === 'da' ? 'Klik på jordingssystem for detaljer' : 'Click earthing system for details'}</div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Vælg jordingssystem' : 'Select Earthing System'}</div>
+        <div class="select-grid">
+          ${['TN-S', 'TN-C-S', 'TN-C', 'TT', 'IT'].map(sys =>
+            `<button class="sel-btn ${earthSelected === sys ? 'selected' : ''}" onclick="earthSelected='${sys}';renderModule('standards')">${sys}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      ${earthSelected ? `
+      <div class="result-box">
+        <div class="result-title">${earthSelected}</div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Beskrivelse' : 'Description'}</span><span class="value">${getEarthInfo(earthSelected).desc}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Typisk brug i DK' : 'Typical use in DK'}</span><span class="value">${getEarthInfo(earthSelected).use}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Fejlbeskyttelse' : 'Fault protection'}</span><span class="value">${getEarthInfo(earthSelected).protection}</span></div>
+      </div>
+      ` : ''}
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Kilder & Links' : 'Sources & Links'}</div>
+      <div class="result-box" style="background:#eaf2f8;border-color:var(--primary-light)">
+        <div class="result-row"><span class="label">Sikkerhedsstyrelsen</span><span class="value">sik.dk</span></div>
+        <div class="result-row"><span class="label">Elsikkerhed.dk</span><span class="value">elsikkerhed.dk</span></div>
+        <div class="result-row"><span class="label">Dansk Standard</span><span class="value">ds.dk</span></div>
+        <div class="result-row"><span class="label">IEC Webstore</span><span class="value">webstore.iec.ch</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Schneider El-guide' : 'Schneider EI Guide'}</span><span class="value">electrical-installation.org</span></div>
+      </div>
+    </div>
+  `;
+}
+
+// ===== COMPONENT BANK MODULE =====
+// Browsable bank of ALL electrical components available in the Danish market
+let bankCategory = 'cables';
+let bankBrand = 'all';
+
+function renderBank() {
+  const categories = {
+    cables: { da: 'Kabler', en: 'Cables', data: PRODUCTS.cables },
+    mcbs: { da: 'Automatsikringer', en: 'MCBs', data: PRODUCTS.mcbs },
+    mccbs: { da: 'Maksimalafbrydere', en: 'MCCBs', data: PRODUCTS.mccbs },
+    fuses: { da: 'Smeltesikringer', en: 'Fuses', data: PRODUCTS.fuses },
+    rcds: { da: 'HPFI / RCD', en: 'RCDs', data: PRODUCTS.rcds },
+    rcbos: { da: 'HPFI-automater', en: 'RCBOs', data: PRODUCTS.rcbos },
+    spds: { da: 'Overspændingsbeskyttelse', en: 'Surge Protection', data: PRODUCTS.spds },
+    contactors: { da: 'Kontaktorer', en: 'Contactors', data: PRODUCTS.contactors },
+    mpcbs: { da: 'Motorværn', en: 'Motor Protection', data: PRODUCTS.mpcbs },
+    overloadRelays: { da: 'Termorelæer', en: 'Overload Relays', data: PRODUCTS.overloadRelays },
+    wiringDevices: { da: 'Stik & Afbrydere', en: 'Sockets & Switches', data: PRODUCTS.wiringDevices }
+  };
+
+  const cat = categories[bankCategory];
+  let items = cat.data;
+
+  // Get unique brands for filter
+  const brands = ['all', ...new Set(cat.data.map(p => p.brand))];
+
+  // Filter by brand
+  if (bankBrand !== 'all') {
+    items = items.filter(p => p.brand === bankBrand);
+  }
+
+  // Build rows based on category
+  const rows = items.map(p => {
+    let spec = '';
+    if (bankCategory === 'cables') spec = `${p.cores} ${p.mm2} mm\u00B2 ${p.material} | Iz=${p.iz}A`;
+    else if (bankCategory === 'mcbs') spec = `${p.curve}${p.rating} ${p.poles} | Icu=${p.icu}kA | ${p.standard}`;
+    else if (bankCategory === 'mccbs') spec = `${p.trip} | Icu=${p.icu}kA | In: ${p.inOptions.join('/')}A`;
+    else if (bankCategory === 'fuses') spec = `${p.rating}A | ${p.size} | Icu=${p.icu}kA`;
+    else if (bankCategory === 'rcds') spec = `${p.poles} ${p.rating}A | ${p.sensitivity}mA Type ${p.rcdType}`;
+    else if (bankCategory === 'rcbos') spec = `${p.poles} ${p.curve}${p.rating} | ${p.sensitivity}mA | Icu=${p.icu}kA`;
+    else if (bankCategory === 'spds') spec = `${p.spdType} ${p.poles} | Imax=${p.imax}kA | Up=${p.up}kV`;
+    else if (bankCategory === 'contactors') spec = `AC-3: ${p.ac3_A}A / ${p.ac3_kW}kW`;
+    else if (bankCategory === 'mpcbs') spec = `${p.rangeMin}-${p.rangeMax}A / ${p.kW}kW`;
+    else if (bankCategory === 'overloadRelays') spec = `${p.rangeMin}-${p.rangeMax}A`;
+    else if (bankCategory === 'wiringDevices') spec = `${p.rating}A | ${lang === 'da' ? p.desc_da : p.desc_en}`;
+
+    const useText = p.use_da ? (lang === 'da' ? p.use_da : p.use_en) : '';
+
+    return `
+      <div class="result-row" style="flex-direction:column;align-items:flex-start;gap:2px">
+        <div style="display:flex;justify-content:space-between;width:100%">
+          <span class="label"><strong>${p.brand}</strong> ${p.model}</span>
+          <span class="value">${spec}</span>
+        </div>
+        ${useText ? `<span style="font-size:0.75rem;color:var(--text-muted)">${useText}</span>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">\uD83D\uDCE6 ${lang === 'da' ? 'Komponentbank' : 'Component Bank'}</div>
+      <div class="info-row">${lang === 'da' ? 'Komplet bank over elektriske komponenter tilg\u00E6ngelige i Danmark (NKT, Schneider, ABB, Eaton, Hager, LK). Klik for at filtrere.' : 'Complete bank of electrical components available in Denmark (NKT, Schneider, ABB, Eaton, Hager, LK). Click to filter.'}</div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Kategori' : 'Category'}</div>
+        <div class="select-grid">
+          ${Object.keys(categories).map(k =>
+            `<button class="sel-btn ${bankCategory === k ? 'selected' : ''}" onclick="bankCategory='${k}';bankBrand='all';renderModule('bank')">${lang === 'da' ? categories[k].da : categories[k].en}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'M\u00E6rke' : 'Brand'}</div>
+        <div class="select-grid">
+          ${brands.map(b =>
+            `<button class="sel-btn ${bankBrand === b ? 'selected' : ''}" onclick="bankBrand='${b}';renderModule('bank')">${b === 'all' ? (lang === 'da' ? 'Alle' : 'All') : b}</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? cat.da : cat.en} (${items.length})</div>
+      <div class="result-box" style="background:#fff;border-color:var(--border)">
+        ${rows || '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Ingen produkter' : 'No products') + '</span></div>'}
+      </div>
+    </div>
+  `;
+}
+
+// ===== AI-ELECTRICIAN MODULE =====
+// Click-driven expert Q&A knowledge base (no typing - click topics, questions, and keyword tags)
+// Answers grounded in DS/HD 60364, IEC standards, and Danish regulations
+
+const AI_KNOWLEDGE = [
+  // --- Cables ---
+  { topic: 'cable', tags: ['kabel','tværsnit','dimensionering','iz'],
+    q_da: 'Hvordan vælger jeg det rigtige kabeltværsnit?',
+    q_en: 'How do I choose the correct cable cross-section?',
+    a_da: 'Følg 3 trin: 1) Beregn belastningsstrømmen IB. 2) Vælg en beskyttelse hvor IB \u2264 In. 3) Vælg et kabel hvor In \u2264 Iz (korrigeret strømbæreevne). Iz korrigeres for fremføringsmetode, temperatur og gruppering. Brug "Kabler"-modulet — appen viser kun kabler der er sikre for din IB.',
+    a_en: 'Follow 3 steps: 1) Calculate load current IB. 2) Choose protection where IB \u2264 In. 3) Choose a cable where In \u2264 Iz (corrected ampacity). Iz is corrected for installation method, temperature and grouping. Use the "Cables" module — the app only shows cables that are safe for your IB.' },
+  { topic: 'cable', tags: ['kabel','spændingsfald','længde'],
+    q_da: 'Hvornår skal jeg vælge et større kabel pga. spændingsfald?',
+    q_en: 'When should I upsize a cable due to voltage drop?',
+    a_da: 'Hvis spændingsfaldet overstiger grænserne: maks 3% for belysning og maks 5% for andre belastninger (HD 60364). Ved lange kabelruter (>100 m) bliver spændingsfald ofte den afgørende faktor — ikke strømbæreevnen. Tjek "Spændingsfald"-modulet.',
+    a_en: 'If voltage drop exceeds limits: max 3% for lighting and max 5% for other loads (HD 60364). For long cable runs (>100 m), voltage drop often becomes the deciding factor — not ampacity. Check the "Voltage Drop" module.' },
+  // --- Fuses / MCB ---
+  { topic: 'protection', tags: ['sikring','automatsikring','mcb','kurve'],
+    q_da: 'Hvilken kurve (B/C/D) skal jeg vælge på automatsikringen?',
+    q_en: 'Which curve (B/C/D) should I choose for the MCB?',
+    a_da: 'Kurve B (3-5\u00D7In): resistive belastninger — lys, varme, stikkontakter. Kurve C (5-10\u00D7In): induktive belastninger — motorer, transformere, kompressorer. Kurve D (10-20\u00D7In): høje startstrømme — store motorer, svejsemaskiner. I boliger bruges typisk B og C.',
+    a_en: 'Curve B (3-5\u00D7In): resistive loads — lighting, heating, sockets. Curve C (5-10\u00D7In): inductive loads — motors, transformers, compressors. Curve D (10-20\u00D7In): high inrush — large motors, welders. In homes, B and C are typical.' },
+  { topic: 'protection', tags: ['sikring','koordination','ib','in','iz'],
+    q_da: 'Hvad betyder reglen IB \u2264 In \u2264 Iz?',
+    q_en: 'What does the rule IB \u2264 In \u2264 Iz mean?',
+    a_da: 'Det er grundreglen for overbelastningsbeskyttelse (DS/HD 60364-4-43): Belastningsstrømmen (IB) skal være mindre end beskyttelsens mærkestrøm (In), som skal være mindre end kablets strømbæreevne (Iz). Dette sikrer at kablet aldrig overbelastes uden at beskyttelsen udløser. QI-indekset i appen tjekker dette automatisk.',
+    a_en: 'It is the fundamental rule for overload protection (DS/HD 60364-4-43): Load current (IB) must be less than the protective device rating (In), which must be less than the cable ampacity (Iz). This ensures the cable can never be overloaded without the protection tripping. The app QI index checks this automatically.' },
+  { topic: 'protection', tags: ['kortslutning','icu','ikmax','brydeevne'],
+    q_da: 'Hvordan sikrer jeg at beskyttelsen kan klare kortslutningen?',
+    q_en: 'How do I ensure the protection can handle the short-circuit?',
+    a_da: 'Beskyttelsens brydeevne (Icu) skal være større end den maksimale kortslutningsstrøm (Ik max) på monteringsstedet: Icu \u2265 Ik max. Samtidig skal Ik min (mindste kortslutning i kabelenden) være stor nok til at udløse beskyttelsen hurtigt. Brug "Kortslutning"-modulet.',
+    a_en: 'The protective device breaking capacity (Icu) must exceed the maximum short-circuit current (Ik max) at the installation point: Icu \u2265 Ik max. Also, Ik min (minimum short-circuit at cable end) must be large enough to trip the protection quickly. Use the "Short Circuit" module.' },
+  // --- RCD / HPFI ---
+  { topic: 'rcd', tags: ['hpfi','rcd','fejlstrøm','beskyttelse'],
+    q_da: 'Hvornår er HPFI (30 mA) lovpligtigt i Danmark?',
+    q_en: 'When is RCD (30 mA) mandatory in Denmark?',
+    a_da: 'HPFI Type A 30 mA er lovpligtigt på alle nye installationer i boliger, alle stikkontaktkredse, badeværelser (zone 0/1/2) og udendørs stikkontakter (Installationsbekendtgørelsen). For EV-ladere kræves Type B eller Type A + 6 mA DC-detektion.',
+    a_en: 'RCD Type A 30 mA is mandatory on all new residential installations, all socket circuits, bathrooms (zones 0/1/2) and outdoor sockets (Installation Regulations). For EV chargers, Type B or Type A + 6 mA DC detection is required.' },
+  { topic: 'rcd', tags: ['hpfi','rcd','type','ev','lader'],
+    q_da: 'Hvilken RCD-type skal jeg bruge til en EV-lader?',
+    q_en: 'Which RCD type should I use for an EV charger?',
+    a_da: 'EV-ladere kan generere glatte DC-fejlstrømme der "blinder" en almindelig Type A. Brug derfor Type B RCD, ELLER Type A kombineret med 6 mA DC-fejlstrømsdetektion (indbygget i mange ladestandere). Se "Komponentbank" → HPFI/RCD → Type B.',
+    a_en: 'EV chargers can generate smooth DC fault currents that "blind" a standard Type A. Therefore use a Type B RCD, OR Type A combined with 6 mA DC fault detection (built into many charging stations). See "Component Bank" → RCD → Type B.' },
+  // --- Transformer ---
+  { topic: 'trafo', tags: ['trafo','transformer','dimensionering','belastning'],
+    q_da: 'Hvor stor en transformer skal jeg vælge?',
+    q_en: 'How large a transformer should I choose?',
+    a_da: 'Vælg en trafo hvor den summerede tilsyneladende effekt (S i kVA) ligger ved 75-80% belastningsgrad — det er optimalt for levetid og effektivitet. Husk fremtidige udvidelser. Brug "Trafo"-modulet til at se fuldlaststrøm, kortslutningsstrøm og tab.',
+    a_en: 'Choose a transformer where the summed apparent power (S in kVA) sits at 75-80% load level — optimal for lifetime and efficiency. Account for future expansion. Use the "Transformer" module to see full-load current, short-circuit current and losses.' },
+  // --- Motor ---
+  { topic: 'motor', tags: ['motor','motorværn','kontaktor','termorelæ','startstrøm'],
+    q_da: 'Hvordan beskytter jeg en motor korrekt?',
+    q_en: 'How do I correctly protect a motor?',
+    a_da: 'En motorafgang har typisk: 1) Motorværn (MPCB, fx TeSys GV2) eller sikring til kortslutning, 2) Kontaktor (fx LC1D) til til/fra, 3) Termorelæ (fx LRD) til overbelastning indstillet til motorens mærkestrøm. Vælg kurve C eller D pga. startstrøm. Appen anbefaler alle tre i "Belastning"-modulet.',
+    a_en: 'A motor feeder typically has: 1) Motor protection (MPCB, e.g. TeSys GV2) or fuse for short-circuit, 2) Contactor (e.g. LC1D) for on/off, 3) Overload relay (e.g. LRD) set to the motor rated current. Choose curve C or D due to inrush. The app recommends all three in the "Load" module.' },
+  // --- Earthing ---
+  { topic: 'earth', tags: ['jording','tn','tt','it','pe'],
+    q_da: 'Hvilket jordingssystem bruges i Danmark?',
+    q_en: 'Which earthing system is used in Denmark?',
+    a_da: 'TN-C-S er det mest almindelige i Danmark: fælles PEN-leder i forsyningen, der splittes til separat N og PE ved installationens indgang. Nye installationer bruger TN-S (separat N og PE hele vejen). Se "Standarder" → Jordingssystemer for detaljer.',
+    a_en: 'TN-C-S is the most common in Denmark: combined PEN conductor in the supply, split into separate N and PE at the installation entry. New installations use TN-S (separate N and PE throughout). See "Standards" → Earthing Systems for details.' },
+  // --- Surge ---
+  { topic: 'surge', tags: ['overspænding','spd','lyn','beskyttelse'],
+    q_da: 'Har jeg brug for overspændingsbeskyttelse (SPD)?',
+    q_en: 'Do I need surge protection (SPD)?',
+    a_da: 'SPD anbefales kraftigt for at beskytte elektronik mod lyn og koblingsoverspændinger. Type 2 i hovedtavlen er standard. Hvis bygningen har lynafleder eller udsat placering, brug Type 1+2. Se "Komponentbank" → Overspændingsbeskyttelse.',
+    a_en: 'SPD is strongly recommended to protect electronics from lightning and switching surges. Type 2 in the main panel is standard. If the building has a lightning rod or exposed location, use Type 1+2. See "Component Bank" → Surge Protection.' },
+  // --- Power factor ---
+  { topic: 'pf', tags: ['cosfi','effektfaktor','fasekompensering'],
+    q_da: 'Hvad gør jeg ved lav effektfaktor (cos\u03C6)?',
+    q_en: 'What do I do about low power factor (cos\u03C6)?',
+    a_da: 'Lav cos\u03C6 (under 0,85) øger strømmen og dermed tab og kabelstørrelse. Overvej fasekompensering (kondensatorbatterier) for at hæve cos\u03C6 mod 0,95. Det reducerer IB og kan tillade et mindre kabel og mindre beskyttelse.',
+    a_en: 'Low cos\u03C6 (below 0.85) increases current and thus losses and cable size. Consider power factor correction (capacitor banks) to raise cos\u03C6 toward 0.95. This reduces IB and may allow a smaller cable and smaller protection.' },
+
+  // --- Danish EL-law: Authorization ---
+  { topic: 'law', tags: ['autorisation','lov','elinstallatør','tilladelse'],
+    q_da: 'Hvem må udføre elinstallationer i Danmark?',
+    q_en: 'Who may perform electrical installations in Denmark?',
+    a_da: 'Kun autoriserede elinstallatørvirksomheder må udføre fast elinstallationsarbejde (Autorisationsloven / Lov om autorisation af elinstallatører m.v.). Privatpersoner må kun udføre simple arbejder som at montere lamper og udskifte stikkontakter/afbrydere i egen bolig. Alt andet kræver autorisation og registrering hos Sikkerhedsstyrelsen.',
+    a_en: 'Only authorized electrical contractor companies may perform fixed electrical installation work (Authorization Act). Private individuals may only do simple tasks such as mounting lamps and replacing sockets/switches in their own home. Everything else requires authorization and registration with the Danish Safety Authority (Sikkerhedsstyrelsen).' },
+  { topic: 'law', tags: ['elsikkerhedsloven','lov','ansvar','sikkerhed'],
+    q_da: 'Hvad er Elsikkerhedsloven?',
+    q_en: 'What is the Danish Electrical Safety Act?',
+    a_da: 'Elsikkerhedsloven (Lov nr. 525 af 29/04/2015) fastlægger de grundlæggende sikkerhedskrav til elektriske anlæg, installationer og materiel i Danmark. Den administreres af Sikkerhedsstyrelsen og henviser til installationsbekendtgørelsen og standarderne DS/HD 60364-serien. Formålet er at forebygge fare for personer, husdyr og ejendom.',
+    a_en: 'The Electrical Safety Act (Act no. 525 of 29/04/2015) sets the fundamental safety requirements for electrical systems, installations and equipment in Denmark. It is administered by the Danish Safety Authority and references the installation order and the DS/HD 60364 series of standards. Its purpose is to prevent danger to persons, livestock and property.' },
+  { topic: 'law', tags: ['installationsbekendtgørelsen','bek','krav','regler'],
+    q_da: 'Hvad regulerer Installationsbekendtgørelsen?',
+    q_en: 'What does the Installation Order regulate?',
+    a_da: 'Installationsbekendtgørelsen (BEK nr. 1082) stiller krav til udførelsen af elektriske installationer, herunder at de skal udføres efter DS/HD 60364-standarderne. Den dækker bl.a. beskyttelse mod elektrisk stød, overstrøm, dokumentation og afprøvning før idriftsættelse.',
+    a_en: 'The Installation Order (BEK no. 1082) sets requirements for the execution of electrical installations, including that they must be carried out per the DS/HD 60364 standards. It covers protection against electric shock, overcurrent, documentation, and testing before commissioning.' },
+  { topic: 'law', tags: ['dokumentation','afprøvning','idriftsættelse','måling'],
+    q_da: 'Hvilken dokumentation kræves før en installation tages i brug?',
+    q_en: 'What documentation is required before an installation is put into use?',
+    a_da: 'Før idriftsættelse skal installationen afprøves og dokumenteres: kontinuitet af beskyttelsesledere, isolationsmodstand, fejlstrømsafbryderes (HPFI) funktion og udløsetid, og kontrol af effektiv jordforbindelse/sløjfeimpedans. Resultaterne dokumenteres i en afleveringsrapport iht. DS/HD 60364-6.',
+    a_en: 'Before commissioning, the installation must be tested and documented: continuity of protective conductors, insulation resistance, RCD function and trip time, and verification of effective earthing/loop impedance. Results are documented in a handover report per DS/HD 60364-6.' },
+
+  // --- Zones (bathroom) ---
+  { topic: 'zones', tags: ['badeværelse','zone','vådrum','ip'],
+    q_da: 'Hvilke regler gælder for el i badeværelser?',
+    q_en: 'What rules apply to electrics in bathrooms?',
+    a_da: 'Badeværelser er opdelt i zoner (0, 1, 2) iht. DS/HD 60364-7-701. Zone 0 (i karret/bruseren): kun SELV 12V. Zone 1 (over): IPX4, kun fast materiel egnet til formålet. Zone 2 (0,6 m omkring): IPX4. HPFI 30 mA er obligatorisk på alle kredse. Stikkontakter er ikke tilladt i zone 0-1.',
+    a_en: 'Bathrooms are divided into zones (0, 1, 2) per DS/HD 60364-7-701. Zone 0 (inside tub/shower): only SELV 12V. Zone 1 (above): IPX4, only fixed equipment suitable for the purpose. Zone 2 (0.6 m around): IPX4. RCD 30 mA is mandatory on all circuits. Sockets are not permitted in zones 0-1.' },
+  { topic: 'zones', tags: ['udendørs','ip','kapsling','vejr'],
+    q_da: 'Hvilken IP-klasse skal udendørs materiel have?',
+    q_en: 'What IP rating must outdoor equipment have?',
+    a_da: 'Udendørs materiel skal minimum være IP44 (beskyttet mod stænkvand), og ofte IP65/IP67 ved direkte vejrpåvirkning eller nedgravning. Alle udendørs stikkontakter skal beskyttes af HPFI 30 mA. Vælg UV-bestandige materialer.',
+    a_en: 'Outdoor equipment must be at least IP44 (splash-proof), and often IP65/IP67 for direct weather exposure or burial. All outdoor sockets must be protected by RCD 30 mA. Choose UV-resistant materials.' },
+
+  // --- Disconnection time ---
+  { topic: 'protection', tags: ['udløsetid','frakobling','stød','sløjfeimpedans'],
+    q_da: 'Hvad er kravet til frakoblingstid ved fejl?',
+    q_en: 'What is the required disconnection time on a fault?',
+    a_da: 'Iht. DS/HD 60364-4-41: i TN-systemer skal en fejl frakobles inden 0,4 s for endegrupper op til 32 A (230V), og inden 5 s for fordelingskredse. Dette kræver at Ik min er stor nok til at udløse beskyttelsen — derfor kontrolleres sløjfeimpedansen. Brug "Kortslutning"-modulet.',
+    a_en: 'Per DS/HD 60364-4-41: in TN systems a fault must be disconnected within 0.4 s for final circuits up to 32 A (230V), and within 5 s for distribution circuits. This requires Ik min to be large enough to trip the protection — hence the loop impedance is verified. Use the "Short Circuit" module.' },
+
+  // --- Group/circuit sizing ---
+  { topic: 'protection', tags: ['gruppe','stikkontakt','13a','16a','kreds'],
+    q_da: 'Hvor mange stikkontakter må jeg sætte på én gruppe?',
+    q_en: 'How many sockets may I put on one circuit?',
+    a_da: 'Der er ikke et fast maksimum i de danske regler, men kredsen skal dimensioneres efter den forventede samtidige belastning, så IB \u2264 In \u2264 Iz overholdes. Typisk bruges 13A eller 16A grupper med HPFI til stikkontakter. Brug "Belastning"-modulet til at beregne IB med en realistisk samtidighedsfaktor.',
+    a_en: 'There is no fixed maximum in the Danish rules, but the circuit must be sized for the expected simultaneous load so that IB \u2264 In \u2264 Iz is met. Typically 13A or 16A circuits with RCD are used for sockets. Use the "Load" module to calculate IB with a realistic simultaneity factor.' },
+
+  // --- Selectivity ---
+  { topic: 'protection', tags: ['selektivitet','koordination','serieforbindelse'],
+    q_da: 'Hvad er selektivitet mellem sikringer?',
+    q_en: 'What is selectivity between protective devices?',
+    a_da: 'Selektivitet betyder at ved en fejl udløser kun den nærmeste beskyttelse opstrøms for fejlen — ikke hovedsikringen. Det opnås ved at vælge beskyttelser med tilstrækkelig forskel i mærkestrøm og udløsekarakteristik (typisk faktor 1,6:1 for sikringer). Det sikrer at resten af anlægget forbliver i drift.',
+    a_en: 'Selectivity means that on a fault, only the nearest upstream protection trips — not the main fuse. It is achieved by choosing protective devices with sufficient difference in rating and trip characteristic (typically 1.6:1 ratio for fuses). This keeps the rest of the installation operating.' },
+
+  // --- Cable color code ---
+  { topic: 'cable', tags: ['farve','leder','l1','l2','l3','n','pe'],
+    q_da: 'Hvad er farvekoderne for ledere i Danmark?',
+    q_en: 'What are the conductor color codes in Denmark?',
+    a_da: 'Iht. HD 60364-5-51: Beskyttelsesleder (PE) er grøn/gul. Neutralleder (N) er blå. Faseledere (L1, L2, L3) er typisk brun, sort og grå. Grøn/gul må ALDRIG bruges til andet end PE.',
+    a_en: 'Per HD 60364-5-51: Protective conductor (PE) is green/yellow. Neutral (N) is blue. Phase conductors (L1, L2, L3) are typically brown, black and grey. Green/yellow must NEVER be used for anything other than PE.' },
+
+];
+
+const AI_TOPICS = {
+  cable: { da: 'Kabler', en: 'Cables', icon: '\uD83D\uDD17' },
+  protection: { da: 'Beskyttelse', en: 'Protection', icon: '\uD83D\uDEE1\uFE0F' },
+  rcd: { da: 'HPFI/RCD', en: 'RCD', icon: '\u26A1' },
+  trafo: { da: 'Transformer', en: 'Transformer', icon: '\uD83D\uDD0B' },
+  motor: { da: 'Motorer', en: 'Motors', icon: '\u2699\uFE0F' },
+  earth: { da: 'Jording', en: 'Earthing', icon: '\u23DA' },
+  surge: { da: 'Overspænding', en: 'Surge', icon: '\uD83C\uDF29\uFE0F' },
+  pf: { da: 'Effektfaktor', en: 'Power Factor', icon: '\uD83D\uDCC8' },
+  law: { da: 'EL-Lov', en: 'EL-Law', icon: '\u2696\uFE0F' },
+  zones: { da: 'Zoner/IP', en: 'Zones/IP', icon: '\uD83D\uDEBF' }
+};
+
+let aiTopic = 'all';
+let aiTag = null;
+let aiOpenQuestion = null;
+let aiSearch = ''; // free-text search (allowed only here)
+let aiMode = 'offline'; // 'offline' = click-only KB, 'online' = live AI
+let aiChat = []; // online chat history
+
+// Build the offline Q&A results list HTML (used for live search updates)
+function buildAiResultsHtml() {
+  let questions = AI_KNOWLEDGE;
+  if (aiTopic !== 'all') questions = questions.filter(k => k.topic === aiTopic);
+  if (aiTag) questions = questions.filter(k => k.tags.includes(aiTag));
+  if (aiSearch.trim()) {
+    const terms = aiSearch.toLowerCase().split(/\s+/).filter(Boolean);
+    questions = questions.filter(k => {
+      const hay = ((lang === 'da' ? k.q_da + ' ' + k.a_da : k.q_en + ' ' + k.a_en) + ' ' + k.tags.join(' ')).toLowerCase();
+      return terms.every(term => hay.includes(term));
+    });
+  }
+  const list = questions.map(k => {
+    const globalIdx = AI_KNOWLEDGE.indexOf(k);
+    const isOpen = aiOpenQuestion === globalIdx;
+    return `
+      <div style="margin-bottom:8px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+        <button class="sel-btn" style="width:100%;text-align:left;border:none;border-radius:0;${isOpen ? 'background:linear-gradient(135deg,var(--primary),var(--primary-light));color:white' : ''}" onclick="aiOpenQuestion=${isOpen ? 'null' : globalIdx};renderModule('ai')">
+          ${AI_TOPICS[k.topic].icon} ${lang === 'da' ? k.q_da : k.q_en}
+        </button>
+        ${isOpen ? `
+        <div style="padding:14px 16px;background:var(--success-bg);font-size:0.88rem;line-height:1.7;color:var(--text)">
+          \uD83D\uDC68\u200D\uD83D\uDD27 ${lang === 'da' ? k.a_da : k.a_en}
+        </div>` : ''}
+      </div>`;
+  }).join('');
+  const header = `<div class="card-title">${lang === 'da' ? 'Sp\u00F8rgsm\u00E5l & Svar' : 'Questions & Answers'} (${questions.length})</div>`;
+  return header + (list || '<div class="info-row">' + (lang === 'da' ? 'Ingen sp\u00F8rgsm\u00E5l matcher. Pr\u00F8v andre ord, eller skift til Online AI for ethvert sp\u00F8rgsm\u00E5l.' : 'No questions match. Try other words, or switch to Online AI for any question.') + '</div>');
+}
+
+// Live search handler — updates only the results container so the input keeps focus
+function aiLiveSearch() {
+  const inp = document.getElementById('aiSearchBox');
+  if (!inp) return;
+  aiSearch = inp.value;
+  aiOpenQuestion = null;
+  const res = document.getElementById('aiResults');
+  if (res) res.innerHTML = buildAiResultsHtml();
+}
+let aiBusy = false;
+
+// Call a live AI service for open-ended questions (online mode only)
+async function askOnlineAI(question) {
+  const cfg = JSON.parse(localStorage.getItem('aiElectricianCfg') || '{}');
+  if (!cfg.endpoint || !cfg.key) {
+    aiChat.push({ role: 'assistant', text: lang === 'da'
+      ? 'Online AI er ikke konfigureret. Klik p\u00E5 "Indstil AI" for at tilslutte en AI-tjeneste (OpenAI-kompatibel).'
+      : 'Online AI is not configured. Click "Configure AI" to connect an AI service (OpenAI-compatible).' });
+    aiBusy = false; renderModule('ai'); return;
+  }
+  aiBusy = true; renderModule('ai');
+  const sysPrompt = lang === 'da'
+    ? 'Du er en erfaren dansk autoriseret elektriker og ekspert i DS/HD 60364, Elsikkerhedsloven, Installationsbekendtgørelsen og Fællesregulativet. Svar præcist, sikkert og kortfattet på dansk. Henvis altid til relevante standarder. Hvis noget kræver en autoriseret elinstallatør, sig det.'
+    : 'You are an experienced Danish authorized electrician and expert in DS/HD 60364, the Electrical Safety Act, the Installation Order and Fællesregulativet. Answer precisely, safely and concisely in English. Always reference relevant standards. If something requires an authorized electrician, say so.';
+  try {
+    const res = await fetch(cfg.endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
+      body: JSON.stringify({
+        model: cfg.model || 'gpt-4o-mini',
+        messages: [{ role: 'system', content: sysPrompt }, { role: 'user', content: question }],
+        temperature: 0.2
+      })
+    });
+    const data = await res.json();
+    const answer = data.choices && data.choices[0] && data.choices[0].message
+      ? data.choices[0].message.content
+      : (lang === 'da' ? 'Intet svar modtaget.' : 'No answer received.');
+    aiChat.push({ role: 'assistant', text: answer });
+  } catch (e) {
+    aiChat.push({ role: 'assistant', text: (lang === 'da' ? 'Fejl ved forbindelse: ' : 'Connection error: ') + e.message });
+  }
+  aiBusy = false; renderModule('ai');
+}
+
+function submitAiQuestion() {
+  const inp = document.getElementById('aiQuestionInput');
+  if (!inp || !inp.value.trim()) return;
+  const q = inp.value.trim();
+  aiChat.push({ role: 'user', text: q });
+  askOnlineAI(q);
+}
+
+function configureAI() {
+  const cfg = JSON.parse(localStorage.getItem('aiElectricianCfg') || '{}');
+  const endpoint = prompt(lang === 'da' ? 'AI endpoint URL (OpenAI-kompatibel):' : 'AI endpoint URL (OpenAI-compatible):', cfg.endpoint || 'https://api.openai.com/v1/chat/completions');
+  if (endpoint === null) return;
+  const key = prompt(lang === 'da' ? 'API-nøgle:' : 'API key:', cfg.key || '');
+  if (key === null) return;
+  const model = prompt(lang === 'da' ? 'Model:' : 'Model:', cfg.model || 'gpt-4o-mini');
+  if (model === null) return;
+  localStorage.setItem('aiElectricianCfg', JSON.stringify({ endpoint, key, model }));
+  renderModule('ai');
+}
+
+function renderAiElectrician() {
+  // Collect all tags for clickable "search" chips
+  const allTags = [...new Set(AI_KNOWLEDGE.flatMap(k => k.tags))].sort();
+
+  // Filter questions
+  let questions = AI_KNOWLEDGE;
+  if (aiTopic !== 'all') questions = questions.filter(k => k.topic === aiTopic);
+  if (aiTag) questions = questions.filter(k => k.tags.includes(aiTag));
+
+  const questionList = questions.map((k, idx) => {
+    const globalIdx = AI_KNOWLEDGE.indexOf(k);
+    const isOpen = aiOpenQuestion === globalIdx;
+    return `
+      <div style="margin-bottom:8px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+        <button class="sel-btn" style="width:100%;text-align:left;border:none;border-radius:0;${isOpen ? 'background:linear-gradient(135deg,var(--primary),var(--primary-light));color:white' : ''}" onclick="aiOpenQuestion=${isOpen ? 'null' : globalIdx};renderModule('ai')">
+          ${AI_TOPICS[k.topic].icon} ${lang === 'da' ? k.q_da : k.q_en}
+        </button>
+        ${isOpen ? `
+        <div style="padding:14px 16px;background:var(--success-bg);font-size:0.88rem;line-height:1.7;color:var(--text)">
+          \uD83D\uDC68\u200D\uD83D\uDD27 ${lang === 'da' ? k.a_da : k.a_en}
+        </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+
+  // Mode toggle
+  const modeToggle = `
+    <div class="select-group">
+      <div class="select-label">${lang === 'da' ? 'Tilstand' : 'Mode'}</div>
+      <div class="select-grid">
+        <button class="sel-btn ${aiMode === 'offline' ? 'selected' : ''}" onclick="aiMode='offline';renderModule('ai')">\uD83D\uDDB1\uFE0F ${lang === 'da' ? 'Klik (offline)' : 'Click (offline)'}</button>
+        <button class="sel-btn ${aiMode === 'online' ? 'selected' : ''}" onclick="aiMode='online';renderModule('ai')">\uD83C\uDF10 ${lang === 'da' ? 'Online AI (alle spørgsmål)' : 'Online AI (any question)'}</button>
+      </div>
+    </div>
+  `;
+
+  if (aiMode === 'online') {
+    const cfg = JSON.parse(localStorage.getItem('aiElectricianCfg') || '{}');
+    const configured = cfg.endpoint && cfg.key;
+    const chatHtml = aiChat.map(m => `
+      <div style="margin-bottom:10px;display:flex;${m.role === 'user' ? 'justify-content:flex-end' : 'justify-content:flex-start'}">
+        <div style="max-width:85%;padding:10px 14px;border-radius:14px;font-size:0.88rem;line-height:1.6;${m.role === 'user'
+          ? 'background:linear-gradient(135deg,var(--primary),var(--primary-light));color:white;border-bottom-right-radius:4px'
+          : 'background:var(--success-bg);color:var(--text);border-bottom-left-radius:4px'}">
+          ${m.role === 'assistant' ? '\uD83D\uDC68\u200D\uD83D\uDD27 ' : ''}${m.text.replace(/</g,'&lt;')}
+        </div>
+      </div>
+    `).join('');
+
+    return `
+      <div class="card fade-in">
+        <div class="card-title">\uD83D\uDC68\u200D\uD83D\uDD27 ${lang === 'da' ? 'Spørg AI-Elektrikeren — Online' : 'Ask the AI-Electrician — Online'}</div>
+        <div class="info-row">${lang === 'da' ? 'Online tilstand kan besvare ETHVERT spørgsmål om elinstallation og dansk EL-lov. Kræver en tilsluttet AI-tjeneste.' : 'Online mode can answer ANY question about electrical installation and Danish EL-law. Requires a connected AI service.'}</div>
+        ${modeToggle}
+        ${!configured ? `
+          <div class="result-box warning">
+            <div class="result-title">${lang === 'da' ? 'Opsætning påkrævet' : 'Setup required'}</div>
+            <div class="result-row"><span class="label">${lang === 'da' ? 'Tilslut en OpenAI-kompatibel AI-tjeneste for at stille frie spørgsmål.' : 'Connect an OpenAI-compatible AI service to ask free questions.'}</span></div>
+          </div>
+          <div style="margin-top:12px"><button class="sel-btn selected" onclick="configureAI()">\u2699\uFE0F ${lang === 'da' ? 'Indstil AI' : 'Configure AI'}</button></div>
+        ` : `
+          <div style="margin-top:8px;max-height:340px;overflow-y:auto;padding:4px">${chatHtml || '<div class="info-row">' + (lang === 'da' ? 'Stil dit første spørgsmål nedenfor.' : 'Ask your first question below.') + '</div>'}</div>
+          ${aiBusy ? '<div class="info-row">' + (lang === 'da' ? 'AI tænker…' : 'AI is thinking…') + '</div>' : ''}
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <textarea id="aiQuestionInput" rows="2" placeholder="${lang === 'da' ? 'Skriv dit spørgsmål…' : 'Type your question…'}" style="flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:inherit;font-size:0.88rem;resize:vertical"></textarea>
+            <button class="sel-btn selected" onclick="submitAiQuestion()" style="align-self:stretch">${lang === 'da' ? 'Send' : 'Send'}</button>
+          </div>
+          <div style="margin-top:8px;display:flex;gap:8px">
+            <button class="sel-btn" onclick="configureAI()">\u2699\uFE0F ${lang === 'da' ? 'Indstillinger' : 'Settings'}</button>
+            <button class="sel-btn" onclick="aiChat=[];renderModule('ai')">\uD83D\uDDD1\uFE0F ${lang === 'da' ? 'Ryd' : 'Clear'}</button>
+          </div>
+        `}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">\uD83D\uDC68\u200D\uD83D\uDD27 ${lang === 'da' ? 'Spørg AI-Elektrikeren' : 'Ask the AI-Electrician'}</div>
+      <div class="info-row">${lang === 'da' ? 'Skriv et frit sp\u00F8rgsm\u00E5l i s\u00F8gefeltet, eller klik p\u00E5 et emne/n\u00F8gleord. Alle svar f\u00F8lger DS/HD 60364 og dansk lovgivning.' : 'Type a free question in the search box, or click a topic/keyword. All answers follow DS/HD 60364 and Danish regulations.'}</div>
+      ${modeToggle}
+
+      <div class="select-group">
+        <div class="select-label">\uD83D\uDD0D ${lang === 'da' ? 'S\u00F8gefelt (fri tekst tilladt her)' : 'Search box (free text allowed here)'}</div>
+        <input id="aiSearchBox" type="text" value="${aiSearch.replace(/"/g,'&quot;')}" oninput="aiLiveSearch()" autocomplete="off"
+          placeholder="${lang === 'da' ? 'F.eks. HPFI badeværelse, kabel tværsnit, autorisation…' : 'E.g. RCD bathroom, cable size, authorization…'}"
+          style="width:100%;padding:12px 14px;border:1.5px solid var(--primary-light);border-radius:var(--radius-sm);font-family:inherit;font-size:0.9rem;outline:none;box-shadow:0 2px 8px rgba(50,130,184,0.08)">
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Emne' : 'Topic'}</div>
+        <div class="select-grid">
+          <button class="sel-btn ${aiTopic === 'all' ? 'selected' : ''}" onclick="aiTopic='all';aiTag=null;aiOpenQuestion=null;renderModule('ai')">${lang === 'da' ? 'Alle' : 'All'}</button>
+          ${Object.keys(AI_TOPICS).map(tp =>
+            `<button class="sel-btn ${aiTopic === tp ? 'selected' : ''}" onclick="aiTopic='${tp}';aiTag=null;aiOpenQuestion=null;renderModule('ai')">${AI_TOPICS[tp].icon} ${lang === 'da' ? AI_TOPICS[tp].da : AI_TOPICS[tp].en}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="select-group">
+        <div class="select-label">\uD83C\uDFF7\uFE0F ${lang === 'da' ? 'N\u00F8gleord' : 'Keywords'}</div>
+        <div class="select-grid">
+          ${aiTag ? `<button class="sel-btn selected" onclick="aiTag=null;aiOpenQuestion=null;renderModule('ai')">\u2715 ${aiTag}</button>` : ''}
+          ${allTags.filter(tg => tg !== aiTag).map(tg =>
+            `<button class="sel-btn" onclick="aiTag='${tg}';aiOpenQuestion=null;renderModule('ai')">${tg}</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card fade-in" id="aiResults">
+      ${buildAiResultsHtml()}
+    </div>
+  `;
+}
+
+// ===== INIT =====
+renderNav();
+renderStatusBar();
+renderModule(activeModule);
+</script>
+</body>
+</html>
