@@ -1194,6 +1194,287 @@ function renderRecommendations(title, products, type) {
   `;
 }
 
+// ===== AI ASSISTANT - Contextual Guidance =====
+// Provides intelligent tips and warnings in each module based on current state
+
+function getAiAssistant(module) {
+  const ib = calcIB();
+  const tips = [];
+  const warnings = [];
+  const errors = [];
+
+  switch(module) {
+    case 'load':
+      if (loadState.power === 1) {
+        tips.push(lang === 'da' ? 'Tip: Vælg den faktiske effekt for din belastning.' : 'Tip: Select the actual power for your load.');
+      }
+      if (ib > 63 && ib <= 125) {
+        tips.push(lang === 'da' ? 'IB > 63 A: Overvej C120N/H MCB eller NH-sikring.' : 'IB > 63 A: Consider C120N/H MCB or NH fuse.');
+      }
+      if (ib > 125) {
+        tips.push(lang === 'da' ? 'IB > 125 A: Brug maksimalafbryder (MCCB) eller NH-sikring.' : 'IB > 125 A: Use MCCB or NH fuse.');
+      }
+      if (loadState.cosPhi < 0.85) {
+        tips.push(lang === 'da' ? 'Lav cos\u03C6: Overvej fasekompensering for at reducere strømmen.' : 'Low cos\u03C6: Consider power factor correction to reduce current.');
+      }
+      if (loadState.simFactor < 0.7) {
+        tips.push(lang === 'da' ? 'Lav samtidighedsfaktor: Kontroll\u00E9r at dette er korrekt for anlægstypen.' : 'Low simultaneity factor: Verify this is correct for the installation type.');
+      }
+      break;
+
+    case 'fuse':
+      if (fuseState.size && fuseState.size < ib) {
+        errors.push(lang === 'da' ? '\u26A0\uFE0F FEJL: Sikringsstørrelse (' + fuseState.size + ' A) er MINDRE end IB (' + ib.toFixed(1) + ' A)! Vælg en større sikring.' : '\u26A0\uFE0F ERROR: Fuse rating (' + fuseState.size + ' A) is LESS than IB (' + ib.toFixed(1) + ' A)! Select a larger fuse.');
+      }
+      if (fuseState.size && fuseState.size >= ib) {
+        tips.push(lang === 'da' ? '\u2705 IB (' + ib.toFixed(1) + ' A) \u2264 In (' + fuseState.size + ' A) — korrekt dimensioneret.' : '\u2705 IB (' + ib.toFixed(1) + ' A) \u2264 In (' + fuseState.size + ' A) — correctly dimensioned.');
+      }
+      if (!fuseState.size) {
+        tips.push(lang === 'da' ? 'Vælg sikringsholder og størrelse. IB = ' + ib.toFixed(1) + ' A.' : 'Select fuse holder and size. IB = ' + ib.toFixed(1) + ' A.');
+      }
+      break;
+
+    case 'mcb':
+      if (mcbState.rating && mcbState.rating < ib) {
+        errors.push(lang === 'da' ? '\u26A0\uFE0F FEJL: MCB mærkestrøm (' + mcbState.rating + ' A) < IB (' + ib.toFixed(1) + ' A)! Oversikret kabel!' : '\u26A0\uFE0F ERROR: MCB rating (' + mcbState.rating + ' A) < IB (' + ib.toFixed(1) + ' A)! Cable overloaded!');
+      }
+      if (mcbState.rating && mcbState.rating >= ib) {
+        tips.push(lang === 'da' ? '\u2705 IB \u2264 In — korrekt.' : '\u2705 IB \u2264 In — correct.');
+      }
+      if (mcbState.curve === 'B') {
+        tips.push(lang === 'da' ? 'Kurve B: Bedst til resistive belastninger (lys, varme, stikkontakter).' : 'Curve B: Best for resistive loads (lighting, heating, sockets).');
+      } else if (mcbState.curve === 'C') {
+        tips.push(lang === 'da' ? 'Kurve C: Til induktive belastninger (motorer, transformere, kompressorer).' : 'Curve C: For inductive loads (motors, transformers, compressors).');
+      } else if (mcbState.curve === 'D') {
+        tips.push(lang === 'da' ? 'Kurve D: Til høje startstrømme (store motorer, svejsemaskiner).' : 'Curve D: For high inrush (large motors, welding machines).');
+      }
+      break;
+
+    case 'mccb':
+      const io = mccbState.inVal * mccbState.ioMult;
+      if (io < ib) {
+        errors.push(lang === 'da' ? '\u26A0\uFE0F FEJL: Io (' + io.toFixed(0) + ' A) < IB (' + ib.toFixed(1) + ' A)! Utilstrækkelig beskyttelse.' : '\u26A0\uFE0F ERROR: Io (' + io.toFixed(0) + ' A) < IB (' + ib.toFixed(1) + ' A)! Insufficient protection.');
+      }
+      if (io >= ib) {
+        tips.push(lang === 'da' ? '\u2705 IB \u2264 Io — langsom udløser korrekt indstillet.' : '\u2705 IB \u2264 Io — long-time protection correctly set.');
+      }
+      tips.push(lang === 'da' ? 'Micrologic 2.2: Indstil Io \u2265 IB, og Isd baseret p\u00E5 Ik min.' : 'Micrologic 2.2: Set Io \u2265 IB, and Isd based on Ik min.');
+      break;
+
+    case 'cable':
+      if (cableState.crossSection) {
+        const izTable = cableState.material === 'copper' ? IZ_COPPER : IZ_ALU;
+        const baseIz = izTable[parseFloat(cableState.crossSection)] || 0;
+        const kInstall = INSTALL_METHODS[cableState.installMethod] || 1.0;
+        const kTemp = TEMP_FACTORS[cableState.temp] || 1.0;
+        const kGroup = GROUP_FACTORS[cableState.grouping] || 1.0;
+        const correctedIz = baseIz * kInstall * kTemp * kGroup;
+
+        if (correctedIz < ib) {
+          errors.push(lang === 'da' ? '\u26A0\uFE0F FEJL: Korrigeret Iz (' + correctedIz.toFixed(1) + ' A) < IB (' + ib.toFixed(1) + ' A)! Kablet er UNDERDIMENSIONERET!' : '\u26A0\uFE0F ERROR: Corrected Iz (' + correctedIz.toFixed(1) + ' A) < IB (' + ib.toFixed(1) + ' A)! Cable is UNDERSIZED!');
+        } else {
+          tips.push(lang === 'da' ? '\u2705 Iz (' + correctedIz.toFixed(1) + ' A) \u2265 IB (' + ib.toFixed(1) + ' A) — kabel korrekt dimensioneret.' : '\u2705 Iz (' + correctedIz.toFixed(1) + ' A) \u2265 IB (' + ib.toFixed(1) + ' A) — cable correctly sized.');
+        }
+        if (cableState.grouping > 3) {
+          warnings.push(lang === 'da' ? 'H\u00F8j gruppering reducerer kapaciteten kraftigt. Overvej større tværsnit.' : 'High grouping significantly reduces capacity. Consider larger cross-section.');
+        }
+        if (cableState.temp > 35) {
+          warnings.push(lang === 'da' ? 'Forhøjet temperatur: Kablets kapacitet er reduceret.' : 'Elevated temperature: Cable capacity is reduced.');
+        }
+      } else {
+        tips.push(lang === 'da' ? 'Vælg kabeltype og tværsnit. Krævet Iz \u2265 ' + ib.toFixed(1) + ' A.' : 'Select cable type and cross-section. Required Iz \u2265 ' + ib.toFixed(1) + ' A.');
+      }
+      break;
+
+    case 'vdrop':
+      const cables2 = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
+      const ct2 = cables2[cableState.type];
+      const cc2 = ct2 && ct2[cableState.cores] ? ct2[cableState.cores] : {};
+      const sc2 = cc2[cableState.crossSection];
+      if (sc2) {
+        const L = vdropState.length / 1000;
+        const cosP = loadState.cosPhi;
+        const sinP = Math.sin(Math.acos(cosP));
+        const Un = loadState.voltage === '3x400' ? 400 : 230;
+        let vd;
+        if (loadState.voltage === '3x400') {
+          vd = Math.sqrt(3) * ib * L * (sc2.r * cosP + sc2.x * sinP);
+        } else {
+          vd = 2 * ib * L * (sc2.r * cosP + sc2.x * sinP);
+        }
+        const vdP = (vd / Un) * 100;
+        if (vdP > 5) {
+          errors.push(lang === 'da' ? '\u26A0\uFE0F Spændingsfald ' + vdP.toFixed(1) + '% OVERSTIGER 5%! Vælg større kabel eller kortere kabelrute.' : '\u26A0\uFE0F Voltage drop ' + vdP.toFixed(1) + '% EXCEEDS 5%! Choose larger cable or shorter route.');
+        } else if (vdP > 3) {
+          warnings.push(lang === 'da' ? 'Spændingsfald ' + vdP.toFixed(1) + '% — uegnet til belysning (maks 3%).' : 'Voltage drop ' + vdP.toFixed(1) + '% — unsuitable for lighting (max 3%).');
+        } else {
+          tips.push(lang === 'da' ? '\u2705 Spændingsfald ' + vdP.toFixed(1) + '% — OK for alle belastningstyper.' : '\u2705 Voltage drop ' + vdP.toFixed(1) + '% — OK for all load types.');
+        }
+      }
+      if (vdropState.length > 100) {
+        tips.push(lang === 'da' ? 'Lang kabelrute: Kontroller spændingsfald og kortslutningsstrøm i enden.' : 'Long cable run: Check voltage drop and short-circuit current at end.');
+      }
+      break;
+
+    case 'scircuit':
+      tips.push(lang === 'da' ? 'Kontroll\u00E9r: Icu \u2265 Ik max OG Isd \u2264 Ik min for korrekt beskyttelse.' : 'Verify: Icu \u2265 Ik max AND Isd \u2264 Ik min for correct protection.');
+      tips.push(lang === 'da' ? 'IEC 60909: c = 1,05 (maks) for lavspænding. Ik min beregnes med 0,95 faktor.' : 'IEC 60909: c = 1.05 (max) for LV. Ik min calculated with 0.95 factor.');
+      break;
+
+    case 'trafo':
+      tips.push(lang === 'da' ? 'Belastningsgrad 75-80% er optimal for levetid og effektivitet.' : 'Load level 75-80% is optimal for lifetime and efficiency.');
+      if (trafoState.loadPercent > 90) {
+        warnings.push(lang === 'da' ? 'Belastning over 90%: Overvej større trafo for fremtidige udvidelser.' : 'Load above 90%: Consider larger transformer for future expansion.');
+      }
+      break;
+
+    case 'standards':
+      tips.push(lang === 'da' ? 'Alle beregninger f\u00F8lger DS/HD 60364 og IEC 60909.' : 'All calculations follow DS/HD 60364 and IEC 60909.');
+      break;
+  }
+
+  return { tips, warnings, errors };
+}
+
+// Render AI assistant card
+function renderAiAssistant(module) {
+  const ai = getAiAssistant(module);
+  if (ai.tips.length === 0 && ai.warnings.length === 0 && ai.errors.length === 0) return '';
+
+  let html = '<div class="card fade-in" style="border-left:4px solid var(--accent);"><div class="card-title">\uD83E\uDD16 ' + (lang === 'da' ? 'AI-Assistent' : 'AI Assistant') + '</div>';
+
+  if (ai.errors.length > 0) {
+    html += '<div class="result-box error" style="margin-top:0">';
+    html += '<div class="result-title">' + (lang === 'da' ? 'FEJL — Korrektion påkrævet' : 'ERROR — Correction required') + '</div>';
+    ai.errors.forEach(e => { html += '<div class="result-row"><span class="label" style="color:var(--danger);font-weight:600">' + e + '</span></div>'; });
+    html += '</div>';
+  }
+
+  if (ai.warnings.length > 0) {
+    html += '<div class="result-box warning" style="margin-top:8px">';
+    html += '<div class="result-title">' + (lang === 'da' ? 'Advarsel' : 'Warning') + '</div>';
+    ai.warnings.forEach(w => { html += '<div class="result-row"><span class="label" style="color:#b8860b">\u26A0\uFE0F ' + w + '</span></div>'; });
+    html += '</div>';
+  }
+
+  if (ai.tips.length > 0) {
+    html += '<div style="margin-top:8px;padding:10px 12px;background:var(--primary-glow);border-radius:var(--radius-sm)">';
+    ai.tips.forEach(t => { html += '<div style="padding:4px 0;font-size:0.82rem;color:var(--primary);">\uD83D\uDCA1 ' + t + '</div>'; });
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+// ===== QI VALIDATION SYSTEM =====
+// Quality Index: Checks coordination between all modules and flags issues
+
+function runQiValidation() {
+  const ib = calcIB();
+  const issues = [];
+  const passed = [];
+
+  // 1. Check IB <= In (protection device rating)
+  if (mcbState.rating) {
+    if (mcbState.rating >= ib) {
+      passed.push({ rule: 'IB \u2264 In (MCB)', detail: ib.toFixed(1) + ' A \u2264 ' + mcbState.rating + ' A' });
+    } else {
+      issues.push({ rule: 'IB \u2264 In (MCB)', detail: ib.toFixed(1) + ' A > ' + mcbState.rating + ' A', severity: 'error' });
+    }
+  }
+
+  // 2. Check In <= Iz (protection device <= cable capacity)
+  if (mcbState.rating && cableState.crossSection) {
+    const izTable = cableState.material === 'copper' ? IZ_COPPER : IZ_ALU;
+    const baseIz = izTable[parseFloat(cableState.crossSection)] || 0;
+    const kTotal = (INSTALL_METHODS[cableState.installMethod] || 1) * (TEMP_FACTORS[cableState.temp] || 1) * (GROUP_FACTORS[cableState.grouping] || 1);
+    const corrIz = baseIz * kTotal;
+    if (mcbState.rating <= corrIz) {
+      passed.push({ rule: 'In \u2264 Iz', detail: mcbState.rating + ' A \u2264 ' + corrIz.toFixed(1) + ' A' });
+    } else {
+      issues.push({ rule: 'In \u2264 Iz', detail: mcbState.rating + ' A > ' + corrIz.toFixed(1) + ' A', severity: 'error' });
+    }
+  }
+
+  // 3. Check voltage drop
+  const cables3 = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
+  const ct3 = cables3[cableState.type];
+  const cc3 = ct3 && ct3[cableState.cores] ? ct3[cableState.cores] : {};
+  const sc3 = cc3[cableState.crossSection];
+  if (sc3 && vdropState.length) {
+    const L = vdropState.length / 1000;
+    const cosP = loadState.cosPhi;
+    const sinP = Math.sin(Math.acos(cosP));
+    const Un = loadState.voltage === '3x400' ? 400 : 230;
+    const vd = loadState.voltage === '3x400'
+      ? Math.sqrt(3) * ib * L * (sc3.r * cosP + sc3.x * sinP)
+      : 2 * ib * L * (sc3.r * cosP + sc3.x * sinP);
+    const vdP = (vd / Un) * 100;
+    if (vdP <= 4) {
+      passed.push({ rule: '\u0394U \u2264 4%', detail: vdP.toFixed(2) + '%' });
+    } else {
+      issues.push({ rule: '\u0394U \u2264 4%', detail: vdP.toFixed(2) + '% > 4%', severity: vdP > 5 ? 'error' : 'warning' });
+    }
+  }
+
+  // 4. Coordination check: IB <= In <= Iz
+  if (mcbState.rating && cableState.crossSection) {
+    const izTable = cableState.material === 'copper' ? IZ_COPPER : IZ_ALU;
+    const corrIz = (izTable[parseFloat(cableState.crossSection)] || 0) *
+      (INSTALL_METHODS[cableState.installMethod] || 1) *
+      (TEMP_FACTORS[cableState.temp] || 1) *
+      (GROUP_FACTORS[cableState.grouping] || 1);
+    if (ib <= mcbState.rating && mcbState.rating <= corrIz) {
+      passed.push({ rule: 'IB \u2264 In \u2264 Iz (koordination)', detail: ib.toFixed(1) + ' \u2264 ' + mcbState.rating + ' \u2264 ' + corrIz.toFixed(1) + ' A' });
+    }
+  }
+
+  // 5. Fuse coordination
+  if (fuseState.size) {
+    if (fuseState.size >= ib) {
+      passed.push({ rule: 'IB \u2264 In (sikring)', detail: ib.toFixed(1) + ' A \u2264 ' + fuseState.size + ' A' });
+    } else {
+      issues.push({ rule: 'IB \u2264 In (sikring)', detail: ib.toFixed(1) + ' A > ' + fuseState.size + ' A', severity: 'error' });
+    }
+  }
+
+  return { issues, passed, score: passed.length > 0 ? Math.round((passed.length / (passed.length + issues.length)) * 100) : 0 };
+}
+
+// ===== DYNAMIC COORDINATE AXES =====
+// When a value changes in one module, propagate relevant data to other modules
+
+function syncAxes() {
+  // Auto-suggest cable based on IB
+  const ib = calcIB();
+
+  // If no cable selected yet, auto-find smallest suitable
+  if (!cableState.crossSection && ib > 0) {
+    const izTable = cableState.material === 'copper' ? IZ_COPPER : IZ_ALU;
+    const sizes = Object.keys(izTable).map(Number).sort((a,b) => a - b);
+    for (const sz of sizes) {
+      if (izTable[sz] >= ib) {
+        // Don't auto-set, but store suggestion
+        cableState._suggested = sz;
+        break;
+      }
+    }
+  }
+
+  // Auto-suggest fuse based on IB
+  if (!fuseState.size && ib > 0) {
+    const allSizes = [6,10,13,16,20,25,32,35,40,50,63,80,100,125,160,200,250,315,400,500,630];
+    fuseState._suggested = allSizes.find(s => s >= ib) || null;
+  }
+
+  // Auto-suggest MCB based on IB
+  if (!mcbState.rating && ib > 0) {
+    const stdRatings = [6,10,13,16,20,25,32,40,50,63];
+    mcbState._suggested = stdRatings.find(r => r >= ib) || null;
+  }
+}
+
 // ===== DANISH STANDARDS & REGULATIONS =====
 // Based on research of Danish electrical standards websites (elsikkerhed.dk, lovguiden.dk, Sikkerhedsstyrelsen)
 // Content was rephrased for compliance with licensing restrictions
@@ -1358,19 +1639,57 @@ function renderStatusBar() {
 }
 
 function renderModule(mod) {
+  syncAxes(); // Dynamic coordination
   const main = document.getElementById('mainContent');
+  let content = '';
   switch(mod) {
-    case 'load': main.innerHTML = renderLoad(); break;
-    case 'fuse': main.innerHTML = renderFuse(); break;
-    case 'mcb': main.innerHTML = renderMCB(); break;
-    case 'mccb': main.innerHTML = renderMCCB(); break;
-    case 'cable': main.innerHTML = renderCable(); break;
-    case 'vdrop': main.innerHTML = renderVdrop(); break;
-    case 'scircuit': main.innerHTML = renderShortCircuit(); break;
-    case 'trafo': main.innerHTML = renderTrafo(); break;
-    case 'standards': main.innerHTML = renderStandards(); break;
+    case 'load': content = renderLoad(); break;
+    case 'fuse': content = renderFuse(); break;
+    case 'mcb': content = renderMCB(); break;
+    case 'mccb': content = renderMCCB(); break;
+    case 'cable': content = renderCable(); break;
+    case 'vdrop': content = renderVdrop(); break;
+    case 'scircuit': content = renderShortCircuit(); break;
+    case 'trafo': content = renderTrafo(); break;
+    case 'standards': content = renderStandards(); break;
   }
+  // Append AI assistant to every module
+  content += renderAiAssistant(mod);
+  // Append QI validation summary if enough data exists
+  const qi = runQiValidation();
+  if (qi.passed.length + qi.issues.length > 0 && mod !== 'standards') {
+    content += renderQiCard(qi);
+  }
+  main.innerHTML = content;
   renderStatusBar();
+}
+
+function renderQiCard(qi) {
+  const scoreColor = qi.score >= 80 ? 'var(--success)' : qi.score >= 50 ? '#b8860b' : 'var(--danger)';
+  let html = '<div class="card fade-in" style="border-left:4px solid ' + scoreColor + ';">';
+  html += '<div class="card-title">\uD83D\uDCCA ' + (lang === 'da' ? 'QI Kvalitetsindeks' : 'QI Quality Index') + ' \u2014 ' + qi.score + '%</div>';
+
+  if (qi.issues.length > 0) {
+    html += '<div class="result-box ' + (qi.issues.some(i => i.severity === 'error') ? 'error' : 'warning') + '" style="margin-top:0">';
+    html += '<div class="result-title">' + (lang === 'da' ? 'Problemer fundet' : 'Issues found') + '</div>';
+    qi.issues.forEach(i => {
+      const icon = i.severity === 'error' ? '\u274C' : '\u26A0\uFE0F';
+      html += '<div class="result-row"><span class="label">' + icon + ' ' + i.rule + '</span><span class="value">' + i.detail + '</span></div>';
+    });
+    html += '</div>';
+  }
+
+  if (qi.passed.length > 0) {
+    html += '<div class="result-box" style="margin-top:8px">';
+    html += '<div class="result-title">' + (lang === 'da' ? 'Bestået' : 'Passed') + '</div>';
+    qi.passed.forEach(p => {
+      html += '<div class="result-row"><span class="label">\u2705 ' + p.rule + '</span><span class="value">' + p.detail + '</span></div>';
+    });
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
 }
 
 // ===== LOAD MODULE =====
