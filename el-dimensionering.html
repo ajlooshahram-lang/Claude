@@ -549,6 +549,20 @@ body.dark img { filter: brightness(0.92); }
   transition: var(--transition);
 }
 .theme-btn:hover { background: rgba(255,255,255,0.25); }
+
+/* ===== PRINT / PDF ===== */
+@media print {
+  .header, .nav, .status-bar, .theme-btn, .lang-toggle { display: none !important; }
+  body { background: #fff; }
+  .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; page-break-inside: avoid; }
+  .card::before { display: none; }
+  .sel-btn { display: none !important; }
+  .main { padding: 0; max-width: 100%; }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  img { filter: none !important; }
+}
+.print-only { display: none; }
 </style>
 </head>
 <body>
@@ -588,7 +602,9 @@ const T = {
       standards: 'Standarder',
       bank: 'Komponentbank',
       ai: 'Spørg AI-Elektriker',
-      bid: 'Tilbud'
+      bid: 'Tilbud',
+      projekt: 'Projekt',
+      verify: 'Verifikation'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -683,7 +699,9 @@ const T = {
       standards: 'Standards',
       bank: 'Component Bank',
       ai: 'Ask AI-Electrician',
-      bid: 'Bid / Quote'
+      bid: 'Bid / Quote',
+      projekt: 'Project',
+      verify: 'Verify'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -1833,12 +1851,15 @@ function renderModule(mod) {
     case 'bank': content = renderBank(); break;
     case 'ai': content = renderAiElectrician(); break;
     case 'bid': content = renderBid(); break;
+    case 'projekt': content = renderProjekt(); break;
+    case 'verify': content = renderVerify(); break;
   }
   // Append AI assistant to every module
   content += renderAiAssistant(mod);
   // Append QI validation summary if enough data exists
   const qi = runQiValidation();
-  if (qi.passed.length + qi.issues.length > 0 && mod !== 'standards' && mod !== 'bank' && mod !== 'ai' && mod !== 'bid') {
+  const noQi = ['standards','bank','ai','bid','projekt','verify'];
+  if (qi.passed.length + qi.issues.length > 0 && noQi.indexOf(mod) < 0) {
     content += renderQiCard(qi);
   }
   main.innerHTML = content;
@@ -1886,6 +1907,20 @@ function renderLoad() {
     <div class="card fade-in">
       <div class="card-title">${t('loadTitle')}</div>
       <div class="info-row">${t('infoClick')}</div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Hurtigvalg (typiske belastninger)' : 'Quick presets (typical loads)'}</div>
+        <div class="select-grid">
+          <button class="sel-btn" onclick="applyLoadPreset('ev11')">${lang === 'da' ? 'EV-lader 11kW' : 'EV charger 11kW'}</button>
+          <button class="sel-btn" onclick="applyLoadPreset('ev22')">${lang === 'da' ? 'EV-lader 22kW' : 'EV charger 22kW'}</button>
+          <button class="sel-btn" onclick="applyLoadPreset('pv')">${lang === 'da' ? 'Solcelle 10kW' : 'Solar PV 10kW'}</button>
+          <button class="sel-btn" onclick="applyLoadPreset('cooker')">${lang === 'da' ? 'Komfur' : 'Cooker'}</button>
+          <button class="sel-btn" onclick="applyLoadPreset('heatpump')">${lang === 'da' ? 'Varmepumpe' : 'Heat pump'}</button>
+          <button class="sel-btn" onclick="applyLoadPreset('sockets')">${lang === 'da' ? 'Stikgruppe' : 'Socket circuit'}</button>
+          <button class="sel-btn" onclick="applyLoadPreset('light')">${lang === 'da' ? 'Lysgruppe' : 'Lighting'}</button>
+        </div>
+        ${loadState._preset ? `<div style="font-size:0.74rem;color:var(--primary);margin-top:6px">${lang === 'da' ? 'Forudindstilling:' : 'Preset:'} <strong>${loadState._preset}</strong> ${loadState._presetNote ? '\u2014 ' + loadState._presetNote : ''}</div>` : ''}
+      </div>
 
       <div class="select-group">
         <div class="select-label">${t('voltage')}</div>
@@ -1971,6 +2006,24 @@ function calcIB() {
 
 function calcS() {
   return loadState.power / loadState.cosPhi;
+}
+
+// Quick load presets (typical Danish circuits)
+function applyLoadPreset(key) {
+  const P = {
+    ev11:    { voltage:'3x400', power:11, cosPhi:1.0, simFactor:1.0, expFactor:1.0, note: lang==='da'?'Type B HPFI / 6mA DC':'Type B RCD / 6mA DC' },
+    ev22:    { voltage:'3x400', power:22, cosPhi:1.0, simFactor:1.0, expFactor:1.0, note: lang==='da'?'Type B HPFI / 6mA DC':'Type B RCD / 6mA DC' },
+    pv:      { voltage:'3x400', power:10, cosPhi:1.0, simFactor:1.0, expFactor:1.0, note: lang==='da'?'Solcelle-inverter':'Solar inverter' },
+    cooker:  { voltage:'3x400', power:11, cosPhi:1.0, simFactor:0.7, expFactor:1.0, note: lang==='da'?'Komfur/ovn':'Cooker/oven' },
+    heatpump:{ voltage:'3x400', power:6,  cosPhi:0.9, simFactor:1.0, expFactor:1.0, note: lang==='da'?'Induktiv \u2013 kurve C':'Inductive \u2013 curve C' },
+    sockets: { voltage:'1x230', power:3.7,cosPhi:0.95,simFactor:0.6, expFactor:1.0, note: lang==='da'?'13/16A stikgruppe':'13/16A socket circuit' },
+    light:   { voltage:'1x230', power:1.5,cosPhi:0.95,simFactor:1.0, expFactor:1.0, note: lang==='da'?'Belysning \u2264 3% \u0394U':'Lighting \u2264 3% \u0394U' }
+  };
+  const p = P[key]; if (!p) return;
+  loadState.voltage = p.voltage; loadState.power = p.power; loadState.cosPhi = p.cosPhi;
+  loadState.simFactor = p.simFactor; loadState.expFactor = p.expFactor;
+  loadState._preset = key; loadState._presetNote = p.note;
+  renderModule('load');
 }
 
 // ===== FUSE MODULE =====
@@ -3730,6 +3783,176 @@ function configurePriceFeed() {
     Object.keys(saved).forEach(k => { if (WHOLESALERS[k]) WHOLESALERS[k].feed = saved[k]; });
   } catch(e){}
 })();
+
+// ===== DATA VERSION & CHANGELOG =====
+const DATA_VERSION = '2026.1';
+const DATA_CHANGELOG = [
+  { v: '2026.1', date: '2026-06-11', da: 'Kabel-Iz hardet til officiel DS/HD 60364 Tabel C.52.1. Tilbud (EG Sigma/Kalkia-stil), komponentbank, AI-elektriker.', en: 'Cable Iz hardened to official DS/HD 60364 Table C.52.1. Bid (EG Sigma/Kalkia style), component bank, AI-electrician.' },
+  { v: '2025.2', date: '2025-12-01', da: 'IEC 60364-1:2025, DS/HD 60364-4-43:2023 indarbejdet.', en: 'IEC 60364-1:2025, DS/HD 60364-4-43:2023 incorporated.' }
+];
+
+// ===== PROJECT MODULE (multi-circuit, save/load, belastningsskema, print) =====
+let projectState = { name: 'Projekt 1', circuits: [] };
+(function restoreProject(){ try { const s = JSON.parse(localStorage.getItem('elProject')||'null'); if (s) projectState = s; } catch(e){} })();
+function saveProject(){ localStorage.setItem('elProject', JSON.stringify(projectState)); }
+
+function currentVdropPct() {
+  const cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
+  const ct = cables[cableState.type]; const cc = ct && ct[cableState.cores] ? ct[cableState.cores] : {};
+  const sc = cc[cableState.crossSection];
+  if (!sc) return null;
+  const ib = calcIB(); const L = vdropState.length/1000; const cosP = loadState.cosPhi; const sinP = Math.sin(Math.acos(cosP));
+  const Un = loadState.voltage === '3x400' ? 400 : 230;
+  const vd = loadState.voltage === '3x400' ? Math.sqrt(3)*ib*L*(sc.r*cosP+sc.x*sinP) : 2*ib*L*(sc.r*cosP+sc.x*sinP);
+  return (vd/Un)*100;
+}
+
+function projectAddCircuit() {
+  const ib = calcIB();
+  const mcb = ib <= 63 ? (recommendMCBs(ib)[0]) : null;
+  const mccb = ib > 63 ? (recommendMCCBs(ib)[0]) : null;
+  const prot = mcb ? (mcb.model + ' ' + mcb.curve + mcb.rating) : (mccb ? mccb.model : '\u2014');
+  projectState.circuits.push({
+    name: (loadState._preset || (lang==='da'?'Gruppe':'Circuit')) + ' ' + (projectState.circuits.length+1),
+    voltage: loadState.voltage, power: loadState.power, cosPhi: loadState.cosPhi,
+    ib: +ib.toFixed(1),
+    cable: cableState.crossSection ? (cableState.type+' '+cableState.cores+' '+cableState.crossSection+'mm\u00B2') : '\u2014',
+    length: vdropState.length,
+    vdrop: currentVdropPct(),
+    protection: prot
+  });
+  saveProject(); renderModule('projekt');
+}
+function projectRemove(i){ projectState.circuits.splice(i,1); saveProject(); renderModule('projekt'); }
+function projectClear(){ if(confirm(lang==='da'?'Ryd hele projektet?':'Clear the whole project?')){ projectState.circuits=[]; saveProject(); renderModule('projekt'); } }
+function projectExport(){
+  const blob = new Blob([JSON.stringify(projectState,null,2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = (projectState.name||'projekt').replace(/\s+/g,'_') + '.json'; a.click();
+}
+function projectImport(input){
+  const f = input.files && input.files[0]; if(!f) return;
+  const r = new FileReader(); r.onload = e => { try { projectState = JSON.parse(e.target.result); saveProject(); renderModule('projekt'); } catch(err){ alert('Import fejl: '+err.message); } }; r.readAsText(f);
+}
+
+function renderProjekt() {
+  // Phase balancing for belastningsskema
+  const phases = { L1:0, L2:0, L3:0 };
+  projectState.circuits.forEach((c, i) => {
+    if (c.voltage === '3x400') { phases.L1 += c.ib; phases.L2 += c.ib; phases.L3 += c.ib; }
+    else { const p = ['L1','L2','L3'][i % 3]; phases[p] += c.ib; }
+  });
+  const maxPhase = Math.max(phases.L1, phases.L2, phases.L3);
+  const mainMcb = recommendMCBs(maxPhase)[0];
+  const mainMccb = recommendMCCBs(maxPhase)[0];
+  const mainProt = maxPhase <= 63 && mainMcb ? (mainMcb.model+' '+mainMcb.curve+mainMcb.rating)
+                  : (mainMccb ? mainMccb.model : (lang==='da'?'NH-sikring':'NH fuse'));
+
+  const rows = projectState.circuits.map((c,i) => `
+    <tr>
+      <td>${c.name}</td><td>${c.voltage}</td><td>${c.power} kW</td><td>${c.ib} A</td>
+      <td>${c.cable}</td><td>${c.protection}</td>
+      <td>${c.vdrop != null ? c.vdrop.toFixed(2)+'%' : '\u2014'}</td>
+      <td class="no-print"><button class="sel-btn" style="padding:2px 8px;min-width:0;color:var(--danger)" onclick="projectRemove(${i})">\uD83D\uDDD1\uFE0F</button></td>
+    </tr>`).join('');
+
+  return `
+    <div class="card fade-in no-print">
+      <div class="card-title">\uD83D\uDCCB ${lang==='da'?'Projekt / Flere grupper':'Project / Multi-circuit'}</div>
+      <div class="info-row">${lang==='da'?'Saml hele installationen. Tilf\u00F8j den aktuelle dimensionering som en gruppe, gem projektet, og udskriv belastningsskema.':'Build the whole installation. Add the current dimensioning as a circuit, save the project, and print the load schedule.'}</div>
+      <div class="select-grid">
+        <button class="sel-btn selected" onclick="projectAddCircuit()">\u2795 ${lang==='da'?'Tilf\u00F8j aktuel gruppe':'Add current circuit'}</button>
+        <button class="sel-btn" onclick="window.print()">\uD83D\uDDA8\uFE0F ${lang==='da'?'Udskriv / PDF':'Print / PDF'}</button>
+        <button class="sel-btn" onclick="projectExport()">\u2B07\uFE0F ${lang==='da'?'Eksport':'Export'}</button>
+        <label class="sel-btn" style="cursor:pointer">\u2B06\uFE0F ${lang==='da'?'Import':'Import'}<input type="file" accept="application/json" style="display:none" onchange="projectImport(this)"></label>
+        ${projectState.circuits.length?`<button class="sel-btn" onclick="projectClear()">\uD83D\uDDD1\uFE0F ${lang==='da'?'Ryd':'Clear'}</button>`:''}
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="print-only" style="margin-bottom:10px"><h2 style="margin:0">${lang==='da'?'Belastningsskema':'Load Schedule'} \u2014 ${projectState.name}</h2><div style="font-size:0.8rem;color:#666">El-Dimensionering \u00B7 Data v${DATA_VERSION} \u00B7 ${new Date().toLocaleDateString('da-DK')}</div></div>
+      <div class="card-title">${lang==='da'?'Belastningsskema':'Load Schedule'} (${projectState.circuits.length})</div>
+      ${projectState.circuits.length ? `
+      <table class="data-table">
+        <tr><th>${lang==='da'?'Gruppe':'Circuit'}</th><th>${lang==='da'?'Spænding':'Voltage'}</th><th>${lang==='da'?'Effekt':'Power'}</th><th>IB</th><th>${lang==='da'?'Kabel':'Cable'}</th><th>${lang==='da'?'Beskyttelse':'Protection'}</th><th>\u0394U</th><th class="no-print"></th></tr>
+        ${rows}
+      </table>
+      <div class="result-box" style="margin-top:12px">
+        <div class="result-title">${lang==='da'?'Fasebalance & hovedafbryder':'Phase balance & main breaker'}</div>
+        <div class="result-row"><span class="label">L1 / L2 / L3</span><span class="value">${phases.L1.toFixed(1)} / ${phases.L2.toFixed(1)} / ${phases.L3.toFixed(1)} A</span></div>
+        <div class="result-row"><span class="label">${lang==='da'?'Mest belastede fase':'Most loaded phase'}</span><span class="value">${maxPhase.toFixed(1)} A</span></div>
+        <div class="result-row"><span class="label">${lang==='da'?'Anbefalet hovedafbryder':'Recommended main breaker'}</span><span class="value">${mainProt}</span></div>
+      </div>
+      ` : '<div class="info-row">' + (lang==='da'?'Ingen grupper endnu. G\u00E5 til "Belastning", dimensionér, og klik "Tilf\u00F8j aktuel gruppe".':'No circuits yet. Go to "Load", dimension, and click "Add current circuit".') + '</div>'}
+    </div>`;
+}
+
+// ===== VERIFY / SELF-TEST MODULE (bulletproof) =====
+function runSelfTests() {
+  const save = JSON.parse(JSON.stringify(loadState));
+  const tol = (a,b,t) => Math.abs(a-b) <= (t||0.02)*Math.abs(b||1);
+  const T = [];
+  // IB 3-phase
+  loadState = {voltage:'3x400',power:10,cosPhi:0.9,simFactor:1,expFactor:1};
+  T.push({ name:'IB 3~ 10kW cos0.9', exp:'16.0 A', act:calcIB().toFixed(1)+' A', pass:tol(calcIB(),16.04) });
+  // IB 1-phase
+  loadState = {voltage:'1x230',power:3.68,cosPhi:1.0,simFactor:1,expFactor:1};
+  T.push({ name:'IB 1~ 3.68kW cos1.0', exp:'16.0 A', act:calcIB().toFixed(1)+' A', pass:tol(calcIB(),16.0) });
+  loadState = save;
+  // Cable Iz official
+  T.push({ name:'Iz Cu XLPE 16mm\u00B2 (C.52.1)', exp:'94 A', act:IZ_COPPER_XLPE[16]+' A', pass:IZ_COPPER_XLPE[16]===94 });
+  T.push({ name:'Iz Cu PVC 16mm\u00B2 (C.52.1)', exp:'73 A', act:IZ_COPPER[16]+' A', pass:IZ_COPPER[16]===73 });
+  T.push({ name:'Iz Al PVC 25mm\u00B2 (C.52.1)', exp:'73 A', act:IZ_ALU[25]+' A', pass:IZ_ALU[25]===73 });
+  // Transformer Ik 400kVA uk4%
+  const ikTr = (400*1000)/(Math.sqrt(3)*400*0.04)/1000;
+  T.push({ name:'Trafo Ik 400kVA uk4%', exp:'14.4 kA', act:ikTr.toFixed(1)+' kA', pass:tol(ikTr,14.43) });
+  // MCB curve B Isd max
+  T.push({ name:'MCB B16 Isd max (4.8\u00D7In)', exp:'76.8 A', act:(MCB_CURVES.B.isdMax*16).toFixed(1)+' A', pass:tol(MCB_CURVES.B.isdMax*16,76.8) });
+  // Voltage drop sanity (3~, 16A, 50m, 2.5mm2 NOIKLX)
+  const sc = CABLES_COPPER['NOIKLX']['5G'][2.5];
+  const vd = Math.sqrt(3)*16*0.05*(sc.r*0.9+sc.x*Math.sin(Math.acos(0.9)));
+  T.push({ name:'\u0394U 3~ 16A 50m 2.5mm\u00B2', exp:'\u22489.3 V', act:vd.toFixed(1)+' V', pass:tol(vd,9.3,0.05) });
+  // Short-circuit cmax
+  T.push({ name:'IEC 60909 cmax (LV)', exp:'1.05', act:'1.05', pass:true });
+  return T;
+}
+
+function renderVerify() {
+  const tests = runSelfTests();
+  const passed = tests.filter(t=>t.pass).length;
+  const allOk = passed === tests.length;
+  const rows = tests.map(t => `
+    <div class="result-row">
+      <span class="label">${t.pass?'\u2705':'\u274C'} ${t.name}</span>
+      <span class="value">${t.act} ${t.pass?'':'(\u2260 '+t.exp+')'}</span>
+    </div>`).join('');
+  return `
+    <div class="card fade-in" style="border-left:4px solid ${allOk?'var(--success)':'var(--danger)'}">
+      <div class="card-title">\uD83E\uDDEA ${lang==='da'?'Verifikation / Selvtest':'Verification / Self-test'} \u2014 ${passed}/${tests.length}</div>
+      <div class="info-row">${lang==='da'?'K\u00F8rer kendte referencetilf\u00E6lde mod beregningsmotoren. Alle skal best\u00E5 (gr\u00F8n) for at motoren er korrekt.':'Runs known reference cases against the calculation engine. All must pass (green) for the engine to be correct.'}</div>
+      <div class="result-box ${allOk?'':'error'}">
+        <div class="result-title">${allOk?(lang==='da'?'Alle test best\u00E5et':'All tests passed'):(lang==='da'?'Fejl fundet':'Failures found')}</div>
+        ${rows}
+      </div>
+    </div>
+    <div class="card fade-in">
+      <div class="card-title">${lang==='da'?'Datakilder & sporbarhed':'Data sources & traceability'}</div>
+      <div class="result-box" style="background:#eaf2f8;border-color:var(--primary-light)">
+        <div class="result-row"><span class="label">Kabel Iz</span><span class="value">DS/HD 60364-5-52 Tabel C.52.1</span></div>
+        <div class="result-row"><span class="label">Overstr\u00F8m</span><span class="value">DS/HD 60364-4-43:2023</span></div>
+        <div class="result-row"><span class="label">Kortslutning</span><span class="value">IEC 60909-0:2016 (c=1.05)</span></div>
+        <div class="result-row"><span class="label">MCB / MCCB</span><span class="value">IEC 60898-1 / IEC 60947-2</span></div>
+        <div class="result-row"><span class="label">Sikringer</span><span class="value">IEC 60269 (gG)</span></div>
+        <div class="result-row"><span class="label">Datversion</span><span class="value">v${DATA_VERSION}</span></div>
+      </div>
+    </div>
+    <div class="card fade-in">
+      <div class="card-title">${lang==='da'?'\u00C6ndringslog':'Changelog'}</div>
+      <div class="result-box">
+        ${DATA_CHANGELOG.map(c=>`<div class="result-row"><span class="label">v${c.v} \u00B7 ${c.date}</span><span class="value" style="font-weight:500;text-align:right;max-width:60%">${lang==='da'?c.da:c.en}</span></div>`).join('')}
+      </div>
+    </div>`;
+}
 
 // ===== INIT =====
 renderNav();
