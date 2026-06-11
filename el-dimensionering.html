@@ -2881,8 +2881,49 @@ const AI_TOPICS = {
 let aiTopic = 'all';
 let aiTag = null;
 let aiOpenQuestion = null;
+let aiSearch = ''; // free-text search (allowed only here)
 let aiMode = 'offline'; // 'offline' = click-only KB, 'online' = live AI
 let aiChat = []; // online chat history
+
+// Build the offline Q&A results list HTML (used for live search updates)
+function buildAiResultsHtml() {
+  let questions = AI_KNOWLEDGE;
+  if (aiTopic !== 'all') questions = questions.filter(k => k.topic === aiTopic);
+  if (aiTag) questions = questions.filter(k => k.tags.includes(aiTag));
+  if (aiSearch.trim()) {
+    const terms = aiSearch.toLowerCase().split(/\s+/).filter(Boolean);
+    questions = questions.filter(k => {
+      const hay = ((lang === 'da' ? k.q_da + ' ' + k.a_da : k.q_en + ' ' + k.a_en) + ' ' + k.tags.join(' ')).toLowerCase();
+      return terms.every(term => hay.includes(term));
+    });
+  }
+  const list = questions.map(k => {
+    const globalIdx = AI_KNOWLEDGE.indexOf(k);
+    const isOpen = aiOpenQuestion === globalIdx;
+    return `
+      <div style="margin-bottom:8px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+        <button class="sel-btn" style="width:100%;text-align:left;border:none;border-radius:0;${isOpen ? 'background:linear-gradient(135deg,var(--primary),var(--primary-light));color:white' : ''}" onclick="aiOpenQuestion=${isOpen ? 'null' : globalIdx};renderModule('ai')">
+          ${AI_TOPICS[k.topic].icon} ${lang === 'da' ? k.q_da : k.q_en}
+        </button>
+        ${isOpen ? `
+        <div style="padding:14px 16px;background:var(--success-bg);font-size:0.88rem;line-height:1.7;color:var(--text)">
+          \uD83D\uDC68\u200D\uD83D\uDD27 ${lang === 'da' ? k.a_da : k.a_en}
+        </div>` : ''}
+      </div>`;
+  }).join('');
+  const header = `<div class="card-title">${lang === 'da' ? 'Sp\u00F8rgsm\u00E5l & Svar' : 'Questions & Answers'} (${questions.length})</div>`;
+  return header + (list || '<div class="info-row">' + (lang === 'da' ? 'Ingen sp\u00F8rgsm\u00E5l matcher. Pr\u00F8v andre ord, eller skift til Online AI for ethvert sp\u00F8rgsm\u00E5l.' : 'No questions match. Try other words, or switch to Online AI for any question.') + '</div>');
+}
+
+// Live search handler — updates only the results container so the input keeps focus
+function aiLiveSearch() {
+  const inp = document.getElementById('aiSearchBox');
+  if (!inp) return;
+  aiSearch = inp.value;
+  aiOpenQuestion = null;
+  const res = document.getElementById('aiResults');
+  if (res) res.innerHTML = buildAiResultsHtml();
+}
 let aiBusy = false;
 
 // Call a live AI service for open-ended questions (online mode only)
@@ -3019,8 +3060,15 @@ function renderAiElectrician() {
   return `
     <div class="card fade-in">
       <div class="card-title">\uD83D\uDC68\u200D\uD83D\uDD27 ${lang === 'da' ? 'Spørg AI-Elektrikeren' : 'Ask the AI-Electrician'}</div>
-      <div class="info-row">${lang === 'da' ? 'Klik p\u00E5 et emne eller et n\u00F8gleord for at finde svar. Alle svar f\u00F8lger DS/HD 60364 og dansk lovgivning.' : 'Click a topic or keyword to find answers. All answers follow DS/HD 60364 and Danish regulations.'}</div>
+      <div class="info-row">${lang === 'da' ? 'Skriv et frit sp\u00F8rgsm\u00E5l i s\u00F8gefeltet, eller klik p\u00E5 et emne/n\u00F8gleord. Alle svar f\u00F8lger DS/HD 60364 og dansk lovgivning.' : 'Type a free question in the search box, or click a topic/keyword. All answers follow DS/HD 60364 and Danish regulations.'}</div>
       ${modeToggle}
+
+      <div class="select-group">
+        <div class="select-label">\uD83D\uDD0D ${lang === 'da' ? 'S\u00F8gefelt (fri tekst tilladt her)' : 'Search box (free text allowed here)'}</div>
+        <input id="aiSearchBox" type="text" value="${aiSearch.replace(/"/g,'&quot;')}" oninput="aiLiveSearch()" autocomplete="off"
+          placeholder="${lang === 'da' ? 'F.eks. HPFI badeværelse, kabel tværsnit, autorisation…' : 'E.g. RCD bathroom, cable size, authorization…'}"
+          style="width:100%;padding:12px 14px;border:1.5px solid var(--primary-light);border-radius:var(--radius-sm);font-family:inherit;font-size:0.9rem;outline:none;box-shadow:0 2px 8px rgba(50,130,184,0.08)">
+      </div>
 
       <div class="select-group">
         <div class="select-label">${lang === 'da' ? 'Emne' : 'Topic'}</div>
@@ -3033,7 +3081,7 @@ function renderAiElectrician() {
       </div>
 
       <div class="select-group">
-        <div class="select-label">\uD83D\uDD0D ${lang === 'da' ? 'S\u00F8g via n\u00F8gleord' : 'Search by keyword'}</div>
+        <div class="select-label">\uD83C\uDFF7\uFE0F ${lang === 'da' ? 'N\u00F8gleord' : 'Keywords'}</div>
         <div class="select-grid">
           ${aiTag ? `<button class="sel-btn selected" onclick="aiTag=null;aiOpenQuestion=null;renderModule('ai')">\u2715 ${aiTag}</button>` : ''}
           ${allTags.filter(tg => tg !== aiTag).map(tg =>
@@ -3043,9 +3091,8 @@ function renderAiElectrician() {
       </div>
     </div>
 
-    <div class="card fade-in">
-      <div class="card-title">${lang === 'da' ? 'Sp\u00F8rgsm\u00E5l & Svar' : 'Questions & Answers'} (${questions.length})</div>
-      ${questionList || '<div class="info-row">' + (lang === 'da' ? 'Ingen sp\u00F8rgsm\u00E5l matcher. Pr\u00F8v et andet emne.' : 'No questions match. Try another topic.') + '</div>'}
+    <div class="card fade-in" id="aiResults">
+      ${buildAiResultsHtml()}
     </div>
   `;
 }
