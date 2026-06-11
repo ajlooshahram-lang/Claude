@@ -587,7 +587,8 @@ const T = {
       trafo: 'Trafo',
       standards: 'Standarder',
       bank: 'Komponentbank',
-      ai: 'Spørg AI-Elektriker'
+      ai: 'Spørg AI-Elektriker',
+      bid: 'Tilbud'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -681,7 +682,8 @@ const T = {
       trafo: 'Transformer',
       standards: 'Standards',
       bank: 'Component Bank',
-      ai: 'Ask AI-Electrician'
+      ai: 'Ask AI-Electrician',
+      bid: 'Bid / Quote'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -1806,12 +1808,13 @@ function renderModule(mod) {
     case 'standards': content = renderStandards(); break;
     case 'bank': content = renderBank(); break;
     case 'ai': content = renderAiElectrician(); break;
+    case 'bid': content = renderBid(); break;
   }
   // Append AI assistant to every module
   content += renderAiAssistant(mod);
   // Append QI validation summary if enough data exists
   const qi = runQiValidation();
-  if (qi.passed.length + qi.issues.length > 0 && mod !== 'standards' && mod !== 'bank' && mod !== 'ai') {
+  if (qi.passed.length + qi.issues.length > 0 && mod !== 'standards' && mod !== 'bank' && mod !== 'ai' && mod !== 'bid') {
     content += renderQiCard(qi);
   }
   main.innerHTML = content;
@@ -3416,6 +3419,251 @@ function configureLawSource() {
     if (navigator.onLine) checkLawUpdates(false);
     else window.addEventListener('online', () => checkLawUpdates(false), { once: true });
   }
+})();
+
+// ===== BID / QUOTE ENGINE (connect to Danish wholesalers) =====
+// Generates an initial project price ("tilbud") from a bill of materials.
+//
+// IMPORTANT - HONEST NOTE: Live, exact wholesaler prices are only available
+// through authenticated B2B accounts (Lemvigh-Müller, Solar, Sanistål, AO).
+// There is no public price API. So the app uses INDICATIVE reference prices
+// (clearly labelled) out of the box, and lets you CONNECT your own B2B price
+// feed per wholesaler for real, live, customer-specific pricing.
+
+const WHOLESALERS = {
+  'Lemvigh-Müller': { idx: 1.00, feed: '' },
+  'Solar': { idx: 1.02, feed: '' },
+  'Sanistål': { idx: 1.04, feed: '' },
+  'AO': { idx: 1.03, feed: '' }
+};
+// EG Sigma / EG Kalkia compatibility: Danish trade calculation systems key
+// products by EL-nr (unique Danish electrical product number) and import
+// wholesaler price files (DLF / grossist prisfiler). The price-feed pattern
+// supports {elnr} {ref} {id} so it can plug into the same data sources.
+
+// Indicative unit prices in DKK ex. moms (rough Danish-market estimates).
+// Cables are priced per metre; everything else per piece.
+function priceFor(cat, p) {
+  let v;
+  if (cat === 'cables') {
+    const base = {1.5:12,2.5:18,4:28,6:40,10:65,16:100,25:160,35:220,50:310,70:430,95:580,120:740,150:920,185:1150,240:1500};
+    v = base[p.mm2] || 50;
+    if (p.material === 'Al') v *= 0.6;
+  } else if (cat === 'mcbs') {
+    v = 80 + (p.rating || 16) * 1.5 + (p.icu >= 10 ? 45 : 0);
+  } else if (cat === 'mccbs') {
+    const f = {'NSX 100':1800,'NSX 160':2500,'NSX 250':3500,'NSX 400':6000,'NSX 630':8500};
+    v = f[p.frame] || 2000;
+  } else if (cat === 'fuses') {
+    v = (p.size || '').indexOf('NH') === 0 ? 60 + p.rating * 0.5 : 20 + p.rating * 0.6;
+  } else if (cat === 'rcds') {
+    v = 400 + p.rating * 4 + (p.rcdType === 'B' ? 2500 : 0);
+  } else if (cat === 'rcbos') {
+    v = 350 + p.rating * 4;
+  } else if (cat === 'spds') {
+    v = (p.spdType || '').indexOf('1') >= 0 ? 2500 : 1200;
+  } else if (cat === 'contactors') {
+    v = 200 + (p.ac3_A || 9) * 12;
+  } else if (cat === 'mpcbs') {
+    v = (p.series || '').indexOf('GV3') >= 0 ? 1800 : 400 + (p.rangeMax || 6) * 8;
+  } else if (cat === 'overloadRelays') {
+    v = 300 + (p.rangeMax || 6) * 6;
+  } else if (cat === 'wiringDevices') {
+    v = p.cat === 'socket' ? 85 : 70;
+  } else { v = 100; }
+  return Math.round(v);
+}
+
+function findProduct(cat, id) {
+  return (PRODUCTS[cat] || []).find(x => x.id === id);
+}
+
+// Bid state
+let bidState = {
+  wholesaler: 'Lemvigh-Müller',
+  laborHours: 8,
+  hourlyRate: 550,
+  markup: 15,
+  basket: [], // { cat, id, qty }
+  pickCat: 'cables'
+};
+
+function addToBid(cat, id, qty) {
+  const existing = bidState.basket.find(b => b.cat === cat && b.id === id);
+  if (existing) existing.qty += (qty || 1);
+  else bidState.basket.push({ cat, id, qty: qty || 1 });
+}
+function bidQty(i, d) { bidState.basket[i].qty = Math.max(1, bidState.basket[i].qty + d); renderModule('bid'); }
+function bidRemove(i) { bidState.basket.splice(i, 1); renderModule('bid'); }
+function bidAddPick(id) { addToBid(bidState.pickCat, id, bidState.pickCat === 'cables' ? (vdropState.length || 1) : 1); renderModule('bid'); }
+
+// Auto-build a starter basket from the current dimensioning
+function bidAutoFill() {
+  bidState.basket = [];
+  const ib = calcIB();
+  // Cable (qty = run length in metres)
+  const recCab = recommendCables(ib)[0];
+  if (recCab) addToBid('cables', recCab.id, vdropState.length || 25);
+  // Protection: MCB if <=63A else MCCB
+  if (ib <= 63) { const m = recommendMCBs(ib)[0]; if (m) addToBid('mcbs', m.id, 1); }
+  else { const m = recommendMCCBs(ib)[0]; if (m) addToBid('mccbs', m.id, 1); }
+  // RCD
+  const r = recommendRCDs(ib, loadState.voltage)[0]; if (r) addToBid('rcds', r.id, 1);
+  renderModule('bid');
+}
+
+function renderBid() {
+  const wsKeys = Object.keys(WHOLESALERS);
+  const ws = WHOLESALERS[bidState.wholesaler];
+  const hourlyOptions = [450, 500, 550, 600, 650, 750];
+  const markupOptions = [0, 10, 15, 20, 25, 30];
+  const laborSteps = true;
+
+  // Build itemized lines
+  let materials = 0;
+  const lines = bidState.basket.map((b, i) => {
+    const p = findProduct(b.cat, b.id);
+    if (!p) return '';
+    const unit = Math.round(priceFor(b.cat, p) * ws.idx);
+    const lineTotal = unit * b.qty;
+    materials += lineTotal;
+    const unitLabel = b.cat === 'cables' ? 'kr/m' : 'kr/stk';
+    return `
+      <div class="result-row" style="align-items:center;gap:10px">
+        ${getComponentVisual(b.cat, p)}
+        <div style="flex:1">
+          <div style="display:flex;justify-content:space-between;gap:8px">
+            <span class="label"><strong>${p.brand}</strong> ${p.model}</span>
+            <span class="value">${lineTotal.toLocaleString('da-DK')} kr</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+            <button class="sel-btn" style="padding:2px 9px;min-width:0" onclick="bidQty(${i},-1)">\u2212</button>
+            <span style="font-weight:700;min-width:50px;text-align:center">${b.qty} ${b.cat === 'cables' ? 'm' : 'stk'}</span>
+            <button class="sel-btn" style="padding:2px 9px;min-width:0" onclick="bidQty(${i},1)">+</button>
+            <span style="font-size:0.74rem;color:var(--text-muted)">\u00D7 ${unit} ${unitLabel}</span>
+            <button class="sel-btn" style="padding:2px 9px;min-width:0;margin-left:auto;color:var(--danger)" onclick="bidRemove(${i})">\uD83D\uDDD1\uFE0F</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  const labor = bidState.laborHours * bidState.hourlyRate;
+  const subtotal = materials + labor;
+  const markupAmt = subtotal * (bidState.markup / 100);
+  const exVat = subtotal + markupAmt;
+  const vat = exVat * 0.25;
+  const total = exVat + vat;
+  const fmt = n => Math.round(n).toLocaleString('da-DK');
+
+  // Picker products for chosen category
+  const pickCats = { cables:'Kabler', mcbs:'Automatsikringer', mccbs:'Maksimalafbrydere', fuses:'Sikringer', rcds:'HPFI', rcbos:'HPFI-auto', spds:'Overspænding', contactors:'Kontaktorer', mpcbs:'Motorværn', overloadRelays:'Termorelæ', wiringDevices:'Stik/Afbryder' };
+  const pickItems = (PRODUCTS[bidState.pickCat] || []).map(p =>
+    `<button class="sel-btn" onclick="bidAddPick('${p.id}')">+ ${p.brand} ${p.model}${p.mm2 ? ' ' + p.mm2 + 'mm\u00B2' : (p.rating ? ' ' + (p.curve||'') + p.rating + 'A' : '')}</button>`
+  ).join('');
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">\uD83D\uDCB0 ${lang === 'da' ? 'Tilbud / Projektpris' : 'Bid / Project Price'}</div>
+      <div class="info-row">${lang === 'da' ? 'Genererer en indledende projektpris fra din materialeliste. Priser er VEJLEDENDE indtil du tilslutter dit B2B-prisfeed.' : 'Generates an initial project price from your bill of materials. Prices are INDICATIVE until you connect your B2B price feed.'}</div>
+
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Grossist' : 'Wholesaler'}</div>
+        <div class="select-grid">
+          ${wsKeys.map(w =>
+            `<button class="sel-btn ${bidState.wholesaler === w ? 'selected' : ''}" onclick="bidState.wholesaler='${w}';renderModule('bid')">${w}${WHOLESALERS[w].feed ? ' \uD83D\uDD17' : ''}</button>`
+          ).join('')}
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px">${ws.feed ? (lang === 'da' ? 'Live priser tilsluttet.' : 'Live prices connected.') : (lang === 'da' ? 'Vejledende priser (prisindeks ' + ws.idx.toFixed(2) + '). Tilslut feed for live priser.' : 'Indicative prices (index ' + ws.idx.toFixed(2) + '). Connect feed for live prices.')}</div>
+      </div>
+
+      <div class="select-grid" style="margin-bottom:8px">
+        <button class="sel-btn selected" onclick="bidAutoFill()">\u26A1 ${lang === 'da' ? 'Auto-udfyld fra dimensionering' : 'Auto-fill from dimensioning'}</button>
+        <button class="sel-btn" onclick="configurePriceFeed()">\uD83D\uDD17 ${lang === 'da' ? 'Tilslut prisfeed' : 'Connect price feed'}</button>
+        ${bidState.basket.length ? `<button class="sel-btn" onclick="bidState.basket=[];renderModule('bid')">\uD83D\uDDD1\uFE0F ${lang === 'da' ? 'Ryd' : 'Clear'}</button>` : ''}
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Tilf\u00F8j komponenter' : 'Add components'}</div>
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Kategori' : 'Category'}</div>
+        <div class="select-grid">
+          ${Object.keys(pickCats).map(k =>
+            `<button class="sel-btn ${bidState.pickCat === k ? 'selected' : ''}" onclick="bidState.pickCat='${k}';renderModule('bid')">${pickCats[k]}</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="select-grid" style="max-height:160px;overflow-y:auto">${pickItems}</div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Materialeliste' : 'Bill of Materials'} (${bidState.basket.length})</div>
+      ${lines || '<div class="info-row">' + (lang === 'da' ? 'Kurven er tom. Brug "Auto-udfyld" eller tilf\u00F8j komponenter ovenfor.' : 'Basket is empty. Use "Auto-fill" or add components above.') + '</div>'}
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Arbejdsl\u00F8n & avance' : 'Labor & markup'}</div>
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Arbejdstimer' : 'Labor hours'}</div>
+        <div class="select-grid" style="align-items:center">
+          <button class="sel-btn" style="min-width:0" onclick="bidState.laborHours=Math.max(0,bidState.laborHours-1);renderModule('bid')">\u2212</button>
+          <span style="font-weight:700;min-width:60px;text-align:center">${bidState.laborHours} t</span>
+          <button class="sel-btn" style="min-width:0" onclick="bidState.laborHours+=1;renderModule('bid')">+</button>
+        </div>
+      </div>
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Timepris' : 'Hourly rate'}</div>
+        <div class="select-grid">
+          ${hourlyOptions.map(h => `<button class="sel-btn ${bidState.hourlyRate === h ? 'selected' : ''}" onclick="bidState.hourlyRate=${h};renderModule('bid')">${h} kr</button>`).join('')}
+        </div>
+      </div>
+      <div class="select-group">
+        <div class="select-label">${lang === 'da' ? 'Avance (%)' : 'Markup (%)'}</div>
+        <div class="select-grid">
+          ${markupOptions.map(mk => `<button class="sel-btn ${bidState.markup === mk ? 'selected' : ''}" onclick="bidState.markup=${mk};renderModule('bid')">${mk}%</button>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">${lang === 'da' ? 'Tilbud (indledende projektpris)' : 'Bid (initial project price)'}</div>
+      <div class="result-box">
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Materialer' : 'Materials'}</span><span class="value">${fmt(materials)} kr</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Arbejdsl\u00F8n' : 'Labor'} (${bidState.laborHours} t \u00D7 ${bidState.hourlyRate})</span><span class="value">${fmt(labor)} kr</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Subtotal' : 'Subtotal'}</span><span class="value">${fmt(subtotal)} kr</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Avance' : 'Markup'} (${bidState.markup}%)</span><span class="value">${fmt(markupAmt)} kr</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'I alt ekskl. moms' : 'Total excl. VAT'}</span><span class="value">${fmt(exVat)} kr</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Moms 25%' : 'VAT 25%'}</span><span class="value">${fmt(vat)} kr</span></div>
+        <div class="result-row" style="border-top:2px solid var(--success);margin-top:6px;padding-top:10px">
+          <span class="label" style="font-weight:800;color:var(--text)">${lang === 'da' ? 'TOTAL inkl. moms' : 'TOTAL incl. VAT'}</span>
+          <span class="value" style="font-size:1.15rem;color:var(--success)">${fmt(total)} kr</span>
+        </div>
+      </div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px">${lang === 'da' ? 'Vejledende tilbud. Endelig pris afh\u00E6nger af grossistens dagspriser, rabatter og projektforhold.' : 'Indicative bid. Final price depends on the wholesaler daily prices, discounts and project conditions.'}</div>
+    </div>
+  `;
+}
+
+function configurePriceFeed() {
+  const w = bidState.wholesaler;
+  const cur = WHOLESALERS[w].feed || '';
+  const url = prompt(lang === 'da'
+    ? 'URL-m\u00F8nster til ' + w + ' B2B-prisfeed (pladsholdere {elnr} {ref} {id}).\nKompatibel med EG Sigma / EG Kalkia prisfiler (EL-nr).\nF.eks.: https://api.lemu.dk/price/{elnr}\n(Tomt = vejledende priser)'
+    : 'URL pattern for ' + w + ' B2B price feed (placeholders {elnr} {ref} {id}).\nCompatible with EG Sigma / EG Kalkia price files (EL-nr).\nE.g.: https://api.lemu.dk/price/{elnr}\n(Empty = indicative prices)', cur);
+  if (url === null) return;
+  WHOLESALERS[w].feed = url.trim();
+  try { localStorage.setItem('priceFeeds', JSON.stringify(Object.fromEntries(Object.entries(WHOLESALERS).map(([k,v]) => [k, v.feed])))); } catch(e){}
+  alert(lang === 'da'
+    ? (url.trim() ? 'Prisfeed gemt for ' + w + '. Live priser kr\u00E6ver gyldig B2B-adgang (som i EG Sigma/Kalkia).' : 'Bruger vejledende priser for ' + w + '.')
+    : (url.trim() ? 'Price feed saved for ' + w + '. Live prices require valid B2B access (as in EG Sigma/Kalkia).' : 'Using indicative prices for ' + w + '.'));
+  renderModule('bid');
+}
+// Restore saved price feeds
+(function restorePriceFeeds() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('priceFeeds') || '{}');
+    Object.keys(saved).forEach(k => { if (WHOLESALERS[k]) WHOLESALERS[k].feed = saved[k]; });
+  } catch(e){}
 })();
 
 // ===== INIT =====
