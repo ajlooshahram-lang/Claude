@@ -409,3 +409,11 @@ th.sortable:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
 .chip:hover{border-color:var(--blue);color:var(--blue)}
 .chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
 .chip:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+
+
+
+/* drag-to-reorder pinned rows */
+tr.pinned-row[draggable]{cursor:grab}
+tr.pinned-row[draggable]:active{cursor:grabbing}
+tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46,84,150,.08)}
+[data-theme="dark"] tr.row-dragover td{background:rgba(125,167,240,.12)}

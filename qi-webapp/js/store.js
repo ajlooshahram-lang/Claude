@@ -305,8 +305,20 @@
   function togglePin(id) {
     const c = get().cases.find(x => x.id === id); if (!c) return false;
     c.pinned = !c.pinned;
+    if (c.pinned) { c.pinOrder = Date.now(); } else { c.pinOrder = 0; }
     logAudit(c.pinned ? "Pinned" : "Unpinned", codeOf(get().cases.indexOf(c)), "");
     save(); return c.pinned;
+  }
+  function reorderPin(id, beforeId) {
+    const cases = get().cases;
+    const src = cases.find(x => x.id === id);
+    const tgt = cases.find(x => x.id === beforeId);
+    if (!src || !tgt || !src.pinned || !tgt.pinned) return false;
+    src.pinOrder = (tgt.pinOrder || 0) - 1;
+    const pinned = cases.filter(c => c.pinned).sort((a, b) => (a.pinOrder || 0) - (b.pinOrder || 0));
+    pinned.forEach((c, i) => { c.pinOrder = (i + 1) * 10; });
+    logAudit("Reordered pin", codeOf(cases.indexOf(src)), "");
+    save(); return true;
   }
 
   // ---- generic registers ----
@@ -526,7 +538,7 @@
   }
 
   const API = { uid, seed, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
-    undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete, togglePin,
+    undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete, togglePin, reorderPin,
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
     auditList, clearAudit, takeSnapshot, snapshots, restoreSnapshot, deleteSnapshot, renameSnapshot, diffSnapshots, paretoRPN, controlChartData,
     savedViews, saveView, deleteSavedView,
