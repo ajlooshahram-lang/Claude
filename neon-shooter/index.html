@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>NEON VOID — sci-fi shooter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="game">
+    <canvas id="c"></canvas>
+
+    <div id="hud" class="hud" hidden>
+      <div class="hud-left">
+        <div class="hud-label">SCORE</div>
+        <div id="score" class="hud-score">0</div>
+        <div id="combo" class="hud-combo"></div>
+      </div>
+      <div class="hud-right">
+        <div class="hud-label">SHIELD</div>
+        <div id="lives" class="lives"></div>
+        <div class="hud-wave" id="wave">WAVE 1</div>
+      </div>
+    </div>
+
+    <div id="start" class="overlay">
+      <div class="scanlines"></div>
+      <div class="title-wrap">
+        <h1 class="title" data-text="NEON VOID">NEON&nbsp;VOID</h1>
+        <div class="subtitle">DEEP&nbsp;SPACE&nbsp;DEFENSE&nbsp;PROTOCOL</div>
+        <button id="startBtn" class="neon-btn">&#9654; &nbsp;LAUNCH</button>
+        <div class="hint">MOVE&nbsp;<span class="k">WASD</span>&nbsp;/&nbsp;<span class="k">&#9664;&#9650;&#9660;&#9654;</span>&nbsp;&middot;&nbsp;FIRE&nbsp;<span class="k">SPACE</span>&nbsp;&middot;&nbsp;or&nbsp;mouse / touch</div>
+        <div class="hiscore">HI&nbsp;&middot;&nbsp;<span id="startHi">0</span></div>
+      </div>
+    </div>
+
+    <div id="over" class="overlay" hidden>
+      <div class="scanlines"></div>
+      <div class="title-wrap">
+        <h1 class="title over-title" data-text="GAME OVER">GAME&nbsp;OVER</h1>
+        <div class="result">
+          <div class="result-row"><span>SCORE</span><b id="finalScore">0</b></div>
+          <div class="result-row"><span>WAVE</span><b id="finalWave">1</b></div>
+          <div class="result-row hi"><span>BEST</span><b id="finalHi">0</b></div>
+        </div>
+        <div id="newRecord" class="record" hidden>&#9733; NEW RECORD &#9733;</div>
+        <button id="againBtn" class="neon-btn">&#8635; &nbsp;RE-ENGAGE</button>
+        <div class="hint">press <span class="k">R</span> to restart</div>
+      </div>
+    </div>
+
+    <button id="muteBtn" class="mute" title="Mute (M)">&#9834;</button>
+  </div>
+
+  <script src="js/game.js"></script>
+</body>
+</html>

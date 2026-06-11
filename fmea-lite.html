@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NEON FMEA — Risk Prioritizer</title>
+<style>
+  :root{
+    --bg:#0a0e1a;--panel:#121a2e;--panel2:#0e1526;--line:#22304d;--ink:#e8eefc;--muted:#8696b8;
+    --cyan:#39e0ff;--mag:#ff4fd8;--red:#ff4d5e;--amber:#ffb23e;--green:#43e08a;--blue:#4f8cff;
+    --glow:0 0 10px rgba(57,224,255,.5);--radius:12px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:"Orbitron",ui-sans-serif,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+    background:radial-gradient(1200px 600px at 70% -10%,rgba(79,140,255,.12),transparent 60%),
+               radial-gradient(900px 500px at 10% 110%,rgba(255,79,216,.10),transparent 60%),var(--bg);
+    color:var(--ink);font-size:14px;letter-spacing:.02em;
+  }
+  .wrap{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
+  header{display:flex;align-items:center;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+  .logo{width:42px;height:42px;border-radius:10px;display:grid;place-items:center;font-weight:900;
+    background:linear-gradient(135deg,var(--cyan),var(--blue));color:#03101f;box-shadow:0 0 18px rgba(57,224,255,.5)}
+  h1{font-size:20px;margin:0;font-weight:900;text-shadow:0 0 14px rgba(57,224,255,.45)}
+  h1 small{display:block;font-size:11px;color:var(--muted);font-weight:500;letter-spacing:.18em;margin-top:2px}
+  header .grow{flex:1}
+  .btn{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+    padding:9px 14px;border-radius:9px;cursor:pointer;font-weight:700;letter-spacing:.04em}
+  .btn:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow)}
+  .btn.primary{background:linear-gradient(135deg,var(--cyan),var(--blue));color:#03101f;border:none}
+  .btn.primary:hover{box-shadow:0 0 20px rgba(57,224,255,.6);color:#03101f}
+  .btn.ghost{background:transparent}
+  .btn.danger:hover{border-color:var(--red);color:var(--red);box-shadow:0 0 10px rgba(255,77,94,.5)}
+
+  /* KPI strip */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+  @media(max-width:640px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  .kpi{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+    border-radius:var(--radius);padding:14px 16px;position:relative;overflow:hidden}
+  .kpi::after{content:"";position:absolute;inset:0 0 auto 0;height:2px;background:var(--cyan);opacity:.7}
+  .kpi.red::after{background:var(--red)} .kpi.amber::after{background:var(--amber)} .kpi.green::after{background:var(--green)}
+  .kpi .l{font-size:10px;color:var(--muted);letter-spacing:.15em}
+  .kpi .v{font-size:28px;font-weight:900;margin-top:4px}
+
+  /* toolbar */
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+  select,input{font:inherit;font-size:13px;background:var(--panel);color:var(--ink);border:1px solid var(--line);
+    border-radius:8px;padding:8px 10px}
+  select:focus,input:focus{outline:none;border-color:var(--cyan);box-shadow:var(--glow)}
+  .toolbar .grow{flex:1}
+  .muted{color:var(--muted)}
+
+  /* table */
+  .tablewrap{border:1px solid var(--line);border-radius:var(--radius);overflow:auto;background:var(--panel2)}
+  table{border-collapse:collapse;width:100%;min-width:760px}
+  th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{background:#0c1424;font-size:10px;letter-spacing:.12em;color:var(--muted);position:sticky;top:0}
+  td.wrap{white-space:normal;min-width:200px}
+  tr:hover td{background:rgba(57,224,255,.04)}
+  .rpn{font-weight:900;font-size:16px;text-align:center}
+  .badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.04em}
+  .b-Critical{background:rgba(255,77,94,.18);color:#ff8a96;box-shadow:0 0 10px rgba(255,77,94,.35)}
+  .b-High{background:rgba(255,178,62,.16);color:#ffce86}
+  .b-Medium{background:rgba(79,140,255,.16);color:#9cc0ff}
+  .b-Low{background:rgba(67,224,138,.14);color:#8ef0bb}
+  .act{font-weight:800;color:var(--red);text-shadow:0 0 8px rgba(255,77,94,.5)}
+  td select{padding:5px 8px;font-size:12px}
+  .del{color:var(--muted);cursor:pointer;border:none;background:none;font-size:16px}
+  .del:hover{color:var(--red)}
+  .empty{padding:46px;text-align:center;color:var(--muted)}
+
+  /* modal */
+  .ov{position:fixed;inset:0;background:rgba(4,8,18,.72);display:none;align-items:flex-start;justify-content:center;padding:6vh 16px;z-index:20}
+  .ov.on{display:flex}
+  .modal{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:16px;
+    width:560px;max-width:100%;padding:22px;box-shadow:0 24px 80px rgba(0,0,0,.6),0 0 40px rgba(57,224,255,.08)}
+  .modal h2{margin:0 0 14px;font-size:17px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:520px){.grid2{grid-template-columns:1fr}}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field.full{grid-column:1/-1}
+  .field label{font-size:11px;color:var(--muted);letter-spacing:.08em}
+  .readout{grid-column:1/-1;background:#0c1424;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px;display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+  .readout .big{font-size:24px;font-weight:900}
+  .foot{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+  .toast{position:fixed;right:18px;bottom:18px;background:var(--cyan);color:#03101f;font-weight:800;
+    padding:12px 18px;border-radius:10px;box-shadow:0 0 24px rgba(57,224,255,.5);z-index:40;display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">FM</div>
+    <h1>NEON&nbsp;FMEA<small>RISK&nbsp;PRIORITIZER</small></h1>
+    <div class="grow"></div>
+    <button class="btn ghost" id="sampleBtn">Load sample</button>
+    <button class="btn ghost danger" id="clearBtn">Clear</button>
+    <button class="btn" id="csvBtn">Export CSV</button>
+    <button class="btn primary" id="addBtn">+ Add failure mode</button>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="toolbar">
+    <label class="muted">Filter</label>
+    <select id="fBand"><option value="">All bands</option><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select>
+    <select id="fStatus"><option value="">All status</option><option>Open</option><option>In progress</option><option>Resolved</option></select>
+    <label class="muted">Sort</label>
+    <select id="fSort"><option value="rpn">RPN (high→low)</option><option value="sev">Severity</option><option value="band">Band</option></select>
+    <span class="grow"></span>
+    <span class="muted" id="count"></span>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr>
+        <th>RPN</th><th>Band</th><th class="wrap">Process / failure mode</th>
+        <th>S</th><th>O</th><th>D</th><th>Action</th><th>Owner</th><th>Status</th><th></th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- add/edit modal -->
+<div class="ov" id="ov">
+  <div class="modal">
+    <h2 id="mTitle">Add failure mode</h2>
+    <div class="grid2">
+      <div class="field full"><label>PROCESS STEP / FUNCTION</label>
+        <select id="m_step"></select></div>
+      <div class="field full"><label>FAILURE MODE</label>
+        <select id="m_fail"></select></div>
+      <div class="field"><label>SEVERITY (1–10)</label><select id="m_sev"></select></div>
+      <div class="field"><label>OCCURRENCE (1–10)</label><select id="m_occ"></select></div>
+      <div class="field"><label>DETECTION (1–10)</label><select id="m_det"></select></div>
+      <div class="field"><label>OWNER</label><select id="m_owner"></select></div>
+      <div class="field"><label>STATUS</label><select id="m_status"></select></div>
+      <div class="field"><label>CURRENT CONTROL</label><select id="m_control"></select></div>
+      <div class="readout" id="m_readout"></div>
+    </div>
+    <div class="foot">
+      <button class="btn ghost" id="cancelBtn">Cancel</button>
+      <button class="btn primary" id="saveBtn">Save</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  var KEY="neon_fmea_v1";
+  var $=function(s){return document.querySelector(s)};
+  var esc=function(s){return String(s==null?"":s).replace(/[&<>"]/g,function(m){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]})};
+
+  // ----- controlled vocabularies (dropdown-only for consistency) -----
+  var LIST={
+    step:["Intake / Triage","Requirements review","Design","Development","Testing","Deployment","Handoff to Ops","Inspection","Assembly","Calibration","Commissioning"],
+    fail:["Incomplete requirements","Missing acceptance criteria","Wrong configuration","Undocumented change","Edge case missed","Defect escapes to production","Wrong environment deployed","Knowledge not transferred","Out of calibration","Interlock not tested","Material out of spec"],
+    score:[1,2,3,4,5,6,7,8,9,10],
+    owner:["QA Lead","Dev Lead","PM","Ops Lead","Engineer","Process Owner","Unassigned"],
+    status:["Open","In progress","Resolved"],
+    control:["None","Visual check","Peer review","Automated test","Checklist","Alarm / interlock","Inspection gate","SPC monitoring"]
+  };
+
+  function bandOf(rpn){ return rpn>=200?"Critical":rpn>=100?"High":rpn>=50?"Medium":"Low"; }
+  function actionNow(s,o,d){ var r=s*o*d; return (r>=100)||(s>=9); }
+
+  // ----- state -----
+  var state=load();
+  function load(){ try{var r=localStorage.getItem(KEY);return r?JSON.parse(r):[]}catch(e){return[]} }
+  function save(){ try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){} }
+  function uid(){ return "f"+Date.now().toString(36)+Math.random().toString(36).slice(2,5) }
+
+  function sample(){
+    state=[
+      mk("Testing","Edge case missed",9,7,6,"QA Lead","Open","Automated test"),
+      mk("Deployment","Wrong environment deployed",10,3,3,"Ops Lead","In progress","Checklist"),
+      mk("Intake / Triage","Incomplete requirements",8,7,5,"Dev Lead","Open","Peer review"),
+      mk("Handoff to Ops","Knowledge not transferred",8,5,7,"PM","Open","None"),
+      mk("Requirements review","Missing acceptance criteria",7,6,4,"PM","Resolved","Checklist"),
+      mk("Calibration","Out of calibration",6,5,5,"Engineer","Open","Inspection gate")
+    ];
+    save(); render(); toast("Sample register loaded");
+  }
+  function mk(step,fail,s,o,d,owner,status,control){
+    return {id:uid(),step:step,fail:fail,sev:s,occ:o,det:d,owner:owner,status:status,control:control};
+  }
+
+  // ----- option builders -----
+  function opts(arr,sel,blank){
+    var h=blank?'<option value="">'+esc(blank)+'</option>':'';
+    return h+arr.map(function(v){return '<option '+(String(v)===String(sel)?'selected':'')+'>'+esc(v)+'</option>'}).join('');
+  }
+
+  // ----- KPIs -----
+  function renderKpis(){
+    var n=state.length;
+    var crit=state.filter(function(r){return bandOf(r.sev*r.occ*r.det)==="Critical"}).length;
+    var avg=n?Math.round(state.reduce(function(a,r){return a+r.sev*r.occ*r.det},0)/n):0;
+    var resolved=state.filter(function(r){return r.status==="Resolved"}).length;
+    var pct=n?Math.round(resolved/n*100):0;
+    var k=function(cls,l,v){return '<div class="kpi '+cls+'"><div class="l">'+l+'</div><div class="v">'+v+'</div></div>'};
+    $("#kpis").innerHTML=
+      k("","TOTAL MODES",n)+
+      k("red","CRITICAL",crit)+
+      k("amber","AVG RPN",avg)+
+      k("green","% ACTIONED",pct+"%");
+  }
+
+  // ----- table -----
+  function render(){
+    renderKpis();
+    var fb=$("#fBand").value, fs=$("#fStatus").value, sort=$("#fSort").value;
+    var list=state.map(function(r){var c=Object.assign({},r);c.rpn=r.sev*r.occ*r.det;c.band=bandOf(c.rpn);return c});
+    if(fb) list=list.filter(function(r){return r.band===fb});
+    if(fs) list=list.filter(function(r){return r.status===fs});
+    var bandRank={Critical:0,High:1,Medium:2,Low:3};
+    list.sort(function(a,b){
+      if(sort==="sev")return b.sev-a.sev;
+      if(sort==="band")return bandRank[a.band]-bandRank[b.band]|| b.rpn-a.rpn;
+      return b.rpn-a.rpn;
+    });
+    $("#count").textContent=list.length+" of "+state.length+" shown";
+    var tb=$("#rows");
+    if(!list.length){ tb.innerHTML='<tr><td colspan="10" class="empty">No failure modes yet. Click <b>+ Add failure mode</b> or <b>Load sample</b>.</td></tr>'; return; }
+    tb.innerHTML=list.map(function(r){
+      var rpnColor=r.band==="Critical"?"var(--red)":r.band==="High"?"var(--amber)":r.band==="Medium"?"var(--blue)":"var(--green)";
+      return '<tr>'+
+        '<td class="rpn" style="color:'+rpnColor+';text-shadow:0 0 10px '+rpnColor+'">'+r.rpn+'</td>'+
+        '<td><span class="badge b-'+r.band+'">'+r.band+'</span></td>'+
+        '<td class="wrap"><b>'+esc(r.fail)+'</b><div class="muted" style="font-size:11px">'+esc(r.step)+' &middot; ctrl: '+esc(r.control)+'</div></td>'+
+        '<td class="rpn" style="font-size:13px">'+r.sev+'</td><td class="rpn" style="font-size:13px">'+r.occ+'</td><td class="rpn" style="font-size:13px">'+r.det+'</td>'+
+        '<td>'+(actionNow(r.sev,r.occ,r.det)?'<span class="act">ACT NOW</span>':'<span class="muted">monitor</span>')+'</td>'+
+        '<td><select data-edit="owner" data-id="'+r.id+'">'+opts(LIST.owner,r.owner)+'</select></td>'+
+        '<td><select data-edit="status" data-id="'+r.id+'">'+opts(LIST.status,r.status)+'</select></td>'+
+        '<td><button class="del" data-del="'+r.id+'" title="Delete">&times;</button></td>'+
+        '</tr>';
+    }).join('');
+  }
+
+  // ----- inline edit + delete (event delegation) -----
+  $("#rows").addEventListener("change",function(e){
+    var sel=e.target.closest("select[data-edit]"); if(!sel)return;
+    var row=state.find(function(r){return r.id===sel.dataset.id}); if(!row)return;
+    row[sel.dataset.edit]=sel.value; save(); render();
+  });
+  $("#rows").addEventListener("click",function(e){
+    var b=e.target.closest("[data-del]"); if(!b)return;
+    state=state.filter(function(r){return r.id!==b.dataset.del}); save(); render(); toast("Removed");
+  });
+  ["fBand","fStatus","fSort"].forEach(function(id){$("#"+id).addEventListener("change",render)});
+
+  // ----- modal -----
+  var editingId=null;
+  function fillSelectors(){
+    $("#m_step").innerHTML=opts(LIST.step,"","— choose —");
+    $("#m_fail").innerHTML=opts(LIST.fail,"","— choose —");
+    $("#m_sev").innerHTML=opts(LIST.score,5);
+    $("#m_occ").innerHTML=opts(LIST.score,5);
+    $("#m_det").innerHTML=opts(LIST.score,5);
+    $("#m_owner").innerHTML=opts(LIST.owner,"Unassigned");
+    $("#m_status").innerHTML=opts(LIST.status,"Open");
+    $("#m_control").innerHTML=opts(LIST.control,"None");
+  }
+  function preview(){
+    var s=+$("#m_sev").value,o=+$("#m_occ").value,d=+$("#m_det").value,r=s*o*d,band=bandOf(r);
+    var col=band==="Critical"?"var(--red)":band==="High"?"var(--amber)":band==="Medium"?"var(--blue)":"var(--green)";
+    $("#m_readout").innerHTML='<div><div class="l muted" style="font-size:10px">RPN</div><div class="big" style="color:'+col+';text-shadow:0 0 12px '+col+'">'+r+'</div></div>'+
+      '<div><span class="badge b-'+band+'">'+band+'</span></div>'+
+      '<div>'+(actionNow(s,o,d)?'<span class="act">&#9888; ACT NOW (RPN&ge;100 or Severity&ge;9)</span>':'<span class="muted">Monitor — below action threshold</span>')+'</div>';
+  }
+  function openModal(id){
+    fillSelectors();
+    editingId=id||null;
+    $("#mTitle").textContent=id?"Edit failure mode":"Add failure mode";
+    if(id){
+      var r=state.find(function(x){return x.id===id});
+      $("#m_step").value=r.step;$("#m_fail").value=r.fail;$("#m_sev").value=r.sev;$("#m_occ").value=r.occ;
+      $("#m_det").value=r.det;$("#m_owner").value=r.owner;$("#m_status").value=r.status;$("#m_control").value=r.control;
+    }
+    preview();
+    $("#ov").classList.add("on");
+    $("#m_step").focus();
+  }
+  function closeModal(){ $("#ov").classList.remove("on"); }
+  ["m_sev","m_occ","m_det"].forEach(function(id){$("#"+id).addEventListener("change",preview)});
+  $("#addBtn").addEventListener("click",function(){openModal()});
+  $("#cancelBtn").addEventListener("click",closeModal);
+  $("#ov").addEventListener("click",function(e){if(e.target.id==="ov")closeModal()});
+  $("#saveBtn").addEventListener("click",function(){
+    var step=$("#m_step").value,fail=$("#m_fail").value;
+    if(!step||!fail){toast("Choose a process step and failure mode");return;}
+    var data={step:step,fail:fail,sev:+$("#m_sev").value,occ:+$("#m_occ").value,det:+$("#m_det").value,
+      owner:$("#m_owner").value,status:$("#m_status").value,control:$("#m_control").value};
+    if(editingId){ Object.assign(state.find(function(r){return r.id===editingId}),data); }
+    else { data.id=uid(); state.push(data); }
+    save(); render(); closeModal(); toast(editingId?"Updated":"Added");
+  });
+
+  // ----- CSV / clear / sample -----
+  $("#csvBtn").addEventListener("click",function(){
+    var cols=["RPN","Band","Process step","Failure mode","Severity","Occurrence","Detection","Action","Owner","Status","Control"];
+    var lines=[cols.join(",")];
+    state.slice().sort(function(a,b){return b.sev*b.occ*b.det-a.sev*a.occ*a.det}).forEach(function(r){
+      var rpn=r.sev*r.occ*r.det;
+      var row=[rpn,bandOf(rpn),r.step,r.fail,r.sev,r.occ,r.det,actionNow(r.sev,r.occ,r.det)?"ACT NOW":"monitor",r.owner,r.status,r.control];
+      lines.push(row.map(function(v){v=String(v).replace(/"/g,'""');return /[",\n]/.test(v)?'"'+v+'"':v}).join(","));
+    });
+    var blob=new Blob([lines.join("\n")],{type:"text/csv"});
+    var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="fmea-register.csv";a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href)},800);
+    toast("CSV exported");
+  });
+  $("#clearBtn").addEventListener("click",function(){ if(confirm("Clear the whole register?")){state=[];save();render();toast("Cleared");} });
+  $("#sampleBtn").addEventListener("click",sample);
+
+  // ----- toast + keys -----
+  var tT;
+  function toast(m){var t=$("#toast");t.textContent=m;t.style.display="block";clearTimeout(tT);tT=setTimeout(function(){t.style.display="none"},1800);}
+  document.addEventListener("keydown",function(e){
+    if(e.key==="Escape")closeModal();
+    else if((e.key==="a"||e.key==="A")&&!$("#ov").classList.contains("on")&&!/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)){openModal();}
+  });
+
+  // first run: seed with sample so it never looks empty
+  if(!state.length) sample(); else render();
+})();
+</script>
+</body>
+</html>
