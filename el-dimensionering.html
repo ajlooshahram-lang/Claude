@@ -604,7 +604,8 @@ const T = {
       ai: 'Spørg AI-Elektriker',
       bid: 'Tilbud',
       projekt: 'Projekt',
-      verify: 'Verifikation'
+      verify: 'Verifikation',
+      draw: 'Tegning'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -701,7 +702,8 @@ const T = {
       ai: 'Ask AI-Electrician',
       bid: 'Bid / Quote',
       projekt: 'Project',
-      verify: 'Verify'
+      verify: 'Verify',
+      draw: 'Drawing'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -1963,12 +1965,13 @@ function renderModule(mod) {
     case 'bid': content = renderBid(); break;
     case 'projekt': content = renderProjekt(); break;
     case 'verify': content = renderVerify(); break;
+    case 'draw': content = renderDrawing(); break;
   }
   // Append AI assistant to every module
   content += renderAiAssistant(mod);
   // Append QI validation summary if enough data exists
   const qi = runQiValidation();
-  const noQi = ['standards','bank','ai','bid','projekt','verify'];
+  const noQi = ['standards','bank','ai','bid','projekt','verify','draw'];
   if (qi.passed.length + qi.issues.length > 0 && noQi.indexOf(mod) < 0) {
     content += renderQiCard(qi);
   }
@@ -4169,6 +4172,130 @@ function renderVerify() {
       <div class="result-box">
         ${DATA_CHANGELOG.map(c=>`<div class="result-row"><span class="label">v${c.v} \u00B7 ${c.date}</span><span class="value" style="font-weight:500;text-align:right;max-width:60%">${lang==='da'?c.da:c.en}</span></div>`).join('')}
       </div>
+    </div>`;
+}
+
+// ===== INSTALLATION DRAWING MODULE =====
+// Draws a single-line diagram (enstregsdiagram) of the installation from the
+// load schedule — a real "picture" of the coming installation. Plus an optional
+// online AI-painting connector for a photorealistic render.
+let drawStyle = 'schematic'; // 'schematic' | 'iso'
+
+function consumerIcon(c, x, y, scale){
+  // returns SVG for a consumer symbol based on size/phase
+  const big = c.phase === '3' || c.kW >= 5;
+  const s = scale || 1;
+  if (big) {
+    // motor / heavy load (circle with M)
+    return `<circle cx="${x}" cy="${y}" r="${13*s}" fill="#0e1b2a" stroke="#00d0ff" stroke-width="2"/>
+      <text x="${x}" y="${y+4*s}" text-anchor="middle" font-size="${12*s}" fill="#00d0ff" font-weight="700">M</text>`;
+  }
+  // socket / light (square)
+  return `<rect x="${x-11*s}" y="${y-11*s}" width="${22*s}" height="${22*s}" rx="3" fill="#0e1b2a" stroke="#ffd166" stroke-width="2"/>
+    <circle cx="${x}" cy="${y}" r="${4*s}" fill="#ffd166"/>`;
+}
+
+function buildSLD(){
+  // Use the unlimited load schedule if present, else a default sample
+  let cons = loadList.length ? loadList.slice(0, 14) : [
+    {kW:11,cos:0.9,sf:1,phase:'3',name:'EV'},{kW:4,cos:0.9,sf:1,phase:'3',name:'Komfur'},
+    {kW:2,cos:0.95,sf:0.6,phase:'L1',name:'Stik'},{kW:1.5,cos:0.95,sf:1,phase:'L2',name:'Lys'}
+  ];
+  const sch = calcLoadSchedule();
+  const totalKVA = loadList.length ? sch.kVA : 18.5;
+  const ib = loadList.length ? sch.ib : 30;
+  const trafo = (typeof TRAFO_SIZES!=='undefined') ? (TRAFO_SIZES.find(t=>t>=totalKVA)||630) : 630;
+  const W = 720, rowH = 46, top = 150;
+  const H = top + cons.length*rowH + 40;
+  const busX = 210, mainW = 96;
+
+  let rows = '';
+  cons.forEach((c,i)=>{
+    const y = top + i*rowH + 20;
+    const ci = lsConsumerCurrent ? lsConsumerCurrent(c) : {L1:0,L2:0,L3:0};
+    const cIb = Math.max(ci.L1||0, ci.L2||0, ci.L3||0) || (c.kW*1000/( (c.phase==='3'?Math.sqrt(3)*400:230)*c.cos));
+    const cab = (typeof recommendCables==='function') ? recommendCables(cIb)[0] : null;
+    const mcb = (typeof recommendMCBs==='function') ? recommendMCBs(cIb,10)[0] : null;
+    const cableLbl = cab ? (cab.mm2+' mm²') : '';
+    const mcbLbl = mcb ? ('C'+mcb.rating) : '';
+    rows += `
+      <line x1="${busX}" y1="${y}" x2="${W-130}" y2="${y}" stroke="#2f5f7a" stroke-width="2"/>
+      <!-- breaker box -->
+      <rect x="${busX+30}" y="${y-11}" width="34" height="22" rx="3" fill="#10202e" stroke="#00d0ff" stroke-width="1.5"/>
+      <text x="${busX+47}" y="${y+4}" text-anchor="middle" font-size="10" fill="#9fe6ff">${mcbLbl}</text>
+      <!-- cable label -->
+      <text x="${busX+120}" y="${y-6}" font-size="11" fill="#7fb4d6">${cableLbl} · ${c.phase==='3'?'3~':c.phase} · ${cIb.toFixed(1)} A</text>
+      ${consumerIcon(c, W-150, y, 1)}
+      <text x="${W-130}" y="${y+4}" font-size="11" fill="#cfe3f2">${c.name? c.name : ('K'+(i+1))} (${c.kW} kW)</text>`;
+  });
+
+  return `
+  <svg viewBox="0 0 ${W} ${H}" width="100%" style="background:radial-gradient(circle at 30% 0%,#0c1826,#060d16);border-radius:12px;border:1px solid var(--line,var(--border))" xmlns="http://www.w3.org/2000/svg">
+    <defs><filter id="gl"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    <!-- Transformer -->
+    <g filter="url(#gl)">
+      <circle cx="70" cy="70" r="22" fill="none" stroke="#ff8a5c" stroke-width="2.5"/>
+      <circle cx="70" cy="92" r="22" fill="none" stroke="#ff8a5c" stroke-width="2.5"/>
+    </g>
+    <text x="70" y="135" text-anchor="middle" font-size="12" fill="#ffb38a" font-weight="700">${trafo} kVA</text>
+    <text x="70" y="150" text-anchor="middle" font-size="9" fill="#9a8" >10/0,4 kV</text>
+    <line x1="70" y1="114" x2="70" y2="${top-30}" stroke="#ff8a5c" stroke-width="2"/>
+    <line x1="70" y1="${top-30}" x2="${busX}" y2="${top-30}" stroke="#ff8a5c" stroke-width="2"/>
+    <!-- Main board / busbar -->
+    <rect x="${busX-mainW/2+20}" y="${top-46}" width="${mainW}" height="34" rx="5" fill="#0e1b2a" stroke="#00ffc8" stroke-width="2" filter="url(#gl)"/>
+    <text x="${busX+20}" y="${top-24}" text-anchor="middle" font-size="11" fill="#00ffc8" font-weight="700">TAVLE</text>
+    <text x="${busX+20}" y="${top-58}" text-anchor="middle" font-size="10" fill="#9fe6ff">IB ${ib.toFixed(0)} A</text>
+    <line x1="${busX}" y1="${top-12}" x2="${busX}" y2="${top + cons.length*rowH}" stroke="#00ffc8" stroke-width="3"/>
+    ${rows}
+    <text x="${W/2}" y="${H-12}" text-anchor="middle" font-size="10" fill="#5b7790">Enstregsdiagram · ${cons.length} grupper · genereret af El-Dimensionering</text>
+  </svg>`;
+}
+
+// Optional online AI painting
+async function genAiPainting(){
+  const cfg = JSON.parse(localStorage.getItem('aiElectricianCfg')||'{}');
+  const imgCfg = JSON.parse(localStorage.getItem('aiImgCfg')||'{}');
+  const box = document.getElementById('aiImgBox');
+  if(!imgCfg.endpoint || !imgCfg.key){
+    if(box) box.innerHTML = '<div class="info-row">'+(lang==='da'?'Online AI-billede ikke konfigureret. Klik "Indstil AI-billede".':'Online AI image not configured. Click "Configure AI image".')+'</div>';
+    return;
+  }
+  if(box) box.innerHTML = '<div class="info-row">'+(lang==='da'?'Genererer AI-maleri…':'Generating AI painting…')+'</div>';
+  const sch = calcLoadSchedule();
+  const prompt = (lang==='da'?'Fotorealistisk maleri af en dansk eltavle-installation: ':'Photorealistic painting of a Danish electrical switchboard installation: ')
+    + (loadList.length?loadList.length:4)+' grupper, '+(TRAFO_SIZES.find(t=>t>=sch.kVA)||630)+' kVA transformer, neon blue glow, clean industrial, professional';
+  try{
+    const res = await fetch(imgCfg.endpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+imgCfg.key},
+      body:JSON.stringify({model:imgCfg.model||'dall-e-3',prompt:prompt,n:1,size:'1024x1024'})});
+    const data = await res.json();
+    const url = data.data && data.data[0] && (data.data[0].url || ('data:image/png;base64,'+data.data[0].b64_json));
+    if(box) box.innerHTML = url ? '<img src="'+url+'" style="width:100%;border-radius:12px;border:1px solid var(--line)">' : '<div class="info-row">'+(lang==='da'?'Intet billede modtaget.':'No image received.')+'</div>';
+  }catch(e){ if(box) box.innerHTML = '<div class="info-row">'+(lang==='da'?'Fejl: ':'Error: ')+e.message+'</div>'; }
+}
+function configAiImg(){
+  const cur = JSON.parse(localStorage.getItem('aiImgCfg')||'{}');
+  const ep = prompt(lang==='da'?'Billede-API endpoint (OpenAI-kompatibel images):':'Image API endpoint (OpenAI-compatible images):', cur.endpoint||'https://api.openai.com/v1/images/generations');
+  if(ep===null) return; const key = prompt('API key:', cur.key||''); if(key===null) return;
+  const model = prompt('Model:', cur.model||'dall-e-3'); if(model===null) return;
+  localStorage.setItem('aiImgCfg', JSON.stringify({endpoint:ep.trim(),key:key.trim(),model:model.trim()}));
+  alert(lang==='da'?'Gemt. Klik "Generér AI-maleri".':'Saved. Click "Generate AI painting".');
+}
+
+function renderDrawing(){
+  return `
+    <div class="card fade-in">
+      <div class="card-title">🖼️ ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div>
+      <div class="info-row">${lang==='da'?'Et enstregsdiagram af din installation — genereret fra belastningsskemaet, så du kan forestille dig anlægget. Tilf\u00F8j forbrugere under "Belastning".':'A single-line diagram of your installation — generated from the load schedule so you can picture the system. Add consumers under "Load".'}</div>
+      ${buildSLD()}
+    </div>
+    <div class="card fade-in">
+      <div class="card-title">🎨 ${lang==='da'?'AI-maleri (foto-realistisk, online)':'AI painting (photorealistic, online)'}</div>
+      <div class="info-row">${lang==='da'?'Generér et foto-realistisk billede af installationen via en online billed-AI (kræver tilslutning).':'Generate a photorealistic image of the installation via an online image AI (requires connection).'}</div>
+      <div class="select-grid">
+        <button class="sel-btn selected" onclick="genAiPainting()">🎨 ${lang==='da'?'Generér AI-maleri':'Generate AI painting'}</button>
+        <button class="sel-btn" onclick="configAiImg()">⚙️ ${lang==='da'?'Indstil AI-billede':'Configure AI image'}</button>
+      </div>
+      <div id="aiImgBox" style="margin-top:12px"></div>
     </div>`;
 }
 
