@@ -624,7 +624,10 @@ const T = {
       bid: 'Tilbud',
       projekt: 'Projekt',
       verify: 'Verifikation',
-      draw: 'Tegning'
+      draw: 'Tegning',
+      backup: 'Back-up',
+      wire: 'Ledningsnumre',
+      risk: 'Risikovurdering'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -722,7 +725,10 @@ const T = {
       bid: 'Bid / Quote',
       projekt: 'Project',
       verify: 'Verify',
-      draw: 'Drawing'
+      draw: 'Drawing',
+      backup: 'Back-up',
+      wire: 'Wire Numbers',
+      risk: 'Risk Matrix'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -1985,12 +1991,15 @@ function renderModule(mod) {
     case 'projekt': content = renderProjekt(); break;
     case 'verify': content = renderVerify(); break;
     case 'draw': content = renderDrawing(); break;
+    case 'backup': content = renderBackup(); break;
+    case 'wire': content = renderWire(); break;
+    case 'risk': content = renderRisk(); break;
   }
   // Append AI assistant to every module
   content += renderAiAssistant(mod);
   // Append QI validation summary if enough data exists
   const qi = runQiValidation();
-  const noQi = ['standards','bank','ai','bid','projekt','verify','draw'];
+  const noQi = ['standards','bank','ai','bid','projekt','verify','draw','backup','wire','risk'];
   if (qi.passed.length + qi.issues.length > 0 && noQi.indexOf(mod) < 0) {
     content += renderQiCard(qi);
   }
@@ -4018,8 +4027,9 @@ function configurePriceFeed() {
 })();
 
 // ===== DATA VERSION & CHANGELOG =====
-const DATA_VERSION = '2026.2';
+const DATA_VERSION = '2026.3';
 const DATA_CHANGELOG = [
+  { v: '2026.3', date: '2026-06-12', da: 'Back-up koordinering (IEC 60947-2 Annex A), ledningsnumre/klemmeplan (DS/EN 81346-2), og installationsrisikomatrix (DS/HD 60364-1 §131) tilføjet.', en: 'Back-up coordination (IEC 60947-2 Annex A), wire numbering/terminal plans (DS/EN 81346-2), and installation risk matrix (DS/HD 60364-1 §131) added.' },
   { v: '2026.2', date: '2026-06-11', da: 'Sikringer hardet mod Siemens 5SE2/3NA & TYTAN katalogerne (IEC 60269). D03-størrelse tilføjet. Frakoblingstid- og selektivitetskontrol.', en: 'Fuses hardened against Siemens 5SE2/3NA & TYTAN catalogs (IEC 60269). D03 size added. Disconnection-time and selectivity checks.' },
   { v: '2026.1', date: '2026-06-11', da: 'Kabel-Iz hardet til officiel DS/HD 60364 Tabel C.52.1. Tilbud (EG Sigma/Kalkia-stil), komponentbank, AI-elektriker.', en: 'Cable Iz hardened to official DS/HD 60364 Table C.52.1. Bid (EG Sigma/Kalkia style), component bank, AI-electrician.' },
   { v: '2025.2', date: '2025-12-01', da: 'IEC 60364-1:2025, DS/HD 60364-4-43:2023 indarbejdet.', en: 'IEC 60364-1:2025, DS/HD 60364-4-43:2023 incorporated.' }
@@ -4191,7 +4201,7 @@ function renderVerify() {
       <div class="result-box">
         ${DATA_CHANGELOG.map(c=>`<div class="result-row"><span class="label">v${c.v} \u00B7 ${c.date}</span><span class="value" style="font-weight:500;text-align:right;max-width:60%">${lang==='da'?c.da:c.en}</span></div>`).join('')}
       </div>
-    </div>`;
+    </div>` + (typeof riskBlocksSignoff==='function'&&riskBlocksSignoff()?`<div class="card fade-in" style="border-left:4px solid var(--danger)"><div class="card-title" style="color:var(--danger)">🚫 ${lang==='da'?'Projektgodkendelse BLOKERET':'Project Sign-off BLOCKED'}</div><div class="result-box error"><div class="result-title">${lang==='da'?'Uacceptable risici fundet i risikomatrix. Løs alle røde risici før godkendelse.':'Unacceptable risks found in risk matrix. Resolve all red risks before sign-off.'}</div><div class="select-grid"><button class="sel-btn" onclick="switchModule('risk')">${lang==='da'?'Gå til Risikovurdering →':'Go to Risk Matrix →'}</button></div></div></div>`:'');
 }
 
 // ===== INSTALLATION DRAWING MODULE =====
@@ -4371,6 +4381,754 @@ function renderDrawing(){
   const nodes=getDrawNodes(), typeKeys=Object.keys(NODE_TYPES);
   const nodeEditor=`<div class="select-group"><div class="select-label">${lang==='da'?'Installationens noder (tilf\u00F8j/fjern/flyt)':'Installation nodes (add/remove/move)'}</div>${nodes.map((n,i)=>{const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;return `<div style="display:inline-flex;align-items:center;gap:4px;margin:3px 4px;padding:5px 9px;border:1.5px solid ${nt.color};border-radius:8px;font-size:.78rem;background:rgba(0,0,0,0.25)"><span>${nt.icon}</span><span style="color:${nt.color};font-weight:700">${lang==='da'?nt.da:nt.en}</span><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},-1)">\u25C0</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},1)">\u25B6</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem;color:var(--danger)" onclick="drawNodeRemove(${i})">\u2715</button></div>`;}).join('')}</div><div class="select-group"><div class="select-label">${lang==='da'?'Tilf\u00F8j node':'Add node'}</div><div class="select-grid">${typeKeys.map(k=>`<button class="sel-btn" onclick="drawNodeAdd('${k}')">${NODE_TYPES[k].icon} ${lang==='da'?NODE_TYPES[k].da:NODE_TYPES[k].en}</button>`).join('')}<button class="sel-btn" onclick="drawNodeReset()">\u21BA ${lang==='da'?'Nulstil':'Reset'}</button></div></div>`;
   return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram':'Single-line'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='iso'?build3D():buildSLD()}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
+}
+
+// ===== BACK-UP COORDINATION MODULE (IEC 60947-2 Annex A) =====
+let backupState = { manufacturer: null, upstreamDevice: null, downstreamDevice: null, ikAtPoint: null, validatedResult: null };
+
+const BACKUP_TABLES = {
+  schneider: {
+    name: 'Schneider Electric',
+    source: 'Schneider back-up tables (SENTRON catalogue)',
+    combinations: {
+      'NH1-200A-gG': {
+        'C60N-C': { icuBackup: 20, maxIn: 63, conditions: 'Ik ≤ 20 kA' },
+        'C60N-B': { icuBackup: 20, maxIn: 63, conditions: 'Ik ≤ 20 kA' },
+        'C60H-C': { icuBackup: 25, maxIn: 63, conditions: 'Ik ≤ 25 kA' },
+        'C60H-B': { icuBackup: 25, maxIn: 63, conditions: 'Ik ≤ 25 kA' },
+        'C120N-C': { icuBackup: 20, maxIn: 125, conditions: 'Ik ≤ 20 kA' },
+        'NSX100-F': { icuBackup: 36, maxIn: 100, conditions: 'Ik ≤ 36 kA' },
+        'NSX100-N': { icuBackup: 50, maxIn: 100, conditions: 'Ik ≤ 50 kA' },
+        'NSX160-N': { icuBackup: 50, maxIn: 160, conditions: 'Ik ≤ 50 kA' }
+      },
+      'NH1-250A-gG': {
+        'C60N-C': { icuBackup: 25, maxIn: 63, conditions: 'Ik ≤ 25 kA' },
+        'C60H-C': { icuBackup: 30, maxIn: 63, conditions: 'Ik ≤ 30 kA' },
+        'NSX100-N': { icuBackup: 50, maxIn: 100, conditions: 'Ik ≤ 50 kA' },
+        'NSX160-N': { icuBackup: 50, maxIn: 160, conditions: 'Ik ≤ 50 kA' },
+        'NSX250-N': { icuBackup: 50, maxIn: 250, conditions: 'Ik ≤ 50 kA' }
+      },
+      'NH2-315A-gG': {
+        'NSX100-N': { icuBackup: 50, maxIn: 100, conditions: 'Ik ≤ 50 kA' },
+        'NSX160-N': { icuBackup: 50, maxIn: 160, conditions: 'Ik ≤ 50 kA' },
+        'NSX250-N': { icuBackup: 50, maxIn: 250, conditions: 'Ik ≤ 50 kA' },
+        'NSX400-N': { icuBackup: 50, maxIn: 400, conditions: 'Ik ≤ 50 kA' }
+      },
+      'NH2-400A-gG': {
+        'NSX250-N': { icuBackup: 50, maxIn: 250, conditions: 'Ik ≤ 50 kA' },
+        'NSX400-N': { icuBackup: 50, maxIn: 400, conditions: 'Ik ≤ 50 kA' },
+        'NSX630-N': { icuBackup: 50, maxIn: 630, conditions: 'Ik ≤ 50 kA' }
+      }
+    }
+  },
+  siemens: {
+    name: 'Siemens',
+    source: 'Siemens beta katalog 2008 / SENTRON 5SY back-up tables',
+    combinations: {
+      'NH000-100A-gG': {
+        '5SY-B': { icuBackup: 15, maxIn: 63, conditions: 'Ik ≤ 15 kA, 3p' },
+        '5SY-C': { icuBackup: 15, maxIn: 63, conditions: 'Ik ≤ 15 kA, 3p' },
+        '5SL-B': { icuBackup: 10, maxIn: 63, conditions: 'Ik ≤ 10 kA' },
+        '5SL-C': { icuBackup: 10, maxIn: 63, conditions: 'Ik ≤ 10 kA' }
+      },
+      'NH000-160A-gG': {
+        '5SY-B': { icuBackup: 20, maxIn: 63, conditions: 'Ik ≤ 20 kA, 3p' },
+        '5SY-C': { icuBackup: 20, maxIn: 63, conditions: 'Ik ≤ 20 kA, 3p' },
+        '5SL-B': { icuBackup: 15, maxIn: 63, conditions: 'Ik ≤ 15 kA' },
+        '5SL-C': { icuBackup: 15, maxIn: 63, conditions: 'Ik ≤ 15 kA' }
+      },
+      'NH1-250A-gG': {
+        '5SY-B': { icuBackup: 25, maxIn: 63, conditions: 'Ik ≤ 25 kA, 3p' },
+        '5SY-C': { icuBackup: 25, maxIn: 63, conditions: 'Ik ≤ 25 kA, 3p' },
+        '3VA1-N': { icuBackup: 25, maxIn: 160, conditions: 'Ik ≤ 25 kA' }
+      },
+      'NH2-400A-gG': {
+        '3VA1-N': { icuBackup: 36, maxIn: 160, conditions: 'Ik ≤ 36 kA' },
+        '3VA2-M': { icuBackup: 55, maxIn: 250, conditions: 'Ik ≤ 55 kA' }
+      }
+    }
+  },
+  abb: {
+    name: 'ABB',
+    source: 'ABB S200 + OFAF NH back-up coordination tables',
+    combinations: {
+      'NH000-100A-gG': {
+        'S200-B': { icuBackup: 15, maxIn: 63, conditions: 'Ik ≤ 15 kA' },
+        'S200-C': { icuBackup: 15, maxIn: 63, conditions: 'Ik ≤ 15 kA' },
+        'S200M-B': { icuBackup: 15, maxIn: 63, conditions: 'Ik ≤ 15 kA' },
+        'S200M-C': { icuBackup: 15, maxIn: 63, conditions: 'Ik ≤ 15 kA' }
+      },
+      'NH000-160A-gG': {
+        'S200-B': { icuBackup: 20, maxIn: 63, conditions: 'Ik ≤ 20 kA' },
+        'S200-C': { icuBackup: 20, maxIn: 63, conditions: 'Ik ≤ 20 kA' },
+        'S200M-B': { icuBackup: 20, maxIn: 63, conditions: 'Ik ≤ 20 kA' },
+        'S200M-C': { icuBackup: 20, maxIn: 63, conditions: 'Ik ≤ 20 kA' }
+      },
+      'NH1-250A-gG': {
+        'S200-B': { icuBackup: 25, maxIn: 63, conditions: 'Ik ≤ 25 kA' },
+        'S200-C': { icuBackup: 25, maxIn: 63, conditions: 'Ik ≤ 25 kA' },
+        'S800N': { icuBackup: 36, maxIn: 125, conditions: 'Ik ≤ 36 kA' }
+      },
+      'NH2-400A-gG': {
+        'S800N': { icuBackup: 50, maxIn: 125, conditions: 'Ik ≤ 50 kA' },
+        'S800S': { icuBackup: 50, maxIn: 125, conditions: 'Ik ≤ 50 kA' },
+        'Tmax-T4-N': { icuBackup: 36, maxIn: 250, conditions: 'Ik ≤ 36 kA' }
+      }
+    }
+  }
+};
+
+function validateBackupCombination(manufacturer, upstreamKey, downstreamKey, ikProspective) {
+  try {
+    if (!manufacturer || !BACKUP_TABLES[manufacturer]) {
+      return { valid: false, icuBackup: null, source: null, warning: lang==='da'?'⚠️ ADVARSEL: Vælg producent':'⚠️ WARNING: Select manufacturer' };
+    }
+    const mfr = BACKUP_TABLES[manufacturer];
+    const combos = mfr.combinations[upstreamKey];
+    if (!combos) {
+      return { valid: false, icuBackup: null, source: mfr.source, warning: lang==='da'?'🚫 AFVIST: Opstrømsenheden findes ikke i '+mfr.name+' back-up tabel':'🚫 REJECTED: Upstream device not in '+mfr.name+' tested table' };
+    }
+    const entry = combos[downstreamKey];
+    if (!entry) {
+      return { valid: false, icuBackup: null, source: mfr.source, warning: lang==='da'?'🚫 AFVIST: Kombinationen er IKKE type-testet af '+mfr.name+'. Brug KUN verificerede kombinationer per IEC 60947-2 Annex A.':'🚫 REJECTED: Combination NOT type-tested by '+mfr.name+'. Use ONLY verified combinations per IEC 60947-2 Annex A.' };
+    }
+    if (ikProspective > entry.icuBackup) {
+      return { valid: false, icuBackup: entry.icuBackup, source: mfr.source, warning: lang==='da'?'🚫 FEJL: Ik ('+ikProspective+' kA) > Icu_backup ('+entry.icuBackup+' kA). Installation er IKKE sikker.':'🚫 ERROR: Ik ('+ikProspective+' kA) > Icu_backup ('+entry.icuBackup+' kA). Installation is NOT safe.' };
+    }
+    const safeIk = entry.icuBackup * 0.9;
+    if (ikProspective > safeIk) {
+      return { valid: true, icuBackup: entry.icuBackup, source: mfr.source, warning: lang==='da'?'⚠️ BEMÆRK: Ik er tæt på grænsen ('+ikProspective+' / '+entry.icuBackup+' kA). Overvej større opstrømssikring.':'⚠️ NOTE: Ik is close to limit ('+ikProspective+' / '+entry.icuBackup+' kA). Consider larger upstream device.' };
+    }
+    return { valid: true, icuBackup: entry.icuBackup, source: mfr.source, warning: null };
+  } catch(e) {
+    return { valid: false, icuBackup: null, source: null, warning: lang==='da'?'🚫 FEJL: Intern valideringsfejl. Kombination afvist (konservativ sikkerhed).':'🚫 ERROR: Internal validation error. Combination rejected (conservative safety).' };
+  }
+}
+
+function backupSetMfr(m){ backupState.manufacturer=m; backupState.upstreamDevice=null; backupState.downstreamDevice=null; backupState.validatedResult=null; renderModule('backup'); }
+function backupSetUp(u){ backupState.upstreamDevice=u; backupState.downstreamDevice=null; backupState.validatedResult=null; renderModule('backup'); }
+function backupSetDown(d){
+  backupState.downstreamDevice=d;
+  var ik = 0;
+  try { var zTotal=scState.zNet+scState.zTrafo; ik=zTotal>0?(400/(Math.sqrt(3)*zTotal/1000)):0; ik=Math.round(ik*10)/10; } catch(e){ ik=0; }
+  backupState.ikAtPoint=ik;
+  backupState.validatedResult=validateBackupCombination(backupState.manufacturer, backupState.upstreamDevice, d, ik);
+  renderModule('backup');
+}
+
+function renderBackup(){
+  const mfrs = Object.keys(BACKUP_TABLES);
+  let html = '<div class="card fade-in"><div class="card-title">🛡️ '+(lang==='da'?'Back-up koordinering (IEC 60947-2 Annex A)':'Back-up coordination (IEC 60947-2 Annex A)')+'</div>';
+  html += '<div class="info-row">'+(lang==='da'?'Validér producent-testede kombinationer af opstrøms- og nedstrømsbeskyttelse. KUN type-testede kombinationer accepteres — INGEN interpolering.':'Validate manufacturer-tested upstream/downstream protection combinations. ONLY type-tested combinations accepted — NO interpolation.')+'</div>';
+  // Manufacturer selection
+  html += '<div class="select-group"><div class="select-label">'+(lang==='da'?'Producent':'Manufacturer')+'</div><div class="select-grid">';
+  mfrs.forEach(function(m){ html += '<button class="sel-btn '+(backupState.manufacturer===m?'selected':'')+'" onclick="backupSetMfr(\''+m+'\')">'+BACKUP_TABLES[m].name+'</button>'; });
+  html += '</div></div>';
+
+  if(backupState.manufacturer){
+    var combos = BACKUP_TABLES[backupState.manufacturer].combinations;
+    var upKeys = Object.keys(combos);
+    html += '<div class="select-group"><div class="select-label">'+(lang==='da'?'Opstrømsenhed (sikring/MCCB)':'Upstream device (fuse/MCCB)')+'</div><div class="select-grid">';
+    upKeys.forEach(function(u){ html += '<button class="sel-btn '+(backupState.upstreamDevice===u?'selected':'')+'" onclick="backupSetUp(\''+u+'\')">'+u+'</button>'; });
+    html += '</div></div>';
+  }
+
+  if(backupState.upstreamDevice){
+    var downKeys = Object.keys(BACKUP_TABLES[backupState.manufacturer].combinations[backupState.upstreamDevice]||{});
+    html += '<div class="select-group"><div class="select-label">'+(lang==='da'?'Nedstrømsenhed (MCB/MCCB)':'Downstream device (MCB/MCCB)')+'</div><div class="select-grid">';
+    downKeys.forEach(function(d){ html += '<button class="sel-btn '+(backupState.downstreamDevice===d?'selected':'')+'" onclick="backupSetDown(\''+d+'\')">'+d+'</button>'; });
+    html += '</div></div>';
+  }
+
+  // Ik info
+  if(backupState.ikAtPoint>0){
+    html += '<div class="result-box"><div class="result-title">'+(lang==='da'?'Prospektiv kortslutningsstrøm':'Prospective short-circuit current')+'</div><div class="result-row"><span class="label">Ik</span><span class="value">'+backupState.ikAtPoint+' kA</span></div></div>';
+  }
+
+  // Result card
+  if(backupState.validatedResult){
+    var r=backupState.validatedResult;
+    if(r.valid && !r.warning){
+      html += '<div class="result-box" style="border-color:var(--success);background:rgba(6,214,160,0.08)"><div class="result-title" style="color:var(--success)">✅ '+(lang==='da'?'GODKENDT':'APPROVED')+'</div>';
+      html += '<div class="result-row"><span class="label">Icu_backup</span><span class="value" style="color:var(--success);font-weight:800">'+r.icuBackup+' kA</span></div>';
+      if(r.source) html += '<div class="result-row"><span class="label">'+(lang==='da'?'Kilde':'Source')+'</span><span class="value">'+r.source+'</span></div>';
+      html += '</div>';
+    } else if(r.valid && r.warning){
+      html += '<div class="result-box warning"><div class="result-title" style="color:#ffd166">⚠️ '+(lang==='da'?'GODKENDT MED ADVARSEL':'APPROVED WITH WARNING')+'</div>';
+      html += '<div class="result-row"><span class="label">Icu_backup</span><span class="value" style="font-weight:800">'+r.icuBackup+' kA</span></div>';
+      html += '<div class="result-row"><span class="label">'+(lang==='da'?'Advarsel':'Warning')+'</span><span class="value" style="color:#ffd166">'+r.warning+'</span></div>';
+      html += '</div>';
+    } else {
+      html += '<div class="result-box error"><div class="result-title" style="color:var(--danger)">🚫 '+(lang==='da'?'AFVIST':'REJECTED')+'</div>';
+      html += '<div class="result-row"><span class="label">'+(lang==='da'?'Årsag':'Reason')+'</span><span class="value" style="color:var(--danger)">'+r.warning+'</span></div>';
+      if(r.icuBackup) html += '<div class="result-row"><span class="label">Icu_backup</span><span class="value">'+r.icuBackup+' kA</span></div>';
+      html += '</div>';
+      // Show valid alternatives
+      if(backupState.upstreamDevice && backupState.manufacturer){
+        var alts = Object.keys(BACKUP_TABLES[backupState.manufacturer].combinations[backupState.upstreamDevice]||{});
+        if(alts.length>0){
+          html += '<div class="select-group"><div class="select-label">'+(lang==='da'?'Gyldige alternativer for valgt opstrøm':'Valid alternatives for selected upstream')+'</div><div class="select-grid">';
+          alts.forEach(function(a){ 
+            var e=BACKUP_TABLES[backupState.manufacturer].combinations[backupState.upstreamDevice][a];
+            html += '<button class="sel-btn" onclick="backupSetDown(\''+a+'\')">'+a+' ('+e.icuBackup+' kA)</button>'; 
+          });
+          html += '</div></div>';
+        }
+      }
+    }
+  } else if(!backupState.manufacturer){
+    html += '<div class="result-box warning"><div class="result-title">'+(lang==='da'?'Vælg producent for at starte validering':'Select manufacturer to start validation')+'</div></div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+// ===== WIRE NUMBERING / TERMINAL PLANS MODULE (DS/EN 81346-2) =====
+let wireState = { panelName: 'HT', numberingScheme: 'danish', terminalMfr: 'phoenix', wireList: [], terminalStrips: [] };
+
+const WIRE_SCHEME = {
+  danish: {
+    panels: ['HT', 'UT', 'GT', 'FT', 'LT', 'ST'],
+    panelNames: { 'HT':'Hovedtavle', 'UT':'Undertavle', 'GT':'Gruppetavle', 'FT':'Fordelingstavle', 'LT':'Lystavle', 'ST':'Styretavle' },
+    circuitPrefix: 'K',
+    conductors3phase: ['L1','L2','L3','N','PE'],
+    conductors1phase: ['L','N','PE'],
+    colors: {
+      'L1': { color:'#8B4513', name:'Brun / Brown', hex:'#8B4513' },
+      'L2': { color:'#1a1a1a', name:'Sort / Black', hex:'#1a1a1a' },
+      'L3': { color:'#808080', name:'Grå / Grey', hex:'#808080' },
+      'L':  { color:'#8B4513', name:'Brun / Brown', hex:'#8B4513' },
+      'N':  { color:'#0066CC', name:'Blå / Blue', hex:'#0066CC' },
+      'PE': { color:'#228B22', name:'Grøn/Gul / Green-Yellow', hex:'#228B22', stripe:'#FFD700' }
+    }
+  },
+  iec60204: {
+    panels: ['=M1','=M2','=E1','=E2'],
+    panelNames: { '=M1':'Machine Panel 1', '=M2':'Machine Panel 2', '=E1':'Electrical Cabinet 1', '=E2':'Electrical Cabinet 2' },
+    circuitPrefix: '-W',
+    conductors3phase: ['L1','L2','L3','N','PE'],
+    conductors1phase: ['L','N','PE'],
+    colors: {
+      'L1': { color:'#8B4513', name:'Brown', hex:'#8B4513' },
+      'L2': { color:'#1a1a1a', name:'Black', hex:'#1a1a1a' },
+      'L3': { color:'#808080', name:'Grey', hex:'#808080' },
+      'L':  { color:'#8B4513', name:'Brown', hex:'#8B4513' },
+      'N':  { color:'#0066CC', name:'Blue', hex:'#0066CC' },
+      'PE': { color:'#228B22', name:'Green-Yellow', hex:'#228B22', stripe:'#FFD700' }
+    }
+  }
+};
+
+const TERMINAL_MANUFACTURERS = {
+  phoenix: {
+    name: 'Phoenix Contact CLIPLINE',
+    types: {
+      'UT-4':    { width:6.2, maxA:32, maxMM2:4, color:'#aaa' },
+      'UT-6':    { width:8.2, maxA:41, maxMM2:6, color:'#aaa' },
+      'UT-10':   { width:10.2, maxA:57, maxMM2:10, color:'#aaa' },
+      'UT-16':   { width:12.2, maxA:76, maxMM2:16, color:'#aaa' },
+      'UT-35':   { width:16.2, maxA:125, maxMM2:35, color:'#aaa' },
+      'USLKG-5': { width:6.2, maxA:32, maxMM2:4, color:'#228B22', type:'PE' },
+      'USLKG-10':{ width:10.2, maxA:57, maxMM2:10, color:'#228B22', type:'PE' },
+      'USLKG-16':{ width:12.2, maxA:76, maxMM2:16, color:'#228B22', type:'PE' },
+      'UKN-4':   { width:6.2, maxA:32, maxMM2:4, color:'#0066CC', type:'N' },
+      'UKN-10':  { width:10.2, maxA:57, maxMM2:10, color:'#0066CC', type:'N' }
+    }
+  },
+  weidmuller: {
+    name: 'Weidmüller',
+    types: {
+      'WDU-4':   { width:6.1, maxA:32, maxMM2:4, color:'#aaa' },
+      'WDU-6':   { width:8.1, maxA:41, maxMM2:6, color:'#aaa' },
+      'WDU-10':  { width:10.1, maxA:57, maxMM2:10, color:'#aaa' },
+      'WDU-16':  { width:12.1, maxA:76, maxMM2:16, color:'#aaa' },
+      'WDU-35':  { width:16.1, maxA:125, maxMM2:35, color:'#aaa' },
+      'WPE-4':   { width:6.1, maxA:32, maxMM2:4, color:'#228B22', type:'PE' },
+      'WPE-10':  { width:10.1, maxA:57, maxMM2:10, color:'#228B22', type:'PE' },
+      'WPE-16':  { width:12.1, maxA:76, maxMM2:16, color:'#228B22', type:'PE' },
+      'WN-4':    { width:6.1, maxA:32, maxMM2:4, color:'#0066CC', type:'N' },
+      'WN-10':   { width:10.1, maxA:57, maxMM2:10, color:'#0066CC', type:'N' }
+    }
+  },
+  wago: {
+    name: 'Wago TopJob S',
+    types: {
+      '2002-1201': { width:5.2, maxA:24, maxMM2:2.5, color:'#aaa' },
+      '2002-1301': { width:5.2, maxA:32, maxMM2:4, color:'#aaa' },
+      '2006-1201': { width:7.5, maxA:41, maxMM2:6, color:'#aaa' },
+      '2010-1201': { width:10, maxA:57, maxMM2:10, color:'#aaa' },
+      '2016-1201': { width:12, maxA:76, maxMM2:16, color:'#aaa' },
+      '2002-1207': { width:5.2, maxA:24, maxMM2:2.5, color:'#228B22', type:'PE' },
+      '2006-1207': { width:7.5, maxA:41, maxMM2:6, color:'#228B22', type:'PE' },
+      '2002-1204': { width:5.2, maxA:24, maxMM2:2.5, color:'#0066CC', type:'N' },
+      '2006-1204': { width:7.5, maxA:41, maxMM2:6, color:'#0066CC', type:'N' }
+    }
+  }
+};
+
+function generateWireNumbers(consumers, panelName, scheme) {
+  var config = WIRE_SCHEME[scheme] || WIRE_SCHEME.danish;
+  var wires = [];
+  consumers.forEach(function(consumer, idx){
+    var circuitNum = idx + 1;
+    var circuitId = panelName + '-' + config.circuitPrefix + circuitNum;
+    var is3phase = consumer.phase === '3';
+    var conductors = is3phase ? config.conductors3phase : config.conductors1phase;
+    var mm2 = cableState.crossSection || 2.5;
+    conductors.forEach(function(cond){
+      wires.push({
+        wireNumber: circuitId + '-' + cond,
+        circuit: circuitId,
+        conductor: cond,
+        color: config.colors[cond],
+        crossSection: mm2,
+        terminalFrom: panelName + ':X' + circuitNum + ':' + cond,
+        terminalTo: circuitId + ':load'
+      });
+    });
+  });
+  return wires;
+}
+
+function selectTerminal(mm2, conductor, manufacturer) {
+  var mfr = TERMINAL_MANUFACTURERS[manufacturer] || TERMINAL_MANUFACTURERS.phoenix;
+  var isPE = conductor === 'PE';
+  var isN = conductor === 'N';
+  var candidates = [];
+  Object.keys(mfr.types).forEach(function(key){
+    var t = mfr.types[key];
+    if (isPE && t.type !== 'PE') return;
+    if (isN && t.type !== 'N' && t.type === 'PE') return;
+    if (isN && !t.type && candidates.length === 0) { /* allow standard if no N-specific */ }
+    if (!isPE && !isN && t.type) return;
+    if (t.maxMM2 >= mm2) candidates.push({ key: key, data: t });
+  });
+  // For N conductor: prefer N-type, fall back to standard
+  if (isN) {
+    var nTypes = [];
+    var stdTypes = [];
+    Object.keys(mfr.types).forEach(function(key){
+      var t = mfr.types[key];
+      if (t.type === 'PE') return;
+      if (t.maxMM2 < mm2) return;
+      if (t.type === 'N') nTypes.push({ key: key, data: t });
+      else if (!t.type) stdTypes.push({ key: key, data: t });
+    });
+    candidates = nTypes.length > 0 ? nTypes : stdTypes;
+  }
+  candidates.sort(function(a, b){ return a.data.maxMM2 - b.data.maxMM2; });
+  return candidates.length > 0 ? candidates[0] : null;
+}
+
+function generateTerminalLayout(wireList, manufacturer) {
+  var strips = [];
+  var currentStrip = { name: 'X1', terminals: [] };
+  wireList.forEach(function(w, idx){
+    var term = selectTerminal(w.crossSection, w.conductor, manufacturer);
+    currentStrip.terminals.push({
+      position: idx + 1,
+      wireNumber: w.wireNumber,
+      conductor: w.conductor,
+      terminal: term,
+      color: w.color
+    });
+    if (currentStrip.terminals.length >= 20) {
+      strips.push(currentStrip);
+      currentStrip = { name: 'X' + (strips.length + 2), terminals: [] };
+    }
+  });
+  if (currentStrip.terminals.length > 0) strips.push(currentStrip);
+  return strips;
+}
+
+function renderTerminalSVG(terminalStrips) {
+  var pageW = 794, pageH = 1123; // A4 at 96dpi
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+pageW+' '+pageH+'" style="width:100%;max-width:794px;background:#0e1b2a;border-radius:8px">';
+  svg += '<text x="397" y="30" text-anchor="middle" fill="#00d0ff" font-size="16" font-weight="700">'+(lang==='da'?'Klemmeplan / Terminal Layout':'Terminal Strip Layout')+'</text>';
+  var y = 50;
+  terminalStrips.forEach(function(strip){
+    svg += '<text x="20" y="'+(y+15)+'" fill="#ffd166" font-size="12" font-weight="700">'+strip.name+'</text>';
+    y += 25;
+    strip.terminals.forEach(function(t, i){
+      var tx = 60 + (i % 10) * 70;
+      var ty = y + Math.floor(i / 10) * 60;
+      var col = t.color ? t.color.hex : '#aaa';
+      if (t.conductor === 'PE') col = '#228B22';
+      else if (t.conductor === 'N') col = '#0066CC';
+      svg += '<rect x="'+tx+'" y="'+ty+'" width="55" height="40" rx="3" fill="rgba(255,255,255,0.05)" stroke="'+col+'" stroke-width="2"/>';
+      svg += '<text x="'+(tx+27)+'" y="'+(ty+17)+'" text-anchor="middle" fill="'+col+'" font-size="8" font-weight="700">'+t.wireNumber.split('-').slice(-2).join('-')+'</text>';
+      svg += '<text x="'+(tx+27)+'" y="'+(ty+32)+'" text-anchor="middle" fill="#aaa" font-size="7">'+(t.terminal?t.terminal.key:'?')+'</text>';
+    });
+    y += Math.ceil(strip.terminals.length / 10) * 60 + 15;
+  });
+  svg += '</svg>';
+  return svg;
+}
+
+function wireSetScheme(s){ wireState.numberingScheme=s; wireState.wireList=[]; wireState.terminalStrips=[]; renderModule('wire'); }
+function wireSetPanel(p){ wireState.panelName=p; wireState.wireList=[]; wireState.terminalStrips=[]; renderModule('wire'); }
+function wireSetMfr(m){ wireState.terminalMfr=m; wireState.wireList=[]; wireState.terminalStrips=[]; renderModule('wire'); }
+function wireGenerate(){
+  wireState.wireList = generateWireNumbers(loadList, wireState.panelName, wireState.numberingScheme);
+  wireState.terminalStrips = generateTerminalLayout(wireState.wireList, wireState.terminalMfr);
+  renderModule('wire');
+}
+
+function renderWire(){
+  var config = WIRE_SCHEME[wireState.numberingScheme];
+  var html = '<div class="card fade-in"><div class="card-title">🔌 '+(lang==='da'?'Ledningsnumre & Klemmeplan (DS/EN 81346-2)':'Wire Numbers & Terminal Plan (DS/EN 81346-2)')+'</div>';
+  html += '<div class="info-row">'+(lang==='da'?'Auto-generér ledningsnumre fra belastningsskema. Vælg nummererings-skema, panel og klemmeproducent.':'Auto-generate wire numbers from load schedule. Select numbering scheme, panel, and terminal manufacturer.')+'</div>';
+
+  // Scheme toggle
+  html += '<div class="select-group"><div class="select-label">'+(lang==='da'?'Nummereringsskema':'Numbering Scheme')+'</div><div class="select-grid">';
+  html += '<button class="sel-btn '+(wireState.numberingScheme==='danish'?'selected':'')+'" onclick="wireSetScheme(\'danish\')">🇩🇰 Dansk (DS/EN 81346-2)</button>';
+  html += '<button class="sel-btn '+(wireState.numberingScheme==='iec60204'?'selected':'')+'" onclick="wireSetScheme(\'iec60204\')">🌐 IEC 60204-1</button>';
+  html += '</div></div>';
+
+  // Panel selection
+  html += '<div class="select-group"><div class="select-label">'+(lang==='da'?'Panel':'Panel')+'</div><div class="select-grid">';
+  config.panels.forEach(function(p){
+    var label = p + ' — ' + (config.panelNames[p]||'');
+    html += '<button class="sel-btn '+(wireState.panelName===p?'selected':'')+'" onclick="wireSetPanel(\''+p+'\')">'+label+'</button>';
+  });
+  html += '</div></div>';
+
+  // Terminal manufacturer
+  html += '<div class="select-group"><div class="select-label">'+(lang==='da'?'Klemmeproducent':'Terminal Manufacturer')+'</div><div class="select-grid">';
+  Object.keys(TERMINAL_MANUFACTURERS).forEach(function(m){
+    html += '<button class="sel-btn '+(wireState.terminalMfr===m?'selected':'')+'" onclick="wireSetMfr(\''+m+'\')">'+TERMINAL_MANUFACTURERS[m].name+'</button>';
+  });
+  html += '</div></div>';
+
+  // Generate button
+  if(loadList.length > 0){
+    html += '<div class="select-grid"><button class="sel-btn selected" onclick="wireGenerate()">⚡ '+(lang==='da'?'Generer ledningsnumre':'Generate wire numbers')+'</button></div>';
+  } else {
+    html += '<div class="result-box warning"><div class="result-title">'+(lang==='da'?'Tilføj forbrugere først':'Add consumers first')+'</div>';
+    html += '<div class="select-grid"><button class="sel-btn" onclick="switchModule(\'load\')">'+(lang==='da'?'Gå til Belastning →':'Go to Load Calc →')+'</button></div></div>';
+  }
+
+  // Wire list table
+  if(wireState.wireList.length > 0){
+    html += '<div class="result-box"><div class="result-title">'+(lang==='da'?'Genererede ledningsnumre':'Generated Wire Numbers')+' ('+wireState.wireList.length+')</div>';
+    html += '<div style="overflow-x:auto"><table style="width:100%;font-size:.78rem;border-collapse:collapse">';
+    html += '<tr style="border-bottom:1px solid var(--border)"><th style="text-align:left;padding:4px">'+(lang==='da'?'Ledningsnr.':'Wire No.')+'</th><th style="text-align:left;padding:4px">'+(lang==='da'?'Kreds':'Circuit')+'</th><th style="text-align:left;padding:4px">'+(lang==='da'?'Leder':'Cond.')+'</th><th style="text-align:left;padding:4px">'+(lang==='da'?'Farve':'Color')+'</th><th style="text-align:left;padding:4px">mm²</th></tr>';
+    wireState.wireList.forEach(function(w){
+      var swatch = '<span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:'+w.color.hex+';border:1px solid rgba(255,255,255,0.2);vertical-align:middle'+(w.color.stripe?';box-shadow:inset 0 0 0 2px '+w.color.stripe:'')+'"></span>';
+      html += '<tr style="border-bottom:1px solid rgba(255,255,255,0.05)"><td style="padding:4px;font-family:monospace;color:var(--primary-light)">'+w.wireNumber+'</td><td style="padding:4px">'+w.circuit+'</td><td style="padding:4px;font-weight:700">'+w.conductor+'</td><td style="padding:4px">'+swatch+' '+w.color.name+'</td><td style="padding:4px">'+w.crossSection+'</td></tr>';
+    });
+    html += '</table></div></div>';
+  }
+
+  // Terminal strip SVG
+  if(wireState.terminalStrips.length > 0){
+    html += '<div class="card fade-in"><div class="card-title">📋 '+(lang==='da'?'Klemmeplan (SVG)':'Terminal Layout (SVG)')+'</div>';
+    html += renderTerminalSVG(wireState.terminalStrips);
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+// ===== INSTALLATION RISK MATRIX MODULE (DS/HD 60364-1 §131) =====
+let riskState = { assessmentDate: null, installation: { type: null, environment: null, occupants: null }, risks: [], overrides: {}, mitigations: [], showMitigations: false };
+
+const RISK_CATEGORIES = {
+  electric_shock: { da:'Elektrisk stød', en:'Electric Shock', icon:'⚡', clause:'DS/HD 60364-4-41', subcategories:['direct_contact','indirect_contact','residual_voltage'] },
+  fire: { da:'Brand', en:'Fire', icon:'🔥', clause:'DS/HD 60364-4-42', subcategories:['overload_ignition','arc_fault','poor_connection','cable_routing'] },
+  overcurrent: { da:'Overstrøm', en:'Overcurrent', icon:'📈', clause:'DS/HD 60364-4-43', subcategories:['overload','short_circuit','backup_inadequate'] },
+  overvoltage: { da:'Overspænding', en:'Overvoltage', icon:'⚠️', clause:'DS/HD 60364-4-44', subcategories:['lightning','switching_transient','neutral_loss'] },
+  electromagnetic: { da:'Elektromagnetisk forstyrrelse', en:'Electromagnetic Disturbance', icon:'📡', clause:'DS/HD 60364-4-44', subcategories:['harmonic_distortion','voltage_fluctuation','emc_emission'] },
+  earth_fault: { da:'Jordfejl', en:'Earth Fault', icon:'🌍', clause:'DS/HD 60364-5-54', subcategories:['missing_rcd','high_loop_impedance','tn_vs_tt_mismatch'] }
+};
+
+const PROBABILITY_LABELS = {
+  da: ['Meget sjælden','Sjælden','Mulig','Sandsynlig','Meget sandsynlig'],
+  en: ['Very Rare','Rare','Possible','Probable','Very Probable']
+};
+const CONSEQUENCE_LABELS = {
+  da: ['Ubetydelig','Mindre','Moderat','Alvorlig','Katastrofal'],
+  en: ['Insignificant','Minor','Moderate','Serious','Catastrophic']
+};
+
+const RISK_MATRIX = [
+  ['green','green','green','yellow','yellow'],
+  ['green','green','yellow','yellow','red'],
+  ['green','yellow','yellow','red','red'],
+  ['yellow','yellow','red','red','red'],
+  ['yellow','red','red','red','red']
+];
+
+const RISK_LEVELS = {
+  green:  { da:'Acceptabel', en:'Acceptable', action:'none', color:'#06d6a0' },
+  yellow: { da:'Reducér risiko', en:'Mitigate', action:'mitigate', color:'#ffd166' },
+  red:    { da:'Uacceptabel - SKAL rettes', en:'Unacceptable - MUST fix', action:'mandatory', color:'#ef476f' }
+};
+
+const AUTO_RISK_RULES = [
+  {
+    id: 'shock_no_rcd',
+    category: 'electric_shock',
+    condition: function(){ return !rcdSelected; },
+    probability: 4, consequence: 5,
+    description: { da:'Intet RCD 30mA beskyttelse registreret. Risiko for dødelig elektrisk stød.', en:'No RCD 30mA protection detected. Risk of fatal electric shock.' },
+    clause: 'DS/HD 60364-4-41 §411.3.3',
+    mitigation: { da:'Installér RCD type A/F 30mA på alle stikkontaktkredse ≤ 32A', en:'Install RCD type A/F 30mA on all socket circuits ≤ 32A' }
+  },
+  {
+    id: 'fire_overload',
+    category: 'fire',
+    condition: function(){
+      try {
+        var ls = calcLoadSchedule();
+        if (ls.maxPhase <= 0) return false;
+        // Check if cable Iz is set and Ib > Iz
+        if (typeof IZ_COPPER !== 'undefined' && cableState.crossSection) {
+          var izEntry = IZ_COPPER[cableState.installMethod];
+          if (izEntry && izEntry[cableState.crossSection]) {
+            return ls.ib > izEntry[cableState.crossSection];
+          }
+        }
+        return false;
+      } catch(e) { return true; }
+    },
+    probability: 4, consequence: 4,
+    description: { da:'Kabel belastet over Iz. Risiko for overophedning og brand.', en:'Cable loaded above Iz. Risk of overheating and fire.' },
+    clause: 'DS/HD 60364-4-43 §433.1',
+    mitigation: { da:'Vælg større kabeltværsnit eller reducér belastning. Kontrollér Ib ≤ In ≤ Iz.', en:'Select larger cable cross-section or reduce load. Verify Ib ≤ In ≤ Iz.' }
+  },
+  {
+    id: 'overcurrent_backup',
+    category: 'overcurrent',
+    condition: function(){ return backupState.validatedResult && !backupState.validatedResult.valid; },
+    probability: 3, consequence: 5,
+    description: { da:'Brydeevne utilstrækkelig. MCB/MCCB kan ikke afbryde kortslutningsstrøm sikkert.', en:'Breaking capacity insufficient. MCB/MCCB cannot safely interrupt fault current.' },
+    clause: 'DS/HD 60364-4-43 §434.3.1 + IEC 60947-2 Annex A',
+    mitigation: { da:'Etablér back-up beskyttelse med valideret kombination, eller vælg enhed med højere Icu.', en:'Establish back-up protection with validated combination, or select device with higher Icu.' }
+  },
+  {
+    id: 'overvoltage_no_spd',
+    category: 'overvoltage',
+    condition: function(){ return true; },
+    probability: 3, consequence: 3,
+    description: { da:'Ingen overspændingsbeskyttelse (SPD) registreret.', en:'No surge protection device (SPD) detected.' },
+    clause: 'DS/HD 60364-4-44 §443.4',
+    mitigation: { da:'Installér SPD Type 1+2 ved hovedtavle per DS/HD 60364-4-44.', en:'Install SPD Type 1+2 at main panel per DS/HD 60364-4-44.' }
+  },
+  {
+    id: 'earth_fault_impedance',
+    category: 'earth_fault',
+    condition: function(){ return true; },
+    probability: 2, consequence: 4,
+    description: { da:'Fejlsløjfeimpedans ikke verificeret. Afbrydetid muligvis utilstrækkelig.', en:'Fault loop impedance not verified. Disconnection time may be insufficient.' },
+    clause: 'DS/HD 60364-4-41 §411.4.4',
+    mitigation: { da:'Beregn og verificér fejlsløjfeimpedans Zs. Kontrollér Ia × Zs ≤ U0.', en:'Calculate and verify fault loop impedance Zs. Check Ia × Zs ≤ U0.' }
+  }
+];
+
+function calculateRiskLevel(probability, consequence) {
+  var p = Math.max(1, Math.min(5, Math.round(probability))) - 1;
+  var c = Math.max(1, Math.min(5, Math.round(consequence))) - 1;
+  return RISK_MATRIX[c][p];
+}
+
+function autoPopulateRisks() {
+  var risks = [];
+  AUTO_RISK_RULES.forEach(function(rule){
+    var triggered = true;
+    try { triggered = rule.condition(); } catch(e) { triggered = true; }
+    if (triggered) {
+      var level = RISK_MATRIX[rule.consequence - 1][rule.probability - 1];
+      risks.push({
+        id: rule.id,
+        category: rule.category,
+        description: rule.description,
+        probability: rule.probability,
+        consequence: rule.consequence,
+        riskLevel: level,
+        autoDetected: true,
+        clause: rule.clause,
+        mitigation: rule.mitigation
+      });
+    }
+  });
+  var priority = { red: 0, yellow: 1, green: 2 };
+  risks.sort(function(a, b){ return priority[a.riskLevel] - priority[b.riskLevel]; });
+  return risks;
+}
+
+function generateMitigations(risks) {
+  var mits = [];
+  risks.forEach(function(r){
+    if (r.riskLevel === 'red' || r.riskLevel === 'yellow') {
+      mits.push({
+        riskId: r.id,
+        category: r.category,
+        clause: r.clause,
+        action: r.mitigation,
+        priority: r.riskLevel === 'red' ? 1 : 2
+      });
+    }
+  });
+  mits.sort(function(a, b){ return a.priority - b.priority; });
+  return mits;
+}
+
+function riskSetInstType(v){ riskState.installation.type=v; renderModule('risk'); }
+function riskSetEnv(v){ riskState.installation.environment=v; renderModule('risk'); }
+function riskSetOcc(v){ riskState.installation.occupants=v; renderModule('risk'); }
+function riskToggleMit(){ riskState.showMitigations=!riskState.showMitigations; renderModule('risk'); }
+function riskOverride(riskId, p, c){
+  riskState.overrides[riskId] = { p: p, c: c };
+  renderModule('risk');
+}
+
+function renderRisk(){
+  if(!riskState.assessmentDate) riskState.assessmentDate = new Date().toISOString().split('T')[0];
+  riskState.risks = autoPopulateRisks();
+  // Apply overrides
+  riskState.risks.forEach(function(r){
+    if(riskState.overrides[r.id]){
+      r.probability = riskState.overrides[r.id].p;
+      r.consequence = riskState.overrides[r.id].c;
+      r.riskLevel = calculateRiskLevel(r.probability, r.consequence);
+    }
+  });
+  var priority = { red: 0, yellow: 1, green: 2 };
+  riskState.risks.sort(function(a, b){ return priority[a.riskLevel] - priority[b.riskLevel]; });
+  riskState.mitigations = generateMitigations(riskState.risks);
+  var hasRed = riskState.risks.some(function(r){ return r.riskLevel === 'red'; });
+
+  var html = '<div class="card fade-in"><div class="card-title">🎯 '+(lang==='da'?'Installationsrisikomatrix (DS/HD 60364-1 §131)':'Installation Risk Matrix (DS/HD 60364-1 §131)')+'</div>';
+  html += '<div class="info-row">'+(lang==='da'?'Automatisk risikovurdering baseret på nuværende designvalg. Konservativ tilgang: ukendt tilstand = risiko til stede.':'Automatic risk assessment based on current design choices. Conservative approach: unknown state = risk present.')+'</div>';
+
+  // Installation context
+  html += '<div class="select-group"><div class="select-label">'+(lang==='da'?'Installationstype':'Installation Type')+'</div><div class="select-grid">';
+  var types = [{k:'bolig',da:'Bolig',en:'Residential'},{k:'erhverv',da:'Erhverv',en:'Commercial'},{k:'industri',da:'Industri',en:'Industrial'},{k:'landbrug',da:'Landbrug',en:'Agricultural'}];
+  types.forEach(function(tp){ html += '<button class="sel-btn '+(riskState.installation.type===tp.k?'selected':'')+'" onclick="riskSetInstType(\''+tp.k+'\')">'+(lang==='da'?tp.da:tp.en)+'</button>'; });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">'+(lang==='da'?'Miljø':'Environment')+'</div><div class="select-grid">';
+  var envs = [{k:'indoor_dry',da:'Indendørs tør',en:'Indoor dry'},{k:'indoor_wet',da:'Indendørs våd',en:'Indoor wet'},{k:'outdoor',da:'Udendørs',en:'Outdoor'},{k:'hazardous',da:'Eksplosionsfarlig',en:'Hazardous'}];
+  envs.forEach(function(ev){ html += '<button class="sel-btn '+(riskState.installation.environment===ev.k?'selected':'')+'" onclick="riskSetEnv(\''+ev.k+'\')">'+(lang==='da'?ev.da:ev.en)+'</button>'; });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">'+(lang==='da'?'Persongruppe':'Occupants')+'</div><div class="select-grid">';
+  var occs = [{k:'general',da:'Almen offentlighed',en:'General public'},{k:'children',da:'Børn',en:'Children'},{k:'elderly',da:'Ældre',en:'Elderly'},{k:'trained',da:'Uddannet personale',en:'Trained personnel'}];
+  occs.forEach(function(oc){ html += '<button class="sel-btn '+(riskState.installation.occupants===oc.k?'selected':'')+'" onclick="riskSetOcc(\''+oc.k+'\')">'+(lang==='da'?oc.da:oc.en)+'</button>'; });
+  html += '</div></div>';
+
+  // 5×5 matrix visual
+  html += '<div class="select-group"><div class="select-label">'+(lang==='da'?'5×5 Risikomatrix':'5×5 Risk Matrix')+'</div>';
+  html += '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:.7rem;text-align:center">';
+  html += '<tr><th style="padding:4px;min-width:55px"></th>';
+  for(var p=1;p<=5;p++) html += '<th style="padding:4px;min-width:50px;color:var(--text-muted)">P'+p+'</th>';
+  html += '</tr>';
+  for(var c=5;c>=1;c--){
+    html += '<tr><td style="padding:4px;font-weight:700;color:var(--text-muted)">C'+c+'</td>';
+    for(var p=1;p<=5;p++){
+      var lvl = RISK_MATRIX[c-1][p-1];
+      var bg = RISK_LEVELS[lvl].color;
+      html += '<td style="padding:4px"><span style="display:inline-block;width:30px;height:22px;border-radius:4px;background:'+bg+';opacity:0.8"></span></td>';
+    }
+    html += '</tr>';
+  }
+  html += '</table></div></div>';
+
+  // Risk entries
+  html += '</div><div class="card fade-in"><div class="card-title">'+(lang==='da'?'Identificerede risici':'Identified Risks')+' ('+riskState.risks.length+')</div>';
+  if(hasRed){
+    html += '<div class="result-box error"><div class="result-title">🚫 '+(lang==='da'?'UACCEPTABLE RISICI FUNDET — projektgodkendelse blokeret':'UNACCEPTABLE RISKS FOUND — project sign-off blocked')+'</div></div>';
+  }
+  riskState.risks.forEach(function(r){
+    var cat = RISK_CATEGORIES[r.category]||{};
+    var lvl = RISK_LEVELS[r.riskLevel];
+    html += '<div class="result-box" style="border-left:4px solid '+lvl.color+';margin-bottom:8px">';
+    html += '<div class="result-title" style="color:'+lvl.color+'">'+(cat.icon||'')+ ' '+(lang==='da'?cat.da:cat.en)+' — '+(lang==='da'?lvl.da:lvl.en)+'</div>';
+    html += '<div class="result-row"><span class="label">'+(lang==='da'?r.description.da:r.description.en)+'</span></div>';
+    html += '<div class="result-row"><span class="label">'+(lang==='da'?'Sandsynlighed':'Probability')+'</span><span class="value">P'+r.probability+' ('+(PROBABILITY_LABELS[lang]||PROBABILITY_LABELS.da)[r.probability-1]+')</span></div>';
+    html += '<div class="result-row"><span class="label">'+(lang==='da'?'Konsekvens':'Consequence')+'</span><span class="value">C'+r.consequence+' ('+(CONSEQUENCE_LABELS[lang]||CONSEQUENCE_LABELS.da)[r.consequence-1]+')</span></div>';
+    html += '<div class="result-row"><span class="label">'+(lang==='da'?'Reference':'Reference')+'</span><span class="value">'+r.clause+'</span></div>';
+    // Override buttons (5 prob × 5 cons)
+    html += '<div style="margin-top:6px"><span style="font-size:.7rem;color:var(--text-muted)">'+(lang==='da'?'Overstyr P/C:':'Override P/C:')+'</span> ';
+    for(var pp=1;pp<=5;pp++){
+      for(var cc=1;cc<=5;cc++){
+        var sel = (r.probability===pp&&r.consequence===cc)?'selected':'';
+        html += '<button class="sel-btn '+sel+'" style="padding:1px 4px;min-width:0;font-size:.6rem;margin:1px" onclick="riskOverride(\''+r.id+'\','+pp+','+cc+')">P'+pp+'C'+cc+'</button>';
+      }
+    }
+    html += '</div>';
+    html += '</div>';
+  });
+
+  // Mitigations button
+  html += '<div class="select-grid"><button class="sel-btn '+(riskState.showMitigations?'selected':'')+'" onclick="riskToggleMit()">📋 '+(lang==='da'?'Anbefalinger / Mitigering':'Recommendations / Mitigation')+'</button></div>';
+  if(riskState.showMitigations && riskState.mitigations.length > 0){
+    html += '<div class="result-box" style="margin-top:8px"><div class="result-title">'+(lang==='da'?'Mitigeringsanbefalinger':'Mitigation Recommendations')+'</div>';
+    riskState.mitigations.forEach(function(m){
+      var cat = RISK_CATEGORIES[m.category]||{};
+      html += '<div class="result-row" style="flex-direction:column;align-items:flex-start;gap:2px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)">';
+      html += '<span class="label" style="font-weight:700;color:'+(m.priority===1?'var(--danger)':'#ffd166')+'">'+(cat.icon||'')+' '+(lang==='da'?cat.da:cat.en)+' — '+m.clause+'</span>';
+      html += '<span class="value" style="text-align:left">'+(lang==='da'?m.action.da:m.action.en)+'</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  // Export button
+  html += '<div class="select-grid" style="margin-top:12px"><button class="sel-btn" onclick="riskExportReport()">📄 '+(lang==='da'?'Eksporter rapport':'Export report')+'</button></div>';
+  html += '</div>';
+  return html;
+}
+
+function riskExportReport(){
+  // Check completeness
+  var missing = [];
+  if(!riskState.installation.type) missing.push(lang==='da'?'Installationstype':'Installation type');
+  if(!riskState.installation.environment) missing.push(lang==='da'?'Miljø':'Environment');
+  if(!riskState.installation.occupants) missing.push(lang==='da'?'Persongruppe':'Occupants');
+  if(missing.length > 0){
+    alert((lang==='da'?'Udfyld venligst: ':'Please complete: ')+missing.join(', '));
+    return;
+  }
+  // Generate print SVG report
+  var w=794,h=1123;
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+w+' '+h+'" style="background:#fff">';
+  svg += '<text x="397" y="40" text-anchor="middle" font-size="20" font-weight="700" fill="#111">'+(lang==='da'?'Risikovurdering — Elinstallation':'Risk Assessment — Electrical Installation')+'</text>';
+  svg += '<text x="397" y="65" text-anchor="middle" font-size="12" fill="#666">'+(lang==='da'?'Dato: ':'Date: ')+riskState.assessmentDate+' | '+(lang==='da'?'Type: ':'Type: ')+riskState.installation.type+' | '+(lang==='da'?'Miljø: ':'Env: ')+riskState.installation.environment+' | '+(lang==='da'?'Persongruppe: ':'Occupants: ')+riskState.installation.occupants+'</text>';
+  var y=100;
+  riskState.risks.forEach(function(r){
+    var cat = RISK_CATEGORIES[r.category]||{};
+    var lvl = RISK_LEVELS[r.riskLevel];
+    svg += '<rect x="30" y="'+y+'" width="734" height="50" rx="4" fill="'+lvl.color+'" fill-opacity="0.15" stroke="'+lvl.color+'" stroke-width="1"/>';
+    svg += '<text x="45" y="'+(y+20)+'" font-size="11" font-weight="700" fill="#111">'+(cat.icon||'')+' '+(lang==='da'?cat.da:cat.en)+' — '+(lang==='da'?lvl.da:lvl.en)+'</text>';
+    svg += '<text x="45" y="'+(y+37)+'" font-size="9" fill="#333">P'+r.probability+'/C'+r.consequence+' | '+r.clause+' | '+(lang==='da'?r.description.da:r.description.en).substring(0,80)+'</text>';
+    y+=58;
+  });
+  svg += '</svg>';
+  var blob = new Blob([svg], {type:'image/svg+xml'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href=url; a.download='risikovurdering-'+riskState.assessmentDate+'.svg'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Integration: red risks block project sign-off in verify module
+function riskBlocksSignoff(){
+  try {
+    var risks = autoPopulateRisks();
+    // Apply overrides
+    risks.forEach(function(r){
+      if(riskState.overrides[r.id]){
+        r.probability = riskState.overrides[r.id].p;
+        r.consequence = riskState.overrides[r.id].c;
+        r.riskLevel = calculateRiskLevel(r.probability, r.consequence);
+      }
+    });
+    return risks.some(function(r){ return r.riskLevel === 'red'; });
+  } catch(e) { return true; } // Conservative: assume blocked if error
 }
 
 // ===== INIT =====
