@@ -64,14 +64,14 @@ the first checkpoint. Tasks 10 and 11 are independent of each other after checkp
 
 ## Tasks
 
-- [ ] 1. Foundational data tables, state, and the derated-ampacity engine (highest-priority safety fix)
+- [x] 1. Foundational data tables, state, and the derated-ampacity engine (highest-priority safety fix)
   - Add all new `const` data tables and new state beside the existing declarations, build the shared
     correction-factor resolver and derating function, then route the auto-recommendation through it so
     derating stops being display-only. This single task closes the root-cause "display-only derating"
     bug described in the design Overview.
   - All edits are within the existing `<script>` block of `el-dimensionering.html`.
 
-  - [ ] 1.1 Add new data tables and verdict state
+  - [x] 1.1 Add new data tables and verdict state
     - Add `const` tables next to the existing data tables: `K_ADIABATIC`, `STANDARD_CSA`,
       `SOIL_FACTORS`, `DISCONNECT_TIME`, `FUSE_0_4S`, `U0_NOMINAL` (230), `U_L_LIMIT` (50).
     - Add `let verdictState = { systemType:'TN', circuitCategory:'final', tClear:null, rcdIDn:0.3, soilResistivity:null }`.
@@ -80,14 +80,14 @@ the first checkpoint. Tasks 10 and 11 are independent of each other after checkp
       `FUSE_5S`, `MCB_CURVES`, `MCCB_TRIPS`, `CABLES_*`, `PRODUCTS.*`).
     - _Requirements: 4.2, 4.4, 5.1, 5.5, 2.2, 6.5_
 
-  - [ ] 1.2 Implement `getCorrectionFactor(category, key)` conservative resolver
+  - [x] 1.2 Implement `getCorrectionFactor(category, key)` conservative resolver
     - Map `category` → table (`ca`→`TEMP_FACTORS`, `cg`→`GROUP_FACTORS`, `cs`→`SOIL_FACTORS`,
       `kInstall`→`INSTALL_METHODS`); return `{ value, defaulted, valid, source }`.
     - When `key` is absent/null, substitute the numerically lowest value `≤ 1.0` for that category
       (most reducing); for `cs` when not buried, return `{ value:1.0, defaulted:false }`.
     - _Requirements: 2.1, 2.2, 2.5_
 
-  - [ ]* 1.3 Write property test for conservative correction-factor defaults
+  - [x]* 1.3 Write property test for conservative correction-factor defaults
     - **Property 4: Conservative defaults never inflate capacity**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 4: Conservative defaults never inflate capacity`
     - Verify an unselected factor resolves to the lowest defined value (`≤ 1.0` and `≤` every
@@ -95,7 +95,7 @@ the first checkpoint. Tasks 10 and 11 are independent of each other after checkp
       never decreases `Derated_Iz`. Minimum 100 iterations via `fast-check`.
     - **Validates: Requirements 2.1, 2.2, 2.5**
 
-  - [ ] 1.4 Implement `computeDeratedIz(...)` and `deratedIzForProduct(product, env)`
+  - [x] 1.4 Implement `computeDeratedIz(...)` and `deratedIzForProduct(product, env)`
     - Resolve each factor via `getCorrectionFactor`; compute `totalFactor = ca×cg×cs×kInstall` and
       `deratedIz = Math.floor(baseIz × totalFactor × 100) / 100` (round **down** to 2 dp).
     - Apply the DD-5 validation guard: reject non-numeric factors, factors `< 0.01`, and **defaulted**
@@ -106,21 +106,21 @@ the first checkpoint. Tasks 10 and 11 are independent of each other after checkp
       active environment selections.
     - _Requirements: 1.4, 1.8, 2.3, 2.4_
 
-  - [ ]* 1.5 Write property test for the derating formula and round-down
+  - [x]* 1.5 Write property test for the derating formula and round-down
     - **Property 2: Derating formula and round-down**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 2: Derating formula and round-down`
     - Verify `Derated_Iz === floor(Base_Iz × Ca × Cg × Cs × k_install × 100)/100`, has at most two
       decimals, and is `≤` the exact unrounded product. Minimum 100 iterations.
     - **Validates: Requirements 1.4**
 
-  - [ ]* 1.6 Write property test for derating monotonicity
+  - [x]* 1.6 Write property test for derating monotonicity
     - **Property 3: Derating never increases capacity**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 3: Derating never increases capacity`
     - Verify that whenever the total correction factor is `≤ 1`, `Derated_Iz ≤ Base_Iz`. Minimum 100
       iterations.
     - **Validates: Requirements 1.4**
 
-  - [ ] 1.7 Refactor `recommendCables` and the cable AI assistant to use derated capacity
+  - [x] 1.7 Refactor `recommendCables` and the cable AI assistant to use derated capacity
     - Change `recommendCables(ib, material)` to filter candidates on
       `deratedIzForProduct(c, env) >= inMin` (where `inMin` is the smallest standard device rating
       `≥ IB`) instead of the raw `officialIz(c)`; exclude any conductor whose `Derated_Iz < In`.
@@ -130,7 +130,7 @@ the first checkpoint. Tasks 10 and 11 are independent of each other after checkp
       `computeDeratedIz` (remove the duplicated derating math so there is one source of truth).
     - _Requirements: 1.1, 1.2, 1.3, 1.5, 1.9_
 
-  - [ ]* 1.8 Write property test for derated-safe recommendations (regression guard)
+  - [x]* 1.8 Write property test for derated-safe recommendations (regression guard)
     - **Property 1: Recommendations are derated-safe**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 1: Recommendations are derated-safe`
     - Verify every conductor returned by `recommendCables(IB)` has `Derated_Iz ≥ In`; that the set is
@@ -138,27 +138,27 @@ the first checkpoint. Tasks 10 and 11 are independent of each other after checkp
       is excluded (display-only-bug regression guard). Minimum 100 iterations.
     - **Validates: Requirements 1.1, 1.5, 1.9**
 
-- [ ] 2. Checkpoint - derating engine and recommendation fix
+- [x] 2. Checkpoint - derating engine and recommendation fix
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 3. Overload coordination verdict — I₂ ≤ 1,45 × Iz
+- [x] 3. Overload coordination verdict — I₂ ≤ 1,45 × Iz
   - Add the device-tripping-current helper and the overload check function to the Correctness Engine
     section. Both are pure functions returning the shared verdict shape
     `{ id, state, clause, values, message, recommendation }`.
 
-  - [ ] 3.1 Implement `deviceI2(device)`
+  - [x] 3.1 Implement `deviceI2(device)`
     - Return `{ i2, factor, defaulted }`: `1.6 × In` for a gG fuse, `1.45 × In` for an MCB/MCCB, and
       `1.6 × In` with `defaulted:true` for an unknown device kind (conservative).
     - _Requirements: 3.1, 3.5_
 
-  - [ ]* 3.2 Write property test for I₂ computation by device type
+  - [x]* 3.2 Write property test for I₂ computation by device type
     - **Property 5: I₂ computed by device type**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 5: I2 computed by device type`
     - Verify `I₂ = 1.6 × In` for gG fuse / unknown kind and `1.45 × In` for MCB/MCCB across random
       `In > 0`. Minimum 100 iterations.
     - **Validates: Requirements 3.1, 3.5**
 
-  - [ ] 3.3 Implement `checkOverloadI2({ device, deratedIz })`
+  - [x] 3.3 Implement `checkOverloadI2({ device, deratedIz })`
     - Return INSUFFICIENT_DATA when `device.inA` or `deratedIz` is missing, zero, or negative.
     - Otherwise compare `round2(i2) ≤ round2(1.45 × deratedIz)`: PASS on hold (incl. equality), else
       FAIL with a non-null recommendation (larger cross-section or lower-I₂ device).
@@ -166,39 +166,39 @@ the first checkpoint. Tasks 10 and 11 are independent of each other after checkp
       limit (currents to 2 dp).
     - _Requirements: 3.2, 3.3, 3.4, 3.6, 3.7_
 
-  - [ ]* 3.4 Write property test for overload verdict correctness
+  - [x]* 3.4 Write property test for overload verdict correctness
     - **Property 6: Overload verdict correctness**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 6: Overload verdict correctness`
     - Verify PASS iff `round2(I₂) ≤ round2(1.45 × Derated_Iz)` (equality passes) and FAIL otherwise
       carries a non-null recommendation, for valid `In, Derated_Iz > 0`. Minimum 100 iterations.
     - **Validates: Requirements 3.2, 3.3**
 
-  - [ ]* 3.5 Write property test for overload independence (gG fuse)
+  - [x]* 3.5 Write property test for overload independence (gG fuse)
     - **Property 7: Overload independence for gG fuses**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 7: Overload independence for gG fuses`
     - Generate inputs in the region where `In ≤ Derated_Iz` but `1.6 × In > 1.45 × Derated_Iz` and
       verify the verdict is FAIL. Minimum 100 iterations.
     - **Validates: Requirements 3.2, 3.3**
 
-  - [ ]* 3.6 Write property test for overload equivalence (MCB/MCCB)
+  - [x]* 3.6 Write property test for overload equivalence (MCB/MCCB)
     - **Property 8: Overload equivalence for MCB/MCCB**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 8: Overload equivalence for MCB/MCCB`
     - Verify that for MCB/MCCB (`I₂ = 1.45 × In`) the overload verdict is PASS iff `In ≤ Derated_Iz`.
       Minimum 100 iterations.
     - **Validates: Requirements 3.1, 3.2**
 
-- [ ] 4. Adiabatic short-circuit withstand verdict — k²·S² ≥ I²t
+- [x] 4. Adiabatic short-circuit withstand verdict — k²·S² ≥ I²t
   - Add the adiabatic-constant lookup, the standard-cross-section selector, and the adiabatic check to
     the Correctness Engine section.
 
-  - [ ] 4.1 Implement `adiabaticK(material, insulation)` and `nextStandardCrossSection(sMin)`
+  - [x] 4.1 Implement `adiabaticK(material, insulation)` and `nextStandardCrossSection(sMin)`
     - `adiabaticK` looks up `K_ADIABATIC` (Cu/PVC 115, Cu/XLPE 143, Al/PVC 76, Al/XLPE 94), returning
       `null` for undefined combinations; map insulation from cable type (`/NOIKLX|NOIKX|NOIK-AL|NOSP/i`
       → XLPE, otherwise PVC).
     - `nextStandardCrossSection` returns the smallest `STANDARD_CSA` value `≥ sMin`, or `null` if none.
     - _Requirements: 4.2, 4.4, 4.8_
 
-  - [ ] 4.2 Implement `checkAdiabatic({ material, insulation, sArea, isc, tClear })`
+  - [x] 4.2 Implement `checkAdiabatic({ material, insulation, sArea, isc, tClear })`
     - Return INSUFFICIENT_DATA when `isc` or `tClear` is unknown, or when `k` is `null`.
     - Compute `i2t = isc² × tClear`, `withstand = k² × sArea²`, `sMin = √(i2t)/k`; PASS when
       `withstand ≥ i2t`, else FAIL recommending `nextStandardCrossSection(sMin)`; if none exists, FAIL
@@ -207,28 +207,28 @@ the first checkpoint. Tasks 10 and 11 are independent of each other after checkp
       `sMin`, `sArea`.
     - _Requirements: 4.1, 4.3, 4.5, 4.6, 4.7, 4.9_
 
-  - [ ]* 4.3 Write property test for adiabatic withstand correctness
+  - [x]* 4.3 Write property test for adiabatic withstand correctness
     - **Property 9: Adiabatic withstand correctness**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 9: Adiabatic withstand correctness`
     - For material/insulation pairs with defined `k`, verify PASS iff `k² × S² ≥ Isc² × t_clear`.
       Minimum 100 iterations.
     - **Validates: Requirements 4.1, 4.2, 4.3**
 
-  - [ ]* 4.4 Write property test for monotonicity in cross-section
+  - [x]* 4.4 Write property test for monotonicity in cross-section
     - **Property 10: Adiabatic verdict is monotonic in cross-section**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 10: Adiabatic verdict is monotonic in cross-section`
     - For fixed material, insulation, Isc, t_clear: if `S1 ≥ S2` and S2 yields PASS, S1 yields PASS.
       Minimum 100 iterations.
     - **Validates: Requirements 4.3**
 
-  - [ ]* 4.5 Write property test for monotonicity in fault energy
+  - [x]* 4.5 Write property test for monotonicity in fault energy
     - **Property 11: Adiabatic verdict is monotonic in fault energy**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 11: Adiabatic verdict is monotonic in fault energy`
     - For a fixed conductor: as `I²t` increases, a PASS may become FAIL but a FAIL never becomes PASS.
       Minimum 100 iterations.
     - **Validates: Requirements 4.3**
 
-  - [ ]* 4.6 Write property test for the adiabatic recommendation round-trip
+  - [x]* 4.6 Write property test for the adiabatic recommendation round-trip
     - **Property 12: Adiabatic recommendation round-trip**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 12: Adiabatic recommendation round-trip`
     - For any FAIL case where a standard cross-section is adequate, verify re-evaluating the
@@ -236,30 +236,30 @@ the first checkpoint. Tasks 10 and 11 are independent of each other after checkp
       (`k² × S_min² ≥ I²t`). Minimum 100 iterations.
     - **Validates: Requirements 4.4, 4.8**
 
-- [ ] 5. Earth-fault-loop impedance / disconnection-time verdict — Zs ≤ Zs_max
+- [x] 5. Earth-fault-loop impedance / disconnection-time verdict — Zs ≤ Zs_max
   - Add the disconnection-time lookup, the Ia derivation, the Zs estimator, and the Zs check to the
     Correctness Engine section.
 
-  - [ ] 5.1 Implement `requiredDisconnectionTime(systemType, circuitCategory, inA)`
+  - [x] 5.1 Implement `requiredDisconnectionTime(systemType, circuitCategory, inA)`
     - Look up `DISCONNECT_TIME`: TN → 0.4 s for final with `In ≤ 32 A`, else 5 s; TT → 0.2 s for final
       with `In ≤ 32 A`, else 1 s.
     - _Requirements: 5.1_
 
-  - [ ]* 5.2 Write property test for the disconnection-time lookup
+  - [x]* 5.2 Write property test for the disconnection-time lookup
     - **Property 13: Disconnection-time lookup**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 13: Disconnection-time lookup`
     - Verify the returned time matches the `DISCONNECT_TIME` matrix across all System_Type × circuit
       category × `In`-straddling-32 A combinations. Minimum 100 iterations.
     - **Validates: Requirements 5.1**
 
-  - [ ] 5.3 Implement `deriveIa(device, reqTime)` and `estimateZsActual()`
+  - [x] 5.3 Implement `deriveIa(device, reqTime)` and `estimateZsActual()`
     - `deriveIa`: MCB → `MCB_CURVES[curve].isdMax × In`; MCCB → `inVal × ioMult × isdMult × 1.1`;
       gG fuse → `FUSE_5S[size]` (5 s) or `FUSE_0_4S[size]` (0.4/0.2 s); unknown → `{ known:false }`.
     - `estimateZsActual`: derive loop impedance from `scState` and the selected cable r/x; return
       `{ zs, known }` with `known:false` when the impedance model is incomplete.
     - _Requirements: 5.2, 5.7, 5.9_
 
-  - [ ] 5.4 Implement `checkZs({ systemType, circuitCategory, device, rcdIDn, u0 })`
+  - [x] 5.4 Implement `checkZs({ systemType, circuitCategory, device, rcdIDn, u0 })`
     - TN: compute `Zs_max = U0/Ia`, evaluate `Zs ≤ Zs_max`, clause `DS/HD 60364-4-41 §411.4` (+ §411.3.2);
       FAIL recommends a faster-operating device.
     - TT: evaluate `Zs × IΔn ≤ U_L (50 V)`, clause `§411.5` (+ §411.3.2); FAIL recommends adding an RCD
@@ -268,28 +268,28 @@ the first checkpoint. Tasks 10 and 11 are independent of each other after checkp
     - Populate `values` with `zsMax`, `zsActual`, `ia`, `reqTime`.
     - _Requirements: 5.3, 5.4, 5.5, 5.6, 5.8, 5.10_
 
-  - [ ]* 5.5 Write property test for inverse monotonicity of Zs_max
+  - [x]* 5.5 Write property test for inverse monotonicity of Zs_max
     - **Property 14: Zs_max is inversely monotonic in Ia**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 14: Zs_max is inversely monotonic in Ia`
     - For fixed `U₀` and `Ia > 0`, verify `Zs_max = U₀/Ia` and a larger Ia yields a smaller `Zs_max`.
       Minimum 100 iterations.
     - **Validates: Requirements 5.3**
 
-  - [ ]* 5.6 Write property test for Zs verdict correctness (TN and TT)
+  - [x]* 5.6 Write property test for Zs verdict correctness (TN and TT)
     - **Property 15: Zs verdict correctness for TN and TT**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 15: Zs verdict correctness for TN and TT`
     - Verify TN PASS iff `Zs ≤ Zs_max`, TT PASS iff `Zs × IΔn ≤ 50 V`, and every FAIL carries a
       non-null recommendation. Minimum 100 iterations.
     - **Validates: Requirements 5.4, 5.5, 5.6, 5.10**
 
-- [ ] 6. Checkpoint - all four check functions implemented
+- [x] 6. Checkpoint - all four check functions implemented
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 7. Compute-once orchestrator and shared verdict renderers
+- [x] 7. Compute-once orchestrator and shared verdict renderers
   - Add the single orchestrator that produces the immutable verdict bundle consumed identically by
     every view, plus the shared bilingual renderers.
 
-  - [ ] 7.1 Implement `evaluateCorrectnessVerdicts()`
+  - [x] 7.1 Implement `evaluateCorrectnessVerdicts()`
     - Read the relevant global state (`loadState`/`calcIB`, `cableState`+soil, `scState`,
       `mcb/mccb/fuseState`, `verdictState`), call the four checks, and return a frozen bundle
       `{ ampacity, overload, adiabatic, zs }`.
@@ -297,7 +297,7 @@ the first checkpoint. Tasks 10 and 11 are independent of each other after checkp
       (never a thrown exception that blanks the screen).
     - _Requirements: 1.2, 1.3, 7.7, 9.2_
 
-  - [ ] 7.2 Implement `renderVerdictRow(verdict)` and `renderVerdictInputs()`
+  - [x] 7.2 Implement `renderVerdictRow(verdict)` and `renderVerdictInputs()`
     - `renderVerdictRow`: one bilingual row with a PASS/FAIL/INSUFFICIENT_DATA badge, governing clause,
       and computed values; distinguish FAIL/INSUFFICIENT_DATA with icon + text label, not color alone.
     - `renderVerdictInputs`: click-only controls for `verdictState` (System_Type, circuit category,
@@ -305,7 +305,7 @@ the first checkpoint. Tasks 10 and 11 are independent of each other after checkp
       conservative defaults pre-selected.
     - _Requirements: 9.1, 9.4, 6.1, 6.2, 6.3, 6.5, 6.6_
 
-  - [ ]* 7.3 Write property test for the safety-provenance invariant
+  - [x]* 7.3 Write property test for the safety-provenance invariant
     - **Property 20: Safety-provenance invariant**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 20: Safety-provenance invariant`
     - For each of the four verdicts and any inputs (including missing/non-numeric fields), verify the
@@ -313,7 +313,7 @@ the first checkpoint. Tasks 10 and 11 are independent of each other after checkp
       INSUFFICIENT_DATA, never PASS. Minimum 100 iterations.
     - **Validates: Requirements 1.7, 3.6, 3.7, 4.6, 4.7, 4.9, 5.7, 5.8, 5.9, 9.1, 9.2, 9.5**
 
-  - [ ]* 7.4 Write property test for the conservative tie-break
+  - [x]* 7.4 Write property test for the conservative tie-break
     - **Property 21: Conservative tie-break**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 21: Conservative tie-break`
     - For situations with two or more equally valid, unrankable candidates, verify the most
@@ -321,50 +321,50 @@ the first checkpoint. Tasks 10 and 11 are independent of each other after checkp
       Minimum 100 iterations.
     - **Validates: Requirements 9.3**
 
-- [ ] 8. Integrate the four verdicts into the Verify module, QI index, and Risk matrix
+- [x] 8. Integrate the four verdicts into the Verify module, QI index, and Risk matrix
   - Wire the orchestrator output into the three summary views so every verdict is visible and
     consistent. All three read the one bundle from `evaluateCorrectnessVerdicts()`.
 
-  - [ ] 8.1 Extend `runQiValidation()` with the four verdicts as scored rules
+  - [x] 8.1 Extend `runQiValidation()` with the four verdicts as scored rules
     - Push `ampacity`, `overload`, `adiabatic`, and `zs` as scored rules whose displayed state is one
       of PASS / FAIL / INSUFFICIENT_DATA; map FAIL → `error` severity and INSUFFICIENT_DATA →
       `warning` severity (never counted as passing).
     - _Requirements: 7.2, 7.3, 7.4_
 
-  - [ ]* 8.2 Write property test for QI severity mapping
+  - [x]* 8.2 Write property test for QI severity mapping
     - **Property 16: QI severity mapping**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 16: QI severity mapping`
     - Verify FAIL → `error` and INSUFFICIENT_DATA → `warning` (never passing) for each verdict.
       Minimum 100 iterations.
     - **Validates: Requirements 7.3, 7.4**
 
-  - [ ] 8.3 Extend `runSelfTests()` / `renderVerify()` with four self-tests and a verdict panel
+  - [x] 8.3 Extend `runSelfTests()` / `renderVerify()` with four self-tests and a verdict panel
     - Append one self-test per verdict that reads the bundle and reports the verdict's current
       PASS / FAIL / INSUFFICIENT_DATA state; render the verdict panel via `renderVerdictRow`.
     - Preserve all existing self-test reference cases unchanged.
     - _Requirements: 7.1_
 
-  - [ ] 8.4 Refactor `AUTO_RISK_RULES` / `autoPopulateRisks()` to be verdict-driven
+  - [x] 8.4 Refactor `AUTO_RISK_RULES` / `autoPopulateRisks()` to be verdict-driven
     - Make the shock/fire/earth rules read the verdict bundle: any FAIL or INSUFFICIENT_DATA verdict
       adds exactly one risk entry identifying the verdict, its state, and its governing clause; a PASS
       verdict removes the corresponding entry.
     - _Requirements: 7.5, 7.6_
 
-  - [ ]* 8.5 Write property test for risk-entry presence and removal
+  - [x]* 8.5 Write property test for risk-entry presence and removal
     - **Property 17: Risk-entry presence and removal**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 17: Risk-entry presence and removal`
     - Verify FAIL/INSUFFICIENT_DATA produces exactly one referencing risk entry and PASS produces
       none, for each verdict. Minimum 100 iterations.
     - **Validates: Requirements 7.5, 7.6**
 
-  - [ ]* 8.6 Write property test for cross-view consistency
+  - [x]* 8.6 Write property test for cross-view consistency
     - **Property 18: Cross-view consistency (single source of truth)**
     - Tag: `// Feature: dimensioning-correctness-hardening, Property 18: Cross-view consistency`
     - Verify that for any inputs, the state reported by the Verify module, QI index, and Risk matrix is
       identical for each of the four verdicts. Minimum 100 iterations.
     - **Validates: Requirements 1.2, 1.3, 7.1, 7.2, 7.7**
 
-- [ ] 9. Checkpoint - verdicts integrated across all summary views
+- [x] 9. Checkpoint - verdicts integrated across all summary views
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 10. Click-only verdict inputs, provenance cards, and derating display in `renderCable`
