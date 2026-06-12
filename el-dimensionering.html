@@ -4956,9 +4956,132 @@ function buildTccCurve(){
   else { const tm=tMain(If); const ratio = isFinite(tm)? tm/tDisc : 999; const selOk = ratio>=1.5; selCol = selOk?'var(--success)':'var(--warning-text)';
     selTxt = da ? ('Selektivitet ved Ief: gren t≈'+fmt(tDisc)+' s vs hoved ('+mainLbl+') t≈'+(isFinite(tm)?fmt(tm):'>1000')+' s → '+(selOk?'SELEKTIV ✓ — kun gruppen kobler ud':'IKKE fuld selektiv ⚠ — hovedværn kan også udløse')) : ('Selectivity at Ief: branch t≈'+fmt(tDisc)+' s vs main ('+mainLbl+') t≈'+(isFinite(tm)?fmt(tm):'>1000')+' s → '+(selOk?'SELECTIVE ✓ — only the circuit trips':'NOT fully selective ⚠ — main may also trip')); }
 
+  // --- I²t adiabatic energy let-through (IEC 60364-4-43 clause 434.5.2) ---
+  const cabS = cab ? cab.mm2 : 2.5;
+  const cabXlpe = cab ? /NOIKLX|NOIKX|NOIK-AL|NOSP/i.test(cab.model||'') : false;
+  const cabMat = cab ? cab.material : 'Cu';
+  const kAdiab = (cabMat==='Cu') ? (cabXlpe ? 143 : 115) : (cabXlpe ? 94 : 76);
+  const cableI2tLimit = kAdiab * kAdiab * cabS * cabS;
+  // Branch device I²t: MCB → Ief² × t_disconnect
+  const brI2t = (isFinite(tDisc) && tDisc>0) ? (If*If*tDisc) : (If*If*0.02);
+  // Main device I²t: for fuses use simplified gG formula K*In^β, for MCBs use Ief²*t
+  const mainI2tCalc = mainType==='fuse' ? (80000*Math.pow(Inm,1.8)) : (function(){ const tmv=tMain(If); return (isFinite(tmv)&&tmv>0)?(If*If*tmv):(If*If*0.02); })();
+  const i2tBrOk = brI2t <= cableI2tLimit;
+  const i2tMainOk = mainI2tCalc <= cableI2tLimit;
+  const i2tOk = i2tBrOk; // cable protection is primarily the branch device's job
+  const i2tCol = i2tOk ? 'var(--success)' : 'var(--danger)';
+  const i2tVerdict = i2tOk
+    ? (da ? '✓ Kablet tåler energigennemløbet (I²t) — adiabatisk kontrol opfyldt.' : '✓ Cable withstands the energy let-through (I²t) — adiabatic check met.')
+    : (da ? '⚠ Kablet kan blive beskadiget — I²t overstiger k²S² grænsen. Vælg større tværsnit eller hurtigere udkobling.' : '⚠ Cable may be damaged — I²t exceeds k²S² limit. Choose larger cross-section or faster disconnection.');
+  const fmtI2t = (v) => v>=1e6 ? (v/1e6).toFixed(1)+'M' : v>=1e3 ? (v/1e3).toFixed(1)+'k' : v.toFixed(0);
+
   return `<div class="card fade-in"><div class="card-title">📈 ${da?'Kurve, selektivitet & brydeevne':'Curve, selectivity & breaking capacity'} — ${curve}${In} · ⏚ ${sldEarthing}</div>`
     + `<svg viewBox="0 0 ${W} ${H}" width="100%" style="border-radius:12px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 24px rgba(0,160,255,0.15)" xmlns="http://www.w3.org/2000/svg"><defs><filter id="tccGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>${g}<text x="${mLft}" y="16" font-size="11" font-weight="800" fill="#bfe9ff">${da?'Tid (log) vs strøm (log)':'Time (log) vs current (log)'}</text></svg>`
-    + `<div class="result-box ${cls}" style="margin-top:10px"><div class="result-row"><span class="label" style="line-height:1.5">${cap}</span></div><div class="result-row"><span class="label" style="line-height:1.5;color:${selCol}">⛓ ${selTxt}</span></div><div class="result-row"><span class="label" style="line-height:1.5;color:${buCol}">🔌 ${buTxt}</span></div></div></div>`;
+    + `<div class="result-box ${cls}" style="margin-top:10px"><div class="result-row"><span class="label" style="line-height:1.5">${cap}</span></div><div class="result-row"><span class="label" style="line-height:1.5;color:${selCol}">⛓ ${selTxt}</span></div><div class="result-row"><span class="label" style="line-height:1.5;color:${buCol}">🔌 ${buTxt}</span></div><div class="result-row"><span class="label" style="line-height:1.5;color:${i2tCol}">⚡ I²t: ${da?'Gren':'Branch'} ${fmtI2t(brI2t)} A²s | ${da?'Hoved':'Main'} ${fmtI2t(mainI2tCalc)} A²s | ${da?'Kabelgrænse':'Cable limit'} k²S²=${fmtI2t(cableI2tLimit)} A²s (k=${kAdiab}, S=${cabS} mm²) → ${i2tVerdict}</span></div></div></div>`;
+}
+
+// Printable protection-coordination report (IEC 60364 adiabatic, selectivity, cascading)
+// Shows on print (class print-only inverted), summary of ALL coordination for selected circuit.
+function buildProtReport(){
+  const da = lang==='da';
+  const cons = loadList.length ? loadList.slice(0,16) : [
+    {kW:11,cos:0.9,sf:1,phase:'3',name:'EV-lader'},{kW:11,cos:1,sf:0.7,phase:'3',name:'Komfur'},
+    {kW:3.7,cos:0.95,sf:0.6,phase:'L1',name:'Stikgrupper'},{kW:2.2,cos:0.95,sf:0.6,phase:'L2',name:'Hvidevarer'},
+    {kW:1.5,cos:0.95,sf:1,phase:'L3',name:'Belysning'}
+  ];
+  let idx = (sldFaultRow>=0 && sldFaultRow<cons.length) ? sldFaultRow : cons.findIndex(c=>['motor','ev','heat','cooker'].includes(sldInferType(c)));
+  if(idx<0) idx=0;
+  const c = cons[idx];
+  const ci = lsConsumerCurrent(c);
+  const cIb = Math.max(ci.L1||0,ci.L2||0,ci.L3||0) || (c.kW*1000/((c.phase==='3'?Math.sqrt(3)*400:230)*(c.cos||0.9)));
+  const cab = recommendCables(cIb)[0];
+  const mcb = recommendMCBs(cIb,10)[0];
+  if(!mcb) return '';
+  const In = mcb.rating, curve = mcb.curve||'C';
+  const m = curve==='B'?5:curve==='D'?20:10, Ia = m*In, K = 90;
+  const autoL = (c.dist && c.dist>0) ? c.dist : 25;
+  const L = sldRunLen>0 ? sldRunLen : autoL;
+  const Rkm = cab ? (cab.r!=null?cab.r:(cab.R||0)) : 0;
+  const R1R2 = 2*Rkm*(L/1000);
+  const Ze = sldEarthing==='TN-C-S'?0.35 : sldEarthing==='TN-S'?0.80 : sldEarthing==='TT'?20 : 0;
+  const measZs = sldMeasZsFactor*(Ze+R1R2), Uo=230, Cmin=0.95;
+  let If, scen;
+  if(sldEarthing==='IT' && !sldITSecond){ If=0.5; scen='it1'; }
+  else if(sldEarthing==='IT' && sldITSecond){ If=400/(2*R1R2+0.3); scen='it2'; }
+  else { If=(Cmin*Uo)/measZs; scen=(sldEarthing==='TT')?'tt':'tn'; }
+  const tReq = scen==='it1' ? null : (sldEarthing==='TT'?0.2:((In<=32)?0.4:5));
+  const Iz = cab ? officialIz(cab) : cIb*1.25;
+  // Disconnection time
+  let tDisc; if(If>=Ia)tDisc=0.02; else if(If>1.13*In)tDisc=K/((If/In)*(If/In)-1); else tDisc=Infinity;
+  const fmt=(t)=> t<0.1?t.toFixed(2):t.toFixed(1);
+  // Main device
+  const STD=[6,10,13,16,20,25,32,40,50,63,80,100,125,160,200,250,315,400,500,630];
+  const nextStd=(v)=>STD.find(x=>x>=v)||STD[STD.length-1];
+  let mainIb = (typeof calcLoadSchedule==='function') ? (calcLoadSchedule().ib||0) : 0;
+  if(!(mainIb>0)){ let pT={L1:0,L2:0,L3:0}; cons.forEach(cc=>{const x=lsConsumerCurrent(cc);pT.L1+=x.L1||0;pT.L2+=x.L2||0;pT.L3+=x.L3||0;}); mainIb=Math.max(pT.L1,pT.L2,pT.L3); }
+  mainIb = Math.max(mainIb, In*1.25);
+  const mainType = mainIb<=63 ? 'mcb' : 'fuse';
+  const Inm = Math.max(nextStd(mainIb), nextStd(In));
+  const mainLbl = mainType==='mcb' ? ('C'+Inm+' A') : ('gG '+Inm+' A');
+  const IaM = 10*Inm;
+  const tMain = (I)=> mainType==='mcb'
+    ? (I>=IaM?0.02:(I>1.13*Inm?K/((I/Inm)*(I/Inm)-1):Infinity))
+    : Math.min(1000, Math.max(0.004, 1056*Math.pow(I/Inm,-4.72)));
+  // Selectivity
+  let selVerdict;
+  if(!isFinite(tDisc)){ selVerdict = da?'Via HPFI/tid':'Via RCD/time'; }
+  else { const tm=tMain(If); const ratio=isFinite(tm)?tm/tDisc:999; selVerdict = ratio>=1.5?(da?'SELEKTIV ✓':'SELECTIVE ✓'):(da?'IKKE fuld selektiv ⚠':'NOT fully selective ⚠'); }
+  // Ik & cascading
+  let kVAv = (typeof calcLoadSchedule==='function') ? (calcLoadSchedule().kVA||0) : 0;
+  if(!(kVAv>0)){ kVAv = cons.reduce((a,cc)=>a+(cc.kW||0),0)/0.9; }
+  const trafoK = (typeof TRAFO_SIZES!=='undefined') ? (TRAFO_SIZES.find(t=>t>=kVAv)||630) : 630;
+  const uk = (typeof TRAFO_UK!=='undefined' && TRAFO_UK[trafoK]) ? (TRAFO_UK[trafoK]/100) : 0.04;
+  const Ik = trafoK*1000/(Math.sqrt(3)*400*uk)/1000;
+  const IcuBr = (mcb.icu!=null?mcb.icu:6);
+  const mainProd = mainType==='mcb' ? recommendMCBs(mainIb,10)[0] : (typeof recommendFuses==='function'?recommendFuses(mainIb)[0]:null);
+  const IcuMain = mainProd ? (mainProd.icu!=null?mainProd.icu:(mainType==='fuse'?120:10)) : (mainType==='fuse'?120:10);
+  let cascVerdict;
+  if(Ik<=IcuBr){ cascVerdict = da?'Gren-Icu tilstrækkeligt':'Branch Icu adequate'; }
+  else if(Ik<=IcuMain){ cascVerdict = da?'CASCADING med hovedværn':'CASCADING with main'; }
+  else { cascVerdict = da?'⚠ Icu utilstrækkeligt':'⚠ Icu insufficient'; }
+  // I²t adiabatic
+  const cabS = cab ? cab.mm2 : 2.5;
+  const cabXlpe = cab ? /NOIKLX|NOIKX|NOIK-AL|NOSP/i.test(cab.model||'') : false;
+  const cabMat = cab ? cab.material : 'Cu';
+  const kAdiab = (cabMat==='Cu') ? (cabXlpe ? 143 : 115) : (cabXlpe ? 94 : 76);
+  const cableI2tLimit = kAdiab * kAdiab * cabS * cabS;
+  const brI2t = (isFinite(tDisc) && tDisc>0) ? (If*If*tDisc) : (If*If*0.02);
+  const i2tOk = brI2t <= cableI2tLimit;
+  const i2tVerdict = i2tOk ? (da?'Kablet tåler ✓':'Cable withstands ✓') : (da?'Kablet kan blive beskadiget ⚠':'Cable may be damaged ⚠');
+  const fmtI2t = (v) => v>=1e6 ? (v/1e6).toFixed(1)+'M' : v>=1e3 ? (v/1e3).toFixed(1)+'k' : v.toFixed(0);
+  // Disconnection verdict
+  let discVerdict;
+  if(scen==='it1'){ discVerdict = da?'IMD alarmerer (ingen udkobling)':'IMD alarms (no disconnection)'; }
+  else if(scen==='tt'){ discVerdict = da?'HPFI 30 mA ≤ 0,2 s':'RCD 30 mA ≤ 0.2 s'; }
+  else { discVerdict = (isFinite(tDisc)&&tDisc<=(tReq||5))?(da?'Opfyldt ✓':'Met ✓'):(da?'Ikke opfyldt ⚠':'Not met ⚠'); }
+
+  const row = (l,v,col)=>`<div class="result-row"><span class="label">${l}</span><span class="value"${col?` style="color:${col}"`:''}>${v}</span></div>`;
+  const title = da ? 'Koordinationsrapport' : 'Coordination report';
+  const circName = c.name || ('K'+(idx+1));
+
+  let html = `<div class="card fade-in prot-report" style="page-break-inside:avoid"><style>.prot-report{display:block}@media print{.prot-report{display:block!important;border:2px solid #333;padding:16px;margin:12px 0}}</style>`;
+  html += `<div class="card-title">📋 ${title} — ${circName} · ⏚ ${sldEarthing}</div>`;
+  html += `<div class="result-box ok" style="margin-top:8px">`;
+  html += row(da?'Kreds':'Circuit', circName + ' ('+c.phase+', '+(c.kW||0)+' kW)');
+  html += row('IB ('+da?'driftstrøm':'load current'+')', cIb.toFixed(1)+' A');
+  html += row('In ('+da?'mærkestrøm':'rated current'+')', In+' A ('+curve+In+')');
+  html += row('Iz ('+da?'kabelstrømværdi':'cable current capacity'+')', Iz.toFixed(0)+' A ('+(cab?cab.mm2:'?')+' mm² '+(cabMat)+')');
+  html += row(da?'Jordingssystem':'Earthing system', sldEarthing);
+  html += row('Zs', measZs.toFixed(2)+' Ω (Ze='+Ze.toFixed(2)+', R1+R2='+R1R2.toFixed(3)+')');
+  html += row('Ief ('+da?'fejlstrøm':'fault current'+')', (If<1?'<1':If.toFixed(0))+' A');
+  html += row(da?'Udkoblingstid':'Disconnection time', isFinite(tDisc)?fmt(tDisc)+' s':(da?'Ingen':'None')+' ('+discVerdict+')');
+  html += row(da?'Selektivitet':'Selectivity', selVerdict);
+  html += row(da?'Brydeevne / Cascading':'Breaking capacity / Cascading', cascVerdict + ' (Ik≈'+Ik.toFixed(1)+' kA, Icu gren='+IcuBr+' kA, hoved='+IcuMain+' kA)');
+  html += row('I²t '+da?'adiabatisk kontrol':'adiabatic check', fmtI2t(brI2t)+' A²s '+(i2tOk?'≤':'>')+' '+fmtI2t(cableI2tLimit)+' A²s → '+i2tVerdict, i2tOk?'var(--success)':'var(--danger)');
+  html += `</div>`;
+  html += `<div style="margin-top:10px;text-align:right"><button class="sel-btn" onclick="window.print()" style="font-weight:700">🖨️ ${da?'Print rapport':'Print report'}</button></div>`;
+  html += `</div>`;
+  return html;
 }
 
 // Loop-impedance (Zs), prospective fault current and disconnection-time readout for the
@@ -5048,7 +5171,7 @@ function buildLoopReadout(){
 function renderDrawing(){
   const nodes=getDrawNodes(), typeKeys=Object.keys(NODE_TYPES);
   const nodeEditor=`<div class="select-group"><div class="select-label">${lang==='da'?'Installationens noder (tilf\u00F8j/fjern/flyt)':'Installation nodes (add/remove/move)'}</div>${nodes.map((n,i)=>{const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;return `<div style="display:inline-flex;align-items:center;gap:4px;margin:3px 4px;padding:5px 9px;border:1.5px solid ${nt.color};border-radius:8px;font-size:.78rem;background:rgba(0,0,0,0.25)"><span>${nt.icon}</span><span style="color:${nt.color};font-weight:700">${lang==='da'?nt.da:nt.en}</span><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},-1)">\u25C0</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},1)">\u25B6</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem;color:var(--danger)" onclick="drawNodeRemove(${i})">\u2715</button></div>`;}).join('')}</div><div class="select-group"><div class="select-label">${lang==='da'?'Tilf\u00F8j node':'Add node'}</div><div class="select-grid">${typeKeys.map(k=>`<button class="sel-btn" onclick="drawNodeAdd('${k}')">${NODE_TYPES[k].icon} ${lang==='da'?NODE_TYPES[k].da:NODE_TYPES[k].en}</button>`).join('')}<button class="sel-btn" onclick="drawNodeReset()">\u21BA ${lang==='da'?'Nulstil':'Reset'}</button></div></div>`;
-  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
+  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
 }
 
 // ===== ANALYZING BRAIN MODULE =====
