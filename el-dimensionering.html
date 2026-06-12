@@ -4499,6 +4499,12 @@ let bbSpan = 400; function bbSetSpan(v){bbSpan=+v;renderModule('draw');}
 let derType = 'PV'; function derSetType(v){derType=v;renderModule('draw');}
 let derPower = 10; function derSetPower(v){derPower=+v;renderModule('draw');}
 let derConnection = 'load'; function derSetConnection(v){derConnection=v;renderModule('draw');}
+// Selectivity optimizer state
+let selectOptPriority = 'selectivity'; function setSelectOptPriority(v){selectOptPriority=v;renderModule('draw');}
+// Cable route 3D state
+let cableRouteView = 'iso'; function setCableRouteView(v){cableRouteView=v;renderModule('draw');}
+// Cu vs Al comparison state
+let cuAlMode = 'all'; function setCuAlMode(v){cuAlMode=v;renderModule('draw');}
 // Standard earth-electrode symbol (vertical line + 3 decreasing horizontal bars)
 function earthSymbol(x, y, color){
   return `<g stroke="${color}" stroke-width="2" stroke-linecap="round" fill="none"><line x1="${x}" y1="${y-9}" x2="${x}" y2="${y}"/><line x1="${x-11}" y1="${y}" x2="${x+11}" y2="${y}"/><line x1="${x-7}" y1="${y+4}" x2="${x+7}" y2="${y+4}"/><line x1="${x-3}" y1="${y+8}" x2="${x+3}" y2="${y+8}"/></g>`;
@@ -10385,6 +10391,463 @@ function buildAutoSLD(){
   return htm;
 }
 
+// ===== AUTOMATIC PROTECTION SELECTIVITY OPTIMIZER =====
+function buildSelectivityOpt(){
+  const da = lang==='da';
+  const cons = loadList.length ? loadList.slice(0,16) : [
+    {kW:11,cos:0.9,sf:1,phase:'3',name:'EV-lader',dist:30},{kW:11,cos:1,sf:0.7,phase:'3',name:'Komfur',dist:12},
+    {kW:3.7,cos:0.95,sf:0.6,phase:'L1',name:'Stikgrupper',dist:25},{kW:2.2,cos:0.95,sf:0.6,phase:'L2',name:'Hvidevarer',dist:18},
+    {kW:1.5,cos:0.95,sf:1,phase:'L3',name:'Belysning',dist:22}
+  ];
+  const STD = [6,10,13,16,20,25,32,40,50,63,80,100,125,160,200,250,315,400,500,630];
+  const nextStd = (v) => STD.find(x => x >= v) || STD[STD.length-1];
+  // Main device
+  const ls = calcLoadSchedule();
+  const mainIb = ls.ib || ls.maxPhase || 100;
+  const mainIn = nextStd(mainIb);
+  // Trafo Ik
+  let kVATotal = 0;
+  cons.forEach(c => { const x = lsConsumerCurrent(c); kVATotal += x.kVA||0; });
+  const trafoK = TRAFO_SIZES.find(t => t >= kVATotal) || 630;
+  const uk = (TRAFO_UK[trafoK] || 4) / 100;
+  const Ik = trafoK * 1000 / (Math.sqrt(3) * 400 * uk);
+  // Main cable Iz (to verify we never exceed it)
+  const mainCables = recommendCables(mainIb);
+  const mainCab = mainCables[0];
+  const mainIz = mainCab ? officialIz(mainCab) : 999;
+  // Analyze each branch for selectivity with main
+  let results = [];
+  let fullSelectiveCount = 0;
+  cons.forEach((c, idx) => {
+    const ci = lsConsumerCurrent(c);
+    const IB = Math.max(ci.L1||0, ci.L2||0, ci.L3||0) || (c.kW*1000/((c.phase==='3'?Math.sqrt(3)*400:230)*(c.cos||0.9)));
+    const brIn = nextStd(IB);
+    const mcbs = recommendMCBs(IB, Ik/1000);
+    const mcb = mcbs[0];
+    const cables = recommendCables(IB);
+    const cab = cables[0];
+    const cabIz = cab ? officialIz(cab) : 0;
+    // Selectivity ratio: main/branch >= 1.6 for MCB-MCB, >= 1.0 for fuse-MCB (fuses are inherently more selective)
+    const brRating = mcb ? mcb.rating : brIn;
+    const ratio = mainIn / brRating;
+    // Full selectivity requires ratio >= 1.6 for MCB-MCB per IEC 60947-2 annex A
+    const isSelective = ratio >= 1.6;
+    if(isSelective) fullSelectiveCount++;
+    // Determine optimization options
+    let options = [];
+    // Option A: increase main device (if cable Iz allows)
+    const neededMainA = nextStd(brRating * 1.6);
+    if(neededMainA <= mainIz && neededMainA > mainIn){
+      // CRITICAL SAFETY: verify IB <= In <= Iz after change
+      if(mainIb <= neededMainA && neededMainA <= mainIz){
+        options.push({type:'A', label: da?'Oger hovedvaern':'Increase main device', detail:`${mainIn}A -> ${neededMainA}A`, newRatio:(neededMainA/brRating).toFixed(2), cost: selectOptPriority==='cost'?2:1});
+      }
+    }
+    // Option B: change branch to fuse (inherently better selectivity characteristics per IEC 60269)
+    const fuseOptions = recommendFuses(IB);
+    const fuse = fuseOptions.find(f => f.rating >= IB && f.rating <= cabIz);
+    if(fuse){
+      // Fuse-MCB selectivity is typically achieved at ratio >= 1.0
+      const fuseRatio = mainIn / fuse.rating;
+      if(fuseRatio >= 1.0){
+        options.push({type:'B', label: da?'Skift gren til sikring (gG)':'Change branch to fuse (gG)', detail:`${fuse.brand} ${fuse.model} ${fuse.rating}A`, newRatio: fuseRatio.toFixed(2), cost: selectOptPriority==='cost'?1:2});
+      }
+    }
+    // Option C: add time-delay (Isd) to upstream device
+    if(mainIn >= 100){
+      options.push({type:'C', label: da?'Tilfoej tidsforsinkelse (Isd) til hovedvaern':'Add time-delay (Isd) to main device', detail: da?'Isd=0.1-0.4s':'Isd=0.1-0.4s', newRatio:'FULD', cost: selectOptPriority==='cost'?3:1});
+    }
+    // Option D: use current-limiting branch device (reduces let-through I2t)
+    if(!isSelective && brRating <= 63){
+      options.push({type:'D', label: da?'Brug strombegraensende enhed':'Use current-limiting device', detail: da?'Reducerer gennemgangsenergi':'Reduces let-through energy', newRatio:'I2t', cost: 2});
+    }
+    // Sort by priority
+    if(selectOptPriority==='cost') options.sort((a,b)=>a.cost-b.cost);
+    else if(selectOptPriority==='balance') options.sort((a,b)=>(a.cost+a.type.charCodeAt(0))-(b.cost+b.type.charCodeAt(0)));
+    // CRITICAL SAFETY: never propose reducing branch below IB
+    options = options.filter(o => {
+      if(o.type==='B' && fuse && fuse.rating < IB) return false;
+      return true;
+    });
+    results.push({idx, name:c.name||('K'+(idx+1)), IB, brRating, ratio, isSelective, cabIz, options, mcb, fuse});
+  });
+  // SVG: before/after selectivity map (tree diagram)
+  const svgW = 640, svgH = 260;
+  const branchCount = results.length;
+  let svg = '';
+  svg += `<defs><filter id="selGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+  svg += `<radialGradient id="selBg" cx="50%" cy="30%" r="80%"><stop offset="0%" stop-color="#0d1f33"/><stop offset="100%" stop-color="#060e18"/></radialGradient></defs>`;
+  svg += `<rect width="${svgW}" height="${svgH}" fill="url(#selBg)"/>`;
+  svg += `<text x="${svgW/2}" y="18" text-anchor="middle" font-size="10" font-weight="800" fill="#bfe9ff" filter="url(#selGlow)">${da?'SELEKTIVITETSKORT':'SELECTIVITY MAP'}</text>`;
+  svg += `<text x="${svgW/4}" y="34" text-anchor="middle" font-size="8" fill="#5a8aaa">${da?'FOR (nuvaerende)':'BEFORE (current)'}</text>`;
+  svg += `<text x="${3*svgW/4}" y="34" text-anchor="middle" font-size="8" fill="#5a8aaa">${da?'EFTER (optimeret)':'AFTER (optimized)'}</text>`;
+  svg += `<line x1="${svgW/2}" y1="25" x2="${svgW/2}" y2="${svgH-10}" stroke="#3a5a7c" stroke-width="1" stroke-dasharray="4,3"/>`;
+  // Before side (left)
+  const leftCx = svgW/4, rightCx = 3*svgW/4;
+  const topY = 55, botY = svgH - 30;
+  // Main node
+  svg += `<circle cx="${leftCx}" cy="${topY}" r="14" fill="rgba(0,229,255,0.15)" stroke="#00e5ff" stroke-width="2"/>`;
+  svg += `<text x="${leftCx}" y="${topY+4}" text-anchor="middle" font-size="7" fill="#00e5ff" font-weight="700">${mainIn}A</text>`;
+  svg += `<circle cx="${rightCx}" cy="${topY}" r="14" fill="rgba(6,214,160,0.15)" stroke="#06d6a0" stroke-width="2"/>`;
+  svg += `<text x="${rightCx}" y="${topY+4}" text-anchor="middle" font-size="7" fill="#06d6a0" font-weight="700">${mainIn}A</text>`;
+  // Branch nodes
+  const spacing = Math.min(55, (svgW/2 - 60) / Math.max(branchCount,1));
+  results.forEach((r, i) => {
+    const bx = leftCx - (branchCount-1)*spacing/2 + i*spacing;
+    const by = botY - 20;
+    const color = r.isSelective ? '#06d6a0' : '#ff3b5c';
+    svg += `<line x1="${leftCx}" y1="${topY+14}" x2="${bx}" y2="${by-8}" stroke="${color}" stroke-width="1.5"/>`;
+    svg += `<circle cx="${bx}" cy="${by}" r="8" fill="rgba(${r.isSelective?'6,214,160':'255,59,92'},0.15)" stroke="${color}" stroke-width="1.5"/>`;
+    svg += `<text x="${bx}" y="${by+3}" text-anchor="middle" font-size="5.5" fill="${color}" font-weight="700">${r.brRating}A</text>`;
+    svg += `<text x="${bx}" y="${by+16}" text-anchor="middle" font-size="5" fill="#7fa8c4">${r.ratio.toFixed(1)}</text>`;
+    // Right side (after optimization)
+    const rx = rightCx - (branchCount-1)*spacing/2 + i*spacing;
+    const hasOpt = r.options.length > 0;
+    const afterColor = (r.isSelective || hasOpt) ? '#06d6a0' : '#ffd166';
+    svg += `<line x1="${rightCx}" y1="${topY+14}" x2="${rx}" y2="${by-8}" stroke="${afterColor}" stroke-width="1.5"/>`;
+    svg += `<circle cx="${rx}" cy="${by}" r="8" fill="rgba(6,214,160,0.15)" stroke="${afterColor}" stroke-width="1.5"/>`;
+    svg += `<text x="${rx}" y="${by+3}" text-anchor="middle" font-size="5.5" fill="${afterColor}" font-weight="700">${r.brRating}A</text>`;
+    if(hasOpt && !r.isSelective){
+      svg += `<text x="${rx}" y="${by+16}" text-anchor="middle" font-size="5" fill="#06d6a0">${r.options[0].newRatio}</text>`;
+    }
+  });
+  // Legend
+  svg += `<circle cx="30" cy="${svgH-12}" r="4" fill="none" stroke="#06d6a0" stroke-width="1.5"/>`;
+  svg += `<text x="38" y="${svgH-9}" font-size="6" fill="#06d6a0">${da?'Selektiv':'Selective'}</text>`;
+  svg += `<circle cx="100" cy="${svgH-12}" r="4" fill="none" stroke="#ff3b5c" stroke-width="1.5"/>`;
+  svg += `<text x="108" y="${svgH-9}" font-size="6" fill="#ff3b5c">${da?'Ikke selektiv':'Not selective'}</text>`;
+  svg += `<circle cx="190" cy="${svgH-12}" r="4" fill="none" stroke="#ffd166" stroke-width="1.5"/>`;
+  svg += `<text x="198" y="${svgH-9}" font-size="6" fill="#ffd166">${da?'Delvis':'Partial'}</text>`;
+  const svgTag = `<svg viewBox="0 0 ${svgW} ${svgH}" width="100%" style="max-width:680px;border-radius:12px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 24px rgba(0,160,255,0.15)" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+  // HTML
+  let htm = `<div class="card fade-in"><div class="card-title">\u2694\uFE0F ${da?'Selektivitetsoptimering':'Selectivity optimization'}</div>`;
+  htm += `<div class="info-row">${da?'Analyserer beskyttelsesplanen og foreslar automatisk aendringer for at opna FULD selektivitet. Ratio >= 1.6:1 kraevet for MCB-MCB par (IEC 60947-2 Annex A).':'Analyzes the protection scheme and automatically suggests changes to achieve FULL selectivity. Ratio >= 1.6:1 required for MCB-MCB pairs (IEC 60947-2 Annex A).'}</div>`;
+  // Priority selector
+  htm += `<div class="select-group"><div class="select-label">${da?'Optimeringsprioritet':'Optimization priority'}</div><div class="select-grid">`;
+  htm += `<button class="sel-btn ${selectOptPriority==='selectivity'?'selected':''}" onclick="setSelectOptPriority('selectivity')">\u2694\uFE0F ${da?'Maksimal selektivitet':'Maximize selectivity'}</button>`;
+  htm += `<button class="sel-btn ${selectOptPriority==='cost'?'selected':''}" onclick="setSelectOptPriority('cost')">\uD83D\uDCB0 ${da?'Minimer omkostning':'Minimize cost'}</button>`;
+  htm += `<button class="sel-btn ${selectOptPriority==='balance'?'selected':''}" onclick="setSelectOptPriority('balance')">\u2696\uFE0F ${da?'Balance':'Balance'}</button>`;
+  htm += `</div></div>`;
+  // Status summary
+  const pct = branchCount>0 ? Math.round(fullSelectiveCount/branchCount*100) : 0;
+  const statusColor = pct===100?'#06d6a0':pct>=50?'#ffd166':'#ff3b5c';
+  htm += `<div class="result-box" style="margin:10px 0"><div class="info-row"><b>${da?'Nuvaerende selektivitet':'Current selectivity'}:</b> <span style="color:${statusColor};font-weight:700">${fullSelectiveCount}/${branchCount} ${da?'kredse selektive':'circuits selective'} (${pct}%)</span></div>`;
+  htm += `<div class="info-row"><b>${da?'Hovedvaern':'Main device'}:</b> ${mainIn}A | <b>${da?'Kabel Iz':'Cable Iz'}:</b> ${mainIz}A</div></div>`;
+  // Per-circuit table
+  htm += `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.72rem;color:var(--text-main)">`;
+  htm += `<tr style="border-bottom:1px solid rgba(0,200,255,0.2)"><th style="text-align:left;padding:4px">${da?'Kreds':'Circuit'}</th><th>IB</th><th>In</th><th>${da?'Ratio':'Ratio'}</th><th>${da?'Status':'Status'}</th><th>${da?'Forslag':'Suggestion'}</th></tr>`;
+  results.forEach(r => {
+    const sc = r.isSelective?'#06d6a0':'#ff3b5c';
+    const best = r.options[0];
+    htm += `<tr style="border-bottom:1px solid rgba(0,200,255,0.08)"><td style="padding:4px;font-weight:600">${r.name}</td>`;
+    htm += `<td style="text-align:center">${r.IB.toFixed(1)}A</td>`;
+    htm += `<td style="text-align:center">${r.brRating}A</td>`;
+    htm += `<td style="text-align:center;color:${sc}">${r.ratio.toFixed(2)}</td>`;
+    htm += `<td style="text-align:center;color:${sc}">${r.isSelective?(da?'OK':'OK'):(da?'IKKE SEL.':'NOT SEL.')}</td>`;
+    htm += `<td style="padding:4px;font-size:0.68rem">${r.isSelective?(da?'Ingen aendring':'No change'):(best?best.label+' ('+best.detail+')':'—')}</td></tr>`;
+  });
+  htm += `</table></div>`;
+  // CRITICAL SAFETY warnings
+  htm += `<div class="verify-badge" style="color:#ff3b5c;border-color:#ff3b5c;margin:8px 0">\u26A0\uFE0F ${da?'SIKKERHED: Ingen forslag reducerer en grenvaern under IB. Ingen forslag overskrider kabel Iz. IB <= In <= Iz opretholdes ALTID.':'SAFETY: No suggestion reduces a branch device below IB. No suggestion exceeds cable Iz. IB <= In <= Iz is ALWAYS maintained.'}</div>`;
+  htm += svgTag;
+  htm += `<div style="font-size:0.68rem;color:var(--text-muted);margin-top:6px;font-style:italic">\uD83D\uDCD6 DS/HD 60364-4-43 \u00A7435 \u00B7 IEC 60947-2 \u00B7 Selektivitetsoptimering</div>`;
+  htm += `</div>`;
+  return htm;
+}
+
+// ===== CABLE ROUTE 3D VISUALIZATION =====
+function buildCableRoute3D(){
+  const da = lang==='da';
+  const cons = loadList.length ? loadList.slice(0,12) : [
+    {kW:11,cos:0.9,sf:1,phase:'3',name:'EV-lader',dist:30},{kW:11,cos:1,sf:0.7,phase:'3',name:'Komfur',dist:12},
+    {kW:3.7,cos:0.95,sf:0.6,phase:'L1',name:'Stikgrupper',dist:25},{kW:2.2,cos:0.95,sf:0.6,phase:'L2',name:'Hvidevarer',dist:18},
+    {kW:1.5,cos:0.95,sf:1,phase:'L3',name:'Belysning',dist:22}
+  ];
+  const STD = [6,10,13,16,20,25,32,40,50,63,80,100,125,160,200,250,315,400,500,630];
+  const nextStd = (v) => STD.find(x => x >= v) || STD[STD.length-1];
+  // Calculate cable data for each route
+  let routes = [];
+  let hasOverLimit = false;
+  cons.forEach((c, idx) => {
+    const ci = lsConsumerCurrent(c);
+    const IB = Math.max(ci.L1||0, ci.L2||0, ci.L3||0) || (c.kW*1000/((c.phase==='3'?Math.sqrt(3)*400:230)*(c.cos||0.9)));
+    const cables = recommendCables(IB);
+    const cab = cables[0];
+    const mm2 = cab ? cab.mm2 : 2.5;
+    const r_ohm = cab ? cab.r : 7.41;
+    const x_ohm = cab ? cab.x : 0.105;
+    const L = (c.dist && c.dist > 0) ? c.dist : 25;
+    const cosP = c.cos || 0.9;
+    const sinP = Math.sqrt(1 - cosP*cosP);
+    const Vn = c.phase === '3' ? 400 : 230;
+    // Voltage drop per DS/HD 60364-5-52: dU = IB * L * (r*cosP + x*sinP) / 1000
+    // For 3-phase: dU = sqrt(3) * IB * L * (r*cosP + x*sinP) / 1000
+    const factor = c.phase === '3' ? Math.sqrt(3) : 2;
+    const dU_V = factor * IB * (L/1000) * (r_ohm * cosP + x_ohm * sinP);
+    const dU_pct = (dU_V / Vn) * 100;
+    // DS/HD 60364-5-52 limit: 4% for final circuits, 1% for lighting
+    const isLight = /lys|belysning|light/i.test(c.name||'');
+    const limit = isLight ? 3.0 : 4.0; // Conservative: 3% for lighting
+    const overLimit = dU_pct > limit;
+    const nearLimit = dU_pct > limit * 0.75 && !overLimit;
+    if(overLimit) hasOverLimit = true;
+    routes.push({idx, name:c.name||('K'+(idx+1)), IB, mm2, L, dU_pct, dU_V, overLimit, nearLimit, limit, cab, phase:c.phase});
+  });
+  // SVG: 3D isometric cable routing visualization
+  const svgW = 680, svgH = 380;
+  let svg = '';
+  svg += `<defs><filter id="crGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+  svg += `<radialGradient id="crBg" cx="50%" cy="40%" r="75%"><stop offset="0%" stop-color="#0d1f33"/><stop offset="100%" stop-color="#060e18"/></radialGradient>`;
+  svg += `<filter id="crPulse"><animate attributeName="stdDeviation" values="1;3;1" dur="1s" repeatCount="indefinite"/></filter></defs>`;
+  svg += `<rect width="${svgW}" height="${svgH}" fill="url(#crBg)"/>`;
+  svg += `<text x="${svgW/2}" y="20" text-anchor="middle" font-size="11" font-weight="800" fill="#bfe9ff" filter="url(#crGlow)">${da?'KABELRUTER (3D)':'CABLE ROUTES (3D)'}</text>`;
+  svg += `<text x="${svgW/2}" y="35" text-anchor="middle" font-size="7" fill="#5a8aaa">${da?'Laengde proportional med afstand | Tykkelse proportional med mm2 | Farve = spaendingsfald':'Length proportional to distance | Thickness proportional to mm2 | Color = voltage drop'}</text>`;
+  // Panel center node
+  const cx = svgW/2, cy = svgH/2 + 10;
+  // Isometric offsets based on view
+  const isoAngle = cableRouteView==='top' ? 0 : cableRouteView==='side' ? Math.PI/6 : Math.PI/5;
+  const zFactor = cableRouteView==='top' ? 0 : cableRouteView==='side' ? 0.8 : 0.4;
+  // Panel box
+  svg += `<rect x="${cx-25}" y="${cy-30}" width="50" height="60" fill="rgba(0,229,255,0.12)" stroke="#00e5ff" stroke-width="2" rx="6"/>`;
+  svg += `<text x="${cx}" y="${cy+3}" text-anchor="middle" font-size="8" fill="#00e5ff" font-weight="800">${da?'TAVLE':'PANEL'}</text>`;
+  svg += `<text x="${cx}" y="${cy+14}" text-anchor="middle" font-size="6" fill="#7fa8c4">${sldEarthing}</text>`;
+  // Routes radiating outward
+  const maxDist = Math.max(...routes.map(r=>r.L), 1);
+  const maxMm2 = Math.max(...routes.map(r=>r.mm2), 1);
+  routes.forEach((r, i) => {
+    const angle = (2 * Math.PI * i / routes.length) - Math.PI/2;
+    const lenScale = 100 + (r.L / maxDist) * 80;
+    const ex = cx + Math.cos(angle) * lenScale;
+    const ey = cy + Math.sin(angle) * lenScale * (cableRouteView==='side'?0.5:1) - (zFactor * 20 * (i%3));
+    const thickness = 1 + (r.mm2 / maxMm2) * 4;
+    // Color: green=OK, amber=near limit, red=over limit
+    let color = '#06d6a0';
+    if(r.nearLimit) color = '#ffd166';
+    if(r.overLimit) color = '#ff3b5c';
+    // Cable line with glow for over-limit
+    if(r.overLimit){
+      svg += `<line x1="${cx}" y1="${cy}" x2="${ex}" y2="${ey}" stroke="${color}" stroke-width="${thickness+2}" opacity="0.3"><animate attributeName="opacity" values="0.2;0.6;0.2" dur="0.8s" repeatCount="indefinite"/></line>`;
+    }
+    svg += `<line x1="${cx}" y1="${cy}" x2="${ex}" y2="${ey}" stroke="${color}" stroke-width="${thickness}" stroke-linecap="round"/>`;
+    // Consumer node
+    svg += `<circle cx="${ex}" cy="${ey}" r="12" fill="rgba(${r.overLimit?'255,59,92':r.nearLimit?'255,209,102':'6,214,160'},0.12)" stroke="${color}" stroke-width="1.5"/>`;
+    svg += `<text x="${ex}" y="${ey+3}" text-anchor="middle" font-size="5.5" fill="${color}" font-weight="700">${r.name.substring(0,6)}</text>`;
+    // Labels along cable
+    const mx = (cx + ex) / 2, my = (cy + ey) / 2;
+    svg += `<text x="${mx}" y="${my-8}" text-anchor="middle" font-size="5.5" fill="#bfe9ff">${r.mm2}mm\u00B2 | ${r.L}m</text>`;
+    svg += `<text x="${mx}" y="${my+4}" text-anchor="middle" font-size="5.5" fill="${color}" font-weight="600">\u0394U=${r.dU_pct.toFixed(1)}%</text>`;
+    // Warning icon for over-limit
+    if(r.overLimit){
+      svg += `<text x="${ex+14}" y="${ey-6}" font-size="9" fill="#ff3b5c" font-weight="900">\u26A0</text>`;
+    }
+  });
+  // Legend
+  svg += `<rect x="10" y="${svgH-45}" width="140" height="38" fill="rgba(0,0,0,0.4)" rx="4"/>`;
+  svg += `<circle cx="22" cy="${svgH-32}" r="4" fill="#06d6a0"/>`;
+  svg += `<text x="30" y="${svgH-29}" font-size="6" fill="#06d6a0">\u0394U OK (<75% ${da?'af graense':'of limit'})</text>`;
+  svg += `<circle cx="22" cy="${svgH-21}" r="4" fill="#ffd166"/>`;
+  svg += `<text x="30" y="${svgH-18}" font-size="6" fill="#ffd166">\u0394U ${da?'taet pa graense':'near limit'} (75-100%)</text>`;
+  svg += `<circle cx="22" cy="${svgH-12}" r="4" fill="#ff3b5c"/>`;
+  svg += `<text x="30" y="${svgH-9}" font-size="6" fill="#ff3b5c">\u0394U ${da?'OVER GRAENSE':'OVER LIMIT'} (>100%)</text>`;
+  const svgTag = `<svg viewBox="0 0 ${svgW} ${svgH}" width="100%" style="max-width:720px;border-radius:12px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 24px rgba(0,160,255,0.15)" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+  // HTML
+  let htm = `<div class="card fade-in"><div class="card-title">\uD83D\uDDFA\uFE0F ${da?'Kabelruter (3D)':'Cable routes (3D)'}</div>`;
+  htm += `<div class="info-row">${da?'3D isometrisk visualisering af kabelruter fra tavle til forbrugere. Laengde proportional med reel afstand. Tykkelse proportional med kabeltvaersnit. Farvekode viser spaendingsfald i forhold til DS/HD 60364-graense.':'3D isometric visualization of cable routes from panel to consumers. Length proportional to actual distance. Thickness proportional to cable cross-section. Color code shows voltage drop relative to DS/HD 60364 limit.'}</div>`;
+  // View selector
+  htm += `<div class="select-group"><div class="select-label">${da?'Visningsvinkel':'View angle'}</div><div class="select-grid">`;
+  htm += `<button class="sel-btn ${cableRouteView==='top'?'selected':''}" onclick="setCableRouteView('top')">\u2B07\uFE0F ${da?'Oppefra':'Top-down'}</button>`;
+  htm += `<button class="sel-btn ${cableRouteView==='iso'?'selected':''}" onclick="setCableRouteView('iso')">\uD83D\uDCC0 ${da?'Isometrisk':'Isometric'}</button>`;
+  htm += `<button class="sel-btn ${cableRouteView==='side'?'selected':''}" onclick="setCableRouteView('side')">\u27A1\uFE0F ${da?'Fra siden':'Side view'}</button>`;
+  htm += `</div></div>`;
+  // CRITICAL SAFETY: warn about over-limit routes
+  if(hasOverLimit){
+    htm += `<div class="verify-badge" style="color:#ff3b5c;border-color:#ff3b5c;margin:8px 0">\u26A0\uFE0F ${da?'KRITISK: En eller flere kabelruter OVERSKRIDER spaendingsfaldgraensen (pulserende ROD). Oeg kabeltvaersnit eller reducer afstand!':'CRITICAL: One or more cable routes EXCEED voltage drop limit (pulsing RED). Increase cable cross-section or reduce distance!'}</div>`;
+  }
+  htm += svgTag;
+  // Data table
+  htm += `<div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:0.72rem;color:var(--text-main)">`;
+  htm += `<tr style="border-bottom:1px solid rgba(0,200,255,0.2)"><th style="text-align:left;padding:4px">${da?'Rute':'Route'}</th><th>${da?'Kabel':'Cable'}</th><th>mm\u00B2</th><th>${da?'Laengde':'Length'}</th><th>\u0394U%</th><th>${da?'Graense':'Limit'}</th><th>Status</th></tr>`;
+  routes.forEach(r => {
+    const sc = r.overLimit?'#ff3b5c':r.nearLimit?'#ffd166':'#06d6a0';
+    htm += `<tr style="border-bottom:1px solid rgba(0,200,255,0.08)"><td style="padding:4px;font-weight:600">${r.name}</td>`;
+    htm += `<td style="text-align:center">${r.cab?r.cab.model:'-'}</td>`;
+    htm += `<td style="text-align:center">${r.mm2}</td>`;
+    htm += `<td style="text-align:center">${r.L}m</td>`;
+    htm += `<td style="text-align:center;color:${sc};font-weight:700">${r.dU_pct.toFixed(2)}%</td>`;
+    htm += `<td style="text-align:center">${r.limit}%</td>`;
+    htm += `<td style="text-align:center;color:${sc};font-weight:700">${r.overLimit?(da?'OVER':'OVER'):r.nearLimit?(da?'ADVARSEL':'WARNING'):'OK'}</td></tr>`;
+  });
+  htm += `</table></div>`;
+  htm += `<div style="font-size:0.68rem;color:var(--text-muted);margin-top:6px;font-style:italic">\uD83D\uDCD6 DS/HD 60364-5-52 \u00A7521-\u00A7525 \u00B7 Kabelf\u00F8ring</div>`;
+  htm += `</div>`;
+  return htm;
+}
+
+// ===== COPPER VS ALUMINIUM INSTALLATION COMPARISON =====
+function buildCuAlCompare(){
+  const da = lang==='da';
+  const cons = loadList.length ? loadList.slice(0,16) : [
+    {kW:11,cos:0.9,sf:1,phase:'3',name:'EV-lader',dist:30},{kW:11,cos:1,sf:0.7,phase:'3',name:'Komfur',dist:12},
+    {kW:3.7,cos:0.95,sf:0.6,phase:'L1',name:'Stikgrupper',dist:25},{kW:2.2,cos:0.95,sf:0.6,phase:'L2',name:'Hvidevarer',dist:18},
+    {kW:1.5,cos:0.95,sf:1,phase:'L3',name:'Belysning',dist:22}
+  ];
+  const STD_CU = [1.5,2.5,4,6,10,16,25,35,50,70,95,120,150,185,240];
+  const STD_AL = [16,25,35,50,70,95,120,150,185,240]; // Al not available below 16mm2 in DK standard practice
+  // For each circuit, find equivalent Cu and Al cables
+  let circuits = [];
+  let totalCuCost = 0, totalAlCost = 0;
+  let totalCuWeight = 0, totalAlWeight = 0;
+  let hasSubAl16 = false;
+  cons.forEach((c, idx) => {
+    const ci = lsConsumerCurrent(c);
+    const IB = Math.max(ci.L1||0, ci.L2||0, ci.L3||0) || (c.kW*1000/((c.phase==='3'?Math.sqrt(3)*400:230)*(c.cos||0.9)));
+    const L = (c.dist && c.dist > 0) ? c.dist : 25;
+    const cosP = c.cos || 0.9;
+    const sinP = Math.sqrt(1 - cosP*cosP);
+    const Vn = c.phase === '3' ? 400 : 230;
+    const factor = c.phase === '3' ? Math.sqrt(3) : 2;
+    // Copper: find smallest cable with Iz >= IB
+    let cuMm2 = null, cuIz = 0;
+    for(const mm2 of STD_CU){
+      const iz = IZ_COPPER[mm2] || 0;
+      if(iz >= IB){ cuMm2 = mm2; cuIz = iz; break; }
+    }
+    if(!cuMm2){ cuMm2 = 240; cuIz = IZ_COPPER[240]||380; }
+    // Aluminium: find smallest Al cable with Iz >= IB (only >= 16mm2)
+    let alMm2 = null, alIz = 0;
+    for(const mm2 of STD_AL){
+      const iz = IZ_ALU[mm2] || 0;
+      if(iz >= IB){ alMm2 = mm2; alIz = iz; break; }
+    }
+    if(!alMm2 && IB <= (IZ_ALU[240]||300)){ alMm2 = 240; alIz = IZ_ALU[240]||300; }
+    // CRITICAL SAFETY: Al below 16mm2 is NOT standard practice in Denmark
+    const needsSubAl16 = !alMm2 || (alMm2 === null);
+    if(IB > 0 && (IZ_ALU[16]||58) < IB && !alMm2) { /* cannot find suitable Al cable */ }
+    if(IB <= (IZ_ALU[16]||58) && alMm2 === 16) { /* 16mm2 Al covers it, but small loads typically dont use Al */ }
+    // Check if Al would require less than 16mm2 equivalent
+    const cuEquivForAl = cuMm2;
+    const alNeeded = cuEquivForAl ? (cuEquivForAl < 16) : false;
+    if(alNeeded || !alMm2) hasSubAl16 = true;
+    // Voltage drop for both
+    const cuR = PRODUCTS.cables.find(c2=>c2.mm2===cuMm2&&c2.material==='Cu');
+    const alR = PRODUCTS.cables.find(c2=>c2.mm2===alMm2&&c2.material==='Al');
+    const cuResist = cuR ? cuR.r : (1000/(56*cuMm2));
+    const cuReact = cuR ? cuR.x : 0.08;
+    const alResist = alR ? alR.r : (1000/(35*(alMm2||16)));
+    const alReact = alR ? alR.x : 0.08;
+    const cuDU = factor * IB * (L/1000) * (cuResist*cosP + cuReact*sinP);
+    const alDU = alMm2 ? (factor * IB * (L/1000) * (alResist*cosP + alReact*sinP)) : 0;
+    const cuDUpct = (cuDU/Vn)*100;
+    const alDUpct = alMm2 ? (alDU/Vn)*100 : 0;
+    // Cost (DKK per 100m from priceFor)
+    const cuPrice = priceFor('cables', {mm2:cuMm2, material:'Cu'}) * (L/100);
+    const alPrice = alMm2 ? (priceFor('cables', {mm2:alMm2, material:'Al'}) * (L/100)) : 0;
+    totalCuCost += cuPrice;
+    if(alMm2) totalAlCost += alPrice;
+    // Weight (kg/km): Cu density 8900 kg/m3, Al density 2700 kg/m3
+    // Weight per m = density * area * cores (approximate 4 cores)
+    const cores = 4;
+    const cuWt = 8.9 * (cuMm2/1000000) * cores * L; // kg
+    const alWt = alMm2 ? (2.7 * (alMm2/1000000) * cores * L) : 0;
+    totalCuWeight += cuWt;
+    totalAlWeight += alWt;
+    circuits.push({idx, name:c.name||('K'+(idx+1)), IB, L, cuMm2, alMm2, cuIz, alIz, cuDUpct, alDUpct, cuPrice, alPrice, cuWt, alWt, needsSubAl16:alNeeded||!alMm2, phase:c.phase});
+  });
+  // Savings
+  const savings = totalCuCost - totalAlCost;
+  // Verdict
+  let verdict, verdictColor;
+  const allAbove16 = !hasSubAl16;
+  if(hasSubAl16 && circuits.every(c=>c.needsSubAl16)){
+    verdict = da ? 'Kobber anbefales - alle kredse kraever tvaersnit under 16mm2 (Al ikke standard i DK under 16mm2)' : 'Copper recommended - all circuits require cross-section below 16mm2 (Al not standard in DK below 16mm2)';
+    verdictColor = '#00e5ff';
+  } else if(allAbove16 && savings > 500){
+    verdict = da ? 'Aluminium muligt for hovedkabler (>=16mm2) - spar ' + Math.round(savings) + ' DKK. KRAV: anti-oxidationsmiddel + momentkontrollerede terminaler!' : 'Aluminium viable for main cables (>=16mm2) - save ' + Math.round(savings) + ' DKK. REQUIRED: anti-oxidation compound + torque-controlled terminals!';
+    verdictColor = '#06d6a0';
+  } else {
+    verdict = da ? 'Blandet anbefaling: Al for hovedkabler (>=16mm2), Cu for grene (<16mm2)' : 'Mixed recommendation: Al for mains (>=16mm2), Cu for branches (<16mm2)';
+    verdictColor = '#ffd166';
+  }
+  // SVG: side-by-side bar chart for cost, weight, deltaU, space
+  const svgW = 640, svgH = 220;
+  let svg2 = '';
+  svg2 += `<defs><filter id="cuAlGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+  svg2 += `<radialGradient id="cuAlBg" cx="50%" cy="30%" r="80%"><stop offset="0%" stop-color="#0d1f33"/><stop offset="100%" stop-color="#060e18"/></radialGradient></defs>`;
+  svg2 += `<rect width="${svgW}" height="${svgH}" fill="url(#cuAlBg)"/>`;
+  svg2 += `<text x="${svgW/2}" y="20" text-anchor="middle" font-size="10" font-weight="800" fill="#bfe9ff" filter="url(#cuAlGlow)">${da?'KOBBER vs ALUMINIUM':'COPPER vs ALUMINIUM'}</text>`;
+  // Bar chart categories
+  const cats = [
+    {label: da?'Pris (DKK)':'Cost (DKK)', cu: totalCuCost, al: totalAlCost, unit:'DKK'},
+    {label: da?'Vaegt (kg)':'Weight (kg)', cu: totalCuWeight, al: totalAlWeight, unit:'kg'},
+    {label: da?'Gns. \u0394U%':'Avg. \u0394U%', cu: circuits.reduce((s,c)=>s+c.cuDUpct,0)/Math.max(circuits.length,1), al: circuits.filter(c=>c.alMm2).reduce((s,c)=>s+c.alDUpct,0)/Math.max(circuits.filter(c=>c.alMm2).length,1), unit:'%'},
+    {label: da?'Plads (mm2 total)':'Space (mm2 total)', cu: circuits.reduce((s,c)=>s+c.cuMm2,0), al: circuits.reduce((s,c)=>s+(c.alMm2||0),0), unit:'mm\u00B2'}
+  ];
+  const barAreaTop = 45, barAreaH = 140;
+  const barW = 35, gap = svgW / (cats.length + 1);
+  cats.forEach((cat, i) => {
+    const x = gap * (i + 1) - barW;
+    const maxVal = Math.max(cat.cu, cat.al, 0.01);
+    const cuH = (cat.cu / maxVal) * (barAreaH - 30);
+    const alH = (cat.al / maxVal) * (barAreaH - 30);
+    const baseY = barAreaTop + barAreaH;
+    // Cu bar (copper/orange)
+    svg2 += `<rect x="${x-18}" y="${baseY-cuH}" width="${barW}" height="${cuH}" fill="rgba(255,140,50,0.6)" stroke="#ff8c32" stroke-width="1" rx="3"/>`;
+    svg2 += `<text x="${x-18+barW/2}" y="${baseY-cuH-5}" text-anchor="middle" font-size="6" fill="#ff8c32">${cat.cu.toFixed(cat.unit==='%'?2:0)}</text>`;
+    // Al bar (silver/grey)
+    svg2 += `<rect x="${x+20}" y="${baseY-alH}" width="${barW}" height="${alH}" fill="rgba(180,200,220,0.5)" stroke="#b4c8dc" stroke-width="1" rx="3"/>`;
+    svg2 += `<text x="${x+20+barW/2}" y="${baseY-alH-5}" text-anchor="middle" font-size="6" fill="#b4c8dc">${cat.al.toFixed(cat.unit==='%'?2:0)}</text>`;
+    // Category label
+    svg2 += `<text x="${x+barW/2}" y="${baseY+14}" text-anchor="middle" font-size="7" fill="#7fa8c4">${cat.label}</text>`;
+  });
+  // Legend
+  svg2 += `<rect x="20" y="${svgH-25}" width="12" height="10" fill="rgba(255,140,50,0.6)" stroke="#ff8c32" rx="2"/>`;
+  svg2 += `<text x="36" y="${svgH-17}" font-size="7" fill="#ff8c32">${da?'Kobber (Cu)':'Copper (Cu)'}</text>`;
+  svg2 += `<rect x="120" y="${svgH-25}" width="12" height="10" fill="rgba(180,200,220,0.5)" stroke="#b4c8dc" rx="2"/>`;
+  svg2 += `<text x="136" y="${svgH-17}" font-size="7" fill="#b4c8dc">${da?'Aluminium (Al)':'Aluminium (Al)'}</text>`;
+  if(savings > 0){
+    svg2 += `<text x="${svgW-20}" y="${svgH-17}" text-anchor="end" font-size="8" fill="#06d6a0" font-weight="700">${da?'Besparelse':'Savings'}: ${Math.round(savings)} DKK</text>`;
+  }
+  const svgTag = `<svg viewBox="0 0 ${svgW} ${svgH}" width="100%" style="max-width:680px;border-radius:12px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 24px rgba(0,160,255,0.15)" xmlns="http://www.w3.org/2000/svg">${svg2}</svg>`;
+  // HTML
+  let htm = `<div class="card fade-in"><div class="card-title">\uD83E\uDD49 ${da?'Kobber vs aluminium':'Copper vs aluminium'}</div>`;
+  htm += `<div class="info-row">${da?'Komplet side-om-side sammenligning af kobber vs aluminium for hele installationen. Al kraever typisk ~1.6x Cu-tvaersnittet for samme stroembaereevne (Iz). VIGTIGT: Al-forbindelser KRAEVER anti-oxidationsmiddel og momentkontrollerede klemmer.':'Complete side-by-side comparison of copper vs aluminium for the entire installation. Al typically requires ~1.6x Cu cross-section for same current capacity (Iz). IMPORTANT: Al connections REQUIRE anti-oxidation compound and torque-controlled terminals.'}</div>`;
+  // CRITICAL SAFETY: Al connection warnings
+  htm += `<div class="verify-badge" style="color:#ff3b5c;border-color:#ff3b5c;margin:8px 0">\u26A0\uFE0F ${da?'SIKKERHED: Aluminium-forbindelser KRAEVER: (1) Anti-oxidationsmiddel (kontaktfedt), (2) Momentkontrollerede terminaler (korrekt tilspaending), (3) Periodisk eftersyn (Al kryber under belastning). Manglende overholdelse = brandfelt!':'SAFETY: Aluminium connections REQUIRE: (1) Anti-oxidation compound (contact grease), (2) Torque-controlled terminals (correct tightening), (3) Periodic inspection (Al creeps under load). Non-compliance = fire hazard!'}</div>`;
+  if(hasSubAl16){
+    htm += `<div class="verify-badge" style="color:#ffd166;border-color:#ffd166;margin:8px 0">\u26A0\uFE0F ${da?'ADVARSEL: En eller flere kredse ville kraeve Al under 16mm2 - dette er IKKE standardpraksis i Danmark. Brug kobber for disse kredse.':'WARNING: One or more circuits would require Al below 16mm2 - this is NOT standard practice in Denmark. Use copper for these circuits.'}</div>`;
+  }
+  htm += svgTag;
+  // Summary
+  htm += `<div class="result-box" style="margin-top:10px">`;
+  htm += `<div class="info-row"><b>${da?'Total materialepris Cu':'Total material cost Cu'}:</b> ${Math.round(totalCuCost)} DKK</div>`;
+  htm += `<div class="info-row"><b>${da?'Total materialepris Al':'Total material cost Al'}:</b> ${Math.round(totalAlCost)} DKK ${savings>0?'<span style="color:#06d6a0;font-weight:700">(\u2193'+Math.round(savings)+' DKK)</span>':''}</div>`;
+  htm += `<div class="info-row"><b>${da?'Vaegt Cu':'Weight Cu'}:</b> ${totalCuWeight.toFixed(1)} kg | <b>${da?'Vaegt Al':'Weight Al'}:</b> ${totalAlWeight.toFixed(1)} kg ${totalAlWeight<totalCuWeight?'<span style="color:#06d6a0">(\u2193'+(100-totalAlWeight/Math.max(totalCuWeight,0.01)*100).toFixed(0)+'%)</span>':''}</div>`;
+  htm += `</div>`;
+  // Per-circuit table
+  htm += `<div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:0.72rem;color:var(--text-main)">`;
+  htm += `<tr style="border-bottom:1px solid rgba(0,200,255,0.2)"><th style="text-align:left;padding:4px">${da?'Kreds':'Circuit'}</th><th>IB</th><th>Cu mm\u00B2</th><th>Al mm\u00B2</th><th>Cu \u0394U%</th><th>Al \u0394U%</th><th>${da?'Note':'Note'}</th></tr>`;
+  circuits.forEach(c => {
+    const noteColor = c.needsSubAl16 ? '#ffd166' : '#7fa8c4';
+    const note = c.needsSubAl16 ? (da?'Al<16mm2 - brug Cu':'Al<16mm2 - use Cu') : (c.alMm2?(da?'Al muligt':'Al viable'):'—');
+    htm += `<tr style="border-bottom:1px solid rgba(0,200,255,0.08)"><td style="padding:4px;font-weight:600">${c.name}</td>`;
+    htm += `<td style="text-align:center">${c.IB.toFixed(1)}A</td>`;
+    htm += `<td style="text-align:center">${c.cuMm2}mm\u00B2</td>`;
+    htm += `<td style="text-align:center">${c.alMm2?c.alMm2+'mm\u00B2':'—'}</td>`;
+    htm += `<td style="text-align:center">${c.cuDUpct.toFixed(2)}%</td>`;
+    htm += `<td style="text-align:center">${c.alMm2?c.alDUpct.toFixed(2)+'%':'—'}</td>`;
+    htm += `<td style="text-align:center;color:${noteColor};font-size:0.65rem">${note}</td></tr>`;
+  });
+  htm += `</table></div>`;
+  // Verdict
+  htm += `<div class="verify-badge" style="color:${verdictColor};border-color:${verdictColor};margin:10px 0">${verdict}</div>`;
+  // Long-term reliability warning
+  htm += `<div class="result-box" style="margin-top:8px"><div class="info-row" style="font-weight:700">${da?'Langsigtet palidelighed':'Long-term reliability'}:</div>`;
+  htm += `<div class="info-row">${da?'Al-forbindelser kraever anti-oxidationsmiddel (f.eks. Burndy Penetrox A) og momentkontrollerede klemmer. Al kryber mekanisk under termisk belastning = losne forbindelser over tid = BRANDFARE. Periodisk termografisk eftersyn anbefales staerkt.':'Al connections require anti-oxidation compound (e.g. Burndy Penetrox A) and torque-controlled terminals. Al creeps mechanically under thermal load = loose connections over time = FIRE HAZARD. Periodic thermographic inspection strongly recommended.'}</div></div>`;
+  htm += `<div style="font-size:0.68rem;color:var(--text-muted);margin-top:6px;font-style:italic">\uD83D\uDCD6 DS/HD 60364-5-52 \u00A7521.6 \u00B7 IEC 60228 \u00B7 NKT kabelguide</div>`;
+  htm += `</div>`;
+  return htm;
+}
+
 function buildProtReport(){
   const da = lang==='da';
   const cons = loadList.length ? loadList.slice(0,16) : [
@@ -10671,7 +11134,7 @@ function buildCommissioning(){
 function renderDrawing(){
   const nodes=getDrawNodes(), typeKeys=Object.keys(NODE_TYPES);
   const nodeEditor=`<div class="select-group"><div class="select-label">${lang==='da'?'Installationens noder (tilf\u00F8j/fjern/flyt)':'Installation nodes (add/remove/move)'}</div>${nodes.map((n,i)=>{const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;return `<div style="display:inline-flex;align-items:center;gap:4px;margin:3px 4px;padding:5px 9px;border:1.5px solid ${nt.color};border-radius:8px;font-size:.78rem;background:rgba(0,0,0,0.25)"><span>${nt.icon}</span><span style="color:${nt.color};font-weight:700">${lang==='da'?nt.da:nt.en}</span><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},-1)">\u25C0</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},1)">\u25B6</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem;color:var(--danger)" onclick="drawNodeRemove(${i})">\u2715</button></div>`;}).join('')}</div><div class="select-group"><div class="select-label">${lang==='da'?'Tilf\u00F8j node':'Add node'}</div><div class="select-grid">${typeKeys.map(k=>`<button class="sel-btn" onclick="drawNodeAdd('${k}')">${NODE_TYPES[k].icon} ${lang==='da'?NODE_TYPES[k].da:NODE_TYPES[k].en}</button>`).join('')}<button class="sel-btn" onclick="drawNodeReset()">\u21BA ${lang==='da'?'Nulstil':'Reset'}</button></div></div>`;
-  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():(sldFault?buildCoordDashboard():'')+buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildArcFlash():''}${drawStyle==='schematic'&&sldFault?buildDeratingChart():''}${drawStyle==='schematic'&&sldFault?buildInrushCheck():''}${drawStyle==='schematic'&&sldFault?buildEnergyEfficiency():''}${drawStyle==='schematic'&&sldFault?buildHarmonicCheck():''}${drawStyle==='schematic'&&sldFault?buildCableLifetime():''}${drawStyle==='schematic'&&sldFault?buildPowerFlow():''}${drawStyle==='schematic'&&sldFault?buildVoltageProfile():''}${drawStyle==='schematic'&&sldFault?buildEmcRouting():''}${drawStyle==='schematic'&&sldFault?buildMotorStart():''}${drawStyle==='schematic'&&sldFault?buildCapBank():''}${drawStyle==='schematic'&&sldFault?buildRelaySettings():''}${drawStyle==='schematic'&&sldFault?buildGenSet():''}${drawStyle==='schematic'&&sldFault?buildLightningRisk():''}${drawStyle==='schematic'&&sldFault?buildThermalPred():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='schematic'&&sldFault?buildDiscrimTable():''}${drawStyle==='schematic'&&sldFault?buildCommissioning():''}${drawStyle==='schematic'&&sldFault?buildInspectionInterval():''}${drawStyle==='schematic'&&sldFault?buildZsSimulator():''}${drawStyle==='schematic'&&sldFault?buildSelectiveMap():''}${drawStyle==='schematic'&&sldFault?buildTouchVoltage():''}${drawStyle==='schematic'&&sldFault?buildDocChecklist():''}${drawStyle==='schematic'&&sldFault?buildVoltageUnbalance():''}${drawStyle==='schematic'&&sldFault?buildGroundingWizard():''}${drawStyle==='schematic'&&sldFault?buildTrayFill():''}${drawStyle==='schematic'&&sldFault?buildMotorIk():''}${drawStyle==='schematic'&&sldFault?buildCableFire():''}${drawStyle==='schematic'&&sldFault?buildLoadOptimizer():''}${drawStyle==='schematic'&&sldFault?buildPEVerify():''}${drawStyle==='schematic'&&sldFault?buildTimeMargin():''}${drawStyle==='schematic'&&sldFault?buildCostEstimate():''}${drawStyle==='schematic'&&sldFault?buildRcdCoord():''}${drawStyle==='schematic'&&sldFault?buildFaultMap():''}${drawStyle==='schematic'&&sldFault?buildComplianceScore():''}${drawStyle==='schematic'&&sldFault?buildPowerStudy():''}${drawStyle==='schematic'&&sldFault?buildFaultTemp():''}${drawStyle==='schematic'&&sldFault?buildCircuitDesign():''}${drawStyle==='schematic'&&sldFault?buildPfPenalty():''}${drawStyle==='schematic'&&sldFault?buildEmergencyLighting():''}${drawStyle==='schematic'&&sldFault?buildPullForce():''}${drawStyle==='schematic'&&sldFault?buildVdropOptimizer():''}${drawStyle==='schematic'&&sldFault?buildStorageOptimizer():''}${drawStyle==='schematic'&&sldFault?buildReliability():''}${drawStyle==='schematic'&&sldFault?buildResidualLife():''}${drawStyle==='schematic'&&sldFault?buildBusbarWithstand():''}${drawStyle==='schematic'&&sldFault?buildDerBlinding():''}${drawStyle==='schematic'&&sldFault?buildSettingSheet():''}${drawStyle==='schematic'&&sldFault?buildCableSchedule():''}${drawStyle==='schematic'&&sldFault?buildAutoSLD():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
+  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():(sldFault?buildCoordDashboard():'')+buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildArcFlash():''}${drawStyle==='schematic'&&sldFault?buildDeratingChart():''}${drawStyle==='schematic'&&sldFault?buildInrushCheck():''}${drawStyle==='schematic'&&sldFault?buildEnergyEfficiency():''}${drawStyle==='schematic'&&sldFault?buildHarmonicCheck():''}${drawStyle==='schematic'&&sldFault?buildCableLifetime():''}${drawStyle==='schematic'&&sldFault?buildPowerFlow():''}${drawStyle==='schematic'&&sldFault?buildVoltageProfile():''}${drawStyle==='schematic'&&sldFault?buildEmcRouting():''}${drawStyle==='schematic'&&sldFault?buildMotorStart():''}${drawStyle==='schematic'&&sldFault?buildCapBank():''}${drawStyle==='schematic'&&sldFault?buildRelaySettings():''}${drawStyle==='schematic'&&sldFault?buildGenSet():''}${drawStyle==='schematic'&&sldFault?buildLightningRisk():''}${drawStyle==='schematic'&&sldFault?buildThermalPred():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='schematic'&&sldFault?buildDiscrimTable():''}${drawStyle==='schematic'&&sldFault?buildCommissioning():''}${drawStyle==='schematic'&&sldFault?buildInspectionInterval():''}${drawStyle==='schematic'&&sldFault?buildZsSimulator():''}${drawStyle==='schematic'&&sldFault?buildSelectiveMap():''}${drawStyle==='schematic'&&sldFault?buildTouchVoltage():''}${drawStyle==='schematic'&&sldFault?buildDocChecklist():''}${drawStyle==='schematic'&&sldFault?buildVoltageUnbalance():''}${drawStyle==='schematic'&&sldFault?buildGroundingWizard():''}${drawStyle==='schematic'&&sldFault?buildTrayFill():''}${drawStyle==='schematic'&&sldFault?buildMotorIk():''}${drawStyle==='schematic'&&sldFault?buildCableFire():''}${drawStyle==='schematic'&&sldFault?buildLoadOptimizer():''}${drawStyle==='schematic'&&sldFault?buildPEVerify():''}${drawStyle==='schematic'&&sldFault?buildTimeMargin():''}${drawStyle==='schematic'&&sldFault?buildCostEstimate():''}${drawStyle==='schematic'&&sldFault?buildRcdCoord():''}${drawStyle==='schematic'&&sldFault?buildFaultMap():''}${drawStyle==='schematic'&&sldFault?buildComplianceScore():''}${drawStyle==='schematic'&&sldFault?buildPowerStudy():''}${drawStyle==='schematic'&&sldFault?buildFaultTemp():''}${drawStyle==='schematic'&&sldFault?buildCircuitDesign():''}${drawStyle==='schematic'&&sldFault?buildPfPenalty():''}${drawStyle==='schematic'&&sldFault?buildEmergencyLighting():''}${drawStyle==='schematic'&&sldFault?buildPullForce():''}${drawStyle==='schematic'&&sldFault?buildVdropOptimizer():''}${drawStyle==='schematic'&&sldFault?buildStorageOptimizer():''}${drawStyle==='schematic'&&sldFault?buildReliability():''}${drawStyle==='schematic'&&sldFault?buildResidualLife():''}${drawStyle==='schematic'&&sldFault?buildBusbarWithstand():''}${drawStyle==='schematic'&&sldFault?buildDerBlinding():''}${drawStyle==='schematic'&&sldFault?buildSettingSheet():''}${drawStyle==='schematic'&&sldFault?buildCableSchedule():''}${drawStyle==='schematic'&&sldFault?buildAutoSLD():''}${drawStyle==='schematic'&&sldFault?buildSelectivityOpt():''}${drawStyle==='schematic'&&sldFault?buildCableRoute3D():''}${drawStyle==='schematic'&&sldFault?buildCuAlCompare():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
 }
 
 // ===== ANALYZING BRAIN MODULE =====
