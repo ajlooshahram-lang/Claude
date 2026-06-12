@@ -2271,6 +2271,7 @@ function renderLoad() {
         <div class="result-row"><span class="label">${t('sApparent')}</span><span class="value">${S.toFixed(2)} kVA</span></div>
         <div class="result-row"><span class="label">${t('voltage')}</span><span class="value">${loadState.voltage} V</span></div>
         <div class="result-row"><span class="label">${t('powerFactor')}</span><span class="value">${loadState.cosPhi}</span></div>
+        <div style="font-size:0.68rem;color:var(--text-muted);margin-top:4px;font-style:italic">📖 DS/HD 60364-5-52 §523 · IB ≤ In ≤ Iz</div>
       </div>
     </div>
 
@@ -2386,6 +2387,7 @@ function renderFuse() {
         <div class="result-row"><span class="label">${t('fuseCurrent5s')}</span><span class="value">${FUSE_5S[fuseState.size] || '—'} A</span></div>
         <div class="result-row"><span class="label">${t('fuseCurrentRange')}</span><span class="value">${holder.range}</span></div>
         <div class="result-row"><span class="label">${t('fuseBreaker')}</span><span class="value">${holder.breaker}</span></div>
+        <div style="font-size:0.68rem;color:var(--text-muted);margin-top:4px;font-style:italic">📖 IEC 60269 · DS/HD 60364-4-43 §433</div>
       </div>
     </div>
     ` : ''}
@@ -2453,6 +2455,7 @@ function renderMCB() {
         <div class="result-row"><span class="label">Ics</span><span class="value">${(icu * mcb.ics).toFixed(1)} kA</span></div>
         <div class="result-row"><span class="label">${t('mcbIsd')}</span><span class="value">${isdMin} - ${isdMax} A</span></div>
         <div class="result-row"><span class="label">${t('mcbPoles')}</span><span class="value">${mcbState.poles === '1p' ? '1P' : 'Multi-pole'}</span></div>
+        <div style="font-size:0.68rem;color:var(--text-muted);margin-top:4px;font-style:italic">📖 IEC 60898-1 · DS/HD 60364-4-43 §433 · Sikkerhedsstyrelsen.dk</div>
       </div>
     </div>
     ` : ''}
@@ -2530,6 +2533,7 @@ function renderMCCB() {
         <div class="result-row"><span class="label">${t('mccbIr')}</span><span class="value">${(mccbState.inVal * 0.4).toFixed(0)} - ${io.toFixed(0)} A</span></div>
         <div class="result-row"><span class="label">${t('mccbIsdCalc')}</span><span class="value">${isdMin.toFixed(0)} - ${isdMax.toFixed(0)} A (\u00B110%)</span></div>
         <div class="result-row"><span class="label">${t('mccbIi')}</span><span class="value">${ii} A</span></div>
+        <div style="font-size:0.68rem;color:var(--text-muted);margin-top:4px;font-style:italic">📖 IEC 60947-2 · DS/HD 60364-4-43 §433 · Micrologic 2.2</div>
       </div>
     </div>
   `;
@@ -2640,6 +2644,7 @@ function renderCable() {
         <div class="result-row"><span class="label">Iz (${lang === 'da' ? 'basis' : 'base'})</span><span class="value">${baseIz} A</span></div>
         <div class="result-row"><span class="label">K (total)</span><span class="value">${kTotal.toFixed(3)}</span></div>
         <div class="result-row"><span class="label">${t('cableIz')} (${lang === 'da' ? 'korrigeret' : 'corrected'})</span><span class="value">${correctedIz.toFixed(1)} A</span></div>
+        <div style="font-size:0.68rem;color:var(--text-muted);margin-top:4px;font-style:italic">📖 DS/HD 60364-5-52 Tabel C.52.1 · Iz officiel</div>
       </div>
     </div>
     ` : ''}
@@ -4370,6 +4375,8 @@ function sldSetEarthing(s){ sldEarthing = s; renderModule('draw'); }
 let sldITSecond = false;     // IT system: escalate to a 2nd fault
 let sldRunLen = 0;           // loop-calc run length override (m); 0 = auto
 let sldMeasZsFactor = 1;     // measured Zs as a multiple of calculated
+let costEstHourly = 550;     // hourly rate for cost estimator
+function setCostEstHourly(v){costEstHourly=v;renderModule('draw');}
 let derSoilRes = 1.0;        // soil thermal resistivity K·m/W for buried cables (method D)
 function setDerSoilRes(v){ derSoilRes = +v; renderModule('draw'); }
 let inrushType = 'oil';      // transformer type for inrush: 'oil' | 'dry'
@@ -8224,6 +8231,197 @@ function buildLoadOptimizer(){
   return html;
 }
 
+
+function buildPEVerify(){
+  const da = lang==='da';
+  const cons = loadList.length ? loadList.slice(0,16) : [
+    {kW:11,cos:0.9,sf:1,phase:'3',name:'EV-lader'},{kW:11,cos:1,sf:0.7,phase:'3',name:'Komfur'},
+    {kW:3.7,cos:0.95,sf:0.6,phase:'L1',name:'Stikgrupper'},{kW:2.2,cos:0.95,sf:0.6,phase:'L2',name:'Hvidevarer'},
+    {kW:1.5,cos:0.95,sf:1,phase:'L3',name:'Belysning'}
+  ];
+  function peRequired(phaseMm2){
+    if(phaseMm2<=16) return phaseMm2;
+    if(phaseMm2<=35) return 16;
+    return Math.ceil(phaseMm2/2);
+  }
+  const stdSizes = [1.5,2.5,4,6,10,16,25,35,50,70,95,120,150,185,240];
+  const snapPE = (v)=> stdSizes.find(s=>s>=v)||v;
+  let rows = '';
+  let allPass = true;
+  cons.forEach((c,i)=>{
+    const cIb = (c.kW*1000)/((c.phase==='3'?Math.sqrt(3)*400:230)*(c.cos||0.9))*(c.sf||1);
+    const cab = recommendCables(cIb)[0];
+    const phaseMm2 = cab ? parseFloat(cab.mm2||cab.size||'2.5') : 2.5;
+    const reqPE = snapPE(peRequired(phaseMm2));
+    const actualPE = phaseMm2;
+    const ok = actualPE >= reqPE;
+    if(!ok) allPass = false;
+    rows += `<div class="result-row"><span class="label">${c.name||('Gr.'+(i+1))} (${phaseMm2} mm\u00b2)</span><span class="value" style="color:${ok?'var(--success)':'var(--danger)'}">${da?'PE krav':'PE req'}: ${reqPE} mm\u00b2 | ${da?'Aktuel':'Actual'}: ${actualPE} mm\u00b2 ${ok?'\u2705':'\u274c'}</span></div>`;
+  });
+  const largestPE = Math.max(...cons.map((c)=>{
+    const cIb = (c.kW*1000)/((c.phase==='3'?Math.sqrt(3)*400:230)*(c.cos||0.9))*(c.sf||1);
+    const cab = recommendCables(cIb)[0];
+    return cab ? parseFloat(cab.mm2||cab.size||'2.5') : 2.5;
+  }));
+  const mainBond = Math.max(6, snapPE(Math.ceil(largestPE/2)));
+  let html = `<div class="card fade-in"><div class="card-title">\u{1f6e1}\ufe0f ${da?'PE-leder kontrol':'PE conductor check'}</div>`;
+  html += `<div class="info-row" style="margin-bottom:8px">${da?'Kontrollerer beskyttelsesledertv\u00e6rsnit iht. DS/HD 60364-5-54 Tabel 54.2. NOIKLX 5G-kabler har PE = fasetv\u00e6rsnit.':'Checks protective conductor sizing per DS/HD 60364-5-54 Table 54.2. NOIKLX 5G cables have PE = phase size.'}</div>`;
+  html += `<div class="result-box">${rows}`;
+  html += `<div class="result-row" style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><span class="label">${da?'Hovedudligningsforbindelse':'Main equipotential bonding'}</span><span class="value">\u2265 ${mainBond} mm\u00b2 Cu</span></div>`;
+  html += `</div>`;
+  const verdictColor = allPass ? 'var(--success)' : 'var(--danger)';
+  const verdictText = allPass ? (da?'Alle PE-ledere opfylder kravene':'All PE conductors meet requirements') : (da?'En eller flere PE-ledere er underdimensionerede':'One or more PE conductors are undersized');
+  html += `<div style="margin-top:10px;padding:10px 14px;border-radius:8px;border:1.5px solid ${verdictColor};background:rgba(0,0,0,0.2)">`;
+  html += `<div style="font-weight:700;color:${verdictColor};font-size:0.9rem">${allPass?'\u2705':'\u274c'} ${verdictText}</div>`;
+  html += `<div style="font-size:0.68rem;color:var(--text-muted);margin-top:4px;font-style:italic">\u{1f4d6} DS/HD 60364-5-54 \u00a7543 Tabel 54.2 \u00b7 Beskyttelsesledere</div>`;
+  html += `</div></div>`;
+  return html;
+}
+
+function buildTimeMargin(){
+  const da = lang==='da';
+  const cons = loadList.length ? loadList.slice(0,12) : [
+    {kW:11,cos:0.9,sf:1,phase:'3',name:'EV-lader'},{kW:11,cos:1,sf:0.7,phase:'3',name:'Komfur'},
+    {kW:3.7,cos:0.95,sf:0.6,phase:'L1',name:'Stikgrupper'},{kW:2.2,cos:0.95,sf:0.6,phase:'L2',name:'Hvidevarer'},
+    {kW:1.5,cos:0.95,sf:1,phase:'L3',name:'Belysning'}
+  ];
+  const STD=[6,10,13,16,20,25,32,40,50,63,80,100,125,160,200,250,315,400,500,630];
+  const nextStd=(v)=>STD.find(x=>x>=v)||STD[STD.length-1];
+  let mainIb=0;
+  cons.forEach(c=>{const x=lsConsumerCurrent(c);mainIb+=Math.max(x.L1||0,x.L2||0,x.L3||0)||(c.kW*1000/((c.phase==='3'?Math.sqrt(3)*400:230)*(c.cos||0.9))*(c.sf||1));});
+  const Inm = Math.max(nextStd(mainIb),63);
+  const K=90;
+  const tMain=(I)=> I>=10*Inm ? 0.02 : (I>1.13*Inm ? K/((I/Inm)*(I/Inm)-1) : 999);
+  const svgW=420, svgH=40+cons.length*28;
+  let svg = `<svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;max-width:420px;height:auto;margin:10px auto;display:block;background:rgba(0,0,0,0.3);border-radius:12px;border:1px solid rgba(0,200,255,0.15)">`;
+  svg += `<text x="${svgW/2}" y="16" text-anchor="middle" fill="#bfe9ff" font-size="9" font-weight="700">${da?'Tidsmargin pr. gruppe (hovedenhed C'+Inm+')':'Time margin per circuit (main device C'+Inm+')'}</text>`;
+  const barX=140, maxBarW=240;
+  cons.forEach((c,i)=>{
+    const cIb=(c.kW*1000)/((c.phase==='3'?Math.sqrt(3)*400:230)*(c.cos||0.9))*(c.sf||1);
+    const mcb = recommendMCBs(cIb,10)[0];
+    const In = mcb?mcb.rating:16;
+    const curve = (mcb&&mcb.curve)||'C';
+    const m = curve==='B'?5:curve==='D'?20:10;
+    const Ia = m*In;
+    const cab = recommendCables(cIb)[0];
+    const L = (c.dist&&c.dist>0)?c.dist:25;
+    const Rkm = cab?(cab.r!=null?cab.r:(cab.R||0)):0;
+    const Ze=0.35;
+    const Zs = Ze + 2*Rkm*(L/1000);
+    const If = Zs>0 ? (0.95*230)/Zs : 3000;
+    const tBranch = If>=Ia ? 0.02 : (If>1.13*In ? K/((If/In)*(If/In)-1) : 999);
+    const tMainV = tMain(If);
+    const margin = Math.min(tMainV - tBranch, 5);
+    const clampedMargin = Math.max(margin, 0);
+    const color = margin>=0.15 ? '#06d6a0' : (margin>=0.05 ? '#ffd166' : '#ef476f');
+    const barW = Math.min(maxBarW, (clampedMargin/2)*maxBarW);
+    const y = 28 + i*28;
+    svg += `<text x="4" y="${y+5}" fill="#7fa8c4" font-size="7">${(c.name||('Gr.'+(i+1))).substring(0,16)}</text>`;
+    svg += `<rect x="${barX}" y="${y-6}" width="${Math.max(barW,2)}" height="14" rx="3" fill="${color}" opacity="0.75"/>`;
+    svg += `<text x="${barX+Math.max(barW,2)+4}" y="${y+4}" fill="${color}" font-size="7">${margin>=999?'\u221e':margin.toFixed(2)}s</text>`;
+  });
+  svg += `<line x1="${barX+(0.15/2)*maxBarW}" y1="22" x2="${barX+(0.15/2)*maxBarW}" y2="${svgH-4}" stroke="#06d6a0" stroke-dasharray="2,2" stroke-width="0.5" opacity="0.6"/>`;
+  svg += `<text x="${barX+(0.15/2)*maxBarW}" y="${svgH-1}" text-anchor="middle" fill="#06d6a0" font-size="6">0.15s</text>`;
+  svg += `</svg>`;
+  let html = `<div class="card fade-in"><div class="card-title">\u{23f1}\ufe0f ${da?'Tidsmargin (selektivitet)':'Time margin (selectivity)'}</div>`;
+  html += `<div class="info-row" style="margin-bottom:8px">${da?'Viser tidsmarginen mellem hovedenhed og hver gruppeafbryder ved den prospektive kortslutningsstr\u00f8m. IEC 60947-2 anbefaler \u22650,15 s margin.':'Shows time margin between main device and each branch breaker at the prospective fault current. IEC 60947-2 recommends \u22650.15 s margin.'}</div>`;
+  html += svg;
+  html += `<div class="result-box" style="margin-top:8px">`;
+  html += `<div class="result-row"><span class="label">${da?'Hovedenhed':'Main device'}</span><span class="value">C${Inm} A</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Anbefalet margin':'Recommended margin'}</span><span class="value">\u2265 0,15 s (IEC 60947-2)</span></div>`;
+  html += `</div>`;
+  html += `<div style="margin-top:10px;padding:10px 14px;border-radius:8px;border:1.5px solid var(--primary);background:rgba(0,0,0,0.2)">`;
+  html += `<div style="font-size:0.68rem;color:var(--text-muted);margin-top:4px;font-style:italic">\u{1f4d6} DS/HD 60364-4-43 \u00a7435 \u00b7 IEC 60947-2 \u00a72.17</div>`;
+  html += `</div></div>`;
+  return html;
+}
+
+function buildCostEstimate(){
+  const da = lang==='da';
+  const cons = loadList.length ? loadList.slice(0,20) : [
+    {kW:11,cos:0.9,sf:1,phase:'3',name:'EV-lader'},{kW:11,cos:1,sf:0.7,phase:'3',name:'Komfur'},
+    {kW:3.7,cos:0.95,sf:0.6,phase:'L1',name:'Stikgrupper'},{kW:2.2,cos:0.95,sf:0.6,phase:'L2',name:'Hvidevarer'},
+    {kW:1.5,cos:0.95,sf:1,phase:'L3',name:'Belysning'}
+  ];
+  const hourlyRate = costEstHourly || 550;
+  let matTotal = 0;
+  let totalCableM = 0;
+  let deviceCount = 0;
+  cons.forEach(c=>{
+    const cIb=(c.kW*1000)/((c.phase==='3'?Math.sqrt(3)*400:230)*(c.cos||0.9))*(c.sf||1);
+    const cab = recommendCables(cIb)[0];
+    const mcb = recommendMCBs(cIb,10)[0];
+    const L = (c.dist&&c.dist>0)?c.dist:25;
+    totalCableM += L;
+    if(cab) matTotal += priceFor('cables',{mm2:parseFloat(cab.mm2||cab.size||'2.5'),material:'Cu'}) * (L/100);
+    if(mcb){ matTotal += priceFor('mcbs',{rating:mcb.rating,icu:mcb.icu||6}); deviceCount++; }
+    matTotal += priceFor('rcds',{rating:mcb?mcb.rating:16,rcdType:'A'});
+    deviceCount++;
+  });
+  const STD=[6,10,13,16,20,25,32,40,50,63,80,100,125,160,200,250,315,400,500,630];
+  const nextStd=(v)=>STD.find(x=>x>=v)||STD[STD.length-1];
+  let mainIb=0;
+  cons.forEach(c=>{mainIb+=(c.kW*1000)/((c.phase==='3'?Math.sqrt(3)*400:230)*(c.cos||0.9))*(c.sf||1);});
+  if(mainIb>63){ matTotal += priceFor('mccbs',{frame:'NSX 160'}); deviceCount++; }
+  else { matTotal += priceFor('mcbs',{rating:nextStd(mainIb),icu:10}); deviceCount++; }
+  const laborMinutes = totalCableM*3 + deviceCount*15 + 120;
+  const laborHours = laborMinutes/60;
+  const laborCost = Math.round(laborHours * hourlyRate);
+  const testMinutes = deviceCount*10 + 60;
+  const testCost = Math.round((testMinutes/60)*hourlyRate);
+  const totalCost = matTotal + laborCost + testCost;
+  const totalKVA = cons.reduce((a,c)=>a+(c.kW/(c.cos||0.9)),0);
+  const marketPrice = Math.round(totalKVA * 3000);
+  const svgW=240, svgH=240, cx=120, cy=120, r=80;
+  const total = matTotal+laborCost+testCost;
+  const slices = [
+    {label:da?'Materialer':'Materials', val:matTotal, color:'#00e5ff'},
+    {label:da?'Arbejdslon':'Labor', val:laborCost, color:'#06d6a0'},
+    {label:da?'Test/ibrugtagning':'Testing', val:testCost, color:'#ffd166'}
+  ];
+  let startAngle = 0;
+  let paths = '';
+  slices.forEach(s=>{
+    const pct = s.val/total;
+    const angle = pct*2*Math.PI;
+    const endAngle = startAngle+angle;
+    const largeArc = angle>Math.PI?1:0;
+    const x1=cx+r*Math.cos(startAngle), y1=cy+r*Math.sin(startAngle);
+    const x2=cx+r*Math.cos(endAngle), y2=cy+r*Math.sin(endAngle);
+    paths += `<path d="M${cx},${cy} L${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 ${largeArc},1 ${x2.toFixed(1)},${y2.toFixed(1)} Z" fill="${s.color}" opacity="0.7" stroke="#0a1628" stroke-width="1"/>`;
+    const mid = startAngle+angle/2;
+    const lx=cx+(r*0.6)*Math.cos(mid), ly=cy+(r*0.6)*Math.sin(mid);
+    paths += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" fill="#fff" font-size="7" font-weight="700">${(pct*100).toFixed(0)}%</text>`;
+    startAngle = endAngle;
+  });
+  let svg = `<svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;max-width:240px;height:auto;margin:10px auto;display:block;background:rgba(0,0,0,0.3);border-radius:12px;border:1px solid rgba(0,200,255,0.15)">`;
+  svg += paths;
+  slices.forEach((s,i)=>{
+    svg += `<rect x="10" y="${svgH-50+i*14}" width="10" height="8" rx="2" fill="${s.color}" opacity="0.7"/>`;
+    svg += `<text x="24" y="${svgH-43+i*14}" fill="#7fa8c4" font-size="7">${s.label}</text>`;
+  });
+  svg += `</svg>`;
+  let html = `<div class="card fade-in"><div class="card-title">\u{1f4b0} ${da?'Omkostningsestimat':'Cost estimate'}</div>`;
+  html += `<div class="info-row" style="margin-bottom:8px">${da?'Estimerer samlede installationsomkostninger baseret p\u00e5 det aktuelle design. Timepris kan justeres.':'Estimates total installation cost based on the current design. Hourly rate can be adjusted.'}</div>`;
+  html += `<div class="select-group"><div class="select-label">${da?'Timepris (DKK/time)':'Hourly rate (DKK/hr)'}</div><div class="select-grid">`;
+  [450,500,550,600,650,750].forEach(rv=>{
+    html += `<button class="sel-btn ${hourlyRate===rv?'selected':''}" onclick="setCostEstHourly(${rv})">${rv}</button>`;
+  });
+  html += `</div></div>`;
+  html += svg;
+  html += `<div class="result-box" style="margin-top:8px">`;
+  html += `<div class="result-row"><span class="label">${da?'Materialer':'Materials'}</span><span class="value">${Math.round(matTotal).toLocaleString('da-DK')} DKK</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Arbejdslon':'Labor'} (${laborHours.toFixed(1)} ${da?'timer':'hrs'} \u00d7 ${hourlyRate})</span><span class="value">${laborCost.toLocaleString('da-DK')} DKK</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Test/ibrugtagning':'Testing/commissioning'}</span><span class="value">${testCost.toLocaleString('da-DK')} DKK</span></div>`;
+  html += `<div class="result-row" style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;font-weight:700"><span class="label">${da?'Total estimat':'Total estimate'}</span><span class="value" style="color:#00e5ff">${Math.round(totalCost).toLocaleString('da-DK')} DKK</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Markedspris (benchmark)':'Market price (benchmark)'}</span><span class="value">${marketPrice.toLocaleString('da-DK')} DKK (~3.000 DKK/kVA)</span></div>`;
+  html += `</div>`;
+  html += `<div style="margin-top:10px;padding:10px 14px;border-radius:8px;border:1.5px solid var(--primary);background:rgba(0,0,0,0.2)">`;
+  html += `<div style="font-size:0.68rem;color:var(--text-muted);margin-top:4px;font-style:italic">\u{1f4d6} Akkord/tidsfortegnelse \u00b7 Dansk El-Forbund</div>`;
+  html += `</div></div>`;
+  return html;
+}
+
 function buildProtReport(){
   const da = lang==='da';
   const cons = loadList.length ? loadList.slice(0,16) : [
@@ -8510,7 +8708,7 @@ function buildCommissioning(){
 function renderDrawing(){
   const nodes=getDrawNodes(), typeKeys=Object.keys(NODE_TYPES);
   const nodeEditor=`<div class="select-group"><div class="select-label">${lang==='da'?'Installationens noder (tilf\u00F8j/fjern/flyt)':'Installation nodes (add/remove/move)'}</div>${nodes.map((n,i)=>{const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;return `<div style="display:inline-flex;align-items:center;gap:4px;margin:3px 4px;padding:5px 9px;border:1.5px solid ${nt.color};border-radius:8px;font-size:.78rem;background:rgba(0,0,0,0.25)"><span>${nt.icon}</span><span style="color:${nt.color};font-weight:700">${lang==='da'?nt.da:nt.en}</span><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},-1)">\u25C0</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},1)">\u25B6</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem;color:var(--danger)" onclick="drawNodeRemove(${i})">\u2715</button></div>`;}).join('')}</div><div class="select-group"><div class="select-label">${lang==='da'?'Tilf\u00F8j node':'Add node'}</div><div class="select-grid">${typeKeys.map(k=>`<button class="sel-btn" onclick="drawNodeAdd('${k}')">${NODE_TYPES[k].icon} ${lang==='da'?NODE_TYPES[k].da:NODE_TYPES[k].en}</button>`).join('')}<button class="sel-btn" onclick="drawNodeReset()">\u21BA ${lang==='da'?'Nulstil':'Reset'}</button></div></div>`;
-  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():(sldFault?buildCoordDashboard():'')+buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildArcFlash():''}${drawStyle==='schematic'&&sldFault?buildDeratingChart():''}${drawStyle==='schematic'&&sldFault?buildInrushCheck():''}${drawStyle==='schematic'&&sldFault?buildEnergyEfficiency():''}${drawStyle==='schematic'&&sldFault?buildHarmonicCheck():''}${drawStyle==='schematic'&&sldFault?buildCableLifetime():''}${drawStyle==='schematic'&&sldFault?buildPowerFlow():''}${drawStyle==='schematic'&&sldFault?buildVoltageProfile():''}${drawStyle==='schematic'&&sldFault?buildEmcRouting():''}${drawStyle==='schematic'&&sldFault?buildMotorStart():''}${drawStyle==='schematic'&&sldFault?buildCapBank():''}${drawStyle==='schematic'&&sldFault?buildRelaySettings():''}${drawStyle==='schematic'&&sldFault?buildGenSet():''}${drawStyle==='schematic'&&sldFault?buildLightningRisk():''}${drawStyle==='schematic'&&sldFault?buildThermalPred():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='schematic'&&sldFault?buildDiscrimTable():''}${drawStyle==='schematic'&&sldFault?buildCommissioning():''}${drawStyle==='schematic'&&sldFault?buildInspectionInterval():''}${drawStyle==='schematic'&&sldFault?buildZsSimulator():''}${drawStyle==='schematic'&&sldFault?buildSelectiveMap():''}${drawStyle==='schematic'&&sldFault?buildTouchVoltage():''}${drawStyle==='schematic'&&sldFault?buildDocChecklist():''}${drawStyle==='schematic'&&sldFault?buildVoltageUnbalance():''}${drawStyle==='schematic'&&sldFault?buildGroundingWizard():''}${drawStyle==='schematic'&&sldFault?buildTrayFill():''}${drawStyle==='schematic'&&sldFault?buildMotorIk():''}${drawStyle==='schematic'&&sldFault?buildCableFire():''}${drawStyle==='schematic'&&sldFault?buildLoadOptimizer():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
+  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():(sldFault?buildCoordDashboard():'')+buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildArcFlash():''}${drawStyle==='schematic'&&sldFault?buildDeratingChart():''}${drawStyle==='schematic'&&sldFault?buildInrushCheck():''}${drawStyle==='schematic'&&sldFault?buildEnergyEfficiency():''}${drawStyle==='schematic'&&sldFault?buildHarmonicCheck():''}${drawStyle==='schematic'&&sldFault?buildCableLifetime():''}${drawStyle==='schematic'&&sldFault?buildPowerFlow():''}${drawStyle==='schematic'&&sldFault?buildVoltageProfile():''}${drawStyle==='schematic'&&sldFault?buildEmcRouting():''}${drawStyle==='schematic'&&sldFault?buildMotorStart():''}${drawStyle==='schematic'&&sldFault?buildCapBank():''}${drawStyle==='schematic'&&sldFault?buildRelaySettings():''}${drawStyle==='schematic'&&sldFault?buildGenSet():''}${drawStyle==='schematic'&&sldFault?buildLightningRisk():''}${drawStyle==='schematic'&&sldFault?buildThermalPred():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='schematic'&&sldFault?buildDiscrimTable():''}${drawStyle==='schematic'&&sldFault?buildCommissioning():''}${drawStyle==='schematic'&&sldFault?buildInspectionInterval():''}${drawStyle==='schematic'&&sldFault?buildZsSimulator():''}${drawStyle==='schematic'&&sldFault?buildSelectiveMap():''}${drawStyle==='schematic'&&sldFault?buildTouchVoltage():''}${drawStyle==='schematic'&&sldFault?buildDocChecklist():''}${drawStyle==='schematic'&&sldFault?buildVoltageUnbalance():''}${drawStyle==='schematic'&&sldFault?buildGroundingWizard():''}${drawStyle==='schematic'&&sldFault?buildTrayFill():''}${drawStyle==='schematic'&&sldFault?buildMotorIk():''}${drawStyle==='schematic'&&sldFault?buildCableFire():''}${drawStyle==='schematic'&&sldFault?buildLoadOptimizer():''}${drawStyle==='schematic'&&sldFault?buildPEVerify():''}${drawStyle==='schematic'&&sldFault?buildTimeMargin():''}${drawStyle==='schematic'&&sldFault?buildCostEstimate():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
 }
 
 // ===== ANALYZING BRAIN MODULE =====
