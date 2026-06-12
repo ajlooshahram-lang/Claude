@@ -4391,6 +4391,19 @@ let cbTarget = 0.95; function cbSetTarget(t){cbTarget=t;renderModule('draw');}
 let rlIrMult = 0.95; function rlSetIr(v){rlIrMult=v;renderModule('draw');}
 let rlIsdMult = 5; function rlSetIsd(v){rlIsdMult=v;renderModule('draw');}
 let rlTsd = 0.1; function rlSetTsd(v){rlTsd=v;renderModule('draw');}
+// Generator sizing state
+let gsMotorAllow = 1.5; function gsSetMotor(v){gsMotorAllow=v;renderModule('draw');}
+let gsTransferTime = 10; function gsSetTransfer(v){gsTransferTime=v;renderModule('draw');}
+let gsPriorityPct = 70; function gsSetPriority(v){gsPriorityPct=v;renderModule('draw');}
+// Lightning protection state
+let lpBuildingType = 'office'; function lpSetBuilding(v){lpBuildingType=v;renderModule('draw');}
+let lpHeight = 10; function lpSetHeight(v){lpHeight=v;renderModule('draw');}
+let lpLocation = 'suburban'; function lpSetLocation(v){lpLocation=v;renderModule('draw');}
+let lpRoofType = 'flat'; function lpSetRoof(v){lpRoofType=v;renderModule('draw');}
+let lpContents = 'standard'; function lpSetContents(v){lpContents=v;renderModule('draw');}
+// Thermal prediction state
+let tpAmbient = 25; function tpSetAmbient(v){tpAmbient=v;renderModule('draw');}
+let tpConnQuality = 'good'; function tpSetConn(v){tpConnQuality=v;renderModule('draw');}
 // Standard earth-electrode symbol (vertical line + 3 decreasing horizontal bars)
 function earthSymbol(x, y, color){
   return `<g stroke="${color}" stroke-width="2" stroke-linecap="round" fill="none"><line x1="${x}" y1="${y-9}" x2="${x}" y2="${y}"/><line x1="${x-11}" y1="${y}" x2="${x+11}" y2="${y}"/><line x1="${x-7}" y1="${y+4}" x2="${x+7}" y2="${y+4}"/><line x1="${x-3}" y1="${y+8}" x2="${x+3}" y2="${y+8}"/></g>`;
@@ -6540,6 +6553,312 @@ function buildRelaySettings(){
   return htm;
 }
 
+// ===== BACKUP GENERATOR SIZING + TRANSFER SWITCHING =====
+function buildGenSet(){
+  const da = lang==='da';
+  const sch = calcLoadSchedule();
+  const totalKW = sch.kW || 30;
+  const totalKVA = sch.kVA || 40;
+  // Priority loads = percentage of total
+  const priorityKW = totalKW * (gsPriorityPct/100);
+  const priorityKVA = totalKVA * (gsPriorityPct/100);
+  // Motor starting allowance
+  const genKVA_raw = priorityKVA * gsMotorAllow;
+  // Standard genset sizes
+  const GENSET_SIZES = [15,20,25,30,40,50,60,75,100,125,150,200,250,300,350,400,500];
+  const genKVA = GENSET_SIZES.find(g => g >= genKVA_raw) || 500;
+  const genIdx = GENSET_SIZES.indexOf(genKVA);
+  // ATS sizing (next standard above gen capacity)
+  const ATS_SIZES = [63,100,160,250,400,630,800,1000,1250,1600];
+  const genA = genKVA * 1000 / (Math.sqrt(3) * 400);
+  const atsA = ATS_SIZES.find(a => a >= genA) || 1600;
+  // Transfer time options
+  const transferOptions = [0,3,5,10,15,30];
+  const motorOptions = [1.0,1.25,1.5,1.75,2.0];
+  const priorityOptions = [30,40,50,60,70,80,90,100];
+  // Load breakdown
+  const cons = loadList.length ? loadList.slice(0,12) : [{kW:11,cos:0.9,sf:1,phase:'3',name:'EV-lader'},{kW:5,cos:0.95,sf:0.8,phase:'3',name:'Ventilation'},{kW:3,cos:1,sf:0.6,phase:'L1',name:'Belysning'}];
+  const priorityLoads = cons.slice(0, Math.ceil(cons.length * gsPriorityPct/100));
+  // SVG timeline diagram
+  const W=580, H=300;
+  let svg = '';
+  svg += '<defs><filter id="gsGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  svg += '<radialGradient id="gsBg" cx="50%" cy="50%" r="70%"><stop offset="0%" stop-color="#0d1a2e"/><stop offset="100%" stop-color="#060e1c"/></radialGradient></defs>';
+  svg += '<rect width="'+W+'" height="'+H+'" fill="url(#gsBg)"/>';
+  svg += '<text x="'+(W/2)+'" y="22" text-anchor="middle" font-size="11" font-weight="800" fill="#bfe9ff" filter="url(#gsGlow)">'+(da?'Transfersekvens (tidslinje)':'Transfer sequence (timeline)')+'</text>';
+  // Timeline
+  const tl={l:60,r:40,y1:80,y2:220,mid:150};
+  const phases = [{t:0,label:da?'Netfejl':'Mains fail',color:'#ff3b5c'},{t:gsTransferTime*0.3,label:da?'Detektering':'Detection',color:'#ffd166'},{t:gsTransferTime*0.6,label:da?'Genstart':'Gen start',color:'#06d6a0'},{t:gsTransferTime,label:da?'ATS transfer':'ATS transfer',color:'#00d4ff'},{t:gsTransferTime+2,label:da?'Last tilsluttet':'Load connected',color:'#a78bfa'}];
+  const maxT = gsTransferTime + 5;
+  const xT = (t) => tl.l + (t/maxT)*(W-tl.l-tl.r);
+  // Axis
+  svg += '<line x1="'+tl.l+'" y1="'+tl.mid+'" x2="'+(W-tl.r)+'" y2="'+tl.mid+'" stroke="#3a5a7a" stroke-width="1.5"/>';
+  svg += '<text x="'+(W-tl.r+5)+'" y="'+(tl.mid+4)+'" font-size="8" fill="#7fa8c4">t(s)</text>';
+  // Mains voltage (drops at t=0)
+  svg += '<polyline points="'+tl.l+','+(tl.mid-40)+' '+xT(0)+','+(tl.mid-40)+' '+xT(0.1)+','+(tl.mid-5)+' '+(W-tl.r)+','+(tl.mid-5)+'" fill="none" stroke="#ff3b5c" stroke-width="2" filter="url(#gsGlow)"/>';
+  svg += '<text x="'+(tl.l+5)+'" y="'+(tl.mid-45)+'" font-size="8" fill="#ff3b5c">'+(da?'Netsp\u00e6nding':'Mains voltage')+'</text>';
+  // Gen voltage (ramps up)
+  const genStart = xT(gsTransferTime*0.6);
+  const genReady = xT(gsTransferTime);
+  svg += '<polyline points="'+tl.l+','+(tl.mid+5)+' '+genStart+','+(tl.mid+5)+' '+genReady+','+(tl.mid+40)+' '+(W-tl.r)+','+(tl.mid+40)+'" fill="none" stroke="#06d6a0" stroke-width="2" filter="url(#gsGlow)"/>';
+  svg += '<text x="'+genStart+'" y="'+(tl.mid+55)+'" font-size="8" fill="#06d6a0">'+(da?'Generatorsp\u00e6nding':'Generator voltage')+'</text>';
+  // Phase markers
+  phases.forEach(function(ph){
+    const x = xT(ph.t);
+    svg += '<line x1="'+x+'" y1="'+(tl.mid-55)+'" x2="'+x+'" y2="'+(tl.mid+60)+'" stroke="'+ph.color+'" stroke-width="1" stroke-dasharray="3 2" opacity="0.6"/>';
+    svg += '<circle cx="'+x+'" cy="'+tl.mid+'" r="4" fill="'+ph.color+'" filter="url(#gsGlow)"/>';
+    svg += '<text x="'+x+'" y="'+(tl.mid+72)+'" text-anchor="middle" font-size="7" fill="'+ph.color+'">'+ph.label+'</text>';
+    svg += '<text x="'+x+'" y="'+(tl.mid+82)+'" text-anchor="middle" font-size="7" fill="#5a7a9a">'+ph.t.toFixed(1)+'s</text>';
+  });
+  // Generator icon
+  svg += '<rect x="'+(W-tl.r-60)+'" y="40" width="50" height="30" rx="5" fill="none" stroke="#06d6a0" stroke-width="1.5"/>';
+  svg += '<text x="'+(W-tl.r-35)+'" y="58" text-anchor="middle" font-size="9" fill="#06d6a0" font-weight="700">G</text>';
+  svg += '<text x="'+(W-tl.r-35)+'" y="78" text-anchor="middle" font-size="7" fill="#06d6a0">'+genKVA+' kVA</text>';
+  const svgTag = '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="max-width:620px;border-radius:12px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 24px rgba(0,160,255,0.15)" xmlns="http://www.w3.org/2000/svg">'+svg+'</svg>';
+  // Build HTML
+  let htm = '<div class="card fade-in"><div class="card-title">\u26A1 '+(da?'N\u00f8dstr\u00f8m & generator':'Backup power & generator')+'</div>';
+  htm += '<div class="info-row" style="margin-bottom:8px">'+(da?'Beregner generatorst\u00f8rrelse ud fra prioriterede laster, motorstartfaktor og ATS-dimensionering. Viser transfersekvens.':'Calculates generator size from priority loads, motor starting factor, and ATS sizing. Shows transfer sequence.')+'</div>';
+  // Selectors
+  htm += '<div class="select-group"><div class="select-label">'+(da?'Prioriterede laster (% af total)':'Priority loads (% of total)')+'</div><div class="select-grid">';
+  priorityOptions.forEach(function(v){ htm += '<button class="sel-btn '+(gsPriorityPct===v?'selected':'')+'" onclick="gsSetPriority('+v+')">'+v+'%</button>'; });
+  htm += '</div></div>';
+  htm += '<div class="select-group"><div class="select-label">'+(da?'Motorstartfaktor':'Motor starting allowance')+'</div><div class="select-grid">';
+  motorOptions.forEach(function(v){ htm += '<button class="sel-btn '+(gsMotorAllow===v?'selected':'')+'" onclick="gsSetMotor('+v+')">'+v.toFixed(2)+'x</button>'; });
+  htm += '</div></div>';
+  htm += '<div class="select-group"><div class="select-label">'+(da?'Transfertid (sek)':'Transfer time (sec)')+'</div><div class="select-grid">';
+  transferOptions.forEach(function(v){ htm += '<button class="sel-btn '+(gsTransferTime===v?'selected':'')+'" onclick="gsSetTransfer('+v+')">'+v+' s</button>'; });
+  htm += '</div></div>';
+  htm += svgTag;
+  // Results
+  htm += '<div class="result-box" style="margin-top:10px;background:rgba(0,30,50,0.4);border:1px solid rgba(0,200,255,0.2)">';
+  htm += '<div class="result-title" style="color:#bfe9ff">'+(da?'Generatordimensionering':'Generator sizing')+'</div>';
+  htm += '<div class="result-row"><span class="label">'+(da?'Total last':'Total load')+'</span><span class="value" style="color:#bfe9ff">'+totalKVA.toFixed(1)+' kVA / '+totalKW.toFixed(1)+' kW</span></div>';
+  htm += '<div class="result-row"><span class="label">'+(da?'Prioriteret last':'Priority load')+'</span><span class="value" style="color:#ffd166">'+priorityKVA.toFixed(1)+' kVA ('+gsPriorityPct+'%)</span></div>';
+  htm += '<div class="result-row"><span class="label">'+(da?'Med motorstart':'With motor start')+'</span><span class="value" style="color:#ff9a4d">'+genKVA_raw.toFixed(1)+' kVA (x'+gsMotorAllow+')</span></div>';
+  htm += '<div class="result-row"><span class="label">'+(da?'Valgt generator':'Selected generator')+'</span><span class="value" style="color:#06d6a0">'+genKVA+' kVA</span></div>';
+  htm += '<div class="result-row"><span class="label">'+(da?'Generator str\u00f8m':'Generator current')+'</span><span class="value" style="color:#06d6a0">'+genA.toFixed(1)+' A</span></div>';
+  htm += '<div class="result-row"><span class="label">'+(da?'ATS dimensionering':'ATS sizing')+'</span><span class="value" style="color:#00d4ff">'+atsA+' A</span></div>';
+  htm += '<div class="result-row"><span class="label">'+(da?'Transfertid':'Transfer time')+'</span><span class="value" style="color:#a78bfa">'+gsTransferTime+' s</span></div>';
+  htm += '</div>';
+  // Priority load list
+  htm += '<div class="result-box" style="margin-top:8px;background:rgba(0,30,50,0.4);border:1px solid rgba(0,200,255,0.2)">';
+  htm += '<div class="result-title" style="color:#bfe9ff">'+(da?'Prioriterede forbrugere':'Priority consumers')+'</div>';
+  priorityLoads.forEach(function(c){ htm += '<div class="result-row"><span class="label">'+c.name+'</span><span class="value" style="color:#06d6a0">'+c.kW+' kW</span></div>'; });
+  htm += '</div></div>';
+  return htm;
+}
+
+// ===== LIGHTNING PROTECTION RISK ASSESSMENT =====
+function buildLightningRisk(){
+  const da = lang==='da';
+  // IEC 62305-2 simplified parameters
+  const Ng = 1.5; // ground flash density for Denmark
+  // Building dimensions from type
+  const buildTypes = {office:{da:'Kontor',en:'Office',L:30,W2:20,H:12},house:{da:'Bolig',en:'House',L:12,W2:10,H:8},warehouse:{da:'Lager',en:'Warehouse',L:50,W2:30,H:10},hospital:{da:'Hospital',en:'Hospital',L:60,W2:40,H:20},church:{da:'Kirke',en:'Church',L:20,W2:12,H:25}};
+  const bt = buildTypes[lpBuildingType] || buildTypes.office;
+  const H = lpHeight || bt.H;
+  // Collection area (simplified): Ad = L*W + 2*L*H + 2*W*H + pi*H^2
+  const L = bt.L, W2 = bt.W2;
+  const Ad = (L*W2 + 2*L*H + 2*W2*H + Math.PI*H*H) * 1e-6; // km^2
+  // Location factor Cd
+  const locationFactors = {isolated:2.0,rural:1.0,suburban:0.5,urban:0.25};
+  const Cd = locationFactors[lpLocation] || 0.5;
+  // Expected number of strikes per year
+  const Nd = Ng * Ad * Cd * 1e6 * 1e-6; // Nd = Ng * Ad * Cd (Ad already in km2)
+  const Nd_real = Ng * (L*W2 + 2*L*H + 2*W2*H + Math.PI*H*H) * 1e-6 * Cd;
+  // Risk factors
+  const roofFactors = {flat:1.0,pitched:0.8,metal:1.5,thatch:2.0};
+  const contentFactors = {standard:1.0,electronics:2.0,explosive:5.0,irreplaceable:3.0};
+  const Cr = roofFactors[lpRoofType] || 1.0;
+  const Cc = contentFactors[lpContents] || 1.0;
+  // Tolerable risk (IEC 62305-2 Table 7)
+  const Rt = 1e-5; // typical for loss of human life
+  const Ra = Nd_real * Cr * Cc * 0.01; // simplified annual risk
+  const needsLPS = Ra > Rt;
+  // LPS class
+  let lpsClass = 'IV';
+  if(Ra > 0.02) lpsClass = 'I';
+  else if(Ra > 0.005) lpsClass = 'II';
+  else if(Ra > 0.001) lpsClass = 'III';
+  // Rolling sphere radius per class
+  const sphereR = {I:20,II:30,III:45,IV:60};
+  const R = sphereR[lpsClass];
+  // SVG building with protection dome
+  const SW=580, SH=340;
+  let svg = '';
+  svg += '<defs><filter id="lpGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  svg += '<radialGradient id="lpBg" cx="50%" cy="50%" r="70%"><stop offset="0%" stop-color="#0d1a2e"/><stop offset="100%" stop-color="#060e1c"/></radialGradient></defs>';
+  svg += '<rect width="'+SW+'" height="'+SH+'" fill="url(#lpBg)"/>';
+  svg += '<text x="'+(SW/2)+'" y="22" text-anchor="middle" font-size="11" font-weight="800" fill="#bfe9ff" filter="url(#lpGlow)">'+(da?'Lynbeskyttelseszone (rullende kugle)':'Lightning protection zone (rolling sphere)')+'</text>';
+  // Ground line
+  var gy = SH-50;
+  svg += '<line x1="40" y1="'+gy+'" x2="'+(SW-40)+'" y2="'+gy+'" stroke="#3a5a7a" stroke-width="1.5"/>';
+  // Building
+  var bx = SW/2-50, bw = 100, bh = Math.min(120, H*5);
+  var by = gy - bh;
+  svg += '<rect x="'+bx+'" y="'+by+'" width="'+bw+'" height="'+bh+'" fill="rgba(0,100,180,0.15)" stroke="#00d4ff" stroke-width="1.5" rx="3"/>';
+  svg += '<text x="'+(SW/2)+'" y="'+(by+bh/2)+'" text-anchor="middle" font-size="9" fill="#00d4ff" font-weight="600">'+(da?bt.da:bt.en)+'</text>';
+  svg += '<text x="'+(SW/2)+'" y="'+(by+bh/2+14)+'" text-anchor="middle" font-size="8" fill="#7fa8c4">H='+H+'m</text>';
+  // Protection dome (rolling sphere)
+  if(needsLPS){
+    var cx = SW/2, dome_r = Math.min(150, R*3);
+    svg += '<ellipse cx="'+cx+'" cy="'+by+'" rx="'+dome_r+'" ry="'+(dome_r*0.6)+'" fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="5 3" opacity="0.7" filter="url(#lpGlow)"/>';
+    svg += '<text x="'+cx+'" y="'+(by-dome_r*0.6-8)+'" text-anchor="middle" font-size="8" fill="#a78bfa">R='+R+'m (Klasse '+lpsClass+')</text>';
+    // Lightning rod
+    svg += '<line x1="'+(SW/2)+'" y1="'+(by-15)+'" x2="'+(SW/2)+'" y2="'+by+'" stroke="#ffd166" stroke-width="2" filter="url(#lpGlow)"/>';
+    svg += '<circle cx="'+(SW/2)+'" cy="'+(by-18)+'" r="3" fill="#ffd166" filter="url(#lpGlow)"/>';
+    svg += '<text x="'+(SW/2+10)+'" y="'+(by-10)+'" font-size="7" fill="#ffd166">'+(da?'Fanganordning':'Air terminal')+'</text>';
+  }
+  // Lightning bolt
+  svg += '<polyline points="'+(SW/2+60)+',30 '+(SW/2+50)+',60 '+(SW/2+65)+',60 '+(SW/2+45)+',100" fill="none" stroke="#ffd166" stroke-width="2" filter="url(#lpGlow)"/>';
+  // Ground electrode
+  svg += '<line x1="'+(bx+bw-10)+'" y1="'+gy+'" x2="'+(bx+bw-10)+'" y2="'+(gy+25)+'" stroke="#06d6a0" stroke-width="2"/>';
+  svg += '<line x1="'+(bx+bw-18)+'" y1="'+(gy+25)+'" x2="'+(bx+bw-2)+'" y2="'+(gy+25)+'" stroke="#06d6a0" stroke-width="2"/>';
+  svg += '<line x1="'+(bx+bw-15)+'" y1="'+(gy+30)+'" x2="'+(bx+bw-5)+'" y2="'+(gy+30)+'" stroke="#06d6a0" stroke-width="1.5"/>';
+  svg += '<text x="'+(bx+bw+5)+'" y="'+(gy+25)+'" font-size="7" fill="#06d6a0">'+(da?'Jordelektrode':'Earth electrode')+'</text>';
+  var svgTag = '<svg viewBox="0 0 '+SW+' '+SH+'" width="100%" style="max-width:620px;border-radius:12px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 24px rgba(0,160,255,0.15)" xmlns="http://www.w3.org/2000/svg">'+svg+'</svg>';
+  // Build HTML
+  let htm = '<div class="card fade-in"><div class="card-title">\u26A1 '+(da?'Lynbeskyttelse (risikovurdering)':'Lightning protection (risk assessment)')+'</div>';
+  htm += '<div class="info-row" style="margin-bottom:8px">'+(da?'Forenklet risikovurdering iht. IEC 62305-2. Beregner forventet nedslag og anbefaler LPS-klasse for Danmark (Ng=1,5 nedslag/km\u00b2/\u00e5r).':'Simplified risk assessment per IEC 62305-2. Calculates expected strikes and recommends LPS class for Denmark (Ng=1.5 strikes/km\u00b2/year).')+'</div>';
+  // Selectors
+  var buildKeys = Object.keys(buildTypes);
+  htm += '<div class="select-group"><div class="select-label">'+(da?'Bygningstype':'Building type')+'</div><div class="select-grid">';
+  buildKeys.forEach(function(k){ var b=buildTypes[k]; htm += '<button class="sel-btn '+(lpBuildingType===k?'selected':'')+'" onclick="lpSetBuilding(\''+k+'\')">'+(da?b.da:b.en)+'</button>'; });
+  htm += '</div></div>';
+  htm += '<div class="select-group"><div class="select-label">'+(da?'Bygningsh\u00f8jde (m)':'Building height (m)')+'</div><div class="select-grid">';
+  [6,8,10,12,15,20,25,30].forEach(function(v){ htm += '<button class="sel-btn '+(lpHeight===v?'selected':'')+'" onclick="lpSetHeight('+v+')">'+v+' m</button>'; });
+  htm += '</div></div>';
+  htm += '<div class="select-group"><div class="select-label">'+(da?'Placering':'Location')+'</div><div class="select-grid">';
+  [{k:'isolated',da:'Isoleret',en:'Isolated'},{k:'rural',da:'Landligt',en:'Rural'},{k:'suburban',da:'Forstad',en:'Suburban'},{k:'urban',da:'By',en:'Urban'}].forEach(function(loc){ htm += '<button class="sel-btn '+(lpLocation===loc.k?'selected':'')+'" onclick="lpSetLocation(\''+loc.k+'\')">'+(da?loc.da:loc.en)+'</button>'; });
+  htm += '</div></div>';
+  htm += '<div class="select-group"><div class="select-label">'+(da?'Tagtype':'Roof type')+'</div><div class="select-grid">';
+  [{k:'flat',da:'Fladt',en:'Flat'},{k:'pitched',da:'Skr\u00e5t',en:'Pitched'},{k:'metal',da:'Metal',en:'Metal'},{k:'thatch',da:'Str\u00e5tag',en:'Thatch'}].forEach(function(r){ htm += '<button class="sel-btn '+(lpRoofType===r.k?'selected':'')+'" onclick="lpSetRoof(\''+r.k+'\')">'+(da?r.da:r.en)+'</button>'; });
+  htm += '</div></div>';
+  htm += '<div class="select-group"><div class="select-label">'+(da?'Indhold':'Contents')+'</div><div class="select-grid">';
+  [{k:'standard',da:'Standard',en:'Standard'},{k:'electronics',da:'Elektronik',en:'Electronics'},{k:'explosive',da:'Eksplosivt',en:'Explosive'},{k:'irreplaceable',da:'Uerstatteligt',en:'Irreplaceable'}].forEach(function(c){ htm += '<button class="sel-btn '+(lpContents===c.k?'selected':'')+'" onclick="lpSetContents(\''+c.k+'\')">'+(da?c.da:c.en)+'</button>'; });
+  htm += '</div></div>';
+  htm += svgTag;
+  // Results
+  htm += '<div class="result-box" style="margin-top:10px;background:rgba(0,30,50,0.4);border:1px solid rgba(0,200,255,0.2)">';
+  htm += '<div class="result-title" style="color:#bfe9ff">'+(da?'Risikovurdering':'Risk assessment')+'</div>';
+  htm += '<div class="result-row"><span class="label">Ng ('+( da?'Danmark':'Denmark')+')</span><span class="value" style="color:#bfe9ff">'+Ng+' / km\u00b2 / '+( da?'\u00e5r':'year')+'</span></div>';
+  htm += '<div class="result-row"><span class="label">'+(da?'Opsamlingsareal Ad':'Collection area Ad')+'</span><span class="value" style="color:#ffd166">'+(Ad*1e6).toFixed(0)+' m\u00b2</span></div>';
+  htm += '<div class="result-row"><span class="label">'+(da?'Placeringsfaktor Cd':'Location factor Cd')+'</span><span class="value" style="color:#ffd166">'+Cd+'</span></div>';
+  htm += '<div class="result-row"><span class="label">'+(da?'Forventet nedslag Nd':'Expected strikes Nd')+'</span><span class="value" style="color:#ff9a4d">'+Nd_real.toFixed(4)+' / '+(da?'\u00e5r':'year')+'</span></div>';
+  htm += '<div class="result-row"><span class="label">'+(da?'Beregnet risiko Ra':'Calculated risk Ra')+'</span><span class="value" style="color:'+(needsLPS?'#ff3b5c':'#06d6a0')+'">'+Ra.toExponential(2)+'</span></div>';
+  htm += '<div class="result-row"><span class="label">'+(da?'Tolerabel risiko Rt':'Tolerable risk Rt')+'</span><span class="value" style="color:#7fa8c4">'+Rt.toExponential(1)+'</span></div>';
+  htm += '<div class="result-row"><span class="label">'+(da?'LPS n\u00f8dvendig?':'LPS required?')+'</span><span class="value" style="color:'+(needsLPS?'#ff3b5c':'#06d6a0')+'">'+(needsLPS?(da?'Ja - Klasse '+lpsClass:'Yes - Class '+lpsClass):(da?'Nej':'No'))+'</span></div>';
+  if(needsLPS){
+    htm += '<div class="result-row"><span class="label">'+(da?'Rullende kugle radius':'Rolling sphere radius')+'</span><span class="value" style="color:#a78bfa">'+R+' m</span></div>';
+  }
+  htm += '</div></div>';
+  return htm;
+}
+
+// ===== THERMAL IMAGING PREDICTION =====
+function buildThermalPred(){
+  const da = lang==='da';
+  const sch = calcLoadSchedule();
+  const IB = sch.ib || 50;
+  // Connection points to analyze
+  const cons = loadList.length ? loadList.slice(0,10) : [{kW:11,cos:0.9,sf:1,phase:'3',name:'EV-lader'},{kW:5,cos:0.95,sf:0.8,phase:'3',name:'Motor'},{kW:3,cos:1,sf:0.6,phase:'L1',name:'Stikgrupper'}];
+  // Connection quality factors
+  const qualityFactors = {excellent:0.7,good:1.0,fair:1.5,poor:2.5};
+  const Cq = qualityFactors[tpConnQuality] || 1.0;
+  // Ambient temp selector options
+  const ambientOptions = [15,20,25,30,35,40,45];
+  const qualityOptions = [{k:'excellent',da:'Fremragende',en:'Excellent'},{k:'good',da:'God',en:'Good'},{k:'fair',da:'Rimelig',en:'Fair'},{k:'poor',da:'D\u00e5rlig',en:'Poor'}];
+  // Calculate temperatures at connection points
+  // Formula: deltaT = (I/In)^2 * deltaT_rated * Cq
+  // deltaT_rated typical values: cable term=15K, breaker term=25K, busbar joint=20K
+  const points = [];
+  cons.forEach(function(c,i){
+    const ci = lsConsumerCurrent(c);
+    const Ic = Math.max(ci.L1||0,ci.L2||0,ci.L3||0) || (c.kW*1000/((c.phase==='3'?Math.sqrt(3)*400:230)*(c.cos||0.9)));
+    const mcbs = recommendMCBs(Ic,10);
+    const In = (mcbs && mcbs[0]) ? mcbs[0].rating : Math.ceil(Ic/10)*10;
+    const ratio = Ic/In;
+    const dtCable = Math.pow(ratio,2) * 15 * Cq;
+    const dtBreaker = Math.pow(ratio,2) * 25 * Cq;
+    const dtBusbar = Math.pow(ratio,2) * 20 * Cq;
+    const tCable = tpAmbient + dtCable;
+    const tBreaker = tpAmbient + dtBreaker;
+    const tBusbar = tpAmbient + dtBusbar;
+    // Hot spot threshold: ambient + 50K for breakers, ambient + 40K for cables
+    points.push({name:c.name,Ic:Ic,In:In,ratio:ratio,tCable:tCable,tBreaker:tBreaker,tBusbar:tBusbar,dtCable:dtCable,dtBreaker:dtBreaker,dtBusbar:dtBusbar,hotCable:tCable>(tpAmbient+40),hotBreaker:tBreaker>(tpAmbient+50),hotBusbar:tBusbar>(tpAmbient+45)});
+  });
+  const hotSpots = points.filter(function(p){return p.hotCable||p.hotBreaker||p.hotBusbar;});
+  // SVG thermal color map
+  const SW=580, SH=320;
+  let svg = '';
+  svg += '<defs><filter id="tpGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  svg += '<radialGradient id="tpBg" cx="50%" cy="50%" r="70%"><stop offset="0%" stop-color="#0d1a2e"/><stop offset="100%" stop-color="#060e1c"/></radialGradient>';
+  svg += '<linearGradient id="tpHeat" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#0066ff"/><stop offset="25%" stop-color="#00ccff"/><stop offset="50%" stop-color="#00ff66"/><stop offset="75%" stop-color="#ffcc00"/><stop offset="100%" stop-color="#ff3300"/></linearGradient></defs>';
+  svg += '<rect width="'+SW+'" height="'+SH+'" fill="url(#tpBg)"/>';
+  svg += '<text x="'+(SW/2)+'" y="22" text-anchor="middle" font-size="11" font-weight="800" fill="#bfe9ff" filter="url(#tpGlow)">'+(da?'Termisk farvekort':'Thermal color map')+'</text>';
+  // Color bar legend
+  svg += '<rect x="40" y="'+( SH-30)+'" width="200" height="12" fill="url(#tpHeat)" rx="3"/>';
+  svg += '<text x="40" y="'+(SH-5)+'" font-size="7" fill="#7fa8c4">'+tpAmbient+'\u00b0C</text>';
+  svg += '<text x="240" y="'+(SH-5)+'" font-size="7" fill="#7fa8c4">'+(tpAmbient+70)+'\u00b0C</text>';
+  // Draw connection points as thermal spots
+  var cols = Math.min(points.length, 5);
+  var rows = Math.ceil(points.length/cols);
+  var startX = 60, startY = 50, gapX = (SW-120)/Math.max(cols-1,1), gapY = (SH-120)/Math.max(rows-1,1);
+  points.forEach(function(pt,idx){
+    var col = idx % cols, row = Math.floor(idx/cols);
+    var cx = startX + col*gapX, cy = startY + row*gapY + 20;
+    // Temperature determines color
+    var maxT = Math.max(pt.tCable,pt.tBreaker,pt.tBusbar);
+    var tNorm = Math.min(1, Math.max(0, (maxT-tpAmbient)/70));
+    var r = Math.round(tNorm*255);
+    var g = Math.round((1-tNorm)*200);
+    var b2 = Math.round((1-tNorm)*255);
+    var color = 'rgb('+r+','+g+','+b2+')';
+    var radius = 12 + tNorm*10;
+    // Glow effect for hot spots
+    if(pt.hotCable||pt.hotBreaker||pt.hotBusbar){
+      svg += '<circle cx="'+cx+'" cy="'+cy+'" r="'+(radius+8)+'" fill="none" stroke="'+color+'" stroke-width="2" opacity="0.4" filter="url(#tpGlow)"/>';
+    }
+    svg += '<circle cx="'+cx+'" cy="'+cy+'" r="'+radius+'" fill="'+color+'" opacity="0.85" filter="url(#tpGlow)"/>';
+    svg += '<text x="'+cx+'" y="'+(cy+3)+'" text-anchor="middle" font-size="8" fill="#fff" font-weight="700">'+maxT.toFixed(0)+'\u00b0</text>';
+    svg += '<text x="'+cx+'" y="'+(cy+radius+12)+'" text-anchor="middle" font-size="7" fill="#bfe9ff">'+pt.name+'</text>';
+    if(pt.hotCable||pt.hotBreaker||pt.hotBusbar){
+      svg += '<text x="'+cx+'" y="'+(cy-radius-5)+'" text-anchor="middle" font-size="8" fill="#ff3b5c" font-weight="700">\u26a0</text>';
+    }
+  });
+  var svgTag = '<svg viewBox="0 0 '+SW+' '+SH+'" width="100%" style="max-width:620px;border-radius:12px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 24px rgba(0,160,255,0.15)" xmlns="http://www.w3.org/2000/svg">'+svg+'</svg>';
+  // Build HTML
+  let htm = '<div class="card fade-in"><div class="card-title">\uD83C\uDF21\uFE0F '+(da?'Termisk forudsigelse':'Thermal prediction')+'</div>';
+  htm += '<div class="info-row" style="margin-bottom:8px">'+(da?'Forudsiger temperaturer ved kabeltilslutninger, afbryderklemmer og skinnesamlinger. Formel: \u0394T = (I/In)\u00b2 \u00d7 \u0394T_rated \u00d7 kvalitetsfaktor.':'Predicts temperatures at cable connections, breaker terminals, and busbar joints. Formula: \u0394T = (I/In)\u00b2 \u00d7 \u0394T_rated \u00d7 quality factor.')+'</div>';
+  // Selectors
+  htm += '<div class="select-group"><div class="select-label">'+(da?'Omgivelsestemperatur':'Ambient temperature')+'</div><div class="select-grid">';
+  ambientOptions.forEach(function(v){ htm += '<button class="sel-btn '+(tpAmbient===v?'selected':'')+'" onclick="tpSetAmbient('+v+')">'+v+' \u00b0C</button>'; });
+  htm += '</div></div>';
+  htm += '<div class="select-group"><div class="select-label">'+(da?'Tilslutningskvalitet':'Connection quality')+'</div><div class="select-grid">';
+  qualityOptions.forEach(function(q){ htm += '<button class="sel-btn '+(tpConnQuality===q.k?'selected':'')+'" onclick="tpSetConn(\''+q.k+'\')">'+(da?q.da:q.en)+'</button>'; });
+  htm += '</div></div>';
+  htm += svgTag;
+  // Results table
+  htm += '<div class="result-box" style="margin-top:10px;background:rgba(0,30,50,0.4);border:1px solid rgba(0,200,255,0.2)">';
+  htm += '<div class="result-title" style="color:#bfe9ff">'+(da?'Temperaturforudsigelse':'Temperature prediction')+'</div>';
+  htm += '<div class="result-row"><span class="label">'+(da?'Omgivelsestemperatur':'Ambient')+'</span><span class="value" style="color:#bfe9ff">'+tpAmbient+' \u00b0C</span></div>';
+  htm += '<div class="result-row"><span class="label">'+(da?'Kvalitetsfaktor':'Quality factor')+'</span><span class="value" style="color:#ffd166">'+Cq+'x ('+tpConnQuality+')</span></div>';
+  htm += '<div class="result-row"><span class="label">'+(da?'Hot spots fundet':'Hot spots found')+'</span><span class="value" style="color:'+(hotSpots.length>0?'#ff3b5c':'#06d6a0')+'">'+hotSpots.length+'</span></div>';
+  htm += '</div>';
+  // Detailed per-point results
+  htm += '<div class="result-box" style="margin-top:8px;background:rgba(0,30,50,0.4);border:1px solid rgba(0,200,255,0.2)">';
+  htm += '<div class="result-title" style="color:#bfe9ff">'+(da?'Tilslutningspunkter':'Connection points')+'</div>';
+  points.forEach(function(pt){
+    var hot = pt.hotCable||pt.hotBreaker||pt.hotBusbar;
+    var icon = hot?'\u26a0\ufe0f':'\u2705';
+    var maxT2 = Math.max(pt.tCable,pt.tBreaker,pt.tBusbar);
+    var color = hot?'#ff3b5c':'#06d6a0';
+    htm += '<div class="result-row"><span class="label">'+icon+' '+pt.name+' ('+pt.Ic.toFixed(1)+'A / '+pt.In+'A)</span><span class="value" style="color:'+color+'">'+maxT2.toFixed(1)+' \u00b0C (\u0394T='+pt.dtBreaker.toFixed(1)+'K)</span></div>';
+  });
+  htm += '</div></div>';
+  return htm;
+}
+
 function buildProtReport(){
   const da = lang==='da';
   const cons = loadList.length ? loadList.slice(0,16) : [
@@ -6729,7 +7048,7 @@ function buildLoopReadout(){
 function renderDrawing(){
   const nodes=getDrawNodes(), typeKeys=Object.keys(NODE_TYPES);
   const nodeEditor=`<div class="select-group"><div class="select-label">${lang==='da'?'Installationens noder (tilf\u00F8j/fjern/flyt)':'Installation nodes (add/remove/move)'}</div>${nodes.map((n,i)=>{const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;return `<div style="display:inline-flex;align-items:center;gap:4px;margin:3px 4px;padding:5px 9px;border:1.5px solid ${nt.color};border-radius:8px;font-size:.78rem;background:rgba(0,0,0,0.25)"><span>${nt.icon}</span><span style="color:${nt.color};font-weight:700">${lang==='da'?nt.da:nt.en}</span><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},-1)">\u25C0</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},1)">\u25B6</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem;color:var(--danger)" onclick="drawNodeRemove(${i})">\u2715</button></div>`;}).join('')}</div><div class="select-group"><div class="select-label">${lang==='da'?'Tilf\u00F8j node':'Add node'}</div><div class="select-grid">${typeKeys.map(k=>`<button class="sel-btn" onclick="drawNodeAdd('${k}')">${NODE_TYPES[k].icon} ${lang==='da'?NODE_TYPES[k].da:NODE_TYPES[k].en}</button>`).join('')}<button class="sel-btn" onclick="drawNodeReset()">\u21BA ${lang==='da'?'Nulstil':'Reset'}</button></div></div>`;
-  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():(sldFault?buildCoordDashboard():'')+buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildArcFlash():''}${drawStyle==='schematic'&&sldFault?buildDeratingChart():''}${drawStyle==='schematic'&&sldFault?buildInrushCheck():''}${drawStyle==='schematic'&&sldFault?buildEnergyEfficiency():''}${drawStyle==='schematic'&&sldFault?buildHarmonicCheck():''}${drawStyle==='schematic'&&sldFault?buildCableLifetime():''}${drawStyle==='schematic'&&sldFault?buildPowerFlow():''}${drawStyle==='schematic'&&sldFault?buildVoltageProfile():''}${drawStyle==='schematic'&&sldFault?buildEmcRouting():''}${drawStyle==='schematic'&&sldFault?buildMotorStart():''}${drawStyle==='schematic'&&sldFault?buildCapBank():''}${drawStyle==='schematic'&&sldFault?buildRelaySettings():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='schematic'&&sldFault?buildDiscrimTable():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
+  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():(sldFault?buildCoordDashboard():'')+buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildArcFlash():''}${drawStyle==='schematic'&&sldFault?buildDeratingChart():''}${drawStyle==='schematic'&&sldFault?buildInrushCheck():''}${drawStyle==='schematic'&&sldFault?buildEnergyEfficiency():''}${drawStyle==='schematic'&&sldFault?buildHarmonicCheck():''}${drawStyle==='schematic'&&sldFault?buildCableLifetime():''}${drawStyle==='schematic'&&sldFault?buildPowerFlow():''}${drawStyle==='schematic'&&sldFault?buildVoltageProfile():''}${drawStyle==='schematic'&&sldFault?buildEmcRouting():''}${drawStyle==='schematic'&&sldFault?buildMotorStart():''}${drawStyle==='schematic'&&sldFault?buildCapBank():''}${drawStyle==='schematic'&&sldFault?buildRelaySettings():''}${drawStyle==='schematic'&&sldFault?buildGenSet():''}${drawStyle==='schematic'&&sldFault?buildLightningRisk():''}${drawStyle==='schematic'&&sldFault?buildThermalPred():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='schematic'&&sldFault?buildDiscrimTable():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
 }
 
 // ===== ANALYZING BRAIN MODULE =====
