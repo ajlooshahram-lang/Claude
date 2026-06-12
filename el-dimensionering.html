@@ -4432,6 +4432,14 @@ let ctfType = 'tray'; function ctfSetType(v){ctfType=v;renderModule('draw');}
 let ctfTrayW = 300; function ctfSetTrayW(v){ctfTrayW=+v;renderModule('draw');}
 let ctfTrayH = 75; function ctfSetTrayH(v){ctfTrayH=+v;renderModule('draw');}
 let ctfConduit = 32; function ctfSetConduit(v){ctfConduit=+v;renderModule('draw');}
+// Motor Ik contribution state
+let mikBusbarRated = 25; function mikSetBusbar(v){mikBusbarRated=+v;renderModule('draw');}
+// Cable fire classification state
+let cfBuildType = 'residential'; function cfSetBuild(v){cfBuildType=v;renderModule('draw');}
+let cfEscapeRoute = false; function cfSetEscape(v){cfEscapeRoute=v;renderModule('draw');}
+let cfCableDensity = 'low'; function cfSetDensity(v){cfCableDensity=v;renderModule('draw');}
+// Load optimizer state
+let loApplied = false; function loSetApplied(v){loApplied=!!v;renderModule('draw');}
 // Standard earth-electrode symbol (vertical line + 3 decreasing horizontal bars)
 function earthSymbol(x, y, color){
   return `<g stroke="${color}" stroke-width="2" stroke-linecap="round" fill="none"><line x1="${x}" y1="${y-9}" x2="${x}" y2="${y}"/><line x1="${x-11}" y1="${y}" x2="${x+11}" y2="${y}"/><line x1="${x-7}" y1="${y+4}" x2="${x+7}" y2="${y+4}"/><line x1="${x-3}" y1="${y+8}" x2="${x+3}" y2="${y+8}"/></g>`;
@@ -7885,6 +7893,337 @@ function buildTrayFill(){
   return html;
 }
 
+// ===== MOTOR SHORT-CIRCUIT CONTRIBUTION (IEC 60909-0 §9 · DS/HD 60364-4-43 §434.2) =====
+function buildMotorIk(){
+  const da = lang==='da';
+  const cons = loadList.length ? loadList.slice(0,16) : [
+    {kW:11,cos:0.9,sf:1,phase:'3',name:'EV-lader'},{kW:7.5,cos:0.85,sf:1,phase:'3',name:'Motor/pumpe'},
+    {kW:3,cos:0.85,sf:0.8,phase:'3',name:'Ventilation'},{kW:7.5,cos:0.8,sf:0.7,phase:'3',name:'Kompressor'},
+    {kW:3.7,cos:0.95,sf:0.6,phase:'L1',name:'Stikgrupper'},{kW:1.5,cos:0.95,sf:1,phase:'L3',name:'Belysning'}
+  ];
+  // Identify motors (3-phase, cos 0.75-0.9, or name matches motor keywords)
+  const motorKw = ['motor','pumpe','pump','kompressor','compressor','ventilat','fan','kran','crane','elevator','lift'];
+  const motors = cons.filter(c => c.phase==='3' && (c.cos>=0.75 && c.cos<=0.9 || motorKw.some(k=>((c.name||'').toLowerCase()).includes(k))));
+  // Transformer Ik
+  const sch = calcLoadSchedule();
+  let kVAv = sch.kVA;
+  if(!(kVAv>0)) kVAv = cons.reduce((a,c)=>a+(c.kW||0),0)/0.9;
+  const trafoK = (typeof TRAFO_SIZES!=='undefined') ? (TRAFO_SIZES.find(t=>t>=kVAv)||630) : 630;
+  const uk = (typeof TRAFO_UK!=='undefined' && TRAFO_UK[trafoK]) ? (TRAFO_UK[trafoK]/100) : 0.04;
+  const IkTrafo = trafoK*1000/(Math.sqrt(3)*400*uk)/1000; // kA
+  // Motor contributions: Ik_motor = In * (100/Xd") where Xd" ~ 20% => 5*In
+  const Xd = 20; // subtransient reactance %
+  const motorContribs = motors.map(c=>{
+    const In = (c.kW*1000*c.sf)/(Math.sqrt(3)*400*(c.cos||0.85));
+    const IkM = In * (100/Xd); // = 5*In
+    return {name:c.name||'Motor', kW:c.kW, In:In, IkM:IkM};
+  });
+  const totalMotorIk = motorContribs.reduce((a,m)=>a+m.IkM, 0)/1000; // kA
+  const totalIk = IkTrafo + totalMotorIk; // kA
+  // Check against busbar rating and main device Icu
+  const busbarOk = totalIk <= mikBusbarRated;
+  const mainMcb = sch.ib<=63 ? (recommendMCBs(sch.ib)[0]) : null;
+  const mainMccb = sch.ib>63 ? (recommendMCCBs(sch.ib)[0]) : null;
+  const mainDevice = mainMccb || mainMcb;
+  const deviceIcu = mainDevice ? (mainDevice.icu||10) : 10;
+  const icuOk = totalIk <= deviceIcu;
+  // Verdict
+  let verdictColor, verdictText;
+  if(busbarOk && icuOk){
+    verdictColor = 'var(--success)';
+    verdictText = da?'Busbar OK -- total Ik inden for rating':'Busbar OK -- total Ik within rating';
+  } else if(!icuOk){
+    verdictColor = 'var(--danger)';
+    verdictText = da?'Icu utilstraekkelig -- motorbidrag skubber Ik over raekvidde':'Icu insufficient -- motor contribution pushes Ik above rated';
+  } else {
+    verdictColor = 'var(--danger)';
+    verdictText = da?'Busbar rating overskredet -- motorers kortslutningsbidrag for hoejt':'Busbar rating exceeded -- motor short-circuit contribution too high';
+  }
+  // SVG diagram: transformer and motor sources feeding fault point
+  const svgW = 400, svgH = 260;
+  let svg = `<svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;max-width:400px;height:auto;margin:10px auto;display:block;background:rgba(0,0,0,0.3);border-radius:12px;border:1px solid rgba(0,200,255,0.15)">`;
+  svg += `<defs><marker id="arrMik" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00e5ff"/></marker>`;
+  svg += `<marker id="arrMikO" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ff9a4d"/></marker></defs>`;
+  // Fault point (busbar)
+  const faultX = svgW/2, faultY = svgH - 50;
+  svg += `<rect x="${faultX-60}" y="${faultY-8}" width="120" height="16" rx="3" fill="rgba(255,59,92,0.15)" stroke="#ff3b5c" stroke-width="1.5"/>`;
+  svg += `<text x="${faultX}" y="${faultY+4}" text-anchor="middle" fill="#ff3b5c" font-size="9" font-weight="700">${da?'Fejlpunkt':'Fault point'}: ${totalIk.toFixed(1)} kA</text>`;
+  // Transformer source (top-left)
+  const tX = 70, tY = 40;
+  svg += `<circle cx="${tX}" cy="${tY}" r="22" fill="rgba(0,229,255,0.1)" stroke="#00e5ff" stroke-width="1.5"/>`;
+  svg += `<text x="${tX}" y="${tY-4}" text-anchor="middle" fill="#00e5ff" font-size="8" font-weight="700">Trafo</text>`;
+  svg += `<text x="${tX}" y="${tY+8}" text-anchor="middle" fill="#bfe9ff" font-size="7">${trafoK} kVA</text>`;
+  svg += `<line x1="${tX}" y1="${tY+24}" x2="${faultX-20}" y2="${faultY-12}" stroke="#00e5ff" stroke-width="2" marker-end="url(#arrMik)"/>`;
+  svg += `<text x="${(tX+faultX-20)/2-15}" y="${(tY+24+faultY-12)/2}" fill="#00e5ff" font-size="8">${IkTrafo.toFixed(1)} kA</text>`;
+  // Motor sources (top-right area, stacked)
+  const mCount = Math.min(motorContribs.length, 5);
+  motorContribs.slice(0,5).forEach((m,i)=>{
+    const mX = 250 + (i%3)*50, mY = 30 + Math.floor(i/3)*50;
+    svg += `<rect x="${mX-18}" y="${mY-12}" width="36" height="24" rx="4" fill="rgba(255,154,77,0.1)" stroke="#ff9a4d" stroke-width="1"/>`;
+    svg += `<text x="${mX}" y="${mY+2}" text-anchor="middle" fill="#ff9a4d" font-size="6.5" font-weight="700">M ${m.kW}kW</text>`;
+    svg += `<line x1="${mX}" y1="${mY+14}" x2="${faultX+20}" y2="${faultY-12}" stroke="#ff9a4d" stroke-width="1.2" stroke-dasharray="3,2" marker-end="url(#arrMikO)"/>`;
+  });
+  if(motorContribs.length>0){
+    svg += `<text x="${300}" y="${svgH-70}" text-anchor="middle" fill="#ff9a4d" font-size="8">\u03A3 ${da?'motorer':'motors'}: ${totalMotorIk.toFixed(2)} kA</text>`;
+  }
+  // Busbar rating indicator
+  svg += `<text x="${faultX}" y="${faultY+25}" text-anchor="middle" fill="#7fa8c4" font-size="8">${da?'Busbar rating':'Busbar rating'}: ${mikBusbarRated} kA | ${da?'Apparat Icu':'Device Icu'}: ${deviceIcu} kA</text>`;
+  svg += `</svg>`;
+  // Build HTML
+  let html = `<div class="card fade-in"><div class="card-title">\u26A1 ${da?'Motorers kortslutningsbidrag':'Motor short-circuit contribution'} \u00b7 IEC 60909-0</div>`;
+  html += `<div class="info-row" style="margin-bottom:8px">${da?'Motorer bidrager til kortslutningsstroemmen ved fejlpunktet (IEC 60909-0 \u00A79). Subtransient reaktans Xd\u2033 \u2248 20% giver Ik_motor \u2248 5\u00D7In. Total Ik = trafo + motorers bidrag.':'Motors contribute to the short-circuit current at the fault point (IEC 60909-0 \u00A79). Subtransient reactance Xd\u2033 \u2248 20% gives Ik_motor \u2248 5\u00D7In. Total Ik = transformer + motor contributions.'}</div>`;
+  // Busbar rated Ik selector
+  html += `<div class="select-group" style="margin-bottom:10px"><div class="select-label">${da?'Busbar kortslutningsrating [kA]':'Busbar short-circuit rating [kA]'}</div><div class="select-grid">`;
+  [10,15,25,36,50,70,100].forEach(v=>{
+    html += `<button class="sel-btn ${mikBusbarRated===v?'selected':''}" onclick="mikSetBusbar(${v})">${v} kA</button>`;
+  });
+  html += `</div></div>`;
+  html += svg;
+  // Results table
+  html += `<div class="result-box" style="margin-top:10px">`;
+  html += `<div class="result-row"><span class="label">${da?'Trafo Ik':'Transformer Ik'}</span><span class="value" style="color:#00e5ff">${IkTrafo.toFixed(2)} kA</span></div>`;
+  motorContribs.forEach(m=>{
+    html += `<div class="result-row"><span class="label">\u2192 ${m.name} (${m.kW} kW, In=${m.In.toFixed(1)}A)</span><span class="value" style="color:#ff9a4d">+${(m.IkM/1000).toFixed(3)} kA</span></div>`;
+  });
+  html += `<div class="result-row"><span class="label" style="font-weight:700">${da?'Total Ik ved samleskinne':'Total Ik at busbar'}</span><span class="value" style="font-weight:700;color:${busbarOk&&icuOk?'var(--success)':'var(--danger)'}">${totalIk.toFixed(2)} kA</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Busbar rating':'Busbar rating'}</span><span class="value">${mikBusbarRated} kA ${busbarOk?'\u2705':'\u274C'}</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Apparat Icu':'Device Icu'}</span><span class="value">${deviceIcu} kA ${icuOk?'\u2705':'\u274C'}</span></div>`;
+  html += `</div>`;
+  // Verdict
+  html += `<div style="margin-top:10px;padding:10px 14px;border-radius:8px;border:1.5px solid ${verdictColor};background:rgba(0,0,0,0.2)">`;
+  html += `<div style="font-weight:700;color:${verdictColor};font-size:0.9rem">${busbarOk&&icuOk?'\u2705':'\u274C'} ${verdictText}</div>`;
+  html += `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px">\uD83D\uDCD6 IEC 60909-0 \u00A79 \u00b7 DS/HD 60364-4-43 \u00A7434.2</div>`;
+  html += `</div></div>`;
+  return html;
+}
+
+// ===== CABLE FIRE PERFORMANCE CLASSIFICATION (BEK 1082 §12 · DS/EN 13501-6 · CPR) =====
+function buildCableFire(){
+  const da = lang==='da';
+  // Fire classification requirements based on building type, escape route, cable density
+  const fireMatrix = {
+    residential:  {normal:'Eca', escape:'Dca', high:'Cca'},
+    commercial:   {normal:'Dca', escape:'Cca', high:'B2ca'},
+    'high-rise':  {normal:'Cca', escape:'B2ca', high:'B2ca'},
+    hospital:     {normal:'Cca', escape:'B2ca', high:'B1ca'},
+    tunnel:       {normal:'B2ca', escape:'B1ca', high:'B1ca'},
+    'public':     {normal:'Cca', escape:'B2ca', high:'B1ca'}
+  };
+  const densityKey = cfCableDensity==='high'?'high':(cfEscapeRoute?'escape':'normal');
+  const buildData = fireMatrix[cfBuildType] || fireMatrix.residential;
+  const requiredClass = cfEscapeRoute ? buildData.escape : (cfCableDensity==='high'?buildData.high:buildData.normal);
+  // Euroclass hierarchy
+  const classHierarchy = ['Eca','Dca','Cca','B2ca','B1ca','Aca'];
+  const classIdx = classHierarchy.indexOf(requiredClass);
+  // NKT product recommendation
+  const nktProducts = {
+    Eca:  {name:'NOIKLX 90 (Eca)', props:{da:'Standard PVC, ingen brandkrav',en:'Standard PVC, no fire requirement'}},
+    Dca:  {name:'NOIKLX 90 Dca-s2,d2,a2', props:{da:'Begraenset brandspredning, moderat roeg',en:'Limited flame spread, moderate smoke'}},
+    Cca:  {name:'NOIKLX Cca-s1b,d1,a1', props:{da:'Lav brandspredning, lav roeg, ingen drip',en:'Low flame spread, low smoke, no dripping'}},
+    B2ca: {name:'NHXMH B2ca-s1,d0,a1', props:{da:'Meget lav brandspredning, minimal roeg, halogen-fri',en:'Very low flame spread, minimal smoke, halogen-free'}},
+    B1ca: {name:'NHXMH-J B1ca-s1,d0,a0', props:{da:'Lavestte brandspredning, ingen syre, halogen-fri',en:'Lowest flame spread, no acid gas, halogen-free'}},
+    Aca:  {name:'Mineralsk (MICC) Aca', props:{da:'Ikke-braendbar, mineralsk isolation',en:'Non-combustible, mineral insulation'}}
+  };
+  const product = nktProducts[requiredClass] || nktProducts.Dca;
+  // SVG fire rating scale
+  const svgW = 400, svgH = 180;
+  let svg = `<svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;max-width:400px;height:auto;margin:10px auto;display:block;background:rgba(0,0,0,0.3);border-radius:12px;border:1px solid rgba(0,200,255,0.15)">`;
+  const barY = 80, barH = 30, barW = 340, barX = 30;
+  // Background bar
+  svg += `<rect x="${barX}" y="${barY}" width="${barW}" height="${barH}" rx="6" fill="rgba(255,255,255,0.05)" stroke="rgba(127,168,196,0.2)" stroke-width="0.5"/>`;
+  // Gradient from red (Eca) to green (B1ca/Aca)
+  const segW = barW / classHierarchy.length;
+  classHierarchy.forEach((cls,i)=>{
+    const isReq = i === classIdx;
+    const colors = ['#ff3b5c','#ff6b4d','#ffd166','#4de8b0','#00e5ff','#a78bfa'];
+    const fillColor = colors[i] || '#00e5ff';
+    const opacity = isReq ? 0.7 : 0.15;
+    const strokeW = isReq ? 2 : 0.5;
+    const strokeC = isReq ? fillColor : 'rgba(127,168,196,0.2)';
+    svg += `<rect x="${barX + i*segW}" y="${barY}" width="${segW-2}" height="${barH}" rx="3" fill="${fillColor}" opacity="${opacity}" stroke="${strokeC}" stroke-width="${strokeW}"/>`;
+    svg += `<text x="${barX + i*segW + segW/2}" y="${barY+barH/2+4}" text-anchor="middle" fill="${isReq?'#fff':'#7fa8c4'}" font-size="${isReq?10:8}" font-weight="${isReq?'700':'400'}">${cls}</text>`;
+  });
+  // Arrow pointing to required class
+  if(classIdx>=0){
+    const arrX = barX + classIdx*segW + segW/2;
+    svg += `<polygon points="${arrX-6},${barY-8} ${arrX+6},${barY-8} ${arrX},${barY-2}" fill="#ff3b5c"/>`;
+    svg += `<text x="${arrX}" y="${barY-14}" text-anchor="middle" fill="#ff3b5c" font-size="8" font-weight="700">${da?'Kraevet':'Required'}</text>`;
+  }
+  // Labels
+  svg += `<text x="${barX}" y="${barY+barH+18}" fill="#7fa8c4" font-size="8">${da?'Laveste krav':'Lowest req.'}</text>`;
+  svg += `<text x="${barX+barW}" y="${barY+barH+18}" text-anchor="end" fill="#7fa8c4" font-size="8">${da?'Hoejeste krav':'Highest req.'}</text>`;
+  svg += `<text x="${svgW/2}" y="30" text-anchor="middle" fill="#bfe9ff" font-size="10" font-weight="700">${da?'Euroclass brandskala (CPR)':'Euroclass fire scale (CPR)'}</text>`;
+  // Properties icons
+  const propIcons = ['\uD83D\uDD25','\uD83D\uDCA8','\u2620\uFE0F','\uD83D\uDCA7'];
+  const propLabelsDA = ['Brandspredning','Roegproduktion','Syregas','Dryp'];
+  const propLabelsEN = ['Flame spread','Smoke','Acid gas','Dripping'];
+  const propLevels = {Eca:[3,3,3,3],Dca:[2,2,2,2],Cca:[1,1,1,1],B2ca:[1,1,0,1],B1ca:[0,0,0,0],Aca:[0,0,0,0]};
+  const levels = propLevels[requiredClass]||[2,2,2,2];
+  propIcons.forEach((icon,i)=>{
+    const px = barX + i*90;
+    const py = svgH - 30;
+    const levelColor = levels[i]===0?'#06d6a0':levels[i]===1?'#ffd166':'#ff3b5c';
+    const levelText = levels[i]===0?(da?'Ingen':'None'):levels[i]===1?(da?'Lav':'Low'):(da?'Moderat':'Moderate');
+    svg += `<text x="${px}" y="${py}" fill="${levelColor}" font-size="8">${icon} ${(da?propLabelsDA:propLabelsEN)[i]}: ${levelText}</text>`;
+  });
+  svg += `</svg>`;
+  // Build HTML
+  let html = `<div class="card fade-in"><div class="card-title">\uD83D\uDD25 ${da?'Brandklassificering (CPR)':'Fire classification (CPR)'} \u00b7 DS/EN 13501-6</div>`;
+  html += `<div class="info-row" style="margin-bottom:8px">${da?'EU Construction Products Regulation (CPR) kraever Euroclass-klassificering af kabler iht. DS/EN 13501-6. Kravet afhaenger af bygningstype, flugtvej og kabeltaethed.':'EU Construction Products Regulation (CPR) requires Euroclass classification for cables per DS/EN 13501-6. Requirement depends on building type, escape route and cable density.'}</div>`;
+  // Building type selector
+  html += `<div class="select-group" style="margin-bottom:8px"><div class="select-label">${da?'Bygningstype':'Building type'}</div><div class="select-grid">`;
+  const buildTypes = [{k:'residential',da:'Bolig',en:'Residential'},{k:'commercial',da:'Erhverv',en:'Commercial'},{k:'high-rise',da:'Hoejhus',en:'High-rise'},{k:'hospital',da:'Hospital',en:'Hospital'},{k:'tunnel',da:'Tunnel',en:'Tunnel'},{k:'public',da:'Offentlig forsamling',en:'Public assembly'}];
+  buildTypes.forEach(bt=>{
+    html += `<button class="sel-btn ${cfBuildType===bt.k?'selected':''}" onclick="cfSetBuild('${bt.k}')">${da?bt.da:bt.en}</button>`;
+  });
+  html += `</div></div>`;
+  // Escape route selector
+  html += `<div class="select-group" style="margin-bottom:8px"><div class="select-label">${da?'Flugtvej':'Escape route'}</div><div class="select-grid">`;
+  html += `<button class="sel-btn ${!cfEscapeRoute?'selected':''}" onclick="cfSetEscape(false)">${da?'Nej':'No'}</button>`;
+  html += `<button class="sel-btn ${cfEscapeRoute?'selected':''}" onclick="cfSetEscape(true)">${da?'Ja':'Yes'}</button>`;
+  html += `</div></div>`;
+  // Cable density selector
+  html += `<div class="select-group" style="margin-bottom:8px"><div class="select-label">${da?'Kabeltaethed':'Cable density'}</div><div class="select-grid">`;
+  html += `<button class="sel-btn ${cfCableDensity==='low'?'selected':''}" onclick="cfSetDensity('low')">${da?'Lav':'Low'}</button>`;
+  html += `<button class="sel-btn ${cfCableDensity==='medium'?'selected':''}" onclick="cfSetDensity('medium')">${da?'Middel':'Medium'}</button>`;
+  html += `<button class="sel-btn ${cfCableDensity==='high'?'selected':''}" onclick="cfSetDensity('high')">${da?'Hoej':'High'}</button>`;
+  html += `</div></div>`;
+  html += svg;
+  // Results
+  html += `<div class="result-box" style="margin-top:10px">`;
+  html += `<div class="result-row"><span class="label">${da?'Kraevet brandklasse':'Required fire class'}</span><span class="value" style="color:#ff9a4d;font-weight:700">${requiredClass}</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Anbefalet kabel (NKT)':'Recommended cable (NKT)'}</span><span class="value" style="color:#00e5ff">${product.name}</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Egenskaber':'Properties'}</span><span class="value">${da?product.props.da:product.props.en}</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Bygningstype':'Building type'}</span><span class="value">${(buildTypes.find(b=>b.k===cfBuildType)||{da:'?',en:'?'})[da?'da':'en']}</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Flugtvej':'Escape route'}</span><span class="value">${cfEscapeRoute?(da?'Ja':'Yes'):(da?'Nej':'No')}</span></div>`;
+  html += `</div>`;
+  // Verdict
+  const verdictColor = 'var(--success)';
+  const verdictText = da?`Kabel skal vaere min. ${requiredClass} -- anbefalet: ${product.name}`:`Cable must be min. ${requiredClass} -- recommended: ${product.name}`;
+  html += `<div style="margin-top:10px;padding:10px 14px;border-radius:8px;border:1.5px solid ${verdictColor};background:rgba(0,0,0,0.2)">`;
+  html += `<div style="font-weight:700;color:${verdictColor};font-size:0.9rem">\u2705 ${verdictText}</div>`;
+  html += `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px">\uD83D\uDCD6 BEK 1082 \u00A712 \u00b7 DS/EN 13501-6 \u00b7 EU forordning 305/2011 (CPR)</div>`;
+  html += `</div></div>`;
+  return html;
+}
+
+// ===== SMART LOAD BALANCING OPTIMIZER (DS/HD 60364-5-52 §524 · EN 50160 §4.2.5) =====
+function buildLoadOptimizer(){
+  const da = lang==='da';
+  const cons = loadList.length ? loadList.slice(0,20) : [
+    {kW:11,cos:0.9,sf:1,phase:'3',name:'EV-lader'},{kW:7.5,cos:0.85,sf:1,phase:'3',name:'Motor'},
+    {kW:3.7,cos:0.95,sf:0.6,phase:'L1',name:'Stik A'},{kW:3.7,cos:0.95,sf:0.6,phase:'L1',name:'Stik B'},
+    {kW:2.2,cos:0.95,sf:0.6,phase:'L2',name:'Hvidevarer'},{kW:1.5,cos:0.95,sf:1,phase:'L3',name:'Belysning A'},
+    {kW:2.0,cos:0.95,sf:0.8,phase:'L1',name:'Stik C'},{kW:1.8,cos:0.95,sf:0.7,phase:'L3',name:'Belysning B'}
+  ];
+  // Separate three-phase (unchanged) and single-phase (optimizable)
+  const threePhase = cons.filter(c=>c.phase==='3');
+  const singlePhase = cons.filter(c=>c.phase!=='3');
+  // Current per single-phase circuit
+  const spCurrents = singlePhase.map(c=>{
+    const P = c.kW*1000*(c.sf||1);
+    const I = P/(230*(c.cos||0.95));
+    return {name:c.name||'?', I:I, origPhase:c.phase, kW:c.kW};
+  });
+  // Three-phase contribution to each phase (balanced)
+  const tpPerPhase = threePhase.reduce((a,c)=>{
+    const I = (c.kW*1000*(c.sf||1))/(Math.sqrt(3)*400*(c.cos||0.9));
+    return a+I;
+  },0);
+  // Before: current phase assignment
+  const beforeL = {L1:tpPerPhase, L2:tpPerPhase, L3:tpPerPhase};
+  spCurrents.forEach(sp=>{ beforeL[sp.origPhase] = (beforeL[sp.origPhase]||0) + sp.I; });
+  const beforeAvg = (beforeL.L1+beforeL.L2+beforeL.L3)/3;
+  const beforeMaxDev = Math.max(Math.abs(beforeL.L1-beforeAvg),Math.abs(beforeL.L2-beforeAvg),Math.abs(beforeL.L3-beforeAvg));
+  const beforeVUF = beforeAvg>0 ? (beforeMaxDev/beforeAvg)*100*0.4 : 0;
+  const beforeNeutral = Math.sqrt(Math.max(0, beforeL.L1*beforeL.L1+beforeL.L2*beforeL.L2+beforeL.L3*beforeL.L3-beforeL.L1*beforeL.L2-beforeL.L2*beforeL.L3-beforeL.L1*beforeL.L3));
+  // Greedy optimizer: assign largest single-phase loads first to least-loaded phase
+  const sorted = [...spCurrents].sort((a,b)=>b.I-a.I);
+  const afterL = {L1:tpPerPhase, L2:tpPerPhase, L3:tpPerPhase};
+  const assignments = [];
+  sorted.forEach(sp=>{
+    // Find least loaded phase
+    const minPhase = afterL.L1<=afterL.L2 ? (afterL.L1<=afterL.L3?'L1':'L3') : (afterL.L2<=afterL.L3?'L2':'L3');
+    afterL[minPhase] += sp.I;
+    assignments.push({name:sp.name, from:sp.origPhase, to:minPhase, I:sp.I});
+  });
+  const afterAvg = (afterL.L1+afterL.L2+afterL.L3)/3;
+  const afterMaxDev = Math.max(Math.abs(afterL.L1-afterAvg),Math.abs(afterL.L2-afterAvg),Math.abs(afterL.L3-afterAvg));
+  const afterVUF = afterAvg>0 ? (afterMaxDev/afterAvg)*100*0.4 : 0;
+  const afterNeutral = Math.sqrt(Math.max(0, afterL.L1*afterL.L1+afterL.L2*afterL.L2+afterL.L3*afterL.L3-afterL.L1*afterL.L2-afterL.L2*afterL.L3-afterL.L1*afterL.L3));
+  const improvement = beforeVUF>0 ? ((beforeVUF-afterVUF)/beforeVUF)*100 : 0;
+  const en50160Limit = 2.0;
+  const afterOk = afterVUF <= en50160Limit;
+  // Moves needed
+  const moves = assignments.filter(a=>a.from!==a.to);
+  // SVG bar chart: before (faded) vs after (solid)
+  const svgW = 400, svgH = 220;
+  const maxCurrent = Math.max(beforeL.L1,beforeL.L2,beforeL.L3,afterL.L1,afterL.L2,afterL.L3,1);
+  const barMaxH = 120, chartY = 40, chartX = 60;
+  let svg = `<svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;max-width:400px;height:auto;margin:10px auto;display:block;background:rgba(0,0,0,0.3);border-radius:12px;border:1px solid rgba(0,200,255,0.15)">`;
+  svg += `<text x="${svgW/2}" y="22" text-anchor="middle" fill="#bfe9ff" font-size="10" font-weight="700">${da?'Fasestroemme: foer vs. efter':'Phase currents: before vs. after'}</text>`;
+  const phases = ['L1','L2','L3'];
+  const phColors = ['#8B4513','#555','#999'];
+  phases.forEach((ph,i)=>{
+    const bx = chartX + i*110;
+    const bH = (beforeL[ph]/maxCurrent)*barMaxH;
+    const aH = (afterL[ph]/maxCurrent)*barMaxH;
+    // Before bar (faded)
+    svg += `<rect x="${bx}" y="${chartY+barMaxH-bH}" width="30" height="${bH}" rx="3" fill="${phColors[i]}" opacity="0.3" stroke="${phColors[i]}" stroke-width="0.5"/>`;
+    svg += `<text x="${bx+15}" y="${chartY+barMaxH-bH-5}" text-anchor="middle" fill="${phColors[i]}" font-size="7" opacity="0.6">${beforeL[ph].toFixed(1)}A</text>`;
+    // After bar (solid)
+    svg += `<rect x="${bx+35}" y="${chartY+barMaxH-aH}" width="30" height="${aH}" rx="3" fill="${phColors[i]}" opacity="0.8" stroke="#00e5ff" stroke-width="1"/>`;
+    svg += `<text x="${bx+50}" y="${chartY+barMaxH-aH-5}" text-anchor="middle" fill="#00e5ff" font-size="7">${afterL[ph].toFixed(1)}A</text>`;
+    // Phase label
+    svg += `<text x="${bx+32}" y="${chartY+barMaxH+15}" text-anchor="middle" fill="#7fa8c4" font-size="9" font-weight="700">${ph}</text>`;
+  });
+  // Legend
+  svg += `<rect x="${chartX}" y="${svgH-30}" width="12" height="8" rx="2" fill="#555" opacity="0.3"/>`;
+  svg += `<text x="${chartX+16}" y="${svgH-23}" fill="#7fa8c4" font-size="7">${da?'Foer':'Before'}</text>`;
+  svg += `<rect x="${chartX+60}" y="${svgH-30}" width="12" height="8" rx="2" fill="#00e5ff" opacity="0.8"/>`;
+  svg += `<text x="${chartX+76}" y="${svgH-23}" fill="#7fa8c4" font-size="7">${da?'Efter':'After'}</text>`;
+  // Improvement arrow
+  if(improvement>0){
+    svg += `<text x="${svgW-60}" y="${svgH-20}" text-anchor="middle" fill="#06d6a0" font-size="10" font-weight="700">\u2193${improvement.toFixed(0)}%</text>`;
+  }
+  svg += `</svg>`;
+  // Build HTML
+  let html = `<div class="card fade-in"><div class="card-title">\u2696\uFE0F ${da?'Faseoptimering':'Phase optimization'} \u00b7 EN 50160</div>`;
+  html += `<div class="info-row" style="margin-bottom:8px">${da?'Analyserer fasefordelingen og foresl\u00E5r flytning af enfase-kredse for at minimere ubalancen. Greedy-algoritme: stoerste belastning tildeles mindst belastede fase.':'Analyzes the phase distribution and suggests moving single-phase circuits to minimize unbalance. Greedy algorithm: largest load assigned to least-loaded phase.'}</div>`;
+  html += svg;
+  // Before/after comparison
+  html += `<div class="result-box" style="margin-top:10px">`;
+  html += `<div class="result-row"><span class="label" style="font-weight:700">${da?'FOER optimering':'BEFORE optimization'}</span><span class="value"></span></div>`;
+  html += `<div class="result-row"><span class="label">L1 / L2 / L3</span><span class="value">${beforeL.L1.toFixed(1)} / ${beforeL.L2.toFixed(1)} / ${beforeL.L3.toFixed(1)} A</span></div>`;
+  html += `<div class="result-row"><span class="label">VUF</span><span class="value">${beforeVUF.toFixed(2)}%</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Neutralstroem':'Neutral current'}</span><span class="value">${beforeNeutral.toFixed(1)} A</span></div>`;
+  html += `<div class="result-row"><span class="label" style="font-weight:700;margin-top:6px">${da?'EFTER optimering':'AFTER optimization'}</span><span class="value"></span></div>`;
+  html += `<div class="result-row"><span class="label">L1 / L2 / L3</span><span class="value" style="color:#00e5ff">${afterL.L1.toFixed(1)} / ${afterL.L2.toFixed(1)} / ${afterL.L3.toFixed(1)} A</span></div>`;
+  html += `<div class="result-row"><span class="label">VUF</span><span class="value" style="color:${afterOk?'var(--success)':'var(--danger)'}">${afterVUF.toFixed(2)}%</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Neutralstroem':'Neutral current'}</span><span class="value" style="color:#00e5ff">${afterNeutral.toFixed(1)} A</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Forbedring':'Improvement'}</span><span class="value" style="color:var(--success)">${improvement.toFixed(0)}%</span></div>`;
+  html += `</div>`;
+  // Move recommendations
+  if(moves.length>0){
+    html += `<div class="result-box" style="margin-top:8px;border-color:#ff9a4d">`;
+    html += `<div style="font-weight:700;color:#ff9a4d;font-size:0.8rem;margin-bottom:4px">${da?'Anbefalede flytninger:':'Recommended moves:'}</div>`;
+    moves.forEach(m=>{
+      html += `<div class="result-row"><span class="label">\u2192 ${m.name} (${m.I.toFixed(1)}A)</span><span class="value">${m.from} \u2192 ${m.to}</span></div>`;
+    });
+    html += `</div>`;
+  }
+  // Verdict
+  const verdictColor = afterOk?'var(--success)':'#ffd166';
+  const verdictText = afterOk
+    ? (da?`Forbedring ${improvement.toFixed(0)}% -- VUF ${afterVUF.toFixed(2)}% inden for EN 50160 graense`:`Improvement ${improvement.toFixed(0)}% -- VUF ${afterVUF.toFixed(2)}% within EN 50160 limit`)
+    : (da?`Forbedring ${improvement.toFixed(0)}% -- VUF stadig over 2% (yderligere foranstaltninger noedvendige)`:`Improvement ${improvement.toFixed(0)}% -- VUF still above 2% (further measures needed)`);
+  html += `<div style="margin-top:10px;padding:10px 14px;border-radius:8px;border:1.5px solid ${verdictColor};background:rgba(0,0,0,0.2)">`;
+  html += `<div style="font-weight:700;color:${verdictColor};font-size:0.9rem">${afterOk?'\u2705':'\u26A0\uFE0F'} ${verdictText}</div>`;
+  html += `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px">\uD83D\uDCD6 DS/HD 60364-5-52 \u00A7524 \u00b7 EN 50160 \u00A74.2.5 \u00b7 ${da?'Fasebalancering':'Phase balancing'}</div>`;
+  html += `</div></div>`;
+  return html;
+}
+
 function buildProtReport(){
   const da = lang==='da';
   const cons = loadList.length ? loadList.slice(0,16) : [
@@ -8171,7 +8510,7 @@ function buildCommissioning(){
 function renderDrawing(){
   const nodes=getDrawNodes(), typeKeys=Object.keys(NODE_TYPES);
   const nodeEditor=`<div class="select-group"><div class="select-label">${lang==='da'?'Installationens noder (tilf\u00F8j/fjern/flyt)':'Installation nodes (add/remove/move)'}</div>${nodes.map((n,i)=>{const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;return `<div style="display:inline-flex;align-items:center;gap:4px;margin:3px 4px;padding:5px 9px;border:1.5px solid ${nt.color};border-radius:8px;font-size:.78rem;background:rgba(0,0,0,0.25)"><span>${nt.icon}</span><span style="color:${nt.color};font-weight:700">${lang==='da'?nt.da:nt.en}</span><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},-1)">\u25C0</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},1)">\u25B6</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem;color:var(--danger)" onclick="drawNodeRemove(${i})">\u2715</button></div>`;}).join('')}</div><div class="select-group"><div class="select-label">${lang==='da'?'Tilf\u00F8j node':'Add node'}</div><div class="select-grid">${typeKeys.map(k=>`<button class="sel-btn" onclick="drawNodeAdd('${k}')">${NODE_TYPES[k].icon} ${lang==='da'?NODE_TYPES[k].da:NODE_TYPES[k].en}</button>`).join('')}<button class="sel-btn" onclick="drawNodeReset()">\u21BA ${lang==='da'?'Nulstil':'Reset'}</button></div></div>`;
-  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():(sldFault?buildCoordDashboard():'')+buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildArcFlash():''}${drawStyle==='schematic'&&sldFault?buildDeratingChart():''}${drawStyle==='schematic'&&sldFault?buildInrushCheck():''}${drawStyle==='schematic'&&sldFault?buildEnergyEfficiency():''}${drawStyle==='schematic'&&sldFault?buildHarmonicCheck():''}${drawStyle==='schematic'&&sldFault?buildCableLifetime():''}${drawStyle==='schematic'&&sldFault?buildPowerFlow():''}${drawStyle==='schematic'&&sldFault?buildVoltageProfile():''}${drawStyle==='schematic'&&sldFault?buildEmcRouting():''}${drawStyle==='schematic'&&sldFault?buildMotorStart():''}${drawStyle==='schematic'&&sldFault?buildCapBank():''}${drawStyle==='schematic'&&sldFault?buildRelaySettings():''}${drawStyle==='schematic'&&sldFault?buildGenSet():''}${drawStyle==='schematic'&&sldFault?buildLightningRisk():''}${drawStyle==='schematic'&&sldFault?buildThermalPred():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='schematic'&&sldFault?buildDiscrimTable():''}${drawStyle==='schematic'&&sldFault?buildCommissioning():''}${drawStyle==='schematic'&&sldFault?buildInspectionInterval():''}${drawStyle==='schematic'&&sldFault?buildZsSimulator():''}${drawStyle==='schematic'&&sldFault?buildSelectiveMap():''}${drawStyle==='schematic'&&sldFault?buildTouchVoltage():''}${drawStyle==='schematic'&&sldFault?buildDocChecklist():''}${drawStyle==='schematic'&&sldFault?buildVoltageUnbalance():''}${drawStyle==='schematic'&&sldFault?buildGroundingWizard():''}${drawStyle==='schematic'&&sldFault?buildTrayFill():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
+  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():(sldFault?buildCoordDashboard():'')+buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildArcFlash():''}${drawStyle==='schematic'&&sldFault?buildDeratingChart():''}${drawStyle==='schematic'&&sldFault?buildInrushCheck():''}${drawStyle==='schematic'&&sldFault?buildEnergyEfficiency():''}${drawStyle==='schematic'&&sldFault?buildHarmonicCheck():''}${drawStyle==='schematic'&&sldFault?buildCableLifetime():''}${drawStyle==='schematic'&&sldFault?buildPowerFlow():''}${drawStyle==='schematic'&&sldFault?buildVoltageProfile():''}${drawStyle==='schematic'&&sldFault?buildEmcRouting():''}${drawStyle==='schematic'&&sldFault?buildMotorStart():''}${drawStyle==='schematic'&&sldFault?buildCapBank():''}${drawStyle==='schematic'&&sldFault?buildRelaySettings():''}${drawStyle==='schematic'&&sldFault?buildGenSet():''}${drawStyle==='schematic'&&sldFault?buildLightningRisk():''}${drawStyle==='schematic'&&sldFault?buildThermalPred():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='schematic'&&sldFault?buildDiscrimTable():''}${drawStyle==='schematic'&&sldFault?buildCommissioning():''}${drawStyle==='schematic'&&sldFault?buildInspectionInterval():''}${drawStyle==='schematic'&&sldFault?buildZsSimulator():''}${drawStyle==='schematic'&&sldFault?buildSelectiveMap():''}${drawStyle==='schematic'&&sldFault?buildTouchVoltage():''}${drawStyle==='schematic'&&sldFault?buildDocChecklist():''}${drawStyle==='schematic'&&sldFault?buildVoltageUnbalance():''}${drawStyle==='schematic'&&sldFault?buildGroundingWizard():''}${drawStyle==='schematic'&&sldFault?buildTrayFill():''}${drawStyle==='schematic'&&sldFault?buildMotorIk():''}${drawStyle==='schematic'&&sldFault?buildCableFire():''}${drawStyle==='schematic'&&sldFault?buildLoadOptimizer():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
 }
 
 // ===== ANALYZING BRAIN MODULE =====
