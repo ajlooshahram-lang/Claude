@@ -4422,6 +4422,16 @@ let tvLocType = 'normal'; function tvSetLoc(v){tvLocType=v;renderModule('draw');
 // Documentation checklist state
 let docCheckItems = {}; function docSetItem(k,v){docCheckItems[k]=v;renderModule('draw');}
 function docResetAll(){docCheckItems={};renderModule('draw');}
+// Voltage unbalance state
+let vubGridType = 'normal'; function vubSetGrid(v){vubGridType=v;renderModule('draw');}
+// Grounding wizard state
+let gwSoilRes = 100; function gwSetSoil(v){gwSoilRes=+v;renderModule('draw');}
+let gwElectrode = 'rod3'; function gwSetElectrode(v){gwElectrode=v;renderModule('draw');}
+// Cable tray fill state
+let ctfType = 'tray'; function ctfSetType(v){ctfType=v;renderModule('draw');}
+let ctfTrayW = 300; function ctfSetTrayW(v){ctfTrayW=+v;renderModule('draw');}
+let ctfTrayH = 75; function ctfSetTrayH(v){ctfTrayH=+v;renderModule('draw');}
+let ctfConduit = 32; function ctfSetConduit(v){ctfConduit=+v;renderModule('draw');}
 // Standard earth-electrode symbol (vertical line + 3 decreasing horizontal bars)
 function earthSymbol(x, y, color){
   return `<g stroke="${color}" stroke-width="2" stroke-linecap="round" fill="none"><line x1="${x}" y1="${y-9}" x2="${x}" y2="${y}"/><line x1="${x-11}" y1="${y}" x2="${x+11}" y2="${y}"/><line x1="${x-7}" y1="${y+4}" x2="${x+7}" y2="${y+4}"/><line x1="${x-3}" y1="${y+8}" x2="${x+3}" y2="${y+8}"/></g>`;
@@ -7484,6 +7494,397 @@ function buildDocChecklist(){
   return html;
 }
 
+// ===== VOLTAGE UNBALANCE ANALYSIS (EN 50160 §4.2.5 · DS/HD 60364-5-52) =====
+function buildVoltageUnbalance(){
+  const da = lang==='da';
+  const sched = calcLoadSchedule();
+  const ph = sched.ph;
+  const L1 = ph.L1||0, L2 = ph.L2||0, L3 = ph.L3||0;
+  const avg = (L1+L2+L3)/3;
+  const maxDev = Math.max(Math.abs(L1-avg),Math.abs(L2-avg),Math.abs(L3-avg));
+  // Current unbalance factor
+  const cuf = avg>0 ? (maxDev/avg)*100 : 0;
+  // Grid impedance factor: weak grid amplifies unbalance
+  const gridFactor = vubGridType==='weak'?1.8 : vubGridType==='strong'?0.5 : 1.0;
+  // Voltage unbalance factor (VUF) approximation
+  const vuf = cuf * gridFactor * 0.4; // typical 40% of current unbalance translates to voltage
+  // Motor derating per NEMA MG1: derate by 2x VUF%
+  const derating = Math.min(vuf*2, 100);
+  const motorEffLoss = vuf * 3.5; // approx additional losses %
+  // Limits
+  const en50160Limit = 2.0;
+  const iec60034Limit = 1.0;
+  const withinEN = vuf <= en50160Limit;
+  const motorSafe = vuf <= iec60034Limit;
+  // Verdict
+  let verdictColor, verdictText;
+  if(withinEN && motorSafe){
+    verdictColor = 'var(--success)';
+    verdictText = da?'Inden for EN 50160 graense -- ingen derating noedvendig':'Within EN 50160 limit -- no derating required';
+  } else if(withinEN && !motorSafe){
+    verdictColor = '#ffd166';
+    verdictText = da?'Motor-derating paakraevet (VUF > 1%)':'Motor derating required (VUF > 1%)';
+  } else {
+    verdictColor = 'var(--danger)';
+    verdictText = da?'Rebalancer belastninger mellem faser (VUF > 2%)':'Rebalance loads between phases (VUF > 2%)';
+  }
+  // SVG phasor diagram
+  const svgW = 380, svgH = 300, cx = 190, cy = 150, baseR = 90;
+  const vNom = 230;
+  const v1 = vNom * (1 + (L1-avg)/(avg||1)*0.1*gridFactor);
+  const v2 = vNom * (1 + (L2-avg)/(avg||1)*0.1*gridFactor);
+  const v3 = vNom * (1 + (L3-avg)/(avg||1)*0.1*gridFactor);
+  const maxV = Math.max(v1,v2,v3,vNom);
+  const scale = baseR / maxV;
+  const r1 = v1*scale, r2 = v2*scale, r3 = v3*scale;
+  // Angles: 90deg (up), 210deg, 330deg
+  const a1 = -Math.PI/2, a2 = -Math.PI/2 + 2*Math.PI/3, a3 = -Math.PI/2 + 4*Math.PI/3;
+  const x1 = cx + r1*Math.cos(a1), y1 = cy + r1*Math.sin(a1);
+  const x2 = cx + r2*Math.cos(a2), y2 = cy + r2*Math.sin(a2);
+  const x3 = cx + r3*Math.cos(a3), y3 = cy + r3*Math.sin(a3);
+  let svg = `<svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;max-width:380px;height:auto;margin:10px auto;display:block;background:rgba(0,0,0,0.3);border-radius:12px;border:1px solid rgba(0,200,255,0.15)">`;
+  // Reference circle (balanced)
+  svg += `<circle cx="${cx}" cy="${cy}" r="${baseR}" fill="none" stroke="rgba(127,168,196,0.2)" stroke-width="1" stroke-dasharray="4,3"/>`;
+  // Phasor arrows
+  svg += `<line x1="${cx}" y1="${cy}" x2="${x1}" y2="${y1}" stroke="#8B4513" stroke-width="2.5" marker-end="url(#arrVub)"/>`;
+  svg += `<line x1="${cx}" y1="${cy}" x2="${x2}" y2="${y2}" stroke="#333" stroke-width="2.5" marker-end="url(#arrVub)"/>`;
+  svg += `<line x1="${cx}" y1="${cy}" x2="${x3}" y2="${y3}" stroke="#888" stroke-width="2.5" marker-end="url(#arrVub)"/>`;
+  // Arrow marker
+  svg += `<defs><marker id="arrVub" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00e5ff"/></marker></defs>`;
+  // Labels
+  svg += `<text x="${x1}" y="${y1-10}" text-anchor="middle" fill="#8B4513" font-size="10" font-weight="700">L1: ${v1.toFixed(0)}V (${L1.toFixed(1)}A)</text>`;
+  svg += `<text x="${x2+(x2<cx?-5:5)}" y="${y2+15}" text-anchor="${x2<cx?'end':'start'}" fill="#555" font-size="10" font-weight="700">L2: ${v2.toFixed(0)}V (${L2.toFixed(1)}A)</text>`;
+  svg += `<text x="${x3+(x3>cx?5:-5)}" y="${y3+15}" text-anchor="${x3>cx?'start':'end'}" fill="#888" font-size="10" font-weight="700">L3: ${v3.toFixed(0)}V (${L3.toFixed(1)}A)</text>`;
+  // Center label
+  svg += `<text x="${cx}" y="${cy+baseR+30}" text-anchor="middle" fill="#7fa8c4" font-size="9">VUF = ${vuf.toFixed(2)}% ${da?'(stiplet = balanceret)':'(dashed = balanced)'}</text>`;
+  // Unbalance triangle
+  svg += `<polygon points="${x1},${y1} ${x2},${y2} ${x3},${y3}" fill="rgba(0,229,255,0.05)" stroke="rgba(0,229,255,0.3)" stroke-width="1"/>`;
+  svg += `</svg>`;
+  // Build HTML
+  let html = `<div class="card fade-in"><div class="card-title">\u26A1 ${da?'Spaendingsubalance':'Voltage unbalance'} \u00b7 EN 50160</div>`;
+  html += `<div class="info-row" style="margin-bottom:8px">${da?'Beregner spaendingsubalancefaktoren (VUF) ved PCC baseret paa fasebelastning. Motorderating iht. NEMA MG1: derat med 2x VUF%. EN 50160 kraever VUF \u2264 2% ved LV.':'Calculates voltage unbalance factor (VUF) at PCC from phase loading. Motor derating per NEMA MG1: derate by 2x VUF%. EN 50160 requires VUF \u2264 2% at LV.'}</div>`;
+  // Grid impedance selector
+  html += `<div class="select-group" style="margin-bottom:10px"><div class="select-label">${da?'Forsyningsimpedans (nettype)':'Supply impedance (grid type)'}</div><div class="select-grid">`;
+  html += `<button class="sel-btn ${vubGridType==='weak'?'selected':''}" onclick="vubSetGrid('weak')">\uD83D\uDFE1 ${da?'Svagt net':'Weak grid'}</button>`;
+  html += `<button class="sel-btn ${vubGridType==='normal'?'selected':''}" onclick="vubSetGrid('normal')">\uD83D\uDFE2 ${da?'Normalt net':'Normal grid'}</button>`;
+  html += `<button class="sel-btn ${vubGridType==='strong'?'selected':''}" onclick="vubSetGrid('strong')">\uD83D\uDD35 ${da?'Staerkt net':'Strong grid'}</button>`;
+  html += `</div></div>`;
+  html += svg;
+  // Results
+  html += `<div class="result-box" style="margin-top:10px">`;
+  html += `<div class="result-row"><span class="label">${da?'Fasestroemme':'Phase currents'}</span><span class="value">L1=${L1.toFixed(1)}A, L2=${L2.toFixed(1)}A, L3=${L3.toFixed(1)}A</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Gennemsnit':'Average'}</span><span class="value">${avg.toFixed(1)} A</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Stroemubalance (CUF)':'Current unbalance (CUF)'}</span><span class="value">${cuf.toFixed(1)}%</span></div>`;
+  html += `<div class="result-row"><span class="label">VUF (${da?'spaendingsubalance':'voltage unbalance'})</span><span class="value" style="color:${withinEN?'var(--success)':'var(--danger)'}">${vuf.toFixed(2)}%</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'EN 50160 graense':'EN 50160 limit'}</span><span class="value">\u2264 ${en50160Limit}%</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Motor-derating (NEMA MG1)':'Motor derating (NEMA MG1)'}</span><span class="value" style="color:${motorSafe?'var(--success)':'#ffd166'}">${derating.toFixed(1)}%</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Ekstra tab i motorer':'Additional motor losses'}</span><span class="value">${motorEffLoss.toFixed(1)}%</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Lejebeskadigelsesrisiko':'Bearing damage risk'}</span><span class="value" style="color:${vuf>1.5?'var(--danger)':'var(--success)'}">${vuf>1.5?(da?'Forhoejet':'Elevated'):(da?'Lav':'Low')}</span></div>`;
+  html += `</div>`;
+  // Verdict
+  html += `<div style="margin-top:10px;padding:10px 14px;border-radius:8px;border:1.5px solid ${verdictColor};background:rgba(0,0,0,0.2)">`;
+  html += `<div style="font-weight:700;color:${verdictColor};font-size:0.9rem">${withinEN&&motorSafe?'\u2705':withinEN?'\u26A0\uFE0F':'\u274C'} ${verdictText}</div>`;
+  html += `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px">\uD83D\uDCD6 EN 50160 \u00A74.2.5 \u00b7 DS/HD 60364-5-52 \u00b7 ${da?'Fasebalancering':'Phase balancing'} \u00b7 Sikkerhedsstyrelsen.dk</div>`;
+  html += `</div></div>`;
+  return html;
+}
+
+// ===== GROUNDING DESIGN WIZARD (DS/HD 60364-5-54 §542) =====
+function buildGroundingWizard(){
+  const da = lang==='da';
+  const soilOpts = [50,100,200,500,1000,2000];
+  const electrodes = {
+    rod15:{da:'Staang 1,5m',en:'Rod 1.5m',L:1.5,type:'rod'},
+    rod3:{da:'Staang 3m',en:'Rod 3m',L:3,type:'rod'},
+    strip10:{da:'Baand 10m',en:'Strip 10m',L:10,type:'strip'},
+    strip20:{da:'Baand 20m',en:'Strip 20m',L:20,type:'strip'},
+    foundation:{da:'Fundamentsjord',en:'Foundation earth',L:15,type:'strip'},
+    ring:{da:'Ringjord',en:'Ring earth',L:25,type:'strip'}
+  };
+  const elec = electrodes[gwElectrode] || electrodes.rod3;
+  // Calculate electrode resistance
+  let Ra;
+  if(elec.type==='rod'){
+    Ra = gwSoilRes / (2 * Math.PI * elec.L);
+  } else {
+    Ra = (2 * gwSoilRes) / (Math.PI * elec.L);
+  }
+  // RCD sensitivity
+  const iDn = 0.03; // 30mA HPFI
+  const touchV = Ra * iDn;
+  const ttSafe = touchV <= 50;
+  // PE sizing per Table 54.2: min half of phase, but >= 6mm2 Cu
+  const sched = calcLoadSchedule();
+  const ib = sched.ib || 16;
+  const cab = recommendCables(ib)[0];
+  const phaseSize = cab ? cab.mm2 : 2.5;
+  let peSize;
+  if(phaseSize <= 16) peSize = phaseSize;
+  else if(phaseSize <= 35) peSize = 16;
+  else peSize = Math.max(Math.round(phaseSize/2), 6);
+  peSize = Math.max(peSize, 6);
+  // TN verification: Zs check
+  const tnZpe = cab ? (2*(cab.r||0)*0.025) : 0.5; // 25m typical run in PE
+  const tnOk = sldEarthing.startsWith('TN');
+  // Verdict
+  let verdictColor, verdictText;
+  if(sldEarthing==='TT'){
+    if(ttSafe){
+      verdictColor = 'var(--success)';
+      verdictText = da?'Ra x I\u0394n = '+touchV.toFixed(1)+'V \u2264 50V -- Sikker':'Ra x I\u0394n = '+touchV.toFixed(1)+'V \u2264 50V -- Safe';
+    } else {
+      verdictColor = 'var(--danger)';
+      verdictText = da?'Ra x I\u0394n = '+touchV.toFixed(1)+'V > 50V -- Reducer Ra (laengere elektrode/lavere modstand)':'Ra x I\u0394n = '+touchV.toFixed(1)+'V > 50V -- Reduce Ra (longer electrode/lower resistivity)';
+    }
+  } else if(sldEarthing.startsWith('TN')){
+    verdictColor = 'var(--success)';
+    verdictText = da?'TN-system: PE-leder sikrer lav impedans hele vejen -- verificer Zs ved endepunkter':'TN system: PE conductor ensures low impedance throughout -- verify Zs at endpoints';
+  } else {
+    verdictColor = '#ffd166';
+    verdictText = da?'IT-system: Jordelektrode til IMD reference -- Ra ikke kritisk for personbeskyttelse ved 1. fejl':'IT system: Earth electrode for IMD reference -- Ra not critical for personal protection at 1st fault';
+  }
+  // SVG visualization: cross-section of grounding arrangement
+  const svgW = 400, svgH = 280;
+  let svg = `<svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;max-width:400px;height:auto;margin:10px auto;display:block;background:rgba(0,0,0,0.3);border-radius:12px;border:1px solid rgba(0,200,255,0.15)">`;
+  // Ground surface
+  svg += `<rect x="0" y="130" width="${svgW}" height="150" fill="#1a0f0a" opacity="0.6"/>`;
+  svg += `<line x1="0" y1="130" x2="${svgW}" y2="130" stroke="#4a3520" stroke-width="2"/>`;
+  svg += `<text x="20" y="125" fill="#7fa8c4" font-size="8">${da?'Overflade':'Surface'}</text>`;
+  svg += `<text x="20" y="148" fill="#6b4c30" font-size="8">${da?'Jord':'Soil'} (\u03C1=${gwSoilRes} \u03A9\u00b7m)</text>`;
+  // Building outline
+  svg += `<rect x="60" y="40" width="120" height="90" rx="4" fill="rgba(6,16,28,0.8)" stroke="#00e5ff" stroke-width="1.5"/>`;
+  svg += `<text x="120" y="65" text-anchor="middle" fill="#00e5ff" font-size="9" font-weight="700">${da?'Tavle':'Panel'}</text>`;
+  svg += `<text x="120" y="80" text-anchor="middle" fill="#bfe9ff" font-size="7">\u23DA ${sldEarthing}</text>`;
+  // PE bar in building
+  svg += `<rect x="80" y="100" width="80" height="8" rx="2" fill="#06d6a0" opacity="0.3" stroke="#06d6a0" stroke-width="1"/>`;
+  svg += `<text x="120" y="120" text-anchor="middle" fill="#06d6a0" font-size="7">PE ${peSize}mm\u00B2 Cu</text>`;
+  // PE conductor going down to electrode
+  svg += `<line x1="120" y1="108" x2="120" y2="130" stroke="#06d6a0" stroke-width="2"/>`;
+  // Electrode
+  if(elec.type==='rod'){
+    const rodH = Math.min(elec.L*30, 100);
+    svg += `<line x1="120" y1="130" x2="120" y2="${130+rodH}" stroke="#ff9a4d" stroke-width="3"/>`;
+    svg += `<circle cx="120" cy="${130+rodH}" r="3" fill="#ff9a4d"/>`;
+    svg += `<text x="135" y="${130+rodH/2}" fill="#ff9a4d" font-size="8">${elec.L}m ${da?'staang':'rod'}</text>`;
+  } else {
+    const stripW = Math.min(elec.L*8, 250);
+    svg += `<line x1="120" y1="130" x2="120" y2="165" stroke="#06d6a0" stroke-width="1.5"/>`;
+    svg += `<line x1="${120-stripW/2}" y1="165" x2="${120+stripW/2}" y2="165" stroke="#ff9a4d" stroke-width="3"/>`;
+    svg += `<text x="120" y="180" text-anchor="middle" fill="#ff9a4d" font-size="8">${elec.L}m ${da?(elec.type==='strip'?'baand':'ring'):'strip'}</text>`;
+  }
+  // Bonding connections (right side)
+  svg += `<line x1="160" y1="104" x2="220" y2="104" stroke="#06d6a0" stroke-width="1" stroke-dasharray="3,2"/>`;
+  svg += `<rect x="220" y="90" width="60" height="30" rx="3" fill="rgba(6,16,28,0.6)" stroke="rgba(0,229,255,0.3)" stroke-width="1"/>`;
+  svg += `<text x="250" y="108" text-anchor="middle" fill="#bfe9ff" font-size="7">${da?'Vandroer':'Water pipe'}</text>`;
+  svg += `<line x1="160" y1="104" x2="220" y2="75" stroke="#06d6a0" stroke-width="1" stroke-dasharray="3,2"/>`;
+  svg += `<rect x="220" y="62" width="60" height="25" rx="3" fill="rgba(6,16,28,0.6)" stroke="rgba(0,229,255,0.3)" stroke-width="1"/>`;
+  svg += `<text x="250" y="78" text-anchor="middle" fill="#bfe9ff" font-size="7">${da?'Gasroer':'Gas pipe'}</text>`;
+  // Ra value display
+  svg += `<text x="120" y="${svgH-20}" text-anchor="middle" fill="#ff9a4d" font-size="11" font-weight="700">Ra = ${Ra.toFixed(1)} \u03A9</text>`;
+  svg += `<text x="120" y="${svgH-6}" text-anchor="middle" fill="#7fa8c4" font-size="8">${da?'Elektrodens spredningsmodstand':'Electrode spreading resistance'}</text>`;
+  svg += `</svg>`;
+  // Build HTML
+  let html = `<div class="card fade-in"><div class="card-title">\u23DA ${da?'Jordingsdesign':'Grounding design'} \u00b7 DS/HD 60364-5-54</div>`;
+  html += `<div class="info-row" style="margin-bottom:8px">${da?'Trin-for-trin guide til jordingsdesign iht. DS/HD 60364-5-54 \u00A7542. Beregner elektrodens spredningsmodstand Ra og verificerer sikkerhed for det valgte system.':'Step-by-step guide to grounding design per DS/HD 60364-5-54 \u00A7542. Calculates electrode spreading resistance Ra and verifies safety for the selected system.'}</div>`;
+  // Step 1: Earthing system (already selected via sldEarthing)
+  html += `<div class="select-group" style="margin-bottom:8px"><div class="select-label">${da?'1. Jordingssystem (valgt ovenfor)':'1. Earthing system (selected above)'}: <strong>${sldEarthing}</strong></div></div>`;
+  // Step 2: Soil resistivity
+  html += `<div class="select-group" style="margin-bottom:8px"><div class="select-label">${da?'2. Jordbundsmodstand (\u03C1)':'2. Soil resistivity (\u03C1)'}</div><div class="select-grid">`;
+  soilOpts.forEach(s=>{
+    html += `<button class="sel-btn ${gwSoilRes===s?'selected':''}" onclick="gwSetSoil(${s})">${s} \u03A9\u00b7m</button>`;
+  });
+  html += `</div></div>`;
+  // Step 3: Electrode type
+  html += `<div class="select-group" style="margin-bottom:8px"><div class="select-label">${da?'3. Elektrodetype':'3. Electrode type'}</div><div class="select-grid">`;
+  Object.keys(electrodes).forEach(k=>{
+    const e = electrodes[k];
+    html += `<button class="sel-btn ${gwElectrode===k?'selected':''}" onclick="gwSetElectrode('${k}')">${da?e.da:e.en}</button>`;
+  });
+  html += `</div></div>`;
+  html += svg;
+  // Results
+  html += `<div class="result-box" style="margin-top:10px">`;
+  html += `<div class="result-row"><span class="label">Ra (${da?'elektrodens modstand':'electrode resistance'})</span><span class="value">${Ra.toFixed(1)} \u03A9</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Beregningsformel':'Formula'}</span><span class="value">${elec.type==='rod'?'\u03C1/(2\u03C0L)':'2\u03C1/(\u03C0L)'}</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Jordmodstand':'Soil resistivity'} (\u03C1)</span><span class="value">${gwSoilRes} \u03A9\u00b7m</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Elektrodelængde':'Electrode length'} (L)</span><span class="value">${elec.L} m</span></div>`;
+  if(sldEarthing==='TT'){
+    html += `<div class="result-row"><span class="label">Ra \u00d7 I\u0394n</span><span class="value" style="color:${ttSafe?'var(--success)':'var(--danger)'}">${touchV.toFixed(1)} V ${ttSafe?'\u2264':'>'}  50V</span></div>`;
+  }
+  html += `<div class="result-row"><span class="label">${da?'PE-tvaersnit (Tabel 54.2)':'PE size (Table 54.2)'}</span><span class="value">${peSize} mm\u00B2 Cu (${da?'min':'min'} \u2265 6mm\u00B2)</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Faseledertvaersnit':'Phase conductor size'}</span><span class="value">${phaseSize} mm\u00B2</span></div>`;
+  html += `</div>`;
+  // Verdict
+  html += `<div style="margin-top:10px;padding:10px 14px;border-radius:8px;border:1.5px solid ${verdictColor};background:rgba(0,0,0,0.2)">`;
+  html += `<div style="font-weight:700;color:${verdictColor};font-size:0.9rem">${verdictColor==='var(--success)'?'\u2705':verdictColor==='var(--danger)'?'\u274C':'\u26A0\uFE0F'} ${verdictText}</div>`;
+  html += `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px">\uD83D\uDCD6 DS/HD 60364-5-54 \u00A7542 \u00b7 ${da?'Jordingselektroder':'Earth electrodes'} \u00b7 Sikkerhedsstyrelsen.dk</div>`;
+  html += `</div></div>`;
+  return html;
+}
+
+// ===== CABLE TRAY FILL CALCULATION (DS/HD 60364-5-52 §523 · IEC 61537) =====
+function buildTrayFill(){
+  const da = lang==='da';
+  const cons = loadList.length ? loadList.slice(0,16) : [
+    {kW:11,cos:0.9,sf:1,phase:'3',name:'EV-lader',dist:25},{kW:11,cos:1,sf:0.7,phase:'3',name:'Komfur',dist:15},
+    {kW:3.7,cos:0.95,sf:0.6,phase:'L1',name:'Stikgrupper',dist:20},{kW:2.2,cos:0.95,sf:0.6,phase:'L2',name:'Hvidevarer',dist:18},
+    {kW:1.5,cos:0.95,sf:1,phase:'L3',name:'Belysning',dist:12}
+  ];
+  // Estimate cable OD for each circuit: OD = 2.5*sqrt(mm2*cores_num) + 5
+  const circuits = cons.map(c=>{
+    const ci = lsConsumerCurrent(c);
+    const cIb = Math.max(ci.L1||0,ci.L2||0,ci.L3||0) || (c.kW*1000/((c.phase==='3'?Math.sqrt(3)*400:230)*(c.cos||0.9)));
+    const cab = recommendCables(cIb)[0];
+    const mm2 = cab ? cab.mm2 : 2.5;
+    const coresStr = cab ? (cab.cores||'5G') : (c.phase==='3'?'5G':'3G');
+    const coresNum = parseInt(coresStr)||5;
+    const od = 2.5*Math.sqrt(mm2*coresNum) + 5;
+    const area = Math.PI * Math.pow(od/2, 2);
+    return {name:c.name||('K'+(cons.indexOf(c)+1)), mm2, cores:coresStr, od:od, area:area, phase:c.phase, cab};
+  });
+  const totalCableArea = circuits.reduce((a,c)=>a+c.area, 0);
+  // Tray or conduit area
+  let containerArea, containerLabel;
+  if(ctfType==='tray'){
+    containerArea = ctfTrayW * ctfTrayH;
+    containerLabel = `${ctfTrayW}x${ctfTrayH}mm ${da?'kabelkanal':'cable tray'}`;
+  } else {
+    containerArea = Math.PI * Math.pow(ctfConduit/2, 2);
+    containerLabel = `\u00D8${ctfConduit}mm ${da?'roer':'conduit'}`;
+  }
+  const fillPct = containerArea > 0 ? (totalCableArea / containerArea) * 100 : 0;
+  const remaining = containerArea - totalCableArea;
+  const remainPct = containerArea > 0 ? (remaining / containerArea) * 100 : 0;
+  // Grouping derating factor (IEC 61537 / DS 60364-5-52 Table B.52.17)
+  const nCircuits = circuits.length;
+  let deratingFactor;
+  if(nCircuits<=1) deratingFactor=1.0;
+  else if(nCircuits<=3) deratingFactor=0.82;
+  else if(nCircuits<=6) deratingFactor=0.73;
+  else if(nCircuits<=9) deratingFactor=0.70;
+  else deratingFactor=0.65;
+  // Verdict
+  let verdictColor, verdictText;
+  if(fillPct<=40){
+    verdictColor = 'var(--success)';
+    verdictText = da?'Inden for 40% fyldning -- OK':'Within 40% fill -- OK';
+  } else if(fillPct<=50){
+    verdictColor = '#ffd166';
+    verdictText = da?'Over 40% -- derating paakraevet eller stoerre kanal':'Over 40% -- derating required or larger tray';
+  } else {
+    verdictColor = 'var(--danger)';
+    verdictText = da?'Over 50% -- forbudt (IEC 61537)':'Over 50% -- prohibited';
+  }
+  // SVG cross-section
+  const svgW = 400, svgH = 300;
+  let svg = `<svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;max-width:400px;height:auto;margin:10px auto;display:block;background:rgba(0,0,0,0.3);border-radius:12px;border:1px solid rgba(0,200,255,0.15)">`;
+  if(ctfType==='tray'){
+    // Draw tray cross-section
+    const trayDrawW = Math.min(ctfTrayW * 0.5, 300);
+    const trayDrawH = Math.min(ctfTrayH * 1.5, 150);
+    const tx = (svgW - trayDrawW)/2, ty = (svgH - trayDrawH)/2 + 20;
+    svg += `<rect x="${tx}" y="${ty}" width="${trayDrawW}" height="${trayDrawH}" fill="rgba(6,16,28,0.5)" stroke="#00e5ff" stroke-width="2" rx="3"/>`;
+    svg += `<text x="${svgW/2}" y="${ty-8}" text-anchor="middle" fill="#00e5ff" font-size="9">${containerLabel}</text>`;
+    // Place cables inside tray (simple packing)
+    const maxOD = Math.max(...circuits.map(c=>c.od));
+    const scale = Math.min((trayDrawW-10)/(maxOD*Math.ceil(Math.sqrt(nCircuits))+10), (trayDrawH-10)/(maxOD*2+10), 3);
+    let cx_pos = tx + 10, cy_pos = ty + 10;
+    const phColors = {L1:'#8B4513','3':'#00e5ff',L2:'#333',L3:'#888'};
+    circuits.forEach((c,i)=>{
+      const r = (c.od * scale)/2;
+      if(cx_pos + r*2 > tx + trayDrawW - 5){ cx_pos = tx + 10; cy_pos += r*2 + 3; }
+      const color = phColors[c.phase] || '#00e5ff';
+      svg += `<circle cx="${cx_pos+r}" cy="${cy_pos+r}" r="${r}" fill="${color}" opacity="0.4" stroke="${color}" stroke-width="1"/>`;
+      svg += `<text x="${cx_pos+r}" y="${cy_pos+r+3}" text-anchor="middle" fill="#fff" font-size="${Math.max(r*0.7,5)}">${c.mm2}</text>`;
+      cx_pos += r*2 + 3;
+    });
+    // Fill percentage indicator
+    svg += `<rect x="${tx}" y="${ty+trayDrawH+15}" width="${trayDrawW}" height="12" rx="4" fill="rgba(255,255,255,0.08)" stroke="rgba(0,200,255,0.2)" stroke-width="0.5"/>`;
+    const fillW = Math.min(fillPct/100, 1) * trayDrawW;
+    const fillColor = fillPct<=40?'#06d6a0':fillPct<=50?'#ffd166':'#ef476f';
+    svg += `<rect x="${tx}" y="${ty+trayDrawH+15}" width="${fillW}" height="12" rx="4" fill="${fillColor}" opacity="0.6"/>`;
+    svg += `<text x="${svgW/2}" y="${ty+trayDrawH+40}" text-anchor="middle" fill="${fillColor}" font-size="10" font-weight="700">${fillPct.toFixed(1)}% ${da?'fyldning':'fill'}</text>`;
+    // 40% limit line
+    const limitX = tx + trayDrawW * 0.4;
+    svg += `<line x1="${limitX}" y1="${ty+trayDrawH+14}" x2="${limitX}" y2="${ty+trayDrawH+28}" stroke="#ffd166" stroke-width="1.5" stroke-dasharray="3,2"/>`;
+    svg += `<text x="${limitX}" y="${ty+trayDrawH+12}" text-anchor="middle" fill="#ffd166" font-size="7">40%</text>`;
+  } else {
+    // Conduit cross-section
+    const condR = Math.min(ctfConduit * 2, 100);
+    const ccx = svgW/2, ccy = svgH/2;
+    svg += `<circle cx="${ccx}" cy="${ccy}" r="${condR}" fill="rgba(6,16,28,0.5)" stroke="#00e5ff" stroke-width="2"/>`;
+    svg += `<text x="${ccx}" y="${ccy - condR - 12}" text-anchor="middle" fill="#00e5ff" font-size="9">${containerLabel}</text>`;
+    // Place cables in conduit
+    const angleStep = (2*Math.PI)/nCircuits;
+    const innerR = condR * 0.55;
+    const phColors = {L1:'#8B4513','3':'#00e5ff',L2:'#333',L3:'#888'};
+    circuits.forEach((c,i)=>{
+      const a = i * angleStep - Math.PI/2;
+      const scale = Math.min(condR/(ctfConduit/2), 2);
+      const r = Math.min((c.od*scale)/2, condR*0.25);
+      const px = ccx + innerR * Math.cos(a);
+      const py = ccy + innerR * Math.sin(a);
+      const color = phColors[c.phase] || '#00e5ff';
+      svg += `<circle cx="${px}" cy="${py}" r="${r}" fill="${color}" opacity="0.4" stroke="${color}" stroke-width="1"/>`;
+      svg += `<text x="${px}" y="${py+3}" text-anchor="middle" fill="#fff" font-size="${Math.max(r*0.6,5)}">${c.mm2}</text>`;
+    });
+    // Fill indicator
+    svg += `<text x="${ccx}" y="${ccy + condR + 20}" text-anchor="middle" fill="${fillPct<=40?'#06d6a0':fillPct<=50?'#ffd166':'#ef476f'}" font-size="11" font-weight="700">${fillPct.toFixed(1)}% ${da?'fyldning':'fill'}</text>`;
+  }
+  svg += `</svg>`;
+  // Build HTML
+  let html = `<div class="card fade-in"><div class="card-title">\uD83D\uDCE6 ${da?'Kabelkanal-fyldning':'Cable tray fill'} \u00b7 IEC 61537</div>`;
+  html += `<div class="info-row" style="margin-bottom:8px">${da?'Beregner kabelkanalens fyldningsgrad baseret paa installationens kredsloeb. Max 40% for kanal/roer (IEC 61537). Gruppereduktionsfaktor iht. DS/HD 60364-5-52 Tabel B.52.17.':'Calculates cable tray/conduit fill based on installation circuits. Max 40% for tray/conduit (IEC 61537). Grouping derating factor per DS/HD 60364-5-52 Table B.52.17.'}</div>`;
+  // Type selector
+  html += `<div class="select-group" style="margin-bottom:8px"><div class="select-label">${da?'Kanaltype':'Container type'}</div><div class="select-grid">`;
+  html += `<button class="sel-btn ${ctfType==='tray'?'selected':''}" onclick="ctfSetType('tray')">\u2B1C ${da?'Kabelkanal':'Cable tray'}</button>`;
+  html += `<button class="sel-btn ${ctfType==='conduit'?'selected':''}" onclick="ctfSetType('conduit')">\u26AA ${da?'Roer (conduit)':'Conduit'}</button>`;
+  html += `</div></div>`;
+  if(ctfType==='tray'){
+    // Tray width selector
+    html += `<div class="select-group" style="margin-bottom:8px"><div class="select-label">${da?'Kanalbredde':'Tray width'}</div><div class="select-grid">`;
+    [100,200,300,450,600].forEach(w=>{
+      html += `<button class="sel-btn ${ctfTrayW===w?'selected':''}" onclick="ctfSetTrayW(${w})">${w}mm</button>`;
+    });
+    html += `</div></div>`;
+    // Tray height selector
+    html += `<div class="select-group" style="margin-bottom:8px"><div class="select-label">${da?'Kanalhoeojde':'Tray height'}</div><div class="select-grid">`;
+    [50,75,100].forEach(h=>{
+      html += `<button class="sel-btn ${ctfTrayH===h?'selected':''}" onclick="ctfSetTrayH(${h})">${h}mm</button>`;
+    });
+    html += `</div></div>`;
+  } else {
+    // Conduit diameter selector
+    html += `<div class="select-group" style="margin-bottom:8px"><div class="select-label">${da?'Roerdiameter':'Conduit diameter'}</div><div class="select-grid">`;
+    [20,25,32,40,50,63].forEach(d=>{
+      html += `<button class="sel-btn ${ctfConduit===d?'selected':''}" onclick="ctfSetConduit(${d})">\u00D8${d}mm</button>`;
+    });
+    html += `</div></div>`;
+  }
+  html += svg;
+  // Circuit table
+  html += `<table class="data-table" style="margin-top:10px;width:100%"><thead><tr><th>${da?'Kreds':'Circuit'}</th><th>mm\u00B2</th><th>${da?'Kerner':'Cores'}</th><th>OD (mm)</th><th>${da?'Areal':'Area'} (mm\u00B2)</th></tr></thead><tbody>`;
+  circuits.forEach(c=>{
+    html += `<tr><td>${c.name}</td><td>${c.mm2}</td><td>${c.cores}</td><td>${c.od.toFixed(1)}</td><td>${c.area.toFixed(0)}</td></tr>`;
+  });
+  html += `</tbody></table>`;
+  // Results
+  html += `<div class="result-box" style="margin-top:10px">`;
+  html += `<div class="result-row"><span class="label">${da?'Samlet kabelareal':'Total cable area'}</span><span class="value">${totalCableArea.toFixed(0)} mm\u00B2</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Kanalareal':'Container area'}</span><span class="value">${containerArea.toFixed(0)} mm\u00B2</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Fyldningsgrad':'Fill ratio'}</span><span class="value" style="color:${fillPct<=40?'var(--success)':fillPct<=50?'#ffd166':'var(--danger)'}">${fillPct.toFixed(1)}%</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Restkapacitet':'Remaining capacity'}</span><span class="value">${remaining>0?remaining.toFixed(0):'0'} mm\u00B2 (${remainPct>0?remainPct.toFixed(0):'0'}%)</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Gruppereduktionsfaktor':'Grouping derating factor'}</span><span class="value">${deratingFactor.toFixed(2)} (${nCircuits} ${da?'kredsloeb':'circuits'})</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Max fyldning':'Max fill'}</span><span class="value">40% (IEC 61537)</span></div>`;
+  html += `</div>`;
+  // Verdict
+  html += `<div style="margin-top:10px;padding:10px 14px;border-radius:8px;border:1.5px solid ${verdictColor};background:rgba(0,0,0,0.2)">`;
+  html += `<div style="font-weight:700;color:${verdictColor};font-size:0.9rem">${fillPct<=40?'\u2705':fillPct<=50?'\u26A0\uFE0F':'\u274C'} ${verdictText}</div>`;
+  html += `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px">\uD83D\uDCD6 DS/HD 60364-5-52 \u00A7523 \u00b7 IEC 61537 \u00b7 ${da?'Kabelkanal':'Cable tray'} \u00b7 Sikkerhedsstyrelsen.dk</div>`;
+  html += `</div></div>`;
+  return html;
+}
+
 function buildProtReport(){
   const da = lang==='da';
   const cons = loadList.length ? loadList.slice(0,16) : [
@@ -7770,7 +8171,7 @@ function buildCommissioning(){
 function renderDrawing(){
   const nodes=getDrawNodes(), typeKeys=Object.keys(NODE_TYPES);
   const nodeEditor=`<div class="select-group"><div class="select-label">${lang==='da'?'Installationens noder (tilf\u00F8j/fjern/flyt)':'Installation nodes (add/remove/move)'}</div>${nodes.map((n,i)=>{const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;return `<div style="display:inline-flex;align-items:center;gap:4px;margin:3px 4px;padding:5px 9px;border:1.5px solid ${nt.color};border-radius:8px;font-size:.78rem;background:rgba(0,0,0,0.25)"><span>${nt.icon}</span><span style="color:${nt.color};font-weight:700">${lang==='da'?nt.da:nt.en}</span><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},-1)">\u25C0</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},1)">\u25B6</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem;color:var(--danger)" onclick="drawNodeRemove(${i})">\u2715</button></div>`;}).join('')}</div><div class="select-group"><div class="select-label">${lang==='da'?'Tilf\u00F8j node':'Add node'}</div><div class="select-grid">${typeKeys.map(k=>`<button class="sel-btn" onclick="drawNodeAdd('${k}')">${NODE_TYPES[k].icon} ${lang==='da'?NODE_TYPES[k].da:NODE_TYPES[k].en}</button>`).join('')}<button class="sel-btn" onclick="drawNodeReset()">\u21BA ${lang==='da'?'Nulstil':'Reset'}</button></div></div>`;
-  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():(sldFault?buildCoordDashboard():'')+buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildArcFlash():''}${drawStyle==='schematic'&&sldFault?buildDeratingChart():''}${drawStyle==='schematic'&&sldFault?buildInrushCheck():''}${drawStyle==='schematic'&&sldFault?buildEnergyEfficiency():''}${drawStyle==='schematic'&&sldFault?buildHarmonicCheck():''}${drawStyle==='schematic'&&sldFault?buildCableLifetime():''}${drawStyle==='schematic'&&sldFault?buildPowerFlow():''}${drawStyle==='schematic'&&sldFault?buildVoltageProfile():''}${drawStyle==='schematic'&&sldFault?buildEmcRouting():''}${drawStyle==='schematic'&&sldFault?buildMotorStart():''}${drawStyle==='schematic'&&sldFault?buildCapBank():''}${drawStyle==='schematic'&&sldFault?buildRelaySettings():''}${drawStyle==='schematic'&&sldFault?buildGenSet():''}${drawStyle==='schematic'&&sldFault?buildLightningRisk():''}${drawStyle==='schematic'&&sldFault?buildThermalPred():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='schematic'&&sldFault?buildDiscrimTable():''}${drawStyle==='schematic'&&sldFault?buildCommissioning():''}${drawStyle==='schematic'&&sldFault?buildInspectionInterval():''}${drawStyle==='schematic'&&sldFault?buildZsSimulator():''}${drawStyle==='schematic'&&sldFault?buildSelectiveMap():''}${drawStyle==='schematic'&&sldFault?buildTouchVoltage():''}${drawStyle==='schematic'&&sldFault?buildDocChecklist():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
+  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():(sldFault?buildCoordDashboard():'')+buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildArcFlash():''}${drawStyle==='schematic'&&sldFault?buildDeratingChart():''}${drawStyle==='schematic'&&sldFault?buildInrushCheck():''}${drawStyle==='schematic'&&sldFault?buildEnergyEfficiency():''}${drawStyle==='schematic'&&sldFault?buildHarmonicCheck():''}${drawStyle==='schematic'&&sldFault?buildCableLifetime():''}${drawStyle==='schematic'&&sldFault?buildPowerFlow():''}${drawStyle==='schematic'&&sldFault?buildVoltageProfile():''}${drawStyle==='schematic'&&sldFault?buildEmcRouting():''}${drawStyle==='schematic'&&sldFault?buildMotorStart():''}${drawStyle==='schematic'&&sldFault?buildCapBank():''}${drawStyle==='schematic'&&sldFault?buildRelaySettings():''}${drawStyle==='schematic'&&sldFault?buildGenSet():''}${drawStyle==='schematic'&&sldFault?buildLightningRisk():''}${drawStyle==='schematic'&&sldFault?buildThermalPred():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='schematic'&&sldFault?buildDiscrimTable():''}${drawStyle==='schematic'&&sldFault?buildCommissioning():''}${drawStyle==='schematic'&&sldFault?buildInspectionInterval():''}${drawStyle==='schematic'&&sldFault?buildZsSimulator():''}${drawStyle==='schematic'&&sldFault?buildSelectiveMap():''}${drawStyle==='schematic'&&sldFault?buildTouchVoltage():''}${drawStyle==='schematic'&&sldFault?buildDocChecklist():''}${drawStyle==='schematic'&&sldFault?buildVoltageUnbalance():''}${drawStyle==='schematic'&&sldFault?buildGroundingWizard():''}${drawStyle==='schematic'&&sldFault?buildTrayFill():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
 }
 
 // ===== ANALYZING BRAIN MODULE =====
