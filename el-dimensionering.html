@@ -4362,6 +4362,7 @@ function renderVerify() {
 // load schedule — a real "picture" of the coming installation. Plus an optional
 // online AI-painting connector for a photorealistic render.
 let drawStyle = 'schematic'; // 'schematic' | 'iso'
+let sldFault = false;        // earth-fault demonstration mode for the single-line diagram
 
 // EU/DK conductor colours for phase dots in the diagram
 // Conductor colours (EU/DK). L2 "black" is lightened so it reads on the dark canvas.
@@ -4432,6 +4433,9 @@ function buildSLD(){
   const IN = Math.sqrt(Math.max(0, pT.L1*pT.L1 + pT.L2*pT.L2 + pT.L3*pT.L3 - pT.L1*pT.L2 - pT.L2*pT.L3 - pT.L1*pT.L3));
   const maxA = Math.max(pT.L1, pT.L2, pT.L3, 1);
   const maxCIb = Math.max(...R.map(r=>r.cIb), 1);
+  // earth-fault demo: fault a circuit with an exposed conductive part (motor/EV/heater)
+  let faultRow = -1;
+  if(sldFault){ faultRow = R.findIndex(r => ['motor','ev','heat','cooker'].includes(sldInferType(r.c))); if(faultRow < 0) faultRow = 0; }
 
   const W = 820, rowH = 48, top = 196;
   const H = top + cons.length*rowH + 54;
@@ -4451,25 +4455,28 @@ function buildSLD(){
     const ph = is3 ? '3~' : c.phase;
     const tagCol = is3 ? '#bfe9ff' : (SLD_PHASE[c.phase]||'#7fb4d6');
     const type = sldInferType(c);
+    const isFault = sldFault && i===faultRow;
     const tapDur = Math.max(0.7, 2.6 - (cIb/maxCIb)*1.8).toFixed(2);
     // pickoffs from each tapped phase bar (shows which phases feed the circuit)
     let picks = '';
     r.phases.forEach(pp => { const bx = barX[pp];
-      picks += `<line x1="${bx}" y1="${y}" x2="${busR}" y2="${y}" stroke="${SLD_PHASE[pp]}" stroke-width="2"/><circle cx="${bx}" cy="${y}" r="3.6" fill="${SLD_PHASE[pp]}" stroke="#0a1422" stroke-width="0.8"/>`; });
+      picks += `<line x1="${bx}" y1="${y}" x2="${busR}" y2="${y}" stroke="${isFault?'#ff3b5c':SLD_PHASE[pp]}" stroke-width="2"/><circle cx="${bx}" cy="${y}" r="3.6" fill="${isFault?'#ff3b5c':SLD_PHASE[pp]}" stroke="#0a1422" stroke-width="0.8"/>`; });
     const tapPath = `M ${busR} ${y} L ${brX} ${y}`;
-    const tapFlow = is3
-      ? (sldFlow(tapPath, SLD_FLOW.L1, 1, tapDur) + sldFlow(tapPath, SLD_FLOW.L2, 1, (tapDur*1.12).toFixed(2)) + sldFlow(tapPath, SLD_FLOW.L3, 1, (tapDur*1.24).toFixed(2)))
-      : sldFlow(tapPath, SLD_FLOW[c.phase]||'#7fe9ff', Math.min(3, 1+Math.round(cIb/maxCIb*2)), tapDur);
+    const tapFlow = isFault
+      ? sldFlow(tapPath, '#ff3b5c', 3, tapDur)
+      : (is3
+        ? (sldFlow(tapPath, SLD_FLOW.L1, 1, tapDur) + sldFlow(tapPath, SLD_FLOW.L2, 1, (tapDur*1.12).toFixed(2)) + sldFlow(tapPath, SLD_FLOW.L3, 1, (tapDur*1.24).toFixed(2)))
+        : sldFlow(tapPath, SLD_FLOW[c.phase]||'#7fe9ff', Math.min(3, 1+Math.round(cIb/maxCIb*2)), tapDur));
     rows += `
       ${picks}
-      <line x1="${busR}" y1="${y}" x2="${brX}" y2="${y}" stroke="${is3?'#3a6f86':tagCol}" stroke-width="2"/>
+      <line x1="${busR}" y1="${y}" x2="${brX}" y2="${y}" stroke="${isFault?'#ff3b5c':(is3?'#3a6f86':tagCol)}" stroke-width="2"/>
       ${tapFlow}
-      <text x="${(busR+brX)/2}" y="${y-6}" text-anchor="middle" font-size="9" font-weight="800" fill="${tagCol}">${ph}</text>
-      <g filter="url(#sldGlow)"><rect x="${brX}" y="${y-12}" width="${brW}" height="24" rx="5" fill="#0c1c2b" stroke="#00d0ff" stroke-width="1.6"/></g>
+      <text x="${(busR+brX)/2}" y="${y-6}" text-anchor="middle" font-size="9" font-weight="800" fill="${isFault?'#ff6b82':tagCol}">${ph}</text>
+      <g filter="url(#sldGlow)"><rect x="${brX}" y="${y-12}" width="${brW}" height="24" rx="5" fill="#0c1c2b" stroke="${isFault?'#ff3b5c':'#00d0ff'}" stroke-width="1.6"/></g>
       <line x1="${brX+8}" y1="${y+7}" x2="${brX+brW-8}" y2="${y-7}" stroke="#7fe9ff" stroke-width="1.6"/>
       <text x="${brX+brW/2}" y="${y+21}" text-anchor="middle" font-size="8.5" fill="#9fe6ff" font-weight="700">${mcbLbl}</text>
-      <line x1="${brX+brW}" y1="${y}" x2="${symX-16}" y2="${y}" stroke="#27506b" stroke-width="2"/>
-      ${sldFlow(`M ${brX+brW} ${y} L ${symX-16} ${y}`, '#7fe9ff', 1, (parseFloat(tapDur)*1.3).toFixed(2))}
+      <line x1="${brX+brW}" y1="${y}" x2="${symX-16}" y2="${y}" stroke="${isFault?'#7a2230':'#27506b'}" stroke-width="2"/>
+      ${sldFlow(`M ${brX+brW} ${y} L ${symX-16} ${y}`, isFault?'#ff3b5c':'#7fe9ff', isFault?3:1, (parseFloat(tapDur)*1.3).toFixed(2))}
       <text x="${brX+brW+10}" y="${y-6}" font-size="10.5" fill="#9fd0ea">${cableLbl} · ${cIb.toFixed(1)} A</text>
       ${sldSymbol(type, symX, y)}
       <text x="${nameX}" y="${y-2}" font-size="11" fill="#dbeaf6" font-weight="600">${(c.name || ('K'+(i+1)))}</text>
@@ -4489,6 +4496,10 @@ function buildSLD(){
       const dur = Math.max(0.7, 3.2 - fr*2.4).toFixed(2);
       const cnt = Math.max(1, Math.min(4, Math.round(1+fr*3)));
       bars += sldFlow(`M ${bx} ${busTop} L ${bx} ${busBot}`, SLD_FLOW[pp], cnt, dur);
+    } else if(sldFault){
+      // fault current returns to source via PE (load -> source = upward)
+      bars += `<line x1="${bx}" y1="${busTop}" x2="${bx}" y2="${busBot}" stroke="#ff3b5c" stroke-width="2.5" stroke-dasharray="6 4" opacity="0.85" filter="url(#sldGlow)"/>`;
+      bars += sldFlow(`M ${bx} ${busBot} L ${bx} ${busTop}`, '#ff3b5c', 4, '1.1');
     }
   });
 
@@ -4505,7 +4516,9 @@ function buildSLD(){
   });
   const unbal = (1 - Math.min(pT.L1,pT.L2,pT.L3)/maxA) * 100;
   gauge += `<text x="${gx+158}" y="${gy+54}" font-size="10" fill="#6fb6ff" font-weight="700">N: ${IN.toFixed(0)} A</text>`;
-  gauge += `<text x="${gx+158}" y="${gy+74}" font-size="10" fill="#3fcf7a" font-weight="700">PE: 0 A</text>`;
+  gauge += sldFault
+    ? `<text x="${gx+158}" y="${gy+74}" font-size="10" fill="#ff6b82" font-weight="800">PE: ⚡ ${lang==='da'?'FEJL':'FAULT'}</text>`
+    : `<text x="${gx+158}" y="${gy+74}" font-size="10" fill="#3fcf7a" font-weight="700">PE: 0 A</text>`;
   gauge += `<text x="${gx+158}" y="${gy+90}" font-size="7.5" fill="#7fa8c4">${lang==='da'?'PE: kun fejlstrøm':'PE: fault only'}</text>`;
   gauge += `<text x="${gx+14}" y="${gy+gh-8}" font-size="8.5" fill="#9fb8cc">${lang==='da'?'Skævhed':'Imbalance'}: ${unbal.toFixed(0)}%</text>`;
 
@@ -4513,6 +4526,22 @@ function buildSLD(){
   const leg = [['L1',SLD_PHASE.L1],['L2','#aeb6bf'],['L3',SLD_PHASE.L3],['N',SLD_PHASE.N],['PE',SLD_PHASE.PE]];
   let legend = '';
   leg.forEach((l,k)=>{ const lx = 24 + k*58; legend += `<circle cx="${lx}" cy="${H-18}" r="5" fill="${l[1]}" stroke="#5a7488" stroke-width="1"/><text x="${lx+9}" y="${H-14}" font-size="9" fill="#9fb8cc">${l[0]}</text>`; });
+
+  // ---- earth-fault overlay: live conductor faults to earth -> current returns via PE, RCD trips ----
+  let faultOverlay = '';
+  if(sldFault && faultRow >= 0){
+    const fy = top + faultRow*rowH + 18;
+    const belowY = busBot + 22, peX = barX.PE;
+    const peRoute = `M ${symX} ${fy} L ${symX} ${belowY} L ${peX} ${belowY} L ${peX} ${busTop}`;
+    faultOverlay += `<path d="${peRoute}" fill="none" stroke="#27ae60" stroke-width="2.5" stroke-dasharray="5 4" opacity="0.85"/>`;
+    faultOverlay += sldFlow(peRoute, '#ff3b5c', 5, '1.2');
+    faultOverlay += `<text x="${(symX+peX)/2}" y="${belowY-5}" text-anchor="middle" font-size="9" font-weight="700" fill="#3fcf7a">PE ${lang==='da'?'(beskyttelsesleder — fejlstrøm tilbage til kilde)':'(protective earth — fault current back to source)'}</text>`;
+    faultOverlay += `<g filter="url(#sldGlow)"><path d="M ${symX-5} ${fy-15} l 9 0 l -5 7 l 8 0 l -12 14 l 4 -10 l -7 0 z" fill="#ff3b5c"/></g>`;
+    faultOverlay += `<text x="${symX}" y="${fy-19}" text-anchor="middle" font-size="9" font-weight="800" fill="#ff6b82">${lang==='da'?'JORDFEJL':'EARTH FAULT'}</text>`;
+    faultOverlay += `<g filter="url(#sldGlow)"><rect x="${W/2-152}" y="6" width="304" height="24" rx="8" fill="#2a0a12" stroke="#ff3b5c" stroke-width="1.5"/></g>`;
+    faultOverlay += `<text x="${W/2}" y="22" text-anchor="middle" font-size="11" font-weight="800" fill="#ff6b82">⚡ ${lang==='da'?'JORDFEJL — HPFI 30 mA udløser <0,3 s':'EARTH FAULT — RCD 30 mA trips <0.3 s'}</text>`;
+    faultOverlay += `<text x="${brX+brW+10}" y="${fy+12}" font-size="9" fill="#ff8a9c">${lang==='da'?'Reststrøm > 30 mA':'Residual > 30 mA'}</text>`;
+  }
 
   return `
   <svg viewBox="0 0 ${W} ${H}" width="100%" style="border-radius:14px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 30px rgba(0,160,255,0.18)" xmlns="http://www.w3.org/2000/svg">
@@ -4545,6 +4574,7 @@ function buildSLD(){
     ${bars}
     ${rows}
     ${gauge}
+    ${faultOverlay}
     ${legend}
     <text x="${W-18}" y="${H-14}" text-anchor="end" font-size="9.5" fill="#5b7790">${cons.length} ${lang==='da'?'grupper':'circuits'} · El-Dimensionering</text>
   </svg>`;
@@ -4663,14 +4693,16 @@ function neonScene(nodes, opts){
   g += `<line x1="0" y1="${gY}" x2="${W}" y2="${gY}" stroke="url(#${sq}hz)" stroke-width="2.5" filter="url(#${sq}glow)"/>`;
   g += `<rect x="0" y="0" width="${W}" height="${H}" fill="url(#${sq}vig)"/>`;
 
-  // ---- glowing curved connectors with travelling energy pulses (behind boxes) ----
+  // ---- glowing curved connectors with 3-phase travelling current (behind boxes) ----
   for(let i=0;i<n-1;i++){
     const C=(NODE_TYPES[nodes[i].type]||NODE_TYPES.custom).color;
     const cx=padX+i*sp, nx=padX+(i+1)*sp, cyMid=gY-bh*0.46;
     const x1=cx+bw/2+dxp, x2=nx-bw/2, midX=(x1+x2)/2;
     const path=`M ${x1} ${cyMid} Q ${midX} ${(cyMid-30).toFixed(0)} ${x2} ${cyMid}`;
+    const dur=2+i*0.25;
     g += `<path d="${path}" fill="none" stroke="${C}" stroke-width="3" stroke-linecap="round" opacity="0.5" filter="url(#${sq}glow)"/>`;
-    g += `<circle r="3.6" fill="#ffffff" filter="url(#${sq}glow)"><animateMotion dur="${(2+i*0.25).toFixed(2)}s" repeatCount="indefinite" path="${path}"/></circle>`;
+    // three phase-coloured current pulses (L1/L2/L3) flowing along the feed
+    ['L1','L2','L3'].forEach((pp,k)=>{ g += `<circle r="3.1" fill="${SLD_FLOW[pp]}" filter="url(#${sq}glow)"><animateMotion dur="${dur.toFixed(2)}s" repeatCount="indefinite" path="${path}" begin="${(-(dur/3)*k).toFixed(2)}s"/></circle>`; });
   }
 
   // ---- nodes: shaded isometric boxes, halo, reflection, glowing icon disc ----
@@ -4711,6 +4743,8 @@ function neonScene(nodes, opts){
 
   // ---- title + footer ----
   g += `<text x="24" y="34" font-size="14" font-weight="800" fill="#cdeeff" filter="url(#${sq}glow)">${title}</text>`;
+  // phase legend (matches the single-line diagram)
+  [['L1','#ff9a4d'],['L2','#e9eef3'],['L3','#cfd6dd']].forEach((p,k)=>{ const lx=24+k*52; g += `<circle cx="${lx}" cy="${H-16}" r="4" fill="${p[1]}"/><text x="${lx+8}" y="${H-12}" font-size="9" fill="#9fb8cc">${p[0]}</text>`; });
   g += `<text x="${W-18}" y="${H-14}" text-anchor="end" font-size="9" fill="#5681a0">El-Dimensionering \u00B7 ${n} ${lang==='da'?'noder':'nodes'}</text>`;
 
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="border-radius:16px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 34px rgba(0,160,255,0.20);overflow:visible" xmlns="http://www.w3.org/2000/svg"><defs>${defs}</defs>${g}</svg>`;
@@ -4721,7 +4755,7 @@ function build3D(){ return neonScene(getDrawNodes()); }
 function renderDrawing(){
   const nodes=getDrawNodes(), typeKeys=Object.keys(NODE_TYPES);
   const nodeEditor=`<div class="select-group"><div class="select-label">${lang==='da'?'Installationens noder (tilf\u00F8j/fjern/flyt)':'Installation nodes (add/remove/move)'}</div>${nodes.map((n,i)=>{const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;return `<div style="display:inline-flex;align-items:center;gap:4px;margin:3px 4px;padding:5px 9px;border:1.5px solid ${nt.color};border-radius:8px;font-size:.78rem;background:rgba(0,0,0,0.25)"><span>${nt.icon}</span><span style="color:${nt.color};font-weight:700">${lang==='da'?nt.da:nt.en}</span><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},-1)">\u25C0</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},1)">\u25B6</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem;color:var(--danger)" onclick="drawNodeRemove(${i})">\u2715</button></div>`;}).join('')}</div><div class="select-group"><div class="select-label">${lang==='da'?'Tilf\u00F8j node':'Add node'}</div><div class="select-grid">${typeKeys.map(k=>`<button class="sel-btn" onclick="drawNodeAdd('${k}')">${NODE_TYPES[k].icon} ${lang==='da'?NODE_TYPES[k].da:NODE_TYPES[k].en}</button>`).join('')}<button class="sel-btn" onclick="drawNodeReset()">\u21BA ${lang==='da'?'Nulstil':'Reset'}</button></div></div>`;
-  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="info-row" style="margin-bottom:10px">${lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Måleren øverst viser fasebalancen.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. The gauge on top shows phase balance.'}</div>`:''}${drawStyle==='iso'?build3D():buildSLD()}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
+  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Fejlstrømmen (rød) løber tilbage via PE-lederen — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. The fault current (red) returns via the PE conductor — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Måleren øverst viser fasebalancen.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. The gauge on top shows phase balance.')}</div>`:''}${drawStyle==='iso'?build3D():buildSLD()}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
 }
 
 // ===== ANALYZING BRAIN MODULE =====
