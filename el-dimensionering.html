@@ -4404,6 +4404,17 @@ let lpContents = 'standard'; function lpSetContents(v){lpContents=v;renderModule
 // Thermal prediction state
 let tpAmbient = 25; function tpSetAmbient(v){tpAmbient=v;renderModule('draw');}
 let tpConnQuality = 'good'; function tpSetConn(v){tpConnQuality=v;renderModule('draw');}
+// Inspection interval state
+let inspType = 'residential'; function inspSetType(v){inspType=v;renderModule('draw');}
+let inspEnv = 'dry'; function inspSetEnv(v){inspEnv=v;renderModule('draw');}
+let inspAge = '0-5'; function inspSetAge(v){inspAge=v;renderModule('draw');}
+let inspMod = 'none'; function inspSetMod(v){inspMod=v;renderModule('draw');}
+// Zs simulator state
+let zsLen = 30; function zsSetLen(v){zsLen=+v;renderModule('draw');}
+let zsSize = 2.5; function zsSetSize(v){zsSize=+v;renderModule('draw');}
+let zsEarth = 'TN-C-S'; function zsSetEarth(v){zsEarth=v;renderModule('draw');}
+let zsMcbRating = 16; function zsSetMcb(v){zsMcbRating=+v;renderModule('draw');}
+let zsMcbCurve = 'C'; function zsSetCurve(v){zsMcbCurve=v;renderModule('draw');}
 // Standard earth-electrode symbol (vertical line + 3 decreasing horizontal bars)
 function earthSymbol(x, y, color){
   return `<g stroke="${color}" stroke-width="2" stroke-linecap="round" fill="none"><line x1="${x}" y1="${y-9}" x2="${x}" y2="${y}"/><line x1="${x-11}" y1="${y}" x2="${x+11}" y2="${y}"/><line x1="${x-7}" y1="${y+4}" x2="${x+7}" y2="${y+4}"/><line x1="${x-3}" y1="${y+8}" x2="${x+3}" y2="${y+8}"/></g>`;
@@ -6861,6 +6872,270 @@ function buildThermalPred(){
   return htm;
 }
 
+function buildInspectionInterval(){
+  const da = lang==='da';
+  // Base intervals in months
+  const BASE_INTERVALS = {
+    residential: 120, commercial: 60, industrial: 36, hospital: 12,
+    school: 60, swimming_pool: 12, construction: 3
+  };
+  const TYPE_LABELS = {
+    residential: {da:'Bolig',en:'Residential'},
+    commercial: {da:'Erhverv',en:'Commercial'},
+    industrial: {da:'Industri',en:'Industrial'},
+    hospital: {da:'Hospital',en:'Hospital'},
+    school: {da:'Skole',en:'School'},
+    swimming_pool: {da:'Svommehal',en:'Swimming pool'},
+    construction: {da:'Byggeplads',en:'Construction site'}
+  };
+  const ENV_LABELS = {
+    dry: {da:'Tor',en:'Dry'},
+    damp: {da:'Fugtig',en:'Damp'},
+    corrosive: {da:'Korrosiv',en:'Corrosive'},
+    explosive: {da:'Eksplosiv',en:'Explosive'}
+  };
+  const AGE_LABELS = ['0-5','5-10','10-20','20-40','40+'];
+  const MOD_LABELS = {
+    none: {da:'Ingen',en:'None'},
+    minor: {da:'Mindre',en:'Minor'},
+    major: {da:'Vasentlige',en:'Major'}
+  };
+  // Environment factor
+  const envFactor = inspEnv==='dry'?1.0 : inspEnv==='damp'?0.7 : inspEnv==='corrosive'?0.5 : 0.3;
+  // Age factor
+  const ageFactor = inspAge==='0-5'?1.0 : inspAge==='5-10'?0.9 : inspAge==='10-20'?0.75 : inspAge==='20-40'?0.6 : 0.5;
+  // Modification factor
+  const modFactor = inspMod==='none'?1.0 : inspMod==='minor'?0.85 : 0.6;
+  // Calculate interval
+  const baseMonths = BASE_INTERVALS[inspType] || 60;
+  const adjMonths = Math.max(1, Math.round(baseMonths * envFactor * ageFactor * modFactor));
+  const adjYears = adjMonths >= 12 ? (adjMonths/12).toFixed(1) : null;
+  const intervalLabel = adjMonths >= 12 ? (adjYears + (da?' ar':' years')) : (adjMonths + (da?' mdr':' months'));
+  // Next inspection date
+  const now = new Date();
+  const nextDate = new Date(now.getTime() + adjMonths * 30.44 * 24 * 60 * 60 * 1000);
+  const nextStr = nextDate.toISOString().slice(0,10);
+  // Legal requirement
+  const legalRequired = ['hospital','swimming_pool','construction','industrial'].includes(inspType);
+  const legalLabel = legalRequired
+    ? (da?'LOVPLIGTIGT eftersyn (BEK 1082 \u00a78)':'LEGALLY REQUIRED inspection (BEK 1082 \u00a78)')
+    : (da?'Anbefalet eftersyn (god praksis)':'Recommended inspection (good practice)');
+  // Inspection scope per DS/HD 60364-6 section 6.5
+  const scope = [
+    {da:'Visuel inspektion af hele installationen',en:'Visual inspection of the entire installation'},
+    {da:'Test af beskyttelseslederes kontinuitet',en:'Continuity test of protective conductors'},
+    {da:'Isolationsmodstandsmaaling',en:'Insulation resistance measurement'},
+    {da:'Sloejfeimpedansmaaling (Zs)',en:'Loop impedance measurement (Zs)'},
+    {da:'HPFI/RCD-funktionstest',en:'RCD function test'},
+    {da:'Gennemgang af dokumentation og maerkning',en:'Review of documentation and labelling'},
+    {da:'Kontrol af belastningsforhold',en:'Verification of loading conditions'}
+  ];
+
+  let html = `<div class="card fade-in" style="border-left:4px solid var(--primary-light)">`;
+  html += `<div class="card-title">\u{1F50D} ${da?'Eftersyn & interval':'Inspection & interval'}</div>`;
+  html += `<div class="info-row" style="margin-bottom:6px">${da?'Beregner anbefalet eftersynsinterval baseret paa DS/HD 60364-6 \u00a76.5, Installationsbekendtgoerelsen og Sikkerhedsstyrelsens retningslinjer.':'Calculates recommended inspection interval based on DS/HD 60364-6 \u00a76.5, the Installation Order and Danish Safety Authority guidelines.'}</div>`;
+  html += `<div style="font-size:0.68rem;font-style:italic;color:var(--text-muted);margin-bottom:10px;opacity:0.85">\u{1F4D6} DS/HD 60364-6 \u00a76.5 \u00b7 BEK 1082 \u00a78 \u00b7 <a href="https://sikkerhedsstyrelsen.dk/eftersyn" target="_blank" style="color:var(--primary-light)">Sikkerhedsstyrelsen.dk/eftersyn</a></div>`;
+
+  // Installation type selector
+  html += `<div class="select-group"><div class="select-label">${da?'Installationstype':'Installation type'}</div><div class="select-grid">`;
+  Object.keys(TYPE_LABELS).forEach(k => {
+    html += `<button class="sel-btn ${inspType===k?'selected':''}" onclick="inspSetType('${k}')">${TYPE_LABELS[k][da?'da':'en']}</button>`;
+  });
+  html += `</div></div>`;
+
+  // Environment selector
+  html += `<div class="select-group"><div class="select-label">${da?'Miljo':'Environment'}</div><div class="select-grid">`;
+  Object.keys(ENV_LABELS).forEach(k => {
+    html += `<button class="sel-btn ${inspEnv===k?'selected':''}" onclick="inspSetEnv('${k}')">${ENV_LABELS[k][da?'da':'en']}</button>`;
+  });
+  html += `</div></div>`;
+
+  // Age selector
+  html += `<div class="select-group"><div class="select-label">${da?'Installationens alder':'Installation age'}</div><div class="select-grid">`;
+  AGE_LABELS.forEach(a => {
+    html += `<button class="sel-btn ${inspAge===a?'selected':''}" onclick="inspSetAge('${a}')">${a} ${da?'ar':'yr'}</button>`;
+  });
+  html += `</div></div>`;
+
+  // Modifications selector
+  html += `<div class="select-group"><div class="select-label">${da?'Aendringer siden sidst':'Modifications since last'}</div><div class="select-grid">`;
+  Object.keys(MOD_LABELS).forEach(k => {
+    html += `<button class="sel-btn ${inspMod===k?'selected':''}" onclick="inspSetMod('${k}')">${MOD_LABELS[k][da?'da':'en']}</button>`;
+  });
+  html += `</div></div>`;
+
+  // Results
+  html += `<div class="result-box" style="margin-top:12px">`;
+  html += `<div class="result-title">${da?'Anbefalet interval':'Recommended interval'}</div>`;
+  html += `<div class="result-row"><span class="label">${da?'Basisinterval':'Base interval'}</span><span class="value">${baseMonths>=12?(baseMonths/12)+' '+(da?'ar':'yr'):baseMonths+' '+(da?'mdr':'mo')}</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Miljofaktor':'Env. factor'}</span><span class="value">\u00d7${envFactor.toFixed(2)}</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Aldersfaktor':'Age factor'}</span><span class="value">\u00d7${ageFactor.toFixed(2)}</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Aendringsfaktor':'Mod. factor'}</span><span class="value">\u00d7${modFactor.toFixed(2)}</span></div>`;
+  html += `<div class="result-row" style="font-weight:700;font-size:1rem"><span class="label">${da?'Justeret interval':'Adjusted interval'}</span><span class="value" style="color:var(--primary-light)">${intervalLabel}</span></div>`;
+  html += `<div class="result-row"><span class="label">${da?'Naeste eftersyn':'Next inspection'}</span><span class="value">${nextStr}</span></div>`;
+  html += `</div>`;
+
+  // Legal status
+  const legalColor = legalRequired ? 'var(--danger)' : 'var(--success)';
+  html += `<div style="margin-top:10px;padding:10px 14px;border-radius:8px;border:1.5px solid ${legalColor};background:rgba(0,0,0,0.2)">`;
+  html += `<div style="font-weight:700;color:${legalColor};font-size:0.85rem">${legalRequired?'\u26A0\uFE0F':'\u2705'} ${legalLabel}</div>`;
+  html += `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px">\u{1F4D6} DS/HD 60364-6 \u00a76.5 \u00b7 BEK 1082 \u00a78 \u00b7 Sikkerhedsstyrelsen.dk/eftersyn</div>`;
+  html += `</div>`;
+
+  // Scope of inspection
+  html += `<div style="margin-top:12px"><div style="font-weight:700;font-size:0.82rem;color:var(--text);margin-bottom:6px">${da?'Eftersyn skal daekke (\u00a76.5):':'Inspection must cover (\u00a76.5):'}</div>`;
+  scope.forEach((s,i) => {
+    html += `<div style="font-size:0.78rem;padding:4px 0;color:var(--text-light)">${i+1}. ${da?s.da:s.en}</div>`;
+  });
+  html += `</div>`;
+
+  html += `</div>`;
+  return html;
+}
+
+function buildZsSimulator(){
+  const da = lang==='da';
+  // Cable resistance data (ohm/km at 20C for copper)
+  const ZS_CABLE_R = {1.5:12.1, 2.5:7.41, 4:4.61, 6:3.08, 10:1.83, 16:1.15, 25:0.727, 35:0.525, 50:0.388, 70:0.269, 95:0.194};
+  const ZS_SIZES = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95];
+  const ZS_LENGTHS = [5, 10, 15, 20, 30, 50, 75, 100, 150, 200];
+  const ZS_MCB_RATINGS = [6, 10, 13, 16, 20, 25, 32, 40, 50, 63];
+  // Ze values per earthing system
+  const ZS_ZE = {'TN-C-S':0.35, 'TN-S':0.80, 'TT':20.0, 'IT':50.0};
+  // Zs_max table values (DS/HD 60364-6 Table 6A) for 0.4s disconnection (TN)
+  const ZS_MAX_B = {6:7.67, 10:4.60, 13:3.54, 16:2.87, 20:2.30, 25:1.84, 32:1.44, 40:1.15, 50:0.92, 63:0.73};
+  const ZS_MAX_C = {6:3.83, 10:2.30, 13:1.77, 16:1.44, 20:1.15, 25:0.92, 32:0.72, 40:0.57, 50:0.46, 63:0.37};
+  const ZS_MAX_D = {6:1.92, 10:1.15, 13:0.88, 16:0.72, 20:0.57, 25:0.46, 32:0.36, 40:0.29, 50:0.23, 63:0.18};
+  const ZS_MAX = zsMcbCurve==='B'?ZS_MAX_B : zsMcbCurve==='D'?ZS_MAX_D : ZS_MAX_C;
+
+  // Calculate R1+R2 (line + PE, same size assumed)
+  const rPerKm = ZS_CABLE_R[zsSize] || 7.41;
+  const R1R2 = 2 * rPerKm * (zsLen / 1000);
+  const Ze = ZS_ZE[zsEarth] || 0.35;
+  const Zs = Ze + R1R2;
+  const ZsMax = ZS_MAX[zsMcbRating] || 1.44;
+  const zsOk = Zs <= ZsMax;
+  // Simulated test current and voltage
+  const Itest = 25; // typical test current in mA (actually uses higher, but display simplified)
+  const Vdrop = Zs * Itest;
+  // Fault current
+  const If = 230 / Zs;
+  // Ia for MCB
+  const mcbMult = zsMcbCurve==='B'?5 : zsMcbCurve==='D'?20 : 10;
+  const Ia = mcbMult * zsMcbRating;
+  const tripsOk = If >= Ia;
+
+  // SVG: Stylized loop impedance tester with digital display and circuit loop
+  const svgW = 440, svgH = 260;
+  const displayZs = Zs.toFixed(3);
+  const displayColor = zsOk ? '#00ff88' : '#ff3b5c';
+  const loopColor = zsOk ? '#00c8ff' : '#ff3b5c';
+  const animDur = zsOk ? '2s' : '1s';
+
+  let svg = `<svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;max-width:440px;height:auto;margin:10px auto;display:block;background:rgba(0,0,0,0.3);border-radius:12px;border:1px solid rgba(0,200,255,0.2)">`;
+  // Instrument body
+  svg += `<rect x="20" y="30" width="150" height="200" rx="12" fill="#1a1a2e" stroke="${loopColor}" stroke-width="2"/>`;
+  svg += `<text x="95" y="55" text-anchor="middle" fill="${loopColor}" font-size="9" font-weight="700">${da?'SLOEJFEIMPEDANSTESTER':'LOOP IMPEDANCE TESTER'}</text>`;
+  // Digital display
+  svg += `<rect x="35" y="65" width="120" height="55" rx="6" fill="#0a0a15" stroke="${displayColor}" stroke-width="1.5"/>`;
+  svg += `<text x="95" y="83" text-anchor="middle" fill="#aaa" font-size="8">Zs (\u03A9)</text>`;
+  svg += `<text x="95" y="110" text-anchor="middle" fill="${displayColor}" font-size="22" font-weight="800">${displayZs}</text>`;
+  // Max label
+  svg += `<text x="95" y="135" text-anchor="middle" fill="#888" font-size="7.5">Zs_max = ${ZsMax.toFixed(2)} \u03A9</text>`;
+  // Status indicator
+  svg += `<circle cx="55" cy="155" r="8" fill="${zsOk?'#00ff88':'#ff3b5c'}" opacity="0.9"><animate attributeName="opacity" values="0.9;0.4;0.9" dur="1.5s" repeatCount="indefinite"/></circle>`;
+  svg += `<text x="70" y="159" fill="${zsOk?'#00ff88':'#ff3b5c'}" font-size="10" font-weight="700">${zsOk?'OK':'FAIL'}</text>`;
+  // Test leads from instrument
+  svg += `<line x1="95" y1="230" x2="95" y2="245" stroke="#ff6600" stroke-width="3" stroke-linecap="round"/>`;
+  svg += `<text x="95" y="225" text-anchor="middle" fill="#aaa" font-size="7">L - PE</text>`;
+  // Circuit loop path (right side)
+  svg += `<path d="M 170 80 L 250 80 L 250 30 L 400 30 L 400 230 L 250 230 L 250 180 L 170 180" fill="none" stroke="${loopColor}" stroke-width="2" stroke-dasharray="6 3" opacity="0.7">`;
+  svg += `<animate attributeName="stroke-dashoffset" values="0;-18" dur="${animDur}" repeatCount="indefinite"/></path>`;
+  // Labels on loop
+  svg += `<text x="210" y="72" fill="#ff9500" font-size="8" font-weight="600">L (${da?'fase':'line'})</text>`;
+  svg += `<text x="210" y="195" fill="#00cc66" font-size="8" font-weight="600">PE</text>`;
+  // Ze section
+  svg += `<rect x="355" y="100" width="60" height="50" rx="4" fill="none" stroke="#ffd27a" stroke-width="1.5" stroke-dasharray="3 2"/>`;
+  svg += `<text x="385" y="120" text-anchor="middle" fill="#ffd27a" font-size="8" font-weight="600">Ze</text>`;
+  svg += `<text x="385" y="137" text-anchor="middle" fill="#ffd27a" font-size="10" font-weight="700">${Ze.toFixed(2)} \u03A9</text>`;
+  // R1+R2 section
+  svg += `<rect x="260" y="100" width="70" height="50" rx="4" fill="none" stroke="#00c8ff" stroke-width="1.5" stroke-dasharray="3 2"/>`;
+  svg += `<text x="295" y="120" text-anchor="middle" fill="#00c8ff" font-size="8" font-weight="600">R1+R2</text>`;
+  svg += `<text x="295" y="137" text-anchor="middle" fill="#00c8ff" font-size="10" font-weight="700">${R1R2.toFixed(3)} \u03A9</text>`;
+  // Test current arrow
+  svg += `<circle cx="250" cy="130" r="5" fill="${loopColor}" opacity="0.8"><animate attributeName="cx" values="190;400;400;190" dur="${animDur}" repeatCount="indefinite"/><animate attributeName="cy" values="80;80;180;180" dur="${animDur}" repeatCount="indefinite"/></circle>`;
+  // Formula annotation
+  svg += `<text x="295" y="210" text-anchor="middle" fill="#aaa" font-size="8">Zs = Ze + (R1+R2) = ${Ze.toFixed(2)} + ${R1R2.toFixed(3)} = ${Zs.toFixed(3)} \u03A9</text>`;
+  svg += `</svg>`;
+
+  let html = `<div class="card fade-in" style="border-left:4px solid ${zsOk?'var(--success)':'var(--danger)'}">`;
+  html += `<div class="card-title">\u26A1 ${da?'Sloejfeimpedans-test (simulator)':'Loop impedance test (simulator)'}</div>`;
+  html += `<div class="info-row" style="margin-bottom:6px">${da?'Interaktiv simulation af hvordan en sloejfeimpedanstester virker: injicerer en teststr\u00f8m i L-PE sloejfen, maaler spaendingsfaldet og beregner Zs = V/I.':'Interactive simulation of how a loop impedance tester works: injects a test current into the L-PE loop, measures the voltage drop and computes Zs = V/I.'}</div>`;
+  html += `<div style="font-size:0.68rem;font-style:italic;color:var(--text-muted);margin-bottom:10px;opacity:0.85">\u{1F4D6} DS/HD 60364-6 \u00a76.4.3.4 \u00b7 Tabel 6A</div>`;
+
+  // Cable length selector
+  html += `<div class="select-group"><div class="select-label">${da?'Kabellængde':'Cable length'}</div><div class="select-grid">`;
+  ZS_LENGTHS.forEach(l => {
+    html += `<button class="sel-btn ${zsLen===l?'selected':''}" onclick="zsSetLen(${l})">${l} m</button>`;
+  });
+  html += `</div></div>`;
+
+  // Cable size selector
+  html += `<div class="select-group"><div class="select-label">${da?'Kabeltvaersnit':'Cable size'}</div><div class="select-grid">`;
+  ZS_SIZES.forEach(s => {
+    html += `<button class="sel-btn ${zsSize===s?'selected':''}" onclick="zsSetSize(${s})">${s} mm\u00b2</button>`;
+  });
+  html += `</div></div>`;
+
+  // Earthing system selector
+  html += `<div class="select-group"><div class="select-label">${da?'Jordingssystem':'Earthing system'}</div><div class="select-grid">`;
+  ['TN-C-S','TN-S','TT','IT'].forEach(e => {
+    html += `<button class="sel-btn ${zsEarth===e?'selected':''}" onclick="zsSetEarth('${e}')">\u23DA ${e}</button>`;
+  });
+  html += `</div></div>`;
+
+  // MCB curve selector
+  html += `<div class="select-group"><div class="select-label">${da?'MCB karakteristik':'MCB curve'}</div><div class="select-grid">`;
+  ['B','C','D'].forEach(c => {
+    html += `<button class="sel-btn ${zsMcbCurve===c?'selected':''}" onclick="zsSetCurve('${c}')">Kurve ${c}</button>`;
+  });
+  html += `</div></div>`;
+
+  // MCB rating selector
+  html += `<div class="select-group"><div class="select-label">${da?'MCB maerkestr\u00f8m':'MCB rating'}</div><div class="select-grid">`;
+  ZS_MCB_RATINGS.forEach(r => {
+    html += `<button class="sel-btn ${zsMcbRating===r?'selected':''}" onclick="zsSetMcb(${r})">${r} A</button>`;
+  });
+  html += `</div></div>`;
+
+  // SVG display
+  html += svg;
+
+  // Results
+  html += `<div class="result-box" style="margin-top:12px;border-color:${zsOk?'var(--success)':'var(--danger)'}">`;
+  html += `<div class="result-title">${da?'Maalingsresultat':'Measurement result'}</div>`;
+  html += `<div class="result-row"><span class="label">Ze (${da?'forsyningsjordimpedans':'supply earth impedance'})</span><span class="value">${Ze.toFixed(2)} \u03A9</span></div>`;
+  html += `<div class="result-row"><span class="label">R1+R2 (${zsSize} mm\u00b2 \u00d7 ${zsLen} m)</span><span class="value">${R1R2.toFixed(3)} \u03A9</span></div>`;
+  html += `<div class="result-row" style="font-weight:700"><span class="label">Zs = Ze + R1+R2</span><span class="value" style="color:${displayColor}">${Zs.toFixed(3)} \u03A9</span></div>`;
+  html += `<div class="result-row"><span class="label">Zs_max (${zsMcbCurve}${zsMcbRating}, 0.4s)</span><span class="value">${ZsMax.toFixed(2)} \u03A9</span></div>`;
+  html += `<div class="result-row"><span class="label">If = Uo/Zs</span><span class="value">${If.toFixed(1)} A</span></div>`;
+  html += `<div class="result-row"><span class="label">Ia (${mcbMult}\u00d7In)</span><span class="value">${Ia} A</span></div>`;
+  html += `</div>`;
+
+  // Verdict
+  const verdictColor = zsOk ? 'var(--success)' : 'var(--danger)';
+  const verdictText = zsOk
+    ? (da?'Zs OK \u2014 afbrydelse sikret inden for kraevet tid':'Zs OK \u2014 disconnection assured within required time')
+    : (da?'Zs for hoej \u2014 forhoej kabeltvaersnit eller tilfoej HPFI/RCD':'Zs too high \u2014 increase cable size or add RCD');
+  html += `<div style="margin-top:10px;padding:10px 14px;border-radius:8px;border:1.5px solid ${verdictColor};background:rgba(0,0,0,0.2)">`;
+  html += `<div style="font-weight:700;color:${verdictColor};font-size:0.9rem">${zsOk?'\u2705':'\u274C'} ${verdictText}</div>`;
+  html += `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px">\u{1F4D6} DS/HD 60364-6 \u00a76.4.3.4 \u00b7 Tabel 6A</div>`;
+  html += `</div>`;
+
+  html += `</div>`;
+  return html;
+}
+
 function buildProtReport(){
   const da = lang==='da';
   const cons = loadList.length ? loadList.slice(0,16) : [
@@ -7147,7 +7422,7 @@ function buildCommissioning(){
 function renderDrawing(){
   const nodes=getDrawNodes(), typeKeys=Object.keys(NODE_TYPES);
   const nodeEditor=`<div class="select-group"><div class="select-label">${lang==='da'?'Installationens noder (tilf\u00F8j/fjern/flyt)':'Installation nodes (add/remove/move)'}</div>${nodes.map((n,i)=>{const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;return `<div style="display:inline-flex;align-items:center;gap:4px;margin:3px 4px;padding:5px 9px;border:1.5px solid ${nt.color};border-radius:8px;font-size:.78rem;background:rgba(0,0,0,0.25)"><span>${nt.icon}</span><span style="color:${nt.color};font-weight:700">${lang==='da'?nt.da:nt.en}</span><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},-1)">\u25C0</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},1)">\u25B6</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem;color:var(--danger)" onclick="drawNodeRemove(${i})">\u2715</button></div>`;}).join('')}</div><div class="select-group"><div class="select-label">${lang==='da'?'Tilf\u00F8j node':'Add node'}</div><div class="select-grid">${typeKeys.map(k=>`<button class="sel-btn" onclick="drawNodeAdd('${k}')">${NODE_TYPES[k].icon} ${lang==='da'?NODE_TYPES[k].da:NODE_TYPES[k].en}</button>`).join('')}<button class="sel-btn" onclick="drawNodeReset()">\u21BA ${lang==='da'?'Nulstil':'Reset'}</button></div></div>`;
-  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():(sldFault?buildCoordDashboard():'')+buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildArcFlash():''}${drawStyle==='schematic'&&sldFault?buildDeratingChart():''}${drawStyle==='schematic'&&sldFault?buildInrushCheck():''}${drawStyle==='schematic'&&sldFault?buildEnergyEfficiency():''}${drawStyle==='schematic'&&sldFault?buildHarmonicCheck():''}${drawStyle==='schematic'&&sldFault?buildCableLifetime():''}${drawStyle==='schematic'&&sldFault?buildPowerFlow():''}${drawStyle==='schematic'&&sldFault?buildVoltageProfile():''}${drawStyle==='schematic'&&sldFault?buildEmcRouting():''}${drawStyle==='schematic'&&sldFault?buildMotorStart():''}${drawStyle==='schematic'&&sldFault?buildCapBank():''}${drawStyle==='schematic'&&sldFault?buildRelaySettings():''}${drawStyle==='schematic'&&sldFault?buildGenSet():''}${drawStyle==='schematic'&&sldFault?buildLightningRisk():''}${drawStyle==='schematic'&&sldFault?buildThermalPred():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='schematic'&&sldFault?buildDiscrimTable():''}${drawStyle==='schematic'&&sldFault?buildCommissioning():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
+  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():(sldFault?buildCoordDashboard():'')+buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildArcFlash():''}${drawStyle==='schematic'&&sldFault?buildDeratingChart():''}${drawStyle==='schematic'&&sldFault?buildInrushCheck():''}${drawStyle==='schematic'&&sldFault?buildEnergyEfficiency():''}${drawStyle==='schematic'&&sldFault?buildHarmonicCheck():''}${drawStyle==='schematic'&&sldFault?buildCableLifetime():''}${drawStyle==='schematic'&&sldFault?buildPowerFlow():''}${drawStyle==='schematic'&&sldFault?buildVoltageProfile():''}${drawStyle==='schematic'&&sldFault?buildEmcRouting():''}${drawStyle==='schematic'&&sldFault?buildMotorStart():''}${drawStyle==='schematic'&&sldFault?buildCapBank():''}${drawStyle==='schematic'&&sldFault?buildRelaySettings():''}${drawStyle==='schematic'&&sldFault?buildGenSet():''}${drawStyle==='schematic'&&sldFault?buildLightningRisk():''}${drawStyle==='schematic'&&sldFault?buildThermalPred():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='schematic'&&sldFault?buildDiscrimTable():''}${drawStyle==='schematic'&&sldFault?buildCommissioning():''}${drawStyle==='schematic'&&sldFault?buildInspectionInterval():''}${drawStyle==='schematic'&&sldFault?buildZsSimulator():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
 }
 
 // ===== ANALYZING BRAIN MODULE =====
