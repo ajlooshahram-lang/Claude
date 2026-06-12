@@ -4381,6 +4381,16 @@ function setEeElPrice(v){ eeElPrice = +v; renderModule('draw'); }
 function sldSetITSecond(b){ sldITSecond = b; renderModule('draw'); }
 function sldSetRunLen(m){ sldRunLen = m; renderModule('draw'); }
 function sldSetMeasZs(f){ sldMeasZsFactor = +f; renderModule('draw'); }
+// Motor starting analysis state
+let msMethod = 'dol'; function msSetMethod(m){msMethod=m;renderModule('draw');}
+let msMotorKW = 7.5; function msSetMotor(kw){msMotorKW=kw;renderModule('draw');}
+let msCurve = 'C'; function msSetCurve(c){msCurve=c;renderModule('draw');}
+// Capacitor bank state
+let cbTarget = 0.95; function cbSetTarget(t){cbTarget=t;renderModule('draw');}
+// Relay settings state
+let rlIrMult = 0.95; function rlSetIr(v){rlIrMult=v;renderModule('draw');}
+let rlIsdMult = 5; function rlSetIsd(v){rlIsdMult=v;renderModule('draw');}
+let rlTsd = 0.1; function rlSetTsd(v){rlTsd=v;renderModule('draw');}
 // Standard earth-electrode symbol (vertical line + 3 decreasing horizontal bars)
 function earthSymbol(x, y, color){
   return `<g stroke="${color}" stroke-width="2" stroke-linecap="round" fill="none"><line x1="${x}" y1="${y-9}" x2="${x}" y2="${y}"/><line x1="${x-11}" y1="${y}" x2="${x+11}" y2="${y}"/><line x1="${x-7}" y1="${y+4}" x2="${x+7}" y2="${y+4}"/><line x1="${x-3}" y1="${y+8}" x2="${x+3}" y2="${y+8}"/></g>`;
@@ -6170,6 +6180,366 @@ function buildEmcRouting(){
   return htm;
 }
 
+
+// ===== MOTOR STARTING ANALYSIS =====
+function buildMotorStart(){
+  const da = lang==='da';
+  const motorPowers = [1.5,3,5.5,7.5,11,15,22,30,45,75];
+  const methods = {
+    dol: {da:'DOL (direkte)',en:'DOL (Direct On Line)',multMin:6,multMax:8,tMin:0.5,tMax:3},
+    yd: {da:'Stjerne-Trekant (Y/\u0394)',en:'Star-Delta (Y/\u0394)',multMin:2,multMax:3,tMin:3,tMax:10},
+    soft: {da:'Soft Starter',en:'Soft Starter',multMin:2,multMax:4,tMin:5,tMax:20},
+    vfd: {da:'VFD (frekvensomformer)',en:'VFD (Variable Freq. Drive)',multMin:1,multMax:1.5,tMin:5,tMax:30}
+  };
+  const curves = ['B','C','D'];
+  // Find a motor in loadList or use default
+  const motorCons = loadList.find(c => /motor|pumpe|pump|kompres|vent|kran|crane/.test((c.name||'').toLowerCase()));
+  const Pkw = msMotorKW;
+  const In = (Pkw * 1000) / (Math.sqrt(3) * 400 * 0.85); // typical motor efficiency*cos
+  const m = methods[msMethod];
+  const Istart = In * (m.multMin + m.multMax) / 2;
+  const tStart = (m.tMin + m.tMax) / 2;
+  // Voltage dip: deltaU% = Istart * Zs / Un * 100 (Zs from transformer)
+  const sch = calcLoadSchedule();
+  const totalKVA = loadList.length ? sch.kVA : 100;
+  const trafo = (typeof TRAFO_SIZES!=='undefined') ? (TRAFO_SIZES.find(t=>t>=totalKVA)||400) : 400;
+  const uk = TRAFO_UK[trafo] || 4;
+  const Ztrafo = (uk/100) * (400*400) / (trafo*1000); // transformer impedance in ohms
+  const deltaU = (Istart * Ztrafo / 400) * 100;
+  // MCB trip check
+  const mcbIn = In < 16 ? 16 : In < 20 ? 20 : In < 25 ? 25 : In < 32 ? 32 : In < 40 ? 40 : In < 50 ? 50 : In < 63 ? 63 : 80;
+  const curve = MCB_CURVES[msCurve];
+  const mcbInstTrip = curve.isdMax * mcbIn; // instantaneous trip threshold
+  const ridesThrough = Istart < mcbInstTrip;
+  // SVG chart: current vs time with MCB trip curve overlay
+  const W=600, H=320;
+  let svg = '';
+  svg += '<defs><filter id="msGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  svg += '<radialGradient id="msBg" cx="50%" cy="50%" r="70%"><stop offset="0%" stop-color="#0d1f33"/><stop offset="100%" stop-color="#06101c"/></radialGradient></defs>';
+  svg += `<rect width="${W}" height="${H}" fill="url(#msBg)"/>`;
+  svg += `<text x="${W/2}" y="20" text-anchor="middle" font-size="11" font-weight="800" fill="#bfe9ff" filter="url(#msGlow)">${da?'Motorstart \u2014 str\u00f8m vs tid':'Motor Start \u2014 current vs time'}</text>`;
+  // Axes
+  const ax={l:70,r:30,t:35,b:40};
+  const pw=W-ax.l-ax.r, ph=H-ax.t-ax.b;
+  svg += `<line x1="${ax.l}" y1="${ax.t}" x2="${ax.l}" y2="${H-ax.b}" stroke="#3a5a7a" stroke-width="1"/>`;
+  svg += `<line x1="${ax.l}" y1="${H-ax.b}" x2="${W-ax.r}" y2="${H-ax.b}" stroke="#3a5a7a" stroke-width="1"/>`;
+  svg += `<text x="${ax.l-8}" y="${ax.t-8}" text-anchor="end" font-size="8" fill="#7fa8c4">I (A)</text>`;
+  svg += `<text x="${W-ax.r+5}" y="${H-ax.b+12}" font-size="8" fill="#7fa8c4">t (s)</text>`;
+  // Scale
+  const maxI = Math.max(Istart * 1.2, mcbInstTrip * 1.1);
+  const maxT = Math.max(tStart * 1.5, 5);
+  // Grid lines
+  for(let g=0;g<=4;g++){
+    const gy = ax.t + (ph/4)*g;
+    const gval = (maxI*(4-g)/4).toFixed(0);
+    svg += `<line x1="${ax.l}" y1="${gy}" x2="${W-ax.r}" y2="${gy}" stroke="#1a3a5a" stroke-width="0.5" stroke-dasharray="3 3"/>`;
+    svg += `<text x="${ax.l-5}" y="${gy+3}" text-anchor="end" font-size="7" fill="#5a7a9a">${gval}</text>`;
+  }
+  for(let g=0;g<=5;g++){
+    const gx = ax.l + (pw/5)*g;
+    const gval = (maxT*g/5).toFixed(1);
+    svg += `<text x="${gx}" y="${H-ax.b+12}" text-anchor="middle" font-size="7" fill="#5a7a9a">${gval}s</text>`;
+  }
+  // Motor starting current curve (exponential decay from Istart to In)
+  const nPts = 40;
+  let motorPath = '';
+  for(let i=0;i<=nPts;i++){
+    const t = (i/nPts) * maxT;
+    let I;
+    if(t <= tStart){
+      // During start: high current decaying
+      const frac = t / tStart;
+      I = In + (Istart - In) * Math.exp(-3*frac);
+    } else {
+      I = In;
+    }
+    const px = ax.l + (t/maxT)*pw;
+    const py = ax.t + (1 - I/maxI)*ph;
+    motorPath += (i===0?'M':'L') + px.toFixed(1)+','+py.toFixed(1);
+  }
+  svg += `<path d="${motorPath}" fill="none" stroke="#00d4ff" stroke-width="2.5" filter="url(#msGlow)"/>`;
+  svg += `<text x="${ax.l+pw*0.15}" y="${ax.t+(1-Istart/maxI)*ph-8}" font-size="8" fill="#00d4ff">Istart=${Istart.toFixed(0)}A</text>`;
+  // MCB instantaneous trip line
+  const mcbY = ax.t + (1 - mcbInstTrip/maxI)*ph;
+  svg += `<line x1="${ax.l}" y1="${mcbY}" x2="${W-ax.r}" y2="${mcbY}" stroke="#ff3b5c" stroke-width="1.5" stroke-dasharray="6 3"/>`;
+  svg += `<text x="${W-ax.r-5}" y="${mcbY-5}" text-anchor="end" font-size="8" fill="#ff3b5c">MCB ${msCurve}${mcbIn} inst.=${mcbInstTrip.toFixed(0)}A</text>`;
+  // In line
+  const inY = ax.t + (1 - In/maxI)*ph;
+  svg += `<line x1="${ax.l}" y1="${inY}" x2="${W-ax.r}" y2="${inY}" stroke="#06d6a0" stroke-width="1" stroke-dasharray="4 2"/>`;
+  svg += `<text x="${W-ax.r-5}" y="${inY-5}" text-anchor="end" font-size="8" fill="#06d6a0">In=${In.toFixed(1)}A</text>`;
+  // Verdict on chart
+  const verdictColor = ridesThrough ? '#06d6a0' : '#ffd166';
+  const verdictText = ridesThrough ? (da?'Beskyttelsen holder':'Protection rides through') : (da?'Risiko for udl\u00f8sning':'Risk of nuisance trip');
+  svg += `<rect x="${W/2-100}" y="${H-32}" width="200" height="20" rx="4" fill="${verdictColor}" fill-opacity="0.15" stroke="${verdictColor}" stroke-width="1"/>`;
+  svg += `<text x="${W/2}" y="${H-19}" text-anchor="middle" font-size="9" font-weight="700" fill="${verdictColor}">${verdictText}</text>`;
+  const svgTag = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:640px;border-radius:12px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 24px rgba(0,160,255,0.15)" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+  // Build HTML
+  let htm = `<div class="card fade-in"><div class="card-title">\u2699\ufe0f ${da?'Motorstart-analyse':'Motor starting analysis'}</div>`;
+  htm += `<div class="info-row" style="margin-bottom:8px">${da?'Analyserer motorstartmetoders effekt p\u00e5 sp\u00e6ndingsfald og beskyttelseskoordinering.':'Analyzes motor starting methods and their effect on voltage drop and protection coordination.'}</div>`;
+  // Selectors
+  htm += `<div class="select-group"><div class="select-label">${da?'Motoreffekt (kW)':'Motor power (kW)'}</div><div class="select-grid">`;
+  motorPowers.forEach(p => { htm += `<button class="sel-btn ${msMotorKW===p?'selected':''}" onclick="msSetMotor(${p})">${p} kW</button>`; });
+  htm += `</div></div>`;
+  htm += `<div class="select-group"><div class="select-label">${da?'Startmetode':'Starting method'}</div><div class="select-grid">`;
+  Object.keys(methods).forEach(k => { htm += `<button class="sel-btn ${msMethod===k?'selected':''}" onclick="msSetMethod('${k}')">${da?methods[k].da:methods[k].en}</button>`; });
+  htm += `</div></div>`;
+  htm += `<div class="select-group"><div class="select-label">${da?'MCB-kurve':'MCB curve'}</div><div class="select-grid">`;
+  curves.forEach(c => { htm += `<button class="sel-btn ${msCurve===c?'selected':''}" onclick="msSetCurve('${c}')">${c}</button>`; });
+  htm += `</div></div>`;
+  htm += svgTag;
+  // Results
+  htm += `<div class="result-box" style="margin-top:10px;background:rgba(0,30,50,0.4);border:1px solid rgba(0,200,255,0.2)">`;
+  htm += `<div class="result-title" style="color:#bfe9ff">${da?'Startparametre':'Starting parameters'}</div>`;
+  htm += `<div class="result-row"><span class="label">${da?'Nominel str\u00f8m In':'Nominal current In'}</span><span class="value" style="color:#06d6a0">${In.toFixed(1)} A</span></div>`;
+  htm += `<div class="result-row"><span class="label">${da?'Startstr\u00f8m Istart':'Starting current Istart'}</span><span class="value" style="color:#00d4ff">${Istart.toFixed(0)} A (${((m.multMin+m.multMax)/2).toFixed(1)}\u00d7In)</span></div>`;
+  htm += `<div class="result-row"><span class="label">${da?'Starttid':'Starting time'}</span><span class="value" style="color:#ffd166">${tStart.toFixed(1)} s</span></div>`;
+  htm += `<div class="result-row"><span class="label">${da?'Sp\u00e6ndingsdip ved PCC (\u0394U%)':'Voltage dip at PCC (\u0394U%)'}</span><span class="value" style="color:${deltaU>5?'#ff3b5c':'#06d6a0'}">${deltaU.toFixed(1)} %</span></div>`;
+  htm += `<div class="result-row"><span class="label">${da?'MCB udl\u00f8sningsgr\u00e6nse':'MCB trip threshold'}</span><span class="value" style="color:#ff9a4d">${mcbInstTrip.toFixed(0)} A (${msCurve}${mcbIn})</span></div>`;
+  htm += `</div>`;
+  // Verdict box
+  const vBg = ridesThrough ? 'rgba(6,214,160,0.08)' : 'rgba(255,209,102,0.1)';
+  const vBorder = ridesThrough ? 'rgba(6,214,160,0.4)' : 'rgba(255,209,102,0.4)';
+  htm += `<div class="result-box" style="margin-top:8px;background:${vBg};border:1px solid ${vBorder}">`;
+  htm += `<div class="result-title" style="color:${verdictColor}">${ridesThrough?'\u2705':'\u26a0\ufe0f'} ${verdictText}</div>`;
+  if(!ridesThrough){
+    htm += `<div class="result-row"><span class="label" style="color:#ffd166">${da?'Anbefaling: Brug kurve C/D eller VFD for at undg\u00e5 falsk udl\u00f8sning.':'Recommendation: Use curve C/D or VFD to avoid nuisance tripping.'}</span></div>`;
+  }
+  htm += `</div></div>`;
+  return htm;
+}
+
+// ===== CAPACITOR BANK SIZING (POWER FACTOR CORRECTION) =====
+function buildCapBank(){
+  const da = lang==='da';
+  const sch = calcLoadSchedule();
+  // Get total active power and average cos phi
+  const totalKW = sch.kW || (loadList.length ? loadList.reduce((s,c)=>s+c.kW*c.sf,0) : 50);
+  const avgCos = loadList.length ? (loadList.reduce((s,c)=>s+c.cos,0)/loadList.length) : 0.82;
+  const cosCurrent = Math.min(Math.max(avgCos, 0.5), 0.99);
+  const cosTarget = cbTarget;
+  const targetOpts = [0.90,0.92,0.95,0.97,0.99,1.0];
+  const stdBanks = [5,10,15,20,25,30,40,50,75,100];
+  // Calculations
+  const phi1 = Math.acos(cosCurrent);
+  const phi2 = Math.acos(Math.min(cosTarget, 0.9999));
+  const tanPhi1 = Math.tan(phi1);
+  const tanPhi2 = Math.tan(phi2);
+  const Qc = totalKW * (tanPhi1 - tanPhi2); // required kVAr
+  const QcPos = Math.max(0, Qc);
+  // Pick standard bank size
+  const bankSize = stdBanks.find(b => b >= QcPos) || stdBanks[stdBanks.length-1];
+  // Before/after apparent power and current
+  const S_before = totalKW / cosCurrent;
+  const S_after = totalKW / Math.min(cosTarget, 0.9999);
+  const I_before = S_before * 1000 / (Math.sqrt(3) * 400);
+  const I_after = S_after * 1000 / (Math.sqrt(3) * 400);
+  const currentReduction = ((1 - I_after/I_before) * 100);
+  // Loss reduction (I^2 R proportional)
+  const lossReduction = ((1 - (I_after*I_after)/(I_before*I_before)) * 100);
+  // Annual savings estimate
+  const cableR = 0.002; // assumed system resistance in ohms per phase
+  const hoursPerYear = 4000;
+  const elPrice = 2.5; // DKK/kWh
+  const lossBeforeW = 3 * I_before * I_before * cableR;
+  const lossAfterW = 3 * I_after * I_after * cableR;
+  const annualSavings = (lossBeforeW - lossAfterW) * hoursPerYear * elPrice / 1000;
+  // Fixed vs automatic recommendation
+  const loadVariability = loadList.length > 4 ? 'auto' : 'fixed';
+  // SVG Power Triangle
+  const W=580, H=320;
+  let svg = '';
+  svg += '<defs><filter id="cbGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  svg += '<radialGradient id="cbBg" cx="50%" cy="50%" r="70%"><stop offset="0%" stop-color="#0d1f33"/><stop offset="100%" stop-color="#06101c"/></radialGradient></defs>';
+  svg += `<rect width="${W}" height="${H}" fill="url(#cbBg)"/>`;
+  svg += `<text x="${W/2}" y="20" text-anchor="middle" font-size="11" font-weight="800" fill="#bfe9ff" filter="url(#cbGlow)">${da?'Effekttrekant \u2014 f\u00f8r/efter kompensering':'Power triangle \u2014 before/after compensation'}</text>`;
+  // Draw triangles
+  const cx=W/2-50, cy=H-60;
+  const scale = Math.min(200/(S_before||1), 150/(totalKW*tanPhi1||1));
+  const pLen = totalKW * scale; // P horizontal
+  const q1Len = totalKW * tanPhi1 * scale; // Q before (vertical, going UP)
+  const q2Len = totalKW * tanPhi2 * scale; // Q after
+  const s1Len = S_before * scale;
+  // Before triangle (dimmer)
+  const bx1=cx, by1=cy; // P start (bottom-left)
+  const bx2=cx+pLen, by2=cy; // P end (bottom-right)
+  const bx3=cx+pLen, by3=cy-q1Len; // Q top
+  svg += `<polygon points="${bx1},${by1} ${bx2},${by2} ${bx3},${by3}" fill="rgba(255,59,92,0.08)" stroke="#ff3b5c" stroke-width="1.5" stroke-dasharray="4 2"/>`;
+  // After triangle (bright)
+  const ax3=cx+pLen, ay3=cy-q2Len;
+  svg += `<polygon points="${bx1},${by1} ${bx2},${by2} ${ax3},${ay3}" fill="rgba(6,214,160,0.1)" stroke="#06d6a0" stroke-width="2"/>`;
+  // Labels
+  svg += `<text x="${cx+pLen/2}" y="${cy+18}" text-anchor="middle" font-size="9" fill="#ffd166" font-weight="700">P = ${totalKW.toFixed(0)} kW</text>`;
+  svg += `<text x="${bx3+12}" y="${cy-(q1Len/2)}" font-size="8" fill="#ff3b5c" font-weight="600">Q\u2081=${(totalKW*tanPhi1).toFixed(0)} kVAr</text>`;
+  svg += `<text x="${ax3+12}" y="${cy-(q2Len/2)}" font-size="8" fill="#06d6a0" font-weight="600">Q\u2082=${(totalKW*tanPhi2).toFixed(0)} kVAr</text>`;
+  // S labels
+  svg += `<text x="${cx+pLen/2-30}" y="${cy-q1Len/2-5}" font-size="8" fill="#ff3b5c" transform="rotate(${(-Math.atan2(q1Len,pLen)*180/Math.PI).toFixed(1)},${cx+pLen/2-30},${cy-q1Len/2-5})">S\u2081=${S_before.toFixed(0)} kVA</text>`;
+  svg += `<text x="${cx+pLen/2-30}" y="${cy-q2Len/2+10}" font-size="8" fill="#06d6a0" transform="rotate(${(-Math.atan2(q2Len,pLen)*180/Math.PI).toFixed(1)},${cx+pLen/2-30},${cy-q2Len/2+10})">S\u2082=${S_after.toFixed(0)} kVA</text>`;
+  // Qc arrow
+  if(QcPos > 0){
+    const qcY1 = cy - q1Len;
+    const qcY2 = cy - q2Len;
+    svg += `<line x1="${bx3+5}" y1="${qcY1}" x2="${ax3+5}" y2="${qcY2}" stroke="#00d4ff" stroke-width="2" marker-end="url(#cbArr)"/>`;
+    svg += `<text x="${bx3+22}" y="${(qcY1+qcY2)/2+3}" font-size="9" fill="#00d4ff" font-weight="700">Qc=${QcPos.toFixed(0)} kVAr</text>`;
+  }
+  // Legend
+  svg += `<rect x="15" y="35" width="12" height="12" rx="2" fill="none" stroke="#ff3b5c" stroke-dasharray="3 2"/>`;
+  svg += `<text x="32" y="45" font-size="8" fill="#ff3b5c">${da?'F\u00f8r (cos\u03c6='+cosCurrent.toFixed(2)+')':'Before (cos\u03c6='+cosCurrent.toFixed(2)+')'}</text>`;
+  svg += `<rect x="15" y="52" width="12" height="12" rx="2" fill="none" stroke="#06d6a0"/>`;
+  svg += `<text x="32" y="62" font-size="8" fill="#06d6a0">${da?'Efter (cos\u03c6='+cosTarget.toFixed(2)+')':'After (cos\u03c6='+cosTarget.toFixed(2)+')'}</text>`;
+  const svgTag = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:620px;border-radius:12px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 24px rgba(0,160,255,0.15)" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+  // HTML output
+  let htm = `<div class="card fade-in"><div class="card-title">\u26a1 ${da?'Fasekompensering (kVAr)':'Power factor correction (kVAr)'}</div>`;
+  htm += `<div class="info-row" style="margin-bottom:8px">${da?'Beregner n\u00f8dvendig reaktiv effektkompensation (kVAr) for at forbedre cos \u03c6. Formel: Qc = P \u00d7 (tan\u03c6\u2081 \u2212 tan\u03c6\u2082)':'Calculates required reactive power compensation (kVAr) to improve cos \u03c6. Formula: Qc = P \u00d7 (tan\u03c6\u2081 \u2212 tan\u03c6\u2082)'}</div>`;
+  // Target selector
+  htm += `<div class="select-group"><div class="select-label">${da?'M\u00e5l cos \u03c6':'Target cos \u03c6'}</div><div class="select-grid">`;
+  targetOpts.forEach(t => { htm += `<button class="sel-btn ${cbTarget===t?'selected':''}" onclick="cbSetTarget(${t})">${t.toFixed(2)}</button>`; });
+  htm += `</div></div>`;
+  htm += svgTag;
+  // Results
+  htm += `<div class="result-box" style="margin-top:10px;background:rgba(0,30,50,0.4);border:1px solid rgba(0,200,255,0.2)">`;
+  htm += `<div class="result-title" style="color:#bfe9ff">${da?'Kompensering':'Compensation'}</div>`;
+  htm += `<div class="result-row"><span class="label">${da?'Aktuel cos \u03c6':'Current cos \u03c6'}</span><span class="value" style="color:#ff9a4d">${cosCurrent.toFixed(3)}</span></div>`;
+  htm += `<div class="result-row"><span class="label">${da?'M\u00e5l cos \u03c6':'Target cos \u03c6'}</span><span class="value" style="color:#06d6a0">${cosTarget.toFixed(2)}</span></div>`;
+  htm += `<div class="result-row"><span class="label">${da?'N\u00f8dvendig Qc':'Required Qc'}</span><span class="value" style="color:#00d4ff">${QcPos.toFixed(1)} kVAr</span></div>`;
+  htm += `<div class="result-row"><span class="label">${da?'Valgt kondensatorbatteri':'Selected capacitor bank'}</span><span class="value" style="color:#ffd166">${bankSize} kVAr</span></div>`;
+  htm += `</div>`;
+  // Before/after comparison
+  htm += `<div class="result-box" style="margin-top:8px;background:rgba(0,30,50,0.4);border:1px solid rgba(0,200,255,0.2)">`;
+  htm += `<div class="result-title" style="color:#bfe9ff">${da?'F\u00f8r/efter sammenligning':'Before/after comparison'}</div>`;
+  htm += `<div class="result-row"><span class="label">${da?'Str\u00f8m f\u00f8r':'Current before'}</span><span class="value" style="color:#ff3b5c">${I_before.toFixed(1)} A</span></div>`;
+  htm += `<div class="result-row"><span class="label">${da?'Str\u00f8m efter':'Current after'}</span><span class="value" style="color:#06d6a0">${I_after.toFixed(1)} A</span></div>`;
+  htm += `<div class="result-row"><span class="label">${da?'Str\u00f8mreduktion':'Current reduction'}</span><span class="value" style="color:#00d4ff">${currentReduction.toFixed(1)} %</span></div>`;
+  htm += `<div class="result-row"><span class="label">${da?'Tabsreduktion (I\u00b2R)':'Loss reduction (I\u00b2R)'}</span><span class="value" style="color:#06d6a0">${lossReduction.toFixed(1)} %</span></div>`;
+  htm += `<div class="result-row"><span class="label">${da?'\u00c5rlig besparelse (estimat)':'Annual savings (estimate)'}</span><span class="value" style="color:#ffd166">${annualSavings.toFixed(0)} DKK</span></div>`;
+  htm += `</div>`;
+  // Recommendation
+  const recoFixed = da?'Fast kompensering (fast kondensatorbatteri) \u2014 velegnet til stabil belastning.':'Fixed compensation (fixed capacitor bank) \u2014 suitable for stable load.';
+  const recoAuto = da?'Automatisk (trinvis) kompensering \u2014 anbefales ved varierende belastning (>4 grupper).':'Automatic (stepped) compensation \u2014 recommended for variable load (>4 circuits).';
+  htm += `<div class="result-box" style="margin-top:8px;background:rgba(6,214,160,0.06);border:1px solid rgba(6,214,160,0.3)">`;
+  htm += `<div class="result-title" style="color:#06d6a0">${da?'Anbefaling':'Recommendation'}</div>`;
+  htm += `<div class="result-row"><span class="label" style="color:#bfe9ff">\u2022 ${loadVariability==='auto'?recoAuto:recoFixed}</span></div>`;
+  htm += `<div class="result-row"><span class="label" style="color:#7fa8c4">${da?'Standardst\u00f8rrelser: 5/10/15/20/25/30/40/50/75/100 kVAr':'Standard sizes: 5/10/15/20/25/30/40/50/75/100 kVAr'}</span></div>`;
+  htm += `</div></div>`;
+  return htm;
+}
+
+// ===== PROTECTION RELAY SETTINGS CALCULATOR =====
+function buildRelaySettings(){
+  const da = lang==='da';
+  const sch = calcLoadSchedule();
+  const IB = sch.ib || 50; // load current
+  // Transformer data for Ik
+  const totalKVA = sch.kVA || 100;
+  const trafo = (typeof TRAFO_SIZES!=='undefined') ? (TRAFO_SIZES.find(t=>t>=totalKVA)||400) : 400;
+  const uk = TRAFO_UK[trafo] || 4;
+  const Ik_busbar = (trafo * 1000) / (Math.sqrt(3) * 400 * (uk/100)); // Ik at busbar
+  const Ik_min = Ik_busbar * 0.4; // approximate Ik at cable end (40% of busbar)
+  // Relay settings
+  const In_relay = IB < 100 ? (Math.ceil(IB/10)*10) : (Math.ceil(IB/50)*50); // next standard relay In
+  const Ir = rlIrMult * In_relay; // long-time pickup
+  const tr_options = [5,10,15,20,25,30]; // long-time delay at 6xIr
+  const Isd = rlIsdMult * Ir; // short-time pickup
+  const tsd = rlTsd; // short-time delay
+  const Ii = 12 * In_relay; // instantaneous (fixed at 12xIn typical)
+  const isdOptions = [2,3,4,5,6,7,8,9,10];
+  const tsdOptions = [0,0.05,0.1,0.15,0.2,0.3,0.4];
+  const irOptions = [0.8,0.85,0.9,0.95,1.0];
+  // Verification checks
+  const checks = [];
+  checks.push({name: da?'Ir \u2265 IB (laststr\u00f8m)':'Ir \u2265 IB (load current)', ok: Ir >= IB*0.98, val: `${Ir.toFixed(1)}A \u2265 ${IB.toFixed(1)}A`});
+  checks.push({name: da?'Isd \u2264 Ik_min (sikrer udl\u00f8sning)':'Isd \u2264 Ik_min (ensures trip)', ok: Isd <= Ik_min, val: `${Isd.toFixed(0)}A \u2264 ${Ik_min.toFixed(0)}A`});
+  checks.push({name: da?'Ii \u2264 Ik_busbar':'Ii \u2264 Ik_busbar', ok: Ii <= Ik_busbar, val: `${Ii.toFixed(0)}A \u2264 ${Ik_busbar.toFixed(0)}A`});
+  checks.push({name: da?'Selektivitet tsd > downstream':'Selectivity tsd > downstream', ok: tsd >= 0.05, val: `${(tsd*1000).toFixed(0)}ms`});
+  // SVG trip curve visualization (3 zones)
+  const W=580, H=340;
+  let svg = '';
+  svg += '<defs><filter id="rlGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  svg += '<radialGradient id="rlBg" cx="50%" cy="50%" r="70%"><stop offset="0%" stop-color="#0d1f33"/><stop offset="100%" stop-color="#06101c"/></radialGradient></defs>';
+  svg += `<rect width="${W}" height="${H}" fill="url(#rlBg)"/>`;
+  svg += `<text x="${W/2}" y="20" text-anchor="middle" font-size="11" font-weight="800" fill="#bfe9ff" filter="url(#rlGlow)">${da?'Rel\u00e6-udl\u00f8sningskurve (3 zoner)':'Relay trip curve (3 zones)'}</text>`;
+  // Log-log axes (simplified linear representation)
+  const ax={l:70,r:30,t:40,b:45};
+  const pw=W-ax.l-ax.r, ph=H-ax.t-ax.b;
+  svg += `<line x1="${ax.l}" y1="${ax.t}" x2="${ax.l}" y2="${H-ax.b}" stroke="#3a5a7a" stroke-width="1"/>`;
+  svg += `<line x1="${ax.l}" y1="${H-ax.b}" x2="${W-ax.r}" y2="${H-ax.b}" stroke="#3a5a7a" stroke-width="1"/>`;
+  svg += `<text x="${ax.l-8}" y="${ax.t-8}" text-anchor="end" font-size="8" fill="#7fa8c4">t (s)</text>`;
+  svg += `<text x="${W-ax.r+5}" y="${H-ax.b+12}" font-size="8" fill="#7fa8c4">I/Ir</text>`;
+  // Simplified log scale: I/Ir from 1 to 15, t from 0.01 to 100
+  const logI = (x) => Math.log10(x);
+  const logT = (x) => Math.log10(x);
+  const iMin=1, iMax=15, tMin2=0.01, tMax2=100;
+  const xPos = (mult) => ax.l + ((logI(mult)-logI(iMin))/(logI(iMax)-logI(iMin)))*pw;
+  const yPos = (t) => ax.t + ((logT(tMax2)-logT(t))/(logT(tMax2)-logT(tMin2)))*ph;
+  // Grid
+  [1,2,5,10,15].forEach(v => {
+    const x = xPos(v);
+    svg += `<line x1="${x}" y1="${ax.t}" x2="${x}" y2="${H-ax.b}" stroke="#1a3a5a" stroke-width="0.5" stroke-dasharray="2 3"/>`;
+    svg += `<text x="${x}" y="${H-ax.b+12}" text-anchor="middle" font-size="7" fill="#5a7a9a">${v}x</text>`;
+  });
+  [0.01,0.1,1,10,100].forEach(v => {
+    const y = yPos(v);
+    svg += `<line x1="${ax.l}" y1="${y}" x2="${W-ax.r}" y2="${y}" stroke="#1a3a5a" stroke-width="0.5" stroke-dasharray="2 3"/>`;
+    svg += `<text x="${ax.l-5}" y="${y+3}" text-anchor="end" font-size="7" fill="#5a7a9a">${v}s</text>`;
+  });
+  // Zone 1: Long-time (inverse curve from 1.05xIr to Isd)
+  const ltPoints = [];
+  for(let mult=1.05; mult<=rlIsdMult; mult+=0.2){
+    const t = 15 / Math.pow(mult, 2); // simplified inverse characteristic
+    ltPoints.push(`${xPos(mult).toFixed(1)},${yPos(Math.max(t,tsd+0.01)).toFixed(1)}`);
+  }
+  if(ltPoints.length>1) svg += `<polyline points="${ltPoints.join(' ')}" fill="none" stroke="#ffd166" stroke-width="2.5" filter="url(#rlGlow)"/>`;
+  svg += `<text x="${xPos(2)}" y="${yPos(15/4)-10}" font-size="8" fill="#ffd166" font-weight="600">${da?'Langtid (invers)':'Long-time (inverse)'}</text>`;
+  // Zone 2: Short-time (definite time from Isd to Ii)
+  const stY = yPos(tsd || 0.05);
+  const stX1 = xPos(rlIsdMult);
+  const stX2 = xPos(Math.min(12, iMax));
+  svg += `<line x1="${stX1}" y1="${stY}" x2="${stX2}" y2="${stY}" stroke="#00d4ff" stroke-width="2.5" filter="url(#rlGlow)"/>`;
+  svg += `<text x="${(parseFloat(stX1)+parseFloat(stX2))/2}" y="${stY-8}" text-anchor="middle" font-size="8" fill="#00d4ff" font-weight="600">${da?'Korttid (definit)':'Short-time (definite)'}</text>`;
+  // Zone 3: Instantaneous
+  const iiX = xPos(Math.min(12, iMax));
+  svg += `<line x1="${iiX}" y1="${yPos(0.01)}" x2="${iiX}" y2="${stY}" stroke="#ff3b5c" stroke-width="2.5" filter="url(#rlGlow)"/>`;
+  svg += `<text x="${iiX+5}" y="${yPos(0.03)}" font-size="8" fill="#ff3b5c" font-weight="600">${da?'Momentan':'Instantaneous'}</text>`;
+  // Ir marker
+  svg += `<line x1="${xPos(1)}" y1="${ax.t}" x2="${xPos(1)}" y2="${H-ax.b}" stroke="#06d6a0" stroke-width="1" stroke-dasharray="4 2"/>`;
+  svg += `<text x="${xPos(1)+3}" y="${ax.t+12}" font-size="7" fill="#06d6a0">Ir=${Ir.toFixed(0)}A</text>`;
+  const svgTag = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:620px;border-radius:12px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 24px rgba(0,160,255,0.15)" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+  // Build HTML
+  let htm = `<div class="card fade-in"><div class="card-title">\uD83D\uDD12 ${da?'Rel\u00e6indstillinger':'Relay settings'}</div>`;
+  htm += `<div class="info-row" style="margin-bottom:8px">${da?'Beregner indstillinger for elektroniske beskyttelsesrel\u00e6er (ANSI 50/51). Verificerer mod laststr\u00f8m, minimums- og maksimumskortslutningsstr\u00f8m.':'Computes settings for electronic protection relays (ANSI 50/51). Verifies against load current, minimum and maximum short-circuit current.'}</div>`;
+  // Selectors
+  htm += `<div class="select-group"><div class="select-label">${da?'Langtid pickup Ir (multiplikator af In)':'Long-time pickup Ir (multiplier of In)'}</div><div class="select-grid">`;
+  irOptions.forEach(v => { htm += `<button class="sel-btn ${rlIrMult===v?'selected':''}" onclick="rlSetIr(${v})">${v.toFixed(2)}x</button>`; });
+  htm += `</div></div>`;
+  htm += `<div class="select-group"><div class="select-label">${da?'Korttid pickup Isd (multiplikator af Ir)':'Short-time pickup Isd (multiplier of Ir)'}</div><div class="select-grid">`;
+  isdOptions.forEach(v => { htm += `<button class="sel-btn ${rlIsdMult===v?'selected':''}" onclick="rlSetIsd(${v})">${v}x</button>`; });
+  htm += `</div></div>`;
+  htm += `<div class="select-group"><div class="select-label">${da?'Korttid forsinkelse tsd':'Short-time delay tsd'}</div><div class="select-grid">`;
+  tsdOptions.forEach(v => { htm += `<button class="sel-btn ${rlTsd===v?'selected':''}" onclick="rlSetTsd(${v})">${(v*1000).toFixed(0)} ms</button>`; });
+  htm += `</div></div>`;
+  htm += svgTag;
+  // Settings summary
+  htm += `<div class="result-box" style="margin-top:10px;background:rgba(0,30,50,0.4);border:1px solid rgba(0,200,255,0.2)">`;
+  htm += `<div class="result-title" style="color:#bfe9ff">${da?'Rel\u00e6indstillinger':'Relay settings'}</div>`;
+  htm += `<div class="result-row"><span class="label">${da?'Rel\u00e6 In (standardramme)':'Relay In (standard frame)'}</span><span class="value" style="color:#bfe9ff">${In_relay} A</span></div>`;
+  htm += `<div class="result-row"><span class="label">${da?'Langtid pickup Ir':'Long-time pickup Ir'}</span><span class="value" style="color:#ffd166">${Ir.toFixed(1)} A (${rlIrMult}\u00d7In)</span></div>`;
+  htm += `<div class="result-row"><span class="label">${da?'Korttid pickup Isd':'Short-time pickup Isd'}</span><span class="value" style="color:#00d4ff">${Isd.toFixed(0)} A (${rlIsdMult}\u00d7Ir)</span></div>`;
+  htm += `<div class="result-row"><span class="label">${da?'Korttid forsinkelse tsd':'Short-time delay tsd'}</span><span class="value" style="color:#00d4ff">${(tsd*1000).toFixed(0)} ms</span></div>`;
+  htm += `<div class="result-row"><span class="label">${da?'Momentan Ii':'Instantaneous Ii'}</span><span class="value" style="color:#ff3b5c">${Ii.toFixed(0)} A (12\u00d7In)</span></div>`;
+  htm += `<div class="result-row"><span class="label">Ik ${da?'tavle':'busbar'}</span><span class="value" style="color:#ff9a4d">${Ik_busbar.toFixed(0)} A</span></div>`;
+  htm += `<div class="result-row"><span class="label">Ik min (${da?'kabelende':'cable end'})</span><span class="value" style="color:#ff9a4d">${Ik_min.toFixed(0)} A</span></div>`;
+  htm += `</div>`;
+  // Verification badges
+  htm += `<div class="result-box" style="margin-top:8px;background:rgba(0,30,50,0.4);border:1px solid rgba(0,200,255,0.2)">`;
+  htm += `<div class="result-title" style="color:#bfe9ff">${da?'Verifikation':'Verification'}</div>`;
+  checks.forEach(ch => {
+    const icon = ch.ok ? '\u2705' : '\u274c';
+    const color = ch.ok ? '#06d6a0' : '#ff3b5c';
+    htm += `<div class="result-row"><span class="label">${icon} ${ch.name}</span><span class="value" style="color:${color}">${ch.val}</span></div>`;
+  });
+  htm += `</div></div>`;
+  return htm;
+}
+
 function buildProtReport(){
   const da = lang==='da';
   const cons = loadList.length ? loadList.slice(0,16) : [
@@ -6359,7 +6729,7 @@ function buildLoopReadout(){
 function renderDrawing(){
   const nodes=getDrawNodes(), typeKeys=Object.keys(NODE_TYPES);
   const nodeEditor=`<div class="select-group"><div class="select-label">${lang==='da'?'Installationens noder (tilf\u00F8j/fjern/flyt)':'Installation nodes (add/remove/move)'}</div>${nodes.map((n,i)=>{const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;return `<div style="display:inline-flex;align-items:center;gap:4px;margin:3px 4px;padding:5px 9px;border:1.5px solid ${nt.color};border-radius:8px;font-size:.78rem;background:rgba(0,0,0,0.25)"><span>${nt.icon}</span><span style="color:${nt.color};font-weight:700">${lang==='da'?nt.da:nt.en}</span><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},-1)">\u25C0</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},1)">\u25B6</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem;color:var(--danger)" onclick="drawNodeRemove(${i})">\u2715</button></div>`;}).join('')}</div><div class="select-group"><div class="select-label">${lang==='da'?'Tilf\u00F8j node':'Add node'}</div><div class="select-grid">${typeKeys.map(k=>`<button class="sel-btn" onclick="drawNodeAdd('${k}')">${NODE_TYPES[k].icon} ${lang==='da'?NODE_TYPES[k].da:NODE_TYPES[k].en}</button>`).join('')}<button class="sel-btn" onclick="drawNodeReset()">\u21BA ${lang==='da'?'Nulstil':'Reset'}</button></div></div>`;
-  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():(sldFault?buildCoordDashboard():'')+buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildArcFlash():''}${drawStyle==='schematic'&&sldFault?buildDeratingChart():''}${drawStyle==='schematic'&&sldFault?buildInrushCheck():''}${drawStyle==='schematic'&&sldFault?buildEnergyEfficiency():''}${drawStyle==='schematic'&&sldFault?buildHarmonicCheck():''}${drawStyle==='schematic'&&sldFault?buildCableLifetime():''}${drawStyle==='schematic'&&sldFault?buildPowerFlow():''}${drawStyle==='schematic'&&sldFault?buildVoltageProfile():''}${drawStyle==='schematic'&&sldFault?buildEmcRouting():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='schematic'&&sldFault?buildDiscrimTable():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
+  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():(sldFault?buildCoordDashboard():'')+buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildArcFlash():''}${drawStyle==='schematic'&&sldFault?buildDeratingChart():''}${drawStyle==='schematic'&&sldFault?buildInrushCheck():''}${drawStyle==='schematic'&&sldFault?buildEnergyEfficiency():''}${drawStyle==='schematic'&&sldFault?buildHarmonicCheck():''}${drawStyle==='schematic'&&sldFault?buildCableLifetime():''}${drawStyle==='schematic'&&sldFault?buildPowerFlow():''}${drawStyle==='schematic'&&sldFault?buildVoltageProfile():''}${drawStyle==='schematic'&&sldFault?buildEmcRouting():''}${drawStyle==='schematic'&&sldFault?buildMotorStart():''}${drawStyle==='schematic'&&sldFault?buildCapBank():''}${drawStyle==='schematic'&&sldFault?buildRelaySettings():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='schematic'&&sldFault?buildDiscrimTable():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
 }
 
 // ===== ANALYZING BRAIN MODULE =====
