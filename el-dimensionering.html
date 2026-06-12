@@ -4897,10 +4897,18 @@ function buildTccCurve(){
   const tMain = (I)=> mainType==='mcb'
     ? (I>=IaM?0.02:(I>1.13*Inm?K/((I/Inm)*(I/Inm)-1):Infinity))
     : Math.min(1000, Math.max(0.004, 1056*Math.pow(I/Inm,-4.72)));
+  let kVAv = (typeof calcLoadSchedule==='function') ? (calcLoadSchedule().kVA||0) : 0;
+  if(!(kVAv>0)){ kVAv = cons.reduce((a,cc)=>a+(cc.kW||0),0)/0.9; }
+  const trafoK = (typeof TRAFO_SIZES!=='undefined') ? (TRAFO_SIZES.find(t=>t>=kVAv)||630) : 630;
+  const uk = (typeof TRAFO_UK!=='undefined' && TRAFO_UK[trafoK]) ? (TRAFO_UK[trafoK]/100) : 0.04;
+  const Ik = trafoK*1000/(Math.sqrt(3)*400*uk)/1000;
+  const IcuBr = (mcb.icu!=null?mcb.icu:6);
+  const mainProd = mainType==='mcb' ? recommendMCBs(mainIb,10)[0] : (typeof recommendFuses==='function'?recommendFuses(mainIb)[0]:null);
+  const IcuMain = mainProd ? (mainProd.icu!=null?mainProd.icu:(mainType==='fuse'?120:10)) : (mainType==='fuse'?120:10);
 
   const W=720,H=420,mLft=54,mTop=30,pw=W-mLft-18,ph=H-mTop-44;
   const L10=Math.log10;
-  const X=(I)=>mLft+(L10(Math.min(Math.max(I,1),10000)))/4*pw;
+  const X=(I)=>mLft+(L10(Math.min(Math.max(I,1),100000)))/5*pw;
   const Y=(t)=>mTop+(3-L10(Math.min(Math.max(t,0.01),1000)))/5*ph;
   const tTh=(I)=>K/((I/In)*(I/In)-1);
   const fmt=(t)=> t<0.1?t.toFixed(2):t.toFixed(1);
@@ -4908,17 +4916,17 @@ function buildTccCurve(){
 
   let g='';
   g += `<rect x="0" y="0" width="${W}" height="${H}" fill="#06101c"/>`;
-  for(let e=0;e<4;e++)for(let kk=2;kk<10;kk++){const x=X(Math.pow(10,e)*kk);g+=`<line x1="${x}" y1="${mTop}" x2="${x}" y2="${mTop+ph}" stroke="rgba(0,200,255,0.05)" stroke-width="0.6"/>`;}
-  for(let e=0;e<=4;e++){const I=Math.pow(10,e),x=X(I);g+=`<line x1="${x}" y1="${mTop}" x2="${x}" y2="${mTop+ph}" stroke="rgba(0,200,255,0.13)" stroke-width="1"/>`;g+=`<text x="${x}" y="${mTop+ph+13}" text-anchor="middle" font-size="9" fill="#7fa8c4">${I>=1000?(I/1000)+'k':I}A</text>`;}
+  for(let e=0;e<5;e++)for(let kk=2;kk<10;kk++){const x=X(Math.pow(10,e)*kk);g+=`<line x1="${x}" y1="${mTop}" x2="${x}" y2="${mTop+ph}" stroke="rgba(0,200,255,0.05)" stroke-width="0.6"/>`;}
+  for(let e=0;e<=5;e++){const I=Math.pow(10,e),x=X(I);g+=`<line x1="${x}" y1="${mTop}" x2="${x}" y2="${mTop+ph}" stroke="rgba(0,200,255,0.13)" stroke-width="1"/>`;g+=`<text x="${x}" y="${mTop+ph+13}" text-anchor="middle" font-size="9" fill="#7fa8c4">${I>=1000?(I/1000)+'k':I}A</text>`;}
   const tl={'-2':'0,01s','-1':'0,1s','0':'1s','1':'10s','2':'100s','3':'1000s'};
   for(let e=-2;e<=3;e++){const y=Y(Math.pow(10,e));g+=`<line x1="${mLft}" y1="${y}" x2="${mLft+pw}" y2="${y}" stroke="rgba(0,200,255,0.13)" stroke-width="1"/>`;g+=`<text x="${mLft-6}" y="${y+3}" text-anchor="end" font-size="9" fill="#7fa8c4">${da?tl[e]:tl[e].replace(',','.')}</text>`;}
 
   let pts=[]; const startI=1.15*In;
   for(let i=0;i<=30;i++){const I=startI*Math.pow(Ia/startI,i/30);let t=tTh(I);if(t>1000)t=1000;pts.push(X(I).toFixed(1)+','+Y(t).toFixed(1));}
-  pts.push(X(Ia).toFixed(1)+','+Y(0.02).toFixed(1)); pts.push(X(10000).toFixed(1)+','+Y(0.02).toFixed(1));
+  pts.push(X(Ia).toFixed(1)+','+Y(0.02).toFixed(1)); pts.push(X(100000).toFixed(1)+','+Y(0.02).toFixed(1));
   let mpts=[];
-  if(mainType==='mcb'){ const sM=1.15*Inm; for(let i=0;i<=30;i++){const I=sM*Math.pow(IaM/sM,i/30);let t=K/((I/Inm)*(I/Inm)-1);if(t>1000)t=1000;mpts.push(X(I).toFixed(1)+','+Y(t).toFixed(1));} mpts.push(X(IaM).toFixed(1)+','+Y(0.02).toFixed(1)); mpts.push(X(10000).toFixed(1)+','+Y(0.02).toFixed(1)); }
-  else { const sM=1.3*Inm; for(let i=0;i<=40;i++){const I=sM*Math.pow(10000/sM,i/40);let t=1056*Math.pow(I/Inm,-4.72);if(t>1000)t=1000;if(t<0.004)t=0.004;mpts.push(X(I).toFixed(1)+','+Y(t).toFixed(1));} }
+  if(mainType==='mcb'){ const sM=1.15*Inm; for(let i=0;i<=30;i++){const I=sM*Math.pow(IaM/sM,i/30);let t=K/((I/Inm)*(I/Inm)-1);if(t>1000)t=1000;mpts.push(X(I).toFixed(1)+','+Y(t).toFixed(1));} mpts.push(X(IaM).toFixed(1)+','+Y(0.02).toFixed(1)); mpts.push(X(100000).toFixed(1)+','+Y(0.02).toFixed(1)); }
+  else { const sM=1.3*Inm; for(let i=0;i<=40;i++){const I=sM*Math.pow(100000/sM,i/40);let t=1056*Math.pow(I/Inm,-4.72);if(t>1000)t=1000;if(t<0.004)t=0.004;mpts.push(X(I).toFixed(1)+','+Y(t).toFixed(1));} }
   g += `<polyline points="${mpts.join(' ')}" fill="none" stroke="#ff9a4d" stroke-width="2.2" stroke-dasharray="7 4" opacity="0.9" filter="url(#tccGlow)"/>`;
   g += `<polyline points="${pts.join(' ')}" fill="none" stroke="#00e5ff" stroke-width="2.5" filter="url(#tccGlow)"/>`;
   g += `<line x1="${mLft+pw-168}" y1="13" x2="${mLft+pw-150}" y2="13" stroke="#00e5ff" stroke-width="2.5"/><text x="${mLft+pw-146}" y="16" font-size="8.5" fill="#bfe9ff">${da?'gren':'branch'} ${curve}${In}</text>`;
@@ -4932,6 +4940,12 @@ function buildTccCurve(){
   g += `<text x="${X(If)}" y="${mTop+ph+27}" text-anchor="middle" font-size="9" font-weight="700" fill="${ifCol}">Ief ${If<1?'<1':If.toFixed(0)} A</text>`;
   if(isFinite(tDisc)){g+=`<circle cx="${X(If)}" cy="${Y(tDisc)}" r="5" fill="#ffffff" stroke="${ifCol}" stroke-width="2" filter="url(#tccGlow)"/><text x="${X(If)+8}" y="${Y(tDisc)-6}" font-size="9" font-weight="700" fill="#e6f4ff">t≈${fmt(tDisc)} s</text>`;}
 
+  g += `<line x1="${X(Ik*1000)}" y1="${mTop}" x2="${X(Ik*1000)}" y2="${mTop+ph}" stroke="#c08cff" stroke-width="2" stroke-dasharray="2 3" filter="url(#tccGlow)"/>`;
+  g += `<text x="${X(Ik*1000)}" y="${mTop+ph+38}" text-anchor="middle" font-size="9" font-weight="700" fill="#c08cff">Ik ${Ik.toFixed(1)} kA</text>`;
+  let buTxt, buCol;
+  if(Ik<=IcuBr){ buCol='var(--success)'; buTxt = da?('Kortslutning: Ik≈'+Ik.toFixed(1)+' kA ≤ gren-brydeevne ('+IcuBr+' kA) → gren-værnet er tilstrækkeligt alene.'):('Short circuit: Ik≈'+Ik.toFixed(1)+' kA ≤ branch breaking capacity ('+IcuBr+' kA) → the branch device is adequate alone.'); }
+  else if(Ik<=IcuMain){ buCol='var(--warning-text)'; buTxt = da?('Back-up: Ik≈'+Ik.toFixed(1)+' kA > gren-Icu ('+IcuBr+' kA) men ≤ hoved-Icu ('+IcuMain+' kA) → CASCADING: hovedværnet understøtter grenen (brug producentens back-up-tabel).'):('Back-up: Ik≈'+Ik.toFixed(1)+' kA > branch Icu ('+IcuBr+' kA) but ≤ main Icu ('+IcuMain+' kA) → CASCADING: the main backs up the branch (use the maker back-up table).'); }
+  else { buCol='var(--danger)'; buTxt = da?('⚠ Ik≈'+Ik.toFixed(1)+' kA overstiger begge brydeevner ('+IcuBr+'/'+IcuMain+' kA) → vælg højere Icu eller strømbegrænsende værn.'):('⚠ Ik≈'+Ik.toFixed(1)+' kA exceeds both breaking capacities ('+IcuBr+'/'+IcuMain+' kA) → choose higher Icu or current-limiting devices.'); }
   let cls,cap;
   if(scen==='it1'){cls='warning';cap=da?'IT 1. fejl: fejlstrømmen er meget lille (langt til venstre for In) → ingen overstrømsudkobling; IMD alarmerer.':'IT 1st fault: the fault current is tiny (far left of In) → no overcurrent trip; the IMD alarms.';}
   else if(rcd){cls='ok';cap=da?('Ief ('+If.toFixed(0)+' A) er under In → automatsikringen udkobler ikke; HPFI 30 mA sikrer udkobling ≤'+tReq+' s (grøn linje).'):('Ief ('+If.toFixed(0)+' A) is below In → the MCB will not trip; the 30 mA RCD ensures disconnection ≤'+tReq+' s (green line).');}
@@ -4942,9 +4956,9 @@ function buildTccCurve(){
   else { const tm=tMain(If); const ratio = isFinite(tm)? tm/tDisc : 999; const selOk = ratio>=1.5; selCol = selOk?'var(--success)':'var(--warning-text)';
     selTxt = da ? ('Selektivitet ved Ief: gren t≈'+fmt(tDisc)+' s vs hoved ('+mainLbl+') t≈'+(isFinite(tm)?fmt(tm):'>1000')+' s → '+(selOk?'SELEKTIV ✓ — kun gruppen kobler ud':'IKKE fuld selektiv ⚠ — hovedværn kan også udløse')) : ('Selectivity at Ief: branch t≈'+fmt(tDisc)+' s vs main ('+mainLbl+') t≈'+(isFinite(tm)?fmt(tm):'>1000')+' s → '+(selOk?'SELECTIVE ✓ — only the circuit trips':'NOT fully selective ⚠ — main may also trip')); }
 
-  return `<div class="card fade-in"><div class="card-title">📈 ${da?'Tid/strøm-kurve & selektivitet':'Time/current curve & selectivity'} — ${curve}${In} · ⏚ ${sldEarthing}</div>`
+  return `<div class="card fade-in"><div class="card-title">📈 ${da?'Kurve, selektivitet & brydeevne':'Curve, selectivity & breaking capacity'} — ${curve}${In} · ⏚ ${sldEarthing}</div>`
     + `<svg viewBox="0 0 ${W} ${H}" width="100%" style="border-radius:12px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 24px rgba(0,160,255,0.15)" xmlns="http://www.w3.org/2000/svg"><defs><filter id="tccGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>${g}<text x="${mLft}" y="16" font-size="11" font-weight="800" fill="#bfe9ff">${da?'Tid (log) vs strøm (log)':'Time (log) vs current (log)'}</text></svg>`
-    + `<div class="result-box ${cls}" style="margin-top:10px"><div class="result-row"><span class="label" style="line-height:1.5">${cap}</span></div><div class="result-row"><span class="label" style="line-height:1.5;color:${selCol}">⛓ ${selTxt}</span></div></div></div>`;
+    + `<div class="result-box ${cls}" style="margin-top:10px"><div class="result-row"><span class="label" style="line-height:1.5">${cap}</span></div><div class="result-row"><span class="label" style="line-height:1.5;color:${selCol}">⛓ ${selTxt}</span></div><div class="result-row"><span class="label" style="line-height:1.5;color:${buCol}">🔌 ${buTxt}</span></div></div></div>`;
 }
 
 // Loop-impedance (Zs), prospective fault current and disconnection-time readout for the
