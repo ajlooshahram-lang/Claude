@@ -4474,6 +4474,16 @@ let cpRouteType = 'tray'; function cpSetRoute(v){cpRouteType=v;renderModule('dra
 let cpRouteLen = 50; function cpSetLen(v){cpRouteLen=+v;renderModule('draw');}
 let cpBends = 180; function cpSetBends(v){cpBends=+v;renderModule('draw');}
 let cpCableSize = 16; function cpSetCable(v){cpCableSize=+v;renderModule('draw');}
+// Voltage drop optimizer state
+let vdOptBudget = 'optimal'; function vdOptSetBudget(v){vdOptBudget=v;renderModule('draw');}
+// Energy storage optimizer state
+let storPvSize = 8; function storSetPv(v){storPvSize=+v;renderModule('draw');}
+let storBattSize = 10; function storSetBatt(v){storBattSize=+v;renderModule('draw');}
+let storProfile = 'residential'; function storSetProfile(v){storProfile=v;renderModule('draw');}
+// Reliability state
+let relSupplyType = 'underground'; function relSetSupply(v){relSupplyType=v;renderModule('draw');}
+let relCriticality = 'medium'; function relSetCrit(v){relCriticality=v;renderModule('draw');}
+let relRevLoss = 1000; function relSetRev(v){relRevLoss=+v;renderModule('draw');}
 // Standard earth-electrode symbol (vertical line + 3 decreasing horizontal bars)
 function earthSymbol(x, y, color){
   return `<g stroke="${color}" stroke-width="2" stroke-linecap="round" fill="none"><line x1="${x}" y1="${y-9}" x2="${x}" y2="${y}"/><line x1="${x-11}" y1="${y}" x2="${x+11}" y2="${y}"/><line x1="${x-7}" y1="${y+4}" x2="${x+7}" y2="${y+4}"/><line x1="${x-3}" y1="${y+8}" x2="${x+3}" y2="${y+8}"/></g>`;
@@ -9218,6 +9228,429 @@ function buildPullForce(){
   return htm;
 }
 
+
+// ===== VOLTAGE DROP OPTIMIZATION ALGORITHM =====
+function buildVdropOptimizer(){
+  const da = lang==='da';
+  const cons = loadList.length ? loadList.slice(0,20) : [
+    {kW:11,cos:0.9,sf:1,phase:'3',name:'EV-lader',dist:25},{kW:11,cos:1,sf:0.7,phase:'3',name:'Komfur',dist:18},
+    {kW:3.7,cos:0.95,sf:0.6,phase:'L1',name:'Stikgrupper',dist:30},{kW:2.2,cos:0.95,sf:0.6,phase:'L2',name:'Hvidevarer',dist:15},
+    {kW:1.5,cos:0.95,sf:1,phase:'L3',name:'Belysning',dist:35},{kW:5.5,cos:0.85,sf:0.8,phase:'3',name:'Varmepumpe',dist:22}
+  ];
+  const Un = 400; // 3-phase nominal
+  const Un1 = 230; // 1-phase nominal
+  const cuCables = PRODUCTS.cables.filter(c=>c.material==='Cu').sort((a,b)=>a.mm2-b.mm2);
+  // Calculate voltage drop for a consumer given a cable
+  function calcVdrop(c, cable){
+    const P = c.kW*1000*c.sf;
+    const dist = c.dist || 20;
+    const cosP = c.cos;
+    const sinP = Math.sqrt(1-cosP*cosP);
+    if(c.phase==='3'){
+      const I = P/(Math.sqrt(3)*Un*cosP);
+      const dU = Math.sqrt(3)*I*(dist/1000)*(cable.r*cosP+cable.x*sinP);
+      return (dU/Un)*100;
+    } else {
+      const I = P/(Un1*cosP);
+      const dU = 2*I*(dist/1000)*(cable.r*cosP+cable.x*sinP);
+      return (dU/Un1)*100;
+    }
+  }
+  // Get limit: 3% for lighting, 4% general
+  function getLimit(c){
+    const name = (c.name||'').toLowerCase();
+    return (name.includes('lys')||name.includes('light')||name.includes('belysning')) ? 3 : 4;
+  }
+  // Find current cable (smallest that carries the load)
+  function findCurrentCable(c){
+    const P = c.kW*1000*c.sf;
+    const I = c.phase==='3' ? P/(Math.sqrt(3)*Un*c.cos) : P/(Un1*c.cos);
+    for(const cab of cuCables){ if(cab.iz >= I) return cab; }
+    return cuCables[cuCables.length-1];
+  }
+  // Optimize: find smallest cable that brings vdrop within limit
+  function findOptimalCable(c, limit){
+    for(const cab of cuCables){
+      if(cab.iz < 6) continue;
+      const vd = calcVdrop(c, cab);
+      if(vd <= limit) return {cable:cab, vdrop:vd};
+    }
+    return null;
+  }
+  // Build results
+  const results = cons.map(c=>{
+    const limit = getLimit(c);
+    const curCable = findCurrentCable(c);
+    const curVd = calcVdrop(c, curCable);
+    const needsFix = curVd > limit;
+    let optResult = null;
+    if(needsFix){ optResult = findOptimalCable(c, limit); }
+    // Cost estimate: DKK per meter difference
+    const costPerMm2 = {1.5:8,2.5:12,4:18,6:25,10:38,16:55,25:85,35:110,50:155,70:210,95:290,120:370,150:450,185:560,240:730};
+    const dist = c.dist || 20;
+    let costDiff = 0;
+    if(optResult){
+      const oldCost = (costPerMm2[curCable.mm2]||50)*dist;
+      const newCost = (costPerMm2[optResult.cable.mm2]||50)*dist;
+      costDiff = newCost - oldCost;
+    }
+    return {name:c.name, limit, curMm2:curCable.mm2, curVd, needsFix, optResult, costDiff, dist, canFix:!!optResult};
+  });
+  const failCount = results.filter(r=>r.needsFix).length;
+  const fixableCount = results.filter(r=>r.needsFix&&r.canFix).length;
+  const totalCost = results.reduce((s,r)=>s+r.costDiff, 0);
+  // Budget mode filtering
+  const showCheapest = vdOptBudget === 'cheapest';
+  // SVG: before/after bar chart
+  const svgW=580, svgH=260;
+  const barW = Math.min(40, (svgW-100)/results.length - 8);
+  let svg = '';
+  svg += '<defs><filter id="vdGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  svg += '<radialGradient id="vdBg" cx="50%" cy="50%" r="70%"><stop offset="0%" stop-color="#0d1f33"/><stop offset="100%" stop-color="#06101c"/></radialGradient></defs>';
+  svg += `<rect width="${svgW}" height="${svgH}" fill="url(#vdBg)"/>`;
+  svg += `<text x="${svgW/2}" y="18" text-anchor="middle" font-size="10" font-weight="800" fill="#bfe9ff" filter="url(#vdGlow)">${da?'\u0394U% per gruppe - f\u00f8r/efter optimering':'\u0394U% per circuit - before/after optimization'}</text>`;
+  // Y-axis scale (0-8%)
+  const maxY = 8;
+  const chartH = svgH - 60;
+  const chartY = 35;
+  for(let y=0;y<=maxY;y+=2){
+    const py = chartY + chartH - (y/maxY)*chartH;
+    svg += `<line x1="50" y1="${py}" x2="${svgW-20}" y2="${py}" stroke="rgba(127,168,196,0.15)" stroke-width="0.5"/>`;
+    svg += `<text x="45" y="${py+3}" text-anchor="end" font-size="6" fill="#7fa8c4">${y}%</text>`;
+  }
+  // 4% limit line
+  const limY4 = chartY + chartH - (4/maxY)*chartH;
+  svg += `<line x1="50" y1="${limY4}" x2="${svgW-20}" y2="${limY4}" stroke="#ff9a4d" stroke-width="1.5" stroke-dasharray="4,3"/>`;
+  svg += `<text x="${svgW-18}" y="${limY4+3}" font-size="6" fill="#ff9a4d">4%</text>`;
+  // 3% limit line
+  const limY3 = chartY + chartH - (3/maxY)*chartH;
+  svg += `<line x1="50" y1="${limY3}" x2="${svgW-20}" y2="${limY3}" stroke="#ffd166" stroke-width="1" stroke-dasharray="3,3"/>`;
+  svg += `<text x="${svgW-18}" y="${limY3+3}" font-size="6" fill="#ffd166">3%</text>`;
+  // Bars
+  results.forEach((r,i)=>{
+    const cx = 70 + i*(barW+12);
+    const beforeH = Math.min(r.curVd/maxY, 1)*chartH;
+    const beforeY = chartY + chartH - beforeH;
+    const beforeColor = r.needsFix ? 'rgba(255,59,92,0.35)' : 'rgba(6,214,160,0.35)';
+    svg += `<rect x="${cx}" y="${beforeY}" width="${barW/2-1}" height="${beforeH}" fill="${beforeColor}" rx="2"/>`;
+    if(r.optResult){
+      const afterH = Math.min(r.optResult.vdrop/maxY, 1)*chartH;
+      const afterY = chartY + chartH - afterH;
+      svg += `<rect x="${cx+barW/2+1}" y="${afterY}" width="${barW/2-1}" height="${afterH}" fill="rgba(0,229,255,0.7)" rx="2"/>`;
+      svg += `<text x="${cx+barW/2+barW/4}" y="${afterY-3}" text-anchor="middle" font-size="5" fill="#00e5ff">${r.optResult.vdrop.toFixed(1)}%</text>`;
+    } else if(!r.needsFix){
+      svg += `<rect x="${cx+barW/2+1}" y="${beforeY}" width="${barW/2-1}" height="${beforeH}" fill="rgba(6,214,160,0.7)" rx="2"/>`;
+    }
+    svg += `<text x="${cx+barW/2}" y="${chartY+chartH+12}" text-anchor="middle" font-size="5.5" fill="#7fa8c4">${(r.name||'').substring(0,8)}</text>`;
+    svg += `<text x="${cx+barW/4}" y="${beforeY-3}" text-anchor="middle" font-size="5" fill="${r.needsFix?'#ff3b5c':'#06d6a0'}">${r.curVd.toFixed(1)}%</text>`;
+  });
+  // Legend
+  svg += `<rect x="60" y="${svgH-18}" width="8" height="8" fill="rgba(255,59,92,0.35)" rx="1"/>`;
+  svg += `<text x="72" y="${svgH-11}" font-size="6" fill="#7fa8c4">${da?'F\u00f8r':'Before'}</text>`;
+  svg += `<rect x="100" y="${svgH-18}" width="8" height="8" fill="rgba(0,229,255,0.7)" rx="1"/>`;
+  svg += `<text x="112" y="${svgH-11}" font-size="6" fill="#7fa8c4">${da?'Efter':'After'}</text>`;
+  const svgTag = `<svg viewBox="0 0 ${svgW} ${svgH}" width="100%" style="max-width:620px;border-radius:12px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 24px rgba(0,160,255,0.15)" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+  // Verdict
+  let verdict, verdictColor;
+  if(failCount===0){ verdict=da?'Alle grupper overholder \u0394U-gr\u00e6nsen':'All circuits within \u0394U limits'; verdictColor='#06d6a0'; }
+  else if(fixableCount===failCount){ verdict=da?`${failCount} gruppe(r) optimeret via kabelopgradering`:`${failCount} circuit(s) optimized via cable upgrade`; verdictColor='#00e5ff'; }
+  else { verdict=da?'Ikke alle kan l\u00f8ses med kabel alene - forkort rute':'Not all fixable with cable alone - shorten route'; verdictColor='#ff9a4d'; }
+  // HTML
+  let htm = `<div class="card fade-in"><div class="card-title">\u26A1 ${da?'\u0394U-optimering':'Voltage drop optimization'}</div>`;
+  htm += `<div class="info-row">${da?'Analyserer sp\u00e6ndingsfald for alle grupper og beregner optimal kabeldimensionering. Hovedkablets \u0394U p\u00e5virker alle nedstr\u00f8ms grupper.':'Analyzes voltage drop for all circuits and calculates optimal cable sizing. Main cable \u0394U affects all downstream circuits.'}</div>`;
+  htm += `<div class="select-group"><div class="select-label">${da?'Budget':'Budget constraint'}</div><div class="select-grid">`;
+  htm += `<button class="sel-btn ${vdOptBudget==='cheapest'?'selected':''}" onclick="vdOptSetBudget('cheapest')">${da?'Billigste l\u00f8sning':'Cheapest fix'}</button>`;
+  htm += `<button class="sel-btn ${vdOptBudget==='optimal'?'selected':''}" onclick="vdOptSetBudget('optimal')">${da?'Optimal l\u00f8sning':'Optimal fix'}</button>`;
+  htm += `</div></div>`;
+  htm += `<div class="result-box" style="margin-top:10px">`;
+  htm += `<table class="data-table"><thead><tr><th>${da?'Gruppe':'Circuit'}</th><th>mm\u00b2</th><th>\u0394U%</th><th>${da?'Gr\u00e6nse':'Limit'}</th><th>${da?'Anbefaling':'Recommendation'}</th><th>${da?'Ny \u0394U%':'New \u0394U%'}</th><th>${da?'Merpris':'Add. cost'}</th></tr></thead><tbody>`;
+  results.forEach(r=>{
+    const recText = !r.needsFix ? (da?'Allerede OK':'Already OK') :
+      (r.canFix ? (da?`Opgrader til ${r.optResult.cable.mm2}mm\u00b2`:`Upsize to ${r.optResult.cable.mm2}mm\u00b2`) :
+      (da?'Forkort rute':'Shorten route'));
+    const newVd = r.optResult ? r.optResult.vdrop.toFixed(2) : (r.needsFix?'-':r.curVd.toFixed(2));
+    const color = !r.needsFix?'#06d6a0':(r.canFix?'#00e5ff':'#ff9a4d');
+    htm += `<tr><td>${r.name||'-'}</td><td>${r.curMm2}</td><td style="color:${r.needsFix?'#ff3b5c':'#06d6a0'}">${r.curVd.toFixed(2)}%</td><td>${r.limit}%</td><td style="color:${color}">${recText}</td><td>${newVd}%</td><td>${r.costDiff>0?r.costDiff.toFixed(0)+' DKK':'-'}</td></tr>`;
+  });
+  htm += `</tbody></table>`;
+  htm += `<div class="info-row" style="margin-top:8px"><b>${da?'Samlet meromkostning':'Total additional cost'}:</b> ${totalCost.toFixed(0)} DKK</div>`;
+  htm += `<div class="info-row"><b>${da?'Grupper over gr\u00e6nse':'Circuits over limit'}:</b> ${failCount} / ${results.length}</div>`;
+  htm += `<div class="info-row"><b>${da?'L\u00f8sbare med kabel':'Fixable with cable'}:</b> ${fixableCount}</div>`;
+  htm += `</div>`;
+  htm += svgTag;
+  htm += `<div class="verify-badge" style="color:${verdictColor};border-color:${verdictColor}">${verdict}</div>`;
+  htm += `<div style="font-size:0.68rem;color:var(--text-muted);margin-top:4px;font-style:italic">\uD83D\uDCD6 DS/HD 60364-5-52 \u00a7525 \u00b7 Sp\u00e6ndingsfald optimering</div>`;
+  htm += `</div>`;
+  return htm;
+}
+
+// ===== ENERGY STORAGE + PV SELF-CONSUMPTION OPTIMIZER =====
+function buildStorageOptimizer(){
+  const da = lang==='da';
+  const pvKWp = storPvSize;
+  const battKWh = storBattSize;
+  const profile = storProfile;
+  // Consumption profiles (kW per hour, 0-23)
+  const profiles = {
+    residential: [0.3,0.2,0.2,0.2,0.3,0.5,1.2,1.8,1.5,1.0,0.8,0.7,0.8,0.7,0.6,0.8,1.2,2.0,2.5,2.2,1.8,1.2,0.8,0.4],
+    commercial:  [0.2,0.2,0.1,0.1,0.1,0.3,0.8,2.5,4.0,4.5,4.5,4.2,3.8,4.0,4.5,4.2,3.5,2.0,0.8,0.4,0.3,0.2,0.2,0.2]
+  };
+  const consProfile = profiles[profile] || profiles.residential;
+  // PV generation curve (bell shape, peak at solar noon ~12-13)
+  function pvGen(hour){
+    if(hour<5||hour>21) return 0;
+    const peak = 12.5;
+    const sigma = 3.2;
+    return pvKWp * Math.exp(-Math.pow(hour-peak,2)/(2*sigma*sigma));
+  }
+  // Simulate 24 hours
+  let directUse=0, gridImport=0, gridExport=0, battCharge=0, battDischarge=0;
+  let soc = battKWh*0.5; // start at 50%
+  const hourData = [];
+  for(let h=0;h<24;h++){
+    const pv = pvGen(h);
+    const load = consProfile[h];
+    let direct = Math.min(pv, load);
+    let surplus = pv - direct;
+    let deficit = load - direct;
+    // Battery charge from surplus
+    let toCharge = 0;
+    if(surplus>0 && soc<battKWh*0.95){
+      toCharge = Math.min(surplus, battKWh*0.25, battKWh*0.95-soc); // C/4 max charge rate
+      soc += toCharge;
+      surplus -= toCharge;
+      battCharge += toCharge;
+    }
+    // Battery discharge for deficit
+    let fromBatt = 0;
+    if(deficit>0 && soc>battKWh*0.1){
+      fromBatt = Math.min(deficit, battKWh*0.25, soc-battKWh*0.1);
+      soc -= fromBatt;
+      deficit -= fromBatt;
+      battDischarge += fromBatt;
+    }
+    directUse += direct;
+    gridExport += surplus;
+    gridImport += deficit;
+    hourData.push({h, pv, load, direct, surplus:surplus>0?surplus:0, deficit:deficit>0?deficit:0, soc, toCharge, fromBatt});
+  }
+  const totalPv = hourData.reduce((s,d)=>s+d.pv,0);
+  const totalLoad = hourData.reduce((s,d)=>s+d.load,0);
+  const selfConsNoBatt = totalPv>0 ? Math.min(1, (directUse/(totalPv)))*100 : 0;
+  const selfConsWithBatt = totalPv>0 ? Math.min(1, ((directUse+battDischarge)/totalPv))*100 : 0;
+  const selfSufficiency = totalLoad>0 ? ((directUse+battDischarge)/totalLoad)*100 : 0;
+  // Economics
+  const elPrice = 2.5; // DKK/kWh average Denmark
+  const feedIn = 0.8; // DKK/kWh feed-in tariff
+  const annualSavings = (battDischarge*365*elPrice) - (gridExport>0?0:0) + (directUse*365*(elPrice-feedIn));
+  const battCostPerKWh = 4500; // DKK/kWh installed
+  const battInvestment = battKWh * battCostPerKWh;
+  const paybackYears = annualSavings>0 ? battInvestment/annualSavings : 99;
+  // SVG: 24-hour area chart
+  const svgW=580, svgH=280;
+  const chartL=55, chartR=svgW-25, chartT=35, chartB=svgH-35;
+  const chartW2=chartR-chartL, chartH2=chartB-chartT;
+  const maxPower = Math.max(pvKWp, Math.max(...consProfile))*1.1;
+  let svg = '';
+  svg += '<defs><filter id="stGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  svg += '<radialGradient id="stBg" cx="50%" cy="50%" r="70%"><stop offset="0%" stop-color="#0d1f33"/><stop offset="100%" stop-color="#06101c"/></radialGradient></defs>';
+  svg += `<rect width="${svgW}" height="${svgH}" fill="url(#stBg)"/>`;
+  svg += `<text x="${svgW/2}" y="18" text-anchor="middle" font-size="10" font-weight="800" fill="#bfe9ff" filter="url(#stGlow)">${da?'24-timers energiprofil - PV + batteri':'24-hour energy profile - PV + battery'}</text>`;
+  // Grid lines
+  for(let y=0;y<=maxPower;y+=Math.ceil(maxPower/5)){
+    const py=chartB-(y/maxPower)*chartH2;
+    svg += `<line x1="${chartL}" y1="${py}" x2="${chartR}" y2="${py}" stroke="rgba(127,168,196,0.12)" stroke-width="0.5"/>`;
+    svg += `<text x="${chartL-5}" y="${py+3}" text-anchor="end" font-size="6" fill="#7fa8c4">${y.toFixed(0)}kW</text>`;
+  }
+  // X-axis hours
+  for(let h=0;h<24;h+=3){
+    const px=chartL+(h/23)*chartW2;
+    svg += `<text x="${px}" y="${chartB+12}" text-anchor="middle" font-size="6" fill="#7fa8c4">${h}:00</text>`;
+  }
+  // PV area (yellow fill)
+  let pvPath = `M${chartL},${chartB}`;
+  for(let h=0;h<24;h++){
+    const px=chartL+(h/23)*chartW2;
+    const py=chartB-(hourData[h].pv/maxPower)*chartH2;
+    pvPath += ` L${px},${py}`;
+  }
+  pvPath += ` L${chartR},${chartB} Z`;
+  svg += `<path d="${pvPath}" fill="rgba(255,200,0,0.2)" stroke="#ffd700" stroke-width="1.5"/>`;
+  // Consumption line (cyan)
+  let loadPath = '';
+  for(let h=0;h<24;h++){
+    const px=chartL+(h/23)*chartW2;
+    const py=chartB-(hourData[h].load/maxPower)*chartH2;
+    loadPath += (h===0?'M':' L')+`${px},${py}`;
+  }
+  svg += `<path d="${loadPath}" fill="none" stroke="#00e5ff" stroke-width="2"/>`;
+  // Grid import areas (red)
+  for(let h=0;h<24;h++){
+    if(hourData[h].deficit>0){
+      const px=chartL+(h/23)*chartW2;
+      const bh=(hourData[h].deficit/maxPower)*chartH2;
+      svg += `<rect x="${px-chartW2/48}" y="${chartB-bh}" width="${chartW2/24}" height="${bh}" fill="rgba(255,59,92,0.3)" rx="1"/>`;
+    }
+  }
+  // Battery charge/discharge (green)
+  for(let h=0;h<24;h++){
+    const px=chartL+(h/23)*chartW2;
+    if(hourData[h].toCharge>0){
+      const bh=(hourData[h].toCharge/maxPower)*chartH2;
+      svg += `<rect x="${px-chartW2/48}" y="${chartB-bh-2}" width="${chartW2/24}" height="${bh}" fill="rgba(6,214,160,0.4)" rx="1"/>`;
+    }
+    if(hourData[h].fromBatt>0){
+      const bh=(hourData[h].fromBatt/maxPower)*chartH2;
+      svg += `<rect x="${px}" y="${chartB-bh}" width="${chartW2/24}" height="${bh}" fill="rgba(6,214,160,0.7)" rx="1"/>`;
+    }
+  }
+  // Legend
+  svg += `<rect x="${chartL}" y="${svgH-16}" width="10" height="6" fill="rgba(255,200,0,0.4)"/><text x="${chartL+14}" y="${svgH-11}" font-size="6" fill="#ffd700">PV</text>`;
+  svg += `<line x1="${chartL+40}" y1="${svgH-13}" x2="${chartL+52}" y2="${svgH-13}" stroke="#00e5ff" stroke-width="2"/><text x="${chartL+56}" y="${svgH-11}" font-size="6" fill="#00e5ff">${da?'Forbrug':'Load'}</text>`;
+  svg += `<rect x="${chartL+100}" y="${svgH-16}" width="10" height="6" fill="rgba(255,59,92,0.4)"/><text x="${chartL+114}" y="${svgH-11}" font-size="6" fill="#ff3b5c">${da?'Net-import':'Grid import'}</text>`;
+  svg += `<rect x="${chartL+180}" y="${svgH-16}" width="10" height="6" fill="rgba(6,214,160,0.5)"/><text x="${chartL+194}" y="${svgH-11}" font-size="6" fill="#06d6a0">${da?'Batteri':'Battery'}</text>`;
+  const svgTag = `<svg viewBox="0 0 ${svgW} ${svgH}" width="100%" style="max-width:620px;border-radius:12px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 24px rgba(0,160,255,0.15)" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+  // Verdict
+  let verdict, verdictColor;
+  if(paybackYears<8){ verdict=da?`Batteri tilbagebetalingstid: ${paybackYears.toFixed(1)} \u00e5r - god investering`:`Battery payback: ${paybackYears.toFixed(1)} years - good investment`; verdictColor='#06d6a0'; }
+  else if(paybackYears<15){ verdict=da?`Tilbagebetalingstid: ${paybackYears.toFixed(1)} \u00e5r - acceptabel`:`Payback: ${paybackYears.toFixed(1)} years - acceptable`; verdictColor='#ffd166'; }
+  else { verdict=da?'Lang tilbagebetalingstid - overvej mindre batteri':'Long payback - consider smaller battery'; verdictColor='#ff9a4d'; }
+  // HTML
+  let htm = `<div class="card fade-in"><div class="card-title">\u2600\uFE0F ${da?'Energilager & solceller':'Energy storage & solar'}</div>`;
+  htm += `<div class="info-row">${da?'Beregner optimal batterist\u00f8rrelse og selvforbrugsgrad for PV-anl\u00e6g. Simulerer 24-timers energiflow.':'Calculates optimal battery size and self-consumption rate for PV systems. Simulates 24-hour energy flow.'}</div>`;
+  // Selectors
+  const pvOpts = [3,5,8,10,12,15,20];
+  const battOpts = [5,7,10,13,15,20];
+  const profOpts = [{v:'residential',l:da?'Bolig':'Residential'},{v:'commercial',l:da?'Erhverv':'Commercial'}];
+  htm += `<div class="select-group"><div class="select-label">${da?'PV-st\u00f8rrelse (kWp)':'PV size (kWp)'}</div><div class="select-grid">`;
+  pvOpts.forEach(v=>{ htm += `<button class="sel-btn ${storPvSize===v?'selected':''}" onclick="storSetPv(${v})">${v} kWp</button>`; });
+  htm += `</div></div>`;
+  htm += `<div class="select-group"><div class="select-label">${da?'Batterist\u00f8rrelse (kWh)':'Battery size (kWh)'}</div><div class="select-grid">`;
+  battOpts.forEach(v=>{ htm += `<button class="sel-btn ${storBattSize===v?'selected':''}" onclick="storSetBatt(${v})">${v} kWh</button>`; });
+  htm += `</div></div>`;
+  htm += `<div class="select-group"><div class="select-label">${da?'Forbrugsprofil':'Consumption profile'}</div><div class="select-grid">`;
+  profOpts.forEach(p=>{ htm += `<button class="sel-btn ${storProfile===p.v?'selected':''}" onclick="storSetProfile('${p.v}')">${p.l}</button>`; });
+  htm += `</div></div>`;
+  htm += `<div class="result-box" style="margin-top:10px">`;
+  htm += `<div class="info-row"><b>${da?'Daglig PV-produktion':'Daily PV production'}:</b> ${totalPv.toFixed(1)} kWh</div>`;
+  htm += `<div class="info-row"><b>${da?'Dagligt forbrug':'Daily consumption'}:</b> ${totalLoad.toFixed(1)} kWh</div>`;
+  htm += `<div class="info-row"><b>${da?'Selvforbrug uden batteri':'Self-consumption without battery'}:</b> ${selfConsNoBatt.toFixed(0)}%</div>`;
+  htm += `<div class="info-row"><b>${da?'Selvforbrug med batteri':'Self-consumption with battery'}:</b> <span style="color:#06d6a0;font-weight:700">${selfConsWithBatt.toFixed(0)}%</span></div>`;
+  htm += `<div class="info-row"><b>${da?'Selvforsyningsgrad':'Self-sufficiency'}:</b> ${selfSufficiency.toFixed(0)}%</div>`;
+  htm += `<div class="info-row"><b>${da?'Net-import reduceret':'Grid import reduced'}:</b> ${(battDischarge*365).toFixed(0)} kWh/\u00e5r</div>`;
+  htm += `<div class="info-row"><b>${da?'\u00c5rlig besparelse':'Annual savings'}:</b> ${(annualSavings).toFixed(0)} DKK</div>`;
+  htm += `<div class="info-row"><b>${da?'Batteri-investering':'Battery investment'}:</b> ${battInvestment.toFixed(0)} DKK</div>`;
+  htm += `<div class="info-row"><b>${da?'Tilbagebetalingstid':'Payback period'}:</b> ${paybackYears.toFixed(1)} ${da?'\u00e5r':'years'}</div>`;
+  htm += `</div>`;
+  htm += svgTag;
+  htm += `<div class="verify-badge" style="color:${verdictColor};border-color:${verdictColor}">${verdict}</div>`;
+  htm += `<div style="font-size:0.68rem;color:var(--text-muted);margin-top:4px;font-style:italic">\uD83D\uDCD6 DS/HD 60364-7-712 \u00b7 IEC 62109 \u00b7 Energistyrelsen.dk</div>`;
+  htm += `</div>`;
+  return htm;
+}
+
+// ===== NETWORK RELIABILITY ESTIMATE (SAIDI/SAIFI) =====
+function buildReliability(){
+  const da = lang==='da';
+  // Danish grid statistics base values
+  const baseStats = {
+    overhead:  {saidi:45, saifi:0.8, label_da:'Luftledning (land)', label_en:'Overhead (rural)'},
+    underground:{saidi:20, saifi:0.3, label_da:'Jordkabel (by)', label_en:'Underground (urban)'},
+    industrial: {saidi:12, saifi:0.15, label_da:'Dedikeret (industri)', label_en:'Dedicated (industrial)'}
+  };
+  const critFactor = {low:1.0, medium:1.0, high:1.0, critical:1.0};
+  const supply = baseStats[relSupplyType] || baseStats.underground;
+  // Calculate expected outage metrics
+  const annualSAIDI = supply.saidi; // minutes/year
+  const annualSAIFI = supply.saifi; // interruptions/year
+  const annualHours = annualSAIDI / 60;
+  const costPerYear = annualHours * relRevLoss;
+  // 10-year projection
+  const degradation = relSupplyType==='overhead' ? 1.03 : 1.01; // slight increase over time
+  const tenYearData = [];
+  let totalCost10 = 0;
+  for(let y=1;y<=10;y++){
+    const factor = Math.pow(degradation, y-1);
+    const outMin = annualSAIDI * factor;
+    const events = annualSAIFI * factor;
+    const cost = (outMin/60) * relRevLoss;
+    totalCost10 += cost;
+    tenYearData.push({year:y, outMin, events, cost});
+  }
+  // UPS/generator justification
+  const upsCost = relRevLoss > 5000 ? 150000 : (relRevLoss > 1000 ? 45000 : 15000);
+  const upsPayback = costPerYear>0 ? upsCost/costPerYear : 99;
+  const genCost = 250000;
+  const genPayback = costPerYear>0 ? genCost/costPerYear : 99;
+  // SVG: reliability timeline over 10 years
+  const svgW=580, svgH=240;
+  const chartL2=55, chartR2=svgW-30, chartT2=35, chartB2=svgH-30;
+  const chartW3=chartR2-chartL2, chartH3=chartB2-chartT2;
+  const maxOut = Math.max(...tenYearData.map(d=>d.outMin))*1.2;
+  let svg = '';
+  svg += '<defs><filter id="rlGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  svg += '<radialGradient id="rlBg" cx="50%" cy="50%" r="70%"><stop offset="0%" stop-color="#0d1f33"/><stop offset="100%" stop-color="#06101c"/></radialGradient></defs>';
+  svg += `<rect width="${svgW}" height="${svgH}" fill="url(#rlBg)"/>`;
+  svg += `<text x="${svgW/2}" y="18" text-anchor="middle" font-size="10" font-weight="800" fill="#bfe9ff" filter="url(#rlGlow)">${da?'Forventet afbrud over 10 \u00e5r':'Expected outages over 10 years'}</text>`;
+  // Y-axis
+  for(let y=0;y<=maxOut;y+=Math.ceil(maxOut/5)){
+    const py=chartB2-(y/maxOut)*chartH3;
+    svg += `<line x1="${chartL2}" y1="${py}" x2="${chartR2}" y2="${py}" stroke="rgba(127,168,196,0.12)" stroke-width="0.5"/>`;
+    svg += `<text x="${chartL2-5}" y="${py+3}" text-anchor="end" font-size="6" fill="#7fa8c4">${y.toFixed(0)}min</text>`;
+  }
+  // Bars for each year
+  const barW2 = chartW3/10 - 6;
+  tenYearData.forEach((d,i)=>{
+    const px = chartL2 + i*(barW2+6) + 3;
+    const bh = (d.outMin/maxOut)*chartH3;
+    const py = chartB2 - bh;
+    const color = d.outMin>60?'#ff3b5c':(d.outMin>30?'#ff9a4d':'#00e5ff');
+    svg += `<rect x="${px}" y="${py}" width="${barW2}" height="${bh}" fill="${color}" opacity="0.6" rx="2"/>`;
+    svg += `<text x="${px+barW2/2}" y="${py-4}" text-anchor="middle" font-size="6" fill="${color}" font-weight="600">${d.outMin.toFixed(0)}'</text>`;
+    svg += `<text x="${px+barW2/2}" y="${chartB2+11}" text-anchor="middle" font-size="6" fill="#7fa8c4">${da?'\u00c5r':'Y'}${d.year}</text>`;
+    // Event markers
+    const evCount = Math.round(d.events*10)/10;
+    svg += `<text x="${px+barW2/2}" y="${py-12}" text-anchor="middle" font-size="5" fill="#ffd166">${evCount}x</text>`;
+  });
+  // Cost annotation
+  svg += `<text x="${chartR2}" y="${chartT2+10}" text-anchor="end" font-size="7" fill="#ff9a4d" font-weight="600">${da?'10-\u00e5rs tab':'10yr loss'}: ${(totalCost10/1000).toFixed(0)}k DKK</text>`;
+  const svgTag = `<svg viewBox="0 0 ${svgW} ${svgH}" width="100%" style="max-width:620px;border-radius:12px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 24px rgba(0,160,255,0.15)" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+  // Verdict
+  let verdict, verdictColor;
+  if(annualSAIDI<=15){ verdict=da?'H\u00f8j forsyningssikkerhed - lav risiko':'High supply reliability - low risk'; verdictColor='#06d6a0'; }
+  else if(annualSAIDI<=35){ verdict=da?'Middel forsyningssikkerhed - UPS anbefales for kritiske belastninger':'Medium reliability - UPS recommended for critical loads'; verdictColor='#ffd166'; }
+  else { verdict=da?'Lav forsyningssikkerhed - n\u00f8dforsyning p\u00e5kr\u00e6vet':'Low reliability - backup supply required'; verdictColor='#ff3b5c'; }
+  // HTML
+  let htm = `<div class="card fade-in"><div class="card-title">\uD83D\uDD0C ${da?'Forsyningssikkerhed':'Supply reliability'}</div>`;
+  htm += `<div class="info-row">${da?'Estimerer installations forventede nedetid baseret p\u00e5 danske netstatistikker (SAIDI/SAIFI). Beregner \u00f8konomisk tab og retf\u00e6rdigg\u00f8r UPS/generator-investering.':'Estimates installation expected downtime based on Danish grid statistics (SAIDI/SAIFI). Calculates economic loss and justifies UPS/generator investment.'}</div>`;
+  // Selectors
+  const supplyOpts = [{v:'overhead',l:da?'Luftledning (land)':'Overhead (rural)'},{v:'underground',l:da?'Jordkabel (by)':'Underground (urban)'},{v:'industrial',l:da?'Dedikeret (industri)':'Dedicated (industrial)'}];
+  const critOpts = [{v:'low',l:da?'Lav':'Low'},{v:'medium',l:da?'Middel':'Medium'},{v:'high',l:da?'H\u00f8j':'High'},{v:'critical',l:da?'Kritisk':'Critical'}];
+  const revOpts = [100,500,1000,5000,10000];
+  htm += `<div class="select-group"><div class="select-label">${da?'Forsyningstype':'Supply type'}</div><div class="select-grid">`;
+  supplyOpts.forEach(o=>{ htm += `<button class="sel-btn ${relSupplyType===o.v?'selected':''}" onclick="relSetSupply('${o.v}')">${o.l}</button>`; });
+  htm += `</div></div>`;
+  htm += `<div class="select-group"><div class="select-label">${da?'Kritikalitet':'Criticality'}</div><div class="select-grid">`;
+  critOpts.forEach(o=>{ htm += `<button class="sel-btn ${relCriticality===o.v?'selected':''}" onclick="relSetCrit('${o.v}')">${o.l}</button>`; });
+  htm += `</div></div>`;
+  htm += `<div class="select-group"><div class="select-label">${da?'Omsætningstab (DKK/time)':'Revenue loss (DKK/hour)'}</div><div class="select-grid">`;
+  revOpts.forEach(v=>{ htm += `<button class="sel-btn ${relRevLoss===v?'selected':''}" onclick="relSetRev(${v})">${v.toLocaleString()} DKK</button>`; });
+  htm += `</div></div>`;
+  htm += `<div class="result-box" style="margin-top:10px">`;
+  htm += `<div class="info-row"><b>SAIDI:</b> ${annualSAIDI.toFixed(1)} min/${da?'\u00e5r':'year'} (${annualHours.toFixed(2)} ${da?'timer':'hours'})</div>`;
+  htm += `<div class="info-row"><b>SAIFI:</b> ${annualSAIFI.toFixed(2)} ${da?'afbrydelser/\u00e5r':'interruptions/year'}</div>`;
+  htm += `<div class="info-row"><b>${da?'\u00c5rlig tabsomkostning':'Annual outage cost'}:</b> <span style="color:#ff9a4d;font-weight:700">${costPerYear.toFixed(0)} DKK</span></div>`;
+  htm += `<div class="info-row"><b>${da?'10-\u00e5rs akkumuleret tab':'10-year accumulated loss'}:</b> ${totalCost10.toFixed(0)} DKK</div>`;
+  htm += `<div class="info-row"><b>${da?'UPS tilbagebetalingstid':'UPS payback'}:</b> ${upsPayback.toFixed(1)} ${da?'\u00e5r':'years'} (${upsCost.toLocaleString()} DKK)</div>`;
+  htm += `<div class="info-row"><b>${da?'Generator tilbagebetalingstid':'Generator payback'}:</b> ${genPayback.toFixed(1)} ${da?'\u00e5r':'years'} (${genCost.toLocaleString()} DKK)</div>`;
+  htm += `</div>`;
+  htm += svgTag;
+  htm += `<div class="verify-badge" style="color:${verdictColor};border-color:${verdictColor}">${verdict}</div>`;
+  htm += `<div style="font-size:0.68rem;color:var(--text-muted);margin-top:4px;font-style:italic">\uD83D\uDCD6 F\u00e6llesregulativet 2019 \u00b7 Energinet leveringskvalitet \u00b7 DS/EN 50160 \u00a74.4</div>`;
+  htm += `</div>`;
+  return htm;
+}
+
 function buildProtReport(){
   const da = lang==='da';
   const cons = loadList.length ? loadList.slice(0,16) : [
@@ -9504,7 +9937,7 @@ function buildCommissioning(){
 function renderDrawing(){
   const nodes=getDrawNodes(), typeKeys=Object.keys(NODE_TYPES);
   const nodeEditor=`<div class="select-group"><div class="select-label">${lang==='da'?'Installationens noder (tilf\u00F8j/fjern/flyt)':'Installation nodes (add/remove/move)'}</div>${nodes.map((n,i)=>{const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;return `<div style="display:inline-flex;align-items:center;gap:4px;margin:3px 4px;padding:5px 9px;border:1.5px solid ${nt.color};border-radius:8px;font-size:.78rem;background:rgba(0,0,0,0.25)"><span>${nt.icon}</span><span style="color:${nt.color};font-weight:700">${lang==='da'?nt.da:nt.en}</span><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},-1)">\u25C0</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},1)">\u25B6</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem;color:var(--danger)" onclick="drawNodeRemove(${i})">\u2715</button></div>`;}).join('')}</div><div class="select-group"><div class="select-label">${lang==='da'?'Tilf\u00F8j node':'Add node'}</div><div class="select-grid">${typeKeys.map(k=>`<button class="sel-btn" onclick="drawNodeAdd('${k}')">${NODE_TYPES[k].icon} ${lang==='da'?NODE_TYPES[k].da:NODE_TYPES[k].en}</button>`).join('')}<button class="sel-btn" onclick="drawNodeReset()">\u21BA ${lang==='da'?'Nulstil':'Reset'}</button></div></div>`;
-  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():(sldFault?buildCoordDashboard():'')+buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildArcFlash():''}${drawStyle==='schematic'&&sldFault?buildDeratingChart():''}${drawStyle==='schematic'&&sldFault?buildInrushCheck():''}${drawStyle==='schematic'&&sldFault?buildEnergyEfficiency():''}${drawStyle==='schematic'&&sldFault?buildHarmonicCheck():''}${drawStyle==='schematic'&&sldFault?buildCableLifetime():''}${drawStyle==='schematic'&&sldFault?buildPowerFlow():''}${drawStyle==='schematic'&&sldFault?buildVoltageProfile():''}${drawStyle==='schematic'&&sldFault?buildEmcRouting():''}${drawStyle==='schematic'&&sldFault?buildMotorStart():''}${drawStyle==='schematic'&&sldFault?buildCapBank():''}${drawStyle==='schematic'&&sldFault?buildRelaySettings():''}${drawStyle==='schematic'&&sldFault?buildGenSet():''}${drawStyle==='schematic'&&sldFault?buildLightningRisk():''}${drawStyle==='schematic'&&sldFault?buildThermalPred():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='schematic'&&sldFault?buildDiscrimTable():''}${drawStyle==='schematic'&&sldFault?buildCommissioning():''}${drawStyle==='schematic'&&sldFault?buildInspectionInterval():''}${drawStyle==='schematic'&&sldFault?buildZsSimulator():''}${drawStyle==='schematic'&&sldFault?buildSelectiveMap():''}${drawStyle==='schematic'&&sldFault?buildTouchVoltage():''}${drawStyle==='schematic'&&sldFault?buildDocChecklist():''}${drawStyle==='schematic'&&sldFault?buildVoltageUnbalance():''}${drawStyle==='schematic'&&sldFault?buildGroundingWizard():''}${drawStyle==='schematic'&&sldFault?buildTrayFill():''}${drawStyle==='schematic'&&sldFault?buildMotorIk():''}${drawStyle==='schematic'&&sldFault?buildCableFire():''}${drawStyle==='schematic'&&sldFault?buildLoadOptimizer():''}${drawStyle==='schematic'&&sldFault?buildPEVerify():''}${drawStyle==='schematic'&&sldFault?buildTimeMargin():''}${drawStyle==='schematic'&&sldFault?buildCostEstimate():''}${drawStyle==='schematic'&&sldFault?buildRcdCoord():''}${drawStyle==='schematic'&&sldFault?buildFaultMap():''}${drawStyle==='schematic'&&sldFault?buildComplianceScore():''}${drawStyle==='schematic'&&sldFault?buildPowerStudy():''}${drawStyle==='schematic'&&sldFault?buildFaultTemp():''}${drawStyle==='schematic'&&sldFault?buildCircuitDesign():''}${drawStyle==='schematic'&&sldFault?buildPfPenalty():''}${drawStyle==='schematic'&&sldFault?buildEmergencyLighting():''}${drawStyle==='schematic'&&sldFault?buildPullForce():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
+  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():(sldFault?buildCoordDashboard():'')+buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildArcFlash():''}${drawStyle==='schematic'&&sldFault?buildDeratingChart():''}${drawStyle==='schematic'&&sldFault?buildInrushCheck():''}${drawStyle==='schematic'&&sldFault?buildEnergyEfficiency():''}${drawStyle==='schematic'&&sldFault?buildHarmonicCheck():''}${drawStyle==='schematic'&&sldFault?buildCableLifetime():''}${drawStyle==='schematic'&&sldFault?buildPowerFlow():''}${drawStyle==='schematic'&&sldFault?buildVoltageProfile():''}${drawStyle==='schematic'&&sldFault?buildEmcRouting():''}${drawStyle==='schematic'&&sldFault?buildMotorStart():''}${drawStyle==='schematic'&&sldFault?buildCapBank():''}${drawStyle==='schematic'&&sldFault?buildRelaySettings():''}${drawStyle==='schematic'&&sldFault?buildGenSet():''}${drawStyle==='schematic'&&sldFault?buildLightningRisk():''}${drawStyle==='schematic'&&sldFault?buildThermalPred():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='schematic'&&sldFault?buildDiscrimTable():''}${drawStyle==='schematic'&&sldFault?buildCommissioning():''}${drawStyle==='schematic'&&sldFault?buildInspectionInterval():''}${drawStyle==='schematic'&&sldFault?buildZsSimulator():''}${drawStyle==='schematic'&&sldFault?buildSelectiveMap():''}${drawStyle==='schematic'&&sldFault?buildTouchVoltage():''}${drawStyle==='schematic'&&sldFault?buildDocChecklist():''}${drawStyle==='schematic'&&sldFault?buildVoltageUnbalance():''}${drawStyle==='schematic'&&sldFault?buildGroundingWizard():''}${drawStyle==='schematic'&&sldFault?buildTrayFill():''}${drawStyle==='schematic'&&sldFault?buildMotorIk():''}${drawStyle==='schematic'&&sldFault?buildCableFire():''}${drawStyle==='schematic'&&sldFault?buildLoadOptimizer():''}${drawStyle==='schematic'&&sldFault?buildPEVerify():''}${drawStyle==='schematic'&&sldFault?buildTimeMargin():''}${drawStyle==='schematic'&&sldFault?buildCostEstimate():''}${drawStyle==='schematic'&&sldFault?buildRcdCoord():''}${drawStyle==='schematic'&&sldFault?buildFaultMap():''}${drawStyle==='schematic'&&sldFault?buildComplianceScore():''}${drawStyle==='schematic'&&sldFault?buildPowerStudy():''}${drawStyle==='schematic'&&sldFault?buildFaultTemp():''}${drawStyle==='schematic'&&sldFault?buildCircuitDesign():''}${drawStyle==='schematic'&&sldFault?buildPfPenalty():''}${drawStyle==='schematic'&&sldFault?buildEmergencyLighting():''}${drawStyle==='schematic'&&sldFault?buildPullForce():''}${drawStyle==='schematic'&&sldFault?buildVdropOptimizer():''}${drawStyle==='schematic'&&sldFault?buildStorageOptimizer():''}${drawStyle==='schematic'&&sldFault?buildReliability():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
 }
 
 // ===== ANALYZING BRAIN MODULE =====
