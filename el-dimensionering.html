@@ -33,6 +33,12 @@
   --radius-sm: 8px;
   --radius-lg: 16px;
   --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Theme-aware tinted surfaces (used by inline result boxes / SVG wraps) */
+  --tint-success: linear-gradient(135deg,#eafaf1,#d5f5e3);
+  --tint-warning: linear-gradient(135deg,#fef9e7,#fdebd0);
+  --tint-info: linear-gradient(135deg,#eaf3fb,#d6eafb);
+  --tint-panel: linear-gradient(135deg,#f8fafc,#eef3f8);
+  --warning-text: #b8860b;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -104,13 +110,11 @@ body {
 /* Navigation */
 .nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 14px 20px;
   background: white;
   border-bottom: 1px solid var(--border);
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
   box-shadow: var(--shadow-sm);
 }
 .nav::-webkit-scrollbar { display: none; }
@@ -314,7 +318,7 @@ body {
   padding-left: 8px;
 }
 
-.result-box.warning .result-title { color: #b8860b; }
+.result-box.warning .result-title { color: var(--warning-text); }
 .result-box.error .result-title { color: var(--danger); }
 
 .result-row {
@@ -393,12 +397,19 @@ body {
 @media (max-width: 600px) {
   .header { padding: 12px 16px; }
   .header h1 { font-size: 1.05rem; }
-  .nav { padding: 10px 12px; gap: 6px; }
-  .nav-btn { font-size: 0.72rem; padding: 7px 12px; }
+  .nav { padding: 9px 10px; gap: 5px; }
+  .nav-btn { font-size: 0.7rem; padding: 6px 11px; border-radius: 16px; }
   .card { padding: 16px; margin-bottom: 14px; border-radius: var(--radius); }
-  .sel-btn { padding: 8px 12px; font-size: 0.8rem; min-width: 44px; }
+  .sel-btn { padding: 7px 11px; font-size: 0.76rem; min-width: 40px; }
   .main { padding: 14px; }
-  .select-grid { gap: 6px; }
+  .select-grid { gap: 5px; }
+  .card-title { font-size: 0.96rem; }
+}
+
+@media (max-width: 380px) {
+  .nav-btn { font-size: 0.64rem; padding: 5px 9px; }
+  .sel-btn { padding: 6px 9px; font-size: 0.72rem; min-width: 36px; }
+  .select-grid { gap: 4px; }
 }
 
 /* Animations */
@@ -527,6 +538,12 @@ body.dark {
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
   --shadow: 0 4px 12px rgba(0,0,0,0.35);
   --shadow-lg: 0 10px 30px rgba(0,0,0,0.45);
+  /* Theme-aware tinted surfaces -> deep neon-glass in dark mode */
+  --tint-success: linear-gradient(135deg, rgba(46,230,168,0.14), rgba(46,230,168,0.04));
+  --tint-warning: linear-gradient(135deg, rgba(255,210,122,0.16), rgba(255,160,60,0.05));
+  --tint-info: linear-gradient(135deg, rgba(0,200,255,0.14), rgba(0,128,255,0.04));
+  --tint-panel: linear-gradient(135deg, #0f1d2e, #0a1622);
+  --warning-text: #ffd27a;
 }
 body.dark .sel-btn { background: #1a2535; color: #b8d4e8; border-color: #2a3f55; }
 body.dark .sel-btn:hover { background: #1f3048; border-color: #00e5ff; color: #e0f4ff; box-shadow: 0 0 10px rgba(0,229,255,0.25); }
@@ -569,11 +586,154 @@ body.dark img { filter: brightness(0.92); }
 }
 .theme-btn:hover { background: rgba(255,255,255,0.25); }
 
+/* ===================================================================
+   GAME-GRADE NEON SCI-FI LAYER  \u2014  high-quality glow, depth & motion
+   Light theme = clean premium glass. Dark theme = full neon sci-fi.
+   =================================================================== */
+
+/* --- Ambient animated background (sits behind all content) --- */
+:root {
+  --amb1: rgba(50,130,184,0.12);
+  --amb2: rgba(0,180,216,0.10);
+  --amb3: rgba(120,170,255,0.08);
+  --grid-line: rgba(50,130,184,0.05);
+}
+body.dark {
+  --amb1: rgba(0,200,255,0.12);
+  --amb2: rgba(140,60,255,0.12);
+  --amb3: rgba(0,255,200,0.07);
+  --grid-line: rgba(0,200,255,0.07);
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -8%, var(--amb1), transparent 60%),
+    radial-gradient(ellipse 55% 50% at 100% 0%, var(--amb2), transparent 55%),
+    radial-gradient(ellipse 55% 55% at 0% 18%, var(--amb3), transparent 55%);
+  transition: background 0.5s ease;
+}
+/* Moving neon perspective grid (subtle in light, vivid in dark) */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 46px 46px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 65% at 50% 0%, #000 25%, transparent 78%);
+          mask-image: radial-gradient(ellipse 75% 65% at 50% 0%, #000 25%, transparent 78%);
+  animation: gridDrift 22s linear infinite;
+}
+body.dark::after { opacity: 0.7; }
+@keyframes gridDrift {
+  from { background-position: 0 0, 0 0; }
+  to   { background-position: 46px 46px, 46px 46px; }
+}
+
+/* --- Header: neon glow, animated sheen, gradient title --- */
+.header { overflow: hidden; box-shadow: 0 4px 20px rgba(10,46,77,0.25), 0 0 40px rgba(0,180,216,0.10); }
+.header::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(120deg, transparent 32%, rgba(255,255,255,0.16) 50%, transparent 68%);
+  transform: translateX(-130%);
+  animation: sheen 7.5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes sheen { 0%, 55% { transform: translateX(-130%); } 100% { transform: translateX(130%); } }
+body.dark .header {
+  background: linear-gradient(135deg, #061320 0%, #0a2742 55%, #0e3e62 100%);
+  border-bottom: 1px solid rgba(0,200,255,0.28);
+  box-shadow: 0 4px 26px rgba(0,0,0,0.55), 0 0 46px rgba(0,200,255,0.18);
+}
+#appTitleText {
+  background: linear-gradient(90deg, #ffffff, #cdeeff);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.25));
+}
+body.dark #appTitleText {
+  background: linear-gradient(90deg, #7dfcff, #00c8ff 45%, #b79bff);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 10px rgba(0,200,255,0.6));
+}
+#verBadge { box-shadow: 0 0 12px rgba(0,200,255,0.35); }
+
+/* --- Cards: glassmorphism + neon edges --- */
+.card { backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); }
+.card::before { height: 3px; transition: opacity 0.3s ease, box-shadow 0.3s ease; }
+.card:hover::before { box-shadow: 0 0 14px var(--accent); }
+body.dark .card {
+  background: linear-gradient(160deg, rgba(28,38,54,0.86), rgba(14,22,36,0.94));
+  border: 1px solid rgba(0,200,255,0.15);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+body.dark .card:hover {
+  border-color: rgba(0,200,255,0.42);
+  box-shadow: 0 16px 44px rgba(0,0,0,0.55), 0 0 32px rgba(0,200,255,0.14);
+}
+
+/* --- Buttons: shine sweep + neon glow --- */
+.sel-btn::before, .nav-btn::before {
+  content: "";
+  position: absolute; top: 0; left: -130%;
+  width: 55%; height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.45), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+  z-index: 1;
+}
+.nav-btn { position: relative; overflow: hidden; }
+.sel-btn:hover::before, .nav-btn:hover::before { left: 150%; }
+
+/* Pulsing neon on the active/selected control (dark = showcase) */
+@keyframes neonPulse {
+  0%, 100% { box-shadow: 0 0 16px rgba(0,229,255,0.55), 0 0 4px rgba(0,200,255,0.85); }
+  50%      { box-shadow: 0 0 28px rgba(0,229,255,0.95), 0 0 10px rgba(0,220,255,1); }
+}
+body.dark .sel-btn.selected { animation: neonPulse 2.8s ease-in-out infinite; }
+body.dark .nav-btn.active   { animation: neonPulse 3.4s ease-in-out infinite; }
+
+/* --- Result boxes & chips: inner glow in dark --- */
+body.dark .result-box { box-shadow: inset 0 0 0 1px rgba(0,200,255,0.06), 0 0 20px rgba(0,120,200,0.10); }
+body.dark .status-chip.has-value { box-shadow: 0 0 12px rgba(0,200,255,0.18); }
+body.dark .verify-badge.ok { box-shadow: 0 0 14px rgba(0,255,200,0.25); }
+body.dark .info-row { box-shadow: inset 0 0 0 1px rgba(0,200,255,0.08); }
+
+/* --- Theme button glow --- */
+body.dark .theme-btn { box-shadow: 0 0 14px rgba(0,200,255,0.3); }
+
+/* --- Neon scrollbar in dark --- */
+body.dark ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #00c8ff, #0066aa); }
+body.dark ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #2ee6ff, #0080cc); }
+
+/* --- Data table neon header glow in dark --- */
+body.dark .data-table { box-shadow: 0 0 22px rgba(0,150,220,0.12); }
+body.dark .data-table th { box-shadow: 0 0 18px rgba(0,200,255,0.2); }
+
+/* --- Respect reduced-motion preference --- */
+@media (prefers-reduced-motion: reduce) {
+  body::after, .header::after { animation: none; }
+  body.dark .sel-btn.selected, body.dark .nav-btn.active { animation: none; }
+  .sel-btn::before, .nav-btn::before { transition: none; }
+}
+
 /* ===== PRINT / PDF ===== */
 @media print {
   .header, .nav, .status-bar, .theme-btn, .lang-toggle { display: none !important; }
   body { background: #fff; }
-  .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; page-break-inside: avoid; }
+  body::before, body::after { display: none !important; }
+  .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; page-break-inside: avoid; backdrop-filter: none; }
   .card::before { display: none; }
   .sel-btn { display: none !important; }
   .main { padding: 0; max-width: 100%; }
@@ -611,6 +771,7 @@ const T = {
     appTitle: 'El-Dimensionering',
     modules: {
       load: 'Belastning',
+      brain: '🧠 Analyse-Hjerne',
       fuse: 'Sikringer',
       mcb: 'Automatsikring',
       mccb: 'Maksimalafbryder',
@@ -709,6 +870,7 @@ const T = {
     appTitle: 'Electrical Dimensioning',
     modules: {
       load: 'Load Calc',
+      brain: '🧠 Analyzing Brain',
       fuse: 'Fuses',
       mcb: 'MCB',
       mccb: 'MCCB',
@@ -1588,7 +1750,7 @@ function renderAiAssistant(module) {
   if (ai.warnings.length > 0) {
     html += '<div class="result-box warning" style="margin-top:8px">';
     html += '<div class="result-title">' + (lang === 'da' ? 'Advarsel' : 'Warning') + '</div>';
-    ai.warnings.forEach(w => { html += '<div class="result-row"><span class="label" style="color:#b8860b">\u26A0\uFE0F ' + w + '</span></div>'; });
+    ai.warnings.forEach(w => { html += '<div class="result-row"><span class="label" style="color:var(--warning-text)">\u26A0\uFE0F ' + w + '</span></div>'; });
     html += '</div>';
   }
 
@@ -1971,6 +2133,7 @@ function renderModule(mod) {
   let content = '';
   switch(mod) {
     case 'load': content = renderLoad(); break;
+    case 'brain': content = renderBrain(); break;
     case 'fuse': content = renderFuse(); break;
     case 'mcb': content = renderMCB(); break;
     case 'mccb': content = renderMCCB(); break;
@@ -1990,7 +2153,7 @@ function renderModule(mod) {
   content += renderAiAssistant(mod);
   // Append QI validation summary if enough data exists
   const qi = runQiValidation();
-  const noQi = ['standards','bank','ai','bid','projekt','verify','draw'];
+  const noQi = ['standards','bank','ai','bid','projekt','verify','draw','brain'];
   if (qi.passed.length + qi.issues.length > 0 && noQi.indexOf(mod) < 0) {
     content += renderQiCard(qi);
   }
@@ -1999,7 +2162,7 @@ function renderModule(mod) {
 }
 
 function renderQiCard(qi) {
-  const scoreColor = qi.score >= 80 ? 'var(--success)' : qi.score >= 50 ? '#b8860b' : 'var(--danger)';
+  const scoreColor = qi.score >= 80 ? 'var(--success)' : qi.score >= 50 ? 'var(--warning-text)' : 'var(--danger)';
   let html = '<div class="card fade-in" style="border-left:4px solid ' + scoreColor + ';">';
   html += '<div class="card-title">\uD83D\uDCCA ' + (lang === 'da' ? 'QI Kvalitetsindeks' : 'QI Quality Index') + ' \u2014 ' + qi.score + '%</div>';
 
@@ -2810,7 +2973,7 @@ function renderStandards() {
         <div class="result-row"><span class="label">${lang === 'da' ? 'Myndighed' : 'Authority'}</span><span class="value">Sikkerhedsstyrelsen</span></div>
       </div>
 
-      <div class="result-box" style="margin-top:12px;background:linear-gradient(135deg,#eafaf1,#d5f5e3);border-color:var(--success)">
+      <div class="result-box" style="margin-top:12px;background:var(--tint-success);border-color:var(--success)">
         <div class="result-title">${lang === 'da' ? 'Tekniske Standarder' : 'Technical Standards'}</div>
         <div class="result-row"><span class="label">${lang === 'da' ? 'Kabeldimensionering' : 'Cable Sizing'}</span><span class="value">${DK_STANDARDS.cableSizing}</span></div>
         <div class="result-row"><span class="label">${lang === 'da' ? 'Overstrømsbeskyttelse' : 'Overcurrent Protection'}</span><span class="value">${DK_STANDARDS.overcurrent}</span></div>
@@ -2819,7 +2982,7 @@ function renderStandards() {
         <div class="result-row"><span class="label">${lang === 'da' ? 'Beskyttelse mod stød' : 'Shock Protection'}</span><span class="value">${DK_STANDARDS.rcd}</span></div>
       </div>
 
-      <div class="result-box" style="margin-top:12px;background:linear-gradient(135deg,#fef9e7,#fdebd0);border-color:var(--warning)">
+      <div class="result-box" style="margin-top:12px;background:var(--tint-warning);border-color:var(--warning)">
         <div class="result-title">${lang === 'da' ? 'Komponentstandarder' : 'Component Standards'}</div>
         <div class="result-row"><span class="label">${lang === 'da' ? 'Automatsikring (MCB)' : 'MCB'}</span><span class="value">${DK_STANDARDS.mcb}</span></div>
         <div class="result-row"><span class="label">${lang === 'da' ? 'Maksimalafbryder (MCCB)' : 'MCCB'}</span><span class="value">${DK_STANDARDS.mccb}</span></div>
@@ -3023,7 +3186,7 @@ function configurePhotos() {
 // License-safe, offline, scalable illustrations of each real component type.
 function getComponentSvg(category, p) {
   const w = 64, h = 64;
-  const wrap = (inner) => `<svg viewBox="0 0 ${w} ${h}" width="56" height="56" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;border-radius:8px;background:linear-gradient(135deg,#f8fafc,#eef3f8);border:1px solid var(--border)">${inner}</svg>`;
+  const wrap = (inner) => `<svg viewBox="0 0 ${w} ${h}" width="56" height="56" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;border-radius:8px;background:var(--tint-panel);border:1px solid var(--border)">${inner}</svg>`;
 
   switch (category) {
     case 'cables': {
@@ -4329,48 +4492,556 @@ function drawNodeRemove(i){if(!drawNodes)drawNodes=[...getDrawNodes()];drawNodes
 function drawNodeMove(i,d){if(!drawNodes)drawNodes=[...getDrawNodes()];const j=i+d;if(j<0||j>=drawNodes.length)return;[drawNodes[i],drawNodes[j]]=[drawNodes[j],drawNodes[i]];renderModule('draw');}
 function drawNodeReset(){drawNodes=null;renderModule('draw');}
 
-function build3D(){
-  const nodes=getDrawNodes();
-  const W=Math.max(760,nodes.length*170+80),H=400,gY=320;
-  const sp=(W-120)/Math.max(nodes.length-1,1);
-  let svg='';
-  // ground perspective grid
-  for(let i=0;i<12;i++) svg+=`<line x1="0" y1="${gY+i*7}" x2="${W}" y2="${gY+i*7}" stroke="rgba(0,180,255,${0.04-i*0.003})"/>`;
-  svg+=`<line x1="0" y1="${gY}" x2="${W}" y2="${gY}" stroke="rgba(0,225,255,0.3)" stroke-width="2"/>`;
-  // nodes
-  nodes.forEach((n,idx)=>{
-    const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;
-    const cx=60+idx*sp, bw=88, bd=44, bh=105, topY=gY-bh;
-    // 3D box faces
-    const tp=`${cx-bw/2},${topY} ${cx+bw/2},${topY} ${cx+bw/2+bd*.4},${topY-bd*.4} ${cx-bw/2+bd*.4},${topY-bd*.4}`;
-    const lf=`${cx-bw/2},${topY} ${cx-bw/2},${gY} ${cx+bw/2},${gY} ${cx+bw/2},${topY}`;
-    const rf=`${cx+bw/2},${topY} ${cx+bw/2},${gY} ${cx+bw/2+bd*.4},${gY-bd*.4} ${cx+bw/2+bd*.4},${topY-bd*.4}`;
-    // drop shadow
-    svg+=`<ellipse cx="${cx+10}" cy="${gY+6}" rx="${bw/2+5}" ry="8" fill="rgba(0,0,0,0.3)"/>`;
-    // faces with neon glow
-    svg+=`<polygon points="${lf}" fill="rgba(8,18,32,0.92)" stroke="${nt.color}" stroke-width="1.8"/>`;
-    svg+=`<polygon points="${rf}" fill="rgba(5,12,24,0.92)" stroke="${nt.color}" stroke-width="1.8"/>`;
-    svg+=`<polygon points="${tp}" fill="rgba(12,25,45,0.92)" stroke="${nt.color}" stroke-width="1.8"/>`;
-    // neon floor reflection
-    svg+=`<line x1="${cx-bw/2}" y1="${gY}" x2="${cx+bw/2}" y2="${gY}" stroke="${nt.color}" stroke-width="3" opacity="0.4" filter="url(#g3)"/>`;
-    // icon + labels
-    svg+=`<text x="${cx+bd*.2}" y="${topY-bd*.4-16}" text-anchor="middle" font-size="22">${nt.icon}</text>`;
-    svg+=`<text x="${cx+bd*.2}" y="${topY-bd*.4-2}" text-anchor="middle" font-size="11" fill="${nt.color}" font-weight="800">${lang==='da'?nt.da:nt.en}</text>`;
-    if(n.label) svg+=`<text x="${cx}" y="${gY+22}" text-anchor="middle" font-size="10" fill="#8ab4d0">${n.label}</text>`;
-    // cable to next
-    if(idx<nodes.length-1){
-      const nx=60+(idx+1)*sp, cy2=gY-bh*0.5;
-      svg+=`<line x1="${cx+bw/2+bd*.4}" y1="${cy2}" x2="${nx-bw/2}" y2="${cy2}" stroke="${nt.color}" stroke-width="3" stroke-linecap="round" opacity="0.7" filter="url(#g3)"/>`;
-      svg+=`<circle cx="${(cx+bw/2+bd*.4+nx-bw/2)/2}" cy="${cy2}" r="4" fill="${nt.color}" opacity="0.9"/>`;
-    }
+// High-quality neon isometric 3D scene renderer. Data-driven from a node list.
+// Used by the Drawing module AND the Analyzing Brain module. Premium, sell-grade.
+let _sceneSeq = 0;
+function neonScene(nodes, opts){
+  opts = opts || {};
+  if(!nodes || !nodes.length) nodes = [{type:'panel',label:''}];
+  const sq = 's' + (_sceneSeq++) + '_';
+  const title = opts.title || ((lang==='da'?'3D installationsskitse':'3D installation scene'));
+  const n = nodes.length;
+  const sp = 188, padX = 100, bw = 96, bd = 50, bh = 122;
+  const W = Math.max(860, padX*2 + (n-1)*sp + bd + 40);
+  const H = 480, gY = 348;
+  const dxp = bd*0.46, dyp = bd*0.46, vpX = W/2;
+  let defs = '', g = '';
+
+  // ---- per-node gradients (shaded faces, glow halo) ----
+  nodes.forEach((nd,i)=>{
+    const C = (NODE_TYPES[nd.type]||NODE_TYPES.custom).color;
+    defs += `
+      <linearGradient id="${sq}f${i}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="${C}" stop-opacity="0.52"/>
+        <stop offset="0.55" stop-color="${C}" stop-opacity="0.12"/>
+        <stop offset="1" stop-color="#040b15" stop-opacity="0.96"/></linearGradient>
+      <linearGradient id="${sq}t${i}" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="${C}" stop-opacity="0.9"/>
+        <stop offset="1" stop-color="${C}" stop-opacity="0.28"/></linearGradient>
+      <linearGradient id="${sq}s${i}" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#02080f" stop-opacity="0.96"/>
+        <stop offset="1" stop-color="${C}" stop-opacity="0.24"/></linearGradient>
+      <radialGradient id="${sq}h${i}" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0" stop-color="${C}" stop-opacity="0.6"/>
+        <stop offset="1" stop-color="${C}" stop-opacity="0"/></radialGradient>`;
   });
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="background:linear-gradient(180deg,#050c18,#020710 65%,#010408);border-radius:14px;border:1px solid var(--line,#2a3645);overflow:visible" xmlns="http://www.w3.org/2000/svg"><defs><filter id="g3"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>${svg}<text x="${W/2}" y="${H-8}" text-anchor="middle" font-size="9" fill="#4a7090">3D ${lang==='da'?'installationsskitse':'installation scene'} \u00B7 ${nodes.length} ${lang==='da'?'noder':'nodes'} \u00B7 El-Dimensionering</text></svg>`;
+  // ---- shared defs: deep-space sky, neon horizon, glow + shadow filters ----
+  defs += `
+    <radialGradient id="${sq}sky" cx="0.5" cy="0.16" r="0.95">
+      <stop offset="0" stop-color="#0b2138"/><stop offset="0.5" stop-color="#050e1a"/><stop offset="1" stop-color="#01040a"/></radialGradient>
+    <linearGradient id="${sq}hz" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#00d0ff" stop-opacity="0"/><stop offset="0.5" stop-color="#00e5ff" stop-opacity="0.95"/><stop offset="1" stop-color="#00d0ff" stop-opacity="0"/></linearGradient>
+    <filter id="${sq}glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="${sq}soft" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="9" stdDeviation="8" flood-color="#000" flood-opacity="0.55"/></filter>`;
+
+  // ---- background + perspective floor ----
+  g += `<rect x="0" y="0" width="${W}" height="${H}" fill="url(#${sq}sky)"/>`;
+  for(let i=0;i<=16;i++){ const x=(W/16)*i; g += `<line x1="${x}" y1="${H}" x2="${vpX}" y2="${gY}" stroke="rgba(0,200,255,0.08)" stroke-width="1"/>`; }
+  for(let i=1;i<=9;i++){ const f=Math.pow(i/9,2); const yy=gY+(H-gY)*f; g += `<line x1="0" y1="${yy}" x2="${W}" y2="${yy}" stroke="rgba(0,200,255,${(0.05+0.13*f).toFixed(3)})" stroke-width="1"/>`; }
+  g += `<line x1="0" y1="${gY}" x2="${W}" y2="${gY}" stroke="url(#${sq}hz)" stroke-width="2.5" filter="url(#${sq}glow)"/>`;
+
+  // ---- glowing connectors with travelling energy pulses (drawn behind boxes) ----
+  for(let i=0;i<n-1;i++){
+    const C=(NODE_TYPES[nodes[i].type]||NODE_TYPES.custom).color;
+    const cx=padX+i*sp, nx=padX+(i+1)*sp, cyMid=gY-bh*0.46;
+    const x1=cx+bw/2+dxp, x2=nx-bw/2;
+    g += `<line x1="${x1}" y1="${cyMid}" x2="${x2}" y2="${cyMid}" stroke="${C}" stroke-width="3" stroke-linecap="round" opacity="0.5" filter="url(#${sq}glow)"/>`;
+    g += `<circle r="3.6" fill="#ffffff" filter="url(#${sq}glow)"><animateMotion dur="${(2+i*0.25).toFixed(2)}s" repeatCount="indefinite" path="M ${x1} ${cyMid} L ${x2} ${cyMid}"/></circle>`;
+  }
+
+  // ---- nodes: shaded isometric boxes, halo, reflection, glowing icon disc ----
+  nodes.forEach((nd,i)=>{
+    const nt=NODE_TYPES[nd.type]||NODE_TYPES.custom, C=nt.color;
+    const cx=padX+i*sp, topY=gY-bh;
+    const front=`${cx-bw/2},${topY} ${cx+bw/2},${topY} ${cx+bw/2},${gY} ${cx-bw/2},${gY}`;
+    const top=`${cx-bw/2},${topY} ${cx+bw/2},${topY} ${cx+bw/2+dxp},${topY-dyp} ${cx-bw/2+dxp},${topY-dyp}`;
+    const side=`${cx+bw/2},${topY} ${cx+bw/2+dxp},${topY-dyp} ${cx+bw/2+dxp},${gY-dyp} ${cx+bw/2},${gY}`;
+    g += `<ellipse cx="${cx+dxp/2}" cy="${gY}" rx="${(bw*0.72).toFixed(0)}" ry="15" fill="url(#${sq}h${i})"/>`;
+    g += `<polygon points="${cx-bw/2},${gY} ${cx+bw/2},${gY} ${cx+bw/2},${gY+bh*0.55} ${cx-bw/2},${gY+bh*0.55}" fill="${C}" opacity="0.07"/>`;
+    g += `<g filter="url(#${sq}soft)">`;
+    g += `<polygon points="${side}" fill="url(#${sq}s${i})" stroke="${C}" stroke-width="1.4" stroke-opacity="0.7"/>`;
+    g += `<polygon points="${front}" fill="url(#${sq}f${i})" stroke="${C}" stroke-width="1.8"/>`;
+    g += `<polygon points="${top}" fill="url(#${sq}t${i})" stroke="${C}" stroke-width="1.6"/>`;
+    g += `</g>`;
+    g += `<line x1="${cx-bw/2}" y1="${topY}" x2="${cx-bw/2}" y2="${gY}" stroke="#ffffff" stroke-opacity="0.22" stroke-width="1"/>`;
+    const ix=cx+dxp*0.5, iy=topY-dyp*0.5;
+    g += `<circle cx="${ix}" cy="${iy}" r="18" fill="#03101c" stroke="${C}" stroke-width="1.6" filter="url(#${sq}glow)"><animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="${(2.4+i*0.3).toFixed(1)}s" repeatCount="indefinite"/></circle>`;
+    g += `<text x="${ix}" y="${iy+6}" text-anchor="middle" font-size="19">${nt.icon}</text>`;
+    g += `<text x="${cx+dxp/2}" y="${gY+26}" text-anchor="middle" font-size="12" font-weight="800" fill="${C}" filter="url(#${sq}glow)">${lang==='da'?nt.da:nt.en}</text>`;
+    if(nd.label) g += `<text x="${cx+dxp/2}" y="${gY+43}" text-anchor="middle" font-size="11" fill="#cfe6f5">${(''+nd.label).replace(/&/g,'&amp;').replace(/</g,'&lt;')}</text>`;
+  });
+
+  // ---- ambient floating particles ----
+  for(let i=0;i<8;i++){ const px=(W/8)*i+24, r=(1.4+(i%3)).toFixed(1); g += `<circle cx="${px}" cy="${56+(i*29)%150}" r="${r}" fill="#7fe9ff" opacity="0.45"><animate attributeName="opacity" values="0.08;0.65;0.08" dur="${(3+i*0.4).toFixed(1)}s" repeatCount="indefinite"/></circle>`; }
+
+  // ---- title + footer ----
+  g += `<text x="24" y="34" font-size="14" font-weight="800" fill="#cdeeff" filter="url(#${sq}glow)">${title}</text>`;
+  g += `<text x="${W-18}" y="${H-14}" text-anchor="end" font-size="9" fill="#5681a0">El-Dimensionering \u00B7 ${n} ${lang==='da'?'noder':'nodes'}</text>`;
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="border-radius:16px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 34px rgba(0,160,255,0.20);overflow:visible" xmlns="http://www.w3.org/2000/svg"><defs>${defs}</defs>${g}</svg>`;
 }
+
+function build3D(){ return neonScene(getDrawNodes()); }
 
 function renderDrawing(){
   const nodes=getDrawNodes(), typeKeys=Object.keys(NODE_TYPES);
   const nodeEditor=`<div class="select-group"><div class="select-label">${lang==='da'?'Installationens noder (tilf\u00F8j/fjern/flyt)':'Installation nodes (add/remove/move)'}</div>${nodes.map((n,i)=>{const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;return `<div style="display:inline-flex;align-items:center;gap:4px;margin:3px 4px;padding:5px 9px;border:1.5px solid ${nt.color};border-radius:8px;font-size:.78rem;background:rgba(0,0,0,0.25)"><span>${nt.icon}</span><span style="color:${nt.color};font-weight:700">${lang==='da'?nt.da:nt.en}</span><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},-1)">\u25C0</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},1)">\u25B6</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem;color:var(--danger)" onclick="drawNodeRemove(${i})">\u2715</button></div>`;}).join('')}</div><div class="select-group"><div class="select-label">${lang==='da'?'Tilf\u00F8j node':'Add node'}</div><div class="select-grid">${typeKeys.map(k=>`<button class="sel-btn" onclick="drawNodeAdd('${k}')">${NODE_TYPES[k].icon} ${lang==='da'?NODE_TYPES[k].da:NODE_TYPES[k].en}</button>`).join('')}<button class="sel-btn" onclick="drawNodeReset()">\u21BA ${lang==='da'?'Nulstil':'Reset'}</button></div></div>`;
   return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram':'Single-line'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='iso'?build3D():buildSLD()}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
+}
+
+// ===== ANALYZING BRAIN MODULE =====
+// Upload a full project description (PDF / text) OR pick a sample. The engine
+// extracts every load, cable, distance and requirement, auto-produces an
+// optimized dimensioning proposal, renders a sell-grade 3D scene, and writes
+// smart recommendations for BOTH the installer and the (non-technical) customer.
+// 100% click-only (file picker = a click; no typing required).
+
+// Consumer knowledge library (DA + EN keywords -> typical electrical data)
+const BRAIN_LIB = [
+  { keys:['ladestander','ladeboks','ladestik','elbil-lader','elbillader','ev-lader','ev lader','ev-ladere','elbil','ev charger','ev-charger','charger','evse'], da:'EV-lader', en:'EV charger', kW:11, phase:'3', cos:1.0, sf:1.0, node:'ev', feature:'ev', dist:20 },
+  { keys:['solcelleanlæg','solcelleanlaeg','solceller','solcelle','sol-anlæg','solanlæg','pv-anlæg','pv anlæg',' pv ','solar','photovolta'], da:'Solcelleanlæg', en:'Solar PV', kW:10, phase:'3', cos:1.0, sf:1.0, node:'pv', feature:'pv', dist:12 },
+  { keys:['batterilager','energilager','hjemmebatteri','batteri','battery','energy storage'], da:'Batteri', en:'Battery', kW:5, phase:'3', cos:1.0, sf:1.0, node:'battery', feature:'battery', dist:8 },
+  { keys:['varmepumpe','luft til vand','luft/vand','luft-vand','heat pump','heatpump'], da:'Varmepumpe', en:'Heat pump', kW:6, phase:'3', cos:0.9, sf:1.0, node:'load', feature:'motor', dist:14 },
+  { keys:['traverskran','traverse','portalkran','kran','crane','hoist','spil'], da:'Kran', en:'Crane', kW:15, phase:'3', cos:0.8, sf:0.6, node:'motor', feature:'motor', dist:35 },
+  { keys:['kompressor','compressor'], da:'Kompressor', en:'Compressor', kW:7.5, phase:'3', cos:0.85, sf:0.8, node:'motor', feature:'motor', dist:25 },
+  { keys:['elevator','lift'], da:'Elevator', en:'Elevator', kW:7.5, phase:'3', cos:0.8, sf:0.7, node:'motor', feature:'motor', dist:30 },
+  { keys:['motorer','motor','pumpe','pumper','pump'], da:'Motor/pumpe', en:'Motor/pump', kW:7.5, phase:'3', cos:0.85, sf:1.0, node:'motor', feature:'motor', dist:30 },
+  { keys:['ventilation','udsugning','aircondition','aircon','hvac','blæser','blaeser','ventilator','fan'], da:'Ventilation', en:'Ventilation', kW:3, phase:'3', cos:0.85, sf:0.8, node:'motor', feature:'motor', dist:20 },
+  { keys:['svejser','svejs','welder','welding'], da:'Svejser', en:'Welder', kW:10, phase:'3', cos:0.8, sf:0.5, node:'load', feature:'motor', dist:18 },
+  { keys:['serverrum','server','datacenter','data center','ups'], da:'Serverrum', en:'Server room', kW:8, phase:'3', cos:0.9, sf:0.9, node:'load', dist:15 },
+  { keys:['komfur','kogeplade','induktionskomfur','ovn','stove','cooker','oven','hob'], da:'Komfur/ovn', en:'Cooker/oven', kW:11, phase:'3', cos:1.0, sf:0.7, node:'load', dist:12 },
+  { keys:['vandvarmer','varmtvandsbeholder','varmtvand','water heater','el-varme','elvarme','elradiator','varmelegeme'], da:'El-varme/vand', en:'Electric heat/water', kW:4, phase:'3', cos:1.0, sf:0.8, node:'load', dist:12 },
+  { keys:['hvidevarer','vaskemaskine','tørretumbler','toerretumbler','opvaskemaskine','opvask','washing','dryer','dishwasher','appliance'], da:'Hvidevarer', en:'Appliances', kW:2.2, phase:'L2', cos:0.95, sf:0.6, node:'load', dist:14 },
+  { keys:['stikkontakt','stikgruppe','stikgrupper','stikkredse',' stik ','brugsgenstande','sockets','socket','outlet','udtag'], da:'Stikgrupper', en:'Socket circuits', kW:3.7, phase:'L1', cos:0.95, sf:0.6, node:'load', dist:18 },
+  { keys:['belysning','lysgruppe','armatur','lamper',' lys ','lighting','luminaire','light fitting'], da:'Belysning', en:'Lighting', kW:1.5, phase:'L3', cos:0.95, sf:1.0, node:'load', feature:'lighting', dist:22 }
+];
+
+// Extra requirement keywords (drive recommendations, not loads)
+const BRAIN_REQ = [
+  { keys:['badeværelse','badevaerelse','vådrum','vaadrum','bruser','bathroom','wet room','shower'], feature:'bathroom' },
+  { keys:['udendørs','udendoers','udvendig','have','carport','outdoor','outside','garden'], feature:'outdoor' },
+  { keys:['landbrug','stald','gård','farm','agricult','barn','livestock'], feature:'farm' },
+  { keys:['industri','fabrik','værksted','vaerksted','industrial','factory','workshop','production'], feature:'industry' },
+  { keys:['lejlighed','etagebolig','boligblok','boliger','apartments','housing','multi-dwelling'], feature:'housing' }
+];
+
+let brainProject = null;   // last analyzed project
+let brainSource  = '';     // source label (filename / sample)
+let brainBusy    = false;  // PDF/AI in progress
+let brainErr     = '';     // error message
+let brainAiOut   = '';     // optional online-AI enhancement output
+
+function _brainNum(s){ return parseFloat((''+s).replace(',', '.')); }
+
+function _loadScript(src){
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = () => rej(new Error('load failed'));
+    document.head.appendChild(s);
+  });
+}
+
+// File picker handler (txt/csv/md read directly; pdf via pdf.js with fallback)
+async function brainHandleFile(ev){
+  const file = ev.target.files && ev.target.files[0];
+  if(!file) return;
+  brainErr = ''; brainAiOut = '';
+  const name = file.name.toLowerCase();
+  if(name.endsWith('.pdf')){ await brainReadPdf(file); return; }
+  try {
+    const text = await file.text();
+    brainAnalyze(text, file.name);
+  } catch(e){
+    brainErr = (lang==='da' ? 'Kunne ikke læse filen. Prøv en .txt-fil eller vælg et eksempelprojekt.' : 'Could not read the file. Try a .txt file or pick a sample project.');
+    renderModule('brain');
+  }
+}
+
+async function brainReadPdf(file){
+  brainBusy = true; brainErr = ''; renderModule('brain');
+  try {
+    if(!window.pdfjsLib){
+      await _loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+    }
+    if(window.pdfjsLib && pdfjsLib.GlobalWorkerOptions){
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    let text = '';
+    for(let p=1; p<=pdf.numPages; p++){
+      const page = await pdf.getPage(p);
+      const c = await page.getTextContent();
+      text += c.items.map(it => it.str).join(' ') + '\n';
+    }
+    brainBusy = false;
+    if(text.replace(/\s/g,'').length < 20) throw new Error('empty');
+    brainAnalyze(text, file.name);
+  } catch(e){
+    // Offline / scanned PDF fallback: naive byte scan for embedded plain text
+    try {
+      const t = await file.text();
+      const clean = t.replace(/[^\x09\x0A\x0D\x20-\x7E\u00C0-\u017F]/g, ' ');
+      if(clean.replace(/\s/g,'').length > 60){ brainBusy = false; brainAnalyze(clean, file.name + ' (rå tekst)'); return; }
+    } catch(_){}
+    brainBusy = false;
+    brainErr = (lang==='da'
+      ? 'Kunne ikke læse PDF\'en offline (måske scannet/komprimeret). Forbind til internettet, upload en .txt, eller vælg et eksempelprojekt nedenfor.'
+      : 'Could not read the PDF offline (possibly scanned/compressed). Connect to the internet, upload a .txt, or pick a sample project below.');
+    renderModule('brain');
+  }
+}
+
+// Ready-made click-only sample projects (always work, fully offline)
+const BRAIN_SAMPLES = {
+  parcelhus: {
+    da: 'Nyt parcelhus på 180 m². Forsyning 400V 3-faset. Ønsker: 1 EV-lader 11 kW ca. 20 meter fra tavlen, solcelleanlæg 10 kW, hjemmebatteri 5 kW, varmepumpe 6 kW (luft/vand), induktionskomfur, hvidevarer, 8 stikgrupper, belysning i alle rum ca. 25 meter, 1 badeværelse, udendørs stikkontakt og belysning.',
+    en: 'New detached house 180 m². Supply 400V three-phase. Wants: 1 EV charger 11 kW about 20 meter from the panel, solar PV 10 kW, home battery 5 kW, heat pump 6 kW, induction cooker, appliances, 8 socket circuits, lighting in all rooms about 25 meter, 1 bathroom, outdoor socket and lighting.',
+    icon:'🏡', da_label:'Parcelhus + EV/sol', en_label:'House + EV/solar'
+  },
+  landbrug: {
+    da: 'Landbrug med stald. Forsyning 400V. 3 motorer/pumper á 7,5 kW, ventilation 4 kW, en kornelevator-motor 11 kW ca. 45 meter væk, vandvarmer 4 kW, belysning i stald 30 meter, stikgrupper. 2 EV-ladere 22 kW til maskiner.',
+    en: 'Farm with barn. Supply 400V. 3 motors/pumps at 7.5 kW, ventilation 4 kW, a grain elevator motor 11 kW about 45 meter away, water heater 4 kW, barn lighting 30 meter, socket circuits. 2 EV chargers 22 kW for machinery.',
+    icon:'🚜', da_label:'Landbrug/stald', en_label:'Farm/barn'
+  },
+  industri: {
+    da: 'Lille industri/værksted. Forsyning 400V. Traverskran 15 kW, 2 kompressorer á 7,5 kW, svejser 10 kW, ventilation 5,5 kW ca. 40 meter, serverrum 8 kW, belysning og mange stikkontakter. Krav om overspændingsbeskyttelse.',
+    en: 'Small industry/workshop. Supply 400V. Overhead crane 15 kW, 2 compressors at 7.5 kW, welder 10 kW, ventilation 5.5 kW about 40 meter, server room 8 kW, lighting and many sockets. Surge protection required.',
+    icon:'🏭', da_label:'Industri/værksted', en_label:'Industry/workshop'
+  },
+  etagebolig: {
+    da: 'Etagebolig med 12 lejligheder. Forsyning 400V. Hver bolig: komfur, hvidevarer, stikgrupper, belysning. Fælles: ventilation 3 kW, elevator-motor 7,5 kW, 4 EV-ladere 11 kW i kælder ca. 35 meter, udendørs belysning.',
+    en: 'Apartment building with 12 dwellings. Supply 400V. Each home: cooker, appliances, sockets, lighting. Common: ventilation 3 kW, elevator motor 7.5 kW, 4 EV chargers 11 kW in basement about 35 meter, outdoor lighting.',
+    icon:'🏢', da_label:'Etagebolig', en_label:'Apartment block'
+  }
+};
+function brainLoadSample(key){
+  const s = BRAIN_SAMPLES[key]; if(!s) return;
+  brainErr=''; brainAiOut='';
+  brainAnalyze(lang==='da'? s.da : s.en, (lang==='da'? s.da_label : s.en_label));
+}
+
+// Core extractor: text -> structured project.
+// Segment-based: each number is bound to the nearest preceding keyword, and
+// overlapping keyword hits (e.g. "pumpe" inside "varmepumpe") are removed.
+function brainExtract(text){
+  const low = (' ' + text.toLowerCase() + ' ').replace(/\s+/g,' ');
+  const supply = /(\b400\s*v|3\s*[x×]\s*400|3-?faset|three-?phase|3~)/.test(low) ? '3x400'
+               : (/(\b230\s*v|1-?faset|single-?phase)/.test(low) ? '1x230' : '3x400');
+
+  // 1) one hit per library entry (its earliest keyword occurrence)
+  let hits = [];
+  BRAIN_LIB.forEach(entry => {
+    let best = -1, bestKey = '';
+    entry.keys.forEach(k => { const p = low.indexOf(k); if(p >= 0 && (best < 0 || p < best)){ best = p; bestKey = k; } });
+    if(best >= 0) hits.push({ entry, pos: best, end: best + bestKey.length });
+  });
+  // 2) order by position, longer keyword wins ties, then drop overlaps
+  hits.sort((a,b) => a.pos - b.pos || (b.end - b.pos) - (a.end - a.pos));
+  const accepted = []; let lastEnd = -1;
+  hits.forEach(h => { if(h.pos >= lastEnd){ accepted.push(h); lastEnd = h.end; } });
+
+  // 3) parse power/distance from each hit's own segment (up to the next hit)
+  const consumers = [];
+  const features = new Set();
+  accepted.forEach((h, i) => {
+    const entry = h.entry;
+    const segEnd = (i+1 < accepted.length) ? accepted[i+1].pos : Math.min(low.length, h.end + 80);
+    const seg = low.slice(h.end, segEnd);
+    const pre = low.slice((i > 0) ? accepted[i-1].end : Math.max(0, h.pos - 18), h.pos);
+
+    let qty = 1;
+    const qm = pre.match(/(\d{1,3})\s*(?:stk\.?|styk|x|×|pcs|pieces)?\s*$/);
+    if(qm){ const q = parseInt(qm[1],10); if(q >= 1 && q <= 500) qty = q; }
+
+    let kW = entry.kW, m;
+    if((m = seg.match(/(\d+(?:[.,]\d+)?)\s*kw/)))            kW = _brainNum(m[1]);
+    else if((m = seg.match(/(\d+(?:[.,]\d+)?)\s*kva/)))      kW = _brainNum(m[1]) * entry.cos;
+    else if((m = seg.match(/(\d+(?:[.,]\d+)?)\s*a(?:mp|mpere)?\b/))){
+      const A = _brainNum(m[1]);
+      kW = (entry.phase==='3' ? Math.sqrt(3)*400*entry.cos*A : 230*entry.cos*A) / 1000;
+    }
+    else if((m = seg.match(/(\d{3,5})\s*w\b/)))              kW = _brainNum(m[1]) / 1000;
+
+    let dist = entry.dist;
+    const dm = seg.match(/(\d+(?:[.,]\d+)?)\s*m(?:eter|tr)?\b/);
+    if(dm){ const d = _brainNum(dm[1]); if(d > 0 && d < 2000) dist = d; }
+
+    const label = (lang==='da'? entry.da : entry.en) + (qty > 1 ? ' (' + qty + ' stk)' : '');
+    consumers.push({
+      name: label, kW: +(kW*qty).toFixed(2), kWunit: kW, qty,
+      cos: entry.cos, sf: entry.sf, phase: entry.phase,
+      node: entry.node, feature: entry.feature || null, dist
+    });
+    if(entry.feature) features.add(entry.feature);
+  });
+
+  BRAIN_REQ.forEach(r => { if(r.keys.some(k => low.indexOf(k) >= 0)) features.add(r.feature); });
+
+  let note = '';
+  if(consumers.length === 0){
+    consumers.push({ name: lang==='da'?'Blandet forbrug':'Mixed load', kW:10, kWunit:10, qty:1, cos:0.9, sf:0.8, phase:'3', node:'load', feature:null, dist:18 });
+    note = lang==='da' ? 'Ingen specifikke forbrugere fundet i teksten — bruger et generisk skøn. Tilføj flere detaljer for et mere præcist forslag.' : 'No specific loads found in the text — using a generic estimate. Add more detail for a more precise proposal.';
+  }
+  return { consumers, features:[...features], supply, source: brainSource, note, raw:text };
+}
+
+// Build the 3D scene node list for a project
+function brainBuildNodes(p){
+  const sch = calcLoadSchedule();
+  const trafo = TRAFO_SIZES.find(t => t >= sch.kVA) || TRAFO_SIZES[TRAFO_SIZES.length-1];
+  const nodes = [
+    { type:'grid',  label: p.supply==='3x400' ? '400 V 3~' : '230 V 1~' },
+    { type:'trafo', label: trafo + ' kVA' },
+    { type:'meter', label: lang==='da'?'Måler':'Meter' },
+    { type:'panel', label: 'IB ' + sch.ib.toFixed(0) + ' A' }
+  ];
+  const f = p.features;
+  if(f.includes('pv'))      nodes.push({ type:'pv',      label:'PV' });
+  if(f.includes('battery')) nodes.push({ type:'battery', label: lang==='da'?'Batteri':'Battery' });
+  if(f.includes('ev'))      nodes.push({ type:'ev',      label:'EV' });
+  if(f.includes('motor'))   nodes.push({ type:'motor',   label: lang==='da'?'Motorer':'Motors' });
+  nodes.push({ type:'load', label: p.consumers.length + ' ' + (lang==='da'?'grupper':'circuits') });
+  return nodes;
+}
+
+// Per-circuit dimensioning proposal
+function brainDimension(p){
+  const rows = [];
+  let anyVdropOver = false;
+  p.consumers.forEach(c => {
+    const cur = lsConsumerCurrent(c);
+    const ib = Math.max(cur.L1||0, cur.L2||0, cur.L3||0) || 0.1;
+    const cable = recommendCables(ib, 'copper')[0];
+    let prot = '';
+    if(ib > 125){ const mc = recommendMCCBs(ib)[0]; prot = mc ? (mc.brand+' '+mc.model) : (lang==='da'?'NH-sikring':'NH fuse'); }
+    else if(ib > 63){ const f = recommendFuses(ib)[0]; const mc = recommendMCBs(ib)[0]; prot = mc ? (mc.model+' '+mc.curve+mc.rating) : (f ? (f.brand+' '+f.rating+'A') : '—'); }
+    else { const curve = c.feature==='motor' ? 'C' : 'B'; const mc = recommendMCBs(ib)[0]; prot = mc ? (mc.brand+' '+mc.model+' '+curve+mc.rating) : '—'; }
+    // voltage drop
+    let vdP = 0;
+    if(cable){
+      const L = (c.dist||0)/1000, cosP = c.cos, sinP = Math.sin(Math.acos(cosP)), Un = c.phase==='3'?400:230;
+      const vd = (c.phase==='3' ? Math.sqrt(3) : 2) * ib * L * ((cable.r||0)*cosP + (cable.x||0)*sinP);
+      vdP = (vd/Un)*100;
+    }
+    const limit = c.feature==='lighting' ? 3 : 4;
+    const vdOver = vdP > limit;
+    if(vdOver) anyVdropOver = true;
+    rows.push({
+      name: c.name, kW: c.kW, phase: c.phase==='3'?'3~':c.phase, ib,
+      cable: cable ? (cable.mm2+' mm²') : '—',
+      cableObj: cable, prot, dist: c.dist||0, vdP, vdOver, limit, feature: c.feature
+    });
+  });
+  return { rows, anyVdropOver };
+}
+
+// Recommendations for the installer (technical)
+function brainInstallerRecs(p, dim){
+  const r = [], da = lang==='da', f = p.features;
+  const sch = calcLoadSchedule();
+  const trafo = TRAFO_SIZES.find(t => t >= sch.kVA) || TRAFO_SIZES[TRAFO_SIZES.length-1];
+  r.push(da ? `Dimensionér hovedforsyning efter IB ≈ ${sch.ib.toFixed(0)} A / ${sch.kVA.toFixed(1)} kVA — foreslået transformer ${trafo} kVA.` 
+            : `Size the main supply for IB ≈ ${sch.ib.toFixed(0)} A / ${sch.kVA.toFixed(1)} kVA — suggested transformer ${trafo} kVA.`);
+  r.push(da ? 'Alle endegrupper beskyttes med HPFI/RCD 30 mA (min. Type A) iht. Installationsbekendtgørelsen.' 
+            : 'Protect all final circuits with RCD 30 mA (min. Type A) per the Installation Order.');
+  r.push(da ? 'Montér overspændingsbeskyttelse SPD Type 2 i hovedtavlen (Type 1+2 ved lynudsat placering).' 
+            : 'Install surge protection SPD Type 2 in the main panel (Type 1+2 if lightning-exposed).');
+  r.push(da ? 'Kontrollér selektivitet mellem hoved- og gruppebeskyttelse (typisk 1,6:1 for sikringer).' 
+            : 'Verify selectivity between main and group protection (typically 1.6:1 for fuses).');
+  if(f.includes('ev'))      r.push(da ? 'EV-ladere: dedikeret gruppe, kurve C, og Type B HPFI ELLER Type A + 6 mA DC-detektion (DS/HD 60364-7-722).' : 'EV chargers: dedicated circuit, curve C, and Type B RCD OR Type A + 6 mA DC detection (DS/HD 60364-7-722).');
+  if(f.includes('pv'))      r.push(da ? 'Solceller: AC-sidesikring, anti-ø-drift, korrekt mærkning og adskillelse; overvej Type B ved transformerløs inverter.' : 'Solar PV: AC-side protection, anti-islanding, correct labelling and isolation; consider Type B with transformerless inverter.');
+  if(f.includes('battery')) r.push(da ? 'Batterilager: følg producentens krav til afbryder, BMS og placering; brandmæssig adskillelse.' : 'Battery storage: follow manufacturer requirements for isolation, BMS and placement; fire separation.');
+  if(f.includes('motor'))   r.push(da ? 'Motorafgange: kurve C/D, motorværn (MPCB) + termorelæ indstillet til mærkestrøm; overvej softstart/VFD ved store motorer.' : 'Motor feeders: curve C/D, motor protection (MPCB) + overload relay set to rated current; consider soft-start/VFD for large motors.');
+  if(f.includes('bathroom'))r.push(da ? 'Badeværelse: overhold zoner 0/1/2 (DS/HD 60364-7-701), IPX4+, SELV i zone 0, og potentialudligning.' : 'Bathroom: observe zones 0/1/2 (DS/HD 60364-7-701), IPX4+, SELV in zone 0, and equipotential bonding.');
+  if(f.includes('outdoor')) r.push(da ? 'Udendørs: materiel min. IP44 (IP65 ved direkte vejr), UV-bestandigt, HPFI 30 mA på alle udendørs kredse.' : 'Outdoor: equipment min. IP44 (IP65 for direct weather), UV-resistant, RCD 30 mA on all outdoor circuits.');
+  if(f.includes('lighting'))r.push(da ? 'Belysning: spændingsfald ≤ 3% — vælg evt. større tværsnit på lange lysgrupper.' : 'Lighting: voltage drop ≤ 3% — upsize conductors on long lighting runs if needed.');
+  if(dim.anyVdropOver)      r.push(da ? '⚠️ En eller flere grupper overstiger spændingsfaldsgrænsen — opgradér kabeltværsnit eller afkort ruten.' : '⚠️ One or more circuits exceed the voltage-drop limit — upsize the cable or shorten the route.');
+  r.push(da ? 'Dokumentér med måleprotokol (kontinuitet, isolation, HPFI-udløsetid, sløjfeimpedans) før idriftsættelse (DS/HD 60364-6).' : 'Document with a test protocol (continuity, insulation, RCD trip time, loop impedance) before commissioning (DS/HD 60364-6).');
+  return r;
+}
+
+// Recommendations for the customer (plain language, zero electrical knowledge)
+function brainCustomerRecs(p){
+  const da = lang==='da', f = p.features, out = [];
+  const names = p.consumers.map(c => (c.name||'').replace(/\s*\(\d+ stk\)/,'')).filter((v,i,a)=>a.indexOf(v)===i);
+  out.push(da
+    ? `Vi installerer et komplet, sikkert og fremtidssikret el-anlæg til dit projekt — i alt ${p.consumers.length} grupper, bl.a. ${names.slice(0,5).join(', ')}.`
+    : `We will install a complete, safe and future-proof electrical system for your project — ${p.consumers.length} circuits in total, including ${names.slice(0,5).join(', ')}.`);
+  out.push(da
+    ? 'Alt beskyttes af moderne fejlstrømsafbrydere (HPFI), der afbryder strømmen på et splitsekund, hvis noget går galt — det beskytter både dig og din familie.'
+    : 'Everything is protected by modern residual-current devices that cut the power in a split second if anything goes wrong — protecting you and your family.');
+  if(f.includes('ev') || f.includes('pv') || f.includes('battery'))
+    out.push(da
+      ? 'Anlægget er klar til den grønne fremtid: elbil-opladning, solceller og batteri spiller sammen, så du sparer penge og er forberedt på i morgen.'
+      : 'Your system is ready for the green future: EV charging, solar and battery work together so you save money and are prepared for tomorrow.');
+  out.push(da
+    ? 'Alt udføres efter de danske el-regler (DS/HD 60364) af en autoriseret elektriker — og afleveres med fuld dokumentation og måling.'
+    : 'Everything is done to the Danish electrical rules (DS/HD 60364) by an authorized electrician — and delivered with full documentation and testing.');
+  out.push(da
+    ? '👆 3D-tegningen ovenfor viser præcis, hvad der bliver installeret — fra forsyning til hver enkelt gruppe i dit hjem.'
+    : '👆 The 3D drawing above shows exactly what will be installed — from the supply to every circuit in your home.');
+  return out;
+}
+
+function brainAnalyze(text, source){
+  brainSource = source || '';
+  const p = brainExtract(text);
+  // Sync into the app-wide load schedule so the whole tool reflects the project
+  loadList = p.consumers.map(c => ({ name:c.name, kW:c.kW, cos:c.cos, sf:c.sf, phase:c.phase }));
+  p.nodes = brainBuildNodes(p);
+  brainProject = p;
+  renderModule('brain');
+}
+
+function brainReset(){ brainProject=null; brainSource=''; brainErr=''; brainAiOut=''; loadList=[]; renderModule('brain'); }
+
+// Optional: enhance analysis with online AI (uses the AI-Electrician config)
+async function brainAiAnalyze(){
+  if(!brainProject){ return; }
+  const cfg = JSON.parse(localStorage.getItem('aiElectricianCfg') || '{}');
+  if(!cfg.endpoint || !cfg.key){
+    brainAiOut = (lang==='da' ? 'Online AI er ikke konfigureret. Gå til "Spørg AI-Elektriker" → Online AI → Indstil AI.' : 'Online AI is not configured. Go to "Ask AI-Electrician" → Online AI → Configure AI.');
+    renderModule('brain'); return;
+  }
+  brainBusy = true; renderModule('brain');
+  const sys = lang==='da'
+    ? 'Du er en erfaren dansk autoriseret elinstallatør. Analysér projektbeskrivelsen og giv et kort, struktureret dimensioneringsoverblik (forsyning, hovedtavle, vigtige grupper, kabler, beskyttelse) samt de 3 vigtigste anbefalinger. Følg DS/HD 60364. Svar kort på dansk.'
+    : 'You are an experienced Danish authorized electrician. Analyze the project description and give a short, structured dimensioning overview (supply, main panel, key circuits, cables, protection) plus the 3 most important recommendations. Follow DS/HD 60364. Answer briefly in English.';
+  try {
+    const res = await fetch(cfg.endpoint, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+cfg.key },
+      body: JSON.stringify({ model: cfg.model||'gpt-4o-mini', temperature:0.2,
+        messages:[ {role:'system', content:sys}, {role:'user', content:(brainProject.raw||'').slice(0,6000)} ] })
+    });
+    const data = await res.json();
+    brainAiOut = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || (lang==='da'?'Intet svar modtaget.':'No answer received.');
+  } catch(e){ brainAiOut = (lang==='da'?'Fejl ved forbindelse: ':'Connection error: ') + e.message; }
+  brainBusy = false; renderModule('brain');
+}
+
+function renderBrain(){
+  const da = lang==='da';
+  const sampleBtns = Object.keys(BRAIN_SAMPLES).map(k => {
+    const s = BRAIN_SAMPLES[k];
+    return `<button class="sel-btn" onclick="brainLoadSample('${k}')">${s.icon} ${da? s.da_label : s.en_label}</button>`;
+  }).join('');
+
+  let html = `
+    <div class="card fade-in">
+      <div class="card-title">🧠 ${da? 'Analyse-Hjerne — automatisk projektanalyse' : 'Analyzing Brain — automatic project analysis'}</div>
+      <div class="info-row">${da
+        ? 'Upload en hel projektbeskrivelse (PDF eller tekst) — eller vælg et eksempel. Hjernen finder alle forbrugere, kabler, afstande og krav, dimensionerer hele projektet og tegner en flot 3D-visning til kunden.'
+        : 'Upload a full project description (PDF or text) — or pick a sample. The brain finds every load, cable, distance and requirement, dimensions the whole project, and draws a beautiful 3D view for the customer.'}</div>
+      <input type="file" id="brainFile" accept=".txt,.md,.csv,.text,.pdf" style="display:none" onchange="brainHandleFile(event)">
+      <div class="select-group">
+        <div class="select-label">📥 ${da? 'Indlæs projekt' : 'Load project'}</div>
+        <div class="select-grid">
+          <button class="sel-btn selected" onclick="document.getElementById('brainFile').click()">📄 ${da? 'Upload PDF / tekst' : 'Upload PDF / text'}</button>
+          ${sampleBtns}
+          ${brainProject ? `<button class="sel-btn" onclick="brainReset()" style="color:var(--danger)">🗑️ ${da?'Nulstil':'Reset'}</button>` : ''}
+        </div>
+      </div>
+      ${brainBusy ? `<div class="info-row">⏳ ${da? 'Analyserer…' : 'Analyzing…'}</div>` : ''}
+      ${brainErr ? `<div class="result-box error"><div class="result-title">${da?'Bemærk':'Note'}</div><div class="result-row"><span class="label">${brainErr}</span></div></div>` : ''}
+    </div>`;
+
+  if(!brainProject){
+    html += `
+      <div class="card fade-in">
+        <div class="card-title">✨ ${da? 'Sådan virker det' : 'How it works'}</div>
+        <div class="result-box" style="background:var(--tint-info);border-color:var(--accent)">
+          <div class="result-row"><span class="label">1 · ${da?'Vælg eller upload et projekt':'Pick or upload a project'}</span><span class="value">📥</span></div>
+          <div class="result-row"><span class="label">2 · ${da?'Hjernen udtrækker laster, kabler, afstande, krav':'The brain extracts loads, cables, distances, requirements'}</span><span class="value">🧠</span></div>
+          <div class="result-row"><span class="label">3 · ${da?'Optimeret dimensionering beregnes automatisk':'Optimized dimensioning is computed automatically'}</span><span class="value">⚙️</span></div>
+          <div class="result-row"><span class="label">4 · ${da?'Flot 3D-tegning + anbefalinger til dig og kunden':'Beautiful 3D drawing + advice for you and the customer'}</span><span class="value">🎨</span></div>
+        </div>
+      </div>`;
+    return html;
+  }
+
+  const p = brainProject;
+  const sch = calcLoadSchedule();
+  const dim = brainDimension(p);
+  const trafo = TRAFO_SIZES.find(t => t >= sch.kVA) || TRAFO_SIZES[TRAFO_SIZES.length-1];
+  const mainProt = sch.ib<=63 ? (recommendMCBs(sch.ib)[0]) : null;
+  const mainMccb = sch.ib>63 ? (recommendMCCBs(sch.ib)[0]) : null;
+  const mainLbl = mainProt ? (mainProt.model+' '+mainProt.curve+mainProt.rating) : (mainMccb ? mainMccb.model : (da?'NH-sikring':'NH fuse'));
+  const featLabels = { ev:'EV', pv:'PV', battery:da?'Batteri':'Battery', motor:da?'Motor':'Motor', lighting:da?'Belysning':'Lighting', bathroom:da?'Bad':'Bath', outdoor:da?'Udendørs':'Outdoor', farm:da?'Landbrug':'Farm', industry:da?'Industri':'Industry', housing:da?'Bolig':'Housing' };
+
+  // detected summary
+  const consumerChips = p.consumers.map(c => `<span class="status-chip has-value"><span class="chip-value">${c.name}</span><span class="chip-label">· ${c.kW} kW</span></span>`).join(' ');
+  const featChips = p.features.map(f => `<span class="status-chip has-value"><span class="chip-value">${featLabels[f]||f}</span></span>`).join(' ');
+
+  html += `
+    <div class="card fade-in">
+      <div class="card-title">📋 ${da? 'Analyseret projekt' : 'Analyzed project'}</div>
+      <div class="info-row">${da?'Kilde':'Source'}: <strong style="margin-left:4px">${(brainSource||'—').replace(/</g,'&lt;')}</strong></div>
+      ${p.note ? `<div class="result-box warning"><div class="result-row"><span class="label">${p.note}</span></div></div>` : ''}
+      <div class="select-label" style="margin-top:6px">${da?'Fundne forbrugere':'Detected loads'} (${p.consumers.length})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${consumerChips}</div>
+      ${p.features.length ? `<div class="select-label">${da?'Fundne krav/egenskaber':'Detected requirements'}</div><div style="display:flex;flex-wrap:wrap;gap:6px">${featChips}</div>` : ''}
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">🏗️ ${da? '3D-projektvisning (til kunden)' : '3D project view (for the customer)'}</div>
+      <div class="info-row">${da?'Sælg projektet: en flot, letforståelig 3D-tegning af hele anlægget.':'Sell the project: a beautiful, easy-to-understand 3D drawing of the whole installation.'}</div>
+      ${neonScene(p.nodes, { title: (da?'Dit el-projekt i 3D':'Your electrical project in 3D') })}
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">⚙️ ${da? 'Optimeret dimensioneringsforslag' : 'Optimized dimensioning proposal'}</div>
+      <div class="result-box">
+        <div class="result-title">${da?'Hovedanlæg':'Main system'}</div>
+        <div class="result-row"><span class="label">${da?'Forsyning':'Supply'}</span><span class="value">${p.supply} V</span></div>
+        <div class="result-row"><span class="label">L1 / L2 / L3</span><span class="value">${sch.ph.L1.toFixed(0)} / ${sch.ph.L2.toFixed(0)} / ${sch.ph.L3.toFixed(0)} A</span></div>
+        <div class="result-row"><span class="label">${da?'Dimensionerende strøm (IB)':'Design current (IB)'}</span><span class="value">${sch.ib.toFixed(0)} A</span></div>
+        <div class="result-row"><span class="label">${da?'Samlet effekt':'Total power'}</span><span class="value">${sch.kVA.toFixed(1)} kVA</span></div>
+        <div class="result-row"><span class="label">${da?'Anbefalet transformer':'Recommended transformer'}</span><span class="value">${trafo} kVA</span></div>
+        <div class="result-row"><span class="label">${da?'Anbefalet hovedafbryder':'Recommended main breaker'}</span><span class="value">${mainLbl}</span></div>
+      </div>
+      <table class="data-table">
+        <tr><th>${da?'Gruppe':'Circuit'}</th><th>kW</th><th>${da?'Fase':'Ph'}</th><th>IB</th><th>${da?'Kabel':'Cable'}</th><th>${da?'Beskyttelse':'Protection'}</th><th>L</th><th>ΔU</th></tr>
+        ${dim.rows.map(r => `<tr>
+          <td>${r.name}</td><td>${r.kW}</td><td>${r.phase}</td><td>${r.ib.toFixed(1)} A</td>
+          <td>${r.cable}</td><td>${r.prot}</td><td>${r.dist} m</td>
+          <td style="color:${r.vdOver?'var(--danger)':'var(--success)'};font-weight:700">${r.vdP.toFixed(1)}%</td>
+        </tr>`).join('')}
+      </table>
+    </div>`;
+
+  // Installer recommendations
+  const inst = brainInstallerRecs(p, dim);
+  html += `
+    <div class="card fade-in" style="border-left:4px solid var(--accent)">
+      <div class="card-title">👷 ${da? 'Anbefalinger til installatøren' : 'Recommendations for the installer'}</div>
+      <div class="result-box">
+        ${inst.map(x => `<div class="result-row"><span class="label">🔧 ${x}</span></div>`).join('')}
+      </div>
+    </div>`;
+
+  // Customer recommendations (plain language)
+  const cust = brainCustomerRecs(p);
+  html += `
+    <div class="card fade-in" style="border-left:4px solid var(--success)">
+      <div class="card-title">🤝 ${da? 'Til kunden (uden el-viden)' : 'For the customer (no electrical knowledge)'}</div>
+      <div class="result-box" style="background:var(--tint-success);border-color:var(--success)">
+        ${cust.map(x => `<div class="result-row"><span class="label" style="font-size:0.9rem;line-height:1.6">${x}</span></div>`).join('')}
+      </div>
+    </div>`;
+
+  // Optional online AI enhancement
+  html += `
+    <div class="card fade-in">
+      <div class="card-title">🌐 ${da? 'Forbedr med online AI (valgfrit)' : 'Enhance with online AI (optional)'}</div>
+      <div class="info-row">${da?'Send projektet til en tilsluttet AI-tjeneste for et ekstra ekspert-tjek. Virker også 100% offline uden dette.':'Send the project to a connected AI service for an extra expert check. Works 100% offline without this too.'}</div>
+      <div class="select-grid"><button class="sel-btn selected" onclick="brainAiAnalyze()">🤖 ${da?'Analysér med online AI':'Analyze with online AI'}</button></div>
+      ${brainBusy ? `<div class="info-row" style="margin-top:8px">🤖 ${da?'AI tænker…':'AI is thinking…'}</div>` : ''}
+      ${brainAiOut ? `<div class="result-box" style="margin-top:10px;background:var(--tint-info);border-color:var(--accent)"><div class="result-title">${da?'AI-ekspertvurdering':'AI expert assessment'}</div><div class="result-row"><span class="label" style="white-space:pre-wrap;line-height:1.6">${brainAiOut.replace(/</g,'&lt;')}</span></div></div>` : ''}
+    </div>`;
+
+  return html;
 }
 
 // ===== INIT =====
