@@ -1,0 +1,73 @@
+{
+  "pbtResults": {
+    "1.3 Write property test for conservative correction-factor defaults": {
+      "status": "passed",
+      "lastRunTimestamp": 1781303043113
+    },
+    "1.5 Write property test for the derating formula and round-down": {
+      "status": "passed",
+      "lastRunTimestamp": 1781303044149
+    },
+    "1.6 Write property test for derating monotonicity": {
+      "status": "passed",
+      "lastRunTimestamp": 1781303045160
+    },
+    "1.8 Write property test for derated-safe recommendations (regression guard)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781303045536
+    },
+    "3.2 Write property test for I₂ computation by device type": {
+      "status": "passed",
+      "lastRunTimestamp": 1781303963497
+    },
+    "3.4 Write property test for overload verdict correctness": {
+      "status": "passed",
+      "lastRunTimestamp": 1781303965994
+    },
+    "3.5 Write property test for overload independence (gG fuse)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781303968515
+    },
+    "3.6 Write property test for overload equivalence (MCB/MCCB)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781303972067
+    },
+    "4.3 Write property test for adiabatic withstand correctness": {
+      "status": "passed",
+      "lastRunTimestamp": 1781303974643
+    },
+    "4.4 Write property test for monotonicity in cross-section": {
+      "status": "passed",
+      "lastRunTimestamp": 1781303977127
+    },
+    "4.5 Write property test for monotonicity in fault energy": {
+      "status": "passed",
+      "lastRunTimestamp": 1781303979606
+    },
+    "4.6 Write property test for the adiabatic recommendation round-trip": {
+      "status": "passed",
+      "lastRunTimestamp": 1781303983143
+    },
+    "5.2 Write property test for the disconnection-time lookup": {
+      "status": "passed",
+      "lastRunTimestamp": 1781303985780
+    },
+    "5.5 Write property test for inverse monotonicity of Zs_max": {
+      "status": "passed",
+      "lastRunTimestamp": 1781303988324
+    },
+    "5.6 Write property test for Zs verdict correctness (TN and TT)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781303990969
+    },
+    "10.3 Write property test for click-only, conservatively-defaulted verdict screens": {
+      "status": "passed",
+      "lastRunTimestamp": 1781305777156
+    },
+    "11.2 Write property test for bilingual completeness and fallback": {
+      "status": "passed",
+      "lastRunTimestamp": 1781305777991
+    }
+  },
+  "executionHistory": {}
+}

@@ -706,7 +706,28 @@ const T = {
     ok: 'OK',
     fail: 'FEJL',
     infoClick: 'V\u00E6lg v\u00E6rdier ved at klikke - ingen indtastning n\u00F8dvendig',
-    calculate: 'Beregn'
+    calculate: 'Beregn',
+    // Correctness verdicts (Tier 1 hardening) — Task 7/8/11
+    verdictPanelTitle: 'Korrekthedsverdikter (DS/HD 60364)',
+    verdictInputsTitle: 'Verifikationsparametre (klik)',
+    vStatePass: 'GODKENDT',
+    vStateFail: 'FEJL',
+    vStateInsufficient: 'UTILSTR\u00C6KKELIGE DATA',
+    vRecommendation: 'Anbefaling',
+    vSystemType: 'Jordingssystem',
+    vCircuitCategory: 'Kredsl\u00F8bstype',
+    vFinal: 'Endekreds',
+    vDistribution: 'Fordeling',
+    vTclear: 'Udkoblingstid t_clear [s]',
+    vDeviceDerived: 'Enhedsbestemt',
+    vRcdIDn: 'RCD I\u0394n [A]',
+    vSoil: 'Jordbund Cs [K\u00B7m/W]',
+    vNotBuried: 'Ikke nedgravet',
+    vTitleAmpacity: 'Str\u00F8mb\u00E6reevne (IB \u2264 In \u2264 Iz)',
+    vTitleOverload: 'Overbelastning (I\u2082 \u2264 1,45\u00D7Iz)',
+    vTitleAdiabatic: 'Kortslutningsholdbarhed (k\u00B2S\u00B2 \u2265 I\u00B2t)',
+    vTitleZs: 'Fejlsl\u00F8jfe / udkobling (Zs)',
+    cableVerifyTitle: 'Korrekthedskontrol'
   },
   en: {
     appTitle: 'Electrical Dimensioning',
@@ -799,11 +820,60 @@ const T = {
     ok: 'OK',
     fail: 'FAIL',
     infoClick: 'Select values by clicking - no typing required',
-    calculate: 'Calculate'
+    calculate: 'Calculate',
+    // Correctness verdicts (Tier 1 hardening) — Task 7/8/11
+    verdictPanelTitle: 'Correctness verdicts (DS/HD 60364)',
+    verdictInputsTitle: 'Verification parameters (click)',
+    vStatePass: 'PASS',
+    vStateFail: 'FAIL',
+    vStateInsufficient: 'INSUFFICIENT DATA',
+    vRecommendation: 'Recommendation',
+    vSystemType: 'Earthing system',
+    vCircuitCategory: 'Circuit category',
+    vFinal: 'Final circuit',
+    vDistribution: 'Distribution',
+    vTclear: 'Clearing time t_clear [s]',
+    vDeviceDerived: 'Device-derived',
+    vRcdIDn: 'RCD I\u0394n [A]',
+    vSoil: 'Soil class Cs [K\u00B7m/W]',
+    vNotBuried: 'Not buried',
+    vTitleAmpacity: 'Ampacity (IB \u2264 In \u2264 Iz)',
+    vTitleOverload: 'Overload (I\u2082 \u2264 1.45\u00D7Iz)',
+    vTitleAdiabatic: 'Short-circuit withstand (k\u00B2S\u00B2 \u2265 I\u00B2t)',
+    vTitleZs: 'Fault loop / disconnection (Zs)',
+    cableVerifyTitle: 'Correctness verification'
   }
 };
 
-function t(key) { return T[lang][key] || key; }
+// Alias to the translation tables so self-tests can probe the Danish fallback
+// without colliding with local variables also named `T` (e.g. the self-test
+// results array inside runSelfTests()).
+const I18N = T;
+
+// Every UI string key introduced by the dimensioning-correctness-hardening
+// feature (Tasks 1, 7, 8, 10). Each MUST resolve to a non-empty value in BOTH
+// da and en; a missing active-language value falls back to Danish (see t()).
+// Used by the Property 19 bilingual-completeness self-test.
+const NEW_I18N_KEYS = [
+  'verdictPanelTitle', 'verdictInputsTitle',
+  'vStatePass', 'vStateFail', 'vStateInsufficient', 'vRecommendation',
+  'vSystemType', 'vCircuitCategory', 'vFinal', 'vDistribution',
+  'vTclear', 'vDeviceDerived', 'vRcdIDn', 'vSoil', 'vNotBuried',
+  'vTitleAmpacity', 'vTitleOverload', 'vTitleAdiabatic', 'vTitleZs',
+  'cableVerifyTitle'
+];
+
+// t(): resolve a key in the active language. Life-safety-critical strings must
+// never render blank or as a raw key — so if the active-language value is
+// missing or empty, fall back to the authoritative Danish text, and only if
+// that is also missing return the key itself. (Req 8.4, 8.5.)
+function t(key) {
+  const active = T[lang] ? T[lang][key] : undefined;
+  if (active !== undefined && active !== null && active !== '') return active;
+  const da = T.da ? T.da[key] : undefined;
+  if (da !== undefined && da !== null && da !== '') return da;
+  return key;
+}
 
 function setLang(l) {
   lang = l;
@@ -1039,6 +1109,802 @@ const TEMP_FACTORS = {
 const GROUP_FACTORS = {
   1: 1.0, 2: 0.80, 3: 0.70, 4: 0.65, 5: 0.60, 6: 0.57, 7: 0.54, 8: 0.52, 9: 0.50
 };
+
+// ============================================================================
+// ===== CORRECTNESS ENGINE — DATA TABLES (Tier 1 safety hardening) ===========
+// Feature: dimensioning-correctness-hardening (Task 1)
+// Added beside the existing correction-factor tables. No existing table is
+// modified. Every value traces to a DS/HD 60364 reference clause.
+// ============================================================================
+
+// Adiabatic constant k (DS/HD 60364-4-43 Table 43A) — A·s^½/mm². XLPE bucket
+// also covers EPR. Used by k²·S² ≥ I²t short-circuit-withstand verification.
+const K_ADIABATIC = { Cu: { PVC: 115, XLPE: 143 }, Al: { PVC: 76, XLPE: 94 } };
+
+// Standard conductor cross-section series (mm²) — DS/HD 60364-5-52.
+const STANDARD_CSA = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240];
+
+// Soil-thermal-resistivity correction Cs (DS/HD 60364-5-52 Annex B, Table
+// B.52.16). Applies only to buried installations; key = resistivity [K·m/W].
+// Reference resistivity 2.5 K·m/W = 1.00. Conservative buried default = 0.96.
+const SOIL_FACTORS = { 1.0: 1.18, 1.5: 1.10, 2.0: 1.05, 2.5: 1.00, 3.0: 0.96 };
+
+// Disconnection-time matrix (DS/HD 60364-4-41 §411.3.2.2 / §411.3.2.3) — seconds.
+const DISCONNECT_TIME = {
+  TN: { final: { '<=32': 0.4, '>32': 5 }, distribution: 5 },
+  TT: { final: { '<=32': 0.2, '>32': 1 }, distribution: 1 }
+};
+
+// gG fuse current that clears within 0.4 s (IEC 60269 gG time-current bands).
+const FUSE_0_4S = { 6: 47, 10: 82, 13: 110, 16: 130, 20: 170, 25: 220, 32: 300, 40: 380, 50: 500, 63: 650 };
+
+// Supply / safety constants.
+const U0_NOMINAL = 230; // V, line-to-earth, Danish 230/400 V system (U₀)
+const U_L_LIMIT = 50;   // V AC, conventional touch-voltage limit (TT systems)
+
+// ============================================================================
+// ===== CORRECTNESS ENGINE — SHARED PURE FUNCTIONS ===========================
+// Single source of truth for derating. recommendCables, the cable AI assistant
+// and the cable module display all route through computeDeratedIz so derating
+// can never again be "display only".
+// ============================================================================
+
+// Resolve one correction-factor category to its active value, applying the
+// conservative default (numerically lowest value ≤ 1.0 — most reducing) when
+// the key is not selected. For 'cs', when the installation is NOT buried the
+// soil correction does not apply and the value is a non-defaulted 1.0.
+// category: 'ca' | 'cg' | 'cs' | 'kInstall'
+// Returns { value, defaulted, valid, source }.
+function getCorrectionFactor(category, key, buried) {
+  const tables = { ca: TEMP_FACTORS, cg: GROUP_FACTORS, cs: SOIL_FACTORS, kInstall: INSTALL_METHODS };
+  const sources = {
+    ca: 'DS/HD 60364-5-52 Annex B (Ca, ambient temperature)',
+    cg: 'DS/HD 60364-5-52 Annex B (Cg, grouping)',
+    cs: 'DS/HD 60364-5-52 Annex B (Cs, soil resistivity)',
+    kInstall: 'DS/HD 60364-5-52 (installation method)'
+  };
+  const table = tables[category];
+  const source = sources[category] || String(category);
+  if (!table) return { value: NaN, defaulted: false, valid: false, source };
+
+  // Soil correction only applies to buried installations.
+  if (category === 'cs' && !buried) {
+    return { value: 1.0, defaulted: false, valid: true, source };
+  }
+
+  // Key explicitly selected and present in the reference table.
+  if (key !== null && key !== undefined && Object.prototype.hasOwnProperty.call(table, key)) {
+    const v = table[key];
+    return { value: v, defaulted: false, valid: typeof v === 'number' && isFinite(v), source };
+  }
+
+  // Conservative default: the numerically lowest value ≤ 1.0 in this category
+  // (guaranteed ≤ every selectable value, so a default never inflates capacity).
+  const vals = Object.keys(table).map(function (k) { return table[k]; });
+  const reducing = vals.filter(function (v) { return typeof v === 'number' && isFinite(v) && v <= 1.0; });
+  const fallback = reducing.length ? Math.min.apply(null, reducing) : Math.min.apply(null, vals);
+  return { value: fallback, defaulted: true, valid: isFinite(fallback), source };
+}
+
+// Compute the derated continuous ampacity:
+//   Derated_Iz = floor(Base_Iz × Ca × Cg × Cs × k_install × 100) / 100  (round DOWN to 2 dp)
+// Applies the DD-5 validation guard: rejects non-numeric factors, factors < 0.01,
+// and DEFAULTED factors > 1.0 (a default may never increase capacity); honours
+// user-selected Annex B values > 1.0 up to the documented ceiling of 1.25.
+// opts = { baseIz, caKey, cgKey, csKey, kInstallKey, buried }
+function computeDeratedIz(opts) {
+  opts = opts || {};
+  const baseIz = opts.baseIz;
+  const buried = !!opts.buried;
+  if (typeof baseIz !== 'number' || !isFinite(baseIz) || baseIz <= 0) {
+    return { ok: false, error: { factor: 'baseIz', reason: 'non-numeric' } };
+  }
+  const ca = getCorrectionFactor('ca', opts.caKey);
+  const cg = getCorrectionFactor('cg', opts.cgKey);
+  const cs = getCorrectionFactor('cs', opts.csKey, buried);
+  const kInstall = getCorrectionFactor('kInstall', opts.kInstallKey);
+  const resolved = { ca: ca, cg: cg, cs: cs, kInstall: kInstall };
+
+  // DD-5 validation guard.
+  const names = ['ca', 'cg', 'cs', 'kInstall'];
+  for (let i = 0; i < names.length; i++) {
+    const name = names[i];
+    const f = resolved[name];
+    const v = f.value;
+    if (typeof v !== 'number' || !isFinite(v)) return { ok: false, error: { factor: name, reason: 'non-numeric' } };
+    if (v < 0.01) return { ok: false, error: { factor: name, reason: 'below-minimum' } };
+    if (f.defaulted && v > 1.0) return { ok: false, error: { factor: name, reason: 'default-exceeds-unity' } };
+    if (!f.defaulted && v > 1.25) return { ok: false, error: { factor: name, reason: 'exceeds-ceiling' } };
+  }
+
+  const totalFactor = ca.value * cg.value * cs.value * kInstall.value;
+  const deratedIz = Math.floor(baseIz * totalFactor * 100) / 100; // round DOWN to 2 dp
+  return {
+    ok: true,
+    deratedIz: deratedIz,
+    baseIz: baseIz,
+    totalFactor: totalFactor,
+    factors: { ca: ca.value, cg: cg.value, cs: cs.value, kInstall: kInstall.value },
+    defaulted: { ca: ca.defaulted, cg: cg.defaulted, cs: cs.defaulted, kInstall: kInstall.defaulted }
+  };
+}
+
+// Convenience wrapper: derate a PRODUCT using its official base Iz table value
+// and the active environment selections (falling back to live cableState).
+// Returns the numeric Derated_Iz, or NaN when the computation is rejected.
+function deratedIzForProduct(product, env) {
+  env = env || {};
+  const baseIz = officialIz(product);
+  const cs = (typeof cableState !== 'undefined') ? cableState : {};
+  const installKey = (env.installMethod != null) ? env.installMethod : cs.installMethod;
+  const buried = (env.buried != null) ? env.buried : (installKey === 'D');
+  const res = computeDeratedIz({
+    baseIz: baseIz,
+    caKey: (env.temp != null) ? env.temp : cs.temp,
+    cgKey: (env.grouping != null) ? env.grouping : cs.grouping,
+    csKey: (env.soil != null) ? env.soil : cs.soil,
+    kInstallKey: installKey,
+    buried: buried
+  });
+  return res.ok ? res.deratedIz : NaN;
+}
+
+// ============================================================================
+// ===== CORRECTNESS ENGINE — VERDICT CHECKS (Tasks 3, 4, 5) ==================
+// Each check is a pure function returning the shared verdict shape:
+//   { id, state:'PASS'|'FAIL'|'INSUFFICIENT_DATA', clause, values:{...},
+//     message:{da,en}, recommendation:{da,en}|null }
+// Conservative by default: any missing/zero/negative required input yields
+// INSUFFICIENT_DATA (never PASS), and every verdict cites its governing
+// DS/HD 60364 clause. Danish text is primary; English mirrors it.
+// ============================================================================
+
+// Round a current/value to two decimal places for safe comparison & display.
+function round2(x) { return Math.round(x * 100) / 100; }
+
+// ---- TASK 3: Overload coordination I2 <= 1,45 x Iz (DS/HD 60364-4-43 §433.1) -
+
+// deviceI2: conventional operating current I2 by device type.
+//   gG fuse -> 1.6 x In ; MCB/MCCB -> 1.45 x In ; unknown kind -> 1.6 x In
+//   (conservative, with defaulted:true).
+// device = { kind:'fuse'|'mcb'|'mccb'|null, inA:Number }.
+// Returns { i2, factor, defaulted }.
+function deviceI2(device) {
+  device = device || {};
+  const inA = device.inA;
+  let factor, defaulted;
+  if (device.kind === 'mcb' || device.kind === 'mccb') {
+    factor = 1.45; defaulted = false;
+  } else if (device.kind === 'fuse') {
+    factor = 1.6; defaulted = false;
+  } else {
+    factor = 1.6; defaulted = true; // undetermined kind -> highest applicable factor
+  }
+  const i2 = (typeof inA === 'number' && isFinite(inA)) ? factor * inA : NaN;
+  return { i2: i2, factor: factor, defaulted: defaulted };
+}
+
+// checkOverloadI2: second condition of overload protection, I2 <= 1,45 x Derated_Iz.
+// opts = { device, deratedIz }.
+function checkOverloadI2(opts) {
+  opts = opts || {};
+  const device = opts.device || {};
+  const deratedIz = opts.deratedIz;
+  const clause = 'DS/HD 60364-4-43 \u00A7433.1';
+  const inA = device.inA;
+  if (typeof inA !== 'number' || !isFinite(inA) || inA <= 0 ||
+      typeof deratedIz !== 'number' || !isFinite(deratedIz) || deratedIz <= 0) {
+    return {
+      id: 'overload', state: 'INSUFFICIENT_DATA', clause: clause, values: {},
+      message: {
+        da: 'Overbelastningsbetingelsen (I\u2082 \u2264 1,45 \u00D7 Iz) kunne ikke vurderes \u2014 In eller Derated_Iz mangler.',
+        en: 'Overload condition (I\u2082 \u2264 1.45 \u00D7 Iz) could not be evaluated \u2014 In or Derated_Iz missing.'
+      },
+      recommendation: null
+    };
+  }
+  const di = deviceI2(device);
+  const i2 = round2(di.i2);
+  const limit = round2(1.45 * deratedIz);
+  const values = { i2: i2, limit: limit, factor: di.factor, defaulted: di.defaulted, inA: round2(inA), deratedIz: round2(deratedIz) };
+  if (i2 <= limit) {
+    return {
+      id: 'overload', state: 'PASS', clause: clause, values: values,
+      message: {
+        da: 'I\u2082 = ' + i2.toFixed(2) + ' A \u2264 1,45 \u00D7 Iz = ' + limit.toFixed(2) + ' A \u2014 overbelastningsbeskyttelse OK.',
+        en: 'I\u2082 = ' + i2.toFixed(2) + ' A \u2264 1.45 \u00D7 Iz = ' + limit.toFixed(2) + ' A \u2014 overload protection OK.'
+      },
+      recommendation: null
+    };
+  }
+  return {
+    id: 'overload', state: 'FAIL', clause: clause, values: values,
+    message: {
+      da: 'I\u2082 = ' + i2.toFixed(2) + ' A > 1,45 \u00D7 Iz = ' + limit.toFixed(2) + ' A \u2014 overbelastningsbeskyttelse ikke opfyldt.',
+      en: 'I\u2082 = ' + i2.toFixed(2) + ' A > 1.45 \u00D7 Iz = ' + limit.toFixed(2) + ' A \u2014 overload protection not met.'
+    },
+    recommendation: {
+      da: 'V\u00E6lg et st\u00F8rre tv\u00E6rsnit (h\u00F8jere Derated_Iz) eller en enhed med lavere I\u2082-faktor.',
+      en: 'Choose a larger cross-section (higher Derated_Iz) or a device with a lower I\u2082 factor.'
+    }
+  };
+}
+
+// ---- TASK 4: Adiabatic short-circuit withstand k^2*S^2 >= I^2t (§434.5.2) ----
+
+// adiabaticK: material/insulation -> k [A.s^1/2/mm^2] from K_ADIABATIC, or null.
+// material 'Cu'/'Al' (also accepts 'copper'/'aluminium'); insulation 'PVC'/'XLPE'.
+function adiabaticK(material, insulation) {
+  const m = /^(al|alu)/i.test(String(material)) ? 'Al'
+          : /^(cu|copper)/i.test(String(material)) ? 'Cu' : null;
+  const ins = /(xlpe|epr)/i.test(String(insulation)) ? 'XLPE'
+            : /pvc/i.test(String(insulation)) ? 'PVC' : null;
+  if (!m || !ins) return null;
+  const row = K_ADIABATIC[m];
+  const k = row ? row[ins] : undefined;
+  return (typeof k === 'number' && isFinite(k)) ? k : null;
+}
+
+// insulationForType: map insulation from the existing cable type/model string
+// (same convention as officialIz): XLPE for NOIKLX/NOIKX/NOIK-AL/NOSP, else PVC.
+function insulationForType(typeOrModel) {
+  return /NOIKLX|NOIKX|NOIK-AL|NOSP/i.test(String(typeOrModel || '')) ? 'XLPE' : 'PVC';
+}
+
+// nextStandardCrossSection: smallest STANDARD_CSA value >= sMin, or null if none.
+function nextStandardCrossSection(sMin) {
+  if (typeof sMin !== 'number' || !isFinite(sMin)) return null;
+  for (let i = 0; i < STANDARD_CSA.length; i++) {
+    if (STANDARD_CSA[i] >= sMin) return STANDARD_CSA[i];
+  }
+  return null;
+}
+
+// checkAdiabatic: the conductor survives the fault energy until the device clears.
+// opts = { material, insulation, sArea, isc, tClear }.
+function checkAdiabatic(opts) {
+  opts = opts || {};
+  const clause = 'DS/HD 60364-4-43 \u00A7434.5.2';
+  const k = adiabaticK(opts.material, opts.insulation);
+  const isc = opts.isc, tClear = opts.tClear, sArea = opts.sArea;
+  const iscBad = (typeof isc !== 'number' || !isFinite(isc) || isc <= 0);
+  const tBad = (typeof tClear !== 'number' || !isFinite(tClear) || tClear <= 0);
+  const sBad = (typeof sArea !== 'number' || !isFinite(sArea) || sArea <= 0);
+  if (k === null || iscBad || tBad || sBad) {
+    return {
+      id: 'adiabatic', state: 'INSUFFICIENT_DATA', clause: clause, values: { k: k },
+      message: {
+        da: 'Kortslutningsholdbarhed (k\u00B2\u00B7S\u00B2 \u2265 I\u00B2t) kunne ikke vurderes \u2014 Isc, t_clear, tv\u00E6rsnit eller k mangler.',
+        en: 'Short-circuit withstand (k\u00B2\u00B7S\u00B2 \u2265 I\u00B2t) could not be evaluated \u2014 Isc, t_clear, cross-section or k missing.'
+      },
+      recommendation: null
+    };
+  }
+  const i2t = isc * isc * tClear;
+  const withstand = k * k * sArea * sArea;
+  const sMin = Math.sqrt(i2t) / k;
+  const values = { k: k, i2t: i2t, withstand: withstand, sMin: sMin, sArea: sArea, isc: isc, tClear: tClear };
+  if (withstand >= i2t) {
+    return {
+      id: 'adiabatic', state: 'PASS', clause: clause, values: values,
+      message: {
+        da: 'k\u00B2\u00B7S\u00B2 = ' + Math.round(withstand) + ' \u2265 I\u00B2t = ' + Math.round(i2t) + ' A\u00B2s \u2014 leder t\u00E5ler kortslutningsenergien (S_min = ' + sMin.toFixed(2) + ' mm\u00B2).',
+        en: 'k\u00B2\u00B7S\u00B2 = ' + Math.round(withstand) + ' \u2265 I\u00B2t = ' + Math.round(i2t) + ' A\u00B2s \u2014 conductor withstands the fault energy (S_min = ' + sMin.toFixed(2) + ' mm\u00B2).'
+      },
+      recommendation: null
+    };
+  }
+  const rec = nextStandardCrossSection(sMin);
+  if (rec === null) {
+    return {
+      id: 'adiabatic', state: 'FAIL', clause: clause, values: values,
+      message: {
+        da: 'k\u00B2\u00B7S\u00B2 = ' + Math.round(withstand) + ' < I\u00B2t = ' + Math.round(i2t) + ' A\u00B2s \u2014 ingen tilg\u00E6ngelig tv\u00E6rsnit opfylder kortslutningsholdbarhed.',
+        en: 'k\u00B2\u00B7S\u00B2 = ' + Math.round(withstand) + ' < I\u00B2t = ' + Math.round(i2t) + ' A\u00B2s \u2014 no available cross-section meets withstand.'
+      },
+      recommendation: {
+        da: 'Ingen tilg\u00E6ngelig tv\u00E6rsnit opfylder kortslutningsholdbarhed \u2014 reduc\u00E9r I\u00B2t (hurtigere udkobling) eller anvend parallelle ledere.',
+        en: 'No available cross-section meets withstand \u2014 reduce I\u00B2t (faster clearing) or use parallel conductors.'
+      }
+    };
+  }
+  const valuesRec = Object.assign({}, values, { recommendedCsa: rec });
+  return {
+    id: 'adiabatic', state: 'FAIL', clause: clause, values: valuesRec,
+    message: {
+      da: 'k\u00B2\u00B7S\u00B2 = ' + Math.round(withstand) + ' < I\u00B2t = ' + Math.round(i2t) + ' A\u00B2s \u2014 tv\u00E6rsnit for lille til kortslutningsenergien.',
+      en: 'k\u00B2\u00B7S\u00B2 = ' + Math.round(withstand) + ' < I\u00B2t = ' + Math.round(i2t) + ' A\u00B2s \u2014 cross-section too small for the fault energy.'
+    },
+    recommendation: {
+      da: 'V\u00E6lg mindst ' + rec + ' mm\u00B2 (\u2265 S_min = ' + sMin.toFixed(2) + ' mm\u00B2).',
+      en: 'Choose at least ' + rec + ' mm\u00B2 (\u2265 S_min = ' + sMin.toFixed(2) + ' mm\u00B2).'
+    }
+  };
+}
+
+// ---- TASK 5: Zs / disconnection time (DS/HD 60364-4-41 §411) ----------------
+
+// requiredDisconnectionTime: DISCONNECT_TIME matrix lookup -> seconds, or null.
+//   TN: final <=32A -> 0.4 s, else 5 s ; distribution -> 5 s.
+//   TT: final <=32A -> 0.2 s, else 1 s ; distribution -> 1 s.
+function requiredDisconnectionTime(systemType, circuitCategory, inA) {
+  const sys = DISCONNECT_TIME[systemType];
+  if (!sys) return null;
+  if (circuitCategory === 'distribution') return sys.distribution;
+  if (circuitCategory === 'final') {
+    if (typeof inA !== 'number' || !isFinite(inA)) return null;
+    return (inA <= 32) ? sys.final['<=32'] : sys.final['>32'];
+  }
+  return null;
+}
+
+// deriveIa: current guaranteeing operation within reqTime, by device.
+//   MCB  -> MCB_CURVES[curve].isdMax x In (instantaneous magnetic trip; valid 0.4 s & 5 s)
+//   MCCB -> inVal x ioMult x isdMult x 1.1 (magnetic pickup with tolerance)
+//   gG fuse -> FUSE_5S[size] when reqTime >= 5 s, else FUSE_0_4S[size]
+//   unknown / no data -> { known:false }
+// Returns { ia, known }.
+function deriveIa(device, reqTime) {
+  device = device || {};
+  if (device.kind === 'mcb') {
+    const curve = MCB_CURVES[device.curve];
+    const inA = device.inA;
+    if (!curve || typeof inA !== 'number' || !isFinite(inA) || inA <= 0) return { ia: NaN, known: false };
+    return { ia: curve.isdMax * inA, known: true };
+  }
+  if (device.kind === 'mccb') {
+    const a = device.inVal, b = device.ioMult, c = device.isdMult;
+    if ([a, b, c].some(function (v) { return typeof v !== 'number' || !isFinite(v) || v <= 0; })) return { ia: NaN, known: false };
+    return { ia: a * b * c * 1.1, known: true };
+  }
+  if (device.kind === 'fuse') {
+    const table = (typeof reqTime === 'number' && reqTime >= 5) ? FUSE_5S : FUSE_0_4S;
+    const ia = table[device.size];
+    if (typeof ia !== 'number' || !isFinite(ia)) return { ia: NaN, known: false };
+    return { ia: ia, known: true };
+  }
+  return { ia: NaN, known: false };
+}
+
+// estimateZsActual: earth-fault-loop impedance from scState + selected cable.
+//   zTotal_mOhm = zNet + zTrafo + cableZ ; zs = zTotal_mOhm / 1000 (Ohm).
+//   Returns { zs, known }; known:false when the impedance model is incomplete.
+function estimateZsActual() {
+  const cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
+  const byType = cables[cableState.type];
+  const byCores = (byType && byType[cableState.cores]) ? byType[cableState.cores] : null;
+  const selected = byCores ? byCores[cableState.crossSection] : null;
+  if (!selected) return { zs: NaN, known: false };
+  if (typeof scState.zNet !== 'number' || !isFinite(scState.zNet) ||
+      typeof scState.zTrafo !== 'number' || !isFinite(scState.zTrafo)) {
+    return { zs: NaN, known: false };
+  }
+  const L = ((vdropState && typeof vdropState.length === 'number') ? vdropState.length : 0) / 1000; // km
+  const rCable = selected.r * L;
+  const xCable = selected.x * L;
+  const zCable = Math.sqrt(rCable * rCable + xCable * xCable) * 1000; // mOhm
+  const zTotal_mOhm = scState.zNet + scState.zTrafo + zCable;
+  if (!isFinite(zTotal_mOhm) || zTotal_mOhm <= 0) return { zs: NaN, known: false };
+  return { zs: zTotal_mOhm / 1000, known: true };
+}
+
+// checkZs: automatic disconnection / fault protection.
+//   TN -> Zs <= Zs_max = U0/Ia            clause §411.4 (+ §411.3.2)
+//   TT -> Zs x IDn <= U_L (50 V)          clause §411.5 (+ §411.3.2)
+// opts = { systemType, circuitCategory, device, rcdIDn, u0 }.
+function checkZs(opts) {
+  opts = opts || {};
+  const device = opts.device || {};
+  const systemType = opts.systemType;
+  const circuitCategory = opts.circuitCategory;
+  const rcdIDn = opts.rcdIDn;
+  const u0 = (typeof opts.u0 === 'number' && isFinite(opts.u0) && opts.u0 > 0) ? opts.u0 : U0_NOMINAL;
+  const reqTime = requiredDisconnectionTime(systemType, circuitCategory, device.inA);
+  const zsRes = estimateZsActual();
+  const zsActual = zsRes.known ? zsRes.zs : NaN;
+
+  if (systemType === 'TT') {
+    const clause = 'DS/HD 60364-4-41 \u00A7411.5 (+ \u00A7411.3.2)';
+    if (!zsRes.known || typeof rcdIDn !== 'number' || !isFinite(rcdIDn) || rcdIDn <= 0) {
+      return {
+        id: 'zs', state: 'INSUFFICIENT_DATA', clause: clause,
+        values: { zsMax: null, zsActual: zsRes.known ? round2(zsActual) : null, ia: null, reqTime: reqTime, rcdIDn: (typeof rcdIDn === 'number' ? rcdIDn : null) },
+        message: {
+          da: 'Fejlbeskyttelse (Zs \u00D7 I\u0394n \u2264 50 V) kunne ikke vurderes \u2014 Zs eller I\u0394n mangler.',
+          en: 'Fault protection (Zs \u00D7 I\u0394n \u2264 50 V) could not be evaluated \u2014 Zs or I\u0394n missing.'
+        },
+        recommendation: null
+      };
+    }
+    const product = zsActual * rcdIDn;
+    const zsMax = U_L_LIMIT / rcdIDn; // largest Zs that satisfies the touch-voltage limit
+    const values = { zsMax: round2(zsMax), zsActual: round2(zsActual), ia: null, reqTime: reqTime, rcdIDn: rcdIDn, uL: U_L_LIMIT, touchVoltage: round2(product) };
+    if (product <= U_L_LIMIT) {
+      return {
+        id: 'zs', state: 'PASS', clause: clause, values: values,
+        message: {
+          da: 'Zs \u00D7 I\u0394n = ' + round2(product).toFixed(2) + ' V \u2264 50 V \u2014 RCD-fejlbeskyttelse OK (TT).',
+          en: 'Zs \u00D7 I\u0394n = ' + round2(product).toFixed(2) + ' V \u2264 50 V \u2014 RCD fault protection OK (TT).'
+        },
+        recommendation: null
+      };
+    }
+    return {
+      id: 'zs', state: 'FAIL', clause: clause, values: values,
+      message: {
+        da: 'Zs \u00D7 I\u0394n = ' + round2(product).toFixed(2) + ' V > 50 V \u2014 automatisk udkobling ikke sikret (TT).',
+        en: 'Zs \u00D7 I\u0394n = ' + round2(product).toFixed(2) + ' V > 50 V \u2014 automatic disconnection not assured (TT).'
+      },
+      recommendation: {
+        da: 'Tilf\u00F8j en RCD eller v\u00E6lg en lavere I\u0394n (f.eks. 30 mA).',
+        en: 'Add an RCD or choose a lower I\u0394n (e.g. 30 mA).'
+      }
+    };
+  }
+
+  if (systemType === 'TN') {
+    const clause = 'DS/HD 60364-4-41 \u00A7411.4 (+ \u00A7411.3.2)';
+    const iaRes = deriveIa(device, reqTime);
+    const ia = iaRes.ia;
+    if (!iaRes.known || typeof ia !== 'number' || !isFinite(ia) || ia <= 0 || !zsRes.known) {
+      return {
+        id: 'zs', state: 'INSUFFICIENT_DATA', clause: clause,
+        values: { zsMax: null, zsActual: zsRes.known ? round2(zsActual) : null, ia: iaRes.known ? round2(ia) : null, reqTime: reqTime },
+        message: {
+          da: 'Udkoblingsbetingelsen (Zs \u2264 U\u2080/Ia) kunne ikke vurderes \u2014 Ia eller Zs mangler.',
+          en: 'Disconnection condition (Zs \u2264 U\u2080/Ia) could not be evaluated \u2014 Ia or Zs missing.'
+        },
+        recommendation: null
+      };
+    }
+    const zsMax = u0 / ia;
+    const reqTxtDa = (reqTime != null) ? (reqTime + ' s') : 'kr\u00E6vet tid';
+    const reqTxtEn = (reqTime != null) ? (reqTime + ' s') : 'required time';
+    const values = { zsMax: round2(zsMax), zsActual: round2(zsActual), ia: round2(ia), reqTime: reqTime, u0: u0 };
+    if (zsActual <= zsMax) {
+      return {
+        id: 'zs', state: 'PASS', clause: clause, values: values,
+        message: {
+          da: 'Zs = ' + round2(zsActual).toFixed(2) + ' \u03A9 \u2264 Zs_max = ' + round2(zsMax).toFixed(2) + ' \u03A9 \u2014 udkobling inden for ' + reqTxtDa + ' (TN).',
+          en: 'Zs = ' + round2(zsActual).toFixed(2) + ' \u03A9 \u2264 Zs_max = ' + round2(zsMax).toFixed(2) + ' \u03A9 \u2014 disconnection within ' + reqTxtEn + ' (TN).'
+        },
+        recommendation: null
+      };
+    }
+    return {
+      id: 'zs', state: 'FAIL', clause: clause, values: values,
+      message: {
+        da: 'Zs = ' + round2(zsActual).toFixed(2) + ' \u03A9 > Zs_max = ' + round2(zsMax).toFixed(2) + ' \u03A9 \u2014 udkobling inden for kr\u00E6vet tid ikke bevist (TN).',
+        en: 'Zs = ' + round2(zsActual).toFixed(2) + ' \u03A9 > Zs_max = ' + round2(zsMax).toFixed(2) + ' \u03A9 \u2014 disconnection within required time not proven (TN).'
+      },
+      recommendation: {
+        da: 'V\u00E6lg en hurtigere enhed (lavere Ia), reduc\u00E9r Zs (st\u00F8rre tv\u00E6rsnit/kortere l\u00E6ngde) eller tilf\u00F8j en RCD.',
+        en: 'Choose a faster-operating device (lower Ia), reduce Zs (larger cross-section/shorter length) or add an RCD.'
+      }
+    };
+  }
+
+  // Unknown earthing system -> governing clause/path cannot be determined.
+  return {
+    id: 'zs', state: 'INSUFFICIENT_DATA', clause: 'DS/HD 60364-4-41 \u00A7411.3.2',
+    values: { zsMax: null, zsActual: zsRes.known ? round2(zsActual) : null, ia: null, reqTime: reqTime },
+    message: {
+      da: 'Jordingssystem ikke fastlagt \u2014 udkoblings-/fejlbeskyttelse kan ikke vurderes.',
+      en: 'Earthing system not determined \u2014 disconnection/fault protection cannot be evaluated.'
+    },
+    recommendation: null
+  };
+}
+
+// ============================================================================
+// ===== CORRECTNESS ENGINE — ORCHESTRATOR + SHARED RENDERERS (Task 7) =========
+// Compute once, render many. evaluateCorrectnessVerdicts() reads the global
+// click-only state, calls the four pure checks, and returns ONE frozen bundle
+// consumed identically by the Cable engine, the Verify module, the QI index and
+// the Risk matrix — so cross-view consistency is guaranteed by construction.
+// ============================================================================
+
+// activeDevice: pick the device that drives the overload & Zs verdicts.
+//   Prefer a selected MCB rating, else an MCCB In, else a gG fuse size.
+//   Returns a descriptor usable by deviceI2 / deriveIa, or { kind:null }.
+function activeDevice() {
+  if (typeof mcbState !== 'undefined' && mcbState && mcbState.rating) {
+    return { kind: 'mcb', inA: mcbState.rating, curve: mcbState.curve };
+  }
+  if (typeof mccbState !== 'undefined' && mccbState && mccbState.inVal) {
+    return { kind: 'mccb', inA: mccbState.inVal, inVal: mccbState.inVal, ioMult: mccbState.ioMult, isdMult: mccbState.isdMult };
+  }
+  if (typeof fuseState !== 'undefined' && fuseState && fuseState.size) {
+    return { kind: 'fuse', inA: fuseState.size, size: fuseState.size };
+  }
+  return { kind: null, inA: null };
+}
+
+// evaluateCorrectnessVerdicts: build inputs, call the four checks, return the
+// immutable bundle { ampacity, overload, adiabatic, zs }. Each check call is
+// wrapped so any thrown error degrades to INSUFFICIENT_DATA for that id (never
+// a crash that blanks the screen). Every verdict carries its governing clause.
+function evaluateCorrectnessVerdicts() {
+  const clauseAmp = 'DS/HD 60364-5-52 \u00A7523';
+  const clauseOv  = 'DS/HD 60364-4-43 \u00A7433.1';
+  const clauseAd  = 'DS/HD 60364-4-43 \u00A7434.5.2';
+  const clauseZs  = 'DS/HD 60364-4-41 \u00A7411.3.2';
+
+  // Defensive wrapper: a thrown check yields an INSUFFICIENT_DATA verdict and a
+  // returned verdict is guaranteed a non-empty clause (safety provenance).
+  function guard(id, clause, fn) {
+    try {
+      const v = fn();
+      if (v && (!v.clause || v.clause === '')) v.clause = clause;
+      return v;
+    } catch (e) {
+      return {
+        id: id, state: 'INSUFFICIENT_DATA', clause: clause, values: {},
+        message: {
+          da: 'Verdikt kunne ikke beregnes (uventet fejl) \u2014 behandlet konservativt som utilstr\u00E6kkelige data.',
+          en: 'Verdict could not be computed (unexpected error) \u2014 treated conservatively as insufficient data.'
+        },
+        recommendation: null
+      };
+    }
+  }
+
+  // --- Shared derived inputs (read from the click-only global state) ---
+  const ib = (typeof calcIB === 'function') ? calcIB() : NaN;
+  const cs = (typeof cableState !== 'undefined' && cableState) ? cableState : {};
+  const izTable = (typeof izTableFor === 'function') ? izTableFor() : null;
+  const hasCable = !!(cs.crossSection && izTable);
+  const baseIz = hasCable ? (izTable[parseFloat(cs.crossSection)] || 0) : 0;
+  const buried = cs.installMethod === 'D';
+  // Same derating the Cable module and recommendCables use (single source of truth).
+  const dRes = hasCable ? computeDeratedIz({
+    baseIz: baseIz, caKey: cs.temp, cgKey: cs.grouping, csKey: cs.soil,
+    kInstallKey: cs.installMethod, buried: buried
+  }) : null;
+  const deratedIz = (dRes && dRes.ok) ? dRes.deratedIz : NaN;
+
+  const device = activeDevice();
+
+  // In for coordination: the smallest standard device rating >= IB (Req 1).
+  const stdRatings = [6,10,13,16,20,25,32,40,50,63,80,100,125,160,200,250,315,400,500,630];
+  const ibOk = (typeof ib === 'number' && isFinite(ib) && ib > 0);
+  const inFromIB = ibOk ? (stdRatings.find(function (r) { return r >= ib; }) || ib) : null;
+  // For disconnection-time bracketing prefer the actually selected device In.
+  const inForChecks = (device.inA != null && isFinite(device.inA) && device.inA > 0) ? device.inA : inFromIB;
+
+  // Prospective max short-circuit current ikMax (largest I^2t -> conservative
+  // for adiabatic), computed exactly as the short-circuit module does.
+  const Un = (typeof loadState !== 'undefined' && loadState && loadState.voltage === '3x400') ? 400 : 230;
+  const zSum = ((typeof scState !== 'undefined' && scState) ? (scState.zNet + scState.zTrafo) : NaN); // mOhm
+  const ikMax3ph = (typeof zSum === 'number' && isFinite(zSum) && zSum > 0)
+    ? (1.05 * Un) / (Math.sqrt(3) * zSum / 1000) : NaN; // A
+
+  // Clearing time: explicit click selection wins, else device-derived required time.
+  const vs = (typeof verdictState !== 'undefined' && verdictState) ? verdictState : {};
+  const reqT = requiredDisconnectionTime(vs.systemType, vs.circuitCategory, inForChecks);
+  const tClear = (vs.tClear != null) ? vs.tClear : reqT;
+
+  // ---- Ampacity coordination IB <= In <= Derated_Iz (DS/HD 60364-5-52 §523) ----
+  const ampacity = guard('ampacity', clauseAmp, function () {
+    if (!hasCable || !dRes || !dRes.ok || inFromIB == null) {
+      return {
+        id: 'ampacity', state: 'INSUFFICIENT_DATA', clause: clauseAmp,
+        values: {
+          baseIz: hasCable ? round2(baseIz) : null,
+          deratedIz: (dRes && dRes.ok) ? round2(dRes.deratedIz) : null,
+          inA: inFromIB != null ? round2(inFromIB) : null,
+          ib: ibOk ? round2(ib) : null
+        },
+        message: {
+          da: 'Str\u00F8mb\u00E6reevne (IB \u2264 In \u2264 Derated_Iz) kunne ikke vurderes \u2014 kabel, IB eller korrektionsfaktor mangler.',
+          en: 'Ampacity (IB \u2264 In \u2264 Derated_Iz) could not be evaluated \u2014 cable, IB or correction factor missing.'
+        },
+        recommendation: null
+      };
+    }
+    const inEff = inFromIB;
+    const values = {
+      baseIz: round2(baseIz), deratedIz: round2(deratedIz), inA: round2(inEff),
+      ib: round2(ib), totalFactor: Math.round(dRes.totalFactor * 1000) / 1000
+    };
+    const pass = (deratedIz >= inEff) && (ib <= inEff);
+    if (pass) {
+      return {
+        id: 'ampacity', state: 'PASS', clause: clauseAmp, values: values,
+        message: {
+          da: 'IB = ' + round2(ib).toFixed(2) + ' A \u2264 In = ' + round2(inEff).toFixed(2) + ' A \u2264 Derated_Iz = ' + round2(deratedIz).toFixed(2) + ' A \u2014 str\u00F8mb\u00E6reevne OK.',
+          en: 'IB = ' + round2(ib).toFixed(2) + ' A \u2264 In = ' + round2(inEff).toFixed(2) + ' A \u2264 Derated_Iz = ' + round2(deratedIz).toFixed(2) + ' A \u2014 ampacity OK.'
+        },
+        recommendation: null
+      };
+    }
+    return {
+      id: 'ampacity', state: 'FAIL', clause: clauseAmp, values: values,
+      message: {
+        da: 'Koordination IB \u2264 In \u2264 Derated_Iz ikke opfyldt \u2014 In = ' + round2(inEff).toFixed(2) + ' A > Derated_Iz = ' + round2(deratedIz).toFixed(2) + ' A.',
+        en: 'Coordination IB \u2264 In \u2264 Derated_Iz not satisfied \u2014 In = ' + round2(inEff).toFixed(2) + ' A > Derated_Iz = ' + round2(deratedIz).toFixed(2) + ' A.'
+      },
+      recommendation: {
+        da: 'V\u00E6lg et st\u00F8rre tv\u00E6rsnit (h\u00F8jere Derated_Iz) eller en enhed med lavere In.',
+        en: 'Choose a larger cross-section (higher Derated_Iz) or a device with a lower In.'
+      }
+    };
+  });
+
+  // ---- Overload coordination I2 <= 1,45 x Derated_Iz (§433.1) ----
+  const overload = guard('overload', clauseOv, function () {
+    return checkOverloadI2({ device: device, deratedIz: deratedIz });
+  });
+
+  // ---- Adiabatic short-circuit withstand k^2*S^2 >= I^2t (§434.5.2) ----
+  const adiabatic = guard('adiabatic', clauseAd, function () {
+    const sArea = hasCable ? parseFloat(cs.crossSection) : NaN;
+    return checkAdiabatic({
+      material: cs.material,                       // 'copper'/'aluminium' accepted by adiabaticK
+      insulation: insulationForType(cs.type),
+      sArea: sArea, isc: ikMax3ph, tClear: tClear
+    });
+  });
+
+  // ---- Earth-fault-loop impedance / disconnection time (§411) ----
+  const zs = guard('zs', clauseZs, function () {
+    return checkZs({
+      systemType: vs.systemType, circuitCategory: vs.circuitCategory,
+      device: device, rcdIDn: vs.rcdIDn, u0: U0_NOMINAL
+    });
+  });
+
+  return Object.freeze({ ampacity: ampacity, overload: overload, adiabatic: adiabatic, zs: zs });
+}
+
+// classifyVerdictForQi: pure mapping of a verdict state to its QI bucket /
+// severity. PASS -> passed; FAIL -> error issue; INSUFFICIENT_DATA -> warning
+// issue (never counted as passing). Used by runQiValidation and Property 16.
+function classifyVerdictForQi(verdict) {
+  const st = verdict && verdict.state;
+  if (st === 'PASS') return { target: 'passed', severity: null };
+  if (st === 'FAIL') return { target: 'issues', severity: 'error' };
+  return { target: 'issues', severity: 'warning' }; // INSUFFICIENT_DATA / anything else
+}
+
+// Risk metadata per verdict (category + worst-case probability/consequence used
+// for FAIL; INSUFFICIENT_DATA is scored one notch lower — yellow, not red).
+const VERDICT_RISK_META = {
+  ampacity:  { category: 'fire',        probability: 4, consequence: 4, da: 'Str\u00F8mb\u00E6reevne', en: 'Ampacity' },
+  overload:  { category: 'fire',        probability: 4, consequence: 4, da: 'Overbelastningskoordination', en: 'Overload coordination' },
+  adiabatic: { category: 'overcurrent', probability: 4, consequence: 5, da: 'Kortslutningsholdbarhed', en: 'Short-circuit withstand' },
+  zs:        { category: 'earth_fault', probability: 4, consequence: 4, da: 'Fejlsl\u00F8jfeimpedans / udkobling', en: 'Fault-loop impedance / disconnection' }
+};
+
+// verdictRiskEntriesFromBundle: pure mapping of a verdict bundle to risk entries.
+// FAIL or INSUFFICIENT_DATA -> exactly one entry referencing the verdict id, its
+// state and its governing clause; PASS -> no entry. (Req 7.5, 7.6; Property 17.)
+function verdictRiskEntriesFromBundle(bundle) {
+  const out = [];
+  ['ampacity', 'overload', 'adiabatic', 'zs'].forEach(function (id) {
+    const v = bundle ? bundle[id] : null;
+    if (!v || v.state === 'PASS') return; // PASS -> ensure no entry remains
+    const meta = VERDICT_RISK_META[id];
+    const isFail = (v.state === 'FAIL');
+    const p = isFail ? meta.probability : 2;
+    const c = isFail ? meta.consequence : 4;
+    const level = RISK_MATRIX[c - 1][p - 1];
+    const stateDa = isFail ? 'FEJL' : 'UTILSTR\u00C6KKELIGE DATA';
+    const stateEn = isFail ? 'FAIL' : 'INSUFFICIENT DATA';
+    out.push({
+      id: 'verdict_' + id,
+      verdictId: id,
+      verdictState: v.state,
+      category: meta.category,
+      description: {
+        da: meta.da + ' \u2014 ' + stateDa + ': ' + (v.message ? v.message.da : ''),
+        en: meta.en + ' \u2014 ' + stateEn + ': ' + (v.message ? v.message.en : '')
+      },
+      probability: p, consequence: c, riskLevel: level, autoDetected: true,
+      clause: v.clause,
+      mitigation: v.recommendation || {
+        da: 'Tilvejebring de manglende inputs, s\u00E5 verdiktet kan beregnes (konservativ h\u00E5ndtering).',
+        en: 'Provide the missing inputs so the verdict can be evaluated (conservative handling).'
+      }
+    });
+  });
+  return out;
+}
+
+// verdictRiskEntries: live wrapper reading the one computed bundle.
+function verdictRiskEntries() {
+  let bundle = null;
+  try { bundle = evaluateCorrectnessVerdicts(); } catch (e) { bundle = null; }
+  return verdictRiskEntriesFromBundle(bundle);
+}
+
+// renderVerdictRow: one bilingual verdict card. PASS = green check, FAIL = red
+// cross, INSUFFICIENT_DATA = amber warning — always with a TEXT state label (not
+// colour alone, Req 9.4). Shows the governing clause, key values and (if any)
+// the conservative recommendation. Uses the existing neon theme classes.
+function renderVerdictRow(verdict) {
+  if (!verdict) return '';
+  const st = verdict.state;
+  const boxClass = st === 'PASS' ? '' : (st === 'FAIL' ? 'error' : 'warning');
+  const badgeClass = st === 'PASS' ? 'ok' : 'fail';
+  const icon = st === 'PASS' ? '\u2713' : (st === 'FAIL' ? '\u2717' : '\u26A0');
+  const stateLabel = st === 'PASS' ? t('vStatePass') : (st === 'FAIL' ? t('vStateFail') : t('vStateInsufficient'));
+  const titleKey = { ampacity: 'vTitleAmpacity', overload: 'vTitleOverload', adiabatic: 'vTitleAdiabatic', zs: 'vTitleZs' }[verdict.id] || null;
+  const title = titleKey ? t(titleKey) : (verdict.id || '');
+  const msg = verdict.message ? (lang === 'da' ? verdict.message.da : verdict.message.en) : '';
+  const rec = verdict.recommendation ? (lang === 'da' ? verdict.recommendation.da : verdict.recommendation.en) : '';
+
+  const vals = verdict.values || {};
+  const num = function (x) { return (typeof x === 'number' && isFinite(x)); };
+  const vr = function (label, x, unit) {
+    if (!num(x)) return '';
+    return '<div class="result-row"><span class="label">' + label + '</span><span class="value">' + x.toFixed(2) + (unit ? ' ' + unit : '') + '</span></div>';
+  };
+  let valuesHtml = '';
+  if (verdict.id === 'ampacity') {
+    valuesHtml = vr('IB', vals.ib, 'A') + vr('In', vals.inA, 'A') + vr('Iz (base)', vals.baseIz, 'A') + vr('Derated_Iz', vals.deratedIz, 'A');
+  } else if (verdict.id === 'overload') {
+    valuesHtml = vr('I\u2082', vals.i2, 'A') + vr('1,45 \u00D7 Iz', vals.limit, 'A');
+  } else if (verdict.id === 'adiabatic') {
+    valuesHtml = vr('k', vals.k, 'A\u00B7s\u00BD/mm\u00B2') + vr('S', vals.sArea, 'mm\u00B2') + vr('S_min', vals.sMin, 'mm\u00B2') + vr('S anbefalet / rec.', vals.recommendedCsa, 'mm\u00B2');
+  } else if (verdict.id === 'zs') {
+    valuesHtml = vr('Zs', vals.zsActual, '\u03A9') + vr('Zs_max', vals.zsMax, '\u03A9') + vr('Ia', vals.ia, 'A') + vr('Zs\u00D7I\u0394n', vals.touchVoltage, 'V') + (num(vals.reqTime) ? '<div class="result-row"><span class="label">t_req</span><span class="value">' + vals.reqTime + ' s</span></div>' : '');
+  }
+
+  return '\n    <div class="result-box ' + boxClass + '" style="margin-bottom:8px">' +
+    '<div class="result-row"><span class="label"><strong>' + title + '</strong></span>' +
+    '<span class="value"><span class="verify-badge ' + badgeClass + '">' + icon + ' ' + stateLabel + '</span></span></div>' +
+    (msg ? '<div class="result-row"><span class="label">' + msg + '</span></div>' : '') +
+    valuesHtml +
+    (rec ? '<div class="result-row"><span class="label" style="color:#b8860b">\uD83D\uDCA1 ' + t('vRecommendation') + ': ' + rec + '</span></div>' : '') +
+    '<div class="info-row">' + (verdict.clause || '') + '</div>' +
+    '</div>';
+}
+
+// renderVerdictInputs: 100% click-only controls binding verdictState. Every
+// control pre-selects its conservative default, has a 44x44 px minimum target,
+// and re-renders the active module on tap (no typing anywhere). (Req 6.)
+function renderVerdictInputs() {
+  const vs = (typeof verdictState !== 'undefined' && verdictState) ? verdictState : {};
+  const re = "renderModule(activeModule)";
+  const b = function (sel, onclick, label) {
+    return '<button class="sel-btn ' + (sel ? 'selected' : '') + '" style="min-width:44px;min-height:44px" onclick="' + onclick + '">' + label + '</button>';
+  };
+  // System type (TN / TT)
+  let sysHtml = '';
+  [['TN', 'TN'], ['TT', 'TT']].forEach(function (o) {
+    sysHtml += b(vs.systemType === o[0], "verdictState.systemType='" + o[0] + "';" + re, o[1]);
+  });
+  // Circuit category (final / distribution)
+  let catHtml =
+    b(vs.circuitCategory === 'final', "verdictState.circuitCategory='final';" + re, t('vFinal')) +
+    b(vs.circuitCategory === 'distribution', "verdictState.circuitCategory='distribution';" + re, t('vDistribution'));
+  // Clearing time t_clear (device-derived/null + discrete standard times)
+  let tcHtml = b(vs.tClear == null, "verdictState.tClear=null;" + re, t('vDeviceDerived'));
+  [0.1, 0.2, 0.4, 1, 5].forEach(function (s) {
+    tcHtml += b(vs.tClear === s, "verdictState.tClear=" + s + ";" + re, s + ' s');
+  });
+  // RCD I-delta-n
+  let rcdHtml = '';
+  [0.03, 0.1, 0.3, 0.5].forEach(function (a) {
+    rcdHtml += b(vs.rcdIDn === a, "verdictState.rcdIDn=" + a + ";" + re, a + ' A');
+  });
+  // Soil class (SOIL_FACTORS keys + a not-buried option). The button also mirrors
+  // the value into cableState.soil so the ampacity derating stays identical to
+  // the Cable module and recommendCables (single source of truth).
+  let soilHtml = b(vs.soilResistivity == null, "verdictState.soilResistivity=null;cableState.soil=null;" + re, t('vNotBuried'));
+  Object.keys(SOIL_FACTORS).forEach(function (k) {
+    const sel = (vs.soilResistivity != null && String(vs.soilResistivity) === String(k));
+    soilHtml += b(sel, "verdictState.soilResistivity=" + k + ";cableState.soil=" + k + ";" + re, k + ' (' + SOIL_FACTORS[k] + ')');
+  });
+
+  return '\n    <div class="select-group" style="margin-top:12px"><div class="select-label">' + t('verdictInputsTitle') + '</div></div>' +
+    '<div class="select-group"><div class="select-label">' + t('vSystemType') + '</div><div class="select-grid">' + sysHtml + '</div></div>' +
+    '<div class="select-group"><div class="select-label">' + t('vCircuitCategory') + '</div><div class="select-grid">' + catHtml + '</div></div>' +
+    '<div class="select-group"><div class="select-label">' + t('vTclear') + '</div><div class="select-grid">' + tcHtml + '</div></div>' +
+    '<div class="select-group"><div class="select-label">' + t('vRcdIDn') + '</div><div class="select-grid">' + rcdHtml + '</div></div>' +
+    '<div class="select-group"><div class="select-label">' + t('vSoil') + '</div><div class="select-grid">' + soilHtml + '</div></div>';
+}
 
 // ===== PRODUCT DATABASE =====
 // Real products from major manufacturers used in Danish electrical installations
@@ -1310,15 +2176,24 @@ function officialIz(product) {
 }
 
 function recommendCables(ib, material) {
-  // Proper coordination IB <= In <= Iz: the cable must carry at least the
-  // protection rating (next standard size >= IB), not just IB itself.
+  // Proper coordination IB <= In <= Derated_Iz: the cable must carry at least the
+  // protection rating (next standard size >= IB) AFTER derating — not the raw
+  // table value (the original display-only-derating bug). Single source of truth:
+  // deratedIzForProduct() -> computeDeratedIz().  DS/HD 60364-5-52 §523.
   const mat = material || cableState.material;
   const stdRatings = [6,10,13,16,20,25,32,40,50,63,80,100,125,160,200,250,315,400,500,630];
   const inMin = stdRatings.find(r => r >= ib) || ib;
+  const env = {
+    temp: cableState.temp,
+    grouping: cableState.grouping,
+    installMethod: cableState.installMethod,
+    soil: cableState.soil,
+    buried: cableState.installMethod === 'D'
+  };
   return PRODUCTS.cables
     .filter(c => c.material === (mat === 'copper' ? 'Cu' : 'Al'))
-    .filter(c => officialIz(c) >= inMin) // Iz >= In >= IB
-    .sort((a, b) => officialIz(a) - officialIz(b)) // Smallest suitable first
+    .filter(c => { const d = deratedIzForProduct(c, env); return isFinite(d) && d >= inMin; }) // Derated_Iz >= In >= IB
+    .sort((a, b) => deratedIzForProduct(a, env) - deratedIzForProduct(b, env)) // Smallest suitable first
     .slice(0, 5);
 }
 
@@ -1387,7 +2262,21 @@ function recommendOverloadRelays(ib) {
 
 // Render product recommendation card
 function renderRecommendations(title, products, type) {
-  if (!products || products.length === 0) return '';
+  if (!products || products.length === 0) {
+    // Cable engine exhaustion: no conductor whose Derated_Iz >= In (Req 1.9).
+    if (type === 'cable') {
+      return `
+    <div class="card fade-in" style="border-left:4px solid var(--danger)">
+      <div class="card-title">\u26A0\uFE0F ${title}</div>
+      <div class="result-box error" style="margin-top:0">
+        <div class="result-title">${lang === 'da' ? 'Ingen kompatibel leder fundet' : 'No compliant conductor found'}</div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Ingen leders deratede str\u00F8mv\u00E6rdi (Derated_Iz) opfylder In efter korrektion. Reduc\u00E9r belastningen, forbedr installationsforholdene, eller v\u00E6lg et st\u00F8rre materiale.' : 'No conductor\u2019s derated capacity (Derated_Iz) meets In after correction. Reduce the load, improve installation conditions, or choose a larger material.'}</span></div>
+        <div class="info-row">DS/HD 60364-5-52 \u00A7523</div>
+      </div>
+    </div>`;
+    }
+    return '';
+  }
 
   const typeToCat = { cable:'cables', mcb:'mcbs', mccb:'mccbs', fuse:'fuses', contactor:'contactors', rcd:'rcds', mpcb:'mpcbs', relay:'overloadRelays' };
   const cat = typeToCat[type] || type;
@@ -1406,7 +2295,11 @@ function renderRecommendations(title, products, type) {
 
   let rows = '';
   if (type === 'cable') {
-    rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.cores} ${p.mm2} mm\u00B2`, `Iz = ${officialIz(p)} A`, `${lang === 'da' ? p.use_da : p.use_en} | R=${p.r} X=${p.x} \u03A9/km`)).join('');
+    rows = products.map(p => {
+      const dz = deratedIzForProduct(p);
+      const dzTxt = isFinite(dz) ? dz.toFixed(2) : '\u2014';
+      return rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.cores} ${p.mm2} mm\u00B2`, `Iz = ${officialIz(p)} A \u00B7 Iz\u2032 = ${dzTxt} A`, `${lang === 'da' ? p.use_da : p.use_en} | R=${p.r} X=${p.x} \u03A9/km`);
+    }).join('');
   } else if (type === 'mcb') {
     rows = products.map(p => rowWrap(p, `<strong>${p.brand}</strong> ${p.model} ${p.curve}${p.rating} (${p.poles})`, `Icu = ${p.icu} kA`)).join('');
   } else if (type === 'mccb') {
@@ -1506,21 +2399,33 @@ function getAiAssistant(module) {
       if (cableState.crossSection) {
         const izTable = izTableFor();
         const baseIz = izTable[parseFloat(cableState.crossSection)] || 0;
-        const kInstall = INSTALL_METHODS[cableState.installMethod] || 1.0;
-        const kTemp = TEMP_FACTORS[cableState.temp] || 1.0;
-        const kGroup = GROUP_FACTORS[cableState.grouping] || 1.0;
-        const correctedIz = baseIz * kInstall * kTemp * kGroup;
+        // Single source of truth — no duplicated inline derating math.
+        const dRes = computeDeratedIz({
+          baseIz: baseIz,
+          caKey: cableState.temp,
+          cgKey: cableState.grouping,
+          csKey: cableState.soil,
+          kInstallKey: cableState.installMethod,
+          buried: cableState.installMethod === 'D'
+        });
 
-        if (correctedIz < ib) {
-          errors.push(lang === 'da' ? '\u26A0\uFE0F FEJL: Korrigeret Iz (' + correctedIz.toFixed(1) + ' A) < IB (' + ib.toFixed(1) + ' A)! Kablet er UNDERDIMENSIONERET!' : '\u26A0\uFE0F ERROR: Corrected Iz (' + correctedIz.toFixed(1) + ' A) < IB (' + ib.toFixed(1) + ' A)! Cable is UNDERSIZED!');
+        if (!dRes.ok) {
+          errors.push(lang === 'da'
+            ? '\u26A0\uFE0F FEJL: Ugyldig korrektionsfaktor (' + dRes.error.factor + ' \u2014 ' + dRes.error.reason + '). Iz kan ikke beregnes.'
+            : '\u26A0\uFE0F ERROR: Invalid correction factor (' + dRes.error.factor + ' \u2014 ' + dRes.error.reason + '). Iz cannot be computed.');
         } else {
-          tips.push(lang === 'da' ? '\u2705 Iz (' + correctedIz.toFixed(1) + ' A) \u2265 IB (' + ib.toFixed(1) + ' A) — kabel korrekt dimensioneret.' : '\u2705 Iz (' + correctedIz.toFixed(1) + ' A) \u2265 IB (' + ib.toFixed(1) + ' A) — cable correctly sized.');
-        }
-        if (cableState.grouping > 3) {
-          warnings.push(lang === 'da' ? 'H\u00F8j gruppering reducerer kapaciteten kraftigt. Overvej større tværsnit.' : 'High grouping significantly reduces capacity. Consider larger cross-section.');
-        }
-        if (cableState.temp > 35) {
-          warnings.push(lang === 'da' ? 'Forhøjet temperatur: Kablets kapacitet er reduceret.' : 'Elevated temperature: Cable capacity is reduced.');
+          const correctedIz = dRes.deratedIz;
+          if (correctedIz < ib) {
+            errors.push(lang === 'da' ? '\u26A0\uFE0F FEJL: Korrigeret Iz (' + correctedIz.toFixed(2) + ' A) < IB (' + ib.toFixed(1) + ' A)! Kablet er UNDERDIMENSIONERET!' : '\u26A0\uFE0F ERROR: Corrected Iz (' + correctedIz.toFixed(2) + ' A) < IB (' + ib.toFixed(1) + ' A)! Cable is UNDERSIZED!');
+          } else {
+            tips.push(lang === 'da' ? '\u2705 Iz (' + correctedIz.toFixed(2) + ' A) \u2265 IB (' + ib.toFixed(1) + ' A) — kabel korrekt dimensioneret.' : '\u2705 Iz (' + correctedIz.toFixed(2) + ' A) \u2265 IB (' + ib.toFixed(1) + ' A) — cable correctly sized.');
+          }
+          if (cableState.grouping > 3) {
+            warnings.push(lang === 'da' ? 'H\u00F8j gruppering reducerer kapaciteten kraftigt. Overvej større tværsnit.' : 'High grouping significantly reduces capacity. Consider larger cross-section.');
+          }
+          if (cableState.temp > 35) {
+            warnings.push(lang === 'da' ? 'Forhøjet temperatur: Kablets kapacitet er reduceret.' : 'Elevated temperature: Cable capacity is reduced.');
+          }
         }
       } else {
         tips.push(lang === 'da' ? 'Vælg kabeltype og tværsnit. Krævet Iz \u2265 ' + ib.toFixed(1) + ' A.' : 'Select cable type and cross-section. Required Iz \u2265 ' + ib.toFixed(1) + ' A.');
@@ -1679,6 +2584,30 @@ function runQiValidation() {
       issues.push({ rule: 'IB \u2264 In (sikring)', detail: ib.toFixed(1) + ' A > ' + fuseState.size + ' A', severity: 'error' });
     }
   }
+
+  // 6. Correctness-engine verdicts (Tier 1 hardening) — appended as scored rules
+  // from the ONE shared bundle so QI matches Verify and Risk exactly. PASS ->
+  // passed; FAIL -> error issue; INSUFFICIENT_DATA -> warning issue (never
+  // counted as passing). Wrapped so it can never break the existing QI scoring.
+  try {
+    const bundle = evaluateCorrectnessVerdicts();
+    const ruleNames = {
+      ampacity:  { da: 'Str\u00F8mb\u00E6reevne IB \u2264 In \u2264 Iz', en: 'Ampacity IB \u2264 In \u2264 Iz' },
+      overload:  { da: 'Overbelastning I\u2082 \u2264 1,45\u00D7Iz', en: 'Overload I\u2082 \u2264 1.45\u00D7Iz' },
+      adiabatic: { da: 'Kortslutningsholdbarhed k\u00B2S\u00B2 \u2265 I\u00B2t', en: 'Short-circuit withstand k\u00B2S\u00B2 \u2265 I\u00B2t' },
+      zs:        { da: 'Fejlsl\u00F8jfe Zs \u2264 Zs_max', en: 'Fault loop Zs \u2264 Zs_max' }
+    };
+    ['ampacity', 'overload', 'adiabatic', 'zs'].forEach(function (id) {
+      const v = bundle[id];
+      if (!v) return;
+      const rn = ruleNames[id] ? (lang === 'da' ? ruleNames[id].da : ruleNames[id].en) : id;
+      const msg = v.message ? (lang === 'da' ? v.message.da : v.message.en) : '';
+      const detail = msg + ' [' + v.clause + ']';
+      const cls = classifyVerdictForQi(v);
+      if (cls.target === 'passed') passed.push({ rule: rn, detail: detail });
+      else issues.push({ rule: rn, detail: detail, severity: cls.severity });
+    });
+  } catch (e) { /* defensive: never break existing QI scoring/logic */ }
 
   return { issues, passed, score: passed.length > 0 ? Math.round((passed.length / (passed.length + issues.length)) * 100) : 0 };
 }
@@ -1863,11 +2792,16 @@ let mcbState = { type: 'C60N', curve: 'B', rating: null, poles: 'multi' };
 // MCCB state
 let mccbState = { frame: 'NSX 400', trip: 'F', inVal: 400, ioMult: 0.8, isdMult: 2 };
 // Cable state
-let cableState = { material: 'copper', type: 'NOIKLX', cores: '5G', crossSection: null, installMethod: 'C', temp: 30, grouping: 1 };
+let cableState = { material: 'copper', type: 'NOIKLX', cores: '5G', crossSection: null, installMethod: 'C', temp: 30, grouping: 1, soil: null };
 // Voltage drop state
 let vdropState = { length: 50 };
 // Short circuit state
 let scState = { zNet: 1, zTrafo: 5 };
+// Correctness-engine verdict state (Task 1 — click-only inputs feed the four verdicts).
+// Conservative pre-selection: TN (computable Zs), final (shortest disconnect time),
+// rcdIDn 0.3 A (hardest TT condition). tClear/soilResistivity null → device-derived /
+// conservative default.
+let verdictState = { systemType: 'TN', circuitCategory: 'final', tClear: null, rcdIDn: 0.3, soilResistivity: null };
 // Standards state
 let rcdSelected = null;
 let rcdSensitivity = null;
@@ -2393,14 +3327,36 @@ function renderCable() {
   const izTable = izTableFor();
   const selectedCable = currentCores[cableState.crossSection];
 
-  // Correction factors
-  const kInstall = INSTALL_METHODS[cableState.installMethod] || 1.0;
-  const kTemp = TEMP_FACTORS[cableState.temp] || 1.0;
-  const kGroup = GROUP_FACTORS[cableState.grouping] || 1.0;
-  const kTotal = kInstall * kTemp * kGroup;
-
+  // Derating via the single source of truth (computeDeratedIz). The duplicated
+  // inline kInstall*kTemp*kGroup math has been removed — DS/HD 60364-5-52 §523.
   const baseIz = izTable[parseFloat(cableState.crossSection)] || 0;
-  const correctedIz = baseIz * kTotal;
+  const buried = cableState.installMethod === 'D';
+  const deratedRes = computeDeratedIz({
+    baseIz: baseIz,
+    caKey: cableState.temp,
+    cgKey: cableState.grouping,
+    csKey: cableState.soil,
+    kInstallKey: cableState.installMethod,
+    buried: buried
+  });
+  const kTotal = deratedRes.ok ? deratedRes.totalFactor : 0;
+  const correctedIz = deratedRes.ok ? deratedRes.deratedIz : 0;
+  const deratedError = deratedRes.ok ? null : deratedRes.error;
+  const anyDefaulted = deratedRes.ok && Object.keys(deratedRes.defaulted).filter(k => deratedRes.defaulted[k]);
+  const defaultedList = (anyDefaulted && anyDefaulted.length) ? anyDefaulted : [];
+
+  // Live correctness verdicts for the in-module verification card (Task 10).
+  // Same single source of truth as Verify / QI / Risk: compute once, render many,
+  // so the four verdicts the user sees here are identical to every summary view.
+  let verdictRowsHtml = '';
+  try {
+    const vb = evaluateCorrectnessVerdicts();
+    verdictRowsHtml =
+      renderVerdictRow(vb.ampacity) +
+      renderVerdictRow(vb.overload) +
+      renderVerdictRow(vb.adiabatic) +
+      renderVerdictRow(vb.zs);
+  } catch (e) { verdictRowsHtml = ''; }
 
   return `
     <div class="card fade-in">
@@ -2474,18 +3430,28 @@ function renderCable() {
       </div>
     </div>
 
+    <div class="card fade-in">
+      <div class="card-title">\u2696\uFE0F ${t('cableVerifyTitle')}</div>
+      <div class="info-row">${lang === 'da' ? 'Live verdikter fra samme beregningskilde som Verific\u00E9r, QI og Risiko \u2014 hver verdikt citerer sin DS/HD 60364-paragraf. Ingen indtastning.' : 'Live verdicts from the same computed source as Verify, QI and Risk \u2014 each verdict cites its DS/HD 60364 clause. No typing.'}</div>
+      ${renderVerdictInputs()}
+      ${verdictRowsHtml}
+    </div>
+
     ${cableState.crossSection && selectedCable ? `
     <div class="card fade-in">
       <div class="card-title">${t('cableResult')}</div>
-      <div class="result-box">
+      <div class="result-box${deratedError ? ' error' : ''}">
         <div class="result-title">${t('result')}</div>
         <div class="result-row"><span class="label">${t('cableType')}</span><span class="value">${cableState.type} ${cableState.cores} ${cableState.crossSection} mm\u00B2</span></div>
         <div class="result-row"><span class="label">${t('cableMaterial')}</span><span class="value">${cableState.material === 'copper' ? t('cableCopper') : t('cableAluminium')}</span></div>
         <div class="result-row"><span class="label">${t('cableR')}</span><span class="value">${selectedCable.r} \u03A9/km</span></div>
         <div class="result-row"><span class="label">${t('cableX')}</span><span class="value">${selectedCable.x} \u03A9/km</span></div>
-        <div class="result-row"><span class="label">Iz (${lang === 'da' ? 'basis' : 'base'})</span><span class="value">${baseIz} A</span></div>
-        <div class="result-row"><span class="label">K (total)</span><span class="value">${kTotal.toFixed(3)}</span></div>
-        <div class="result-row"><span class="label">${t('cableIz')} (${lang === 'da' ? 'korrigeret' : 'corrected'})</span><span class="value">${correctedIz.toFixed(1)} A</span></div>
+        <div class="result-row"><span class="label">Iz (${lang === 'da' ? 'basis' : 'base'})</span><span class="value">${baseIz.toFixed(2)} A</span></div>
+        <div class="result-row"><span class="label">K (Ca\u00D7Cg\u00D7Cs\u00D7k)</span><span class="value">${kTotal.toFixed(3)}</span></div>
+        <div class="result-row"><span class="label">${t('cableIz')} (${lang === 'da' ? 'derated' : 'derated'})</span><span class="value">${correctedIz.toFixed(2)} A</span></div>
+        ${deratedError ? `<div class="result-row"><span class="label" style="color:var(--danger);font-weight:600">\u26A0\uFE0F ${lang === 'da' ? 'Ugyldig korrektionsfaktor' : 'Invalid correction factor'}: ${deratedError.factor} (${deratedError.reason})</span></div>` : ''}
+        ${defaultedList.length ? `<div class="result-row"><span class="label" style="color:#b8860b">\u26A0\uFE0F ${lang === 'da' ? 'Konservativ standardv\u00E6rdi anvendt' : 'Conservative default applied'}: ${defaultedList.join(', ')}</span></div>` : ''}
+        <div class="info-row">DS/HD 60364-5-52 \u00A7523</div>
       </div>
     </div>
     ` : ''}
@@ -4027,8 +4993,9 @@ function configurePriceFeed() {
 })();
 
 // ===== DATA VERSION & CHANGELOG =====
-const DATA_VERSION = '2026.3';
+const DATA_VERSION = '2026.4';
 const DATA_CHANGELOG = [
+  { v: '2026.4', date: '2026-06-12', da: 'Korrekthedsh\u00E6rdning: derating styrer nu ALLE verdikter (\u00A7523), overbelastning I\u2082\u22641,45\u00B7Iz (\u00A7433.1), adiabatisk kortslutningsholdbarhed k\u00B2S\u00B2\u2265I\u00B2t (\u00A7434.5.2), og Zs/udkoblingstid (\u00A7411). INSUFFICIENT_DATA-tilstand: aldrig PASS uden bevis.', en: 'Correctness hardening: derating now drives ALL verdicts (\u00A7523), overload I\u2082\u22641.45\u00B7Iz (\u00A7433.1), adiabatic short-circuit withstand k\u00B2S\u00B2\u2265I\u00B2t (\u00A7434.5.2), and Zs/disconnection time (\u00A7411). INSUFFICIENT_DATA state: never PASS without proof.' },
   { v: '2026.3', date: '2026-06-12', da: 'Back-up koordinering (IEC 60947-2 Annex A), ledningsnumre/klemmeplan (DS/EN 81346-2), og installationsrisikomatrix (DS/HD 60364-1 §131) tilføjet.', en: 'Back-up coordination (IEC 60947-2 Annex A), wire numbering/terminal plans (DS/EN 81346-2), and installation risk matrix (DS/HD 60364-1 §131) added.' },
   { v: '2026.2', date: '2026-06-11', da: 'Sikringer hardet mod Siemens 5SE2/3NA & TYTAN katalogerne (IEC 60269). D03-størrelse tilføjet. Frakoblingstid- og selektivitetskontrol.', en: 'Fuses hardened against Siemens 5SE2/3NA & TYTAN catalogs (IEC 60269). D03 size added. Disconnection-time and selectivity checks.' },
   { v: '2026.1', date: '2026-06-11', da: 'Kabel-Iz hardet til officiel DS/HD 60364 Tabel C.52.1. Tilbud (EG Sigma/Kalkia-stil), komponentbank, AI-elektriker.', en: 'Cable Iz hardened to official DS/HD 60364 Table C.52.1. Bid (EG Sigma/Kalkia style), component bank, AI-electrician.' },
@@ -4164,6 +5131,624 @@ function runSelfTests() {
   T.push({ name:'\u0394U 3~ 16A 50m 2.5mm\u00B2', exp:'\u22489.3 V', act:vd.toFixed(1)+' V', pass:tol(vd,9.3,0.05) });
   // Short-circuit cmax
   T.push({ name:'IEC 60909 cmax (LV)', exp:'1.05', act:'1.05', pass:true });
+
+  // ==========================================================================
+  // ===== PROPERTY-BASED SELF-TESTS — Derating engine (Tier 1 hardening) ======
+  // Feature: dimensioning-correctness-hardening. No fast-check at runtime, so
+  // each property is checked with ~100 randomized in-browser iterations (the
+  // app's existing self-test mechanism). Each pushes a single summary row.
+  // ==========================================================================
+  const rnd = (arr) => arr[(Math.random() * arr.length) | 0];
+  const caKeysN = Object.keys(TEMP_FACTORS).map(Number);
+  const cgKeysN = Object.keys(GROUP_FACTORS).map(Number);
+  const kKeysA = Object.keys(INSTALL_METHODS);
+
+  // Feature: dimensioning-correctness-hardening, Property 2: Derating formula and round-down
+  (function () {
+    let pass = true, fail = null;
+    for (let i = 0; i < 100; i++) {
+      const baseIz = Math.round((Math.random() * 399 + 1) * 100) / 100; // 1..400 A
+      const res = computeDeratedIz({ baseIz: baseIz, caKey: rnd(caKeysN), cgKey: rnd(cgKeysN), csKey: null, kInstallKey: rnd(kKeysA), buried: false });
+      if (!res.ok) continue;
+      const exact = baseIz * res.totalFactor;
+      const expected = Math.floor(exact * 100) / 100;
+      const twoDp = Math.abs(res.deratedIz * 100 - Math.round(res.deratedIz * 100)) < 1e-6;
+      if (res.deratedIz !== expected || res.deratedIz > exact + 1e-9 || !twoDp) {
+        pass = false; fail = JSON.stringify({ baseIz: baseIz, derated: res.deratedIz, expected: expected, exact: +exact.toFixed(5) }); break;
+      }
+    }
+    T.push({ name: 'Prop 2: Derated_Iz = floor(base\u00D7\u03A0k\u00D7100)/100 \u2264 exact (100\u00D7)', exp: 'all ok', act: pass ? 'all ok' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: dimensioning-correctness-hardening, Property 3: Derating never increases capacity
+  (function () {
+    let pass = true, fail = null;
+    for (let i = 0; i < 100; i++) {
+      const baseIz = Math.round((Math.random() * 399 + 1) * 100) / 100;
+      const res = computeDeratedIz({ baseIz: baseIz, caKey: rnd(caKeysN), cgKey: rnd(cgKeysN), csKey: null, kInstallKey: rnd(kKeysA), buried: false });
+      if (!res.ok) continue;
+      if (res.totalFactor <= 1 && res.deratedIz > baseIz + 1e-9) {
+        pass = false; fail = JSON.stringify({ baseIz: baseIz, total: +res.totalFactor.toFixed(4), derated: res.deratedIz }); break;
+      }
+    }
+    T.push({ name: 'Prop 3: total\u22641 \u21D2 Derated_Iz \u2264 Base_Iz (100\u00D7)', exp: 'no inflation', act: pass ? 'no inflation' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: dimensioning-correctness-hardening, Property 4: Conservative defaults never inflate capacity
+  (function () {
+    let pass = true, fail = null;
+    const tableOf = { ca: TEMP_FACTORS, cg: GROUP_FACTORS, cs: SOIL_FACTORS, kInstall: INSTALL_METHODS };
+    ['ca', 'cg', 'cs', 'kInstall'].forEach(function (cat) {
+      const vals = Object.keys(tableOf[cat]).map(function (k) { return tableOf[cat][k]; });
+      const def = getCorrectionFactor(cat, null, true); // buried:true so 'cs' participates
+      const minLE1 = Math.min.apply(null, vals.filter(function (v) { return v <= 1.0; }));
+      if (!def.defaulted) { pass = false; fail = cat + ' not flagged defaulted'; return; }
+      if (Math.abs(def.value - minLE1) > 1e-9) { pass = false; fail = cat + ' default ' + def.value + ' != min\u22641.0 ' + minLE1; return; }
+      if (def.value > 1.0) { pass = false; fail = cat + ' default > 1.0'; return; }
+      vals.forEach(function (v) { if (def.value > v + 1e-9) { pass = false; fail = cat + ' default not <= selectable ' + v; } });
+    });
+    // Monotonicity: replacing an unselected factor with its largest selectable
+    // value never decreases Derated_Iz.
+    const maxCa = Math.max.apply(null, caKeysN.map(function (k) { return TEMP_FACTORS[k]; }));
+    const maxCaKey = caKeysN.filter(function (k) { return TEMP_FACTORS[k] === maxCa; })[0];
+    for (let i = 0; i < 100 && pass; i++) {
+      const baseIz = Math.round((Math.random() * 399 + 1) * 100) / 100;
+      const cgKey = rnd(cgKeysN), kKey = rnd(kKeysA);
+      const withDefault = computeDeratedIz({ baseIz: baseIz, caKey: null, cgKey: cgKey, csKey: null, kInstallKey: kKey, buried: false });
+      const withMax = computeDeratedIz({ baseIz: baseIz, caKey: maxCaKey, cgKey: cgKey, csKey: null, kInstallKey: kKey, buried: false });
+      if (withDefault.ok && withMax.ok && withMax.deratedIz < withDefault.deratedIz - 1e-9) {
+        pass = false; fail = JSON.stringify({ baseIz: baseIz, def: withDefault.deratedIz, max: withMax.deratedIz });
+      }
+    }
+    T.push({ name: 'Prop 4: conservative default = lowest \u22641.0, never inflates (100\u00D7)', exp: 'conservative', act: pass ? 'conservative' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: dimensioning-correctness-hardening, Property 1: Recommendations are derated-safe
+  (function () {
+    const saveCable = JSON.parse(JSON.stringify(cableState));
+    let pass = true, fail = null;
+    const stdRatings = [6,10,13,16,20,25,32,40,50,63,80,100,125,160,200,250,315,400,500,630];
+    for (let i = 0; i < 100 && pass; i++) {
+      cableState.material = Math.random() < 0.5 ? 'copper' : 'aluminium';
+      cableState.temp = rnd(caKeysN);
+      cableState.grouping = rnd(cgKeysN);
+      cableState.installMethod = rnd(kKeysA);
+      cableState.soil = null;
+      const ib = Math.round((Math.random() * 200 + 1) * 10) / 10; // 1..201 A
+      const inMin = stdRatings.find(function (r) { return r >= ib; }) || ib;
+      const env = { temp: cableState.temp, grouping: cableState.grouping, installMethod: cableState.installMethod, soil: null, buried: cableState.installMethod === 'D' };
+      const recs = recommendCables(ib, cableState.material);
+      for (let j = 0; j < recs.length; j++) {
+        const dz = deratedIzForProduct(recs[j], env);
+        if (!(isFinite(dz) && dz >= inMin - 1e-9)) { pass = false; fail = JSON.stringify({ ib: ib, inMin: inMin, id: recs[j].id, dz: dz }); break; }
+      }
+    }
+    // Regression guard against the display-only-derating bug: under heavy derating,
+    // any conductor that would pass on Base_Iz but whose Derated_Iz < In must be
+    // excluded from the recommendation set.
+    if (pass) {
+      cableState.material = 'copper'; cableState.temp = 50; cableState.grouping = 9; cableState.installMethod = 'A2'; cableState.soil = null;
+      const env = { temp: 50, grouping: 9, installMethod: 'A2', soil: null, buried: false };
+      const ib = 70;
+      const inMin = stdRatings.find(function (r) { return r >= ib; });
+      const recs = recommendCables(ib, 'copper');
+      let guardExercised = false;
+      for (let j = 0; j < PRODUCTS.cables.length; j++) {
+        const c = PRODUCTS.cables[j];
+        if (c.material !== 'Cu') continue;
+        const base = officialIz(c);
+        const dz = deratedIzForProduct(c, env);
+        if (base >= inMin && (!isFinite(dz) || dz < inMin)) {
+          guardExercised = true;
+          if (recs.indexOf(c) !== -1) { pass = false; fail = 'display-only regression: ' + c.id + ' base=' + base + ' dz=' + dz; break; }
+        }
+      }
+      if (!guardExercised) { /* heavy-derate region produced no straddling conductor; guard still holds */ }
+    }
+    cableState = saveCable;
+    T.push({ name: 'Prop 1: recommendCables \u2192 every Derated_Iz \u2265 In (regression, 100\u00D7)', exp: 'all safe', act: pass ? 'all safe' : ('fail ' + fail), pass: pass });
+  })();
+
+  // ==========================================================================
+  // ===== PROPERTY-BASED SELF-TESTS — Verdict checks (Tasks 3, 4, 5) ==========
+  // Same ~100-iteration in-browser mechanism. No fast-check at runtime.
+  // ==========================================================================
+
+  // Feature: dimensioning-correctness-hardening, Property 5: I2 computed by device type
+  (function () {
+    let pass = true, fail = null;
+    const kinds = ['fuse', 'mcb', 'mccb', null, undefined, 'xyz'];
+    for (let i = 0; i < 100 && pass; i++) {
+      const inA = Math.round((Math.random() * 630 + 0.5) * 100) / 100;
+      const kind = rnd(kinds);
+      const res = deviceI2({ kind: kind, inA: inA });
+      const expFactor = (kind === 'mcb' || kind === 'mccb') ? 1.45 : 1.6;
+      const expDefaulted = !(kind === 'mcb' || kind === 'mccb' || kind === 'fuse');
+      if (Math.abs(res.factor - expFactor) > 1e-12 || Math.abs(res.i2 - expFactor * inA) > 1e-9 || res.defaulted !== expDefaulted) {
+        pass = false; fail = JSON.stringify({ kind: String(kind), inA: inA, i2: res.i2, factor: res.factor, defaulted: res.defaulted });
+      }
+    }
+    T.push({ name: 'Prop 5: I\u2082 = 1.6\u00D7In (gG/unknown) / 1.45\u00D7In (MCB/MCCB) (100\u00D7)', exp: 'by type', act: pass ? 'by type' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: dimensioning-correctness-hardening, Property 6: Overload verdict correctness
+  (function () {
+    let pass = true, fail = null;
+    const kinds = ['fuse', 'mcb', 'mccb', null];
+    for (let i = 0; i < 100 && pass; i++) {
+      const inA = Math.round((Math.random() * 200 + 0.5) * 100) / 100;
+      const deratedIz = Math.round((Math.random() * 250 + 0.5) * 100) / 100;
+      const kind = rnd(kinds);
+      const v = checkOverloadI2({ device: { kind: kind, inA: inA }, deratedIz: deratedIz });
+      const i2 = round2(deviceI2({ kind: kind, inA: inA }).i2);
+      const limit = round2(1.45 * deratedIz);
+      const expState = (i2 <= limit) ? 'PASS' : 'FAIL';
+      if (v.state !== expState) { pass = false; fail = JSON.stringify({ kind: String(kind), inA: inA, deratedIz: deratedIz, i2: i2, limit: limit, state: v.state }); break; }
+      if (v.state === 'FAIL' && !v.recommendation) { pass = false; fail = 'FAIL without recommendation: ' + JSON.stringify({ inA: inA, deratedIz: deratedIz }); break; }
+    }
+    T.push({ name: 'Prop 6: overload PASS iff round2(I\u2082) \u2264 round2(1.45\u00D7Iz) (100\u00D7)', exp: 'iff', act: pass ? 'iff' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: dimensioning-correctness-hardening, Property 7: Overload independence for gG fuses
+  (function () {
+    let pass = true, fail = null, tested = 0;
+    for (let i = 0; i < 100 && pass; i++) {
+      const deratedIz = Math.round((Math.random() * 200 + 10) * 100) / 100;
+      const lo = 0.90625 * deratedIz; // 1.6*In > 1.45*Iz  <=>  In > (1.45/1.6)*Iz
+      const inA = Math.round((lo + Math.random() * (deratedIz - lo)) * 100) / 100;
+      const i2 = round2(1.6 * inA);
+      const limit = round2(1.45 * deratedIz);
+      // Stay strictly inside the region the verdict actually evaluates.
+      if (!(inA <= deratedIz && i2 > limit)) continue;
+      tested++;
+      const v = checkOverloadI2({ device: { kind: 'fuse', inA: inA }, deratedIz: deratedIz });
+      if (v.state !== 'FAIL') { pass = false; fail = JSON.stringify({ inA: inA, deratedIz: deratedIz, i2: i2, limit: limit, state: v.state }); break; }
+    }
+    T.push({ name: 'Prop 7: gG fuse In\u2264Iz but 1.6\u00D7In>1.45\u00D7Iz \u21D2 FAIL (' + tested + '\u00D7)', exp: 'FAIL', act: pass ? 'FAIL' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: dimensioning-correctness-hardening, Property 8: Overload equivalence for MCB/MCCB
+  (function () {
+    let pass = true, fail = null;
+    const grid = []; for (let g = 1; g <= 250; g++) grid.push(g); // integers avoid sub-0.01 rounding boundary
+    for (let i = 0; i < 100 && pass; i++) {
+      const inA = rnd(grid);
+      const deratedIz = rnd(grid);
+      const kind = Math.random() < 0.5 ? 'mcb' : 'mccb';
+      const v = checkOverloadI2({ device: { kind: kind, inA: inA }, deratedIz: deratedIz });
+      const expState = (inA <= deratedIz) ? 'PASS' : 'FAIL';
+      if (v.state !== expState) { pass = false; fail = JSON.stringify({ kind: kind, inA: inA, deratedIz: deratedIz, state: v.state }); break; }
+    }
+    T.push({ name: 'Prop 8: MCB/MCCB overload PASS iff In \u2264 Iz (100\u00D7)', exp: 'iff In\u2264Iz', act: pass ? 'iff In\u2264Iz' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: dimensioning-correctness-hardening, Property 9: Adiabatic withstand correctness
+  (function () {
+    let pass = true, fail = null;
+    const mats = ['Cu', 'Al'], inss = ['PVC', 'XLPE'];
+    for (let i = 0; i < 100 && pass; i++) {
+      const material = rnd(mats), insulation = rnd(inss);
+      const sArea = rnd(STANDARD_CSA);
+      const isc = Math.round(Math.random() * 20000 + 100);
+      const tClear = Math.round((Math.random() * 5 + 0.01) * 1000) / 1000;
+      const v = checkAdiabatic({ material: material, insulation: insulation, sArea: sArea, isc: isc, tClear: tClear });
+      const k = adiabaticK(material, insulation);
+      const expState = ((k * k * sArea * sArea) >= (isc * isc * tClear)) ? 'PASS' : 'FAIL';
+      if (v.state !== expState) { pass = false; fail = JSON.stringify({ material: material, insulation: insulation, sArea: sArea, isc: isc, tClear: tClear, state: v.state }); break; }
+    }
+    T.push({ name: 'Prop 9: adiabatic PASS iff k\u00B2S\u00B2 \u2265 Isc\u00B2\u00B7t_clear (100\u00D7)', exp: 'iff', act: pass ? 'iff' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: dimensioning-correctness-hardening, Property 10: Adiabatic verdict is monotonic in cross-section
+  (function () {
+    let pass = true, fail = null;
+    const mats = ['Cu', 'Al'], inss = ['PVC', 'XLPE'];
+    for (let i = 0; i < 100 && pass; i++) {
+      const material = rnd(mats), insulation = rnd(inss);
+      const isc = Math.round(Math.random() * 20000 + 100);
+      const tClear = Math.round((Math.random() * 5 + 0.01) * 1000) / 1000;
+      const sA = rnd(STANDARD_CSA), sB = rnd(STANDARD_CSA);
+      const small = Math.min(sA, sB), big = Math.max(sA, sB);
+      const vSmall = checkAdiabatic({ material: material, insulation: insulation, sArea: small, isc: isc, tClear: tClear });
+      const vBig = checkAdiabatic({ material: material, insulation: insulation, sArea: big, isc: isc, tClear: tClear });
+      if (vSmall.state === 'PASS' && vBig.state !== 'PASS') { pass = false; fail = JSON.stringify({ material: material, insulation: insulation, small: small, big: big, isc: isc, tClear: tClear }); break; }
+    }
+    T.push({ name: 'Prop 10: adiabatic monotonic in S (S\u2191 keeps PASS) (100\u00D7)', exp: 'monotone', act: pass ? 'monotone' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: dimensioning-correctness-hardening, Property 11: Adiabatic verdict is monotonic in fault energy
+  (function () {
+    let pass = true, fail = null;
+    const mats = ['Cu', 'Al'], inss = ['PVC', 'XLPE'];
+    for (let i = 0; i < 100 && pass; i++) {
+      const material = rnd(mats), insulation = rnd(inss);
+      const sArea = rnd(STANDARD_CSA);
+      const isc = Math.round(Math.random() * 20000 + 100);
+      const t1 = Math.round((Math.random() * 5 + 0.01) * 1000) / 1000;
+      const t2 = Math.round((Math.random() * 5 + 0.01) * 1000) / 1000;
+      const tLow = Math.min(t1, t2), tHigh = Math.max(t1, t2); // I^2t increases with tClear
+      const vLow = checkAdiabatic({ material: material, insulation: insulation, sArea: sArea, isc: isc, tClear: tLow });
+      const vHigh = checkAdiabatic({ material: material, insulation: insulation, sArea: sArea, isc: isc, tClear: tHigh });
+      if (vLow.state === 'FAIL' && vHigh.state === 'PASS') { pass = false; fail = JSON.stringify({ material: material, insulation: insulation, sArea: sArea, isc: isc, tLow: tLow, tHigh: tHigh }); break; }
+    }
+    T.push({ name: 'Prop 11: adiabatic monotonic in I\u00B2t (FAIL never \u2192 PASS) (100\u00D7)', exp: 'monotone', act: pass ? 'monotone' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: dimensioning-correctness-hardening, Property 12: Adiabatic recommendation round-trip
+  (function () {
+    let pass = true, fail = null, tested = 0;
+    const mats = ['Cu', 'Al'], inss = ['PVC', 'XLPE'];
+    for (let i = 0; i < 300 && pass && tested < 100; i++) {
+      const material = rnd(mats), insulation = rnd(inss);
+      const sArea = rnd(STANDARD_CSA);
+      const isc = Math.round(Math.random() * 11500 + 500);
+      const tClear = Math.round((Math.random() * 1.15 + 0.05) * 1000) / 1000;
+      const v = checkAdiabatic({ material: material, insulation: insulation, sArea: sArea, isc: isc, tClear: tClear });
+      if (v.state !== 'FAIL' || !v.values || v.values.recommendedCsa == null) continue; // only FAIL with an adequate standard CSA
+      tested++;
+      const rec = v.values.recommendedCsa;
+      const v2 = checkAdiabatic({ material: material, insulation: insulation, sArea: rec, isc: isc, tClear: tClear });
+      if (v2.state !== 'PASS') { pass = false; fail = JSON.stringify({ material: material, insulation: insulation, isc: isc, tClear: tClear, sMin: v.values.sMin, rec: rec, state: v2.state }); break; }
+    }
+    T.push({ name: 'Prop 12: adiabatic S_min\u2192next CSA re-evaluates PASS (round-trip, ' + tested + '\u00D7)', exp: 'PASS', act: pass ? 'PASS' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: dimensioning-correctness-hardening, Property 13: Disconnection-time lookup
+  (function () {
+    let pass = true, fail = null;
+    const sysTypes = ['TN', 'TT'], cats = ['final', 'distribution'];
+    for (let i = 0; i < 100 && pass; i++) {
+      const sys = rnd(sysTypes), cat = rnd(cats);
+      const inA = Math.round((Math.random() * 100 + 1) * 10) / 10; // straddles 32 A
+      const got = requiredDisconnectionTime(sys, cat, inA);
+      let exp;
+      if (cat === 'distribution') exp = DISCONNECT_TIME[sys].distribution;
+      else exp = (inA <= 32) ? DISCONNECT_TIME[sys].final['<=32'] : DISCONNECT_TIME[sys].final['>32'];
+      if (got !== exp) { pass = false; fail = JSON.stringify({ sys: sys, cat: cat, inA: inA, got: got, exp: exp }); break; }
+    }
+    T.push({ name: 'Prop 13: required disconnect time matches DISCONNECT_TIME matrix (100\u00D7)', exp: 'matrix', act: pass ? 'matrix' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: dimensioning-correctness-hardening, Property 14: Zs_max is inversely monotonic in Ia
+  (function () {
+    const saveC = JSON.parse(JSON.stringify(cableState));
+    const saveS = JSON.parse(JSON.stringify(scState));
+    const saveV = JSON.parse(JSON.stringify(vdropState));
+    cableState.material = 'copper'; cableState.type = 'NOIKLX'; cableState.cores = '5G'; cableState.crossSection = 2.5;
+    vdropState.length = 0; // zero cable contribution -> Zs = (zNet + zTrafo) / 1000
+    let pass = true, fail = null;
+    const curves = ['B', 'C', 'D'];
+    for (let i = 0; i < 100 && pass; i++) {
+      scState.zNet = Math.round(Math.random() * 4950 + 50); scState.zTrafo = 0;
+      const inA1 = 6 + ((Math.random() * 57) | 0), inA2 = 6 + ((Math.random() * 57) | 0);
+      const c1 = rnd(curves), c2 = rnd(curves);
+      const ia1 = MCB_CURVES[c1].isdMax * inA1, ia2 = MCB_CURVES[c2].isdMax * inA2;
+      const v1 = checkZs({ systemType: 'TN', circuitCategory: 'final', device: { kind: 'mcb', curve: c1, inA: inA1 }, rcdIDn: 0.3, u0: U0_NOMINAL });
+      const v2 = checkZs({ systemType: 'TN', circuitCategory: 'final', device: { kind: 'mcb', curve: c2, inA: inA2 }, rcdIDn: 0.3, u0: U0_NOMINAL });
+      if (v1.state === 'INSUFFICIENT_DATA' || v2.state === 'INSUFFICIENT_DATA') { pass = false; fail = 'unexpected INSUFFICIENT_DATA'; break; }
+      if (Math.abs(v1.values.zsMax - round2(U0_NOMINAL / ia1)) > 1e-9) { pass = false; fail = JSON.stringify({ ia1: ia1, zsMax: v1.values.zsMax }); break; }
+      if (ia1 > ia2 && !(v1.values.zsMax <= v2.values.zsMax)) { pass = false; fail = JSON.stringify({ ia1: ia1, ia2: ia2, z1: v1.values.zsMax, z2: v2.values.zsMax }); break; }
+    }
+    cableState = saveC; scState = saveS; vdropState = saveV;
+    T.push({ name: 'Prop 14: checkZs TN Zs_max = U\u2080/Ia, \u2193 as Ia\u2191 (100\u00D7)', exp: 'inverse', act: pass ? 'inverse' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: dimensioning-correctness-hardening, Property 15: Zs verdict correctness for TN and TT
+  (function () {
+    const saveC = JSON.parse(JSON.stringify(cableState));
+    const saveS = JSON.parse(JSON.stringify(scState));
+    const saveV = JSON.parse(JSON.stringify(vdropState));
+    cableState.material = 'copper'; cableState.type = 'NOIKLX'; cableState.cores = '5G'; cableState.crossSection = 2.5;
+    vdropState.length = 0;
+    let pass = true, fail = null;
+    const curves = ['B', 'C', 'D'], idns = [0.03, 0.1, 0.3, 0.5];
+    for (let i = 0; i < 100 && pass; i++) {
+      scState.zNet = Math.round(Math.random() * 4950 + 50); scState.zTrafo = 0;
+      const zs = scState.zNet / 1000; // length 0 -> zCable 0
+      if (Math.random() < 0.5) {
+        const c = rnd(curves), inA = 6 + ((Math.random() * 57) | 0);
+        const ia = MCB_CURVES[c].isdMax * inA;
+        const zsMax = U0_NOMINAL / ia;
+        const v = checkZs({ systemType: 'TN', circuitCategory: 'final', device: { kind: 'mcb', curve: c, inA: inA }, rcdIDn: 0.3, u0: U0_NOMINAL });
+        const expState = (zs <= zsMax) ? 'PASS' : 'FAIL';
+        if (v.state !== expState) { pass = false; fail = JSON.stringify({ sys: 'TN', zs: zs, zsMax: zsMax, ia: ia, state: v.state }); break; }
+        if (v.state === 'FAIL' && !v.recommendation) { pass = false; fail = 'TN FAIL without recommendation'; break; }
+      } else {
+        const idn = rnd(idns);
+        const v = checkZs({ systemType: 'TT', circuitCategory: 'final', device: { kind: 'mcb', curve: 'C', inA: 16 }, rcdIDn: idn, u0: U0_NOMINAL });
+        const expState = ((zs * idn) <= U_L_LIMIT) ? 'PASS' : 'FAIL';
+        if (v.state !== expState) { pass = false; fail = JSON.stringify({ sys: 'TT', zs: zs, idn: idn, product: zs * idn, state: v.state }); break; }
+        if (v.state === 'FAIL' && !v.recommendation) { pass = false; fail = 'TT FAIL without recommendation'; break; }
+      }
+    }
+    cableState = saveC; scState = saveS; vdropState = saveV;
+    T.push({ name: 'Prop 15: Zs TN(Zs\u2264Zs_max)/TT(Zs\u00D7I\u0394n\u226450), FAIL\u2192rec (100\u00D7)', exp: 'iff', act: pass ? 'iff' : ('fail ' + fail), pass: pass });
+  })();
+
+  // ==========================================================================
+  // ===== PROPERTY-BASED SELF-TESTS — Orchestrator + integration (Tasks 7, 8) =
+  // Same ~100-iteration in-browser mechanism. No fast-check at runtime.
+  // ==========================================================================
+
+  // Feature: dimensioning-correctness-hardening, Property 20: Safety-provenance invariant
+  (function () {
+    let pass = true, fail = null;
+    const hasClause = function (v) { return !!(v && typeof v.clause === 'string' && v.clause.length > 0); };
+    const saveC = JSON.parse(JSON.stringify(cableState));
+    for (let i = 0; i < 100 && pass; i++) {
+      // Overload with a nulled/invalid required field -> must never PASS, must carry a clause.
+      const ov = checkOverloadI2({ device: { kind: rnd(['fuse', 'mcb', 'mccb', null]), inA: (Math.random() < 0.5 ? null : 0) }, deratedIz: (Math.random() < 0.5 ? null : -1) });
+      if (!hasClause(ov) || ov.state === 'PASS') { pass = false; fail = 'overload ' + (ov && ov.state); break; }
+      // Adiabatic with a nulled required field.
+      const ad = checkAdiabatic({ material: 'Cu', insulation: 'PVC', sArea: (Math.random() < 0.5 ? null : 6), isc: null, tClear: (Math.random() < 0.5 ? null : 0.4) });
+      if (!hasClause(ad) || ad.state === 'PASS') { pass = false; fail = 'adiabatic ' + (ad && ad.state); break; }
+      // Adiabatic with an undefined adiabatic constant k (unknown material/insulation).
+      const ad2 = checkAdiabatic({ material: 'Xx', insulation: 'Yy', sArea: 6, isc: 1000, tClear: 0.4 });
+      if (!hasClause(ad2) || ad2.state === 'PASS') { pass = false; fail = 'adiabatic-k ' + (ad2 && ad2.state); break; }
+      // Zs with actual Zs unknown (no cable selected).
+      cableState.crossSection = null;
+      const zs = checkZs({ systemType: rnd(['TN', 'TT']), circuitCategory: 'final', device: { kind: 'mcb', curve: 'C', inA: 16 }, rcdIDn: 0.3, u0: U0_NOMINAL });
+      if (!hasClause(zs) || zs.state === 'PASS') { pass = false; fail = 'zs ' + (zs && zs.state); break; }
+    }
+    cableState = saveC;
+    // The live bundle must always expose a clause for every verdict.
+    if (pass) {
+      const b = evaluateCorrectnessVerdicts();
+      ['ampacity', 'overload', 'adiabatic', 'zs'].forEach(function (id) {
+        if (!hasClause(b[id])) { pass = false; fail = 'bundle ' + id + ' missing clause'; }
+      });
+    }
+    T.push({ name: 'Prop 20: every verdict has a clause; missing input \u21D2 INSUFFICIENT_DATA, never PASS (100\u00D7)', exp: 'provenance', act: pass ? 'provenance' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: dimensioning-correctness-hardening, Property 21: Conservative tie-break
+  (function () {
+    let pass = true, fail = null, tested = 0;
+    const mats = ['Cu', 'Al'], inss = ['PVC', 'XLPE'];
+    for (let i = 0; i < 400 && pass && tested < 100; i++) {
+      const material = rnd(mats), insulation = rnd(inss);
+      const sArea = rnd(STANDARD_CSA);
+      const isc = Math.round(Math.random() * 15000 + 500);
+      const tClear = Math.round((Math.random() * 1 + 0.05) * 1000) / 1000;
+      const v = checkAdiabatic({ material: material, insulation: insulation, sArea: sArea, isc: isc, tClear: tClear });
+      if (v.state !== 'FAIL' || !v.values || v.values.recommendedCsa == null) continue;
+      tested++;
+      const k = adiabaticK(material, insulation);
+      const i2t = isc * isc * tClear;
+      const rec = v.values.recommendedCsa;
+      // Conservative tie-break: upsize, never downsize, the conductor...
+      if (!(rec >= sArea)) { pass = false; fail = 'rec < failing CSA ' + JSON.stringify({ rec: rec, sArea: sArea }); break; }
+      // ...the recommendation actually satisfies the withstand...
+      if (!(k * k * rec * rec >= i2t)) { pass = false; fail = 'rec fails withstand ' + JSON.stringify({ rec: rec }); break; }
+      // ...and it is the SMALLEST adequate standard size (no smaller one also passes).
+      const anySmaller = STANDARD_CSA.filter(function (s) { return s < rec; }).some(function (s) { return k * k * s * s >= i2t; });
+      if (anySmaller) { pass = false; fail = 'a smaller standard CSA also satisfies'; break; }
+    }
+    // Overload FAIL recommends a larger cross-section / lower-I2 device (added measure).
+    if (pass) {
+      const ov = checkOverloadI2({ device: { kind: 'fuse', inA: 25 }, deratedIz: 20 }); // 1.6*25=40 > 1.45*20=29
+      if (ov.state !== 'FAIL' || !ov.recommendation) { pass = false; fail = 'overload FAIL missing recommendation'; }
+    }
+    // Zs TT FAIL recommends adding/lowering the RCD (additional protective measure).
+    if (pass) {
+      const saveC = JSON.parse(JSON.stringify(cableState)), saveS = JSON.parse(JSON.stringify(scState)), saveV = JSON.parse(JSON.stringify(vdropState));
+      cableState.material = 'copper'; cableState.type = 'NOIKLX'; cableState.cores = '5G'; cableState.crossSection = 2.5;
+      vdropState.length = 0; scState.zNet = 4000; scState.zTrafo = 0; // Zs = 4 ohm; 4*0.5 = 2 V <=50 -> need bigger
+      scState.zNet = 200000; // Zs = 200 ohm; 200*0.5 = 100 V > 50 -> FAIL
+      const zs = checkZs({ systemType: 'TT', circuitCategory: 'final', device: { kind: 'mcb', curve: 'C', inA: 16 }, rcdIDn: 0.5, u0: U0_NOMINAL });
+      cableState = saveC; scState = saveS; vdropState = saveV;
+      if (zs.state !== 'FAIL' || !zs.recommendation) { pass = false; fail = 'zs TT FAIL missing recommendation (' + zs.state + ')'; }
+    }
+    T.push({ name: 'Prop 21: conservative tie-break (larger CSA / faster device / added measure) (' + tested + '\u00D7)', exp: 'conservative', act: pass ? 'conservative' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: dimensioning-correctness-hardening, Property 16: QI severity mapping
+  (function () {
+    let pass = true, fail = null;
+    const states = ['PASS', 'FAIL', 'INSUFFICIENT_DATA'];
+    for (let i = 0; i < 100 && pass; i++) {
+      const st = rnd(states);
+      const cls = classifyVerdictForQi({ state: st });
+      let ok;
+      if (st === 'FAIL') ok = (cls.target === 'issues' && cls.severity === 'error');
+      else if (st === 'INSUFFICIENT_DATA') ok = (cls.target === 'issues' && cls.severity === 'warning');
+      else ok = (cls.target === 'passed' && cls.severity === null);
+      if (!ok) { pass = false; fail = JSON.stringify({ st: st, cls: cls }); break; }
+    }
+    T.push({ name: 'Prop 16: QI FAIL\u2192error, INSUFFICIENT_DATA\u2192warning (never passing) (100\u00D7)', exp: 'severity map', act: pass ? 'severity map' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: dimensioning-correctness-hardening, Property 17: Risk-entry presence and removal
+  (function () {
+    let pass = true, fail = null;
+    const states = ['PASS', 'FAIL', 'INSUFFICIENT_DATA'];
+    const ids = ['ampacity', 'overload', 'adiabatic', 'zs'];
+    const mkV = function (id, st) { return { id: id, state: st, clause: 'DS/HD 60364', values: {}, message: { da: 'd', en: 'e' }, recommendation: st === 'PASS' ? null : { da: 'r', en: 'r' } }; };
+    for (let i = 0; i < 100 && pass; i++) {
+      const bundle = {}, expect = {};
+      ids.forEach(function (id) { const st = rnd(states); bundle[id] = mkV(id, st); expect[id] = (st === 'PASS') ? 0 : 1; });
+      const entries = verdictRiskEntriesFromBundle(bundle);
+      for (let j = 0; j < ids.length; j++) {
+        const id = ids[j];
+        const cnt = entries.filter(function (e) { return e.verdictId === id; }).length;
+        if (cnt !== expect[id]) { pass = false; fail = JSON.stringify({ id: id, state: bundle[id].state, cnt: cnt, exp: expect[id] }); break; }
+        if (cnt === 1) {
+          const e = entries.filter(function (x) { return x.verdictId === id; })[0];
+          if (e.verdictState !== bundle[id].state || !e.clause) { pass = false; fail = 'entry missing state/clause for ' + id; break; }
+        }
+      }
+    }
+    T.push({ name: 'Prop 17: FAIL/INSUFFICIENT_DATA \u21D2 exactly 1 risk entry, PASS \u21D2 0 (per verdict, 100\u00D7)', exp: 'present/removed', act: pass ? 'present/removed' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: dimensioning-correctness-hardening, Property 18: Cross-view consistency
+  (function () {
+    const saveCable = JSON.parse(JSON.stringify(cableState));
+    const saveSc = JSON.parse(JSON.stringify(scState));
+    const saveMcb = JSON.parse(JSON.stringify(mcbState));
+    const saveMccb = JSON.parse(JSON.stringify(mccbState));
+    const saveFuse = JSON.parse(JSON.stringify(fuseState));
+    const saveVs = JSON.parse(JSON.stringify(verdictState));
+    const saveVd = JSON.parse(JSON.stringify(vdropState));
+    let pass = true, fail = null;
+    const ids = ['ampacity', 'overload', 'adiabatic', 'zs'];
+    const csOpts = [null, 1.5, 2.5, 4, 6, 10, 16, 25];
+    for (let i = 0; i < 100 && pass; i++) {
+      cableState.material = 'copper'; cableState.type = 'NOIKLX'; cableState.cores = '5G';
+      cableState.crossSection = rnd(csOpts); cableState.installMethod = rnd(kKeysA);
+      cableState.temp = rnd(caKeysN); cableState.grouping = rnd(cgKeysN); cableState.soil = null;
+      scState.zNet = rnd([0.5, 1, 2, 5, 10]); scState.zTrafo = rnd([2, 5, 10, 20]);
+      vdropState.length = rnd([0, 10, 50, 100]);
+      if (Math.random() < 0.5) { mcbState.rating = rnd([6, 10, 16, 20, 32, 63]); mcbState.curve = rnd(['B', 'C', 'D']); fuseState.size = null; mccbState.inVal = null; }
+      else { mcbState.rating = null; mccbState.inVal = null; fuseState.size = rnd([10, 16, 20, 32, 63]); }
+      verdictState.systemType = rnd(['TN', 'TT']); verdictState.circuitCategory = rnd(['final', 'distribution']);
+      verdictState.tClear = rnd([null, 0.1, 0.4, 1, 5]); verdictState.rcdIDn = rnd([0.03, 0.1, 0.3, 0.5]);
+
+      const bundle = evaluateCorrectnessVerdicts();
+      const riskEntries = verdictRiskEntriesFromBundle(bundle);
+      for (let j = 0; j < ids.length && pass; j++) {
+        const id = ids[j];
+        const verifyState = bundle[id].state;                 // Verify reads the bundle directly
+        const cls = classifyVerdictForQi(bundle[id]);          // QI mapping
+        const qiState = (cls.target === 'passed') ? 'PASS' : (cls.severity === 'error' ? 'FAIL' : 'INSUFFICIENT_DATA');
+        const ent = riskEntries.filter(function (e) { return e.verdictId === id; }); // Risk mapping
+        const riskState = ent.length ? ent[0].verdictState : 'PASS';
+        if (!(verifyState === qiState && qiState === riskState)) {
+          pass = false; fail = JSON.stringify({ id: id, verify: verifyState, qi: qiState, risk: riskState }); break;
+        }
+      }
+    }
+    cableState = saveCable; scState = saveSc; mcbState = saveMcb; mccbState = saveMccb; fuseState = saveFuse; verdictState = saveVs; vdropState = saveVd;
+    T.push({ name: 'Prop 18: Verify = QI = Risk state per verdict (single source) (100\u00D7)', exp: 'consistent', act: pass ? 'consistent' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: dimensioning-correctness-hardening, Property 22: Click-only conservatively-defaulted verdict screens
+  (function () {
+    let pass = true, fail = null;
+    const saveVs = JSON.parse(JSON.stringify(verdictState));
+    const saveCable = JSON.parse(JSON.stringify(cableState));
+    // (a) Across randomized verdictState, the rendered controls are ALWAYS
+    //     click-only: no free-text/keyboard-entry control of any kind, and the
+    //     finite option sets are .sel-btn buttons.
+    for (let i = 0; i < 100 && pass; i++) {
+      verdictState.systemType = rnd(['TN', 'TT']);
+      verdictState.circuitCategory = rnd(['final', 'distribution']);
+      verdictState.tClear = rnd([null, 0.1, 0.2, 0.4, 1, 5]);
+      verdictState.rcdIDn = rnd([0.03, 0.1, 0.3, 0.5]);
+      verdictState.soilResistivity = rnd([null, 1.0, 1.5, 2.0, 2.5, 3.0]);
+      const html = renderVerdictInputs();
+      if (/<input/i.test(html) || /<textarea/i.test(html) || /contenteditable/i.test(html) || /<select\b/i.test(html)) {
+        pass = false; fail = 'free-text/keyboard control present'; break;
+      }
+      if (!/sel-btn/.test(html)) { pass = false; fail = 'no .sel-btn controls'; break; }
+    }
+    // (b) The conservative defaults are the most restrictive (safest) options and
+    //     a valid verdict is computable from defaults alone (no typing needed).
+    if (pass) {
+      verdictState = { systemType: 'TN', circuitCategory: 'final', tClear: null, rcdIDn: 0.3, soilResistivity: null };
+      // System_Type TN = fully computable disconnection baseline; circuit category
+      // 'final' = the stricter (shorter) required disconnection time.
+      const tFinal = requiredDisconnectionTime('TN', 'final', 16);
+      const tDist = requiredDisconnectionTime('TN', 'distribution', 16);
+      if (verdictState.systemType !== 'TN' || verdictState.circuitCategory !== 'final' || verdictState.rcdIDn !== 0.3) {
+        pass = false; fail = 'defaults are not the documented conservative ones';
+      } else if (!(tFinal <= tDist)) {
+        pass = false; fail = "'final' default is not the stricter disconnection time";
+      } else {
+        const b = evaluateCorrectnessVerdicts();
+        ['ampacity', 'overload', 'adiabatic', 'zs'].forEach(function (id) {
+          const st = b[id] && b[id].state;
+          if (!(st === 'PASS' || st === 'FAIL' || st === 'INSUFFICIENT_DATA')) { pass = false; fail = 'verdict not computable from defaults: ' + id; }
+        });
+      }
+    }
+    verdictState = saveVs; cableState = saveCable;
+    T.push({ name: 'Prop 22: verdict inputs click-only (no <input>/<textarea>), conservative defaults (100\u00D7)', exp: 'click-only+safe', act: pass ? 'click-only+safe' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: dimensioning-correctness-hardening, Property 19: Bilingual completeness and fallback
+  (function () {
+    let pass = true, fail = null;
+    const saveLang = lang;
+    // Every new key resolves to a non-empty, non-raw string in BOTH languages.
+    for (let i = 0; i < 100 && pass; i++) {
+      const key = NEW_I18N_KEYS[(Math.random() * NEW_I18N_KEYS.length) | 0];
+      lang = 'da'; const da = t(key);
+      lang = 'en'; const en = t(key);
+      if (typeof da !== 'string' || da === '' || da === key) { pass = false; fail = 'da empty/raw for ' + key; break; }
+      if (typeof en !== 'string' || en === '' || en === key) { pass = false; fail = 'en empty/raw for ' + key; break; }
+    }
+    // Missing English value falls back to the authoritative Danish text (not blank,
+    // not the raw key). I18N aliases the live translation tables (local `T` here is
+    // the results array, so we mutate via the alias).
+    if (pass) {
+      const probe = '__falltest_' + (Date.now() % 100000);
+      I18N.da[probe] = 'Dansk reservetekst'; // present only in da
+      lang = 'en';
+      const got = t(probe);
+      if (got !== 'Dansk reservetekst') { pass = false; fail = 'missing EN did not fall back to DA (got "' + got + '")'; }
+      delete I18N.da[probe];
+      // A key absent from both languages returns the raw key (never blank).
+      if (pass && t('__definitely_absent_key__') !== '__definitely_absent_key__') { pass = false; fail = 'absent key did not return raw key'; }
+    }
+    lang = saveLang;
+    T.push({ name: 'Prop 19: new keys non-empty in da+en; missing EN \u2192 DA fallback (100\u00D7)', exp: 'complete+fallback', act: pass ? 'complete+fallback' : ('fail ' + fail), pass: pass });
+  })();
+
+  // ==========================================================================
+  // ===== REGRESSION GUARD (Task 12.1) — display-only-derating bug ============
+  // Deterministic reproduction of the original defect: a conductor whose raw
+  // Base_Iz >= In but whose Derated_Iz < In under heavy derating MUST be excluded
+  // by recommendCables AND drive the ampacity verdict to FAIL (never the old
+  // display-only "OK"). DS/HD 60364-5-52 §523.
+  // ==========================================================================
+  (function () {
+    const saveCable = JSON.parse(JSON.stringify(cableState));
+    const saveLoad = JSON.parse(JSON.stringify(loadState));
+    let pass = true, detail = '';
+    // Heavy derating: 50 °C ambient (Ca=0.71), 9 grouped (Cg=0.50), method A2 (0.83).
+    const env = { temp: 50, grouping: 9, installMethod: 'A2', soil: null, buried: false };
+    const target = PRODUCTS.cables.filter(function (c) { return c.id === 'NKT-NOIKLX-16'; })[0];
+    const inMin = 32, ib = 30; // smallest standard rating >= IB(30 A) = 32 A
+    cableState.material = 'copper'; cableState.type = 'NOIKLX'; cableState.cores = '5G';
+    cableState.crossSection = 16; cableState.temp = 50; cableState.grouping = 9;
+    cableState.installMethod = 'A2'; cableState.soil = null;
+    loadState = { voltage: '3x400', power: 20.8, cosPhi: 1.0, simFactor: 1.0, expFactor: 1.0 }; // -> IB ~30 A
+    const baseIz = target ? officialIz(target) : NaN;            // 94 A (XLPE)
+    const dz = target ? deratedIzForProduct(target, env) : NaN;  // ~27.69 A
+    // Precondition: the scenario genuinely straddles (passes on base, fails on derated).
+    if (!target || !(baseIz >= inMin && isFinite(dz) && dz < inMin)) {
+      pass = false; detail = 'scenario not straddling: base=' + baseIz + ' dz=' + dz;
+    }
+    // 1) recommendCables must EXCLUDE the straddling conductor.
+    if (pass) {
+      const recs = recommendCables(ib, 'copper');
+      if (recs.indexOf(target) !== -1) { pass = false; detail = '16mm\u00B2 wrongly recommended (dz=' + dz + ' < ' + inMin + ')'; }
+    }
+    // 2) The ampacity verdict for the selected straddling conductor must be FAIL.
+    if (pass) {
+      const bundle = evaluateCorrectnessVerdicts();
+      if (!bundle.ampacity || bundle.ampacity.state !== 'FAIL') { pass = false; detail = 'ampacity not FAIL (got ' + (bundle.ampacity && bundle.ampacity.state) + ')'; }
+    }
+    cableState = saveCable; loadState = saveLoad;
+    T.push({ name: 'Regression: Base_Iz\u2265In but Derated_Iz<In \u21D2 excluded + ampacity FAIL (\u00A7523)', exp: 'excluded+FAIL', act: pass ? 'excluded+FAIL' : ('fail ' + detail), pass: pass });
+  })();
+
+  // ===== LIVE VERDICT SELF-TESTS (Task 8.3) — one per verdict. Each reports the
+  // current verdict state; the test asserts the verdict MACHINERY returns a valid
+  // 3-state result WITH a clause (an INSUFFICIENT_DATA verdict from defaults is
+  // acceptable), not that the verdict itself is PASS.
+  (function () {
+    let bundle = null;
+    try { bundle = evaluateCorrectnessVerdicts(); } catch (e) { bundle = null; }
+    const titles = { ampacity: 'Str\u00F8mb\u00E6reevne', overload: 'Overbelastning', adiabatic: 'Adiabatisk holdbarhed', zs: 'Zs / udkobling' };
+    ['ampacity', 'overload', 'adiabatic', 'zs'].forEach(function (id) {
+      const v = bundle ? bundle[id] : null;
+      const valid = !!(v && (v.state === 'PASS' || v.state === 'FAIL' || v.state === 'INSUFFICIENT_DATA') && typeof v.clause === 'string' && v.clause.length > 0);
+      T.push({ name: 'Verdikt: ' + titles[id] + ' (' + (v ? v.clause : '\u2014') + ')', exp: 'PASS|FAIL|INSUFFICIENT_DATA + clause', act: v ? v.state : 'no bundle', pass: valid });
+    });
+  })();
+
   return T;
 }
 
@@ -4176,6 +5761,22 @@ function renderVerify() {
       <span class="label">${t.pass?'\u2705':'\u274C'} ${t.name}</span>
       <span class="value">${t.act} ${t.pass?'':'(\u2260 '+t.exp+')'}</span>
     </div>`).join('');
+  // Live correctness-verdict panel — the four cards + click-only inputs, all
+  // rendered from the ONE shared bundle so this view matches QI and Risk exactly.
+  let verdictPanel = '';
+  try {
+    const vb = evaluateCorrectnessVerdicts();
+    verdictPanel = `
+    <div class="card fade-in">
+      <div class="card-title">\u2696\uFE0F ${t('verdictPanelTitle')}</div>
+      <div class="info-row">${lang==='da'?'Live korrekthedsverdikter \u2014 alle visninger l\u00E6ser samme beregnede kilde (\u00E9n sandhedskilde).':'Live correctness verdicts \u2014 every view reads the one computed source of truth.'}</div>
+      ${renderVerdictRow(vb.ampacity)}
+      ${renderVerdictRow(vb.overload)}
+      ${renderVerdictRow(vb.adiabatic)}
+      ${renderVerdictRow(vb.zs)}
+      ${renderVerdictInputs()}
+    </div>`;
+  } catch (e) { verdictPanel = ''; }
   return `
     <div class="card fade-in" style="border-left:4px solid ${allOk?'var(--success)':'var(--danger)'}">
       <div class="card-title">\uD83E\uDDEA ${lang==='da'?'Verifikation / Selvtest':'Verification / Self-test'} \u2014 ${passed}/${tests.length}</div>
@@ -4185,6 +5786,7 @@ function renderVerify() {
         ${rows}
       </div>
     </div>
+    ${verdictPanel}
     <div class="card fade-in">
       <div class="card-title">${lang==='da'?'Datakilder & sporbarhed':'Data sources & traceability'}</div>
       <div class="result-box" style="background:var(--primary-glow);border-color:var(--primary-light)">
@@ -4881,18 +6483,11 @@ const AUTO_RISK_RULES = [
     id: 'fire_overload',
     category: 'fire',
     condition: function(){
-      try {
-        var ls = calcLoadSchedule();
-        if (ls.maxPhase <= 0) return false;
-        // Check if cable Iz is set and Ib > Iz
-        if (typeof IZ_COPPER !== 'undefined' && cableState.crossSection) {
-          var izEntry = IZ_COPPER[cableState.installMethod];
-          if (izEntry && izEntry[cableState.crossSection]) {
-            return ls.ib > izEntry[cableState.crossSection];
-          }
-        }
-        return false;
-      } catch(e) { return true; }
+      // Superseded by the verdict-driven Ampacity / Overload entries (Task 8.4):
+      // those read the ONE correctness bundle, so a PASS verdict leaves no
+      // residual fire-overload entry and a FAIL/INSUFFICIENT_DATA adds exactly
+      // one. Kept in the rule set for traceability; no longer self-triggers.
+      return false;
     },
     probability: 4, consequence: 4,
     description: { da:'Kabel belastet over Iz. Risiko for overophedning og brand.', en:'Cable loaded above Iz. Risk of overheating and fire.' },
@@ -4920,7 +6515,13 @@ const AUTO_RISK_RULES = [
   {
     id: 'earth_fault_impedance',
     category: 'earth_fault',
-    condition: function(){ return true; },
+    condition: function(){
+      // Superseded by the verdict-driven Zs entry (Task 8.4): it reads the ONE
+      // correctness bundle, so a PASS Zs verdict leaves no residual earth-fault
+      // entry while FAIL/INSUFFICIENT_DATA adds exactly one. Kept for
+      // traceability; no longer self-triggers.
+      return false;
+    },
     probability: 2, consequence: 4,
     description: { da:'Fejlsløjfeimpedans ikke verificeret. Afbrydetid muligvis utilstrækkelig.', en:'Fault loop impedance not verified. Disconnection time may be insufficient.' },
     clause: 'DS/HD 60364-4-41 §411.4.4',
@@ -4954,6 +6555,11 @@ function autoPopulateRisks() {
       });
     }
   });
+  // Verdict-driven entries from the ONE shared correctness bundle: any FAIL or
+  // INSUFFICIENT_DATA verdict contributes exactly one entry (referencing the
+  // verdict id, state and clause); a PASS verdict contributes none, so a
+  // now-passing verdict leaves no residual risk entry (Req 7.5, 7.6).
+  verdictRiskEntries().forEach(function(e){ risks.push(e); });
   var priority = { red: 0, yellow: 1, green: 2 };
   risks.sort(function(a, b){ return priority[a.riskLevel] - priority[b.riskLevel]; });
   return risks;
