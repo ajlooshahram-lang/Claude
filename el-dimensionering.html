@@ -4367,6 +4367,12 @@ let sldFaultRow = -1;        // which circuit faults (-1 = auto-pick)
 let sldEarthing = 'TN-C-S';  // earthing system: 'TN-C-S' | 'TN-S' | 'TT'
 function sldPickFault(i){ sldFault = true; sldFaultRow = i; renderModule('draw'); }
 function sldSetEarthing(s){ sldEarthing = s; renderModule('draw'); }
+let sldITSecond = false;     // IT system: escalate to a 2nd fault
+let sldRunLen = 0;           // loop-calc run length override (m); 0 = auto
+let sldMeasZsFactor = 1;     // measured Zs as a multiple of calculated
+function sldSetITSecond(b){ sldITSecond = b; renderModule('draw'); }
+function sldSetRunLen(m){ sldRunLen = m; renderModule('draw'); }
+function sldSetMeasZs(f){ sldMeasZsFactor = +f; renderModule('draw'); }
 // Standard earth-electrode symbol (vertical line + 3 decreasing horizontal bars)
 function earthSymbol(x, y, color){
   return `<g stroke="${color}" stroke-width="2" stroke-linecap="round" fill="none"><line x1="${x}" y1="${y-9}" x2="${x}" y2="${y}"/><line x1="${x-11}" y1="${y}" x2="${x+11}" y2="${y}"/><line x1="${x-7}" y1="${y+4}" x2="${x+7}" y2="${y+4}"/><line x1="${x-3}" y1="${y+8}" x2="${x+3}" y2="${y+8}"/></g>`;
@@ -4442,12 +4448,19 @@ function buildSLD(){
   const maxA = Math.max(pT.L1, pT.L2, pT.L3, 1);
   const maxCIb = Math.max(...R.map(r=>r.cIb), 1);
   // earth-fault demo: fault the clicked circuit, else auto-pick one with an exposed conductive part
-  let faultRow = -1;
+  let faultRow = -1, faultRow2 = -1;
+  const itSecond = sldFault && sldEarthing==='IT' && sldITSecond;
   if(sldFault){
     faultRow = (sldFaultRow >= 0 && sldFaultRow < R.length)
       ? sldFaultRow
       : R.findIndex(r => ['motor','ev','heat','cooker'].includes(sldInferType(r.c)));
     if(faultRow < 0) faultRow = 0;
+    if(itSecond){
+      const p1 = R[faultRow] ? R[faultRow].c.phase : '3';
+      faultRow2 = R.findIndex((r,ix)=> ix!==faultRow && r.c.phase!==p1 && r.c.phase!=='3');
+      if(faultRow2 < 0) faultRow2 = R.findIndex((r,ix)=> ix!==faultRow);
+      if(faultRow2 < 0) faultRow2 = faultRow;
+    }
   }
 
   const W = 820, rowH = 48, top = 196;
@@ -4468,7 +4481,7 @@ function buildSLD(){
     const ph = is3 ? '3~' : c.phase;
     const tagCol = is3 ? '#bfe9ff' : (SLD_PHASE[c.phase]||'#7fb4d6');
     const type = sldInferType(c);
-    const isFault = sldFault && i===faultRow;
+    const isFault = sldFault && (i===faultRow || (itSecond && i===faultRow2));
     const tapDur = Math.max(0.7, 2.6 - (cIb/maxCIb)*1.8).toFixed(2);
     // pickoffs from each tapped phase bar (shows which phases feed the circuit)
     let picks = '';
@@ -4580,16 +4593,23 @@ function buildSLD(){
     }
   }
 
-  // ---- earth-fault overlay: the fault-return path depends on the earthing system ----
+  // ---- earth-fault overlay: the fault-return path depends on the earthing system (IT supports 1st/2nd fault) ----
   let faultOverlay = '';
   if(sldFault && faultRow >= 0){
     const fy = top + faultRow*rowH + 18;
     const belowY = busBot + 16, peX = barX.PE, soilMid = H-50;
-    let peRoute, dots, dur, retNote, fcol = '#ff3b5c';
+    let peRoute, dots, dur, retNote, fcol = '#ff3b5c', extra = '';
     if(sldEarthing==='TT'){
       peRoute = `M ${symX} ${fy} L ${symX} ${belowY} L ${peX} ${belowY} L ${peX} ${soilMid} L ${srcX} ${soilMid} L ${srcX} ${feedY}`;
       dots = 3; dur = '2.3';
       retNote = lang==='da' ? 'TT: fejlstrøm gennem JORD (Ra+Rb) — høj impedans, LAV fejlstrøm → automatsikring udløser IKKE, HPFI er OBLIGATORISK' : 'TT: fault current through SOIL (Ra+Rb) — high impedance, LOW current → MCB will NOT trip, RCD is MANDATORY';
+    } else if(sldEarthing==='IT' && itSecond){
+      const fyB = top + faultRow2*rowH + 18;
+      peRoute = `M ${symX} ${fy} L ${peX} ${fy} L ${peX} ${fyB} L ${symX} ${fyB}`;
+      dots = 5; dur = '0.9'; fcol = '#ff3b5c';
+      retNote = lang==='da' ? 'IT 2. fejl: anden fejl på en anden fase → fase-fase via PE/jord → HØJ strøm → overstrømsbeskyttelse (automatsikring) udløser hurtigt.' : 'IT 2nd fault: a second fault on another phase → line-to-line via PE/earth → HIGH current → overcurrent protection (MCB) disconnects fast.';
+      extra += `<g filter="url(#sldGlow)"><path d="M ${symX-5} ${fyB-15} l 9 0 l -5 7 l 8 0 l -12 14 l 4 -10 l -7 0 z" fill="#ff3b5c"/></g>`;
+      extra += `<text x="${symX}" y="${fyB-19}" text-anchor="middle" font-size="9" font-weight="800" fill="#ff6b82">${lang==='da'?'2. FEJL':'2nd FAULT'}</text>`;
     } else if(sldEarthing==='IT'){
       peRoute = `M ${symX} ${fy} L ${symX} ${belowY} L ${peX} ${belowY} L ${peX} ${busTop} L ${srcX} ${busTop} L ${srcX} ${feedY+16}`;
       dots = 1; dur = '3.0'; fcol = '#ffd27a';
@@ -4601,20 +4621,26 @@ function buildSLD(){
         ? (lang==='da' ? 'TN-C-S: metallisk retur via PE/PEN — lav impedans, HØJ fejlstrøm → automatsikring + HPFI udløser hurtigt' : 'TN-C-S: metallic return via PE/PEN — low impedance, HIGH current → MCB + RCD trip fast')
         : (lang==='da' ? 'TN-S: metallisk PE-retur hele vejen — lav impedans, HØJ fejlstrøm' : 'TN-S: metallic PE return throughout — low impedance, HIGH current');
     }
-    const isIT = sldEarthing==='IT';
-    const bcol = isIT ? '#ffd27a' : '#ff6b82', bfill = isIT ? '#2a2208' : '#2a0a12';
-    const banner = isIT ? (lang==='da'?'1. JORDFEJL — IMD ALARM (ingen udkobling)':'1st EARTH FAULT — IMD ALARM (no disconnection)') : (lang==='da'?'JORDFEJL — HPFI 30 mA udløser <0,3 s':'EARTH FAULT — RCD 30 mA trips <0.3 s');
-    const flashLbl = isIT ? (lang==='da'?'1. FEJL':'1st FAULT') : (lang==='da'?'JORDFEJL':'EARTH FAULT');
-    const resLbl = isIT ? 'IMD: alarm' : (lang==='da'?'Reststrøm > 30 mA':'Residual > 30 mA');
+    const isIT1 = sldEarthing==='IT' && !itSecond;
+    const bcol = isIT1 ? '#ffd27a' : '#ff6b82', bfill = isIT1 ? '#2a2208' : '#2a0a12';
+    const banner = isIT1
+      ? (lang==='da'?'1. JORDFEJL — IMD ALARM (ingen udkobling)':'1st EARTH FAULT — IMD ALARM (no disconnect)')
+      : ((sldEarthing==='IT' && itSecond)
+        ? (lang==='da'?'2. JORDFEJL — fase-fase → udkobling':'2nd FAULT — line-line → trips')
+        : (lang==='da'?'JORDFEJL — HPFI 30 mA udløser <0,3 s':'EARTH FAULT — RCD 30 mA trips <0.3 s'));
+    const flashLbl = (sldEarthing==='IT') ? (lang==='da'?'1. FEJL':'1st FAULT') : (lang==='da'?'JORDFEJL':'EARTH FAULT');
+    const resLbl = isIT1 ? 'IMD: alarm' : (lang==='da'?'Reststrøm > 30 mA':'Residual > 30 mA');
+    const noteCol = (sldEarthing==='TT'||isIT1) ? '#ffd27a' : '#ff8a9c';
     faultOverlay += `<path d="${peRoute}" fill="none" stroke="#27ae60" stroke-width="2.5" stroke-dasharray="5 4" opacity="0.85"/>`;
     faultOverlay += sldFlow(peRoute, fcol, dots, dur);
     faultOverlay += `<g filter="url(#sldGlow)"><path d="M ${symX-5} ${fy-15} l 9 0 l -5 7 l 8 0 l -12 14 l 4 -10 l -7 0 z" fill="${fcol}"/></g>`;
     faultOverlay += `<text x="${symX}" y="${fy-19}" text-anchor="middle" font-size="9" font-weight="800" fill="${bcol}">${flashLbl}</text>`;
-    faultOverlay += `<text x="${brX+brW+10}" y="${fy+12}" font-size="9" fill="${isIT?'#ffd27a':'#ff8a9c'}">${resLbl}</text>`;
+    faultOverlay += `<text x="${brX+brW+10}" y="${fy+12}" font-size="9" fill="${isIT1?'#ffd27a':'#ff8a9c'}">${resLbl}</text>`;
     faultOverlay += `<g filter="url(#sldGlow)"><rect x="${W/2-164}" y="6" width="328" height="24" rx="8" fill="${bfill}" stroke="${bcol}" stroke-width="1.5"/></g>`;
-    faultOverlay += `<text x="${W/2}" y="22" text-anchor="middle" font-size="11" font-weight="800" fill="${bcol}">⚡ ${banner}</text>`;
+    faultOverlay += `<text x="${W/2}" y="22" text-anchor="middle" font-size="10" font-weight="800" fill="${bcol}">⚡ ${banner}</text>`;
     faultOverlay += `<rect x="${W/2-232}" y="${H-44}" width="464" height="18" rx="6" fill="#0a0f17" opacity="0.78"/>`;
-    faultOverlay += `<text x="${W/2}" y="${H-31}" text-anchor="middle" font-size="9" font-weight="700" fill="${(sldEarthing==='TT'||isIT)?'#ffd27a':'#ff8a9c'}">${retNote}</text>`;
+    faultOverlay += `<text x="${W/2}" y="${H-31}" text-anchor="middle" font-size="9" font-weight="700" fill="${noteCol}">${retNote}</text>`;
+    faultOverlay += extra;
   }
 
   return `
@@ -4828,7 +4854,7 @@ function neonScene(nodes, opts){
 function build3D(){ return neonScene(getDrawNodes()); }
 
 // Loop-impedance (Zs), prospective fault current and disconnection-time readout for the
-// selected/faulted circuit. Earthing-system aware (TN/TT use Zs; IT = first-fault alarm).
+// selected/faulted circuit. Earthing-system aware; click-only length + measured-Zs controls.
 function buildLoopReadout(){
   const da = lang==='da';
   const cons = loadList.length ? loadList.slice(0,16) : [
@@ -4843,8 +4869,8 @@ function buildLoopReadout(){
   const cIb = Math.max(ci.L1||0,ci.L2||0,ci.L3||0) || (c.kW*1000/((c.phase==='3'?Math.sqrt(3)*400:230)*(c.cos||0.9)));
   const cab = recommendCables(cIb)[0];
   const mcb = recommendMCBs(cIb,10)[0];
-  const L = (c.dist && c.dist>0) ? c.dist : 25;
-  const assumed = !(c.dist && c.dist>0);
+  const autoL = (c.dist && c.dist>0) ? c.dist : 25;
+  const L = sldRunLen>0 ? sldRunLen : autoL;
   const Rkm = cab ? (cab.r!=null ? cab.r : (cab.R||0)) : 0;
   const R1R2 = 2 * Rkm * (L/1000);
   const Ze = sldEarthing==='TN-C-S'?0.35 : sldEarthing==='TN-S'?0.80 : sldEarthing==='TT'?20 : 0;
@@ -4852,45 +4878,69 @@ function buildLoopReadout(){
   const k = mcb ? (mcb.curve==='B'?5:mcb.curve==='D'?20:10) : 10;
   const Ia = mcb ? k*mcb.rating : null;
   const devLbl = mcb ? (mcb.curve+mcb.rating+' A') : (cIb>63?'MCCB/NH':'—');
-  const row = (l,v)=>`<div class="result-row"><span class="label">${l}</span><span class="value">${v}</span></div>`;
+  const row = (l,v,col)=>`<div class="result-row"><span class="label">${l}</span><span class="value"${col?` style="color:${col}"`:''}>${v}</span></div>`;
+
+  // click-only controls (length + measured-Zs factor), hidden for IT (no Zs there)
+  const lenBtns = ['auto',10,25,50,75,100].map(m=>{const val=m==='auto'?0:m; const sel=(sldRunLen===val); return `<button class="sel-btn ${sel?'selected':''}" onclick="sldSetRunLen(${val})">${m==='auto'?'auto':m+' m'}</button>`;}).join('');
+  const facBtns = [1,1.25,1.5,2].map(f=>`<button class="sel-btn ${sldMeasZsFactor===f?'selected':''}" onclick="sldSetMeasZs(${f})">${f}×</button>`).join('');
+  const controls = (sldEarthing==='IT') ? '' :
+    `<div class="select-group" style="margin-bottom:6px"><div class="select-label">${da?'Kabellængde til Zs-beregning':'Cable length for Zs'}</div><div class="select-grid">${lenBtns}</div></div>`
+    + `<div class="select-group" style="margin-bottom:6px"><div class="select-label">${da?'Målt Zs (× beregnet) — verifikation':'Measured Zs (× calculated) — verification'}</div><div class="select-grid">${facBtns}</div></div>`;
+
   let rowsHtml='', verdict='', cls='ok';
-  if(sldEarthing==='IT'){
+  if(sldEarthing==='IT' && !sldITSecond){
     cls='warning';
-    rowsHtml += row(da?'System':'System', 'IT '+(da?'(isoleret/Z, IMD-overvåget)':'(isolated/Z, IMD-monitored)'));
+    rowsHtml += row(da?'System':'System','IT '+(da?'(isoleret/Z, IMD)':'(isolated/Z, IMD)'));
     rowsHtml += row(da?'Beskyttelse':'Protection', devLbl);
-    verdict = da ? 'IT — 1. fejl: meget lille fejlstrøm (begrænset af Zct/kapacitans). INGEN udkobling; IMD alarmerer. Find og afhjælp fejlen — en 2. fejl på en anden fase giver line-line-strøm og udkobling.' : 'IT — 1st fault: very small fault current (limited by Zct/capacitance). NO disconnection; the IMD alarms. Locate and clear it — a 2nd fault on another phase becomes a line-line fault and disconnects.';
+    verdict = da ? 'IT — 1. fejl: meget lille fejlstrøm (begrænset af Zct/kapacitans). INGEN udkobling; IMD alarmerer. En 2. fejl på en anden fase giver fase-fase-strøm og udkobling.' : 'IT — 1st fault: very small fault current (limited by Zct/capacitance). NO disconnection; the IMD alarms. A 2nd fault on another phase gives line-line current and disconnection.';
+  } else if(sldEarthing==='IT' && sldITSecond){
+    cls='error';
+    const Vll=400, Zloop=2*R1R2+0.3, If2=Vll/Zloop;
+    rowsHtml += row(da?'System':'System','IT — '+(da?'2. fejl (fase-fase)':'2nd fault (line-line)'));
+    rowsHtml += row(da?'Fejlsløjfespænding':'Fault-loop voltage', Vll+' V');
+    rowsHtml += row(da?'Anslået fejlstrøm':'Estimated fault current','≈ '+If2.toFixed(0)+' A');
+    rowsHtml += row(da?'Beskyttelse':'Protection', devLbl+(Ia?(' · Ia≈'+Ia+' A'):''));
+    verdict = da ? 'IT 2. fejl: to fejl på forskellige faser danner en fase-fase-sløjfe (~400 V) med høj strøm → automatsikringen udløser hurtigt (<0,1 s).' : 'IT 2nd fault: two faults on different phases form a line-line loop (~400 V) with high current → the MCB disconnects fast (<0.1 s).';
   } else {
-    const Zs = Ze + R1R2;
-    const If = (Cmin*Uo)/Zs;
+    const calcZs = Ze + R1R2;
+    const If = (Cmin*Uo)/calcZs;
+    const measZs = sldMeasZsFactor*calcZs;
     rowsHtml += row('Ze ('+(da?'kilde/typisk':'source/typical')+')', Ze.toFixed(2)+' Ω');
-    rowsHtml += row('R1+R2 (L='+L+' m'+(assumed?(da?', antaget':', assumed'):'')+')', R1R2.toFixed(3)+' Ω');
-    rowsHtml += row('Zs', Zs.toFixed(2)+' Ω');
-    rowsHtml += row(da?'Forventet fejlstrøm Ief = 0,95·Uo/Zs':'Prospective Ief = 0.95·Uo/Zs', If.toFixed(0)+' A');
-    rowsHtml += row(da?'Beskyttelse':'Protection', devLbl + (Ia?(' · Ia ≈ '+Ia+' A'):''));
+    rowsHtml += row('R1+R2 (L='+L+' m'+((sldRunLen===0 && !(c.dist>0))?(da?', antaget':', assumed'):'')+')', R1R2.toFixed(3)+' Ω');
+    rowsHtml += row(da?'Beregnet Zs':'Calculated Zs', calcZs.toFixed(2)+' Ω');
+    rowsHtml += row(da?'Forventet fejlstrøm Ief':'Prospective Ief', If.toFixed(0)+' A');
+    rowsHtml += row(da?'Beskyttelse':'Protection', devLbl+(Ia?(' · Ia≈'+Ia+' A'):''));
     if(sldEarthing==='TT'){
-      const RA = Ze, Utouch = RA*0.03, tReq = (mcb && mcb.rating<=32)?0.2:1;
-      rowsHtml += row(da?'HPFI 30 mA: RA·IΔn':'RCD 30 mA: RA·IΔn', Utouch.toFixed(1)+' V (≤ 50 V '+(Utouch<=50?'✓':'✗')+')');
-      rowsHtml += row(da?'Krævet udkoblingstid':'Required disconnection', '≤ '+tReq+' s');
-      cls = Utouch<=50 ? 'ok' : 'error';
-      verdict = da ? ('TT: Zs er høj, så automatsikringen når sjældent Ia → HPFI sikrer udkobling <'+tReq+' s. Berøringsspænding RA·IΔn = '+Utouch.toFixed(1)+' V ≤ 50 V.') : ('TT: Zs is high so the MCB rarely reaches Ia → the RCD ensures disconnection <'+tReq+' s. Touch voltage RA·IΔn = '+Utouch.toFixed(1)+' V ≤ 50 V.');
+      const RAmax = 50/0.03, Utouch = measZs*0.03;
+      rowsHtml += row(da?'Maks. RA (HPFI 30 mA, 50 V)':'Max RA (RCD 30 mA, 50 V)', RAmax.toFixed(0)+' Ω');
+      rowsHtml += row((da?'Målt RA = ':'Measured RA = ')+sldMeasZsFactor+'×', measZs.toFixed(2)+' Ω', measZs<=RAmax?'var(--success)':'var(--danger)');
+      rowsHtml += row(da?'Berøringsspænding RA·IΔn':'Touch voltage RA·IΔn', Utouch.toFixed(1)+' V (≤ 50 V '+(Utouch<=50?'✓':'✗')+')');
+      cls = (measZs<=RAmax && Utouch<=50) ? 'ok' : 'error';
+      verdict = da ? ('TT: HPFI 30 mA udkobler så længe RA ≤ '+RAmax.toFixed(0)+' Ω. Målt '+measZs.toFixed(1)+' Ω → '+(measZs<=RAmax?'✓ opfyldt, udkobler <0,2 s.':'✗ for høj!')) : ('TT: the 30 mA RCD disconnects while RA ≤ '+RAmax.toFixed(0)+' Ω. Measured '+measZs.toFixed(1)+' Ω → '+(measZs<=RAmax?'✓ met, trips <0.2 s.':'✗ too high!'));
     } else {
-      const tReq = (mcb && mcb.rating<=32)?0.4:5, trips = Ia && If>=Ia;
-      rowsHtml += row(da?'Krævet udkoblingstid':'Required disconnection', '≤ '+tReq+' s');
-      cls = trips ? 'ok' : 'warning';
-      verdict = trips
-        ? (da ? ('✓ Ief ('+If.toFixed(0)+' A) ≥ Ia ('+Ia+' A) → momentan udkobling <0,1 s, opfylder ≤'+tReq+' s.') : ('✓ Ief ('+If.toFixed(0)+' A) ≥ Ia ('+Ia+' A) → instantaneous trip <0.1 s, meets ≤'+tReq+' s.'))
-        : (da ? ('⚠ Ief under Ia — overstrømsbeskyttelsen er for langsom; HPFI/RCD sikrer udkobling.') : ('⚠ Ief below Ia — overcurrent protection too slow; an RCD ensures disconnection.'));
+      const ZsMax = Ia ? (Cmin*Uo/Ia) : null;
+      const tReq = (mcb && mcb.rating<=32)?0.4:5;
+      const measOk = ZsMax!=null && measZs<=ZsMax;
+      const calcOk = ZsMax!=null && calcZs<=ZsMax;
+      rowsHtml += row(da?'Maks. Zs (Cmin·Uo/Ia)':'Max Zs (Cmin·Uo/Ia)', ZsMax!=null?ZsMax.toFixed(2)+' Ω':'—');
+      rowsHtml += row((da?'Målt Zs = ':'Measured Zs = ')+sldMeasZsFactor+'×', measZs.toFixed(2)+' Ω', measOk?'var(--success)':'var(--danger)');
+      rowsHtml += row(da?'Krævet udkoblingstid':'Required disconnection','≤ '+tReq+' s');
+      cls = measOk ? 'ok' : (calcOk ? 'warning' : 'error');
+      verdict = measOk
+        ? (da ? ('✓ Målt Zs ('+measZs.toFixed(2)+' Ω) ≤ maks. ('+ZsMax.toFixed(2)+' Ω) → momentan udkobling <0,1 s, opfylder ≤'+tReq+' s.') : ('✓ Measured Zs ('+measZs.toFixed(2)+' Ω) ≤ max ('+ZsMax.toFixed(2)+' Ω) → instantaneous trip <0.1 s, meets ≤'+tReq+' s.'))
+        : (da ? ('⚠ Målt Zs ('+measZs.toFixed(2)+' Ω) > maks. ('+(ZsMax!=null?ZsMax.toFixed(2):'?')+' Ω) → automatsikring udløser ikke i tide. Forkort kabel, øg tværsnit, eller anvend HPFI.') : ('⚠ Measured Zs ('+measZs.toFixed(2)+' Ω) > max ('+(ZsMax!=null?ZsMax.toFixed(2):'?')+' Ω) → MCB will not trip in time. Shorten the run, increase csa, or use an RCD.'));
     }
   }
   return `<div class="card fade-in"><div class="card-title">📐 ${da?'Sløjfeimpedans & udkobling':'Loop impedance & disconnection'} — ${c.name||('K'+(idx+1))} · ⏚ ${sldEarthing}</div>`
+    + controls
     + `<div class="result-box ${cls}">${rowsHtml}<div class="result-row"><span class="label" style="line-height:1.55">${verdict}</span></div></div>`
-    + `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px">${da?'Ze og evt. kabellængde er typiske/antagne værdier til undervisning. Brug målt sløjfeimpedans ved idriftsættelse (DS/HD 60364-6).':'Ze and any cable length are typical/assumed teaching values. Use the measured loop impedance at commissioning (DS/HD 60364-6).'}</div></div>`;
+    + `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px">${da?'Ze og kabellængde er typiske/antagne værdier til undervisning. Brug målt sløjfeimpedans ved idriftsættelse (DS/HD 60364-6).':'Ze and cable length are typical/assumed teaching values. Use the measured loop impedance at commissioning (DS/HD 60364-6).'}</div></div>`;
 }
 
 function renderDrawing(){
   const nodes=getDrawNodes(), typeKeys=Object.keys(NODE_TYPES);
   const nodeEditor=`<div class="select-group"><div class="select-label">${lang==='da'?'Installationens noder (tilf\u00F8j/fjern/flyt)':'Installation nodes (add/remove/move)'}</div>${nodes.map((n,i)=>{const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;return `<div style="display:inline-flex;align-items:center;gap:4px;margin:3px 4px;padding:5px 9px;border:1.5px solid ${nt.color};border-radius:8px;font-size:.78rem;background:rgba(0,0,0,0.25)"><span>${nt.icon}</span><span style="color:${nt.color};font-weight:700">${lang==='da'?nt.da:nt.en}</span><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},-1)">\u25C0</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},1)">\u25B6</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem;color:var(--danger)" onclick="drawNodeRemove(${i})">\u2715</button></div>`;}).join('')}</div><div class="select-group"><div class="select-label">${lang==='da'?'Tilf\u00F8j node':'Add node'}</div><div class="select-grid">${typeKeys.map(k=>`<button class="sel-btn" onclick="drawNodeAdd('${k}')">${NODE_TYPES[k].icon} ${lang==='da'?NODE_TYPES[k].da:NODE_TYPES[k].en}</button>`).join('')}<button class="sel-btn" onclick="drawNodeReset()">\u21BA ${lang==='da'?'Nulstil':'Reset'}</button></div></div>`;
-  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div><div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
+  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
 }
 
 // ===== ANALYZING BRAIN MODULE =====
