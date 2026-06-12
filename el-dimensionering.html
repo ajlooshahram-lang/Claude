@@ -5808,6 +5808,368 @@ function buildCableLifetime(){
   return htm;
 }
 
+
+// ===== POWER FLOW SANKEY DIAGRAM =====
+function buildPowerFlow(){
+  const da = lang==='da';
+  const cons = loadList.length ? loadList.slice(0,12) : [
+    {kW:11,cos:0.9,sf:1,phase:'3',name:'EV-lader'},{kW:11,cos:1,sf:0.7,phase:'3',name:'Komfur'},
+    {kW:3.7,cos:0.95,sf:0.6,phase:'L1',name:'Stikgrupper'},{kW:2.2,cos:0.95,sf:0.6,phase:'L2',name:'Hvidevarer'},
+    {kW:1.5,cos:0.95,sf:1,phase:'L3',name:'Belysning'}
+  ];
+  if(!cons.length){
+    return `<div class="card fade-in"><div class="card-title">\u26A1 ${da?'Effektflow (Sankey)':'Power flow (Sankey)'}</div><div class="info-row">${da?'Tilf\u00F8j forbrugere i belastningsskemaet f\u00F8rst.':'Add consumers to the load schedule first.'}</div></div>`;
+  }
+  const W=700, H=380, pad=40;
+  // Calculate power for each circuit
+  const circuits = cons.map(c => {
+    const pUseful = c.kW * c.sf;
+    // Estimate cable loss: I^2*R*L, assume typical 50m, R~1.2 ohm/km for 2.5mm2 
+    const I = c.phase==='3' ? (pUseful*1000)/(Math.sqrt(3)*400*(c.cos||0.9)) : (pUseful*1000)/(230*(c.cos||0.95));
+    const dist = c.dist || 30;
+    const Rkm = c.phase==='3' ? 0.8 : 1.2;
+    const Rcable = Rkm * (dist/1000);
+    const pLoss = (c.phase==='3' ? 3 : 2) * I * I * Rcable / 1000; // kW
+    return { name: c.name||'Kreds', pUseful, pLoss: Math.max(pLoss, pUseful*0.005), phase: c.phase };
+  });
+  const totalUseful = circuits.reduce((s,c) => s + c.pUseful, 0);
+  const totalLoss = circuits.reduce((s,c) => s + c.pLoss, 0);
+  const totalInput = totalUseful + totalLoss;
+  // Sankey geometry
+  const trafoX = pad+30, panelX = W*0.4, loadX = W-pad-60;
+  const bandMaxH = H - 2*pad - 40;
+  const scale = bandMaxH / totalInput;
+  // Build SVG
+  let svg = '';
+  svg += `<defs><filter id="sankGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+  svg += `<radialGradient id="sankBg" cx="50%" cy="50%" r="70%"><stop offset="0%" stop-color="#0d1f33"/><stop offset="100%" stop-color="#06101c"/></radialGradient></defs>`;
+  svg += `<rect width="${W}" height="${H}" fill="url(#sankBg)"/>`;
+  // Title
+  svg += `<text x="${W/2}" y="22" text-anchor="middle" font-size="12" font-weight="800" fill="#bfe9ff" filter="url(#sankGlow)">${da?'Effektflow (Sankey)':'Power flow (Sankey)'}</text>`;
+  // Transformer block
+  const trafoH = totalInput * scale;
+  const trafoY = (H - trafoH)/2;
+  svg += `<rect x="${trafoX-20}" y="${trafoY}" width="40" height="${trafoH}" rx="4" fill="#0a1e33" stroke="#00e5ff" stroke-width="2" filter="url(#sankGlow)"/>`;
+  svg += `<text x="${trafoX}" y="${trafoY-8}" text-anchor="middle" font-size="9" fill="#7fa8c4">${da?'Trafo':'Transformer'}</text>`;
+  svg += `<text x="${trafoX}" y="${trafoY+trafoH/2+4}" text-anchor="middle" font-size="10" fill="#00e5ff" font-weight="700">${totalInput.toFixed(1)} kW</text>`;
+  // Panel block
+  const panelH = totalInput * scale;
+  const panelY = trafoY;
+  svg += `<rect x="${panelX-15}" y="${panelY}" width="30" height="${panelH}" rx="3" fill="#0a1e33" stroke="#00e5ff" stroke-width="1.5"/>`;
+  svg += `<text x="${panelX}" y="${panelY-8}" text-anchor="middle" font-size="9" fill="#7fa8c4">${da?'Hovedtavle':'Main panel'}</text>`;
+  // Main flow band: transformer -> panel
+  const mainBandW = totalInput * scale;
+  svg += `<path d="M${trafoX+20} ${trafoY} C${(trafoX+20+panelX-15)/2} ${trafoY} ${(trafoX+20+panelX-15)/2} ${panelY} ${panelX-15} ${panelY} L${panelX-15} ${panelY+panelH} C${(trafoX+20+panelX-15)/2} ${panelY+panelH} ${(trafoX+20+panelX-15)/2} ${trafoY+trafoH} ${trafoX+20} ${trafoY+trafoH} Z" fill="rgba(0,229,255,0.18)" stroke="rgba(0,229,255,0.4)" stroke-width="0.5"/>`;
+  // Fan out to circuits from panel
+  let yOff = panelY;
+  const circColors = ['#00e5ff','#4dd0e1','#26c6da','#00bcd4','#0097a7','#00acc1','#80deea','#b2ebf2','#4db6ac','#80cbc4','#a7ffeb','#64ffda'];
+  circuits.forEach((c, i) => {
+    const bandH = (c.pUseful + c.pLoss) * scale;
+    const lossH = c.pLoss * scale;
+    const usefulH = c.pUseful * scale;
+    const loadY = pad + 35 + i * ((H - 2*pad - 35) / circuits.length);
+    const col = circColors[i % circColors.length];
+    // Useful power band (cyan)
+    const py1 = yOff, py2 = yOff + usefulH;
+    const ly1 = loadY, ly2 = loadY + usefulH;
+    svg += `<path d="M${panelX+15} ${py1} C${(panelX+15+loadX)/2} ${py1} ${(panelX+15+loadX)/2} ${ly1} ${loadX} ${ly1} L${loadX} ${ly2} C${(panelX+15+loadX)/2} ${ly2} ${(panelX+15+loadX)/2} ${py2} ${panelX+15} ${py2} Z" fill="${col}" fill-opacity="0.25" stroke="${col}" stroke-width="0.7" stroke-opacity="0.6"/>`;
+    // Loss bleed band (red)
+    const lpy1 = yOff + usefulH, lpy2 = lpy1 + lossH;
+    const lly1 = ly2, lly2 = lly1 + Math.max(lossH, 2);
+    svg += `<path d="M${panelX+15} ${lpy1} C${(panelX+15+loadX)/2} ${lpy1} ${(panelX+15+loadX)/2} ${lly1} ${loadX} ${lly1} L${loadX} ${lly2} C${(panelX+15+loadX)/2} ${lly2} ${(panelX+15+loadX)/2} ${lpy2} ${panelX+15} ${lpy2} Z" fill="#ff3b5c" fill-opacity="0.35" stroke="#ff3b5c" stroke-width="0.5" stroke-opacity="0.5"/>`;
+    // Label
+    svg += `<text x="${loadX+8}" y="${(ly1+ly2)/2+4}" font-size="8" fill="#bfe9ff">${c.name} (${c.pUseful.toFixed(1)} kW)</text>`;
+    yOff += bandH;
+  });
+  // Totals
+  svg += `<text x="${W/2}" y="${H-12}" text-anchor="middle" font-size="9" fill="#7fa8c4">${da?'Total ind':'Total in'}: ${totalInput.toFixed(1)} kW | ${da?'Nyttig':'Useful'}: <tspan fill="#00e5ff">${totalUseful.toFixed(1)} kW</tspan> | ${da?'Tab':'Losses'}: <tspan fill="#ff3b5c">${totalLoss.toFixed(2)} kW</tspan></text>`;
+  const svgTag = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:720px;border-radius:12px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 24px rgba(0,160,255,0.15)" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+  let htm = `<div class="card fade-in"><div class="card-title">\u26A1 ${da?'Effektflow (Sankey)':'Power flow (Sankey)'}</div>`;
+  htm += `<div class="info-row" style="margin-bottom:8px">${da?'Sankey-diagram der viser effektstr\u00F8mmen fra transformeren gennem hovedtavlen til hver kreds. Bredden er proportional med effekten. R\u00F8de b\u00E5nd viser kabeltab (I\u00B2R).':'Sankey diagram showing power flow from transformer through main panel to each circuit. Band width is proportional to power. Red bands show cable losses (I\u00B2R).'}</div>`;
+  htm += svgTag;
+  htm += `<div class="result-box" style="margin-top:10px;background:rgba(0,30,50,0.4);border:1px solid rgba(0,200,255,0.2)">`;
+  htm += `<div class="result-row"><span class="label" style="color:#7fa8c4">${da?'Total indgangseffekt':'Total input power'}</span><span class="value" style="color:#00e5ff">${totalInput.toFixed(2)} kW</span></div>`;
+  htm += `<div class="result-row"><span class="label" style="color:#7fa8c4">${da?'Total nytteeffekt':'Total useful power'}</span><span class="value" style="color:#00e5ff">${totalUseful.toFixed(2)} kW</span></div>`;
+  htm += `<div class="result-row"><span class="label" style="color:#7fa8c4">${da?'Totale kabeltab':'Total cable losses'}</span><span class="value" style="color:#ff3b5c">${totalLoss.toFixed(3)} kW (${(totalLoss/totalInput*100).toFixed(2)}%)</span></div>`;
+  htm += `<div class="result-row"><span class="label" style="color:#7fa8c4">${da?'Virkningsgrad':'Efficiency'}</span><span class="value" style="color:#06d6a0">${(totalUseful/totalInput*100).toFixed(1)}%</span></div>`;
+  htm += `</div></div>`;
+  return htm;
+}
+
+
+// ===== VOLTAGE REGULATION UNDER LOAD (VOLTAGE PROFILE) =====
+let vpMainLen = 25; // default main cable length in meters
+function buildVoltageProfile(){
+  const da = lang==='da';
+  const cons = loadList.length ? loadList.slice(0,8) : [
+    {kW:11,cos:0.9,sf:1,phase:'3',name:'EV-lader',dist:30},{kW:11,cos:1,sf:0.7,phase:'3',name:'Komfur',dist:12},
+    {kW:3.7,cos:0.95,sf:0.6,phase:'L1',name:'Stikgrupper',dist:25},{kW:2.2,cos:0.95,sf:0.6,phase:'L2',name:'Hvidevarer',dist:18},
+    {kW:1.5,cos:0.95,sf:1,phase:'L3',name:'Belysning',dist:22}
+  ];
+  if(!cons.length){
+    return `<div class="card fade-in"><div class="card-title">\uD83D\uDCC9 ${da?'Sp\u00E6ndingsprofil':'Voltage profile'}</div><div class="info-row">${da?'Tilf\u00F8j forbrugere i belastningsskemaet f\u00F8rst.':'Add consumers to the load schedule first.'}</div></div>`;
+  }
+  const mainLenOpts = [10,25,50,75,100];
+  const mainLen = vpMainLen || 25;
+  // Determine voltage system
+  const is3ph = cons.some(c => c.phase==='3');
+  const Vnom = is3ph ? 400 : 230;
+  const Vmin = is3ph ? 380 : 220;
+  const Vmax = Vnom;
+  // Main cable voltage drop (assume 35mm2 Cu, R=0.524 ohm/km for XLPE 5G35)
+  const Rmain = 0.524; // ohm/km
+  const Xmain = 0.07;
+  // Total current through main cable (sum of all loads)
+  let ibTotal = 0;
+  cons.forEach(c => {
+    const p = c.kW * c.sf * 1000;
+    ibTotal += c.phase==='3' ? p/(Math.sqrt(3)*400*(c.cos||0.9)) : p/(230*(c.cos||0.95));
+  });
+  const cosAvg = 0.9, sinAvg = Math.sin(Math.acos(cosAvg));
+  const dvMain = (is3ph ? Math.sqrt(3) : 2) * ibTotal * (mainLen/1000) * (Rmain*cosAvg + Xmain*sinAvg);
+  const Vpanel = Vnom - dvMain;
+  // Per circuit voltage profile
+  const W=660, H=320, padL=55, padR=30, padT=45, padB=50;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const circColors = ['#00e5ff','#ff9a4d','#06d6a0','#ffd166','#e040fb','#4dd0e1','#ff3b5c','#80cbc4'];
+  // Calculate each circuit's profile points: [trafo(0m, Vnom), panel(mainLen, Vpanel), end(mainLen+dist, Vend)]
+  const profiles = cons.map((c, i) => {
+    const dist = c.dist || (typeof vdropState!=='undefined'? vdropState.length : 30);
+    const p = c.kW * c.sf * 1000;
+    const I = c.phase==='3' ? p/(Math.sqrt(3)*400*(c.cos||0.9)) : p/(230*(c.cos||0.95));
+    // Branch cable: assume 2.5mm2 for small, 6mm2 for medium, 16mm2 for big
+    let Rbranch = 7.41; // 2.5mm2
+    if(c.kW > 5) Rbranch = 3.08; // 6mm2
+    if(c.kW > 10) Rbranch = 1.15; // 16mm2
+    const Xbranch = 0.08;
+    const cosC = c.cos||0.9, sinC = Math.sin(Math.acos(cosC));
+    const dvBranch = (c.phase==='3' ? Math.sqrt(3) : 2) * I * (dist/1000) * (Rbranch*cosC + Xbranch*sinC);
+    const Vend = Vpanel - dvBranch;
+    const totalDist = mainLen + dist;
+    return { name: c.name, points: [{x:0,v:Vnom},{x:mainLen,v:Vpanel},{x:totalDist,v:Vend}], totalDist, Vend, dvPct: ((Vnom-Vend)/Vnom)*100, phase: c.phase };
+  });
+  const maxDist = Math.max(...profiles.map(p => p.totalDist), mainLen+10);
+  // SVG
+  let svg = '';
+  svg += `<defs><filter id="vpGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+  svg += `<radialGradient id="vpBg" cx="50%" cy="50%" r="70%"><stop offset="0%" stop-color="#0d1f33"/><stop offset="100%" stop-color="#06101c"/></radialGradient></defs>`;
+  svg += `<rect width="${W}" height="${H}" fill="url(#vpBg)"/>`;
+  // Title
+  svg += `<text x="${W/2}" y="20" text-anchor="middle" font-size="12" font-weight="800" fill="#bfe9ff" filter="url(#vpGlow)">${da?'Sp\u00E6ndingsprofil':'Voltage profile'}</text>`;
+  // Grid
+  const vRange = Vmax - Vmin;
+  for(let v = Vmin; v <= Vmax; v += (is3ph?5:2.5)){
+    const y = padT + plotH - ((v - Vmin)/vRange)*plotH;
+    svg += `<line x1="${padL}" y1="${y}" x2="${padL+plotW}" y2="${y}" stroke="rgba(0,200,255,0.13)" stroke-width="0.5"/>`;
+    svg += `<text x="${padL-5}" y="${y+3}" text-anchor="end" font-size="8" fill="#7fa8c4">${v.toFixed(0)}V</text>`;
+  }
+  // X axis labels
+  for(let d=0; d<=maxDist; d+=Math.ceil(maxDist/5)){
+    const x = padL + (d/maxDist)*plotW;
+    svg += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${padT+plotH}" stroke="rgba(0,200,255,0.08)" stroke-width="0.5"/>`;
+    svg += `<text x="${x}" y="${padT+plotH+14}" text-anchor="middle" font-size="8" fill="#7fa8c4">${d}m</text>`;
+  }
+  // Voltage drop limit bands
+  const limits = [{pct:3, color:'rgba(255,209,102,0.12)', label: da?'3% lys':'3% light'},
+                  {pct:4, color:'rgba(255,154,77,0.10)', label: da?'4% generel':'4% general'},
+                  {pct:5, color:'rgba(255,59,92,0.10)', label: '5% max'}];
+  limits.forEach(lim => {
+    const vLim = Vnom * (1 - lim.pct/100);
+    if(vLim >= Vmin){
+      const y = padT + plotH - ((vLim-Vmin)/vRange)*plotH;
+      svg += `<line x1="${padL}" y1="${y}" x2="${padL+plotW}" y2="${y}" stroke="${lim.color.replace(/0\.\d+\)/,'0.6)')}" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+      svg += `<text x="${padL+plotW+3}" y="${y+3}" font-size="7" fill="${lim.color.replace(/0\.\d+\)/,'0.8)')}">${lim.label}</text>`;
+    }
+  });
+  // Plot lines
+  profiles.forEach((pr, i) => {
+    const col = circColors[i % circColors.length];
+    const pts = pr.points.map(p => {
+      const x = padL + (p.x/maxDist)*plotW;
+      const y = padT + plotH - ((p.v-Vmin)/vRange)*plotH;
+      return `${x},${y}`;
+    }).join(' ');
+    svg += `<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" filter="url(#vpGlow)"/>`;
+    // End dot
+    const lastPt = pr.points[pr.points.length-1];
+    const ex = padL + (lastPt.x/maxDist)*plotW;
+    const ey = padT + plotH - ((lastPt.v-Vmin)/vRange)*plotH;
+    svg += `<circle cx="${ex}" cy="${ey}" r="3.5" fill="${col}" filter="url(#vpGlow)"/>`;
+    svg += `<text x="${ex+6}" y="${ey+3}" font-size="7" fill="${col}">${pr.name}</text>`;
+    // Mark if crossing limit
+    if(pr.dvPct > 5){
+      svg += `<text x="${ex+6}" y="${ey+12}" font-size="7" fill="#ff3b5c">\u26A0 ${pr.dvPct.toFixed(1)}%</text>`;
+    }
+  });
+  // Axis labels
+  svg += `<text x="${padL+plotW/2}" y="${H-5}" text-anchor="middle" font-size="9" fill="#7fa8c4">${da?'Afstand fra trafo (m)':'Distance from transformer (m)'}</text>`;
+  svg += `<text x="12" y="${padT+plotH/2}" text-anchor="middle" font-size="9" fill="#7fa8c4" transform="rotate(-90,12,${padT+plotH/2})">${da?'Sp\u00E6nding (V)':'Voltage (V)'}</text>`;
+  // Panel vertical line
+  const panelXpos = padL + (mainLen/maxDist)*plotW;
+  svg += `<line x1="${panelXpos}" y1="${padT}" x2="${panelXpos}" y2="${padT+plotH}" stroke="rgba(0,229,255,0.3)" stroke-width="1" stroke-dasharray="3 2"/>`;
+  svg += `<text x="${panelXpos}" y="${padT-5}" text-anchor="middle" font-size="7" fill="#00e5ff">${da?'Tavle':'Panel'}</text>`;
+  const svgTag = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:700px;border-radius:12px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 24px rgba(0,160,255,0.15)" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+  // Main cable length selector
+  let selector = `<div class="select-group" style="margin-bottom:10px"><div class="select-label">${da?'Hovedkabel l\u00E6ngde':'Main cable length'}</div><div class="select-grid">`;
+  mainLenOpts.forEach(ml => {
+    selector += `<button class="sel-btn ${ml===mainLen?'selected':''}" onclick="vpMainLen=${ml};renderModule('draw')">${ml} m</button>`;
+  });
+  selector += `</div></div>`;
+  let htm = `<div class="card fade-in"><div class="card-title">\uD83D\uDCC9 ${da?'Sp\u00E6ndingsprofil':'Voltage profile'}</div>`;
+  htm += `<div class="info-row" style="margin-bottom:8px">${da?'Viser sp\u00E6ndingsniveauet fra transformerens sekund\u00E6rside gennem hovedkabel og tavle til enden af hver kreds. V\u00E6lg hovedkablets l\u00E6ngde nedenfor.':'Shows voltage level from transformer secondary through main cable and panel to the end of each circuit. Select main cable length below.'}</div>`;
+  htm += selector;
+  htm += svgTag;
+  // Summary table
+  htm += `<div class="result-box" style="margin-top:10px;background:rgba(0,30,50,0.4);border:1px solid rgba(0,200,255,0.2)">`;
+  htm += `<div class="result-row"><span class="label" style="color:#7fa8c4">${da?'Sp\u00E6nding ved tavle':'Voltage at panel'}</span><span class="value" style="color:#00e5ff">${Vpanel.toFixed(1)} V (\u0394${dvMain.toFixed(1)} V = ${(dvMain/Vnom*100).toFixed(2)}%)</span></div>`;
+  profiles.forEach((pr,i) => {
+    const col = circColors[i % circColors.length];
+    const warn = pr.dvPct > 5 ? ' \u26A0' : pr.dvPct > 4 ? ' \u26A0' : '';
+    htm += `<div class="result-row"><span class="label" style="color:${col}">${pr.name}</span><span class="value" style="color:${pr.dvPct>5?'#ff3b5c':pr.dvPct>4?'#ff9a4d':'#06d6a0'}">${pr.Vend.toFixed(1)} V (\u0394${pr.dvPct.toFixed(2)}%)${warn}</span></div>`;
+  });
+  htm += `</div></div>`;
+  return htm;
+}
+
+
+// ===== EMC & CABLE ROUTING RECOMMENDATIONS =====
+function buildEmcRouting(){
+  const da = lang==='da';
+  const cons = loadList.length ? loadList.slice(0,16) : [
+    {kW:11,cos:0.9,sf:1,phase:'3',name:'EV-lader'},{kW:11,cos:1,sf:0.7,phase:'3',name:'Komfur'},
+    {kW:3.7,cos:0.95,sf:0.6,phase:'L1',name:'Stikgrupper'},{kW:2.2,cos:0.95,sf:0.6,phase:'L2',name:'Hvidevarer'},
+    {kW:1.5,cos:0.95,sf:1,phase:'L3',name:'Belysning'},{kW:8,cos:0.9,sf:0.9,phase:'3',name:'Serverrum'}
+  ];
+  if(!cons.length){
+    return `<div class="card fade-in"><div class="card-title">\uD83D\uDEE1\uFE0F ${da?'EMC & kabelf\u00F8ring':'EMC & cable routing'}</div><div class="info-row">${da?'Tilf\u00F8j forbrugere i belastningsskemaet f\u00F8rst.':'Add consumers to the load schedule first.'}</div></div>`;
+  }
+  // Classify circuits into EMC categories
+  function emcCat(c){
+    const n = (c.name||'').toLowerCase();
+    // Cat 1: sensitive (data, telecom, measurement)
+    if(/server|data|ups|m\u00e5l|sensor|telecom|measurement|plc|signal/.test(n)) return 1;
+    // Cat 3: disturbing (VFD motors, EV, welders, large switching)
+    if(/motor|pumpe|pump|kompres|vent|kran|crane|elevator|lift|svejs|weld|ev|lade|elbil|charg|vfd|frekvens|inverter/.test(n)) return 3;
+    // Cat 2: normal (lighting, sockets, general)
+    return 2;
+  }
+  const classified = cons.map(c => ({...c, cat: emcCat(c)}));
+  const cat1 = classified.filter(c => c.cat===1);
+  const cat2 = classified.filter(c => c.cat===2);
+  const cat3 = classified.filter(c => c.cat===3);
+  // Separation rules per IEC 61000-5-2
+  const rules = [
+    {from:1, to:3, dist:300, alt: da?'eller metallisk barriere':'or metallic barrier'},
+    {from:1, to:2, dist:100, alt:''},
+    {from:2, to:3, dist:150, alt: da?'eller separat bakke':'or separate tray'}
+  ];
+  // SVG cross-section diagram
+  const W=620, H=300;
+  let svg = '';
+  svg += `<defs><filter id="emcGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+  svg += `<radialGradient id="emcBg" cx="50%" cy="50%" r="70%"><stop offset="0%" stop-color="#0d1f33"/><stop offset="100%" stop-color="#06101c"/></radialGradient></defs>`;
+  svg += `<rect width="${W}" height="${H}" fill="url(#emcBg)"/>`;
+  // Title
+  svg += `<text x="${W/2}" y="22" text-anchor="middle" font-size="12" font-weight="800" fill="#bfe9ff" filter="url(#emcGlow)">${da?'EMC & kabelf\u00F8ring \u2014 tv\u00E6rsnit':'EMC & cable routing \u2014 cross-section'}</text>`;
+  // Draw cable tray outline
+  const trayY = 100, trayH = 120, trayW = 500, trayX = (W-trayW)/2;
+  svg += `<rect x="${trayX}" y="${trayY}" width="${trayW}" height="${trayH}" rx="6" fill="none" stroke="rgba(0,200,255,0.3)" stroke-width="2" stroke-dasharray="6 3"/>`;
+  svg += `<text x="${trayX+trayW/2}" y="${trayY-8}" text-anchor="middle" font-size="9" fill="#7fa8c4">${da?'Kabelbakke / kabelrute':'Cable tray / route'}</text>`;
+  // Three zones
+  const zoneW = trayW / 3 - 20;
+  const zones = [
+    {label: da?'Kat. 1 (F\u00F8lsom)':'Cat. 1 (Sensitive)', color:'#06d6a0', x: trayX+15, items: cat1},
+    {label: da?'Kat. 2 (Normal)':'Cat. 2 (Normal)', color:'#ffd166', x: trayX+trayW/3+5, items: cat2},
+    {label: da?'Kat. 3 (Forstyrrende)':'Cat. 3 (Disturbing)', color:'#ff3b5c', x: trayX+2*trayW/3-5, items: cat3}
+  ];
+  zones.forEach((z,zi) => {
+    svg += `<rect x="${z.x}" y="${trayY+10}" width="${zoneW}" height="${trayH-20}" rx="4" fill="${z.color}" fill-opacity="0.08" stroke="${z.color}" stroke-width="1.2" stroke-opacity="0.5"/>`;
+    svg += `<text x="${z.x+zoneW/2}" y="${trayY+26}" text-anchor="middle" font-size="9" font-weight="700" fill="${z.color}">${z.label}</text>`;
+    // Draw cable circles for items
+    const maxShow = Math.min(z.items.length, 5);
+    for(let i=0;i<maxShow;i++){
+      const cx = z.x + 20 + i*(zoneW-40)/Math.max(maxShow-1,1);
+      const cy = trayY + 60 + (i%2)*30;
+      svg += `<circle cx="${cx}" cy="${cy}" r="10" fill="#0a1e2e" stroke="${z.color}" stroke-width="1.5" filter="url(#emcGlow)"/>`;
+      svg += `<text x="${cx}" y="${cy+3}" text-anchor="middle" font-size="6" fill="${z.color}">${(z.items[i].name||'').slice(0,4)}</text>`;
+    }
+    if(z.items.length > 5){
+      svg += `<text x="${z.x+zoneW/2}" y="${trayY+trayH-10}" text-anchor="middle" font-size="7" fill="${z.color}">+${z.items.length-5} ${da?'flere':'more'}</text>`;
+    }
+    if(z.items.length === 0){
+      svg += `<text x="${z.x+zoneW/2}" y="${trayY+65}" text-anchor="middle" font-size="8" fill="#5a6d7e" opacity="0.6">(${da?'ingen':'none'})</text>`;
+    }
+  });
+  // Separation arrows
+  const arrowY = trayY + trayH + 25;
+  // Cat1 <-> Cat2: 100mm
+  const x1_2_l = trayX+15+zoneW, x1_2_r = trayX+trayW/3+5;
+  svg += `<line x1="${x1_2_l}" y1="${arrowY}" x2="${x1_2_r}" y2="${arrowY}" stroke="#ffd166" stroke-width="1.5" marker-start="url(#emcArr)" marker-end="url(#emcArr)"/>`;
+  svg += `<text x="${(x1_2_l+x1_2_r)/2}" y="${arrowY-5}" text-anchor="middle" font-size="8" fill="#ffd166">\u2265100mm</text>`;
+  // Cat2 <-> Cat3: 150mm
+  const x2_3_l = trayX+trayW/3+5+zoneW, x2_3_r = trayX+2*trayW/3-5;
+  svg += `<line x1="${x2_3_l}" y1="${arrowY+20}" x2="${x2_3_r}" y2="${arrowY+20}" stroke="#ff9a4d" stroke-width="1.5"/>`;
+  svg += `<text x="${(x2_3_l+x2_3_r)/2}" y="${arrowY+15}" text-anchor="middle" font-size="8" fill="#ff9a4d">\u2265150mm</text>`;
+  // Cat1 <-> Cat3: 300mm (full span)
+  svg += `<line x1="${trayX+15+zoneW/2}" y1="${arrowY+40}" x2="${trayX+2*trayW/3-5+zoneW/2}" y2="${arrowY+40}" stroke="#ff3b5c" stroke-width="1.5"/>`;
+  svg += `<text x="${W/2}" y="${arrowY+35}" text-anchor="middle" font-size="8" fill="#ff3b5c">\u2265300mm ${da?'eller metallisk barriere':'or metallic barrier'}</text>`;
+  // IEC reference
+  svg += `<text x="${W/2}" y="${H-8}" text-anchor="middle" font-size="7" fill="#5a6d7e">IEC 61000-5-2</text>`;
+  const svgTag = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:660px;border-radius:12px;border:1px solid rgba(0,200,255,0.28);box-shadow:0 0 24px rgba(0,160,255,0.15)" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+  // Recommendations and issues
+  let issues = [];
+  let recos = [];
+  if(cat1.length && cat3.length){
+    issues.push(da?'F\u00F8lsomme kredse (data/server) og forstyrrende kredse (motorer/EV) er p\u00E5 samme installation \u2014 korrekt adskillelse kr\u00E6ves!':'Sensitive circuits (data/server) and disturbing circuits (motors/EV) are on the same installation \u2014 proper separation required!');
+    recos.push(da?'Anvend skærmet kabel (f.eks. NOIKX-S eller LSZH-S) for kategori 1 kredse.':'Use shielded cable (e.g. NOIKX-S or LSZH-S) for category 1 circuits.');
+    recos.push(da?'Monter EMC-filter p\u00E5 frekvensomformere og store kontaktorer.':'Install EMC filters on VFDs and large contactors.');
+  }
+  if(cat3.length){
+    recos.push(da?'F\u00F8r kategori 3 kabler i separat bakke eller r\u00F8r med min. 150 mm afstand til kategori 2.':'Route category 3 cables in separate tray or conduit with min. 150mm separation from category 2.');
+  }
+  if(cat3.some(c => /ev|lade|elbil|charg/.test((c.name||'').toLowerCase()))){
+    recos.push(da?'EV-ladere: Overvej skærmet forsyningskabel og ferritkerner p\u00E5 kommunikationskabler.':'EV chargers: Consider shielded supply cable and ferrite cores on communication cables.');
+  }
+  if(cat3.some(c => /svejs|weld/.test((c.name||'').toLowerCase()))){
+    issues.push(da?'Svejseudstyr genererer kraftig EMI \u2014 dedikeret kreds med EMC-filter anbefales.':'Welding equipment generates strong EMI \u2014 dedicated circuit with EMC filter recommended.');
+  }
+  if(!issues.length && !recos.length){
+    recos.push(da?'\u2713 Ingen kritiske EMC-problemer detekteret. Standardinstallation er tilstr\u00E6kkelig.':'\u2713 No critical EMC issues detected. Standard installation is sufficient.');
+  }
+  let htm = `<div class="card fade-in"><div class="card-title">\uD83D\uDEE1\uFE0F ${da?'EMC & kabelf\u00F8ring':'EMC & cable routing'}</div>`;
+  htm += `<div class="info-row" style="margin-bottom:8px">${da?'Klassificerer kredse i EMC-kategorier og anbefaler minimumafstande per IEC 61000-5-2. Visualiserer kabelbakkens tv\u00E6rsnit med anbefalet placering.':'Classifies circuits into EMC categories and recommends minimum separation distances per IEC 61000-5-2. Visualizes cable tray cross-section with recommended placement.'}</div>`;
+  htm += svgTag;
+  // Classification summary
+  htm += `<div class="result-box" style="margin-top:10px;background:rgba(0,30,50,0.4);border:1px solid rgba(0,200,255,0.2)">`;
+  htm += `<div class="result-title" style="color:#bfe9ff;margin-bottom:6px">${da?'Klassificering':'Classification'}</div>`;
+  htm += `<div class="result-row"><span class="label" style="color:#06d6a0">${da?'Kat. 1 (F\u00F8lsom)':'Cat. 1 (Sensitive)'}</span><span class="value" style="color:#06d6a0">${cat1.length ? cat1.map(c=>c.name).join(', ') : (da?'Ingen':'None')}</span></div>`;
+  htm += `<div class="result-row"><span class="label" style="color:#ffd166">${da?'Kat. 2 (Normal)':'Cat. 2 (Normal)'}</span><span class="value" style="color:#ffd166">${cat2.length ? cat2.map(c=>c.name).join(', ') : (da?'Ingen':'None')}</span></div>`;
+  htm += `<div class="result-row"><span class="label" style="color:#ff3b5c">${da?'Kat. 3 (Forstyrrende)':'Cat. 3 (Disturbing)'}</span><span class="value" style="color:#ff3b5c">${cat3.length ? cat3.map(c=>c.name).join(', ') : (da?'Ingen':'None')}</span></div>`;
+  htm += `</div>`;
+  // Separation rules table
+  htm += `<div class="result-box" style="margin-top:8px;background:rgba(0,30,50,0.4);border:1px solid rgba(0,200,255,0.2)">`;
+  htm += `<div class="result-title" style="color:#bfe9ff;margin-bottom:6px">${da?'Mindsteafstande (IEC 61000-5-2)':'Minimum distances (IEC 61000-5-2)'}</div>`;
+  rules.forEach(r => {
+    htm += `<div class="result-row"><span class="label" style="color:#7fa8c4">${da?'Kat.':'Cat.'} ${r.from} \u2194 ${da?'Kat.':'Cat.'} ${r.to}</span><span class="value" style="color:#ff9a4d">\u2265 ${r.dist} mm ${r.alt}</span></div>`;
+  });
+  htm += `</div>`;
+  // Issues and recommendations
+  if(issues.length){
+    htm += `<div class="result-box error" style="margin-top:8px">`;
+    htm += `<div class="result-title" style="color:#ff3b5c">\u26A0 ${da?'Potentielle EMC-problemer':'Potential EMC issues'}</div>`;
+    issues.forEach(iss => { htm += `<div class="result-row"><span class="label" style="color:#ff9a4d">${iss}</span></div>`; });
+    htm += `</div>`;
+  }
+  if(recos.length){
+    htm += `<div class="result-box" style="margin-top:8px;background:rgba(6,214,160,0.06);border:1px solid rgba(6,214,160,0.3)">`;
+    htm += `<div class="result-title" style="color:#06d6a0">${da?'Anbefalinger':'Recommendations'}</div>`;
+    recos.forEach(rec => { htm += `<div class="result-row"><span class="label" style="color:#bfe9ff">\u2022 ${rec}</span></div>`; });
+    htm += `</div>`;
+  }
+  htm += `</div>`;
+  return htm;
+}
+
 function buildProtReport(){
   const da = lang==='da';
   const cons = loadList.length ? loadList.slice(0,16) : [
@@ -5997,7 +6359,7 @@ function buildLoopReadout(){
 function renderDrawing(){
   const nodes=getDrawNodes(), typeKeys=Object.keys(NODE_TYPES);
   const nodeEditor=`<div class="select-group"><div class="select-label">${lang==='da'?'Installationens noder (tilf\u00F8j/fjern/flyt)':'Installation nodes (add/remove/move)'}</div>${nodes.map((n,i)=>{const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;return `<div style="display:inline-flex;align-items:center;gap:4px;margin:3px 4px;padding:5px 9px;border:1.5px solid ${nt.color};border-radius:8px;font-size:.78rem;background:rgba(0,0,0,0.25)"><span>${nt.icon}</span><span style="color:${nt.color};font-weight:700">${lang==='da'?nt.da:nt.en}</span><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},-1)">\u25C0</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},1)">\u25B6</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem;color:var(--danger)" onclick="drawNodeRemove(${i})">\u2715</button></div>`;}).join('')}</div><div class="select-group"><div class="select-label">${lang==='da'?'Tilf\u00F8j node':'Add node'}</div><div class="select-grid">${typeKeys.map(k=>`<button class="sel-btn" onclick="drawNodeAdd('${k}')">${NODE_TYPES[k].icon} ${lang==='da'?NODE_TYPES[k].da:NODE_TYPES[k].en}</button>`).join('')}<button class="sel-btn" onclick="drawNodeReset()">\u21BA ${lang==='da'?'Nulstil':'Reset'}</button></div></div>`;
-  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():(sldFault?buildCoordDashboard():'')+buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildArcFlash():''}${drawStyle==='schematic'&&sldFault?buildDeratingChart():''}${drawStyle==='schematic'&&sldFault?buildInrushCheck():''}${drawStyle==='schematic'&&sldFault?buildEnergyEfficiency():''}${drawStyle==='schematic'&&sldFault?buildHarmonicCheck():''}${drawStyle==='schematic'&&sldFault?buildCableLifetime():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='schematic'&&sldFault?buildDiscrimTable():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
+  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():(sldFault?buildCoordDashboard():'')+buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildArcFlash():''}${drawStyle==='schematic'&&sldFault?buildDeratingChart():''}${drawStyle==='schematic'&&sldFault?buildInrushCheck():''}${drawStyle==='schematic'&&sldFault?buildEnergyEfficiency():''}${drawStyle==='schematic'&&sldFault?buildHarmonicCheck():''}${drawStyle==='schematic'&&sldFault?buildCableLifetime():''}${drawStyle==='schematic'&&sldFault?buildPowerFlow():''}${drawStyle==='schematic'&&sldFault?buildVoltageProfile():''}${drawStyle==='schematic'&&sldFault?buildEmcRouting():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='schematic'&&sldFault?buildDiscrimTable():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
 }
 
 // ===== ANALYZING BRAIN MODULE =====
