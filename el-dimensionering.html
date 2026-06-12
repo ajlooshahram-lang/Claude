@@ -4932,6 +4932,27 @@ function buildTccCurve(){
   g += `<line x1="${mLft+pw-168}" y1="13" x2="${mLft+pw-150}" y2="13" stroke="#00e5ff" stroke-width="2.5"/><text x="${mLft+pw-146}" y="16" font-size="8.5" fill="#bfe9ff">${da?'gren':'branch'} ${curve}${In}</text>`;
   g += `<line x1="${mLft+pw-168}" y1="25" x2="${mLft+pw-150}" y2="25" stroke="#ff9a4d" stroke-width="2.5" stroke-dasharray="5 3"/><text x="${mLft+pw-146}" y="28" font-size="8.5" fill="#ffcaa0">${da?'hoved':'main'} ${mainLbl}</text>`;
 
+  // --- Cable thermal damage curve (IEC 60364-4-43): t = k²S² / I² ---
+  const _cblS = cab ? cab.mm2 : 2.5;
+  const _cblXlpe = cab ? /NOIKLX|NOIKX|NOIK-AL|NOSP/i.test(cab.model||'') : false;
+  const _cblMat = cab ? cab.material : 'Cu';
+  const cabDmgK = (_cblMat==='Cu') ? (_cblXlpe ? 143 : 115) : (_cblXlpe ? 94 : 76);
+  const cabDmgS = _cblS;   // cable mm²
+  const cabDmgStart = Math.max(If, cIb, In); // start from Ief or IB (whichever is higher)
+  let cblPts = [];
+  for(let i=0; i<=50; i++){
+    const I = cabDmgStart * Math.pow(100000/cabDmgStart, i/50);
+    const tCab = (cabDmgK*cabDmgK*cabDmgS*cabDmgS)/(I*I);
+    if(tCab > 1000) continue;
+    if(tCab < 0.01) continue;
+    cblPts.push(X(I).toFixed(1)+','+Y(tCab).toFixed(1));
+  }
+  if(cblPts.length > 1){
+    g += `<polyline points="${cblPts.join(' ')}" fill="none" stroke="#ff3b5c" stroke-width="2" stroke-dasharray="6 3" opacity="0.85" filter="url(#tccGlow)"/>`;
+  }
+  g += `<line x1="${mLft+pw-168}" y1="37" x2="${mLft+pw-150}" y2="37" stroke="#ff3b5c" stroke-width="2" stroke-dasharray="4 2"/><text x="${mLft+pw-146}" y="40" font-size="8.5" fill="#ff7a8f">${da?'kabelgrænse':'cable limit'} (k\u00B2S\u00B2/I\u00B2)</text>`;
+
+
   g += `<line x1="${X(In)}" y1="${mTop}" x2="${X(In)}" y2="${mTop+ph}" stroke="#6aa8c8" stroke-width="1" stroke-dasharray="3 3"/><text x="${X(In)}" y="${mTop-4}" text-anchor="middle" font-size="8" fill="#9fb8cc">In ${In}A</text>`;
   g += `<line x1="${X(Ia)}" y1="${mTop}" x2="${X(Ia)}" y2="${mTop+ph}" stroke="#6aa8c8" stroke-width="1" stroke-dasharray="2 4"/><text x="${X(Ia)}" y="${mTop-4}" text-anchor="middle" font-size="8" fill="#9fb8cc">Ia ${Ia}A</text>`;
   if(tReq){const tc = rcd?'#3fcf7a':'#ffd27a'; const tlb = rcd?(da?'HPFI 30 mA ≤'+tReq+'s':'RCD 30 mA ≤'+tReq+'s'):((da?'krav ':'req ')+tReq+'s'); g+=`<line x1="${mLft}" y1="${Y(tReq)}" x2="${mLft+pw}" y2="${Y(tReq)}" stroke="${tc}" stroke-width="1.4" stroke-dasharray="6 4"/><text x="${mLft+pw}" y="${Y(tReq)-4}" text-anchor="end" font-size="8.5" fill="${tc}">${tlb}</text>`;}
@@ -4982,6 +5003,214 @@ function buildTccCurve(){
 
 // Printable protection-coordination report (IEC 60364 adiabatic, selectivity, cascading)
 // Shows on print (class print-only inverted), summary of ALL coordination for selected circuit.
+// Protection-coordination dashboard summary — compact visual card
+function buildCoordDashboard(){
+  const da = lang==='da';
+  const cons = loadList.length ? loadList.slice(0,16) : [
+    {kW:11,cos:0.9,sf:1,phase:'3',name:'EV-lader'},{kW:11,cos:1,sf:0.7,phase:'3',name:'Komfur'},
+    {kW:3.7,cos:0.95,sf:0.6,phase:'L1',name:'Stikgrupper'},{kW:2.2,cos:0.95,sf:0.6,phase:'L2',name:'Hvidevarer'},
+    {kW:1.5,cos:0.95,sf:1,phase:'L3',name:'Belysning'}
+  ];
+  const STD=[6,10,13,16,20,25,32,40,50,63,80,100,125,160,200,250,315,400,500,630];
+  const nextStd=(v)=>STD.find(x=>x>=v)||STD[STD.length-1];
+  const K=90;
+  // Main device
+  let mainIb = 0;
+  let pT={L1:0,L2:0,L3:0}; cons.forEach(cc=>{const x=lsConsumerCurrent(cc);pT.L1+=x.L1||0;pT.L2+=x.L2||0;pT.L3+=x.L3||0;});
+  mainIb=Math.max(pT.L1,pT.L2,pT.L3);
+  const firstMcb = recommendMCBs(cons[0]?(Math.max(...Object.values(lsConsumerCurrent(cons[0])).filter(v=>typeof v==='number'))):16,10)[0];
+  const firstIn = firstMcb?firstMcb.rating:16;
+  mainIb = Math.max(mainIb, firstIn*1.25);
+  const mainType = mainIb<=63 ? 'mcb' : 'fuse';
+  const Inm = Math.max(nextStd(mainIb), nextStd(firstIn));
+  const IaM = 10*Inm;
+  const tMain = (I)=> mainType==='mcb'
+    ? (I>=IaM?0.02:(I>1.13*Inm?K/((I/Inm)*(I/Inm)-1):Infinity))
+    : Math.min(1000, Math.max(0.004, 1056*Math.pow(I/Inm,-4.72)));
+  let kVAv = cons.reduce((a,cc)=>a+(cc.kW||0),0)/0.9;
+  const trafoK = (typeof TRAFO_SIZES!=='undefined') ? (TRAFO_SIZES.find(t=>t>=kVAv)||630) : 630;
+  const uk = (typeof TRAFO_UK!=='undefined' && TRAFO_UK[trafoK]) ? (TRAFO_UK[trafoK]/100) : 0.04;
+  const Ik = trafoK*1000/(Math.sqrt(3)*400*uk)/1000;
+
+  let total=0, passAll=0, issues=[];
+  cons.forEach((c,i)=>{
+    total++;
+    const ci = lsConsumerCurrent(c);
+    const cIb = Math.max(ci.L1||0,ci.L2||0,ci.L3||0) || (c.kW*1000/((c.phase==='3'?Math.sqrt(3)*400:230)*(c.cos||0.9)));
+    const cab = recommendCables(cIb)[0];
+    const mcb = recommendMCBs(cIb,10)[0];
+    if(!mcb){ issues.push({name:c.name||('K'+(i+1)),msg:da?'Ingen MCB fundet':'No MCB found'}); return; }
+    const In = mcb.rating, curve = mcb.curve||'C';
+    const Iz = cab ? officialIz(cab) : cIb*1.25;
+    const m = curve==='B'?5:curve==='D'?20:10, Ia = m*In;
+    // Check 1: IB <= In <= Iz
+    const chk1 = (cIb <= In) && (In <= Iz);
+    // Fault current
+    const autoL = (c.dist && c.dist>0) ? c.dist : 25;
+    const L = sldRunLen>0 ? sldRunLen : autoL;
+    const Rkm = cab ? (cab.r!=null?cab.r:(cab.R||0)) : 0;
+    const R1R2 = 2*Rkm*(L/1000);
+    const Ze = sldEarthing==='TN-C-S'?0.35 : sldEarthing==='TN-S'?0.80 : sldEarthing==='TT'?20 : 0;
+    const measZs = sldMeasZsFactor*(Ze+R1R2), Uo=230, Cmin=0.95;
+    let If;
+    if(sldEarthing==='IT' && !sldITSecond){ If=0.5; }
+    else if(sldEarthing==='IT' && sldITSecond){ If=400/(2*R1R2+0.3); }
+    else { If=(Cmin*Uo)/measZs; }
+    const tReq = (sldEarthing==='IT'&&!sldITSecond) ? null : (sldEarthing==='TT'?0.2:((In<=32)?0.4:5));
+    // Check 2: Zs disconnection
+    let tDisc;
+    if(If>=Ia) tDisc=0.02;
+    else if(If>1.13*In) tDisc=K/((If/In)*(If/In)-1);
+    else tDisc=Infinity;
+    const chk2 = (tReq===null) || (sldEarthing==='TT') || (isFinite(tDisc) && tDisc<=tReq);
+    // Check 3: I²t adiabatic
+    const cabS = cab ? cab.mm2 : 2.5;
+    const cabXlpe = cab ? /NOIKLX|NOIKX|NOIK-AL|NOSP/i.test(cab.model||'') : false;
+    const cabMat = cab ? cab.material : 'Cu';
+    const kAdiab = (cabMat==='Cu') ? (cabXlpe ? 143 : 115) : (cabXlpe ? 94 : 76);
+    const cableI2tLimit = kAdiab * kAdiab * cabS * cabS;
+    const brI2t = (isFinite(tDisc) && tDisc>0) ? (If*If*tDisc) : (If*If*0.02);
+    const chk3 = brI2t <= cableI2tLimit;
+    // Check 4: Selectivity
+    let tBranch = tDisc;
+    const tM = tMain(If);
+    const ratio = (isFinite(tBranch) && isFinite(tM)) ? tM/tBranch : 999;
+    const chk4 = !isFinite(tBranch) || ratio >= 1.0;
+    // Aggregate
+    const circName = c.name||('K'+(i+1));
+    if(chk1 && chk2 && chk3 && chk4){ passAll++; }
+    else {
+      let fixes = [];
+      if(!chk1) fixes.push(da?'IB≤In≤Iz fejler — vælg større kabel eller mindre In':'IB≤In≤Iz fails — choose larger cable or smaller In');
+      if(!chk2) fixes.push(da?'Zs-udkobling for langsom — HPFI eller kortere kabel':'Zs disconnection too slow — add RCD or shorter cable');
+      if(!chk3) fixes.push(da?'I²t overstiger kabelgrænse — større tværsnit':'I²t exceeds cable limit — larger cross-section');
+      if(!chk4) fixes.push(da?'Selektivitet ikke opfyldt — koordiner med hovedværn':'Selectivity not met — coordinate with main');
+      issues.push({name:circName, msg:fixes.join('; ')});
+    }
+  });
+
+  const pct = total>0 ? Math.round(100*passAll/total) : 100;
+  const barCol = pct===100 ? 'var(--success)' : pct>=75 ? '#ffd166' : 'var(--danger)';
+  const needAtt = total - passAll;
+
+  let issueHtml = '';
+  if(issues.length>0){
+    issueHtml = `<div style="margin-top:10px"><div style="font-weight:700;margin-bottom:4px;font-size:0.82rem;color:var(--danger)">${da?'Kredse der kræver handling':'Circuits needing attention'}:</div>`;
+    issues.forEach(iss=>{
+      issueHtml += `<div class="info-row" style="margin:3px 0;font-size:0.78rem;padding:4px 8px;background:var(--danger-bg);border-radius:6px"><strong>${iss.name}</strong>: ${iss.msg}</div>`;
+    });
+    issueHtml += `</div>`;
+  }
+
+  return `<div class="card fade-in" style="border-left:4px solid ${barCol}"><div class="card-title">📊 ${da?'Koordineringsoversigt':'Coordination overview'} · ⏚ ${sldEarthing}</div>
+  <div class="info-row" style="margin-bottom:10px">${da?'Automatisk kontrol af IB≤In≤Iz, Zs-udkobling, I²t adiabatisk og selektivitet for alle kredse.':'Automatic check of IB≤In≤Iz, Zs disconnection, I²t adiabatic and selectivity for all circuits.'}</div>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px">
+    <div class="result-box ok" style="flex:1;min-width:100px;text-align:center;padding:12px"><div style="font-size:2rem;font-weight:800;color:var(--text)">${total}</div><div style="font-size:0.75rem;color:var(--text-light)">${da?'kredse kontrolleret':'circuits checked'}</div></div>
+    <div class="result-box ok" style="flex:1;min-width:100px;text-align:center;padding:12px"><div style="font-size:2rem;font-weight:800;color:var(--success)">${passAll}</div><div style="font-size:0.75rem;color:var(--text-light)">${da?'bestået alle':'pass all'}</div></div>
+    <div class="result-box ${needAtt>0?'error':'ok'}" style="flex:1;min-width:100px;text-align:center;padding:12px"><div style="font-size:2rem;font-weight:800;color:${needAtt>0?'var(--danger)':'var(--success)'}">${needAtt}</div><div style="font-size:0.75rem;color:var(--text-light)">${da?'kræver handling':'need attention'}</div></div>
+  </div>
+  <div style="background:var(--border-light);border-radius:8px;height:18px;overflow:hidden;margin-bottom:6px">
+    <div style="width:${pct}%;height:100%;background:${barCol};border-radius:8px;transition:width 0.5s ease"></div>
+  </div>
+  <div style="text-align:center;font-size:0.8rem;font-weight:700;color:${barCol}">${pct}% ${da?'opfyldt':'compliant'}</div>
+  ${issueHtml}
+  </div>`;
+}
+
+// Discrimination table — selectivity matrix of all circuits vs main device
+function buildDiscrimTable(){
+  const da = lang==='da';
+  const cons = loadList.length ? loadList.slice(0,16) : [
+    {kW:11,cos:0.9,sf:1,phase:'3',name:'EV-lader'},{kW:11,cos:1,sf:0.7,phase:'3',name:'Komfur'},
+    {kW:3.7,cos:0.95,sf:0.6,phase:'L1',name:'Stikgrupper'},{kW:2.2,cos:0.95,sf:0.6,phase:'L2',name:'Hvidevarer'},
+    {kW:1.5,cos:0.95,sf:1,phase:'L3',name:'Belysning'}
+  ];
+  const STD=[6,10,13,16,20,25,32,40,50,63,80,100,125,160,200,250,315,400,500,630];
+  const nextStd=(v)=>STD.find(x=>x>=v)||STD[STD.length-1];
+  const K=90;
+  // Main device
+  let mainIb = 0;
+  let pT={L1:0,L2:0,L3:0}; cons.forEach(cc=>{const x=lsConsumerCurrent(cc);pT.L1+=x.L1||0;pT.L2+=x.L2||0;pT.L3+=x.L3||0;});
+  mainIb=Math.max(pT.L1,pT.L2,pT.L3);
+  const firstMcb = recommendMCBs(cons[0]?(Math.max(...Object.values(lsConsumerCurrent(cons[0])).filter(v=>typeof v==='number'))):16,10)[0];
+  const firstIn = firstMcb?firstMcb.rating:16;
+  mainIb = Math.max(mainIb, firstIn*1.25);
+  const mainType = mainIb<=63 ? 'mcb' : 'fuse';
+  const Inm = Math.max(nextStd(mainIb), nextStd(firstIn));
+  const IaM = 10*Inm;
+  const mainLbl = mainType==='mcb' ? ('C'+Inm+' A') : ('gG '+Inm+' A');
+  const tMain = (I)=> mainType==='mcb'
+    ? (I>=IaM?0.02:(I>1.13*Inm?K/((I/Inm)*(I/Inm)-1):Infinity))
+    : Math.min(1000, Math.max(0.004, 1056*Math.pow(I/Inm,-4.72)));
+
+  let rows = '';
+  cons.forEach((c,i)=>{
+    const ci = lsConsumerCurrent(c);
+    const cIb = Math.max(ci.L1||0,ci.L2||0,ci.L3||0) || (c.kW*1000/((c.phase==='3'?Math.sqrt(3)*400:230)*(c.cos||0.9)));
+    const cab = recommendCables(cIb)[0];
+    const mcb = recommendMCBs(cIb,10)[0];
+    if(!mcb) return;
+    const In = mcb.rating, curve = mcb.curve||'C';
+    const m = curve==='B'?5:curve==='D'?20:10, Ia = m*In;
+    const autoL = (c.dist && c.dist>0) ? c.dist : 25;
+    const L = sldRunLen>0 ? sldRunLen : autoL;
+    const Rkm = cab ? (cab.r!=null?cab.r:(cab.R||0)) : 0;
+    const R1R2 = 2*Rkm*(L/1000);
+    const Ze = sldEarthing==='TN-C-S'?0.35 : sldEarthing==='TN-S'?0.80 : sldEarthing==='TT'?20 : 0;
+    const measZs = sldMeasZsFactor*(Ze+R1R2), Uo=230, Cmin=0.95;
+    let If;
+    if(sldEarthing==='IT' && !sldITSecond){ If=0.5; }
+    else if(sldEarthing==='IT' && sldITSecond){ If=400/(2*R1R2+0.3); }
+    else { If=(Cmin*Uo)/measZs; }
+    // Branch trip time at If
+    let tBranch;
+    if(If>=Ia) tBranch=0.02;
+    else if(If>1.13*In) tBranch=K/((If/In)*(If/In)-1);
+    else tBranch=Infinity;
+    // Main trip time at If
+    const tM = tMain(If);
+    // Selectivity evaluation
+    let status, color, label;
+    if(!isFinite(tBranch)){
+      status='rcd'; color='#ffd166'; label=da?'HPFI/tid':'RCD/time';
+    } else {
+      const ratio = isFinite(tM) ? tM/tBranch : 999;
+      if(ratio >= 1.5){
+        status='sel'; color='var(--success)'; label=da?'Selektiv ✓':'Selective ✓';
+      } else if(ratio >= 1.0){
+        status='backup'; color='#ffd166'; label=da?'Back-up kræves':'Back-up required';
+      } else {
+        status='no'; color='var(--danger)'; label=da?'Ikke selektiv ✗':'Not selective ✗';
+      }
+    }
+    const circName = c.name || ('K'+(i+1));
+    const brLbl = curve+In+'A';
+    const fmt=(t)=> t<0.1?t.toFixed(2):t.toFixed(1);
+    rows += `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:6px 10px;font-weight:600">${circName}</td>
+      <td style="padding:6px 10px;text-align:center">${brLbl}</td>
+      <td style="padding:6px 10px;text-align:center">${If<1?'<1':If.toFixed(0)} A</td>
+      <td style="padding:6px 10px;text-align:center">${isFinite(tBranch)?fmt(tBranch)+' s':'—'}</td>
+      <td style="padding:6px 10px;text-align:center">${isFinite(tM)?fmt(tM)+' s':'—'}</td>
+      <td style="padding:6px 10px;text-align:center;font-weight:700;color:${color};background:${status==='sel'?'rgba(6,214,160,0.08)':status==='backup'?'rgba(255,209,102,0.10)':status==='no'?'rgba(239,71,111,0.08)':'rgba(255,209,102,0.08)'};border-radius:6px">${label}</td>
+    </tr>`;
+  });
+
+  return `<div class="card fade-in"><div class="card-title">⛓ ${da?'Selektivitetstabel':'Discrimination table'} — ${da?'alle kredse vs hoved':'all circuits vs main'} (${mainLbl}) · ⏚ ${sldEarthing}</div>
+  <div class="info-row" style="margin-bottom:8px">${da?'Matrixen viser selektiviteten mellem hver gren og hovedværnet ved kredsens forventede fejlstrøm (Ief). Grøn = selektiv, gul = back-up nødvendig, rød = ikke selektiv.':'The matrix shows selectivity between each branch and the main device at the circuit prospective fault current (Ief). Green = selective, amber = back-up needed, red = not selective.'}</div>
+  <div style="overflow-x:auto"><table class="data-table" style="width:100%;border-collapse:collapse;font-size:0.82rem">
+    <thead><tr style="background:var(--primary-glow);border-bottom:2px solid var(--primary-light)">
+      <th style="padding:8px 10px;text-align:left">${da?'Kreds':'Circuit'}</th>
+      <th style="padding:8px 10px;text-align:center">${da?'Gren':'Branch'}</th>
+      <th style="padding:8px 10px;text-align:center">Ief</th>
+      <th style="padding:8px 10px;text-align:center">${da?'t gren':'t branch'}</th>
+      <th style="padding:8px 10px;text-align:center">${da?'t hoved':'t main'}</th>
+      <th style="padding:8px 10px;text-align:center">${da?'Status':'Status'}</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div></div>`;
+}
+
 function buildProtReport(){
   const da = lang==='da';
   const cons = loadList.length ? loadList.slice(0,16) : [
@@ -5171,7 +5400,7 @@ function buildLoopReadout(){
 function renderDrawing(){
   const nodes=getDrawNodes(), typeKeys=Object.keys(NODE_TYPES);
   const nodeEditor=`<div class="select-group"><div class="select-label">${lang==='da'?'Installationens noder (tilf\u00F8j/fjern/flyt)':'Installation nodes (add/remove/move)'}</div>${nodes.map((n,i)=>{const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;return `<div style="display:inline-flex;align-items:center;gap:4px;margin:3px 4px;padding:5px 9px;border:1.5px solid ${nt.color};border-radius:8px;font-size:.78rem;background:rgba(0,0,0,0.25)"><span>${nt.icon}</span><span style="color:${nt.color};font-weight:700">${lang==='da'?nt.da:nt.en}</span><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},-1)">\u25C0</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},1)">\u25B6</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem;color:var(--danger)" onclick="drawNodeRemove(${i})">\u2715</button></div>`;}).join('')}</div><div class="select-group"><div class="select-label">${lang==='da'?'Tilf\u00F8j node':'Add node'}</div><div class="select-grid">${typeKeys.map(k=>`<button class="sel-btn" onclick="drawNodeAdd('${k}')">${NODE_TYPES[k].icon} ${lang==='da'?NODE_TYPES[k].da:NODE_TYPES[k].en}</button>`).join('')}<button class="sel-btn" onclick="drawNodeReset()">\u21BA ${lang==='da'?'Nulstil':'Reset'}</button></div></div>`;
-  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
+  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${lang==='da'?'Tegning af installationen':'Installation drawing'}</div><div class="info-row">${lang==='da'?'Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.':'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.'}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${lang==='da'?'Enstregsdiagram (fasestrøm)':'Single-line (phase current)'}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${lang==='da'?'3D-skitse':'3D scene'}</button></div>${drawStyle==='schematic'?`<div class="select-grid" style="margin-bottom:8px"><button class="sel-btn ${!sldFault?'selected':''}" onclick="sldFault=false;renderModule('draw')">✅ ${lang==='da'?'Normal drift':'Normal operation'}</button><button class="sel-btn ${sldFault?'selected':''}" onclick="sldFault=true;renderModule('draw')">⚡ ${lang==='da'?'Jordfejl (fejlstrøm)':'Earth fault'}</button></div><div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'Jordingssystem':'Earthing system'}</div><div class="select-grid">${['TN-C-S','TN-S','TT','IT'].map(s=>`<button class="sel-btn ${sldEarthing===s?'selected':''}" onclick="sldSetEarthing('${s}')">⏚ ${s}</button>`).join('')}</div></div>${sldEarthing==='IT'&&sldFault?`<div class="select-group" style="margin-bottom:8px"><div class="select-label">${lang==='da'?'IT — fejlscenarie':'IT — fault scenario'}</div><div class="select-grid"><button class="sel-btn ${!sldITSecond?'selected':''}" onclick="sldSetITSecond(false)">1. ${lang==='da'?'fejl':'fault'}</button><button class="sel-btn ${sldITSecond?'selected':''}" onclick="sldSetITSecond(true)">2. ${lang==='da'?'fejl (fase-fase)':'fault (line-line)'}</button></div></div>`:''}<div class="info-row" style="margin-bottom:10px">${sldFault?(lang==='da'?'⚡ Jordfejl: en spændingsførende leder rører kabinet/jord. Klik på en vilkårlig gruppe for at flytte fejlen. Fejlvejen afhænger af jordingssystemet (nederst) — HPFI 30 mA registrerer ubalancen og udløser <0,3 s.':'⚡ Earth fault: a live conductor touches the enclosure/earth. Click any circuit to move the fault. The fault path depends on the earthing system (bottom) — the 30 mA RCD detects the imbalance and trips <0.3 s.'):(lang==='da'?'⚡ Animationshastigheden viser strømmens størrelse — jo hurtigere flow, jo mere strøm. Farver = faser: L1 brun · L2 sort · L3 grå · N blå · PE grøn. Klik på en gruppe for at simulere en jordfejl.':'⚡ Animation speed shows current magnitude — faster flow means more current. Colours = phases: L1 brown · L2 black · L3 grey · N blue · PE green. Click a circuit to simulate an earth fault.')}</div>`:''}${drawStyle==='iso'?build3D():(sldFault?buildCoordDashboard():'')+buildSLD()}${drawStyle==='schematic'&&sldFault?buildLoopReadout():''}${drawStyle==='schematic'&&sldFault?buildTccCurve():''}${drawStyle==='schematic'&&sldFault?buildProtReport():''}${drawStyle==='schematic'&&sldFault?buildDiscrimTable():''}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${lang==='da'?'AI-maleri':'AI painting'}</div><div class="info-row">${lang==='da'?'Gener\u00E9r et foto-realistisk billede via online billed-AI.':'Generate a photorealistic image via online image AI.'}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${lang==='da'?'Gener\u00E9r':'Generate'}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${lang==='da'?'Indstil':'Configure'}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
 }
 
 // ===== ANALYZING BRAIN MODULE =====
