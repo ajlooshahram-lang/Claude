@@ -4021,8 +4021,9 @@ function configurePriceFeed() {
 })();
 
 // ===== DATA VERSION & CHANGELOG =====
-const DATA_VERSION = '2026.10';
+const DATA_VERSION = '2026.11';
 const DATA_CHANGELOG = [
+  { v: '2026.11', date: '2026-06-13', da: 'Mock-bed\u00f8mmelse skærpet (konservativ): best\u00e5 kr\u00e6ver nu b\u00e5de \u226580% samlet OG \u226560% i hver kategori \u2014 man kan ikke best\u00e5 mens et helt fagomr\u00e5de dumpes. 3-trins farvekodning pr. kategori.', en: 'Mock verdict tightened (conservative): passing now requires both \u226580% overall AND \u226560% in every category \u2014 you cannot pass while failing an entire domain. 3-tier per-category colour coding.' },
   { v: '2026.10', date: '2026-06-13', da: 'Eksamenssimulator: Fuld Mock (alle 11 scenarier/68 trin p\u00e5 tid) og \u201dGennemg\u00e5 fejl\u201d-skærm (dit svar vs. korrekt + forklaring + DS/HD 60364-klausul) for b\u00e5de quiz og mock.', en: 'Exam simulator: Full Mock (all 11 scenarios/68 steps, timed) and a \u201cReview mistakes\u201d screen (your answer vs. correct + explanation + DS/HD 60364 clause) for both quiz and mock.' },
   { v: '2026.9', date: '2026-06-13', da: 'Eksamenssimulator udvidet: L\u00E6rling/Eksamen-tilstand (udskudt facit), blandet svar-r\u00E6kkef\u00F8lge pr. fors\u00F8g, 3 nye scenarier (TT-system, n\u00F8dstr\u00F8msgenerator i \u00F8-drift, solceller+batteri 7-712) \u2014 nu 11 scenarier/68 trin, og udskriv/eksport\u00E9r rapport med svage DS/HD 60364-klausuler.', en: 'Exam simulator expanded: Apprentice/Exam mode (deferred answers), shuffled option order per attempt, 3 new scenarios (TT system, standby generator island mode, PV+battery 7-712) \u2014 now 11 scenarios/68 steps, and a printable/exportable report of weak DS/HD 60364 clauses.' },
   { v: '2026.8', date: '2026-06-13', da: 'Eksamenssimulator tilf\u00F8jet: Hurtig Quiz (klik-only) + Fuld Opgave med 8 scenarier (forsyning, maskine, installation) med trinvise beregninger, l\u00E6rlinge-forklaringer, DS/HD 60364-henvisninger, scoring, svage omr\u00E5der, best\u00E5/dump (80%) og 60-min timer. Moderne emner: 75%-reglen afskaffet 1. jan 2020, EV som kontinuerlig last, Type B HPFI (7-722).', en: 'Exam simulator added: Quick Quiz (click-only) + Full Assignment with 8 scenarios (supply, machine, installation) with step-by-step calculations, apprentice explanations, DS/HD 60364 references, scoring, weak areas, pass/fail (80%) and 60-min timer. Modern topics: 75% rule abolished 1 Jan 2020, EV as continuous load, Type B RCD (7-722).' },
@@ -4529,6 +4530,7 @@ const EXAM_SCEN = [
 ];
 const EXAM_CATNAME = { forsyning:{da:'Forsyning',en:'Supply'}, maskine:{da:'Maskine',en:'Machine'}, installation:{da:'Installation',en:'Installation'} };
 const EXAM_PASS = 80;
+const EXAM_CAT_FLOOR = 60;
 
 function examQuizScore(){ let c=0,a=0; EXAM_QUIZ.forEach((q,i)=>{ if(examState.quizPick[i]!==undefined){ a++; if(examState.quizPick[i]===q.ci) c++; } }); return { correct:c, answered:a, total:EXAM_QUIZ.length }; }
 function examScenScore(sc){ let c=0; sc.steps.forEach((s,i)=>{ if(examState.scPick[sc.id+':'+i]===s.ci) c++; }); return { correct:c, total:sc.steps.length }; }
@@ -4668,18 +4670,24 @@ function renderMock(){
   const seq = examMockSeq(); const answered = examMockAnswered(); const done = answered===seq.length;
   if(done){
     if(examState.mockReview) return examMockReviewHtml();
-    const r = examMockScore(); const pct = Math.round(100*r.correct/r.total); const pass = pct>=EXAM_PASS;
+    const r = examMockScore(); const pct = Math.round(100*r.correct/r.total); let pass = pct>=EXAM_PASS;
     const reviewBtn = r.correct<r.total ? ('<button class="sel-btn" onclick="examState.mockReview=true;renderModule(\'exam\')">\uD83D\uDD0D '+(da?'Gennemg\u00e5 fejl':'Review mistakes')+' ('+(r.total-r.correct)+')</button>') : '';
     const cats={}; ['forsyning','maskine','installation'].forEach(c=>cats[c]={c:0,t:0});
     seq.forEach(function(p){ var sc=EXAM_SCEN.find(function(s){return s.id===p.sid;}); cats[sc.cat].t++; if(examState.scPick[p.sid+':'+p.j]===sc.steps[p.j].ci) cats[sc.cat].c++; });
-    const catRows = ['forsyning','maskine','installation'].map(function(c){ var pc=Math.round(100*cats[c].c/cats[c].t); return `<div class="result-row"><span class="label">${examL(EXAM_CATNAME[c])}</span><span class="value" style="color:${pc>=EXAM_PASS?'var(--success)':'var(--danger)'}">${cats[c].c}/${cats[c].t} \u00b7 ${pc}%</span></div>`; }).join('');
+    const catPct={}; ['forsyning','maskine','installation'].forEach(function(c){ catPct[c]=Math.round(100*cats[c].c/cats[c].t); });
+    const weakCats = ['forsyning','maskine','installation'].filter(function(c){ return catPct[c] < EXAM_CAT_FLOOR; });
+    pass = pass && weakCats.length===0;
+    const catRows = ['forsyning','maskine','installation'].map(function(c){ var pc=catPct[c]; return `<div class="result-row"><span class="label">${examL(EXAM_CATNAME[c])}</span><span class="value" style="color:${pc>=EXAM_PASS?'var(--success)':(pc>=EXAM_CAT_FLOOR?'#b8860b':'var(--danger)')}">${cats[c].c}/${cats[c].t} \u00b7 ${pc}%</span></div>`; }).join('');
     const rd = examReportData();
     const weak = rd.weakClauses.length ? rd.weakClauses.slice(0,6).map(function(w){return w.clause+' \u00d7'+w.count;}).join('<br>') : (da?'Ingen':'None');
     const used = examFmtTime(Math.max(0, 3600-examState.timerLeft));
     return `<div class="card fade-in"><div class="card-title">\uD83C\uDFAF ${da?'Mock-resultat':'Mock result'}</div>`
       + `<div class="result-box ${pass?'':'error'}"><div class="result-title">${pass?(da?'\uD83C\uDF89 Best\u00e5et':'\uD83C\uDF89 Passed'):(da?'\u26A0\uFE0F Ikke best\u00e5et':'\u26A0\uFE0F Not passed')} \u2014 ${pct}%</div>`
       + `<div class="result-row"><span class="label">${da?'Rigtige trin':'Correct steps'}</span><span class="value">${r.correct}/${r.total}</span></div>`
-      + `<div class="result-row"><span class="label">${da?'Tid brugt':'Time used'}</span><span class="value">${used}</span></div></div>`
+      + `<div class="result-row"><span class="label">${da?'Tid brugt':'Time used'}</span><span class="value">${used}</span></div>`
+      + `<div class="result-row"><span class="label">${da?'Krav':'Requirement'}</span><span class="value">${da?'\u226580% samlet + \u226560% pr. kategori':'\u226580% overall + \u226560% per category'}</span></div>`
+      + (weakCats.length?`<div class="result-row"><span class="label">${da?'For svag kategori':'Category too weak'}</span><span class="value" style="color:var(--danger)">${weakCats.map(function(c){return examL(EXAM_CATNAME[c])+' '+catPct[c]+'%';}).join(', ')}</span></div>`:'')
+      + `</div>`
       + `<div class="card-title" style="margin-top:14px">${da?'Pr. kategori':'By category'}</div>`+catRows
       + `<div class="result-row"><span class="label">${da?'Svage klausuler':'Weak clauses'}</span><span class="value" style="color:var(--danger);text-align:right;max-width:70%">${weak}</span></div>`
       + `<div class="select-grid" style="margin-top:10px"><button class="sel-btn" onclick="examPrintReport()">\uD83D\uDDA8\uFE0F ${da?'Udskriv rapport':'Print report'}</button><button class="sel-btn" onclick="examDownloadReport()">\u2B07\uFE0F ${da?'Download .txt':'Download .txt'}</button>${reviewBtn}<button class="sel-btn selected" onclick="examStartMock()">\u21BA ${da?'Ny mock':'New mock'}</button><button class="sel-btn" onclick="examAbortMock()">\u2715 ${da?'Luk':'Close'}</button></div></div>`;
