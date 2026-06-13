@@ -1,0 +1,33 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Add 3 more modules: Motor Starter Configurator (IEC 60947-4-1), Cable Tray Fill Calculator, and Energy Meter/CT Sizing (EN 50470 + MID directive). Each follows the same click-only pattern.",
+  "status": "completed",
+  "steps": [
+    "Step 1: Add translation keys to T.da.modules and T.en.modules for: motor ('Motorstarter'/'Motor Starter'), tray ('Kabelbakke'/'Cable Tray'), meter ('Energimaaler'/'Energy Meter')",
+    "Step 2: Add all module-specific translation keys for labels, options, and results in both DA and EN",
+    "Step 3: Add state variables: motorState (motorPower, voltage, startType DOL/Star-Delta/Soft/VFD, contactor size, overload relay setting, coordination type 1/2), trayState (trayWidth, trayType ladder/perforated/solid, cables array with diameters, fill standard), meterState (meterType direct/CT, voltage, maxCurrent, CTratio, accuracy class, MID compliance)",
+    "Step 4: Create renderMotor() function implementing IEC 60947-4-1 motor starter selection with: motor power selection (0.37-315 kW via buttons), voltage (230/400/690V), start type (DOL/Y-Delta/Soft starter/VFD), coordination type (Type 1 = replacement allowed / Type 2 = no damage). Calculate: FLC from power, contactor rating (next standard size above FLC), overload relay setting (1.0-1.15x FLC), short-circuit protection (MPCB or fuse+contactor). Results show complete starter assembly with IEC 60947-4-1 clause references.",
+    "Step 5: Create renderTray() function for cable tray fill calculation with: tray type selection (ladder/perforated/solid bottom), tray width (100-600mm via buttons), tray depth (50-150mm), cable entries (add cables by selecting OD from standard sizes: 8-50mm). Calculate: total cable area (pi*d^2/4), tray usable area (width*depth*fill_factor), fill percentage. Standard fill limits: ladder 50%, perforated 50%, solid 40% per NEMA/IEC guidance. Results show fill percentage with pass/fail verdict and remaining capacity.",
+    "Step 6: Create renderMeter() function implementing EN 50470 + MID directive energy meter and CT sizing with: connection type (direct/CT connected), system voltage (230V single/400V three-phase), max load current selection (via buttons), CT ratio selection (standard ratios: 50/5, 75/5, 100/5, 150/5, 200/5, 250/5, 300/5, 400/5, 500/5, 600/5, 750/5, 800/5, 1000/5, 1250/5, 1500/5, 2000/5), accuracy class (0.5/1.0/2.0 per EN 50470-3), MID class (A/B/C per 2014/32/EU). Calculate: required CT ratio (Iprimary >= 1.2x max load), burden check, meter compatibility. Results show recommended CT + meter combination with EN 50470 and MID directive references.",
+    "Step 7: Add 'motor', 'tray', 'meter' cases to the renderModule() switch statement",
+    "Step 8: Add self-tests: motor module (FLC calculation for 11kW 400V 3-phase = ~22A), tray fill (3 cables of 20mm OD in 300x100mm ladder = fill%), meter/CT (200A load requires minimum 250/5 CT ratio). Add inside runSelfTests()."
+  ],
+  "acceptance_criteria": [
+    "Motor starter module shows correct FLC calculation and contactor sizing with IEC 60947-4-1 references",
+    "Cable tray module calculates fill percentage correctly and shows pass/fail based on tray type limits",
+    "Energy meter module recommends correct CT ratio and shows EN 50470/MID compliance",
+    "All three modules accessible via navigation in both DA and EN",
+    "All values selected via click-only buttons - no text inputs",
+    "New self-tests pass alongside existing tests",
+    "HTML file parses without syntax errors"
+  ],
+  "verification": [
+    "Run syntax check: node -e \"const fs=require('fs'); const html=fs.readFileSync('el-dimensionering.html','utf8'); const m=html.match(/<script[^>]*>([\\s\\S]*?)<\\/script>/); try{new Function(m[1]);console.log('SYNTAX OK')}catch(e){console.error(e.message);process.exit(1)}\"",
+    "Verify the file contains renderMotor, renderTray, renderMeter functions",
+    "Verify T.da.modules contains motor, tray, meter keys",
+    "Verify renderModule switch contains motor, tray, meter cases"
+  ],
+  "blocked_reason": null,
+  "findings": "All 65 tests pass (56 existing + 9 new). Functions: renderMotor(), renderTray(), renderMeter(), calcMotorFLC(), getNextContactorSize(), getMotorSCPD(), calcTrayFill(), calcCTSizing(). State vars: motorState, trayState, meterState. Module keys: motor, tray, meter. Modules added before INIT block after renderHarmonics. JSDOM test requires url:'http://localhost' for localStorage."
+}
