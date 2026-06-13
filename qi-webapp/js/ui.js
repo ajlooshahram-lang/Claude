@@ -102,6 +102,161 @@
     nav.querySelectorAll(".nav-item").forEach(b => b.addEventListener("click", () => go(b.dataset.view)));
   }
 
+  // ---------- i18n (English is the source/default; Danish is opt-in & fully reversible) ----------
+  // Map of exact English phrase -> Danish. Only matched phrases are translated; everything
+  // else (dynamic counts, user data, names) stays as authored. English is never altered
+  // destructively — each node's original text is captured so toggling back restores it exactly.
+  const I18N_DA = {
+    // nav groups
+    "Overview": "Overblik", "Delivery": "Levering", "Risk & Quality": "Risiko & kvalitet",
+    "Improve": "Forbedring", "People & Cost": "Personer & omkostninger", "Intelligence": "Intelligens",
+    "Setup": "Opsætning", "Engineering": "Ingeniør", "Business": "Forretning",
+    // nav labels / view titles
+    "Portfolio": "Portefølje", "Dashboard": "Dashboard", "Cases (Master)": "Sager (master)",
+    "PM Tasks": "PM-opgaver", "Kanban Board": "Kanban-tavle", "Timeline": "Tidslinje",
+    "Risk Register": "Risikoregister", "Six Sigma": "Six Sigma", "Gage R&R (MSA)": "Gage R&R (MSA)",
+    "Risk Matrix": "Risikomatrix", "X̄-R Control Chart": "X̄-R kontrolkort",
+    "Process Capability": "Proceskapabilitet", "NCR Pareto": "NCR Pareto", "Action Log": "Handlingslog",
+    "Stakeholders": "Interessenter", "Budget": "Budget", "AI Assistant": "AI-assistent",
+    "Change Impact": "Ændringspåvirkning", "KPI Scorecard": "KPI-scorecard", "Data Health": "Datasundhed",
+    "Report Pack": "Rapportpakke", "History & Backups": "Historik & sikkerhedskopier",
+    "Settings": "Indstillinger", "Help": "Hjælp", "Bow-tie (HAZOP)": "Bow-tie (HAZOP)",
+    "Earned Value (EVM)": "Indtjent værdi (EVM)", "Cash Flow / S-curve": "Pengestrøm / S-kurve",
+    "Prioritisation (RICE/WSJF)": "Prioritering (RICE/WSJF)",
+    // engineering / business register labels
+    "HAZOP / Hazards": "HAZOP / farer", "Calibration": "Kalibrering", "Punch List": "Mangelliste",
+    "SIL / Functional Safety": "SIL / funktionssikkerhed", "Requirements Traceability": "Kravsporbarhed",
+    "Document Register": "Dokumentregister", "Non-Conformance": "Afvigelse",
+    "Management of Change": "Ændringsstyring", "Milestones": "Milepæle", "Decision Log": "Beslutningslog",
+    "Procurement": "Indkøb", "Resources / Capacity": "Ressourcer / kapacitet", "OKR Scorecard": "OKR-scorecard",
+    // topbar / chrome
+    "Share": "Del", "Print": "Udskriv", "Export": "Eksportér", "Import": "Importér",
+    "+ New Case": "+ Ny sag", "Auto-saved locally": "Gemmes lokalt automatisk",
+    // KPI labels
+    "Total Cases": "Sager i alt", "Open / Active": "Åbne / aktive", "Critical (RPN≥200)": "Kritiske (RPN≥200)",
+    "Avg RPN": "Gns. RPN", "Avg % Done": "Gns. % færdig", "Blocked": "Blokeret",
+    "% of Budget Spent": "% af budget brugt", "Total Est. Budget": "Samlet est. budget",
+    "Total Actual Spend": "Samlet faktisk forbrug", "Projects": "Projekter", "Total Spend": "Samlet forbrug",
+    "Variance": "Varians", "BAC — Budget at completion": "BAC — budget ved afslutning",
+    "EV — Earned value": "EV — indtjent værdi", "AC — Actual cost": "AC — faktisk omkostning",
+    "PV — Planned value": "PV — planlagt værdi", "EAC — Est. at completion": "EAC — est. ved afslutning",
+    "% Repeatability (EV)": "% repeterbarhed (EV)", "% Reproducibility (AV)": "% reproducerbarhed (AV)",
+    "% Part variation (PV)": "% delvariation (PV)", "ndc (distinct categories)": "ndc (distinkte kategorier)",
+    "PPM out of spec": "PPM uden for spec", "On track (green)": "På sporet (grøn)",
+    "Watch (amber)": "Hold øje (gul)", "Action needed (red)": "Handling kræves (rød)",
+    "All Cases": "Alle sager", "All Open": "Alle åbne", "All Critical": "Alle kritiske",
+    // section headings
+    "All cases ranked": "Alle sager rangeret", "Ask the advisor": "Spørg rådgiveren", "Ask the AI": "Spørg AI",
+    "Bow-tie — barrier analysis": "Bow-tie — barriereanalyse", "Branding": "Branding", "Cases by": "Sager efter",
+    "Change history": "Ændringshistorik", "Change impact / traceability": "Ændringspåvirkning / sporbarhed",
+    "Compare two restore points": "Sammenlign to gendannelsespunkter", "Data": "Data",
+    "Earned value": "Indtjent værdi", "Estimate vs Actual by category": "Estimat vs. faktisk pr. kategori",
+    "Histogram with spec limits": "Histogram med specgrænser",
+    "Management KPI scorecard (RAG)": "Ledelses-KPI-scorecard (RAG)", "Monthly spend": "Månedligt forbrug",
+    "Open non-conformances": "Åbne afvigelser", "Pareto by discipline": "Pareto efter disciplin",
+    "Pareto by disposition": "Pareto efter disposition", "Pareto by severity": "Pareto efter alvorlighed",
+    "Per-case budget": "Budget pr. sag", "Planned vs Earned vs Actual": "Planlagt vs. indtjent vs. faktisk",
+    "Print / share": "Udskriv / del", "Prioritisation method": "Prioriteringsmetode",
+    "Priority action queue — ranked by RPN": "Prioriteret handlingskø — rangeret efter RPN",
+    "Project information": "Projektoplysninger", "R chart (subgroup ranges)": "R-kort (undergruppe-spændvidder)",
+    "Restore points (snapshots)": "Gendannelsespunkter (øjebliksbilleder)",
+    "Risk exposure (RPN) by category": "Risikoeksponering (RPN) pr. kategori",
+    "Sigma & defect trend": "Sigma & fejltrend", "Spec limits": "Specgrænser", "Status mix": "Statusfordeling",
+    "Study setup": "Studieopsætning", "Subgroup data": "Undergruppedata", "Team roster": "Teamoversigt",
+    "Top risks": "Største risici", "Utilisation by person": "Udnyttelse pr. person", "Verdict": "Vurdering",
+    "X̄ chart (subgroup means)": "X̄-kort (undergruppe-gennemsnit)", "Your data is safe": "Dine data er sikre",
+    "How it works": "Sådan virker det", "How to read this": "Sådan læses dette",
+    // modal titles
+    "A3 Report": "A3-rapport", "Delete case?": "Slet sag?", "Keyboard shortcuts": "Tastaturgenveje",
+    "Manage saved views": "Administrér gemte visninger", "Project checks": "Projekttjek",
+    "Rename snapshot": "Omdøb øjebliksbillede", "Save current view": "Gem nuværende visning",
+    "Share link": "Delingslink", "Snapshot diff": "Øjebliksbillede-forskel",
+    "You haven't added any cases yet": "Du har ikke tilføjet nogen sager endnu",
+    // buttons / actions
+    "Apply": "Anvend", "Ask": "Spørg", "Back": "Tilbage", "Cancel": "Annullér", "Clear": "Ryd",
+    "Clear log": "Ryd log", "Close": "Luk", "Copy": "Kopiér", "Del": "Slet", "Delete": "Slet",
+    "Delete selected": "Slet valgte", "Delete view": "Slet visning", "Duplicate": "Dublér", "Edit": "Redigér",
+    "Export cases CSV": "Eksportér sager CSV", "Export CSV": "Eksportér CSV", "Manage": "Administrér",
+    "Next": "Næste", "Open": "Åbn", "Open Data Health": "Åbn datasundhed",
+    "Print / Save as PDF": "Udskriv / gem som PDF", "Remove logo": "Fjern logo", "Rename": "Omdøb",
+    "Reset to sample data": "Nulstil til eksempeldata", "Restore": "Gendan",
+    "Save AI settings": "Gem AI-indstillinger", "Save branding": "Gem branding", "Save": "Gem",
+    "Save project": "Gem projekt", "Save view": "Gem visning", "Show all": "Vis alle",
+    "Show diff": "Vis forskel", "Skip": "Spring over", "Skip tour": "Spring rundvisning over",
+    "Take the tour": "Tag rundvisningen", "Create": "Opret"
+  };
+  function langCode() { return (S.brand() && S.brand().lang) === "da" ? "da" : "en"; }
+  function translatePhrase(s) { return Object.prototype.hasOwnProperty.call(I18N_DA, s) ? I18N_DA[s] : null; }
+
+  let __i18nBusy = false;
+  // Translate (or restore) a DOM subtree in place. Reversible: the first time a node is seen
+  // its original English text is cached on the node, so switching back to English is exact.
+  function applyI18nRaw(root) {
+    root = root || document.body;
+    const da = langCode() === "da";
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const p = node.parentNode; if (!p) return NodeFilter.FILTER_REJECT;
+        const tag = p.nodeName; if (tag === "SCRIPT" || tag === "STYLE") return NodeFilter.FILTER_REJECT;
+        if (p.closest && p.closest("[data-i18n-skip]")) return NodeFilter.FILTER_REJECT;
+        if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    const nodes = []; let n; while ((n = walker.nextNode())) nodes.push(n);
+    nodes.forEach(node => {
+      if (node.__i18nOrig === undefined) node.__i18nOrig = node.nodeValue;
+      const orig = node.__i18nOrig;
+      let target = orig;
+      if (da) {
+        const lead = (orig.match(/^\s*/) || [""])[0], trail = (orig.match(/\s*$/) || [""])[0];
+        const tr = translatePhrase(orig.trim());
+        if (tr) target = lead + tr + trail;
+      }
+      if (node.nodeValue !== target) node.nodeValue = target;   // conditional write: prevents observer loops
+    });
+    const ATTRS = ["title", "aria-label", "placeholder"];
+    root.querySelectorAll("[title],[aria-label],[placeholder]").forEach(el => {
+      if (el.closest("[data-i18n-skip]")) return;
+      if (!el.__i18nAttr) el.__i18nAttr = {};
+      ATTRS.forEach(a => {
+        if (!el.hasAttribute(a)) return;
+        if (el.__i18nAttr[a] === undefined) el.__i18nAttr[a] = el.getAttribute(a);
+        const orig = el.__i18nAttr[a];
+        let target = orig;
+        if (da) { const tr = translatePhrase(orig.trim()); if (tr) target = tr; }
+        if (el.getAttribute(a) !== target) el.setAttribute(a, target);
+      });
+    });
+  }
+  function applyI18n(root) {
+    if (__i18nBusy) return;
+    __i18nBusy = true;
+    try { applyI18nRaw(root); } finally { __i18nBusy = false; }
+  }
+  // Single choke point for showing the modal — guarantees the modal is localized synchronously
+  // at open time (the MutationObserver below is a backstop for later in-modal DOM updates).
+  function showModalOverlay() {
+    const ov = $("#modalOverlay"); ov.hidden = false;
+    if (langCode() === "da") applyI18n($("#modal"));
+  }
+  function applyLang() {
+    const da = langCode() === "da";
+    document.documentElement.setAttribute("lang", da ? "da" : "en");
+    const btn = $("#btnLang");
+    if (btn) {
+      btn.textContent = da ? "DA" : "EN";
+      btn.title = da ? "Skift sprog (engelsk)" : "Switch language (Danish)";
+      btn.setAttribute("aria-label", btn.title);
+    }
+    applyI18n(document.body);
+  }
+  function toggleLang() {
+    S.setBrand({ lang: langCode() === "da" ? "en" : "da" });
+    applyLang();
+    toast(langCode() === "da" ? "Sprog: Dansk" : "Language: English");
+  }
+
   let current = "dashboard";
   function go(view, opts) {
     if (!RENDER[view]) view = "dashboard";
@@ -116,6 +271,7 @@
     CH.destroyAll();
     content.innerHTML = (RENDER[view] || (() => "<div class='empty'>Not found</div>"))();
     if (AFTER[view]) AFTER[view]();
+    if (langCode() === "da") applyI18n(document.body);   // localize freshly-rendered English content
     // Reflect the current view in the URL so back/forward and bookmarks work.
     if (!(opts && opts.skipHash)) {
       const target = "#" + view;
@@ -886,7 +1042,7 @@
       ${addList}${remList}${chgList}
       <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
         <button class="btn btn-primary" data-act="cancel">Close</button></div></div>`;
-    $("#modalOverlay").hidden = false;
+    showModalOverlay();
   }
 
   // ---------- generic registers ----------
@@ -1503,7 +1659,7 @@
           <button type="submit" class="btn btn-primary">${editing ? "Save changes" : "Add case"}</button></div>
         </div>
       </form>`;
-    $("#modalOverlay").hidden = false;
+    showModalOverlay();
 
     const readForm = () => ({
       problem: $("#f_problem").value.trim(), category: $("#f_category").value, priority: $("#f_priority").value,
@@ -1570,7 +1726,7 @@
         <button class="btn" data-act="cancel">Cancel</button>
         <button class="btn btn-primary" id="proj_name_ok">${esc(opts.okLabel || "OK")}</button>
       </div></div>`;
-    $("#modalOverlay").hidden = false;
+    showModalOverlay();
     const sf = $("#proj_name_pick"); if (sf) sf.focus();
     $("#proj_name_ok").addEventListener("click", () => {
       const v = $("#proj_name_pick").value;
@@ -1597,7 +1753,7 @@
       ${tableWrap("<th>Name</th><th>Filter</th><th></th>", rows)}
       <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
         <button class="btn btn-primary" data-act="cancel">Close</button></div></div>`;
-    $("#modalOverlay").hidden = false;
+    showModalOverlay();
   }
 
   // Save the current Cases filter as a named view (click-only)
@@ -1618,7 +1774,7 @@
         <button class="btn" data-act="cancel">Cancel</button>
         <button class="btn btn-primary" id="sv_save_ok">Save</button>
       </div></div>`;
-    $("#modalOverlay").hidden = false;
+    showModalOverlay();
     const picker = $("#sv_name_pick"); if (picker) picker.focus();
     $("#sv_save_ok").addEventListener("click", () => {
       const v = picker.value;
@@ -1640,7 +1796,7 @@
         <button class="btn" data-act="cancel">Cancel</button>
         <button class="btn btn-primary" id="sn_label_ok">Rename</button>
       </div></div>`;
-    $("#modalOverlay").hidden = false;
+    showModalOverlay();
     const picker = $("#sn_label_pick"); if (picker) picker.focus();
     $("#sn_label_ok").addEventListener("click", () => {
       const v = picker.value;
@@ -1668,7 +1824,7 @@
       <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
         <button class="btn" data-act="cancel">Close</button>
         <button class="btn btn-primary" onclick="window.print()">Print A3</button></div></div>`;
-    $("#modalOverlay").hidden = false;
+    showModalOverlay();
   }
 
   function confirmDelete(id) {
@@ -1679,7 +1835,7 @@
       <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
       <button class="btn" data-act="cancel">Cancel</button>
       <button class="btn btn-danger" data-act="confirmdel" data-id="${id}">Delete</button></div></div>`;
-    $("#modalOverlay").hidden = false;
+    showModalOverlay();
   }
 
   // ---------- export / import / csv ----------
@@ -1746,7 +1902,7 @@
         <button class="btn btn-primary" id="copyShare">Copy</button>
         <button class="btn" data-act="cancel">Close</button>
       </div></div>`;
-    $("#modalOverlay").hidden = false;
+    showModalOverlay();
     const t0 = $("#shareUrl"); if (t0) { t0.focus(); t0.select(); }
     $("#copyShare").addEventListener("click", () => {
       const t = $("#shareUrl"); t.select();
@@ -1807,7 +1963,7 @@
         ${issues.length ? '<button class="btn" data-act="goHealth">Open Data Health</button>' : ''}
         <button class="btn btn-primary" data-act="cancel">Close</button>
       </div></div>`;
-    $("#modalOverlay").hidden = false;
+    showModalOverlay();
   }
   // ---------- onboarding tour ----------
   const TOUR = [
@@ -1835,7 +1991,7 @@
             : `<button class="btn btn-primary" data-act="tourNext">Next</button>`}
         </div>
       </div>`;
-    $("#modalOverlay").hidden = false;
+    showModalOverlay();
     uiState.tourStep = step;
   }
 
@@ -1859,7 +2015,7 @@
       <div>${rows}</div>
       <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
         <button class="btn btn-primary" data-act="cancel">Close</button></div></div>`;
-    $("#modalOverlay").hidden = false;
+    showModalOverlay();
   }
 
   // ---------- command palette (Cmd/Ctrl+K) ----------
@@ -1895,7 +2051,7 @@
       <input id="cmdInput" class="cmd-input" placeholder="Type to filter… then Enter" autocomplete="off">
       <div class="cmd-list" id="cmdList"></div>
       <div class="sub" style="margin-top:8px">↑/↓ to move · Enter to run · Esc to close</div>`;
-    $("#modalOverlay").hidden = false;
+    showModalOverlay();
     const input = $("#cmdInput");
     render();
     if (input) input.focus();
@@ -2051,6 +2207,7 @@
   $("#btnShare").addEventListener("click", shareLink);
   $("#btnPrint").addEventListener("click", () => window.print());
   $("#btnTheme").addEventListener("click", toggleTheme);
+  $("#btnLang").addEventListener("click", toggleLang);
   $("#btnChecks").addEventListener("click", runChecks);
   $("#btnHelp").addEventListener("click", showShortcuts);
   $("#fileImport").addEventListener("change", e => { if (e.target.files[0]) handleImport(e.target.files[0]); e.target.value = ""; });
@@ -2106,6 +2263,17 @@
 
   // ---------- init ----------
   S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
+  // Localize modals (opened by ~13 different builders) without touching each one.
+  (function observeModal() {
+    const modal = $("#modal");
+    if (!modal || typeof MutationObserver === "undefined") return;
+    const obs = new MutationObserver(() => {
+      if (__i18nBusy || langCode() !== "da") return;   // English is native; modals are authored in English
+      applyI18n(modal);
+    });
+    obs.observe(modal, { childList: true, subtree: true, characterData: true });
+  })();
+  applyLang();   // sets <html lang>, button state, and translates current chrome if Danish was persisted
   const initialHash = (location.hash || "").replace(/^#/, "");
   go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
 })();

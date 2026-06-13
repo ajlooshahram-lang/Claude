@@ -579,5 +579,56 @@ rmBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(S.savedViews().length === 0, "deleting from manager removes the saved view");
 doc.querySelector("#modal [data-act=cancel]") && doc.querySelector("#modal [data-act=cancel]").click();
 
+// 39) i18n (EN/DA) — click-only toggle, Danish translation, and EXACT reversibility to English.
+//     This guards the core invariant: English is the source of truth, so every other test
+//     (which runs in English) is unaffected. The toggle must never mutate English text.
+S.reset();
+S.setBrand({ lang: "en" });   // deterministic start
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const langBtn = doc.getElementById("btnLang");
+ok(langBtn != null, "language toggle button present in topbar");
+ok(langBtn.getAttribute("data-i18n-skip") !== null, "language button is excluded from translation");
+ok(doc.documentElement.getAttribute("lang") === "en", "document starts in English");
+// capture the English dashboard before switching
+const enDash = doc.getElementById("content").innerHTML;
+ok(/Total Cases/.test(enDash), "English dashboard shows 'Total Cases'");
+const enNav = doc.getElementById("nav").innerHTML;
+ok(/Dashboard/.test(enNav) && /Risk Register/.test(enNav), "English nav shows English labels");
+// switch to Danish (single click — no typing)
+langBtn.click();
+ok(doc.documentElement.getAttribute("lang") === "da", "click switches document to Danish");
+ok(S.brand().lang === "da", "language persisted to brand");
+ok(langBtn.textContent === "DA", "language button reflects Danish state");
+const daNav = doc.getElementById("nav").innerHTML;
+ok(/Risikoregister/.test(daNav), "nav label translated to Danish (Risikoregister)");
+const daDash = doc.getElementById("content").innerHTML;
+ok(/Sager i alt/.test(daDash), "dashboard KPI translated to Danish (Sager i alt)");
+ok(!/Total Cases/.test(daDash), "no untranslated 'Total Cases' remains in Danish dashboard");
+ok(doc.getElementById("viewTitle").textContent === "Dashboard", "view title 'Dashboard' is identical in Danish (by design)");
+// Danish must NOT introduce any free-text inputs (click-only invariant holds in both languages)
+let daFreeText = 0;
+doc.querySelectorAll("#content input").forEach(inp => { const t = (inp.getAttribute("type") || "text").toLowerCase(); if (t === "text" || t === "number") daFreeText++; });
+ok(daFreeText === 0, "no free-text inputs introduced in Danish view (click-only preserved)");
+// modal localisation via observer
+doc.getElementById("btnHelp").click();
+ok(/Tastaturgenveje/.test(doc.getElementById("modal").innerHTML), "modal localised to Danish (Tastaturgenveje)");
+doc.querySelector("#modal [data-act=cancel]").click();
+// switch back to English — must restore EXACTLY (this protects all English-asserting tests)
+langBtn.click();
+ok(doc.documentElement.getAttribute("lang") === "en", "click switches back to English");
+ok(langBtn.textContent === "EN", "language button reflects English state");
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const enDash2 = doc.getElementById("content").innerHTML;
+ok(/Total Cases/.test(enDash2) && !/Sager i alt/.test(enDash2), "English fully restored on toggle back (no Danish residue)");
+ok(doc.getElementById("nav").innerHTML.indexOf("Risikoregister") === -1, "nav restored to English on toggle back");
+S.setBrand({ lang: "en" });   // leave the suite in English for any trailing checks
+
+// 40) seed realism — 5-why root-cause chains and named sponsor are present without altering pinned metrics
+S.reset();
+ok(S.kpis().estTotal === 42500 && S.kpis().crit === 5 && S.validCases().length === 6, "seed metrics unchanged after enrichment (42500 / 5 crit / 6 cases)");
+const seededWhys = S.get().cases.filter(c => Array.isArray(c.whys) && c.whys.filter(w => w && w.trim()).length >= 3);
+ok(seededWhys.length === 6, "all 6 seed cases carry a multi-level 5-why chain");
+ok(/Sorensen/.test(S.get().project.sponsor) && S.get().project.manager, "project has a named sponsor and manager");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

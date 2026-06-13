@@ -8,17 +8,18 @@
   function uid() { return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
   function seed() {
-    const mk = (problem, category, priority, sev, occ, det, root, method, target, status, percent, cost, prio) => ({
+    const mk = (problem, category, priority, sev, occ, det, root, method, target, status, percent, cost, prio, whys) => ({
       id: uid(), dateLogged: "2026-05-15", problem, category, priority,
       sev, occ, det, rootCause: root, leanMethod: method, owner: "PM",
       target, startDate: "2026-06-01", status, percent,
       costCat: cost[0], estCost: cost[1], actCost: cost[2],
       reach: prio[0], impact: prio[1], confidence: prio[2], effort: prio[3],
-      userValue: prio[4], timeCrit: prio[5], riskRed: prio[6], jobSize: prio[7]
+      userValue: prio[4], timeCrit: prio[5], riskRed: prio[6], jobSize: prio[7],
+      whys: Array.isArray(whys) ? whys.concat(["", "", "", "", ""]).slice(0, 5) : ["", "", "", "", ""]
     });
     return {
       project: {
-        name: "QI Intelligence Program", sponsor: "", manager: "",
+        name: "QI Intelligence Program", sponsor: "Maria Sorensen, VP Engineering", manager: "Daniel Pedersen, PMP",
         org: "Engineering", start: "2026-06-01", end: "2026-12-31",
         status: "IN PROGRESS", version: "v9.0", currency: "$",
         spec: { usl: 11, lsl: 9, target: 10 }   // process-capability spec limits
@@ -29,22 +30,52 @@
       cases: [
         mk("Delivery targets missed 20% consistently", "Delivery / Schedule", "1-CRITICAL", 8, 7, 6,
           "Handoff delays invisible; no WIP limits", "Value Stream Mapping", "On-time delivery >95% in 8 weeks", "IN PROGRESS", 0.2, ["Labour / Effort", 15000, 12000],
-          [2000, 5, 80, 8,  8, 8, 5, 8]),
+          [2000, 5, 80, 8,  8, 8, 5, 8],
+          ["Sprint commitments slip by ~20% every cycle",
+           "Work sits in queues between teams without anyone noticing",
+           "There are no WIP limits, so everything is started and little is finished",
+           "Teams are measured on utilisation, not flow/throughput",
+           "No end-to-end value-stream owner accountable for lead time"]),
         mk("Defect rate at 12% - customers complaining", "Quality / Defects", "1-CRITICAL", 8, 7, 6,
           "No quality check at source", "Mistake-Proofing / Poka-Yoke", "Zero defect escapes within 4 weeks", "OPEN", 0, ["Materials", 5000, 7500],
-          [1000, 8, 90, 5,  8, 8, 8, 5]),
+          [1000, 8, 90, 5,  8, 8, 8, 5],
+          ["12% of delivered units are returned as defective",
+           "Defects are only caught at final inspection, not at the source",
+           "Operators have no in-process check or poka-yoke at each step",
+           "Standard work omits self-verification at the point of creation",
+           "Quality was designed as an inspection gate, not built into the process"]),
         mk("Team overwhelmed, parallel tasks >8 each", "Process / Flow", "2-HIGH", 7, 6, 5,
           "No WIP limits; everything is priority 1", "Kanban", "Max 3 active tasks per person", "OPEN", 0, ["Training", 3000, 2000],
-          [500, 3, 80, 3,  5, 5, 3, 3]),
+          [500, 3, 80, 3,  5, 5, 3, 3],
+          ["Each person juggles more than 8 active tasks at once",
+           "Context-switching destroys focus and lengthens every task",
+           "Intake has no limit; new work is pushed regardless of capacity",
+           "Everything is labelled priority-1, so nothing can be sequenced",
+           "No pull-based system or WIP cap exists to protect capacity"]),
         mk("Approval bottleneck adds 2.3 days per case", "Process / Flow", "2-HIGH", 7, 6, 5,
           "Wrong routing; unclear decision authority", "Standard Work", "Approval time <4 hours", "OPEN", 0, ["External / Consultant", 10000, 10000],
-          [500, 5, 70, 5,  5, 5, 3, 5]),
+          [500, 5, 70, 5,  5, 5, 3, 5],
+          ["Cases wait an average of 2.3 days for approval",
+           "Requests are routed to the wrong approver and re-queued",
+           "Decision authority and approval thresholds are undocumented",
+           "No delegation matrix exists for routine, low-risk decisions",
+           "Governance was never standardised as the org scaled"]),
         mk("New hire onboarding takes 6 weeks", "People / Training", "3-MEDIUM", 6, 5, 5,
           "No documented process; tribal knowledge", "Standard Work", "Onboard in 2 weeks, consistent quality", "OPEN", 0, ["Tooling / Software", 2000, 1500],
-          [200, 2, 70, 8,  3, 2, 2, 8]),
+          [200, 2, 70, 8,  3, 2, 2, 8],
+          ["New hires take ~6 weeks to reach productive output",
+           "They depend on senior staff to explain undocumented steps",
+           "Key procedures live as tribal knowledge, not written standards",
+           "No standard work or onboarding checklist has been authored",
+           "Documentation has never been resourced or owned by anyone"]),
         mk("Leader not visible to frontline team", "Process / Flow", "2-HIGH", 7, 6, 5,
           "No structured Gemba cadence in place", "Gemba Walk", "Weekly Gemba walk every leader", "IN PROGRESS", 0.2, ["Labour / Effort", 7500, 5000],
-          [200, 3, 70, 2,  3, 3, 5, 2])
+          [200, 3, 70, 2,  3, 3, 5, 2],
+          ["Frontline teams rarely see leadership at the work",
+           "Problems surface late, only after they have escalated",
+           "There is no regular Gemba walk or floor cadence",
+           "Leaders' calendars are consumed by status meetings, not observation",
+           "Going-to-the-work is not an expected leadership behaviour"])
       ],
       sigma: [
         { week: "Week 1", units: 600, defects: 72, opps: 5 },
