@@ -1,0 +1,14 @@
+{
+  "task_id": "task-add-9-features",
+  "task_description": "Add 9 new features to el-dimensionering.html: EV charger (7-722), earthing & bonding (5-54), harmonics/neutral sizing (523.6.3), offline PWA, motor starter configurator (60947-4-1), cable tray fill calculator, energy meter/CT sizing (50470+MID), exam mode, QR panel labels. PRs #7 and #8 have already been merged.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "Syntax check passes. 72/72 self-tests pass. All review issues (7) addressed: EV RCD safety fix (chargerPower/chargeMode separation), harmonics balance parameter implemented, PWA blob-URL replaced with Cache API, QR relabeled as visual identifier, PWA test made non-tautological, exam state reset on module switch, cable tray capacity display clarified."
+  }
+}
