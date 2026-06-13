@@ -49,6 +49,7 @@
   // ---------- views config ----------
   const VIEWS = [
     { g: "Overview" },
+    { id: "brain", label: "Project Brain", icon: "🧠" },
     { id: "portfolio", label: "Portfolio", icon: "▣" },
     { id: "dashboard", label: "Dashboard", icon: "▤" },
     { id: "cases", label: "Cases (Master)", icon: "★" },
@@ -643,6 +644,107 @@
       } catch (e) { out.textContent = "Could not reach the AI endpoint. " + offlineAnswer(q); }
     });
   };
+
+  RENDER.brain = function () {
+    const profiles = (window.QIBrain && QIBrain.listProfiles && QIBrain.listProfiles()) || [];
+    const profOpts = `<option value="">Auto-detect domain</option>` +
+      profiles.map(p => `<option value="${esc(p.id)}">${esc(p.label)}</option>`).join("");
+    return `<div class="card">
+        <h3>Project Brain <span class="tag">auto-plan</span></h3>
+        <p style="line-height:1.6">Paste or upload your <b>project description</b>. The Brain analyses it
+        <b>locally on this device</b> — nothing is uploaded or sent to any server — and builds a full plan:
+        phases, tasks, a risk register, milestones, procurement and a budget skeleton. Review the preview,
+        then apply it to the active project. It structures and tracks the work; people still execute it.</p>
+        <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+          <label class="muted" for="brainProfile">Domain</label>
+          <select id="brainProfile" style="max-width:280px">${profOpts}</select>
+          <label class="btn btn-sm" for="brainFile">Upload .txt / .md</label>
+          <input id="brainFile" type="file" accept=".txt,.md,text/plain,text/markdown" hidden />
+          <span class="muted" id="brainFileName"></span>
+        </div>
+        <textarea id="brainText" rows="9" style="width:100%;margin-top:8px;font:inherit;padding:10px;border:1.5px solid var(--border);border-radius:8px"
+          placeholder="Paste your project description here (stays on this device)…"></textarea>
+        <div class="toolbar" style="margin-top:8px">
+          <button class="btn btn-primary" id="brainAnalyze">Analyze</button>
+          <button class="btn" id="brainClear">Clear</button>
+        </div>
+      </div>
+      <div id="brainOut"></div>`;
+  };
+  AFTER.brain = function () {
+    const fileInput = $("#brainFile"), nameEl = $("#brainFileName"), ta = $("#brainText");
+    if (fileInput) fileInput.addEventListener("change", () => {
+      const f = fileInput.files && fileInput.files[0]; if (!f) return;
+      nameEl.textContent = f.name;
+      const reader = new FileReader();
+      reader.onload = () => { ta.value = String(reader.result || ""); };
+      reader.readAsText(f);
+    });
+    const clearBtn = $("#brainClear");
+    if (clearBtn) clearBtn.addEventListener("click", () => { ta.value = ""; nameEl.textContent = ""; uiState.brainPlan = null; $("#brainOut").innerHTML = ""; });
+
+    const analyzeBtn = $("#brainAnalyze");
+    if (analyzeBtn) analyzeBtn.addEventListener("click", () => {
+      const text = (ta.value || "").trim();
+      if (!text) { toast("Paste or upload a project description first."); return; }
+      if (!window.QIBrain) { toast("Brain engine not loaded."); return; }
+      const plan = QIBrain.analyzeProject(text, { profile: $("#brainProfile").value || undefined });
+      uiState.brainPlan = plan;
+      renderBrainPreview(plan);
+    });
+  };
+  function renderBrainPreview(plan) {
+    const kpi = (cls, l, v) => `<div class="kpi ${cls}"><div class="label">${l}</div><div class="value">${v}</div></div>`;
+    const s = plan.summary, sc = s.scale;
+    const scaleBits = [];
+    if (sc.routeKm) scaleBits.push(`${sc.routeKm} km route`);
+    if (sc.sites) scaleBits.push(`${sc.sites} sites`);
+    if (sc.homesPassed) scaleBits.push(`${sc.homesPassed.toLocaleString()} homes`);
+    if (sc.durationMonths) scaleBits.push(`${sc.durationMonths} months`);
+    const warn = plan.coverage.warnings.length
+      ? `<div class="readout" style="border-left:3px solid var(--amber,#e0a800)">${plan.coverage.warnings.map(esc).join("<br>")}</div>` : "";
+    const phaseRows = plan.phases.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.owner)}</td><td class="center">${p.taskCount}</td></tr>`).join("");
+    const riskRows = plan.risks.map(r => `<tr><td class="wrap">${esc(r.problem.replace(/^RISK:\s*/, ""))}</td><td class="center">${r.sev}</td><td class="center">${r.occ}</td><td class="center">${r.det}</td><td class="center"><b>${r.sev * r.occ * r.det}</b></td></tr>`).join("");
+    const budgetRows = plan.budget.rows.map(b => `<tr><td>${esc(b.category)}</td><td class="right">${money(b.est)}</td></tr>`).join("");
+    $("#brainOut").innerHTML = `
+      <div class="card"><div class="card-head"><h3>Analysis — ${esc(s.title)}</h3>
+        <span class="tag">${esc(s.domainLabel)} · ${Math.round(plan.coverage.confidence * 100)}% confidence</span></div>
+        <p class="muted">${scaleBits.length ? "Detected scale: " + esc(scaleBits.join(" · ")) : "No explicit scale detected."}</p>
+        ${warn}
+        <div class="kpi-row" style="display:flex;gap:12px;flex-wrap:wrap;margin:8px 0">
+          ${kpi("navy", "Phases", plan.phases.length)}
+          ${kpi("navy", "Tasks", plan.cases.length)}
+          ${kpi("navy", "Risks", plan.risks.length)}
+          ${kpi("navy", "Milestones", plan.milestones.length)}
+          ${kpi("navy", "Est. budget", money(plan.budget.total))}
+        </div>
+        <div class="toolbar">
+          <button class="btn btn-primary" id="brainApply">Apply plan to active project</button>
+          <span class="muted">Adds ${plan.cases.length + plan.risks.length} cases, ${plan.milestones.length} milestones and ${plan.procurement.length} procurement items.</span>
+        </div>
+      </div>
+      <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="card"><h3>Work breakdown</h3>${tableWrap("<th>Phase</th><th>Owner</th><th>Tasks</th>", phaseRows)}</div>
+        <div class="card"><h3>Top risks (FMEA RPN)</h3>${tableWrap("<th class='wrap'>Risk</th><th>S</th><th>O</th><th>D</th><th>RPN</th>", riskRows)}</div>
+      </div>
+      <div class="card"><h3>Budget skeleton</h3>${tableWrap("<th>Category</th><th class='right'>Estimate</th>", budgetRows)}</div>
+      <div class="card"><h3>Suggested roles</h3><p>${plan.roles.map(r => `<span class="badge">${esc(r)}</span>`).join(" ")}</p></div>`;
+    const applyBtn = $("#brainApply");
+    if (applyBtn) applyBtn.addEventListener("click", () => {
+      const n = applyBrainPlan(plan);
+      toast(`Applied: ${n} cases, ${plan.milestones.length} milestones, ${plan.procurement.length} procurement items.`);
+      go("dashboard");
+    });
+  }
+  function applyBrainPlan(plan) {
+    let n = 0;
+    const add = c => { const copy = Object.assign({}, c); delete copy._brain; delete copy._phase; S.addCase(copy); n++; };
+    plan.cases.forEach(add);
+    plan.risks.forEach(add);
+    plan.milestones.forEach(m => S.regAdd("milestones", Object.assign({}, m)));
+    plan.procurement.forEach(p => S.regAdd("procurement", Object.assign({}, p)));
+    return n;
+  }
 
   RENDER.health = function () {
     const issues = S.health();
