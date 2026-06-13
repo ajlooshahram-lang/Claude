@@ -4570,6 +4570,8 @@ function examBackToList(){ examState.scId = null; renderModule('exam'); }
 function examResetScen(id){ Object.keys(examState.scPick).forEach(k=>{ if(k.indexOf(id+':')===0) delete examState.scPick[k]; }); Object.keys(examState.scOrder).forEach(k=>{ if(k.indexOf(id+':')===0) delete examState.scOrder[k]; }); examState.step = 0; renderModule('exam'); }
 function examTab(t){ examState.tab = t; examState.scId = null; examState.quizReview = false; examState.mockReview = false; renderModule('exam'); }
 function examSetMode(m){ examState.mode = m; renderModule('exam'); }
+let examKeyTaps = 0;
+function examKeyTap(){ examKeyTaps++; if(examKeyTaps>=5){ examKeyTaps=0; examState.tab='answerkey'; renderModule('exam'); } setTimeout(function(){ examKeyTaps=0; },2000); }
 
 function examResetAll(){ try { localStorage.removeItem('examStore'); } catch(e){} examState.quizPick = {}; examState.quizOrder = {}; examState.quizReview = false; examState.scPick = {}; examState.scOrder = {}; examState.mockReview = false; examState.quizIdx = 0; examState.step = 0; renderModule('exam'); }
 
@@ -4710,12 +4712,31 @@ function renderMock(){
     + `<div class="info-row" style="margin-top:8px">${da?'Eksamenstilstand: facit og forklaringer vises f\u00f8rst n\u00e5r alle 68 trin er besvaret.':'Exam mode: answers and explanations are shown only when all 68 steps are answered.'}</div></div>`;
 }
 
+function examRenderAnswerKey(){
+  const da = lang==='da';
+  let html = `<div class="card fade-in"><div class="card-title">\uD83D\uDD11 ${da?'Instrukt\u00f8r: Facitliste (IKKE til studerende)':'Instructor: Answer key (NOT for students)'}</div>`
+    + `<div class="result-box warning"><div class="result-title">\u26A0\uFE0F ${da?'Verific\u00e9r!':'Verify!'}</div><div style="padding:6px 2px">${da?'Gennemg\u00e5 hvert facit nedenfor. Kiro har forfattet disse \u2014 de SKAL spot-tjekkes af en autoriseret fagperson mod DS/HD 60364 og virkelige pr\u00f8vesvar, f\u00f8r eleverne bruger dem.':'Review each answer below. Kiro authored these \u2014 they MUST be spot-checked by an authorized professional against DS/HD 60364 and real exam answers before students use them.'}</div></div>`;
+  html += `<div class="card-title" style="margin-top:14px">${da?'Quiz (23 sp\u00f8rgsm\u00e5l)':'Quiz (23 questions)'}</div>`;
+  EXAM_QUIZ.forEach(function(q,i){
+    html += `<div class="result-row" style="flex-direction:column;align-items:flex-start;gap:2px"><span class="label" style="font-weight:700">Q${i+1}: ${examL(q.q)}</span><span class="value" style="color:var(--success)">\u2705 ${examL(q.opts[q.ci])}</span><span class="value" style="font-size:.75rem;color:var(--text-light)">${q.clause}</span></div>`;
+  });
+  html += `<div class="card-title" style="margin-top:18px">${da?'Scenarier (11 / 68 trin)':'Scenarios (11 / 68 steps)'}</div>`;
+  EXAM_SCEN.forEach(function(sc){
+    html += `<div style="margin-top:14px;font-weight:700;color:var(--primary)">${examL(sc.title)} [${sc.cat}]</div>`;
+    sc.steps.forEach(function(s,j){
+      html += `<div class="result-row" style="flex-direction:column;align-items:flex-start;gap:2px"><span class="label">${da?'Trin':'Step'} ${j+1}: ${examL(s.q)}</span><span class="value" style="color:var(--success)">\u2705 ${examL(s.opts[s.ci])}</span><span class="value" style="font-size:.75rem;color:var(--text-light)">${s.clause}</span></div>`;
+    });
+  });
+  html += `<div class="select-grid" style="margin-top:14px"><button class="sel-btn selected" onclick="examTab('quiz')">\u25C0 ${da?'Tilbage':'Back'}</button></div></div>`;
+  return html;
+}
+
 function renderExam(){
   const da = lang==='da';
   const tleft = examState.timerLeft;
   const timerColor = tleft<=300 ? 'var(--danger)' : (tleft<=600 ? '#b8860b' : 'var(--success)');
   const expired = tleft<=0;
-  let head = `<div class="card fade-in"><div class="card-title">\uD83C\uDF93 ${da?'Eksamenssimulator':'Exam simulator'}</div>`
+  let head = `<div class="card fade-in"><div class="card-title"><span onclick="examKeyTap()" style="cursor:default">\uD83C\uDF93</span> ${da?'Eksamenssimulator':'Exam simulator'}</div>`
     + `<div class="info-row">${da?'\u00d8v til autorisationspr\u00f8ven: klik-only opgaver med trinvise beregninger, l\u00e6rlinge-forklaringer og DS/HD 60364-henvisninger. Best\u00e5: '+EXAM_PASS+'%.':'Practice for the authorization exam: click-only assignments with step-by-step calculations, apprentice explanations and DS/HD 60364 references. Pass: '+EXAM_PASS+'%.'}</div>`
     + `<div class="result-box warning" style="margin-bottom:10px"><div class="result-title">\u26A0\uFE0F ${da?'Sikkerhedsforbehold':'Safety disclaimer'}</div><div style="padding:6px 2px;line-height:1.5">${da?'Dette er et <strong>l\u00e6ringsv\u00e6rkt\u00f8j</strong> \u2014 ikke en projekteringsfacitliste. El-arbejde er livsfarligt ved fejl. Verificér ALTID mod g\u00e6ldende <strong>DS/HD 60364</strong> og fabrikantens data, og f\u00f8lg <strong>Sikkerhedsstyrelsen.dk</strong> (Elsikkerhedsloven, Installationsbekendtg\u00f8relsen). V\u00e6lg ved tvivl altid den sikrere l\u00f8sning.':'This is a <strong>learning tool</strong> \u2014 not a design authority. Electrical work is lethal when wrong. ALWAYS verify against the current <strong>DS/HD 60364</strong> and manufacturer data, and follow <strong>Sikkerhedsstyrelsen.dk</strong> (Danish electrical-safety law). When in doubt, always choose the safer option.'}</div></div>`
     + `<div class="select-grid" style="margin-bottom:10px">`
@@ -4735,7 +4756,7 @@ function renderExam(){
     + `</div>`
     + (expired ? `<div class="result-box error" style="margin-top:10px"><div class="result-title">\u23F0 ${da?'Tiden er udl\u00f8bet':'Time is up'}</div><div style="padding:6px 2px">${da?'Til pr\u00f8ven har du 60 min \u2014 \u00f8v dig p\u00e5 tempoet.':'You get 60 min at the exam \u2014 practise your pace.'}</div></div>` : '')
     + `</div></div>`;
-  const body = examState.tab==='quiz' ? examRenderQuiz() : (examState.tab==='mock' ? renderMock() : (examState.scId ? examRenderScenario() : examRenderScenList()));
+  const body = examState.tab==='answerkey' ? examRenderAnswerKey() : (examState.tab==='quiz' ? examRenderQuiz() : (examState.tab==='mock' ? renderMock() : (examState.scId ? examRenderScenario() : examRenderScenList())));
   return head + body;
 }
 
