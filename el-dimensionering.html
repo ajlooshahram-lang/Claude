@@ -4378,8 +4378,9 @@ function renderDrawing(){
 }
 
 // ===== EXAM SIMULATOR (data + engine) =====
-let examState = { tab:'quiz', mode:'apprentice', quizIdx:0, quizPick:{}, scId:null, step:0, scPick:{}, timerOn:false, timerEnd:null, timerLeft:3600 };
+let examState = { tab:'quiz', mode:'apprentice', quizIdx:0, quizPick:{}, quizOrder:{}, scId:null, step:0, scPick:{}, scOrder:{}, timerOn:false, timerEnd:null, timerLeft:3600 };
 let examTimerHandle = null;
+function examShuffle(n){ var a=[]; for(var x=0;x<n;x++) a.push(x); for(var x=n-1;x>0;x--){ var r=Math.floor(Math.random()*(x+1)); var t=a[x]; a[x]=a[r]; a[r]=t; } return a; }
 function examL(o){ return (typeof o==='string') ? o : (o[lang]||o.en||o.da||''); }
 function examLoadStore(){ try { return JSON.parse(localStorage.getItem('examStore')||'{}'); } catch(e){ return {}; } }
 function examSaveStore(s){ try { localStorage.setItem('examStore', JSON.stringify(s)); } catch(e){} }
@@ -4517,7 +4518,7 @@ function examPickQuiz(i){
   renderModule('exam');
 }
 function examQuizGo(i){ examState.quizIdx = Math.max(0, Math.min(EXAM_QUIZ.length-1, i)); renderModule('exam'); }
-function examResetQuiz(){ examState.quizPick = {}; examState.quizIdx = 0; renderModule('exam'); }
+function examResetQuiz(){ examState.quizPick = {}; examState.quizOrder = {}; examState.quizIdx = 0; renderModule('exam'); }
 
 function examPickStep(i){
   const sc = EXAM_SCEN.find(s=>s.id===examState.scId); if(!sc) return;
@@ -4530,11 +4531,11 @@ function examPickStep(i){
 function examScenStep(d){ const sc = EXAM_SCEN.find(s=>s.id===examState.scId); if(!sc) return; examState.step = Math.max(0, Math.min(sc.steps.length-1, examState.step+d)); renderModule('exam'); }
 function examOpenScen(id){ examState.scId = id; examState.step = 0; renderModule('exam'); }
 function examBackToList(){ examState.scId = null; renderModule('exam'); }
-function examResetScen(id){ Object.keys(examState.scPick).forEach(k=>{ if(k.indexOf(id+':')===0) delete examState.scPick[k]; }); examState.step = 0; renderModule('exam'); }
+function examResetScen(id){ Object.keys(examState.scPick).forEach(k=>{ if(k.indexOf(id+':')===0) delete examState.scPick[k]; }); Object.keys(examState.scOrder).forEach(k=>{ if(k.indexOf(id+':')===0) delete examState.scOrder[k]; }); examState.step = 0; renderModule('exam'); }
 function examTab(t){ examState.tab = t; examState.scId = null; renderModule('exam'); }
 function examSetMode(m){ examState.mode = m; renderModule('exam'); }
 
-function examResetAll(){ try { localStorage.removeItem('examStore'); } catch(e){} examState.quizPick = {}; examState.scPick = {}; examState.quizIdx = 0; examState.step = 0; renderModule('exam'); }
+function examResetAll(){ try { localStorage.removeItem('examStore'); } catch(e){} examState.quizPick = {}; examState.quizOrder = {}; examState.scPick = {}; examState.scOrder = {}; examState.quizIdx = 0; examState.step = 0; renderModule('exam'); }
 
 function examStartTimer(){ examState.timerOn = true; examState.timerEnd = Date.now() + examState.timerLeft*1000; if(examTimerHandle) clearInterval(examTimerHandle); examTimerHandle = setInterval(examTick, 1000); renderModule('exam'); }
 function examPauseTimer(){ examState.timerOn = false; if(examTimerHandle){ clearInterval(examTimerHandle); examTimerHandle = null; } renderModule('exam'); }
@@ -4594,7 +4595,9 @@ function examRenderQuiz(){
     }
     return `<button class="sel-btn ${idx===i?'selected':''}" style="${style}" onclick="examQuizGo(${idx})">${idx+1}</button>`;
   }).join('');
-  const opts = q.opts.map((o,oi)=>{
+  if(!examState.quizOrder[i] || examState.quizOrder[i].length!==q.opts.length) examState.quizOrder[i] = examShuffle(q.opts.length);
+  const opts = examState.quizOrder[i].map((oi)=>{
+    const o = q.opts[oi];
     let style=''; let cls='sel-btn'; const click = answered ? '' : `onclick="examPickQuiz(${oi})"`;
     if(reveal){
       if(oi===q.ci) style='border-color:var(--success);background:var(--success-bg);color:var(--success);font-weight:700';
@@ -4662,7 +4665,9 @@ function examRenderScenario(){
     }
     return `<button class="sel-btn ${idx===i?'selected':''}" style="${style}" onclick="examState.step=${idx};renderModule('exam')">${idx+1}</button>`;
   }).join('');
-  const opts = step.opts.map((o,oi)=>{
+  if(!examState.scOrder[k] || examState.scOrder[k].length!==step.opts.length) examState.scOrder[k] = examShuffle(step.opts.length);
+  const opts = examState.scOrder[k].map((oi)=>{
+    const o = step.opts[oi];
     let style=''; let cls='sel-btn'; const click = answered ? '' : `onclick="examPickStep(${oi})"`;
     if(reveal){
       if(oi===step.ci) style='border-color:var(--success);background:var(--success-bg);color:var(--success);font-weight:700';
