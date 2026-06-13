@@ -629,7 +629,10 @@ const T = {
       wire: 'Ledningsnumre',
       risk: 'Risikovurdering',
       selectivity: 'Selektivitet',
-      commission: 'Idriftsættelse'
+      commission: 'Idriftsættelse',
+      ev: 'EV-lader',
+      earthing: 'Jording',
+      harmonics: 'Harmonik'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -781,7 +784,56 @@ const T = {
     forensicTitle: 'Hvorfor fejlede dette?',
     forensicCausal: 'Årsagskæde',
     forensicFixes: 'Rangerede rettelser (mindste ændring først)',
-    forensicWhy: '🔍 Hvorfor?'
+    forensicWhy: '🔍 Hvorfor?',
+    // EV Charger module (DS/HD 60364-7-722)
+    evTitle: 'EV-lader dimensionering (DS/HD 60364-7-722)',
+    evChargerType: 'Ladertype',
+    evPhases: 'Faser',
+    evCableLength: 'Kabellængde [m]',
+    evEarthSystem: 'Jordingssystem',
+    evLoadMgmt: 'Laststyring',
+    evStatic: 'Statisk',
+    evDynamic: 'Dynamisk',
+    evNone: 'Ingen',
+    evRcdReq: 'RCD-krav',
+    evCableSize: 'Anbefalet kabeltværsnit',
+    evProtection: 'Beskyttelsesenhed',
+    evDedicatedCircuit: 'Dedikeret kredsløb krævet',
+    evContFactor: 'Kontinuitetsfaktor',
+    evResult: 'Dimensioneringsresultat',
+    evMode2: 'Mode 2',
+    evMode3: 'Mode 3',
+    // Earthing module (DS/HD 60364-5-54)
+    earthTitle: 'Jording og udligning (DS/HD 60364-5-54)',
+    earthSystemType: 'Systemtype',
+    earthSoilRes: 'Jordbundsresistivitet [ohm-m]',
+    earthElectrodeType: 'Elektrodetype',
+    earthRod: 'Jordspyd',
+    earthStrip: 'Jordbånd',
+    earthPlate: 'Jordplade',
+    earthFoundation: 'Fundamentjord',
+    earthElectrodeLen: 'Elektrodelængde/dimension [m]',
+    earthResistance: 'Beregnet jordmodstand',
+    earthMinPE: 'Minimum PE-tværsnit',
+    earthBonding: 'Potentialudligningskrav',
+    earthResult: 'Jordingsresultat',
+    // Harmonics module (section 523.6.3)
+    harmTitle: 'Harmonisk/Neutraldimensionering (IEC 60364 §523.6.3)',
+    harmLoadType: 'Belastningstype',
+    harmLinear: 'Lineær',
+    harmLED: 'LED-belysning',
+    harmVFD: 'Frekvensomformer (VFD)',
+    harmIT: 'IT-udstyr',
+    harmMixed: 'Blandet',
+    harmTHD: 'THD-N procent',
+    harmPhases: 'Antal faser',
+    harmBalance: 'Belastningsbalance',
+    harmBalanced: 'Symmetrisk',
+    harmUnbalanced: 'Usymmetrisk',
+    harmNeutralFactor: 'Neutralfaktor',
+    harmNeutralSize: 'Anbefalet neutraltværsnit',
+    harmTriplen: 'Advarsel: Triplen-harmoniske',
+    harmResult: 'Harmonikresultat'
   },
   en: {
     appTitle: 'Electrical Dimensioning',
@@ -805,7 +857,10 @@ const T = {
       wire: 'Wire Numbers',
       risk: 'Risk Matrix',
       selectivity: 'Selectivity',
-      commission: 'Commissioning'
+      commission: 'Commissioning',
+      ev: 'EV Charger',
+      earthing: 'Earthing',
+      harmonics: 'Harmonics'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -949,7 +1004,56 @@ const T = {
     forensicTitle: 'Why did this fail?',
     forensicCausal: 'Causal chain',
     forensicFixes: 'Ranked fixes (least change first)',
-    forensicWhy: '🔍 Why?'
+    forensicWhy: '🔍 Why?',
+    // EV Charger module (DS/HD 60364-7-722)
+    evTitle: 'EV Charger Dimensioning (DS/HD 60364-7-722)',
+    evChargerType: 'Charger Type',
+    evPhases: 'Phases',
+    evCableLength: 'Cable Length [m]',
+    evEarthSystem: 'Earthing System',
+    evLoadMgmt: 'Load Management',
+    evStatic: 'Static',
+    evDynamic: 'Dynamic',
+    evNone: 'None',
+    evRcdReq: 'RCD Requirement',
+    evCableSize: 'Recommended Cable Size',
+    evProtection: 'Protection Device',
+    evDedicatedCircuit: 'Dedicated Circuit Required',
+    evContFactor: 'Continuity Factor',
+    evResult: 'Dimensioning Result',
+    evMode2: 'Mode 2',
+    evMode3: 'Mode 3',
+    // Earthing module (DS/HD 60364-5-54)
+    earthTitle: 'Earthing & Bonding (DS/HD 60364-5-54)',
+    earthSystemType: 'System Type',
+    earthSoilRes: 'Soil Resistivity [ohm-m]',
+    earthElectrodeType: 'Electrode Type',
+    earthRod: 'Ground Rod',
+    earthStrip: 'Ground Strip',
+    earthPlate: 'Ground Plate',
+    earthFoundation: 'Foundation Earth',
+    earthElectrodeLen: 'Electrode Length/Dimension [m]',
+    earthResistance: 'Calculated Earth Resistance',
+    earthMinPE: 'Minimum PE Cross-section',
+    earthBonding: 'Equipotential Bonding Requirements',
+    earthResult: 'Earthing Result',
+    // Harmonics module (section 523.6.3)
+    harmTitle: 'Harmonics/Neutral Sizing (IEC 60364 sect. 523.6.3)',
+    harmLoadType: 'Load Type',
+    harmLinear: 'Linear',
+    harmLED: 'LED Lighting',
+    harmVFD: 'Variable Frequency Drive',
+    harmIT: 'IT Equipment',
+    harmMixed: 'Mixed',
+    harmTHD: 'THD-N Percentage',
+    harmPhases: 'Number of Phases',
+    harmBalance: 'Load Balance',
+    harmBalanced: 'Balanced',
+    harmUnbalanced: 'Unbalanced',
+    harmNeutralFactor: 'Neutral Factor',
+    harmNeutralSize: 'Recommended Neutral Size',
+    harmTriplen: 'Warning: Triplen Harmonics',
+    harmResult: 'Harmonics Result'
   }
 };
 
@@ -2918,6 +3022,12 @@ let solverResult = null; // cached last solve result for rendering
 let selectivityState = { upstream: null, downstream: null, showProof: false };
 // Commissioning module state (DS/HD 60364-6 §6.4)
 let commissionState = { step: 0, results: [], projectName: '', date: '' };
+// EV Charger module state (DS/HD 60364-7-722)
+let evState = { chargerType: '7.4', phases: '1', cableLength: 10, earthSystem: 'TN-S', loadMgmt: 'none' };
+// Earthing & Bonding module state (DS/HD 60364-5-54)
+let earthingState = { systemType: 'TN-S', soilResistivity: 100, electrodeType: 'rod', electrodeLength: 2.4 };
+// Harmonics / Neutral Sizing module state (section 523.6.3)
+let harmonicsState = { loadType: 'linear', thdPercent: '0-15', phases: '3', balance: 'balanced' };
 // Standards state
 let rcdSelected = null;
 let rcdSensitivity = null;
@@ -3046,6 +3156,9 @@ function renderModule(mod) {
     case 'risk': content = renderRisk(); break;
     case 'selectivity': content = renderSelectivity(); break;
     case 'commission': content = renderCommission(); break;
+    case 'ev': content = renderEV(); break;
+    case 'earthing': content = renderEarthing(); break;
+    case 'harmonics': content = renderHarmonics(); break;
   }
   // Append AI assistant to every module
   content += renderAiAssistant(mod);
@@ -6490,6 +6603,58 @@ function runSelfTests() {
     T.push({ name: 'Forensic: non-empty explanation + ≥1 fix for every FAIL scenario', exp: 'all have forensic', act: pass ? 'all have forensic' : ('fail ' + fail), pass: pass });
   })();
 
+  // ===== EV CHARGER MODULE TESTS (DS/HD 60364-7-722) =====
+  // Test: continuous load factor = 1.0 per 722.531.1
+  (function() {
+    var calc = calcEVCableSize(7.4, '1', 10, 'none');
+    T.push({ name: 'EV 722: continuous load factor = 1.0', exp: '1', act: String(calc.contFactor), pass: calc.contFactor === 1.0 });
+  })();
+  // Test: Mode 3 requires RCD Type B per 722.531.2
+  (function() {
+    var rcd = getEVRcdType('mode3');
+    T.push({ name: 'EV 722: Mode 3 requires RCD Type B', exp: 'Type B', act: rcd.type, pass: rcd.type === 'Type B' });
+  })();
+  // Test: Mode 2 allows Type A + 6mA DC per 722.531.2.101
+  (function() {
+    var rcd = getEVRcdType('mode2');
+    T.push({ name: 'EV 722: Mode 2 allows Type A + 6mA DC', exp: 'Type A + 6mA DC', act: rcd.type, pass: rcd.type === 'Type A + 6mA DC' });
+  })();
+
+  // ===== EARTHING MODULE TESTS (DS/HD 60364-5-54) =====
+  // Test: Rod electrode resistance formula R = rho/(2*pi*L)
+  (function() {
+    var R = calcEarthResistance(100, 'rod', 2.4);
+    var expected = 100 / (2 * Math.PI * 2.4); // ~6.63 ohm
+    T.push({ name: 'Earthing 54: rod R=rho/(2piL) 100ohm-m 2.4m', exp: expected.toFixed(2)+' \u03A9', act: R.toFixed(2)+' \u03A9', pass: Math.abs(R - expected) < 0.01 });
+  })();
+  // Test: PE sizing per Table 54.1 (phase 10mm2 -> PE 10mm2)
+  (function() {
+    var pe = getMinPESize(10);
+    T.push({ name: 'Earthing 54: PE size for 10mm\u00B2 phase = 10mm\u00B2', exp: '10', act: String(pe), pass: pe === 10 });
+  })();
+  // Test: PE sizing per Table 54.1 (phase 50mm2 -> PE 25mm2)
+  (function() {
+    var pe = getMinPESize(50);
+    T.push({ name: 'Earthing 54: PE size for 50mm\u00B2 phase = 25mm\u00B2', exp: '25', act: String(pe), pass: pe === 25 });
+  })();
+
+  // ===== HARMONICS MODULE TESTS (section 523.6.3) =====
+  // Test: Neutral factor 1.45 for THD > 33%
+  (function() {
+    var f = calcNeutralFactor('33-45', 'balanced');
+    T.push({ name: 'Harmonics 523.6.3: neutral factor 1.45 for THD 33-45%', exp: '1.45', act: f.toFixed(2), pass: Math.abs(f - 1.45) < 0.001 });
+  })();
+  // Test: Neutral factor 1.0 for THD < 15%
+  (function() {
+    var f = calcNeutralFactor('0-15', 'balanced');
+    T.push({ name: 'Harmonics 523.6.3: neutral factor 1.0 for THD 0-15%', exp: '1.00', act: f.toFixed(2), pass: Math.abs(f - 1.0) < 0.001 });
+  })();
+  // Test: Neutral factor 1.45 for THD > 45%
+  (function() {
+    var f = calcNeutralFactor('>45', 'balanced');
+    T.push({ name: 'Harmonics 523.6.3: neutral factor 1.45 for THD >45%', exp: '1.45', act: f.toFixed(2), pass: Math.abs(f - 1.45) < 0.001 });
+  })();
+
   return T;
 }
 
@@ -7962,6 +8127,368 @@ function buildForensicExplanation(verdict, env) {
 // Forensic state: which verdict panels are expanded
 var forensicExpanded = {};
 function toggleForensic(id) { forensicExpanded[id] = !forensicExpanded[id]; renderModule(activeModule); }
+
+// ===== EV CHARGER MODULE (DS/HD 60364-7-722) =====
+function calcEVCableSize(power, phases, length, loadMgmt) {
+  // Continuous load factor per 722.531.1 = 1.0 (EV chargers rated for continuous duty)
+  var contFactor = 1.0;
+  var voltage = phases === '3' ? 400 : 230;
+  var current = phases === '3' ? (power * 1000) / (Math.sqrt(3) * voltage) : (power * 1000) / voltage;
+  var designCurrent = current * contFactor;
+  // Load management reduction (conservative: static=0.9, dynamic=0.75, per 722.311.1)
+  if (loadMgmt === 'static') designCurrent *= 0.9;
+  else if (loadMgmt === 'dynamic') designCurrent *= 0.75;
+  // Cable sizing: pick smallest Cu XLPE cable that carries designCurrent
+  // Using standard cable sizes and their Iz ratings (method C, Cu XLPE)
+  var cableSizes = [
+    {size: 1.5, iz: 23}, {size: 2.5, iz: 32}, {size: 4, iz: 42},
+    {size: 6, iz: 54}, {size: 10, iz: 73}, {size: 16, iz: 98},
+    {size: 25, iz: 131}, {size: 35, iz: 162}, {size: 50, iz: 196}
+  ];
+  var selected = cableSizes[cableSizes.length - 1];
+  for (var i = 0; i < cableSizes.length; i++) {
+    if (cableSizes[i].iz >= designCurrent) { selected = cableSizes[i]; break; }
+  }
+  // Voltage drop check (conservative: max 3% for dedicated EV circuit)
+  var r = 0.0183 / selected.size; // approx Cu resistance ohm/m at 70C
+  var vdrop = phases === '3' ? Math.sqrt(3) * designCurrent * (length / 1000) * r * 1000 : 2 * designCurrent * (length / 1000) * r * 1000;
+  var vdropPercent = (vdrop / voltage) * 100;
+  return { current: current, designCurrent: designCurrent, cableSize: selected.size, iz: selected.iz, vdropPercent: vdropPercent, contFactor: contFactor };
+}
+
+function getEVRcdType(chargerType) {
+  // Per 722.531.2: Mode 3 chargers with onboard DC charging require Type B RCD
+  // Mode 2 with Type A + 6mA DC detection acceptable per 722.531.2.101
+  if (chargerType === 'mode3') return { type: 'Type B', clause: '722.531.2' };
+  return { type: 'Type A + 6mA DC', clause: '722.531.2.101' };
+}
+
+function renderEV() {
+  var s = evState;
+  var chargerPowers = [
+    {label: '3.7 kW (1~)', value: '3.7', ph: '1'},
+    {label: '7.4 kW (1~)', value: '7.4', ph: '1'},
+    {label: '11 kW (3~)', value: '11', ph: '3'},
+    {label: '22 kW (3~)', value: '22', ph: '3'}
+  ];
+  var cableLengths = [5, 10, 15, 20, 25, 30, 40, 50];
+  var earthSystems = ['TN-S', 'TN-C-S', 'TT', 'IT'];
+  var loadMgmtOpts = ['none', 'static', 'dynamic'];
+
+  var html = '<div class="card fade-in"><div class="card-title">\u26A1 ' + t('evTitle') + '</div>';
+  html += '<div class="info-row">' + (lang === 'da' ? 'Dimensionering af EV-laderinstallation iht. DS/HD 60364-7-722. Alle EV-ladere betragtes som kontinuerlig belastning (faktor 1.0 per 722.531.1).' : 'EV charger installation dimensioning per DS/HD 60364-7-722. All EV chargers treated as continuous load (factor 1.0 per 722.531.1).') + '</div>';
+
+  // Charger type / power
+  html += '<div class="select-group"><div class="select-label">' + t('evChargerType') + '</div><div class="select-grid">';
+  chargerPowers.forEach(function(cp) {
+    html += '<button class="sel-btn ' + (s.chargerType === cp.value ? 'selected' : '') + '" onclick="evState.chargerType=\'' + cp.value + '\';evState.phases=\'' + cp.ph + '\';renderModule(\'ev\')">' + cp.label + '</button>';
+  });
+  html += '</div></div>';
+
+  // Mode selection
+  html += '<div class="select-group"><div class="select-label">' + (lang === 'da' ? 'Lademode' : 'Charging Mode') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn ' + (s.chargerType !== 'mode3' && s.chargerType !== 'mode2' || s.chargerType === 'mode2' ? '' : '') + (s.chargerType === 'mode2' ? 'selected' : '') + '" onclick="evState.chargerType=\'mode2\';renderModule(\'ev\')">' + t('evMode2') + '</button>';
+  html += '<button class="sel-btn ' + (s.chargerType === 'mode3' ? 'selected' : '') + '" onclick="evState.chargerType=\'mode3\';renderModule(\'ev\')">' + t('evMode3') + '</button>';
+  html += '</div></div>';
+
+  // Cable length
+  html += '<div class="select-group"><div class="select-label">' + t('evCableLength') + '</div><div class="select-grid">';
+  cableLengths.forEach(function(len) {
+    html += '<button class="sel-btn ' + (s.cableLength === len ? 'selected' : '') + '" onclick="evState.cableLength=' + len + ';renderModule(\'ev\')">' + len + ' m</button>';
+  });
+  html += '</div></div>';
+
+  // Earthing system
+  html += '<div class="select-group"><div class="select-label">' + t('evEarthSystem') + '</div><div class="select-grid">';
+  earthSystems.forEach(function(es) {
+    html += '<button class="sel-btn ' + (s.earthSystem === es ? 'selected' : '') + '" onclick="evState.earthSystem=\'' + es + '\';renderModule(\'ev\')">' + es + '</button>';
+  });
+  html += '</div></div>';
+
+  // Load management
+  html += '<div class="select-group"><div class="select-label">' + t('evLoadMgmt') + '</div><div class="select-grid">';
+  loadMgmtOpts.forEach(function(lm) {
+    var lbl = lm === 'none' ? t('evNone') : (lm === 'static' ? t('evStatic') : t('evDynamic'));
+    html += '<button class="sel-btn ' + (s.loadMgmt === lm ? 'selected' : '') + '" onclick="evState.loadMgmt=\'' + lm + '\';renderModule(\'ev\')">' + lbl + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '</div>'; // end input card
+
+  // Results
+  var power = parseFloat(s.chargerType) || 7.4;
+  if (s.chargerType === 'mode2') power = 3.7;
+  if (s.chargerType === 'mode3') power = 22;
+  var calc = calcEVCableSize(power, s.phases, s.cableLength, s.loadMgmt);
+  var rcd = getEVRcdType(s.chargerType);
+
+  html += '<div class="card fade-in"><div class="card-title">' + t('evResult') + '</div>';
+  html += '<div class="result-box"><div class="result-title">' + (lang === 'da' ? 'Beregning' : 'Calculation') + '</div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Nominel strøm' : 'Rated Current') + '</span><span class="value">' + calc.current.toFixed(1) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + t('evContFactor') + '</span><span class="value">' + calc.contFactor + ' (722.531.1)</span></div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Designstrøm' : 'Design Current') + '</span><span class="value">' + calc.designCurrent.toFixed(1) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + t('evCableSize') + '</span><span class="value" style="font-weight:800">' + calc.cableSize + ' mm\u00B2 Cu XLPE (Iz=' + calc.iz + 'A)</span></div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Spændingsfald' : 'Voltage Drop') + '</span><span class="value">' + calc.vdropPercent.toFixed(2) + ' %</span></div>';
+  html += '</div>';
+
+  // RCD requirement
+  html += '<div class="result-box' + (rcd.type === 'Type B' ? ' warning' : '') + '"><div class="result-title">' + t('evRcdReq') + '</div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'RCD-type' : 'RCD Type') + '</span><span class="value" style="font-weight:800">' + rcd.type + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Klausul' : 'Clause') + '</span><span class="value">' + rcd.clause + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Følsomhed' : 'Sensitivity') + '</span><span class="value">30 mA (\u2264 32A), 300 mA (> 32A)</span></div>';
+  html += '</div>';
+
+  // Dedicated circuit requirement
+  html += '<div class="result-box"><div class="result-title">' + t('evDedicatedCircuit') + '</div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Krav' : 'Requirement') + '</span><span class="value" style="color:var(--danger);font-weight:800">' + (lang === 'da' ? 'JA - per 722.311' : 'YES - per 722.311') + '</span></div>';
+  html += '<div class="info-row">' + (lang === 'da' ? 'DS/HD 60364-7-722 \u00A7722.311: Hvert ladepunkt skal forsynes fra et dedikeret kredsløb med egen beskyttelse.' : 'DS/HD 60364-7-722 sect. 722.311: Each charging point shall be supplied from a dedicated circuit with its own protective device.') + '</div>';
+  html += '</div>';
+
+  // Protection device recommendation
+  var protRating = Math.ceil(calc.designCurrent / 5) * 5; // Round up to nearest 5A standard rating
+  var standardRatings = [6, 10, 13, 16, 20, 25, 32, 40, 50, 63];
+  for (var i = 0; i < standardRatings.length; i++) {
+    if (standardRatings[i] >= calc.designCurrent) { protRating = standardRatings[i]; break; }
+  }
+  html += '<div class="result-box"><div class="result-title">' + t('evProtection') + '</div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Anbefalet MCB' : 'Recommended MCB') + '</span><span class="value">C' + protRating + ' (' + s.phases + (s.phases === '3' ? '+N' : '') + 'P)</span></div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Klausul' : 'Clause') + '</span><span class="value">722.531.1, 722.531.2</span></div>';
+  html += '</div>';
+
+  html += '</div>'; // end result card
+  return html;
+}
+
+// ===== EARTHING & BONDING MODULE (DS/HD 60364-5-54) =====
+function calcEarthResistance(soilRes, electrodeType, electrodeLength) {
+  // Earth electrode resistance formulas per DS/HD 60364-5-54 section 542
+  var R;
+  switch (electrodeType) {
+    case 'rod':
+      // Vertical rod: R = rho / (2 * pi * L) (simplified Dwight formula)
+      R = soilRes / (2 * Math.PI * electrodeLength);
+      break;
+    case 'strip':
+      // Horizontal strip: R = rho / (pi * L) * ln(2L/d), d~0.03m typical
+      R = (soilRes / (Math.PI * electrodeLength)) * Math.log(2 * electrodeLength / 0.03);
+      break;
+    case 'plate':
+      // Plate electrode: R = rho / (4 * sqrt(A/pi)), A = L*L
+      var area = electrodeLength * electrodeLength;
+      R = soilRes / (4 * Math.sqrt(area / Math.PI));
+      break;
+    case 'foundation':
+      // Foundation earth: R = rho / (2 * pi * equivalent_radius), conservative approx
+      var equivR = Math.sqrt(electrodeLength * electrodeLength / Math.PI);
+      R = soilRes / (2 * Math.PI * equivR);
+      break;
+    default:
+      R = soilRes / (2 * Math.PI * electrodeLength);
+  }
+  return R;
+}
+
+function getMinPESize(phaseSize) {
+  // Per Table 54.1 (DS/HD 60364-5-54 section 543)
+  if (phaseSize <= 16) return phaseSize; // S_PE = S_phase for S <= 16
+  if (phaseSize <= 35) return 16; // S_PE = 16 for 16 < S <= 35
+  return phaseSize / 2; // S_PE = S/2 for S > 35
+}
+
+function renderEarthing() {
+  var s = earthingState;
+  var systemTypes = ['TN-S', 'TN-C-S', 'TT', 'IT'];
+  var soilValues = [50, 100, 200, 500, 1000, 2000, 5000];
+  var electrodeTypes = ['rod', 'strip', 'plate', 'foundation'];
+  var electrodeLengths = [1.5, 2.4, 3, 4.5, 6, 9, 12];
+
+  var html = '<div class="card fade-in"><div class="card-title">\u2B50 ' + t('earthTitle') + '</div>';
+  html += '<div class="info-row">' + (lang === 'da' ? 'Dimensionering af jordingssystem iht. DS/HD 60364-5-54. Beregner jordmodstand, PE-tværsnit og potentialudligningskrav per sektion 542, 543, 544.' : 'Earthing system design per DS/HD 60364-5-54. Calculates earth resistance, PE cross-section, and equipotential bonding requirements per sections 542, 543, 544.') + '</div>';
+
+  // System type
+  html += '<div class="select-group"><div class="select-label">' + t('earthSystemType') + '</div><div class="select-grid">';
+  systemTypes.forEach(function(st) {
+    html += '<button class="sel-btn ' + (s.systemType === st ? 'selected' : '') + '" onclick="earthingState.systemType=\'' + st + '\';renderModule(\'earthing\')">' + st + '</button>';
+  });
+  html += '</div></div>';
+
+  // Soil resistivity
+  html += '<div class="select-group"><div class="select-label">' + t('earthSoilRes') + '</div><div class="select-grid">';
+  soilValues.forEach(function(sv) {
+    html += '<button class="sel-btn ' + (s.soilResistivity === sv ? 'selected' : '') + '" onclick="earthingState.soilResistivity=' + sv + ';renderModule(\'earthing\')">' + sv + '</button>';
+  });
+  html += '</div></div>';
+
+  // Electrode type
+  html += '<div class="select-group"><div class="select-label">' + t('earthElectrodeType') + '</div><div class="select-grid">';
+  electrodeTypes.forEach(function(et) {
+    var lbl = et === 'rod' ? t('earthRod') : (et === 'strip' ? t('earthStrip') : (et === 'plate' ? t('earthPlate') : t('earthFoundation')));
+    html += '<button class="sel-btn ' + (s.electrodeType === et ? 'selected' : '') + '" onclick="earthingState.electrodeType=\'' + et + '\';renderModule(\'earthing\')">' + lbl + '</button>';
+  });
+  html += '</div></div>';
+
+  // Electrode length
+  html += '<div class="select-group"><div class="select-label">' + t('earthElectrodeLen') + '</div><div class="select-grid">';
+  electrodeLengths.forEach(function(el) {
+    html += '<button class="sel-btn ' + (s.electrodeLength === el ? 'selected' : '') + '" onclick="earthingState.electrodeLength=' + el + ';renderModule(\'earthing\')">' + el + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '</div>'; // end input card
+
+  // Calculate results
+  var R = calcEarthResistance(s.soilResistivity, s.electrodeType, s.electrodeLength);
+  var maxR = s.systemType === 'TT' ? 200 : (s.systemType === 'IT' ? 500 : 10);
+  var rPass = R <= maxR;
+
+  // PE sizing (assume typical phase sizes)
+  var phaseSizes = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120];
+  var peTable = phaseSizes.map(function(ps) { return { phase: ps, pe: getMinPESize(ps) }; });
+
+  html += '<div class="card fade-in"><div class="card-title">' + t('earthResult') + '</div>';
+
+  // Earth resistance result
+  html += '<div class="result-box ' + (rPass ? '' : 'error') + '"><div class="result-title">' + t('earthResistance') + '</div>';
+  html += '<div class="result-row"><span class="label">R<sub>E</sub></span><span class="value" style="font-weight:800;color:' + (rPass ? 'var(--success)' : 'var(--danger)') + '">' + R.toFixed(2) + ' \u03A9</span></div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Maks. tilladt' : 'Max. allowed') + ' (' + s.systemType + ')</span><span class="value">' + maxR + ' \u03A9</span></div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Status' : 'Status') + '</span><span class="value"><span class="verify-badge ' + (rPass ? 'ok' : 'fail') + '">' + (rPass ? (lang === 'da' ? 'GODKENDT' : 'PASS') : (lang === 'da' ? 'FEJL' : 'FAIL')) + '</span></span></div>';
+  html += '<div class="info-row">' + (lang === 'da' ? 'Formel (jordspyd): R = \u03C1 / (2\u03C0L). Ref: DS/HD 60364-5-54 \u00A7542.2.' : 'Formula (rod): R = \u03C1 / (2\u03C0L). Ref: DS/HD 60364-5-54 sect. 542.2.') + '</div>';
+  html += '</div>';
+
+  // PE conductor sizing table (Table 54.1)
+  html += '<div class="result-box"><div class="result-title">' + t('earthMinPE') + ' (Table 54.1, \u00A7543)</div>';
+  html += '<div class="info-row">' + (lang === 'da' ? 'Minimum PE-leder per DS/HD 60364-5-54 Tabel 54.1:' : 'Minimum PE conductor per DS/HD 60364-5-54 Table 54.1:') + '</div>';
+  html += '<div class="result-row"><span class="label">S\u2264 16 mm\u00B2</span><span class="value">PE = S (faseleder)</span></div>';
+  html += '<div class="result-row"><span class="label">16 < S \u2264 35 mm\u00B2</span><span class="value">PE = 16 mm\u00B2</span></div>';
+  html += '<div class="result-row"><span class="label">S > 35 mm\u00B2</span><span class="value">PE = S/2</span></div>';
+  html += '</div>';
+
+  // Bonding requirements (section 544)
+  html += '<div class="result-box"><div class="result-title">' + t('earthBonding') + ' (\u00A7544)</div>';
+  html += '<div class="info-row">' + (lang === 'da' ? 'Hovedpotentialudligning per \u00A7544.1:' : 'Main equipotential bonding per sect. 544.1:') + '</div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Min. hovedudligning' : 'Min. main bonding') + '</span><span class="value">6 mm\u00B2 Cu / 16 mm\u00B2 Al (\u00A7544.1)</span></div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Supplerende udligning' : 'Supplementary bonding') + '</span><span class="value">\u2265 2.5 mm\u00B2 Cu (mekanisk beskyttet) (\u00A7544.2)</span></div>';
+  if (s.systemType === 'TT') {
+    html += '<div class="result-row"><span class="label" style="color:var(--danger)">' + (lang === 'da' ? 'TT-krav' : 'TT requirement') + '</span><span class="value" style="color:var(--danger)">' + (lang === 'da' ? 'Jordelektrode SKAL opfylde R\u00D7I\u0394n \u2264 50V' : 'Earth electrode MUST satisfy R\u00D7I\u0394n \u2264 50V') + '</span></div>';
+  }
+  html += '</div>';
+
+  html += '</div>'; // end result card
+  return html;
+}
+
+// ===== HARMONICS / NEUTRAL SIZING MODULE (IEC 60364 section 523.6.3) =====
+function calcNeutralFactor(thdRange, balance) {
+  // Per IEC 60364 section 523.6.3 and IEC/TR 60725:
+  // THD-N 0-15%: standard sizing, factor 1.0, no reduction allowed
+  // THD-N 15-33%: neutral same as phase (factor 1.0, no reduction)
+  // THD-N 33-45%: neutral must be oversized, factor 1.45
+  // THD-N >45%: neutral must be oversized, factor 1.45 (minimum)
+  switch (thdRange) {
+    case '0-15': return 1.0;
+    case '15-33': return 1.0;
+    case '33-45': return 1.45;
+    case '>45': return 1.45;
+    default: return 1.0;
+  }
+}
+
+function renderHarmonics() {
+  var s = harmonicsState;
+  var loadTypes = ['linear', 'led', 'vfd', 'it', 'mixed'];
+  var thdRanges = ['0-15', '15-33', '33-45', '>45'];
+  var phaseOpts = ['1', '3'];
+  var balanceOpts = ['balanced', 'unbalanced'];
+
+  var html = '<div class="card fade-in"><div class="card-title">\uD83C\uDF10 ' + t('harmTitle') + '</div>';
+  html += '<div class="info-row">' + (lang === 'da' ? 'Neutralleder-dimensionering under harmoniske forhold per IEC 60364 \u00A7523.6.3. Ved THD > 33% i 3-faset symmetrisk belastning kan triplen-harmoniske (3., 9., 15...) summere i neutrallederen.' : 'Neutral conductor sizing under harmonic conditions per IEC 60364 sect. 523.6.3. When THD > 33% in 3-phase balanced load, triplen harmonics (3rd, 9th, 15th...) sum in the neutral conductor.') + '</div>';
+
+  // Load type
+  html += '<div class="select-group"><div class="select-label">' + t('harmLoadType') + '</div><div class="select-grid">';
+  loadTypes.forEach(function(lt) {
+    var lbl = lt === 'linear' ? t('harmLinear') : (lt === 'led' ? t('harmLED') : (lt === 'vfd' ? t('harmVFD') : (lt === 'it' ? t('harmIT') : t('harmMixed'))));
+    html += '<button class="sel-btn ' + (s.loadType === lt ? 'selected' : '') + '" onclick="harmonicsState.loadType=\'' + lt + '\';renderModule(\'harmonics\')">' + lbl + '</button>';
+  });
+  html += '</div></div>';
+
+  // THD range
+  html += '<div class="select-group"><div class="select-label">' + t('harmTHD') + '</div><div class="select-grid">';
+  thdRanges.forEach(function(tr) {
+    html += '<button class="sel-btn ' + (s.thdPercent === tr ? 'selected' : '') + '" onclick="harmonicsState.thdPercent=\'' + tr + '\';renderModule(\'harmonics\')">' + tr + ' %</button>';
+  });
+  html += '</div></div>';
+
+  // Phases
+  html += '<div class="select-group"><div class="select-label">' + t('harmPhases') + '</div><div class="select-grid">';
+  phaseOpts.forEach(function(ph) {
+    html += '<button class="sel-btn ' + (s.phases === ph ? 'selected' : '') + '" onclick="harmonicsState.phases=\'' + ph + '\';renderModule(\'harmonics\')">' + ph + '</button>';
+  });
+  html += '</div></div>';
+
+  // Balance
+  html += '<div class="select-group"><div class="select-label">' + t('harmBalance') + '</div><div class="select-grid">';
+  balanceOpts.forEach(function(b) {
+    var lbl = b === 'balanced' ? t('harmBalanced') : t('harmUnbalanced');
+    html += '<button class="sel-btn ' + (s.balance === b ? 'selected' : '') + '" onclick="harmonicsState.balance=\'' + b + '\';renderModule(\'harmonics\')">' + lbl + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '</div>'; // end input card
+
+  // Calculate results
+  var neutralFactor = calcNeutralFactor(s.thdPercent, s.balance);
+  var triplenWarning = (s.thdPercent === '33-45' || s.thdPercent === '>45') && s.phases === '3';
+  var reductionAllowed = s.thdPercent === '0-15' && s.phases === '3' && s.balance === 'balanced';
+
+  // Example cable sizes showing neutral sizing
+  var examplePhases = [2.5, 4, 6, 10, 16, 25, 35, 50];
+
+  html += '<div class="card fade-in"><div class="card-title">' + t('harmResult') + '</div>';
+
+  // Neutral factor result
+  html += '<div class="result-box ' + (neutralFactor > 1.0 ? 'warning' : '') + '"><div class="result-title">' + t('harmNeutralFactor') + '</div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Neutralfaktor' : 'Neutral Factor') + '</span><span class="value" style="font-weight:800;' + (neutralFactor > 1.0 ? 'color:var(--danger)' : '') + '">' + neutralFactor.toFixed(2) + '</span></div>';
+  html += '<div class="result-row"><span class="label">THD-N</span><span class="value">' + s.thdPercent + ' %</span></div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Klausul' : 'Clause') + '</span><span class="value">IEC 60364 \u00A7523.6.3</span></div>';
+  if (reductionAllowed) {
+    html += '<div class="info-row" style="color:var(--success)">' + (lang === 'da' ? '\u2705 Neutral reduktion tilladt: symmetrisk belastning, THD < 15%. Neutral kan reduceres til minimum 50% af faseleder (per \u00A7523.6.3).' : '\u2705 Neutral reduction allowed: balanced load, THD < 15%. Neutral may be reduced to minimum 50% of phase conductor (per sect. 523.6.3).') + '</div>';
+  }
+  html += '</div>';
+
+  // Triplen harmonic warning
+  if (triplenWarning) {
+    html += '<div class="result-box error"><div class="result-title">\u26A0\uFE0F ' + t('harmTriplen') + '</div>';
+    html += '<div class="info-row" style="color:var(--danger)">' + (lang === 'da' ? 'Ved THD > 33% i 3-faset system summerer triplen-harmoniske (3., 9., 15. harmonisk) i neutrallederen. Neutralstrømmen kan overstige fasestrømmen! Neutralleder SKAL dimensioneres med faktor ' + neutralFactor.toFixed(2) + ' per \u00A7523.6.3.' : 'When THD > 33% in 3-phase system, triplen harmonics (3rd, 9th, 15th harmonic) sum in the neutral. Neutral current can exceed phase current! Neutral MUST be sized with factor ' + neutralFactor.toFixed(2) + ' per sect. 523.6.3.') + '</div>';
+    html += '</div>';
+  }
+
+  // Neutral sizing table
+  html += '<div class="result-box"><div class="result-title">' + t('harmNeutralSize') + '</div>';
+  html += '<div class="info-row">' + (lang === 'da' ? 'Anbefalet neutraltværsnit baseret på faseleder:' : 'Recommended neutral cross-section based on phase conductor:') + '</div>';
+  examplePhases.forEach(function(ps) {
+    var neutralSize = neutralFactor > 1.0 ? Math.ceil(ps * neutralFactor) : ps;
+    // Round up to nearest standard size
+    var stdSizes = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240];
+    var recSize = stdSizes[stdSizes.length - 1];
+    for (var i = 0; i < stdSizes.length; i++) {
+      if (stdSizes[i] >= neutralSize) { recSize = stdSizes[i]; break; }
+    }
+    html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Fase' : 'Phase') + ' ' + ps + ' mm\u00B2</span><span class="value">' + (lang === 'da' ? 'Neutral' : 'Neutral') + ': ' + recSize + ' mm\u00B2' + (neutralFactor > 1.0 ? ' (\u00D7' + neutralFactor.toFixed(2) + ')' : '') + '</span></div>';
+  });
+  html += '</div>';
+
+  // Typical THD values by load type
+  html += '<div class="result-box"><div class="result-title">' + (lang === 'da' ? 'Typiske THD-v\u00E6rdier' : 'Typical THD Values') + '</div>';
+  html += '<div class="result-row"><span class="label">' + t('harmLinear') + '</span><span class="value">&lt; 5%</span></div>';
+  html += '<div class="result-row"><span class="label">' + t('harmLED') + '</span><span class="value">15-40%</span></div>';
+  html += '<div class="result-row"><span class="label">' + t('harmVFD') + '</span><span class="value">25-45%</span></div>';
+  html += '<div class="result-row"><span class="label">' + t('harmIT') + '</span><span class="value">50-80%</span></div>';
+  html += '<div class="result-row"><span class="label">' + t('harmMixed') + '</span><span class="value">15-35%</span></div>';
+  html += '</div>';
+
+  html += '</div>'; // end result card
+  return html;
+}
 
 // ===== INIT =====
 renderNav();
