@@ -632,7 +632,10 @@ const T = {
       commission: 'Idriftsættelse',
       ev: 'EV-lader',
       earthing: 'Jording',
-      harmonics: 'Harmonik'
+      harmonics: 'Harmonik',
+      motor: 'Motorstarter',
+      tray: 'Kabelbakke',
+      meter: 'Energim\u00e5ler'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -833,7 +836,56 @@ const T = {
     harmNeutralFactor: 'Neutralfaktor',
     harmNeutralSize: 'Anbefalet neutraltværsnit',
     harmTriplen: 'Advarsel: Triplen-harmoniske',
-    harmResult: 'Harmonikresultat'
+    harmResult: 'Harmonikresultat',
+    // Motor Starter module (IEC 60947-4-1)
+    motorTitle: 'Motorstarter konfiguration (IEC 60947-4-1)',
+    motorPower: 'Motoreffekt [kW]',
+    motorVoltage: 'Sp\u00e6nding',
+    motorStartType: 'Startmetode',
+    motorDOL: 'Direkte start (DOL)',
+    motorStarDelta: 'Stjerne/trekant',
+    motorSoft: 'Softstarter',
+    motorVFD: 'Frekvensomformer (VFD)',
+    motorCoordType: 'Koordinationstype',
+    motorType1: 'Type 1 (udskiftning tilladt)',
+    motorType2: 'Type 2 (ingen skade)',
+    motorFLC: 'Fuld belastningsstr\u00f8m (FLC)',
+    motorContactor: 'Kontaktor st\u00f8rrelse',
+    motorOverload: 'Overbelastningsrel\u00e6',
+    motorSCPD: 'Kortslutningsbeskyttelse',
+    motorResult: 'Motorstarter resultat',
+    motorAssembly: 'Komplet startersamling',
+    // Cable Tray module
+    trayTitle: 'Kabelbakke fyldningsberegning',
+    trayType: 'Bakketype',
+    trayLadder: 'Stigebakke',
+    trayPerforated: 'Perforeret bakke',
+    traySolid: 'Lukket bakke',
+    trayWidth: 'Bakkebredde [mm]',
+    trayDepth: 'Bakkedybde [mm]',
+    trayCableOD: 'Tilf\u00f8j kabel (ydre diameter)',
+    trayFillPct: 'Fyldningsprocent',
+    trayLimit: 'Fyldningsgr\u00e6nse',
+    trayRemaining: 'Restkapacitet',
+    trayResult: 'Kabelbakke resultat',
+    trayPass: 'OK - Inden for gr\u00e6nse',
+    trayFail: 'OVERFYLDT',
+    trayClear: 'Nulstil kabler',
+    trayCableCount: 'Antal kabler',
+    // Energy Meter/CT module (EN 50470 + MID)
+    meterTitle: 'Energim\u00e5ler/CT dimensionering (EN 50470 + MID 2014/32/EU)',
+    meterConnType: 'Tilslutningstype',
+    meterDirect: 'Direkte m\u00e5ling',
+    meterCT: 'CT-tilsluttet',
+    meterVoltage: 'Systemsp\u00e6nding',
+    meterMaxCurrent: 'Maks. belastningsstr\u00f8m [A]',
+    meterCTRatio: 'CT-forhold',
+    meterAccuracy: 'N\u00f8jagtighedsklasse (EN 50470-3)',
+    meterMIDClass: 'MID-klasse (2014/32/EU)',
+    meterBurden: 'CT byrde',
+    meterResult: 'M\u00e5lerresultat',
+    meterRecCT: 'Anbefalet CT-forhold',
+    meterRecMeter: 'Anbefalet m\u00e5ler'
   },
   en: {
     appTitle: 'Electrical Dimensioning',
@@ -860,7 +912,10 @@ const T = {
       commission: 'Commissioning',
       ev: 'EV Charger',
       earthing: 'Earthing',
-      harmonics: 'Harmonics'
+      harmonics: 'Harmonics',
+      motor: 'Motor Starter',
+      tray: 'Cable Tray',
+      meter: 'Energy Meter'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -1053,7 +1108,56 @@ const T = {
     harmNeutralFactor: 'Neutral Factor',
     harmNeutralSize: 'Recommended Neutral Size',
     harmTriplen: 'Warning: Triplen Harmonics',
-    harmResult: 'Harmonics Result'
+    harmResult: 'Harmonics Result',
+    // Motor Starter module (IEC 60947-4-1)
+    motorTitle: 'Motor Starter Configuration (IEC 60947-4-1)',
+    motorPower: 'Motor Power [kW]',
+    motorVoltage: 'Voltage',
+    motorStartType: 'Start Method',
+    motorDOL: 'Direct On-Line (DOL)',
+    motorStarDelta: 'Star-Delta',
+    motorSoft: 'Soft Starter',
+    motorVFD: 'Variable Frequency Drive (VFD)',
+    motorCoordType: 'Coordination Type',
+    motorType1: 'Type 1 (replacement allowed)',
+    motorType2: 'Type 2 (no damage)',
+    motorFLC: 'Full Load Current (FLC)',
+    motorContactor: 'Contactor Size',
+    motorOverload: 'Overload Relay',
+    motorSCPD: 'Short-Circuit Protection',
+    motorResult: 'Motor Starter Result',
+    motorAssembly: 'Complete Starter Assembly',
+    // Cable Tray module
+    trayTitle: 'Cable Tray Fill Calculation',
+    trayType: 'Tray Type',
+    trayLadder: 'Ladder Tray',
+    trayPerforated: 'Perforated Tray',
+    traySolid: 'Solid Bottom Tray',
+    trayWidth: 'Tray Width [mm]',
+    trayDepth: 'Tray Depth [mm]',
+    trayCableOD: 'Add Cable (outer diameter)',
+    trayFillPct: 'Fill Percentage',
+    trayLimit: 'Fill Limit',
+    trayRemaining: 'Remaining Capacity',
+    trayResult: 'Cable Tray Result',
+    trayPass: 'OK - Within limit',
+    trayFail: 'OVERFILLED',
+    trayClear: 'Clear Cables',
+    trayCableCount: 'Cable Count',
+    // Energy Meter/CT module (EN 50470 + MID)
+    meterTitle: 'Energy Meter/CT Sizing (EN 50470 + MID 2014/32/EU)',
+    meterConnType: 'Connection Type',
+    meterDirect: 'Direct Measurement',
+    meterCT: 'CT Connected',
+    meterVoltage: 'System Voltage',
+    meterMaxCurrent: 'Max. Load Current [A]',
+    meterCTRatio: 'CT Ratio',
+    meterAccuracy: 'Accuracy Class (EN 50470-3)',
+    meterMIDClass: 'MID Class (2014/32/EU)',
+    meterBurden: 'CT Burden',
+    meterResult: 'Meter Result',
+    meterRecCT: 'Recommended CT Ratio',
+    meterRecMeter: 'Recommended Meter'
   }
 };
 
@@ -3028,6 +3132,9 @@ let evState = { chargerType: '7.4', phases: '1', cableLength: 10, earthSystem: '
 let earthingState = { systemType: 'TN-S', soilResistivity: 100, electrodeType: 'rod', electrodeLength: 2.4 };
 // Harmonics / Neutral Sizing module state (section 523.6.3)
 let harmonicsState = { loadType: 'linear', thdPercent: '0-15', phases: '3', balance: 'balanced' };
+let motorState = { motorPower: 11, voltage: '400', startType: 'DOL', coordType: '2' };
+let trayState = { trayType: 'ladder', trayWidth: 300, trayDepth: 100, cables: [] };
+let meterState = { connType: 'CT', voltage: '400', maxCurrent: 200, ctRatio: '250/5', accuracy: '1.0', midClass: 'B' };
 // Standards state
 let rcdSelected = null;
 let rcdSensitivity = null;
@@ -3159,6 +3266,9 @@ function renderModule(mod) {
     case 'ev': content = renderEV(); break;
     case 'earthing': content = renderEarthing(); break;
     case 'harmonics': content = renderHarmonics(); break;
+    case 'motor': content = renderMotor(); break;
+    case 'tray': content = renderTray(); break;
+    case 'meter': content = renderMeter(); break;
   }
   // Append AI assistant to every module
   content += renderAiAssistant(mod);
@@ -6655,6 +6765,62 @@ function runSelfTests() {
     T.push({ name: 'Harmonics 523.6.3: neutral factor 1.45 for THD >45%', exp: '1.45', act: f.toFixed(2), pass: Math.abs(f - 1.45) < 0.001 });
   })();
 
+  // ===== MOTOR STARTER MODULE TESTS (IEC 60947-4-1) =====
+  // Test: FLC calculation for 11kW 400V 3-phase
+  (function() {
+    var flc = calcMotorFLC(11, '400', '3');
+    // FLC = 11000 / (sqrt(3) * 400 * 0.85 * 0.88) = ~21.2A (conservative)
+    var expected = 11000 / (Math.sqrt(3) * 400 * 0.85 * 0.88);
+    T.push({ name: 'Motor IEC 60947-4-1: FLC 11kW 400V 3ph', exp: expected.toFixed(1)+' A', act: flc.toFixed(1)+' A', pass: Math.abs(flc - expected) < 0.1 });
+  })();
+  // Test: Contactor sizing - next size above FLC
+  (function() {
+    var flc = calcMotorFLC(11, '400', '3');
+    var contactor = getNextContactorSize(flc);
+    T.push({ name: 'Motor IEC 60947-4-1: contactor >= FLC', exp: '>=' + flc.toFixed(1), act: String(contactor) + ' A', pass: contactor >= flc });
+  })();
+  // Test: DOL starting multiple = 8x
+  (function() {
+    var scpd = getMotorSCPD(20, 'DOL', '2');
+    T.push({ name: 'Motor IEC 60947-4-1: DOL start multiple 8x', exp: '8', act: String(scpd.startMult), pass: scpd.startMult === 8 });
+  })();
+
+  // ===== CABLE TRAY MODULE TESTS (NEMA VE-2 / IEC 61537) =====
+  // Test: 3 cables of 20mm OD in 300x100mm ladder tray fill calculation
+  (function() {
+    var calc = calcTrayFill('ladder', 300, 100, [20, 20, 20]);
+    var expectedArea = 3 * Math.PI * 10 * 10; // 3 * pi * r^2 = 942.48 mm^2
+    var expectedFill = (expectedArea / (300 * 100)) * 100; // ~3.14%
+    T.push({ name: 'Tray: 3x20mm in 300x100 ladder fill%', exp: expectedFill.toFixed(1)+'%', act: calc.fillPct.toFixed(1)+'%', pass: Math.abs(calc.fillPct - expectedFill) < 0.1 });
+  })();
+  // Test: Solid tray fill limit is 40%
+  (function() {
+    var calc = calcTrayFill('solid', 300, 100, []);
+    T.push({ name: 'Tray: solid tray limit 40%', exp: '40', act: calc.fillLimit.toFixed(0), pass: calc.fillLimit === 40 });
+  })();
+  // Test: Ladder tray fill limit is 50%
+  (function() {
+    var calc = calcTrayFill('ladder', 300, 100, []);
+    T.push({ name: 'Tray: ladder tray limit 50%', exp: '50', act: calc.fillLimit.toFixed(0), pass: calc.fillLimit === 50 });
+  })();
+
+  // ===== ENERGY METER/CT MODULE TESTS (EN 50470 + MID) =====
+  // Test: 200A load requires minimum 250/5 CT ratio (1.2 x 200 = 240A)
+  (function() {
+    var ct = calcCTSizing(200);
+    T.push({ name: 'Meter EN 50470: 200A load -> CT 250/5', exp: '250/5', act: ct.recommended.label, pass: ct.recommended.label === '250/5' });
+  })();
+  // Test: 500A load requires minimum 600/5 CT ratio (1.2 x 500 = 600A)
+  (function() {
+    var ct = calcCTSizing(500);
+    T.push({ name: 'Meter EN 50470: 500A load -> CT 600/5', exp: '600/5', act: ct.recommended.label, pass: ct.recommended.label === '600/5' });
+  })();
+  // Test: 50A load requires minimum 75/5 CT ratio (1.2 x 50 = 60A)
+  (function() {
+    var ct = calcCTSizing(50);
+    T.push({ name: 'Meter EN 50470: 50A load -> CT 75/5', exp: '75/5', act: ct.recommended.label, pass: ct.recommended.label === '75/5' });
+  })();
+
   return T;
 }
 
@@ -8484,6 +8650,372 @@ function renderHarmonics() {
   html += '<div class="result-row"><span class="label">' + t('harmVFD') + '</span><span class="value">25-45%</span></div>';
   html += '<div class="result-row"><span class="label">' + t('harmIT') + '</span><span class="value">50-80%</span></div>';
   html += '<div class="result-row"><span class="label">' + t('harmMixed') + '</span><span class="value">15-35%</span></div>';
+  html += '</div>';
+
+  html += '</div>'; // end result card
+  return html;
+}
+
+// ===== MOTOR STARTER MODULE (IEC 60947-4-1) =====
+function calcMotorFLC(powerKW, voltage, phases) {
+  // FLC = P / (sqrt(3) * U * cos_phi * eta)
+  // Conservative: cos_phi=0.85, eta=0.88 for standard induction motors
+  var cosPhi = 0.85;
+  var eta = 0.88;
+  if (phases === '1') {
+    return (powerKW * 1000) / (parseFloat(voltage) * cosPhi * eta);
+  }
+  return (powerKW * 1000) / (Math.sqrt(3) * parseFloat(voltage) * cosPhi * eta);
+}
+
+function getNextContactorSize(flc) {
+  // Standard contactor sizes per IEC 60947-4-1
+  var sizes = [9, 12, 16, 18, 25, 32, 40, 50, 65, 80, 95, 115, 150, 185, 225, 265, 330, 400, 500, 630];
+  for (var i = 0; i < sizes.length; i++) {
+    if (sizes[i] >= flc) return sizes[i];
+  }
+  return sizes[sizes.length - 1];
+}
+
+function getMotorSCPD(flc, startType, coordType) {
+  // Short-circuit protection sizing per IEC 60947-4-1
+  // Type 2 coordination requires MPCB or fuse rated for motor starting
+  var startingMultiple = 1;
+  switch(startType) {
+    case 'DOL': startingMultiple = 8; break;
+    case 'Star-Delta': startingMultiple = 2.7; break;
+    case 'Soft': startingMultiple = 4; break;
+    case 'VFD': startingMultiple = 1.5; break;
+  }
+  var scpdRating = Math.ceil(flc * 1.3); // Minimum 1.3x FLC for cable protection
+  var fuseRating = Math.ceil(flc * startingMultiple * 0.8); // Fuse must withstand starting current
+  // Standard fuse sizes
+  var fuseSizes = [2, 4, 6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630];
+  var selectedFuse = fuseSizes[fuseSizes.length - 1];
+  for (var i = 0; i < fuseSizes.length; i++) {
+    if (fuseSizes[i] >= fuseRating) { selectedFuse = fuseSizes[i]; break; }
+  }
+  return { rating: scpdRating, fuseSize: selectedFuse, startMult: startingMultiple, type: coordType === '2' ? 'MPCB' : 'gG Fuse + Contactor' };
+}
+
+function renderMotor() {
+  var s = motorState;
+  var powers = [0.37, 0.55, 0.75, 1.1, 1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110, 132, 160, 200, 250, 315];
+  var voltages = ['230', '400', '690'];
+  var startTypes = ['DOL', 'Star-Delta', 'Soft', 'VFD'];
+  var coordTypes = ['1', '2'];
+
+  var html = '<div class="card fade-in"><div class="card-title">\u2699\uFE0F ' + t('motorTitle') + '</div>';
+  html += '<div class="info-row">' + (lang === 'da' ? 'Motorstarter konfiguration iht. IEC 60947-4-1. V\u00e6lg motoreffekt, sp\u00e6nding, startmetode og koordinationstype for at f\u00e5 komplet startersamling.' : 'Motor starter configuration per IEC 60947-4-1. Select motor power, voltage, start method and coordination type to get complete starter assembly.') + '</div>';
+
+  // Motor power
+  html += '<div class="select-group"><div class="select-label">' + t('motorPower') + '</div><div class="select-grid">';
+  powers.forEach(function(p) {
+    html += '<button class="sel-btn ' + (s.motorPower === p ? 'selected' : '') + '" onclick="motorState.motorPower=' + p + ';renderModule(\'motor\')">' + p + '</button>';
+  });
+  html += '</div></div>';
+
+  // Voltage
+  html += '<div class="select-group"><div class="select-label">' + t('motorVoltage') + '</div><div class="select-grid">';
+  voltages.forEach(function(v) {
+    html += '<button class="sel-btn ' + (s.voltage === v ? 'selected' : '') + '" onclick="motorState.voltage=\'' + v + '\';renderModule(\'motor\')">' + v + ' V</button>';
+  });
+  html += '</div></div>';
+
+  // Start type
+  html += '<div class="select-group"><div class="select-label">' + t('motorStartType') + '</div><div class="select-grid">';
+  startTypes.forEach(function(st) {
+    var lbl = st === 'DOL' ? t('motorDOL') : (st === 'Star-Delta' ? t('motorStarDelta') : (st === 'Soft' ? t('motorSoft') : t('motorVFD')));
+    html += '<button class="sel-btn ' + (s.startType === st ? 'selected' : '') + '" onclick="motorState.startType=\'' + st + '\';renderModule(\'motor\')">' + lbl + '</button>';
+  });
+  html += '</div></div>';
+
+  // Coordination type
+  html += '<div class="select-group"><div class="select-label">' + t('motorCoordType') + '</div><div class="select-grid">';
+  coordTypes.forEach(function(ct) {
+    var lbl = ct === '1' ? t('motorType1') : t('motorType2');
+    html += '<button class="sel-btn ' + (s.coordType === ct ? 'selected' : '') + '" onclick="motorState.coordType=\'' + ct + '\';renderModule(\'motor\')">' + lbl + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '</div>'; // end input card
+
+  // Results
+  var flc = calcMotorFLC(s.motorPower, s.voltage, '3');
+  var contactorSize = getNextContactorSize(flc);
+  var overloadMin = flc * 1.0;
+  var overloadMax = flc * 1.15;
+  var scpd = getMotorSCPD(flc, s.startType, s.coordType);
+
+  html += '<div class="card fade-in"><div class="card-title">' + t('motorResult') + '</div>';
+  html += '<div class="result-box"><div class="result-title">' + t('motorAssembly') + '</div>';
+  html += '<div class="result-row"><span class="label">' + t('motorFLC') + '</span><span class="value" style="font-weight:800">' + flc.toFixed(1) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + t('motorContactor') + '</span><span class="value">' + contactorSize + ' A (AC-3)</span></div>';
+  html += '<div class="result-row"><span class="label">' + t('motorOverload') + '</span><span class="value">' + overloadMin.toFixed(1) + ' - ' + overloadMax.toFixed(1) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + t('motorSCPD') + '</span><span class="value">' + scpd.type + ' ' + scpd.fuseSize + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + t('motorStartType') + '</span><span class="value">' + s.startType + ' (' + (lang === 'da' ? 'startstr\u00f8m' : 'starting current') + ' ' + scpd.startMult + '\u00D7 FLC)</span></div>';
+  html += '<div class="result-row"><span class="label">' + t('motorCoordType') + '</span><span class="value">' + (lang === 'da' ? 'Type ' : 'Type ') + s.coordType + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Standard' : 'Standard') + '</span><span class="value">IEC 60947-4-1</span></div>';
+  html += '</div>';
+
+  // Info about coordination types
+  html += '<div class="info-row">' + (lang === 'da' ? '<b>Type 1 koordination (IEC 60947-4-1 \u00A714.3.1):</b> Ved kortslutning kan kontaktor/overbelastningsrel\u00e6 v\u00e6re beskadiget og kr\u00e6ve udskiftning. Billigere l\u00f8sning.' : '<b>Type 1 coordination (IEC 60947-4-1 sect. 14.3.1):</b> Upon short-circuit, contactor/overload relay may be damaged and require replacement. Less expensive solution.') + '</div>';
+  html += '<div class="info-row">' + (lang === 'da' ? '<b>Type 2 koordination (IEC 60947-4-1 \u00A714.3.2):</b> Ved kortslutning m\u00e5 der ikke v\u00e6re skade p\u00e5 kontaktor/overbelastningsrel\u00e6. Kontakter m\u00e5 svejses men skal kunne adskilles. MPCB anbefales.' : '<b>Type 2 coordination (IEC 60947-4-1 sect. 14.3.2):</b> Upon short-circuit, no damage to contactor/overload relay is permitted. Contacts may weld but must be separable. MPCB recommended.') + '</div>';
+
+  html += '</div>'; // end result card
+  return html;
+}
+
+// ===== CABLE TRAY FILL MODULE =====
+function calcTrayFill(trayType, trayWidth, trayDepth, cables) {
+  // Fill factor limits per NEMA VE-2 / IEC 61537 guidance
+  var fillLimit = 0.50; // 50% for ladder and perforated
+  if (trayType === 'solid') fillLimit = 0.40; // 40% for solid bottom
+
+  var usableArea = trayWidth * trayDepth * fillLimit; // mm^2
+  var totalCableArea = 0;
+  cables.forEach(function(od) {
+    totalCableArea += Math.PI * (od / 2) * (od / 2);
+  });
+
+  var fillPct = (trayWidth * trayDepth > 0) ? (totalCableArea / (trayWidth * trayDepth)) * 100 : 0;
+  var remaining = usableArea - totalCableArea;
+
+  return {
+    totalCableArea: totalCableArea,
+    usableArea: usableArea,
+    totalArea: trayWidth * trayDepth,
+    fillPct: fillPct,
+    fillLimit: fillLimit * 100,
+    pass: totalCableArea <= usableArea,
+    remaining: remaining
+  };
+}
+
+function renderTray() {
+  var s = trayState;
+  var trayTypes = ['ladder', 'perforated', 'solid'];
+  var widths = [100, 150, 200, 300, 400, 500, 600];
+  var depths = [50, 60, 75, 100, 125, 150];
+  var cableODs = [8, 10, 12, 14, 16, 18, 20, 22, 25, 28, 30, 32, 35, 38, 40, 45, 50];
+
+  var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDCE6 ' + t('trayTitle') + '</div>';
+  html += '<div class="info-row">' + (lang === 'da' ? 'Beregning af kabelbakkefyldning iht. NEMA VE-2 / IEC 61537. Fyldningsgr\u00e6nse: stigebakke/perforeret 50%, lukket bakke 40%.' : 'Cable tray fill calculation per NEMA VE-2 / IEC 61537 guidance. Fill limits: ladder/perforated 50%, solid bottom 40%.') + '</div>';
+
+  // Tray type
+  html += '<div class="select-group"><div class="select-label">' + t('trayType') + '</div><div class="select-grid">';
+  trayTypes.forEach(function(tt) {
+    var lbl = tt === 'ladder' ? t('trayLadder') : (tt === 'perforated' ? t('trayPerforated') : t('traySolid'));
+    html += '<button class="sel-btn ' + (s.trayType === tt ? 'selected' : '') + '" onclick="trayState.trayType=\'' + tt + '\';renderModule(\'tray\')">' + lbl + '</button>';
+  });
+  html += '</div></div>';
+
+  // Tray width
+  html += '<div class="select-group"><div class="select-label">' + t('trayWidth') + '</div><div class="select-grid">';
+  widths.forEach(function(w) {
+    html += '<button class="sel-btn ' + (s.trayWidth === w ? 'selected' : '') + '" onclick="trayState.trayWidth=' + w + ';renderModule(\'tray\')">' + w + '</button>';
+  });
+  html += '</div></div>';
+
+  // Tray depth
+  html += '<div class="select-group"><div class="select-label">' + t('trayDepth') + '</div><div class="select-grid">';
+  depths.forEach(function(d) {
+    html += '<button class="sel-btn ' + (s.trayDepth === d ? 'selected' : '') + '" onclick="trayState.trayDepth=' + d + ';renderModule(\'tray\')">' + d + '</button>';
+  });
+  html += '</div></div>';
+
+  // Add cable buttons
+  html += '<div class="select-group"><div class="select-label">' + t('trayCableOD') + ' [mm]</div><div class="select-grid">';
+  cableODs.forEach(function(od) {
+    html += '<button class="sel-btn" onclick="trayState.cables.push(' + od + ');renderModule(\'tray\')">' + od + ' mm</button>';
+  });
+  html += '</div></div>';
+
+  // Clear cables button
+  html += '<div class="select-group"><div class="select-grid">';
+  html += '<button class="sel-btn" style="background:var(--danger);color:#fff" onclick="trayState.cables=[];renderModule(\'tray\')">' + t('trayClear') + '</button>';
+  html += '</div></div>';
+
+  html += '</div>'; // end input card
+
+  // Calculate and display results
+  var calc = calcTrayFill(s.trayType, s.trayWidth, s.trayDepth, s.cables);
+
+  html += '<div class="card fade-in"><div class="card-title">' + t('trayResult') + '</div>';
+
+  // Cable summary
+  html += '<div class="result-box"><div class="result-title">' + t('trayCableCount') + ': ' + s.cables.length + '</div>';
+  if (s.cables.length > 0) {
+    // Group cables by size
+    var cableGroups = {};
+    s.cables.forEach(function(od) { cableGroups[od] = (cableGroups[od] || 0) + 1; });
+    Object.keys(cableGroups).sort(function(a,b){return a-b;}).forEach(function(od) {
+      html += '<div class="result-row"><span class="label">OD ' + od + ' mm</span><span class="value">\u00D7 ' + cableGroups[od] + ' (' + (Math.PI * (od/2) * (od/2) * cableGroups[od]).toFixed(0) + ' mm\u00B2)</span></div>';
+    });
+  }
+  html += '</div>';
+
+  // Fill result
+  var fillClass = calc.pass ? '' : 'error';
+  html += '<div class="result-box ' + fillClass + '"><div class="result-title">' + t('trayFillPct') + '</div>';
+  html += '<div class="result-row"><span class="label">' + t('trayFillPct') + '</span><span class="value" style="font-weight:800;' + (calc.pass ? 'color:var(--success)' : 'color:var(--danger)') + '">' + calc.fillPct.toFixed(1) + ' %</span></div>';
+  html += '<div class="result-row"><span class="label">' + t('trayLimit') + '</span><span class="value">' + calc.fillLimit.toFixed(0) + ' % (' + s.trayType + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Total kabelareal' : 'Total cable area') + '</span><span class="value">' + calc.totalCableArea.toFixed(0) + ' mm\u00B2</span></div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Bakke totalareal' : 'Tray total area') + '</span><span class="value">' + calc.totalArea.toFixed(0) + ' mm\u00B2</span></div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Brugbart areal' : 'Usable area') + '</span><span class="value">' + calc.usableArea.toFixed(0) + ' mm\u00B2</span></div>';
+  html += '<div class="result-row"><span class="label">' + t('trayRemaining') + '</span><span class="value" style="' + (calc.remaining < 0 ? 'color:var(--danger)' : '') + '">' + calc.remaining.toFixed(0) + ' mm\u00B2</span></div>';
+
+  // Verdict
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Resultat' : 'Verdict') + '</span><span class="value"><span class="verify-badge ' + (calc.pass ? 'ok' : 'fail') + '">' + (calc.pass ? t('trayPass') : t('trayFail')) + '</span></span></div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Reference' : 'Reference') + '</span><span class="value">NEMA VE-2 / IEC 61537</span></div>';
+  html += '</div>';
+
+  html += '</div>'; // end result card
+  return html;
+}
+
+// ===== ENERGY METER/CT SIZING MODULE (EN 50470 + MID 2014/32/EU) =====
+function calcCTSizing(maxCurrent) {
+  // CT primary must be >= 1.2x max load current for headroom
+  var requiredPrimary = maxCurrent * 1.2;
+  var standardRatios = [
+    {primary: 50, secondary: 5, label: '50/5'},
+    {primary: 75, secondary: 5, label: '75/5'},
+    {primary: 100, secondary: 5, label: '100/5'},
+    {primary: 150, secondary: 5, label: '150/5'},
+    {primary: 200, secondary: 5, label: '200/5'},
+    {primary: 250, secondary: 5, label: '250/5'},
+    {primary: 300, secondary: 5, label: '300/5'},
+    {primary: 400, secondary: 5, label: '400/5'},
+    {primary: 500, secondary: 5, label: '500/5'},
+    {primary: 600, secondary: 5, label: '600/5'},
+    {primary: 750, secondary: 5, label: '750/5'},
+    {primary: 800, secondary: 5, label: '800/5'},
+    {primary: 1000, secondary: 5, label: '1000/5'},
+    {primary: 1250, secondary: 5, label: '1250/5'},
+    {primary: 1500, secondary: 5, label: '1500/5'},
+    {primary: 2000, secondary: 5, label: '2000/5'}
+  ];
+  var recommended = standardRatios[standardRatios.length - 1];
+  for (var i = 0; i < standardRatios.length; i++) {
+    if (standardRatios[i].primary >= requiredPrimary) {
+      recommended = standardRatios[i];
+      break;
+    }
+  }
+  // Burden calculation (typical): 5VA for class 0.5, 2.5VA for class 1.0
+  return {
+    requiredPrimary: requiredPrimary,
+    recommended: recommended,
+    allRatios: standardRatios
+  };
+}
+
+function renderMeter() {
+  var s = meterState;
+  var connTypes = ['direct', 'CT'];
+  var voltages = ['230', '400'];
+  var currents = [25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1500, 2000];
+  var ctRatios = ['50/5', '75/5', '100/5', '150/5', '200/5', '250/5', '300/5', '400/5', '500/5', '600/5', '750/5', '800/5', '1000/5', '1250/5', '1500/5', '2000/5'];
+  var accuracyClasses = ['0.5', '1.0', '2.0'];
+  var midClasses = ['A', 'B', 'C'];
+
+  var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDCCA ' + t('meterTitle') + '</div>';
+  html += '<div class="info-row">' + (lang === 'da' ? 'Dimensionering af energim\u00e5ler og str\u00f8mtransformere iht. EN 50470 og MID-direktivet 2014/32/EU. For str\u00f8mme over 63A anbefales CT-tilsluttet m\u00e5ler.' : 'Energy meter and current transformer sizing per EN 50470 and MID directive 2014/32/EU. For currents above 63A, CT-connected meter is recommended.') + '</div>';
+
+  // Connection type
+  html += '<div class="select-group"><div class="select-label">' + t('meterConnType') + '</div><div class="select-grid">';
+  connTypes.forEach(function(ct) {
+    var lbl = ct === 'direct' ? t('meterDirect') : t('meterCT');
+    html += '<button class="sel-btn ' + (s.connType === ct ? 'selected' : '') + '" onclick="meterState.connType=\'' + ct + '\';renderModule(\'meter\')">' + lbl + '</button>';
+  });
+  html += '</div></div>';
+
+  // System voltage
+  html += '<div class="select-group"><div class="select-label">' + t('meterVoltage') + '</div><div class="select-grid">';
+  voltages.forEach(function(v) {
+    var lbl = v === '230' ? '230V 1~' : '400V 3~';
+    html += '<button class="sel-btn ' + (s.voltage === v ? 'selected' : '') + '" onclick="meterState.voltage=\'' + v + '\';renderModule(\'meter\')">' + lbl + '</button>';
+  });
+  html += '</div></div>';
+
+  // Max load current
+  html += '<div class="select-group"><div class="select-label">' + t('meterMaxCurrent') + '</div><div class="select-grid">';
+  currents.forEach(function(c) {
+    html += '<button class="sel-btn ' + (s.maxCurrent === c ? 'selected' : '') + '" onclick="meterState.maxCurrent=' + c + ';renderModule(\'meter\')">' + c + ' A</button>';
+  });
+  html += '</div></div>';
+
+  // CT Ratio (only shown for CT connection)
+  if (s.connType === 'CT') {
+    html += '<div class="select-group"><div class="select-label">' + t('meterCTRatio') + '</div><div class="select-grid">';
+    ctRatios.forEach(function(r) {
+      html += '<button class="sel-btn ' + (s.ctRatio === r ? 'selected' : '') + '" onclick="meterState.ctRatio=\'' + r + '\';renderModule(\'meter\')">' + r + '</button>';
+    });
+    html += '</div></div>';
+  }
+
+  // Accuracy class
+  html += '<div class="select-group"><div class="select-label">' + t('meterAccuracy') + '</div><div class="select-grid">';
+  accuracyClasses.forEach(function(ac) {
+    html += '<button class="sel-btn ' + (s.accuracy === ac ? 'selected' : '') + '" onclick="meterState.accuracy=\'' + ac + '\';renderModule(\'meter\')">' + (lang === 'da' ? 'Klasse ' : 'Class ') + ac + '</button>';
+  });
+  html += '</div></div>';
+
+  // MID class
+  html += '<div class="select-group"><div class="select-label">' + t('meterMIDClass') + '</div><div class="select-grid">';
+  midClasses.forEach(function(mc) {
+    html += '<button class="sel-btn ' + (s.midClass === mc ? 'selected' : '') + '" onclick="meterState.midClass=\'' + mc + '\';renderModule(\'meter\')">' + (lang === 'da' ? 'Klasse ' : 'Class ') + mc + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '</div>'; // end input card
+
+  // Results
+  html += '<div class="card fade-in"><div class="card-title">' + t('meterResult') + '</div>';
+
+  if (s.connType === 'direct') {
+    // Direct connection - max 63A typically
+    var directMax = s.maxCurrent <= 63;
+    html += '<div class="result-box ' + (directMax ? '' : 'error') + '"><div class="result-title">' + t('meterRecMeter') + '</div>';
+    html += '<div class="result-row"><span class="label">' + t('meterConnType') + '</span><span class="value">' + t('meterDirect') + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + t('meterMaxCurrent') + '</span><span class="value">' + s.maxCurrent + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">' + t('meterAccuracy') + '</span><span class="value">' + (lang === 'da' ? 'Klasse ' : 'Class ') + s.accuracy + ' (EN 50470-3)</span></div>';
+    html += '<div class="result-row"><span class="label">' + t('meterMIDClass') + '</span><span class="value">' + (lang === 'da' ? 'Klasse ' : 'Class ') + s.midClass + ' (2014/32/EU)</span></div>';
+    if (!directMax) {
+      html += '<div class="info-row" style="color:var(--danger)">' + (lang === 'da' ? '\u26A0\uFE0F Direkte m\u00e5ling anbefales kun op til 63A. For ' + s.maxCurrent + 'A skal CT-tilsluttet m\u00e5ler anvendes.' : '\u26A0\uFE0F Direct measurement recommended only up to 63A. For ' + s.maxCurrent + 'A, CT-connected meter should be used.') + '</div>';
+    }
+    html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Standard' : 'Standard') + '</span><span class="value">EN 50470-1/-3, MID 2014/32/EU</span></div>';
+    html += '</div>';
+  } else {
+    // CT connected
+    var ctCalc = calcCTSizing(s.maxCurrent);
+    var selectedRatio = s.ctRatio.split('/');
+    var selectedPrimary = parseInt(selectedRatio[0]);
+    var ctAdequate = selectedPrimary >= ctCalc.requiredPrimary;
+    var burdenVA = s.accuracy === '0.5' ? 5 : (s.accuracy === '1.0' ? 2.5 : 1.5);
+
+    html += '<div class="result-box"><div class="result-title">' + t('meterRecCT') + '</div>';
+    html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Maks. belastning' : 'Max. load') + '</span><span class="value">' + s.maxCurrent + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Kr\u00e6vet CT prim\u00e6r (\u22651.2\u00D7 belastning)' : 'Required CT primary (\u22651.2\u00D7 load)') + '</span><span class="value">\u2265 ' + ctCalc.requiredPrimary.toFixed(0) + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Anbefalet CT-forhold' : 'Recommended CT ratio') + '</span><span class="value" style="font-weight:800">' + ctCalc.recommended.label + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Valgt CT-forhold' : 'Selected CT ratio') + '</span><span class="value' + (ctAdequate ? '' : '" style="color:var(--danger)') + '">' + s.ctRatio + (ctAdequate ? ' \u2705' : ' \u274C') + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + t('meterBurden') + '</span><span class="value">' + burdenVA + ' VA (class ' + s.accuracy + ')</span></div>';
+    html += '<div class="result-row"><span class="label">' + t('meterAccuracy') + '</span><span class="value">' + (lang === 'da' ? 'Klasse ' : 'Class ') + s.accuracy + ' (EN 50470-3)</span></div>';
+    html += '<div class="result-row"><span class="label">' + t('meterMIDClass') + '</span><span class="value">' + (lang === 'da' ? 'Klasse ' : 'Class ') + s.midClass + ' (2014/32/EU)</span></div>';
+    if (!ctAdequate) {
+      html += '<div class="info-row" style="color:var(--danger)">' + (lang === 'da' ? '\u26A0\uFE0F Valgt CT-forhold ' + s.ctRatio + ' er utilstr\u00e6kkeligt. CT prim\u00e6r skal v\u00e6re \u2265 1.2 \u00D7 ' + s.maxCurrent + 'A = ' + ctCalc.requiredPrimary.toFixed(0) + 'A. Anbefalet: ' + ctCalc.recommended.label + '.' : '\u26A0\uFE0F Selected CT ratio ' + s.ctRatio + ' is insufficient. CT primary must be \u2265 1.2 \u00D7 ' + s.maxCurrent + 'A = ' + ctCalc.requiredPrimary.toFixed(0) + 'A. Recommended: ' + ctCalc.recommended.label + '.') + '</div>';
+    }
+    html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Standard' : 'Standard') + '</span><span class="value">EN 50470-1/-3, MID 2014/32/EU</span></div>';
+    html += '</div>';
+  }
+
+  // MID class explanation
+  html += '<div class="result-box"><div class="result-title">' + (lang === 'da' ? 'MID-klasser (2014/32/EU Annex V)' : 'MID Classes (2014/32/EU Annex V)') + '</div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Klasse A' : 'Class A') + '</span><span class="value">\u00B12% - ' + (lang === 'da' ? 'Husholdning' : 'Domestic') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Klasse B' : 'Class B') + '</span><span class="value">\u00B11% - ' + (lang === 'da' ? 'Erhverv' : 'Commercial') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Klasse C' : 'Class C') + '</span><span class="value">\u00B10.5% - ' + (lang === 'da' ? 'Industri/afregning' : 'Industrial/billing') + '</span></div>';
+  html += '<div class="info-row">' + (lang === 'da' ? 'MID-direktivet 2014/32/EU kr\u00e6ver CE-m\u00e6rket m\u00e5ler med relevant klasse for faktureringsform\u00e5l. EN 50470-3 specificerer pr\u00e6cisionsklasser for aktiv energim\u00e5ling.' : 'MID directive 2014/32/EU requires CE-marked meter with relevant class for billing purposes. EN 50470-3 specifies accuracy classes for active energy measurement.') + '</div>';
   html += '</div>';
 
   html += '</div>'; // end result card
