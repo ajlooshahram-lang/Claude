@@ -4379,7 +4379,7 @@ function renderDrawing(){
 }
 
 // ===== EXAM SIMULATOR (data + engine) =====
-let examState = { tab:'quiz', mode:'apprentice', quizIdx:0, quizPick:{}, quizOrder:{}, scId:null, step:0, scPick:{}, scOrder:{}, timerOn:false, timerEnd:null, timerLeft:3600 };
+let examState = { tab:'quiz', mode:'apprentice', quizIdx:0, quizPick:{}, quizOrder:{}, scId:null, step:0, scPick:{}, scOrder:{}, mockOn:false, mockPos:0, timerOn:false, timerEnd:null, timerLeft:3600 };
 let examTimerHandle = null;
 function examShuffle(n){ var a=[]; for(var x=0;x<n;x++) a.push(x); for(var x=n-1;x>0;x--){ var r=Math.floor(Math.random()*(x+1)); var t=a[x]; a[x]=a[r]; a[r]=t; } return a; }
 function examL(o){ return (typeof o==='string') ? o : (o[lang]||o.en||o.da||''); }
@@ -4622,6 +4622,55 @@ function examReportHtml(d){
 function examPrintReport(){ try { const w=window.open('','_blank'); if(!w){ alert(lang==='da'?'Tillad pop op-vinduer for at udskrive rapporten.':'Allow pop-ups to print the report.'); return; } w.document.write(examReportHtml(examReportData())); w.document.close(); w.focus(); setTimeout(()=>{ try{ w.print(); }catch(e){} }, 300); } catch(e){} }
 function examDownloadReport(){ try { const blob=new Blob([examReportText(examReportData())],{type:'text/plain;charset=utf-8'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='el-eksamen-rapport.txt'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); } catch(e){} }
 
+function examMockSeq(){ var seq=[]; EXAM_SCEN.forEach(function(sc){ sc.steps.forEach(function(st,j){ seq.push({sid:sc.id,j:j}); }); }); return seq; }
+function examMockCur(){ var seq=examMockSeq(); var p=seq[examState.mockPos]; if(!p) return null; var sc=EXAM_SCEN.find(function(s){return s.id===p.sid;}); return { sid:p.sid, j:p.j, sc:sc, step:sc.steps[p.j], pos:examState.mockPos, total:seq.length }; }
+function examMockAnswered(){ var seq=examMockSeq(), a=0; seq.forEach(function(p){ if(examState.scPick[p.sid+':'+p.j]!==undefined) a++; }); return a; }
+function examMockScore(){ var seq=examMockSeq(), c=0; seq.forEach(function(p){ var sc=EXAM_SCEN.find(function(s){return s.id===p.sid;}); if(examState.scPick[p.sid+':'+p.j]===sc.steps[p.j].ci) c++; }); return { correct:c, total:seq.length }; }
+function examStartMock(){ examState.mockOn=true; examState.mode='exam'; examState.mockPos=0; examMockSeq().forEach(function(p){ delete examState.scPick[p.sid+':'+p.j]; delete examState.scOrder[p.sid+':'+p.j]; }); examState.timerLeft=3600; examStartTimer(); }
+function examAbortMock(){ examState.mockOn=false; examPauseTimer(); }
+function examMockNav(d){ var n=examMockSeq().length; examState.mockPos=Math.max(0, Math.min(n-1, examState.mockPos+d)); renderModule('exam'); }
+function examSaveMock(){ EXAM_SCEN.forEach(function(sc){ examSaveScenario(sc); }); var store=examLoadStore(); var sc=examMockScore(); var pct=Math.round(100*sc.correct/sc.total); store.mockBest=Math.max(store.mockBest||0,pct); store.mockLast=pct; examSaveStore(store); }
+function examMockPick(oi){ var cur=examMockCur(); if(!cur) return; var key=cur.sid+':'+cur.j; if(examState.scPick[key]!==undefined) return; examState.scPick[key]=oi; if(examMockAnswered()===examMockSeq().length){ examSaveMock(); examPauseTimer(); } else { renderModule('exam'); } }
+function renderMock(){
+  const da = lang==='da'; const store = examLoadStore();
+  if(!examState.mockOn){
+    const best = store.mockBest!=null ? store.mockBest+'%' : (da?'ikke taget':'not taken');
+    return `<div class="card fade-in"><div class="card-title">\uD83C\uDFAF ${da?'Fuld mock-eksamen':'Full mock exam'}</div>`
+      + `<div class="info-row">${da?'K\u00f8r alle 11 scenarier (68 trin) i \u00e9t forl\u00f8b under eksamensbetingelser: intet facit undervejs, 60-min timer starter automatisk, samlet bed\u00f8mmelse til sidst (best\u00e5 '+EXAM_PASS+'%).':'Run all 11 scenarios (68 steps) in one session under exam conditions: no answers shown, 60-min timer auto-starts, single aggregate verdict at the end (pass '+EXAM_PASS+'%).'}</div>`
+      + `<div class="result-row"><span class="label">${da?'Bedste mock':'Best mock'}</span><span class="value">${best}</span></div>`
+      + `<div class="select-grid" style="margin-top:10px"><button class="sel-btn selected" onclick="examStartMock()">\u25B6 ${da?'Start fuld mock':'Start full mock'}</button></div></div>`;
+  }
+  const seq = examMockSeq(); const answered = examMockAnswered(); const done = answered===seq.length;
+  if(done){
+    const r = examMockScore(); const pct = Math.round(100*r.correct/r.total); const pass = pct>=EXAM_PASS;
+    const cats={}; ['forsyning','maskine','installation'].forEach(c=>cats[c]={c:0,t:0});
+    seq.forEach(function(p){ var sc=EXAM_SCEN.find(function(s){return s.id===p.sid;}); cats[sc.cat].t++; if(examState.scPick[p.sid+':'+p.j]===sc.steps[p.j].ci) cats[sc.cat].c++; });
+    const catRows = ['forsyning','maskine','installation'].map(function(c){ var pc=Math.round(100*cats[c].c/cats[c].t); return `<div class="result-row"><span class="label">${examL(EXAM_CATNAME[c])}</span><span class="value" style="color:${pc>=EXAM_PASS?'var(--success)':'var(--danger)'}">${cats[c].c}/${cats[c].t} \u00b7 ${pc}%</span></div>`; }).join('');
+    const rd = examReportData();
+    const weak = rd.weakClauses.length ? rd.weakClauses.slice(0,6).map(function(w){return w.clause+' \u00d7'+w.count;}).join('<br>') : (da?'Ingen':'None');
+    const used = examFmtTime(Math.max(0, 3600-examState.timerLeft));
+    return `<div class="card fade-in"><div class="card-title">\uD83C\uDFAF ${da?'Mock-resultat':'Mock result'}</div>`
+      + `<div class="result-box ${pass?'':'error'}"><div class="result-title">${pass?(da?'\uD83C\uDF89 Best\u00e5et':'\uD83C\uDF89 Passed'):(da?'\u26A0\uFE0F Ikke best\u00e5et':'\u26A0\uFE0F Not passed')} \u2014 ${pct}%</div>`
+      + `<div class="result-row"><span class="label">${da?'Rigtige trin':'Correct steps'}</span><span class="value">${r.correct}/${r.total}</span></div>`
+      + `<div class="result-row"><span class="label">${da?'Tid brugt':'Time used'}</span><span class="value">${used}</span></div></div>`
+      + `<div class="card-title" style="margin-top:14px">${da?'Pr. kategori':'By category'}</div>`+catRows
+      + `<div class="result-row"><span class="label">${da?'Svage klausuler':'Weak clauses'}</span><span class="value" style="color:var(--danger);text-align:right;max-width:70%">${weak}</span></div>`
+      + `<div class="select-grid" style="margin-top:10px"><button class="sel-btn" onclick="examPrintReport()">\uD83D\uDDA8\uFE0F ${da?'Udskriv rapport':'Print report'}</button><button class="sel-btn" onclick="examDownloadReport()">\u2B07\uFE0F ${da?'Download .txt':'Download .txt'}</button><button class="sel-btn selected" onclick="examStartMock()">\u21BA ${da?'Ny mock':'New mock'}</button><button class="sel-btn" onclick="examAbortMock()">\u2715 ${da?'Luk':'Close'}</button></div></div>`;
+  }
+  const cur = examMockCur(); const sc = cur.sc; const step = cur.step; const key = cur.sid+':'+cur.j;
+  const picked = examState.scPick[key]; const isAnswered = picked!==undefined;
+  if(!examState.scOrder[key] || examState.scOrder[key].length!==step.opts.length) examState.scOrder[key]=examShuffle(step.opts.length);
+  const opts = examState.scOrder[key].map(function(oi){ const o=step.opts[oi]; let cls='sel-btn'; const click=isAnswered?'':`onclick="examMockPick(${oi})"`; if(isAnswered&&oi===picked) cls='sel-btn selected'; return `<button class="${cls}" ${click}>${examL(o)}</button>`; }).join('');
+  const scNum = EXAM_SCEN.findIndex(function(s){return s.id===cur.sid;})+1;
+  return `<div class="card fade-in"><div class="card-title">\uD83C\uDFAF ${da?'Mock \u2014 sp\u00f8rgsm\u00e5l':'Mock \u2014 question'} ${cur.pos+1}/${cur.total}</div>`
+    + `<div class="info-row">${da?'Scenarie':'Scenario'} ${scNum}/${EXAM_SCEN.length}: ${examL(sc.title)} \u00b7 ${da?'trin':'step'} ${cur.j+1}/${sc.steps.length} \u00b7 ${answered}/${seq.length} ${da?'besvaret':'answered'}</div>`
+    + `<div class="select-group"><div class="select-label">${examL(step.q)}</div><div class="select-grid">${opts}</div></div>`
+    + `<div class="select-grid" style="margin-top:12px"><button class="sel-btn" ${cur.pos<=0?"disabled style='opacity:.4'":''} onclick="examMockNav(-1)">\u25C0 ${da?'Forrige':'Prev'}</button>`
+    + `<button class="sel-btn" ${cur.pos>=cur.total-1?"disabled style='opacity:.4'":''} onclick="examMockNav(1)">${da?'N\u00e6ste':'Next'} \u25B6</button>`
+    + `<button class="sel-btn" onclick="examAbortMock()">\u2715 ${da?'Afbryd mock':'Abort mock'}</button></div>`
+    + `<div class="info-row" style="margin-top:8px">${da?'Eksamenstilstand: facit og forklaringer vises f\u00f8rst n\u00e5r alle 68 trin er besvaret.':'Exam mode: answers and explanations are shown only when all 68 steps are answered.'}</div></div>`;
+}
+
 function renderExam(){
   const da = lang==='da';
   const tleft = examState.timerLeft;
@@ -4633,6 +4682,7 @@ function renderExam(){
     + `<div class="select-grid" style="margin-bottom:10px">`
     + `<button class="sel-btn ${examState.tab==='quiz'?'selected':''}" onclick="examTab('quiz')">\u26A1 ${da?'Hurtig Quiz':'Quick Quiz'}</button>`
     + `<button class="sel-btn ${examState.tab==='scenario'?'selected':''}" onclick="examTab('scenario')">\uD83D\uDCDD ${da?'Fuld Opgave':'Full Assignment'}</button>`
+    + `<button class="sel-btn ${examState.tab==='mock'?'selected':''}" onclick="examTab('mock')">\uD83C\uDFAF ${da?'Fuld Mock':'Full Mock'}</button>`
     + `</div>`
     + `<div class="select-group"><div class="select-label">${da?'Tilstand':'Mode'}</div><div class="select-grid">`
     + `<button class="sel-btn ${examState.mode!=='exam'?'selected':''}" onclick="examSetMode('apprentice')">\uD83D\uDC68\u200D\uD83C\uDFEB ${da?'L\u00e6rling (forklar nu)':'Apprentice (explain now)'}</button>`
@@ -4646,7 +4696,7 @@ function renderExam(){
     + `</div>`
     + (expired ? `<div class="result-box error" style="margin-top:10px"><div class="result-title">\u23F0 ${da?'Tiden er udl\u00f8bet':'Time is up'}</div><div style="padding:6px 2px">${da?'Til pr\u00f8ven har du 60 min \u2014 \u00f8v dig p\u00e5 tempoet.':'You get 60 min at the exam \u2014 practise your pace.'}</div></div>` : '')
     + `</div></div>`;
-  const body = examState.tab==='quiz' ? examRenderQuiz() : (examState.scId ? examRenderScenario() : examRenderScenList());
+  const body = examState.tab==='quiz' ? examRenderQuiz() : (examState.tab==='mock' ? renderMock() : (examState.scId ? examRenderScenario() : examRenderScenList()));
   return head + body;
 }
 
