@@ -589,13 +589,24 @@ body.dark img { filter: brightness(0.92); }
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiRWwtRGltZW5zaW9uZXJpbmciLCJzaG9ydF9uYW1lIjoiRWxEaW0iLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJ0aGVtZV9jb2xvciI6IiMwZjRjNzUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiI2YwZjRmOCIsImljb25zIjpbXX0=">
 <script>
-if ('serviceWorker' in navigator) {
-  const swCode = "self.addEventListener('install', e => { e.waitUntil(caches.open('eldim-v1').then(c => c.addAll(['./',location.href]))); self.skipWaiting(); });" +
-    "self.addEventListener('activate', e => { e.waitUntil(clients.claim()); });" +
-    "self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).catch(() => caches.match('./')))); });";
-  const swBlob = new Blob([swCode], {type: 'application/javascript'});
-  const swUrl = URL.createObjectURL(swBlob);
-  navigator.serviceWorker.register(swUrl, {scope: './'}).catch(function(){});
+// Offline caching via Cache API (main thread).
+// A blob-URL service worker cannot control the page due to scope restrictions,
+// so we cache the page directly from the main thread for offline access.
+if ('caches' in window) {
+  var CACHE_NAME = 'eldim-v2026.7';
+  caches.open(CACHE_NAME).then(function(cache) {
+    cache.put(location.href, new Response(document.documentElement.outerHTML, {
+      headers: {'Content-Type': 'text/html; charset=utf-8'}
+    }));
+  }).catch(function(){});
+  // Clean up old caches
+  caches.keys().then(function(names) {
+    names.forEach(function(name) {
+      if (name !== CACHE_NAME && name.indexOf('eldim-') === 0) {
+        caches.delete(name);
+      }
+    });
+  }).catch(function(){});
 }
 </script>
 </head>
@@ -652,7 +663,7 @@ const T = {
       tray: 'Kabelbakke',
       meter: 'Energim\u00e5ler',
       exam: 'Eksamen',
-      qr: 'QR-m\u00e6rkat'
+      qr: 'Panel-ID'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -934,7 +945,7 @@ const T = {
       tray: 'Cable Tray',
       meter: 'Energy Meter',
       exam: 'Exam Mode',
-      qr: 'QR Labels'
+      qr: 'Panel ID'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -3146,7 +3157,7 @@ let selectivityState = { upstream: null, downstream: null, showProof: false };
 // Commissioning module state (DS/HD 60364-6 §6.4)
 let commissionState = { step: 0, results: [], projectName: '', date: '' };
 // EV Charger module state (DS/HD 60364-7-722)
-let evState = { chargerType: '7.4', phases: '1', cableLength: 10, earthSystem: 'TN-S', loadMgmt: 'none' };
+let evState = { chargerPower: '7.4', chargeMode: 'mode3', phases: '1', cableLength: 10, earthSystem: 'TN-S', loadMgmt: 'none' };
 // Earthing & Bonding module state (DS/HD 60364-5-54)
 let earthingState = { systemType: 'TN-S', soilResistivity: 100, electrodeType: 'rod', electrodeLength: 2.4 };
 // Harmonics / Neutral Sizing module state (section 523.6.3)
@@ -3288,7 +3299,7 @@ function renderModule(mod) {
     case 'motor': content = renderMotor(); break;
     case 'tray': content = renderTray(); break;
     case 'meter': content = renderMeter(); break;
-    case 'exam': content = renderExam(); break;
+    case 'exam': examState.showResult = false; examState.selectedAnswer = -1; content = renderExam(); break;
     case 'qr': content = renderQR(); break;
   }
   // Append AI assistant to every module
@@ -5733,7 +5744,7 @@ function configurePriceFeed() {
 // ===== DATA VERSION & CHANGELOG =====
 const DATA_VERSION = '2026.7';
 const DATA_CHANGELOG = [
-  { v: '2026.7', date: '2026-06-14', da: '9 nye moduler: EV-lader (IEC 61851/DS 60364-7-722), Jording (DS/HD 60364-5-54), Harmonik (523.6.3), Motorstarter (IEC 60947-4-1), Kabelbakke (IEC 61537), Energim\u00e5ler (EN 50470 + MID), Eksamen (autorisationspr\u00f8ve-tr\u00e6ning), QR-m\u00e6rkat (panelidentifikation), Offline PWA (service worker).', en: '9 new modules: EV Charger (IEC 61851/DS 60364-7-722), Earthing (DS/HD 60364-5-54), Harmonics (523.6.3), Motor Starter (IEC 60947-4-1), Cable Tray (IEC 61537), Energy Meter (EN 50470 + MID), Exam Mode (authorization exam practice), QR Labels (panel identification), Offline PWA (service worker).' },
+  { v: '2026.7', date: '2026-06-14', da: '9 nye moduler: EV-lader (IEC 61851/DS 60364-7-722), Jording (DS/HD 60364-5-54), Harmonik (523.6.3), Motorstarter (IEC 60947-4-1), Kabelbakke (IEC 61537), Energim\u00e5ler (EN 50470 + MID), Eksamen (autorisationspr\u00f8ve-tr\u00e6ning), Panel-ID (visuelt identifikation), Offline cache (Cache API).', en: '9 new modules: EV Charger (IEC 61851/DS 60364-7-722), Earthing (DS/HD 60364-5-54), Harmonics (523.6.3), Motor Starter (IEC 60947-4-1), Cable Tray (IEC 61537), Energy Meter (EN 50470 + MID), Exam Mode (authorization exam practice), Panel ID (visual identification), Offline cache (Cache API).' },
   { v: '2026.6', date: '2026-06-13', da: 'Selektivitetsmodul: interaktiv log-log T-I kurve SVG + selektivitetsbevismotor. Idriftsættelsesmodul: DS/HD 60364-6 §6.4 trin-for-trin witness mode med protokoleksport. Forensisk forklarer: årsagskæde + rangerede rettelsesmuligheder på hvert FEJL-verdikt.', en: 'Selectivity module: interactive log-log T-I curve SVG + selectivity proof engine. Commissioning module: DS/HD 60364-6 §6.4 step-by-step witness mode with protocol export. Forensic explainer: causal chain + ranked fix options on every FAIL verdict.' },
   { v: '2026.5', date: '2026-06-13', da: 'Auto-dimensionering solver: et klik finder mindste DS/HD 60364-kompatible {kabel, enhed, RCD}-sæt. Udtømmende søgning med 5-tjek compliance-gate. Konservativ: gulv Iz, loft Zs, ekskludér ved tvivl. TT håndhæver RCD. Rangeret output: Anbefalet + op til 3 alternativer.', en: 'Auto-dimensioning solver: one click finds smallest DS/HD 60364 compliant {cable, device, RCD} set. Exhaustive search with 5-check compliance gate. Conservative: floor Iz, ceiling Zs, exclude on doubt. TT enforces RCD. Ranked output: Recommended + up to 3 alternatives.' },
   { v: '2026.4', date: '2026-06-12', da: 'Korrekthedsh\u00E6rdning: derating styrer nu ALLE verdikter (\u00A7523), overbelastning I\u2082\u22641,45\u00B7Iz (\u00A7433.1), adiabatisk kortslutningsholdbarhed k\u00B2S\u00B2\u2265I\u00B2t (\u00A7434.5.2), og Zs/udkoblingstid (\u00A7411). INSUFFICIENT_DATA-tilstand: aldrig PASS uden bevis.', en: 'Correctness hardening: derating now drives ALL verdicts (\u00A7523), overload I\u2082\u22641.45\u00B7Iz (\u00A7433.1), adiabatic short-circuit withstand k\u00B2S\u00B2\u2265I\u00B2t (\u00A7434.5.2), and Zs/disconnection time (\u00A7411). INSUFFICIENT_DATA state: never PASS without proof.' },
@@ -6751,6 +6762,11 @@ function runSelfTests() {
     var rcd = getEVRcdType('mode2');
     T.push({ name: 'EV 722: Mode 2 allows Type A + 6mA DC', exp: 'Type A + 6mA DC', act: rcd.type, pass: rcd.type === 'Type A + 6mA DC' });
   })();
+  // Test: Unknown mode defaults to Type B (conservative) per 722.531.2
+  (function() {
+    var rcd = getEVRcdType('unknown');
+    T.push({ name: 'EV 722: unknown mode defaults to Type B (conservative)', exp: 'Type B', act: rcd.type, pass: rcd.type === 'Type B' });
+  })();
 
   // ===== EARTHING MODULE TESTS (DS/HD 60364-5-54) =====
   // Test: Rod electrode resistance formula R = rho/(2*pi*L)
@@ -6771,7 +6787,7 @@ function runSelfTests() {
   })();
 
   // ===== HARMONICS MODULE TESTS (section 523.6.3) =====
-  // Test: Neutral factor 1.45 for THD > 33%
+  // Test: Neutral factor 1.45 for THD > 33% (balanced)
   (function() {
     var f = calcNeutralFactor('33-45', 'balanced');
     T.push({ name: 'Harmonics 523.6.3: neutral factor 1.45 for THD 33-45%', exp: '1.45', act: f.toFixed(2), pass: Math.abs(f - 1.45) < 0.001 });
@@ -6781,10 +6797,21 @@ function runSelfTests() {
     var f = calcNeutralFactor('0-15', 'balanced');
     T.push({ name: 'Harmonics 523.6.3: neutral factor 1.0 for THD 0-15%', exp: '1.00', act: f.toFixed(2), pass: Math.abs(f - 1.0) < 0.001 });
   })();
-  // Test: Neutral factor 1.45 for THD > 45%
+  // Test: Neutral factor 1.45 for THD > 45% (balanced)
   (function() {
     var f = calcNeutralFactor('>45', 'balanced');
     T.push({ name: 'Harmonics 523.6.3: neutral factor 1.45 for THD >45%', exp: '1.45', act: f.toFixed(2), pass: Math.abs(f - 1.45) < 0.001 });
+  })();
+  // Test: Unbalanced load with THD 33-45% gets higher factor (1.45 * 1.15 = 1.6675)
+  (function() {
+    var f = calcNeutralFactor('33-45', 'unbalanced');
+    var expected = 1.45 * 1.15;
+    T.push({ name: 'Harmonics 523.6.3: unbalanced THD 33-45% factor > 1.45', exp: expected.toFixed(2), act: f.toFixed(2), pass: Math.abs(f - expected) < 0.01 });
+  })();
+  // Test: Unbalanced load with THD 0-15% stays at 1.0 (no margin added for low THD)
+  (function() {
+    var f = calcNeutralFactor('0-15', 'unbalanced');
+    T.push({ name: 'Harmonics 523.6.3: unbalanced THD 0-15% factor = 1.0', exp: '1.00', act: f.toFixed(2), pass: Math.abs(f - 1.0) < 0.001 });
   })();
 
   // ===== MOTOR STARTER MODULE TESTS (IEC 60947-4-1) =====
@@ -6866,11 +6893,13 @@ function runSelfTests() {
 
   // ===== PWA TEST =====
   (function() {
-    // Verify PWA registration code exists in page source
+    // Verify Cache API offline caching code is present in page source with version stamp
     var pageSource = document.documentElement ? (document.documentElement.outerHTML || '') : '';
-    var hasSWCode = (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) || pageSource.indexOf('serviceWorker') >= 0;
-    // Fallback: just verify the function/code was loaded (always true if we got here)
-    T.push({ name: 'PWA: service worker registration code present', exp: 'present', act: 'present', pass: true });
+    var hasCacheAPI = pageSource.indexOf('caches.open') >= 0;
+    var hasVersionedCache = pageSource.indexOf('eldim-v2026') >= 0;
+    var hasCleanup = pageSource.indexOf('caches.keys') >= 0 && pageSource.indexOf('caches.delete') >= 0;
+    var pass = hasCacheAPI && hasVersionedCache && hasCleanup;
+    T.push({ name: 'PWA: Cache API with versioned cache and cleanup present', exp: 'cache+version+cleanup', act: (hasCacheAPI ? 'cache' : '') + (hasVersionedCache ? '+version' : '') + (hasCleanup ? '+cleanup' : ''), pass: pass });
   })();
 
   return T;
@@ -8374,11 +8403,12 @@ function calcEVCableSize(power, phases, length, loadMgmt) {
   return { current: current, designCurrent: designCurrent, cableSize: selected.size, iz: selected.iz, vdropPercent: vdropPercent, contFactor: contFactor };
 }
 
-function getEVRcdType(chargerType) {
+function getEVRcdType(chargeMode) {
   // Per 722.531.2: Mode 3 chargers with onboard DC charging require Type B RCD
   // Mode 2 with Type A + 6mA DC detection acceptable per 722.531.2.101
-  if (chargerType === 'mode3') return { type: 'Type B', clause: '722.531.2' };
-  return { type: 'Type A + 6mA DC', clause: '722.531.2.101' };
+  // CONSERVATIVE: default to Type B (safer) when mode is unknown or mode3
+  if (chargeMode === 'mode2') return { type: 'Type A + 6mA DC', clause: '722.531.2.101' };
+  return { type: 'Type B', clause: '722.531.2' };
 }
 
 function renderEV() {
@@ -8399,14 +8429,14 @@ function renderEV() {
   // Charger type / power
   html += '<div class="select-group"><div class="select-label">' + t('evChargerType') + '</div><div class="select-grid">';
   chargerPowers.forEach(function(cp) {
-    html += '<button class="sel-btn ' + (s.chargerType === cp.value ? 'selected' : '') + '" onclick="evState.chargerType=\'' + cp.value + '\';evState.phases=\'' + cp.ph + '\';renderModule(\'ev\')">' + cp.label + '</button>';
+    html += '<button class="sel-btn ' + (s.chargerPower === cp.value ? 'selected' : '') + '" onclick="evState.chargerPower=\'' + cp.value + '\';evState.phases=\'' + cp.ph + '\';renderModule(\'ev\')">' + cp.label + '</button>';
   });
   html += '</div></div>';
 
   // Mode selection
   html += '<div class="select-group"><div class="select-label">' + (lang === 'da' ? 'Lademode' : 'Charging Mode') + '</div><div class="select-grid">';
-  html += '<button class="sel-btn ' + (s.chargerType !== 'mode3' && s.chargerType !== 'mode2' || s.chargerType === 'mode2' ? '' : '') + (s.chargerType === 'mode2' ? 'selected' : '') + '" onclick="evState.chargerType=\'mode2\';renderModule(\'ev\')">' + t('evMode2') + '</button>';
-  html += '<button class="sel-btn ' + (s.chargerType === 'mode3' ? 'selected' : '') + '" onclick="evState.chargerType=\'mode3\';renderModule(\'ev\')">' + t('evMode3') + '</button>';
+  html += '<button class="sel-btn ' + (s.chargeMode === 'mode2' ? 'selected' : '') + '" onclick="evState.chargeMode=\'mode2\';renderModule(\'ev\')">' + t('evMode2') + '</button>';
+  html += '<button class="sel-btn ' + (s.chargeMode === 'mode3' ? 'selected' : '') + '" onclick="evState.chargeMode=\'mode3\';renderModule(\'ev\')">' + t('evMode3') + '</button>';
   html += '</div></div>';
 
   // Cable length
@@ -8434,11 +8464,9 @@ function renderEV() {
   html += '</div>'; // end input card
 
   // Results
-  var power = parseFloat(s.chargerType) || 7.4;
-  if (s.chargerType === 'mode2') power = 3.7;
-  if (s.chargerType === 'mode3') power = 22;
+  var power = parseFloat(s.chargerPower) || 7.4;
   var calc = calcEVCableSize(power, s.phases, s.cableLength, s.loadMgmt);
-  var rcd = getEVRcdType(s.chargerType);
+  var rcd = getEVRcdType(s.chargeMode);
 
   html += '<div class="card fade-in"><div class="card-title">' + t('evResult') + '</div>';
   html += '<div class="result-box"><div class="result-title">' + (lang === 'da' ? 'Beregning' : 'Calculation') + '</div>';
@@ -8602,13 +8630,23 @@ function calcNeutralFactor(thdRange, balance) {
   // THD-N 15-33%: neutral same as phase (factor 1.0, no reduction)
   // THD-N 33-45%: neutral must be oversized, factor 1.45
   // THD-N >45%: neutral must be oversized, factor 1.45 (minimum)
+  // For UNBALANCED loads: neutral already carries imbalance current,
+  // so apply an additional 15% margin per conservative engineering practice.
+  // This ensures the neutral is never undersized when both imbalance and harmonics combine.
+  var baseFactor;
   switch (thdRange) {
-    case '0-15': return 1.0;
-    case '15-33': return 1.0;
-    case '33-45': return 1.45;
-    case '>45': return 1.45;
-    default: return 1.0;
+    case '0-15': baseFactor = 1.0; break;
+    case '15-33': baseFactor = 1.0; break;
+    case '33-45': baseFactor = 1.45; break;
+    case '>45': baseFactor = 1.45; break;
+    default: baseFactor = 1.0;
   }
+  // Unbalanced 3-phase loads: neutral carries imbalance current plus harmonics
+  // Conservative approach: add 15% margin for unbalanced systems with THD > 15%
+  if (balance === 'unbalanced' && thdRange !== '0-15') {
+    baseFactor = Math.max(baseFactor * 1.15, 1.15);
+  }
+  return baseFactor;
 }
 
 function renderHarmonics() {
@@ -8668,6 +8706,9 @@ function renderHarmonics() {
   html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Neutralfaktor' : 'Neutral Factor') + '</span><span class="value" style="font-weight:800;' + (neutralFactor > 1.0 ? 'color:var(--danger)' : '') + '">' + neutralFactor.toFixed(2) + '</span></div>';
   html += '<div class="result-row"><span class="label">THD-N</span><span class="value">' + s.thdPercent + ' %</span></div>';
   html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Klausul' : 'Clause') + '</span><span class="value">IEC 60364 \u00A7523.6.3</span></div>';
+  if (s.balance === 'unbalanced' && s.thdPercent !== '0-15') {
+    html += '<div class="info-row" style="color:var(--warning)">' + (lang === 'da' ? '\u26A0 Usymmetrisk belastning: neutralfaktor for\u00f8get med 15% margin, da ubalancestr\u00f8m adderer til harmonisk belastning p\u00e5 neutral.' : '\u26A0 Unbalanced load: neutral factor increased by 15% margin, as imbalance current adds to harmonic loading on neutral.') + '</div>';
+  }
   if (reductionAllowed) {
     html += '<div class="info-row" style="color:var(--success)">' + (lang === 'da' ? '\u2705 Neutral reduktion tilladt: symmetrisk belastning, THD < 15%. Neutral kan reduceres til minimum 50% af faseleder (per \u00A7523.6.3).' : '\u2705 Neutral reduction allowed: balanced load, THD < 15%. Neutral may be reduced to minimum 50% of phase conductor (per sect. 523.6.3).') + '</div>';
   }
@@ -8909,8 +8950,10 @@ function renderTray() {
 
   // Fill result
   var fillClass = calc.pass ? '' : 'error';
+  var capacityPct = calc.fillLimit > 0 ? (calc.fillPct / calc.fillLimit * 100).toFixed(0) : 0;
   html += '<div class="result-box ' + fillClass + '"><div class="result-title">' + t('trayFillPct') + '</div>';
-  html += '<div class="result-row"><span class="label">' + t('trayFillPct') + '</span><span class="value" style="font-weight:800;' + (calc.pass ? 'color:var(--success)' : 'color:var(--danger)') + '">' + calc.fillPct.toFixed(1) + ' %</span></div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Udnyttet kapacitet' : 'Capacity Used') + '</span><span class="value" style="font-weight:800;' + (calc.pass ? 'color:var(--success)' : 'color:var(--danger)') + '">' + capacityPct + ' %' + (lang === 'da' ? ' af tilladt' : ' of allowed') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Fyldning (totalareal)' : 'Fill (total area)') + '</span><span class="value">' + calc.fillPct.toFixed(1) + ' % ' + (lang === 'da' ? 'af ' : 'of ') + calc.totalArea.toFixed(0) + ' mm\u00B2</span></div>';
   html += '<div class="result-row"><span class="label">' + t('trayLimit') + '</span><span class="value">' + calc.fillLimit.toFixed(0) + ' % (' + s.trayType + ')</span></div>';
   html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Total kabelareal' : 'Total cable area') + '</span><span class="value">' + calc.totalCableArea.toFixed(0) + ' mm\u00B2</span></div>';
   html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Bakke totalareal' : 'Tray total area') + '</span><span class="value">' + calc.totalArea.toFixed(0) + ' mm\u00B2</span></div>';
@@ -9239,8 +9282,10 @@ function renderExam() {
 let qrState = { panelName: 'Hovedtavle', location: 'Teknikrum', circuitCount: 24, voltage: '400', mainBreaker: '63', installYear: '2024' };
 
 function generateQRSvg(text) {
-  // Minimal QR Code generator - Version 2, Error Correction L, Alphanumeric mode
-  // Generates a simple 25x25 QR-like matrix and renders as SVG
+  // Visual Panel Identifier - generates a deterministic pattern based on panel data.
+  // NOTE: This is a visual identifier for human recognition, NOT an ISO 18004 QR code.
+  // It uses finder patterns for visual structure but the data area is a deterministic
+  // hash pattern, not scannable by QR readers. Use as visual labels only.
   var size = 25;
   var modules = [];
   for (var i = 0; i < size * size; i++) modules[i] = 0;
@@ -9318,7 +9363,8 @@ function qrSet(prop, val) {
 
 function renderQR() {
   var t = lang === 'da';
-  var html = '<div class="card fade-in"><div class="card-title">' + (t ? 'QR-m\u00e6rkat til tavle' : 'QR Label for Panel') + '</div>';
+  var html = '<div class="card fade-in"><div class="card-title">' + (t ? 'Visuelt panel-ID' : 'Visual Panel Identifier') + '</div>';
+  html += '<div class="info-row">' + (t ? 'Genererer et unikt visuelt identifikationsm\u00f8nster baseret p\u00e5 tavlens data. OBS: Dette er IKKE en skanbar QR-kode (ISO 18004), men en visuel identifikator til menneskelig genkendelse.' : 'Generates a unique visual identification pattern based on panel data. NOTE: This is NOT a scannable QR code (ISO 18004), but a visual identifier for human recognition.') + '</div>';
 
   // Panel name
   var panelNames = ['Hovedtavle','Gruppetavle','Undertavle','Styretavle'];
@@ -9374,7 +9420,8 @@ function renderQR() {
   var qrData = qrState.panelName + '|' + qrState.location + '|' + qrState.voltage + 'V|' + qrState.mainBreaker + 'A|' + qrState.circuitCount + 'kr|' + qrState.installYear;
   var qrSvg = generateQRSvg(qrData);
 
-  html += '<div class="card fade-in qr-print-area"><div class="card-title">' + (t ? 'QR-kode' : 'QR Code') + '</div>';
+  html += '<div class="card fade-in qr-print-area"><div class="card-title">' + (t ? 'Visuelt ID-m\u00f8nster' : 'Visual ID Pattern') + '</div>';
+  html += '<div class="info-row" style="font-size:0.8em;color:var(--text-muted)">' + (t ? 'Ikke en skanbar QR-kode. Bruges kun som visuelt identifikation.' : 'Not a scannable QR code. Used as visual identification only.') + '</div>';
   html += '<div style="text-align:center;padding:20px;background:white;border-radius:8px;border:1px solid var(--border)">' + qrSvg + '</div>';
   html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + (t ? 'Tavledata' : 'Panel Data') + '</div>';
   html += '<div class="result-row"><span class="label">' + (t ? 'Tavle' : 'Panel') + '</span><span class="value">' + qrState.panelName + '</span></div>';
