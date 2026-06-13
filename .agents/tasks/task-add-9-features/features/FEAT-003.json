@@ -1,0 +1,38 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Add final 3 features: Offline PWA (service worker for offline operation), Exam Mode (practice mode for Danish electrical authorization exam), and QR Panel Labels (generate QR codes for panel identification). PWA is infrastructure; Exam and QR are new modules.",
+  "status": "completed",
+  "steps": [
+    "Step 1: Add translation keys to T.da.modules and T.en.modules for: exam ('Eksamen'/'Exam Mode'), qr ('QR-maerkat'/'QR Labels')",
+    "Step 2: Add all module-specific translation keys in both DA and EN for exam mode (question prompts, score, timer, categories) and QR labels (panel name, location, circuit info)",
+    "Step 3: Implement PWA - Add a <script> block at the end of <head> (before </head>) that registers a service worker inline. Since this is a single-file app, embed the service worker registration and the SW code using a Blob URL approach: create the service worker script as a blob and register it. The SW should cache the HTML file itself for offline use. Add a <link rel='manifest'> with an inline data URI manifest containing: name 'El-Dimensionering', short_name 'ElDim', start_url, display 'standalone', theme_color '#0f4c75', background_color '#f0f4f8'. Add meta tags for PWA: <meta name='theme-color' content='#0f4c75'>, <meta name='apple-mobile-web-app-capable' content='yes'>.",
+    "Step 4: Add state variables: examState (category, currentQuestion, score, totalAnswered, timer, questions array, selectedAnswer, showResult), qrState (panelName, location, circuitCount, voltage, mainBreaker, installDate, customFields)",
+    "Step 5: Create renderExam() function - Danish electrical authorization exam practice mode with: category selection via buttons (Forsyning/Installationer/Motorer/Jordsystem/Sikkerhed/Alle), difficulty buttons (Let/Mellem/Svar corresponding to Easy/Medium/Hard), question display with 4 answer options as buttons, score tracking, explanation after answer with DS/HD 60364 clause reference. Include 20+ hardcoded exam questions covering: cable sizing, protection coordination, earthing systems, disconnection times, IP ratings, zone classifications (bathroom/wet rooms), RCD requirements. Each question: {category, difficulty, da:{q,options,correct,explanation,clause}, en:{q,options,correct,explanation,clause}}.",
+    "Step 6: Create renderQR() function - QR panel label generator with: panel name selection (Hovedtavle/Gruppetavle/Undertavle/Styretavle via buttons), location selection (Kaelder/Stueplan/1.sal/2.sal/Teknikrum via buttons), voltage (230V/400V), main breaker rating (25A-630A via buttons), number of circuits (4-72 via buttons), installation year (2020-2026 via buttons). Generate QR code as SVG using a minimal inline QR encoder (implement a simple QR code generator that creates SVG path data - use the alphanumeric mode for the data string). The QR encodes a data string with all panel info. Show the QR SVG preview and a 'print label' button that triggers window.print() with print-specific CSS.",
+    "Step 7: Add 'exam' and 'qr' cases to the renderModule() switch statement",
+    "Step 8: Add self-tests: PWA (verify service worker registration code exists by checking typeof navigator.serviceWorker reference in code), Exam mode (verify question bank has >= 20 questions, verify correct answer index is valid for each), QR module (verify QR SVG generation produces valid SVG string for test input). Add inside runSelfTests().",
+    "Step 9: Update DATA_VERSION to '2026.7' and add a changelog entry describing all 9 new modules."
+  ],
+  "acceptance_criteria": [
+    "PWA manifest and service worker registration code are present in the HTML file",
+    "Exam mode has 20+ questions covering DS/HD 60364 topics with click-only answer selection",
+    "QR module generates visible SVG QR code from panel information selected via buttons",
+    "Both exam and qr modules appear in navigation in DA and EN",
+    "All values selected via buttons - no text inputs anywhere in new modules",
+    "New self-tests pass alongside all existing tests",
+    "HTML file parses without syntax errors",
+    "DATA_VERSION updated and changelog entry added"
+  ],
+  "verification": [
+    "Run syntax check: node -e \"const fs=require('fs'); const html=fs.readFileSync('el-dimensionering.html','utf8'); const m=html.match(/<script[^>]*>([\\s\\S]*?)<\\/script>/); try{new Function(m[1]);console.log('SYNTAX OK')}catch(e){console.error(e.message);process.exit(1)}\"",
+    "Verify the file contains renderExam, renderQR functions",
+    "Verify manifest data URI or meta tags for PWA are present",
+    "Verify EXAM_QUESTIONS or similar array has >= 20 entries",
+    "Verify T.da.modules contains exam, qr keys",
+    "Verify renderModule switch contains exam, qr cases",
+    "Verify DATA_VERSION is '2026.7'"
+  ],
+  "blocked_reason": null,
+  "findings": "All 69 self-tests pass (4 new tests added: exam bank >= 20, valid answer indices, QR SVG generation, PWA code present). DATA_VERSION updated to 2026.7 with changelog for all 9 modules. PWA uses Blob URL approach for service worker since single-file app. 23 exam questions covering 7 categories (supply, install, motor, earth, cable, protect) with 3 difficulty levels. QR generates deterministic 25x25 matrix SVG."
+}
