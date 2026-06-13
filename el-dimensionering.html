@@ -727,7 +727,23 @@ const T = {
     vTitleOverload: 'Overbelastning (I\u2082 \u2264 1,45\u00D7Iz)',
     vTitleAdiabatic: 'Kortslutningsholdbarhed (k\u00B2S\u00B2 \u2265 I\u00B2t)',
     vTitleZs: 'Fejlsl\u00F8jfe / udkobling (Zs)',
-    cableVerifyTitle: 'Korrekthedskontrol'
+    cableVerifyTitle: 'Korrekthedskontrol',
+    // Auto-dimensioning solver (Feature: auto-dimensioning-solver)
+    solverTitle: 'Auto-dimensionering',
+    solverInfo: 'Finder automatisk det mindste kompatible {kabel, beskyttelsesenhed, RCD}-sæt iht. DS/HD 60364.',
+    solverBtn: 'Find optimal sæt',
+    solverApply: 'Anvend',
+    solverRecommended: 'Anbefalet',
+    solverAlt: 'Alternativ',
+    solverNoSolution: 'Ingen kompatibel løsning fundet.',
+    solverLength: 'Kabellængde [m]',
+    solverSolving: 'Beregner...',
+    solverSystemType: 'Jordingssystem',
+    solverTemp: 'Temperatur [°C]',
+    solverGrouping: 'Gruppering',
+    solverInstall: 'Fremføringsmetode',
+    solverResults: 'Resultater',
+    solverGoverning: 'Styrende begrænsning'
   },
   en: {
     appTitle: 'Electrical Dimensioning',
@@ -841,7 +857,23 @@ const T = {
     vTitleOverload: 'Overload (I\u2082 \u2264 1.45\u00D7Iz)',
     vTitleAdiabatic: 'Short-circuit withstand (k\u00B2S\u00B2 \u2265 I\u00B2t)',
     vTitleZs: 'Fault loop / disconnection (Zs)',
-    cableVerifyTitle: 'Correctness verification'
+    cableVerifyTitle: 'Correctness verification',
+    // Auto-dimensioning solver (Feature: auto-dimensioning-solver)
+    solverTitle: 'Auto-dimensioning',
+    solverInfo: 'Automatically finds the smallest compliant {cable, protection device, RCD} set per DS/HD 60364.',
+    solverBtn: 'Find optimal set',
+    solverApply: 'Apply',
+    solverRecommended: 'Recommended',
+    solverAlt: 'Alternative',
+    solverNoSolution: 'No compliant solution found.',
+    solverLength: 'Cable length [m]',
+    solverSolving: 'Solving...',
+    solverSystemType: 'Earthing system',
+    solverTemp: 'Temperature [°C]',
+    solverGrouping: 'Grouping',
+    solverInstall: 'Installation method',
+    solverResults: 'Results',
+    solverGoverning: 'Governing constraint'
   }
 };
 
@@ -2802,6 +2834,9 @@ let scState = { zNet: 1, zTrafo: 5 };
 // rcdIDn 0.3 A (hardest TT condition). tClear/soilResistivity null → device-derived /
 // conservative default.
 let verdictState = { systemType: 'TN', circuitCategory: 'final', tClear: null, rcdIDn: 0.3, soilResistivity: null };
+// Auto-dimensioning solver state (click-only inputs)
+let solverState = { systemType: 'TN', circuitCategory: 'final', cableLength: 25, installMethod: 'C', temp: 30, grouping: 1, soil: null, expanded: false };
+let solverResult = null; // cached last solve result for rendering
 // Standards state
 let rcdSelected = null;
 let rcdSensitivity = null;
@@ -3315,6 +3350,374 @@ function renderMCCB() {
   `;
 }
 
+// ===== AUTO-DIMENSIONING SOLVER (Feature: auto-dimensioning-solver) =====
+// Life-safety-critical: every verdict cites DS/HD 60364, conservative always.
+// Exhaustive search with early-exit pipeline: ampacity → overload → adiabatic → Zs → ΔU.
+
+function preFilterCandidates(ib) {
+  var cables = PRODUCTS.cables.filter(function(c) {
+    return officialIz(c) >= ib;
+  });
+  var devices = [];
+  PRODUCTS.mcbs.forEach(function(m) {
+    if (m.rating >= ib) {
+      devices.push({ id: m.id, kind: 'mcb', inA: m.rating, curve: m.curve, icu: m.icu, brand: m.brand, model: m.model, i5s: null, _src: m });
+    }
+  });
+  PRODUCTS.mccbs.forEach(function(m) {
+    (m.inOptions || []).forEach(function(inVal) {
+      if (inVal >= ib) {
+        devices.push({ id: m.id + '-' + inVal, kind: 'mccb', inA: inVal, curve: null, icu: m.icu, brand: m.brand, model: m.model + ' @ ' + inVal + 'A', i5s: null, _src: m });
+      }
+    });
+  });
+  PRODUCTS.fuses.forEach(function(f) {
+    if (f.rating >= ib) {
+      devices.push({ id: f.id, kind: 'fuse', inA: f.rating, curve: null, icu: f.icu, brand: f.brand, model: f.model, i5s: f.i5s || null, _src: f });
+    }
+  });
+  return { cables: cables, devices: devices };
+}
+
+function rankCompliantSets(sets) {
+  var CURVE_ORDER = { B: 0, C: 1, D: 2 };
+  return sets.slice().sort(function(a, b) {
+    if (a.cable.mm2 !== b.cable.mm2) return a.cable.mm2 - b.cable.mm2;
+    if (a.inA !== b.inA) return a.inA - b.inA;
+    var curveA = CURVE_ORDER[a.device.curve] != null ? CURVE_ORDER[a.device.curve] : 1;
+    var curveB = CURVE_ORDER[b.device.curve] != null ? CURVE_ORDER[b.device.curve] : 1;
+    if (curveA !== curveB) return curveA - curveB;
+    if (a.device.icu !== b.device.icu) return b.device.icu - a.device.icu;
+    var rcdA = a.rcd ? 0 : 1;
+    var rcdB = b.rcd ? 0 : 1;
+    return rcdA - rcdB;
+  });
+}
+
+function computeZsForCandidate(cable, cableLength) {
+  if (!cable || typeof cable.r !== 'number' || typeof cable.x !== 'number') return NaN;
+  if (typeof cableLength !== 'number' || cableLength <= 0) return NaN;
+  if (typeof scState.zNet !== 'number' || typeof scState.zTrafo !== 'number') return NaN;
+  var L_km = cableLength / 1000;
+  var rCable = cable.r * L_km;
+  var xCable = cable.x * L_km;
+  var zCable_mOhm = Math.sqrt(rCable * rCable + xCable * xCable) * 1000;
+  var zTotal_mOhm = scState.zNet + scState.zTrafo + zCable_mOhm;
+  return Math.ceil(zTotal_mOhm / 1000 * 100) / 100;
+}
+
+function computeVdropForCandidate(cable, ib, env) {
+  if (!cable || typeof cable.r !== 'number' || typeof cable.x !== 'number') return Infinity;
+  var L_km = env.cableLength / 1000;
+  var cosP = loadState.cosPhi || 0.9;
+  var sinP = Math.sqrt(1 - cosP * cosP);
+  var rX = cable.r * cosP + cable.x * sinP;
+  var is3phase = (loadState.voltage === '3x400');
+  var Unom = is3phase ? 400 : 230;
+  var factor = is3phase ? Math.sqrt(3) : 2;
+  var deltaU_V = factor * ib * L_km * rX;
+  return (deltaU_V / Unom) * 100;
+}
+
+function findBestRCD(deviceInA, zsActual, env) {
+  var compatible = PRODUCTS.rcds.filter(function(rcd) {
+    if (rcd.rating < deviceInA) return false;
+    var iDn_A = rcd.sensitivity / 1000;
+    return (zsActual * iDn_A) <= 50;
+  });
+  if (compatible.length === 0) return null;
+  compatible.sort(function(a, b) {
+    if (a.sensitivity !== b.sensitivity) return a.sensitivity - b.sensitivity;
+    return a.rating - b.rating;
+  });
+  return compatible[0];
+}
+
+function computeIscForSolver(env) {
+  var Un = (loadState.voltage === '3x400') ? 400 : 230;
+  var zSource_mOhm = scState.zNet + scState.zTrafo;
+  if (!isFinite(zSource_mOhm) || zSource_mOhm <= 0) return NaN;
+  return (1.05 * Un) / (Math.sqrt(3) * zSource_mOhm / 1000);
+}
+
+function deriveTClearForSolver(device, env) {
+  var reqTime = requiredDisconnectionTime(env.systemType, env.circuitCategory, device.inA);
+  if (reqTime != null) return reqTime;
+  return 5;
+}
+
+function buildZsVerdictTT(zsActual, iDn_A) {
+  var product = zsActual * iDn_A;
+  var zsMax = 50 / iDn_A;
+  var pass = product <= 50;
+  return {
+    id: 'zs', state: pass ? 'PASS' : 'FAIL',
+    clause: 'DS/HD 60364-4-41 §411.5',
+    values: { zsActual: round2(zsActual), zsMax: round2(zsMax), rcdIDn: iDn_A, touchVoltage: round2(product) },
+    message: pass
+      ? { da: 'Zs×IΔn = ' + round2(product) + 'V ≤ 50V — RCD-fejlbeskyttelse OK (TT).', en: 'Zs×IΔn = ' + round2(product) + 'V ≤ 50V — RCD fault protection OK (TT).' }
+      : { da: 'Zs×IΔn = ' + round2(product) + 'V > 50V — fejlbeskyttelse ikke opfyldt.', en: 'Zs×IΔn = ' + round2(product) + 'V > 50V — fault protection not met.' },
+    recommendation: null
+  };
+}
+
+function buildZsVerdictTN(zsActual, device, env) {
+  var reqTime = requiredDisconnectionTime(env.systemType, env.circuitCategory, device.inA);
+  var iaRes = deriveIa(device, reqTime);
+  if (!iaRes.known || !isFinite(iaRes.ia) || iaRes.ia <= 0 || !isFinite(zsActual)) {
+    return {
+      id: 'zs', state: 'INSUFFICIENT_DATA',
+      clause: 'DS/HD 60364-4-41 §411.4',
+      values: { zsActual: round2(zsActual), ia: iaRes.known ? round2(iaRes.ia) : null },
+      message: { da: 'Ia eller Zs mangler — kan ikke vurdere udkobling.', en: 'Ia or Zs missing — cannot evaluate disconnection.' },
+      recommendation: null
+    };
+  }
+  var u0 = 230;
+  var zsMax = u0 / iaRes.ia;
+  var pass = zsActual <= zsMax;
+  return {
+    id: 'zs', state: pass ? 'PASS' : 'FAIL',
+    clause: 'DS/HD 60364-4-41 §411.4',
+    values: { zsActual: round2(zsActual), zsMax: round2(zsMax), ia: round2(iaRes.ia), reqTime: reqTime, u0: u0 },
+    message: pass
+      ? { da: 'Zs = ' + round2(zsActual) + 'Ω ≤ Zs_max = ' + round2(zsMax) + 'Ω — udkobling OK (TN).', en: 'Zs = ' + round2(zsActual) + 'Ω ≤ Zs_max = ' + round2(zsMax) + 'Ω — disconnection OK (TN).' }
+      : { da: 'Zs = ' + round2(zsActual) + 'Ω > Zs_max = ' + round2(zsMax) + 'Ω — udkobling ikke sikret.', en: 'Zs = ' + round2(zsActual) + 'Ω > Zs_max = ' + round2(zsMax) + 'Ω — disconnection not assured.' },
+    recommendation: null
+  };
+}
+
+function evaluateCandidateSet(cable, device, deratedIz, ib, env) {
+  var verdicts = {};
+  var rcd = null;
+  // CHECK 1: Ampacity IB ≤ In ≤ Derated_Iz (§523)
+  var ampState, ampClause = 'DS/HD 60364-5-52 §523';
+  if (ib <= device.inA && device.inA <= deratedIz) { ampState = 'PASS'; } else { ampState = 'FAIL'; }
+  verdicts.ampacity = {
+    id: 'ampacity', state: ampState, clause: ampClause,
+    values: { ib: round2(ib), inA: round2(device.inA), deratedIz: round2(deratedIz) },
+    message: ampState === 'PASS'
+      ? { da: 'IB ≤ In ≤ Iz: ' + round2(ib) + ' ≤ ' + device.inA + ' ≤ ' + round2(deratedIz) + ' A — OK.', en: 'IB ≤ In ≤ Iz: ' + round2(ib) + ' ≤ ' + device.inA + ' ≤ ' + round2(deratedIz) + ' A — OK.' }
+      : { da: 'Ampacity fejler: IB=' + round2(ib) + ', In=' + device.inA + ', Iz=' + round2(deratedIz), en: 'Ampacity fails: IB=' + round2(ib) + ', In=' + device.inA + ', Iz=' + round2(deratedIz) },
+    recommendation: null
+  };
+  if (ampState !== 'PASS') {
+    return { cable: cable, device: device, rcd: null, deratedIz: deratedIz, inA: device.inA, verdicts: verdicts, compliant: false, failedCheck: 'ampacity', reason: ampState, deviceKind: device.kind };
+  }
+  // CHECK 2: Overload I2 ≤ 1.45 × Derated_Iz (§433.1)
+  verdicts.overload = checkOverloadI2({ device: device, deratedIz: deratedIz });
+  if (verdicts.overload.state !== 'PASS') {
+    return { cable: cable, device: device, rcd: null, deratedIz: deratedIz, inA: device.inA, verdicts: verdicts, compliant: false, failedCheck: 'overload', reason: verdicts.overload.state, deviceKind: device.kind };
+  }
+  // CHECK 3: Adiabatic k²S² ≥ I²t (§434.5.2)
+  var insulation = insulationForType(cable.model);
+  var material = cable.material;
+  var isc = computeIscForSolver(env);
+  var tClear = deriveTClearForSolver(device, env);
+  verdicts.adiabatic = checkAdiabatic({ material: material, insulation: insulation, sArea: cable.mm2, isc: isc, tClear: tClear });
+  if (verdicts.adiabatic.state !== 'PASS') {
+    return { cable: cable, device: device, rcd: null, deratedIz: deratedIz, inA: device.inA, verdicts: verdicts, compliant: false, failedCheck: 'adiabatic', reason: verdicts.adiabatic.state, deviceKind: device.kind };
+  }
+  // CHECK 4: Zs / disconnection (§411)
+  var zsActual = computeZsForCandidate(cable, env.cableLength);
+  var zsCeil = Math.ceil(zsActual * 100) / 100;
+  if (env.systemType === 'TT') {
+    rcd = findBestRCD(device.inA, zsCeil, env);
+    if (rcd) {
+      verdicts.zs = buildZsVerdictTT(zsCeil, rcd.sensitivity / 1000);
+    } else {
+      verdicts.zs = { id: 'zs', state: 'FAIL', clause: 'DS/HD 60364-4-41 §411.5', values: { zsActual: zsCeil }, message: { da: 'Ingen kompatibel RCD giver Zs×IΔn ≤ 50V.', en: 'No compatible RCD achieves Zs×IΔn ≤ 50V.' }, recommendation: null };
+    }
+  } else {
+    verdicts.zs = buildZsVerdictTN(zsCeil, device, env);
+    if (verdicts.zs.state !== 'PASS') {
+      rcd = findBestRCD(device.inA, zsCeil, env);
+      if (rcd) {
+        verdicts.zs = buildZsVerdictTT(zsCeil, rcd.sensitivity / 1000);
+        verdicts.zs.clause = 'DS/HD 60364-4-41 §411.4 (+ RCD §411.3.3)';
+      }
+    }
+  }
+  if (verdicts.zs.state !== 'PASS') {
+    return { cable: cable, device: device, rcd: rcd, deratedIz: deratedIz, inA: device.inA, verdicts: verdicts, compliant: false, failedCheck: 'zs', reason: verdicts.zs.state, deviceKind: device.kind };
+  }
+  // CHECK 5: Voltage drop ΔU ≤ 4% (§525)
+  var vdrop = computeVdropForCandidate(cable, ib, env);
+  var vdropClause = 'DS/HD 60364-5-52 §525';
+  verdicts.vdrop = {
+    id: 'vdrop', state: (vdrop <= 4.0) ? 'PASS' : 'FAIL', clause: vdropClause,
+    values: { deltaU_pct: round2(vdrop), limit: 4.0, length: env.cableLength },
+    message: (vdrop <= 4.0)
+      ? { da: 'ΔU = ' + round2(vdrop) + '% ≤ 4% — OK.', en: 'ΔU = ' + round2(vdrop) + '% ≤ 4% — OK.' }
+      : { da: 'ΔU = ' + round2(vdrop) + '% > 4% — for stor.', en: 'ΔU = ' + round2(vdrop) + '% > 4% — excessive.' },
+    recommendation: (vdrop <= 4.0) ? null : { da: 'Vælg større tværsnit eller kortere kabel.', en: 'Choose larger cross-section or shorter cable.' }
+  };
+  if (verdicts.vdrop.state !== 'PASS') {
+    return { cable: cable, device: device, rcd: rcd, deratedIz: deratedIz, inA: device.inA, verdicts: verdicts, compliant: false, failedCheck: 'vdrop', reason: 'FAIL', deviceKind: device.kind };
+  }
+  // ALL 5 PASS
+  return { cable: cable, device: device, rcd: rcd, deratedIz: deratedIz, inA: device.inA, verdicts: verdicts, compliant: true, failedCheck: null, reason: null, deviceKind: device.kind };
+}
+
+function solveOptimalSet(opts) {
+  opts = opts || {};
+  var t0 = performance.now();
+  var ib = (typeof opts.ib === 'number' && opts.ib > 0) ? opts.ib : calcIB();
+  if (!isFinite(ib) || ib <= 0) {
+    return { ranked: [], totalEvaluated: 0, totalCompliant: 0, exclusionLog: [], elapsedMs: 0, noSolutionClause: null };
+  }
+  var env = {
+    systemType: opts.systemType || solverState.systemType,
+    circuitCategory: opts.circuitCategory || solverState.circuitCategory,
+    cableLength: opts.cableLength || solverState.cableLength,
+    installMethod: opts.installMethod || solverState.installMethod,
+    temp: opts.temp != null ? opts.temp : solverState.temp,
+    grouping: opts.grouping != null ? opts.grouping : solverState.grouping,
+    soil: opts.soil !== undefined ? opts.soil : solverState.soil
+  };
+  var buried = (env.installMethod === 'D');
+  var filtered = preFilterCandidates(ib);
+  var compliantSets = [];
+  var exclusionLog = [];
+  var totalEvaluated = 0;
+  for (var ci = 0; ci < filtered.cables.length; ci++) {
+    var cable = filtered.cables[ci];
+    var baseIz = officialIz(cable);
+    var dRes = computeDeratedIz({ baseIz: baseIz, caKey: env.temp, cgKey: env.grouping, csKey: env.soil, kInstallKey: env.installMethod, buried: buried });
+    if (!dRes.ok) {
+      exclusionLog.push({ cableId: cable.id, deviceId: '*', failedCheck: 'derating', reason: dRes.error });
+      continue;
+    }
+    var deratedIz = dRes.deratedIz;
+    if (deratedIz < ib) {
+      exclusionLog.push({ cableId: cable.id, deviceId: '*', failedCheck: 'ampacity_post_derating', reason: 'Derated_Iz < IB' });
+      continue;
+    }
+    for (var di = 0; di < filtered.devices.length; di++) {
+      var device = filtered.devices[di];
+      totalEvaluated++;
+      var result = evaluateCandidateSet(cable, device, deratedIz, ib, env);
+      if (result.compliant) {
+        compliantSets.push(result);
+      } else {
+        exclusionLog.push({ cableId: cable.id, deviceId: device.id, failedCheck: result.failedCheck, reason: result.reason });
+      }
+    }
+  }
+  var finalSets = compliantSets;
+  if (env.systemType === 'TT') {
+    finalSets = compliantSets.filter(function(s) { return s.rcd !== null; });
+  }
+  var ranked = rankCompliantSets(finalSets).slice(0, 4);
+  var noSolutionClause = null;
+  if (ranked.length === 0 && exclusionLog.length > 0) {
+    var freq = {};
+    exclusionLog.forEach(function(e) { var key = e.failedCheck || 'unknown'; freq[key] = (freq[key] || 0) + 1; });
+    noSolutionClause = Object.keys(freq).reduce(function(a, b) { return freq[a] >= freq[b] ? a : b; });
+  }
+  var elapsedMs = performance.now() - t0;
+  return { ranked: ranked, totalEvaluated: totalEvaluated, totalCompliant: finalSets.length, exclusionLog: exclusionLog, elapsedMs: elapsedMs, noSolutionClause: noSolutionClause };
+}
+
+function renderSolverPanel() {
+  var html = '';
+  html += '<div class="info-row">' + t('solverInfo') + '</div>';
+  // System type
+  html += '<div class="select-group"><div class="select-label">' + t('solverSystemType') + '</div><div class="select-grid">';
+  ['TN', 'TT'].forEach(function(st) {
+    html += '<button class="sel-btn ' + (solverState.systemType === st ? 'selected' : '') + '" onclick="solverState.systemType=\'' + st + '\';solverResult=null;renderModule(\'cable\')">' + st + '</button>';
+  });
+  html += '</div></div>';
+  // Cable length
+  var lengths = [5,10,15,20,25,30,40,50,60,70,80,100,125,150];
+  html += '<div class="select-group"><div class="select-label">' + t('solverLength') + '</div><div class="select-grid">';
+  lengths.forEach(function(l) {
+    html += '<button class="sel-btn ' + (solverState.cableLength === l ? 'selected' : '') + '" onclick="solverState.cableLength=' + l + ';solverResult=null;renderModule(\'cable\')">' + l + '</button>';
+  });
+  html += '</div></div>';
+  // Install method
+  html += '<div class="select-group"><div class="select-label">' + t('solverInstall') + '</div><div class="select-grid">';
+  Object.keys(INSTALL_METHODS).forEach(function(k) {
+    html += '<button class="sel-btn ' + (solverState.installMethod === k ? 'selected' : '') + '" onclick="solverState.installMethod=\'' + k + '\';solverResult=null;renderModule(\'cable\')">' + k + ' (' + INSTALL_METHODS[k] + ')</button>';
+  });
+  html += '</div></div>';
+  // Temperature
+  html += '<div class="select-group"><div class="select-label">' + t('solverTemp') + '</div><div class="select-grid">';
+  Object.keys(TEMP_FACTORS).forEach(function(k) {
+    html += '<button class="sel-btn ' + (solverState.temp === parseInt(k) ? 'selected' : '') + '" onclick="solverState.temp=' + k + ';solverResult=null;renderModule(\'cable\')">' + k + '° (' + TEMP_FACTORS[k] + ')</button>';
+  });
+  html += '</div></div>';
+  // Grouping
+  html += '<div class="select-group"><div class="select-label">' + t('solverGrouping') + '</div><div class="select-grid">';
+  Object.keys(GROUP_FACTORS).forEach(function(k) {
+    html += '<button class="sel-btn ' + (solverState.grouping === parseInt(k) ? 'selected' : '') + '" onclick="solverState.grouping=' + k + ';solverResult=null;renderModule(\'cable\')">' + k + ' (' + GROUP_FACTORS[k] + ')</button>';
+  });
+  html += '</div></div>';
+  // Solve button
+  html += '<div style="text-align:center;margin:16px 0"><button class="sel-btn selected" style="padding:14px 32px;font-size:1rem;min-width:220px" onclick="solverResult=solveOptimalSet();renderModule(\'cable\')">⚡ ' + t('solverBtn') + '</button></div>';
+  // Results
+  if (solverResult) {
+    html += '<div style="margin-top:12px;font-size:0.72rem;color:var(--text-muted)">' + (lang === 'da' ? 'Evalueret ' : 'Evaluated ') + solverResult.totalEvaluated + (lang === 'da' ? ' par, ' : ' pairs, ') + solverResult.totalCompliant + (lang === 'da' ? ' kompatible i ' : ' compliant in ') + solverResult.elapsedMs.toFixed(1) + ' ms</div>';
+    if (solverResult.ranked.length > 0) {
+      solverResult.ranked.forEach(function(s, idx) {
+        var badge = idx === 0 ? t('solverRecommended') : ('#' + (idx + 1) + ' ' + t('solverAlt'));
+        var badgeColor = idx === 0 ? 'var(--success)' : 'var(--primary-light)';
+        html += '<div class="result-box' + (idx === 0 ? '' : ' warning') + '" style="margin-top:10px">';
+        html += '<div class="result-title" style="color:' + badgeColor + '">' + badge + '</div>';
+        html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Kabel' : 'Cable') + '</span><span class="value">' + s.cable.brand + ' ' + s.cable.model + ' ' + s.cable.mm2 + 'mm² ' + s.cable.material + '</span></div>';
+        html += '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Beskyttelse' : 'Device') + '</span><span class="value">' + s.device.brand + ' ' + s.device.model + (s.device.curve ? ' ' + s.device.curve : '') + ' ' + s.device.inA + 'A (' + s.device.icu + 'kA)</span></div>';
+        if (s.rcd) {
+          html += '<div class="result-row"><span class="label">RCD</span><span class="value">' + s.rcd.brand + ' ' + s.rcd.model + ' ' + s.rcd.sensitivity + 'mA ' + s.rcd.rcdType + '</span></div>';
+        }
+        html += '<div class="result-row"><span class="label">Iz (derated)</span><span class="value">' + round2(s.deratedIz) + ' A</span></div>';
+        // 5 verdict badges
+        html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin:8px 0">';
+        ['ampacity', 'overload', 'adiabatic', 'zs', 'vdrop'].forEach(function(vk) {
+          var v = s.verdicts[vk];
+          if (v) { html += '<span class="verify-badge ok" title="' + v.clause + '">✓ ' + vk + '</span>'; }
+        });
+        html += '</div>';
+        // Apply button
+        html += '<button class="sel-btn" style="margin-top:6px;width:100%;padding:10px" onclick="applySolverResult(' + idx + ')">✔ ' + t('solverApply') + '</button>';
+        html += '</div>';
+      });
+    } else {
+      // No solution
+      html += '<div class="result-box error" style="margin-top:10px"><div class="result-title">' + t('solverNoSolution') + '</div>';
+      if (solverResult.noSolutionClause) {
+        html += '<div class="result-row"><span class="label">' + t('solverGoverning') + '</span><span class="value">' + solverResult.noSolutionClause + '</span></div>';
+      }
+      html += '</div>';
+    }
+  }
+  return html;
+}
+
+function applySolverResult(idx) {
+  if (!solverResult || !solverResult.ranked[idx]) return;
+  var s = solverResult.ranked[idx];
+  // Update cableState
+  cableState.material = s.cable.material === 'Cu' ? 'copper' : 'aluminium';
+  cableState.crossSection = String(s.cable.mm2);
+  // Try to match type/cores from PRODUCTS
+  if (/NOIKLX/.test(s.cable.model)) cableState.type = 'NOIKLX';
+  else if (/NOIKX-Flex/.test(s.cable.model)) cableState.type = 'NOIKX-Flex';
+  else if (/NOIK-AL/.test(s.cable.model)) cableState.type = 'NOIK-AL-M';
+  if (s.cable.cores) cableState.cores = s.cable.cores;
+  // Update protection state
+  if (s.deviceKind === 'mcb') {
+    mcbState.type = s.device._src.model || mcbState.type;
+    mcbState.curve = s.device.curve || mcbState.curve;
+    mcbState.rating = s.device.inA;
+  } else if (s.deviceKind === 'fuse') {
+    fuseState.size = s.device.inA;
+  }
+  // Collapse solver
+  solverState.expanded = false;
+  solverResult = null;
+  renderModule('cable');
+}
+
 // ===== CABLE MODULE =====
 function renderCable() {
   const cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
@@ -3455,6 +3858,14 @@ function renderCable() {
       </div>
     </div>
     ` : ''}
+
+    <div class="card fade-in" style="margin-top:16px;">
+      <div class="card-title" style="cursor:pointer" onclick="solverState.expanded=!solverState.expanded;renderModule('cable')">
+        \u26A1 ${lang==='da'?'Auto-dimensionering':'Auto-dimensioning'}
+        <span style="margin-left:auto;font-size:0.8em">${solverState.expanded?'\u25BC':'\u25B6'}</span>
+      </div>
+      ${solverState.expanded ? renderSolverPanel() : ''}
+    </div>
   `;
 }
 
@@ -4993,8 +5404,9 @@ function configurePriceFeed() {
 })();
 
 // ===== DATA VERSION & CHANGELOG =====
-const DATA_VERSION = '2026.4';
+const DATA_VERSION = '2026.5';
 const DATA_CHANGELOG = [
+  { v: '2026.5', date: '2026-06-13', da: 'Auto-dimensionering solver: et klik finder mindste DS/HD 60364-kompatible {kabel, enhed, RCD}-sæt. Udtømmende søgning med 5-tjek compliance-gate. Konservativ: gulv Iz, loft Zs, ekskludér ved tvivl. TT håndhæver RCD. Rangeret output: Anbefalet + op til 3 alternativer.', en: 'Auto-dimensioning solver: one click finds smallest DS/HD 60364 compliant {cable, device, RCD} set. Exhaustive search with 5-check compliance gate. Conservative: floor Iz, ceiling Zs, exclude on doubt. TT enforces RCD. Ranked output: Recommended + up to 3 alternatives.' },
   { v: '2026.4', date: '2026-06-12', da: 'Korrekthedsh\u00E6rdning: derating styrer nu ALLE verdikter (\u00A7523), overbelastning I\u2082\u22641,45\u00B7Iz (\u00A7433.1), adiabatisk kortslutningsholdbarhed k\u00B2S\u00B2\u2265I\u00B2t (\u00A7434.5.2), og Zs/udkoblingstid (\u00A7411). INSUFFICIENT_DATA-tilstand: aldrig PASS uden bevis.', en: 'Correctness hardening: derating now drives ALL verdicts (\u00A7523), overload I\u2082\u22641.45\u00B7Iz (\u00A7433.1), adiabatic short-circuit withstand k\u00B2S\u00B2\u2265I\u00B2t (\u00A7434.5.2), and Zs/disconnection time (\u00A7411). INSUFFICIENT_DATA state: never PASS without proof.' },
   { v: '2026.3', date: '2026-06-12', da: 'Back-up koordinering (IEC 60947-2 Annex A), ledningsnumre/klemmeplan (DS/EN 81346-2), og installationsrisikomatrix (DS/HD 60364-1 §131) tilføjet.', en: 'Back-up coordination (IEC 60947-2 Annex A), wire numbering/terminal plans (DS/EN 81346-2), and installation risk matrix (DS/HD 60364-1 §131) added.' },
   { v: '2026.2', date: '2026-06-11', da: 'Sikringer hardet mod Siemens 5SE2/3NA & TYTAN katalogerne (IEC 60269). D03-størrelse tilføjet. Frakoblingstid- og selektivitetskontrol.', en: 'Fuses hardened against Siemens 5SE2/3NA & TYTAN catalogs (IEC 60269). D03 size added. Disconnection-time and selectivity checks.' },
@@ -5747,6 +6159,132 @@ function runSelfTests() {
       const valid = !!(v && (v.state === 'PASS' || v.state === 'FAIL' || v.state === 'INSUFFICIENT_DATA') && typeof v.clause === 'string' && v.clause.length > 0);
       T.push({ name: 'Verdikt: ' + titles[id] + ' (' + (v ? v.clause : '\u2014') + ')', exp: 'PASS|FAIL|INSUFFICIENT_DATA + clause', act: v ? v.state : 'no bundle', pass: valid });
     });
+  })();
+
+  // ==========================================================================
+  // ===== PROPERTY-BASED SELF-TESTS — Auto-dimensioning solver ===============
+  // Feature: auto-dimensioning-solver. ~50-100 iterations per property.
+  // ==========================================================================
+
+  // Feature: auto-dimensioning-solver, Property 1: Master Safety Invariant
+  (function () {
+    const saveLoad = JSON.parse(JSON.stringify(loadState));
+    const saveSc = JSON.parse(JSON.stringify(scState));
+    let pass = true, fail = null;
+    const sysTypes = ['TN', 'TT'];
+    const lenOpts = [5,10,15,20,25,30,40,50,60,70,80,100];
+    for (let i = 0; i < 50 && pass; i++) {
+      const ib = Math.round((Math.random() * 124 + 1) * 10) / 10;
+      loadState.power = ib * (loadState.voltage === '3x400' ? Math.sqrt(3) * 0.4 * 0.9 : 0.23) / 1000;
+      const sType = rnd(sysTypes);
+      const cLen = rnd(lenOpts);
+      const iMethod = rnd(kKeysA);
+      const tmp = rnd(caKeysN);
+      const grp = rnd(cgKeysN);
+      const res = solveOptimalSet({ ib: ib, systemType: sType, cableLength: cLen, installMethod: iMethod, temp: tmp, grouping: grp, soil: null });
+      for (let j = 0; j < res.ranked.length && pass; j++) {
+        const s = res.ranked[j];
+        ['ampacity', 'overload', 'adiabatic', 'zs', 'vdrop'].forEach(function(vk) {
+          if (s.verdicts[vk] && s.verdicts[vk].state !== 'PASS') { pass = false; fail = 'set ' + j + ' vk=' + vk + ' state=' + s.verdicts[vk].state + ' ib=' + ib; }
+        });
+      }
+    }
+    loadState = saveLoad; scState = saveSc;
+    T.push({ name: 'Solver Prop 1: all outputs fully compliant (50×)', exp: 'all PASS', act: pass ? 'all PASS' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: auto-dimensioning-solver, Property 2: Ampacity Coordination
+  (function () {
+    let pass = true, fail = null;
+    for (let i = 0; i < 50 && pass; i++) {
+      const ib = Math.round((Math.random() * 100 + 1) * 10) / 10;
+      const res = solveOptimalSet({ ib: ib, systemType: 'TN', cableLength: 25, installMethod: 'C', temp: 30, grouping: 1, soil: null });
+      for (let j = 0; j < res.ranked.length && pass; j++) {
+        const s = res.ranked[j];
+        if (!(ib <= s.inA && s.inA <= s.deratedIz)) { pass = false; fail = 'ib=' + ib + ' In=' + s.inA + ' Iz=' + s.deratedIz; }
+      }
+    }
+    T.push({ name: 'Solver Prop 2: IB ≤ In ≤ Derated_Iz (50×)', exp: 'all ok', act: pass ? 'all ok' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: auto-dimensioning-solver, Property 5: Voltage Drop ≤ 4%
+  (function () {
+    let pass = true, fail = null;
+    for (let i = 0; i < 50 && pass; i++) {
+      const ib = Math.round((Math.random() * 80 + 1) * 10) / 10;
+      const cLen = rnd([10,20,30,40,50,60,80,100]);
+      const res = solveOptimalSet({ ib: ib, systemType: 'TN', cableLength: cLen, installMethod: 'C', temp: 30, grouping: 1, soil: null });
+      for (let j = 0; j < res.ranked.length && pass; j++) {
+        const v = res.ranked[j].verdicts.vdrop;
+        if (v && v.values && v.values.deltaU_pct > 4.0) { pass = false; fail = 'ΔU=' + v.values.deltaU_pct + '% ib=' + ib + ' L=' + cLen; }
+      }
+    }
+    T.push({ name: 'Solver Prop 5: ΔU ≤ 4% for all outputs (50×)', exp: 'all ≤4%', act: pass ? 'all ≤4%' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: auto-dimensioning-solver, Property 6: TT → RCD required
+  (function () {
+    let pass = true, fail = null;
+    for (let i = 0; i < 50 && pass; i++) {
+      const ib = Math.round((Math.random() * 50 + 1) * 10) / 10;
+      const res = solveOptimalSet({ ib: ib, systemType: 'TT', cableLength: 25, installMethod: 'C', temp: 30, grouping: 1, soil: null });
+      for (let j = 0; j < res.ranked.length && pass; j++) {
+        if (!res.ranked[j].rcd) { pass = false; fail = 'TT set without RCD, ib=' + ib; }
+      }
+    }
+    T.push({ name: 'Solver Prop 6: TT → every set has RCD (50×)', exp: 'all have RCD', act: pass ? 'all have RCD' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: auto-dimensioning-solver, Property 8: Ranking order mm2↑ then In↑
+  (function () {
+    let pass = true, fail = null;
+    for (let i = 0; i < 50 && pass; i++) {
+      const ib = Math.round((Math.random() * 100 + 1) * 10) / 10;
+      const res = solveOptimalSet({ ib: ib, systemType: 'TN', cableLength: 25, installMethod: 'C', temp: 30, grouping: 1, soil: null });
+      for (let j = 0; j + 1 < res.ranked.length && pass; j++) {
+        const a = res.ranked[j], b = res.ranked[j + 1];
+        if (a.cable.mm2 > b.cable.mm2) { pass = false; fail = 'mm2 order ' + a.cable.mm2 + '>' + b.cable.mm2; }
+        if (a.cable.mm2 === b.cable.mm2 && a.inA > b.inA) { pass = false; fail = 'In order ' + a.inA + '>' + b.inA + ' at mm2=' + a.cable.mm2; }
+      }
+    }
+    T.push({ name: 'Solver Prop 8: ranked mm²↑ then In↑ (50×)', exp: 'ordered', act: pass ? 'ordered' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: auto-dimensioning-solver, Property 9: Output length = min(4, totalCompliant)
+  (function () {
+    let pass = true, fail = null;
+    for (let i = 0; i < 50 && pass; i++) {
+      const ib = Math.round((Math.random() * 100 + 1) * 10) / 10;
+      const res = solveOptimalSet({ ib: ib, systemType: 'TN', cableLength: 25, installMethod: 'C', temp: 30, grouping: 1, soil: null });
+      const expected = Math.min(4, res.totalCompliant);
+      if (res.ranked.length !== expected) { pass = false; fail = 'len=' + res.ranked.length + ' exp=' + expected + ' total=' + res.totalCompliant + ' ib=' + ib; }
+    }
+    T.push({ name: 'Solver Prop 9: output len = min(4, compliant) (50×)', exp: 'matches', act: pass ? 'matches' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Feature: auto-dimensioning-solver, Property 11: Conservative rounding
+  (function () {
+    let pass = true, fail = null;
+    for (let i = 0; i < 50 && pass; i++) {
+      const cable = rnd(PRODUCTS.cables);
+      const baseIz = officialIz(cable);
+      const tmp = rnd(caKeysN), grp = rnd(cgKeysN), im = rnd(kKeysA);
+      const dRes = computeDeratedIz({ baseIz: baseIz, caKey: tmp, cgKey: grp, csKey: null, kInstallKey: im, buried: im === 'D' });
+      if (dRes.ok) {
+        const rawIz = baseIz * dRes.totalFactor;
+        if (dRes.deratedIz > rawIz + 1e-9) { pass = false; fail = 'Iz ' + dRes.deratedIz + ' > raw ' + rawIz.toFixed(4); break; }
+      }
+      const cLen = rnd([10,20,30,50,80]);
+      const zsRaw = computeZsForCandidate(cable, cLen);
+      if (isFinite(zsRaw)) {
+        var L_km = cLen / 1000;
+        var rC = cable.r * L_km, xC = cable.x * L_km;
+        var zC_mOhm = Math.sqrt(rC * rC + xC * xC) * 1000;
+        var zRawExact = (scState.zNet + scState.zTrafo + zC_mOhm) / 1000;
+        if (zsRaw < zRawExact - 1e-9) { pass = false; fail = 'Zs ' + zsRaw + ' < raw ' + zRawExact.toFixed(6); break; }
+      }
+    }
+    T.push({ name: 'Solver Prop 11: Iz ≤ raw float, Zs ≥ raw float (50×)', exp: 'conservative', act: pass ? 'conservative' : ('fail ' + fail), pass: pass });
   })();
 
   return T;
