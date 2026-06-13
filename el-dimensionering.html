@@ -582,6 +582,79 @@ body.dark img { filter: brightness(0.92); }
   img { filter: none !important; }
 }
 .print-only { display: none; }
+
+/* ===== DRAWING MODULE ANIMATIONS ===== */
+@keyframes currentFlow {
+  from { stroke-dashoffset: 40; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes currentFlowReverse {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: 40; }
+}
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.4; filter: blur(3px); }
+  50% { opacity: 1; filter: blur(6px); }
+}
+@keyframes particleMove {
+  0% { offset-distance: 0%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+@keyframes neonPulse {
+  0%, 100% { stroke-opacity: 0.6; filter: drop-shadow(0 0 2px currentColor); }
+  50% { stroke-opacity: 1; filter: drop-shadow(0 0 8px currentColor) drop-shadow(0 0 16px currentColor); }
+}
+@keyframes floatUp {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes sparkle {
+  0%, 100% { opacity: 0.3; r: 2; }
+  50% { opacity: 1; r: 4; }
+}
+@keyframes cableGlow3D {
+  0%, 100% { stroke-width: 3; opacity: 0.7; }
+  50% { stroke-width: 5; opacity: 1; }
+}
+@keyframes particle3D {
+  0% { transform: translateX(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateX(var(--travel, 100px)); opacity: 0; }
+}
+@keyframes reflectionShimmer {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.35; }
+}
+@keyframes motorSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.sld-current-line {
+  stroke-dasharray: 12 8;
+  animation: currentFlow 1.2s linear infinite;
+}
+.sld-current-line-reverse {
+  stroke-dasharray: 12 8;
+  animation: currentFlowReverse 1.2s linear infinite;
+}
+.sld-glow-pulse {
+  animation: pulseGlow 2.5s ease-in-out infinite;
+}
+.sld-neon-pulse {
+  animation: neonPulse 2s ease-in-out infinite;
+}
+.sld-float {
+  animation: floatUp 3s ease-in-out infinite;
+}
+.iso-cable-glow {
+  animation: cableGlow3D 2s ease-in-out infinite;
+}
+.iso-reflection {
+  animation: reflectionShimmer 3s ease-in-out infinite;
+}
 </style>
 </head>
 <body>
@@ -4209,21 +4282,51 @@ function renderVerify() {
 let drawStyle = 'schematic'; // 'schematic' | 'iso'
 
 function consumerIcon(c, x, y, scale){
-  // returns SVG for a consumer symbol based on size/phase
-  const big = c.phase === '3' || c.kW >= 5;
+  // Returns SVG for a consumer symbol using IEC-standard representations
   const s = scale || 1;
-  if (big) {
-    // motor / heavy load (circle with M)
-    return `<circle cx="${x}" cy="${y}" r="${13*s}" fill="#0e1b2a" stroke="#00d0ff" stroke-width="2"/>
-      <text x="${x}" y="${y+4*s}" text-anchor="middle" font-size="${12*s}" fill="#00d0ff" font-weight="700">M</text>`;
+  const big = c.phase === '3' || c.kW >= 5;
+  const nm = (c.name||'').toLowerCase();
+  const uid = 'ci'+Math.random().toString(36).slice(2,8);
+
+  // Motor (IEC: circle with M, rotating indicator)
+  if (big || nm.includes('motor') || nm.includes('pumpe') || nm.includes('pump') || nm.includes('ev') || nm.includes('komfur')) {
+    return `<g class="sld-float" style="animation-delay:${Math.random()*2}s">
+      <circle cx="${x}" cy="${y}" r="${16*s}" fill="rgba(0,208,255,0.06)" stroke="url(#motorGrad)" stroke-width="${2.5*s}"/>
+      <circle cx="${x}" cy="${y}" r="${16*s}" fill="none" stroke="#00d0ff" stroke-width="${0.8*s}" stroke-dasharray="3 5" opacity="0.5" style="transform-origin:${x}px ${y}px;animation:motorSpin 4s linear infinite"/>
+      <circle cx="${x}" cy="${y}" r="${9*s}" fill="none" stroke="#00d0ff" stroke-width="${1.2*s}" opacity="0.4"/>
+      <text x="${x}" y="${y+5*s}" text-anchor="middle" font-size="${13*s}" fill="#00d0ff" font-weight="800" font-family="monospace">M</text>
+      <circle cx="${x}" cy="${y}" r="${16*s}" fill="none" stroke="#00d0ff" stroke-width="${1*s}" opacity="0.3" class="sld-glow-pulse"/>
+    </g>`;
   }
-  // socket / light (square)
-  return `<rect x="${x-11*s}" y="${y-11*s}" width="${22*s}" height="${22*s}" rx="3" fill="#0e1b2a" stroke="#ffd166" stroke-width="2"/>
-    <circle cx="${x}" cy="${y}" r="${4*s}" fill="#ffd166"/>`;
+
+  // Lighting (IEC: circle with rays / starburst)
+  if (nm.includes('lys') || nm.includes('light') || nm.includes('belys') || nm.includes('lamp')) {
+    const rays = [0,60,120,180,240,300].map(a => {
+      const rad = a * Math.PI / 180;
+      const x1 = x + Math.cos(rad)*8*s, y1 = y + Math.sin(rad)*8*s;
+      const x2 = x + Math.cos(rad)*14*s, y2 = y + Math.sin(rad)*14*s;
+      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#ffd166" stroke-width="${1.5*s}" stroke-linecap="round" opacity="0.8"/>`;
+    }).join('');
+    return `<g class="sld-float" style="animation-delay:${Math.random()*2}s">
+      <circle cx="${x}" cy="${y}" r="${10*s}" fill="rgba(255,209,102,0.1)" stroke="#ffd166" stroke-width="${2*s}"/>
+      ${rays}
+      <circle cx="${x}" cy="${y}" r="${4*s}" fill="#ffd166" opacity="0.9"/>
+      <circle cx="${x}" cy="${y}" r="${16*s}" fill="none" stroke="#ffd166" stroke-width="${1*s}" opacity="0.2" class="sld-glow-pulse" style="animation-delay:0.5s"/>
+    </g>`;
+  }
+
+  // Socket / outlet (IEC: semicircle with pins)
+  return `<g class="sld-float" style="animation-delay:${Math.random()*2}s">
+    <circle cx="${x}" cy="${y}" r="${14*s}" fill="rgba(159,230,255,0.05)" stroke="#9fe6ff" stroke-width="${2*s}"/>
+    <path d="M${x-8*s},${y+4*s} A${8*s},${8*s} 0 0,1 ${x+8*s},${y+4*s}" fill="none" stroke="#9fe6ff" stroke-width="${1.8*s}" stroke-linecap="round"/>
+    <line x1="${x-4*s}" y1="${y-2*s}" x2="${x-4*s}" y2="${y+4*s}" stroke="#9fe6ff" stroke-width="${2*s}" stroke-linecap="round"/>
+    <line x1="${x+4*s}" y1="${y-2*s}" x2="${x+4*s}" y2="${y+4*s}" stroke="#9fe6ff" stroke-width="${2*s}" stroke-linecap="round"/>
+    <circle cx="${x}" cy="${y}" r="${14*s}" fill="none" stroke="#9fe6ff" stroke-width="${0.8*s}" opacity="0.2" class="sld-glow-pulse" style="animation-delay:1s"/>
+  </g>`;
 }
 
 function buildSLD(){
-  // Use the unlimited load schedule if present, else a default sample
+  // Enhanced single-line diagram with IEC symbols, animated current flow, and professional aesthetics
   let cons = loadList.length ? loadList.slice(0, 14) : [
     {kW:11,cos:0.9,sf:1,phase:'3',name:'EV'},{kW:4,cos:0.9,sf:1,phase:'3',name:'Komfur'},
     {kW:2,cos:0.95,sf:0.6,phase:'L1',name:'Stik'},{kW:1.5,cos:0.95,sf:1,phase:'L2',name:'Lys'}
@@ -4232,49 +4335,134 @@ function buildSLD(){
   const totalKVA = loadList.length ? sch.kVA : 18.5;
   const ib = loadList.length ? sch.ib : 30;
   const trafo = (typeof TRAFO_SIZES!=='undefined') ? (TRAFO_SIZES.find(t=>t>=totalKVA)||630) : 630;
-  const W = 720, rowH = 46, top = 150;
-  const H = top + cons.length*rowH + 40;
-  const busX = 210, mainW = 96;
+  const W = 780, rowH = 52, top = 185;
+  const H = top + cons.length*rowH + 60;
+  const busX = 230, mainW = 110;
 
+  // Build gradient definitions and filters
+  let defs = `<defs>
+    <filter id="glSLD"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="glSLD2"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="dropSh"><feDropShadow dx="2" dy="3" stdDeviation="4" flood-color="rgba(0,0,0,0.5)"/></filter>
+    <linearGradient id="busGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#00ffc8"/><stop offset="100%" stop-color="#009f7d"/></linearGradient>
+    <linearGradient id="trafoGrad1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff9f6b"/><stop offset="100%" stop-color="#ff5c3a"/></linearGradient>
+    <linearGradient id="trafoGrad2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ffb347"/><stop offset="100%" stop-color="#ff8a5c"/></linearGradient>
+    <linearGradient id="motorGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#00e5ff"/><stop offset="100%" stop-color="#0080ff"/></linearGradient>
+    <linearGradient id="panelGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0e2235"/><stop offset="100%" stop-color="#0a1520"/></linearGradient>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0d1f30"/><stop offset="30%" stop-color="#081422"/><stop offset="100%" stop-color="#040a12"/></linearGradient>
+    <radialGradient id="bgRadial" cx="15%" cy="10%"><stop offset="0%" stop-color="rgba(0,200,180,0.06)"/><stop offset="100%" stop-color="transparent"/></radialGradient>
+    <linearGradient id="rcdGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#a855f7"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient>
+  </defs>`;
+
+  // Build consumer rows with animated current flow
   let rows = '';
   cons.forEach((c,i)=>{
-    const y = top + i*rowH + 20;
-    const ci = lsConsumerCurrent ? lsConsumerCurrent(c) : {L1:0,L2:0,L3:0};
+    const y = top + i*rowH + 26;
+    const ci = (typeof lsConsumerCurrent==='function') ? lsConsumerCurrent(c) : {L1:0,L2:0,L3:0};
     const cIb = Math.max(ci.L1||0, ci.L2||0, ci.L3||0) || (c.kW*1000/( (c.phase==='3'?Math.sqrt(3)*400:230)*c.cos));
     const cab = (typeof recommendCables==='function') ? recommendCables(cIb)[0] : null;
     const mcb = (typeof recommendMCBs==='function') ? recommendMCBs(cIb,10)[0] : null;
-    const cableLbl = cab ? (cab.mm2+' mm²') : '';
+    const cableLbl = cab ? (cab.mm2+' mm\u00B2') : '';
     const mcbLbl = mcb ? ('C'+mcb.rating) : '';
+    const delay = (i*0.15).toFixed(2);
+    const hue = i * 25;
+
+    // Animated current-carrying line with direction arrows
     rows += `
-      <line x1="${busX}" y1="${y}" x2="${W-130}" y2="${y}" stroke="#2f5f7a" stroke-width="2"/>
-      <!-- breaker box -->
-      <rect x="${busX+30}" y="${y-11}" width="34" height="22" rx="3" fill="#10202e" stroke="#00d0ff" stroke-width="1.5"/>
-      <text x="${busX+47}" y="${y+4}" text-anchor="middle" font-size="10" fill="#9fe6ff">${mcbLbl}</text>
-      <!-- cable label -->
-      <text x="${busX+120}" y="${y-6}" font-size="11" fill="#7fb4d6">${cableLbl} · ${c.phase==='3'?'3~':c.phase} · ${cIb.toFixed(1)} A</text>
-      ${consumerIcon(c, W-150, y, 1)}
-      <text x="${W-130}" y="${y+4}" font-size="11" fill="#cfe3f2">${c.name? c.name : ('K'+(i+1))} (${c.kW} kW)</text>`;
+      <!-- Row ${i} cable with animated current -->
+      <line x1="${busX}" y1="${y}" x2="${busX+25}" y2="${y}" stroke="rgba(0,255,200,0.5)" stroke-width="2"/>
+      <line x1="${busX+85}" y1="${y}" x2="${W-180}" y2="${y}" stroke="#1a3a50" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="${busX+85}" y1="${y}" x2="${W-180}" y2="${y}" stroke="rgba(0,208,255,0.6)" stroke-width="2" stroke-linecap="round" class="sld-current-line" style="animation-delay:${delay}s"/>
+      <!-- Current direction arrow -->
+      <polygon points="${busX+160},${y-4} ${busX+172},${y} ${busX+160},${y+4}" fill="#00d0ff" opacity="0.8" class="sld-glow-pulse" style="animation-delay:${delay}s"/>
+      <polygon points="${busX+220},${y-4} ${busX+232},${y} ${busX+220},${y+4}" fill="#00d0ff" opacity="0.5" class="sld-glow-pulse" style="animation-delay:${(parseFloat(delay)+0.3).toFixed(2)}s"/>
+
+      <!-- MCB Symbol (IEC: angled line through contacts) -->
+      <g filter="url(#glSLD)">
+        <rect x="${busX+28}" y="${y-14}" width="54" height="28" rx="6" fill="url(#panelGrad)" stroke="#00b8d4" stroke-width="1.5"/>
+        <line x1="${busX+38}" y1="${y+6}" x2="${busX+50}" y2="${y-6}" stroke="#00e5ff" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="${busX+38}" cy="${y+6}" r="2.5" fill="#00e5ff"/>
+        <circle cx="${busX+50}" cy="${y-6}" r="2.5" fill="#00e5ff"/>
+        <text x="${busX+66}" y="${y+4}" text-anchor="middle" font-size="9" fill="#9fe6ff" font-weight="700">${mcbLbl}</text>
+      </g>
+
+      <!-- Cable specification label -->
+      <text x="${busX+100}" y="${y-14}" font-size="10" fill="#5d9ab8" font-weight="500">${cableLbl}</text>
+      <text x="${busX+160}" y="${y-14}" font-size="9.5" fill="#4a8099">${c.phase==='3'?'3~+N+PE':c.phase+'+N+PE'}</text>
+      <text x="${busX+240}" y="${y-14}" font-size="9.5" fill="#4a8099">${cIb.toFixed(1)} A</text>
+
+      <!-- Consumer icon -->
+      ${consumerIcon(c, W-160, y, 1)}
+      <text x="${W-130}" y="${y+4}" font-size="11" fill="#d4eaf5" font-weight="600">${c.name? c.name : ('K'+(i+1))}</text>
+      <text x="${W-130}" y="${y+17}" font-size="9" fill="#6a9bb5">${c.kW} kW</text>`;
   });
 
+  // Main diagram
   return `
-  <svg viewBox="0 0 ${W} ${H}" width="100%" style="background:radial-gradient(circle at 30% 0%,#0c1826,#060d16);border-radius:12px;border:1px solid var(--line,var(--border))" xmlns="http://www.w3.org/2000/svg">
-    <defs><filter id="gl"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-    <!-- Transformer -->
-    <g filter="url(#gl)">
-      <circle cx="70" cy="70" r="22" fill="none" stroke="#ff8a5c" stroke-width="2.5"/>
-      <circle cx="70" cy="92" r="22" fill="none" stroke="#ff8a5c" stroke-width="2.5"/>
+  <svg viewBox="0 0 ${W} ${H}" width="100%" style="border-radius:14px;border:1px solid rgba(0,200,180,0.15);overflow:visible" xmlns="http://www.w3.org/2000/svg">
+    ${defs}
+    <!-- Background -->
+    <rect width="${W}" height="${H}" fill="url(#bgGrad)" rx="14"/>
+    <rect width="${W}" height="${H}" fill="url(#bgRadial)" rx="14"/>
+    <!-- Subtle grid pattern -->
+    <g opacity="0.04">
+      ${Array.from({length:Math.floor(H/30)},(_,i)=>`<line x1="0" y1="${i*30}" x2="${W}" y2="${i*30}" stroke="#00ffc8" stroke-width="0.5"/>`).join('')}
+      ${Array.from({length:Math.floor(W/30)},(_,i)=>`<line x1="${i*30}" y1="0" x2="${i*30}" y2="${H}" stroke="#00ffc8" stroke-width="0.5"/>`).join('')}
     </g>
-    <text x="70" y="135" text-anchor="middle" font-size="12" fill="#ffb38a" font-weight="700">${trafo} kVA</text>
-    <text x="70" y="150" text-anchor="middle" font-size="9" fill="#9a8" >10/0,4 kV</text>
-    <line x1="70" y1="114" x2="70" y2="${top-30}" stroke="#ff8a5c" stroke-width="2"/>
-    <line x1="70" y1="${top-30}" x2="${busX}" y2="${top-30}" stroke="#ff8a5c" stroke-width="2"/>
-    <!-- Main board / busbar -->
-    <rect x="${busX-mainW/2+20}" y="${top-46}" width="${mainW}" height="34" rx="5" fill="#0e1b2a" stroke="#00ffc8" stroke-width="2" filter="url(#gl)"/>
-    <text x="${busX+20}" y="${top-24}" text-anchor="middle" font-size="11" fill="#00ffc8" font-weight="700">TAVLE</text>
-    <text x="${busX+20}" y="${top-58}" text-anchor="middle" font-size="10" fill="#9fe6ff">IB ${ib.toFixed(0)} A</text>
-    <line x1="${busX}" y1="${top-12}" x2="${busX}" y2="${top + cons.length*rowH}" stroke="#00ffc8" stroke-width="3"/>
+
+    <!-- === TRANSFORMER (IEC: two overlapping circles) === -->
+    <g filter="url(#glSLD2)">
+      <circle cx="85" cy="58" r="26" fill="rgba(255,143,92,0.05)" stroke="url(#trafoGrad1)" stroke-width="3"/>
+      <circle cx="85" cy="88" r="26" fill="rgba(255,179,71,0.05)" stroke="url(#trafoGrad2)" stroke-width="3"/>
+      <!-- HV winding symbol -->
+      <text x="85" y="62" text-anchor="middle" font-size="11" fill="#ff9f6b" font-weight="700">HV</text>
+      <text x="85" y="95" text-anchor="middle" font-size="11" fill="#ffb347" font-weight="700">LV</text>
+    </g>
+    <!-- Transformer glow ring -->
+    <circle cx="85" cy="73" r="38" fill="none" stroke="#ff8a5c" stroke-width="1" opacity="0.2" class="sld-glow-pulse"/>
+    <text x="85" y="132" text-anchor="middle" font-size="13" fill="#ffb38a" font-weight="700">${trafo} kVA</text>
+    <text x="85" y="148" text-anchor="middle" font-size="10" fill="#7a9a70" font-weight="600">10/0,4 kV</text>
+
+    <!-- Supply cable from transformer to panel (animated) -->
+    <line x1="85" y1="114" x2="85" y2="${top-55}" stroke="#ff8a5c" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="85" y1="114" x2="85" y2="${top-55}" stroke="rgba(255,138,92,0.5)" stroke-width="2" class="sld-current-line" style="animation-duration:1.8s"/>
+    <line x1="85" y1="${top-55}" x2="${busX-mainW/2+15}" y2="${top-55}" stroke="#ff8a5c" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="85" y1="${top-55}" x2="${busX-mainW/2+15}" y2="${top-55}" stroke="rgba(255,138,92,0.5)" stroke-width="2" class="sld-current-line" style="animation-duration:1.8s"/>
+    <!-- Direction arrow on supply -->
+    <polygon points="140,${top-59} 152,${top-55} 140,${top-51}" fill="#ff8a5c" opacity="0.8" class="sld-glow-pulse"/>
+
+    <!-- === RCD / HPFI (IEC symbol) === -->
+    <g filter="url(#glSLD)" transform="translate(${busX-mainW/2+20},${top-75})">
+      <rect x="0" y="0" width="40" height="22" rx="4" fill="rgba(168,85,247,0.08)" stroke="url(#rcdGrad)" stroke-width="1.8"/>
+      <text x="20" y="15" text-anchor="middle" font-size="8" fill="#c084fc" font-weight="700">HPFI</text>
+      <path d="M42,11 L52,11" stroke="#c084fc" stroke-width="1.5"/>
+    </g>
+
+    <!-- === MAIN PANEL / BUSBAR === -->
+    <g filter="url(#dropSh)">
+      <rect x="${busX-mainW/2}" y="${top-50}" width="${mainW}" height="40" rx="8" fill="url(#panelGrad)" stroke="url(#busGrad)" stroke-width="2.5"/>
+      <!-- Panel interior detail lines -->
+      <line x1="${busX-mainW/2+8}" y1="${top-38}" x2="${busX+mainW/2-8}" y2="${top-38}" stroke="rgba(0,255,200,0.15)" stroke-width="1"/>
+      <line x1="${busX-mainW/2+8}" y1="${top-22}" x2="${busX+mainW/2-8}" y2="${top-22}" stroke="rgba(0,255,200,0.15)" stroke-width="1"/>
+    </g>
+    <text x="${busX}" y="${top-26}" text-anchor="middle" font-size="12" fill="#00ffc8" font-weight="800" letter-spacing="1">${lang==='da'?'HOVEDTAVLE':'MAIN PANEL'}</text>
+    <text x="${busX}" y="${top-58}" text-anchor="middle" font-size="10" fill="#80d4e0" font-weight="600">I\u0042 = ${ib.toFixed(0)} A</text>
+    <!-- Panel glow -->
+    <rect x="${busX-mainW/2}" y="${top-50}" width="${mainW}" height="40" rx="8" fill="none" stroke="#00ffc8" stroke-width="1.5" opacity="0.3" class="sld-neon-pulse"/>
+
+    <!-- === BUSBAR (vertical) with animated flow === -->
+    <line x1="${busX}" y1="${top-10}" x2="${busX}" y2="${top + cons.length*rowH + 10}" stroke="#003d33" stroke-width="6" stroke-linecap="round"/>
+    <line x1="${busX}" y1="${top-10}" x2="${busX}" y2="${top + cons.length*rowH + 10}" stroke="url(#busGrad)" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="${busX}" y1="${top-10}" x2="${busX}" y2="${top + cons.length*rowH + 10}" stroke="rgba(0,255,200,0.4)" stroke-width="2" class="sld-current-line" style="animation-duration:2s;stroke-dasharray:16 12"/>
+    <!-- Busbar glow -->
+    <line x1="${busX}" y1="${top-10}" x2="${busX}" y2="${top + cons.length*rowH + 10}" stroke="#00ffc8" stroke-width="8" opacity="0.08" class="sld-glow-pulse"/>
+
+    <!-- Consumer rows -->
     ${rows}
-    <text x="${W/2}" y="${H-12}" text-anchor="middle" font-size="10" fill="#5b7790">Enstregsdiagram · ${cons.length} grupper · genereret af El-Dimensionering</text>
+
+    <!-- Footer -->
+    <text x="${W/2}" y="${H-18}" text-anchor="middle" font-size="10" fill="#3a6580" font-weight="500">${lang==='da'?'Enstregsdiagram':'Single-line diagram'} \u00B7 ${cons.length} ${lang==='da'?'grupper':'circuits'} \u00B7 IEC 60617</text>
+    <text x="${W/2}" y="${H-5}" text-anchor="middle" font-size="8" fill="#2a4a60">El-Dimensionering \u00B7 ${lang==='da'?'Automatisk genereret':'Auto-generated'}</text>
   </svg>`;
 }
 
@@ -4339,40 +4527,132 @@ function drawNodeReset(){drawNodes=null;renderModule('draw');}
 
 function build3D(){
   const nodes=getDrawNodes();
-  const W=Math.max(760,nodes.length*170+80),H=400,gY=320;
-  const sp=(W-120)/Math.max(nodes.length-1,1);
+  const W=Math.max(820,nodes.length*180+100),H=460,gY=340;
+  const sp=(W-140)/Math.max(nodes.length-1,1);
   let svg='';
-  // ground perspective grid
-  for(let i=0;i<12;i++) svg+=`<line x1="0" y1="${gY+i*7}" x2="${W}" y2="${gY+i*7}" stroke="rgba(0,180,255,${0.04-i*0.003})"/>`;
-  svg+=`<line x1="0" y1="${gY}" x2="${W}" y2="${gY}" stroke="rgba(0,225,255,0.3)" stroke-width="2"/>`;
-  // nodes
+
+  // Defs: filters, gradients for professional 3D look
+  svg+=`<defs>
+    <filter id="g3"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="g3soft"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="shadow3d"><feDropShadow dx="4" dy="6" stdDeviation="8" flood-color="rgba(0,0,0,0.6)"/></filter>
+    <filter id="innerGlow"><feGaussianBlur stdDeviation="2" result="b"/><feComposite in="SourceGraphic" in2="b" operator="over"/></filter>
+    <linearGradient id="floorGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(0,180,255,0.08)"/><stop offset="100%" stop-color="rgba(0,0,0,0)"/></linearGradient>
+    <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0a1628"/><stop offset="60%" stop-color="#050c18"/><stop offset="100%" stop-color="#020508"/></linearGradient>
+    <radialGradient id="spotGrad" cx="50%" cy="20%"><stop offset="0%" stop-color="rgba(0,200,255,0.04)"/><stop offset="100%" stop-color="transparent"/></radialGradient>
+  </defs>`;
+
+  // Sky background
+  svg+=`<rect width="${W}" height="${H}" fill="url(#skyGrad)" rx="14"/>`;
+  svg+=`<rect width="${W}" height="${H}" fill="url(#spotGrad)" rx="14"/>`;
+
+  // Reflective floor with perspective grid
+  svg+=`<rect x="0" y="${gY}" width="${W}" height="${H-gY}" fill="url(#floorGrad)" opacity="0.5"/>`;
+  // Perspective grid lines (converging slightly for depth effect)
+  for(let i=0;i<16;i++){
+    const yy = gY + i*7;
+    const fade = Math.max(0, 0.12 - i*0.007);
+    svg+=`<line x1="0" y1="${yy}" x2="${W}" y2="${yy}" stroke="rgba(0,200,255,${fade.toFixed(3)})" stroke-width="0.8"/>`;
+  }
+  // Vertical grid lines with perspective
+  for(let i=0;i<20;i++){
+    const xx = W/2 + (i-10)*50;
+    svg+=`<line x1="${xx}" y1="${gY}" x2="${xx+(i-10)*2}" y2="${H}" stroke="rgba(0,200,255,0.03)" stroke-width="0.5"/>`;
+  }
+  // Main ground line with glow
+  svg+=`<line x1="0" y1="${gY}" x2="${W}" y2="${gY}" stroke="rgba(0,225,255,0.25)" stroke-width="1.5"/>`;
+  svg+=`<line x1="0" y1="${gY}" x2="${W}" y2="${gY}" stroke="rgba(0,225,255,0.1)" stroke-width="6" class="iso-reflection"/>`;
+
+  // Nodes with full 3D rendering
   nodes.forEach((n,idx)=>{
     const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;
-    const cx=60+idx*sp, bw=88, bd=44, bh=105, topY=gY-bh;
-    // 3D box faces
-    const tp=`${cx-bw/2},${topY} ${cx+bw/2},${topY} ${cx+bw/2+bd*.4},${topY-bd*.4} ${cx-bw/2+bd*.4},${topY-bd*.4}`;
-    const lf=`${cx-bw/2},${topY} ${cx-bw/2},${gY} ${cx+bw/2},${gY} ${cx+bw/2},${topY}`;
-    const rf=`${cx+bw/2},${topY} ${cx+bw/2},${gY} ${cx+bw/2+bd*.4},${gY-bd*.4} ${cx+bw/2+bd*.4},${topY-bd*.4}`;
-    // drop shadow
-    svg+=`<ellipse cx="${cx+10}" cy="${gY+6}" rx="${bw/2+5}" ry="8" fill="rgba(0,0,0,0.3)"/>`;
-    // faces with neon glow
-    svg+=`<polygon points="${lf}" fill="rgba(8,18,32,0.92)" stroke="${nt.color}" stroke-width="1.8"/>`;
-    svg+=`<polygon points="${rf}" fill="rgba(5,12,24,0.92)" stroke="${nt.color}" stroke-width="1.8"/>`;
-    svg+=`<polygon points="${tp}" fill="rgba(12,25,45,0.92)" stroke="${nt.color}" stroke-width="1.8"/>`;
-    // neon floor reflection
-    svg+=`<line x1="${cx-bw/2}" y1="${gY}" x2="${cx+bw/2}" y2="${gY}" stroke="${nt.color}" stroke-width="3" opacity="0.4" filter="url(#g3)"/>`;
-    // icon + labels
-    svg+=`<text x="${cx+bd*.2}" y="${topY-bd*.4-16}" text-anchor="middle" font-size="22">${nt.icon}</text>`;
-    svg+=`<text x="${cx+bd*.2}" y="${topY-bd*.4-2}" text-anchor="middle" font-size="11" fill="${nt.color}" font-weight="800">${lang==='da'?nt.da:nt.en}</text>`;
-    if(n.label) svg+=`<text x="${cx}" y="${gY+22}" text-anchor="middle" font-size="10" fill="#8ab4d0">${n.label}</text>`;
-    // cable to next
+    const cx=70+idx*sp, bw=96, bd=48, bh=120, topY=gY-bh;
+    const uid='n3d'+idx;
+
+    // Per-node gradient
+    svg+=`<defs><linearGradient id="${uid}fg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${nt.color}" stop-opacity="0.15"/><stop offset="100%" stop-color="${nt.color}" stop-opacity="0.02"/></linearGradient>
+    <linearGradient id="${uid}side" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="${nt.color}" stop-opacity="0.08"/><stop offset="100%" stop-color="${nt.color}" stop-opacity="0.02"/></linearGradient></defs>`;
+
+    // Drop shadow (ellipse under box)
+    svg+=`<ellipse cx="${cx+12}" cy="${gY+8}" rx="${bw/2+12}" ry="10" fill="rgba(0,0,0,0.4)" filter="url(#g3soft)"/>`;
+
+    // Floor reflection (mirrored, faded box)
+    svg+=`<rect x="${cx-bw/2}" y="${gY+2}" width="${bw}" height="${bh*0.3}" rx="2" fill="${nt.color}" opacity="0.04" class="iso-reflection"/>`;
+
+    // 3D box faces with gradients
+    const frontFace=`M${cx-bw/2},${topY} L${cx-bw/2},${gY} L${cx+bw/2},${gY} L${cx+bw/2},${topY} Z`;
+    const rightFace=`M${cx+bw/2},${topY} L${cx+bw/2},${gY} L${cx+bw/2+bd*.4},${gY-bd*.35} L${cx+bw/2+bd*.4},${topY-bd*.35} Z`;
+    const topFace=`M${cx-bw/2},${topY} L${cx+bw/2},${topY} L${cx+bw/2+bd*.4},${topY-bd*.35} L${cx-bw/2+bd*.4},${topY-bd*.35} Z`;
+
+    // Faces with proper shading
+    svg+=`<path d="${frontFace}" fill="url(#${uid}fg)" stroke="${nt.color}" stroke-width="1.5" filter="url(#shadow3d)"/>`;
+    svg+=`<path d="${rightFace}" fill="url(#${uid}side)" stroke="${nt.color}" stroke-width="1.2" opacity="0.8"/>`;
+    svg+=`<path d="${topFace}" fill="rgba(${parseInt(nt.color.slice(1,3),16)},${parseInt(nt.color.slice(3,5),16)},${parseInt(nt.color.slice(5,7),16)},0.08)" stroke="${nt.color}" stroke-width="1.5"/>`;
+
+    // Neon edge highlights
+    svg+=`<path d="${frontFace}" fill="none" stroke="${nt.color}" stroke-width="2" opacity="0.3" class="sld-neon-pulse" style="animation-delay:${idx*0.4}s"/>`;
+
+    // Internal panel detail (horizontal lines suggesting equipment)
+    for(let ln=0;ln<4;ln++){
+      const ly = topY + 20 + ln*22;
+      if(ly < gY-15) svg+=`<line x1="${cx-bw/2+10}" y1="${ly}" x2="${cx+bw/2-10}" y2="${ly}" stroke="${nt.color}" stroke-width="0.8" opacity="0.2"/>`;
+    }
+
+    // Status LED dots on panel face
+    svg+=`<circle cx="${cx-bw/2+14}" cy="${topY+12}" r="3" fill="#06d6a0" opacity="0.8"><animate attributeName="opacity" values="0.4;1;0.4" dur="2s" repeatCount="indefinite" begin="${idx*0.3}s"/></circle>`;
+    svg+=`<circle cx="${cx-bw/2+24}" cy="${topY+12}" r="3" fill="#ffd166" opacity="0.5"><animate attributeName="opacity" values="0.3;0.8;0.3" dur="3s" repeatCount="indefinite" begin="${idx*0.5}s"/></circle>`;
+
+    // Neon floor reflection line
+    svg+=`<line x1="${cx-bw/2}" y1="${gY}" x2="${cx+bw/2}" y2="${gY}" stroke="${nt.color}" stroke-width="4" opacity="0.25" filter="url(#g3)"/>`;
+    svg+=`<line x1="${cx-bw/2+5}" y1="${gY+3}" x2="${cx+bw/2-5}" y2="${gY+3}" stroke="${nt.color}" stroke-width="2" opacity="0.1" class="iso-reflection"/>`;
+
+    // Icon + labels (above box)
+    svg+=`<text x="${cx+bd*.2}" y="${topY-bd*.35-22}" text-anchor="middle" font-size="24" filter="url(#g3)">${nt.icon}</text>`;
+    svg+=`<text x="${cx+bd*.2}" y="${topY-bd*.35-4}" text-anchor="middle" font-size="12" fill="${nt.color}" font-weight="800" letter-spacing="0.5">${lang==='da'?nt.da:nt.en}</text>`;
+    if(n.label) svg+=`<text x="${cx}" y="${gY+26}" text-anchor="middle" font-size="10" fill="#7ab0cc" font-weight="600">${n.label}</text>`;
+
+    // Cable to next node with animated particles
     if(idx<nodes.length-1){
-      const nx=60+(idx+1)*sp, cy2=gY-bh*0.5;
-      svg+=`<line x1="${cx+bw/2+bd*.4}" y1="${cy2}" x2="${nx-bw/2}" y2="${cy2}" stroke="${nt.color}" stroke-width="3" stroke-linecap="round" opacity="0.7" filter="url(#g3)"/>`;
-      svg+=`<circle cx="${(cx+bw/2+bd*.4+nx-bw/2)/2}" cy="${cy2}" r="4" fill="${nt.color}" opacity="0.9"/>`;
+      const nx=70+(idx+1)*sp;
+      const cableY=gY-bh*0.5;
+      const cStartX=cx+bw/2+bd*.4;
+      const cEndX=nx-bw/2;
+      const cableMid=(cStartX+cEndX)/2;
+      const nextNt=NODE_TYPES[nodes[idx+1].type]||NODE_TYPES.custom;
+
+      // Cable shadow
+      svg+=`<line x1="${cStartX}" y1="${cableY+5}" x2="${cEndX}" y2="${cableY+5}" stroke="rgba(0,0,0,0.3)" stroke-width="4" stroke-linecap="round"/>`;
+
+      // Main cable with glow animation
+      svg+=`<line x1="${cStartX}" y1="${cableY}" x2="${cEndX}" y2="${cableY}" stroke="#0a2030" stroke-width="5" stroke-linecap="round"/>`;
+      svg+=`<line x1="${cStartX}" y1="${cableY}" x2="${cEndX}" y2="${cableY}" stroke="${nt.color}" stroke-width="3" stroke-linecap="round" opacity="0.7" class="iso-cable-glow" style="animation-delay:${idx*0.5}s"/>`;
+
+      // Animated current flow dashes
+      svg+=`<line x1="${cStartX}" y1="${cableY}" x2="${cEndX}" y2="${cableY}" stroke="${nt.color}" stroke-width="2" stroke-linecap="round" class="sld-current-line" style="animation-duration:${1+idx*0.2}s;stroke-dasharray:8 12"/>`;
+
+      // Particle dots traveling along cable
+      svg+=`<circle r="4" fill="${nt.color}" opacity="0.9" filter="url(#g3)"><animate attributeName="cx" from="${cStartX}" to="${cEndX}" dur="${2+idx*0.3}s" repeatCount="indefinite"/><animate attributeName="cy" values="${cableY};${cableY-3};${cableY}" dur="${2+idx*0.3}s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;1;0" dur="${2+idx*0.3}s" repeatCount="indefinite"/></circle>`;
+      svg+=`<circle r="3" fill="${nextNt.color}" opacity="0.7" filter="url(#g3)"><animate attributeName="cx" from="${cStartX}" to="${cEndX}" dur="${2+idx*0.3}s" repeatCount="indefinite" begin="${1+idx*0.15}s"/><animate attributeName="cy" values="${cableY};${cableY+2};${cableY}" dur="${2+idx*0.3}s" repeatCount="indefinite" begin="${1+idx*0.15}s"/><animate attributeName="opacity" values="0;0.8;0.8;0" dur="${2+idx*0.3}s" repeatCount="indefinite" begin="${1+idx*0.15}s"/></circle>`;
+
+      // Direction arrow
+      svg+=`<polygon points="${cableMid-6},${cableY-5} ${cableMid+6},${cableY} ${cableMid-6},${cableY+5}" fill="${nt.color}" opacity="0.7"><animate attributeName="opacity" values="0.4;1;0.4" dur="1.5s" repeatCount="indefinite"/></polygon>`;
+
+      // Cable connection dots at endpoints
+      svg+=`<circle cx="${cStartX}" cy="${cableY}" r="4" fill="${nt.color}" opacity="0.8"/>`;
+      svg+=`<circle cx="${cEndX}" cy="${cableY}" r="4" fill="${nextNt.color}" opacity="0.8"/>`;
     }
   });
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="background:linear-gradient(180deg,#050c18,#020710 65%,#010408);border-radius:14px;border:1px solid var(--line,#2a3645);overflow:visible" xmlns="http://www.w3.org/2000/svg"><defs><filter id="g3"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>${svg}<text x="${W/2}" y="${H-8}" text-anchor="middle" font-size="9" fill="#4a7090">3D ${lang==='da'?'installationsskitse':'installation scene'} \u00B7 ${nodes.length} ${lang==='da'?'noder':'nodes'} \u00B7 El-Dimensionering</text></svg>`;
+
+  // Ambient floating particles for atmosphere
+  for(let p=0;p<8;p++){
+    const px=80+Math.random()*(W-160), py=40+Math.random()*(gY-80);
+    svg+=`<circle cx="${px}" cy="${py}" r="${1+Math.random()*2}" fill="rgba(0,200,255,${0.1+Math.random()*0.2})"><animate attributeName="cy" values="${py};${py-15};${py}" dur="${4+Math.random()*4}s" repeatCount="indefinite" begin="${Math.random()*3}s"/><animate attributeName="opacity" values="0;0.4;0" dur="${4+Math.random()*4}s" repeatCount="indefinite" begin="${Math.random()*3}s"/></circle>`;
+  }
+
+  // Footer
+  svg+=`<text x="${W/2}" y="${H-12}" text-anchor="middle" font-size="9" fill="#3a6080" font-weight="500">3D ${lang==='da'?'Installationsoversigt':'Installation Overview'} \u00B7 ${nodes.length} ${lang==='da'?'noder':'nodes'} \u00B7 El-Dimensionering</text>`;
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="border-radius:14px;border:1px solid rgba(0,180,255,0.12);overflow:visible" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
 }
 
 function renderDrawing(){
