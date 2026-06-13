@@ -4378,7 +4378,7 @@ function renderDrawing(){
 }
 
 // ===== EXAM SIMULATOR (data + engine) =====
-let examState = { tab:'quiz', quizIdx:0, quizPick:{}, scId:null, step:0, scPick:{}, timerOn:false, timerEnd:null, timerLeft:3600 };
+let examState = { tab:'quiz', mode:'apprentice', quizIdx:0, quizPick:{}, scId:null, step:0, scPick:{}, timerOn:false, timerEnd:null, timerLeft:3600 };
 let examTimerHandle = null;
 function examL(o){ return (typeof o==='string') ? o : (o[lang]||o.en||o.da||''); }
 function examLoadStore(){ try { return JSON.parse(localStorage.getItem('examStore')||'{}'); } catch(e){ return {}; } }
@@ -4532,6 +4532,7 @@ function examOpenScen(id){ examState.scId = id; examState.step = 0; renderModule
 function examBackToList(){ examState.scId = null; renderModule('exam'); }
 function examResetScen(id){ Object.keys(examState.scPick).forEach(k=>{ if(k.indexOf(id+':')===0) delete examState.scPick[k]; }); examState.step = 0; renderModule('exam'); }
 function examTab(t){ examState.tab = t; examState.scId = null; renderModule('exam'); }
+function examSetMode(m){ examState.mode = m; renderModule('exam'); }
 
 function examResetAll(){ try { localStorage.removeItem('examStore'); } catch(e){} examState.quizPick = {}; examState.scPick = {}; examState.quizIdx = 0; examState.step = 0; renderModule('exam'); }
 
@@ -4559,6 +4560,10 @@ function renderExam(){
     + `<button class="sel-btn ${examState.tab==='quiz'?'selected':''}" onclick="examTab('quiz')">\u26A1 ${da?'Hurtig Quiz':'Quick Quiz'}</button>`
     + `<button class="sel-btn ${examState.tab==='scenario'?'selected':''}" onclick="examTab('scenario')">\uD83D\uDCDD ${da?'Fuld Opgave':'Full Assignment'}</button>`
     + `</div>`
+    + `<div class="select-group"><div class="select-label">${da?'Tilstand':'Mode'}</div><div class="select-grid">`
+    + `<button class="sel-btn ${examState.mode!=='exam'?'selected':''}" onclick="examSetMode('apprentice')">\uD83D\uDC68\u200D\uD83C\uDFEB ${da?'L\u00e6rling (forklar nu)':'Apprentice (explain now)'}</button>`
+    + `<button class="sel-btn ${examState.mode==='exam'?'selected':''}" onclick="examSetMode('exam')">\uD83D\uDCDD ${da?'Eksamen (svar f\u00f8rst)':'Exam (answer first)'}</button>`
+    + `</div><div class="info-row" style="margin-top:6px">${da?'L\u00e6rling: forklaring + facit efter hvert trin. Eksamen: intet facit f\u00f8r hele opgaven/quizzen er besvaret \u2014 som til pr\u00f8ven.':'Apprentice: explanation + answer after each step. Exam: no answers until the whole assignment/quiz is completed \u2014 like the real exam.'}</div></div>`
     + `<div class="select-group"><div class="select-label">${da?'Pr\u00f8vetimer (60 min, valgfri)':'Exam timer (60 min, optional)'}</div>`
     + `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">`
     + `<span id="examTimer" style="font-size:1.4rem;font-weight:800;font-variant-numeric:tabular-nums;color:${timerColor}">${examFmtTime(tleft)}</span>`
@@ -4577,22 +4582,28 @@ function examRenderQuiz(){
   const picked = examState.quizPick[i];
   const answered = picked!==undefined;
   const s = examQuizScore();
+  const examMode = examState.mode==='exam';
+  const allDone = s.answered===s.total;
+  const reveal = examMode ? allDone : answered;
   const grid = EXAM_QUIZ.map((qq,idx)=>{
     const p = examState.quizPick[idx];
     let style = 'padding:4px 8px;min-width:0;font-size:.72rem';
-    if(p!==undefined) style += p===qq.ci ? ';border-color:var(--success);color:var(--success)' : ';border-color:var(--danger);color:var(--danger)';
+    if(p!==undefined){
+      if(examMode && !allDone) style += ';border-color:var(--primary-light);color:var(--primary-light)';
+      else style += p===qq.ci ? ';border-color:var(--success);color:var(--success)' : ';border-color:var(--danger);color:var(--danger)';
+    }
     return `<button class="sel-btn ${idx===i?'selected':''}" style="${style}" onclick="examQuizGo(${idx})">${idx+1}</button>`;
   }).join('');
   const opts = q.opts.map((o,oi)=>{
-    let style=''; const click = answered ? '' : `onclick="examPickQuiz(${oi})"`;
-    if(answered){
+    let style=''; let cls='sel-btn'; const click = answered ? '' : `onclick="examPickQuiz(${oi})"`;
+    if(reveal){
       if(oi===q.ci) style='border-color:var(--success);background:var(--success-bg);color:var(--success);font-weight:700';
       else if(oi===picked) style='border-color:var(--danger);background:var(--danger-bg);color:var(--danger)';
       else style='opacity:.55';
-    }
-    return `<button class="sel-btn" style="${style}" ${click}>${examL(o)}</button>`;
+    } else if(answered && oi===picked){ cls='sel-btn selected'; }
+    return `<button class="${cls}" style="${style}" ${click}>${examL(o)}</button>`;
   }).join('');
-  const fb = answered ? examFeedback(picked===q.ci, q.ex, q.clause) : '';
+  const fb = reveal ? examFeedback(picked===q.ci, q.ex, q.clause) : '';
   let verdict='';
   if(s.answered===s.total){
     const pct = Math.round(100*s.correct/s.total); const pass = pct>=EXAM_PASS;
@@ -4640,21 +4651,27 @@ function examRenderScenario(){
   const stepN = sc.steps.length, i = examState.step, step = sc.steps[i];
   const k = sc.id+':'+i, picked = examState.scPick[k], answered = picked!==undefined;
   const answeredCount = examScenAnswered(sc);
+  const examMode = examState.mode==='exam';
+  const allDone = answeredCount===stepN;
+  const reveal = examMode ? allDone : answered;
   const dots = sc.steps.map((s,idx)=>{
     const p = examState.scPick[sc.id+':'+idx]; let style='padding:4px 9px;min-width:0;font-size:.72rem';
-    if(p!==undefined) style += p===s.ci ? ';border-color:var(--success);color:var(--success)' : ';border-color:var(--danger);color:var(--danger)';
+    if(p!==undefined){
+      if(examMode && !allDone) style += ';border-color:var(--primary-light);color:var(--primary-light)';
+      else style += p===s.ci ? ';border-color:var(--success);color:var(--success)' : ';border-color:var(--danger);color:var(--danger)';
+    }
     return `<button class="sel-btn ${idx===i?'selected':''}" style="${style}" onclick="examState.step=${idx};renderModule('exam')">${idx+1}</button>`;
   }).join('');
   const opts = step.opts.map((o,oi)=>{
-    let style=''; const click = answered ? '' : `onclick="examPickStep(${oi})"`;
-    if(answered){
+    let style=''; let cls='sel-btn'; const click = answered ? '' : `onclick="examPickStep(${oi})"`;
+    if(reveal){
       if(oi===step.ci) style='border-color:var(--success);background:var(--success-bg);color:var(--success);font-weight:700';
       else if(oi===picked) style='border-color:var(--danger);background:var(--danger-bg);color:var(--danger)';
       else style='opacity:.55';
-    }
-    return `<button class="sel-btn" style="${style}" ${click}>${examL(o)}</button>`;
+    } else if(answered && oi===picked){ cls='sel-btn selected'; }
+    return `<button class="${cls}" style="${style}" ${click}>${examL(o)}</button>`;
   }).join('');
-  const fb = answered ? examFeedback(picked===step.ci, step.ex, step.clause) : '';
+  const fb = reveal ? examFeedback(picked===step.ci, step.ex, step.clause) : '';
   let verdict='';
   if(answeredCount===stepN){
     const r = examScenScore(sc); const pct = Math.round(100*r.correct/stepN); const pass = pct>=EXAM_PASS;
