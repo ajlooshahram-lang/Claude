@@ -627,7 +627,9 @@ const T = {
       draw: 'Tegning',
       backup: 'Back-up',
       wire: 'Ledningsnumre',
-      risk: 'Risikovurdering'
+      risk: 'Risikovurdering',
+      selectivity: 'Selektivitet',
+      commission: 'Idriftsættelse'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -743,7 +745,43 @@ const T = {
     solverGrouping: 'Gruppering',
     solverInstall: 'Fremføringsmetode',
     solverResults: 'Resultater',
-    solverGoverning: 'Styrende begrænsning'
+    solverGoverning: 'Styrende begrænsning',
+    // Selectivity module (Feature: selectivity T-I curves)
+    selectTitle: 'Selektivitetskontrol (T-I kurver)',
+    selectUpstream: 'Opstrøms enhed',
+    selectDownstream: 'Nedstrøms enhed',
+    selectVerdict: 'Selektivitetsdom',
+    selectiveUpTo: 'Selektiv op til',
+    notSelective: 'IKKE selektiv ved',
+    selectRatio: 'Forhold',
+    selectLimitCurrent: 'Grænsestrøm',
+    selectProof: 'Vis kurver (SVG)',
+    // Commissioning module (DS/HD 60364-6 §6.4)
+    commTitle: 'Idriftsættelsesprotokol (DS/HD 60364-6 §6.4)',
+    commStep: 'Trin',
+    commOf: 'af',
+    commNext: 'Næste →',
+    commPrev: '← Tilbage',
+    commGenerate: 'Generer protokol',
+    commRestart: 'Start forfra',
+    commProjectName: 'Projektnavn',
+    commDate: 'Dato',
+    commMeasured: 'Målt værdi',
+    commRequirement: 'Krav',
+    commTestPE: 'Kontinuitet af PE',
+    commTestInsul: 'Isolationsmodstand',
+    commTestPol: 'Polaritetskontrol',
+    commTestZs: 'Sløjfeimpedans Zs',
+    commTestRCD1: 'RCD udløsningstid ×1 IΔn',
+    commTestRCD5: 'RCD udløsningstid ×5 IΔn',
+    commTestPhase: 'Fasesekvens',
+    commPass: 'BESTÅET',
+    commFail: 'IKKE BESTÅET',
+    // Forensic explainer
+    forensicTitle: 'Hvorfor fejlede dette?',
+    forensicCausal: 'Årsagskæde',
+    forensicFixes: 'Rangerede rettelser (mindste ændring først)',
+    forensicWhy: '🔍 Hvorfor?'
   },
   en: {
     appTitle: 'Electrical Dimensioning',
@@ -765,7 +803,9 @@ const T = {
       draw: 'Drawing',
       backup: 'Back-up',
       wire: 'Wire Numbers',
-      risk: 'Risk Matrix'
+      risk: 'Risk Matrix',
+      selectivity: 'Selectivity',
+      commission: 'Commissioning'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -873,7 +913,43 @@ const T = {
     solverGrouping: 'Grouping',
     solverInstall: 'Installation method',
     solverResults: 'Results',
-    solverGoverning: 'Governing constraint'
+    solverGoverning: 'Governing constraint',
+    // Selectivity module (Feature: selectivity T-I curves)
+    selectTitle: 'Selectivity verification (T-I curves)',
+    selectUpstream: 'Upstream device',
+    selectDownstream: 'Downstream device',
+    selectVerdict: 'Selectivity verdict',
+    selectiveUpTo: 'Selective up to',
+    notSelective: 'NOT selective at',
+    selectRatio: 'Ratio',
+    selectLimitCurrent: 'Limit current',
+    selectProof: 'Show curves (SVG)',
+    // Commissioning module (DS/HD 60364-6 §6.4)
+    commTitle: 'Commissioning protocol (DS/HD 60364-6 §6.4)',
+    commStep: 'Step',
+    commOf: 'of',
+    commNext: 'Next →',
+    commPrev: '← Back',
+    commGenerate: 'Generate protocol',
+    commRestart: 'Restart',
+    commProjectName: 'Project name',
+    commDate: 'Date',
+    commMeasured: 'Measured value',
+    commRequirement: 'Requirement',
+    commTestPE: 'Continuity of PE',
+    commTestInsul: 'Insulation resistance',
+    commTestPol: 'Polarity check',
+    commTestZs: 'Loop impedance Zs',
+    commTestRCD1: 'RCD trip time ×1 IΔn',
+    commTestRCD5: 'RCD trip time ×5 IΔn',
+    commTestPhase: 'Phase sequence',
+    commPass: 'PASS',
+    commFail: 'FAIL',
+    // Forensic explainer
+    forensicTitle: 'Why did this fail?',
+    forensicCausal: 'Causal chain',
+    forensicFixes: 'Ranked fixes (least change first)',
+    forensicWhy: '🔍 Why?'
   }
 };
 
@@ -1890,6 +1966,7 @@ function renderVerdictRow(verdict) {
     valuesHtml +
     (rec ? '<div class="result-row"><span class="label" style="color:#b8860b">\uD83D\uDCA1 ' + t('vRecommendation') + ': ' + rec + '</span></div>' : '') +
     '<div class="info-row">' + (verdict.clause || '') + '</div>' +
+    (st === 'FAIL' ? '<div style="margin-top:6px"><button class="sel-btn" style="font-size:0.75rem;padding:5px 12px" onclick="toggleForensic(\'' + verdict.id + '\')">' + t('forensicWhy') + '</button></div>' + (forensicExpanded[verdict.id] ? (function(){ var fe = buildForensicExplanation(verdict); var causal = lang === 'da' ? fe.causal.da : fe.causal.en; var fixesHtml = fe.fixes.map(function(f){ return '<div class="result-row"><span class="label" style="color:var(--accent)">' + (lang === 'da' ? f.desc.da : f.desc.en) + '</span></div>'; }).join(''); return '<div style="margin-top:8px;padding:10px;background:rgba(0,200,255,0.05);border:1px solid rgba(0,200,255,0.2);border-radius:8px"><div style="font-size:0.72rem;font-weight:700;color:var(--primary);margin-bottom:6px">' + t('forensicCausal') + '</div><div style="font-size:0.8rem;font-family:monospace;color:var(--text-light);margin-bottom:10px;word-break:break-all">' + causal + '</div>' + (fe.fixes.length ? '<div style="font-size:0.72rem;font-weight:700;color:var(--primary);margin-bottom:6px">' + t('forensicFixes') + '</div>' + fixesHtml : '') + '</div>'; })() : '') : '') +
     '</div>';
 }
 
@@ -2837,6 +2914,10 @@ let verdictState = { systemType: 'TN', circuitCategory: 'final', tClear: null, r
 // Auto-dimensioning solver state (click-only inputs)
 let solverState = { systemType: 'TN', circuitCategory: 'final', cableLength: 25, installMethod: 'C', temp: 30, grouping: 1, soil: null, expanded: false };
 let solverResult = null; // cached last solve result for rendering
+// Selectivity module state
+let selectivityState = { upstream: null, downstream: null, showProof: false };
+// Commissioning module state (DS/HD 60364-6 §6.4)
+let commissionState = { step: 0, results: [], projectName: '', date: '' };
 // Standards state
 let rcdSelected = null;
 let rcdSensitivity = null;
@@ -2963,6 +3044,8 @@ function renderModule(mod) {
     case 'backup': content = renderBackup(); break;
     case 'wire': content = renderWire(); break;
     case 'risk': content = renderRisk(); break;
+    case 'selectivity': content = renderSelectivity(); break;
+    case 'commission': content = renderCommission(); break;
   }
   // Append AI assistant to every module
   content += renderAiAssistant(mod);
@@ -5404,8 +5487,9 @@ function configurePriceFeed() {
 })();
 
 // ===== DATA VERSION & CHANGELOG =====
-const DATA_VERSION = '2026.5';
+const DATA_VERSION = '2026.6';
 const DATA_CHANGELOG = [
+  { v: '2026.6', date: '2026-06-13', da: 'Selektivitetsmodul: interaktiv log-log T-I kurve SVG + selektivitetsbevismotor. Idriftsættelsesmodul: DS/HD 60364-6 §6.4 trin-for-trin witness mode med protokoleksport. Forensisk forklarer: årsagskæde + rangerede rettelsesmuligheder på hvert FEJL-verdikt.', en: 'Selectivity module: interactive log-log T-I curve SVG + selectivity proof engine. Commissioning module: DS/HD 60364-6 §6.4 step-by-step witness mode with protocol export. Forensic explainer: causal chain + ranked fix options on every FAIL verdict.' },
   { v: '2026.5', date: '2026-06-13', da: 'Auto-dimensionering solver: et klik finder mindste DS/HD 60364-kompatible {kabel, enhed, RCD}-sæt. Udtømmende søgning med 5-tjek compliance-gate. Konservativ: gulv Iz, loft Zs, ekskludér ved tvivl. TT håndhæver RCD. Rangeret output: Anbefalet + op til 3 alternativer.', en: 'Auto-dimensioning solver: one click finds smallest DS/HD 60364 compliant {cable, device, RCD} set. Exhaustive search with 5-check compliance gate. Conservative: floor Iz, ceiling Zs, exclude on doubt. TT enforces RCD. Ranked output: Recommended + up to 3 alternatives.' },
   { v: '2026.4', date: '2026-06-12', da: 'Korrekthedsh\u00E6rdning: derating styrer nu ALLE verdikter (\u00A7523), overbelastning I\u2082\u22641,45\u00B7Iz (\u00A7433.1), adiabatisk kortslutningsholdbarhed k\u00B2S\u00B2\u2265I\u00B2t (\u00A7434.5.2), og Zs/udkoblingstid (\u00A7411). INSUFFICIENT_DATA-tilstand: aldrig PASS uden bevis.', en: 'Correctness hardening: derating now drives ALL verdicts (\u00A7523), overload I\u2082\u22641.45\u00B7Iz (\u00A7433.1), adiabatic short-circuit withstand k\u00B2S\u00B2\u2265I\u00B2t (\u00A7434.5.2), and Zs/disconnection time (\u00A7411). INSUFFICIENT_DATA state: never PASS without proof.' },
   { v: '2026.3', date: '2026-06-12', da: 'Back-up koordinering (IEC 60947-2 Annex A), ledningsnumre/klemmeplan (DS/EN 81346-2), og installationsrisikomatrix (DS/HD 60364-1 §131) tilføjet.', en: 'Back-up coordination (IEC 60947-2 Annex A), wire numbering/terminal plans (DS/EN 81346-2), and installation risk matrix (DS/HD 60364-1 §131) added.' },
@@ -6285,6 +6369,125 @@ function runSelfTests() {
       }
     }
     T.push({ name: 'Solver Prop 11: Iz ≤ raw float, Zs ≥ raw float (50×)', exp: 'conservative', act: pass ? 'conservative' : ('fail ' + fail), pass: pass });
+  })();
+
+  // ==========================================================================
+  // ===== PROPERTY-BASED SELF-TESTS — Selectivity, Commission, Forensic =======
+  // Feature: selectivity T-I curves, commissioning witness, forensic explainer
+  // ==========================================================================
+
+  // Selectivity: getTripCurveData returns sorted ascending current points for B/C/D/fuse
+  (function () {
+    let pass = true, fail = null;
+    const configs = [
+      { type: 'mcb', curve: 'B', rating: 16 },
+      { type: 'mcb', curve: 'C', rating: 25 },
+      { type: 'mcb', curve: 'D', rating: 32 },
+      { type: 'fuse', curve: null, rating: 25 },
+      { type: 'fuse', curve: null, rating: 63 },
+      { type: 'fuse', curve: null, rating: 160 },
+      { type: 'mccb', curve: null, rating: 250, ioMult: 0.8, isdMult: 2 }
+    ];
+    configs.forEach(function (dev) {
+      if (!pass) return;
+      var pts = getTripCurveData(dev);
+      if (pts.length < 2) { pass = false; fail = 'too few points for ' + dev.type + ' ' + dev.rating; return; }
+      for (var i = 1; i < pts.length; i++) {
+        if (pts[i].current_A < pts[i - 1].current_A - 1e-9) {
+          pass = false; fail = 'not sorted asc ' + dev.type + ' ' + dev.rating + ' at idx ' + i;
+          return;
+        }
+      }
+      // All points must have positive current and time
+      pts.forEach(function (p, idx) {
+        if (p.current_A <= 0 || p.time_s <= 0) { pass = false; fail = 'non-positive at ' + dev.type + ' ' + dev.rating + ' idx=' + idx; }
+      });
+    });
+    T.push({ name: 'Selectivity: getTripCurveData sorted asc + positive for B/C/D/fuse/MCCB', exp: 'sorted', act: pass ? 'sorted' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Selectivity: fuse selectivity ratio ≥1.6:1 implies selective
+  (function () {
+    let pass = true, fail = null;
+    var fusePairs = [[63, 25], [100, 40], [160, 63], [250, 100]];
+    fusePairs.forEach(function (pair) {
+      if (!pass) return;
+      var up = { type: 'fuse', curve: null, rating: pair[0] };
+      var down = { type: 'fuse', curve: null, rating: pair[1] };
+      var ratio = pair[0] / pair[1];
+      var sel = checkSelectivity(up, down);
+      if (ratio >= 1.6 && !sel.selective) { pass = false; fail = pair[0] + '/' + pair[1] + ' ratio=' + ratio.toFixed(2) + ' not selective'; }
+    });
+    T.push({ name: 'Selectivity: gG fuse ratio ≥1.6:1 → selective', exp: 'selective', act: pass ? 'selective' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Commission: all test verdicts computed correctly
+  (function () {
+    let pass = true, fail = null;
+    // PE continuity: 0.5Ω → OK, 1.5Ω → FAIL
+    if (!COMMISSION_TESTS[0].check(0.5)) { pass = false; fail = 'PE 0.5 should pass'; }
+    if (COMMISSION_TESTS[0].check(1.5)) { pass = false; fail = 'PE 1.5 should fail'; }
+    // Insulation: 1MΩ → OK, 0.5MΩ → FAIL
+    if (!COMMISSION_TESTS[1].check(1)) { pass = false; fail = 'Insul 1 should pass'; }
+    if (COMMISSION_TESTS[1].check(0.5)) { pass = false; fail = 'Insul 0.5 should fail'; }
+    // Polarity
+    if (!COMMISSION_TESTS[2].check('PASS')) { pass = false; fail = 'Polarity PASS should pass'; }
+    if (COMMISSION_TESTS[2].check('FAIL')) { pass = false; fail = 'Polarity FAIL should fail'; }
+    // RCD ×1 IΔn: 200ms → OK, 300ms → OK, 301 would fail but we test 300
+    if (!COMMISSION_TESTS[4].check(200)) { pass = false; fail = 'RCD1 200 should pass'; }
+    if (!COMMISSION_TESTS[4].check(300)) { pass = false; fail = 'RCD1 300 should pass'; }
+    // RCD ×5 IΔn: 30ms → OK, 50ms → FAIL
+    if (!COMMISSION_TESTS[5].check(30)) { pass = false; fail = 'RCD5 30 should pass'; }
+    if (COMMISSION_TESTS[5].check(50)) { pass = false; fail = 'RCD5 50 should fail'; }
+    // Phase sequence
+    if (!COMMISSION_TESTS[6].check('L1-L2-L3')) { pass = false; fail = 'Phase L1L2L3 should pass'; }
+    if (!COMMISSION_TESTS[6].check('N/A')) { pass = false; fail = 'Phase N/A should pass'; }
+    T.push({ name: 'Commission: all test verdicts computed correctly (PE/Insul/Pol/RCD/Phase)', exp: 'correct', act: pass ? 'correct' : ('fail ' + fail), pass: pass });
+  })();
+
+  // Forensic: buildForensicExplanation returns non-empty explanation + ≥1 fix for FAIL
+  (function () {
+    let pass = true, fail = null;
+    var saveCable = JSON.parse(JSON.stringify(cableState));
+    var saveSc = JSON.parse(JSON.stringify(scState));
+    var saveVd = JSON.parse(JSON.stringify(vdropState));
+    // Create scenario that produces FAILs
+    cableState.material = 'copper'; cableState.type = 'NOIKLX'; cableState.cores = '5G';
+    cableState.crossSection = 1.5; cableState.installMethod = 'A1';
+    cableState.temp = 50; cableState.grouping = 9; cableState.soil = null;
+    scState.zNet = 5000; scState.zTrafo = 0; vdropState.length = 0;
+
+    // Test ampacity FAIL
+    var ampV = { id: 'ampacity', state: 'FAIL', values: { baseIz: 22, deratedIz: 7, inA: 16, ib: 14 }, clause: 'DS/HD 60364-5-52' };
+    var fe = buildForensicExplanation(ampV);
+    if (!fe.causal.da || fe.causal.da.length < 10) { pass = false; fail = 'ampacity causal empty'; }
+    if (fe.fixes.length < 1) { pass = false; fail = 'ampacity no fixes'; }
+
+    // Test overload FAIL
+    var ovV = { id: 'overload', state: 'FAIL', values: { i2: 40, limit: 29, factor: 1.6, inA: 25, deratedIz: 20 }, clause: 'DS/HD 60364-4-43' };
+    fe = buildForensicExplanation(ovV);
+    if (!fe.causal.en || fe.causal.en.length < 10) { pass = false; fail = 'overload causal empty'; }
+    if (fe.fixes.length < 1) { pass = false; fail = 'overload no fixes'; }
+
+    // Test adiabatic FAIL
+    var adV = { id: 'adiabatic', state: 'FAIL', values: { isc: 6000, tClear: 0.4, i2t: 14400000, k: 143, sArea: 2.5, withstand: 127806, sMin: 4.2, recommendedCsa: 6 }, clause: 'DS/HD 60364-4-43' };
+    fe = buildForensicExplanation(adV);
+    if (!fe.causal.da || fe.causal.da.length < 10) { pass = false; fail = 'adiabatic causal empty'; }
+    if (fe.fixes.length < 1) { pass = false; fail = 'adiabatic no fixes'; }
+
+    // Test Zs FAIL
+    var zsV = { id: 'zs', state: 'FAIL', values: { zsActual: 4.5, zsMax: 2.99, ia: 77 }, clause: 'DS/HD 60364-4-41' };
+    fe = buildForensicExplanation(zsV);
+    if (!fe.causal.da || fe.causal.da.length < 5) { pass = false; fail = 'zs causal empty'; }
+    if (fe.fixes.length < 1) { pass = false; fail = 'zs no fixes'; }
+
+    // PASS verdict should return empty
+    var passV = { id: 'ampacity', state: 'PASS', values: {}, clause: 'DS/HD 60364' };
+    fe = buildForensicExplanation(passV);
+    if (fe.causal.da !== '' || fe.fixes.length > 0) { pass = false; fail = 'PASS should return empty forensic'; }
+
+    cableState = saveCable; scState = saveSc; vdropState = saveVd;
+    T.push({ name: 'Forensic: non-empty explanation + ≥1 fix for every FAIL scenario', exp: 'all have forensic', act: pass ? 'all have forensic' : ('fail ' + fail), pass: pass });
   })();
 
   return T;
@@ -7274,6 +7477,491 @@ function riskBlocksSignoff(){
     return risks.some(function(r){ return r.riskLevel === 'red'; });
   } catch(e) { return true; } // Conservative: assume blocked if error
 }
+
+// ============================================================================
+// ===== FEATURE A: SELECTIVITY T-I CURVE RENDERER + PROOF ENGINE =============
+// DS/HD 60364-5-53 §535.2 — coordination of protective devices. Log-log time-
+// current SVG renderer with selectivity limit computation.
+// ============================================================================
+
+// getTripCurveData(device) — returns sorted [{current_A, time_s}] points.
+// device = { type:'mcb'|'fuse'|'mccb', curve:'B'|'C'|'D', rating:Number, ... }
+function getTripCurveData(device) {
+  if (!device || !device.type) return [];
+  const pts = [];
+  if (device.type === 'mcb') {
+    const In = device.rating || 16;
+    const curve = MCB_CURVES[device.curve || 'C'];
+    if (!curve) return [];
+    const magLo = curve.isdMin * In;
+    const magHi = curve.isdMax * In;
+    // Thermal zone: I²t=const from ~1.13×In at 3600s down to magnetic region
+    const iStart = 1.13 * In;
+    const tStart = 3600;
+    const I2t = iStart * iStart * tStart;
+    // Generate thermal points from 1.13In up to magnetic low
+    for (let mult = 1.13; mult < curve.isdMin; mult *= 1.15) {
+      const I = mult * In;
+      const tTrip = I2t / (I * I);
+      if (tTrip > 0.001 && tTrip <= 10000) pts.push({ current_A: I, time_s: tTrip });
+    }
+    // Magnetic trip zone (instantaneous)
+    pts.push({ current_A: magLo, time_s: 0.08 });
+    pts.push({ current_A: magHi, time_s: 0.04 });
+    // Beyond magnetic: instantaneous
+    pts.push({ current_A: magHi * 2, time_s: 0.02 });
+  } else if (device.type === 'fuse') {
+    const size = device.rating;
+    if (!size) return [];
+    const i5s = FUSE_5S[size];
+    const i04s = FUSE_0_4S[size];
+    // Conventional non-fusing current ~1.25×In, fusing ~1.6×In at long times
+    const iPreArc = 1.6 * size;
+    pts.push({ current_A: iPreArc, time_s: 7200 });
+    pts.push({ current_A: 2 * size, time_s: 600 });
+    // 5s point
+    if (i5s) pts.push({ current_A: i5s, time_s: 5 });
+    // Interpolate between 5s and 0.4s log-log
+    if (i5s && i04s) {
+      const logI1 = Math.log10(i5s), logT1 = Math.log10(5);
+      const logI2 = Math.log10(i04s), logT2 = Math.log10(0.4);
+      for (let f = 0.2; f <= 0.8; f += 0.2) {
+        const logI = logI1 + f * (logI2 - logI1);
+        const logT = logT1 + f * (logT2 - logT1);
+        pts.push({ current_A: Math.pow(10, logI), time_s: Math.pow(10, logT) });
+      }
+    }
+    // 0.4s point
+    if (i04s) pts.push({ current_A: i04s, time_s: 0.4 });
+    // Beyond 0.4s: extrapolate to 0.01s
+    if (i04s) {
+      pts.push({ current_A: i04s * 2, time_s: 0.05 });
+      pts.push({ current_A: i04s * 4, time_s: 0.01 });
+    }
+  } else if (device.type === 'mccb') {
+    const In = device.rating || 400;
+    const ioMult = device.ioMult || 0.8;
+    const isdMult = device.isdMult || 2;
+    const Ir = In * ioMult;
+    const Isd = Ir * isdMult;
+    // Long-time thermal zone
+    const I2t = (1.1 * Ir) * (1.1 * Ir) * 3600;
+    for (let mult = 1.05; mult < isdMult * ioMult; mult *= 1.2) {
+      const I = mult * In;
+      const tTrip = I2t / (I * I);
+      if (tTrip > 0.001 && tTrip <= 10000) pts.push({ current_A: I, time_s: tTrip });
+    }
+    // Short-time (Isd) magnetic pickup
+    pts.push({ current_A: Isd, time_s: 0.1 });
+    pts.push({ current_A: Isd * 1.5, time_s: 0.05 });
+    // Instantaneous
+    pts.push({ current_A: In * 12, time_s: 0.02 });
+  }
+  // Sort ascending by current
+  pts.sort(function (a, b) { return a.current_A - b.current_A; });
+  return pts;
+}
+
+// checkSelectivity(upstream, downstream) — compare two T-I curves
+function checkSelectivity(upstream, downstream) {
+  const upCurve = getTripCurveData(upstream);
+  const downCurve = getTripCurveData(downstream);
+  if (upCurve.length < 2 || downCurve.length < 2) {
+    return { selective: false, limitCurrent_A: 0, ratio: 0, message: { da: 'Utilstrækkelige data til analyse.', en: 'Insufficient data for analysis.' } };
+  }
+  // Helper: interpolate time at a given current from a curve (log-log)
+  function timeAtCurrent(curve, I) {
+    if (I <= curve[0].current_A) return curve[0].time_s * 2; // extrapolate slower
+    if (I >= curve[curve.length - 1].current_A) return curve[curve.length - 1].time_s;
+    for (let j = 1; j < curve.length; j++) {
+      if (curve[j].current_A >= I) {
+        const logI1 = Math.log10(curve[j - 1].current_A), logT1 = Math.log10(curve[j - 1].time_s);
+        const logI2 = Math.log10(curve[j].current_A), logT2 = Math.log10(curve[j].time_s);
+        const f = (Math.log10(I) - logI1) / (logI2 - logI1);
+        return Math.pow(10, logT1 + f * (logT2 - logT1));
+      }
+    }
+    return curve[curve.length - 1].time_s;
+  }
+
+  // Find selectivity limit: highest current where downstream trips faster than upstream
+  let limitCurrent = 0;
+  const testCurrents = [];
+  for (let logI = 0; logI <= 5; logI += 0.05) testCurrents.push(Math.pow(10, logI));
+  for (let i = 0; i < testCurrents.length; i++) {
+    const I = testCurrents[i];
+    const tUp = timeAtCurrent(upCurve, I);
+    const tDown = timeAtCurrent(downCurve, I);
+    if (tDown < tUp * 0.9) { // downstream is faster (selective)
+      limitCurrent = I;
+    }
+  }
+
+  // Ratio check (rule of thumb for gG fuses: ≥1.6:1)
+  const ratio = (upstream.rating && downstream.rating) ? upstream.rating / downstream.rating : 0;
+  const isFusesFuse = upstream.type === 'fuse' && downstream.type === 'fuse';
+  const selective = isFusesFuse ? (ratio >= 1.6) : (limitCurrent > 0);
+
+  if (selective) {
+    return {
+      selective: true, limitCurrent_A: Math.round(limitCurrent), ratio: +ratio.toFixed(2),
+      message: {
+        da: 'Selektiv op til ' + Math.round(limitCurrent) + ' A' + (isFusesFuse ? ' (forhold ' + ratio.toFixed(1) + ':1 ≥ 1,6:1)' : ''),
+        en: 'Selective up to ' + Math.round(limitCurrent) + ' A' + (isFusesFuse ? ' (ratio ' + ratio.toFixed(1) + ':1 ≥ 1.6:1)' : '')
+      }
+    };
+  }
+  return {
+    selective: false, limitCurrent_A: Math.round(limitCurrent), ratio: +ratio.toFixed(2),
+    message: {
+      da: 'IKKE selektiv' + (limitCurrent > 0 ? ' — overlap ved ' + Math.round(limitCurrent) + ' A' : '') + (isFusesFuse ? ' (forhold ' + ratio.toFixed(1) + ':1 < 1,6:1)' : ''),
+      en: 'NOT selective' + (limitCurrent > 0 ? ' — overlap at ' + Math.round(limitCurrent) + ' A' : '') + (isFusesFuse ? ' (ratio ' + ratio.toFixed(1) + ':1 < 1.6:1)' : '')
+    }
+  };
+}
+
+// renderSelectivitySVG — inline SVG log-log T-I plot
+function renderSelectivitySVG(upstream, downstream) {
+  const upCurve = getTripCurveData(upstream);
+  const downCurve = getTripCurveData(downstream);
+  const sel = checkSelectivity(upstream, downstream);
+  const W = 600, H = 400, pad = 60, padR = 30, padT = 30;
+  const plotW = W - pad - padR, plotH = H - padT - pad;
+  // Log scales: X = current 1A..100kA (0..5), Y = time 0.001s..10000s (-3..4)
+  function xPos(logI) { return pad + (logI / 5) * plotW; }
+  function yPos(logT) { return padT + ((4 - logT) / 7) * plotH; } // 7 decades
+  function curvePath(curve, color) {
+    if (curve.length < 2) return '';
+    let d = '';
+    curve.forEach(function (pt, i) {
+      const x = xPos(Math.log10(Math.max(pt.current_A, 1)));
+      const y = yPos(Math.log10(Math.max(pt.time_s, 0.001)));
+      d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
+    });
+    return '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+  // Grid lines
+  let grid = '';
+  for (let i = 0; i <= 5; i++) {
+    const x = xPos(i);
+    grid += '<line x1="' + x + '" y1="' + padT + '" x2="' + x + '" y2="' + (H - pad) + '" stroke="#2a3645" stroke-width="0.5"/>';
+    grid += '<text x="' + x + '" y="' + (H - pad + 14) + '" text-anchor="middle" font-size="9" fill="#8fa3b5">' + Math.pow(10, i) + '</text>';
+  }
+  for (let j = -3; j <= 4; j++) {
+    const y = yPos(j);
+    grid += '<line x1="' + pad + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y + '" stroke="#2a3645" stroke-width="0.5"/>';
+    grid += '<text x="' + (pad - 5) + '" y="' + (y + 3) + '" text-anchor="end" font-size="9" fill="#8fa3b5">' + (j < 0 ? '0.' + '0'.repeat(-j - 1) + '1' : Math.pow(10, j)) + '</text>';
+  }
+  // Selectivity limit line
+  let limitLine = '';
+  if (sel.limitCurrent_A > 0) {
+    const lx = xPos(Math.log10(sel.limitCurrent_A));
+    limitLine = '<line x1="' + lx + '" y1="' + padT + '" x2="' + lx + '" y2="' + (H - pad) + '" stroke="#ffd166" stroke-width="1.5" stroke-dasharray="6,4"/>';
+    limitLine += '<text x="' + lx + '" y="' + (padT - 5) + '" text-anchor="middle" font-size="9" font-weight="700" fill="#ffd166">' + Math.round(sel.limitCurrent_A) + ' A</text>';
+  }
+  // Labels
+  const upLabel = (upstream.type === 'fuse' ? 'gG ' : (upstream.type === 'mccb' ? 'MCCB ' : 'MCB ' + (upstream.curve || '') + ' ')) + upstream.rating + 'A';
+  const downLabel = (downstream.type === 'fuse' ? 'gG ' : (downstream.type === 'mccb' ? 'MCCB ' : 'MCB ' + (downstream.curve || '') + ' ')) + downstream.rating + 'A';
+
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:600px;background:#0f1620;border-radius:12px;border:1px solid #2a3645">' +
+    grid + limitLine +
+    curvePath(upCurve, '#ff6b8a') + curvePath(downCurve, '#00d0ff') +
+    '<text x="' + (W - padR - 5) + '" y="' + (H - pad + 30) + '" text-anchor="end" font-size="10" fill="#8fa3b5">' + (lang === 'da' ? 'Strøm [A]' : 'Current [A]') + '</text>' +
+    '<text x="' + (pad - 35) + '" y="' + (padT + plotH / 2) + '" text-anchor="middle" font-size="10" fill="#8fa3b5" transform="rotate(-90,' + (pad - 35) + ',' + (padT + plotH / 2) + ')">' + (lang === 'da' ? 'Tid [s]' : 'Time [s]') + '</text>' +
+    '<rect x="' + (pad + 10) + '" y="' + (padT + 5) + '" width="12" height="3" fill="#ff6b8a"/>' +
+    '<text x="' + (pad + 26) + '" y="' + (padT + 9) + '" font-size="9" fill="#ff6b8a">' + upLabel + ' (' + (lang === 'da' ? 'opstrøms' : 'upstream') + ')</text>' +
+    '<rect x="' + (pad + 10) + '" y="' + (padT + 18) + '" width="12" height="3" fill="#00d0ff"/>' +
+    '<text x="' + (pad + 26) + '" y="' + (padT + 22) + '" font-size="9" fill="#00d0ff">' + downLabel + ' (' + (lang === 'da' ? 'nedstrøms' : 'downstream') + ')</text>' +
+    '</svg>';
+}
+
+// renderSelectivity — the selectivity module UI
+function renderSelectivity() {
+  const ss = selectivityState;
+  const deviceTypes = [
+    { label: 'MCB B', opts: [6, 10, 13, 16, 20, 25, 32, 40, 50, 63], type: 'mcb', curve: 'B' },
+    { label: 'MCB C', opts: [6, 10, 13, 16, 20, 25, 32, 40, 50, 63], type: 'mcb', curve: 'C' },
+    { label: 'MCB D', opts: [10, 16, 20, 25, 32, 40, 50, 63], type: 'mcb', curve: 'D' },
+    { label: 'gG ' + (lang === 'da' ? 'sikring' : 'fuse'), opts: [6, 10, 13, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250], type: 'fuse', curve: null },
+    { label: 'MCCB', opts: [100, 160, 250, 400, 630], type: 'mccb', curve: null }
+  ];
+
+  function renderDeviceSelector(role) {
+    const selected = ss[role];
+    let html = '';
+    deviceTypes.forEach(function (dt) {
+      html += '<div class="select-group"><div class="select-label">' + dt.label + '</div><div class="select-grid">';
+      dt.opts.forEach(function (r) {
+        const isSel = selected && selected.type === dt.type && selected.curve === dt.curve && selected.rating === r;
+        html += '<button class="sel-btn ' + (isSel ? 'selected' : '') + '" onclick="selectivityState.' + role + '={type:\'' + dt.type + '\',curve:' + (dt.curve ? '\'' + dt.curve + '\'' : 'null') + ',rating:' + r + (dt.type === 'mccb' ? ',ioMult:0.8,isdMult:2' : '') + '};selectivityState.showProof=false;renderModule(\'selectivity\')">' + r + '</button>';
+      });
+      html += '</div></div>';
+    });
+    return html;
+  }
+
+  let result = '';
+  if (ss.upstream && ss.downstream) {
+    const sel = checkSelectivity(ss.upstream, ss.downstream);
+    const msg = lang === 'da' ? sel.message.da : sel.message.en;
+    const boxClass = sel.selective ? '' : 'error';
+    const badge = sel.selective ? '<span class="verify-badge ok">✓ ' + (lang === 'da' ? 'SELEKTIV' : 'SELECTIVE') + '</span>' : '<span class="verify-badge fail">✗ ' + (lang === 'da' ? 'IKKE SELEKTIV' : 'NOT SELECTIVE') + '</span>';
+    result = '<div class="result-box ' + boxClass + '">' +
+      '<div class="result-title">' + t('selectVerdict') + '</div>' +
+      '<div class="result-row"><span class="label">' + msg + '</span><span class="value">' + badge + '</span></div>' +
+      (sel.limitCurrent_A > 0 ? '<div class="result-row"><span class="label">' + t('selectLimitCurrent') + '</span><span class="value">' + sel.limitCurrent_A + ' A</span></div>' : '') +
+      (sel.ratio > 0 ? '<div class="result-row"><span class="label">' + t('selectRatio') + '</span><span class="value">' + sel.ratio + ':1</span></div>' : '') +
+      '</div>' +
+      '<div class="select-grid" style="margin-top:12px"><button class="sel-btn ' + (ss.showProof ? 'selected' : '') + '" onclick="selectivityState.showProof=!selectivityState.showProof;renderModule(\'selectivity\')">' + t('selectProof') + '</button></div>' +
+      (ss.showProof ? '<div style="margin-top:12px">' + renderSelectivitySVG(ss.upstream, ss.downstream) + '</div>' : '');
+  }
+
+  return '<div class="card fade-in"><div class="card-title">⚡ ' + t('selectTitle') + '</div>' +
+    '<div class="info-row">' + (lang === 'da' ? 'Vælg opstrøms og nedstrøms enhed. Appen beregner selektivitetsgrænsen og tegner T-I kurverne (DS/HD 60364-5-53 §535.2).' : 'Select upstream and downstream devices. The app computes the selectivity limit and draws T-I curves (DS/HD 60364-5-53 §535.2).') + '</div>' +
+    '<div class="card-title" style="font-size:0.9rem;border:none;padding:0;margin:12px 0 0">↑ ' + t('selectUpstream') + '</div>' +
+    renderDeviceSelector('upstream') +
+    '<div class="card-title" style="font-size:0.9rem;border:none;padding:0;margin:12px 0 0">↓ ' + t('selectDownstream') + '</div>' +
+    renderDeviceSelector('downstream') +
+    result +
+    '</div>';
+}
+
+// ============================================================================
+// ===== FEATURE B: COMMISSIONING WITNESS MODE (DS/HD 60364-6 §6.4) ===========
+// Step-by-step test sequence per the standard's verification requirements.
+// ============================================================================
+
+const COMMISSION_TESTS = [
+  { id: 'pe', keyName: 'commTestPE', requirement: { da: 'Kontinuitet ≤ 1 Ω (DS/HD 60364-6 §61.3.2)', en: 'Continuity ≤ 1 Ω (DS/HD 60364-6 §61.3.2)' }, options: [0.1, 0.2, 0.3, 0.5, 0.7, 1.0, 1.5, 2.0, 3.0, 5.0], unit: 'Ω', check: function (v) { return v <= 1.0; } },
+  { id: 'insulation', keyName: 'commTestInsul', requirement: { da: 'Isolationsmodstand ≥ 1 MΩ ved 500V DC (DS/HD 60364-6 §61.3.3)', en: 'Insulation resistance ≥ 1 MΩ at 500V DC (DS/HD 60364-6 §61.3.3)' }, options: [0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 999], unit: 'MΩ', check: function (v) { return v >= 1; } },
+  { id: 'polarity', keyName: 'commTestPol', requirement: { da: 'Korrekt polaritet (DS/HD 60364-6 §61.3.4)', en: 'Correct polarity (DS/HD 60364-6 §61.3.4)' }, options: ['PASS', 'FAIL'], unit: '', check: function (v) { return v === 'PASS'; } },
+  { id: 'zs', keyName: 'commTestZs', requirement: { da: 'Zs ≤ Zs_max (DS/HD 60364-6 §61.3.6)', en: 'Zs ≤ Zs_max (DS/HD 60364-6 §61.3.6)' }, options: [0.1, 0.2, 0.3, 0.5, 0.7, 1.0, 1.5, 2.0, 3.0, 5.0, 7.0, 10.0], unit: 'Ω', check: function (v) { try { var b = evaluateCorrectnessVerdicts(); if (b.zs && b.zs.values && b.zs.values.zsMax) return v <= b.zs.values.zsMax; } catch (e) {} return v <= 2.0; } },
+  { id: 'rcd1', keyName: 'commTestRCD1', requirement: { da: 'RCD ×1 IΔn ≤ 300 ms (DS/HD 60364-6 §61.3.7)', en: 'RCD ×1 IΔn ≤ 300 ms (DS/HD 60364-6 §61.3.7)' }, options: [10, 20, 30, 50, 80, 100, 150, 200, 250, 300], unit: 'ms', check: function (v) { return v <= 300; } },
+  { id: 'rcd5', keyName: 'commTestRCD5', requirement: { da: 'RCD ×5 IΔn ≤ 40 ms (DS/HD 60364-6 §61.3.7)', en: 'RCD ×5 IΔn ≤ 40 ms (DS/HD 60364-6 §61.3.7)' }, options: [5, 8, 10, 15, 20, 25, 30, 35, 40, 50], unit: 'ms', check: function (v) { return v <= 40; } },
+  { id: 'phase', keyName: 'commTestPhase', requirement: { da: 'Korrekt fasesekvens L1-L2-L3 (DS/HD 60364-6 §61.3.8)', en: 'Correct phase sequence L1-L2-L3 (DS/HD 60364-6 §61.3.8)' }, options: ['L1-L2-L3', (typeof lang !== 'undefined' && lang === 'en') ? 'Reverse' : 'Omvendt', 'N/A'], unit: '', check: function (v) { return v === 'L1-L2-L3' || v === 'N/A'; } }
+];
+
+function commSetValue(stepIdx, val) {
+  commissionState.results[stepIdx] = val;
+  renderModule('commission');
+}
+function commNext() { if (commissionState.step < COMMISSION_TESTS.length - 1) { commissionState.step++; renderModule('commission'); } }
+function commPrev() { if (commissionState.step > 0) { commissionState.step--; renderModule('commission'); } }
+function commRestart() { commissionState = { step: 0, results: [], projectName: commissionState.projectName, date: commissionState.date }; renderModule('commission'); }
+function commSetProject(name) { commissionState.projectName = name; }
+function commSetDate(d) { commissionState.date = d; }
+
+function renderCommissionProtocol() {
+  // Generate A4 SVG verification report
+  var W = 794, H = 1123;
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" style="background:#fff">';
+  svg += '<rect width="' + W + '" height="' + H + '" fill="#fff"/>';
+  svg += '<text x="397" y="40" text-anchor="middle" font-size="18" font-weight="700" fill="#111">' + (lang === 'da' ? 'Idriftsættelsesprotokol — DS/HD 60364-6 §6.4' : 'Commissioning Protocol — DS/HD 60364-6 §6.4') + '</text>';
+  svg += '<text x="397" y="62" text-anchor="middle" font-size="11" fill="#555">' + (commissionState.projectName || 'Projekt') + ' | ' + (commissionState.date || new Date().toLocaleDateString('da-DK')) + ' | El-Dimensionering v' + DATA_VERSION + '</text>';
+  var y = 100;
+  // Results table
+  svg += '<rect x="40" y="' + y + '" width="714" height="28" fill="#0f4c75"/>';
+  svg += '<text x="55" y="' + (y + 18) + '" font-size="10" font-weight="700" fill="#fff">' + (lang === 'da' ? 'Test' : 'Test') + '</text>';
+  svg += '<text x="350" y="' + (y + 18) + '" font-size="10" font-weight="700" fill="#fff">' + (lang === 'da' ? 'Krav' : 'Requirement') + '</text>';
+  svg += '<text x="560" y="' + (y + 18) + '" font-size="10" font-weight="700" fill="#fff">' + (lang === 'da' ? 'Målt' : 'Measured') + '</text>';
+  svg += '<text x="680" y="' + (y + 18) + '" font-size="10" font-weight="700" fill="#fff">' + (lang === 'da' ? 'Dom' : 'Verdict') + '</text>';
+  y += 30;
+  var allPass = true;
+  COMMISSION_TESTS.forEach(function (test, i) {
+    var val = commissionState.results[i];
+    var pass = val != null ? test.check(val) : false;
+    if (val == null || !pass) allPass = false;
+    var bg = i % 2 === 0 ? '#f8fafc' : '#ffffff';
+    svg += '<rect x="40" y="' + y + '" width="714" height="24" fill="' + bg + '"/>';
+    svg += '<text x="55" y="' + (y + 16) + '" font-size="9" fill="#333">' + t(test.keyName) + '</text>';
+    svg += '<text x="350" y="' + (y + 16) + '" font-size="8" fill="#555">' + (lang === 'da' ? test.requirement.da : test.requirement.en) + '</text>';
+    svg += '<text x="560" y="' + (y + 16) + '" font-size="9" fill="#111" font-weight="600">' + (val != null ? val + ' ' + test.unit : '—') + '</text>';
+    svg += '<text x="680" y="' + (y + 16) + '" font-size="9" font-weight="700" fill="' + (pass ? '#059669' : '#dc2626') + '">' + (val != null ? (pass ? '✓ OK' : '✗ FAIL') : '—') + '</text>';
+    y += 26;
+  });
+  y += 20;
+  // Correctness verdicts summary
+  svg += '<text x="55" y="' + y + '" font-size="11" font-weight="700" fill="#0f4c75">' + (lang === 'da' ? 'Korrekthedsverdikter (dimensionering)' : 'Correctness verdicts (dimensioning)') + '</text>';
+  y += 18;
+  try {
+    var vb = evaluateCorrectnessVerdicts();
+    ['ampacity', 'overload', 'adiabatic', 'zs'].forEach(function (id) {
+      var v = vb[id];
+      var color = v.state === 'PASS' ? '#059669' : (v.state === 'FAIL' ? '#dc2626' : '#ca8a04');
+      svg += '<text x="55" y="' + y + '" font-size="9" fill="' + color + '">' + v.state + ' — ' + (v.message ? (lang === 'da' ? v.message.da : v.message.en) : id) + '</text>';
+      y += 15;
+    });
+  } catch (e) { svg += '<text x="55" y="' + y + '" font-size="9" fill="#666">Verdicts not available</text>'; y += 15; }
+  // Final verdict
+  y += 20;
+  svg += '<rect x="40" y="' + y + '" width="714" height="36" rx="4" fill="' + (allPass ? '#dcfce7' : '#fef2f2') + '" stroke="' + (allPass ? '#059669' : '#dc2626') + '" stroke-width="2"/>';
+  svg += '<text x="397" y="' + (y + 23) + '" text-anchor="middle" font-size="14" font-weight="700" fill="' + (allPass ? '#059669' : '#dc2626') + '">' + (allPass ? (lang === 'da' ? '✓ BESTÅET — Installationen er godkendt til drift' : '✓ PASS — Installation approved for operation') : (lang === 'da' ? '✗ IKKE BESTÅET — Udbedring påkrævet' : '✗ FAIL — Remedial action required')) + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function renderCommission() {
+  var cs = commissionState;
+  var step = cs.step;
+  var test = COMMISSION_TESTS[step];
+  var allDone = cs.results.length >= COMMISSION_TESTS.length && cs.results.every(function (v, i) { return v != null; });
+
+  // Project name + date (click buttons for common project names)
+  var projectNames = ['Bolig', 'Erhverv', 'Institution', 'Industri', 'EV-anlæg'];
+  var projectBtns = projectNames.map(function (n) {
+    return '<button class="sel-btn ' + (cs.projectName === n ? 'selected' : '') + '" onclick="commSetProject(\'' + n + '\');renderModule(\'commission\')">' + n + '</button>';
+  }).join('');
+  var dateBtns = (function () {
+    var today = new Date().toLocaleDateString('da-DK');
+    return '<button class="sel-btn ' + (cs.date === today ? 'selected' : '') + '" onclick="commSetDate(\'' + today + '\');renderModule(\'commission\')">' + today + '</button>';
+  })();
+
+  // Step indicator
+  var stepIndicator = '';
+  COMMISSION_TESTS.forEach(function (tst, i) {
+    var val = cs.results[i];
+    var icon = val == null ? '○' : (tst.check(val) ? '✅' : '🚫');
+    var cls = i === step ? 'selected' : '';
+    stepIndicator += '<button class="sel-btn ' + cls + '" style="min-width:36px;padding:4px 8px" onclick="commissionState.step=' + i + ';renderModule(\'commission\')">' + icon + ' ' + (i + 1) + '</button>';
+  });
+
+  // Current test UI
+  var testName = t(test.keyName);
+  var req = lang === 'da' ? test.requirement.da : test.requirement.en;
+  var currentVal = cs.results[step];
+  var isPass = currentVal != null ? test.check(currentVal) : null;
+  var optBtns = test.options.map(function (o) {
+    return '<button class="sel-btn ' + (currentVal === o ? 'selected' : '') + '" onclick="commSetValue(' + step + ',' + (typeof o === 'string' ? '\'' + o + '\'' : o) + ')">' + o + (test.unit && typeof o === 'number' ? ' ' + test.unit : '') + '</button>';
+  }).join('');
+
+  var verdictHtml = '';
+  if (currentVal != null) {
+    verdictHtml = '<div class="result-box ' + (isPass ? '' : 'error') + '" style="margin-top:12px">' +
+      '<div class="result-row"><span class="label">' + t('commMeasured') + ': ' + currentVal + ' ' + test.unit + '</span>' +
+      '<span class="value"><span class="verify-badge ' + (isPass ? 'ok' : 'fail') + '">' + (isPass ? '✓ OK' : '✗ ' + t('commFail')) + '</span></span></div></div>';
+  }
+
+  // Protocol generation
+  var protocolHtml = '';
+  if (allDone) {
+    protocolHtml = '<div class="card fade-in"><div class="card-title">📋 ' + t('commGenerate') + '</div>' +
+      '<div class="select-grid"><button class="sel-btn selected" onclick="(function(){var d=document.getElementById(\'commProto\');if(d.style.display===\'none\')d.style.display=\'block\';else d.style.display=\'none\'})()">' + t('commGenerate') + '</button>' +
+      '<button class="sel-btn" onclick="commRestart()">' + t('commRestart') + '</button></div>' +
+      '<div id="commProto" style="display:none;margin-top:12px">' + renderCommissionProtocol() + '</div></div>';
+  }
+
+  return '<div class="card fade-in"><div class="card-title">🔧 ' + t('commTitle') + '</div>' +
+    '<div class="info-row">' + (lang === 'da' ? 'Gennemfør alle 7 påkrævede tests iht. DS/HD 60364-6 §6.4. Klik den målte værdi for hver test.' : 'Complete all 7 required tests per DS/HD 60364-6 §6.4. Click the measured value for each test.') + '</div>' +
+    '<div class="select-group"><div class="select-label">' + t('commProjectName') + '</div><div class="select-grid">' + projectBtns + '</div></div>' +
+    '<div class="select-group"><div class="select-label">' + t('commDate') + '</div><div class="select-grid">' + dateBtns + '</div></div>' +
+    '</div>' +
+    '<div class="card fade-in"><div class="card-title">' + t('commStep') + ' ' + (step + 1) + ' ' + t('commOf') + ' ' + COMMISSION_TESTS.length + ' — ' + testName + '</div>' +
+    '<div class="select-grid" style="margin-bottom:12px">' + stepIndicator + '</div>' +
+    '<div class="info-row">' + req + '</div>' +
+    '<div class="select-group"><div class="select-label">' + t('commMeasured') + '</div><div class="select-grid">' + optBtns + '</div></div>' +
+    verdictHtml +
+    '<div class="select-grid" style="margin-top:12px">' +
+    (step > 0 ? '<button class="sel-btn" onclick="commPrev()">' + t('commPrev') + '</button>' : '') +
+    (step < COMMISSION_TESTS.length - 1 ? '<button class="sel-btn selected" onclick="commNext()">' + t('commNext') + '</button>' : '') +
+    '</div></div>' +
+    protocolHtml;
+}
+
+// ============================================================================
+// ===== FEATURE C: FORENSIC EXPLAINER ("Why Did It Fail?") ====================
+// Attached to every FAIL verdict — causal chain + ranked fix options.
+// ============================================================================
+
+// buildForensicExplanation(verdict, env) — returns { causal:{da,en}, fixes:[{desc:{da,en},fixed:bool}] }
+function buildForensicExplanation(verdict, env) {
+  env = env || {};
+  var result = { causal: { da: '', en: '' }, fixes: [] };
+  if (!verdict || verdict.state !== 'FAIL') return result;
+  var vals = verdict.values || {};
+
+  if (verdict.id === 'ampacity') {
+    // Causal chain
+    var cs = (typeof cableState !== 'undefined') ? cableState : {};
+    var caKey = cs.temp, cgKey = cs.grouping, kKey = cs.installMethod;
+    var ca = getCorrectionFactor('ca', caKey);
+    var cg = getCorrectionFactor('cg', cgKey);
+    var kI = getCorrectionFactor('kInstall', kKey);
+    result.causal.da = 'Derated_Iz = Base_Iz(' + (vals.baseIz || '?') + 'A) × Ca(' + ca.value.toFixed(2) + ') × Cg(' + cg.value.toFixed(2) + ') × k_install(' + kI.value.toFixed(2) + ') = ' + (vals.deratedIz || '?') + ' A. In(' + (vals.inA || '?') + 'A) > ' + (vals.deratedIz || '?') + 'A → FEJL';
+    result.causal.en = 'Derated_Iz = Base_Iz(' + (vals.baseIz || '?') + 'A) × Ca(' + ca.value.toFixed(2) + ') × Cg(' + cg.value.toFixed(2) + ') × k_install(' + kI.value.toFixed(2) + ') = ' + (vals.deratedIz || '?') + ' A. In(' + (vals.inA || '?') + 'A) > ' + (vals.deratedIz || '?') + 'A → FAIL';
+
+    // Fix options
+    // 1. Reduce grouping
+    if (cgKey && cgKey > 1) {
+      var newCg = Math.max(1, Math.ceil(cgKey / 3));
+      var newCgFactor = getCorrectionFactor('cg', newCg).value;
+      var newIz1 = Math.floor((vals.baseIz || 0) * ca.value * newCgFactor * kI.value * 100) / 100;
+      var fixes1 = newIz1 >= (vals.inA || 0);
+      result.fixes.push({ desc: { da: 'Reducer gruppering fra ' + cgKey + '→' + newCg + ': Iz stiger til ' + newIz1.toFixed(0) + 'A ' + (fixes1 ? '✅' : '(utilstrækkelig)'), en: 'Reduce grouping from ' + cgKey + '→' + newCg + ': Iz rises to ' + newIz1.toFixed(0) + 'A ' + (fixes1 ? '✅' : '(insufficient)') }, fixed: fixes1 });
+    }
+    // 2. Upsize cable
+    var currentCsa = cs.crossSection ? parseFloat(cs.crossSection) : 0;
+    var nextCsa = STANDARD_CSA.find(function (s) { return s > currentCsa; });
+    if (nextCsa) {
+      var izTable = (typeof izTableFor === 'function') ? izTableFor() : {};
+      var newBase = izTable[nextCsa] || 0;
+      var newIz2 = Math.floor(newBase * ca.value * cg.value * kI.value * 100) / 100;
+      var fixes2 = newIz2 >= (vals.inA || 0);
+      result.fixes.push({ desc: { da: 'Opskalér kabel til ' + nextCsa + 'mm²: Iz = ' + newIz2.toFixed(0) + 'A ' + (fixes2 ? '✅' : '(utilstrækkelig)'), en: 'Upsize cable to ' + nextCsa + 'mm²: Iz = ' + newIz2.toFixed(0) + 'A ' + (fixes2 ? '✅' : '(insufficient)') }, fixed: fixes2 });
+    }
+    // 3. Change installation method
+    if (kKey !== 'E' && kKey !== 'F' && kKey !== 'G') {
+      var betterK = INSTALL_METHODS['E'] || 1.04;
+      var newIz3 = Math.floor((vals.baseIz || 0) * ca.value * cg.value * betterK * 100) / 100;
+      var fixes3 = newIz3 >= (vals.inA || 0);
+      result.fixes.push({ desc: { da: 'Skift metode til E (perforeret bakke): Iz = ' + newIz3.toFixed(0) + 'A ' + (fixes3 ? '✅' : '(utilstrækkelig)'), en: 'Change method to E (perforated tray): Iz = ' + newIz3.toFixed(0) + 'A ' + (fixes3 ? '✅' : '(insufficient)') }, fixed: fixes3 });
+    }
+  } else if (verdict.id === 'overload') {
+    var factor = vals.factor || 1.6;
+    result.causal.da = 'I₂ = ' + factor + ' × In(' + (vals.inA || '?') + 'A) = ' + (vals.i2 || '?') + 'A. Grænse = 1,45 × Iz(' + (vals.deratedIz || '?') + 'A) = ' + (vals.limit || '?') + 'A. ' + (vals.i2 || 0) + ' > ' + (vals.limit || 0) + ' → FEJL';
+    result.causal.en = 'I₂ = ' + factor + ' × In(' + (vals.inA || '?') + 'A) = ' + (vals.i2 || '?') + 'A. Limit = 1.45 × Iz(' + (vals.deratedIz || '?') + 'A) = ' + (vals.limit || '?') + 'A. ' + (vals.i2 || 0) + ' > ' + (vals.limit || 0) + ' → FAIL';
+    // Fix: increase cable size
+    if (vals.i2 && vals.i2 > 0) {
+      var reqIz = vals.i2 / 1.45;
+      result.fixes.push({ desc: { da: 'Behøver Iz ≥ ' + reqIz.toFixed(1) + 'A (I₂/1,45). Opskalér kabeltværsnit.', en: 'Need Iz ≥ ' + reqIz.toFixed(1) + 'A (I₂/1.45). Upsize cable cross-section.' }, fixed: false });
+    }
+    // Fix: use MCB instead of fuse (lower I2 factor)
+    if (vals.factor > 1.45) {
+      var newI2 = 1.45 * (vals.inA || 0);
+      var wouldPass = newI2 <= (vals.limit || 0);
+      result.fixes.push({ desc: { da: 'Skift til MCB/MCCB (I₂=1,45×In=' + newI2.toFixed(1) + 'A) i stedet for sikring ' + (wouldPass ? '✅' : ''), en: 'Switch to MCB/MCCB (I₂=1.45×In=' + newI2.toFixed(1) + 'A) instead of fuse ' + (wouldPass ? '✅' : '') }, fixed: wouldPass });
+    }
+  } else if (verdict.id === 'adiabatic') {
+    result.causal.da = 'I²t = Isc²(' + (vals.isc || '?') + '²) × t(' + (vals.tClear || '?') + 's) = ' + Math.round(vals.i2t || 0) + '. k²S² = ' + (vals.k || '?') + '² × ' + (vals.sArea || '?') + '² = ' + Math.round(vals.withstand || 0) + '. ' + Math.round(vals.withstand || 0) + ' < ' + Math.round(vals.i2t || 0) + ' → FEJL';
+    result.causal.en = 'I²t = Isc²(' + (vals.isc || '?') + '²) × t(' + (vals.tClear || '?') + 's) = ' + Math.round(vals.i2t || 0) + '. k²S² = ' + (vals.k || '?') + '² × ' + (vals.sArea || '?') + '² = ' + Math.round(vals.withstand || 0) + '. ' + Math.round(vals.withstand || 0) + ' < ' + Math.round(vals.i2t || 0) + ' → FAIL';
+    if (vals.recommendedCsa) {
+      result.fixes.push({ desc: { da: 'Opskalér kabel til ≥ ' + vals.recommendedCsa + ' mm² (S_min = ' + (vals.sMin || 0).toFixed(2) + ' mm²) ✅', en: 'Upsize cable to ≥ ' + vals.recommendedCsa + ' mm² (S_min = ' + (vals.sMin || 0).toFixed(2) + ' mm²) ✅' }, fixed: true });
+    }
+    // Fix: reduce clearing time
+    if (vals.isc && vals.sArea && vals.k) {
+      var maxT = (vals.k * vals.k * vals.sArea * vals.sArea) / (vals.isc * vals.isc);
+      result.fixes.push({ desc: { da: 'Reducer udkoblingstid til < ' + maxT.toFixed(3) + ' s (hurtigere enhed)', en: 'Reduce clearing time to < ' + maxT.toFixed(3) + ' s (faster device)' }, fixed: false });
+    }
+  } else if (verdict.id === 'zs') {
+    if (vals.zsActual != null && vals.zsMax != null) {
+      result.causal.da = 'Zs = ' + (vals.zsActual || '?') + ' Ω > Zs_max = ' + (vals.zsMax || '?') + ' Ω (= U₀/' + (vals.ia || 'Ia') + ') → FEJL';
+      result.causal.en = 'Zs = ' + (vals.zsActual || '?') + ' Ω > Zs_max = ' + (vals.zsMax || '?') + ' Ω (= U₀/' + (vals.ia || 'Ia') + ') → FAIL';
+    } else if (vals.touchVoltage != null) {
+      result.causal.da = 'Zs × IΔn = ' + (vals.touchVoltage || '?') + ' V > 50 V → FEJL';
+      result.causal.en = 'Zs × IΔn = ' + (vals.touchVoltage || '?') + ' V > 50 V → FAIL';
+    }
+    // Fix options
+    result.fixes.push({ desc: { da: 'Tilføj RCD med lavere IΔn (f.eks. 30 mA) for at sikre udkobling', en: 'Add RCD with lower IΔn (e.g. 30 mA) to ensure disconnection' }, fixed: false });
+    result.fixes.push({ desc: { da: 'Opskalér kabeltværsnit (reducerer impedans) eller forkort kabellængde', en: 'Upsize cable cross-section (reduces impedance) or shorten cable length' }, fixed: false });
+  }
+
+  // Sort fixes: fixed=true first (proven solutions first)
+  result.fixes.sort(function (a, b) { return (b.fixed ? 1 : 0) - (a.fixed ? 1 : 0); });
+  return result;
+}
+
+// Forensic state: which verdict panels are expanded
+var forensicExpanded = {};
+function toggleForensic(id) { forensicExpanded[id] = !forensicExpanded[id]; renderModule(activeModule); }
 
 // ===== INIT =====
 renderNav();
