@@ -13,6 +13,7 @@ const html = fs.readFileSync(path.join(root, "index.html"), "utf8")
   .replace(/<script src="https:\/\/[^"]+"><\/script>/, `<script>${chartShim}</script>`)
   .replace('<script src="js/calc.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/calc.js"))}</script>`)
   .replace('<script src="js/store.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/store.js"))}</script>`)
+  .replace('<script src="js/brain.js"></script>', () => `<script>${fs.readFileSync(path.join(root, "js/brain.js"))}</script>`)
   .replace('<script src="js/charts.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/charts.js"))}</script>`)
   .replace('<script src="js/ui.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/ui.js"))}</script>`);
 
@@ -578,6 +579,30 @@ ok(rmBtn != null, "manager has delete buttons");
 rmBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(S.savedViews().length === 0, "deleting from manager removes the saved view");
 doc.querySelector("#modal [data-act=cancel]") && doc.querySelector("#modal [data-act=cancel]").click();
+
+// 38) Project Brain — analyze a description locally and apply the generated plan
+S.reset();
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("brainText") != null, "Brain view renders a description input");
+ok(typeof window.QIBrain === "object" && typeof window.QIBrain.analyzeProject === "function", "Brain engine exposed to the UI");
+const brainCasesBefore = S.validCases().length;
+const brainMsBefore = S.regRows("milestones").length;
+const brainProcBefore = S.regRows("procurement").length;
+doc.getElementById("brainText").value =
+  "FTTH fibre backbone rollout, 1200 km route across 45 sites, OTDR splicing, GPON last mile, 18 months";
+doc.getElementById("brainAnalyze").click();
+const brainOut = doc.getElementById("brainOut").innerHTML;
+ok(/Work breakdown/.test(brainOut), "Brain renders a work-breakdown preview");
+ok(/Top risks/.test(brainOut), "Brain renders a risk preview");
+ok(/Fibre|fibre-telecom/i.test(brainOut), "Brain detected the fibre domain in the UI");
+const brainApply = doc.getElementById("brainApply");
+ok(brainApply != null, "Apply-plan button appears after analysis");
+brainApply.click();
+ok(S.validCases().length >= brainCasesBefore + 15, "Apply adds the generated task + risk cases (" + brainCasesBefore + " -> " + S.validCases().length + ")");
+ok(S.regRows("milestones").length > brainMsBefore, "Apply adds generated milestones");
+ok(S.regRows("procurement").length > brainProcBefore, "Apply adds generated procurement items");
+// click-only / privacy sanity: analysis must not call out to the network
+ok(window.__promptCalls === 0, "Brain flow used no prompt()");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
