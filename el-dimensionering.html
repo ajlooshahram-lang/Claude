@@ -4021,8 +4021,9 @@ function configurePriceFeed() {
 })();
 
 // ===== DATA VERSION & CHANGELOG =====
-const DATA_VERSION = '2026.9';
+const DATA_VERSION = '2026.10';
 const DATA_CHANGELOG = [
+  { v: '2026.10', date: '2026-06-13', da: 'Eksamenssimulator: Fuld Mock (alle 11 scenarier/68 trin p\u00e5 tid) og \u201dGennemg\u00e5 fejl\u201d-skærm (dit svar vs. korrekt + forklaring + DS/HD 60364-klausul) for b\u00e5de quiz og mock.', en: 'Exam simulator: Full Mock (all 11 scenarios/68 steps, timed) and a \u201cReview mistakes\u201d screen (your answer vs. correct + explanation + DS/HD 60364 clause) for both quiz and mock.' },
   { v: '2026.9', date: '2026-06-13', da: 'Eksamenssimulator udvidet: L\u00E6rling/Eksamen-tilstand (udskudt facit), blandet svar-r\u00E6kkef\u00F8lge pr. fors\u00F8g, 3 nye scenarier (TT-system, n\u00F8dstr\u00F8msgenerator i \u00F8-drift, solceller+batteri 7-712) \u2014 nu 11 scenarier/68 trin, og udskriv/eksport\u00E9r rapport med svage DS/HD 60364-klausuler.', en: 'Exam simulator expanded: Apprentice/Exam mode (deferred answers), shuffled option order per attempt, 3 new scenarios (TT system, standby generator island mode, PV+battery 7-712) \u2014 now 11 scenarios/68 steps, and a printable/exportable report of weak DS/HD 60364 clauses.' },
   { v: '2026.8', date: '2026-06-13', da: 'Eksamenssimulator tilf\u00F8jet: Hurtig Quiz (klik-only) + Fuld Opgave med 8 scenarier (forsyning, maskine, installation) med trinvise beregninger, l\u00E6rlinge-forklaringer, DS/HD 60364-henvisninger, scoring, svage omr\u00E5der, best\u00E5/dump (80%) og 60-min timer. Moderne emner: 75%-reglen afskaffet 1. jan 2020, EV som kontinuerlig last, Type B HPFI (7-722).', en: 'Exam simulator added: Quick Quiz (click-only) + Full Assignment with 8 scenarios (supply, machine, installation) with step-by-step calculations, apprentice explanations, DS/HD 60364 references, scoring, weak areas, pass/fail (80%) and 60-min timer. Modern topics: 75% rule abolished 1 Jan 2020, EV as continuous load, Type B RCD (7-722).' },
   { v: '2026.2', date: '2026-06-11', da: 'Sikringer hardet mod Siemens 5SE2/3NA & TYTAN katalogerne (IEC 60269). D03-størrelse tilføjet. Frakoblingstid- og selektivitetskontrol.', en: 'Fuses hardened against Siemens 5SE2/3NA & TYTAN catalogs (IEC 60269). D03 size added. Disconnection-time and selectivity checks.' },
@@ -4379,7 +4380,7 @@ function renderDrawing(){
 }
 
 // ===== EXAM SIMULATOR (data + engine) =====
-let examState = { tab:'quiz', mode:'apprentice', quizIdx:0, quizPick:{}, quizOrder:{}, scId:null, step:0, scPick:{}, scOrder:{}, mockOn:false, mockPos:0, timerOn:false, timerEnd:null, timerLeft:3600 };
+let examState = { tab:'quiz', mode:'apprentice', quizIdx:0, quizPick:{}, quizOrder:{}, quizReview:false, scId:null, step:0, scPick:{}, scOrder:{}, mockOn:false, mockPos:0, mockReview:false, timerOn:false, timerEnd:null, timerLeft:3600 };
 let examTimerHandle = null;
 function examShuffle(n){ var a=[]; for(var x=0;x<n;x++) a.push(x); for(var x=n-1;x>0;x--){ var r=Math.floor(Math.random()*(x+1)); var t=a[x]; a[x]=a[r]; a[r]=t; } return a; }
 function examL(o){ return (typeof o==='string') ? o : (o[lang]||o.en||o.da||''); }
@@ -4550,7 +4551,7 @@ function examPickQuiz(i){
   renderModule('exam');
 }
 function examQuizGo(i){ examState.quizIdx = Math.max(0, Math.min(EXAM_QUIZ.length-1, i)); renderModule('exam'); }
-function examResetQuiz(){ examState.quizPick = {}; examState.quizOrder = {}; examState.quizIdx = 0; renderModule('exam'); }
+function examResetQuiz(){ examState.quizPick = {}; examState.quizOrder = {}; examState.quizReview = false; examState.quizIdx = 0; renderModule('exam'); }
 
 function examPickStep(i){
   const sc = EXAM_SCEN.find(s=>s.id===examState.scId); if(!sc) return;
@@ -4564,10 +4565,10 @@ function examScenStep(d){ const sc = EXAM_SCEN.find(s=>s.id===examState.scId); i
 function examOpenScen(id){ examState.scId = id; examState.step = 0; renderModule('exam'); }
 function examBackToList(){ examState.scId = null; renderModule('exam'); }
 function examResetScen(id){ Object.keys(examState.scPick).forEach(k=>{ if(k.indexOf(id+':')===0) delete examState.scPick[k]; }); Object.keys(examState.scOrder).forEach(k=>{ if(k.indexOf(id+':')===0) delete examState.scOrder[k]; }); examState.step = 0; renderModule('exam'); }
-function examTab(t){ examState.tab = t; examState.scId = null; renderModule('exam'); }
+function examTab(t){ examState.tab = t; examState.scId = null; examState.quizReview = false; examState.mockReview = false; renderModule('exam'); }
 function examSetMode(m){ examState.mode = m; renderModule('exam'); }
 
-function examResetAll(){ try { localStorage.removeItem('examStore'); } catch(e){} examState.quizPick = {}; examState.quizOrder = {}; examState.scPick = {}; examState.scOrder = {}; examState.quizIdx = 0; examState.step = 0; renderModule('exam'); }
+function examResetAll(){ try { localStorage.removeItem('examStore'); } catch(e){} examState.quizPick = {}; examState.quizOrder = {}; examState.quizReview = false; examState.scPick = {}; examState.scOrder = {}; examState.mockReview = false; examState.quizIdx = 0; examState.step = 0; renderModule('exam'); }
 
 function examStartTimer(){ examState.timerOn = true; examState.timerEnd = Date.now() + examState.timerLeft*1000; if(examTimerHandle) clearInterval(examTimerHandle); examTimerHandle = setInterval(examTick, 1000); renderModule('exam'); }
 function examPauseTimer(){ examState.timerOn = false; if(examTimerHandle){ clearInterval(examTimerHandle); examTimerHandle = null; } renderModule('exam'); }
@@ -4626,11 +4627,35 @@ function examMockSeq(){ var seq=[]; EXAM_SCEN.forEach(function(sc){ sc.steps.for
 function examMockCur(){ var seq=examMockSeq(); var p=seq[examState.mockPos]; if(!p) return null; var sc=EXAM_SCEN.find(function(s){return s.id===p.sid;}); return { sid:p.sid, j:p.j, sc:sc, step:sc.steps[p.j], pos:examState.mockPos, total:seq.length }; }
 function examMockAnswered(){ var seq=examMockSeq(), a=0; seq.forEach(function(p){ if(examState.scPick[p.sid+':'+p.j]!==undefined) a++; }); return a; }
 function examMockScore(){ var seq=examMockSeq(), c=0; seq.forEach(function(p){ var sc=EXAM_SCEN.find(function(s){return s.id===p.sid;}); if(examState.scPick[p.sid+':'+p.j]===sc.steps[p.j].ci) c++; }); return { correct:c, total:seq.length }; }
-function examStartMock(){ examState.mockOn=true; examState.mode='exam'; examState.mockPos=0; examMockSeq().forEach(function(p){ delete examState.scPick[p.sid+':'+p.j]; delete examState.scOrder[p.sid+':'+p.j]; }); examState.timerLeft=3600; examStartTimer(); }
+function examStartMock(){ examState.mockOn=true; examState.mode='exam'; examState.mockPos=0; examState.mockReview=false; examMockSeq().forEach(function(p){ delete examState.scPick[p.sid+':'+p.j]; delete examState.scOrder[p.sid+':'+p.j]; }); examState.timerLeft=3600; examStartTimer(); }
 function examAbortMock(){ examState.mockOn=false; examPauseTimer(); }
 function examMockNav(d){ var n=examMockSeq().length; examState.mockPos=Math.max(0, Math.min(n-1, examState.mockPos+d)); renderModule('exam'); }
 function examSaveMock(){ EXAM_SCEN.forEach(function(sc){ examSaveScenario(sc); }); var store=examLoadStore(); var sc=examMockScore(); var pct=Math.round(100*sc.correct/sc.total); store.mockBest=Math.max(store.mockBest||0,pct); store.mockLast=pct; examSaveStore(store); }
 function examMockPick(oi){ var cur=examMockCur(); if(!cur) return; var key=cur.sid+':'+cur.j; if(examState.scPick[key]!==undefined) return; examState.scPick[key]=oi; if(examMockAnswered()===examMockSeq().length){ examSaveMock(); examPauseTimer(); } else { renderModule('exam'); } }
+function examReviewCard(label, step, picked){
+  const da = lang==='da';
+  const your = picked!==undefined ? examL(step.opts[picked]) : (da?'(ubesvaret)':'(unanswered)');
+  const correct = examL(step.opts[step.ci]);
+  return `<div class="result-box error" style="margin-top:10px"><div class="result-title">${label}</div>`
+    + `<div style="padding:4px 2px;font-weight:600">${examL(step.q)}</div>`
+    + `<div class="result-row"><span class="label">${da?'Dit svar':'Your answer'}</span><span class="value" style="color:var(--danger);text-align:right;max-width:70%">${your}</span></div>`
+    + `<div class="result-row"><span class="label">${da?'Korrekt':'Correct'}</span><span class="value" style="color:var(--success);text-align:right;max-width:70%">${correct}</span></div>`
+    + `<div style="padding:6px 2px;line-height:1.5">\uD83D\uDC68\u200D\uD83C\uDFEB ${examL(step.ex)}</div>`
+    + `<div class="result-row"><span class="label">\uD83D\uDCD8 ${da?'Reference':'Reference'}</span><span class="value">${step.clause}</span></div></div>`;
+}
+function examQuizReviewHtml(){
+  const da = lang==='da';
+  let cards = EXAM_QUIZ.map(function(q,i){ var picked=examState.quizPick[i]; if(picked===q.ci) return ''; return examReviewCard((da?'Sp\u00f8rgsm\u00e5l ':'Question ')+(i+1), q, picked); }).filter(Boolean).join('');
+  if(!cards) cards = `<div class="result-box"><div class="result-title">${da?'Ingen fejl \u2014 perfekt':'No mistakes \u2014 perfect'}</div></div>`;
+  return `<div class="card fade-in"><div class="card-title">\uD83D\uDD0D ${da?'Gennemgang af fejl':'Review of mistakes'}</div>`+cards+`<div class="select-grid" style="margin-top:10px"><button class="sel-btn selected" onclick="examState.quizReview=false;renderModule('exam')">\u25C0 ${da?'Tilbage':'Back'}</button></div></div>`;
+}
+function examMockReviewHtml(){
+  const da = lang==='da';
+  let cards = examMockSeq().map(function(p){ var sc=EXAM_SCEN.find(function(s){return s.id===p.sid;}); var step=sc.steps[p.j]; var picked=examState.scPick[p.sid+':'+p.j]; if(picked===step.ci) return ''; return examReviewCard(examL(sc.title)+' \u00b7 '+(da?'trin ':'step ')+(p.j+1), step, picked); }).filter(Boolean).join('');
+  if(!cards) cards = `<div class="result-box"><div class="result-title">${da?'Ingen fejl \u2014 perfekt':'No mistakes \u2014 perfect'}</div></div>`;
+  return `<div class="card fade-in"><div class="card-title">\uD83D\uDD0D ${da?'Gennemgang af fejl':'Review of mistakes'}</div>`+cards+`<div class="select-grid" style="margin-top:10px"><button class="sel-btn selected" onclick="examState.mockReview=false;renderModule('exam')">\u25C0 ${da?'Tilbage til resultat':'Back to result'}</button></div></div>`;
+}
+
 function renderMock(){
   const da = lang==='da'; const store = examLoadStore();
   if(!examState.mockOn){
@@ -4642,7 +4667,9 @@ function renderMock(){
   }
   const seq = examMockSeq(); const answered = examMockAnswered(); const done = answered===seq.length;
   if(done){
+    if(examState.mockReview) return examMockReviewHtml();
     const r = examMockScore(); const pct = Math.round(100*r.correct/r.total); const pass = pct>=EXAM_PASS;
+    const reviewBtn = r.correct<r.total ? ('<button class="sel-btn" onclick="examState.mockReview=true;renderModule(\'exam\')">\uD83D\uDD0D '+(da?'Gennemg\u00e5 fejl':'Review mistakes')+' ('+(r.total-r.correct)+')</button>') : '';
     const cats={}; ['forsyning','maskine','installation'].forEach(c=>cats[c]={c:0,t:0});
     seq.forEach(function(p){ var sc=EXAM_SCEN.find(function(s){return s.id===p.sid;}); cats[sc.cat].t++; if(examState.scPick[p.sid+':'+p.j]===sc.steps[p.j].ci) cats[sc.cat].c++; });
     const catRows = ['forsyning','maskine','installation'].map(function(c){ var pc=Math.round(100*cats[c].c/cats[c].t); return `<div class="result-row"><span class="label">${examL(EXAM_CATNAME[c])}</span><span class="value" style="color:${pc>=EXAM_PASS?'var(--success)':'var(--danger)'}">${cats[c].c}/${cats[c].t} \u00b7 ${pc}%</span></div>`; }).join('');
@@ -4655,7 +4682,7 @@ function renderMock(){
       + `<div class="result-row"><span class="label">${da?'Tid brugt':'Time used'}</span><span class="value">${used}</span></div></div>`
       + `<div class="card-title" style="margin-top:14px">${da?'Pr. kategori':'By category'}</div>`+catRows
       + `<div class="result-row"><span class="label">${da?'Svage klausuler':'Weak clauses'}</span><span class="value" style="color:var(--danger);text-align:right;max-width:70%">${weak}</span></div>`
-      + `<div class="select-grid" style="margin-top:10px"><button class="sel-btn" onclick="examPrintReport()">\uD83D\uDDA8\uFE0F ${da?'Udskriv rapport':'Print report'}</button><button class="sel-btn" onclick="examDownloadReport()">\u2B07\uFE0F ${da?'Download .txt':'Download .txt'}</button><button class="sel-btn selected" onclick="examStartMock()">\u21BA ${da?'Ny mock':'New mock'}</button><button class="sel-btn" onclick="examAbortMock()">\u2715 ${da?'Luk':'Close'}</button></div></div>`;
+      + `<div class="select-grid" style="margin-top:10px"><button class="sel-btn" onclick="examPrintReport()">\uD83D\uDDA8\uFE0F ${da?'Udskriv rapport':'Print report'}</button><button class="sel-btn" onclick="examDownloadReport()">\u2B07\uFE0F ${da?'Download .txt':'Download .txt'}</button>${reviewBtn}<button class="sel-btn selected" onclick="examStartMock()">\u21BA ${da?'Ny mock':'New mock'}</button><button class="sel-btn" onclick="examAbortMock()">\u2715 ${da?'Luk':'Close'}</button></div></div>`;
   }
   const cur = examMockCur(); const sc = cur.sc; const step = cur.step; const key = cur.sid+':'+cur.j;
   const picked = examState.scPick[key]; const isAnswered = picked!==undefined;
@@ -4702,6 +4729,7 @@ function renderExam(){
 
 function examRenderQuiz(){
   const da = lang==='da';
+  if(examState.quizReview) return examQuizReviewHtml();
   const i = examState.quizIdx, q = EXAM_QUIZ[i];
   const picked = examState.quizPick[i];
   const answered = picked!==undefined;
@@ -4735,7 +4763,8 @@ function examRenderQuiz(){
     const pct = Math.round(100*s.correct/s.total); const pass = pct>=EXAM_PASS;
     verdict = `<div class="result-box ${pass?'':'error'}" style="margin-top:12px"><div class="result-title">${pass?(da?'\uD83C\uDF89 Best\u00e5et':'\uD83C\uDF89 Passed'):(da?'\u26A0\uFE0F Ikke best\u00e5et':'\u26A0\uFE0F Not passed')} \u2014 ${pct}%</div>`
       + `<div class="result-row"><span class="label">${da?'Rigtige':'Correct'}</span><span class="value">${s.correct}/${s.total}</span></div>`
-      + `<div class="result-row"><span class="label">${da?'Kr\u00e6vet':'Required'}</span><span class="value">${EXAM_PASS}%</span></div></div>`;
+      + `<div class="result-row"><span class="label">${da?'Kr\u00e6vet':'Required'}</span><span class="value">${EXAM_PASS}%</span></div></div>`
+      + (s.correct<s.total ? `<div class="select-grid" style="margin-top:8px"><button class="sel-btn" onclick="examState.quizReview=true;renderModule('exam')">\uD83D\uDD0D ${da?'Gennemg\u00e5 fejl':'Review mistakes'} (${s.total-s.correct})</button></div>` : '');
   }
   const nav = `<div class="select-grid" style="margin-top:12px">`
     + `<button class="sel-btn" ${i<=0?"disabled style='opacity:.4'":''} onclick="examQuizGo(${i-1})">\u25C0 ${da?'Forrige':'Prev'}</button>`
