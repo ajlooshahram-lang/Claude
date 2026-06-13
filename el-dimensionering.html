@@ -4021,8 +4021,9 @@ function configurePriceFeed() {
 })();
 
 // ===== DATA VERSION & CHANGELOG =====
-const DATA_VERSION = '2026.11';
+const DATA_VERSION = '2026.12';
 const DATA_CHANGELOG = [
+  { v: '2026.12', date: '2026-06-13', da: 'Mock kan nu v\u00e6lges: Fuld (alle 11/68 trin) eller Hurtig (1 tilf\u00e6ldigt scenarie pr. kategori, ~18 trin) til hurtig, varieret \u00f8velse. Separate bedste-scorer pr. type.', en: 'Mock is now selectable: Full (all 11/68 steps) or Quick (1 random scenario per category, ~18 steps) for fast, varied practice. Separate best scores per type.' },
   { v: '2026.11', date: '2026-06-13', da: 'Mock-bed\u00f8mmelse skærpet (konservativ): best\u00e5 kr\u00e6ver nu b\u00e5de \u226580% samlet OG \u226560% i hver kategori \u2014 man kan ikke best\u00e5 mens et helt fagomr\u00e5de dumpes. 3-trins farvekodning pr. kategori.', en: 'Mock verdict tightened (conservative): passing now requires both \u226580% overall AND \u226560% in every category \u2014 you cannot pass while failing an entire domain. 3-tier per-category colour coding.' },
   { v: '2026.10', date: '2026-06-13', da: 'Eksamenssimulator: Fuld Mock (alle 11 scenarier/68 trin p\u00e5 tid) og \u201dGennemg\u00e5 fejl\u201d-skærm (dit svar vs. korrekt + forklaring + DS/HD 60364-klausul) for b\u00e5de quiz og mock.', en: 'Exam simulator: Full Mock (all 11 scenarios/68 steps, timed) and a \u201cReview mistakes\u201d screen (your answer vs. correct + explanation + DS/HD 60364 clause) for both quiz and mock.' },
   { v: '2026.9', date: '2026-06-13', da: 'Eksamenssimulator udvidet: L\u00E6rling/Eksamen-tilstand (udskudt facit), blandet svar-r\u00E6kkef\u00F8lge pr. fors\u00F8g, 3 nye scenarier (TT-system, n\u00F8dstr\u00F8msgenerator i \u00F8-drift, solceller+batteri 7-712) \u2014 nu 11 scenarier/68 trin, og udskriv/eksport\u00E9r rapport med svage DS/HD 60364-klausuler.', en: 'Exam simulator expanded: Apprentice/Exam mode (deferred answers), shuffled option order per attempt, 3 new scenarios (TT system, standby generator island mode, PV+battery 7-712) \u2014 now 11 scenarios/68 steps, and a printable/exportable report of weak DS/HD 60364 clauses.' },
@@ -4381,7 +4382,7 @@ function renderDrawing(){
 }
 
 // ===== EXAM SIMULATOR (data + engine) =====
-let examState = { tab:'quiz', mode:'apprentice', quizIdx:0, quizPick:{}, quizOrder:{}, quizReview:false, scId:null, step:0, scPick:{}, scOrder:{}, mockOn:false, mockPos:0, mockReview:false, timerOn:false, timerEnd:null, timerLeft:3600 };
+let examState = { tab:'quiz', mode:'apprentice', quizIdx:0, quizPick:{}, quizOrder:{}, quizReview:false, scId:null, step:0, scPick:{}, scOrder:{}, mockOn:false, mockPos:0, mockReview:false, mockSet:[], mockKind:'full', timerOn:false, timerEnd:null, timerLeft:3600 };
 let examTimerHandle = null;
 function examShuffle(n){ var a=[]; for(var x=0;x<n;x++) a.push(x); for(var x=n-1;x>0;x--){ var r=Math.floor(Math.random()*(x+1)); var t=a[x]; a[x]=a[r]; a[r]=t; } return a; }
 function examL(o){ return (typeof o==='string') ? o : (o[lang]||o.en||o.da||''); }
@@ -4625,14 +4626,14 @@ function examReportHtml(d){
 function examPrintReport(){ try { const w=window.open('','_blank'); if(!w){ alert(lang==='da'?'Tillad pop op-vinduer for at udskrive rapporten.':'Allow pop-ups to print the report.'); return; } w.document.write(examReportHtml(examReportData())); w.document.close(); w.focus(); setTimeout(()=>{ try{ w.print(); }catch(e){} }, 300); } catch(e){} }
 function examDownloadReport(){ try { const blob=new Blob([examReportText(examReportData())],{type:'text/plain;charset=utf-8'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='el-eksamen-rapport.txt'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); } catch(e){} }
 
-function examMockSeq(){ var seq=[]; EXAM_SCEN.forEach(function(sc){ sc.steps.forEach(function(st,j){ seq.push({sid:sc.id,j:j}); }); }); return seq; }
+function examMockSeq(){ var seq=[]; var ids=(examState.mockSet&&examState.mockSet.length)?examState.mockSet:EXAM_SCEN.map(function(s){return s.id;}); ids.forEach(function(id){ var sc=EXAM_SCEN.find(function(s){return s.id===id;}); if(sc) sc.steps.forEach(function(st,j){ seq.push({sid:id,j:j}); }); }); return seq; }
 function examMockCur(){ var seq=examMockSeq(); var p=seq[examState.mockPos]; if(!p) return null; var sc=EXAM_SCEN.find(function(s){return s.id===p.sid;}); return { sid:p.sid, j:p.j, sc:sc, step:sc.steps[p.j], pos:examState.mockPos, total:seq.length }; }
 function examMockAnswered(){ var seq=examMockSeq(), a=0; seq.forEach(function(p){ if(examState.scPick[p.sid+':'+p.j]!==undefined) a++; }); return a; }
 function examMockScore(){ var seq=examMockSeq(), c=0; seq.forEach(function(p){ var sc=EXAM_SCEN.find(function(s){return s.id===p.sid;}); if(examState.scPick[p.sid+':'+p.j]===sc.steps[p.j].ci) c++; }); return { correct:c, total:seq.length }; }
-function examStartMock(){ examState.mockOn=true; examState.mode='exam'; examState.mockPos=0; examState.mockReview=false; examMockSeq().forEach(function(p){ delete examState.scPick[p.sid+':'+p.j]; delete examState.scOrder[p.sid+':'+p.j]; }); examState.timerLeft=3600; examStartTimer(); }
+function examStartMock(kind){ kind = kind||'full'; var ids; if(kind==='quick'){ ids=[]; ['forsyning','maskine','installation'].forEach(function(c){ var pool=EXAM_SCEN.filter(function(s){return s.cat===c;}); if(pool.length) ids.push(pool[Math.floor(Math.random()*pool.length)].id); }); } else { ids=EXAM_SCEN.map(function(s){return s.id;}); } examState.mockKind=kind; examState.mockSet=ids; examState.mockOn=true; examState.mode='exam'; examState.mockPos=0; examState.mockReview=false; examMockSeq().forEach(function(p){ delete examState.scPick[p.sid+':'+p.j]; delete examState.scOrder[p.sid+':'+p.j]; }); examState.timerLeft=3600; examStartTimer(); }
 function examAbortMock(){ examState.mockOn=false; examPauseTimer(); }
 function examMockNav(d){ var n=examMockSeq().length; examState.mockPos=Math.max(0, Math.min(n-1, examState.mockPos+d)); renderModule('exam'); }
-function examSaveMock(){ EXAM_SCEN.forEach(function(sc){ examSaveScenario(sc); }); var store=examLoadStore(); var sc=examMockScore(); var pct=Math.round(100*sc.correct/sc.total); store.mockBest=Math.max(store.mockBest||0,pct); store.mockLast=pct; examSaveStore(store); }
+function examSaveMock(){ examState.mockSet.forEach(function(id){ var sc=EXAM_SCEN.find(function(s){return s.id===id;}); if(sc) examSaveScenario(sc); }); var store=examLoadStore(); var sc=examMockScore(); var pct=Math.round(100*sc.correct/sc.total); var key=examState.mockKind==='quick'?'mockBestQuick':'mockBestFull'; store[key]=Math.max(store[key]||0,pct); examSaveStore(store); }
 function examMockPick(oi){ var cur=examMockCur(); if(!cur) return; var key=cur.sid+':'+cur.j; if(examState.scPick[key]!==undefined) return; examState.scPick[key]=oi; if(examMockAnswered()===examMockSeq().length){ examSaveMock(); examPauseTimer(); } else { renderModule('exam'); } }
 function examReviewCard(label, step, picked){
   const da = lang==='da';
@@ -4661,23 +4662,26 @@ function examMockReviewHtml(){
 function renderMock(){
   const da = lang==='da'; const store = examLoadStore();
   if(!examState.mockOn){
-    const best = store.mockBest!=null ? store.mockBest+'%' : (da?'ikke taget':'not taken');
-    return `<div class="card fade-in"><div class="card-title">\uD83C\uDFAF ${da?'Fuld mock-eksamen':'Full mock exam'}</div>`
-      + `<div class="info-row">${da?'K\u00f8r alle 11 scenarier (68 trin) i \u00e9t forl\u00f8b under eksamensbetingelser: intet facit undervejs, 60-min timer starter automatisk, samlet bed\u00f8mmelse til sidst (best\u00e5 '+EXAM_PASS+'%).':'Run all 11 scenarios (68 steps) in one session under exam conditions: no answers shown, 60-min timer auto-starts, single aggregate verdict at the end (pass '+EXAM_PASS+'%).'}</div>`
-      + `<div class="result-row"><span class="label">${da?'Bedste mock':'Best mock'}</span><span class="value">${best}</span></div>`
-      + `<div class="select-grid" style="margin-top:10px"><button class="sel-btn selected" onclick="examStartMock()">\u25B6 ${da?'Start fuld mock':'Start full mock'}</button></div></div>`;
+    const bf = store.mockBestFull!=null ? store.mockBestFull+'%' : (da?'ikke taget':'not taken');
+    const bq = store.mockBestQuick!=null ? store.mockBestQuick+'%' : (da?'ikke taget':'not taken');
+    return `<div class="card fade-in"><div class="card-title">\uD83C\uDFAF ${da?'Mock-eksamen':'Mock exam'}</div>`
+      + `<div class="info-row">${da?'K\u00f8r en mock under eksamensbetingelser: intet facit undervejs, 60-min timer starter automatisk, samlet bed\u00f8mmelse til sidst (best\u00e5 '+EXAM_PASS+'% samlet + '+EXAM_CAT_FLOOR+'% pr. kategori).':'Run a mock under exam conditions: no answers shown, 60-min timer auto-starts, single aggregate verdict at the end (pass '+EXAM_PASS+'% overall + '+EXAM_CAT_FLOOR+'% per category).'}</div>`
+      + `<div class="result-row"><span class="label">${da?'Fuld (11 scenarier / 68 trin)':'Full (11 scenarios / 68 steps)'}</span><span class="value">${bf}</span></div>`
+      + `<div class="result-row"><span class="label">${da?'Hurtig (1 pr. kategori, tilf\u00e6ldig)':'Quick (1 per category, random)'}</span><span class="value">${bq}</span></div>`
+      + `<div class="select-grid" style="margin-top:10px"><button class="sel-btn selected" onclick="examStartMock('full')">\u25B6 ${da?'Start fuld mock':'Start full mock'}</button><button class="sel-btn" onclick="examStartMock('quick')">\u26A1 ${da?'Start hurtig mock':'Start quick mock'}</button></div></div>`;
   }
   const seq = examMockSeq(); const answered = examMockAnswered(); const done = answered===seq.length;
   if(done){
     if(examState.mockReview) return examMockReviewHtml();
     const r = examMockScore(); const pct = Math.round(100*r.correct/r.total); let pass = pct>=EXAM_PASS;
     const reviewBtn = r.correct<r.total ? ('<button class="sel-btn" onclick="examState.mockReview=true;renderModule(\'exam\')">\uD83D\uDD0D '+(da?'Gennemg\u00e5 fejl':'Review mistakes')+' ('+(r.total-r.correct)+')</button>') : '';
-    const cats={}; ['forsyning','maskine','installation'].forEach(c=>cats[c]={c:0,t:0});
+    const order=['forsyning','maskine','installation'].filter(function(c){ return examState.mockSet.some(function(id){ var s=EXAM_SCEN.find(function(x){return x.id===id;}); return s&&s.cat===c; }); });
+    const cats={}; order.forEach(function(c){ cats[c]={c:0,t:0}; });
     seq.forEach(function(p){ var sc=EXAM_SCEN.find(function(s){return s.id===p.sid;}); cats[sc.cat].t++; if(examState.scPick[p.sid+':'+p.j]===sc.steps[p.j].ci) cats[sc.cat].c++; });
-    const catPct={}; ['forsyning','maskine','installation'].forEach(function(c){ catPct[c]=Math.round(100*cats[c].c/cats[c].t); });
-    const weakCats = ['forsyning','maskine','installation'].filter(function(c){ return catPct[c] < EXAM_CAT_FLOOR; });
+    const catPct={}; order.forEach(function(c){ catPct[c]=Math.round(100*cats[c].c/cats[c].t); });
+    const weakCats = order.filter(function(c){ return catPct[c] < EXAM_CAT_FLOOR; });
     pass = pass && weakCats.length===0;
-    const catRows = ['forsyning','maskine','installation'].map(function(c){ var pc=catPct[c]; return `<div class="result-row"><span class="label">${examL(EXAM_CATNAME[c])}</span><span class="value" style="color:${pc>=EXAM_PASS?'var(--success)':(pc>=EXAM_CAT_FLOOR?'#b8860b':'var(--danger)')}">${cats[c].c}/${cats[c].t} \u00b7 ${pc}%</span></div>`; }).join('');
+    const catRows = order.map(function(c){ var pc=catPct[c]; return `<div class="result-row"><span class="label">${examL(EXAM_CATNAME[c])}</span><span class="value" style="color:${pc>=EXAM_PASS?'var(--success)':(pc>=EXAM_CAT_FLOOR?'#b8860b':'var(--danger)')}">${cats[c].c}/${cats[c].t} \u00b7 ${pc}%</span></div>`; }).join('');
     const rd = examReportData();
     const weak = rd.weakClauses.length ? rd.weakClauses.slice(0,6).map(function(w){return w.clause+' \u00d7'+w.count;}).join('<br>') : (da?'Ingen':'None');
     const used = examFmtTime(Math.max(0, 3600-examState.timerLeft));
@@ -4696,9 +4700,9 @@ function renderMock(){
   const picked = examState.scPick[key]; const isAnswered = picked!==undefined;
   if(!examState.scOrder[key] || examState.scOrder[key].length!==step.opts.length) examState.scOrder[key]=examShuffle(step.opts.length);
   const opts = examState.scOrder[key].map(function(oi){ const o=step.opts[oi]; let cls='sel-btn'; const click=isAnswered?'':`onclick="examMockPick(${oi})"`; if(isAnswered&&oi===picked) cls='sel-btn selected'; return `<button class="${cls}" ${click}>${examL(o)}</button>`; }).join('');
-  const scNum = EXAM_SCEN.findIndex(function(s){return s.id===cur.sid;})+1;
+  const scNum = examState.mockSet.indexOf(cur.sid)+1;
   return `<div class="card fade-in"><div class="card-title">\uD83C\uDFAF ${da?'Mock \u2014 sp\u00f8rgsm\u00e5l':'Mock \u2014 question'} ${cur.pos+1}/${cur.total}</div>`
-    + `<div class="info-row">${da?'Scenarie':'Scenario'} ${scNum}/${EXAM_SCEN.length}: ${examL(sc.title)} \u00b7 ${da?'trin':'step'} ${cur.j+1}/${sc.steps.length} \u00b7 ${answered}/${seq.length} ${da?'besvaret':'answered'}</div>`
+    + `<div class="info-row">${da?'Scenarie':'Scenario'} ${scNum}/${examState.mockSet.length}: ${examL(sc.title)} \u00b7 ${da?'trin':'step'} ${cur.j+1}/${sc.steps.length} \u00b7 ${answered}/${seq.length} ${da?'besvaret':'answered'}</div>`
     + `<div class="select-group"><div class="select-label">${examL(step.q)}</div><div class="select-grid">${opts}</div></div>`
     + `<div class="select-grid" style="margin-top:12px"><button class="sel-btn" ${cur.pos<=0?"disabled style='opacity:.4'":''} onclick="examMockNav(-1)">\u25C0 ${da?'Forrige':'Prev'}</button>`
     + `<button class="sel-btn" ${cur.pos>=cur.total-1?"disabled style='opacity:.4'":''} onclick="examMockNav(1)">${da?'N\u00e6ste':'Next'} \u25B6</button>`
