@@ -1,0 +1,7 @@
+{
+  "task_id": "task-phase3-complete",
+  "task_description": "Build Phase 3 of the QI Platform: remaining CRUD endpoints (projects, registers, snapshots), security hardening (MFA encryption, password change, session cleanup), share tokens, deployment packaging (Dockerfile, docker-compose, nginx), integration tests, and frontend API client extensions.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005"],
+  "blocked_reason": null
+}
