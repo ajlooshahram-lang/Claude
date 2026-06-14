@@ -115,101 +115,120 @@
   function defaultRouteSections() {
     return [
       {
-        _id: uid(), name: "Bangkok - Chiang Mai Backbone", startKm: 0, endKm: 685,
-        startCoords: { lat: 13.7563, lng: 100.5018, alt: 5 },
-        endCoords: { lat: 18.7883, lng: 98.9853, alt: 310 },
+        _id: uid(), name: "SEA-1: Singapore/Malaysia - Indonesia (Java)", startKm: 0, endKm: 1200,
+        startCoords: { lat: 1.29, lng: 104.05, alt: -15 },
+        endCoords: { lat: -7.25, lng: 112.75, alt: -20 },
         waypoints: [
-          { lat: 14.3514, lng: 100.5770, alt: 20 },
-          { lat: 15.2287, lng: 100.5340, alt: 45 },
-          { lat: 16.4419, lng: 100.3497, alt: 60 },
-          { lat: 17.0085, lng: 99.8265, alt: 120 },
-          { lat: 17.9647, lng: 99.0087, alt: 220 }
+          { lat: 1.29, lng: 104.05, alt: -15 },
+          { lat: 0.5, lng: 105.5, alt: -45 },
+          { lat: -2.0, lng: 107.0, alt: -60 },
+          { lat: -5.5, lng: 110.0, alt: -55 },
+          { lat: -7.25, lng: 112.75, alt: -20 }
         ],
-        cableType: "G.652.D", coreCount: 288, status: "active",
-        startDate: "2025-03", installedDate: "2026-09",
+        cableType: "G.652.D", coreCount: 288, status: "installed",
+        startDate: "2025-03", installedDate: "2026-06",
         stations: [
-          { name: "Bangkok Hub Central", type: "termination", coords: { lat: 13.7563, lng: 100.5018, alt: 5 } },
-          { name: "Nakhon Sawan Junction", type: "junction", coords: { lat: 15.7047, lng: 100.1372, alt: 50 } },
-          { name: "Lampang Switch", type: "switch", coords: { lat: 18.2888, lng: 99.4902, alt: 260 } },
-          { name: "Chiang Mai Terminal", type: "termination", coords: { lat: 18.7883, lng: 98.9853, alt: 310 } }
+          { name: "Singapore CLS (Changi)", type: "termination", coords: { lat: 1.29, lng: 104.05, alt: -15 } },
+          { name: "Surabaya CLS", type: "termination", coords: { lat: -7.25, lng: 112.75, alt: -20 } }
         ]
       },
       {
-        _id: uid(), name: "Jakarta - Surabaya Express", startKm: 0, endKm: 780,
-        startCoords: { lat: -6.2088, lng: 106.8456, alt: 8 },
-        endCoords: { lat: -7.2575, lng: 112.7521, alt: 5 },
+        _id: uid(), name: "SEA-2: Thailand - Vietnam - Philippines", startKm: 0, endKm: 2800,
+        startCoords: { lat: 7.19, lng: 100.59, alt: -10 },
+        endCoords: { lat: 14.55, lng: 120.98, alt: -12 },
         waypoints: [
-          { lat: -6.5971, lng: 106.8060, alt: 30 },
-          { lat: -6.7320, lng: 108.5523, alt: 15 },
-          { lat: -6.9175, lng: 110.4203, alt: 10 },
-          { lat: -7.2504, lng: 112.7688, alt: 5 }
+          { lat: 7.19, lng: 100.59, alt: -10 },
+          { lat: 7.5, lng: 103.0, alt: -65 },
+          { lat: 8.5, lng: 106.5, alt: -80 },
+          { lat: 10.3, lng: 107.0, alt: -25 },
+          { lat: 12.0, lng: 112.0, alt: -1200 },
+          { lat: 14.0, lng: 117.0, alt: -2500 },
+          { lat: 14.55, lng: 120.98, alt: -12 }
         ],
-        cableType: "G.657.A2", coreCount: 144, status: "installed",
-        startDate: "2025-06", installedDate: "2027-04",
+        cableType: "G.652.D", coreCount: 192, status: "in-progress",
+        startDate: "2025-06", installedDate: "2027-09",
         stations: [
-          { name: "Jakarta Gateway", type: "termination", coords: { lat: -6.2088, lng: 106.8456, alt: 8 } },
-          { name: "Cirebon Relay", type: "junction", coords: { lat: -6.7320, lng: 108.5523, alt: 15 } },
-          { name: "Semarang Switch", type: "switch", coords: { lat: -6.9175, lng: 110.4203, alt: 10 } },
-          { name: "Surabaya Terminal", type: "termination", coords: { lat: -7.2575, lng: 112.7521, alt: 5 } }
+          { name: "Songkhla CLS", type: "termination", coords: { lat: 7.19, lng: 100.59, alt: -10 } },
+          { name: "HCMC CLS (Vung Tau)", type: "junction", coords: { lat: 10.3, lng: 107.0, alt: -25 } },
+          { name: "Manila CLS", type: "termination", coords: { lat: 14.55, lng: 120.98, alt: -12 } }
         ]
       },
       {
-        _id: uid(), name: "Hanoi - Ho Chi Minh Trunk", startKm: 0, endKm: 1726,
-        startCoords: { lat: 21.0285, lng: 105.8542, alt: 15 },
-        endCoords: { lat: 10.8231, lng: 106.6297, alt: 10 },
+        _id: uid(), name: "SEA-3: Philippines - Taiwan", startKm: 0, endKm: 1100,
+        startCoords: { lat: 14.55, lng: 120.98, alt: -12 },
+        endCoords: { lat: 25.0, lng: 121.75, alt: -15 },
         waypoints: [
-          { lat: 19.8075, lng: 105.7764, alt: 12 },
-          { lat: 17.9753, lng: 106.3482, alt: 8 },
-          { lat: 16.0544, lng: 108.2022, alt: 5 },
-          { lat: 13.7530, lng: 109.2190, alt: 4 },
-          { lat: 12.2388, lng: 109.1967, alt: 6 },
-          { lat: 11.9404, lng: 108.4583, alt: 850 }
+          { lat: 14.55, lng: 120.98, alt: -12 },
+          { lat: 17.0, lng: 121.0, alt: -800 },
+          { lat: 19.5, lng: 121.5, alt: -3500 },
+          { lat: 21.5, lng: 121.0, alt: -4000 },
+          { lat: 24.0, lng: 121.5, alt: -500 },
+          { lat: 25.0, lng: 121.75, alt: -15 }
         ],
-        cableType: "G.652.D", coreCount: 96, status: "planned",
-        startDate: "2027-01", installedDate: "2029-06",
+        cableType: "G.654.E", coreCount: 96, status: "planned",
+        startDate: "2027-01", installedDate: "2029-03",
         stations: [
-          { name: "Hanoi Central Office", type: "termination", coords: { lat: 21.0285, lng: 105.8542, alt: 15 } },
-          { name: "Vinh Junction", type: "junction", coords: { lat: 18.6790, lng: 105.6813, alt: 10 } },
-          { name: "Da Nang Switch", type: "switch", coords: { lat: 16.0544, lng: 108.2022, alt: 5 } },
-          { name: "Nha Trang Relay", type: "junction", coords: { lat: 12.2388, lng: 109.1967, alt: 6 } },
-          { name: "Ho Chi Minh Terminal", type: "termination", coords: { lat: 10.8231, lng: 106.6297, alt: 10 } }
+          { name: "Manila CLS", type: "termination", coords: { lat: 14.55, lng: 120.98, alt: -12 } },
+          { name: "Toucheng CLS (Taiwan)", type: "termination", coords: { lat: 25.0, lng: 121.75, alt: -15 } }
         ]
       },
       {
-        _id: uid(), name: "Singapore - Kuala Lumpur Link", startKm: 0, endKm: 350,
-        startCoords: { lat: 1.3521, lng: 103.8198, alt: 3 },
-        endCoords: { lat: 3.1390, lng: 101.6869, alt: 55 },
+        _id: uid(), name: "SEA-4: Philippines - Guam", startKm: 0, endKm: 2600,
+        startCoords: { lat: 14.55, lng: 120.98, alt: -12 },
+        endCoords: { lat: 13.45, lng: 144.79, alt: -18 },
         waypoints: [
-          { lat: 1.4927, lng: 103.7414, alt: 5 },
-          { lat: 1.8655, lng: 103.2204, alt: 20 },
-          { lat: 2.1896, lng: 102.2501, alt: 30 },
-          { lat: 2.7456, lng: 101.9381, alt: 45 }
+          { lat: 14.55, lng: 120.98, alt: -12 },
+          { lat: 14.0, lng: 125.0, alt: -3000 },
+          { lat: 13.5, lng: 130.0, alt: -4000 },
+          { lat: 13.4, lng: 135.0, alt: -3800 },
+          { lat: 13.5, lng: 140.0, alt: -3500 },
+          { lat: 13.45, lng: 144.79, alt: -18 }
         ],
-        cableType: "G.657.A2", coreCount: 288, status: "active",
-        startDate: "2025-01", installedDate: "2026-03",
+        cableType: "G.654.E", coreCount: 48, status: "planned",
+        startDate: "2027-06", installedDate: "2029-12",
         stations: [
-          { name: "Singapore Exchange", type: "termination", coords: { lat: 1.3521, lng: 103.8198, alt: 3 } },
-          { name: "Johor Bahru Switch", type: "switch", coords: { lat: 1.4927, lng: 103.7414, alt: 5 } },
-          { name: "Malacca Junction", type: "junction", coords: { lat: 2.1896, lng: 102.2501, alt: 30 } },
-          { name: "Kuala Lumpur Hub", type: "termination", coords: { lat: 3.1390, lng: 101.6869, alt: 55 } }
+          { name: "Manila CLS", type: "termination", coords: { lat: 14.55, lng: 120.98, alt: -12 } },
+          { name: "Guam CLS (Piti)", type: "termination", coords: { lat: 13.45, lng: 144.79, alt: -18 } }
         ]
       },
       {
-        _id: uid(), name: "Manila - Cebu Submarine", startKm: 0, endKm: 570,
-        startCoords: { lat: 14.5995, lng: 120.9842, alt: 0 },
-        endCoords: { lat: 10.3157, lng: 123.8854, alt: 0 },
+        _id: uid(), name: "SEA-5: Malaysia - Brunei - Sabah", startKm: 0, endKm: 1500,
+        startCoords: { lat: 3.8, lng: 103.4, alt: -10 },
+        endCoords: { lat: 5.98, lng: 116.07, alt: -12 },
         waypoints: [
-          { lat: 13.7565, lng: 121.0583, alt: -50 },
-          { lat: 12.8797, lng: 121.7740, alt: -120 },
-          { lat: 11.5890, lng: 122.7610, alt: -80 },
-          { lat: 10.6918, lng: 123.3411, alt: -30 }
+          { lat: 3.8, lng: 103.4, alt: -10 },
+          { lat: 4.5, lng: 107.0, alt: -80 },
+          { lat: 4.9, lng: 114.9, alt: -50 },
+          { lat: 5.5, lng: 115.5, alt: -35 },
+          { lat: 5.98, lng: 116.07, alt: -12 }
         ],
-        cableType: "G.654.E", coreCount: 48, status: "tested",
-        startDate: "2026-02", installedDate: "2028-01",
+        cableType: "G.657.A2", coreCount: 144, status: "planned",
+        startDate: "2026-06", installedDate: "2028-06",
         stations: [
-          { name: "Manila Landing Station", type: "termination", coords: { lat: 14.5995, lng: 120.9842, alt: 0 } },
-          { name: "Mindoro Repeater", type: "junction", coords: { lat: 12.8797, lng: 121.7740, alt: -120 } },
-          { name: "Cebu Landing Station", type: "termination", coords: { lat: 10.3157, lng: 123.8854, alt: 0 } }
+          { name: "Kuantan CLS", type: "termination", coords: { lat: 3.8, lng: 103.4, alt: -10 } },
+          { name: "Muara CLS (Brunei)", type: "junction", coords: { lat: 4.9, lng: 114.9, alt: -50 } },
+          { name: "Kota Kinabalu CLS", type: "termination", coords: { lat: 5.98, lng: 116.07, alt: -12 } }
+        ]
+      },
+      {
+        _id: uid(), name: "SEA-6: Indonesia - Malaysia - Thailand (Ring)", startKm: 0, endKm: 2400,
+        startCoords: { lat: -7.25, lng: 112.75, alt: -20 },
+        endCoords: { lat: 7.19, lng: 100.59, alt: -10 },
+        waypoints: [
+          { lat: -7.25, lng: 112.75, alt: -20 },
+          { lat: -5.0, lng: 110.0, alt: -55 },
+          { lat: -2.0, lng: 107.0, alt: -60 },
+          { lat: 1.0, lng: 104.5, alt: -40 },
+          { lat: 3.8, lng: 103.4, alt: -10 },
+          { lat: 5.0, lng: 102.5, alt: -70 },
+          { lat: 7.19, lng: 100.59, alt: -10 }
+        ],
+        cableType: "G.652.D", coreCount: 192, status: "in-progress",
+        startDate: "2025-09", installedDate: "2027-12",
+        stations: [
+          { name: "Surabaya CLS", type: "termination", coords: { lat: -7.25, lng: 112.75, alt: -20 } },
+          { name: "Kuantan CLS", type: "junction", coords: { lat: 3.8, lng: 103.4, alt: -10 } },
+          { name: "Songkhla CLS", type: "termination", coords: { lat: 7.19, lng: 100.59, alt: -10 } }
         ]
       }
     ];
