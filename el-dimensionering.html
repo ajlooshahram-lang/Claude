@@ -756,6 +756,7 @@ const T = {
       motor: '\u2699\uFE0F Motorstart',
       curves: '\uD83D\uDCC8 Kurver',
       ev: '\uD83D\uDE97 EV-lader',
+      harmonics: '\u3030\uFE0F Harmoniske',
       exam: '\uD83C\uDF93 Eksamen'
     },
     // Load module
@@ -860,6 +861,7 @@ const T = {
       motor: '\u2699\uFE0F Motor Start',
       curves: '\uD83D\uDCC8 Curves',
       ev: '\uD83D\uDE97 EV Charger',
+      harmonics: '\u3030\uFE0F Harmonics',
       exam: '\uD83C\uDF93 Exam'
     },
     loadTitle: 'Load Calculation',
@@ -2008,6 +2010,8 @@ let motorState = { power: 7.5, voltage: 400, eta: 0.89, cosfi: 0.85, method: 'DO
 let curvesState = { dev1Type: 'gG', dev1Rating: 63, dev1Curve: 'B', dev2Type: 'mcb', dev2Rating: 16, dev2Curve: 'B', cableCS: 4, cableIns: 'PVC', cableMat: 'Cu', showDev1: true, showDev2: true, showCable: true, faultCurrent: 1000 };
 // EV Charger state
 let evState = { power: 11, numChargers: 1, mainFuse: 63, existingLoad: 50, earthing: 'TN-S', cableLength: 15, installation: 'outdoor', dcDetection: false };
+// Harmonics assessment state
+let harmonicsState = { thd3: 33, iPhase: 16, circuits: 4, crossSection: 2.5 };
 // Short circuit state
 let scState = { zNet: 1, zTrafo: 5 };
 // Standards state
@@ -2138,6 +2142,7 @@ function renderModule(mod) {
     case 'motor': content = renderMotorStart(); break;
     case 'curves': content = renderCurves(); break;
     case 'ev': content = renderEvCharger(); break;
+    case 'harmonics': content = renderHarmonics(); break;
     case 'exam': content = renderExam(); break;
   }
   // Append AI assistant to every module
@@ -10623,6 +10628,365 @@ function renderEvSvgDiagram(charger, state, capacityOk, needsLoadMgmt, penBreakR
 
   // Standard ref at bottom
   svg += '<text x="' + (W/2) + '" y="' + (H - 4) + '" text-anchor="middle" font-size="6" fill="rgba(255,255,255,0.25)">DS/HD 60364-7-722 | IEC 61851</text>';
+
+  return '<div style="margin-top:16px;overflow-x:auto"><svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:' + W + 'px;border-radius:14px;border:1px solid rgba(0,180,255,0.1)">' + svg + '</svg></div>';
+}
+
+// ===== HARMONICS ASSESSMENT / NEUTRAL OVERSIZING (DS/HD 60364-5-52 §523.6.3) =====
+function renderHarmonics() {
+  const da = lang === 'da';
+  const st = harmonicsState;
+
+  // Load type presets {label_da, label_en, thd3}
+  const LOAD_PRESETS = [
+    { da: 'LED belysning', en: 'LED lighting', thd3: 50 },
+    { da: 'Computere/IT', en: 'Computers/IT', thd3: 65 },
+    { da: 'Lysstofrør m/ HF', en: 'Fluorescent HF', thd3: 33 },
+    { da: 'Frekvensomformere', en: 'VFDs', thd3: 30 },
+    { da: 'Blandet kontor', en: 'Mixed office', thd3: 40 },
+    { da: 'Resistiv (varme)', en: 'Resistive', thd3: 0 },
+    { da: 'Motor (direkte)', en: 'Motor direct', thd3: 3 }
+  ];
+  const THD3_OPTIONS = [0, 5, 10, 15, 20, 25, 30, 33, 40, 45, 50, 60, 70, 80];
+  const PHASE_CURRENT_OPTIONS = [6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125];
+  const CIRCUIT_OPTIONS = [1, 2, 3, 4, 6, 8, 10, 12, 16, 20];
+  const CROSS_SECTION_OPTIONS = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120];
+
+  // --- CALCULATIONS ---
+  const thd3Frac = st.thd3 / 100;
+  // Neutral current per circuit (triplen harmonics add arithmetically)
+  const iNeutralPerCircuit = 3 * st.iPhase * thd3Frac;
+  // Total neutral current for grouped circuits (triplens from each circuit add)
+  const iNeutralTotal = iNeutralPerCircuit * st.circuits;
+  // Phase current total
+  const iPhaseTotal = st.iPhase * st.circuits;
+  // Neutral to phase ratio
+  const neutralRatio = st.thd3 > 0 ? (iNeutralPerCircuit / st.iPhase) : 0;
+
+  // Assessment category per DS/HD 60364-5-52 §523.6.3
+  let category, categoryColor, categoryLabel, deratingFactor, neutralSizing;
+  if (st.thd3 < 15) {
+    category = 1;
+    categoryColor = '#00e676';
+    categoryLabel = da ? 'Under 15% - Normal drift' : 'Below 15% - Normal operation';
+    deratingFactor = 1.0;
+    neutralSizing = 'same';
+  } else if (st.thd3 >= 15 && st.thd3 <= 33) {
+    category = 2;
+    categoryColor = '#ffab00';
+    categoryLabel = da ? '15-33% - Neutral er belastet leder' : '15-33% - Neutral is loaded conductor';
+    deratingFactor = 0.86;
+    neutralSizing = 'same';
+  } else if (st.thd3 > 33 && st.thd3 <= 45) {
+    category = 3;
+    categoryColor = '#ff6d00';
+    categoryLabel = da ? '33-45% - Dimensioner efter neutralstrøm' : '33-45% - Size by neutral current';
+    deratingFactor = 0.86;
+    neutralSizing = 'neutral';
+  } else {
+    category = 4;
+    categoryColor = '#ff1744';
+    categoryLabel = da ? 'Over 45% - Neutral STØRRE end faser' : 'Above 45% - Neutral LARGER than phases';
+    deratingFactor = 1.0; // Phase sized normally, but neutral must be larger
+    neutralSizing = 'larger';
+  }
+
+  // Derated phase Iz
+  const izDerated = st.iPhase * deratingFactor;
+
+  // Required neutral cross-section
+  // Cable Iz data (copper PVC, method C reference values)
+  const CABLE_IZ = [
+    { cs: 1.5, iz: 17.5 }, { cs: 2.5, iz: 24 }, { cs: 4, iz: 32 }, { cs: 6, iz: 41 },
+    { cs: 10, iz: 57 }, { cs: 16, iz: 76 }, { cs: 25, iz: 101 }, { cs: 35, iz: 125 },
+    { cs: 50, iz: 151 }, { cs: 70, iz: 192 }, { cs: 95, iz: 232 }, { cs: 120, iz: 269 }
+  ];
+
+  // Find current phase cable Iz
+  const phaseCableData = CABLE_IZ.find(function(c) { return c.cs === st.crossSection; }) || CABLE_IZ[1];
+
+  // Required neutral size
+  let requiredNeutralCS = st.crossSection;
+  let neutralIzNeeded = iNeutralPerCircuit;
+  if (neutralSizing === 'larger') {
+    // Neutral must carry more than phases - find appropriate size
+    for (var ni = 0; ni < CABLE_IZ.length; ni++) {
+      if (CABLE_IZ[ni].iz >= neutralIzNeeded) {
+        requiredNeutralCS = CABLE_IZ[ni].cs;
+        break;
+      }
+      if (ni === CABLE_IZ.length - 1) requiredNeutralCS = CABLE_IZ[ni].cs;
+    }
+    if (requiredNeutralCS < st.crossSection) requiredNeutralCS = st.crossSection;
+  } else if (neutralSizing === 'neutral') {
+    // Size on neutral current
+    for (var ni2 = 0; ni2 < CABLE_IZ.length; ni2++) {
+      if (CABLE_IZ[ni2].iz >= neutralIzNeeded) {
+        requiredNeutralCS = CABLE_IZ[ni2].cs;
+        break;
+      }
+      if (ni2 === CABLE_IZ.length - 1) requiredNeutralCS = CABLE_IZ[ni2].cs;
+    }
+    if (requiredNeutralCS < st.crossSection) requiredNeutralCS = st.crossSection;
+  }
+
+  // Fire risk: neutral undersized if current cross-section Iz < neutral current
+  const neutralUndersized = phaseCableData.iz < iNeutralPerCircuit && st.thd3 >= 15;
+  const fireRisk = neutralUndersized || (category >= 3 && requiredNeutralCS > st.crossSection);
+
+  // --- BUILD UI ---
+  let html = '<div class="card fade-in"><div class="card-title">\u3030\uFE0F ' + (da ? 'Harmonisk vurdering / Neutral dimensionering' : 'Harmonic Assessment / Neutral Oversizing') + '</div>';
+  html += '<div class="info-row">' + (da ? 'Vurdering af 3. harmoniske (triplen) belastning p\u00E5 neutralleder iht. DS/HD 60364-5-52 \u00A7523.6.3 + Annex E. Underdimensionerede neutralledere er en alvorlig BRANDRISIKO.' : 'Assessment of 3rd harmonic (triplen) loading on neutral conductor per DS/HD 60364-5-52 \u00A7523.6.3 + Annex E. Undersized neutrals are a serious FIRE RISK.') + '</div>';
+
+  // Safety warning
+  html += '<div class="result-box danger" style="margin-bottom:14px"><div class="result-title">\uD83D\uDD25 ' + (da ? 'Sikkerhedsadvarsel' : 'Safety Warning') + '</div>';
+  html += '<div style="padding:6px 2px;line-height:1.5">' + (da ? 'Triplen harmoniske (3., 9., 15. ...) adderes ARITMETISK i neutrallederen i stedet for at udligne. En underdimensioneret neutral kan overophede og for\u00E5rsage BRAND. V\u00E6r altid konservativ.' : 'Triplen harmonics (3rd, 9th, 15th...) add ARITHMETICALLY in the neutral conductor instead of cancelling. An undersized neutral can overheat and cause FIRE. Always be conservative.') + '</div></div>';
+
+  // 1. Load type presets
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDCE6 ' + (da ? 'Lasttype (typisk THD3)' : 'Load type (typical THD3)') + '</div><div class="select-grid">';
+  LOAD_PRESETS.forEach(function(p) {
+    html += '<button class="sel-btn ' + (st.thd3 === p.thd3 ? 'selected' : '') + '" onclick="harmonicsState.thd3=' + p.thd3 + ';renderModule(\'harmonics\')">' + (da ? p.da : p.en) + ' (' + p.thd3 + '%)</button>';
+  });
+  html += '</div></div>';
+
+  // 2. THD3 fine-tune
+  html += '<div class="select-group"><div class="select-label">\u3030\uFE0F ' + (da ? '3. harmoniske indhold [%]' : '3rd harmonic content [%]') + '</div><div class="select-grid">';
+  THD3_OPTIONS.forEach(function(t) {
+    html += '<button class="sel-btn ' + (st.thd3 === t ? 'selected' : '') + '" onclick="harmonicsState.thd3=' + t + ';renderModule(\'harmonics\')">' + t + '%</button>';
+  });
+  html += '</div></div>';
+
+  // 3. Phase current
+  html += '<div class="select-group"><div class="select-label">\u26A1 ' + (da ? 'Fasestrøm [A]' : 'Phase current [A]') + '</div><div class="select-grid">';
+  PHASE_CURRENT_OPTIONS.forEach(function(a) {
+    html += '<button class="sel-btn ' + (st.iPhase === a ? 'selected' : '') + '" onclick="harmonicsState.iPhase=' + a + ';renderModule(\'harmonics\')">' + a + ' A</button>';
+  });
+  html += '</div></div>';
+
+  // 4. Number of circuits
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD22 ' + (da ? 'Antal kredsl\u00F8b (grupperet)' : 'Number of circuits (grouped)') + '</div><div class="select-grid">';
+  CIRCUIT_OPTIONS.forEach(function(c) {
+    html += '<button class="sel-btn ' + (st.circuits === c ? 'selected' : '') + '" onclick="harmonicsState.circuits=' + c + ';renderModule(\'harmonics\')">' + c + '</button>';
+  });
+  html += '</div></div>';
+
+  // 5. Cable cross-section (phase)
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDCCF ' + (da ? 'Kabel tværsnit (fase) [mm\u00B2]' : 'Cable cross-section (phase) [mm\u00B2]') + '</div><div class="select-grid">';
+  CROSS_SECTION_OPTIONS.forEach(function(cs) {
+    html += '<button class="sel-btn ' + (st.crossSection === cs ? 'selected' : '') + '" onclick="harmonicsState.crossSection=' + cs + ';renderModule(\'harmonics\')">' + cs + ' mm\u00B2</button>';
+  });
+  html += '</div></div>';
+
+  // --- RESULTS ---
+  html += '</div>'; // close first card
+
+  // Category badge card
+  html += '<div class="card fade-in">';
+  html += '<div class="result-box ' + (category === 1 ? 'success' : category === 2 ? 'warning' : 'danger') + '">';
+  html += '<div class="result-title" style="font-size:1.1em">';
+  html += '<span style="display:inline-block;padding:3px 10px;border-radius:12px;background:' + categoryColor + ';color:#000;font-weight:700;margin-right:8px">' + (da ? 'Kategori ' : 'Category ') + category + '</span>';
+  html += categoryLabel + '</div>';
+
+  // Result rows
+  html += '<div class="result-row"><span>' + (da ? 'Neutralstr\u00F8m (per kredsl\u00F8b)' : 'Neutral current (per circuit)') + '</span><span style="font-weight:700;color:' + categoryColor + '">' + iNeutralPerCircuit.toFixed(1) + ' A</span></div>';
+  html += '<div class="result-row"><span>' + (da ? 'Fasestr\u00F8m (per kredsl\u00F8b)' : 'Phase current (per circuit)') + '</span><span>' + st.iPhase + ' A</span></div>';
+  html += '<div class="result-row"><span>' + (da ? 'Neutral/fase forhold' : 'Neutral/phase ratio') + '</span><span style="font-weight:700;color:' + (neutralRatio > 1 ? '#ff1744' : neutralRatio > 0.5 ? '#ff6d00' : categoryColor) + '">' + (neutralRatio * 100).toFixed(0) + '% (' + neutralRatio.toFixed(2) + ')</span></div>';
+  html += '<div class="result-row"><span>' + (da ? 'Total neutralstr\u00F8m (' + st.circuits + ' kredsl\u00F8b)' : 'Total neutral current (' + st.circuits + ' circuits)') + '</span><span style="font-weight:700;color:' + (iNeutralTotal > phaseCableData.iz ? '#ff1744' : categoryColor) + '">' + iNeutralTotal.toFixed(1) + ' A</span></div>';
+  html += '<div class="result-row"><span>' + (da ? 'Derating faktor (faseledere)' : 'Derating factor (phase conductors)') + '</span><span style="font-weight:700">' + deratingFactor.toFixed(2) + '</span></div>';
+  html += '<div class="result-row"><span>' + (da ? 'Derated fasestr\u00F8m Iz' : 'Derated phase Iz') + '</span><span>' + izDerated.toFixed(1) + ' A</span></div>';
+  html += '<div class="result-row"><span>' + (da ? 'Nuv\u00E6rende fase-tværsnit' : 'Current phase cross-section') + '</span><span>' + st.crossSection + ' mm\u00B2 (Iz=' + phaseCableData.iz + 'A)</span></div>';
+  html += '<div class="result-row"><span style="font-weight:700">' + (da ? 'P\u00E5kr\u00E6vet neutral-tværsnit' : 'Required neutral cross-section') + '</span><span style="font-weight:700;color:' + (requiredNeutralCS > st.crossSection ? '#ff1744' : categoryColor) + '">' + requiredNeutralCS + ' mm\u00B2</span></div>';
+  html += '</div>'; // result-box
+
+  // Fire risk warning
+  if (fireRisk) {
+    html += '<div class="result-box danger" style="margin-top:14px;border:2px solid #ff1744;animation:pulseGlow 1.5s ease-in-out infinite">';
+    html += '<div class="result-title" style="color:#ff1744;font-size:1.1em">\uD83D\uDD25\uD83D\uDD25\uD83D\uDD25 ' + (da ? 'BRANDFARE - Neutral UNDERDIMENSIONERET' : 'FIRE HAZARD - Neutral UNDERSIZED') + ' \uD83D\uDD25\uD83D\uDD25\uD83D\uDD25</div>';
+    html += '<div style="padding:8px 2px;line-height:1.6">';
+    html += '<div style="font-weight:700;color:#ff1744;margin-bottom:6px">' + (da ? 'Neutrallederen kan IKKE b\u00E6re den harmoniske str\u00F8m!' : 'The neutral conductor CANNOT carry the harmonic current!') + '</div>';
+    html += '<div>' + (da ? 'Neutralstr\u00F8m: <strong>' + iNeutralPerCircuit.toFixed(1) + ' A</strong> > Kabel Iz: <strong>' + phaseCableData.iz + ' A</strong> (' + st.crossSection + ' mm\u00B2)' : 'Neutral current: <strong>' + iNeutralPerCircuit.toFixed(1) + ' A</strong> > Cable Iz: <strong>' + phaseCableData.iz + ' A</strong> (' + st.crossSection + ' mm\u00B2)') + '</div>';
+    html += '<div style="margin-top:6px;font-weight:700">' + (da ? '\u27A1 \u00D8g neutral til mindst <span style="color:#ffab00;font-size:1.2em">' + requiredNeutralCS + ' mm\u00B2</span>' : '\u27A1 Increase neutral to at least <span style="color:#ffab00;font-size:1.2em">' + requiredNeutralCS + ' mm\u00B2</span>') + '</div>';
+    html += '<div style="margin-top:8px;font-size:0.85em;opacity:0.8">' + (da ? 'Overophedet neutral er den hyppigste \u00E5rsag til elektriske brande i kontorbygninger med LED/IT-udstyr.' : 'Overheated neutral is the most common cause of electrical fires in office buildings with LED/IT equipment.') + '</div>';
+    html += '</div></div>';
+  }
+
+  // Recommendation box
+  html += '<div class="result-box ' + (category <= 2 ? 'success' : 'warning') + '" style="margin-top:14px">';
+  html += '<div class="result-title">\uD83D\uDCCB ' + (da ? 'Anbefaling' : 'Recommendation') + '</div>';
+  html += '<div style="padding:6px 2px;line-height:1.6">';
+  if (category === 1) {
+    html += '<div>\u2705 ' + (da ? 'Normal kabeldimensionering. Neutral behøver ikke oversizes.' : 'Normal cable sizing. Neutral does not need oversizing.') + '</div>';
+    html += '<div>' + (da ? 'Ingen derating nødvendig for faseledere.' : 'No derating needed for phase conductors.') + '</div>';
+  } else if (category === 2) {
+    html += '<div>\u26A0\uFE0F ' + (da ? 'Neutrallederen T\u00C6LLER som belastet leder (4 belastede ledere).' : 'Neutral COUNTS as a loaded conductor (4 loaded conductors).') + '</div>';
+    html += '<div>' + (da ? 'Reducer fase Iz med faktor <strong>0.86</strong>.' : 'Reduce phase Iz by factor <strong>0.86</strong>.') + '</div>';
+    html += '<div>' + (da ? 'Neutral mindst samme størrelse som faser: <strong>' + requiredNeutralCS + ' mm\u00B2</strong>' : 'Neutral at least same size as phases: <strong>' + requiredNeutralCS + ' mm\u00B2</strong>') + '</div>';
+  } else if (category === 3) {
+    html += '<div>\uD83D\uDEA8 ' + (da ? 'Kablet skal dimensioneres efter NEUTRALSTRØMMEN, ikke fasestrømmen.' : 'Cable must be sized by NEUTRAL CURRENT, not phase current.') + '</div>';
+    html += '<div>' + (da ? 'Neutral mindst: <strong>' + requiredNeutralCS + ' mm\u00B2</strong>' : 'Neutral minimum: <strong>' + requiredNeutralCS + ' mm\u00B2</strong>') + '</div>';
+    html += '<div>' + (da ? 'Overvej 5-leder kabel (separat neutral).' : 'Consider 5-core cable (separate neutral).') + '</div>';
+  } else {
+    html += '<div>\uD83D\uDD25 ' + (da ? 'Neutrallederen skal v\u00E6re ST\u00D8RRE end faselederne!' : 'Neutral conductor must be LARGER than phase conductors!') + '</div>';
+    html += '<div>' + (da ? 'Minimum neutral: <strong style="color:#ff1744;font-size:1.1em">' + requiredNeutralCS + ' mm\u00B2</strong> (fase: ' + st.crossSection + ' mm\u00B2)' : 'Minimum neutral: <strong style="color:#ff1744;font-size:1.1em">' + requiredNeutralCS + ' mm\u00B2</strong> (phase: ' + st.crossSection + ' mm\u00B2)') + '</div>';
+    html += '<div>' + (da ? 'Brug ALTID separat overst\u00F8rret neutralleder.' : 'ALWAYS use separate oversized neutral conductor.') + '</div>';
+    html += '<div>' + (da ? 'Overvej dobbelt neutral eller dedikeret neutralkabel.' : 'Consider double neutral or dedicated neutral cable.') + '</div>';
+  }
+  html += '</div></div>';
+
+  // DS/HD reference
+  html += '<div style="margin-top:10px;padding:8px 12px;border-radius:8px;background:rgba(0,180,255,0.05);border:1px solid rgba(0,180,255,0.15);font-size:0.82em;color:rgba(255,255,255,0.6)">';
+  html += '<strong>DS/HD 60364-5-52 \u00A7523.6.3 + Annex E</strong> | ';
+  html += (da ? 'Str\u00F8mbelastningsevne - Indflydelse af overstr\u00F8mme i neutralleder' : 'Current-carrying capacity - Effect of harmonic currents on neutral conductor');
+  html += '</div>';
+
+  html += '</div>'; // close results card
+
+  // Visualization
+  html += buildHarmonicsViz(st, da, category, categoryColor, iNeutralPerCircuit, neutralRatio);
+
+  return html;
+}
+
+function buildHarmonicsViz(st, da, category, categoryColor, iNeutral, neutralRatio) {
+  const W = 580, H = 380;
+  const thd3Frac = st.thd3 / 100;
+  let svg = '';
+
+  // Background
+  svg += '<defs>';
+  svg += '<linearGradient id="harmBg" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="rgba(10,15,30,1)"/><stop offset="100%" stop-color="rgba(5,10,20,1)"/></linearGradient>';
+  // Animated flow for waves
+  svg += '<style>';
+  svg += '@keyframes harmWaveFlow { from { transform: translateX(0); } to { transform: translateX(-120px); } }';
+  svg += '@keyframes harmHeatPulse { 0%,100% { opacity: 0.3; } 50% { opacity: 0.8; } }';
+  svg += '@keyframes harmNeutralGlow { 0%,100% { filter: drop-shadow(0 0 2px rgba(255,50,50,0.3)); } 50% { filter: drop-shadow(0 0 8px rgba(255,50,50,0.9)); } }';
+  svg += '</style>';
+  svg += '</defs>';
+  svg += '<rect width="' + W + '" height="' + H + '" fill="url(#harmBg)"/>';
+
+  // Title
+  svg += '<text x="' + (W/2) + '" y="22" text-anchor="middle" font-size="11" fill="rgba(255,255,255,0.85)" font-weight="600">' + (da ? '3-fase system med 3. harmoniske i neutral' : '3-phase system with 3rd harmonics in neutral') + '</text>';
+
+  // Phase colors
+  var phaseColors = ['#ff4444', '#ffcc00', '#4488ff']; // L1=red, L2=yellow, L3=blue
+  var phaseLabels = ['L1', 'L2', 'L3'];
+  var neutralColor = '#00bfff';
+  var harmonicColor = '#ff3366';
+
+  // Draw 3 phase waveforms
+  var waveY = 80;
+  var waveH = 40;
+  var waveW = W - 80;
+  var startX = 40;
+
+  // Phase offset (120 degrees = 2*PI/3)
+  var phaseOffsets = [0, 2.094, 4.189]; // 0, 120, 240 degrees in radians
+
+  for (var p = 0; p < 3; p++) {
+    var yCenter = waveY + p * (waveH + 15);
+    var color = phaseColors[p];
+
+    // Phase label
+    svg += '<text x="10" y="' + (yCenter + 4) + '" font-size="9" fill="' + color + '" font-weight="600">' + phaseLabels[p] + '</text>';
+
+    // Fundamental sine wave (animated)
+    svg += '<g style="animation:harmWaveFlow 2s linear infinite">';
+    var pathFund = 'M';
+    for (var x = 0; x < waveW + 120; x += 2) {
+      var angle = (x / waveW) * 4 * Math.PI + phaseOffsets[p];
+      var y = yCenter - Math.sin(angle) * (waveH * 0.4);
+      pathFund += (x === 0 ? '' : ' L') + (startX + x) + ',' + y.toFixed(1);
+    }
+    svg += '<path d="' + pathFund + '" fill="none" stroke="' + color + '" stroke-width="1.5" opacity="0.8"/>';
+
+    // 3rd harmonic component (smaller amplitude, 3x frequency)
+    if (st.thd3 > 0) {
+      var pathHarm = 'M';
+      for (var x2 = 0; x2 < waveW + 120; x2 += 2) {
+        var angle2 = (x2 / waveW) * 4 * Math.PI * 3; // 3x frequency, NO phase offset (all in phase)
+        var y2 = yCenter - Math.sin(angle2) * (waveH * 0.4 * thd3Frac);
+        pathHarm += (x2 === 0 ? '' : ' L') + (startX + x2) + ',' + y2.toFixed(1);
+      }
+      svg += '<path d="' + pathHarm + '" fill="none" stroke="' + harmonicColor + '" stroke-width="1" opacity="0.5" stroke-dasharray="3 2"/>';
+    }
+    svg += '</g>';
+  }
+
+  // Neutral conductor section
+  var neutralY = waveY + 3 * (waveH + 15) + 20;
+
+  // Neutral label
+  svg += '<text x="10" y="' + (neutralY + 4) + '" font-size="9" fill="' + neutralColor + '" font-weight="600">N</text>';
+
+  // Neutral waveform: 3rd harmonics ADD UP (3x amplitude of individual 3rd harmonic)
+  var neutralAmplitude = waveH * 0.4 * thd3Frac * 3; // Triplens add: 3 * individual
+  var maxNeutralScale = Math.min(neutralAmplitude, waveH * 0.9);
+
+  svg += '<g style="animation:harmWaveFlow 2s linear infinite;' + (category >= 3 ? 'animation:harmWaveFlow 2s linear infinite, harmNeutralGlow 1.5s ease-in-out infinite' : '') + '">';
+  if (st.thd3 > 0) {
+    var pathNeutral = 'M';
+    for (var xn = 0; xn < waveW + 120; xn += 2) {
+      var angleN = (xn / waveW) * 4 * Math.PI * 3; // 3x frequency
+      var yn = neutralY - Math.sin(angleN) * maxNeutralScale;
+      pathNeutral += (xn === 0 ? '' : ' L') + (startX + xn) + ',' + yn.toFixed(1);
+    }
+    svg += '<path d="' + pathNeutral + '" fill="none" stroke="' + (category >= 3 ? '#ff1744' : neutralColor) + '" stroke-width="' + (category >= 3 ? '2.5' : '1.5') + '" opacity="0.9"/>';
+  } else {
+    // Zero neutral current - flat line
+    svg += '<line x1="' + startX + '" y1="' + neutralY + '" x2="' + (startX + waveW) + '" y2="' + neutralY + '" stroke="' + neutralColor + '" stroke-width="1" opacity="0.4"/>';
+  }
+  svg += '</g>';
+
+  // Amplitude comparison labels
+  var compY = neutralY + 50;
+  svg += '<text x="' + (W/2) + '" y="' + compY + '" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.7)">' + (da ? 'Amplitudesammenligning' : 'Amplitude comparison') + '</text>';
+
+  // Phase bar
+  var barX = 60, barW = 200, barH2 = 14;
+  var phaseBarY = compY + 10;
+  svg += '<rect x="' + barX + '" y="' + phaseBarY + '" width="' + barW + '" height="' + barH2 + '" rx="4" fill="rgba(0,180,255,0.3)" stroke="rgba(0,180,255,0.5)" stroke-width="1"/>';
+  svg += '<text x="' + (barX - 5) + '" y="' + (phaseBarY + 10) + '" text-anchor="end" font-size="8" fill="rgba(255,255,255,0.6)">' + (da ? 'Fase' : 'Phase') + '</text>';
+  svg += '<text x="' + (barX + barW + 5) + '" y="' + (phaseBarY + 10) + '" font-size="8" fill="rgba(255,255,255,0.6)">' + st.iPhase + ' A</text>';
+
+  // Neutral bar
+  var neutralBarY = phaseBarY + 22;
+  var neutralBarW = Math.min(barW * neutralRatio, barW * 2.5);
+  var nbColor = category >= 3 ? '#ff1744' : category === 2 ? '#ffab00' : '#00e676';
+  svg += '<rect x="' + barX + '" y="' + neutralBarY + '" width="' + Math.max(neutralBarW, 2) + '" height="' + barH2 + '" rx="4" fill="' + nbColor + '" opacity="0.6" stroke="' + nbColor + '" stroke-width="1"' + (category >= 3 ? ' style="animation:harmHeatPulse 1s ease-in-out infinite"' : '') + '/>';
+  svg += '<text x="' + (barX - 5) + '" y="' + (neutralBarY + 10) + '" text-anchor="end" font-size="8" fill="rgba(255,255,255,0.6)">N</text>';
+  svg += '<text x="' + (barX + Math.max(neutralBarW, 2) + 5) + '" y="' + (neutralBarY + 10) + '" font-size="8" fill="' + nbColor + '">' + iNeutral.toFixed(1) + ' A (' + (neutralRatio * 100).toFixed(0) + '%)</text>';
+
+  // Heat indicator on neutral conductor
+  var heatY = neutralBarY + 30;
+  var heatLevel = Math.min(neutralRatio / 1.5, 1); // 0 to 1
+  var heatW = barW * heatLevel;
+  svg += '<text x="' + barX + '" y="' + (heatY + 2) + '" font-size="8" fill="rgba(255,255,255,0.5)">' + (da ? 'Varmebelastning neutral:' : 'Heat load neutral:') + '</text>';
+  svg += '<rect x="' + barX + '" y="' + (heatY + 6) + '" width="' + barW + '" height="8" rx="4" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>';
+  if (st.thd3 > 0) {
+    var heatGradient = heatLevel > 0.6 ? '#ff1744' : heatLevel > 0.3 ? '#ff6d00' : '#00e676';
+    svg += '<rect x="' + barX + '" y="' + (heatY + 6) + '" width="' + Math.max(heatW, 3) + '" height="8" rx="4" fill="' + heatGradient + '" opacity="0.7"' + (heatLevel > 0.6 ? ' style="animation:harmHeatPulse 0.8s ease-in-out infinite"' : '') + '/>';
+  }
+
+  // Category badge in SVG
+  var badgeY = H - 60;
+  svg += '<rect x="' + (W/2 - 120) + '" y="' + badgeY + '" width="240" height="36" rx="10" fill="rgba(0,0,0,0.4)" stroke="' + categoryColor + '" stroke-width="1.5"/>';
+  svg += '<text x="' + (W/2) + '" y="' + (badgeY + 15) + '" text-anchor="middle" font-size="9" fill="' + categoryColor + '" font-weight="700">' + (da ? 'Kategori ' : 'Category ') + category + ': ' + (st.thd3) + '% THD3</text>';
+  svg += '<text x="' + (W/2) + '" y="' + (badgeY + 28) + '" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.5)">' + (da ? 'In=' + iNeutral.toFixed(1) + 'A | Derating=' + (category <= 1 ? '1.00' : '0.86') + ' | Neutral: ' + requiredNeutralCS + 'mm\u00B2' : 'In=' + iNeutral.toFixed(1) + 'A | Derating=' + (category <= 1 ? '1.00' : '0.86') + ' | Neutral: ' + requiredNeutralCS + 'mm\u00B2') + '</text>';
+
+  // Legend
+  svg += '<rect x="' + (W - 170) + '" y="40" width="155" height="75" rx="6" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>';
+  svg += '<text x="' + (W - 163) + '" y="54" font-size="7" fill="rgba(255,255,255,0.6)" font-weight="600">' + (da ? 'Forklaring' : 'Legend') + '</text>';
+  svg += '<line x1="' + (W - 163) + '" y1="62" x2="' + (W - 143) + '" y2="62" stroke="' + phaseColors[0] + '" stroke-width="1.5"/>';
+  svg += '<text x="' + (W - 138) + '" y="65" font-size="7" fill="rgba(255,255,255,0.5)">' + (da ? 'Fundamental (50Hz)' : 'Fundamental (50Hz)') + '</text>';
+  svg += '<line x1="' + (W - 163) + '" y1="75" x2="' + (W - 143) + '" y2="75" stroke="' + harmonicColor + '" stroke-width="1" stroke-dasharray="3 2"/>';
+  svg += '<text x="' + (W - 138) + '" y="78" font-size="7" fill="rgba(255,255,255,0.5)">' + (da ? '3. harmonisk (150Hz)' : '3rd harmonic (150Hz)') + '</text>';
+  svg += '<line x1="' + (W - 163) + '" y1="88" x2="' + (W - 143) + '" y2="88" stroke="' + neutralColor + '" stroke-width="2"/>';
+  svg += '<text x="' + (W - 138) + '" y="91" font-size="7" fill="rgba(255,255,255,0.5)">' + (da ? 'Neutral (sum af triplen)' : 'Neutral (triplen sum)') + '</text>';
+  svg += '<line x1="' + (W - 163) + '" y1="101" x2="' + (W - 143) + '" y2="101" stroke="#ff1744" stroke-width="2.5"/>';
+  svg += '<text x="' + (W - 138) + '" y="104" font-size="7" fill="rgba(255,255,255,0.5)">' + (da ? 'Overbelastet neutral' : 'Overloaded neutral') + '</text>';
+
+  // Standard reference
+  svg += '<text x="' + (W/2) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="6" fill="rgba(255,255,255,0.25)">DS/HD 60364-5-52 \u00A7523.6.3 + Annex E</text>';
 
   return '<div style="margin-top:16px;overflow-x:auto"><svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:' + W + 'px;border-radius:14px;border:1px solid rgba(0,180,255,0.1)">' + svg + '</svg></div>';
 }
