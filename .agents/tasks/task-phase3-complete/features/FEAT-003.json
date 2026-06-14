@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "feat",
   "description": "Add comprehensive integration tests for all new endpoints: projects, registers, snapshots, shares, and security features (MFA encryption, password change session revocation, session cleanup).",
-  "status": "pending",
+  "status": "completed",
   "steps": [
     "Create server/test/projects.test.ts following the pattern of cases.test.ts: CRUD lifecycle (create, list, get, update, soft-delete) + tenant isolation tests (user B cannot see/modify/delete user A's projects). Use buildTestApp, registerUser, cleanDatabase from helpers.ts.",
     "Create server/test/registers.test.ts: create register row with type+projectId+data, list by type+projectId, update, soft-delete, tenant isolation. Test with at least 2 different register types (e.g. hazop, calibration).",
@@ -25,5 +25,5 @@
     "Run `cd server && DATABASE_URL=postgresql://qi:qi@localhost:5432/qi_platform?schema=public npm test` and confirm all tests pass (old + new)"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 83 tests pass (12 existing + 57 new across 5 test files + 14 tests from other suites). TypeScript strict mode compiles cleanly. Key: to run tests in this sandbox, Postgres must be started in the same bash call due to bwrap PID namespace isolation. DATABASE_URL must use host= parameter for Unix socket. DATA_ENCRYPTION_KEY env var must be set for MFA encryption tests."
 }
