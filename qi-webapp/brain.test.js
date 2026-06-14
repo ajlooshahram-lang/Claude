@@ -651,5 +651,122 @@ console.log("\n-- getCountryInfo: data integrity spot check --");
   ok(bn.geographicalChallenges.some(function (c) { return c.indexOf("shallow") >= 0 || c.indexOf("Shallow") >= 0; }), "Brunei mentions shallow bay");
 })();
 
+// ============================================================================
+// Submarine Cable Detection Tests
+// ============================================================================
+
+console.log("\n-- submarine detection: keyword triggers isSubmarine --");
+(function () {
+  var subBrief = "Submarine fibre optic cable system connecting 8 Asian countries. " +
+    "Undersea route of 5000 km across the seabed with repeaters every 80 km. " +
+    "Shore end landings at each country with cable ship installation. " +
+    "Branching units for multi-landing topology. 36 months duration.";
+
+  var result = B.analyzeProject(subBrief);
+  ok(result.summary.isSubmarine === true, "submarine keywords trigger isSubmarine=true (got " + result.summary.isSubmarine + ")");
+  ok(result.summary.domain === "fibre-telecom", "submarine project still picks fibre-telecom domain");
+  ok(result.summary.scale.routeKm === 5000, "parses 5000 km route for submarine project");
+})();
+
+console.log("\n-- submarine detection: terrestrial brief stays non-submarine --");
+(function () {
+  // The existing fibreBrief has trenching and HDD - should NOT be submarine
+  var result = B.analyzeProject(fibreBrief);
+  ok(result.summary.isSubmarine === false, "terrestrial brief with trenching/HDD is NOT submarine (got " + result.summary.isSubmarine + ")");
+})();
+
+console.log("\n-- submarine phases: correct phase names --");
+(function () {
+  var subBrief = "Submarine undersea cable system 3000 km with landing stations, " +
+    "repeater placement, cable ship deployment, seabed burial. " +
+    "Shore end at each country. 8 sites, 24 months.";
+
+  var result = B.analyzeProject(subBrief);
+  ok(result.summary.isSubmarine === true, "submarine mode detected for phase test");
+
+  var phaseNames = result.phases.map(function (p) { return p.name; });
+  ok(phaseNames.indexOf("Marine Installation") >= 0, "submarine plan has Marine Installation phase");
+  ok(phaseNames.indexOf("Shore-End & Landing") >= 0, "submarine plan has Shore-End & Landing phase");
+  ok(phaseNames.indexOf("Route Survey & Desktop Study") >= 0, "submarine plan has Route Survey phase");
+  ok(phaseNames.indexOf("System Commissioning") >= 0, "submarine plan has System Commissioning phase");
+  ok(phaseNames.indexOf("Cable Manufacturing & Factory Testing") >= 0, "submarine plan has Cable Manufacturing phase");
+  ok(result.phases.length === 10, "submarine plan has 10 phases (got " + result.phases.length + ")");
+})();
+
+console.log("\n-- submarine phases: NO terrestrial phases --");
+(function () {
+  var subBrief = "Submarine undersea cable with repeaters, seabed survey, cable ship, " +
+    "landing station, branching unit, 2000 km ocean route. 5 sites.";
+
+  var result = B.analyzeProject(subBrief);
+  ok(result.summary.isSubmarine === true, "submarine mode detected for exclusion test");
+
+  var allProblems = result.cases.map(function (c) { return c.problem; }).join(" ");
+  ok(allProblems.indexOf("Trenching, ducting, and HDD along planned route") < 0, "submarine plan does NOT have terrestrial trenching task");
+  ok(allProblems.indexOf("Micro-trenching in urban") < 0, "submarine plan does NOT have micro-trenching task");
+  ok(allProblems.indexOf("Road/pavement reinstatement") < 0, "submarine plan does NOT have road reinstatement");
+  ok(allProblems.indexOf("Fibre cable blowing/pulling") < 0, "submarine plan does NOT have cable blowing task");
+})();
+
+console.log("\n-- submarine costs: higher per km than terrestrial --");
+(function () {
+  var subBrief = "Submarine undersea cable system with repeaters, cable ship, seabed, " +
+    "landing station, branching unit, 1000 km ocean route. 8 sites.";
+  var terrBrief = "FTTH fibre optic trenching HDD duct network, 1000 km route, 8 sites, 10000 homes passed.";
+
+  var subResult = B.analyzeProject(subBrief);
+  var terrResult = B.analyzeProject(terrBrief);
+
+  ok(subResult.summary.isSubmarine === true, "submarine mode for cost comparison");
+  ok(terrResult.summary.isSubmarine === false, "terrestrial mode for cost comparison");
+
+  ok(subResult.budget.total > terrResult.budget.total, "submarine budget total (" + subResult.budget.total + ") > terrestrial budget total (" + terrResult.budget.total + ")");
+
+  // Check procurement values are significantly higher
+  var subProcTotal = subResult.procurement.reduce(function (s, p) { return s + (p.value || 0); }, 0);
+  var terrProcTotal = terrResult.procurement.reduce(function (s, p) { return s + (p.value || 0); }, 0);
+  ok(subProcTotal > terrProcTotal * 3, "submarine procurement (" + subProcTotal + ") is significantly higher than terrestrial (" + terrProcTotal + ")");
+})();
+
+console.log("\n-- submarine risks: mentions cable ship and anchor damage --");
+(function () {
+  var subBrief = "Submarine undersea cable system, 2000 km seabed route, " +
+    "repeater every 80 km, cable ship, landing station, branching unit, ocean.";
+
+  var result = B.analyzeProject(subBrief);
+  ok(result.summary.isSubmarine === true, "submarine mode for risk test");
+
+  var riskTexts = result.risks.map(function (r) { return r.problem; }).join(" ");
+  ok(riskTexts.indexOf("Cable ship") >= 0 || riskTexts.indexOf("cable ship") >= 0, "submarine risks mention cable ship");
+  ok(riskTexts.indexOf("Anchor damage") >= 0 || riskTexts.indexOf("anchor damage") >= 0 || riskTexts.indexOf("Anchor") >= 0, "submarine risks mention anchor damage");
+  ok(riskTexts.indexOf("weather") >= 0 || riskTexts.indexOf("Weather") >= 0, "submarine risks mention weather");
+  ok(riskTexts.indexOf("Fishing") >= 0 || riskTexts.indexOf("fishing") >= 0 || riskTexts.indexOf("trawler") >= 0, "submarine risks mention fishing/trawler");
+  ok(result.risks.length === 10, "submarine plan has 10 risks (got " + result.risks.length + ")");
+})();
+
+console.log("\n-- submarine procurement: submarine-specific items --");
+(function () {
+  var subBrief = "Submarine undersea cable, seabed route 1500 km, cable ship installation, " +
+    "landing station, branching unit, repeater, ocean deployment. 6 sites.";
+
+  var result = B.analyzeProject(subBrief);
+  ok(result.summary.isSubmarine === true, "submarine mode for procurement test");
+
+  var packages = result.procurement.map(function (p) { return p.package; }).join(" | ");
+  ok(packages.indexOf("Submarine cable") >= 0, "submarine procurement includes submarine cable");
+  ok(packages.indexOf("repeaters") >= 0 || packages.indexOf("Repeaters") >= 0 || packages.indexOf("amplifiers") >= 0, "submarine procurement includes repeaters/amplifiers");
+  ok(packages.indexOf("SLTE") >= 0, "submarine procurement includes SLTE");
+  ok(packages.indexOf("Cable ship") >= 0 || packages.indexOf("cable ship") >= 0, "submarine procurement includes cable ship charter");
+  ok(packages.indexOf("Shore-end") >= 0 || packages.indexOf("shore-end") >= 0, "submarine procurement includes shore-end cable");
+  ok(packages.indexOf("Spare cable") >= 0 || packages.indexOf("spare cable") >= 0, "submarine procurement includes spare cable depot");
+  ok(result.procurement.length === 10, "submarine plan has 10 procurement items (got " + result.procurement.length + ")");
+})();
+
+console.log("\n-- submarine: generic profile unaffected --");
+(function () {
+  var generic = B.analyzeProject("We want to reorganise the office filing system.");
+  ok(generic.summary.isSubmarine === false, "generic project has isSubmarine=false (got " + generic.summary.isSubmarine + ")");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);

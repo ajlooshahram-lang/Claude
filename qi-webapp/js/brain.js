@@ -111,6 +111,19 @@
       ["telecom", 2], ["broadband", 2], ["network", 1], ["cable", 1], ["closure", 1], ["pop", 1],
     ],
 
+    // ---- Submarine Detection Keywords (higher weight) ----------------------
+    submarineKeywords: [
+      ["submarine", 5], ["undersea", 5], ["under the sea", 5], ["seabed", 4], ["ocean", 3],
+      ["landing station", 4], ["cable ship", 4], ["repeater", 3], ["branching unit", 3], ["shore end", 3],
+    ],
+
+    // ---- Terrestrial Keywords (for scoring comparison) ----------------------
+    terrestrialKeywords: [
+      ["trenching", 3], ["trench", 3], ["hdd", 3], ["duct", 3], ["ducting", 3],
+      ["ftth", 3], ["homes passed", 3], ["last mile", 3], ["micro-trench", 3],
+      ["aerial", 2], ["pole", 2], ["road crossing", 2], ["pavement", 2], ["manhole", 2],
+    ],
+
     // ---- International Standards & Specifications Reference Library --------
     standards: [
       // ITU-T Telecommunications Standards
@@ -359,6 +372,132 @@
         { package: "Aerial materials (strand, lashing wire, pole hardware, clamps)", vendor: "TBD", value: round(km * 0.1 * 5500), poStatus: "Planned", owner: "Procurement Manager" },
         { package: "Labels, cable tags, and identification materials", vendor: "TBD", value: round(km * 80), poStatus: "Planned", owner: "Warehouse Manager" },
         { package: "Safety and PPE (laser safety goggles, arc flash protection, harnesses)", vendor: "TBD", value: 25000, poStatus: "Planned", owner: "HSE Officer" },
+      ];
+    },
+
+    // ---- Submarine-Specific Phase Templates --------------------------------
+    buildSubmarinePhases: function (scale) {
+      var km = scale.routeKm || 1000;
+      var sites = scale.sites || 8; // landing points
+
+      return [
+        // Phase 1: Route Survey & Desktop Study
+        { name: "Route Survey & Desktop Study", owner: "Survey Lead", tasks: [
+          { problem: "Bathymetric survey and seabed sampling along proposed route", costCat: "External / Consultant", estCost: round(km * 800), leanMethod: "Value Stream Mapping" },
+          { problem: "Cable route engineering and burial assessment", costCat: "External / Consultant", estCost: round(km * 500), leanMethod: "Standard Work" },
+          { problem: "Hazard identification: anchoring areas, fishing zones, seismic activity", costCat: "External / Consultant", estCost: round(km * 300), sev: 6 },
+          { problem: "Desktop study and existing cable/pipeline crossing analysis", costCat: "External / Consultant", estCost: 80000 },
+        ]},
+
+        // Phase 2: System Design & Engineering
+        { name: "System Design & Engineering", owner: "Design Manager", tasks: [
+          { problem: "Repeater spacing and optical amplifier design", costCat: "External / Consultant", estCost: round(km / 80 * 50000), sev: 5, leanMethod: "Standard Work" },
+          { problem: "Branching unit placement for multi-landing systems", costCat: "External / Consultant", estCost: round(sites * 25000) },
+          { problem: "Power feed equipment design and redundancy planning", costCat: "External / Consultant", estCost: 120000, sev: 5 },
+          { problem: "Cable type selection: lightweight/single-armour/double-armour by depth zone", costCat: "External / Consultant", estCost: 60000, leanMethod: "Standard Work" },
+          { problem: "Link budget per span and system capacity planning", costCat: "Tooling / Software", estCost: 80000, sev: 5, leanMethod: "Mistake-Proofing / Poka-Yoke" },
+        ]},
+
+        // Phase 3: Permitting & Landing Rights
+        { name: "Permitting & Landing Rights", owner: "Permitting & Wayleave Manager", tasks: [
+          { problem: "Submarine cable landing permits per country", costCat: "External / Consultant", estCost: round(sites * 150000), priority: "1-CRITICAL", sev: 8 },
+          { problem: "Maritime route approvals and navigation safety zones", costCat: "External / Consultant", estCost: round(sites * 80000), priority: "2-HIGH", sev: 6 },
+          { problem: "Environmental marine EIA for each jurisdiction", costCat: "External / Consultant", estCost: round(sites * 120000), priority: "2-HIGH", sev: 6 },
+          { problem: "Cable protection zone applications and gazette notifications", costCat: "External / Consultant", estCost: round(sites * 40000) },
+        ]},
+
+        // Phase 4: Procurement & Manufacturing
+        { name: "Procurement & Manufacturing", owner: "Procurement Manager", tasks: [
+          { problem: "Submarine cable manufacturing (12-18 months lead time)", costCat: "Materials", estCost: round(km * 35000), priority: "1-CRITICAL", sev: 7 },
+          { problem: "Repeaters and optical amplifiers procurement", costCat: "Materials", estCost: round(km / 80 * 500000), priority: "1-CRITICAL" },
+          { problem: "SLTE (submarine line terminal equipment) procurement", costCat: "Materials", estCost: round(sites * 5500000), priority: "2-HIGH" },
+          { problem: "Branching units procurement", costCat: "Materials", estCost: round(sites * 800000) },
+          { problem: "Cable ship charter for installation and burial", costCat: "External / Consultant", estCost: round(km / 50 * 225000), priority: "2-HIGH" },
+          { problem: "Shore-end materials and accessories", costCat: "Materials", estCost: round(sites * 3500000) },
+        ]},
+
+        // Phase 5: Cable Manufacturing & Factory Testing
+        { name: "Cable Manufacturing & Factory Testing", owner: "QA/QC Manager", tasks: [
+          { problem: "Cable manufacture at turnkey supplier facility", costCat: "External / Consultant", estCost: round(km * 5000), sev: 5 },
+          { problem: "Factory acceptance testing (FAT) for cable and repeaters", costCat: "External / Consultant", estCost: 250000, sev: 6, leanMethod: "Mistake-Proofing / Poka-Yoke" },
+          { problem: "Repeater integration and system testing at factory", costCat: "External / Consultant", estCost: 180000, sev: 5 },
+          { problem: "Cable loading onto cable ship", costCat: "External / Consultant", estCost: 150000 },
+        ]},
+
+        // Phase 6: Marine Installation
+        { name: "Marine Installation", owner: "Cable Installation Supervisor", tasks: [
+          { problem: "Cable ship mobilization and transit to route", costCat: "External / Consultant", estCost: round(km / 50 * 225000), priority: "2-HIGH" },
+          { problem: "Cable lay operations along surveyed route", costCat: "External / Consultant", estCost: round(km * 20000), priority: "1-CRITICAL", sev: 6 },
+          { problem: "Cable burial: plough/jet trencher for shallow sections, surface-lay for deep water", costCat: "External / Consultant", estCost: round(km * 0.4 * 15000), sev: 5 },
+          { problem: "Shore-end pull-in operations at each landing", costCat: "External / Consultant", estCost: round(sites * 500000), sev: 6 },
+          { problem: "Joint operations for cable segments", costCat: "External / Consultant", estCost: round(km / 200 * 150000) },
+        ]},
+
+        // Phase 7: Shore-End & Landing
+        { name: "Shore-End & Landing", owner: "Civil Works Manager", tasks: [
+          { problem: "Beach manhole construction at each landing site", costCat: "External / Consultant", estCost: round(sites * 350000) },
+          { problem: "Horizontal directional drilling (HDD) at landing sites", costCat: "External / Consultant", estCost: round(sites * 600000), sev: 5 },
+          { problem: "Shore-end cable pull from beach manhole to cable ship", costCat: "External / Consultant", estCost: round(sites * 400000) },
+          { problem: "Cable landing station fit-out and equipment installation", costCat: "Materials", estCost: round(sites * 2000000), priority: "2-HIGH" },
+        ]},
+
+        // Phase 8: System Commissioning
+        { name: "System Commissioning", owner: "Test & Commissioning Lead", tasks: [
+          { problem: "End-to-end optical testing across all spans", costCat: "Tooling / Software", estCost: 200000, sev: 6, leanMethod: "Mistake-Proofing / Poka-Yoke" },
+          { problem: "SLTE commissioning at each terminal station", costCat: "Tooling / Software", estCost: round(sites * 80000), sev: 6 },
+          { problem: "BER testing and system margin verification", costCat: "Tooling / Software", estCost: 150000, sev: 6, leanMethod: "Mistake-Proofing / Poka-Yoke" },
+          { problem: "Wavelength provisioning and capacity allocation", costCat: "Tooling / Software", estCost: 100000, sev: 5 },
+        ]},
+
+        // Phase 9: Documentation & Handover
+        { name: "Documentation & Handover", owner: "GIS/Documentation Specialist", tasks: [
+          { problem: "As-laid cable route chart (RPL - Route Position List)", costCat: "Tooling / Software", estCost: round(km * 50) },
+          { problem: "System acceptance documentation and test certificates", costCat: "Labour / Effort", estCost: 80000 },
+          { problem: "O&M documentation and maintenance procedures", costCat: "Labour / Effort", estCost: 60000 },
+          { problem: "Spare cable and repair inventory documentation", costCat: "Labour / Effort", estCost: 30000 },
+        ]},
+
+        // Phase 10: Network Operations & Maintenance
+        { name: "Network Operations & Maintenance", owner: "NOC Manager", tasks: [
+          { problem: "24/7 NOC monitoring system setup and staffing", costCat: "Tooling / Software", estCost: 350000 },
+          { problem: "Cable repair contracts with vessel operators", costCat: "External / Consultant", estCost: 500000, priority: "2-HIGH" },
+          { problem: "Spare cable depot establishment for future repairs", costCat: "Materials", estCost: round(km * 0.05 * 35000) },
+          { problem: "Marine maintenance agreements and annual surveys", costCat: "External / Consultant", estCost: 200000 },
+        ]},
+      ];
+    },
+
+    // ---- Submarine-Specific Risks ------------------------------------------
+    buildSubmarineRisks: function (text, scale) {
+      return [
+        { problem: "RISK: Cable ship availability/scheduling delays during peak season", category: "Delivery / Schedule", sev: 8, occ: 6, det: 5, priority: "1-CRITICAL", rootCause: "Limited global fleet of cable ships; high demand from offshore wind and submarine telecom" },
+        { problem: "RISK: Adverse weather window closure during marine installation", category: "Delivery / Schedule", sev: 7, occ: 7, det: 3, priority: "1-CRITICAL", rootCause: "Monsoon seasons, typhoon belts, and sea state limitations for cable operations" },
+        { problem: "RISK: Anchor damage from shipping lanes crossing cable route", category: "Quality / Defects", sev: 9, occ: 5, det: 6, priority: "1-CRITICAL", rootCause: "Heavy vessel traffic in shallow water sections; inadequate cable burial depth or protection" },
+        { problem: "RISK: Fishing trawler snag in shallow water sections", category: "Quality / Defects", sev: 8, occ: 6, det: 5, priority: "2-HIGH", rootCause: "Intensive fishing activity in continental shelf waters; cable exposure due to seabed mobility" },
+        { problem: "RISK: Seismic/volcanic activity damaging deployed cable", category: "Quality / Defects", sev: 9, occ: 4, det: 7, priority: "2-HIGH", rootCause: "Pacific Ring of Fire location; submarine landslides triggered by earthquakes" },
+        { problem: "RISK: Manufacturing defect requiring cable recall or at-sea repair", category: "Quality / Defects", sev: 8, occ: 3, det: 5, priority: "2-HIGH", rootCause: "Complex manufacturing process; insulation failures or fibre defects found during FAT or installation" },
+        { problem: "RISK: Geopolitical route restrictions through territorial waters disputes", category: "Process / Flow", sev: 7, occ: 5, det: 5, priority: "2-HIGH", rootCause: "South China Sea disputes; overlapping maritime claims; political tensions affecting cable routing" },
+        { problem: "RISK: Deep-water cable repair complexity at depths exceeding 1000m", category: "Delivery / Schedule", sev: 8, occ: 4, det: 6, priority: "2-HIGH", rootCause: "Specialized equipment needed for deep-water grapnel and repair; limited repair vessel availability" },
+        { problem: "RISK: Power feed failure in long repeatered systems", category: "Quality / Defects", sev: 9, occ: 3, det: 5, priority: "2-HIGH", rootCause: "High-voltage DC power feed over thousands of km; shunt faults and repeater power issues" },
+        { problem: "RISK: Shore-end erosion/instability at landing beaches", category: "Quality / Defects", sev: 7, occ: 5, det: 4, priority: "2-HIGH", rootCause: "Coastal erosion, storm surge, sedimentation changes, and beach profile instability over cable lifetime" },
+      ];
+    },
+
+    // ---- Submarine-Specific Procurement ------------------------------------
+    buildSubmarineProcurement: function (scale) {
+      var km = scale.routeKm || 1000;
+      var sites = scale.sites || 8;
+      return [
+        { package: "Submarine cable (lightweight deep-water + armoured shallow)", vendor: "TBD", value: round(km * 35000), poStatus: "RFQ", owner: "Procurement Manager" },
+        { package: "Optical repeaters/amplifiers (EDFA)", vendor: "TBD", value: round(km / 80 * 500000), poStatus: "RFQ", owner: "Procurement Manager" },
+        { package: "Branching units (for multi-landing systems)", vendor: "TBD", value: round(sites * 800000), poStatus: "RFQ", owner: "Procurement Manager" },
+        { package: "Power Feed Equipment (PFE)", vendor: "TBD", value: round(sites * 2000000), poStatus: "RFQ", owner: "Procurement Manager" },
+        { package: "SLTE (submarine line terminal equipment)", vendor: "TBD", value: round(sites * 5500000), poStatus: "RFQ", owner: "Procurement Manager" },
+        { package: "Cable ship charter (installation + burial)", vendor: "TBD", value: round(km / 50 * 225000), poStatus: "RFQ", owner: "Procurement Manager" },
+        { package: "Shore-end cable and accessories", vendor: "TBD", value: round(sites * 3500000), poStatus: "RFQ", owner: "Procurement Manager" },
+        { package: "Cable route survey vessel charter", vendor: "TBD", value: round(km * 800), poStatus: "RFQ", owner: "Survey Lead" },
+        { package: "Spare cable depot stock (for future repairs)", vendor: "TBD", value: round(km * 0.05 * 35000), poStatus: "Planned", owner: "NOC Manager" },
+        { package: "Marine route markers/cable protection", vendor: "TBD", value: round(km * 0.3 * 5000), poStatus: "Planned", owner: "Procurement Manager" },
       ];
     },
 
@@ -754,22 +893,47 @@
    * @param {string} text - the project description (stays local).
    * @param {object} [opts] - { profile?: "fibre-telecom"|"generic-pm" }
    */
+  // Detect whether a project is submarine or terrestrial.
+  function detectSubmarine(text, profile) {
+    if (!profile.submarineKeywords || !profile.terrestrialKeywords) return false;
+    var subScore = scoreKeywords(text, profile.submarineKeywords);
+    var terrScore = scoreKeywords(text, profile.terrestrialKeywords);
+    return subScore.score > terrScore.score;
+  }
+
   function analyzeProject(text, opts) {
     opts = opts || {};
     var picked = pickProfile(text, opts.profile);
     var profile = picked.profile;
     var scale = extractScale(text);
 
-    var phases = profile.buildPhases(scale);
+    // Submarine detection for fibre-telecom profile
+    var isSubmarine = false;
+    if (profile.id === "fibre-telecom") {
+      isSubmarine = detectSubmarine(text, profile);
+    }
+
+    var phases;
+    var procurement;
+    var riskList;
+    if (isSubmarine && profile.buildSubmarinePhases) {
+      phases = profile.buildSubmarinePhases(scale);
+      riskList = profile.buildSubmarineRisks(text, scale);
+      procurement = profile.buildSubmarineProcurement(scale);
+    } else {
+      phases = profile.buildPhases(scale);
+      riskList = profile.buildRisks(text, scale);
+      procurement = profile.buildProcurement(scale);
+    }
+
     var cases = [];
     phases.forEach(function (ph) {
       (ph.tasks || []).forEach(function (t) {
         cases.push(mkCase(Object.assign({}, t, { owner: t.owner || ph.owner, _phase: ph.name, _brain: "task" })));
       });
     });
-    var risks = (profile.buildRisks(text, scale) || []).map(function (r) { return mkCase(Object.assign({}, r, { leanMethod: r.leanMethod || "FMEA", _brain: "risk" })); });
+    var risks = (riskList || []).map(function (r) { return mkCase(Object.assign({}, r, { leanMethod: r.leanMethod || "FMEA", _brain: "risk" })); });
     var milestones = buildMilestones(phases, scale);
-    var procurement = profile.buildProcurement(scale);
     var budget = aggregateBudget(cases.concat(risks), procurement);
 
     // ---- Country detection ------------------------------------------------
@@ -810,6 +974,7 @@
         domain: profile.id,
         domainLabel: profile.label,
         scale: scale,
+        isSubmarine: isSubmarine,
       },
       phases: phases.map(function (p) { return { name: p.name, owner: p.owner, taskCount: (p.tasks || []).length }; }),
       cases: cases,
