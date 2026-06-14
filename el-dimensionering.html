@@ -923,7 +923,9 @@ const T = {
       pfc: '\uD83D\uDD0B Fasekompensering',
       energy: '\uD83D\uDCB0 Energi',
       panel: '\uD83D\uDDC4\uFE0F El-tavle',
-      exam: '\uD83C\uDF93 Eksamen'
+      exam: '\uD83C\uDF93 Eksamen',
+      zones: '\uD83D\uDEBF Zoner/IP',
+      earth: '\uD83C\uDF0D Jording'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1035,7 +1037,9 @@ const T = {
       pfc: '\uD83D\uDD0B Power Factor',
       energy: '\uD83D\uDCB0 Energy',
       panel: '\uD83D\uDDC4\uFE0F Switchboard',
-      exam: '\uD83C\uDF93 Exam'
+      exam: '\uD83C\uDF93 Exam',
+      zones: '\uD83D\uDEBF Zones/IP',
+      earth: '\uD83C\uDF0D Earthing'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -2213,6 +2217,10 @@ let pfcState = { cosCurrent: 0.85, cosTarget: 0.95, power: 100, compType: 'fixed
 let energyState = { profile: 8760, price: 2.5, power: 100, priceIncrease: 3 };
 // Panel / Switchboard state
 let panelState = { category: 'hovedtavle', mounting: 'flush', ip: 'IP30', material: 'steel', rows: 4, modulesPerRow: 24, mainRating: 63, mainType: 'loadbreak', busbar: 'pin', busbarCurrent: 100, surge: 'none', mainRcd: 'none' };
+// Zones/IP state
+let zonesState = { location: 'bathroom', zone: null, equipment: null };
+// Earthing & Bonding state
+let earthState = { system: 'TN-S', mainEarth: 10, largestPhase: 10, bondingType: 'main', services: { water: false, gas: false, heating: false, ventilation: false, reinforcement: false } };
 // Short circuit state
 let scState = { zNet: 1, zTrafo: 5 };
 // Standards state
@@ -2353,6 +2361,8 @@ function renderModule(mod) {
     case 'pfc': content += renderPfc(); break;
     case 'energy': content += renderEnergy(); break;
     case 'panel': content += renderPanel(); break;
+    case 'zones': content += renderZones(); break;
+    case 'earth': content += renderEarth(); break;
     case 'exam': content = renderExam(); break;
   }
   // Append AI assistant to every module
@@ -15590,6 +15600,500 @@ function panelDownloadBOM() {
   a.download = 'panel_bom_' + s.category + '.csv';
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// ===== IP RATING & ZONE SELECTOR - DS/HD 60364-7-701/702/703 =====
+function renderZones() {
+  var da = lang === 'da';
+  var s = zonesState;
+
+  var LOCATIONS = [
+    { id: 'bathroom', da: 'Badev\u00E6relse', en: 'Bathroom' },
+    { id: 'shower', da: 'Bruser', en: 'Shower room' },
+    { id: 'outdoor', da: 'Udend\u00F8rs', en: 'Outdoor' },
+    { id: 'pool', da: 'Sv\u00F8mmehal', en: 'Swimming pool' },
+    { id: 'sauna', da: 'Sauna', en: 'Sauna' },
+    { id: 'basement', da: 'K\u00E6lder', en: 'Basement' },
+    { id: 'wetroom', da: 'V\u00E5drum generelt', en: 'Wet room' }
+  ];
+
+  var ZONES = [
+    { id: 'zone0', da: 'Zone 0', en: 'Zone 0' },
+    { id: 'zone1', da: 'Zone 1', en: 'Zone 1' },
+    { id: 'zone2', da: 'Zone 2', en: 'Zone 2' },
+    { id: 'outside', da: 'Uden for zoner', en: 'Outside zones' }
+  ];
+
+  var EQUIPMENT = [
+    { id: 'socket', da: 'Stikkontakt', en: 'Socket' },
+    { id: 'luminaire', da: 'Belysning', en: 'Luminaire' },
+    { id: 'switch', da: 'Kontakt', en: 'Switch' },
+    { id: 'heater', da: 'Varmeapparat', en: 'Heater' },
+    { id: 'fan', da: 'Ventilator', en: 'Fan' },
+    { id: 'evcharger', da: 'EV-lader', en: 'EV charger' }
+  ];
+
+  // Determine if zones apply
+  var showZones = (s.location === 'bathroom' || s.location === 'shower');
+
+  // Zone logic per DS/HD 60364-7-701
+  var ipRequired = '';
+  var allowed = true;
+  var verdict = '';
+  var rcdType = '';
+  var selvLimit = '';
+  var clause = '';
+  var notes = '';
+
+  if (s.location && s.equipment) {
+    if (s.location === 'bathroom' || s.location === 'shower') {
+      clause = 'DS/HD 60364-7-701';
+      if (s.zone === 'zone0') {
+        ipRequired = 'IPX7';
+        selvLimit = da ? 'Maks. 12V AC SELV' : 'Max. 12V AC SELV';
+        rcdType = da ? 'SELV forsyning (12V maks.)' : 'SELV supply (12V max.)';
+        if (s.equipment === 'socket' || s.equipment === 'switch' || s.equipment === 'heater' || s.equipment === 'fan' || s.equipment === 'evcharger') {
+          allowed = false;
+          verdict = da ? 'IKKE TILLADT i Zone 0' : 'NOT ALLOWED in Zone 0';
+        } else if (s.equipment === 'luminaire') {
+          allowed = true;
+          verdict = da ? 'Kun SELV 12V armaturer (IPX7)' : 'Only SELV 12V luminaires (IPX7)';
+        } else {
+          allowed = false;
+          verdict = da ? 'IKKE TILLADT i Zone 0' : 'NOT ALLOWED in Zone 0';
+        }
+      } else if (s.zone === 'zone1') {
+        ipRequired = 'IPX4 (IPX5 ved jets)';
+        rcdType = da ? '30 mA RCD (Type A eller B)' : '30 mA RCD (Type A or B)';
+        selvLimit = '';
+        if (s.equipment === 'socket') {
+          allowed = false;
+          verdict = da ? 'IKKE TILLADT - Ingen stikkontakter i Zone 1' : 'NOT ALLOWED - No sockets in Zone 1';
+        } else if (s.equipment === 'evcharger') {
+          allowed = false;
+          verdict = da ? 'IKKE TILLADT - Ingen EV-ladere i Zone 1' : 'NOT ALLOWED - No EV chargers in Zone 1';
+        } else if (s.equipment === 'switch') {
+          allowed = false;
+          verdict = da ? 'IKKE TILLADT - Kun fastmonteret udstyr' : 'NOT ALLOWED - Fixed equipment only';
+        } else {
+          allowed = true;
+          verdict = da ? 'Tilladt - Fastmonteret udstyr med IPX4' : 'Allowed - Fixed equipment with IPX4';
+          notes = da ? 'IPX5 kr\u00E6ves ved brusejets' : 'IPX5 required if shower jets present';
+        }
+      } else if (s.zone === 'zone2') {
+        ipRequired = 'IPX4';
+        rcdType = da ? '30 mA RCD (Type A)' : '30 mA RCD (Type A)';
+        selvLimit = '';
+        if (s.equipment === 'socket') {
+          allowed = true;
+          verdict = da ? 'Tilladt KUN med individuel 30mA RCD + skilletransformator' : 'Allowed ONLY with individual 30mA RCD + isolation transformer';
+          rcdType = da ? 'Individuel 30 mA RCD + skilletransformator' : 'Individual 30 mA RCD + isolation transformer';
+          notes = da ? 'Stikkontakt skal v\u00E6re mindst 0,6m fra badekarkant' : 'Socket must be at least 0.6m from bath edge';
+        } else if (s.equipment === 'evcharger') {
+          allowed = false;
+          verdict = da ? 'IKKE TILLADT i Zone 2' : 'NOT ALLOWED in Zone 2';
+        } else {
+          allowed = true;
+          verdict = da ? 'Tilladt - Fastmonteret udstyr med IPX4' : 'Allowed - Fixed equipment with IPX4';
+        }
+      } else if (s.zone === 'outside') {
+        ipRequired = da ? 'Ingen zone-krav (min. IP20)' : 'No zone requirement (min. IP20)';
+        rcdType = da ? '30 mA RCD for alle badev\u00E6relseskredsekl\u00F8b' : '30 mA RCD for all bathroom circuits';
+        allowed = true;
+        verdict = da ? 'Tilladt - Standardkrav g\u00E6lder, men 30mA RCD er p\u00E5kr\u00E6vet' : 'Allowed - Standard requirements apply, but 30mA RCD required';
+      }
+    } else if (s.location === 'pool') {
+      clause = 'DS/HD 60364-7-702';
+      ipRequired = 'IPX5';
+      rcdType = da ? '30 mA RCD (Type A)' : '30 mA RCD (Type A)';
+      if (s.equipment === 'socket') {
+        allowed = false;
+        verdict = da ? 'IKKE TILLADT i sv\u00F8mmehal bassinomr\u00E5de' : 'NOT ALLOWED in pool basin area';
+      } else if (s.equipment === 'evcharger') {
+        allowed = false;
+        verdict = da ? 'IKKE TILLADT i sv\u00F8mmehal' : 'NOT ALLOWED in swimming pool';
+      } else {
+        allowed = true;
+        verdict = da ? 'Tilladt - IPX5 kr\u00E6ves, SELV foretr\u00E6kkes' : 'Allowed - IPX5 required, SELV preferred';
+        selvLimit = da ? 'SELV 12V foretr\u00E6kkes' : 'SELV 12V preferred';
+      }
+    } else if (s.location === 'sauna') {
+      clause = 'DS/HD 60364-7-703';
+      ipRequired = 'IP24 (min.)';
+      rcdType = da ? '30 mA RCD (Type A)' : '30 mA RCD (Type A)';
+      if (s.equipment === 'socket' || s.equipment === 'evcharger') {
+        allowed = false;
+        verdict = da ? 'IKKE TILLADT i sauna' : 'NOT ALLOWED in sauna';
+      } else if (s.equipment === 'heater') {
+        allowed = true;
+        verdict = da ? 'Tilladt - Saunaovn med varmebeskyttelse' : 'Allowed - Sauna heater with thermal protection';
+        ipRequired = 'IP24';
+      } else if (s.equipment === 'luminaire') {
+        allowed = true;
+        verdict = da ? 'Tilladt - Varmebestandigt armatur kr\u00E6ves' : 'Allowed - Heat-resistant luminaire required';
+        ipRequired = 'IP24, varmebestandigt';
+      } else {
+        allowed = true;
+        verdict = da ? 'Tilladt med begr\u00E6nsninger' : 'Allowed with restrictions';
+      }
+    } else if (s.location === 'outdoor') {
+      clause = 'DS/HD 60364-7-714';
+      ipRequired = da ? 'IP44 (min.), IP55/IP65 for eksponerede' : 'IP44 (min.), IP55/IP65 for exposed';
+      rcdType = da ? '30 mA RCD (Type A)' : '30 mA RCD (Type A)';
+      allowed = true;
+      if (s.equipment === 'socket') {
+        verdict = da ? 'Tilladt - IP44 min., med 30mA RCD og l\u00E5g' : 'Allowed - IP44 min., with 30mA RCD and lid';
+        ipRequired = 'IP44 (IP55 anbefalet)';
+      } else if (s.equipment === 'evcharger') {
+        verdict = da ? 'Tilladt - IP55 min., dedikeret 30mA Type B RCD' : 'Allowed - IP55 min., dedicated 30mA Type B RCD';
+        ipRequired = 'IP55 (min.)';
+        rcdType = da ? '30 mA RCD Type B (DC-fejlstr\u00F8msbeskyttelse)' : '30 mA RCD Type B (DC fault current protection)';
+      } else if (s.equipment === 'luminaire') {
+        verdict = da ? 'Tilladt - IP55 for v\u00E6gmonteret, IP65 for jordniveau' : 'Allowed - IP55 for wall-mounted, IP65 for ground level';
+        ipRequired = 'IP55 / IP65';
+      } else {
+        verdict = da ? 'Tilladt med korrekt IP-klassificering' : 'Allowed with correct IP rating';
+      }
+    } else if (s.location === 'basement') {
+      clause = 'DS/HD 60364-7-701 (analogi)';
+      ipRequired = da ? 'IP44 (ved fugt)' : 'IP44 (if damp)';
+      rcdType = da ? '30 mA RCD anbefalet' : '30 mA RCD recommended';
+      allowed = true;
+      verdict = da ? 'Tilladt - IP44 anbefales ved fugtrisiko' : 'Allowed - IP44 recommended if moisture risk';
+    } else if (s.location === 'wetroom') {
+      clause = 'DS/HD 60364-7-701';
+      ipRequired = 'IPX4 (min.)';
+      rcdType = da ? '30 mA RCD p\u00E5kr\u00E6vet' : '30 mA RCD required';
+      if (s.equipment === 'socket') {
+        allowed = true;
+        verdict = da ? 'Tilladt - Kun med individuel 30mA RCD' : 'Allowed - Only with individual 30mA RCD';
+      } else {
+        allowed = true;
+        verdict = da ? 'Tilladt med IPX4 og 30mA RCD' : 'Allowed with IPX4 and 30mA RCD';
+      }
+    }
+  }
+
+  // Build HTML
+  var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDEBF ' + (da ? 'IP-Klassificering & Zonev\u00E6lger' : 'IP Rating & Zone Selector') + ' - DS/HD 60364-7-701/702/703</div>';
+
+  // Location type
+  html += '<div class="select-group"><div class="select-label">\uD83C\uDFE0 ' + (da ? 'Placering' : 'Location') + '</div><div class="select-grid">';
+  LOCATIONS.forEach(function(loc) {
+    html += '<button class="sel-btn ' + (s.location === loc.id ? 'selected' : '') + '" onclick="zonesState.location=\'' + loc.id + '\';zonesState.zone=null;zonesState.equipment=null;renderModule(\'zones\')">' + (da ? loc.da : loc.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Zone selection (only for bathroom/shower)
+  if (showZones) {
+    html += '<div class="select-group"><div class="select-label">\uD83D\uDEBF ' + (da ? 'Zone' : 'Zone') + '</div><div class="select-grid">';
+    ZONES.forEach(function(z) {
+      html += '<button class="sel-btn ' + (s.zone === z.id ? 'selected' : '') + '" onclick="zonesState.zone=\'' + z.id + '\';renderModule(\'zones\')">' + (da ? z.da : z.en) + '</button>';
+    });
+    html += '</div></div>';
+  }
+
+  // Equipment type
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD0C ' + (da ? 'Udstyr' : 'Equipment') + '</div><div class="select-grid">';
+  EQUIPMENT.forEach(function(eq) {
+    html += '<button class="sel-btn ' + (s.equipment === eq.id ? 'selected' : '') + '" onclick="zonesState.equipment=\'' + eq.id + '\';renderModule(\'zones\')">' + (da ? eq.da : eq.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '</div>';
+
+  // Animated SVG: Bathroom cross-section
+  if (showZones) {
+    html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCCF ' + (da ? 'Zonediagram (tv\u00E6rsnit)' : 'Zone Diagram (cross-section)') + '</div>';
+    html += '<div style="text-align:center;padding:10px;overflow-x:auto;">';
+    html += buildZoneSvg(da, s.zone);
+    html += '</div></div>';
+  }
+
+  // Results
+  if (s.location && s.equipment && (!showZones || s.zone)) {
+    var statusClass = allowed ? 'success' : 'error';
+    html += '<div class="card fade-in"><div class="card-title">\u2705 ' + (da ? 'Resultat' : 'Result') + '</div>';
+    html += '<div class="result-box ' + statusClass + '">';
+    html += '<div class="result-title">' + (allowed ? (da ? 'TILLADT' : 'ALLOWED') : (da ? 'IKKE TILLADT' : 'NOT ALLOWED')) + '</div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Vurdering' : 'Verdict') + '</span><span class="value">' + verdict + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Kr\u00E6vet IP' : 'Required IP') + '</span><span class="value">' + ipRequired + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'RCD-krav' : 'RCD requirement') + '</span><span class="value">' + rcdType + '</span></div>';
+    if (selvLimit) {
+      html += '<div class="result-row"><span class="label">' + (da ? 'SELV-gr\u00E6nse' : 'SELV limit') + '</span><span class="value">' + selvLimit + '</span></div>';
+    }
+    if (notes) {
+      html += '<div class="result-row"><span class="label">' + (da ? 'Bem\u00E6rkning' : 'Note') + '</span><span class="value">' + notes + '</span></div>';
+    }
+    html += '<div class="result-row"><span class="label">' + (da ? 'Henvisning' : 'Reference') + '</span><span class="value">' + clause + '</span></div>';
+    html += '</div></div>';
+  }
+
+  return html;
+}
+
+function buildZoneSvg(da, activeZone) {
+  // Bathroom cross-section: Zone 0 (inside bath), Zone 1 (0.6m from bath, 2.25m high), Zone 2 (0.6m beyond Zone 1)
+  var z0fill = activeZone === 'zone0' ? 'rgba(255,50,50,0.35)' : 'rgba(255,50,50,0.12)';
+  var z1fill = activeZone === 'zone1' ? 'rgba(255,165,0,0.35)' : 'rgba(255,165,0,0.12)';
+  var z2fill = activeZone === 'zone2' ? 'rgba(255,255,0,0.35)' : 'rgba(255,255,0,0.12)';
+  var outfill = activeZone === 'outside' ? 'rgba(50,200,50,0.25)' : 'rgba(50,200,50,0.06)';
+
+  var svg = '<svg viewBox="0 0 500 320" style="max-width:500px;width:100%;height:auto;font-family:inherit;">';
+  // Background
+  svg += '<rect x="0" y="0" width="500" height="320" fill="var(--card, #1e1e2e)" rx="8"/>';
+  // Floor
+  svg += '<rect x="20" y="260" width="460" height="4" fill="#888"/>';
+  // Ceiling at 2.25m (scaled: floor=260, ceiling=35 => 225px for 2.25m)
+  svg += '<line x1="20" y1="35" x2="480" y2="35" stroke="#666" stroke-dasharray="4,4"/>';
+  svg += '<text x="485" y="38" fill="#aaa" font-size="9" text-anchor="end">2,25m</text>';
+  // Bathtub (located center-left)
+  svg += '<rect x="80" y="210" width="120" height="50" rx="10" fill="none" stroke="#4fc3f7" stroke-width="2"/>';
+  svg += '<text x="140" y="240" fill="#4fc3f7" font-size="10" text-anchor="middle">' + (da ? 'Badekar' : 'Bathtub') + '</text>';
+  // Water line in bathtub
+  svg += '<rect x="85" y="235" width="110" height="20" rx="5" fill="rgba(79,195,247,0.15)"/>';
+
+  // Zone 0: inside bathtub
+  svg += '<rect x="80" y="210" width="120" height="50" rx="10" fill="' + z0fill + '"/>';
+  svg += '<text x="140" y="280" fill="#ff5252" font-size="9" text-anchor="middle" font-weight="600">Zone 0</text>';
+
+  // Zone 1: 0.6m around bath up to 2.25m (bath edge to 0.6m out)
+  svg += '<rect x="40" y="35" width="200" height="225" fill="' + z1fill + '" opacity="0.7"/>';
+  svg += '<text x="55" y="55" fill="#ff9800" font-size="9" font-weight="600">Zone 1</text>';
+  // 0.6m dimension line
+  svg += '<line x1="200" y1="260" x2="240" y2="260" stroke="#ff9800" stroke-width="1.5"/>';
+  svg += '<text x="220" y="275" fill="#ff9800" font-size="8" text-anchor="middle">0,6m</text>';
+
+  // Zone 2: 0.6m beyond Zone 1
+  svg += '<rect x="240" y="35" width="60" height="225" fill="' + z2fill + '" opacity="0.7"/>';
+  svg += '<text x="270" y="55" fill="#fdd835" font-size="9" font-weight="600">Zone 2</text>';
+  // 0.6m dimension
+  svg += '<line x1="240" y1="270" x2="300" y2="270" stroke="#fdd835" stroke-width="1.5"/>';
+  svg += '<text x="270" y="285" fill="#fdd835" font-size="8" text-anchor="middle">0,6m</text>';
+
+  // Outside zones
+  svg += '<rect x="300" y="35" width="180" height="225" fill="' + outfill + '" opacity="0.7"/>';
+  svg += '<text x="390" y="55" fill="#66bb6a" font-size="9" font-weight="600">' + (da ? 'Uden for zoner' : 'Outside zones') + '</text>';
+
+  // Shower head (animated water drops)
+  svg += '<circle cx="140" cy="50" r="8" fill="none" stroke="#4fc3f7" stroke-width="1.5"/>';
+  svg += '<line x1="140" y1="58" x2="140" y2="75" stroke="#4fc3f7" stroke-width="1"/>';
+  // Animated water particles
+  svg += '<circle cx="135" cy="80" r="1.5" fill="#4fc3f7"><animate attributeName="cy" values="75;200" dur="1.8s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0" dur="1.8s" repeatCount="indefinite"/></circle>';
+  svg += '<circle cx="140" cy="85" r="1.5" fill="#4fc3f7"><animate attributeName="cy" values="75;200" dur="2s" repeatCount="indefinite" begin="0.3s"/><animate attributeName="opacity" values="1;0" dur="2s" repeatCount="indefinite" begin="0.3s"/></circle>';
+  svg += '<circle cx="145" cy="78" r="1.5" fill="#4fc3f7"><animate attributeName="cy" values="75;200" dur="1.6s" repeatCount="indefinite" begin="0.6s"/><animate attributeName="opacity" values="1;0" dur="1.6s" repeatCount="indefinite" begin="0.6s"/></circle>';
+
+  // Height dimension (left)
+  svg += '<line x1="25" y1="35" x2="25" y2="260" stroke="#aaa" stroke-width="0.5" stroke-dasharray="2,2"/>';
+  svg += '<text x="15" y="150" fill="#aaa" font-size="8" text-anchor="middle" transform="rotate(-90,15,150)">2,25m</text>';
+
+  // Legend
+  svg += '<rect x="320" y="270" width="12" height="12" fill="rgba(255,50,50,0.3)" rx="2"/>';
+  svg += '<text x="336" y="280" fill="#aaa" font-size="8">Zone 0 (IPX7)</text>';
+  svg += '<rect x="320" y="286" width="12" height="12" fill="rgba(255,165,0,0.3)" rx="2"/>';
+  svg += '<text x="336" y="296" fill="#aaa" font-size="8">Zone 1 (IPX4/5)</text>';
+  svg += '<rect x="400" y="270" width="12" height="12" fill="rgba(255,255,0,0.3)" rx="2"/>';
+  svg += '<text x="416" y="280" fill="#aaa" font-size="8">Zone 2 (IPX4)</text>';
+  svg += '<rect x="400" y="286" width="12" height="12" fill="rgba(50,200,50,0.2)" rx="2"/>';
+  svg += '<text x="416" y="296" fill="#aaa" font-size="8">' + (da ? 'Udenfor' : 'Outside') + '</text>';
+
+  svg += '</svg>';
+  return svg;
+}
+
+// ===== EARTHING & BONDING CALCULATOR - DS/HD 60364-5-54 =====
+function renderEarth() {
+  var da = lang === 'da';
+  var s = earthState;
+
+  var SYSTEMS = ['TN-S', 'TN-C-S', 'TT'];
+  var MAIN_EARTH_SIZES = [6, 10, 16, 25, 35, 50];
+  var PHASE_SIZES = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240];
+  var BONDING_TYPES = [
+    { id: 'main', da: 'Hovedudligning', en: 'Main bonding' },
+    { id: 'supplementary', da: 'Supplerende', en: 'Supplementary' }
+  ];
+  var SERVICES = [
+    { id: 'water', da: 'Vand (metal)', en: 'Water (metal)' },
+    { id: 'gas', da: 'Gas', en: 'Gas' },
+    { id: 'heating', da: 'Varme', en: 'Heating' },
+    { id: 'ventilation', da: 'Ventilation', en: 'Ventilation' },
+    { id: 'reinforcement', da: 'Armering', en: 'Reinforcement' }
+  ];
+
+  // Calculations per DS/HD 60364-5-54
+  var phase = s.largestPhase;
+  var peMin;
+  if (phase <= 16) {
+    peMin = phase;
+  } else if (phase <= 35) {
+    peMin = 16;
+  } else {
+    peMin = Math.ceil(phase / 2);
+  }
+
+  // Main bonding conductor: half the largest PE, minimum 6mm2 Cu
+  var mainBondMin = Math.max(Math.ceil(peMin / 2), 6);
+
+  // Supplementary bonding: 2.5mm2 (mechanically protected) or 4mm2
+  var suppBondMin = 4; // conservative: not mechanically protected
+  var suppBondProtected = 2.5;
+
+  // Earth electrode resistance for TT: Ra <= 50V / IDn (assume 30mA RCD)
+  var idn = 0.03; // 30mA RCD
+  var raMax = Math.floor(50 / idn); // 1666 ohm
+  var raNote = da ? 'Ra \u2264 50V / I\u0394n = 50 / 0,03 = 1667 \u03A9 (med 30mA RCD)' : 'Ra \u2264 50V / I\u0394n = 50 / 0.03 = 1667 \u03A9 (with 30mA RCD)';
+
+  // Count connected services
+  var connectedServices = SERVICES.filter(function(svc) { return s.services[svc.id]; });
+
+  // Build HTML
+  var html = '<div class="card fade-in"><div class="card-title">\uD83C\uDF0D ' + (da ? 'Jording & Udligningsforbindelser' : 'Earthing & Bonding Calculator') + ' - DS/HD 60364-5-54</div>';
+
+  // System type
+  html += '<div class="select-group"><div class="select-label">\u26A1 ' + (da ? 'Jordingssystem' : 'Earthing system') + '</div><div class="select-grid">';
+  SYSTEMS.forEach(function(sys) {
+    html += '<button class="sel-btn ' + (s.system === sys ? 'selected' : '') + '" onclick="earthState.system=\'' + sys + '\';renderModule(\'earth\')">' + sys + '</button>';
+  });
+  html += '</div></div>';
+
+  // Main earthing conductor
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD29 ' + (da ? 'Hovedjordleder [mm\u00B2 Cu]' : 'Main earthing conductor [mm\u00B2 Cu]') + '</div><div class="select-grid">';
+  MAIN_EARTH_SIZES.forEach(function(sz) {
+    html += '<button class="sel-btn ' + (s.mainEarth === sz ? 'selected' : '') + '" onclick="earthState.mainEarth=' + sz + ';renderModule(\'earth\')">' + sz + '</button>';
+  });
+  html += '</div></div>';
+
+  // Largest phase conductor
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDCCF ' + (da ? 'St\u00F8rste faseleder [mm\u00B2]' : 'Largest phase conductor [mm\u00B2]') + '</div><div class="select-grid">';
+  PHASE_SIZES.forEach(function(sz) {
+    html += '<button class="sel-btn ' + (s.largestPhase === sz ? 'selected' : '') + '" onclick="earthState.largestPhase=' + sz + ';renderModule(\'earth\')">' + sz + '</button>';
+  });
+  html += '</div></div>';
+
+  // Bonding type
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD17 ' + (da ? 'Udligningstype' : 'Bonding type') + '</div><div class="select-grid">';
+  BONDING_TYPES.forEach(function(bt) {
+    html += '<button class="sel-btn ' + (s.bondingType === bt.id ? 'selected' : '') + '" onclick="earthState.bondingType=\'' + bt.id + '\';renderModule(\'earth\')">' + (da ? bt.da : bt.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Connected services (toggle buttons)
+  html += '<div class="select-group"><div class="select-label">\uD83C\uDFE0 ' + (da ? 'Tilsluttede installationer' : 'Connected services') + '</div><div class="select-grid">';
+  SERVICES.forEach(function(svc) {
+    var active = s.services[svc.id];
+    html += '<button class="sel-btn ' + (active ? 'selected' : '') + '" onclick="earthState.services.' + svc.id + '=!' + active + ';renderModule(\'earth\')">' + (da ? svc.da : svc.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '</div>';
+
+  // Animated SVG: Earthing arrangement
+  html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCCF ' + (da ? 'Jordingsdiagram' : 'Earthing Diagram') + '</div>';
+  html += '<div style="text-align:center;padding:10px;overflow-x:auto;">';
+  html += buildEarthSvg(da, s, connectedServices, peMin);
+  html += '</div></div>';
+
+  // Results
+  html += '<div class="card fade-in"><div class="card-title">\u2705 ' + (da ? 'Resultater' : 'Results') + '</div>';
+  html += '<div class="result-box success">';
+  html += '<div class="result-title">' + (da ? 'Beregnede krav' : 'Calculated Requirements') + '</div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Min. PE-leder' : 'Min. PE conductor') + '</span><span class="value">' + peMin + ' mm\u00B2 Cu</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Min. hovedudligningsleder' : 'Min. main bonding conductor') + '</span><span class="value">' + mainBondMin + ' mm\u00B2 Cu</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Min. supplerende udligning' : 'Min. supplementary bonding') + '</span><span class="value">' + suppBondMin + ' mm\u00B2 Cu (' + (da ? 'ubeskyttet' : 'unprotected') + ') / ' + suppBondProtected + ' mm\u00B2 Cu (' + (da ? 'beskyttet' : 'protected') + ')</span></div>';
+
+  if (s.system === 'TT') {
+    html += '<div class="result-row"><span class="label">' + (da ? 'Maks. jordelektrodemodstand' : 'Max. earth electrode resistance') + '</span><span class="value">' + raMax + ' \u03A9</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Beregning' : 'Calculation') + '</span><span class="value">' + raNote + '</span></div>';
+  }
+
+  // Bonding requirements per service
+  if (connectedServices.length > 0) {
+    html += '<div class="result-row" style="border-top:1px solid var(--border);padding-top:8px;margin-top:8px"><span class="label" style="font-weight:700">' + (da ? 'Udligningskrav pr. installation' : 'Bonding requirement per service') + '</span><span class="value"></span></div>';
+    connectedServices.forEach(function(svc) {
+      var bondSize = s.bondingType === 'main' ? mainBondMin : suppBondMin;
+      html += '<div class="result-row"><span class="label">' + (da ? svc.da : svc.en) + '</span><span class="value">' + bondSize + ' mm\u00B2 Cu ' + (s.bondingType === 'main' ? (da ? '(hovedudligning)' : '(main bonding)') : (da ? '(supplerende)' : '(supplementary)')) + '</span></div>';
+    });
+  }
+
+  html += '<div class="result-row" style="border-top:1px solid var(--border);padding-top:8px;margin-top:8px"><span class="label">' + (da ? 'Henvisninger' : 'References') + '</span><span class="value">DS/HD 60364-5-54, DS/HD 60364-4-41</span></div>';
+  html += '</div></div>';
+
+  return html;
+}
+
+function buildEarthSvg(da, state, connectedServices, peMin) {
+  var svg = '<svg viewBox="0 0 500 350" style="max-width:500px;width:100%;height:auto;font-family:inherit;">';
+  // Background
+  svg += '<rect x="0" y="0" width="500" height="350" fill="var(--card, #1e1e2e)" rx="8"/>';
+
+  // Ground level
+  svg += '<line x1="20" y1="280" x2="480" y2="280" stroke="#8d6e63" stroke-width="2"/>';
+  svg += '<text x="30" y="295" fill="#8d6e63" font-size="9">' + (da ? 'Jordniveau' : 'Ground level') + '</text>';
+
+  // Main Earth Terminal (MET) - center
+  svg += '<rect x="200" y="130" width="100" height="30" rx="5" fill="none" stroke="#4caf50" stroke-width="2"/>';
+  svg += '<text x="250" y="150" fill="#4caf50" font-size="9" text-anchor="middle" font-weight="600">' + (da ? 'Hovedjordklemme' : 'Main Earth Terminal') + '</text>';
+
+  // PE from supply (top)
+  svg += '<line x1="250" y1="40" x2="250" y2="130" stroke="#4caf50" stroke-width="2" stroke-dasharray="8,4">';
+  svg += '<animate attributeName="stroke-dashoffset" values="24;0" dur="1.5s" repeatCount="indefinite"/>';
+  svg += '</line>';
+  svg += '<text x="255" y="60" fill="#aaa" font-size="8">' + (da ? 'PE fra forsyning' : 'PE from supply') + '</text>';
+  svg += '<text x="255" y="72" fill="#66bb6a" font-size="8">' + peMin + ' mm\u00B2</text>';
+
+  // Earth electrode (for TT systems)
+  if (state.system === 'TT') {
+    svg += '<line x1="250" y1="160" x2="250" y2="280" stroke="#4caf50" stroke-width="2"/>';
+    svg += '<line x1="250" y1="280" x2="250" y2="330" stroke="#8d6e63" stroke-width="2.5"/>';
+    // Earth electrode symbol
+    svg += '<line x1="230" y1="310" x2="270" y2="310" stroke="#8d6e63" stroke-width="2.5"/>';
+    svg += '<line x1="235" y1="318" x2="265" y2="318" stroke="#8d6e63" stroke-width="2"/>';
+    svg += '<line x1="240" y1="326" x2="260" y2="326" stroke="#8d6e63" stroke-width="1.5"/>';
+    svg += '<text x="275" y="318" fill="#aaa" font-size="8">' + (da ? 'Jordelektrode' : 'Earth electrode') + '</text>';
+    // Animated current flow
+    svg += '<circle cx="250" cy="200" r="3" fill="#ffeb3b"><animate attributeName="cy" values="160;320" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0" dur="2s" repeatCount="indefinite"/></circle>';
+  } else {
+    // For TN systems, just show connection down to MET
+    svg += '<line x1="250" y1="160" x2="250" y2="200" stroke="#4caf50" stroke-width="1.5"/>';
+    svg += '<text x="255" y="195" fill="#aaa" font-size="8">' + (da ? 'Til PEN/PE' : 'To PEN/PE') + '</text>';
+  }
+
+  // PE conductors fanning out to bonded services
+  var serviceCount = connectedServices.length;
+  var startX = 100;
+  var spacing = serviceCount > 1 ? 300 / (serviceCount - 1) : 0;
+  if (serviceCount === 1) startX = 250;
+
+  connectedServices.forEach(function(svc, idx) {
+    var x = serviceCount === 1 ? 250 : startX + idx * spacing;
+    var y = 60;
+    // Service box
+    svg += '<rect x="' + (x - 30) + '" y="' + y + '" width="60" height="22" rx="4" fill="none" stroke="#42a5f5" stroke-width="1.5"/>';
+    svg += '<text x="' + x + '" y="' + (y + 14) + '" fill="#42a5f5" font-size="8" text-anchor="middle">' + (da ? svc.da : svc.en) + '</text>';
+    // Bonding conductor from MET to service
+    svg += '<line x1="250" y1="130" x2="' + x + '" y2="' + (y + 22) + '" stroke="#66bb6a" stroke-width="1.5" stroke-dasharray="6,3">';
+    svg += '<animate attributeName="stroke-dashoffset" values="18;0" dur="2s" repeatCount="indefinite"/>';
+    svg += '</line>';
+  });
+
+  // If no services selected, show placeholder
+  if (serviceCount === 0) {
+    svg += '<text x="250" y="90" fill="#666" font-size="10" text-anchor="middle">' + (da ? 'V\u00E6lg tilsluttede installationer ovenfor' : 'Select connected services above') + '</text>';
+  }
+
+  // System label
+  svg += '<rect x="370" y="130" width="100" height="22" rx="4" fill="none" stroke="#aaa" stroke-width="1"/>';
+  svg += '<text x="420" y="145" fill="#aaa" font-size="9" text-anchor="middle">' + state.system + '</text>';
+
+  // Legend
+  svg += '<line x1="350" y1="240" x2="380" y2="240" stroke="#4caf50" stroke-width="2"/>';
+  svg += '<text x="385" y="243" fill="#aaa" font-size="8">PE</text>';
+  svg += '<line x1="350" y1="255" x2="380" y2="255" stroke="#66bb6a" stroke-width="1.5" stroke-dasharray="6,3"/>';
+  svg += '<text x="385" y="258" fill="#aaa" font-size="8">' + (da ? 'Udligning' : 'Bonding') + '</text>';
+
+  svg += '</svg>';
+  return svg;
 }
 
 // ===== INIT =====
