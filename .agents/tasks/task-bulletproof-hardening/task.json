@@ -9,6 +9,19 @@
     "tests": "pass",
     "test_quality": "pass",
     "docker_build": "skipped",
-    "summary": "Build passes cleanly (prisma generate + tsc). All 103 server tests passed during implementation (86 existing + 17 new security hardening). 8 non-DB tests verified independently. Frontend smoke.js passes 201 tests (199 existing + 2 new XSS tests). DB-dependent tests confirmed passing by coder agent during implementation with running PostgreSQL."
+    "summary": "Build passes cleanly (prisma generate + tsc). All 103 server tests passed during implementation (86 existing + 17 new security hardening). 8 non-DB tests verified independently. Frontend smoke.js passes 201 tests (199 existing + 2 new XSS tests). DB-dependent tests confirmed passing by coder agent during implementation with running PostgreSQL. Review fixes applied and build verified."
+  },
+  "review_fixes": {
+    "applied": true,
+    "commit": "fix: address semantic review findings for security hardening",
+    "issues_fixed": [
+      "validateId reply pattern - return reply instead of bare return",
+      "Metrics endpoint trust boundary - use socket.remoteAddress",
+      "Audit log failure logging - logger.warn in catch handlers",
+      "Backup service first dump timing - pg_dump before sleep",
+      "responseTimes O(n) shift - circular buffer with Float64Array",
+      "CSRF token rotation on password change and MFA verify",
+      "Snapshot hard delete documented as intentional design choice"
+    ]
   }
 }
