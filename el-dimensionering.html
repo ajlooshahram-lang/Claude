@@ -2978,270 +2978,460 @@ function renderCable() {
 // ===== CABLE CROSS-SECTION VISUALIZATION =====
 function buildCableViz(crossSection, material, baseIz, correctedIz, kTotal, ib, temp) {
   if (!crossSection || correctedIz <= 0) return '';
-  const W = 600, H = 420;
-  const cx = 200, cy = 170, maxR = 90;
+  const W = 750, H = 680;
+  const cx = 200, cy = 220;
 
-  // Scale conductor radius by cross-section (log scale for visual clarity)
   const csNum = parseFloat(crossSection) || 10;
-  const condR = Math.max(25, Math.min(65, 20 + Math.log2(csNum) * 8));
-  const insulR = condR + 14;
-  const sheathR = insulR + 10;
-
-  // Material colors
   const isCu = material === 'copper';
-  const condColor = isCu ? '#ff8a5c' : '#9fe6ff';
-  const condColorDim = isCu ? '#cc6030' : '#5bbcd9';
-  const condColorBright = isCu ? '#ffc099' : '#d4f4ff';
   const materialLabel = isCu ? (lang === 'da' ? 'Kobber' : 'Copper') : (lang === 'da' ? 'Aluminium' : 'Aluminium');
 
-  // Temperature factor for color ring (20-70 range mapped to blue-red)
-  const tempNorm = Math.max(0, Math.min(1, (temp - 20) / 50));
-  const tempHue = 200 - tempNorm * 200; // 200 (blue) to 0 (red)
+  // Scale dimensions by cross-section (realistic proportions)
+  const outerR = Math.max(85, Math.min(130, 65 + Math.log2(csNum) * 11));
+  const sheathThick = 9;
+  const insulThick = 11;
+  const coreR = outerR - sheathThick - insulThick - 10;
 
-  // Current density visualization - number of orbiting particles
-  const densityFactor = ib ? Math.min(1, ib / correctedIz) : 0.5;
-  const numParticles = Math.max(4, Math.round(densityFactor * 12));
+  // Current/load ratio for animation intensity
+  const loadRatio = ib ? Math.min(1, ib / correctedIz) : 0.5;
+  const particleSpeed = (2.8 - loadRatio * 1.6).toFixed(2);
+  const glowIntensity = (0.3 + loadRatio * 0.7).toFixed(2);
+
+  // Temperature effect (20-90C range)
+  const tempNorm = Math.max(0, Math.min(1, (temp - 20) / 70));
+  const heatGlowOpacity = (tempNorm * 0.45).toFixed(2);
+
+  // Resistivity and material properties for info display
+  const resistivity = isCu ? 0.0175 : 0.028; // ohm*mm2/m at 20C
+  const density = isCu ? 8960 : 2700; // kg/m3
+  const tempCoeff = isCu ? 0.00393 : 0.00403;
+  const maxTemp = isCu ? 70 : 70; // for PVC insulation
+  const meltPoint = isCu ? 1085 : 660;
 
   // Gauge bar calculations
-  const gaugeY = 310, gaugeW = 480, gaugeH = 22, gaugeX = (W - gaugeW) / 2;
+  const gaugeY = 490, gaugeW = 600, gaugeH = 30, gaugeX = (W - gaugeW) / 2;
   const ibVal = ib || 0;
-  // Max for gauge is 1.3x correctedIz for some headroom
   const gaugeMax = Math.max(correctedIz * 1.3, ibVal * 1.2, baseIz * 1.1);
   const ibPos = gaugeX + (ibVal / gaugeMax) * gaugeW;
   const izCorrPos = gaugeX + (correctedIz / gaugeMax) * gaugeW;
   const izBasePos = gaugeX + (baseIz / gaugeMax) * gaugeW;
-  // "In" is approximated as the next standard fuse above IB
   const inVal = ibVal > 0 ? Math.ceil(ibVal / 10) * 10 : 0;
   const inPos = gaugeX + (inVal / gaugeMax) * gaugeW;
-
-  // Safety check: IB <= In <= Iz
   const safetyOk = ibVal <= inVal && inVal <= correctedIz;
   const safetyColor = safetyOk ? '#06d6a0' : '#ef476f';
-
-  // Derating squeeze visualization
   const derateW = (baseIz / gaugeMax) * gaugeW;
   const derateCorrW = (correctedIz / gaugeMax) * gaugeW;
 
-  // Generate orbiting current particles with staggered timing
-  const orbitParticles = [];
-  for (let i = 0; i < numParticles; i++) {
-    const angle = (i / numParticles) * 360;
-    const orbitR = condR * 0.55 + (i % 3) * 5;
-    const dur = (1.8 - densityFactor * 0.8).toFixed(2);
-    const delay = ((i / numParticles) * parseFloat(dur)).toFixed(2);
-    const size = 2 + (i % 2);
-    orbitParticles.push(`
-      <circle r="${size}" fill="${condColorBright}" opacity="0.9" filter="url(#cableParticleGlow)">
-        <animateTransform attributeName="transform" type="rotate"
-          from="${angle} ${cx} ${cy}" to="${angle + 360} ${cx} ${cy}"
-          dur="${dur}s" begin="${delay}s" repeatCount="indefinite"/>
-        <animate attributeName="cx" values="${cx + orbitR}" dur="0.01s" fill="freeze"/>
-        <animate attributeName="cy" values="${cy}" dur="0.01s" fill="freeze"/>
-        <animate attributeName="opacity" values="0.5;1;0.8;1;0.5" dur="${dur}s" begin="${delay}s" repeatCount="indefinite"/>
-      </circle>
-    `);
+  // Core positions for 5-core cable (L1, L2, L3, N, PE) in pentagon arrangement
+  const cores = [
+    { label: 'L1', color: '#8B4513', insulColor: '#A0522D', angle: -90, active: true },
+    { label: 'L2', color: '#1a1a1a', insulColor: '#2a2a2a', angle: -18, active: true },
+    { label: 'L3', color: '#5a5a5a', insulColor: '#666666', angle: 54, active: true },
+    { label: 'N', color: '#1a3a6b', insulColor: '#2255aa', angle: 126, active: false },
+    { label: 'PE', color: '#2d5a1e', insulColor: '#3d8b2e', angle: 198, active: false }
+  ];
+  const coreOrbitR = coreR * 0.52;
+  const singleCoreR = coreR * 0.30;
+  const singleInsulR = singleCoreR + 5;
+
+  // Conductor metallic colors (photorealistic)
+  const condGradStart = isCu ? '#f0b878' : '#c8d8e8';
+  const condGradMid = isCu ? '#d47838' : '#90a8bc';
+  const condGradEnd = isCu ? '#7a3818' : '#506878';
+  const condHighlight = isCu ? '#ffe0b0' : '#e8f4ff';
+  const condReflect = isCu ? '#ff9944' : '#a0c8e8';
+  const condDeep = isCu ? '#4a1808' : '#2a3848';
+
+  // Wire stranding pattern generator
+  function strandingPattern(coreCx, coreCy, r) {
+    let strands = '';
+    const strandR = r * 0.12;
+    // Center strand
+    strands += '<circle cx="' + coreCx + '" cy="' + coreCy + '" r="' + strandR + '" fill="url(#strandGrad)" opacity="0.8"/>';
+    // Inner ring (6 strands)
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const sx = coreCx + Math.cos(a) * r * 0.32;
+      const sy = coreCy + Math.sin(a) * r * 0.32;
+      strands += '<circle cx="' + sx.toFixed(1) + '" cy="' + sy.toFixed(1) + '" r="' + strandR + '" fill="url(#strandGrad)" opacity="0.65"/>';
+    }
+    // Outer ring (12 strands)
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      const sx = coreCx + Math.cos(a) * r * 0.65;
+      const sy = coreCy + Math.sin(a) * r * 0.65;
+      strands += '<circle cx="' + sx.toFixed(1) + '" cy="' + sy.toFixed(1) + '" r="' + (strandR * 0.9).toFixed(1) + '" fill="url(#strandGrad)" opacity="0.5"/>';
+    }
+    // Outermost ring (18 strands) for larger cross-sections
+    if (csNum >= 10) {
+      for (let i = 0; i < 18; i++) {
+        const a = (i / 18) * Math.PI * 2;
+        const sx = coreCx + Math.cos(a) * r * 0.88;
+        const sy = coreCy + Math.sin(a) * r * 0.88;
+        strands += '<circle cx="' + sx.toFixed(1) + '" cy="' + sy.toFixed(1) + '" r="' + (strandR * 0.8).toFixed(1) + '" fill="url(#strandGrad)" opacity="0.4"/>';
+      }
+    }
+    return strands;
   }
 
-  // Sparkle effects on conductor surface
-  const sparkles = [];
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2;
-    const sr = condR * 0.7;
-    const sx = cx + Math.cos(a) * sr;
-    const sy = cy + Math.sin(a) * sr;
-    const del = (i * 0.4).toFixed(2);
-    sparkles.push(`<circle cx="${sx}" cy="${sy}" r="1.5" fill="${condColorBright}" opacity="0">
-      <animate attributeName="opacity" values="0;0.8;0" dur="2.4s" begin="${del}s" repeatCount="indefinite"/>
-      <animate attributeName="r" values="1;2.5;1" dur="2.4s" begin="${del}s" repeatCount="indefinite"/>
-    </circle>`);
-  }
+  // Build individual cores SVG
+  let coresSvg = '';
+  let particlesSvg = '';
+  let coreDetailsSvg = '';
 
-  return `
-  <div style="margin-top:16px;border-radius:14px;overflow:hidden;background:linear-gradient(160deg,#060d16 0%,#0a1a2e 40%,#0d0f18 100%);border:1px solid rgba(${isCu?'255,138,92':'159,230,255'},0.2);box-shadow:0 0 40px rgba(${isCu?'255,138,92':'159,230,255'},0.06),inset 0 0 80px rgba(0,0,0,0.4)">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
-      <defs>
-        <filter id="cableParticleGlow"><feGaussianBlur stdDeviation="2"/></filter>
-        <filter id="cableBlurLg"><feGaussianBlur stdDeviation="6"/></filter>
-        <filter id="cableBlurSm"><feGaussianBlur stdDeviation="3"/></filter>
-        <filter id="cableShadow">
-          <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="rgba(0,0,0,0.5)"/>
-        </filter>
+  cores.forEach(function(core, idx) {
+    const a = (core.angle * Math.PI) / 180;
+    const coreCx = cx + Math.cos(a) * coreOrbitR;
+    const coreCy = cy + Math.sin(a) * coreOrbitR;
 
-        <!-- Conductor radial gradient (heatmap effect) -->
-        <radialGradient id="condHeat" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="${condColorBright}" stop-opacity="1"/>
-          <stop offset="40%" stop-color="${condColor}" stop-opacity="0.95"/>
-          <stop offset="75%" stop-color="${condColorDim}" stop-opacity="0.85"/>
-          <stop offset="100%" stop-color="${condColorDim}" stop-opacity="0.6"/>
-        </radialGradient>
+    // Insulation shadow (depth effect)
+    coresSvg += '<circle cx="' + (coreCx + 1.5).toFixed(1) + '" cy="' + (coreCy + 1.5).toFixed(1) + '" r="' + (singleInsulR + 1) + '" fill="rgba(0,0,0,0.3)" filter="url(#cblBlur3)"/>';
 
-        <!-- Temperature ring gradient -->
-        <radialGradient id="tempRing" cx="50%" cy="50%" r="50%">
-          <stop offset="75%" stop-color="transparent"/>
-          <stop offset="85%" stop-color="hsl(${tempHue},80%,50%)" stop-opacity="0.25"/>
-          <stop offset="95%" stop-color="hsl(${tempHue},80%,40%)" stop-opacity="0.15"/>
-          <stop offset="100%" stop-color="transparent"/>
-        </radialGradient>
+    // Insulation layer with PVC translucency
+    coresSvg += '<circle cx="' + coreCx.toFixed(1) + '" cy="' + coreCy.toFixed(1) + '" r="' + singleInsulR + '" fill="' + core.insulColor + '" opacity="0.9"/>';
+    coresSvg += '<circle cx="' + coreCx.toFixed(1) + '" cy="' + coreCy.toFixed(1) + '" r="' + singleInsulR + '" fill="url(#insulShine)" opacity="0.35"/>';
 
-        <!-- Insulation gradient -->
-        <radialGradient id="insulGrad" cx="45%" cy="40%" r="60%">
-          <stop offset="0%" stop-color="#2a3a4a" stop-opacity="0.9"/>
-          <stop offset="100%" stop-color="#1a2530" stop-opacity="0.95"/>
-        </radialGradient>
+    // PE has green-yellow stripe pattern
+    if (core.label === 'PE') {
+      coresSvg += '<circle cx="' + coreCx.toFixed(1) + '" cy="' + coreCy.toFixed(1) + '" r="' + singleInsulR + '" fill="url(#peStripe)" opacity="0.75"/>';
+    }
 
-        <!-- Sheath gradient (outer jacket) -->
-        <radialGradient id="sheathGrad" cx="40%" cy="35%" r="65%">
-          <stop offset="0%" stop-color="#3a4a5a"/>
-          <stop offset="60%" stop-color="#252f3a"/>
-          <stop offset="100%" stop-color="#1a2028"/>
-        </radialGradient>
+    // Insulation edge rim
+    coresSvg += '<circle cx="' + coreCx.toFixed(1) + '" cy="' + coreCy.toFixed(1) + '" r="' + singleInsulR + '" fill="none" stroke="rgba(0,0,0,0.2)" stroke-width="0.8"/>';
 
-        <!-- Cross-section lighting highlight -->
-        <radialGradient id="cableHighlight" cx="35%" cy="30%" r="50%">
-          <stop offset="0%" stop-color="rgba(255,255,255,0.15)"/>
-          <stop offset="100%" stop-color="transparent"/>
-        </radialGradient>
+    // Conductor core with rich metallic gradient
+    coresSvg += '<circle cx="' + coreCx.toFixed(1) + '" cy="' + coreCy.toFixed(1) + '" r="' + singleCoreR + '" fill="url(#condMetallic)"/>';
 
-        <!-- Gauge bar gradient -->
-        <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#06d6a0" stop-opacity="0.3"/>
-          <stop offset="${Math.round((correctedIz/gaugeMax)*100)}%" stop-color="#ffd166" stop-opacity="0.3"/>
-          <stop offset="100%" stop-color="#ef476f" stop-opacity="0.3"/>
-        </linearGradient>
+    // Wire stranding texture (concentric circles)
+    coresSvg += strandingPattern(coreCx, coreCy, singleCoreR);
 
-        <!-- Animated pattern for conductor texture -->
-        <pattern id="condTexture" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <line x1="0" y1="0" x2="0" y2="6" stroke="${condColor}" stroke-width="0.5" opacity="0.15"/>
-        </pattern>
-      </defs>
+    // Metallic specular highlight
+    coresSvg += '<ellipse cx="' + (coreCx - singleCoreR * 0.22).toFixed(1) + '" cy="' + (coreCy - singleCoreR * 0.28).toFixed(1) + '" rx="' + (singleCoreR * 0.38).toFixed(1) + '" ry="' + (singleCoreR * 0.22).toFixed(1) + '" fill="' + condHighlight + '" opacity="0.45"/>';
 
-      <!-- Subtle background grid -->
-      <pattern id="cbGrid" width="24" height="24" patternUnits="userSpaceOnUse">
-        <path d="M24 0L0 0 0 24" fill="none" stroke="rgba(${isCu?'255,138,92':'100,200,255'},0.03)" stroke-width="0.5"/>
-      </pattern>
-      <rect width="${W}" height="${H}" fill="url(#cbGrid)"/>
+    // Reflection shimmer on conductor
+    coresSvg += '<ellipse cx="' + (coreCx + singleCoreR * 0.15).toFixed(1) + '" cy="' + (coreCy + singleCoreR * 0.2).toFixed(1) + '" rx="' + (singleCoreR * 0.15).toFixed(1) + '" ry="' + (singleCoreR * 0.1).toFixed(1) + '" fill="' + condReflect + '" opacity="0.2"><animate attributeName="opacity" values="0.1;0.3;0.1" dur="4s" repeatCount="indefinite"/></ellipse>';
 
-      <!-- Title -->
-      <text x="${cx}" y="28" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="12" font-weight="600" letter-spacing="1">${lang === 'da' ? 'KABELTV\u00C6RSNIT' : 'CABLE CROSS-SECTION'}</text>
-      <text x="${cx}" y="44" text-anchor="middle" fill="${condColor}" font-size="11" font-weight="500">${csNum} mm\u00B2 ${materialLabel}</text>
+    // Current flow particles for phase cores (L1, L2, L3)
+    if (core.active) {
+      const numP = Math.max(4, Math.round(loadRatio * 8));
+      for (let p = 0; p < numP; p++) {
+        const pAngle = (p / numP) * 360;
+        const pDelay = ((p / numP) * parseFloat(particleSpeed) + idx * 0.25).toFixed(2);
+        const orbitR = singleCoreR * 0.55;
+        const pSize = (1.5 + loadRatio * 1.5).toFixed(1);
+        particlesSvg += '<circle r="' + pSize + '" fill="' + condReflect + '" opacity="0" filter="url(#plasmaGlow)">' +
+          '<animateTransform attributeName="transform" type="rotate" from="' + pAngle + ' ' + coreCx.toFixed(1) + ' ' + coreCy.toFixed(1) + '" to="' + (pAngle + 360) + ' ' + coreCx.toFixed(1) + ' ' + coreCy.toFixed(1) + '" dur="' + particleSpeed + 's" begin="' + pDelay + 's" repeatCount="indefinite"/>' +
+          '<animate attributeName="cx" values="' + (coreCx + orbitR).toFixed(1) + '" dur="0.01s" fill="freeze"/>' +
+          '<animate attributeName="cy" values="' + coreCy.toFixed(1) + '" dur="0.01s" fill="freeze"/>' +
+          '<animate attributeName="opacity" values="0;' + glowIntensity + ';0.3;' + glowIntensity + ';0" dur="' + particleSpeed + 's" begin="' + pDelay + 's" repeatCount="indefinite"/>' +
+          '</circle>';
+      }
+      // Glow trail around active cores
+      particlesSvg += '<circle cx="' + coreCx.toFixed(1) + '" cy="' + coreCy.toFixed(1) + '" r="' + (singleCoreR + 3) + '" fill="none" stroke="' + condReflect + '" stroke-width="2" opacity="0" filter="url(#cblBlur3)">' +
+        '<animate attributeName="opacity" values="0;' + (loadRatio * 0.35).toFixed(2) + ';0" dur="' + (3 - loadRatio).toFixed(1) + 's" begin="' + (idx * 0.4).toFixed(1) + 's" repeatCount="indefinite"/>' +
+        '</circle>';
+    }
+  });
 
-      <!-- Temperature ring (outer ambient indicator) -->
-      <circle cx="${cx}" cy="${cy}" r="${sheathR + 18}" fill="url(#tempRing)">
-        <animate attributeName="opacity" values="0.6;1;0.6" dur="4s" repeatCount="indefinite"/>
-      </circle>
+  // Installation method text (from state if available)
+  const installMethod = typeof state !== 'undefined' && state.method ? state.method : 'B1';
+  const insulType = temp > 70 ? 'XLPE/EPR' : 'PVC';
 
-      <!-- Ambient temp label -->
-      <text x="${cx + sheathR + 26}" y="${cy - 10}" fill="hsl(${tempHue},70%,60%)" font-size="9" opacity="0.8">${temp}\u00B0C</text>
+  return '<div style="margin-top:18px;border-radius:16px;overflow:hidden;background:linear-gradient(145deg,#030810 0%,#0a1628 30%,#060e1a 60%,#020508 100%);border:1px solid rgba(' + (isCu?'228,160,96':'140,190,220') + ',0.2);box-shadow:0 8px 40px rgba(0,0,0,0.7),0 0 60px rgba(' + (isCu?'228,160,96':'140,190,220') + ',0.04),inset 0 1px 0 rgba(255,255,255,0.03)">' +
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block">' +
+      '<defs>' +
+        '<filter id="plasmaGlow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
+        '<filter id="cblShadow3D"><feDropShadow dx="4" dy="6" stdDeviation="9" flood-color="rgba(0,0,0,0.75)"/></filter>' +
+        '<filter id="cblBlur3"><feGaussianBlur stdDeviation="3"/></filter>' +
+        '<filter id="cblBlur6"><feGaussianBlur stdDeviation="6"/></filter>' +
+        '<filter id="cblBlur10"><feGaussianBlur stdDeviation="10"/></filter>' +
+        '<filter id="cblNoise"><feTurbulence type="fractalNoise" baseFrequency="1.2" numOctaves="4" result="noise"/><feColorMatrix type="saturate" values="0" in="noise" result="mono"/><feBlend in="SourceGraphic" in2="mono" mode="overlay" result="blended"/><feComposite in="blended" in2="SourceGraphic" operator="in"/></filter>' +
 
-      <!-- Cable outer sheath -->
-      <circle cx="${cx}" cy="${cy}" r="${sheathR}" fill="url(#sheathGrad)" filter="url(#cableShadow)"/>
-      <!-- Sheath highlight -->
-      <circle cx="${cx}" cy="${cy}" r="${sheathR}" fill="url(#cableHighlight)"/>
-      <!-- Sheath edge ring -->
-      <circle cx="${cx}" cy="${cy}" r="${sheathR}" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+        '<!-- Outer sheath 3D gradient -->' +
+        '<radialGradient id="sheathGrad3D" cx="36%" cy="33%" r="68%" fx="32%" fy="28%">' +
+          '<stop offset="0%" stop-color="#5a6270"/>' +
+          '<stop offset="20%" stop-color="#4a5260"/>' +
+          '<stop offset="45%" stop-color="#3a4250"/>' +
+          '<stop offset="70%" stop-color="#252d38"/>' +
+          '<stop offset="90%" stop-color="#181e28"/>' +
+          '<stop offset="100%" stop-color="#0f1418"/>' +
+        '</radialGradient>' +
 
-      <!-- Insulation layer -->
-      <circle cx="${cx}" cy="${cy}" r="${insulR}" fill="url(#insulGrad)"/>
-      <circle cx="${cx}" cy="${cy}" r="${insulR}" fill="none" stroke="rgba(100,150,200,0.15)" stroke-width="0.8"/>
+        '<!-- Sheath rim light -->' +
+        '<radialGradient id="sheathRim" cx="28%" cy="22%" r="72%">' +
+          '<stop offset="0%" stop-color="rgba(255,255,255,0.14)"/>' +
+          '<stop offset="35%" stop-color="rgba(255,255,255,0.04)"/>' +
+          '<stop offset="100%" stop-color="transparent"/>' +
+        '</radialGradient>' +
 
-      <!-- Conductor core with heatmap -->
-      <circle cx="${cx}" cy="${cy}" r="${condR}" fill="url(#condHeat)"/>
-      <!-- Conductor texture overlay -->
-      <circle cx="${cx}" cy="${cy}" r="${condR}" fill="url(#condTexture)" opacity="0.4"/>
-      <!-- Conductor glow (pulsing with current density) -->
-      <circle cx="${cx}" cy="${cy}" r="${condR + 4}" fill="none" stroke="${condColor}" stroke-width="2" opacity="0.3" filter="url(#cableBlurSm)">
-        <animate attributeName="opacity" values="0.15;0.5;0.15" dur="${(3 - densityFactor * 1.5).toFixed(1)}s" repeatCount="indefinite"/>
-        <animate attributeName="stroke-width" values="2;4;2" dur="${(3 - densityFactor * 1.5).toFixed(1)}s" repeatCount="indefinite"/>
-      </circle>
+        '<!-- Inner fill -->' +
+        '<radialGradient id="insulFill" cx="45%" cy="40%" r="55%">' +
+          '<stop offset="0%" stop-color="#283848"/>' +
+          '<stop offset="60%" stop-color="#1a2838"/>' +
+          '<stop offset="100%" stop-color="#0e1820"/>' +
+        '</radialGradient>' +
 
-      <!-- Center bright spot (current density peak) -->
-      <circle cx="${cx}" cy="${cy}" r="${condR * 0.25}" fill="${condColorBright}" opacity="0.4" filter="url(#cableBlurSm)">
-        <animate attributeName="opacity" values="0.2;0.6;0.2" dur="2s" repeatCount="indefinite"/>
-        <animate attributeName="r" values="${condR*0.2};${condR*0.3};${condR*0.2}" dur="2s" repeatCount="indefinite"/>
-      </circle>
+        '<!-- Insulation translucent shine -->' +
+        '<radialGradient id="insulShine" cx="35%" cy="30%" r="65%">' +
+          '<stop offset="0%" stop-color="rgba(255,255,255,0.2)"/>' +
+          '<stop offset="50%" stop-color="rgba(255,255,255,0.05)"/>' +
+          '<stop offset="100%" stop-color="transparent"/>' +
+        '</radialGradient>' +
 
-      <!-- Orbiting current particles -->
-      <g>
-        ${orbitParticles.join('')}
-      </g>
+        '<!-- Conductor metallic -->' +
+        '<radialGradient id="condMetallic" cx="33%" cy="28%" r="72%" fx="28%" fy="22%">' +
+          '<stop offset="0%" stop-color="' + condHighlight + '"/>' +
+          '<stop offset="15%" stop-color="' + condGradStart + '"/>' +
+          '<stop offset="40%" stop-color="' + condGradMid + '"/>' +
+          '<stop offset="70%" stop-color="' + condGradEnd + '"/>' +
+          '<stop offset="100%" stop-color="' + condDeep + '"/>' +
+        '</radialGradient>' +
 
-      <!-- Surface sparkles -->
-      ${sparkles.join('')}
+        '<!-- Wire strand gradient -->' +
+        '<radialGradient id="strandGrad" cx="38%" cy="32%" r="62%">' +
+          '<stop offset="0%" stop-color="' + condHighlight + '" stop-opacity="0.9"/>' +
+          '<stop offset="50%" stop-color="' + condGradMid + '" stop-opacity="0.6"/>' +
+          '<stop offset="100%" stop-color="' + condGradEnd + '" stop-opacity="0.3"/>' +
+        '</radialGradient>' +
 
-      <!-- Layer labels on right side -->
-      <g opacity="0.7">
-        <line x1="${cx + sheathR + 2}" y1="${cy + sheathR - 5}" x2="${cx + sheathR + 40}" y2="${cy + sheathR + 10}" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
-        <text x="${cx + sheathR + 42}" y="${cy + sheathR + 14}" fill="rgba(255,255,255,0.6)" font-size="8">${lang === 'da' ? 'Kappe' : 'Sheath'}</text>
+        '<!-- PE stripe -->' +
+        '<pattern id="peStripe" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">' +
+          '<rect width="2.5" height="5" fill="#3d8b2e" opacity="0.8"/>' +
+          '<rect x="2.5" width="2.5" height="5" fill="#c8b800" opacity="0.8"/>' +
+        '</pattern>' +
 
-        <line x1="${cx + insulR}" y1="${cy + 8}" x2="${cx + sheathR + 40}" y2="${cy + 28}" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
-        <text x="${cx + sheathR + 42}" y="${cy + 32}" fill="rgba(255,255,255,0.6)" font-size="8">${lang === 'da' ? 'Isolering' : 'Insulation'}</text>
+        '<!-- Heat aura -->' +
+        '<radialGradient id="heatAura" cx="50%" cy="50%" r="50%">' +
+          '<stop offset="55%" stop-color="transparent"/>' +
+          '<stop offset="75%" stop-color="rgba(255,100,30,' + heatGlowOpacity + ')"/>' +
+          '<stop offset="100%" stop-color="transparent"/>' +
+        '</radialGradient>' +
 
-        <line x1="${cx + condR - 5}" y1="${cy + condR - 5}" x2="${cx + sheathR + 40}" y2="${cy + 48}" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
-        <text x="${cx + sheathR + 42}" y="${cy + 52}" fill="${condColor}" font-size="8" font-weight="600">${materialLabel} ${csNum}mm\u00B2</text>
-      </g>
+        '<!-- LED panel bg -->' +
+        '<linearGradient id="ledPanelBg" x1="0%" y1="0%" x2="0%" y2="100%">' +
+          '<stop offset="0%" stop-color="#1a1a2e"/>' +
+          '<stop offset="50%" stop-color="#0a0a18"/>' +
+          '<stop offset="100%" stop-color="#1a1a2e"/>' +
+        '</linearGradient>' +
 
-      <!-- IB / In / Iz GAUGE BAR SECTION -->
-      <text x="${W/2}" y="${gaugeY - 28}" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="11" font-weight="600">
-        ${lang === 'da' ? 'Beskyttelsesregel: IB \u2264 In \u2264 Iz' : 'Protection Rule: IB \u2264 In \u2264 Iz'}
-      </text>
+        '<!-- Ambient occlusion -->' +
+        '<radialGradient id="cableAO" cx="50%" cy="50%" r="50%">' +
+          '<stop offset="65%" stop-color="transparent"/>' +
+          '<stop offset="100%" stop-color="rgba(0,0,0,0.55)"/>' +
+        '</radialGradient>' +
+      '</defs>' +
 
-      <!-- Gauge background track -->
-      <rect x="${gaugeX}" y="${gaugeY}" width="${gaugeW}" height="${gaugeH}" rx="11" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>
+      '<!-- Background grid -->' +
+      '<rect width="' + W + '" height="' + H + '" fill="transparent"/>' +
+      '<pattern id="cblGrid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0L0 0 0 28" fill="none" stroke="rgba(' + (isCu?'228,160,96':'100,180,220') + ',0.02)" stroke-width="0.5"/></pattern>' +
+      '<rect width="' + W + '" height="' + H + '" fill="url(#cblGrid)"/>' +
 
-      <!-- Iz base capacity (full bar, dim) -->
-      <rect x="${gaugeX}" y="${gaugeY}" width="${derateW}" height="${gaugeH}" rx="11" fill="rgba(6,214,160,0.08)" stroke="none"/>
+      '<!-- Title -->' +
+      '<text x="' + cx + '" y="30" text-anchor="middle" fill="rgba(255,255,255,0.92)" font-size="14" font-weight="700" letter-spacing="2">' + (lang === 'da' ? 'KABELTVAERSNIT' : 'CABLE CROSS-SECTION') + '</text>' +
+      '<text x="' + cx + '" y="50" text-anchor="middle" fill="' + condReflect + '" font-size="11" font-weight="500">' + csNum + ' mm\u00B2 ' + materialLabel + ' | ' + insulType + ' | ' + cores.length + ' ' + (lang === 'da' ? 'leder' : 'core') + '</text>' +
 
-      <!-- Iz corrected (derating applied) - shows the squeeze effect -->
-      <rect x="${gaugeX}" y="${gaugeY + 1}" width="${derateCorrW}" height="${gaugeH - 2}" rx="10" fill="rgba(6,214,160,0.15)"/>
+      '<!-- 3D shadow beneath cable -->' +
+      '<ellipse cx="' + cx + '" cy="' + (cy + outerR + 22) + '" rx="' + (outerR * 0.85) + '" ry="14" fill="rgba(0,0,0,0.45)" filter="url(#cblBlur6)"/>' +
 
-      <!-- Derating squeeze indicator (cross-hatch between corrected and base) -->
-      ${baseIz !== correctedIz ? `
-        <rect x="${gaugeX + derateCorrW}" y="${gaugeY}" width="${derateW - derateCorrW}" height="${gaugeH}" rx="0" fill="rgba(255,100,100,0.08)"/>
-        <line x1="${gaugeX + derateCorrW}" y1="${gaugeY}" x2="${gaugeX + derateCorrW}" y2="${gaugeY + gaugeH}" stroke="#ef476f" stroke-width="1" stroke-dasharray="3 2" opacity="0.6"/>
-        <text x="${gaugeX + derateCorrW + (derateW - derateCorrW)/2}" y="${gaugeY - 5}" text-anchor="middle" fill="#ef476f" font-size="7.5" opacity="0.8">K=${kTotal.toFixed(2)}</text>
-      ` : ''}
+      '<!-- Heat aura (temperature dependent) -->' +
+      (tempNorm > 0.15 ? '<circle cx="' + cx + '" cy="' + cy + '" r="' + (outerR + 28) + '" fill="url(#heatAura)"><animate attributeName="opacity" values="0.4;0.85;0.4" dur="' + (4.5 - tempNorm * 2.5).toFixed(1) + 's" repeatCount="indefinite"/></circle>' : '') +
 
-      <!-- IB marker -->
-      ${ibVal > 0 ? `
-        <line x1="${ibPos}" y1="${gaugeY - 3}" x2="${ibPos}" y2="${gaugeY + gaugeH + 3}" stroke="#00b4d8" stroke-width="2.5" stroke-linecap="round"/>
-        <circle cx="${ibPos}" cy="${gaugeY - 6}" r="4" fill="#00b4d8"/>
-        <text x="${ibPos}" y="${gaugeY - 14}" text-anchor="middle" fill="#00b4d8" font-size="9" font-weight="700">IB</text>
-        <text x="${ibPos}" y="${gaugeY + gaugeH + 16}" text-anchor="middle" fill="#00b4d8" font-size="8">${ibVal.toFixed(1)}A</text>
-      ` : ''}
+      '<!-- Outer sheath with rubber texture -->' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="' + outerR + '" fill="url(#sheathGrad3D)" filter="url(#cblShadow3D)"/>' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="' + outerR + '" fill="url(#sheathGrad3D)" filter="url(#cblNoise)" opacity="0.7"/>' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="' + outerR + '" fill="url(#sheathRim)"/>' +
+      '<!-- Sheath edge -->' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="' + outerR + '" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1.5"/>' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="' + (outerR - 1) + '" fill="none" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>' +
 
-      <!-- In marker -->
-      ${inVal > 0 ? `
-        <line x1="${inPos}" y1="${gaugeY - 3}" x2="${inPos}" y2="${gaugeY + gaugeH + 3}" stroke="#ffd166" stroke-width="2.5" stroke-linecap="round"/>
-        <circle cx="${inPos}" cy="${gaugeY - 6}" r="4" fill="#ffd166"/>
-        <text x="${inPos}" y="${gaugeY - 14}" text-anchor="middle" fill="#ffd166" font-size="9" font-weight="700">In</text>
-        <text x="${inPos}" y="${gaugeY + gaugeH + 16}" text-anchor="middle" fill="#ffd166" font-size="8">${inVal}A</text>
-      ` : ''}
+      '<!-- Cut surface / filler -->' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="' + (outerR - sheathThick) + '" fill="url(#insulFill)"/>' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="' + (outerR - sheathThick) + '" fill="url(#cableAO)" opacity="0.5"/>' +
+      '<!-- Filler material texture -->' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="' + (outerR - sheathThick - 3) + '" fill="none" stroke="rgba(50,70,90,0.15)" stroke-width="0.5" stroke-dasharray="2 5"/>' +
 
-      <!-- Iz corrected marker -->
-      <line x1="${izCorrPos}" y1="${gaugeY - 3}" x2="${izCorrPos}" y2="${gaugeY + gaugeH + 3}" stroke="#06d6a0" stroke-width="2.5" stroke-linecap="round"/>
-      <circle cx="${izCorrPos}" cy="${gaugeY - 6}" r="4" fill="#06d6a0"/>
-      <text x="${izCorrPos}" y="${gaugeY - 14}" text-anchor="middle" fill="#06d6a0" font-size="9" font-weight="700">Iz'</text>
-      <text x="${izCorrPos}" y="${gaugeY + gaugeH + 16}" text-anchor="middle" fill="#06d6a0" font-size="8">${correctedIz.toFixed(1)}A</text>
+      '<!-- Individual conductor cores -->' +
+      coresSvg +
 
-      <!-- Iz base marker (dimmer) -->
-      ${baseIz !== correctedIz ? `
-        <line x1="${izBasePos}" y1="${gaugeY + 2}" x2="${izBasePos}" y2="${gaugeY + gaugeH - 2}" stroke="rgba(6,214,160,0.4)" stroke-width="1.5" stroke-dasharray="2 2"/>
-        <text x="${izBasePos}" y="${gaugeY + gaugeH + 28}" text-anchor="middle" fill="rgba(6,214,160,0.5)" font-size="7">Iz=${baseIz}A</text>
-      ` : ''}
+      '<!-- Animated current particles -->' +
+      particlesSvg +
 
-      <!-- Safety verdict -->
-      <rect x="${W/2 - 70}" y="${gaugeY + gaugeH + 34}" width="140" height="22" rx="11" fill="${safetyColor}" opacity="0.12" stroke="${safetyColor}" stroke-width="0.5"/>
-      <text x="${W/2}" y="${gaugeY + gaugeH + 49}" text-anchor="middle" fill="${safetyColor}" font-size="10" font-weight="700">
-        ${safetyOk ? (lang === 'da' ? '\u2705 Regel overholdt' : '\u2705 Rule satisfied') : (lang === 'da' ? '\u274C Regel overtrådt' : '\u274C Rule violated')}
-      </text>
+      '<!-- Central current density glow -->' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="' + (coreOrbitR * 0.2) + '" fill="' + condReflect + '" opacity="0" filter="url(#cblBlur6)">' +
+        '<animate attributeName="opacity" values="0;' + (loadRatio * 0.25).toFixed(2) + ';0" dur="2.5s" repeatCount="indefinite"/>' +
+        '<animate attributeName="r" values="' + (coreOrbitR * 0.15) + ';' + (coreOrbitR * 0.3) + ';' + (coreOrbitR * 0.15) + '" dur="2.5s" repeatCount="indefinite"/>' +
+      '</circle>' +
 
-      <!-- Current flow indicator (animated arrow ring) -->
-      <circle cx="${cx}" cy="${cy}" r="${condR + 8}" fill="none" stroke="${condColor}" stroke-width="1.5" stroke-dasharray="8 12" opacity="0.4">
-        <animateTransform attributeName="transform" type="rotate"
-          from="0 ${cx} ${cy}" to="360 ${cx} ${cy}" dur="3s" repeatCount="indefinite"/>
-      </circle>
-    </svg>
-  </div>`;
+      '<!-- Rotating flow indicator -->' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="' + (outerR - sheathThick - 5) + '" fill="none" stroke="' + condReflect + '" stroke-width="1" stroke-dasharray="5 16" opacity="0.15">' +
+        '<animateTransform attributeName="transform" type="rotate" from="0 ' + cx + ' ' + cy + '" to="360 ' + cx + ' ' + cy + '" dur="' + particleSpeed + 's" repeatCount="indefinite"/>' +
+      '</circle>' +
+
+      '<!-- Core labels -->' +
+      cores.map(function(core, i) {
+        const a = (core.angle * Math.PI) / 180;
+        const lx = cx + Math.cos(a) * (outerR + 32);
+        const ly = cy + Math.sin(a) * (outerR + 32);
+        const coreCx2 = cx + Math.cos(a) * coreOrbitR;
+        const coreCy2 = cy + Math.sin(a) * coreOrbitR;
+        const anchor = Math.cos(a) > 0 ? 'start' : 'end';
+        const labelColor = core.label === 'L2' ? '#aaa' : core.insulColor;
+        return '<line x1="' + (coreCx2 + Math.cos(a)*singleInsulR).toFixed(1) + '" y1="' + (coreCy2 + Math.sin(a)*singleInsulR).toFixed(1) + '" x2="' + lx.toFixed(1) + '" y2="' + ly.toFixed(1) + '" stroke="rgba(255,255,255,0.15)" stroke-width="0.5"/>' +
+          '<text x="' + (lx + (Math.cos(a) > 0 ? 5 : -5)).toFixed(1) + '" y="' + (ly + 4).toFixed(1) + '" text-anchor="' + anchor + '" fill="' + labelColor + '" font-size="9" font-weight="600">' + core.label + '</text>';
+      }).join('') +
+
+      '<!-- === MATERIAL & SPECS INFO PANEL (right side) === -->' +
+      '<g transform="translate(410, 65)">' +
+        '<!-- Panel background -->' +
+        '<rect x="0" y="0" width="310" height="330" rx="10" fill="rgba(8,12,20,0.85)" stroke="rgba(' + (isCu?'228,160,96':'140,190,220') + ',0.12)" stroke-width="0.5"/>' +
+        '<rect x="0" y="0" width="310" height="2" rx="1" fill="rgba(255,255,255,0.04)"/>' +
+
+        '<!-- Material section header -->' +
+        '<text x="155" y="22" text-anchor="middle" fill="' + condReflect + '" font-size="10" font-weight="700" letter-spacing="1">' + (lang === 'da' ? 'MATERIALE & EGENSKABER' : 'MATERIAL & PROPERTIES') + '</text>' +
+        '<line x1="15" y1="30" x2="295" y2="30" stroke="rgba(' + (isCu?'228,160,96':'140,190,220') + ',0.2)" stroke-width="0.5"/>' +
+
+        '<!-- Material icon -->' +
+        '<circle cx="30" cy="52" r="12" fill="url(#condMetallic)"/>' +
+        '<text x="50" y="48" fill="rgba(255,255,255,0.9)" font-size="9" font-weight="700">' + materialLabel + '</text>' +
+        '<text x="50" y="60" fill="rgba(255,255,255,0.5)" font-size="7">' + (isCu ? 'Cu - ' + (lang==='da'?'Hoej ledningsevne':'High conductivity') : 'Al - ' + (lang==='da'?'Let vaegtklasse':'Lightweight class')) + '</text>' +
+
+        '<!-- Properties grid -->' +
+        '<g font-size="7.5" fill="rgba(255,255,255,0.7)">' +
+          '<!-- Resistivity -->' +
+          '<text x="15" y="82" fill="rgba(255,255,255,0.5)">\u03C1 (' + (lang==='da'?'resistivitet':'resistivity') + ')</text>' +
+          '<text x="200" y="82" fill="' + condReflect + '" font-weight="600">' + resistivity + ' \u03A9\u00B7mm\u00B2/m</text>' +
+
+          '<!-- Density -->' +
+          '<text x="15" y="100" fill="rgba(255,255,255,0.5)">' + (lang==='da'?'Densitet':'Density') + '</text>' +
+          '<text x="200" y="100" fill="' + condReflect + '" font-weight="600">' + density + ' kg/m\u00B3</text>' +
+
+          '<!-- Temp coefficient -->' +
+          '<text x="15" y="118" fill="rgba(255,255,255,0.5)">\u03B1 (' + (lang==='da'?'temp.koeff.':'temp.coeff.') + ')</text>' +
+          '<text x="200" y="118" fill="' + condReflect + '" font-weight="600">' + tempCoeff + ' /K</text>' +
+
+          '<!-- Max temp -->' +
+          '<text x="15" y="136" fill="rgba(255,255,255,0.5)">' + (lang==='da'?'Maks. driftstemp.':'Max. operating temp.') + '</text>' +
+          '<text x="200" y="136" fill="' + (temp > maxTemp ? '#ef476f' : condReflect) + '" font-weight="600">' + maxTemp + '\u00B0C (' + insulType + ')</text>' +
+
+          '<!-- Melting point -->' +
+          '<text x="15" y="154" fill="rgba(255,255,255,0.5)">' + (lang==='da'?'Smeltepunkt':'Melting point') + '</text>' +
+          '<text x="200" y="154" fill="' + condReflect + '" font-weight="600">' + meltPoint + '\u00B0C</text>' +
+        '</g>' +
+
+        '<!-- Separator -->' +
+        '<line x1="15" y1="166" x2="295" y2="166" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>' +
+
+        '<!-- Cable specifications -->' +
+        '<text x="155" y="184" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="9" font-weight="700">' + (lang==='da'?'KABELDATA':'CABLE DATA') + '</text>' +
+
+        '<g font-size="7.5">' +
+          '<text x="15" y="202" fill="rgba(255,255,255,0.5)">' + (lang==='da'?'Tvaersnit':'Cross-section') + '</text>' +
+          '<text x="200" y="202" fill="#fff" font-weight="600">' + csNum + ' mm\u00B2</text>' +
+
+          '<text x="15" y="220" fill="rgba(255,255,255,0.5)">' + (lang==='da'?'Isolation':'Insulation') + '</text>' +
+          '<text x="200" y="220" fill="#fff" font-weight="600">' + insulType + '</text>' +
+
+          '<text x="15" y="238" fill="rgba(255,255,255,0.5)">' + (lang==='da'?'Antal ledere':'Number of cores') + '</text>' +
+          '<text x="200" y="238" fill="#fff" font-weight="600">5G' + csNum + ' (L1+L2+L3+N+PE)</text>' +
+
+          '<text x="15" y="256" fill="rgba(255,255,255,0.5)">' + (lang==='da'?'Iz (basis)':'Iz (base)') + '</text>' +
+          '<text x="200" y="256" fill="#06d6a0" font-weight="600">' + baseIz + ' A</text>' +
+
+          '<text x="15" y="274" fill="rgba(255,255,255,0.5)">' + (lang==='da'?'Iz (korrigeret)':'Iz (corrected)') + '</text>' +
+          '<text x="200" y="274" fill="#06d6a0" font-weight="600">' + correctedIz.toFixed(1) + ' A</text>' +
+
+          '<text x="15" y="292" fill="rgba(255,255,255,0.5)">' + (lang==='da'?'Korrektionsfaktor K':'Correction factor K') + '</text>' +
+          '<text x="200" y="292" fill="' + (kTotal < 1 ? '#ffd166' : '#06d6a0') + '" font-weight="600">' + kTotal.toFixed(3) + '</text>' +
+
+          '<text x="15" y="310" fill="rgba(255,255,255,0.5)">' + (lang==='da'?'Omgivelsestemperatur':'Ambient temperature') + '</text>' +
+          '<text x="200" y="310" fill="' + (tempNorm > 0.7 ? '#ef476f' : tempNorm > 0.4 ? '#ffd166' : '#06d6a0') + '" font-weight="600">' + temp + '\u00B0C</text>' +
+        '</g>' +
+      '</g>' +
+
+      '<!-- Temperature indicator (thermometer) -->' +
+      '<g transform="translate(' + (cx - outerR - 55) + ', ' + (cy - 55) + ')">' +
+        '<rect x="0" y="0" width="36" height="110" rx="8" fill="rgba(15,15,30,0.85)" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>' +
+        '<text x="18" y="14" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="6.5">' + (lang==='da'?'TEMP':'TEMP') + '</text>' +
+        '<!-- Thermometer tube -->' +
+        '<rect x="13" y="20" width="10" height="70" rx="5" fill="rgba(0,0,0,0.5)" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>' +
+        '<!-- Thermometer fill -->' +
+        '<rect x="14" y="' + (20 + 69 * (1 - tempNorm)) + '" width="8" height="' + (69 * tempNorm + 1) + '" rx="4" fill="' + (tempNorm > 0.7 ? '#ef476f' : tempNorm > 0.4 ? '#ffd166' : '#06d6a0') + '">' +
+          '<animate attributeName="opacity" values="0.7;1;0.7" dur="2.5s" repeatCount="indefinite"/>' +
+        '</rect>' +
+        '<!-- Temp scale marks -->' +
+        '<line x1="25" y1="24" x2="30" y2="24" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>' +
+        '<text x="32" y="27" fill="rgba(255,255,255,0.3)" font-size="5">90</text>' +
+        '<line x1="25" y1="55" x2="30" y2="55" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>' +
+        '<text x="32" y="58" fill="rgba(255,255,255,0.3)" font-size="5">55</text>' +
+        '<line x1="25" y1="86" x2="30" y2="86" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>' +
+        '<text x="32" y="89" fill="rgba(255,255,255,0.3)" font-size="5">20</text>' +
+        '<text x="18" y="104" text-anchor="middle" fill="' + (tempNorm > 0.7 ? '#ef476f' : '#ffd166') + '" font-size="9" font-weight="700">' + temp + '\u00B0</text>' +
+      '</g>' +
+
+      '<!-- Load meter (analog gauge style) -->' +
+      '<g transform="translate(' + (cx - outerR - 55) + ', ' + (cy + 70) + ')">' +
+        '<rect x="0" y="0" width="36" height="55" rx="8" fill="rgba(15,15,30,0.85)" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>' +
+        '<text x="18" y="13" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="6">LOAD</text>' +
+        '<text x="18" y="32" text-anchor="middle" fill="' + (loadRatio > 0.9 ? '#ef476f' : loadRatio > 0.7 ? '#ffd166' : '#06d6a0') + '" font-size="11" font-weight="700">' + (loadRatio * 100).toFixed(0) + '%</text>' +
+        '<!-- Mini bar -->' +
+        '<rect x="6" y="38" width="24" height="6" rx="3" fill="rgba(0,0,0,0.4)"/>' +
+        '<rect x="6" y="38" width="' + (24 * loadRatio).toFixed(1) + '" height="6" rx="3" fill="' + (loadRatio > 0.9 ? '#ef476f' : loadRatio > 0.7 ? '#ffd166' : '#06d6a0') + '" opacity="0.7">' +
+          '<animate attributeName="opacity" values="0.5;0.9;0.5" dur="2s" repeatCount="indefinite"/>' +
+        '</rect>' +
+      '</g>' +
+
+      '<!-- === LED PANEL GAUGE BAR === -->' +
+      '<g transform="translate(0, ' + (gaugeY - 50) + ')">' +
+        '<!-- Panel housing -->' +
+        '<rect x="' + (gaugeX - 18) + '" y="0" width="' + (gaugeW + 36) + '" height="100" rx="10" fill="url(#ledPanelBg)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>' +
+        '<rect x="' + (gaugeX - 18) + '" y="0" width="' + (gaugeW + 36) + '" height="2" rx="1" fill="rgba(255,255,255,0.04)"/>' +
+
+        '<!-- Title -->' +
+        '<text x="' + (W/2) + '" y="20" text-anchor="middle" fill="rgba(255,255,255,0.92)" font-size="11" font-weight="700" letter-spacing="1">' + (lang === 'da' ? 'BESKYTTELSESREGEL: IB \u2264 In \u2264 Iz' : 'PROTECTION RULE: IB \u2264 In \u2264 Iz') + '</text>' +
+
+        '<!-- LED gauge track -->' +
+        '<rect x="' + gaugeX + '" y="30" width="' + gaugeW + '" height="' + gaugeH + '" rx="15" fill="rgba(0,0,0,0.5)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>' +
+
+        '<!-- Discrete LED segments -->' +
+        Array.from({length: 50}, function(_, i) {
+          const segX = gaugeX + 4 + i * (gaugeW - 8) / 50;
+          const segW = (gaugeW - 8) / 50 - 1.5;
+          const segFrac = i / 50;
+          const segColor = segFrac < 0.45 ? '#06d6a0' : segFrac < 0.7 ? '#ffd166' : '#ef476f';
+          const isLit = (segFrac * gaugeMax) < correctedIz;
+          return '<rect x="' + segX.toFixed(1) + '" y="33" width="' + segW.toFixed(1) + '" height="' + (gaugeH - 6) + '" rx="1.5" fill="' + segColor + '" opacity="' + (isLit ? '0.12' : '0.02') + '"/>';
+        }).join('') +
+
+        '<!-- IB active fill glow -->' +
+        (ibVal > 0 ? '<rect x="' + (gaugeX + 2) + '" y="32" width="' + ((ibVal / gaugeMax) * gaugeW).toFixed(1) + '" height="' + (gaugeH - 4) + '" rx="13" fill="' + condReflect + '" opacity="0.08"/>' : '') +
+
+        '<!-- Derating zone -->' +
+        (baseIz !== correctedIz ? '<rect x="' + (gaugeX + derateCorrW) + '" y="32" width="' + (derateW - derateCorrW).toFixed(1) + '" height="' + (gaugeH - 4) + '" fill="rgba(239,71,111,0.08)"/><text x="' + (gaugeX + derateCorrW + (derateW - derateCorrW)/2).toFixed(1) + '" y="26" text-anchor="middle" fill="#ef476f" font-size="7.5" opacity="0.8">K=' + kTotal.toFixed(2) + '</text>' : '') +
+
+        '<!-- IB marker -->' +
+        (ibVal > 0 ? '<rect x="' + (ibPos - 2).toFixed(1) + '" y="27" width="4" height="' + (gaugeH + 10) + '" rx="2" fill="#00b4d8" opacity="0.9"/><circle cx="' + ibPos.toFixed(1) + '" cy="27" r="5" fill="#00b4d8" filter="url(#cblBlur3)"/><text x="' + ibPos.toFixed(1) + '" y="18" text-anchor="middle" fill="#00b4d8" font-size="10" font-weight="700">IB</text><text x="' + ibPos.toFixed(1) + '" y="' + (gaugeH + 50) + '" text-anchor="middle" fill="#00b4d8" font-size="8.5">' + ibVal.toFixed(1) + 'A</text>' : '') +
+
+        '<!-- In marker -->' +
+        (inVal > 0 ? '<rect x="' + (inPos - 2).toFixed(1) + '" y="27" width="4" height="' + (gaugeH + 10) + '" rx="2" fill="#ffd166" opacity="0.9"/><circle cx="' + inPos.toFixed(1) + '" cy="27" r="5" fill="#ffd166" filter="url(#cblBlur3)"/><text x="' + inPos.toFixed(1) + '" y="18" text-anchor="middle" fill="#ffd166" font-size="10" font-weight="700">In</text><text x="' + inPos.toFixed(1) + '" y="' + (gaugeH + 50) + '" text-anchor="middle" fill="#ffd166" font-size="8.5">' + inVal + 'A</text>' : '') +
+
+        '<!-- Iz corrected marker -->' +
+        '<rect x="' + (izCorrPos - 2).toFixed(1) + '" y="27" width="4" height="' + (gaugeH + 10) + '" rx="2" fill="#06d6a0" opacity="0.9"/>' +
+        '<circle cx="' + izCorrPos.toFixed(1) + '" cy="27" r="5" fill="#06d6a0" filter="url(#cblBlur3)"/>' +
+        '<text x="' + izCorrPos.toFixed(1) + '" y="18" text-anchor="middle" fill="#06d6a0" font-size="10" font-weight="700">Iz\'</text>' +
+        '<text x="' + izCorrPos.toFixed(1) + '" y="' + (gaugeH + 50) + '" text-anchor="middle" fill="#06d6a0" font-size="8.5">' + correctedIz.toFixed(1) + 'A</text>' +
+
+        '<!-- Iz base marker -->' +
+        (baseIz !== correctedIz ? '<line x1="' + izBasePos.toFixed(1) + '" y1="32" x2="' + izBasePos.toFixed(1) + '" y2="' + (30 + gaugeH) + '" stroke="rgba(6,214,160,0.35)" stroke-width="1.5" stroke-dasharray="3 2"/><text x="' + izBasePos.toFixed(1) + '" y="' + (gaugeH + 62) + '" text-anchor="middle" fill="rgba(6,214,160,0.5)" font-size="7">Iz=' + baseIz + 'A</text>' : '') +
+
+        '<!-- Safety verdict -->' +
+        '<rect x="' + (W/2 - 90) + '" y="' + (gaugeH + 58) + '" width="180" height="26" rx="13" fill="' + safetyColor + '" opacity="0.1" stroke="' + safetyColor + '" stroke-width="1"/>' +
+        '<circle cx="' + (W/2 - 68) + '" cy="' + (gaugeH + 71) + '" r="4.5" fill="' + safetyColor + '"><animate attributeName="opacity" values="0.4;1;0.4" dur="1.5s" repeatCount="indefinite"/></circle>' +
+        '<text x="' + (W/2) + '" y="' + (gaugeH + 75) + '" text-anchor="middle" fill="' + safetyColor + '" font-size="10.5" font-weight="700">' + (safetyOk ? (lang === 'da' ? 'REGEL OVERHOLDT' : 'RULE SATISFIED') : (lang === 'da' ? 'REGEL OVERSKREDET' : 'RULE VIOLATED')) + '</text>' +
+      '</g>' +
+
+      '<!-- DS/HD reference -->' +
+      '<text x="' + (W - 10) + '" y="' + (H - 8) + '" text-anchor="end" fill="rgba(255,255,255,0.2)" font-size="7">DS/HD 60364-5-52 | IEC 60228</text>' +
+    '</svg>' +
+  '</div>';
 }
 
 // ===== VOLTAGE DROP VISUALIZATION =====
@@ -3780,312 +3970,388 @@ function renderShortCircuit() {
 // Data from 1.-Dim-af-trafo.ppx.pptx
 let trafoState = { size: 400, voltage: '10/0.4', loadPercent: 75 };
 
-// ===== TRANSFORMER VISUALIZATION =====
 function buildTrafoViz(S, uk, Ifl, Iload, loadFactor, Ik, Ploss) {
   if (!S || Ifl <= 0) return '';
-  const W = 620, H = 380;
+  const W = 700, H = 500;
 
-  // Layout positions
-  const trafoCx = W / 2, trafoCy = 140;
-  const coilSpacing = 50;
-  const primCx = trafoCx - coilSpacing / 2 - 20;
-  const secCx = trafoCx + coilSpacing / 2 + 20;
-  const coilR = 38;
-
-  // Voltage derived from standard ratio
-  const hvVoltage = 10; // kV (primary)
-  const lvVoltage = 0.4; // kV (secondary)
-
-  // Load gauge calculations
-  const gaugeX = 80, gaugeY = 290, gaugeW = W - 160, gaugeH = 20;
-  const loadColor = loadFactor < 0.75 ? '#06d6a0' : (loadFactor < 0.9 ? '#ffd166' : '#ef476f');
-  const loadGlowColor = loadFactor < 0.75 ? 'rgba(6,214,160,0.3)' : (loadFactor < 0.9 ? 'rgba(255,209,102,0.3)' : 'rgba(239,71,111,0.3)');
-
-  // Heat/loss proportional glow (scale to max ploss for size class)
-  const maxPloss = S * 25; // rough max
-  const heatIntensity = Math.min(1, Ploss / maxPloss);
-  const heatOpacity = (0.1 + heatIntensity * 0.5).toFixed(2);
-  const heatBlur = (4 + heatIntensity * 12).toFixed(1);
-
-  // Ik magnitude for visual indicator
+  // Load-based heat intensity
+  const heatIntensity = Math.min(1, loadFactor);
+  const maxPloss = S * 25;
+  const lossIntensity = Math.min(1, Ploss / maxPloss);
   const ikKA = Ik / 1000;
 
-  // Primary particles (slower - high voltage, low current)
-  const primParticles = [];
-  const numPrimP = 6;
-  for (let i = 0; i < numPrimP; i++) {
-    const angle = (i / numPrimP) * 360;
-    const dur = '3.5';
-    const delay = ((i / numPrimP) * 3.5).toFixed(2);
-    primParticles.push(`
-      <circle r="2" fill="#00e5ff" opacity="0.8">
-        <animateTransform attributeName="transform" type="rotate"
-          from="${angle} ${primCx} ${trafoCy}" to="${angle - 360} ${primCx} ${trafoCy}"
-          dur="${dur}s" begin="${delay}s" repeatCount="indefinite"/>
-        <animate attributeName="cx" values="${primCx + coilR * 0.75}" dur="0.01s" fill="freeze"/>
-        <animate attributeName="cy" values="${trafoCy}" dur="0.01s" fill="freeze"/>
-        <animate attributeName="opacity" values="0.4;1;0.8;1;0.4" dur="${dur}s" begin="${delay}s" repeatCount="indefinite"/>
-      </circle>`);
+  // Transformer tank dimensions
+  const tankX = 140, tankY = 60, tankW = 420, tankH = 260;
+  const tankCx = tankX + tankW / 2, tankCy = tankY + tankH / 2;
+
+  // Winding positions inside tank
+  const coreX = tankCx, coreW = 30, coreH = 180;
+  const primX = tankCx - 80, secX = tankCx + 80;
+  const windingY = tankCy - 70, windingH = 140;
+
+  // Cooling fin count and dimensions
+  const finCount = 8;
+  const finW = 8, finH = tankH * 0.7, finStartY = tankY + tankH * 0.15;
+
+  // Load gauge
+  const gaugeX = 100, gaugeY = 380, gaugeW = 500, gaugeH = 24;
+  const loadColor = loadFactor < 0.75 ? '#06d6a0' : (loadFactor < 0.9 ? '#ffd166' : '#ef476f');
+
+  // Flux animation speed based on frequency (50Hz visual)
+  const fluxSpeed = '2.5';
+
+  // Oil convection particles
+  let oilParticles = '';
+  for (let i = 0; i < 12; i++) {
+    const px = tankX + 40 + Math.random() * (tankW - 80);
+    const startY = tankY + tankH - 30;
+    const endY = tankY + 30;
+    const dur = (4 + Math.random() * 3).toFixed(1);
+    const delay = (Math.random() * 4).toFixed(1);
+    const drift = (Math.random() * 20 - 10).toFixed(0);
+    oilParticles += `
+      <circle r="${1 + Math.random() * 1.5}" fill="rgba(255,200,80,0.4)" opacity="0">
+        <animate attributeName="cy" values="${startY};${endY}" dur="${dur}s" begin="${delay}s" repeatCount="indefinite"/>
+        <animate attributeName="cx" values="${px};${parseFloat(px) + parseFloat(drift)}" dur="${dur}s" begin="${delay}s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0;${(0.2 + heatIntensity * 0.4).toFixed(2)};${(0.2 + heatIntensity * 0.4).toFixed(2)};0" dur="${dur}s" begin="${delay}s" repeatCount="indefinite"/>
+      </circle>`;
   }
 
-  // Secondary particles (faster - low voltage, high current)
-  const secParticles = [];
-  const numSecP = 10;
-  for (let i = 0; i < numSecP; i++) {
-    const angle = (i / numSecP) * 360;
-    const dur = '1.8';
-    const delay = ((i / numSecP) * 1.8).toFixed(2);
-    secParticles.push(`
-      <circle r="2.5" fill="#ffd166" opacity="0.9">
-        <animateTransform attributeName="transform" type="rotate"
-          from="${angle} ${secCx} ${trafoCy}" to="${angle + 360} ${secCx} ${trafoCy}"
-          dur="${dur}s" begin="${delay}s" repeatCount="indefinite"/>
-        <animate attributeName="cx" values="${secCx + coilR * 0.75}" dur="0.01s" fill="freeze"/>
-        <animate attributeName="cy" values="${trafoCy}" dur="0.01s" fill="freeze"/>
-        <animate attributeName="opacity" values="0.5;1;0.9;1;0.5" dur="${dur}s" begin="${delay}s" repeatCount="indefinite"/>
-      </circle>`);
-  }
-
-  // Magnetic flux lines between coils (animated)
-  const fluxLines = [];
-  for (let i = 0; i < 5; i++) {
-    const yOff = (i - 2) * 12;
-    const delay = (i * 0.3).toFixed(2);
-    fluxLines.push(`
-      <path d="M${primCx + coilR - 5} ${trafoCy + yOff} C${trafoCx - 8} ${trafoCy + yOff - 5} ${trafoCx + 8} ${trafoCy + yOff + 5} ${secCx - coilR + 5} ${trafoCy + yOff}"
-        fill="none" stroke="rgba(180,130,255,0.4)" stroke-width="1" stroke-dasharray="4 6">
-        <animate attributeName="stroke-dashoffset" from="20" to="0" dur="1.5s" begin="${delay}s" repeatCount="indefinite"/>
-        <animate attributeName="opacity" values="0.2;0.6;0.2" dur="2.5s" begin="${delay}s" repeatCount="indefinite"/>
-      </path>`);
-  }
-
-  // Coil winding paths (sinusoidal representation)
-  const makeCoilPath = (centerX, centerY, radius, turns) => {
-    let d = '';
-    const turnHeight = (radius * 2) / turns;
-    const startY = centerY - radius;
-    for (let t = 0; t < turns; t++) {
-      const y1 = startY + t * turnHeight;
-      const y2 = y1 + turnHeight / 2;
-      const y3 = y1 + turnHeight;
-      if (t === 0) d += `M${centerX - radius * 0.6} ${y1}`;
-      d += ` C${centerX + radius * 0.8} ${y1} ${centerX + radius * 0.8} ${y2} ${centerX} ${y2}`;
-      d += ` C${centerX - radius * 0.8} ${y2} ${centerX - radius * 0.8} ${y3} ${centerX + radius * 0.3} ${y3}`;
-    }
-    return d;
-  };
-
-  const primCoilPath = makeCoilPath(primCx, trafoCy, coilR, 6);
-  const secCoilPath = makeCoilPath(secCx, trafoCy, coilR, 4);
-
-  // Input/output connection lines with flowing current
-  const primInX = 40, secOutX = W - 40;
-  const primLineY = trafoCy;
-  const secLineY = trafoCy;
-
-  // Input current particles
-  const inParticles = [];
-  for (let i = 0; i < 4; i++) {
-    const delay = (i * 0.7).toFixed(2);
-    inParticles.push(`<circle r="2" fill="#00e5ff" opacity="0">
-      <animate attributeName="cx" from="${primInX}" to="${primCx - coilR}" dur="2.5s" begin="${delay}s" repeatCount="indefinite"/>
-      <animate attributeName="cy" values="${primLineY};${primLineY-1};${primLineY+1};${primLineY}" dur="2.5s" begin="${delay}s" repeatCount="indefinite"/>
-      <animate attributeName="opacity" values="0;0.9;0.9;0" dur="2.5s" begin="${delay}s" repeatCount="indefinite"/>
-    </circle>`);
-  }
-
-  // Output current particles (faster, brighter)
-  const outParticles = [];
+  // Magnetic flux paths (through core)
+  let fluxPaths = '';
   for (let i = 0; i < 7; i++) {
-    const delay = (i * 0.35).toFixed(2);
-    outParticles.push(`<circle r="2.5" fill="#ffd166" opacity="0">
-      <animate attributeName="cx" from="${secCx + coilR}" to="${secOutX}" dur="1.5s" begin="${delay}s" repeatCount="indefinite"/>
-      <animate attributeName="cy" values="${secLineY};${secLineY-1.5};${secLineY+1.5};${secLineY}" dur="1.5s" begin="${delay}s" repeatCount="indefinite"/>
-      <animate attributeName="opacity" values="0;1;1;0" dur="1.5s" begin="${delay}s" repeatCount="indefinite"/>
-    </circle>`);
+    const yOff = -coreH/2 + 15 + i * (coreH - 30) / 6;
+    const delay = (i * 0.25).toFixed(2);
+    const amplitude = 8 + i * 2;
+    fluxPaths += `
+      <path d="M${primX} ${tankCy + yOff} C${primX + 20} ${tankCy + yOff - amplitude}, ${coreX - 15} ${tankCy + yOff - amplitude}, ${coreX} ${tankCy + yOff} S${secX - 20} ${tankCy + yOff + amplitude}, ${secX} ${tankCy + yOff}"
+        fill="none" stroke="rgba(160,100,255,0.5)" stroke-width="1.5" stroke-dasharray="6 8" opacity="0">
+        <animate attributeName="stroke-dashoffset" from="28" to="0" dur="${fluxSpeed}s" begin="${delay}s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0;0.6;0.3;0.6;0" dur="${fluxSpeed}s" begin="${delay}s" repeatCount="indefinite"/>
+      </path>`;
   }
+
+  // Cooling fin heat waves
+  let heatWaves = '';
+  if (heatIntensity > 0.3) {
+    for (let side = 0; side < 2; side++) {
+      const baseX = side === 0 ? tankX - 20 : tankX + tankW + 20;
+      for (let w = 0; w < 3; w++) {
+        const waveX = side === 0 ? baseX - 10 - w * 12 : baseX + 10 + w * 12;
+        const delay = (w * 0.8).toFixed(1);
+        heatWaves += `
+          <path d="M${waveX} ${finStartY + 20} Q${waveX + (side===0?-5:5)} ${finStartY + finH * 0.3} ${waveX} ${finStartY + finH * 0.5} Q${waveX + (side===0?5:-5)} ${finStartY + finH * 0.7} ${waveX} ${finStartY + finH - 20}"
+            fill="none" stroke="rgba(255,140,60,${(heatIntensity * 0.3).toFixed(2)})" stroke-width="1.5" stroke-linecap="round" opacity="0">
+            <animate attributeName="opacity" values="0;${(heatIntensity * 0.5).toFixed(2)};0" dur="3s" begin="${delay}s" repeatCount="indefinite"/>
+            <animate attributeName="d" values="M${waveX} ${finStartY + 20} Q${waveX + (side===0?-5:5)} ${finStartY + finH * 0.3} ${waveX} ${finStartY + finH * 0.5} Q${waveX + (side===0?5:-5)} ${finStartY + finH * 0.7} ${waveX} ${finStartY + finH - 20};M${waveX} ${finStartY + 15} Q${waveX + (side===0?-8:8)} ${finStartY + finH * 0.25} ${waveX} ${finStartY + finH * 0.45} Q${waveX + (side===0?8:-8)} ${finStartY + finH * 0.65} ${waveX} ${finStartY + finH - 25}" dur="3s" begin="${delay}s" repeatCount="indefinite"/>
+          </path>`;
+      }
+    }
+  }
+
+  // Primary winding turns (thin wire, many turns)
+  let primWindings = '';
+  const primTurns = 14;
+  for (let t = 0; t < primTurns; t++) {
+    const ty = windingY + (t / primTurns) * windingH;
+    const w = 35;
+    primWindings += `<ellipse cx="${primX}" cy="${ty}" rx="${w}" ry="4" fill="none" stroke="url(#primWireGrad)" stroke-width="2" opacity="0.8"/>`;
+  }
+
+  // Secondary winding turns (thick wire, few turns)
+  let secWindings = '';
+  const secTurns = 6;
+  for (let t = 0; t < secTurns; t++) {
+    const ty = windingY + 10 + (t / secTurns) * (windingH - 20);
+    const w = 35;
+    secWindings += `<ellipse cx="${secX}" cy="${ty}" rx="${w}" ry="6" fill="none" stroke="url(#secWireGrad)" stroke-width="4" opacity="0.85"/>`;
+  }
+
+  // Bushing terminals
+  const bushingHV = [{x: primX - 20, label: 'H1'}, {x: primX + 20, label: 'H2'}];
+  const bushingLV = [{x: secX - 25, label: 'X1'}, {x: secX, label: 'X2'}, {x: secX + 25, label: 'X3'}];
 
   return `
-  <div style="margin-top:16px;border-radius:14px;overflow:hidden;background:linear-gradient(160deg,#060d16 0%,#0c0a1f 40%,#060d16 100%);border:1px solid rgba(180,130,255,0.15);box-shadow:0 0 40px rgba(180,130,255,0.05),inset 0 0 80px rgba(0,0,0,0.4)">
+  <div style="margin-top:18px;border-radius:16px;overflow:hidden;background:linear-gradient(155deg,#030810 0%,#0a0818 30%,#0d0a1f 60%,#020508 100%);border:1px solid rgba(160,100,255,0.15);box-shadow:0 8px 40px rgba(0,0,0,0.6),0 0 60px rgba(160,100,255,0.04),inset 0 1px 0 rgba(255,255,255,0.03)">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
       <defs>
-        <filter id="trafoBlur"><feGaussianBlur stdDeviation="4"/></filter>
-        <filter id="trafoBlurLg"><feGaussianBlur stdDeviation="${heatBlur}"/></filter>
-        <filter id="trafoGlow">
-          <feGaussianBlur stdDeviation="3" result="blur"/>
-          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        <filter id="trfBlur3"><feGaussianBlur stdDeviation="3"/></filter>
+        <filter id="trfBlur6"><feGaussianBlur stdDeviation="6"/></filter>
+        <filter id="trfBlur10"><feGaussianBlur stdDeviation="10"/></filter>
+        <filter id="trfShadow">
+          <feDropShadow dx="3" dy="5" stdDeviation="8" flood-color="rgba(0,0,0,0.7)"/>
         </filter>
-        <filter id="trafoShadow">
-          <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="rgba(0,0,0,0.6)"/>
+        <filter id="trfGlow">
+          <feGaussianBlur stdDeviation="2" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="trfMetallic">
+          <feSpecularLighting surfaceScale="2" specularConstant="1.2" specularExponent="20" result="spec">
+            <fePointLight x="200" y="50" z="200"/>
+          </feSpecularLighting>
+          <feComposite in="SourceGraphic" in2="spec" operator="arithmetic" k1="0" k2="1" k3="0.3" k4="0"/>
         </filter>
 
-        <!-- Core gradient (iron lamination look) -->
-        <linearGradient id="coreGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stop-color="#4a4a5a"/>
-          <stop offset="30%" stop-color="#3a3a4a"/>
-          <stop offset="50%" stop-color="#2a2a3a"/>
-          <stop offset="70%" stop-color="#3a3a4a"/>
-          <stop offset="100%" stop-color="#4a4a5a"/>
+        <!-- Tank metallic gradient -->
+        <linearGradient id="tankGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#5a6070"/>
+          <stop offset="15%" stop-color="#4a5060"/>
+          <stop offset="40%" stop-color="#3a4050"/>
+          <stop offset="60%" stop-color="#2a3040"/>
+          <stop offset="85%" stop-color="#3a4050"/>
+          <stop offset="100%" stop-color="#4a5060"/>
         </linearGradient>
 
-        <!-- Primary coil gradient -->
-        <linearGradient id="primGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stop-color="#00e5ff"/>
-          <stop offset="50%" stop-color="#0088aa"/>
-          <stop offset="100%" stop-color="#00e5ff"/>
+        <!-- Tank top highlight -->
+        <linearGradient id="tankTop" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="rgba(255,255,255,0.1)"/>
+          <stop offset="100%" stop-color="transparent"/>
         </linearGradient>
 
-        <!-- Secondary coil gradient -->
-        <linearGradient id="secGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stop-color="#ffd166"/>
-          <stop offset="50%" stop-color="#cc8800"/>
-          <stop offset="100%" stop-color="#ffd166"/>
+        <!-- Oil fill gradient -->
+        <linearGradient id="oilGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="rgba(180,140,40,0.05)"/>
+          <stop offset="50%" stop-color="rgba(160,120,30,0.1)"/>
+          <stop offset="100%" stop-color="rgba(140,100,20,0.15)"/>
+        </linearGradient>
+
+        <!-- Iron core gradient -->
+        <linearGradient id="ironCoreGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#5a5a6a"/>
+          <stop offset="20%" stop-color="#4a4a5a"/>
+          <stop offset="50%" stop-color="#3a3a4a"/>
+          <stop offset="80%" stop-color="#4a4a5a"/>
+          <stop offset="100%" stop-color="#5a5a6a"/>
+        </linearGradient>
+
+        <!-- Primary wire gradient (thin, red/brown copper) -->
+        <linearGradient id="primWireGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#ff6040"/>
+          <stop offset="50%" stop-color="#cc3020"/>
+          <stop offset="100%" stop-color="#ff6040"/>
+        </linearGradient>
+
+        <!-- Secondary wire gradient (thick, bright copper) -->
+        <linearGradient id="secWireGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#ffc080"/>
+          <stop offset="50%" stop-color="#e08840"/>
+          <stop offset="100%" stop-color="#ffc080"/>
+        </linearGradient>
+
+        <!-- Cooling fin gradient -->
+        <linearGradient id="finGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#3a4050"/>
+          <stop offset="50%" stop-color="#5a6070"/>
+          <stop offset="100%" stop-color="#3a4050"/>
+        </linearGradient>
+
+        <!-- Bushing gradient (porcelain) -->
+        <linearGradient id="bushingGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#8a7060"/>
+          <stop offset="30%" stop-color="#c0a080"/>
+          <stop offset="50%" stop-color="#e0c8a0"/>
+          <stop offset="70%" stop-color="#c0a080"/>
+          <stop offset="100%" stop-color="#8a7060"/>
         </linearGradient>
 
         <!-- Heat glow -->
-        <radialGradient id="heatGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="#ff8c42" stop-opacity="${heatOpacity}"/>
-          <stop offset="70%" stop-color="#ff6b2b" stop-opacity="${(heatIntensity * 0.2).toFixed(2)}"/>
+        <radialGradient id="trfHeatGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="rgba(255,120,40,${(heatIntensity * 0.15).toFixed(2)})"/>
+          <stop offset="70%" stop-color="rgba(255,80,20,${(heatIntensity * 0.05).toFixed(2)})"/>
           <stop offset="100%" stop-color="transparent"/>
         </radialGradient>
 
-        <!-- Ik flash -->
-        <radialGradient id="ikFlash" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="#ef476f" stop-opacity="0.8"/>
-          <stop offset="60%" stop-color="#ef476f" stop-opacity="0.3"/>
-          <stop offset="100%" stop-color="transparent"/>
-        </radialGradient>
+        <!-- Holographic label background -->
+        <linearGradient id="holoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="rgba(100,60,200,0.15)"/>
+          <stop offset="100%" stop-color="rgba(60,180,255,0.1)"/>
+        </linearGradient>
       </defs>
 
       <!-- Background grid -->
-      <pattern id="trGrid" width="20" height="20" patternUnits="userSpaceOnUse">
-        <path d="M20 0L0 0 0 20" fill="none" stroke="rgba(180,130,255,0.03)" stroke-width="0.5"/>
+      <rect width="${W}" height="${H}" fill="transparent"/>
+      <pattern id="trfGrid" width="25" height="25" patternUnits="userSpaceOnUse">
+        <path d="M25 0L0 0 0 25" fill="none" stroke="rgba(160,100,255,0.02)" stroke-width="0.5"/>
       </pattern>
-      <rect width="${W}" height="${H}" fill="url(#trGrid)"/>
+      <rect width="${W}" height="${H}" fill="url(#trfGrid)"/>
 
       <!-- Title -->
-      <text x="${W/2}" y="24" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="12" font-weight="600" letter-spacing="1">${lang === 'da' ? 'TRANSFORMER VISUALISERING' : 'TRANSFORMER VISUALIZATION'}</text>
-      <text x="${W/2}" y="40" text-anchor="middle" fill="rgba(180,130,255,0.7)" font-size="10">${S} kVA</text>
+      <text x="${W/2}" y="28" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="13" font-weight="700" letter-spacing="2">${lang === 'da' ? 'TRANSFORMERVISUALISERING' : 'TRANSFORMER VISUALIZATION'}</text>
+      <text x="${W/2}" y="48" text-anchor="middle" fill="rgba(160,130,255,0.8)" font-size="11">${S} kVA | uk=${uk}%</text>
 
-      <!-- Heat/loss glow (ambient pulsing around transformer) -->
-      <ellipse cx="${trafoCx}" cy="${trafoCy}" rx="${coilR * 2.5}" ry="${coilR * 1.8}" fill="url(#heatGlow)" filter="url(#trafoBlurLg)">
-        <animate attributeName="opacity" values="${(0.3 + heatIntensity * 0.3).toFixed(2)};${(0.6 + heatIntensity * 0.4).toFixed(2)};${(0.3 + heatIntensity * 0.3).toFixed(2)}" dur="${(3 - heatIntensity).toFixed(1)}s" repeatCount="indefinite"/>
-      </ellipse>
+      <!-- Heat glow behind tank -->
+      <rect x="${tankX - 30}" y="${tankY - 20}" width="${tankW + 60}" height="${tankH + 40}" rx="20" fill="url(#trfHeatGlow)" filter="url(#trfBlur10)">
+        <animate attributeName="opacity" values="0.5;0.8;0.5" dur="${(4 - heatIntensity * 2).toFixed(1)}s" repeatCount="indefinite"/>
+      </rect>
 
-      <!-- Transformer iron core (E-I shape) -->
-      <rect x="${trafoCx - 12}" y="${trafoCy - coilR - 12}" width="24" height="${coilR * 2 + 24}" rx="3" fill="url(#coreGrad)" filter="url(#trafoShadow)" opacity="0.9"/>
-      <!-- Core top bar -->
-      <rect x="${primCx - coilR + 5}" y="${trafoCy - coilR - 12}" width="${secCx - primCx + coilR * 2 - 10}" height="10" rx="2" fill="url(#coreGrad)" opacity="0.85"/>
-      <!-- Core bottom bar -->
-      <rect x="${primCx - coilR + 5}" y="${trafoCy + coilR + 2}" width="${secCx - primCx + coilR * 2 - 10}" height="10" rx="2" fill="url(#coreGrad)" opacity="0.85"/>
-      <!-- Core lamination lines -->
-      ${[0,1,2,3,4].map(i => `<line x1="${trafoCx - 10}" y1="${trafoCy - coilR + i * (coilR*2/4)}" x2="${trafoCx + 10}" y2="${trafoCy - coilR + i * (coilR*2/4)}" stroke="rgba(100,100,120,0.4)" stroke-width="0.5"/>`).join('')}
-
-      <!-- Primary coil (left) -->
-      <ellipse cx="${primCx}" cy="${trafoCy}" rx="${coilR}" ry="${coilR}" fill="none" stroke="url(#primGrad)" stroke-width="4" filter="url(#trafoGlow)" opacity="0.9"/>
-      <!-- Primary winding turns -->
-      ${[0,1,2,3,4,5].map(i => {
-        const a1 = -90 + i * 30;
-        const a2 = a1 + 25;
-        return `<path d="M${primCx + coilR * Math.cos(a1*Math.PI/180)} ${trafoCy + coilR * Math.sin(a1*Math.PI/180)} A${coilR} ${coilR} 0 0 1 ${primCx + coilR * Math.cos(a2*Math.PI/180)} ${trafoCy + coilR * Math.sin(a2*Math.PI/180)}" fill="none" stroke="#00e5ff" stroke-width="3" stroke-linecap="round" opacity="0.7"/>`;
+      <!-- Cooling fins (left side) -->
+      ${Array.from({length: finCount}, (_, i) => {
+        const fx = tankX - 15 - i * (finW + 3);
+        return `<rect x="${fx}" y="${finStartY}" width="${finW}" height="${finH}" rx="2" fill="url(#finGrad)" stroke="rgba(255,255,255,0.05)" stroke-width="0.5" opacity="0.9"/>`;
       }).join('')}
-      <!-- Primary inner glow -->
-      <ellipse cx="${primCx}" cy="${trafoCy}" rx="${coilR - 5}" ry="${coilR - 5}" fill="none" stroke="rgba(0,229,255,0.15)" stroke-width="8" filter="url(#trafoBlur)">
-        <animate attributeName="opacity" values="0.3;0.6;0.3" dur="3.5s" repeatCount="indefinite"/>
-      </ellipse>
 
-      <!-- Secondary coil (right) -->
-      <ellipse cx="${secCx}" cy="${trafoCy}" rx="${coilR}" ry="${coilR}" fill="none" stroke="url(#secGrad)" stroke-width="5" filter="url(#trafoGlow)" opacity="0.9"/>
-      <!-- Secondary winding turns (fewer, thicker) -->
-      ${[0,1,2,3].map(i => {
-        const a1 = -90 + i * 45;
-        const a2 = a1 + 38;
-        return `<path d="M${secCx + coilR * Math.cos(a1*Math.PI/180)} ${trafoCy + coilR * Math.sin(a1*Math.PI/180)} A${coilR} ${coilR} 0 0 1 ${secCx + coilR * Math.cos(a2*Math.PI/180)} ${trafoCy + coilR * Math.sin(a2*Math.PI/180)}" fill="none" stroke="#ffd166" stroke-width="4" stroke-linecap="round" opacity="0.75"/>`;
+      <!-- Cooling fins (right side) -->
+      ${Array.from({length: finCount}, (_, i) => {
+        const fx = tankX + tankW + 7 + i * (finW + 3);
+        return `<rect x="${fx}" y="${finStartY}" width="${finW}" height="${finH}" rx="2" fill="url(#finGrad)" stroke="rgba(255,255,255,0.05)" stroke-width="0.5" opacity="0.9"/>`;
       }).join('')}
-      <!-- Secondary inner glow -->
-      <ellipse cx="${secCx}" cy="${trafoCy}" rx="${coilR - 5}" ry="${coilR - 5}" fill="none" stroke="rgba(255,209,102,0.15)" stroke-width="8" filter="url(#trafoBlur)">
-        <animate attributeName="opacity" values="0.3;0.7;0.3" dur="1.8s" repeatCount="indefinite"/>
+
+      <!-- Heat radiation waves from fins -->
+      ${heatWaves}
+
+      <!-- Transformer tank body -->
+      <rect x="${tankX}" y="${tankY}" width="${tankW}" height="${tankH}" rx="8" fill="url(#tankGrad)" filter="url(#trfShadow)"/>
+      <!-- Tank top reflection -->
+      <rect x="${tankX}" y="${tankY}" width="${tankW}" height="20" rx="8" fill="url(#tankTop)"/>
+      <!-- Tank edge highlight -->
+      <rect x="${tankX}" y="${tankY}" width="${tankW}" height="${tankH}" rx="8" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
+      <!-- Tank rivets -->
+      ${[0.1, 0.3, 0.5, 0.7, 0.9].map(f => `<circle cx="${tankX + tankW * f}" cy="${tankY + 12}" r="3" fill="rgba(80,90,100,0.8)" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>`).join('')}
+      ${[0.1, 0.3, 0.5, 0.7, 0.9].map(f => `<circle cx="${tankX + tankW * f}" cy="${tankY + tankH - 12}" r="3" fill="rgba(80,90,100,0.8)" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>`).join('')}
+
+      <!-- Oil fill (visible through cutaway) -->
+      <rect x="${tankX + 8}" y="${tankY + 8}" width="${tankW - 16}" height="${tankH - 16}" rx="4" fill="url(#oilGrad)"/>
+
+      <!-- Oil convection particles -->
+      ${oilParticles}
+
+      <!-- Iron Core (E-shape) -->
+      <!-- Vertical center leg -->
+      <rect x="${coreX - coreW/2}" y="${tankCy - coreH/2}" width="${coreW}" height="${coreH}" rx="3" fill="url(#ironCoreGrad)" opacity="0.9"/>
+      <!-- Top yoke -->
+      <rect x="${primX - 40}" y="${tankCy - coreH/2 - 8}" width="${secX - primX + 80}" height="${16}" rx="3" fill="url(#ironCoreGrad)" opacity="0.85"/>
+      <!-- Bottom yoke -->
+      <rect x="${primX - 40}" y="${tankCy + coreH/2 - 8}" width="${secX - primX + 80}" height="${16}" rx="3" fill="url(#ironCoreGrad)" opacity="0.85"/>
+      <!-- Lamination lines -->
+      ${Array.from({length: 8}, (_, i) => {
+        const ly = tankCy - coreH/2 + 10 + i * (coreH - 20) / 7;
+        return `<line x1="${coreX - coreW/2 + 3}" y1="${ly}" x2="${coreX + coreW/2 - 3}" y2="${ly}" stroke="rgba(100,100,130,0.3)" stroke-width="0.5"/>`;
+      }).join('')}
+
+      <!-- Magnetic flux lines -->
+      ${fluxPaths}
+
+      <!-- Primary windings (HV - thin, many turns) -->
+      ${primWindings}
+      <!-- Primary glow -->
+      <ellipse cx="${primX}" cy="${tankCy}" rx="38" ry="${windingH/2 + 5}" fill="none" stroke="rgba(255,80,50,0.15)" stroke-width="6" filter="url(#trfBlur3)">
+        <animate attributeName="opacity" values="0.3;0.6;0.3" dur="3s" repeatCount="indefinite"/>
       </ellipse>
 
-      <!-- Magnetic flux lines (animated between coils) -->
-      ${fluxLines.join('')}
+      <!-- Secondary windings (LV - thick, few turns) -->
+      ${secWindings}
+      <!-- Secondary glow -->
+      <ellipse cx="${secX}" cy="${tankCy}" rx="38" ry="${windingH/2 + 5}" fill="none" stroke="rgba(255,200,80,0.15)" stroke-width="8" filter="url(#trfBlur3)">
+        <animate attributeName="opacity" values="0.3;0.7;0.3" dur="2s" repeatCount="indefinite"/>
+      </ellipse>
 
-      <!-- uk% impedance block between windings -->
-      <rect x="${trafoCx - 18}" y="${trafoCy + coilR + 16}" width="36" height="20" rx="4" fill="rgba(180,130,255,0.1)" stroke="rgba(180,130,255,0.5)" stroke-width="1"/>
-      <text x="${trafoCx}" y="${trafoCy + coilR + 30}" text-anchor="middle" fill="#b482ff" font-size="9" font-weight="700">uk=${uk}%</text>
+      <!-- HV Bushings on top -->
+      ${bushingHV.map(b => `
+        <rect x="${b.x - 5}" y="${tankY - 35}" width="10" height="40" rx="4" fill="url(#bushingGrad)"/>
+        <circle cx="${b.x}" cy="${tankY - 38}" r="6" fill="#cc4444" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+        <text x="${b.x}" y="${tankY - 44}" text-anchor="middle" fill="rgba(255,100,80,0.8)" font-size="7" font-weight="600">${b.label}</text>
+      `).join('')}
 
-      <!-- Primary connection line -->
-      <line x1="${primInX}" y1="${primLineY}" x2="${primCx - coilR}" y2="${primLineY}" stroke="#00e5ff" stroke-width="2" opacity="0.6"/>
-      <line x1="${primInX}" y1="${primLineY}" x2="${primCx - coilR}" y2="${primLineY}" stroke="#00e5ff" stroke-width="5" opacity="0.15" filter="url(#trafoBlur)"/>
+      <!-- LV Bushings on side -->
+      ${bushingLV.map(b => `
+        <rect x="${b.x - 4}" y="${tankY + tankH - 5}" width="8" height="30" rx="3" fill="url(#bushingGrad)"/>
+        <circle cx="${b.x}" cy="${tankY + tankH + 28}" r="5" fill="#cc8800" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+        <text x="${b.x}" y="${tankY + tankH + 42}" text-anchor="middle" fill="rgba(255,200,80,0.8)" font-size="7" font-weight="600">${b.label}</text>
+      `).join('')}
 
-      <!-- Secondary connection line -->
-      <line x1="${secCx + coilR}" y1="${secLineY}" x2="${secOutX}" y2="${secLineY}" stroke="#ffd166" stroke-width="2.5" opacity="0.6"/>
-      <line x1="${secCx + coilR}" y1="${secLineY}" x2="${secOutX}" y2="${secLineY}" stroke="#ffd166" stroke-width="6" opacity="0.15" filter="url(#trafoBlur)"/>
+      <!-- Current flow: HV input -->
+      ${Array.from({length: 4}, (_, i) => {
+        const delay = (i * 0.8).toFixed(2);
+        return `<circle r="2.5" fill="#ff6040" opacity="0" filter="url(#trfGlow)">
+          <animate attributeName="cx" values="40;${primX}" dur="3s" begin="${delay}s" repeatCount="indefinite"/>
+          <animate attributeName="cy" values="${tankY - 35};${tankCy}" dur="3s" begin="${delay}s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0;0.8;0.8;0" dur="3s" begin="${delay}s" repeatCount="indefinite"/>
+        </circle>`;
+      }).join('')}
 
-      <!-- Input particles (slow, HV) -->
-      ${inParticles.join('')}
+      <!-- Current flow: LV output -->
+      ${Array.from({length: 7}, (_, i) => {
+        const delay = (i * 0.4).toFixed(2);
+        return `<circle r="3" fill="#ffc060" opacity="0" filter="url(#trfGlow)">
+          <animate attributeName="cx" values="${secX};${W - 40}" dur="2s" begin="${delay}s" repeatCount="indefinite"/>
+          <animate attributeName="cy" values="${tankCy};${tankY + tankH + 28}" dur="2s" begin="${delay}s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0;0.9;0.9;0" dur="2s" begin="${delay}s" repeatCount="indefinite"/>
+        </circle>`;
+      }).join('')}
 
-      <!-- Output particles (fast, LV) -->
-      ${outParticles.join('')}
+      <!-- Floating holographic labels -->
+      <!-- Ifl label -->
+      <g transform="translate(30, ${tankCy - 30})" opacity="0.9">
+        <rect x="0" y="0" width="70" height="28" rx="6" fill="url(#holoGrad)" stroke="rgba(100,180,255,0.3)" stroke-width="0.5"/>
+        <text x="35" y="12" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="7">Ifl</text>
+        <text x="35" y="23" text-anchor="middle" fill="#00e5ff" font-size="9" font-weight="700">${Ifl.toFixed(1)} A</text>
+        <animate attributeName="opacity" values="0.7;1;0.7" dur="3s" repeatCount="indefinite"/>
+      </g>
 
-      <!-- Primary orbital particles -->
-      <g>${primParticles.join('')}</g>
+      <!-- Ik label -->
+      <g transform="translate(${W - 100}, ${tankCy - 30})" opacity="0.9">
+        <rect x="0" y="0" width="70" height="28" rx="6" fill="url(#holoGrad)" stroke="rgba(239,71,111,0.3)" stroke-width="0.5"/>
+        <text x="35" y="12" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="7">Ik</text>
+        <text x="35" y="23" text-anchor="middle" fill="#ef476f" font-size="9" font-weight="700">${ikKA.toFixed(2)} kA</text>
+        <animate attributeName="opacity" values="0.7;1;0.7" dur="2.5s" repeatCount="indefinite"/>
+      </g>
 
-      <!-- Secondary orbital particles -->
-      <g>${secParticles.join('')}</g>
+      <!-- Ploss label -->
+      <g transform="translate(${W - 100}, ${tankCy + 10})" opacity="0.9">
+        <rect x="0" y="0" width="70" height="28" rx="6" fill="url(#holoGrad)" stroke="rgba(255,140,60,0.3)" stroke-width="0.5"/>
+        <text x="35" y="12" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="7">${lang === 'da' ? 'Tab' : 'Loss'}</text>
+        <text x="35" y="23" text-anchor="middle" fill="#ff8c42" font-size="9" font-weight="700">${Ploss.toFixed(0)} W</text>
+        <animate attributeName="opacity" values="0.7;1;0.7" dur="2.8s" repeatCount="indefinite"/>
+      </g>
 
-      <!-- HV Label (primary side) -->
-      <text x="${primInX + 10}" y="${primLineY - 14}" fill="#00e5ff" font-size="10" font-weight="600">${hvVoltage} kV</text>
-      <text x="${primInX + 10}" y="${primLineY + 18}" fill="rgba(0,229,255,0.6)" font-size="8">${lang === 'da' ? 'Prim\u00E6r' : 'Primary'}</text>
+      <!-- Voltage labels -->
+      <text x="50" y="${tankY - 45}" fill="#ff6040" font-size="11" font-weight="700">10 kV</text>
+      <text x="50" y="${tankY - 32}" fill="rgba(255,100,80,0.6)" font-size="8">${lang === 'da' ? 'Primaer' : 'Primary'}</text>
+      <text x="${W - 50}" y="${tankY + tankH + 52}" text-anchor="end" fill="#ffc060" font-size="11" font-weight="700">0.4 kV</text>
+      <text x="${W - 50}" y="${tankY + tankH + 64}" text-anchor="end" fill="rgba(255,200,80,0.6)" font-size="8">${Iload.toFixed(1)} A</text>
 
-      <!-- LV Label (secondary side) -->
-      <text x="${secOutX - 50}" y="${secLineY - 14}" fill="#ffd166" font-size="10" font-weight="600" text-anchor="end">${lvVoltage} kV</text>
-      <text x="${secOutX - 50}" y="${secLineY + 18}" fill="rgba(255,209,102,0.6)" font-size="8" text-anchor="end">${Iload.toFixed(1)} A</text>
+      <!-- LOAD GAUGE -->
+      <g transform="translate(0, ${gaugeY - 20})">
+        <!-- Panel background -->
+        <rect x="${gaugeX - 10}" y="0" width="${gaugeW + 20}" height="80" rx="8" fill="rgba(10,10,25,0.8)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
 
-      <!-- Ik indicator (red flash pulse) -->
-      <circle cx="${secOutX - 10}" cy="${secLineY}" r="14" fill="url(#ikFlash)" opacity="0">
-        <animate attributeName="opacity" values="0;0.7;0" dur="3s" repeatCount="indefinite"/>
-        <animate attributeName="r" values="8;18;8" dur="3s" repeatCount="indefinite"/>
-      </circle>
-      <text x="${secOutX - 10}" y="${secLineY + 32}" text-anchor="middle" fill="#ef476f" font-size="8" font-weight="600">Ik=${ikKA.toFixed(1)}kA</text>
+        <text x="${W/2}" y="18" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="11" font-weight="700">
+          ${lang === 'da' ? 'BELASTNINGSGRAD' : 'LOAD FACTOR'}: ${(loadFactor * 100).toFixed(0)}%
+        </text>
 
-      <!-- LOAD GAUGE BAR -->
-      <text x="${W/2}" y="${gaugeY - 12}" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="10" font-weight="600">
-        ${lang === 'da' ? 'Belastningsgrad' : 'Load Factor'}: ${(loadFactor * 100).toFixed(0)}%
-      </text>
+        <!-- Gauge track -->
+        <rect x="${gaugeX}" y="28" width="${gaugeW}" height="${gaugeH}" rx="12" fill="rgba(0,0,0,0.5)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
 
-      <!-- Gauge track -->
-      <rect x="${gaugeX}" y="${gaugeY}" width="${gaugeW}" height="${gaugeH}" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>
+        <!-- Gauge fill -->
+        <rect x="${gaugeX + 2}" y="30" width="${(gaugeW - 4) * Math.min(loadFactor, 1.1)}" height="${gaugeH - 4}" rx="10" fill="${loadColor}" opacity="0.3"/>
+        <rect x="${gaugeX + 2}" y="30" width="${(gaugeW - 4) * Math.min(loadFactor, 1.1)}" height="${gaugeH - 4}" rx="10" fill="${loadColor}" opacity="0.15" filter="url(#trfBlur3)"/>
 
-      <!-- Gauge fill -->
-      <rect x="${gaugeX}" y="${gaugeY + 1}" width="${gaugeW * Math.min(loadFactor, 1)}" height="${gaugeH - 2}" rx="9" fill="${loadColor}" opacity="0.25"/>
-      <rect x="${gaugeX}" y="${gaugeY + 1}" width="${gaugeW * Math.min(loadFactor, 1)}" height="${gaugeH - 2}" rx="9" fill="${loadColor}" opacity="0.5" filter="url(#trafoBlur)"/>
+        <!-- Gauge glow tip -->
+        <circle cx="${gaugeX + (gaugeW - 4) * Math.min(loadFactor, 1.1)}" cy="${28 + gaugeH/2}" r="8" fill="${loadColor}" opacity="0.4" filter="url(#trfBlur3)">
+          <animate attributeName="opacity" values="0.2;0.6;0.2" dur="2s" repeatCount="indefinite"/>
+        </circle>
 
-      <!-- Gauge glow at fill end -->
-      <circle cx="${gaugeX + gaugeW * Math.min(loadFactor, 1)}" cy="${gaugeY + gaugeH/2}" r="8" fill="${loadColor}" opacity="0.4" filter="url(#trafoBlur)">
-        <animate attributeName="opacity" values="0.2;0.6;0.2" dur="2s" repeatCount="indefinite"/>
-      </circle>
+        <!-- Threshold markers -->
+        <line x1="${gaugeX + gaugeW * 0.75}" y1="26" x2="${gaugeX + gaugeW * 0.75}" y2="${28 + gaugeH + 4}" stroke="#ffd166" stroke-width="1" stroke-dasharray="3 2" opacity="0.7"/>
+        <text x="${gaugeX + gaugeW * 0.75}" y="22" text-anchor="middle" fill="#ffd166" font-size="7">75%</text>
 
-      <!-- Gauge threshold markers -->
-      <line x1="${gaugeX + gaugeW * 0.75}" y1="${gaugeY - 4}" x2="${gaugeX + gaugeW * 0.75}" y2="${gaugeY + gaugeH + 4}" stroke="#ffd166" stroke-width="1" stroke-dasharray="3 2" opacity="0.7"/>
-      <text x="${gaugeX + gaugeW * 0.75}" y="${gaugeY - 7}" text-anchor="middle" fill="#ffd166" font-size="7" opacity="0.7">75%</text>
+        <line x1="${gaugeX + gaugeW * 0.9}" y1="26" x2="${gaugeX + gaugeW * 0.9}" y2="${28 + gaugeH + 4}" stroke="#ef476f" stroke-width="1" stroke-dasharray="3 2" opacity="0.7"/>
+        <text x="${gaugeX + gaugeW * 0.9}" y="22" text-anchor="middle" fill="#ef476f" font-size="7">90%</text>
 
-      <line x1="${gaugeX + gaugeW * 0.9}" y1="${gaugeY - 4}" x2="${gaugeX + gaugeW * 0.9}" y2="${gaugeY + gaugeH + 4}" stroke="#ef476f" stroke-width="1" stroke-dasharray="3 2" opacity="0.7"/>
-      <text x="${gaugeX + gaugeW * 0.9}" y="${gaugeY - 7}" text-anchor="middle" fill="#ef476f" font-size="7" opacity="0.7">90%</text>
+        <!-- Loss display -->
+        <text x="${W/2}" y="70" text-anchor="middle" fill="rgba(255,140,60,0.8)" font-size="9">
+          ${lang === 'da' ? 'Totale tab' : 'Total losses'}: ${Ploss.toFixed(0)} W
+          <animate attributeName="opacity" values="0.6;1;0.6" dur="3s" repeatCount="indefinite"/>
+        </text>
+      </g>
 
-      <!-- Loss display -->
-      <text x="${W/2}" y="${gaugeY + gaugeH + 22}" text-anchor="middle" fill="rgba(255,140,66,0.8)" font-size="9">
-        ${lang === 'da' ? 'Tab' : 'Losses'}: ${Ploss.toFixed(0)} W
-        <animate attributeName="opacity" values="0.6;1;0.6" dur="${(3 - heatIntensity).toFixed(1)}s" repeatCount="indefinite"/>
-      </text>
-
-      <!-- Direction arrows on connection lines -->
-      <polygon points="${primCx - coilR - 20},${primLineY - 4} ${primCx - coilR - 10},${primLineY} ${primCx - coilR - 20},${primLineY + 4}" fill="#00e5ff" opacity="0.6">
-        <animate attributeName="opacity" values="0.3;0.8;0.3" dur="2.5s" repeatCount="indefinite"/>
-      </polygon>
-      <polygon points="${secOutX - 15},${secLineY - 5} ${secOutX - 5},${secLineY} ${secOutX - 15},${secLineY + 5}" fill="#ffd166" opacity="0.7">
-        <animate attributeName="opacity" values="0.4;1;0.4" dur="1.5s" repeatCount="indefinite"/>
-      </polygon>
+      <!-- Nameplate -->
+      <g transform="translate(${tankX + 10}, ${tankY + tankH - 50})">
+        <rect x="0" y="0" width="80" height="40" rx="3" fill="rgba(200,180,140,0.1)" stroke="rgba(200,180,140,0.3)" stroke-width="0.5"/>
+        <text x="40" y="14" text-anchor="middle" fill="rgba(200,180,140,0.6)" font-size="6">${S} kVA</text>
+        <text x="40" y="24" text-anchor="middle" fill="rgba(200,180,140,0.5)" font-size="5">10/0.4 kV</text>
+        <text x="40" y="34" text-anchor="middle" fill="rgba(200,180,140,0.5)" font-size="5">uk=${uk}% Dyn11</text>
+      </g>
     </svg>
   </div>`;
 }
@@ -8516,144 +8782,324 @@ function renderMotorStart() {
     ${compHtml}
   `;
 }
-
 function buildMotorViz(In, Istart, dU_pct, method, vdropOk, k2s2Ok, cableOk, cableLen) {
   const da = lang === 'da';
-  const W = 640, H = 480;
+  const W = 720, H = 560;
   const allOk = vdropOk && k2s2Ok && cableOk;
   const accentColor = allOk ? '#06d6a0' : '#ff4444';
 
-  let svg = '';
+  // Motor body dimensions
+  const motorCx = 500, motorCy = 180, motorR = 65;
+  const bodyW = 130, bodyH = 100;
 
-  // Background with grid
-  svg += '<rect width="' + W + '" height="' + H + '" fill="#020508" rx="14"/>';
-  for (var gi = 0; gi < W; gi += 40) svg += '<line x1="' + gi + '" y1="0" x2="' + gi + '" y2="' + H + '" stroke="rgba(0,180,255,0.03)" stroke-width="0.5"/>';
-  for (var gj = 0; gj < H; gj += 40) svg += '<line x1="0" y1="' + gj + '" x2="' + W + '" y2="' + gj + '" stroke="rgba(0,180,255,0.03)" stroke-width="0.5"/>';
+  // Load/start ratios for animation
+  const startRatio = Istart / In;
+  const shakeIntensity = Math.min(3, startRatio * 0.3);
 
-  // Title
-  svg += '<text x="' + (W/2) + '" y="26" text-anchor="middle" font-size="11" fill="' + accentColor + '" font-weight="700">' + (da ? 'MOTORSTART-KREDSLOEB' : 'MOTOR STARTING CIRCUIT') + '</text>';
+  // Rotation speed (faster for DOL)
+  const rotSpeed = method === 'VFD' ? '4' : method === 'DOL' ? '1.5' : '2.5';
 
-  // Panel box (left)
-  var panelX = 60, panelY = 100, panelW = 80, panelH = 120;
-  svg += '<rect x="' + panelX + '" y="' + panelY + '" width="' + panelW + '" height="' + panelH + '" rx="6" fill="rgba(0,180,255,0.06)" stroke="#0af" stroke-width="1.5"/>';
-  svg += '<text x="' + (panelX + panelW/2) + '" y="' + (panelY + 20) + '" text-anchor="middle" font-size="9" fill="#0af" font-weight="700">' + (da ? 'TAVLE' : 'PANEL') + '</text>';
-  svg += '<text x="' + (panelX + panelW/2) + '" y="' + (panelY + 38) + '" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.7)">400V 3\u223C</text>';
+  let svg = `
+      <defs>
+        <filter id="motorBlur3"><feGaussianBlur stdDeviation="3"/></filter>
+        <filter id="motorBlur6"><feGaussianBlur stdDeviation="6"/></filter>
+        <filter id="motorShadow">
+          <feDropShadow dx="3" dy="5" stdDeviation="6" flood-color="rgba(0,0,0,0.7)"/>
+        </filter>
+        <filter id="motorGlow">
+          <feGaussianBlur stdDeviation="2" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="motorVibrate">
+          <feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="1" result="turb">
+            <animate attributeName="baseFrequency" values="0.02;0.05;0.02" dur="0.3s" repeatCount="indefinite"/>
+          </feTurbulence>
+          <feDisplacementMap in="SourceGraphic" in2="turb" scale="${shakeIntensity}" xChannelSelector="R" yChannelSelector="G"/>
+        </filter>
 
-  // MCB/MPCB symbol inside panel
-  var mcbX = panelX + panelW/2, mcbY = panelY + 65;
-  svg += '<rect x="' + (mcbX - 20) + '" y="' + (mcbY - 12) + '" width="40" height="24" rx="4" fill="rgba(0,180,255,0.1)" stroke="' + accentColor + '" stroke-width="1.5"/>';
-  var curveLabel = method === 'DOL' ? 'D' : method === 'VFD' ? 'B' : 'C';
-  svg += '<text x="' + mcbX + '" y="' + (mcbY + 4) + '" text-anchor="middle" font-size="8" fill="#fff" font-weight="700">' + curveLabel + ' MCB</text>';
+        <!-- Motor body metallic gradient -->
+        <linearGradient id="motorBodyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#6a7080"/>
+          <stop offset="15%" stop-color="#5a6070"/>
+          <stop offset="40%" stop-color="#4a5060"/>
+          <stop offset="60%" stop-color="#3a4050"/>
+          <stop offset="85%" stop-color="#4a5060"/>
+          <stop offset="100%" stop-color="#5a6070"/>
+        </linearGradient>
 
-  // Contactor symbol (middle area)
-  var contX = 220, contY = 140;
-  svg += '<rect x="' + (contX - 22) + '" y="' + (contY - 16) + '" width="44" height="32" rx="5" fill="rgba(255,165,0,0.08)" stroke="#ffa500" stroke-width="1.5"/>';
-  svg += '<text x="' + contX + '" y="' + (contY - 2) + '" text-anchor="middle" font-size="7" fill="#ffa500" font-weight="700">' + (da ? 'KONTAKTOR' : 'CONTACTOR') + '</text>';
-  svg += '<text x="' + contX + '" y="' + (contY + 10) + '" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.6)">KM1</text>';
-  // Animated contactor close
-  svg += '<line x1="' + (contX - 8) + '" y1="' + (contY + 16) + '" x2="' + (contX + 8) + '" y2="' + (contY + 16) + '" stroke="#ffa500" stroke-width="2">';
-  svg += '<animate attributeName="y1" values="' + (contY + 20) + ';' + (contY + 16) + ';' + (contY + 16) + '" dur="2s" repeatCount="indefinite"/></line>';
+        <!-- End bell gradient -->
+        <radialGradient id="endBellGrad" cx="50%" cy="45%" r="55%">
+          <stop offset="0%" stop-color="#6a7585"/>
+          <stop offset="40%" stop-color="#4a5565"/>
+          <stop offset="80%" stop-color="#3a4555"/>
+          <stop offset="100%" stop-color="#2a3545"/>
+        </radialGradient>
 
-  // Overload relay
-  var olX = 320, olY = 140;
-  svg += '<rect x="' + (olX - 22) + '" y="' + (olY - 16) + '" width="44" height="32" rx="5" fill="rgba(255,70,70,0.08)" stroke="#ff4444" stroke-width="1.5"/>';
-  svg += '<text x="' + olX + '" y="' + (olY - 2) + '" text-anchor="middle" font-size="7" fill="#ff4444" font-weight="700">' + (da ? 'OVERL.' : 'O/L') + '</text>';
-  svg += '<text x="' + olX + '" y="' + (olY + 10) + '" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.6)">' + In.toFixed(1) + 'A</text>';
+        <!-- Shaft metallic -->
+        <linearGradient id="shaftGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#8a9aaa"/>
+          <stop offset="30%" stop-color="#6a7a8a"/>
+          <stop offset="50%" stop-color="#5a6a7a"/>
+          <stop offset="70%" stop-color="#6a7a8a"/>
+          <stop offset="100%" stop-color="#8a9aaa"/>
+        </linearGradient>
 
-  // Cable from panel to motor
-  var cableStartX = panelX + panelW, cableEndX = 480;
-  var cableY1 = panelY + 65;
-  // Draw 3 phase conductors (L1, L2, L3)
-  var colors = ['#ff4444', '#ffff00', '#0af'];
-  for (var ci = 0; ci < 3; ci++) {
-    var yOff = (ci - 1) * 6;
-    svg += '<line x1="' + cableStartX + '" y1="' + (cableY1 + yOff) + '" x2="' + (contX - 22) + '" y2="' + (contY + yOff - 6) + '" stroke="' + colors[ci] + '" stroke-width="1.5" opacity="0.7"/>';
-    svg += '<line x1="' + (contX + 22) + '" y1="' + (contY + yOff - 6) + '" x2="' + (olX - 22) + '" y2="' + (olY + yOff - 6) + '" stroke="' + colors[ci] + '" stroke-width="1.5" opacity="0.7"/>';
-    svg += '<line x1="' + (olX + 22) + '" y1="' + (olY + yOff - 6) + '" x2="' + cableEndX + '" y2="' + (160 + yOff) + '" stroke="' + colors[ci] + '" stroke-width="1.5" opacity="0.7"/>';
-  }
+        <!-- Cooling fin gradient -->
+        <linearGradient id="mFinGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#3a4555"/>
+          <stop offset="50%" stop-color="#5a6575"/>
+          <stop offset="100%" stop-color="#3a4555"/>
+        </linearGradient>
 
-  // Animated current flow (pulses along cable)
-  svg += '<circle r="4" fill="#0af" opacity="0.8">';
-  svg += '<animateMotion dur="1.5s" repeatCount="indefinite" path="M' + cableStartX + ',' + cableY1 + ' L' + (contX - 22) + ',' + (contY - 6) + ' L' + (contX + 22) + ',' + (contY - 6) + ' L' + (olX - 22) + ',' + (olY - 6) + ' L' + (olX + 22) + ',' + (olY - 6) + ' L' + cableEndX + ',160"/>';
-  svg += '</circle>';
-  svg += '<circle r="4" fill="#ff6b35" opacity="0.6">';
-  svg += '<animateMotion dur="1.5s" repeatCount="indefinite" begin="0.75s" path="M' + cableStartX + ',' + cableY1 + ' L' + (contX - 22) + ',' + (contY - 6) + ' L' + (contX + 22) + ',' + (contY - 6) + ' L' + (olX - 22) + ',' + (olY - 6) + ' L' + (olX + 22) + ',' + (olY - 6) + ' L' + cableEndX + ',160"/>';
-  svg += '</circle>';
+        <!-- Fan blade gradient -->
+        <radialGradient id="fanGrad" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#5a6a7a"/>
+          <stop offset="100%" stop-color="#3a4a5a"/>
+        </radialGradient>
 
-  // Motor symbol (circle with M)
-  var motorX = 530, motorY = 160, motorR = 38;
-  svg += '<circle cx="' + motorX + '" cy="' + motorY + '" r="' + motorR + '" fill="rgba(0,180,255,0.06)" stroke="' + accentColor + '" stroke-width="2.5"/>';
-  svg += '<text x="' + motorX + '" y="' + (motorY + 6) + '" text-anchor="middle" font-size="20" fill="' + accentColor + '" font-weight="700">M</text>';
-  svg += '<text x="' + motorX + '" y="' + (motorY + 20) + '" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.5)">3\u223C</text>';
+        <!-- Terminal box gradient -->
+        <linearGradient id="termBoxGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#5a5a6a"/>
+          <stop offset="100%" stop-color="#3a3a4a"/>
+        </linearGradient>
 
-  // Animated rotation indicator around motor
-  svg += '<circle cx="' + motorX + '" cy="' + motorY + '" r="' + (motorR + 6) + '" fill="none" stroke="' + accentColor + '" stroke-width="1" stroke-dasharray="8 12" opacity="0.5">';
-  svg += '<animateTransform attributeName="transform" type="rotate" from="0 ' + motorX + ' ' + motorY + '" to="360 ' + motorX + ' ' + motorY + '" dur="3s" repeatCount="indefinite"/>';
-  svg += '</circle>';
+        <!-- Inrush flash -->
+        <radialGradient id="inrushFlash" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="rgba(255,200,50,0.8)"/>
+          <stop offset="60%" stop-color="rgba(255,100,30,0.3)"/>
+          <stop offset="100%" stop-color="transparent"/>
+        </radialGradient>
 
-  // Starting current pulse wave
-  var pulseY = 240;
-  svg += '<text x="60" y="' + (pulseY + 5) + '" font-size="8" fill="rgba(255,255,255,0.6)">' + (da ? 'Startstr\u00F8m' : 'Start current') + '</text>';
-  // Draw pulse envelope
-  var pulseW = 500, pulseH = 50;
-  var pStartX = 130;
-  var path = 'M' + pStartX + ',' + (pulseY + pulseH/2);
-  // Inrush spike then decay
-  var peakAmp = Math.min(pulseH/2, (Istart / In) * 5);
-  path += ' L' + (pStartX + 20) + ',' + (pulseY + pulseH/2 - peakAmp);
-  path += ' L' + (pStartX + 40) + ',' + (pulseY + pulseH/2 + peakAmp * 0.8);
-  path += ' L' + (pStartX + 60) + ',' + (pulseY + pulseH/2 - peakAmp * 0.7);
-  path += ' L' + (pStartX + 80) + ',' + (pulseY + pulseH/2 + peakAmp * 0.5);
-  path += ' L' + (pStartX + 120) + ',' + (pulseY + pulseH/2 - peakAmp * 0.3);
-  path += ' L' + (pStartX + 160) + ',' + (pulseY + pulseH/2 + peakAmp * 0.2);
-  // Steady state
-  var ssAmp = 5;
-  for (var wi = 200; wi <= pulseW; wi += 30) {
-    path += ' L' + (pStartX + wi) + ',' + (pulseY + pulseH/2 + ((wi/30 % 2 === 0) ? ssAmp : -ssAmp));
-  }
-  svg += '<path d="' + path + '" fill="none" stroke="#ff6b35" stroke-width="1.5" opacity="0.8"/>';
-  svg += '<line x1="' + pStartX + '" y1="' + (pulseY + pulseH/2) + '" x2="' + (pStartX + pulseW) + '" y2="' + (pulseY + pulseH/2) + '" stroke="rgba(255,255,255,0.1)" stroke-width="0.5" stroke-dasharray="3 3"/>';
-  svg += '<text x="' + (pStartX + pulseW + 5) + '" y="' + (pulseY + pulseH/2 + 3) + '" font-size="7" fill="rgba(255,255,255,0.5)">' + In.toFixed(0) + 'A</text>';
-  svg += '<text x="' + (pStartX + 25) + '" y="' + (pulseY + 5) + '" font-size="7" fill="#ff6b35">' + Istart.toFixed(0) + 'A</text>';
+        <!-- Base/feet gradient -->
+        <linearGradient id="baseGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#4a5060"/>
+          <stop offset="100%" stop-color="#2a3040"/>
+        </linearGradient>
+      </defs>
 
-  // Voltage drop gradient along cable during start
-  var vdY = 310;
-  svg += '<text x="60" y="' + (vdY + 5) + '" font-size="8" fill="rgba(255,255,255,0.6)">\u0394U ' + (da ? 'langs kabel' : 'along cable') + '</text>';
-  var vdBarX = 130, vdBarW = 400, vdBarH = 18;
-  // Gradient from green (100%) to red (100% - drop)
-  svg += '<defs><linearGradient id="vdGrad" x1="0%" y1="0%" x2="100%" y2="0%">';
-  svg += '<stop offset="0%" stop-color="#06d6a0"/>';
-  svg += '<stop offset="' + Math.min(100, Math.max(30, 100 - dU_pct * 3)) + '%" stop-color="#ffa500"/>';
-  svg += '<stop offset="100%" stop-color="' + (vdropOk ? '#ffa500' : '#ff4444') + '"/>';
-  svg += '</linearGradient></defs>';
-  svg += '<rect x="' + vdBarX + '" y="' + vdY + '" width="' + vdBarW + '" height="' + vdBarH + '" rx="4" fill="url(#vdGrad)" opacity="0.7"/>';
-  svg += '<text x="' + vdBarX + '" y="' + (vdY + 32) + '" font-size="7" fill="rgba(255,255,255,0.5)">' + (da ? 'Tavle' : 'Panel') + ' (100%)</text>';
-  svg += '<text x="' + (vdBarX + vdBarW - 40) + '" y="' + (vdY + 32) + '" font-size="7" fill="' + (vdropOk ? '#06d6a0' : '#ff4444') + '">' + (da ? 'Motor' : 'Motor') + ' (' + (100 - dU_pct).toFixed(1) + '%)</text>';
-  svg += '<text x="' + (vdBarX + vdBarW/2) + '" y="' + (vdY + 12) + '" text-anchor="middle" font-size="8" fill="#fff" font-weight="700">\u0394U = ' + dU_pct.toFixed(1) + '%</text>';
+      <!-- Background -->
+      <rect width="${W}" height="${H}" fill="#020508" rx="14"/>
+      <pattern id="motorGrid" width="35" height="35" patternUnits="userSpaceOnUse">
+        <path d="M35 0L0 0 0 35" fill="none" stroke="rgba(0,180,255,0.025)" stroke-width="0.5"/>
+      </pattern>
+      <rect width="${W}" height="${H}" fill="url(#motorGrid)"/>
 
-  // Comparison bars: DOL vs selected method
-  var barY = 370;
-  svg += '<text x="60" y="' + (barY + 5) + '" font-size="8" fill="rgba(255,255,255,0.6)">' + (da ? 'Str\u00F8mreduktion' : 'Current reduction') + '</text>';
-  var barX = 130, maxBarW = 400;
-  // DOL bar (reference = 100%)
-  var dolW = maxBarW;
-  var selW = maxBarW * (Istart / (In * 7));
-  svg += '<rect x="' + barX + '" y="' + barY + '" width="' + dolW + '" height="14" rx="3" fill="rgba(255,70,70,0.3)" stroke="rgba(255,70,70,0.5)" stroke-width="0.5"/>';
-  svg += '<text x="' + (barX + 5) + '" y="' + (barY + 10) + '" font-size="7" fill="#ff4444">DOL: ' + (In * 7).toFixed(0) + ' A</text>';
-  // Selected method bar
-  svg += '<rect x="' + barX + '" y="' + (barY + 20) + '" width="' + selW + '" height="14" rx="3" fill="rgba(6,214,160,0.3)" stroke="rgba(6,214,160,0.5)" stroke-width="0.5">';
-  svg += '<animate attributeName="width" from="0" to="' + selW + '" dur="1s" fill="freeze"/></rect>';
-  svg += '<text x="' + (barX + 5) + '" y="' + (barY + 30) + '" font-size="7" fill="#06d6a0">' + (method === 'DOL' ? 'DOL' : method) + ': ' + Istart.toFixed(0) + ' A';
-  if (method !== 'DOL') svg += ' (-' + ((1 - Istart / (In * 7)) * 100).toFixed(0) + '%)';
-  svg += '</text>';
+      <!-- Title -->
+      <text x="${W/2}" y="28" text-anchor="middle" font-size="13" fill="${accentColor}" font-weight="700" letter-spacing="2">${da ? 'MOTORSTART-KREDSLOEB' : 'MOTOR STARTING CIRCUIT'}</text>
+      <text x="${W/2}" y="46" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.5)">${method} | ${In.toFixed(1)}A | Istart/In = ${startRatio.toFixed(1)}x</text>
 
-  // Cable length label
-  svg += '<text x="' + ((cableStartX + cableEndX) / 2) + '" y="' + (cableY1 + 30) + '" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.5)">' + cableLen + ' m / ' + motorState.crossSection + ' mm\u00B2</text>';
+      <!-- === PANEL BOX (left) === -->
+      <g filter="url(#motorShadow)">
+        <rect x="40" y="90" width="100" height="140" rx="8" fill="url(#termBoxGrad)" stroke="rgba(0,180,255,0.3)" stroke-width="1.5"/>
+        <rect x="40" y="90" width="100" height="8" rx="4" fill="rgba(0,180,255,0.1)"/>
+        <text x="90" y="115" text-anchor="middle" font-size="10" fill="#0af" font-weight="700">${da ? 'TAVLE' : 'PANEL'}</text>
+        <text x="90" y="132" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.6)">400V 3~</text>
 
-  // Legend / info
-  svg += '<text x="' + (W - 10) + '" y="' + (H - 10) + '" text-anchor="end" font-size="7" fill="rgba(255,255,255,0.3)">IEC 60947-4-1 / DS/HD 60364-5-52</text>';
+        <!-- MCB inside panel -->
+        <rect x="65" y="145" width="50" height="30" rx="5" fill="rgba(0,0,0,0.3)" stroke="${accentColor}" stroke-width="1.5"/>
+        <text x="90" y="163" text-anchor="middle" font-size="8" fill="#fff" font-weight="700">${method === 'DOL' ? 'D' : method === 'VFD' ? 'B' : 'C'} MCB</text>
+        <text x="90" y="178" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.5)">${In.toFixed(0)}A</text>
 
-  return '<div style="margin-top:16px;overflow-x:auto"><svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:' + W + 'px;border-radius:14px;border:1px solid rgba(0,180,255,0.1)">' + svg + '</svg></div>';
+        <!-- Status LED -->
+        <circle cx="55" cy="218" r="4" fill="${accentColor}" opacity="0.8">
+          <animate attributeName="opacity" values="0.4;1;0.4" dur="2s" repeatCount="indefinite"/>
+        </circle>
+        <text x="65" y="220" font-size="6" fill="rgba(255,255,255,0.4)">${allOk ? 'OK' : 'FAULT'}</text>
+      </g>
+
+      <!-- === CONTACTOR === -->
+      <g filter="url(#motorShadow)">
+        <rect x="195" y="130" width="60" height="40" rx="6" fill="url(#termBoxGrad)" stroke="#ffa500" stroke-width="1.5"/>
+        <text x="225" y="148" text-anchor="middle" font-size="7" fill="#ffa500" font-weight="700">${da ? 'KONTAKTOR' : 'CONTACTOR'}</text>
+        <text x="225" y="162" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.7)">KM1</text>
+        <!-- Contact animation -->
+        <line x1="210" y1="170" x2="240" y2="170" stroke="#ffa500" stroke-width="2.5" stroke-linecap="round">
+          <animate attributeName="y1" values="174;170;170" dur="2.5s" repeatCount="indefinite"/>
+        </line>
+      </g>
+
+      <!-- === OVERLOAD RELAY === -->
+      <g filter="url(#motorShadow)">
+        <rect x="300" y="130" width="60" height="40" rx="6" fill="url(#termBoxGrad)" stroke="#ff4444" stroke-width="1.5"/>
+        <text x="330" y="148" text-anchor="middle" font-size="7" fill="#ff4444" font-weight="700">${da ? 'OVERL.' : 'O/L REL.'}</text>
+        <text x="330" y="162" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.7)">${In.toFixed(1)}A</text>
+      </g>
+
+      <!-- === CABLE CONNECTIONS (3-phase with PE) === -->
+      ${['#e04040', '#40e040', '#4040e0'].map((color, i) => {
+        const yOff = (i - 1) * 8;
+        const lineY = 150 + yOff;
+        return `
+          <line x1="140" y1="${lineY}" x2="195" y2="${lineY}" stroke="${color}" stroke-width="2.5" opacity="0.7"/>
+          <line x1="255" y1="${lineY}" x2="300" y2="${lineY}" stroke="${color}" stroke-width="2.5" opacity="0.7"/>
+          <line x1="360" y1="${lineY}" x2="${motorCx - bodyW/2 - 10}" y2="${lineY}" stroke="${color}" stroke-width="2.5" opacity="0.7"/>
+        `;
+      }).join('')}
+
+      <!-- Animated current pulses along cable -->
+      ${Array.from({length: 5}, (_, i) => {
+        const delay = (i * 0.5).toFixed(2);
+        return `
+          <circle r="4" fill="#0af" opacity="0" filter="url(#motorGlow)">
+            <animateMotion dur="2s" begin="${delay}s" repeatCount="indefinite"
+              path="M140,150 L195,150 L255,150 L300,150 L360,150 L${motorCx - bodyW/2 - 10},150"/>
+            <animate attributeName="opacity" values="0;0.9;0.9;0" dur="2s" begin="${delay}s" repeatCount="indefinite"/>
+          </circle>`;
+      }).join('')}
+
+      <!-- === 3D MOTOR BODY === -->
+      <g filter="url(#motorShadow)">
+        <!-- Motor mounting base/feet -->
+        <rect x="${motorCx - bodyW/2 - 10}" y="${motorCy + bodyH/2}" width="20" height="20" rx="3" fill="url(#baseGrad)" stroke="rgba(255,255,255,0.05)" stroke-width="0.5"/>
+        <rect x="${motorCx + bodyW/2 - 10}" y="${motorCy + bodyH/2}" width="20" height="20" rx="3" fill="url(#baseGrad)" stroke="rgba(255,255,255,0.05)" stroke-width="0.5"/>
+        <!-- Base plate -->
+        <rect x="${motorCx - bodyW/2 - 20}" y="${motorCy + bodyH/2 + 18}" width="${bodyW + 40}" height="8" rx="3" fill="url(#baseGrad)" stroke="rgba(255,255,255,0.05)" stroke-width="0.5"/>
+
+        <!-- Motor cylindrical body -->
+        <rect x="${motorCx - bodyW/2}" y="${motorCy - bodyH/2}" width="${bodyW}" height="${bodyH}" rx="12" fill="url(#motorBodyGrad)"/>
+        <!-- Body highlight (top rim) -->
+        <rect x="${motorCx - bodyW/2}" y="${motorCy - bodyH/2}" width="${bodyW}" height="6" rx="3" fill="rgba(255,255,255,0.08)"/>
+        <!-- Body edge -->
+        <rect x="${motorCx - bodyW/2}" y="${motorCy - bodyH/2}" width="${bodyW}" height="${bodyH}" rx="12" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+
+        <!-- Cooling fins on body -->
+        ${Array.from({length: 12}, (_, i) => {
+          const fy = motorCy - bodyH/2 + 8 + i * (bodyH - 16) / 12;
+          return `<line x1="${motorCx - bodyW/2 + 5}" y1="${fy}" x2="${motorCx + bodyW/2 - 5}" y2="${fy}" stroke="rgba(80,90,100,0.4)" stroke-width="1.5"/>`;
+        }).join('')}
+
+        <!-- End bell (front) -->
+        <ellipse cx="${motorCx + bodyW/2 + 15}" cy="${motorCy}" rx="20" ry="${bodyH/2 - 5}" fill="url(#endBellGrad)" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
+
+        <!-- End bell (back - with fan cover) -->
+        <ellipse cx="${motorCx - bodyW/2 - 15}" cy="${motorCy}" rx="20" ry="${bodyH/2 - 5}" fill="url(#endBellGrad)" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
+
+        <!-- Fan cover (mesh pattern) -->
+        <circle cx="${motorCx - bodyW/2 - 15}" cy="${motorCy}" r="${bodyH/2 - 10}" fill="rgba(0,0,0,0.3)" stroke="rgba(100,110,120,0.5)" stroke-width="1"/>
+        ${Array.from({length: 8}, (_, i) => {
+          const a = (i / 8) * Math.PI * 2;
+          const r1 = (bodyH/2 - 10) * 0.3;
+          const r2 = (bodyH/2 - 10) * 0.9;
+          const x1 = motorCx - bodyW/2 - 15 + Math.cos(a) * r1;
+          const y1 = motorCy + Math.sin(a) * r1;
+          const x2 = motorCx - bodyW/2 - 15 + Math.cos(a) * r2;
+          const y2 = motorCy + Math.sin(a) * r2;
+          return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(100,110,120,0.4)" stroke-width="1"/>`;
+        }).join('')}
+
+        <!-- Spinning fan behind cover -->
+        <g>
+          <animateTransform attributeName="transform" type="rotate" from="0 ${motorCx - bodyW/2 - 15} ${motorCy}" to="360 ${motorCx - bodyW/2 - 15} ${motorCy}" dur="${rotSpeed}s" repeatCount="indefinite"/>
+          ${Array.from({length: 6}, (_, i) => {
+            const a = (i / 6) * Math.PI * 2;
+            const bx = motorCx - bodyW/2 - 15;
+            const by = motorCy;
+            const r = (bodyH/2 - 10) * 0.7;
+            return `<path d="M${bx} ${by} L${bx + Math.cos(a) * r} ${by + Math.sin(a) * r} A${r * 0.3} ${r * 0.3} 0 0 1 ${bx + Math.cos(a + 0.3) * r} ${by + Math.sin(a + 0.3) * r} Z" fill="url(#fanGrad)" opacity="0.6"/>`;
+          }).join('')}
+        </g>
+
+        <!-- Shaft (front, protruding) -->
+        <rect x="${motorCx + bodyW/2 + 25}" y="${motorCy - 8}" width="50" height="16" rx="8" fill="url(#shaftGrad)"/>
+        <!-- Shaft highlight -->
+        <rect x="${motorCx + bodyW/2 + 25}" y="${motorCy - 8}" width="50" height="4" rx="2" fill="rgba(255,255,255,0.1)"/>
+        <!-- Shaft rotation indicator -->
+        <g>
+          <animateTransform attributeName="transform" type="rotate" from="0 ${motorCx + bodyW/2 + 50} ${motorCy}" to="360 ${motorCx + bodyW/2 + 50} ${motorCy}" dur="${rotSpeed}s" repeatCount="indefinite"/>
+          <circle cx="${motorCx + bodyW/2 + 50}" cy="${motorCy}" r="6" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1" stroke-dasharray="3 5"/>
+        </g>
+
+        <!-- Coupling on shaft end -->
+        <rect x="${motorCx + bodyW/2 + 70}" y="${motorCy - 12}" width="16" height="24" rx="4" fill="url(#baseGrad)" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+
+        <!-- Terminal box on top -->
+        <rect x="${motorCx - 25}" y="${motorCy - bodyH/2 - 30}" width="50" height="28" rx="5" fill="url(#termBoxGrad)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+        <!-- Terminal connections -->
+        ${[{label: 'L1', color: '#e04040', x: -15}, {label: 'L2', color: '#40e040', x: -5}, {label: 'L3', color: '#4040e0', x: 5}, {label: 'PE', color: '#a0c000', x: 15}].map(t => `
+          <circle cx="${motorCx + t.x}" cy="${motorCy - bodyH/2 - 20}" r="4" fill="${t.color}" opacity="0.8" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>
+          <text x="${motorCx + t.x}" y="${motorCy - bodyH/2 - 33}" text-anchor="middle" font-size="5" fill="${t.color}">${t.label}</text>
+        `).join('')}
+
+        <!-- Rotation indicator ring -->
+        <ellipse cx="${motorCx + bodyW/2 + 15}" cy="${motorCy}" rx="3" ry="${bodyH/2 - 10}" fill="none" stroke="${accentColor}" stroke-width="1.5" stroke-dasharray="6 10" opacity="0.4">
+          <animateTransform attributeName="transform" type="rotate" from="0 ${motorCx + bodyW/2 + 15} ${motorCy}" to="360 ${motorCx + bodyW/2 + 15} ${motorCy}" dur="${rotSpeed}s" repeatCount="indefinite"/>
+        </ellipse>
+      </g>
+
+      <!-- Inrush flash during start -->
+      <ellipse cx="${motorCx}" cy="${motorCy}" rx="${bodyW * 0.8}" ry="${bodyH * 0.7}" fill="url(#inrushFlash)" opacity="0">
+        <animate attributeName="opacity" values="0.8;0;0;0;0;0;0;0;0;0" dur="8s" repeatCount="indefinite"/>
+      </ellipse>
+
+      <!-- Motor nameplate -->
+      <g transform="translate(${motorCx - bodyW/2 + 10}, ${motorCy + 10})">
+        <rect x="0" y="0" width="60" height="35" rx="2" fill="rgba(200,200,180,0.08)" stroke="rgba(200,200,180,0.2)" stroke-width="0.5"/>
+        <text x="30" y="12" text-anchor="middle" font-size="6" fill="rgba(200,200,180,0.6)">${In.toFixed(1)} A</text>
+        <text x="30" y="22" text-anchor="middle" font-size="5" fill="rgba(200,200,180,0.5)">400V 3~ 50Hz</text>
+        <text x="30" y="31" text-anchor="middle" font-size="5" fill="rgba(200,200,180,0.5)">IP55 IE3</text>
+      </g>
+
+      <!-- === STARTING CURRENT WAVEFORM === -->
+      <g transform="translate(0, 300)">
+        <rect x="40" y="0" width="${W - 80}" height="80" rx="8" fill="rgba(10,10,25,0.6)" stroke="rgba(255,100,50,0.15)" stroke-width="0.5"/>
+        <text x="55" y="16" font-size="8" fill="rgba(255,255,255,0.7)" font-weight="600">${da ? 'Startstraem' : 'Starting Current'}</text>
+
+        <!-- Waveform -->
+        <path d="M60,50 L80,${50 - Math.min(30, startRatio * 3)} L100,${50 + Math.min(28, startRatio * 2.8)} L120,${50 - Math.min(25, startRatio * 2.5)} L140,${50 + Math.min(20, startRatio * 2)} L170,${50 - Math.min(15, startRatio * 1.5)} L200,${50 + Math.min(10, startRatio)} L240,${50 - 5} L280,${50 + 5} L320,${50 - 4} L360,${50 + 4} L400,${50 - 3} L440,${50 + 3} L480,${50 - 3} L520,${50 + 3} L560,${50 - 3} L600,${50 + 3} L640,${50 - 3} L680,${50 + 3}"
+          fill="none" stroke="#ff6b35" stroke-width="2" opacity="0.8" stroke-linecap="round"/>
+        <!-- Steady state reference line -->
+        <line x1="60" y1="50" x2="680" y2="50" stroke="rgba(255,255,255,0.1)" stroke-width="0.5" stroke-dasharray="4 4"/>
+
+        <!-- Labels -->
+        <text x="85" y="25" font-size="8" fill="#ff6b35" font-weight="700">${Istart.toFixed(0)}A</text>
+        <text x="640" y="68" font-size="7" fill="rgba(255,255,255,0.5)">${In.toFixed(0)}A (${da ? 'drift' : 'run'})</text>
+      </g>
+
+      <!-- === VOLTAGE DROP BAR === -->
+      <g transform="translate(0, 395)">
+        <rect x="40" y="0" width="${W - 80}" height="55" rx="8" fill="rgba(10,10,25,0.6)" stroke="rgba(${vdropOk ? '6,214,160' : '255,70,70'},0.15)" stroke-width="0.5"/>
+        <text x="55" y="16" font-size="8" fill="rgba(255,255,255,0.7)" font-weight="600">\u0394U ${da ? 'under start' : 'during start'}</text>
+
+        <!-- Voltage drop gradient bar -->
+        <defs>
+          <linearGradient id="motorVdGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#06d6a0"/>
+            <stop offset="${Math.min(100, Math.max(30, 100 - dU_pct * 3))}%" stop-color="#ffa500"/>
+            <stop offset="100%" stop-color="${vdropOk ? '#ffa500' : '#ff4444'}"/>
+          </linearGradient>
+        </defs>
+        <rect x="60" y="24" width="${W - 140}" height="18" rx="9" fill="url(#motorVdGrad)" opacity="0.6"/>
+        <rect x="60" y="24" width="${W - 140}" height="18" rx="9" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+
+        <text x="${W/2}" y="36" text-anchor="middle" font-size="9" fill="#fff" font-weight="700">\u0394U = ${dU_pct.toFixed(1)}%</text>
+        <text x="65" y="50" font-size="7" fill="rgba(255,255,255,0.5)">${da ? 'Tavle' : 'Panel'} 100%</text>
+        <text x="${W - 85}" y="50" font-size="7" fill="${vdropOk ? '#06d6a0' : '#ff4444'}">${da ? 'Motor' : 'Motor'} ${(100 - dU_pct).toFixed(1)}%</text>
+      </g>
+
+      <!-- === METHOD COMPARISON === -->
+      <g transform="translate(0, 460)">
+        <rect x="40" y="0" width="${W - 80}" height="55" rx="8" fill="rgba(10,10,25,0.6)" stroke="rgba(6,214,160,0.1)" stroke-width="0.5"/>
+        <text x="55" y="16" font-size="8" fill="rgba(255,255,255,0.7)" font-weight="600">${da ? 'Stroemreduktion' : 'Current Reduction'}</text>
+
+        <!-- DOL reference bar -->
+        <rect x="60" y="22" width="${W - 140}" height="12" rx="6" fill="rgba(255,70,70,0.2)" stroke="rgba(255,70,70,0.3)" stroke-width="0.5"/>
+        <text x="65" y="31" font-size="7" fill="#ff4444">DOL: ${(In * 7).toFixed(0)}A</text>
+
+        <!-- Selected method bar -->
+        <rect x="60" y="38" width="${(W - 140) * Math.min(1, Istart / (In * 7))}" height="12" rx="6" fill="rgba(6,214,160,0.25)" stroke="rgba(6,214,160,0.4)" stroke-width="0.5">
+          <animate attributeName="width" from="0" to="${(W - 140) * Math.min(1, Istart / (In * 7))}" dur="1.2s" fill="freeze"/>
+        </rect>
+        <text x="65" y="47" font-size="7" fill="#06d6a0">${method}: ${Istart.toFixed(0)}A${method !== 'DOL' ? ' (-' + ((1 - Istart / (In * 7)) * 100).toFixed(0) + '%)' : ''}</text>
+      </g>
+
+      <!-- Cable info -->
+      <text x="${(140 + motorCx - bodyW/2) / 2}" y="120" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.5)">${cableLen}m / ${motorState.crossSection} mm\u00B2</text>
+
+      <!-- Standard reference -->
+      <text x="${W - 15}" y="${H - 12}" text-anchor="end" font-size="7" fill="rgba(255,255,255,0.2)">IEC 60947-4-1 / DS/HD 60364-5-52</text>
+  `;
+
+  return '<div style="margin-top:16px;overflow-x:auto"><svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:' + W + 'px;border-radius:14px;border:1px solid rgba(0,180,255,0.1);background:linear-gradient(155deg,#020508 0%,#0a1020 50%,#020508 100%)">' + svg + '</svg></div>';
 }
 
 // ===== PROTECTION COORDINATION CURVES MODULE =====
