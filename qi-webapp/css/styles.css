@@ -596,3 +596,26 @@ body.presenting .hamburger{display:none!important}
 .alert-dropdown .alert-item .alert-dismiss{margin-left:auto;background:none;border:none;color:var(--muted,#999);cursor:pointer;font-size:12px;white-space:nowrap}
 .alert-dropdown .alert-item .alert-dismiss:hover{color:var(--ink)}
 .alert-summary-bar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;font-size:13px;font-weight:600}
+
+/* Programme Timeline / Gantt */
+.prog-gantt{overflow-x:auto}
+.prog-chart{position:relative;min-height:280px;padding:40px 0 10px}
+.prog-ticks{position:absolute;top:0;left:140px;right:0;height:30px;display:flex;align-items:flex-end}
+.prog-tick{position:absolute;font-size:10px;color:var(--muted,#888);transform:translateX(-50%);white-space:nowrap}
+.prog-today-marker{position:absolute;top:30px;bottom:0;width:2px;background:#e53e3e;z-index:2}
+.prog-today-marker::after{content:"Today";position:absolute;top:-16px;left:4px;font-size:9px;color:#e53e3e;white-space:nowrap}
+.prog-row{display:flex;align-items:center;height:48px;border-bottom:1px solid var(--line,#eee)}
+.prog-label{width:140px;flex:none;padding:4px 10px;font-size:12px;font-weight:600;line-height:1.3}
+.prog-label small{font-weight:400;color:var(--muted,#888);font-size:11px}
+.prog-track{position:relative;flex:1;height:36px}
+.prog-bar{position:absolute;top:10px;height:16px;border-radius:4px;cursor:pointer;transition:opacity .2s}
+.prog-bar:hover{opacity:.8}
+.prog-bar-green{background:#38a169}
+.prog-bar-blue{background:#3182ce}
+.prog-bar-gray{background:#a0aec0}
+.prog-diamond{position:absolute;top:8px;width:10px;height:10px;background:#dd6b20;transform:translateX(-50%) rotate(45deg);z-index:1}
+.prog-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;padding:8px 0;font-size:12px}
+.prog-leg-item{display:flex;align-items:center;gap:4px}
+.prog-leg-swatch{display:inline-block;width:16px;height:10px;border-radius:3px}
+.prog-diamond-legend{display:inline-block;width:8px;height:8px;background:#dd6b20;transform:rotate(45deg)}
+.prog-today-legend{display:inline-block;width:12px;height:2px;background:#e53e3e}

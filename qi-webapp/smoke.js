@@ -750,5 +750,17 @@ ok(docsTable != null && docsTable.tagName === "TABLE", "Documents view renders a
 var addDocBtn = doc.getElementById("btnAddDocument");
 ok(addDocBtn != null, "Add Document button exists");
 
+// 48) Programme Timeline
+var progNavBtn = doc.querySelector('.nav-item[data-view="programme"]');
+ok(progNavBtn != null, "Programme Timeline nav item exists");
+
+if (progNavBtn) progNavBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+var progGantt = doc.getElementById("programmeGantt");
+var progBars = progGantt ? progGantt.querySelectorAll(".prog-bar") : [];
+ok(progBars.length === 6, "Programme Timeline renders segment bars");
+
+var todayMarker = progGantt ? progGantt.querySelector(".prog-today-marker") : null;
+ok(todayMarker != null, "Programme Timeline shows today marker");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

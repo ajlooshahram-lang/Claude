@@ -214,6 +214,7 @@
   const VIEWS = [
     { g: "Overview" },
     { id: "brain", label: "Project Brain", icon: "🧠" },
+    { id: "programme", label: "Programme Timeline", icon: "⟿" },
     { id: "portfolio", label: "Portfolio", icon: "▣" },
     { id: "dashboard", label: "Dashboard", icon: "▤" },
     { id: "cases", label: "Cases (Master)", icon: "★" },
@@ -1580,6 +1581,101 @@
       <div class="toolbar"><button class="btn btn-primary" data-act="newproj">+ New project</button>
         <span class="muted">Each project has its own cases, risks, budget, history and backups.</span></div>
       ${tableWrap("<th>Project</th><th>Status</th><th>Cases</th><th>Critical</th><th>Open</th><th>% Done</th><th>Est. budget</th><th>Actual</th><th></th>", rows)}`;
+  };
+
+  // ---------- Programme Timeline / Gantt ----------
+  const PROGRAMME_SEGMENTS = [
+    { id: "SEA-1", name: "SEA-1: Singapore - Jakarta", km: 1200, startDate: "2025-03-01", installedDate: "2026-09-15", status: "installed" },
+    { id: "SEA-2", name: "SEA-2: Jakarta - Surabaya", km: 800, startDate: "2025-06-01", installedDate: "2027-02-28", status: "in-progress" },
+    { id: "SEA-3", name: "SEA-3: Singapore - Bangkok", km: 1800, startDate: "2025-09-01", installedDate: "2027-12-31", status: "in-progress" },
+    { id: "SEA-4", name: "SEA-4: Bangkok - Hanoi", km: 1500, startDate: "2026-01-01", installedDate: "2028-06-30", status: "planned" },
+    { id: "SEA-5", name: "SEA-5: Manila - Guam", km: 2500, startDate: "2026-06-01", installedDate: "2029-03-31", status: "planned" },
+    { id: "SEA-6", name: "SEA-6: Kuala Lumpur - Brunei", km: 1400, startDate: "2027-01-01", installedDate: "2029-12-31", status: "planned" }
+  ];
+  const PROG_TIMELINE_START = new Date("2025-01-01").getTime();
+  const PROG_TIMELINE_END = new Date("2030-01-01").getTime();
+  const PROG_TIMELINE_SPAN = PROG_TIMELINE_END - PROG_TIMELINE_START;
+
+  function progPct(dateStr) {
+    var t = new Date(dateStr).getTime();
+    return Math.max(0, Math.min(100, ((t - PROG_TIMELINE_START) / PROG_TIMELINE_SPAN) * 100));
+  }
+
+  RENDER.programme = function () {
+    var totalKm = PROGRAMME_SEGMENTS.reduce(function (a, s) { return a + s.km; }, 0);
+    var completed = PROGRAMME_SEGMENTS.filter(function (s) { return s.status === "installed"; }).length;
+    var overallProgress = Math.round((completed / PROGRAMME_SEGMENTS.length) * 100);
+    var estBudget = "$" + (totalKm * 45).toLocaleString() + "k";
+
+    var kpiRow = '<div class="grid kpis" style="margin-bottom:16px">' +
+      '<div class="kpi navy"><div class="label">Total km</div><div class="value">' + totalKm.toLocaleString() + ' km</div></div>' +
+      '<div class="kpi teal"><div class="label">Segments Completed</div><div class="value">' + completed + ' / ' + PROGRAMME_SEGMENTS.length + '</div></div>' +
+      '<div class="kpi blue"><div class="label">Overall Progress</div><div class="value">' + overallProgress + '%</div></div>' +
+      '<div class="kpi purple"><div class="label">Est. Budget</div><div class="value">' + estBudget + '</div></div>' +
+      '</div>';
+
+    // Monthly tick marks for 2025-2030
+    var ticks = '';
+    for (var y = 2025; y <= 2029; y++) {
+      for (var m = 0; m < 12; m += 6) {
+        var tickDate = new Date(y, m, 1);
+        var leftPct = progPct(tickDate.toISOString().slice(0, 10));
+        var label = tickDate.toLocaleDateString("en", { year: "2-digit", month: "short" });
+        ticks += '<div class="prog-tick" style="left:' + leftPct + '%">' + label + '</div>';
+      }
+    }
+
+    // Today marker
+    var todayPct = progPct(new Date().toISOString().slice(0, 10));
+    var todayMarker = '<div class="prog-today-marker" style="left:' + todayPct + '%" title="Today"></div>';
+
+    // Segment bars
+    var bars = PROGRAMME_SEGMENTS.map(function (seg) {
+      var startPct = progPct(seg.startDate);
+      var endPct = progPct(seg.installedDate);
+      var widthPct = Math.max(endPct - startPct, 1);
+      var colorClass = seg.status === "installed" ? "prog-bar-green" :
+                       seg.status === "in-progress" ? "prog-bar-blue" : "prog-bar-gray";
+
+      // Milestone diamonds: start, 50% point, end
+      var midPct = startPct + (endPct - startPct) / 2;
+      var diamonds = '<span class="prog-diamond" style="left:' + startPct + '%" title="Start: ' + seg.startDate + '"></span>' +
+                     '<span class="prog-diamond" style="left:' + midPct + '%" title="50% milestone"></span>' +
+                     '<span class="prog-diamond" style="left:' + endPct + '%" title="Installed: ' + seg.installedDate + '"></span>';
+
+      return '<div class="prog-row">' +
+        '<div class="prog-label">' + esc(seg.id) + '<br><small>' + esc(seg.name.split(": ")[1] || seg.name) + '</small></div>' +
+        '<div class="prog-track">' +
+          '<div class="prog-bar ' + colorClass + '" data-segment="' + esc(seg.id) + '" style="left:' + startPct + '%;width:' + widthPct + '%" title="' + esc(seg.name) + ' (' + seg.km + ' km)\n' + seg.startDate + ' to ' + seg.installedDate + '"></div>' +
+          diamonds +
+        '</div></div>';
+    }).join("");
+
+    return kpiRow +
+      '<div class="card prog-gantt" id="programmeGantt">' +
+        '<h3>Programme Timeline (2025 - 2030)</h3>' +
+        '<div class="prog-chart">' +
+          '<div class="prog-ticks">' + ticks + '</div>' +
+          todayMarker +
+          bars +
+        '</div>' +
+        '<div class="prog-legend">' +
+          '<span class="prog-leg-item"><span class="prog-leg-swatch prog-bar-green"></span> Installed</span>' +
+          '<span class="prog-leg-item"><span class="prog-leg-swatch prog-bar-blue"></span> In Progress</span>' +
+          '<span class="prog-leg-item"><span class="prog-leg-swatch prog-bar-gray"></span> Planned</span>' +
+          '<span class="prog-leg-item"><span class="prog-diamond-legend"></span> Milestone</span>' +
+          '<span class="prog-leg-item"><span class="prog-today-legend"></span> Today</span>' +
+        '</div>' +
+      '</div>';
+  };
+  AFTER.programme = function () {
+    var bars = content.querySelectorAll(".prog-bar[data-segment]");
+    bars.forEach(function (bar) {
+      bar.style.cursor = "pointer";
+      bar.addEventListener("click", function () {
+        toast("Segment: " + bar.dataset.segment + " selected");
+      });
+    });
   };
 
   // ---------- Kanban board ----------
