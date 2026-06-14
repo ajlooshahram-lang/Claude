@@ -769,6 +769,95 @@ body.presentation-mode:not(.dark) .result-row .value {
   filter: brightness(1.2) drop-shadow(0 0 8px rgba(0,180,255,0.4));
   transform: translateY(-2px);
 }
+
+/* ===== LIVE UPDATE NOTIFICATION BAR ===== */
+.update-bar {
+  display: none;
+  width: 100%;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #1a73e8, #0d47a1);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  transition: all 0.3s ease;
+}
+.update-bar.visible { display: flex; align-items: center; gap: 12px; }
+.update-bar.amber { background: linear-gradient(135deg, #f57c00, #e65100); }
+.update-bar.red { background: linear-gradient(135deg, #d32f2f, #b71c1c); }
+.update-bar .update-bar-text { flex: 1; }
+.update-bar .update-bar-badge {
+  background: rgba(255,255,255,0.25);
+  border-radius: 50%;
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700;
+}
+.update-bar .update-bar-dismiss {
+  background: rgba(255,255,255,0.2);
+  border: none; color: #fff;
+  border-radius: 6px; padding: 4px 10px;
+  font-size: 0.75rem; cursor: pointer;
+  transition: background 0.2s;
+}
+.update-bar .update-bar-dismiss:hover { background: rgba(255,255,255,0.35); }
+
+.update-panel {
+  display: none;
+  width: 100%;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.update-panel.expanded { display: block; }
+.update-panel .update-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+.update-panel .update-item:last-child { border-bottom: none; }
+.update-panel .update-item .update-icon {
+  font-size: 1.1rem; flex-shrink: 0; margin-top: 2px;
+}
+.update-panel .update-item .update-detail { flex: 1; }
+.update-panel .update-item .update-detail .update-title { font-weight: 600; color: var(--text); }
+.update-panel .update-item .update-detail .update-desc { color: var(--text-light); font-size: 0.78rem; margin-top: 2px; }
+.update-panel .update-item .update-detail .update-date { color: var(--text-muted); font-size: 0.72rem; margin-top: 2px; }
+.update-panel .update-actions {
+  display: flex; gap: 10px; margin-top: 12px; padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.update-panel .update-actions button {
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.update-panel .update-actions .apply-all-btn {
+  background: var(--primary);
+  color: #fff;
+}
+.update-panel .update-actions .apply-all-btn:hover {
+  background: var(--primary-dark, #0d47a1);
+  transform: translateY(-1px);
+}
+.update-panel .update-actions .dismiss-btn {
+  background: var(--bg-hover, #f0f0f0);
+  color: var(--text);
+}
+.update-panel .update-actions .dismiss-btn:hover {
+  background: var(--border);
+}
 </style>
 </head>
 <body>
@@ -784,6 +873,14 @@ body.presentation-mode:not(.dark) .result-row .value {
     </div>
   </div>
 </div>
+
+<!-- Live Update Notification Bar -->
+<div class="update-bar" id="updateBar" onclick="toggleUpdatePanel()">
+  <span class="update-bar-badge" id="updateBadge">0</span>
+  <span class="update-bar-text" id="updateBarText"></span>
+  <button class="update-bar-dismiss" id="updateBarDismiss" onclick="event.stopPropagation();dismissUpdates()"></button>
+</div>
+<div class="update-panel" id="updatePanel"></div>
 
 <div class="nav" id="mainNav"></div>
 <div class="status-bar" id="statusBar"></div>
@@ -4995,27 +5092,41 @@ function renderStandards() {
   const online = (typeof navigator !== 'undefined') && navigator.onLine;
   const upd = lawUpdateInfo;
   const hasChanges = upd && upd.changes && upd.changes.length > 0;
+  const autoOnLabel = updateAutoEnabled ? (lang === 'da' ? 'Til' : 'On') : (lang === 'da' ? 'Fra' : 'Off');
+  const autoOnColor = updateAutoEnabled ? 'var(--success)' : 'var(--text-muted)';
+  const historyHtml = appliedUpdatesHistory.length
+    ? appliedUpdatesHistory.slice(-10).reverse().map(h => `<div class="result-row"><span class="label">${h.title || h.name || h.category}</span><span class="value">${h.appliedAt ? h.appliedAt.slice(0,10) : ''}</span></div>`).join('')
+    : `<div class="result-row"><span class="label">${lang === 'da' ? 'Ingen anvendte opdateringer endnu' : 'No applied updates yet'}</span><span class="value">-</span></div>`;
   const updateCard = `
     <div class="card fade-in" style="border-left:4px solid ${hasChanges ? 'var(--warning)' : 'var(--success)'}">
-      <div class="card-title">\uD83D\uDD04 ${lang === 'da' ? 'Lov-opdateringer (dynamisk)' : 'Law Updates (dynamic)'}</div>
-      <div class="info-row">${lang === 'da' ? 'Danske el-regler revideres l\u00F8bende. Appen kan tjekke for nye versioner, n\u00E5r du er online.' : 'Danish electrical rules are revised regularly. The app can check for newer versions when online.'}</div>
+      <div class="card-title">\uD83D\uDD04 ${lang === 'da' ? 'Live Opdateringscenter' : 'Live Update Center'}</div>
+      <div class="info-row">${lang === 'da' ? 'Automatisk kontrol af lovgivning, priser, nye produkter og app-version. Opdateringer anvises og kan anvendes med et klik.' : 'Automatic checks for legislation, prices, new products, and app version. Updates are shown and can be applied with one click.'}</div>
       <div class="result-box ${hasChanges ? 'warning' : ''}">
         <div class="result-row"><span class="label">${lang === 'da' ? 'Status' : 'Status'}</span><span class="value">${online ? (lang === 'da' ? '\uD83D\uDFE2 Online' : '\uD83D\uDFE2 Online') : (lang === 'da' ? '\u26AB Offline' : '\u26AB Offline')}</span></div>
-        <div class="result-row"><span class="label">${lang === 'da' ? 'Baseline tjekket' : 'Baseline checked'}</span><span class="value">${STANDARDS_BASELINE.checked}</span></div>
-        ${upd ? `<div class="result-row"><span class="label">${lang === 'da' ? 'Sidst tjekket online' : 'Last online check'}</span><span class="value">${upd.date}</span></div>` : ''}
-        ${hasChanges ? upd.changes.map(c => `<div class="result-row"><span class="label">\u26A0\uFE0F ${c.name}</span><span class="value">${c.from} \u2192 ${c.to}</span></div>`).join('') : `<div class="result-row"><span class="label">${lang === 'da' ? 'Ingen \u00E6ndringer registreret' : 'No changes detected'}</span><span class="value">\u2705</span></div>`}
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Auto-opdatering' : 'Auto-update'}</span><span class="value" style="color:${autoOnColor};font-weight:700">${autoOnLabel}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Sidst tjekket' : 'Last checked'}</span><span class="value">${getLastCheckDisplay()}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Baseline version' : 'Baseline version'}</span><span class="value">${STANDARDS_BASELINE.checked}</span></div>
+        <div class="result-row"><span class="label">${lang === 'da' ? 'Ventende opdateringer' : 'Pending updates'}</span><span class="value" style="font-weight:700;color:${pendingUpdates.length ? 'var(--warning)' : 'var(--success)'}">${pendingUpdates.length}</span></div>
+        ${hasChanges ? upd.changes.map(c => `<div class="result-row"><span class="label">\u26A0\uFE0F ${c.name}</span><span class="value">${c.from} \u2192 ${c.to}</span></div>`).join('') : `<div class="result-row"><span class="label">${lang === 'da' ? 'Ingen lov\u00E6ndringer registreret' : 'No law changes detected'}</span><span class="value">\u2705</span></div>`}
       </div>
       <div class="select-grid" style="margin-top:10px">
-        <button class="sel-btn selected" onclick="checkLawUpdates(true)">\uD83D\uDD0D ${lang === 'da' ? 'Tjek for opdateringer nu' : 'Check for updates now'}</button>
-        <button class="sel-btn" onclick="configureLawSource()">\u2699\uFE0F ${lang === 'da' ? 'Indstil opdateringskilde' : 'Set update source'}</button>
+        <button class="sel-btn selected" onclick="checkForUpdates(true)">\uD83D\uDD0D ${lang === 'da' ? 'Tjek nu' : 'Check now'}</button>
+        <button class="sel-btn ${updateAutoEnabled ? 'selected' : ''}" onclick="toggleAutoUpdate()">${updateAutoEnabled ? '\u2705' : '\u26AA'} ${lang === 'da' ? 'Auto-opdatering' : 'Auto-update'}</button>
+        <button class="sel-btn" onclick="configureLawSource()">\u2699\uFE0F ${lang === 'da' ? 'Indstil kilde' : 'Set source'}</button>
+        ${pendingUpdates.length ? `<button class="sel-btn" style="background:var(--primary);color:#fff" onclick="applyAllUpdates()">\u2B07\uFE0F ${lang === 'da' ? 'Anvend alle (' + pendingUpdates.length + ')' : 'Apply all (' + pendingUpdates.length + ')'}</button>` : ''}
       </div>
+    </div>
+    <div class="card fade-in">
+      <div class="card-title">\uD83D\uDCCB ${lang === 'da' ? 'Anvendte opdateringer (historik)' : 'Applied Updates (history)'}</div>
+      <div class="result-box">${historyHtml}</div>
     </div>`;
 
   return `
     ${updateCard}
     <div class="card fade-in">
       <div class="card-title">${lang === 'da' ? 'Danske Elstandarder & Lovgivning' : 'Danish Electrical Standards & Legislation'}</div>
-      <div class="info-row">${lang === 'da' ? 'Oversigt over gældende standarder brugt i denne app' : 'Overview of applicable standards used in this app'}</div>
+      <div class="info-row">${lang === 'da' ? 'Oversigt over g\u00E6ldende standarder brugt i denne app' : 'Overview of applicable standards used in this app'}</div>
+
 
       <div class="result-box" style="background:var(--primary-glow);border-color:var(--primary-light)">
         <div class="result-title">${lang === 'da' ? 'Lovgrundlag' : 'Legal Framework'}</div>
@@ -5920,14 +6031,67 @@ function togglePresentation() {
   else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) { applyTheme('dark'); }
 })();
 
-// ===== DYNAMIC LAW / STANDARDS UPDATE CHECK =====
-// Danish electrical regulations are revised regularly. When online, the app can
-// check a remote JSON manifest for newer standard versions/dates and notify the user.
-// Default manifest is configurable; falls back silently offline.
-// Default manifest is hosted in this repo; users can override via configureLawSource().
-const LAW_MANIFEST_DEFAULT = 'https://raw.githubusercontent.com/ajlooshahram-lang/Claude/main/standards-manifest.json';
+// ===== COMPREHENSIVE LIVE UPDATE ENGINE =====
+// Automatically checks for and applies updates to: electrical laws, price indices,
+// new products, deprecations, and app version.
+//
+// MANIFEST JSON FORMAT (hosted at the configurable URL):
+// {
+//   "version": "2.0",
+//   "checked": "2026-06-14",
+//   "categories": {
+//     "laws": {
+//       "version": "2026-06-14",
+//       "items": {
+//         "Elsikkerhedsloven": { "value": "LBK nr 26 af 2023", "date": "2026-06-01", "severity": "info", "description_da": "...", "description_en": "..." },
+//         "DS/HD 60364-5-52": { "value": "2011+A12:2024", "date": "2026-06-10", "severity": "amber", "description_da": "Ny amendment", "description_en": "New amendment" }
+//       }
+//     },
+//     "prices": {
+//       "version": "2026-Q2",
+//       "multipliers": {
+//         "cables": 1.05,
+//         "mcbs": 1.02,
+//         "mccbs": 1.03,
+//         "fuses": 1.00,
+//         "rcds": 1.01,
+//         "general": 1.03
+//       },
+//       "date": "2026-06-01",
+//       "description_da": "Kvartalsvis prisindeks Q2 2026",
+//       "description_en": "Quarterly price index Q2 2026"
+//     },
+//     "products": {
+//       "version": "2026-06-14",
+//       "additions": [
+//         { "cat": "mcbs", "data": { "id": "...", "brand": "...", ... }, "date": "2026-06-01", "description_da": "...", "description_en": "..." }
+//       ]
+//     },
+//     "deprecations": {
+//       "version": "2026-06-14",
+//       "items": [
+//         { "cat": "mcbs", "id": "...", "reason_da": "...", "reason_en": "...", "date": "2026-06-01" }
+//       ]
+//     },
+//     "appVersion": {
+//       "version": "3.1.0",
+//       "url": "https://...",
+//       "date": "2026-06-14",
+//       "description_da": "Ny version tilgængelig",
+//       "description_en": "New version available"
+//     }
+//   }
+// }
+
+const UPDATE_MANIFEST_URL_DEFAULT = 'https://raw.githubusercontent.com/ajlooshahram-lang/Claude/main/updates-manifest.json';
+const _updateUrlStored = localStorage.getItem('updateManifestUrl');
+const UPDATE_MANIFEST_URL = _updateUrlStored === 'off' ? '' : (_updateUrlStored || UPDATE_MANIFEST_URL_DEFAULT);
+
+// Keep backward compat aliases
+const LAW_MANIFEST_DEFAULT = UPDATE_MANIFEST_URL_DEFAULT;
 const _lawStored = localStorage.getItem('lawManifestUrl');
 const LAW_MANIFEST_URL = _lawStored === 'off' ? '' : (_lawStored || LAW_MANIFEST_DEFAULT);
+
 // Current built-in standards baseline (what the app was built against)
 const STANDARDS_BASELINE = {
   checked: '2026-06-11',
@@ -5940,90 +6104,489 @@ const STANDARDS_BASELINE = {
     'Fællesregulativet': '2019'
   }
 };
-let lawUpdateInfo = JSON.parse(localStorage.getItem('lawUpdateInfo') || 'null');
 
-async function checkLawUpdates(manual) {
-  if (!navigator.onLine) {
-    if (manual) alert(lang === 'da' ? 'Ingen internetforbindelse. Pr\u00F8v igen, n\u00E5r du er online.' : 'No internet connection. Try again when online.');
+// Price index multipliers (applied to priceFor calculations)
+let PRICE_INDEX_MULTIPLIERS = JSON.parse(localStorage.getItem('priceIndexMultipliers') || 'null') || {
+  cables: 1.00, mcbs: 1.00, mccbs: 1.00, fuses: 1.00,
+  rcds: 1.00, rcbos: 1.00, spds: 1.00, contactors: 1.00,
+  mpcbs: 1.00, overloadRelays: 1.00, wiringDevices: 1.00, general: 1.00
+};
+
+// Update engine state
+let lawUpdateInfo = JSON.parse(localStorage.getItem('lawUpdateInfo') || 'null');
+let pendingUpdates = JSON.parse(localStorage.getItem('pendingUpdates') || '[]');
+let appliedUpdatesHistory = JSON.parse(localStorage.getItem('appliedUpdatesHistory') || '[]');
+let updateAutoEnabled = localStorage.getItem('updateAutoEnabled') !== 'false';
+let lastUpdateCheck = localStorage.getItem('lastUpdateCheckTimestamp') || null;
+
+// Dismissed updates - will re-show next session
+let _dismissedThisSession = false;
+
+function getUpdateBarColor(updates) {
+  if (!updates || !updates.length) return '';
+  const hasCritical = updates.some(u => u.severity === 'red' || u.severity === 'critical');
+  const hasAmber = updates.some(u => u.severity === 'amber' || u.severity === 'warning');
+  if (hasCritical) return 'red';
+  if (hasAmber) return 'amber';
+  return '';
+}
+
+function showUpdateBar() {
+  const bar = document.getElementById('updateBar');
+  const badge = document.getElementById('updateBadge');
+  const text = document.getElementById('updateBarText');
+  const dismiss = document.getElementById('updateBarDismiss');
+  if (!bar || !pendingUpdates.length || _dismissedThisSession) {
+    if (bar) bar.classList.remove('visible');
     return;
   }
-  const url = LAW_MANIFEST_URL;
-  if (!url) {
-    // No manifest configured: guide the user (no false claims of an update)
-    if (manual) {
-      configureLawSource();
-    }
+  const count = pendingUpdates.length;
+  badge.textContent = count;
+  text.textContent = lang === 'da'
+    ? '\uD83D\uDD04 ' + count + ' opdatering' + (count > 1 ? 'er' : '') + ' tilg\u00E6ngelige'
+    : '\uD83D\uDD04 ' + count + ' update' + (count > 1 ? 's' : '') + ' available';
+  dismiss.textContent = lang === 'da' ? 'Afvis' : 'Dismiss';
+  bar.className = 'update-bar visible ' + getUpdateBarColor(pendingUpdates);
+}
+
+function toggleUpdatePanel() {
+  const panel = document.getElementById('updatePanel');
+  if (!panel) return;
+  const isExpanded = panel.classList.contains('expanded');
+  if (isExpanded) {
+    panel.classList.remove('expanded');
     return;
   }
-  try {
-    const res = await fetch(url, { cache: 'no-store' });
-    const data = await res.json();
-    // Compare manifest items vs baseline
-    const changes = [];
-    if (data && data.items) {
-      Object.keys(data.items).forEach(k => {
-        const latest = data.items[k];
-        const current = STANDARDS_BASELINE.items[k];
-        if (current && latest && latest !== current) {
-          changes.push({ name: k, from: current, to: latest });
-        } else if (!current && latest) {
-          changes.push({ name: k, from: '\u2014', to: latest });
+  renderUpdatePanel();
+  panel.classList.add('expanded');
+}
+
+function renderUpdatePanel() {
+  const panel = document.getElementById('updatePanel');
+  if (!panel || !pendingUpdates.length) return;
+  const icons = { laws: '\u2696\uFE0F', prices: '\uD83D\uDCB0', products: '\uD83C\uDD95', deprecations: '\u26D4', appVersion: '\uD83D\uDCE6' };
+  const catLabels = {
+    da: { laws: 'Lovgivning', prices: 'Prisindeks', products: 'Nye produkter', deprecations: 'Udgåede produkter', appVersion: 'App-version' },
+    en: { laws: 'Legislation', prices: 'Price Index', products: 'New Products', deprecations: 'Deprecations', appVersion: 'App Version' }
+  };
+  let html = '<div style="font-weight:700;font-size:0.95rem;margin-bottom:10px;color:var(--primary)">'
+    + (lang === 'da' ? 'Tilg\u00E6ngelige opdateringer' : 'Available Updates') + '</div>';
+  html += pendingUpdates.map(u => {
+    const icon = icons[u.category] || '\uD83D\uDD04';
+    const catLabel = (catLabels[lang] || catLabels.en)[u.category] || u.category;
+    const desc = u['description_' + lang] || u.description_en || u.description_da || '';
+    const severityColor = u.severity === 'red' ? '#d32f2f' : u.severity === 'amber' ? '#f57c00' : 'var(--primary)';
+    return '<div class="update-item">'
+      + '<span class="update-icon">' + icon + '</span>'
+      + '<div class="update-detail">'
+      + '<div class="update-title" style="color:' + severityColor + '">[' + catLabel + '] ' + (u.title || u.name || '') + '</div>'
+      + '<div class="update-desc">' + desc + '</div>'
+      + '<div class="update-date">' + (u.date || '') + '</div>'
+      + '</div></div>';
+  }).join('');
+  html += '<div class="update-actions">'
+    + '<button class="apply-all-btn" onclick="applyAllUpdates()">' + (lang === 'da' ? 'Anvend alle' : 'Apply all') + '</button>'
+    + '<button class="dismiss-btn" onclick="dismissUpdates()">' + (lang === 'da' ? 'Afvis' : 'Dismiss') + '</button>'
+    + '</div>';
+  panel.innerHTML = html;
+}
+
+function dismissUpdates() {
+  _dismissedThisSession = true;
+  const bar = document.getElementById('updateBar');
+  const panel = document.getElementById('updatePanel');
+  if (bar) bar.classList.remove('visible');
+  if (panel) panel.classList.remove('expanded');
+}
+
+function applyAllUpdates() {
+  if (!pendingUpdates.length) return;
+  pendingUpdates.forEach(u => {
+    applyUpdate(u);
+    appliedUpdatesHistory.push({ ...u, appliedAt: new Date().toISOString() });
+  });
+  localStorage.setItem('appliedUpdatesHistory', JSON.stringify(appliedUpdatesHistory));
+  // Store applied versions per category so we don't re-apply
+  const appliedVersions = JSON.parse(localStorage.getItem('appliedUpdateVersions') || '{}');
+  pendingUpdates.forEach(u => {
+    if (u.category && u.version) appliedVersions[u.category + ':' + (u.id || u.name || '')] = u.version;
+  });
+  localStorage.setItem('appliedUpdateVersions', JSON.stringify(appliedVersions));
+  pendingUpdates = [];
+  localStorage.setItem('pendingUpdates', '[]');
+  showUpdateBar();
+  const panel = document.getElementById('updatePanel');
+  if (panel) panel.classList.remove('expanded');
+  if (typeof activeModule !== 'undefined' && activeModule === 'standards') renderModule('standards');
+}
+
+function applyUpdate(u) {
+  switch (u.category) {
+    case 'laws':
+      // Update STANDARDS_BASELINE
+      if (u.name && u.value) {
+        STANDARDS_BASELINE.items[u.name] = u.value;
+        STANDARDS_BASELINE.checked = u.date || new Date().toISOString().slice(0, 10);
+      }
+      // Update lawUpdateInfo for the standards module display
+      if (!lawUpdateInfo) lawUpdateInfo = { date: new Date().toISOString().slice(0, 10), source: UPDATE_MANIFEST_URL, changes: [] };
+      lawUpdateInfo.changes = lawUpdateInfo.changes || [];
+      if (u.name) {
+        const existingIdx = lawUpdateInfo.changes.findIndex(c => c.name === u.name);
+        if (existingIdx >= 0) lawUpdateInfo.changes[existingIdx] = { name: u.name, from: u.from || '-', to: u.value };
+        else lawUpdateInfo.changes.push({ name: u.name, from: u.from || '-', to: u.value });
+      }
+      localStorage.setItem('lawUpdateInfo', JSON.stringify(lawUpdateInfo));
+      break;
+    case 'prices':
+      // Update price index multipliers
+      if (u.multipliers) {
+        Object.keys(u.multipliers).forEach(k => {
+          PRICE_INDEX_MULTIPLIERS[k] = u.multipliers[k];
+        });
+        localStorage.setItem('priceIndexMultipliers', JSON.stringify(PRICE_INDEX_MULTIPLIERS));
+      }
+      break;
+    case 'products':
+      // Add new products to PRODUCTS arrays
+      if (u.productData && u.productCat && typeof PRODUCTS !== 'undefined' && PRODUCTS[u.productCat]) {
+        const exists = PRODUCTS[u.productCat].find(p => p.id === u.productData.id);
+        if (!exists) {
+          PRODUCTS[u.productCat].push(u.productData);
+          // Persist new products
+          const added = JSON.parse(localStorage.getItem('addedProducts') || '[]');
+          added.push({ cat: u.productCat, data: u.productData });
+          localStorage.setItem('addedProducts', JSON.stringify(added));
         }
-      });
-    }
-    lawUpdateInfo = { date: new Date().toISOString().slice(0, 10), source: url, changes, manifestDate: data.checked || null };
-    localStorage.setItem('lawUpdateInfo', JSON.stringify(lawUpdateInfo));
-    if (activeModule === 'standards') renderModule('standards');
-    if (manual) {
-      alert(changes.length
-        ? (lang === 'da' ? changes.length + ' opdatering(er) fundet. Se "Standarder".' : changes.length + ' update(s) found. See "Standards".')
-        : (lang === 'da' ? 'Alle standarder er opdaterede.' : 'All standards are up to date.'));
-    }
-  } catch (e) {
-    if (manual) alert((lang === 'da' ? 'Kunne ikke hente opdateringer: ' : 'Could not fetch updates: ') + e.message);
+      }
+      break;
+    case 'deprecations':
+      // Mark product as discontinued
+      if (u.productCat && u.productId && typeof PRODUCTS !== 'undefined' && PRODUCTS[u.productCat]) {
+        const prod = PRODUCTS[u.productCat].find(p => p.id === u.productId);
+        if (prod) prod.discontinued = true;
+        const depr = JSON.parse(localStorage.getItem('deprecatedProducts') || '[]');
+        if (!depr.find(d => d.cat === u.productCat && d.id === u.productId)) {
+          depr.push({ cat: u.productCat, id: u.productId, reason: u.reason || '' });
+          localStorage.setItem('deprecatedProducts', JSON.stringify(depr));
+        }
+      }
+      break;
+    case 'appVersion':
+      // Nothing to auto-apply; just record it
+      break;
   }
 }
 
+// Restore previously added products and deprecations from localStorage on load
+(function restorePersistedUpdates() {
+  try {
+    const added = JSON.parse(localStorage.getItem('addedProducts') || '[]');
+    added.forEach(a => {
+      if (typeof PRODUCTS !== 'undefined' && PRODUCTS[a.cat]) {
+        if (!PRODUCTS[a.cat].find(p => p.id === a.data.id)) PRODUCTS[a.cat].push(a.data);
+      }
+    });
+    const depr = JSON.parse(localStorage.getItem('deprecatedProducts') || '[]');
+    depr.forEach(d => {
+      if (typeof PRODUCTS !== 'undefined' && PRODUCTS[d.cat]) {
+        const prod = PRODUCTS[d.cat].find(p => p.id === d.id);
+        if (prod) prod.discontinued = true;
+      }
+    });
+  } catch (e) { /* silent */ }
+})();
+
+// Price index multiplier override is applied after priceFor is defined (see below)
+
+// Core fetch and compare function
+async function checkForUpdates(manual) {
+  if (!navigator.onLine) {
+    if (manual) {
+      showToast(lang === 'da' ? 'Ingen internetforbindelse' : 'No internet connection', 'warning');
+    }
+    return;
+  }
+  if (!updateAutoEnabled && !manual) return;
+
+  const url = UPDATE_MANIFEST_URL || LAW_MANIFEST_URL;
+  if (!url) {
+    if (manual) configureLawSource();
+    return;
+  }
+
+  // Throttle: max once per 24h unless manual
+  if (!manual) {
+    const now = Date.now();
+    if (lastUpdateCheck && (now - parseInt(lastUpdateCheck, 10)) < 86400000) return;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
+    clearTimeout(timeout);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+
+    lastUpdateCheck = String(Date.now());
+    localStorage.setItem('lastUpdateCheckTimestamp', lastUpdateCheck);
+
+    const newPending = [];
+    const appliedVersions = JSON.parse(localStorage.getItem('appliedUpdateVersions') || '{}');
+
+    // Process categories
+    if (data.categories) {
+      // LAWS
+      if (data.categories.laws && data.categories.laws.items) {
+        Object.entries(data.categories.laws.items).forEach(function(entry) {
+          var k = entry[0], v = entry[1];
+          var val = typeof v === 'string' ? v : v.value;
+          var current = STANDARDS_BASELINE.items[k];
+          var appliedKey = 'laws:' + k;
+          if (appliedVersions[appliedKey] === val) return;
+          if (current !== val) {
+            newPending.push({
+              category: 'laws', name: k, value: val, from: current || '-',
+              severity: (typeof v === 'object' && v.severity) || 'amber',
+              date: (typeof v === 'object' && v.date) || data.categories.laws.version || '',
+              description_da: (typeof v === 'object' && v.description_da) || (k + ': ' + (current || '?') + ' -> ' + val),
+              description_en: (typeof v === 'object' && v.description_en) || (k + ': ' + (current || '?') + ' -> ' + val),
+              title: k, version: val, id: k
+            });
+          }
+        });
+      }
+
+      // PRICES
+      if (data.categories.prices && data.categories.prices.multipliers) {
+        var pVer = data.categories.prices.version || '';
+        var appliedPKey = 'prices:index';
+        if (appliedVersions[appliedPKey] !== pVer) {
+          var currentMuls = PRICE_INDEX_MULTIPLIERS;
+          var changed = Object.keys(data.categories.prices.multipliers).some(function(k) {
+            return data.categories.prices.multipliers[k] !== currentMuls[k];
+          });
+          if (changed) {
+            newPending.push({
+              category: 'prices', name: 'price-index', multipliers: data.categories.prices.multipliers,
+              severity: 'info', date: data.categories.prices.date || pVer,
+              description_da: data.categories.prices.description_da || 'Opdateret prisindeks',
+              description_en: data.categories.prices.description_en || 'Updated price index',
+              title: lang === 'da' ? 'Prisindeks opdatering' : 'Price index update',
+              version: pVer, id: 'price-index'
+            });
+          }
+        }
+      }
+
+      // NEW PRODUCTS
+      if (data.categories.products && data.categories.products.additions) {
+        data.categories.products.additions.forEach(function(prod) {
+          var pKey = 'products:' + (prod.data && prod.data.id || '');
+          if (appliedVersions[pKey]) return;
+          if (typeof PRODUCTS !== 'undefined' && PRODUCTS[prod.cat]) {
+            if (!PRODUCTS[prod.cat].find(function(p) { return p.id === prod.data.id; })) {
+              newPending.push({
+                category: 'products', productCat: prod.cat, productData: prod.data,
+                severity: 'info', date: prod.date || data.categories.products.version || '',
+                description_da: prod.description_da || ('Nyt produkt: ' + (prod.data.id || '')),
+                description_en: prod.description_en || ('New product: ' + (prod.data.id || '')),
+                title: (prod.data.brand || '') + ' ' + (prod.data.id || ''),
+                name: prod.data.id, version: data.categories.products.version || prod.data.id, id: prod.data.id
+              });
+            }
+          }
+        });
+      }
+
+      // DEPRECATIONS
+      if (data.categories.deprecations && data.categories.deprecations.items) {
+        data.categories.deprecations.items.forEach(function(dep) {
+          var dKey = 'deprecations:' + dep.cat + ':' + dep.id;
+          if (appliedVersions[dKey]) return;
+          newPending.push({
+            category: 'deprecations', productCat: dep.cat, productId: dep.id,
+            reason: dep['reason_' + lang] || dep.reason_da || dep.reason_en || '',
+            severity: 'amber', date: dep.date || data.categories.deprecations.version || '',
+            description_da: dep.reason_da || ('Udg\u00E5et: ' + dep.id),
+            description_en: dep.reason_en || ('Discontinued: ' + dep.id),
+            title: dep.id, name: dep.id, version: data.categories.deprecations.version || dep.id, id: dep.cat + ':' + dep.id
+          });
+        });
+      }
+
+      // APP VERSION
+      if (data.categories.appVersion && data.categories.appVersion.version) {
+        var avKey = 'appVersion:' + data.categories.appVersion.version;
+        if (!appliedVersions[avKey]) {
+          newPending.push({
+            category: 'appVersion', severity: 'info',
+            date: data.categories.appVersion.date || '',
+            description_da: data.categories.appVersion.description_da || 'Ny app-version tilg\u00E6ngelig',
+            description_en: data.categories.appVersion.description_en || 'New app version available',
+            title: 'v' + data.categories.appVersion.version,
+            name: 'appVersion', version: data.categories.appVersion.version, id: 'appVersion',
+            url: data.categories.appVersion.url || ''
+          });
+        }
+      }
+    }
+
+    // Also support legacy flat "items" format for backward compat
+    if (data.items && !data.categories) {
+      Object.keys(data.items).forEach(function(k) {
+        var latest = data.items[k];
+        var current = STANDARDS_BASELINE.items[k];
+        var appliedKey = 'laws:' + k;
+        if (appliedVersions[appliedKey] === latest) return;
+        if (current && latest && latest !== current) {
+          newPending.push({
+            category: 'laws', name: k, value: latest, from: current,
+            severity: 'amber', date: data.checked || '',
+            description_da: k + ': ' + current + ' -> ' + latest,
+            description_en: k + ': ' + current + ' -> ' + latest,
+            title: k, version: latest, id: k
+          });
+        } else if (!current && latest) {
+          newPending.push({
+            category: 'laws', name: k, value: latest, from: '-',
+            severity: 'info', date: data.checked || '',
+            description_da: 'Ny standard: ' + k + ' ' + latest,
+            description_en: 'New standard: ' + k + ' ' + latest,
+            title: k, version: latest, id: k
+          });
+        }
+      });
+    }
+
+    // Update pending
+    if (newPending.length) {
+      pendingUpdates = newPending;
+      localStorage.setItem('pendingUpdates', JSON.stringify(pendingUpdates));
+      _dismissedThisSession = false;
+      showUpdateBar();
+    } else {
+      pendingUpdates = [];
+      localStorage.setItem('pendingUpdates', '[]');
+      showUpdateBar();
+    }
+
+    // Also update lawUpdateInfo for standards module display
+    var lawChanges = newPending.filter(function(u) { return u.category === 'laws'; });
+    lawUpdateInfo = {
+      date: new Date().toISOString().slice(0, 10),
+      source: url,
+      changes: lawChanges.map(function(c) { return { name: c.name, from: c.from || '-', to: c.value || '' }; }),
+      manifestDate: data.checked || null
+    };
+    localStorage.setItem('lawUpdateInfo', JSON.stringify(lawUpdateInfo));
+    if (typeof activeModule !== 'undefined' && activeModule === 'standards') renderModule('standards');
+
+    if (manual) {
+      showToast(newPending.length
+        ? (lang === 'da' ? newPending.length + ' opdatering(er) fundet!' : newPending.length + ' update(s) found!')
+        : (lang === 'da' ? 'Alt er opdateret' : 'Everything is up to date'), newPending.length ? 'info' : 'success');
+    }
+  } catch (e) {
+    if (manual) {
+      showToast((lang === 'da' ? 'Kunne ikke hente opdateringer: ' : 'Could not fetch updates: ') + e.message, 'error');
+    }
+    // Never break the app on fetch failure
+  }
+}
+
+// Backward compat wrapper
+async function checkLawUpdates(manual) {
+  return checkForUpdates(manual);
+}
+
+// Toast notification helper (non-blocking, no prompt/confirm)
+function showToast(msg, type) {
+  var existing = document.getElementById('updateToast');
+  if (existing) existing.remove();
+  var toast = document.createElement('div');
+  toast.id = 'updateToast';
+  var bg = type === 'error' ? '#d32f2f' : type === 'warning' ? '#f57c00' : type === 'success' ? '#2e7d32' : '#1a73e8';
+  toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:' + bg + ';color:#fff;padding:12px 20px;border-radius:10px;font-size:0.85rem;font-weight:600;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.3);animation:fadeIn 0.3s ease;max-width:320px;';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(function() { if (toast.parentNode) toast.remove(); }, 4000);
+}
+
 function configureLawSource() {
-  const LAW_PRESETS = [
+  var LAW_PRESETS = [
+    { label: lang==='da'?'GitHub (standard)':'GitHub (default)', url: UPDATE_MANIFEST_URL_DEFAULT },
     { label: lang==='da'?'Sikkerhedsstyrelsen (officiel)':'Safety Authority (official)', url: 'https://sikkerhedsstyrelsen.dk/api/standards.json' },
     { label: lang==='da'?'DS/IEC standard-manifest':'DS/IEC standard manifest', url: 'https://ds.dk/api/el-standards.json' },
     { label: lang==='da'?'Lokal server':'Local server', url: 'http://localhost:8080/standards.json' },
     { label: lang==='da'?'Deaktiver':'Disable', url: 'off' }
   ];
-  const overlay = document.createElement('div');
+  var overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
-  const modal = document.createElement('div');
+  var modal = document.createElement('div');
   modal.style.cssText = 'background:var(--card);border-radius:var(--radius-lg);padding:24px;max-width:400px;width:100%;box-shadow:var(--shadow-lg);border:1px solid var(--border)';
-  modal.innerHTML = '<div style="font-weight:700;font-size:1rem;margin-bottom:12px;color:var(--primary)">' + (lang==='da'?'Opdateringskilde for standarder':'Standards update source') + '</div>'
-    + '<div style="font-size:0.82rem;color:var(--text-light);margin-bottom:16px">' + (lang==='da'?'Vælg en kilde til lov-opdateringer:':'Select a source for law updates:') + '</div>'
+  modal.innerHTML = '<div style="font-weight:700;font-size:1rem;margin-bottom:12px;color:var(--primary)">' + (lang==='da'?'Opdateringskilde':'Update source') + '</div>'
+    + '<div style="font-size:0.82rem;color:var(--text-light);margin-bottom:16px">' + (lang==='da'?'V\u00E6lg en kilde til opdateringer:':'Select a source for updates:') + '</div>'
     + '<div style="display:flex;flex-direction:column;gap:8px">'
-    + LAW_PRESETS.map(p => '<button class="sel-btn" style="width:100%;text-align:left" data-url="' + p.url + '">' + p.label + '</button>').join('')
+    + LAW_PRESETS.map(function(p) { return '<button class="sel-btn" style="width:100%;text-align:left" data-url="' + p.url + '">' + p.label + '</button>'; }).join('')
     + '</div>'
     + '<div style="margin-top:14px;display:flex;justify-content:flex-end"><button class="sel-btn" id="lawModalClose">' + (lang==='da'?'Annuller':'Cancel') + '</button></div>';
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
   overlay.addEventListener('click', function(e) {
     if (e.target === overlay || e.target.id === 'lawModalClose') { document.body.removeChild(overlay); return; }
-    const btn = e.target.closest('[data-url]');
+    var btn = e.target.closest('[data-url]');
     if (btn) {
-      const url = btn.getAttribute('data-url');
-      localStorage.setItem('lawManifestUrl', url === 'off' ? 'off' : url);
+      var u = btn.getAttribute('data-url');
+      localStorage.setItem('updateManifestUrl', u === 'off' ? 'off' : u);
+      localStorage.setItem('lawManifestUrl', u === 'off' ? 'off' : u);
       document.body.removeChild(overlay);
       location.reload();
     }
   });
 }
 
-// Auto-check once per day when online
-(function autoLawCheck() {
-  if (!LAW_MANIFEST_URL) return;
-  const last = localStorage.getItem('lawCheckedAt');
-  const today = new Date().toISOString().slice(0, 10);
-  if (last !== today) {
-    localStorage.setItem('lawCheckedAt', today);
-    if (navigator.onLine) checkLawUpdates(false);
-    else window.addEventListener('online', () => checkLawUpdates(false), { once: true });
+// Toggle auto-update setting
+function toggleAutoUpdate() {
+  updateAutoEnabled = !updateAutoEnabled;
+  localStorage.setItem('updateAutoEnabled', updateAutoEnabled ? 'true' : 'false');
+  if (typeof activeModule !== 'undefined' && activeModule === 'standards') renderModule('standards');
+}
+
+// Get formatted last-check time
+function getLastCheckDisplay() {
+  if (!lastUpdateCheck) return lang === 'da' ? 'Aldrig' : 'Never';
+  var d = new Date(parseInt(lastUpdateCheck, 10));
+  return d.toLocaleString(lang === 'da' ? 'da-DK' : 'en-GB');
+}
+
+// Auto-check on page load (silent, non-blocking)
+(function autoUpdateCheck() {
+  if (!updateAutoEnabled) return;
+  if (!UPDATE_MANIFEST_URL && !LAW_MANIFEST_URL) return;
+
+  function doCheck() {
+    // Throttle: once per 24h
+    var now = Date.now();
+    if (lastUpdateCheck && (now - parseInt(lastUpdateCheck, 10)) < 86400000) {
+      // Still show bar if there are pending updates from last check
+      if (pendingUpdates.length) showUpdateBar();
+      return;
+    }
+    checkForUpdates(false);
+  }
+
+  if (navigator.onLine) {
+    // Delay slightly to not block initial render
+    setTimeout(doCheck, 2000);
+  } else {
+    window.addEventListener('online', function() { setTimeout(doCheck, 1000); }, { once: true });
+  }
+
+  // Also show bar immediately if we have stored pending updates
+  if (pendingUpdates.length) {
+    setTimeout(showUpdateBar, 500);
   }
 })();
 
@@ -6079,6 +6642,16 @@ function priceFor(cat, p) {
   } else { v = 100; }
   return Math.round(v);
 }
+
+// Apply price index multiplier from Live Update Engine
+(function applyPriceIndexOverride() {
+  const _origPriceFor = priceFor;
+  priceFor = function(cat, p) {
+    const base = _origPriceFor(cat, p);
+    const catMul = PRICE_INDEX_MULTIPLIERS[cat] || PRICE_INDEX_MULTIPLIERS.general || 1.0;
+    return Math.round(base * catMul);
+  };
+})();
 
 function findProduct(cat, id) {
   return (PRODUCTS[cat] || []).find(x => x.id === id);
