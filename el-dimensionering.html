@@ -740,6 +740,7 @@ const T = {
       verify: 'Verifikation',
       draw: 'Tegning',
       selectivity: '\u26A1 Selektivitet',
+      zs: '\uD83D\uDD04 Sl\u00F8jfe Zs',
       exam: '\uD83C\uDF93 Eksamen'
     },
     // Load module
@@ -840,6 +841,7 @@ const T = {
       verify: 'Verify',
       draw: 'Drawing',
       selectivity: '\u26A1 Selectivity',
+      zs: '\uD83D\uDD04 Loop Zs',
       exam: '\uD83C\uDF93 Exam'
     },
     loadTitle: 'Load Calculation',
@@ -1980,6 +1982,8 @@ let cableState = { material: 'copper', type: 'NOIKLX', cores: '5G', crossSection
 let vdropState = { length: 50 };
 // Selectivity state
 let selState = { upType: null, upRating: null, upCurve: null, dnType: null, dnRating: null, dnCurve: null };
+// Loop impedance (Zs) state
+let zsState = { earthing: 'TN-S', deviceType: 'mcb', deviceCurve: 'B', deviceRating: 16, material: 'copper', crossSection: 2.5, cableLength: 20, circuitType: 'final', ze: 0.35 };
 // Short circuit state
 let scState = { zNet: 1, zTrafo: 5 };
 // Standards state
@@ -2106,6 +2110,7 @@ function renderModule(mod) {
     case 'verify': content = renderVerify(); break;
     case 'draw': content = renderDrawing(); break;
     case 'selectivity': content = renderSelectivity(); break;
+    case 'zs': content = renderZs(); break;
     case 'exam': content = renderExam(); break;
   }
   // Append AI assistant to every module
@@ -7213,6 +7218,329 @@ function buildSelectivityViz(result) {
   svg += `<text x="${chartX + 24}" y="${chartY + chartH - 12}" font-size="7" fill="rgba(255,255,255,0.6)">${da ? 'Opstr\u00F8ms' : 'Upstream'}</text>`;
   svg += `<circle cx="${chartX + 90}" cy="${chartY + chartH - 15}" r="4" fill="${dnCurveColor}"/>`;
   svg += `<text x="${chartX + 99}" y="${chartY + chartH - 12}" font-size="7" fill="rgba(255,255,255,0.6)">${da ? 'Nedstr\u00F8ms' : 'Downstream'}</text>`;
+
+  return `<div style="margin-top:16px"><svg viewBox="0 0 ${W} ${H}" width="100%" style="border-radius:14px;border:1.5px solid rgba(0,180,255,0.15);overflow:visible;background:#020508;box-shadow:0 6px 24px rgba(0,100,200,0.08)" xmlns="http://www.w3.org/2000/svg">${svg}</svg></div>`;
+}
+
+function renderZs() {
+  const da = lang === 'da';
+  const U0 = 230; // Phase-to-earth voltage
+
+  // Cable resistance data (mOhm/m per conductor at 20C)
+  const R_CU = { 1.5: 12.1, 2.5: 7.41, 4: 4.61, 6: 3.08, 10: 1.83, 16: 1.15, 25: 0.727, 35: 0.524, 50: 0.387 };
+  const AL_FACTOR = 1.64;
+
+  // Cross-sections and lengths
+  const CROSS_SECTIONS = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50];
+  const LENGTHS = [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 100, 125, 150, 200];
+  const ZE_VALUES = [0.2, 0.35, 0.5, 0.8, 1.0];
+  const MCB_RATINGS = [6, 10, 13, 16, 20, 25, 32, 40, 50, 63];
+  const FUSE_RATINGS = [6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160];
+
+  // MCB magnetic trip multipliers (upper limit for conservative check)
+  const MCB_MULT = { B: 5, C: 10, D: 20 };
+
+  // gG fuse trip currents for 0.4s and 5s (IEC 60269 approximate)
+  const FUSE_IA_04 = { 6: 28, 10: 46, 16: 65, 20: 85, 25: 110, 32: 150, 40: 190, 50: 250, 63: 320, 80: 425, 100: 580, 125: 715, 160: 950 };
+  const FUSE_IA_5 = { 6: 16, 10: 28, 16: 42, 20: 53, 25: 68, 32: 90, 40: 110, 50: 145, 63: 185, 80: 245, 100: 320, 125: 405, 160: 530 };
+
+  // Disconnection times per earthing system
+  function getRequiredTime() {
+    if (zsState.earthing === 'TT') {
+      return zsState.circuitType === 'final' ? 0.2 : 1.0;
+    }
+    // TN-S, TN-C-S
+    return zsState.circuitType === 'final' ? 0.4 : 5.0;
+  }
+
+  // Get trip current Ia
+  function getIa() {
+    const reqTime = getRequiredTime();
+    if (zsState.deviceType === 'fuse') {
+      const table = reqTime <= 0.4 ? FUSE_IA_04 : FUSE_IA_5;
+      return table[zsState.deviceRating] || zsState.deviceRating * 5;
+    }
+    // MCB
+    return MCB_MULT[zsState.deviceCurve] * zsState.deviceRating;
+  }
+
+  // Calculate R per meter for one conductor
+  function getRperMeter() {
+    const rCu = R_CU[zsState.crossSection] || 7.41;
+    return zsState.material === 'copper' ? rCu : rCu * AL_FACTOR;
+  }
+
+  // Cable impedance (phase + PE, same cross-section assumed)
+  function getZcable() {
+    const rPerM = getRperMeter(); // mOhm/m per conductor
+    return 2 * rPerM * zsState.cableLength / 1000; // Ohms
+  }
+
+  function getZsTotal() {
+    return zsState.ze + getZcable();
+  }
+
+  function getIkMin() {
+    const zs = getZsTotal();
+    return zs > 0 ? U0 / zs : 99999;
+  }
+
+  function getMaxLength() {
+    const ia = getIa();
+    const rPerM = getRperMeter();
+    if (rPerM <= 0 || ia <= 0) return 999;
+    // Zs_max = U0 / Ia; Zcable_max = Zs_max - Ze; L_max = Zcable_max * 1000 / (2 * rPerM)
+    const zsMax = U0 / ia;
+    const zcableMax = zsMax - zsState.ze;
+    if (zcableMax <= 0) return 0;
+    return zcableMax * 1000 / (2 * rPerM);
+  }
+
+  // Earthing system buttons
+  let earthingSection = `
+    <div class="select-group">
+      <div class="select-label">${da ? 'Jordingssystem' : 'Earthing system'}</div>
+      <div class="select-grid">
+        ${['TN-S', 'TN-C-S', 'TT'].map(e => `<button class="sel-btn ${zsState.earthing === e ? 'selected' : ''}" onclick="zsState.earthing='${e}';renderModule('zs')">${e}</button>`).join('')}
+      </div>
+    </div>`;
+
+  // Device type buttons
+  let deviceSection = `
+    <div class="select-group">
+      <div class="select-label">${da ? 'Beskyttelsestype' : 'Protection device type'}</div>
+      <div class="select-grid">
+        ${['mcb', 'fuse'].map(t => `<button class="sel-btn ${zsState.deviceType === t ? 'selected' : ''}" onclick="zsState.deviceType='${t}';${t === 'mcb' ? "zsState.deviceCurve='B';zsState.deviceRating=16" : "zsState.deviceRating=16"};renderModule('zs')">${t === 'mcb' ? 'MCB' : (da ? 'gG Sikring' : 'gG Fuse')}</button>`).join('')}
+      </div>
+    </div>`;
+
+  // MCB curve selection
+  if (zsState.deviceType === 'mcb') {
+    deviceSection += `
+    <div class="select-group">
+      <div class="select-label">${da ? 'MCB Kurve' : 'MCB Curve'}</div>
+      <div class="select-grid">
+        ${['B', 'C', 'D'].map(c => `<button class="sel-btn ${zsState.deviceCurve === c ? 'selected' : ''}" onclick="zsState.deviceCurve='${c}';renderModule('zs')">${c} (${MCB_MULT[c]}\u00D7In)</button>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  // Device rating buttons
+  const ratings = zsState.deviceType === 'mcb' ? MCB_RATINGS : FUSE_RATINGS;
+  deviceSection += `
+    <div class="select-group">
+      <div class="select-label">${da ? 'M\u00E6rkestr\u00F8m In [A]' : 'Rated current In [A]'}</div>
+      <div class="select-grid">
+        ${ratings.map(r => `<button class="sel-btn ${zsState.deviceRating === r ? 'selected' : ''}" onclick="zsState.deviceRating=${r};renderModule('zs')">${r} A</button>`).join('')}
+      </div>
+    </div>`;
+
+  // Cable material
+  let cableSection = `
+    <div class="select-group">
+      <div class="select-label">${da ? 'Ledermateriale' : 'Conductor material'}</div>
+      <div class="select-grid">
+        ${[['copper', da ? 'Kobber (Cu)' : 'Copper (Cu)'], ['aluminium', da ? 'Aluminium (Al)' : 'Aluminium (Al)']].map(([v, lbl]) => `<button class="sel-btn ${zsState.material === v ? 'selected' : ''}" onclick="zsState.material='${v}';renderModule('zs')">${lbl}</button>`).join('')}
+      </div>
+    </div>`;
+
+  // Cross-section
+  cableSection += `
+    <div class="select-group">
+      <div class="select-label">${da ? 'Tv\u00E6rsnit [mm\u00B2]' : 'Cross-section [mm\u00B2]'}</div>
+      <div class="select-grid">
+        ${CROSS_SECTIONS.map(cs => `<button class="sel-btn ${zsState.crossSection === cs ? 'selected' : ''}" onclick="zsState.crossSection=${cs};renderModule('zs')">${cs}</button>`).join('')}
+      </div>
+    </div>`;
+
+  // Cable length
+  cableSection += `
+    <div class="select-group">
+      <div class="select-label">${da ? 'Kabellængde [m]' : 'Cable length [m]'}</div>
+      <div class="select-grid">
+        ${LENGTHS.map(l => `<button class="sel-btn ${zsState.cableLength === l ? 'selected' : ''}" onclick="zsState.cableLength=${l};renderModule('zs')">${l} m</button>`).join('')}
+      </div>
+    </div>`;
+
+  // External impedance Ze
+  cableSection += `
+    <div class="select-group">
+      <div class="select-label">${da ? 'Ekstern impedans Ze [\u03A9]' : 'External impedance Ze [\u03A9]'}</div>
+      <div class="select-grid">
+        ${ZE_VALUES.map(z => `<button class="sel-btn ${zsState.ze === z ? 'selected' : ''}" onclick="zsState.ze=${z};renderModule('zs')">${z} \u03A9</button>`).join('')}
+      </div>
+    </div>`;
+
+  // Circuit type
+  let circuitSection = `
+    <div class="select-group">
+      <div class="select-label">${da ? 'Kredsl\u00F8bstype' : 'Circuit type'}</div>
+      <div class="select-grid">
+        <button class="sel-btn ${zsState.circuitType === 'final' ? 'selected' : ''}" onclick="zsState.circuitType='final';renderModule('zs')">${da ? 'Slutkreds \u226432A' : 'Final circuit \u226432A'}</button>
+        <button class="sel-btn ${zsState.circuitType === 'distribution' ? 'selected' : ''}" onclick="zsState.circuitType='distribution';renderModule('zs')">${da ? 'Fordeling >32A' : 'Distribution >32A'}</button>
+      </div>
+    </div>`;
+
+  // Calculations
+  const zcable = getZcable();
+  const zsTotal = getZsTotal();
+  const ikMin = getIkMin();
+  const ia = getIa();
+  const maxLen = getMaxLength();
+  const reqTime = getRequiredTime();
+  const pass = ikMin >= ia;
+  const margin = ia > 0 ? ((ikMin - ia) / ia * 100) : 0;
+
+  const verdictColor = pass ? 'var(--success)' : 'var(--danger)';
+  const verdictIcon = pass ? '\u2705' : '\u274C';
+  const verdictText = pass
+    ? (da ? 'Frakobling OK inden for ' + reqTime + ' s' : 'Disconnection OK within ' + reqTime + ' s')
+    : (da ? 'FEJL: Ik_min for lav - frakobling IKKE sikret' : 'FAIL: Ik_min too low - disconnection NOT assured');
+
+  let resultHtml = `
+    <div class="card fade-in">
+      <div class="card-title" style="color:${verdictColor}">${verdictIcon} ${da ? 'Resultat' : 'Result'}</div>
+      <div class="result-box ${pass ? '' : 'danger'}">
+        <div class="result-title" style="color:${verdictColor};font-size:1.1rem">${verdictText}</div>
+        <div class="result-row"><span class="label">Zs ${da ? '(samlet sl\u00F8jfeimpedans)' : '(total loop impedance)'}</span><span class="value">${zsTotal.toFixed(3)} \u03A9</span></div>
+        <div class="result-row"><span class="label">Ze ${da ? '(ekstern)' : '(external)'}</span><span class="value">${zsState.ze.toFixed(2)} \u03A9</span></div>
+        <div class="result-row"><span class="label">Zcable ${da ? '(kabel fase+PE)' : '(cable phase+PE)'}</span><span class="value">${zcable.toFixed(3)} \u03A9</span></div>
+        <div class="result-row"><span class="label">Ik_min ${da ? '(min. kortslutningsstr\u00F8m)' : '(min. fault current)'}</span><span class="value" style="color:${pass ? 'var(--success)' : 'var(--danger)'}">${ikMin.toFixed(1)} A</span></div>
+        <div class="result-row"><span class="label">Ia ${da ? '(kr\u00E6vet udl\u00F8sestr\u00F8m)' : '(required trip current)'}</span><span class="value">${ia.toFixed(0)} A</span></div>
+        <div class="result-row"><span class="label">${da ? 'Kr\u00E6vet frakoblingstid' : 'Required disconnection time'}</span><span class="value">${reqTime} s</span></div>
+        <div class="result-row"><span class="label">${da ? 'Maks. kabellængde' : 'Max. cable length'}</span><span class="value">${maxLen.toFixed(1)} m</span></div>
+        <div class="result-row"><span class="label">${da ? 'Sikkerhedsmargin' : 'Safety margin'}</span><span class="value" style="color:${margin >= 0 ? 'var(--success)' : 'var(--danger)'}">${margin >= 0 ? '+' : ''}${margin.toFixed(1)}%</span></div>
+      </div>
+      <div style="margin-top:12px;padding:8px 12px;border-radius:8px;background:rgba(0,180,255,0.06);border:1px solid rgba(0,180,255,0.15);font-size:0.78rem;line-height:1.5">
+        <strong>DS/HD 60364-4-41 \u00A7411.3.2 / \u00A7411.4</strong><br>
+        ${da ? 'Betingelse: Zs \u00D7 Ia \u2264 U0 \u2194 Ik_min = U0/Zs \u2265 Ia' : 'Condition: Zs \u00D7 Ia \u2264 U0 \u2194 Ik_min = U0/Zs \u2265 Ia'}<br>
+        ${da ? 'Frakoblingstid for ' + zsState.earthing + ': ' + reqTime + ' s (' + (zsState.circuitType === 'final' ? 'slutkreds \u226432A' : 'fordeling >32A') + ')' : 'Disconnection time for ' + zsState.earthing + ': ' + reqTime + ' s (' + (zsState.circuitType === 'final' ? 'final circuit \u226432A' : 'distribution >32A') + ')'}
+      </div>
+      ${buildZsViz(zsTotal, zcable, zsState.ze, ikMin, ia, pass, reqTime)}
+    </div>`;
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">\uD83D\uDD04 ${da ? 'Sl\u00F8jfeimpedans / Frakoblingstid' : 'Loop Impedance / Disconnection Time'}</div>
+      <div class="info-row">${da ? 'Kontroll\u00E9r at fejlbeskyttelsen opfylder kravene i DS/HD 60364-4-41. V\u00E6lg jordingssystem, beskyttelse, kabel og l\u00E6ngde.' : 'Verify that fault protection meets DS/HD 60364-4-41 requirements. Select earthing system, protection device, cable and length.'}</div>
+      ${earthingSection}
+      ${deviceSection}
+      <div style="border-top:1px solid rgba(255,255,255,0.08);margin:16px 0"></div>
+      ${cableSection}
+      ${circuitSection}
+    </div>
+    ${resultHtml}
+  `;
+}
+
+function buildZsViz(zsTotal, zcable, ze, ikMin, ia, pass, reqTime) {
+  const da = lang === 'da';
+  const W = 620, H = 420;
+  const verdictColor = pass ? '#06d6a0' : '#ff4444';
+
+  let svg = '';
+
+  // Background
+  svg += `<rect width="${W}" height="${H}" fill="#020508" rx="14"/>`;
+  for (let i = 0; i < W; i += 40) svg += `<line x1="${i}" y1="0" x2="${i}" y2="${H}" stroke="rgba(0,180,255,0.03)" stroke-width="0.5"/>`;
+  for (let i = 0; i < H; i += 40) svg += `<line x1="0" y1="0" x2="${W}" y2="0" stroke="rgba(0,180,255,0.03)" stroke-width="0.5"/>`;
+
+  // Title
+  svg += `<text x="${W/2}" y="28" text-anchor="middle" font-size="11" fill="${verdictColor}" font-weight="700">${da ? 'FEJLSL\u00D8JFE' : 'FAULT LOOP'}</text>`;
+
+  // The fault loop path: Source -> Phase conductor (top) -> Fault point (right) -> PE conductor (bottom) -> back to Source
+  const loopLeft = 80, loopRight = 520, loopTop = 80, loopBot = 320;
+  const srcX = loopLeft, srcY = (loopTop + loopBot) / 2;
+  const faultX = loopRight, faultY = (loopTop + loopBot) / 2;
+
+  // Source (transformer)
+  svg += `<circle cx="${srcX}" cy="${srcY}" r="28" fill="rgba(0,180,255,0.08)" stroke="#0af" stroke-width="2"/>`;
+  svg += `<text x="${srcX}" y="${srcY - 6}" text-anchor="middle" font-size="9" fill="#0af" font-weight="700">U0</text>`;
+  svg += `<text x="${srcX}" y="${srcY + 8}" text-anchor="middle" font-size="10" fill="#fff" font-weight="700">230V</text>`;
+  svg += `<text x="${srcX}" y="${srcY + 42}" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.5)">${da ? 'KILDE' : 'SOURCE'}</text>`;
+
+  // Protection device position (on phase conductor near source)
+  const devX = 180, devY = loopTop;
+  const devW = 60, devH = 34;
+
+  // Phase conductor (top path: source -> device -> fault)
+  svg += `<line x1="${srcX}" y1="${srcY - 28}" x2="${srcX}" y2="${loopTop}" stroke="#0af" stroke-width="2.5"/>`;
+  svg += `<line x1="${srcX}" y1="${loopTop}" x2="${devX - devW/2}" y2="${loopTop}" stroke="#0af" stroke-width="2.5"/>`;
+
+  // Protection device box
+  const devColor = pass ? '#06d6a0' : '#ff4444';
+  svg += `<rect x="${devX - devW/2}" y="${devY - devH/2}" width="${devW}" height="${devH}" rx="5" fill="rgba(0,180,255,0.08)" stroke="${devColor}" stroke-width="2"/>`;
+  const devLabel = zsState.deviceType === 'mcb' ? zsState.deviceCurve + zsState.deviceRating : 'gG ' + zsState.deviceRating;
+  svg += `<text x="${devX}" y="${devY + 4}" text-anchor="middle" font-size="9" fill="#fff" font-weight="700">${devLabel}A</text>`;
+
+  // Trip/no-trip indicator
+  if (pass) {
+    svg += `<circle cx="${devX}" cy="${devY - devH/2 - 10}" r="5" fill="#06d6a0" opacity="0.9">`;
+    svg += `<animate attributeName="opacity" values="0.5;1;0.5" dur="1.5s" repeatCount="indefinite"/></circle>`;
+    svg += `<text x="${devX + 10}" y="${devY - devH/2 - 7}" font-size="7" fill="#06d6a0">${da ? 'UDKOBLER' : 'TRIPS'}</text>`;
+  } else {
+    svg += `<circle cx="${devX}" cy="${devY - devH/2 - 10}" r="5" fill="#ff4444" opacity="0.9">`;
+    svg += `<animate attributeName="opacity" values="0.3;1;0.3" dur="0.8s" repeatCount="indefinite"/></circle>`;
+    svg += `<text x="${devX + 10}" y="${devY - devH/2 - 7}" font-size="7" fill="#ff4444">${da ? 'FOR LANGSOM' : 'TOO SLOW'}</text>`;
+  }
+
+  // Phase conductor continues after device to fault
+  svg += `<line x1="${devX + devW/2}" y1="${loopTop}" x2="${faultX}" y2="${loopTop}" stroke="#0af" stroke-width="2.5"/>`;
+
+  // Ze label (source side impedance)
+  const zeEndX = devX - devW/2;
+  svg += `<text x="${(srcX + zeEndX) / 2}" y="${loopTop - 12}" text-anchor="middle" font-size="8" fill="#88ccff">Ze = ${ze.toFixed(2)} \u03A9</text>`;
+
+  // Zcable label (cable impedance on phase path)
+  svg += `<text x="${(devX + devW/2 + faultX) / 2}" y="${loopTop - 12}" text-anchor="middle" font-size="8" fill="#88ccff">${da ? 'Fase' : 'Phase'}: R = ${(zcable / 2).toFixed(3)} \u03A9</text>`;
+
+  // Fault point (right side)
+  svg += `<line x1="${faultX}" y1="${loopTop}" x2="${faultX}" y2="${loopBot}" stroke="rgba(255,68,68,0.6)" stroke-width="2" stroke-dasharray="4,3"/>`;
+  svg += `<circle cx="${faultX}" cy="${faultY}" r="18" fill="rgba(255,68,68,0.12)" stroke="#ff4444" stroke-width="2">`;
+  svg += `<animate attributeName="r" values="16;20;16" dur="1.2s" repeatCount="indefinite"/></circle>`;
+  svg += `<text x="${faultX}" y="${faultY + 4}" text-anchor="middle" font-size="12" fill="#ff4444">\u26A1</text>`;
+  svg += `<text x="${faultX}" y="${faultY + 34}" text-anchor="middle" font-size="8" fill="#ff4444">${da ? 'FEJLSTED' : 'FAULT'}</text>`;
+
+  // PE conductor (bottom path: fault -> back to source)
+  svg += `<line x1="${faultX}" y1="${loopBot}" x2="${srcX}" y2="${loopBot}" stroke="#0c6" stroke-width="2.5"/>`;
+  svg += `<line x1="${srcX}" y1="${loopBot}" x2="${srcX}" y2="${srcY + 28}" stroke="#0c6" stroke-width="2.5"/>`;
+
+  // PE label
+  svg += `<text x="${(srcX + faultX) / 2}" y="${loopBot + 16}" text-anchor="middle" font-size="8" fill="#0c6">PE: R = ${(zcable / 2).toFixed(3)} \u03A9</text>`;
+
+  // Animated fault current particles flowing through the loop
+  const pathDur = '3s';
+  for (let i = 0; i < 6; i++) {
+    const delay = (i * 0.5).toFixed(1);
+    const particleColor = pass ? '#06d6a0' : '#ff8844';
+    // Phase path particles (left to right along top)
+    svg += `<circle r="3.5" fill="${particleColor}" opacity="0.85">`;
+    svg += `<animate attributeName="cx" values="${srcX};${devX};${faultX}" dur="${pathDur}" begin="${delay}s" repeatCount="indefinite"/>`;
+    svg += `<animate attributeName="cy" values="${loopTop};${loopTop};${loopTop}" dur="${pathDur}" begin="${delay}s" repeatCount="indefinite"/>`;
+    svg += `<animate attributeName="opacity" values="0.9;0.7;0.4" dur="${pathDur}" begin="${delay}s" repeatCount="indefinite"/>`;
+    svg += `</circle>`;
+    // PE path particles (right to left along bottom)
+    svg += `<circle r="3.5" fill="${particleColor}" opacity="0.85">`;
+    svg += `<animate attributeName="cx" values="${faultX};${(srcX + faultX) / 2};${srcX}" dur="${pathDur}" begin="${delay}s" repeatCount="indefinite"/>`;
+    svg += `<animate attributeName="cy" values="${loopBot};${loopBot};${loopBot}" dur="${pathDur}" begin="${delay}s" repeatCount="indefinite"/>`;
+    svg += `<animate attributeName="opacity" values="0.9;0.7;0.4" dur="${pathDur}" begin="${delay}s" repeatCount="indefinite"/>`;
+    svg += `</circle>`;
+  }
+
+  // Zs total label in center
+  svg += `<rect x="${W/2 - 70}" y="${faultY - 20}" width="140" height="40" rx="8" fill="rgba(0,20,40,0.8)" stroke="${verdictColor}" stroke-width="1.5"/>`;
+  svg += `<text x="${W/2}" y="${faultY - 2}" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.7)">Zs ${da ? 'total' : 'total'}</text>`;
+  svg += `<text x="${W/2}" y="${faultY + 14}" text-anchor="middle" font-size="12" fill="${verdictColor}" font-weight="700">${zsTotal.toFixed(3)} \u03A9</text>`;
+
+  // Current values box (bottom right)
+  const boxX = 380, boxY = 345, boxW = 220, boxH = 60;
+  svg += `<rect x="${boxX}" y="${boxY}" width="${boxW}" height="${boxH}" rx="8" fill="rgba(0,20,40,0.7)" stroke="rgba(0,180,255,0.15)" stroke-width="1"/>`;
+  svg += `<text x="${boxX + 10}" y="${boxY + 16}" font-size="8" fill="rgba(255,255,255,0.7)">Ik_min = U0/Zs = <tspan fill="${verdictColor}" font-weight="700">${ikMin.toFixed(1)} A</tspan></text>`;
+  svg += `<text x="${boxX + 10}" y="${boxY + 32}" font-size="8" fill="rgba(255,255,255,0.7)">Ia (${da ? 'krav' : 'req.'}) = <tspan fill="#ffcc00" font-weight="700">${ia.toFixed(0)} A</tspan></text>`;
+  svg += `<text x="${boxX + 10}" y="${boxY + 48}" font-size="8" fill="rgba(255,255,255,0.7)">${da ? 'Frakoblingstid' : 'Disc. time'}: <tspan fill="#88ccff" font-weight="700">${reqTime} s</tspan> (${zsState.earthing})</text>`;
+
+  // Verdict stamp
+  svg += `<text x="${W/2}" y="${H - 12}" text-anchor="middle" font-size="10" fill="${verdictColor}" font-weight="700">${pass ? (da ? '\u2705 FRAKOBLING SIKRET' : '\u2705 DISCONNECTION ASSURED') : (da ? '\u274C FRAKOBLING IKKE SIKRET' : '\u274C DISCONNECTION NOT ASSURED')}</text>`;
 
   return `<div style="margin-top:16px"><svg viewBox="0 0 ${W} ${H}" width="100%" style="border-radius:14px;border:1.5px solid rgba(0,180,255,0.15);overflow:visible;background:#020508;box-shadow:0 6px 24px rgba(0,100,200,0.08)" xmlns="http://www.w3.org/2000/svg">${svg}</svg></div>`;
 }
