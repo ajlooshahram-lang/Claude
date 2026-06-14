@@ -754,6 +754,7 @@ const T = {
       selectivity: '\u26A1 Selektivitet',
       zs: '\uD83D\uDD04 Sl\u00F8jfe Zs',
       motor: '\u2699\uFE0F Motorstart',
+      curves: '\uD83D\uDCC8 Kurver',
       exam: '\uD83C\uDF93 Eksamen'
     },
     // Load module
@@ -856,6 +857,7 @@ const T = {
       selectivity: '\u26A1 Selectivity',
       zs: '\uD83D\uDD04 Loop Zs',
       motor: '\u2699\uFE0F Motor Start',
+      curves: '\uD83D\uDCC8 Curves',
       exam: '\uD83C\uDF93 Exam'
     },
     loadTitle: 'Load Calculation',
@@ -2000,6 +2002,8 @@ let selState = { upType: null, upRating: null, upCurve: null, dnType: null, dnRa
 let zsState = { earthing: 'TN-S', deviceType: 'mcb', deviceCurve: 'B', deviceRating: 16, material: 'copper', crossSection: 2.5, cableLength: 20, circuitType: 'final', ze: 0.35 };
 // Motor start state
 let motorState = { power: 7.5, voltage: 400, eta: 0.89, cosfi: 0.85, method: 'DOL', cableLength: 30, crossSection: 4 };
+// Curves (time-current) state
+let curvesState = { dev1Type: 'gG', dev1Rating: 63, dev1Curve: 'B', dev2Type: 'mcb', dev2Rating: 16, dev2Curve: 'B', cableCS: 4, cableIns: 'PVC', cableMat: 'Cu', showDev1: true, showDev2: true, showCable: true, faultCurrent: 1000 };
 // Short circuit state
 let scState = { zNet: 1, zTrafo: 5 };
 // Standards state
@@ -2128,6 +2132,7 @@ function renderModule(mod) {
     case 'selectivity': content = renderSelectivity(); break;
     case 'zs': content = renderZs(); break;
     case 'motor': content = renderMotorStart(); break;
+    case 'curves': content = renderCurves(); break;
     case 'exam': content = renderExam(); break;
   }
   // Append AI assistant to every module
@@ -8642,6 +8647,668 @@ function buildMotorViz(In, Istart, dU_pct, method, vdropOk, k2s2Ok, cableOk, cab
 
   // Legend / info
   svg += '<text x="' + (W - 10) + '" y="' + (H - 10) + '" text-anchor="end" font-size="7" fill="rgba(255,255,255,0.3)">IEC 60947-4-1 / DS/HD 60364-5-52</text>';
+
+  return '<div style="margin-top:16px;overflow-x:auto"><svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:' + W + 'px;border-radius:14px;border:1px solid rgba(0,180,255,0.1)">' + svg + '</svg></div>';
+}
+
+// ===== PROTECTION COORDINATION CURVES MODULE =====
+function renderCurves() {
+  const da = lang === 'da';
+  const GG_RATINGS = [6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630];
+  const MCB_RATINGS = [6, 10, 13, 16, 20, 25, 32, 40, 50, 63];
+  const MCCB_RATINGS = [16, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 320, 400, 500, 630];
+  const CABLE_SECTIONS = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240];
+  const DEVICE_TYPES = ['gG', 'mcb_B', 'mcb_C', 'mcb_D', 'mccb'];
+  const DEVICE_LABELS = {
+    gG: da ? 'gG Sikring' : 'gG Fuse',
+    mcb_B: 'MCB B',
+    mcb_C: 'MCB C',
+    mcb_D: 'MCB D',
+    mccb: 'MCCB'
+  };
+  const FAULT_CURRENTS = [1, 5, 10, 50, 100, 500, 1000, 2000, 5000, 10000, 20000, 50000];
+
+  function getRatingsForType(type) {
+    if (type === 'gG') return GG_RATINGS;
+    if (type.startsWith('mcb')) return MCB_RATINGS;
+    if (type === 'mccb') return MCCB_RATINGS;
+    return [];
+  }
+
+  // Device 1 (upstream) selection
+  let dev1Section = `
+    <div class="select-group">
+      <div class="select-label">\u2B06\uFE0F ${da ? 'Enhed 1 - Opstr\u00F8ms (forsyningsside)' : 'Device 1 - Upstream (supply side)'}</div>
+      <div class="select-grid">
+        ${DEVICE_TYPES.map(t => `<button class="sel-btn ${curvesState.dev1Type === t ? 'selected' : ''}" onclick="curvesState.dev1Type='${t}';curvesState.dev1Rating=null;renderModule('curves')">${DEVICE_LABELS[t]}</button>`).join('')}
+      </div>
+    </div>`;
+  if (curvesState.dev1Type) {
+    const r1 = getRatingsForType(curvesState.dev1Type);
+    dev1Section += `
+    <div class="select-group">
+      <div class="select-label">${da ? 'M\u00E6rkestr\u00F8m enhed 1 [A]' : 'Rated current device 1 [A]'}</div>
+      <div class="select-grid">
+        ${r1.map(r => `<button class="sel-btn ${curvesState.dev1Rating === r ? 'selected' : ''}" onclick="curvesState.dev1Rating=${r};renderModule('curves')">${r}</button>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  // Device 2 (downstream) selection
+  let dev2Section = `
+    <div class="select-group">
+      <div class="select-label">\u2B07\uFE0F ${da ? 'Enhed 2 - Nedstr\u00F8ms (forbrugerside)' : 'Device 2 - Downstream (consumer side)'}</div>
+      <div class="select-grid">
+        ${DEVICE_TYPES.map(t => `<button class="sel-btn ${curvesState.dev2Type === t ? 'selected' : ''}" onclick="curvesState.dev2Type='${t}';curvesState.dev2Rating=null;renderModule('curves')">${DEVICE_LABELS[t]}</button>`).join('')}
+      </div>
+    </div>`;
+  if (curvesState.dev2Type) {
+    const r2 = getRatingsForType(curvesState.dev2Type);
+    dev2Section += `
+    <div class="select-group">
+      <div class="select-label">${da ? 'M\u00E6rkestr\u00F8m enhed 2 [A]' : 'Rated current device 2 [A]'}</div>
+      <div class="select-grid">
+        ${r2.map(r => `<button class="sel-btn ${curvesState.dev2Rating === r ? 'selected' : ''}" onclick="curvesState.dev2Rating=${r};renderModule('curves')">${r}</button>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  // Cable selection
+  let cableSection = `
+    <div class="select-group">
+      <div class="select-label">\uD83D\uDCE1 ${da ? 'Kabel at beskytte' : 'Cable to protect'}</div>
+      <div class="select-grid">
+        ${CABLE_SECTIONS.map(s => `<button class="sel-btn ${curvesState.cableCS === s ? 'selected' : ''}" onclick="curvesState.cableCS=${s};renderModule('curves')">${s} mm\u00B2</button>`).join('')}
+      </div>
+    </div>
+    <div class="select-group">
+      <div class="select-label">${da ? 'Isolering' : 'Insulation'}</div>
+      <div class="select-grid">
+        <button class="sel-btn ${curvesState.cableIns === 'PVC' ? 'selected' : ''}" onclick="curvesState.cableIns='PVC';renderModule('curves')">PVC (k=115/76)</button>
+        <button class="sel-btn ${curvesState.cableIns === 'XLPE' ? 'selected' : ''}" onclick="curvesState.cableIns='XLPE';renderModule('curves')">XLPE (k=143/94)</button>
+      </div>
+    </div>
+    <div class="select-group">
+      <div class="select-label">${da ? 'Ledermateriale' : 'Conductor material'}</div>
+      <div class="select-grid">
+        <button class="sel-btn ${curvesState.cableMat === 'Cu' ? 'selected' : ''}" onclick="curvesState.cableMat='Cu';renderModule('curves')">Cu (${da?'Kobber':'Copper'})</button>
+        <button class="sel-btn ${curvesState.cableMat === 'Al' ? 'selected' : ''}" onclick="curvesState.cableMat='Al';renderModule('curves')">Al (${da?'Aluminium':'Aluminum'})</button>
+      </div>
+    </div>`;
+
+  // Show/hide toggles
+  let toggleSection = `
+    <div class="select-group">
+      <div class="select-label">${da ? 'Vis/skjul kurver' : 'Show/hide curves'}</div>
+      <div class="select-grid">
+        <button class="sel-btn ${curvesState.showDev1 ? 'selected' : ''}" onclick="curvesState.showDev1=!curvesState.showDev1;renderModule('curves')" style="${curvesState.showDev1?'border-color:#4488ff':''}">
+          \u2B06\uFE0F ${da ? 'Enhed 1' : 'Device 1'}
+        </button>
+        <button class="sel-btn ${curvesState.showDev2 ? 'selected' : ''}" onclick="curvesState.showDev2=!curvesState.showDev2;renderModule('curves')" style="${curvesState.showDev2?'border-color:#44dd88':''}">
+          \u2B07\uFE0F ${da ? 'Enhed 2' : 'Device 2'}
+        </button>
+        <button class="sel-btn ${curvesState.showCable ? 'selected' : ''}" onclick="curvesState.showCable=!curvesState.showCable;renderModule('curves')" style="${curvesState.showCable?'border-color:#ff4444':''}">
+          \uD83D\uDCE1 ${da ? 'Kabelskade' : 'Cable damage'}
+        </button>
+      </div>
+    </div>`;
+
+  // Fault current selector
+  let faultSection = `
+    <div class="select-group">
+      <div class="select-label">\u26A1 ${da ? 'Fejlstr\u00F8m (vertikal linje)' : 'Fault current (vertical line)'}</div>
+      <div class="select-grid">
+        ${FAULT_CURRENTS.map(fc => `<button class="sel-btn ${curvesState.faultCurrent === fc ? 'selected' : ''}" onclick="curvesState.faultCurrent=${fc};renderModule('curves')">${fc >= 1000 ? (fc/1000) + 'kA' : fc + 'A'}</button>`).join('')}
+      </div>
+    </div>`;
+
+  // Build visualization
+  const viz = buildCurvesViz();
+
+  // Results panel
+  const results = buildCurvesResults();
+
+  return `<div class="card fade-in">
+    <div class="card-title">\uD83D\uDCC8 ${da ? 'Beskyttelseskoordinering - Tid/Str\u00F8m Kurver' : 'Protection Coordination - Time/Current Curves'}</div>
+    <div class="info-row" style="margin-bottom:12px;opacity:0.7">${da ? 'Log-log diagram iht. DS/HD 60364-4-43 \u00A7434.5.2, IEC 60269, IEC 60898' : 'Log-log diagram per DS/HD 60364-4-43 \u00A7434.5.2, IEC 60269, IEC 60898'}</div>
+    ${dev1Section}
+    ${dev2Section}
+    ${cableSection}
+    ${toggleSection}
+    ${faultSection}
+  </div>
+  ${viz}
+  ${results}`;
+}
+
+function buildCurvesResults() {
+  const da = lang === 'da';
+  const s = curvesState;
+  if (!s.dev1Rating && !s.dev2Rating) return '';
+
+  const kVal = getCurveKValue();
+  const If = s.faultCurrent;
+
+  let html = '<div class="card fade-in"><div class="card-title">' + (da ? 'Resultater' : 'Results') + '</div>';
+
+  // Trip times at fault current
+  if (s.dev1Rating && s.showDev1) {
+    const t1 = getCurveTripTime(s.dev1Type, s.dev1Rating, If);
+    html += '<div class="result-box"><div class="result-row"><span class="label">' + (da ? 'Enhed 1 udl\u00F8setid ved ' : 'Device 1 trip time at ') + formatCurrent(If) + '</span><span class="value">' + formatTime(t1) + '</span></div></div>';
+  }
+  if (s.dev2Rating && s.showDev2) {
+    const t2 = getCurveTripTime(s.dev2Type, s.dev2Rating, If);
+    html += '<div class="result-box"><div class="result-row"><span class="label">' + (da ? 'Enhed 2 udl\u00F8setid ved ' : 'Device 2 trip time at ') + formatCurrent(If) + '</span><span class="value">' + formatTime(t2) + '</span></div></div>';
+  }
+
+  // Selectivity limit
+  if (s.dev1Rating && s.dev2Rating) {
+    const selLimit = findSelectivityLimit(s.dev1Type, s.dev1Rating, s.dev2Type, s.dev2Rating);
+    const selColor = selLimit > 0 ? 'var(--success)' : 'var(--danger)';
+    html += '<div class="result-box" style="border-left:3px solid ' + selColor + '"><div class="result-row"><span class="label">' + (da ? 'Selektivitetsgr\u00E6nse' : 'Selectivity limit') + '</span><span class="value" style="color:' + selColor + '">' + (selLimit > 0 ? formatCurrent(selLimit) : (da ? 'Ingen selektivitet' : 'No selectivity')) + '</span></div></div>';
+  }
+
+  // Cable protection check
+  if (s.cableCS && s.showCable && (s.dev2Rating || s.dev1Rating)) {
+    const protDevice = s.dev2Rating ? { type: s.dev2Type, rating: s.dev2Rating } : { type: s.dev1Type, rating: s.dev1Rating };
+    const cableOk = checkCableProtection(protDevice.type, protDevice.rating, s.cableCS, kVal);
+    const cpColor = cableOk ? 'var(--success)' : 'var(--danger)';
+    html += '<div class="result-box" style="border-left:3px solid ' + cpColor + '">';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Kabel beskyttet (t < (kS/I)\u00B2)' : 'Cable protected (t < (kS/I)\u00B2)') + '</span><span class="value" style="color:' + cpColor + '">' + (cableOk ? (da ? 'JA \u2705' : 'YES \u2705') : (da ? 'NEJ \u274C' : 'NO \u274C')) + '</span></div>';
+    html += '<div class="result-row"><span class="label">k\u00B7S</span><span class="value">' + kVal + ' \u00D7 ' + s.cableCS + ' = ' + (kVal * s.cableCS) + ' A\u00B7s\u00BD</span></div>';
+    html += '</div>';
+  }
+
+  // IB <= In <= Iz reminder
+  html += '<div class="result-box" style="border-left:3px solid var(--primary);opacity:0.8"><div class="result-row"><span class="label">' + (da ? 'Grundregel \u00A7433.1' : 'Basic rule \u00A7433.1') + '</span><span class="value">IB \u2264 In \u2264 Iz</span></div></div>';
+
+  html += '</div>';
+  return html;
+}
+
+function getCurveKValue() {
+  const s = curvesState;
+  if (s.cableMat === 'Cu') return s.cableIns === 'PVC' ? 115 : 143;
+  return s.cableIns === 'PVC' ? 76 : 94;
+}
+
+function formatCurrent(I) {
+  if (I >= 1000) return (I / 1000).toFixed(I >= 10000 ? 0 : 1) + ' kA';
+  return I + ' A';
+}
+
+function formatTime(t) {
+  if (t === null || t === Infinity) return '\u221E';
+  if (t < 0.001) return '< 1 ms';
+  if (t < 0.01) return (t * 1000).toFixed(1) + ' ms';
+  if (t < 1) return (t * 1000).toFixed(0) + ' ms';
+  if (t < 60) return t.toFixed(2) + ' s';
+  if (t < 3600) return (t / 60).toFixed(1) + ' min';
+  return (t / 3600).toFixed(1) + ' h';
+}
+
+function getCurveTripTime(devType, rating, current) {
+  const mult = current / rating;
+  if (mult <= 1) return Infinity;
+  if (devType === 'gG') return getGGTime(mult);
+  if (devType.startsWith('mcb')) return getMCBTime(devType, mult);
+  if (devType === 'mccb') return getMCCBTime(mult);
+  return Infinity;
+}
+
+function getGGTime(mult) {
+  // gG fuse time-current data points (normalized)
+  const pts = [
+    [1.0, 100000], [1.25, 4500], [1.3, 3600], [1.4, 800], [1.6, 300], [1.8, 80],
+    [2.0, 30], [2.5, 8], [3.0, 3], [4.0, 0.8], [5.0, 0.3], [7.0, 0.05],
+    [10.0, 0.01], [15.0, 0.005], [20.0, 0.003]
+  ];
+  return interpolateLogLog(pts, mult);
+}
+
+function getGGTimeBand(mult, band) {
+  // min = fast, max = slow
+  const ptsMin = [
+    [1.0, 50000], [1.25, 3000], [1.3, 2000], [1.5, 400], [1.6, 150], [1.8, 40],
+    [2.0, 12], [2.5, 3.5], [3.0, 1.2], [4.0, 0.4], [5.0, 0.12], [7.0, 0.02],
+    [10.0, 0.005], [15.0, 0.003], [20.0, 0.002]
+  ];
+  const ptsMax = [
+    [1.0, 200000], [1.25, 7000], [1.3, 5000], [1.5, 1500], [1.6, 600], [1.8, 200],
+    [2.0, 80], [2.5, 20], [3.0, 7], [4.0, 2], [5.0, 0.7], [7.0, 0.12],
+    [10.0, 0.03], [15.0, 0.01], [20.0, 0.006]
+  ];
+  return band === 'min' ? interpolateLogLog(ptsMin, mult) : interpolateLogLog(ptsMax, mult);
+}
+
+function getMCBTime(devType, mult) {
+  // Thermal region
+  if (mult <= 1.13) return Infinity;
+  const thermalPts = [
+    [1.13, 3600], [1.3, 600], [1.45, 60], [2.0, 8], [2.5, 3.5], [3.0, 2]
+  ];
+  const curve = devType.replace('mcb_', '');
+  const isdMin = curve === 'B' ? 3.2 : (curve === 'C' ? 7 : 10);
+  const isdMax = curve === 'B' ? 4.8 : (curve === 'C' ? 10 : 20);
+  if (mult >= isdMax) return 0.004;
+  if (mult >= isdMin) return 0.08;
+  return interpolateLogLog(thermalPts, mult);
+}
+
+function getMCBTimeBand(devType, mult, band) {
+  if (mult <= 1.0) return Infinity;
+  const curve = devType.replace('mcb_', '');
+  const isdMin = curve === 'B' ? 3.2 : (curve === 'C' ? 7 : 10);
+  const isdMax = curve === 'B' ? 4.8 : (curve === 'C' ? 10 : 20);
+
+  const thermalMin = [
+    [1.0, 50000], [1.13, 2400], [1.3, 200], [1.45, 20], [2.0, 3], [2.5, 1.5], [3.0, 0.8]
+  ];
+  const thermalMax = [
+    [1.0, 200000], [1.13, 7200], [1.3, 1500], [1.45, 120], [2.0, 20], [2.5, 8], [3.0, 4]
+  ];
+
+  if (band === 'min') {
+    if (mult >= isdMin) return 0.004;
+    if (mult <= 1.0) return 100000;
+    return interpolateLogLog(thermalMin, mult);
+  } else {
+    if (mult >= isdMax) return 0.004;
+    if (mult >= isdMin) return 0.1;
+    if (mult <= 1.0) return 200000;
+    return interpolateLogLog(thermalMax, mult);
+  }
+}
+
+function getMCCBTime(mult) {
+  if (mult <= 1.0) return Infinity;
+  const pts = [
+    [1.0, 100000], [1.05, 7200], [1.1, 3600], [1.2, 600], [1.3, 200], [1.5, 50],
+    [2.0, 10], [3.0, 2], [5.0, 0.3], [8.0, 0.05], [10.0, 0.02], [13.0, 0.01]
+  ];
+  if (mult >= 13) return 0.008;
+  return interpolateLogLog(pts, mult);
+}
+
+function getMCCBTimeBand(mult, band) {
+  if (mult <= 1.0) return Infinity;
+  const ptsMin = [
+    [1.0, 50000], [1.05, 3600], [1.1, 1800], [1.2, 300], [1.3, 100], [1.5, 20],
+    [2.0, 4], [3.0, 0.8], [5.0, 0.1], [8.0, 0.02], [10.0, 0.008], [13.0, 0.005]
+  ];
+  const ptsMax = [
+    [1.0, 200000], [1.05, 14400], [1.1, 7200], [1.2, 1200], [1.3, 500], [1.5, 100],
+    [2.0, 25], [3.0, 5], [5.0, 0.8], [8.0, 0.12], [10.0, 0.05], [13.0, 0.02]
+  ];
+  if (mult >= 13) return band === 'min' ? 0.004 : 0.015;
+  return band === 'min' ? interpolateLogLog(ptsMin, mult) : interpolateLogLog(ptsMax, mult);
+}
+
+function interpolateLogLog(pts, x) {
+  if (x <= pts[0][0]) return pts[0][1];
+  if (x >= pts[pts.length - 1][0]) return pts[pts.length - 1][1];
+  for (let i = 0; i < pts.length - 1; i++) {
+    if (x >= pts[i][0] && x <= pts[i + 1][0]) {
+      const lx0 = Math.log10(pts[i][0]), lx1 = Math.log10(pts[i + 1][0]);
+      const ly0 = Math.log10(pts[i][1]), ly1 = Math.log10(pts[i + 1][1]);
+      const lx = Math.log10(x);
+      const ly = ly0 + (ly1 - ly0) * (lx - lx0) / (lx1 - lx0);
+      return Math.pow(10, ly);
+    }
+  }
+  return pts[pts.length - 1][1];
+}
+
+function findSelectivityLimit(type1, rating1, type2, rating2) {
+  // Find the current where downstream curve meets upstream curve
+  // Sweep from low to high and find where t_downstream >= t_upstream
+  const testCurrents = [];
+  for (let e = 0; e <= 5; e += 0.05) testCurrents.push(Math.pow(10, e));
+  let selLimit = 0;
+  for (let i = 0; i < testCurrents.length; i++) {
+    const I = testCurrents[i];
+    const t1 = getCurveTripTime(type1, rating1, I);
+    const t2 = getCurveTripTime(type2, rating2, I);
+    if (t1 !== Infinity && t2 !== Infinity && t2 < t1) {
+      selLimit = I;
+    } else if (t1 !== Infinity && t2 !== Infinity && t2 >= t1 && selLimit > 0) {
+      return Math.round(selLimit);
+    }
+  }
+  return selLimit > 0 ? Math.round(selLimit) : 0;
+}
+
+function checkCableProtection(devType, devRating, cs, kVal) {
+  // Check if device trips before cable damage at all fault currents
+  const testCurrents = [];
+  for (let e = 1; e <= 5; e += 0.1) testCurrents.push(Math.pow(10, e));
+  for (let i = 0; i < testCurrents.length; i++) {
+    const I = testCurrents[i];
+    const tDevice = getCurveTripTime(devType, devRating, I);
+    const tCable = Math.pow((kVal * cs) / I, 2);
+    if (tDevice !== Infinity && tDevice > tCable && I > devRating * 1.5) return false;
+  }
+  return true;
+}
+
+function buildCurvesViz() {
+  const s = curvesState;
+  if (!s.dev1Rating && !s.dev2Rating && !s.cableCS) return '';
+  const DEVICE_LABELS = { gG: 'gG', mcb_B: 'MCB B', mcb_C: 'MCB C', mcb_D: 'MCB D', mccb: 'MCCB' };
+
+  const W = 760, H = 620;
+  const pad = { top: 40, right: 40, bottom: 55, left: 65 };
+  const plotW = W - pad.left - pad.right;
+  const plotH = H - pad.top - pad.bottom;
+
+  // Log scale: X = current 1A to 100000A (5 decades), Y = time 0.001s to 10000s (7 decades)
+  const xMin = 0, xMax = 5; // log10(1) to log10(100000)
+  const yMin = -3, yMax = 4; // log10(0.001) to log10(10000)
+
+  function xPos(logI) { return pad.left + (logI - xMin) / (xMax - xMin) * plotW; }
+  function yPos(logT) { return pad.top + (yMax - logT) / (yMax - yMin) * plotH; }
+
+  let svg = '';
+
+  // Background gradient
+  svg += '<defs>';
+  svg += '<linearGradient id="curveBg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0a1628"/><stop offset="100%" stop-color="#0d0d1a"/></linearGradient>';
+  // Glow filters
+  svg += '<filter id="glowBlue"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  svg += '<filter id="glowGreen"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  svg += '<filter id="glowRed"><feGaussianBlur stdDeviation="1.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  // Pulse animation
+  svg += '<style>';
+  svg += '@keyframes curvePulse { 0%,100%{opacity:0.3} 50%{opacity:0.6} }';
+  svg += '@keyframes particleFlow { 0%{stroke-dashoffset:20} 100%{stroke-dashoffset:0} }';
+  svg += '@keyframes faultPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }';
+  svg += '@keyframes dotPulse { 0%,100%{r:3;opacity:1} 50%{r:6;opacity:0.5} }';
+  svg += '.selZone { animation: curvePulse 3s ease-in-out infinite; }';
+  svg += '.curvePath { stroke-dasharray: 4 2; animation: particleFlow 1s linear infinite; }';
+  svg += '.faultLine { animation: faultPulse 1.5s ease-in-out infinite; }';
+  svg += '.tripDot { animation: dotPulse 1.2s ease-in-out infinite; }';
+  svg += '</style>';
+  svg += '</defs>';
+
+  // Background
+  svg += '<rect width="' + W + '" height="' + H + '" fill="url(#curveBg)" rx="14"/>';
+
+  // Grid lines - decades
+  const gridColor = 'rgba(0,180,255,0.08)';
+  const subGridColor = 'rgba(0,180,255,0.03)';
+  // X-axis grid (current decades)
+  for (let d = xMin; d <= xMax; d++) {
+    const x = xPos(d);
+    svg += '<line x1="' + x + '" y1="' + pad.top + '" x2="' + x + '" y2="' + (H - pad.bottom) + '" stroke="' + gridColor + '" stroke-width="0.5"/>';
+    // Sub-decade lines
+    for (let sub = 2; sub <= 9; sub++) {
+      const sx = xPos(d + Math.log10(sub));
+      if (sx > pad.left && sx < W - pad.right) {
+        svg += '<line x1="' + sx + '" y1="' + pad.top + '" x2="' + sx + '" y2="' + (H - pad.bottom) + '" stroke="' + subGridColor + '" stroke-width="0.3"/>';
+      }
+    }
+  }
+  // Y-axis grid (time decades)
+  for (let d = yMin; d <= yMax; d++) {
+    const y = yPos(d);
+    svg += '<line x1="' + pad.left + '" y1="' + y + '" x2="' + (W - pad.right) + '" y2="' + y + '" stroke="' + gridColor + '" stroke-width="0.5"/>';
+    for (let sub = 2; sub <= 9; sub++) {
+      const sy = yPos(d + Math.log10(sub));
+      if (sy > pad.top && sy < H - pad.bottom) {
+        svg += '<line x1="' + pad.left + '" y1="' + sy + '" x2="' + (W - pad.right) + '" y2="' + sy + '" stroke="' + subGridColor + '" stroke-width="0.3"/>';
+      }
+    }
+  }
+
+  // Axis border
+  svg += '<rect x="' + pad.left + '" y="' + pad.top + '" width="' + plotW + '" height="' + plotH + '" fill="none" stroke="rgba(0,180,255,0.15)" stroke-width="1"/>';
+
+  // X-axis labels
+  const xLabels = ['1A', '10A', '100A', '1kA', '10kA', '100kA'];
+  for (let d = 0; d <= 5; d++) {
+    svg += '<text x="' + xPos(d) + '" y="' + (H - pad.bottom + 18) + '" text-anchor="middle" font-size="9" fill="rgba(200,220,255,0.7)">' + xLabels[d] + '</text>';
+  }
+  svg += '<text x="' + (pad.left + plotW / 2) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="10" fill="rgba(200,220,255,0.5)">' + (lang === 'da' ? 'Str\u00F8m [A]' : 'Current [A]') + '</text>';
+
+  // Y-axis labels
+  const yLabels = ['1ms', '10ms', '100ms', '1s', '10s', '100s', '1000s', '10000s'];
+  for (let d = yMin; d <= yMax; d++) {
+    svg += '<text x="' + (pad.left - 8) + '" y="' + (yPos(d) + 3) + '" text-anchor="end" font-size="9" fill="rgba(200,220,255,0.7)">' + yLabels[d - yMin] + '</text>';
+  }
+  svg += '<text x="15" y="' + (pad.top + plotH / 2) + '" text-anchor="middle" font-size="10" fill="rgba(200,220,255,0.5)" transform="rotate(-90,15,' + (pad.top + plotH / 2) + ')">' + (lang === 'da' ? 'Tid [s]' : 'Time [s]') + '</text>';
+
+  // Helper to generate curve points
+  function genCurvePoints(devType, rating, band, nPts) {
+    const pts = [];
+    const iStart = Math.log10(rating * 0.8);
+    const iEnd = Math.log10(rating * 25);
+    const step = (iEnd - iStart) / nPts;
+    for (let i = 0; i <= nPts; i++) {
+      const logI = iStart + step * i;
+      const I = Math.pow(10, logI);
+      const mult = I / rating;
+      let t;
+      if (devType === 'gG') {
+        t = band ? getGGTimeBand(mult, band) : getGGTime(mult);
+      } else if (devType.startsWith('mcb')) {
+        t = band ? getMCBTimeBand(devType, mult, band) : getMCBTime(devType, mult);
+      } else {
+        t = band ? getMCCBTimeBand(mult, band) : getMCCBTime(mult);
+      }
+      if (t !== Infinity && t > 0) {
+        const logT = Math.log10(t);
+        if (logT >= yMin && logT <= yMax && logI >= xMin && logI <= xMax) {
+          pts.push([xPos(logI), yPos(logT)]);
+        }
+      }
+    }
+    return pts;
+  }
+
+  function pointsToPath(pts) {
+    if (pts.length < 2) return '';
+    let d = 'M' + pts[0][0].toFixed(1) + ',' + pts[0][1].toFixed(1);
+    for (let i = 1; i < pts.length; i++) {
+      // Smooth bezier
+      if (i < pts.length - 1) {
+        const cp1x = (pts[i - 1][0] + pts[i][0]) / 2;
+        const cp1y = pts[i][1];
+        const cp2x = (pts[i][0] + pts[i + 1][0]) / 2;
+        const cp2y = pts[i][1];
+        d += ' Q' + pts[i][0].toFixed(1) + ',' + pts[i][1].toFixed(1) + ' ' + ((pts[i][0] + pts[i + 1][0]) / 2).toFixed(1) + ',' + ((pts[i][1] + pts[i + 1][1]) / 2).toFixed(1);
+      } else {
+        d += ' L' + pts[i][0].toFixed(1) + ',' + pts[i][1].toFixed(1);
+      }
+    }
+    return d;
+  }
+
+  function pointsToFilled(ptsMin, ptsMax) {
+    if (ptsMin.length < 2 || ptsMax.length < 2) return '';
+    let d = 'M' + ptsMin[0][0].toFixed(1) + ',' + ptsMin[0][1].toFixed(1);
+    for (let i = 1; i < ptsMin.length; i++) {
+      d += ' L' + ptsMin[i][0].toFixed(1) + ',' + ptsMin[i][1].toFixed(1);
+    }
+    for (let i = ptsMax.length - 1; i >= 0; i--) {
+      d += ' L' + ptsMax[i][0].toFixed(1) + ',' + ptsMax[i][1].toFixed(1);
+    }
+    d += ' Z';
+    return d;
+  }
+
+  // Selectivity zone (between device 1 max and device 2 min)
+  if (s.dev1Rating && s.dev2Rating && s.showDev1 && s.showDev2) {
+    const pts1Max = genCurvePoints(s.dev1Type, s.dev1Rating, 'min', 80);
+    const pts2Min = genCurvePoints(s.dev2Type, s.dev2Rating, 'max', 80);
+    // Green zone where dev2 is below dev1 (selective)
+    if (pts1Max.length > 1 && pts2Min.length > 1) {
+      // Create selectivity shading between the curves
+      const selPath = pointsToFilled(pts2Min, pts1Max);
+      if (selPath) {
+        svg += '<path d="' + selPath + '" fill="rgba(0,255,100,0.06)" class="selZone"/>';
+      }
+    }
+  }
+
+  // Device 1 curve (upstream) - blue band
+  if (s.dev1Rating && s.showDev1) {
+    const pts1Min = genCurvePoints(s.dev1Type, s.dev1Rating, 'min', 80);
+    const pts1Max = genCurvePoints(s.dev1Type, s.dev1Rating, 'max', 80);
+    const bandPath = pointsToFilled(pts1Min, pts1Max);
+    if (bandPath) {
+      svg += '<path d="' + bandPath + '" fill="rgba(60,130,255,0.15)" stroke="none"/>';
+    }
+    const midPts = genCurvePoints(s.dev1Type, s.dev1Rating, null, 80);
+    const midPath = pointsToPath(midPts);
+    if (midPath) {
+      svg += '<path d="' + midPath + '" fill="none" stroke="rgba(80,150,255,0.9)" stroke-width="2" filter="url(#glowBlue)" class="curvePath"/>';
+    }
+    // Label
+    if (midPts.length > 5) {
+      const lp = midPts[Math.floor(midPts.length * 0.3)];
+      svg += '<text x="' + (lp[0] + 5) + '" y="' + (lp[1] - 8) + '" font-size="8" fill="#6699ff" font-weight="bold">' + (DEVICE_LABELS[s.dev1Type] || 'Dev1') + ' ' + s.dev1Rating + 'A</text>';
+    }
+  }
+
+  // Device 2 curve (downstream) - green band
+  if (s.dev2Rating && s.showDev2) {
+    const pts2Min = genCurvePoints(s.dev2Type, s.dev2Rating, 'min', 80);
+    const pts2Max = genCurvePoints(s.dev2Type, s.dev2Rating, 'max', 80);
+    const bandPath2 = pointsToFilled(pts2Min, pts2Max);
+    if (bandPath2) {
+      svg += '<path d="' + bandPath2 + '" fill="rgba(60,220,130,0.12)" stroke="none"/>';
+    }
+    const midPts2 = genCurvePoints(s.dev2Type, s.dev2Rating, null, 80);
+    const midPath2 = pointsToPath(midPts2);
+    if (midPath2) {
+      svg += '<path d="' + midPath2 + '" fill="none" stroke="rgba(80,230,140,0.9)" stroke-width="2" filter="url(#glowGreen)" class="curvePath"/>';
+    }
+    if (midPts2.length > 5) {
+      const lp2 = midPts2[Math.floor(midPts2.length * 0.3)];
+      svg += '<text x="' + (lp2[0] + 5) + '" y="' + (lp2[1] - 8) + '" font-size="8" fill="#44dd88" font-weight="bold">' + (DEVICE_LABELS[s.dev2Type] || 'Dev2') + ' ' + s.dev2Rating + 'A</text>';
+    }
+  }
+
+  // Cable damage curve - red dashed hyperbola t = (k*S/I)^2
+  if (s.cableCS && s.showCable) {
+    const kVal = getCurveKValue();
+    const kS = kVal * s.cableCS;
+    const cablePts = [];
+    for (let logI = Math.log10(s.cableCS * 2); logI <= xMax; logI += 0.05) {
+      const I = Math.pow(10, logI);
+      const t = Math.pow(kS / I, 2);
+      const logT = Math.log10(t);
+      if (logT >= yMin && logT <= yMax) {
+        cablePts.push([xPos(logI), yPos(logT)]);
+      }
+    }
+    if (cablePts.length > 1) {
+      let cPath = 'M' + cablePts[0][0].toFixed(1) + ',' + cablePts[0][1].toFixed(1);
+      for (let i = 1; i < cablePts.length; i++) {
+        cPath += ' L' + cablePts[i][0].toFixed(1) + ',' + cablePts[i][1].toFixed(1);
+      }
+      svg += '<path d="' + cPath + '" fill="none" stroke="rgba(255,60,60,0.8)" stroke-width="2" stroke-dasharray="6 3" filter="url(#glowRed)"/>';
+      // Label
+      const clp = cablePts[Math.min(10, cablePts.length - 1)];
+      svg += '<text x="' + (clp[0] + 5) + '" y="' + (clp[1] - 8) + '" font-size="8" fill="#ff5555" font-weight="bold">' + s.cableCS + 'mm\u00B2 ' + s.cableMat + '/' + s.cableIns + ' (k=' + kVal + ')</text>';
+
+      // Danger zone check - if cable curve goes below protection curve
+      if (s.dev2Rating && s.showDev2) {
+        const dangerPts = [];
+        for (let logI = Math.log10(s.dev2Rating * 1.5); logI <= xMax; logI += 0.05) {
+          const I = Math.pow(10, logI);
+          const tCable = Math.pow(kS / I, 2);
+          const tDev = getCurveTripTime(s.dev2Type, s.dev2Rating, I);
+          if (tDev !== Infinity && tDev > tCable) {
+            const logTc = Math.log10(tCable);
+            const logTd = Math.log10(tDev);
+            if (logTc >= yMin && logTd <= yMax) {
+              dangerPts.push([xPos(logI), yPos(logTc), yPos(Math.min(logTd, yMax))]);
+            }
+          }
+        }
+        if (dangerPts.length > 1) {
+          let dPath = 'M' + dangerPts[0][0].toFixed(1) + ',' + dangerPts[0][1].toFixed(1);
+          for (let i = 1; i < dangerPts.length; i++) dPath += ' L' + dangerPts[i][0].toFixed(1) + ',' + dangerPts[i][1].toFixed(1);
+          for (let i = dangerPts.length - 1; i >= 0; i--) dPath += ' L' + dangerPts[i][0].toFixed(1) + ',' + dangerPts[i][2].toFixed(1);
+          dPath += ' Z';
+          svg += '<path d="' + dPath + '" fill="rgba(255,0,0,0.12)" stroke="rgba(255,0,0,0.4)" stroke-width="0.5"/>';
+          svg += '<text x="' + dangerPts[Math.floor(dangerPts.length / 2)][0].toFixed(1) + '" y="' + ((dangerPts[0][1] + dangerPts[0][2]) / 2).toFixed(1) + '" font-size="9" fill="#ff4444" text-anchor="middle" font-weight="bold">\u26A0 DANGER</text>';
+        }
+      }
+    }
+  }
+
+  // Fault current vertical line
+  if (s.faultCurrent) {
+    const logIf = Math.log10(s.faultCurrent);
+    if (logIf >= xMin && logIf <= xMax) {
+      const fx = xPos(logIf);
+      svg += '<line x1="' + fx + '" y1="' + pad.top + '" x2="' + fx + '" y2="' + (H - pad.bottom) + '" stroke="rgba(255,220,0,0.6)" stroke-width="1.5" stroke-dasharray="4 2" class="faultLine"/>';
+      svg += '<text x="' + fx + '" y="' + (pad.top - 5) + '" text-anchor="middle" font-size="9" fill="#ffdd00" font-weight="bold">If=' + formatCurrent(s.faultCurrent) + '</text>';
+
+      // Intersection dots
+      if (s.dev1Rating && s.showDev1) {
+        const t1 = getCurveTripTime(s.dev1Type, s.dev1Rating, s.faultCurrent);
+        if (t1 !== Infinity && t1 > 0) {
+          const logT1 = Math.log10(t1);
+          if (logT1 >= yMin && logT1 <= yMax) {
+            const fy1 = yPos(logT1);
+            svg += '<circle cx="' + fx + '" cy="' + fy1 + '" r="4" fill="#6699ff" stroke="#fff" stroke-width="1" class="tripDot"/>';
+            svg += '<text x="' + (fx + 10) + '" y="' + (fy1 - 5) + '" font-size="8" fill="#99bbff">' + formatTime(t1) + '</text>';
+          }
+        }
+      }
+      if (s.dev2Rating && s.showDev2) {
+        const t2 = getCurveTripTime(s.dev2Type, s.dev2Rating, s.faultCurrent);
+        if (t2 !== Infinity && t2 > 0) {
+          const logT2 = Math.log10(t2);
+          if (logT2 >= yMin && logT2 <= yMax) {
+            const fy2 = yPos(logT2);
+            svg += '<circle cx="' + fx + '" cy="' + fy2 + '" r="4" fill="#44dd88" stroke="#fff" stroke-width="1" class="tripDot"/>';
+            svg += '<text x="' + (fx + 10) + '" y="' + (fy2 + 12) + '" font-size="8" fill="#66eeaa">' + formatTime(t2) + '</text>';
+          }
+        }
+      }
+      // Cable intersection
+      if (s.cableCS && s.showCable) {
+        const kVal = getCurveKValue();
+        const tCable = Math.pow((kVal * s.cableCS) / s.faultCurrent, 2);
+        if (tCable > 0) {
+          const logTc = Math.log10(tCable);
+          if (logTc >= yMin && logTc <= yMax) {
+            const fyc = yPos(logTc);
+            svg += '<circle cx="' + fx + '" cy="' + fyc + '" r="4" fill="#ff4444" stroke="#fff" stroke-width="1" class="tripDot"/>';
+            svg += '<text x="' + (fx + 10) + '" y="' + (fyc + 12) + '" font-size="8" fill="#ff6666">' + formatTime(tCable) + '</text>';
+          }
+        }
+      }
+    }
+  }
+
+  // Title
+  svg += '<text x="' + (W / 2) + '" y="20" text-anchor="middle" font-size="11" fill="rgba(200,220,255,0.8)" font-weight="bold">' + (lang === 'da' ? 'Tid/Str\u00F8m Karakteristik (I\u00B2t)' : 'Time/Current Characteristic (I\u00B2t)') + '</text>';
+
+  // Legend
+  let legendY = pad.top + 10;
+  if (s.dev1Rating && s.showDev1) {
+    svg += '<rect x="' + (W - pad.right - 90) + '" y="' + legendY + '" width="12" height="3" fill="rgba(80,150,255,0.9)" rx="1"/>';
+    svg += '<text x="' + (W - pad.right - 74) + '" y="' + (legendY + 4) + '" font-size="7" fill="#6699ff">' + (lang === 'da' ? 'Opstr\u00F8ms' : 'Upstream') + '</text>';
+    legendY += 14;
+  }
+  if (s.dev2Rating && s.showDev2) {
+    svg += '<rect x="' + (W - pad.right - 90) + '" y="' + legendY + '" width="12" height="3" fill="rgba(80,230,140,0.9)" rx="1"/>';
+    svg += '<text x="' + (W - pad.right - 74) + '" y="' + (legendY + 4) + '" font-size="7" fill="#44dd88">' + (lang === 'da' ? 'Nedstr\u00F8ms' : 'Downstream') + '</text>';
+    legendY += 14;
+  }
+  if (s.cableCS && s.showCable) {
+    svg += '<line x1="' + (W - pad.right - 90) + '" y1="' + (legendY + 2) + '" x2="' + (W - pad.right - 78) + '" y2="' + (legendY + 2) + '" stroke="#ff4444" stroke-width="2" stroke-dasharray="3 2"/>';
+    svg += '<text x="' + (W - pad.right - 74) + '" y="' + (legendY + 4) + '" font-size="7" fill="#ff5555">' + (lang === 'da' ? 'Kabelskade' : 'Cable damage') + '</text>';
+    legendY += 14;
+  }
+
+  // Standards reference
+  svg += '<text x="' + (W - 10) + '" y="' + (H - 10) + '" text-anchor="end" font-size="7" fill="rgba(255,255,255,0.3)">DS/HD 60364-4-43 / IEC 60269 / IEC 60898</text>';
 
   return '<div style="margin-top:16px;overflow-x:auto"><svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:' + W + 'px;border-radius:14px;border:1px solid rgba(0,180,255,0.1)">' + svg + '</svg></div>';
 }
