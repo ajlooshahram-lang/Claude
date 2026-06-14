@@ -126,6 +126,7 @@
           { lat: 17.9647, lng: 99.0087, alt: 220 }
         ],
         cableType: "G.652.D", coreCount: 288, status: "active",
+        startDate: "2025-03", installedDate: "2026-09",
         stations: [
           { name: "Bangkok Hub Central", type: "termination", coords: { lat: 13.7563, lng: 100.5018, alt: 5 } },
           { name: "Nakhon Sawan Junction", type: "junction", coords: { lat: 15.7047, lng: 100.1372, alt: 50 } },
@@ -144,6 +145,7 @@
           { lat: -7.2504, lng: 112.7688, alt: 5 }
         ],
         cableType: "G.657.A2", coreCount: 144, status: "installed",
+        startDate: "2025-06", installedDate: "2027-04",
         stations: [
           { name: "Jakarta Gateway", type: "termination", coords: { lat: -6.2088, lng: 106.8456, alt: 8 } },
           { name: "Cirebon Relay", type: "junction", coords: { lat: -6.7320, lng: 108.5523, alt: 15 } },
@@ -164,6 +166,7 @@
           { lat: 11.9404, lng: 108.4583, alt: 850 }
         ],
         cableType: "G.652.D", coreCount: 96, status: "planned",
+        startDate: "2027-01", installedDate: "2029-06",
         stations: [
           { name: "Hanoi Central Office", type: "termination", coords: { lat: 21.0285, lng: 105.8542, alt: 15 } },
           { name: "Vinh Junction", type: "junction", coords: { lat: 18.6790, lng: 105.6813, alt: 10 } },
@@ -183,6 +186,7 @@
           { lat: 2.7456, lng: 101.9381, alt: 45 }
         ],
         cableType: "G.657.A2", coreCount: 288, status: "active",
+        startDate: "2025-01", installedDate: "2026-03",
         stations: [
           { name: "Singapore Exchange", type: "termination", coords: { lat: 1.3521, lng: 103.8198, alt: 3 } },
           { name: "Johor Bahru Switch", type: "switch", coords: { lat: 1.4927, lng: 103.7414, alt: 5 } },
@@ -201,6 +205,7 @@
           { lat: 10.6918, lng: 123.3411, alt: -30 }
         ],
         cableType: "G.654.E", coreCount: 48, status: "tested",
+        startDate: "2026-02", installedDate: "2028-01",
         stations: [
           { name: "Manila Landing Station", type: "termination", coords: { lat: 14.5995, lng: 120.9842, alt: 0 } },
           { name: "Mindoro Repeater", type: "junction", coords: { lat: 12.8797, lng: 121.7740, alt: -120 } },

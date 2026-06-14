@@ -583,5 +583,10 @@ rmBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(S.savedViews().length === 0, "deleting from manager removes the saved view");
 doc.querySelector("#modal [data-act=cancel]") && doc.querySelector("#modal [data-act=cancel]").click();
 
+// 39) Timeline slider in 3D network view
+doc.querySelector('.nav-item[data-view="network3d"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("n3dSlider") != null, "timeline slider renders in 3D network view");
+ok(doc.getElementById("n3dPlay") != null, "play button exists in 3D network timeline");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

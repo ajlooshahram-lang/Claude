@@ -778,6 +778,18 @@
         </div>
       </div>
 
+      <div class="net3d-timeline" id="n3dTimeline">
+        <div class="net3d-timeline-label" id="n3dTimeLabel">Show All</div>
+        <div class="net3d-timeline-row">
+          <button class="btn btn-sm net3d-tl-btn" id="n3dPlay" title="Play animation">&#9654; Play</button>
+          <input type="range" id="n3dSlider" class="net3d-slider" min="0" max="66" value="66" step="1">
+          <button class="btn btn-sm net3d-tl-btn" id="n3dReset" title="Reset to show all">&#8634; Reset</button>
+        </div>
+        <div class="net3d-timeline-ticks">
+          <span>Jan 2025</span><span>Jan 2027</span><span>Jun 2030</span>
+        </div>
+      </div>
+
       <div class="net3d-legend" id="n3dLegend">
         <div class="net3d-legend-title">Cable Types</div>
         ${Object.entries(cableColorMap).map(([type, color]) => `<div class="net3d-legend-item"><span class="net3d-legend-swatch" style="background:${color};box-shadow:0 0 8px ${color}"></span>${esc(type)}</div>`).join("")}
@@ -993,7 +1005,7 @@
             '<p><strong>Route:</strong> ' + esc(route.name) + '</p>' +
             '<p><strong>Coordinates:</strong> ' + station.coords.lat.toFixed(4) + ', ' + station.coords.lng.toFixed(4) + '</p>' +
             '<p><strong>Altitude:</strong> ' + (station.coords.alt || 0) + ' m</p></div>',
-          properties: { stationName: station.name, type: "station", stationType: station.type }
+          properties: { stationName: station.name, type: "station", stationType: station.type, routeId: route._id }
         });
         stationEntities.push(stEntity);
       });
@@ -1106,10 +1118,177 @@
       });
     });
 
+    // --- Timeline Slider ---
+    var sliderEl = document.getElementById("n3dSlider");
+    var timeLabelEl = document.getElementById("n3dTimeLabel");
+    var playBtn = document.getElementById("n3dPlay");
+    var resetBtn = document.getElementById("n3dReset");
+    var timelineInterval = null;
+    var timelinePlaying = false;
+
+    // Timeline spans Jan 2025 (month 0) to Jun 2030 (month 65), plus value 66 = "Show All"
+    function sliderToDate(val) {
+      var month = parseInt(val, 10);
+      if (month >= 66) return null; // show all
+      var y = 2025 + Math.floor(month / 12);
+      var m = month % 12; // 0-indexed month
+      return { year: y, month: m };
+    }
+
+    function dateToYM(dateStr) {
+      // "2025-03" => { year: 2025, month: 2 } (0-indexed month)
+      if (!dateStr) return null;
+      var parts = dateStr.split("-");
+      return { year: parseInt(parts[0], 10), month: parseInt(parts[1], 10) - 1 };
+    }
+
+    function ymToSlider(ym) {
+      return (ym.year - 2025) * 12 + ym.month;
+    }
+
+    function formatDateLabel(val) {
+      var d = sliderToDate(val);
+      if (!d) return "Show All";
+      var months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+      return months[d.month] + " " + d.year;
+    }
+
+    function applyTimeline(val) {
+      var sliderMonth = parseInt(val, 10);
+      var showAll = sliderMonth >= 66;
+      if (timeLabelEl) timeLabelEl.textContent = formatDateLabel(val);
+
+      routes.forEach(function(route, idx) {
+        var installed = dateToYM(route.installedDate);
+        var started = dateToYM(route.startDate);
+        var installedSlider = installed ? ymToSlider(installed) : 999;
+        var startedSlider = started ? ymToSlider(started) : 999;
+
+        var entIdx = idx * 2; // glow entity index
+        var glowEnt = routeEntities[entIdx];
+        var dashEnt = routeEntities[entIdx + 1];
+
+        if (showAll) {
+          // Show all routes normally
+          if (glowEnt) glowEnt.show = true;
+          if (dashEnt) dashEnt.show = true;
+          if (dashEnt && dashEnt.polyline) {
+            dashEnt.polyline.width = 3;
+          }
+          if (glowEnt && glowEnt.polyline) {
+            glowEnt.polyline.width = 8;
+          }
+        } else if (sliderMonth >= installedSlider) {
+          // Installed: solid bright lines
+          if (glowEnt) glowEnt.show = true;
+          if (dashEnt) dashEnt.show = true;
+          if (dashEnt && dashEnt.polyline) {
+            dashEnt.polyline.width = 4;
+          }
+          if (glowEnt && glowEnt.polyline) {
+            glowEnt.polyline.width = 10;
+          }
+        } else if (sliderMonth >= startedSlider) {
+          // In-progress: dim dashed lines
+          if (glowEnt) glowEnt.show = false;
+          if (dashEnt) dashEnt.show = true;
+          if (dashEnt && dashEnt.polyline) {
+            dashEnt.polyline.width = 2;
+          }
+        } else {
+          // Not started: hidden
+          if (glowEnt) glowEnt.show = false;
+          if (dashEnt) dashEnt.show = false;
+        }
+      });
+
+      // Station visibility: only show stations connected to visible routes
+      var visibleRouteIds = {};
+      routes.forEach(function(route, idx) {
+        var installed = dateToYM(route.installedDate);
+        var started = dateToYM(route.startDate);
+        var installedSlider = installed ? ymToSlider(installed) : 999;
+        var startedSlider = started ? ymToSlider(started) : 999;
+        if (showAll || sliderMonth >= startedSlider) {
+          visibleRouteIds[route._id] = true;
+        }
+      });
+
+      stationEntities.forEach(function(se) {
+        var props = se.properties;
+        if (props && props.routeId) {
+          se.show = !!visibleRouteIds[props.routeId.getValue ? props.routeId.getValue() : props.routeId];
+        } else {
+          se.show = showAll;
+        }
+      });
+
+      // Labels follow route visibility
+      labelEntities.forEach(function(le) {
+        var props = le.properties;
+        if (props && props.routeId) {
+          le.show = !!visibleRouteIds[props.routeId.getValue ? props.routeId.getValue() : props.routeId];
+        } else {
+          le.show = showAll;
+        }
+      });
+    }
+
+    if (sliderEl) {
+      sliderEl.addEventListener("input", function() {
+        applyTimeline(sliderEl.value);
+      });
+    }
+
+    if (playBtn) {
+      playBtn.addEventListener("click", function() {
+        if (timelinePlaying) {
+          // Stop
+          timelinePlaying = false;
+          if (timelineInterval) { clearInterval(timelineInterval); timelineInterval = null; }
+          playBtn.innerHTML = "&#9654; Play";
+          return;
+        }
+        // Start from beginning if at end
+        if (sliderEl && parseInt(sliderEl.value, 10) >= 66) {
+          sliderEl.value = 0;
+          applyTimeline(0);
+        }
+        timelinePlaying = true;
+        playBtn.innerHTML = "&#9646;&#9646; Pause";
+        timelineInterval = setInterval(function() {
+          if (!sliderEl) return;
+          var v = parseInt(sliderEl.value, 10) + 1;
+          if (v > 65) {
+            v = 65;
+            clearInterval(timelineInterval);
+            timelineInterval = null;
+            timelinePlaying = false;
+            playBtn.innerHTML = "&#9654; Play";
+          }
+          sliderEl.value = v;
+          applyTimeline(v);
+        }, 500);
+      });
+    }
+
+    if (resetBtn) {
+      resetBtn.addEventListener("click", function() {
+        if (timelinePlaying) {
+          timelinePlaying = false;
+          if (timelineInterval) { clearInterval(timelineInterval); timelineInterval = null; }
+          playBtn.innerHTML = "&#9654; Play";
+        }
+        if (sliderEl) sliderEl.value = 66;
+        applyTimeline(66);
+      });
+    }
+
     // Register teardown so go() can destroy viewer + cancel RAF on navigation away
     viewCleanup = function () {
       animationRunning = false;
       if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+      if (timelineInterval) { clearInterval(timelineInterval); timelineInterval = null; }
       if (cesiumViewer && !cesiumViewer.isDestroyed()) { cesiumViewer.destroy(); }
       cesiumViewer = null;
     };
