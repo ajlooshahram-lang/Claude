@@ -14,6 +14,9 @@ import sharesRoutes from "./routes/shares.js";
 import programmesRoutes from "./routes/programmes.js";
 import packagesRoutes from "./routes/packages.js";
 import workOrdersRoutes from "./routes/work-orders.js";
+import variationsRoutes from "./routes/variations.js";
+import claimsRoutes from "./routes/claims.js";
+import paymentsRoutes from "./routes/payments.js";
 
 const SERVICE = "qi-platform-server";
 const VERSION = "0.1.0";
@@ -101,6 +104,15 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
 
   // Work Order CRUD routes
   await app.register(workOrdersRoutes);
+
+  // Contract Variation CRUD routes
+  await app.register(variationsRoutes);
+
+  // Contract Claim CRUD routes
+  await app.register(claimsRoutes);
+
+  // Payment Certificate CRUD routes
+  await app.register(paymentsRoutes);
 
   return app;
 }
