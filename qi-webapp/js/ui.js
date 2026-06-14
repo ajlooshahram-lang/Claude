@@ -2143,6 +2143,11 @@
     toast("Storage full — export a JSON backup and delete old snapshots.");
   });
 
+  // Surface API sync failures so users know when server sync fails.
+  window.addEventListener("qi-sync-error", (e) => {
+    toast("Sync failed — change saved locally", { ms: 4000 });
+  });
+
   // ---------- online mode / auth ----------
   const API = window.QIAPI || null;  // may be null in smoke tests that don't load api.js
 
