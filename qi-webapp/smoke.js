@@ -843,5 +843,16 @@ var riskHeatCells = riskHeatTable ? riskHeatTable.querySelectorAll('.riskheat-ce
 var hasColors = Array.from(riskHeatCells).some(function (c) { return /background:#e74c3c|background:#f39c12|background:#f1c40f|background:#27ae60/.test(c.getAttribute("style")); });
 ok(hasColors, "Risk Heat Map shows severity colors");
 
+// 59) Lessons Library
+var lessonsNav = doc.querySelector('.nav-item[data-view="lessons"]');
+ok(lessonsNav != null, "Lessons Library nav item exists");
+
+if (lessonsNav) lessonsNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var lessonsContent = doc.getElementById("content").innerHTML;
+ok(/Total Lessons/.test(lessonsContent) && /Most Recalled/.test(lessonsContent) && /By Category/.test(lessonsContent), "Lessons Library renders summary cards");
+
+var lessonsRecordBtn = doc.getElementById("lessonsRecordBtn");
+ok(lessonsRecordBtn != null, "Lessons Library has Record New Lesson button");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

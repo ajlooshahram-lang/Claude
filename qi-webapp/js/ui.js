@@ -242,6 +242,7 @@
     { id: "raci", label: "RACI Matrix", icon: "⊞" },
     { id: "budget", label: "Budget", icon: "$" },
     { g: "Intelligence" },
+    { id: "lessons", label: "Lessons Library", icon: "\uD83D\uDCDA" },
     { id: "ai", label: "AI Assistant", icon: "✦" },
     { id: "impact", label: "Change Impact", icon: "⇄" },
     { id: "scorecard", label: "KPI Scorecard", icon: "▣" },
@@ -1050,6 +1051,196 @@
           '<div><strong>Scenario:</strong><br>' + esc(result.scenario) + '</div>' +
           '</div></div>';
         document.getElementById("repairResult").innerHTML = html;
+      });
+    }
+  };
+
+  // ---------- Lessons Learned Library ----------
+  RENDER.lessons = function () {
+    var B = window.QIBrain;
+    var allLessons = [];
+    if (B && B.recallLessons) {
+      // Use empty context with readOnly to get all lessons without inflating counts
+      var store = null;
+      try {
+        var raw = localStorage.getItem("qi_brain_lessons");
+        if (raw) store = JSON.parse(raw);
+      } catch (e) {}
+      if (store && store.lessons) allLessons = store.lessons;
+    }
+
+    var total = allLessons.length;
+
+    // By category breakdown
+    var catCounts = {};
+    allLessons.forEach(function (l) {
+      var cat = l.category || "Uncategorized";
+      catCounts[cat] = (catCounts[cat] || 0) + 1;
+    });
+    var catBreakdown = Object.keys(catCounts).map(function (k) {
+      return '<span class="badge">' + esc(k) + ': ' + catCounts[k] + '</span>';
+    }).join(" ") || '<span class="muted">None</span>';
+
+    // Most recalled (top 3)
+    var sorted = allLessons.slice().sort(function (a, b) { return (b.timesRecalled || 0) - (a.timesRecalled || 0); });
+    var topRecalled = sorted.slice(0, 3);
+    var recalledHtml = topRecalled.length ? topRecalled.map(function (l) {
+      return '<li>' + esc(l.challenge || "Untitled") + ' <span class="muted">(' + (l.timesRecalled || 0) + ' recalls)</span></li>';
+    }).join("") : '<li class="muted">No lessons recalled yet</li>';
+
+    // Recent (last 5)
+    var recent = allLessons.slice().sort(function (a, b) { return (b.timestamp || 0) - (a.timestamp || 0); });
+    var recentFive = recent.slice(0, 5);
+    var recentHtml = recentFive.length ? recentFive.map(function (l) {
+      var d = l.timestamp ? new Date(l.timestamp).toLocaleDateString() : "Unknown";
+      return '<li>' + esc(l.challenge || "Untitled") + ' <span class="muted">(' + d + ')</span></li>';
+    }).join("") : '<li class="muted">No lessons recorded yet</li>';
+
+    // Summary cards
+    var summary = '<div class="kpi-row" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">' +
+      '<div class="kpi navy"><div class="label">Total Lessons</div><div class="value">' + total + '</div></div>' +
+      '<div class="kpi navy"><div class="label">Categories</div><div class="value">' + Object.keys(catCounts).length + '</div></div>' +
+      '</div>' +
+      '<div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">' +
+      '<div class="card"><h4>By Category</h4><div>' + catBreakdown + '</div></div>' +
+      '<div class="card"><h4>Most Recalled (Top 3)</h4><ol id="lessonsTopRecalled">' + recalledHtml + '</ol></div>' +
+      '</div>' +
+      '<div class="card" style="margin-bottom:16px"><h4>Recent (Last 5)</h4><ol>' + recentHtml + '</ol></div>';
+
+    // Filter bar
+    var catOptions = '<option value="">All Categories</option>';
+    C.LISTS.category.forEach(function (c) { catOptions += '<option value="' + esc(c) + '">' + esc(c) + '</option>'; });
+
+    var impactOptions = '<option value="">All Impact</option>' +
+      '<option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option>';
+
+    var projTypes = ["fibre-telecom", "construction", "software", "manufacturing", "infrastructure", "general"];
+    var projOptions = '<option value="">All Project Types</option>';
+    projTypes.forEach(function (pt) { projOptions += '<option value="' + esc(pt) + '">' + esc(pt) + '</option>'; });
+
+    var filterBar = '<div class="card" style="margin-bottom:16px"><div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Category</span><select id="lessonsFilterCat">' + catOptions + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Impact</span><select id="lessonsFilterImpact">' + impactOptions + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Project Type</span><select id="lessonsFilterProj">' + projOptions + '</select></label>' +
+      '<button class="btn btn-primary" id="lessonsFilterBtn" style="padding:8px 16px">Filter</button>' +
+      '<button class="btn" id="lessonsRecordBtn" style="padding:8px 16px">Record New Lesson</button>' +
+      '<button class="btn" id="lessonsExportBtn" style="padding:8px 16px">Export Lessons</button>' +
+      '</div></div>';
+
+    // Lesson table
+    var tableRows = allLessons.map(function (l, idx) {
+      var d = l.timestamp ? new Date(l.timestamp).toLocaleDateString() : "N/A";
+      return '<tr class="lessons-row" data-idx="' + idx + '">' +
+        '<td class="wrap">' + esc(l.challenge || "Untitled") + '</td>' +
+        '<td class="wrap">' + esc((l.resolution || "").substring(0, 60)) + (l.resolution && l.resolution.length > 60 ? "..." : "") + '</td>' +
+        '<td>' + esc(l.category || "N/A") + '</td>' +
+        '<td>' + (l.tags || []).map(function (t) { return '<span class="badge">' + esc(t) + '</span>'; }).join(" ") + '</td>' +
+        '<td>' + esc(l.impact || "N/A") + '</td>' +
+        '<td class="center">' + (l.timesRecalled || 0) + '</td>' +
+        '<td>' + d + '</td>' +
+        '</tr>' +
+        '<tr class="lessons-detail" data-detail="' + idx + '" style="display:none"><td colspan="7">' +
+        '<div style="padding:8px;background:#f8fafc;border-radius:6px">' +
+        '<strong>Challenge:</strong> ' + esc(l.challenge || "") + '<br>' +
+        '<strong>Resolution:</strong> ' + esc(l.resolution || "") + '<br>' +
+        '<strong>Project Type:</strong> ' + esc(l.projectType || "N/A") + '<br>' +
+        '<strong>Tags:</strong> ' + (l.tags || []).join(", ") +
+        '</div></td></tr>';
+    }).join("");
+
+    var lessonTable = '<div class="card"><h3>Lesson Library</h3>' +
+      '<div class="table-wrap"><table id="lessonsTable"><thead><tr>' +
+      '<th>Challenge</th><th>Resolution</th><th>Category</th><th>Tags</th><th>Impact</th><th>Times Recalled</th><th>Date</th>' +
+      '</tr></thead><tbody>' + (tableRows || '<tr><td colspan="7" class="muted">No lessons recorded yet. Click "Record New Lesson" to start.</td></tr>') +
+      '</tbody></table></div></div>';
+
+    return '<h2 style="margin-bottom:16px">Lessons Learned Library</h2>' + summary + filterBar + lessonTable;
+  };
+
+  AFTER.lessons = function () {
+    // Filter button
+    var filterBtn = document.getElementById("lessonsFilterBtn");
+    if (filterBtn) {
+      filterBtn.addEventListener("click", function () {
+        var catVal = document.getElementById("lessonsFilterCat").value;
+        var impactVal = document.getElementById("lessonsFilterImpact").value;
+        var projVal = document.getElementById("lessonsFilterProj").value;
+        var table = document.getElementById("lessonsTable");
+        if (!table) return;
+        var rows = table.querySelectorAll("tr.lessons-row");
+        var details = table.querySelectorAll("tr.lessons-detail");
+
+        var allLessons = [];
+        try {
+          var raw = localStorage.getItem("qi_brain_lessons");
+          if (raw) { var store = JSON.parse(raw); allLessons = store.lessons || []; }
+        } catch (e) {}
+
+        rows.forEach(function (row, i) {
+          var lesson = allLessons[parseInt(row.getAttribute("data-idx"))];
+          if (!lesson) { row.style.display = "none"; details[i].style.display = "none"; return; }
+          var show = true;
+          if (catVal && lesson.category !== catVal) show = false;
+          if (impactVal && (lesson.impact || "").toLowerCase() !== impactVal.toLowerCase()) show = false;
+          if (projVal && lesson.projectType !== projVal) show = false;
+          row.style.display = show ? "" : "none";
+          details[i].style.display = "none";
+        });
+      });
+    }
+
+    // Row expand/collapse
+    var table = document.getElementById("lessonsTable");
+    if (table) {
+      table.addEventListener("click", function (e) {
+        var row = e.target.closest("tr.lessons-row");
+        if (!row) return;
+        var idx = row.getAttribute("data-idx");
+        var detail = table.querySelector('tr[data-detail="' + idx + '"]');
+        if (detail) {
+          detail.style.display = detail.style.display === "none" ? "" : "none";
+        }
+      });
+    }
+
+    // Record New Lesson button
+    var recordBtn = document.getElementById("lessonsRecordBtn");
+    if (recordBtn) {
+      recordBtn.addEventListener("click", function () {
+        openRecordLessonModal();
+      });
+    }
+
+    // Export button
+    var exportBtn = document.getElementById("lessonsExportBtn");
+    if (exportBtn) {
+      exportBtn.addEventListener("click", function () {
+        var allLessons = [];
+        try {
+          var raw = localStorage.getItem("qi_brain_lessons");
+          if (raw) { var store = JSON.parse(raw); allLessons = store.lessons || []; }
+        } catch (e) {}
+        if (!allLessons.length) { toast("No lessons to export."); return; }
+
+        var lines = ["LESSONS LEARNED LIBRARY - EXPORT", "Generated: " + new Date().toISOString(), "Total Lessons: " + allLessons.length, ""];
+        allLessons.forEach(function (l, i) {
+          lines.push((i + 1) + ". " + (l.challenge || "Untitled"));
+          lines.push("   Resolution: " + (l.resolution || "N/A"));
+          lines.push("   Category: " + (l.category || "N/A"));
+          lines.push("   Impact: " + (l.impact || "N/A"));
+          lines.push("   Tags: " + (l.tags || []).join(", "));
+          lines.push("   Project Type: " + (l.projectType || "N/A"));
+          lines.push("   Times Recalled: " + (l.timesRecalled || 0));
+          lines.push("   Date: " + (l.timestamp ? new Date(l.timestamp).toLocaleDateString() : "N/A"));
+          lines.push("");
+        });
+
+        var blob = new Blob([lines.join("\n")], { type: "text/plain" });
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "lessons-export-" + new Date().toISOString().split("T")[0] + ".txt";
+        a.click();
+        toast("Lessons exported successfully.");
       });
     }
   };
