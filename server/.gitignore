@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.log
+
+# Secrets — never commit real environment values
+.env
+.env.*
+!.env.example
+
+# Prisma local artifacts
+prisma/*.db
+prisma/*.db-journal
