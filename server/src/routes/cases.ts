@@ -103,6 +103,14 @@ export default async function casesRoutes(app: FastifyInstance): Promise<void> {
 
       const data = parsed.data;
 
+      // Verify the project belongs to the authenticated user's tenant
+      const project = await prisma.project.findFirst({
+        where: { id: data.projectId, tenantId: request.tenantId },
+      });
+      if (!project) {
+        return reply.code(404).send({ error: "Not found" });
+      }
+
       const created = await prisma.case.create({
         data: {
           tenantId: request.tenantId,

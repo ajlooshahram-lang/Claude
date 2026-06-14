@@ -54,30 +54,43 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
       const passwordHash = await hashPassword(password);
 
       // Transaction: create tenant, user, membership
-      const result = await prisma.$transaction(async (tx) => {
-        const tenant = await tx.tenant.create({
-          data: { name: tenantName },
-        });
+      let result: { tenant: { id: string; name: string }; user: { id: string; email: string } };
+      try {
+        result = await prisma.$transaction(async (tx) => {
+          const tenant = await tx.tenant.create({
+            data: { name: tenantName },
+          });
 
-        const user = await tx.user.create({
-          data: {
-            tenantId: tenant.id,
-            email: email.toLowerCase(),
-            passwordHash,
-            displayName: displayName ?? null,
-          },
-        });
+          const user = await tx.user.create({
+            data: {
+              tenantId: tenant.id,
+              email: email.toLowerCase(),
+              passwordHash,
+              displayName: displayName ?? null,
+            },
+          });
 
-        await tx.membership.create({
-          data: {
-            tenantId: tenant.id,
-            userId: user.id,
-            role: "OWNER",
-          },
-        });
+          await tx.membership.create({
+            data: {
+              tenantId: tenant.id,
+              userId: user.id,
+              role: "OWNER",
+            },
+          });
 
-        return { tenant, user };
-      });
+          return { tenant, user };
+        });
+      } catch (err: unknown) {
+        if (
+          typeof err === "object" &&
+          err !== null &&
+          "code" in err &&
+          (err as { code: string }).code === "P2002"
+        ) {
+          return reply.code(409).send({ error: "Registration failed" });
+        }
+        return reply.code(500).send({ error: "Internal server error" });
+      }
 
       const token = generateSessionToken();
       await createSession(

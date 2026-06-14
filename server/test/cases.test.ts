@@ -251,6 +251,22 @@ describe("Cases CRUD integration tests", () => {
   });
 
   describe("Tenant isolation", () => {
+    test("user B cannot POST a case with user A's projectId (returns 404)", async () => {
+      await setupTwoTenants();
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/cases",
+        headers: { cookie: `session=${cookieB}` },
+        payload: {
+          projectId: projectIdA,
+          problem: "Cross-tenant write attempt",
+        },
+      });
+
+      assert.equal(res.statusCode, 404, "Should return 404 when projectId belongs to another tenant");
+    });
+
     test("user B cannot GET user A's case (returns 404, not 403)", async () => {
       await setupTwoTenants();
 
