@@ -2081,7 +2081,7 @@ let harmonicsState = { thd3: 33, iPhase: 16, circuits: 4, crossSection: 2.5 };
 // Generator sizing state
 let genState = { criticalLoads: [], genSize: 100, mode: 'island', earthing: 'TN-S', largestMotor: 0, startMethod: 'DOL', transfer: 'auto', customLoads: [] };
 // PLC/BMS/FMS state
-let plcState = { platform: 'siemens', plcLang: 'ST', protocol: 'bacnet', integration: 'monitor', fms: { energy: true, alarm: true, maintenance: false, occupancy: false, demand: false } };
+let plcState = { platform: 'siemens', plcLang: 'ST', protocol: 'bacnet', integration: 'monitor', fms: { energy: true, alarm: true, maintenance: false, occupancy: false, demand: false }, safety: { sil: 'SIL2', category: 'Cat3', functions: { estop: true, guard: false, lightCurtain: false, twoHand: false, safeSpeed: false } }, motorSeq: { type: 'dol_interlock', count: 2 }, hvac: { system: 'ahu' }, energy: { demandLimit: 100 }, network: { subnet: '192.168.1', startIP: 10 } };
 // Short circuit state
 let scState = { zNet: 1, zTrafo: 5 };
 // Standards state
@@ -11644,6 +11644,722 @@ function buildGenViz(da, genKVA, inGen, ikGen, ikGrid, st, warning, loadKW) {
 // ===== PLC/BMS/FMS INTEGRATION MODULE =====
 function plcSet(key, val) { plcState[key] = val; renderModule('plc'); }
 function plcFmsToggle(key) { plcState.fms[key] = !plcState.fms[key]; renderModule('plc'); }
+function plcSafetyToggle(key) { plcState.safety.functions[key] = !plcState.safety.functions[key]; renderModule('plc'); }
+function plcSetSafety(key, val) { plcState.safety[key] = val; renderModule('plc'); }
+function plcSetMotorSeq(key, val) { plcState.motorSeq[key] = val; renderModule('plc'); }
+function plcSetHvac(key, val) { plcState.hvac[key] = val; renderModule('plc'); }
+function plcSetEnergy(key, val) { plcState.energy[key] = val; renderModule('plc'); }
+function plcSetNetwork(key, val) { plcState.network[key] = val; renderModule('plc'); }
+
+function plcGenerateSafetyCode() {
+  var st = plcState;
+  var sf = st.safety;
+  var code = '';
+  var isScl = (st.platform === 'siemens');
+  code += '// ============================================\n';
+  code += '// SAFETY PLC PROGRAM - ' + sf.sil + ' / ' + sf.category + '\n';
+  code += '// IEC 61508 / EN ISO 13849-1 compliant\n';
+  code += '// ============================================\n\n';
+  if (st.plcLang === 'ST') {
+    code += (isScl ? 'FUNCTION_BLOCK "FB_SafetyMonitor"\n' : 'FUNCTION_BLOCK FB_SafetyMonitor\n');
+    code += 'VAR_INPUT\n';
+    code += '  bEStop_Ch1      : BOOL;   // E-Stop Channel 1\n';
+    code += '  bEStop_Ch2      : BOOL;   // E-Stop Channel 2\n';
+    if (sf.functions.guard) code += '  bGuard_Ch1      : BOOL;   // Guard door Ch1\n  bGuard_Ch2      : BOOL;   // Guard door Ch2\n';
+    if (sf.functions.lightCurtain) code += '  bLC_OSSD1       : BOOL;   // Light curtain OSSD1\n  bLC_OSSD2       : BOOL;   // Light curtain OSSD2\n';
+    if (sf.functions.twoHand) code += '  bHand_Left      : BOOL;   // Two-hand left\n  bHand_Right     : BOOL;   // Two-hand right\n';
+    if (sf.functions.safeSpeed) code += '  wEncoder_Speed  : WORD;   // Encoder speed value\n  wSafe_SpeedLim  : WORD;   // Safe speed limit\n';
+    code += '  bTestPulse_In   : BOOL;   // Test pulse feedback\n';
+    code += 'END_VAR\n\n';
+    code += 'VAR_OUTPUT\n';
+    code += '  bSafe_State     : BOOL;   // TRUE = safe to operate\n';
+    code += '  bFault_Active   : BOOL;   // Cross-fault detected\n';
+    code += '  bContactor_K1   : BOOL;   // Safety contactor 1\n';
+    code += '  bContactor_K2   : BOOL;   // Safety contactor 2\n';
+    code += '  wDiag_Code      : WORD;   // Diagnostic code\n';
+    code += 'END_VAR\n\n';
+    code += 'VAR\n';
+    code += '  tonTestPulse    : TON;    // Test pulse timer\n';
+    code += '  tonDiscrepancy  : TON;    // Cross-fault detection timer\n';
+    code += '  tonDebounce     : TON;    // Input debounce\n';
+    code += '  bTestPulse_Out  : BOOL;   // Test pulse output\n';
+    code += '  bCrossFault     : BOOL;   // Cross-fault latch\n';
+    code += '  iTestCycle      : INT;    // Test cycle counter\n';
+    code += 'END_VAR\n\n';
+    code += (isScl ? 'BEGIN\n' : '');
+    code += '// === TEST PULSE GENERATION (every 100ms) ===\n';
+    code += 'tonTestPulse(IN := NOT tonTestPulse.Q, PT := T#100ms);\n';
+    code += 'bTestPulse_Out := tonTestPulse.Q;\n';
+    code += 'IF tonTestPulse.Q AND NOT bTestPulse_In THEN\n';
+    code += '  iTestCycle := iTestCycle + 1;\n';
+    code += '  IF iTestCycle > 3 THEN\n';
+    code += '    bFault_Active := TRUE;\n';
+    code += '    wDiag_Code := 16#F001; // Test pulse failure\n';
+    code += '  END_IF;\n';
+    code += 'ELSE\n';
+    code += '  iTestCycle := 0;\n';
+    code += 'END_IF;\n\n';
+    code += '// === DUAL-CHANNEL E-STOP MONITORING ===\n';
+    code += '// Cross-fault detection: both channels must agree within 500ms\n';
+    code += 'tonDiscrepancy(IN := (bEStop_Ch1 XOR bEStop_Ch2), PT := T#500ms);\n';
+    code += 'IF tonDiscrepancy.Q THEN\n';
+    code += '  bCrossFault := TRUE; // Latch cross-fault\n';
+    code += '  wDiag_Code := 16#E001; // E-Stop discrepancy\n';
+    code += 'END_IF;\n\n';
+    code += '// === SAFE STATE DETERMINATION ===\n';
+    code += 'bSafe_State := bEStop_Ch1 AND bEStop_Ch2\n';
+    code += '               AND NOT bCrossFault\n';
+    code += '               AND NOT bFault_Active\n';
+    if (sf.functions.guard) code += '               AND bGuard_Ch1 AND bGuard_Ch2\n';
+    if (sf.functions.lightCurtain) code += '               AND bLC_OSSD1 AND bLC_OSSD2\n';
+    if (sf.functions.safeSpeed) code += '               AND (wEncoder_Speed <= wSafe_SpeedLim)\n';
+    code += ';\n\n';
+    if (sf.functions.twoHand) {
+      code += '// === TWO-HAND CONTROL (EN 574 Type IIIC) ===\n';
+      code += '// Both buttons within 500ms, release = immediate stop\n';
+      code += 'IF bHand_Left AND bHand_Right THEN\n';
+      code += '  tonDebounce(IN := TRUE, PT := T#500ms);\n';
+      code += '  IF tonDebounce.Q THEN\n';
+      code += '    bSafe_State := bSafe_State AND TRUE;\n';
+      code += '  END_IF;\n';
+      code += 'ELSE\n';
+      code += '  tonDebounce(IN := FALSE);\n';
+      code += '  bSafe_State := FALSE; // Immediate stop on release\n';
+      code += 'END_IF;\n\n';
+    }
+    code += '// === OUTPUT CONTROL (redundant contactors) ===\n';
+    code += 'bContactor_K1 := bSafe_State;\n';
+    code += 'bContactor_K2 := bSafe_State;\n\n';
+    code += '// === RESET LOGIC (manual reset required after fault) ===\n';
+    code += '// bCrossFault requires power cycle or authorized reset\n\n';
+    code += (isScl ? 'END_FUNCTION_BLOCK' : 'END_FUNCTION_BLOCK');
+  } else {
+    code += '// Safety Logic - Ladder representation\n';
+    code += '// Rung 0: Dual-channel E-Stop\n';
+    code += '|---[ ]---EStop_Ch1---[ ]---EStop_Ch2---[/]---CrossFault---( )---Safe_State---|\n\n';
+    code += '// Rung 1: Cross-fault detection (500ms discrepancy timer)\n';
+    code += '|---[XOR]---EStop_Ch1/Ch2---[TON 500ms]---( )---CrossFault_Latch---|\n\n';
+    if (sf.functions.guard) code += '// Rung 2: Guard door dual-channel\n|---[ ]---Guard_Ch1---[ ]---Guard_Ch2---( )---Guard_OK---|\n\n';
+    if (sf.functions.lightCurtain) code += '// Rung 3: Light curtain OSSD\n|---[ ]---LC_OSSD1---[ ]---LC_OSSD2---( )---LC_OK---|\n\n';
+    code += '// Output: Redundant contactors\n';
+    code += '|---[ ]---Safe_State---( )---Contactor_K1---|\n';
+    code += '|---[ ]---Safe_State---( )---Contactor_K2---|\n';
+  }
+  return code;
+}
+
+function plcGenerateMotorSequence() {
+  var st = plcState;
+  var ms = st.motorSeq;
+  var n = ms.count;
+  var code = '';
+  var isScl = (st.platform === 'siemens');
+  code += '// ============================================\n';
+  code += '// MOTOR SEQUENCE: ' + ms.type.toUpperCase() + ' (' + n + ' motors)\n';
+  code += '// State Machine: Idle > Starting > Running > Stopping > Fault\n';
+  code += '// ============================================\n\n';
+  if (st.plcLang !== 'ST') {
+    // Simplified for non-ST languages
+    code += '// SFC / Ladder representation\n';
+    code += '// [S0: IDLE] -> bStartCmd -> [S1: STARTING]\n';
+    for (var i = 1; i <= n; i++) {
+      code += '// [S' + i + ': START_M' + i + '] -> delay -> [S' + (i + 1) + ']\n';
+    }
+    code += '// [S' + (n + 1) + ': RUNNING] -> bStopCmd -> [S' + (n + 2) + ': STOPPING]\n';
+    code += '// [S' + (n + 2) + ': STOPPING] -> all off -> [S0: IDLE]\n';
+    code += '// [FAULT] -> any fault -> all off, require reset\n\n';
+    if (ms.type === 'star_delta') {
+      code += '// Star-Delta Timer: 6s per motor\n';
+      code += '// Sequence: Close Star -> Start -> Wait 6s -> Open Star -> Close Delta\n';
+    }
+    return code;
+  }
+  code += (isScl ? 'FUNCTION_BLOCK "FB_MotorSequence_' + ms.type + '"\n' : 'FUNCTION_BLOCK FB_MotorSequence_' + ms.type + '\n');
+  code += 'VAR_INPUT\n';
+  code += '  bStartCmd    : BOOL;   // Start command\n';
+  code += '  bStopCmd     : BOOL;   // Stop command\n';
+  code += '  bReset       : BOOL;   // Fault reset\n';
+  code += '  bEStop       : BOOL;   // Emergency stop\n';
+  for (var i = 1; i <= n; i++) {
+    code += '  bM' + i + '_Running : BOOL;   // Motor ' + i + ' running feedback\n';
+    code += '  bM' + i + '_Fault   : BOOL;   // Motor ' + i + ' fault\n';
+  }
+  code += 'END_VAR\n\n';
+  code += 'VAR_OUTPUT\n';
+  for (var i = 1; i <= n; i++) {
+    code += '  bM' + i + '_Start   : BOOL;   // Motor ' + i + ' start command\n';
+    if (ms.type === 'star_delta') {
+      code += '  bM' + i + '_Star    : BOOL;   // Motor ' + i + ' star contactor\n';
+      code += '  bM' + i + '_Delta   : BOOL;   // Motor ' + i + ' delta contactor\n';
+    }
+  }
+  code += '  iState       : INT;    // Current state\n';
+  code += '  bFault       : BOOL;   // Sequence fault\n';
+  code += '  wFaultCode   : WORD;   // Fault code\n';
+  code += 'END_VAR\n\n';
+  code += 'VAR\n';
+  for (var i = 1; i <= n; i++) {
+    code += '  tonM' + i + '_Delay  : TON;\n';
+    if (ms.type === 'star_delta') code += '  tonM' + i + '_SD     : TON;    // Star-delta timer 6s\n';
+  }
+  code += '  tonTimeout   : TON;    // Start timeout\n';
+  code += 'END_VAR\n\n';
+  code += (isScl ? 'BEGIN\n' : '');
+  code += '// === EMERGENCY STOP ===\n';
+  code += 'IF NOT bEStop THEN\n';
+  code += '  iState := 99; // Fault state\n';
+  for (var i = 1; i <= n; i++) {
+    code += '  bM' + i + '_Start := FALSE;\n';
+    if (ms.type === 'star_delta') code += '  bM' + i + '_Star := FALSE; bM' + i + '_Delta := FALSE;\n';
+  }
+  code += '  bFault := TRUE;\n';
+  code += '  wFaultCode := 16#FF00; // E-Stop\n';
+  code += '  RETURN;\n';
+  code += 'END_IF;\n\n';
+  code += '// === STATE MACHINE ===\n';
+  code += 'CASE iState OF\n\n';
+  code += '  0: // IDLE\n';
+  code += '    IF bStartCmd AND NOT bFault THEN\n';
+  code += '      iState := 1;\n';
+  code += '    END_IF;\n\n';
+  // Starting states
+  for (var i = 1; i <= n; i++) {
+    code += '  ' + i + ': // STARTING Motor ' + i + '\n';
+    if (ms.type === 'star_delta') {
+      code += '    bM' + i + '_Star := TRUE;\n';
+      code += '    bM' + i + '_Start := TRUE;\n';
+      code += '    tonM' + i + '_SD(IN := TRUE, PT := T#6s);\n';
+      code += '    IF tonM' + i + '_SD.Q THEN\n';
+      code += '      bM' + i + '_Star := FALSE;\n';
+      code += '      bM' + i + '_Delta := TRUE;\n';
+      code += '      tonM' + i + '_SD(IN := FALSE);\n';
+      var delayTime = '3s';
+      code += '      tonM' + i + '_Delay(IN := TRUE, PT := T#' + delayTime + ');\n';
+      code += '      IF tonM' + i + '_Delay.Q THEN\n';
+      code += '        tonM' + i + '_Delay(IN := FALSE);\n';
+      code += '        iState := ' + (i < n ? (i + 1) : (n + 1)) + ';\n';
+      code += '      END_IF;\n';
+      code += '    END_IF;\n';
+    } else if (ms.type === 'cascade') {
+      code += '    bM' + i + '_Start := TRUE;\n';
+      code += '    tonM' + i + '_Delay(IN := bM' + i + '_Running, PT := T#3s);\n';
+      code += '    IF tonM' + i + '_Delay.Q THEN\n';
+      code += '      tonM' + i + '_Delay(IN := FALSE);\n';
+      code += '      iState := ' + (i < n ? (i + 1) : (n + 1)) + ';\n';
+      code += '    END_IF;\n';
+    } else if (ms.type === 'pump_valve') {
+      code += '    // Open valve first, then start pump\n';
+      code += '    bM' + i + '_Start := FALSE; // Valve opening\n';
+      code += '    tonM' + i + '_Delay(IN := TRUE, PT := T#5s); // Valve travel time\n';
+      code += '    IF tonM' + i + '_Delay.Q THEN\n';
+      code += '      bM' + i + '_Start := TRUE; // Start pump\n';
+      code += '      tonM' + i + '_Delay(IN := FALSE);\n';
+      code += '      iState := ' + (i < n ? (i + 1) : (n + 1)) + ';\n';
+      code += '    END_IF;\n';
+    } else if (ms.type === 'conveyor_ramp') {
+      code += '    bM' + i + '_Start := TRUE;\n';
+      code += '    // Speed ramp: 0-100% over 5s via AO\n';
+      code += '    tonM' + i + '_Delay(IN := bM' + i + '_Running, PT := T#5s);\n';
+      code += '    IF tonM' + i + '_Delay.Q THEN\n';
+      code += '      tonM' + i + '_Delay(IN := FALSE);\n';
+      code += '      iState := ' + (i < n ? (i + 1) : (n + 1)) + ';\n';
+      code += '    END_IF;\n';
+    } else {
+      // DOL with interlock
+      code += '    bM' + i + '_Start := TRUE;\n';
+      if (i > 1) code += '    // Interlock: M' + (i - 1) + ' must be running\n';
+      if (i > 1) code += '    IF NOT bM' + (i - 1) + '_Running THEN bM' + i + '_Start := FALSE; END_IF;\n';
+      code += '    tonM' + i + '_Delay(IN := bM' + i + '_Running, PT := T#2s);\n';
+      code += '    IF tonM' + i + '_Delay.Q THEN\n';
+      code += '      tonM' + i + '_Delay(IN := FALSE);\n';
+      code += '      iState := ' + (i < n ? (i + 1) : (n + 1)) + ';\n';
+      code += '    END_IF;\n';
+    }
+    code += '    // Timeout check\n';
+    code += '    tonTimeout(IN := NOT bM' + i + '_Running, PT := T#10s);\n';
+    code += '    IF tonTimeout.Q THEN iState := 99; bFault := TRUE; wFaultCode := 16#000' + i + '; END_IF;\n\n';
+  }
+  code += '  ' + (n + 1) + ': // RUNNING\n';
+  code += '    // Monitor all motors\n';
+  for (var i = 1; i <= n; i++) {
+    code += '    IF bM' + i + '_Fault THEN iState := 99; bFault := TRUE; wFaultCode := 16#00' + i + '0; END_IF;\n';
+  }
+  code += '    IF bStopCmd THEN iState := ' + (n + 2) + '; END_IF;\n\n';
+  code += '  ' + (n + 2) + ': // STOPPING (reverse order)\n';
+  for (var i = n; i >= 1; i--) {
+    code += '    bM' + i + '_Start := FALSE;\n';
+    if (ms.type === 'star_delta') code += '    bM' + i + '_Star := FALSE; bM' + i + '_Delta := FALSE;\n';
+  }
+  code += '    iState := 0;\n\n';
+  code += '  99: // FAULT\n';
+  for (var i = 1; i <= n; i++) {
+    code += '    bM' + i + '_Start := FALSE;\n';
+    if (ms.type === 'star_delta') code += '    bM' + i + '_Star := FALSE; bM' + i + '_Delta := FALSE;\n';
+  }
+  code += '    IF bReset AND NOT bM1_Fault';
+  for (var i = 2; i <= n; i++) code += ' AND NOT bM' + i + '_Fault';
+  code += ' THEN\n';
+  code += '      bFault := FALSE;\n';
+  code += '      wFaultCode := 16#0000;\n';
+  code += '      iState := 0;\n';
+  code += '    END_IF;\n\n';
+  code += 'END_CASE;\n\n';
+  code += (isScl ? 'END_FUNCTION_BLOCK' : 'END_FUNCTION_BLOCK');
+  return code;
+}
+
+function plcGenerateHVACCode() {
+  var st = plcState;
+  var sys = st.hvac.system;
+  var code = '';
+  var isScl = (st.platform === 'siemens');
+  var sysNames = { ahu: 'Air Handling Unit (AHU)', fcu: 'Fan Coil Unit (FCU)', vav: 'Variable Air Volume (VAV)', heatpump: 'Heat Pump', chiller: 'Chiller' };
+  code += '// ============================================\n';
+  code += '// HVAC CONTROL: ' + (sysNames[sys] || sys) + '\n';
+  code += '// PID + Sequence of Operations + Frost Protection\n';
+  code += '// ============================================\n\n';
+  if (st.plcLang !== 'ST') {
+    code += '// PID Controller Block\n';
+    code += '// Setpoint: 21.0 C (occupied) / 16.0 C (unoccupied)\n';
+    code += '// Deadband: +/- 0.5 C\n';
+    code += '// Output: 0-100% to heating/cooling valves\n';
+    code += '// Frost protection: < 5 C = close dampers, enable heat\n';
+    return code;
+  }
+  code += (isScl ? 'FUNCTION_BLOCK "FB_HVAC_' + sys.toUpperCase() + '"\n' : 'FUNCTION_BLOCK FB_HVAC_' + sys.toUpperCase() + '\n');
+  code += 'VAR_INPUT\n';
+  code += '  rSupplyTemp    : REAL;   // Supply air temperature [C]\n';
+  code += '  rReturnTemp    : REAL;   // Return air temperature [C]\n';
+  code += '  rOutdoorTemp   : REAL;   // Outdoor temperature [C]\n';
+  code += '  rRoomTemp      : REAL;   // Room/zone temperature [C]\n';
+  code += '  bOccupied      : BOOL;   // Occupancy status\n';
+  code += '  bEnable        : BOOL;   // System enable\n';
+  if (sys === 'ahu' || sys === 'vav') code += '  rCO2_ppm      : REAL;   // CO2 level [ppm]\n';
+  if (sys === 'heatpump' || sys === 'chiller') code += '  rWaterTemp    : REAL;   // Water temperature [C]\n';
+  code += 'END_VAR\n\n';
+  code += 'VAR_OUTPUT\n';
+  if (sys === 'ahu') {
+    code += '  rDamperPos     : REAL;   // Outdoor damper 0-100%\n';
+    code += '  rFanSpeed      : REAL;   // Supply fan speed 0-100%\n';
+    code += '  rHeatValve     : REAL;   // Heating valve 0-100%\n';
+    code += '  rCoolValve     : REAL;   // Cooling valve 0-100%\n';
+    code += '  bFrostAlarm    : BOOL;   // Frost protection active\n';
+    code += '  bFreeCool      : BOOL;   // Free cooling enabled\n';
+  } else if (sys === 'fcu') {
+    code += '  rFanSpeed      : REAL;   // Fan speed 0-100%\n';
+    code += '  rHeatValve     : REAL;   // Heating valve 0-100%\n';
+    code += '  rCoolValve     : REAL;   // Cooling valve 0-100%\n';
+    code += '  iFanStage      : INT;    // Fan stage 0/1/2/3\n';
+  } else if (sys === 'vav') {
+    code += '  rDamperPos     : REAL;   // VAV damper position 0-100%\n';
+    code += '  rReheatValve   : REAL;   // Reheat valve 0-100%\n';
+    code += '  rAirflowSP     : REAL;   // Airflow setpoint [l/s]\n';
+  } else if (sys === 'heatpump') {
+    code += '  bCompressor    : BOOL;   // Compressor enable\n';
+    code += '  bReversing     : BOOL;   // Reversing valve (cool mode)\n';
+    code += '  rPumpSpeed     : REAL;   // Circulation pump speed\n';
+    code += '  bDefrost       : BOOL;   // Defrost cycle active\n';
+  } else {
+    code += '  bCompressor1   : BOOL;   // Compressor stage 1\n';
+    code += '  bCompressor2   : BOOL;   // Compressor stage 2\n';
+    code += '  rCondFanSpeed  : REAL;   // Condenser fan speed\n';
+    code += '  rChWPumpSpeed  : REAL;   // Chilled water pump speed\n';
+  }
+  code += '  iState         : INT;    // Operating state\n';
+  code += '  bAlarm         : BOOL;   // System alarm\n';
+  code += 'END_VAR\n\n';
+  code += 'VAR\n';
+  code += '  // PID Controller variables\n';
+  code += '  rSetpoint      : REAL := 21.0;  // Temperature setpoint [C]\n';
+  code += '  rDeadband      : REAL := 0.5;   // Deadband [C]\n';
+  code += '  rKp            : REAL := 2.0;   // Proportional gain\n';
+  code += '  rKi            : REAL := 0.1;   // Integral gain\n';
+  code += '  rKd            : REAL := 0.5;   // Derivative gain\n';
+  code += '  rError         : REAL;          // Current error\n';
+  code += '  rIntegral      : REAL;          // Integral sum\n';
+  code += '  rDerivative    : REAL;          // Derivative\n';
+  code += '  rLastError     : REAL;          // Previous error\n';
+  code += '  rOutput        : REAL;          // PID output 0-100\n';
+  code += '  rFrostLimit    : REAL := 5.0;   // Frost protection threshold\n';
+  code += '  rFreeCoolDelta : REAL := 2.0;   // Free cooling differential\n';
+  code += '  tonStartDelay  : TON;\n';
+  code += '  tonSchedule    : TON;\n';
+  code += 'END_VAR\n\n';
+  code += (isScl ? 'BEGIN\n' : '');
+  code += '// === SCHEDULE: Occupied/Unoccupied setback ===\n';
+  code += 'IF bOccupied THEN\n';
+  code += '  rSetpoint := 21.0; // Occupied setpoint\n';
+  code += 'ELSE\n';
+  code += '  rSetpoint := 16.0; // Unoccupied setback\n';
+  code += 'END_IF;\n\n';
+  code += '// === FROST PROTECTION ===\n';
+  if (sys === 'ahu' || sys === 'vav') {
+    code += 'IF rSupplyTemp < rFrostLimit THEN\n';
+    code += '  bFrostAlarm := TRUE;\n';
+    code += '  rDamperPos := 0.0;   // Close outdoor damper\n';
+    code += '  rHeatValve := 100.0; // Full heating\n';
+    code += '  rFanSpeed := 30.0;   // Minimum fan\n';
+    code += '  RETURN;\n';
+    code += 'ELSE\n';
+    code += '  bFrostAlarm := FALSE;\n';
+    code += 'END_IF;\n\n';
+  } else {
+    code += 'IF rOutdoorTemp < rFrostLimit AND NOT bEnable THEN\n';
+    code += '  // Enable frost protection circulation\n';
+    code += '  bAlarm := FALSE;\n';
+    code += 'END_IF;\n\n';
+  }
+  code += '// === FREE COOLING LOGIC ===\n';
+  if (sys === 'ahu' || sys === 'vav') {
+    code += 'bFreeCool := (rOutdoorTemp < (rRoomTemp - rFreeCoolDelta)) AND (rOutdoorTemp > rFrostLimit);\n';
+    code += 'IF bFreeCool THEN\n';
+    code += '  rDamperPos := 100.0; // Full fresh air\n';
+    code += '  rCoolValve := 0.0;   // No mechanical cooling\n';
+    code += 'END_IF;\n\n';
+  }
+  code += '// === PID CONTROLLER ===\n';
+  code += 'rError := rSetpoint - rRoomTemp;\n';
+  code += 'IF ABS(rError) > rDeadband THEN\n';
+  code += '  rIntegral := rIntegral + rError;\n';
+  code += '  // Anti-windup\n';
+  code += '  IF rIntegral > 100.0 THEN rIntegral := 100.0; END_IF;\n';
+  code += '  IF rIntegral < -100.0 THEN rIntegral := -100.0; END_IF;\n';
+  code += '  rDerivative := rError - rLastError;\n';
+  code += '  rOutput := (rKp * rError) + (rKi * rIntegral) + (rKd * rDerivative);\n';
+  code += '  // Clamp output\n';
+  code += '  IF rOutput > 100.0 THEN rOutput := 100.0; END_IF;\n';
+  code += '  IF rOutput < -100.0 THEN rOutput := -100.0; END_IF;\n';
+  code += 'ELSE\n';
+  code += '  rOutput := 0.0; // Within deadband\n';
+  code += 'END_IF;\n';
+  code += 'rLastError := rError;\n\n';
+  code += '// === SEQUENCE OF OPERATIONS ===\n';
+  if (sys === 'ahu') {
+    code += '// Heating: output > 0, Cooling: output < 0\n';
+    code += 'IF rOutput > 0.0 THEN\n';
+    code += '  rHeatValve := rOutput;\n';
+    code += '  rCoolValve := 0.0;\n';
+    code += 'ELSIF rOutput < 0.0 AND NOT bFreeCool THEN\n';
+    code += '  rHeatValve := 0.0;\n';
+    code += '  rCoolValve := ABS(rOutput);\n';
+    code += 'ELSE\n';
+    code += '  rHeatValve := 0.0;\n';
+    code += '  rCoolValve := 0.0;\n';
+    code += 'END_IF;\n';
+    code += '// Fan speed modulation\n';
+    code += 'IF bEnable THEN\n';
+    code += '  rFanSpeed := 30.0 + (ABS(rOutput) * 0.7); // 30-100%\n';
+    code += '  rDamperPos := 20.0 + (rFanSpeed * 0.5);   // Min 20%\n';
+    code += 'ELSE\n';
+    code += '  rFanSpeed := 0.0;\n';
+    code += '  rDamperPos := 0.0;\n';
+    code += 'END_IF;\n';
+  } else if (sys === 'fcu') {
+    code += 'IF rOutput > 0.0 THEN\n';
+    code += '  rHeatValve := rOutput; rCoolValve := 0.0;\n';
+    code += 'ELSIF rOutput < 0.0 THEN\n';
+    code += '  rHeatValve := 0.0; rCoolValve := ABS(rOutput);\n';
+    code += 'END_IF;\n';
+    code += '// Fan staging\n';
+    code += 'IF ABS(rOutput) < 30.0 THEN iFanStage := 1;\n';
+    code += 'ELSIF ABS(rOutput) < 60.0 THEN iFanStage := 2;\n';
+    code += 'ELSE iFanStage := 3; END_IF;\n';
+    code += 'rFanSpeed := REAL(iFanStage) * 33.3;\n';
+  } else if (sys === 'vav') {
+    code += '// VAV damper position from PID output\n';
+    code += 'rDamperPos := 20.0 + (ABS(rOutput) * 0.8); // Min 20%\n';
+    code += 'IF rOutput > 0.0 THEN\n';
+    code += '  rReheatValve := rOutput;\n';
+    code += 'ELSE\n';
+    code += '  rReheatValve := 0.0;\n';
+    code += 'END_IF;\n';
+    code += '// CO2-based ventilation\n';
+    code += 'IF rCO2_ppm > 800.0 THEN\n';
+    code += '  rAirflowSP := rAirflowSP * 1.2; // Increase 20%\n';
+    code += 'END_IF;\n';
+  } else if (sys === 'heatpump') {
+    code += '// Heat pump staging\n';
+    code += 'bCompressor := (ABS(rOutput) > 20.0) AND bEnable;\n';
+    code += 'bReversing := (rOutput < 0.0); // Cool mode\n';
+    code += 'rPumpSpeed := 30.0 + (ABS(rOutput) * 0.7);\n';
+    code += '// Defrost: outdoor < 2C and running > 30min\n';
+    code += 'bDefrost := (rOutdoorTemp < 2.0) AND bCompressor;\n';
+  } else {
+    code += '// Chiller staging\n';
+    code += 'bCompressor1 := (ABS(rOutput) > 25.0) AND bEnable;\n';
+    code += 'bCompressor2 := (ABS(rOutput) > 60.0) AND bEnable;\n';
+    code += 'rCondFanSpeed := 30.0 + (ABS(rOutput) * 0.7);\n';
+    code += 'rChWPumpSpeed := 40.0 + (ABS(rOutput) * 0.6);\n';
+  }
+  code += '\n' + (isScl ? 'END_FUNCTION_BLOCK' : 'END_FUNCTION_BLOCK');
+  return code;
+}
+
+function plcGenerateLoadShedding() {
+  var st = plcState;
+  var limit = st.energy.demandLimit;
+  var schedule = calcLoadSchedule();
+  var code = '';
+  var isScl = (st.platform === 'siemens');
+  // Classify loads by priority
+  var priorities = { P1: [], P2: [], P3: [] };
+  loadList.forEach(function(c, i) {
+    var nm = c.name || 'Load ' + (i + 1);
+    var n = nm.toLowerCase();
+    if (n.match(/nod|critical|sikkerhed|safety|server|ups|noedlys/i) || c.kW > limit * 0.3) {
+      priorities.P1.push({ name: nm, kW: c.kW, idx: i });
+    } else if (n.match(/motor|pump|kompressor|hvac|ventil/i) || c.kW > limit * 0.15) {
+      priorities.P2.push({ name: nm, kW: c.kW, idx: i });
+    } else {
+      priorities.P3.push({ name: nm, kW: c.kW, idx: i });
+    }
+  });
+  code += '// ============================================\n';
+  code += '// ENERGY MANAGEMENT / LOAD SHEDDING\n';
+  code += '// Demand limit: ' + limit + ' kW\n';
+  code += '// P1 (Critical): ' + priorities.P1.length + ' loads (' + priorities.P1.reduce(function(s, l) { return s + l.kW; }, 0).toFixed(1) + ' kW)\n';
+  code += '// P2 (Important): ' + priorities.P2.length + ' loads (' + priorities.P2.reduce(function(s, l) { return s + l.kW; }, 0).toFixed(1) + ' kW)\n';
+  code += '// P3 (Deferrable): ' + priorities.P3.length + ' loads (' + priorities.P3.reduce(function(s, l) { return s + l.kW; }, 0).toFixed(1) + ' kW)\n';
+  code += '// Total installed: ' + schedule.kW.toFixed(1) + ' kW\n';
+  code += '// ============================================\n\n';
+  if (st.plcLang !== 'ST') {
+    code += '// Demand monitoring with hysteresis\n';
+    code += '// Shed threshold: ' + limit + ' kW | Restore: ' + (limit * 0.85).toFixed(0) + ' kW\n';
+    code += '// Shed order: P3 first (LIFO), then P2\n';
+    code += '// Restore order: Last shed = first restored\n';
+    code += '// Alarm at: ' + (limit * 0.9).toFixed(0) + ' kW (warning), ' + limit + ' kW (critical)\n';
+    return code;
+  }
+  code += (isScl ? 'FUNCTION_BLOCK "FB_LoadShedding"\n' : 'FUNCTION_BLOCK FB_LoadShedding\n');
+  code += 'VAR_INPUT\n';
+  code += '  rDemand_kW     : REAL;   // Current demand [kW]\n';
+  code += '  bEnable        : BOOL;   // Load shed enable\n';
+  code += '  rDemandLimit   : REAL := ' + limit + '.0; // Demand limit [kW]\n';
+  code += 'END_VAR\n\n';
+  code += 'VAR_OUTPUT\n';
+  code += '  bShedActive    : BOOL;   // Shedding in progress\n';
+  code += '  iShedLevel     : INT;    // Current shed level 0-3\n';
+  code += '  bAlarm_Warning : BOOL;   // 90% demand warning\n';
+  code += '  bAlarm_Critical: BOOL;   // 100% demand critical\n';
+  code += '  rShedKW        : REAL;   // Total shed kW\n';
+  code += '  bRestore       : BOOL;   // Restoration active\n';
+  code += 'END_VAR\n\n';
+  code += 'VAR\n';
+  code += '  rHysteresis    : REAL := ' + (limit * 0.15).toFixed(1) + '; // 15% hysteresis\n';
+  code += '  tonShedDelay   : TON;    // Anti-cycling delay\n';
+  code += '  tonRestoreDelay: TON;    // Restore delay\n';
+  code += '  iShedStack     : ARRAY[1..20] OF INT; // LIFO stack\n';
+  code += '  iStackPtr      : INT := 0;\n';
+  var allLoads = priorities.P3.concat(priorities.P2);
+  allLoads.forEach(function(l, i) {
+    code += '  bShed_' + (i + 1) + '       : BOOL;   // ' + l.name + ' (' + l.kW + ' kW)\n';
+  });
+  code += 'END_VAR\n\n';
+  code += (isScl ? 'BEGIN\n' : '');
+  code += '// === ALARM THRESHOLDS ===\n';
+  code += 'bAlarm_Warning := rDemand_kW >= (rDemandLimit * 0.9);\n';
+  code += 'bAlarm_Critical := rDemand_kW >= rDemandLimit;\n\n';
+  code += '// === LOAD SHEDDING (shed P3 first, then P2) ===\n';
+  code += 'IF bEnable AND (rDemand_kW > rDemandLimit) THEN\n';
+  code += '  tonShedDelay(IN := TRUE, PT := T#5s); // 5s anti-cycling\n';
+  code += '  IF tonShedDelay.Q THEN\n';
+  code += '    bShedActive := TRUE;\n';
+  code += '    // Shed next available load from P3, then P2\n';
+  code += '    IF iStackPtr < ' + allLoads.length + ' THEN\n';
+  code += '      iStackPtr := iStackPtr + 1;\n';
+  code += '      iShedStack[iStackPtr] := iStackPtr;\n';
+  code += '      CASE iStackPtr OF\n';
+  allLoads.forEach(function(l, i) {
+    code += '        ' + (i + 1) + ': bShed_' + (i + 1) + ' := TRUE; rShedKW := rShedKW + ' + l.kW.toFixed(1) + ';\n';
+  });
+  code += '      END_CASE;\n';
+  code += '    END_IF;\n';
+  code += '    tonShedDelay(IN := FALSE);\n';
+  code += '  END_IF;\n';
+  code += 'END_IF;\n\n';
+  code += '// === LOAD RESTORATION (LIFO - last shed, first restored) ===\n';
+  code += 'IF bShedActive AND (rDemand_kW < (rDemandLimit - rHysteresis)) THEN\n';
+  code += '  tonRestoreDelay(IN := TRUE, PT := T#30s); // 30s restore delay\n';
+  code += '  IF tonRestoreDelay.Q AND iStackPtr > 0 THEN\n';
+  code += '    bRestore := TRUE;\n';
+  code += '    CASE iShedStack[iStackPtr] OF\n';
+  allLoads.forEach(function(l, i) {
+    code += '      ' + (i + 1) + ': bShed_' + (i + 1) + ' := FALSE; rShedKW := rShedKW - ' + l.kW.toFixed(1) + ';\n';
+  });
+  code += '    END_CASE;\n';
+  code += '    iStackPtr := iStackPtr - 1;\n';
+  code += '    IF iStackPtr = 0 THEN bShedActive := FALSE; bRestore := FALSE; END_IF;\n';
+  code += '    tonRestoreDelay(IN := FALSE);\n';
+  code += '  END_IF;\n';
+  code += 'END_IF;\n\n';
+  code += '// === TOU SCHEDULE TEMPLATE ===\n';
+  code += '// Peak:     07:00-09:00, 17:00-19:00 (reduce limit to 80%)\n';
+  code += '// Off-peak: 22:00-06:00 (increase limit to 120%)\n';
+  code += '// Standard: all other hours (100% limit)\n\n';
+  code += (isScl ? 'END_FUNCTION_BLOCK' : 'END_FUNCTION_BLOCK');
+  return code;
+}
+
+function plcGenerateNetworkConfig() {
+  var st = plcState;
+  var io = plcGenerateIOList();
+  var subnet = st.network.subnet;
+  var startIP = st.network.startIP;
+  var config = { devices: [], switches: [], summary: {} };
+  var ip = startIP;
+
+  // PLC CPU
+  config.devices.push({ name: (st.platform === 'siemens' ? 'S7-1500 CPU' : st.platform === 'ab' ? 'CompactLogix L33ER' : st.platform === 'schneider' ? 'M340 CPU' : st.platform === 'abb' ? 'AC500 PM5' : 'PLC CPU'), ip: subnet + '.' + ip, role: 'PLC Controller', port: 1 });
+  ip++;
+
+  // I/O modules (1 per 16 points)
+  var totalIO = io.summary.DI + io.summary.DO + io.summary.AI + io.summary.AO;
+  var ioModules = Math.ceil(totalIO / 16);
+  for (var i = 0; i < ioModules; i++) {
+    config.devices.push({ name: 'I/O Module ' + (i + 1), ip: subnet + '.' + ip, role: 'Remote I/O', port: i + 2 });
+    ip++;
+  }
+
+  // BMS gateway
+  config.devices.push({ name: 'BMS Gateway (' + st.protocol + ')', ip: subnet + '.' + ip, role: 'Protocol gateway', port: ip - startIP + 1 });
+  ip++;
+
+  // HMI
+  config.devices.push({ name: (st.platform === 'siemens' ? 'TP1200 Comfort HMI' : st.platform === 'ab' ? 'PanelView Plus 7' : 'HMI Panel'), ip: subnet + '.' + ip, role: 'Operator interface', port: ip - startIP + 1 });
+  ip++;
+
+  // Network switch
+  if (st.platform === 'siemens') {
+    config.switches.push({ name: 'SCALANCE XC208', type: 'Managed L2', ports: 8, topology: 'PROFINET Ring (MRP)' });
+    if (ioModules > 4) config.switches.push({ name: 'SCALANCE XC208 #2', type: 'Managed L2', ports: 8, topology: 'PROFINET Ring (MRP)' });
+  } else if (st.platform === 'ab') {
+    config.switches.push({ name: 'Stratix 5700', type: 'Managed L2', ports: 8, topology: 'EtherNet/IP Star' });
+  } else {
+    config.switches.push({ name: 'Industrial Switch', type: 'Unmanaged', ports: 8, topology: (st.protocol === 'modbus_tcp' || st.protocol === 'modbus_rtu') ? 'Daisy-chain' : 'Star' });
+  }
+
+  config.summary = {
+    network: subnet + '.0/24',
+    gateway: subnet + '.1',
+    dns: subnet + '.1',
+    totalDevices: config.devices.length,
+    topology: config.switches.length > 0 ? config.switches[0].topology : 'Star',
+    protocol: st.platform === 'siemens' ? 'PROFINET IO' : st.platform === 'ab' ? 'EtherNet/IP' : 'Modbus TCP'
+  };
+  return config;
+}
+
+function plcGenerateHardwareBOM() {
+  var st = plcState;
+  var io = plcGenerateIOList();
+  var summary = io.summary;
+  var bom = [];
+  var totalMA = 0;
+  var totalModules = 0;
+
+  // CPU
+  var cpu = {};
+  if (st.platform === 'siemens') {
+    if (summary.DI + summary.DO + summary.AI + summary.AO > 64) cpu = { partNo: '6ES7515-2AM02-0AB0', desc: 'S7-1500 CPU 1515-2 PN', qty: 1, price: 3200 };
+    else if (summary.DI + summary.DO + summary.AI + summary.AO > 32) cpu = { partNo: '6ES7513-1AL02-0AB0', desc: 'S7-1500 CPU 1513-1 PN', qty: 1, price: 1800 };
+    else cpu = { partNo: '6ES7511-1AK02-0AB0', desc: 'S7-1500 CPU 1511-1 PN', qty: 1, price: 950 };
+  } else if (st.platform === 'ab') {
+    if (summary.DI + summary.DO + summary.AI + summary.AO > 64) cpu = { partNo: '1769-L33ER', desc: 'CompactLogix 5370 L3 2MB', qty: 1, price: 3500 };
+    else cpu = { partNo: '1769-L30ER', desc: 'CompactLogix 5370 L3 1MB', qty: 1, price: 2200 };
+  } else if (st.platform === 'schneider') {
+    cpu = { partNo: 'BMXP342020', desc: 'M340 CPU Modbus/Ethernet', qty: 1, price: 1500 };
+  } else if (st.platform === 'abb') {
+    cpu = { partNo: 'PM583-ETH', desc: 'AC500 PM583 CPU', qty: 1, price: 1800 };
+  } else {
+    cpu = { partNo: 'GENERIC-CPU', desc: 'IEC 61131-3 PLC CPU', qty: 1, price: 1500 };
+  }
+  bom.push(cpu);
+  totalMA += 800;
+  totalModules++;
+
+  // DI cards (16-point)
+  var diCards = Math.ceil(summary.DI / 16);
+  if (diCards > 0) {
+    var diPart = st.platform === 'siemens' ? { partNo: '6ES7521-1BH50-0AA0', desc: 'DI 16x24VDC HF', price: 280 } : st.platform === 'ab' ? { partNo: '1769-IQ16', desc: '16-Point 24VDC Input', price: 320 } : { partNo: 'BMXDDI1602', desc: '16 DI 24VDC', price: 250 };
+    bom.push({ partNo: diPart.partNo, desc: diPart.desc, qty: diCards, price: diPart.price * diCards });
+    totalMA += diCards * 120;
+    totalModules += diCards;
+  }
+
+  // DO cards (16-point)
+  var doCards = Math.ceil(summary.DO / 16);
+  if (doCards > 0) {
+    var doPart = st.platform === 'siemens' ? { partNo: '6ES7522-1BH50-0AA0', desc: 'DQ 16x24VDC/0.5A HF', price: 320 } : st.platform === 'ab' ? { partNo: '1769-OB16', desc: '16-Point 24VDC Output', price: 350 } : { partNo: 'BMXDDO1602', desc: '16 DO 24VDC', price: 280 };
+    bom.push({ partNo: doPart.partNo, desc: doPart.desc, qty: doCards, price: doPart.price * doCards });
+    totalMA += doCards * 250;
+    totalModules += doCards;
+  }
+
+  // AI cards (8-point)
+  var aiCards = Math.ceil(summary.AI / 8);
+  if (aiCards > 0) {
+    var aiPart = st.platform === 'siemens' ? { partNo: '6ES7531-7KF00-0AB0', desc: 'AI 8x13bit', price: 450 } : st.platform === 'ab' ? { partNo: '1769-IF8', desc: '8-Channel Analog Input', price: 520 } : { partNo: 'BMXAMI0810', desc: '8 AI 0-10V/4-20mA', price: 380 };
+    bom.push({ partNo: aiPart.partNo, desc: aiPart.desc, qty: aiCards, price: aiPart.price * aiCards });
+    totalMA += aiCards * 80;
+    totalModules += aiCards;
+  }
+
+  // AO cards (4-point)
+  var aoCards = Math.ceil(summary.AO / 4);
+  if (aoCards > 0) {
+    var aoPart = st.platform === 'siemens' ? { partNo: '6ES7532-5HD00-0AB0', desc: 'AQ 4x16bit', price: 520 } : st.platform === 'ab' ? { partNo: '1769-OF4', desc: '4-Channel Analog Output', price: 580 } : { partNo: 'BMXAMO0410', desc: '4 AO 0-10V/4-20mA', price: 420 };
+    bom.push({ partNo: aoPart.partNo, desc: aoPart.desc, qty: aoCards, price: aoPart.price * aoCards });
+    totalMA += aoCards * 120;
+    totalModules += aoCards;
+  }
+
+  // Communication module
+  var commModule = st.platform === 'siemens' ? { partNo: '6GK7243-5DX30-0XE0', desc: 'CM 1542-5 PROFINET', price: 650 } : st.platform === 'ab' ? { partNo: '1769-AENTR', desc: 'Dual-port EtherNet/IP Adapter', price: 580 } : { partNo: 'BMENOC0321', desc: 'Ethernet Communication', price: 500 };
+  bom.push({ partNo: commModule.partNo, desc: commModule.desc, qty: 1, price: commModule.price });
+  totalMA += 150;
+  totalModules++;
+
+  // Power supply
+  var psWatts = Math.ceil(totalMA * 24 / 1000 * 1.3); // 30% margin
+  var psPart = {};
+  if (psWatts <= 5) psPart = st.platform === 'siemens' ? { partNo: '6EP1333-4BA00', desc: 'SITOP PSU8200 5A/24VDC', price: 280 } : { partNo: 'PS-24VDC-5A', desc: '24VDC 5A Power Supply', price: 250 };
+  else if (psWatts <= 10) psPart = st.platform === 'siemens' ? { partNo: '6EP1334-3BA10', desc: 'SITOP PSU8200 10A/24VDC', price: 380 } : { partNo: 'PS-24VDC-10A', desc: '24VDC 10A Power Supply', price: 350 };
+  else psPart = st.platform === 'siemens' ? { partNo: '6EP1336-3BA10', desc: 'SITOP PSU8200 20A/24VDC', price: 520 } : { partNo: 'PS-24VDC-20A', desc: '24VDC 20A Power Supply', price: 480 };
+  bom.push({ partNo: psPart.partNo, desc: psPart.desc, qty: 1, price: psPart.price });
+  totalModules++;
+
+  // Cabinet size estimate (12mm per module on DIN rail)
+  var dinWidth = totalModules * 12;
+  var cabinetSize = dinWidth < 300 ? '400x300x200mm' : dinWidth < 600 ? '600x400x250mm' : dinWidth < 900 ? '800x600x300mm' : '1000x800x300mm';
+
+  var totalPrice = bom.reduce(function(s, b) { return s + b.price; }, 0);
+
+  return {
+    items: bom,
+    totalModules: totalModules,
+    totalMA: totalMA,
+    dinWidth: dinWidth,
+    cabinetSize: cabinetSize,
+    totalPrice: totalPrice,
+    io: summary
+  };
+}
+
+function plcDownloadBOM() {
+  var bom = plcGenerateHardwareBOM();
+  var csv = 'Part Number,Description,Quantity,Unit Price (EUR),Total Price (EUR)\n';
+  bom.items.forEach(function(item) {
+    csv += '"' + item.partNo + '","' + item.desc + '",' + item.qty + ',' + (item.price / item.qty).toFixed(0) + ',' + item.price + '\n';
+  });
+  csv += '\n"","TOTAL","","","' + bom.totalPrice + '"\n';
+  csv += '"","Cabinet: ' + bom.cabinetSize + '","","",""\n';
+  csv += '"","DIN-rail width: ' + bom.dinWidth + 'mm","","",""\n';
+  csv += '"","PSU load: ' + bom.totalMA + ' mA (24VDC)","","",""\n';
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a'); a.href = url; a.download = 'hardware_bom_' + plcState.platform + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
 
 function plcGenerateIOList() {
   const st = plcState;
@@ -12204,6 +12920,276 @@ function renderPlc() {
     html += '<button class="sel-btn" onclick="plcDownloadBMS()">\uD83C\uDF10 ' + (da ? 'Download BMS-punkter (.csv)' : 'Download BMS points (.csv)') + '</button>';
     html += '<button class="sel-btn" onclick="plcDownloadFMS()">\uD83D\uDCCA ' + (da ? 'Download FMS-config (.json)' : 'Download FMS config (.json)') + '</button>';
     html += '</div></div>';
+  }
+
+  // ============================================================
+  // SECTION 6: SAFETY PLC (IEC 61508 / EN ISO 13849-1)
+  // ============================================================
+  html += '<div class="card fade-in"><div class="card-title">\u26A0\uFE0F ' + (da ? 'Sikkerheds-PLC (IEC 61508 / EN ISO 13849-1)' : 'Safety PLC (IEC 61508 / EN ISO 13849-1)') + '</div>';
+  html += '<div class="info-row">' + (da ? 'Konfigurer sikkerhedsniveau og sikkerhedsfunktioner for maskinsikkerhed' : 'Configure safety integrity level and safety functions for machine safety') + '</div>';
+
+  // SIL Level
+  html += '<div style="margin-top:10px"><strong>' + (da ? 'Sikkerhedsniveau (SIL):' : 'Safety Integrity Level (SIL):') + '</strong></div>';
+  var silLevels = [{ id: 'SIL1', label: 'SIL 1' }, { id: 'SIL2', label: 'SIL 2' }, { id: 'SIL3', label: 'SIL 3' }];
+  html += '<div class="select-grid">';
+  silLevels.forEach(function(s) {
+    html += '<button class="sel-btn ' + (st.safety.sil === s.id ? 'selected' : '') + '" onclick="plcSetSafety(\'sil\',\'' + s.id + '\')">' + s.label + '</button>';
+  });
+  html += '</div>';
+
+  // Safety Category
+  html += '<div style="margin-top:10px"><strong>' + (da ? 'Sikkerhedskategori (EN ISO 13849-1):' : 'Safety Category (EN ISO 13849-1):') + '</strong></div>';
+  var cats = [{ id: 'Cat1', label: 'Cat. 1' }, { id: 'Cat2', label: 'Cat. 2' }, { id: 'Cat3', label: 'Cat. 3' }, { id: 'Cat4', label: 'Cat. 4' }];
+  html += '<div class="select-grid">';
+  cats.forEach(function(c) {
+    html += '<button class="sel-btn ' + (st.safety.category === c.id ? 'selected' : '') + '" onclick="plcSetSafety(\'category\',\'' + c.id + '\')">' + c.label + '</button>';
+  });
+  html += '</div>';
+
+  // Safety functions
+  html += '<div style="margin-top:10px"><strong>' + (da ? 'Sikkerhedsfunktioner:' : 'Safety Functions:') + '</strong></div>';
+  var safetyFuncs = [
+    { key: 'estop', da: 'N\u00F8dstop (E-Stop)', en: 'E-Stop circuit' },
+    { key: 'guard', da: 'D\u00F8rov\u00E5gning', en: 'Guard door monitoring' },
+    { key: 'lightCurtain', da: 'Lysgardin', en: 'Light curtain' },
+    { key: 'twoHand', da: 'Toh\u00E5ndsbetjening', en: 'Two-hand control' },
+    { key: 'safeSpeed', da: 'Sikker hastighed', en: 'Safe speed monitoring' }
+  ];
+  html += '<div class="select-grid">';
+  safetyFuncs.forEach(function(f) {
+    html += '<button class="sel-btn ' + (st.safety.functions[f.key] ? 'selected' : '') + '" onclick="plcSafetyToggle(\'' + f.key + '\')">' + (st.safety.functions[f.key] ? '\u2705 ' : '\u274C ') + (da ? f.da : f.en) + '</button>';
+  });
+  html += '</div>';
+
+  // Safety requirements summary
+  var sfActive = Object.keys(st.safety.functions).filter(function(k) { return st.safety.functions[k]; });
+  if (sfActive.length > 0) {
+    html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + (da ? 'Krav og arkitektur' : 'Requirements and Architecture') + '</div>';
+    var archMap = { Cat1: (da ? 'Enkeltkanal' : 'Single channel'), Cat2: (da ? 'Enkeltkanal + test' : 'Single channel + diagnostics'), Cat3: (da ? 'Dobbeltkanal' : 'Dual channel'), Cat4: (da ? 'Dobbeltkanal + diagnostik' : 'Dual channel + full diagnostics') };
+    var hwMap = { Cat1: (da ? 'Sikkerhedsrel\u00E6 (f.eks. Pilz PNOZ)' : 'Safety relay (e.g. Pilz PNOZ)'), Cat2: (da ? 'Sikkerhedsrel\u00E6 + testpuls' : 'Safety relay + test pulse'), Cat3: (da ? 'Sikkerhedsrel\u00E6 / Safety PLC-modul' : 'Safety relay / Safety PLC module'), Cat4: (da ? 'Safety PLC-modul (f.eks. S7-1500F / GuardLogix)' : 'Safety PLC module (e.g. S7-1500F / GuardLogix)') };
+    html += '<div class="result-row"><span class="label">' + (da ? 'Arkitektur' : 'Architecture') + '</span><span class="value">' + (archMap[st.safety.category] || 'N/A') + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'P\u00E5kr\u00E6vet hardware' : 'Required hardware') + '</span><span class="value">' + (hwMap[st.safety.category] || 'N/A') + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Aktive funktioner' : 'Active functions') + '</span><span class="value">' + sfActive.length + '</span></div>';
+    html += '<div class="result-row"><span class="label">PFH (SIL)</span><span class="value">' + (st.safety.sil === 'SIL1' ? '< 10^-5' : st.safety.sil === 'SIL2' ? '< 10^-6' : '< 10^-7') + ' /h</span></div>';
+    html += '</div>';
+
+    // Safety code
+    var safetyCode = plcGenerateSafetyCode();
+    html += '<div style="margin-top:12px"><strong>' + (da ? 'Sikkerhedsprogram (' + st.plcLang + '):' : 'Safety Program (' + st.plcLang + '):') + '</strong></div>';
+    html += '<pre style="background:#1a1f2e;color:#e2e8f0;padding:14px;border-radius:8px;font-size:.72rem;overflow-x:auto;max-height:350px;border:1px solid #f56565">' + safetyCode.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+  }
+  html += '</div>';
+
+  // ============================================================
+  // SECTION 7: MOTOR SEQUENCE TEMPLATES
+  // ============================================================
+  html += '<div class="card fade-in"><div class="card-title">\u2699\uFE0F ' + (da ? 'Motorsekvens-skabeloner' : 'Motor Sequence Templates') + '</div>';
+  html += '<div class="info-row">' + (da ? 'V\u00E6lg sekvenstype og antal motorer for komplet PLC-kode med tilstandsmaskine' : 'Select sequence type and motor count for complete PLC code with state machine') + '</div>';
+
+  // Sequence types
+  html += '<div style="margin-top:10px"><strong>' + (da ? 'Sekvenstype:' : 'Sequence type:') + '</strong></div>';
+  var seqTypes = [
+    { id: 'dol_interlock', da: 'DOL med interlock', en: 'DOL with interlock' },
+    { id: 'star_delta', da: 'Stjerne-Trekant (tidsbaseret)', en: 'Star-Delta (timed)' },
+    { id: 'cascade', da: 'Kaskadestart (sekventiel)', en: 'Cascade start (sequential)' },
+    { id: 'pump_valve', da: 'Pumpe med ventilinterlock', en: 'Pump with valve interlock' },
+    { id: 'conveyor_ramp', da: 'Transport\u00F8r med hastighedsrampe', en: 'Conveyor with speed ramp' }
+  ];
+  html += '<div class="select-grid">';
+  seqTypes.forEach(function(s) {
+    html += '<button class="sel-btn ' + (st.motorSeq.type === s.id ? 'selected' : '') + '" onclick="plcSetMotorSeq(\'type\',\'' + s.id + '\')">' + (da ? s.da : s.en) + '</button>';
+  });
+  html += '</div>';
+
+  // Motor count
+  html += '<div style="margin-top:10px"><strong>' + (da ? 'Antal motorer i sekvens:' : 'Number of motors in sequence:') + '</strong></div>';
+  var motorCounts = [1, 2, 3, 4, 5, 6, 8];
+  html += '<div class="select-grid">';
+  motorCounts.forEach(function(n) {
+    html += '<button class="sel-btn ' + (st.motorSeq.count === n ? 'selected' : '') + '" onclick="plcSetMotorSeq(\'count\',' + n + ')">' + n + '</button>';
+  });
+  html += '</div>';
+
+  // Generated sequence info
+  html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + (da ? 'Sekvensparametre' : 'Sequence Parameters') + '</div>';
+  var seqInfo = { dol_interlock: { da: 'Direkte start med motorinterlock, 2s forsinkelse', en: 'Direct-on-line with motor interlock, 2s delay' }, star_delta: { da: 'Stjerne-trekant omkobling efter 6s, 3s forsinkelse mellem motorer', en: 'Star-delta changeover after 6s, 3s delay between motors' }, cascade: { da: 'Sekventiel start, 3s forsinkelse pr. motor', en: 'Sequential start, 3s delay per motor' }, pump_valve: { da: 'Ventil\u00E5bning (5s) f\u00F8r pumpestart', en: 'Valve opening (5s) before pump start' }, conveyor_ramp: { da: 'Hastighedsrampe 0-100% over 5s', en: 'Speed ramp 0-100% over 5s' } };
+  html += '<div class="result-row"><span class="label">' + (da ? 'Beskrivelse' : 'Description') + '</span><span class="value">' + (da ? seqInfo[st.motorSeq.type].da : seqInfo[st.motorSeq.type].en) + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Tilstandsmaskine' : 'State machine') + '</span><span class="value">Idle \u2192 Starting \u2192 Running \u2192 Stopping \u2192 Fault</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Motorer' : 'Motors') + '</span><span class="value">' + st.motorSeq.count + '</span></div>';
+  html += '</div>';
+
+  // Generated code
+  var motorCode = plcGenerateMotorSequence();
+  html += '<div style="margin-top:12px"><strong>' + (da ? 'Genereret program (' + st.plcLang + '):' : 'Generated program (' + st.plcLang + '):') + '</strong></div>';
+  html += '<pre style="background:#1a1f2e;color:#e2e8f0;padding:14px;border-radius:8px;font-size:.72rem;overflow-x:auto;max-height:400px;border:1px solid #2d3748">' + motorCode.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+  html += '</div>';
+
+  // ============================================================
+  // SECTION 8: HVAC CONTROL TEMPLATES
+  // ============================================================
+  html += '<div class="card fade-in"><div class="card-title">\u2744\uFE0F ' + (da ? 'HVAC-styrings-skabeloner' : 'HVAC Control Templates') + '</div>';
+  html += '<div class="info-row">' + (da ? 'V\u00E6lg HVAC-systemtype for komplet PID-regulering, sekvens og frostbeskyttelse' : 'Select HVAC system type for complete PID control, sequence of operations and frost protection') + '</div>';
+
+  var hvacTypes = [
+    { id: 'ahu', da: 'AHU (Luftbehandlingsanl\u00E6g)', en: 'AHU (Air Handling Unit)' },
+    { id: 'fcu', da: 'FCU (Fan Coil)', en: 'FCU (Fan Coil Unit)' },
+    { id: 'vav', da: 'VAV (Variabel luftm\u00E6ngde)', en: 'VAV (Variable Air Volume)' },
+    { id: 'heatpump', da: 'Varmepumpe', en: 'Heat Pump' },
+    { id: 'chiller', da: 'K\u00F8lemaskine', en: 'Chiller' }
+  ];
+  html += '<div class="select-grid">';
+  hvacTypes.forEach(function(h) {
+    html += '<button class="sel-btn ' + (st.hvac.system === h.id ? 'selected' : '') + '" onclick="plcSetHvac(\'system\',\'' + h.id + '\')">' + (da ? h.da : h.en) + '</button>';
+  });
+  html += '</div>';
+
+  // HVAC features summary
+  var hvacFeatureMap = { ahu: ['PID temp.', (da ? 'Spj\u00E6ld\u2192Bl\u00E6ser\u2192Varme\u2192K\u00F8l' : 'Damper\u2192Fan\u2192Heat\u2192Cool'), (da ? 'Frostbeskyttelse' : 'Frost protection'), (da ? 'Frik\u00F8ling' : 'Free cooling'), 'CO2 DCV'], fcu: ['PID temp.', (da ? '3-trins bl\u00E6ser' : '3-stage fan'), (da ? 'Varme/k\u00F8l ventil' : 'Heat/cool valve'), (da ? 'Tidsplan' : 'Schedule')], vav: ['PID temp.', (da ? 'VAV-spj\u00E6ld' : 'VAV damper'), 'Reheat', 'CO2 DCV', (da ? 'Luftm\u00E6ngde SP' : 'Airflow SP')], heatpump: ['PID temp.', (da ? 'Kompressor' : 'Compressor'), (da ? 'Vendingsventil' : 'Reversing valve'), (da ? 'Afrimning' : 'Defrost'), (da ? 'Cirkulations-pumpe' : 'Circ. pump')], chiller: ['PID temp.', (da ? '2-trins kompressor' : '2-stage compressor'), (da ? 'Kondensatorbl\u00E6ser' : 'Condenser fan'), (da ? 'K\u00F8levandspumpe' : 'ChW pump')] };
+  html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + (da ? 'Inkluderede funktioner' : 'Included Features') + '</div>';
+  (hvacFeatureMap[st.hvac.system] || []).forEach(function(feat) {
+    html += '<div class="result-row"><span class="label">\u2705 ' + feat + '</span></div>';
+  });
+  html += '<div class="result-row"><span class="label">' + (da ? 'S\u00E6tpunkt' : 'Setpoint') + '</span><span class="value">21.0\u00B0C (' + (da ? 'optaget' : 'occupied') + ') / 16.0\u00B0C (' + (da ? 'ubesat' : 'unoccupied') + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'D\u00F8db\u00E5nd' : 'Deadband') + '</span><span class="value">\u00B10.5\u00B0C</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Frostgr\u00E6nse' : 'Frost limit') + '</span><span class="value">5.0\u00B0C</span></div>';
+  html += '</div>';
+
+  // BACnet point mapping for HVAC
+  if (st.protocol === 'bacnet') {
+    html += '<div style="margin-top:12px"><strong>BACnet ' + (da ? 'punktkortl\u00E6gning:' : 'point mapping:') + '</strong></div>';
+    html += '<div style="overflow-x:auto"><table class="data-table"><thead><tr><th>Object</th><th>Instance</th><th>Name</th><th>' + (da ? 'Enhed' : 'Units') + '</th></tr></thead><tbody>';
+    var hvacBacnet = [];
+    if (st.hvac.system === 'ahu') {
+      hvacBacnet = [{ obj: 'AI', inst: 100, name: 'Supply Air Temp', unit: '\u00B0C' }, { obj: 'AI', inst: 101, name: 'Return Air Temp', unit: '\u00B0C' }, { obj: 'AI', inst: 102, name: 'Outdoor Temp', unit: '\u00B0C' }, { obj: 'AO', inst: 200, name: 'Damper Position', unit: '%' }, { obj: 'AO', inst: 201, name: 'Fan Speed', unit: '%' }, { obj: 'AO', inst: 202, name: 'Heat Valve', unit: '%' }, { obj: 'AO', inst: 203, name: 'Cool Valve', unit: '%' }, { obj: 'BI', inst: 300, name: 'Frost Alarm', unit: 'active/inactive' }, { obj: 'BI', inst: 301, name: 'Free Cooling', unit: 'active/inactive' }];
+    } else if (st.hvac.system === 'fcu') {
+      hvacBacnet = [{ obj: 'AI', inst: 100, name: 'Room Temp', unit: '\u00B0C' }, { obj: 'AO', inst: 200, name: 'Fan Speed', unit: '%' }, { obj: 'AO', inst: 201, name: 'Heat Valve', unit: '%' }, { obj: 'AO', inst: 202, name: 'Cool Valve', unit: '%' }, { obj: 'MV', inst: 400, name: 'Fan Stage', unit: '0-3' }];
+    } else if (st.hvac.system === 'vav') {
+      hvacBacnet = [{ obj: 'AI', inst: 100, name: 'Room Temp', unit: '\u00B0C' }, { obj: 'AI', inst: 101, name: 'CO2 Level', unit: 'ppm' }, { obj: 'AO', inst: 200, name: 'Damper Position', unit: '%' }, { obj: 'AO', inst: 201, name: 'Reheat Valve', unit: '%' }, { obj: 'AO', inst: 202, name: 'Airflow Setpoint', unit: 'l/s' }];
+    } else if (st.hvac.system === 'heatpump') {
+      hvacBacnet = [{ obj: 'AI', inst: 100, name: 'Water Temp', unit: '\u00B0C' }, { obj: 'AI', inst: 101, name: 'Outdoor Temp', unit: '\u00B0C' }, { obj: 'BO', inst: 500, name: 'Compressor', unit: 'on/off' }, { obj: 'BO', inst: 501, name: 'Reversing Valve', unit: 'heat/cool' }, { obj: 'AO', inst: 200, name: 'Pump Speed', unit: '%' }, { obj: 'BI', inst: 300, name: 'Defrost Active', unit: 'active/inactive' }];
+    } else {
+      hvacBacnet = [{ obj: 'AI', inst: 100, name: 'ChW Supply Temp', unit: '\u00B0C' }, { obj: 'AI', inst: 101, name: 'ChW Return Temp', unit: '\u00B0C' }, { obj: 'BO', inst: 500, name: 'Compressor 1', unit: 'on/off' }, { obj: 'BO', inst: 501, name: 'Compressor 2', unit: 'on/off' }, { obj: 'AO', inst: 200, name: 'Condenser Fan', unit: '%' }, { obj: 'AO', inst: 201, name: 'ChW Pump Speed', unit: '%' }];
+    }
+    hvacBacnet.forEach(function(pt) {
+      html += '<tr><td>' + pt.obj + '</td><td>' + pt.inst + '</td><td>' + pt.name + '</td><td>' + pt.unit + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
+  // HVAC code
+  var hvacCode = plcGenerateHVACCode();
+  html += '<div style="margin-top:12px"><strong>' + (da ? 'HVAC-program (' + st.plcLang + '):' : 'HVAC Program (' + st.plcLang + '):') + '</strong></div>';
+  html += '<pre style="background:#1a1f2e;color:#e2e8f0;padding:14px;border-radius:8px;font-size:.72rem;overflow-x:auto;max-height:400px;border:1px solid #63b3ed">' + hvacCode.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+  html += '</div>';
+
+  // ============================================================
+  // SECTION 9: ENERGY MANAGEMENT / LOAD SHEDDING
+  // ============================================================
+  html += '<div class="card fade-in"><div class="card-title">\u26A1 ' + (da ? 'Energistyring / Lastafkastning' : 'Energy Management / Load Shedding') + '</div>';
+  html += '<div class="info-row">' + (da ? 'Demand response med automatisk lastafkastning, prioritetsgrupper og TOU-skema' : 'Demand response with automatic load shedding, priority groups and TOU schedule') + '</div>';
+
+  // Demand limit
+  html += '<div style="margin-top:10px"><strong>' + (da ? 'Effektgr\u00E6nse (kW):' : 'Demand limit (kW):') + '</strong></div>';
+  var demandLimits = [50, 75, 100, 125, 150, 200, 250, 300, 400, 500];
+  html += '<div class="select-grid">';
+  demandLimits.forEach(function(d) {
+    html += '<button class="sel-btn ' + (st.energy.demandLimit === d ? 'selected' : '') + '" onclick="plcSetEnergy(\'demandLimit\',' + d + ')">' + d + ' kW</button>';
+  });
+  html += '</div>';
+
+  // Priority groups auto-assigned
+  var enPriorities = { P1: [], P2: [], P3: [] };
+  loadList.forEach(function(c, i) {
+    var nm = (c.name || 'Load ' + (i + 1));
+    var n = nm.toLowerCase();
+    if (n.match(/nod|critical|sikkerhed|safety|server|ups|noedlys/i) || c.kW > st.energy.demandLimit * 0.3) {
+      enPriorities.P1.push({ name: nm, kW: c.kW });
+    } else if (n.match(/motor|pump|kompressor|hvac|ventil/i) || c.kW > st.energy.demandLimit * 0.15) {
+      enPriorities.P2.push({ name: nm, kW: c.kW });
+    } else {
+      enPriorities.P3.push({ name: nm, kW: c.kW });
+    }
+  });
+
+  html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + (da ? 'Prioritetsgrupper (auto-tildelt)' : 'Priority Groups (auto-assigned)') + '</div>';
+  html += '<div class="result-row"><span class="label" style="color:#f56565">P1 ' + (da ? 'Kritisk' : 'Critical') + '</span><span class="value">' + enPriorities.P1.length + ' ' + (da ? 'forbrugere' : 'loads') + ' (' + enPriorities.P1.reduce(function(s, l) { return s + l.kW; }, 0).toFixed(1) + ' kW)</span></div>';
+  html += '<div class="result-row"><span class="label" style="color:#f6ad55">P2 ' + (da ? 'Vigtig' : 'Important') + '</span><span class="value">' + enPriorities.P2.length + ' ' + (da ? 'forbrugere' : 'loads') + ' (' + enPriorities.P2.reduce(function(s, l) { return s + l.kW; }, 0).toFixed(1) + ' kW)</span></div>';
+  html += '<div class="result-row"><span class="label" style="color:#48bb78">P3 ' + (da ? 'Udskydelig' : 'Deferrable') + '</span><span class="value">' + enPriorities.P3.length + ' ' + (da ? 'forbrugere' : 'loads') + ' (' + enPriorities.P3.reduce(function(s, l) { return s + l.kW; }, 0).toFixed(1) + ' kW)</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Advarsel ved' : 'Warning at') + '</span><span class="value">' + (st.energy.demandLimit * 0.9).toFixed(0) + ' kW (90%)</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Afkast ved' : 'Shed at') + '</span><span class="value">' + st.energy.demandLimit + ' kW (100%)</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Genindkobling ved' : 'Restore at') + '</span><span class="value">' + (st.energy.demandLimit * 0.85).toFixed(0) + ' kW (85%)</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Sekvens' : 'Sequence') + '</span><span class="value">' + (da ? 'Afkast P3 \u2192 P2 | Genindkobling LIFO' : 'Shed P3 \u2192 P2 | Restore LIFO') + '</span></div>';
+  html += '</div>';
+
+  // Load shedding code
+  if (loadList.length > 0) {
+    var lsCode = plcGenerateLoadShedding();
+    html += '<div style="margin-top:12px"><strong>' + (da ? 'Lastafkastningsprogram (' + st.plcLang + '):' : 'Load Shedding Program (' + st.plcLang + '):') + '</strong></div>';
+    html += '<pre style="background:#1a1f2e;color:#e2e8f0;padding:14px;border-radius:8px;font-size:.72rem;overflow-x:auto;max-height:350px;border:1px solid #f6ad55">' + lsCode.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+  }
+  html += '</div>';
+
+  // ============================================================
+  // SECTION 10: NETWORK TOPOLOGY
+  // ============================================================
+  html += '<div class="card fade-in"><div class="card-title">\uD83C\uDF10 ' + (da ? 'Netv\u00E6rkstopologi' : 'Network Topology') + '</div>';
+  html += '<div class="info-row">' + (da ? 'Anbefalet netv\u00E6rkskonfiguration baseret p\u00E5 platform og I/O-antal' : 'Recommended network configuration based on platform and I/O count') + '</div>';
+
+  var netConfig = plcGenerateNetworkConfig();
+
+  // Topology recommendation
+  html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + (da ? 'Netv\u00E6rksoversigt' : 'Network Summary') + '</div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Topologi' : 'Topology') + '</span><span class="value">' + netConfig.summary.topology + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Protokol' : 'Protocol') + '</span><span class="value">' + netConfig.summary.protocol + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Subnet' : 'Subnet') + '</span><span class="value">' + netConfig.summary.network + '</span></div>';
+  html += '<div class="result-row"><span class="label">Gateway</span><span class="value">' + netConfig.summary.gateway + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Enheder' : 'Devices') + '</span><span class="value">' + netConfig.summary.totalDevices + '</span></div>';
+  html += '</div>';
+
+  // Switch info
+  html += '<div style="margin-top:12px"><strong>' + (da ? 'Netv\u00E6rksswitch:' : 'Network switch:') + '</strong></div>';
+  html += '<div style="overflow-x:auto"><table class="data-table"><thead><tr><th>' + (da ? 'Navn' : 'Name') + '</th><th>Type</th><th>' + (da ? 'Porte' : 'Ports') + '</th><th>' + (da ? 'Topologi' : 'Topology') + '</th></tr></thead><tbody>';
+  netConfig.switches.forEach(function(sw) {
+    html += '<tr><td>' + sw.name + '</td><td>' + sw.type + '</td><td>' + sw.ports + '</td><td>' + sw.topology + '</td></tr>';
+  });
+  html += '</tbody></table></div>';
+
+  // Device IP table
+  html += '<div style="margin-top:12px"><strong>' + (da ? 'IP-adresser:' : 'IP addresses:') + '</strong></div>';
+  html += '<div style="overflow-x:auto"><table class="data-table"><thead><tr><th>' + (da ? 'Enhed' : 'Device') + '</th><th>IP</th><th>' + (da ? 'Rolle' : 'Role') + '</th><th>' + (da ? 'Switch-port' : 'Switch port') + '</th></tr></thead><tbody>';
+  netConfig.devices.forEach(function(dev) {
+    html += '<tr><td>' + dev.name + '</td><td style="font-family:monospace">' + dev.ip + '</td><td>' + dev.role + '</td><td>Port ' + dev.port + '</td></tr>';
+  });
+  html += '</tbody></table></div>';
+  html += '</div>';
+
+  // ============================================================
+  // SECTION 11: HARDWARE BOM
+  // ============================================================
+  if (loadList.length > 0) {
+    var bom = plcGenerateHardwareBOM();
+    html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCE6 ' + (da ? 'Hardware-stykliste (BOM)' : 'Hardware Bill of Materials (BOM)') + '</div>';
+    html += '<div class="info-row">' + (da ? 'Auto-beregnet baseret p\u00E5 I/O-antal: DI:' + bom.io.DI + ' DO:' + bom.io.DO + ' AI:' + bom.io.AI + ' AO:' + bom.io.AO + ' (' + (bom.io.DI + bom.io.DO + bom.io.AI + bom.io.AO) + ' total)' : 'Auto-calculated based on I/O count: DI:' + bom.io.DI + ' DO:' + bom.io.DO + ' AI:' + bom.io.AI + ' AO:' + bom.io.AO + ' (' + (bom.io.DI + bom.io.DO + bom.io.AI + bom.io.AO) + ' total)') + '</div>';
+
+    // BOM Table
+    html += '<div style="overflow-x:auto;margin-top:12px"><table class="data-table"><thead><tr><th>' + (da ? 'Varenr.' : 'Part No.') + '</th><th>' + (da ? 'Beskrivelse' : 'Description') + '</th><th>' + (da ? 'Antal' : 'Qty') + '</th><th>' + (da ? 'Pris (EUR)' : 'Price (EUR)') + '</th></tr></thead><tbody>';
+    bom.items.forEach(function(item) {
+      html += '<tr><td style="font-family:monospace;font-size:.75rem">' + item.partNo + '</td><td>' + item.desc + '</td><td>' + item.qty + '</td><td style="text-align:right">\u20AC ' + item.price.toLocaleString() + '</td></tr>';
+    });
+    html += '<tr style="border-top:2px solid #4a5568;font-weight:bold"><td></td><td>TOTAL</td><td>' + bom.totalModules + ' ' + (da ? 'moduler' : 'modules') + '</td><td style="text-align:right">\u20AC ' + bom.totalPrice.toLocaleString() + '</td></tr>';
+    html += '</tbody></table></div>';
+
+    // Physical summary
+    html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + (da ? 'Fysisk opsummering' : 'Physical Summary') + '</div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'DIN-skinnebredde' : 'DIN-rail width') + '</span><span class="value">' + bom.dinWidth + ' mm</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Skabst\u00F8rrelse' : 'Cabinet size') + '</span><span class="value">' + bom.cabinetSize + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Str\u00F8mforbrug (24VDC)' : 'Current draw (24VDC)') + '</span><span class="value">' + bom.totalMA + ' mA</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Estimeret pris' : 'Estimated price') + '</span><span class="value">\u20AC ' + (bom.totalPrice * 0.9).toFixed(0) + ' - \u20AC ' + (bom.totalPrice * 1.2).toFixed(0) + '</span></div>';
+    html += '</div>';
+
+    // Download BOM CSV
+    html += '<div style="margin-top:12px"><button class="sel-btn" onclick="plcDownloadBOM()">\u2B07\uFE0F ' + (da ? 'Download BOM (.csv)' : 'Download BOM (.csv)') + '</button></div>';
+    html += '</div>';
   }
 
   return html;
