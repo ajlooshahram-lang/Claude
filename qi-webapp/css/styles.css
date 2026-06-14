@@ -426,6 +426,10 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .net3d-toolbar select:hover{border-color:#4a7abf}
 .net3d-toggle{display:flex;align-items:center;gap:5px;color:#8ab4e8;font-size:12px;cursor:pointer;user-select:none}
 .net3d-toggle input{accent-color:#00d4ff}
+.net3d-route-badge{display:inline-flex;align-items:center;padding:4px 10px;background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.3);border-radius:12px;color:#8ab4e8;font-size:11px;font-weight:600;white-space:nowrap;letter-spacing:0.02em}
+#n3dImportBtn{background:rgba(0,255,136,0.12);border:1px solid rgba(0,255,136,0.3);color:#00ff88}
+#n3dImportBtn:hover{background:rgba(0,255,136,0.25);color:#00ff88}
+#n3dClearImported{font-size:11px}
 
 .cesium-container{width:100%;min-height:600px;height:65vh;background:#050d1a;position:relative;border-radius:0 0 var(--radius) var(--radius);overflow:hidden}
 .cesium-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#8ab4e8;z-index:10}

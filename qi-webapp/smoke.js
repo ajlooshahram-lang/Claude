@@ -588,5 +588,10 @@ doc.querySelector('.nav-item[data-view="network3d"]').dispatchEvent(new window.E
 ok(doc.getElementById("n3dSlider") != null, "timeline slider renders in 3D network view");
 ok(doc.getElementById("n3dPlay") != null, "play button exists in 3D network timeline");
 
+// 40) GIS Import controls in 3D network view
+ok(doc.getElementById("n3dImportBtn") != null, "Import Routes button exists in 3D view");
+ok(doc.getElementById("n3dClearImported") != null, "Clear Imported button exists");
+ok(doc.querySelector(".net3d-route-badge") != null, "Route count badge shows in controls");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

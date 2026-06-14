@@ -738,13 +738,17 @@
   // ---------- 3D Network Visualization ----------
   RENDER.network3d = function () {
     const routes = S.routeSections();
-    const totalKm = routes.reduce((a, r) => a + (r.endKm || 0), 0);
-    const totalStations = routes.reduce((a, r) => a + (r.stations ? r.stations.length : 0), 0);
-    const cableTypes = [...new Set(routes.map(r => r.cableType).filter(Boolean))];
+    const importedRoutes = (function () { try { var raw = (typeof localStorage !== "undefined") && localStorage.getItem("qi_imported_routes"); return raw ? JSON.parse(raw) : []; } catch (e) { return []; } })();
+    const allRoutes = routes.concat(importedRoutes);
+    const totalKm = allRoutes.reduce((a, r) => a + (r.endKm || 0), 0);
+    const totalStations = allRoutes.reduce((a, r) => a + (r.stations ? r.stations.length : 0), 0);
+    const cableTypes = [...new Set(allRoutes.map(r => r.cableType).filter(Boolean))];
     const allStations = [];
-    routes.forEach(r => { if (r.stations) r.stations.forEach(s => allStations.push(s)); });
+    allRoutes.forEach(r => { if (r.stations) r.stations.forEach(s => allStations.push(s)); });
 
     const cableColorMap = { "G.652.D": "#00d4ff", "G.657.A2": "#00ff88", "G.654.E": "#ff6600", "G.655.C": "#ff00ff", "G.657.B3": "#ffdd00" };
+    const demoCount = routes.length;
+    const importedCount = importedRoutes.length;
 
     return `<div class="net3d-wrap">
       <div class="net3d-toolbar">
@@ -762,6 +766,10 @@
           </select>
           <label class="net3d-toggle"><input type="checkbox" id="n3dLabels" checked> Labels</label>
           <label class="net3d-toggle"><input type="checkbox" id="n3dAnim" checked> Animations</label>
+          <button class="btn btn-sm" id="n3dImportBtn" title="Import routes from KML or GeoJSON">&#128229; Import Routes</button>
+          <input type="file" id="n3dFileInput" accept=".kml,.geojson,.json" style="display:none">
+          ${importedCount > 0 ? '<button class="btn btn-sm btn-danger" id="n3dClearImported" title="Remove all imported routes">&#10005; Clear Imported</button>' : '<button class="btn btn-sm btn-danger" id="n3dClearImported" title="Remove all imported routes" style="display:none">&#10005; Clear Imported</button>'}
+          <span class="net3d-route-badge" id="n3dRouteBadge">${demoCount} demo${importedCount > 0 ? " + " + importedCount + " imported" : ""}</span>
         </div>
         <div class="net3d-toolbar-right">
           <select id="n3dFlyTo" title="Fly to station">
@@ -805,7 +813,7 @@
       </div>
 
       <div class="net3d-stats">
-        <div class="net3d-stat"><span class="net3d-stat-val">${routes.length}</span><span class="net3d-stat-lbl">Routes</span></div>
+        <div class="net3d-stat"><span class="net3d-stat-val">${allRoutes.length}</span><span class="net3d-stat-lbl">Routes</span></div>
         <div class="net3d-stat"><span class="net3d-stat-val">${totalKm.toLocaleString()}</span><span class="net3d-stat-lbl">Total km</span></div>
         <div class="net3d-stat"><span class="net3d-stat-val">${totalStations}</span><span class="net3d-stat-lbl">Stations</span></div>
         <div class="net3d-stat"><span class="net3d-stat-val">${cableTypes.length}</span><span class="net3d-stat-lbl">Cable Types</span></div>
@@ -829,7 +837,7 @@
           '<p>Please open this application in a modern browser (Chrome, Firefox, Edge) with hardware acceleration enabled.</p>' +
           '<div class="cesium-fallback-routes">' +
           '<h4>Fiber Routes Summary</h4>' +
-          S.routeSections().map(function(r) {
+          S.routeSections().concat((function () { try { var raw = (typeof localStorage !== "undefined") && localStorage.getItem("qi_imported_routes"); return raw ? JSON.parse(raw) : []; } catch (e) { return []; } })()).map(function(r) {
             return '<div class="cesium-fallback-route"><strong>' + esc(r.name) + '</strong> - ' + esc(r.cableType) + ' (' + r.coreCount + ' cores, ' + r.endKm + ' km) [' + r.status + ']</div>';
           }).join("") +
           '</div></div>';
@@ -879,6 +887,8 @@
     }
 
     var routes = S.routeSections();
+    var importedRoutes = (function () { try { var raw = (typeof localStorage !== "undefined") && localStorage.getItem("qi_imported_routes"); return raw ? JSON.parse(raw) : []; } catch (e) { return []; } })();
+    routes = routes.concat(importedRoutes);
     var cableColorMap = { "G.652.D": Cesium.Color.fromCssColorString("#00d4ff"), "G.657.A2": Cesium.Color.fromCssColorString("#00ff88"), "G.654.E": Cesium.Color.fromCssColorString("#ff6600"), "G.655.C": Cesium.Color.fromCssColorString("#ff00ff"), "G.657.B3": Cesium.Color.fromCssColorString("#ffdd00") };
     var stationColorMap = { termination: "#ff4444", junction: "#ffbb33", switch: "#00ffcc" };
     var routeEntities = [];
@@ -1281,6 +1291,218 @@
         }
         if (sliderEl) sliderEl.value = 66;
         applyTimeline(66);
+      });
+    }
+
+    // --- GIS Import ---
+    var importBtn = document.getElementById("n3dImportBtn");
+    var fileInput = document.getElementById("n3dFileInput");
+    var clearBtn = document.getElementById("n3dClearImported");
+
+    function parseGeoJSON(text, filename) {
+      var data = JSON.parse(text);
+      var features = (data.type === "FeatureCollection") ? data.features : (data.type === "Feature" ? [data] : []);
+      var parsedRoutes = [];
+      var parsedStations = [];
+      features.forEach(function (f) {
+        if (!f.geometry) return;
+        var props = f.properties || {};
+        var geomType = f.geometry.type;
+        if (geomType === "LineString" || geomType === "MultiLineString") {
+          var coords = geomType === "LineString" ? f.geometry.coordinates : f.geometry.coordinates[0];
+          if (!coords || coords.length < 2) return;
+          var startCoords = { lng: coords[0][0], lat: coords[0][1], alt: coords[0][2] || 0 };
+          var endCoords = { lng: coords[coords.length - 1][0], lat: coords[coords.length - 1][1], alt: coords[coords.length - 1][2] || 0 };
+          var waypoints = [];
+          for (var i = 1; i < coords.length - 1; i++) {
+            waypoints.push({ lng: coords[i][0], lat: coords[i][1], alt: coords[i][2] || 0 });
+          }
+          // Estimate km from coordinates (Haversine approximation)
+          var totalKmEst = 0;
+          for (var j = 0; j < coords.length - 1; j++) {
+            var dLat = (coords[j + 1][1] - coords[j][1]) * Math.PI / 180;
+            var dLon = (coords[j + 1][0] - coords[j][0]) * Math.PI / 180;
+            var a2 = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(coords[j][1] * Math.PI / 180) * Math.cos(coords[j + 1][1] * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            totalKmEst += 6371 * 2 * Math.atan2(Math.sqrt(a2), Math.sqrt(1 - a2));
+          }
+          parsedRoutes.push({
+            _id: "imp_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+            name: props.name || ("Route " + (parsedRoutes.length + 1)),
+            cableType: props.cableType || "G.652.D",
+            coreCount: props.coreCount || 96,
+            startCoords: startCoords,
+            endCoords: endCoords,
+            waypoints: waypoints,
+            startKm: 0,
+            endKm: Math.round(totalKmEst),
+            status: "planned",
+            startDate: props.startDate || null,
+            installedDate: props.installedDate || null,
+            stations: [],
+            _imported: true
+          });
+        } else if (geomType === "Point") {
+          var pc = f.geometry.coordinates;
+          parsedStations.push({
+            name: props.name || ("Station " + (parsedStations.length + 1)),
+            type: (props.type === "junction" || props.type === "switch") ? props.type : "termination",
+            coords: { lng: pc[0], lat: pc[1], alt: pc[2] || 0 }
+          });
+        }
+      });
+      // Attach stations to nearest route
+      if (parsedRoutes.length > 0 && parsedStations.length > 0) {
+        parsedStations.forEach(function (st) {
+          var best = 0;
+          var bestDist = Infinity;
+          parsedRoutes.forEach(function (r, ri) {
+            var d = Math.abs(r.startCoords.lat - st.coords.lat) + Math.abs(r.startCoords.lng - st.coords.lng);
+            if (d < bestDist) { bestDist = d; best = ri; }
+          });
+          parsedRoutes[best].stations.push(st);
+        });
+      }
+      return { routes: parsedRoutes, stations: parsedStations };
+    }
+
+    function parseKML(text, filename) {
+      var parser = new DOMParser();
+      var xml = parser.parseFromString(text, "text/xml");
+      var placemarks = xml.querySelectorAll("Placemark");
+      var parsedRoutes = [];
+      var parsedStations = [];
+      for (var p = 0; p < placemarks.length; p++) {
+        var pm = placemarks[p];
+        var nameEl = pm.querySelector("name");
+        var pmName = nameEl ? nameEl.textContent.trim() : "";
+        var lineString = pm.querySelector("LineString");
+        var point = pm.querySelector("Point");
+        // Get cableType from ExtendedData or description
+        var cableType = "G.652.D";
+        var extData = pm.querySelector("ExtendedData");
+        if (extData) {
+          var dataEls = extData.querySelectorAll("Data");
+          for (var d = 0; d < dataEls.length; d++) {
+            if (dataEls[d].getAttribute("name") === "cableType") {
+              var valEl = dataEls[d].querySelector("value");
+              if (valEl) cableType = valEl.textContent.trim();
+            }
+          }
+        }
+        if (!cableType || cableType === "G.652.D") {
+          var desc = pm.querySelector("description");
+          if (desc) {
+            var match = desc.textContent.match(/cableType[:\s]*([A-Z0-9.]+)/i);
+            if (match) cableType = match[1];
+          }
+        }
+        if (lineString) {
+          var coordsEl = lineString.querySelector("coordinates");
+          if (!coordsEl) continue;
+          var coordText = coordsEl.textContent.trim();
+          var coordPairs = coordText.split(/\s+/).filter(function (s) { return s.length > 0; });
+          if (coordPairs.length < 2) continue;
+          var coords = coordPairs.map(function (cp) { var parts = cp.split(","); return { lng: parseFloat(parts[0]), lat: parseFloat(parts[1]), alt: parseFloat(parts[2]) || 0 }; });
+          var waypoints = coords.slice(1, -1);
+          var totalKmEst = 0;
+          for (var k = 0; k < coords.length - 1; k++) {
+            var dLat = (coords[k + 1].lat - coords[k].lat) * Math.PI / 180;
+            var dLon = (coords[k + 1].lng - coords[k].lng) * Math.PI / 180;
+            var a2 = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(coords[k].lat * Math.PI / 180) * Math.cos(coords[k + 1].lat * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            totalKmEst += 6371 * 2 * Math.atan2(Math.sqrt(a2), Math.sqrt(1 - a2));
+          }
+          parsedRoutes.push({
+            _id: "imp_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+            name: pmName || ("Route " + (parsedRoutes.length + 1)),
+            cableType: cableType,
+            coreCount: 96,
+            startCoords: coords[0],
+            endCoords: coords[coords.length - 1],
+            waypoints: waypoints,
+            startKm: 0,
+            endKm: Math.round(totalKmEst),
+            status: "planned",
+            startDate: null,
+            installedDate: null,
+            stations: [],
+            _imported: true
+          });
+        } else if (point) {
+          var ptCoordsEl = point.querySelector("coordinates");
+          if (!ptCoordsEl) continue;
+          var ptParts = ptCoordsEl.textContent.trim().split(",");
+          parsedStations.push({
+            name: pmName || ("Station " + (parsedStations.length + 1)),
+            type: "termination",
+            coords: { lng: parseFloat(ptParts[0]), lat: parseFloat(ptParts[1]), alt: parseFloat(ptParts[2]) || 0 }
+          });
+        }
+      }
+      // Attach stations to nearest route
+      if (parsedRoutes.length > 0 && parsedStations.length > 0) {
+        parsedStations.forEach(function (st) {
+          var best = 0;
+          var bestDist = Infinity;
+          parsedRoutes.forEach(function (r, ri) {
+            var d = Math.abs(r.startCoords.lat - st.coords.lat) + Math.abs(r.startCoords.lng - st.coords.lng);
+            if (d < bestDist) { bestDist = d; best = ri; }
+          });
+          parsedRoutes[best].stations.push(st);
+        });
+      }
+      return { routes: parsedRoutes, stations: parsedStations };
+    }
+
+    function handleImportFile(file) {
+      if (!file) return;
+      var fr = new FileReader();
+      fr.onload = function () {
+        try {
+          var text = fr.result;
+          var result;
+          if (file.name.toLowerCase().endsWith(".kml")) {
+            result = parseKML(text, file.name);
+          } else {
+            result = parseGeoJSON(text, file.name);
+          }
+          if (result.routes.length === 0 && result.stations.length === 0) {
+            toast("No routes or stations found in " + file.name);
+            return;
+          }
+          // Merge with existing imported routes
+          var existing = [];
+          try { var raw = (typeof localStorage !== "undefined") && localStorage.getItem("qi_imported_routes"); if (raw) existing = JSON.parse(raw); } catch (e) { existing = []; }
+          var merged = existing.concat(result.routes);
+          if (typeof localStorage !== "undefined") localStorage.setItem("qi_imported_routes", JSON.stringify(merged));
+          var totalStationsImported = result.routes.reduce(function (a, r) { return a + (r.stations ? r.stations.length : 0); }, 0) + result.stations.length;
+          toast("Imported " + result.routes.length + " routes and " + totalStationsImported + " stations from " + file.name);
+          // Refresh view
+          go("network3d");
+        } catch (e) {
+          toast("Error parsing file: " + e.message);
+        }
+      };
+      fr.readAsText(file);
+    }
+
+    if (importBtn) {
+      importBtn.addEventListener("click", function () {
+        if (fileInput) fileInput.click();
+      });
+    }
+    if (fileInput) {
+      fileInput.addEventListener("change", function (e) {
+        if (e.target.files && e.target.files[0]) {
+          handleImportFile(e.target.files[0]);
+          e.target.value = "";
+        }
+      });
+    }
+    if (clearBtn) {
+      clearBtn.addEventListener("click", function () {
+        if (typeof localStorage !== "undefined") localStorage.removeItem("qi_imported_routes");
+        toast("Imported routes cleared.");
+        go("network3d");
       });
     }
 
