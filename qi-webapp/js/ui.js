@@ -236,6 +236,7 @@
     { id: "log", label: "Action Log", icon: "✎" },
     { g: "People & Cost" },
     { id: "stakeholders", label: "Stakeholders", icon: "♟" },
+    { id: "raci", label: "RACI Matrix", icon: "⊞" },
     { id: "budget", label: "Budget", icon: "$" },
     { g: "Intelligence" },
     { id: "ai", label: "AI Assistant", icon: "✦" },
@@ -792,6 +793,154 @@
     content.querySelectorAll("select[data-sk]").forEach(sel => sel.addEventListener("change", () => {
       const i = +sel.dataset.sk; S.get().stakeholders[i][sel.dataset.f] = sel.value; S.save(); go("stakeholders");
     }));
+  };
+
+  // ---------- RACI Matrix / Stakeholder Management ----------
+  const RACI_ROLES = (function () {
+    var B = window.QIBrain;
+    if (B && B._profiles) {
+      var fp = B._profiles.find(function (p) { return p.id === "fibre-telecom"; });
+      if (fp && fp.roles) return fp.roles;
+    }
+    return ["Programme Director", "Project Manager", "Design Manager", "Survey Lead", "Permitting & Wayleave Manager", "Civil Works Manager", "OSP Engineer", "Cable Installation Supervisor", "Splicing Supervisor", "Test & Commissioning Lead", "QA/QC Manager", "HSE Officer", "Procurement Manager", "Logistics Coordinator", "Regional Coordinator", "NOC Manager", "GIS/Documentation Specialist", "Warehouse Manager", "Contract Administrator", "Finance Controller"];
+  })();
+
+  const RACI_ACTIVITIES = [
+    { phase: "Survey & Design", activities: ["Route Survey", "System Design"] },
+    { phase: "Permitting", activities: ["Cable Landing Permits"] },
+    { phase: "Procurement", activities: ["Cable Manufacturing", "Cable Ship Charter"] },
+    { phase: "Installation", activities: ["Marine Installation", "Shore-End Works"] },
+    { phase: "Commissioning", activities: ["System Testing", "Acceptance/Handover"] },
+    { phase: "Operations", activities: ["Network Operations"] }
+  ];
+
+  const RACI_ALL_ACTIVITIES = RACI_ACTIVITIES.reduce(function (arr, g) { return arr.concat(g.activities); }, []);
+
+  const RACI_DEFAULTS = {
+    "Route Survey": { "Survey Lead": "R", "Design Manager": "A", "Programme Director": "I", "HSE Officer": "C", "GIS/Documentation Specialist": "C" },
+    "System Design": { "Design Manager": "R", "Programme Director": "A", "OSP Engineer": "C", "Survey Lead": "C", "Project Manager": "I" },
+    "Cable Landing Permits": { "Permitting & Wayleave Manager": "R", "Programme Director": "A", "Contract Administrator": "C", "Regional Coordinator": "C", "Project Manager": "I" },
+    "Cable Manufacturing": { "Procurement Manager": "R", "Project Manager": "A", "QA/QC Manager": "C", "Design Manager": "C", "Finance Controller": "I" },
+    "Cable Ship Charter": { "Procurement Manager": "R", "Logistics Coordinator": "A", "Contract Administrator": "C", "Finance Controller": "I", "Programme Director": "I" },
+    "Marine Installation": { "Cable Installation Supervisor": "R", "Project Manager": "A", "HSE Officer": "C", "QA/QC Manager": "C", "NOC Manager": "I" },
+    "Shore-End Works": { "Civil Works Manager": "R", "Cable Installation Supervisor": "A", "HSE Officer": "C", "Permitting & Wayleave Manager": "C", "Regional Coordinator": "I" },
+    "System Testing": { "Test & Commissioning Lead": "R", "QA/QC Manager": "A", "OSP Engineer": "C", "NOC Manager": "C", "Programme Director": "I" },
+    "Acceptance/Handover": { "Project Manager": "R", "Programme Director": "A", "Test & Commissioning Lead": "C", "Contract Administrator": "C", "Finance Controller": "I" },
+    "Network Operations": { "NOC Manager": "R", "Programme Director": "A", "Regional Coordinator": "C", "GIS/Documentation Specialist": "C", "Warehouse Manager": "I" }
+  };
+
+  const RACI_COLORS = { R: "#3b82f6", A: "#ef4444", C: "#eab308", I: "#22c55e" };
+
+  function raciLoad() {
+    var s = S.get(); s.registers = s.registers || {};
+    var data = s.registers._raci;
+    if (data && typeof data === "object" && !Array.isArray(data)) return data;
+    // initialize from defaults
+    var init = {};
+    RACI_ALL_ACTIVITIES.forEach(function (act) {
+      init[act] = {};
+      RACI_ROLES.forEach(function (role) {
+        init[act][role] = (RACI_DEFAULTS[act] && RACI_DEFAULTS[act][role]) || "";
+      });
+    });
+    return init;
+  }
+  function raciSave(data) {
+    var s = S.get(); s.registers = s.registers || {};
+    s.registers._raci = data; S.save();
+  }
+
+  RENDER.raci = function () {
+    var data = raciLoad();
+    var abbr = RACI_ROLES.map(function (r) { return r.split(" ").map(function (w) { return w[0]; }).join(""); });
+    var thCols = RACI_ROLES.map(function (r, i) {
+      return '<th class="raci-col" title="' + esc(r) + '">' + esc(abbr[i]) + '</th>';
+    }).join("");
+    var rows = "";
+    RACI_ACTIVITIES.forEach(function (group) {
+      rows += '<tr class="raci-phase"><td colspan="' + (RACI_ROLES.length + 1) + '"><strong>' + esc(group.phase) + '</strong></td></tr>';
+      group.activities.forEach(function (act) {
+        rows += '<tr><td class="raci-act">' + esc(act) + '</td>';
+        RACI_ROLES.forEach(function (role) {
+          var val = (data[act] && data[act][role]) || "";
+          var bg = val ? RACI_COLORS[val] || "#6b7280" : "#e5e7eb";
+          var fg = val ? "#fff" : "#999";
+          rows += '<td class="raci-cell" style="background:' + bg + ';color:' + fg + '">';
+          rows += '<select class="raci-sel" data-act="' + esc(act) + '" data-role="' + esc(role) + '" style="background:transparent;color:inherit;border:none;width:100%;text-align:center;font-weight:bold">';
+          rows += '<option value=""' + (val === "" ? " selected" : "") + '>-</option>';
+          rows += '<option value="R"' + (val === "R" ? " selected" : "") + '>R</option>';
+          rows += '<option value="A"' + (val === "A" ? " selected" : "") + '>A</option>';
+          rows += '<option value="C"' + (val === "C" ? " selected" : "") + '>C</option>';
+          rows += '<option value="I"' + (val === "I" ? " selected" : "") + '>I</option>';
+          rows += '</select></td>';
+        });
+        rows += '</tr>';
+      });
+    });
+
+    var legend = '<div style="margin:12px 0;display:flex;gap:16px;flex-wrap:wrap">' +
+      '<span style="padding:2px 10px;background:#3b82f6;color:#fff;border-radius:4px;font-weight:bold">R = Responsible</span>' +
+      '<span style="padding:2px 10px;background:#ef4444;color:#fff;border-radius:4px;font-weight:bold">A = Accountable</span>' +
+      '<span style="padding:2px 10px;background:#eab308;color:#fff;border-radius:4px;font-weight:bold">C = Consulted</span>' +
+      '<span style="padding:2px 10px;background:#22c55e;color:#fff;border-radius:4px;font-weight:bold">I = Informed</span>' +
+      '<span style="padding:2px 10px;background:#e5e7eb;color:#999;border-radius:4px">- = Not involved</span></div>';
+
+    var matrix = '<div class="card"><h3>RACI Matrix - Submarine Cable Programme</h3>' + legend +
+      '<div class="table-wrap"><table class="raci-table" id="raciTable"><thead><tr><th>Activity</th>' + thCols + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+
+    // Country Authorities section
+    var countryHtml = "";
+    var B = window.QIBrain;
+    if (B && B._profiles) {
+      var fp = B._profiles.find(function (p) { return p.id === "fibre-telecom"; });
+      if (fp && fp.COUNTRY_DATABASE) {
+        var phaseMap = {
+          "Route Survey": "feasibility", "System Design": "feasibility",
+          "Cable Landing Permits": "permitting", "Cable Manufacturing": "permitting",
+          "Cable Ship Charter": "construction", "Marine Installation": "construction",
+          "Shore-End Works": "construction", "System Testing": "operations",
+          "Acceptance/Handover": "operations", "Network Operations": "operations"
+        };
+        var countryRows = fp.COUNTRY_DATABASE.map(function (c) {
+          var auths = c.regulatoryAuthorities;
+          var authList = Object.keys(auths).map(function (k) {
+            var a = auths[k];
+            var phases = [];
+            Object.keys(phaseMap).forEach(function (act) {
+              if (c.keyContacts && c.keyContacts[phaseMap[act]]) {
+                var contacts = c.keyContacts[phaseMap[act]];
+                if (contacts.some(function (ct) { return ct.toLowerCase().indexOf(a.name.split("/")[0].trim().toLowerCase()) >= 0 || ct.toLowerCase().indexOf(a.name.split(" ")[0].toLowerCase()) >= 0; })) {
+                  var phase = phaseMap[act];
+                  if (phases.indexOf(phase) < 0) phases.push(phase);
+                }
+              }
+            });
+            return '<tr><td>' + esc(a.name) + '</td><td class="wrap" style="font-size:0.85em">' + esc(a.fullName) + '</td><td class="wrap" style="font-size:0.85em">' + esc(a.jurisdiction) + '</td><td>' + (phases.length ? phases.map(function (p) { return '<span class="badge" style="margin:1px">' + esc(p) + '</span>'; }).join("") : '<span class="muted">All phases</span>') + '</td></tr>';
+          }).join("");
+          return '<div class="card" style="margin-top:8px"><h4>' + esc(c.name) + ' (' + esc(c.code) + ')</h4>' +
+            '<div class="table-wrap"><table><thead><tr><th>Authority</th><th>Full Name</th><th>Jurisdiction</th><th>Phases</th></tr></thead><tbody>' +
+            authList + '</tbody></table></div></div>';
+        }).join("");
+        countryHtml = '<div id="raciCountryAuthorities"><h3 style="margin-top:24px">Country Regulatory Authorities</h3>' +
+          '<p class="muted">Reference data from the Project Brain - showing key authorities for each of the 8 programme countries.</p>' +
+          countryRows + '</div>';
+      }
+    }
+
+    return matrix + countryHtml;
+  };
+
+  AFTER.raci = function () {
+    content.querySelectorAll(".raci-sel").forEach(function (sel) {
+      sel.addEventListener("change", function () {
+        var act = sel.dataset.act, role = sel.dataset.role, val = sel.value;
+        var data = raciLoad();
+        if (!data[act]) data[act] = {};
+        data[act][role] = val;
+        raciSave(data);
+        go("raci");
+      });
+    });
   };
 
   RENDER.budget = function () {
