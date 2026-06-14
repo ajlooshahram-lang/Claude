@@ -3,6 +3,8 @@ import { z } from "zod";
 import prisma from "../db.js";
 import { authenticate, requireRole } from "../middleware/rbac.js";
 
+const dateString = z.string().max(50).refine((s) => !isNaN(Date.parse(s)), { message: "Invalid date format" });
+
 const CreateWorkOrderBody = z.object({
   packageId: z.string().min(1),
   reference: z.string().max(100),
@@ -11,8 +13,8 @@ const CreateWorkOrderBody = z.object({
   location: z.unknown().optional(),
   routeKmStart: z.number().optional(),
   routeKmEnd: z.number().optional(),
-  plannedStart: z.string().max(50).optional(),
-  plannedEnd: z.string().max(50).optional(),
+  plannedStart: dateString.optional(),
+  plannedEnd: dateString.optional(),
   assignedTo: z.string().max(200).optional(),
   percentComplete: z.number().min(0).max(100).optional(),
   plannedQuantity: z.number().min(0).max(10_000_000_000).optional(),

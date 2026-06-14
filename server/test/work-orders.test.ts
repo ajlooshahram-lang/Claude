@@ -440,6 +440,49 @@ describe("Work Orders CRUD integration tests", () => {
 
       assert.equal(res.statusCode, 404, "Should return 404, not 403");
     });
+
+    test("user B cannot PATCH user A's work order (returns 404)", async () => {
+      await setupTwoTenants();
+      const packageId = await createPackageForTenantA();
+
+      const createRes = await app.inject({
+        method: "POST",
+        url: "/work-orders",
+        headers: { cookie: `session=${cookieA}` },
+        payload: { packageId, reference: "WO-001" },
+      });
+      const workOrderId = (createRes.json() as Record<string, unknown>)["id"] as string;
+
+      const res = await app.inject({
+        method: "PATCH",
+        url: `/work-orders/${workOrderId}`,
+        headers: { cookie: `session=${cookieB}` },
+        payload: { description: "Hacked by tenant B" },
+      });
+
+      assert.equal(res.statusCode, 404, "Should return 404 for cross-tenant PATCH");
+    });
+
+    test("user B cannot DELETE user A's work order (returns 404)", async () => {
+      await setupTwoTenants();
+      const packageId = await createPackageForTenantA();
+
+      const createRes = await app.inject({
+        method: "POST",
+        url: "/work-orders",
+        headers: { cookie: `session=${cookieA}` },
+        payload: { packageId, reference: "WO-001" },
+      });
+      const workOrderId = (createRes.json() as Record<string, unknown>)["id"] as string;
+
+      const res = await app.inject({
+        method: "DELETE",
+        url: `/work-orders/${workOrderId}`,
+        headers: { cookie: `session=${cookieB}` },
+      });
+
+      assert.equal(res.statusCode, 404, "Should return 404 for cross-tenant DELETE");
+    });
   });
 
   describe("Delete restrictions", () => {

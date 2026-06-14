@@ -14,6 +14,8 @@ const ContractTypeEnum = z.enum([
   "OTHER",
 ]);
 
+const dateString = z.string().max(50).refine((s) => !isNaN(Date.parse(s)), { message: "Invalid date format" });
+
 const CreatePackageBody = z.object({
   programmeId: z.string().min(1),
   projectId: z.string().min(1),
@@ -26,8 +28,8 @@ const CreatePackageBody = z.object({
   retentionPercent: z.number().min(0).max(100).optional(),
   maxRetentionPercent: z.number().min(0).max(100).optional(),
   defectsLiabilityMonths: z.number().int().min(0).max(60).optional(),
-  startDate: z.string().max(50).optional(),
-  endDate: z.string().max(50).optional(),
+  startDate: dateString.optional(),
+  endDate: dateString.optional(),
   metadata: z.unknown().optional(),
 });
 
@@ -154,6 +156,19 @@ export default async function packagesRoutes(app: FastifyInstance): Promise<void
       }
 
       const data = parsed.data;
+
+      // Verify programmeId belongs to tenant
+      const programme = await prisma.programme.findFirst({
+        where: {
+          id: data.programmeId,
+          tenantId: request.tenantId,
+          deletedAt: null,
+        },
+      });
+
+      if (!programme) {
+        return reply.code(404).send({ error: "Not found" });
+      }
 
       // Verify projectId belongs to tenant
       const project = await prisma.project.findFirst({

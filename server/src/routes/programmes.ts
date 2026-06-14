@@ -3,13 +3,15 @@ import { z } from "zod";
 import prisma from "../db.js";
 import { authenticate, requireRole } from "../middleware/rbac.js";
 
+const dateString = z.string().max(50).refine((s) => !isNaN(Date.parse(s)), { message: "Invalid date format" });
+
 const CreateProgrammeBody = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(5000).optional(),
   totalBudget: z.number().min(0).max(10_000_000_000),
   baseCurrency: z.string().max(10).optional(),
-  startDate: z.string().max(50).optional(),
-  endDate: z.string().max(50).optional(),
+  startDate: dateString.optional(),
+  endDate: dateString.optional(),
   metadata: z.unknown().optional(),
 });
 
@@ -62,19 +64,16 @@ export default async function programmesRoutes(app: FastifyInstance): Promise<vo
         },
       });
 
-      const workOrders = await prisma.workOrder.findMany({
+      const progressAgg = await prisma.workOrder.aggregate({
         where: {
           package: { programmeId: id },
           tenantId: request.tenantId,
           deletedAt: null,
         },
-        select: { percentComplete: true },
+        _avg: { percentComplete: true },
       });
 
-      const overallProgress =
-        workOrders.length > 0
-          ? workOrders.reduce((sum, wo) => sum + wo.percentComplete, 0) / workOrders.length
-          : 0;
+      const overallProgress = progressAgg._avg.percentComplete ?? 0;
 
       return {
         ...found,
@@ -205,84 +204,86 @@ export default async function programmesRoutes(app: FastifyInstance): Promise<vo
         return reply.code(404).send({ error: "Not found" });
       }
 
-      // Total projects count
-      const totalProjects = await prisma.project.count({
-        where: {
-          programmeId: id,
-          tenantId: request.tenantId,
-          deletedAt: null,
-        },
-      });
-
-      // Active packages count
-      const activePackages = await prisma.package.count({
-        where: {
-          programmeId: id,
-          tenantId: request.tenantId,
-          status: "ACTIVE",
-          deletedAt: null,
-        },
-      });
-
-      // Total work orders
-      const totalWorkOrders = await prisma.workOrder.count({
-        where: {
-          package: { programmeId: id },
-          tenantId: request.tenantId,
-          deletedAt: null,
-        },
-      });
-
-      // Budget summary - committed via packages contractValue sum
-      const packagesAgg = await prisma.package.aggregate({
-        where: {
-          programmeId: id,
-          tenantId: request.tenantId,
-          deletedAt: null,
-        },
-        _sum: {
-          contractValue: true,
-          cumulativePaid: true,
-        },
-      });
-
-      // Schedule summary - earliest start, latest end across packages
-      const scheduleAgg = await prisma.package.aggregate({
-        where: {
-          programmeId: id,
-          tenantId: request.tenantId,
-          deletedAt: null,
-          startDate: { not: null },
-        },
-        _min: { startDate: true },
-        _max: { endDate: true },
-      });
-
-      // Progress - weighted average of work order percentComplete
-      const workOrders = await prisma.workOrder.findMany({
-        where: {
-          package: { programmeId: id },
-          tenantId: request.tenantId,
-          deletedAt: null,
-        },
-        select: { percentComplete: true },
-      });
-
-      const overallProgress =
-        workOrders.length > 0
-          ? workOrders.reduce((sum, wo) => sum + wo.percentComplete, 0) / workOrders.length
-          : 0;
+      // Run independent queries in parallel
+      const [
+        totalProjects,
+        activePackages,
+        totalWorkOrders,
+        packagesAgg,
+        scheduleAgg,
+        progressAgg,
+        projectIds,
+      ] = await Promise.all([
+        // Total projects count
+        prisma.project.count({
+          where: {
+            programmeId: id,
+            tenantId: request.tenantId,
+            deletedAt: null,
+          },
+        }),
+        // Active packages count
+        prisma.package.count({
+          where: {
+            programmeId: id,
+            tenantId: request.tenantId,
+            status: "ACTIVE",
+            deletedAt: null,
+          },
+        }),
+        // Total work orders
+        prisma.workOrder.count({
+          where: {
+            package: { programmeId: id },
+            tenantId: request.tenantId,
+            deletedAt: null,
+          },
+        }),
+        // Budget summary - committed via packages contractValue sum
+        prisma.package.aggregate({
+          where: {
+            programmeId: id,
+            tenantId: request.tenantId,
+            deletedAt: null,
+          },
+          _sum: {
+            contractValue: true,
+            cumulativePaid: true,
+          },
+        }),
+        // Schedule summary - earliest start, latest end across packages
+        prisma.package.aggregate({
+          where: {
+            programmeId: id,
+            tenantId: request.tenantId,
+            deletedAt: null,
+            startDate: { not: null },
+          },
+          _min: { startDate: true },
+          _max: { endDate: true },
+        }),
+        // Progress - use aggregate for average instead of fetching all rows
+        prisma.workOrder.aggregate({
+          where: {
+            package: { programmeId: id },
+            tenantId: request.tenantId,
+            deletedAt: null,
+          },
+          _avg: { percentComplete: true },
+          _count: { id: true },
+        }),
+        // Project IDs for risk query
+        prisma.project.findMany({
+          where: {
+            programmeId: id,
+            tenantId: request.tenantId,
+            deletedAt: null,
+          },
+          select: { id: true },
+        }),
+      ]);
 
       // Top risks - highest RPN cases across programme projects
-      const projectIds = await prisma.project.findMany({
-        where: {
-          programmeId: id,
-          tenantId: request.tenantId,
-          deletedAt: null,
-        },
-        select: { id: true },
-      });
-
       const topRisks = await prisma.case.findMany({
         where: {
           tenantId: request.tenantId,
@@ -295,6 +296,8 @@ export default async function programmesRoutes(app: FastifyInstance): Promise<vo
         orderBy: [{ sev: "desc" }, { occ: "desc" }, { det: "desc" }],
         take: 10,
       });
+
+      const overallProgress = progressAgg._avg.percentComplete ?? 0;
 
       return {
         totalProjects,
@@ -311,7 +314,7 @@ export default async function programmesRoutes(app: FastifyInstance): Promise<vo
         },
         progress: {
           overallPercent: Math.round(overallProgress * 100) / 100,
-          totalWorkOrders: workOrders.length,
+          totalWorkOrders: progressAgg._count.id,
         },
         topRisks: topRisks.map((c) => ({
           id: c.id,
