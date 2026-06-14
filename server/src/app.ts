@@ -18,6 +18,7 @@ import variationsRoutes from "./routes/variations.js";
 import claimsRoutes from "./routes/claims.js";
 import paymentsRoutes from "./routes/payments.js";
 import exchangeRatesRoutes from "./routes/exchange-rates.js";
+import progressReportsRoutes from "./routes/progress-reports.js";
 
 const SERVICE = "qi-platform-server";
 const VERSION = "0.1.0";
@@ -117,6 +118,9 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
 
   // Exchange Rate CRUD routes
   await app.register(exchangeRatesRoutes);
+
+  // Progress Reports / EVM Engine routes
+  await app.register(progressReportsRoutes);
 
   return app;
 }
