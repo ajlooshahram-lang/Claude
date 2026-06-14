@@ -1666,6 +1666,10 @@
           '<span class="prog-leg-item"><span class="prog-diamond-legend"></span> Milestone</span>' +
           '<span class="prog-leg-item"><span class="prog-today-legend"></span> Today</span>' +
         '</div>' +
+      '</div>' +
+      '<div class="card" id="sCurveCard">' +
+        '<h3>Cumulative Programme Spend (S-Curve)</h3>' +
+        '<div class="chart-box"><canvas id="chSCurve"></canvas></div>' +
       '</div>';
   };
   AFTER.programme = function () {
@@ -1676,6 +1680,140 @@
         toast("Segment: " + bar.dataset.segment + " selected");
       });
     });
+
+    // S-Curve chart
+    if (typeof Chart !== "undefined") {
+      var totalKm = PROGRAMME_SEGMENTS.reduce(function (a, s) { return a + s.km; }, 0);
+      var totalBudget = totalKm * 45000; // USD per km
+      var totalBudgetM = totalBudget / 1e6; // in millions
+      var totalMonths = 60; // Jan 2025 to Dec 2029
+
+      // Generate month labels
+      var monthLabels = [];
+      for (var mi = 0; mi < totalMonths; mi++) {
+        var yr = 2025 + Math.floor(mi / 12);
+        var mo = mi % 12;
+        var monthName = new Date(yr, mo, 1).toLocaleDateString("en", { year: "2-digit", month: "short" });
+        monthLabels.push(monthName);
+      }
+
+      // Planned S-curve: cumulative = totalBudget * (3t^2 - 2t^3) where t = month/totalMonths
+      var plannedData = [];
+      for (var pi = 0; pi < totalMonths; pi++) {
+        var t = (pi + 1) / totalMonths;
+        var cumulative = totalBudgetM * (3 * t * t - 2 * t * t * t);
+        plannedData.push(Math.round(cumulative * 100) / 100);
+      }
+
+      // Actual spend: 8 months of data (SEA-1 installation ramp-up)
+      var actualMonths = 8;
+      var actualData = [];
+      for (var ai = 0; ai < actualMonths; ai++) {
+        var at = (ai + 1) / totalMonths;
+        // Actual tracks slightly above planned in early months (front-loaded mobilization)
+        var actualCum = totalBudgetM * (3 * at * at - 2 * at * at * at) * 1.05;
+        actualData.push(Math.round(actualCum * 100) / 100);
+      }
+
+      // CPI estimate based on actual vs planned
+      var lastActual = actualData[actualData.length - 1];
+      var lastPlanned = plannedData[actualMonths - 1];
+      var cpi = lastPlanned / lastActual; // cost performance index
+
+      // Forecast: from month 8 to end, extrapolated with CPI adjustment
+      var forecastData = new Array(actualMonths - 1).fill(null);
+      forecastData.push(lastActual); // start from last actual
+      for (var fi = actualMonths; fi < totalMonths; fi++) {
+        var ft = (fi + 1) / totalMonths;
+        var plannedIncrement = totalBudgetM * (3 * ft * ft - 2 * ft * ft * ft) -
+                               totalBudgetM * (3 * ((fi) / totalMonths) * ((fi) / totalMonths) - 2 * Math.pow((fi) / totalMonths, 3));
+        var forecastIncrement = plannedIncrement / cpi;
+        var prev = forecastData[fi - 1];
+        forecastData.push(Math.round((prev + forecastIncrement) * 100) / 100);
+      }
+
+      // Budget reference line (horizontal)
+      var budgetLine = new Array(totalMonths).fill(totalBudgetM);
+
+      var el = document.getElementById("chSCurve");
+      var ctx = el && el.getContext("2d");
+      if (ctx) {
+        if (window.QICharts && QICharts.destroyAll) QICharts.destroyAll();
+        new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: monthLabels,
+            datasets: [
+              {
+                label: "Planned",
+                data: plannedData,
+                borderColor: "#2563eb",
+                borderDash: [8, 4],
+                borderWidth: 2,
+                pointRadius: 0,
+                fill: false,
+                tension: 0.3
+              },
+              {
+                label: "Actual",
+                data: actualData,
+                borderColor: "#16a34a",
+                borderWidth: 3,
+                pointRadius: 2,
+                fill: false,
+                tension: 0.2
+              },
+              {
+                label: "Forecast",
+                data: forecastData,
+                borderColor: "#ea580c",
+                borderDash: [4, 4],
+                borderWidth: 2,
+                pointRadius: 0,
+                fill: false,
+                tension: 0.3
+              },
+              {
+                label: "Total Budget",
+                data: budgetLine,
+                borderColor: "#dc2626",
+                borderDash: [12, 6],
+                borderWidth: 1.5,
+                pointRadius: 0,
+                fill: false
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: "top" },
+              tooltip: {
+                callbacks: {
+                  label: function (context) {
+                    return context.dataset.label + ": $" + (context.parsed.y || 0).toFixed(1) + "M";
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                title: { display: true, text: "Month" },
+                ticks: { maxTicksLimit: 12 }
+              },
+              y: {
+                title: { display: true, text: "Cumulative USD (Millions)" },
+                beginAtZero: true,
+                ticks: {
+                  callback: function (value) { return "$" + value + "M"; }
+                }
+              }
+            }
+          }
+        });
+      }
+    }
   };
 
   // ---------- Kanban board ----------

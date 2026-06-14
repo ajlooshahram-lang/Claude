@@ -762,5 +762,13 @@ ok(progBars.length === 6, "Programme Timeline renders segment bars");
 var todayMarker = progGantt ? progGantt.querySelector(".prog-today-marker") : null;
 ok(todayMarker != null, "Programme Timeline shows today marker");
 
+// 49) S-Curve visualization
+var sCurveCanvas = doc.getElementById("chSCurve");
+ok(sCurveCanvas != null, "S-Curve canvas element exists in programme view");
+
+var sCurveCard = doc.getElementById("sCurveCard");
+var sCurveTitle = sCurveCard ? sCurveCard.querySelector("h3") : null;
+ok(sCurveTitle != null && /Cumulative Programme Spend/.test(sCurveTitle.textContent), "S-Curve has chart title rendered nearby");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
