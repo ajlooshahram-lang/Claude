@@ -821,6 +821,8 @@ const T = {
       harmonics: '\u3030\uFE0F Harmoniske',
       gen: '\uD83C\uDFED Generator',
       plc: '\uD83E\uDD16 PLC/BMS',
+      spd: '\u26A1 Overspænding',
+      tray: '\uD83D\uDCD0 Kabelbakke',
       exam: '\uD83C\uDF93 Eksamen'
     },
     // Load module
@@ -928,6 +930,8 @@ const T = {
       harmonics: '\u3030\uFE0F Harmonics',
       gen: '\uD83C\uDFED Generator',
       plc: '\uD83E\uDD16 PLC/BMS',
+      spd: '\u26A1 Surge Protection',
+      tray: '\uD83D\uDCD0 Cable Tray',
       exam: '\uD83C\uDF93 Exam'
     },
     loadTitle: 'Load Calculation',
@@ -2082,6 +2086,10 @@ let harmonicsState = { thd3: 33, iPhase: 16, circuits: 4, crossSection: 2.5 };
 let genState = { criticalLoads: [], genSize: 100, mode: 'island', earthing: 'TN-S', largestMotor: 0, startMethod: 'DOL', transfer: 'auto', customLoads: [] };
 // PLC/BMS/FMS state
 let plcState = { platform: 'siemens', plcLang: 'ST', protocol: 'bacnet', integration: 'monitor', fms: { energy: true, alarm: true, maintenance: false, occupancy: false, demand: false }, safety: { sil: 'SIL2', category: 'Cat3', functions: { estop: true, guard: false, lightCurtain: false, twoHand: false, safeSpeed: false } }, motorSeq: { type: 'dol_interlock', count: 2 }, hvac: { system: 'ahu' }, energy: { demandLimit: 100 }, network: { subnet: '192.168.1', startIP: 10 } };
+// SPD selector state
+let spdState = { building: 'bolig', lightning: 'ingen', location: 'main', sensitive: 'ingen', supply: 'TN-S' };
+// Cable tray fill state
+let trayState = { type: 'tray', width: 300, height: 100, cables: [], qtyPending: 1 };
 // Short circuit state
 let scState = { zNet: 1, zTrafo: 5 };
 // Standards state
@@ -2217,6 +2225,8 @@ function renderModule(mod) {
     case 'harmonics': content += renderHarmonics(); break;
     case 'gen': content += renderGenerator(); break;
     case 'plc': content += renderPlc(); break;
+    case 'spd': content += renderSpd(); break;
+    case 'tray': content += renderTray(); break;
     case 'exam': content = renderExam(); break;
   }
   // Append AI assistant to every module
@@ -13458,6 +13468,600 @@ function renderPlc() {
   }
 
   return html;
+}
+
+// ===== SURGE PROTECTION (SPD) SELECTOR - DS/HD 60364-5-534 =====
+function renderSpd() {
+  var da = lang === 'da';
+  var s = spdState;
+
+  // Options
+  var BUILDINGS = [
+    { id: 'bolig', da: 'Bolig', en: 'Dwelling' },
+    { id: 'kontor', da: 'Kontor', en: 'Office' },
+    { id: 'industri', da: 'Industri', en: 'Industrial' },
+    { id: 'hospital', da: 'Hospital', en: 'Hospital' },
+    { id: 'datacenter', da: 'Datacenter', en: 'Datacenter' }
+  ];
+  var LIGHTNING = [
+    { id: 'ingen', da: 'Ingen', en: 'None' },
+    { id: 'lps', da: 'Ekstern fangleder', en: 'External LPS' },
+    { id: 'hv', da: 'Taet paa hoejspaending', en: 'Near HV' }
+  ];
+  var LOCATIONS = [
+    { id: 'main', da: 'Hovedtavle', en: 'Main panel' },
+    { id: 'sub', da: 'Undertavle', en: 'Sub-panel' },
+    { id: 'equip', da: 'Ved udstyr', en: 'At equipment' }
+  ];
+  var SENSITIVE = [
+    { id: 'ingen', da: 'Ingen', en: 'None' },
+    { id: 'it', da: 'IT/Computere', en: 'IT/Computers' },
+    { id: 'medical', da: 'Medicinsk', en: 'Medical' },
+    { id: 'industrial', da: 'Industrielle styringer', en: 'Industrial controls' }
+  ];
+  var SUPPLIES = ['TN-S', 'TN-C-S', 'TT'];
+
+  // Risk assessment logic
+  var required = false;
+  var reason = '';
+  if (s.lightning === 'lps') { required = true; reason = da ? 'Ekstern fangleder kraever SPD Type 1' : 'External LPS requires SPD Type 1'; }
+  else if (s.lightning === 'hv') { required = true; reason = da ? 'Naerhed til hoejspaending kraever SPD' : 'Proximity to HV requires SPD'; }
+  else if (s.building === 'hospital' || s.building === 'datacenter') { required = true; reason = da ? 'Kritisk installation kraever SPD' : 'Critical installation requires SPD'; }
+  else if (s.sensitive === 'medical') { required = true; reason = da ? 'Medicinsk udstyr kraever SPD-beskyttelse' : 'Medical equipment requires SPD protection'; }
+  else { reason = da ? 'Anbefalet baseret paa risikovurdering' : 'Recommended based on risk assessment'; }
+
+  // SPD Type determination
+  var spdType = 'Type 2';
+  var spdTypeReason = '';
+  if (s.lightning === 'lps') {
+    if (s.sensitive !== 'ingen') { spdType = 'Type 1+2'; spdTypeReason = da ? 'Direkte lyn + foelsomt udstyr' : 'Direct lightning + sensitive equipment'; }
+    else { spdType = 'Type 1'; spdTypeReason = da ? 'Direkte lynbeskyttelse' : 'Direct lightning protection'; }
+  } else if (s.lightning === 'hv') {
+    spdType = 'Type 1+2';
+    spdTypeReason = da ? 'Hoej induktiv risiko fra naert HV' : 'High inductive risk from nearby HV';
+  } else if (s.sensitive !== 'ingen') {
+    spdType = 'Type 2+3';
+    spdTypeReason = da ? 'Standard + finbeskyttelse af udstyr' : 'Standard + fine protection of equipment';
+  } else {
+    spdType = 'Type 2';
+    spdTypeReason = da ? 'Standard overspaendingsbeskyttelse' : 'Standard surge protection';
+  }
+
+  // Coordination cascade
+  var cascade = [];
+  if (spdType === 'Type 1' || spdType === 'Type 1+2') {
+    cascade.push({ location: da ? 'Hovedtavle' : 'Main panel', type: 'Type 1', iimp: '12.5 kA (10/350)', purpose: da ? 'Direkte lyn' : 'Direct lightning' });
+  }
+  if (spdType === 'Type 1+2' || spdType === 'Type 2' || spdType === 'Type 2+3') {
+    cascade.push({ location: da ? 'Hovedtavle/Undertavle' : 'Main/Sub panel', type: 'Type 2', imax: '40 kA (8/20)', purpose: da ? 'Indirekte overspaending' : 'Indirect surge' });
+  }
+  if (spdType === 'Type 2+3') {
+    cascade.push({ location: da ? 'Ved udstyr' : 'At equipment', type: 'Type 3', up: '0.8 kV', purpose: da ? 'Finbeskyttelse' : 'Fine protection' });
+  }
+
+  // Uc (continuous operating voltage)
+  var ucLN = 260;
+  var ucNPE = 0;
+  var ucNote = '';
+  if (s.supply === 'TT') {
+    ucLN = 260; ucNPE = 260;
+    ucNote = da ? 'TT: Uc>=260V L-N og Uc>=260V N-PE' : 'TT: Uc>=260V L-N and Uc>=260V N-PE';
+  } else if (s.supply === 'TN-C-S') {
+    ucLN = 260; ucNPE = 0;
+    ucNote = da ? 'TN-C-S: Uc>=260V L-N (3+1 konfiguration)' : 'TN-C-S: Uc>=260V L-N (3+1 configuration)';
+  } else {
+    ucLN = 260; ucNPE = 0;
+    ucNote = da ? 'TN-S: Uc>=260V L-N (4+0 konfiguration)' : 'TN-S: Uc>=260V L-N (4+0 configuration)';
+  }
+
+  // Backup fuse
+  var backupFuse = 125;
+  var maxFuse = 125;
+  if (spdType === 'Type 1' || spdType === 'Type 1+2') { backupFuse = 160; maxFuse = 160; }
+  else if (spdType === 'Type 2' || spdType === 'Type 2+3') { backupFuse = 125; maxFuse = 125; }
+
+  // Specs
+  var iimp = (spdType === 'Type 1' || spdType === 'Type 1+2') ? '12.5 kA (10/350 us)' : '-';
+  var imax = '40 kA (8/20 us)';
+  var inSpec = '20 kA';
+  var upSpec = (spdType === 'Type 2+3') ? '<=1.5 kV (Type 2), <=0.8 kV (Type 3)' : '<=1.5 kV';
+
+  // Build HTML
+  var html = '<div class="card fade-in"><div class="card-title">' + (da ? '\u26A1 Overspaendingsbeskyttelse (SPD) - DS/HD 60364-5-534' : '\u26A1 Surge Protection (SPD) - DS/HD 60364-5-534') + '</div>';
+
+  // Building type
+  html += '<div class="select-group"><div class="select-label">\uD83C\uDFE2 ' + (da ? 'Bygningstype' : 'Building type') + '</div><div class="select-grid">';
+  BUILDINGS.forEach(function(b) {
+    html += '<button class="sel-btn ' + (s.building === b.id ? 'selected' : '') + '" onclick="spdState.building=\'' + b.id + '\';renderModule(\'spd\')">' + (da ? b.da : b.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Lightning protection
+  html += '<div class="select-group"><div class="select-label">\u26A1 ' + (da ? 'Lynbeskyttelse' : 'Lightning protection') + '</div><div class="select-grid">';
+  LIGHTNING.forEach(function(l) {
+    html += '<button class="sel-btn ' + (s.lightning === l.id ? 'selected' : '') + '" onclick="spdState.lightning=\'' + l.id + '\';renderModule(\'spd\')">' + (da ? l.da : l.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Installation location
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDCCD ' + (da ? 'Installationssted' : 'Installation location') + '</div><div class="select-grid">';
+  LOCATIONS.forEach(function(loc) {
+    html += '<button class="sel-btn ' + (s.location === loc.id ? 'selected' : '') + '" onclick="spdState.location=\'' + loc.id + '\';renderModule(\'spd\')">' + (da ? loc.da : loc.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Sensitive equipment
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDCBB ' + (da ? 'Foelsomt udstyr' : 'Sensitive equipment') + '</div><div class="select-grid">';
+  SENSITIVE.forEach(function(eq) {
+    html += '<button class="sel-btn ' + (s.sensitive === eq.id ? 'selected' : '') + '" onclick="spdState.sensitive=\'' + eq.id + '\';renderModule(\'spd\')">' + (da ? eq.da : eq.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Supply system
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD0C ' + (da ? 'Forsyningssystem' : 'Supply system') + '</div><div class="select-grid">';
+  SUPPLIES.forEach(function(sup) {
+    html += '<button class="sel-btn ' + (s.supply === sup ? 'selected' : '') + '" onclick="spdState.supply=\'' + sup + '\';renderModule(\'spd\')">' + sup + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '</div>'; // close input card
+
+  // Results card
+  var verdictClass = required ? 'error' : 'warning';
+  var verdictText = required ? (da ? 'SPD ER PAKRAEVET' : 'SPD IS REQUIRED') : (da ? 'SPD ANBEFALES' : 'SPD RECOMMENDED');
+
+  html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCCB ' + (da ? 'Resultat' : 'Result') + '</div>';
+
+  // Verdict
+  html += '<div class="result-box ' + verdictClass + '"><div class="result-title">' + verdictText + '</div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Begrundelse' : 'Reason') + '</span><span class="value">' + reason + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'SPD Type' : 'SPD Type') + '</span><span class="value">' + spdType + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Typevalg' : 'Type reason') + '</span><span class="value">' + spdTypeReason + '</span></div>';
+  html += '</div>';
+
+  // Specifications
+  html += '<div class="result-box"><div class="result-title">' + (da ? 'Specifikationer' : 'Specifications') + '</div>';
+  html += '<div class="result-row"><span class="label">Uc (L-N)</span><span class="value">>=' + ucLN + 'V</span></div>';
+  if (ucNPE > 0) html += '<div class="result-row"><span class="label">Uc (N-PE)</span><span class="value">>=' + ucNPE + 'V</span></div>';
+  html += '<div class="result-row"><span class="label">' + ucNote + '</span><span class="value"></span></div>';
+  if (iimp !== '-') html += '<div class="result-row"><span class="label">Iimp</span><span class="value">' + iimp + '</span></div>';
+  html += '<div class="result-row"><span class="label">Imax</span><span class="value">' + imax + '</span></div>';
+  html += '<div class="result-row"><span class="label">In</span><span class="value">' + inSpec + '</span></div>';
+  html += '<div class="result-row"><span class="label">Up (' + (da ? 'beskyttelsesniveau' : 'protection level') + ')</span><span class="value">' + upSpec + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Forsikring (backup)' : 'Backup fuse') + '</span><span class="value">' + backupFuse + 'A gG (max ' + maxFuse + 'A)</span></div>';
+  html += '</div>';
+
+  // Coordination cascade
+  if (cascade.length > 0) {
+    html += '<div class="result-box"><div class="result-title">' + (da ? 'Koordineringskaskade' : 'Coordination Cascade') + '</div>';
+    cascade.forEach(function(c, idx) {
+      html += '<div class="result-row"><span class="label">' + (idx + 1) + '. ' + c.location + '</span><span class="value">' + c.type + ' - ' + c.purpose + '</span></div>';
+    });
+    html += '</div>';
+  }
+
+  // Reference and safety
+  html += '<div class="result-box warning"><div class="result-title">' + (da ? 'Reference & Sikkerhed' : 'Reference & Safety') + '</div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Standard' : 'Standard') + '</span><span class="value">DS/HD 60364-5-534</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'ADVARSEL' : 'WARNING') + '</span><span class="value">' + (da ? 'SPD skal installeres af autoriseret elinstallatoer. Kontroller altid producent-datablad for specifik koordinering.' : 'SPD must be installed by authorized electrician. Always check manufacturer datasheet for specific coordination.') + '</span></div>';
+  html += '</div>';
+
+  html += '</div>'; // close results card
+
+  // SVG animation card
+  html += '<div class="card fade-in"><div class="card-title">\uD83C\uDF29\uFE0F ' + (da ? 'Installationskaskade' : 'Installation Cascade') + '</div>';
+  html += buildSpdViz(s, spdType, cascade);
+  html += '</div>';
+
+  return html;
+}
+
+function buildSpdViz(s, spdType, cascade) {
+  var W = 680, H = 340;
+  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:680px;height:auto;display:block;margin:0 auto">';
+
+  // Background
+  svg += '<defs>';
+  svg += '<linearGradient id="spdBg" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#0a0e1a"/><stop offset="100%" stop-color="#1a1040"/></linearGradient>';
+  svg += '<linearGradient id="surgeGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#ff0" stop-opacity="1"/><stop offset="100%" stop-color="#f80" stop-opacity="0.3"/></linearGradient>';
+  svg += '<filter id="spdGlow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  // Animated surge path
+  svg += '<path id="surgePath" d="M 30 170 L 200 170 L 350 170 L 520 170 L 650 170" fill="none"/>';
+  svg += '</defs>';
+  svg += '<rect width="' + W + '" height="' + H + '" fill="url(#spdBg)" rx="8"/>';
+
+  // Title
+  svg += '<text x="' + (W / 2) + '" y="28" text-anchor="middle" fill="#8af" font-size="13" font-weight="bold">' + (lang === 'da' ? 'SPD Kaskadebeskyttelse' : 'SPD Cascade Protection') + '</text>';
+
+  // Main bus bar
+  svg += '<line x1="30" y1="170" x2="650" y2="170" stroke="#445" stroke-width="4" stroke-linecap="round"/>';
+  svg += '<line x1="30" y1="170" x2="650" y2="170" stroke="#0cf" stroke-width="2" stroke-linecap="round" opacity="0.5"/>';
+
+  // Surge wave animation (lightning bolt traveling along bus)
+  svg += '<circle r="6" fill="#ff0" filter="url(#spdGlow)">';
+  svg += '<animateMotion dur="3s" repeatCount="indefinite" path="M 30,0 L 200,0 L 350,0 L 520,0 L 620,0" begin="0s"/>';
+  svg += '<animate attributeName="r" values="6;3;6" dur="0.5s" repeatCount="indefinite"/>';
+  svg += '<animate attributeName="opacity" values="1;0.4;1" dur="0.5s" repeatCount="indefinite"/>';
+  svg += '</circle>';
+
+  // SPD devices at positions
+  var positions = [];
+  if (spdType === 'Type 1' || spdType === 'Type 1+2') positions.push({ x: 150, label: 'Type 1', color: '#f44', iimp: '12.5kA' });
+  if (spdType === 'Type 1+2' || spdType === 'Type 2' || spdType === 'Type 2+3') positions.push({ x: 340, label: 'Type 2', color: '#fa0', imax: '40kA' });
+  if (spdType === 'Type 2+3') positions.push({ x: 530, label: 'Type 3', color: '#0c6', up: '0.8kV' });
+  if (positions.length === 0) positions.push({ x: 340, label: 'Type 2', color: '#fa0', imax: '40kA' });
+
+  positions.forEach(function(p, i) {
+    // SPD device box
+    svg += '<rect x="' + (p.x - 25) + '" y="100" width="50" height="60" rx="4" fill="#1a2040" stroke="' + p.color + '" stroke-width="2"/>';
+    svg += '<text x="' + p.x + '" y="125" text-anchor="middle" fill="' + p.color + '" font-size="9" font-weight="bold">' + p.label + '</text>';
+    // SPD symbol (varistor zigzag)
+    svg += '<polyline points="' + (p.x - 8) + ',132 ' + (p.x + 8) + ',138 ' + (p.x - 8) + ',144 ' + (p.x + 8) + ',150" fill="none" stroke="' + p.color + '" stroke-width="2"/>';
+    // Connection to bus
+    svg += '<line x1="' + p.x + '" y1="160" x2="' + p.x + '" y2="170" stroke="' + p.color + '" stroke-width="2"/>';
+    // Ground connection
+    svg += '<line x1="' + p.x + '" y1="170" x2="' + p.x + '" y2="200" stroke="#0c6" stroke-width="1.5"/>';
+    svg += '<line x1="' + (p.x - 12) + '" y1="200" x2="' + (p.x + 12) + '" y2="200" stroke="#0c6" stroke-width="2"/>';
+    svg += '<line x1="' + (p.x - 8) + '" y1="205" x2="' + (p.x + 8) + '" y2="205" stroke="#0c6" stroke-width="1.5"/>';
+    svg += '<line x1="' + (p.x - 4) + '" y1="210" x2="' + (p.x + 4) + '" y2="210" stroke="#0c6" stroke-width="1"/>';
+    // Label underneath
+    var specLabel = p.iimp || p.imax || p.up || '';
+    svg += '<text x="' + p.x + '" y="230" text-anchor="middle" fill="#aaa" font-size="9">' + specLabel + '</text>';
+
+    // Attenuation indicator - animated pulse shrinking
+    if (i < positions.length - 1) {
+      var nextX = positions[i + 1].x;
+      var midX = (p.x + nextX) / 2;
+      svg += '<text x="' + midX + '" y="165" text-anchor="middle" fill="#ff0" font-size="18" opacity="0.7">';
+      svg += '<animate attributeName="opacity" values="0.3;0.9;0.3" dur="2s" repeatCount="indefinite" begin="' + (i * 0.5) + 's"/>';
+      svg += '\u2192</text>';
+      // Shrinking surge representation
+      svg += '<circle cx="' + midX + '" cy="170" r="' + (10 - i * 3) + '" fill="none" stroke="#ff0" stroke-width="1" opacity="0.5">';
+      svg += '<animate attributeName="r" values="' + (10 - i * 3) + ';' + (5 - i * 2) + ';' + (10 - i * 3) + '" dur="1.5s" repeatCount="indefinite"/>';
+      svg += '</circle>';
+    }
+  });
+
+  // Source label (left)
+  svg += '<text x="40" y="155" fill="#f88" font-size="10">' + (lang === 'da' ? 'Forsyning' : 'Supply') + '</text>';
+  // Equipment label (right)
+  svg += '<text x="600" y="155" fill="#8f8" font-size="10">' + (lang === 'da' ? 'Udstyr' : 'Equipment') + '</text>';
+
+  // Lightning bolt symbol at source
+  svg += '<polygon points="60,50 70,80 65,80 75,110 55,75 60,75 50,50" fill="#ff0" opacity="0.8">';
+  svg += '<animate attributeName="opacity" values="0.3;1;0.3" dur="1s" repeatCount="indefinite"/>';
+  svg += '</polygon>';
+
+  // Protected equipment icon (right)
+  svg += '<rect x="610" y="80" width="40" height="30" rx="3" fill="#1a2040" stroke="#0c6" stroke-width="1.5"/>';
+  svg += '<text x="630" y="100" text-anchor="middle" fill="#0c6" font-size="16">\uD83D\uDCBB</text>';
+
+  // Surge energy attenuation labels
+  svg += '<text x="' + (W / 2) + '" y="275" text-anchor="middle" fill="#8af" font-size="10">' + (lang === 'da' ? 'Overspaendingsenergi reduceres ved hvert trin' : 'Surge energy reduced at each stage') + '</text>';
+
+  // Animated surge wave along bus
+  svg += '<rect x="0" y="168" width="20" height="4" fill="url(#surgeGrad)" rx="2">';
+  svg += '<animateMotion dur="3s" repeatCount="indefinite" path="M 30,0 L 620,0"/>';
+  svg += '<animate attributeName="width" values="20;10;5;2" dur="3s" repeatCount="indefinite"/>';
+  svg += '<animate attributeName="opacity" values="1;0.7;0.4;0.1" dur="3s" repeatCount="indefinite"/>';
+  svg += '</rect>';
+
+  // Second wave (staggered)
+  svg += '<rect x="0" y="168" width="16" height="3" fill="#ff0" rx="1" opacity="0.6">';
+  svg += '<animateMotion dur="3s" repeatCount="indefinite" path="M 30,0 L 620,0" begin="1.5s"/>';
+  svg += '<animate attributeName="width" values="16;8;4;1" dur="3s" repeatCount="indefinite" begin="1.5s"/>';
+  svg += '<animate attributeName="opacity" values="0.8;0.5;0.2;0" dur="3s" repeatCount="indefinite" begin="1.5s"/>';
+  svg += '</rect>';
+
+  // Legend
+  svg += '<text x="30" y="310" fill="#888" font-size="9">DS/HD 60364-5-534 | ' + spdType + ' | Uc>=' + 260 + 'V</text>';
+
+  svg += '</svg>';
+  return svg;
+}
+
+// ===== CABLE TRAY FILL CALCULATION =====
+function renderTray() {
+  var da = lang === 'da';
+  var s = trayState;
+
+  // Tray types
+  var TRAY_TYPES = [
+    { id: 'tray', da: 'Bakke', en: 'Tray' },
+    { id: 'ladder', da: 'Stige', en: 'Ladder' },
+    { id: 'trunking', da: 'Kanal', en: 'Trunking' },
+    { id: 'conduit', da: 'Roer', en: 'Conduit' }
+  ];
+  var WIDTHS = [100, 150, 200, 300, 400, 500, 600];
+  var HEIGHTS = [50, 60, 80, 100, 150];
+  var QTYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20];
+
+  // Cable presets: name, outer diameter (mm), cross-section area (mm2)
+  var CABLE_PRESETS = [
+    { name: '3G1.5', diam: 9, area: 63.6, color: '#4af' },
+    { name: '3G2.5', diam: 10.5, area: 86.6, color: '#4cf' },
+    { name: '5G2.5', diam: 12, area: 113.1, color: '#0af' },
+    { name: '5G4', diam: 13.5, area: 143.1, color: '#08f' },
+    { name: '5G6', diam: 15, area: 176.7, color: '#06f' },
+    { name: '5G10', diam: 18, area: 254.5, color: '#48f' },
+    { name: '5G16', diam: 22, area: 380.1, color: '#84f' },
+    { name: '4x25+16', diam: 30, area: 706.9, color: '#a4f' },
+    { name: '4x35+16', diam: 34, area: 907.9, color: '#c4f' },
+    { name: '4x50+25', diam: 40, area: 1256.6, color: '#f4a' },
+    { name: '4x70+35', diam: 48, area: 1809.6, color: '#f84' },
+    { name: '4x95+50', diam: 55, area: 2376.0, color: '#fa4' },
+    { name: '4x120+70', diam: 62, area: 3019.1, color: '#fc4' },
+    { name: '4x150+70', diam: 67, area: 3525.7, color: '#fe4' },
+    { name: '4x185+95', diam: 72, area: 4071.5, color: '#ff8' },
+    { name: '4x240+120', diam: 76, area: 4536.5, color: '#fff' }
+  ];
+
+  // Weight per meter estimates (kg/m)
+  var CABLE_WEIGHTS = { '3G1.5': 0.1, '3G2.5': 0.14, '5G2.5': 0.22, '5G4': 0.31, '5G6': 0.43, '5G10': 0.72, '5G16': 1.05, '4x25+16': 1.7, '4x35+16': 2.2, '4x50+25': 3.1, '4x70+35': 4.3, '4x95+50': 5.8, '4x120+70': 7.2, '4x150+70': 8.5, '4x185+95': 10.5, '4x240+120': 13.2 };
+
+  // Calculations
+  var totalDiamSum = 0;
+  var totalAreaSum = 0;
+  var totalWeight = 0;
+  var cableCount = 0;
+  s.cables.forEach(function(c) {
+    var preset = CABLE_PRESETS.find(function(p) { return p.name === c.name; });
+    if (preset) {
+      totalDiamSum += preset.diam * c.qty;
+      totalAreaSum += preset.area * c.qty;
+      totalWeight += (CABLE_WEIGHTS[c.name] || 0.5) * c.qty;
+      cableCount += c.qty;
+    }
+  });
+
+  // Fill calculation depends on type
+  var fillPct = 0;
+  var maxFill = 100;
+  var fillMethod = '';
+  if (s.type === 'tray' || s.type === 'ladder') {
+    // For trays: fill = sum of diameters / width * 100
+    fillPct = s.width > 0 ? (totalDiamSum / s.width) * 100 : 0;
+    maxFill = 100;
+    fillMethod = da ? 'Summen af kabeldiametre / bakkebredde' : 'Sum of cable diameters / tray width';
+  } else if (s.type === 'trunking') {
+    // For trunking: fill = sum of areas / (width * height) * 100
+    var trunkArea = s.width * s.height;
+    fillPct = trunkArea > 0 ? (totalAreaSum / trunkArea) * 100 : 0;
+    maxFill = 45;
+    fillMethod = da ? 'Summen af kabeltvaersnit / (bredde x hoejde)' : 'Sum of cable areas / (width x height)';
+  } else if (s.type === 'conduit') {
+    // For conduit: fill = sum of areas / conduit area * 100 (use width as diameter)
+    var conduitArea = Math.PI * Math.pow(s.width / 2, 2);
+    fillPct = conduitArea > 0 ? (totalAreaSum / conduitArea) * 100 : 0;
+    maxFill = 40;
+    fillMethod = da ? 'Summen af kabeltvaersnit / roertvaersnit' : 'Sum of cable areas / conduit area';
+  }
+
+  var fillOk = fillPct <= maxFill;
+  var remainingPct = Math.max(0, maxFill - fillPct);
+
+  // Grouping derating factor (approximation based on number of circuits)
+  var deratingFactor = 1.0;
+  if (cableCount >= 20) deratingFactor = 0.38;
+  else if (cableCount >= 16) deratingFactor = 0.41;
+  else if (cableCount >= 12) deratingFactor = 0.45;
+  else if (cableCount >= 9) deratingFactor = 0.50;
+  else if (cableCount >= 7) deratingFactor = 0.54;
+  else if (cableCount >= 5) deratingFactor = 0.60;
+  else if (cableCount >= 4) deratingFactor = 0.65;
+  else if (cableCount >= 3) deratingFactor = 0.70;
+  else if (cableCount >= 2) deratingFactor = 0.80;
+
+  // Layers estimate
+  var layersEst = 1;
+  if (s.type === 'tray' || s.type === 'ladder') {
+    layersEst = Math.max(1, Math.ceil(totalDiamSum / s.width));
+  }
+
+  // Recommended upsize
+  var recommendedWidth = s.width;
+  if (!fillOk) {
+    for (var wi = 0; wi < WIDTHS.length; wi++) {
+      if (s.type === 'tray' || s.type === 'ladder') {
+        if (totalDiamSum / WIDTHS[wi] * 100 <= maxFill) { recommendedWidth = WIDTHS[wi]; break; }
+      } else if (s.type === 'trunking') {
+        if (totalAreaSum / (WIDTHS[wi] * s.height) * 100 <= maxFill) { recommendedWidth = WIDTHS[wi]; break; }
+      } else {
+        if (totalAreaSum / (Math.PI * Math.pow(WIDTHS[wi] / 2, 2)) * 100 <= maxFill) { recommendedWidth = WIDTHS[wi]; break; }
+      }
+    }
+  }
+
+  // Build HTML
+  var html = '<div class="card fade-in"><div class="card-title">' + (da ? '\uD83D\uDCD0 Kabelbakke Fyldningsberegning' : '\uD83D\uDCD0 Cable Tray Fill Calculation') + '</div>';
+
+  // Tray type
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDCE6 ' + (da ? 'Bakketype' : 'Tray type') + '</div><div class="select-grid">';
+  TRAY_TYPES.forEach(function(t) {
+    html += '<button class="sel-btn ' + (s.type === t.id ? 'selected' : '') + '" onclick="trayState.type=\'' + t.id + '\';renderModule(\'tray\')">' + (da ? t.da : t.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Tray width
+  html += '<div class="select-group"><div class="select-label">\u2194\uFE0F ' + (da ? 'Bredde' : 'Width') + ' (mm)</div><div class="select-grid">';
+  WIDTHS.forEach(function(w) {
+    html += '<button class="sel-btn ' + (s.width === w ? 'selected' : '') + '" onclick="trayState.width=' + w + ';renderModule(\'tray\')">' + w + '</button>';
+  });
+  html += '</div></div>';
+
+  // Tray height (relevant for trunking)
+  if (s.type === 'trunking') {
+    html += '<div class="select-group"><div class="select-label">\u2195\uFE0F ' + (da ? 'Hoejde' : 'Height') + ' (mm)</div><div class="select-grid">';
+    HEIGHTS.forEach(function(h) {
+      html += '<button class="sel-btn ' + (s.height === h ? 'selected' : '') + '" onclick="trayState.height=' + h + ';renderModule(\'tray\')">' + h + '</button>';
+    });
+    html += '</div></div>';
+  }
+
+  // Quantity selector
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD22 ' + (da ? 'Antal pr. kabel' : 'Quantity per cable') + '</div><div class="select-grid">';
+  QTYS.forEach(function(q) {
+    html += '<button class="sel-btn ' + (s.qtyPending === q ? 'selected' : '') + '" onclick="trayState.qtyPending=' + q + ';renderModule(\'tray\')">' + q + '</button>';
+  });
+  html += '</div></div>';
+
+  // Cable presets
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD0C ' + (da ? 'Tilfoej kabel (klik for at tilfoeje)' : 'Add cable (click to add)') + '</div><div class="select-grid">';
+  CABLE_PRESETS.forEach(function(cp) {
+    html += '<button class="sel-btn" onclick="trayAddCable(\'' + cp.name + '\')" style="border-color:' + cp.color + '44">' + cp.name + ' <small>\u00F8' + cp.diam + 'mm</small></button>';
+  });
+  html += '</div></div>';
+
+  // Current cables list
+  if (s.cables.length > 0) {
+    html += '<div class="select-group"><div class="select-label">\uD83D\uDCCB ' + (da ? 'Tilfoejede kabler' : 'Added cables') + '</div><div class="select-grid">';
+    s.cables.forEach(function(c, idx) {
+      var preset = CABLE_PRESETS.find(function(p) { return p.name === c.name; });
+      var col = preset ? preset.color : '#fff';
+      html += '<button class="sel-btn selected" onclick="trayRemoveCable(' + idx + ')" style="border-color:' + col + '">' + c.qty + 'x ' + c.name + ' \u2715</button>';
+    });
+    html += '<button class="sel-btn" onclick="trayClearCables()" style="border-color:#f44">' + (da ? 'Ryd alle' : 'Clear all') + '</button>';
+    html += '</div></div>';
+  }
+
+  html += '</div>'; // close input card
+
+  // Results card
+  if (s.cables.length > 0) {
+    var fillColor = fillPct <= maxFill * 0.6 ? '#0c6' : fillPct <= maxFill ? '#fa0' : '#f44';
+    var resultClass = fillOk ? (fillPct > maxFill * 0.8 ? 'warning' : '') : 'error';
+
+    html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCCA ' + (da ? 'Resultat' : 'Result') + '</div>';
+
+    // Fill percentage - large display
+    html += '<div style="text-align:center;padding:16px 0">';
+    html += '<div style="font-size:3rem;font-weight:bold;color:' + fillColor + '">' + fillPct.toFixed(1) + '%</div>';
+    html += '<div style="font-size:0.9rem;color:var(--text-muted)">' + (da ? 'Fyldningsgrad' : 'Fill ratio') + ' (max ' + maxFill + '%)</div>';
+    html += '</div>';
+
+    // Verdict
+    html += '<div class="result-box ' + resultClass + '"><div class="result-title">' + (fillOk ? (da ? '\u2705 GODKENDT' : '\u2705 PASS') : (da ? '\u274C OVERFYLDT' : '\u274C OVERFILLED')) + '</div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Beregningsmetode' : 'Calculation method') + '</span><span class="value">' + fillMethod + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Resterende kapacitet' : 'Remaining capacity') + '</span><span class="value">' + remainingPct.toFixed(1) + '% (' + (da ? 'af max' : 'of max') + ' ' + maxFill + '%)</span></div>';
+    if (!fillOk && recommendedWidth > s.width) {
+      html += '<div class="result-row"><span class="label">' + (da ? 'Anbefalet opgradering' : 'Recommended upsize') + '</span><span class="value">' + recommendedWidth + ' mm</span></div>';
+    }
+    html += '<div class="result-row"><span class="label">' + (da ? 'Antal kabler' : 'Cable count') + '</span><span class="value">' + cableCount + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Estimerede lag' : 'Estimated layers') + '</span><span class="value">' + layersEst + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Vaegt pr. meter' : 'Weight per meter') + '</span><span class="value">' + totalWeight.toFixed(1) + ' kg/m</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Grupperingsderating' : 'Grouping derating') + '</span><span class="value">' + deratingFactor.toFixed(2) + ' (' + cableCount + ' ' + (da ? 'kredsloeb' : 'circuits') + ')</span></div>';
+    html += '</div>';
+
+    html += '</div>'; // close results card
+
+    // SVG visualization
+    html += '<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ' + (da ? 'Tvaersnit' : 'Cross-section') + '</div>';
+    html += buildTrayViz(s, CABLE_PRESETS, fillPct, maxFill);
+    html += '</div>';
+  }
+
+  return html;
+}
+
+function trayAddCable(name) {
+  var existing = trayState.cables.find(function(c) { return c.name === name; });
+  if (existing) {
+    existing.qty += trayState.qtyPending;
+  } else {
+    trayState.cables.push({ name: name, qty: trayState.qtyPending });
+  }
+  renderModule('tray');
+}
+
+function trayRemoveCable(idx) {
+  trayState.cables.splice(idx, 1);
+  renderModule('tray');
+}
+
+function trayClearCables() {
+  trayState.cables = [];
+  renderModule('tray');
+}
+
+function buildTrayViz(s, CABLE_PRESETS, fillPct, maxFill) {
+  var W = 680, H = 360;
+  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:680px;height:auto;display:block;margin:0 auto">';
+
+  // Background
+  svg += '<defs>';
+  svg += '<linearGradient id="trayBg" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#0a0e1a"/><stop offset="100%" stop-color="#101828"/></linearGradient>';
+  svg += '<filter id="trayGlow"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  svg += '</defs>';
+  svg += '<rect width="' + W + '" height="' + H + '" fill="url(#trayBg)" rx="8"/>';
+
+  // Title
+  svg += '<text x="' + (W / 2) + '" y="25" text-anchor="middle" fill="#8af" font-size="12" font-weight="bold">' + (lang === 'da' ? 'Kabelbakke Tvaersnit' : 'Cable Tray Cross-Section') + '</text>';
+
+  // Tray outline
+  var trayVisW = Math.min(500, W - 80);
+  var trayVisH = Math.min(200, H - 120);
+  var trayX = (W - trayVisW) / 2;
+  var trayY = 60;
+
+  // Tray walls
+  svg += '<rect x="' + trayX + '" y="' + trayY + '" width="' + trayVisW + '" height="' + trayVisH + '" fill="none" stroke="#556" stroke-width="3" rx="2"/>';
+  // Tray bottom highlight
+  svg += '<line x1="' + (trayX + 2) + '" y1="' + (trayY + trayVisH) + '" x2="' + (trayX + trayVisW - 2) + '" y2="' + (trayY + trayVisH) + '" stroke="#889" stroke-width="4"/>';
+
+  // Fill level indicator
+  var fillHeight = Math.min(trayVisH, trayVisH * fillPct / 100);
+  var fillColor = fillPct <= maxFill * 0.6 ? '#0c640' : fillPct <= maxFill ? '#fa040' : '#f4440';
+  var fillColorSolid = fillPct <= maxFill * 0.6 ? 'rgba(0,200,100,0.1)' : fillPct <= maxFill ? 'rgba(255,160,0,0.1)' : 'rgba(255,68,68,0.15)';
+  svg += '<rect x="' + (trayX + 2) + '" y="' + (trayY + trayVisH - fillHeight) + '" width="' + (trayVisW - 4) + '" height="' + fillHeight + '" fill="' + fillColorSolid + '" rx="1"/>';
+
+  // Max fill line
+  var maxFillY = trayY + trayVisH - (trayVisH * maxFill / 100);
+  svg += '<line x1="' + trayX + '" y1="' + maxFillY + '" x2="' + (trayX + trayVisW) + '" y2="' + maxFillY + '" stroke="#f44" stroke-width="1" stroke-dasharray="5,5" opacity="0.6"/>';
+  svg += '<text x="' + (trayX + trayVisW + 5) + '" y="' + (maxFillY + 4) + '" fill="#f44" font-size="9">Max ' + maxFill + '%</text>';
+
+  // Draw cables inside tray
+  var currentX = trayX + 10;
+  var currentY = trayY + trayVisH - 10;
+  var scale = Math.min(1, trayVisW / (s.width || 300));
+  var animDelay = 0;
+
+  s.cables.forEach(function(c) {
+    var preset = CABLE_PRESETS.find(function(p) { return p.name === c.name; });
+    if (!preset) return;
+    var r = Math.max(3, preset.diam * scale * 0.8);
+    for (var i = 0; i < c.qty; i++) {
+      if (currentX + r * 2 > trayX + trayVisW - 10) {
+        currentX = trayX + 10;
+        currentY -= r * 2 + 2;
+      }
+      if (currentY - r < trayY + 5) break; // overflow
+
+      // Cable circle with animation
+      svg += '<circle cx="' + (currentX + r) + '" cy="' + (currentY - r) + '" r="' + r + '" fill="' + preset.color + '22" stroke="' + preset.color + '" stroke-width="1.5" filter="url(#trayGlow)">';
+      svg += '<animate attributeName="r" from="0" to="' + r + '" dur="0.4s" begin="' + animDelay + 's" fill="freeze"/>';
+      svg += '<animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="' + animDelay + 's" fill="freeze"/>';
+      svg += '</circle>';
+      // Cable label (only for larger cables)
+      if (r >= 8) {
+        svg += '<text x="' + (currentX + r) + '" y="' + (currentY - r + 3) + '" text-anchor="middle" fill="' + preset.color + '" font-size="' + Math.min(8, r) + '" opacity="0.9">' + preset.name.split('x')[0] + '</text>';
+      }
+      currentX += r * 2 + 3;
+      animDelay += 0.05;
+    }
+  });
+
+  // Dimension annotations
+  svg += '<text x="' + (W / 2) + '" y="' + (trayY + trayVisH + 25) + '" text-anchor="middle" fill="#aaa" font-size="10">' + s.width + ' mm</text>';
+  // Width arrows
+  svg += '<line x1="' + trayX + '" y1="' + (trayY + trayVisH + 15) + '" x2="' + (trayX + trayVisW) + '" y2="' + (trayY + trayVisH + 15) + '" stroke="#888" stroke-width="1" marker-start="url(#arrowL)" marker-end="url(#arrowR)"/>';
+
+  // Fill percentage display
+  var pctColor = fillPct <= maxFill * 0.6 ? '#0c6' : fillPct <= maxFill ? '#fa0' : '#f44';
+  svg += '<text x="' + (W / 2) + '" y="' + (H - 30) + '" text-anchor="middle" fill="' + pctColor + '" font-size="18" font-weight="bold">' + fillPct.toFixed(1) + '% ' + (lang === 'da' ? 'fyldning' : 'fill') + '</text>';
+  svg += '<text x="' + (W / 2) + '" y="' + (H - 12) + '" text-anchor="middle" fill="#888" font-size="10">' + s.cables.length + ' ' + (lang === 'da' ? 'kabeltyper' : 'cable types') + ' | ' + (s.cables.reduce(function(a, c) { return a + c.qty; }, 0)) + ' ' + (lang === 'da' ? 'kabler total' : 'cables total') + '</text>';
+
+  svg += '</svg>';
+  return svg;
 }
 
 // ===== INIT =====
