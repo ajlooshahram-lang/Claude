@@ -157,6 +157,10 @@ export default async function variationsRoutes(app: FastifyInstance): Promise<vo
   );
 
   // PATCH /variations/:id - update + status transitions (MANAGER+)
+  // Note: Variation approval intentionally requires only MANAGER+ (not ADMIN+).
+  // Per requirements, MANAGER role has authority over all variation operations including
+  // approval. This differs from payment certificates where ADMIN+ is required for
+  // APPROVED/PAID transitions as a spending-authority control on cash disbursements.
   app.patch(
     "/variations/:id",
     { preHandler: [requireRole("MANAGER")] },
@@ -222,7 +226,7 @@ export default async function variationsRoutes(app: FastifyInstance): Promise<vo
         }
       }
 
-      // When APPROVED: update Package.contractValue by adding agreedValue
+      // When APPROVED: update Package.contractValue by adding agreedValue (in a transaction)
       if (data.status === "APPROVED" && existing.status !== "APPROVED") {
         const agreedValue = existing.assessedAmount !== null
           ? Number(existing.assessedAmount)
@@ -239,10 +243,20 @@ export default async function variationsRoutes(app: FastifyInstance): Promise<vo
 
         if (pkg) {
           const newContractValue = Math.round((Number(pkg.contractValue) + finalAgreedValue) * 100) / 100;
-          await prisma.package.update({
-            where: { id: existing.packageId },
-            data: { contractValue: newContractValue },
+
+          const updated = await prisma.$transaction(async (tx) => {
+            await tx.package.update({
+              where: { id: existing.packageId },
+              data: { contractValue: newContractValue },
+            });
+
+            return tx.contractVariation.update({
+              where: { id },
+              data: updateData,
+            });
           });
+
+          return updated;
         }
       }
 

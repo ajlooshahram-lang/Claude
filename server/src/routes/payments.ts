@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import prisma from "../db.js";
 import { authenticate, requireRole } from "../middleware/rbac.js";
 
@@ -218,18 +219,37 @@ export default async function paymentsRoutes(app: FastifyInstance): Promise<void
       if (data.currency !== undefined) createData["currency"] = data.currency;
       if (data.metadata !== undefined) createData["metadata"] = data.metadata;
 
-      const created = await prisma.paymentCertificate.create({ data: createData as never });
+      // Wrap certificate creation and package update in a transaction for atomicity.
+      // Also handles certNumber unique constraint race (P2002) with a conflict response.
+      try {
+        const created = await prisma.$transaction(async (tx) => {
+          const cert = await tx.paymentCertificate.create({ data: createData as never });
 
-      // Update package retentionHeld
-      await prisma.package.update({
-        where: { id: data.packageId },
-        data: {
-          retentionHeld: Math.round((currentRetentionHeld + retentionDeducted) * 100) / 100,
-          cumulativeCertified: Math.round((previousCertified + grossAmount) * 100) / 100,
-        },
-      });
+          await tx.package.update({
+            where: { id: data.packageId },
+            data: {
+              retentionHeld: Math.round((currentRetentionHeld + retentionDeducted) * 100) / 100,
+              cumulativeCertified: Math.round((previousCertified + grossAmount) * 100) / 100,
+            },
+          });
 
-      return reply.code(201).send(created);
+          return cert;
+        });
+
+        return reply.code(201).send(created);
+      } catch (err) {
+        // Handle certNumber unique constraint violation (concurrent creation race)
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2002"
+        ) {
+          return reply.code(409).send({
+            error: "Conflict",
+            details: "A payment certificate with this number already exists. Please retry.",
+          });
+        }
+        throw err;
+      }
     },
   );
 
@@ -257,6 +277,16 @@ export default async function paymentsRoutes(app: FastifyInstance): Promise<void
       }
 
       const data = parsed.data;
+
+      // Reject grossAmount changes once certificate leaves DRAFT status.
+      // Changing grossAmount after retention has been calculated would make the
+      // financial breakdown inconsistent (grossAmount - retentionDeducted != netAmount).
+      if (data.grossAmount !== undefined && existing.status !== "DRAFT") {
+        return reply.code(400).send({
+          error: "Cannot modify grossAmount",
+          details: "grossAmount can only be changed while the certificate is in DRAFT status",
+        });
+      }
 
       // Validate status transition
       if (data.status !== undefined && data.status !== existing.status) {
@@ -308,7 +338,7 @@ export default async function paymentsRoutes(app: FastifyInstance): Promise<void
         }
       }
 
-      // When PAID: update Package.cumulativePaid += netAmount
+      // When PAID: update Package.cumulativePaid += netAmount (in a transaction)
       if (data.status === "PAID" && existing.status !== "PAID") {
         const pkg = await prisma.package.findFirst({
           where: { id: existing.packageId, tenantId: request.tenantId },
@@ -317,10 +347,55 @@ export default async function paymentsRoutes(app: FastifyInstance): Promise<void
         if (pkg) {
           const netAmount = Number(existing.netAmount);
           const newCumulativePaid = Math.round((Number(pkg.cumulativePaid) + netAmount) * 100) / 100;
-          await prisma.package.update({
-            where: { id: existing.packageId },
-            data: { cumulativePaid: newCumulativePaid },
+
+          const updated = await prisma.$transaction(async (tx) => {
+            await tx.package.update({
+              where: { id: existing.packageId },
+              data: { cumulativePaid: newCumulativePaid },
+            });
+
+            return tx.paymentCertificate.update({
+              where: { id },
+              data: updateData,
+            });
           });
+
+          return updated;
+        }
+      }
+
+      // When PAID -> REJECTED: reverse Package.cumulativePaid and retentionHeld (in a transaction)
+      if (data.status === "REJECTED" && existing.status === "PAID") {
+        const pkg = await prisma.package.findFirst({
+          where: { id: existing.packageId, tenantId: request.tenantId },
+        });
+
+        if (pkg) {
+          const netAmount = Number(existing.netAmount);
+          const retentionDeducted = Number(existing.retentionDeducted);
+          const newCumulativePaid = Math.round((Number(pkg.cumulativePaid) - netAmount) * 100) / 100;
+          const newRetentionHeld = Math.round((Number(pkg.retentionHeld) - retentionDeducted) * 100) / 100;
+          const newCumulativeCertified = Math.round(
+            (Number(pkg.cumulativeCertified) - Number(existing.grossAmount)) * 100,
+          ) / 100;
+
+          const updated = await prisma.$transaction(async (tx) => {
+            await tx.package.update({
+              where: { id: existing.packageId },
+              data: {
+                cumulativePaid: Math.max(0, newCumulativePaid),
+                retentionHeld: Math.max(0, newRetentionHeld),
+                cumulativeCertified: Math.max(0, newCumulativeCertified),
+              },
+            });
+
+            return tx.paymentCertificate.update({
+              where: { id },
+              data: updateData,
+            });
+          });
+
+          return updated;
         }
       }
 
