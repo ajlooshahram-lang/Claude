@@ -32,7 +32,7 @@ ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard rende
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 
 // 2) navigate every view (simulate clicks)
-const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","raci","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","documents","report","audit","config","help","repair"];
+const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","raci","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","documents","report","audit","config","help","repair","clientview"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -810,6 +810,15 @@ ok(dcPlan.summary.domain === "data-center", "Data center profile detected from d
 // 55) FTTH profile detected from description
 var ftthPlan = window.QIBrain.analyzeProject("Deploy FTTH last mile network passing 50000 homes with splitter cabinets and ONT installation");
 ok(ftthPlan.summary.domain === "terrestrial-ftth", "FTTH profile detected from description");
+
+// 56) Client Portal
+var clientNavBtn = doc.querySelector('.nav-item[data-view="clientview"]');
+ok(clientNavBtn != null, "Client Portal nav item exists");
+
+if (clientNavBtn) clientNavBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+var clientContent = doc.getElementById("content").innerHTML;
+ok(/client-progress-bar-fill/.test(clientContent) && /Progress Indicators/.test(clientContent), "Client Portal renders progress indicators");
+ok(!/FMEA/.test(clientContent) && !/RPN/.test(clientContent), "Client Portal does NOT show FMEA/RPN scores");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

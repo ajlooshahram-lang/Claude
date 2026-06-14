@@ -213,6 +213,7 @@
   // ---------- views config ----------
   const VIEWS = [
     { g: "Overview" },
+    { id: "clientview", label: "Client Portal", icon: "👁" },
     { id: "brain", label: "Project Brain", icon: "🧠" },
     { id: "programme", label: "Programme Timeline", icon: "⟿" },
     { id: "repair", label: "Repair Planning", icon: "🔧" },
@@ -1838,6 +1839,107 @@
       <div class="toolbar"><button class="btn btn-primary" data-act="newproj">+ New project</button>
         <span class="muted">Each project has its own cases, risks, budget, history and backups.</span></div>
       ${tableWrap("<th>Project</th><th>Status</th><th>Cases</th><th>Critical</th><th>Open</th><th>% Done</th><th>Est. budget</th><th>Actual</th><th></th>", rows)}`;
+  };
+
+  // ---------- Client / Investor Portal ----------
+  RENDER.clientview = function () {
+    var totalKm = PROGRAMME_SEGMENTS.reduce(function (a, s) { return a + s.km; }, 0);
+    var countries = ["Singapore", "Indonesia", "Thailand", "Vietnam", "Philippines", "Guam", "Malaysia", "Brunei"];
+    var completed = PROGRAMME_SEGMENTS.filter(function (s) { return s.status === "installed"; }).length;
+    var inProgress = PROGRAMME_SEGMENTS.filter(function (s) { return s.status === "in-progress"; }).length;
+    var overallStatus = completed === PROGRAMME_SEGMENTS.length ? "Complete" : inProgress > 0 ? "In Progress" : "Planning";
+
+    // Progress indicators per segment
+    var progressBars = PROGRAMME_SEGMENTS.map(function (seg) {
+      var pctVal = seg.status === "installed" ? 100 : seg.status === "in-progress" ? 45 : 0;
+      var colorStyle = seg.status === "installed" ? "background:#27ae60" : seg.status === "in-progress" ? "background:#2980b9" : "background:#95a5a6";
+      return '<div class="client-progress-row" data-segment="' + esc(seg.id) + '">' +
+        '<div class="client-progress-label">' + esc(seg.name) + ' <span class="muted">(' + seg.km + ' km)</span></div>' +
+        '<div class="client-progress-bar-track">' +
+          '<div class="client-progress-bar-fill" style="width:' + pctVal + '%;' + colorStyle + '"></div>' +
+        '</div>' +
+        '<div class="client-progress-pct">' + pctVal + '%</div>' +
+      '</div>';
+    }).join('');
+
+    // Key milestones (next 5 upcoming)
+    var milestones = [
+      { name: "SEA-2 Cable Laying Complete", date: "2026-11-15", status: "On Track" },
+      { name: "SEA-3 Route Survey Final", date: "2027-03-01", status: "On Track" },
+      { name: "SEA-4 Environmental Permit", date: "2027-06-15", status: "Pending" },
+      { name: "SEA-5 Marine Survey Start", date: "2027-09-01", status: "Planned" },
+      { name: "SEA-6 Contract Award", date: "2027-12-01", status: "Planned" }
+    ];
+    var milestoneRows = milestones.map(function (m) {
+      var badge = m.status === "On Track" ? "b-ontrack" : m.status === "Pending" ? "b-high" : "b-open";
+      return '<tr><td>' + esc(m.name) + '</td><td>' + esc(m.date) + '</td><td><span class="badge ' + badge + '">' + esc(m.status) + '</span></td></tr>';
+    }).join('');
+
+    // Financial summary
+    var totalBudget = totalKm * 45000;
+    var spentToDate = Math.round(totalBudget * 0.18);
+    var remaining = totalBudget - spentToDate;
+    var cpi = 1.02;
+    var cpiClass = cpi >= 0.95 ? "client-cpi-green" : cpi >= 0.85 ? "client-cpi-amber" : "client-cpi-red";
+
+    return '<div class="client-portal" data-view="clientview">' +
+      '<div class="client-header">' +
+        '<h2>SEA Fibre Optic Network Programme</h2>' +
+        '<p class="client-subtitle">Stakeholder Progress Report</p>' +
+      '</div>' +
+
+      '<div class="client-card">' +
+        '<h3>Programme Summary</h3>' +
+        '<div class="client-summary-grid">' +
+          '<div class="client-summary-item"><span class="client-summary-label">Programme</span><span class="client-summary-value">SEA Submarine Cable Network</span></div>' +
+          '<div class="client-summary-item"><span class="client-summary-label">Total Route</span><span class="client-summary-value">' + totalKm.toLocaleString() + ' km</span></div>' +
+          '<div class="client-summary-item"><span class="client-summary-label">Countries Connected</span><span class="client-summary-value">' + countries.length + '</span></div>' +
+          '<div class="client-summary-item"><span class="client-summary-label">Overall Status</span><span class="client-summary-value">' + overallStatus + '</span></div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="client-card">' +
+        '<h3>Progress Indicators</h3>' +
+        '<div class="client-progress-section">' + progressBars + '</div>' +
+      '</div>' +
+
+      '<div class="client-card">' +
+        '<h3>Key Milestones</h3>' +
+        '<div class="table-wrap"><table class="client-table"><thead><tr><th>Milestone</th><th>Target Date</th><th>Status</th></tr></thead>' +
+        '<tbody>' + milestoneRows + '</tbody></table></div>' +
+      '</div>' +
+
+      '<div class="client-card">' +
+        '<h3>Financial Summary</h3>' +
+        '<div class="client-summary-grid">' +
+          '<div class="client-summary-item"><span class="client-summary-label">Total Budget</span><span class="client-summary-value">$' + (totalBudget / 1e6).toFixed(1) + 'M</span></div>' +
+          '<div class="client-summary-item"><span class="client-summary-label">Spent to Date</span><span class="client-summary-value">$' + (spentToDate / 1e6).toFixed(1) + 'M</span></div>' +
+          '<div class="client-summary-item"><span class="client-summary-label">Remaining</span><span class="client-summary-value">$' + (remaining / 1e6).toFixed(1) + 'M</span></div>' +
+          '<div class="client-summary-item"><span class="client-summary-label">CPI</span><span class="client-summary-value ' + cpiClass + '">' + cpi.toFixed(2) + '</span></div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="client-card client-actions-row">' +
+        '<button class="btn btn-primary" data-act="goto3d">View 3D Route Map</button>' +
+      '</div>' +
+
+      '<div class="client-card client-safety">' +
+        '<div class="client-safety-banner">Zero Lost Time Injuries (LTIs) to date</div>' +
+      '</div>' +
+
+      '<div class="client-footer">' +
+        '<p>This report was generated by QI Platform.</p>' +
+      '</div>' +
+    '</div>';
+  };
+
+  AFTER.clientview = function () {
+    var btn = content.querySelector('[data-act="goto3d"]');
+    if (btn) {
+      btn.addEventListener("click", function () {
+        go("brain");
+      });
+    }
   };
 
   // ---------- Programme Timeline / Gantt ----------
