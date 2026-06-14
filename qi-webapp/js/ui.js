@@ -2568,6 +2568,80 @@
   $("#navAddCase").addEventListener("click", () => openCaseForm());
   $("#btnExport").addEventListener("click", exportJSON);
   $("#btnImport").addEventListener("click", importJSON);
+  // ---------- presentation mode ----------
+  const PRESENT_VIEWS = ["dashboard", "brain", "budget", "evm"];
+  let presentInterval = null;
+  let presentIdx = 0;
+  let presentProgressBar = null;
+  let presentProgressAnim = null;
+
+  function startPresentation() {
+    document.body.classList.add("presenting");
+    // Request fullscreen
+    try { if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen(); } catch (e) {}
+    // Create exit button
+    if (!document.getElementById("exitPresentBtn")) {
+      const btn = document.createElement("button");
+      btn.id = "exitPresentBtn";
+      btn.className = "exit-present-btn";
+      btn.textContent = "Exit";
+      btn.title = "Exit presentation mode";
+      btn.addEventListener("click", stopPresentation);
+      document.body.appendChild(btn);
+    }
+    // Create progress bar
+    if (!document.getElementById("presentProgress")) {
+      const bar = document.createElement("div");
+      bar.id = "presentProgress";
+      bar.className = "present-progress";
+      bar.innerHTML = '<div class="present-progress-fill"></div>';
+      document.body.appendChild(bar);
+      presentProgressBar = bar.querySelector(".present-progress-fill");
+    }
+    // Start cycling
+    presentIdx = 0;
+    go(PRESENT_VIEWS[presentIdx]);
+    resetProgressAnim();
+    presentInterval = setInterval(() => {
+      presentIdx = (presentIdx + 1) % PRESENT_VIEWS.length;
+      go(PRESENT_VIEWS[presentIdx]);
+      resetProgressAnim();
+    }, 8000);
+  }
+
+  function resetProgressAnim() {
+    if (presentProgressBar) {
+      presentProgressBar.style.transition = "none";
+      presentProgressBar.style.width = "0%";
+      // Force reflow then animate
+      void presentProgressBar.offsetWidth;
+      presentProgressBar.style.transition = "width 8s linear";
+      presentProgressBar.style.width = "100%";
+    }
+  }
+
+  function stopPresentation() {
+    document.body.classList.remove("presenting");
+    if (presentInterval) { clearInterval(presentInterval); presentInterval = null; }
+    // Exit fullscreen
+    try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen(); } catch (e) {}
+    // Remove exit button
+    const btn = document.getElementById("exitPresentBtn");
+    if (btn) btn.remove();
+    // Remove progress bar
+    const bar = document.getElementById("presentProgress");
+    if (bar) bar.remove();
+    presentProgressBar = null;
+  }
+
+  // Listen for fullscreenchange to detect ESC exit
+  document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement && document.body.classList.contains("presenting")) {
+      stopPresentation();
+    }
+  });
+
+  $("#btnPresent").addEventListener("click", startPresentation);
   $("#btnShare").addEventListener("click", shareLink);
   $("#btnPrint").addEventListener("click", () => window.print());
   $("#btnTheme").addEventListener("click", toggleTheme);

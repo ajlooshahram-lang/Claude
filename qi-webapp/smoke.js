@@ -701,5 +701,9 @@ if (vendorModalClose) vendorModalClose.click();
 ok(doc.querySelector('meta[name="viewport"]') != null, "viewport meta tag present");
 ok(/@media/.test(cssAll), "CSS contains responsive @media rules");
 
+// 42) Presentation mode
+ok(doc.getElementById("btnPresent") != null, "Present button exists in topbar");
+ok(/body\.presenting/.test(cssAll), "Presentation mode CSS class defined in stylesheet");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
