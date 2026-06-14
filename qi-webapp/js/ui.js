@@ -215,6 +215,7 @@
     { g: "Overview" },
     { id: "brain", label: "Project Brain", icon: "🧠" },
     { id: "programme", label: "Programme Timeline", icon: "⟿" },
+    { id: "repair", label: "Repair Planning", icon: "🔧" },
     { id: "portfolio", label: "Portfolio", icon: "▣" },
     { id: "dashboard", label: "Dashboard", icon: "▤" },
     { id: "cases", label: "Cases (Master)", icon: "★" },
@@ -941,6 +942,113 @@
         go("raci");
       });
     });
+  };
+
+  // ---------- Repair Planning ----------
+  RENDER.repair = function () {
+    var B = window.QIBrain;
+    var db = null;
+    if (B && B._profiles) {
+      var fp = B._profiles.find(function (p) { return p.id === "fibre-telecom"; });
+      if (fp && fp.REPAIR_DATABASE) db = fp.REPAIR_DATABASE;
+    }
+
+    if (!db) {
+      return '<div class="card"><h3>Repair Planning</h3><p class="muted">No repair database available. Ensure the fibre-telecom profile is loaded.</p></div>';
+    }
+
+    // Ship table
+    var shipRows = db.repairShips.map(function (ship) {
+      return '<tr>' +
+        '<td>' + esc(ship.name) + '</td>' +
+        '<td>' + esc(ship.operator) + '</td>' +
+        '<td>' + esc(ship.homePort) + '</td>' +
+        '<td>' + ship.speed + ' kn</td>' +
+        '<td>' + ship.mobilizationDays[0] + '-' + ship.mobilizationDays[1] + ' days</td>' +
+        '<td>$' + Math.round(ship.dayRate[0] / 1000) + '-' + Math.round(ship.dayRate[1] / 1000) + 'k/day</td>' +
+        '<td>' + ship.depthRating.toLocaleString() + 'm</td>' +
+        '</tr>';
+    }).join('');
+
+    var shipTable = '<div class="card"><h3>Cable Repair Vessel Fleet</h3>' +
+      '<div class="table-wrap"><table id="repairShipTable"><thead><tr>' +
+      '<th>Vessel</th><th>Operator</th><th>Home Port</th><th>Speed</th><th>Mobilization</th><th>Day Rate</th><th>Depth Rating</th>' +
+      '</tr></thead><tbody>' + shipRows + '</tbody></table></div></div>';
+
+    // Spare depots
+    var depotRows = db.spareDepots.map(function (d) {
+      return '<tr><td>' + esc(d.location) + '</td><td>' + esc(d.region) + '</td>' +
+        '<td>' + d.stockPercent + '% of system length</td>' +
+        '<td class="wrap">' + esc(d.description) + '</td></tr>';
+    }).join('');
+
+    var depotTable = '<div class="card"><h3>Spare Cable Depots</h3>' +
+      '<div class="table-wrap"><table><thead><tr><th>Location</th><th>Region</th><th>Stock Level</th><th>Coverage</th></tr></thead><tbody>' +
+      depotRows + '</tbody></table></div></div>';
+
+    // Repair scenarios
+    var scenarioRows = db.repairScenarios.map(function (s) {
+      return '<tr><td>' + esc(s.label) + '</td>' +
+        '<td>' + s.repairDays[0] + '-' + s.repairDays[1] + ' days</td>' +
+        '<td>$' + (s.costRange[0] / 1000000).toFixed(0) + '-' + (s.costRange[1] / 1000000).toFixed(0) + 'M</td>' +
+        '<td class="wrap">' + esc(s.description) + '</td></tr>';
+    }).join('');
+
+    var scenarioTable = '<div class="card"><h3>Repair Scenarios by Depth</h3>' +
+      '<div class="table-wrap"><table><thead><tr><th>Scenario</th><th>Duration</th><th>Cost Range</th><th>Description</th></tr></thead><tbody>' +
+      scenarioRows + '</tbody></table></div></div>';
+
+    // Repair calculator
+    var depthOptions = '<option value="100">Shallow (100m)</option>' +
+      '<option value="500">Mid-depth (500m)</option>' +
+      '<option value="1000">Mid-depth (1000m)</option>' +
+      '<option value="2000">Deep (2000m)</option>' +
+      '<option value="4000">Very Deep (4000m)</option>' +
+      '<option value="6000">Ultra Deep (6000m)</option>';
+
+    var faultOptions = '<option value="cable-break">Cable Break</option>' +
+      '<option value="shunt-fault">Shunt Fault</option>' +
+      '<option value="multiple-break">Multiple Break</option>' +
+      '<option value="repeater-failure">Repeater Failure</option>';
+
+    var calculator = '<div class="card" id="repairCalculator"><h3>Repair Cost Calculator</h3>' +
+      '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px">' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Fault Depth</span><select id="repairDepth">' + depthOptions + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Fault Type</span><select id="repairFaultType">' + faultOptions + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Distance from Depot (km)</span><select id="repairDistance">' +
+      '<option value="100">100 km</option><option value="300">300 km</option><option value="500" selected>500 km</option><option value="1000">1000 km</option><option value="2000">2000 km</option>' +
+      '</select></label>' +
+      '<button id="repairCalcBtn" class="btn-primary" style="padding:8px 16px">Calculate</button></div>' +
+      '<div id="repairResult" class="muted">Select parameters and click Calculate to estimate repair cost.</div></div>';
+
+    return '<h2 style="margin-bottom:16px">Cable Repair & Restoration Planning</h2>' +
+      shipTable + depotTable + scenarioTable + calculator;
+  };
+
+  AFTER.repair = function () {
+    var calcBtn = document.getElementById("repairCalcBtn");
+    if (calcBtn) {
+      calcBtn.addEventListener("click", function () {
+        var depth = Number(document.getElementById("repairDepth").value);
+        var faultType = document.getElementById("repairFaultType").value;
+        var distance = Number(document.getElementById("repairDistance").value);
+        var B = window.QIBrain;
+        if (!B || !B.estimateRepairCost) return;
+        var result = B.estimateRepairCost({ depth: depth, distanceFromDepotKm: distance, faultType: faultType });
+        if (!result) return;
+        var html = '<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:16px;margin-top:8px">' +
+          '<h4 style="margin:0 0 12px 0">Repair Estimate</h4>' +
+          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">' +
+          '<div><strong>Nearest Ship:</strong><br>' + esc(result.nearestShip) + '</div>' +
+          '<div><strong>Transit:</strong><br>' + result.transitDays + ' days</div>' +
+          '<div><strong>Repair Duration:</strong><br>' + result.repairDays + ' days</div>' +
+          '<div><strong>Total Duration:</strong><br>' + result.totalDays + ' days</div>' +
+          '<div><strong>Estimated Cost:</strong><br>$' + result.estimatedCost.toLocaleString() + '</div>' +
+          '<div><strong>Scenario:</strong><br>' + esc(result.scenario) + '</div>' +
+          '</div></div>';
+        document.getElementById("repairResult").innerHTML = html;
+      });
+    }
   };
 
   RENDER.budget = function () {

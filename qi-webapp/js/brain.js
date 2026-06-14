@@ -1014,6 +1014,30 @@
       "FIDIC-19": { number: "19", title: "Force Majeure", summary: "Defines force majeure events, notice requirements, duty to minimize delay, and termination rights for prolonged force majeure.", submarineRelevance: "Submarine force majeure includes tsunami, volcanic eruption, armed conflict in territorial waters, and extreme weather beyond seasonal norms." },
       "FIDIC-20": { number: "20", title: "Claims, Disputes and Arbitration", summary: "Claims procedure with 28-day notice requirement, detailed particulars within 42 days, DAB referral, and ICC arbitration.", submarineRelevance: "Submarine cable disputes often arise from unforeseen seabed conditions, vessel delays, and multi-jurisdictional permitting. Strict 28-day notice is critical." }
     },
+
+    // ---- Cable Repair & Restoration Planning Database ----------------------
+    REPAIR_DATABASE: {
+      repairShips: [
+        { name: "CS Sovereign", operator: "Global Marine", homePort: "UK", speed: 12, mobilizationDays: [7, 14], dayRate: [150000, 200000], depthRating: 2000 },
+        { name: "CS Cable Innovator", operator: "Global Marine", homePort: "UK", speed: 12, mobilizationDays: [7, 14], dayRate: [120000, 180000], depthRating: 1500 },
+        { name: "Ile de Re", operator: "ASN/Nokia", homePort: "France", speed: 13, mobilizationDays: [10, 21], dayRate: [180000, 250000], depthRating: 6000 },
+        { name: "Ile de Brehat", operator: "ASN/Nokia", homePort: "France", speed: 12, mobilizationDays: [10, 21], dayRate: [150000, 200000], depthRating: 4000 },
+        { name: "Subcom Reliance", operator: "SubCom", homePort: "USA", speed: 11, mobilizationDays: [14, 28], dayRate: [200000, 300000], depthRating: 8000 },
+        { name: "KDD Ocean Link", operator: "NTT-WEM", homePort: "Japan", speed: 11, mobilizationDays: [7, 14], dayRate: [120000, 180000], depthRating: 3000 },
+        { name: "Fu Hai", operator: "HMN Tech", homePort: "China", speed: 12, mobilizationDays: [5, 10], dayRate: [80000, 150000], depthRating: 4000 },
+        { name: "Asean Explorer", operator: "E-Marine", homePort: "UAE", speed: 10, mobilizationDays: [10, 21], dayRate: [100000, 160000], depthRating: 2000 }
+      ],
+      spareDepots: [
+        { location: "Singapore", region: "Southeast Asia", stockPercent: 2.5, description: "Primary regional spare cable depot covering Malacca Strait and South China Sea routes" },
+        { location: "Guam", region: "Western Pacific", stockPercent: 2.0, description: "Pacific depot covering trans-Pacific and Asia-US cable segments" },
+        { location: "Manila", region: "Philippines", stockPercent: 3.0, description: "Depot covering Philippine inter-island and regional cable systems" }
+      ],
+      repairScenarios: [
+        { id: "shallow", label: "Shallow Water (<200m)", maxDepth: 200, repairDays: [7, 14], costRange: [2000000, 5000000], description: "Grapnel recovery, cut-and-splice repair in continental shelf waters" },
+        { id: "mid", label: "Mid-Depth (200-1500m)", maxDepth: 1500, repairDays: [14, 28], costRange: [5000000, 10000000], description: "ROV-assisted recovery, complex jointing at moderate depths" },
+        { id: "deep", label: "Deep Water (>1500m)", maxDepth: 99999, repairDays: [21, 45], costRange: [8000000, 20000000], description: "Deep-water grapnel with specialized equipment, extended vessel time" }
+      ]
+    },
   };
 
   // ---- GENERIC PM profile (fallback) --------------------------------------
@@ -2515,6 +2539,103 @@
     };
   }
 
+  // ---- Cable Repair & Restoration Planning --------------------------------
+  function estimateRepairCost(opts) {
+    opts = opts || {};
+    var depth = Number(opts.depth) || 500;
+    var distanceFromDepotKm = Number(opts.distanceFromDepotKm) || 200;
+    var faultType = opts.faultType || "cable-break";
+
+    var db = fibreProfile.REPAIR_DATABASE;
+    if (!db) return null;
+
+    // Find repair scenario based on depth
+    var scenario = null;
+    for (var i = 0; i < db.repairScenarios.length; i++) {
+      var s = db.repairScenarios[i];
+      if (i === 0 && depth <= s.maxDepth) { scenario = s; break; }
+      if (i === 1 && depth > 200 && depth <= s.maxDepth) { scenario = s; break; }
+      if (i === 2 && depth > 1500) { scenario = s; break; }
+    }
+    if (!scenario) scenario = db.repairScenarios[2]; // default to deep
+
+    // Find nearest capable ship (by depth rating and closest home port region)
+    var capableShips = db.repairShips.filter(function (ship) {
+      return ship.depthRating >= depth;
+    });
+    if (capableShips.length === 0) capableShips = [db.repairShips[4]]; // Subcom Reliance as fallback
+
+    // Pick ship with fastest mobilization
+    var nearestShip = capableShips[0];
+    for (var j = 1; j < capableShips.length; j++) {
+      if (capableShips[j].mobilizationDays[0] < nearestShip.mobilizationDays[0]) {
+        nearestShip = capableShips[j];
+      }
+    }
+
+    // Calculate transit days based on distance and ship speed
+    var transitDays = Math.ceil(distanceFromDepotKm / (nearestShip.speed * 24 * 1.852));
+    if (transitDays < 1) transitDays = 1;
+
+    // Repair days from scenario
+    var repairDaysMin = scenario.repairDays[0];
+    var repairDaysMax = scenario.repairDays[1];
+    var repairDays = Math.round((repairDaysMin + repairDaysMax) / 2);
+
+    // Fault type multiplier
+    var faultMultiplier = 1.0;
+    if (faultType === "shunt-fault") faultMultiplier = 0.8;
+    else if (faultType === "multiple-break") faultMultiplier = 1.5;
+    else if (faultType === "repeater-failure") faultMultiplier = 1.8;
+
+    // Total days
+    var mobilizationDays = Math.round((nearestShip.mobilizationDays[0] + nearestShip.mobilizationDays[1]) / 2);
+    var totalDays = mobilizationDays + (transitDays * 2) + repairDays;
+
+    // Cost estimate
+    var avgDayRate = (nearestShip.dayRate[0] + nearestShip.dayRate[1]) / 2;
+    var vesselCost = totalDays * avgDayRate;
+    var materialCost = (scenario.costRange[0] + scenario.costRange[1]) / 2 * 0.3;
+    var estimatedCost = Math.round((vesselCost + materialCost) * faultMultiplier);
+
+    return {
+      nearestShip: nearestShip.name,
+      transitDays: transitDays,
+      repairDays: repairDays,
+      totalDays: totalDays,
+      estimatedCost: estimatedCost,
+      scenario: scenario.label,
+      faultType: faultType
+    };
+  }
+
+  function getRepairStrategy() {
+    var db = fibreProfile.REPAIR_DATABASE;
+    if (!db) return null;
+
+    var depots = db.spareDepots.map(function (d) {
+      return {
+        location: d.location,
+        region: d.region,
+        stockPercent: d.stockPercent,
+        description: d.description
+      };
+    });
+
+    return {
+      depots: depots,
+      totalShips: db.repairShips.length,
+      repairScenarios: db.repairScenarios.map(function (s) {
+        return {
+          id: s.id,
+          label: s.label,
+          repairDays: s.repairDays,
+          costRange: s.costRange
+        };
+      })
+    };
+  }
+
   var API = {
     analyzeProject: analyzeProject,
     listProfiles: listProfiles,
@@ -2537,7 +2658,9 @@
     monteCarloSchedule: monteCarloSchedule,
     monteCarloCost: monteCarloCost,
     riskQuantification: riskQuantification,
-    pertRandom: pertRandom
+    pertRandom: pertRandom,
+    estimateRepairCost: estimateRepairCost,
+    getRepairStrategy: getRepairStrategy
   };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIBrain = API;

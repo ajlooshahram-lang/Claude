@@ -15,7 +15,7 @@ const html = fs.readFileSync(path.join(root, "index.html"), "utf8")
   .replace('<script src="js/store.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/store.js"))}</script>`)
   .replace('<script src="js/brain.js"></script>', () => `<script>${fs.readFileSync(path.join(root, "js/brain.js"))}</script>`)
   .replace('<script src="js/charts.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/charts.js"))}</script>`)
-  .replace('<script src="js/ui.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/ui.js"))}</script>`);
+  .replace('<script src="js/ui.js"></script>', () => `<script>${fs.readFileSync(path.join(root, "js/ui.js"))}</script>`);
 
 const dom = new JSDOM(html, { runScripts: "dangerously", url: "http://localhost/", pretendToBeVisual: true });
 const { window } = dom;
@@ -32,7 +32,7 @@ ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard rende
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 
 // 2) navigate every view (simulate clicks)
-const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","raci","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","documents","report","audit","config","help"];
+const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","raci","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","documents","report","audit","config","help","repair"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -787,6 +787,17 @@ ok(raciTable != null && raciTable.tagName === "TABLE", "RACI matrix renders a ta
 
 var raciCountry = doc.getElementById("raciCountryAuthorities");
 ok(raciCountry != null, "RACI country authorities section exists");
+
+// 52) Repair Planning
+var repairNavBtn = doc.querySelector('.nav-item[data-view="repair"]');
+ok(repairNavBtn != null, "Repair Planning nav item exists");
+
+if (repairNavBtn) repairNavBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+var repairShipTable = doc.getElementById("repairShipTable");
+ok(repairShipTable != null && repairShipTable.tagName === "TABLE", "Repair ship table renders");
+
+var repairCalc = doc.getElementById("repairCalculator");
+ok(repairCalc != null, "Repair scenario calculator exists");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
