@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Implement auth module (register, login, logout, session management, TOTP MFA), RBAC middleware, and Case CRUD routes with full tenant isolation.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Update src/db.ts to export a properly-typed PrismaClient singleton (not the lazy dynamic import pattern - we need full type safety for queries). Keep the checkDatabase function.",
     "Create src/auth/password.ts: hashPassword(plain) and verifyPassword(hash, plain) using @node-rs/argon2 with Argon2id algorithm, conservative parameters (memoryCost=65536, timeCost=3, parallelism=1)",
@@ -31,5 +31,5 @@
     "npm test passes all tests (existing + new)"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "1. @node-rs/argon2 Algorithm enum cannot be imported with verbatimModuleSyntax - used numeric value 2 for Argon2id instead. 2. exactOptionalPropertyTypes requires filtering out undefined values before passing to Prisma update - used Object.entries filter pattern. 3. SESSION_SECRET given a zod default for dev/test; production check updated to detect the default value rather than absence."
 }
