@@ -1,0 +1,7 @@
+{
+  "task_id": "task-secure-backend-phase1-auth",
+  "task_description": "Phase 1 secure backend: authentication (Argon2id + server-side sessions + TOTP MFA), RBAC middleware, Case CRUD with tenant isolation, integration tests with real Postgres, and CI update.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}

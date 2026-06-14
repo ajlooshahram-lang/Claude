@@ -1,0 +1,35 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Implement auth module (register, login, logout, session management, TOTP MFA), RBAC middleware, and Case CRUD routes with full tenant isolation.",
+  "status": "pending",
+  "steps": [
+    "Update src/db.ts to export a properly-typed PrismaClient singleton (not the lazy dynamic import pattern - we need full type safety for queries). Keep the checkDatabase function.",
+    "Create src/auth/password.ts: hashPassword(plain) and verifyPassword(hash, plain) using @node-rs/argon2 with Argon2id algorithm, conservative parameters (memoryCost=65536, timeCost=3, parallelism=1)",
+    "Create src/auth/session.ts: generateSessionToken() (32 random bytes as hex), hashToken(token) (SHA-256), createSession(userId, token, userAgent, ip, expiresInMs=7*24*60*60*1000), validateSession(tokenHash) that checks expiry and revocation, revokeSession(tokenHash)",
+    "Create src/auth/totp.ts: generateTotpSecret(), verifyTotpToken(secret, token) using otplib",
+    "Create src/auth/routes.ts: Fastify plugin registering POST /auth/register, POST /auth/login, POST /auth/logout, GET /auth/me, POST /auth/mfa/enroll, POST /auth/mfa/verify. Register creates Tenant+User+Membership(OWNER) in a transaction. Login verifies password then checks MFA if enabled. Session token delivered via httpOnly/secure/sameSite=strict cookie named 'session'. Rate limits: 3/min register, 5/min login.",
+    "Create src/middleware/rbac.ts: Fastify preHandler hook that reads session cookie, validates session via tokenHash lookup, loads user+membership, decorates request with { user, membership, tenantId }. Export requireRole(minimumRole) factory that returns a preHandler checking role hierarchy (OWNER > ADMIN > MANAGER > VIEWER).",
+    "Create src/routes/cases.ts: Fastify plugin with GET /cases (list by projectId query param, scoped by tenantId), GET /cases/:id, POST /cases, PATCH /cases/:id, DELETE /cases/:id (soft-delete sets deletedAt). All queries include WHERE tenantId = authenticated user's tenantId. Use zod for request body validation.",
+    "Update src/app.ts to register @fastify/cookie, the auth routes plugin, and the cases routes plugin. Cookie secret comes from config.sessionSecret.",
+    "Update src/config.ts if needed to ensure SESSION_SECRET is available in test/dev (provide a default for non-prod)."
+  ],
+  "acceptance_criteria": [
+    "POST /auth/register creates a tenant, user (with argon2id hashed password), and OWNER membership",
+    "POST /auth/login returns a session cookie (httpOnly, secure in prod, sameSite=strict) and stores only SHA-256 hash of token in DB",
+    "POST /auth/logout revokes the session",
+    "GET /auth/me returns the current user when session is valid, 401 otherwise",
+    "TOTP enrollment generates a secret, verification validates a 6-digit code",
+    "RBAC middleware rejects requests without valid session (401) and requests with insufficient role (403)",
+    "Case CRUD operations are all scoped by tenantId - no cross-tenant data access possible",
+    "Soft-delete on cases sets deletedAt and excludes from list queries",
+    "Rate limiting is applied to auth endpoints (3/min register, 5/min login)",
+    "Error messages never reveal whether an email exists (generic 'invalid credentials')"
+  ],
+  "verification": [
+    "npm run build succeeds",
+    "npm test passes all tests (existing + new)"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Integration tests for auth flow and Case CRUD with real Postgres, plus CI workflow update with Postgres service container.",
+  "status": "pending",
+  "steps": [
+    "Create test/auth.test.ts: integration tests using real Postgres via Docker (the container from FEAT-001). Tests: register success, register duplicate email fails, login success, login wrong password (generic error), logout invalidates session, GET /auth/me with valid/invalid session, MFA enroll + verify flow. Use fastify.inject() for all HTTP calls. Parse set-cookie header to extract session token for subsequent requests.",
+    "Create test/cases.test.ts: integration tests for Case CRUD. Setup: register two users in different tenants. Tests: create case (POST), list cases (GET with projectId filter), get case by id, update case (PATCH), soft-delete case (DELETE returns 200, subsequent GET returns 404), tenant isolation (user A cannot GET/PATCH/DELETE user B's case - returns 404 not 403 to avoid leaking existence).",
+    "Create test/helpers.ts: shared test utilities - buildTestApp() that creates app with test config pointing to real DB, registerUser() helper that creates tenant+user and returns session cookie, cleanDatabase() that truncates tables between tests.",
+    "Update .github/workflows/backend-ci.yml: add a postgres service container (postgres:16-alpine, POSTGRES_PASSWORD=qi, POSTGRES_USER=qi, POSTGRES_DB=qi_platform, health checks). Set DATABASE_URL and SESSION_SECRET env vars for the test step. Add prisma migrate deploy step before tests.",
+    "Ensure test isolation: each test file cleans up its data so tests can run independently and in any order."
+  ],
+  "acceptance_criteria": [
+    "test/auth.test.ts passes with all auth flow scenarios covered",
+    "test/cases.test.ts passes with CRUD operations and tenant isolation verified",
+    "Tenant isolation test proves user in tenant A gets 404 (not 403) when accessing tenant B's case",
+    "CI workflow runs tests against real Postgres service container",
+    "All tests are independent and can run in any order",
+    "npm test passes all tests (health + auth + cases)"
+  ],
+  "verification": [
+    "npm run build succeeds",
+    "npm test passes all tests with DATABASE_URL pointing to local Docker Postgres",
+    "Review .github/workflows/backend-ci.yml has postgres service and migration step"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
