@@ -546,11 +546,22 @@
   function getMode() { return mode; }
 
   // Wrap case mutations to also sync via API when mode='api'
+  function notifySyncError(action, err) {
+    var msg = "Sync failed (" + action + "): change saved locally";
+    if (typeof root.dispatchEvent === "function") {
+      root.dispatchEvent(new (root.CustomEvent || root.Event)("qi-sync-error", { detail: { action: action, error: err } }));
+    }
+    if (typeof console !== "undefined") console.warn("[QI sync]", msg, err);
+  }
+
   var _addCase = addCase;
   addCase = function (c) {
     var result = _addCase(c);
     if (mode === "api" && typeof root.QIAPI !== "undefined" && root.QIAPI) {
-      try { root.QIAPI.createCase(result); } catch (e) {}
+      try {
+        var p = root.QIAPI.createCase(result);
+        if (p && typeof p.catch === "function") p.catch(function (e) { notifySyncError("createCase", e); });
+      } catch (e) { notifySyncError("createCase", e); }
     }
     return result;
   };
@@ -558,7 +569,10 @@
   updateCase = function (id, patch) {
     var result = _updateCase(id, patch);
     if (mode === "api" && typeof root.QIAPI !== "undefined" && root.QIAPI) {
-      try { root.QIAPI.updateCase(id, patch); } catch (e) {}
+      try {
+        var p = root.QIAPI.updateCase(id, patch);
+        if (p && typeof p.catch === "function") p.catch(function (e) { notifySyncError("updateCase", e); });
+      } catch (e) { notifySyncError("updateCase", e); }
     }
     return result;
   };
@@ -566,7 +580,10 @@
   deleteCase = function (id) {
     var result = _deleteCase(id);
     if (mode === "api" && typeof root.QIAPI !== "undefined" && root.QIAPI) {
-      try { root.QIAPI.deleteCase(id); } catch (e) {}
+      try {
+        var p = root.QIAPI.deleteCase(id);
+        if (p && typeof p.catch === "function") p.catch(function (e) { notifySyncError("deleteCase", e); });
+      } catch (e) { notifySyncError("deleteCase", e); }
     }
     return result;
   };

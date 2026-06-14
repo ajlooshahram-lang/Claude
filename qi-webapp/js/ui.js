@@ -2208,6 +2208,15 @@
     if (emailEl) emailEl.focus();
   }
 
+  function revealMfaChallenge() {
+    mfaRequired = true;
+    const mfaField = $("#mfaField");
+    if (mfaField) mfaField.hidden = false;
+    showAuthError("MFA required. Enter the 6-digit code.");
+    const mfaInput = $("#auth_mfa");
+    if (mfaInput) mfaInput.focus();
+  }
+
   async function handleAuthSubmit() {
     if (!API) return;
     const errEl = $("#authError");
@@ -2240,26 +2249,12 @@
       if (btn) { btn.disabled = false; btn.textContent = "Login"; }
       if (res.ok) {
         if (res.data && res.data.mfaRequired) {
-          mfaRequired = true;
-          const mfaField = $("#mfaField");
-          if (mfaField) mfaField.hidden = false;
-          showAuthError("MFA required. Enter the 6-digit code.");
-          const mfaInput = $("#auth_mfa");
-          if (mfaInput) mfaInput.focus();
+          revealMfaChallenge();
         } else {
           onAuthSuccess();
         }
       } else {
-        if (res.data && res.data && res.data.mfaRequired) {
-          mfaRequired = true;
-          const mfaField = $("#mfaField");
-          if (mfaField) mfaField.hidden = false;
-          showAuthError("MFA required. Enter the 6-digit code.");
-          const mfaInput = $("#auth_mfa");
-          if (mfaInput) mfaInput.focus();
-        } else {
-          showAuthError(res.error || "Login failed.");
-        }
+        showAuthError(res.error || "Login failed.");
       }
     }
   }
@@ -2307,8 +2302,11 @@
         const initialHash = (location.hash || "").replace(/^#/, "");
         go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
       } else {
-        if (res.error === "fetch not available" || res.error === "Network error") {
-          // Backend unreachable - fall back to local mode
+        // Determine if error is an auth error (401/403) or server unreachable
+        const errStr = (res.error || "").toLowerCase();
+        const isAuthError = errStr.includes("authenticat") || errStr.includes("authoriz") || errStr.includes("401") || errStr.includes("403");
+        if (!isAuthError) {
+          // Backend unreachable or server error - fall back to local mode
           S.setMode("local");
           connStatus = "local";
           updateConnDot();
@@ -2317,7 +2315,7 @@
           const initialHash = (location.hash || "").replace(/^#/, "");
           go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
         } else {
-          // 401 or other auth error - show login
+          // 401 or 403 auth error - show login
           connStatus = "error";
           updateConnDot();
           updateLogoutBtn();
