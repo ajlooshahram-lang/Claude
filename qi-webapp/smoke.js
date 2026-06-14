@@ -663,5 +663,37 @@ ok(nonExemptInputs.length === 0, "Intel: No free-text/number inputs in brain vie
 const cancelBtn = lessonModal.querySelector("[data-act=cancel]");
 if (cancelBtn) cancelBtn.click();
 
+// 40) Vendor Directory UI panel in Brain view
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const vendorPanel = doc.getElementById("brainVendorPanel");
+ok(vendorPanel != null, "Vendor: panel exists in Brain view");
+ok(/Vendor Directory/.test(vendorPanel.innerHTML), "Vendor: panel title rendered");
+ok(doc.getElementById("vendorCatFilter") != null, "Vendor: category filter dropdown exists");
+ok(doc.getElementById("vendorRegFilter") != null, "Vendor: region filter dropdown exists");
+ok(doc.getElementById("vendorBudFilter") != null, "Vendor: budget tier filter dropdown exists");
+ok(doc.getElementById("vendorCompareBtn") != null, "Vendor: Compare Selected button exists");
+const vendorTableWrap = doc.getElementById("vendorTableWrap");
+ok(vendorTableWrap != null && vendorTableWrap.innerHTML.length > 100, "Vendor: table renders with vendor data");
+const vendorChks = vendorTableWrap.querySelectorAll(".vendor-chk");
+ok(vendorChks.length === 38, "Vendor: all 38 vendors shown by default");
+
+// 41) Vendor comparison modal
+// Select first two vendors and click compare
+vendorChks[0].checked = true;
+vendorChks[0].dispatchEvent(new window.Event("change", { bubbles: true }));
+vendorChks[1].checked = true;
+vendorChks[1].dispatchEvent(new window.Event("change", { bubbles: true }));
+const compareBtn2 = doc.getElementById("vendorCompareBtn");
+ok(!compareBtn2.disabled, "Vendor: Compare button enabled after selecting 2 vendors");
+compareBtn2.click();
+const vendorModal = doc.getElementById("modal");
+ok(vendorModal && /Vendor Comparison/.test(vendorModal.innerHTML), "Vendor: comparison modal opens with title");
+ok(/Attribute/.test(vendorModal.innerHTML), "Vendor: comparison modal has attribute column");
+ok(/Capabilities/.test(vendorModal.innerHTML) && /Products/.test(vendorModal.innerHTML), "Vendor: comparison modal shows capabilities and products");
+ok(/Price Range/.test(vendorModal.innerHTML) && /Lead Time/.test(vendorModal.innerHTML), "Vendor: comparison modal shows price range and lead time");
+// Close comparison modal
+const vendorModalClose = vendorModal.querySelector("[data-act=cancel]");
+if (vendorModalClose) vendorModalClose.click();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

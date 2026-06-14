@@ -813,7 +813,30 @@
       <button class="btn btn-primary" id="brainRecordLesson">Record lesson</button>
     </div>`;
 
-    container.innerHTML = healthHtml + findingsHtml + patternsHtml + recsHtml + lessonsHtml;
+    // --- Vendor Directory Panel ---
+    const vendorCategories = ["All", "Turnkey Systems", "Cable Manufacturers", "Installation Vessels", "Survey & Engineering", "Equipment & Components", "Landing Stations", "Consulting"];
+    const vendorRegions = ["All", "Asia-Pacific", "Europe", "Americas", "Middle East", "Southeast Asia", "Nordic"];
+    const vendorBudgets = ["All", "Premium", "Mid-range", "Competitive"];
+    const catFilterOpts = vendorCategories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+    const regFilterOpts = vendorRegions.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join("");
+    const budFilterOpts = vendorBudgets.map(b => `<option value="${esc(b)}">${esc(b)}</option>`).join("");
+
+    const vendorHtml = `<div class="card" id="brainVendorPanel">
+      <h3>Vendor Directory <span class="tag">38 vendors</span></h3>
+      <div class="toolbar" style="flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <label class="muted">Category</label>
+        <select id="vendorCatFilter" style="max-width:200px">${catFilterOpts}</select>
+        <label class="muted">Region</label>
+        <select id="vendorRegFilter" style="max-width:180px">${regFilterOpts}</select>
+        <label class="muted">Budget Tier</label>
+        <select id="vendorBudFilter" style="max-width:160px">${budFilterOpts}</select>
+        <span class="grow"></span>
+        <button class="btn btn-primary" id="vendorCompareBtn" disabled>Compare Selected</button>
+      </div>
+      <div id="vendorTableWrap"></div>
+    </div>`;
+
+    container.innerHTML = healthHtml + findingsHtml + patternsHtml + recsHtml + lessonsHtml + vendorHtml;
 
     // Wire "Confirm" buttons for pending lessons
     container.querySelectorAll(".brainConfirmLesson").forEach(btn => {
@@ -831,6 +854,150 @@
     // Wire "Record lesson" button
     const recordBtn = $("#brainRecordLesson");
     if (recordBtn) recordBtn.addEventListener("click", openRecordLessonModal);
+
+    // --- Vendor Directory wiring ---
+    const vendorSelected = new Set();
+
+    function categoryToFilter(cat) {
+      const map = { "Turnkey Systems": "turnkey-systems", "Cable Manufacturers": "cable-manufacturers", "Installation Vessels": "installation-vessels", "Survey & Engineering": "survey-engineering", "Equipment & Components": "equipment-components", "Landing Stations": "landing-stations", "Consulting": "consulting" };
+      return map[cat] || "";
+    }
+    function budgetToFilter(b) {
+      const map = { "Premium": "premium", "Mid-range": "mid", "Competitive": "competitive" };
+      return map[b] || "";
+    }
+    function regionToFilter(r) {
+      const map = { "Asia-Pacific": "asia-pacific", "Europe": "europe", "Americas": "americas", "Middle East": "middle-east", "Southeast Asia": "southeast-asia", "Nordic": "nordic" };
+      return map[r] || "";
+    }
+    function categoryLabel(cat) {
+      const map = { "turnkey-systems": "Turnkey", "cable-manufacturers": "Cable Mfr", "installation-vessels": "Vessels", "survey-engineering": "Survey", "equipment-components": "Equipment", "landing-stations": "Landing", "consulting": "Consulting" };
+      return map[cat] || cat;
+    }
+    function priceLabel(p) {
+      const map = { "premium": "Premium", "mid": "Mid-range", "competitive": "Competitive" };
+      return map[p] || p;
+    }
+    function priceBadgeCls(p) {
+      const map = { "premium": "b-critical", "mid": "b-progress", "competitive": "b-ontrack" };
+      return map[p] || "b-open";
+    }
+
+    function renderVendorTable() {
+      const catVal = ($("#vendorCatFilter") || {}).value || "All";
+      const regVal = ($("#vendorRegFilter") || {}).value || "All";
+      const budVal = ($("#vendorBudFilter") || {}).value || "All";
+      const criteria = {};
+      if (catVal !== "All") criteria.category = categoryToFilter(catVal);
+      if (regVal !== "All") criteria.region = regionToFilter(regVal);
+      if (budVal !== "All") criteria.budgetTier = budgetToFilter(budVal);
+      const vendors = QIBrain.vendorSearch(criteria);
+      const rows = vendors.map(v => {
+        const strengthsStr = (v.strengths || []).slice(0, 2).join(", ");
+        const truncStr = strengthsStr.length > 60 ? strengthsStr.slice(0, 57) + "..." : strengthsStr;
+        return `<tr>
+          <td class="center"><input type="checkbox" class="vendor-chk" data-vid="${esc(v.id)}" ${vendorSelected.has(v.id) ? "checked" : ""}></td>
+          <td><b>${esc(v.company)}</b></td>
+          <td>${esc(v.hq)}</td>
+          <td><span class="badge b-open">${esc(categoryLabel(v.category))}</span></td>
+          <td><span class="badge ${priceBadgeCls(v.priceRange)}">${esc(priceLabel(v.priceRange))}</span></td>
+          <td class="wrap muted">${esc(truncStr)}</td>
+        </tr>`;
+      }).join("");
+      const head = `<th class="center"><input type="checkbox" id="vendorSelectAll"></th><th>Company</th><th>HQ</th><th>Category</th><th>Price</th><th class="wrap">Key Strengths</th>`;
+      const wrap = $("#vendorTableWrap");
+      if (wrap) {
+        wrap.innerHTML = vendors.length > 0
+          ? tableWrap(head, rows, "vendor-tbl")
+          : `<p class="muted">No vendors match the selected filters.</p>`;
+        wireVendorCheckboxes();
+      }
+    }
+
+    function wireVendorCheckboxes() {
+      const wrap = $("#vendorTableWrap");
+      if (!wrap) return;
+      wrap.querySelectorAll(".vendor-chk").forEach(cb => {
+        cb.addEventListener("change", () => {
+          if (cb.checked) vendorSelected.add(cb.dataset.vid);
+          else vendorSelected.delete(cb.dataset.vid);
+          updateCompareBtn();
+          const sa = $("#vendorSelectAll");
+          if (sa) {
+            const all = wrap.querySelectorAll(".vendor-chk");
+            sa.checked = all.length > 0 && [...all].every(c => c.checked);
+          }
+        });
+      });
+      const sa = $("#vendorSelectAll");
+      if (sa) sa.addEventListener("change", () => {
+        wrap.querySelectorAll(".vendor-chk").forEach(cb => {
+          cb.checked = sa.checked;
+          if (sa.checked) vendorSelected.add(cb.dataset.vid);
+          else vendorSelected.delete(cb.dataset.vid);
+        });
+        updateCompareBtn();
+      });
+    }
+
+    function updateCompareBtn() {
+      const btn = $("#vendorCompareBtn");
+      if (btn) {
+        btn.disabled = vendorSelected.size < 2;
+        btn.textContent = vendorSelected.size > 0 ? `Compare Selected (${vendorSelected.size})` : "Compare Selected";
+      }
+    }
+
+    function openVendorCompareModal() {
+      const ids = [...vendorSelected];
+      if (ids.length < 2) { toast("Select at least 2 vendors to compare."); return; }
+      const result = QIBrain.vendorComparison(ids);
+      if (!result.vendors || result.vendors.length === 0) { toast("No vendors found."); return; }
+      const vendors = result.vendors;
+      const fields = [
+        { key: "company", label: "Company" },
+        { key: "hq", label: "HQ" },
+        { key: "capabilities", label: "Capabilities", isList: true },
+        { key: "products", label: "Products", isList: true },
+        { key: "notableProjects", label: "Notable Projects", isList: true },
+        { key: "priceRange", label: "Price Range" },
+        { key: "leadTime", label: "Lead Time" },
+        { key: "strengths", label: "Strengths", isList: true },
+        { key: "considerations", label: "Considerations", isList: true }
+      ];
+      const headerCols = vendors.map(v => `<th>${esc(v.company)}</th>`).join("");
+      const bodyRows = fields.map(f => {
+        const cells = vendors.map(v => {
+          const val = v[f.key];
+          if (f.isList && Array.isArray(val)) return `<td class="wrap">${val.map(item => esc(item)).join("<br>")}</td>`;
+          return `<td>${esc(val || "")}</td>`;
+        }).join("");
+        return `<tr><td><b>${esc(f.label)}</b></td>${cells}</tr>`;
+      }).join("");
+      const modal = $("#modal");
+      modal.innerHTML = `<h2>Vendor Comparison</h2>
+        <div class="sub">${esc(result.summary)}</div>
+        <div class="table-wrap" style="margin:12px 0"><table class="vendor-compare-tbl"><thead><tr><th>Attribute</th>${headerCols}</tr></thead><tbody>${bodyRows}</tbody></table></div>
+        <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
+          <button class="btn btn-primary" data-act="cancel">Close</button></div></div>`;
+      $("#modalOverlay").hidden = false;
+      modal.querySelector("[data-act=cancel]").addEventListener("click", closeModal);
+    }
+
+    // Wire filter dropdowns
+    const catFilter = $("#vendorCatFilter");
+    const regFilter = $("#vendorRegFilter");
+    const budFilter = $("#vendorBudFilter");
+    if (catFilter) catFilter.addEventListener("change", renderVendorTable);
+    if (regFilter) regFilter.addEventListener("change", renderVendorTable);
+    if (budFilter) budFilter.addEventListener("change", renderVendorTable);
+
+    // Wire compare button
+    const compareBtn = $("#vendorCompareBtn");
+    if (compareBtn) compareBtn.addEventListener("click", openVendorCompareModal);
+
+    // Initial render of vendor table
+    renderVendorTable();
   }
 
   function openRecordLessonModal() {
