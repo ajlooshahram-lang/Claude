@@ -2102,6 +2102,341 @@ function renderQiCard(qi) {
   return html;
 }
 
+// ===== LOAD VISUALIZATION =====
+function buildLoadViz(state, list, schedule, ib) {
+  const W = 680, H = 520;
+  const hasData = ib > 0 || list.length > 0;
+  if (!hasData) return '';
+
+  // Calculate values
+  const P_kW = state.power * state.simFactor * state.expFactor;
+  const cosPhi = state.cosPhi;
+  const sinPhi = Math.sqrt(1 - cosPhi * cosPhi);
+  const S_kVA = P_kW / cosPhi;
+  const Q_kVAr = P_kW * sinPhi / cosPhi;
+  const phiDeg = Math.acos(cosPhi) * 180 / Math.PI;
+
+  // Phase currents from schedule or single calc
+  const phL1 = schedule.ph ? schedule.ph.L1 : (state.voltage === '3x400' ? ib : ib);
+  const phL2 = schedule.ph ? schedule.ph.L2 : (state.voltage === '3x400' ? ib : 0);
+  const phL3 = schedule.ph ? schedule.ph.L3 : (state.voltage === '3x400' ? ib : 0);
+  const maxPh = Math.max(phL1, phL2, phL3, 0.01);
+  const avgPh = (phL1 + phL2 + phL3) / 3;
+  const deviation = avgPh > 0 ? ((maxPh - Math.min(phL1, phL2, phL3)) / avgPh) * 100 : 0;
+
+  // Unique IDs for this SVG instance
+  const uid = 'lv' + Date.now().toString(36).slice(-4);
+
+  // ---- SANKEY POWER FLOW SECTION ----
+  const sankeyY = 30;
+  const sankeyH = 160;
+  const barMaxW = 18;
+  const barGap = 8;
+  const flowStartX = 80;
+  const flowEndX = W - 80;
+  const flowLen = flowEndX - flowStartX;
+
+  // Phase bar widths proportional to load
+  const w1 = Math.max(3, (phL1 / maxPh) * barMaxW);
+  const w2 = Math.max(3, (phL2 / maxPh) * barMaxW);
+  const w3 = Math.max(3, (phL3 / maxPh) * barMaxW);
+
+  // Phase Y positions
+  const phY1 = sankeyY + 40;
+  const phY2 = sankeyY + 40 + barMaxW + barGap;
+  const phY3 = sankeyY + 40 + 2 * (barMaxW + barGap);
+
+  // Build flowing particles for each phase
+  function phaseParticles(y, w, color, phaseIdx) {
+    let svg = '';
+    const count = 6;
+    for (let i = 0; i < count; i++) {
+      const delay = (i * (1.8 / count)).toFixed(2);
+      const size = (w * 0.35).toFixed(1);
+      svg += `<circle r="${size}" fill="${color}" opacity="0" filter="url(#${uid}partGlow)">
+        <animate attributeName="cx" from="${flowStartX}" to="${flowEndX}" dur="1.8s" begin="${delay}s" repeatCount="indefinite"/>
+        <animate attributeName="cy" values="${y};${y - 1.5};${y + 1.5};${y}" dur="1.8s" begin="${delay}s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0;0.9;0.9;0" dur="1.8s" begin="${delay}s" repeatCount="indefinite"/>
+      </circle>`;
+      // Trailing glow particle
+      svg += `<circle r="${(w * 0.7).toFixed(1)}" fill="${color}" opacity="0" filter="url(#${uid}blur)">
+        <animate attributeName="cx" from="${flowStartX}" to="${flowEndX}" dur="1.8s" begin="${(parseFloat(delay) + 0.05).toFixed(2)}s" repeatCount="indefinite"/>
+        <animate attributeName="cy" values="${y};${y - 1};${y + 1};${y}" dur="1.8s" begin="${(parseFloat(delay) + 0.05).toFixed(2)}s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0;0.3;0.3;0" dur="1.8s" begin="${(parseFloat(delay) + 0.05).toFixed(2)}s" repeatCount="indefinite"/>
+      </circle>`;
+    }
+    return svg;
+  }
+
+  // Consumer branch splits
+  let consumerBranches = '';
+  if (list.length > 0) {
+    const branchStartX = flowEndX - 120;
+    const branchSpacing = Math.min(30, 100 / list.length);
+    list.forEach((c, idx) => {
+      const bx = branchStartX + idx * branchSpacing;
+      const by = phY3 + barMaxW + 10 + idx * 8;
+      const phColor = c.phase === 'L1' ? '#ff4444' : c.phase === 'L2' ? '#ffcc00' : c.phase === 'L3' ? '#4488ff' : '#bb88ff';
+      consumerBranches += `<path d="M${bx},${c.phase === 'L1' ? phY1 : c.phase === 'L2' ? phY2 : c.phase === 'L3' ? phY3 : phY2} Q${bx + 20},${by - 10} ${bx + 40},${by}" 
+        fill="none" stroke="${phColor}" stroke-width="2" stroke-dasharray="6 4" opacity="0.6">
+        <animate attributeName="stroke-dashoffset" from="20" to="0" dur="1.2s" repeatCount="indefinite"/>
+      </path>
+      <circle cx="${bx + 40}" cy="${by}" r="4" fill="${phColor}" opacity="0.8">
+        <animate attributeName="r" values="3;5;3" dur="2s" begin="${(idx * 0.3).toFixed(1)}s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" begin="${(idx * 0.3).toFixed(1)}s" repeatCount="indefinite"/>
+      </circle>
+      <text x="${bx + 48}" y="${by + 4}" fill="${phColor}" font-size="8" font-family="monospace" opacity="0.8">${c.kW}kW</text>`;
+    });
+  }
+
+  // ---- POWER TRIANGLE SECTION ----
+  const triBaseX = 60;
+  const triBaseY = 370;
+  const triMaxSize = 200;
+  const triScale = S_kVA > 0 ? triMaxSize / S_kVA : 0;
+  const triPx = P_kW * triScale; // horizontal (active power)
+  const triQy = Q_kVAr * triScale; // vertical (reactive power)
+  const triSlen = S_kVA * triScale; // hypotenuse
+
+  // Power triangle points
+  const ptA = { x: triBaseX, y: triBaseY }; // origin
+  const ptB = { x: triBaseX + triPx, y: triBaseY }; // P endpoint
+  const ptC = { x: triBaseX + triPx, y: triBaseY - triQy }; // S endpoint (Q goes up)
+
+  // Angle arc
+  const arcR = 35;
+  const arcEndX = triBaseX + arcR * cosPhi;
+  const arcEndY = triBaseY - arcR * sinPhi;
+
+  // ---- PHASE BALANCE SECTION ----
+  const gaugeBaseX = W - 140;
+  const gaugeBaseY = 290;
+  const gaugeH = 120;
+  const gaugeW = 22;
+  const gaugeGap = 36;
+
+  function getBalanceColor(current) {
+    if (avgPh === 0) return '#06d6a0';
+    const dev = Math.abs(current - avgPh) / avgPh * 100;
+    if (dev < 15) return '#06d6a0';
+    if (dev < 30) return '#ffd166';
+    return '#ef476f';
+  }
+
+  const g1Color = getBalanceColor(phL1);
+  const g2Color = getBalanceColor(phL2);
+  const g3Color = getBalanceColor(phL3);
+  const g1H = maxPh > 0 ? (phL1 / maxPh) * gaugeH : 0;
+  const g2H = maxPh > 0 ? (phL2 / maxPh) * gaugeH : 0;
+  const g3H = maxPh > 0 ? (phL3 / maxPh) * gaugeH : 0;
+
+  // Section titles
+  const titleSankey = lang === 'da' ? '3-faset effektflow' : '3-Phase Power Flow';
+  const titleTriangle = lang === 'da' ? 'Effekttrekant' : 'Power Triangle';
+  const titleBalance = lang === 'da' ? 'Fasebalance' : 'Phase Balance';
+  const balanceStatus = deviation < 15 ? (lang === 'da' ? 'Balanceret' : 'Balanced') :
+                        deviation < 30 ? (lang === 'da' ? 'Ubalanceret' : 'Unbalanced') :
+                        (lang === 'da' ? 'Kritisk ubalance' : 'Severely unbalanced');
+  const balanceColor = deviation < 15 ? '#06d6a0' : deviation < 30 ? '#ffd166' : '#ef476f';
+
+  return `
+  <div class="card fade-in" style="padding:0;overflow:hidden;background:linear-gradient(160deg,#060d16 0%,#0a1a2e 40%,#060d16 100%);border:1px solid rgba(0,229,255,0.12);box-shadow:0 4px 40px rgba(0,229,255,0.06),inset 0 0 80px rgba(0,0,0,0.4)">
+    <div style="padding:16px 20px 8px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:1.3rem">&#9889;</span>
+      <span style="font-weight:700;font-size:1.05rem;color:#e0e8f0">${lang === 'da' ? 'Belastningsvisualisering' : 'Load Visualization'}</span>
+    </div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;padding:0 8px 12px">
+      <defs>
+        <filter id="${uid}blur"><feGaussianBlur stdDeviation="5"/></filter>
+        <filter id="${uid}partGlow"><feGaussianBlur stdDeviation="2.5"/><feComposite in="SourceGraphic" operator="over"/></filter>
+        <filter id="${uid}softGlow">
+          <feGaussianBlur stdDeviation="3" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="${uid}triGlow">
+          <feGaussianBlur stdDeviation="4" result="b"/>
+          <feComposite in="SourceGraphic" in2="b" operator="over"/>
+        </filter>
+        <linearGradient id="${uid}l1grad" x1="0%" x2="100%">
+          <stop offset="0%" stop-color="#ff2222" stop-opacity="0.2"/>
+          <stop offset="50%" stop-color="#ff4444" stop-opacity="0.9"/>
+          <stop offset="100%" stop-color="#ff2222" stop-opacity="0.3"/>
+        </linearGradient>
+        <linearGradient id="${uid}l2grad" x1="0%" x2="100%">
+          <stop offset="0%" stop-color="#ccaa00" stop-opacity="0.2"/>
+          <stop offset="50%" stop-color="#ffcc00" stop-opacity="0.9"/>
+          <stop offset="100%" stop-color="#ccaa00" stop-opacity="0.3"/>
+        </linearGradient>
+        <linearGradient id="${uid}l3grad" x1="0%" x2="100%">
+          <stop offset="0%" stop-color="#2255dd" stop-opacity="0.2"/>
+          <stop offset="50%" stop-color="#4488ff" stop-opacity="0.9"/>
+          <stop offset="100%" stop-color="#2255dd" stop-opacity="0.3"/>
+        </linearGradient>
+        <linearGradient id="${uid}sGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#ff00ff"/>
+          <stop offset="100%" stop-color="#00e5ff"/>
+        </linearGradient>
+        <radialGradient id="${uid}supGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.6"/>
+          <stop offset="100%" stop-color="#00e5ff" stop-opacity="0"/>
+        </radialGradient>
+        <pattern id="${uid}grid" width="24" height="24" patternUnits="userSpaceOnUse">
+          <path d="M24 0L0 0 0 24" fill="none" stroke="rgba(0,229,255,0.03)" stroke-width="0.5"/>
+        </pattern>
+      </defs>
+
+      <!-- Background grid -->
+      <rect width="${W}" height="${H}" fill="url(#${uid}grid)"/>
+
+      <!-- ===== SANKEY POWER FLOW ===== -->
+      <text x="${W / 2}" y="${sankeyY + 14}" text-anchor="middle" fill="#8899aa" font-size="11" font-weight="600" letter-spacing="1">${titleSankey.toUpperCase()}</text>
+
+      <!-- Supply node glow -->
+      <ellipse cx="${flowStartX - 20}" cy="${phY2}" rx="18" ry="40" fill="url(#${uid}supGlow)" opacity="0.5">
+        <animate attributeName="opacity" values="0.3;0.6;0.3" dur="3s" repeatCount="indefinite"/>
+      </ellipse>
+      <rect x="${flowStartX - 34}" y="${phY1 - 12}" width="14" height="${phY3 - phY1 + 24}" rx="4" fill="none" stroke="#00e5ff" stroke-width="1.5" opacity="0.7"/>
+      <text x="${flowStartX - 27}" y="${phY1 - 18}" text-anchor="middle" fill="#00e5ff" font-size="9" font-weight="600">${lang === 'da' ? 'FORSYNING' : 'SUPPLY'}</text>
+
+      <!-- Load node -->
+      <rect x="${flowEndX + 16}" y="${phY1 - 12}" width="14" height="${phY3 - phY1 + 24}" rx="4" fill="none" stroke="#ff8844" stroke-width="1.5" opacity="0.7"/>
+      <text x="${flowEndX + 23}" y="${phY1 - 18}" text-anchor="middle" fill="#ff8844" font-size="9" font-weight="600">${lang === 'da' ? 'LAST' : 'LOAD'}</text>
+
+      <!-- Phase L1 (Red) -->
+      <rect x="${flowStartX}" y="${phY1 - w1 / 2}" width="${flowLen}" height="${w1}" rx="${w1 / 2}" fill="url(#${uid}l1grad)" opacity="0.35"/>
+      <line x1="${flowStartX}" y1="${phY1}" x2="${flowEndX}" y2="${phY1}" stroke="#ff4444" stroke-width="${w1}" stroke-linecap="round" opacity="0.25"/>
+      <line x1="${flowStartX}" y1="${phY1}" x2="${flowEndX}" y2="${phY1}" stroke="#ff4444" stroke-width="${Math.max(2, w1 * 0.5)}" stroke-linecap="round" opacity="0.7" stroke-dasharray="2 ${(40 - w1).toFixed(0)}" stroke-dashoffset="0">
+        <animate attributeName="stroke-dashoffset" from="42" to="0" dur="1.5s" repeatCount="indefinite"/>
+      </line>
+      ${phaseParticles(phY1, w1, '#ff6666', 0)}
+      <text x="${flowStartX - 42}" y="${phY1 + 4}" fill="#ff4444" font-size="10" font-weight="700">L1</text>
+      <text x="${flowEndX + 36}" y="${phY1 + 4}" fill="#ff4444" font-size="9" font-weight="600">${phL1.toFixed(1)}A</text>
+
+      <!-- Phase L2 (Yellow) -->
+      <rect x="${flowStartX}" y="${phY2 - w2 / 2}" width="${flowLen}" height="${w2}" rx="${w2 / 2}" fill="url(#${uid}l2grad)" opacity="0.35"/>
+      <line x1="${flowStartX}" y1="${phY2}" x2="${flowEndX}" y2="${phY2}" stroke="#ffcc00" stroke-width="${w2}" stroke-linecap="round" opacity="0.2"/>
+      <line x1="${flowStartX}" y1="${phY2}" x2="${flowEndX}" y2="${phY2}" stroke="#ffcc00" stroke-width="${Math.max(2, w2 * 0.5)}" stroke-linecap="round" opacity="0.7" stroke-dasharray="2 ${(40 - w2).toFixed(0)}" stroke-dashoffset="0">
+        <animate attributeName="stroke-dashoffset" from="42" to="0" dur="1.6s" repeatCount="indefinite"/>
+      </line>
+      ${phaseParticles(phY2, w2, '#ffdd44', 1)}
+      <text x="${flowStartX - 42}" y="${phY2 + 4}" fill="#ffcc00" font-size="10" font-weight="700">L2</text>
+      <text x="${flowEndX + 36}" y="${phY2 + 4}" fill="#ffcc00" font-size="9" font-weight="600">${phL2.toFixed(1)}A</text>
+
+      <!-- Phase L3 (Blue) -->
+      <rect x="${flowStartX}" y="${phY3 - w3 / 2}" width="${flowLen}" height="${w3}" rx="${w3 / 2}" fill="url(#${uid}l3grad)" opacity="0.35"/>
+      <line x1="${flowStartX}" y1="${phY3}" x2="${flowEndX}" y2="${phY3}" stroke="#4488ff" stroke-width="${w3}" stroke-linecap="round" opacity="0.2"/>
+      <line x1="${flowStartX}" y1="${phY3}" x2="${flowEndX}" y2="${phY3}" stroke="#4488ff" stroke-width="${Math.max(2, w3 * 0.5)}" stroke-linecap="round" opacity="0.7" stroke-dasharray="2 ${(40 - w3).toFixed(0)}" stroke-dashoffset="0">
+        <animate attributeName="stroke-dashoffset" from="42" to="0" dur="1.7s" repeatCount="indefinite"/>
+      </line>
+      ${phaseParticles(phY3, w3, '#66aaff', 2)}
+      <text x="${flowStartX - 42}" y="${phY3 + 4}" fill="#4488ff" font-size="10" font-weight="700">L3</text>
+      <text x="${flowEndX + 36}" y="${phY3 + 4}" fill="#4488ff" font-size="9" font-weight="600">${phL3.toFixed(1)}A</text>
+
+      <!-- Consumer branches -->
+      ${consumerBranches}
+
+      <!-- Total flow indicator -->
+      <text x="${W / 2}" y="${phY3 + 36}" text-anchor="middle" fill="#aabbcc" font-size="10">${lang === 'da' ? 'Samlet' : 'Total'}: <tspan font-weight="700" fill="#00e5ff">${ib.toFixed(1)} A</tspan> / <tspan fill="#ff88ff">${S_kVA.toFixed(1)} kVA</tspan></text>
+
+      <!-- Separator line -->
+      <line x1="40" y1="240" x2="${W - 40}" y2="240" stroke="rgba(0,229,255,0.08)" stroke-width="1"/>
+
+      <!-- ===== POWER TRIANGLE ===== -->
+      <text x="${triBaseX + triPx / 2}" y="${triBaseY - triQy - 30 > 260 ? 268 : 260}" text-anchor="middle" fill="#8899aa" font-size="11" font-weight="600" letter-spacing="1">${titleTriangle.toUpperCase()}</text>
+
+      <!-- Triangle glow background -->
+      <polygon points="${ptA.x},${ptA.y} ${ptB.x},${ptB.y} ${ptC.x},${ptC.y}" fill="rgba(0,229,255,0.03)" stroke="none"/>
+
+      <!-- P (active power) - horizontal -->
+      <line x1="${ptA.x}" y1="${ptA.y}" x2="${ptB.x}" y2="${ptB.y}" stroke="#06d6a0" stroke-width="3" stroke-linecap="round" filter="url(#${uid}softGlow)"/>
+      <line x1="${ptA.x}" y1="${ptA.y}" x2="${ptB.x}" y2="${ptB.y}" stroke="#06d6a0" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>
+      <!-- P arrow -->
+      <polygon points="${ptB.x - 8},${ptB.y - 4} ${ptB.x},${ptB.y} ${ptB.x - 8},${ptB.y + 4}" fill="#06d6a0" opacity="0.9"/>
+      <text x="${(ptA.x + ptB.x) / 2}" y="${ptA.y + 18}" text-anchor="middle" fill="#06d6a0" font-size="11" font-weight="700">P = ${P_kW.toFixed(1)} kW</text>
+
+      <!-- Q (reactive power) - vertical -->
+      <line x1="${ptB.x}" y1="${ptB.y}" x2="${ptC.x}" y2="${ptC.y}" stroke="#ffd166" stroke-width="3" stroke-linecap="round" filter="url(#${uid}softGlow)"/>
+      <line x1="${ptB.x}" y1="${ptB.y}" x2="${ptC.x}" y2="${ptC.y}" stroke="#ffd166" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>
+      <!-- Q arrow -->
+      <polygon points="${ptC.x - 4},${ptC.y + 8} ${ptC.x},${ptC.y} ${ptC.x + 4},${ptC.y + 8}" fill="#ffd166" opacity="0.9"/>
+      <text x="${ptB.x + 16}" y="${(ptB.y + ptC.y) / 2 + 4}" fill="#ffd166" font-size="11" font-weight="700" text-anchor="start">Q = ${Q_kVAr.toFixed(1)} kVAr</text>
+
+      <!-- S (apparent power) - hypotenuse with animated glow -->
+      <line x1="${ptA.x}" y1="${ptA.y}" x2="${ptC.x}" y2="${ptC.y}" stroke="url(#${uid}sGrad)" stroke-width="4" stroke-linecap="round" opacity="0.4" filter="url(#${uid}blur)">
+        <animate attributeName="opacity" values="0.3;0.7;0.3" dur="2s" repeatCount="indefinite"/>
+      </line>
+      <line x1="${ptA.x}" y1="${ptA.y}" x2="${ptC.x}" y2="${ptC.y}" stroke="url(#${uid}sGrad)" stroke-width="2.5" stroke-linecap="round"/>
+      <!-- S pulsing glow overlay -->
+      <line x1="${ptA.x}" y1="${ptA.y}" x2="${ptC.x}" y2="${ptC.y}" stroke="#ff00ff" stroke-width="6" stroke-linecap="round" opacity="0" filter="url(#${uid}blur)">
+        <animate attributeName="opacity" values="0;0.4;0" dur="2.5s" repeatCount="indefinite"/>
+      </line>
+      <text x="${(ptA.x + ptC.x) / 2 - 20}" y="${(ptA.y + ptC.y) / 2 - 10}" fill="#ee66ff" font-size="12" font-weight="800">S = ${S_kVA.toFixed(1)} kVA</text>
+
+      <!-- Angle arc (phi) -->
+      ${phiDeg > 0.5 ? `
+      <path d="M${ptA.x + arcR},${ptA.y} A${arcR},${arcR} 0 0,0 ${arcEndX},${arcEndY}" fill="none" stroke="#00e5ff" stroke-width="2" stroke-dasharray="3 2" opacity="0.8">
+        <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/>
+      </path>
+      <text x="${ptA.x + arcR * 0.7 * cosPhi + 6}" y="${ptA.y - arcR * 0.4 * sinPhi + 2}" fill="#00e5ff" font-size="10" font-weight="700">
+        cos\u03C6 = ${cosPhi}
+      </text>
+      <text x="${ptA.x + arcR * 0.5 * cosPhi + 4}" y="${ptA.y - arcR * 0.7 * sinPhi - 2}" fill="#00e5ff" font-size="9" opacity="0.7">
+        \u03C6 = ${phiDeg.toFixed(1)}\u00B0
+      </text>
+      ` : ''}
+
+      <!-- ===== PHASE BALANCE GAUGES ===== -->
+      <text x="${gaugeBaseX + gaugeGap}" y="${gaugeBaseY - 16}" text-anchor="middle" fill="#8899aa" font-size="11" font-weight="600" letter-spacing="1">${titleBalance.toUpperCase()}</text>
+
+      <!-- L1 gauge -->
+      <rect x="${gaugeBaseX - gaugeW / 2}" y="${gaugeBaseY}" width="${gaugeW}" height="${gaugeH}" rx="4" fill="rgba(255,255,255,0.03)" stroke="rgba(255,68,68,0.3)" stroke-width="1"/>
+      <rect x="${gaugeBaseX - gaugeW / 2 + 2}" y="${gaugeBaseY + gaugeH - g1H}" width="${gaugeW - 4}" height="${g1H}" rx="3" fill="${g1Color}" opacity="0.8">
+        <animate attributeName="height" from="0" to="${g1H}" dur="1.2s" fill="freeze"/>
+        <animate attributeName="y" from="${gaugeBaseY + gaugeH}" to="${gaugeBaseY + gaugeH - g1H}" dur="1.2s" fill="freeze"/>
+      </rect>
+      <rect x="${gaugeBaseX - gaugeW / 2 + 2}" y="${gaugeBaseY + gaugeH - g1H}" width="${gaugeW - 4}" height="${g1H}" rx="3" fill="${g1Color}" opacity="0.2" filter="url(#${uid}blur)">
+        <animate attributeName="opacity" values="0.1;0.35;0.1" dur="2s" repeatCount="indefinite"/>
+      </rect>
+      <text x="${gaugeBaseX}" y="${gaugeBaseY + gaugeH + 14}" text-anchor="middle" fill="#ff4444" font-size="9" font-weight="700">L1</text>
+      <text x="${gaugeBaseX}" y="${gaugeBaseY + gaugeH + 25}" text-anchor="middle" fill="#aabbcc" font-size="8">${phL1.toFixed(1)}A</text>
+
+      <!-- L2 gauge -->
+      <rect x="${gaugeBaseX + gaugeGap - gaugeW / 2}" y="${gaugeBaseY}" width="${gaugeW}" height="${gaugeH}" rx="4" fill="rgba(255,255,255,0.03)" stroke="rgba(255,204,0,0.3)" stroke-width="1"/>
+      <rect x="${gaugeBaseX + gaugeGap - gaugeW / 2 + 2}" y="${gaugeBaseY + gaugeH - g2H}" width="${gaugeW - 4}" height="${g2H}" rx="3" fill="${g2Color}" opacity="0.8">
+        <animate attributeName="height" from="0" to="${g2H}" dur="1.4s" fill="freeze"/>
+        <animate attributeName="y" from="${gaugeBaseY + gaugeH}" to="${gaugeBaseY + gaugeH - g2H}" dur="1.4s" fill="freeze"/>
+      </rect>
+      <rect x="${gaugeBaseX + gaugeGap - gaugeW / 2 + 2}" y="${gaugeBaseY + gaugeH - g2H}" width="${gaugeW - 4}" height="${g2H}" rx="3" fill="${g2Color}" opacity="0.2" filter="url(#${uid}blur)">
+        <animate attributeName="opacity" values="0.1;0.35;0.1" dur="2.2s" repeatCount="indefinite"/>
+      </rect>
+      <text x="${gaugeBaseX + gaugeGap}" y="${gaugeBaseY + gaugeH + 14}" text-anchor="middle" fill="#ffcc00" font-size="9" font-weight="700">L2</text>
+      <text x="${gaugeBaseX + gaugeGap}" y="${gaugeBaseY + gaugeH + 25}" text-anchor="middle" fill="#aabbcc" font-size="8">${phL2.toFixed(1)}A</text>
+
+      <!-- L3 gauge -->
+      <rect x="${gaugeBaseX + 2 * gaugeGap - gaugeW / 2}" y="${gaugeBaseY}" width="${gaugeW}" height="${gaugeH}" rx="4" fill="rgba(255,255,255,0.03)" stroke="rgba(68,136,255,0.3)" stroke-width="1"/>
+      <rect x="${gaugeBaseX + 2 * gaugeGap - gaugeW / 2 + 2}" y="${gaugeBaseY + gaugeH - g3H}" width="${gaugeW - 4}" height="${g3H}" rx="3" fill="${g3Color}" opacity="0.8">
+        <animate attributeName="height" from="0" to="${g3H}" dur="1.6s" fill="freeze"/>
+        <animate attributeName="y" from="${gaugeBaseY + gaugeH}" to="${gaugeBaseY + gaugeH - g3H}" dur="1.6s" fill="freeze"/>
+      </rect>
+      <rect x="${gaugeBaseX + 2 * gaugeGap - gaugeW / 2 + 2}" y="${gaugeBaseY + gaugeH - g3H}" width="${gaugeW - 4}" height="${g3H}" rx="3" fill="${g3Color}" opacity="0.2" filter="url(#${uid}blur)">
+        <animate attributeName="opacity" values="0.1;0.35;0.1" dur="2.4s" repeatCount="indefinite"/>
+      </rect>
+      <text x="${gaugeBaseX + 2 * gaugeGap}" y="${gaugeBaseY + gaugeH + 14}" text-anchor="middle" fill="#4488ff" font-size="9" font-weight="700">L3</text>
+      <text x="${gaugeBaseX + 2 * gaugeGap}" y="${gaugeBaseY + gaugeH + 25}" text-anchor="middle" fill="#aabbcc" font-size="8">${phL3.toFixed(1)}A</text>
+
+      <!-- Balance status -->
+      <text x="${gaugeBaseX + gaugeGap}" y="${gaugeBaseY + gaugeH + 42}" text-anchor="middle" fill="${balanceColor}" font-size="9.5" font-weight="700">${balanceStatus}</text>
+      <text x="${gaugeBaseX + gaugeGap}" y="${gaugeBaseY + gaugeH + 54}" text-anchor="middle" fill="#667788" font-size="8">\u0394 ${deviation.toFixed(0)}%</text>
+
+      <!-- Decorative corner accents -->
+      <path d="M10,10 L30,10 L30,12 L12,12 L12,30 L10,30 Z" fill="#00e5ff" opacity="0.15"/>
+      <path d="M${W - 10},10 L${W - 30},10 L${W - 30},12 L${W - 12},12 L${W - 12},30 L${W - 10},30 Z" fill="#00e5ff" opacity="0.15"/>
+      <path d="M10,${H - 10} L30,${H - 10} L30,${H - 12} L12,${H - 12} L12,${H - 30} L10,${H - 30} Z" fill="#00e5ff" opacity="0.15"/>
+      <path d="M${W - 10},${H - 10} L${W - 30},${H - 10} L${W - 30},${H - 12} L${W - 12},${H - 12} L${W - 12},${H - 30} L${W - 10},${H - 30} Z" fill="#00e5ff" opacity="0.15"/>
+    </svg>
+  </div>`;
+}
+
 // ===== LOAD MODULE =====
 function renderLoad() {
   const ib = calcIB();
@@ -2175,6 +2510,8 @@ function renderLoad() {
         </div>
       </div>
     </div>
+
+    ${(calcIB() > 0 || loadList.length > 0) ? buildLoadViz(loadState, loadList, calcLoadSchedule(), calcIB()) : ''}
 
     <div class="card fade-in">
       <div class="card-title">${t('loadResult')}</div>
