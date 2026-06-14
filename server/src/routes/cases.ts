@@ -1,44 +1,9 @@
 import type { FastifyInstance } from "fastify";
-import { z } from "zod";
 import prisma from "../db.js";
 import { authenticate, requireRole } from "../middleware/rbac.js";
-
-const CreateCaseBody = z.object({
-  projectId: z.string().min(1),
-  problem: z.string().min(1).max(2000),
-  category: z.string().max(200).optional(),
-  priority: z.string().max(100).optional(),
-  status: z.string().max(100).optional(),
-  owner: z.string().max(200).optional(),
-  sev: z.number().int().min(1).max(10).optional(),
-  occ: z.number().int().min(1).max(10).optional(),
-  det: z.number().int().min(1).max(10).optional(),
-  rootCause: z.string().max(2000).optional(),
-  leanMethod: z.string().max(200).optional(),
-  target: z.string().max(500).optional(),
-  whys: z.array(z.string()).optional(),
-  dateLogged: z.string().optional(),
-  startDate: z.string().optional(),
-  percent: z.number().min(0).max(100).optional(),
-  costCat: z.string().max(200).optional(),
-  estCost: z.number().optional(),
-  actCost: z.number().optional(),
-  reach: z.number().optional(),
-  impact: z.number().optional(),
-  confidence: z.number().optional(),
-  effort: z.number().optional(),
-  userValue: z.number().optional(),
-  timeCrit: z.number().optional(),
-  riskRed: z.number().optional(),
-  jobSize: z.number().optional(),
-  pinned: z.boolean().optional(),
-});
-
-const UpdateCaseBody = CreateCaseBody.partial().omit({ projectId: true });
-
-const ListCasesQuery = z.object({
-  projectId: z.string().min(1),
-});
+import { CreateCaseBody, UpdateCaseBody, ListCasesQuery } from "../validation/schemas.js";
+import { validateId } from "../validation/index.js";
+import { logMutation } from "../logging.js";
 
 export default async function casesRoutes(app: FastifyInstance): Promise<void> {
   // All case routes require authentication
@@ -74,6 +39,7 @@ export default async function casesRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: [requireRole("VIEWER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
+      if (!validateId(id, reply)) return;
 
       const found = await prisma.case.findFirst({
         where: {
@@ -145,6 +111,21 @@ export default async function casesRoutes(app: FastifyInstance): Promise<void> {
         },
       });
 
+      // Audit log
+      prisma.auditLog.create({
+        data: {
+          tenantId: request.tenantId,
+          actorId: request.user.id,
+          action: "case.create",
+          entity: "Case",
+          entityId: created.id,
+          detail: { problem: data.problem, projectId: data.projectId },
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logMutation(request, "case.create", "Case", created.id, { projectId: data.projectId });
+
       return reply.code(201).send(created);
     },
   );
@@ -155,6 +136,8 @@ export default async function casesRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: [requireRole("MANAGER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
+      if (!validateId(id, reply)) return;
+
       const parsed = UpdateCaseBody.safeParse(request.body);
       if (!parsed.success) {
         return reply.code(400).send({ error: "Invalid request body", details: parsed.error.issues });
@@ -186,6 +169,21 @@ export default async function casesRoutes(app: FastifyInstance): Promise<void> {
         data: updateData,
       });
 
+      // Audit log with changed fields
+      prisma.auditLog.create({
+        data: {
+          tenantId: request.tenantId,
+          actorId: request.user.id,
+          action: "case.update",
+          entity: "Case",
+          entityId: id,
+          detail: { changedFields: Object.keys(updateData) },
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logMutation(request, "case.update", "Case", id, { changedFields: Object.keys(updateData) });
+
       return updated;
     },
   );
@@ -196,6 +194,7 @@ export default async function casesRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: [requireRole("MANAGER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
+      if (!validateId(id, reply)) return;
 
       // Verify the case belongs to this tenant
       const existing = await prisma.case.findFirst({
@@ -214,6 +213,21 @@ export default async function casesRoutes(app: FastifyInstance): Promise<void> {
         where: { id },
         data: { deletedAt: new Date() },
       });
+
+      // Audit log
+      prisma.auditLog.create({
+        data: {
+          tenantId: request.tenantId,
+          actorId: request.user.id,
+          action: "case.delete",
+          entity: "Case",
+          entityId: id,
+          detail: { problem: existing.problem },
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logMutation(request, "case.delete", "Case", id);
 
       return reply.code(200).send({ ok: true });
     },

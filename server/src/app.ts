@@ -15,6 +15,7 @@ import projectsRoutes from "./routes/projects.js";
 import registersRoutes from "./routes/registers.js";
 import snapshotsRoutes from "./routes/snapshots.js";
 import sharesRoutes from "./routes/shares.js";
+import metricsRoutes from "./routes/metrics.js";
 
 const SERVICE = "qi-platform-server";
 const VERSION = "0.1.0";
@@ -128,6 +129,9 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
 
   // Share token routes (includes public /shared/:token endpoint)
   await app.register(sharesRoutes);
+
+  // Metrics endpoint (protected: localhost or METRICS_TOKEN)
+  await app.register(metricsRoutes);
 
   return app;
 }

@@ -2,6 +2,9 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import prisma from "../db.js";
 import { authenticate, requireRole } from "../middleware/rbac.js";
+import { CreateRegisterBody, UpdateRegisterBody, ListRegistersQuery } from "../validation/schemas.js";
+import { validateId } from "../validation/index.js";
+import { logMutation } from "../logging.js";
 
 const VALID_REGISTER_TYPES = [
   "hazop",
@@ -20,23 +23,6 @@ const VALID_REGISTER_TYPES = [
 ] as const;
 
 const RegisterTypeParam = z.enum(VALID_REGISTER_TYPES);
-
-const CreateRegisterBody = z.object({
-  projectId: z.string().min(1),
-  data: z.unknown().default({}),
-  pinned: z.boolean().optional(),
-  sortOrder: z.number().int().optional(),
-});
-
-const UpdateRegisterBody = z.object({
-  data: z.unknown().optional(),
-  pinned: z.boolean().optional(),
-  sortOrder: z.number().int().optional(),
-});
-
-const ListRegistersQuery = z.object({
-  projectId: z.string().min(1),
-});
 
 export default async function registersRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", authenticate);
@@ -107,6 +93,22 @@ export default async function registersRoutes(app: FastifyInstance): Promise<voi
       if (sortOrder !== undefined) createData["sortOrder"] = sortOrder;
 
       const created = await prisma.registerRow.create({ data: createData as never });
+
+      // Audit log
+      prisma.auditLog.create({
+        data: {
+          tenantId: request.tenantId,
+          actorId: request.user.id,
+          action: "register.create",
+          entity: "RegisterRow",
+          entityId: created.id,
+          detail: { registerType: typeParsed.data, projectId },
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logMutation(request, "register.create", "RegisterRow", created.id, { registerType: typeParsed.data });
+
       return reply.code(201).send(created);
     },
   );
@@ -121,6 +123,7 @@ export default async function registersRoutes(app: FastifyInstance): Promise<voi
       if (!typeParsed.success) {
         return reply.code(400).send({ error: "Invalid register type" });
       }
+      if (!validateId(id, reply)) return;
 
       const parsed = UpdateRegisterBody.safeParse(request.body);
       if (!parsed.success) {
@@ -150,6 +153,21 @@ export default async function registersRoutes(app: FastifyInstance): Promise<voi
         data: updateData,
       });
 
+      // Audit log
+      prisma.auditLog.create({
+        data: {
+          tenantId: request.tenantId,
+          actorId: request.user.id,
+          action: "register.update",
+          entity: "RegisterRow",
+          entityId: id,
+          detail: { changedFields: Object.keys(updateData), registerType: typeParsed.data },
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logMutation(request, "register.update", "RegisterRow", id, { changedFields: Object.keys(updateData) });
+
       return updated;
     },
   );
@@ -164,6 +182,7 @@ export default async function registersRoutes(app: FastifyInstance): Promise<voi
       if (!typeParsed.success) {
         return reply.code(400).send({ error: "Invalid register type" });
       }
+      if (!validateId(id, reply)) return;
 
       const existing = await prisma.registerRow.findFirst({
         where: {
@@ -182,6 +201,21 @@ export default async function registersRoutes(app: FastifyInstance): Promise<voi
         where: { id },
         data: { deletedAt: new Date() },
       });
+
+      // Audit log
+      prisma.auditLog.create({
+        data: {
+          tenantId: request.tenantId,
+          actorId: request.user.id,
+          action: "register.delete",
+          entity: "RegisterRow",
+          entityId: id,
+          detail: { registerType: typeParsed.data },
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logMutation(request, "register.delete", "RegisterRow", id, { registerType: typeParsed.data });
 
       return reply.code(200).send({ ok: true });
     },

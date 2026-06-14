@@ -1,14 +1,10 @@
 import type { FastifyInstance } from "fastify";
-import { z } from "zod";
 import { randomBytes, createHash } from "node:crypto";
 import prisma from "../db.js";
 import { authenticate, requireRole } from "../middleware/rbac.js";
-
-const CreateShareBody = z.object({
-  projectId: z.string().min(1),
-  scope: z.enum(["VIEWER", "MANAGER"]),
-  expiresInHours: z.number().min(1).max(8760), // max 1 year
-});
+import { CreateShareBody } from "../validation/schemas.js";
+import { validateId } from "../validation/index.js";
+import { logMutation } from "../logging.js";
 
 function hashShareToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -52,6 +48,21 @@ export default async function sharesRoutes(app: FastifyInstance): Promise<void> 
           createdBy: request.user.id,
         },
       });
+
+      // Audit log
+      prisma.auditLog.create({
+        data: {
+          tenantId: request.tenantId,
+          actorId: request.user.id,
+          action: "share.create",
+          entity: "ShareToken",
+          entityId: shareToken.id,
+          detail: { projectId, scope, expiresInHours },
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logMutation(request, "share.create", "ShareToken", shareToken.id, { projectId, scope });
 
       return reply.code(201).send({
         id: shareToken.id,
@@ -101,6 +112,7 @@ export default async function sharesRoutes(app: FastifyInstance): Promise<void> 
     { preHandler: [authenticate, requireRole("MANAGER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
+      if (!validateId(id, reply)) return;
 
       const existing = await prisma.shareToken.findFirst({
         where: {
@@ -118,6 +130,21 @@ export default async function sharesRoutes(app: FastifyInstance): Promise<void> 
         where: { id },
         data: { revokedAt: new Date() },
       });
+
+      // Audit log
+      prisma.auditLog.create({
+        data: {
+          tenantId: request.tenantId,
+          actorId: request.user.id,
+          action: "share.revoke",
+          entity: "ShareToken",
+          entityId: id,
+          detail: { projectId: existing.projectId },
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logMutation(request, "share.revoke", "ShareToken", id);
 
       return reply.code(200).send({ ok: true });
     },

@@ -1,5 +1,4 @@
 import type { FastifyInstance } from "fastify";
-import { z } from "zod";
 import prisma from "../db.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import { generateSessionToken, createSession, hashToken, revokeSession, revokeAllUserSessions } from "./session.js";
@@ -8,31 +7,10 @@ import { encrypt, decrypt } from "./crypto.js";
 import { authenticate } from "../middleware/rbac.js";
 import { loadConfig } from "../config.js";
 import { authenticator } from "otplib";
+import { RegisterBody, LoginBody, MfaVerifyBody, ChangePasswordBody } from "../validation/schemas.js";
+import { logAuthEvent } from "../logging.js";
 
 const SEVEN_DAYS_SEC = 7 * 24 * 60 * 60;
-
-const RegisterBody = z.object({
-  email: z.string().email().max(255),
-  password: z.string().min(8).max(128),
-  displayName: z.string().max(200).optional(),
-  tenantName: z.string().min(1).max(200),
-});
-
-const LoginBody = z.object({
-  email: z.string().email(),
-  password: z.string(),
-  tenantId: z.string().min(1),
-  mfaToken: z.string().length(6).optional(),
-});
-
-const MfaVerifyBody = z.object({
-  token: z.string().length(6),
-});
-
-const ChangePasswordBody = z.object({
-  currentPassword: z.string().min(8).max(128),
-  newPassword: z.string().min(8).max(128),
-});
 
 function cookieOptions(isProd: boolean) {
   return {
@@ -109,6 +87,21 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
         request.ip,
       );
 
+      // Audit log
+      prisma.auditLog.create({
+        data: {
+          tenantId: result.tenant.id,
+          actorId: result.user.id,
+          action: "auth.register",
+          entity: "User",
+          entityId: result.user.id,
+          detail: { email: result.user.email },
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logAuthEvent(request, "register", { userId: result.user.id, email: result.user.email });
+
       return reply
         .setCookie("session", token, cookieOptions(isProd))
         .code(201)
@@ -143,6 +136,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
 
       const valid = await verifyPassword(user.passwordHash, password);
       if (!valid) {
+        logAuthEvent(request, "login.failed", { email, tenantId });
         return reply.code(401).send({ error: "Invalid credentials" });
       }
 
@@ -154,6 +148,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
         const decryptedSecret = decrypt(user.mfaSecret, config.dataEncryptionKey);
         const mfaValid = verifyTotpToken(decryptedSecret, mfaToken);
         if (!mfaValid) {
+          logAuthEvent(request, "login.mfa_failed", { userId: user.id });
           return reply.code(401).send({ error: "Invalid credentials" });
         }
       }
@@ -172,6 +167,21 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
         request.headers["user-agent"],
         request.ip,
       );
+
+      // Audit log
+      prisma.auditLog.create({
+        data: {
+          tenantId: user.tenantId,
+          actorId: user.id,
+          action: "auth.login",
+          entity: "User",
+          entityId: user.id,
+          detail: {},
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logAuthEvent(request, "login.success", { userId: user.id });
 
       return reply
         .setCookie("session", token, cookieOptions(isProd))
@@ -194,6 +204,21 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
         const tokenHash = hashToken(token);
         await revokeSession(prisma, tokenHash);
       }
+
+      // Audit log
+      prisma.auditLog.create({
+        data: {
+          tenantId: request.tenantId,
+          actorId: request.user.id,
+          action: "auth.logout",
+          entity: "User",
+          entityId: request.user.id,
+          detail: {},
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logAuthEvent(request, "logout", { userId: request.user.id });
 
       return reply
         .clearCookie("session", { path: "/" })
@@ -238,6 +263,21 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
         secret,
       );
 
+      // Audit log
+      prisma.auditLog.create({
+        data: {
+          tenantId: request.tenantId,
+          actorId: request.user.id,
+          action: "auth.mfa_enroll",
+          entity: "User",
+          entityId: request.user.id,
+          detail: {},
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logAuthEvent(request, "mfa.enroll", { userId: request.user.id });
+
       return { secret, otpauthUrl };
     },
   );
@@ -278,6 +318,21 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
         const currentHash = hashToken(sessionToken);
         await revokeAllUserSessions(prisma, request.user.id, currentHash);
       }
+
+      // Audit log
+      prisma.auditLog.create({
+        data: {
+          tenantId: request.tenantId,
+          actorId: request.user.id,
+          action: "auth.mfa_verify",
+          entity: "User",
+          entityId: request.user.id,
+          detail: {},
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logAuthEvent(request, "mfa.verify", { userId: request.user.id });
 
       return { ok: true };
     },
@@ -322,6 +377,21 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
         const currentHash = hashToken(sessionToken);
         await revokeAllUserSessions(prisma, user.id, currentHash);
       }
+
+      // Audit log
+      prisma.auditLog.create({
+        data: {
+          tenantId: request.tenantId,
+          actorId: request.user.id,
+          action: "auth.change_password",
+          entity: "User",
+          entityId: request.user.id,
+          detail: {},
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logAuthEvent(request, "password.change", { userId: request.user.id });
 
       return { ok: true };
     },

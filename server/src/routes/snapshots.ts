@@ -1,20 +1,9 @@
 import type { FastifyInstance } from "fastify";
-import { z } from "zod";
 import prisma from "../db.js";
 import { authenticate, requireRole } from "../middleware/rbac.js";
-
-const ListSnapshotsQuery = z.object({
-  projectId: z.string().min(1),
-});
-
-const CreateSnapshotBody = z.object({
-  projectId: z.string().min(1),
-  label: z.string().max(500).optional(),
-});
-
-const UpdateSnapshotBody = z.object({
-  label: z.string().max(500),
-});
+import { CreateSnapshotBody, UpdateSnapshotBody, ListSnapshotsQuery } from "../validation/schemas.js";
+import { validateId } from "../validation/index.js";
+import { logMutation } from "../logging.js";
 
 export default async function snapshotsRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", authenticate);
@@ -85,6 +74,22 @@ export default async function snapshotsRoutes(app: FastifyInstance): Promise<voi
       if (label !== undefined) createData["label"] = label;
 
       const created = await prisma.snapshot.create({ data: createData as never });
+
+      // Audit log
+      prisma.auditLog.create({
+        data: {
+          tenantId: request.tenantId,
+          actorId: request.user.id,
+          action: "snapshot.create",
+          entity: "Snapshot",
+          entityId: created.id,
+          detail: { projectId, label: label ?? null },
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logMutation(request, "snapshot.create", "Snapshot", created.id, { projectId });
+
       return reply.code(201).send(created);
     },
   );
@@ -95,6 +100,8 @@ export default async function snapshotsRoutes(app: FastifyInstance): Promise<voi
     { preHandler: [requireRole("MANAGER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
+      if (!validateId(id, reply)) return;
+
       const parsed = UpdateSnapshotBody.safeParse(request.body);
       if (!parsed.success) {
         return reply.code(400).send({ error: "Invalid request body", details: parsed.error.issues });
@@ -113,6 +120,21 @@ export default async function snapshotsRoutes(app: FastifyInstance): Promise<voi
         data: { label: parsed.data.label },
       });
 
+      // Audit log
+      prisma.auditLog.create({
+        data: {
+          tenantId: request.tenantId,
+          actorId: request.user.id,
+          action: "snapshot.update",
+          entity: "Snapshot",
+          entityId: id,
+          detail: { label: parsed.data.label },
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logMutation(request, "snapshot.update", "Snapshot", id, { label: parsed.data.label });
+
       return updated;
     },
   );
@@ -123,6 +145,7 @@ export default async function snapshotsRoutes(app: FastifyInstance): Promise<voi
     { preHandler: [requireRole("MANAGER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
+      if (!validateId(id, reply)) return;
 
       const existing = await prisma.snapshot.findFirst({
         where: { id, tenantId: request.tenantId },
@@ -133,6 +156,22 @@ export default async function snapshotsRoutes(app: FastifyInstance): Promise<voi
       }
 
       await prisma.snapshot.delete({ where: { id } });
+
+      // Audit log
+      prisma.auditLog.create({
+        data: {
+          tenantId: request.tenantId,
+          actorId: request.user.id,
+          action: "snapshot.delete",
+          entity: "Snapshot",
+          entityId: id,
+          detail: { projectId: existing.projectId },
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logMutation(request, "snapshot.delete", "Snapshot", id);
+
       return reply.code(200).send({ ok: true });
     },
   );
@@ -143,6 +182,7 @@ export default async function snapshotsRoutes(app: FastifyInstance): Promise<voi
     { preHandler: [requireRole("MANAGER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
+      if (!validateId(id, reply)) return;
 
       const snapshot = await prisma.snapshot.findFirst({
         where: { id, tenantId: request.tenantId },
@@ -215,6 +255,21 @@ export default async function snapshotsRoutes(app: FastifyInstance): Promise<voi
           await tx.registerRow.createMany({ data: registersPayload });
         }
       });
+
+      // Audit log
+      prisma.auditLog.create({
+        data: {
+          tenantId: request.tenantId,
+          actorId: request.user.id,
+          action: "snapshot.restore",
+          entity: "Snapshot",
+          entityId: id,
+          detail: { projectId },
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logMutation(request, "snapshot.restore", "Snapshot", id, { projectId });
 
       return reply.code(200).send({ ok: true, restoredFrom: id });
     },

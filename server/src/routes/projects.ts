@@ -1,29 +1,9 @@
 import type { FastifyInstance } from "fastify";
-import { z } from "zod";
 import prisma from "../db.js";
 import { authenticate, requireRole } from "../middleware/rbac.js";
-
-const CreateProjectBody = z.object({
-  name: z.string().min(1).max(500),
-  sponsor: z.string().max(200).optional(),
-  manager: z.string().max(200).optional(),
-  org: z.string().max(200).optional(),
-  startDate: z.string().max(50).optional(),
-  endDate: z.string().max(50).optional(),
-  status: z.enum(["PLANNING", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "CANCELLED"]).optional(),
-  version: z.string().max(100).optional(),
-  currency: z.string().max(10).optional(),
-  sortOrder: z.number().int().optional(),
-  spec: z.unknown().optional(),
-  roster: z.unknown().optional(),
-  stakeholders: z.unknown().optional(),
-  sigma: z.unknown().optional(),
-  gage: z.unknown().optional(),
-  cashflow: z.unknown().optional(),
-  xbarR: z.unknown().optional(),
-});
-
-const UpdateProjectBody = CreateProjectBody.partial();
+import { CreateProjectBody, UpdateProjectBody } from "../validation/schemas.js";
+import { validateId } from "../validation/index.js";
+import { logMutation } from "../logging.js";
 
 export default async function projectsRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", authenticate);
@@ -50,6 +30,7 @@ export default async function projectsRoutes(app: FastifyInstance): Promise<void
     { preHandler: [requireRole("VIEWER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
+      if (!validateId(id, reply)) return;
 
       const found = await prisma.project.findFirst({
         where: {
@@ -102,6 +83,22 @@ export default async function projectsRoutes(app: FastifyInstance): Promise<void
       if (data.xbarR !== undefined) createData["xbarR"] = data.xbarR;
 
       const created = await prisma.project.create({ data: createData as never });
+
+      // Audit log
+      prisma.auditLog.create({
+        data: {
+          tenantId: request.tenantId,
+          actorId: request.user.id,
+          action: "project.create",
+          entity: "Project",
+          entityId: created.id,
+          detail: { name: data.name },
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logMutation(request, "project.create", "Project", created.id, { name: data.name });
+
       return reply.code(201).send(created);
     },
   );
@@ -112,6 +109,8 @@ export default async function projectsRoutes(app: FastifyInstance): Promise<void
     { preHandler: [requireRole("MANAGER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
+      if (!validateId(id, reply)) return;
+
       const parsed = UpdateProjectBody.safeParse(request.body);
       if (!parsed.success) {
         return reply.code(400).send({ error: "Invalid request body", details: parsed.error.issues });
@@ -141,6 +140,21 @@ export default async function projectsRoutes(app: FastifyInstance): Promise<void
         data: updateData,
       });
 
+      // Audit log with changed fields
+      prisma.auditLog.create({
+        data: {
+          tenantId: request.tenantId,
+          actorId: request.user.id,
+          action: "project.update",
+          entity: "Project",
+          entityId: id,
+          detail: { changedFields: Object.keys(updateData) },
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logMutation(request, "project.update", "Project", id, { changedFields: Object.keys(updateData) });
+
       return updated;
     },
   );
@@ -151,6 +165,7 @@ export default async function projectsRoutes(app: FastifyInstance): Promise<void
     { preHandler: [requireRole("MANAGER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
+      if (!validateId(id, reply)) return;
 
       const existing = await prisma.project.findFirst({
         where: {
@@ -168,6 +183,21 @@ export default async function projectsRoutes(app: FastifyInstance): Promise<void
         where: { id },
         data: { deletedAt: new Date() },
       });
+
+      // Audit log
+      prisma.auditLog.create({
+        data: {
+          tenantId: request.tenantId,
+          actorId: request.user.id,
+          action: "project.delete",
+          entity: "Project",
+          entityId: id,
+          detail: { name: String((existing as Record<string, unknown>)["name"] ?? "") },
+          ip: request.ip,
+        },
+      }).catch(() => { /* non-blocking */ });
+
+      logMutation(request, "project.delete", "Project", id);
 
       return reply.code(200).send({ ok: true });
     },
