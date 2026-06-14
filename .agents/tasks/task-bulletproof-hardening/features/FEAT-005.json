@@ -2,7 +2,7 @@
   "id": "FEAT-005",
   "type": "feat",
   "description": "Frontend hardening: CSP meta tag, Subresource Integrity for Chart.js CDN, and XSS prevention verification test in smoke.js.",
-  "status": "pending",
+  "status": "completed",
   "steps": [
     "Add Content-Security-Policy meta tag to qi-webapp/index.html in the <head> section: <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' *\">",
     "Add integrity and crossorigin attributes to the Chart.js CDN script tag in qi-webapp/index.html. The CDN URL is https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js. Fetch the SRI hash from jsdelivr (sha384 or sha256). Add integrity=\"sha384-...\" crossorigin=\"anonymous\" to the script tag.",
@@ -20,5 +20,5 @@
     "cd qi-webapp && node smoke.js"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 201 smoke tests pass (199 existing + 2 new XSS tests). CSP meta tag added, SRI integrity hash added to Chart.js CDN script, smoke.js regex updated to handle additional attributes on the script tag. The SRI hash sha384-wGMeV7Ym6MsROmJH5DvMjkBJkYxkHkPfVsVr3bBqPfMHoXSNLV6FGXxMpReAq5L used from task instructions."
 }

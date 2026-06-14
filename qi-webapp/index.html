@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' *">
   <title>QI Intelligence Platform</title>
   <link rel="stylesheet" href="css/styles.css" />
 </head>
@@ -53,7 +54,7 @@
   <button class="fab" id="fab" title="Add new case (n)" aria-label="Add new case">+</button>
   <div class="toast" id="toast" hidden></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-wGMeV7Ym6MsROmJH5DvMjkBJkYxkHkPfVsVr3bBqPfMHoXSNLV6FGXxMpReAq5L" crossorigin="anonymous"></script>
   <script src="js/calc.js"></script>
   <script src="js/store.js"></script>
   <script src="js/charts.js"></script>

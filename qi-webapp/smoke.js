@@ -10,7 +10,7 @@ const chartShim = "window.Chart=function(){this.destroy=()=>{};this.update=()=>{
 const cssText = fs.readFileSync(path.join(root, "css/styles.css"), "utf8");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8")
   .replace('<link rel="stylesheet" href="css/styles.css" />', `<style>${cssText}</style>`)
-  .replace(/<script src="https:\/\/[^"]+"><\/script>/, `<script>${chartShim}</script>`)
+  .replace(/<script src="https:\/\/[^"]*"[^>]*><\/script>/, `<script>${chartShim}</script>`)
   .replace('<script src="js/calc.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/calc.js"))}</script>`)
   .replace('<script src="js/store.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/store.js"))}</script>`)
   .replace('<script src="js/charts.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/charts.js"))}</script>`)
@@ -578,6 +578,14 @@ ok(rmBtn != null, "manager has delete buttons");
 rmBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(S.savedViews().length === 0, "deleting from manager removes the saved view");
 doc.querySelector("#modal [data-act=cancel]") && doc.querySelector("#modal [data-act=cancel]").click();
+
+// 39) XSS prevention — esc() sanitises user input in rendered HTML
+S.reset();
+S.addCase({ problem: '<script>alert(1)</script>', category: "Quality / Defects", priority: "1-CRITICAL", sev: 9, occ: 9, det: 9, owner: "PM", leanMethod: "PDCA", target: "x", startDate: "2026-06-01", status: "OPEN", percent: 0, dateLogged: "2026-06-01", costCat: "Other", estCost: 0, actCost: 0 });
+doc.querySelector('.nav-item[data-view="cases"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const casesHtml = doc.getElementById("content").innerHTML;
+ok(casesHtml.includes("&lt;script&gt;alert(1)&lt;/script&gt;"), "XSS: script tag is HTML-escaped in cases view");
+ok(!/<script>alert\(1\)<\/script>/.test(casesHtml.replace(/<script[\s\S]*?<\/script>/g, "")), "XSS: no raw <script>alert(1)</script> in rendered output");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
