@@ -6,6 +6,9 @@
   const content = $("#content");
   const uiState = { caseFilter: { q: "", status: "", priority: "", owner: "", sort: "rpn" }, regFilter: {}, regSelected: {}, regSort: {}, selected: new Set() };
 
+  // Connection status for online mode: "connected", "error", "local"
+  let connStatus = "local";
+
   // ---------- helpers ----------
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
   function cur() { return (S.get().project.currency) || "$"; }
@@ -706,7 +709,16 @@
           <div class="field full"><label>API base URL</label><select id="ai_base">${opts(["https://api.openai.com/v1"], ai.baseUrl || "https://api.openai.com/v1")}</select></div>
           <div class="field full"><label>API key (the only typed field)</label><input type="password" id="ai_key" value="${esc(ai.key || "")}" placeholder="sk-…"></div>
         </div>
-        <div style="margin-top:14px"><button class="btn btn-primary" data-act="saveai">Save AI settings</button></div></div>`;
+        <div style="margin-top:14px"><button class="btn btn-primary" data-act="saveai">Save AI settings</button></div></div>
+
+      <div class="card"><h3>Online mode</h3>
+        <p class="muted" style="margin-top:-6px">Switch between offline (browser-only) and online (server-backed) operation. Online mode requires a running QI backend.</p>
+        <div class="form-grid">
+          <div class="field"><label>Mode</label><select id="cfg_mode">${opts(["local", "api"], S.getMode())}</select></div>
+          <div class="field" id="cfgUrlField" ${S.getMode() === "api" ? "" : "hidden"}><label>Backend URL</label><input type="text" id="cfg_api_url" value="${esc((typeof window !== "undefined" && window.QI_API_URL) || "")}" placeholder="(same-origin if blank)"></div>
+        </div>
+        <div style="margin-top:10px"><span class="conn-dot conn-${connStatus}" style="display:inline-block;vertical-align:middle;margin-right:6px"></span><span class="muted">${connStatus === "connected" ? "Connected" : connStatus === "error" ? "Disconnected" : "Local mode (offline)"}</span></div>
+        <div style="margin-top:14px"><button class="btn btn-primary" data-act="savemode">Save mode</button></div></div>`;
   };
   AFTER.config = function () {
     content.querySelectorAll("input[data-ro],select[data-ro]").forEach(inp => inp.addEventListener("change", () => {
@@ -720,6 +732,12 @@
       const fr = new FileReader();
       fr.onload = () => { S.setBrand({ logo: fr.result }); refreshHeader(); go("config"); toast("Logo set."); };
       fr.readAsDataURL(f);
+    });
+    // Online mode: show/hide URL field
+    const modeEl = $("#cfg_mode");
+    if (modeEl) modeEl.addEventListener("change", () => {
+      const urlF = $("#cfgUrlField");
+      if (urlF) urlF.hidden = modeEl.value !== "api";
     });
   };
 
@@ -1990,6 +2008,25 @@
       S.setAi({ provider: $("#ai_provider").value, baseUrl: $("#ai_base").value, model: $("#ai_model").value, key: $("#ai_key").value });
       toast("AI settings saved.");
     }
+    else if (act === "savemode") {
+      const newMode = ($("#cfg_mode") || {}).value || "local";
+      const urlVal = ($("#cfg_api_url") || {}).value || "";
+      S.setMode(newMode);
+      if (typeof window !== "undefined") {
+        window.QI_API_URL = urlVal;
+        try { localStorage.setItem("qi_api_url", urlVal); } catch (e) {}
+        if (API) { /* update base URL in API module at runtime - re-read from window */ }
+      }
+      if (newMode === "api") {
+        connStatus = "error"; // until verified
+        updateConnDot(); updateLogoutBtn();
+        checkSessionAndBoot();
+      } else {
+        connStatus = "local";
+        updateConnDot(); updateLogoutBtn();
+        toast("Switched to offline mode.");
+      }
+    }
     else if (act === "regadd") { S.regAdd(b.dataset.reg, {}); go(b.dataset.reg); }
     else if (act === "regdel") { S.regDelete(b.dataset.reg, id); go(b.dataset.reg); }
     else if (act === "regclear") { uiState.regFilter[b.dataset.reg] = ""; go(b.dataset.reg); }
@@ -2053,6 +2090,8 @@
   $("#btnTheme").addEventListener("click", toggleTheme);
   $("#btnChecks").addEventListener("click", runChecks);
   $("#btnHelp").addEventListener("click", showShortcuts);
+  const logoutBtn = $("#btnLogout");
+  if (logoutBtn) logoutBtn.addEventListener("click", handleLogout);
   $("#fileImport").addEventListener("change", e => { if (e.target.files[0]) handleImport(e.target.files[0]); e.target.value = ""; });
   $("#hamburger").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
   const fab = $("#fab"); if (fab) fab.addEventListener("click", () => openCaseForm());
@@ -2104,8 +2143,209 @@
     toast("Storage full — export a JSON backup and delete old snapshots.");
   });
 
+  // ---------- online mode / auth ----------
+  const API = window.QIAPI || null;  // may be null in smoke tests that don't load api.js
+
+  // Connection status: "connected", "error", "local"
+  function updateConnDot() {
+    const dot = $("#connDot");
+    if (!dot) return;
+    if (S.getMode() !== "api") { dot.hidden = true; return; }
+    dot.hidden = false;
+    dot.className = "conn-dot conn-" + connStatus;
+    dot.title = connStatus === "connected" ? "Connected to server" : connStatus === "error" ? "Connection error" : "Local mode";
+  }
+
+  // Logout button visibility
+  function updateLogoutBtn() {
+    const btn = $("#btnLogout");
+    if (!btn) return;
+    btn.hidden = S.getMode() !== "api";
+  }
+
+  // ---------- login/register screen ----------
+  let authScreen = "login"; // "login" or "register"
+  let mfaRequired = false;
+
+  function showLoginScreen() {
+    const isReg = authScreen === "register";
+    const formHtml = isReg ? `
+      <div class="login-card">
+        <h2>Create account</h2>
+        <div class="login-field"><label>Email</label><input type="email" id="auth_email" placeholder="you@example.com" autocomplete="email"></div>
+        <div class="login-field"><label>Password</label><input type="password" id="auth_pass" placeholder="Password" autocomplete="new-password"></div>
+        <div class="login-field"><label>Display name</label><input type="text" id="auth_display" placeholder="Your name" autocomplete="name"></div>
+        <div class="login-field"><label>Tenant / Org name</label><input type="text" id="auth_tenant" placeholder="Organization"></div>
+        <div id="authError" class="login-error" hidden></div>
+        <button class="btn btn-primary block" id="authSubmit">Register</button>
+        <p class="login-toggle">Already have an account? <a href="#" id="authToggle">Log in</a></p>
+      </div>` : `
+      <div class="login-card">
+        <h2>Log in</h2>
+        <div class="login-field"><label>Email</label><input type="email" id="auth_email" placeholder="you@example.com" autocomplete="email"></div>
+        <div class="login-field"><label>Password</label><input type="password" id="auth_pass" placeholder="Password" autocomplete="current-password"></div>
+        <div class="login-field" id="mfaField" ${mfaRequired ? "" : "hidden"}><label>MFA code (6 digits)</label><input type="text" id="auth_mfa" placeholder="123456" maxlength="6" autocomplete="one-time-code"></div>
+        <div id="authError" class="login-error" hidden></div>
+        <button class="btn btn-primary block" id="authSubmit">Login</button>
+        <p class="login-toggle">No account? <a href="#" id="authToggle">Register</a></p>
+      </div>`;
+    content.innerHTML = `<div class="login-wrap">${formHtml}</div>`;
+    // Wire events
+    const toggle = $("#authToggle");
+    if (toggle) toggle.addEventListener("click", (e) => {
+      e.preventDefault();
+      authScreen = isReg ? "login" : "register";
+      mfaRequired = false;
+      showLoginScreen();
+    });
+    const submit = $("#authSubmit");
+    if (submit) submit.addEventListener("click", handleAuthSubmit);
+    // Allow enter key to submit
+    content.querySelectorAll("input").forEach(inp => {
+      inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); handleAuthSubmit(); } });
+    });
+    const emailEl = $("#auth_email");
+    if (emailEl) emailEl.focus();
+  }
+
+  async function handleAuthSubmit() {
+    if (!API) return;
+    const errEl = $("#authError");
+    const email = ($("#auth_email") || {}).value || "";
+    const pass = ($("#auth_pass") || {}).value || "";
+    if (!email || !pass) { showAuthError("Please enter email and password."); return; }
+
+    const btn = $("#authSubmit");
+    if (btn) { btn.disabled = true; btn.textContent = "Please wait..."; }
+
+    if (authScreen === "register") {
+      const display = ($("#auth_display") || {}).value || "";
+      const tenant = ($("#auth_tenant") || {}).value || "";
+      const res = await API.register(email, pass, display, tenant);
+      if (btn) { btn.disabled = false; btn.textContent = "Register"; }
+      if (res.ok) {
+        // Auto-login after register
+        const loginRes = await API.login(email, pass);
+        if (loginRes.ok) { onAuthSuccess(); return; }
+        // If login fails after register, show login form
+        authScreen = "login";
+        showLoginScreen();
+        toast("Registered! Please log in.");
+      } else {
+        showAuthError(res.error || "Registration failed.");
+      }
+    } else {
+      const mfa = mfaRequired ? (($("#auth_mfa") || {}).value || "") : undefined;
+      const res = await API.login(email, pass, undefined, mfa);
+      if (btn) { btn.disabled = false; btn.textContent = "Login"; }
+      if (res.ok) {
+        if (res.data && res.data.mfaRequired) {
+          mfaRequired = true;
+          const mfaField = $("#mfaField");
+          if (mfaField) mfaField.hidden = false;
+          showAuthError("MFA required. Enter the 6-digit code.");
+          const mfaInput = $("#auth_mfa");
+          if (mfaInput) mfaInput.focus();
+        } else {
+          onAuthSuccess();
+        }
+      } else {
+        if (res.data && res.data && res.data.mfaRequired) {
+          mfaRequired = true;
+          const mfaField = $("#mfaField");
+          if (mfaField) mfaField.hidden = false;
+          showAuthError("MFA required. Enter the 6-digit code.");
+          const mfaInput = $("#auth_mfa");
+          if (mfaInput) mfaInput.focus();
+        } else {
+          showAuthError(res.error || "Login failed.");
+        }
+      }
+    }
+  }
+
+  function showAuthError(msg) {
+    const el = $("#authError");
+    if (!el) return;
+    el.textContent = msg;
+    el.hidden = false;
+  }
+
+  function onAuthSuccess() {
+    connStatus = "connected";
+    updateConnDot();
+    updateLogoutBtn();
+    const initialHash = (location.hash || "").replace(/^#/, "");
+    go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
+  }
+
+  async function handleLogout() {
+    if (API) await API.logout();
+    connStatus = "error";
+    updateConnDot();
+    showLoginScreen();
+  }
+
+  // Check session on boot when mode='api'
+  async function checkSessionAndBoot() {
+    if (S.getMode() !== "api" || !API) {
+      // Local mode: just boot normally
+      connStatus = "local";
+      updateConnDot();
+      updateLogoutBtn();
+      const initialHash = (location.hash || "").replace(/^#/, "");
+      go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
+      return;
+    }
+    // API mode: check session
+    try {
+      const res = await API.me();
+      if (res.ok) {
+        connStatus = "connected";
+        updateConnDot();
+        updateLogoutBtn();
+        const initialHash = (location.hash || "").replace(/^#/, "");
+        go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
+      } else {
+        if (res.error === "fetch not available" || res.error === "Network error") {
+          // Backend unreachable - fall back to local mode
+          S.setMode("local");
+          connStatus = "local";
+          updateConnDot();
+          updateLogoutBtn();
+          toast("Server unreachable - working offline");
+          const initialHash = (location.hash || "").replace(/^#/, "");
+          go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
+        } else {
+          // 401 or other auth error - show login
+          connStatus = "error";
+          updateConnDot();
+          updateLogoutBtn();
+          showLoginScreen();
+        }
+      }
+    } catch (e) {
+      // Network error - graceful degradation
+      S.setMode("local");
+      connStatus = "local";
+      updateConnDot();
+      updateLogoutBtn();
+      toast("Server unreachable - working offline");
+      const initialHash = (location.hash || "").replace(/^#/, "");
+      go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
+    }
+  }
+
   // ---------- init ----------
   S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
-  const initialHash = (location.hash || "").replace(/^#/, "");
-  go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
+  // Boot depends on mode
+  if (S.getMode() === "api" && API) {
+    checkSessionAndBoot();
+  } else {
+    connStatus = "local";
+    updateConnDot();
+    updateLogoutBtn();
+    const initialHash = (location.hash || "").replace(/^#/, "");
+    go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
+  }
 })();

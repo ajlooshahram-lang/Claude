@@ -2,10 +2,20 @@
 (function (root) {
   "use strict";
 
-  var BASE = (root.QI_API_URL != null ? root.QI_API_URL : "");
+  // Restore persisted API URL on boot
+  try {
+    if (typeof localStorage !== "undefined" && !root.QI_API_URL) {
+      var saved = localStorage.getItem("qi_api_url");
+      if (saved) root.QI_API_URL = saved;
+    }
+  } catch (e) {}
+
+  function getBase() {
+    return (root.QI_API_URL != null ? root.QI_API_URL : "");
+  }
 
   function request(method, path, body) {
-    var url = BASE + path;
+    var url = getBase() + path;
     var opts = {
       method: method,
       credentials: "include",

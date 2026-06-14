@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Add login/register screen, logout button, online mode toggle in Settings, and connection status indicator to the UI (qi-webapp/js/ui.js). Also add CSS for these new components (qi-webapp/css/styles.css).",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "In qi-webapp/js/ui.js, add a login/register screen: When mode='api' and no session exists (QIAPI.me() returns 401), show a login form instead of the dashboard. The login form has email + password text inputs + Login button. If MFA is required (response has mfaRequired:true), show a 6-digit code input. Include a 'Register' link that toggles to a register form (email + password + display name + Register button). On successful auth, proceed to dashboard. NOTE: text inputs for email/password are allowed here as the one exception to the click-only rule.",
     "Add a logout button to the topbar in ui.js. When clicked (and mode='api'), call QIAPI.logout() and return to the login screen. When mode='local', hide the logout button.",

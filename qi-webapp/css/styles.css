@@ -417,3 +417,22 @@ tr.pinned-row[draggable]{cursor:grab}
 tr.pinned-row[draggable]:active{cursor:grabbing}
 tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46,84,150,.08)}
 [data-theme="dark"] tr.row-dragover td{background:rgba(125,167,240,.12)}
+
+/* login/register screen */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:60vh;padding:40px 20px}
+.login-card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:32px 28px;width:100%;max-width:380px}
+.login-card h2{margin:0 0 20px;font-size:20px;text-align:center;color:var(--navy)}
+.login-field{margin-bottom:14px;display:flex;flex-direction:column;gap:5px}
+.login-field label{font-size:12px;font-weight:600;color:#42506a}
+.login-field input{padding:10px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff;color:var(--ink)}
+.login-field input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(46,84,150,.12)}
+.login-error{color:var(--red);font-size:12px;margin-bottom:10px;padding:8px;background:#fde2e2;border-radius:6px}
+.login-toggle{text-align:center;font-size:13px;color:var(--muted);margin-top:16px}
+.login-toggle a{color:var(--blue);text-decoration:none;font-weight:600}
+.login-toggle a:hover{text-decoration:underline}
+
+/* connection status dot */
+.conn-dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.conn-connected{background:var(--green)}
+.conn-error{background:var(--red)}
+.conn-local{background:#bbb}
