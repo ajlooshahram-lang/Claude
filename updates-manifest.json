@@ -1,0 +1,59 @@
+{
+  "version": "2026.13",
+  "lastUpdated": "2026-06-14",
+  "checkInterval": 86400,
+  "updates": [
+    {
+      "id": "law-2026-01",
+      "category": "law",
+      "severity": "amber",
+      "date": "2026-06-14",
+      "version": "2026.13",
+      "title_da": "DS/HD 60364-5-52:2011+A12+Ret.3+A1:2025 — ny udgave",
+      "title_en": "DS/HD 60364-5-52:2011+A12+Ret.3+A1:2025 — new edition",
+      "description_da": "Ny A1 ændring til DS/HD 60364-5-52. Kabeldimensionering: præcisering af grupperingsfaktorer for kabler i jordslange og opdateret Tabel B.52.17 for >20 kredse.",
+      "description_en": "New A1 amendment to DS/HD 60364-5-52. Cable sizing: clarification of grouping factors for cables in ground ducts and updated Table B.52.17 for >20 circuits.",
+      "action": "update_standard",
+      "data": { "standard": "DS/HD 60364-5-52", "newVersion": "2011+A12+Ret.3+A1:2025" }
+    },
+    {
+      "id": "price-2026-q2",
+      "category": "price",
+      "severity": "blue",
+      "date": "2026-06-01",
+      "version": "2026.13",
+      "title_da": "Prisindeks opdateret Q2 2026",
+      "title_en": "Price index updated Q2 2026",
+      "description_da": "Kobberpris +4%, aluminium +2%, plastkapslinger uændret. Nye priser afspejlet i Tilbud- og El-tavle-modulerne.",
+      "description_en": "Copper price +4%, aluminium +2%, plastic enclosures unchanged. New prices reflected in Bid and Panel modules.",
+      "action": "update_price_index",
+      "data": { "copper": 1.04, "aluminium": 1.02, "plastic": 1.00, "steel": 1.01, "mcb": 1.00, "mccb": 1.01, "cable_cu": 1.04, "cable_al": 1.02 }
+    },
+    {
+      "id": "product-2026-01",
+      "category": "product",
+      "severity": "blue",
+      "date": "2026-05-15",
+      "version": "2026.13",
+      "title_da": "Nye produkter: Schneider Acti9 iC40x serie",
+      "title_en": "New products: Schneider Acti9 iC40x series",
+      "description_da": "Schneider Acti9 iC40x serie tilføjet — ny kompakt MCB med 10kA brydeevne i kun 9mm bredde.",
+      "description_en": "Schneider Acti9 iC40x series added — new compact MCB with 10kA breaking capacity in only 9mm width.",
+      "action": "add_product",
+      "data": { "type": "mcb", "brand": "Schneider", "model": "iC40x", "series": "Acti9", "icu": 10, "width_mm": 9 }
+    },
+    {
+      "id": "deprecation-2026-01",
+      "category": "deprecation",
+      "severity": "blue",
+      "date": "2026-04-01",
+      "version": "2026.13",
+      "title_da": "Udgået: ABB S200 serie (erstattet af S200M)",
+      "title_en": "Discontinued: ABB S200 series (replaced by S200M)",
+      "description_da": "ABB S200 serie er udgået fra produktion. Erstattes af S200M med forbedret brydeevne.",
+      "description_en": "ABB S200 series discontinued. Replaced by S200M with improved breaking capacity.",
+      "action": "deprecate_product",
+      "data": { "brand": "ABB", "model": "S200", "replacement": "S200M" }
+    }
+  ]
+}
