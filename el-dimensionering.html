@@ -753,6 +753,7 @@ const T = {
       draw: 'Tegning',
       selectivity: '\u26A1 Selektivitet',
       zs: '\uD83D\uDD04 Sl\u00F8jfe Zs',
+      motor: '\u2699\uFE0F Motorstart',
       exam: '\uD83C\uDF93 Eksamen'
     },
     // Load module
@@ -854,6 +855,7 @@ const T = {
       draw: 'Drawing',
       selectivity: '\u26A1 Selectivity',
       zs: '\uD83D\uDD04 Loop Zs',
+      motor: '\u2699\uFE0F Motor Start',
       exam: '\uD83C\uDF93 Exam'
     },
     loadTitle: 'Load Calculation',
@@ -1996,6 +1998,8 @@ let vdropState = { length: 50 };
 let selState = { upType: null, upRating: null, upCurve: null, dnType: null, dnRating: null, dnCurve: null };
 // Loop impedance (Zs) state
 let zsState = { earthing: 'TN-S', deviceType: 'mcb', deviceCurve: 'B', deviceRating: 16, material: 'copper', crossSection: 2.5, cableLength: 20, circuitType: 'final', ze: 0.35 };
+// Motor start state
+let motorState = { power: 7.5, voltage: 400, eta: 0.89, cosfi: 0.85, method: 'DOL', cableLength: 30, crossSection: 4 };
 // Short circuit state
 let scState = { zNet: 1, zTrafo: 5 };
 // Standards state
@@ -2123,6 +2127,7 @@ function renderModule(mod) {
     case 'draw': content = renderDrawing(); break;
     case 'selectivity': content = renderSelectivity(); break;
     case 'zs': content = renderZs(); break;
+    case 'motor': content = renderMotorStart(); break;
     case 'exam': content = renderExam(); break;
   }
   // Append AI assistant to every module
@@ -5487,6 +5492,7 @@ function configurePriceFeed() {
 // ===== DATA VERSION & CHANGELOG =====
 const DATA_VERSION = '2026.12';
 const DATA_CHANGELOG = [
+  { v: '2026.13', date: '2026-06-14', da: 'Motorstart-beregner: DOL/Y-\u0394/Softstart/VFD, startstr\u00F8m, sp\u00E6ndingsfald under start, k\u00B2S\u00B2-verifikation, MCB-kurve, kabelvalg, termisk rel\u00E6 og animeret SVG-visualisering (IEC 60947-4-1, DS/HD 60364-5-52 \u00A7525).', en: 'Motor start calculator: DOL/Y-\u0394/Soft starter/VFD, starting current, voltage drop during start, k\u00B2S\u00B2 verification, MCB curve, cable selection, thermal relay and animated SVG visualization (IEC 60947-4-1, DS/HD 60364-5-52 \u00A7525).' },
   { v: '2026.12', date: '2026-06-13', da: 'Mock kan nu v\u00e6lges: Fuld (alle 11/68 trin) eller Hurtig (1 tilf\u00e6ldigt scenarie pr. kategori, ~18 trin) til hurtig, varieret \u00f8velse. Separate bedste-scorer pr. type.', en: 'Mock is now selectable: Full (all 11/68 steps) or Quick (1 random scenario per category, ~18 steps) for fast, varied practice. Separate best scores per type.' },
   { v: '2026.11', date: '2026-06-13', da: 'Mock-bed\u00f8mmelse skærpet (konservativ): best\u00e5 kr\u00e6ver nu b\u00e5de \u226580% samlet OG \u226560% i hver kategori \u2014 man kan ikke best\u00e5 mens et helt fagomr\u00e5de dumpes. 3-trins farvekodning pr. kategori.', en: 'Mock verdict tightened (conservative): passing now requires both \u226580% overall AND \u226560% in every category \u2014 you cannot pass while failing an entire domain. 3-tier per-category colour coding.' },
   { v: '2026.10', date: '2026-06-13', da: 'Eksamenssimulator: Fuld Mock (alle 11 scenarier/68 trin p\u00e5 tid) og \u201dGennemg\u00e5 fejl\u201d-skærm (dit svar vs. korrekt + forklaring + DS/HD 60364-klausul) for b\u00e5de quiz og mock.', en: 'Exam simulator: Full Mock (all 11 scenarios/68 steps, timed) and a \u201cReview mistakes\u201d screen (your answer vs. correct + explanation + DS/HD 60364 clause) for both quiz and mock.' },
@@ -8244,6 +8250,400 @@ function examRenderAnswerKey(){
   });
   html += `<div class="select-grid" style="margin-top:14px"><button class="sel-btn selected" onclick="examTab('quiz')">\u25C0 ${da?'Tilbage':'Back'}</button></div></div>`;
   return html;
+}
+
+function renderMotorStart() {
+  const da = lang === 'da';
+
+  // IEC standard motor data (400V, 3-phase)
+  const MOTOR_POWERS = [0.75, 1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110];
+  const MOTOR_FLC = { 0.75: 1.8, 1.5: 3.5, 2.2: 5.0, 3: 6.6, 4: 8.8, 5.5: 11.8, 7.5: 15.7, 11: 22.4, 15: 29.5, 18.5: 35.5, 22: 41.5, 30: 55.5, 37: 67, 45: 81, 55: 99, 75: 134, 90: 160, 110: 195 };
+  const ETA_VALUES = [0.85, 0.87, 0.89, 0.90, 0.91, 0.92, 0.93, 0.94, 0.95];
+  const COSFI_VALUES = [0.80, 0.82, 0.84, 0.85, 0.86, 0.87, 0.88, 0.90];
+  const METHODS = ['DOL', 'Y-Delta', 'Soft', 'VFD'];
+  const METHOD_LABELS = { DOL: 'DOL', 'Y-Delta': da ? 'Stjerne-Trekant (Y-\u0394)' : 'Star-Delta (Y-\u0394)', Soft: da ? 'Softstart' : 'Soft Starter', VFD: 'VFD' };
+  const METHOD_MULT = { DOL: 7, 'Y-Delta': 2.3, Soft: 3, VFD: 1.2 };
+  const METHOD_TORQUE = { DOL: 100, 'Y-Delta': 33, Soft: 50, VFD: 100 };
+  const METHOD_CURVE = { DOL: 'D', 'Y-Delta': 'C', Soft: 'C', VFD: 'B' };
+  const CABLE_LENGTHS = [10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 100, 125, 150];
+  const CROSS_SECTIONS = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240];
+  const MAX_VDROP_START = { DOL: 15, 'Y-Delta': 10, Soft: 10, VFD: 5 };
+
+  // Cable resistance data (mOhm/m per conductor at 20C, copper)
+  const R_DATA = { 1.5: 12.1, 2.5: 7.41, 4: 4.61, 6: 3.08, 10: 1.83, 16: 1.15, 25: 0.727, 35: 0.524, 50: 0.387, 70: 0.269, 95: 0.194, 120: 0.155, 150: 0.126, 185: 0.1017, 240: 0.0787 };
+  const X_DATA = { 1.5: 0.113, 2.5: 0.105, 4: 0.099, 6: 0.097, 10: 0.092, 16: 0.088, 25: 0.086, 35: 0.082, 50: 0.084, 70: 0.081, 95: 0.082, 120: 0.082, 150: 0.084, 185: 0.082, 240: 0.083 };
+
+  // Iz table (XLPE 90C, method C, 3 loaded conductors)
+  const IZ_XLPE = { 1.5: 22, 2.5: 30, 4: 40, 6: 51, 10: 70, 16: 94, 25: 119, 35: 147, 50: 179, 70: 229, 95: 278, 120: 322, 150: 371, 185: 424, 240: 500 };
+
+  // k factor for XLPE copper (for k2S2 check) - 143 for XLPE Cu
+  const K_CABLE = 143;
+
+  // MCB standard ratings
+  const MCB_RATINGS = [6, 10, 13, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125];
+
+  // --- Calculations ---
+  const U = motorState.voltage;
+  const P = motorState.power * 1000; // Watts
+  const eta = motorState.eta;
+  const cosfi = motorState.cosfi;
+  const method = motorState.method;
+
+  // Rated current
+  const In = P / (Math.sqrt(3) * U * cosfi * eta);
+  // IEC reference current for comparison
+  const In_IEC = MOTOR_FLC[motorState.power] || In;
+
+  // Starting current
+  const Istart = In * METHOD_MULT[method];
+
+  // Cable impedance
+  const rPerM = R_DATA[motorState.crossSection] || 7.41; // mOhm/m
+  const xPerM = X_DATA[motorState.crossSection] || 0.1;  // mOhm/m
+  const Zcable = Math.sqrt(Math.pow(rPerM * motorState.cableLength * 2, 2) + Math.pow(xPerM * motorState.cableLength * 2, 2)) / 1000; // Ohms (phase + neutral/PE)
+  const Rcable = rPerM * motorState.cableLength * 2 / 1000; // Ohms
+
+  // Voltage drop during starting (3-phase: uses sqrt(3) * I * Z per phase)
+  const dU_start_V = Math.sqrt(3) * Istart * (rPerM * motorState.cableLength / 1000 * cosfi + xPerM * motorState.cableLength / 1000 * 0.6);
+  const dU_start_pct = (dU_start_V / U) * 100;
+
+  // Voltage drop during normal running
+  const dU_run_V = Math.sqrt(3) * In * (rPerM * motorState.cableLength / 1000 * cosfi + xPerM * motorState.cableLength / 1000 * Math.sin(Math.acos(cosfi)));
+  const dU_run_pct = (dU_run_V / U) * 100;
+
+  // Cable Iz capacity
+  const Iz = IZ_XLPE[motorState.crossSection] || 30;
+  const cableOk = Iz >= In * 1.25; // Cable should handle at least 1.25 * In for motor circuits
+
+  // Recommended MCB
+  const recCurve = METHOD_CURVE[method];
+  let recMCB = MCB_RATINGS.find(function(r) { return r >= In * 1.1; }) || MCB_RATINGS[MCB_RATINGS.length - 1];
+  // For DOL, ensure MCB doesn't trip on Istart (D-curve: 10-20x In)
+  if (method === 'DOL' && recMCB * 20 < Istart) {
+    recMCB = MCB_RATINGS.find(function(r) { return r * 10 <= Istart && r >= In; }) || recMCB;
+  }
+
+  // Thermal relay setting (overload relay)
+  const thermalMin = (In * 1.0).toFixed(1);
+  const thermalMax = (In * 1.05).toFixed(1);
+
+  // k2S2 check: cable must withstand starting current thermal stress
+  // Energy let-through during start: I^2 * t (typical DOL start = 3-10s, Y-D=5-15s, Soft=5-20s, VFD=continuous)
+  const startDurations = { DOL: 5, 'Y-Delta': 8, Soft: 10, VFD: 0.5 };
+  const tStart = startDurations[method];
+  const I2t_start = Istart * Istart * tStart;
+  const k2S2 = Math.pow(K_CABLE, 2) * Math.pow(motorState.crossSection, 2);
+  const k2s2_ok = k2S2 >= I2t_start;
+
+  // Starting torque
+  const torquePct = METHOD_TORQUE[method];
+
+  // Max voltage drop limit
+  const maxVdrop = MAX_VDROP_START[method];
+  const vdropOk = dU_start_pct <= maxVdrop;
+
+  // Recommended cable (find smallest cross-section that handles In*1.25)
+  const recCable = CROSS_SECTIONS.find(function(cs) { return (IZ_XLPE[cs] || 0) >= In * 1.25; }) || 240;
+
+  // --- Build UI ---
+  // Motor power buttons
+  let powerSection = `
+    <div class="select-group">
+      <div class="select-label">\u26A1 ${da ? 'Motoreffekt [kW]' : 'Motor power [kW]'}</div>
+      <div class="select-grid">
+        ${MOTOR_POWERS.map(function(p) { return '<button class="sel-btn ' + (motorState.power === p ? 'selected' : '') + '" onclick="motorState.power=' + p + ';renderModule(\'motor\')">' + p + ' kW</button>'; }).join('')}
+      </div>
+    </div>`;
+
+  // Voltage (fixed 400V 3-phase for now, could add 690V)
+  let voltageSection = `
+    <div class="select-group">
+      <div class="select-label">\uD83D\uDD0C ${da ? 'Sp\u00E6nding' : 'Voltage'}</div>
+      <div class="select-grid">
+        <button class="sel-btn ${motorState.voltage === 400 ? 'selected' : ''}" onclick="motorState.voltage=400;renderModule('motor')">400V 3\u223C</button>
+        <button class="sel-btn ${motorState.voltage === 690 ? 'selected' : ''}" onclick="motorState.voltage=690;renderModule('motor')">690V 3\u223C</button>
+      </div>
+    </div>`;
+
+  // Efficiency buttons
+  let etaSection = `
+    <div class="select-group">
+      <div class="select-label">\u03B7 ${da ? 'Virkningsgrad' : 'Efficiency'}</div>
+      <div class="select-grid">
+        ${ETA_VALUES.map(function(e) { return '<button class="sel-btn ' + (motorState.eta === e ? 'selected' : '') + '" onclick="motorState.eta=' + e + ';renderModule(\'motor\')">' + (e * 100).toFixed(0) + '%</button>'; }).join('')}
+      </div>
+    </div>`;
+
+  // Power factor buttons
+  let cosfiSection = `
+    <div class="select-group">
+      <div class="select-label">cos\u03C6 ${da ? 'Effektfaktor' : 'Power factor'}</div>
+      <div class="select-grid">
+        ${COSFI_VALUES.map(function(c) { return '<button class="sel-btn ' + (motorState.cosfi === c ? 'selected' : '') + '" onclick="motorState.cosfi=' + c + ';renderModule(\'motor\')">' + c.toFixed(2) + '</button>'; }).join('')}
+      </div>
+    </div>`;
+
+  // Starting method buttons
+  let methodSection = `
+    <div class="select-group">
+      <div class="select-label">\uD83D\uDE80 ${da ? 'Startmetode' : 'Starting method'}</div>
+      <div class="select-grid">
+        ${METHODS.map(function(m) { return '<button class="sel-btn ' + (motorState.method === m ? 'selected' : '') + '" onclick="motorState.method=\'' + m + '\';renderModule(\'motor\')">' + METHOD_LABELS[m] + ' (' + METHOD_MULT[m] + '\u00D7In)</button>'; }).join('')}
+      </div>
+    </div>`;
+
+  // Cable length buttons
+  let lengthSection = `
+    <div class="select-group">
+      <div class="select-label">\uD83D\uDCCF ${da ? 'Kabell\u00E6ngde [m]' : 'Cable length [m]'}</div>
+      <div class="select-grid">
+        ${CABLE_LENGTHS.map(function(l) { return '<button class="sel-btn ' + (motorState.cableLength === l ? 'selected' : '') + '" onclick="motorState.cableLength=' + l + ';renderModule(\'motor\')">' + l + ' m</button>'; }).join('')}
+      </div>
+    </div>`;
+
+  // Cross-section buttons
+  let csSection = `
+    <div class="select-group">
+      <div class="select-label">\uD83D\uDDB1 ${da ? 'Kabeltv\u00E6rsnit [mm\u00B2]' : 'Cable cross-section [mm\u00B2]'}</div>
+      <div class="select-grid">
+        ${CROSS_SECTIONS.map(function(cs) { return '<button class="sel-btn ' + (motorState.crossSection === cs ? 'selected' : '') + '" onclick="motorState.crossSection=' + cs + ';renderModule(\'motor\')">' + cs + ' mm\u00B2</button>'; }).join('')}
+      </div>
+    </div>`;
+
+  // --- Results ---
+  const overallOk = vdropOk && cableOk && k2s2_ok;
+  const verdictColor = overallOk ? 'var(--success)' : 'var(--danger)';
+  const verdictIcon = overallOk ? '\u2705' : '\u26A0\uFE0F';
+  const verdictText = overallOk
+    ? (da ? 'Motorinstallation OK' : 'Motor installation OK')
+    : (da ? 'Kontroll\u00E9r markerede problemer' : 'Check highlighted issues');
+
+  let resultHtml = `
+    <div class="card fade-in">
+      <div class="card-title" style="color:${verdictColor}">${verdictIcon} ${da ? 'Resultat' : 'Result'}</div>
+      <div class="result-box ${overallOk ? '' : 'danger'}">
+        <div class="result-title" style="color:${verdictColor};font-size:1.1rem">${verdictText}</div>
+
+        <div class="result-row"><span class="label">${da ? 'M\u00E6rkestr\u00F8m In (beregnet)' : 'Rated current In (calculated)'}</span><span class="value" style="color:var(--primary)">${In.toFixed(2)} A</span></div>
+        <div class="result-row"><span class="label">${da ? 'IEC reference In (' + U + 'V)' : 'IEC reference In (' + U + 'V)'}</span><span class="value">${In_IEC.toFixed(1)} A</span></div>
+        <div class="result-row"><span class="label">${da ? 'Startstr\u00F8m Istart (' + METHOD_MULT[method] + '\u00D7In)' : 'Starting current Istart (' + METHOD_MULT[method] + '\u00D7In)'}</span><span class="value" style="color:#ff6b35;font-weight:700">${Istart.toFixed(1)} A</span></div>
+
+        <div style="border-top:1px solid rgba(255,255,255,0.06);margin:10px 0"></div>
+
+        <div class="result-row"><span class="label">${da ? 'Sp\u00E6ndingsfald ved start \u0394U%' : 'Starting voltage drop \u0394U%'}</span><span class="value" style="color:${vdropOk ? 'var(--success)' : 'var(--danger)'}">${dU_start_pct.toFixed(1)}% ${vdropOk ? '\u2705' : '\u274C'} (max ${maxVdrop}%)</span></div>
+        <div class="result-row"><span class="label">${da ? 'Sp\u00E6ndingsfald drift \u0394U%' : 'Running voltage drop \u0394U%'}</span><span class="value" style="color:${dU_run_pct <= 5 ? 'var(--success)' : 'var(--danger)'}">${dU_run_pct.toFixed(2)}%</span></div>
+
+        <div style="border-top:1px solid rgba(255,255,255,0.06);margin:10px 0"></div>
+
+        <div class="result-row"><span class="label">${da ? 'Anbefalet MCB-kurve' : 'Recommended MCB curve'}</span><span class="value" style="color:var(--primary)">${recCurve}${recMCB} (${recCurve === 'D' ? '10-20' : recCurve === 'C' ? '5-10' : '3-5'}\u00D7In)</span></div>
+        <div class="result-row"><span class="label">${da ? 'Anbefalet kabel' : 'Recommended cable'}</span><span class="value" style="color:${motorState.crossSection >= recCable ? 'var(--success)' : 'var(--danger)'}">${recCable} mm\u00B2 XLPE Cu ${motorState.crossSection >= recCable ? '\u2705' : '\u274C (' + (da ? 'for lille' : 'too small') + ')'}</span></div>
+        <div class="result-row"><span class="label">${da ? 'Kabel Iz kapacitet' : 'Cable Iz capacity'}</span><span class="value" style="color:${cableOk ? 'var(--success)' : 'var(--danger)'}">${Iz} A ${cableOk ? '\u2265' : '<'} ${(In * 1.25).toFixed(1)} A (1.25\u00D7In)</span></div>
+
+        <div style="border-top:1px solid rgba(255,255,255,0.06);margin:10px 0"></div>
+
+        <div class="result-row"><span class="label">${da ? 'Termisk rel\u00E6 indstilling' : 'Thermal relay setting'}</span><span class="value" style="color:var(--primary)">${thermalMin} - ${thermalMax} A</span></div>
+        <div class="result-row"><span class="label">${da ? 'Startmoment (% af DOL)' : 'Starting torque (% of DOL)'}</span><span class="value">${torquePct}%</span></div>
+
+        <div style="border-top:1px solid rgba(255,255,255,0.06);margin:10px 0"></div>
+
+        <div class="result-row"><span class="label">k\u00B2S\u00B2 ${da ? 'verifikation' : 'verification'}</span><span class="value" style="color:${k2s2_ok ? 'var(--success)' : 'var(--danger)'}">${(k2S2/1e6).toFixed(1)}M ${k2s2_ok ? '\u2265' : '<'} ${(I2t_start/1e6).toFixed(1)}M (I\u00B2t) ${k2s2_ok ? '\u2705' : '\u274C'}</span></div>
+        <div class="result-row"><span class="label">${da ? 'Starttid (typisk)' : 'Start duration (typical)'}</span><span class="value">${tStart} s</span></div>
+      </div>
+
+      <div style="margin-top:12px;padding:8px 12px;border-radius:8px;background:rgba(0,180,255,0.06);border:1px solid rgba(0,180,255,0.15);font-size:0.78rem;line-height:1.5">
+        <strong>${da ? 'Beskyttelseskoordinering (IEC 60947-4-1)' : 'Protection coordination (IEC 60947-4-1)'}</strong><br>
+        ${da ? 'MPCB (motorsikringsafbryder) + kontaktor + overbelastningsrel\u00E6' : 'MPCB (motor protection circuit breaker) + contactor + overload relay'}<br>
+        ${da ? 'Overbelastningsrel\u00E6 klasse 10 (standard) / klasse 20 (tung start)' : 'Overload relay class 10 (standard) / class 20 (heavy start)'}<br>
+        <strong>DS/HD 60364-5-52 \u00A7525</strong> + <strong>IEC 60947-4-1</strong>
+      </div>
+
+      ${buildMotorViz(In, Istart, dU_start_pct, method, vdropOk, k2s2_ok, cableOk, motorState.cableLength)}
+    </div>`;
+
+  // Comparison table for all methods
+  let compHtml = `
+    <div class="card fade-in">
+      <div class="card-title">\uD83D\uDCCA ${da ? 'Sammenligning af startmetoder' : 'Starting method comparison'}</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
+            <th style="text-align:left;padding:6px;color:var(--text-light)">${da ? 'Metode' : 'Method'}</th>
+            <th style="text-align:right;padding:6px;color:var(--text-light)">Istart [A]</th>
+            <th style="text-align:right;padding:6px;color:var(--text-light)">\u0394U%</th>
+            <th style="text-align:right;padding:6px;color:var(--text-light)">${da ? 'Moment' : 'Torque'}</th>
+            <th style="text-align:center;padding:6px;color:var(--text-light)">${da ? 'Kurve' : 'Curve'}</th>
+          </tr>`;
+  METHODS.forEach(function(m) {
+    var iS = In * METHOD_MULT[m];
+    var dU = (Math.sqrt(3) * iS * (rPerM * motorState.cableLength / 1000 * cosfi + xPerM * motorState.cableLength / 1000 * 0.6) / U) * 100;
+    var isSelected = m === method;
+    var rowStyle = isSelected ? 'background:rgba(0,180,255,0.1);font-weight:700' : '';
+    compHtml += `
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.05);${rowStyle}">
+            <td style="padding:6px;color:${isSelected ? 'var(--primary)' : '#fff'}">${isSelected ? '\u25B6 ' : ''}${METHOD_LABELS[m]}</td>
+            <td style="text-align:right;padding:6px;color:#ff6b35">${iS.toFixed(1)}</td>
+            <td style="text-align:right;padding:6px;color:${dU <= MAX_VDROP_START[m] ? 'var(--success)' : 'var(--danger)'}">${dU.toFixed(1)}%</td>
+            <td style="text-align:right;padding:6px">${METHOD_TORQUE[m]}%</td>
+            <td style="text-align:center;padding:6px;color:var(--primary)">${METHOD_CURVE[m]}</td>
+          </tr>`;
+  });
+  compHtml += `</table></div></div>`;
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">\u2699\uFE0F ${da ? 'Motorstart-beregner' : 'Motor Start Calculator'}</div>
+      <div class="info-row">${da ? 'Beregn startstr\u00F8m, sp\u00E6ndingsfald, beskyttelse og kabel for motorinstallation iht. DS/HD 60364 og IEC 60947-4-1.' : 'Calculate starting current, voltage drop, protection and cable for motor installation per DS/HD 60364 and IEC 60947-4-1.'}</div>
+      ${powerSection}
+      ${voltageSection}
+      ${etaSection}
+      ${cosfiSection}
+      ${methodSection}
+      <div style="border-top:1px solid rgba(255,255,255,0.08);margin:16px 0"></div>
+      ${lengthSection}
+      ${csSection}
+    </div>
+    ${resultHtml}
+    ${compHtml}
+  `;
+}
+
+function buildMotorViz(In, Istart, dU_pct, method, vdropOk, k2s2Ok, cableOk, cableLen) {
+  const da = lang === 'da';
+  const W = 640, H = 480;
+  const allOk = vdropOk && k2s2Ok && cableOk;
+  const accentColor = allOk ? '#06d6a0' : '#ff4444';
+
+  let svg = '';
+
+  // Background with grid
+  svg += '<rect width="' + W + '" height="' + H + '" fill="#020508" rx="14"/>';
+  for (var gi = 0; gi < W; gi += 40) svg += '<line x1="' + gi + '" y1="0" x2="' + gi + '" y2="' + H + '" stroke="rgba(0,180,255,0.03)" stroke-width="0.5"/>';
+  for (var gj = 0; gj < H; gj += 40) svg += '<line x1="0" y1="' + gj + '" x2="' + W + '" y2="' + gj + '" stroke="rgba(0,180,255,0.03)" stroke-width="0.5"/>';
+
+  // Title
+  svg += '<text x="' + (W/2) + '" y="26" text-anchor="middle" font-size="11" fill="' + accentColor + '" font-weight="700">' + (da ? 'MOTORSTART-KREDSLOEB' : 'MOTOR STARTING CIRCUIT') + '</text>';
+
+  // Panel box (left)
+  var panelX = 60, panelY = 100, panelW = 80, panelH = 120;
+  svg += '<rect x="' + panelX + '" y="' + panelY + '" width="' + panelW + '" height="' + panelH + '" rx="6" fill="rgba(0,180,255,0.06)" stroke="#0af" stroke-width="1.5"/>';
+  svg += '<text x="' + (panelX + panelW/2) + '" y="' + (panelY + 20) + '" text-anchor="middle" font-size="9" fill="#0af" font-weight="700">' + (da ? 'TAVLE' : 'PANEL') + '</text>';
+  svg += '<text x="' + (panelX + panelW/2) + '" y="' + (panelY + 38) + '" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.7)">400V 3\u223C</text>';
+
+  // MCB/MPCB symbol inside panel
+  var mcbX = panelX + panelW/2, mcbY = panelY + 65;
+  svg += '<rect x="' + (mcbX - 20) + '" y="' + (mcbY - 12) + '" width="40" height="24" rx="4" fill="rgba(0,180,255,0.1)" stroke="' + accentColor + '" stroke-width="1.5"/>';
+  var curveLabel = method === 'DOL' ? 'D' : method === 'VFD' ? 'B' : 'C';
+  svg += '<text x="' + mcbX + '" y="' + (mcbY + 4) + '" text-anchor="middle" font-size="8" fill="#fff" font-weight="700">' + curveLabel + ' MCB</text>';
+
+  // Contactor symbol (middle area)
+  var contX = 220, contY = 140;
+  svg += '<rect x="' + (contX - 22) + '" y="' + (contY - 16) + '" width="44" height="32" rx="5" fill="rgba(255,165,0,0.08)" stroke="#ffa500" stroke-width="1.5"/>';
+  svg += '<text x="' + contX + '" y="' + (contY - 2) + '" text-anchor="middle" font-size="7" fill="#ffa500" font-weight="700">' + (da ? 'KONTAKTOR' : 'CONTACTOR') + '</text>';
+  svg += '<text x="' + contX + '" y="' + (contY + 10) + '" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.6)">KM1</text>';
+  // Animated contactor close
+  svg += '<line x1="' + (contX - 8) + '" y1="' + (contY + 16) + '" x2="' + (contX + 8) + '" y2="' + (contY + 16) + '" stroke="#ffa500" stroke-width="2">';
+  svg += '<animate attributeName="y1" values="' + (contY + 20) + ';' + (contY + 16) + ';' + (contY + 16) + '" dur="2s" repeatCount="indefinite"/></line>';
+
+  // Overload relay
+  var olX = 320, olY = 140;
+  svg += '<rect x="' + (olX - 22) + '" y="' + (olY - 16) + '" width="44" height="32" rx="5" fill="rgba(255,70,70,0.08)" stroke="#ff4444" stroke-width="1.5"/>';
+  svg += '<text x="' + olX + '" y="' + (olY - 2) + '" text-anchor="middle" font-size="7" fill="#ff4444" font-weight="700">' + (da ? 'OVERL.' : 'O/L') + '</text>';
+  svg += '<text x="' + olX + '" y="' + (olY + 10) + '" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.6)">' + In.toFixed(1) + 'A</text>';
+
+  // Cable from panel to motor
+  var cableStartX = panelX + panelW, cableEndX = 480;
+  var cableY1 = panelY + 65;
+  // Draw 3 phase conductors (L1, L2, L3)
+  var colors = ['#ff4444', '#ffff00', '#0af'];
+  for (var ci = 0; ci < 3; ci++) {
+    var yOff = (ci - 1) * 6;
+    svg += '<line x1="' + cableStartX + '" y1="' + (cableY1 + yOff) + '" x2="' + (contX - 22) + '" y2="' + (contY + yOff - 6) + '" stroke="' + colors[ci] + '" stroke-width="1.5" opacity="0.7"/>';
+    svg += '<line x1="' + (contX + 22) + '" y1="' + (contY + yOff - 6) + '" x2="' + (olX - 22) + '" y2="' + (olY + yOff - 6) + '" stroke="' + colors[ci] + '" stroke-width="1.5" opacity="0.7"/>';
+    svg += '<line x1="' + (olX + 22) + '" y1="' + (olY + yOff - 6) + '" x2="' + cableEndX + '" y2="' + (160 + yOff) + '" stroke="' + colors[ci] + '" stroke-width="1.5" opacity="0.7"/>';
+  }
+
+  // Animated current flow (pulses along cable)
+  svg += '<circle r="4" fill="#0af" opacity="0.8">';
+  svg += '<animateMotion dur="1.5s" repeatCount="indefinite" path="M' + cableStartX + ',' + cableY1 + ' L' + (contX - 22) + ',' + (contY - 6) + ' L' + (contX + 22) + ',' + (contY - 6) + ' L' + (olX - 22) + ',' + (olY - 6) + ' L' + (olX + 22) + ',' + (olY - 6) + ' L' + cableEndX + ',160"/>';
+  svg += '</circle>';
+  svg += '<circle r="4" fill="#ff6b35" opacity="0.6">';
+  svg += '<animateMotion dur="1.5s" repeatCount="indefinite" begin="0.75s" path="M' + cableStartX + ',' + cableY1 + ' L' + (contX - 22) + ',' + (contY - 6) + ' L' + (contX + 22) + ',' + (contY - 6) + ' L' + (olX - 22) + ',' + (olY - 6) + ' L' + (olX + 22) + ',' + (olY - 6) + ' L' + cableEndX + ',160"/>';
+  svg += '</circle>';
+
+  // Motor symbol (circle with M)
+  var motorX = 530, motorY = 160, motorR = 38;
+  svg += '<circle cx="' + motorX + '" cy="' + motorY + '" r="' + motorR + '" fill="rgba(0,180,255,0.06)" stroke="' + accentColor + '" stroke-width="2.5"/>';
+  svg += '<text x="' + motorX + '" y="' + (motorY + 6) + '" text-anchor="middle" font-size="20" fill="' + accentColor + '" font-weight="700">M</text>';
+  svg += '<text x="' + motorX + '" y="' + (motorY + 20) + '" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.5)">3\u223C</text>';
+
+  // Animated rotation indicator around motor
+  svg += '<circle cx="' + motorX + '" cy="' + motorY + '" r="' + (motorR + 6) + '" fill="none" stroke="' + accentColor + '" stroke-width="1" stroke-dasharray="8 12" opacity="0.5">';
+  svg += '<animateTransform attributeName="transform" type="rotate" from="0 ' + motorX + ' ' + motorY + '" to="360 ' + motorX + ' ' + motorY + '" dur="3s" repeatCount="indefinite"/>';
+  svg += '</circle>';
+
+  // Starting current pulse wave
+  var pulseY = 240;
+  svg += '<text x="60" y="' + (pulseY + 5) + '" font-size="8" fill="rgba(255,255,255,0.6)">' + (da ? 'Startstr\u00F8m' : 'Start current') + '</text>';
+  // Draw pulse envelope
+  var pulseW = 500, pulseH = 50;
+  var pStartX = 130;
+  var path = 'M' + pStartX + ',' + (pulseY + pulseH/2);
+  // Inrush spike then decay
+  var peakAmp = Math.min(pulseH/2, (Istart / In) * 5);
+  path += ' L' + (pStartX + 20) + ',' + (pulseY + pulseH/2 - peakAmp);
+  path += ' L' + (pStartX + 40) + ',' + (pulseY + pulseH/2 + peakAmp * 0.8);
+  path += ' L' + (pStartX + 60) + ',' + (pulseY + pulseH/2 - peakAmp * 0.7);
+  path += ' L' + (pStartX + 80) + ',' + (pulseY + pulseH/2 + peakAmp * 0.5);
+  path += ' L' + (pStartX + 120) + ',' + (pulseY + pulseH/2 - peakAmp * 0.3);
+  path += ' L' + (pStartX + 160) + ',' + (pulseY + pulseH/2 + peakAmp * 0.2);
+  // Steady state
+  var ssAmp = 5;
+  for (var wi = 200; wi <= pulseW; wi += 30) {
+    path += ' L' + (pStartX + wi) + ',' + (pulseY + pulseH/2 + ((wi/30 % 2 === 0) ? ssAmp : -ssAmp));
+  }
+  svg += '<path d="' + path + '" fill="none" stroke="#ff6b35" stroke-width="1.5" opacity="0.8"/>';
+  svg += '<line x1="' + pStartX + '" y1="' + (pulseY + pulseH/2) + '" x2="' + (pStartX + pulseW) + '" y2="' + (pulseY + pulseH/2) + '" stroke="rgba(255,255,255,0.1)" stroke-width="0.5" stroke-dasharray="3 3"/>';
+  svg += '<text x="' + (pStartX + pulseW + 5) + '" y="' + (pulseY + pulseH/2 + 3) + '" font-size="7" fill="rgba(255,255,255,0.5)">' + In.toFixed(0) + 'A</text>';
+  svg += '<text x="' + (pStartX + 25) + '" y="' + (pulseY + 5) + '" font-size="7" fill="#ff6b35">' + Istart.toFixed(0) + 'A</text>';
+
+  // Voltage drop gradient along cable during start
+  var vdY = 310;
+  svg += '<text x="60" y="' + (vdY + 5) + '" font-size="8" fill="rgba(255,255,255,0.6)">\u0394U ' + (da ? 'langs kabel' : 'along cable') + '</text>';
+  var vdBarX = 130, vdBarW = 400, vdBarH = 18;
+  // Gradient from green (100%) to red (100% - drop)
+  svg += '<defs><linearGradient id="vdGrad" x1="0%" y1="0%" x2="100%" y2="0%">';
+  svg += '<stop offset="0%" stop-color="#06d6a0"/>';
+  svg += '<stop offset="' + Math.min(100, Math.max(30, 100 - dU_pct * 3)) + '%" stop-color="#ffa500"/>';
+  svg += '<stop offset="100%" stop-color="' + (vdropOk ? '#ffa500' : '#ff4444') + '"/>';
+  svg += '</linearGradient></defs>';
+  svg += '<rect x="' + vdBarX + '" y="' + vdY + '" width="' + vdBarW + '" height="' + vdBarH + '" rx="4" fill="url(#vdGrad)" opacity="0.7"/>';
+  svg += '<text x="' + vdBarX + '" y="' + (vdY + 32) + '" font-size="7" fill="rgba(255,255,255,0.5)">' + (da ? 'Tavle' : 'Panel') + ' (100%)</text>';
+  svg += '<text x="' + (vdBarX + vdBarW - 40) + '" y="' + (vdY + 32) + '" font-size="7" fill="' + (vdropOk ? '#06d6a0' : '#ff4444') + '">' + (da ? 'Motor' : 'Motor') + ' (' + (100 - dU_pct).toFixed(1) + '%)</text>';
+  svg += '<text x="' + (vdBarX + vdBarW/2) + '" y="' + (vdY + 12) + '" text-anchor="middle" font-size="8" fill="#fff" font-weight="700">\u0394U = ' + dU_pct.toFixed(1) + '%</text>';
+
+  // Comparison bars: DOL vs selected method
+  var barY = 370;
+  svg += '<text x="60" y="' + (barY + 5) + '" font-size="8" fill="rgba(255,255,255,0.6)">' + (da ? 'Str\u00F8mreduktion' : 'Current reduction') + '</text>';
+  var barX = 130, maxBarW = 400;
+  // DOL bar (reference = 100%)
+  var dolW = maxBarW;
+  var selW = maxBarW * (Istart / (In * 7));
+  svg += '<rect x="' + barX + '" y="' + barY + '" width="' + dolW + '" height="14" rx="3" fill="rgba(255,70,70,0.3)" stroke="rgba(255,70,70,0.5)" stroke-width="0.5"/>';
+  svg += '<text x="' + (barX + 5) + '" y="' + (barY + 10) + '" font-size="7" fill="#ff4444">DOL: ' + (In * 7).toFixed(0) + ' A</text>';
+  // Selected method bar
+  svg += '<rect x="' + barX + '" y="' + (barY + 20) + '" width="' + selW + '" height="14" rx="3" fill="rgba(6,214,160,0.3)" stroke="rgba(6,214,160,0.5)" stroke-width="0.5">';
+  svg += '<animate attributeName="width" from="0" to="' + selW + '" dur="1s" fill="freeze"/></rect>';
+  svg += '<text x="' + (barX + 5) + '" y="' + (barY + 30) + '" font-size="7" fill="#06d6a0">' + (method === 'DOL' ? 'DOL' : method) + ': ' + Istart.toFixed(0) + ' A';
+  if (method !== 'DOL') svg += ' (-' + ((1 - Istart / (In * 7)) * 100).toFixed(0) + '%)';
+  svg += '</text>';
+
+  // Cable length label
+  svg += '<text x="' + ((cableStartX + cableEndX) / 2) + '" y="' + (cableY1 + 30) + '" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.5)">' + cableLen + ' m / ' + motorState.crossSection + ' mm\u00B2</text>';
+
+  // Legend / info
+  svg += '<text x="' + (W - 10) + '" y="' + (H - 10) + '" text-anchor="end" font-size="7" fill="rgba(255,255,255,0.3)">IEC 60947-4-1 / DS/HD 60364-5-52</text>';
+
+  return '<div style="margin-top:16px;overflow-x:auto"><svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:' + W + 'px;border-radius:14px;border:1px solid rgba(0,180,255,0.1)">' + svg + '</svg></div>';
 }
 
 function renderExam(){
