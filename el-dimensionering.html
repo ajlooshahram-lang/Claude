@@ -925,7 +925,8 @@ const T = {
       panel: '\uD83D\uDDC4\uFE0F El-tavle',
       exam: '\uD83C\uDF93 Eksamen',
       zones: '\uD83D\uDEBF Zoner/IP',
-      earth: '\uD83C\uDF0D Jording'
+      earth: '\uD83C\uDF0D Jording',
+      test: '\uD83D\uDCCB Afpr\u00F8vning'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1039,7 +1040,8 @@ const T = {
       panel: '\uD83D\uDDC4\uFE0F Switchboard',
       exam: '\uD83C\uDF93 Exam',
       zones: '\uD83D\uDEBF Zones/IP',
-      earth: '\uD83C\uDF0D Earthing'
+      earth: '\uD83C\uDF0D Earthing',
+      test: '\uD83D\uDCCB Testing'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -2221,6 +2223,17 @@ let panelState = { category: 'hovedtavle', mounting: 'flush', ip: 'IP30', materi
 let zonesState = { location: 'bathroom', zone: null, equipment: null };
 // Earthing & Bonding state
 let earthState = { system: 'TN-S', mainEarth: 10, largestPhase: 10, bondingType: 'main', services: { water: false, gas: false, heating: false, ventilation: false, reinforcement: false } };
+// Test protocol state (DS/HD 60364-6)
+let testState = {
+  buildingType: null, installType: null, company: null, earthingSystem: null,
+  inspection: { labelling: null, colours: null, accessibility: null, damage: null, ipZones: null, bonding: null, electrode: null, signs: null, docs: null, fireSeals: null },
+  continuity: {},
+  insulation: { value: null },
+  rcd: { tripTime: null, tripCurrent: null, rcdType: '30mA' },
+  loopZ: { value: null, maxZs: null },
+  polarity: null,
+  voltLN: null, voltLL: null
+};
 // Short circuit state
 let scState = { zNet: 1, zTrafo: 5 };
 // Standards state
@@ -2363,13 +2376,14 @@ function renderModule(mod) {
     case 'panel': content += renderPanel(); break;
     case 'zones': content += renderZones(); break;
     case 'earth': content += renderEarth(); break;
+    case 'test': content += renderTest(); break;
     case 'exam': content = renderExam(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
   // Append QI validation summary if enough data exists
   const qi = runQiValidation();
-  const noQi = ['standards','bank','ai','bid','projekt','verify','draw','exam','plc'];
+  const noQi = ['standards','bank','ai','bid','projekt','verify','draw','exam','plc','test'];
   if (qi.passed.length + qi.issues.length > 0 && noQi.indexOf(mod) < 0) {
     content += renderQiCard(qi);
   }
@@ -16094,6 +16108,472 @@ function buildEarthSvg(da, state, connectedServices, peMin) {
 
   svg += '</svg>';
   return svg;
+}
+
+// ===== INSPECTION & TEST PROTOCOL (DS/HD 60364-6) =====
+function renderTest() {
+  var da = lang === 'da';
+  var s = testState;
+
+  // Auto-fill date
+  var today = new Date().toISOString().slice(0,10);
+
+  // Building types
+  var BUILDINGS = [
+    { id: 'villa', da: 'Villa', en: 'Villa' },
+    { id: 'apartment', da: 'Lejlighed', en: 'Apartment' },
+    { id: 'office', da: 'Kontor', en: 'Office' },
+    { id: 'shop', da: 'Butik', en: 'Shop' },
+    { id: 'industry', da: 'Industri', en: 'Industry' }
+  ];
+
+  var INSTALL_TYPES = [
+    { id: 'new', da: 'Ny', en: 'New' },
+    { id: 'extension', da: 'Udvidelse', en: 'Extension' },
+    { id: 'modification', da: '\u00C6ndring', en: 'Modification' }
+  ];
+
+  var COMPANIES = [
+    { id: 'own', da: 'Egen virksomhed', en: 'Own company' },
+    { id: 'kemp', da: 'Kemp & Lauritzen', en: 'Kemp & Lauritzen' },
+    { id: 'bravida', da: 'Bravida', en: 'Bravida' },
+    { id: 'caverion', da: 'Caverion', en: 'Caverion' },
+    { id: 'elcon', da: 'Elcon', en: 'Elcon' }
+  ];
+
+  var EARTH_SYS = ['TN-S', 'TN-C-S', 'TT'];
+
+  // Inspection items per DS/HD 60364-6 section 61.2
+  var INSPECTIONS = [
+    { id: 'labelling', da: 'Korrekt m\u00E6rkning af kredse', en: 'Correct circuit labelling' },
+    { id: 'colours', da: 'Korrekt lederfarver', en: 'Correct conductor colours' },
+    { id: 'accessibility', da: 'Tilg\u00E6ngelighed til afbrydere', en: 'Accessibility of switches' },
+    { id: 'damage', da: 'Ingen synlige skader', en: 'No visible damage' },
+    { id: 'ipZones', da: 'Korrekt IP-klasse i zoner', en: 'Correct IP in zones' },
+    { id: 'bonding', da: 'Hovedudligning tilsluttet', en: 'Main bonding connected' },
+    { id: 'electrode', da: 'Jordelektrode tilstand', en: 'Earth electrode condition' },
+    { id: 'signs', da: 'Advarselsskilte', en: 'Warning signs' },
+    { id: 'docs', da: 'Dokumentation tilg\u00E6ngelig', en: 'Documentation available' },
+    { id: 'fireSeals', da: 'Brandt\u00E6tninger', en: 'Fire seals' }
+  ];
+
+  // Insulation resistance values (M-ohm)
+  var INSULATION_VALUES = [0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500];
+  // RCD trip times (ms)
+  var RCD_TIMES = [10, 15, 20, 25, 30, 40, 50, 100, 150, 200, 300];
+  // RCD trip currents (mA)
+  var RCD_CURRENTS = [15, 20, 25, 30];
+  // RCD types
+  var RCD_TYPES = ['30mA', '30mA Type S'];
+  // Loop impedance values (ohm)
+  var LOOP_VALUES = [0.2, 0.3, 0.5, 0.8, 1.0, 1.5, 2.0, 3.0, 5.0];
+  // Voltage L-N
+  var VOLT_LN = [220, 225, 228, 230, 232, 235, 240];
+  // Voltage L-L
+  var VOLT_LL = [380, 390, 395, 400, 405, 410, 415];
+
+  // Try to pull max Zs from zsState if available
+  var maxZsFromModule = (typeof zsState !== 'undefined' && zsState.deviceRating) ? null : null;
+  // Calculate max Zs based on device if zsState has data
+  if (typeof zsState !== 'undefined' && zsState.deviceRating && zsState.deviceCurve) {
+    var zsMulti = zsState.deviceCurve === 'B' ? 5 : (zsState.deviceCurve === 'C' ? 10 : 20);
+    var iaCalc = zsState.deviceRating * zsMulti;
+    if (iaCalc > 0) maxZsFromModule = +(230 / iaCalc).toFixed(2);
+  }
+  var effectiveMaxZs = s.loopZ.maxZs || maxZsFromModule;
+
+  // Auto-verdicts
+  var insulationPass = s.insulation.value !== null ? s.insulation.value >= 1 : null;
+  var rcdTimePass = null;
+  if (s.rcd.tripTime !== null) {
+    if (s.rcd.rcdType === '30mA Type S') {
+      rcdTimePass = s.rcd.tripTime <= 40;
+    } else {
+      rcdTimePass = s.rcd.tripTime <= 300;
+    }
+  }
+  var rcdCurrentPass = s.rcd.tripCurrent !== null ? s.rcd.tripCurrent <= 30 : null;
+  var loopPass = null;
+  if (s.loopZ.value !== null && effectiveMaxZs) {
+    loopPass = s.loopZ.value <= effectiveMaxZs;
+  }
+
+  // Overall verdict
+  var allInspections = INSPECTIONS.every(function(item) { return s.inspection[item.id] === 'pass' || s.inspection[item.id] === 'na'; });
+  var hasAnyFail = INSPECTIONS.some(function(item) { return s.inspection[item.id] === 'fail'; });
+  var testsPassed = insulationPass !== false && rcdTimePass !== false && rcdCurrentPass !== false && loopPass !== false && s.polarity !== 'fail';
+  var continuityOk = Object.keys(s.continuity).length === 0 || Object.keys(s.continuity).every(function(k) { return s.continuity[k] === 'ok'; });
+  var overallPass = allInspections && !hasAnyFail && testsPassed && continuityOk;
+  var anyData = INSPECTIONS.some(function(item) { return s.inspection[item.id] !== null; }) || s.insulation.value !== null || s.rcd.tripTime !== null || s.polarity !== null;
+
+  // ===== BUILD HTML =====
+  var html = '';
+
+  // Section 1 - Project Info
+  html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCCB ' + (da ? 'Afpr\u00F8vningsprotokol - DS/HD 60364-6' : 'Inspection & Test Protocol - DS/HD 60364-6') + '</div>';
+  html += '<div style="font-size:0.8em;color:var(--text-light);margin-bottom:12px">' + (da ? 'Dato: ' : 'Date: ') + '<strong>' + today + '</strong></div>';
+
+  // Building type
+  html += '<div class="select-group"><div class="select-label">\uD83C\uDFE0 ' + (da ? 'Installationsadresse / Bygningstype' : 'Installation address / Building type') + '</div><div class="select-grid">';
+  BUILDINGS.forEach(function(b) {
+    html += '<button class="sel-btn ' + (s.buildingType === b.id ? 'selected' : '') + '" onclick="testState.buildingType=\'' + b.id + '\';renderModule(\'test\')">' + (da ? b.da : b.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Installation type
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD27 ' + (da ? 'Installationstype' : 'Installation type') + '</div><div class="select-grid">';
+  INSTALL_TYPES.forEach(function(it) {
+    html += '<button class="sel-btn ' + (s.installType === it.id ? 'selected' : '') + '" onclick="testState.installType=\'' + it.id + '\';renderModule(\'test\')">' + (da ? it.da : it.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Company
+  html += '<div class="select-group"><div class="select-label">\uD83C\uDFE2 ' + (da ? 'Installat\u00F8rvirksomhed' : 'Installer company') + '</div><div class="select-grid">';
+  COMPANIES.forEach(function(c) {
+    html += '<button class="sel-btn ' + (s.company === c.id ? 'selected' : '') + '" onclick="testState.company=\'' + c.id + '\';renderModule(\'test\')">' + (da ? c.da : c.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Earthing system
+  html += '<div class="select-group"><div class="select-label">\u26A1 ' + (da ? 'Jordingssystem' : 'Earthing system') + '</div><div class="select-grid">';
+  EARTH_SYS.forEach(function(es) {
+    var linked = (typeof earthState !== 'undefined' && earthState.system === es);
+    html += '<button class="sel-btn ' + (s.earthingSystem === es ? 'selected' : '') + (linked && !s.earthingSystem ? ' pulse-hint' : '') + '" onclick="testState.earthingSystem=\'' + es + '\';renderModule(\'test\')">' + es + (linked && !s.earthingSystem ? ' \u2190' : '') + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '</div>';
+
+  // Section 2 - Visual Inspection Checklist
+  html += '<div class="card fade-in"><div class="card-title">\uD83D\uDC41\uFE0F ' + (da ? 'Visuel inspektion - \u00A761.2' : 'Visual Inspection - \u00A761.2') + '</div>';
+  html += '<div style="font-size:0.75em;color:var(--text-light);margin-bottom:10px">' + (da ? 'Klik: Godkendt / Fejl / Ikke relevant' : 'Click: Pass / Fail / N.A.') + '</div>';
+
+  INSPECTIONS.forEach(function(item) {
+    var val = s.inspection[item.id];
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">';
+    html += '<span style="flex:1;font-size:0.82em;color:var(--text)">' + (da ? item.da : item.en) + '</span>';
+    html += '<button class="sel-btn ' + (val === 'pass' ? 'selected' : '') + '" style="min-width:40px;padding:4px 8px;font-size:0.75em;background:' + (val === 'pass' ? '#2e7d32' : '') + ';color:' + (val === 'pass' ? '#fff' : '') + '" onclick="testState.inspection.' + item.id + '=\'pass\';renderModule(\'test\')">\u2713</button>';
+    html += '<button class="sel-btn ' + (val === 'fail' ? 'selected' : '') + '" style="min-width:40px;padding:4px 8px;font-size:0.75em;background:' + (val === 'fail' ? '#c62828' : '') + ';color:' + (val === 'fail' ? '#fff' : '') + '" onclick="testState.inspection.' + item.id + '=\'fail\';renderModule(\'test\')">\u2717</button>';
+    html += '<button class="sel-btn ' + (val === 'na' ? 'selected' : '') + '" style="min-width:40px;padding:4px 8px;font-size:0.75em" onclick="testState.inspection.' + item.id + '=\'na\';renderModule(\'test\')">N/A</button>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Section 3 - Test Results
+  html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCCA ' + (da ? 'Pr\u00F8vningsresultater - \u00A761.3' : 'Test Results - \u00A761.3') + '</div>';
+
+  // 3a - Continuity (PE)
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD0C a) ' + (da ? 'Kontinuitet (PE-leder)' : 'Continuity (PE conductor)') + '</div>';
+  html += '<div style="font-size:0.75em;color:var(--text-light);margin-bottom:6px">' + (da ? 'Pr\u00F8v pr. kreds - klik OK eller Fejl' : 'Test per circuit - click OK or Fail') + '</div>';
+  var circuitLabels = ['C1','C2','C3','C4','C5','C6','C7','C8'];
+  html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">';
+  circuitLabels.forEach(function(c) {
+    var val = s.continuity[c];
+    var bgOk = val === 'ok' ? 'background:#2e7d32;color:#fff;' : '';
+    var bgFail = val === 'fail' ? 'background:#c62828;color:#fff;' : '';
+    html += '<div style="text-align:center;font-size:0.72em">';
+    html += '<div style="font-weight:600;margin-bottom:2px;color:var(--text)">' + c + '</div>';
+    html += '<button class="sel-btn" style="padding:2px 6px;font-size:0.8em;' + bgOk + '" onclick="testState.continuity[\'' + c + '\']=\'ok\';renderModule(\'test\')">OK</button> ';
+    html += '<button class="sel-btn" style="padding:2px 6px;font-size:0.8em;' + bgFail + '" onclick="testState.continuity[\'' + c + '\']=\'fail\';renderModule(\'test\')">' + (da ? 'Fejl' : 'Fail') + '</button>';
+    html += '</div>';
+  });
+  html += '</div></div>';
+
+  // 3b - Insulation resistance
+  html += '<div class="select-group"><div class="select-label">\u26A1 b) ' + (da ? 'Isolationsmodstand' : 'Insulation resistance') + '</div>';
+  html += '<div style="font-size:0.72em;color:var(--text-light);margin-bottom:4px">' + (da ? 'Krav: \u22651 M\u03A9 ved 500V DC (230/400V kredse)' : 'Requirement: \u22651 M\u03A9 at 500V DC (230/400V circuits)') + '</div>';
+  html += '<div class="select-grid">';
+  INSULATION_VALUES.forEach(function(v) {
+    var label = v >= 500 ? '500+' : String(v);
+    html += '<button class="sel-btn ' + (s.insulation.value === v ? 'selected' : '') + '" onclick="testState.insulation.value=' + v + ';renderModule(\'test\')">' + label + ' M\u03A9</button>';
+  });
+  html += '</div>';
+  if (insulationPass !== null) {
+    html += '<div style="margin-top:6px;font-size:0.8em;font-weight:600;color:' + (insulationPass ? '#4caf50' : '#f44336') + '">' + (insulationPass ? '\u2713 ' + (da ? 'GODKENDT' : 'PASS') : '\u2717 ' + (da ? 'IKKE GODKENDT - under 1 M\u03A9' : 'FAIL - below 1 M\u03A9')) + '</div>';
+  }
+  html += '</div>';
+
+  // 3c - RCD test
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDEE1\uFE0F c) ' + (da ? 'HPFI-test / RCD' : 'RCD test') + '</div>';
+  // RCD type selection
+  html += '<div style="font-size:0.72em;color:var(--text-light);margin-bottom:4px">' + (da ? 'Type:' : 'Type:') + '</div>';
+  html += '<div class="select-grid" style="margin-bottom:8px">';
+  RCD_TYPES.forEach(function(rt) {
+    html += '<button class="sel-btn ' + (s.rcd.rcdType === rt ? 'selected' : '') + '" onclick="testState.rcd.rcdType=\'' + rt + '\';renderModule(\'test\')">' + rt + '</button>';
+  });
+  html += '</div>';
+  // Trip time
+  html += '<div style="font-size:0.72em;color:var(--text-light);margin-bottom:4px">' + (da ? 'Udl\u00F8setid [ms]:' : 'Trip time [ms]:') + ' ' + (s.rcd.rcdType === '30mA Type S' ? (da ? '(Krav: \u226440ms)' : '(Required: \u226440ms)') : (da ? '(Krav: \u2264300ms)' : '(Required: \u2264300ms)')) + '</div>';
+  html += '<div class="select-grid">';
+  RCD_TIMES.forEach(function(t) {
+    html += '<button class="sel-btn ' + (s.rcd.tripTime === t ? 'selected' : '') + '" onclick="testState.rcd.tripTime=' + t + ';renderModule(\'test\')">' + t + ' ms</button>';
+  });
+  html += '</div>';
+  if (rcdTimePass !== null) {
+    html += '<div style="margin-top:4px;font-size:0.8em;font-weight:600;color:' + (rcdTimePass ? '#4caf50' : '#f44336') + '">' + (rcdTimePass ? '\u2713 ' + (da ? 'Tid OK' : 'Time OK') : '\u2717 ' + (da ? 'For langsom' : 'Too slow')) + '</div>';
+  }
+  // Trip current
+  html += '<div style="font-size:0.72em;color:var(--text-light);margin-top:8px;margin-bottom:4px">' + (da ? 'Udl\u00F8sestr\u00F8m [mA]:' : 'Trip current [mA]:') + '</div>';
+  html += '<div class="select-grid">';
+  RCD_CURRENTS.forEach(function(c) {
+    html += '<button class="sel-btn ' + (s.rcd.tripCurrent === c ? 'selected' : '') + '" onclick="testState.rcd.tripCurrent=' + c + ';renderModule(\'test\')">' + c + ' mA</button>';
+  });
+  html += '</div>';
+  if (rcdCurrentPass !== null) {
+    html += '<div style="margin-top:4px;font-size:0.8em;font-weight:600;color:' + (rcdCurrentPass ? '#4caf50' : '#f44336') + '">' + (rcdCurrentPass ? '\u2713 ' + (da ? 'Str\u00F8m OK' : 'Current OK') : '\u2717 ' + (da ? 'Over 30mA' : 'Over 30mA')) + '</div>';
+  }
+  html += '</div>';
+
+  // 3d - Loop impedance
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD04 d) ' + (da ? 'Sl\u00F8jfeimpedans (Zs)' : 'Loop impedance (Zs)') + '</div>';
+  if (effectiveMaxZs) {
+    html += '<div style="font-size:0.72em;color:var(--text-light);margin-bottom:4px">' + (da ? 'Maks. Zs (fra enhed): ' : 'Max. Zs (from device): ') + effectiveMaxZs + ' \u03A9</div>';
+  }
+  html += '<div class="select-grid">';
+  LOOP_VALUES.forEach(function(z) {
+    html += '<button class="sel-btn ' + (s.loopZ.value === z ? 'selected' : '') + '" onclick="testState.loopZ.value=' + z + ';renderModule(\'test\')">' + z + ' \u03A9</button>';
+  });
+  html += '</div>';
+  if (loopPass !== null) {
+    html += '<div style="margin-top:4px;font-size:0.8em;font-weight:600;color:' + (loopPass ? '#4caf50' : '#f44336') + '">' + (loopPass ? '\u2713 ' + (da ? 'Zs OK' : 'Zs OK') : '\u2717 ' + (da ? 'Zs for h\u00F8j' : 'Zs too high')) + '</div>';
+  }
+  // Manual max Zs override
+  html += '<div style="margin-top:6px;font-size:0.72em;color:var(--text-light)">' + (da ? 'Eller v\u00E6lg maks Zs manuelt:' : 'Or select max Zs manually:') + '</div>';
+  html += '<div class="select-grid">';
+  [0.5, 0.8, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0].forEach(function(z) {
+    html += '<button class="sel-btn ' + (s.loopZ.maxZs === z ? 'selected' : '') + '" onclick="testState.loopZ.maxZs=' + z + ';renderModule(\'test\')">' + z + ' \u03A9</button>';
+  });
+  html += '</div></div>';
+
+  // 3e - Polarity
+  html += '<div class="select-group"><div class="select-label">\u2B50 e) ' + (da ? 'Polaritet' : 'Polarity') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn ' + (s.polarity === 'ok' ? 'selected' : '') + '" style="' + (s.polarity === 'ok' ? 'background:#2e7d32;color:#fff' : '') + '" onclick="testState.polarity=\'ok\';renderModule(\'test\')">OK</button>';
+  html += '<button class="sel-btn ' + (s.polarity === 'fail' ? 'selected' : '') + '" style="' + (s.polarity === 'fail' ? 'background:#c62828;color:#fff' : '') + '" onclick="testState.polarity=\'fail\';renderModule(\'test\')">' + (da ? 'Fejl' : 'Fail') + '</button>';
+  html += '</div></div>';
+
+  // 3f - Operating voltage
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD0B f) ' + (da ? 'Driftssp\u00E6nding' : 'Operating voltage') + '</div>';
+  html += '<div style="font-size:0.72em;color:var(--text-light);margin-bottom:4px">L-N:</div>';
+  html += '<div class="select-grid">';
+  VOLT_LN.forEach(function(v) {
+    html += '<button class="sel-btn ' + (s.voltLN === v ? 'selected' : '') + '" onclick="testState.voltLN=' + v + ';renderModule(\'test\')">' + v + ' V</button>';
+  });
+  html += '</div>';
+  html += '<div style="font-size:0.72em;color:var(--text-light);margin-top:6px;margin-bottom:4px">L-L:</div>';
+  html += '<div class="select-grid">';
+  VOLT_LL.forEach(function(v) {
+    html += '<button class="sel-btn ' + (s.voltLL === v ? 'selected' : '') + '" onclick="testState.voltLL=' + v + ';renderModule(\'test\')">' + v + ' V</button>';
+  });
+  html += '</div></div>';
+
+  html += '</div>';
+
+  // Section 4 - Overall Verdict
+  html += '<div class="card fade-in"><div class="card-title">\uD83C\uDFC1 ' + (da ? 'Samlet vurdering' : 'Overall Verdict') + '</div>';
+  if (anyData) {
+    if (overallPass) {
+      html += '<div class="result-box success" style="text-align:center;padding:16px;font-size:1.1em;font-weight:700;color:#2e7d32">';
+      html += '\u2713 ' + (da ? 'GODKENDT \u2014 installationen kan idrifts\u00E6ttes' : 'APPROVED \u2014 installation may be commissioned');
+      html += '</div>';
+    } else {
+      html += '<div class="result-box" style="text-align:center;padding:16px;font-size:1.1em;font-weight:700;color:#c62828;background:#fce4ec;border:1px solid #ef9a9a;border-radius:8px">';
+      html += '\u2717 ' + (da ? 'IKKE GODKENDT \u2014 afhj\u00E6lp fejl f\u00F8r idrifts\u00E6ttelse' : 'NOT APPROVED \u2014 rectify faults before commissioning');
+      html += '</div>';
+    }
+  } else {
+    html += '<div style="text-align:center;padding:16px;font-size:0.9em;color:var(--text-light);font-style:italic">' + (da ? 'Udfyld inspektion og pr\u00F8vninger ovenfor' : 'Complete inspection and tests above') + '</div>';
+  }
+  html += '</div>';
+
+  // Section 5 - Print/Export
+  html += '<div class="card fade-in"><div class="card-title">\uD83D\uDDA8\uFE0F ' + (da ? 'Udskriv / Eksport\u00E9r' : 'Print / Export') + '</div>';
+  html += '<div class="select-grid">';
+  html += '<button class="sel-btn" onclick="testProtocolPrint()">\uD83D\uDDA8\uFE0F ' + (da ? 'Udskriv protokol' : 'Print protocol') + '</button>';
+  html += '<button class="sel-btn" onclick="testProtocolDownload()">\u2B07\uFE0F ' + (da ? 'Download PDF' : 'Download PDF') + '</button>';
+  html += '</div></div>';
+
+  return html;
+}
+
+// Print test protocol as professional A4 document
+function testProtocolPrint() {
+  var content = testProtocolBuildDoc();
+  var w = window.open('', '_blank', 'width=800,height=1100');
+  w.document.write(content);
+  w.document.close();
+  setTimeout(function() { w.print(); }, 400);
+}
+
+// Download test protocol as HTML (opens as PDF in browser)
+function testProtocolDownload() {
+  var content = testProtocolBuildDoc();
+  var blob = new Blob([content], { type: 'text/html;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'afproevningsprotokol-DS-HD-60364-6.html';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Build the professional A4 document HTML
+function testProtocolBuildDoc() {
+  var da = lang === 'da';
+  var s = testState;
+  var today = new Date().toISOString().slice(0, 10);
+
+  var BUILDINGS = { villa: 'Villa', apartment: da ? 'Lejlighed' : 'Apartment', office: da ? 'Kontor' : 'Office', shop: da ? 'Butik' : 'Shop', industry: da ? 'Industri' : 'Industry' };
+  var INSTALL_TYPES = { 'new': da ? 'Ny installation' : 'New installation', extension: da ? 'Udvidelse' : 'Extension', modification: da ? '\u00C6ndring' : 'Modification' };
+  var COMPANIES = { own: da ? 'Egen virksomhed' : 'Own company', kemp: 'Kemp & Lauritzen', bravida: 'Bravida', caverion: 'Caverion', elcon: 'Elcon' };
+  var INSPECTIONS = [
+    { id: 'labelling', da: 'Korrekt m\u00E6rkning af kredse', en: 'Correct circuit labelling' },
+    { id: 'colours', da: 'Korrekt lederfarver', en: 'Correct conductor colours' },
+    { id: 'accessibility', da: 'Tilg\u00E6ngelighed til afbrydere', en: 'Accessibility of switches' },
+    { id: 'damage', da: 'Ingen synlige skader', en: 'No visible damage' },
+    { id: 'ipZones', da: 'Korrekt IP-klasse i zoner', en: 'Correct IP in zones' },
+    { id: 'bonding', da: 'Hovedudligning tilsluttet', en: 'Main bonding connected' },
+    { id: 'electrode', da: 'Jordelektrode tilstand', en: 'Earth electrode condition' },
+    { id: 'signs', da: 'Advarselsskilte', en: 'Warning signs' },
+    { id: 'docs', da: 'Dokumentation tilg\u00E6ngelig', en: 'Documentation available' },
+    { id: 'fireSeals', da: 'Brandt\u00E6tninger', en: 'Fire seals' }
+  ];
+
+  // Calculate verdicts
+  var insulationPass = s.insulation.value !== null ? s.insulation.value >= 1 : null;
+  var rcdTimePass = null;
+  if (s.rcd.tripTime !== null) {
+    rcdTimePass = s.rcd.rcdType === '30mA Type S' ? s.rcd.tripTime <= 40 : s.rcd.tripTime <= 300;
+  }
+  var maxZsFromModule = null;
+  if (typeof zsState !== 'undefined' && zsState.deviceRating && zsState.deviceCurve) {
+    var zsMulti = zsState.deviceCurve === 'B' ? 5 : (zsState.deviceCurve === 'C' ? 10 : 20);
+    var iaCalc = zsState.deviceRating * zsMulti;
+    if (iaCalc > 0) maxZsFromModule = +(230 / iaCalc).toFixed(2);
+  }
+  var effectiveMaxZs = s.loopZ.maxZs || maxZsFromModule;
+  var loopPass = (s.loopZ.value !== null && effectiveMaxZs) ? s.loopZ.value <= effectiveMaxZs : null;
+
+  var allInspections = INSPECTIONS.every(function(item) { return s.inspection[item.id] === 'pass' || s.inspection[item.id] === 'na'; });
+  var hasAnyFail = INSPECTIONS.some(function(item) { return s.inspection[item.id] === 'fail'; });
+  var testsPassed = insulationPass !== false && rcdTimePass !== false && loopPass !== false && s.polarity !== 'fail';
+  var continuityOk = Object.keys(s.continuity).length === 0 || Object.keys(s.continuity).every(function(k) { return s.continuity[k] === 'ok'; });
+  var overallPass = allInspections && !hasAnyFail && testsPassed && continuityOk;
+
+  var doc = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + (da ? 'Afpr\u00F8vningsprotokol' : 'Inspection & Test Protocol') + '</title>';
+  doc += '<style>';
+  doc += 'body{font-family:"Segoe UI",Arial,sans-serif;margin:0;padding:20mm;font-size:10pt;color:#222;line-height:1.4}';
+  doc += 'h1{font-size:14pt;text-align:center;margin:0 0 4pt;border-bottom:2pt solid #1a237e;padding-bottom:6pt;color:#1a237e}';
+  doc += 'h2{font-size:11pt;margin:14pt 0 6pt;color:#1a237e;border-bottom:1pt solid #ccc;padding-bottom:3pt}';
+  doc += '.header-ref{text-align:center;font-size:8.5pt;color:#555;margin-bottom:12pt}';
+  doc += '.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:4pt 16pt;margin-bottom:10pt}';
+  doc += '.info-item{font-size:9pt}.info-item .lbl{color:#555;font-weight:400}.info-item .val{font-weight:600}';
+  doc += 'table{width:100%;border-collapse:collapse;margin:6pt 0;font-size:9pt}';
+  doc += 'th,td{border:1px solid #bbb;padding:4pt 6pt;text-align:left}';
+  doc += 'th{background:#e8eaf6;font-weight:600;color:#1a237e}';
+  doc += '.pass{color:#2e7d32;font-weight:700}.fail{color:#c62828;font-weight:700}.na{color:#777}';
+  doc += '.verdict-box{text-align:center;padding:12pt;margin:16pt 0;border-radius:4pt;font-size:12pt;font-weight:700}';
+  doc += '.verdict-pass{background:#e8f5e9;border:2pt solid #2e7d32;color:#1b5e20}';
+  doc += '.verdict-fail{background:#fce4ec;border:2pt solid #c62828;color:#b71c1c}';
+  doc += '.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:24pt;margin-top:24pt;padding-top:12pt;border-top:1pt solid #ccc}';
+  doc += '.sig-box{border-bottom:1pt solid #333;padding-bottom:40pt;font-size:9pt;color:#555}';
+  doc += '.footer{margin-top:20pt;padding-top:8pt;border-top:1pt solid #ccc;font-size:7.5pt;color:#888;text-align:center}';
+  doc += '@media print{body{padding:15mm}@page{margin:15mm;size:A4}}';
+  doc += '</style></head><body>';
+
+  // Header
+  doc += '<h1>' + (da ? 'AFPR\u00D8VNINGSPROTOKOL' : 'INSPECTION & TEST PROTOCOL') + '</h1>';
+  doc += '<div class="header-ref">' + (da ? 'Iht. DS/HD 60364-6 (Verifikation af elektriske installationer)' : 'Per DS/HD 60364-6 (Verification of electrical installations)') + '</div>';
+
+  // Project info
+  doc += '<h2>' + (da ? '1. Projektoplysninger' : '1. Project Information') + '</h2>';
+  doc += '<div class="info-grid">';
+  doc += '<div class="info-item"><span class="lbl">' + (da ? 'Dato: ' : 'Date: ') + '</span><span class="val">' + today + '</span></div>';
+  doc += '<div class="info-item"><span class="lbl">' + (da ? 'Bygningstype: ' : 'Building type: ') + '</span><span class="val">' + (BUILDINGS[s.buildingType] || '-') + '</span></div>';
+  doc += '<div class="info-item"><span class="lbl">' + (da ? 'Installationstype: ' : 'Installation type: ') + '</span><span class="val">' + (INSTALL_TYPES[s.installType] || '-') + '</span></div>';
+  doc += '<div class="info-item"><span class="lbl">' + (da ? 'Virksomhed: ' : 'Company: ') + '</span><span class="val">' + (COMPANIES[s.company] || '-') + '</span></div>';
+  doc += '<div class="info-item"><span class="lbl">' + (da ? 'Jordingssystem: ' : 'Earthing system: ') + '</span><span class="val">' + (s.earthingSystem || '-') + '</span></div>';
+  doc += '</div>';
+
+  // Visual inspection
+  doc += '<h2>' + (da ? '2. Visuel inspektion (\u00A761.2)' : '2. Visual Inspection (\u00A761.2)') + '</h2>';
+  doc += '<table><tr><th>' + (da ? 'Punkt' : 'Item') + '</th><th>' + (da ? 'Resultat' : 'Result') + '</th></tr>';
+  INSPECTIONS.forEach(function(item) {
+    var val = s.inspection[item.id];
+    var cls = val === 'pass' ? 'pass' : (val === 'fail' ? 'fail' : 'na');
+    var txt = val === 'pass' ? (da ? 'Godkendt' : 'Pass') : (val === 'fail' ? (da ? 'Fejl' : 'Fail') : (val === 'na' ? 'N/A' : '-'));
+    doc += '<tr><td>' + (da ? item.da : item.en) + '</td><td class="' + cls + '">' + txt + '</td></tr>';
+  });
+  doc += '</table>';
+
+  // Test results
+  doc += '<h2>' + (da ? '3. Pr\u00F8vningsresultater (\u00A761.3)' : '3. Test Results (\u00A761.3)') + '</h2>';
+  doc += '<table><tr><th>' + (da ? 'Pr\u00F8vning' : 'Test') + '</th><th>' + (da ? 'M\u00E5lt v\u00E6rdi' : 'Measured value') + '</th><th>' + (da ? 'Krav' : 'Requirement') + '</th><th>' + (da ? 'Vurdering' : 'Verdict') + '</th></tr>';
+
+  // Continuity
+  var contResults = Object.keys(s.continuity);
+  var contSummary = contResults.length > 0 ? contResults.map(function(k) { return k + ': ' + (s.continuity[k] === 'ok' ? 'OK' : (da ? 'Fejl' : 'Fail')); }).join(', ') : '-';
+  var contVerdict = contResults.length === 0 ? '-' : (contResults.every(function(k) { return s.continuity[k] === 'ok'; }) ? (da ? 'Godkendt' : 'Pass') : (da ? 'Fejl' : 'Fail'));
+  var contCls = contVerdict === (da ? 'Godkendt' : 'Pass') ? 'pass' : (contVerdict === '-' ? 'na' : 'fail');
+  doc += '<tr><td>' + (da ? 'a) Kontinuitet (PE)' : 'a) Continuity (PE)') + '</td><td>' + contSummary + '</td><td>' + (da ? 'Lav modstand' : 'Low resistance') + '</td><td class="' + contCls + '">' + contVerdict + '</td></tr>';
+
+  // Insulation
+  var insVal = s.insulation.value !== null ? s.insulation.value + ' M\u03A9' : '-';
+  var insVerdict = insulationPass === null ? '-' : (insulationPass ? (da ? 'Godkendt' : 'Pass') : (da ? 'Fejl' : 'Fail'));
+  var insCls = insulationPass === null ? 'na' : (insulationPass ? 'pass' : 'fail');
+  doc += '<tr><td>' + (da ? 'b) Isolationsmodstand' : 'b) Insulation resistance') + '</td><td>' + insVal + '</td><td>\u22651 M\u03A9 @ 500V DC</td><td class="' + insCls + '">' + insVerdict + '</td></tr>';
+
+  // RCD
+  var rcdVal = s.rcd.tripTime !== null ? s.rcd.tripTime + ' ms' : '-';
+  if (s.rcd.tripCurrent !== null) rcdVal += ', ' + s.rcd.tripCurrent + ' mA';
+  var rcdReq = s.rcd.rcdType === '30mA Type S' ? '\u226440ms' : '\u2264300ms';
+  var rcdPass = rcdTimePass;
+  var rcdVerdict = rcdPass === null ? '-' : (rcdPass ? (da ? 'Godkendt' : 'Pass') : (da ? 'Fejl' : 'Fail'));
+  var rcdCls = rcdPass === null ? 'na' : (rcdPass ? 'pass' : 'fail');
+  doc += '<tr><td>' + (da ? 'c) HPFI / RCD' : 'c) RCD') + '</td><td>' + rcdVal + '</td><td>' + rcdReq + ' (' + s.rcd.rcdType + ')</td><td class="' + rcdCls + '">' + rcdVerdict + '</td></tr>';
+
+  // Loop impedance
+  var loopVal = s.loopZ.value !== null ? s.loopZ.value + ' \u03A9' : '-';
+  var loopReq = effectiveMaxZs ? '\u2264' + effectiveMaxZs + ' \u03A9' : '-';
+  var loopVerdict = loopPass === null ? '-' : (loopPass ? (da ? 'Godkendt' : 'Pass') : (da ? 'Fejl' : 'Fail'));
+  var loopCls = loopPass === null ? 'na' : (loopPass ? 'pass' : 'fail');
+  doc += '<tr><td>' + (da ? 'd) Sl\u00F8jfeimpedans (Zs)' : 'd) Loop impedance (Zs)') + '</td><td>' + loopVal + '</td><td>' + loopReq + '</td><td class="' + loopCls + '">' + loopVerdict + '</td></tr>';
+
+  // Polarity
+  var polVal = s.polarity === 'ok' ? 'OK' : (s.polarity === 'fail' ? (da ? 'Fejl' : 'Fail') : '-');
+  var polCls = s.polarity === 'ok' ? 'pass' : (s.polarity === 'fail' ? 'fail' : 'na');
+  doc += '<tr><td>' + (da ? 'e) Polaritet' : 'e) Polarity') + '</td><td>' + polVal + '</td><td>OK</td><td class="' + polCls + '">' + polVal + '</td></tr>';
+
+  // Voltage
+  var voltVal = '';
+  if (s.voltLN) voltVal += 'L-N: ' + s.voltLN + 'V';
+  if (s.voltLL) voltVal += (voltVal ? ', ' : '') + 'L-L: ' + s.voltLL + 'V';
+  if (!voltVal) voltVal = '-';
+  doc += '<tr><td>' + (da ? 'f) Driftssp\u00E6nding' : 'f) Operating voltage') + '</td><td>' + voltVal + '</td><td>230/400V \u00B110%</td><td class="na">-</td></tr>';
+
+  doc += '</table>';
+
+  // Overall verdict
+  doc += '<h2>' + (da ? '4. Samlet vurdering' : '4. Overall Verdict') + '</h2>';
+  if (overallPass) {
+    doc += '<div class="verdict-box verdict-pass">\u2713 ' + (da ? 'GODKENDT \u2014 Installationen kan idrifts\u00E6ttes' : 'APPROVED \u2014 Installation may be commissioned') + '</div>';
+  } else {
+    doc += '<div class="verdict-box verdict-fail">\u2717 ' + (da ? 'IKKE GODKENDT \u2014 Afhj\u00E6lp fejl f\u00F8r idrifts\u00E6ttelse' : 'NOT APPROVED \u2014 Rectify faults before commissioning') + '</div>';
+  }
+
+  // Signatures
+  doc += '<div class="sig-grid">';
+  doc += '<div class="sig-box">' + (da ? 'Udf\u00F8rt af (autoriseret installat\u00F8r):' : 'Performed by (authorized installer):') + '</div>';
+  doc += '<div class="sig-box">' + (da ? 'Kontrolleret af:' : 'Checked by:') + '</div>';
+  doc += '</div>';
+
+  // Footer
+  doc += '<div class="footer">' + (da ? 'Protokol genereret iht. DS/HD 60364-6. Denne protokol skal opbevares s\u00E5 l\u00E6nge installationen er i drift.' : 'Protocol generated per DS/HD 60364-6. This protocol must be retained for the life of the installation.') + '<br>';
+  doc += (da ? 'Autorisation nr.: ________________  CVR: ________________' : 'Authorization no.: ________________  CVR: ________________') + '</div>';
+
+  doc += '</body></html>';
+  return doc;
 }
 
 // ===== INIT =====
