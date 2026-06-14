@@ -604,5 +604,64 @@ ok(S.regRows("procurement").length > brainProcBefore, "Apply adds generated proc
 // click-only / privacy sanity: analysis must not call out to the network
 ok(window.__promptCalls === 0, "Brain flow used no prompt()");
 
+// 39) Intelligence Engine UI panels
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const intelContainer = doc.getElementById("brainIntel");
+ok(intelContainer != null, "Intel: brainIntel container rendered");
+ok(intelContainer.innerHTML.length > 0, "Intel: intelligence panels rendered with content");
+
+// Health Dashboard
+const healthDash = doc.getElementById("brainHealthDashboard");
+ok(healthDash != null, "Intel: Health Dashboard panel exists");
+ok(/Health Dashboard/.test(healthDash.innerHTML), "Intel: Health Dashboard title rendered");
+ok(/SPI/.test(healthDash.innerHTML) && /CPI/.test(healthDash.innerHTML), "Intel: Health Dashboard shows SPI and CPI scores");
+ok(/Risk Exposure/.test(healthDash.innerHTML), "Intel: Health Dashboard shows Risk Exposure");
+ok(/Quality Index/.test(healthDash.innerHTML), "Intel: Health Dashboard shows Quality Index");
+ok(/badge/.test(healthDash.innerHTML), "Intel: Health Dashboard shows overall health badge");
+
+// Findings list
+const findingsList = doc.getElementById("brainFindingsList");
+ok(findingsList != null, "Intel: Findings list panel exists");
+ok(/Findings/.test(findingsList.innerHTML), "Intel: Findings list title rendered");
+
+// Patterns panel
+const patternsPanel = doc.getElementById("brainPatternsPanel");
+ok(patternsPanel != null, "Intel: Patterns panel exists");
+ok(/Detected Patterns/.test(patternsPanel.innerHTML), "Intel: Patterns panel title rendered");
+
+// Recommendations panel
+const recsPanel = doc.getElementById("brainRecommendationsPanel");
+ok(recsPanel != null, "Intel: Recommendations panel exists");
+ok(/Recommendations/.test(recsPanel.innerHTML), "Intel: Recommendations panel title rendered");
+
+// Lessons panel
+const lessonsPanel = doc.getElementById("brainLessonsPanel");
+ok(lessonsPanel != null, "Intel: Lessons panel exists");
+ok(/Lessons Learned/.test(lessonsPanel.innerHTML), "Intel: Lessons panel title rendered");
+const recordBtn = doc.getElementById("brainRecordLesson");
+ok(recordBtn != null, "Intel: Record lesson button exists");
+
+// Click Record lesson opens modal
+recordBtn.click();
+const modalOverlay = doc.getElementById("modalOverlay");
+ok(modalOverlay && !modalOverlay.hidden, "Intel: Clicking Record lesson opens modal");
+const lessonModal = doc.getElementById("modal");
+ok(lessonModal && /Record Lesson/.test(lessonModal.innerHTML), "Intel: Lesson modal shows title");
+ok(doc.getElementById("les_category") != null, "Intel: Lesson modal has category dropdown");
+ok(doc.getElementById("les_impact") != null, "Intel: Lesson modal has impact dropdown");
+ok(doc.getElementById("les_tag") != null, "Intel: Lesson modal has tag dropdown");
+ok(doc.getElementById("les_projType") != null, "Intel: Lesson modal has project type dropdown");
+ok(doc.getElementById("les_description") != null, "Intel: Lesson modal has description textarea");
+
+// Verify click-only: no free-text inputs in brain view EXCEPT lesson description textarea
+const brainContent = doc.getElementById("content");
+const brainInputs = brainContent.querySelectorAll('input[type="text"], input[type="number"]');
+const nonExemptInputs = Array.from(brainInputs).filter(i => !i.hidden && i.id !== "brainText");
+ok(nonExemptInputs.length === 0, "Intel: No free-text/number inputs in brain view (click-only enforced)");
+
+// Close the modal
+const cancelBtn = lessonModal.querySelector("[data-act=cancel]");
+if (cancelBtn) cancelBtn.click();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

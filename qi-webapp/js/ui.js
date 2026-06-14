@@ -669,7 +669,8 @@
           <button class="btn" id="brainClear">Clear</button>
         </div>
       </div>
-      <div id="brainOut"></div>`;
+      <div id="brainOut"></div>
+      <div id="brainIntel"></div>`;
   };
   AFTER.brain = function () {
     const fileInput = $("#brainFile"), nameEl = $("#brainFileName"), ta = $("#brainText");
@@ -692,7 +693,190 @@
       uiState.brainPlan = plan;
       renderBrainPreview(plan);
     });
+
+    // --- Intelligence Engine: auto-run analyzeStatus on current project ---
+    if (window.QIBrain && typeof QIBrain.analyzeStatus === "function") {
+      renderBrainIntel();
+    }
   };
+
+  function buildProjectState() {
+    return {
+      cases: S.validCases(),
+      registers: { milestones: S.regRows("milestones") },
+      project: S.get().project
+    };
+  }
+
+  function severityBadge(sev) {
+    const map = { critical: "b-critical", high: "b-high", warning: "b-high", medium: "b-progress", low: "b-ontrack" };
+    return `<span class="badge ${map[sev] || "b-open"}">${esc(sev)}</span>`;
+  }
+
+  function healthStatusBadge(status) {
+    const map = { "critical": "b-critical", "warning": "b-high", "on-track": "b-ontrack" };
+    return `<span class="badge ${map[status] || "b-open"}">${esc(status)}</span>`;
+  }
+
+  function confidenceBadge(conf) {
+    const pctVal = Math.round((Number(conf) || 0) * 100);
+    const cls = pctVal >= 80 ? "b-ontrack" : pctVal >= 50 ? "b-progress" : "b-high";
+    return `<span class="badge ${cls}">${pctVal}%</span>`;
+  }
+
+  function renderBrainIntel() {
+    const container = $("#brainIntel");
+    if (!container) return;
+
+    const state = buildProjectState();
+    const status = QIBrain.analyzeStatus(state);
+    const patternResult = QIBrain.detectPatterns(state);
+    const recResult = QIBrain.recommend(state);
+    const selfCheck = QIBrain.selfImproveCheck(state.cases);
+    const lessons = QIBrain.recallLessons({ query: "" });
+
+    // Show pending lessons toast/badge
+    if (selfCheck.pendingLessons && selfCheck.pendingLessons.length > 0) {
+      toast(selfCheck.pendingLessons.length + " pending lesson(s) to review", { ms: 4000 });
+    }
+
+    // --- Health Dashboard ---
+    const healthHtml = `<div class="card" id="brainHealthDashboard">
+      <h3>Health Dashboard ${healthStatusBadge(status.overallHealth)}</h3>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin:12px 0">
+        <div class="kpi navy"><div class="label">SPI</div><div class="value">${status.scores.spiEstimate}</div></div>
+        <div class="kpi navy"><div class="label">CPI</div><div class="value">${status.scores.cpiEstimate}</div></div>
+        <div class="kpi navy"><div class="label">Risk Exposure</div><div class="value">${status.scores.riskExposure}</div></div>
+        <div class="kpi navy"><div class="label">Quality Index</div><div class="value">${status.scores.qualityIndex}</div></div>
+      </div>
+      ${status.findings.length > 0 ? `<p class="muted">${status.findings.length} finding(s) detected. Top issues:</p>
+        <ul style="margin:4px 0;padding-left:20px">${status.findings.slice(0, 3).map(f => `<li>${severityBadge(f.severity)} ${esc(f.detail.slice(0, 100))}</li>`).join("")}</ul>` : `<p class="muted">No findings - project looks healthy.</p>`}
+    </div>`;
+
+    // --- Findings List ---
+    const findingsRows = status.findings.map(f => `<tr>
+      <td>${severityBadge(f.severity)}</td>
+      <td>${esc(f.type)}</td>
+      <td class="wrap">${esc(f.detail)}</td>
+      <td class="wrap muted">${esc(f.type === "risk" ? "Reduce RPN via detection or occurrence improvements" : f.type === "cost" ? "Review budget allocation and change control" : f.type === "schedule" ? "Fast-track critical path or add resources" : f.type === "resource" ? "Redistribute workload" : "Investigate root cause")}</td>
+    </tr>`).join("");
+    const findingsHtml = `<div class="card" id="brainFindingsList">
+      <h3>Findings <span class="tag">${status.findings.length}</span></h3>
+      ${status.findings.length > 0 ? tableWrap("<th>Severity</th><th>Type</th><th>Detail</th><th>Recommendation</th>", findingsRows) : `<p class="muted">No findings to report.</p>`}
+    </div>`;
+
+    // --- Patterns Panel ---
+    const patternsHtml = `<div class="card" id="brainPatternsPanel">
+      <h3>Detected Patterns <span class="tag">${patternResult.patterns.length}</span></h3>
+      ${patternResult.patterns.length > 0 ? patternResult.patterns.map(p => `<div style="border-left:3px solid var(--${p.severity === "critical" ? "red" : p.severity === "high" ? "amber" : "blue"},#666);padding:8px 12px;margin:8px 0;border-radius:4px">
+        <div>${severityBadge(p.severity)} <b>${esc(p.type.replace(/_/g, " "))}</b></div>
+        <div style="margin:4px 0">${esc(p.description)}</div>
+        <div class="muted" style="font-size:0.9em">Evidence: ${esc(p.evidence)}</div>
+        <div style="margin-top:4px;font-size:0.9em">Action: ${esc(p.suggestedAction)}</div>
+      </div>`).join("") : `<p class="muted">No patterns detected in current data.</p>`}
+    </div>`;
+
+    // --- Recommendations Panel ---
+    const recsHtml = `<div class="card" id="brainRecommendationsPanel">
+      <h3>Recommendations <span class="tag">${recResult.recommendations.length}</span></h3>
+      ${recResult.recommendations.length > 0 ? recResult.recommendations.map((r, i) => `<div style="display:flex;gap:12px;align-items:flex-start;padding:8px 0;${i > 0 ? "border-top:1px solid var(--border,#e0e0e0);" : ""}">
+        <span class="badge b-${r.priority === 1 ? "critical" : r.priority === 2 ? "high" : "open"}">P${r.priority}</span>
+        <div style="flex:1">
+          <div><b>${esc(r.title)}</b> ${confidenceBadge(r.confidence)}</div>
+          <div style="margin:4px 0">${esc(r.action)}</div>
+          <div class="muted" style="font-size:0.9em">${esc(r.rationale)}</div>
+        </div>
+      </div>`).join("") : `<p class="muted">No recommendations at this time.</p>`}
+    </div>`;
+
+    // --- Lessons Panel ---
+    const pendingCount = (selfCheck.pendingLessons || []).length;
+    const pendingBadge = pendingCount > 0 ? ` <span class="badge b-high">${pendingCount} pending</span>` : "";
+    const pendingHtml = pendingCount > 0 ? `<div style="border:1px dashed var(--amber,#e0a800);padding:12px;border-radius:8px;margin-bottom:12px">
+      <b>Pending auto-generated lessons</b>${pendingBadge}
+      ${selfCheck.pendingLessons.map((pl, idx) => `<div style="margin:8px 0;padding:6px 0;${idx > 0 ? "border-top:1px solid var(--border,#e0e0e0);" : ""}">
+        <div>${esc(pl.challenge.slice(0, 120))}</div>
+        <div class="muted" style="font-size:0.9em">${esc(pl.category)} | Impact: ${esc(pl.impact)}</div>
+        <button class="btn btn-sm brainConfirmLesson" data-idx="${idx}" style="margin-top:4px">Confirm</button>
+      </div>`).join("")}
+    </div>` : "";
+
+    const storedHtml = lessons.length > 0 ? lessons.map((l, i) => `<div style="padding:6px 0;${i > 0 ? "border-top:1px solid var(--border,#e0e0e0);" : ""}">
+      <div><b>${esc(l.challenge.slice(0, 80))}</b></div>
+      <div class="muted" style="font-size:0.9em">${esc(l.category)} | ${esc(l.impact)} impact | Recalled ${l.timesRecalled}x</div>
+    </div>`).join("") : `<p class="muted">No lessons recorded yet.</p>`;
+
+    const lessonsHtml = `<div class="card" id="brainLessonsPanel">
+      <h3>Lessons Learned${pendingBadge}</h3>
+      ${pendingHtml}
+      <div style="margin-bottom:12px">${storedHtml}</div>
+      <button class="btn btn-primary" id="brainRecordLesson">Record lesson</button>
+    </div>`;
+
+    container.innerHTML = healthHtml + findingsHtml + patternsHtml + recsHtml + lessonsHtml;
+
+    // Wire "Confirm" buttons for pending lessons
+    container.querySelectorAll(".brainConfirmLesson").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const idx = Number(btn.dataset.idx);
+        const pl = selfCheck.pendingLessons[idx];
+        if (pl) {
+          QIBrain.recordLesson(pl);
+          toast("Lesson confirmed and stored.");
+          renderBrainIntel();
+        }
+      });
+    });
+
+    // Wire "Record lesson" button
+    const recordBtn = $("#brainRecordLesson");
+    if (recordBtn) recordBtn.addEventListener("click", openRecordLessonModal);
+  }
+
+  function openRecordLessonModal() {
+    const catOpts = opts(C.LISTS.category, "", "-- select category --");
+    const impactOpts = opts(C.LISTS.hml, "Medium", "-- select impact --");
+    const tagsList = ["risk", "cost", "schedule", "quality", "resource", "process", "technical", "stakeholder"];
+    const tagOpts = opts(tagsList, "", "-- select tag --");
+    const projTypes = ["fibre-telecom", "construction", "software", "manufacturing", "infrastructure", "general"];
+    const projOpts = opts(projTypes, "", "-- select type --");
+    const modal = $("#modal");
+    modal.innerHTML = `<h2>Record Lesson</h2>
+      <div class="sub">Capture knowledge from a resolved challenge. All fields use dropdowns except the description.</div>
+      <form id="lessonForm">
+        <div class="form-grid">
+          <div class="field"><label>Category</label><select id="les_category">${catOpts}</select></div>
+          <div class="field"><label>Impact</label><select id="les_impact">${impactOpts}</select></div>
+          <div class="field"><label>Tag</label><select id="les_tag">${tagOpts}</select></div>
+          <div class="field"><label>Project type</label><select id="les_projType">${projOpts}</select></div>
+          <div class="field full"><label>Challenge &amp; resolution description</label>
+            <textarea id="les_description" rows="4" style="width:100%;font:inherit;padding:8px;border:1.5px solid var(--border);border-radius:6px"
+              placeholder="Describe the challenge and how it was resolved..."></textarea></div>
+        </div>
+        <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
+          <button type="button" class="btn" data-act="cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save lesson</button></div></div>
+      </form>`;
+    $("#modalOverlay").hidden = false;
+    $("#lessonForm").addEventListener("submit", ev => {
+      ev.preventDefault();
+      const desc = ($("#les_description").value || "").trim();
+      if (!desc) { toast("Please enter a description."); return; }
+      const parts = desc.split(/[.;!\n]/).filter(Boolean);
+      QIBrain.recordLesson({
+        challenge: parts[0] || desc,
+        resolution: parts.slice(1).join(". ") || desc,
+        category: $("#les_category").value,
+        tags: $("#les_tag").value ? [$("#les_tag").value] : [],
+        impact: $("#les_impact").value || "medium",
+        projectType: $("#les_projType").value
+      });
+      toast("Lesson recorded.");
+      closeModal();
+      renderBrainIntel();
+    });
+    modal.querySelector("[data-act=cancel]").addEventListener("click", closeModal);
+  }
   function renderBrainPreview(plan) {
     const kpi = (cls, l, v) => `<div class="kpi ${cls}"><div class="label">${l}</div><div class="value">${v}</div></div>`;
     const s = plan.summary, sc = s.scale;
