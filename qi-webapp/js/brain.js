@@ -321,7 +321,7 @@
     },
 
     // ---- Domain-Specific Risks with FMEA Scores ----------------------------
-    buildRisks: function () {
+    buildRisks: function (text, scale) {
       return [
         { problem: "RISK: Permitting/right-of-way delays stall civil works (multi-authority political complexity)", category: "Delivery / Schedule", sev: 8, occ: 7, det: 4, priority: "1-CRITICAL", rootCause: "Multi-authority approvals on critical path; political and bureaucratic complexity" },
         { problem: "RISK: Monsoon/typhoon/flood season halts civil works and damages exposed plant", category: "Delivery / Schedule", sev: 7, occ: 6, det: 3, priority: "2-HIGH", rootCause: "Seasonal climate patterns in tropical/subtropical deployment regions" },
@@ -391,7 +391,7 @@
         ]},
       ];
     },
-    buildRisks: function () {
+    buildRisks: function (text, scale) {
       return [
         { problem: "RISK: Scope creep erodes schedule & budget", category: "Process / Flow", sev: 7, occ: 6, det: 4, priority: "2-HIGH", rootCause: "Weak change control" },
         { problem: "RISK: Key resource unavailability", category: "People / Training", sev: 6, occ: 5, det: 4, priority: "2-HIGH", rootCause: "Single points of dependency" },
