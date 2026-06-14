@@ -811,6 +811,209 @@
         }
       }
     ],
+
+    // ---- Contract Templates Library (NEC4 & FIDIC) -------------------------
+    CONTRACT_TEMPLATES: [
+      {
+        id: "CT-001",
+        name: "Early Warning Notice",
+        contractForm: "NEC4",
+        clause: "15.1",
+        purpose: "Notify the other party of a matter that could increase cost, delay completion, or impair performance",
+        whenToUse: "As soon as a risk or potential problem is identified that may affect the project outcome",
+        timeLimitDays: null,
+        requiredContent: ["description of the matter", "potential effect on cost", "potential effect on time", "proposed actions to mitigate"],
+        sampleSubject: "Early Warning: Potential delay to cable ship mobilization due to adverse weather forecast"
+      },
+      {
+        id: "CT-002",
+        name: "Compensation Event notification",
+        contractForm: "NEC4",
+        clause: "61.3",
+        purpose: "Notify the Project Manager that a compensation event has occurred or is expected",
+        whenToUse: "Within 8 weeks of becoming aware of the event; failure to notify in time may bar the claim",
+        timeLimitDays: 56,
+        requiredContent: ["event description", "clause reference (60.1 sub-clause)", "date event occurred or was identified", "initial assessment of time and cost impact"],
+        sampleSubject: "Compensation Event Notification: Unforeseen seabed conditions at KP 145-160"
+      },
+      {
+        id: "CT-003",
+        name: "Variation Instruction",
+        contractForm: "FIDIC",
+        clause: "13.1",
+        purpose: "Instruct the Contractor to execute a variation to the Works",
+        whenToUse: "When the Engineer determines a change to the scope, design, or sequence of work is required",
+        timeLimitDays: 28,
+        requiredContent: ["detailed description of varied work", "drawings or specifications affected", "required completion date", "instruction to submit cost and time proposals"],
+        sampleSubject: "Variation Instruction No. 007: Additional cable burial depth requirement at shipping lane crossing"
+      },
+      {
+        id: "CT-004",
+        name: "Claim Notice",
+        contractForm: "FIDIC",
+        clause: "20.1",
+        purpose: "Give notice of intention to claim additional payment or extension of time",
+        whenToUse: "Within 28 days of becoming aware of the event or circumstance giving rise to the claim",
+        timeLimitDays: 28,
+        requiredContent: ["description of event or circumstance", "contractual basis for claim", "date of awareness", "initial estimate of additional time or cost"],
+        sampleSubject: "Notice of Claim: Delay and additional cost due to late issuance of cable landing permit (Indonesia)"
+      },
+      {
+        id: "CT-005",
+        name: "Payment Application",
+        contractForm: "BOTH",
+        clause: "NEC4 50.1 / FIDIC 14.3",
+        purpose: "Submit periodic payment application for work completed in the assessment period",
+        whenToUse: "At each assessment date (typically monthly) per the contract payment schedule",
+        timeLimitDays: null,
+        requiredContent: ["assessment period dates", "work completed this period", "cumulative progress", "retention calculation", "materials on site", "supporting measurements"],
+        sampleSubject: "Payment Application No. 12: Marine installation progress KP 800-1050 (September assessment)"
+      },
+      {
+        id: "CT-006",
+        name: "Extension of Time request",
+        contractForm: "BOTH",
+        clause: "NEC4 63.5 / FIDIC 8.4",
+        purpose: "Request extension to the contractual completion date due to qualifying delay events",
+        whenToUse: "Following a compensation event (NEC4) or within 28 days of delay event (FIDIC)",
+        timeLimitDays: 28,
+        requiredContent: ["original completion date", "delay event description", "cause and effect analysis", "revised programme showing critical path impact", "extension days requested"],
+        sampleSubject: "Extension of Time Request: 45 days due to typhoon season closure of marine operations"
+      },
+      {
+        id: "CT-007",
+        name: "Take Over Certificate request",
+        contractForm: "BOTH",
+        clause: "NEC4 40.3 / FIDIC 10.1",
+        purpose: "Request the Employer to take over the completed works or a section thereof",
+        whenToUse: "When the works (or section) are substantially complete and ready for use",
+        timeLimitDays: 14,
+        requiredContent: ["section or works description", "completion date achieved", "outstanding defects list (snag list)", "test certificates and commissioning records", "as-built documentation status"],
+        sampleSubject: "Take Over Certificate Request: Segment 3 (Singapore-Jakarta) system commissioning complete"
+      },
+      {
+        id: "CT-008",
+        name: "Defects notification",
+        contractForm: "BOTH",
+        clause: "NEC4 43.1 / FIDIC 11.1",
+        purpose: "Notify the Contractor of a defect found in the works during the defects liability period",
+        whenToUse: "Upon discovery of a defect during routine inspection or monitoring within the defects period",
+        timeLimitDays: null,
+        requiredContent: ["defect description", "location (KP reference or station)", "date discovered", "required correction and deadline", "impact on system performance"],
+        sampleSubject: "Defects Notification: Elevated BER on fibre pair 3, Span 7 (repeater R7-R8) requiring investigation"
+      },
+      {
+        id: "CT-009",
+        name: "Programme submission",
+        contractForm: "NEC4",
+        clause: "31.1",
+        purpose: "Submit the programme for acceptance showing planned method, sequence, and timing of works",
+        whenToUse: "Within the period stated in the Contract Data, and for each revised programme",
+        timeLimitDays: null,
+        requiredContent: ["activity schedule with logic links", "critical path identification", "resource allocation", "float ownership", "key dates and milestones", "method statements referenced"],
+        sampleSubject: "Revised Programme Submission Rev.04: Updated marine installation sequence following cable ship re-scheduling"
+      },
+      {
+        id: "CT-010",
+        name: "Subcontractor approval request",
+        contractForm: "BOTH",
+        clause: "NEC4 26.2 / FIDIC 4.4",
+        purpose: "Submit proposed subcontractor for acceptance before appointment",
+        whenToUse: "Before engaging any subcontractor not named in the contract; sufficient time for review required",
+        timeLimitDays: 14,
+        requiredContent: ["subcontractor name and details", "scope of subcontracted work", "relevant experience and references", "financial standing evidence", "proposed subcontract form"],
+        sampleSubject: "Subcontractor Approval Request: Global Marine Group for cable burial operations (Segments 2-4)"
+      },
+      {
+        id: "CT-011",
+        name: "Weather event notification",
+        contractForm: "NEC4",
+        clause: "60.1(13)",
+        purpose: "Notify a weather event that qualifies as a compensation event under the weather measurement criteria",
+        whenToUse: "When recorded weather exceeds the 1-in-10-year threshold defined in the Contract Data",
+        timeLimitDays: 56,
+        requiredContent: ["weather measurement data", "comparison to Contract Data thresholds", "period affected", "description of impact on planned activities", "delay quantification"],
+        sampleSubject: "Weather Event Notification: Typhoon Gaemi - sea state exceeding Beaufort 7 for 14 consecutive days"
+      },
+      {
+        id: "CT-012",
+        name: "Cable ship delay notification",
+        contractForm: "BOTH",
+        clause: "N/A (project-specific)",
+        purpose: "Formally notify delay to cable ship availability or mobilization affecting installation schedule",
+        whenToUse: "Immediately upon confirmation of delay from vessel operator or charter party",
+        timeLimitDays: 7,
+        requiredContent: ["vessel name and charter reference", "original mobilization date", "revised mobilization date", "cause of delay", "impact on installation programme", "proposed mitigation"],
+        sampleSubject: "Cable Ship Delay Notification: CS Ile de Re - 21-day delay due to prior project overrun in Pacific"
+      },
+      {
+        id: "CT-013",
+        name: "Force Majeure notice",
+        contractForm: "FIDIC",
+        clause: "19.2",
+        purpose: "Notify the other party of a Force Majeure event preventing performance of contractual obligations",
+        whenToUse: "Within 14 days of becoming aware of the Force Majeure event",
+        timeLimitDays: 14,
+        requiredContent: ["description of event", "date of commencement", "obligations affected", "actions being taken to mitigate", "expected duration if known"],
+        sampleSubject: "Force Majeure Notice: Volcanic eruption and associated seismic activity affecting cable route (Segment 5)"
+      },
+      {
+        id: "CT-014",
+        name: "Marine survey completion certificate",
+        contractForm: "BOTH",
+        clause: "N/A (project-specific)",
+        purpose: "Certify completion of marine route survey and acceptance of survey deliverables",
+        whenToUse: "Upon completion of bathymetric/geophysical survey campaign and delivery of final report",
+        timeLimitDays: null,
+        requiredContent: ["survey vessel and equipment used", "survey dates and coverage", "deliverables received", "data quality assessment", "route recommendations", "outstanding items"],
+        sampleSubject: "Marine Survey Completion Certificate: Route survey campaign Brunei-Philippines (KP 0-2400) complete"
+      },
+      {
+        id: "CT-015",
+        name: "Cable landing permission request",
+        contractForm: "BOTH",
+        clause: "N/A (country-specific regulatory)",
+        purpose: "Formally request permission from national authority to land submarine cable on sovereign territory",
+        whenToUse: "As early as possible in the project; typically 12-24 months before planned landing date",
+        timeLimitDays: null,
+        requiredContent: ["applicant company details", "cable system description", "proposed landing point coordinates", "cable route overview", "environmental impact summary", "economic benefit statement", "technical specifications"],
+        sampleSubject: "Cable Landing Permission Application: Asia Connect Cable System - proposed landing at Changi, Singapore"
+      }
+    ],
+
+    // ---- Clause Reference Library (NEC4 & FIDIC) ---------------------------
+    CLAUSE_REFERENCE: {
+      // NEC4 Clauses
+      "NEC4-15": { number: "15", title: "Early warnings", summary: "Requires both parties to give early warning of matters that could affect cost, time, or quality. Early warning meetings are held to discuss and agree mitigation.", submarineRelevance: "Critical for submarine projects where weather windows, vessel availability, and seabed conditions change rapidly; early notification prevents escalation." },
+      "NEC4-25": { number: "25", title: "Subcontracting", summary: "The Contractor must seek acceptance of proposed subcontractors and subcontract conditions. The Project Manager may withhold acceptance on reasonable grounds.", submarineRelevance: "Submarine projects rely heavily on specialist subcontractors (cable ships, ROV operators, divers); formal acceptance ensures quality and capability." },
+      "NEC4-31": { number: "31", title: "The programme", summary: "The Contractor submits a programme showing method, sequence, timing, and resources. The Project Manager accepts or notifies reasons for non-acceptance within 2 weeks.", submarineRelevance: "Marine installation programmes are highly weather-dependent and must show weather windows, vessel transit times, and jointing operations." },
+      "NEC4-50": { number: "50", title: "Assessing the amount due", summary: "Defines the assessment date and process for calculating interim payments including the Price for Work Done to Date.", submarineRelevance: "Submarine cable payments often follow milestone-based progress (factory, load-out, per-km laid, commissioned) rather than simple monthly valuations." },
+      "NEC4-51": { number: "51", title: "Payment", summary: "The Project Manager certifies payment within one week of each assessment date. The Employer pays within three weeks of the assessment date.", submarineRelevance: "Large submarine projects require timely payment to maintain cable ship charter and prevent demobilization." },
+      "NEC4-52": { number: "52", title: "Defined Cost", summary: "Defines what constitutes Defined Cost for the purpose of assessing compensation events and cost-reimbursable work.", submarineRelevance: "Submarine defined costs include vessel day-rates, fuel, specialist crew, and marine spread equipment not typical in terrestrial works." },
+      "NEC4-53": { number: "53", title: "The Contractor's share", summary: "Mechanism for sharing cost savings or overruns between Employer and Contractor based on the share ranges in the Contract Data.", submarineRelevance: "Incentivizes efficient marine operations; Contractor benefits from faster-than-planned cable lay rates." },
+      "NEC4-60": { number: "60", title: "Compensation events", summary: "Lists the events that entitle the Contractor to additional time and cost. Includes Employer-caused delays, changed conditions, and weather beyond thresholds.", submarineRelevance: "Submarine-specific events include unforeseen seabed conditions, Employer-directed route changes, and weather beyond the 1-in-10-year threshold." },
+      "NEC4-61": { number: "61", title: "Notifying compensation events", summary: "The Contractor must notify within 8 weeks; the Project Manager may also notify. Late notification bars the Contractor from additional cost/time.", submarineRelevance: "8-week time bar is critical; marine operations move fast and conditions change rapidly. Teams must notify immediately." },
+      "NEC4-62": { number: "62", title: "Quotations for compensation events", summary: "The Contractor submits quotations within 3 weeks (or agreed extended period). Must show effect on Defined Cost and programme.", submarineRelevance: "Marine quotations must account for weather standby, vessel repositioning, and potential re-routing costs." },
+      "NEC4-63": { number: "63", title: "Assessing compensation events", summary: "Assessment is based on the effect on Defined Cost plus the Fee. The assessment includes the delay to planned Completion.", submarineRelevance: "Assessment of submarine CEs often requires specialist marine engineering input and vessel cost modelling." },
+      "NEC4-64": { number: "64", title: "The Project Manager's assessments", summary: "The Project Manager makes own assessment if the Contractor fails to submit quotation or submits unreasonable quotation.", submarineRelevance: "PM must understand marine cost drivers (day-rates, fuel, transit, weather standby) to make fair assessment." },
+      "NEC4-65": { number: "65", title: "Implementing compensation events", summary: "Once assessed, the compensation event is implemented by changing the Prices, Completion Date, and/or Key Dates.", submarineRelevance: "Implementation may cascade through the entire marine installation programme affecting subsequent segments." },
+      "NEC4-80": { number: "80", title: "Employer's risks", summary: "Lists the risks carried by the Employer. Includes force majeure events and certain specified risks in the Contract Data.", submarineRelevance: "Submarine employer risks typically include seismic events, acts of war, and interference by third-party vessels." },
+      "NEC4-81": { number: "81", title: "The Contractor's risks", summary: "All risks not listed as Employer's risks are Contractor's risks. Loss or damage from Contractor's risks is at Contractor's cost.", submarineRelevance: "Contractor carries risk of cable ship breakdown, crew issues, and installation methodology failures." },
+      "NEC4-82": { number: "82", title: "Repairs", summary: "The Contractor notifies damage and proceeds with repairs. Cost allocation depends on which party carries the risk.", submarineRelevance: "Submarine cable repair requires mobilization of specialist vessels and can cost millions; risk allocation is critical." },
+      "NEC4-83": { number: "83", title: "Indemnity", summary: "Each party indemnifies the other against claims from third parties. Allocation follows risk ownership.", submarineRelevance: "Submarine projects face third-party claims from fishing vessels, other cable owners, and maritime authorities." },
+      "NEC4-84": { number: "84", title: "Insurance", summary: "The Contractor and Employer maintain insurance per the Insurance Table. Policies must name the other party.", submarineRelevance: "Marine insurance (hull, cargo, P&I, CAR) is specialized and expensive; coverage must match the specific submarine risks." },
+
+      // FIDIC Clauses
+      "FIDIC-4": { number: "4", title: "The Contractor", summary: "Contractor obligations including design responsibility, subcontracting, quality assurance, safety, and site facilities.", submarineRelevance: "Submarine contractors must demonstrate specialist capability, vessel resources, and marine safety management systems." },
+      "FIDIC-8": { number: "8", title: "Commencement, Delays and Suspension", summary: "Covers programme submission, time for completion, extension of time, delays, and suspension of work.", submarineRelevance: "Submarine programmes must account for weather windows, monsoon seasons, and vessel scheduling. Suspension during monsoon is common." },
+      "FIDIC-10": { number: "10", title: "Employer's Taking Over", summary: "Procedures for taking over the completed works or sections. Includes testing, punch lists, and certificate issuance.", submarineRelevance: "Submarine systems are taken over in sections (e.g., per segment) after BER testing and capacity verification on each span." },
+      "FIDIC-11": { number: "11", title: "Defects Liability", summary: "Contractor obligation to remedy defects notified during the Defects Notification Period (DNP). Failure to remedy triggers Employer rights.", submarineRelevance: "Submarine cable defects (shunt faults, elevated BER) may only manifest during commissioning or early operation. DNP typically 2-5 years." },
+      "FIDIC-13": { number: "13", title: "Variations and Adjustments", summary: "Engineer may instruct variations. Contractor may propose value engineering. Adjustments for legislation changes and cost fluctuations.", submarineRelevance: "Route variations due to discovered hazards (unexploded ordnance, existing cables, unstable seabed) are common in submarine projects." },
+      "FIDIC-14": { number: "14", title: "Contract Price and Payment", summary: "Covers the contract price, advance payment, interim payment applications, payment certificates, and final payment.", submarineRelevance: "Submarine payment milestones often include: design approval, cable manufacture start, factory test, load-out, per-km installed, commissioned." },
+      "FIDIC-17": { number: "17", title: "Risk and Responsibility", summary: "Allocation of risks, indemnities, and limitation of liability between the parties. Consequential loss exclusions.", submarineRelevance: "Marine risk allocation is complex: vessel perils, seabed hazards, third-party vessel interference, and sovereign immunity issues." },
+      "FIDIC-19": { number: "19", title: "Force Majeure", summary: "Defines force majeure events, notice requirements, duty to minimize delay, and termination rights for prolonged force majeure.", submarineRelevance: "Submarine force majeure includes tsunami, volcanic eruption, armed conflict in territorial waters, and extreme weather beyond seasonal norms." },
+      "FIDIC-20": { number: "20", title: "Claims, Disputes and Arbitration", summary: "Claims procedure with 28-day notice requirement, detailed particulars within 42 days, DAB referral, and ICC arbitration.", submarineRelevance: "Submarine cable disputes often arise from unforeseen seabed conditions, vessel delays, and multi-jurisdictional permitting. Strict 28-day notice is critical." }
+    },
   };
 
   // ---- GENERIC PM profile (fallback) --------------------------------------
@@ -1681,6 +1884,56 @@
     overbudgetFactor: 1.2
   };
 
+  // ---- Contract Template & Clause Reference Functions ----------------------
+  function getContractTemplates(filter) {
+    filter = filter || {};
+    var templates = (fibreProfile.CONTRACT_TEMPLATES || []).slice();
+
+    // Filter by contractForm (NEC4, FIDIC, or BOTH)
+    if (filter.contractForm) {
+      var form = norm(filter.contractForm);
+      templates = templates.filter(function (t) {
+        var tForm = norm(t.contractForm);
+        return tForm === form || tForm === "both" || form === "both";
+      });
+    }
+
+    // Filter by keyword (search across name, purpose, whenToUse, sampleSubject)
+    if (filter.keyword) {
+      var kw = norm(filter.keyword);
+      templates = templates.filter(function (t) {
+        var haystack = norm(t.name) + " " + norm(t.purpose) + " " + norm(t.whenToUse) + " " + norm(t.sampleSubject);
+        return haystack.indexOf(kw) >= 0;
+      });
+    }
+
+    return templates;
+  }
+
+  function getClauseReference(clauseNumber) {
+    var ref = fibreProfile.CLAUSE_REFERENCE || {};
+    if (!clauseNumber) return null;
+    var key = String(clauseNumber).trim();
+
+    // Try direct key lookup (e.g., "NEC4-15" or "FIDIC-4")
+    if (ref[key]) return ref[key];
+
+    // Try with prefix variations
+    var nec4Key = "NEC4-" + key;
+    if (ref[nec4Key]) return ref[nec4Key];
+
+    var fidicKey = "FIDIC-" + key;
+    if (ref[fidicKey]) return ref[fidicKey];
+
+    // Try matching by number field
+    var keys = Object.keys(ref);
+    for (var i = 0; i < keys.length; i++) {
+      if (ref[keys[i]].number === key) return ref[keys[i]];
+    }
+
+    return null;
+  }
+
   function checkAlerts(projectState, config) {
     var cfg = {};
     var k;
@@ -1834,6 +2087,8 @@
     _clearLessons: _clearLessons,
     vendorSearch: vendorSearch,
     vendorComparison: vendorComparison,
+    getContractTemplates: getContractTemplates,
+    getClauseReference: getClauseReference,
     checkAlerts: checkAlerts
   };
   if (typeof module !== "undefined" && module.exports) module.exports = API;

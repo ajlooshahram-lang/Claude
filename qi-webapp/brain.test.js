@@ -906,5 +906,116 @@ console.log("\n-- checkAlerts: alert object structure --");
   ok(alert.affectedId === "case-123", "alert affectedId matches case id");
 })();
 
+console.log("\n-- contract templates: structure and completeness --");
+(function () {
+  var templates = B.getContractTemplates();
+  ok(templates.length >= 15, "CONTRACT_TEMPLATES has >= 15 entries (got " + templates.length + ")");
+
+  // Check required fields on every template
+  var requiredFields = ["id", "name", "contractForm", "clause", "purpose", "whenToUse", "timeLimitDays", "requiredContent", "sampleSubject"];
+  var allValid = templates.every(function (t) {
+    return requiredFields.every(function (f) {
+      return f in t;
+    });
+  });
+  ok(allValid, "every template has all required fields: " + requiredFields.join(", "));
+
+  // Check contractForm values are valid
+  var validForms = ["NEC4", "FIDIC", "BOTH"];
+  var allFormsValid = templates.every(function (t) {
+    return validForms.indexOf(t.contractForm) >= 0;
+  });
+  ok(allFormsValid, "every template has valid contractForm (NEC4, FIDIC, or BOTH)");
+
+  // Check requiredContent is array with at least one entry
+  var allContentArrays = templates.every(function (t) {
+    return Array.isArray(t.requiredContent) && t.requiredContent.length > 0;
+  });
+  ok(allContentArrays, "every template requiredContent is a non-empty array");
+
+  // Check IDs are unique
+  var ids = templates.map(function (t) { return t.id; });
+  var uniqueIds = ids.filter(function (id, i) { return ids.indexOf(id) === i; });
+  ok(uniqueIds.length === ids.length, "all template IDs are unique");
+})();
+
+console.log("\n-- contract templates: filter by contractForm --");
+(function () {
+  var nec4Only = B.getContractTemplates({ contractForm: "NEC4" });
+  ok(nec4Only.length >= 4, "NEC4 filter returns >= 4 templates (got " + nec4Only.length + ")");
+  ok(nec4Only.every(function (t) { return t.contractForm === "NEC4" || t.contractForm === "BOTH"; }), "NEC4 filter includes NEC4 and BOTH templates");
+
+  var fidicOnly = B.getContractTemplates({ contractForm: "FIDIC" });
+  ok(fidicOnly.length >= 3, "FIDIC filter returns >= 3 templates (got " + fidicOnly.length + ")");
+  ok(fidicOnly.every(function (t) { return t.contractForm === "FIDIC" || t.contractForm === "BOTH"; }), "FIDIC filter includes FIDIC and BOTH templates");
+
+  var bothOnly = B.getContractTemplates({ contractForm: "BOTH" });
+  ok(bothOnly.length >= 5, "BOTH filter returns all templates (got " + bothOnly.length + ")");
+})();
+
+console.log("\n-- contract templates: filter by keyword --");
+(function () {
+  var weatherResults = B.getContractTemplates({ keyword: "weather" });
+  ok(weatherResults.length >= 1, "keyword 'weather' returns at least 1 template (got " + weatherResults.length + ")");
+  ok(weatherResults.some(function (t) { return t.name === "Weather event notification"; }), "weather keyword finds Weather event notification template");
+
+  var paymentResults = B.getContractTemplates({ keyword: "payment" });
+  ok(paymentResults.length >= 1, "keyword 'payment' returns at least 1 template (got " + paymentResults.length + ")");
+
+  var cableShipResults = B.getContractTemplates({ keyword: "cable ship" });
+  ok(cableShipResults.length >= 1, "keyword 'cable ship' returns at least 1 template (got " + cableShipResults.length + ")");
+
+  // Combined filter: contractForm + keyword
+  var nec4Weather = B.getContractTemplates({ contractForm: "NEC4", keyword: "weather" });
+  ok(nec4Weather.length >= 1, "combined NEC4 + weather keyword returns results (got " + nec4Weather.length + ")");
+})();
+
+console.log("\n-- clause reference: NEC4 clauses --");
+(function () {
+  var clause15 = B.getClauseReference("NEC4-15");
+  ok(clause15 !== null, "getClauseReference('NEC4-15') returns a result");
+  ok(clause15.number === "15", "NEC4-15 has number '15'");
+  ok(clause15.title === "Early warnings", "NEC4-15 title is 'Early warnings'");
+  ok(typeof clause15.summary === "string" && clause15.summary.length > 10, "NEC4-15 has a summary");
+  ok(typeof clause15.submarineRelevance === "string" && clause15.submarineRelevance.length > 10, "NEC4-15 has submarineRelevance");
+
+  var clause60 = B.getClauseReference("NEC4-60");
+  ok(clause60 !== null && clause60.title === "Compensation events", "NEC4-60 is 'Compensation events'");
+
+  var clause84 = B.getClauseReference("NEC4-84");
+  ok(clause84 !== null && clause84.title === "Insurance", "NEC4-84 is 'Insurance'");
+})();
+
+console.log("\n-- clause reference: FIDIC clauses --");
+(function () {
+  var clause4 = B.getClauseReference("FIDIC-4");
+  ok(clause4 !== null, "getClauseReference('FIDIC-4') returns a result");
+  ok(clause4.number === "4", "FIDIC-4 has number '4'");
+  ok(clause4.title === "The Contractor", "FIDIC-4 title is 'The Contractor'");
+  ok(typeof clause4.submarineRelevance === "string" && clause4.submarineRelevance.length > 10, "FIDIC-4 has submarineRelevance");
+
+  var clause19 = B.getClauseReference("FIDIC-19");
+  ok(clause19 !== null && clause19.title === "Force Majeure", "FIDIC-19 is 'Force Majeure'");
+
+  var clause20 = B.getClauseReference("FIDIC-20");
+  ok(clause20 !== null && clause20.title === "Claims, Disputes and Arbitration", "FIDIC-20 is 'Claims, Disputes and Arbitration'");
+})();
+
+console.log("\n-- clause reference: lookup by number only --");
+(function () {
+  // Should find NEC4-15 when searching just "15"
+  var result = B.getClauseReference("15");
+  ok(result !== null, "getClauseReference('15') finds NEC4-15 by number match");
+  ok(result.title === "Early warnings", "number-only lookup finds correct clause");
+
+  // Non-existent clause returns null
+  var noResult = B.getClauseReference("99");
+  ok(noResult === null, "getClauseReference('99') returns null for non-existent clause");
+
+  // Null input returns null
+  var nullResult = B.getClauseReference(null);
+  ok(nullResult === null, "getClauseReference(null) returns null");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);
