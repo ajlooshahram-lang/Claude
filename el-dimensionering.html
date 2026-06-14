@@ -5770,434 +5770,550 @@ function drawNodeMove(i,d){if(!drawNodes)drawNodes=[...getDrawNodes()];const j=i
 function drawNodeReset(){drawNodes=null;renderModule('draw');}
 
 function build3D(){
+  // === GATHER ALL REAL PROJECT DATA ===
   const nodes=getDrawNodes();
-  const W=Math.max(960,nodes.length*210+140),H=560,gY=420;
-  const sp=(W-180)/Math.max(nodes.length-1,1);
-  let svg='';
-  // Simulated live data per node
-  const liveData=nodes.map((_,i)=>({v:(400-i*2.5+Math.sin(i)*1.2).toFixed(1),a:(120-i*15+Math.cos(i)*5).toFixed(1),kw:((400*(120-i*15))*1.732/1000).toFixed(1),status:i<nodes.length-1?'ok':'ok'}));
+  const sch=calcLoadSchedule();
+  const ib=calcIB();
+  const qi=runQiValidation();
+  const tSize=trafoState.size;
+  const tUk=(TRAFO_UK[tSize]||4)/100;
+  const tIn=tSize*1000/(Math.sqrt(3)*400);
+  const tIk=tIn/tUk;
+  const tLoad=trafoState.loadPercent;
+  const cMat=cableState.material;
+  const cType=cableState.type;
+  const cCores=cableState.cores;
+  const cCS=cableState.crossSection;
+  const cLen=vdropState.length;
+  const cMethod=cableState.installMethod;
+  const izTable=izTableFor();
+  const baseIz=izTable[parseFloat(cCS)]||0;
+  const kInst=INSTALL_METHODS[cMethod]||1;
+  const kTemp=TEMP_FACTORS[cableState.temp]||1;
+  const kGrp=GROUP_FACTORS[cableState.grouping]||1;
+  const corrIz=baseIz*kInst*kTemp*kGrp;
+  const cables3=cMat==='copper'?CABLES_COPPER:CABLES_ALU;
+  const ct3=cables3[cType];
+  const cc3=ct3&&ct3[cCores]?ct3[cCores]:{};
+  const sc3=cc3[cCS];
+  const Un=loadState.voltage==='3x400'?400:230;
+  let vdP=0;
+  if(sc3&&cLen){
+    const L=cLen/1000;
+    const cosP=loadState.cosPhi;
+    const sinP=Math.sin(Math.acos(cosP));
+    const vd=loadState.voltage==='3x400'?Math.sqrt(3)*ib*L*(sc3.r*cosP+sc3.x*sinP):2*ib*L*(sc3.r*cosP+sc3.x*sinP);
+    vdP=(vd/Un)*100;
+  }
+  const mcbR=mcbState.rating;
+  const mcbC=mcbState.curve;
+  const fuseS=fuseState.size;
+  const mccbIn=mccbState.inVal;
+  const protName=mcbR?(mcbC+mcbR+'A MCB'):(fuseS?(fuseS+'A '+fuseState.holder):(mccbIn?('MCCB '+mccbIn+'A'):'--'));
+  const cableUndersized=corrIz>0&&corrIz<ib;
+  const protInsufficient=(mcbR&&mcbR<ib)||(fuseS&&fuseS<ib);
+  const vdropBad=vdP>5;
+  const icuBad=false;
+  const allOk=qi.issues.length===0&&!cableUndersized&&!protInsufficient&&!vdropBad;
+  const phL1=sch.ph?sch.ph.L1:0;
+  const phL2=sch.ph?sch.ph.L2:0;
+  const phL3=sch.ph?sch.ph.L3:0;
+  const phMax=Math.max(phL1,phL2,phL3,1);
+  const loadCount=loadList.length||0;
+  const totalKW=sch.kW||loadState.power;
+  const totalKVA=sch.kVA||(loadState.power/loadState.cosPhi);
+  const dateStr=new Date().toLocaleDateString(lang==='da'?'da-DK':'en-GB');
 
-  // Defs: comprehensive filters, gradients, patterns for SCADA look
+  // === LAYOUT ===
+  const nodeCount=nodes.length;
+  const W=Math.max(1100,nodeCount*220+200);
+  const H=700;
+  const headerH=52;
+  const footerH=44;
+  const mainY=headerH+10;
+  const floorY=H-footerH-90;
+  const equipY=floorY-20;
+  const sp=(W-200)/Math.max(nodeCount-1,1);
+  let svg='';
+
+  // === DEFS ===
   svg+=`<defs>
-    <filter id="glow4"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <filter id="glow8"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <filter id="glow2"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <filter id="shadow3"><feDropShadow dx="3" dy="5" stdDeviation="6" flood-color="rgba(0,0,0,0.7)"/></filter>
-    <filter id="sharpGlow"><feGaussianBlur stdDeviation="1.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#050c18"/><stop offset="100%" stop-color="#010408"/></linearGradient>
-    <linearGradient id="floorG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(0,160,255,0.06)"/><stop offset="100%" stop-color="rgba(0,0,0,0)"/></linearGradient>
-    <linearGradient id="cableL1" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#8B4513"/><stop offset="100%" stop-color="#A0522D"/></linearGradient>
-    <linearGradient id="cableN" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#1565C0"/><stop offset="100%" stop-color="#1E88E5"/></linearGradient>
-    <linearGradient id="cablePE" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#2E7D32"/><stop offset="50%" stop-color="#FDD835"/><stop offset="100%" stop-color="#2E7D32"/></linearGradient>
-    <radialGradient id="sparkGrad"><stop offset="0%" stop-color="#fff" stop-opacity="1"/><stop offset="100%" stop-color="#0af" stop-opacity="0"/></radialGradient>
-    <pattern id="gridPat" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0L0 0 0 40" fill="none" stroke="rgba(0,180,255,0.04)" stroke-width="0.5"/></pattern>
+    <filter id="g3glow3"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="g3glow6"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="g3glow10"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="g3shadow"><feDropShadow dx="2" dy="4" stdDeviation="5" flood-color="rgba(0,0,0,0.6)"/></filter>
+    <filter id="g3inner"><feGaussianBlur stdDeviation="2" result="b"/><feComposite in="SourceGraphic" in2="b" operator="atop"/></filter>
+    <linearGradient id="g3bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0a1628"/><stop offset="40%" stop-color="#050d1a"/><stop offset="100%" stop-color="#020508"/></linearGradient>
+    <linearGradient id="g3floor" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(0,180,255,0.08)"/><stop offset="100%" stop-color="rgba(0,0,0,0)"/></linearGradient>
+    <linearGradient id="g3cableOk" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#1a5a3a"/><stop offset="50%" stop-color="#2a8a5a"/><stop offset="100%" stop-color="#1a5a3a"/></linearGradient>
+    <linearGradient id="g3cableBad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#8a1a1a"/><stop offset="50%" stop-color="#ff3333"/><stop offset="100%" stop-color="#8a1a1a"/></linearGradient>
+    <linearGradient id="g3vdrop" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#06d6a0"/><stop offset="${Math.max(0,100-vdP*10)}%" stop-color="#06d6a0"/><stop offset="100%" stop-color="${vdP>4?'#ff4444':'#ffd166'}"/></linearGradient>
+    <radialGradient id="g3spark"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="rgba(0,170,255,0)"/></radialGradient>
+    <pattern id="g3grid" width="50" height="50" patternUnits="userSpaceOnUse"><path d="M50 0L0 0 0 50" fill="none" stroke="rgba(0,200,255,0.03)" stroke-width="0.5"/></pattern>
   </defs>`;
 
-  // Background
-  svg+=`<rect width="${W}" height="${H}" fill="url(#bgGrad)" rx="12"/>`;
-  svg+=`<rect width="${W}" height="${H}" fill="url(#gridPat)" rx="12" opacity="0.5"/>`;
+  // === BACKGROUND ===
+  svg+=`<rect width="${W}" height="${H}" fill="url(#g3bg)" rx="14"/>`;
+  svg+=`<rect width="${W}" height="${H}" fill="url(#g3grid)" rx="14" opacity="0.6"/>`;
+  // Ambient depth gradients
+  svg+=`<ellipse cx="${W/2}" cy="${H*0.35}" rx="${W*0.6}" ry="${H*0.3}" fill="rgba(0,80,160,0.02)"/>`;
+  svg+=`<ellipse cx="${W*0.2}" cy="${H*0.7}" rx="${W*0.3}" ry="${H*0.2}" fill="rgba(0,100,200,0.015)"/>`;
 
-  // Floor with perspective grid
-  svg+=`<rect x="0" y="${gY}" width="${W}" height="${H-gY}" fill="url(#floorG)"/>`;
-  for(let i=0;i<12;i++){
-    const yy=gY+i*10;
-    svg+=`<line x1="0" y1="${yy}" x2="${W}" y2="${yy}" stroke="rgba(0,200,255,${(0.08-i*0.006).toFixed(3)})" stroke-width="0.5"/>`;
+  // === FLOOR WITH PERSPECTIVE ===
+  svg+=`<rect x="0" y="${floorY}" width="${W}" height="${H-floorY}" fill="url(#g3floor)"/>`;
+  for(let i=0;i<16;i++){
+    const yy=floorY+i*6;
+    svg+=`<line x1="0" y1="${yy}" x2="${W}" y2="${yy}" stroke="rgba(0,220,255,${(0.06-i*0.003).toFixed(3)})" stroke-width="0.5"/>`;
   }
-  svg+=`<line x1="0" y1="${gY}" x2="${W}" y2="${gY}" stroke="rgba(0,200,255,0.2)" stroke-width="2"/>`;
-  svg+=`<line x1="0" y1="${gY}" x2="${W}" y2="${gY}" stroke="rgba(0,200,255,0.06)" stroke-width="8"/>`;
+  svg+=`<line x1="0" y1="${floorY}" x2="${W}" y2="${floorY}" stroke="rgba(0,220,255,0.25)" stroke-width="2"/>`;
 
-  // Ambient grid hum visualization (low-frequency sine wave at bottom)
-  let humPath='M0,'+(H-20);
-  for(let x=0;x<W;x+=4){humPath+=` L${x},${H-20+Math.sin(x*0.02)*3+Math.sin(x*0.05)*1.5}`;}
-  svg+=`<path d="${humPath}" fill="none" stroke="rgba(0,200,255,0.12)" stroke-width="1.5"><animate attributeName="opacity" values="0.08;0.15;0.08" dur="3s" repeatCount="indefinite"/></path>`;
-  let humPath2='M0,'+(H-15);
-  for(let x=0;x<W;x+=4){humPath2+=` L${x},${H-15+Math.sin(x*0.03+1)*2}`;}
-  svg+=`<path d="${humPath2}" fill="none" stroke="rgba(0,100,255,0.08)" stroke-width="1"/>`;
+  // === PROFESSIONAL HEADER BAR ===
+  svg+=`<rect x="0" y="0" width="${W}" height="${headerH}" rx="14" fill="rgba(0,15,30,0.95)" stroke="rgba(0,180,255,0.2)" stroke-width="1"/>`;
+  svg+=`<rect x="0" y="${headerH-1}" width="${W}" height="2" fill="rgba(0,180,255,0.15)"/>`;
+  // Live indicator
+  svg+=`<circle cx="22" cy="${headerH/2}" r="5" fill="${allOk?'#06d6a0':'#ff4444'}"><animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite"/></circle>`;
+  svg+=`<text x="34" y="${headerH/2+4}" font-size="11" fill="${allOk?'#06d6a0':'#ff4444'}" font-weight="800">LIVE</text>`;
+  // Project title
+  svg+=`<text x="${W/2}" y="${headerH/2-6}" text-anchor="middle" font-size="13" fill="#c0e0ff" font-weight="700">${lang==='da'?'EL-DIMENSIONERING - PROJEKTDEMONSTRATION':'ELECTRICAL SIZING - PROJECT DEMONSTRATION'}</text>`;
+  svg+=`<text x="${W/2}" y="${headerH/2+10}" text-anchor="middle" font-size="10" fill="#6090b0">${tSize} kVA | ${cType} ${cCS||'--'} mm\u00B2 | ${protName} | ${dateStr}</text>`;
+  // QI status badge
+  const qiBadgeW=140;
+  const qiBadgeX=W-qiBadgeW-15;
+  svg+=`<rect x="${qiBadgeX}" y="${headerH/2-12}" width="${qiBadgeW}" height="24" rx="12" fill="${allOk?'rgba(6,214,160,0.15)':'rgba(255,68,68,0.15)'}" stroke="${allOk?'#06d6a0':'#ff4444'}" stroke-width="1.5"/>`;
+  svg+=`<text x="${qiBadgeX+qiBadgeW/2}" y="${headerH/2+4}" text-anchor="middle" font-size="10" fill="${allOk?'#06d6a0':'#ff4444'}" font-weight="800">${allOk?(lang==='da'?'DIMENSIONERET OK':'SIZED OK'):(lang==='da'?'KONTROLLER':'CHECK REQUIRED')}</text>`;
+  if(allOk){
+    svg+=`<rect x="${qiBadgeX}" y="${headerH/2-12}" width="${qiBadgeW}" height="24" rx="12" fill="none" stroke="#06d6a0" stroke-width="2" opacity="0.3" filter="url(#g3glow6)"><animate attributeName="opacity" values="0.2;0.5;0.2" dur="3s" repeatCount="indefinite"/></rect>`;
+  }else{
+    svg+=`<rect x="${qiBadgeX}" y="${headerH/2-12}" width="${qiBadgeW}" height="24" rx="12" fill="none" stroke="#ff4444" stroke-width="2" opacity="0.4"><animate attributeName="opacity" values="0.2;0.7;0.2" dur="1.5s" repeatCount="indefinite"/></rect>`;
+  }
+  // QI score
+  svg+=`<text x="80" y="${headerH/2+4}" font-size="10" fill="#8ab0cc">QI: ${qi.score}%</text>`;
 
-  // SCADA header bar
-  svg+=`<rect x="10" y="8" width="${W-20}" height="28" rx="6" fill="rgba(0,20,40,0.8)" stroke="rgba(0,180,255,0.15)" stroke-width="1"/>`;
-  svg+=`<circle cx="26" cy="22" r="4" fill="#06d6a0"><animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite"/></circle>`;
-  svg+=`<text x="38" y="26" font-size="11" fill="#06d6a0" font-weight="700">LIVE</text>`;
-  svg+=`<text x="${W/2}" y="26" text-anchor="middle" font-size="11" fill="#7ab0cc" font-weight="600">${lang==='da'?'SCADA Installationsoversigt':'SCADA Installation Overview'} - ${nodes.length} ${lang==='da'?'noder':'nodes'}</text>`;
-  svg+=`<text x="${W-60}" y="26" text-anchor="end" font-size="10" fill="#4a7a90">400V 3~50Hz</text>`;
+  // === PHASE BALANCE BARS (top right area) ===
+  const pbX=W-220, pbY=headerH+14;
+  svg+=`<rect x="${pbX-5}" y="${pbY-5}" width="120" height="58" rx="6" fill="rgba(0,10,25,0.8)" stroke="rgba(0,180,255,0.1)" stroke-width="0.5"/>`;
+  svg+=`<text x="${pbX}" y="${pbY+8}" font-size="8" fill="#6090b0" font-weight="600">${lang==='da'?'FASEBALANCE':'PHASE BALANCE'}</text>`;
+  const phBars=[{lbl:'L1',val:phL1,col:'#8B4513'},{lbl:'L2',val:phL2,col:'#333'},{lbl:'L3',val:phL3,col:'#666'}];
+  phBars.forEach((pb,pi)=>{
+    const by=pbY+14+pi*13;
+    const bw=Math.max(2,(pb.val/Math.max(phMax,1))*80);
+    svg+=`<text x="${pbX}" y="${by+8}" font-size="7" fill="${pb.col==='#333'?'#999':pb.col}" font-weight="700">${pb.lbl}</text>`;
+    svg+=`<rect x="${pbX+18}" y="${by}" width="80" height="10" rx="3" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.05)" stroke-width="0.5"/>`;
+    svg+=`<rect x="${pbX+18}" y="${by}" width="${bw}" height="10" rx="3" fill="${pb.col==='#333'?'#555':pb.col}" opacity="0.7"><animate attributeName="width" values="${bw*0.95};${bw};${bw*0.95}" dur="3s" repeatCount="indefinite" begin="${pi*0.3}s"/></rect>`;
+    svg+=`<text x="${pbX+102}" y="${by+8}" font-size="7" fill="#aaa">${pb.val.toFixed(1)}A</text>`;
+  });
 
-  // Draw cables FIRST (behind nodes)
+  // === POWER SUMMARY PANEL (top left) ===
+  const psX=110, psY=headerH+14;
+  svg+=`<rect x="${psX-5}" y="${psY-5}" width="155" height="58" rx="6" fill="rgba(0,10,25,0.8)" stroke="rgba(0,180,255,0.1)" stroke-width="0.5"/>`;
+  svg+=`<text x="${psX}" y="${psY+8}" font-size="8" fill="#6090b0" font-weight="600">${lang==='da'?'EFFEKTDATA':'POWER DATA'}</text>`;
+  svg+=`<text x="${psX}" y="${psY+22}" font-size="9" fill="#06d6a0" font-weight="700">P = ${totalKW.toFixed(1)} kW</text>`;
+  svg+=`<text x="${psX+70}" y="${psY+22}" font-size="9" fill="#ffd166" font-weight="700">S = ${totalKVA.toFixed(1)} kVA</text>`;
+  svg+=`<text x="${psX}" y="${psY+36}" font-size="9" fill="#0af" font-weight="700">IB = ${ib.toFixed(1)} A</text>`;
+  svg+=`<text x="${psX+70}" y="${psY+36}" font-size="9" fill="#c8a0ff">cos\u03C6 = ${loadState.cosPhi}</text>`;
+  svg+=`<text x="${psX}" y="${psY+49}" font-size="8" fill="#7ab0cc">Iz = ${corrIz.toFixed(1)} A | \u0394U = ${vdP.toFixed(2)}%</text>`;
+
+  // === DRAW CABLES BETWEEN NODES ===
   nodes.forEach((n,idx)=>{
-    if(idx>=nodes.length-1) return;
+    if(idx>=nodeCount-1) return;
     const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;
     const nextNt=NODE_TYPES[nodes[idx+1].type]||NODE_TYPES.custom;
-    const cx=90+idx*sp, nx=90+(idx+1)*sp;
+    const cx=100+idx*sp, nx=100+(idx+1)*sp;
     const cStartX=cx+55, cEndX=nx-55;
-    const cableY=gY-100;
-    const ctrlY=cableY-30-Math.sin(idx)*10;
+    const cableY=equipY-80;
+    const ctrlY=cableY-25;
     const cPath=`M${cStartX},${cableY} C${cStartX+40},${ctrlY} ${cEndX-40},${ctrlY} ${cEndX},${cableY}`;
-    const cLen=Math.abs(cEndX-cStartX);
-    const curA=Math.abs(parseFloat(liveData[idx].a));
+    const isCableSegment=true;
+    const segBad=cableUndersized;
 
     // Cable shadow
-    svg+=`<path d="${cPath}" fill="none" stroke="rgba(0,0,0,0.4)" stroke-width="8" transform="translate(2,4)"/>`;
+    svg+=`<path d="${cPath}" fill="none" stroke="rgba(0,0,0,0.3)" stroke-width="10" transform="translate(2,3)"/>`;
 
-    // 3 phase cables (L1 brown, L2 black, L3 grey) + N blue + PE green-yellow
-    const cables=[{dy:-4,color:'#6B3A1F',w:2.5},{dy:-2,color:'#222',w:2.5},{dy:0,color:'#666',w:2.5},{dy:2,color:'#1565C0',w:2},{dy:4,color:'#2E7D32',w:1.8}];
-    cables.forEach(c=>{
-      const cp=`M${cStartX},${cableY+c.dy} C${cStartX+40},${ctrlY+c.dy} ${cEndX-40},${ctrlY+c.dy} ${cEndX},${cableY+c.dy}`;
-      svg+=`<path d="${cp}" fill="none" stroke="${c.color}" stroke-width="${c.w}" stroke-linecap="round" opacity="0.9"/>`;
+    // Multi-core cable rendering (L1 brown, L2 black, L3 grey, N blue, PE green/yellow)
+    const coreColors=[{dy:-4,c:'#8B4513',w:2.2},{dy:-2,c:'#333',w:2.2},{dy:0,c:'#777',w:2.2},{dy:2,c:'#1565C0',w:1.8},{dy:4,c:'#2E7D32',w:1.5}];
+    coreColors.forEach(core=>{
+      const cp=`M${cStartX},${cableY+core.dy} C${cStartX+40},${ctrlY+core.dy} ${cEndX-40},${ctrlY+core.dy} ${cEndX},${cableY+core.dy}`;
+      svg+=`<path d="${cp}" fill="none" stroke="${core.c}" stroke-width="${core.w}" stroke-linecap="round" opacity="0.85"/>`;
     });
 
-    // Outer glow on cable bundle
-    svg+=`<path d="${cPath}" fill="none" stroke="${nt.color}" stroke-width="12" opacity="0.06" filter="url(#glow8)"/>`;
-
-    // Animated current flow particles (multiple for density)
-    for(let p=0;p<5;p++){
-      const delay=(p*0.5).toFixed(1);
-      const dur=(2+idx*0.2).toFixed(1);
-      const pSize=2+Math.random()*2;
-      svg+=`<circle r="${pSize}" fill="${nt.color}" opacity="0" filter="url(#glow2)"><animateMotion path="${cPath.replace('M','M')}" dur="${dur}s" repeatCount="indefinite" begin="${delay}s"/><animate attributeName="opacity" values="0;0.9;0.9;0" dur="${dur}s" repeatCount="indefinite" begin="${delay}s"/></circle>`;
-    }
-    // Reverse direction particles (smaller, next node color)
-    for(let p=0;p<2;p++){
-      const delay=(p*1.2).toFixed(1);
-      const dur=(3+idx*0.3).toFixed(1);
-      const revPath=`M${cEndX},${cableY} C${cEndX-40},${ctrlY} ${cStartX+40},${ctrlY} ${cStartX},${cableY}`;
-      svg+=`<circle r="1.5" fill="${nextNt.color}" opacity="0" filter="url(#glow2)"><animateMotion path="${revPath}" dur="${dur}s" repeatCount="indefinite" begin="${delay}s"/><animate attributeName="opacity" values="0;0.5;0.5;0" dur="${dur}s" repeatCount="indefinite" begin="${delay}s"/></circle>`;
+    // Cable outer glow - RED if undersized, GREEN if ok
+    if(segBad){
+      svg+=`<path d="${cPath}" fill="none" stroke="#ff3333" stroke-width="14" opacity="0.12" filter="url(#g3glow6)"><animate attributeName="opacity" values="0.08;0.2;0.08" dur="1s" repeatCount="indefinite"/></path>`;
+    }else{
+      svg+=`<path d="${cPath}" fill="none" stroke="${nt.color}" stroke-width="12" opacity="0.04" filter="url(#g3glow6)"/>`;
     }
 
-    // Direction arrow on cable
-    const arrowX=(cStartX+cEndX)/2, arrowY=ctrlY+5;
-    svg+=`<polygon points="${arrowX-5},${arrowY-4} ${arrowX+6},${arrowY} ${arrowX-5},${arrowY+4}" fill="${nt.color}" opacity="0.7"><animate attributeName="opacity" values="0.4;1;0.4" dur="1.5s" repeatCount="indefinite"/></polygon>`;
+    // Voltage drop gradient bar along cable
+    const midX=(cStartX+cEndX)/2, midY=ctrlY-18;
+    const vBarW=Math.abs(cEndX-cStartX)*0.6;
+    svg+=`<rect x="${midX-vBarW/2}" y="${midY-2}" width="${vBarW}" height="4" rx="2" fill="url(#g3vdrop)" opacity="0.6"/>`;
 
-    // Live data overlay on cable
-    const midX=(cStartX+cEndX)/2, midY=ctrlY-12;
-    svg+=`<rect x="${midX-28}" y="${midY-10}" width="56" height="14" rx="3" fill="rgba(0,10,20,0.85)" stroke="rgba(0,200,255,0.2)" stroke-width="0.5"/>`;
-    svg+=`<text x="${midX}" y="${midY}" text-anchor="middle" font-size="8" fill="#0af" font-weight="700">${curA.toFixed(0)} A</text>`;
+    // Current flow particles - speed proportional to actual IB
+    const particleSpeed=Math.max(0.8,3-ib/80);
+    const particleCount=Math.min(8,Math.max(3,Math.round(ib/20)));
+    for(let p=0;p<particleCount;p++){
+      const delay=(p*(particleSpeed/particleCount)).toFixed(2);
+      const dur=particleSpeed.toFixed(2);
+      const pSize=1.5+Math.min(2,ib/60);
+      svg+=`<circle r="${pSize}" fill="${segBad?'#ff6666':nt.color}" opacity="0" filter="url(#g3glow3)"><animateMotion path="${cPath}" dur="${dur}s" repeatCount="indefinite" begin="${delay}s"/><animate attributeName="opacity" values="0;0.9;0.9;0" dur="${dur}s" repeatCount="indefinite" begin="${delay}s"/></circle>`;
+    }
+
+    // Cable data overlay
+    svg+=`<rect x="${midX-40}" y="${midY-16}" width="80" height="13" rx="4" fill="rgba(0,8,16,0.9)" stroke="rgba(0,200,255,0.2)" stroke-width="0.5"/>`;
+    svg+=`<text x="${midX}" y="${midY-7}" text-anchor="middle" font-size="8" fill="${segBad?'#ff4444':'#0af'}" font-weight="700">${cType} ${cCS||'?'}mm\u00B2 \u00B7 ${cLen}m</text>`;
+
+    // Current value badge
+    svg+=`<rect x="${midX-22}" y="${midY+5}" width="44" height="12" rx="3" fill="rgba(0,8,16,0.9)" stroke="rgba(6,214,160,0.2)" stroke-width="0.5"/>`;
+    svg+=`<text x="${midX}" y="${midY+14}" text-anchor="middle" font-size="7.5" fill="#06d6a0" font-weight="700">${ib.toFixed(1)} A</text>`;
 
     // Spark at connection points
-    svg+=`<circle cx="${cStartX}" cy="${cableY}" r="3" fill="${nt.color}" opacity="0.8" filter="url(#glow4)"><animate attributeName="r" values="2;5;2" dur="1.5s" repeatCount="indefinite" begin="${idx*0.3}s"/><animate attributeName="opacity" values="0.5;1;0.5" dur="1.5s" repeatCount="indefinite" begin="${idx*0.3}s"/></circle>`;
-    svg+=`<circle cx="${cEndX}" cy="${cableY}" r="3" fill="${nextNt.color}" opacity="0.8" filter="url(#glow4)"><animate attributeName="r" values="2;4;2" dur="1.8s" repeatCount="indefinite" begin="${idx*0.2}s"/><animate attributeName="opacity" values="0.4;1;0.4" dur="1.8s" repeatCount="indefinite" begin="${idx*0.2}s"/></circle>`;
+    svg+=`<circle cx="${cStartX}" cy="${cableY}" r="3" fill="${nt.color}" opacity="0.7" filter="url(#g3glow3)"><animate attributeName="r" values="2;5;2" dur="2s" repeatCount="indefinite" begin="${idx*0.4}s"/><animate attributeName="opacity" values="0.4;1;0.4" dur="2s" repeatCount="indefinite" begin="${idx*0.4}s"/></circle>`;
+    svg+=`<circle cx="${cEndX}" cy="${cableY}" r="3" fill="${nextNt.color}" opacity="0.7" filter="url(#g3glow3)"><animate attributeName="r" values="2;4;2" dur="2.2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.3;0.9;0.3" dur="2.2s" repeatCount="indefinite"/></circle>`;
   });
 
-  // Draw each node with detailed equipment rendering
+  // === DRAW EQUIPMENT NODES ===
   nodes.forEach((n,idx)=>{
     const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;
-    const cx=90+idx*sp, baseY=gY;
-    const uid='scada'+idx;
+    const cx=100+idx*sp;
+    const baseY=equipY;
+    const uid='d3n'+idx;
     const col=nt.color;
+    const modMap={grid:'trafo',trafo:'trafo',panel:'cable',subpan:'cable',motor:'load',ev:'load',pv:'load',load:'load',meter:'vdrop',battery:'load',gen:'load',custom:'load'};
+    const clickMod=modMap[n.type]||'load';
 
-    // Per-node defs
-    svg+=`<defs><linearGradient id="${uid}body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${col}" stop-opacity="0.25"/><stop offset="100%" stop-color="${col}" stop-opacity="0.05"/></linearGradient>
-    <radialGradient id="${uid}glow"><stop offset="0%" stop-color="${col}" stop-opacity="0.3"/><stop offset="100%" stop-color="${col}" stop-opacity="0"/></radialGradient></defs>`;
+    // Per-node gradient defs
+    svg+=`<defs><linearGradient id="${uid}bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${col}" stop-opacity="0.2"/><stop offset="100%" stop-color="${col}" stop-opacity="0.03"/></linearGradient></defs>`;
 
-    // Floor reflection glow
-    svg+=`<ellipse cx="${cx}" cy="${baseY+6}" rx="45" ry="8" fill="${col}" opacity="0.08" filter="url(#glow8)"/>`;
+    // Clickable group with hover effect
+    svg+=`<g onclick="switchModule('${clickMod}')" style="cursor:pointer" class="node3d-hover">`;
 
-    // Equipment-specific detailed rendering
+    // Floor reflection
+    svg+=`<ellipse cx="${cx}" cy="${baseY+8}" rx="50" ry="10" fill="${col}" opacity="0.06" filter="url(#g3glow10)"/>`;
+
+    // === EQUIPMENT-SPECIFIC RENDERING ===
     if(n.type==='grid'){
-      // Power lines with towers and electricity sparks
-      const ty=baseY-180;
-      // Transmission tower silhouette
-      svg+=`<path d="M${cx-3},${baseY} L${cx-8},${ty+60} L${cx-20},${ty+30} L${cx-6},${ty+30} L${cx-4},${ty} L${cx+4},${ty} L${cx+6},${ty+30} L${cx+20},${ty+30} L${cx+8},${ty+60} L${cx+3},${baseY} Z" fill="rgba(100,130,160,0.3)" stroke="#5a8aaa" stroke-width="1.5" filter="url(#shadow3)"/>`;
-      // Cross arms
-      svg+=`<line x1="${cx-30}" y1="${ty+20}" x2="${cx+30}" y2="${ty+20}" stroke="#5a8aaa" stroke-width="2"/>`;
-      svg+=`<line x1="${cx-25}" y1="${ty+40}" x2="${cx+25}" y2="${ty+40}" stroke="#5a8aaa" stroke-width="1.5"/>`;
-      // Power lines coming in
-      svg+=`<line x1="${cx-50}" y1="${ty+15}" x2="${cx-30}" y2="${ty+20}" stroke="#aaa" stroke-width="1.5"/>`;
-      svg+=`<line x1="${cx-50}" y1="${ty+35}" x2="${cx-25}" y2="${ty+40}" stroke="#aaa" stroke-width="1.5"/>`;
-      svg+=`<line x1="${cx+30}" y1="${ty+20}" x2="${cx+50}" y2="${ty+18}" stroke="#aaa" stroke-width="1.5"/>`;
-      // Electricity sparks
-      for(let s=0;s<4;s++){
-        const sx=cx-15+s*10, sy=ty+15+s*8;
-        svg+=`<circle cx="${sx}" cy="${sy}" r="2" fill="#fff" opacity="0" filter="url(#glow4)"><animate attributeName="opacity" values="0;1;0" dur="${0.5+s*0.3}s" repeatCount="indefinite" begin="${s*0.2}s"/><animate attributeName="r" values="1;4;1" dur="${0.5+s*0.3}s" repeatCount="indefinite" begin="${s*0.2}s"/></circle>`;
+      const ty=baseY-190;
+      // Transmission tower
+      svg+=`<path d="M${cx-3},${baseY} L${cx-8},${ty+60} L${cx-22},${ty+28} L${cx-6},${ty+28} L${cx-4},${ty} L${cx+4},${ty} L${cx+6},${ty+28} L${cx+22},${ty+28} L${cx+8},${ty+60} L${cx+3},${baseY} Z" fill="rgba(80,110,140,0.25)" stroke="#6a9aba" stroke-width="1.5" filter="url(#g3shadow)"/>`;
+      svg+=`<line x1="${cx-32}" y1="${ty+18}" x2="${cx+32}" y2="${ty+18}" stroke="#6a9aba" stroke-width="2"/>`;
+      svg+=`<line x1="${cx-27}" y1="${ty+38}" x2="${cx+27}" y2="${ty+38}" stroke="#6a9aba" stroke-width="1.5"/>`;
+      // Power lines
+      svg+=`<path d="M${cx-55},${ty+14} Q${cx-40},${ty+22} ${cx-32},${ty+18}" fill="none" stroke="#bbb" stroke-width="1.5"/>`;
+      svg+=`<path d="M${cx+32},${ty+18} Q${cx+40},${ty+14} ${cx+55},${ty+16}" fill="none" stroke="#bbb" stroke-width="1.5"/>`;
+      svg+=`<path d="M${cx-50},${ty+34} Q${cx-35},${ty+42} ${cx-27},${ty+38}" fill="none" stroke="#bbb" stroke-width="1.2"/>`;
+      // Electricity arcs
+      for(let s=0;s<5;s++){
+        const sx=cx-18+s*9, sy=ty+12+s*7;
+        svg+=`<circle cx="${sx}" cy="${sy}" r="1.5" fill="#fff" opacity="0" filter="url(#g3glow3)"><animate attributeName="opacity" values="0;1;0" dur="${0.4+s*0.25}s" repeatCount="indefinite" begin="${s*0.15}s"/><animate attributeName="r" values="1;4;1" dur="${0.4+s*0.25}s" repeatCount="indefinite" begin="${s*0.15}s"/></circle>`;
       }
-      // Animated spark path
-      svg+=`<path d="M${cx-10},${ty+20} L${cx-5},${ty+28} L${cx-12},${ty+32} L${cx-4},${ty+42}" fill="none" stroke="#7fc8ff" stroke-width="2" opacity="0" filter="url(#glow4)"><animate attributeName="opacity" values="0;0.9;0;0;0" dur="2s" repeatCount="indefinite"/></path>`;
-      svg+=`<path d="M${cx+8},${ty+25} L${cx+12},${ty+32} L${cx+5},${ty+37} L${cx+10},${ty+45}" fill="none" stroke="#aef" stroke-width="1.5" opacity="0" filter="url(#glow4)"><animate attributeName="opacity" values="0;0;0.8;0;0" dur="2.5s" repeatCount="indefinite"/></path>`;
-      // Voltage indicator
-      svg+=`<text x="${cx}" y="${ty-8}" text-anchor="middle" font-size="10" fill="#7fc8ff" font-weight="700">60 kV</text>`;
+      // Lightning bolt animation
+      svg+=`<path d="M${cx-8},${ty+18} L${cx-3},${ty+28} L${cx-9},${ty+32} L${cx-2},${ty+44}" fill="none" stroke="#7fc8ff" stroke-width="2" opacity="0" filter="url(#g3glow3)"><animate attributeName="opacity" values="0;0.9;0;0;0" dur="2.5s" repeatCount="indefinite"/></path>`;
+      // Network Ik label
+      svg+=`<text x="${cx}" y="${ty-10}" text-anchor="middle" font-size="9" fill="#7fc8ff" font-weight="700">${loadState.voltage==='3x400'?'10/0.4 kV':'230V'}</text>`;
+      svg+=`<text x="${cx}" y="${ty-22}" text-anchor="middle" font-size="8" fill="#5a8aaa">Ik=${tIk.toFixed(1)} kA</text>`;
 
     } else if(n.type==='trafo'){
-      // Realistic transformer with cooling fins and magnetic field
-      const ty=baseY-160, tw=70, th=130;
-      // Main body (cylindrical tank)
-      svg+=`<rect x="${cx-tw/2}" y="${ty}" width="${tw}" height="${th}" rx="8" fill="url(#${uid}body)" stroke="${col}" stroke-width="2" filter="url(#shadow3)"/>`;
-      // Cooling fins (left side)
-      for(let f=0;f<6;f++){
-        const fy=ty+15+f*18;
-        svg+=`<rect x="${cx-tw/2-8}" y="${fy}" width="8" height="12" rx="2" fill="rgba(255,138,92,0.15)" stroke="${col}" stroke-width="0.8" opacity="0.7"/>`;
+      const ty=baseY-170, tw=75, th=140;
+      // Main tank body
+      svg+=`<rect x="${cx-tw/2}" y="${ty}" width="${tw}" height="${th}" rx="8" fill="url(#${uid}bg)" stroke="${col}" stroke-width="2" filter="url(#g3shadow)"/>`;
+      // Cooling fins
+      for(let f=0;f<7;f++){
+        const fy=ty+12+f*17;
+        svg+=`<rect x="${cx-tw/2-9}" y="${fy}" width="9" height="11" rx="2" fill="rgba(255,138,92,0.1)" stroke="${col}" stroke-width="0.7" opacity="0.7"/>`;
+        svg+=`<rect x="${cx+tw/2}" y="${fy}" width="9" height="11" rx="2" fill="rgba(255,138,92,0.1)" stroke="${col}" stroke-width="0.7" opacity="0.7"/>`;
       }
-      // Cooling fins (right side)
-      for(let f=0;f<6;f++){
-        const fy=ty+15+f*18;
-        svg+=`<rect x="${cx+tw/2}" y="${fy}" width="8" height="12" rx="2" fill="rgba(255,138,92,0.15)" stroke="${col}" stroke-width="0.8" opacity="0.7"/>`;
+      // Core and winding representation
+      svg+=`<rect x="${cx-22}" y="${ty+18}" width="16" height="${th-36}" rx="4" fill="none" stroke="${col}" stroke-width="1.2" opacity="0.5"/>`;
+      svg+=`<rect x="${cx+6}" y="${ty+18}" width="16" height="${th-36}" rx="4" fill="none" stroke="${col}" stroke-width="1.2" opacity="0.5"/>`;
+      for(let c=0;c<6;c++){
+        svg+=`<ellipse cx="${cx-14}" cy="${ty+26+c*16}" rx="9" ry="5" fill="none" stroke="#ff8a5c" stroke-width="0.8" opacity="0.5"/>`;
+        svg+=`<ellipse cx="${cx+14}" cy="${ty+26+c*16}" rx="9" ry="5" fill="none" stroke="#ffaa7c" stroke-width="0.8" opacity="0.5"/>`;
       }
-      // Core and windings visible inside
-      svg+=`<rect x="${cx-20}" y="${ty+20}" width="14" height="${th-40}" rx="3" fill="none" stroke="${col}" stroke-width="1.5" opacity="0.5"/>`;
-      svg+=`<rect x="${cx+6}" y="${ty+20}" width="14" height="${th-40}" rx="3" fill="none" stroke="${col}" stroke-width="1.5" opacity="0.5"/>`;
-      // Winding coils
-      for(let c=0;c<5;c++){
-        svg+=`<ellipse cx="${cx-13}" cy="${ty+30+c*16}" rx="8" ry="5" fill="none" stroke="#ff8a5c" stroke-width="1" opacity="0.6"/>`;
-        svg+=`<ellipse cx="${cx+13}" cy="${ty+30+c*16}" rx="8" ry="5" fill="none" stroke="#ffaa7c" stroke-width="1" opacity="0.6"/>`;
-      }
-      // Animated magnetic field lines
-      svg+=`<ellipse cx="${cx}" cy="${ty+th/2}" rx="30" ry="50" fill="none" stroke="${col}" stroke-width="0.8" stroke-dasharray="4 6" opacity="0.3"><animate attributeName="stroke-dashoffset" values="0;20" dur="2s" repeatCount="indefinite"/></ellipse>`;
-      svg+=`<ellipse cx="${cx}" cy="${ty+th/2}" rx="38" ry="58" fill="none" stroke="${col}" stroke-width="0.5" stroke-dasharray="3 8" opacity="0.2"><animate attributeName="stroke-dashoffset" values="0;-22" dur="3s" repeatCount="indefinite"/></ellipse>`;
+      // Animated magnetic field
+      svg+=`<ellipse cx="${cx}" cy="${ty+th/2}" rx="32" ry="55" fill="none" stroke="${col}" stroke-width="0.7" stroke-dasharray="4 8" opacity="0.25"><animate attributeName="stroke-dashoffset" values="0;24" dur="2s" repeatCount="indefinite"/></ellipse>`;
       // Humming glow
-      svg+=`<rect x="${cx-tw/2}" y="${ty}" width="${tw}" height="${th}" rx="8" fill="none" stroke="${col}" stroke-width="3" opacity="0.15"><animate attributeName="opacity" values="0.1;0.25;0.1" dur="1s" repeatCount="indefinite"/></rect>`;
-      // HV/LV labels
-      svg+=`<text x="${cx-13}" y="${ty+th+14}" text-anchor="middle" font-size="8" fill="#ffaa7c">HV</text>`;
-      svg+=`<text x="${cx+13}" y="${ty+th+14}" text-anchor="middle" font-size="8" fill="#ffcc9c">LV</text>`;
-      // Bushing insulators on top
-      svg+=`<rect x="${cx-18}" y="${ty-12}" width="6" height="14" rx="2" fill="rgba(255,138,92,0.4)" stroke="${col}" stroke-width="1"/>`;
-      svg+=`<rect x="${cx+12}" y="${ty-12}" width="6" height="14" rx="2" fill="rgba(255,138,92,0.4)" stroke="${col}" stroke-width="1"/>`;
+      svg+=`<rect x="${cx-tw/2}" y="${ty}" width="${tw}" height="${th}" rx="8" fill="none" stroke="${col}" stroke-width="3" opacity="0.1"><animate attributeName="opacity" values="0.08;0.2;0.08" dur="1.2s" repeatCount="indefinite"/></rect>`;
+      // Bushings
+      svg+=`<rect x="${cx-20}" y="${ty-14}" width="7" height="16" rx="2" fill="rgba(255,138,92,0.35)" stroke="${col}" stroke-width="1"/>`;
+      svg+=`<rect x="${cx+13}" y="${ty-14}" width="7" height="16" rx="2" fill="rgba(255,138,92,0.35)" stroke="${col}" stroke-width="1"/>`;
+      // REAL trafo data overlay
+      svg+=`<rect x="${cx-tw/2-2}" y="${ty+th+4}" width="${tw+4}" height="38" rx="4" fill="rgba(0,8,16,0.9)" stroke="${col}" stroke-width="0.5"/>`;
+      svg+=`<text x="${cx}" y="${ty+th+17}" text-anchor="middle" font-size="9" fill="${col}" font-weight="700">${tSize} kVA</text>`;
+      svg+=`<text x="${cx}" y="${ty+th+28}" text-anchor="middle" font-size="7.5" fill="#ffaa7c">uk=${(tUk*100).toFixed(0)}% | In=${tIn.toFixed(0)}A</text>`;
+      // Load bar
+      const loadBarW=tw-10;
+      const loadFill=Math.min(loadBarW,loadBarW*(tLoad/100));
+      const loadCol=tLoad>90?'#ff4444':tLoad>75?'#ffd166':'#06d6a0';
+      svg+=`<rect x="${cx-loadBarW/2}" y="${ty+th+32}" width="${loadBarW}" height="5" rx="2" fill="rgba(255,255,255,0.05)"/>`;
+      svg+=`<rect x="${cx-loadBarW/2}" y="${ty+th+32}" width="${loadFill}" height="5" rx="2" fill="${loadCol}" opacity="0.7"><animate attributeName="opacity" values="0.5;0.8;0.5" dur="4s" repeatCount="indefinite"/></rect>`;
+      svg+=`<text x="${cx+loadBarW/2+5}" y="${ty+th+37}" font-size="6" fill="${loadCol}">${tLoad}%</text>`;
 
     } else if(n.type==='panel'){
-      // Main panel/switchboard - realistic cabinet with breakers
-      const ty=baseY-175, pw=80, ph=155;
-      // Cabinet body
-      svg+=`<rect x="${cx-pw/2}" y="${ty}" width="${pw}" height="${ph}" rx="4" fill="rgba(0,30,50,0.9)" stroke="${col}" stroke-width="2" filter="url(#shadow3)"/>`;
-      // Door frame (slightly open showing internal)
-      svg+=`<rect x="${cx-pw/2+3}" y="${ty+3}" width="${pw-6}" height="${ph-6}" rx="2" fill="rgba(0,50,40,0.3)" stroke="${col}" stroke-width="0.5" opacity="0.8"/>`;
-      // Busbar at top
-      svg+=`<rect x="${cx-pw/2+8}" y="${ty+10}" width="${pw-16}" height="4" rx="1" fill="#c06030" stroke="#ff8a5c" stroke-width="0.5"/>`;
-      svg+=`<rect x="${cx-pw/2+8}" y="${ty+16}" width="${pw-16}" height="4" rx="1" fill="#606060" stroke="#888" stroke-width="0.5"/>`;
-      svg+=`<rect x="${cx-pw/2+8}" y="${ty+22}" width="${pw-16}" height="4" rx="1" fill="#404040" stroke="#666" stroke-width="0.5"/>`;
-      // Rows of MCBs
-      for(let row=0;row<4;row++){
-        for(let col2=0;col2<4;col2++){
-          const bx=cx-pw/2+10+col2*17, by=ty+34+row*28;
-          svg+=`<rect x="${bx}" y="${by}" width="12" height="20" rx="1.5" fill="rgba(20,40,60,0.9)" stroke="rgba(0,255,200,0.3)" stroke-width="0.5"/>`;
-          // Toggle switch
-          svg+=`<rect x="${bx+4}" y="${by+6}" width="4" height="8" rx="1" fill="${Math.random()>0.1?'#06d6a0':'#ff4444'}" opacity="0.8"/>`;
-          // Status LED
-          const ledCol=Math.random()>0.1?'#06d6a0':'#ff4444';
-          svg+=`<circle cx="${bx+6}" cy="${by+3}" r="1.5" fill="${ledCol}"><animate attributeName="opacity" values="0.5;1;0.5" dur="${1.5+Math.random()*2}s" repeatCount="indefinite" begin="${Math.random()*2}s"/></circle>`;
+      const ty=baseY-185, pw=90, ph=165;
+      // Main cabinet
+      svg+=`<rect x="${cx-pw/2}" y="${ty}" width="${pw}" height="${ph}" rx="5" fill="rgba(0,25,45,0.92)" stroke="${col}" stroke-width="2" filter="url(#g3shadow)"/>`;
+      svg+=`<rect x="${cx-pw/2+3}" y="${ty+3}" width="${pw-6}" height="${ph-6}" rx="3" fill="rgba(0,40,60,0.2)" stroke="${col}" stroke-width="0.5" opacity="0.6"/>`;
+      // Busbars (L1 brown, L2 black, L3 grey)
+      svg+=`<rect x="${cx-pw/2+8}" y="${ty+10}" width="${pw-16}" height="4" rx="1" fill="#8B4513" stroke="#a5603a" stroke-width="0.5"/>`;
+      svg+=`<rect x="${cx-pw/2+8}" y="${ty+16}" width="${pw-16}" height="4" rx="1" fill="#444" stroke="#666" stroke-width="0.5"/>`;
+      svg+=`<rect x="${cx-pw/2+8}" y="${ty+22}" width="${pw-16}" height="4" rx="1" fill="#777" stroke="#999" stroke-width="0.5"/>`;
+      // MCB/Protection device rows based on actual loadList
+      const dispCount=Math.max(4,Math.min(16,loadCount||4));
+      const cols=Math.min(5,Math.ceil(Math.sqrt(dispCount)));
+      const rows=Math.ceil(dispCount/cols);
+      const cellW=Math.min(14,(pw-20)/cols);
+      const cellH=Math.min(22,(ph-50)/rows);
+      for(let r=0;r<rows;r++){
+        for(let c=0;c<cols;c++){
+          const ci2=r*cols+c;
+          if(ci2>=dispCount) break;
+          const bx=cx-pw/2+10+c*(cellW+2);
+          const by=ty+32+r*(cellH+4);
+          const isActive=ci2<(loadCount||4);
+          svg+=`<rect x="${bx}" y="${by}" width="${cellW}" height="${cellH}" rx="1.5" fill="rgba(15,30,50,0.9)" stroke="${isActive?'rgba(0,255,200,0.4)':'rgba(60,80,100,0.3)'}" stroke-width="0.5"/>`;
+          // Toggle
+          svg+=`<rect x="${bx+cellW/2-2}" y="${by+cellH*0.3}" width="4" height="${cellH*0.4}" rx="1" fill="${isActive?'#06d6a0':'#444'}" opacity="0.8"/>`;
+          // LED
+          svg+=`<circle cx="${bx+cellW/2}" cy="${by+3}" r="1.5" fill="${isActive?'#06d6a0':'#333'}"><animate attributeName="opacity" values="0.4;1;0.4" dur="${1.8+ci2*0.2}s" repeatCount="indefinite" begin="${ci2*0.15}s"/></circle>`;
         }
       }
-      // Door handle
-      svg+=`<rect x="${cx+pw/2-10}" y="${ty+ph/2-8}" width="3" height="16" rx="1" fill="rgba(200,200,200,0.3)"/>`;
-      // Panel breathing/pulse
-      svg+=`<rect x="${cx-pw/2}" y="${ty}" width="${pw}" height="${ph}" rx="4" fill="none" stroke="${col}" stroke-width="2" opacity="0.2"><animate attributeName="opacity" values="0.15;0.3;0.15" dur="4s" repeatCount="indefinite"/></rect>`;
+      // Protection device label
+      svg+=`<rect x="${cx-pw/2-2}" y="${ty+ph+4}" width="${pw+4}" height="26" rx="4" fill="rgba(0,8,16,0.9)" stroke="${col}" stroke-width="0.5"/>`;
+      svg+=`<text x="${cx}" y="${ty+ph+17}" text-anchor="middle" font-size="8" fill="${protInsufficient?'#ff4444':col}" font-weight="700">${protName}</text>`;
+      svg+=`<text x="${cx}" y="${ty+ph+27}" text-anchor="middle" font-size="7" fill="#6a9aba">${loadCount||'--'} ${lang==='da'?'grupper':'circuits'} | IB=${ib.toFixed(0)}A</text>`;
+      // Warning flash if protection insufficient
+      if(protInsufficient){
+        svg+=`<rect x="${cx-pw/2}" y="${ty}" width="${pw}" height="${ph}" rx="5" fill="none" stroke="#ff4444" stroke-width="3" opacity="0.3"><animate attributeName="opacity" values="0.1;0.5;0.1" dur="1s" repeatCount="indefinite"/></rect>`;
+      }
 
     } else if(n.type==='subpan'){
-      // Sub-panel - smaller cabinet
-      const ty=baseY-140, pw=60, ph=120;
-      svg+=`<rect x="${cx-pw/2}" y="${ty}" width="${pw}" height="${ph}" rx="3" fill="rgba(0,25,45,0.9)" stroke="${col}" stroke-width="1.5" filter="url(#shadow3)"/>`;
-      svg+=`<rect x="${cx-pw/2+3}" y="${ty+3}" width="${pw-6}" height="${ph-6}" rx="2" fill="rgba(0,40,60,0.3)" stroke="${col}" stroke-width="0.5"/>`;
-      // Mini busbar
-      svg+=`<rect x="${cx-pw/2+6}" y="${ty+8}" width="${pw-12}" height="3" rx="1" fill="#c06030" opacity="0.7"/>`;
-      // MCBs (fewer)
-      for(let row=0;row<3;row++){
-        for(let col2=0;col2<3;col2++){
-          const bx=cx-pw/2+8+col2*16, by=ty+18+row*30;
-          svg+=`<rect x="${bx}" y="${by}" width="10" height="22" rx="1" fill="rgba(20,35,55,0.9)" stroke="rgba(159,230,255,0.3)" stroke-width="0.5"/>`;
-          svg+=`<circle cx="${bx+5}" cy="${by+3}" r="1.5" fill="#06d6a0"><animate attributeName="opacity" values="0.4;1;0.4" dur="${2+Math.random()}s" repeatCount="indefinite"/></circle>`;
+      const ty=baseY-150, pw=65, ph=125;
+      svg+=`<rect x="${cx-pw/2}" y="${ty}" width="${pw}" height="${ph}" rx="4" fill="rgba(0,22,40,0.9)" stroke="${col}" stroke-width="1.5" filter="url(#g3shadow)"/>`;
+      svg+=`<rect x="${cx-pw/2+3}" y="${ty+3}" width="${pw-6}" height="${ph-6}" rx="2" fill="rgba(0,35,55,0.25)" stroke="${col}" stroke-width="0.5"/>`;
+      svg+=`<rect x="${cx-pw/2+6}" y="${ty+8}" width="${pw-12}" height="3" rx="1" fill="#8B4513" opacity="0.7"/>`;
+      for(let r=0;r<3;r++){
+        for(let c=0;c<3;c++){
+          const bx=cx-pw/2+8+c*17, by=ty+18+r*32;
+          svg+=`<rect x="${bx}" y="${by}" width="12" height="24" rx="1.5" fill="rgba(15,30,50,0.9)" stroke="rgba(159,230,255,0.3)" stroke-width="0.5"/>`;
+          svg+=`<circle cx="${bx+6}" cy="${by+3}" r="1.5" fill="#06d6a0"><animate attributeName="opacity" values="0.4;1;0.4" dur="${2+r*0.5}s" repeatCount="indefinite"/></circle>`;
         }
       }
-      // Pulse
-      svg+=`<rect x="${cx-pw/2}" y="${ty}" width="${pw}" height="${ph}" rx="3" fill="none" stroke="${col}" stroke-width="1.5" opacity="0.15"><animate attributeName="opacity" values="0.1;0.25;0.1" dur="5s" repeatCount="indefinite"/></rect>`;
+      svg+=`<rect x="${cx-pw/2}" y="${ty}" width="${pw}" height="${ph}" rx="4" fill="none" stroke="${col}" stroke-width="1.5" opacity="0.12"><animate attributeName="opacity" values="0.08;0.2;0.08" dur="5s" repeatCount="indefinite"/></rect>`;
 
     } else if(n.type==='motor'){
-      // Rotating motor with shaft
-      const my=baseY-90, mr=42;
-      // Motor housing (cylindrical body)
-      svg+=`<ellipse cx="${cx}" cy="${my}" rx="${mr}" ry="${mr*0.7}" fill="url(#${uid}body)" stroke="${col}" stroke-width="2" filter="url(#shadow3)"/>`;
-      // End bell detail
-      svg+=`<ellipse cx="${cx}" cy="${my}" rx="${mr-8}" ry="${mr*0.5}" fill="none" stroke="${col}" stroke-width="1" opacity="0.5"/>`;
-      // Cooling fins on body
+      const my=baseY-95, mr=45;
+      // Motor body
+      svg+=`<ellipse cx="${cx}" cy="${my}" rx="${mr}" ry="${mr*0.7}" fill="url(#${uid}bg)" stroke="${col}" stroke-width="2" filter="url(#g3shadow)"/>`;
+      svg+=`<ellipse cx="${cx}" cy="${my}" rx="${mr-10}" ry="${mr*0.5}" fill="none" stroke="${col}" stroke-width="0.8" opacity="0.4"/>`;
+      // Cooling fins
       for(let f=0;f<8;f++){
         const angle=f*Math.PI/4;
-        const fx1=cx+Math.cos(angle)*(mr-2), fy1=my+Math.sin(angle)*(mr*0.65);
-        const fx2=cx+Math.cos(angle)*(mr+5), fy2=my+Math.sin(angle)*(mr*0.8);
-        svg+=`<line x1="${fx1}" y1="${fy1}" x2="${fx2}" y2="${fy2}" stroke="${col}" stroke-width="1" opacity="0.4"/>`;
+        svg+=`<line x1="${cx+Math.cos(angle)*(mr-2)}" y1="${my+Math.sin(angle)*(mr*0.65)}" x2="${cx+Math.cos(angle)*(mr+6)}" y2="${my+Math.sin(angle)*(mr*0.8)}" stroke="${col}" stroke-width="1" opacity="0.35"/>`;
       }
-      // Rotating shaft
-      svg+=`<line x1="${cx+mr}" y1="${my}" x2="${cx+mr+25}" y2="${my}" stroke="#888" stroke-width="4" stroke-linecap="round"/>`;
-      // Spinning indicator (animated rotating element)
+      // Shaft
+      svg+=`<line x1="${cx+mr}" y1="${my}" x2="${cx+mr+28}" y2="${my}" stroke="#888" stroke-width="5" stroke-linecap="round"/>`;
+      // Spinning rotor
       svg+=`<g style="transform-origin:${cx}px ${my}px;animation:motorSpin 2s linear infinite">`;
-      svg+=`<line x1="${cx-20}" y1="${my}" x2="${cx+20}" y2="${my}" stroke="${col}" stroke-width="2" opacity="0.7"/>`;
-      svg+=`<line x1="${cx}" y1="${my-15}" x2="${cx}" y2="${my+15}" stroke="${col}" stroke-width="2" opacity="0.7"/>`;
-      svg+=`<line x1="${cx-14}" y1="${my-14}" x2="${cx+14}" y2="${my+14}" stroke="${col}" stroke-width="1.5" opacity="0.5"/>`;
-      svg+=`<line x1="${cx+14}" y1="${my-14}" x2="${cx-14}" y2="${my+14}" stroke="${col}" stroke-width="1.5" opacity="0.5"/>`;
+      svg+=`<line x1="${cx-22}" y1="${my}" x2="${cx+22}" y2="${my}" stroke="${col}" stroke-width="2" opacity="0.6"/>`;
+      svg+=`<line x1="${cx}" y1="${my-16}" x2="${cx}" y2="${my+16}" stroke="${col}" stroke-width="2" opacity="0.6"/>`;
+      svg+=`<line x1="${cx-15}" y1="${my-15}" x2="${cx+15}" y2="${my+15}" stroke="${col}" stroke-width="1.5" opacity="0.4"/>`;
+      svg+=`<line x1="${cx+15}" y1="${my-15}" x2="${cx-15}" y2="${my+15}" stroke="${col}" stroke-width="1.5" opacity="0.4"/>`;
       svg+=`</g>`;
-      // Center bearing
-      svg+=`<circle cx="${cx}" cy="${my}" r="6" fill="rgba(0,20,40,0.9)" stroke="${col}" stroke-width="1.5"/>`;
-      // Vibration effect
-      svg+=`<ellipse cx="${cx}" cy="${my}" rx="${mr}" ry="${mr*0.7}" fill="none" stroke="${col}" stroke-width="1" opacity="0.2"><animate attributeName="rx" values="${mr};${mr+1};${mr}" dur="0.15s" repeatCount="indefinite"/></ellipse>`;
-      // Base/mount
-      svg+=`<rect x="${cx-25}" y="${my+mr*0.65}" width="50" height="8" rx="2" fill="rgba(60,80,100,0.5)" stroke="${col}" stroke-width="0.8"/>`;
-      svg+=`<line x1="${cx-20}" y1="${my+mr*0.65+8}" x2="${cx-20}" y2="${baseY}" stroke="rgba(100,120,140,0.4)" stroke-width="2"/>`;
-      svg+=`<line x1="${cx+20}" y1="${my+mr*0.65+8}" x2="${cx+20}" y2="${baseY}" stroke="rgba(100,120,140,0.4)" stroke-width="2"/>`;
+      svg+=`<circle cx="${cx}" cy="${my}" r="6" fill="rgba(0,15,30,0.9)" stroke="${col}" stroke-width="1.5"/>`;
+      // Vibration
+      svg+=`<ellipse cx="${cx}" cy="${my}" rx="${mr}" ry="${mr*0.7}" fill="none" stroke="${col}" stroke-width="1" opacity="0.15"><animate attributeName="rx" values="${mr};${mr+1.5};${mr}" dur="0.12s" repeatCount="indefinite"/></ellipse>`;
+      // Motor base
+      svg+=`<rect x="${cx-28}" y="${my+mr*0.65}" width="56" height="8" rx="2" fill="rgba(50,70,90,0.5)" stroke="${col}" stroke-width="0.7"/>`;
+      svg+=`<line x1="${cx-22}" y1="${my+mr*0.65+8}" x2="${cx-22}" y2="${baseY}" stroke="rgba(90,110,130,0.4)" stroke-width="2"/>`;
+      svg+=`<line x1="${cx+22}" y1="${my+mr*0.65+8}" x2="${cx+22}" y2="${baseY}" stroke="rgba(90,110,130,0.4)" stroke-width="2"/>`;
+      // kW label for motor
+      svg+=`<text x="${cx}" y="${my+mr*0.7+24}" text-anchor="middle" font-size="8" fill="${col}" font-weight="600">${totalKW.toFixed(1)} kW</text>`;
 
     } else if(n.type==='ev'){
-      // EV charger with pulsing cable and car silhouette
-      const ty=baseY-155;
-      // Charging station body
-      svg+=`<rect x="${cx-18}" y="${ty}" width="36" height="100" rx="6" fill="rgba(0,30,20,0.9)" stroke="${col}" stroke-width="2" filter="url(#shadow3)"/>`;
+      const ty=baseY-160;
+      // Charging station
+      svg+=`<rect x="${cx-20}" y="${ty}" width="40" height="110" rx="7" fill="rgba(0,28,18,0.9)" stroke="${col}" stroke-width="2" filter="url(#g3shadow)"/>`;
       // Screen
-      svg+=`<rect x="${cx-12}" y="${ty+8}" width="24" height="18" rx="2" fill="rgba(0,40,20,0.8)" stroke="${col}" stroke-width="1"/>`;
-      svg+=`<text x="${cx}" y="${ty+21}" text-anchor="middle" font-size="7" fill="${col}" font-weight="700">11 kW</text>`;
-      // Charging indicator LEDs
-      for(let l=0;l<4;l++){
-        svg+=`<circle cx="${cx-8+l*5.5}" cy="${ty+32}" r="2" fill="${col}"><animate attributeName="opacity" values="0.2;1;0.2" dur="1s" repeatCount="indefinite" begin="${l*0.25}s"/></circle>`;
+      svg+=`<rect x="${cx-14}" y="${ty+8}" width="28" height="20" rx="3" fill="rgba(0,35,20,0.85)" stroke="${col}" stroke-width="1"/>`;
+      svg+=`<text x="${cx}" y="${ty+22}" text-anchor="middle" font-size="7.5" fill="${col}" font-weight="700">${totalKW.toFixed(0)} kW</text>`;
+      // LED sequence
+      for(let l=0;l<5;l++){
+        svg+=`<circle cx="${cx-10+l*5}" cy="${ty+34}" r="2" fill="${col}"><animate attributeName="opacity" values="0.15;1;0.15" dur="1.2s" repeatCount="indefinite" begin="${l*0.2}s"/></circle>`;
       }
-      // Pulsing cable coming out
-      svg+=`<path d="M${cx+18},${ty+60} C${cx+35},${ty+70} ${cx+40},${ty+90} ${cx+30},${ty+110}" fill="none" stroke="${col}" stroke-width="4" stroke-linecap="round" opacity="0.8"><animate attributeName="stroke-width" values="3;5;3" dur="2s" repeatCount="indefinite"/></path>`;
-      svg+=`<circle cx="${cx+30}" cy="${ty+110}" r="4" fill="${col}" opacity="0.8"><animate attributeName="opacity" values="0.4;1;0.4" dur="1s" repeatCount="indefinite"/></circle>`;
+      // Charging cable
+      svg+=`<path d="M${cx+20},${ty+65} C${cx+38},${ty+75} ${cx+42},${ty+95} ${cx+32},${ty+115}" fill="none" stroke="${col}" stroke-width="4" stroke-linecap="round" opacity="0.8"><animate attributeName="stroke-width" values="3;5;3" dur="2s" repeatCount="indefinite"/></path>`;
+      svg+=`<circle cx="${cx+32}" cy="${ty+115}" r="4" fill="${col}" opacity="0.7"><animate attributeName="opacity" values="0.3;1;0.3" dur="1s" repeatCount="indefinite"/></circle>`;
       // Car silhouette
-      svg+=`<path d="M${cx-40},${baseY-10} L${cx-35},${baseY-25} L${cx-20},${baseY-35} L${cx+15},${baseY-35} L${cx+30},${baseY-25} L${cx+35},${baseY-10} Z" fill="rgba(60,80,60,0.4)" stroke="${col}" stroke-width="1" opacity="0.6"/>`;
-      // Wheels
-      svg+=`<circle cx="${cx-25}" cy="${baseY-8}" r="6" fill="rgba(30,40,30,0.6)" stroke="rgba(100,130,100,0.4)" stroke-width="1.5"/>`;
-      svg+=`<circle cx="${cx+22}" cy="${baseY-8}" r="6" fill="rgba(30,40,30,0.6)" stroke="rgba(100,130,100,0.4)" stroke-width="1.5"/>`;
-      // Charging energy flow on cable
-      svg+=`<circle r="2.5" fill="#fff" opacity="0" filter="url(#glow2)"><animateMotion path="M${cx+18},${ty+60} C${cx+35},${ty+70} ${cx+40},${ty+90} ${cx+30},${ty+110}" dur="1.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;0" dur="1.5s" repeatCount="indefinite"/></circle>`;
+      svg+=`<path d="M${cx-42},${baseY-8} L${cx-37},${baseY-24} L${cx-22},${baseY-34} L${cx+17},${baseY-34} L${cx+32},${baseY-24} L${cx+37},${baseY-8} Z" fill="rgba(50,70,50,0.35)" stroke="${col}" stroke-width="1" opacity="0.6"/>`;
+      svg+=`<circle cx="${cx-27}" cy="${baseY-6}" r="6" fill="rgba(25,35,25,0.5)" stroke="rgba(80,120,80,0.4)" stroke-width="1.5"/>`;
+      svg+=`<circle cx="${cx+24}" cy="${baseY-6}" r="6" fill="rgba(25,35,25,0.5)" stroke="rgba(80,120,80,0.4)" stroke-width="1.5"/>`;
+      // Energy particles on cable
+      svg+=`<circle r="2.5" fill="#fff" opacity="0" filter="url(#g3glow3)"><animateMotion path="M${cx+20},${ty+65} C${cx+38},${ty+75} ${cx+42},${ty+95} ${cx+32},${ty+115}" dur="1.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;0" dur="1.5s" repeatCount="indefinite"/></circle>`;
 
     } else if(n.type==='pv'){
-      // Solar panels with sun rays and energy flow
-      const ty=baseY-170;
-      // Panel mounting frame
-      svg+=`<line x1="${cx}" y1="${baseY}" x2="${cx}" y2="${ty+60}" stroke="rgba(100,120,140,0.5)" stroke-width="3"/>`;
-      svg+=`<line x1="${cx-35}" y1="${ty+60}" x2="${cx+35}" y2="${ty+60}" stroke="rgba(100,120,140,0.5)" stroke-width="2"/>`;
-      // Solar panels (tilted rectangles)
-      svg+=`<g transform="rotate(-15,${cx},${ty+40})">`;
+      const ty=baseY-180;
+      svg+=`<line x1="${cx}" y1="${baseY}" x2="${cx}" y2="${ty+65}" stroke="rgba(100,120,140,0.5)" stroke-width="3"/>`;
+      svg+=`<line x1="${cx-38}" y1="${ty+65}" x2="${cx+38}" y2="${ty+65}" stroke="rgba(100,120,140,0.5)" stroke-width="2"/>`;
+      svg+=`<g transform="rotate(-15,${cx},${ty+42})">`;
       for(let r=0;r<2;r++){
         for(let c=0;c<3;c++){
-          const px=cx-30+c*22, py=ty+10+r*28;
-          svg+=`<rect x="${px}" y="${py}" width="20" height="25" rx="1" fill="rgba(20,40,80,0.9)" stroke="#4488cc" stroke-width="1"/>`;
-          // Grid lines on panel
-          svg+=`<line x1="${px}" y1="${py+12}" x2="${px+20}" y2="${py+12}" stroke="#335577" stroke-width="0.5"/>`;
-          svg+=`<line x1="${px+10}" y1="${py}" x2="${px+10}" y2="${py+25}" stroke="#335577" stroke-width="0.5"/>`;
+          const px=cx-32+c*24, py=ty+10+r*30;
+          svg+=`<rect x="${px}" y="${py}" width="22" height="27" rx="1" fill="rgba(15,35,75,0.9)" stroke="#4488cc" stroke-width="1"/>`;
+          svg+=`<line x1="${px}" y1="${py+13}" x2="${px+22}" y2="${py+13}" stroke="#335577" stroke-width="0.5"/>`;
+          svg+=`<line x1="${px+11}" y1="${py}" x2="${px+11}" y2="${py+27}" stroke="#335577" stroke-width="0.5"/>`;
         }
       }
       svg+=`</g>`;
-      // Animated sun rays
-      svg+=`<circle cx="${cx+40}" cy="${ty-10}" r="12" fill="#ffee55" opacity="0.3" filter="url(#glow8)"><animate attributeName="opacity" values="0.2;0.5;0.2" dur="3s" repeatCount="indefinite"/></circle>`;
+      // Sun
+      svg+=`<circle cx="${cx+42}" cy="${ty-12}" r="14" fill="#ffee55" opacity="0.25" filter="url(#g3glow10)"><animate attributeName="opacity" values="0.15;0.4;0.15" dur="3s" repeatCount="indefinite"/></circle>`;
       for(let r=0;r<6;r++){
         const angle=r*Math.PI/3;
-        const rx1=cx+40+Math.cos(angle)*14, ry1=ty-10+Math.sin(angle)*14;
-        const rx2=cx+40+Math.cos(angle)*22, ry2=ty-10+Math.sin(angle)*22;
-        svg+=`<line x1="${rx1}" y1="${ry1}" x2="${rx2}" y2="${ry2}" stroke="#ffee55" stroke-width="1.5" opacity="0.4"><animate attributeName="opacity" values="0.2;0.7;0.2" dur="2s" repeatCount="indefinite" begin="${r*0.3}s"/></line>`;
+        svg+=`<line x1="${cx+42+Math.cos(angle)*16}" y1="${ty-12+Math.sin(angle)*16}" x2="${cx+42+Math.cos(angle)*24}" y2="${ty-12+Math.sin(angle)*24}" stroke="#ffee55" stroke-width="1.5" opacity="0.35"><animate attributeName="opacity" values="0.15;0.6;0.15" dur="2s" repeatCount="indefinite" begin="${r*0.3}s"/></line>`;
       }
-      // Energy flowing down from panels
-      svg+=`<circle r="3" fill="#ffee55" opacity="0" filter="url(#glow2)"><animate attributeName="cy" from="${ty+60}" to="${baseY}" dur="2s" repeatCount="indefinite"/><animate attributeName="cx" values="${cx};${cx+2};${cx}" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;0.8;0" dur="2s" repeatCount="indefinite"/></circle>`;
-      svg+=`<circle r="2" fill="#aaff55" opacity="0" filter="url(#glow2)"><animate attributeName="cy" from="${ty+60}" to="${baseY}" dur="2s" repeatCount="indefinite" begin="1s"/><animate attributeName="cx" values="${cx};${cx-2};${cx}" dur="2s" repeatCount="indefinite" begin="1s"/><animate attributeName="opacity" values="0;0.6;0" dur="2s" repeatCount="indefinite" begin="1s"/></circle>`;
+      // Energy flow
+      svg+=`<circle r="3" fill="#ffee55" opacity="0" filter="url(#g3glow3)"><animate attributeName="cy" from="${ty+65}" to="${baseY}" dur="2s" repeatCount="indefinite"/><animate attributeName="cx" values="${cx};${cx+2};${cx}" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;0.8;0" dur="2s" repeatCount="indefinite"/></circle>`;
 
     } else if(n.type==='battery'){
-      // Battery with animated charge level
-      const ty=baseY-130, bw2=50, bh2=100;
-      // Battery body
-      svg+=`<rect x="${cx-bw2/2}" y="${ty}" width="${bw2}" height="${bh2}" rx="5" fill="rgba(0,30,30,0.9)" stroke="${col}" stroke-width="2" filter="url(#shadow3)"/>`;
-      // Terminal
-      svg+=`<rect x="${cx-8}" y="${ty-8}" width="16" height="10" rx="2" fill="rgba(40,80,60,0.6)" stroke="${col}" stroke-width="1"/>`;
-      // Charge level (animated fill)
+      const ty=baseY-140, bw2=52, bh2=108;
+      svg+=`<rect x="${cx-bw2/2}" y="${ty}" width="${bw2}" height="${bh2}" rx="6" fill="rgba(0,28,28,0.9)" stroke="${col}" stroke-width="2" filter="url(#g3shadow)"/>`;
+      svg+=`<rect x="${cx-9}" y="${ty-9}" width="18" height="11" rx="3" fill="rgba(35,75,55,0.6)" stroke="${col}" stroke-width="1"/>`;
       const chargeH=bh2*0.7;
-      svg+=`<rect x="${cx-bw2/2+5}" y="${ty+bh2-chargeH-5}" width="${bw2-10}" height="${chargeH}" rx="3" fill="${col}" opacity="0.2"/>`;
-      svg+=`<rect x="${cx-bw2/2+5}" y="${ty+bh2-chargeH*0.75-5}" width="${bw2-10}" height="${chargeH*0.75}" rx="3" fill="${col}" opacity="0.15"><animate attributeName="height" values="${chargeH*0.6};${chargeH*0.8};${chargeH*0.6}" dur="6s" repeatCount="indefinite"/></rect>`;
-      // Charge percentage text
-      svg+=`<text x="${cx}" y="${ty+bh2/2+5}" text-anchor="middle" font-size="14" fill="${col}" font-weight="700" opacity="0.9">78%</text>`;
-      // Segment lines
+      svg+=`<rect x="${cx-bw2/2+5}" y="${ty+bh2-chargeH-5}" width="${bw2-10}" height="${chargeH}" rx="4" fill="${col}" opacity="0.15"/>`;
+      svg+=`<rect x="${cx-bw2/2+5}" y="${ty+bh2-chargeH*0.75-5}" width="${bw2-10}" height="${chargeH*0.75}" rx="4" fill="${col}" opacity="0.12"><animate attributeName="height" values="${chargeH*0.6};${chargeH*0.8};${chargeH*0.6}" dur="6s" repeatCount="indefinite"/></rect>`;
+      svg+=`<text x="${cx}" y="${ty+bh2/2+5}" text-anchor="middle" font-size="13" fill="${col}" font-weight="700" opacity="0.85">78%</text>`;
       for(let s=0;s<4;s++){
-        svg+=`<line x1="${cx-bw2/2+5}" y1="${ty+15+s*20}" x2="${cx+bw2/2-5}" y2="${ty+15+s*20}" stroke="${col}" stroke-width="0.5" opacity="0.3"/>`;
+        svg+=`<line x1="${cx-bw2/2+5}" y1="${ty+15+s*22}" x2="${cx+bw2/2-5}" y2="${ty+15+s*22}" stroke="${col}" stroke-width="0.5" opacity="0.25"/>`;
       }
-      // Charging indicator
-      svg+=`<path d="M${cx-4},${ty+25} L${cx+2},${ty+35} L${cx-1},${ty+35} L${cx+4},${ty+45} L${cx-2},${ty+37} L${cx+1},${ty+37} Z" fill="${col}" opacity="0.6"><animate attributeName="opacity" values="0.3;0.8;0.3" dur="2s" repeatCount="indefinite"/></path>`;
+      svg+=`<path d="M${cx-4},${ty+22} L${cx+2},${ty+33} L${cx-1},${ty+33} L${cx+4},${ty+44} L${cx-2},${ty+35} L${cx+1},${ty+35} Z" fill="${col}" opacity="0.5"><animate attributeName="opacity" values="0.25;0.7;0.25" dur="2s" repeatCount="indefinite"/></path>`;
 
     } else if(n.type==='gen'){
-      // Generator with animated exhaust and vibration
-      const ty=baseY-130, gw=65, gh=100;
-      // Generator housing
-      svg+=`<rect x="${cx-gw/2}" y="${ty}" width="${gw}" height="${gh}" rx="6" fill="rgba(40,25,10,0.8)" stroke="${col}" stroke-width="2" filter="url(#shadow3)"/>`;
-      // Engine details
-      svg+=`<rect x="${cx-gw/2+5}" y="${ty+10}" width="${gw-10}" height="${gh/2}" rx="3" fill="none" stroke="${col}" stroke-width="1" opacity="0.5"/>`;
-      // Exhaust pipe
-      svg+=`<rect x="${cx+gw/2-5}" y="${ty-20}" width="8" height="25" rx="2" fill="rgba(80,60,40,0.7)" stroke="${col}" stroke-width="1"/>`;
-      // Animated exhaust puffs
+      const ty=baseY-140, gw=68, gh=110;
+      svg+=`<rect x="${cx-gw/2}" y="${ty}" width="${gw}" height="${gh}" rx="6" fill="rgba(35,22,8,0.8)" stroke="${col}" stroke-width="2" filter="url(#g3shadow)"/>`;
+      svg+=`<rect x="${cx-gw/2+5}" y="${ty+10}" width="${gw-10}" height="${gh/2}" rx="4" fill="none" stroke="${col}" stroke-width="1" opacity="0.4"/>`;
+      svg+=`<rect x="${cx+gw/2-5}" y="${ty-22}" width="9" height="27" rx="2" fill="rgba(70,50,35,0.7)" stroke="${col}" stroke-width="1"/>`;
       for(let p=0;p<3;p++){
-        svg+=`<circle cx="${cx+gw/2}" cy="${ty-25-p*12}" r="${4+p*2}" fill="rgba(150,150,150,0.15)" stroke="none"><animate attributeName="cy" from="${ty-20}" to="${ty-60}" dur="${2+p*0.5}s" repeatCount="indefinite" begin="${p*0.6}s"/><animate attributeName="r" from="3" to="${8+p*3}" dur="${2+p*0.5}s" repeatCount="indefinite" begin="${p*0.6}s"/><animate attributeName="opacity" values="0.3;0.1;0" dur="${2+p*0.5}s" repeatCount="indefinite" begin="${p*0.6}s"/></circle>`;
+        svg+=`<circle cx="${cx+gw/2}" cy="${ty-28-p*14}" r="${4+p*2.5}" fill="rgba(140,140,140,0.12)" stroke="none"><animate attributeName="cy" from="${ty-22}" to="${ty-65}" dur="${2+p*0.5}s" repeatCount="indefinite" begin="${p*0.6}s"/><animate attributeName="r" from="3" to="${9+p*3}" dur="${2+p*0.5}s" repeatCount="indefinite" begin="${p*0.6}s"/><animate attributeName="opacity" values="0.25;0.08;0" dur="${2+p*0.5}s" repeatCount="indefinite" begin="${p*0.6}s"/></circle>`;
       }
-      // Vibration lines
-      svg+=`<line x1="${cx-gw/2-5}" y1="${ty+gh/2}" x2="${cx-gw/2-12}" y2="${ty+gh/2-3}" stroke="${col}" stroke-width="1" opacity="0.4"><animate attributeName="opacity" values="0;0.6;0" dur="0.3s" repeatCount="indefinite"/></line>`;
-      svg+=`<line x1="${cx-gw/2-5}" y1="${ty+gh/2+5}" x2="${cx-gw/2-10}" y2="${ty+gh/2+8}" stroke="${col}" stroke-width="1" opacity="0.3"><animate attributeName="opacity" values="0;0.5;0" dur="0.4s" repeatCount="indefinite" begin="0.15s"/></line>`;
-      // RPM indicator
-      svg+=`<text x="${cx}" y="${ty+gh-10}" text-anchor="middle" font-size="9" fill="${col}" font-weight="600">1500 RPM</text>`;
-      // Vibration on body
-      svg+=`<rect x="${cx-gw/2}" y="${ty}" width="${gw}" height="${gh}" rx="6" fill="none" stroke="${col}" stroke-width="1" opacity="0.2"><animate attributeName="x" values="${cx-gw/2};${cx-gw/2+1};${cx-gw/2-1};${cx-gw/2}" dur="0.2s" repeatCount="indefinite"/></rect>`;
+      svg+=`<line x1="${cx-gw/2-5}" y1="${ty+gh/2}" x2="${cx-gw/2-13}" y2="${ty+gh/2-3}" stroke="${col}" stroke-width="1" opacity="0.3"><animate attributeName="opacity" values="0;0.5;0" dur="0.3s" repeatCount="indefinite"/></line>`;
+      svg+=`<text x="${cx}" y="${ty+gh-12}" text-anchor="middle" font-size="9" fill="${col}" font-weight="600">1500 RPM</text>`;
+      svg+=`<rect x="${cx-gw/2}" y="${ty}" width="${gw}" height="${gh}" rx="6" fill="none" stroke="${col}" stroke-width="1" opacity="0.15"><animate attributeName="x" values="${cx-gw/2};${cx-gw/2+1};${cx-gw/2-1};${cx-gw/2}" dur="0.2s" repeatCount="indefinite"/></rect>`;
 
     } else if(n.type==='load'){
-      // House/building with lights
-      const ty=baseY-150;
-      // Building shape
-      svg+=`<path d="M${cx-35},${baseY} L${cx-35},${ty+30} L${cx},${ty} L${cx+35},${ty+30} L${cx+35},${baseY} Z" fill="rgba(20,30,50,0.8)" stroke="${col}" stroke-width="1.5" filter="url(#shadow3)"/>`;
-      // Roof
-      svg+=`<path d="M${cx-40},${ty+30} L${cx},${ty-5} L${cx+40},${ty+30} Z" fill="rgba(40,30,20,0.5)" stroke="${col}" stroke-width="1"/>`;
-      // Windows with flickering lights
-      const wins=[{x:cx-22,y:ty+40},{x:cx+8,y:ty+40},{x:cx-22,y:ty+75},{x:cx+8,y:ty+75}];
-      wins.forEach((w,wi)=>{
-        svg+=`<rect x="${w.x}" y="${w.y}" width="16" height="20" rx="1" fill="rgba(255,220,100,0.15)" stroke="${col}" stroke-width="0.5"/>`;
-        svg+=`<rect x="${w.x+2}" y="${w.y+2}" width="12" height="16" rx="1" fill="rgba(255,200,50,0.3)"><animate attributeName="opacity" values="0.2;0.5;0.3;0.5;0.2" dur="${3+wi*0.7}s" repeatCount="indefinite" begin="${wi*0.5}s"/></rect>`;
-      });
-      // Door
-      svg+=`<rect x="${cx-7}" y="${baseY-30}" width="14" height="30" rx="2" fill="rgba(60,40,20,0.6)" stroke="${col}" stroke-width="0.8"/>`;
-      // Chimney
-      svg+=`<rect x="${cx+15}" y="${ty+5}" width="8" height="25" fill="rgba(60,40,30,0.6)" stroke="${col}" stroke-width="0.5"/>`;
+      const ty=baseY-155;
+      // Building with real consumer count
+      svg+=`<path d="M${cx-38},${baseY} L${cx-38},${ty+30} L${cx},${ty} L${cx+38},${ty+30} L${cx+38},${baseY} Z" fill="rgba(18,28,45,0.8)" stroke="${col}" stroke-width="1.5" filter="url(#g3shadow)"/>`;
+      svg+=`<path d="M${cx-43},${ty+30} L${cx},${ty-6} L${cx+43},${ty+30} Z" fill="rgba(35,25,15,0.5)" stroke="${col}" stroke-width="1"/>`;
+      // Windows showing consumers
+      const wCount=Math.min(6,Math.max(2,loadCount||4));
+      const wCols=Math.min(3,wCount);
+      const wRows=Math.ceil(wCount/wCols);
+      for(let r=0;r<wRows;r++){
+        for(let c=0;c<wCols;c++){
+          if(r*wCols+c>=wCount) break;
+          const wx=cx-25+c*22, wy=ty+38+r*38;
+          svg+=`<rect x="${wx}" y="${wy}" width="16" height="20" rx="1" fill="rgba(255,220,100,0.1)" stroke="${col}" stroke-width="0.5"/>`;
+          svg+=`<rect x="${wx+2}" y="${wy+2}" width="12" height="16" rx="1" fill="rgba(255,200,50,0.25)"><animate attributeName="opacity" values="0.15;0.45;0.2;0.4;0.15" dur="${2.5+(r*wCols+c)*0.6}s" repeatCount="indefinite" begin="${(r*wCols+c)*0.3}s"/></rect>`;
+        }
+      }
+      svg+=`<rect x="${cx-8}" y="${baseY-28}" width="16" height="28" rx="2" fill="rgba(50,35,18,0.6)" stroke="${col}" stroke-width="0.7"/>`;
+      // Consumer count label
+      svg+=`<text x="${cx}" y="${ty-12}" text-anchor="middle" font-size="9" fill="${col}" font-weight="700">${loadCount||'--'} ${lang==='da'?'forbr.':'loads'}</text>`;
+      svg+=`<text x="${cx}" y="${ty-24}" text-anchor="middle" font-size="8" fill="#7ab0cc">${totalKW.toFixed(1)} kW</text>`;
 
     } else if(n.type==='meter'){
-      // Energy meter
-      const ty=baseY-130, mw=40, mh=100;
-      svg+=`<rect x="${cx-mw/2}" y="${ty}" width="${mw}" height="${mh}" rx="4" fill="rgba(10,20,30,0.9)" stroke="${col}" stroke-width="2" filter="url(#shadow3)"/>`;
-      // Display
-      svg+=`<rect x="${cx-mw/2+5}" y="${ty+10}" width="${mw-10}" height="25" rx="2" fill="rgba(0,20,10,0.8)" stroke="${col}" stroke-width="0.5"/>`;
-      svg+=`<text x="${cx}" y="${ty+27}" text-anchor="middle" font-size="8" fill="${col}" font-weight="700">42.7 kWh</text>`;
-      // Spinning disc indicator
-      svg+=`<circle cx="${cx}" cy="${ty+55}" r="12" fill="none" stroke="${col}" stroke-width="1" opacity="0.5"/>`;
-      svg+=`<line x1="${cx}" y1="${ty+55}" x2="${cx+10}" y2="${ty+55}" stroke="${col}" stroke-width="2" opacity="0.8" style="transform-origin:${cx}px ${ty+55}px;animation:motorSpin 3s linear infinite"/>`;
-      // Blinking comm LED
-      svg+=`<circle cx="${cx+mw/2-8}" cy="${ty+mh-8}" r="2" fill="#06d6a0"><animate attributeName="opacity" values="0;1;0" dur="1s" repeatCount="indefinite"/></circle>`;
+      const ty=baseY-140, mw=44, mh=108;
+      svg+=`<rect x="${cx-mw/2}" y="${ty}" width="${mw}" height="${mh}" rx="5" fill="rgba(8,18,28,0.92)" stroke="${col}" stroke-width="2" filter="url(#g3shadow)"/>`;
+      svg+=`<rect x="${cx-mw/2+5}" y="${ty+10}" width="${mw-10}" height="28" rx="3" fill="rgba(0,18,10,0.85)" stroke="${col}" stroke-width="0.5"/>`;
+      svg+=`<text x="${cx}" y="${ty+28}" text-anchor="middle" font-size="8" fill="${col}" font-weight="700">${totalKW.toFixed(1)} kW</text>`;
+      svg+=`<text x="${cx}" y="${ty+36}" text-anchor="middle" font-size="6.5" fill="#6a9aba">${totalKVA.toFixed(1)} kVA</text>`;
+      // Spinning disc
+      svg+=`<circle cx="${cx}" cy="${ty+58}" r="13" fill="none" stroke="${col}" stroke-width="1" opacity="0.4"/>`;
+      svg+=`<line x1="${cx}" y1="${ty+58}" x2="${cx+11}" y2="${ty+58}" stroke="${col}" stroke-width="2" opacity="0.7" style="transform-origin:${cx}px ${ty+58}px;animation:motorSpin 3s linear infinite"/>`;
+      svg+=`<circle cx="${cx+mw/2-8}" cy="${ty+mh-9}" r="2" fill="#06d6a0"><animate attributeName="opacity" values="0;1;0" dur="1s" repeatCount="indefinite"/></circle>`;
 
     } else {
-      // Default/custom - generic equipment box
-      const ty=baseY-130, bw2=55, bh2=100;
-      svg+=`<rect x="${cx-bw2/2}" y="${ty}" width="${bw2}" height="${bh2}" rx="5" fill="url(#${uid}body)" stroke="${col}" stroke-width="2" filter="url(#shadow3)"/>`;
-      svg+=`<text x="${cx}" y="${ty+bh2/2+5}" text-anchor="middle" font-size="22">${nt.icon}</text>`;
-      svg+=`<rect x="${cx-bw2/2}" y="${ty}" width="${bw2}" height="${bh2}" rx="5" fill="none" stroke="${col}" stroke-width="1.5" opacity="0.2"><animate attributeName="opacity" values="0.1;0.3;0.1" dur="4s" repeatCount="indefinite"/></rect>`;
+      // Default/custom equipment
+      const ty=baseY-140, bw2=58, bh2=108;
+      svg+=`<rect x="${cx-bw2/2}" y="${ty}" width="${bw2}" height="${bh2}" rx="6" fill="url(#${uid}bg)" stroke="${col}" stroke-width="2" filter="url(#g3shadow)"/>`;
+      svg+=`<text x="${cx}" y="${ty+bh2/2+5}" text-anchor="middle" font-size="24">${nt.icon}</text>`;
+      svg+=`<rect x="${cx-bw2/2}" y="${ty}" width="${bw2}" height="${bh2}" rx="6" fill="none" stroke="${col}" stroke-width="1.5" opacity="0.15"><animate attributeName="opacity" values="0.08;0.25;0.08" dur="4s" repeatCount="indefinite"/></rect>`;
     }
 
-    // Node label below
-    svg+=`<text x="${cx}" y="${baseY+20}" text-anchor="middle" font-size="11" fill="${col}" font-weight="700">${lang==='da'?nt.da:nt.en}</text>`;
-    if(n.label) svg+=`<text x="${cx}" y="${baseY+34}" text-anchor="middle" font-size="9" fill="#7ab0cc" font-weight="600">${n.label}</text>`;
+    // Close clickable group
+    svg+=`</g>`;
 
-    // Voltage overlay badge
-    svg+=`<rect x="${cx-20}" y="${baseY+38}" width="40" height="14" rx="3" fill="rgba(0,10,20,0.85)" stroke="rgba(0,200,255,0.15)" stroke-width="0.5"/>`;
-    svg+=`<text x="${cx}" y="${baseY+49}" text-anchor="middle" font-size="7.5" fill="#0af" font-weight="600">${liveData[idx].v} V</text>`;
+    // === NODE LABELS ===
+    svg+=`<text x="${cx}" y="${baseY+22}" text-anchor="middle" font-size="11" fill="${col}" font-weight="700">${lang==='da'?nt.da:nt.en}</text>`;
+    if(n.label) svg+=`<text x="${cx}" y="${baseY+36}" text-anchor="middle" font-size="9" fill="#7ab0cc" font-weight="600">${n.label}</text>`;
 
-    // Power flow overlay
-    if(idx<nodes.length-1){
-      svg+=`<rect x="${cx-22}" y="${baseY+54}" width="44" height="12" rx="3" fill="rgba(0,10,20,0.85)" stroke="rgba(6,214,160,0.15)" stroke-width="0.5"/>`;
-      svg+=`<text x="${cx}" y="${baseY+63}" text-anchor="middle" font-size="7" fill="#06d6a0" font-weight="600">${Math.abs(parseFloat(liveData[idx].kw)).toFixed(1)} kW</text>`;
-    }
-
-    // Protection status indicator
-    svg+=`<circle cx="${cx+30}" cy="${baseY+25}" r="4" fill="#06d6a0" stroke="rgba(6,214,160,0.3)" stroke-width="1"><animate attributeName="opacity" values="0.6;1;0.6" dur="3s" repeatCount="indefinite" begin="${idx*0.5}s"/></circle>`;
-    svg+=`<text x="${cx+38}" y="${baseY+28}" font-size="6" fill="#06d6a0" opacity="0.8">OK</text>`;
+    // === STATUS BADGE PER NODE ===
+    const nodeHasIssue=(n.type==='panel'&&protInsufficient)||(n.type==='trafo'&&tLoad>95);
+    const statusCol=nodeHasIssue?'#ff4444':'#06d6a0';
+    const statusTxt=nodeHasIssue?(lang==='da'?'ADVARSEL':'WARNING'):'OK';
+    svg+=`<circle cx="${cx+40}" cy="${baseY+26}" r="4" fill="${statusCol}" stroke="rgba(${nodeHasIssue?'255,68,68':'6,214,160'},0.3)" stroke-width="1"><animate attributeName="opacity" values="0.5;1;0.5" dur="${nodeHasIssue?'1':'3'}s" repeatCount="indefinite" begin="${idx*0.4}s"/></circle>`;
+    svg+=`<text x="${cx+48}" y="${baseY+29}" font-size="6" fill="${statusCol}" opacity="0.9">${statusTxt}</text>`;
   });
 
-  // Ambient floating particles
-  for(let p=0;p<15;p++){
-    const px=60+Math.random()*(W-120), py=50+Math.random()*(gY-100);
-    const pSize=0.5+Math.random()*2;
-    const dur=5+Math.random()*6;
-    svg+=`<circle cx="${px}" cy="${py}" r="${pSize}" fill="rgba(0,200,255,${(0.05+Math.random()*0.15).toFixed(2)})"><animate attributeName="cy" values="${py};${py-20};${py}" dur="${dur}s" repeatCount="indefinite" begin="${(Math.random()*4).toFixed(1)}s"/><animate attributeName="opacity" values="0;0.3;0" dur="${dur}s" repeatCount="indefinite" begin="${(Math.random()*4).toFixed(1)}s"/></circle>`;
+  // === CONSUMER BRANCH DIAGRAM (if loadList has entries) ===
+  if(loadCount>1){
+    const panelIdx=nodes.findIndex(n=>n.type==='panel');
+    if(panelIdx>=0){
+      const pcx=100+panelIdx*sp;
+      const branchY=floorY+12;
+      const branchCount=Math.min(10,loadCount);
+      const branchSpacing=Math.min(28,(W*0.4)/branchCount);
+      const branchStartX=pcx-((branchCount-1)*branchSpacing)/2;
+      svg+=`<line x1="${branchStartX-5}" y1="${branchY}" x2="${branchStartX+(branchCount-1)*branchSpacing+5}" y2="${branchY}" stroke="rgba(0,255,200,0.2)" stroke-width="1.5"/>`;
+      for(let b=0;b<branchCount;b++){
+        const bx=branchStartX+b*branchSpacing;
+        const consumer=loadList[b];
+        const cI=consumer?lsConsumerCurrent(consumer):{L1:0,L2:0,L3:0};
+        const cMax=Math.max(cI.L1,cI.L2,cI.L3);
+        svg+=`<line x1="${bx}" y1="${branchY}" x2="${bx}" y2="${branchY+20}" stroke="rgba(0,255,200,0.3)" stroke-width="1"/>`;
+        svg+=`<circle cx="${bx}" cy="${branchY+24}" r="4" fill="rgba(0,40,30,0.8)" stroke="rgba(0,255,200,0.4)" stroke-width="0.8"/>`;
+        svg+=`<text x="${bx}" y="${branchY+27}" text-anchor="middle" font-size="5" fill="#06d6a0" font-weight="700">${b+1}</text>`;
+        svg+=`<text x="${bx}" y="${branchY+36}" text-anchor="middle" font-size="5.5" fill="#6a9aba">${cMax.toFixed(0)}A</text>`;
+      }
+      if(loadCount>10){
+        svg+=`<text x="${branchStartX+(branchCount)*branchSpacing+10}" y="${branchY+6}" font-size="7" fill="#6a9aba">+${loadCount-10} ${lang==='da'?'mere':'more'}</text>`;
+      }
+    }
   }
 
-  // Small sparks at random positions for atmosphere
-  for(let s=0;s<6;s++){
-    const sx=100+Math.random()*(W-200), sy=60+Math.random()*(gY-120);
-    svg+=`<circle cx="${sx}" cy="${sy}" r="1" fill="#fff" opacity="0"><animate attributeName="opacity" values="0;0.8;0;0;0;0;0" dur="${3+Math.random()*4}s" repeatCount="indefinite" begin="${(Math.random()*5).toFixed(1)}s"/><animate attributeName="r" values="0;3;0" dur="0.3s" repeatCount="indefinite" begin="${(Math.random()*5).toFixed(1)}s"/></circle>`;
+  // === WARNING INDICATORS ===
+  if(qi.issues.length>0){
+    const warnY=headerH+80;
+    const warnX=20;
+    qi.issues.slice(0,3).forEach((issue,ii)=>{
+      svg+=`<rect x="${warnX}" y="${warnY+ii*18}" width="160" height="15" rx="4" fill="rgba(255,40,40,0.08)" stroke="rgba(255,68,68,0.3)" stroke-width="0.5"/>`;
+      svg+=`<circle cx="${warnX+8}" cy="${warnY+ii*18+7.5}" r="3" fill="#ff4444"><animate attributeName="opacity" values="0.4;1;0.4" dur="1.2s" repeatCount="indefinite" begin="${ii*0.3}s"/></circle>`;
+      svg+=`<text x="${warnX+15}" y="${warnY+ii*18+11}" font-size="7" fill="#ff8888" font-weight="600">${issue.rule}: ${issue.detail}</text>`;
+    });
   }
 
-  // Footer bar
-  svg+=`<rect x="10" y="${H-30}" width="${W-20}" height="22" rx="5" fill="rgba(0,15,30,0.7)" stroke="rgba(0,180,255,0.1)" stroke-width="0.5"/>`;
-  svg+=`<text x="${W/2}" y="${H-15}" text-anchor="middle" font-size="9" fill="#3a6080" font-weight="500">SCADA ${lang==='da'?'Installationsoversigt':'Installation Overview'} \u00B7 ${nodes.length} ${lang==='da'?'noder':'nodes'} \u00B7 400V 3~ \u00B7 El-Dimensionering</text>`;
+  // === AMBIENT PARTICLES ===
+  for(let p=0;p<12;p++){
+    const px=80+((p*137)%(W-160)), py=mainY+30+((p*89)%(floorY-mainY-80));
+    const pSize=0.5+((p*31)%20)/10;
+    const dur=5+((p*17)%60)/10;
+    svg+=`<circle cx="${px}" cy="${py}" r="${pSize}" fill="rgba(0,200,255,${(0.04+((p*7)%12)/100).toFixed(2)})"><animate attributeName="cy" values="${py};${py-18};${py}" dur="${dur}s" repeatCount="indefinite" begin="${((p*23)%40)/10}s"/><animate attributeName="opacity" values="0;0.25;0" dur="${dur}s" repeatCount="indefinite" begin="${((p*23)%40)/10}s"/></circle>`;
+  }
 
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="border-radius:12px;border:1px solid rgba(0,180,255,0.15);overflow:visible;background:#010408" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+  // === MICRO SPARKS ===
+  for(let s=0;s<5;s++){
+    const sx=120+((s*211)%(W-240)), sy=mainY+50+((s*137)%(floorY-mainY-100));
+    svg+=`<circle cx="${sx}" cy="${sy}" r="1" fill="#fff" opacity="0"><animate attributeName="opacity" values="0;0.7;0;0;0;0" dur="${3+((s*11)%40)/10}s" repeatCount="indefinite" begin="${((s*29)%50)/10}s"/><animate attributeName="r" values="0;3;0" dur="0.3s" repeatCount="indefinite" begin="${((s*29)%50)/10}s"/></circle>`;
+  }
+
+  // === PROFESSIONAL FOOTER BAR ===
+  svg+=`<rect x="0" y="${H-footerH}" width="${W}" height="${footerH}" rx="14" fill="rgba(0,12,25,0.9)" stroke="rgba(0,180,255,0.1)" stroke-width="0.5"/>`;
+  svg+=`<text x="${W/2}" y="${H-footerH+18}" text-anchor="middle" font-size="9" fill="#4a7a90" font-weight="500">${lang==='da'?'EL-DIMENSIONERING':'ELECTRICAL SIZING'} | ${tSize} kVA ${trafoState.voltage} | ${cMat==='copper'?(lang==='da'?'Kobber':'Copper'):(lang==='da'?'Aluminium':'Aluminium')} ${cType} ${cCS||'--'} mm\u00B2 | ${protName}</text>`;
+  svg+=`<text x="${W/2}" y="${H-footerH+32}" text-anchor="middle" font-size="8" fill="#3a6080">IB=${ib.toFixed(1)}A | Iz=${corrIz.toFixed(1)}A | \u0394U=${vdP.toFixed(2)}% | Ik=${tIk.toFixed(1)}kA | ${dateStr}</text>`;
+  // Footer live dot
+  svg+=`<circle cx="18" cy="${H-footerH+20}" r="3" fill="${allOk?'#06d6a0':'#ff4444'}"><animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/></circle>`;
+  svg+=`<text x="28" y="${H-footerH+23}" font-size="8" fill="${allOk?'#06d6a0':'#ff4444'}" font-weight="700">${allOk?'ALL CHECKS PASSED':qi.issues.length+' '+(lang==='da'?'advarsler':'warnings')}</text>`;
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="border-radius:14px;border:1.5px solid rgba(0,180,255,0.2);overflow:visible;background:#020508;box-shadow:0 8px 32px rgba(0,100,200,0.08)" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
 }
 
 function renderDrawing(){
