@@ -757,6 +757,7 @@ const T = {
       curves: '\uD83D\uDCC8 Kurver',
       ev: '\uD83D\uDE97 EV-lader',
       harmonics: '\u3030\uFE0F Harmoniske',
+      gen: '\uD83C\uDFED Generator',
       exam: '\uD83C\uDF93 Eksamen'
     },
     // Load module
@@ -862,6 +863,7 @@ const T = {
       curves: '\uD83D\uDCC8 Curves',
       ev: '\uD83D\uDE97 EV Charger',
       harmonics: '\u3030\uFE0F Harmonics',
+      gen: '\uD83C\uDFED Generator',
       exam: '\uD83C\uDF93 Exam'
     },
     loadTitle: 'Load Calculation',
@@ -2012,6 +2014,8 @@ let curvesState = { dev1Type: 'gG', dev1Rating: 63, dev1Curve: 'B', dev2Type: 'm
 let evState = { power: 11, numChargers: 1, mainFuse: 63, existingLoad: 50, earthing: 'TN-S', cableLength: 15, installation: 'outdoor', dcDetection: false };
 // Harmonics assessment state
 let harmonicsState = { thd3: 33, iPhase: 16, circuits: 4, crossSection: 2.5 };
+// Generator sizing state
+let genState = { criticalLoads: [], genSize: 100, mode: 'island', earthing: 'TN-S', largestMotor: 0, startMethod: 'DOL', transfer: 'auto', customLoads: [] };
 // Short circuit state
 let scState = { zNet: 1, zTrafo: 5 };
 // Standards state
@@ -2143,6 +2147,7 @@ function renderModule(mod) {
     case 'curves': content = renderCurves(); break;
     case 'ev': content = renderEvCharger(); break;
     case 'harmonics': content = renderHarmonics(); break;
+    case 'gen': content = renderGenerator(); break;
     case 'exam': content = renderExam(); break;
   }
   // Append AI assistant to every module
@@ -11145,6 +11150,415 @@ function examRenderScenario(){
     + `<div class="select-group"><div class="select-label">${da?'Trin':'Step'} ${i+1}/${stepN} \u2014 ${examL(step.q)}</div><div class="select-grid">${opts}</div></div>`
     + fb + verdict + nav + `</div>`;
 }
+// ===== BACKUP POWER / GENERATOR SIZING (DS/HD 60364-5-55 section 551) =====
+function renderGenerator() {
+  const da = lang === 'da';
+  const st = genState;
+
+  // Preset critical loads {da, en, kW}
+  const LOAD_PRESETS = [
+    { da: 'IT/Server', en: 'IT/Server', kW: 5 },
+    { da: 'Belysning', en: 'Lighting', kW: 3 },
+    { da: 'Koling', en: 'Refrigeration', kW: 8 },
+    { da: 'Elevator', en: 'Elevator', kW: 15 },
+    { da: 'Pumper', en: 'Pumps', kW: 7.5 },
+    { da: 'Ventilation', en: 'Ventilation', kW: 5.5 },
+    { da: 'Brandalarm', en: 'Fire alarm', kW: 1 },
+    { da: 'Medicinsk', en: 'Medical', kW: 10 }
+  ];
+  const CUSTOM_KW = [1, 2, 3, 5, 7.5, 10, 15, 20, 25, 30, 37, 45, 55, 75, 100];
+  const MOTOR_KW = [0, 3, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45];
+  const START_METHODS = [
+    { id: 'DOL', mult: 7, da: 'DOL (7x)', en: 'DOL (7x)' },
+    { id: 'YD', mult: 2.5, da: 'Y-\u0394 (2.5x)', en: 'Y-\u0394 (2.5x)' },
+    { id: 'soft', mult: 3, da: 'Soft (3x)', en: 'Soft (3x)' },
+    { id: 'VFD', mult: 1.2, da: 'VFD (1.2x)', en: 'VFD (1.2x)' }
+  ];
+  const EARTHING_OPTIONS = [
+    { id: 'TN-S', da: 'TN-S ved generator', en: 'TN-S at generator' },
+    { id: 'TT', da: 'Separat TT', en: 'Separate TT' }
+  ];
+  const TRANSFER_OPTIONS = [
+    { id: 'manual', da: 'Manuel', en: 'Manual' },
+    { id: 'auto', da: 'Automatisk ATS', en: 'Automatic ATS' }
+  ];
+  const MODE_OPTIONS = [
+    { id: 'island', da: 'Nodstrom/Standby', en: 'Emergency/Standby' },
+    { id: 'ups', da: 'UPS-backup', en: 'UPS backup' },
+    { id: 'peak', da: 'Peak shaving', en: 'Peak shaving' }
+  ];
+  const STANDARD_SIZES = [50, 75, 100, 125, 150, 200, 250, 300, 400, 500];
+  const SIMULTANEITY = 0.8;
+
+  // --- CALCULATIONS ---
+  // Total running load
+  var totalPresetKW = 0;
+  st.criticalLoads.forEach(function(l) { totalPresetKW += l; });
+  var totalCustomKW = 0;
+  st.customLoads.forEach(function(l) { totalCustomKW += l; });
+  const totalRunningKW = (totalPresetKW + totalCustomKW) * SIMULTANEITY;
+
+  // Motor starting current calculation
+  const startMult = (START_METHODS.find(function(m) { return m.id === st.startMethod; }) || START_METHODS[0]).mult;
+  const motorStartKW = st.largestMotor * startMult;
+
+  // Generator sizing
+  const runningKVA = totalRunningKW / 0.8; // assume PF 0.8
+  const startingSurgeKVA = (totalRunningKW + motorStartKW) / 0.8;
+  const requiredMinKVA = Math.max(runningKVA * 1.1, startingSurgeKVA * 0.7) * 1.15;
+
+  // Standard size selection
+  var recommendedKVA = STANDARD_SIZES[STANDARD_SIZES.length - 1];
+  for (var si = 0; si < STANDARD_SIZES.length; si++) {
+    if (STANDARD_SIZES[si] >= requiredMinKVA) {
+      recommendedKVA = STANDARD_SIZES[si];
+      break;
+    }
+  }
+
+  // Generator nominal current (3-phase 400V)
+  const inGen = recommendedKVA * 1000 / (Math.sqrt(3) * 400);
+  // Sustained fault current (AVR-limited, ~3x In)
+  const ikGen = inGen * 3;
+  // Grid Ik for comparison (typical, ~20x In equivalent)
+  const ikGrid = inGen * 20;
+
+  // MCB trip assessment
+  // Curve B magnetic trip: 3-5x In (use 5x for worst case)
+  // Curve C magnetic trip: 5-10x In
+  // Curve D magnetic trip: 10-20x In
+  const mcbRating = Math.ceil(inGen / 10) > 0 ? 16 : 16; // typical downstream MCB
+  const curveBTrip = mcbRating * 5;
+  const curveCTrip = mcbRating * 10;
+  const curveDTrip = mcbRating * 20;
+  const curveBOk = ikGen >= curveBTrip;
+  const curveCOk = ikGen >= curveCTrip;
+  const curveDOk = ikGen >= curveDTrip;
+
+  // Protection warning
+  const protectionWarning = !curveDOk;
+
+  // Fuel consumption (diesel, ~0.25 L/kWh at 75% load)
+  const loadAt75 = recommendedKVA * 0.75 * 0.8; // kW at 75% and PF 0.8
+  const fuelPerHour = loadAt75 * 0.25; // L/h
+  const runtime500L = fuelPerHour > 0 ? (500 / fuelPerHour) : 0;
+  const runtime1000L = fuelPerHour > 0 ? (1000 / fuelPerHour) : 0;
+
+  // --- BUILD HTML ---
+  var html = '<div class="card fade-in"><div class="card-title">\uD83C\uDFED ' + (da ? 'Generator / Nodstrom dimensionering' : 'Generator / Backup Power Sizing') + '</div>';
+  html += '<div class="info-row">' + (da ? 'Dimensionering af nodstromsanlæg iht. DS/HD 60364-5-55 \u00A7551. Generator Ik er KUN ~3\u00D7In (AVR-begranset) mod nettet ~20\u00D7In.' : 'Backup power sizing per DS/HD 60364-5-55 \u00A7551. Generator Ik is ONLY ~3\u00D7In (AVR-limited) vs grid ~20\u00D7In.') + '</div>';
+
+  // Safety warning
+  html += '<div class="result-box error" style="margin-bottom:14px"><div class="result-title">\u26A0\uFE0F ' + (da ? 'SIKKERHEDSKRITISK' : 'SAFETY-CRITICAL') + '</div>';
+  html += '<div style="padding:6px 2px;line-height:1.5">' + (da ? 'Generator har MEGET lavere kortslutningsstrom end netforsyningen. Overstrombeskyttelse (MCB kurve C/D) udloser muligvis IKKE ved fejl. Suppler ALTID med HPFI/RCD og brug kurve B.' : 'Generator has MUCH lower fault current than grid supply. Overcurrent protection (MCB curve C/D) may NOT trip on faults. ALWAYS supplement with RCD and use curve B.') + '</div></div>';
+
+  // 1. Operation mode
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD27 ' + (da ? 'Driftstilstand' : 'Operation mode') + '</div><div class="select-grid">';
+  MODE_OPTIONS.forEach(function(m) {
+    html += '<button class="sel-btn ' + (st.mode === m.id ? 'selected' : '') + '" onclick="genState.mode=\'' + m.id + '\';renderModule(\'gen\')">' + (da ? m.da : m.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // 2. Critical loads presets
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDCE6 ' + (da ? 'Kritiske laster (klik for at tilfoeje/fjerne)' : 'Critical loads (click to add/remove)') + '</div><div class="select-grid">';
+  LOAD_PRESETS.forEach(function(p, idx) {
+    var active = st.criticalLoads.indexOf(p.kW) >= 0 && st.criticalLoads.filter(function(x){return x===p.kW;}).length > 0;
+    // Check how many times this preset is in the list
+    var countInList = st.criticalLoads.filter(function(x){return x===p.kW;}).length;
+    var label = (da ? p.da : p.en) + ' (' + p.kW + ' kW)';
+    if (countInList > 0) label += ' \u2713';
+    html += '<button class="sel-btn ' + (countInList > 0 ? 'selected' : '') + '" onclick="genTogglePreset(' + p.kW + ')">' + label + '</button>';
+  });
+  html += '</div></div>';
+
+  // 3. Custom load buttons
+  html += '<div class="select-group"><div class="select-label">\u2795 ' + (da ? 'Tilfoej tilpasset last [kW]' : 'Add custom load [kW]') + '</div><div class="select-grid">';
+  CUSTOM_KW.forEach(function(kw) {
+    var countCustom = st.customLoads.filter(function(x){return x===kw;}).length;
+    var label = kw + ' kW';
+    if (countCustom > 0) label += ' (\u00D7' + countCustom + ')';
+    html += '<button class="sel-btn ' + (countCustom > 0 ? 'selected' : '') + '" onclick="genToggleCustom(' + kw + ')">' + label + '</button>';
+  });
+  html += '</div></div>';
+
+  // Show selected loads summary
+  if (st.criticalLoads.length > 0 || st.customLoads.length > 0) {
+    html += '<div style="margin:8px 0;padding:8px 12px;background:rgba(0,255,200,0.05);border:1px solid rgba(0,255,200,0.2);border-radius:8px;font-size:.85rem">';
+    html += '<strong>' + (da ? 'Valgte laster:' : 'Selected loads:') + '</strong> ';
+    var allLoads = st.criticalLoads.concat(st.customLoads);
+    html += allLoads.map(function(l){ return l + ' kW'; }).join(', ');
+    html += ' = <strong>' + (totalPresetKW + totalCustomKW).toFixed(1) + ' kW</strong>';
+    html += ' <button class="sel-btn" style="margin-left:10px;padding:2px 10px;font-size:.75rem" onclick="genState.criticalLoads=[];genState.customLoads=[];renderModule(\'gen\')">' + (da ? 'Ryd alle' : 'Clear all') + '</button>';
+    html += '</div>';
+  }
+
+  // 4. Largest motor
+  html += '<div class="select-group"><div class="select-label">\u2699\uFE0F ' + (da ? 'Storste motor i kritiske laster [kW]' : 'Largest motor in critical loads [kW]') + '</div><div class="select-grid">';
+  MOTOR_KW.forEach(function(kw) {
+    html += '<button class="sel-btn ' + (st.largestMotor === kw ? 'selected' : '') + '" onclick="genState.largestMotor=' + kw + ';renderModule(\'gen\')">' + (kw === 0 ? (da ? 'Ingen' : 'None') : kw + ' kW') + '</button>';
+  });
+  html += '</div></div>';
+
+  // 5. Motor start method
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDE80 ' + (da ? 'Motorstartmetode' : 'Motor start method') + '</div><div class="select-grid">';
+  START_METHODS.forEach(function(m) {
+    html += '<button class="sel-btn ' + (st.startMethod === m.id ? 'selected' : '') + '" onclick="genState.startMethod=\'' + m.id + '\';renderModule(\'gen\')">' + (da ? m.da : m.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // 6. Earthing
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD29 ' + (da ? 'Generator jording' : 'Generator earthing') + '</div><div class="select-grid">';
+  EARTHING_OPTIONS.forEach(function(e) {
+    html += '<button class="sel-btn ' + (st.earthing === e.id ? 'selected' : '') + '" onclick="genState.earthing=\'' + e.id + '\';renderModule(\'gen\')">' + (da ? e.da : e.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // 7. Transfer switch
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD00 ' + (da ? 'Omskifter' : 'Transfer switch') + '</div><div class="select-grid">';
+  TRANSFER_OPTIONS.forEach(function(t) {
+    html += '<button class="sel-btn ' + (st.transfer === t.id ? 'selected' : '') + '" onclick="genState.transfer=\'' + t.id + '\';renderModule(\'gen\')">' + (da ? t.da : t.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // === RESULTS ===
+  if (totalRunningKW > 0 || st.largestMotor > 0) {
+    html += '<div class="result-box ' + (protectionWarning ? 'error' : 'success') + '" style="margin-top:18px">';
+    html += '<div class="result-title" style="font-size:1.3rem">\uD83C\uDFED ' + (da ? 'Generatorresultat' : 'Generator Result') + '</div>';
+
+    // Main results grid
+    html += '<div style="margin:12px 0;padding:10px;background:rgba(0,0,0,0.2);border-radius:10px">';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.9rem">';
+    html += '<div>' + (da ? 'Lobende last (x0.8):' : 'Running load (x0.8):') + '</div><div style="text-align:right"><strong>' + totalRunningKW.toFixed(1) + ' kW</strong></div>';
+    html += '<div>' + (da ? 'Lobende kVA (PF 0.8):' : 'Running kVA (PF 0.8):') + '</div><div style="text-align:right"><strong>' + runningKVA.toFixed(1) + ' kVA</strong></div>';
+    if (st.largestMotor > 0) {
+      html += '<div>' + (da ? 'Startstroms-surge:' : 'Starting surge:') + '</div><div style="text-align:right"><strong>' + startingSurgeKVA.toFixed(1) + ' kVA</strong></div>';
+    }
+    html += '<div>' + (da ? 'Krævet minimum:' : 'Required minimum:') + '</div><div style="text-align:right;color:var(--accent)"><strong>' + requiredMinKVA.toFixed(1) + ' kVA</strong></div>';
+    html += '<div style="font-size:1.1rem;font-weight:700">' + (da ? 'Anbefalet generator:' : 'Recommended generator:') + '</div><div style="text-align:right;font-size:1.1rem;font-weight:700;color:var(--success)"><strong>' + recommendedKVA + ' kVA</strong></div>';
+    html += '</div></div>';
+
+    // Ik comparison (CRITICAL)
+    html += '<div style="margin:12px 0;padding:10px;background:rgba(0,0,0,0.2);border-radius:10px">';
+    html += '<div style="font-weight:600;margin-bottom:8px;color:var(--danger)">\u26A1 ' + (da ? 'Kortslutningsstrom (Ik) sammenligning' : 'Short-circuit current (Ik) comparison') + '</div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:.85rem">';
+    html += '<div>' + (da ? 'Generator In:' : 'Generator In:') + '</div><div style="text-align:right">' + inGen.toFixed(1) + ' A</div>';
+    html += '<div>' + (da ? 'Generator Ik (~3\u00D7In):' : 'Generator Ik (~3\u00D7In):') + '</div><div style="text-align:right;color:var(--danger)"><strong>' + ikGen.toFixed(0) + ' A</strong></div>';
+    html += '<div>' + (da ? 'Net Ik (~20\u00D7In):' : 'Grid Ik (~20\u00D7In):') + '</div><div style="text-align:right;color:var(--success)"><strong>' + ikGrid.toFixed(0) + ' A</strong></div>';
+    html += '</div></div>';
+
+    // Protection warning
+    if (protectionWarning) {
+      html += '<div class="result-box error" style="margin:12px 0"><div class="result-title">\u26A0\uFE0F ' + (da ? 'BESKYTTELSESADVARSEL' : 'PROTECTION WARNING') + '</div>';
+      html += '<div style="padding:6px 2px;line-height:1.6;font-size:.9rem">';
+      html += (da ? 'Ik er kun <strong>' + ikGen.toFixed(0) + ' A</strong> \u2014 kurve D udloser IKKE. Kurve C udloser ' + (curveCOk ? '' : 'IKKE. ') + 'Brug kurve B + HPFI 30 mA!' : 'Ik is only <strong>' + ikGen.toFixed(0) + ' A</strong> \u2014 curve D will NOT trip. Curve C ' + (curveCOk ? 'OK' : 'will NOT trip. ') + 'Use curve B + RCD 30 mA!');
+      html += '<br><strong>' + (da ? 'Anbefaling:' : 'Recommendation:') + '</strong> MCB kurve B + HPFI/RCD 30 mA ' + (da ? 'pa alle kredse' : 'on all circuits') + '</div></div>';
+    } else {
+      html += '<div class="result-box success" style="margin:12px 0"><div class="result-title">\u2713 ' + (da ? 'Beskyttelse OK' : 'Protection OK') + '</div>';
+      html += '<div style="padding:6px 2px">' + (da ? 'Generator Ik er tilstrækkelig til magnetisk udlosning. Suppler stadig med RCD for personsikkerhed.' : 'Generator Ik is sufficient for magnetic trip. Still supplement with RCD for personal safety.') + '</div></div>';
+    }
+
+    // Earthing requirement
+    html += '<div style="margin:12px 0;padding:10px;background:rgba(0,0,0,0.2);border-radius:10px">';
+    html += '<div style="font-weight:600;margin-bottom:6px;color:var(--accent)">\uD83D\uDD29 ' + (da ? 'Jordingskrav (DS/HD 60364-5-55 \u00A7551.4.3)' : 'Earthing requirement (DS/HD 60364-5-55 \u00A7551.4.3)') + '</div>';
+    html += '<div style="font-size:.85rem;line-height:1.5">';
+    if (st.earthing === 'TN-S') {
+      html += (da ? 'N-PE forbindelse SKAL etableres ved generator. Neutral skal jordes ved generatorens stjernepunkt. Separat PE-leder fra generatorstel.' : 'N-PE bond MUST be established at the generator. Neutral must be earthed at generator star point. Separate PE conductor from generator frame.');
+    } else {
+      html += (da ? 'Separat jordelektrode ved generator. Alle eksponerede dele jordes til lokal jordelektrode. RCD obligatorisk pa alle kredse.' : 'Separate earth electrode at generator. All exposed parts earthed to local electrode. RCD mandatory on all circuits.');
+    }
+    html += '</div></div>';
+
+    // Transfer switch
+    html += '<div style="margin:12px 0;padding:10px;background:rgba(0,0,0,0.2);border-radius:10px">';
+    html += '<div style="font-weight:600;margin-bottom:6px;color:var(--accent)">\uD83D\uDD00 ' + (da ? 'Omskifterkrav' : 'Transfer switch requirement') + '</div>';
+    html += '<div style="font-size:.85rem;line-height:1.5">';
+    if (st.transfer === 'auto') {
+      html += (da ? 'Automatisk ATS (Automatic Transfer Switch). Anti-islanding beskyttelse SKAL indbygges. Omskiftningstid typisk 3-10 sek. Forhindrer parallelkoring med net.' : 'Automatic ATS (Automatic Transfer Switch). Anti-islanding protection MUST be built in. Transfer time typically 3-10 sec. Prevents parallel operation with grid.');
+    } else {
+      html += (da ? 'Manuel omskifter. Mekanisk interlock KRÆVES for at forhindre parallelkoring. Bryder-for-lukker princip obligatorisk.' : 'Manual transfer switch. Mechanical interlock REQUIRED to prevent parallel operation. Break-before-make principle mandatory.');
+    }
+    html += '</div></div>';
+
+    // Fuel consumption & runtime
+    html += '<div style="margin:12px 0;padding:10px;background:rgba(0,0,0,0.2);border-radius:10px">';
+    html += '<div style="font-weight:600;margin-bottom:6px;color:var(--accent)">\u26FD ' + (da ? 'Brændstofforbrug (diesel, 75% last)' : 'Fuel consumption (diesel, 75% load)') + '</div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:.85rem">';
+    html += '<div>' + (da ? 'Forbrug:' : 'Consumption:') + '</div><div style="text-align:right">' + fuelPerHour.toFixed(1) + ' L/t</div>';
+    html += '<div>' + (da ? 'Koretid (500 L tank):' : 'Runtime (500 L tank):') + '</div><div style="text-align:right"><strong>' + runtime500L.toFixed(0) + ' timer</strong></div>';
+    html += '<div>' + (da ? 'Koretid (1000 L tank):' : 'Runtime (1000 L tank):') + '</div><div style="text-align:right"><strong>' + runtime1000L.toFixed(0) + ' timer</strong></div>';
+    html += '</div></div>';
+
+    // Standard reference
+    html += '<div style="margin:12px 0;padding:8px 12px;background:rgba(0,180,255,0.08);border:1px solid rgba(0,180,255,0.2);border-radius:8px;font-size:.8rem;line-height:1.5">';
+    html += '<strong>\uD83D\uDCD6 ' + (da ? 'Reference:' : 'Reference:') + '</strong> DS/HD 60364-5-55 \u00A7551 | IEC 60034-1 | DS/HD 60364-4-41 \u00A7411';
+    html += '</div>';
+
+    html += '</div>'; // close result-box
+  }
+
+  // === SVG VISUALIZATION ===
+  html += buildGenViz(da, recommendedKVA, inGen, ikGen, ikGrid, st, protectionWarning, totalRunningKW);
+
+  html += '</div>'; // close card
+  return html;
+}
+
+// Generator load toggle helpers
+function genTogglePreset(kw) {
+  var idx = genState.criticalLoads.indexOf(kw);
+  if (idx >= 0) { genState.criticalLoads.splice(idx, 1); }
+  else { genState.criticalLoads.push(kw); }
+  renderModule('gen');
+}
+function genToggleCustom(kw) {
+  var idx = genState.customLoads.indexOf(kw);
+  if (idx >= 0) { genState.customLoads.splice(idx, 1); }
+  else { genState.customLoads.push(kw); }
+  renderModule('gen');
+}
+
+// Generator SVG visualization
+function buildGenViz(da, genKVA, inGen, ikGen, ikGrid, st, warning, loadKW) {
+  var w = 900, h = 500;
+  var svg = '<div class="card fade-in" style="margin-top:16px"><div class="card-title">\uD83C\uDFA8 ' + (da ? 'Systemdiagram' : 'System Diagram') + '</div>';
+  svg += '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;max-width:900px;height:auto;background:rgba(0,0,0,0.3);border-radius:12px">';
+
+  // Definitions for animations and gradients
+  svg += '<defs>';
+  // Power flow animation
+  svg += '<linearGradient id="genFlowGrad" x1="0%" y1="0%" x2="100%" y2="0%">';
+  svg += '<stop offset="0%" stop-color="#00e676" stop-opacity="0"><animate attributeName="offset" values="-0.5;1" dur="2s" repeatCount="indefinite"/></stop>';
+  svg += '<stop offset="20%" stop-color="#00e676" stop-opacity="0.8"><animate attributeName="offset" values="-0.3;1.2" dur="2s" repeatCount="indefinite"/></stop>';
+  svg += '<stop offset="40%" stop-color="#00e676" stop-opacity="0"><animate attributeName="offset" values="-0.1;1.4" dur="2s" repeatCount="indefinite"/></stop>';
+  svg += '</linearGradient>';
+  // Generator body gradient
+  svg += '<linearGradient id="genBodyGrad" x1="0%" y1="0%" x2="0%" y2="100%">';
+  svg += '<stop offset="0%" stop-color="#4a5568"/><stop offset="100%" stop-color="#2d3748"/>';
+  svg += '</linearGradient>';
+  // Glow filter
+  svg += '<filter id="genGlow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  svg += '</defs>';
+
+  // --- GENERATOR (left) ---
+  // Body with vibration animation
+  svg += '<g transform="translate(60,160)">';
+  svg += '<animateTransform attributeName="transform" type="translate" values="60,160;60,161;60,159;60,160" dur="0.15s" repeatCount="indefinite"/>';
+  // Main body
+  svg += '<rect x="0" y="0" width="140" height="90" rx="8" fill="url(#genBodyGrad)" stroke="#00e676" stroke-width="2"/>';
+  // Cooling fins
+  for (var fi = 0; fi < 5; fi++) {
+    svg += '<rect x="' + (10 + fi * 28) + '" y="-8" width="4" height="8" fill="#4a5568"/>';
+  }
+  // Label
+  svg += '<text x="70" y="40" text-anchor="middle" fill="#00e676" font-size="14" font-weight="bold">GEN</text>';
+  svg += '<text x="70" y="60" text-anchor="middle" fill="#a0aec0" font-size="11">' + genKVA + ' kVA</text>';
+  svg += '<text x="70" y="78" text-anchor="middle" fill="#718096" font-size="9">In=' + inGen.toFixed(0) + 'A</text>';
+  // Exhaust (animated smoke)
+  svg += '<circle cx="130" cy="-15" r="5" fill="rgba(160,174,192,0.4)"><animate attributeName="cy" values="-15;-40" dur="3s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.6;0" dur="3s" repeatCount="indefinite"/><animate attributeName="r" values="5;12" dur="3s" repeatCount="indefinite"/></circle>';
+  svg += '<circle cx="125" cy="-10" r="4" fill="rgba(160,174,192,0.3)"><animate attributeName="cy" values="-10;-35" dur="2.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.5;0" dur="2.5s" repeatCount="indefinite"/><animate attributeName="r" values="4;10" dur="2.5s" repeatCount="indefinite"/></circle>';
+  svg += '</g>';
+
+  // --- POWER LINE from gen to ATS ---
+  svg += '<line x1="200" y1="205" x2="310" y2="205" stroke="url(#genFlowGrad)" stroke-width="4" filter="url(#genGlow)"/>';
+  svg += '<line x1="200" y1="205" x2="310" y2="205" stroke="#00e676" stroke-width="2" stroke-dasharray="8,4"><animate attributeName="stroke-dashoffset" values="24;0" dur="1s" repeatCount="indefinite"/></line>';
+
+  // --- GRID SUPPLY (top) ---
+  svg += '<rect x="330" y="60" width="100" height="50" rx="6" fill="#1a202c" stroke="#4299e1" stroke-width="2"/>';
+  svg += '<text x="380" y="82" text-anchor="middle" fill="#4299e1" font-size="12" font-weight="bold">' + (da ? 'NET' : 'GRID') + '</text>';
+  svg += '<text x="380" y="98" text-anchor="middle" fill="#718096" font-size="9">Ik\u224820\u00D7In</text>';
+  // Line from grid to ATS
+  svg += '<line x1="380" y1="110" x2="380" y2="160" stroke="#4299e1" stroke-width="2" stroke-dasharray="4,3"/>';
+
+  // --- ATS / TRANSFER SWITCH (center) ---
+  svg += '<rect x="320" y="160" width="120" height="90" rx="10" fill="#1a202c" stroke="' + (st.transfer === 'auto' ? '#f6ad55' : '#a0aec0') + '" stroke-width="2.5"/>';
+  svg += '<text x="380" y="190" text-anchor="middle" fill="' + (st.transfer === 'auto' ? '#f6ad55' : '#a0aec0') + '" font-size="13" font-weight="bold">' + (st.transfer === 'auto' ? 'ATS' : (da ? 'MANUEL' : 'MANUAL')) + '</text>';
+  svg += '<text x="380" y="210" text-anchor="middle" fill="#718096" font-size="9">' + (da ? 'Omskifter' : 'Transfer') + '</text>';
+  // Animated switch indicator
+  svg += '<rect x="355" y="220" width="50" height="16" rx="8" fill="rgba(0,0,0,0.4)"/>';
+  svg += '<circle cx="' + (st.transfer === 'auto' ? '390' : '370') + '" cy="228" r="6" fill="' + (st.transfer === 'auto' ? '#f6ad55' : '#a0aec0') + '"><animate attributeName="cx" values="370;390;370" dur="4s" repeatCount="indefinite"/></circle>';
+
+  // --- POWER LINE from ATS to panel ---
+  svg += '<line x1="440" y1="205" x2="550" y2="205" stroke="url(#genFlowGrad)" stroke-width="4" filter="url(#genGlow)"/>';
+  svg += '<line x1="440" y1="205" x2="550" y2="205" stroke="#00e676" stroke-width="2" stroke-dasharray="8,4"><animate attributeName="stroke-dashoffset" values="24;0" dur="1s" repeatCount="indefinite"/></line>';
+
+  // --- CRITICAL PANEL ---
+  svg += '<rect x="560" y="155" width="110" height="100" rx="8" fill="#1a202c" stroke="#9f7aea" stroke-width="2"/>';
+  svg += '<text x="615" y="180" text-anchor="middle" fill="#9f7aea" font-size="11" font-weight="bold">' + (da ? 'KRITISK' : 'CRITICAL') + '</text>';
+  svg += '<text x="615" y="196" text-anchor="middle" fill="#9f7aea" font-size="11" font-weight="bold">' + (da ? 'TAVLE' : 'PANEL') + '</text>';
+  svg += '<text x="615" y="218" text-anchor="middle" fill="#a0aec0" font-size="10">' + loadKW.toFixed(1) + ' kW</text>';
+  // MCB indicators
+  for (var mi = 0; mi < 4; mi++) {
+    svg += '<rect x="' + (575 + mi * 22) + '" y="228" width="14" height="18" rx="2" fill="#2d3748" stroke="#' + (warning ? 'f56565' : '48bb78') + '" stroke-width="1"/>';
+    svg += '<circle cx="' + (582 + mi * 22) + '" cy="240" r="2" fill="#' + (warning ? 'f56565' : '48bb78') + '"/>';
+  }
+
+  // --- LOADS (right) ---
+  svg += '<line x1="670" y1="205" x2="730" y2="205" stroke="#9f7aea" stroke-width="2"/>';
+  // Load icons
+  var loadIcons = ['\uD83D\uDCBB', '\uD83D\uDCA1', '\u2744\uFE0F', '\uD83D\uDE80'];
+  for (var li = 0; li < 4; li++) {
+    svg += '<rect x="740" y="' + (140 + li * 35) + '" width="100" height="28" rx="6" fill="rgba(159,122,234,0.1)" stroke="rgba(159,122,234,0.4)" stroke-width="1"/>';
+    svg += '<text x="790" y="' + (159 + li * 35) + '" text-anchor="middle" fill="#e2e8f0" font-size="10">' + loadIcons[li] + ' ' + (da ? 'Last' : 'Load') + ' ' + (li + 1) + '</text>';
+    svg += '<line x1="670" y1="205" x2="740" y2="' + (154 + li * 35) + '" stroke="rgba(159,122,234,0.3)" stroke-width="1"/>';
+  }
+
+  // --- Ik COMPARISON BAR (bottom) ---
+  svg += '<text x="60" y="320" fill="#e2e8f0" font-size="12" font-weight="bold">' + (da ? 'Ik sammenligning:' : 'Ik comparison:') + '</text>';
+
+  // Grid Ik bar (large, green)
+  var gridBarW = 350;
+  var genBarW = Math.max(20, (ikGen / ikGrid) * gridBarW);
+  svg += '<rect x="60" y="335" width="' + gridBarW + '" height="24" rx="4" fill="rgba(72,187,120,0.3)" stroke="#48bb78" stroke-width="1"/>';
+  svg += '<rect x="60" y="335" width="' + gridBarW + '" height="24" rx="4" fill="rgba(72,187,120,0.15)"/>';
+  svg += '<text x="' + (60 + gridBarW / 2) + '" y="351" text-anchor="middle" fill="#48bb78" font-size="11" font-weight="bold">' + (da ? 'Net' : 'Grid') + ' Ik = ' + ikGrid.toFixed(0) + ' A</text>';
+
+  // Generator Ik bar (small, red/amber)
+  svg += '<rect x="60" y="370" width="' + genBarW + '" height="24" rx="4" fill="rgba(245,101,101,0.3)" stroke="#f56565" stroke-width="1"/>';
+  svg += '<text x="' + Math.max(60 + genBarW / 2, 120) + '" y="386" text-anchor="middle" fill="#f56565" font-size="11" font-weight="bold">Gen Ik = ' + ikGen.toFixed(0) + ' A</text>';
+
+  // Trip threshold indicators
+  var tripX = 60 + (genBarW * 0.8);
+  svg += '<text x="60" y="410" fill="#a0aec0" font-size="9">' + (da ? 'MCB magnetisk udlosning:' : 'MCB magnetic trip threshold:') + '</text>';
+  // Curve D line
+  var curveDX = 60 + (curveDTrip / ikGrid) * gridBarW;
+  if (curveDX < 60 + gridBarW) {
+    svg += '<line x1="' + curveDX + '" y1="330" x2="' + curveDX + '" y2="400" stroke="#fc8181" stroke-width="1.5" stroke-dasharray="4,2"/>';
+    svg += '<text x="' + curveDX + '" y="420" text-anchor="middle" fill="#fc8181" font-size="8">D: ' + curveDTrip + 'A</text>';
+  }
+  // Curve B line
+  var curveBX = 60 + (curveBTrip / ikGrid) * gridBarW;
+  if (curveBX < 60 + gridBarW) {
+    svg += '<line x1="' + curveBX + '" y1="330" x2="' + curveBX + '" y2="400" stroke="#68d391" stroke-width="1.5" stroke-dasharray="4,2"/>';
+    svg += '<text x="' + curveBX + '" y="430" text-anchor="middle" fill="#68d391" font-size="8">B: ' + curveBTrip + 'A</text>';
+  }
+
+  // Trip/no-trip indicator
+  svg += '<g transform="translate(500,340)">';
+  if (warning) {
+    svg += '<rect x="0" y="0" width="160" height="55" rx="8" fill="rgba(245,101,101,0.15)" stroke="#f56565" stroke-width="1.5"/>';
+    svg += '<text x="80" y="20" text-anchor="middle" fill="#f56565" font-size="11" font-weight="bold">\u26A0\uFE0F ' + (da ? 'UDLOSER IKKE' : 'WILL NOT TRIP') + '</text>';
+    svg += '<text x="80" y="38" text-anchor="middle" fill="#fc8181" font-size="9">' + (da ? 'Kurve D kræver' : 'Curve D needs') + ' ' + curveDTrip + 'A</text>';
+    svg += '<text x="80" y="50" text-anchor="middle" fill="#fc8181" font-size="9">' + (da ? 'Generator giver kun' : 'Generator provides only') + ' ' + ikGen.toFixed(0) + 'A</text>';
+  } else {
+    svg += '<rect x="0" y="0" width="160" height="45" rx="8" fill="rgba(72,187,120,0.15)" stroke="#48bb78" stroke-width="1.5"/>';
+    svg += '<text x="80" y="18" text-anchor="middle" fill="#48bb78" font-size="11" font-weight="bold">\u2713 ' + (da ? 'BESKYTTELSE OK' : 'PROTECTION OK') + '</text>';
+    svg += '<text x="80" y="35" text-anchor="middle" fill="#68d391" font-size="9">' + (da ? 'Brug stadig RCD' : 'Still use RCD') + '</text>';
+  }
+  svg += '</g>';
+
+  // RCD recommendation (always)
+  svg += '<g transform="translate(500,410)">';
+  svg += '<rect x="0" y="0" width="160" height="30" rx="6" fill="rgba(99,179,237,0.1)" stroke="#63b3ed" stroke-width="1"/>';
+  svg += '<text x="80" y="19" text-anchor="middle" fill="#63b3ed" font-size="10">\uD83D\uDEE1\uFE0F ' + (da ? 'RCD/HPFI 30mA ALTID' : 'RCD 30mA ALWAYS') + '</text>';
+  svg += '</g>';
+
+  // Legend
+  svg += '<text x="60" y="480" fill="#718096" font-size="8">DS/HD 60364-5-55 \u00A7551 | IEC 60034-1 | ' + (da ? 'Generator Ik \u2248 3\u00D7In (AVR-begranset)' : 'Generator Ik \u2248 3\u00D7In (AVR-limited)') + '</text>';
+
+  svg += '</svg></div>';
+  return svg;
+}
+
 // ===== INIT =====
 renderNav();
 renderStatusBar();
