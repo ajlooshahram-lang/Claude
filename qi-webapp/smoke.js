@@ -691,6 +691,8 @@ ok(vendorModal && /Vendor Comparison/.test(vendorModal.innerHTML), "Vendor: comp
 ok(/Attribute/.test(vendorModal.innerHTML), "Vendor: comparison modal has attribute column");
 ok(/Capabilities/.test(vendorModal.innerHTML) && /Products/.test(vendorModal.innerHTML), "Vendor: comparison modal shows capabilities and products");
 ok(/Price Range/.test(vendorModal.innerHTML) && /Lead Time/.test(vendorModal.innerHTML), "Vendor: comparison modal shows price range and lead time");
+// Verify Print / Save as PDF button exists in comparison modal
+ok(doc.getElementById("vendorPrintBtn") != null, "Vendor: comparison modal has Print / Save as PDF button");
 // Close comparison modal
 const vendorModalClose = vendorModal.querySelector("[data-act=cancel]");
 if (vendorModalClose) vendorModalClose.click();

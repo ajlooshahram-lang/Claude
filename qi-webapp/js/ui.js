@@ -836,7 +836,7 @@
       <div id="vendorTableWrap"></div>
     </div>`;
 
-    container.innerHTML = healthHtml + findingsHtml + patternsHtml + recsHtml + lessonsHtml + vendorHtml;
+    container.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn" id="brainPrintAnalysis">Print Analysis</button></div>` + healthHtml + findingsHtml + patternsHtml + recsHtml + lessonsHtml + vendorHtml;
 
     // Wire "Confirm" buttons for pending lessons
     container.querySelectorAll(".brainConfirmLesson").forEach(btn => {
@@ -854,6 +854,51 @@
     // Wire "Record lesson" button
     const recordBtn = $("#brainRecordLesson");
     if (recordBtn) recordBtn.addEventListener("click", openRecordLessonModal);
+
+    // Wire "Print Analysis" button
+    const printAnalysisBtn = $("#brainPrintAnalysis");
+    if (printAnalysisBtn) printAnalysisBtn.addEventListener("click", function () {
+      var printWin = window.open("", "_blank");
+      if (!printWin) { toast("Please allow pop-ups to print."); return; }
+      var findingsListHtml = status.findings.length > 0
+        ? `<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:11px;margin-bottom:16px"><thead><tr><th>Severity</th><th>Type</th><th>Detail</th></tr></thead><tbody>${status.findings.map(function(f) { return "<tr><td>" + esc(f.severity) + "</td><td>" + esc(f.type) + "</td><td>" + esc(f.detail) + "</td></tr>"; }).join("")}</tbody></table>`
+        : "<p>No findings to report.</p>";
+      var recsListHtml = recResult.recommendations.length > 0
+        ? `<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:11px"><thead><tr><th>Priority</th><th>Title</th><th>Action</th><th>Confidence</th></tr></thead><tbody>${recResult.recommendations.map(function(r) { return "<tr><td>P" + r.priority + "</td><td>" + esc(r.title) + "</td><td>" + esc(r.action) + "</td><td>" + Math.round((Number(r.confidence)||0)*100) + "%</td></tr>"; }).join("")}</tbody></table>`
+        : "<p>No recommendations at this time.</p>";
+      printWin.document.write(`<!DOCTYPE html><html><head><title>Brain Intelligence Analysis</title><style>
+        body{font-family:Arial,Helvetica,sans-serif;margin:20mm 15mm;color:#222}
+        h1{font-size:18px;margin:0 0 4px}
+        h2{font-size:14px;margin:20px 0 8px;border-bottom:1px solid #ddd;padding-bottom:4px}
+        .sub{color:#555;font-size:12px;margin-bottom:16px}
+        .scores{display:flex;gap:24px;margin:12px 0}
+        .scores div{text-align:center}
+        .scores .label{font-size:10px;color:#666;text-transform:uppercase}
+        .scores .value{font-size:18px;font-weight:700}
+        table{border-collapse:collapse;width:100%;font-size:11px}
+        th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top}
+        th{background:#f0f4f8;font-weight:600}
+        p{font-size:12px;color:#555}
+        @media print{body{margin:10mm}@page{size:A4;margin:10mm}}
+      </style></head><body>
+        <h1>QI Platform &mdash; Brain Intelligence Analysis</h1>
+        <div class="sub">Generated: ${new Date().toLocaleDateString()}</div>
+        <h2>Health Status: ${esc(status.overallHealth)}</h2>
+        <div class="scores">
+          <div><div class="label">SPI</div><div class="value">${status.scores.spiEstimate}</div></div>
+          <div><div class="label">CPI</div><div class="value">${status.scores.cpiEstimate}</div></div>
+          <div><div class="label">Risk Exposure</div><div class="value">${status.scores.riskExposure}</div></div>
+          <div><div class="label">Quality Index</div><div class="value">${status.scores.qualityIndex}</div></div>
+        </div>
+        <h2>Findings (${status.findings.length})</h2>
+        ${findingsListHtml}
+        <h2>Recommendations (${recResult.recommendations.length})</h2>
+        ${recsListHtml}
+      </body></html>`);
+      printWin.document.close();
+      printWin.focus();
+      printWin.print();
+    });
 
     // --- Vendor Directory wiring ---
     const vendorSelected = new Set();
@@ -979,9 +1024,31 @@
         <div class="sub">${esc(result.summary)}</div>
         <div class="table-wrap" style="margin:12px 0"><table class="vendor-compare-tbl"><thead><tr><th>Attribute</th>${headerCols}</tr></thead><tbody>${bodyRows}</tbody></table></div>
         <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
+          <button class="btn" id="vendorPrintBtn" data-act="print">Print / Save as PDF</button>
           <button class="btn btn-primary" data-act="cancel">Close</button></div></div>`;
       $("#modalOverlay").hidden = false;
       modal.querySelector("[data-act=cancel]").addEventListener("click", closeModal);
+      modal.querySelector("#vendorPrintBtn").addEventListener("click", function () {
+        var printWin = window.open("", "_blank");
+        if (!printWin) { toast("Please allow pop-ups to print."); return; }
+        var tableHtml = `<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:12px"><thead><tr><th>Attribute</th>${headerCols}</tr></thead><tbody>${bodyRows}</tbody></table>`;
+        printWin.document.write(`<!DOCTYPE html><html><head><title>Vendor Comparison</title><style>
+          body{font-family:Arial,Helvetica,sans-serif;margin:20mm 15mm;color:#222}
+          h1{font-size:18px;margin:0 0 4px}
+          .sub{color:#555;font-size:12px;margin-bottom:16px}
+          table{border-collapse:collapse;width:100%;font-size:11px}
+          th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top}
+          th{background:#f0f4f8;font-weight:600}
+          @media print{body{margin:10mm}@page{size:A4 landscape;margin:10mm}}
+        </style></head><body>
+          <h1>QI Platform &mdash; Vendor Comparison</h1>
+          <div class="sub">Generated: ${new Date().toLocaleDateString()} | ${esc(result.summary)}</div>
+          ${tableHtml}
+        </body></html>`);
+        printWin.document.close();
+        printWin.focus();
+        printWin.print();
+      });
     }
 
     // Wire filter dropdowns
