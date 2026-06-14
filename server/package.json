@@ -15,7 +15,8 @@
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "test": "tsx --test --test-concurrency=1 test/**/*.test.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "audit": "npm audit --production --audit-level=high"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

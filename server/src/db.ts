@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import type { AppConfig } from "./config.js";
 import { logger } from "./logging.js";
+import { softDeleteMiddleware } from "./middleware/soft-delete.js";
 
 const SLOW_QUERY_THRESHOLD_MS = 1000;
 const MAX_RETRIES = 3;
@@ -39,6 +40,9 @@ prisma.$use(async (params, next) => {
 
   return result;
 });
+
+// Soft-delete middleware: auto-filters deletedAt: null on findMany/findFirst
+prisma.$use(softDeleteMiddleware);
 
 export default prisma;
 

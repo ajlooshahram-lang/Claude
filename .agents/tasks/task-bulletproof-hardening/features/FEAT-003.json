@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "feat",
   "description": "Soft-delete consistency middleware, referential integrity verification, SQL injection prevention test, dependency audit script, and docker-compose backup service.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Create Prisma middleware or helper in server/src/db.ts (or server/src/middleware/soft-delete.ts): Use Prisma middleware ($use) to automatically add deletedAt: null filter on findMany/findFirst/findUnique for models that have deletedAt (Project, Case, RegisterRow, Tenant, User). Override delete operations to soft-delete (set deletedAt instead of hard delete) where appropriate. Be careful not to break the existing explicit deletedAt filters in routes -- the middleware should only apply when the query does NOT already specify a deletedAt filter.",
     "Review and fix referential integrity in all routes: Before creating a case, verify project exists AND belongs to tenant AND is not soft-deleted (already done in cases.ts). Before creating a register row, verify same (already done in registers.ts). Before creating a snapshot, verify same (already done in snapshots.ts). Before creating a share token, verify project exists AND belongs to tenant AND user has ADMIN+ role (update shares.ts requireRole from MANAGER to ADMIN).",

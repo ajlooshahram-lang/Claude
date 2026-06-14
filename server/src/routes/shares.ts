@@ -14,7 +14,7 @@ export default async function sharesRoutes(app: FastifyInstance): Promise<void> 
   // Authenticated share management routes
   app.post(
     "/shares",
-    { preHandler: [authenticate, requireRole("MANAGER")] },
+    { preHandler: [authenticate, requireRole("ADMIN")] },
     async (request, reply) => {
       const parsed = CreateShareBody.safeParse(request.body);
       if (!parsed.success) {
