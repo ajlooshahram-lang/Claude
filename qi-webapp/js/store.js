@@ -108,9 +108,108 @@
       },
       gage: defaultGage(),
       cashflow: defaultCashflow(),
-      xbarR: defaultXbar()
+      xbarR: defaultXbar(),
+      routeSections: defaultRouteSections()
     };
   }
+  function defaultRouteSections() {
+    return [
+      {
+        _id: uid(), name: "Bangkok - Chiang Mai Backbone", startKm: 0, endKm: 685,
+        startCoords: { lat: 13.7563, lng: 100.5018, alt: 5 },
+        endCoords: { lat: 18.7883, lng: 98.9853, alt: 310 },
+        waypoints: [
+          { lat: 14.3514, lng: 100.5770, alt: 20 },
+          { lat: 15.2287, lng: 100.5340, alt: 45 },
+          { lat: 16.4419, lng: 100.3497, alt: 60 },
+          { lat: 17.0085, lng: 99.8265, alt: 120 },
+          { lat: 17.9647, lng: 99.0087, alt: 220 }
+        ],
+        cableType: "G.652.D", coreCount: 288, status: "active",
+        stations: [
+          { name: "Bangkok Hub Central", type: "termination", coords: { lat: 13.7563, lng: 100.5018, alt: 5 } },
+          { name: "Nakhon Sawan Junction", type: "junction", coords: { lat: 15.7047, lng: 100.1372, alt: 50 } },
+          { name: "Lampang Switch", type: "switch", coords: { lat: 18.2888, lng: 99.4902, alt: 260 } },
+          { name: "Chiang Mai Terminal", type: "termination", coords: { lat: 18.7883, lng: 98.9853, alt: 310 } }
+        ]
+      },
+      {
+        _id: uid(), name: "Jakarta - Surabaya Express", startKm: 0, endKm: 780,
+        startCoords: { lat: -6.2088, lng: 106.8456, alt: 8 },
+        endCoords: { lat: -7.2575, lng: 112.7521, alt: 5 },
+        waypoints: [
+          { lat: -6.5971, lng: 106.8060, alt: 30 },
+          { lat: -6.7320, lng: 108.5523, alt: 15 },
+          { lat: -6.9175, lng: 110.4203, alt: 10 },
+          { lat: -7.2504, lng: 112.7688, alt: 5 }
+        ],
+        cableType: "G.657.A2", coreCount: 144, status: "installed",
+        stations: [
+          { name: "Jakarta Gateway", type: "termination", coords: { lat: -6.2088, lng: 106.8456, alt: 8 } },
+          { name: "Cirebon Relay", type: "junction", coords: { lat: -6.7320, lng: 108.5523, alt: 15 } },
+          { name: "Semarang Switch", type: "switch", coords: { lat: -6.9175, lng: 110.4203, alt: 10 } },
+          { name: "Surabaya Terminal", type: "termination", coords: { lat: -7.2575, lng: 112.7521, alt: 5 } }
+        ]
+      },
+      {
+        _id: uid(), name: "Hanoi - Ho Chi Minh Trunk", startKm: 0, endKm: 1726,
+        startCoords: { lat: 21.0285, lng: 105.8542, alt: 15 },
+        endCoords: { lat: 10.8231, lng: 106.6297, alt: 10 },
+        waypoints: [
+          { lat: 19.8075, lng: 105.7764, alt: 12 },
+          { lat: 17.9753, lng: 106.3482, alt: 8 },
+          { lat: 16.0544, lng: 108.2022, alt: 5 },
+          { lat: 13.7530, lng: 109.2190, alt: 4 },
+          { lat: 12.2388, lng: 109.1967, alt: 6 },
+          { lat: 11.9404, lng: 108.4583, alt: 850 }
+        ],
+        cableType: "G.652.D", coreCount: 96, status: "planned",
+        stations: [
+          { name: "Hanoi Central Office", type: "termination", coords: { lat: 21.0285, lng: 105.8542, alt: 15 } },
+          { name: "Vinh Junction", type: "junction", coords: { lat: 18.6790, lng: 105.6813, alt: 10 } },
+          { name: "Da Nang Switch", type: "switch", coords: { lat: 16.0544, lng: 108.2022, alt: 5 } },
+          { name: "Nha Trang Relay", type: "junction", coords: { lat: 12.2388, lng: 109.1967, alt: 6 } },
+          { name: "Ho Chi Minh Terminal", type: "termination", coords: { lat: 10.8231, lng: 106.6297, alt: 10 } }
+        ]
+      },
+      {
+        _id: uid(), name: "Singapore - Kuala Lumpur Link", startKm: 0, endKm: 350,
+        startCoords: { lat: 1.3521, lng: 103.8198, alt: 3 },
+        endCoords: { lat: 3.1390, lng: 101.6869, alt: 55 },
+        waypoints: [
+          { lat: 1.4927, lng: 103.7414, alt: 5 },
+          { lat: 1.8655, lng: 103.2204, alt: 20 },
+          { lat: 2.1896, lng: 102.2501, alt: 30 },
+          { lat: 2.7456, lng: 101.9381, alt: 45 }
+        ],
+        cableType: "G.657.A2", coreCount: 288, status: "active",
+        stations: [
+          { name: "Singapore Exchange", type: "termination", coords: { lat: 1.3521, lng: 103.8198, alt: 3 } },
+          { name: "Johor Bahru Switch", type: "switch", coords: { lat: 1.4927, lng: 103.7414, alt: 5 } },
+          { name: "Malacca Junction", type: "junction", coords: { lat: 2.1896, lng: 102.2501, alt: 30 } },
+          { name: "Kuala Lumpur Hub", type: "termination", coords: { lat: 3.1390, lng: 101.6869, alt: 55 } }
+        ]
+      },
+      {
+        _id: uid(), name: "Manila - Cebu Submarine", startKm: 0, endKm: 570,
+        startCoords: { lat: 14.5995, lng: 120.9842, alt: 0 },
+        endCoords: { lat: 10.3157, lng: 123.8854, alt: 0 },
+        waypoints: [
+          { lat: 13.7565, lng: 121.0583, alt: -50 },
+          { lat: 12.8797, lng: 121.7740, alt: -120 },
+          { lat: 11.5890, lng: 122.7610, alt: -80 },
+          { lat: 10.6918, lng: 123.3411, alt: -30 }
+        ],
+        cableType: "G.654.E", coreCount: 48, status: "tested",
+        stations: [
+          { name: "Manila Landing Station", type: "termination", coords: { lat: 14.5995, lng: 120.9842, alt: 0 } },
+          { name: "Mindoro Repeater", type: "junction", coords: { lat: 12.8797, lng: 121.7740, alt: -120 } },
+          { name: "Cebu Landing Station", type: "termination", coords: { lat: 10.3157, lng: 123.8854, alt: 0 } }
+        ]
+      }
+    ];
+  }
+
   function defaultXbar() {
     const data = {
       "0_0": 10.1, "0_1": 9.8, "0_2": 10.0, "0_3": 10.2, "1_0": 9.9, "1_1": 10.3, "1_2": 10.1, "1_3": 9.7,
@@ -154,6 +253,7 @@
     if (!s.gage || !s.gage.data) s.gage = defaultGage();
     if (!Array.isArray(s.cashflow)) s.cashflow = defaultCashflow();
     if (!s.xbarR || !s.xbarR.data) s.xbarR = defaultXbar();
+    if (!Array.isArray(s.routeSections)) s.routeSections = defaultRouteSections();
     return s;
   }
   function defaultWorkspace() {
@@ -161,7 +261,8 @@
     return {
       activeId: id, order: [id], projects: { [id]: seed() },
       brand: { company: "", logo: "", accent: "#2e5496" },
-      ai: { provider: "openai", baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini", key: "" }
+      ai: { provider: "openai", baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini", key: "" },
+      secrets: {}
     };
   }
   function normalizeWs(w) {
@@ -171,6 +272,7 @@
     if (!w.activeId || !w.projects[w.activeId]) w.activeId = w.order[0];
     w.brand = w.brand || { company: "", logo: "", accent: "#2e5496" };
     w.ai = w.ai || { provider: "openai", baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini", key: "" };
+    w.secrets = w.secrets || {};
     w.order.forEach(id => normalize(w.projects[id]));
     return w;
   }
@@ -232,6 +334,26 @@
   function setBrand(patch) { Object.assign(workspace().brand, patch); save(); }
   function aiSettings() { return workspace().ai; }
   function setAi(patch) { Object.assign(workspace().ai, patch); save(); }
+
+  // ---- secrets (credentials stored separately from exportable brand) ----
+  function cesiumToken() {
+    var s = workspace().secrets;
+    // Migrate: if token still lives in brand, move it to secrets
+    if ((!s || !s.cesiumToken) && workspace().brand && workspace().brand.cesiumToken) {
+      if (!s) { workspace().secrets = {}; s = workspace().secrets; }
+      s.cesiumToken = workspace().brand.cesiumToken;
+      delete workspace().brand.cesiumToken;
+      save();
+    }
+    return (s && s.cesiumToken) || "";
+  }
+  function setCesiumToken(token) {
+    if (!workspace().secrets) workspace().secrets = {};
+    workspace().secrets.cesiumToken = token || "";
+    // Remove from brand if still there (migration cleanup)
+    if (workspace().brand && workspace().brand.cesiumToken) delete workspace().brand.cesiumToken;
+    save();
+  }
 
   // ---- portfolio rollup across all projects ----
   function portfolio() {
@@ -537,17 +659,24 @@
     return issues;
   }
 
+  // ---- route sections (3D Network view) ----
+  function routeSections() { const s = get(); if (!Array.isArray(s.routeSections)) s.routeSections = defaultRouteSections(); return s.routeSections; }
+  function addRouteSection(rs) { rs = rs || {}; rs._id = rs._id || uid(); routeSections().push(rs); logAudit("Added", "Route section", rs.name || ""); save(); return rs; }
+  function updateRouteSection(id, patch) { const arr = routeSections(), i = arr.findIndex(r => r._id === id); if (i < 0) return null; Object.assign(arr[i], patch); save(); return arr[i]; }
+  function deleteRouteSection(id) { const arr = routeSections(), i = arr.findIndex(r => r._id === id); if (i < 0) return false; arr.splice(i, 1); save(); return true; }
+
   const API = { uid, seed, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
     undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete, togglePin, reorderPin,
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
     auditList, clearAudit, takeSnapshot, snapshots, restoreSnapshot, deleteSnapshot, renameSnapshot, diffSnapshots, paretoRPN, controlChartData,
     savedViews, saveView, deleteSavedView,
     listProjects, activeProjectId, switchProject, addProject, renameProject, duplicateProject, deleteProject, importAsProject,
-    brand, setBrand, aiSettings, setAi, portfolio,
+    brand, setBrand, aiSettings, setAi, cesiumToken, setCesiumToken, portfolio,
     regRows, regAdd, regUpdate, regDelete, regLabel, regBulkDelete, regTogglePin, evm: () => C.evm(validCases(), get().project),
     gage, setGageCell, setGageConfig, gageResult, cashflow, setCashflow,
     xbar, setXbarCell, setXbarConfig, xbarResult, scorecard,
-    spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy };
+    spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy,
+    routeSections, addRouteSection, updateRouteSection, deleteRouteSection };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);
