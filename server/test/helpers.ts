@@ -62,7 +62,7 @@ export async function registerUser(
 
 export async function cleanDatabase(): Promise<void> {
   await prisma.$executeRawUnsafe(
-    `TRUNCATE "AuditLog", "ShareToken", "Snapshot", "RegisterRow", "Case", "Session", "Membership", "User", "Project", "Tenant" CASCADE`,
+    `TRUNCATE "SyncQueue", "RouteSection", "ProgressReport", "ExchangeRate", "PaymentCertificate", "ContractClaim", "ContractVariation", "WorkOrder", "Package", "Programme", "AuditLog", "ShareToken", "Snapshot", "RegisterRow", "Case", "Session", "Membership", "User", "Project", "Tenant" CASCADE`,
   );
 }
 
