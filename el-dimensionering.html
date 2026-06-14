@@ -2554,9 +2554,279 @@ function renderCable() {
         <div class="result-row"><span class="label">K (total)</span><span class="value">${kTotal.toFixed(3)}</span></div>
         <div class="result-row"><span class="label">${t('cableIz')} (${lang === 'da' ? 'korrigeret' : 'corrected'})</span><span class="value">${correctedIz.toFixed(1)} A</span></div>
       </div>
+      ${buildCableViz(cableState.crossSection, cableState.material, baseIz, correctedIz, kTotal, calcIB(), cableState.temp || 25)}
     </div>
     ` : ''}
   `;
+}
+
+// ===== CABLE CROSS-SECTION VISUALIZATION =====
+function buildCableViz(crossSection, material, baseIz, correctedIz, kTotal, ib, temp) {
+  if (!crossSection || correctedIz <= 0) return '';
+  const W = 600, H = 420;
+  const cx = 200, cy = 170, maxR = 90;
+
+  // Scale conductor radius by cross-section (log scale for visual clarity)
+  const csNum = parseFloat(crossSection) || 10;
+  const condR = Math.max(25, Math.min(65, 20 + Math.log2(csNum) * 8));
+  const insulR = condR + 14;
+  const sheathR = insulR + 10;
+
+  // Material colors
+  const isCu = material === 'copper';
+  const condColor = isCu ? '#ff8a5c' : '#9fe6ff';
+  const condColorDim = isCu ? '#cc6030' : '#5bbcd9';
+  const condColorBright = isCu ? '#ffc099' : '#d4f4ff';
+  const materialLabel = isCu ? (lang === 'da' ? 'Kobber' : 'Copper') : (lang === 'da' ? 'Aluminium' : 'Aluminium');
+
+  // Temperature factor for color ring (20-70 range mapped to blue-red)
+  const tempNorm = Math.max(0, Math.min(1, (temp - 20) / 50));
+  const tempHue = 200 - tempNorm * 200; // 200 (blue) to 0 (red)
+
+  // Current density visualization - number of orbiting particles
+  const densityFactor = ib ? Math.min(1, ib / correctedIz) : 0.5;
+  const numParticles = Math.max(4, Math.round(densityFactor * 12));
+
+  // Gauge bar calculations
+  const gaugeY = 310, gaugeW = 480, gaugeH = 22, gaugeX = (W - gaugeW) / 2;
+  const ibVal = ib || 0;
+  // Max for gauge is 1.3x correctedIz for some headroom
+  const gaugeMax = Math.max(correctedIz * 1.3, ibVal * 1.2, baseIz * 1.1);
+  const ibPos = gaugeX + (ibVal / gaugeMax) * gaugeW;
+  const izCorrPos = gaugeX + (correctedIz / gaugeMax) * gaugeW;
+  const izBasePos = gaugeX + (baseIz / gaugeMax) * gaugeW;
+  // "In" is approximated as the next standard fuse above IB
+  const inVal = ibVal > 0 ? Math.ceil(ibVal / 10) * 10 : 0;
+  const inPos = gaugeX + (inVal / gaugeMax) * gaugeW;
+
+  // Safety check: IB <= In <= Iz
+  const safetyOk = ibVal <= inVal && inVal <= correctedIz;
+  const safetyColor = safetyOk ? '#06d6a0' : '#ef476f';
+
+  // Derating squeeze visualization
+  const derateW = (baseIz / gaugeMax) * gaugeW;
+  const derateCorrW = (correctedIz / gaugeMax) * gaugeW;
+
+  // Generate orbiting current particles with staggered timing
+  const orbitParticles = [];
+  for (let i = 0; i < numParticles; i++) {
+    const angle = (i / numParticles) * 360;
+    const orbitR = condR * 0.55 + (i % 3) * 5;
+    const dur = (1.8 - densityFactor * 0.8).toFixed(2);
+    const delay = ((i / numParticles) * parseFloat(dur)).toFixed(2);
+    const size = 2 + (i % 2);
+    orbitParticles.push(`
+      <circle r="${size}" fill="${condColorBright}" opacity="0.9" filter="url(#cableParticleGlow)">
+        <animateTransform attributeName="transform" type="rotate"
+          from="${angle} ${cx} ${cy}" to="${angle + 360} ${cx} ${cy}"
+          dur="${dur}s" begin="${delay}s" repeatCount="indefinite"/>
+        <animate attributeName="cx" values="${cx + orbitR}" dur="0.01s" fill="freeze"/>
+        <animate attributeName="cy" values="${cy}" dur="0.01s" fill="freeze"/>
+        <animate attributeName="opacity" values="0.5;1;0.8;1;0.5" dur="${dur}s" begin="${delay}s" repeatCount="indefinite"/>
+      </circle>
+    `);
+  }
+
+  // Sparkle effects on conductor surface
+  const sparkles = [];
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const sr = condR * 0.7;
+    const sx = cx + Math.cos(a) * sr;
+    const sy = cy + Math.sin(a) * sr;
+    const del = (i * 0.4).toFixed(2);
+    sparkles.push(`<circle cx="${sx}" cy="${sy}" r="1.5" fill="${condColorBright}" opacity="0">
+      <animate attributeName="opacity" values="0;0.8;0" dur="2.4s" begin="${del}s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="1;2.5;1" dur="2.4s" begin="${del}s" repeatCount="indefinite"/>
+    </circle>`);
+  }
+
+  return `
+  <div style="margin-top:16px;border-radius:14px;overflow:hidden;background:linear-gradient(160deg,#060d16 0%,#0a1a2e 40%,#0d0f18 100%);border:1px solid rgba(${isCu?'255,138,92':'159,230,255'},0.2);box-shadow:0 0 40px rgba(${isCu?'255,138,92':'159,230,255'},0.06),inset 0 0 80px rgba(0,0,0,0.4)">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+      <defs>
+        <filter id="cableParticleGlow"><feGaussianBlur stdDeviation="2"/></filter>
+        <filter id="cableBlurLg"><feGaussianBlur stdDeviation="6"/></filter>
+        <filter id="cableBlurSm"><feGaussianBlur stdDeviation="3"/></filter>
+        <filter id="cableShadow">
+          <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="rgba(0,0,0,0.5)"/>
+        </filter>
+
+        <!-- Conductor radial gradient (heatmap effect) -->
+        <radialGradient id="condHeat" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="${condColorBright}" stop-opacity="1"/>
+          <stop offset="40%" stop-color="${condColor}" stop-opacity="0.95"/>
+          <stop offset="75%" stop-color="${condColorDim}" stop-opacity="0.85"/>
+          <stop offset="100%" stop-color="${condColorDim}" stop-opacity="0.6"/>
+        </radialGradient>
+
+        <!-- Temperature ring gradient -->
+        <radialGradient id="tempRing" cx="50%" cy="50%" r="50%">
+          <stop offset="75%" stop-color="transparent"/>
+          <stop offset="85%" stop-color="hsl(${tempHue},80%,50%)" stop-opacity="0.25"/>
+          <stop offset="95%" stop-color="hsl(${tempHue},80%,40%)" stop-opacity="0.15"/>
+          <stop offset="100%" stop-color="transparent"/>
+        </radialGradient>
+
+        <!-- Insulation gradient -->
+        <radialGradient id="insulGrad" cx="45%" cy="40%" r="60%">
+          <stop offset="0%" stop-color="#2a3a4a" stop-opacity="0.9"/>
+          <stop offset="100%" stop-color="#1a2530" stop-opacity="0.95"/>
+        </radialGradient>
+
+        <!-- Sheath gradient (outer jacket) -->
+        <radialGradient id="sheathGrad" cx="40%" cy="35%" r="65%">
+          <stop offset="0%" stop-color="#3a4a5a"/>
+          <stop offset="60%" stop-color="#252f3a"/>
+          <stop offset="100%" stop-color="#1a2028"/>
+        </radialGradient>
+
+        <!-- Cross-section lighting highlight -->
+        <radialGradient id="cableHighlight" cx="35%" cy="30%" r="50%">
+          <stop offset="0%" stop-color="rgba(255,255,255,0.15)"/>
+          <stop offset="100%" stop-color="transparent"/>
+        </radialGradient>
+
+        <!-- Gauge bar gradient -->
+        <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#06d6a0" stop-opacity="0.3"/>
+          <stop offset="${Math.round((correctedIz/gaugeMax)*100)}%" stop-color="#ffd166" stop-opacity="0.3"/>
+          <stop offset="100%" stop-color="#ef476f" stop-opacity="0.3"/>
+        </linearGradient>
+
+        <!-- Animated pattern for conductor texture -->
+        <pattern id="condTexture" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="6" stroke="${condColor}" stroke-width="0.5" opacity="0.15"/>
+        </pattern>
+      </defs>
+
+      <!-- Subtle background grid -->
+      <pattern id="cbGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+        <path d="M24 0L0 0 0 24" fill="none" stroke="rgba(${isCu?'255,138,92':'100,200,255'},0.03)" stroke-width="0.5"/>
+      </pattern>
+      <rect width="${W}" height="${H}" fill="url(#cbGrid)"/>
+
+      <!-- Title -->
+      <text x="${cx}" y="28" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="12" font-weight="600" letter-spacing="1">${lang === 'da' ? 'KABELTV\u00C6RSNIT' : 'CABLE CROSS-SECTION'}</text>
+      <text x="${cx}" y="44" text-anchor="middle" fill="${condColor}" font-size="11" font-weight="500">${csNum} mm\u00B2 ${materialLabel}</text>
+
+      <!-- Temperature ring (outer ambient indicator) -->
+      <circle cx="${cx}" cy="${cy}" r="${sheathR + 18}" fill="url(#tempRing)">
+        <animate attributeName="opacity" values="0.6;1;0.6" dur="4s" repeatCount="indefinite"/>
+      </circle>
+
+      <!-- Ambient temp label -->
+      <text x="${cx + sheathR + 26}" y="${cy - 10}" fill="hsl(${tempHue},70%,60%)" font-size="9" opacity="0.8">${temp}\u00B0C</text>
+
+      <!-- Cable outer sheath -->
+      <circle cx="${cx}" cy="${cy}" r="${sheathR}" fill="url(#sheathGrad)" filter="url(#cableShadow)"/>
+      <!-- Sheath highlight -->
+      <circle cx="${cx}" cy="${cy}" r="${sheathR}" fill="url(#cableHighlight)"/>
+      <!-- Sheath edge ring -->
+      <circle cx="${cx}" cy="${cy}" r="${sheathR}" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+
+      <!-- Insulation layer -->
+      <circle cx="${cx}" cy="${cy}" r="${insulR}" fill="url(#insulGrad)"/>
+      <circle cx="${cx}" cy="${cy}" r="${insulR}" fill="none" stroke="rgba(100,150,200,0.15)" stroke-width="0.8"/>
+
+      <!-- Conductor core with heatmap -->
+      <circle cx="${cx}" cy="${cy}" r="${condR}" fill="url(#condHeat)"/>
+      <!-- Conductor texture overlay -->
+      <circle cx="${cx}" cy="${cy}" r="${condR}" fill="url(#condTexture)" opacity="0.4"/>
+      <!-- Conductor glow (pulsing with current density) -->
+      <circle cx="${cx}" cy="${cy}" r="${condR + 4}" fill="none" stroke="${condColor}" stroke-width="2" opacity="0.3" filter="url(#cableBlurSm)">
+        <animate attributeName="opacity" values="0.15;0.5;0.15" dur="${(3 - densityFactor * 1.5).toFixed(1)}s" repeatCount="indefinite"/>
+        <animate attributeName="stroke-width" values="2;4;2" dur="${(3 - densityFactor * 1.5).toFixed(1)}s" repeatCount="indefinite"/>
+      </circle>
+
+      <!-- Center bright spot (current density peak) -->
+      <circle cx="${cx}" cy="${cy}" r="${condR * 0.25}" fill="${condColorBright}" opacity="0.4" filter="url(#cableBlurSm)">
+        <animate attributeName="opacity" values="0.2;0.6;0.2" dur="2s" repeatCount="indefinite"/>
+        <animate attributeName="r" values="${condR*0.2};${condR*0.3};${condR*0.2}" dur="2s" repeatCount="indefinite"/>
+      </circle>
+
+      <!-- Orbiting current particles -->
+      <g>
+        ${orbitParticles.join('')}
+      </g>
+
+      <!-- Surface sparkles -->
+      ${sparkles.join('')}
+
+      <!-- Layer labels on right side -->
+      <g opacity="0.7">
+        <line x1="${cx + sheathR + 2}" y1="${cy + sheathR - 5}" x2="${cx + sheathR + 40}" y2="${cy + sheathR + 10}" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+        <text x="${cx + sheathR + 42}" y="${cy + sheathR + 14}" fill="rgba(255,255,255,0.6)" font-size="8">${lang === 'da' ? 'Kappe' : 'Sheath'}</text>
+
+        <line x1="${cx + insulR}" y1="${cy + 8}" x2="${cx + sheathR + 40}" y2="${cy + 28}" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+        <text x="${cx + sheathR + 42}" y="${cy + 32}" fill="rgba(255,255,255,0.6)" font-size="8">${lang === 'da' ? 'Isolering' : 'Insulation'}</text>
+
+        <line x1="${cx + condR - 5}" y1="${cy + condR - 5}" x2="${cx + sheathR + 40}" y2="${cy + 48}" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+        <text x="${cx + sheathR + 42}" y="${cy + 52}" fill="${condColor}" font-size="8" font-weight="600">${materialLabel} ${csNum}mm\u00B2</text>
+      </g>
+
+      <!-- IB / In / Iz GAUGE BAR SECTION -->
+      <text x="${W/2}" y="${gaugeY - 28}" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="11" font-weight="600">
+        ${lang === 'da' ? 'Beskyttelsesregel: IB \u2264 In \u2264 Iz' : 'Protection Rule: IB \u2264 In \u2264 Iz'}
+      </text>
+
+      <!-- Gauge background track -->
+      <rect x="${gaugeX}" y="${gaugeY}" width="${gaugeW}" height="${gaugeH}" rx="11" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>
+
+      <!-- Iz base capacity (full bar, dim) -->
+      <rect x="${gaugeX}" y="${gaugeY}" width="${derateW}" height="${gaugeH}" rx="11" fill="rgba(6,214,160,0.08)" stroke="none"/>
+
+      <!-- Iz corrected (derating applied) - shows the squeeze effect -->
+      <rect x="${gaugeX}" y="${gaugeY + 1}" width="${derateCorrW}" height="${gaugeH - 2}" rx="10" fill="rgba(6,214,160,0.15)"/>
+
+      <!-- Derating squeeze indicator (cross-hatch between corrected and base) -->
+      ${baseIz !== correctedIz ? `
+        <rect x="${gaugeX + derateCorrW}" y="${gaugeY}" width="${derateW - derateCorrW}" height="${gaugeH}" rx="0" fill="rgba(255,100,100,0.08)"/>
+        <line x1="${gaugeX + derateCorrW}" y1="${gaugeY}" x2="${gaugeX + derateCorrW}" y2="${gaugeY + gaugeH}" stroke="#ef476f" stroke-width="1" stroke-dasharray="3 2" opacity="0.6"/>
+        <text x="${gaugeX + derateCorrW + (derateW - derateCorrW)/2}" y="${gaugeY - 5}" text-anchor="middle" fill="#ef476f" font-size="7.5" opacity="0.8">K=${kTotal.toFixed(2)}</text>
+      ` : ''}
+
+      <!-- IB marker -->
+      ${ibVal > 0 ? `
+        <line x1="${ibPos}" y1="${gaugeY - 3}" x2="${ibPos}" y2="${gaugeY + gaugeH + 3}" stroke="#00b4d8" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="${ibPos}" cy="${gaugeY - 6}" r="4" fill="#00b4d8"/>
+        <text x="${ibPos}" y="${gaugeY - 14}" text-anchor="middle" fill="#00b4d8" font-size="9" font-weight="700">IB</text>
+        <text x="${ibPos}" y="${gaugeY + gaugeH + 16}" text-anchor="middle" fill="#00b4d8" font-size="8">${ibVal.toFixed(1)}A</text>
+      ` : ''}
+
+      <!-- In marker -->
+      ${inVal > 0 ? `
+        <line x1="${inPos}" y1="${gaugeY - 3}" x2="${inPos}" y2="${gaugeY + gaugeH + 3}" stroke="#ffd166" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="${inPos}" cy="${gaugeY - 6}" r="4" fill="#ffd166"/>
+        <text x="${inPos}" y="${gaugeY - 14}" text-anchor="middle" fill="#ffd166" font-size="9" font-weight="700">In</text>
+        <text x="${inPos}" y="${gaugeY + gaugeH + 16}" text-anchor="middle" fill="#ffd166" font-size="8">${inVal}A</text>
+      ` : ''}
+
+      <!-- Iz corrected marker -->
+      <line x1="${izCorrPos}" y1="${gaugeY - 3}" x2="${izCorrPos}" y2="${gaugeY + gaugeH + 3}" stroke="#06d6a0" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="${izCorrPos}" cy="${gaugeY - 6}" r="4" fill="#06d6a0"/>
+      <text x="${izCorrPos}" y="${gaugeY - 14}" text-anchor="middle" fill="#06d6a0" font-size="9" font-weight="700">Iz'</text>
+      <text x="${izCorrPos}" y="${gaugeY + gaugeH + 16}" text-anchor="middle" fill="#06d6a0" font-size="8">${correctedIz.toFixed(1)}A</text>
+
+      <!-- Iz base marker (dimmer) -->
+      ${baseIz !== correctedIz ? `
+        <line x1="${izBasePos}" y1="${gaugeY + 2}" x2="${izBasePos}" y2="${gaugeY + gaugeH - 2}" stroke="rgba(6,214,160,0.4)" stroke-width="1.5" stroke-dasharray="2 2"/>
+        <text x="${izBasePos}" y="${gaugeY + gaugeH + 28}" text-anchor="middle" fill="rgba(6,214,160,0.5)" font-size="7">Iz=${baseIz}A</text>
+      ` : ''}
+
+      <!-- Safety verdict -->
+      <rect x="${W/2 - 70}" y="${gaugeY + gaugeH + 34}" width="140" height="22" rx="11" fill="${safetyColor}" opacity="0.12" stroke="${safetyColor}" stroke-width="0.5"/>
+      <text x="${W/2}" y="${gaugeY + gaugeH + 49}" text-anchor="middle" fill="${safetyColor}" font-size="10" font-weight="700">
+        ${safetyOk ? (lang === 'da' ? '\u2705 Regel overholdt' : '\u2705 Rule satisfied') : (lang === 'da' ? '\u274C Regel overtrådt' : '\u274C Rule violated')}
+      </text>
+
+      <!-- Current flow indicator (animated arrow ring) -->
+      <circle cx="${cx}" cy="${cy}" r="${condR + 8}" fill="none" stroke="${condColor}" stroke-width="1.5" stroke-dasharray="8 12" opacity="0.4">
+        <animateTransform attributeName="transform" type="rotate"
+          from="0 ${cx} ${cy}" to="360 ${cx} ${cy}" dur="3s" repeatCount="indefinite"/>
+      </circle>
+    </svg>
+  </div>`;
 }
 
 // ===== VOLTAGE DROP VISUALIZATION =====
@@ -3095,6 +3365,316 @@ function renderShortCircuit() {
 // Data from 1.-Dim-af-trafo.ppx.pptx
 let trafoState = { size: 400, voltage: '10/0.4', loadPercent: 75 };
 
+// ===== TRANSFORMER VISUALIZATION =====
+function buildTrafoViz(S, uk, Ifl, Iload, loadFactor, Ik, Ploss) {
+  if (!S || Ifl <= 0) return '';
+  const W = 620, H = 380;
+
+  // Layout positions
+  const trafoCx = W / 2, trafoCy = 140;
+  const coilSpacing = 50;
+  const primCx = trafoCx - coilSpacing / 2 - 20;
+  const secCx = trafoCx + coilSpacing / 2 + 20;
+  const coilR = 38;
+
+  // Voltage derived from standard ratio
+  const hvVoltage = 10; // kV (primary)
+  const lvVoltage = 0.4; // kV (secondary)
+
+  // Load gauge calculations
+  const gaugeX = 80, gaugeY = 290, gaugeW = W - 160, gaugeH = 20;
+  const loadColor = loadFactor < 0.75 ? '#06d6a0' : (loadFactor < 0.9 ? '#ffd166' : '#ef476f');
+  const loadGlowColor = loadFactor < 0.75 ? 'rgba(6,214,160,0.3)' : (loadFactor < 0.9 ? 'rgba(255,209,102,0.3)' : 'rgba(239,71,111,0.3)');
+
+  // Heat/loss proportional glow (scale to max ploss for size class)
+  const maxPloss = S * 25; // rough max
+  const heatIntensity = Math.min(1, Ploss / maxPloss);
+  const heatOpacity = (0.1 + heatIntensity * 0.5).toFixed(2);
+  const heatBlur = (4 + heatIntensity * 12).toFixed(1);
+
+  // Ik magnitude for visual indicator
+  const ikKA = Ik / 1000;
+
+  // Primary particles (slower - high voltage, low current)
+  const primParticles = [];
+  const numPrimP = 6;
+  for (let i = 0; i < numPrimP; i++) {
+    const angle = (i / numPrimP) * 360;
+    const dur = '3.5';
+    const delay = ((i / numPrimP) * 3.5).toFixed(2);
+    primParticles.push(`
+      <circle r="2" fill="#00e5ff" opacity="0.8">
+        <animateTransform attributeName="transform" type="rotate"
+          from="${angle} ${primCx} ${trafoCy}" to="${angle - 360} ${primCx} ${trafoCy}"
+          dur="${dur}s" begin="${delay}s" repeatCount="indefinite"/>
+        <animate attributeName="cx" values="${primCx + coilR * 0.75}" dur="0.01s" fill="freeze"/>
+        <animate attributeName="cy" values="${trafoCy}" dur="0.01s" fill="freeze"/>
+        <animate attributeName="opacity" values="0.4;1;0.8;1;0.4" dur="${dur}s" begin="${delay}s" repeatCount="indefinite"/>
+      </circle>`);
+  }
+
+  // Secondary particles (faster - low voltage, high current)
+  const secParticles = [];
+  const numSecP = 10;
+  for (let i = 0; i < numSecP; i++) {
+    const angle = (i / numSecP) * 360;
+    const dur = '1.8';
+    const delay = ((i / numSecP) * 1.8).toFixed(2);
+    secParticles.push(`
+      <circle r="2.5" fill="#ffd166" opacity="0.9">
+        <animateTransform attributeName="transform" type="rotate"
+          from="${angle} ${secCx} ${trafoCy}" to="${angle + 360} ${secCx} ${trafoCy}"
+          dur="${dur}s" begin="${delay}s" repeatCount="indefinite"/>
+        <animate attributeName="cx" values="${secCx + coilR * 0.75}" dur="0.01s" fill="freeze"/>
+        <animate attributeName="cy" values="${trafoCy}" dur="0.01s" fill="freeze"/>
+        <animate attributeName="opacity" values="0.5;1;0.9;1;0.5" dur="${dur}s" begin="${delay}s" repeatCount="indefinite"/>
+      </circle>`);
+  }
+
+  // Magnetic flux lines between coils (animated)
+  const fluxLines = [];
+  for (let i = 0; i < 5; i++) {
+    const yOff = (i - 2) * 12;
+    const delay = (i * 0.3).toFixed(2);
+    fluxLines.push(`
+      <path d="M${primCx + coilR - 5} ${trafoCy + yOff} C${trafoCx - 8} ${trafoCy + yOff - 5} ${trafoCx + 8} ${trafoCy + yOff + 5} ${secCx - coilR + 5} ${trafoCy + yOff}"
+        fill="none" stroke="rgba(180,130,255,0.4)" stroke-width="1" stroke-dasharray="4 6">
+        <animate attributeName="stroke-dashoffset" from="20" to="0" dur="1.5s" begin="${delay}s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.2;0.6;0.2" dur="2.5s" begin="${delay}s" repeatCount="indefinite"/>
+      </path>`);
+  }
+
+  // Coil winding paths (sinusoidal representation)
+  const makeCoilPath = (centerX, centerY, radius, turns) => {
+    let d = '';
+    const turnHeight = (radius * 2) / turns;
+    const startY = centerY - radius;
+    for (let t = 0; t < turns; t++) {
+      const y1 = startY + t * turnHeight;
+      const y2 = y1 + turnHeight / 2;
+      const y3 = y1 + turnHeight;
+      if (t === 0) d += `M${centerX - radius * 0.6} ${y1}`;
+      d += ` C${centerX + radius * 0.8} ${y1} ${centerX + radius * 0.8} ${y2} ${centerX} ${y2}`;
+      d += ` C${centerX - radius * 0.8} ${y2} ${centerX - radius * 0.8} ${y3} ${centerX + radius * 0.3} ${y3}`;
+    }
+    return d;
+  };
+
+  const primCoilPath = makeCoilPath(primCx, trafoCy, coilR, 6);
+  const secCoilPath = makeCoilPath(secCx, trafoCy, coilR, 4);
+
+  // Input/output connection lines with flowing current
+  const primInX = 40, secOutX = W - 40;
+  const primLineY = trafoCy;
+  const secLineY = trafoCy;
+
+  // Input current particles
+  const inParticles = [];
+  for (let i = 0; i < 4; i++) {
+    const delay = (i * 0.7).toFixed(2);
+    inParticles.push(`<circle r="2" fill="#00e5ff" opacity="0">
+      <animate attributeName="cx" from="${primInX}" to="${primCx - coilR}" dur="2.5s" begin="${delay}s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="${primLineY};${primLineY-1};${primLineY+1};${primLineY}" dur="2.5s" begin="${delay}s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;0.9;0.9;0" dur="2.5s" begin="${delay}s" repeatCount="indefinite"/>
+    </circle>`);
+  }
+
+  // Output current particles (faster, brighter)
+  const outParticles = [];
+  for (let i = 0; i < 7; i++) {
+    const delay = (i * 0.35).toFixed(2);
+    outParticles.push(`<circle r="2.5" fill="#ffd166" opacity="0">
+      <animate attributeName="cx" from="${secCx + coilR}" to="${secOutX}" dur="1.5s" begin="${delay}s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="${secLineY};${secLineY-1.5};${secLineY+1.5};${secLineY}" dur="1.5s" begin="${delay}s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;1;1;0" dur="1.5s" begin="${delay}s" repeatCount="indefinite"/>
+    </circle>`);
+  }
+
+  return `
+  <div style="margin-top:16px;border-radius:14px;overflow:hidden;background:linear-gradient(160deg,#060d16 0%,#0c0a1f 40%,#060d16 100%);border:1px solid rgba(180,130,255,0.15);box-shadow:0 0 40px rgba(180,130,255,0.05),inset 0 0 80px rgba(0,0,0,0.4)">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+      <defs>
+        <filter id="trafoBlur"><feGaussianBlur stdDeviation="4"/></filter>
+        <filter id="trafoBlurLg"><feGaussianBlur stdDeviation="${heatBlur}"/></filter>
+        <filter id="trafoGlow">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        </filter>
+        <filter id="trafoShadow">
+          <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="rgba(0,0,0,0.6)"/>
+        </filter>
+
+        <!-- Core gradient (iron lamination look) -->
+        <linearGradient id="coreGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#4a4a5a"/>
+          <stop offset="30%" stop-color="#3a3a4a"/>
+          <stop offset="50%" stop-color="#2a2a3a"/>
+          <stop offset="70%" stop-color="#3a3a4a"/>
+          <stop offset="100%" stop-color="#4a4a5a"/>
+        </linearGradient>
+
+        <!-- Primary coil gradient -->
+        <linearGradient id="primGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#00e5ff"/>
+          <stop offset="50%" stop-color="#0088aa"/>
+          <stop offset="100%" stop-color="#00e5ff"/>
+        </linearGradient>
+
+        <!-- Secondary coil gradient -->
+        <linearGradient id="secGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#ffd166"/>
+          <stop offset="50%" stop-color="#cc8800"/>
+          <stop offset="100%" stop-color="#ffd166"/>
+        </linearGradient>
+
+        <!-- Heat glow -->
+        <radialGradient id="heatGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#ff8c42" stop-opacity="${heatOpacity}"/>
+          <stop offset="70%" stop-color="#ff6b2b" stop-opacity="${(heatIntensity * 0.2).toFixed(2)}"/>
+          <stop offset="100%" stop-color="transparent"/>
+        </radialGradient>
+
+        <!-- Ik flash -->
+        <radialGradient id="ikFlash" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#ef476f" stop-opacity="0.8"/>
+          <stop offset="60%" stop-color="#ef476f" stop-opacity="0.3"/>
+          <stop offset="100%" stop-color="transparent"/>
+        </radialGradient>
+      </defs>
+
+      <!-- Background grid -->
+      <pattern id="trGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+        <path d="M20 0L0 0 0 20" fill="none" stroke="rgba(180,130,255,0.03)" stroke-width="0.5"/>
+      </pattern>
+      <rect width="${W}" height="${H}" fill="url(#trGrid)"/>
+
+      <!-- Title -->
+      <text x="${W/2}" y="24" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="12" font-weight="600" letter-spacing="1">${lang === 'da' ? 'TRANSFORMER VISUALISERING' : 'TRANSFORMER VISUALIZATION'}</text>
+      <text x="${W/2}" y="40" text-anchor="middle" fill="rgba(180,130,255,0.7)" font-size="10">${S} kVA</text>
+
+      <!-- Heat/loss glow (ambient pulsing around transformer) -->
+      <ellipse cx="${trafoCx}" cy="${trafoCy}" rx="${coilR * 2.5}" ry="${coilR * 1.8}" fill="url(#heatGlow)" filter="url(#trafoBlurLg)">
+        <animate attributeName="opacity" values="${(0.3 + heatIntensity * 0.3).toFixed(2)};${(0.6 + heatIntensity * 0.4).toFixed(2)};${(0.3 + heatIntensity * 0.3).toFixed(2)}" dur="${(3 - heatIntensity).toFixed(1)}s" repeatCount="indefinite"/>
+      </ellipse>
+
+      <!-- Transformer iron core (E-I shape) -->
+      <rect x="${trafoCx - 12}" y="${trafoCy - coilR - 12}" width="24" height="${coilR * 2 + 24}" rx="3" fill="url(#coreGrad)" filter="url(#trafoShadow)" opacity="0.9"/>
+      <!-- Core top bar -->
+      <rect x="${primCx - coilR + 5}" y="${trafoCy - coilR - 12}" width="${secCx - primCx + coilR * 2 - 10}" height="10" rx="2" fill="url(#coreGrad)" opacity="0.85"/>
+      <!-- Core bottom bar -->
+      <rect x="${primCx - coilR + 5}" y="${trafoCy + coilR + 2}" width="${secCx - primCx + coilR * 2 - 10}" height="10" rx="2" fill="url(#coreGrad)" opacity="0.85"/>
+      <!-- Core lamination lines -->
+      ${[0,1,2,3,4].map(i => `<line x1="${trafoCx - 10}" y1="${trafoCy - coilR + i * (coilR*2/4)}" x2="${trafoCx + 10}" y2="${trafoCy - coilR + i * (coilR*2/4)}" stroke="rgba(100,100,120,0.4)" stroke-width="0.5"/>`).join('')}
+
+      <!-- Primary coil (left) -->
+      <ellipse cx="${primCx}" cy="${trafoCy}" rx="${coilR}" ry="${coilR}" fill="none" stroke="url(#primGrad)" stroke-width="4" filter="url(#trafoGlow)" opacity="0.9"/>
+      <!-- Primary winding turns -->
+      ${[0,1,2,3,4,5].map(i => {
+        const a1 = -90 + i * 30;
+        const a2 = a1 + 25;
+        return `<path d="M${primCx + coilR * Math.cos(a1*Math.PI/180)} ${trafoCy + coilR * Math.sin(a1*Math.PI/180)} A${coilR} ${coilR} 0 0 1 ${primCx + coilR * Math.cos(a2*Math.PI/180)} ${trafoCy + coilR * Math.sin(a2*Math.PI/180)}" fill="none" stroke="#00e5ff" stroke-width="3" stroke-linecap="round" opacity="0.7"/>`;
+      }).join('')}
+      <!-- Primary inner glow -->
+      <ellipse cx="${primCx}" cy="${trafoCy}" rx="${coilR - 5}" ry="${coilR - 5}" fill="none" stroke="rgba(0,229,255,0.15)" stroke-width="8" filter="url(#trafoBlur)">
+        <animate attributeName="opacity" values="0.3;0.6;0.3" dur="3.5s" repeatCount="indefinite"/>
+      </ellipse>
+
+      <!-- Secondary coil (right) -->
+      <ellipse cx="${secCx}" cy="${trafoCy}" rx="${coilR}" ry="${coilR}" fill="none" stroke="url(#secGrad)" stroke-width="5" filter="url(#trafoGlow)" opacity="0.9"/>
+      <!-- Secondary winding turns (fewer, thicker) -->
+      ${[0,1,2,3].map(i => {
+        const a1 = -90 + i * 45;
+        const a2 = a1 + 38;
+        return `<path d="M${secCx + coilR * Math.cos(a1*Math.PI/180)} ${trafoCy + coilR * Math.sin(a1*Math.PI/180)} A${coilR} ${coilR} 0 0 1 ${secCx + coilR * Math.cos(a2*Math.PI/180)} ${trafoCy + coilR * Math.sin(a2*Math.PI/180)}" fill="none" stroke="#ffd166" stroke-width="4" stroke-linecap="round" opacity="0.75"/>`;
+      }).join('')}
+      <!-- Secondary inner glow -->
+      <ellipse cx="${secCx}" cy="${trafoCy}" rx="${coilR - 5}" ry="${coilR - 5}" fill="none" stroke="rgba(255,209,102,0.15)" stroke-width="8" filter="url(#trafoBlur)">
+        <animate attributeName="opacity" values="0.3;0.7;0.3" dur="1.8s" repeatCount="indefinite"/>
+      </ellipse>
+
+      <!-- Magnetic flux lines (animated between coils) -->
+      ${fluxLines.join('')}
+
+      <!-- uk% impedance block between windings -->
+      <rect x="${trafoCx - 18}" y="${trafoCy + coilR + 16}" width="36" height="20" rx="4" fill="rgba(180,130,255,0.1)" stroke="rgba(180,130,255,0.5)" stroke-width="1"/>
+      <text x="${trafoCx}" y="${trafoCy + coilR + 30}" text-anchor="middle" fill="#b482ff" font-size="9" font-weight="700">uk=${uk}%</text>
+
+      <!-- Primary connection line -->
+      <line x1="${primInX}" y1="${primLineY}" x2="${primCx - coilR}" y2="${primLineY}" stroke="#00e5ff" stroke-width="2" opacity="0.6"/>
+      <line x1="${primInX}" y1="${primLineY}" x2="${primCx - coilR}" y2="${primLineY}" stroke="#00e5ff" stroke-width="5" opacity="0.15" filter="url(#trafoBlur)"/>
+
+      <!-- Secondary connection line -->
+      <line x1="${secCx + coilR}" y1="${secLineY}" x2="${secOutX}" y2="${secLineY}" stroke="#ffd166" stroke-width="2.5" opacity="0.6"/>
+      <line x1="${secCx + coilR}" y1="${secLineY}" x2="${secOutX}" y2="${secLineY}" stroke="#ffd166" stroke-width="6" opacity="0.15" filter="url(#trafoBlur)"/>
+
+      <!-- Input particles (slow, HV) -->
+      ${inParticles.join('')}
+
+      <!-- Output particles (fast, LV) -->
+      ${outParticles.join('')}
+
+      <!-- Primary orbital particles -->
+      <g>${primParticles.join('')}</g>
+
+      <!-- Secondary orbital particles -->
+      <g>${secParticles.join('')}</g>
+
+      <!-- HV Label (primary side) -->
+      <text x="${primInX + 10}" y="${primLineY - 14}" fill="#00e5ff" font-size="10" font-weight="600">${hvVoltage} kV</text>
+      <text x="${primInX + 10}" y="${primLineY + 18}" fill="rgba(0,229,255,0.6)" font-size="8">${lang === 'da' ? 'Prim\u00E6r' : 'Primary'}</text>
+
+      <!-- LV Label (secondary side) -->
+      <text x="${secOutX - 50}" y="${secLineY - 14}" fill="#ffd166" font-size="10" font-weight="600" text-anchor="end">${lvVoltage} kV</text>
+      <text x="${secOutX - 50}" y="${secLineY + 18}" fill="rgba(255,209,102,0.6)" font-size="8" text-anchor="end">${Iload.toFixed(1)} A</text>
+
+      <!-- Ik indicator (red flash pulse) -->
+      <circle cx="${secOutX - 10}" cy="${secLineY}" r="14" fill="url(#ikFlash)" opacity="0">
+        <animate attributeName="opacity" values="0;0.7;0" dur="3s" repeatCount="indefinite"/>
+        <animate attributeName="r" values="8;18;8" dur="3s" repeatCount="indefinite"/>
+      </circle>
+      <text x="${secOutX - 10}" y="${secLineY + 32}" text-anchor="middle" fill="#ef476f" font-size="8" font-weight="600">Ik=${ikKA.toFixed(1)}kA</text>
+
+      <!-- LOAD GAUGE BAR -->
+      <text x="${W/2}" y="${gaugeY - 12}" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="10" font-weight="600">
+        ${lang === 'da' ? 'Belastningsgrad' : 'Load Factor'}: ${(loadFactor * 100).toFixed(0)}%
+      </text>
+
+      <!-- Gauge track -->
+      <rect x="${gaugeX}" y="${gaugeY}" width="${gaugeW}" height="${gaugeH}" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>
+
+      <!-- Gauge fill -->
+      <rect x="${gaugeX}" y="${gaugeY + 1}" width="${gaugeW * Math.min(loadFactor, 1)}" height="${gaugeH - 2}" rx="9" fill="${loadColor}" opacity="0.25"/>
+      <rect x="${gaugeX}" y="${gaugeY + 1}" width="${gaugeW * Math.min(loadFactor, 1)}" height="${gaugeH - 2}" rx="9" fill="${loadColor}" opacity="0.5" filter="url(#trafoBlur)"/>
+
+      <!-- Gauge glow at fill end -->
+      <circle cx="${gaugeX + gaugeW * Math.min(loadFactor, 1)}" cy="${gaugeY + gaugeH/2}" r="8" fill="${loadColor}" opacity="0.4" filter="url(#trafoBlur)">
+        <animate attributeName="opacity" values="0.2;0.6;0.2" dur="2s" repeatCount="indefinite"/>
+      </circle>
+
+      <!-- Gauge threshold markers -->
+      <line x1="${gaugeX + gaugeW * 0.75}" y1="${gaugeY - 4}" x2="${gaugeX + gaugeW * 0.75}" y2="${gaugeY + gaugeH + 4}" stroke="#ffd166" stroke-width="1" stroke-dasharray="3 2" opacity="0.7"/>
+      <text x="${gaugeX + gaugeW * 0.75}" y="${gaugeY - 7}" text-anchor="middle" fill="#ffd166" font-size="7" opacity="0.7">75%</text>
+
+      <line x1="${gaugeX + gaugeW * 0.9}" y1="${gaugeY - 4}" x2="${gaugeX + gaugeW * 0.9}" y2="${gaugeY + gaugeH + 4}" stroke="#ef476f" stroke-width="1" stroke-dasharray="3 2" opacity="0.7"/>
+      <text x="${gaugeX + gaugeW * 0.9}" y="${gaugeY - 7}" text-anchor="middle" fill="#ef476f" font-size="7" opacity="0.7">90%</text>
+
+      <!-- Loss display -->
+      <text x="${W/2}" y="${gaugeY + gaugeH + 22}" text-anchor="middle" fill="rgba(255,140,66,0.8)" font-size="9">
+        ${lang === 'da' ? 'Tab' : 'Losses'}: ${Ploss.toFixed(0)} W
+        <animate attributeName="opacity" values="0.6;1;0.6" dur="${(3 - heatIntensity).toFixed(1)}s" repeatCount="indefinite"/>
+      </text>
+
+      <!-- Direction arrows on connection lines -->
+      <polygon points="${primCx - coilR - 20},${primLineY - 4} ${primCx - coilR - 10},${primLineY} ${primCx - coilR - 20},${primLineY + 4}" fill="#00e5ff" opacity="0.6">
+        <animate attributeName="opacity" values="0.3;0.8;0.3" dur="2.5s" repeatCount="indefinite"/>
+      </polygon>
+      <polygon points="${secOutX - 15},${secLineY - 5} ${secOutX - 5},${secLineY} ${secOutX - 15},${secLineY + 5}" fill="#ffd166" opacity="0.7">
+        <animate attributeName="opacity" values="0.4;1;0.4" dur="1.5s" repeatCount="indefinite"/>
+      </polygon>
+    </svg>
+  </div>`;
+}
+
 function renderTrafo() {
   const S = trafoState.size;
   const uk = TRAFO_UK[S] || 4;
@@ -3163,6 +3743,7 @@ function renderTrafo() {
         <div class="result-row"><span class="label">${lang === 'da' ? 'Tab (belastning)' : 'Losses (load)'}</span><span class="value">${(losses.pk * loadFactor * loadFactor).toFixed(0)} W</span></div>
         <div class="result-row"><span class="label">${lang === 'da' ? 'Totale tab' : 'Total losses'}</span><span class="value">${Ploss.toFixed(0)} W</span></div>
       </div>
+      ${buildTrafoViz(S, uk, Ifl, Iload, loadFactor, Ik, Ploss)}
     </div>
 
     <div class="card fade-in">
