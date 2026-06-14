@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Implement auth module (register, login, logout, session management, TOTP MFA), RBAC middleware, and Case CRUD routes with full tenant isolation.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Update src/db.ts to export a properly-typed PrismaClient singleton (not the lazy dynamic import pattern - we need full type safety for queries). Keep the checkDatabase function.",
     "Create src/auth/password.ts: hashPassword(plain) and verifyPassword(hash, plain) using @node-rs/argon2 with Argon2id algorithm, conservative parameters (memoryCost=65536, timeCost=3, parallelism=1)",

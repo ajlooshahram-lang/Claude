@@ -1,18 +1,9 @@
+import { PrismaClient } from "@prisma/client";
 import type { AppConfig } from "./config.js";
 
-/**
- * Lazy Prisma access. The client is imported dynamically so the process (and the
- * CI health test) can start without the generated client or a live database.
- * A real connection is only established the first time a query is needed.
- */
-let clientPromise: Promise<unknown> | null = null;
+const prisma = new PrismaClient();
 
-async function getPrisma(): Promise<{ $queryRaw: (q: TemplateStringsArray) => Promise<unknown> }> {
-  if (!clientPromise) {
-    clientPromise = import("@prisma/client").then((m) => new m.PrismaClient());
-  }
-  return clientPromise as Promise<{ $queryRaw: (q: TemplateStringsArray) => Promise<unknown> }>;
-}
+export default prisma;
 
 export type DbHealth = { ok: boolean; error?: string };
 
@@ -20,7 +11,6 @@ export type DbHealth = { ok: boolean; error?: string };
 export async function checkDatabase(config: AppConfig): Promise<DbHealth> {
   if (!config.databaseUrl) return { ok: false, error: "DATABASE_URL not configured" };
   try {
-    const prisma = await getPrisma();
     await prisma.$queryRaw`SELECT 1`;
     return { ok: true };
   } catch (err) {

@@ -2,8 +2,11 @@ import Fastify, { type FastifyInstance } from "fastify";
 import helmet from "@fastify/helmet";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
+import cookie from "@fastify/cookie";
 import { loadConfig, type AppConfig } from "./config.js";
 import { checkDatabase } from "./db.js";
+import authRoutes from "./auth/routes.js";
+import casesRoutes from "./routes/cases.js";
 
 const SERVICE = "qi-platform-server";
 const VERSION = "0.1.0";
@@ -33,8 +36,12 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     credentials: true,
   });
 
-  // Baseline abuse protection; per-route auth limits tightened in Phase 1.
+  // Baseline abuse protection; per-route auth limits tightened below.
   await app.register(rateLimit, { max: 300, timeWindow: "1 minute" });
+
+  // Cookie support for session tokens.
+  const cookieSecret = config.sessionSecret ?? "dev-secret-not-for-prod";
+  await app.register(cookie, { secret: cookieSecret });
 
   // Liveness: process is up. Never touches the database.
   app.get("/health", async () => ({
@@ -55,6 +62,12 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
       time: new Date().toISOString(),
     });
   });
+
+  // Auth routes (register, login, logout, me, mfa)
+  await app.register(authRoutes);
+
+  // Case CRUD routes
+  await app.register(casesRoutes);
 
   return app;
 }
