@@ -2,7 +2,7 @@ import { describe, test, before, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import type { FastifyInstance } from "fastify";
 import { authenticator } from "otplib";
-import { buildTestApp, registerUser, cleanDatabase, prisma } from "./helpers.js";
+import { buildTestApp, registerUser, cleanDatabase, prisma, extractSessionCookie, extractCsrfToken } from "./helpers.js";
 
 describe("Auth integration tests", () => {
   let app: FastifyInstance;
@@ -50,18 +50,7 @@ describe("Auth integration tests", () => {
         tenantName: "Dup Tenant",
       });
 
-      // Register another user with same email + tenant is not directly possible
-      // because register always creates a new tenant. So we test duplicate by
-      // registering again with same email (the unique constraint is tenantId+email,
-      // but the second call creates a new tenant so it should succeed).
-      // The real duplicate test: manually create a user in the same tenant, then
-      // try to register (won't work since register creates new tenant).
-      // Instead, test that the register transaction handles a real conflict.
-
-      // Since register creates a new tenant each time, duplicates at the register
-      // endpoint level occur if the email+tenantId combination is somehow repeated.
-      // We can test this by creating a user directly in the DB and then trying to
-      // register with the same email (different tenant, should succeed).
+      // Since each register creates a new tenant, same email CAN register in a different tenant
       const res2 = await app.inject({
         method: "POST",
         url: "/auth/register",
@@ -149,13 +138,12 @@ describe("Auth integration tests", () => {
 
   describe("POST /auth/logout", () => {
     test("invalidates session so subsequent /auth/me returns 401", async () => {
-      const { cookie } = await registerUser(app, {
+      const { cookie, csrfToken } = await registerUser(app, {
         email: "logout@example.com",
         password: "SecurePass123!",
         tenantName: "Logout Tenant",
       });
 
-      // Parse the session cookie value
       const sessionCookie = extractSessionCookie(cookie);
 
       // Verify session works before logout
@@ -170,7 +158,10 @@ describe("Auth integration tests", () => {
       const logoutRes = await app.inject({
         method: "POST",
         url: "/auth/logout",
-        headers: { cookie: `session=${sessionCookie}` },
+        headers: {
+          cookie: `session=${sessionCookie}; csrf_token=${csrfToken}`,
+          "x-csrf-token": csrfToken,
+        },
       });
       assert.equal(logoutRes.statusCode, 200);
 
@@ -221,7 +212,7 @@ describe("Auth integration tests", () => {
 
   describe("MFA enrollment and verification", () => {
     test("enroll returns secret and otpauthUrl", async () => {
-      const { cookie } = await registerUser(app, {
+      const { cookie, csrfToken } = await registerUser(app, {
         email: "mfa@example.com",
         password: "SecurePass123!",
         tenantName: "MFA Tenant",
@@ -232,7 +223,10 @@ describe("Auth integration tests", () => {
       const res = await app.inject({
         method: "POST",
         url: "/auth/mfa/enroll",
-        headers: { cookie: `session=${sessionCookie}` },
+        headers: {
+          cookie: `session=${sessionCookie}; csrf_token=${csrfToken}`,
+          "x-csrf-token": csrfToken,
+        },
       });
 
       assert.equal(res.statusCode, 200);
@@ -246,7 +240,7 @@ describe("Auth integration tests", () => {
     });
 
     test("verify with correct token enables MFA", async () => {
-      const { cookie } = await registerUser(app, {
+      const { cookie, csrfToken } = await registerUser(app, {
         email: "mfa-verify@example.com",
         password: "SecurePass123!",
         tenantName: "MFA Verify Tenant",
@@ -258,7 +252,10 @@ describe("Auth integration tests", () => {
       const enrollRes = await app.inject({
         method: "POST",
         url: "/auth/mfa/enroll",
-        headers: { cookie: `session=${sessionCookie}` },
+        headers: {
+          cookie: `session=${sessionCookie}; csrf_token=${csrfToken}`,
+          "x-csrf-token": csrfToken,
+        },
       });
 
       const { secret } = enrollRes.json() as { secret: string };
@@ -270,7 +267,10 @@ describe("Auth integration tests", () => {
       const verifyRes = await app.inject({
         method: "POST",
         url: "/auth/mfa/verify",
-        headers: { cookie: `session=${sessionCookie}` },
+        headers: {
+          cookie: `session=${sessionCookie}; csrf_token=${csrfToken}`,
+          "x-csrf-token": csrfToken,
+        },
         payload: { token: validToken },
       });
 
@@ -290,12 +290,3 @@ describe("Auth integration tests", () => {
     });
   });
 });
-
-/** Extract the raw session token value from a set-cookie header string. */
-function extractSessionCookie(setCookieHeader: string): string {
-  const match = setCookieHeader.match(/session=([^;]+)/);
-  if (!match?.[1]) {
-    throw new Error(`Could not extract session cookie from: ${setCookieHeader}`);
-  }
-  return match[1];
-}

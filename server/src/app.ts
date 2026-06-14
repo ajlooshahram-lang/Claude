@@ -5,6 +5,10 @@ import rateLimit from "@fastify/rate-limit";
 import cookie from "@fastify/cookie";
 import { loadConfig, type AppConfig } from "./config.js";
 import { checkDatabase } from "./db.js";
+import requestIdPlugin from "./middleware/request-id.js";
+import limitsPlugin from "./middleware/limits.js";
+import csrfPlugin from "./middleware/csrf.js";
+import errorHandlerPlugin from "./middleware/errors.js";
 import authRoutes from "./auth/routes.js";
 import casesRoutes from "./routes/cases.js";
 import projectsRoutes from "./routes/projects.js";
@@ -27,12 +31,38 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   const app = Fastify({
     logger: config.nodeEnv !== "test",
     trustProxy: true,
-    // Do not leak internal error details to clients.
     disableRequestLogging: config.nodeEnv === "test",
+    bodyLimit: 1_048_576, // 1MB
   });
 
+  // Request-ID: must be registered first so all other hooks can reference it
+  await app.register(requestIdPlugin);
+
   // Security headers on every response.
-  await app.register(helmet, { contentSecurityPolicy: false });
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"],
+        connectSrc: ["'self'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    xFrameOptions: { action: "deny" },
+    strictTransportSecurity: {
+      maxAge: 31_536_000,
+      includeSubDomains: true,
+    },
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  });
+
+  // Permissions-Policy header (not supported by helmet directly)
+  app.addHook("onSend", async (_request, reply, payload) => {
+    void reply.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    return payload;
+  });
 
   // Strict CORS: only the configured UI origins, credentials allowed for sessions.
   await app.register(cors, {
@@ -40,10 +70,10 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     credentials: true,
   });
 
-  // Baseline abuse protection; per-route auth limits tightened below.
-  // In test mode, disable rate limiting so integration tests are not throttled.
+  // Global rate limit: 1000/min per IP.
+  // In test mode, allowList 127.0.0.1 so integration tests are not throttled.
   await app.register(rateLimit, {
-    max: 300,
+    max: 1000,
     timeWindow: "1 minute",
     allowList: config.nodeEnv === "test" ? ["127.0.0.1"] : [],
   });
@@ -51,6 +81,15 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   // Cookie support for session tokens.
   const cookieSecret = config.sessionSecret ?? "dev-secret-not-for-prod";
   await app.register(cookie, { secret: cookieSecret });
+
+  // Request size limits (URL length)
+  await app.register(limitsPlugin);
+
+  // CSRF protection (double-submit cookie pattern)
+  await app.register(csrfPlugin);
+
+  // Global error handler (must be after request-id so it can reference requestId)
+  await app.register(errorHandlerPlugin);
 
   // Liveness: process is up. Never touches the database.
   app.get("/health", async () => ({

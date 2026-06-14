@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Soft-delete consistency middleware, referential integrity verification, SQL injection prevention test, dependency audit script, and docker-compose backup service.",
+  "status": "pending",
+  "steps": [
+    "Create Prisma middleware or helper in server/src/db.ts (or server/src/middleware/soft-delete.ts): Use Prisma middleware ($use) to automatically add deletedAt: null filter on findMany/findFirst/findUnique for models that have deletedAt (Project, Case, RegisterRow, Tenant, User). Override delete operations to soft-delete (set deletedAt instead of hard delete) where appropriate. Be careful not to break the existing explicit deletedAt filters in routes -- the middleware should only apply when the query does NOT already specify a deletedAt filter.",
+    "Review and fix referential integrity in all routes: Before creating a case, verify project exists AND belongs to tenant AND is not soft-deleted (already done in cases.ts). Before creating a register row, verify same (already done in registers.ts). Before creating a snapshot, verify same (already done in snapshots.ts). Before creating a share token, verify project exists AND belongs to tenant AND user has ADMIN+ role (update shares.ts requireRole from MANAGER to ADMIN).",
+    "Create server/test/sql-injection.test.ts: A test that greps all .ts source files for $queryRaw or $executeRaw with template literal interpolation of variables (not tagged template literals which are safe). Verify no raw SQL with string concatenation exists. The only allowed pattern is Prisma's tagged template: prisma.$queryRaw`SELECT ... ${var}` which is parameterized. Flag prisma.$queryRawUnsafe() or $executeRawUnsafe() calls with non-constant strings.",
+    "Add 'audit' script to server/package.json: Add \"audit\": \"npm audit --production --audit-level=high\" to scripts section.",
+    "Add backup service to docker-compose.yml: A service using postgres:16-alpine that runs pg_dump daily. Use environment variables for credentials. Dumps go to a mounted ./backups volume. Include a simple shell script or command that deletes dumps older than 30 days. Use restart: 'no' with a cron-like entrypoint (or a loop with sleep 86400)."
+  ],
+  "acceptance_criteria": [
+    "Soft-deleted records never appear in list/get responses (enforced at middleware level)",
+    "Share token creation requires ADMIN+ role",
+    "SQL injection test passes: no raw SQL with string interpolation found",
+    "npm run audit script exists in package.json",
+    "docker-compose.yml includes a backup service with pg_dump and 30-day retention",
+    "All existing tests still pass"
+  ],
+  "verification": [
+    "cd server && npm run build",
+    "cd server && npm test"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

@@ -2,7 +2,7 @@ import { describe, test, before, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import type { FastifyInstance } from "fastify";
 import { authenticator } from "otplib";
-import { buildTestApp, registerUser, cleanDatabase, prisma } from "./helpers.js";
+import { buildTestApp, registerUser, cleanDatabase, prisma, extractSessionCookie, extractCsrfToken } from "./helpers.js";
 import { cleanExpiredSessions } from "../src/auth/session.js";
 
 describe("Security integration tests", () => {
@@ -10,7 +10,7 @@ describe("Security integration tests", () => {
 
   before(async () => {
     // Ensure DATA_ENCRYPTION_KEY is set for MFA encryption tests
-    process.env["DATA_ENCRYPTION_KEY"] = "test-encryption-key-32chars-ok!";
+    process.env["DATA_ENCRYPTION_KEY"] = "test-encryption-key-32chars-ok!!";
     app = await buildTestApp();
   });
 
@@ -26,7 +26,7 @@ describe("Security integration tests", () => {
 
   describe("MFA encryption at rest", () => {
     test("after MFA enroll+verify, mfaSecret in DB is encrypted (not raw base32)", async () => {
-      const { cookie, body } = await registerUser(app, {
+      const { cookie, csrfToken, body } = await registerUser(app, {
         email: "mfa-enc@example.com",
         password: "SecurePass123!",
         tenantName: "MFA Encryption Tenant",
@@ -38,7 +38,10 @@ describe("Security integration tests", () => {
       const enrollRes = await app.inject({
         method: "POST",
         url: "/auth/mfa/enroll",
-        headers: { cookie: `session=${sessionCookie}` },
+        headers: {
+          cookie: `session=${sessionCookie}; csrf_token=${csrfToken}`,
+          "x-csrf-token": csrfToken,
+        },
       });
       assert.equal(enrollRes.statusCode, 200);
       const { secret } = enrollRes.json() as { secret: string };
@@ -48,7 +51,10 @@ describe("Security integration tests", () => {
       const verifyRes = await app.inject({
         method: "POST",
         url: "/auth/mfa/verify",
-        headers: { cookie: `session=${sessionCookie}` },
+        headers: {
+          cookie: `session=${sessionCookie}; csrf_token=${csrfToken}`,
+          "x-csrf-token": csrfToken,
+        },
         payload: { token: validToken },
       });
       assert.equal(verifyRes.statusCode, 200);
@@ -73,7 +79,7 @@ describe("Security integration tests", () => {
 
   describe("POST /auth/change-password", () => {
     test("changes password and old sessions are revoked", async () => {
-      const { cookie } = await registerUser(app, {
+      const { cookie, csrfToken } = await registerUser(app, {
         email: "changepw@example.com",
         password: "OldPassword123!",
         tenantName: "ChangePassword Tenant",
@@ -97,13 +103,16 @@ describe("Security integration tests", () => {
         },
       });
       assert.equal(loginRes.statusCode, 200);
-      const secondCookie = extractSessionCookie(loginRes.headers["set-cookie"] as string);
+      const secondCookie = extractSessionCookie(loginRes.headers["set-cookie"] as string | string[]);
 
       // Change password using the first session
       const changeRes = await app.inject({
         method: "POST",
         url: "/auth/change-password",
-        headers: { cookie: `session=${sessionCookie}` },
+        headers: {
+          cookie: `session=${sessionCookie}; csrf_token=${csrfToken}`,
+          "x-csrf-token": csrfToken,
+        },
         payload: {
           currentPassword: "OldPassword123!",
           newPassword: "NewPassword456!",
@@ -132,7 +141,7 @@ describe("Security integration tests", () => {
     });
 
     test("wrong current password returns 401", async () => {
-      const { cookie } = await registerUser(app, {
+      const { cookie, csrfToken } = await registerUser(app, {
         email: "wrongcurrent@example.com",
         password: "CorrectPass123!",
         tenantName: "WrongCurrent Tenant",
@@ -142,7 +151,10 @@ describe("Security integration tests", () => {
       const res = await app.inject({
         method: "POST",
         url: "/auth/change-password",
-        headers: { cookie: `session=${sessionCookie}` },
+        headers: {
+          cookie: `session=${sessionCookie}; csrf_token=${csrfToken}`,
+          "x-csrf-token": csrfToken,
+        },
         payload: {
           currentPassword: "WrongPassword123!",
           newPassword: "NewPassword456!",
@@ -153,7 +165,7 @@ describe("Security integration tests", () => {
     });
 
     test("after password change, login with new password succeeds", async () => {
-      const { cookie, body } = await registerUser(app, {
+      const { cookie, csrfToken, body } = await registerUser(app, {
         email: "newlogin@example.com",
         password: "OldPassword123!",
         tenantName: "NewLogin Tenant",
@@ -165,7 +177,10 @@ describe("Security integration tests", () => {
       await app.inject({
         method: "POST",
         url: "/auth/change-password",
-        headers: { cookie: `session=${sessionCookie}` },
+        headers: {
+          cookie: `session=${sessionCookie}; csrf_token=${csrfToken}`,
+          "x-csrf-token": csrfToken,
+        },
         payload: {
           currentPassword: "OldPassword123!",
           newPassword: "BrandNewPass789!",
@@ -274,12 +289,3 @@ describe("Security integration tests", () => {
     });
   });
 });
-
-/** Extract the raw session token value from a set-cookie header string. */
-function extractSessionCookie(setCookieHeader: string): string {
-  const match = setCookieHeader.match(/session=([^;]+)/);
-  if (!match?.[1]) {
-    throw new Error(`Could not extract session cookie from: ${setCookieHeader}`);
-  }
-  return match[1];
-}

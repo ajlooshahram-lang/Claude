@@ -1,0 +1,38 @@
+{
+  "id": "FEAT-004",
+  "type": "feat",
+  "description": "Comprehensive security hardening test suite covering all new security features: oversized payloads, unknown fields, XSS, SQL injection, CSRF, sessions, rate limiting, validation, soft-delete, RBAC, and request-id.",
+  "status": "pending",
+  "steps": [
+    "Create server/test/security-hardening.test.ts: A comprehensive test suite with all required security tests. Uses buildTestApp() and registerUser() from helpers.ts. Tests must handle CSRF tokens properly (get token from login/register cookie, include in subsequent requests).",
+    "Test: oversized request body (>1MB) on POST /cases returns 413 Payload Too Large",
+    "Test: unknown fields in request body (e.g. {problem: 'x', projectId: 'x', hackerField: 'evil'}) returns 400 or strips the field",
+    "Test: XSS payload in string field (<script>alert(1)</script>) in case problem field - stored as-is (escaped on render), verify it does not cause server error and is stored literally not executed",
+    "Test: SQL injection attempt in query params (e.g. projectId='; DROP TABLE cases;--) returns 400 (invalid UUID) or empty results, not a server error",
+    "Test: CSRF token missing on POST /cases returns 403",
+    "Test: CSRF token mismatch on POST /cases returns 403",
+    "Test: expired session (manually expire in DB) returns 401 not 500",
+    "Test: rate limit exceeded returns 429 (use a tight rate limit config for test)",
+    "Test: password too short (<8 chars) on register returns 400",
+    "Test: password too long (>128 chars) on register returns 400",
+    "Test: enum field with invalid value (status: 'INVALID_STATUS') on case creation returns 400",
+    "Test: numeric field out of bounds (sev: 11) on case creation returns 400",
+    "Test: UUID parameter with invalid format (GET /cases/not-a-uuid) returns 400",
+    "Test: accessing a soft-deleted resource returns 404 (create case, soft-delete it, then GET it returns 404 not the deleted data)",
+    "Test: non-admin creating share token returns 403 (register user with VIEWER role membership)",
+    "Test: requestId present in all responses (check X-Request-Id header on multiple endpoints)",
+    "Test: error responses never contain stack traces, SQL errors, or file paths"
+  ],
+  "acceptance_criteria": [
+    "All 17+ security hardening tests pass",
+    "Tests exercise real code paths (not just mocks)",
+    "Tests would fail if the security feature were removed",
+    "All existing 83 tests still pass alongside new tests"
+  ],
+  "verification": [
+    "cd server && npm run build",
+    "cd server && npm test"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

@@ -1,18 +1,20 @@
 import { describe, test, before, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import type { FastifyInstance } from "fastify";
-import { buildTestApp, registerUser, cleanDatabase, prisma } from "./helpers.js";
+import { buildTestApp, registerUser, cleanDatabase, prisma, extractSessionCookie } from "./helpers.js";
 
 describe("Snapshots CRUD integration tests", () => {
   let app: FastifyInstance;
 
   // User A context
   let cookieA: string;
+  let csrfA: string;
   let tenantIdA: string;
   let projectIdA: string;
 
   // User B context
   let cookieB: string;
+  let csrfB: string;
   let tenantIdB: string;
   let projectIdB: string;
 
@@ -39,6 +41,7 @@ describe("Snapshots CRUD integration tests", () => {
     });
     tenantIdA = regA.body["tenantId"] as string;
     cookieA = extractSessionCookie(regA.cookie);
+    csrfA = regA.csrfToken;
 
     const regB = await registerUser(app, {
       email: "userB@beta.com",
@@ -48,14 +51,13 @@ describe("Snapshots CRUD integration tests", () => {
     });
     tenantIdB = regB.body["tenantId"] as string;
     cookieB = extractSessionCookie(regB.cookie);
+    csrfB = regB.csrfToken;
 
-    // Create project for tenant A
     const projA = await prisma.project.create({
       data: { tenantId: tenantIdA, name: "Project Alpha" },
     });
     projectIdA = projA.id;
 
-    // Create project for tenant B
     const projB = await prisma.project.create({
       data: { tenantId: tenantIdB, name: "Project Beta" },
     });
@@ -69,7 +71,7 @@ describe("Snapshots CRUD integration tests", () => {
       const res = await app.inject({
         method: "POST",
         url: "/snapshots",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, label: "Initial snapshot" },
       });
 
@@ -85,27 +87,24 @@ describe("Snapshots CRUD integration tests", () => {
     test("snapshot captures cases and register rows", async () => {
       await setupTwoTenants();
 
-      // Create a case in the project
       await app.inject({
         method: "POST",
         url: "/cases",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, problem: "Test case for snapshot" },
       });
 
-      // Create a register row
       await app.inject({
         method: "POST",
         url: "/registers/hazop",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, data: { node: "P-101" } },
       });
 
-      // Take snapshot
       const res = await app.inject({
         method: "POST",
         url: "/snapshots",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA },
       });
 
@@ -131,17 +130,16 @@ describe("Snapshots CRUD integration tests", () => {
     test("lists snapshots for a project", async () => {
       await setupTwoTenants();
 
-      // Create two snapshots
       await app.inject({
         method: "POST",
         url: "/snapshots",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, label: "Snap 1" },
       });
       await app.inject({
         method: "POST",
         url: "/snapshots",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, label: "Snap 2" },
       });
 
@@ -176,7 +174,7 @@ describe("Snapshots CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/snapshots",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, label: "Old label" },
       });
       const snapshotId = (createRes.json() as Record<string, unknown>)["id"] as string;
@@ -184,7 +182,7 @@ describe("Snapshots CRUD integration tests", () => {
       const res = await app.inject({
         method: "PATCH",
         url: `/snapshots/${snapshotId}`,
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { label: "New label" },
       });
 
@@ -201,7 +199,7 @@ describe("Snapshots CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/snapshots",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, label: "To be deleted" },
       });
       const snapshotId = (createRes.json() as Record<string, unknown>)["id"] as string;
@@ -209,11 +207,10 @@ describe("Snapshots CRUD integration tests", () => {
       const delRes = await app.inject({
         method: "DELETE",
         url: `/snapshots/${snapshotId}`,
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
       });
       assert.equal(delRes.statusCode, 200);
 
-      // List should not include deleted snapshot
       const listRes = await app.inject({
         method: "GET",
         url: `/snapshots?projectId=${projectIdA}`,
@@ -228,32 +225,28 @@ describe("Snapshots CRUD integration tests", () => {
     test("restores project state from snapshot (cases come back after deletion)", async () => {
       await setupTwoTenants();
 
-      // Create a case
       const caseRes = await app.inject({
         method: "POST",
         url: "/cases",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, problem: "Important case" },
       });
       const caseId = (caseRes.json() as Record<string, unknown>)["id"] as string;
 
-      // Take snapshot (captures the case)
       const snapRes = await app.inject({
         method: "POST",
         url: "/snapshots",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, label: "Before deletion" },
       });
       const snapshotId = (snapRes.json() as Record<string, unknown>)["id"] as string;
 
-      // Delete the case
       await app.inject({
         method: "DELETE",
         url: `/cases/${caseId}`,
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
       });
 
-      // Verify case is gone
       const listBefore = await app.inject({
         method: "GET",
         url: `/cases?projectId=${projectIdA}`,
@@ -261,18 +254,16 @@ describe("Snapshots CRUD integration tests", () => {
       });
       assert.equal((listBefore.json() as unknown[]).length, 0);
 
-      // Restore from snapshot
       const restoreRes = await app.inject({
         method: "POST",
         url: `/snapshots/${snapshotId}/restore`,
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
       });
       assert.equal(restoreRes.statusCode, 200);
       const restoreBody = restoreRes.json();
       assert.equal(restoreBody.ok, true);
       assert.equal(restoreBody.restoredFrom, snapshotId);
 
-      // Verify case is back
       const listAfter = await app.inject({
         method: "GET",
         url: `/cases?projectId=${projectIdA}`,
@@ -291,7 +282,7 @@ describe("Snapshots CRUD integration tests", () => {
       const res = await app.inject({
         method: "POST",
         url: "/snapshots",
-        headers: { cookie: `session=${cookieB}` },
+        headers: { cookie: `session=${cookieB}; csrf_token=${csrfB}`, "x-csrf-token": csrfB },
         payload: { projectId: projectIdA },
       });
 
@@ -301,15 +292,13 @@ describe("Snapshots CRUD integration tests", () => {
     test("user B cannot see user A's snapshots", async () => {
       await setupTwoTenants();
 
-      // User A takes a snapshot
       await app.inject({
         method: "POST",
         url: "/snapshots",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, label: "A's snapshot" },
       });
 
-      // User B queries for A's project
       const res = await app.inject({
         method: "GET",
         url: `/snapshots?projectId=${projectIdA}`,
@@ -327,7 +316,7 @@ describe("Snapshots CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/snapshots",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, label: "Protected" },
       });
       const snapshotId = (createRes.json() as Record<string, unknown>)["id"] as string;
@@ -335,7 +324,7 @@ describe("Snapshots CRUD integration tests", () => {
       const res = await app.inject({
         method: "DELETE",
         url: `/snapshots/${snapshotId}`,
-        headers: { cookie: `session=${cookieB}` },
+        headers: { cookie: `session=${cookieB}; csrf_token=${csrfB}`, "x-csrf-token": csrfB },
       });
 
       assert.equal(res.statusCode, 404, "Should return 404, not 403");
@@ -347,7 +336,7 @@ describe("Snapshots CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/snapshots",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, label: "A's restorable" },
       });
       const snapshotId = (createRes.json() as Record<string, unknown>)["id"] as string;
@@ -355,19 +344,10 @@ describe("Snapshots CRUD integration tests", () => {
       const res = await app.inject({
         method: "POST",
         url: `/snapshots/${snapshotId}/restore`,
-        headers: { cookie: `session=${cookieB}` },
+        headers: { cookie: `session=${cookieB}; csrf_token=${csrfB}`, "x-csrf-token": csrfB },
       });
 
       assert.equal(res.statusCode, 404, "Should return 404, not 403");
     });
   });
 });
-
-/** Extract the raw session token value from a set-cookie header string. */
-function extractSessionCookie(setCookieHeader: string): string {
-  const match = setCookieHeader.match(/session=([^;]+)/);
-  if (!match?.[1]) {
-    throw new Error(`Could not extract session cookie from: ${setCookieHeader}`);
-  }
-  return match[1];
-}

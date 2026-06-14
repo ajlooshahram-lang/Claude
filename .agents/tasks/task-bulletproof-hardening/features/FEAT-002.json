@@ -1,0 +1,39 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Validation schemas, structured logging, database resilience, metrics endpoint, and audit log completeness. Tightens all data input, adds observability, and makes the database layer production-ready.",
+  "status": "pending",
+  "steps": [
+    "Create server/src/validation/schemas.ts: Define strict zod schemas for ALL endpoint request bodies. String field limits: problem max 500, rootCause max 1000, email max 254, password min 8 max 128, displayName max 100, tenantName max 200, project name max 500. Numeric bounds: sev/occ/det 1-10, estCost/actCost 0-999999999, percent 0-1 (note: existing code uses 0-100, need to check). Enum allowlists: status OPEN/IN PROGRESS/ON HOLD/BLOCKED/RESOLVED/CLOSED, priority 1-CRITICAL/2-HIGH/3-MEDIUM/4-LOW, role OWNER/ADMIN/MANAGER/VIEWER. Use .strict() mode to reject unknown fields. UUID format validation for ID params. Export all schemas.",
+    "Create server/src/validation/index.ts: Export a validateBody<T>(schema, body) helper and a validateParams helper that returns parsed data or throws a typed validation error. Also export a validateUUID(id: string) helper.",
+    "Update server/src/auth/routes.ts: Import and apply the hardened schemas from validation/schemas.ts, replacing the existing inline schemas. Ensure .strict() mode is used. Update RegisterBody email max to 254, add displayName max 100.",
+    "Update server/src/routes/cases.ts: Replace inline CreateCaseBody/UpdateCaseBody with hardened schemas from validation/schemas.ts. Apply string max lengths (problem: 500, rootCause: 1000), numeric bounds (sev/occ/det: 1-10, estCost/actCost: 0-999999999, percent: 0-1), enum allowlists for status and priority. Add UUID validation on :id param.",
+    "Update server/src/routes/projects.ts: Apply hardened schemas. Add UUID validation on :id param. Enforce string limits on all fields.",
+    "Update server/src/routes/registers.ts: Apply hardened schemas. Add UUID validation on :id and projectId params.",
+    "Update server/src/routes/snapshots.ts: Apply hardened schemas. Add UUID validation on :id and projectId params.",
+    "Update server/src/routes/shares.ts: Apply hardened schemas. Add UUID validation. Share creation requires ADMIN+ role (change from current MANAGER).",
+    "Create server/src/logging.ts: Configure pino structured logger. Every log entry includes timestamp, level, requestId, tenantId (if authenticated), action, duration. Create helper functions for logging auth events, CRUD mutations, errors, slow queries. NEVER log passwords, session tokens, or MFA secrets. Integrate with Fastify's built-in logger.",
+    "Enhance server/src/db.ts: Add Prisma client configuration with connection timeout (5s), query timeout (10s). Add $use middleware to log slow queries (>1s) as warnings. Add connection retry logic for transient failures. Export connection pool stats for metrics.",
+    "Create server/src/routes/metrics.ts: GET /metrics endpoint. Track: request count by endpoint/status, response time percentiles (p50/p95/p99), active sessions count (query DB), DB connection pool stats, error rate (5xx). Protect: only accessible from localhost (127.0.0.1/::1) or with X-Metrics-Token header matching env var METRICS_TOKEN. Register in app.ts.",
+    "Ensure audit log completeness: Add audit logging to every state-changing operation in routes (create/update/delete for cases, projects, registers, snapshots, shares). Include actor, action, entity, entityId, IP, timestamp. For updates, include a diff of changed fields in the detail JSON. Auth events (login/logout/register/mfa) should also write audit logs."
+  ],
+  "acceptance_criteria": [
+    "All request bodies are validated with strict zod schemas before processing",
+    "Unknown fields in request bodies are rejected (400 error)",
+    "String fields exceeding max length are rejected (400)",
+    "Numeric fields out of bounds are rejected (400)",
+    "Invalid enum values are rejected (400)",
+    "Invalid UUID format in path params returns 400",
+    "Slow queries (>1s) are logged as warnings",
+    "Every state-changing operation writes to AuditLog with actor/action/entity/entityId/IP",
+    "GET /metrics returns structured metrics data when accessed from localhost",
+    "GET /metrics returns 403 when accessed from non-localhost without token",
+    "All existing tests still pass"
+  ],
+  "verification": [
+    "cd server && npm run build",
+    "cd server && npm test"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

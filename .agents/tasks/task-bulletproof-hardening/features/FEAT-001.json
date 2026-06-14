@@ -1,0 +1,32 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Core middleware layer: request-id, global error handler, enhanced security headers, request size limits, CSRF protection, and per-endpoint rate limiting. This establishes the security foundation that all other features build on.",
+  "status": "in_progress",
+  "steps": [
+    "Create server/src/middleware/request-id.ts: Generate a crypto.randomUUID() for each request. Decorate request with requestId. Add X-Request-Id response header via onSend hook. Export the hook as a Fastify plugin.",
+    "Create server/src/middleware/errors.ts: Global error handler (app.setErrorHandler). Log full error with stack trace, requestId, and request context internally via request.log. Return generic {error: 'Internal server error', requestId} to client. Handle Fastify validation errors (400), rate limit (429), not found (404), payload too large (413). Never leak stack traces, SQL errors, or internal paths. For Zod validation errors already handled in routes, let those pass through since routes already return 400.",
+    "Create server/src/middleware/limits.ts: Register Fastify body limit at 1MB (1048576 bytes) via server option or plugin. Add URL length limit (2048) check as onRequest hook. Header size limit (8KB) check.",
+    "Create server/src/middleware/csrf.ts: Double-submit cookie CSRF protection. On successful login/register response, set a csrf_token cookie (httpOnly=false, sameSite=strict, secure in prod, path=/). For POST/PATCH/DELETE requests, require X-CSRF-Token header matching the csrf_token cookie value. Exempt paths: GET requests, POST /auth/register, POST /auth/login, GET /shared/:token. Return 403 {error: 'CSRF token missing'} or {error: 'CSRF token mismatch'}.",
+    "Enhance security headers in server/src/app.ts: Update helmet config to set CSP (default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'), X-Frame-Options: DENY, HSTS max-age=31536000 includeSubDomains, Referrer-Policy: strict-origin-when-cross-origin, Permissions-Policy: camera=(), microphone=(), geolocation=(). Keep X-Content-Type-Options: nosniff (already from helmet).",
+    "Extend rate limiting in server/src/app.ts: Change global max to 1000/min per IP. Auth endpoints already have 3-5/min. Add CRUD endpoints default: 100/min per user. Share token creation (POST /shares): 10/min. Public share endpoint (GET /shared/:token): 30/min per IP. Use route-level rateLimit config options.",
+    "Register all new middleware in server/src/app.ts in correct order: request-id first, then limits, then CSRF, then error handler.",
+    "Enhance server/src/server.ts graceful shutdown: On SIGTERM/SIGINT, set a shutting-down flag, return 503 from /health when flag is set, stop accepting new connections (app.close()), wait for in-flight requests (Fastify handles this), disconnect DB (await prisma.$disconnect()), then exit. Max wait 30 seconds before force exit."
+  ],
+  "acceptance_criteria": [
+    "Every response includes X-Request-Id header with a valid UUID",
+    "Unhandled errors return {error: 'Internal server error', requestId: '...'} with no stack trace",
+    "Request bodies >1MB receive 413 Payload Too Large",
+    "POST/PATCH/DELETE (except exempt) without X-CSRF-Token header receive 403",
+    "CSP, X-Frame-Options, HSTS, Referrer-Policy, Permissions-Policy headers present on responses",
+    "Rate limit returns 429 with Retry-After header when exceeded",
+    "Health endpoint returns 503 during graceful shutdown",
+    "All existing 83 tests still pass (test helpers may need CSRF token setup)"
+  ],
+  "verification": [
+    "cd server && npm run build",
+    "cd server && npm test"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

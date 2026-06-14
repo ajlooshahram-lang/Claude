@@ -109,7 +109,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
         request.ip,
       );
 
-      void reply
+      return reply
         .setCookie("session", token, cookieOptions(isProd))
         .code(201)
         .send({
@@ -173,7 +173,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
         request.ip,
       );
 
-      void reply
+      return reply
         .setCookie("session", token, cookieOptions(isProd))
         .code(200)
         .send({
@@ -195,7 +195,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
         await revokeSession(prisma, tokenHash);
       }
 
-      void reply
+      return reply
         .clearCookie("session", { path: "/" })
         .code(200)
         .send({ ok: true });

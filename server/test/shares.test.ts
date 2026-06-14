@@ -1,18 +1,20 @@
 import { describe, test, before, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import type { FastifyInstance } from "fastify";
-import { buildTestApp, registerUser, cleanDatabase, prisma } from "./helpers.js";
+import { buildTestApp, registerUser, cleanDatabase, prisma, extractSessionCookie } from "./helpers.js";
 
 describe("Shares integration tests", () => {
   let app: FastifyInstance;
 
   // User A context
   let cookieA: string;
+  let csrfA: string;
   let tenantIdA: string;
   let projectIdA: string;
 
   // User B context
   let cookieB: string;
+  let csrfB: string;
   let tenantIdB: string;
   let projectIdB: string;
 
@@ -39,6 +41,7 @@ describe("Shares integration tests", () => {
     });
     tenantIdA = regA.body["tenantId"] as string;
     cookieA = extractSessionCookie(regA.cookie);
+    csrfA = regA.csrfToken;
 
     const regB = await registerUser(app, {
       email: "userB@beta.com",
@@ -48,14 +51,13 @@ describe("Shares integration tests", () => {
     });
     tenantIdB = regB.body["tenantId"] as string;
     cookieB = extractSessionCookie(regB.cookie);
+    csrfB = regB.csrfToken;
 
-    // Create project for tenant A
     const projA = await prisma.project.create({
       data: { tenantId: tenantIdA, name: "Project Alpha" },
     });
     projectIdA = projA.id;
 
-    // Create project for tenant B
     const projB = await prisma.project.create({
       data: { tenantId: tenantIdB, name: "Project Beta" },
     });
@@ -69,12 +71,8 @@ describe("Shares integration tests", () => {
       const res = await app.inject({
         method: "POST",
         url: "/shares",
-        headers: { cookie: `session=${cookieA}` },
-        payload: {
-          projectId: projectIdA,
-          scope: "VIEWER",
-          expiresInHours: 24,
-        },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
+        payload: { projectId: projectIdA, scope: "VIEWER", expiresInHours: 24 },
       });
 
       assert.equal(res.statusCode, 201);
@@ -90,11 +88,7 @@ describe("Shares integration tests", () => {
       const res = await app.inject({
         method: "POST",
         url: "/shares",
-        payload: {
-          projectId: "some-id",
-          scope: "VIEWER",
-          expiresInHours: 24,
-        },
+        payload: { projectId: "some-id", scope: "VIEWER", expiresInHours: 24 },
       });
 
       assert.equal(res.statusCode, 401);
@@ -106,12 +100,8 @@ describe("Shares integration tests", () => {
       const res = await app.inject({
         method: "POST",
         url: "/shares",
-        headers: { cookie: `session=${cookieA}` },
-        payload: {
-          projectId: projectIdA,
-          scope: "ADMIN",
-          expiresInHours: 24,
-        },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
+        payload: { projectId: projectIdA, scope: "ADMIN", expiresInHours: 24 },
       });
 
       assert.equal(res.statusCode, 400);
@@ -122,17 +112,16 @@ describe("Shares integration tests", () => {
     test("lists active share tokens for a project", async () => {
       await setupTwoTenants();
 
-      // Create two shares
       await app.inject({
         method: "POST",
         url: "/shares",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, scope: "VIEWER", expiresInHours: 24 },
       });
       await app.inject({
         method: "POST",
         url: "/shares",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, scope: "MANAGER", expiresInHours: 48 },
       });
 
@@ -167,7 +156,7 @@ describe("Shares integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/shares",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, scope: "VIEWER", expiresInHours: 24 },
       });
       const shareId = (createRes.json() as Record<string, unknown>)["id"] as string;
@@ -175,11 +164,10 @@ describe("Shares integration tests", () => {
       const delRes = await app.inject({
         method: "DELETE",
         url: `/shares/${shareId}`,
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
       });
       assert.equal(delRes.statusCode, 200);
 
-      // Listing should not include revoked tokens
       const listRes = await app.inject({
         method: "GET",
         url: `/shares?projectId=${projectIdA}`,
@@ -194,16 +182,14 @@ describe("Shares integration tests", () => {
     test("valid token returns project data without auth", async () => {
       await setupTwoTenants();
 
-      // Create a share token
       const createRes = await app.inject({
         method: "POST",
         url: "/shares",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, scope: "VIEWER", expiresInHours: 24 },
       });
       const token = (createRes.json() as Record<string, unknown>)["token"] as string;
 
-      // Access via public endpoint (no cookie)
       const res = await app.inject({
         method: "GET",
         url: `/shared/${token}`,
@@ -221,24 +207,21 @@ describe("Shares integration tests", () => {
     test("expired token is rejected (returns 404)", async () => {
       await setupTwoTenants();
 
-      // Create a share token with 1 hour expiry
       const createRes = await app.inject({
         method: "POST",
         url: "/shares",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, scope: "VIEWER", expiresInHours: 1 },
       });
       const shareBody = createRes.json() as Record<string, unknown>;
       const token = shareBody["token"] as string;
       const shareId = shareBody["id"] as string;
 
-      // Manually set expiresAt to the past in DB to simulate expiry
       await prisma.shareToken.update({
         where: { id: shareId },
         data: { expiresAt: new Date(Date.now() - 1000) },
       });
 
-      // Try to access
       const res = await app.inject({
         method: "GET",
         url: `/shared/${token}`,
@@ -250,25 +233,22 @@ describe("Shares integration tests", () => {
     test("revoked token is rejected (returns 404)", async () => {
       await setupTwoTenants();
 
-      // Create then revoke
       const createRes = await app.inject({
         method: "POST",
         url: "/shares",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, scope: "VIEWER", expiresInHours: 24 },
       });
       const shareBody = createRes.json() as Record<string, unknown>;
       const token = shareBody["token"] as string;
       const shareId = shareBody["id"] as string;
 
-      // Revoke
       await app.inject({
         method: "DELETE",
         url: `/shares/${shareId}`,
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
       });
 
-      // Try to access with revoked token
       const res = await app.inject({
         method: "GET",
         url: `/shared/${token}`,
@@ -294,7 +274,7 @@ describe("Shares integration tests", () => {
       const res = await app.inject({
         method: "POST",
         url: "/shares",
-        headers: { cookie: `session=${cookieB}` },
+        headers: { cookie: `session=${cookieB}; csrf_token=${csrfB}`, "x-csrf-token": csrfB },
         payload: { projectId: projectIdA, scope: "VIEWER", expiresInHours: 24 },
       });
 
@@ -304,15 +284,13 @@ describe("Shares integration tests", () => {
     test("user B cannot list user A's share tokens", async () => {
       await setupTwoTenants();
 
-      // User A creates a share
       await app.inject({
         method: "POST",
         url: "/shares",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, scope: "VIEWER", expiresInHours: 24 },
       });
 
-      // User B tries to list shares for A's project
       const res = await app.inject({
         method: "GET",
         url: `/shares?projectId=${projectIdA}`,
@@ -330,7 +308,7 @@ describe("Shares integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/shares",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, scope: "VIEWER", expiresInHours: 24 },
       });
       const shareId = (createRes.json() as Record<string, unknown>)["id"] as string;
@@ -338,19 +316,10 @@ describe("Shares integration tests", () => {
       const res = await app.inject({
         method: "DELETE",
         url: `/shares/${shareId}`,
-        headers: { cookie: `session=${cookieB}` },
+        headers: { cookie: `session=${cookieB}; csrf_token=${csrfB}`, "x-csrf-token": csrfB },
       });
 
       assert.equal(res.statusCode, 404, "Should return 404, not 403");
     });
   });
 });
-
-/** Extract the raw session token value from a set-cookie header string. */
-function extractSessionCookie(setCookieHeader: string): string {
-  const match = setCookieHeader.match(/session=([^;]+)/);
-  if (!match?.[1]) {
-    throw new Error(`Could not extract session cookie from: ${setCookieHeader}`);
-  }
-  return match[1];
-}

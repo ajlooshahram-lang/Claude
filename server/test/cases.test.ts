@@ -1,18 +1,20 @@
 import { describe, test, before, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import type { FastifyInstance } from "fastify";
-import { buildTestApp, registerUser, cleanDatabase, prisma } from "./helpers.js";
+import { buildTestApp, registerUser, cleanDatabase, prisma, extractSessionCookie } from "./helpers.js";
 
 describe("Cases CRUD integration tests", () => {
   let app: FastifyInstance;
 
   // User A context
   let cookieA: string;
+  let csrfA: string;
   let tenantIdA: string;
   let projectIdA: string;
 
   // User B context
   let cookieB: string;
+  let csrfB: string;
   let tenantIdB: string;
   let projectIdB: string;
 
@@ -40,6 +42,7 @@ describe("Cases CRUD integration tests", () => {
     });
     tenantIdA = regA.body["tenantId"] as string;
     cookieA = extractSessionCookie(regA.cookie);
+    csrfA = regA.csrfToken;
 
     // Register user B
     const regB = await registerUser(app, {
@@ -50,6 +53,7 @@ describe("Cases CRUD integration tests", () => {
     });
     tenantIdB = regB.body["tenantId"] as string;
     cookieB = extractSessionCookie(regB.cookie);
+    csrfB = regB.csrfToken;
 
     // Create project for tenant A
     const projA = await prisma.project.create({
@@ -71,7 +75,10 @@ describe("Cases CRUD integration tests", () => {
       const res = await app.inject({
         method: "POST",
         url: "/cases",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: {
           projectId: projectIdA,
           problem: "Widget defect rate too high",
@@ -112,7 +119,10 @@ describe("Cases CRUD integration tests", () => {
       await app.inject({
         method: "POST",
         url: "/cases",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: {
           projectId: projectIdA,
           problem: "Issue to list",
@@ -151,7 +161,10 @@ describe("Cases CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/cases",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: {
           projectId: projectIdA,
           problem: "Specific case",
@@ -180,7 +193,10 @@ describe("Cases CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/cases",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: {
           projectId: projectIdA,
           problem: "Before update",
@@ -193,7 +209,10 @@ describe("Cases CRUD integration tests", () => {
       const res = await app.inject({
         method: "PATCH",
         url: `/cases/${caseId}`,
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: {
           problem: "After update",
           priority: "High",
@@ -214,7 +233,10 @@ describe("Cases CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/cases",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: {
           projectId: projectIdA,
           problem: "To be deleted",
@@ -227,7 +249,10 @@ describe("Cases CRUD integration tests", () => {
       const delRes = await app.inject({
         method: "DELETE",
         url: `/cases/${caseId}`,
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
       });
       assert.equal(delRes.statusCode, 200);
 
@@ -257,7 +282,10 @@ describe("Cases CRUD integration tests", () => {
       const res = await app.inject({
         method: "POST",
         url: "/cases",
-        headers: { cookie: `session=${cookieB}` },
+        headers: {
+          cookie: `session=${cookieB}; csrf_token=${csrfB}`,
+          "x-csrf-token": csrfB,
+        },
         payload: {
           projectId: projectIdA,
           problem: "Cross-tenant write attempt",
@@ -274,7 +302,10 @@ describe("Cases CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/cases",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: {
           projectId: projectIdA,
           problem: "Tenant A secret",
@@ -299,7 +330,10 @@ describe("Cases CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/cases",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: {
           projectId: projectIdA,
           problem: "Tenant A data",
@@ -311,7 +345,10 @@ describe("Cases CRUD integration tests", () => {
       const res = await app.inject({
         method: "PATCH",
         url: `/cases/${caseId}`,
-        headers: { cookie: `session=${cookieB}` },
+        headers: {
+          cookie: `session=${cookieB}; csrf_token=${csrfB}`,
+          "x-csrf-token": csrfB,
+        },
         payload: { problem: "Hacked" },
       });
 
@@ -324,7 +361,10 @@ describe("Cases CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/cases",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: {
           projectId: projectIdA,
           problem: "Tenant A protected",
@@ -336,19 +376,13 @@ describe("Cases CRUD integration tests", () => {
       const res = await app.inject({
         method: "DELETE",
         url: `/cases/${caseId}`,
-        headers: { cookie: `session=${cookieB}` },
+        headers: {
+          cookie: `session=${cookieB}; csrf_token=${csrfB}`,
+          "x-csrf-token": csrfB,
+        },
       });
 
       assert.equal(res.statusCode, 404, "Should return 404, not 403");
     });
   });
 });
-
-/** Extract the raw session token value from a set-cookie header string. */
-function extractSessionCookie(setCookieHeader: string): string {
-  const match = setCookieHeader.match(/session=([^;]+)/);
-  if (!match?.[1]) {
-    throw new Error(`Could not extract session cookie from: ${setCookieHeader}`);
-  }
-  return match[1];
-}

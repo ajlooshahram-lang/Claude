@@ -1,0 +1,24 @@
+{
+  "id": "FEAT-005",
+  "type": "feat",
+  "description": "Frontend hardening: CSP meta tag, Subresource Integrity for Chart.js CDN, and XSS prevention verification test in smoke.js.",
+  "status": "pending",
+  "steps": [
+    "Add Content-Security-Policy meta tag to qi-webapp/index.html in the <head> section: <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' *\">",
+    "Add integrity and crossorigin attributes to the Chart.js CDN script tag in qi-webapp/index.html. The CDN URL is https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js. Fetch the SRI hash from jsdelivr (sha384 or sha256). Add integrity=\"sha384-...\" crossorigin=\"anonymous\" to the script tag.",
+    "Add XSS prevention test to qi-webapp/smoke.js: After the existing tests, add a test that creates a case with problem field containing '<script>alert(1)</script>', then verifies that when rendered, the content appears as escaped text (&lt;script&gt;...) and not as an executable script tag in the DOM. Verify the esc() function is working correctly.",
+    "Verify esc() function coverage: Review qi-webapp/js/ui.js to confirm all user-generated content rendered as innerHTML goes through esc(). The existing code already uses esc() extensively (confirmed from grep). Document any gaps if found."
+  ],
+  "acceptance_criteria": [
+    "qi-webapp/index.html has CSP meta tag with specified policy",
+    "Chart.js script tag has integrity and crossorigin attributes",
+    "smoke.js XSS test passes (escaped content, not executable)",
+    "node smoke.js still passes all 199 existing tests plus new XSS test",
+    "Frontend renders correctly with no CSP violations for normal operation"
+  ],
+  "verification": [
+    "cd qi-webapp && node smoke.js"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

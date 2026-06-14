@@ -1,17 +1,19 @@
 import { describe, test, before, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import type { FastifyInstance } from "fastify";
-import { buildTestApp, registerUser, cleanDatabase, prisma } from "./helpers.js";
+import { buildTestApp, registerUser, cleanDatabase, prisma, extractSessionCookie } from "./helpers.js";
 
 describe("Projects CRUD integration tests", () => {
   let app: FastifyInstance;
 
   // User A context
   let cookieA: string;
+  let csrfA: string;
   let tenantIdA: string;
 
   // User B context
   let cookieB: string;
+  let csrfB: string;
   let tenantIdB: string;
 
   before(async () => {
@@ -37,6 +39,7 @@ describe("Projects CRUD integration tests", () => {
     });
     tenantIdA = regA.body["tenantId"] as string;
     cookieA = extractSessionCookie(regA.cookie);
+    csrfA = regA.csrfToken;
 
     const regB = await registerUser(app, {
       email: "userB@beta.com",
@@ -46,6 +49,7 @@ describe("Projects CRUD integration tests", () => {
     });
     tenantIdB = regB.body["tenantId"] as string;
     cookieB = extractSessionCookie(regB.cookie);
+    csrfB = regB.csrfToken;
   }
 
   describe("POST /projects", () => {
@@ -55,7 +59,10 @@ describe("Projects CRUD integration tests", () => {
       const res = await app.inject({
         method: "POST",
         url: "/projects",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: {
           name: "Fiber Cable Network",
           sponsor: "ACME Corp",
@@ -90,7 +97,10 @@ describe("Projects CRUD integration tests", () => {
       const res = await app.inject({
         method: "POST",
         url: "/projects",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: { sponsor: "No name provided" },
       });
 
@@ -106,13 +116,19 @@ describe("Projects CRUD integration tests", () => {
       await app.inject({
         method: "POST",
         url: "/projects",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: { name: "Project One" },
       });
       await app.inject({
         method: "POST",
         url: "/projects",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: { name: "Project Two" },
       });
 
@@ -133,7 +149,10 @@ describe("Projects CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/projects",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: { name: "Will be deleted" },
       });
       const projectId = (createRes.json() as Record<string, unknown>)["id"] as string;
@@ -142,7 +161,10 @@ describe("Projects CRUD integration tests", () => {
       await app.inject({
         method: "DELETE",
         url: `/projects/${projectId}`,
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
       });
 
       const listRes = await app.inject({
@@ -163,7 +185,10 @@ describe("Projects CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/projects",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: { name: "Single Project" },
       });
       const projectId = (createRes.json() as Record<string, unknown>)["id"] as string;
@@ -200,7 +225,10 @@ describe("Projects CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/projects",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: { name: "Before Update", status: "PLANNING" },
       });
       const projectId = (createRes.json() as Record<string, unknown>)["id"] as string;
@@ -208,7 +236,10 @@ describe("Projects CRUD integration tests", () => {
       const res = await app.inject({
         method: "PATCH",
         url: `/projects/${projectId}`,
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: { name: "After Update", status: "IN_PROGRESS" },
       });
 
@@ -226,7 +257,10 @@ describe("Projects CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/projects",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: { name: "To be deleted" },
       });
       const projectId = (createRes.json() as Record<string, unknown>)["id"] as string;
@@ -235,7 +269,10 @@ describe("Projects CRUD integration tests", () => {
       const delRes = await app.inject({
         method: "DELETE",
         url: `/projects/${projectId}`,
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
       });
       assert.equal(delRes.statusCode, 200);
 
@@ -265,7 +302,10 @@ describe("Projects CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/projects",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: { name: "Tenant A Secret Project" },
       });
       const projectId = (createRes.json() as Record<string, unknown>)["id"] as string;
@@ -285,7 +325,10 @@ describe("Projects CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/projects",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: { name: "Tenant A Protected" },
       });
       const projectId = (createRes.json() as Record<string, unknown>)["id"] as string;
@@ -293,7 +336,10 @@ describe("Projects CRUD integration tests", () => {
       const res = await app.inject({
         method: "PATCH",
         url: `/projects/${projectId}`,
-        headers: { cookie: `session=${cookieB}` },
+        headers: {
+          cookie: `session=${cookieB}; csrf_token=${csrfB}`,
+          "x-csrf-token": csrfB,
+        },
         payload: { name: "Hacked" },
       });
 
@@ -306,7 +352,10 @@ describe("Projects CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/projects",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: { name: "Tenant A Indestructible" },
       });
       const projectId = (createRes.json() as Record<string, unknown>)["id"] as string;
@@ -314,7 +363,10 @@ describe("Projects CRUD integration tests", () => {
       const res = await app.inject({
         method: "DELETE",
         url: `/projects/${projectId}`,
-        headers: { cookie: `session=${cookieB}` },
+        headers: {
+          cookie: `session=${cookieB}; csrf_token=${csrfB}`,
+          "x-csrf-token": csrfB,
+        },
       });
 
       assert.equal(res.statusCode, 404, "Should return 404, not 403");
@@ -327,7 +379,10 @@ describe("Projects CRUD integration tests", () => {
       await app.inject({
         method: "POST",
         url: "/projects",
-        headers: { cookie: `session=${cookieA}` },
+        headers: {
+          cookie: `session=${cookieA}; csrf_token=${csrfA}`,
+          "x-csrf-token": csrfA,
+        },
         payload: { name: "A's Project" },
       });
 
@@ -335,7 +390,10 @@ describe("Projects CRUD integration tests", () => {
       await app.inject({
         method: "POST",
         url: "/projects",
-        headers: { cookie: `session=${cookieB}` },
+        headers: {
+          cookie: `session=${cookieB}; csrf_token=${csrfB}`,
+          "x-csrf-token": csrfB,
+        },
         payload: { name: "B's Project" },
       });
 
@@ -353,12 +411,3 @@ describe("Projects CRUD integration tests", () => {
     });
   });
 });
-
-/** Extract the raw session token value from a set-cookie header string. */
-function extractSessionCookie(setCookieHeader: string): string {
-  const match = setCookieHeader.match(/session=([^;]+)/);
-  if (!match?.[1]) {
-    throw new Error(`Could not extract session cookie from: ${setCookieHeader}`);
-  }
-  return match[1];
-}

@@ -1,18 +1,20 @@
 import { describe, test, before, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import type { FastifyInstance } from "fastify";
-import { buildTestApp, registerUser, cleanDatabase, prisma } from "./helpers.js";
+import { buildTestApp, registerUser, cleanDatabase, prisma, extractSessionCookie } from "./helpers.js";
 
 describe("Registers CRUD integration tests", () => {
   let app: FastifyInstance;
 
   // User A context
   let cookieA: string;
+  let csrfA: string;
   let tenantIdA: string;
   let projectIdA: string;
 
   // User B context
   let cookieB: string;
+  let csrfB: string;
   let tenantIdB: string;
   let projectIdB: string;
 
@@ -39,6 +41,7 @@ describe("Registers CRUD integration tests", () => {
     });
     tenantIdA = regA.body["tenantId"] as string;
     cookieA = extractSessionCookie(regA.cookie);
+    csrfA = regA.csrfToken;
 
     const regB = await registerUser(app, {
       email: "userB@beta.com",
@@ -48,6 +51,7 @@ describe("Registers CRUD integration tests", () => {
     });
     tenantIdB = regB.body["tenantId"] as string;
     cookieB = extractSessionCookie(regB.cookie);
+    csrfB = regB.csrfToken;
 
     // Create project for tenant A
     const projA = await prisma.project.create({
@@ -69,7 +73,7 @@ describe("Registers CRUD integration tests", () => {
       const res = await app.inject({
         method: "POST",
         url: "/registers/hazop",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: {
           projectId: projectIdA,
           data: { node: "P-101", deviation: "High pressure", consequence: "Pipe burst" },
@@ -91,7 +95,7 @@ describe("Registers CRUD integration tests", () => {
       const res = await app.inject({
         method: "POST",
         url: "/registers/calibration",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: {
           projectId: projectIdA,
           data: { instrument: "PT-200", dueDate: "2025-06-15", tolerance: "0.1%" },
@@ -113,11 +117,8 @@ describe("Registers CRUD integration tests", () => {
       const res = await app.inject({
         method: "POST",
         url: "/registers/invalid_type",
-        headers: { cookie: `session=${cookieA}` },
-        payload: {
-          projectId: projectIdA,
-          data: { foo: "bar" },
-        },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
+        payload: { projectId: projectIdA, data: { foo: "bar" } },
       });
 
       assert.equal(res.statusCode, 400);
@@ -129,10 +130,7 @@ describe("Registers CRUD integration tests", () => {
       const res = await app.inject({
         method: "POST",
         url: "/registers/hazop",
-        payload: {
-          projectId: "some-id",
-          data: {},
-        },
+        payload: { projectId: "some-id", data: {} },
       });
 
       assert.equal(res.statusCode, 401);
@@ -143,25 +141,23 @@ describe("Registers CRUD integration tests", () => {
     test("lists register rows by type and projectId", async () => {
       await setupTwoTenants();
 
-      // Create two hazop rows
       await app.inject({
         method: "POST",
         url: "/registers/hazop",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, data: { node: "P-101" }, sortOrder: 2 },
       });
       await app.inject({
         method: "POST",
         url: "/registers/hazop",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, data: { node: "P-102" }, sortOrder: 1 },
       });
 
-      // Create a calibration row (different type, same project)
       await app.inject({
         method: "POST",
         url: "/registers/calibration",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, data: { instrument: "TT-100" } },
       });
 
@@ -173,9 +169,7 @@ describe("Registers CRUD integration tests", () => {
 
       assert.equal(res.statusCode, 200);
       const body = res.json() as unknown[];
-      // Only hazop rows returned
       assert.equal(body.length, 2);
-      // Should be ordered by sortOrder ascending
       assert.equal((body[0] as Record<string, unknown>)["sortOrder"], 1);
       assert.equal((body[1] as Record<string, unknown>)["sortOrder"], 2);
     });
@@ -212,7 +206,7 @@ describe("Registers CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/registers/hazop",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, data: { node: "P-101", status: "open" } },
       });
       const rowId = (createRes.json() as Record<string, unknown>)["id"] as string;
@@ -220,7 +214,7 @@ describe("Registers CRUD integration tests", () => {
       const res = await app.inject({
         method: "PATCH",
         url: `/registers/hazop/${rowId}`,
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { data: { node: "P-101", status: "closed" }, pinned: true },
       });
 
@@ -238,20 +232,18 @@ describe("Registers CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/registers/calibration",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, data: { instrument: "TT-100" } },
       });
       const rowId = (createRes.json() as Record<string, unknown>)["id"] as string;
 
-      // Delete
       const delRes = await app.inject({
         method: "DELETE",
         url: `/registers/calibration/${rowId}`,
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
       });
       assert.equal(delRes.statusCode, 200);
 
-      // List should not include deleted row
       const listRes = await app.inject({
         method: "GET",
         url: `/registers/calibration?projectId=${projectIdA}`,
@@ -269,7 +261,7 @@ describe("Registers CRUD integration tests", () => {
       const res = await app.inject({
         method: "POST",
         url: "/registers/hazop",
-        headers: { cookie: `session=${cookieB}` },
+        headers: { cookie: `session=${cookieB}; csrf_token=${csrfB}`, "x-csrf-token": csrfB },
         payload: { projectId: projectIdA, data: { attack: true } },
       });
 
@@ -279,15 +271,13 @@ describe("Registers CRUD integration tests", () => {
     test("user B cannot see user A's register rows", async () => {
       await setupTwoTenants();
 
-      // User A creates a register row
       await app.inject({
         method: "POST",
         url: "/registers/hazop",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, data: { secret: "data" } },
       });
 
-      // User B tries to list (with A's projectId)
       const res = await app.inject({
         method: "GET",
         url: `/registers/hazop?projectId=${projectIdA}`,
@@ -305,7 +295,7 @@ describe("Registers CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/registers/hazop",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, data: { original: true } },
       });
       const rowId = (createRes.json() as Record<string, unknown>)["id"] as string;
@@ -313,7 +303,7 @@ describe("Registers CRUD integration tests", () => {
       const res = await app.inject({
         method: "PATCH",
         url: `/registers/hazop/${rowId}`,
-        headers: { cookie: `session=${cookieB}` },
+        headers: { cookie: `session=${cookieB}; csrf_token=${csrfB}`, "x-csrf-token": csrfB },
         payload: { data: { hacked: true } },
       });
 
@@ -326,7 +316,7 @@ describe("Registers CRUD integration tests", () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/registers/hazop",
-        headers: { cookie: `session=${cookieA}` },
+        headers: { cookie: `session=${cookieA}; csrf_token=${csrfA}`, "x-csrf-token": csrfA },
         payload: { projectId: projectIdA, data: { protected: true } },
       });
       const rowId = (createRes.json() as Record<string, unknown>)["id"] as string;
@@ -334,19 +324,10 @@ describe("Registers CRUD integration tests", () => {
       const res = await app.inject({
         method: "DELETE",
         url: `/registers/hazop/${rowId}`,
-        headers: { cookie: `session=${cookieB}` },
+        headers: { cookie: `session=${cookieB}; csrf_token=${csrfB}`, "x-csrf-token": csrfB },
       });
 
       assert.equal(res.statusCode, 404, "Should return 404, not 403");
     });
   });
 });
-
-/** Extract the raw session token value from a set-cookie header string. */
-function extractSessionCookie(setCookieHeader: string): string {
-  const match = setCookieHeader.match(/session=([^;]+)/);
-  if (!match?.[1]) {
-    throw new Error(`Could not extract session cookie from: ${setCookieHeader}`);
-  }
-  return match[1];
-}
