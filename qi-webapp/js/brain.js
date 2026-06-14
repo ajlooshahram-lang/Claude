@@ -2071,6 +2071,450 @@
     };
   }
 
+  // ---- Monte Carlo Risk Quantification Engine --------------------------------
+
+  // Seeded PRNG (xorshift32) for reproducible simulations
+  function createRng(seed) {
+    var state = seed ? (seed >>> 0) || 1 : (Date.now() >>> 0) || 1;
+    return function () {
+      state ^= state << 13;
+      state ^= state >>> 17;
+      state ^= state << 5;
+      return (state >>> 0) / 4294967296;
+    };
+  }
+
+  // PERT distribution random sample using beta approximation
+  // mean = (min + 4*mode + max) / 6
+  // Uses Box-Muller approximation shaped to PERT via alpha/beta parameters
+  function pertRandom(min, mode, max, rng) {
+    if (min >= max) return mode;
+    var mu = (min + 4 * mode + max) / 6;
+    var range = max - min;
+    if (range === 0) return min;
+    // PERT shape parameter lambda=4
+    var alpha = 1 + 4 * ((mu - min) / range);
+    var beta = 1 + 4 * ((max - mu) / range);
+    // Generate beta-distributed value using Joehnk method (simple for small alpha/beta)
+    var u, v, w;
+    var maxIter = 100;
+    for (var i = 0; i < maxIter; i++) {
+      u = Math.pow(rng(), 1 / alpha);
+      v = Math.pow(rng(), 1 / beta);
+      w = u + v;
+      if (w <= 1 && w > 0) {
+        return min + (u / w) * range;
+      }
+    }
+    // Fallback: use triangular approximation
+    return triangularRandom(min, mode, max, rng);
+  }
+
+  // Triangular distribution random sample
+  function triangularRandom(min, mode, max, rng) {
+    if (min >= max) return mode;
+    var u = rng();
+    var fc = (mode - min) / (max - min);
+    if (u < fc) {
+      return min + Math.sqrt(u * (max - min) * (mode - min));
+    } else {
+      return max - Math.sqrt((1 - u) * (max - min) * (max - mode));
+    }
+  }
+
+  // Uniform distribution random sample
+  function uniformRandom(min, max, rng) {
+    return min + rng() * (max - min);
+  }
+
+  // Normal distribution random sample (Box-Muller transform)
+  function normalRandom(mean, stdDev, rng) {
+    var u1 = rng();
+    var u2 = rng();
+    if (u1 < 1e-10) u1 = 1e-10;
+    var z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    return mean + z * stdDev;
+  }
+
+  // Build histogram from array of values
+  function buildHistogram(values, bucketCount) {
+    if (!values || values.length === 0) return [];
+    bucketCount = bucketCount || 20;
+    var minVal = values[0];
+    var maxVal = values[0];
+    for (var i = 1; i < values.length; i++) {
+      if (values[i] < minVal) minVal = values[i];
+      if (values[i] > maxVal) maxVal = values[i];
+    }
+    if (minVal === maxVal) {
+      return [{ bucket: Math.round(minVal * 100) / 100, count: values.length }];
+    }
+    var bucketSize = (maxVal - minVal) / bucketCount;
+    var buckets = [];
+    for (var b = 0; b < bucketCount; b++) {
+      buckets.push({ bucket: Math.round((minVal + b * bucketSize) * 100) / 100, count: 0 });
+    }
+    for (var j = 0; j < values.length; j++) {
+      var idx = Math.floor((values[j] - minVal) / bucketSize);
+      if (idx >= bucketCount) idx = bucketCount - 1;
+      buckets[idx].count++;
+    }
+    return buckets;
+  }
+
+  // Percentile from sorted array
+  function percentile(sorted, p) {
+    if (!sorted || sorted.length === 0) return 0;
+    var idx = (p / 100) * (sorted.length - 1);
+    var lower = Math.floor(idx);
+    var upper = Math.ceil(idx);
+    if (lower === upper) return sorted[lower];
+    var frac = idx - lower;
+    return sorted[lower] * (1 - frac) + sorted[upper] * frac;
+  }
+
+  // Calculate critical path duration for a set of tasks with given durations
+  function calcCriticalPath(tasks, durations) {
+    // Build adjacency: each task's earliest start depends on predecessors finishing
+    var taskMap = {};
+    for (var i = 0; i < tasks.length; i++) {
+      taskMap[tasks[i].id] = i;
+    }
+    var earlyFinish = new Array(tasks.length);
+    var visited = new Array(tasks.length);
+    for (var k = 0; k < tasks.length; k++) {
+      earlyFinish[k] = 0;
+      visited[k] = false;
+    }
+
+    // Topological order via DFS to compute earliest finish
+    function computeEF(idx) {
+      if (visited[idx]) return earlyFinish[idx];
+      visited[idx] = true;
+      var deps = tasks[idx].dependencies || [];
+      var earlyStart = 0;
+      for (var d = 0; d < deps.length; d++) {
+        var depIdx = taskMap[deps[d]];
+        if (depIdx !== undefined) {
+          var depEF = computeEF(depIdx);
+          if (depEF > earlyStart) earlyStart = depEF;
+        }
+      }
+      earlyFinish[idx] = earlyStart + durations[idx];
+      return earlyFinish[idx];
+    }
+
+    for (var t = 0; t < tasks.length; t++) {
+      computeEF(t);
+    }
+
+    // Total duration is the maximum early finish
+    var totalDuration = 0;
+    for (var f = 0; f < earlyFinish.length; f++) {
+      if (earlyFinish[f] > totalDuration) totalDuration = earlyFinish[f];
+    }
+
+    // Identify which tasks are on the critical path (early finish === total duration chain)
+    var criticalTasks = [];
+    var lateFinish = new Array(tasks.length);
+    for (var lf = 0; lf < tasks.length; lf++) {
+      lateFinish[lf] = totalDuration;
+    }
+    // Reverse pass: compute late finish
+    // Build reverse adjacency
+    var successors = {};
+    for (var si = 0; si < tasks.length; si++) {
+      successors[tasks[si].id] = [];
+    }
+    for (var sj = 0; sj < tasks.length; sj++) {
+      var deps2 = tasks[sj].dependencies || [];
+      for (var sd = 0; sd < deps2.length; sd++) {
+        if (successors[deps2[sd]]) {
+          successors[deps2[sd]].push(sj);
+        }
+      }
+    }
+    // Compute late start in reverse topological order
+    var lateStart = new Array(tasks.length);
+    var visitedLate = new Array(tasks.length);
+    for (var li = 0; li < tasks.length; li++) {
+      lateStart[li] = totalDuration;
+      visitedLate[li] = false;
+    }
+    function computeLS(idx) {
+      if (visitedLate[idx]) return lateStart[idx];
+      visitedLate[idx] = true;
+      var succs = successors[tasks[idx].id];
+      if (succs.length === 0) {
+        lateStart[idx] = totalDuration - durations[idx];
+      } else {
+        var latestAllowed = totalDuration;
+        for (var s = 0; s < succs.length; s++) {
+          var succLS = computeLS(succs[s]);
+          if (succLS < latestAllowed) latestAllowed = succLS;
+        }
+        lateStart[idx] = latestAllowed - durations[idx];
+      }
+      return lateStart[idx];
+    }
+    for (var ci = 0; ci < tasks.length; ci++) {
+      computeLS(ci);
+    }
+    // Tasks on critical path: early start === late start (zero float)
+    for (var cp = 0; cp < tasks.length; cp++) {
+      var earlyStart2 = earlyFinish[cp] - durations[cp];
+      if (Math.abs(earlyStart2 - lateStart[cp]) < 0.001) {
+        criticalTasks.push(tasks[cp].id);
+      }
+    }
+
+    return { duration: totalDuration, criticalTasks: criticalTasks };
+  }
+
+  // Monte Carlo Schedule Simulation
+  function monteCarloSchedule(tasks, iterations, options) {
+    iterations = iterations || 1000;
+    options = options || {};
+    var rng = createRng(options.seed);
+
+    if (!tasks || tasks.length === 0) {
+      return { p50: 0, p80: 0, p90: 0, mean: 0, stdDev: 0, histogram: [], criticalPathFrequency: [] };
+    }
+
+    var results = [];
+    var cpFreq = {};
+    for (var ti = 0; ti < tasks.length; ti++) {
+      cpFreq[tasks[ti].id] = 0;
+    }
+
+    for (var i = 0; i < iterations; i++) {
+      // Sample durations for each task using PERT distribution
+      var durations = [];
+      for (var t = 0; t < tasks.length; t++) {
+        var task = tasks[t];
+        var opt = Number(task.optimistic) || 1;
+        var ml = Number(task.mostLikely) || opt;
+        var pess = Number(task.pessimistic) || ml;
+        durations.push(pertRandom(opt, ml, pess, rng));
+      }
+      // Calculate critical path
+      var cpResult = calcCriticalPath(tasks, durations);
+      results.push(cpResult.duration);
+      // Track critical path frequency
+      for (var c = 0; c < cpResult.criticalTasks.length; c++) {
+        var tid = cpResult.criticalTasks[c];
+        if (cpFreq[tid] !== undefined) cpFreq[tid]++;
+      }
+    }
+
+    // Sort results for percentile calculations
+    results.sort(function (a, b) { return a - b; });
+
+    // Calculate statistics
+    var sum = 0;
+    for (var si2 = 0; si2 < results.length; si2++) sum += results[si2];
+    var mean = sum / results.length;
+
+    var variance = 0;
+    for (var vi = 0; vi < results.length; vi++) {
+      variance += (results[vi] - mean) * (results[vi] - mean);
+    }
+    variance = variance / results.length;
+    var stdDev = Math.sqrt(variance);
+
+    // Build critical path frequency array
+    var criticalPathFrequency = [];
+    for (var fk in cpFreq) {
+      if (cpFreq.hasOwnProperty(fk)) {
+        criticalPathFrequency.push({
+          taskId: fk,
+          frequency: Math.round((cpFreq[fk] / iterations) * 10000) / 10000
+        });
+      }
+    }
+    criticalPathFrequency.sort(function (a, b) { return b.frequency - a.frequency; });
+
+    return {
+      p50: Math.round(percentile(results, 50) * 100) / 100,
+      p80: Math.round(percentile(results, 80) * 100) / 100,
+      p90: Math.round(percentile(results, 90) * 100) / 100,
+      mean: Math.round(mean * 100) / 100,
+      stdDev: Math.round(stdDev * 100) / 100,
+      histogram: buildHistogram(results),
+      criticalPathFrequency: criticalPathFrequency
+    };
+  }
+
+  // Monte Carlo Cost Simulation
+  function monteCarloCost(items, iterations, options) {
+    iterations = iterations || 1000;
+    options = options || {};
+    var rng = createRng(options.seed);
+
+    if (!items || items.length === 0) {
+      return { p50: 0, p80: 0, p90: 0, mean: 0, stdDev: 0, histogram: [], contingencyRecommendation: { p80Amount: 0, p90Amount: 0, percentOfBase: 0 } };
+    }
+
+    var results = [];
+    // Calculate base cost (sum of likely values)
+    var baseCost = 0;
+    for (var bi = 0; bi < items.length; bi++) {
+      baseCost += Number(items[bi].likely) || 0;
+    }
+
+    for (var i = 0; i < iterations; i++) {
+      var totalCost = 0;
+      for (var j = 0; j < items.length; j++) {
+        var item = items[j];
+        var low = Number(item.low) || 0;
+        var likely = Number(item.likely) || low;
+        var high = Number(item.high) || likely;
+        var dist = (item.distribution || "triangular").toLowerCase();
+
+        var sampled;
+        if (dist === "uniform") {
+          sampled = uniformRandom(low, high, rng);
+        } else if (dist === "normal") {
+          var nmean = (low + 4 * likely + high) / 6;
+          var nstd = (high - low) / 6;
+          sampled = normalRandom(nmean, nstd, rng);
+          // Clamp to reasonable range
+          if (sampled < low * 0.8) sampled = low * 0.8;
+          if (sampled > high * 1.2) sampled = high * 1.2;
+        } else {
+          // triangular (default)
+          sampled = triangularRandom(low, likely, high, rng);
+        }
+        totalCost += sampled;
+      }
+      results.push(totalCost);
+    }
+
+    // Sort for percentile
+    results.sort(function (a, b) { return a - b; });
+
+    // Statistics
+    var sum = 0;
+    for (var si2 = 0; si2 < results.length; si2++) sum += results[si2];
+    var mean = sum / results.length;
+    var variance = 0;
+    for (var vi = 0; vi < results.length; vi++) {
+      variance += (results[vi] - mean) * (results[vi] - mean);
+    }
+    variance = variance / results.length;
+    var stdDev = Math.sqrt(variance);
+
+    var p50 = percentile(results, 50);
+    var p80 = percentile(results, 80);
+    var p90 = percentile(results, 90);
+
+    var contingencyP80 = p80 - baseCost;
+    var contingencyP90 = p90 - baseCost;
+    var percentOfBase = baseCost > 0 ? Math.round((contingencyP90 / baseCost) * 10000) / 100 : 0;
+
+    return {
+      p50: Math.round(p50 * 100) / 100,
+      p80: Math.round(p80 * 100) / 100,
+      p90: Math.round(p90 * 100) / 100,
+      mean: Math.round(mean * 100) / 100,
+      stdDev: Math.round(stdDev * 100) / 100,
+      histogram: buildHistogram(results),
+      contingencyRecommendation: {
+        p80Amount: Math.round(contingencyP80 * 100) / 100,
+        p90Amount: Math.round(contingencyP90 * 100) / 100,
+        percentOfBase: percentOfBase
+      }
+    };
+  }
+
+  // Risk Quantification - auto-generates Monte Carlo inputs from project state
+  function riskQuantification(projectState) {
+    projectState = projectState || {};
+    var cases = projectState.cases || [];
+    var options = projectState.options || {};
+
+    // Extract tasks with cost estimates for cost simulation
+    var costItems = [];
+    var scheduleTasks = [];
+    var taskIndex = 0;
+
+    cases.forEach(function (c) {
+      var est = Number(c.estCost) || 0;
+      if (est > 0) {
+        var rpn = (Number(c.sev) || 1) * (Number(c.occ) || 1) * (Number(c.det) || 1);
+        var isCritical = rpn >= 200 || c.priority === "1-CRITICAL";
+
+        // Auto-generate ranges
+        var optimisticFactor = 0.8;
+        var pessimisticFactor = isCritical ? 2.0 : 1.5;
+
+        costItems.push({
+          id: c.id || ("cost-" + taskIndex),
+          name: (c.problem || "Item " + taskIndex).slice(0, 80),
+          low: Math.round(est * optimisticFactor),
+          likely: est,
+          high: Math.round(est * pessimisticFactor),
+          distribution: "triangular"
+        });
+
+        // Build schedule task if it has a start date or is a primary task
+        if (c._brain === "task" || c.startDate) {
+          var baseDays = 30; // default task duration
+          var phase = c._phase || "";
+          // Estimate duration based on cost magnitude
+          if (est > 100000) baseDays = 60;
+          else if (est > 50000) baseDays = 45;
+          else if (est > 10000) baseDays = 30;
+          else baseDays = 15;
+
+          scheduleTasks.push({
+            id: c.id || ("task-" + taskIndex),
+            name: (c.problem || "Task " + taskIndex).slice(0, 80),
+            optimistic: Math.round(baseDays * optimisticFactor),
+            mostLikely: baseDays,
+            pessimistic: Math.round(baseDays * pessimisticFactor),
+            dependencies: []
+          });
+        }
+        taskIndex++;
+      }
+    });
+
+    // Add sequential dependencies for schedule tasks within same phase
+    // Group by phase and chain them
+    if (scheduleTasks.length > 1) {
+      for (var st = 1; st < scheduleTasks.length; st++) {
+        // Simple chain: each task depends on previous (conservative)
+        scheduleTasks[st].dependencies = [scheduleTasks[st - 1].id];
+      }
+    }
+
+    var scheduleResult = monteCarloSchedule(scheduleTasks, options.iterations || 1000, options);
+    var costResult = monteCarloCost(costItems, options.iterations || 1000, options);
+
+    // Calculate base totals
+    var totalBase = 0;
+    for (var bi = 0; bi < costItems.length; bi++) {
+      totalBase += costItems[bi].likely;
+    }
+
+    return {
+      schedule: scheduleResult,
+      cost: costResult,
+      summary: {
+        tasksAnalyzed: scheduleTasks.length,
+        costItemsAnalyzed: costItems.length,
+        totalBaseEstimate: totalBase,
+        recommendedContingency: costResult.contingencyRecommendation,
+        scheduleConfidence: {
+          p50Days: scheduleResult.p50,
+          p80Days: scheduleResult.p80,
+          p90Days: scheduleResult.p90
+        }
+      }
+    };
+  }
+
   var API = {
     analyzeProject: analyzeProject,
     listProfiles: listProfiles,
@@ -2089,7 +2533,11 @@
     vendorComparison: vendorComparison,
     getContractTemplates: getContractTemplates,
     getClauseReference: getClauseReference,
-    checkAlerts: checkAlerts
+    checkAlerts: checkAlerts,
+    monteCarloSchedule: monteCarloSchedule,
+    monteCarloCost: monteCarloCost,
+    riskQuantification: riskQuantification,
+    pertRandom: pertRandom
   };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIBrain = API;

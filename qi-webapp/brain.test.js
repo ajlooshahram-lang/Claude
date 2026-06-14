@@ -1017,5 +1017,200 @@ console.log("\n-- clause reference: lookup by number only --");
   ok(nullResult === null, "getClauseReference(null) returns null");
 })();
 
+// =========================================================================
+// MONTE CARLO RISK QUANTIFICATION ENGINE TESTS
+// =========================================================================
+
+console.log("\n-- monteCarloSchedule: basic sequential tasks --");
+(function () {
+  var tasks = [
+    { id: "t1", name: "Design", optimistic: 5, mostLikely: 10, pessimistic: 20, dependencies: [] },
+    { id: "t2", name: "Build", optimistic: 10, mostLikely: 15, pessimistic: 30, dependencies: ["t1"] },
+    { id: "t3", name: "Test", optimistic: 3, mostLikely: 7, pessimistic: 14, dependencies: ["t2"] }
+  ];
+  var result = B.monteCarloSchedule(tasks, 2000, { seed: 42 });
+  ok(result.p50 > 0, "monteCarloSchedule p50 is positive (" + result.p50 + ")");
+  ok(result.p80 > result.p50, "monteCarloSchedule p80 > p50 (" + result.p80 + " > " + result.p50 + ")");
+  ok(result.p90 > result.p80, "monteCarloSchedule p90 > p80 (" + result.p90 + " > " + result.p80 + ")");
+  ok(result.mean > 0, "monteCarloSchedule mean is positive (" + result.mean + ")");
+  ok(result.stdDev > 0, "monteCarloSchedule stdDev is positive (" + result.stdDev + ")");
+  ok(result.histogram.length > 0, "monteCarloSchedule produces histogram with buckets (" + result.histogram.length + ")");
+  ok(result.criticalPathFrequency.length === 3, "criticalPathFrequency has 3 entries");
+  // All tasks should be on critical path since they are sequential
+  var allOnCP = result.criticalPathFrequency.every(function (f) { return f.frequency > 0.9; });
+  ok(allOnCP, "all sequential tasks on critical path (frequency > 0.9)");
+  // p50 should be near sum of most-likely values (10+15+7=32)
+  ok(result.p50 > 25 && result.p50 < 45, "p50 near sum of most-likely (" + result.p50 + " between 25 and 45)");
+})();
+
+console.log("\n-- monteCarloSchedule: parallel tasks --");
+(function () {
+  var tasks = [
+    { id: "t1", name: "Start", optimistic: 2, mostLikely: 3, pessimistic: 5, dependencies: [] },
+    { id: "t2", name: "Path A", optimistic: 10, mostLikely: 15, pessimistic: 25, dependencies: ["t1"] },
+    { id: "t3", name: "Path B", optimistic: 8, mostLikely: 12, pessimistic: 20, dependencies: ["t1"] },
+    { id: "t4", name: "End", optimistic: 2, mostLikely: 3, pessimistic: 5, dependencies: ["t2", "t3"] }
+  ];
+  var result = B.monteCarloSchedule(tasks, 1000, { seed: 123 });
+  // t2 is longer so should dominate critical path
+  var t2Freq = result.criticalPathFrequency.find(function (f) { return f.taskId === "t2"; });
+  var t3Freq = result.criticalPathFrequency.find(function (f) { return f.taskId === "t3"; });
+  ok(t2Freq && t2Freq.frequency > t3Freq.frequency, "longer path (t2) more often critical than shorter (t3)");
+  ok(result.p50 > 15, "parallel paths: p50 reflects longest path (" + result.p50 + ")");
+})();
+
+console.log("\n-- monteCarloSchedule: determinism with seed --");
+(function () {
+  var tasks = [
+    { id: "a", name: "Task A", optimistic: 5, mostLikely: 10, pessimistic: 20, dependencies: [] },
+    { id: "b", name: "Task B", optimistic: 8, mostLikely: 12, pessimistic: 18, dependencies: ["a"] }
+  ];
+  var r1 = B.monteCarloSchedule(tasks, 500, { seed: 999 });
+  var r2 = B.monteCarloSchedule(tasks, 500, { seed: 999 });
+  ok(r1.p50 === r2.p50, "determinism: same seed produces same p50 (" + r1.p50 + " === " + r2.p50 + ")");
+  ok(r1.p80 === r2.p80, "determinism: same seed produces same p80");
+  ok(r1.p90 === r2.p90, "determinism: same seed produces same p90");
+  ok(r1.mean === r2.mean, "determinism: same seed produces same mean");
+  ok(r1.stdDev === r2.stdDev, "determinism: same seed produces same stdDev");
+})();
+
+console.log("\n-- monteCarloSchedule: empty input --");
+(function () {
+  var result = B.monteCarloSchedule([], 100);
+  ok(result.p50 === 0, "empty tasks returns p50=0");
+  ok(result.histogram.length === 0, "empty tasks returns empty histogram");
+  ok(result.criticalPathFrequency.length === 0, "empty tasks returns empty criticalPathFrequency");
+})();
+
+console.log("\n-- monteCarloCost: 5 items distribution --");
+(function () {
+  var items = [
+    { id: "c1", name: "Civil works", low: 80000, likely: 100000, high: 150000, distribution: "triangular" },
+    { id: "c2", name: "Cable", low: 40000, likely: 50000, high: 70000, distribution: "triangular" },
+    { id: "c3", name: "Equipment", low: 20000, likely: 30000, high: 45000, distribution: "uniform" },
+    { id: "c4", name: "Labour", low: 15000, likely: 20000, high: 35000, distribution: "normal" },
+    { id: "c5", name: "Permits", low: 5000, likely: 8000, high: 20000, distribution: "triangular" }
+  ];
+  var baseCost = 100000 + 50000 + 30000 + 20000 + 8000; // 208000
+  var result = B.monteCarloCost(items, 2000, { seed: 77 });
+  ok(result.p50 > 0, "monteCarloCost p50 is positive (" + result.p50 + ")");
+  ok(result.p80 > result.p50, "monteCarloCost p80 > p50");
+  ok(result.p90 > result.p80, "monteCarloCost p90 > p80");
+  // p50 should be near the sum of likely values
+  ok(Math.abs(result.p50 - baseCost) < baseCost * 0.15, "p50 near sum of likely values (within 15%): " + result.p50 + " vs base " + baseCost);
+  ok(result.stdDev > 0, "monteCarloCost stdDev > 0 (" + result.stdDev + ")");
+  ok(result.histogram.length >= 5, "monteCarloCost histogram has multiple buckets (" + result.histogram.length + ")");
+  // Histogram total count should equal iterations
+  var histTotal = result.histogram.reduce(function (s, b) { return s + b.count; }, 0);
+  ok(histTotal === 2000, "histogram bucket counts sum to iterations (" + histTotal + ")");
+  // Contingency recommendation
+  ok(result.contingencyRecommendation.p80Amount > 0, "contingencyRecommendation p80Amount > 0 (" + result.contingencyRecommendation.p80Amount + ")");
+  ok(result.contingencyRecommendation.p90Amount > result.contingencyRecommendation.p80Amount, "p90Amount > p80Amount");
+  ok(result.contingencyRecommendation.percentOfBase > 0, "percentOfBase > 0 (" + result.contingencyRecommendation.percentOfBase + "%)");
+})();
+
+console.log("\n-- monteCarloCost: determinism with seed --");
+(function () {
+  var items = [
+    { id: "x1", name: "Item 1", low: 1000, likely: 2000, high: 4000, distribution: "triangular" },
+    { id: "x2", name: "Item 2", low: 500, likely: 800, high: 1500, distribution: "uniform" }
+  ];
+  var r1 = B.monteCarloCost(items, 500, { seed: 555 });
+  var r2 = B.monteCarloCost(items, 500, { seed: 555 });
+  ok(r1.p50 === r2.p50, "cost determinism: same seed same p50");
+  ok(r1.mean === r2.mean, "cost determinism: same seed same mean");
+  ok(r1.p90 === r2.p90, "cost determinism: same seed same p90");
+})();
+
+console.log("\n-- monteCarloCost: empty input --");
+(function () {
+  var result = B.monteCarloCost([], 100);
+  ok(result.p50 === 0, "empty cost items returns p50=0");
+  ok(result.contingencyRecommendation.percentOfBase === 0, "empty items: percentOfBase=0");
+})();
+
+console.log("\n-- riskQuantification: combined analysis --");
+(function () {
+  var projectState = {
+    cases: [
+      { id: "c1", problem: "Civil works trenching", estCost: 100000, sev: 5, occ: 4, det: 3, priority: "2-HIGH", _brain: "task", status: "OPEN", startDate: "2024-01-01" },
+      { id: "c2", problem: "Cable procurement", estCost: 50000, sev: 3, occ: 3, det: 3, priority: "3-MEDIUM", _brain: "task", status: "OPEN", startDate: "2024-02-01" },
+      { id: "c3", problem: "CRITICAL: Permit approval delays", estCost: 80000, sev: 8, occ: 7, det: 4, priority: "1-CRITICAL", _brain: "task", status: "OPEN", startDate: "2024-01-15" },
+      { id: "c4", problem: "Splicing operations", estCost: 30000, sev: 4, occ: 3, det: 3, priority: "3-MEDIUM", _brain: "task", status: "OPEN" },
+      { id: "c5", problem: "Testing and commissioning", estCost: 20000, sev: 5, occ: 3, det: 3, priority: "3-MEDIUM", _brain: "task", status: "OPEN" }
+    ],
+    options: { seed: 321, iterations: 1000 }
+  };
+  var result = B.riskQuantification(projectState);
+  ok(result.schedule !== undefined, "riskQuantification returns schedule");
+  ok(result.cost !== undefined, "riskQuantification returns cost");
+  ok(result.summary !== undefined, "riskQuantification returns summary");
+  ok(result.summary.costItemsAnalyzed === 5, "analyzed 5 cost items (" + result.summary.costItemsAnalyzed + ")");
+  ok(result.summary.tasksAnalyzed >= 3, "analyzed schedule tasks (" + result.summary.tasksAnalyzed + ")");
+  ok(result.summary.totalBaseEstimate === 280000, "base estimate is sum of estCost (280000): " + result.summary.totalBaseEstimate);
+  // Contingency recommendation
+  ok(result.summary.recommendedContingency.p90Amount > 0, "recommends contingency > 0");
+  ok(result.summary.recommendedContingency.percentOfBase > 0, "contingency percent > 0 (" + result.summary.recommendedContingency.percentOfBase + "%)");
+  // Critical items should have higher pessimistic (2x vs 1.5x)
+  ok(result.cost.p90 > result.cost.p50, "cost p90 > p50");
+  ok(result.schedule.p90 > result.schedule.p50, "schedule p90 > p50");
+})();
+
+console.log("\n-- riskQuantification: empty state --");
+(function () {
+  var result = B.riskQuantification({});
+  ok(result.summary.costItemsAnalyzed === 0, "empty state: 0 cost items");
+  ok(result.summary.tasksAnalyzed === 0, "empty state: 0 schedule tasks");
+  ok(result.schedule.p50 === 0, "empty state: schedule p50=0");
+  ok(result.cost.p50 === 0, "empty state: cost p50=0");
+})();
+
+console.log("\n-- pertRandom: PERT distribution helper --");
+(function () {
+  // pertRandom should produce values within [min, max] range
+  var rng = (function () {
+    var s = 12345;
+    return function () {
+      s ^= s << 13; s ^= s >>> 17; s ^= s << 5;
+      return (s >>> 0) / 4294967296;
+    };
+  })();
+  var samples = [];
+  for (var i = 0; i < 1000; i++) {
+    var v = B.pertRandom(5, 10, 20, rng);
+    samples.push(v);
+  }
+  var allInRange = samples.every(function (s) { return s >= 5 && s <= 20; });
+  ok(allInRange, "pertRandom all samples in [5, 20] range");
+  var avg = samples.reduce(function (s, v) { return s + v; }, 0) / samples.length;
+  // PERT mean should be (5 + 4*10 + 20)/6 = 10.83
+  var expectedMean = (5 + 4 * 10 + 20) / 6;
+  ok(Math.abs(avg - expectedMean) < 1.5, "pertRandom mean near PERT expected (" + avg.toFixed(2) + " vs " + expectedMean.toFixed(2) + ")");
+})();
+
+console.log("\n-- histogram bucket distribution --");
+(function () {
+  var items = [
+    { id: "h1", name: "A", low: 100, likely: 200, high: 400, distribution: "triangular" },
+    { id: "h2", name: "B", low: 50, likely: 100, high: 200, distribution: "triangular" },
+    { id: "h3", name: "C", low: 30, likely: 50, high: 80, distribution: "triangular" }
+  ];
+  var result = B.monteCarloCost(items, 5000, { seed: 888 });
+  // Histogram should have a reasonable distribution (not all in one bucket)
+  var nonZeroBuckets = result.histogram.filter(function (b) { return b.count > 0; });
+  ok(nonZeroBuckets.length >= 5, "histogram has >= 5 non-zero buckets (" + nonZeroBuckets.length + ")");
+  // Check that the peak is roughly in the middle (bell-shaped for sum of triangulars)
+  var maxCount = 0;
+  var maxIdx = 0;
+  for (var i = 0; i < result.histogram.length; i++) {
+    if (result.histogram[i].count > maxCount) {
+      maxCount = result.histogram[i].count;
+      maxIdx = i;
+    }
+  }
+  // Peak should not be at the extreme edges (first 2 or last 2 buckets)
+  ok(maxIdx > 1 && maxIdx < result.histogram.length - 2, "histogram peak is not at extremes (peak at index " + maxIdx + " of " + result.histogram.length + ")");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);
