@@ -825,6 +825,7 @@ const T = {
       tray: '\uD83D\uDCD0 Kabelbakke',
       pfc: '\uD83D\uDD0B Fasekompensering',
       energy: '\uD83D\uDCB0 Energi',
+      panel: '\uD83D\uDDC4\uFE0F El-tavle',
       exam: '\uD83C\uDF93 Eksamen'
     },
     // Load module
@@ -936,6 +937,7 @@ const T = {
       tray: '\uD83D\uDCD0 Cable Tray',
       pfc: '\uD83D\uDD0B Power Factor',
       energy: '\uD83D\uDCB0 Energy',
+      panel: '\uD83D\uDDC4\uFE0F Switchboard',
       exam: '\uD83C\uDF93 Exam'
     },
     loadTitle: 'Load Calculation',
@@ -2098,6 +2100,8 @@ let trayState = { type: 'tray', width: 300, height: 100, cables: [], qtyPending:
 let pfcState = { cosCurrent: 0.85, cosTarget: 0.95, power: 100, compType: 'fixed', voltage: 400 };
 // Energy Cost Estimator state
 let energyState = { profile: 8760, price: 2.5, power: 100, priceIncrease: 3 };
+// Panel / Switchboard state
+let panelState = { category: 'hovedtavle', mounting: 'flush', ip: 'IP30', material: 'steel', rows: 4, modulesPerRow: 24, mainRating: 63, mainType: 'loadbreak', busbar: 'pin', busbarCurrent: 100, surge: 'none', mainRcd: 'none' };
 // Short circuit state
 let scState = { zNet: 1, zTrafo: 5 };
 // Standards state
@@ -2237,6 +2241,7 @@ function renderModule(mod) {
     case 'tray': content += renderTray(); break;
     case 'pfc': content += renderPfc(); break;
     case 'energy': content += renderEnergy(); break;
+    case 'panel': content += renderPanel(); break;
     case 'exam': content = renderExam(); break;
   }
   // Append AI assistant to every module
@@ -14474,6 +14479,488 @@ function buildEnergySvg(s, annualCost, pctIncrease) {
 
   svg += '</svg>';
   return svg;
+}
+
+// ===== ELECTRICAL PANEL / SWITCHBOARD MODULE =====
+function renderPanel() {
+  var da = lang === 'da';
+  var s = panelState;
+
+  // Options data
+  var CATEGORIES = [
+    { id: 'hovedtavle', da: 'Hovedtavle', en: 'Main panel' },
+    { id: 'gruppetavle', da: 'Gruppetavle', en: 'Distribution board' },
+    { id: 'undertavle', da: 'Undertavle', en: 'Sub-panel' },
+    { id: 'malerskab', da: 'Maalerskab', en: 'Meter cabinet' },
+    { id: 'mcc', da: 'Motorstarttavle', en: 'MCC' }
+  ];
+  var MOUNTINGS = [
+    { id: 'flush', da: 'Indbygning', en: 'Flush' },
+    { id: 'surface', da: 'Opbyg', en: 'Surface' },
+    { id: 'floor', da: 'Gulvstaaende', en: 'Floor-standing' }
+  ];
+  var IP_RATINGS = [
+    { id: 'IP30', da: 'IP30 (indendoers)', en: 'IP30 (indoor)' },
+    { id: 'IP44', da: 'IP44', en: 'IP44' },
+    { id: 'IP55', da: 'IP55 (udendoers)', en: 'IP55 (outdoor)' },
+    { id: 'IP65', da: 'IP65 (barsk)', en: 'IP65 (harsh)' }
+  ];
+  var MATERIALS = [
+    { id: 'plastic', da: 'Plast', en: 'Plastic' },
+    { id: 'steel', da: 'Staalplade', en: 'Steel' },
+    { id: 'stainless', da: 'Rustfrit', en: 'Stainless steel' }
+  ];
+  var ROW_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
+  var MOD_PER_ROW = [12, 18, 24, 36, 48, 54, 72];
+  var MAIN_RATINGS = [25, 40, 63, 80, 100, 125, 160, 200, 250, 400, 630];
+  var MAIN_TYPES = [
+    { id: 'loadbreak', da: 'Lastadskiller', en: 'Load break switch' },
+    { id: 'mccb', da: 'MCCB', en: 'MCCB' },
+    { id: 'nhfuse', da: 'NH-sikring', en: 'NH-fuse' }
+  ];
+  var BUSBARS = [
+    { id: 'pin', da: 'Stift', en: 'Pin' },
+    { id: 'fork', da: 'Gaffel', en: 'Fork' },
+    { id: 'full', da: 'Skinne', en: 'Full busbar' },
+    { id: 'phase', da: 'Faseskinne', en: 'Phase busbar' }
+  ];
+  var BUSBAR_CURRENTS = [63, 100, 125, 160, 250, 400, 630];
+  var SURGES = [
+    { id: 'none', da: 'Ingen', en: 'None' },
+    { id: 'type2', da: 'Type 2', en: 'Type 2' },
+    { id: 'type12', da: 'Type 1+2', en: 'Type 1+2' }
+  ];
+  var MAIN_RCDS = [
+    { id: 'none', da: 'Ingen', en: 'None' },
+    { id: '30a', da: '30mA Type A', en: '30mA Type A' },
+    { id: '30b', da: '30mA Type B', en: '30mA Type B' },
+    { id: '300s', da: '300mA Type S', en: '300mA Type S' }
+  ];
+
+  // Load project circuits for auto-fill
+  var circuits = [];
+  try { circuits = JSON.parse(localStorage.getItem('projectCircuits') || '[]'); } catch(e) { circuits = []; }
+  var circuitCount = circuits.length + loadList.length;
+
+  // Calculate total module usage
+  var totalModules = s.rows * s.modulesPerRow;
+  var usedModules = 0;
+
+  // Build device layout per row
+  var rowDevices = [];
+  for (var r = 0; r < s.rows; r++) { rowDevices.push([]); }
+
+  // Main switch takes space in row 0
+  var mainSwitchWidth = s.mainType === 'nhfuse' ? 3 : (s.mainRating > 160 ? 4 : 3);
+  if (rowDevices.length > 0) { rowDevices[0].push({ type: 'main', label: s.mainRating + 'A', width: mainSwitchWidth, color: '#ff5555' }); usedModules += mainSwitchWidth; }
+
+  // Surge protection in row 0
+  var spdWidth = 0;
+  if (s.surge === 'type2') { spdWidth = 4; }
+  else if (s.surge === 'type12') { spdWidth = 8; }
+  if (spdWidth > 0 && rowDevices.length > 0) { rowDevices[0].push({ type: 'spd', label: (s.surge === 'type12' ? 'T1+2' : 'T2'), width: spdWidth, color: '#ffaa00' }); usedModules += spdWidth; }
+
+  // Main RCD
+  var rcdWidth = 0;
+  if (s.mainRcd !== 'none') { rcdWidth = 4; }
+  if (rcdWidth > 0 && rowDevices.length > 0) { rowDevices[0].push({ type: 'rcd', label: 'RCD', width: rcdWidth, color: '#00ccff' }); usedModules += rcdWidth; }
+
+  // Fill remaining rows with MCBs from project
+  var mcbWidth = 1;
+  var rcdMcbWidth = 2;
+  var deviceIdx = 0;
+  for (var ri = 1; ri < s.rows; ri++) {
+    var rowFill = 0;
+    while (rowFill + mcbWidth <= s.modulesPerRow && deviceIdx < circuitCount) {
+      var devColor = deviceIdx % 3 === 0 ? '#00ff88' : (deviceIdx % 3 === 1 ? '#55aaff' : '#ff77ff');
+      var devW = (deviceIdx % 5 === 0) ? rcdMcbWidth : mcbWidth;
+      if (rowFill + devW > s.modulesPerRow) break;
+      rowDevices[ri].push({ type: 'mcb', label: 'C' + (deviceIdx + 1), width: devW, color: devColor });
+      rowFill += devW;
+      usedModules += devW;
+      deviceIdx++;
+    }
+  }
+
+  var fillPercent = totalModules > 0 ? Math.round((usedModules / totalModules) * 100) : 0;
+
+  // BOM (Bill of Materials)
+  var bom = [];
+  bom.push({ item: da ? 'Tavleskab' : 'Panel enclosure', desc: (da ? CATEGORIES.find(function(c){return c.id===s.category;}).da : CATEGORIES.find(function(c){return c.id===s.category;}).en) + ' ' + s.ip + ' ' + (da ? MATERIALS.find(function(m){return m.id===s.material;}).da : MATERIALS.find(function(m){return m.id===s.material;}).en), qty: 1, modWidth: '-' });
+  bom.push({ item: da ? 'Hovedafbryder' : 'Main switch', desc: s.mainRating + 'A ' + (da ? MAIN_TYPES.find(function(t){return t.id===s.mainType;}).da : MAIN_TYPES.find(function(t){return t.id===s.mainType;}).en), qty: 1, modWidth: mainSwitchWidth });
+  if (s.surge !== 'none') { bom.push({ item: da ? 'Overspaendingsbeskyttelse' : 'Surge protection', desc: s.surge === 'type12' ? 'Type 1+2' : 'Type 2', qty: 1, modWidth: spdWidth }); }
+  if (s.mainRcd !== 'none') { bom.push({ item: da ? 'Hoved-RCD' : 'Main RCD', desc: s.mainRcd === '30a' ? '30mA Type A' : (s.mainRcd === '30b' ? '30mA Type B' : '300mA Type S'), qty: 1, modWidth: rcdWidth }); }
+  bom.push({ item: da ? 'DIN-skinne' : 'DIN-rail', desc: s.modulesPerRow + ' ' + (da ? 'moduler' : 'modules'), qty: s.rows, modWidth: s.modulesPerRow });
+  bom.push({ item: da ? 'Samleskinne' : 'Busbar', desc: (da ? BUSBARS.find(function(b){return b.id===s.busbar;}).da : BUSBARS.find(function(b){return b.id===s.busbar;}).en) + ' ' + s.busbarCurrent + 'A', qty: s.rows, modWidth: '-' });
+  bom.push({ item: da ? 'Automatsikringer' : 'MCBs', desc: (da ? 'Til kredsloeb' : 'For circuits'), qty: Math.min(circuitCount, deviceIdx), modWidth: mcbWidth });
+  bom.push({ item: da ? 'Kabelforskruninger' : 'Cable glands', desc: 'M20/M25', qty: Math.max(circuitCount, 8), modWidth: '-' });
+  bom.push({ item: da ? 'Terminaler' : 'Terminal blocks', desc: 'PE + N', qty: Math.max(circuitCount * 2, 16), modWidth: '-' });
+  bom.push({ item: da ? 'Maaerkning' : 'Labeling', desc: (da ? 'Skiltesaet' : 'Label set'), qty: 1, modWidth: '-' });
+
+  // Cost estimate (Danish market ranges in DKK)
+  var costs = {
+    enclosure: s.category === 'hovedtavle' || s.category === 'mcc' ? { min: 3500, max: 12000 } : (s.category === 'gruppetavle' ? { min: 1500, max: 5000 } : { min: 800, max: 3000 }),
+    mainSwitch: s.mainRating <= 63 ? { min: 800, max: 1500 } : (s.mainRating <= 160 ? { min: 1500, max: 3500 } : { min: 3500, max: 8000 }),
+    spd: s.surge === 'type12' ? { min: 3500, max: 6000 } : (s.surge === 'type2' ? { min: 1500, max: 3000 } : { min: 0, max: 0 }),
+    rcd: s.mainRcd !== 'none' ? (s.mainRcd === '30b' ? { min: 2000, max: 4000 } : { min: 600, max: 1500 }) : { min: 0, max: 0 },
+    busbar: s.busbar === 'full' || s.busbar === 'phase' ? { min: 1200, max: 3500 } : { min: 300, max: 800 },
+    mcbs: { min: circuitCount * 120, max: circuitCount * 350 },
+    glands: { min: circuitCount * 15, max: circuitCount * 45 },
+    terminals: { min: circuitCount * 20, max: circuitCount * 60 }
+  };
+  if (s.material === 'stainless') { costs.enclosure.min *= 2.5; costs.enclosure.max *= 2.5; }
+  if (s.ip === 'IP65') { costs.enclosure.min *= 1.6; costs.enclosure.max *= 1.6; }
+  var totalCostMin = 0, totalCostMax = 0;
+  Object.keys(costs).forEach(function(k) { totalCostMin += costs[k].min; totalCostMax += costs[k].max; });
+  totalCostMin = Math.round(totalCostMin);
+  totalCostMax = Math.round(totalCostMax);
+
+  // Panel brands/series recommendations
+  var brands = [];
+  if (s.category === 'hovedtavle' || s.category === 'mcc') {
+    brands.push({ brand: 'Schneider Electric', series: 'Prisma Plus P', note: da ? 'Industriel hovedtavle' : 'Industrial main panel' });
+    brands.push({ brand: 'ABB', series: 'ArTu M', note: da ? 'Modulaer hovedtavle' : 'Modular main panel' });
+    brands.push({ brand: 'Rittal', series: 'Ri4Power', note: da ? 'Gulvstaaende storsystem' : 'Floor-standing large system' });
+  } else if (s.category === 'gruppetavle') {
+    brands.push({ brand: 'Schneider Electric', series: 'Resi9 / Pragma', note: da ? 'Boliger og let erhverv' : 'Residential and light commercial' });
+    brands.push({ brand: 'Hager', series: 'Gamma', note: da ? 'Kompakt distribution' : 'Compact distribution' });
+    brands.push({ brand: 'ABB', series: 'Mistral / System pro E', note: da ? 'Vifte af stoerrelse' : 'Range of sizes' });
+  } else {
+    brands.push({ brand: 'Schneider Electric', series: 'Kaedex / Pragma', note: da ? 'Fleksibel undertavle' : 'Flexible sub-panel' });
+    brands.push({ brand: 'Hager', series: 'Volta / Vector', note: da ? 'Plast undertavle' : 'Plastic sub-panel' });
+    brands.push({ brand: 'ABB', series: 'Mistral41', note: da ? 'IP41/65 undertavle' : 'IP41/65 sub-panel' });
+    brands.push({ brand: 'Rittal', series: 'AE / KX', note: da ? 'Rustfrit specialskab' : 'Stainless special cabinet' });
+  }
+
+  // ===== BUILD HTML =====
+  var html = '<div class="card fade-in"><div class="card-title">' + (da ? '\uD83D\uDDC4\uFE0F El-tavle / Switchboard Konfigurator' : '\uD83D\uDDC4\uFE0F Switchboard / Panel Configurator') + '</div>';
+
+  // Section 1 - Panel Type
+  html += '<div class="select-group"><div class="select-label">\uD83C\uDFE2 ' + (da ? 'Tavletype' : 'Panel category') + '</div><div class="select-grid">';
+  CATEGORIES.forEach(function(c) {
+    html += '<button class="sel-btn ' + (s.category === c.id ? 'selected' : '') + '" onclick="panelState.category=\'' + c.id + '\';renderModule(\'panel\')">' + (da ? c.da : c.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD27 ' + (da ? 'Montering' : 'Mounting') + '</div><div class="select-grid">';
+  MOUNTINGS.forEach(function(m) {
+    html += '<button class="sel-btn ' + (s.mounting === m.id ? 'selected' : '') + '" onclick="panelState.mounting=\'' + m.id + '\';renderModule(\'panel\')">' + (da ? m.da : m.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDCA7 ' + (da ? 'IP-kapslingsklasse' : 'IP rating') + '</div><div class="select-grid">';
+  IP_RATINGS.forEach(function(ip) {
+    html += '<button class="sel-btn ' + (s.ip === ip.id ? 'selected' : '') + '" onclick="panelState.ip=\'' + ip.id + '\';renderModule(\'panel\')">' + (da ? ip.da : ip.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">\uD83E\uDDF1 ' + (da ? 'Materiale' : 'Material') + '</div><div class="select-grid">';
+  MATERIALS.forEach(function(mat) {
+    html += '<button class="sel-btn ' + (s.material === mat.id ? 'selected' : '') + '" onclick="panelState.material=\'' + mat.id + '\';renderModule(\'panel\')">' + (da ? mat.da : mat.en) + '</button>';
+  });
+  html += '</div></div>';
+  html += '</div>';
+
+  // Section 2 - Size Configuration
+  html += '<div class="card fade-in"><div class="card-title">' + (da ? '\uD83D\uDCCF Stoerrelse' : '\uD83D\uDCCF Size Configuration') + '</div>';
+
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Antal raekker' : 'Number of rows') + '</div><div class="select-grid">';
+  ROW_OPTIONS.forEach(function(n) {
+    html += '<button class="sel-btn ' + (s.rows === n ? 'selected' : '') + '" onclick="panelState.rows=' + n + ';renderModule(\'panel\')">' + n + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Moduler pr. raekke' : 'Modules per row') + '</div><div class="select-grid">';
+  MOD_PER_ROW.forEach(function(n) {
+    html += '<button class="sel-btn ' + (s.modulesPerRow === n ? 'selected' : '') + '" onclick="panelState.modulesPerRow=' + n + ';renderModule(\'panel\')">' + n + '</button>';
+  });
+  html += '</div></div>';
+
+  // Auto-suggest from project
+  if (circuitCount > 0) {
+    var suggestedRows = Math.max(2, Math.ceil(circuitCount / (s.modulesPerRow * 0.7)) + 1);
+    html += '<div class="result-box" style="margin-top:8px"><div class="result-title">' + (da ? 'Forslag fra projekt' : 'Suggestion from project') + '</div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Kredsloeb i projekt' : 'Circuits in project') + '</span><span class="value">' + circuitCount + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Anbefalet raekker' : 'Recommended rows') + '</span><span class="value">' + suggestedRows + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Total kapacitet' : 'Total capacity') + '</span><span class="value">' + totalModules + ' ' + (da ? 'moduler' : 'modules') + '</span></div>';
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // Section 3 - Main Components
+  html += '<div class="card fade-in"><div class="card-title">' + (da ? '\u26A1 Hovedkomponenter' : '\u26A1 Main Components') + '</div>';
+
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Hovedafbryder maerkestr\u00F8m' : 'Main switch rating') + '</div><div class="select-grid">';
+  MAIN_RATINGS.forEach(function(a) {
+    html += '<button class="sel-btn ' + (s.mainRating === a ? 'selected' : '') + '" onclick="panelState.mainRating=' + a + ';renderModule(\'panel\')">' + a + 'A</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Hovedafbryder type' : 'Main switch type') + '</div><div class="select-grid">';
+  MAIN_TYPES.forEach(function(t) {
+    html += '<button class="sel-btn ' + (s.mainType === t.id ? 'selected' : '') + '" onclick="panelState.mainType=\'' + t.id + '\';renderModule(\'panel\')">' + (da ? t.da : t.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Samleskinnesystem' : 'Busbar system') + '</div><div class="select-grid">';
+  BUSBARS.forEach(function(b) {
+    html += '<button class="sel-btn ' + (s.busbar === b.id ? 'selected' : '') + '" onclick="panelState.busbar=\'' + b.id + '\';renderModule(\'panel\')">' + (da ? b.da : b.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Samleskinne str\u00F8m' : 'Busbar current') + '</div><div class="select-grid">';
+  BUSBAR_CURRENTS.forEach(function(a) {
+    html += '<button class="sel-btn ' + (s.busbarCurrent === a ? 'selected' : '') + '" onclick="panelState.busbarCurrent=' + a + ';renderModule(\'panel\')">' + a + 'A</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Overspaendingsbeskyttelse' : 'Surge protection') + '</div><div class="select-grid">';
+  SURGES.forEach(function(sp) {
+    html += '<button class="sel-btn ' + (s.surge === sp.id ? 'selected' : '') + '" onclick="panelState.surge=\'' + sp.id + '\';renderModule(\'panel\')">' + (da ? sp.da : sp.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Hoved-RCD' : 'Main RCD') + '</div><div class="select-grid">';
+  MAIN_RCDS.forEach(function(rcd) {
+    html += '<button class="sel-btn ' + (s.mainRcd === rcd.id ? 'selected' : '') + '" onclick="panelState.mainRcd=\'' + rcd.id + '\';renderModule(\'panel\')">' + (da ? rcd.da : rcd.en) + '</button>';
+  });
+  html += '</div></div>';
+  html += '</div>';
+
+  // Section 4 - Auto-Fill from Project
+  html += '<div class="card fade-in"><div class="card-title">' + (da ? '\uD83D\uDD04 Auto-udfyld fra projekt' : '\uD83D\uDD04 Auto-fill from project') + '</div>';
+  html += '<button class="sel-btn" onclick="panelAutoFill()" style="padding:12px 24px;font-size:14px;background:linear-gradient(135deg,#00cc88,#0088ff);color:#fff;border:none;border-radius:8px;cursor:pointer">' + (da ? '\u2699\uFE0F Auto-udfyld fra projekt' : '\u2699\uFE0F Auto-fill from project') + '</button>';
+  html += '<p style="margin-top:8px;color:#aaa;font-size:12px">' + (da ? 'Taeller alle gemte kredsloeb og foresl\u00E5r tavlest\u00F8rrelse automatisk' : 'Counts all saved circuits and suggests panel size automatically') + '</p>';
+  html += '</div>';
+
+  // Section 5 - DIN-Rail Layout Visualization
+  html += '<div class="card fade-in"><div class="card-title">' + (da ? '\uD83D\uDCCA DIN-skinne Layout' : '\uD83D\uDCCA DIN-Rail Layout') + '</div>';
+  html += '<div class="result-box"><div class="result-title">' + (da ? 'Fyldningsgrad' : 'Fill percentage') + ': ' + fillPercent + '%</div>';
+  html += '<div style="background:#333;border-radius:6px;height:18px;margin:8px 0;overflow:hidden"><div style="height:100%;width:' + fillPercent + '%;background:linear-gradient(90deg,' + (fillPercent > 80 ? '#ff4444' : '#00ff88') + ',' + (fillPercent > 80 ? '#ff8800' : '#00ccff') + ');border-radius:6px;transition:width 0.6s ease"></div></div>';
+  html += '</div>';
+
+  // Animated row visualization
+  for (var rv = 0; rv < s.rows; rv++) {
+    var rowFillPct = 0;
+    rowDevices[rv].forEach(function(d) { rowFillPct += d.width; });
+    rowFillPct = Math.round((rowFillPct / s.modulesPerRow) * 100);
+    html += '<div style="margin:6px 0;padding:8px;background:#1a1a2e;border:1px solid #333;border-radius:6px">';
+    html += '<div style="display:flex;align-items:center;margin-bottom:4px"><span style="color:#888;font-size:11px;width:60px">' + (da ? 'Raekke' : 'Row') + ' ' + (rv + 1) + '</span><span style="color:#aaa;font-size:10px;margin-left:auto">' + rowFillPct + '%</span></div>';
+    html += '<div style="display:flex;height:28px;background:#111;border-radius:4px;overflow:hidden;gap:1px">';
+    rowDevices[rv].forEach(function(d) {
+      var widthPct = (d.width / s.modulesPerRow) * 100;
+      html += '<div style="width:' + widthPct + '%;background:' + d.color + ';display:flex;align-items:center;justify-content:center;font-size:8px;color:#000;font-weight:700;border-radius:2px;animation:fadeIn 0.5s ease">' + d.label + '</div>';
+    });
+    // Empty space
+    var emptyPct = 100 - rowFillPct;
+    if (emptyPct > 0) { html += '<div style="width:' + emptyPct + '%;background:#222;border-radius:2px"></div>'; }
+    html += '</div></div>';
+  }
+  html += '</div>';
+
+  // Section 5b - Animated SVG Front View
+  html += '<div class="card fade-in"><div class="card-title">' + (da ? '\uD83D\uDDBC\uFE0F Tavle Frontvisning' : '\uD83D\uDDBC\uFE0F Panel Front View') + '</div>';
+  html += buildPanelSVG(s, rowDevices);
+  html += '</div>';
+
+  // Section 6 - BOM Table
+  html += '<div class="card fade-in"><div class="card-title">' + (da ? '\uD83D\uDCCB Materialeliste (BOM)' : '\uD83D\uDCCB Bill of Materials (BOM)') + '</div>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  html += '<thead><tr style="border-bottom:2px solid #444"><th style="text-align:left;padding:6px;color:#00ccff">' + (da ? 'Komponent' : 'Item') + '</th><th style="text-align:left;padding:6px;color:#00ccff">' + (da ? 'Beskrivelse' : 'Description') + '</th><th style="text-align:center;padding:6px;color:#00ccff">' + (da ? 'Antal' : 'Qty') + '</th><th style="text-align:center;padding:6px;color:#00ccff">' + (da ? 'Modulbredde' : 'Module width') + '</th></tr></thead><tbody>';
+  bom.forEach(function(row, idx) {
+    var bgColor = idx % 2 === 0 ? '#1a1a2e' : '#16213e';
+    html += '<tr style="background:' + bgColor + ';border-bottom:1px solid #333"><td style="padding:6px;color:#eee">' + row.item + '</td><td style="padding:6px;color:#aaa">' + row.desc + '</td><td style="text-align:center;padding:6px;color:#00ff88">' + row.qty + '</td><td style="text-align:center;padding:6px;color:#ffaa00">' + row.modWidth + '</td></tr>';
+  });
+  html += '</tbody></table>';
+  html += '<button class="sel-btn" onclick="panelDownloadBOM()" style="margin-top:12px;padding:10px 20px;background:linear-gradient(135deg,#00cc88,#009966);color:#fff;border:none;border-radius:8px;cursor:pointer">' + (da ? '\u2B07\uFE0F Download BOM (CSV)' : '\u2B07\uFE0F Download BOM (CSV)') + '</button>';
+  html += '</div>';
+
+  // Section 7 - Cost Estimate
+  html += '<div class="card fade-in"><div class="card-title">' + (da ? '\uD83D\uDCB0 Prisoverslag' : '\uD83D\uDCB0 Cost Estimate') + '</div>';
+  html += '<div class="result-box"><div class="result-title">' + (da ? 'Estimeret totalpris (DKK)' : 'Estimated total cost (DKK)') + '</div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Minimum' : 'Minimum') + '</span><span class="value" style="color:#00ff88">' + totalCostMin.toLocaleString() + ' DKK</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Maksimum' : 'Maximum') + '</span><span class="value" style="color:#ffaa00">' + totalCostMax.toLocaleString() + ' DKK</span></div>';
+  html += '</div>';
+
+  html += '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:10px">';
+  html += '<thead><tr style="border-bottom:1px solid #444"><th style="text-align:left;padding:4px;color:#888">' + (da ? 'Post' : 'Item') + '</th><th style="text-align:right;padding:4px;color:#888">Min</th><th style="text-align:right;padding:4px;color:#888">Max</th></tr></thead><tbody>';
+  var costLabels = { enclosure: da ? 'Skab' : 'Enclosure', mainSwitch: da ? 'Hovedafbryder' : 'Main switch', spd: 'SPD', rcd: 'RCD', busbar: da ? 'Samleskinne' : 'Busbar', mcbs: da ? 'Automatsikringer' : 'MCBs', glands: da ? 'Forskruninger' : 'Glands', terminals: da ? 'Terminaler' : 'Terminals' };
+  Object.keys(costs).forEach(function(k) {
+    if (costs[k].max > 0) {
+      html += '<tr style="border-bottom:1px solid #222"><td style="padding:4px;color:#ccc">' + costLabels[k] + '</td><td style="text-align:right;padding:4px;color:#aaa">' + Math.round(costs[k].min).toLocaleString() + '</td><td style="text-align:right;padding:4px;color:#aaa">' + Math.round(costs[k].max).toLocaleString() + '</td></tr>';
+    }
+  });
+  html += '</tbody></table>';
+  html += '</div>';
+
+  // Section 8 - Panel Brands/Series
+  html += '<div class="card fade-in"><div class="card-title">' + (da ? '\uD83C\uDFED Anbefalede tavleserier' : '\uD83C\uDFED Recommended Panel Series') + '</div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">';
+  brands.forEach(function(b) {
+    html += '<div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:12px">';
+    html += '<div style="color:#00ccff;font-weight:700;font-size:13px">' + b.brand + '</div>';
+    html += '<div style="color:#ffaa00;font-size:12px;margin-top:4px">' + b.series + '</div>';
+    html += '<div style="color:#888;font-size:11px;margin-top:4px">' + b.note + '</div>';
+    html += '</div>';
+  });
+  html += '</div></div>';
+
+  return html;
+}
+
+// Panel SVG front view
+function buildPanelSVG(s, rowDevices) {
+  var W = 680, H = 420;
+  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:680px;height:auto;background:#0a0a1a;border-radius:8px">';
+
+  // Cabinet outline
+  var cabX = 40, cabY = 20, cabW = 600, cabH = 380;
+  svg += '<rect x="' + cabX + '" y="' + cabY + '" width="' + cabW + '" height="' + cabH + '" fill="#1a1a2e" stroke="#444" stroke-width="2" rx="4"/>';
+
+  // Door frame
+  svg += '<rect x="' + (cabX + 4) + '" y="' + (cabY + 4) + '" width="' + (cabW - 8) + '" height="' + (cabH - 8) + '" fill="none" stroke="#555" stroke-width="1" rx="2"/>';
+
+  // Door handle
+  svg += '<rect x="' + (cabX + cabW - 20) + '" y="' + (cabY + cabH / 2 - 20) + '" width="8" height="40" fill="#666" rx="3"/>';
+
+  // Panel label
+  var catLabel = s.category === 'hovedtavle' ? 'HT' : (s.category === 'gruppetavle' ? 'GT' : (s.category === 'undertavle' ? 'UT' : (s.category === 'malerskab' ? 'MS' : 'MCC')));
+  svg += '<text x="' + (cabX + cabW / 2) + '" y="' + (cabY + 16) + '" text-anchor="middle" fill="#00ccff" font-size="11" font-weight="700">' + catLabel + ' - ' + s.mainRating + 'A - ' + s.ip + '</text>';
+
+  // Busbar at top
+  var busY = cabY + 28;
+  svg += '<rect x="' + (cabX + 30) + '" y="' + busY + '" width="' + (cabW - 60) + '" height="6" fill="#cc8800" rx="1">';
+  svg += '<animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite"/>';
+  svg += '</rect>';
+  svg += '<text x="' + (cabX + cabW / 2) + '" y="' + (busY - 2) + '" text-anchor="middle" fill="#ffcc00" font-size="8">' + s.busbarCurrent + 'A Busbar</text>';
+
+  // DIN-rail rows with devices
+  var rowHeight = (cabH - 70) / s.rows;
+  var railY = cabY + 44;
+
+  for (var ri = 0; ri < s.rows; ri++) {
+    var rY = railY + ri * rowHeight;
+    // DIN-rail
+    svg += '<rect x="' + (cabX + 25) + '" y="' + (rY + rowHeight / 2 - 2) + '" width="' + (cabW - 50) + '" height="4" fill="#555" rx="1"/>';
+    // Row label
+    svg += '<text x="' + (cabX + 10) + '" y="' + (rY + rowHeight / 2 + 3) + '" fill="#666" font-size="8">R' + (ri + 1) + '</text>';
+
+    // Devices on this row
+    var devX = cabX + 30;
+    var devW = (cabW - 60) / s.modulesPerRow;
+    rowDevices[ri].forEach(function(d, di) {
+      var dW = d.width * devW;
+      var dH = rowHeight * 0.6;
+      var dY = rY + (rowHeight - dH) / 2;
+      // Device body
+      svg += '<rect x="' + devX + '" y="' + dY + '" width="' + (dW - 1) + '" height="' + dH + '" fill="' + d.color + '" rx="2" opacity="0">';
+      svg += '<animate attributeName="opacity" from="0" to="0.85" dur="' + (0.3 + di * 0.08) + 's" fill="freeze"/>';
+      svg += '</rect>';
+      // Device label
+      svg += '<text x="' + (devX + dW / 2) + '" y="' + (dY + dH / 2 + 3) + '" text-anchor="middle" fill="#000" font-size="7" font-weight="700" opacity="0">';
+      svg += d.label;
+      svg += '<animate attributeName="opacity" from="0" to="1" dur="' + (0.4 + di * 0.08) + 's" fill="freeze"/>';
+      svg += '</text>';
+      devX += dW;
+    });
+  }
+
+  // Wiring connections (animated)
+  for (var wi = 0; wi < Math.min(s.rows, 4); wi++) {
+    var wireY = railY + wi * rowHeight + rowHeight / 2;
+    var wireColor = wi === 0 ? '#ff5555' : (wi === 1 ? '#00ff88' : (wi === 2 ? '#55aaff' : '#ff77ff'));
+    svg += '<line x1="' + (cabX + 25) + '" y1="' + wireY + '" x2="' + (cabX + 25) + '" y2="' + (busY + 6) + '" stroke="' + wireColor + '" stroke-width="1.5" stroke-dasharray="4 2" opacity="0.6">';
+    svg += '<animate attributeName="stroke-dashoffset" from="20" to="0" dur="1.5s" repeatCount="indefinite"/>';
+    svg += '</line>';
+  }
+
+  // Ground bar at bottom
+  svg += '<rect x="' + (cabX + 30) + '" y="' + (cabY + cabH - 22) + '" width="' + (cabW - 60) + '" height="5" fill="#44aa00" rx="1"/>';
+  svg += '<text x="' + (cabX + cabW / 2) + '" y="' + (cabY + cabH - 10) + '" text-anchor="middle" fill="#66cc00" font-size="8">PE</text>';
+
+  // N-bar
+  svg += '<rect x="' + (cabX + 30) + '" y="' + (cabY + cabH - 34) + '" width="' + (cabW - 60) + '" height="4" fill="#4488ff" rx="1"/>';
+  svg += '<text x="' + (cabX + cabW / 2) + '" y="' + (cabY + cabH - 36) + '" text-anchor="middle" fill="#6699ff" font-size="7">N</text>';
+
+  svg += '</svg>';
+  return svg;
+}
+
+// Auto-fill panel from project circuits
+function panelAutoFill() {
+  var circuits = [];
+  try { circuits = JSON.parse(localStorage.getItem('projectCircuits') || '[]'); } catch(e) { circuits = []; }
+  var totalCircuits = circuits.length + loadList.length;
+  if (totalCircuits === 0) totalCircuits = 6; // minimum sensible
+
+  // Calculate appropriate panel size
+  var modsNeeded = totalCircuits * 1.5 + 10; // 1.5 modules avg per circuit + overhead
+  var bestModPerRow = 24;
+  [12, 18, 24, 36, 48, 54, 72].forEach(function(m) {
+    if (m >= modsNeeded / 4 && m <= modsNeeded) bestModPerRow = m;
+  });
+  var bestRows = Math.max(2, Math.ceil(modsNeeded / bestModPerRow) + 1);
+  if (bestRows > 8) bestRows = 8;
+
+  // Determine main switch from trafo or load
+  var mainA = 63;
+  if (typeof trafoState !== 'undefined' && trafoState.size) {
+    var trafoI = (trafoState.size * 1000) / (400 * 1.732);
+    [25, 40, 63, 80, 100, 125, 160, 200, 250, 400, 630].forEach(function(r) {
+      if (r >= trafoI && mainA === 63) mainA = r;
+    });
+  }
+
+  panelState.rows = bestRows;
+  panelState.modulesPerRow = bestModPerRow;
+  panelState.mainRating = mainA;
+  if (totalCircuits > 20) { panelState.category = 'hovedtavle'; panelState.busbar = 'full'; }
+  else if (totalCircuits > 8) { panelState.category = 'gruppetavle'; panelState.busbar = 'fork'; }
+  else { panelState.category = 'undertavle'; panelState.busbar = 'pin'; }
+  panelState.busbarCurrent = mainA <= 63 ? 63 : (mainA <= 125 ? 125 : (mainA <= 250 ? 250 : 400));
+  renderModule('panel');
+}
+
+// Download BOM as CSV
+function panelDownloadBOM() {
+  var da = lang === 'da';
+  var s = panelState;
+  var circuits = [];
+  try { circuits = JSON.parse(localStorage.getItem('projectCircuits') || '[]'); } catch(e) { circuits = []; }
+  var circuitCount = circuits.length + loadList.length;
+
+  var CATEGORIES = [
+    { id: 'hovedtavle', da: 'Hovedtavle', en: 'Main panel' },
+    { id: 'gruppetavle', da: 'Gruppetavle', en: 'Distribution board' },
+    { id: 'undertavle', da: 'Undertavle', en: 'Sub-panel' },
+    { id: 'malerskab', da: 'Maalerskab', en: 'Meter cabinet' },
+    { id: 'mcc', da: 'Motorstarttavle', en: 'MCC' }
+  ];
+  var MATERIALS = [
+    { id: 'plastic', da: 'Plast', en: 'Plastic' },
+    { id: 'steel', da: 'Staalplade', en: 'Steel' },
+    { id: 'stainless', da: 'Rustfrit', en: 'Stainless steel' }
+  ];
+
+  var csv = (da ? 'Komponent;Beskrivelse;Antal;Modulbredde\n' : 'Item;Description;Qty;Module Width\n');
+  csv += (da ? 'Tavleskab' : 'Panel enclosure') + ';' + (da ? CATEGORIES.find(function(c){return c.id===s.category;}).da : CATEGORIES.find(function(c){return c.id===s.category;}).en) + ' ' + s.ip + ' ' + (da ? MATERIALS.find(function(m){return m.id===s.material;}).da : MATERIALS.find(function(m){return m.id===s.material;}).en) + ';1;-\n';
+  csv += (da ? 'Hovedafbryder' : 'Main switch') + ';' + s.mainRating + 'A;1;' + (s.mainType === 'nhfuse' ? 3 : (s.mainRating > 160 ? 4 : 3)) + '\n';
+  if (s.surge !== 'none') csv += (da ? 'SPD' : 'SPD') + ';' + (s.surge === 'type12' ? 'Type 1+2' : 'Type 2') + ';1;' + (s.surge === 'type12' ? 8 : 4) + '\n';
+  if (s.mainRcd !== 'none') csv += 'RCD;' + (s.mainRcd === '30a' ? '30mA A' : (s.mainRcd === '30b' ? '30mA B' : '300mA S')) + ';1;4\n';
+  csv += (da ? 'DIN-skinne' : 'DIN-rail') + ';' + s.modulesPerRow + ' mod;' + s.rows + ';' + s.modulesPerRow + '\n';
+  csv += (da ? 'Samleskinne' : 'Busbar') + ';' + s.busbarCurrent + 'A;' + s.rows + ';-\n';
+  csv += (da ? 'Automatsikringer' : 'MCBs') + ';' + (da ? 'Diverse' : 'Various') + ';' + circuitCount + ';1\n';
+  csv += (da ? 'Kabelforskruninger' : 'Cable glands') + ';M20/M25;' + Math.max(circuitCount, 8) + ';-\n';
+  csv += (da ? 'Terminaler' : 'Terminal blocks') + ';PE+N;' + Math.max(circuitCount * 2, 16) + ';-\n';
+  csv += (da ? 'Maerkning' : 'Labels') + ';' + (da ? 'Skiltesaet' : 'Label set') + ';1;-\n';
+
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'panel_bom_' + s.category + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ===== INIT =====
