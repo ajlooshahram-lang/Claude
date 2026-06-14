@@ -233,6 +233,7 @@
     { id: "xbarr", label: "X̄-R Control Chart", icon: "⎍" },
     { id: "capability", label: "Process Capability", icon: "◊" },
     { id: "ncrpareto", label: "NCR Pareto", icon: "▟" },
+    { id: "riskheat", label: "Risk Heat Map", icon: "\uD83D\uDD25" },
     { g: "Improve" },
     { id: "pdca", label: "PDCA", icon: "↻" },
     { id: "log", label: "Action Log", icon: "✎" },
@@ -1051,6 +1052,131 @@
         document.getElementById("repairResult").innerHTML = html;
       });
     }
+  };
+
+  // ---------- Risk Heat Map ----------
+  RENDER.riskheat = function () {
+    var B = window.QIBrain;
+    var countryDB = null;
+    if (B && B._profiles) {
+      var fp = B._profiles.find(function (p) { return p.id === "fibre-telecom"; });
+      if (fp && fp.COUNTRY_DATABASE) countryDB = fp.COUNTRY_DATABASE;
+    }
+
+    // Risk scoring data for each country across 5 categories
+    var RISK_SCORES = {
+      Indonesia: { Geopolitical: "High", Geographical: "Critical", Regulatory: "High", Schedule: "Medium", Commercial: "Medium" },
+      Thailand: { Geopolitical: "Medium", Geographical: "Medium", Regulatory: "Medium", Schedule: "Low", Commercial: "Low" },
+      Vietnam: { Geopolitical: "Critical", Geographical: "High", Regulatory: "High", Schedule: "High", Commercial: "Medium" },
+      Taiwan: { Geopolitical: "Critical", Geographical: "High", Regulatory: "Medium", Schedule: "Medium", Commercial: "Low" },
+      Philippines: { Geopolitical: "High", Geographical: "Critical", Regulatory: "High", Schedule: "High", Commercial: "Medium" },
+      Guam: { Geopolitical: "High", Geographical: "Medium", Regulatory: "High", Schedule: "Medium", Commercial: "Low" },
+      Malaysia: { Geopolitical: "Medium", Geographical: "Medium", Regulatory: "Medium", Schedule: "Low", Commercial: "Low" },
+      Brunei: { Geopolitical: "Low", Geographical: "Low", Regulatory: "Low", Schedule: "Low", Commercial: "Low" }
+    };
+
+    var countries = ["Indonesia", "Thailand", "Vietnam", "Taiwan", "Philippines", "Guam", "Malaysia", "Brunei"];
+    var categories = ["Geopolitical", "Geographical", "Regulatory", "Schedule", "Commercial"];
+
+    var severityColor = function (sev) {
+      if (sev === "Critical") return "background:#e74c3c;color:#fff";
+      if (sev === "High") return "background:#f39c12;color:#fff";
+      if (sev === "Medium") return "background:#f1c40f;color:#333";
+      return "background:#27ae60;color:#fff";
+    };
+
+    var severityRPN = function (sev) {
+      if (sev === "Critical") return 4;
+      if (sev === "High") return 3;
+      if (sev === "Medium") return 2;
+      return 1;
+    };
+
+    // Build matrix header
+    var headerCells = '<th style="min-width:110px">Country</th>' + categories.map(function (c) {
+      return '<th style="text-align:center">' + esc(c) + '</th>';
+    }).join('');
+
+    // Build matrix rows
+    var matrixRows = countries.map(function (country) {
+      var scores = RISK_SCORES[country];
+      var cells = categories.map(function (cat) {
+        var sev = scores[cat];
+        return '<td class="riskheat-cell" style="text-align:center;padding:10px;font-weight:bold;' + severityColor(sev) + '">' + esc(sev) + '</td>';
+      }).join('');
+      return '<tr data-country="' + esc(country) + '"><td style="font-weight:bold;padding:8px 12px">' + esc(country) + '</td>' + cells + '</tr>';
+    }).join('');
+
+    var matrix = '<div class="card"><h3>Risk Concentration Matrix</h3>' +
+      '<div class="table-wrap"><table id="riskHeatTable"><thead><tr>' + headerCells + '</tr></thead><tbody>' + matrixRows + '</tbody></table></div></div>';
+
+    // Summary bar - count by severity
+    var counts = { Critical: 0, High: 0, Medium: 0, Low: 0 };
+    countries.forEach(function (country) {
+      var scores = RISK_SCORES[country];
+      categories.forEach(function (cat) {
+        counts[scores[cat]]++;
+      });
+    });
+    var total = countries.length * categories.length;
+    var summaryBar = '<div class="card" id="riskHeatSummary"><h3>Summary: Total Risks by Severity</h3>' +
+      '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px">' +
+      '<div style="padding:10px 18px;border-radius:8px;background:#e74c3c;color:#fff"><strong>' + counts.Critical + '</strong> Critical</div>' +
+      '<div style="padding:10px 18px;border-radius:8px;background:#f39c12;color:#fff"><strong>' + counts.High + '</strong> High</div>' +
+      '<div style="padding:10px 18px;border-radius:8px;background:#f1c40f;color:#333"><strong>' + counts.Medium + '</strong> Medium</div>' +
+      '<div style="padding:10px 18px;border-radius:8px;background:#27ae60;color:#fff"><strong>' + counts.Low + '</strong> Low</div>' +
+      '<div style="padding:10px 18px;border-radius:8px;background:#95a5a6;color:#fff"><strong>' + total + '</strong> Total</div>' +
+      '</div></div>';
+
+    // Top 10 Programme Risks - compute RPN based on country challenges
+    var allRisks = [];
+    countries.forEach(function (country) {
+      var scores = RISK_SCORES[country];
+      var countryInfo = countryDB ? countryDB.find(function (c) { return c.name === country; }) : null;
+
+      // Add geopolitical risk entry
+      var geoPolChallenge = (countryInfo && countryInfo.geopoliticalChallenges && countryInfo.geopoliticalChallenges[0]) || "Geopolitical risk";
+      allRisks.push({
+        country: country,
+        category: "Geopolitical",
+        severity: scores.Geopolitical,
+        rpn: severityRPN(scores.Geopolitical) * severityRPN(scores.Geographical),
+        description: geoPolChallenge
+      });
+
+      // Add geographical risk entry
+      var geoChallenge = (countryInfo && countryInfo.geographicalChallenges && countryInfo.geographicalChallenges[0]) || "Geographical risk";
+      allRisks.push({
+        country: country,
+        category: "Geographical",
+        severity: scores.Geographical,
+        rpn: severityRPN(scores.Geographical) * severityRPN(scores.Geopolitical),
+        description: geoChallenge
+      });
+    });
+
+    // Sort by RPN descending, take top 10
+    allRisks.sort(function (a, b) { return b.rpn - a.rpn; });
+    var top10 = allRisks.slice(0, 10);
+
+    var top10Rows = top10.map(function (r, i) {
+      return '<tr><td>' + (i + 1) + '</td><td>' + esc(r.country) + '</td>' +
+        '<td>' + esc(r.category) + '</td>' +
+        '<td style="' + severityColor(r.severity) + ';padding:4px 10px;border-radius:4px;text-align:center">' + esc(r.severity) + '</td>' +
+        '<td>' + r.rpn + '</td>' +
+        '<td class="wrap">' + esc(r.description) + '</td></tr>';
+    }).join('');
+
+    var top10Table = '<div class="card"><h3>Top 10 Programme Risks</h3>' +
+      '<div class="table-wrap"><table id="riskHeatTop10"><thead><tr>' +
+      '<th>#</th><th>Country</th><th>Category</th><th>Severity</th><th>RPN</th><th>Description</th>' +
+      '</tr></thead><tbody>' + top10Rows + '</tbody></table></div></div>';
+
+    return '<h2 style="margin-bottom:16px">Risk Heat Map</h2>' + summaryBar + matrix + top10Table;
+  };
+
+  AFTER.riskheat = function () {
+    // No interactive elements needed for now; the view is read-only
   };
 
   RENDER.budget = function () {

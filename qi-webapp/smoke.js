@@ -831,5 +831,17 @@ ok(wfTemplates != null && wfTemplates.querySelectorAll(".wf-template-card").leng
 var wfList = S.listWorkflows();
 ok(wfList.length >= 3, "Default workflow templates are pre-seeded (3+)");
 
+// 58) Risk Heat Map
+var riskHeatNav = doc.querySelector('.nav-item[data-view="riskheat"]');
+ok(riskHeatNav != null, "Risk Heat Map nav item exists");
+
+if (riskHeatNav) riskHeatNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var riskHeatTable = doc.getElementById("riskHeatTable");
+ok(riskHeatTable != null && riskHeatTable.querySelectorAll('tr[data-country]').length === 8, "Risk Heat Map renders country rows");
+
+var riskHeatCells = riskHeatTable ? riskHeatTable.querySelectorAll('.riskheat-cell') : [];
+var hasColors = Array.from(riskHeatCells).some(function (c) { return /background:#e74c3c|background:#f39c12|background:#f1c40f|background:#27ae60/.test(c.getAttribute("style")); });
+ok(hasColors, "Risk Heat Map shows severity colors");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
