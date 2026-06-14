@@ -705,5 +705,24 @@ ok(/@media/.test(cssAll), "CSS contains responsive @media rules");
 ok(doc.getElementById("btnPresent") != null, "Present button exists in topbar");
 ok(/body\.presenting/.test(cssAll), "Presentation mode CSS class defined in stylesheet");
 
+// 43) i18n language system
+var langSelectEl = doc.getElementById("langSelect");
+ok(langSelectEl && langSelectEl.querySelectorAll("option").length >= 7, "Language dropdown has 7+ language options");
+
+// 44) Setting language to 'th' translates Dashboard content
+var i18nApi = window.QII18N;
+if (i18nApi && i18nApi.setLanguage) {
+  // Navigate to dashboard first, then switch language
+  var dashNav = doc.querySelector('.nav-item[data-view="dashboard"]');
+  if (dashNav) dashNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  i18nApi.setLanguage("th");
+  var dashContent = doc.getElementById("content").innerHTML;
+  ok(/\u0e01\u0e23\u0e13\u0e35\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14/.test(dashContent), "Setting language to 'th' translates Dashboard content");
+  // Reset back to English for any subsequent tests
+  i18nApi.setLanguage("en");
+} else {
+  ok(false, "Setting language to 'th' translates Dashboard content");
+}
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

@@ -46,6 +46,170 @@
     return `<div class="table-wrap"><table class="${cls || ""}"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 
+  // ---------- i18n multi-language system ----------
+  const I18N = {
+    da: {
+      // Nav group labels
+      "Overview": "Overblik", "Delivery": "Levering", "Risk & Quality": "Risiko & Kvalitet",
+      "Improve": "Forbedring", "People & Cost": "Mennesker & Omkostninger", "Intelligence": "Intelligens",
+      "Setup": "Opsaetning", "Engineering": "Teknik", "Business": "Forretning",
+      // View titles
+      "Dashboard": "Instrumentbraet", "Portfolio": "Portefoelje", "Cases (Master)": "Sager (Master)",
+      "Kanban Board": "Kanban-tavle", "Timeline": "Tidslinje", "Risk Register": "Risikoregister",
+      "Budget": "Budget", "Settings": "Indstillinger", "Help": "Hjaelp", "Project Brain": "Projekthjerne",
+      // KPI labels
+      "Total Cases": "Samlede Sager", "Open / Active": "Aabne / Aktive", "Critical": "Kritisk",
+      "Blocked": "Blokeret", "Budget": "Budget", "Projects": "Projekter",
+      // Buttons
+      "Save": "Gem", "Cancel": "Annuller", "Delete": "Slet", "Apply": "Anvend", "Close": "Luk",
+      "Export": "Eksporter", "Import": "Importer", "Login": "Log ind", "Logout": "Log ud", "Register": "Registrer"
+    },
+    th: {
+      // Nav group labels
+      "Overview": "\u0e20\u0e32\u0e1e\u0e23\u0e27\u0e21", "Delivery": "\u0e01\u0e32\u0e23\u0e2a\u0e48\u0e07\u0e21\u0e2d\u0e1a", "Risk & Quality": "\u0e04\u0e27\u0e32\u0e21\u0e40\u0e2a\u0e35\u0e48\u0e22\u0e07\u0e41\u0e25\u0e30\u0e04\u0e38\u0e13\u0e20\u0e32\u0e1e",
+      "Improve": "\u0e1b\u0e23\u0e31\u0e1a\u0e1b\u0e23\u0e38\u0e07", "People & Cost": "\u0e1a\u0e38\u0e04\u0e25\u0e32\u0e01\u0e23\u0e41\u0e25\u0e30\u0e15\u0e49\u0e19\u0e17\u0e38\u0e19", "Intelligence": "\u0e2d\u0e31\u0e08\u0e09\u0e23\u0e34\u0e22\u0e30",
+      "Setup": "\u0e15\u0e31\u0e49\u0e07\u0e04\u0e48\u0e32", "Engineering": "\u0e27\u0e34\u0e28\u0e27\u0e01\u0e23\u0e23\u0e21", "Business": "\u0e18\u0e38\u0e23\u0e01\u0e34\u0e08",
+      // View titles
+      "Dashboard": "\u0e41\u0e14\u0e0a\u0e1a\u0e2d\u0e23\u0e4c\u0e14", "Portfolio": "\u0e1e\u0e2d\u0e23\u0e4c\u0e15\u0e42\u0e1f\u0e25\u0e34\u0e42\u0e2d", "Cases (Master)": "\u0e01\u0e23\u0e13\u0e35 (\u0e2b\u0e25\u0e31\u0e01)",
+      "Kanban Board": "\u0e01\u0e23\u0e30\u0e14\u0e32\u0e19\u0e04\u0e31\u0e19\u0e1a\u0e31\u0e19", "Timeline": "\u0e44\u0e17\u0e21\u0e4c\u0e44\u0e25\u0e19\u0e4c", "Risk Register": "\u0e17\u0e30\u0e40\u0e1a\u0e35\u0e22\u0e19\u0e04\u0e27\u0e32\u0e21\u0e40\u0e2a\u0e35\u0e48\u0e22\u0e07",
+      "Budget": "\u0e07\u0e1a\u0e1b\u0e23\u0e30\u0e21\u0e32\u0e13", "Settings": "\u0e01\u0e32\u0e23\u0e15\u0e31\u0e49\u0e07\u0e04\u0e48\u0e32", "Help": "\u0e0a\u0e48\u0e27\u0e22\u0e40\u0e2b\u0e25\u0e37\u0e2d", "Project Brain": "\u0e2a\u0e21\u0e2d\u0e07\u0e42\u0e04\u0e23\u0e07\u0e01\u0e32\u0e23",
+      // KPI labels
+      "Total Cases": "\u0e01\u0e23\u0e13\u0e35\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14", "Open / Active": "\u0e40\u0e1b\u0e34\u0e14 / \u0e14\u0e33\u0e40\u0e19\u0e34\u0e19\u0e01\u0e32\u0e23", "Critical": "\u0e27\u0e34\u0e01\u0e24\u0e15",
+      "Blocked": "\u0e16\u0e39\u0e01\u0e1a\u0e25\u0e47\u0e2d\u0e01", "Projects": "\u0e42\u0e04\u0e23\u0e07\u0e01\u0e32\u0e23",
+      // Buttons
+      "Save": "\u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01", "Cancel": "\u0e22\u0e01\u0e40\u0e25\u0e34\u0e01", "Delete": "\u0e25\u0e1a", "Apply": "\u0e19\u0e33\u0e44\u0e1b\u0e43\u0e0a\u0e49", "Close": "\u0e1b\u0e34\u0e14",
+      "Export": "\u0e2a\u0e48\u0e07\u0e2d\u0e2d\u0e01", "Import": "\u0e19\u0e33\u0e40\u0e02\u0e49\u0e32", "Login": "\u0e40\u0e02\u0e49\u0e32\u0e2a\u0e39\u0e48\u0e23\u0e30\u0e1a\u0e1a", "Logout": "\u0e2d\u0e2d\u0e01\u0e08\u0e32\u0e01\u0e23\u0e30\u0e1a\u0e1a", "Register": "\u0e25\u0e07\u0e17\u0e30\u0e40\u0e1a\u0e35\u0e22\u0e19"
+    },
+    vi: {
+      // Nav group labels
+      "Overview": "T\u1ed5ng quan", "Delivery": "Giao h\u00e0ng", "Risk & Quality": "R\u1ee7i ro & Ch\u1ea5t l\u01b0\u1ee3ng",
+      "Improve": "C\u1ea3i ti\u1ebfn", "People & Cost": "Nh\u00e2n s\u1ef1 & Chi ph\u00ed", "Intelligence": "Th\u00f4ng minh",
+      "Setup": "C\u00e0i \u0111\u1eb7t", "Engineering": "K\u1ef9 thu\u1eadt", "Business": "Kinh doanh",
+      // View titles
+      "Dashboard": "B\u1ea3ng \u0111i\u1ec1u khi\u1ec3n", "Portfolio": "Danh m\u1ee5c", "Cases (Master)": "Tr\u01b0\u1eddng h\u1ee3p (Ch\u00ednh)",
+      "Kanban Board": "B\u1ea3ng Kanban", "Timeline": "D\u00f2ng th\u1eddi gian", "Risk Register": "S\u1ed5 r\u1ee7i ro",
+      "Budget": "Ng\u00e2n s\u00e1ch", "Settings": "C\u00e0i \u0111\u1eb7t", "Help": "Tr\u1ee3 gi\u00fap", "Project Brain": "B\u1ed9 n\u00e3o d\u1ef1 \u00e1n",
+      // KPI labels
+      "Total Cases": "T\u1ed5ng s\u1ed1 tr\u01b0\u1eddng h\u1ee3p", "Open / Active": "M\u1edf / Ho\u1ea1t \u0111\u1ed9ng", "Critical": "Nghi\u00eam tr\u1ecdng",
+      "Blocked": "B\u1ecb ch\u1eb7n", "Projects": "D\u1ef1 \u00e1n",
+      // Buttons
+      "Save": "L\u01b0u", "Cancel": "H\u1ee7y", "Delete": "X\u00f3a", "Apply": "\u00c1p d\u1ee5ng", "Close": "\u0110\u00f3ng",
+      "Export": "Xu\u1ea5t", "Import": "Nh\u1eadp", "Login": "\u0110\u0103ng nh\u1eadp", "Logout": "\u0110\u0103ng xu\u1ea5t", "Register": "\u0110\u0103ng k\u00fd"
+    },
+    id: {
+      // Nav group labels
+      "Overview": "Ikhtisar", "Delivery": "Pengiriman", "Risk & Quality": "Risiko & Kualitas",
+      "Improve": "Peningkatan", "People & Cost": "SDM & Biaya", "Intelligence": "Inteligensi",
+      "Setup": "Pengaturan", "Engineering": "Rekayasa", "Business": "Bisnis",
+      // View titles
+      "Dashboard": "Dasbor", "Portfolio": "Portofolio", "Cases (Master)": "Kasus (Utama)",
+      "Kanban Board": "Papan Kanban", "Timeline": "Lini Masa", "Risk Register": "Daftar Risiko",
+      "Budget": "Anggaran", "Settings": "Pengaturan", "Help": "Bantuan", "Project Brain": "Otak Proyek",
+      // KPI labels
+      "Total Cases": "Total Kasus", "Open / Active": "Terbuka / Aktif", "Critical": "Kritis",
+      "Blocked": "Terblokir", "Projects": "Proyek",
+      // Buttons
+      "Save": "Simpan", "Cancel": "Batal", "Delete": "Hapus", "Apply": "Terapkan", "Close": "Tutup",
+      "Export": "Ekspor", "Import": "Impor", "Login": "Masuk", "Logout": "Keluar", "Register": "Daftar"
+    },
+    ja: {
+      // Nav group labels
+      "Overview": "\u6982\u8981", "Delivery": "\u7d0d\u54c1", "Risk & Quality": "\u30ea\u30b9\u30af\u3068\u54c1\u8cea",
+      "Improve": "\u6539\u5584", "People & Cost": "\u4eba\u54e1\u3068\u30b3\u30b9\u30c8", "Intelligence": "\u30a4\u30f3\u30c6\u30ea\u30b8\u30a7\u30f3\u30b9",
+      "Setup": "\u8a2d\u5b9a", "Engineering": "\u30a8\u30f3\u30b8\u30cb\u30a2\u30ea\u30f3\u30b0", "Business": "\u30d3\u30b8\u30cd\u30b9",
+      // View titles
+      "Dashboard": "\u30c0\u30c3\u30b7\u30e5\u30dc\u30fc\u30c9", "Portfolio": "\u30dd\u30fc\u30c8\u30d5\u30a9\u30ea\u30aa", "Cases (Master)": "\u30b1\u30fc\u30b9 (\u30de\u30b9\u30bf\u30fc)",
+      "Kanban Board": "\u30ab\u30f3\u30d0\u30f3\u30dc\u30fc\u30c9", "Timeline": "\u30bf\u30a4\u30e0\u30e9\u30a4\u30f3", "Risk Register": "\u30ea\u30b9\u30af\u767b\u9332\u7c3f",
+      "Budget": "\u4e88\u7b97", "Settings": "\u8a2d\u5b9a", "Help": "\u30d8\u30eb\u30d7", "Project Brain": "\u30d7\u30ed\u30b8\u30a7\u30af\u30c8\u30d6\u30ec\u30a4\u30f3",
+      // KPI labels
+      "Total Cases": "\u7dcf\u30b1\u30fc\u30b9\u6570", "Open / Active": "\u30aa\u30fc\u30d7\u30f3 / \u30a2\u30af\u30c6\u30a3\u30d6", "Critical": "\u91cd\u5927",
+      "Blocked": "\u30d6\u30ed\u30c3\u30af\u6e08\u307f", "Projects": "\u30d7\u30ed\u30b8\u30a7\u30af\u30c8",
+      // Buttons
+      "Save": "\u4fdd\u5b58", "Cancel": "\u30ad\u30e3\u30f3\u30bb\u30eb", "Delete": "\u524a\u9664", "Apply": "\u9069\u7528", "Close": "\u9589\u3058\u308b",
+      "Export": "\u30a8\u30af\u30b9\u30dd\u30fc\u30c8", "Import": "\u30a4\u30f3\u30dd\u30fc\u30c8", "Login": "\u30ed\u30b0\u30a4\u30f3", "Logout": "\u30ed\u30b0\u30a2\u30a6\u30c8", "Register": "\u767b\u9332"
+    },
+    zh: {
+      // Nav group labels
+      "Overview": "\u6982\u89c8", "Delivery": "\u4ea4\u4ed8", "Risk & Quality": "\u98ce\u9669\u4e0e\u8d28\u91cf",
+      "Improve": "\u6539\u8fdb", "People & Cost": "\u4eba\u5458\u4e0e\u6210\u672c", "Intelligence": "\u667a\u80fd",
+      "Setup": "\u8bbe\u7f6e", "Engineering": "\u5de5\u7a0b", "Business": "\u4e1a\u52a1",
+      // View titles
+      "Dashboard": "\u4eea\u8868\u677f", "Portfolio": "\u9879\u76ee\u96c6", "Cases (Master)": "\u6848\u4f8b (\u4e3b\u8868)",
+      "Kanban Board": "\u770b\u677f", "Timeline": "\u65f6\u95f4\u7ebf", "Risk Register": "\u98ce\u9669\u767b\u8bb0\u518c",
+      "Budget": "\u9884\u7b97", "Settings": "\u8bbe\u7f6e", "Help": "\u5e2e\u52a9", "Project Brain": "\u9879\u76ee\u5927\u8111",
+      // KPI labels
+      "Total Cases": "\u6848\u4f8b\u603b\u6570", "Open / Active": "\u5f00\u653e / \u6d3b\u8dc3", "Critical": "\u5173\u952e",
+      "Blocked": "\u5df2\u963b\u585e", "Projects": "\u9879\u76ee",
+      // Buttons
+      "Save": "\u4fdd\u5b58", "Cancel": "\u53d6\u6d88", "Delete": "\u5220\u9664", "Apply": "\u5e94\u7528", "Close": "\u5173\u95ed",
+      "Export": "\u5bfc\u51fa", "Import": "\u5bfc\u5165", "Login": "\u767b\u5f55", "Logout": "\u9000\u51fa", "Register": "\u6ce8\u518c"
+    }
+  };
+
+  const LANG_OPTIONS = [
+    { code: "en", label: "English" },
+    { code: "da", label: "Dansk" },
+    { code: "th", label: "\u0e44\u0e17\u0e22" },
+    { code: "vi", label: "Ti\u1ebfng Vi\u1ec7t" },
+    { code: "id", label: "Bahasa Indonesia" },
+    { code: "ja", label: "\u65e5\u672c\u8a9e" },
+    { code: "zh", label: "\u4e2d\u6587" }
+  ];
+
+  function langCode() {
+    return (S.brand() && S.brand().lang) || "en";
+  }
+
+  function translatePhrase(s) {
+    var code = langCode();
+    if (code === "en" || !I18N[code]) return s;
+    return I18N[code][s] || s;
+  }
+
+  function applyI18n(root) {
+    var code = langCode();
+    if (code === "en") {
+      // Restore originals if switching back to English
+      (root || document).querySelectorAll("[data-i18n-orig]").forEach(function (el) {
+        el.textContent = el.getAttribute("data-i18n-orig");
+        el.removeAttribute("data-i18n-orig");
+      });
+      return;
+    }
+    var dict = I18N[code];
+    if (!dict) return;
+    // Walk text nodes and translate known phrases
+    var targets = (root || document).querySelectorAll(".nav-sep, .kpi .label, .nav-item .lab, h1#viewTitle, .btn, [data-i18n]");
+    targets.forEach(function (el) {
+      if (el.closest("[data-i18n-skip]")) return;
+      var orig = el.getAttribute("data-i18n-orig") || el.textContent.trim();
+      if (dict[orig]) {
+        if (!el.getAttribute("data-i18n-orig")) el.setAttribute("data-i18n-orig", orig);
+        el.textContent = dict[orig];
+      }
+    });
+  }
+
+  function applyLang() {
+    var code = langCode();
+    document.documentElement.setAttribute("lang", code);
+    var sel = document.getElementById("langSelect");
+    if (sel) sel.value = code;
+    applyI18n();
+  }
+
+  function setLanguage(code) {
+    S.setBrand({ lang: code });
+    applyLang();
+    // Re-render the current view so translated content appears in dynamic HTML
+    if (current && RENDER[current]) {
+      content.innerHTML = RENDER[current]();
+      if (AFTER[current]) AFTER[current]();
+    }
+    buildNav();
+    applyI18n();
+  }
+
   // ---------- views config ----------
   const VIEWS = [
     { g: "Overview" },
@@ -98,8 +262,8 @@
   function buildNav() {
     const nav = $("#nav");
     nav.innerHTML = VIEWS.map(v => v.g
-      ? `<div class="nav-sep">${esc(v.g)}</div>`
-      : `<button class="nav-item" data-view="${v.id}"><span class="ico">${v.icon}</span><span class="lab">${esc(v.label)}</span></button>`).join("");
+      ? `<div class="nav-sep">${esc(translatePhrase(v.g))}</div>`
+      : `<button class="nav-item" data-view="${v.id}"><span class="ico">${v.icon}</span><span class="lab">${esc(translatePhrase(v.label))}</span></button>`).join("");
     nav.querySelectorAll(".nav-item").forEach(b => b.addEventListener("click", () => go(b.dataset.view)));
   }
 
@@ -107,7 +271,7 @@
   function go(view, opts) {
     if (!RENDER[view]) view = "dashboard";
     current = view;
-    $("#viewTitle").textContent = TITLES[view] || "QI Platform";
+    $("#viewTitle").textContent = translatePhrase(TITLES[view] || "QI Platform");
     document.querySelectorAll(".nav-item").forEach(b => {
       const active = b.dataset.view === view;
       b.classList.toggle("active", active);
@@ -153,12 +317,12 @@
     }
     return tourBanner + `
       <div class="grid kpis" style="margin-bottom:16px">
-        ${kpi("navy", "Total Cases", k.total)}
-        ${kpi("blue", "Open / Active", k.open)}
+        ${kpi("navy", translatePhrase("Total Cases"), k.total)}
+        ${kpi("blue", translatePhrase("Open / Active"), k.open)}
         ${kpi("red", "Critical (RPN&ge;200)", k.crit)}
         ${kpi("gold", "Avg RPN", k.avgRpn)}
         ${kpi("green", "Avg % Done", pct(k.avgDone))}
-        ${kpi("teal", "Blocked", k.blocked)}
+        ${kpi("teal", translatePhrase("Blocked"), k.blocked)}
       </div>
       <div class="card">
         <div class="card-head"><h3>Cases by</h3>
@@ -2642,6 +2806,7 @@
   });
 
   $("#btnPresent").addEventListener("click", startPresentation);
+  $("#langSelect").addEventListener("change", function (e) { setLanguage(e.target.value); });
   $("#btnShare").addEventListener("click", shareLink);
   $("#btnPrint").addEventListener("click", () => window.print());
   $("#btnTheme").addEventListener("click", toggleTheme);
@@ -2698,8 +2863,11 @@
     toast("Storage full — export a JSON backup and delete old snapshots.");
   });
 
+  // ---------- i18n public API ----------
+  window.QII18N = { setLanguage: setLanguage, translatePhrase: translatePhrase, langCode: langCode, I18N: I18N, LANG_OPTIONS: LANG_OPTIONS };
+
   // ---------- init ----------
-  S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
+  S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); refreshHeader(); applyLang();
   const initialHash = (location.hash || "").replace(/^#/, "");
   go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
 })();
