@@ -515,13 +515,13 @@
   var LESSONS_KEY = "qi_brain_lessons";
 
   // ---- analyzeStatus(projectState) ----------------------------------------
-  function analyzeStatus(projectState) {
+  function analyzeStatus(projectState, nowMs) {
     var cases = (projectState && projectState.cases) || [];
     var milestones = (projectState && projectState.registers && projectState.registers.milestones) || [];
     var project = (projectState && projectState.project) || {};
 
     var findings = [];
-    var now = Date.now();
+    var now = (typeof nowMs === "number") ? nowMs : Date.now();
 
     // --- EVM-like estimates from cases ---
     var totalEst = 0; var totalAct = 0; var totalEv = 0;
@@ -575,7 +575,7 @@
     var highRpnCount = 0;
     cases.forEach(function (c) {
       var rpn = (Number(c.sev) || 1) * (Number(c.occ) || 1) * (Number(c.det) || 1);
-      if (rpn > 200 && (c.status === "OPEN" || !c.status)) {
+      if (rpn >= 200 && (c.status === "OPEN" || !c.status)) {
         highRpnCount++;
         findings.push({ type: "risk", severity: "critical", detail: "High RPN (" + rpn + ") on open item: '" + (c.problem || "").slice(0, 60) + "'" });
       }
@@ -671,6 +671,8 @@
     return "les_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
   }
 
+  var MAX_LESSONS = 500;
+
   function recordLesson(lesson) {
     var store = storageGet(LESSONS_KEY) || { lessons: [] };
     var entry = {
@@ -685,6 +687,19 @@
       timesRecalled: 0
     };
     store.lessons.push(entry);
+
+    // Evict oldest/least-recalled lessons when cap is exceeded
+    if (store.lessons.length > MAX_LESSONS) {
+      store.lessons.sort(function (a, b) {
+        var ra = a.timesRecalled || 0;
+        var rb = b.timesRecalled || 0;
+        if (ra !== rb) return ra - rb; // least recalled first
+        // Same recall count: oldest first
+        return (a.timestamp || "").localeCompare(b.timestamp || "");
+      });
+      store.lessons = store.lessons.slice(store.lessons.length - MAX_LESSONS);
+    }
+
     storageSet(LESSONS_KEY, store);
     return entry;
   }
@@ -698,6 +713,7 @@
     var category = context.category || null;
     var projectType = context.projectType || null;
     var tags = Array.isArray(context.tags) ? context.tags : [];
+    var readOnly = !!context.readOnly;
 
     // Filter by category and projectType if provided
     var filtered = lessons.filter(function (l) {
@@ -712,7 +728,7 @@
       var words = query.split(/\s+/).filter(Boolean);
       var hits = 0;
       words.forEach(function (w) {
-        if (text.indexOf(w) >= 0) hits++;
+        if (w.length > 2 && text.indexOf(w) >= 0) hits++;
       });
       // Tag match bonus
       tags.forEach(function (t) {
@@ -726,12 +742,14 @@
     // Sort by score descending
     scored.sort(function (a, b) { return b.score - a.score; });
 
-    // Update timesRecalled for top results
+    // Update timesRecalled for top results (unless readOnly)
     var results = scored.filter(function (s) { return s.score > 0; }).slice(0, 10);
-    results.forEach(function (s) {
-      s.lesson.timesRecalled = (s.lesson.timesRecalled || 0) + 1;
-    });
-    storageSet(LESSONS_KEY, store);
+    if (!readOnly) {
+      results.forEach(function (s) {
+        s.lesson.timesRecalled = (s.lesson.timesRecalled || 0) + 1;
+      });
+      storageSet(LESSONS_KEY, store);
+    }
 
     return results.map(function (s) { return s.lesson; });
   }
@@ -767,7 +785,7 @@
 
     // High-RPN cases
     var highRpn = cases.filter(function (c) {
-      return (Number(c.sev) || 1) * (Number(c.occ) || 1) * (Number(c.det) || 1) > 200;
+      return (Number(c.sev) || 1) * (Number(c.occ) || 1) * (Number(c.det) || 1) >= 200;
     });
 
     // (a) Category clustering: >40% high-RPN cases in same category
@@ -860,7 +878,7 @@
       var rpn = (Number(c.sev) || 1) * (Number(c.occ) || 1) * (Number(c.det) || 1);
       var est = Number(c.estCost) || 0;
       var act = Number(c.actCost) || 0;
-      if ((c.status === "BLOCKED" || c.status === "RESOLVED") && rpn > 200 && est > 0 && act > est) {
+      if ((c.status === "BLOCKED" || c.status === "RESOLVED") && rpn >= 200 && est > 0 && act > est) {
         patterns.push({
           type: "risk_materialization",
           severity: "critical",
@@ -889,7 +907,7 @@
 
     // Schedule recommendations
     if (findingsByType.schedule && findingsByType.schedule.length > 0) {
-      var lessons = recallLessons({ query: "schedule delay slippage milestone", category: "Delivery / Schedule" });
+      var lessons = recallLessons({ query: "schedule delay slippage milestone", category: "Delivery / Schedule", readOnly: true });
       recommendations.push({
         priority: status.scores.spiEstimate < 0.8 ? 1 : 2,
         title: "Address schedule slippage",
@@ -902,7 +920,7 @@
 
     // Cost recommendations
     if (findingsByType.cost && findingsByType.cost.length > 0) {
-      var costLessons = recallLessons({ query: "cost overrun budget overbudget", category: "Process / Flow" });
+      var costLessons = recallLessons({ query: "cost overrun budget overbudget", category: "Process / Flow", readOnly: true });
       recommendations.push({
         priority: status.scores.cpiEstimate < 0.8 ? 1 : 2,
         title: "Control cost overruns",
@@ -915,7 +933,7 @@
 
     // Risk recommendations
     if (findingsByType.risk && findingsByType.risk.length > 0) {
-      var riskLessons = recallLessons({ query: "risk high rpn mitigation", tags: ["risk"] });
+      var riskLessons = recallLessons({ query: "risk high rpn mitigation", tags: ["risk"], readOnly: true });
       recommendations.push({
         priority: 1,
         title: "Mitigate high-exposure risks",
@@ -953,7 +971,7 @@
     // Pattern-based recommendations
     patternResult.patterns.forEach(function (p) {
       var prio = p.severity === "critical" ? 1 : (p.severity === "high" ? 2 : 3);
-      var patternLessons = recallLessons({ query: p.description });
+      var patternLessons = recallLessons({ query: p.description, readOnly: true });
       recommendations.push({
         priority: prio,
         title: "Pattern detected: " + p.type.replace(/_/g, " "),
