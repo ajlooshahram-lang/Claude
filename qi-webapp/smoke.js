@@ -799,5 +799,17 @@ ok(repairShipTable != null && repairShipTable.tagName === "TABLE", "Repair ship 
 var repairCalc = doc.getElementById("repairCalculator");
 ok(repairCalc != null, "Repair scenario calculator exists");
 
+// 53) Project Template System - Profile list has 5+ project types
+var profileList = window.QIBrain.listProfiles();
+ok(profileList.length >= 5, "Profile list has 5+ project types");
+
+// 54) Data center profile detected from description
+var dcPlan = window.QIBrain.analyzeProject("Build a hyperscale data center with raised floor, UPS redundancy, and cooling systems");
+ok(dcPlan.summary.domain === "data-center", "Data center profile detected from description");
+
+// 55) FTTH profile detected from description
+var ftthPlan = window.QIBrain.analyzeProject("Deploy FTTH last mile network passing 50000 homes with splitter cabinets and ONT installation");
+ok(ftthPlan.summary.domain === "terrestrial-ftth", "FTTH profile detected from description");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

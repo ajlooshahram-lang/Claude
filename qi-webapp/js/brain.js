@@ -1080,7 +1080,252 @@
     },
   };
 
-  var PROFILES = [fibreProfile, genericProfile];
+  // ---- DATA CENTRE BUILD profile -------------------------------------------
+  var dataCenterProfile = {
+    id: "data-center",
+    label: "Data Centre Build",
+    keywords: [
+      ["data center", 3], ["data centre", 3], ["rack", 2], ["cooling", 2],
+      ["ups", 3], ["power distribution", 2], ["raised floor", 3],
+      ["colocation", 3], ["hyperscale", 3]
+    ],
+    roles: [
+      "DC Project Manager",
+      "M&E Engineer",
+      "Structural Engineer",
+      "IT Infrastructure Lead",
+      "Commissioning Manager"
+    ],
+    buildPhases: function (scale) {
+      return [
+        { name: "Design", owner: "DC Project Manager", tasks: [
+          { problem: "Architectural and M&E design for data hall layout", costCat: "External / Consultant", estCost: 120000, leanMethod: "Value Stream Mapping" },
+          { problem: "Power and cooling capacity planning (N+1 / 2N redundancy)", costCat: "External / Consultant", estCost: 80000 },
+          { problem: "Structural design for raised floor and cable containment", costCat: "External / Consultant", estCost: 45000 },
+        ]},
+        { name: "Procurement", owner: "DC Project Manager", tasks: [
+          { problem: "Procure generators, UPS systems, and switchgear", costCat: "Materials", estCost: 850000, priority: "2-HIGH" },
+          { problem: "Procure cooling plant (CRAC/CRAH units, chillers)", costCat: "Materials", estCost: 620000, priority: "2-HIGH" },
+          { problem: "Procure racks, PDUs, and structured cabling", costCat: "Materials", estCost: 340000 },
+          { problem: "Procure fire suppression systems (inert gas / clean agent)", costCat: "Materials", estCost: 180000 },
+        ]},
+        { name: "Civil/Structural", owner: "Structural Engineer", tasks: [
+          { problem: "Foundation and structural frame construction", costCat: "External / Consultant", estCost: 450000, priority: "2-HIGH" },
+          { problem: "Raised floor installation and grounding grid", costCat: "External / Consultant", estCost: 220000 },
+          { problem: "Building envelope and security perimeter", costCat: "External / Consultant", estCost: 180000 },
+        ]},
+        { name: "M&E Install", owner: "M&E Engineer", tasks: [
+          { problem: "HV/LV electrical distribution installation", costCat: "Labour / Effort", estCost: 380000, priority: "2-HIGH", sev: 6 },
+          { problem: "UPS and generator set commissioning", costCat: "Labour / Effort", estCost: 150000, sev: 5 },
+          { problem: "Cooling system installation and pipework", costCat: "Labour / Effort", estCost: 280000, sev: 5 },
+          { problem: "BMS/DCIM integration and sensor deployment", costCat: "Tooling / Software", estCost: 95000 },
+        ]},
+        { name: "Commissioning", owner: "Commissioning Manager", tasks: [
+          { problem: "Integrated systems testing (IST) and load bank testing", costCat: "Labour / Effort", estCost: 120000, sev: 6, leanMethod: "Mistake-Proofing / Poka-Yoke" },
+          { problem: "Thermal validation and CFD model verification", costCat: "Tooling / Software", estCost: 65000 },
+          { problem: "Power chain failover and redundancy validation", costCat: "Labour / Effort", estCost: 85000, sev: 7 },
+        ]},
+        { name: "Handover", owner: "DC Project Manager", tasks: [
+          { problem: "As-built documentation and O&M manuals", costCat: "Labour / Effort", estCost: 40000 },
+          { problem: "Staff training and operational readiness", costCat: "Labour / Effort", estCost: 30000 },
+          { problem: "Client acceptance and defect liability period start", costCat: "Labour / Effort", estCost: 15000 },
+        ]},
+      ];
+    },
+    buildRisks: function (text, scale) {
+      return [
+        { problem: "RISK: Supply chain delays for generators/UPS", category: "Delivery / Schedule", sev: 8, occ: 6, det: 4, priority: "1-CRITICAL", rootCause: "Long lead items (20-40 week delivery), global chip shortages" },
+        { problem: "RISK: Cooling system design failure under peak load", category: "Design / Quality", sev: 9, occ: 4, det: 5, priority: "1-CRITICAL", rootCause: "Inadequate thermal modelling or hot-spot analysis" },
+        { problem: "RISK: Power grid connection delays", category: "Delivery / Schedule", sev: 8, occ: 5, det: 3, priority: "1-CRITICAL", rootCause: "Utility provider capacity constraints and regulatory approvals" },
+        { problem: "RISK: Construction permit delays", category: "Delivery / Schedule", sev: 7, occ: 5, det: 4, priority: "2-HIGH", rootCause: "Local planning authority backlog and environmental objections" },
+      ];
+    },
+    buildProcurement: function (scale) {
+      return [
+        { package: "Generators", vendor: "TBD", value: 400000, poStatus: "RFQ", owner: "DC Project Manager" },
+        { package: "UPS systems", vendor: "TBD", value: 350000, poStatus: "RFQ", owner: "DC Project Manager" },
+        { package: "Cooling (CRAC/CRAH)", vendor: "TBD", value: 500000, poStatus: "RFQ", owner: "M&E Engineer" },
+        { package: "Racks and PDUs", vendor: "TBD", value: 250000, poStatus: "RFQ", owner: "IT Infrastructure Lead" },
+        { package: "Structured cabling", vendor: "TBD", value: 120000, poStatus: "RFQ", owner: "IT Infrastructure Lead" },
+        { package: "Fire suppression", vendor: "TBD", value: 180000, poStatus: "RFQ", owner: "M&E Engineer" },
+      ];
+    },
+  };
+
+  // ---- TERRESTRIAL FTTH/FTTx profile --------------------------------------
+  var terrestrialFtthProfile = {
+    id: "terrestrial-ftth",
+    label: "Terrestrial FTTH/FTTx Rollout",
+    keywords: [
+      ["ftth", 3], ["fttx", 3], ["last mile", 3], ["homes passed", 3],
+      ["splitter cabinet", 3], ["distribution point", 2], ["drop cable", 2],
+      ["ont", 3], ["premises", 2]
+    ],
+    roles: [
+      "Project Manager",
+      "Survey Lead",
+      "Design Engineer",
+      "Civil Contractor Lead",
+      "Splicing Team Lead",
+      "Test Engineer",
+      "Activation Team Lead",
+      "Customer Connect Manager"
+    ],
+    buildPhases: function (scale) {
+      var homes = scale.homesPassed || 10000;
+      var km = scale.routeKm || 50;
+      return [
+        { name: "Survey", owner: "Survey Lead", tasks: [
+          { problem: "Desktop survey and existing infrastructure assessment", costCat: "External / Consultant", estCost: round(km * 200), leanMethod: "Value Stream Mapping" },
+          { problem: "Field survey with GPS recording of pole/duct routes", costCat: "Labour / Effort", estCost: round(km * 350) },
+          { problem: "Demand aggregation and premises database build", costCat: "Tooling / Software", estCost: round(homes * 2) },
+        ]},
+        { name: "Design", owner: "Design Engineer", tasks: [
+          { problem: "High-level network architecture (PON topology)", costCat: "External / Consultant", estCost: 45000, leanMethod: "Value Stream Mapping" },
+          { problem: "Low-level design with splitter placement and cabinet locations", costCat: "External / Consultant", estCost: round(km * 180) },
+          { problem: "Link budget and split ratio calculations", costCat: "Tooling / Software", estCost: 20000 },
+        ]},
+        { name: "Permitting", owner: "Project Manager", tasks: [
+          { problem: "Secure wayleaves and road opening permits", costCat: "External / Consultant", estCost: round(km * 400), priority: "2-HIGH", sev: 6 },
+          { problem: "Utility crossing approvals and traffic management plans", costCat: "External / Consultant", estCost: round(km * 150) },
+          { problem: "Environmental and heritage site assessments", costCat: "External / Consultant", estCost: 15000 },
+        ]},
+        { name: "Trenching/Ducting", owner: "Civil Contractor Lead", tasks: [
+          { problem: "Trench excavation and HDPE duct installation", costCat: "External / Consultant", estCost: round(km * 16000), priority: "2-HIGH" },
+          { problem: "Micro-trenching in paved/urban areas", costCat: "External / Consultant", estCost: round(km * 0.3 * 12000) },
+          { problem: "Chamber and handhole installation at splice points", costCat: "Materials", estCost: round(km * 2000) },
+          { problem: "Reinstatement to local authority specification", costCat: "External / Consultant", estCost: round(km * 2500) },
+        ]},
+        { name: "Cable Install", owner: "Civil Contractor Lead", tasks: [
+          { problem: "Backbone and distribution cable blowing/pulling", costCat: "Labour / Effort", estCost: round(km * 2800) },
+          { problem: "Splitter cabinet installation and powering", costCat: "Materials", estCost: round(homes / 32 * 3500) },
+          { problem: "Drop cable installation from DP to premises boundary", costCat: "Labour / Effort", estCost: round(homes * 35) },
+        ]},
+        { name: "Splicing", owner: "Splicing Team Lead", tasks: [
+          { problem: "Backbone and distribution cable splicing", costCat: "Labour / Effort", estCost: round(km * 900), sev: 5 },
+          { problem: "Splitter installation and fibre patching at cabinets", costCat: "Labour / Effort", estCost: round(homes / 32 * 800) },
+          { problem: "Drop cable termination at network access points", costCat: "Labour / Effort", estCost: round(homes * 12) },
+        ]},
+        { name: "Testing", owner: "Test Engineer", tasks: [
+          { problem: "OTDR bi-directional testing of all backbone/distribution fibres", costCat: "Tooling / Software", estCost: round(km * 200), sev: 5, leanMethod: "Mistake-Proofing / Poka-Yoke" },
+          { problem: "Power meter end-to-end loss verification per splitter leg", costCat: "Tooling / Software", estCost: round(homes / 32 * 500) },
+          { problem: "OLT commissioning and PON port activation testing", costCat: "Tooling / Software", estCost: 30000, sev: 5 },
+        ]},
+        { name: "Activation", owner: "Activation Team Lead", tasks: [
+          { problem: "ONT provisioning and customer premises installation", costCat: "Labour / Effort", estCost: round(homes * 45) },
+          { problem: "Service activation and speed/latency verification", costCat: "Labour / Effort", estCost: round(homes * 8) },
+          { problem: "Customer handover and CPE configuration", costCat: "Labour / Effort", estCost: round(homes * 5) },
+        ]},
+      ];
+    },
+    buildRisks: function (text, scale) {
+      return [
+        { problem: "RISK: Permit delays from multiple local authorities", category: "Delivery / Schedule", sev: 7, occ: 7, det: 4, priority: "1-CRITICAL", rootCause: "Fragmented permitting across municipal boundaries" },
+        { problem: "RISK: Utility conflicts during trenching (gas, water, electric)", category: "Design / Quality", sev: 8, occ: 5, det: 4, priority: "2-HIGH", rootCause: "Inaccurate utility records and survey data" },
+        { problem: "RISK: Bad ground conditions (rock, high water table, contamination)", category: "Process / Flow", sev: 7, occ: 5, det: 5, priority: "2-HIGH", rootCause: "Insufficient geotechnical survey" },
+        { problem: "RISK: Drop cable damage during or after installation", category: "Design / Quality", sev: 5, occ: 6, det: 4, priority: "3-MEDIUM", rootCause: "Third-party works, inadequate protection" },
+        { problem: "RISK: Customer access issues preventing ONT installation", category: "Delivery / Schedule", sev: 5, occ: 6, det: 3, priority: "3-MEDIUM", rootCause: "Tenant coordination, vacant properties, access restrictions" },
+        { problem: "RISK: Contractor quality failures requiring rework", category: "Design / Quality", sev: 7, occ: 5, det: 5, priority: "2-HIGH", rootCause: "Insufficient contractor vetting and QC oversight" },
+      ];
+    },
+    buildProcurement: function (scale) {
+      var homes = scale.homesPassed || 10000;
+      var km = scale.routeKm || 50;
+      return [
+        { package: "Fibre cable (backbone + distribution)", vendor: "TBD", value: round(km * 4500), poStatus: "RFQ", owner: "Project Manager" },
+        { package: "HDPE duct and micro-duct", vendor: "TBD", value: round(km * 3200), poStatus: "RFQ", owner: "Civil Contractor Lead" },
+        { package: "Splice closures and joints", vendor: "TBD", value: round(km * 800), poStatus: "RFQ", owner: "Splicing Team Lead" },
+        { package: "Splitter cabinets", vendor: "TBD", value: round(homes / 32 * 2800), poStatus: "RFQ", owner: "Design Engineer" },
+        { package: "ONTs (Optical Network Terminals)", vendor: "TBD", value: round(homes * 40), poStatus: "RFQ", owner: "Activation Team Lead" },
+        { package: "Drop cables", vendor: "TBD", value: round(homes * 18), poStatus: "RFQ", owner: "Civil Contractor Lead" },
+      ];
+    },
+  };
+
+  // ---- SUBMARINE/TERRESTRIAL POWER CABLE profile --------------------------
+  var powerCableProfile = {
+    id: "power-cable",
+    label: "Submarine/Terrestrial Power Cable",
+    keywords: [
+      ["hvdc", 3], ["high voltage", 3], ["power cable", 3],
+      ["interconnector", 3], ["offshore wind", 3], ["converter station", 3],
+      ["vsc", 3]
+    ],
+    roles: [
+      "Programme Director",
+      "Consenting Manager",
+      "Cable Engineer",
+      "Marine Operations Manager",
+      "Onshore Works Manager",
+      "Commissioning Lead",
+      "Grid Connection Manager"
+    ],
+    buildPhases: function (scale) {
+      var km = scale.routeKm || 200;
+      return [
+        { name: "Feasibility", owner: "Programme Director", tasks: [
+          { problem: "Route feasibility study and corridor identification", costCat: "External / Consultant", estCost: 350000, leanMethod: "Value Stream Mapping" },
+          { problem: "Grid capacity and connection assessment", costCat: "External / Consultant", estCost: 200000 },
+          { problem: "Environmental baseline surveys (benthic, marine mammals)", costCat: "External / Consultant", estCost: 450000 },
+        ]},
+        { name: "Design & Consenting", owner: "Consenting Manager", tasks: [
+          { problem: "Cable system design (HVDC/HVAC, voltage, capacity)", costCat: "External / Consultant", estCost: 800000 },
+          { problem: "Environmental Impact Assessment (EIA) and consenting", costCat: "External / Consultant", estCost: 1200000, priority: "2-HIGH", sev: 7 },
+          { problem: "Marine licence and foreshore consent applications", costCat: "External / Consultant", estCost: 350000, sev: 6 },
+          { problem: "Converter station planning permission", costCat: "External / Consultant", estCost: 250000, sev: 6 },
+        ]},
+        { name: "Procurement", owner: "Programme Director", tasks: [
+          { problem: "HVDC cable manufacturing contract award", costCat: "Materials", estCost: round(km * 500000), priority: "1-CRITICAL", sev: 8 },
+          { problem: "Converter station equipment procurement", costCat: "Materials", estCost: 80000000, priority: "1-CRITICAL", sev: 8 },
+          { problem: "Installation vessel charter and mobilization", costCat: "External / Consultant", estCost: 15000000, priority: "2-HIGH" },
+          { problem: "Offshore substation procurement (if applicable)", costCat: "Materials", estCost: 25000000 },
+        ]},
+        { name: "Manufacturing", owner: "Cable Engineer", tasks: [
+          { problem: "HVDC cable manufacturing and factory acceptance testing", costCat: "Materials", estCost: round(km * 200000), sev: 7 },
+          { problem: "Converter station module fabrication", costCat: "Materials", estCost: 20000000, sev: 7 },
+          { problem: "Cable loading onto installation vessel (carousel/turntable)", costCat: "Labour / Effort", estCost: 5000000 },
+        ]},
+        { name: "Marine Install", owner: "Marine Operations Manager", tasks: [
+          { problem: "Cable laying operations with DP vessel", costCat: "External / Consultant", estCost: round(km * 80000), priority: "1-CRITICAL", sev: 7 },
+          { problem: "Cable burial and protection (jetting/ploughing/rock placement)", costCat: "External / Consultant", estCost: round(km * 40000), sev: 6 },
+          { problem: "Shore-end pull-in and HDD/cofferdam operations", costCat: "External / Consultant", estCost: 8000000, sev: 6 },
+          { problem: "Mid-line jointing (if multiple cable lengths)", costCat: "Labour / Effort", estCost: 3000000, sev: 7 },
+        ]},
+        { name: "Onshore Works", owner: "Onshore Works Manager", tasks: [
+          { problem: "Converter station civil works and building construction", costCat: "External / Consultant", estCost: 15000000, priority: "2-HIGH" },
+          { problem: "Onshore cable route trenching and installation", costCat: "External / Consultant", estCost: round(km * 0.1 * 120000) },
+          { problem: "Grid connection infrastructure (substation upgrades)", costCat: "Materials", estCost: 10000000, sev: 6 },
+        ]},
+        { name: "Commissioning", owner: "Commissioning Lead", tasks: [
+          { problem: "Cable system high-voltage testing and soak test", costCat: "Labour / Effort", estCost: 3000000, sev: 8, leanMethod: "Mistake-Proofing / Poka-Yoke" },
+          { problem: "Converter station commissioning and grid synchronization", costCat: "Labour / Effort", estCost: 5000000, sev: 8 },
+          { problem: "System integration testing and trial operation", costCat: "Labour / Effort", estCost: 2000000, sev: 7 },
+          { problem: "Handover to operations and warranty period start", costCat: "Labour / Effort", estCost: 500000 },
+        ]},
+      ];
+    },
+    buildRisks: function (text, scale) {
+      return [
+        { problem: "RISK: Grid connection delays from TSO/DNO", category: "Delivery / Schedule", sev: 9, occ: 6, det: 3, priority: "1-CRITICAL", rootCause: "Grid capacity constraints, TSO reinforcement works required" },
+        { problem: "RISK: Converter station manufacturing delays", category: "Delivery / Schedule", sev: 9, occ: 5, det: 4, priority: "1-CRITICAL", rootCause: "Limited global manufacturing capacity, 3-4 year lead times" },
+        { problem: "RISK: Marine weather delays during installation campaign", category: "Delivery / Schedule", sev: 7, occ: 7, det: 3, priority: "2-HIGH", rootCause: "Seasonal weather windows, vessel downtime costs" },
+        { problem: "RISK: Cable manufacturing defect requiring repair/replacement", category: "Design / Quality", sev: 9, occ: 3, det: 5, priority: "2-HIGH", rootCause: "Complex extrusion process, quality escapes in factory" },
+        { problem: "RISK: Consenting/planning permission rejection or delay", category: "Delivery / Schedule", sev: 8, occ: 5, det: 4, priority: "1-CRITICAL", rootCause: "Environmental objections, stakeholder opposition, policy changes" },
+      ];
+    },
+    buildProcurement: function (scale) {
+      var km = scale.routeKm || 200;
+      return [
+        { package: "HVDC cable", vendor: "TBD", value: round(km * 500000), poStatus: "RFQ", owner: "Cable Engineer" },
+        { package: "Converter stations", vendor: "TBD", value: 80000000, poStatus: "RFQ", owner: "Programme Director" },
+        { package: "Offshore substation", vendor: "TBD", value: 25000000, poStatus: "RFQ", owner: "Programme Director" },
+        { package: "Installation vessel", vendor: "TBD", value: 15000000, poStatus: "RFQ", owner: "Marine Operations Manager" },
+        { package: "Onshore civils", vendor: "TBD", value: 15000000, poStatus: "RFQ", owner: "Onshore Works Manager" },
+      ];
+    },
+  };
+
+  var PROFILES = [fibreProfile, genericProfile, dataCenterProfile, terrestrialFtthProfile, powerCableProfile];
 
   function pickProfile(text, forcedId) {
     if (forcedId) {
