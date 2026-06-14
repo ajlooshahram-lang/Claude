@@ -203,7 +203,11 @@ export default async function progressReportsRoutes(app: FastifyInstance): Promi
   );
 
   // GET /progress-reports/:programmeId/forecast - project future disbursement
-  // NOTE: This must be registered BEFORE the :id route to avoid conflict
+  // IMPORTANT: Route ordering dependency. This route MUST be registered BEFORE the
+  // generic /progress-reports/:id route below. Both use a single path parameter, and
+  // Fastify resolves parametric routes by registration order. If this route is moved
+  // after /:id, requests to /progress-reports/<programmeId>/forecast will be incorrectly
+  // matched by the /:id handler (treating "programmeId" as "id"), returning 404.
   app.get(
     "/progress-reports/:programmeId/forecast",
     { preHandler: [requireRole("VIEWER")] },
@@ -355,6 +359,21 @@ export default async function progressReportsRoutes(app: FastifyInstance): Promi
 
       if (!programme) {
         return reply.code(404).send({ error: "Programme not found" });
+      }
+
+      // Check for duplicate period: only one report allowed per (programmeId, period)
+      const existing = await prisma.progressReport.findFirst({
+        where: {
+          tenantId: request.tenantId,
+          programmeId: data.programmeId,
+          period: data.period,
+        },
+      });
+
+      if (existing) {
+        return reply
+          .code(409)
+          .send({ error: "A progress report already exists for this programme and period" });
       }
 
       // Auto-calculate EVM metrics
