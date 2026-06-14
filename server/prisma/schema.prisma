@@ -10,15 +10,28 @@
 //    cashflow, control charts, roster, stakeholders, spec) are stored as JSON on
 //    Project. First-class, queryable, access-controlled entities (cases,
 //    register rows, snapshots, audit, share tokens) are modelled as tables.
+//
+// Programme-Scale Extension (v2):
+//  - Programme > Project > Package > WorkOrder hierarchy for $1.3B deployments
+//  - Contract management (NEC4/FIDIC): variations, claims, payment certificates
+//  - Multi-currency with exchange rate tracking
+//  - GIS/spatial via RouteSection with GeoJSON coordinates
+//  - EVM reporting via ProgressReport
+//  - Offline-first field sync via SyncQueue
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMS — Original
+// ─────────────────────────────────────────────────────────────────────────────
 
 enum Role {
   OWNER
@@ -35,17 +48,111 @@ enum ProjectStatus {
   CANCELLED
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMS — Programme Scale
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum ContractType {
+  NEC4_OPTION_A // Priced contract with activity schedule
+  NEC4_OPTION_B // Priced contract with bill of quantities
+  NEC4_OPTION_C // Target contract with activity schedule
+  NEC4_OPTION_D // Target contract with bill of quantities
+  FIDIC_RED // Employer-designed (traditional)
+  FIDIC_YELLOW // Contractor-designed (design-build)
+  FIDIC_SILVER // EPC/Turnkey
+  OTHER
+}
+
+enum PackageStatus {
+  DRAFT
+  TENDERED
+  AWARDED
+  ACTIVE
+  SUBSTANTIALLY_COMPLETE
+  DEFECTS_LIABILITY
+  FINAL_ACCOUNT
+  CLOSED
+  SUSPENDED
+  TERMINATED
+}
+
+enum WorkOrderStatus {
+  DRAFT
+  ISSUED
+  IN_PROGRESS
+  COMPLETED
+  VERIFIED
+  CLOSED
+  CANCELLED
+}
+
+enum VariationStatus {
+  PROPOSED
+  ASSESSED
+  APPROVED
+  REJECTED
+  IMPLEMENTED
+}
+
+enum ClaimStatus {
+  DRAFT
+  SUBMITTED
+  ASSESSED
+  AGREED
+  PAID
+  DISPUTED
+  WITHDRAWN
+}
+
+enum PaymentStatus {
+  DRAFT
+  SUBMITTED
+  CERTIFIED
+  APPROVED
+  PAID
+  REJECTED
+}
+
+enum RouteSectionStatus {
+  PLANNED
+  SURVEYED
+  PERMITTED
+  TRENCHED
+  DUCTED
+  CABLED
+  SPLICED
+  TESTED
+  COMMISSIONED
+  LIVE
+}
+
+enum SyncOperation {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+enum ExchangeRateSource {
+  MANUAL
+  API
+  CENTRAL_BANK
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODELS — Original (with programme-scale extensions marked)
+// ─────────────────────────────────────────────────────────────────────────────
+
 /// An organisation. The unit of isolation and billing.
 model Tenant {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   name      String
-  region    String   @default("eu-west") // data-residency tag
-  brand     Json     @default("{}") // { company, logo, accent }
+  region    String    @default("eu-west") // data-residency tag
+  brand     Json      @default("{}") // { company, logo, accent }
   /// Tenant-scoped integration settings. Secret values (e.g. AI keys) are stored
   /// encrypted at the application layer, never as plaintext.
-  settings  Json     @default("{}")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  settings  Json      @default("{}")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   memberships Membership[]
@@ -53,13 +160,25 @@ model Tenant {
   projects    Project[]
   auditLogs   AuditLog[]
 
+  // Programme-scale relations
+  programmes          Programme[]
+  packages            Package[]
+  workOrders          WorkOrder[]
+  contractVariations  ContractVariation[]
+  contractClaims      ContractClaim[]
+  paymentCertificates PaymentCertificate[]
+  exchangeRates       ExchangeRate[]
+  progressReports     ProgressReport[]
+  routeSections       RouteSection[]
+  syncQueue           SyncQueue[]
+
   @@index([deletedAt])
 }
 
 /// A human identity. Belongs to exactly one tenant in this single-org-per-user
 /// model; cross-tenant access (if ever needed) would be added via Membership.
 model User {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   tenantId     String
   email        String
   /// Argon2id hash. Never store plaintext or reversible encodings.
@@ -67,10 +186,10 @@ model User {
   displayName  String?
   /// TOTP shared secret (encrypted at rest). Null until MFA is enrolled.
   mfaSecret    String?
-  mfaEnabled   Boolean  @default(false)
+  mfaEnabled   Boolean   @default(false)
   lastLoginAt  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
   tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -99,14 +218,14 @@ model Membership {
 /// Server-side session. Only a hash of the session token is persisted so a DB
 /// leak cannot be replayed as a live session.
 model Session {
-  id         String   @id @default(cuid())
-  userId     String
-  tokenHash  String   @unique
-  userAgent  String?
-  ip         String?
-  expiresAt  DateTime
-  revokedAt  DateTime?
-  createdAt  DateTime @default(now())
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  userAgent String?
+  ip        String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -115,19 +234,23 @@ model Session {
 }
 
 /// A program/project. Holds metadata plus the UI's opaque analytical blobs.
+/// In programme-scale mode, a Project represents a regional lot within a Programme.
 model Project {
-  id           String        @id @default(cuid())
-  tenantId     String
-  name         String
-  sponsor      String?
-  manager      String?
-  org          String?
-  startDate    String? // ISO date string, mirroring the UI model
-  endDate      String?
-  status       ProjectStatus @default(IN_PROGRESS)
-  version      String?
-  currency     String        @default("$")
-  sortOrder    Int           @default(0)
+  id        String        @id @default(cuid())
+  tenantId  String
+  name      String
+  sponsor   String?
+  manager   String?
+  org       String?
+  startDate String? // ISO date string, mirroring the UI model
+  endDate   String?
+  status    ProjectStatus @default(IN_PROGRESS)
+  version   String?
+  currency  String        @default("$")
+  sortOrder Int           @default(0)
+
+  // Programme-scale: optional link to parent Programme
+  programmeId String?
 
   // Opaque analytical sub-structures (validated by zod at the API edge).
   spec         Json @default("{}") // { usl, lsl, target }
@@ -138,37 +261,46 @@ model Project {
   cashflow     Json @default("[]")
   xbarR        Json @default("{}")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  cases        Case[]
-  registerRows RegisterRow[]
-  snapshots    Snapshot[]
-  shareTokens  ShareToken[]
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  programme       Programme?       @relation(fields: [programmeId], references: [id], onDelete: SetNull)
+  cases           Case[]
+  registerRows    RegisterRow[]
+  snapshots       Snapshot[]
+  shareTokens     ShareToken[]
+  packages        Package[]
+  progressReports ProgressReport[]
 
   @@index([tenantId])
   @@index([tenantId, deletedAt])
+  @@index([programmeId])
 }
 
 /// A master improvement/risk case. First-class because the whole platform ranks,
 /// filters and authorizes on these fields.
+/// Programme-scale: cases can optionally be linked to a Package or WorkOrder.
 model Case {
-  id         String   @id @default(cuid())
-  tenantId   String
-  projectId  String
+  id        String @id @default(cuid())
+  tenantId  String
+  projectId String
 
-  problem    String
-  category   String?
-  priority   String?
-  status     String?
-  owner      String?
+  // Programme-scale: optional deeper hierarchy links
+  packageId   String?
+  workOrderId String?
+
+  problem  String
+  category String?
+  priority String?
+  status   String?
+  owner    String?
 
   // FMEA / RPN inputs
-  sev        Int?
-  occ        Int?
-  det        Int?
+  sev Int?
+  occ Int?
+  det Int?
 
   rootCause  String?
   leanMethod String?
@@ -178,12 +310,12 @@ model Case {
   // Schedule + progress
   dateLogged String?
   startDate  String?
-  percent    Float    @default(0)
+  percent    Float   @default(0)
 
   // Cost
-  costCat    String?
-  estCost    Float    @default(0)
-  actCost    Float    @default(0)
+  costCat String?
+  estCost Float   @default(0)
+  actCost Float   @default(0)
 
   // Prioritisation (RICE / WSJF)
   reach      Float?
@@ -195,37 +327,51 @@ model Case {
   riskRed    Float?
   jobSize    Float?
 
-  pinned     Boolean  @default(false)
+  pinned Boolean @default(false)
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  deletedAt  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  package   Package?   @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  workOrder WorkOrder? @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
   @@index([projectId, deletedAt])
+  @@index([packageId])
+  @@index([workOrderId])
 }
 
 /// Generic engineering/business register row. One table covers all 13 register
 /// types (hazop, calibration, punch, sil, rtm, docs, ncr, moc, milestones,
 /// decisions, procurement, resources, okr); the variable columns live in `data`.
+/// Programme-scale: registers can be scoped to programme or package level.
 model RegisterRow {
-  id           String   @id @default(cuid())
+  id           String @id @default(cuid())
   tenantId     String
   projectId    String
   registerType String // e.g. "hazop", "calibration", ...
-  data         Json     @default("{}")
-  pinned       Boolean  @default(false)
-  sortOrder    Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  deletedAt    DateTime?
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Programme-scale: optional deeper hierarchy links
+  programmeId String?
+  packageId   String?
+
+  data      Json      @default("{}")
+  pinned    Boolean   @default(false)
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  programme Programme? @relation(fields: [programmeId], references: [id], onDelete: SetNull)
+  package   Package?   @relation(fields: [packageId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
   @@index([projectId, registerType, deletedAt])
+  @@index([programmeId])
+  @@index([packageId])
 }
 
 /// Point-in-time backup of a project's full state (replaces client snapshots).
@@ -246,16 +392,16 @@ model Snapshot {
 /// Scoped, revocable, expiring share grant — the secure replacement for the old
 /// base64-in-URL share link that embedded the entire dataset.
 model ShareToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   tenantId  String
   projectId String
   /// Only the hash of the share secret is stored.
-  tokenHash String   @unique
-  scope     Role     @default(VIEWER) // max role granted to the holder
+  tokenHash String    @unique
+  scope     Role      @default(VIEWER) // max role granted to the holder
   expiresAt DateTime
   revokedAt DateTime?
   createdBy String?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -275,8 +421,436 @@ model AuditLog {
   ip        String?
   createdAt DateTime @default(now())
 
+  // Programme-scale: optional programme context for scoped audit queries
+  programmeId String?
+
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, createdAt])
   @@index([tenantId, action])
+  @@index([programmeId, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODELS — Programme Scale (new)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// The top-level programme entity. Represents the entire fibre optic network
+/// deployment initiative ($1.3B, 5-year). A tenant may have multiple programmes.
+model Programme {
+  id           String        @id @default(cuid())
+  tenantId     String
+  name         String // e.g. "Asia Fibre Network Phase 1"
+  description  String?
+  totalBudget  Decimal       @db.Decimal(20, 2) // in base currency
+  baseCurrency String        @default("USD") // ISO 4217
+  startDate    DateTime?
+  endDate      DateTime?
+  status       ProjectStatus @default(PLANNING)
+
+  // Programme-level metadata (extensible)
+  metadata Json @default("{}") // { client, lender, country, objectives }
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projects        Project[]
+  packages        Package[]
+  progressReports ProgressReport[]
+  exchangeRates   ExchangeRate[]
+  registerRows    RegisterRow[]
+
+  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+}
+
+/// A contract package within a project. Represents a single awarded contract
+/// to a contractor (e.g. "Backbone Duct Installation - Lot N1").
+model Package {
+  id                     String        @id @default(cuid())
+  tenantId               String
+  programmeId            String
+  projectId              String
+  contractRef            String // e.g. "PKG-N1-DUCT-001"
+  title                  String // human-readable name
+  contractType           ContractType  @default(OTHER)
+  contractor             String? // contractor company name
+  contractValue          Decimal       @db.Decimal(20, 2)
+  currency               String        @default("USD") // ISO 4217
+  retentionPercent       Float         @default(5.0) // typically 5-10%
+  maxRetentionPercent    Float         @default(5.0) // cap on total retention
+  defectsLiabilityMonths Int           @default(12)
+  startDate              DateTime?
+  endDate                DateTime?
+  status                 PackageStatus @default(DRAFT)
+
+  // Cumulative financial tracking (denormalized for performance)
+  cumulativeCertified Decimal @default(0) @db.Decimal(20, 2)
+  cumulativePaid      Decimal @default(0) @db.Decimal(20, 2)
+  retentionHeld       Decimal @default(0) @db.Decimal(20, 2)
+
+  metadata Json @default("{}") // { scope, exclusions, key_dates }
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  programme           Programme            @relation(fields: [programmeId], references: [id], onDelete: Cascade)
+  project             Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workOrders          WorkOrder[]
+  variations          ContractVariation[]
+  claims              ContractClaim[]
+  paymentCertificates PaymentCertificate[]
+  routeSections       RouteSection[]
+  cases               Case[]
+  registerRows        RegisterRow[]
+
+  @@index([tenantId])
+  @@index([programmeId])
+  @@index([projectId])
+  @@index([tenantId, status])
+}
+
+/// A field-level task within a package. Work orders are assigned to engineers
+/// and tracked by location (km markers along the fibre route).
+model WorkOrder {
+  id          String  @id @default(cuid())
+  tenantId    String
+  packageId   String
+  reference   String // e.g. "WO-N1-0247"
+  description String?
+  workType    String? // "trenching", "ducting", "cabling", "splicing", "testing"
+
+  // GIS/Location
+  location     Json   @default("{}") // GeoJSON Point or centroid
+  routeKmStart Float?
+  routeKmEnd   Float?
+
+  // Schedule
+  plannedStart DateTime?
+  plannedEnd   DateTime?
+  actualStart  DateTime?
+  actualEnd    DateTime?
+
+  // Progress
+  status          WorkOrderStatus @default(DRAFT)
+  assignedTo      String? // userId or team name
+  percentComplete Float           @default(0)
+
+  // Quantities
+  plannedQuantity Float? // planned metres/units
+  actualQuantity  Float? // installed metres/units
+  unit            String? // "m", "km", "splices", "joints"
+
+  metadata Json @default("{}") // { photos, notes, equipment }
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  package       Package        @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  routeSections RouteSection[]
+  cases         Case[]
+
+  @@index([tenantId])
+  @@index([packageId])
+  @@index([packageId, status])
+  @@index([assignedTo])
+}
+
+/// A contract variation (change order). Records scope changes and their
+/// financial/time impact on a package.
+model ContractVariation {
+  id          String  @id @default(cuid())
+  tenantId    String
+  packageId   String
+  reference   String // e.g. "VO-023"
+  title       String
+  description String?
+  reason      String?
+
+  // Financial impact
+  amount         Decimal @db.Decimal(20, 2) // claimed/approved value
+  currency       String  @default("USD")
+  timeImpactDays Int? // extension of time claimed
+
+  // Assessment
+  assessedAmount   Decimal? @db.Decimal(20, 2) // engineer's assessment
+  assessedTimeDays Int?
+
+  // Workflow
+  status          VariationStatus @default(PROPOSED)
+  submittedDate   DateTime?
+  assessedDate    DateTime?
+  approvedDate    DateTime?
+  approvedBy      String?
+  implementedDate DateTime?
+
+  metadata Json @default("{}") // { attachments, correspondence }
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([packageId])
+  @@index([packageId, status])
+}
+
+/// A contract claim. Records events entitling a party to additional payment
+/// or time (Compensation Events in NEC4, Claims under FIDIC Sub-Clause 20.1).
+model ContractClaim {
+  id             String  @id @default(cuid())
+  tenantId       String
+  packageId      String
+  reference      String // e.g. "CE-015" or "CLM-008"
+  claimType      String? // "COMPENSATION_EVENT", "EOT", "PROLONGATION", "DISRUPTION"
+  title          String
+  description    String?
+  contractClause String? // specific clause relied upon
+
+  // Financial
+  amount         Decimal  @db.Decimal(20, 2) // claimed amount
+  assessedAmount Decimal? @db.Decimal(20, 2) // engineer's assessment
+  currency       String   @default("USD")
+
+  // Time
+  timeClaimedDays Int?
+  timeAwardedDays Int?
+
+  // Workflow
+  status           ClaimStatus @default(DRAFT)
+  submittedDate    DateTime?
+  responseDeadline DateTime? // contractual response period
+  assessedDate     DateTime?
+  agreedDate       DateTime?
+  paidDate         DateTime?
+
+  metadata Json @default("{}") // { notices, supporting_docs }
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([packageId])
+  @@index([packageId, status])
+}
+
+/// An interim or final payment certificate. Tracks the monthly/milestone payment
+/// cycle: work measured > certified by engineer > approved by client > paid.
+model PaymentCertificate {
+  id          String    @id @default(cuid())
+  tenantId    String
+  packageId   String
+  certNumber  Int // sequential per package (1, 2, 3...)
+  periodStart DateTime?
+  periodEnd   DateTime?
+
+  // Financial breakdown
+  workDoneThisPeriod Decimal @default(0) @db.Decimal(20, 2)
+  materialsOnSite    Decimal @default(0) @db.Decimal(20, 2)
+  variationsIncluded Decimal @default(0) @db.Decimal(20, 2)
+  grossAmount        Decimal @default(0) @db.Decimal(20, 2)
+  retentionDeducted  Decimal @default(0) @db.Decimal(20, 2)
+  previousCertified  Decimal @default(0) @db.Decimal(20, 2)
+  netAmount          Decimal @default(0) @db.Decimal(20, 2)
+  currency           String  @default("USD")
+
+  // Workflow
+  status        PaymentStatus @default(DRAFT)
+  submittedDate DateTime?
+  certifiedDate DateTime? // engineer certifies
+  certifiedBy   String?
+  approvedDate  DateTime? // client approves
+  approvedBy    String?
+  paidDate      DateTime?
+  paymentRef    String? // bank reference
+
+  metadata Json @default("{}") // { breakdown, attachments }
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@unique([packageId, certNumber])
+  @@index([tenantId])
+  @@index([packageId])
+  @@index([packageId, status])
+}
+
+/// Exchange rate record for multi-currency support. Stores historical rates
+/// for accurate conversion at transaction time and reporting time.
+model ExchangeRate {
+  id            String             @id @default(cuid())
+  tenantId      String
+  programmeId   String?
+  fromCurrency  String // ISO 4217 (e.g., "USD")
+  toCurrency    String // ISO 4217 (e.g., "VND")
+  rate          Decimal            @db.Decimal(20, 8) // high precision for FX
+  effectiveDate DateTime
+  source        ExchangeRateSource @default(MANUAL)
+  metadata      Json               @default("{}") // { sourceRef, enteredBy }
+
+  createdAt DateTime @default(now())
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  programme Programme? @relation(fields: [programmeId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([fromCurrency, toCurrency, effectiveDate])
+  @@index([programmeId])
+}
+
+/// Progress report record for EVM (Earned Value Management) tracking.
+/// Stores periodic performance snapshots at programme, project, or package level.
+model ProgressReport {
+  id          String  @id @default(cuid())
+  tenantId    String
+  programmeId String
+  projectId   String? // null = programme-level roll-up
+  packageId   String? // null = project or programme level
+
+  period     String // "2025-03" (year-month)
+  reportDate DateTime
+
+  // Physical progress (0.0 to 1.0)
+  plannedProgress Float @default(0)
+  actualProgress  Float @default(0)
+
+  // EVM values (in base currency)
+  budgetAtCompletion Decimal @default(0) @db.Decimal(20, 2)
+  plannedValue       Decimal @default(0) @db.Decimal(20, 2)
+  earnedValue        Decimal @default(0) @db.Decimal(20, 2)
+  actualCost         Decimal @default(0) @db.Decimal(20, 2)
+
+  // Derived performance indices (stored for query performance)
+  spiValue Float? // Schedule Performance Index
+  cpiValue Float? // Cost Performance Index
+  eacValue Decimal? @db.Decimal(20, 2) // Estimate at Completion
+  etcValue Decimal? @db.Decimal(20, 2) // Estimate to Complete
+
+  // Narrative
+  narrative         String?
+  keyIssues         Json    @default("[]")
+  keyRisks          Json    @default("[]")
+  decisionsRequired Json    @default("[]")
+
+  // Forecast
+  forecastCompletion DateTime? // revised completion date
+  forecastCost       Decimal?  @db.Decimal(20, 2)
+
+  metadata Json @default("{}") // { distribution, attachments }
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  programme Programme @relation(fields: [programmeId], references: [id], onDelete: Cascade)
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([programmeId, period])
+  @@index([projectId, period])
+}
+
+/// A section of fibre optic route. Tracks physical cable installation progress
+/// with GIS coordinates, cable specifications, and test results.
+model RouteSection {
+  id          String  @id @default(cuid())
+  tenantId    String
+  packageId   String
+  workOrderId String? // nullable: section may be planned before WO assigned
+
+  name    String // "Backbone Route A, Section 14"
+  kmStart Float // km marker from route origin
+  kmEnd   Float // km marker end
+
+  // GeoJSON LineString stored as JSONB
+  coordinates Json @default("{}") // { type: "LineString", coordinates: [...] }
+
+  // Cable specification
+  cableType  String? // "G.652.D", "G.657.A2"
+  fibreCount Int? // 48, 96, 144, 288
+  ductType   String? // "HDPE 40mm", "Microduct 12/10"
+
+  // Status
+  status RouteSectionStatus @default(PLANNED)
+
+  // Key dates
+  surveyedDate     DateTime?
+  installedDate    DateTime?
+  splicedDate      DateTime?
+  testedDate       DateTime?
+  commissionedDate DateTime?
+
+  // Test results
+  otdrResults   Json? // OTDR trace summary per fibre
+  insertionLoss Float? // measured dB
+  reflectance   Float? // measured dB
+
+  metadata Json @default("{}") // { photos, permits, access }
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  package   Package    @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  workOrder WorkOrder? @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([packageId])
+  @@index([workOrderId])
+  @@index([packageId, status])
+  @@index([kmStart, kmEnd])
+}
+
+/// Offline-first sync queue. Records changes made by field devices when offline,
+/// to be synced to the server when connectivity is restored.
+model SyncQueue {
+  id       String @id @default(cuid())
+  tenantId String
+  userId   String
+  deviceId String // unique device identifier
+
+  entityType String // "WorkOrder", "RouteSection", "Case"
+  entityId   String? // target record ID (null for CREATE before server assigns)
+  operation  SyncOperation
+
+  payload     Json // the full change payload
+  baseVersion Int  @default(0) // version the client had when making the change
+
+  // Status
+  createdAt DateTime  @default(now()) // when created on device
+  queuedAt  DateTime? // when added to upload queue
+  syncedAt  DateTime? // when server processed (null = pending)
+
+  // Conflict handling
+  conflictDetected   Boolean @default(false)
+  conflictResolution Json? // how it was resolved (null if no conflict)
+
+  // Retry
+  attempts  Int     @default(0)
+  lastError String?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([userId, syncedAt])
+  @@index([deviceId, createdAt])
+  @@index([syncedAt]) // for finding pending items
 }
