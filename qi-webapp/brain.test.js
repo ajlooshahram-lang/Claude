@@ -31,6 +31,18 @@ ok(r.procurement.length >= 3, "produces a procurement list");
 ok(r.budget.total > 0 && r.budget.rows.some(x => /Contingency/.test(x.category)), "budget rolls up with contingency");
 ok(r.roles.includes("Splicing Supervisor"), "suggests domain roles (splicing supervisor)");
 
+console.log("\n-- standards / kpis / deliverables coverage --");
+ok(r.standards.length >= 27, "standards array populated (" + r.standards.length + " standards)");
+ok(r.kpis.length >= 12, "kpis array populated (" + r.kpis.length + " KPIs)");
+ok(r.deliverables.length >= 22, "deliverables array populated (" + r.deliverables.length + " deliverables)");
+ok(r.standards.every(s => s.id && s.title && s.scope && s.applicability), "every standard has id, title, scope, applicability keys");
+ok(r.kpis.every(k => k.id && k.name && k.target), "every KPI has id, name, target keys");
+ok(r.deliverables.every(d => d.id && d.name && d.phase && d.description), "every deliverable has id, name, phase, description keys");
+
+console.log("\n-- deliverable-to-phase mapping integrity --");
+const phaseNames = r.phases.map(p => p.name);
+ok(r.deliverables.every(d => phaseNames.includes(d.phase)), "every deliverable phase matches a plan phase name");
+
 console.log("\n-- civil cost scales with detected km --");
 const small = B.analyzeProject("FTTH build, fibre, OTDR, splicing, 10 km route, 2 sites");
 const big = B.analyzeProject("FTTH build, fibre, OTDR, splicing, 2000 km route, 2 sites");
@@ -42,6 +54,9 @@ console.log("\n-- generic fallback + honest warnings --");
 const g = B.analyzeProject("We want to reorganise the office filing system and onboarding.");
 ok(g.summary.domain === "generic-pm", "falls back to generic PM when no domain signal");
 ok(g.coverage.warnings.length >= 1, "warns when domain is not confidently detected");
+ok(g.standards.length === 0, "generic profile returns empty standards array");
+ok(g.kpis.length === 0, "generic profile returns empty kpis array");
+ok(g.deliverables.length === 0, "generic profile returns empty deliverables array");
 const noKm = B.analyzeProject("FTTH fibre OTDR splicing project with GPON");
 ok(noKm.coverage.warnings.some(w => /km/.test(w)), "warns when no route length detected");
 
