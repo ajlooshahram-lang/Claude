@@ -3,7 +3,7 @@ import prisma from "../db.js";
 import { authenticate, requireRole } from "../middleware/rbac.js";
 import { CreateSnapshotBody, UpdateSnapshotBody, ListSnapshotsQuery } from "../validation/schemas.js";
 import { validateId } from "../validation/index.js";
-import { logMutation } from "../logging.js";
+import { logMutation, logger } from "../logging.js";
 
 export default async function snapshotsRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", authenticate);
@@ -86,7 +86,7 @@ export default async function snapshotsRoutes(app: FastifyInstance): Promise<voi
           detail: { projectId, label: label ?? null },
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logMutation(request, "snapshot.create", "Snapshot", created.id, { projectId });
 
@@ -100,7 +100,7 @@ export default async function snapshotsRoutes(app: FastifyInstance): Promise<voi
     { preHandler: [requireRole("MANAGER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      if (!validateId(id, reply)) return;
+      if (!validateId(id, reply)) return reply;
 
       const parsed = UpdateSnapshotBody.safeParse(request.body);
       if (!parsed.success) {
@@ -131,7 +131,7 @@ export default async function snapshotsRoutes(app: FastifyInstance): Promise<voi
           detail: { label: parsed.data.label },
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logMutation(request, "snapshot.update", "Snapshot", id, { label: parsed.data.label });
 
@@ -145,7 +145,7 @@ export default async function snapshotsRoutes(app: FastifyInstance): Promise<voi
     { preHandler: [requireRole("MANAGER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      if (!validateId(id, reply)) return;
+      if (!validateId(id, reply)) return reply;
 
       const existing = await prisma.snapshot.findFirst({
         where: { id, tenantId: request.tenantId },
@@ -155,6 +155,10 @@ export default async function snapshotsRoutes(app: FastifyInstance): Promise<voi
         return reply.code(404).send({ error: "Not found" });
       }
 
+      // Intentional hard delete: Snapshots are ephemeral point-in-time captures,
+      // not persistent business data. They hold a full copy of project state at
+      // creation time and are designed to be disposable. Soft-delete would bloat
+      // storage with large JSON blobs that have no recovery use-case.
       await prisma.snapshot.delete({ where: { id } });
 
       // Audit log
@@ -168,7 +172,7 @@ export default async function snapshotsRoutes(app: FastifyInstance): Promise<voi
           detail: { projectId: existing.projectId },
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logMutation(request, "snapshot.delete", "Snapshot", id);
 
@@ -182,7 +186,7 @@ export default async function snapshotsRoutes(app: FastifyInstance): Promise<voi
     { preHandler: [requireRole("MANAGER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      if (!validateId(id, reply)) return;
+      if (!validateId(id, reply)) return reply;
 
       const snapshot = await prisma.snapshot.findFirst({
         where: { id, tenantId: request.tenantId },
@@ -267,7 +271,7 @@ export default async function snapshotsRoutes(app: FastifyInstance): Promise<voi
           detail: { projectId },
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logMutation(request, "snapshot.restore", "Snapshot", id, { projectId });
 

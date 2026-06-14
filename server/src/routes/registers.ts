@@ -4,7 +4,7 @@ import prisma from "../db.js";
 import { authenticate, requireRole } from "../middleware/rbac.js";
 import { CreateRegisterBody, UpdateRegisterBody, ListRegistersQuery } from "../validation/schemas.js";
 import { validateId } from "../validation/index.js";
-import { logMutation } from "../logging.js";
+import { logMutation, logger } from "../logging.js";
 
 const VALID_REGISTER_TYPES = [
   "hazop",
@@ -105,7 +105,7 @@ export default async function registersRoutes(app: FastifyInstance): Promise<voi
           detail: { registerType: typeParsed.data, projectId },
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logMutation(request, "register.create", "RegisterRow", created.id, { registerType: typeParsed.data });
 
@@ -123,7 +123,7 @@ export default async function registersRoutes(app: FastifyInstance): Promise<voi
       if (!typeParsed.success) {
         return reply.code(400).send({ error: "Invalid register type" });
       }
-      if (!validateId(id, reply)) return;
+      if (!validateId(id, reply)) return reply;
 
       const parsed = UpdateRegisterBody.safeParse(request.body);
       if (!parsed.success) {
@@ -164,7 +164,7 @@ export default async function registersRoutes(app: FastifyInstance): Promise<voi
           detail: { changedFields: Object.keys(updateData), registerType: typeParsed.data },
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logMutation(request, "register.update", "RegisterRow", id, { changedFields: Object.keys(updateData) });
 
@@ -182,7 +182,7 @@ export default async function registersRoutes(app: FastifyInstance): Promise<voi
       if (!typeParsed.success) {
         return reply.code(400).send({ error: "Invalid register type" });
       }
-      if (!validateId(id, reply)) return;
+      if (!validateId(id, reply)) return reply;
 
       const existing = await prisma.registerRow.findFirst({
         where: {
@@ -213,7 +213,7 @@ export default async function registersRoutes(app: FastifyInstance): Promise<voi
           detail: { registerType: typeParsed.data },
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logMutation(request, "register.delete", "RegisterRow", id, { registerType: typeParsed.data });
 

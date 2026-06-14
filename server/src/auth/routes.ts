@@ -5,10 +5,11 @@ import { generateSessionToken, createSession, hashToken, revokeSession, revokeAl
 import { generateTotpSecret, verifyTotpToken } from "./totp.js";
 import { encrypt, decrypt } from "./crypto.js";
 import { authenticate } from "../middleware/rbac.js";
+import { rotateCsrfToken } from "../middleware/csrf.js";
 import { loadConfig } from "../config.js";
 import { authenticator } from "otplib";
 import { RegisterBody, LoginBody, MfaVerifyBody, ChangePasswordBody } from "../validation/schemas.js";
-import { logAuthEvent } from "../logging.js";
+import { logAuthEvent, logger } from "../logging.js";
 
 const SEVEN_DAYS_SEC = 7 * 24 * 60 * 60;
 
@@ -98,7 +99,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
           detail: { email: result.user.email },
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logAuthEvent(request, "register", { userId: result.user.id, email: result.user.email });
 
@@ -179,7 +180,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
           detail: {},
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logAuthEvent(request, "login.success", { userId: user.id });
 
@@ -216,7 +217,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
           detail: {},
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logAuthEvent(request, "logout", { userId: request.user.id });
 
@@ -274,7 +275,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
           detail: {},
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logAuthEvent(request, "mfa.enroll", { userId: request.user.id });
 
@@ -330,9 +331,12 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
           detail: {},
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logAuthEvent(request, "mfa.verify", { userId: request.user.id });
+
+      // Rotate CSRF token on MFA verification to limit token exfiltration window
+      rotateCsrfToken(reply);
 
       return { ok: true };
     },
@@ -389,9 +393,12 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
           detail: {},
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logAuthEvent(request, "password.change", { userId: request.user.id });
+
+      // Rotate CSRF token on password change to limit token exfiltration window
+      rotateCsrfToken(reply);
 
       return { ok: true };
     },

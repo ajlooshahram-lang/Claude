@@ -4,7 +4,7 @@ import prisma from "../db.js";
 import { authenticate, requireRole } from "../middleware/rbac.js";
 import { CreateShareBody } from "../validation/schemas.js";
 import { validateId } from "../validation/index.js";
-import { logMutation } from "../logging.js";
+import { logMutation, logger } from "../logging.js";
 
 function hashShareToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -60,7 +60,7 @@ export default async function sharesRoutes(app: FastifyInstance): Promise<void> 
           detail: { projectId, scope, expiresInHours },
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logMutation(request, "share.create", "ShareToken", shareToken.id, { projectId, scope });
 
@@ -112,7 +112,7 @@ export default async function sharesRoutes(app: FastifyInstance): Promise<void> 
     { preHandler: [authenticate, requireRole("MANAGER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      if (!validateId(id, reply)) return;
+      if (!validateId(id, reply)) return reply;
 
       const existing = await prisma.shareToken.findFirst({
         where: {
@@ -142,7 +142,7 @@ export default async function sharesRoutes(app: FastifyInstance): Promise<void> 
           detail: { projectId: existing.projectId },
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logMutation(request, "share.revoke", "ShareToken", id);
 

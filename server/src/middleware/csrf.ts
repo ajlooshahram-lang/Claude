@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { randomUUID } from "node:crypto";
 import fp from "fastify-plugin";
 
@@ -18,6 +18,18 @@ function buildCsrfCookieString(token: string, isProd: boolean): string {
     cookie += "; Secure";
   }
   return cookie;
+}
+
+/**
+ * Rotates the CSRF token by generating a new one and setting it on the reply.
+ * Call this on sensitive operations (password change, MFA verify) to limit
+ * the window if the token was previously exfiltrated.
+ */
+export function rotateCsrfToken(reply: FastifyReply): void {
+  const isProd = process.env["NODE_ENV"] === "production";
+  const csrfToken = randomUUID();
+  const cookieStr = buildCsrfCookieString(csrfToken, isProd);
+  void reply.header("set-cookie", cookieStr);
 }
 
 async function csrfPlugin(app: FastifyInstance): Promise<void> {

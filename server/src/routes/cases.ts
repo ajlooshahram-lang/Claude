@@ -3,7 +3,7 @@ import prisma from "../db.js";
 import { authenticate, requireRole } from "../middleware/rbac.js";
 import { CreateCaseBody, UpdateCaseBody, ListCasesQuery } from "../validation/schemas.js";
 import { validateId } from "../validation/index.js";
-import { logMutation } from "../logging.js";
+import { logMutation, logger } from "../logging.js";
 
 export default async function casesRoutes(app: FastifyInstance): Promise<void> {
   // All case routes require authentication
@@ -39,7 +39,7 @@ export default async function casesRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: [requireRole("VIEWER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      if (!validateId(id, reply)) return;
+      if (!validateId(id, reply)) return reply;
 
       const found = await prisma.case.findFirst({
         where: {
@@ -122,7 +122,7 @@ export default async function casesRoutes(app: FastifyInstance): Promise<void> {
           detail: { problem: data.problem, projectId: data.projectId },
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logMutation(request, "case.create", "Case", created.id, { projectId: data.projectId });
 
@@ -136,7 +136,7 @@ export default async function casesRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: [requireRole("MANAGER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      if (!validateId(id, reply)) return;
+      if (!validateId(id, reply)) return reply;
 
       const parsed = UpdateCaseBody.safeParse(request.body);
       if (!parsed.success) {
@@ -180,7 +180,7 @@ export default async function casesRoutes(app: FastifyInstance): Promise<void> {
           detail: { changedFields: Object.keys(updateData) },
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logMutation(request, "case.update", "Case", id, { changedFields: Object.keys(updateData) });
 
@@ -194,7 +194,7 @@ export default async function casesRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: [requireRole("MANAGER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      if (!validateId(id, reply)) return;
+      if (!validateId(id, reply)) return reply;
 
       // Verify the case belongs to this tenant
       const existing = await prisma.case.findFirst({
@@ -225,7 +225,7 @@ export default async function casesRoutes(app: FastifyInstance): Promise<void> {
           detail: { problem: existing.problem },
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logMutation(request, "case.delete", "Case", id);
 

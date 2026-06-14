@@ -3,7 +3,7 @@ import prisma from "../db.js";
 import { authenticate, requireRole } from "../middleware/rbac.js";
 import { CreateProjectBody, UpdateProjectBody } from "../validation/schemas.js";
 import { validateId } from "../validation/index.js";
-import { logMutation } from "../logging.js";
+import { logMutation, logger } from "../logging.js";
 
 export default async function projectsRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", authenticate);
@@ -30,7 +30,7 @@ export default async function projectsRoutes(app: FastifyInstance): Promise<void
     { preHandler: [requireRole("VIEWER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      if (!validateId(id, reply)) return;
+      if (!validateId(id, reply)) return reply;
 
       const found = await prisma.project.findFirst({
         where: {
@@ -95,7 +95,7 @@ export default async function projectsRoutes(app: FastifyInstance): Promise<void
           detail: { name: data.name },
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logMutation(request, "project.create", "Project", created.id, { name: data.name });
 
@@ -109,7 +109,7 @@ export default async function projectsRoutes(app: FastifyInstance): Promise<void
     { preHandler: [requireRole("MANAGER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      if (!validateId(id, reply)) return;
+      if (!validateId(id, reply)) return reply;
 
       const parsed = UpdateProjectBody.safeParse(request.body);
       if (!parsed.success) {
@@ -151,7 +151,7 @@ export default async function projectsRoutes(app: FastifyInstance): Promise<void
           detail: { changedFields: Object.keys(updateData) },
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logMutation(request, "project.update", "Project", id, { changedFields: Object.keys(updateData) });
 
@@ -165,7 +165,7 @@ export default async function projectsRoutes(app: FastifyInstance): Promise<void
     { preHandler: [requireRole("MANAGER")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      if (!validateId(id, reply)) return;
+      if (!validateId(id, reply)) return reply;
 
       const existing = await prisma.project.findFirst({
         where: {
@@ -195,7 +195,7 @@ export default async function projectsRoutes(app: FastifyInstance): Promise<void
           detail: { name: String((existing as Record<string, unknown>)["name"] ?? "") },
           ip: request.ip,
         },
-      }).catch(() => { /* non-blocking */ });
+      }).catch((err: unknown) => { logger.warn({ event: 'audit_log_failure', error: err instanceof Error ? err.message : String(err) }); });
 
       logMutation(request, "project.delete", "Project", id);
 

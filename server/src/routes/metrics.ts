@@ -9,14 +9,17 @@ import prisma, { getPoolStats } from "../db.js";
 // In-memory metrics storage
 let requestCount = 0;
 let errorCount5xx = 0;
-const responseTimes: number[] = [];
-const MAX_RESPONSE_TIMES = 10000; // Keep last 10k response times for percentile calculation
+
+// Circular buffer for response times - avoids O(n) shift() on every request
+const MAX_RESPONSE_TIMES = 10000;
+const responseTimes = new Float64Array(MAX_RESPONSE_TIMES);
+let responseTimeCount = 0; // total entries written (may exceed buffer size)
+let writeIndex = 0;
 
 function recordResponseTime(ms: number): void {
-  responseTimes.push(ms);
-  if (responseTimes.length > MAX_RESPONSE_TIMES) {
-    responseTimes.shift();
-  }
+  responseTimes[writeIndex] = ms;
+  writeIndex = (writeIndex + 1) % MAX_RESPONSE_TIMES;
+  responseTimeCount++;
 }
 
 function percentile(sorted: number[], p: number): number {
@@ -26,11 +29,17 @@ function percentile(sorted: number[], p: number): number {
 }
 
 function getPercentiles(): { p50: number; p95: number; p99: number } {
-  const sorted = [...responseTimes].sort((a, b) => a - b);
+  const size = Math.min(responseTimeCount, MAX_RESPONSE_TIMES);
+  if (size === 0) return { p50: 0, p95: 0, p99: 0 };
+  const values: number[] = new Array(size);
+  for (let i = 0; i < size; i++) {
+    values[i] = responseTimes[i] as number;
+  }
+  values.sort((a, b) => a - b);
   return {
-    p50: percentile(sorted, 50),
-    p95: percentile(sorted, 95),
-    p99: percentile(sorted, 99),
+    p50: percentile(values, 50),
+    p95: percentile(values, 95),
+    p99: percentile(values, 99),
   };
 }
 
@@ -47,9 +56,11 @@ export function trackResponseTime(ms: number): void {
 }
 
 function isAuthorized(request: FastifyRequest): boolean {
-  // Allow localhost access
-  const ip = request.ip;
-  if (ip === "127.0.0.1" || ip === "::1" || ip === "localhost") {
+  // Use the raw socket address to bypass trustProxy layer.
+  // request.ip reflects X-Forwarded-For when trustProxy is enabled,
+  // which allows spoofing. The socket address cannot be spoofed.
+  const ip = request.raw.socket.remoteAddress;
+  if (ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1") {
     return true;
   }
 
