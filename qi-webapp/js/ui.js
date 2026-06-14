@@ -71,6 +71,8 @@
     { g: "People & Cost" },
     { id: "stakeholders", label: "Stakeholders", icon: "♟" },
     { id: "budget", label: "Budget", icon: "$" },
+    { g: "Network" },
+    { id: "network3d", label: "3D Network", icon: "🌐" },
     { g: "Intelligence" },
     { id: "ai", label: "AI Assistant", icon: "✦" },
     { id: "impact", label: "Change Impact", icon: "⇄" },
@@ -698,6 +700,13 @@
         </div>
         <div style="margin-top:14px"><button class="btn btn-primary" data-act="savebrand">Save branding</button></div></div>
 
+      <div class="card"><h3>CesiumJS / 3D Map</h3>
+        <p class="muted" style="margin-top:-6px">Enter your Cesium Ion access token to enable terrain and imagery on the 3D Network view. Get a free token at <a href="https://ion.cesium.com/tokens" target="_blank">ion.cesium.com/tokens</a>.</p>
+        <div class="form-grid">
+          <div class="field full"><label>Cesium Ion access token</label><input type="text" id="cesium_token" value="${esc(b.cesiumToken || "")}" placeholder="eyJhbGciOi..."></div>
+        </div>
+        <div style="margin-top:14px"><button class="btn btn-primary" data-act="savecesium">Save token</button></div></div>
+
       <div class="card"><h3>AI assistant (optional — bring your own key)</h3>
         <p class="muted" style="margin-top:-6px">Leave blank to use the built-in offline advisor. The only field you type anywhere in the app is the secret API key below (it can't be a dropdown). It is stored only in this browser and sent only to the endpoint you choose.</p>
         <div class="form-grid">
@@ -720,6 +729,378 @@
       const fr = new FileReader();
       fr.onload = () => { S.setBrand({ logo: fr.result }); refreshHeader(); go("config"); toast("Logo set."); };
       fr.readAsDataURL(f);
+    });
+  };
+
+  // ---------- 3D Network Visualization ----------
+  RENDER.network3d = function () {
+    const routes = S.routeSections();
+    const totalKm = routes.reduce((a, r) => a + (r.endKm || 0), 0);
+    const totalStations = routes.reduce((a, r) => a + (r.stations ? r.stations.length : 0), 0);
+    const cableTypes = [...new Set(routes.map(r => r.cableType).filter(Boolean))];
+    const allStations = [];
+    routes.forEach(r => { if (r.stations) r.stations.forEach(s => allStations.push(s)); });
+
+    const cableColorMap = { "G.652.D": "#00d4ff", "G.657.A2": "#00ff88", "G.654.E": "#ff6600", "G.655.C": "#ff00ff", "G.657.B3": "#ffdd00" };
+
+    return `<div class="net3d-wrap">
+      <div class="net3d-toolbar">
+        <div class="net3d-toolbar-left">
+          <select id="n3dFilter" title="Filter by cable type">
+            <option value="">All cable types</option>
+            ${cableTypes.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join("")}
+          </select>
+          <select id="n3dStatus" title="Filter by status">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="installed">Installed</option>
+            <option value="tested">Tested</option>
+            <option value="planned">Planned</option>
+          </select>
+          <label class="net3d-toggle"><input type="checkbox" id="n3dLabels" checked> Labels</label>
+          <label class="net3d-toggle"><input type="checkbox" id="n3dAnim" checked> Animations</label>
+        </div>
+        <div class="net3d-toolbar-right">
+          <select id="n3dFlyTo" title="Fly to station">
+            <option value="">Fly to station...</option>
+            ${allStations.map(s => `<option value="${s.coords.lat},${s.coords.lng},${s.coords.alt}">${esc(s.name)}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+
+      <div id="cesiumContainer" class="cesium-container">
+        <div class="cesium-loading" id="cesiumLoading">
+          <div class="cesium-loader-ring"></div>
+          <p>Initializing 3D Globe...</p>
+        </div>
+      </div>
+
+      <div class="net3d-legend" id="n3dLegend">
+        <div class="net3d-legend-title">Cable Types</div>
+        ${Object.entries(cableColorMap).map(([type, color]) => `<div class="net3d-legend-item"><span class="net3d-legend-swatch" style="background:${color};box-shadow:0 0 8px ${color}"></span>${esc(type)}</div>`).join("")}
+        <div class="net3d-legend-title" style="margin-top:10px">Stations</div>
+        <div class="net3d-legend-item"><span class="net3d-legend-swatch" style="background:#ff4444;box-shadow:0 0 8px #ff4444;border-radius:50%"></span>Termination</div>
+        <div class="net3d-legend-item"><span class="net3d-legend-swatch" style="background:#ffbb33;box-shadow:0 0 8px #ffbb33;border-radius:50%"></span>Junction</div>
+        <div class="net3d-legend-item"><span class="net3d-legend-swatch" style="background:#00ffcc;box-shadow:0 0 8px #00ffcc;border-radius:50%"></span>Switch</div>
+        <div class="net3d-legend-title" style="margin-top:10px">Status</div>
+        <div class="net3d-legend-item"><span class="net3d-legend-swatch" style="background:#00ff88;border-radius:2px"></span>Active</div>
+        <div class="net3d-legend-item"><span class="net3d-legend-swatch" style="background:#00d4ff;border-radius:2px"></span>Installed</div>
+        <div class="net3d-legend-item"><span class="net3d-legend-swatch" style="background:#ffdd00;border-radius:2px"></span>Tested</div>
+        <div class="net3d-legend-item"><span class="net3d-legend-swatch" style="background:#ff6600;border-radius:2px;opacity:0.7"></span>Planned</div>
+      </div>
+
+      <div class="net3d-stats">
+        <div class="net3d-stat"><span class="net3d-stat-val">${routes.length}</span><span class="net3d-stat-lbl">Routes</span></div>
+        <div class="net3d-stat"><span class="net3d-stat-val">${totalKm.toLocaleString()}</span><span class="net3d-stat-lbl">Total km</span></div>
+        <div class="net3d-stat"><span class="net3d-stat-val">${totalStations}</span><span class="net3d-stat-lbl">Stations</span></div>
+        <div class="net3d-stat"><span class="net3d-stat-val">${cableTypes.length}</span><span class="net3d-stat-lbl">Cable Types</span></div>
+      </div>
+    </div>`;
+  };
+
+  AFTER.network3d = function () {
+    var cesiumViewer = null;
+    var animationRunning = true;
+    var animationFrameId = null;
+
+    // Graceful fallback if Cesium is not available (jsdom / no WebGL)
+    if (typeof window === "undefined" || !window.Cesium) {
+      var container = document.getElementById("cesiumContainer");
+      if (container) {
+        container.innerHTML = '<div class="cesium-fallback">' +
+          '<div class="cesium-fallback-icon">🌐</div>' +
+          '<h3>3D Globe Requires a WebGL-Enabled Browser</h3>' +
+          '<p>The interactive 3D fiber network visualization requires WebGL support and the CesiumJS library.</p>' +
+          '<p>Please open this application in a modern browser (Chrome, Firefox, Edge) with hardware acceleration enabled.</p>' +
+          '<div class="cesium-fallback-routes">' +
+          '<h4>Fiber Routes Summary</h4>' +
+          S.routeSections().map(function(r) {
+            return '<div class="cesium-fallback-route"><strong>' + esc(r.name) + '</strong> - ' + esc(r.cableType) + ' (' + r.coreCount + ' cores, ' + r.endKm + ' km) [' + r.status + ']</div>';
+          }).join("") +
+          '</div></div>';
+      }
+      return;
+    }
+
+    // Cesium is available - initialize 3D globe
+    var Cesium = window.Cesium;
+    var token = (S.brand() && S.brand().cesiumToken) || "";
+    if (token) Cesium.Ion.defaultAccessToken = token;
+
+    var loadingEl = document.getElementById("cesiumLoading");
+
+    try {
+      cesiumViewer = new Cesium.Viewer("cesiumContainer", {
+        terrain: Cesium.Terrain.fromWorldTerrain ? undefined : undefined,
+        baseLayerPicker: false,
+        geocoder: false,
+        homeButton: true,
+        sceneModePicker: true,
+        navigationHelpButton: false,
+        animation: false,
+        timeline: false,
+        fullscreenButton: true,
+        vrButton: false,
+        infoBox: true,
+        selectionIndicator: true,
+        shadows: false,
+        shouldAnimate: true,
+        scene3DOnly: false
+      });
+
+      // Set terrain
+      try {
+        cesiumViewer.scene.terrainProvider = Cesium.createWorldTerrain({ requestWaterMask: true, requestVertexNormals: true });
+      } catch (e) { /* terrain might fail without token */ }
+
+      // Dark atmosphere for dramatic fiber-optic aesthetic
+      cesiumViewer.scene.skyAtmosphere.brightnessShift = -0.3;
+      cesiumViewer.scene.globe.enableLighting = true;
+
+      if (loadingEl) loadingEl.style.display = "none";
+    } catch (e) {
+      if (loadingEl) loadingEl.innerHTML = '<p style="color:#ff4444">Failed to initialize 3D globe: ' + e.message + '</p>';
+      return;
+    }
+
+    var routes = S.routeSections();
+    var cableColorMap = { "G.652.D": Cesium.Color.fromCssColorString("#00d4ff"), "G.657.A2": Cesium.Color.fromCssColorString("#00ff88"), "G.654.E": Cesium.Color.fromCssColorString("#ff6600"), "G.655.C": Cesium.Color.fromCssColorString("#ff00ff"), "G.657.B3": Cesium.Color.fromCssColorString("#ffdd00") };
+    var stationColorMap = { termination: "#ff4444", junction: "#ffbb33", switch: "#00ffcc" };
+    var routeEntities = [];
+    var stationEntities = [];
+    var labelEntities = [];
+
+    function buildRoutePositions(route) {
+      var pts = [];
+      pts.push(route.startCoords);
+      if (route.waypoints) route.waypoints.forEach(function(w) { pts.push(w); });
+      pts.push(route.endCoords);
+      var positions = [];
+      pts.forEach(function(p) { positions.push(Cesium.Cartesian3.fromDegrees(p.lng, p.lat, Math.max((p.alt || 0) + 200, 200))); });
+      return positions;
+    }
+
+    // Draw each route as a glowing animated polyline
+    routes.forEach(function(route) {
+      var positions = buildRoutePositions(route);
+      var color = cableColorMap[route.cableType] || Cesium.Color.WHITE;
+      var alpha = route.status === "planned" ? 0.5 : 1.0;
+
+      // Outer glow polyline
+      var glowEntity = cesiumViewer.entities.add({
+        name: route.name + " (glow)",
+        polyline: {
+          positions: positions,
+          width: 8,
+          material: new Cesium.PolylineGlowMaterialProperty({
+            glowPower: 0.4,
+            taperPower: 0.7,
+            color: color.withAlpha(alpha * 0.6)
+          }),
+          clampToGround: false
+        },
+        properties: { routeId: route._id, type: "route" }
+      });
+      routeEntities.push(glowEntity);
+
+      // Inner bright core polyline (animated dash for data flow)
+      var dashEntity = cesiumViewer.entities.add({
+        name: route.name,
+        polyline: {
+          positions: positions,
+          width: 3,
+          material: new Cesium.PolylineDashMaterialProperty({
+            color: color.withAlpha(alpha),
+            dashLength: 32,
+            dashPattern: 255
+          }),
+          clampToGround: false
+        },
+        description: '<div style="padding:12px;font-family:sans-serif">' +
+          '<h3 style="color:#00d4ff;margin:0 0 8px">' + esc(route.name) + '</h3>' +
+          '<table style="width:100%;border-collapse:collapse">' +
+          '<tr><td style="padding:4px;color:#aaa">Cable Type</td><td style="padding:4px;font-weight:bold">' + esc(route.cableType) + '</td></tr>' +
+          '<tr><td style="padding:4px;color:#aaa">Core Count</td><td style="padding:4px">' + route.coreCount + ' cores</td></tr>' +
+          '<tr><td style="padding:4px;color:#aaa">Length</td><td style="padding:4px">' + route.endKm + ' km</td></tr>' +
+          '<tr><td style="padding:4px;color:#aaa">Status</td><td style="padding:4px">' + esc(route.status) + '</td></tr>' +
+          '<tr><td style="padding:4px;color:#aaa">Stations</td><td style="padding:4px">' + route.stations.length + '</td></tr>' +
+          '</table></div>',
+        properties: { routeId: route._id, type: "route" }
+      });
+      routeEntities.push(dashEntity);
+
+      // Cable name labels along the route midpoint
+      var midIdx = Math.floor(positions.length / 2);
+      var labelEnt = cesiumViewer.entities.add({
+        position: positions[midIdx],
+        label: {
+          text: route.name + "\n" + route.cableType + " - " + route.coreCount + " cores",
+          font: "12px sans-serif",
+          fillColor: color,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -20),
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 2000000),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        },
+        properties: { routeId: route._id, type: "label" }
+      });
+      labelEntities.push(labelEnt);
+
+      // Station markers
+      route.stations.forEach(function(station) {
+        var stColor = Cesium.Color.fromCssColorString(stationColorMap[station.type] || "#ffffff");
+        var stEntity = cesiumViewer.entities.add({
+          name: station.name,
+          position: Cesium.Cartesian3.fromDegrees(station.coords.lng, station.coords.lat, (station.coords.alt || 0) + 250),
+          billboard: {
+            image: createStationIcon(station.type),
+            width: 32,
+            height: 32,
+            verticalOrigin: Cesium.VerticalOrigin.CENTER,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 5000000)
+          },
+          label: {
+            text: station.name,
+            font: "bold 13px sans-serif",
+            fillColor: Cesium.Color.WHITE,
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: 3,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new Cesium.Cartesian2(0, -22),
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 1500000),
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
+          },
+          ellipse: {
+            semiMajorAxis: 5000,
+            semiMinorAxis: 5000,
+            material: stColor.withAlpha(0.3),
+            outline: true,
+            outlineColor: stColor.withAlpha(0.8),
+            outlineWidth: 2,
+            height: (station.coords.alt || 0) + 100
+          },
+          description: '<div style="padding:12px;font-family:sans-serif">' +
+            '<h3 style="color:' + stationColorMap[station.type] + ';margin:0 0 8px">' + esc(station.name) + '</h3>' +
+            '<p><strong>Type:</strong> ' + esc(station.type) + '</p>' +
+            '<p><strong>Route:</strong> ' + esc(route.name) + '</p>' +
+            '<p><strong>Coordinates:</strong> ' + station.coords.lat.toFixed(4) + ', ' + station.coords.lng.toFixed(4) + '</p>' +
+            '<p><strong>Altitude:</strong> ' + (station.coords.alt || 0) + ' m</p></div>',
+          properties: { stationName: station.name, type: "station", stationType: station.type }
+        });
+        stationEntities.push(stEntity);
+      });
+    });
+
+    // Create station icon using canvas
+    function createStationIcon(type) {
+      var canvas = document.createElement("canvas");
+      canvas.width = 64;
+      canvas.height = 64;
+      var ctx = canvas.getContext("2d");
+      var color = stationColorMap[type] || "#ffffff";
+
+      // Outer glow
+      var gradient = ctx.createRadialGradient(32, 32, 8, 32, 32, 30);
+      gradient.addColorStop(0, color);
+      gradient.addColorStop(0.5, color + "88");
+      gradient.addColorStop(1, "transparent");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 64, 64);
+
+      // Inner solid circle
+      ctx.beginPath();
+      ctx.arc(32, 32, 12, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Type indicator
+      ctx.fillStyle = "#000";
+      ctx.font = "bold 11px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      var symbol = type === "termination" ? "T" : type === "switch" ? "S" : "J";
+      ctx.fillText(symbol, 32, 33);
+
+      return canvas.toDataURL();
+    }
+
+    // Animation loop for pulsing station markers
+    var pulseTime = 0;
+    function animateScene() {
+      if (!animationRunning || !cesiumViewer || cesiumViewer.isDestroyed()) return;
+      pulseTime += 0.03;
+      stationEntities.forEach(function(entity) {
+        if (entity.ellipse) {
+          var scale = 5000 + Math.sin(pulseTime) * 2000;
+          entity.ellipse.semiMajorAxis = scale;
+          entity.ellipse.semiMinorAxis = scale;
+        }
+      });
+      animationFrameId = requestAnimationFrame(animateScene);
+    }
+    animateScene();
+
+    // Fly to Asia overview
+    cesiumViewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(107.0, 8.0, 6000000),
+      orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-60), roll: 0 },
+      duration: 3
+    });
+
+    // --- UI Controls ---
+    var filterEl = document.getElementById("n3dFilter");
+    var statusEl = document.getElementById("n3dStatus");
+    var labelsEl = document.getElementById("n3dLabels");
+    var animEl = document.getElementById("n3dAnim");
+    var flyToEl = document.getElementById("n3dFlyTo");
+
+    function applyFilters() {
+      var cableFilter = filterEl ? filterEl.value : "";
+      var statusFilter = statusEl ? statusEl.value : "";
+      var showLabels = labelsEl ? labelsEl.checked : true;
+
+      routes.forEach(function(route, idx) {
+        var visible = true;
+        if (cableFilter && route.cableType !== cableFilter) visible = false;
+        if (statusFilter && route.status !== statusFilter) visible = false;
+        // Each route has 2 polyline entities (glow + dash)
+        var entIdx = idx * 2;
+        if (routeEntities[entIdx]) routeEntities[entIdx].show = visible;
+        if (routeEntities[entIdx + 1]) routeEntities[entIdx + 1].show = visible;
+      });
+
+      labelEntities.forEach(function(le) { le.show = showLabels; });
+      stationEntities.forEach(function(se) {
+        if (se.label) se.label.show = showLabels;
+      });
+    }
+
+    if (filterEl) filterEl.addEventListener("change", applyFilters);
+    if (statusEl) statusEl.addEventListener("change", applyFilters);
+    if (labelsEl) labelsEl.addEventListener("change", applyFilters);
+    if (animEl) animEl.addEventListener("change", function() {
+      animationRunning = animEl.checked;
+      if (animationRunning) animateScene();
+      else if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    });
+    if (flyToEl) flyToEl.addEventListener("change", function() {
+      var v = flyToEl.value;
+      if (!v) return;
+      var parts = v.split(",");
+      var lat = parseFloat(parts[0]), lng = parseFloat(parts[1]), alt = parseFloat(parts[2]) || 0;
+      cesiumViewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(lng, lat, 50000),
+        orientation: { heading: 0, pitch: Cesium.Math.toRadians(-45), roll: 0 },
+        duration: 2
+      });
     });
   };
 
@@ -1989,6 +2370,10 @@
     else if (act === "saveai") {
       S.setAi({ provider: $("#ai_provider").value, baseUrl: $("#ai_base").value, model: $("#ai_model").value, key: $("#ai_key").value });
       toast("AI settings saved.");
+    }
+    else if (act === "savecesium") {
+      S.setBrand({ cesiumToken: $("#cesium_token").value });
+      toast("Cesium token saved.");
     }
     else if (act === "regadd") { S.regAdd(b.dataset.reg, {}); go(b.dataset.reg); }
     else if (act === "regdel") { S.regDelete(b.dataset.reg, id); go(b.dataset.reg); }

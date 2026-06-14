@@ -417,3 +417,40 @@ tr.pinned-row[draggable]{cursor:grab}
 tr.pinned-row[draggable]:active{cursor:grabbing}
 tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46,84,150,.08)}
 [data-theme="dark"] tr.row-dragover td{background:rgba(125,167,240,.12)}
+
+/* =============== 3D Network Visualization =============== */
+.net3d-wrap{position:relative;display:flex;flex-direction:column;gap:0;min-height:700px}
+.net3d-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:linear-gradient(135deg,#0a1628,#132040);border-radius:var(--radius) var(--radius) 0 0;flex-wrap:wrap}
+.net3d-toolbar-left,.net3d-toolbar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.net3d-toolbar select{background:#1a2a4a;color:#b8d4ff;border:1px solid #2a4a7a;border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer}
+.net3d-toolbar select:hover{border-color:#4a7abf}
+.net3d-toggle{display:flex;align-items:center;gap:5px;color:#8ab4e8;font-size:12px;cursor:pointer;user-select:none}
+.net3d-toggle input{accent-color:#00d4ff}
+
+.cesium-container{width:100%;min-height:600px;height:65vh;background:#050d1a;position:relative;border-radius:0 0 var(--radius) var(--radius);overflow:hidden}
+.cesium-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#8ab4e8;z-index:10}
+.cesium-loader-ring{width:48px;height:48px;border:3px solid #1a3a6a;border-top-color:#00d4ff;border-radius:50%;animation:cesium-spin 1s linear infinite}
+@keyframes cesium-spin{to{transform:rotate(360deg)}}
+
+.cesium-fallback{padding:40px;text-align:center;color:#8ab4e8}
+.cesium-fallback-icon{font-size:64px;margin-bottom:16px;filter:drop-shadow(0 0 20px #00d4ff)}
+.cesium-fallback h3{color:#00d4ff;font-size:20px;margin:0 0 12px}
+.cesium-fallback p{color:#6a8ab8;max-width:500px;margin:8px auto;line-height:1.5}
+.cesium-fallback-routes{margin-top:24px;text-align:left;max-width:600px;margin-left:auto;margin-right:auto}
+.cesium-fallback-routes h4{color:#00ff88;margin:0 0 12px;font-size:14px}
+.cesium-fallback-route{padding:8px 12px;margin:6px 0;background:#0a1a30;border:1px solid #1a3a5a;border-radius:8px;color:#8ab4e8;font-size:13px}
+.cesium-fallback-route strong{color:#00d4ff}
+
+.net3d-legend{position:absolute;bottom:70px;right:16px;background:rgba(5,13,26,0.9);border:1px solid #1a3a6a;border-radius:12px;padding:14px 18px;z-index:5;backdrop-filter:blur(8px);min-width:160px}
+.net3d-legend-title{color:#6a8ab8;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;font-weight:700}
+.net3d-legend-item{display:flex;align-items:center;gap:8px;padding:3px 0;color:#b8d4ff;font-size:12px}
+.net3d-legend-swatch{width:14px;height:14px;border-radius:3px;flex-shrink:0}
+
+.net3d-stats{display:flex;align-items:center;justify-content:center;gap:24px;padding:12px 16px;background:linear-gradient(135deg,#0a1628,#132040);border-radius:0 0 var(--radius) var(--radius);margin-top:-1px}
+.net3d-stat{display:flex;flex-direction:column;align-items:center;gap:2px}
+.net3d-stat-val{font-size:20px;font-weight:800;color:#00d4ff;text-shadow:0 0 8px rgba(0,212,255,0.4)}
+.net3d-stat-lbl{font-size:11px;color:#6a8ab8;text-transform:uppercase;letter-spacing:0.05em}
+
+/* dark theme overrides for 3D view (already dark by design, minimal changes needed) */
+[data-theme="dark"] .net3d-toolbar{background:linear-gradient(135deg,#060e1a,#0d1830)}
+[data-theme="dark"] .net3d-stats{background:linear-gradient(135deg,#060e1a,#0d1830)}
