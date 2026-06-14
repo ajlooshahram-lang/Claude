@@ -32,7 +32,7 @@ ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard rende
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 
 // 2) navigate every view (simulate clicks)
-const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","raci","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","documents","report","audit","config","help","repair","clientview"];
+const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","raci","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","workflows","documents","report","audit","config","help","repair","clientview"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -819,6 +819,17 @@ if (clientNavBtn) clientNavBtn.dispatchEvent(new window.Event("click", { bubbles
 var clientContent = doc.getElementById("content").innerHTML;
 ok(/client-progress-bar-fill/.test(clientContent) && /Progress Indicators/.test(clientContent), "Client Portal renders progress indicators");
 ok(!/FMEA/.test(clientContent) && !/RPN/.test(clientContent), "Client Portal does NOT show FMEA/RPN scores");
+
+// 57) Custom Workflow Engine
+var wfNavBtn = doc.querySelector('.nav-item[data-view="workflows"]');
+ok(wfNavBtn != null, "Workflows nav item exists");
+
+if (wfNavBtn) wfNavBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+var wfTemplates = doc.getElementById("workflowTemplates");
+ok(wfTemplates != null && wfTemplates.querySelectorAll(".wf-template-card").length > 0, "Workflows view renders template cards");
+
+var wfList = S.listWorkflows();
+ok(wfList.length >= 3, "Default workflow templates are pre-seeded (3+)");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

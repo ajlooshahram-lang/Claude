@@ -246,6 +246,7 @@
     { id: "scorecard", label: "KPI Scorecard", icon: "▣" },
     { id: "health", label: "Data Health", icon: "✚" },
     { g: "Setup" },
+    { id: "workflows", label: "Workflows", icon: "⇉" },
     { id: "documents", label: "Documents", icon: "📄" },
     { id: "report", label: "Report Pack", icon: "🖨" },
     { id: "audit", label: "History & Backups", icon: "⟲" },
@@ -2688,6 +2689,141 @@
         <div class="readout" style="margin-top:12px"><b>AI recommendation:</b> ${esc(c.ai)}</div></div>`;
   };
   AFTER.impact = function () { const s = $("#impactSel"); if (s) s.addEventListener("change", () => { uiState.impactCase = s.value; go("impact"); }); };
+
+  // ---------- Workflow Engine ----------
+  RENDER.workflows = function () {
+    var templates = S.listWorkflows();
+    var instances = (S.get().workflowInstances || []).filter(function(inst) { return inst.status; });
+    var inProgress = instances.filter(function(inst) { return inst.status === "in-progress"; });
+    var completed = instances.filter(function(inst) { return inst.status === "completed"; });
+    var rejected = instances.filter(function(inst) { return inst.status === "rejected"; });
+
+    // Render template cards with stage pipeline
+    var templateCards = templates.map(function(wf) {
+      var pipeline = wf.stages.map(function(st, idx) {
+        var circle = '<span class="wf-stage-circle" style="display:inline-block;width:18px;height:18px;border-radius:50%;background:#2e5496;color:#fff;font-size:10px;text-align:center;line-height:18px">' + (idx + 1) + '</span>';
+        var label = '<span class="wf-stage-label" style="font-size:11px;margin:0 2px">' + esc(st.name) + '</span>';
+        var arrow = idx < wf.stages.length - 1 ? '<span style="margin:0 4px;color:#999">→</span>' : '';
+        return circle + label + arrow;
+      }).join('');
+      return '<div class="card wf-template-card" data-wfid="' + wf.id + '" style="margin-bottom:12px;padding:14px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+          '<h4 style="margin:0">' + esc(wf.name) + '</h4>' +
+          '<button class="btn btn-sm btn-delete-wf" data-wfid="' + wf.id + '" title="Delete workflow">✕</button>' +
+        '</div>' +
+        '<div class="wf-pipeline" style="margin-top:8px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">' + pipeline + '</div>' +
+        '<div style="margin-top:8px"><span class="badge" style="background:#eee;padding:2px 8px;border-radius:3px;font-size:11px">' + wf.stages.length + ' stages</span></div>' +
+      '</div>';
+    }).join('');
+
+    // Render active instances grouped by status
+    function renderInstanceGroup(title, list, color) {
+      if (list.length === 0) return '<p class="muted" style="margin:4px 0">No ' + title.toLowerCase() + ' instances.</p>';
+      var rows = list.map(function(inst) {
+        var wf = templates.find(function(w) { return w.id === inst.workflowId; });
+        var totalStages = (wf && wf.stages) ? wf.stages.length : 1;
+        var pct = inst.status === "completed" ? 100 : Math.round((inst.currentStage / (totalStages - 1)) * 100);
+        var stageName = (wf && wf.stages[inst.currentStage]) ? wf.stages[inst.currentStage].name : "Unknown";
+        return '<tr><td>' + esc(inst.workflowName || "") + '</td><td>' + esc(inst.entityType || "") + '</td>' +
+          '<td>' + esc(stageName) + '</td><td>' + pct + '%</td>' +
+          '<td><span class="badge" style="background:' + color + ';color:#fff;padding:2px 8px;border-radius:3px;font-size:11px">' + inst.status + '</span></td></tr>';
+      }).join('');
+      return '<table class="tbl"><thead><tr><th>Workflow</th><th>Entity</th><th>Stage</th><th>Progress</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+
+    return '<div class="card" style="margin-bottom:16px">' +
+      '<div class="card-head"><h3>Workflow Templates <span class="badge" style="background:#2e5496;color:#fff;padding:2px 8px;border-radius:3px;font-size:11px">' + templates.length + '</span></h3>' +
+      '<button class="btn btn-primary btn-sm" id="btnCreateWorkflow">Create Workflow</button></div>' +
+      '<div id="workflowTemplates">' + (templateCards || '<p class="muted">No workflow templates.</p>') + '</div>' +
+    '</div>' +
+    '<div class="card" style="margin-bottom:12px">' +
+      '<h3>Active Instances</h3>' +
+      '<h4 style="color:#1565c0">In Progress (' + inProgress.length + ')</h4>' +
+      renderInstanceGroup("In Progress", inProgress, "#1565c0") +
+      '<h4 style="color:#2e7d32;margin-top:12px">Completed (' + completed.length + ')</h4>' +
+      renderInstanceGroup("Completed", completed, "#2e7d32") +
+      '<h4 style="color:#c62828;margin-top:12px">Rejected (' + rejected.length + ')</h4>' +
+      renderInstanceGroup("Rejected", rejected, "#c62828") +
+    '</div>' +
+    '<div id="wfFormModal" class="modal-overlay" style="display:none">' +
+      '<div class="modal" style="max-width:540px">' +
+        '<h3>Create Workflow</h3>' +
+        '<div style="display:flex;flex-direction:column;gap:10px">' +
+          '<input type="text" id="wfName" placeholder="Workflow name" style="padding:6px;border:1px solid #ccc;border-radius:4px" />' +
+          '<div id="wfStagesContainer">' +
+            '<div class="wf-stage-row" style="display:flex;gap:6px;margin-bottom:6px">' +
+              '<input type="text" class="wf-stage-input" placeholder="Stage 1 name" style="flex:1;padding:6px;border:1px solid #ccc;border-radius:4px" />' +
+              '<input type="text" class="wf-stage-approver" placeholder="Approver" style="flex:1;padding:6px;border:1px solid #ccc;border-radius:4px" />' +
+            '</div>' +
+          '</div>' +
+          '<button class="btn btn-sm" id="wfAddStageBtn">+ Add Stage</button>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">' +
+          '<button class="btn" id="wfFormCancel">Cancel</button>' +
+          '<button class="btn btn-primary" id="wfFormSave">Save</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  };
+
+  AFTER.workflows = function () {
+    var createBtn = $("#btnCreateWorkflow");
+    if (createBtn) {
+      createBtn.addEventListener("click", function() {
+        var modal = $("#wfFormModal");
+        if (modal) modal.style.display = "flex";
+      });
+    }
+    var cancelBtn = $("#wfFormCancel");
+    if (cancelBtn) {
+      cancelBtn.addEventListener("click", function() {
+        var modal = $("#wfFormModal");
+        if (modal) modal.style.display = "none";
+      });
+    }
+    var addStageBtn = $("#wfAddStageBtn");
+    if (addStageBtn) {
+      addStageBtn.addEventListener("click", function() {
+        var container = $("#wfStagesContainer");
+        if (!container) return;
+        var count = container.querySelectorAll(".wf-stage-row").length + 1;
+        var row = doc.createElement("div");
+        row.className = "wf-stage-row";
+        row.style.cssText = "display:flex;gap:6px;margin-bottom:6px";
+        row.innerHTML = '<input type="text" class="wf-stage-input" placeholder="Stage ' + count + ' name" style="flex:1;padding:6px;border:1px solid #ccc;border-radius:4px" />' +
+          '<input type="text" class="wf-stage-approver" placeholder="Approver" style="flex:1;padding:6px;border:1px solid #ccc;border-radius:4px" />';
+        container.appendChild(row);
+      });
+    }
+    var saveBtn = $("#wfFormSave");
+    if (saveBtn) {
+      saveBtn.addEventListener("click", function() {
+        var name = ($("#wfName") || {}).value || "";
+        if (!name) return;
+        var stageInputs = document.querySelectorAll(".wf-stage-input");
+        var approverInputs = document.querySelectorAll(".wf-stage-approver");
+        var stages = [];
+        for (var i = 0; i < stageInputs.length; i++) {
+          var sn = (stageInputs[i].value || "").trim();
+          var ap = approverInputs[i] ? (approverInputs[i].value || "").trim() : "";
+          if (sn) stages.push({ name: sn, approver: ap, requiredDocuments: [], autoAdvance: false });
+        }
+        if (stages.length > 0) {
+          S.addWorkflow({ name: name, stages: stages });
+          go("workflows");
+        }
+      });
+    }
+    // Delete workflow template buttons
+    var deleteBtns = document.querySelectorAll(".btn-delete-wf");
+    deleteBtns.forEach(function(btn) {
+      btn.addEventListener("click", function(e) {
+        e.stopPropagation();
+        var wfId = btn.getAttribute("data-wfid");
+        if (wfId) { S.deleteWorkflow(wfId); go("workflows"); }
+      });
+    });
+  };
 
   // ---------- Document Management ----------
   RENDER.documents = function () {

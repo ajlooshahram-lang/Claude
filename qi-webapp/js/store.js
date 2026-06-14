@@ -621,6 +621,216 @@
 
   var DOC_CATEGORIES_LIST = DOC_CATEGORIES;
 
+  // ---- Workflow Engine sub-store ----
+  // Default workflow templates pre-seeded on first load
+  var DEFAULT_WORKFLOWS = [
+    {
+      id: "wf_cable_landing_permit",
+      name: "Cable Landing Permit Approval",
+      stages: [
+        { name: "Draft", approver: "Project Manager", requiredDocuments: ["Application Form", "Route Survey"], autoAdvance: false },
+        { name: "Submitted to Authority", approver: "Regulatory Lead", requiredDocuments: ["Submission Receipt"], autoAdvance: false },
+        { name: "Under Review", approver: "Government Authority", requiredDocuments: ["Review Comments"], autoAdvance: false },
+        { name: "Approved/Rejected", approver: "Government Authority", requiredDocuments: ["Permit Certificate"], autoAdvance: false }
+      ],
+      createdAt: "2026-01-01T00:00:00.000Z",
+      deleted: false
+    },
+    {
+      id: "wf_payment_certificate",
+      name: "Payment Certificate",
+      stages: [
+        { name: "Draft", approver: "Quantity Surveyor", requiredDocuments: ["Measurement Sheet"], autoAdvance: false },
+        { name: "Contractor Submitted", approver: "Contractor PM", requiredDocuments: ["Invoice", "Progress Photos"], autoAdvance: false },
+        { name: "PM Certified", approver: "Project Manager", requiredDocuments: ["Certification Letter"], autoAdvance: false },
+        { name: "Client Approved", approver: "Client Representative", requiredDocuments: ["Approval Letter"], autoAdvance: false },
+        { name: "Paid", approver: "Finance Manager", requiredDocuments: ["Payment Receipt"], autoAdvance: true }
+      ],
+      createdAt: "2026-01-01T00:00:00.000Z",
+      deleted: false
+    },
+    {
+      id: "wf_variation_order",
+      name: "Variation Order",
+      stages: [
+        { name: "Proposed", approver: "Contractor PM", requiredDocuments: ["Variation Request"], autoAdvance: false },
+        { name: "Impact Assessed", approver: "Project Manager", requiredDocuments: ["Impact Assessment", "Cost Estimate"], autoAdvance: false },
+        { name: "Commercially Agreed", approver: "Commercial Manager", requiredDocuments: ["Agreement Letter"], autoAdvance: false },
+        { name: "Instructed", approver: "Client Representative", requiredDocuments: ["Instruction Notice"], autoAdvance: false },
+        { name: "Implemented", approver: "Project Manager", requiredDocuments: ["Completion Certificate"], autoAdvance: true }
+      ],
+      createdAt: "2026-01-01T00:00:00.000Z",
+      deleted: false
+    }
+  ];
+
+  function _workflows() {
+    var s = get();
+    if (!Array.isArray(s.workflows)) {
+      s.workflows = JSON.parse(JSON.stringify(DEFAULT_WORKFLOWS));
+    }
+    return s.workflows;
+  }
+
+  function _workflowInstances() {
+    var s = get();
+    if (!Array.isArray(s.workflowInstances)) s.workflowInstances = [];
+    return s.workflowInstances;
+  }
+
+  function addWorkflow(opts) {
+    opts = opts || {};
+    var wf = {
+      id: uid(),
+      name: opts.name || "Untitled Workflow",
+      stages: Array.isArray(opts.stages) ? opts.stages.map(function(st) {
+        return {
+          name: st.name || "",
+          approver: st.approver || "",
+          requiredDocuments: Array.isArray(st.requiredDocuments) ? st.requiredDocuments : [],
+          autoAdvance: !!st.autoAdvance
+        };
+      }) : [],
+      createdAt: new Date().toISOString(),
+      deleted: false
+    };
+    _workflows().push(wf);
+    logAudit("Added", "Workflow", (wf.name || "").slice(0, 60));
+    save();
+    return wf;
+  }
+
+  function listWorkflows() {
+    return _workflows().filter(function(w) { return !w.deleted; });
+  }
+
+  function deleteWorkflow(id) {
+    var wfs = _workflows();
+    var idx = -1;
+    for (var i = 0; i < wfs.length; i++) { if (wfs[i].id === id) { idx = i; break; } }
+    if (idx < 0) return false;
+    wfs[idx].deleted = true;
+    logAudit("Deleted", "Workflow", (wfs[idx].name || "").slice(0, 60));
+    save();
+    return true;
+  }
+
+  function startWorkflowInstance(workflowId, entityId, entityType) {
+    var wf = _workflows().find(function(w) { return w.id === workflowId && !w.deleted; });
+    if (!wf || !wf.stages || wf.stages.length === 0) return null;
+    var instance = {
+      id: uid(),
+      workflowId: workflowId,
+      workflowName: wf.name,
+      entityId: entityId || "",
+      entityType: entityType || "",
+      currentStage: 0,
+      status: "in-progress",
+      history: [{
+        stage: 0,
+        stageName: wf.stages[0].name,
+        action: "started",
+        timestamp: new Date().toISOString(),
+        approver: ""
+      }],
+      startedAt: new Date().toISOString(),
+      completedAt: null,
+      rejectedAt: null,
+      rejectedReason: null
+    };
+    _workflowInstances().push(instance);
+    logAudit("Started", "Workflow Instance", (wf.name + " for " + (entityType || "entity")).slice(0, 60));
+    save();
+    return instance;
+  }
+
+  function advanceWorkflow(instanceId) {
+    var instances = _workflowInstances();
+    var inst = null;
+    for (var i = 0; i < instances.length; i++) { if (instances[i].id === instanceId) { inst = instances[i]; break; } }
+    if (!inst || inst.status !== "in-progress") return null;
+    var wf = _workflows().find(function(w) { return w.id === inst.workflowId; });
+    if (!wf) return null;
+    var nextStage = inst.currentStage + 1;
+    if (nextStage >= wf.stages.length) {
+      // Completing the workflow
+      inst.currentStage = wf.stages.length - 1;
+      inst.status = "completed";
+      inst.completedAt = new Date().toISOString();
+      inst.history.push({
+        stage: inst.currentStage,
+        stageName: wf.stages[inst.currentStage].name,
+        action: "completed",
+        timestamp: new Date().toISOString(),
+        approver: wf.stages[inst.currentStage].approver || ""
+      });
+    } else {
+      inst.history.push({
+        stage: nextStage,
+        stageName: wf.stages[nextStage].name,
+        action: "advanced",
+        timestamp: new Date().toISOString(),
+        approver: wf.stages[inst.currentStage].approver || ""
+      });
+      inst.currentStage = nextStage;
+    }
+    logAudit("Advanced", "Workflow Instance", (inst.workflowName || "").slice(0, 60));
+    save();
+    return inst;
+  }
+
+  function rejectWorkflow(instanceId, reason) {
+    var instances = _workflowInstances();
+    var inst = null;
+    for (var i = 0; i < instances.length; i++) { if (instances[i].id === instanceId) { inst = instances[i]; break; } }
+    if (!inst || inst.status !== "in-progress") return null;
+    var wf = _workflows().find(function(w) { return w.id === inst.workflowId; });
+    inst.status = "rejected";
+    inst.rejectedAt = new Date().toISOString();
+    inst.rejectedReason = reason || "";
+    var stageName = (wf && wf.stages[inst.currentStage]) ? wf.stages[inst.currentStage].name : "";
+    inst.history.push({
+      stage: inst.currentStage,
+      stageName: stageName,
+      action: "rejected",
+      timestamp: new Date().toISOString(),
+      approver: (wf && wf.stages[inst.currentStage]) ? wf.stages[inst.currentStage].approver : "",
+      reason: reason || ""
+    });
+    logAudit("Rejected", "Workflow Instance", (inst.workflowName || "").slice(0, 60));
+    save();
+    return inst;
+  }
+
+  function getWorkflowStatus(instanceId) {
+    var instances = _workflowInstances();
+    var inst = null;
+    for (var i = 0; i < instances.length; i++) { if (instances[i].id === instanceId) { inst = instances[i]; break; } }
+    if (!inst) return null;
+    var wf = _workflows().find(function(w) { return w.id === inst.workflowId; });
+    var totalStages = (wf && wf.stages) ? wf.stages.length : 0;
+    var currentStageName = (wf && wf.stages[inst.currentStage]) ? wf.stages[inst.currentStage].name : "";
+    var progress = totalStages > 0 ? Math.round((inst.currentStage / (totalStages - 1)) * 100) : 0;
+    if (inst.status === "completed") progress = 100;
+    return {
+      id: inst.id,
+      workflowId: inst.workflowId,
+      workflowName: inst.workflowName,
+      entityId: inst.entityId,
+      entityType: inst.entityType,
+      currentStage: inst.currentStage,
+      currentStageName: currentStageName,
+      totalStages: totalStages,
+      status: inst.status,
+      progress: progress,
+      history: inst.history,
+      startedAt: inst.startedAt,
+      completedAt: inst.completedAt,
+      rejectedAt: inst.rejectedAt,
+      rejectedReason: inst.rejectedReason
+    };
+  }
+
   const API = { uid, seed, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
     undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete, togglePin, reorderPin,
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
@@ -632,7 +842,8 @@
     gage, setGageCell, setGageConfig, gageResult, cashflow, setCashflow,
     xbar, setXbarCell, setXbarConfig, xbarResult, scorecard,
     spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy,
-    addDocument, listDocuments, updateDocument, deleteDocument, DOC_CATEGORIES: DOC_CATEGORIES_LIST };
+    addDocument, listDocuments, updateDocument, deleteDocument, DOC_CATEGORIES: DOC_CATEGORIES_LIST,
+    addWorkflow, listWorkflows, deleteWorkflow, startWorkflowInstance, advanceWorkflow, rejectWorkflow, getWorkflowStatus };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);
