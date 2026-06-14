@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Implement all remaining CRUD route files (Projects, Registers, Snapshots, Share Tokens), security hardening (MFA encryption, password change, session cleanup), and wire them into app.ts. This is Parts A, B, C of the user requirements.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Create server/src/auth/crypto.ts: AES-256-GCM encrypt/decrypt functions using DATA_ENCRYPTION_KEY from config. If key is not set, fall back to plaintext with console.warn. Export encrypt(plaintext, key?) and decrypt(ciphertext, key?) functions.",
     "Create server/src/routes/projects.ts following the exact pattern of cases.ts: GET /projects (list, tenant-scoped, deletedAt null), GET /projects/:id, POST /projects (name required, all other Project fields optional), PATCH /projects/:id, DELETE /projects/:id (soft-delete). Zod schemas for create/update bodies. Use authenticate + requireRole hooks.",

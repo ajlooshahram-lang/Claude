@@ -2,9 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import prisma from "../db.js";
 import { hashPassword, verifyPassword } from "./password.js";
-import { generateSessionToken, createSession, hashToken, revokeSession } from "./session.js";
+import { generateSessionToken, createSession, hashToken, revokeSession, revokeAllUserSessions } from "./session.js";
 import { generateTotpSecret, verifyTotpToken } from "./totp.js";
+import { encrypt, decrypt } from "./crypto.js";
 import { authenticate } from "../middleware/rbac.js";
+import { loadConfig } from "../config.js";
 import { authenticator } from "otplib";
 
 const SEVEN_DAYS_SEC = 7 * 24 * 60 * 60;
@@ -27,6 +29,11 @@ const MfaVerifyBody = z.object({
   token: z.string().length(6),
 });
 
+const ChangePasswordBody = z.object({
+  currentPassword: z.string().min(8).max(128),
+  newPassword: z.string().min(8).max(128),
+});
+
 function cookieOptions(isProd: boolean) {
   return {
     httpOnly: true,
@@ -39,6 +46,7 @@ function cookieOptions(isProd: boolean) {
 
 export default async function authRoutes(app: FastifyInstance): Promise<void> {
   const isProd = process.env["NODE_ENV"] === "production";
+  const config = loadConfig();
 
   // POST /auth/register
   app.post(
@@ -143,7 +151,8 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
         if (!mfaToken) {
           return reply.code(200).send({ mfaRequired: true });
         }
-        const mfaValid = verifyTotpToken(user.mfaSecret, mfaToken);
+        const decryptedSecret = decrypt(user.mfaSecret, config.dataEncryptionKey);
+        const mfaValid = verifyTotpToken(decryptedSecret, mfaToken);
         if (!mfaValid) {
           return reply.code(401).send({ error: "Invalid credentials" });
         }
@@ -216,10 +225,11 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: [authenticate] },
     async (request, _reply) => {
       const secret = generateTotpSecret();
+      const encryptedSecret = encrypt(secret, config.dataEncryptionKey);
 
       await prisma.user.update({
         where: { id: request.user.id },
-        data: { mfaSecret: secret },
+        data: { mfaSecret: encryptedSecret },
       });
 
       const otpauthUrl = authenticator.keyuri(
@@ -251,7 +261,8 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: "MFA not enrolled" });
       }
 
-      const valid = verifyTotpToken(user.mfaSecret, token);
+      const decryptedSecret = decrypt(user.mfaSecret, config.dataEncryptionKey);
+      const valid = verifyTotpToken(decryptedSecret, token);
       if (!valid) {
         return reply.code(400).send({ error: "Invalid TOTP token" });
       }
@@ -260,6 +271,57 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
         where: { id: request.user.id },
         data: { mfaEnabled: true },
       });
+
+      // Revoke all sessions except current after MFA enrollment verification
+      const sessionToken = request.cookies?.["session"];
+      if (sessionToken) {
+        const currentHash = hashToken(sessionToken);
+        await revokeAllUserSessions(prisma, request.user.id, currentHash);
+      }
+
+      return { ok: true };
+    },
+  );
+
+  // POST /auth/change-password
+  app.post(
+    "/auth/change-password",
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const parsed = ChangePasswordBody.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "Invalid request body" });
+      }
+      const { currentPassword, newPassword } = parsed.data;
+
+      // Fetch the current user with password hash
+      const user = await prisma.user.findUnique({
+        where: { id: request.user.id },
+      });
+
+      if (!user) {
+        return reply.code(401).send({ error: "Unauthorized" });
+      }
+
+      // Verify current password
+      const valid = await verifyPassword(user.passwordHash, currentPassword);
+      if (!valid) {
+        return reply.code(401).send({ error: "Invalid credentials" });
+      }
+
+      // Hash new password and update
+      const newHash = await hashPassword(newPassword);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash: newHash },
+      });
+
+      // Revoke all sessions except current
+      const sessionToken = request.cookies?.["session"];
+      if (sessionToken) {
+        const currentHash = hashToken(sessionToken);
+        await revokeAllUserSessions(prisma, user.id, currentHash);
+      }
 
       return { ok: true };
     },

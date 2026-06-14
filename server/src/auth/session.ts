@@ -62,3 +62,34 @@ export async function revokeSession(
     data: { revokedAt: new Date() },
   });
 }
+
+/** Delete expired or revoked sessions (actual DELETE, not soft-delete). */
+export async function cleanExpiredSessions(prisma: PrismaClient): Promise<void> {
+  await prisma.session.deleteMany({
+    where: {
+      OR: [
+        { expiresAt: { lt: new Date() } },
+        { revokedAt: { not: null } },
+      ],
+    },
+  });
+}
+
+/** Revoke all sessions for a user, optionally excluding one (e.g. the current session). */
+export async function revokeAllUserSessions(
+  prisma: PrismaClient,
+  userId: string,
+  exceptTokenHash?: string,
+): Promise<void> {
+  const where: Record<string, unknown> = {
+    userId,
+    revokedAt: null,
+  };
+  if (exceptTokenHash) {
+    where["tokenHash"] = { not: exceptTokenHash };
+  }
+  await prisma.session.updateMany({
+    where: where as never,
+    data: { revokedAt: new Date() },
+  });
+}
