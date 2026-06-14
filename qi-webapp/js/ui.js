@@ -105,8 +105,11 @@
   }
 
   let current = "dashboard";
+  let viewCleanup = null; // teardown function for the current view (e.g. Cesium destroy)
   function go(view, opts) {
     if (!RENDER[view]) view = "dashboard";
+    // Teardown previous view (destroy Cesium viewer, cancel animation frames, etc.)
+    if (viewCleanup) { try { viewCleanup(); } catch (e) {} viewCleanup = null; }
     current = view;
     $("#viewTitle").textContent = TITLES[view] || "QI Platform";
     document.querySelectorAll(".nav-item").forEach(b => {
@@ -703,7 +706,7 @@
       <div class="card"><h3>CesiumJS / 3D Map</h3>
         <p class="muted" style="margin-top:-6px">Enter your Cesium Ion access token to enable terrain and imagery on the 3D Network view. Get a free token at <a href="https://ion.cesium.com/tokens" target="_blank">ion.cesium.com/tokens</a>.</p>
         <div class="form-grid">
-          <div class="field full"><label>Cesium Ion access token</label><input type="text" id="cesium_token" value="${esc(b.cesiumToken || "")}" placeholder="eyJhbGciOi..."></div>
+          <div class="field full"><label>Cesium Ion access token</label><input type="text" id="cesium_token" value="${esc(S.cesiumToken ? S.cesiumToken() : (b.cesiumToken || ""))}" placeholder="eyJhbGciOi..."></div>
         </div>
         <div style="margin-top:14px"><button class="btn btn-primary" data-act="savecesium">Save token</button></div></div>
 
@@ -824,14 +827,19 @@
 
     // Cesium is available - initialize 3D globe
     var Cesium = window.Cesium;
-    var token = (S.brand() && S.brand().cesiumToken) || "";
+    var token = S.cesiumToken ? S.cesiumToken() : ((S.brand() && S.brand().cesiumToken) || "");
     if (token) Cesium.Ion.defaultAccessToken = token;
 
     var loadingEl = document.getElementById("cesiumLoading");
 
     try {
+      // Use the modern Terrain API (Cesium 1.114+); fall back gracefully if unavailable
+      var terrainOpt = (Cesium.Terrain && Cesium.Terrain.fromWorldTerrain)
+        ? Cesium.Terrain.fromWorldTerrain({ requestWaterMask: true, requestVertexNormals: true })
+        : undefined;
+
       cesiumViewer = new Cesium.Viewer("cesiumContainer", {
-        terrain: Cesium.Terrain.fromWorldTerrain ? undefined : undefined,
+        terrain: terrainOpt,
         baseLayerPicker: false,
         geocoder: false,
         homeButton: true,
@@ -847,11 +855,6 @@
         shouldAnimate: true,
         scene3DOnly: false
       });
-
-      // Set terrain
-      try {
-        cesiumViewer.scene.terrainProvider = Cesium.createWorldTerrain({ requestWaterMask: true, requestVertexNormals: true });
-      } catch (e) { /* terrain might fail without token */ }
 
       // Dark atmosphere for dramatic fiber-optic aesthetic
       cesiumViewer.scene.skyAtmosphere.brightnessShift = -0.3;
@@ -1102,6 +1105,14 @@
         duration: 2
       });
     });
+
+    // Register teardown so go() can destroy viewer + cancel RAF on navigation away
+    viewCleanup = function () {
+      animationRunning = false;
+      if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+      if (cesiumViewer && !cesiumViewer.isDestroyed()) { cesiumViewer.destroy(); }
+      cesiumViewer = null;
+    };
   };
 
   RENDER.help = function () {
@@ -2372,7 +2383,8 @@
       toast("AI settings saved.");
     }
     else if (act === "savecesium") {
-      S.setBrand({ cesiumToken: $("#cesium_token").value });
+      if (S.setCesiumToken) S.setCesiumToken($("#cesium_token").value);
+      else S.setBrand({ cesiumToken: $("#cesium_token").value });
       toast("Cesium token saved.");
     }
     else if (act === "regadd") { S.regAdd(b.dataset.reg, {}); go(b.dataset.reg); }

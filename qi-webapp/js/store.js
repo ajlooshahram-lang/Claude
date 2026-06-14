@@ -261,7 +261,8 @@
     return {
       activeId: id, order: [id], projects: { [id]: seed() },
       brand: { company: "", logo: "", accent: "#2e5496" },
-      ai: { provider: "openai", baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini", key: "" }
+      ai: { provider: "openai", baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini", key: "" },
+      secrets: {}
     };
   }
   function normalizeWs(w) {
@@ -271,6 +272,7 @@
     if (!w.activeId || !w.projects[w.activeId]) w.activeId = w.order[0];
     w.brand = w.brand || { company: "", logo: "", accent: "#2e5496" };
     w.ai = w.ai || { provider: "openai", baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini", key: "" };
+    w.secrets = w.secrets || {};
     w.order.forEach(id => normalize(w.projects[id]));
     return w;
   }
@@ -332,6 +334,26 @@
   function setBrand(patch) { Object.assign(workspace().brand, patch); save(); }
   function aiSettings() { return workspace().ai; }
   function setAi(patch) { Object.assign(workspace().ai, patch); save(); }
+
+  // ---- secrets (credentials stored separately from exportable brand) ----
+  function cesiumToken() {
+    var s = workspace().secrets;
+    // Migrate: if token still lives in brand, move it to secrets
+    if ((!s || !s.cesiumToken) && workspace().brand && workspace().brand.cesiumToken) {
+      if (!s) { workspace().secrets = {}; s = workspace().secrets; }
+      s.cesiumToken = workspace().brand.cesiumToken;
+      delete workspace().brand.cesiumToken;
+      save();
+    }
+    return (s && s.cesiumToken) || "";
+  }
+  function setCesiumToken(token) {
+    if (!workspace().secrets) workspace().secrets = {};
+    workspace().secrets.cesiumToken = token || "";
+    // Remove from brand if still there (migration cleanup)
+    if (workspace().brand && workspace().brand.cesiumToken) delete workspace().brand.cesiumToken;
+    save();
+  }
 
   // ---- portfolio rollup across all projects ----
   function portfolio() {
@@ -649,7 +671,7 @@
     auditList, clearAudit, takeSnapshot, snapshots, restoreSnapshot, deleteSnapshot, renameSnapshot, diffSnapshots, paretoRPN, controlChartData,
     savedViews, saveView, deleteSavedView,
     listProjects, activeProjectId, switchProject, addProject, renameProject, duplicateProject, deleteProject, importAsProject,
-    brand, setBrand, aiSettings, setAi, portfolio,
+    brand, setBrand, aiSettings, setAi, cesiumToken, setCesiumToken, portfolio,
     regRows, regAdd, regUpdate, regDelete, regLabel, regBulkDelete, regTogglePin, evm: () => C.evm(validCases(), get().project),
     gage, setGageCell, setGageConfig, gageResult, cashflow, setCashflow,
     xbar, setXbarCell, setXbarConfig, xbarResult, scorecard,
