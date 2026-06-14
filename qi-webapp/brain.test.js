@@ -326,5 +326,124 @@ console.log("\n-- determinism: analyzeStatus same input -> same output --");
   ok(run2 === run3, "analyzeStatus deterministic: run2 === run3");
 })();
 
+// ============================================================================
+// Vendor Directory Tests
+// ============================================================================
+
+console.log("\n-- vendor directory: data completeness --");
+(function () {
+  var profile = B._profiles.find(function (p) { return p.id === "fibre-telecom"; });
+  var vendors = profile.vendors;
+  ok(Array.isArray(vendors), "vendors is an array");
+  ok(vendors.length >= 35, "vendors array has >= 35 entries (got " + vendors.length + ")");
+
+  // All vendors have required fields
+  var requiredFields = ["id", "company", "hq", "category", "capabilities"];
+  var allHaveRequired = vendors.every(function (v) {
+    return requiredFields.every(function (f) { return v[f] !== undefined && v[f] !== null; });
+  });
+  ok(allHaveRequired, "all vendors have required fields (id, company, hq, category, capabilities)");
+
+  // All vendors have full set of fields
+  var fullFields = ["id", "company", "hq", "category", "capabilities", "products", "notableProjects", "website", "priceRange", "leadTime", "strengths", "considerations"];
+  var allHaveFull = vendors.every(function (v) {
+    return fullFields.every(function (f) { return v[f] !== undefined && v[f] !== null; });
+  });
+  ok(allHaveFull, "all vendors have complete field set (12 fields each)");
+
+  // Check all categories are represented
+  var categories = ["turnkey-systems", "cable-manufacturers", "installation-vessels", "survey-engineering", "equipment-components", "landing-stations", "consulting"];
+  var presentCats = categories.filter(function (cat) {
+    return vendors.some(function (v) { return v.category === cat; });
+  });
+  ok(presentCats.length === categories.length, "all 7 vendor categories represented (got " + presentCats.length + ")");
+
+  // Unique IDs
+  var ids = vendors.map(function (v) { return v.id; });
+  var uniqueIds = ids.filter(function (id, i) { return ids.indexOf(id) === i; });
+  ok(uniqueIds.length === vendors.length, "all vendor IDs are unique");
+})();
+
+console.log("\n-- vendorSearch: by category --");
+(function () {
+  var turnkey = B.vendorSearch({ category: "turnkey-systems" });
+  ok(turnkey.length === 4, "vendorSearch category=turnkey-systems returns 4 vendors (got " + turnkey.length + ")");
+  ok(turnkey.every(function (v) { return v.category === "turnkey-systems"; }), "all returned vendors have correct category");
+
+  var cableMfg = B.vendorSearch({ category: "cable-manufacturers" });
+  ok(cableMfg.length === 10, "vendorSearch category=cable-manufacturers returns 10 vendors (got " + cableMfg.length + ")");
+
+  var consulting = B.vendorSearch({ category: "consulting" });
+  ok(consulting.length === 5, "vendorSearch category=consulting returns 5 vendors (got " + consulting.length + ")");
+})();
+
+console.log("\n-- vendorSearch: by region --");
+(function () {
+  var asiaVendors = B.vendorSearch({ region: "asia" });
+  ok(asiaVendors.length > 0, "vendorSearch region=asia returns vendors (got " + asiaVendors.length + ")");
+  ok(asiaVendors.some(function (v) { return v.hq === "Japan"; }), "asia region includes Japanese vendors");
+  ok(asiaVendors.some(function (v) { return v.hq === "China"; }), "asia region includes Chinese vendors");
+
+  var europeVendors = B.vendorSearch({ region: "europe" });
+  ok(europeVendors.length > 0, "vendorSearch region=europe returns vendors (got " + europeVendors.length + ")");
+  ok(europeVendors.some(function (v) { return v.hq === "France"; }), "europe region includes French vendors");
+  ok(europeVendors.some(function (v) { return v.hq === "United Kingdom"; }), "europe region includes UK vendors");
+
+  // Direct HQ match
+  var japanVendors = B.vendorSearch({ region: "Japan" });
+  ok(japanVendors.length >= 3, "vendorSearch region=Japan returns Japanese vendors (got " + japanVendors.length + ")");
+})();
+
+console.log("\n-- vendorSearch: by capability --");
+(function () {
+  var submarineCapable = B.vendorSearch({ capability: "submarine" });
+  ok(submarineCapable.length > 10, "vendorSearch capability=submarine returns many vendors (got " + submarineCapable.length + ")");
+
+  var coherent = B.vendorSearch({ capability: "coherent" });
+  ok(coherent.length >= 2, "vendorSearch capability=coherent finds optical vendors (got " + coherent.length + ")");
+})();
+
+console.log("\n-- vendorSearch: by budgetTier --");
+(function () {
+  var premium = B.vendorSearch({ budgetTier: "premium" });
+  ok(premium.length > 0, "vendorSearch budgetTier=premium returns vendors (got " + premium.length + ")");
+  ok(premium.every(function (v) { return v.priceRange === "premium"; }), "all premium results have priceRange=premium");
+
+  var competitive = B.vendorSearch({ budgetTier: "competitive" });
+  ok(competitive.length > 0, "vendorSearch budgetTier=competitive returns vendors (got " + competitive.length + ")");
+  ok(competitive.every(function (v) { return v.priceRange === "competitive"; }), "all competitive results have priceRange=competitive");
+})();
+
+console.log("\n-- vendorSearch: combined criteria --");
+(function () {
+  var asianCable = B.vendorSearch({ category: "cable-manufacturers", region: "asia" });
+  ok(asianCable.length >= 4, "combined search (Asian cable mfg) returns results (got " + asianCable.length + ")");
+  ok(asianCable.every(function (v) { return v.category === "cable-manufacturers"; }), "combined results match category");
+})();
+
+console.log("\n-- vendorComparison: structured comparison --");
+(function () {
+  var result = B.vendorComparison(["v-subcom", "v-asn", "v-nec"]);
+  ok(result.vendors.length === 3, "vendorComparison returns 3 selected vendors (got " + result.vendors.length + ")");
+  ok(typeof result.comparison === "object", "vendorComparison returns comparison object");
+  ok(Array.isArray(result.comparison.companies), "comparison has companies array");
+  ok(result.comparison.companies.length === 3, "comparison companies has 3 entries");
+  ok(result.comparison.companies[0] === "SubCom", "first company is SubCom");
+  ok(Array.isArray(result.comparison.priceRanges), "comparison has priceRanges array");
+  ok(Array.isArray(result.comparison.leadTimes), "comparison has leadTimes array");
+  ok(Array.isArray(result.comparison.strengths), "comparison has strengths array");
+  ok(Array.isArray(result.comparison.capabilities), "comparison has capabilities array");
+  ok(typeof result.summary === "string" && result.summary.length > 0, "comparison has summary string");
+  ok(result.summary.indexOf("SubCom") >= 0, "summary mentions vendor names");
+
+  // Test with invalid IDs
+  var empty = B.vendorComparison(["nonexistent-id"]);
+  ok(empty.vendors.length === 0, "vendorComparison with invalid IDs returns empty (got " + empty.vendors.length + ")");
+
+  // Test partial match
+  var partial = B.vendorComparison(["v-subcom", "nonexistent"]);
+  ok(partial.vendors.length === 1, "vendorComparison with one valid ID returns 1 vendor");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);
