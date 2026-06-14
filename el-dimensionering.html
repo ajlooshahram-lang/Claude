@@ -2559,6 +2559,330 @@ function renderCable() {
   `;
 }
 
+// ===== VOLTAGE DROP VISUALIZATION =====
+function buildVdropViz(vdrop, vdropPercent, Un, length) {
+  const W = 580, H = 200;
+  const cableY = 100, cableStartX = 80, cableEndX = W - 80;
+  const cableLen = cableEndX - cableStartX;
+
+  // Color stops based on actual voltage drop
+  const dropRatio = Math.min(vdropPercent / 6, 1);
+  const midColor = dropRatio < 0.5 ? '#ffd166' : '#ff8c42';
+  const endColor = dropRatio < 0.3 ? '#ffd166' : (dropRatio < 0.6 ? '#ff8c42' : '#ef476f');
+
+  // Threshold positions on cable
+  const pos3pct = Math.min(3 / Math.max(vdropPercent, 0.01), 1) * cableLen;
+  const pos5pct = Math.min(5 / Math.max(vdropPercent, 0.01), 1) * cableLen;
+
+  // Particles
+  const particles = [];
+  for (let i = 0; i < 8; i++) {
+    const delay = (i * 0.35).toFixed(2);
+    particles.push(`<circle r="3" fill="#00e5ff" opacity="0">
+      <animate attributeName="cx" from="${cableStartX}" to="${cableEndX}" dur="2.2s" begin="${delay}s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="${cableY};${cableY - 2};${cableY + 2};${cableY}" dur="2.2s" begin="${delay}s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;1;1;0" dur="2.2s" begin="${delay}s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="2;3.5;3;2" dur="2.2s" begin="${delay}s" repeatCount="indefinite"/>
+    </circle>`);
+  }
+
+  // Glow particles (larger, dimmer)
+  const glowParticles = [];
+  for (let i = 0; i < 5; i++) {
+    const delay = (i * 0.6 + 0.15).toFixed(2);
+    glowParticles.push(`<circle r="6" fill="#00e5ff" opacity="0" filter="url(#vdropBlur)">
+      <animate attributeName="cx" from="${cableStartX}" to="${cableEndX}" dur="2.2s" begin="${delay}s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="${cableY};${cableY - 1};${cableY + 1};${cableY}" dur="2.2s" begin="${delay}s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;0.4;0.4;0" dur="2.2s" begin="${delay}s" repeatCount="indefinite"/>
+    </circle>`);
+  }
+
+  const srcLabel = `${Un} V`;
+  const loadLabel = `${(Un - vdrop).toFixed(1)} V`;
+  const lengthLabel = `${length} m`;
+
+  // Threshold markers
+  const show3 = pos3pct < cableLen;
+  const show5 = pos5pct < cableLen;
+
+  return `
+  <div style="margin-top:16px;border-radius:12px;overflow:hidden;background:linear-gradient(135deg,#060d16 0%,#0a1628 50%,#060d16 100%);border:1px solid rgba(0,229,255,0.15);box-shadow:0 0 30px rgba(0,229,255,0.05),inset 0 0 60px rgba(0,0,0,0.3)">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+      <defs>
+        <filter id="vdropBlur"><feGaussianBlur stdDeviation="4"/></filter>
+        <filter id="vdropGlow">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        </filter>
+        <linearGradient id="cableGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#06d6a0"/>
+          <stop offset="40%" stop-color="${midColor}"/>
+          <stop offset="100%" stop-color="${endColor}"/>
+        </linearGradient>
+        <linearGradient id="cableGradGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#06d6a0" stop-opacity="0.6"/>
+          <stop offset="100%" stop-color="${endColor}" stop-opacity="0.6"/>
+        </linearGradient>
+        <radialGradient id="srcGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#06d6a0" stop-opacity="0.8"/>
+          <stop offset="100%" stop-color="#06d6a0" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="loadGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="${endColor}" stop-opacity="0.8"/>
+          <stop offset="100%" stop-color="${endColor}" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+
+      <!-- Background grid -->
+      <pattern id="vdGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+        <path d="M20 0L0 0 0 20" fill="none" stroke="rgba(0,229,255,0.04)" stroke-width="0.5"/>
+      </pattern>
+      <rect width="${W}" height="${H}" fill="url(#vdGrid)"/>
+
+      <!-- Cable glow (background) -->
+      <line x1="${cableStartX}" y1="${cableY}" x2="${cableEndX}" y2="${cableY}" 
+        stroke="url(#cableGradGlow)" stroke-width="12" stroke-linecap="round" filter="url(#vdropBlur)" opacity="0.5">
+        <animate attributeName="opacity" values="0.3;0.6;0.3" dur="3s" repeatCount="indefinite"/>
+      </line>
+
+      <!-- Cable body -->
+      <line x1="${cableStartX}" y1="${cableY}" x2="${cableEndX}" y2="${cableY}" 
+        stroke="url(#cableGrad)" stroke-width="6" stroke-linecap="round"/>
+
+      <!-- Cable outer shell (metallic) -->
+      <line x1="${cableStartX}" y1="${cableY - 4}" x2="${cableEndX}" y2="${cableY - 4}" 
+        stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+      <line x1="${cableStartX}" y1="${cableY + 4}" x2="${cableEndX}" y2="${cableY + 4}" 
+        stroke="rgba(0,0,0,0.3)" stroke-width="1"/>
+
+      <!-- 3% threshold marker -->
+      ${show3 ? `
+        <line x1="${cableStartX + pos3pct}" y1="${cableY - 22}" x2="${cableStartX + pos3pct}" y2="${cableY + 22}" 
+          stroke="#ffd166" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.8"/>
+        <text x="${cableStartX + pos3pct}" y="${cableY - 28}" text-anchor="middle" fill="#ffd166" font-size="10" font-weight="600">3%</text>
+      ` : ''}
+
+      <!-- 5% threshold marker -->
+      ${show5 ? `
+        <line x1="${cableStartX + pos5pct}" y1="${cableY - 22}" x2="${cableStartX + pos5pct}" y2="${cableY + 22}" 
+          stroke="#ef476f" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.8"/>
+        <text x="${cableStartX + pos5pct}" y="${cableY + 40}" text-anchor="middle" fill="#ef476f" font-size="10" font-weight="600">5%</text>
+      ` : ''}
+
+      <!-- Actual drop indicator -->
+      <line x1="${cableStartX + Math.min(1, vdropPercent / Math.max(vdropPercent, 0.01)) * cableLen}" y1="${cableY - 18}" 
+            x2="${cableStartX + Math.min(1, vdropPercent / Math.max(vdropPercent, 0.01)) * cableLen}" y2="${cableY + 18}" 
+            stroke="#00e5ff" stroke-width="2" opacity="0.9">
+        <animate attributeName="opacity" values="0.5;1;0.5" dur="1.5s" repeatCount="indefinite"/>
+      </line>
+
+      <!-- Animated particles (current flow) -->
+      ${particles.join('')}
+      ${glowParticles.join('')}
+
+      <!-- Source terminal -->
+      <circle cx="${cableStartX}" cy="${cableY}" r="20" fill="url(#srcGlow)" opacity="0.4">
+        <animate attributeName="r" values="18;22;18" dur="2.5s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="${cableStartX}" cy="${cableY}" r="8" fill="#060d16" stroke="#06d6a0" stroke-width="2.5"/>
+      <text x="${cableStartX}" y="${cableY + 4}" text-anchor="middle" fill="#06d6a0" font-size="7" font-weight="bold">S</text>
+
+      <!-- Load terminal -->
+      <circle cx="${cableEndX}" cy="${cableY}" r="20" fill="url(#loadGlow)" opacity="0.4">
+        <animate attributeName="r" values="18;22;18" dur="2.5s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="${cableEndX}" cy="${cableY}" r="8" fill="#060d16" stroke="${endColor}" stroke-width="2.5"/>
+      <text x="${cableEndX}" y="${cableY + 4}" text-anchor="middle" fill="${endColor}" font-size="7" font-weight="bold">L</text>
+
+      <!-- Voltage labels -->
+      <text x="${cableStartX}" y="${cableY - 38}" text-anchor="middle" fill="#06d6a0" font-size="12" font-weight="700" filter="url(#vdropGlow)">${srcLabel}</text>
+      <text x="${cableEndX}" y="${cableY - 38}" text-anchor="middle" fill="${endColor}" font-size="12" font-weight="700" filter="url(#vdropGlow)">${loadLabel}</text>
+
+      <!-- Length label -->
+      <text x="${(cableStartX + cableEndX) / 2}" y="${cableY + 50}" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="10">${lengthLabel}</text>
+
+      <!-- Drop percentage display -->
+      <text x="${(cableStartX + cableEndX) / 2}" y="${cableY - 55}" text-anchor="middle" fill="#00e5ff" font-size="14" font-weight="700" letter-spacing="1">
+        \u0394U = ${vdropPercent.toFixed(2)}%
+        <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite"/>
+      </text>
+
+      <!-- Direction arrow -->
+      <polygon points="${cableEndX - 25},${cableY - 12} ${cableEndX - 15},${cableY - 12} ${cableEndX - 15},${cableY - 15} ${cableEndX - 8},${cableY - 9} ${cableEndX - 15},${cableY - 3} ${cableEndX - 15},${cableY - 6} ${cableEndX - 25},${cableY - 6}" 
+        fill="#00e5ff" opacity="0.7">
+        <animate attributeName="opacity" values="0.4;0.9;0.4" dur="1.8s" repeatCount="indefinite"/>
+      </polygon>
+    </svg>
+  </div>`;
+}
+
+// ===== SHORT CIRCUIT VISUALIZATION =====
+function buildScViz(zNet, zTrafo, zCable, ikMax, ikMin, check1, check2) {
+  const W = 600, H = 240;
+  const zTotal = zNet + zTrafo + zCable;
+  if (zTotal <= 0) return '';
+
+  // Proportional segment widths
+  const segStart = 70, segEnd = W - 100;
+  const totalSegW = segEnd - segStart;
+  const wNet = Math.max(30, (zNet / zTotal) * totalSegW);
+  const wTrafo = Math.max(30, (zTrafo / zTotal) * totalSegW);
+  const wCable = Math.max(30, (zCable / zTotal) * totalSegW);
+  const scale = totalSegW / (wNet + wTrafo + wCable);
+  const sNet = wNet * scale, sTrafo = wTrafo * scale, sCable = wCable * scale;
+
+  const y = 120;
+  const x1 = segStart;
+  const x2 = x1 + sNet;
+  const x3 = x2 + sTrafo;
+  const x4 = x3 + sCable;
+
+  // Fault current particles (fast, red/orange)
+  const faultParticles = [];
+  for (let i = 0; i < 10; i++) {
+    const delay = (i * 0.18).toFixed(2);
+    const hue = 10 + (i % 3) * 15; // red to orange variation
+    faultParticles.push(`<circle r="2.5" fill="hsl(${hue},100%,55%)" opacity="0">
+      <animate attributeName="cx" from="${x1}" to="${x4}" dur="1.2s" begin="${delay}s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="${y};${y - 2};${y + 2};${y}" dur="1.2s" begin="${delay}s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;1;1;0" dur="1.2s" begin="${delay}s" repeatCount="indefinite"/>
+    </circle>`);
+  }
+  // Glow trail particles
+  const glowFault = [];
+  for (let i = 0; i < 6; i++) {
+    const delay = (i * 0.28 + 0.1).toFixed(2);
+    glowFault.push(`<circle r="5" fill="#ff4444" opacity="0" filter="url(#scBlur)">
+      <animate attributeName="cx" from="${x1}" to="${x4}" dur="1.2s" begin="${delay}s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="${y};${y}" dur="1.2s" begin="${delay}s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;0.35;0.35;0" dur="1.2s" begin="${delay}s" repeatCount="indefinite"/>
+    </circle>`);
+  }
+
+  // Lightning bolt path at fault point
+  const lx = x4 + 15;
+  const boltPath = `M${lx},${y - 25} L${lx - 5},${y - 8} L${lx + 2},${y - 8} L${lx - 7},${y + 20} L${lx + 3},${y + 2} L${lx - 3},${y + 2} Z`;
+
+  // Protection device (circuit breaker symbol)
+  const protX = x1 - 30;
+  const protOk = check1 && check2;
+
+  return `
+  <div style="margin-top:16px;border-radius:12px;overflow:hidden;background:linear-gradient(135deg,#060d16 0%,#10081a 50%,#060d16 100%);border:1px solid rgba(255,68,68,0.15);box-shadow:0 0 30px rgba(255,68,68,0.05),inset 0 0 60px rgba(0,0,0,0.3)">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+      <defs>
+        <filter id="scBlur"><feGaussianBlur stdDeviation="4"/></filter>
+        <filter id="scGlow">
+          <feGaussianBlur stdDeviation="2.5" result="blur"/>
+          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        </filter>
+        <filter id="boltGlow">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <linearGradient id="segNet" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#3282b8"/><stop offset="100%" stop-color="#4a9fd4"/>
+        </linearGradient>
+        <linearGradient id="segTrafo" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#7c4dff"/><stop offset="100%" stop-color="#b388ff"/>
+        </linearGradient>
+        <linearGradient id="segCable" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#ff8c42"/><stop offset="100%" stop-color="#ffd166"/>
+        </linearGradient>
+      </defs>
+
+      <!-- Background grid -->
+      <pattern id="scGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+        <path d="M20 0L0 0 0 20" fill="none" stroke="rgba(255,68,68,0.03)" stroke-width="0.5"/>
+      </pattern>
+      <rect width="${W}" height="${H}" fill="url(#scGrid)"/>
+
+      <!-- Source symbol -->
+      <circle cx="${x1 - 25}" cy="${y}" r="14" fill="none" stroke="#4a9fd4" stroke-width="2" opacity="0.8">
+        <animate attributeName="stroke-opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/>
+      </circle>
+      <text x="${x1 - 25}" y="${y + 4}" text-anchor="middle" fill="#4a9fd4" font-size="9" font-weight="bold">~</text>
+      <text x="${x1 - 25}" y="${y - 22}" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="8">${lang === 'da' ? 'Kilde' : 'Source'}</text>
+      <line x1="${x1 - 11}" y1="${y}" x2="${x1}" y2="${y}" stroke="#4a9fd4" stroke-width="1.5"/>
+
+      <!-- Znet segment -->
+      <rect x="${x1}" y="${y - 10}" width="${sNet}" height="20" rx="4" fill="url(#segNet)" opacity="0.85">
+        <animate attributeName="opacity" values="0.7;0.95;0.7" dur="3s" repeatCount="indefinite"/>
+      </rect>
+      <line x1="${x1}" y1="${y}" x2="${x1 + sNet}" y2="${y}" stroke="rgba(255,255,255,0.2)" stroke-width="1" stroke-dasharray="3 2"/>
+      <text x="${x1 + sNet / 2}" y="${y + 4}" text-anchor="middle" fill="#fff" font-size="9" font-weight="600">Z<tspan font-size="7" dy="2">net</tspan></text>
+      <text x="${x1 + sNet / 2}" y="${y - 18}" text-anchor="middle" fill="#6bb6e0" font-size="9">${zNet} m\u03A9</text>
+
+      <!-- Ztrafo segment -->
+      <rect x="${x2}" y="${y - 10}" width="${sTrafo}" height="20" rx="4" fill="url(#segTrafo)" opacity="0.85">
+        <animate attributeName="opacity" values="0.7;0.95;0.7" dur="3s" begin="0.5s" repeatCount="indefinite"/>
+      </rect>
+      <line x1="${x2}" y1="${y}" x2="${x2 + sTrafo}" y2="${y}" stroke="rgba(255,255,255,0.2)" stroke-width="1" stroke-dasharray="3 2"/>
+      <text x="${x2 + sTrafo / 2}" y="${y + 4}" text-anchor="middle" fill="#fff" font-size="9" font-weight="600">Z<tspan font-size="7" dy="2">trafo</tspan></text>
+      <text x="${x2 + sTrafo / 2}" y="${y - 18}" text-anchor="middle" fill="#b388ff" font-size="9">${zTrafo} m\u03A9</text>
+
+      <!-- Zcable segment -->
+      <rect x="${x3}" y="${y - 10}" width="${sCable}" height="20" rx="4" fill="url(#segCable)" opacity="0.85">
+        <animate attributeName="opacity" values="0.7;0.95;0.7" dur="3s" begin="1s" repeatCount="indefinite"/>
+      </rect>
+      <line x1="${x3}" y1="${y}" x2="${x3 + sCable}" y2="${y}" stroke="rgba(255,255,255,0.2)" stroke-width="1" stroke-dasharray="3 2"/>
+      <text x="${x3 + sCable / 2}" y="${y + 4}" text-anchor="middle" fill="#fff" font-size="9" font-weight="600">Z<tspan font-size="7" dy="2">kabel</tspan></text>
+      <text x="${x3 + sCable / 2}" y="${y - 18}" text-anchor="middle" fill="#ffd166" font-size="9">${zCable.toFixed(1)} m\u03A9</text>
+
+      <!-- Connection line to fault -->
+      <line x1="${x4}" y1="${y}" x2="${x4 + 15}" y2="${y}" stroke="#ff4444" stroke-width="2" opacity="0.7"/>
+
+      <!-- Lightning bolt (fault) -->
+      <path d="${boltPath}" fill="#ff4444" stroke="#ffaa00" stroke-width="0.5" filter="url(#boltGlow)">
+        <animate attributeName="opacity" values="0.6;1;0.3;1;0.6" dur="0.8s" repeatCount="indefinite"/>
+      </path>
+      <circle cx="${lx - 2}" cy="${y}" r="18" fill="none" stroke="#ff4444" stroke-width="1" opacity="0.3" filter="url(#scBlur)">
+        <animate attributeName="r" values="12;22;12" dur="1.5s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.4;0.1;0.4" dur="1.5s" repeatCount="indefinite"/>
+      </circle>
+      <text x="${lx - 2}" y="${y + 38}" text-anchor="middle" fill="#ff6b6b" font-size="9" font-weight="600">${lang === 'da' ? 'Fejl' : 'Fault'}</text>
+
+      <!-- Animated fault current particles -->
+      ${faultParticles.join('')}
+      ${glowFault.join('')}
+
+      <!-- Current labels -->
+      <text x="${(x1 + x4) / 2}" y="${y + 55}" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="9">
+        Ik<tspan font-size="7" dy="1">max</tspan><tspan dy="-1"> = ${(ikMax / 1000).toFixed(2)} kA</tspan>
+      </text>
+      <text x="${(x1 + x4) / 2}" y="${y + 70}" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="9">
+        Ik<tspan font-size="7" dy="1">min</tspan><tspan dy="-1"> = ${ikMin.toFixed(0)} A</tspan>
+      </text>
+
+      <!-- Protection device indicator -->
+      <rect x="${protX - 12}" y="${y - 16}" width="24" height="32" rx="3" fill="${protOk ? 'rgba(6,214,160,0.15)' : 'rgba(239,71,111,0.15)'}" 
+        stroke="${protOk ? '#06d6a0' : '#ef476f'}" stroke-width="1.5">
+        <animate attributeName="stroke-opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/>
+      </rect>
+      <!-- Breaker contacts -->
+      <line x1="${protX}" y1="${y - 10}" x2="${protX}" y2="${y - 2}" stroke="${protOk ? '#06d6a0' : '#ef476f'}" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="${protX}" y1="${y + 2}" x2="${protX + (protOk ? 0 : 5)}" y2="${y + 10}" stroke="${protOk ? '#06d6a0' : '#ef476f'}" stroke-width="2.5" stroke-linecap="round"/>
+      ${protOk ? `
+        <text x="${protX}" y="${y + 28}" text-anchor="middle" fill="#06d6a0" font-size="8" font-weight="700">TRIP OK</text>
+        <circle cx="${protX}" cy="${y - 20}" r="3" fill="#06d6a0" opacity="0.8">
+          <animate attributeName="opacity" values="0.4;1;0.4" dur="1.5s" repeatCount="indefinite"/>
+        </circle>
+      ` : `
+        <text x="${protX}" y="${y + 28}" text-anchor="middle" fill="#ef476f" font-size="8" font-weight="700">FAIL</text>
+        <circle cx="${protX}" cy="${y - 20}" r="3" fill="#ef476f" opacity="0.8">
+          <animate attributeName="opacity" values="0.3;1;0.3" dur="0.6s" repeatCount="indefinite"/>
+        </circle>
+      `}
+
+      <!-- Title -->
+      <text x="${W / 2}" y="22" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="11" font-weight="600" letter-spacing="1">${lang === 'da' ? 'KORTSLUTNINGSKREDSLOEB' : 'SHORT CIRCUIT PATH'}</text>
+
+      <!-- Total impedance -->
+      <text x="${W / 2}" y="${H - 12}" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-size="9">Z<tspan font-size="7" dy="1">total</tspan><tspan dy="-1"> = ${zTotal.toFixed(2)} m\u03A9</tspan></text>
+    </svg>
+  </div>`;
+}
+
 // ===== VOLTAGE DROP MODULE =====
 function renderVdrop() {
   const cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
@@ -2627,6 +2951,7 @@ function renderVdrop() {
         <div class="result-row"><span class="label">${lang === 'da' ? 'Belysning ≤3%' : 'Lighting ≤3%'}</span><span class="value"><span class="verify-badge ${isLighting ? 'ok' : 'fail'}">${isLighting ? (lang==='da'?'OK':'OK') : (lang==='da'?'Over 3%':'Over 3%')}</span></span></div>
         <div class="result-row"><span class="label">${lang === 'da' ? 'Andre ≤5%' : 'Other ≤5%'}</span><span class="value"><span class="verify-badge ${vdropPercent <= 5 ? 'ok' : 'fail'}">${vdropPercent <= 5 ? 'OK' : (lang==='da'?'Over 5%':'Over 5%')}</span></span></div>
       </div>
+      ${buildVdropViz(vdrop, vdropPercent, Un, vdropState.length)}
     </div>
     ` : ''}
   `;
@@ -2761,6 +3086,7 @@ function renderShortCircuit() {
         <div class="result-row"><span class="label">${lang === 'da' ? 'V\u00E6lg beskyttelsesenhed (MCB/MCCB) for kontrolberegning' : 'Select protection device (MCB/MCCB) for verification'}</span></div>
       </div>
       `}
+      ${zTotal > 0 ? buildScViz(scState.zNet, scState.zTrafo, zCable, ikMax3ph, ikMin2ph, check1, check2) : ''}
     </div>
   `;
 }
