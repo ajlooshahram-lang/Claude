@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Core middleware layer: request-id, global error handler, enhanced security headers, request size limits, CSRF protection, and per-endpoint rate limiting. This establishes the security foundation that all other features build on.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Create server/src/middleware/request-id.ts: Generate a crypto.randomUUID() for each request. Decorate request with requestId. Add X-Request-Id response header via onSend hook. Export the hook as a Fastify plugin.",
     "Create server/src/middleware/errors.ts: Global error handler (app.setErrorHandler). Log full error with stack trace, requestId, and request context internally via request.log. Return generic {error: 'Internal server error', requestId} to client. Handle Fastify validation errors (400), rate limit (429), not found (404), payload too large (413). Never leak stack traces, SQL errors, or internal paths. For Zod validation errors already handled in routes, let those pass through since routes already return 400.",
@@ -28,5 +28,5 @@
     "cd server && npm test"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "1. PostgreSQL must be started in the same command as tests due to bwrap PID namespace isolation. DATABASE_URL must use Unix socket: postgresql://qi:qi@localhost:5432/qi_platform?schema=public&host=/projects/sandbox/.pgrun_new. 2. Fastify 5 onSend hooks require returning payload explicitly. 3. Auth routes needed to be changed from void reply.setCookie().send() to return reply.setCookie().send() to avoid ERR_HTTP_HEADERS_SENT with async onSend hooks. 4. Helmet does not support permissionsPolicy option - added via manual onSend hook. 5. CSRF check skips requests without session cookie (unauthenticated requests get 401 from authenticate preHandler). 6. security.test.ts DATA_ENCRYPTION_KEY was 31 chars, needed 32. 7. reply.header('set-cookie', value) in Fastify appends rather than replaces - just append the CSRF cookie string directly."
 }
