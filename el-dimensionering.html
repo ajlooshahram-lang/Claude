@@ -602,6 +602,67 @@ body.dark img { filter: brightness(0.92); }
 }
 .theme-btn:hover { background: rgba(255,255,255,0.25); }
 
+/* ===== PRESENTATION MODE ===== */
+.present-btn.active {
+  background: rgba(255,210,0,0.3);
+  box-shadow: 0 0 12px rgba(255,210,0,0.6), 0 0 4px rgba(255,210,0,0.9);
+  animation: present-glow 2s ease-in-out infinite;
+}
+@keyframes present-glow {
+  0%, 100% { box-shadow: 0 0 12px rgba(255,210,0,0.6), 0 0 4px rgba(255,210,0,0.9); }
+  50% { box-shadow: 0 0 18px rgba(255,210,0,0.8), 0 0 6px rgba(255,210,0,1); }
+}
+body.presentation-mode .select-group { display: none !important; }
+body.presentation-mode .select-grid { display: none !important; }
+body.presentation-mode .info-row { display: none !important; }
+body.presentation-mode .sel-btn { display: none !important; }
+body.presentation-mode .select-label { display: none !important; }
+
+/* Keep these visible */
+body.presentation-mode .card { padding: 28px 24px; }
+body.presentation-mode .card-title { display: block !important; font-size: 1.15rem; }
+body.presentation-mode .result-box { display: block !important; }
+body.presentation-mode .result-row { display: flex !important; }
+body.presentation-mode .result-row .value { font-size: 1.15rem; font-weight: 700; }
+body.presentation-mode .nav { display: flex !important; }
+body.presentation-mode .nav-btn { display: inline-flex !important; }
+body.presentation-mode .header { display: flex !important; }
+body.presentation-mode .status-bar { display: flex !important; }
+body.presentation-mode svg { display: block !important; }
+body.presentation-mode .data-table { display: table !important; }
+body.presentation-mode .verify-badge { display: inline-flex !important; }
+
+/* Dark + Presentation: polished look */
+body.dark.presentation-mode .card {
+  background: linear-gradient(145deg, #1a2a3a, #1e3040);
+  border: 1px solid rgba(0,200,255,0.15);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.03);
+}
+body.dark.presentation-mode .result-box {
+  background: linear-gradient(135deg, rgba(10,25,45,0.9), rgba(15,30,50,0.85));
+  border: 1px solid rgba(0,180,255,0.2);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+body.dark.presentation-mode .result-row .value {
+  color: #7af0ff;
+  text-shadow: 0 0 6px rgba(100,220,255,0.3);
+}
+body.dark.presentation-mode .card-title {
+  color: #00e5ff;
+  text-shadow: 0 0 10px rgba(0,229,255,0.5);
+}
+
+/* Light + Presentation: clean professional look */
+body.presentation-mode:not(.dark) .card {
+  background: linear-gradient(145deg, #ffffff, #f8fbff);
+  box-shadow: 0 4px 20px rgba(0,80,160,0.08);
+  border: 1px solid rgba(0,100,180,0.1);
+}
+body.presentation-mode:not(.dark) .result-row .value {
+  color: #0050a0;
+  font-weight: 700;
+}
+
 /* ===== PRINT / PDF ===== */
 @media print {
   .header, .nav, .status-bar, .theme-btn, .lang-toggle { display: none !important; }
@@ -715,6 +776,7 @@ body.dark img { filter: brightness(0.92); }
 <div class="header">
   <h1 id="appTitle" style="display:flex;align-items:center;gap:8px"><span id="appTitleText">El-Dimensionering</span><span id="verBadge" style="font-size:0.6rem;font-weight:700;background:rgba(255,255,255,0.18);padding:2px 7px;border-radius:10px;letter-spacing:0.5px"></span></h1>
   <div style="display:flex;align-items:center;gap:10px">
+    <button id="presentBtn" class="theme-btn present-btn" onclick="togglePresentation()" title="Præsentation / Presentation">📽️</button>
     <button id="themeBtn" class="theme-btn" onclick="toggleTheme()" title="Dark / Light">🌙</button>
     <div class="lang-toggle">
       <button class="lang-btn active" onclick="setLang('da')">DA</button>
@@ -5804,6 +5866,21 @@ function toggleTheme() {
   const now = document.body.classList.contains('dark') ? 'light' : 'dark';
   applyTheme(now);
 }
+
+// ===== PRESENTATION MODE =====
+function togglePresentation() {
+  const active = document.body.classList.toggle('presentation-mode');
+  const btn = document.getElementById('presentBtn');
+  if (btn) btn.classList.toggle('active', active);
+  localStorage.setItem('presentationMode', active ? 'on' : 'off');
+}
+(function initPresentation() {
+  if (localStorage.getItem('presentationMode') === 'on') {
+    document.body.classList.add('presentation-mode');
+    const btn = document.getElementById('presentBtn');
+    if (btn) btn.classList.add('active');
+  }
+})();
 // Respect saved preference or OS setting
 (function initTheme() {
   const saved = localStorage.getItem('theme');
