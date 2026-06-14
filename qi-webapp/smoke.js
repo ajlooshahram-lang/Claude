@@ -697,5 +697,9 @@ ok(doc.getElementById("vendorPrintBtn") != null, "Vendor: comparison modal has P
 const vendorModalClose = vendorModal.querySelector("[data-act=cancel]");
 if (vendorModalClose) vendorModalClose.click();
 
+// Responsive design smoke tests
+ok(doc.querySelector('meta[name="viewport"]') != null, "viewport meta tag present");
+ok(/@media/.test(cssAll), "CSS contains responsive @media rules");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

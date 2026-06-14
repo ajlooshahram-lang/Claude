@@ -417,3 +417,143 @@ tr.pinned-row[draggable]{cursor:grab}
 tr.pinned-row[draggable]:active{cursor:grabbing}
 tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46,84,150,.08)}
 [data-theme="dark"] tr.row-dragover td{background:rgba(125,167,240,.12)}
+
+
+/* ============================
+   RESPONSIVE DESIGN
+   ============================ */
+
+/* Touch-friendly enhancements (all screen sizes) */
+@media (pointer: coarse) {
+  .nav-item,.btn,.chip,.fab,.kcard,.cmd-item,.sidebar-toggle{min-height:44px;min-width:44px}
+  .nav-item{padding:11px 12px}
+  th,td{padding:12px 11px}
+  select,input,textarea{padding:10px 12px}
+  html{touch-action:manipulation}
+}
+
+/* Tablet breakpoint (max-width: 1024px) */
+@media (max-width: 1024px) {
+  /* Sidebar collapses by default */
+  .sidebar{width:64px}
+  .sidebar .brand-text,.sidebar .nav-sep,.sidebar .projswitch,.sidebar .savedhint,.sidebar .nav-item .lab,.sidebar #navAddCase{display:none}
+  .sidebar .nav-item{justify-content:center;padding:9px 6px}
+  .sidebar .nav-item .ico{margin:0 auto;font-size:16px}
+  .sidebar .brand{justify-content:center;padding:14px 8px}
+  .sidebar .sidebar-foot{padding:8px}
+
+  /* Content takes full width */
+  .content{max-width:none;padding:16px}
+
+  /* KPI cards 2-per-row */
+  .kpis{grid-template-columns:repeat(2,1fr)}
+
+  /* Tables get horizontal scroll */
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+  /* 3D globe container adjusts height */
+  #cesiumContainer{min-height:400px}
+
+  /* Modal max-width */
+  .modal{max-width:90vw}
+
+  /* Font sizes slightly reduced for density */
+  body{font-size:13px}
+  .topbar h1{font-size:16px}
+  .kpi .value{font-size:26px}
+  .kpi .label{font-size:10px}
+}
+
+/* Phone breakpoint (max-width: 600px) */
+@media (max-width: 600px) {
+  /* Sidebar fully hidden (only hamburger menu) */
+  .sidebar{position:fixed;left:0;top:0;z-index:40;transform:translateX(-100%);transition:transform .2s;width:240px}
+  .sidebar.open{transform:translateX(0);width:240px}
+  .sidebar.open .brand-text,.sidebar.open .nav-sep,.sidebar.open .projswitch,.sidebar.open .savedhint,.sidebar.open .nav-item .lab,.sidebar.open #navAddCase{display:initial}
+  .sidebar.open .nav-item{justify-content:flex-start;padding:9px 12px}
+  .sidebar.open .nav-item .ico{margin:0}
+  .sidebar.open .brand{justify-content:flex-start;padding:18px 16px}
+  .sidebar.open .sidebar-foot{padding:12px}
+  .hamburger{display:block}
+
+  /* KPI cards single column */
+  .kpis{grid-template-columns:1fr}
+  .kpi .value{font-size:22px}
+
+  /* Topbar compact (hide some labels, keep icons) */
+  .topbar{padding:10px 14px;gap:8px}
+  .topbar h1{font-size:14px}
+  .topbar-actions .btn:not(.btn-icon){display:none}
+  .topbar-actions .btn-icon{min-width:38px;min-height:38px}
+
+  /* Timeline slider full-width */
+  .net3d-timeline{width:100%;padding:10px 8px}
+  .net3d-timeline input[type=range]{width:100%}
+
+  /* Vendor table: hide less-important columns */
+  .vendor-table th:nth-child(n+4):not(:nth-child(5)),
+  .vendor-table td:nth-child(n+4):not(:nth-child(5)){display:none}
+
+  /* Font sizes reduced */
+  body{font-size:12px}
+  th{font-size:10px}
+  td{font-size:12px}
+
+  /* FAB slightly smaller */
+  .fab{width:48px;height:48px;font-size:24px;right:14px;bottom:60px}
+
+  /* Modals full-screen on phone */
+  .modal-overlay{padding:0;align-items:stretch}
+  .modal{max-width:100vw;width:100%;border-radius:0;min-height:100vh;padding:16px}
+
+  /* Row2 grid single column */
+  .row2{grid-template-columns:1fr}
+
+  /* Kanban single column */
+  .kanban{grid-template-columns:1fr}
+
+  /* Content padding reduced */
+  .content{padding:12px 10px}
+
+  /* Chart boxes reduce height */
+  .chart-box{height:200px}
+  .chart-box.sm{height:180px}
+}
+
+/* iPad presentation mode (landscape-specific) */
+@media (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) {
+  /* Sidebar thin (icons only, no labels) to maximize content area */
+  .sidebar{width:56px}
+  .sidebar .brand-text,.sidebar .nav-sep,.sidebar .projswitch,.sidebar .savedhint,.sidebar .nav-item .lab,.sidebar #navAddCase{display:none}
+  .sidebar .nav-item{justify-content:center;padding:8px 4px}
+  .sidebar .nav-item .ico{margin:0 auto;font-size:15px}
+  .sidebar .brand{justify-content:center;padding:12px 6px}
+  .sidebar .sidebar-foot{padding:6px}
+
+  /* Dashboard KPIs in a single prominent row */
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
+  .kpi .value{font-size:28px}
+
+  /* Charts get more vertical space */
+  .chart-box{height:300px}
+  .chart-box.sm{height:260px}
+
+  /* 3D container optimized height */
+  #cesiumContainer{min-height:480px}
+
+  /* Content area maximized */
+  .content{max-width:none;padding:16px 20px}
+}
+
+/* Dark mode tablet enhancements (high contrast for projector display) */
+@media (max-width: 1024px) {
+  [data-theme="dark"] .kpi{border-width:4px}
+  [data-theme="dark"] .kpi .value{color:#fff;font-weight:900}
+  [data-theme="dark"] .kpi .label{color:#b0c0e0}
+  [data-theme="dark"] .topbar h1{color:#fff}
+  [data-theme="dark"] .badge{font-weight:700}
+  [data-theme="dark"] th{color:#e6eaf3;font-weight:700}
+  [data-theme="dark"] .card h3{color:#fff}
+  [data-theme="dark"] .nav-item.active{background:var(--teal);color:#fff;font-weight:700}
+  [data-theme="dark"] .chart-box canvas{filter:contrast(1.1) brightness(1.05)}
+}
