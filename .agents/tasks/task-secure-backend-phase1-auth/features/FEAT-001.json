@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-001",
+  "type": "chore",
+  "description": "Environment setup: start Docker Postgres, run Prisma migration to create tables, verify existing build and tests pass with database available.",
+  "status": "completed",
+  "steps": [
+    "Start a Docker Postgres container: docker run -d --name qi-pg -e POSTGRES_PASSWORD=qi -e POSTGRES_USER=qi -e POSTGRES_DB=qi_platform -p 5432:5432 postgres:16-alpine (remove existing container first if needed)",
+    "Wait for Postgres to be ready (pg_isready or a SELECT 1 loop)",
+    "Set DATABASE_URL=postgresql://qi:qi@localhost:5432/qi_platform?schema=public",
+    "Run npx prisma migrate dev --name init in server/ to create all tables from the existing schema.prisma",
+    "Run npm run build to confirm prisma generate + tsc still work",
+    "Run npm test to confirm existing health tests still pass"
+  ],
+  "acceptance_criteria": [
+    "Docker Postgres is running and accepting connections on port 5432",
+    "Prisma migration creates all tables (User, Session, Membership, Tenant, Case, Project, etc.)",
+    "npm run build succeeds without errors",
+    "npm test passes all existing health tests"
+  ],
+  "verification": [
+    "docker exec qi-pg pg_isready -U qi returns success",
+    "npx prisma migrate status shows migration applied",
+    "npm run build exits 0",
+    "npm test exits 0"
+  ],
+  "blocked_reason": null,
+  "findings": "Docker container networking does not work in this sandbox (bwrap --unshare-pid with cgroup issues). Native Postgres must be installed via yum (Amazon Linux 2023). Postgres must be started within the SAME shell command that uses it (each execute_bash invocation is a separate bwrap session, so background processes do not persist). Use: su postgres -c 'postgres -D /projects/sandbox/.pg_data -k /projects/sandbox/.pg_run' & then run commands in the same shell invocation. Data dir at /projects/sandbox/.pg_data, socket at /projects/sandbox/.pg_run. DB user: qi, password: qi, database: qi_platform. Prisma migration created at server/prisma/migrations/20260614001630_init/. Build (npm run build) and tests (npm test) both pass without a running database. For future features needing DB access in tests, start Postgres inline within the test command execution."
+}

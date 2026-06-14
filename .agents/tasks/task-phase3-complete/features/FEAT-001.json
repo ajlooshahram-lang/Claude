@@ -1,0 +1,26 @@
+{
+  "id": "FEAT-001",
+  "type": "chore",
+  "description": "Create the feature/phase3-complete branch from feature/secure-backend-phase1-auth, ensure Postgres is running, install dependencies, run the existing build and tests to confirm a green baseline before any new code.",
+  "status": "completed",
+  "steps": [
+    "Create branch feature/phase3-complete from feature/secure-backend-phase1-auth: git checkout feature/secure-backend-phase1-auth && git checkout -b feature/phase3-complete",
+    "Ensure Docker Postgres is running: docker run -d --name qi-pg -e POSTGRES_PASSWORD=qi -e POSTGRES_USER=qi -e POSTGRES_DB=qi_platform -p 5432:5432 postgres:16-alpine (skip if already running)",
+    "cd server && npm install",
+    "Set DATABASE_URL=postgresql://qi:qi@localhost:5432/qi_platform?schema=public in environment",
+    "npx prisma migrate deploy",
+    "npm run build (prisma generate + tsc)",
+    "npm test -- confirm all 26 existing tests pass"
+  ],
+  "acceptance_criteria": [
+    "Branch feature/phase3-complete exists based on feature/secure-backend-phase1-auth",
+    "npm run build exits 0",
+    "npm test shows all 26 tests passing"
+  ],
+  "verification": [
+    "Run `cd server && npm run build` and confirm exit code 0",
+    "Run `cd server && DATABASE_URL=postgresql://qi:qi@localhost:5432/qi_platform?schema=public npm test` and confirm all tests pass"
+  ],
+  "blocked_reason": null,
+  "findings": "Environment uses bwrap with --unshare-pid, so each bash command gets a fresh PID namespace. Postgres must be started within the same command that runs tests. TCP port binding works but firewall blocks connections to 127.0.0.1 (No route to host). Unix socket connections work. Correct DATABASE_URL for this env: postgresql://qi:qi@localhost:5432/qi_platform?schema=public&host=/projects/sandbox/.pgrun_new. Fresh pgdata at /projects/sandbox/.pgdata_new, socket dir at /projects/sandbox/.pgrun_new. Start postgres with: su -s /bin/sh postgres -c 'postgres -D /projects/sandbox/.pgdata_new' & sleep 3. Installed postgresql16-server via dnf on Amazon Linux 2023."
+}

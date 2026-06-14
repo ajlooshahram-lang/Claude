@@ -1,0 +1,34 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Implement all remaining CRUD route files (Projects, Registers, Snapshots, Share Tokens), security hardening (MFA encryption, password change, session cleanup), and wire them into app.ts. This is Parts A, B, C of the user requirements.",
+  "status": "completed",
+  "steps": [
+    "Create server/src/auth/crypto.ts: AES-256-GCM encrypt/decrypt functions using DATA_ENCRYPTION_KEY from config. If key is not set, fall back to plaintext with console.warn. Export encrypt(plaintext, key?) and decrypt(ciphertext, key?) functions.",
+    "Create server/src/routes/projects.ts following the exact pattern of cases.ts: GET /projects (list, tenant-scoped, deletedAt null), GET /projects/:id, POST /projects (name required, all other Project fields optional), PATCH /projects/:id, DELETE /projects/:id (soft-delete). Zod schemas for create/update bodies. Use authenticate + requireRole hooks.",
+    "Create server/src/routes/registers.ts: GET /registers/:type?projectId=xxx (validate type is one of the 13 known types: hazop, calibration, punch, sil, rtm, docs, ncr, moc, milestones, decisions, procurement, resources, okr), POST /registers/:type (body: {projectId, data, pinned?, sortOrder?}), PATCH /registers/:type/:id (body: partial data/pinned/sortOrder), DELETE /registers/:type/:id (soft-delete). All tenant-scoped.",
+    "Create server/src/routes/snapshots.ts: GET /snapshots?projectId=xxx, POST /snapshots (body: {projectId, label?} - captures full project state including cases, registers as JSON in data field), PATCH /snapshots/:id (rename: body {label}), DELETE /snapshots/:id, POST /snapshots/:id/restore (overwrites current project cases/registers from snapshot data). All tenant-scoped.",
+    "Create server/src/routes/shares.ts: POST /shares (body: {projectId, scope: VIEWER|MANAGER, expiresInHours}), GET /shares?projectId=xxx (list active non-revoked non-expired), DELETE /shares/:id (revoke by setting revokedAt). GET /shared/:token (PUBLIC endpoint, no auth - validates SHA-256 hash against DB, checks expiry/revocation, returns project data at scope level). Token generation: 32 random bytes, URL-safe base64. Only SHA-256 hash stored.",
+    "Modify server/src/auth/routes.ts: (a) In MFA enroll, encrypt mfaSecret with crypto.ts before storing. (b) In MFA verify and login, decrypt mfaSecret before verifying TOTP. (c) Add POST /auth/change-password endpoint (requires current password + new password, validates, updates passwordHash, revokes ALL sessions for user except current). (d) After MFA enrollment verification succeeds, revoke all sessions except current.",
+    "Modify server/src/auth/session.ts: Add cleanExpiredSessions() function that deletes sessions where expiresAt < now() OR revokedAt IS NOT NULL. Add revokeAllUserSessions(prisma, userId, exceptTokenHash?) that revokes all sessions for a user except optionally one.",
+    "Modify server/src/server.ts: Call cleanExpiredSessions() at startup and set a 15-minute interval timer. Clear the interval on SIGINT/SIGTERM.",
+    "Modify server/src/app.ts: Register projectsRoutes, registersRoutes, snapshotsRoutes, sharesRoutes (the public /shared/:token route must NOT go through the authenticate hook).",
+    "Ensure all new code compiles with npm run build (strict TS, no any types)"
+  ],
+  "acceptance_criteria": [
+    "npm run build succeeds with no type errors",
+    "All new route files exist: projects.ts, registers.ts, snapshots.ts, shares.ts",
+    "crypto.ts exists with encrypt/decrypt using AES-256-GCM",
+    "session.ts exports cleanExpiredSessions and revokeAllUserSessions",
+    "auth/routes.ts has POST /auth/change-password endpoint",
+    "MFA secret is encrypted before DB storage and decrypted on read",
+    "The /shared/:token endpoint does NOT require authentication",
+    "All existing 26 tests still pass"
+  ],
+  "verification": [
+    "Run `cd server && npm run build` and confirm exit code 0",
+    "Run `cd server && DATABASE_URL=postgresql://qi:qi@localhost:5432/qi_platform?schema=public npm test` and confirm existing tests pass"
+  ],
+  "blocked_reason": null,
+  "findings": "Build and all 26 tests pass. MFA encrypt/decrypt shows console.warn when DATA_ENCRYPTION_KEY not set (expected fallback behavior in dev/test). The /shared/:token endpoint is correctly unauthenticated - not behind the authenticate hook. Session cleanup timer uses void + catch pattern to avoid unhandled promise rejections."
+}
