@@ -820,6 +820,7 @@ const T = {
       ev: '\uD83D\uDE97 EV-lader',
       harmonics: '\u3030\uFE0F Harmoniske',
       gen: '\uD83C\uDFED Generator',
+      plc: '\uD83E\uDD16 PLC/BMS',
       exam: '\uD83C\uDF93 Eksamen'
     },
     // Load module
@@ -926,6 +927,7 @@ const T = {
       ev: '\uD83D\uDE97 EV Charger',
       harmonics: '\u3030\uFE0F Harmonics',
       gen: '\uD83C\uDFED Generator',
+      plc: '\uD83E\uDD16 PLC/BMS',
       exam: '\uD83C\uDF93 Exam'
     },
     loadTitle: 'Load Calculation',
@@ -2078,6 +2080,8 @@ let evState = { power: 11, numChargers: 1, mainFuse: 63, existingLoad: 50, earth
 let harmonicsState = { thd3: 33, iPhase: 16, circuits: 4, crossSection: 2.5 };
 // Generator sizing state
 let genState = { criticalLoads: [], genSize: 100, mode: 'island', earthing: 'TN-S', largestMotor: 0, startMethod: 'DOL', transfer: 'auto', customLoads: [] };
+// PLC/BMS/FMS state
+let plcState = { platform: 'siemens', plcLang: 'ST', protocol: 'bacnet', integration: 'monitor', fms: { energy: true, alarm: true, maintenance: false, occupancy: false, demand: false } };
 // Short circuit state
 let scState = { zNet: 1, zTrafo: 5 };
 // Standards state
@@ -2210,13 +2214,14 @@ function renderModule(mod) {
     case 'ev': content = renderEvCharger(); break;
     case 'harmonics': content = renderHarmonics(); break;
     case 'gen': content = renderGenerator(); break;
+    case 'plc': content = renderPlc(); break;
     case 'exam': content = renderExam(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
   // Append QI validation summary if enough data exists
   const qi = runQiValidation();
-  const noQi = ['standards','bank','ai','bid','projekt','verify','draw','exam'];
+  const noQi = ['standards','bank','ai','bid','projekt','verify','draw','exam','plc'];
   if (qi.passed.length + qi.issues.length > 0 && noQi.indexOf(mod) < 0) {
     content += renderQiCard(qi);
   }
@@ -11634,6 +11639,574 @@ function buildGenViz(da, genKVA, inGen, ikGen, ikGrid, st, warning, loadKW) {
 
   svg += '</svg></div>';
   return svg;
+}
+
+// ===== PLC/BMS/FMS INTEGRATION MODULE =====
+function plcSet(key, val) { plcState[key] = val; renderModule('plc'); }
+function plcFmsToggle(key) { plcState.fms[key] = !plcState.fms[key]; renderModule('plc'); }
+
+function plcGenerateIOList() {
+  const st = plcState;
+  const rows = [];
+  let addr = { DI: 0, DO: 0, AI: 0, AO: 0 };
+  const prefix = st.platform === 'siemens' ? 'M' : st.platform === 'ab' ? '' : st.platform === 'schneider' ? 'IO_' : st.platform === 'abb' ? 'A_' : 'IO_';
+
+  function tagName(base, suffix) {
+    if (st.platform === 'siemens') return prefix + String(rows.length + 1).padStart(3, '0') + '_' + base + '_' + suffix;
+    if (st.platform === 'ab') return base + '_' + String(rows.length + 1).padStart(2, '0') + '_' + suffix;
+    return prefix + base + '_' + suffix + '_' + (rows.length + 1);
+  }
+  function plcAddr(type) {
+    var a = addr[type]; addr[type]++;
+    if (st.platform === 'siemens') {
+      if (type === 'DI') return '%I' + Math.floor(a / 8) + '.' + (a % 8);
+      if (type === 'DO') return '%Q' + Math.floor(a / 8) + '.' + (a % 8);
+      if (type === 'AI') return '%IW' + (a * 2 + 64);
+      return '%QW' + (a * 2 + 64);
+    }
+    if (st.platform === 'ab') {
+      if (type === 'DI') return 'Local:1:I.Data.' + a;
+      if (type === 'DO') return 'Local:2:O.Data.' + a;
+      if (type === 'AI') return 'Local:3:I.Ch' + a + 'Data';
+      return 'Local:4:O.Ch' + a + 'Data';
+    }
+    return type + ':' + a;
+  }
+
+  function classify(c) {
+    var n = (c.name || '').toLowerCase();
+    if (n.match(/motor|pump|ventil|fan|kompressor|compressor/)) return 'motor';
+    if (n.match(/lys|light|belysning|lamp/)) return 'lighting';
+    if (n.match(/ev|lader|charger|elbil/)) return 'ev';
+    if (c.kW >= 5 && c.cos < 0.9) return 'motor';
+    return 'generic';
+  }
+
+  loadList.forEach(function(c, idx) {
+    var type = classify(c);
+    var base = (c.name || ('Load_' + (idx + 1))).replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 16);
+    var cableRef = cableState.type + ' ' + (cableState.crossSection || '?') + 'mm2';
+
+    if (type === 'motor') {
+      rows.push({ tag: tagName(base, 'Start'), desc: (c.name || 'Motor') + ' Run cmd', io: 'DO', signal: '24VDC', addr: plcAddr('DO'), cable: cableRef });
+      rows.push({ tag: tagName(base, 'Run'), desc: (c.name || 'Motor') + ' Running FB', io: 'DI', signal: '24VDC', addr: plcAddr('DI'), cable: cableRef });
+      rows.push({ tag: tagName(base, 'Fault'), desc: (c.name || 'Motor') + ' Fault', io: 'DI', signal: '24VDC', addr: plcAddr('DI'), cable: cableRef });
+      if (c.kW >= 7.5) {
+        rows.push({ tag: tagName(base, 'SpeedRef'), desc: (c.name || 'Motor') + ' VFD Speed', io: 'AO', signal: '0-10V', addr: plcAddr('AO'), cable: cableRef });
+      }
+      rows.push({ tag: tagName(base, 'Current'), desc: (c.name || 'Motor') + ' Current', io: 'AI', signal: '4-20mA', addr: plcAddr('AI'), cable: cableRef });
+    } else if (type === 'lighting') {
+      rows.push({ tag: tagName(base, 'OnOff'), desc: (c.name || 'Light') + ' On/Off', io: 'DO', signal: '24VDC', addr: plcAddr('DO'), cable: cableRef });
+      rows.push({ tag: tagName(base, 'Dim'), desc: (c.name || 'Light') + ' Dimming', io: 'AO', signal: '0-10V/DALI', addr: plcAddr('AO'), cable: cableRef });
+      rows.push({ tag: tagName(base, 'Occ'), desc: (c.name || 'Light') + ' Occupancy', io: 'DI', signal: '24VDC', addr: plcAddr('DI'), cable: cableRef });
+      rows.push({ tag: tagName(base, 'Lux'), desc: (c.name || 'Light') + ' Lux sensor', io: 'AI', signal: '0-10V', addr: plcAddr('AI'), cable: cableRef });
+    } else if (type === 'ev') {
+      rows.push({ tag: tagName(base, 'Enable'), desc: (c.name || 'EV') + ' Enable', io: 'DO', signal: '24VDC', addr: plcAddr('DO'), cable: cableRef });
+      rows.push({ tag: tagName(base, 'Status'), desc: (c.name || 'EV') + ' Status', io: 'DI', signal: '24VDC', addr: plcAddr('DI'), cable: cableRef });
+      rows.push({ tag: tagName(base, 'PwrLimit'), desc: (c.name || 'EV') + ' Power limit', io: 'AO', signal: '4-20mA', addr: plcAddr('AO'), cable: cableRef });
+      rows.push({ tag: tagName(base, 'Energy'), desc: (c.name || 'EV') + ' Energy', io: 'AI', signal: 'Modbus', addr: plcAddr('AI'), cable: cableRef });
+    } else {
+      rows.push({ tag: tagName(base, 'OnOff'), desc: (c.name || 'Load') + ' On/Off', io: 'DO', signal: '24VDC', addr: plcAddr('DO'), cable: cableRef });
+      rows.push({ tag: tagName(base, 'Status'), desc: (c.name || 'Load') + ' Status', io: 'DI', signal: '24VDC', addr: plcAddr('DI'), cable: cableRef });
+    }
+  });
+  return { rows: rows, summary: addr };
+}
+
+function plcGenerateProgram() {
+  const st = plcState;
+  const io = plcGenerateIOList();
+  const da = lang === 'da';
+  var code = '';
+
+  // Structured Text / SCL
+  if (st.plcLang === 'ST' || st.plcLang === 'SCL') {
+    var isScl = (st.platform === 'siemens');
+    code += (isScl ? '// Siemens SCL (TIA Portal)\n' : '// IEC 61131-3 Structured Text\n');
+    code += (isScl ? 'FUNCTION_BLOCK "FB_PlantControl"\n' : 'FUNCTION_BLOCK FB_PlantControl\n');
+    code += 'VAR_INPUT\n';
+    code += '  bEStop       : BOOL;   // Emergency stop\n';
+    code += '  bAutoMode    : BOOL;   // Auto/Manual selector\n';
+    code += '  bStartCmd    : BOOL;   // Master start command\n';
+    code += 'END_VAR\n\n';
+    code += 'VAR_OUTPUT\n';
+    code += '  bSystemRun   : BOOL;   // System running\n';
+    code += '  bAlarmActive : BOOL;   // Alarm active\n';
+    code += '  iRunningLoads: INT;    // Number of running loads\n';
+    code += 'END_VAR\n\n';
+    code += 'VAR\n';
+    loadList.forEach(function(c, i) {
+      var nm = (c.name || 'Load' + (i + 1)).replace(/[^a-zA-Z0-9_]/g, '_');
+      code += '  b' + nm + '_Run     : BOOL;\n';
+      code += '  b' + nm + '_Fault   : BOOL;\n';
+      code += '  ton' + nm + '_Delay : TON;   // Start delay timer\n';
+    });
+    code += '  tonStartSeq  : TON;\n';
+    code += '  iSeqStep     : INT := 0;\n';
+    code += 'END_VAR\n\n';
+    code += (isScl ? 'BEGIN\n' : '');
+    code += '// === SAFETY INTERLOCK ===\n';
+    code += 'IF bEStop THEN\n';
+    code += '  bSystemRun := FALSE;\n';
+    code += '  iSeqStep := 0;\n';
+    loadList.forEach(function(c, i) {
+      var nm = (c.name || 'Load' + (i + 1)).replace(/[^a-zA-Z0-9_]/g, '_');
+      code += '  b' + nm + '_Run := FALSE;\n';
+    });
+    code += '  RETURN;\n';
+    code += 'END_IF;\n\n';
+    code += '// === AUTO SEQUENCE START ===\n';
+    code += 'IF bAutoMode AND bStartCmd AND NOT bSystemRun THEN\n';
+    code += '  iSeqStep := 1;\n';
+    code += '  bSystemRun := TRUE;\n';
+    code += 'END_IF;\n\n';
+    code += '// === SEQUENTIAL START (2s DELAY BETWEEN LOADS) ===\n';
+    code += 'tonStartSeq(IN := (iSeqStep > 0 AND iSeqStep <= ' + Math.max(loadList.length, 1) + '), PT := T#2s);\n';
+    code += 'IF tonStartSeq.Q THEN\n';
+    code += '  CASE iSeqStep OF\n';
+    loadList.forEach(function(c, i) {
+      var nm = (c.name || 'Load' + (i + 1)).replace(/[^a-zA-Z0-9_]/g, '_');
+      code += '    ' + (i + 1) + ': b' + nm + '_Run := TRUE;\n';
+    });
+    code += '  END_CASE;\n';
+    code += '  iSeqStep := iSeqStep + 1;\n';
+    code += '  tonStartSeq(IN := FALSE);\n';
+    code += 'END_IF;\n\n';
+    code += '// === FAULT MONITORING ===\n';
+    code += 'bAlarmActive := FALSE;\n';
+    code += 'iRunningLoads := 0;\n';
+    loadList.forEach(function(c, i) {
+      var nm = (c.name || 'Load' + (i + 1)).replace(/[^a-zA-Z0-9_]/g, '_');
+      code += 'IF b' + nm + '_Fault THEN bAlarmActive := TRUE; b' + nm + '_Run := FALSE; END_IF;\n';
+      code += 'IF b' + nm + '_Run THEN iRunningLoads := iRunningLoads + 1; END_IF;\n';
+    });
+    code += '\n' + (isScl ? 'END_FUNCTION_BLOCK' : 'END_FUNCTION_BLOCK');
+  } else if (st.plcLang === 'LD') {
+    // Ladder diagram text representation
+    code += '// ' + (st.platform === 'siemens' ? 'Siemens LAD (TIA Portal)' : st.platform === 'ab' ? 'Allen-Bradley Ladder (Studio 5000)' : 'IEC 61131-3 Ladder Diagram') + '\n';
+    code += '// Rung 0: Emergency Stop Interlock\n';
+    code += '|---[/]---EStop---+---( )---SystemRun_Reset---|\n';
+    code += '|                 +---( )---AllOutputs_Off----|\n\n';
+    code += '// Rung 1: Auto Start Sequence\n';
+    code += '|---[ ]---AutoMode---[ ]---StartCmd---[/]---Running---( )---SeqStart---|\n\n';
+    loadList.forEach(function(c, i) {
+      var nm = (c.name || 'Load' + (i + 1)).replace(/[^a-zA-Z0-9_]/g, '_');
+      code += '// Rung ' + (i + 2) + ': ' + nm + ' Control\n';
+      code += '|---[ ]---SeqStep_' + (i + 1) + '---[/]---' + nm + '_Fault---[TON 2s]---( )---' + nm + '_Run---|\n';
+      code += '|---[ ]---' + nm + '_Fault---( )---Alarm_Active---|\n\n';
+    });
+  } else if (st.plcLang === 'FBD') {
+    code += '// ' + (st.platform === 'siemens' ? 'Siemens FBD (TIA Portal)' : 'IEC 61131-3 Function Block Diagram') + '\n';
+    code += '// FB_PlantControl\n\n';
+    code += '+-----------+     +--------+     +-----------+\n';
+    code += '| EStop     |---->| NOT    |---->| AND       |----> SystemRun\n';
+    code += '+-----------+     +--------+     |           |\n';
+    code += '                                 | AutoMode--|---\n';
+    code += '+-----------+                    | StartCmd--|---\n';
+    code += '| StartCmd  |--------------------+-----------+\n';
+    code += '+-----------+\n\n';
+    loadList.forEach(function(c, i) {
+      var nm = (c.name || 'Load' + (i + 1)).replace(/[^a-zA-Z0-9_]/g, '_');
+      code += '+-----------+     +--------+     +-----------+\n';
+      code += '| SeqStep=' + (i + 1) + ' |---->| AND    |---->| TON  2s   |----> ' + nm + '_Run\n';
+      code += '+-----------+     |        |     +-----------+\n';
+      code += '| NOT Fault |---->|        |\n';
+      code += '+-----------+     +--------+\n\n';
+    });
+  } else {
+    // SFC
+    code += '// ' + (st.platform === 'siemens' ? 'Siemens GRAPH (TIA Portal)' : 'IEC 61131-3 Sequential Function Chart') + '\n';
+    code += '// Plant Startup Sequence\n\n';
+    code += '  [S0: INIT]\n';
+    code += '      | bStartCmd AND bAutoMode AND NOT bEStop\n';
+    code += '      v\n';
+    loadList.forEach(function(c, i) {
+      var nm = (c.name || 'Load' + (i + 1)).replace(/[^a-zA-Z0-9_]/g, '_');
+      code += '  [S' + (i + 1) + ': START_' + nm + ']\n';
+      code += '      Action: ' + nm + '_Run := TRUE;\n';
+      code += '      | T#2s elapsed AND NOT ' + nm + '_Fault\n';
+      code += '      v\n';
+    });
+    code += '  [S' + (loadList.length + 1) + ': RUNNING]\n';
+    code += '      Action: bSystemRun := TRUE;\n';
+    code += '      | bEStop OR NOT bAutoMode\n';
+    code += '      v\n';
+    code += '  [S0: INIT]  (loop back)\n';
+  }
+  return code;
+}
+
+function plcGenerateBMSPoints() {
+  const st = plcState;
+  const rows = [];
+  var instBase = 1;
+
+  loadList.forEach(function(c, idx) {
+    var nm = (c.name || 'Load ' + (idx + 1));
+    if (st.protocol === 'bacnet') {
+      rows.push({ objType: 'Binary Output', instance: instBase++, name: nm + ' Cmd', desc: 'Start/Stop', units: 'active/inactive' });
+      rows.push({ objType: 'Binary Input', instance: instBase++, name: nm + ' Status', desc: 'Running/Stopped', units: 'active/inactive' });
+      rows.push({ objType: 'Analog Input', instance: instBase++, name: nm + ' Power', desc: 'Measured power', units: 'kW' });
+      if (c.kW >= 5) {
+        rows.push({ objType: 'Analog Output', instance: instBase++, name: nm + ' Setpoint', desc: 'Control setpoint', units: '%' });
+      }
+    } else if (st.protocol === 'modbus_tcp' || st.protocol === 'modbus_rtu') {
+      var regBase = 40001 + idx * 10;
+      rows.push({ register: regBase, type: 'Coil', dataType: 'BOOL', scale: 1, name: nm + ' Cmd' });
+      rows.push({ register: regBase + 1, type: 'Discrete Input', dataType: 'BOOL', scale: 1, name: nm + ' Status' });
+      rows.push({ register: regBase + 2, type: 'Input Register', dataType: 'UINT16', scale: 0.1, name: nm + ' Power (kW)' });
+      rows.push({ register: regBase + 3, type: 'Holding Register', dataType: 'UINT16', scale: 1, name: nm + ' Setpoint (%)' });
+    } else if (st.protocol === 'knx') {
+      var grp = (idx + 1);
+      rows.push({ groupAddr: '1/' + grp + '/0', dpt: 'DPT 1.001', name: nm + ' Switch' });
+      rows.push({ groupAddr: '1/' + grp + '/1', dpt: 'DPT 1.002', name: nm + ' Status' });
+      rows.push({ groupAddr: '2/' + grp + '/0', dpt: 'DPT 9.001', name: nm + ' Power' });
+      if (c.kW < 2) {
+        rows.push({ groupAddr: '2/' + grp + '/1', dpt: 'DPT 5.001', name: nm + ' Dimming' });
+      }
+    } else {
+      // LON
+      rows.push({ nv: 'nvoSwitch_' + (idx + 1), snvt: 'SNVT_switch', name: nm + ' Cmd' });
+      rows.push({ nv: 'nviStatus_' + (idx + 1), snvt: 'SNVT_switch', name: nm + ' Status' });
+      rows.push({ nv: 'nviPower_' + (idx + 1), snvt: 'SNVT_power', name: nm + ' Power' });
+    }
+  });
+  return rows;
+}
+
+function plcGenerateFMSConfig() {
+  const st = plcState;
+  const schedule = calcLoadSchedule();
+  var config = {
+    project: 'El-Dimensionering PLC/BMS/FMS',
+    generated: new Date().toISOString(),
+    totalKW: schedule.kW,
+    totalKVA: schedule.kVA,
+    consumers: loadList.length,
+    features: {}
+  };
+  if (st.fms.energy) {
+    config.features.energyMetering = {
+      enabled: true,
+      meterPoints: loadList.map(function(c, i) {
+        return { id: 'EM_' + (i + 1), name: c.name || 'Load ' + (i + 1), kW: c.kW, thresholdHigh: c.kW * 1.2, thresholdLow: c.kW * 0.1 };
+      }),
+      totalDemand_kW: schedule.kW,
+      maxDemand_kVA: schedule.kVA
+    };
+  }
+  if (st.fms.alarm) {
+    config.features.alarmManagement = {
+      enabled: true,
+      alarms: loadList.map(function(c, i) {
+        return { id: 'ALM_' + (i + 1), source: c.name || 'Load ' + (i + 1), overload: c.kW * 1.15, underVoltage: 207, overVoltage: 253, priority: c.kW > 10 ? 'HIGH' : 'MEDIUM' };
+      })
+    };
+  }
+  if (st.fms.maintenance) {
+    config.features.maintenance = {
+      enabled: true,
+      schedules: loadList.map(function(c, i) {
+        return { id: 'MNT_' + (i + 1), equipment: c.name || 'Load ' + (i + 1), interval_hours: c.kW > 10 ? 2000 : 4000, lastService: null };
+      })
+    };
+  }
+  if (st.fms.occupancy) {
+    config.features.occupancyControl = { enabled: true, zones: Math.ceil(loadList.length / 3), unoccupiedReduction: 0.4 };
+  }
+  if (st.fms.demand) {
+    config.features.demandResponse = { enabled: true, peakLimit_kW: schedule.kW * 0.8, shedPriority: loadList.map(function(c, i) { return { name: c.name || 'Load ' + (i + 1), priority: i + 1, shedKW: c.kW }; }) };
+  }
+  return config;
+}
+
+function plcDownloadIO() {
+  var io = plcGenerateIOList();
+  var csv = 'Tag,Description,I/O Type,Signal,PLC Address,Cable\n';
+  io.rows.forEach(function(r) { csv += '"' + r.tag + '","' + r.desc + '","' + r.io + '","' + r.signal + '","' + r.addr + '","' + r.cable + '"\n'; });
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a'); a.href = url; a.download = 'io_list_' + plcState.platform + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+function plcDownloadProgram() {
+  var code = plcGenerateProgram();
+  var ext = (plcState.platform === 'siemens' && plcState.plcLang === 'ST') ? '.scl' : (plcState.plcLang === 'ST' ? '.st' : '.txt');
+  var blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a'); a.href = url; a.download = 'plc_program_' + plcState.platform + ext;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+function plcDownloadBMS() {
+  var pts = plcGenerateBMSPoints();
+  var csv = '';
+  if (plcState.protocol === 'bacnet') {
+    csv = 'Object Type,Instance,Name,Description,Units\n';
+    pts.forEach(function(r) { csv += '"' + r.objType + '",' + r.instance + ',"' + r.name + '","' + r.desc + '","' + r.units + '"\n'; });
+  } else if (plcState.protocol === 'modbus_tcp' || plcState.protocol === 'modbus_rtu') {
+    csv = 'Register,Type,Data Type,Scale,Name\n';
+    pts.forEach(function(r) { csv += r.register + ',"' + r.type + '","' + r.dataType + '",' + r.scale + ',"' + r.name + '"\n'; });
+  } else if (plcState.protocol === 'knx') {
+    csv = 'Group Address,DPT,Name\n';
+    pts.forEach(function(r) { csv += '"' + r.groupAddr + '","' + r.dpt + '","' + r.name + '"\n'; });
+  } else {
+    csv = 'NV,SNVT,Name\n';
+    pts.forEach(function(r) { csv += '"' + r.nv + '","' + r.snvt + '","' + r.name + '"\n'; });
+  }
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a'); a.href = url; a.download = 'bms_points_' + plcState.protocol + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+function plcDownloadFMS() {
+  var cfg = plcGenerateFMSConfig();
+  var blob = new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a'); a.href = url; a.download = 'fms_config.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+function plcBuildSvg() {
+  const da = lang === 'da';
+  const st = plcState;
+  const numLoads = Math.min(loadList.length, 6);
+  const w = 700, h = 420;
+  var svg = '<div class="result-box" style="text-align:center;overflow-x:auto"><svg viewBox="0 0 ' + w + ' ' + h + '" style="max-width:100%;height:auto;font-family:monospace">';
+
+  // Background
+  svg += '<rect width="' + w + '" height="' + h + '" fill="#0d1117" rx="12"/>';
+
+  // Animated data flow defs
+  svg += '<defs>';
+  svg += '<linearGradient id="plcNeon" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#00f0ff"/><stop offset="100%" stop-color="#a855f7"/></linearGradient>';
+  svg += '<filter id="plcGlow"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  svg += '</defs>';
+
+  // PLC Cabinet
+  svg += '<rect x="50" y="80" width="120" height="200" rx="8" fill="#1a1f2e" stroke="#00f0ff" stroke-width="2" filter="url(#plcGlow)"/>';
+  svg += '<text x="110" y="105" text-anchor="middle" fill="#00f0ff" font-size="11" font-weight="bold">' + (st.platform === 'siemens' ? 'S7-1500' : st.platform === 'ab' ? 'CompactLogix' : st.platform === 'schneider' ? 'M340' : st.platform === 'abb' ? 'AC500' : 'PLC') + '</text>';
+  // LEDs
+  for (var li = 0; li < Math.min(loadList.length, 8); li++) {
+    var ledColor = li % 2 === 0 ? '#48bb78' : '#f6ad55';
+    svg += '<circle cx="' + (70 + (li % 4) * 25) + '" cy="' + (125 + Math.floor(li / 4) * 30) + '" r="5" fill="' + ledColor + '" opacity="0.8"><animate attributeName="opacity" values="0.4;1;0.4" dur="' + (1 + li * 0.3) + 's" repeatCount="indefinite"/></circle>';
+  }
+  svg += '<text x="110" y="210" text-anchor="middle" fill="#a0aec0" font-size="8">DI:' + (plcGenerateIOList().summary.DI) + ' DO:' + (plcGenerateIOList().summary.DO) + '</text>';
+  svg += '<text x="110" y="225" text-anchor="middle" fill="#a0aec0" font-size="8">AI:' + (plcGenerateIOList().summary.AI) + ' AO:' + (plcGenerateIOList().summary.AO) + '</text>';
+  svg += '<text x="110" y="260" text-anchor="middle" fill="#63b3ed" font-size="9">' + (st.plcLang) + '</text>';
+
+  // BMS Server
+  svg += '<rect x="290" y="30" width="120" height="80" rx="8" fill="#1a1f2e" stroke="#a855f7" stroke-width="2" filter="url(#plcGlow)"/>';
+  svg += '<text x="350" y="55" text-anchor="middle" fill="#a855f7" font-size="11" font-weight="bold">BMS</text>';
+  svg += '<text x="350" y="75" text-anchor="middle" fill="#d6bcfa" font-size="9">' + (st.protocol === 'bacnet' ? 'BACnet' : st.protocol === 'modbus_tcp' ? 'Modbus TCP' : st.protocol === 'modbus_rtu' ? 'Modbus RTU' : st.protocol === 'knx' ? 'KNX' : 'LON') + '</text>';
+  svg += '<text x="350" y="95" text-anchor="middle" fill="#a0aec0" font-size="8">' + loadList.length + ' ' + (da ? 'punkter' : 'points') + '</text>';
+
+  // FMS Dashboard
+  svg += '<rect x="530" y="30" width="120" height="80" rx="8" fill="#1a1f2e" stroke="#f6ad55" stroke-width="2" filter="url(#plcGlow)"/>';
+  svg += '<text x="590" y="55" text-anchor="middle" fill="#f6ad55" font-size="11" font-weight="bold">FMS</text>';
+  var fmsCount = Object.keys(st.fms).filter(function(k) { return st.fms[k]; }).length;
+  svg += '<text x="590" y="75" text-anchor="middle" fill="#fbd38d" font-size="9">' + fmsCount + ' ' + (da ? 'funktioner' : 'features') + '</text>';
+  svg += '<text x="590" y="95" text-anchor="middle" fill="#a0aec0" font-size="8">' + calcLoadSchedule().kW.toFixed(1) + ' kW total</text>';
+
+  // Connection PLC -> BMS
+  svg += '<line x1="170" y1="140" x2="290" y2="70" stroke="url(#plcNeon)" stroke-width="2" stroke-dasharray="6 3"><animate attributeName="stroke-dashoffset" values="0;-18" dur="1.5s" repeatCount="indefinite"/></line>';
+  svg += '<text x="220" y="95" fill="#00f0ff" font-size="7" transform="rotate(-20,220,95)">' + (st.protocol === 'bacnet' ? 'BACnet/IP' : st.protocol === 'knx' ? 'KNX TP' : 'TCP/IP') + '</text>';
+
+  // Connection BMS -> FMS
+  svg += '<line x1="410" y1="70" x2="530" y2="70" stroke="url(#plcNeon)" stroke-width="2" stroke-dasharray="6 3"><animate attributeName="stroke-dashoffset" values="0;-18" dur="2s" repeatCount="indefinite"/></line>';
+  svg += '<text x="470" y="62" fill="#a855f7" font-size="7">REST API</text>';
+
+  // Field devices
+  var deviceY = 320;
+  var deviceSpacing = numLoads > 0 ? Math.min(100, (w - 100) / Math.max(numLoads, 1)) : 100;
+  var startX = (w - (numLoads - 1) * deviceSpacing) / 2;
+  for (var di = 0; di < numLoads; di++) {
+    var dx = startX + di * deviceSpacing;
+    var c = loadList[di];
+    var nm = (c.name || 'Load ' + (di + 1)).substring(0, 8);
+    svg += '<rect x="' + (dx - 25) + '" y="' + deviceY + '" width="50" height="60" rx="6" fill="#1a1f2e" stroke="#48bb78" stroke-width="1.5"/>';
+    svg += '<text x="' + dx + '" y="' + (deviceY + 20) + '" text-anchor="middle" fill="#48bb78" font-size="8">' + nm + '</text>';
+    svg += '<text x="' + dx + '" y="' + (deviceY + 38) + '" text-anchor="middle" fill="#a0aec0" font-size="7">' + c.kW + ' kW</text>';
+    svg += '<text x="' + dx + '" y="' + (deviceY + 52) + '" text-anchor="middle" fill="#718096" font-size="6">' + c.phase + '</text>';
+    // Connection line to PLC
+    svg += '<line x1="' + dx + '" y1="' + deviceY + '" x2="110" y2="280" stroke="#48bb78" stroke-width="1" stroke-dasharray="4 2" opacity="0.6"><animate attributeName="stroke-dashoffset" values="0;-12" dur="' + (2 + di * 0.4) + 's" repeatCount="indefinite"/></line>';
+  }
+
+  // Title
+  svg += '<text x="' + (w / 2) + '" y="' + (h - 8) + '" text-anchor="middle" fill="#4a5568" font-size="8">IEC 61131-3 | ' + (st.platform === 'siemens' ? 'TIA Portal' : st.platform === 'ab' ? 'Studio 5000' : st.platform === 'schneider' ? 'EcoStruxure' : st.platform === 'abb' ? 'Automation Builder' : 'IEC 61131-3') + ' | ' + (da ? 'Automatisk genereret' : 'Auto-generated') + '</text>';
+
+  svg += '</svg></div>';
+  return svg;
+}
+
+function renderPlc() {
+  const da = lang === 'da';
+  const st = plcState;
+  const schedule = calcLoadSchedule();
+  var html = '';
+
+  // Title card
+  html += '<div class="card fade-in"><div class="card-title">\uD83E\uDD16 ' + (da ? 'PLC/BMS/FMS Integration' : 'PLC/BMS/FMS Integration') + '</div>';
+  html += '<div class="info-row">' + (da ? 'Auto-genererer PLC-program, I/O-liste, BMS-punktliste og FMS-konfiguration fra dit dimensioneringsprojekt. ' + loadList.length + ' forbrugere registreret.' : 'Auto-generates PLC program, I/O list, BMS points list and FMS configuration from your dimensioning project. ' + loadList.length + ' consumers registered.') + '</div>';
+
+  if (loadList.length === 0) {
+    html += '<div class="result-box error"><div class="result-title">\u26A0\uFE0F ' + (da ? 'Ingen forbrugere' : 'No consumers') + '</div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Tilf\u00F8j forbrugere i Belastning-modulet f\u00F8rst' : 'Add consumers in the Load module first') + '</span></div></div>';
+  }
+  html += '</div>';
+
+  // Section 1: PLC Platform
+  html += '<div class="card fade-in"><div class="card-title">\uD83D\uDD27 ' + (da ? 'PLC-platform' : 'PLC Platform') + '</div>';
+  html += '<div class="info-row">' + (da ? 'V\u00E6lg PLC-fabrikat og programmeringssprog' : 'Select PLC manufacturer and programming language') + '</div>';
+  var platforms = [
+    { id: 'siemens', label: 'Siemens S7-1500 / TIA Portal' },
+    { id: 'ab', label: 'Allen-Bradley CompactLogix / Studio 5000' },
+    { id: 'schneider', label: 'Schneider M340 / EcoStruxure' },
+    { id: 'abb', label: 'ABB AC500' },
+    { id: 'generic', label: (da ? 'Generisk IEC 61131-3' : 'Generic IEC 61131-3') }
+  ];
+  html += '<div class="select-grid">';
+  platforms.forEach(function(p) {
+    html += '<button class="sel-btn ' + (st.platform === p.id ? 'selected' : '') + '" onclick="plcSet(\'platform\',\'' + p.id + '\')">' + p.label + '</button>';
+  });
+  html += '</div>';
+
+  // Programming language
+  html += '<div style="margin-top:12px"><strong>' + (da ? 'Programmeringssprog:' : 'Programming language:') + '</strong></div>';
+  var plcLangs = [
+    { id: 'ST', label: (st.platform === 'siemens' ? 'SCL (Structured Text)' : 'Structured Text (ST)') },
+    { id: 'LD', label: (st.platform === 'siemens' ? 'LAD (Ladder)' : 'Ladder Diagram (LD)') },
+    { id: 'FBD', label: 'Function Block Diagram (FBD)' },
+    { id: 'SFC', label: (st.platform === 'siemens' ? 'GRAPH (SFC)' : 'Sequential Function Chart (SFC)') }
+  ];
+  html += '<div class="select-grid">';
+  plcLangs.forEach(function(l) {
+    html += '<button class="sel-btn ' + (st.plcLang === l.id ? 'selected' : '') + '" onclick="plcSet(\'plcLang\',\'' + l.id + '\')">' + l.label + '</button>';
+  });
+  html += '</div></div>';
+
+  // Section 2: BMS Protocol
+  html += '<div class="card fade-in"><div class="card-title">\uD83C\uDF10 ' + (da ? 'BMS-protokol' : 'BMS Protocol') + '</div>';
+  html += '<div class="info-row">' + (da ? 'V\u00E6lg kommunikationsprotokol og integrationsniveau' : 'Select communication protocol and integration level') + '</div>';
+  var protocols = [
+    { id: 'bacnet', label: 'BACnet' },
+    { id: 'modbus_tcp', label: 'Modbus TCP' },
+    { id: 'modbus_rtu', label: 'Modbus RTU' },
+    { id: 'knx', label: 'KNX' },
+    { id: 'lon', label: 'LON' }
+  ];
+  html += '<div class="select-grid">';
+  protocols.forEach(function(p) {
+    html += '<button class="sel-btn ' + (st.protocol === p.id ? 'selected' : '') + '" onclick="plcSet(\'protocol\',\'' + p.id + '\')">' + p.label + '</button>';
+  });
+  html += '</div>';
+
+  // Integration level
+  html += '<div style="margin-top:12px"><strong>' + (da ? 'Integrationsniveau:' : 'Integration level:') + '</strong></div>';
+  var integrations = [
+    { id: 'monitor', da: 'Kun overv\u00E5gning', en: 'Monitoring only' },
+    { id: 'control', da: 'Overv\u00E5gning + styring', en: 'Monitoring + Control' },
+    { id: 'full', da: 'Fuld automation', en: 'Full automation' }
+  ];
+  html += '<div class="select-grid">';
+  integrations.forEach(function(ig) {
+    html += '<button class="sel-btn ' + (st.integration === ig.id ? 'selected' : '') + '" onclick="plcSet(\'integration\',\'' + ig.id + '\')">' + (da ? ig.da : ig.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Section 3: FMS Options
+  html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCCA ' + (da ? 'FMS-funktioner' : 'FMS Features') + '</div>';
+  html += '<div class="info-row">' + (da ? 'Aktiver/deaktiver Facility Management funktioner' : 'Enable/disable Facility Management features') + '</div>';
+  var fmsOpts = [
+    { key: 'energy', da: 'Energim\u00E5ling', en: 'Energy metering' },
+    { key: 'alarm', da: 'Alarmh\u00E5ndtering', en: 'Alarm management' },
+    { key: 'maintenance', da: 'Vedligeholdelsesplan', en: 'Maintenance scheduling' },
+    { key: 'occupancy', da: 'Tilstedev\u00E6relsesstyring', en: 'Occupancy-based control' },
+    { key: 'demand', da: 'Behovsstyring', en: 'Demand response' }
+  ];
+  html += '<div class="select-grid">';
+  fmsOpts.forEach(function(f) {
+    html += '<button class="sel-btn ' + (st.fms[f.key] ? 'selected' : '') + '" onclick="plcFmsToggle(\'' + f.key + '\')">' + (st.fms[f.key] ? '\u2705 ' : '\u274C ') + (da ? f.da : f.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Section 4: Auto-Generated Outputs (only show if consumers exist)
+  if (loadList.length > 0) {
+    var io = plcGenerateIOList();
+
+    // A) I/O List Table
+    html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCCB ' + (da ? 'I/O-liste (auto-genereret)' : 'I/O List (auto-generated)') + '</div>';
+    html += '<div class="info-row">' + io.rows.length + ' ' + (da ? 'signaler | DI:' : 'signals | DI:') + io.summary.DI + ' DO:' + io.summary.DO + ' AI:' + io.summary.AI + ' AO:' + io.summary.AO + '</div>';
+    html += '<div style="overflow-x:auto"><table class="data-table"><thead><tr><th>Tag</th><th>' + (da ? 'Beskrivelse' : 'Description') + '</th><th>I/O</th><th>Signal</th><th>' + (da ? 'Adresse' : 'Address') + '</th><th>' + (da ? 'Kabel' : 'Cable') + '</th></tr></thead><tbody>';
+    io.rows.forEach(function(r) {
+      var cls = r.io === 'DI' ? 'color:#48bb78' : r.io === 'DO' ? 'color:#f6ad55' : r.io === 'AI' ? 'color:#63b3ed' : 'color:#d6bcfa';
+      html += '<tr><td style="font-family:monospace;font-size:.75rem">' + r.tag + '</td><td>' + r.desc + '</td><td style="' + cls + ';font-weight:bold">' + r.io + '</td><td>' + r.signal + '</td><td style="font-family:monospace">' + r.addr + '</td><td>' + r.cable + '</td></tr>';
+    });
+    html += '</tbody></table></div></div>';
+
+    // B) PLC Program
+    var code = plcGenerateProgram();
+    html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCBB ' + (da ? 'PLC-program' : 'PLC Program') + ' (' + st.plcLang + (st.platform === 'siemens' && st.plcLang === 'ST' ? '/SCL' : '') + ')</div>';
+    html += '<pre style="background:#1a1f2e;color:#e2e8f0;padding:14px;border-radius:8px;font-size:.75rem;overflow-x:auto;max-height:400px;border:1px solid #2d3748">' + code.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre></div>';
+
+    // C) BMS Points
+    var bmsPoints = plcGenerateBMSPoints();
+    html += '<div class="card fade-in"><div class="card-title">\uD83C\uDF10 ' + (da ? 'BMS-punktliste' : 'BMS Points List') + ' (' + (st.protocol === 'bacnet' ? 'BACnet' : st.protocol === 'modbus_tcp' ? 'Modbus TCP' : st.protocol === 'modbus_rtu' ? 'Modbus RTU' : st.protocol === 'knx' ? 'KNX' : 'LON') + ')</div>';
+    html += '<div style="overflow-x:auto"><table class="data-table"><thead><tr>';
+    if (st.protocol === 'bacnet') {
+      html += '<th>Object Type</th><th>Instance</th><th>Name</th><th>' + (da ? 'Beskrivelse' : 'Description') + '</th><th>' + (da ? 'Enhed' : 'Units') + '</th>';
+    } else if (st.protocol === 'modbus_tcp' || st.protocol === 'modbus_rtu') {
+      html += '<th>Register</th><th>Type</th><th>Data Type</th><th>Scale</th><th>Name</th>';
+    } else if (st.protocol === 'knx') {
+      html += '<th>Group Address</th><th>DPT</th><th>Name</th>';
+    } else {
+      html += '<th>NV</th><th>SNVT</th><th>Name</th>';
+    }
+    html += '</tr></thead><tbody>';
+    bmsPoints.forEach(function(r) {
+      html += '<tr>';
+      if (st.protocol === 'bacnet') {
+        html += '<td>' + r.objType + '</td><td>' + r.instance + '</td><td>' + r.name + '</td><td>' + r.desc + '</td><td>' + r.units + '</td>';
+      } else if (st.protocol === 'modbus_tcp' || st.protocol === 'modbus_rtu') {
+        html += '<td style="font-family:monospace">' + r.register + '</td><td>' + r.type + '</td><td>' + r.dataType + '</td><td>' + r.scale + '</td><td>' + r.name + '</td>';
+      } else if (st.protocol === 'knx') {
+        html += '<td style="font-family:monospace">' + r.groupAddr + '</td><td>' + r.dpt + '</td><td>' + r.name + '</td>';
+      } else {
+        html += '<td style="font-family:monospace">' + r.nv + '</td><td>' + r.snvt + '</td><td>' + r.name + '</td>';
+      }
+      html += '</tr>';
+    });
+    html += '</tbody></table></div></div>';
+
+    // D) FMS Integration summary
+    var fmsCfg = plcGenerateFMSConfig();
+    var activeFms = Object.keys(fmsCfg.features);
+    if (activeFms.length > 0) {
+      html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCCA ' + (da ? 'FMS-integration' : 'FMS Integration') + '</div>';
+      html += '<div class="result-box"><div class="result-title">' + (da ? 'Aktive funktioner' : 'Active features') + '</div>';
+      activeFms.forEach(function(k) {
+        var feat = fmsCfg.features[k];
+        html += '<div class="result-row"><span class="label">' + k + '</span><span class="value">\u2705 ' + (da ? 'Aktiv' : 'Active') + '</span></div>';
+      });
+      html += '<div class="result-row"><span class="label">' + (da ? 'Total effekt' : 'Total power') + '</span><span class="value">' + fmsCfg.totalKW.toFixed(1) + ' kW / ' + fmsCfg.totalKVA.toFixed(1) + ' kVA</span></div>';
+      html += '</div></div>';
+    }
+
+    // SVG Visualization
+    html += '<div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ' + (da ? 'Systemarkitektur' : 'System Architecture') + '</div>';
+    html += plcBuildSvg();
+    html += '</div>';
+
+    // Section 5: Download buttons
+    html += '<div class="card fade-in"><div class="card-title">\u2B07\uFE0F ' + (da ? 'Download' : 'Downloads') + '</div>';
+    html += '<div class="select-grid">';
+    html += '<button class="sel-btn" onclick="plcDownloadIO()">\uD83D\uDCCB ' + (da ? 'Download I/O-liste (.csv)' : 'Download I/O list (.csv)') + '</button>';
+    html += '<button class="sel-btn" onclick="plcDownloadProgram()">\uD83D\uDCBB ' + (da ? 'Download PLC-program' : 'Download PLC program') + ' (' + (st.platform === 'siemens' && st.plcLang === 'ST' ? '.scl' : st.plcLang === 'ST' ? '.st' : '.txt') + ')</button>';
+    html += '<button class="sel-btn" onclick="plcDownloadBMS()">\uD83C\uDF10 ' + (da ? 'Download BMS-punkter (.csv)' : 'Download BMS points (.csv)') + '</button>';
+    html += '<button class="sel-btn" onclick="plcDownloadFMS()">\uD83D\uDCCA ' + (da ? 'Download FMS-config (.json)' : 'Download FMS config (.json)') + '</button>';
+    html += '</div></div>';
+  }
+
+  return html;
 }
 
 // ===== INIT =====
