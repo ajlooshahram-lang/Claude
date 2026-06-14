@@ -755,6 +755,7 @@ const T = {
       zs: '\uD83D\uDD04 Sl\u00F8jfe Zs',
       motor: '\u2699\uFE0F Motorstart',
       curves: '\uD83D\uDCC8 Kurver',
+      ev: '\uD83D\uDE97 EV-lader',
       exam: '\uD83C\uDF93 Eksamen'
     },
     // Load module
@@ -858,6 +859,7 @@ const T = {
       zs: '\uD83D\uDD04 Loop Zs',
       motor: '\u2699\uFE0F Motor Start',
       curves: '\uD83D\uDCC8 Curves',
+      ev: '\uD83D\uDE97 EV Charger',
       exam: '\uD83C\uDF93 Exam'
     },
     loadTitle: 'Load Calculation',
@@ -2004,6 +2006,8 @@ let zsState = { earthing: 'TN-S', deviceType: 'mcb', deviceCurve: 'B', deviceRat
 let motorState = { power: 7.5, voltage: 400, eta: 0.89, cosfi: 0.85, method: 'DOL', cableLength: 30, crossSection: 4 };
 // Curves (time-current) state
 let curvesState = { dev1Type: 'gG', dev1Rating: 63, dev1Curve: 'B', dev2Type: 'mcb', dev2Rating: 16, dev2Curve: 'B', cableCS: 4, cableIns: 'PVC', cableMat: 'Cu', showDev1: true, showDev2: true, showCable: true, faultCurrent: 1000 };
+// EV Charger state
+let evState = { power: 11, numChargers: 1, mainFuse: 63, existingLoad: 50, earthing: 'TN-S', cableLength: 15, installation: 'outdoor', dcDetection: false };
 // Short circuit state
 let scState = { zNet: 1, zTrafo: 5 };
 // Standards state
@@ -2133,6 +2137,7 @@ function renderModule(mod) {
     case 'zs': content = renderZs(); break;
     case 'motor': content = renderMotorStart(); break;
     case 'curves': content = renderCurves(); break;
+    case 'ev': content = renderEvCharger(); break;
     case 'exam': content = renderExam(); break;
   }
   // Append AI assistant to every module
@@ -9309,6 +9314,422 @@ function buildCurvesViz() {
 
   // Standards reference
   svg += '<text x="' + (W - 10) + '" y="' + (H - 10) + '" text-anchor="end" font-size="7" fill="rgba(255,255,255,0.3)">DS/HD 60364-4-43 / IEC 60269 / IEC 60898</text>';
+
+  return '<div style="margin-top:16px;overflow-x:auto"><svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:' + W + 'px;border-radius:14px;border:1px solid rgba(0,180,255,0.1)">' + svg + '</svg></div>';
+}
+
+// ===== EV CHARGER DIMENSIONING WIZARD (DS/HD 60364-7-722) =====
+function renderEvCharger() {
+  const da = lang === 'da';
+
+  // Charger power options: {label, kW, phases, current}
+  const CHARGER_OPTIONS = [
+    { kW: 3.7, phases: 1, current: 16, label: '3.7 kW (1\u00D716A)' },
+    { kW: 7.4, phases: 1, current: 32, label: '7.4 kW (1\u00D732A)' },
+    { kW: 11, phases: 3, current: 16, label: '11 kW (3\u00D716A)' },
+    { kW: 22, phases: 3, current: 32, label: '22 kW (3\u00D732A)' }
+  ];
+  const NUM_OPTIONS = [1, 2, 3, 4, 6, 8, 10];
+  const MAIN_FUSE_OPTIONS = [16, 20, 25, 32, 35, 40, 50, 63, 80, 100, 125, 160, 200];
+  const LOAD_PCT_OPTIONS = [20, 30, 40, 50, 60, 70, 80];
+  const EARTHING_OPTIONS = ['TN-S', 'TN-C-S'];
+  const CABLE_LENGTH_OPTIONS = [5, 10, 15, 20, 25, 30, 40, 50];
+  const INSTALL_OPTIONS = ['indoor', 'outdoor'];
+  const DC_OPTIONS = [true, false];
+
+  // Cable data (copper XLPE, method C, single circuit)
+  const CABLE_DATA = [
+    { cs: 1.5, iz: 22, r: 12.1 },
+    { cs: 2.5, iz: 30, r: 7.41 },
+    { cs: 4, iz: 40, r: 4.61 },
+    { cs: 6, iz: 51, r: 3.08 },
+    { cs: 10, iz: 70, r: 1.83 },
+    { cs: 16, iz: 94, r: 1.15 },
+    { cs: 25, iz: 119, r: 0.727 },
+    { cs: 35, iz: 147, r: 0.524 },
+    { cs: 50, iz: 179, r: 0.387 }
+  ];
+
+  // Get selected charger info
+  const selectedCharger = CHARGER_OPTIONS.find(function(c) { return c.kW === evState.power; }) || CHARGER_OPTIONS[2];
+  const chargerCurrent = selectedCharger.current; // Continuous rated current per charger
+  const chargerPhases = selectedCharger.phases;
+  const chargerKW = selectedCharger.kW;
+
+  // Total EV current (100% continuous, NO diversity reduction per DS/HD 60364-7-722)
+  const totalEvCurrent = chargerCurrent * evState.numChargers;
+
+  // Available capacity from main fuse
+  const usedByExisting = evState.mainFuse * (evState.existingLoad / 100);
+  const availableCapacity = evState.mainFuse - usedByExisting;
+
+  // Capacity verdict
+  const capacityOk = availableCapacity >= totalEvCurrent;
+  const marginal = availableCapacity >= totalEvCurrent * 0.9 && availableCapacity < totalEvCurrent;
+  const needsLoadMgmt = !capacityOk;
+
+  // Cable sizing (for one charger circuit, continuous load = 100%)
+  const requiredIz = chargerCurrent; // Continuous = size at 100%
+  const recCable = CABLE_DATA.find(function(c) { return c.iz >= requiredIz * 1.0; }) || CABLE_DATA[CABLE_DATA.length - 1];
+
+  // Voltage drop calculation
+  const U = chargerPhases === 3 ? 400 : 230;
+  const vdropV = chargerPhases === 3
+    ? Math.sqrt(3) * chargerCurrent * (recCable.r * evState.cableLength / 1000)
+    : 2 * chargerCurrent * (recCable.r * evState.cableLength / 1000);
+  const vdropPct = (vdropV / U) * 100;
+  const vdropOk = vdropPct <= 3; // DS/HD 60364-5-52 max 3% for final circuit
+
+  // If vdrop exceeds, find bigger cable
+  let finalCable = recCable;
+  if (!vdropOk) {
+    for (var ci = 0; ci < CABLE_DATA.length; ci++) {
+      var testCable = CABLE_DATA[ci];
+      if (testCable.iz < requiredIz) continue;
+      var testVdrop = chargerPhases === 3
+        ? Math.sqrt(3) * chargerCurrent * (testCable.r * evState.cableLength / 1000) / U * 100
+        : 2 * chargerCurrent * (testCable.r * evState.cableLength / 1000) / U * 100;
+      if (testVdrop <= 3) { finalCable = testCable; break; }
+    }
+    if (!finalCable || (chargerPhases === 3 ? Math.sqrt(3) * chargerCurrent * (finalCable.r * evState.cableLength / 1000) / U * 100 : 2 * chargerCurrent * (finalCable.r * evState.cableLength / 1000) / U * 100) > 3) {
+      finalCable = CABLE_DATA[CABLE_DATA.length - 1]; // Use largest available
+    }
+  }
+  const finalVdropPct = chargerPhases === 3
+    ? Math.sqrt(3) * chargerCurrent * (finalCable.r * evState.cableLength / 1000) / U * 100
+    : 2 * chargerCurrent * (finalCable.r * evState.cableLength / 1000) / U * 100;
+
+  // MCB rating (at or above charger current)
+  const MCB_RATINGS = [6, 10, 13, 16, 20, 25, 32, 40, 50, 63];
+  const recMCB = MCB_RATINGS.find(function(r) { return r >= chargerCurrent; }) || chargerCurrent;
+
+  // RCD determination per DS/HD 60364-7-722 section 722.531.3.101
+  const rcdType = evState.dcDetection ? 'A' : 'B';
+  const rcdLabel = rcdType === 'B'
+    ? (da ? 'Type B (eller Type A + RDC-DD)' : 'Type B (or Type A + RDC-DD)')
+    : (da ? 'Type A (lader har DC-detektion)' : 'Type A (charger has DC detection)');
+
+  // PEN-break assessment
+  const penBreakRisk = evState.earthing === 'TN-C-S';
+
+  // IP rating
+  const ipRating = evState.installation === 'outdoor' ? 'IP44' : 'IP20';
+
+  // --- Build verdict ---
+  let verdictClass, verdictText, verdictIcon;
+  if (capacityOk && finalVdropPct <= 3) {
+    verdictClass = 'success';
+    verdictIcon = '\u2713';
+    verdictText = da ? 'Kan tilsluttes direkte' : 'Can be connected directly';
+  } else if (!capacityOk && (availableCapacity >= totalEvCurrent * 0.5)) {
+    verdictClass = 'warning';
+    verdictIcon = '\u26A0\uFE0F';
+    verdictText = da ? 'Kr\u00E6ver laststyring' : 'Requires load management';
+  } else {
+    verdictClass = 'danger';
+    verdictIcon = '\u2717';
+    verdictText = da ? 'Hovedsikring for lille' : 'Main fuse too small';
+  }
+
+  // --- UI SECTIONS ---
+  let html = '<div class="card fade-in"><div class="card-title">\uD83D\uDE97 ' + (da ? 'EV-lader dimensionering' : 'EV Charger Dimensioning') + '</div>';
+  html += '<div class="info-row">' + (da ? 'Dimensionering af EV-ladeinstallation iht. DS/HD 60364-7-722. EV-ladning er KONTINUERLIG last \u2014 dimensioner altid til 100%.' : 'EV charging installation dimensioning per DS/HD 60364-7-722. EV charging is a CONTINUOUS load \u2014 always size at 100%.') + '</div>';
+
+  // Safety disclaimer
+  html += '<div class="result-box warning" style="margin-bottom:14px"><div class="result-title">\u26A0\uFE0F ' + (da ? 'Sikkerhedsforbehold' : 'Safety disclaimer') + '</div>';
+  html += '<div style="padding:6px 2px;line-height:1.5">' + (da ? 'EV er kontinuerlig last \u2014 dimensioner ALTID til 100%. 75%-reglen blev AFSKAFFET 1. januar 2020. Brug ALDRIG diversitet p\u00E5 det enkelte ladekredsloeb.' : 'EV is continuous load \u2014 ALWAYS size at 100%. The 75% rule was ABOLISHED 1 January 2020. NEVER apply diversity to the individual charging circuit.') + '</div></div>';
+
+  // 1. Charger power selector
+  html += '<div class="select-group"><div class="select-label">\u26A1 ' + (da ? 'Ladereffekt' : 'Charger power') + '</div><div class="select-grid">';
+  CHARGER_OPTIONS.forEach(function(opt) {
+    html += '<button class="sel-btn ' + (evState.power === opt.kW ? 'selected' : '') + '" onclick="evState.power=' + opt.kW + ';renderModule(\'ev\')">' + opt.label + '</button>';
+  });
+  html += '</div></div>';
+
+  // 2. Number of chargers
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD22 ' + (da ? 'Antal ladere' : 'Number of chargers') + '</div><div class="select-grid">';
+  NUM_OPTIONS.forEach(function(n) {
+    html += '<button class="sel-btn ' + (evState.numChargers === n ? 'selected' : '') + '" onclick="evState.numChargers=' + n + ';renderModule(\'ev\')">' + n + '</button>';
+  });
+  html += '</div></div>';
+
+  // 3. Main fuse
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD0C ' + (da ? 'Hovedsikring' : 'Main fuse') + '</div><div class="select-grid">';
+  MAIN_FUSE_OPTIONS.forEach(function(f) {
+    html += '<button class="sel-btn ' + (evState.mainFuse === f ? 'selected' : '') + '" onclick="evState.mainFuse=' + f + ';renderModule(\'ev\')">' + f + 'A</button>';
+  });
+  html += '</div></div>';
+
+  // 4. Existing load percentage
+  html += '<div class="select-group"><div class="select-label">\uD83C\uDFE0 ' + (da ? 'Eksisterende belastning' : 'Existing load') + '</div><div class="select-grid">';
+  LOAD_PCT_OPTIONS.forEach(function(p) {
+    html += '<button class="sel-btn ' + (evState.existingLoad === p ? 'selected' : '') + '" onclick="evState.existingLoad=' + p + ';renderModule(\'ev\')">' + p + '%</button>';
+  });
+  html += '</div></div>';
+
+  // 5. Earthing system
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD29 ' + (da ? 'Jordingssystem' : 'Earthing system') + '</div><div class="select-grid">';
+  EARTHING_OPTIONS.forEach(function(e) {
+    html += '<button class="sel-btn ' + (evState.earthing === e ? 'selected' : '') + '" onclick="evState.earthing=\'' + e + '\';renderModule(\'ev\')">' + e + '</button>';
+  });
+  html += '</div></div>';
+
+  // 6. Cable length
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDCCF ' + (da ? 'Kabellangde til lader' : 'Cable length to charger') + '</div><div class="select-grid">';
+  CABLE_LENGTH_OPTIONS.forEach(function(l) {
+    html += '<button class="sel-btn ' + (evState.cableLength === l ? 'selected' : '') + '" onclick="evState.cableLength=' + l + ';renderModule(\'ev\')">' + l + ' m</button>';
+  });
+  html += '</div></div>';
+
+  // 7. Installation
+  html += '<div class="select-group"><div class="select-label">\uD83C\uDFD7\uFE0F ' + (da ? 'Installation' : 'Installation') + '</div><div class="select-grid">';
+  INSTALL_OPTIONS.forEach(function(inst) {
+    var lbl = inst === 'indoor' ? (da ? 'Indendors' : 'Indoor') : (da ? 'Udendors' : 'Outdoor');
+    html += '<button class="sel-btn ' + (evState.installation === inst ? 'selected' : '') + '" onclick="evState.installation=\'' + inst + '\';renderModule(\'ev\')">' + lbl + '</button>';
+  });
+  html += '</div></div>';
+
+  // 8. DC detection
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD0D ' + (da ? 'Lader har indbygget DC-detektion' : 'Charger has built-in DC detection') + '</div><div class="select-grid">';
+  DC_OPTIONS.forEach(function(d) {
+    var lbl = d ? (da ? 'Ja' : 'Yes') : (da ? 'Nej' : 'No');
+    html += '<button class="sel-btn ' + (evState.dcDetection === d ? 'selected' : '') + '" onclick="evState.dcDetection=' + d + ';renderModule(\'ev\')">' + lbl + '</button>';
+  });
+  html += '</div></div>';
+
+  // === RESULTS ===
+  html += '<div class="result-box ' + verdictClass + '" style="margin-top:18px">';
+  html += '<div class="result-title" style="font-size:1.3rem">' + verdictIcon + ' ' + verdictText + '</div>';
+
+  // Capacity summary
+  html += '<div style="margin:12px 0;padding:10px;background:rgba(0,0,0,0.2);border-radius:10px">';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.9rem">';
+  html += '<div>' + (da ? 'Hovedsikring:' : 'Main fuse:') + '</div><div style="text-align:right"><strong>' + evState.mainFuse + ' A</strong></div>';
+  html += '<div>' + (da ? 'Eksisterende belastning:' : 'Existing load:') + '</div><div style="text-align:right"><strong>' + usedByExisting.toFixed(1) + ' A (' + evState.existingLoad + '%)</strong></div>';
+  html += '<div>' + (da ? 'Tilgangelig kapacitet:' : 'Available capacity:') + '</div><div style="text-align:right"><strong>' + availableCapacity.toFixed(1) + ' A</strong></div>';
+  html += '<div>' + (da ? 'Total EV-behov (100% kont.):' : 'Total EV demand (100% cont.):') + '</div><div style="text-align:right;color:' + (capacityOk ? 'var(--success)' : 'var(--danger)') + '"><strong>' + totalEvCurrent + ' A</strong></div>';
+  html += '</div></div>';
+
+  // Per-charger specs
+  html += '<div style="margin:12px 0;padding:10px;background:rgba(0,0,0,0.2);border-radius:10px">';
+  html += '<div style="font-weight:600;margin-bottom:8px;color:var(--accent)">' + (da ? 'Per lader:' : 'Per charger:') + '</div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:.85rem">';
+  html += '<div>' + (da ? 'Effekt:' : 'Power:') + '</div><div style="text-align:right">' + chargerKW + ' kW (' + chargerPhases + (chargerPhases === 3 ? '\u00D7' : '\u00D7') + ')</div>';
+  html += '<div>' + (da ? 'Strom (kontinuerlig):' : 'Current (continuous):') + '</div><div style="text-align:right"><strong>' + chargerCurrent + ' A</strong></div>';
+  html += '<div>' + (da ? 'Kabel:' : 'Cable:') + '</div><div style="text-align:right">' + (chargerPhases === 3 ? '5G' : '3G') + finalCable.cs + ' mm\u00B2 (Iz=' + finalCable.iz + 'A)</div>';
+  html += '<div>' + (da ? 'Spandingsfald:' : 'Voltage drop:') + '</div><div style="text-align:right;color:' + (finalVdropPct <= 3 ? 'var(--success)' : 'var(--danger)') + '">' + finalVdropPct.toFixed(1) + '% ' + (finalVdropPct <= 3 ? '\u2713' : '\u2717') + '</div>';
+  html += '<div>' + (da ? 'MCB:' : 'MCB:') + '</div><div style="text-align:right">C' + recMCB + '</div>';
+  html += '<div>' + (da ? 'RCD:' : 'RCD:') + '</div><div style="text-align:right;color:' + (rcdType === 'B' ? '#ff9955' : 'var(--success)') + '">' + rcdLabel + '</div>';
+  html += '<div>IP' + (da ? '-krav:' : ' rating:') + '</div><div style="text-align:right">' + ipRating + '</div>';
+  html += '</div></div>';
+
+  // Load management recommendation
+  if (needsLoadMgmt) {
+    html += '<div style="margin:12px 0;padding:10px;background:rgba(255,150,0,0.1);border:1px solid rgba(255,150,0,0.3);border-radius:10px">';
+    html += '<div style="font-weight:600;color:#ff9955;margin-bottom:6px">\u26A1 ' + (da ? 'Laststyring p\u00E5kr\u00E6vet' : 'Load management required') + '</div>';
+    html += '<div style="font-size:.85rem;line-height:1.5">';
+    html += (da ? 'Den samlede EV-belastning (' + totalEvCurrent + ' A) overstiger den tilg\u00E6ngelige kapacitet (' + availableCapacity.toFixed(1) + ' A). ' : 'Total EV load (' + totalEvCurrent + ' A) exceeds available capacity (' + availableCapacity.toFixed(1) + ' A). ');
+    html += (da ? 'L\u00f8sning: Installer dynamisk laststyring (DLM) iht. DS/HD 60364-7-722. DLM m\u00E5ler realtids-hovedstr\u00f8m og reducerer ladestrom n\u00E5r kapaciteten er opbrugt.' : 'Solution: Install dynamic load management (DLM) per DS/HD 60364-7-722. DLM measures real-time main current and reduces charging when capacity is exhausted.');
+    html += '</div></div>';
+  }
+
+  // PEN-break warning for TN-C-S
+  if (penBreakRisk) {
+    html += '<div style="margin:12px 0;padding:10px;background:rgba(255,50,50,0.1);border:1px solid rgba(255,50,50,0.3);border-radius:10px">';
+    html += '<div style="font-weight:600;color:var(--danger);margin-bottom:6px">\u26A0\uFE0F ' + (da ? 'PEN-brud risiko (TN-C-S)' : 'PEN-break risk (TN-C-S)') + '</div>';
+    html += '<div style="font-size:.85rem;line-height:1.5">';
+    html += (da ? 'Ved TN-C-S forsyning kan PEN-brud medf\u00f8re farlig ber\u00f8ringsspaending p\u00E5 chassis. DS/HD 60364-7-722 \u00a7722.411.4.1 kr\u00E6ver beskyttelsesforanstaltninger:' : 'In TN-C-S supply, PEN break can cause dangerous touch voltage on chassis. DS/HD 60364-7-722 \u00a7722.411.4.1 requires protective measures:');
+    html += '<ul style="margin:6px 0 0 16px;padding:0">';
+    html += '<li>' + (da ? 'Sp\u00E6ndingsoverv\u00E5gningsrel\u00E6 (f.eks. Bender VMD460/VMD420)' : 'Voltage monitoring relay (e.g. Bender VMD460/VMD420)') + '</li>';
+    html += '<li>' + (da ? 'Lokal jordelektrode (erstatningsjord)' : 'Local earth electrode (substitute earth)') + '</li>';
+    html += '<li>' + (da ? 'Potentialudligning til alle ledende dele' : 'Equipotential bonding to all conductive parts') + '</li>';
+    html += '</ul></div></div>';
+  }
+
+  // RCD explanation
+  html += '<div style="margin:12px 0;padding:10px;background:rgba(0,180,255,0.05);border:1px solid rgba(0,180,255,0.15);border-radius:10px">';
+  html += '<div style="font-weight:600;color:var(--accent);margin-bottom:6px">\uD83D\uDEE1\uFE0F RCD ' + (da ? 'krav iht. \u00a7722.531.3.101' : 'requirement per \u00a7722.531.3.101') + '</div>';
+  html += '<div style="font-size:.85rem;line-height:1.5">';
+  if (rcdType === 'B') {
+    html += (da ? 'Laderen har IKKE indbygget DC-fejlstromsdetektion. Der kr\u00E6ves <strong>RCD Type B</strong> (30mA) eller <strong>Type A + RDC-DD</strong> (6mA DC-detektion). Type A alene er IKKE tilstr\u00E6kkelig for EV-ladere uden DC-detektion.' : 'Charger does NOT have built-in DC fault current detection. <strong>RCD Type B</strong> (30mA) or <strong>Type A + RDC-DD</strong> (6mA DC detection) is required. Type A alone is NOT sufficient for EV chargers without DC detection.');
+  } else {
+    html += (da ? 'Laderen har indbygget DC-fejlstromsdetektion (\u22656mA). <strong>RCD Type A</strong> (30mA) er tilstr\u00E6kkelig iht. \u00a7722.531.3.101.' : 'Charger has built-in DC fault current detection (\u22656mA). <strong>RCD Type A</strong> (30mA) is sufficient per \u00a7722.531.3.101.');
+  }
+  html += '</div></div>';
+
+  // DS/HD references
+  html += '<div style="margin:12px 0;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:.8rem;color:var(--text-muted)">';
+  html += '<strong>' + (da ? 'Normreferencer:' : 'Standard references:') + '</strong><br>';
+  html += '\u2022 DS/HD 60364-7-722 \u2014 ' + (da ? 'Forsyning af elkoretojer' : 'Supply of electric vehicles') + '<br>';
+  html += '\u2022 \u00a7722.531.3.101 \u2014 RCD ' + (da ? 'krav' : 'requirements') + '<br>';
+  html += '\u2022 \u00a7722.411.4.1 \u2014 PEN-' + (da ? 'brud beskyttelse' : 'break protection') + '<br>';
+  html += '\u2022 DS/HD 60364-5-52 \u2014 ' + (da ? 'Kabeldimensionering' : 'Cable sizing') + '<br>';
+  html += '\u2022 ' + (da ? '75%-reglen AFSKAFFET 1. jan 2020 \u2014 brug ALTID 100%' : '75% rule ABOLISHED 1 Jan 2020 \u2014 ALWAYS use 100%') + '</div>';
+
+  html += '</div>'; // end result-box
+
+  // === ANIMATED SVG VISUALIZATION ===
+  html += renderEvSvgDiagram(selectedCharger, evState, capacityOk, needsLoadMgmt, penBreakRisk, rcdType, totalEvCurrent, availableCapacity, usedByExisting, finalCable, recMCB);
+
+  html += '</div>'; // end card
+  return html;
+}
+
+function renderEvSvgDiagram(charger, state, capacityOk, needsLoadMgmt, penBreakRisk, rcdType, totalEvCurrent, availableCapacity, usedByExisting, cable, mcb) {
+  const da = lang === 'da';
+  const W = 700, H = 420;
+  const numC = state.numChargers;
+  const mainFuse = state.mainFuse;
+
+  // Colors
+  const panelColor = '#1a2a3a';
+  const wireColor = capacityOk ? '#00e5ff' : '#ff4444';
+  const carColor = '#4488ff';
+  const warningColor = '#ff4444';
+  const greenColor = '#00e676';
+  const greyColor = '#555';
+
+  let svg = '';
+
+  // Background gradient
+  svg += '<defs>';
+  svg += '<linearGradient id="evBg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0a1628"/><stop offset="100%" stop-color="#0d2040"/></linearGradient>';
+  svg += '<linearGradient id="evWire" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="' + wireColor + '"/><stop offset="100%" stop-color="' + wireColor + '" stop-opacity="0.5"/></linearGradient>';
+  // Animated dash for current flow
+  svg += '<style>';
+  svg += '@keyframes evFlow { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }';
+  svg += '@keyframes evPulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }';
+  svg += '@keyframes evOverflow { 0%,100% { fill:' + warningColor + '; opacity:0.8; } 50% { fill:' + warningColor + '; opacity:0.3; } }';
+  svg += '</style>';
+  svg += '</defs>';
+
+  svg += '<rect width="' + W + '" height="' + H + '" fill="url(#evBg)" rx="14"/>';
+
+  // Title
+  svg += '<text x="' + (W/2) + '" y="24" text-anchor="middle" font-size="11" fill="rgba(255,255,255,0.7)" font-weight="600">' + (da ? 'EV-ladeinstallation oversigt' : 'EV Charging Installation Overview') + '</text>';
+
+  // Main panel box
+  var panelX = 30, panelY = 50, panelW = 80, panelH = 140;
+  svg += '<rect x="' + panelX + '" y="' + panelY + '" width="' + panelW + '" height="' + panelH + '" rx="6" fill="' + panelColor + '" stroke="' + wireColor + '" stroke-width="1.5"/>';
+  svg += '<text x="' + (panelX + panelW/2) + '" y="' + (panelY + 18) + '" text-anchor="middle" font-size="9" fill="' + wireColor + '">' + (da ? 'Hovedtavle' : 'Main panel') + '</text>';
+  svg += '<text x="' + (panelX + panelW/2) + '" y="' + (panelY + 34) + '" text-anchor="middle" font-size="10" fill="#fff" font-weight="bold">' + mainFuse + 'A</text>';
+
+  // Main fuse symbol
+  svg += '<rect x="' + (panelX + 20) + '" y="' + (panelY + 45) + '" width="40" height="16" rx="3" fill="none" stroke="#ff9955" stroke-width="1"/>';
+  svg += '<text x="' + (panelX + panelW/2) + '" y="' + (panelY + 57) + '" text-anchor="middle" font-size="7" fill="#ff9955">' + (da ? 'Hovedsikr.' : 'Main fuse') + '</text>';
+
+  // Draw charger circuits (max visible: 5 for layout)
+  var visibleChargers = Math.min(numC, 5);
+  var startY = panelY + 75;
+  var spacing = Math.min(25, (panelH - 40) / visibleChargers);
+  var circuitStartX = panelX + panelW;
+  var chargerX = 480;
+  var carX = 580;
+
+  for (var i = 0; i < visibleChargers; i++) {
+    var yPos = startY + i * spacing;
+
+    // Wire from panel to RCD
+    svg += '<line x1="' + circuitStartX + '" y1="' + yPos + '" x2="' + (circuitStartX + 60) + '" y2="' + yPos + '" stroke="' + wireColor + '" stroke-width="1.5" stroke-dasharray="6 3" style="animation:evFlow 0.8s linear infinite"/>';
+
+    // RCD symbol
+    var rcdX = circuitStartX + 65;
+    svg += '<rect x="' + rcdX + '" y="' + (yPos - 8) + '" width="28" height="16" rx="3" fill="none" stroke="' + (rcdType === 'B' ? '#ff9955' : greenColor) + '" stroke-width="1"/>';
+    svg += '<text x="' + (rcdX + 14) + '" y="' + (yPos + 3) + '" text-anchor="middle" font-size="6" fill="' + (rcdType === 'B' ? '#ff9955' : greenColor) + '">RCD ' + rcdType + '</text>';
+
+    // Wire from RCD to MCB
+    svg += '<line x1="' + (rcdX + 28) + '" y1="' + yPos + '" x2="' + (rcdX + 58) + '" y2="' + yPos + '" stroke="' + wireColor + '" stroke-width="1.5" stroke-dasharray="6 3" style="animation:evFlow 0.8s linear infinite;animation-delay:0.' + (i*2) + 's"/>';
+
+    // MCB symbol
+    var mcbX = rcdX + 62;
+    svg += '<rect x="' + mcbX + '" y="' + (yPos - 8) + '" width="24" height="16" rx="3" fill="none" stroke="' + wireColor + '" stroke-width="1"/>';
+    svg += '<text x="' + (mcbX + 12) + '" y="' + (yPos + 3) + '" text-anchor="middle" font-size="6" fill="' + wireColor + '">C' + mcb + '</text>';
+
+    // Cable to charger
+    svg += '<line x1="' + (mcbX + 24) + '" y1="' + yPos + '" x2="' + chargerX + '" y2="' + yPos + '" stroke="' + wireColor + '" stroke-width="1.5" stroke-dasharray="6 3" style="animation:evFlow 0.6s linear infinite;animation-delay:0.' + (i*3) + 's"/>';
+
+    // Cable label
+    svg += '<text x="' + ((mcbX + 24 + chargerX) / 2) + '" y="' + (yPos - 6) + '" text-anchor="middle" font-size="6" fill="rgba(255,255,255,0.5)">' + cable.cs + 'mm\u00B2 / ' + state.cableLength + 'm</text>';
+
+    // Charger box
+    svg += '<rect x="' + chargerX + '" y="' + (yPos - 10) + '" width="36" height="20" rx="4" fill="rgba(0,230,118,0.15)" stroke="' + greenColor + '" stroke-width="1"/>';
+    svg += '<text x="' + (chargerX + 18) + '" y="' + (yPos + 3) + '" text-anchor="middle" font-size="6" fill="' + greenColor + '">' + charger.kW + 'kW</text>';
+
+    // Wire to car
+    svg += '<line x1="' + (chargerX + 36) + '" y1="' + yPos + '" x2="' + carX + '" y2="' + yPos + '" stroke="' + greenColor + '" stroke-width="1" stroke-dasharray="4 2" style="animation:evFlow 1s linear infinite"/>';
+
+    // Car silhouette (simple)
+    svg += '<rect x="' + carX + '" y="' + (yPos - 8) + '" width="30" height="16" rx="6" fill="' + carColor + '" opacity="0.7"/>';
+    svg += '<circle cx="' + (carX + 7) + '" cy="' + (yPos + 9) + '" r="3" fill="#333" stroke="' + carColor + '" stroke-width="0.5"/>';
+    svg += '<circle cx="' + (carX + 23) + '" cy="' + (yPos + 9) + '" r="3" fill="#333" stroke="' + carColor + '" stroke-width="0.5"/>';
+    svg += '<text x="' + (carX + 15) + '" y="' + (yPos + 2) + '" text-anchor="middle" font-size="6" fill="#fff">\uD83D\uDE97</text>';
+  }
+
+  // If more chargers than visible, show "..."
+  if (numC > visibleChargers) {
+    svg += '<text x="' + (chargerX + 18) + '" y="' + (startY + visibleChargers * spacing + 5) + '" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.5)">+' + (numC - visibleChargers) + ' ' + (da ? 'mere' : 'more') + '...</text>';
+  }
+
+  // === CAPACITY BAR ===
+  var barX = 30, barY = H - 110, barW = W - 60, barH = 28;
+  svg += '<text x="' + barX + '" y="' + (barY - 8) + '" font-size="9" fill="rgba(255,255,255,0.7)">' + (da ? 'Kapacitetsfordeling (hovedsikring)' : 'Capacity allocation (main fuse)') + '</text>';
+
+  // Background bar
+  svg += '<rect x="' + barX + '" y="' + barY + '" width="' + barW + '" height="' + barH + '" rx="6" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>';
+
+  // Existing load (grey)
+  var existPct = Math.min(evState.existingLoad / 100, 1);
+  var existW = barW * existPct;
+  svg += '<rect x="' + barX + '" y="' + barY + '" width="' + existW + '" height="' + barH + '" rx="6" fill="' + greyColor + '" opacity="0.7"/>';
+  if (existW > 30) {
+    svg += '<text x="' + (barX + existW / 2) + '" y="' + (barY + barH/2 + 4) + '" text-anchor="middle" font-size="8" fill="#fff">' + (da ? 'Eksisterende' : 'Existing') + ' ' + usedByExisting.toFixed(0) + 'A</text>';
+  }
+
+  // EV load (green or red)
+  var evPct = totalEvCurrent / mainFuse;
+  var evW = Math.min(barW * evPct, barW - existW + 40); // Allow overflow
+  var evColor = capacityOk ? greenColor : warningColor;
+  var evBarX = barX + existW;
+
+  if (capacityOk) {
+    svg += '<rect x="' + evBarX + '" y="' + barY + '" width="' + Math.min(evW, barW - existW) + '" height="' + barH + '" rx="0" fill="' + evColor + '" opacity="0.6"/>';
+  } else {
+    // Overflow: show what fits + pulsing overflow
+    var fitsW = barW - existW;
+    if (fitsW > 0) {
+      svg += '<rect x="' + evBarX + '" y="' + barY + '" width="' + fitsW + '" height="' + barH + '" fill="' + warningColor + '" opacity="0.5"/>';
+    }
+    // Pulsing overflow indicator
+    svg += '<rect x="' + (barX + barW - 2) + '" y="' + (barY - 4) + '" width="' + Math.min(evW - fitsW + 10, 60) + '" height="' + (barH + 8) + '" rx="4" style="animation:evOverflow 1s ease-in-out infinite" />';
+    svg += '<text x="' + (barX + barW + 20) + '" y="' + (barY + barH/2 + 4) + '" text-anchor="middle" font-size="8" fill="' + warningColor + '" style="animation:evPulse 1s ease-in-out infinite">' + (da ? 'OVERBELASTET!' : 'OVERLOADED!') + '</text>';
+  }
+
+  // EV label on bar
+  if (evW > 25 && capacityOk) {
+    svg += '<text x="' + (evBarX + Math.min(evW, barW - existW) / 2) + '" y="' + (barY + barH/2 + 4) + '" text-anchor="middle" font-size="8" fill="#fff">EV ' + totalEvCurrent + 'A</text>';
+  }
+
+  // Capacity numbers below bar
+  svg += '<text x="' + barX + '" y="' + (barY + barH + 16) + '" font-size="8" fill="rgba(255,255,255,0.5)">0A</text>';
+  svg += '<text x="' + (barX + barW) + '" y="' + (barY + barH + 16) + '" text-anchor="end" font-size="8" fill="rgba(255,255,255,0.5)">' + mainFuse + 'A</text>';
+  svg += '<text x="' + (barX + barW/2) + '" y="' + (barY + barH + 16) + '" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.6)">' + (da ? 'Tilg\u00E6ngelig: ' : 'Available: ') + availableCapacity.toFixed(0) + 'A | EV: ' + totalEvCurrent + 'A</text>';
+
+  // PEN-break indicator for TN-C-S
+  if (penBreakRisk) {
+    svg += '<rect x="' + (W - 160) + '" y="' + (H - 55) + '" width="145" height="40" rx="6" fill="rgba(255,50,50,0.1)" stroke="' + warningColor + '" stroke-width="1" stroke-dasharray="3 2"/>';
+    svg += '<text x="' + (W - 88) + '" y="' + (H - 38) + '" text-anchor="middle" font-size="8" fill="' + warningColor + '" font-weight="600">\u26A0\uFE0F PEN-' + (da ? 'brud risiko' : 'break risk') + '</text>';
+    svg += '<text x="' + (W - 88) + '" y="' + (H - 25) + '" text-anchor="middle" font-size="7" fill="rgba(255,100,100,0.8)">' + (da ? 'TN-C-S: Overv\u00E5gning kr\u00E6ves' : 'TN-C-S: Monitoring required') + '</text>';
+    svg += '<text x="' + (W - 88) + '" y="' + (H - 15) + '" text-anchor="middle" font-size="6" fill="rgba(255,255,255,0.4)">\u00a7722.411.4.1</text>';
+  }
+
+  // RCD type legend
+  svg += '<rect x="' + (barX) + '" y="' + (H - 55) + '" width="130" height="40" rx="6" fill="rgba(0,180,255,0.05)" stroke="rgba(0,180,255,0.2)" stroke-width="1"/>';
+  svg += '<text x="' + (barX + 8) + '" y="' + (H - 38) + '" font-size="8" fill="var(--accent)" font-weight="600">\uD83D\uDEE1\uFE0F RCD: Type ' + rcdType + '</text>';
+  svg += '<text x="' + (barX + 8) + '" y="' + (H - 25) + '" font-size="7" fill="rgba(255,255,255,0.6)">' + (rcdType === 'B' ? (da ? 'Ingen DC-detektion i lader' : 'No DC detection in charger') : (da ? 'Lader har DC-detektion' : 'Charger has DC detection')) + '</text>';
+  svg += '<text x="' + (barX + 8) + '" y="' + (H - 15) + '" font-size="6" fill="rgba(255,255,255,0.4)">\u00a7722.531.3.101</text>';
+
+  // Standard ref at bottom
+  svg += '<text x="' + (W/2) + '" y="' + (H - 4) + '" text-anchor="middle" font-size="6" fill="rgba(255,255,255,0.25)">DS/HD 60364-7-722 | IEC 61851</text>';
 
   return '<div style="margin-top:16px;overflow-x:auto"><svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:' + W + 'px;border-radius:14px;border:1px solid rgba(0,180,255,0.1)">' + svg + '</svg></div>';
 }
