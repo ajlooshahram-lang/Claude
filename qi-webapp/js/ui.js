@@ -281,6 +281,8 @@
     CH.destroyAll();
     content.innerHTML = (RENDER[view] || (() => "<div class='empty'>Not found</div>"))();
     if (AFTER[view]) AFTER[view]();
+    // Refresh alert badge on each navigation
+    refreshAlertBadge();
     // Reflect the current view in the URL so back/forward and bookmarks work.
     if (!(opts && opts.skipHash)) {
       const target = "#" + view;
@@ -290,6 +292,104 @@
     }
     window.scrollTo(0, 0);
   }
+
+  // ---------- Alert / Notification System ----------
+  const DISMISSED_ALERTS_KEY = "qi_dismissed_alerts";
+
+  function getDismissedAlerts() {
+    try {
+      const raw = localStorage.getItem(DISMISSED_ALERTS_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+  }
+
+  function dismissAlert(alertId) {
+    try {
+      const dismissed = getDismissedAlerts();
+      if (dismissed.indexOf(alertId) < 0) dismissed.push(alertId);
+      localStorage.setItem(DISMISSED_ALERTS_KEY, JSON.stringify(dismissed));
+    } catch (e) { /* no-op */ }
+  }
+
+  function getActiveAlerts() {
+    if (!window.QIBrain || typeof QIBrain.checkAlerts !== "function") return { alerts: [], summary: { critical: 0, warning: 0, info: 0 } };
+    const state = buildProjectState();
+    const result = QIBrain.checkAlerts(state);
+    const dismissed = getDismissedAlerts();
+    const active = result.alerts.filter(a => dismissed.indexOf(a.id) < 0);
+    let crit = 0, warn = 0, info = 0;
+    active.forEach(a => { if (a.severity === "critical") crit++; else if (a.severity === "warning") warn++; else info++; });
+    return { alerts: active, allAlerts: result.alerts, summary: { critical: crit, warning: warn, info: info } };
+  }
+
+  function refreshAlertBadge() {
+    const badge = $("#alertBadge");
+    if (!badge) return;
+    const data = getActiveAlerts();
+    const count = data.summary.critical + data.summary.warning;
+    if (count > 0) {
+      badge.textContent = count > 99 ? "99+" : String(count);
+      badge.hidden = false;
+    } else {
+      badge.hidden = true;
+    }
+  }
+
+  function renderAlertDropdown() {
+    const dropdown = $("#alertDropdown");
+    if (!dropdown) return;
+    const data = getActiveAlerts();
+    if (data.alerts.length === 0) {
+      dropdown.innerHTML = `<h4>Alerts</h4><p class="muted">No active alerts.</p>`;
+      return;
+    }
+    // Group by severity
+    const groups = { critical: [], warning: [], info: [] };
+    data.alerts.forEach(a => { (groups[a.severity] || groups.info).push(a); });
+    let html = `<h4>Alerts <span class="muted">(${data.alerts.length})</span></h4>`;
+    ["critical", "warning", "info"].forEach(sev => {
+      if (groups[sev].length === 0) return;
+      html += `<div style="margin:8px 0 4px"><b style="text-transform:capitalize">${sev}</b> (${groups[sev].length})</div>`;
+      groups[sev].forEach(a => {
+        html += `<div class="alert-item">
+          <span class="badge ${sev === "critical" ? "b-critical" : sev === "warning" ? "b-high" : "b-open"}">${esc(sev)}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:13px">${esc(a.title)}</div>
+            <div class="muted" style="font-size:12px">${esc(a.detail.slice(0, 100))}</div>
+          </div>
+          <button class="alert-dismiss" data-alert-id="${esc(a.id)}">Dismiss</button>
+        </div>`;
+      });
+    });
+    dropdown.innerHTML = html;
+    dropdown.querySelectorAll(".alert-dismiss").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        dismissAlert(btn.dataset.alertId);
+        renderAlertDropdown();
+        refreshAlertBadge();
+      });
+    });
+  }
+
+  function toggleAlertDropdown() {
+    const dropdown = $("#alertDropdown");
+    if (!dropdown) return;
+    const isOpen = !dropdown.hidden;
+    if (isOpen) {
+      dropdown.hidden = true;
+    } else {
+      renderAlertDropdown();
+      dropdown.hidden = false;
+    }
+  }
+
+  // Wire alert dropdown close on outside click & initial badge refresh
+  document.addEventListener("click", () => {
+    const dropdown = $("#alertDropdown");
+    if (dropdown) dropdown.hidden = true;
+  });
+  refreshAlertBadge();
 
   // ---------- renderers ----------
   const RENDER = {};
@@ -1000,7 +1100,30 @@
       <div id="vendorTableWrap"></div>
     </div>`;
 
-    container.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn" id="brainPrintAnalysis">Print Analysis</button></div>` + healthHtml + findingsHtml + patternsHtml + recsHtml + lessonsHtml + vendorHtml;
+    // --- Alert Panel (full list in Brain view) ---
+    const alertData = getActiveAlerts();
+    const alertSummaryHtml = `<div class="alert-summary-bar">
+      <span style="color:#e53e3e">${alertData.summary.critical} critical</span>
+      <span style="color:#e0a800">${alertData.summary.warning} warnings</span>
+      <span style="color:#3182ce">${alertData.summary.info} info</span>
+    </div>`;
+    const alertListHtml = alertData.allAlerts.length > 0
+      ? alertData.allAlerts.map(a => `<tr>
+          <td>${severityBadge(a.severity)}</td>
+          <td>${esc(a.category)}</td>
+          <td><b>${esc(a.title)}</b></td>
+          <td class="wrap">${esc(a.detail)}</td>
+          <td class="muted">${a.timestamp ? a.timestamp.slice(0, 10) : ""}</td>
+          <td>${a.affectedId ? `<button class="btn btn-sm alertGoToCase" data-case-id="${esc(a.affectedId)}">Go to case</button>` : ""}</td>
+        </tr>`).join("")
+      : "";
+    const alertPanelHtml = `<div class="card" id="brainAlertPanel">
+      <h3>Alerts <span class="tag">${alertData.allAlerts.length}</span></h3>
+      ${alertSummaryHtml}
+      ${alertData.allAlerts.length > 0 ? tableWrap("<th>Severity</th><th>Category</th><th>Title</th><th>Detail</th><th>Time</th><th></th>", alertListHtml, "alert-tbl") : `<p class="muted">No alerts detected - programme health looks good.</p>`}
+    </div>`;
+
+    container.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn" id="brainPrintAnalysis">Print Analysis</button></div>` + alertPanelHtml + healthHtml + findingsHtml + patternsHtml + recsHtml + lessonsHtml + vendorHtml;
 
     // Wire "Confirm" buttons for pending lessons
     container.querySelectorAll(".brainConfirmLesson").forEach(btn => {
@@ -1012,6 +1135,13 @@
           toast("Lesson confirmed and stored.");
           renderBrainIntel();
         }
+      });
+    });
+
+    // Wire "Go to case" buttons in alert panel
+    container.querySelectorAll(".alertGoToCase").forEach(btn => {
+      btn.addEventListener("click", () => {
+        go("cases");
       });
     });
 
@@ -2806,6 +2936,7 @@
   });
 
   $("#btnPresent").addEventListener("click", startPresentation);
+  $("#btnAlerts").addEventListener("click", function (e) { e.stopPropagation(); toggleAlertDropdown(); });
   $("#langSelect").addEventListener("change", function (e) { setLanguage(e.target.value); });
   $("#btnShare").addEventListener("click", shareLink);
   $("#btnPrint").addEventListener("click", () => window.print());

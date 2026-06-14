@@ -724,5 +724,20 @@ if (i18nApi && i18nApi.setLanguage) {
   ok(false, "Setting language to 'th' translates Dashboard content");
 }
 
+// 45) Alert notification system
+ok(doc.getElementById("btnAlerts") != null, "Alert: bell icon button exists in topbar");
+var bellBtn = doc.getElementById("btnAlerts");
+bellBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+var alertDropdown = doc.getElementById("alertDropdown");
+ok(alertDropdown && !alertDropdown.hidden, "Alert: clicking bell icon opens the alert dropdown panel");
+// Close the dropdown by clicking on document
+doc.dispatchEvent(new window.Event("click", { bubbles: true }));
+
+// 46) Alert panel renders in brain view
+var brainNav2 = doc.querySelector('.nav-item[data-view="brain"]');
+if (brainNav2) brainNav2.dispatchEvent(new window.Event("click", { bubbles: true }));
+var brainAlertPanel = doc.getElementById("brainAlertPanel");
+ok(brainAlertPanel != null, "Alert: alert panel renders in brain intelligence view");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

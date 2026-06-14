@@ -1672,6 +1672,152 @@
     };
   }
 
+  // ---- Alert / Notification Engine -----------------------------------------
+  var ALERT_DEFAULTS = {
+    cpiThreshold: 0.9,
+    spiThreshold: 0.9,
+    rpnThreshold: 200,
+    blockedDaysThreshold: 14,
+    overbudgetFactor: 1.2
+  };
+
+  function checkAlerts(projectState, config) {
+    var cfg = {};
+    var k;
+    for (k in ALERT_DEFAULTS) { cfg[k] = ALERT_DEFAULTS[k]; }
+    if (config) { for (k in config) { if (config.hasOwnProperty(k)) cfg[k] = config[k]; } }
+
+    var cases = (projectState && projectState.cases) || [];
+    var milestones = (projectState && projectState.registers && projectState.registers.milestones) || [];
+    var project = (projectState && projectState.project) || {};
+    var now = Date.now();
+    var alerts = [];
+    var alertIdx = 0;
+
+    function makeAlert(severity, category, title, detail, affectedId) {
+      alertIdx++;
+      return {
+        id: "alert_" + alertIdx + "_" + now,
+        severity: severity,
+        category: category,
+        title: title,
+        detail: detail,
+        affectedId: affectedId || null,
+        timestamp: new Date(now).toISOString()
+      };
+    }
+
+    // 1) Overdue milestones (forecast > baseline)
+    milestones.forEach(function (ms) {
+      if (ms.forecast && ms.baseline) {
+        var fDate = new Date(ms.forecast).getTime();
+        var bDate = new Date(ms.baseline).getTime();
+        // Also handle numeric strings
+        if (isNaN(fDate) || isNaN(bDate)) {
+          var fNum = parseInt(String(ms.forecast).replace(/[^0-9]/g, ""), 10) || 0;
+          var bNum = parseInt(String(ms.baseline).replace(/[^0-9]/g, ""), 10) || 0;
+          if (fNum > bNum) {
+            alerts.push(makeAlert("warning", "schedule", "Overdue milestone", "Milestone '" + (ms.milestone || ms.name || "unknown") + "' forecast (" + ms.forecast + ") exceeds baseline (" + ms.baseline + ")", ms.id || null));
+          }
+        } else if (fDate > bDate) {
+          alerts.push(makeAlert("warning", "schedule", "Overdue milestone", "Milestone '" + (ms.milestone || ms.name || "unknown") + "' forecast (" + ms.forecast + ") exceeds baseline (" + ms.baseline + ")", ms.id || null));
+        }
+      }
+    });
+
+    // 2) Overbudget cases (actCost > estCost * overbudgetFactor)
+    cases.forEach(function (c) {
+      var est = Number(c.estCost) || 0;
+      var act = Number(c.actCost) || 0;
+      if (est > 0 && act > est * cfg.overbudgetFactor) {
+        alerts.push(makeAlert("warning", "cost", "Case overbudget", "'" + (c.problem || "").slice(0, 60) + "' actual cost " + act + " exceeds " + Math.round(cfg.overbudgetFactor * 100) + "% of estimate " + est, c.id || null));
+      }
+    });
+
+    // 3) CPI below threshold
+    var totalEst = 0; var totalAct = 0; var totalEv = 0;
+    cases.forEach(function (c) {
+      var est = Number(c.estCost) || 0;
+      var act = Number(c.actCost) || 0;
+      var pct = Number(c.percent) || 0;
+      totalEst += est;
+      totalAct += act;
+      totalEv += est * pct;
+    });
+    var cpi = totalAct > 0 ? totalEv / totalAct : 1;
+    if (totalAct > 0 && cpi < cfg.cpiThreshold) {
+      alerts.push(makeAlert("critical", "cost", "CPI below threshold", "Cost Performance Index is " + (Math.round(cpi * 100) / 100) + " (threshold: " + cfg.cpiThreshold + ")", null));
+    }
+
+    // 4) SPI below threshold
+    var projectStart = project.start ? new Date(project.start).getTime() : null;
+    var projectEnd = project.end ? new Date(project.end).getTime() : null;
+    var plannedFraction = 1;
+    if (projectStart && projectEnd && projectEnd > projectStart) {
+      var elapsed = Math.max(0, now - projectStart);
+      var total = projectEnd - projectStart;
+      plannedFraction = Math.min(1, elapsed / total);
+    }
+    var earnedFraction = totalEst > 0 ? totalEv / totalEst : 0;
+    var spi = plannedFraction > 0 ? earnedFraction / plannedFraction : 1;
+    if (totalEst > 0 && spi < cfg.spiThreshold) {
+      alerts.push(makeAlert("critical", "schedule", "SPI below threshold", "Schedule Performance Index is " + (Math.round(spi * 100) / 100) + " (threshold: " + cfg.spiThreshold + ")", null));
+    }
+
+    // 5) Cases BLOCKED for > blockedDaysThreshold days
+    cases.forEach(function (c) {
+      if (c.status === "BLOCKED") {
+        var startMs = c.startDate ? new Date(c.startDate).getTime() : 0;
+        if (startMs && (now - startMs) > cfg.blockedDaysThreshold * 24 * 60 * 60 * 1000) {
+          alerts.push(makeAlert("critical", "blocked", "Case blocked too long", "'" + (c.problem || "").slice(0, 60) + "' has been BLOCKED for >" + cfg.blockedDaysThreshold + " days", c.id || null));
+        }
+      }
+    });
+
+    // 6) High-RPN risks still OPEN (RPN > rpnThreshold)
+    cases.forEach(function (c) {
+      var rpn = (Number(c.sev) || 1) * (Number(c.occ) || 1) * (Number(c.det) || 1);
+      if (rpn > cfg.rpnThreshold && (c.status === "OPEN" || !c.status)) {
+        alerts.push(makeAlert("warning", "risk", "High-RPN risk open", "RPN " + rpn + " on '" + (c.problem || "").slice(0, 60) + "'", c.id || null));
+      }
+    });
+
+    // 7) Payment certificates overdue (cases with costCat containing 'payment' or category 'payment' that are overdue)
+    cases.forEach(function (c) {
+      var isPayment = /payment/i.test(c.costCat || "") || /payment.*cert/i.test(c.problem || "") || /certificate/i.test(c.problem || "");
+      if (isPayment && c.status !== "CLOSED" && c.status !== "RESOLVED") {
+        var startMs = c.startDate ? new Date(c.startDate).getTime() : 0;
+        if (startMs && (now - startMs) > 30 * 24 * 60 * 60 * 1000) {
+          alerts.push(makeAlert("warning", "payment", "Payment certificate overdue", "'" + (c.problem || "").slice(0, 60) + "' started >30 days ago and not closed", c.id || null));
+        }
+      }
+    });
+
+    // 8) Unresolved claims older than 30 days
+    cases.forEach(function (c) {
+      var isClaim = /claim/i.test(c.problem || "") || /claim/i.test(c.category || "") || /claim/i.test(c.costCat || "");
+      if (isClaim && c.status !== "CLOSED" && c.status !== "RESOLVED") {
+        var startMs = c.startDate ? new Date(c.startDate).getTime() : 0;
+        if (startMs && (now - startMs) > 30 * 24 * 60 * 60 * 1000) {
+          alerts.push(makeAlert("info", "claims", "Unresolved claim >30 days", "'" + (c.problem || "").slice(0, 60) + "' unresolved for >30 days", c.id || null));
+        }
+      }
+    });
+
+    // Build summary
+    var critCount = 0; var warnCount = 0; var infoCount = 0;
+    alerts.forEach(function (a) {
+      if (a.severity === "critical") critCount++;
+      else if (a.severity === "warning") warnCount++;
+      else infoCount++;
+    });
+
+    return {
+      alerts: alerts,
+      summary: { critical: critCount, warning: warnCount, info: infoCount }
+    };
+  }
+
   var API = {
     analyzeProject: analyzeProject,
     listProfiles: listProfiles,
@@ -1687,7 +1833,8 @@
     selfImproveCheck: selfImproveCheck,
     _clearLessons: _clearLessons,
     vendorSearch: vendorSearch,
-    vendorComparison: vendorComparison
+    vendorComparison: vendorComparison,
+    checkAlerts: checkAlerts
   };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIBrain = API;

@@ -768,5 +768,143 @@ console.log("\n-- submarine: generic profile unaffected --");
   ok(generic.summary.isSubmarine === false, "generic project has isSubmarine=false (got " + generic.summary.isSubmarine + ")");
 })();
 
+// ============================================================
+// checkAlerts tests
+// ============================================================
+console.log("\n-- checkAlerts: basic structure --");
+(function () {
+  var result = B.checkAlerts({ cases: [], registers: {}, project: {} });
+  ok(result && Array.isArray(result.alerts), "checkAlerts returns object with alerts array");
+  ok(result.summary && typeof result.summary.critical === "number", "checkAlerts returns summary with critical count");
+  ok(typeof result.summary.warning === "number", "checkAlerts returns summary with warning count");
+  ok(typeof result.summary.info === "number", "checkAlerts returns summary with info count");
+  ok(result.alerts.length === 0, "empty project has no alerts");
+})();
+
+console.log("\n-- checkAlerts: overdue milestones --");
+(function () {
+  var state = {
+    cases: [],
+    registers: { milestones: [
+      { milestone: "Phase 1", baseline: "2024-01-15", forecast: "2024-03-20" },
+      { milestone: "Phase 2", baseline: "2024-06-01", forecast: "2024-05-01" }
+    ]},
+    project: {}
+  };
+  var result = B.checkAlerts(state);
+  var schedAlerts = result.alerts.filter(function (a) { return a.category === "schedule" && a.title === "Overdue milestone"; });
+  ok(schedAlerts.length === 1, "overdue milestone detected (forecast > baseline) (got " + schedAlerts.length + ")");
+  ok(schedAlerts[0].severity === "warning", "overdue milestone severity is warning");
+  ok(/Phase 1/.test(schedAlerts[0].detail), "overdue milestone detail mentions the milestone name");
+})();
+
+console.log("\n-- checkAlerts: overbudget cases --");
+(function () {
+  var state = {
+    cases: [
+      { problem: "Budget ok case", estCost: 1000, actCost: 1100, status: "OPEN", sev: 3, occ: 3, det: 3 },
+      { problem: "Overbudget case", estCost: 1000, actCost: 1300, status: "OPEN", sev: 3, occ: 3, det: 3 }
+    ],
+    registers: {},
+    project: {}
+  };
+  var result = B.checkAlerts(state);
+  var costAlerts = result.alerts.filter(function (a) { return a.category === "cost" && a.title === "Case overbudget"; });
+  ok(costAlerts.length === 1, "overbudget case detected (actCost > estCost * 1.2) (got " + costAlerts.length + ")");
+  ok(costAlerts[0].severity === "warning", "overbudget case severity is warning");
+  ok(/Overbudget case/.test(costAlerts[0].detail), "overbudget alert detail mentions the case");
+})();
+
+console.log("\n-- checkAlerts: blocked case >14 days --");
+(function () {
+  var oldDate = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  var state = {
+    cases: [
+      { problem: "Long blocked case", status: "BLOCKED", startDate: oldDate, sev: 3, occ: 3, det: 3, estCost: 0, actCost: 0 }
+    ],
+    registers: {},
+    project: {}
+  };
+  var result = B.checkAlerts(state);
+  var blockedAlerts = result.alerts.filter(function (a) { return a.category === "blocked"; });
+  ok(blockedAlerts.length === 1, "blocked case alert detected (got " + blockedAlerts.length + ")");
+  ok(blockedAlerts[0].severity === "critical", "blocked case severity is critical");
+  ok(/Long blocked case/.test(blockedAlerts[0].detail), "blocked alert detail mentions the case");
+})();
+
+console.log("\n-- checkAlerts: high-RPN risk still open --");
+(function () {
+  var state = {
+    cases: [
+      { problem: "Risky item", status: "OPEN", sev: 8, occ: 7, det: 5, estCost: 0, actCost: 0 }
+    ],
+    registers: {},
+    project: {}
+  };
+  var result = B.checkAlerts(state);
+  var riskAlerts = result.alerts.filter(function (a) { return a.category === "risk"; });
+  ok(riskAlerts.length === 1, "high-RPN risk alert detected (RPN=280) (got " + riskAlerts.length + ")");
+  ok(riskAlerts[0].severity === "warning", "high-RPN alert severity is warning");
+  ok(/280/.test(riskAlerts[0].detail), "high-RPN alert detail mentions RPN value");
+})();
+
+console.log("\n-- checkAlerts: CPI below threshold --");
+(function () {
+  // Cases where earned is low compared to spent
+  var state = {
+    cases: [
+      { problem: "Work A", estCost: 10000, actCost: 15000, percent: 0.5, status: "IN PROGRESS", sev: 3, occ: 3, det: 3 }
+    ],
+    registers: {},
+    project: {}
+  };
+  // CPI = EV / AC = (10000 * 0.5) / 15000 = 5000/15000 = 0.333
+  var result = B.checkAlerts(state);
+  var cpiAlerts = result.alerts.filter(function (a) { return a.title === "CPI below threshold"; });
+  ok(cpiAlerts.length === 1, "CPI alert detected when CPI < 0.9 (got " + cpiAlerts.length + ")");
+  ok(cpiAlerts[0].severity === "critical", "CPI alert severity is critical");
+})();
+
+console.log("\n-- checkAlerts: config customization --");
+(function () {
+  var state = {
+    cases: [
+      { problem: "Slightly over", estCost: 1000, actCost: 1100, status: "OPEN", sev: 3, occ: 3, det: 3 }
+    ],
+    registers: {},
+    project: {}
+  };
+  // Default factor 1.2: 1100 < 1200, no alert
+  var r1 = B.checkAlerts(state);
+  var costA1 = r1.alerts.filter(function (a) { return a.category === "cost" && a.title === "Case overbudget"; });
+  ok(costA1.length === 0, "no overbudget alert with default 1.2 factor");
+
+  // Custom factor 1.05: 1100 > 1050, alert triggered
+  var r2 = B.checkAlerts(state, { overbudgetFactor: 1.05 });
+  var costA2 = r2.alerts.filter(function (a) { return a.category === "cost" && a.title === "Case overbudget"; });
+  ok(costA2.length === 1, "overbudget alert triggered with custom 1.05 factor");
+})();
+
+console.log("\n-- checkAlerts: alert object structure --");
+(function () {
+  var oldDate = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  var state = {
+    cases: [
+      { id: "case-123", problem: "Blocked thing", status: "BLOCKED", startDate: oldDate, sev: 3, occ: 3, det: 3, estCost: 0, actCost: 0 }
+    ],
+    registers: {},
+    project: {}
+  };
+  var result = B.checkAlerts(state);
+  var alert = result.alerts.find(function (a) { return a.category === "blocked"; });
+  ok(alert && typeof alert.id === "string" && alert.id.length > 0, "alert has an id");
+  ok(alert.severity === "critical" || alert.severity === "warning" || alert.severity === "info", "alert has valid severity");
+  ok(typeof alert.category === "string", "alert has category");
+  ok(typeof alert.title === "string", "alert has title");
+  ok(typeof alert.detail === "string", "alert has detail");
+  ok(typeof alert.timestamp === "string" && alert.timestamp.length > 0, "alert has timestamp");
+  ok(alert.affectedId === "case-123", "alert affectedId matches case id");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);
