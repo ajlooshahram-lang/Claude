@@ -490,7 +490,540 @@
 
   function listProfiles() { return PROFILES.map(function (p) { return { id: p.id, label: p.label }; }); }
 
-  var API = { analyzeProject: analyzeProject, listProfiles: listProfiles, extractScale: extractScale, _profiles: PROFILES };
+  // ---- Intelligence Engine: localStorage with in-memory fallback ----------
+  var _memoryStore = {};
+  function storageGet(key) {
+    try {
+      if (typeof localStorage !== "undefined") {
+        var raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : null;
+      }
+    } catch (e) { /* no localStorage available */ }
+    return _memoryStore[key] ? JSON.parse(_memoryStore[key]) : null;
+  }
+  function storageSet(key, value) {
+    var json = JSON.stringify(value);
+    try {
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(key, json);
+        return;
+      }
+    } catch (e) { /* no localStorage available */ }
+    _memoryStore[key] = json;
+  }
+
+  var LESSONS_KEY = "qi_brain_lessons";
+
+  // ---- analyzeStatus(projectState) ----------------------------------------
+  function analyzeStatus(projectState) {
+    var cases = (projectState && projectState.cases) || [];
+    var milestones = (projectState && projectState.registers && projectState.registers.milestones) || [];
+    var project = (projectState && projectState.project) || {};
+
+    var findings = [];
+    var now = Date.now();
+
+    // --- EVM-like estimates from cases ---
+    var totalEst = 0; var totalAct = 0; var totalEv = 0;
+    cases.forEach(function (c) {
+      var est = Number(c.estCost) || 0;
+      var act = Number(c.actCost) || 0;
+      var pct = Number(c.percent) || 0;
+      totalEst += est;
+      totalAct += act;
+      totalEv += est * pct;
+    });
+
+    var cpiEstimate = totalAct > 0 ? totalEv / totalAct : 1;
+    // SPI estimate based on schedule progress
+    var projectStart = project.start ? new Date(project.start).getTime() : null;
+    var projectEnd = project.end ? new Date(project.end).getTime() : null;
+    var plannedFraction = 1;
+    if (projectStart && projectEnd && projectEnd > projectStart) {
+      var elapsed = Math.max(0, now - projectStart);
+      var total = projectEnd - projectStart;
+      plannedFraction = Math.min(1, elapsed / total);
+    }
+    var earnedFraction = totalEst > 0 ? totalEv / totalEst : 0;
+    var spiEstimate = plannedFraction > 0 ? earnedFraction / plannedFraction : 1;
+
+    // --- Schedule slippage from milestones ---
+    var slippedMilestones = 0;
+    milestones.forEach(function (ms) {
+      if (ms.forecast && ms.baseline) {
+        var fNum = parseInt(String(ms.forecast).replace(/[^0-9]/g, ""), 10) || 0;
+        var bNum = parseInt(String(ms.baseline).replace(/[^0-9]/g, ""), 10) || 0;
+        if (fNum > bNum) {
+          slippedMilestones++;
+          findings.push({ type: "schedule", severity: "warning", detail: "Milestone '" + (ms.milestone || "unknown") + "' forecast (" + ms.forecast + ") exceeds baseline (" + ms.baseline + ")" });
+        }
+      }
+    });
+
+    // --- Cost overruns per case ---
+    var costOverruns = 0;
+    cases.forEach(function (c) {
+      var est = Number(c.estCost) || 0;
+      var act = Number(c.actCost) || 0;
+      if (est > 0 && act > est) {
+        costOverruns++;
+        findings.push({ type: "cost", severity: "warning", detail: "'" + (c.problem || "").slice(0, 60) + "' overbudget: actual " + act + " vs estimated " + est });
+      }
+    });
+
+    // --- High-RPN open risks ---
+    var highRpnCount = 0;
+    cases.forEach(function (c) {
+      var rpn = (Number(c.sev) || 1) * (Number(c.occ) || 1) * (Number(c.det) || 1);
+      if (rpn > 200 && (c.status === "OPEN" || !c.status)) {
+        highRpnCount++;
+        findings.push({ type: "risk", severity: "critical", detail: "High RPN (" + rpn + ") on open item: '" + (c.problem || "").slice(0, 60) + "'" });
+      }
+    });
+
+    // --- Quality signals ---
+    cases.forEach(function (c) {
+      var sev = Number(c.sev) || 0;
+      var occ = Number(c.occ) || 0;
+      if (sev >= 7) {
+        findings.push({ type: "quality", severity: "warning", detail: "High severity (" + sev + ") on: '" + (c.problem || "").slice(0, 60) + "'" });
+      }
+      if (occ >= 6) {
+        findings.push({ type: "quality", severity: "warning", detail: "High occurrence (" + occ + ") on: '" + (c.problem || "").slice(0, 60) + "'" });
+      }
+    });
+
+    // --- Resource bottlenecks ---
+    var ownerCounts = {};
+    var noOwner = 0;
+    cases.forEach(function (c) {
+      var isOpen = !c.status || c.status === "OPEN" || c.status === "IN PROGRESS";
+      var isCritical = c.priority === "1-CRITICAL" || c.priority === "2-HIGH";
+      if (isOpen && isCritical) {
+        if (!c.owner || c.owner === "") {
+          noOwner++;
+        } else {
+          ownerCounts[c.owner] = (ownerCounts[c.owner] || 0) + 1;
+        }
+      }
+    });
+    Object.keys(ownerCounts).forEach(function (owner) {
+      if (ownerCounts[owner] > 5) {
+        findings.push({ type: "resource", severity: "warning", detail: "Owner '" + owner + "' has " + ownerCounts[owner] + " open critical/high cases (bottleneck)" });
+      }
+    });
+    if (noOwner > 0) {
+      findings.push({ type: "resource", severity: "warning", detail: noOwner + " critical/high case(s) have no assigned owner" });
+    }
+
+    // --- Stalled work ---
+    cases.forEach(function (c) {
+      if (c.status === "IN PROGRESS" && (Number(c.percent) || 0) < 0.2 && c.startDate) {
+        var start = new Date(c.startDate).getTime();
+        if (start && (now - start) > 30 * 24 * 60 * 60 * 1000) {
+          findings.push({ type: "stalled", severity: "warning", detail: "Stalled: '" + (c.problem || "").slice(0, 60) + "' started >30 days ago, still <20% complete" });
+        }
+      }
+    });
+
+    // --- Risk exposure score ---
+    var totalRpn = 0; var caseCount = cases.length || 1;
+    cases.forEach(function (c) {
+      totalRpn += (Number(c.sev) || 1) * (Number(c.occ) || 1) * (Number(c.det) || 1);
+    });
+    var riskExposure = totalRpn / caseCount;
+
+    // --- Quality index (inverse of average severity for open items) ---
+    var openSevSum = 0; var openCount = 0;
+    cases.forEach(function (c) {
+      if (!c.status || c.status === "OPEN" || c.status === "IN PROGRESS") {
+        openSevSum += (Number(c.sev) || 1);
+        openCount++;
+      }
+    });
+    var avgSev = openCount > 0 ? openSevSum / openCount : 1;
+    var qualityIndex = Math.max(0, Math.min(1, 1 - (avgSev - 1) / 9));
+
+    // --- Overall health ---
+    var criticalFindings = findings.filter(function (f) { return f.severity === "critical"; }).length;
+    var warningFindings = findings.filter(function (f) { return f.severity === "warning"; }).length;
+    var overallHealth = "on-track";
+    if (criticalFindings > 0 || cpiEstimate < 0.7 || spiEstimate < 0.7) {
+      overallHealth = "critical";
+    } else if (warningFindings > 5 || cpiEstimate < 0.9 || spiEstimate < 0.9 || slippedMilestones > 2) {
+      overallHealth = "warning";
+    }
+
+    return {
+      overallHealth: overallHealth,
+      findings: findings,
+      scores: {
+        spiEstimate: Math.round(spiEstimate * 100) / 100,
+        cpiEstimate: Math.round(cpiEstimate * 100) / 100,
+        riskExposure: Math.round(riskExposure * 100) / 100,
+        qualityIndex: Math.round(qualityIndex * 100) / 100
+      }
+    };
+  }
+
+  // ---- Lesson Memory System ------------------------------------------------
+  function generateId() {
+    return "les_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+  }
+
+  function recordLesson(lesson) {
+    var store = storageGet(LESSONS_KEY) || { lessons: [] };
+    var entry = {
+      id: generateId(),
+      timestamp: new Date().toISOString(),
+      challenge: lesson.challenge || "",
+      resolution: lesson.resolution || "",
+      category: lesson.category || "",
+      tags: Array.isArray(lesson.tags) ? lesson.tags : [],
+      impact: lesson.impact || "medium",
+      projectType: lesson.projectType || "",
+      timesRecalled: 0
+    };
+    store.lessons.push(entry);
+    storageSet(LESSONS_KEY, store);
+    return entry;
+  }
+
+  function recallLessons(context) {
+    var store = storageGet(LESSONS_KEY) || { lessons: [] };
+    var lessons = store.lessons;
+    if (!lessons.length) return [];
+
+    var query = norm(context.query || context.challenge || "");
+    var category = context.category || null;
+    var projectType = context.projectType || null;
+    var tags = Array.isArray(context.tags) ? context.tags : [];
+
+    // Filter by category and projectType if provided
+    var filtered = lessons.filter(function (l) {
+      if (category && l.category && l.category !== category) return false;
+      if (projectType && l.projectType && l.projectType !== projectType) return false;
+      return true;
+    });
+
+    // Score by keyword overlap
+    var scored = filtered.map(function (l) {
+      var text = norm(l.challenge) + " " + (l.tags || []).join(" ") + " " + norm(l.resolution);
+      var words = query.split(/\s+/).filter(Boolean);
+      var hits = 0;
+      words.forEach(function (w) {
+        if (text.indexOf(w) >= 0) hits++;
+      });
+      // Tag match bonus
+      tags.forEach(function (t) {
+        if ((l.tags || []).indexOf(t) >= 0) hits += 2;
+      });
+      // Boost frequently recalled
+      var recallBoost = Math.min(3, (l.timesRecalled || 0) * 0.5);
+      return { lesson: l, score: hits + recallBoost };
+    });
+
+    // Sort by score descending
+    scored.sort(function (a, b) { return b.score - a.score; });
+
+    // Update timesRecalled for top results
+    var results = scored.filter(function (s) { return s.score > 0; }).slice(0, 10);
+    results.forEach(function (s) {
+      s.lesson.timesRecalled = (s.lesson.timesRecalled || 0) + 1;
+    });
+    storageSet(LESSONS_KEY, store);
+
+    return results.map(function (s) { return s.lesson; });
+  }
+
+  function suggestMitigations(riskDescription) {
+    var store = storageGet(LESSONS_KEY) || { lessons: [] };
+    var lessons = store.lessons;
+    if (!lessons.length) return [];
+
+    var query = norm(riskDescription);
+    var words = query.split(/\s+/).filter(Boolean);
+
+    var scored = lessons.map(function (l) {
+      var text = norm(l.challenge) + " " + (l.tags || []).join(" ");
+      var hits = 0;
+      words.forEach(function (w) {
+        if (w.length > 2 && text.indexOf(w) >= 0) hits++;
+      });
+      return { lesson: l, score: hits };
+    });
+
+    scored.sort(function (a, b) { return b.score - a.score; });
+    return scored.filter(function (s) { return s.score > 0; }).slice(0, 5).map(function (s) {
+      return { challenge: s.lesson.challenge, resolution: s.lesson.resolution, confidence: Math.min(1, s.score / words.length), lessonId: s.lesson.id };
+    });
+  }
+
+  // ---- detectPatterns(projectState) ----------------------------------------
+  function detectPatterns(projectState) {
+    var cases = (projectState && projectState.cases) || [];
+    var milestones = (projectState && projectState.registers && projectState.registers.milestones) || [];
+    var patterns = [];
+
+    // High-RPN cases
+    var highRpn = cases.filter(function (c) {
+      return (Number(c.sev) || 1) * (Number(c.occ) || 1) * (Number(c.det) || 1) > 200;
+    });
+
+    // (a) Category clustering: >40% high-RPN cases in same category
+    if (highRpn.length >= 3) {
+      var catCounts = {};
+      highRpn.forEach(function (c) {
+        var cat = c.category || "Unknown";
+        catCounts[cat] = (catCounts[cat] || 0) + 1;
+      });
+      Object.keys(catCounts).forEach(function (cat) {
+        if (catCounts[cat] / highRpn.length > 0.4) {
+          patterns.push({
+            type: "category_clustering",
+            severity: "high",
+            description: "Over 40% of high-RPN items are in category '" + cat + "'",
+            evidence: catCounts[cat] + " of " + highRpn.length + " high-RPN cases (" + Math.round(catCounts[cat] / highRpn.length * 100) + "%)",
+            suggestedAction: "Conduct a focused root-cause analysis on '" + cat + "' category. Consider structural intervention."
+          });
+        }
+      });
+    }
+
+    // (b) Owner overload: >30% open critical cases to one owner
+    var openCritical = cases.filter(function (c) {
+      var isOpen = !c.status || c.status === "OPEN" || c.status === "IN PROGRESS";
+      return isOpen && (c.priority === "1-CRITICAL" || c.priority === "2-HIGH");
+    });
+    if (openCritical.length >= 3) {
+      var ownCounts = {};
+      openCritical.forEach(function (c) {
+        var own = c.owner || "Unassigned";
+        ownCounts[own] = (ownCounts[own] || 0) + 1;
+      });
+      Object.keys(ownCounts).forEach(function (own) {
+        if (ownCounts[own] / openCritical.length > 0.3) {
+          patterns.push({
+            type: "owner_overload",
+            severity: "medium",
+            description: "Owner '" + own + "' carries over 30% of open critical/high items",
+            evidence: ownCounts[own] + " of " + openCritical.length + " open critical/high cases (" + Math.round(ownCounts[own] / openCritical.length * 100) + "%)",
+            suggestedAction: "Redistribute work from '" + own + "' or add support resources to reduce single-point-of-failure risk."
+          });
+        }
+      });
+    }
+
+    // (c) Cost drift: >3 cases in same costCat overbudget
+    var overBudgetByCat = {};
+    cases.forEach(function (c) {
+      var est = Number(c.estCost) || 0;
+      var act = Number(c.actCost) || 0;
+      if (est > 0 && act > est) {
+        var cat = c.costCat || "Other";
+        overBudgetByCat[cat] = (overBudgetByCat[cat] || 0) + 1;
+      }
+    });
+    Object.keys(overBudgetByCat).forEach(function (cat) {
+      if (overBudgetByCat[cat] > 3) {
+        patterns.push({
+          type: "cost_drift",
+          severity: "high",
+          description: "Cost drift in '" + cat + "': " + overBudgetByCat[cat] + " items overbudget",
+          evidence: overBudgetByCat[cat] + " cases in '" + cat + "' have actCost > estCost",
+          suggestedAction: "Review cost estimation methodology for '" + cat + "'. Consider re-baselining or adding contingency."
+        });
+      }
+    });
+
+    // (d) Schedule pattern: >3 milestones forecast-slipping
+    var slipping = milestones.filter(function (ms) {
+      if (ms.forecast && ms.baseline) {
+        var fNum = parseInt(String(ms.forecast).replace(/[^0-9]/g, ""), 10) || 0;
+        var bNum = parseInt(String(ms.baseline).replace(/[^0-9]/g, ""), 10) || 0;
+        return fNum > bNum;
+      }
+      return false;
+    });
+    if (slipping.length > 3) {
+      patterns.push({
+        type: "schedule_pattern",
+        severity: "high",
+        description: "Systemic schedule slippage: " + slipping.length + " milestones forecasting late",
+        evidence: slipping.map(function (ms) { return ms.milestone || "unknown"; }).join(", "),
+        suggestedAction: "Reassess overall timeline. Consider fast-tracking critical path or adding resources to recover schedule."
+      });
+    }
+
+    // (e) Risk materialization: BLOCKED/RESOLVED with actCost > estCost and high RPN
+    cases.forEach(function (c) {
+      var rpn = (Number(c.sev) || 1) * (Number(c.occ) || 1) * (Number(c.det) || 1);
+      var est = Number(c.estCost) || 0;
+      var act = Number(c.actCost) || 0;
+      if ((c.status === "BLOCKED" || c.status === "RESOLVED") && rpn > 200 && est > 0 && act > est) {
+        patterns.push({
+          type: "risk_materialization",
+          severity: "critical",
+          description: "Risk materialized: '" + (c.problem || "").slice(0, 60) + "' (RPN " + rpn + ", cost overrun)",
+          evidence: "RPN=" + rpn + ", estCost=" + est + ", actCost=" + act + ", status=" + c.status,
+          suggestedAction: "Record as lesson learned. Review whether similar risks remain open and strengthen mitigations."
+        });
+      }
+    });
+
+    return { patterns: patterns };
+  }
+
+  // ---- recommend(projectState) ---------------------------------------------
+  function recommend(projectState) {
+    var status = analyzeStatus(projectState);
+    var patternResult = detectPatterns(projectState);
+    var recommendations = [];
+
+    // Convert findings to recommendations
+    var findingsByType = {};
+    status.findings.forEach(function (f) {
+      findingsByType[f.type] = findingsByType[f.type] || [];
+      findingsByType[f.type].push(f);
+    });
+
+    // Schedule recommendations
+    if (findingsByType.schedule && findingsByType.schedule.length > 0) {
+      var lessons = recallLessons({ query: "schedule delay slippage milestone", category: "Delivery / Schedule" });
+      recommendations.push({
+        priority: status.scores.spiEstimate < 0.8 ? 1 : 2,
+        title: "Address schedule slippage",
+        action: "Review " + findingsByType.schedule.length + " slipping milestone(s). Fast-track critical-path activities or add resources.",
+        rationale: "SPI estimate is " + status.scores.spiEstimate + ". " + findingsByType.schedule.length + " milestone(s) forecasting late.",
+        confidence: Math.min(0.95, 0.6 + (lessons.length * 0.1)),
+        relatedLessonId: lessons.length > 0 ? lessons[0].id : null
+      });
+    }
+
+    // Cost recommendations
+    if (findingsByType.cost && findingsByType.cost.length > 0) {
+      var costLessons = recallLessons({ query: "cost overrun budget overbudget", category: "Process / Flow" });
+      recommendations.push({
+        priority: status.scores.cpiEstimate < 0.8 ? 1 : 2,
+        title: "Control cost overruns",
+        action: "Investigate " + findingsByType.cost.length + " items exceeding budget. Tighten change control and re-baseline if necessary.",
+        rationale: "CPI estimate is " + status.scores.cpiEstimate + ". " + findingsByType.cost.length + " item(s) over budget.",
+        confidence: Math.min(0.95, 0.6 + (costLessons.length * 0.1)),
+        relatedLessonId: costLessons.length > 0 ? costLessons[0].id : null
+      });
+    }
+
+    // Risk recommendations
+    if (findingsByType.risk && findingsByType.risk.length > 0) {
+      var riskLessons = recallLessons({ query: "risk high rpn mitigation", tags: ["risk"] });
+      recommendations.push({
+        priority: 1,
+        title: "Mitigate high-exposure risks",
+        action: "Address " + findingsByType.risk.length + " high-RPN open item(s). Implement detection improvements or reduce occurrence.",
+        rationale: "Risk exposure score is " + status.scores.riskExposure + ". " + findingsByType.risk.length + " item(s) exceed RPN 200.",
+        confidence: Math.min(0.95, 0.7 + (riskLessons.length * 0.1)),
+        relatedLessonId: riskLessons.length > 0 ? riskLessons[0].id : null
+      });
+    }
+
+    // Resource recommendations
+    if (findingsByType.resource && findingsByType.resource.length > 0) {
+      recommendations.push({
+        priority: 3,
+        title: "Resolve resource bottlenecks",
+        action: "Redistribute load from overloaded owners and assign owners to unassigned critical items.",
+        rationale: findingsByType.resource.length + " resource concern(s) identified.",
+        confidence: 0.7,
+        relatedLessonId: null
+      });
+    }
+
+    // Stalled work recommendations
+    if (findingsByType.stalled && findingsByType.stalled.length > 0) {
+      recommendations.push({
+        priority: 3,
+        title: "Unblock stalled work items",
+        action: "Review " + findingsByType.stalled.length + " stalled item(s) that started over 30 days ago with less than 20% progress.",
+        rationale: "Items stuck in progress indicate blocked dependencies or insufficient resources.",
+        confidence: 0.65,
+        relatedLessonId: null
+      });
+    }
+
+    // Pattern-based recommendations
+    patternResult.patterns.forEach(function (p) {
+      var prio = p.severity === "critical" ? 1 : (p.severity === "high" ? 2 : 3);
+      var patternLessons = recallLessons({ query: p.description });
+      recommendations.push({
+        priority: prio,
+        title: "Pattern detected: " + p.type.replace(/_/g, " "),
+        action: p.suggestedAction,
+        rationale: p.description + " (" + p.evidence + ")",
+        confidence: Math.min(0.95, 0.5 + (patternLessons.length * 0.15)),
+        relatedLessonId: patternLessons.length > 0 ? patternLessons[0].id : null
+      });
+    });
+
+    // Sort by priority (ascending = most urgent first), then by confidence descending
+    recommendations.sort(function (a, b) {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      return b.confidence - a.confidence;
+    });
+
+    return { recommendations: recommendations };
+  }
+
+  // ---- selfImproveCheck(cases) ---------------------------------------------
+  function selfImproveCheck(cases) {
+    cases = cases || [];
+    var pendingLessons = [];
+
+    cases.forEach(function (c) {
+      var rpn = (Number(c.sev) || 1) * (Number(c.occ) || 1) * (Number(c.det) || 1);
+      var est = Number(c.estCost) || 0;
+      var act = Number(c.actCost) || 0;
+      var isResolved = c.status === "RESOLVED" || c.status === "CLOSED";
+      var wasBlocked = c.status === "BLOCKED";
+
+      var reasons = [];
+      if (rpn >= 200) reasons.push("high RPN (" + rpn + ")");
+      if (est > 0 && act > est * 1.5) reasons.push("overbudget (actual " + act + " vs est " + est + ")");
+      if (wasBlocked) reasons.push("was BLOCKED");
+
+      if ((isResolved || wasBlocked) && reasons.length > 0) {
+        pendingLessons.push({
+          challenge: (c.problem || "Unknown issue") + " [" + reasons.join("; ") + "]",
+          resolution: isResolved ? "Resolved/closed successfully" : "Currently blocked - needs resolution path",
+          category: c.category || "Process / Flow",
+          tags: [c.costCat || "Other", c.priority || "3-MEDIUM"].concat(reasons.length > 1 ? ["multi-factor"] : []),
+          impact: rpn >= 300 ? "high" : (rpn >= 200 ? "medium" : "low"),
+          projectType: c._brain === "risk" ? "risk-management" : "task-execution"
+        });
+      }
+    });
+
+    return { pendingLessons: pendingLessons };
+  }
+
+  // ---- clear lesson memory (for testing) -----------------------------------
+  function _clearLessons() {
+    storageSet(LESSONS_KEY, { lessons: [] });
+  }
+
+  var API = {
+    analyzeProject: analyzeProject,
+    listProfiles: listProfiles,
+    extractScale: extractScale,
+    _profiles: PROFILES,
+    analyzeStatus: analyzeStatus,
+    recordLesson: recordLesson,
+    recallLessons: recallLessons,
+    suggestMitigations: suggestMitigations,
+    detectPatterns: detectPatterns,
+    recommend: recommend,
+    selfImproveCheck: selfImproveCheck,
+    _clearLessons: _clearLessons
+  };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIBrain = API;
 })(typeof window !== "undefined" ? window : globalThis);
