@@ -445,5 +445,211 @@ console.log("\n-- vendorComparison: structured comparison --");
   ok(partial.vendors.length === 1, "vendorComparison with one valid ID returns 1 vendor");
 })();
 
+// ============================================================================
+// Country Database Tests
+// ============================================================================
+
+console.log("\n-- country database: all 8 countries present --");
+(function () {
+  var profile = B._profiles.find(function (p) { return p.id === "fibre-telecom"; });
+  var db = profile.COUNTRY_DATABASE;
+  ok(Array.isArray(db), "COUNTRY_DATABASE is an array");
+  ok(db.length === 8, "COUNTRY_DATABASE has exactly 8 countries (got " + db.length + ")");
+
+  var expectedCodes = ["ID", "TH", "VN", "TW", "PH", "GU", "MY", "BN"];
+  var actualCodes = db.map(function (c) { return c.code; });
+  ok(expectedCodes.every(function (code) { return actualCodes.indexOf(code) >= 0; }), "all 8 expected country codes present: " + actualCodes.join(", "));
+
+  var expectedNames = ["Indonesia", "Thailand", "Vietnam", "Taiwan", "Philippines", "Guam", "Malaysia", "Brunei"];
+  var actualNames = db.map(function (c) { return c.name; });
+  ok(expectedNames.every(function (name) { return actualNames.indexOf(name) >= 0; }), "all 8 country names present");
+})();
+
+console.log("\n-- country database: data completeness per country --");
+(function () {
+  var profile = B._profiles.find(function (p) { return p.id === "fibre-telecom"; });
+  var db = profile.COUNTRY_DATABASE;
+
+  var allComplete = db.every(function (c) {
+    return c.code && c.name && Array.isArray(c.aliases) && c.aliases.length > 0 &&
+      typeof c.regulatoryAuthorities === "object" &&
+      c.regulatoryAuthorities.telecom && c.regulatoryAuthorities.maritime &&
+      c.regulatoryAuthorities.environment && c.regulatoryAuthorities.investment &&
+      Array.isArray(c.geopoliticalChallenges) && c.geopoliticalChallenges.length >= 3 &&
+      Array.isArray(c.geographicalChallenges) && c.geographicalChallenges.length >= 3 &&
+      typeof c.keyContacts === "object" &&
+      c.keyContacts.feasibility && c.keyContacts.permitting &&
+      c.keyContacts.construction && c.keyContacts.operations;
+  });
+  ok(allComplete, "every country has code, name, aliases, regulatoryAuthorities (telecom/maritime/environment/investment), geopolitical+geographical challenges (3+), keyContacts (4 phases)");
+
+  // Check authority field structure
+  var allAuthoritiesComplete = db.every(function (c) {
+    var auths = c.regulatoryAuthorities;
+    var keys = ["telecom", "maritime", "environment", "investment"];
+    return keys.every(function (k) {
+      return auths[k] && auths[k].name && auths[k].fullName && auths[k].jurisdiction;
+    });
+  });
+  ok(allAuthoritiesComplete, "every authority entry has name, fullName, and jurisdiction");
+})();
+
+console.log("\n-- country database: specific authority verification --");
+(function () {
+  var profile = B._profiles.find(function (p) { return p.id === "fibre-telecom"; });
+  var db = profile.COUNTRY_DATABASE;
+  var findCountry = function (code) { return db.find(function (c) { return c.code === code; }); };
+
+  // Indonesia
+  var id = findCountry("ID");
+  ok(id.regulatoryAuthorities.telecom.name.indexOf("Kominfo") >= 0 || id.regulatoryAuthorities.telecom.name.indexOf("BAKTI") >= 0, "Indonesia telecom: Kominfo/BAKTI");
+  ok(id.regulatoryAuthorities.maritime.name === "DJPL", "Indonesia maritime: DJPL");
+  ok(id.regulatoryAuthorities.environment.name === "KLHK", "Indonesia environment: KLHK");
+  ok(id.regulatoryAuthorities.investment.name.indexOf("BKPM") >= 0 || id.regulatoryAuthorities.investment.name.indexOf("OSS") >= 0, "Indonesia investment: BKPM/OSS");
+
+  // Thailand
+  var th = findCountry("TH");
+  ok(th.regulatoryAuthorities.telecom.name === "NBTC", "Thailand telecom: NBTC");
+  ok(th.regulatoryAuthorities.maritime.name === "Marine Department", "Thailand maritime: Marine Department");
+  ok(th.regulatoryAuthorities.environment.name === "ONEP", "Thailand environment: ONEP");
+  ok(th.regulatoryAuthorities.investment.name === "BOI", "Thailand investment: BOI");
+
+  // Vietnam
+  var vn = findCountry("VN");
+  ok(vn.regulatoryAuthorities.telecom.name === "MIC", "Vietnam telecom: MIC");
+  ok(vn.regulatoryAuthorities.maritime.name === "Vinamarine", "Vietnam maritime: Vinamarine");
+
+  // Taiwan
+  var tw = findCountry("TW");
+  ok(tw.regulatoryAuthorities.telecom.name === "NCC", "Taiwan telecom: NCC");
+
+  // Philippines
+  var ph = findCountry("PH");
+  ok(ph.regulatoryAuthorities.telecom.name === "NTC", "Philippines telecom: NTC");
+  ok(ph.regulatoryAuthorities.maritime.name === "MARINA", "Philippines maritime: MARINA");
+
+  // Guam
+  var gu = findCountry("GU");
+  ok(gu.regulatoryAuthorities.telecom.name === "FCC", "Guam telecom: FCC");
+  ok(gu.regulatoryAuthorities.maritime.name === "USACE", "Guam maritime: USACE");
+
+  // Malaysia
+  var my = findCountry("MY");
+  ok(my.regulatoryAuthorities.telecom.name === "MCMC", "Malaysia telecom: MCMC");
+
+  // Brunei
+  var bn = findCountry("BN");
+  ok(bn.regulatoryAuthorities.telecom.name === "AITI", "Brunei telecom: AITI");
+  ok(bn.regulatoryAuthorities.investment.name === "BEDB", "Brunei investment: BEDB");
+})();
+
+console.log("\n-- country detection in analyzeProject --");
+(function () {
+  var brief = "Submarine fibre cable deployment connecting Indonesia, Thailand, and Vietnam. " +
+    "Route passes through Jakarta to Bangkok via 3000 km undersea cable. " +
+    "GPON termination at 20 sites passing 50000 homes over 24 months.";
+
+  var result = B.analyzeProject(brief);
+
+  // Check that country arrays are present in output
+  ok(Array.isArray(result.regulatoryAuthorities), "analyzeProject output includes regulatoryAuthorities array");
+  ok(Array.isArray(result.countryRisks), "analyzeProject output includes countryRisks array");
+  ok(Array.isArray(result.countryTasks), "analyzeProject output includes countryTasks array");
+
+  // Should detect Indonesia, Thailand, and Vietnam
+  ok(result.regulatoryAuthorities.length === 3, "detects 3 countries in brief (got " + result.regulatoryAuthorities.length + ")");
+  var countryCodes = result.regulatoryAuthorities.map(function (r) { return r.code; });
+  ok(countryCodes.indexOf("ID") >= 0, "detects Indonesia (ID)");
+  ok(countryCodes.indexOf("TH") >= 0, "detects Thailand (TH)");
+  ok(countryCodes.indexOf("VN") >= 0, "detects Vietnam (VN)");
+
+  // Verify structure of regulatory authorities output
+  var idAuth = result.regulatoryAuthorities.find(function (r) { return r.code === "ID"; });
+  ok(idAuth.country === "Indonesia", "regulatory entry has country name");
+  ok(idAuth.authorities.telecom.name.indexOf("Kominfo") >= 0, "regulatory entry includes telecom authority");
+  ok(idAuth.authorities.maritime.name === "DJPL", "regulatory entry includes maritime authority");
+
+  // Verify country risks output
+  var idRisks = result.countryRisks.find(function (r) { return r.code === "ID"; });
+  ok(Array.isArray(idRisks.geopolitical) && idRisks.geopolitical.length >= 3, "countryRisks includes geopolitical challenges");
+  ok(Array.isArray(idRisks.geographical) && idRisks.geographical.length >= 3, "countryRisks includes geographical challenges");
+
+  // Verify country tasks output
+  var idTasks = result.countryTasks.find(function (r) { return r.code === "ID"; });
+  ok(typeof idTasks.keyContacts === "object", "countryTasks includes keyContacts");
+  ok(Array.isArray(idTasks.keyContacts.feasibility), "keyContacts has feasibility phase");
+  ok(Array.isArray(idTasks.keyContacts.permitting), "keyContacts has permitting phase");
+  ok(Array.isArray(idTasks.keyContacts.construction), "keyContacts has construction phase");
+  ok(Array.isArray(idTasks.keyContacts.operations), "keyContacts has operations phase");
+})();
+
+console.log("\n-- country detection: alias matching --");
+(function () {
+  // Test alias detection (city names, etc.)
+  var brief = "Fibre optic cable landing at Manila and Kaohsiung connecting to Apra Harbor. " +
+    "OTDR testing at 5 sites, 10 km submarine cable route.";
+  var result = B.analyzeProject(brief);
+  var codes = result.regulatoryAuthorities.map(function (r) { return r.code; });
+  ok(codes.indexOf("PH") >= 0, "detects Philippines via alias 'manila'");
+  ok(codes.indexOf("TW") >= 0, "detects Taiwan via alias 'kaohsiung'");
+  ok(codes.indexOf("GU") >= 0, "detects Guam via alias 'apra harbor'");
+})();
+
+console.log("\n-- country detection: no countries in generic text --");
+(function () {
+  var brief = "Fibre optic deployment project, OTDR testing, splicing, 100 km route.";
+  var result = B.analyzeProject(brief);
+  ok(result.regulatoryAuthorities.length === 0, "no countries detected in generic text (got " + result.regulatoryAuthorities.length + ")");
+  ok(result.countryRisks.length === 0, "countryRisks empty for generic text");
+  ok(result.countryTasks.length === 0, "countryTasks empty for generic text");
+})();
+
+console.log("\n-- getCountryInfo: by code --");
+(function () {
+  var info = B.getCountryInfo("ID");
+  ok(info !== null, "getCountryInfo('ID') returns data");
+  ok(info.name === "Indonesia", "getCountryInfo('ID') returns Indonesia");
+  ok(info.regulatoryAuthorities.telecom.name.indexOf("Kominfo") >= 0, "getCountryInfo returns regulatory authorities");
+  ok(info.geopoliticalChallenges.length >= 3, "getCountryInfo returns geopolitical challenges");
+  ok(info.geographicalChallenges.length >= 3, "getCountryInfo returns geographical challenges");
+  ok(info.keyContacts.feasibility.length >= 2, "getCountryInfo returns key contacts");
+
+  // Test all 8 codes return valid data
+  var allCodes = ["ID", "TH", "VN", "TW", "PH", "GU", "MY", "BN"];
+  var allFound = allCodes.every(function (code) { return B.getCountryInfo(code) !== null; });
+  ok(allFound, "getCountryInfo returns data for all 8 country codes");
+})();
+
+console.log("\n-- getCountryInfo: by name and alias --");
+(function () {
+  var byName = B.getCountryInfo("Indonesia");
+  ok(byName !== null && byName.code === "ID", "getCountryInfo by name 'Indonesia' works");
+
+  var byAlias = B.getCountryInfo("bangkok");
+  ok(byAlias !== null && byAlias.code === "TH", "getCountryInfo by alias 'bangkok' returns Thailand");
+
+  var notFound = B.getCountryInfo("Antarctica");
+  ok(notFound === null, "getCountryInfo returns null for unknown country");
+
+  var lowerCase = B.getCountryInfo("my");
+  ok(lowerCase !== null && lowerCase.name === "Malaysia", "getCountryInfo handles lowercase code 'my'");
+})();
+
+console.log("\n-- getCountryInfo: data integrity spot check --");
+(function () {
+  // Verify specific real-world data across different countries
+  var tw = B.getCountryInfo("TW");
+  ok(tw.regulatoryAuthorities.maritime.name.indexOf("Maritime and Port Bureau") >= 0, "Taiwan maritime authority correct");
+  ok(tw.geopoliticalChallenges.some(function (c) { return c.indexOf("Cross-strait") >= 0; }), "Taiwan has cross-strait challenge");
+
+  var gu = B.getCountryInfo("GU");
+  ok(gu.regulatoryAuthorities.environment.name.indexOf("EPA") >= 0, "Guam environment authority includes EPA");
+  ok(gu.geopoliticalChallenges.some(function (c) { return c.indexOf("military") >= 0 || c.indexOf("DoD") >= 0 || c.indexOf("Military") >= 0; }), "Guam mentions military restrictions");
+
+  var bn = B.getCountryInfo("BN");
+  ok(bn.geopoliticalChallenges.some(function (c) { return c.indexOf("Islamic") >= 0 || c.indexOf("Sharia") >= 0; }), "Brunei mentions Islamic law considerations");
+  ok(bn.geographicalChallenges.some(function (c) { return c.indexOf("shallow") >= 0 || c.indexOf("Shallow") >= 0; }), "Brunei mentions shallow bay");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);

@@ -413,6 +413,265 @@
       { id: "v-analysys", company: "Analysys Mason", hq: "United Kingdom", category: "consulting", capabilities: ["telecom strategy consulting", "regulatory advisory", "network economics", "market entry strategy", "due diligence"], products: ["strategy consulting", "regulatory and policy advisory", "transaction support", "market forecasting", "network cost modelling"], notableProjects: ["Government broadband strategy advisory", "Telecom M&A due diligence", "National broadband plan development", "Regulatory spectrum advisory"], website: "https://www.analysysmason.com", priceRange: "premium", leadTime: "2-6 months", strengths: ["Largest telecom specialist consultancy", "Global office network", "Regulatory expertise", "Strong quantitative modelling"], considerations: ["Premium consulting rates", "Generalist telecom not cable-specific", "Large engagement minimum sizes"] },
       { id: "v-mott", company: "Mott MacDonald", hq: "United Kingdom", category: "consulting", capabilities: ["infrastructure consulting", "project management", "engineering design", "programme management", "environmental consulting"], products: ["project management services", "engineering design review", "programme advisory", "environmental impact assessment", "owners engineer services"], notableProjects: ["Major infrastructure programmes globally", "Telecommunications infrastructure advisory", "Cable landing facility design", "Subsea cable route engineering oversight"], website: "https://www.mottmac.com", priceRange: "premium", leadTime: "2-4 months", strengths: ["Global engineering consultancy", "Deep infrastructure expertise", "Owners engineer capability", "Multi-disciplinary teams"], considerations: ["Not telecom-specialist", "Large firm overhead", "Primarily advisory and oversight role"] }
     ],
+
+    // ---- Country-Specific Regulatory & Risk Database -----------------------
+    COUNTRY_DATABASE: [
+      {
+        code: "ID",
+        name: "Indonesia",
+        aliases: ["indonesia", "indonesian", "jakarta", "java", "sumatra", "kalimantan", "sulawesi", "borneo"],
+        regulatoryAuthorities: {
+          telecom: { name: "Kominfo / BAKTI", fullName: "Ministry of Communication and Information Technology / Badan Aksesibilitas Telekomunikasi dan Informasi", jurisdiction: "Telecom licensing, spectrum allocation, network service permits" },
+          maritime: { name: "DJPL", fullName: "Directorate General of Sea Transportation (Direktorat Jenderal Perhubungan Laut)", jurisdiction: "Submarine cable landing permits, maritime route approvals, seabed usage rights" },
+          environment: { name: "KLHK", fullName: "Ministry of Environment and Forestry (Kementerian Lingkungan Hidup dan Kehutanan)", jurisdiction: "Environmental impact assessment (AMDAL), coastal zone environmental permits" },
+          coastal: { name: "KKP", fullName: "Ministry of Marine Affairs and Fisheries (Kementerian Kelautan dan Perikanan)", jurisdiction: "Coastal zone management, marine spatial planning, fishery impact assessment" },
+          investment: { name: "BKPM / OSS", fullName: "Investment Coordinating Board / Online Single Submission system", jurisdiction: "Foreign investment approval, business licensing, investment incentives" }
+        },
+        geopoliticalChallenges: [
+          "Complex multi-ministry approval process requiring coordination across 5+ agencies",
+          "Cabotage rules restricting foreign-flagged cable ships in Indonesian waters",
+          "Regional autonomy laws giving provincial/regency governments permit authority",
+          "Periodic moratorium on new telecom licenses during policy reviews",
+          "Military/naval security clearances required for certain maritime corridors"
+        ],
+        geographicalChallenges: [
+          "17,000+ islands requiring extensive submarine cable routing",
+          "Ring of Fire location with high seismic and volcanic activity",
+          "Strong ocean currents in straits (Lombok, Makassar, Malacca)",
+          "Coral reef ecosystems requiring environmental mitigation",
+          "Monsoon seasons affecting marine operations (Dec-Mar west, Jun-Sep east)"
+        ],
+        keyContacts: {
+          feasibility: ["Kominfo Directorate of Telecommunications", "BKPM investment desk", "Local provincial government (Pemda)"],
+          permitting: ["DJPL regional offices", "KKP coastal zone division", "KLHK AMDAL commission", "Provincial marine affairs office"],
+          construction: ["Indonesian Navy (TNI-AL) for maritime security clearance", "Port authorities at landing sites", "Local village heads (Kepala Desa) for land access"],
+          operations: ["Kominfo monitoring division", "BAKTI for universal service obligations", "Indonesian Internet Exchange (IIX)"]
+        }
+      },
+      {
+        code: "TH",
+        name: "Thailand",
+        aliases: ["thailand", "thai", "bangkok", "gulf of thailand", "andaman"],
+        regulatoryAuthorities: {
+          telecom: { name: "NBTC", fullName: "National Broadcasting and Telecommunications Commission", jurisdiction: "Telecom licensing, spectrum management, network service regulation" },
+          maritime: { name: "Marine Department", fullName: "Marine Department, Ministry of Transport", jurisdiction: "Submarine cable route approval, seabed permits, maritime navigation safety" },
+          environment: { name: "ONEP", fullName: "Office of Natural Resources and Environmental Policy and Planning", jurisdiction: "Environmental impact assessment (EIA/EHIA), coastal environmental permits" },
+          coastal: { name: "DMCR", fullName: "Department of Marine and Coastal Resources", jurisdiction: "Coastal zone protection, marine habitat conservation, shore-end landing approvals" },
+          investment: { name: "BOI", fullName: "Board of Investment of Thailand", jurisdiction: "Foreign investment promotion, tax incentives, investment permits for telecom" }
+        },
+        geopoliticalChallenges: [
+          "Political instability cycles affecting long-term infrastructure commitments",
+          "Military government legacy with ongoing regulatory framework changes",
+          "State enterprise involvement (CAT Telecom/NT) in submarine cable landing",
+          "Bilateral maritime boundary disputes with neighboring countries"
+        ],
+        geographicalChallenges: [
+          "Gulf of Thailand shallow waters (average 45m depth) complicating cable burial",
+          "Southwest monsoon season (Nov-Feb) restricting marine operations",
+          "Heavy fishing activity in Gulf requiring cable protection measures",
+          "Coral reef areas around southern islands requiring environmental mitigation",
+          "River delta sedimentation at Chao Phraya affecting shore-end stability"
+        ],
+        keyContacts: {
+          feasibility: ["NBTC licensing division", "BOI investment promotion office", "CAT Telecom/NT for landing station access"],
+          permitting: ["Marine Department regional offices", "ONEP EIA division", "DMCR coastal permits section", "Royal Thai Navy hydrographic department"],
+          construction: ["Port Authority of Thailand", "Marine Department vessel traffic services", "Local Tambon (sub-district) administration"],
+          operations: ["NBTC compliance monitoring", "National Telecom (NT) interconnection", "Thai Network Information Center (THNIC)"]
+        }
+      },
+      {
+        code: "VN",
+        name: "Vietnam",
+        aliases: ["vietnam", "vietnamese", "hanoi", "ho chi minh", "saigon", "vung tau", "da nang"],
+        regulatoryAuthorities: {
+          telecom: { name: "MIC", fullName: "Ministry of Information and Communications (Bo Thong tin va Truyen thong)", jurisdiction: "Telecom licensing, network service permits, international gateway approvals" },
+          maritime: { name: "Vinamarine", fullName: "Vietnam Maritime Administration (Cuc Hang hai Viet Nam)", jurisdiction: "Submarine cable route permits, maritime safety zones, seabed usage rights" },
+          environment: { name: "MONRE", fullName: "Ministry of Natural Resources and Environment", jurisdiction: "Environmental impact assessment, marine environmental protection, coastal zone management" },
+          coastal: { name: "VASI", fullName: "Vietnam Administration of Seas and Islands", jurisdiction: "Marine spatial planning, island territory management, sea-use permits" },
+          investment: { name: "MPI", fullName: "Ministry of Planning and Investment", jurisdiction: "Foreign investment licensing, investment certificates, special economic zone approvals" }
+        },
+        geopoliticalChallenges: [
+          "Communist Party-state approval process requiring multiple government levels",
+          "South China Sea territorial disputes affecting cable routing in contested waters",
+          "State-owned enterprise dominance (VNPT, Viettel, FPT) in telecom sector",
+          "National security reviews for foreign participation in telecom infrastructure",
+          "Complex land-use rights system (no private land ownership) for terrestrial portions"
+        ],
+        geographicalChallenges: [
+          "Typhoon season (Jun-Nov) with 6-8 typhoons annually along central coast",
+          "South China Sea routing constraints due to disputed territorial claims",
+          "Mekong Delta sedimentation and subsidence affecting southern landing sites",
+          "Strong longshore currents along central Vietnam coast",
+          "Fishing fleet density (one of worlds largest) creating cable risk"
+        ],
+        keyContacts: {
+          feasibility: ["MIC International Cooperation Department", "MPI Foreign Investment Agency", "Provincial Peoples Committee"],
+          permitting: ["Vinamarine regional offices", "MONRE EIA department", "VASI sea-use planning division", "Provincial Department of Natural Resources"],
+          construction: ["Vietnam Peoples Navy for security clearance", "Port authorities at landing sites", "Local Peoples Committee for land access"],
+          operations: ["MIC telecom monitoring center", "VNPT/Viettel for interconnection", "Vietnam Internet Network Information Center (VNNIC)"]
+        }
+      },
+      {
+        code: "TW",
+        name: "Taiwan",
+        aliases: ["taiwan", "taiwanese", "taipei", "kaohsiung", "formosa", "roc"],
+        regulatoryAuthorities: {
+          telecom: { name: "NCC", fullName: "National Communications Commission", jurisdiction: "Telecom licensing, network service regulation, submarine cable landing permits" },
+          maritime: { name: "Maritime and Port Bureau / MOTC", fullName: "Maritime and Port Bureau, Ministry of Transportation and Communications", jurisdiction: "Maritime route approvals, port access permits, seabed usage coordination" },
+          environment: { name: "Ministry of Environment", fullName: "Ministry of Environment (formerly EPA)", jurisdiction: "Environmental impact assessment, marine ecology protection, pollution control" },
+          coastal: { name: "Ocean Affairs Council", fullName: "Ocean Affairs Council (Hai Yang Wei Yuan Hui)", jurisdiction: "Marine spatial planning, coastal zone management, ocean resource protection" },
+          investment: { name: "Investment Commission / MOEA", fullName: "Investment Commission, Ministry of Economic Affairs", jurisdiction: "Foreign investment approval, cross-strait investment review, technology transfer" }
+        },
+        geopoliticalChallenges: [
+          "Cross-strait political sensitivity with PRC affecting international cable routing",
+          "Diplomatic isolation limiting bilateral agreements for cable protection",
+          "PRC military activity in Taiwan Strait creating cable route constraints",
+          "US-China technology competition affecting equipment vendor selection",
+          "Limited international treaty participation for submarine cable protection"
+        ],
+        geographicalChallenges: [
+          "High seismicity (Pacific Ring of Fire) with frequent earthquakes damaging cables",
+          "Typhoon belt exposure (Jul-Oct) with intense storms",
+          "Deep ocean trenches east of Taiwan (>4000m) requiring specialized cable",
+          "Strong Kuroshio Current along east coast affecting cable laying operations",
+          "Submarine volcanic activity in some offshore areas"
+        ],
+        keyContacts: {
+          feasibility: ["NCC licensing division", "Investment Commission MOEA", "Chunghwa Telecom (landing station operator)"],
+          permitting: ["Maritime and Port Bureau", "Ministry of Environment EIA division", "Ocean Affairs Council", "Council of Agriculture (fishery coordination)"],
+          construction: ["Coast Guard Administration for security clearance", "Port authorities (Kaohsiung, Toucheng)", "Local county/city government for land permits"],
+          operations: ["NCC compliance monitoring", "Chunghwa Telecom interconnection", "Taiwan Network Information Center (TWNIC)"]
+        }
+      },
+      {
+        code: "PH",
+        name: "Philippines",
+        aliases: ["philippines", "filipino", "manila", "luzon", "visayas", "mindanao", "cebu", "davao"],
+        regulatoryAuthorities: {
+          telecom: { name: "NTC", fullName: "National Telecommunications Commission", jurisdiction: "Telecom franchise licensing, network service permits, equipment type approval" },
+          maritime: { name: "MARINA", fullName: "Maritime Industry Authority", jurisdiction: "Maritime vessel permits, submarine cable route clearance, port access coordination" },
+          environment: { name: "DENR", fullName: "Department of Environment and Natural Resources", jurisdiction: "Environmental compliance certificate (ECC), protected area permits, coastal resource management" },
+          coastal: { name: "NAMRIA", fullName: "National Mapping and Resource Information Authority", jurisdiction: "Hydrographic surveys, nautical charting, maritime boundary delineation" },
+          investment: { name: "PEZA / BOI", fullName: "Philippine Economic Zone Authority / Board of Investments", jurisdiction: "Investment incentives, economic zone registration, foreign ownership clearance" }
+        },
+        geopoliticalChallenges: [
+          "Typhoon Alley exposure with 20+ typhoons annually crossing cable routes",
+          "South China Sea (West Philippine Sea) disputes affecting western cable routing",
+          "Complex LGU (Local Government Unit) permit requirements at barangay/municipal/provincial levels",
+          "Congressional franchise requirement for telecom operators",
+          "Anti-dummy law restricting foreign ownership to 40% in utilities"
+        ],
+        geographicalChallenges: [
+          "7,000+ islands requiring extensive inter-island submarine cable routing",
+          "Typhoon Alley with 20+ cyclones per year (peak Jul-Nov)",
+          "Deep Philippine Trench (>10,000m) east of archipelago",
+          "Active volcanic and seismic zones throughout archipelago",
+          "Strong currents in inter-island straits (San Bernardino, Surigao)"
+        ],
+        keyContacts: {
+          feasibility: ["NTC licensing division", "DICT (Dept of ICT) policy office", "BOI investment promotion", "PEZA for economic zone benefits"],
+          permitting: ["MARINA maritime permits", "DENR Environmental Management Bureau", "NAMRIA hydrographic division", "LGU offices (barangay to provincial)"],
+          construction: ["Philippine Coast Guard for maritime clearance", "Philippine Ports Authority", "DPWH (Dept of Public Works) for road crossings", "Barangay captains for local access"],
+          operations: ["NTC compliance monitoring", "PLDT/Globe for interconnection", "Philippine Network Information Center (PHNIC)"]
+        }
+      },
+      {
+        code: "GU",
+        name: "Guam",
+        aliases: ["guam", "guamanian", "hagatna", "apra harbor", "us territory"],
+        regulatoryAuthorities: {
+          telecom: { name: "FCC", fullName: "Federal Communications Commission (United States)", jurisdiction: "Telecom licensing, submarine cable landing licenses (Section 1.767), spectrum management" },
+          maritime: { name: "USACE", fullName: "United States Army Corps of Engineers", jurisdiction: "Section 10/404 permits for submarine cable installation, dredge and fill permits" },
+          environment: { name: "EPA + Guam EPA", fullName: "US Environmental Protection Agency + Guam Environmental Protection Agency", jurisdiction: "NEPA compliance, marine environmental review, water quality certification" },
+          coastal: { name: "NOAA", fullName: "National Oceanic and Atmospheric Administration", jurisdiction: "Essential fish habitat consultation, marine sanctuary review, coastal zone management consistency" },
+          investment: { name: "DoD / CFIUS", fullName: "Department of Defense / Committee on Foreign Investment in the United States", jurisdiction: "National security review for foreign investment near military installations, CFIUS clearance" }
+        },
+        geopoliticalChallenges: [
+          "Dual federal/territorial jurisdiction requiring both US federal and Guam territorial permits",
+          "Extensive military zones (Naval Base Guam, Andersen AFB) restricting cable routes",
+          "CFIUS national security review for foreign-owned cable systems",
+          "Strategic military significance increasing scrutiny of Asian-connected cables",
+          "Limited local workforce requiring imported specialized labor"
+        ],
+        geographicalChallenges: [
+          "Coral reef ecosystem requiring strict environmental mitigation under NEPA",
+          "Mariana Trench proximity with extreme ocean depths",
+          "Typhoon exposure in western Pacific (peak Aug-Nov)",
+          "Limited landing beach options due to reef, military, and conservation zones",
+          "Seismic activity (Pacific Ring of Fire)"
+        ],
+        keyContacts: {
+          feasibility: ["FCC International Bureau", "Guam Telecom Authority (GTA)", "Joint Region Marianas (military coordination)"],
+          permitting: ["USACE Pacific Ocean Division", "NOAA Pacific Islands Regional Office", "Guam EPA", "US Fish and Wildlife Service", "DoD real estate office"],
+          construction: ["Naval Facilities Engineering Command (NAVFAC) Marianas", "Port Authority of Guam", "Guam Department of Land Management"],
+          operations: ["FCC compliance monitoring", "GTA interconnection", "Pacific Islands Telecommunications Association (PITA)"]
+        }
+      },
+      {
+        code: "MY",
+        name: "Malaysia",
+        aliases: ["malaysia", "malaysian", "kuala lumpur", "penang", "johor", "sabah", "sarawak", "peninsular"],
+        regulatoryAuthorities: {
+          telecom: { name: "MCMC", fullName: "Malaysian Communications and Multimedia Commission", jurisdiction: "Telecom licensing (NFP/NSP/ASP), network facility provision, spectrum management" },
+          maritime: { name: "Marine Department", fullName: "Marine Department Malaysia (Jabatan Laut Malaysia)", jurisdiction: "Submarine cable route approval, maritime safety zones, seabed usage permits" },
+          environment: { name: "DOE", fullName: "Department of Environment (Jabatan Alam Sekitar)", jurisdiction: "Environmental impact assessment (EIA), pollution control, coastal environmental permits" },
+          coastal: { name: "JUPEM / NHSA", fullName: "Department of Survey and Mapping / National Hydrographic Centre", jurisdiction: "Hydrographic surveys, maritime boundary coordination, seabed mapping" },
+          investment: { name: "MIDA", fullName: "Malaysian Investment Development Authority", jurisdiction: "Foreign investment incentives, manufacturing/services approvals, investment tax allowances" }
+        },
+        geopoliticalChallenges: [
+          "East Malaysia (Sabah/Sarawak) vs Peninsular Malaysia requiring separate state approvals",
+          "Strait of Malacca as one of worlds busiest shipping lanes complicating cable routing",
+          "Overlapping maritime claims with neighbors (Singapore, Indonesia, Philippines, Brunei)",
+          "Bumiputera equity requirements potentially affecting foreign ownership structure",
+          "State-level land authority separate from federal maritime authority"
+        ],
+        geographicalChallenges: [
+          "Northeast monsoon (Nov-Mar) and southwest monsoon (May-Sep) seasons",
+          "Strait of Malacca heavy vessel traffic and anchor damage risk",
+          "Shallow continental shelf waters in Malacca Strait requiring burial",
+          "Coral reef areas (Sabah, Terengganu) requiring environmental protection",
+          "Riverine sediment discharge at major river mouths affecting cable stability"
+        ],
+        keyContacts: {
+          feasibility: ["MCMC licensing division", "MIDA investment promotion", "Telekom Malaysia (TM) for landing station access"],
+          permitting: ["Marine Department regional offices", "DOE EIA division", "State authority land offices", "Malaysian Maritime Enforcement Agency (MMEA)"],
+          construction: ["Royal Malaysian Navy hydrographic directorate", "Port authorities (Port Klang, Tanjung Pelepas, Kota Kinabalu)", "State land office for terrestrial right-of-way"],
+          operations: ["MCMC compliance monitoring", "TM/Maxis/TIME for interconnection", "MyNIC (Malaysia Network Information Centre)"]
+        }
+      },
+      {
+        code: "BN",
+        name: "Brunei",
+        aliases: ["brunei", "bruneian", "bandar seri begawan", "brunei darussalam"],
+        regulatoryAuthorities: {
+          telecom: { name: "AITI", fullName: "Authority for Info-communications Technology Industry", jurisdiction: "Telecom licensing, network service regulation, ICT industry development" },
+          maritime: { name: "Marine Department", fullName: "Marine Department, Ministry of Transport and Infocommunications", jurisdiction: "Submarine cable route permits, maritime navigation safety, port access" },
+          environment: { name: "Dept of Environment, Parks and Recreation", fullName: "Department of Environment, Parks and Recreation", jurisdiction: "Environmental impact assessment, coastal zone protection, marine park management" },
+          coastal: { name: "Survey Department", fullName: "Survey Department, Ministry of Development", jurisdiction: "Hydrographic surveys, coastal mapping, land/marine boundary coordination" },
+          investment: { name: "BEDB", fullName: "Brunei Economic Development Board", jurisdiction: "Foreign direct investment facilitation, business licensing, economic diversification incentives" }
+        },
+        geopoliticalChallenges: [
+          "Small country with limited cable landing point options on Brunei Bay",
+          "Islamic law (Sharia) considerations for business operations and contracts",
+          "Sultan and government decision-making concentration requiring high-level engagement",
+          "Enclave geography (surrounded by Malaysian Sarawak) complicating terrestrial routes",
+          "Petroleum-dependent economy with evolving diversification priorities"
+        ],
+        geographicalChallenges: [
+          "Shallow Brunei Bay requiring extensive cable burial for protection",
+          "Limited coastline (161 km) constraining landing site options",
+          "South China Sea monsoon exposure (northeast Dec-Mar)",
+          "Oil and gas infrastructure in offshore areas creating route conflicts",
+          "Mangrove ecosystems along coast requiring environmental protection"
+        ],
+        keyContacts: {
+          feasibility: ["AITI licensing and regulation division", "BEDB investment facilitation team", "Unified National Networks (UNN) for infrastructure sharing"],
+          permitting: ["Marine Department", "Dept of Environment, Parks and Recreation", "Land Department for terrestrial permits", "Ministry of Defence (maritime security)"],
+          construction: ["Royal Brunei Navy for maritime clearance", "Ports Department for shore access", "UNN for infrastructure coordination", "Public Works Department for road crossings"],
+          operations: ["AITI compliance monitoring", "UNN/DST for interconnection", "BruNET (Brunei national backbone)"]
+        }
+      }
+    ],
   };
 
   // ---- GENERIC PM profile (fallback) --------------------------------------
@@ -513,6 +772,32 @@
     var procurement = profile.buildProcurement(scale);
     var budget = aggregateBudget(cases.concat(risks), procurement);
 
+    // ---- Country detection ------------------------------------------------
+    var regulatoryAuthorities = [];
+    var countryRisks = [];
+    var countryTasks = [];
+    var detectedCountries = detectCountries(text, profile);
+    if (detectedCountries.length > 0) {
+      detectedCountries.forEach(function (country) {
+        regulatoryAuthorities.push({
+          country: country.name,
+          code: country.code,
+          authorities: country.regulatoryAuthorities
+        });
+        countryRisks.push({
+          country: country.name,
+          code: country.code,
+          geopolitical: country.geopoliticalChallenges,
+          geographical: country.geographicalChallenges
+        });
+        countryTasks.push({
+          country: country.name,
+          code: country.code,
+          keyContacts: country.keyContacts
+        });
+      });
+    }
+
     // Coverage / confidence & honest warnings.
     var warnings = [];
     if (picked.profile.id === "generic-pm") warnings.push("Domain not confidently detected — used the generic PM template. Add more detail (e.g. 'fibre', 'OTDR', 'route km') for a tailored plan.");
@@ -536,11 +821,55 @@
       standards: profile.standards || [],
       kpis: profile.kpis || [],
       deliverables: profile.deliverables || [],
+      regulatoryAuthorities: regulatoryAuthorities,
+      countryRisks: countryRisks,
+      countryTasks: countryTasks,
       coverage: { profile: profile.id, confidence: Math.round(confidence * 100) / 100, matched: picked.matched, warnings: warnings },
     };
   }
 
   function listProfiles() { return PROFILES.map(function (p) { return { id: p.id, label: p.label }; }); }
+
+  // ---- Country Detection & Info -------------------------------------------
+  function detectCountries(text, profile) {
+    var db = profile.COUNTRY_DATABASE;
+    if (!db || !Array.isArray(db)) return [];
+    var t = norm(text);
+    var detected = [];
+    db.forEach(function (country) {
+      var found = false;
+      // Check country name
+      if (t.indexOf(norm(country.name)) >= 0) found = true;
+      // Check country code (word boundary)
+      if (!found) {
+        var codeRe = new RegExp("(^|[^a-z])" + country.code.toLowerCase() + "([^a-z]|$)");
+        if (codeRe.test(t)) found = true;
+      }
+      // Check aliases
+      if (!found && country.aliases) {
+        for (var i = 0; i < country.aliases.length; i++) {
+          if (t.indexOf(country.aliases[i]) >= 0) { found = true; break; }
+        }
+      }
+      if (found) detected.push(country);
+    });
+    return detected;
+  }
+
+  function getCountryInfo(countryCode) {
+    var profile = PROFILES.find(function (p) { return p.id === "fibre-telecom"; });
+    if (!profile || !profile.COUNTRY_DATABASE) return null;
+    var code = String(countryCode || "").toUpperCase();
+    var country = profile.COUNTRY_DATABASE.find(function (c) { return c.code === code; });
+    if (!country) {
+      // Try name match
+      var lc = norm(countryCode);
+      country = profile.COUNTRY_DATABASE.find(function (c) {
+        return norm(c.name) === lc || (c.aliases && c.aliases.indexOf(lc) >= 0);
+      });
+    }
+    return country || null;
+  }
 
   // ---- Intelligence Engine: localStorage with in-memory fallback ----------
   var _memoryStore = {};
@@ -1182,6 +1511,7 @@
     analyzeProject: analyzeProject,
     listProfiles: listProfiles,
     extractScale: extractScale,
+    getCountryInfo: getCountryInfo,
     _profiles: PROFILES,
     analyzeStatus: analyzeStatus,
     recordLesson: recordLesson,
