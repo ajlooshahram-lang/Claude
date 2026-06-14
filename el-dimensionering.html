@@ -739,6 +739,7 @@ const T = {
       projekt: 'Projekt',
       verify: 'Verifikation',
       draw: 'Tegning',
+      selectivity: '\u26A1 Selektivitet',
       exam: '\uD83C\uDF93 Eksamen'
     },
     // Load module
@@ -838,6 +839,7 @@ const T = {
       projekt: 'Project',
       verify: 'Verify',
       draw: 'Drawing',
+      selectivity: '\u26A1 Selectivity',
       exam: '\uD83C\uDF93 Exam'
     },
     loadTitle: 'Load Calculation',
@@ -1976,6 +1978,8 @@ let mccbState = { frame: 'NSX 400', trip: 'F', inVal: 400, ioMult: 0.8, isdMult:
 let cableState = { material: 'copper', type: 'NOIKLX', cores: '5G', crossSection: null, installMethod: 'C', temp: 30, grouping: 1 };
 // Voltage drop state
 let vdropState = { length: 50 };
+// Selectivity state
+let selState = { upType: null, upRating: null, upCurve: null, dnType: null, dnRating: null, dnCurve: null };
 // Short circuit state
 let scState = { zNet: 1, zTrafo: 5 };
 // Standards state
@@ -2101,6 +2105,7 @@ function renderModule(mod) {
     case 'projekt': content = renderProjekt(); break;
     case 'verify': content = renderVerify(); break;
     case 'draw': content = renderDrawing(); break;
+    case 'selectivity': content = renderSelectivity(); break;
     case 'exam': content = renderExam(); break;
   }
   // Append AI assistant to every module
@@ -6793,6 +6798,423 @@ function build3D(){
   svg+=`<text x="28" y="${H-footerH+23}" font-size="8" fill="${allOk?'#06d6a0':'#ff4444'}" font-weight="700">${allOk?'ALL CHECKS PASSED':qi.issues.length+' '+(lang==='da'?'advarsler':'warnings')}</text>`;
 
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="border-radius:14px;border:1.5px solid rgba(0,180,255,0.2);overflow:visible;background:#020508;box-shadow:0 8px 32px rgba(0,100,200,0.08)" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+}
+
+// ===== SELECTIVITY MODULE =====
+function calcSelectivity() {
+  const up = selState.upType, dn = selState.dnType;
+  const upR = selState.upRating, dnR = selState.dnRating;
+  const upC = selState.upCurve, dnC = selState.dnCurve;
+  if (!up || !dn || !upR || !dnR) return null;
+
+  const ratio = upR / dnR;
+  let verdict = 'none'; // 'full', 'partial', 'none'
+  let limitKa = null;
+  let detail = '';
+  const da = lang === 'da';
+
+  if (up === 'gG' && dn === 'gG') {
+    // gG vs gG: full selectivity at ratio >= 1.6:1
+    if (ratio >= 2.0) {
+      verdict = 'full';
+      detail = da ? 'Forhold ' + ratio.toFixed(2) + ':1 \u2265 2:1 - fuld selektivitet (IEC 60269)' : 'Ratio ' + ratio.toFixed(2) + ':1 \u2265 2:1 - full selectivity (IEC 60269)';
+    } else if (ratio >= 1.6) {
+      verdict = 'partial';
+      limitKa = Math.min(50, Math.round(upR * 0.15));
+      detail = da ? 'Forhold ' + ratio.toFixed(2) + ':1 \u2265 1.6:1 - delvis selektivitet op til ca. ' + limitKa + ' kA' : 'Ratio ' + ratio.toFixed(2) + ':1 \u2265 1.6:1 - partial selectivity up to approx. ' + limitKa + ' kA';
+    } else {
+      verdict = 'none';
+      detail = da ? 'Forhold ' + ratio.toFixed(2) + ':1 < 1.6:1 - ingen selektivitet' : 'Ratio ' + ratio.toFixed(2) + ':1 < 1.6:1 - no selectivity';
+    }
+  } else if (up === 'mcb' && dn === 'mcb') {
+    // MCB vs MCB - same curve or different curve
+    const curveMultiplier = { 'B': 5, 'C': 10, 'D': 20 };
+    const upTrip = upR * (curveMultiplier[upC] || 5);
+    const dnTrip = dnR * (curveMultiplier[dnC] || 5);
+    const tripRatio = upTrip / dnTrip;
+
+    if (upC === dnC) {
+      // Same curve: ratio >= 2:1 needed
+      if (ratio >= 2.0) {
+        verdict = 'partial';
+        limitKa = Math.min(10, Math.round(dnR * curveMultiplier[dnC] / 1000 * 2));
+        if (limitKa < 1) limitKa = 1;
+        detail = da ? 'Samme kurve ' + upC + ' - forhold ' + ratio.toFixed(2) + ':1 \u2265 2:1 - delvis selektivitet op til ' + limitKa + ' kA' : 'Same curve ' + upC + ' - ratio ' + ratio.toFixed(2) + ':1 \u2265 2:1 - partial selectivity up to ' + limitKa + ' kA';
+      } else {
+        verdict = 'none';
+        detail = da ? 'Samme kurve ' + upC + ' - forhold ' + ratio.toFixed(2) + ':1 < 2:1 - ingen selektivitet' : 'Same curve ' + upC + ' - ratio ' + ratio.toFixed(2) + ':1 < 2:1 - no selectivity';
+      }
+    } else {
+      // Different curves
+      if (tripRatio >= 2.0 && ratio >= 1.6) {
+        verdict = 'partial';
+        limitKa = Math.min(10, Math.round(dnTrip / 1000 * 1.5));
+        if (limitKa < 1) limitKa = 1;
+        detail = da ? 'Kurve ' + upC + '/' + dnC + ' - udl\u00F8seforhold ' + tripRatio.toFixed(1) + ':1 - delvis selektivitet op til ' + limitKa + ' kA' : 'Curve ' + upC + '/' + dnC + ' - trip ratio ' + tripRatio.toFixed(1) + ':1 - partial selectivity up to ' + limitKa + ' kA';
+      } else if (tripRatio >= 1.6) {
+        verdict = 'partial';
+        limitKa = 1;
+        detail = da ? 'Kurve ' + upC + '/' + dnC + ' - begr\u00E6nset selektivitet' : 'Curve ' + upC + '/' + dnC + ' - limited selectivity';
+      } else {
+        verdict = 'none';
+        detail = da ? 'Kurve ' + upC + '/' + dnC + ' - utilstr\u00E6kkeligt udl\u00F8seforhold' : 'Curve ' + upC + '/' + dnC + ' - insufficient trip ratio';
+      }
+    }
+  } else if (up === 'gG' && dn === 'mcb') {
+    // gG upstream vs MCB downstream
+    const curveMultiplier = { 'B': 5, 'C': 10, 'D': 20 };
+    const dnInstTrip = dnR * (curveMultiplier[dnC] || 5);
+    if (ratio >= 2.0 && upR >= dnInstTrip / 1000 * 1.6) {
+      verdict = 'partial';
+      limitKa = 10; // Conservative 10kA limit
+      detail = da ? 'gG ' + upR + 'A / MCB ' + dnC + dnR + 'A - delvis selektivitet op til ' + limitKa + ' kA (konservativt)' : 'gG ' + upR + 'A / MCB ' + dnC + dnR + 'A - partial selectivity up to ' + limitKa + ' kA (conservative)';
+    } else if (ratio >= 1.6) {
+      verdict = 'partial';
+      limitKa = 6;
+      detail = da ? 'gG ' + upR + 'A / MCB ' + dnC + dnR + 'A - begr\u00E6nset selektivitet op til ' + limitKa + ' kA' : 'gG ' + upR + 'A / MCB ' + dnC + dnR + 'A - limited selectivity up to ' + limitKa + ' kA';
+    } else {
+      verdict = 'none';
+      detail = da ? 'Utilstr\u00E6kkeligt forhold mellem gG ' + upR + 'A og MCB ' + dnC + dnR + 'A' : 'Insufficient ratio between gG ' + upR + 'A and MCB ' + dnC + dnR + 'A';
+    }
+  } else if (up === 'mccb' && dn === 'mcb') {
+    // MCCB upstream vs MCB downstream
+    if (ratio >= 2.5) {
+      verdict = 'partial';
+      limitKa = Math.min(50, Math.round(upR * 0.25));
+      detail = da ? 'MCCB ' + upR + 'A / MCB ' + dnC + dnR + 'A - delvis selektivitet op til ' + limitKa + ' kA (bekr\u00E6ft mod fabrikantens tabel)' : 'MCCB ' + upR + 'A / MCB ' + dnC + dnR + 'A - partial selectivity up to ' + limitKa + ' kA (confirm against manufacturer table)';
+    } else if (ratio >= 1.6) {
+      verdict = 'partial';
+      limitKa = Math.min(20, Math.round(upR * 0.1));
+      if (limitKa < 3) limitKa = 3;
+      detail = da ? 'MCCB ' + upR + 'A / MCB ' + dnC + dnR + 'A - begr\u00E6nset selektivitet' : 'MCCB ' + upR + 'A / MCB ' + dnC + dnR + 'A - limited selectivity';
+    } else {
+      verdict = 'none';
+      detail = da ? 'Utilstr\u00E6kkeligt forhold MCCB/MCB' : 'Insufficient MCCB/MCB ratio';
+    }
+  } else if (up === 'mccb' && dn === 'gG') {
+    // MCCB upstream vs gG downstream
+    if (ratio >= 2.0) {
+      verdict = 'partial';
+      limitKa = Math.min(50, Math.round(upR * 0.2));
+      detail = da ? 'MCCB ' + upR + 'A / gG ' + dnR + 'A - delvis selektivitet op til ' + limitKa + ' kA' : 'MCCB ' + upR + 'A / gG ' + dnR + 'A - partial selectivity up to ' + limitKa + ' kA';
+    } else {
+      verdict = 'none';
+      detail = da ? 'Utilstr\u00E6kkeligt forhold MCCB/gG' : 'Insufficient MCCB/gG ratio';
+    }
+  } else if (up === 'mccb' && dn === 'mccb') {
+    // MCCB vs MCCB
+    if (ratio >= 2.5) {
+      verdict = 'partial';
+      limitKa = Math.min(65, Math.round(upR * 0.15));
+      detail = da ? 'MCCB ' + upR + 'A / MCCB ' + dnR + 'A - delvis selektivitet (bekr\u00E6ft mod fabrikant)' : 'MCCB ' + upR + 'A / MCCB ' + dnR + 'A - partial selectivity (confirm with manufacturer)';
+    } else {
+      verdict = 'none';
+      detail = da ? 'MCCB ' + upR + 'A / MCCB ' + dnR + 'A - verific\u00E9r mod fabrikantens selektivitetstabel' : 'MCCB ' + upR + 'A / MCCB ' + dnR + 'A - verify against manufacturer selectivity table';
+    }
+  } else if (up === 'gG' && dn === 'mccb') {
+    // gG upstream vs MCCB downstream (unusual)
+    if (ratio >= 2.0) {
+      verdict = 'partial';
+      limitKa = Math.min(30, Math.round(upR * 0.1));
+      detail = da ? 'gG ' + upR + 'A / MCCB ' + dnR + 'A - delvis (us\u00E6dvanlig kombination)' : 'gG ' + upR + 'A / MCCB ' + dnR + 'A - partial (unusual combination)';
+    } else {
+      verdict = 'none';
+      detail = da ? 'Utilstr\u00E6kkeligt forhold' : 'Insufficient ratio';
+    }
+  } else if (up === 'mcb' && dn === 'gG') {
+    // MCB upstream vs gG downstream (unusual)
+    if (ratio >= 2.0) {
+      verdict = 'partial';
+      limitKa = 3;
+      detail = da ? 'MCB opstr\u00F8ms / gG nedstr\u00F8ms - begr\u00E6nset selektivitet' : 'MCB upstream / gG downstream - limited selectivity';
+    } else {
+      verdict = 'none';
+      detail = da ? 'Utilstr\u00E6kkeligt forhold MCB/gG' : 'Insufficient MCB/gG ratio';
+    }
+  } else if (up === 'mcb' && dn === 'mccb') {
+    // MCB upstream vs MCCB downstream (unusual, generally not selective)
+    verdict = 'none';
+    detail = da ? 'MCB opstr\u00F8ms for MCCB - generelt ikke selektivt' : 'MCB upstream of MCCB - generally not selective';
+  } else {
+    verdict = 'none';
+    detail = da ? 'Kombination ikke underst\u00F8ttet' : 'Combination not supported';
+  }
+
+  return { verdict, ratio, limitKa, detail };
+}
+
+function renderSelectivity() {
+  const da = lang === 'da';
+  const GG_RATINGS = [6, 10, 16, 20, 25, 32, 35, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630];
+  const MCB_RATINGS = [6, 10, 13, 16, 20, 25, 32, 40, 50, 63];
+  const MCCB_RATINGS = [16, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630];
+  const DEVICE_TYPES = ['gG', 'mcb', 'mccb'];
+  const DEVICE_LABELS = {
+    gG: da ? 'gG Sikring' : 'gG Fuse',
+    mcb: da ? 'MCB Automatsikring' : 'MCB Breaker',
+    mccb: 'MCCB'
+  };
+
+  function getRatings(type) {
+    if (type === 'gG') return GG_RATINGS;
+    if (type === 'mcb') return MCB_RATINGS;
+    if (type === 'mccb') return MCCB_RATINGS;
+    return [];
+  }
+
+  // Upstream selection
+  let upSection = `
+    <div class="select-group">
+      <div class="select-label">\u2B06\uFE0F ${da ? 'Opstr\u00F8ms enhed (forsyningsside)' : 'Upstream device (supply side)'}</div>
+      <div class="select-grid">
+        ${DEVICE_TYPES.map(t => `<button class="sel-btn ${selState.upType === t ? 'selected' : ''}" onclick="selState.upType='${t}';selState.upRating=null;selState.upCurve=${t==='mcb'?"'B'":"null"};renderModule('selectivity')">${DEVICE_LABELS[t]}</button>`).join('')}
+      </div>
+    </div>`;
+
+  if (selState.upType === 'mcb') {
+    upSection += `
+    <div class="select-group">
+      <div class="select-label">${da ? 'Kurve (opstr\u00F8ms)' : 'Curve (upstream)'}</div>
+      <div class="select-grid">
+        ${['B','C','D'].map(c => `<button class="sel-btn ${selState.upCurve === c ? 'selected' : ''}" onclick="selState.upCurve='${c}';renderModule('selectivity')">${c} (${c==='B'?'3-5':c==='C'?'5-10':'10-20'}\u00D7In)</button>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  if (selState.upType) {
+    const upRatings = getRatings(selState.upType);
+    upSection += `
+    <div class="select-group">
+      <div class="select-label">${da ? 'M\u00E6rkestr\u00F8m opstr\u00F8ms [A]' : 'Rated current upstream [A]'}</div>
+      <div class="select-grid">
+        ${upRatings.map(r => `<button class="sel-btn ${selState.upRating === r ? 'selected' : ''}" onclick="selState.upRating=${r};renderModule('selectivity')">${r} A</button>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  // Downstream selection
+  let dnSection = `
+    <div class="select-group">
+      <div class="select-label">\u2B07\uFE0F ${da ? 'Nedstr\u00F8ms enhed (forbrugerside)' : 'Downstream device (consumer side)'}</div>
+      <div class="select-grid">
+        ${DEVICE_TYPES.map(t => `<button class="sel-btn ${selState.dnType === t ? 'selected' : ''}" onclick="selState.dnType='${t}';selState.dnRating=null;selState.dnCurve=${t==='mcb'?"'B'":"null"};renderModule('selectivity')">${DEVICE_LABELS[t]}</button>`).join('')}
+      </div>
+    </div>`;
+
+  if (selState.dnType === 'mcb') {
+    dnSection += `
+    <div class="select-group">
+      <div class="select-label">${da ? 'Kurve (nedstr\u00F8ms)' : 'Curve (downstream)'}</div>
+      <div class="select-grid">
+        ${['B','C','D'].map(c => `<button class="sel-btn ${selState.dnCurve === c ? 'selected' : ''}" onclick="selState.dnCurve='${c}';renderModule('selectivity')">${c} (${c==='B'?'3-5':c==='C'?'5-10':'10-20'}\u00D7In)</button>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  if (selState.dnType) {
+    const dnRatings = getRatings(selState.dnType);
+    dnSection += `
+    <div class="select-group">
+      <div class="select-label">${da ? 'M\u00E6rkestr\u00F8m nedstr\u00F8ms [A]' : 'Rated current downstream [A]'}</div>
+      <div class="select-grid">
+        ${dnRatings.map(r => `<button class="sel-btn ${selState.dnRating === r ? 'selected' : ''}" onclick="selState.dnRating=${r};renderModule('selectivity')">${r} A</button>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  // Results
+  const result = calcSelectivity();
+  let resultHtml = '';
+  if (result) {
+    const verdictColor = result.verdict === 'full' ? 'var(--success)' : result.verdict === 'partial' ? '#b8860b' : 'var(--danger)';
+    const verdictIcon = result.verdict === 'full' ? '\u2705' : result.verdict === 'partial' ? '\u26A0\uFE0F' : '\u274C';
+    const verdictText = result.verdict === 'full'
+      ? (da ? 'Fuld selektivitet' : 'Full selectivity')
+      : result.verdict === 'partial'
+        ? (da ? 'Delvis selektivitet' + (result.limitKa ? ' (op til ' + result.limitKa + ' kA)' : '') : 'Partial selectivity' + (result.limitKa ? ' (up to ' + result.limitKa + ' kA)' : ''))
+        : (da ? 'Ingen selektivitet' : 'No selectivity');
+
+    const upLabel = selState.upType === 'mcb' ? 'MCB ' + (selState.upCurve || '') + selState.upRating + 'A' : selState.upType === 'mccb' ? 'MCCB ' + selState.upRating + 'A' : 'gG ' + selState.upRating + 'A';
+    const dnLabel = selState.dnType === 'mcb' ? 'MCB ' + (selState.dnCurve || '') + selState.dnRating + 'A' : selState.dnType === 'mccb' ? 'MCCB ' + selState.dnRating + 'A' : 'gG ' + selState.dnRating + 'A';
+
+    resultHtml = `
+    <div class="card fade-in">
+      <div class="card-title" style="color:${verdictColor}">${verdictIcon} ${da ? 'Resultat' : 'Result'}</div>
+      <div class="result-box ${result.verdict === 'none' ? 'danger' : result.verdict === 'partial' ? 'warning' : ''}">
+        <div class="result-title" style="color:${verdictColor};font-size:1.1rem">${verdictText}</div>
+        <div class="result-row"><span class="label">${da ? 'Opstr\u00F8ms' : 'Upstream'}</span><span class="value">${upLabel}</span></div>
+        <div class="result-row"><span class="label">${da ? 'Nedstr\u00F8ms' : 'Downstream'}</span><span class="value">${dnLabel}</span></div>
+        <div class="result-row"><span class="label">${da ? 'Forhold' : 'Ratio'}</span><span class="value">${result.ratio.toFixed(2)}:1</span></div>
+        ${result.limitKa ? `<div class="result-row"><span class="label">${da ? 'Gr\u00E6nsestr\u00F8m' : 'Limit current'}</span><span class="value">${result.limitKa} kA</span></div>` : ''}
+        <div class="result-row" style="flex-direction:column;align-items:flex-start;gap:4px"><span class="label">${da ? 'Vurdering' : 'Assessment'}</span><span class="value" style="font-size:0.82rem;line-height:1.4">${result.detail}</span></div>
+      </div>
+      <div style="margin-top:12px;padding:8px 12px;border-radius:8px;background:rgba(0,180,255,0.06);border:1px solid rgba(0,180,255,0.15);font-size:0.78rem;line-height:1.5">
+        <strong>DS/HD 60364-5-53 \u00A7536</strong> &bull; IEC 60269<br>
+        ${da ? '\u26A0\uFE0F Bekr\u00E6ft altid mod fabrikantens selektivitetstabel' : '\u26A0\uFE0F Always confirm against manufacturer selectivity table'}
+      </div>
+      ${buildSelectivityViz(result)}
+    </div>`;
+  }
+
+  return `
+    <div class="card fade-in">
+      <div class="card-title">\u26A1 ${da ? 'Selektivitetskontrol' : 'Selectivity Check'}</div>
+      <div class="info-row">${da ? 'V\u00E6lg opstr\u00F8ms- og nedstr\u00F8msbeskyttelse for at kontrollere selektivitet iht. DS/HD 60364-5-53 \u00A7536 og IEC 60269.' : 'Select upstream and downstream protective devices to check selectivity per DS/HD 60364-5-53 \u00A7536 and IEC 60269.'}</div>
+      ${upSection}
+      <div style="border-top:1px solid rgba(255,255,255,0.08);margin:16px 0"></div>
+      ${dnSection}
+    </div>
+    ${resultHtml}
+  `;
+}
+
+function buildSelectivityViz(result) {
+  if (!result) return '';
+  const da = lang === 'da';
+  const W = 620, H = 480;
+  const isSelective = result.verdict === 'full';
+  const isPartial = result.verdict === 'partial';
+  const isNone = result.verdict === 'none';
+
+  const verdictColor = isSelective ? '#06d6a0' : isPartial ? '#e6a817' : '#ff4444';
+  const upLabel = selState.upType === 'mcb' ? 'MCB ' + (selState.upCurve || '') + selState.upRating : selState.upType === 'mccb' ? 'MCCB ' + selState.upRating : 'gG ' + selState.upRating;
+  const dnLabel = selState.dnType === 'mcb' ? 'MCB ' + (selState.dnCurve || '') + selState.dnRating : selState.dnType === 'mccb' ? 'MCCB ' + selState.dnRating : 'gG ' + selState.dnRating;
+
+  // Device positions
+  const lineX = 160, upY = 100, dnY = 260, faultY = 380;
+
+  // Upstream device (larger)
+  const upDevW = 70, upDevH = 50;
+  // Downstream device (smaller)
+  const dnDevW = 56, dnDevH = 40;
+
+  let svg = '';
+
+  // Background grid
+  svg += `<rect width="${W}" height="${H}" fill="#020508" rx="14"/>`;
+  for (let i = 0; i < W; i += 40) svg += `<line x1="${i}" y1="0" x2="${i}" y2="${H}" stroke="rgba(0,180,255,0.03)" stroke-width="0.5"/>`;
+  for (let i = 0; i < H; i += 40) svg += `<line x1="0" y1="${i}" x2="${W}" y2="${i}" stroke="rgba(0,180,255,0.03)" stroke-width="0.5"/>`;
+
+  // Title
+  svg += `<text x="${W/2}" y="30" text-anchor="middle" font-size="11" fill="${verdictColor}" font-weight="700">${da ? 'SELEKTIVITETSDIAGRAM' : 'SELECTIVITY DIAGRAM'}</text>`;
+
+  // Supply label at top
+  svg += `<text x="${lineX}" y="52" text-anchor="middle" font-size="9" fill="#88ccff">${da ? 'FORSYNING' : 'SUPPLY'}</text>`;
+  svg += `<line x1="${lineX}" y1="58" x2="${lineX}" y2="${upY - upDevH/2}" stroke="#0af" stroke-width="2.5"/>`;
+
+  // Upstream device box
+  svg += `<rect x="${lineX - upDevW/2}" y="${upY - upDevH/2}" width="${upDevW}" height="${upDevH}" rx="6" fill="rgba(0,180,255,0.08)" stroke="${isNone ? '#ff4444' : verdictColor}" stroke-width="2"/>`;
+  svg += `<text x="${lineX}" y="${upY + 4}" text-anchor="middle" font-size="10" fill="#fff" font-weight="700">${upLabel}</text>`;
+  svg += `<text x="${lineX}" y="${upY + 16}" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.5)">${da ? 'OPSTR\u00D8MS' : 'UPSTREAM'}</text>`;
+
+  // Connection line between devices
+  svg += `<line x1="${lineX}" y1="${upY + upDevH/2}" x2="${lineX}" y2="${dnY - dnDevH/2}" stroke="#0af" stroke-width="2.5"/>`;
+
+  // Downstream device box (smaller)
+  svg += `<rect x="${lineX - dnDevW/2}" y="${dnY - dnDevH/2}" width="${dnDevW}" height="${dnDevH}" rx="5" fill="rgba(0,180,255,0.06)" stroke="${verdictColor}" stroke-width="1.8"/>`;
+  svg += `<text x="${lineX}" y="${dnY + 3}" text-anchor="middle" font-size="9" fill="#fff" font-weight="700">${dnLabel}</text>`;
+  svg += `<text x="${lineX}" y="${dnY + 14}" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.5)">${da ? 'NEDSTR\u00D8MS' : 'DOWNSTREAM'}</text>`;
+
+  // Line to fault
+  svg += `<line x1="${lineX}" y1="${dnY + dnDevH/2}" x2="${lineX}" y2="${faultY}" stroke="#0af" stroke-width="2"/>`;
+
+  // Fault indicator
+  svg += `<circle cx="${lineX}" cy="${faultY}" r="14" fill="rgba(255,68,68,0.15)" stroke="#ff4444" stroke-width="2">`;
+  svg += `<animate attributeName="r" values="12;16;12" dur="1.5s" repeatCount="indefinite"/></circle>`;
+  svg += `<text x="${lineX}" y="${faultY + 4}" text-anchor="middle" font-size="10" fill="#ff4444" font-weight="700">\u26A1</text>`;
+  svg += `<text x="${lineX}" y="${faultY + 30}" text-anchor="middle" font-size="8" fill="#ff4444">${da ? 'FEJL' : 'FAULT'}</text>`;
+
+  // Animated fault current flowing upward (particles)
+  for (let i = 0; i < 5; i++) {
+    const delay = (i * 0.4).toFixed(1);
+    svg += `<circle cx="${lineX}" cy="0" r="3" fill="#ff8844" opacity="0.9">`;
+    svg += `<animate attributeName="cy" values="${faultY};${dnY};${upY};60" dur="2s" begin="${delay}s" repeatCount="indefinite"/>`;
+    svg += `<animate attributeName="opacity" values="0.9;0.7;0.4;0" dur="2s" begin="${delay}s" repeatCount="indefinite"/>`;
+    svg += `</circle>`;
+  }
+
+  // Trip animation
+  if (isSelective || isPartial) {
+    // Downstream trips (flash animation)
+    svg += `<rect x="${lineX - dnDevW/2 - 4}" y="${dnY - dnDevH/2 - 4}" width="${dnDevW + 8}" height="${dnDevH + 8}" rx="7" fill="none" stroke="${verdictColor}" stroke-width="2" opacity="0">`;
+    svg += `<animate attributeName="opacity" values="0;0.9;0;0.7;0" dur="2s" repeatCount="indefinite"/></rect>`;
+    svg += `<text x="${lineX + dnDevW/2 + 16}" y="${dnY + 4}" font-size="9" fill="${verdictColor}" font-weight="700">${da ? 'UDKOBLER' : 'TRIPS'}`;
+    svg += `<animate attributeName="opacity" values="0;1;0;1;0" dur="2s" repeatCount="indefinite"/></text>`;
+    // Upstream stays closed (green indicator)
+    svg += `<circle cx="${lineX + upDevW/2 + 14}" cy="${upY}" r="5" fill="#06d6a0" opacity="0.8"/>`;
+    svg += `<text x="${lineX + upDevW/2 + 26}" y="${upY + 3}" font-size="8" fill="#06d6a0">${da ? 'LUKKET' : 'CLOSED'}</text>`;
+  } else {
+    // Both trip (red warning)
+    svg += `<rect x="${lineX - upDevW/2 - 4}" y="${upY - upDevH/2 - 4}" width="${upDevW + 8}" height="${upDevH + 8}" rx="7" fill="none" stroke="#ff4444" stroke-width="2" opacity="0">`;
+    svg += `<animate attributeName="opacity" values="0;0.9;0;0.7;0" dur="1.5s" repeatCount="indefinite"/></rect>`;
+    svg += `<rect x="${lineX - dnDevW/2 - 4}" y="${dnY - dnDevH/2 - 4}" width="${dnDevW + 8}" height="${dnDevH + 8}" rx="7" fill="none" stroke="#ff4444" stroke-width="2" opacity="0">`;
+    svg += `<animate attributeName="opacity" values="0;0.9;0;0.7;0" dur="1.5s" repeatCount="indefinite"/></rect>`;
+    svg += `<text x="${lineX + upDevW/2 + 16}" y="${upY + 4}" font-size="9" fill="#ff4444" font-weight="700">${da ? 'UDKOBLER!' : 'TRIPS!'}`;
+    svg += `<animate attributeName="opacity" values="0;1;0;1;0" dur="1.5s" repeatCount="indefinite"/></text>`;
+    svg += `<text x="${lineX + dnDevW/2 + 16}" y="${dnY + 4}" font-size="9" fill="#ff4444" font-weight="700">${da ? 'UDKOBLER!' : 'TRIPS!'}`;
+    svg += `<animate attributeName="opacity" values="0;1;0;1;0" dur="1.5s" repeatCount="indefinite"/></text>`;
+  }
+
+  // Time/current characteristic curves (right side)
+  const chartX = 320, chartY = 60, chartW = 260, chartH = 360;
+  svg += `<rect x="${chartX}" y="${chartY}" width="${chartW}" height="${chartH}" rx="8" fill="rgba(0,20,40,0.6)" stroke="rgba(0,180,255,0.15)" stroke-width="1"/>`;
+  svg += `<text x="${chartX + chartW/2}" y="${chartY + 18}" text-anchor="middle" font-size="9" fill="#88ccff" font-weight="700">${da ? 'TID/STR\u00D8M KARAKTERISTIK' : 'TIME/CURRENT CHARACTERISTIC'}</text>`;
+
+  // Axes
+  const axX = chartX + 40, axY = chartY + 40, axW = chartW - 60, axH = chartH - 70;
+  svg += `<line x1="${axX}" y1="${axY}" x2="${axX}" y2="${axY + axH}" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>`;
+  svg += `<line x1="${axX}" y1="${axY + axH}" x2="${axX + axW}" y2="${axY + axH}" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>`;
+  svg += `<text x="${axX - 5}" y="${axY + axH/2}" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.5)" transform="rotate(-90 ${axX - 5} ${axY + axH/2})">t [s]</text>`;
+  svg += `<text x="${axX + axW/2}" y="${axY + axH + 14}" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.5)">I [A] \u2192</text>`;
+
+  // Log scale grid lines
+  for (let i = 0; i <= 4; i++) {
+    const y = axY + (i / 4) * axH;
+    svg += `<line x1="${axX}" y1="${y}" x2="${axX + axW}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>`;
+    const tLabel = ['10000', '100', '1', '0.01', '0.0001'][i];
+    svg += `<text x="${axX - 4}" y="${y + 3}" text-anchor="end" font-size="6" fill="rgba(255,255,255,0.3)">${tLabel}</text>`;
+  }
+  for (let i = 0; i <= 4; i++) {
+    const x = axX + (i / 4) * axW;
+    svg += `<line x1="${x}" y1="${axY}" x2="${x}" y2="${axY + axH}" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>`;
+  }
+
+  // Upstream device curve (shifted right / higher)
+  const upCurveColor = '#0af';
+  const upShift = 0.6; // Shifted further right (higher current threshold)
+  svg += `<path d="M ${axX + axW * 0.2 + upShift * 30} ${axY + 10} Q ${axX + axW * 0.35 + upShift * 20} ${axY + axH * 0.4} ${axX + axW * 0.5 + upShift * 15} ${axY + axH * 0.7} Q ${axX + axW * 0.6 + upShift * 10} ${axY + axH * 0.85} ${axX + axW * 0.85} ${axY + axH - 5}" fill="none" stroke="${upCurveColor}" stroke-width="2" stroke-dasharray="none"/>`;
+  svg += `<text x="${axX + axW * 0.82}" y="${axY + axH - 15}" font-size="7" fill="${upCurveColor}" font-weight="700">${upLabel}</text>`;
+
+  // Downstream device curve (shifted left / lower threshold)
+  const dnCurveColor = '#e6a817';
+  svg += `<path d="M ${axX + axW * 0.05} ${axY + 10} Q ${axX + axW * 0.15} ${axY + axH * 0.35} ${axX + axW * 0.3} ${axY + axH * 0.65} Q ${axX + axW * 0.4} ${axY + axH * 0.82} ${axX + axW * 0.6} ${axY + axH - 5}" fill="none" stroke="${dnCurveColor}" stroke-width="2"/>`;
+  svg += `<text x="${axX + axW * 0.55}" y="${axY + axH - 15}" font-size="7" fill="${dnCurveColor}" font-weight="700">${dnLabel}</text>`;
+
+  // Overlap zone (if not selective)
+  if (isNone) {
+    svg += `<rect x="${axX + axW * 0.25}" y="${axY + axH * 0.55}" width="${axW * 0.25}" height="${axH * 0.25}" rx="4" fill="rgba(255,68,68,0.12)" stroke="rgba(255,68,68,0.4)" stroke-width="1" stroke-dasharray="3,2"/>`;
+    svg += `<text x="${axX + axW * 0.375}" y="${axY + axH * 0.68}" text-anchor="middle" font-size="7" fill="#ff4444">${da ? 'OVERLAP' : 'OVERLAP'}</text>`;
+  } else if (isPartial && result.limitKa) {
+    // Selectivity limit line
+    const limitX = axX + axW * 0.65;
+    svg += `<line x1="${limitX}" y1="${axY + 30}" x2="${limitX}" y2="${axY + axH - 10}" stroke="${verdictColor}" stroke-width="1" stroke-dasharray="4,3"/>`;
+    svg += `<text x="${limitX + 3}" y="${axY + 40}" font-size="7" fill="${verdictColor}">${result.limitKa} kA</text>`;
+    svg += `<text x="${limitX + 3}" y="${axY + 50}" font-size="6" fill="rgba(255,255,255,0.4)">${da ? 'gr\u00E6nse' : 'limit'}</text>`;
+  }
+
+  // Selective zone indication
+  if (isSelective || isPartial) {
+    svg += `<rect x="${axX + axW * 0.02}" y="${axY + axH * 0.6}" width="${axW * 0.2}" height="${axH * 0.3}" rx="4" fill="rgba(6,214,160,0.06)" stroke="rgba(6,214,160,0.2)" stroke-width="0.5"/>`;
+    svg += `<text x="${axX + axW * 0.12}" y="${axY + axH * 0.77}" text-anchor="middle" font-size="6" fill="#06d6a0">${da ? 'SELEKTIV' : 'SELECTIVE'}</text>`;
+  }
+
+  // Legend
+  svg += `<circle cx="${chartX + 15}" cy="${chartY + chartH - 15}" r="4" fill="${upCurveColor}"/>`;
+  svg += `<text x="${chartX + 24}" y="${chartY + chartH - 12}" font-size="7" fill="rgba(255,255,255,0.6)">${da ? 'Opstr\u00F8ms' : 'Upstream'}</text>`;
+  svg += `<circle cx="${chartX + 90}" cy="${chartY + chartH - 15}" r="4" fill="${dnCurveColor}"/>`;
+  svg += `<text x="${chartX + 99}" y="${chartY + chartH - 12}" font-size="7" fill="rgba(255,255,255,0.6)">${da ? 'Nedstr\u00F8ms' : 'Downstream'}</text>`;
+
+  return `<div style="margin-top:16px"><svg viewBox="0 0 ${W} ${H}" width="100%" style="border-radius:14px;border:1.5px solid rgba(0,180,255,0.15);overflow:visible;background:#020508;box-shadow:0 6px 24px rgba(0,100,200,0.08)" xmlns="http://www.w3.org/2000/svg">${svg}</svg></div>`;
 }
 
 function renderDrawing(){
