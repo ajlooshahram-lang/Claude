@@ -619,3 +619,19 @@ body.presenting .hamburger{display:none!important}
 .prog-leg-swatch{display:inline-block;width:16px;height:10px;border-radius:3px}
 .prog-diamond-legend{display:inline-block;width:8px;height:8px;background:#dd6b20;transform:rotate(45deg)}
 .prog-today-legend{display:inline-block;width:12px;height:2px;background:#e53e3e}
+
+/* Weather Windows */
+.weather-section{margin-top:4px}
+.weather-chart{position:relative;padding:10px 0}
+.weather-row{display:flex;align-items:center;height:36px;border-bottom:1px solid var(--line,#eee)}
+.weather-label{width:140px;flex:none;padding:4px 10px;font-size:11px;font-weight:600;line-height:1.3}
+.weather-label small{font-weight:400;color:var(--muted,#888);font-size:10px}
+.weather-track{position:relative;flex:1;height:28px}
+.weather-block{position:absolute;top:4px;height:20px;border-radius:3px;opacity:.7}
+.weather-block-restricted{background:rgba(220,38,38,.45)}
+.weather-block-operational{background:rgba(72,187,120,.25)}
+.weather-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;padding:6px 0;font-size:12px}
+.weather-leg-item{display:flex;align-items:center;gap:5px}
+.weather-leg-swatch{display:inline-block;width:16px;height:12px;border-radius:3px}
+[data-theme="dark"] .weather-block-restricted{background:rgba(248,113,113,.4)}
+[data-theme="dark"] .weather-block-operational{background:rgba(72,187,120,.2)}

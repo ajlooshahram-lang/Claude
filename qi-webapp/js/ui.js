@@ -1601,6 +1601,56 @@
     return Math.max(0, Math.min(100, ((t - PROG_TIMELINE_START) / PROG_TIMELINE_SPAN) * 100));
   }
 
+  // Weather Window Calendar: marine cable installation restrictions by country
+  const WEATHER_WINDOWS = [
+    { country: "Indonesia", sea: "Java Sea", restrictedMonths: [12, 1, 2, 3], reason: "Northwest monsoon, high seas" },
+    { country: "Thailand", sea: "Gulf of Thailand", restrictedMonths: [11, 12, 1, 2], reason: "Northeast monsoon" },
+    { country: "Vietnam", sea: "South China Sea", restrictedMonths: [6, 7, 8, 9, 10, 11], reason: "Typhoon season" },
+    { country: "Taiwan", sea: "Pacific", restrictedMonths: [7, 8, 9, 10], reason: "Typhoon belt" },
+    { country: "Philippines", sea: "Philippine Sea", restrictedMonths: [7, 8, 9, 10, 11], reason: "Typhoon alley, 20+/year" },
+    { country: "Guam", sea: "Western Pacific", restrictedMonths: [8, 9, 10, 11], reason: "Typhoon exposure" },
+    { country: "Malaysia", sea: "South China Sea/Strait", restrictedMonths: [11, 12, 1, 2, 3], reason: "Northeast monsoon" },
+    { country: "Brunei", sea: "South China Sea", restrictedMonths: [11, 12, 1, 2, 3], reason: "Northeast monsoon" }
+  ];
+
+  function renderWeatherWindows() {
+    var rows = WEATHER_WINDOWS.map(function (w) {
+      var blocks = '';
+      for (var y = 2025; y <= 2029; y++) {
+        for (var m = 1; m <= 12; m++) {
+          var startDate = new Date(y, m - 1, 1);
+          var endDate = new Date(y, m, 0); // last day of month
+          var leftPct = progPct(startDate.toISOString().slice(0, 10));
+          var rightPct = progPct(endDate.toISOString().slice(0, 10));
+          var widthPct = Math.max(rightPct - leftPct, 0.3);
+          var isRestricted = w.restrictedMonths.indexOf(m) >= 0;
+          var cls = isRestricted ? 'weather-block-restricted' : 'weather-block-operational';
+          blocks += '<div class="weather-block ' + cls + '" style="left:' + leftPct + '%;width:' + widthPct + '%" title="' + esc(w.country) + ' - ' + startDate.toLocaleDateString("en", { year: "numeric", month: "short" }) + (isRestricted ? ' (RESTRICTED: ' + esc(w.reason) + ')' : ' (Operational)') + '"></div>';
+        }
+      }
+      return '<div class="weather-row">' +
+        '<div class="weather-label">' + esc(w.country) + '<br><small>' + esc(w.sea) + '</small></div>' +
+        '<div class="weather-track">' + blocks + '</div>' +
+      '</div>';
+    }).join('');
+
+    return '<div class="card" id="weatherWindowCard">' +
+      '<div class="card-head">' +
+        '<h3>Weather Windows (Marine Cable Installation)</h3>' +
+        '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">' +
+          '<input type="checkbox" id="weatherToggle" checked> Show Weather Windows' +
+        '</label>' +
+      '</div>' +
+      '<div id="weatherWindowSection" class="weather-section">' +
+        '<div class="weather-chart">' + rows + '</div>' +
+        '<div class="weather-legend">' +
+          '<span class="weather-leg-item"><span class="weather-leg-swatch weather-block-restricted"></span> Restricted (monsoon/typhoon)</span>' +
+          '<span class="weather-leg-item"><span class="weather-leg-swatch weather-block-operational"></span> Operational window</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
   RENDER.programme = function () {
     var totalKm = PROGRAMME_SEGMENTS.reduce(function (a, s) { return a + s.km; }, 0);
     var completed = PROGRAMME_SEGMENTS.filter(function (s) { return s.status === "installed"; }).length;
@@ -1667,6 +1717,7 @@
           '<span class="prog-leg-item"><span class="prog-today-legend"></span> Today</span>' +
         '</div>' +
       '</div>' +
+      renderWeatherWindows() +
       '<div class="card" id="sCurveCard">' +
         '<h3>Cumulative Programme Spend (S-Curve)</h3>' +
         '<div class="chart-box"><canvas id="chSCurve"></canvas></div>' +
@@ -1680,6 +1731,15 @@
         toast("Segment: " + bar.dataset.segment + " selected");
       });
     });
+
+    // Weather window toggle
+    var weatherToggle = document.getElementById("weatherToggle");
+    var weatherSection = document.getElementById("weatherWindowSection");
+    if (weatherToggle && weatherSection) {
+      weatherToggle.addEventListener("change", function () {
+        weatherSection.style.display = weatherToggle.checked ? "" : "none";
+      });
+    }
 
     // S-Curve chart
     if (typeof Chart !== "undefined") {

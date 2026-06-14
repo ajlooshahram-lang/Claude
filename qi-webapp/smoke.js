@@ -770,5 +770,12 @@ var sCurveCard = doc.getElementById("sCurveCard");
 var sCurveTitle = sCurveCard ? sCurveCard.querySelector("h3") : null;
 ok(sCurveTitle != null && /Cumulative Programme Spend/.test(sCurveTitle.textContent), "S-Curve has chart title rendered nearby");
 
+// 50) Weather Windows
+var weatherSection = doc.getElementById("weatherWindowSection");
+ok(weatherSection != null, "Weather window section renders in programme view");
+
+var weatherToggle = doc.getElementById("weatherToggle");
+ok(weatherToggle != null && weatherToggle.type === "checkbox", "Weather toggle checkbox exists");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
