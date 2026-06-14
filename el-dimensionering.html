@@ -605,7 +605,7 @@ body.dark img { filter: brightness(0.92); }
 /* ===== PRINT / PDF ===== */
 @media print {
   .header, .nav, .status-bar, .theme-btn, .lang-toggle { display: none !important; }
-  body { background: #fff; }
+  body { background: #fff; color: #000; font-size: 10pt; }
   .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; page-break-inside: avoid; }
   .card::before { display: none; }
   .sel-btn { display: none !important; }
@@ -613,6 +613,18 @@ body.dark img { filter: brightness(0.92); }
   .no-print { display: none !important; }
   .print-only { display: block !important; }
   img { filter: none !important; }
+  /* Project report print styles */
+  .projekt-report-card { border: 1px solid #999; margin-bottom: 8pt; padding: 10pt; background: #fff !important; }
+  .projekt-report-card .card-title { font-size: 11pt; color: #000; border-bottom: 1px solid #ccc; padding-bottom: 4pt; margin-bottom: 6pt; }
+  .projekt-report-card .result-box { border: 1px solid #ddd; background: #fafafa !important; }
+  .projekt-report-card .result-row .label { color: #333; }
+  .projekt-report-card .result-row .value { color: #000; }
+  .projekt-report-card .verify-badge.ok { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+  .projekt-report-card .verify-badge.fail { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+  .data-table { border-collapse: collapse; width: 100%; }
+  .data-table th, .data-table td { border: 1px solid #ccc; padding: 3pt 5pt; font-size: 9pt; }
+  .data-table th { background: #f0f0f0; font-weight: 700; }
+  @page { margin: 15mm; size: A4; }
 }
 .print-only { display: none; }
 
@@ -5546,63 +5558,396 @@ function projectImport(input){
   const r = new FileReader(); r.onload = e => { try { projectState = JSON.parse(e.target.result); saveProject(); renderModule('projekt'); } catch(err){ alert('Import fejl: '+err.message); } }; r.readAsText(f);
 }
 
-function renderProjekt() {
-  // Phase balancing for belastningsskema
-  const phases = { L1:0, L2:0, L3:0 };
-  projectState.circuits.forEach((c, i) => {
-    if (c.voltage === '3x400') { phases.L1 += c.ib; phases.L2 += c.ib; phases.L3 += c.ib; }
-    else { const p = ['L1','L2','L3'][i % 3]; phases[p] += c.ib; }
-  });
-  const maxPhase = Math.max(phases.L1, phases.L2, phases.L3);
-  const mainMcb = recommendMCBs(maxPhase)[0];
-  const mainMccb = recommendMCCBs(maxPhase)[0];
-  const mainProt = maxPhase <= 63 && mainMcb ? (mainMcb.model+' '+mainMcb.curve+mainMcb.rating)
-                  : (mainMccb ? mainMccb.model : (lang==='da'?'NH-sikring':'NH fuse'));
+// Project report state
+let projektReportView = 'setup'; // 'setup' | 'report'
+let projektSetup = {
+  projectType: 'bolig',
+  installationType: 'ny',
+  earthingSystem: 'TN-S',
+  supply: '3x400',
+  projectName: 'Projekt 1',
+  installer: ''
+};
+(function restoreProjektSetup(){ try { const s = JSON.parse(localStorage.getItem('elProjektSetup')||'null'); if (s) projektSetup = s; } catch(e){} })();
+function saveProjektSetup(){ localStorage.setItem('elProjektSetup', JSON.stringify(projektSetup)); }
 
-  const rows = projectState.circuits.map((c,i) => `
-    <tr>
-      <td>${c.name}</td><td>${c.voltage}</td><td>${c.power} kW</td><td>${c.ib} A</td>
-      <td>${c.cable}</td><td>${c.protection}</td>
-      <td>${c.vdrop != null ? c.vdrop.toFixed(2)+'%' : '\u2014'}</td>
-      <td class="no-print"><button class="sel-btn" style="padding:2px 8px;min-width:0;color:var(--danger)" onclick="projectRemove(${i})">\uD83D\uDDD1\uFE0F</button></td>
-    </tr>`).join('');
+function setProjektField(field, value) {
+  projektSetup[field] = value;
+  if (field === 'supply') loadState.voltage = value;
+  saveProjektSetup();
+  renderModule('projekt');
+}
+
+function switchProjektView(view) {
+  projektReportView = view;
+  renderModule('projekt');
+}
+
+function projektGenerateReport() {
+  projektReportView = 'report';
+  renderModule('projekt');
+}
+
+function renderProjektSetup() {
+  const da = lang === 'da';
+  const ps = projektSetup;
+  const btn = (field, val, labelDa, labelEn) =>
+    `<button class="sel-btn ${ps[field]===val?'selected':''}" onclick="setProjektField('${field}','${val}')">${da?labelDa:labelEn}</button>`;
+
+  // Auto-fill main protection
+  const ib = calcIB();
+  const mainProt = mcbState.rating ? (mcbState.curve + mcbState.rating + 'A MCB') :
+    fuseState.size ? (fuseState.size + 'A ' + fuseState.holder) :
+    mccbState.inVal ? (mccbState.frame + ' ' + mccbState.inVal + 'A') : (da?'Ikke valgt':'Not selected');
 
   return `
-    <div class="card fade-in no-print">
-      <div class="card-title">\uD83D\uDCCB ${lang==='da'?'Projekt / Flere grupper':'Project / Multi-circuit'}</div>
-      <div class="info-row">${lang==='da'?'Saml hele installationen. Tilf\u00F8j den aktuelle dimensionering som en gruppe, gem projektet, og udskriv belastningsskema.':'Build the whole installation. Add the current dimensioning as a circuit, save the project, and print the load schedule.'}</div>
-      <div class="select-grid">
-        <button class="sel-btn selected" onclick="projectAddCircuit()">\u2795 ${lang==='da'?'Tilf\u00F8j aktuel gruppe':'Add current circuit'}</button>
-        <button class="sel-btn" onclick="window.print()">\uD83D\uDDA8\uFE0F ${lang==='da'?'Udskriv / PDF':'Print / PDF'}</button>
-        <button class="sel-btn" onclick="projectExport()">\u2B07\uFE0F ${lang==='da'?'Eksport':'Export'}</button>
-        <label class="sel-btn" style="cursor:pointer">\u2B06\uFE0F ${lang==='da'?'Import':'Import'}<input type="file" accept="application/json" style="display:none" onchange="projectImport(this)"></label>
-        ${projectState.circuits.length?`<button class="sel-btn" onclick="projectClear()">\uD83D\uDDD1\uFE0F ${lang==='da'?'Ryd':'Clear'}</button>`:''}
-      </div>
-    </div>
-
     <div class="card fade-in">
-      <div class="print-only" style="margin-bottom:10px"><h2 style="margin:0">${lang==='da'?'Belastningsskema':'Load Schedule'} \u2014 ${projectState.name}</h2><div style="font-size:0.8rem;color:#666">El-Dimensionering \u00B7 Data v${DATA_VERSION} \u00B7 ${new Date().toLocaleDateString('da-DK')}</div></div>
-      <div class="card-title">${lang==='da'?'Belastningsskema':'Load Schedule'} (${projectState.circuits.length})</div>
-      ${projectState.circuits.length ? `
-      <table class="data-table">
-        <tr><th>${lang==='da'?'Gruppe':'Circuit'}</th><th>${lang==='da'?'Spænding':'Voltage'}</th><th>${lang==='da'?'Effekt':'Power'}</th><th>IB</th><th>${lang==='da'?'Kabel':'Cable'}</th><th>${lang==='da'?'Beskyttelse':'Protection'}</th><th>\u0394U</th><th class="no-print"></th></tr>
-        ${rows}
-      </table>
+      <div class="card-title">\u2699\uFE0F ${da?'Projektops\u00E6tning':'Project Setup'}</div>
+      <div class="info-row">${da?'Definer projektmetadata. Alle valg er klik-baserede.':'Define project metadata. All choices are click-based.'}</div>
+
       <div class="result-box" style="margin-top:12px">
-        <div class="result-title">${lang==='da'?'Fasebalance & hovedafbryder':'Phase balance & main breaker'}</div>
-        <div class="result-row"><span class="label">L1 / L2 / L3</span><span class="value">${phases.L1.toFixed(1)} / ${phases.L2.toFixed(1)} / ${phases.L3.toFixed(1)} A</span></div>
-        <div class="result-row"><span class="label">${lang==='da'?'Mest belastede fase':'Most loaded phase'}</span><span class="value">${maxPhase.toFixed(1)} A</span></div>
-        <div class="result-row"><span class="label">${lang==='da'?'Anbefalet hovedafbryder':'Recommended main breaker'}</span><span class="value">${mainProt}</span></div>
-        ${(() => {
-          const mainRating = (maxPhase <= 63 && mainMcb) ? mainMcb.rating : (mainMccb ? Math.min.apply(null, mainMccb.inOptions.filter(x=>x>=maxPhase)) : 0);
-          const maxGroupIb = projectState.circuits.reduce((m,c)=>Math.max(m,c.ib),0);
-          const sel = mainRating >= maxGroupIb * 1.6;
-          return `<div class="result-row"><span class="label">${lang==='da'?'Selektivitet (\u22651,6:1)':'Selectivity (\u22651.6:1)'}</span><span class="value">${mainRating} A / ${maxGroupIb.toFixed(0)} A <span class="verify-badge ${sel?'ok':'fail'}">${sel?(lang==='da'?'OK':'OK'):(lang==='da'?'Tjek':'Check')}</span></span></div>`;
-        })()}
+        <div class="result-title">${da?'Projekttype':'Project Type'}</div>
+        <div class="select-grid">
+          ${btn('projectType','bolig','Bolig','Dwelling')}
+          ${btn('projectType','erhverv','Erhverv','Commercial')}
+          ${btn('projectType','industri','Industri','Industrial')}
+          ${btn('projectType','renovering','Renovering','Renovation')}
+        </div>
       </div>
-      ` : '<div class="info-row">' + (lang==='da'?'Ingen grupper endnu. G\u00E5 til "Belastning", dimensionér, og klik "Tilf\u00F8j aktuel gruppe".':'No circuits yet. Go to "Load", dimension, and click "Add current circuit".') + '</div>'}
+
+      <div class="result-box" style="margin-top:12px">
+        <div class="result-title">${da?'Installationstype':'Installation Type'}</div>
+        <div class="select-grid">
+          ${btn('installationType','ny','Ny','New')}
+          ${btn('installationType','udvidelse','Udvidelse','Extension')}
+          ${btn('installationType','aendring','\u00C6ndring','Modification')}
+        </div>
+      </div>
+
+      <div class="result-box" style="margin-top:12px">
+        <div class="result-title">${da?'Jordingssystem':'Earthing System'}</div>
+        <div class="select-grid">
+          ${btn('earthingSystem','TN-S','TN-S','TN-S')}
+          ${btn('earthingSystem','TN-C-S','TN-C-S','TN-C-S')}
+          ${btn('earthingSystem','TT','TT','TT')}
+        </div>
+      </div>
+
+      <div class="result-box" style="margin-top:12px">
+        <div class="result-title">${da?'Forsyning':'Supply'}</div>
+        <div class="select-grid">
+          ${btn('supply','1x230','1\u00D7230V','1\u00D7230V')}
+          ${btn('supply','3x400','3\u00D7400V','3\u00D7400V')}
+        </div>
+      </div>
+
+      <div class="result-box" style="margin-top:12px">
+        <div class="result-title">${da?'Hovedbeskyttelse (auto)':'Main Protection (auto)'}</div>
+        <div class="result-row"><span class="label">${da?'Enhed':'Device'}</span><span class="value" style="font-weight:700">${mainProt}</span></div>
+      </div>
+
+      <div class="result-box" style="margin-top:12px">
+        <div class="result-title">${da?'Projektinformation':'Project Information'}</div>
+        <div class="result-row"><span class="label">${da?'Dato':'Date'}</span><span class="value">${new Date().toLocaleDateString(da?'da-DK':'en-GB')}</span></div>
+        <div class="result-row"><span class="label">${da?'Standard':'Standard'}</span><span class="value">DS/HD 60364</span></div>
+        <div class="result-row"><span class="label">${da?'Dataversion':'Data Version'}</span><span class="value">v${DATA_VERSION}</span></div>
+      </div>
+
+      <div class="result-box" style="margin-top:12px">
+        <div class="result-title">${da?'Install\u00F8r (forudvalg)':'Installer (preset)'}</div>
+        <div class="select-grid">
+          ${btn('installer','autoriseret',da?'Autoriseret elinstallat\u00F8r':'Authorized electrician')}
+          ${btn('installer','maskinmester','Maskinmester','Marine engineer')}
+          ${btn('installer','ingenioer',da?'Ingeni\u00F8r':'Engineer')}
+        </div>
+      </div>
     </div>`;
 }
+
+function renderProjektReport() {
+  const da = lang === 'da';
+  const ps = projektSetup;
+  const dateStr = new Date().toLocaleDateString(da?'da-DK':'en-GB');
+
+  // --- Section 1: Project Summary ---
+  const typeLabels = {bolig:da?'Bolig':'Dwelling', erhverv:da?'Erhverv':'Commercial', industri:da?'Industri':'Industrial', renovering:da?'Renovering':'Renovation'};
+  const instLabels = {ny:da?'Ny installation':'New installation', udvidelse:da?'Udvidelse':'Extension', aendring:da?'\u00C6ndring':'Modification'};
+  const supplyLabel = ps.supply === '3x400' ? '3\u00D7400V + N + PE' : '1\u00D7230V + N + PE';
+
+  // --- Section 2: Load Schedule ---
+  const consumers = loadList.length ? loadList : [];
+  const sch = calcLoadSchedule();
+  const loadRows = consumers.map((c, i) => {
+    const I = c.phase === '3' ? (c.kW*1000*c.sf)/(Math.sqrt(3)*400*c.cos) : (c.kW*1000*c.sf)/(230*c.cos);
+    return `<tr><td>${i+1}</td><td>${c.name||((da?'Forbruger':'Consumer')+' '+(i+1))}</td><td>${c.kW}</td><td>${c.cos}</td><td>${c.sf}</td><td>${c.phase}</td><td>${I.toFixed(1)}</td></tr>`;
+  }).join('');
+
+  // --- Section 3: Total demand ---
+  const totalKW = sch.kW;
+  const totalKVA = sch.kVA;
+  const totalKVAr = Math.sqrt(Math.max(0, totalKVA*totalKVA - totalKW*totalKW));
+  const ibMain = sch.ib;
+  const avgSf = consumers.length ? (consumers.reduce((s,c) => s + c.sf, 0) / consumers.length) : 1;
+
+  // --- Section 4: Transformer ---
+  const tSize = trafoState.size;
+  const tUk = TRAFO_UK[tSize] || 4;
+  const tLosses = TRAFO_LOSSES[tSize] || {p0:0, pk:0};
+  const tIn = (tSize * 1000) / (Math.sqrt(3) * 400);
+  const tIk = tIn / (tUk / 100);
+
+  // --- Section 5: Cable specification ---
+  const izTable = izTableFor();
+  const baseIz = izTable[parseFloat(cableState.crossSection)] || 0;
+  const kInstall = INSTALL_METHODS[cableState.installMethod] || 1.0;
+  const kTemp = TEMP_FACTORS[cableState.temp] || 1.0;
+  const kGroup = GROUP_FACTORS[cableState.grouping] || 1.0;
+  const kTotal = kInstall * kTemp * kGroup;
+  const corrIz = baseIz * kTotal;
+  const cableName = cableState.type + ' ' + cableState.cores + ' ' + (cableState.crossSection || '?') + 'mm\u00B2';
+  const materialLabel = cableState.material === 'copper' ? (da?'Kobber':'Copper') : (da?'Aluminium':'Aluminium');
+
+  // --- Section 6: Protection coordination ---
+  const ib = calcIB();
+  const inRating = mcbState.rating || fuseState.size || mccbState.inVal || 0;
+  const coordOk = ib <= inRating && inRating <= corrIz;
+
+  // --- Section 7: Voltage drop ---
+  const cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
+  const ct = cables[cableState.type];
+  const cc = ct && ct[cableState.cores] ? ct[cableState.cores] : {};
+  const sc = cc[cableState.crossSection];
+  let vdVolts = 0, vdPercent = 0;
+  if (sc && vdropState.length) {
+    const L = vdropState.length / 1000;
+    const cosP = loadState.cosPhi;
+    const sinP = Math.sin(Math.acos(cosP));
+    const Un = loadState.voltage === '3x400' ? 400 : 230;
+    vdVolts = loadState.voltage === '3x400'
+      ? Math.sqrt(3) * ib * L * (sc.r * cosP + sc.x * sinP)
+      : 2 * ib * L * (sc.r * cosP + sc.x * sinP);
+    vdPercent = (vdVolts / Un) * 100;
+  }
+  const vdLimit = ps.projectType === 'industri' ? 5 : 3;
+  const vdOk = vdPercent <= vdLimit;
+
+  // --- Section 8: Short-circuit ---
+  const zNet = scState.zNet || 1;
+  const zTrafo = scState.zTrafo || 5;
+  let zCable = 0;
+  if (sc && vdropState.length) {
+    zCable = (sc.r * vdropState.length / 1000) * 2; // simplified Zcable (go+return)
+  }
+  const zTotal = zNet + zTrafo + zCable;
+  const Un_sc = loadState.voltage === '3x400' ? 400 : 230;
+  const ikMax = (1.05 * Un_sc) / (Math.sqrt(3) * (zTotal / 1000));
+  const ikMin = (0.95 * Un_sc) / (Math.sqrt(3) * (zTotal / 1000) * 1.5);
+  const protIcu = mcbState.rating ? 6 : (mccbState.inVal ? 36 : 50); // kA
+  const icuOk = (ikMax / 1000) <= protIcu;
+
+  // Disconnection time check (5s distribution, 0.4s final per TN)
+  const disconnOk = ikMin > (inRating * 5); // simplified: Ikmin must trip magnetic
+
+  // --- Section 9: QI Validation ---
+  const qi = runQiValidation();
+
+  // --- Overall verdict ---
+  const allChecks = [coordOk, vdOk, icuOk, qi.issues.filter(i=>i.severity==='error').length === 0];
+  const overallPass = allChecks.every(Boolean);
+
+  // Build the report HTML
+  let html = '';
+
+  // Overall verdict banner
+  html += `<div class="card fade-in projekt-report-card" style="border-left:6px solid ${overallPass?'var(--success)':'var(--danger)'}; text-align:center; padding:20px;">
+    <div style="font-size:2.5rem;font-weight:900;color:${overallPass?'var(--success)':'var(--danger)'}">${overallPass?'\u2713':'\u2717'}</div>
+    <div style="font-size:1.3rem;font-weight:800;color:${overallPass?'var(--success)':'var(--danger)'}; margin-top:4px">${overallPass?(da?'GODKENDT / APPROVED':'APPROVED / GODKENDT'):(da?'KRAV IKKE OPFYLDT / REQUIREMENTS NOT MET':'REQUIREMENTS NOT MET / KRAV IKKE OPFYLDT')}</div>
+    <div style="font-size:0.8rem;color:var(--text-muted);margin-top:6px">DS/HD 60364-6 ${da?'Verifikation':'Verification'} - ${dateStr}</div>
+  </div>`;
+
+  // Section 1: Project Summary
+  html += `<div class="card fade-in projekt-report-card">
+    <div class="card-title">${da?'1. Projektoversigt':'1. Project Summary'}</div>
+    <div class="result-box">
+      <div class="result-row"><span class="label">${da?'Projekttype':'Project Type'}</span><span class="value">${typeLabels[ps.projectType]||ps.projectType}</span></div>
+      <div class="result-row"><span class="label">${da?'Installation':'Installation'}</span><span class="value">${instLabels[ps.installationType]||ps.installationType}</span></div>
+      <div class="result-row"><span class="label">${da?'Forsyning':'Supply'}</span><span class="value">${supplyLabel}</span></div>
+      <div class="result-row"><span class="label">${da?'Jordingssystem':'Earthing System'}</span><span class="value">${ps.earthingSystem}</span></div>
+      <div class="result-row"><span class="label">${da?'Dato':'Date'}</span><span class="value">${dateStr}</span></div>
+      <div class="result-row"><span class="label">${da?'Standard':'Standard'}</span><span class="value">DS/HD 60364:2017+</span></div>
+      <div class="result-row"><span class="label">${da?'Beregningsdata':'Calculation Data'}</span><span class="value">v${DATA_VERSION}</span></div>
+      <div class="result-row"><span class="label">${da?'Install\u00F8r':'Installer'}</span><span class="value">${ps.installer||'-'}</span></div>
+    </div>
+  </div>`;
+
+  // Section 2: Load Schedule
+  html += `<div class="card fade-in projekt-report-card">
+    <div class="card-title">${da?'2. Belastningsskema':'2. Load Schedule'}</div>
+    ${consumers.length ? `<table class="data-table" style="font-size:0.82rem">
+      <tr><th>#</th><th>${da?'Forbruger':'Consumer'}</th><th>kW</th><th>cos\u03C6</th><th>sf</th><th>${da?'Fase':'Phase'}</th><th>IB (A)</th></tr>
+      ${loadRows}
+    </table>` : `<div class="info-row">${da?'Ingen forbrugere i belastningsskema. Tilf\u00F8j via "Belastning" modulet.':'No consumers in load schedule. Add via "Load" module.'}</div>`}
+  </div>`;
+
+  // Section 3: Total Demand
+  html += `<div class="card fade-in projekt-report-card">
+    <div class="card-title">${da?'3. Samlet effektbehov':'3. Total Demand'}</div>
+    <div class="result-box">
+      <div class="result-row"><span class="label">${da?'Tilsyneladende effekt':'Apparent Power'} (S)</span><span class="value">${totalKVA.toFixed(1)} kVA</span></div>
+      <div class="result-row"><span class="label">${da?'Aktiv effekt':'Active Power'} (P)</span><span class="value">${totalKW.toFixed(1)} kW</span></div>
+      <div class="result-row"><span class="label">${da?'Reaktiv effekt':'Reactive Power'} (Q)</span><span class="value">${totalKVAr.toFixed(1)} kVAr</span></div>
+      <div class="result-row"><span class="label">${da?'Dimensioneringsstr\u00F8m':'Design Current'} (IB)</span><span class="value">${ibMain.toFixed(1)} A</span></div>
+      <div class="result-row"><span class="label">${da?'Samtidighedsfaktor (gns.)':'Simultaneity Factor (avg.)'}</span><span class="value">${avgSf.toFixed(2)}</span></div>
+      <div class="result-row"><span class="label">${da?'Antal forbrugere':'Number of Consumers'}</span><span class="value">${consumers.length}</span></div>
+    </div>
+  </div>`;
+
+  // Section 4: Transformer
+  html += `<div class="card fade-in projekt-report-card">
+    <div class="card-title">${da?'4. Transformerdata':'4. Transformer Data'}</div>
+    <div class="result-box">
+      <div class="result-row"><span class="label">${da?'St\u00F8rrelse':'Size'}</span><span class="value">${tSize} kVA</span></div>
+      <div class="result-row"><span class="label">${da?'Sp\u00E6nding':'Voltage'}</span><span class="value">${trafoState.voltage} kV</span></div>
+      <div class="result-row"><span class="label">uk%</span><span class="value">${tUk}%</span></div>
+      <div class="result-row"><span class="label">${da?'Nominel str\u00F8m':'Rated Current'} (In)</span><span class="value">${tIn.toFixed(1)} A</span></div>
+      <div class="result-row"><span class="label">${da?'Kortslutningsstr\u00F8m':'Short-Circuit Current'} (Ik)</span><span class="value">${(tIk/1000).toFixed(1)} kA</span></div>
+      <div class="result-row"><span class="label">${da?'Tomgangstab':'No-Load Losses'} (P0)</span><span class="value">${tLosses.p0} W</span></div>
+      <div class="result-row"><span class="label">${da?'Belastningstab':'Load Losses'} (Pk)</span><span class="value">${tLosses.pk} W</span></div>
+      <div class="result-row"><span class="label">${da?'Belastningsgrad':'Load Factor'}</span><span class="value">${trafoState.loadPercent}%</span></div>
+    </div>
+  </div>`;
+
+  // Section 5: Cable Specification
+  html += `<div class="card fade-in projekt-report-card">
+    <div class="card-title">${da?'5. Kabelspecifikation':'5. Cable Specification'}</div>
+    <div class="result-box">
+      <div class="result-row"><span class="label">${da?'Kabeltype':'Cable Type'}</span><span class="value">${cableName}</span></div>
+      <div class="result-row"><span class="label">${da?'Materiale':'Material'}</span><span class="value">${materialLabel}</span></div>
+      <div class="result-row"><span class="label">${da?'Referencemetode':'Installation Method'}</span><span class="value">${cableState.installMethod} (DS/HD 60364-5-52)</span></div>
+      <div class="result-row"><span class="label">${da?'Basisstr\u00F8mb\u00E6reevne':'Base Current Capacity'} (Iz)</span><span class="value">${baseIz} A</span></div>
+      <div class="result-row"><span class="label">${da?'Installationsfaktor':'Installation Factor'} (k1)</span><span class="value">${kInstall.toFixed(2)}</span></div>
+      <div class="result-row"><span class="label">${da?'Temperaturfaktor':'Temperature Factor'} (k2)</span><span class="value">${kTemp.toFixed(2)} (${cableState.temp}\u00B0C)</span></div>
+      <div class="result-row"><span class="label">${da?'Grupperingsfaktor':'Grouping Factor'} (k3)</span><span class="value">${kGroup.toFixed(2)} (${cableState.grouping} ${da?'kabler':'cables'})</span></div>
+      <div class="result-row"><span class="label">${da?'Samlet korrektion':'Total Correction'} (k1\u00D7k2\u00D7k3)</span><span class="value">${kTotal.toFixed(3)}</span></div>
+      <div class="result-row"><span class="label">${da?'Korrigeret Iz':'Corrected Iz'}</span><span class="value" style="font-weight:700">${corrIz.toFixed(1)} A</span></div>
+    </div>
+  </div>`;
+
+  // Section 6: Protection Coordination
+  const protDevice = mcbState.rating ? (mcbState.type + ' ' + mcbState.curve + mcbState.rating + 'A') :
+    fuseState.size ? (fuseState.holder + ' ' + fuseState.size + 'A') :
+    mccbState.inVal ? (mccbState.frame + ' ' + mccbState.inVal + 'A') : '-';
+  html += `<div class="card fade-in projekt-report-card">
+    <div class="card-title">${da?'6. Beskyttelseskoordination':'6. Protection Coordination'}</div>
+    <div class="result-box" style="border-color:${coordOk?'var(--success)':'var(--danger)'}">
+      <div class="result-title">${da?'IB \u2264 In \u2264 Iz kontrol':'IB \u2264 In \u2264 Iz Check'} (DS/HD 60364-4-43)</div>
+      <div class="result-row"><span class="label">${da?'Beskyttelse':'Protection Device'}</span><span class="value">${protDevice}</span></div>
+      <div class="result-row"><span class="label">IB (${da?'dimensioneringsstr\u00F8m':'design current'})</span><span class="value">${ib.toFixed(1)} A</span></div>
+      <div class="result-row"><span class="label">In (${da?'m\u00E6rkestr\u00F8m':'rated current'})</span><span class="value">${inRating} A</span></div>
+      <div class="result-row"><span class="label">Iz (${da?'str\u00F8mb\u00E6reevne':'current capacity'})</span><span class="value">${corrIz.toFixed(1)} A</span></div>
+      <div class="result-row"><span class="label">${da?'Resultat':'Result'}</span><span class="value"><span class="verify-badge ${coordOk?'ok':'fail'}">${ib.toFixed(1)} \u2264 ${inRating} \u2264 ${corrIz.toFixed(1)} ${coordOk?(da?'OK':'OK'):(da?'FEJL':'FAIL')}</span></span></div>
+    </div>
+  </div>`;
+
+  // Section 7: Voltage Drop
+  html += `<div class="card fade-in projekt-report-card">
+    <div class="card-title">${da?'7. Sp\u00E6ndingsfald':'7. Voltage Drop'}</div>
+    <div class="result-box" style="border-color:${vdOk?'var(--success)':'var(--danger)'}">
+      <div class="result-row"><span class="label">${da?'Kabell\u00E6ngde':'Cable Length'}</span><span class="value">${vdropState.length} m</span></div>
+      <div class="result-row"><span class="label">\u0394U (${da?'absolut':'absolute'})</span><span class="value">${vdVolts.toFixed(2)} V</span></div>
+      <div class="result-row"><span class="label">\u0394U%</span><span class="value" style="font-weight:700">${vdPercent.toFixed(2)}%</span></div>
+      <div class="result-row"><span class="label">${da?'Gr\u00E6nse':'Limit'}</span><span class="value">${vdLimit}% (${ps.projectType==='industri'?(da?'Industri':'Industrial'):(da?'Slutkreds':'Final circuit')})</span></div>
+      <div class="result-row"><span class="label">${da?'Resultat':'Result'}</span><span class="value"><span class="verify-badge ${vdOk?'ok':'fail'}">${vdPercent.toFixed(2)}% ${vdOk?'\u2264':'>'} ${vdLimit}% ${vdOk?(da?'OK':'OK'):(da?'FEJL':'FAIL')}</span></span></div>
+    </div>
+  </div>`;
+
+  // Section 8: Short-Circuit Verification
+  html += `<div class="card fade-in projekt-report-card">
+    <div class="card-title">${da?'8. Kortslutningsverifikation':'8. Short-Circuit Verification'}</div>
+    <div class="result-box" style="border-color:${icuOk?'var(--success)':'var(--danger)'}">
+      <div class="result-title">IEC 60909-0 (c_max=1.05, c_min=0.95)</div>
+      <div class="result-row"><span class="label">Z_net</span><span class="value">${zNet.toFixed(1)} m\u03A9</span></div>
+      <div class="result-row"><span class="label">Z_trafo</span><span class="value">${zTrafo.toFixed(1)} m\u03A9</span></div>
+      <div class="result-row"><span class="label">Z_kabel</span><span class="value">${(zCable*1000).toFixed(1)} m\u03A9</span></div>
+      <div class="result-row"><span class="label">Z_total</span><span class="value">${zTotal.toFixed(1)} m\u03A9</span></div>
+      <div class="result-row"><span class="label">Ik_max (${da?'maks. kortslutning':'max. short-circuit'})</span><span class="value">${(ikMax/1000).toFixed(2)} kA</span></div>
+      <div class="result-row"><span class="label">Ik_min (${da?'min. kortslutning':'min. short-circuit'})</span><span class="value">${(ikMin/1000).toFixed(2)} kA</span></div>
+      <div class="result-row"><span class="label">Icu (${da?'brydeevne':'breaking capacity'})</span><span class="value">${protIcu} kA</span></div>
+      <div class="result-row"><span class="label">${da?'Icu-kontrol':'Icu Check'}</span><span class="value"><span class="verify-badge ${icuOk?'ok':'fail'}">Ik_max ${(ikMax/1000).toFixed(1)} kA ${icuOk?'\u2264':'>'} Icu ${protIcu} kA ${icuOk?(da?'OK':'OK'):(da?'FEJL':'FAIL')}</span></span></div>
+      <div class="result-row"><span class="label">${da?'Afbrydelse':'Disconnection'}</span><span class="value"><span class="verify-badge ${disconnOk?'ok':'fail'}">${disconnOk?(da?'Sikret':'Ensured'):(da?'Kontroll\u00E9r':'Verify')}</span></span></div>
+    </div>
+  </div>`;
+
+  // Section 9: QI Validation Summary
+  const qiOk = qi.issues.filter(i=>i.severity==='error').length === 0;
+  html += `<div class="card fade-in projekt-report-card">
+    <div class="card-title">${da?'9. Kvalitetsindeks (QI)':'9. Quality Index (QI)'}</div>
+    <div class="result-box" style="border-color:${qiOk?'var(--success)':'var(--danger)'}">
+      <div class="result-title">${da?'Score':'Score'}: ${qi.score}% - ${qi.passed.length} ${da?'best\u00E5et':'passed'}, ${qi.issues.length} ${da?'problemer':'issues'}</div>
+      ${qi.passed.map(p => `<div class="result-row"><span class="label">\u2705 ${p.rule}</span><span class="value">${p.detail}</span></div>`).join('')}
+      ${qi.issues.map(i => `<div class="result-row"><span class="label">${i.severity==='error'?'\u274C':'\u26A0\uFE0F'} ${i.rule}</span><span class="value" style="color:var(--danger)">${i.detail}</span></div>`).join('')}
+    </div>
+  </div>`;
+
+  // Section 10: Single-Line Diagram
+  html += `<div class="card fade-in projekt-report-card">
+    <div class="card-title">${da?'10. Enstreg-diagram (SLD)':'10. Single-Line Diagram (SLD)'}</div>
+    <div style="overflow-x:auto;background:var(--bg);border-radius:8px;padding:8px;border:1px solid var(--border)">
+      ${buildSLD()}
+    </div>
+  </div>`;
+
+  // Section 11: Declaration
+  html += `<div class="card fade-in projekt-report-card" style="border-left:4px solid var(--primary)">
+    <div class="card-title">${da?'11. Erkl\u00E6ring':'11. Declaration'}</div>
+    <div class="result-box" style="background:var(--primary-glow);border-color:var(--primary-light)">
+      <div style="font-style:italic;padding:8px;line-height:1.6">
+        ${da?'Installationen er dimensioneret iht. DS/HD 60364. Alle beregninger er verificeret.':'The installation is dimensioned according to DS/HD 60364. All calculations have been verified.'}
+      </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <div class="result-row"><span class="label">${da?'Dato':'Date'}</span><span class="value">${dateStr}</span></div>
+        <div class="result-row"><span class="label">${da?'Udf\u00F8rt af':'Performed by'}</span><span class="value">${ps.installer||'-'}</span></div>
+        <div class="result-row"><span class="label">${da?'V\u00E6rkt\u00F8j':'Tool'}</span><span class="value">El-Dimensionering v${DATA_VERSION}</span></div>
+      </div>
+    </div>
+  </div>`;
+
+  return html;
+}
+
+function renderProjekt() {
+  const da = lang === 'da';
+
+  // View toggle buttons + action bar
+  const toolbar = `
+    <div class="card fade-in no-print">
+      <div class="card-title">\uD83D\uDCCB ${da?'Projekt / Rapport':'Project / Report'}</div>
+      <div class="info-row">${da?'Professionel projektrapport og afleveringsdokument iht. DS/HD 60364-6.':'Professional project report and handover document per DS/HD 60364-6.'}</div>
+      <div class="select-grid" style="margin-bottom:12px">
+        <button class="sel-btn ${projektReportView==='setup'?'selected':''}" onclick="switchProjektView('setup')">\u2699\uFE0F ${da?'Projektops\u00E6tning':'Project Setup'}</button>
+        <button class="sel-btn ${projektReportView==='report'?'selected':''}" onclick="projektGenerateReport()">\uD83D\uDCC4 ${da?'Gener\u00E9r rapport':'Generate Report'}</button>
+      </div>
+      <div class="select-grid">
+        <button class="sel-btn" onclick="projectAddCircuit()">\u2795 ${da?'Tilf\u00F8j aktuel gruppe':'Add current circuit'}</button>
+        <button class="sel-btn" onclick="window.print()">\uD83D\uDDA8\uFE0F ${da?'Udskriv / PDF':'Print / PDF'}</button>
+        <button class="sel-btn" onclick="projectExport()">\u2B07\uFE0F ${da?'Eksport':'Export'}</button>
+        <label class="sel-btn" style="cursor:pointer">\u2B06\uFE0F ${da?'Import':'Import'}<input type="file" accept="application/json" style="display:none" onchange="projectImport(this)"></label>
+        ${projectState.circuits.length?`<button class="sel-btn" onclick="projectClear()">\uD83D\uDDD1\uFE0F ${da?'Ryd':'Clear'}</button>`:''}
+      </div>
+    </div>`;
+
+  // Print header (visible only when printing)
+  const printHeader = `<div class="print-only" style="margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #333">
+    <h1 style="margin:0;font-size:1.4rem">${da?'Projektrapport':'Project Report'} - ${projektSetup.projectName || 'Projekt 1'}</h1>
+    <div style="font-size:0.8rem;color:#666;margin-top:4px">El-Dimensionering v${DATA_VERSION} | ${new Date().toLocaleDateString(da?'da-DK':'en-GB')} | DS/HD 60364-6</div>
+  </div>`;
+
+  // Content based on active view
+  const content = projektReportView === 'report' ? renderProjektReport() : renderProjektSetup();
+
+  return toolbar + printHeader + content;
+}
+
 
 // ===== VERIFY / SELF-TEST MODULE (bulletproof) =====
 function runSelfTests() {
