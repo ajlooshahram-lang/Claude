@@ -10,7 +10,9 @@ export { isValidId } from "./schemas.js";
  * Validates that a string matches a cuid (alphanumeric, starts with lowercase letter,
  * 20-30 chars) or standard UUID format. Returns 400 response if invalid.
  *
- * @returns true if valid, false if invalid (response already sent)
+ * @returns true if valid, false if invalid (response already sent).
+ * Callers should `return reply` (not bare `return`) when this returns false
+ * so Fastify knows the response was handled.
  */
 export function validateId(id: string, reply: FastifyReply): boolean {
   if (!isValidId(id)) {

@@ -2,7 +2,7 @@
   "id": "FEAT-004",
   "type": "feat",
   "description": "Comprehensive security hardening test suite covering all new security features: oversized payloads, unknown fields, XSS, SQL injection, CSRF, sessions, rate limiting, validation, soft-delete, RBAC, and request-id.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Create server/test/security-hardening.test.ts: A comprehensive test suite with all required security tests. Uses buildTestApp() and registerUser() from helpers.ts. Tests must handle CSRF tokens properly (get token from login/register cookie, include in subsequent requests).",
     "Test: oversized request body (>1MB) on POST /cases returns 413 Payload Too Large",
