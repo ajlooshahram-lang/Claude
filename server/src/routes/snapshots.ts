@@ -168,7 +168,7 @@ export default async function snapshotsRoutes(app: FastifyInstance): Promise<voi
         return reply.code(404).send({ error: "Not found" });
       }
 
-      // Create a backup snapshot before restoring
+      // Create a backup snapshot before restoring (outside transaction for safety)
       const currentCases = await prisma.case.findMany({
         where: { projectId, tenantId: request.tenantId, deletedAt: null },
       });
@@ -186,38 +186,35 @@ export default async function snapshotsRoutes(app: FastifyInstance): Promise<voi
         },
       });
 
-      // Delete existing cases and registers for this project
-      await prisma.case.deleteMany({
-        where: { projectId, tenantId: request.tenantId },
-      });
-      await prisma.registerRow.deleteMany({
-        where: { projectId, tenantId: request.tenantId },
-      });
-
-      // Recreate from snapshot data
-      const casesData = snapshotData.cases ?? [];
-      for (const c of casesData) {
-        const { id: _id, createdAt: _ca, updatedAt: _ua, deletedAt: _da, ...rest } = c;
-        await prisma.case.create({
-          data: {
-            ...rest,
-            tenantId: request.tenantId,
-            projectId,
-          } as never,
+      // Perform the restore inside a transaction to prevent data loss on failure
+      await prisma.$transaction(async (tx) => {
+        // Delete existing cases and registers for this project
+        await tx.case.deleteMany({
+          where: { projectId, tenantId: request.tenantId },
         });
-      }
-
-      const registersData = snapshotData.registers ?? [];
-      for (const r of registersData) {
-        const { id: _id, createdAt: _ca, updatedAt: _ua, deletedAt: _da, ...rest } = r;
-        await prisma.registerRow.create({
-          data: {
-            ...rest,
-            tenantId: request.tenantId,
-            projectId,
-          } as never,
+        await tx.registerRow.deleteMany({
+          where: { projectId, tenantId: request.tenantId },
         });
-      }
+
+        // Recreate from snapshot data using createMany for efficiency
+        const casesData = snapshotData.cases ?? [];
+        if (casesData.length > 0) {
+          const casesPayload = casesData.map((c) => {
+            const { id: _id, createdAt: _ca, updatedAt: _ua, deletedAt: _da, ...rest } = c;
+            return { ...rest, tenantId: request.tenantId, projectId } as never;
+          });
+          await tx.case.createMany({ data: casesPayload });
+        }
+
+        const registersData = snapshotData.registers ?? [];
+        if (registersData.length > 0) {
+          const registersPayload = registersData.map((r) => {
+            const { id: _id, createdAt: _ca, updatedAt: _ua, deletedAt: _da, ...rest } = r;
+            return { ...rest, tenantId: request.tenantId, projectId } as never;
+          });
+          await tx.registerRow.createMany({ data: registersPayload });
+        }
+      });
 
       return reply.code(200).send({ ok: true, restoredFrom: id });
     },

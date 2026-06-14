@@ -148,7 +148,7 @@ export default async function sharesRoutes(app: FastifyInstance): Promise<void> 
         return reply.code(404).send({ error: "Not found" });
       }
 
-      // Fetch project data at granted scope level
+      // Fetch project data filtered by granted scope level
       const project = await prisma.project.findFirst({
         where: { id: shareToken.projectId, deletedAt: null },
       });
@@ -166,6 +166,30 @@ export default async function sharesRoutes(app: FastifyInstance): Promise<void> 
         where: { projectId: project.id, tenantId: shareToken.tenantId, deletedAt: null },
         orderBy: { sortOrder: "asc" },
       });
+
+      // Enforce scope: VIEWER tokens exclude sensitive write-only fields (cost, internal notes)
+      // MANAGER tokens return the full dataset
+      if (shareToken.scope === "VIEWER") {
+        const filteredCases = cases.map((c) => {
+          const { actCost: _ac, estCost: _ec, costCat: _cc, rootCause: _rc, ...viewerFields } = c;
+          return viewerFields;
+        });
+
+        const filteredProject = {
+          id: project.id,
+          name: (project as Record<string, unknown>).name,
+          description: (project as Record<string, unknown>).description,
+          createdAt: project.createdAt,
+          updatedAt: project.updatedAt,
+        };
+
+        return {
+          project: filteredProject,
+          cases: filteredCases,
+          registers,
+          scope: shareToken.scope,
+        };
+      }
 
       return {
         project,

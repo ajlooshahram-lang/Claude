@@ -574,6 +574,11 @@
   };
 
   // Wrap project mutations with API sync
+  // TODO: ID divergence - local store generates client-side IDs via uid() while the server
+  // generates separate cuid() IDs. No reconciliation maps the two, so subsequent updates/deletes
+  // on the local ID will not match the server record. This is acceptable for the current
+  // write-only backup pattern but must be resolved before implementing bidirectional sync
+  // or multi-device scenarios. Consider returning server IDs and patching the local store.
   var _addProject = addProject;
   addProject = function (name) {
     var result = _addProject(name);

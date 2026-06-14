@@ -6,14 +6,14 @@ services:
     volumes:
       - qi_data:/var/lib/postgresql/data
     environment:
-      POSTGRES_USER: qi
-      POSTGRES_PASSWORD: qi
-      POSTGRES_DB: qi_platform
+      POSTGRES_USER: ${POSTGRES_USER:-qi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: ${POSTGRES_DB:-qi_platform}
     networks:
       - internal
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U qi -d qi_platform"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-qi} -d ${POSTGRES_DB:-qi_platform}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,12 +25,12 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://qi:qi@db:5432/qi_platform?schema=public
-      SESSION_SECRET: ${SESSION_SECRET}
-      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-qi}:${POSTGRES_PASSWORD:?err}@db:5432/${POSTGRES_DB:-qi_platform}?schema=public
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET must be set}
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:?DATA_ENCRYPTION_KEY must be set}
       NODE_ENV: production
       PORT: "8080"
-      CORS_ORIGINS: http://localhost
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
     command: sh -c "npx prisma migrate deploy && node dist/server.js"
     networks:
       - internal

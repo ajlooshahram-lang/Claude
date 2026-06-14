@@ -14,7 +14,16 @@ const EnvSchema = z.object({
     .transform((s) => s.split(",").map((o) => o.trim()).filter(Boolean)),
   DATABASE_URL: z.string().min(1).optional(),
   SESSION_SECRET: z.string().min(16).default("dev-session-secret-min-16-chars"),
-  DATA_ENCRYPTION_KEY: z.string().min(16).optional(),
+  DATA_ENCRYPTION_KEY: z.string().min(16).optional().refine(
+    (val) => {
+      if (!val) return true; // optional is fine
+      // Accept 64 hex chars (32 bytes) or exactly 32 ASCII bytes
+      if (/^[0-9a-fA-F]{64}$/.test(val)) return true;
+      if (Buffer.from(val, "utf8").length === 32) return true;
+      return false;
+    },
+    { message: "DATA_ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes) or a 32-byte ASCII string" },
+  ),
   DATA_REGION: z.string().default("eu-west"),
 });
 

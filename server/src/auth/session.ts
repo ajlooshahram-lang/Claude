@@ -63,7 +63,12 @@ export async function revokeSession(
   });
 }
 
-/** Delete expired or revoked sessions (actual DELETE, not soft-delete). */
+/** Delete expired or revoked sessions (actual DELETE, not soft-delete).
+ * TODO: This hard-deletes revoked sessions, which means session audit history
+ * (who was logged in when) is lost 15 minutes after revocation. If a security audit
+ * requires historical session data, consider archiving to a separate audit_sessions table
+ * or switching to soft-delete with a longer retention period before implementing compliance features.
+ */
 export async function cleanExpiredSessions(prisma: PrismaClient): Promise<void> {
   await prisma.session.deleteMany({
     where: {
