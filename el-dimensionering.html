@@ -3180,7 +3180,7 @@ function renderCable() {
 
     <div class="card fade-in" style="border:1px solid ${cableState.material === 'copper' ? 'rgba(228,160,96,0.3)' : 'rgba(140,190,220,0.3)'};background:linear-gradient(135deg,rgba(10,20,40,0.95),rgba(5,10,20,0.98))">
       <div class="card-title" style="font-size:1.3em;background:linear-gradient(90deg,${cableState.material === 'copper' ? '#e4a060' : '#8cbee0'},${cableState.material === 'copper' ? '#ff9944' : '#a0d4ff'});-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">
-        ${lang === 'da' ? 'KABELBANK' : 'CABLE BANK'} - ${lang === 'da' ? 'Komplet Opslagsvaerk' : 'Complete Reference'}
+        ${lang === 'da' ? 'KABELBANK' : 'CABLE BANK'} - ${lang === 'da' ? 'Komplet Opslagsværk' : 'Complete Reference'}
       </div>
       <div style="color:rgba(255,255,255,0.5);font-size:0.85em;margin-bottom:16px;font-style:italic">
         ${lang === 'da' ? 'Alt du skal vide om kabler - materialer, installation, derating, sammenligning' : 'Everything you need to know about cables - materials, installation, derating, comparison'}
@@ -3205,8 +3205,8 @@ function renderCable() {
           <div class="result-row"><span class="label">${lang === 'da' ? 'Densitet' : 'Density'}</span><span class="value">${cableState.material === 'copper' ? '8960' : '2700'} kg/m\u00B3</span></div>
           <div class="result-row"><span class="label">${lang === 'da' ? 'Smeltepunkt' : 'Melting point'}</span><span class="value">${cableState.material === 'copper' ? '1085' : '660'} \u00B0C</span></div>
           <div class="result-row"><span class="label">${lang === 'da' ? 'Varmeledningsevne' : 'Thermal conductivity'}</span><span class="value">${cableState.material === 'copper' ? '401' : '237'} W/(m\u00B7K)</span></div>
-          <div class="result-row"><span class="label">k-${lang === 'da' ? 'vaerdi' : 'value'} (PVC)</span><span class="value">${cableState.material === 'copper' ? '115' : '76'}</span></div>
-          <div class="result-row"><span class="label">k-${lang === 'da' ? 'vaerdi' : 'value'} (XLPE)</span><span class="value">${cableState.material === 'copper' ? '143' : '94'}</span></div>
+          <div class="result-row"><span class="label">k-${lang === 'da' ? 'værdi' : 'value'} (PVC)</span><span class="value">${cableState.material === 'copper' ? '115' : '76'}</span></div>
+          <div class="result-row"><span class="label">k-${lang === 'da' ? 'værdi' : 'value'} (XLPE)</span><span class="value">${cableState.material === 'copper' ? '143' : '94'}</span></div>
         </div>
         <!-- Right: Comparison material -->
         <div style="background:rgba(${cableState.material === 'copper' ? '140,190,220' : '228,160,96'},0.05);border-radius:10px;padding:14px;border:1px dashed rgba(${cableState.material === 'copper' ? '140,190,220' : '228,160,96'},0.2);opacity:0.75">
@@ -3218,8 +3218,8 @@ function renderCable() {
           <div class="result-row"><span class="label">${lang === 'da' ? 'Densitet' : 'Density'}</span><span class="value">${cableState.material === 'copper' ? '2700' : '8960'} kg/m\u00B3</span></div>
           <div class="result-row"><span class="label">${lang === 'da' ? 'Smeltepunkt' : 'Melting point'}</span><span class="value">${cableState.material === 'copper' ? '660' : '1085'} \u00B0C</span></div>
           <div class="result-row"><span class="label">${lang === 'da' ? 'Varmeledningsevne' : 'Thermal conductivity'}</span><span class="value">${cableState.material === 'copper' ? '237' : '401'} W/(m\u00B7K)</span></div>
-          <div class="result-row"><span class="label">k-${lang === 'da' ? 'vaerdi' : 'value'} (PVC)</span><span class="value">${cableState.material === 'copper' ? '76' : '115'}</span></div>
-          <div class="result-row"><span class="label">k-${lang === 'da' ? 'vaerdi' : 'value'} (XLPE)</span><span class="value">${cableState.material === 'copper' ? '94' : '143'}</span></div>
+          <div class="result-row"><span class="label">k-${lang === 'da' ? 'værdi' : 'value'} (PVC)</span><span class="value">${cableState.material === 'copper' ? '76' : '115'}</span></div>
+          <div class="result-row"><span class="label">k-${lang === 'da' ? 'værdi' : 'value'} (XLPE)</span><span class="value">${cableState.material === 'copper' ? '94' : '143'}</span></div>
         </div>
       </div>
 
@@ -3227,31 +3227,31 @@ function renderCable() {
       <div style="background:rgba(50,50,80,0.3);border-radius:8px;padding:12px;margin-bottom:14px;border:1px solid rgba(100,100,150,0.2)">
         <div style="font-weight:bold;color:#ffd166;margin-bottom:8px">${lang === 'da' ? 'Isolationstyper - Max driftstemperatur' : 'Insulation Types - Max Operating Temperature'}</div>
         <div class="result-row"><span class="label">PVC (Polyvinylchlorid)</span><span class="value" style="color:#06d6a0">70\u00B0C</span></div>
-        <div class="result-row"><span class="label">XLPE / EPR (${lang === 'da' ? 'tvaerbundet polyethylen' : 'cross-linked polyethylene'})</span><span class="value" style="color:#06d6a0">90\u00B0C</span></div>
+        <div class="result-row"><span class="label">XLPE / EPR (${lang === 'da' ? 'tværbundet polyethylen' : 'cross-linked polyethylene'})</span><span class="value" style="color:#06d6a0">90\u00B0C</span></div>
         <div class="result-row"><span class="label">${lang === 'da' ? 'Kortslutning (PVC, 5s)' : 'Short-circuit (PVC, 5s)'}</span><span class="value" style="color:#ef476f">160\u00B0C</span></div>
         <div class="result-row"><span class="label">${lang === 'da' ? 'Kortslutning (XLPE, 5s)' : 'Short-circuit (XLPE, 5s)'}</span><span class="value" style="color:#ef476f">250\u00B0C</span></div>
       </div>
 
       <!-- Cost & Weight comparison -->
       <div style="background:rgba(50,50,80,0.3);border-radius:8px;padding:12px;margin-bottom:14px;border:1px solid rgba(100,100,150,0.2)">
-        <div style="font-weight:bold;color:#ffd166;margin-bottom:8px">${lang === 'da' ? 'Pris & Vaegt Sammenligning' : 'Cost & Weight Comparison'}</div>
+        <div style="font-weight:bold;color:#ffd166;margin-bottom:8px">${lang === 'da' ? 'Pris & Vægt Sammenligning' : 'Cost & Weight Comparison'}</div>
         <div class="result-row">
-          <span class="label">${lang === 'da' ? 'Prisforhold' : 'Price ratio'} (${lang === 'da' ? 'samme stroembaereevne' : 'same ampacity'})</span>
+          <span class="label">${lang === 'da' ? 'Prisforhold' : 'Price ratio'} (${lang === 'da' ? 'samme strømbæreevne' : 'same ampacity'})</span>
           <span class="value">Cu \u2248 3\u00D7 ${lang === 'da' ? 'prisen af' : 'the price of'} Al</span>
         </div>
         <div class="result-row">
-          <span class="label">${lang === 'da' ? 'Vaegtforhold' : 'Weight ratio'} (${lang === 'da' ? 'samme stroembaereevne' : 'same ampacity'})</span>
-          <span class="value">Al \u2248 50% ${lang === 'da' ? 'af Cu vaegt' : 'of Cu weight'}</span>
+          <span class="label">${lang === 'da' ? 'Vægtforhold' : 'Weight ratio'} (${lang === 'da' ? 'samme strømbæreevne' : 'same ampacity'})</span>
+          <span class="value">Al \u2248 50% ${lang === 'da' ? 'af Cu vægt' : 'of Cu weight'}</span>
         </div>
         <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div style="background:rgba(228,160,96,0.1);border-radius:6px;padding:10px;border:1px solid rgba(228,160,96,0.2)">
             <div style="color:#e4a060;font-weight:bold;margin-bottom:6px">${lang === 'da' ? 'Kobber fordele' : 'Copper advantages'}</div>
             <div style="color:rgba(255,255,255,0.7);font-size:0.82em;line-height:1.6">
               \u2713 ${lang === 'da' ? 'Bedre ledningsevne (lavere R)' : 'Better conductivity (lower R)'}<br>
-              \u2713 ${lang === 'da' ? 'Mindre tvaersnit kraevet' : 'Smaller cross-section needed'}<br>
+              \u2713 ${lang === 'da' ? 'Mindre tværsnit krævet' : 'Smaller cross-section needed'}<br>
               \u2713 ${lang === 'da' ? 'Lettere at arbejde med' : 'Easier to work with'}<br>
               \u2713 ${lang === 'da' ? 'Bedre korrosionsbestandighed' : 'Better corrosion resistance'}<br>
-              \u2713 ${lang === 'da' ? 'Hoejere kortslutningsstroem' : 'Higher short-circuit capacity'}
+              \u2713 ${lang === 'da' ? 'Højere kortslutningsstrøm' : 'Higher short-circuit capacity'}
             </div>
             <div style="color:rgba(255,100,100,0.7);font-size:0.82em;line-height:1.6;margin-top:6px">
               \u2717 ${lang === 'da' ? 'Dyrere' : 'More expensive'}<br>
@@ -3264,12 +3264,12 @@ function renderCable() {
               \u2713 ${lang === 'da' ? 'Meget billigere' : 'Much cheaper'}<br>
               \u2713 ${lang === 'da' ? 'Lettere (nemmere montage)' : 'Lighter (easier mounting)'}<br>
               \u2713 ${lang === 'da' ? 'God til lange kabler' : 'Good for long cables'}<br>
-              \u2713 ${lang === 'da' ? 'Rigelig tilgaengelighed' : 'Abundant availability'}
+              \u2713 ${lang === 'da' ? 'Rigelig tilgængelighed' : 'Abundant availability'}
             </div>
             <div style="color:rgba(255,100,100,0.7);font-size:0.82em;line-height:1.6;margin-top:6px">
-              \u2717 ${lang === 'da' ? 'Stoerre tvaersnit paakraevet' : 'Larger cross-section required'}<br>
+              \u2717 ${lang === 'da' ? 'Større tværsnit påkrævet' : 'Larger cross-section required'}<br>
               \u2717 ${lang === 'da' ? 'Kryber under tryk' : 'Creeps under pressure'}<br>
-              \u2717 ${lang === 'da' ? 'Oxiderer (kraever special tilslutning)' : 'Oxidizes (needs special termination)'}
+              \u2717 ${lang === 'da' ? 'Oxiderer (kræver special tilslutning)' : 'Oxidizes (needs special termination)'}
             </div>
           </div>
         </div>
@@ -3280,24 +3280,24 @@ function renderCable() {
     <div class="card fade-in">
       <div class="card-title">
         <span style="font-size:1.4em;margin-right:8px">\uD83D\uDEE0\uFE0F</span>
-        ${lang === 'da' ? 'Fremfoeringsmetoder - Visuel Guide' : 'Installation Methods - Visual Guide'}
+        ${lang === 'da' ? 'Fremføringsmetoder - Visuel Guide' : 'Installation Methods - Visual Guide'}
       </div>
       <div style="color:rgba(255,255,255,0.5);font-size:0.82em;margin-bottom:14px">
-        DS/HD 60364-5-52, Table B.52.1 | ${lang === 'da' ? 'Klik for at vaelge metode' : 'Click to select method'}
+        DS/HD 60364-5-52, Table B.52.1 | ${lang === 'da' ? 'Klik for at vælge metode' : 'Click to select method'}
       </div>
 
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
         ${(function(){
           const methods = {
-            'A1': { factor: 0.87, da: 'Isoleret leder i roer i isoleret vaeg', en: 'Insulated conductor in conduit in insulated wall', icon: 'wall-conduit', app_da: 'Skjult i isolerede vaegge', app_en: 'Concealed in insulated walls' },
-            'A2': { factor: 0.83, da: 'Flerlederkabel i roer i isoleret vaeg', en: 'Multi-core cable in conduit in insulated wall', icon: 'wall-cable', app_da: 'Kabel i roer i vaeg', app_en: 'Cable in conduit in wall' },
-            'B1': { factor: 1.0, da: 'Isoleret leder i roer paa vaeg', en: 'Insulated conductor in conduit on wall', icon: 'surface-conduit', app_da: 'Synlige installationsroer', app_en: 'Visible conduit on surface' },
-            'B2': { factor: 0.96, da: 'Flerlederkabel i roer paa vaeg', en: 'Multi-core cable in conduit on wall', icon: 'surface-cable', app_da: 'Kabel i kabelkanal', app_en: 'Cable in trunking' },
-            'C': { factor: 1.0, da: 'Kabel direkte paa vaeg/loft', en: 'Cable direct on wall/ceiling', icon: 'direct-surface', app_da: 'Direkte monteret, kabelklemmer', app_en: 'Direct mounted, cable clips' },
+            'A1': { factor: 0.87, da: 'Isoleret leder i rør i isoleret væg', en: 'Insulated conductor in conduit in insulated wall', icon: 'wall-conduit', app_da: 'Skjult i isolerede vægge', app_en: 'Concealed in insulated walls' },
+            'A2': { factor: 0.83, da: 'Flerlederkabel i rør i isoleret væg', en: 'Multi-core cable in conduit in insulated wall', icon: 'wall-cable', app_da: 'Kabel i rør i væg', app_en: 'Cable in conduit in wall' },
+            'B1': { factor: 1.0, da: 'Isoleret leder i rør på væg', en: 'Insulated conductor in conduit on wall', icon: 'surface-conduit', app_da: 'Synlige installationsrør', app_en: 'Visible conduit on surface' },
+            'B2': { factor: 0.96, da: 'Flerlederkabel i rør på væg', en: 'Multi-core cable in conduit on wall', icon: 'surface-cable', app_da: 'Kabel i kabelkanal', app_en: 'Cable in trunking' },
+            'C': { factor: 1.0, da: 'Kabel direkte på væg/loft', en: 'Cable direct on wall/ceiling', icon: 'direct-surface', app_da: 'Direkte monteret, kabelklemmer', app_en: 'Direct mounted, cable clips' },
             'D': { factor: 1.0, da: 'Kabel i jord', en: 'Cable buried in ground', icon: 'underground', app_da: 'Jordkabler, forsyningskabler', app_en: 'Underground cables, supply' },
             'E': { factor: 1.04, da: 'Kabel i fri luft (vandret)', en: 'Cable in free air (horizontal)', icon: 'free-air-h', app_da: 'Kabelbakker, stiger', app_en: 'Cable trays, ladders' },
             'F': { factor: 1.09, da: 'Kabel i fri luft (vertikal)', en: 'Cable in free air (vertical)', icon: 'free-air-v', app_da: 'Vertikale kabelbakker', app_en: 'Vertical cable trays' },
-            'G': { factor: 1.17, da: 'Kabel frit haengende', en: 'Cable suspended in free air', icon: 'suspended', app_da: 'Ophaengt wire, spaendef', app_en: 'Suspended, catenary wire' }
+            'G': { factor: 1.17, da: 'Kabel frit hængende', en: 'Cable suspended in free air', icon: 'suspended', app_da: 'Ophængt wire, spændtråd', app_en: 'Suspended, catenary wire' }
           };
           return Object.entries(methods).map(([code, m]) => `
             <div onclick="cableState.installMethod='${code}';renderModule('cable')"
@@ -3388,7 +3388,7 @@ function renderCable() {
             <thead>
               <tr style="background:rgba(40,50,70,0.5)">
                 <th style="padding:8px;text-align:left;color:#7678ed;border-bottom:1px solid rgba(118,120,237,0.2)">${lang === 'da' ? 'Antal kredse' : 'No. of circuits'}</th>
-                <th style="padding:8px;text-align:center;color:#7678ed;border-bottom:1px solid rgba(118,120,237,0.2)">${lang === 'da' ? 'Bundt/roer' : 'Bunched/conduit'}</th>
+                <th style="padding:8px;text-align:center;color:#7678ed;border-bottom:1px solid rgba(118,120,237,0.2)">${lang === 'da' ? 'Bundt/rør' : 'Bunched/conduit'}</th>
                 <th style="padding:8px;text-align:center;color:#7678ed;border-bottom:1px solid rgba(118,120,237,0.2)">${lang === 'da' ? 'Enkeltlag bakke' : 'Single layer tray'}</th>
               </tr>
             </thead>
@@ -3414,17 +3414,17 @@ function renderCable() {
 
       <!-- Worst-case combined scenario -->
       <div style="background:rgba(239,71,111,0.06);border:1px solid rgba(239,71,111,0.2);border-radius:8px;padding:12px">
-        <div style="color:#ef476f;font-weight:bold;margin-bottom:8px">${lang === 'da' ? '\u26A0 Vaerste kombinerede scenarier' : '\u26A0 Worst-Case Combined Scenarios'}</div>
+        <div style="color:#ef476f;font-weight:bold;margin-bottom:8px">${lang === 'da' ? '\u26A0 Værste kombinerede scenarier' : '\u26A0 Worst-Case Combined Scenarios'}</div>
         <div style="font-size:0.82em;color:rgba(255,255,255,0.7);line-height:1.8">
           <div class="result-row"><span class="label">A1 + 45\u00B0C + 6 ${lang === 'da' ? 'kredse' : 'circuits'}</span><span class="value" style="color:#ef476f">k = ${(0.87 * 0.79 * 0.57).toFixed(3)}</span></div>
           <div class="result-row"><span class="label">A2 + 40\u00B0C + 4 ${lang === 'da' ? 'kredse' : 'circuits'}</span><span class="value" style="color:#ef476f">k = ${(0.83 * 0.87 * 0.65).toFixed(3)}</span></div>
           <div class="result-row"><span class="label">B1 + 35\u00B0C + 3 ${lang === 'da' ? 'kredse' : 'circuits'}</span><span class="value" style="color:#ffd166">k = ${(1.0 * 0.94 * 0.70).toFixed(3)}</span></div>
           <div class="result-row"><span class="label">E + 30\u00B0C + 1 ${lang === 'da' ? 'kreds' : 'circuit'}</span><span class="value" style="color:#06d6a0">k = ${(1.04 * 1.0 * 1.0).toFixed(3)}</span></div>
           <div style="margin-top:8px;padding:8px;background:rgba(239,71,111,0.1);border-radius:6px;color:#ffd166;font-size:0.85em">
-            ${lang === 'da' ? '\u26A0 Naar k < 0.5, overveej stoerre tvaersnit eller aendre installationsmetode!' : '\u26A0 When k < 0.5, consider larger cross-section or change installation method!'}
+            ${lang === 'da' ? '\u26A0 Når k < 0.5, overvej større tværsnit eller ændre installationsmetode!' : '\u26A0 When k < 0.5, consider larger cross-section or change installation method!'}
           </div>
           <div style="margin-top:6px;color:rgba(255,255,255,0.5);font-size:0.78em">
-            ${lang === 'da' ? 'Din nuvaerende kombination' : 'Your current combination'}: k = ${kTotal.toFixed(3)} (${kTotal < 0.5 ? (lang === 'da' ? 'KRITISK LAV' : 'CRITICALLY LOW') : kTotal < 0.7 ? (lang === 'da' ? 'LAV' : 'LOW') : kTotal < 0.9 ? (lang === 'da' ? 'MODERAT' : 'MODERATE') : (lang === 'da' ? 'GOD' : 'GOOD')})
+            ${lang === 'da' ? 'Din nuværende kombination' : 'Your current combination'}: k = ${kTotal.toFixed(3)} (${kTotal < 0.5 ? (lang === 'da' ? 'KRITISK LAV' : 'CRITICALLY LOW') : kTotal < 0.7 ? (lang === 'da' ? 'LAV' : 'LOW') : kTotal < 0.9 ? (lang === 'da' ? 'MODERAT' : 'MODERATE') : (lang === 'da' ? 'GOD' : 'GOOD')})
           </div>
         </div>
       </div>
@@ -3437,7 +3437,7 @@ function renderCable() {
         ${lang === 'da' ? 'Kabel Sammenligning' : 'Cable Comparison Tool'}
       </div>
       <div style="color:rgba(255,255,255,0.5);font-size:0.82em;margin-bottom:12px">
-        ${lang === 'da' ? 'Vaelg to tvaersnit for at sammenligne side om side' : 'Select two cross-sections to compare side by side'}
+        ${lang === 'da' ? 'Vælg to tværsnit for at sammenligne side om side' : 'Select two cross-sections to compare side by side'}
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
@@ -3462,11 +3462,11 @@ function renderCable() {
       ${(function(){
         const cmpA = typeof window !== 'undefined' && window._cmpA ? window._cmpA : null;
         const cmpB = typeof window !== 'undefined' && window._cmpB ? window._cmpB : null;
-        if (!cmpA || !cmpB) return '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-style:italic">' + (lang === 'da' ? 'Vaelg begge tvaersnit ovenfor for at se sammenligning' : 'Select both cross-sections above to see comparison') + '</div>';
+        if (!cmpA || !cmpB) return '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px;font-style:italic">' + (lang === 'da' ? 'Vælg begge tværsnit ovenfor for at se sammenligning' : 'Select both cross-sections above to see comparison') + '</div>';
 
         const dataA = currentCores[cmpA];
         const dataB = currentCores[cmpB];
-        if (!dataA || !dataB) return '<div style="color:rgba(255,100,100,0.6);text-align:center;padding:12px">' + (lang === 'da' ? 'Tvaersnit ikke tilgaengeligt for denne kabeltype' : 'Cross-section not available for this cable type') + '</div>';
+        if (!dataA || !dataB) return '<div style="color:rgba(255,100,100,0.6);text-align:center;padding:12px">' + (lang === 'da' ? 'Tværsnit ikke tilgængeligt for denne kabeltype' : 'Cross-section not available for this cable type') + '</div>';
 
         const izA = izTable[parseFloat(cmpA)] || 0;
         const izB = izTable[parseFloat(cmpB)] || 0;
@@ -3497,7 +3497,7 @@ function renderCable() {
             '<div class="result-row"><span class="label">R</span><span class="value">' + dataA.r + ' \u03A9/km</span></div>' +
             '<div class="result-row"><span class="label">X</span><span class="value">' + dataA.x + ' \u03A9/km</span></div>' +
             '<div class="result-row"><span class="label">\u0394U (100m,16A)</span><span class="value">' + vdA + ' V</span></div>' +
-            '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Vaegt' : 'Weight') + '/m</span><span class="value">' + wA + ' kg</span></div>' +
+            '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Vægt' : 'Weight') + '/m</span><span class="value">' + wA + ' kg</span></div>' +
             '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Sikker' : 'Safe') + '?</span><span class="value" style="color:' + (safeA ? '#06d6a0' : '#ef476f') + '">' + (safeA ? '\u2713' : '\u2717') + '</span></div>' +
           '</div>' +
           '<!-- VS divider -->' +
@@ -3510,7 +3510,7 @@ function renderCable() {
             '<div class="result-row"><span class="label">R</span><span class="value">' + dataB.r + ' \u03A9/km</span></div>' +
             '<div class="result-row"><span class="label">X</span><span class="value">' + dataB.x + ' \u03A9/km</span></div>' +
             '<div class="result-row"><span class="label">\u0394U (100m,16A)</span><span class="value">' + vdB + ' V</span></div>' +
-            '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Vaegt' : 'Weight') + '/m</span><span class="value">' + wB + ' kg</span></div>' +
+            '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Vægt' : 'Weight') + '/m</span><span class="value">' + wB + ' kg</span></div>' +
             '<div class="result-row"><span class="label">' + (lang === 'da' ? 'Sikker' : 'Safe') + '?</span><span class="value" style="color:' + (safeB ? '#06d6a0' : '#ef476f') + '">' + (safeB ? '\u2713' : '\u2717') + '</span></div>' +
           '</div>' +
         '</div>' +
@@ -3524,12 +3524,12 @@ function renderCable() {
     <div class="card fade-in" style="border:1px solid ${correctedIz >= (calcIB() || 0) ? 'rgba(6,214,160,0.3)' : 'rgba(239,71,111,0.4)'};background:${correctedIz >= (calcIB() || 0) ? 'linear-gradient(135deg,rgba(6,214,160,0.03),rgba(5,10,20,0.95))' : 'linear-gradient(135deg,rgba(239,71,111,0.05),rgba(5,10,20,0.95))'}">
       <div class="card-title">
         <span style="font-size:1.4em;margin-right:8px">${correctedIz >= (calcIB() || 0) ? '\u2705' : '\u26A0\uFE0F'}</span>
-        ${lang === 'da' ? 'Kabelvaelger - Anbefaling' : 'Cable Selector - Recommendation'}
+        ${lang === 'da' ? 'Kabelvælger - Anbefaling' : 'Cable Selector - Recommendation'}
       </div>
 
       ${(function(){
         const ib = calcIB() || 0;
-        if (ib <= 0) return '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:16px;font-style:italic">' + (lang === 'da' ? 'Indstil belastningsstroemmen (IB) i Belastning-modulet for at se anbefalinger' : 'Set the load current (IB) in the Load module to see recommendations') + '</div>';
+        if (ib <= 0) return '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:16px;font-style:italic">' + (lang === 'da' ? 'Indstil belastningsstrømmen (IB) i Belastning-modulet for at se anbefalinger' : 'Set the load current (IB) in the Load module to see recommendations') + '</div>';
 
         const izTab = izTableFor();
         const allCS = Object.keys(izTab).map(function(k) { return parseFloat(k); }).sort(function(a,b){ return a-b; });
@@ -3560,7 +3560,7 @@ function renderCable() {
         if (cableState.crossSection) {
           html += (lang === 'da' ? 'Valgt: ' : 'Selected: ') + cableState.crossSection + ' mm\u00B2, Iz(korr)=' + correctedIz.toFixed(1) + 'A ' + (currentSafe ? '\u2265' : '<') + ' IB=' + ib.toFixed(1) + 'A';
         } else {
-          html += (lang === 'da' ? 'Intet tvaersnit valgt endnu' : 'No cross-section selected yet');
+          html += (lang === 'da' ? 'Intet tværsnit valgt endnu' : 'No cross-section selected yet');
         }
         html += '</div></div></div></div>';
 
@@ -3578,7 +3578,7 @@ function renderCable() {
         }
 
         // All safe cables
-        html += '<div style="margin-bottom:8px;color:rgba(255,255,255,0.5);font-size:0.82em;font-weight:bold">' + (lang === 'da' ? 'Alle sikre tvaersnit' : 'All safe cross-sections') + ' (Iz\u2099 \u2265 IB = ' + ib.toFixed(1) + 'A):</div>';
+        html += '<div style="margin-bottom:8px;color:rgba(255,255,255,0.5);font-size:0.82em;font-weight:bold">' + (lang === 'da' ? 'Alle sikre tværsnit' : 'All safe cross-sections') + ' (Iz\u2099 \u2265 IB = ' + ib.toFixed(1) + 'A):</div>';
         html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">';
         safeList.forEach(function(entry, idx) {
           const isOptimal = idx === 0;
@@ -3596,7 +3596,7 @@ function renderCable() {
 
         // Unsafe cables (smaller ones)
         if (unsafeList.length > 0) {
-          html += '<div style="margin-bottom:8px;color:rgba(239,71,111,0.7);font-size:0.82em;font-weight:bold">' + (lang === 'da' ? 'Utilstraekkelige tvaersnit' : 'Insufficient cross-sections') + ' (' + (lang === 'da' ? 'brug ikke' : 'do not use') + '):</div>';
+          html += '<div style="margin-bottom:8px;color:rgba(239,71,111,0.7);font-size:0.82em;font-weight:bold">' + (lang === 'da' ? 'Utilstrækkelige tværsnit' : 'Insufficient cross-sections') + ' (' + (lang === 'da' ? 'brug ikke' : 'do not use') + '):</div>';
           html += '<div style="display:flex;flex-wrap:wrap;gap:6px;opacity:0.6">';
           unsafeList.forEach(function(entry) {
             const isCurrent = entry.cs === currentCS;
@@ -3616,7 +3616,7 @@ function renderCable() {
         <div style="color:rgba(255,255,255,0.5);font-size:0.78em;line-height:1.5">
           <strong>${lang === 'da' ? 'Dimensioneringskrav' : 'Sizing requirement'} (DS/HD 60364-5-52):</strong><br>
           IB \u2264 In \u2264 Iz &nbsp;&nbsp;|&nbsp;&nbsp; I2 \u2264 1.45 \u00D7 Iz<br>
-          ${lang === 'da' ? 'Hvor' : 'Where'}: IB = ${lang === 'da' ? 'driftsstr\u00F8m' : 'operating current'}, In = ${lang === 'da' ? 'overstr\u00F8msbeskyttelsens maerkestr\u00F8m' : 'protection device rated current'}, Iz = ${lang === 'da' ? 'kabelens str\u00F8mbaereevne (korrigeret)' : 'cable current-carrying capacity (corrected)'}
+          ${lang === 'da' ? 'Hvor' : 'Where'}: IB = ${lang === 'da' ? 'driftsstr\u00F8m' : 'operating current'}, In = ${lang === 'da' ? 'overstrømsbeskyttelsens mærkestrøm' : 'protection device rated current'}, Iz = ${lang === 'da' ? 'kabelens strømbæreevne (korrigeret)' : 'cable current-carrying capacity (corrected)'}
         </div>
       </div>
     </div>
@@ -3874,7 +3874,7 @@ function buildCableViz(crossSection, material, baseIz, correctedIz, kTotal, ib, 
       '<rect width="' + W + '" height="' + H + '" fill="url(#cblGrid)"/>' +
 
       '<!-- Title -->' +
-      '<text x="' + cx + '" y="30" text-anchor="middle" fill="rgba(255,255,255,0.92)" font-size="14" font-weight="700" letter-spacing="2">' + (lang === 'da' ? 'KABELTVAERSNIT' : 'CABLE CROSS-SECTION') + '</text>' +
+      '<text x="' + cx + '" y="30" text-anchor="middle" fill="rgba(255,255,255,0.92)" font-size="14" font-weight="700" letter-spacing="2">' + (lang === 'da' ? 'KABELTVÆRSNIT' : 'CABLE CROSS-SECTION') + '</text>' +
       '<text x="' + cx + '" y="50" text-anchor="middle" fill="' + condReflect + '" font-size="11" font-weight="500">' + csNum + ' mm\u00B2 ' + materialLabel + ' | ' + insulType + ' | ' + cores.length + ' ' + (lang === 'da' ? 'leder' : 'core') + '</text>' +
 
       '<!-- 3D shadow beneath cable -->' +
@@ -3940,7 +3940,7 @@ function buildCableViz(crossSection, material, baseIz, correctedIz, kTotal, ib, 
         '<!-- Material icon -->' +
         '<circle cx="30" cy="52" r="12" fill="url(#condMetallic)"/>' +
         '<text x="50" y="48" fill="rgba(255,255,255,0.9)" font-size="9" font-weight="700">' + materialLabel + '</text>' +
-        '<text x="50" y="60" fill="rgba(255,255,255,0.5)" font-size="7">' + (isCu ? 'Cu - ' + (lang==='da'?'Hoej ledningsevne':'High conductivity') : 'Al - ' + (lang==='da'?'Let vaegtklasse':'Lightweight class')) + '</text>' +
+        '<text x="50" y="60" fill="rgba(255,255,255,0.5)" font-size="7">' + (isCu ? 'Cu - ' + (lang==='da'?'Høj ledningsevne':'High conductivity') : 'Al - ' + (lang==='da'?'Let vægtklasse':'Lightweight class')) + '</text>' +
 
         '<!-- Properties grid -->' +
         '<g font-size="7.5" fill="rgba(255,255,255,0.7)">' +
@@ -3972,7 +3972,7 @@ function buildCableViz(crossSection, material, baseIz, correctedIz, kTotal, ib, 
         '<text x="155" y="184" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="9" font-weight="700">' + (lang==='da'?'KABELDATA':'CABLE DATA') + '</text>' +
 
         '<g font-size="7.5">' +
-          '<text x="15" y="202" fill="rgba(255,255,255,0.5)">' + (lang==='da'?'Tvaersnit':'Cross-section') + '</text>' +
+          '<text x="15" y="202" fill="rgba(255,255,255,0.5)">' + (lang==='da'?'Tværsnit':'Cross-section') + '</text>' +
           '<text x="200" y="202" fill="#fff" font-weight="600">' + csNum + ' mm\u00B2</text>' +
 
           '<text x="15" y="220" fill="rgba(255,255,255,0.5)">' + (lang==='da'?'Isolation':'Insulation') + '</text>' +
@@ -4398,7 +4398,7 @@ function buildScViz(zNet, zTrafo, zCable, ikMax, ikMin, check1, check2) {
       `}
 
       <!-- Title -->
-      <text x="${W / 2}" y="22" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="11" font-weight="600" letter-spacing="1">${lang === 'da' ? 'KORTSLUTNINGSKREDSLOEB' : 'SHORT CIRCUIT PATH'}</text>
+      <text x="${W / 2}" y="22" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="11" font-weight="600" letter-spacing="1">${lang === 'da' ? 'KORTSLUTNINGSKREDSLØB' : 'SHORT CIRCUIT PATH'}</text>
 
       <!-- Total impedance -->
       <text x="${W / 2}" y="${H - 12}" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-size="9">Z<tspan font-size="7" dy="1">total</tspan><tspan dy="-1"> = ${zTotal.toFixed(2)} m\u03A9</tspan></text>
@@ -4954,7 +4954,7 @@ function buildTrafoViz(S, uk, Ifl, Iload, loadFactor, Ik, Ploss) {
 
       <!-- Voltage labels -->
       <text x="50" y="${tankY - 45}" fill="#ff6040" font-size="11" font-weight="700">10 kV</text>
-      <text x="50" y="${tankY - 32}" fill="rgba(255,100,80,0.6)" font-size="8">${lang === 'da' ? 'Primaer' : 'Primary'}</text>
+      <text x="50" y="${tankY - 32}" fill="rgba(255,100,80,0.6)" font-size="8">${lang === 'da' ? 'Primær' : 'Primary'}</text>
       <text x="${W - 50}" y="${tankY + tankH + 52}" text-anchor="end" fill="#ffc060" font-size="11" font-weight="700">0.4 kV</text>
       <text x="${W - 50}" y="${tankY + tankH + 64}" text-anchor="end" fill="rgba(255,200,80,0.6)" font-size="8">${Iload.toFixed(1)} A</text>
 
@@ -10287,7 +10287,7 @@ function buildMotorViz(In, Istart, dU_pct, method, vdropOk, k2s2Ok, cableOk, cab
       <rect width="${W}" height="${H}" fill="url(#motorGrid)"/>
 
       <!-- Title -->
-      <text x="${W/2}" y="28" text-anchor="middle" font-size="13" fill="${accentColor}" font-weight="700" letter-spacing="2">${da ? 'MOTORSTART-KREDSLOEB' : 'MOTOR STARTING CIRCUIT'}</text>
+      <text x="${W/2}" y="28" text-anchor="middle" font-size="13" fill="${accentColor}" font-weight="700" letter-spacing="2">${da ? 'MOTORSTART-KREDSLØB' : 'MOTOR STARTING CIRCUIT'}</text>
       <text x="${W/2}" y="46" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.5)">${method} | ${In.toFixed(1)}A | Istart/In = ${startRatio.toFixed(1)}x</text>
 
       <!-- === PANEL BOX (left) === -->
@@ -10444,7 +10444,7 @@ function buildMotorViz(In, Istart, dU_pct, method, vdropOk, k2s2Ok, cableOk, cab
       <!-- === STARTING CURRENT WAVEFORM === -->
       <g transform="translate(0, 300)">
         <rect x="40" y="0" width="${W - 80}" height="80" rx="8" fill="rgba(10,10,25,0.6)" stroke="rgba(255,100,50,0.15)" stroke-width="0.5"/>
-        <text x="55" y="16" font-size="8" fill="rgba(255,255,255,0.7)" font-weight="600">${da ? 'Startstraem' : 'Starting Current'}</text>
+        <text x="55" y="16" font-size="8" fill="rgba(255,255,255,0.7)" font-weight="600">${da ? 'Startstrøm' : 'Starting Current'}</text>
 
         <!-- Waveform -->
         <path d="M60,50 L80,${50 - Math.min(30, startRatio * 3)} L100,${50 + Math.min(28, startRatio * 2.8)} L120,${50 - Math.min(25, startRatio * 2.5)} L140,${50 + Math.min(20, startRatio * 2)} L170,${50 - Math.min(15, startRatio * 1.5)} L200,${50 + Math.min(10, startRatio)} L240,${50 - 5} L280,${50 + 5} L320,${50 - 4} L360,${50 + 4} L400,${50 - 3} L440,${50 + 3} L480,${50 - 3} L520,${50 + 3} L560,${50 - 3} L600,${50 + 3} L640,${50 - 3} L680,${50 + 3}"
@@ -10481,7 +10481,7 @@ function buildMotorViz(In, Istart, dU_pct, method, vdropOk, k2s2Ok, cableOk, cab
       <!-- === METHOD COMPARISON === -->
       <g transform="translate(0, 460)">
         <rect x="40" y="0" width="${W - 80}" height="55" rx="8" fill="rgba(10,10,25,0.6)" stroke="rgba(6,214,160,0.1)" stroke-width="0.5"/>
-        <text x="55" y="16" font-size="8" fill="rgba(255,255,255,0.7)" font-weight="600">${da ? 'Stroemreduktion' : 'Current Reduction'}</text>
+        <text x="55" y="16" font-size="8" fill="rgba(255,255,255,0.7)" font-weight="600">${da ? 'Strømreduktion' : 'Current Reduction'}</text>
 
         <!-- DOL reference bar -->
         <rect x="60" y="22" width="${W - 140}" height="12" rx="6" fill="rgba(255,70,70,0.2)" stroke="rgba(255,70,70,0.3)" stroke-width="0.5"/>
@@ -11285,7 +11285,7 @@ function renderEvCharger() {
 
   // Safety disclaimer
   html += '<div class="result-box warning" style="margin-bottom:14px"><div class="result-title">\u26A0\uFE0F ' + (da ? 'Sikkerhedsforbehold' : 'Safety disclaimer') + '</div>';
-  html += '<div style="padding:6px 2px;line-height:1.5">' + (da ? 'EV er kontinuerlig last \u2014 dimensioner ALTID til 100%. 75%-reglen blev AFSKAFFET 1. januar 2020. Brug ALDRIG diversitet p\u00E5 det enkelte ladekredsloeb.' : 'EV is continuous load \u2014 ALWAYS size at 100%. The 75% rule was ABOLISHED 1 January 2020. NEVER apply diversity to the individual charging circuit.') + '</div></div>';
+  html += '<div style="padding:6px 2px;line-height:1.5">' + (da ? 'EV er kontinuerlig last \u2014 dimensioner ALTID til 100%. 75%-reglen blev AFSKAFFET 1. januar 2020. Brug ALDRIG diversitet p\u00E5 det enkelte ladekredsløb.' : 'EV is continuous load \u2014 ALWAYS size at 100%. The 75% rule was ABOLISHED 1 January 2020. NEVER apply diversity to the individual charging circuit.') + '</div></div>';
 
   // 1. Charger power selector
   html += '<div class="select-group"><div class="select-label">\u26A1 ' + (da ? 'Ladereffekt' : 'Charger power') + '</div><div class="select-grid">';
@@ -11386,7 +11386,7 @@ function renderEvCharger() {
     html += '<div style="margin:12px 0;padding:10px;background:rgba(255,50,50,0.1);border:1px solid rgba(255,50,50,0.3);border-radius:10px">';
     html += '<div style="font-weight:600;color:var(--danger);margin-bottom:6px">\u26A0\uFE0F ' + (da ? 'PEN-brud risiko (TN-C-S)' : 'PEN-break risk (TN-C-S)') + '</div>';
     html += '<div style="font-size:.85rem;line-height:1.5">';
-    html += (da ? 'Ved TN-C-S forsyning kan PEN-brud medf\u00f8re farlig ber\u00f8ringsspaending p\u00E5 chassis. DS/HD 60364-7-722 \u00a7722.411.4.1 kr\u00E6ver beskyttelsesforanstaltninger:' : 'In TN-C-S supply, PEN break can cause dangerous touch voltage on chassis. DS/HD 60364-7-722 \u00a7722.411.4.1 requires protective measures:');
+    html += (da ? 'Ved TN-C-S forsyning kan PEN-brud medf\u00f8re farlig ber\u00f8ringsspænding p\u00E5 chassis. DS/HD 60364-7-722 \u00a7722.411.4.1 kr\u00E6ver beskyttelsesforanstaltninger:' : 'In TN-C-S supply, PEN break can cause dangerous touch voltage on chassis. DS/HD 60364-7-722 \u00a7722.411.4.1 requires protective measures:');
     html += '<ul style="margin:6px 0 0 16px;padding:0">';
     html += '<li>' + (da ? 'Sp\u00E6ndingsoverv\u00E5gningsrel\u00E6 (f.eks. Bender VMD460/VMD420)' : 'Voltage monitoring relay (e.g. Bender VMD460/VMD420)') + '</li>';
     html += '<li>' + (da ? 'Lokal jordelektrode (erstatningsjord)' : 'Local earth electrode (substitute earth)') + '</li>';
@@ -12205,7 +12205,7 @@ function renderGenerator() {
   html += '</div></div>';
 
   // 2. Critical loads presets
-  html += '<div class="select-group"><div class="select-label">\uD83D\uDCE6 ' + (da ? 'Kritiske laster (klik for at tilfoeje/fjerne)' : 'Critical loads (click to add/remove)') + '</div><div class="select-grid">';
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDCE6 ' + (da ? 'Kritiske laster (klik for at tilføje/fjerne)' : 'Critical loads (click to add/remove)') + '</div><div class="select-grid">';
   LOAD_PRESETS.forEach(function(p, idx) {
     var active = st.criticalLoads.indexOf(p.kW) >= 0 && st.criticalLoads.filter(function(x){return x===p.kW;}).length > 0;
     // Check how many times this preset is in the list
@@ -12217,7 +12217,7 @@ function renderGenerator() {
   html += '</div></div>';
 
   // 3. Custom load buttons
-  html += '<div class="select-group"><div class="select-label">\u2795 ' + (da ? 'Tilfoej tilpasset last [kW]' : 'Add custom load [kW]') + '</div><div class="select-grid">';
+  html += '<div class="select-group"><div class="select-label">\u2795 ' + (da ? 'Tilføj tilpasset last [kW]' : 'Add custom load [kW]') + '</div><div class="select-grid">';
   CUSTOM_KW.forEach(function(kw) {
     var countCustom = st.customLoads.filter(function(x){return x===kw;}).length;
     var label = kw + ' kW';
@@ -14074,7 +14074,7 @@ function renderSpd() {
   var LIGHTNING = [
     { id: 'ingen', da: 'Ingen', en: 'None' },
     { id: 'lps', da: 'Ekstern fangleder', en: 'External LPS' },
-    { id: 'hv', da: 'Taet paa hoejspaending', en: 'Near HV' }
+    { id: 'hv', da: 'Tæt på højspænding', en: 'Near HV' }
   ];
   var LOCATIONS = [
     { id: 'main', da: 'Hovedtavle', en: 'Main panel' },
@@ -14092,27 +14092,27 @@ function renderSpd() {
   // Risk assessment logic
   var required = false;
   var reason = '';
-  if (s.lightning === 'lps') { required = true; reason = da ? 'Ekstern fangleder kraever SPD Type 1' : 'External LPS requires SPD Type 1'; }
-  else if (s.lightning === 'hv') { required = true; reason = da ? 'Naerhed til hoejspaending kraever SPD' : 'Proximity to HV requires SPD'; }
-  else if (s.building === 'hospital' || s.building === 'datacenter') { required = true; reason = da ? 'Kritisk installation kraever SPD' : 'Critical installation requires SPD'; }
-  else if (s.sensitive === 'medical') { required = true; reason = da ? 'Medicinsk udstyr kraever SPD-beskyttelse' : 'Medical equipment requires SPD protection'; }
-  else { reason = da ? 'Anbefalet baseret paa risikovurdering' : 'Recommended based on risk assessment'; }
+  if (s.lightning === 'lps') { required = true; reason = da ? 'Ekstern fangleder kræver SPD Type 1' : 'External LPS requires SPD Type 1'; }
+  else if (s.lightning === 'hv') { required = true; reason = da ? 'Nærhed til højspænding kræver SPD' : 'Proximity to HV requires SPD'; }
+  else if (s.building === 'hospital' || s.building === 'datacenter') { required = true; reason = da ? 'Kritisk installation kræver SPD' : 'Critical installation requires SPD'; }
+  else if (s.sensitive === 'medical') { required = true; reason = da ? 'Medicinsk udstyr kræver SPD-beskyttelse' : 'Medical equipment requires SPD protection'; }
+  else { reason = da ? 'Anbefalet baseret på risikovurdering' : 'Recommended based on risk assessment'; }
 
   // SPD Type determination
   var spdType = 'Type 2';
   var spdTypeReason = '';
   if (s.lightning === 'lps') {
-    if (s.sensitive !== 'ingen') { spdType = 'Type 1+2'; spdTypeReason = da ? 'Direkte lyn + foelsomt udstyr' : 'Direct lightning + sensitive equipment'; }
+    if (s.sensitive !== 'ingen') { spdType = 'Type 1+2'; spdTypeReason = da ? 'Direkte lyn + følsomt udstyr' : 'Direct lightning + sensitive equipment'; }
     else { spdType = 'Type 1'; spdTypeReason = da ? 'Direkte lynbeskyttelse' : 'Direct lightning protection'; }
   } else if (s.lightning === 'hv') {
     spdType = 'Type 1+2';
-    spdTypeReason = da ? 'Hoej induktiv risiko fra naert HV' : 'High inductive risk from nearby HV';
+    spdTypeReason = da ? 'Høj induktiv risiko fra nært HV' : 'High inductive risk from nearby HV';
   } else if (s.sensitive !== 'ingen') {
     spdType = 'Type 2+3';
     spdTypeReason = da ? 'Standard + finbeskyttelse af udstyr' : 'Standard + fine protection of equipment';
   } else {
     spdType = 'Type 2';
-    spdTypeReason = da ? 'Standard overspaendingsbeskyttelse' : 'Standard surge protection';
+    spdTypeReason = da ? 'Standard overspændingsbeskyttelse' : 'Standard surge protection';
   }
 
   // Coordination cascade
@@ -14121,7 +14121,7 @@ function renderSpd() {
     cascade.push({ location: da ? 'Hovedtavle' : 'Main panel', type: 'Type 1', iimp: '12.5 kA (10/350)', purpose: da ? 'Direkte lyn' : 'Direct lightning' });
   }
   if (spdType === 'Type 1+2' || spdType === 'Type 2' || spdType === 'Type 2+3') {
-    cascade.push({ location: da ? 'Hovedtavle/Undertavle' : 'Main/Sub panel', type: 'Type 2', imax: '40 kA (8/20)', purpose: da ? 'Indirekte overspaending' : 'Indirect surge' });
+    cascade.push({ location: da ? 'Hovedtavle/Undertavle' : 'Main/Sub panel', type: 'Type 2', imax: '40 kA (8/20)', purpose: da ? 'Indirekte overspænding' : 'Indirect surge' });
   }
   if (spdType === 'Type 2+3') {
     cascade.push({ location: da ? 'Ved udstyr' : 'At equipment', type: 'Type 3', up: '0.8 kV', purpose: da ? 'Finbeskyttelse' : 'Fine protection' });
@@ -14155,7 +14155,7 @@ function renderSpd() {
   var upSpec = (spdType === 'Type 2+3') ? '<=1.5 kV (Type 2), <=0.8 kV (Type 3)' : '<=1.5 kV';
 
   // Build HTML
-  var html = '<div class="card fade-in"><div class="card-title">' + (da ? '\u26A1 Overspaendingsbeskyttelse (SPD) - DS/HD 60364-5-534' : '\u26A1 Surge Protection (SPD) - DS/HD 60364-5-534') + '</div>';
+  var html = '<div class="card fade-in"><div class="card-title">' + (da ? '\u26A1 Overspændingsbeskyttelse (SPD) - DS/HD 60364-5-534' : '\u26A1 Surge Protection (SPD) - DS/HD 60364-5-534') + '</div>';
 
   // Building type
   html += '<div class="select-group"><div class="select-label">\uD83C\uDFE2 ' + (da ? 'Bygningstype' : 'Building type') + '</div><div class="select-grid">';
@@ -14179,7 +14179,7 @@ function renderSpd() {
   html += '</div></div>';
 
   // Sensitive equipment
-  html += '<div class="select-group"><div class="select-label">\uD83D\uDCBB ' + (da ? 'Foelsomt udstyr' : 'Sensitive equipment') + '</div><div class="select-grid">';
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDCBB ' + (da ? 'Følsomt udstyr' : 'Sensitive equipment') + '</div><div class="select-grid">';
   SENSITIVE.forEach(function(eq) {
     html += '<button class="sel-btn ' + (s.sensitive === eq.id ? 'selected' : '') + '" onclick="spdState.sensitive=\'' + eq.id + '\';renderModule(\'spd\')">' + (da ? eq.da : eq.en) + '</button>';
   });
@@ -14196,7 +14196,7 @@ function renderSpd() {
 
   // Results card
   var verdictClass = required ? 'error' : 'warning';
-  var verdictText = required ? (da ? 'SPD ER PAKRAEVET' : 'SPD IS REQUIRED') : (da ? 'SPD ANBEFALES' : 'SPD RECOMMENDED');
+  var verdictText = required ? (da ? 'SPD ER PÅKRÆVET' : 'SPD IS REQUIRED') : (da ? 'SPD ANBEFALES' : 'SPD RECOMMENDED');
 
   html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCCB ' + (da ? 'Resultat' : 'Result') + '</div>';
 
@@ -14231,7 +14231,7 @@ function renderSpd() {
   // Reference and safety
   html += '<div class="result-box warning"><div class="result-title">' + (da ? 'Reference & Sikkerhed' : 'Reference & Safety') + '</div>';
   html += '<div class="result-row"><span class="label">' + (da ? 'Standard' : 'Standard') + '</span><span class="value">DS/HD 60364-5-534</span></div>';
-  html += '<div class="result-row"><span class="label">' + (da ? 'ADVARSEL' : 'WARNING') + '</span><span class="value">' + (da ? 'SPD skal installeres af autoriseret elinstallatoer. Kontroller altid producent-datablad for specifik koordinering.' : 'SPD must be installed by authorized electrician. Always check manufacturer datasheet for specific coordination.') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'ADVARSEL' : 'WARNING') + '</span><span class="value">' + (da ? 'SPD skal installeres af autoriseret elinstallatør. Kontroller altid producent-datablad for specifik koordinering.' : 'SPD must be installed by authorized electrician. Always check manufacturer datasheet for specific coordination.') + '</span></div>';
   html += '</div>';
 
   html += '</div>'; // close results card
@@ -14325,7 +14325,7 @@ function buildSpdViz(s, spdType, cascade) {
   svg += '<text x="630" y="100" text-anchor="middle" fill="#0c6" font-size="16">\uD83D\uDCBB</text>';
 
   // Surge energy attenuation labels
-  svg += '<text x="' + (W / 2) + '" y="275" text-anchor="middle" fill="#8af" font-size="10">' + (lang === 'da' ? 'Overspaendingsenergi reduceres ved hvert trin' : 'Surge energy reduced at each stage') + '</text>';
+  svg += '<text x="' + (W / 2) + '" y="275" text-anchor="middle" fill="#8af" font-size="10">' + (lang === 'da' ? 'Overspændingsenergi reduceres ved hvert trin' : 'Surge energy reduced at each stage') + '</text>';
 
   // Animated surge wave along bus
   svg += '<rect x="0" y="168" width="20" height="4" fill="url(#surgeGrad)" rx="2">';
@@ -14358,7 +14358,7 @@ function renderTray() {
     { id: 'tray', da: 'Bakke', en: 'Tray' },
     { id: 'ladder', da: 'Stige', en: 'Ladder' },
     { id: 'trunking', da: 'Kanal', en: 'Trunking' },
-    { id: 'conduit', da: 'Roer', en: 'Conduit' }
+    { id: 'conduit', da: 'Rør', en: 'Conduit' }
   ];
   var WIDTHS = [100, 150, 200, 300, 400, 500, 600];
   var HEIGHTS = [50, 60, 80, 100, 150];
@@ -14416,13 +14416,13 @@ function renderTray() {
     var trunkArea = s.width * s.height;
     fillPct = trunkArea > 0 ? (totalAreaSum / trunkArea) * 100 : 0;
     maxFill = 45;
-    fillMethod = da ? 'Summen af kabeltvaersnit / (bredde x hoejde)' : 'Sum of cable areas / (width x height)';
+    fillMethod = da ? 'Summen af kabeltværsnit / (bredde x højde)' : 'Sum of cable areas / (width x height)';
   } else if (s.type === 'conduit') {
     // For conduit: fill = sum of areas / conduit area * 100 (use width as diameter)
     var conduitArea = Math.PI * Math.pow(s.width / 2, 2);
     fillPct = conduitArea > 0 ? (totalAreaSum / conduitArea) * 100 : 0;
     maxFill = 40;
-    fillMethod = da ? 'Summen af kabeltvaersnit / roertvaersnit' : 'Sum of cable areas / conduit area';
+    fillMethod = da ? 'Summen af kabeltværsnit / rørtværsnit' : 'Sum of cable areas / conduit area';
   }
 
   var fillOk = fillPct <= maxFill;
@@ -14479,7 +14479,7 @@ function renderTray() {
 
   // Tray height (relevant for trunking)
   if (s.type === 'trunking') {
-    html += '<div class="select-group"><div class="select-label">\u2195\uFE0F ' + (da ? 'Hoejde' : 'Height') + ' (mm)</div><div class="select-grid">';
+    html += '<div class="select-group"><div class="select-label">\u2195\uFE0F ' + (da ? 'Højde' : 'Height') + ' (mm)</div><div class="select-grid">';
     HEIGHTS.forEach(function(h) {
       html += '<button class="sel-btn ' + (s.height === h ? 'selected' : '') + '" onclick="trayState.height=' + h + ';renderModule(\'tray\')">' + h + '</button>';
     });
@@ -14494,7 +14494,7 @@ function renderTray() {
   html += '</div></div>';
 
   // Cable presets
-  html += '<div class="select-group"><div class="select-label">\uD83D\uDD0C ' + (da ? 'Tilfoej kabel (klik for at tilfoeje)' : 'Add cable (click to add)') + '</div><div class="select-grid">';
+  html += '<div class="select-group"><div class="select-label">\uD83D\uDD0C ' + (da ? 'Tilføj kabel (klik for at tilføje)' : 'Add cable (click to add)') + '</div><div class="select-grid">';
   CABLE_PRESETS.forEach(function(cp) {
     html += '<button class="sel-btn" onclick="trayAddCable(\'' + cp.name + '\')" style="border-color:' + cp.color + '44">' + cp.name + ' <small>\u00F8' + cp.diam + 'mm</small></button>';
   });
@@ -14502,7 +14502,7 @@ function renderTray() {
 
   // Current cables list
   if (s.cables.length > 0) {
-    html += '<div class="select-group"><div class="select-label">\uD83D\uDCCB ' + (da ? 'Tilfoejede kabler' : 'Added cables') + '</div><div class="select-grid">';
+    html += '<div class="select-group"><div class="select-label">\uD83D\uDCCB ' + (da ? 'Tilføjede kabler' : 'Added cables') + '</div><div class="select-grid">';
     s.cables.forEach(function(c, idx) {
       var preset = CABLE_PRESETS.find(function(p) { return p.name === c.name; });
       var col = preset ? preset.color : '#fff';
@@ -14536,14 +14536,14 @@ function renderTray() {
     }
     html += '<div class="result-row"><span class="label">' + (da ? 'Antal kabler' : 'Cable count') + '</span><span class="value">' + cableCount + '</span></div>';
     html += '<div class="result-row"><span class="label">' + (da ? 'Estimerede lag' : 'Estimated layers') + '</span><span class="value">' + layersEst + '</span></div>';
-    html += '<div class="result-row"><span class="label">' + (da ? 'Vaegt pr. meter' : 'Weight per meter') + '</span><span class="value">' + totalWeight.toFixed(1) + ' kg/m</span></div>';
-    html += '<div class="result-row"><span class="label">' + (da ? 'Grupperingsderating' : 'Grouping derating') + '</span><span class="value">' + deratingFactor.toFixed(2) + ' (' + cableCount + ' ' + (da ? 'kredsloeb' : 'circuits') + ')</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Vægt pr. meter' : 'Weight per meter') + '</span><span class="value">' + totalWeight.toFixed(1) + ' kg/m</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Grupperingsderating' : 'Grouping derating') + '</span><span class="value">' + deratingFactor.toFixed(2) + ' (' + cableCount + ' ' + (da ? 'kredsløb' : 'circuits') + ')</span></div>';
     html += '</div>';
 
     html += '</div>'; // close results card
 
     // SVG visualization
-    html += '<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ' + (da ? 'Tvaersnit' : 'Cross-section') + '</div>';
+    html += '<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ' + (da ? 'Tværsnit' : 'Cross-section') + '</div>';
     html += buildTrayViz(s, CABLE_PRESETS, fillPct, maxFill);
     html += '</div>';
   }
@@ -14583,7 +14583,7 @@ function buildTrayViz(s, CABLE_PRESETS, fillPct, maxFill) {
   svg += '<rect width="' + W + '" height="' + H + '" fill="url(#trayBg)" rx="8"/>';
 
   // Title
-  svg += '<text x="' + (W / 2) + '" y="25" text-anchor="middle" fill="#8af" font-size="12" font-weight="bold">' + (lang === 'da' ? 'Kabelbakke Tvaersnit' : 'Cable Tray Cross-Section') + '</text>';
+  svg += '<text x="' + (W / 2) + '" y="25" text-anchor="middle" fill="#8af" font-size="12" font-weight="bold">' + (lang === 'da' ? 'Kabelbakke Tværsnit' : 'Cable Tray Cross-Section') + '</text>';
 
   // Tray outline
   var trayVisW = Math.min(500, W - 80);
@@ -14708,14 +14708,14 @@ function renderPfc() {
   var html = '<div class="card fade-in"><div class="card-title">' + (da ? '\uD83D\uDD0B Fasekompensering / Kondensatorbatteri' : '\uD83D\uDD0B Power Factor Correction / Capacitor Bank') + '</div>';
 
   // Current cos phi
-  html += '<div class="select-group"><div class="select-label">' + (da ? 'Nuvaerende cos \u03C6' : 'Current cos \u03C6') + '</div><div class="select-grid">';
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Nuværende cos \u03C6' : 'Current cos \u03C6') + '</div><div class="select-grid">';
   [0.60, 0.65, 0.70, 0.75, 0.80, 0.82, 0.85, 0.87, 0.90, 0.92, 0.95].forEach(function(v) {
     html += '<button class="sel-btn ' + (s.cosCurrent === v ? 'selected' : '') + '" onclick="pfcState.cosCurrent=' + v + ';renderModule(\'pfc\')">' + v.toFixed(2) + '</button>';
   });
   html += '</div></div>';
 
   // Target cos phi
-  html += '<div class="select-group"><div class="select-label">' + (da ? 'Oensket cos \u03C6' : 'Target cos \u03C6') + '</div><div class="select-grid">';
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Ønsket cos \u03C6' : 'Target cos \u03C6') + '</div><div class="select-grid">';
   [0.90, 0.92, 0.95, 0.97, 0.98, 0.99, 1.00].forEach(function(v) {
     html += '<button class="sel-btn ' + (s.cosTarget === v ? 'selected' : '') + '" onclick="pfcState.cosTarget=' + v + ';renderModule(\'pfc\')">' + v.toFixed(2) + '</button>';
   });
@@ -14741,7 +14741,7 @@ function renderPfc() {
   html += '</div></div>';
 
   // Voltage
-  html += '<div class="select-group"><div class="select-label">' + (da ? 'Spaending' : 'Voltage') + '</div><div class="select-grid">';
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Spænding' : 'Voltage') + '</div><div class="select-grid">';
   [400, 690].forEach(function(v) {
     html += '<button class="sel-btn ' + (s.voltage === v ? 'selected' : '') + '" onclick="pfcState.voltage=' + v + ';renderModule(\'pfc\')">' + v + 'V</button>';
   });
@@ -14767,16 +14767,16 @@ function renderPfc() {
     html += '<div class="result-row"><span class="label">' + (da ? 'Tuning-frekvens' : 'Tuning frequency') + '</span><span class="value">' + (reactorPct === 7 ? '189 Hz (3.78xf)' : '134 Hz (2.68xf)') + '</span></div>';
   }
 
-  html += '<div class="result-row"><span class="label">' + (da ? 'Stroemreduktion' : 'Current reduction') + '</span><span class="value">\u0394I = ' + deltaI.toFixed(1) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Strømreduktion' : 'Current reduction') + '</span><span class="value">\u0394I = ' + deltaI.toFixed(1) + ' A</span></div>';
   html += '</div>';
 
   // Before / After comparison
-  html += '<div class="result-box"><div class="result-title">' + (da ? 'Foer / Efter kompensering' : 'Before / After compensation') + '</div>';
-  html += '<div class="result-row"><span class="label">' + (da ? 'Tilsyneladende effekt S (foer)' : 'Apparent power S (before)') + '</span><span class="value">' + S_before.toFixed(1) + ' kVA</span></div>';
+  html += '<div class="result-box"><div class="result-title">' + (da ? 'Før / Efter kompensering' : 'Before / After compensation') + '</div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Tilsyneladende effekt S (før)' : 'Apparent power S (before)') + '</span><span class="value">' + S_before.toFixed(1) + ' kVA</span></div>';
   html += '<div class="result-row"><span class="label">' + (da ? 'Tilsyneladende effekt S (efter)' : 'Apparent power S (after)') + '</span><span class="value">' + S_after.toFixed(1) + ' kVA</span></div>';
-  html += '<div class="result-row"><span class="label">' + (da ? 'Stroem I (foer)' : 'Current I (before)') + '</span><span class="value">' + I_before.toFixed(1) + ' A</span></div>';
-  html += '<div class="result-row"><span class="label">' + (da ? 'Stroem I (efter)' : 'Current I (after)') + '</span><span class="value">' + I_after.toFixed(1) + ' A</span></div>';
-  html += '<div class="result-row"><span class="label">cos \u03C6 (' + (da ? 'foer' : 'before') + ')</span><span class="value">' + s.cosCurrent.toFixed(2) + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Strøm I (før)' : 'Current I (before)') + '</span><span class="value">' + I_before.toFixed(1) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Strøm I (efter)' : 'Current I (after)') + '</span><span class="value">' + I_after.toFixed(1) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">cos \u03C6 (' + (da ? 'før' : 'before') + ')</span><span class="value">' + s.cosCurrent.toFixed(2) + '</span></div>';
   html += '<div class="result-row"><span class="label">cos \u03C6 (' + (da ? 'efter' : 'after') + ')</span><span class="value">' + s.cosTarget.toFixed(2) + '</span></div>';
   html += '</div>';
 
@@ -14819,7 +14819,7 @@ function buildPfcSvg(s, Qc, S_before, S_after) {
   svg += '</defs>';
 
   // Title
-  svg += '<text x="' + (W / 2) + '" y="25" text-anchor="middle" fill="#8af" font-size="14" font-weight="bold">' + (da ? 'Effekttrekant - Foer/Efter Kompensering' : 'Power Triangle - Before/After Compensation') + '</text>';
+  svg += '<text x="' + (W / 2) + '" y="25" text-anchor="middle" fill="#8af" font-size="14" font-weight="bold">' + (da ? 'Effekttrekant - Før/Efter Kompensering' : 'Power Triangle - Before/After Compensation') + '</text>';
 
   // Scale
   var maxS = S_before;
@@ -14886,7 +14886,7 @@ function buildPfcSvg(s, Qc, S_before, S_after) {
   svg += '</g>';
 
   // Legend
-  svg += '<text x="20" y="' + (H - 20) + '" fill="#888" font-size="9">' + (da ? 'Roed=Foer | Groen=Efter | Gul=Kompensering' : 'Red=Before | Green=After | Yellow=Compensation') + '</text>';
+  svg += '<text x="20" y="' + (H - 20) + '" fill="#888" font-size="9">' + (da ? 'Rød=Før | Grøn=Efter | Gul=Kompensering' : 'Red=Before | Green=After | Yellow=Compensation') + '</text>';
 
   svg += '</svg>';
   return svg;
@@ -15070,7 +15070,7 @@ function renderPanel() {
   var MOUNTINGS = [
     { id: 'flush', da: 'Indbygning', en: 'Flush' },
     { id: 'surface', da: 'Opbyg', en: 'Surface' },
-    { id: 'floor', da: 'Gulvstaaende', en: 'Floor-standing' }
+    { id: 'floor', da: 'Gulvstående', en: 'Floor-standing' }
   ];
   var IP_RATINGS = [
     { id: 'IP30', da: 'IP30 (indendoers)', en: 'IP30 (indoor)' },
@@ -15161,14 +15161,14 @@ function renderPanel() {
   var bom = [];
   bom.push({ item: da ? 'Tavleskab' : 'Panel enclosure', desc: (da ? CATEGORIES.find(function(c){return c.id===s.category;}).da : CATEGORIES.find(function(c){return c.id===s.category;}).en) + ' ' + s.ip + ' ' + (da ? MATERIALS.find(function(m){return m.id===s.material;}).da : MATERIALS.find(function(m){return m.id===s.material;}).en), qty: 1, modWidth: '-' });
   bom.push({ item: da ? 'Hovedafbryder' : 'Main switch', desc: s.mainRating + 'A ' + (da ? MAIN_TYPES.find(function(t){return t.id===s.mainType;}).da : MAIN_TYPES.find(function(t){return t.id===s.mainType;}).en), qty: 1, modWidth: mainSwitchWidth });
-  if (s.surge !== 'none') { bom.push({ item: da ? 'Overspaendingsbeskyttelse' : 'Surge protection', desc: s.surge === 'type12' ? 'Type 1+2' : 'Type 2', qty: 1, modWidth: spdWidth }); }
+  if (s.surge !== 'none') { bom.push({ item: da ? 'Overspændingsbeskyttelse' : 'Surge protection', desc: s.surge === 'type12' ? 'Type 1+2' : 'Type 2', qty: 1, modWidth: spdWidth }); }
   if (s.mainRcd !== 'none') { bom.push({ item: da ? 'Hoved-RCD' : 'Main RCD', desc: s.mainRcd === '30a' ? '30mA Type A' : (s.mainRcd === '30b' ? '30mA Type B' : '300mA Type S'), qty: 1, modWidth: rcdWidth }); }
   bom.push({ item: da ? 'DIN-skinne' : 'DIN-rail', desc: s.modulesPerRow + ' ' + (da ? 'moduler' : 'modules'), qty: s.rows, modWidth: s.modulesPerRow });
   bom.push({ item: da ? 'Samleskinne' : 'Busbar', desc: (da ? BUSBARS.find(function(b){return b.id===s.busbar;}).da : BUSBARS.find(function(b){return b.id===s.busbar;}).en) + ' ' + s.busbarCurrent + 'A', qty: s.rows, modWidth: '-' });
-  bom.push({ item: da ? 'Automatsikringer' : 'MCBs', desc: (da ? 'Til kredsloeb' : 'For circuits'), qty: Math.min(circuitCount, deviceIdx), modWidth: mcbWidth });
+  bom.push({ item: da ? 'Automatsikringer' : 'MCBs', desc: (da ? 'Til kredsløb' : 'For circuits'), qty: Math.min(circuitCount, deviceIdx), modWidth: mcbWidth });
   bom.push({ item: da ? 'Kabelforskruninger' : 'Cable glands', desc: 'M20/M25', qty: Math.max(circuitCount, 8), modWidth: '-' });
   bom.push({ item: da ? 'Terminaler' : 'Terminal blocks', desc: 'PE + N', qty: Math.max(circuitCount * 2, 16), modWidth: '-' });
-  bom.push({ item: da ? 'Maaerkning' : 'Labeling', desc: (da ? 'Skiltesaet' : 'Label set'), qty: 1, modWidth: '-' });
+  bom.push({ item: da ? 'Mærkning' : 'Labeling', desc: (da ? 'Skiltesæt' : 'Label set'), qty: 1, modWidth: '-' });
 
   // Cost estimate (Danish market ranges in DKK)
   var costs = {
@@ -15192,14 +15192,14 @@ function renderPanel() {
   var brands = [];
   if (s.category === 'hovedtavle' || s.category === 'mcc') {
     brands.push({ brand: 'Schneider Electric', series: 'Prisma Plus P', note: da ? 'Industriel hovedtavle' : 'Industrial main panel' });
-    brands.push({ brand: 'ABB', series: 'ArTu M', note: da ? 'Modulaer hovedtavle' : 'Modular main panel' });
-    brands.push({ brand: 'Rittal', series: 'Ri4Power', note: da ? 'Gulvstaaende storsystem' : 'Floor-standing large system' });
+    brands.push({ brand: 'ABB', series: 'ArTu M', note: da ? 'Modulær hovedtavle' : 'Modular main panel' });
+    brands.push({ brand: 'Rittal', series: 'Ri4Power', note: da ? 'Gulvstående storsystem' : 'Floor-standing large system' });
   } else if (s.category === 'gruppetavle') {
     brands.push({ brand: 'Schneider Electric', series: 'Resi9 / Pragma', note: da ? 'Boliger og let erhverv' : 'Residential and light commercial' });
     brands.push({ brand: 'Hager', series: 'Gamma', note: da ? 'Kompakt distribution' : 'Compact distribution' });
-    brands.push({ brand: 'ABB', series: 'Mistral / System pro E', note: da ? 'Vifte af stoerrelse' : 'Range of sizes' });
+    brands.push({ brand: 'ABB', series: 'Mistral / System pro E', note: da ? 'Vifte af størrelse' : 'Range of sizes' });
   } else {
-    brands.push({ brand: 'Schneider Electric', series: 'Kaedex / Pragma', note: da ? 'Fleksibel undertavle' : 'Flexible sub-panel' });
+    brands.push({ brand: 'Schneider Electric', series: 'Kaedra / Pragma', note: da ? 'Fleksibel undertavle' : 'Flexible sub-panel' });
     brands.push({ brand: 'Hager', series: 'Volta / Vector', note: da ? 'Plast undertavle' : 'Plastic sub-panel' });
     brands.push({ brand: 'ABB', series: 'Mistral41', note: da ? 'IP41/65 undertavle' : 'IP41/65 sub-panel' });
     brands.push({ brand: 'Rittal', series: 'AE / KX', note: da ? 'Rustfrit specialskab' : 'Stainless special cabinet' });
@@ -15235,15 +15235,15 @@ function renderPanel() {
   html += '</div>';
 
   // Section 2 - Size Configuration
-  html += '<div class="card fade-in"><div class="card-title">' + (da ? '\uD83D\uDCCF Stoerrelse' : '\uD83D\uDCCF Size Configuration') + '</div>';
+  html += '<div class="card fade-in"><div class="card-title">' + (da ? '\uD83D\uDCCF Størrelse' : '\uD83D\uDCCF Size Configuration') + '</div>';
 
-  html += '<div class="select-group"><div class="select-label">' + (da ? 'Antal raekker' : 'Number of rows') + '</div><div class="select-grid">';
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Antal rækker' : 'Number of rows') + '</div><div class="select-grid">';
   ROW_OPTIONS.forEach(function(n) {
     html += '<button class="sel-btn ' + (s.rows === n ? 'selected' : '') + '" onclick="panelState.rows=' + n + ';renderModule(\'panel\')">' + n + '</button>';
   });
   html += '</div></div>';
 
-  html += '<div class="select-group"><div class="select-label">' + (da ? 'Moduler pr. raekke' : 'Modules per row') + '</div><div class="select-grid">';
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Moduler pr. række' : 'Modules per row') + '</div><div class="select-grid">';
   MOD_PER_ROW.forEach(function(n) {
     html += '<button class="sel-btn ' + (s.modulesPerRow === n ? 'selected' : '') + '" onclick="panelState.modulesPerRow=' + n + ';renderModule(\'panel\')">' + n + '</button>';
   });
@@ -15253,8 +15253,8 @@ function renderPanel() {
   if (circuitCount > 0) {
     var suggestedRows = Math.max(2, Math.ceil(circuitCount / (s.modulesPerRow * 0.7)) + 1);
     html += '<div class="result-box" style="margin-top:8px"><div class="result-title">' + (da ? 'Forslag fra projekt' : 'Suggestion from project') + '</div>';
-    html += '<div class="result-row"><span class="label">' + (da ? 'Kredsloeb i projekt' : 'Circuits in project') + '</span><span class="value">' + circuitCount + '</span></div>';
-    html += '<div class="result-row"><span class="label">' + (da ? 'Anbefalet raekker' : 'Recommended rows') + '</span><span class="value">' + suggestedRows + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Kredsløb i projekt' : 'Circuits in project') + '</span><span class="value">' + circuitCount + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Anbefalede rækker' : 'Recommended rows') + '</span><span class="value">' + suggestedRows + '</span></div>';
     html += '<div class="result-row"><span class="label">' + (da ? 'Total kapacitet' : 'Total capacity') + '</span><span class="value">' + totalModules + ' ' + (da ? 'moduler' : 'modules') + '</span></div>';
     html += '</div>';
   }
@@ -15263,7 +15263,7 @@ function renderPanel() {
   // Section 3 - Main Components
   html += '<div class="card fade-in"><div class="card-title">' + (da ? '\u26A1 Hovedkomponenter' : '\u26A1 Main Components') + '</div>';
 
-  html += '<div class="select-group"><div class="select-label">' + (da ? 'Hovedafbryder maerkestr\u00F8m' : 'Main switch rating') + '</div><div class="select-grid">';
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Hovedafbryder mærkestrøm' : 'Main switch rating') + '</div><div class="select-grid">';
   MAIN_RATINGS.forEach(function(a) {
     html += '<button class="sel-btn ' + (s.mainRating === a ? 'selected' : '') + '" onclick="panelState.mainRating=' + a + ';renderModule(\'panel\')">' + a + 'A</button>';
   });
@@ -15287,7 +15287,7 @@ function renderPanel() {
   });
   html += '</div></div>';
 
-  html += '<div class="select-group"><div class="select-label">' + (da ? 'Overspaendingsbeskyttelse' : 'Surge protection') + '</div><div class="select-grid">';
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Overspændingsbeskyttelse' : 'Surge protection') + '</div><div class="select-grid">';
   SURGES.forEach(function(sp) {
     html += '<button class="sel-btn ' + (s.surge === sp.id ? 'selected' : '') + '" onclick="panelState.surge=\'' + sp.id + '\';renderModule(\'panel\')">' + (da ? sp.da : sp.en) + '</button>';
   });
@@ -15303,7 +15303,7 @@ function renderPanel() {
   // Section 4 - Auto-Fill from Project
   html += '<div class="card fade-in"><div class="card-title">' + (da ? '\uD83D\uDD04 Auto-udfyld fra projekt' : '\uD83D\uDD04 Auto-fill from project') + '</div>';
   html += '<button class="sel-btn" onclick="panelAutoFill()" style="padding:12px 24px;font-size:14px;background:linear-gradient(135deg,#00cc88,#0088ff);color:#fff;border:none;border-radius:8px;cursor:pointer">' + (da ? '\u2699\uFE0F Auto-udfyld fra projekt' : '\u2699\uFE0F Auto-fill from project') + '</button>';
-  html += '<p style="margin-top:8px;color:#aaa;font-size:12px">' + (da ? 'Taeller alle gemte kredsloeb og foresl\u00E5r tavlest\u00F8rrelse automatisk' : 'Counts all saved circuits and suggests panel size automatically') + '</p>';
+  html += '<p style="margin-top:8px;color:#aaa;font-size:12px">' + (da ? 'Tæller alle gemte kredsløb og foreslår tavlestørrelse automatisk' : 'Counts all saved circuits and suggests panel size automatically') + '</p>';
   html += '</div>';
 
   // Section 5 - DIN-Rail Layout Visualization
@@ -15318,7 +15318,7 @@ function renderPanel() {
     rowDevices[rv].forEach(function(d) { rowFillPct += d.width; });
     rowFillPct = Math.round((rowFillPct / s.modulesPerRow) * 100);
     html += '<div style="margin:6px 0;padding:8px;background:#1a1a2e;border:1px solid #333;border-radius:6px">';
-    html += '<div style="display:flex;align-items:center;margin-bottom:4px"><span style="color:#888;font-size:11px;width:60px">' + (da ? 'Raekke' : 'Row') + ' ' + (rv + 1) + '</span><span style="color:#aaa;font-size:10px;margin-left:auto">' + rowFillPct + '%</span></div>';
+    html += '<div style="display:flex;align-items:center;margin-bottom:4px"><span style="color:#888;font-size:11px;width:60px">' + (da ? 'Række' : 'Row') + ' ' + (rv + 1) + '</span><span style="color:#aaa;font-size:10px;margin-left:auto">' + rowFillPct + '%</span></div>';
     html += '<div style="display:flex;height:28px;background:#111;border-radius:4px;overflow:hidden;gap:1px">';
     rowDevices[rv].forEach(function(d) {
       var widthPct = (d.width / s.modulesPerRow) * 100;
@@ -15525,7 +15525,7 @@ function panelDownloadBOM() {
   csv += (da ? 'Automatsikringer' : 'MCBs') + ';' + (da ? 'Diverse' : 'Various') + ';' + circuitCount + ';1\n';
   csv += (da ? 'Kabelforskruninger' : 'Cable glands') + ';M20/M25;' + Math.max(circuitCount, 8) + ';-\n';
   csv += (da ? 'Terminaler' : 'Terminal blocks') + ';PE+N;' + Math.max(circuitCount * 2, 16) + ';-\n';
-  csv += (da ? 'Maerkning' : 'Labels') + ';' + (da ? 'Skiltesaet' : 'Label set') + ';1;-\n';
+  csv += (da ? 'Mærkning' : 'Labels') + ';' + (da ? 'Skiltesæt' : 'Label set') + ';1;-\n';
 
   var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   var url = URL.createObjectURL(blob);
