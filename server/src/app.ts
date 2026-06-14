@@ -11,6 +11,9 @@ import projectsRoutes from "./routes/projects.js";
 import registersRoutes from "./routes/registers.js";
 import snapshotsRoutes from "./routes/snapshots.js";
 import sharesRoutes from "./routes/shares.js";
+import programmesRoutes from "./routes/programmes.js";
+import packagesRoutes from "./routes/packages.js";
+import workOrdersRoutes from "./routes/work-orders.js";
 
 const SERVICE = "qi-platform-server";
 const VERSION = "0.1.0";
@@ -89,6 +92,15 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
 
   // Share token routes (includes public /shared/:token endpoint)
   await app.register(sharesRoutes);
+
+  // Programme CRUD routes
+  await app.register(programmesRoutes);
+
+  // Package CRUD routes
+  await app.register(packagesRoutes);
+
+  // Work Order CRUD routes
+  await app.register(workOrdersRoutes);
 
   return app;
 }
