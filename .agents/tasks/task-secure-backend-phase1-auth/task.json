@@ -9,6 +9,6 @@
     "tests": "pass",
     "test_quality": "pass",
     "docker_build": "skipped",
-    "summary": "All 26 tests pass (10 auth + 11 cases + 5 health). Build (prisma generate + tsc) passes cleanly. Security fixes applied: cross-tenant projectId validation in POST /cases, register error handling for P2002/generic errors, and new test for cross-tenant case creation block."
+    "summary": "All 26 tests pass (10 auth + 11 cases + 5 health). Build (prisma generate + tsc) passes cleanly. Semantic review identified 5 issues; 2 critical ones fixed (cross-tenant case creation + register error handling). Remaining 3 are hardening items for a future iteration (MFA secret encryption, session invalidation on credential change, session cleanup job)."
   }
 }
