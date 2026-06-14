@@ -2208,7 +2208,7 @@ let harmonicsState = { thd3: 33, iPhase: 16, circuits: 4, crossSection: 2.5 };
 // Generator sizing state
 let genState = { criticalLoads: [], genSize: 100, mode: 'island', earthing: 'TN-S', largestMotor: 0, startMethod: 'DOL', transfer: 'auto', customLoads: [] };
 // PLC/BMS/FMS state
-let plcState = { platform: 'siemens', plcLang: 'ST', protocol: 'bacnet', integration: 'monitor', fms: { energy: true, alarm: true, maintenance: false, occupancy: false, demand: false }, safety: { sil: 'SIL2', category: 'Cat3', functions: { estop: true, guard: false, lightCurtain: false, twoHand: false, safeSpeed: false } }, motorSeq: { type: 'dol_interlock', count: 2 }, hvac: { system: 'ahu' }, energy: { demandLimit: 100 }, network: { subnet: '192.168.1', startIP: 10 } };
+let plcState = { platform: 'siemens', plcLang: 'ST', protocol: 'bacnet', integration: 'monitor', fms: { energy: true, alarm: true, maintenance: false, occupancy: false, demand: false }, safety: { sil: 'SIL2', category: 'Cat3', functions: { estop: true, guard: false, lightCurtain: false, twoHand: false, safeSpeed: false } }, motorSeq: { type: 'dol_interlock', count: 2 }, hvac: { system: 'ahu' }, energy: { demandLimit: 100 }, network: { subnet: '192.168.1', startIP: 10 }, automation: {} };
 // SPD selector state
 let spdState = { building: 'bolig', lightning: 'ingen', location: 'main', sensitive: 'ingen', supply: 'TN-S' };
 // Cable tray fill state
@@ -12590,6 +12590,8 @@ function plcSetMotorSeq(key, val) { plcState.motorSeq[key] = val; renderModule('
 function plcSetHvac(key, val) { plcState.hvac[key] = val; renderModule('plc'); }
 function plcSetEnergy(key, val) { plcState.energy[key] = val; renderModule('plc'); }
 function plcSetNetwork(key, val) { plcState.network[key] = val; renderModule('plc'); }
+function plcSetAutomation(idx, enabled) { if (!plcState.automation) plcState.automation = {}; if (enabled) { if (!plcState.automation[idx]) plcState.automation[idx] = { enabled: true, level: 'standard' }; else plcState.automation[idx].enabled = true; } else { if (plcState.automation[idx]) plcState.automation[idx].enabled = false; } renderModule('plc'); }
+function plcSetAutoLevel(idx, level) { if (!plcState.automation) plcState.automation = {}; if (!plcState.automation[idx]) plcState.automation[idx] = { enabled: true, level: level }; else plcState.automation[idx].level = level; renderModule('plc'); }
 
 function plcGenerateSafetyCode() {
   var st = plcState;
@@ -13710,6 +13712,137 @@ function renderPlc() {
   }
   html += '</div>';
 
+  // ============================================================
+  // INTRODUCTION / OVERVIEW CARD - Plain language explanation
+  // ============================================================
+  html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCA1 ' + (da ? 'Hvad er PLC/BMS/FMS? - Introduktion for kunden' : 'What is PLC/BMS/FMS? - Introduction for the customer') + '</div>';
+  html += '<div class="info-row" style="font-size:0.95rem;line-height:1.6">' + (da ? 'Et PLC-system automatiserer din installation: lys t\u00E6nder/slukker automatisk, motorer starter i r\u00E6kkef\u00F8lge, energiforbrug overv\u00E5ges, og fejl meldes \u00F8jeblikkeligt. BMS (bygningsautomatik) styrer klima og energi. FMS (driftsstyring) planl\u00E6gger vedligehold.' : 'A PLC system automates your installation: lights turn on/off automatically, motors start in sequence, energy consumption is monitored, and faults are reported instantly. BMS (building automation) controls climate and energy. FMS (facility management) plans maintenance.') + '</div>';
+
+  // Benefits list
+  html += '<div style="margin-top:14px"><strong>' + (da ? 'Fordele for bygherren:' : 'Benefits for the building owner:') + '</strong></div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-top:8px">';
+  var plcBenefits = da ? [
+    { icon: '\uD83D\uDCB0', title: 'Energibesparelse', desc: 'Op til 30% lavere elforbrug' },
+    { icon: '\uD83C\uDFE0', title: 'Komfort', desc: 'Automatisk klimastyring og belysning' },
+    { icon: '\uD83D\uDD12', title: 'Sikkerhed', desc: 'Fejlmelding og n\u00F8dstop-funktioner' },
+    { icon: '\uD83D\uDCF1', title: 'Fjernovervagning', desc: 'Kontroll\u00E9r systemet fra din telefon' },
+    { icon: '\uD83D\uDCCB', title: 'Dokumentation', desc: 'Automatisk driftslog og rapporter' }
+  ] : [
+    { icon: '\uD83D\uDCB0', title: 'Energy savings', desc: 'Up to 30% lower electricity usage' },
+    { icon: '\uD83C\uDFE0', title: 'Comfort', desc: 'Automatic climate and lighting control' },
+    { icon: '\uD83D\uDD12', title: 'Safety', desc: 'Fault reporting and emergency stop' },
+    { icon: '\uD83D\uDCF1', title: 'Remote monitoring', desc: 'Control from your phone' },
+    { icon: '\uD83D\uDCCB', title: 'Documentation', desc: 'Automatic operation logs and reports' }
+  ];
+  plcBenefits.forEach(function(b) {
+    html += '<div style="background:#1a1f2e;border:1px solid #2d3748;border-radius:8px;padding:10px;text-align:center">';
+    html += '<div style="font-size:1.4rem">' + b.icon + '</div>';
+    html += '<div style="font-weight:bold;color:#63b3ed;font-size:0.85rem;margin-top:4px">' + b.title + '</div>';
+    html += '<div style="font-size:0.75rem;color:#a0aec0;margin-top:2px">' + b.desc + '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Animated SVG concept diagram: Sensors -> PLC Brain -> Actuators -> Dashboard
+  html += '<div style="margin-top:16px;text-align:center">';
+  html += '<svg viewBox="0 0 700 180" style="width:100%;max-width:700px;height:auto">';
+  // Background
+  html += '<defs>';
+  html += '<linearGradient id="plcFlowGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#48bb78"/><stop offset="50%" style="stop-color:#63b3ed"/><stop offset="100%" style="stop-color:#d6bcfa"/></linearGradient>';
+  html += '<filter id="plcGlow"><feGaussianBlur stdDeviation="2" result="glow"/><feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  html += '</defs>';
+  // Sensors box
+  html += '<rect x="10" y="40" width="130" height="100" rx="10" fill="#1a1f2e" stroke="#48bb78" stroke-width="2"/>';
+  html += '<text x="75" y="65" text-anchor="middle" fill="#48bb78" font-size="11" font-weight="bold">' + (da ? 'SENSORER' : 'SENSORS') + '</text>';
+  html += '<text x="75" y="85" text-anchor="middle" fill="#a0aec0" font-size="9">' + (da ? 'Temperatur' : 'Temperature') + '</text>';
+  html += '<text x="75" y="100" text-anchor="middle" fill="#a0aec0" font-size="9">' + (da ? 'Tryk / Str\u00F8m' : 'Pressure / Current') + '</text>';
+  html += '<text x="75" y="115" text-anchor="middle" fill="#a0aec0" font-size="9">' + (da ? 'Kontakter' : 'Contacts') + '</text>';
+  html += '<text x="75" y="130" text-anchor="middle" fill="#a0aec0" font-size="9">' + (da ? 'Fejlsignaler' : 'Fault signals') + '</text>';
+  // PLC Brain box
+  html += '<rect x="220" y="30" width="150" height="120" rx="12" fill="#1a1f2e" stroke="#63b3ed" stroke-width="3" filter="url(#plcGlow)"/>';
+  html += '<text x="295" y="58" text-anchor="middle" fill="#63b3ed" font-size="13" font-weight="bold">\uD83E\uDDE0 PLC</text>';
+  html += '<text x="295" y="78" text-anchor="middle" fill="#e2e8f0" font-size="10">' + (da ? 'Hjernen i systemet' : 'The system brain') + '</text>';
+  html += '<text x="295" y="96" text-anchor="middle" fill="#a0aec0" font-size="9">' + (da ? 'L\u00E6ser signaler' : 'Reads signals') + '</text>';
+  html += '<text x="295" y="111" text-anchor="middle" fill="#a0aec0" font-size="9">' + (da ? 'Tager beslutninger' : 'Makes decisions') + '</text>';
+  html += '<text x="295" y="126" text-anchor="middle" fill="#a0aec0" font-size="9">' + (da ? 'Sender kommandoer' : 'Sends commands') + '</text>';
+  html += '<text x="295" y="141" text-anchor="middle" fill="#a0aec0" font-size="9">' + (da ? 'Logger data' : 'Logs data') + '</text>';
+  // Actuators box
+  html += '<rect x="450" y="40" width="130" height="100" rx="10" fill="#1a1f2e" stroke="#f6ad55" stroke-width="2"/>';
+  html += '<text x="515" y="65" text-anchor="middle" fill="#f6ad55" font-size="11" font-weight="bold">' + (da ? 'AKTUATORER' : 'ACTUATORS') + '</text>';
+  html += '<text x="515" y="85" text-anchor="middle" fill="#a0aec0" font-size="9">' + (da ? 'Motorer' : 'Motors') + '</text>';
+  html += '<text x="515" y="100" text-anchor="middle" fill="#a0aec0" font-size="9">' + (da ? 'Ventiler' : 'Valves') + '</text>';
+  html += '<text x="515" y="115" text-anchor="middle" fill="#a0aec0" font-size="9">' + (da ? 'Belysning' : 'Lighting') + '</text>';
+  html += '<text x="515" y="130" text-anchor="middle" fill="#a0aec0" font-size="9">' + (da ? 'Frekvensomformere' : 'VFDs') + '</text>';
+  // Dashboard box
+  html += '<rect x="580" y="5" width="110" height="50" rx="8" fill="#1a1f2e" stroke="#d6bcfa" stroke-width="2"/>';
+  html += '<text x="635" y="25" text-anchor="middle" fill="#d6bcfa" font-size="10" font-weight="bold">\uD83D\uDCCA ' + (da ? 'DASHBOARD' : 'DASHBOARD') + '</text>';
+  html += '<text x="635" y="42" text-anchor="middle" fill="#a0aec0" font-size="8">' + (da ? 'Overv\u00E5gning + Alarm' : 'Monitoring + Alarm') + '</text>';
+  // Arrows with animation
+  html += '<line x1="140" y1="90" x2="220" y2="90" stroke="#48bb78" stroke-width="2" stroke-dasharray="6,3"><animate attributeName="stroke-dashoffset" from="18" to="0" dur="1.5s" repeatCount="indefinite"/></line>';
+  html += '<polygon points="215,85 225,90 215,95" fill="#48bb78"/>';
+  html += '<line x1="370" y1="90" x2="450" y2="90" stroke="#f6ad55" stroke-width="2" stroke-dasharray="6,3"><animate attributeName="stroke-dashoffset" from="18" to="0" dur="1.5s" repeatCount="indefinite"/></line>';
+  html += '<polygon points="445,85 455,90 445,95" fill="#f6ad55"/>';
+  html += '<path d="M370,60 Q420,15 580,30" stroke="#d6bcfa" stroke-width="1.5" fill="none" stroke-dasharray="5,3"><animate attributeName="stroke-dashoffset" from="16" to="0" dur="2s" repeatCount="indefinite"/></path>';
+  html += '<polygon points="575,25 583,30 575,35" fill="#d6bcfa"/>';
+  // Labels on arrows
+  html += '<text x="175" y="80" text-anchor="middle" fill="#48bb78" font-size="8">' + (da ? 'M\u00E5linger' : 'Readings') + '</text>';
+  html += '<text x="410" y="80" text-anchor="middle" fill="#f6ad55" font-size="8">' + (da ? 'Kommandoer' : 'Commands') + '</text>';
+  html += '<text x="470" y="18" text-anchor="middle" fill="#d6bcfa" font-size="8">' + (da ? 'Data' : 'Data') + '</text>';
+  html += '</svg>';
+  html += '</div></div>';
+
+  // ============================================================
+  // "HVAD SKAL AUTOMATISERES?" - Per-consumer automation selection
+  // ============================================================
+  if (loadList.length > 0) {
+    html += '<div class="card fade-in"><div class="card-title">\uD83C\uDFAF ' + (da ? 'Hvad skal automatiseres?' : 'What should be automated?') + '</div>';
+    html += '<div class="info-row">' + (da ? 'V\u00E6lg hvilke forbrugere der skal automatiseres og p\u00E5 hvilket niveau. Dette g\u00F8r det KRYSTALKLART hvad kunden f\u00E5r.' : 'Select which consumers should be automated and at what level. This makes it CRYSTAL CLEAR what the customer gets.') + '</div>';
+
+    // Automation level legend
+    html += '<div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-bottom:14px">';
+    html += '<div style="background:#1a1f2e;border:1px solid #48bb78;border-radius:6px;padding:8px;font-size:0.78rem"><strong style="color:#48bb78">' + (da ? 'Simpel' : 'Simple') + '</strong><br>' + (da ? 'T\u00E6nd/Sluk (On/Off)' : 'On/Off only') + '</div>';
+    html += '<div style="background:#1a1f2e;border:1px solid #63b3ed;border-radius:6px;padding:8px;font-size:0.78rem"><strong style="color:#63b3ed">' + (da ? 'Standard' : 'Standard') + '</strong><br>' + (da ? 'T\u00E6nd/Sluk + Fejlmelding + Energim\u00E5ling' : 'On/Off + Fault reporting + Energy metering') + '</div>';
+    html += '<div style="background:#1a1f2e;border:1px solid #d6bcfa;border-radius:6px;padding:8px;font-size:0.78rem"><strong style="color:#d6bcfa">' + (da ? 'Avanceret' : 'Advanced') + '</strong><br>' + (da ? '+ Hastighed/Dimmring + Tidsplan + Tilstandsoverv\u00E5gning' : '+ Speed/Dimming + Scheduling + Condition monitoring') + '</div>';
+    html += '</div>';
+
+    // Per-consumer list
+    html += '<div style="max-height:400px;overflow-y:auto">';
+    loadList.forEach(function(c, idx) {
+      var nm = c.name || ('Load ' + (idx + 1));
+      var auto = (plcState.automation && plcState.automation[idx]) || { enabled: false, level: 'standard' };
+      var isOn = auto.enabled;
+      var borderColor = !isOn ? '#4a5568' : (auto.level === 'simpel' ? '#48bb78' : auto.level === 'standard' ? '#63b3ed' : '#d6bcfa');
+      html += '<div style="background:#1a1f2e;border:1px solid ' + borderColor + ';border-radius:8px;padding:10px;margin-bottom:6px;display:flex;flex-wrap:wrap;align-items:center;gap:8px">';
+      html += '<div style="flex:1;min-width:140px"><strong style="color:#e2e8f0;font-size:0.85rem">' + nm + '</strong><br><span style="color:#a0aec0;font-size:0.72rem">' + (c.kW || 0).toFixed(1) + ' kW</span></div>';
+      // YES/NO toggle
+      html += '<button class="sel-btn ' + (isOn ? 'selected' : '') + '" style="font-size:0.75rem;padding:4px 10px" onclick="plcSetAutomation(' + idx + ',true)">' + (da ? 'JA' : 'YES') + '</button>';
+      html += '<button class="sel-btn ' + (!isOn ? 'selected' : '') + '" style="font-size:0.75rem;padding:4px 10px" onclick="plcSetAutomation(' + idx + ',false)">' + (da ? 'NEJ' : 'NO') + '</button>';
+      // Level buttons (only if enabled)
+      if (isOn) {
+        html += '<div style="display:flex;gap:4px;margin-left:8px">';
+        html += '<button class="sel-btn ' + (auto.level === 'simpel' ? 'selected' : '') + '" style="font-size:0.7rem;padding:3px 8px;border-color:#48bb78" onclick="plcSetAutoLevel(' + idx + ',\'simpel\')">' + (da ? 'Simpel' : 'Simple') + '</button>';
+        html += '<button class="sel-btn ' + (auto.level === 'standard' ? 'selected' : '') + '" style="font-size:0.7rem;padding:3px 8px;border-color:#63b3ed" onclick="plcSetAutoLevel(' + idx + ',\'standard\')">' + (da ? 'Standard' : 'Standard') + '</button>';
+        html += '<button class="sel-btn ' + (auto.level === 'avanceret' ? 'selected' : '') + '" style="font-size:0.7rem;padding:3px 8px;border-color:#d6bcfa" onclick="plcSetAutoLevel(' + idx + ',\'avanceret\')">' + (da ? 'Avanceret' : 'Advanced') + '</button>';
+        html += '</div>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+
+    // Quick summary
+    var autoCount = 0; var autoSimple = 0; var autoStd = 0; var autoAdv = 0;
+    loadList.forEach(function(c, idx) {
+      var a = (plcState.automation && plcState.automation[idx]) || { enabled: false, level: 'standard' };
+      if (a.enabled) { autoCount++; if (a.level === 'simpel') autoSimple++; else if (a.level === 'standard') autoStd++; else autoAdv++; }
+    });
+    html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + (da ? 'Opsummering' : 'Summary') + '</div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Automatiserede forbrugere' : 'Automated consumers') + '</span><span class="value">' + autoCount + ' / ' + loadList.length + '</span></div>';
+    html += '<div class="result-row"><span class="label" style="color:#48bb78">' + (da ? 'Simpel' : 'Simple') + '</span><span class="value">' + autoSimple + '</span></div>';
+    html += '<div class="result-row"><span class="label" style="color:#63b3ed">' + (da ? 'Standard' : 'Standard') + '</span><span class="value">' + autoStd + '</span></div>';
+    html += '<div class="result-row"><span class="label" style="color:#d6bcfa">' + (da ? 'Avanceret' : 'Advanced') + '</span><span class="value">' + autoAdv + '</span></div>';
+    html += '</div></div>';
+  }
+
   // Section 1: PLC Platform
   html += '<div class="card fade-in"><div class="card-title">\uD83D\uDD27 ' + (da ? 'PLC-platform' : 'PLC Platform') + '</div>';
   html += '<div class="info-row">' + (da ? 'V\u00E6lg PLC-fabrikat og programmeringssprog' : 'Select PLC manufacturer and programming language') + '</div>';
@@ -13789,6 +13922,86 @@ function renderPlc() {
   if (loadList.length > 0) {
     var io = plcGenerateIOList();
 
+    // ============================================================
+    // I/O EXPLANATION CARD - Visual legend
+    // ============================================================
+    html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCD6 ' + (da ? 'Forst\u00E5 I/O-signaler' : 'Understanding I/O Signals') + '</div>';
+    html += '<div class="info-row">' + (da ? 'I/O (Input/Output) er kommunikationen mellem PLC-hjernen og den virkelige verden. Her er de 4 typer forklaret:' : 'I/O (Input/Output) is the communication between the PLC brain and the real world. Here are the 4 types explained:') + '</div>';
+
+    // Visual legend grid
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:12px">';
+
+    // DI
+    html += '<div style="background:#1a1f2e;border:1px solid #48bb78;border-radius:8px;padding:12px">';
+    html += '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:1.5rem">\u2B05\uFE0F</span><strong style="color:#48bb78;font-size:1rem">DI</strong><span style="color:#a0aec0;font-size:0.8rem">Digital Input</span></div>';
+    html += '<div style="color:#e2e8f0;font-size:0.82rem;margin-top:6px"><strong>' + (da ? 'Signaler FRA feltet' : 'Signals FROM the field') + '</strong></div>';
+    html += '<div style="color:#a0aec0;font-size:0.75rem;margin-top:4px">' + (da ? 'Sensorer, kontakter, fejlmeldinger. Enten TIL eller FRA (1 eller 0). Eksempel: "Motor k\u00F8rer" feedback, d\u00F8rkontakt, n\u00F8dstop.' : 'Sensors, contacts, fault signals. Either ON or OFF (1 or 0). Example: "Motor running" feedback, door contact, e-stop.') + '</div>';
+    html += '</div>';
+
+    // DO
+    html += '<div style="background:#1a1f2e;border:1px solid #f6ad55;border-radius:8px;padding:12px">';
+    html += '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:1.5rem">\u27A1\uFE0F</span><strong style="color:#f6ad55;font-size:1rem">DO</strong><span style="color:#a0aec0;font-size:0.8rem">Digital Output</span></div>';
+    html += '<div style="color:#e2e8f0;font-size:0.82rem;margin-top:6px"><strong>' + (da ? 'Kommandoer TIL feltet' : 'Commands TO the field') + '</strong></div>';
+    html += '<div style="color:#a0aec0;font-size:0.75rem;margin-top:4px">' + (da ? 'T\u00E6nd motor, \u00E5bn ventil, t\u00E6nd lys. Enten TIL eller FRA. PLC beslutter og sender kommandoen.' : 'Start motor, open valve, turn on light. Either ON or OFF. PLC decides and sends the command.') + '</div>';
+    html += '</div>';
+
+    // AI
+    html += '<div style="background:#1a1f2e;border:1px solid #63b3ed;border-radius:8px;padding:12px">';
+    html += '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:1.5rem">\uD83D\uDCCA\u2B05</span><strong style="color:#63b3ed;font-size:1rem">AI</strong><span style="color:#a0aec0;font-size:0.8rem">Analog Input</span></div>';
+    html += '<div style="color:#e2e8f0;font-size:0.82rem;margin-top:6px"><strong>' + (da ? 'M\u00E5linger FRA feltet' : 'Measurements FROM the field') + '</strong></div>';
+    html += '<div style="color:#a0aec0;font-size:0.75rem;margin-top:4px">' + (da ? 'Temperatur, tryk, str\u00F8m, fugtighed. En v\u00E6rdi der varierer (f.eks. 4-20mA = 0-100%). Giver pr\u00E6cise m\u00E5ledata.' : 'Temperature, pressure, current, humidity. A value that varies (e.g. 4-20mA = 0-100%). Gives precise measurement data.') + '</div>';
+    html += '</div>';
+
+    // AO
+    html += '<div style="background:#1a1f2e;border:1px solid #d6bcfa;border-radius:8px;padding:12px">';
+    html += '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:1.5rem">\uD83D\uDCCA\u27A1</span><strong style="color:#d6bcfa;font-size:1rem">AO</strong><span style="color:#a0aec0;font-size:0.8rem">Analog Output</span></div>';
+    html += '<div style="color:#e2e8f0;font-size:0.82rem;margin-top:6px"><strong>' + (da ? 'Styring TIL feltet' : 'Control TO the field') + '</strong></div>';
+    html += '<div style="color:#a0aec0;font-size:0.75rem;margin-top:4px">' + (da ? 'Hastighed, dimmring, ventilposition. En variabel v\u00E6rdi (0-100%). Eksempel: Frekvensomformer hastighed, spj\u00E6ld\u00E5bning.' : 'Speed, dimming, valve position. A variable value (0-100%). Example: VFD speed, damper opening.') + '</div>';
+    html += '</div>';
+    html += '</div>';
+
+    // Animated motor diagram: DO -> Motor -> DI feedback
+    html += '<div style="margin-top:16px;text-align:center">';
+    html += '<svg viewBox="0 0 500 120" style="width:100%;max-width:500px;height:auto">';
+    html += '<defs><filter id="ioGlow"><feGaussianBlur stdDeviation="1.5" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>';
+    // PLC box
+    html += '<rect x="10" y="25" width="80" height="70" rx="6" fill="#1a1f2e" stroke="#63b3ed" stroke-width="2"/>';
+    html += '<text x="50" y="50" text-anchor="middle" fill="#63b3ed" font-size="10" font-weight="bold">PLC</text>';
+    html += '<text x="50" y="65" text-anchor="middle" fill="#a0aec0" font-size="7">DO: Start</text>';
+    html += '<text x="50" y="78" text-anchor="middle" fill="#a0aec0" font-size="7">DI: Feedback</text>';
+    // Motor
+    html += '<circle cx="250" cy="60" r="30" fill="#1a1f2e" stroke="#f6ad55" stroke-width="2" filter="url(#ioGlow)"/>';
+    html += '<text x="250" y="56" text-anchor="middle" fill="#f6ad55" font-size="11" font-weight="bold">M</text>';
+    html += '<text x="250" y="70" text-anchor="middle" fill="#a0aec0" font-size="7">' + (da ? 'Motor' : 'Motor') + '</text>';
+    // Contactor between
+    html += '<rect x="145" y="42" width="45" height="36" rx="4" fill="#1a1f2e" stroke="#f6ad55" stroke-width="1.5"/>';
+    html += '<text x="167" y="58" text-anchor="middle" fill="#f6ad55" font-size="7">KM1</text>';
+    html += '<text x="167" y="70" text-anchor="middle" fill="#a0aec0" font-size="6">' + (da ? 'Kontaktor' : 'Contactor') + '</text>';
+    // DO arrow (top path): PLC -> Contactor -> Motor
+    html += '<line x1="90" y1="45" x2="145" y2="55" stroke="#f6ad55" stroke-width="1.5" stroke-dasharray="4,2"><animate attributeName="stroke-dashoffset" from="12" to="0" dur="1s" repeatCount="indefinite"/></line>';
+    html += '<line x1="190" y1="60" x2="220" y2="60" stroke="#f6ad55" stroke-width="1.5" stroke-dasharray="4,2"><animate attributeName="stroke-dashoffset" from="12" to="0" dur="1s" repeatCount="indefinite"/></line>';
+    html += '<text x="115" y="40" text-anchor="middle" fill="#f6ad55" font-size="7">DO (' + (da ? 'start' : 'start') + ')</text>';
+    // DI arrow (bottom path): Motor -> PLC
+    html += '<path d="M250,90 Q250,110 140,110 Q50,110 50,95" stroke="#48bb78" stroke-width="1.5" fill="none" stroke-dasharray="4,2"><animate attributeName="stroke-dashoffset" from="0" to="12" dur="1.5s" repeatCount="indefinite"/></path>';
+    html += '<polygon points="48,98 52,98 50,91" fill="#48bb78"/>';
+    html += '<text x="170" y="108" text-anchor="middle" fill="#48bb78" font-size="7">DI (' + (da ? 'k\u00F8rer' : 'running') + ')</text>';
+    // VFD for AO
+    html += '<rect x="340" y="35" width="55" height="50" rx="4" fill="#1a1f2e" stroke="#d6bcfa" stroke-width="1.5"/>';
+    html += '<text x="367" y="55" text-anchor="middle" fill="#d6bcfa" font-size="8">VFD</text>';
+    html += '<text x="367" y="68" text-anchor="middle" fill="#a0aec0" font-size="6">4-20mA</text>';
+    html += '<text x="367" y="78" text-anchor="middle" fill="#a0aec0" font-size="6">' + (da ? 'Hastighed' : 'Speed') + '</text>';
+    html += '<line x1="280" y1="55" x2="340" y2="55" stroke="#d6bcfa" stroke-width="1" stroke-dasharray="3,2"><animate attributeName="stroke-dashoffset" from="10" to="0" dur="1.2s" repeatCount="indefinite"/></line>';
+    html += '<text x="310" y="48" text-anchor="middle" fill="#d6bcfa" font-size="6">AO</text>';
+    // AI from sensor
+    html += '<rect x="420" y="35" width="55" height="50" rx="4" fill="#1a1f2e" stroke="#63b3ed" stroke-width="1.5"/>';
+    html += '<text x="447" y="55" text-anchor="middle" fill="#63b3ed" font-size="8">' + (da ? 'Sensor' : 'Sensor') + '</text>';
+    html += '<text x="447" y="68" text-anchor="middle" fill="#a0aec0" font-size="6">PT100</text>';
+    html += '<text x="447" y="78" text-anchor="middle" fill="#a0aec0" font-size="6">' + (da ? 'Temp.' : 'Temp.') + '</text>';
+    html += '<path d="M420,70 Q390,95 300,95 Q200,95 120,95 Q80,95 70,85" stroke="#63b3ed" stroke-width="1" fill="none" stroke-dasharray="3,2"><animate attributeName="stroke-dashoffset" from="0" to="10" dur="2s" repeatCount="indefinite"/></path>';
+    html += '<text x="300" y="92" text-anchor="middle" fill="#63b3ed" font-size="6">AI (' + (da ? 'm\u00E5ling' : 'reading') + ')</text>';
+    html += '</svg>';
+    html += '</div></div>';
+
     // A) I/O List Table
     html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCCB ' + (da ? 'I/O-liste (auto-genereret)' : 'I/O List (auto-generated)') + '</div>';
     html += '<div class="info-row">' + io.rows.length + ' ' + (da ? 'signaler | DI:' : 'signals | DI:') + io.summary.DI + ' DO:' + io.summary.DO + ' AI:' + io.summary.AI + ' AO:' + io.summary.AO + '</div>';
@@ -13799,10 +14012,158 @@ function renderPlc() {
     });
     html += '</tbody></table></div></div>';
 
+    // ============================================================
+    // WIRING DIAGRAM GENERATOR - Shows HOW to wire each I/O type
+    // ============================================================
+    html += '<div class="card fade-in"><div class="card-title">\uD83D\uDD0C ' + (da ? 'Tilslutningsdiagrammer' : 'Wiring Diagrams') + '</div>';
+    html += '<div class="info-row">' + (da ? 'S\u00E5dan tilsluttes hvert signaltype fysisk mellem PLC-terminal og felt-enhed.' : 'How each signal type is physically wired between PLC terminal and field device.') + '</div>';
+
+    // DI Wiring: Contact -> 24VDC -> PLC input
+    html += '<div style="margin-top:14px"><strong style="color:#48bb78">\u2B05\uFE0F DI - ' + (da ? 'Digital Input tilslutning' : 'Digital Input wiring') + '</strong></div>';
+    html += '<div style="margin-top:6px;text-align:center">';
+    html += '<svg viewBox="0 0 450 100" style="width:100%;max-width:450px;height:auto">';
+    html += '<rect x="5" y="20" width="70" height="60" rx="4" fill="#1a1f2e" stroke="#63b3ed" stroke-width="1.5"/>';
+    html += '<text x="40" y="45" text-anchor="middle" fill="#63b3ed" font-size="8" font-weight="bold">PLC</text>';
+    html += '<text x="40" y="58" text-anchor="middle" fill="#a0aec0" font-size="6">DI.0</text>';
+    html += '<text x="40" y="70" text-anchor="middle" fill="#a0aec0" font-size="6">COM</text>';
+    // Wire from DI.0
+    html += '<line x1="75" y1="55" x2="160" y2="55" stroke="#48bb78" stroke-width="1.5"/>';
+    // Contact symbol
+    html += '<line x1="160" y1="55" x2="175" y2="45" stroke="#48bb78" stroke-width="2"/>';
+    html += '<circle cx="160" cy="55" r="3" fill="#48bb78"/>';
+    html += '<circle cx="190" cy="55" r="3" fill="#48bb78"/>';
+    html += '<text x="175" y="38" text-anchor="middle" fill="#48bb78" font-size="7">' + (da ? 'Kontakt' : 'Contact') + '</text>';
+    // Wire from contact to 24VDC
+    html += '<line x1="190" y1="55" x2="280" y2="55" stroke="#48bb78" stroke-width="1.5"/>';
+    // 24VDC source
+    html += '<rect x="280" y="35" width="60" height="40" rx="4" fill="#1a1f2e" stroke="#f6ad55" stroke-width="1.5"/>';
+    html += '<text x="310" y="55" text-anchor="middle" fill="#f6ad55" font-size="8" font-weight="bold">24VDC</text>';
+    html += '<text x="310" y="66" text-anchor="middle" fill="#a0aec0" font-size="6">+</text>';
+    // Return wire COM
+    html += '<line x1="75" y1="68" x2="120" y2="68" stroke="#a0aec0" stroke-width="1" stroke-dasharray="3,2"/>';
+    html += '<line x1="120" y1="68" x2="120" y2="88" stroke="#a0aec0" stroke-width="1" stroke-dasharray="3,2"/>';
+    html += '<line x1="120" y1="88" x2="310" y2="88" stroke="#a0aec0" stroke-width="1" stroke-dasharray="3,2"/>';
+    html += '<line x1="310" y1="75" x2="310" y2="88" stroke="#a0aec0" stroke-width="1" stroke-dasharray="3,2"/>';
+    html += '<text x="200" y="96" text-anchor="middle" fill="#a0aec0" font-size="6">0V / COM</text>';
+    // Signal flow animation
+    html += '<circle r="3" fill="#48bb78"><animateMotion dur="2s" repeatCount="indefinite" path="M160,55 L75,55"/></circle>';
+    html += '</svg>';
+    html += '</div>';
+
+    // DO Wiring: PLC output -> Relay -> Contactor coil
+    html += '<div style="margin-top:14px"><strong style="color:#f6ad55">\u27A1\uFE0F DO - ' + (da ? 'Digital Output tilslutning' : 'Digital Output wiring') + '</strong></div>';
+    html += '<div style="margin-top:6px;text-align:center">';
+    html += '<svg viewBox="0 0 500 100" style="width:100%;max-width:500px;height:auto">';
+    html += '<rect x="5" y="20" width="70" height="60" rx="4" fill="#1a1f2e" stroke="#63b3ed" stroke-width="1.5"/>';
+    html += '<text x="40" y="45" text-anchor="middle" fill="#63b3ed" font-size="8" font-weight="bold">PLC</text>';
+    html += '<text x="40" y="58" text-anchor="middle" fill="#a0aec0" font-size="6">DO.0</text>';
+    // Wire PLC -> Relay
+    html += '<line x1="75" y1="50" x2="140" y2="50" stroke="#f6ad55" stroke-width="1.5" stroke-dasharray="4,2"><animate attributeName="stroke-dashoffset" from="12" to="0" dur="1s" repeatCount="indefinite"/></line>';
+    // Relay
+    html += '<rect x="140" y="30" width="60" height="40" rx="4" fill="#1a1f2e" stroke="#f6ad55" stroke-width="1.5"/>';
+    html += '<text x="170" y="50" text-anchor="middle" fill="#f6ad55" font-size="7" font-weight="bold">' + (da ? 'Rel\u00E6' : 'Relay') + '</text>';
+    html += '<text x="170" y="62" text-anchor="middle" fill="#a0aec0" font-size="6">K1</text>';
+    // Wire Relay -> Contactor
+    html += '<line x1="200" y1="50" x2="280" y2="50" stroke="#f6ad55" stroke-width="1.5" stroke-dasharray="4,2"><animate attributeName="stroke-dashoffset" from="12" to="0" dur="1s" repeatCount="indefinite"/></line>';
+    // Contactor coil
+    html += '<rect x="280" y="25" width="75" height="50" rx="4" fill="#1a1f2e" stroke="#f6ad55" stroke-width="2"/>';
+    html += '<text x="317" y="45" text-anchor="middle" fill="#f6ad55" font-size="8" font-weight="bold">KM1</text>';
+    html += '<text x="317" y="58" text-anchor="middle" fill="#a0aec0" font-size="6">' + (da ? 'Kontaktor' : 'Contactor') + '</text>';
+    html += '<text x="317" y="68" text-anchor="middle" fill="#a0aec0" font-size="6">' + (da ? 'Spole A1-A2' : 'Coil A1-A2') + '</text>';
+    // Motor
+    html += '<line x1="355" y1="50" x2="400" y2="50" stroke="#e2e8f0" stroke-width="1.5"/>';
+    html += '<circle cx="430" cy="50" r="22" fill="#1a1f2e" stroke="#e2e8f0" stroke-width="1.5"/>';
+    html += '<text x="430" y="54" text-anchor="middle" fill="#e2e8f0" font-size="10" font-weight="bold">M</text>';
+    html += '</svg>';
+    html += '</div>';
+
+    // AI Wiring: 4-20mA transmitter (2-wire)
+    html += '<div style="margin-top:14px"><strong style="color:#63b3ed">\uD83D\uDCCA\u2B05 AI - ' + (da ? 'Analog Input tilslutning (4-20mA, 2-leder)' : 'Analog Input wiring (4-20mA, 2-wire)') + '</strong></div>';
+    html += '<div style="margin-top:6px;text-align:center">';
+    html += '<svg viewBox="0 0 450 110" style="width:100%;max-width:450px;height:auto">';
+    html += '<rect x="5" y="20" width="80" height="70" rx="4" fill="#1a1f2e" stroke="#63b3ed" stroke-width="1.5"/>';
+    html += '<text x="45" y="42" text-anchor="middle" fill="#63b3ed" font-size="8" font-weight="bold">PLC AI</text>';
+    html += '<text x="45" y="55" text-anchor="middle" fill="#a0aec0" font-size="6">AI.0 (+)</text>';
+    html += '<text x="45" y="68" text-anchor="middle" fill="#a0aec0" font-size="6">COM (-)</text>';
+    html += '<text x="45" y="81" text-anchor="middle" fill="#a0aec0" font-size="6">24VDC</text>';
+    // Transmitter
+    html += '<rect x="300" y="25" width="90" height="60" rx="6" fill="#1a1f2e" stroke="#63b3ed" stroke-width="1.5"/>';
+    html += '<text x="345" y="48" text-anchor="middle" fill="#63b3ed" font-size="7" font-weight="bold">' + (da ? 'Transmitter' : 'Transmitter') + '</text>';
+    html += '<text x="345" y="60" text-anchor="middle" fill="#a0aec0" font-size="6">PT100 / 4-20mA</text>';
+    html += '<text x="345" y="72" text-anchor="middle" fill="#a0aec0" font-size="6">' + (da ? '2-leder tilslutning' : '2-wire connection') + '</text>';
+    // Wires (loop powered)
+    html += '<line x1="85" y1="52" x2="300" y2="38" stroke="#63b3ed" stroke-width="1.5"><animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/></line>';
+    html += '<text x="180" y="38" text-anchor="middle" fill="#63b3ed" font-size="6">+ (4-20mA signal)</text>';
+    html += '<line x1="85" y1="65" x2="300" y2="72" stroke="#a0aec0" stroke-width="1"/>';
+    html += '<text x="180" y="76" text-anchor="middle" fill="#a0aec0" font-size="6">- (retur/return)</text>';
+    // 24VDC loop power
+    html += '<path d="M85,78 Q180,100 300,55" stroke="#f6ad55" stroke-width="1" fill="none" stroke-dasharray="3,2"/>';
+    html += '<text x="180" y="100" text-anchor="middle" fill="#f6ad55" font-size="6">24VDC ' + (da ? 'forsyning via loop' : 'loop power') + '</text>';
+    html += '</svg>';
+    html += '</div>';
+
+    // AO Wiring: PLC output -> VFD analog input
+    html += '<div style="margin-top:14px"><strong style="color:#d6bcfa">\uD83D\uDCCA\u27A1 AO - ' + (da ? 'Analog Output tilslutning (til frekvensomformer)' : 'Analog Output wiring (to VFD)') + '</strong></div>';
+    html += '<div style="margin-top:6px;text-align:center">';
+    html += '<svg viewBox="0 0 450 100" style="width:100%;max-width:450px;height:auto">';
+    html += '<rect x="5" y="20" width="80" height="60" rx="4" fill="#1a1f2e" stroke="#63b3ed" stroke-width="1.5"/>';
+    html += '<text x="45" y="42" text-anchor="middle" fill="#63b3ed" font-size="8" font-weight="bold">PLC AO</text>';
+    html += '<text x="45" y="55" text-anchor="middle" fill="#a0aec0" font-size="6">AO.0 (+)</text>';
+    html += '<text x="45" y="68" text-anchor="middle" fill="#a0aec0" font-size="6">COM (-)</text>';
+    // VFD
+    html += '<rect x="300" y="15" width="100" height="70" rx="6" fill="#1a1f2e" stroke="#d6bcfa" stroke-width="2"/>';
+    html += '<text x="350" y="38" text-anchor="middle" fill="#d6bcfa" font-size="8" font-weight="bold">VFD</text>';
+    html += '<text x="350" y="52" text-anchor="middle" fill="#a0aec0" font-size="6">' + (da ? 'Frekvensomformer' : 'Variable Freq. Drive') + '</text>';
+    html += '<text x="350" y="64" text-anchor="middle" fill="#a0aec0" font-size="6">AI1+ / AI1-</text>';
+    html += '<text x="350" y="76" text-anchor="middle" fill="#a0aec0" font-size="6">0-10V / 4-20mA</text>';
+    // Wires
+    html += '<line x1="85" y1="52" x2="300" y2="38" stroke="#d6bcfa" stroke-width="1.5" stroke-dasharray="4,2"><animate attributeName="stroke-dashoffset" from="12" to="0" dur="1.2s" repeatCount="indefinite"/></line>';
+    html += '<text x="180" y="38" text-anchor="middle" fill="#d6bcfa" font-size="6">AO+ (0-10V ' + (da ? 'hastighedsreference' : 'speed ref.') + ')</text>';
+    html += '<line x1="85" y1="65" x2="300" y2="65" stroke="#a0aec0" stroke-width="1"/>';
+    html += '<text x="180" y="78" text-anchor="middle" fill="#a0aec0" font-size="6">COM (0V ' + (da ? 'f\u00E6lles' : 'common') + ')</text>';
+    // Motor from VFD
+    html += '<line x1="400" y1="50" x2="430" y2="50" stroke="#e2e8f0" stroke-width="1.5"/>';
+    html += '<circle cx="447" cy="50" r="15" fill="#1a1f2e" stroke="#e2e8f0" stroke-width="1.5"/>';
+    html += '<text x="447" y="54" text-anchor="middle" fill="#e2e8f0" font-size="9">M</text>';
+    html += '</svg>';
+    html += '</div></div>';
+
     // B) PLC Program
     var code = plcGenerateProgram();
     html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCBB ' + (da ? 'PLC-program' : 'PLC Program') + ' (' + st.plcLang + (st.platform === 'siemens' && st.plcLang === 'ST' ? '/SCL' : '') + ')</div>';
-    html += '<pre style="background:#1a1f2e;color:#e2e8f0;padding:14px;border-radius:8px;font-size:.75rem;overflow-x:auto;max-height:400px;border:1px solid #2d3748">' + code.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre></div>';
+    html += '<pre style="background:#1a1f2e;color:#e2e8f0;padding:14px;border-radius:8px;font-size:.75rem;overflow-x:auto;max-height:400px;border:1px solid #2d3748">' + code.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+
+    // ============================================================
+    // CODE EXPLANATION - "Hvad g\u00F8r koden?" / "What does the code do?"
+    // ============================================================
+    html += '<div style="margin-top:14px;background:#1a1f2e;border:1px solid #4a5568;border-radius:8px;padding:14px">';
+    html += '<div style="font-weight:bold;color:#63b3ed;font-size:0.9rem;margin-bottom:8px">\uD83D\uDCD6 ' + (da ? 'Hvad g\u00F8r koden? (forklaring i klar tekst)' : 'What does the code do? (plain language explanation)') + '</div>';
+
+    if (st.motorSeq.type === 'star_delta') {
+      html += '<div style="color:#e2e8f0;font-size:0.8rem;line-height:1.7">';
+      html += '<div style="margin-bottom:4px"><span style="color:#48bb78;font-weight:bold">' + (da ? 'Linje 1-3:' : 'Lines 1-3:') + '</span> ' + (da ? 'N\u00E5r startknappen trykkes OG der ikke er fejl, starter sekvensen.' : 'When start button is pressed AND there is no fault, the sequence starts.') + '</div>';
+      html += '<div style="margin-bottom:4px"><span style="color:#48bb78;font-weight:bold">' + (da ? 'Linje 4-6:' : 'Lines 4-6:') + '</span> ' + (da ? 'Stjernekontaktor tilkobles - motoren starter med lav str\u00F8m (1/3 af fuld).' : 'Star contactor engages - motor starts with low current (1/3 of full).') + '</div>';
+      html += '<div style="margin-bottom:4px"><span style="color:#48bb78;font-weight:bold">' + (da ? 'Linje 7-9:' : 'Lines 7-9:') + '</span> ' + (da ? 'Timer t\u00E6ller 6 sekunder (omkoblingstid).' : 'Timer counts 6 seconds (changeover time).') + '</div>';
+      html += '<div style="margin-bottom:4px"><span style="color:#48bb78;font-weight:bold">' + (da ? 'Linje 10-12:' : 'Lines 10-12:') + '</span> ' + (da ? 'Stjerne frakobles, kort pause (50ms), trekantkontaktor tilkobles - fuld hastighed.' : 'Star disengages, brief pause (50ms), delta contactor engages - full speed.') + '</div>';
+      html += '<div style="margin-bottom:4px"><span style="color:#48bb78;font-weight:bold">' + (da ? 'Linje 13-15:' : 'Lines 13-15:') + '</span> ' + (da ? 'Overstr\u00F8msoverv\u00E5gning: hvis str\u00F8m > 120% i 5s, stop med fejl.' : 'Overcurrent monitoring: if current > 120% for 5s, stop with fault.') + '</div>';
+      html += '</div>';
+    } else if (st.motorSeq.type === 'cascade') {
+      html += '<div style="color:#e2e8f0;font-size:0.8rem;line-height:1.7">';
+      html += '<div style="margin-bottom:4px"><span style="color:#48bb78;font-weight:bold">' + (da ? 'Trin 1:' : 'Step 1:') + '</span> ' + (da ? 'Systemet venter p\u00E5 startkommando og kontrollerer at alle motorer er klar (ingen fejl).' : 'System waits for start command and checks all motors are ready (no faults).') + '</div>';
+      html += '<div style="margin-bottom:4px"><span style="color:#48bb78;font-weight:bold">' + (da ? 'Trin 2:' : 'Step 2:') + '</span> ' + (da ? 'Motor 1 starter. Vent 3 sekunder og bekr\u00E6ft at den k\u00F8rer.' : 'Motor 1 starts. Wait 3 seconds and confirm it is running.') + '</div>';
+      html += '<div style="margin-bottom:4px"><span style="color:#48bb78;font-weight:bold">' + (da ? 'Trin 3:' : 'Step 3:') + '</span> ' + (da ? 'Motor 2 starter, osv. Hver motor venter p\u00E5 den forrige er bekr\u00E6ftet.' : 'Motor 2 starts, etc. Each motor waits for the previous to confirm running.') + '</div>';
+      html += '<div style="margin-bottom:4px"><span style="color:#48bb78;font-weight:bold">' + (da ? 'Fejlh\u00E5ndtering:' : 'Fault handling:') + '</span> ' + (da ? 'Hvis en motor fejler, stoppes alle efterf\u00F8lgende (interlock-k\u00E6de).' : 'If one motor faults, all subsequent are stopped (interlock chain).') + '</div>';
+      html += '</div>';
+    } else {
+      html += '<div style="color:#e2e8f0;font-size:0.8rem;line-height:1.7">';
+      html += '<div style="margin-bottom:4px"><span style="color:#48bb78;font-weight:bold">' + (da ? 'Trin 1:' : 'Step 1:') + '</span> ' + (da ? 'N\u00E5r startknappen trykkes OG der ikke er aktiv fejl, s\u00E6ttes "Start"-kommandoen.' : 'When start button is pressed AND no active fault, the "Start" command is set.') + '</div>';
+      html += '<div style="margin-bottom:4px"><span style="color:#48bb78;font-weight:bold">' + (da ? 'Trin 2:' : 'Step 2:') + '</span> ' + (da ? 'PLC kontrollerer interlock-betingelser (f.eks. forrige motor k\u00F8rer, ventil er \u00E5ben).' : 'PLC checks interlock conditions (e.g. previous motor running, valve is open).') + '</div>';
+      html += '<div style="margin-bottom:4px"><span style="color:#48bb78;font-weight:bold">' + (da ? 'Trin 3:' : 'Step 3:') + '</span> ' + (da ? 'Hvis alle betingelser er opfyldt, aktiveres output (DO) til kontaktoren.' : 'If all conditions are met, the output (DO) to the contactor is activated.') + '</div>';
+      html += '<div style="margin-bottom:4px"><span style="color:#48bb78;font-weight:bold">' + (da ? 'Trin 4:' : 'Step 4:') + '</span> ' + (da ? 'PLC overv\u00E5ger feedback (DI) for at bekr\u00E6fte at motoren k\u00F8rer korrekt.' : 'PLC monitors feedback (DI) to confirm the motor is running correctly.') + '</div>';
+      html += '<div style="margin-bottom:4px"><span style="color:#48bb78;font-weight:bold">' + (da ? 'Fejlh\u00E5ndtering:' : 'Fault handling:') + '</span> ' + (da ? 'Ved fejl (overstr\u00F8m, manglende feedback) stoppes motoren og alarm genereres.' : 'On fault (overcurrent, missing feedback) the motor is stopped and alarm generated.') + '</div>';
+      html += '</div>';
+    }
+    html += '</div></div>';
 
     // C) BMS Points
     var bmsPoints = plcGenerateBMSPoints();
@@ -14129,6 +14490,177 @@ function renderPlc() {
 
     // Download BOM CSV
     html += '<div style="margin-top:12px"><button class="sel-btn" onclick="plcDownloadBOM()">\u2B07\uFE0F ' + (da ? 'Download BOM (.csv)' : 'Download BOM (.csv)') + '</button></div>';
+    html += '</div>';
+  }
+
+  // ============================================================
+  // PLC CONNECTION / COMMUNICATION - USB/Ethernet til PC/App
+  // ============================================================
+  html += '<div class="card fade-in"><div class="card-title">\uD83D\uDD0C ' + (da ? 'PLC-forbindelse (PC/App til anl\u00E6g)' : 'PLC Connection (PC/App to plant)') + '</div>';
+  html += '<div class="info-row">' + (da ? 'S\u00E5dan forbinder du din PC eller app til PLC-systemet for download/upload, fejls\u00F8gning og overv\u00E5gning.' : 'How to connect your PC or app to the PLC system for download/upload, troubleshooting and monitoring.') + '</div>';
+
+  // Connection methods based on platform
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:12px">';
+
+  // USB/Serial
+  html += '<div style="background:#1a1f2e;border:1px solid #48bb78;border-radius:8px;padding:12px;text-align:center">';
+  html += '<div style="font-size:1.4rem">\uD83D\uDD0C</div>';
+  html += '<div style="font-weight:bold;color:#48bb78;font-size:0.85rem;margin-top:4px">USB / Serial</div>';
+  html += '<div style="color:#a0aec0;font-size:0.72rem;margin-top:4px">' + (da ? 'Direkte kabel til programmering. Siemens: USB-MPI/DP adapter. AB: USB-serial 1761-CBL-PM02.' : 'Direct cable for programming. Siemens: USB-MPI/DP adapter. AB: USB-serial 1761-CBL-PM02.') + '</div>';
+  html += '<div style="color:#48bb78;font-size:0.68rem;margin-top:4px">' + (da ? 'Brug: Upload/download program' : 'Use: Upload/download program') + '</div>';
+  html += '</div>';
+
+  // Ethernet
+  html += '<div style="background:#1a1f2e;border:1px solid #63b3ed;border-radius:8px;padding:12px;text-align:center">';
+  html += '<div style="font-size:1.4rem">\uD83C\uDF10</div>';
+  html += '<div style="font-weight:bold;color:#63b3ed;font-size:0.85rem;margin-top:4px">Ethernet / PROFINET</div>';
+  html += '<div style="color:#a0aec0;font-size:0.72rem;margin-top:4px">' + (da ? 'Netv\u00E6rksforbindelse via RJ45. Hurtigste metode. Bruges ogs\u00E5 til HMI, SCADA og fjernadgang.' : 'Network connection via RJ45. Fastest method. Also used for HMI, SCADA and remote access.') + '</div>';
+  html += '<div style="color:#63b3ed;font-size:0.68rem;margin-top:4px">' + (da ? 'Brug: Online-overv\u00E5gning + fejls\u00F8gning' : 'Use: Online monitoring + troubleshooting') + '</div>';
+  html += '</div>';
+
+  // WiFi/Remote
+  html += '<div style="background:#1a1f2e;border:1px solid #d6bcfa;border-radius:8px;padding:12px;text-align:center">';
+  html += '<div style="font-size:1.4rem">\uD83D\uDCF6</div>';
+  html += '<div style="font-weight:bold;color:#d6bcfa;font-size:0.85rem;margin-top:4px">WiFi / VPN Remote</div>';
+  html += '<div style="color:#a0aec0;font-size:0.72rem;margin-top:4px">' + (da ? 'Tr\u00E5dl\u00F8s eller fjernadgang via VPN-router (f.eks. Siemens SINEMA RC, HMS Ewon). Overv\u00E5g fra kontoret.' : 'Wireless or remote access via VPN router (e.g. Siemens SINEMA RC, HMS Ewon). Monitor from the office.') + '</div>';
+  html += '<div style="color:#d6bcfa;font-size:0.68rem;margin-top:4px">' + (da ? 'Brug: Fjernovervagning + alarm' : 'Use: Remote monitoring + alarm') + '</div>';
+  html += '</div>';
+
+  // App/Cloud
+  html += '<div style="background:#1a1f2e;border:1px solid #f6ad55;border-radius:8px;padding:12px;text-align:center">';
+  html += '<div style="font-size:1.4rem">\uD83D\uDCF1</div>';
+  html += '<div style="font-weight:bold;color:#f6ad55;font-size:0.85rem;margin-top:4px">App / Cloud IoT</div>';
+  html += '<div style="color:#a0aec0;font-size:0.72rem;margin-top:4px">' + (da ? 'MindSphere, MindConnect, Proface Cloud. Data sendes til sky-platform med dashboard p\u00E5 telefon/tablet.' : 'MindSphere, MindConnect, Proface Cloud. Data sent to cloud platform with dashboard on phone/tablet.') + '</div>';
+  html += '<div style="color:#f6ad55;font-size:0.68rem;margin-top:4px">' + (da ? 'Brug: KPI-dashboard + vedligehold' : 'Use: KPI dashboard + maintenance') + '</div>';
+  html += '</div>';
+  html += '</div>';
+
+  // Platform-specific connection info
+  var connInfo = {
+    siemens: { cable: 'Ethernet RJ45 / USB-MPI adapter', software: 'TIA Portal V17+', port: 'X1 (PROFINET) / MPI', protocol: 'S7comm / PROFINET IO' },
+    ab: { cable: 'Ethernet RJ45 / USB-serial', software: 'Studio 5000 / RSLogix', port: 'Ethernet port / RS-232', protocol: 'EtherNet/IP / DF1' },
+    schneider: { cable: 'Ethernet RJ45 / USB Mini-B', software: 'EcoStruxure Control Expert', port: 'Ethernet / USB', protocol: 'Modbus TCP / SoMachine' },
+    abb: { cable: 'Ethernet RJ45 / Serial', software: 'Automation Builder', port: 'ETH1 / COM1', protocol: 'Modbus TCP / ABB Protocol' },
+    generic: { cable: 'Ethernet RJ45 / USB', software: 'CODESYS V3.5', port: 'ETH / USB', protocol: 'CODESYS Gateway / OPC UA' }
+  };
+  var ci = connInfo[st.platform] || connInfo.generic;
+  html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + (da ? 'Forbindelsesdata for ' : 'Connection data for ') + st.platform.charAt(0).toUpperCase() + st.platform.slice(1) + '</div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Kabel' : 'Cable') + '</span><span class="value">' + ci.cable + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Software' : 'Software') + '</span><span class="value">' + ci.software + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Port p\u00E5 PLC' : 'PLC port') + '</span><span class="value">' + ci.port + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Protokol' : 'Protocol') + '</span><span class="value">' + ci.protocol + '</span></div>';
+  html += '</div>';
+
+  // What can you do with the connection?
+  html += '<div style="margin-top:12px"><strong>' + (da ? 'Hvad kan du g\u00F8re med forbindelsen?' : 'What can you do with the connection?') + '</strong></div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:6px;margin-top:8px;font-size:0.78rem">';
+  var connTasks = da ? [
+    '\u2B07\uFE0F Download program til PLC',
+    '\u2B06\uFE0F Upload (backup) fra PLC',
+    '\uD83D\uDD0D Online fejls\u00F8gning (se variable live)',
+    '\uD83D\uDCCA L\u00E6s driftsdata og alarmer',
+    '\u23F1\uFE0F Opdater\u00E9r tidsplaner og setpunkter',
+    '\uD83D\uDCC8 Trend-logging af m\u00E5ledata',
+    '\u26A0\uFE0F Firmware-opdatering af moduler',
+    '\uD83D\uDCCB Eksport\u00E9r diagnostik-rapport'
+  ] : [
+    '\u2B07\uFE0F Download program to PLC',
+    '\u2B06\uFE0F Upload (backup) from PLC',
+    '\uD83D\uDD0D Online troubleshooting (live variables)',
+    '\uD83D\uDCCA Read operation data and alarms',
+    '\u23F1\uFE0F Update schedules and setpoints',
+    '\uD83D\uDCC8 Trend logging of measurements',
+    '\u26A0\uFE0F Firmware update of modules',
+    '\uD83D\uDCCB Export diagnostics report'
+  ];
+  connTasks.forEach(function(t) {
+    html += '<div style="background:#1a1f2e;border:1px solid #2d3748;border-radius:4px;padding:6px 8px;color:#e2e8f0">' + t + '</div>';
+  });
+  html += '</div>';
+
+  // Connection SVG diagram
+  html += '<div style="margin-top:14px;text-align:center">';
+  html += '<svg viewBox="0 0 550 130" style="width:100%;max-width:550px;height:auto">';
+  // PC/Laptop
+  html += '<rect x="10" y="35" width="90" height="60" rx="6" fill="#1a1f2e" stroke="#63b3ed" stroke-width="2"/>';
+  html += '<text x="55" y="58" text-anchor="middle" fill="#63b3ed" font-size="9" font-weight="bold">\uD83D\uDCBB PC/App</text>';
+  html += '<text x="55" y="72" text-anchor="middle" fill="#a0aec0" font-size="7">' + (ci.software.split(' ')[0]) + '</text>';
+  html += '<text x="55" y="84" text-anchor="middle" fill="#a0aec0" font-size="6">' + (da ? 'Programmering' : 'Programming') + '</text>';
+  // Connection cable
+  html += '<line x1="100" y1="65" x2="200" y2="65" stroke="#48bb78" stroke-width="2.5" stroke-dasharray="6,3"><animate attributeName="stroke-dashoffset" from="18" to="0" dur="1.5s" repeatCount="indefinite"/></line>';
+  html += '<text x="150" y="55" text-anchor="middle" fill="#48bb78" font-size="7">' + (da ? 'USB/Ethernet' : 'USB/Ethernet') + '</text>';
+  // Switch/Router
+  html += '<rect x="200" y="40" width="70" height="50" rx="4" fill="#1a1f2e" stroke="#f6ad55" stroke-width="1.5"/>';
+  html += '<text x="235" y="60" text-anchor="middle" fill="#f6ad55" font-size="7" font-weight="bold">Switch</text>';
+  html += '<text x="235" y="73" text-anchor="middle" fill="#a0aec0" font-size="6">' + (da ? 'Industriel' : 'Industrial') + '</text>';
+  html += '<text x="235" y="83" text-anchor="middle" fill="#a0aec0" font-size="6">Managed</text>';
+  // PLC
+  html += '<line x1="270" y1="65" x2="340" y2="65" stroke="#63b3ed" stroke-width="2" stroke-dasharray="5,2"><animate attributeName="stroke-dashoffset" from="14" to="0" dur="1.2s" repeatCount="indefinite"/></line>';
+  html += '<rect x="340" y="30" width="90" height="70" rx="6" fill="#1a1f2e" stroke="#63b3ed" stroke-width="2.5"/>';
+  html += '<text x="385" y="55" text-anchor="middle" fill="#63b3ed" font-size="10" font-weight="bold">\uD83E\uDDE0 PLC</text>';
+  html += '<text x="385" y="70" text-anchor="middle" fill="#a0aec0" font-size="7">' + st.platform.charAt(0).toUpperCase() + st.platform.slice(1) + '</text>';
+  html += '<text x="385" y="82" text-anchor="middle" fill="#a0aec0" font-size="6">' + ci.port.split(' ')[0] + '</text>';
+  // Cloud/Remote path
+  html += '<path d="M235,40 Q235,10 300,10 Q450,10 480,35" stroke="#d6bcfa" stroke-width="1" fill="none" stroke-dasharray="3,2"><animate attributeName="stroke-dashoffset" from="10" to="0" dur="2s" repeatCount="indefinite"/></path>';
+  html += '<rect x="460" y="25" width="70" height="40" rx="6" fill="#1a1f2e" stroke="#d6bcfa" stroke-width="1.5"/>';
+  html += '<text x="495" y="42" text-anchor="middle" fill="#d6bcfa" font-size="7">\u2601\uFE0F Cloud</text>';
+  html += '<text x="495" y="55" text-anchor="middle" fill="#a0aec0" font-size="6">VPN/IoT</text>';
+  // Phone
+  html += '<rect x="460" y="75" width="70" height="40" rx="6" fill="#1a1f2e" stroke="#f6ad55" stroke-width="1.5"/>';
+  html += '<text x="495" y="92" text-anchor="middle" fill="#f6ad55" font-size="7">\uD83D\uDCF1 App</text>';
+  html += '<text x="495" y="105" text-anchor="middle" fill="#a0aec0" font-size="6">Dashboard</text>';
+  html += '<line x1="495" y1="65" x2="495" y2="75" stroke="#d6bcfa" stroke-width="1" stroke-dasharray="2,2"/>';
+  html += '</svg>';
+  html += '</div></div>';
+
+  // ============================================================
+  // CUSTOMER SUMMARY CARD (print-friendly)
+  // ============================================================
+  if (loadList.length > 0) {
+    var csAutoCount = 0; var csTotalIO = 0; var csEstCost = 0;
+    loadList.forEach(function(c, idx) {
+      var a = (plcState.automation && plcState.automation[idx]) || { enabled: false };
+      if (a.enabled) csAutoCount++;
+    });
+    var csIO = plcGenerateIOList();
+    csTotalIO = csIO.rows.length;
+    var csBom = plcGenerateHardwareBOM();
+    csEstCost = csBom.totalPrice;
+    var csTotalKW = loadList.reduce(function(s, c) { return s + (c.kW || 0); }, 0);
+    var csEnergySave = Math.min(30, Math.max(10, Math.round(csAutoCount / loadList.length * 25)));
+
+    html += '<div class="card fade-in" style="border:2px solid #63b3ed;page-break-inside:avoid"><div class="card-title" style="font-size:1.1rem">\uD83D\uDCCB ' + (da ? 'Kundeopsummering - Dit automationssystem' : 'Customer Summary - Your Automation System') + '</div>';
+    html += '<div class="info-row" style="font-style:italic;color:#a0aec0">' + (da ? 'Denne sektion er beregnet til at inkludere i kundetilbud. Print-venlig.' : 'This section is designed to include in customer proposals. Print-friendly.') + '</div>';
+
+    // Main summary box
+    html += '<div class="result-box" style="margin-top:12px;border:1px solid #63b3ed"><div class="result-title" style="font-size:1rem">' + (da ? '\uD83C\uDFE2 Dit automationssystem' : '\uD83C\uDFE2 Your automation system') + '</div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Automatiserede forbrugere' : 'Automated consumers') + '</span><span class="value" style="font-size:1rem;color:#48bb78">' + csAutoCount + ' / ' + loadList.length + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Total I/O-punkter' : 'Total I/O points') + '</span><span class="value">' + csTotalIO + ' (' + (da ? 'signaler' : 'signals') + ')</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'PLC-platform' : 'PLC Platform') + '</span><span class="value">' + st.platform.charAt(0).toUpperCase() + st.platform.slice(1) + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'BMS-protokol' : 'BMS Protocol') + '</span><span class="value">' + st.protocol.toUpperCase().replace('_', ' ') + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Estimeret hardware-pris' : 'Estimated hardware cost') + '</span><span class="value" style="font-weight:bold">\u20AC ' + Math.round(csEstCost * 0.9) + ' - \u20AC ' + Math.round(csEstCost * 1.2) + '</span></div>';
+    html += '</div>';
+
+    // Benefits for customer
+    html += '<div class="result-box" style="margin-top:10px;border:1px solid #48bb78"><div class="result-title" style="color:#48bb78">' + (da ? '\u2705 Fordele ved dit system' : '\u2705 Benefits of your system') + '</div>';
+    html += '<div class="result-row"><span class="label">\uD83D\uDCB0 ' + (da ? 'Energibesparelse' : 'Energy savings') + '</span><span class="value" style="color:#48bb78">ca. ' + csEnergySave + '%</span></div>';
+    html += '<div class="result-row"><span class="label">\uD83D\uDCF1 ' + (da ? 'Fjernovervagning' : 'Remote monitoring') + '</span><span class="value">' + (da ? '24/7 fra telefon/tablet' : '24/7 from phone/tablet') + '</span></div>';
+    html += '<div class="result-row"><span class="label">\u26A0\uFE0F ' + (da ? 'Automatisk fejlmelding' : 'Automatic fault reporting') + '</span><span class="value">' + (da ? 'Instant SMS/email alarm' : 'Instant SMS/email alarm') + '</span></div>';
+    html += '<div class="result-row"><span class="label">\uD83D\uDCC5 ' + (da ? 'Planlagt vedligehold' : 'Scheduled maintenance') + '</span><span class="value">' + (da ? 'Forl\u00E6nger levetid op til 40%' : 'Extends lifetime up to 40%') + '</span></div>';
+    html += '<div class="result-row"><span class="label">\uD83D\uDCCB ' + (da ? 'Dokumentation' : 'Documentation') + '</span><span class="value">' + (da ? 'Automatisk driftslog' : 'Automatic operation log') + '</span></div>';
+    html += '</div>';
+
+    // System includes
+    html += '<div class="result-box" style="margin-top:10px"><div class="result-title">' + (da ? '\uD83D\uDCE6 Systemet inkluderer' : '\uD83D\uDCE6 System includes') + '</div>';
+    html += '<div class="result-row"><span class="label">PLC CPU + I/O</span><span class="value">' + csBom.totalModules + ' ' + (da ? 'moduler' : 'modules') + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'DIN-skinnebredde' : 'DIN rail width') + '</span><span class="value">' + csBom.dinWidth + ' mm</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Sk\u00E6rm/HMI' : 'Display/HMI') + '</span><span class="value">' + (da ? 'Inkluderet (webbaseret)' : 'Included (web-based)') + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Programmering + idrifts\u00E6tning' : 'Programming + commissioning') + '</span><span class="value">' + (da ? 'Inkluderet' : 'Included') + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Forbindelse til PC/App' : 'Connection to PC/App') + '</span><span class="value">' + ci.cable + '</span></div>';
+    html += '</div>';
+
+    // Print button
+    html += '<div style="margin-top:14px;text-align:center"><button class="sel-btn" onclick="window.print()" style="font-size:0.9rem;padding:10px 24px">\uD83D\uDDA8\uFE0F ' + (da ? 'Print kundeopsummering' : 'Print customer summary') + '</button></div>';
     html += '</div>';
   }
 
