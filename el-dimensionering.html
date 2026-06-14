@@ -10929,12 +10929,12 @@ function renderHarmonics() {
   html += '</div>'; // close results card
 
   // Visualization
-  html += buildHarmonicsViz(st, da, category, categoryColor, iNeutralPerCircuit, neutralRatio);
+  html += buildHarmonicsViz(st, da, category, categoryColor, iNeutralPerCircuit, neutralRatio, requiredNeutralCS);
 
   return html;
 }
 
-function buildHarmonicsViz(st, da, category, categoryColor, iNeutral, neutralRatio) {
+function buildHarmonicsViz(st, da, category, categoryColor, iNeutral, neutralRatio, requiredNeutralCS) {
   const W = 580, H = 380;
   const thd3Frac = st.thd3 / 100;
   let svg = '';
@@ -11479,7 +11479,7 @@ function renderGenerator() {
   }
 
   // === SVG VISUALIZATION ===
-  html += buildGenViz(da, recommendedKVA, inGen, ikGen, ikGrid, st, protectionWarning, totalRunningKW);
+  html += buildGenViz(da, recommendedKVA, inGen, ikGen, ikGrid, st, protectionWarning, totalRunningKW, curveDTrip, curveBTrip, curveCTrip, curveBOk, curveCOk, curveDOk);
 
   html += '</div>'; // close card
   return html;
@@ -11500,7 +11500,7 @@ function genToggleCustom(kw) {
 }
 
 // Generator SVG visualization
-function buildGenViz(da, genKVA, inGen, ikGen, ikGrid, st, warning, loadKW) {
+function buildGenViz(da, genKVA, inGen, ikGen, ikGrid, st, warning, loadKW, curveDTrip, curveBTrip, curveCTrip, curveBOk, curveCOk, curveDOk) {
   var w = 900, h = 500;
   var svg = '<div class="card fade-in" style="margin-top:16px"><div class="card-title">\uD83C\uDFA8 ' + (da ? 'Systemdiagram' : 'System Diagram') + '</div>';
   svg += '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;max-width:900px;height:auto;background:rgba(0,0,0,0.3);border-radius:12px">';
