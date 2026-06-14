@@ -5570,143 +5570,454 @@ function consumerIcon(c, x, y, scale){
 }
 
 function buildSLD(){
-  // Enhanced single-line diagram with IEC symbols, animated current flow, and professional aesthetics
-  let cons = loadList.length ? loadList.slice(0, 14) : [
-    {kW:11,cos:0.9,sf:1,phase:'3',name:'EV'},{kW:4,cos:0.9,sf:1,phase:'3',name:'Komfur'},
-    {kW:2,cos:0.95,sf:0.6,phase:'L1',name:'Stik'},{kW:1.5,cos:0.95,sf:1,phase:'L2',name:'Lys'}
+  // === PROFESSIONAL IEC 60617 SINGLE-LINE DIAGRAM ===
+  // Customer-demo and print quality. DS/HD 60364 compliance.
+  // Clickable, animated current flow, real project data on every element.
+
+  // --- DATA GATHERING ---
+  let cons = loadList.length ? loadList.slice(0, 16) : [
+    {kW:11,cos:0.9,sf:1,phase:'3',name:'EV Lader'},{kW:4,cos:0.9,sf:0.7,phase:'3',name:'Komfur'},
+    {kW:2.3,cos:0.95,sf:0.6,phase:'L1',name:'Stikkontakter'},{kW:1.5,cos:0.95,sf:1,phase:'L2',name:'Belysning'}
   ];
   const sch = calcLoadSchedule();
   const totalKVA = loadList.length ? sch.kVA : 18.5;
-  const ib = loadList.length ? sch.ib : 30;
-  const trafo = (typeof TRAFO_SIZES!=='undefined') ? (TRAFO_SIZES.find(t=>t>=totalKVA)||630) : 630;
-  const W = 780, rowH = 52, top = 185;
-  const H = top + cons.length*rowH + 60;
-  const busX = 230, mainW = 110;
+  const totalKW = loadList.length ? sch.kW : 14.5;
+  const ibMain = loadList.length ? sch.ib : 30;
+  const trafoSize = (typeof TRAFO_SIZES!=='undefined') ? (TRAFO_SIZES.find(t=>t>=totalKVA)||630) : 630;
+  const ukPercent = (typeof TRAFO_UK!=='undefined') ? (TRAFO_UK[trafoSize]||4) : 4;
+  const trafoIn = trafoSize*1000/(Math.sqrt(3)*400);
+  const ikBusbar = trafoIn/(ukPercent/100);
+  const qi = runQiValidation();
+  const allOk = qi.issues.length === 0;
+  const dateStr = new Date().toLocaleDateString(lang==='da'?'da-DK':'en-GB');
 
-  // Build gradient definitions and filters
-  let defs = `<defs>
-    <filter id="glSLD"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <filter id="glSLD2"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <filter id="dropSh"><feDropShadow dx="2" dy="3" stdDeviation="4" flood-color="rgba(0,0,0,0.5)"/></filter>
-    <linearGradient id="busGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#00ffc8"/><stop offset="100%" stop-color="#009f7d"/></linearGradient>
-    <linearGradient id="trafoGrad1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff9f6b"/><stop offset="100%" stop-color="#ff5c3a"/></linearGradient>
-    <linearGradient id="trafoGrad2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ffb347"/><stop offset="100%" stop-color="#ff8a5c"/></linearGradient>
-    <linearGradient id="motorGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#00e5ff"/><stop offset="100%" stop-color="#0080ff"/></linearGradient>
-    <linearGradient id="panelGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0e2235"/><stop offset="100%" stop-color="#0a1520"/></linearGradient>
-    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0d1f30"/><stop offset="30%" stop-color="#081422"/><stop offset="100%" stop-color="#040a12"/></linearGradient>
-    <radialGradient id="bgRadial" cx="15%" cy="10%"><stop offset="0%" stop-color="rgba(0,200,180,0.06)"/><stop offset="100%" stop-color="transparent"/></radialGradient>
-    <linearGradient id="rcdGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#a855f7"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient>
+  // Main protection device info
+  const mainProtRating = mcbState.rating || fuseState.size || mccbState.inVal || 0;
+  const mainProtName = mcbState.rating ? (mcbState.curve + mcbState.rating + 'A') :
+    (fuseState.size ? (fuseState.size+'A '+fuseState.holder) :
+    (mccbState.inVal ? ('MCCB '+mccbState.inVal+'A') : '--'));
+  const mainProtType = mcbState.rating ? 'MCB' : (fuseState.size ? 'Fuse' : (mccbState.inVal ? 'MCCB' : '--'));
+
+  // Cable data from state
+  const cMat = cableState.material;
+  const cType = cableState.type;
+  const cCS = cableState.crossSection;
+  const cLen = vdropState.length;
+  const izTable = izTableFor();
+  const baseIz = izTable[parseFloat(cCS)] || 0;
+  const kInst = INSTALL_METHODS[cableState.installMethod] || 1;
+  const kTemp = TEMP_FACTORS[cableState.temp] || 1;
+  const kGrp = GROUP_FACTORS[cableState.grouping] || 1;
+  const corrIz = baseIz * kInst * kTemp * kGrp;
+
+  // Voltage drop calculation
+  const cables3 = cMat==='copper' ? CABLES_COPPER : CABLES_ALU;
+  const ct3 = cables3[cType];
+  const cc3 = ct3 && ct3[cableState.cores] ? ct3[cableState.cores] : {};
+  const sc3 = cc3[cCS];
+  const Un = loadState.voltage==='3x400' ? 400 : 230;
+  let vdPercent = 0;
+  if(sc3 && cLen){
+    const L = cLen/1000;
+    const cosP = loadState.cosPhi;
+    const sinP = Math.sin(Math.acos(cosP));
+    const ib = calcIB();
+    const vd = loadState.voltage==='3x400' ?
+      Math.sqrt(3)*ib*L*(sc3.r*cosP+sc3.x*sinP) :
+      2*ib*L*(sc3.r*cosP+sc3.x*sinP);
+    vdPercent = (vd/Un)*100;
+  }
+
+  // Phase data
+  const phL1 = sch.ph ? sch.ph.L1 : 0;
+  const phL2 = sch.ph ? sch.ph.L2 : 0;
+  const phL3 = sch.ph ? sch.ph.L3 : 0;
+
+  // --- LAYOUT DIMENSIONS ---
+  const W = 960;
+  const rowH = 62;
+  const headerY = 0;
+  const headerH = 55;
+  const trafoTopY = headerH + 15;
+  const mainBreakerY = trafoTopY + 130;
+  const panelY = mainBreakerY + 70;
+  const busStartY = panelY + 30;
+  const firstRowY = busStartY + 30;
+  const busEndY = firstRowY + cons.length * rowH + 15;
+  const legendH = 80;
+  const titleBlockH = 70;
+  const H = busEndY + legendH + titleBlockH + 30;
+  const busX = 160;
+  const cableEndX = W - 200;
+
+  // --- SVG DEFS (filters, gradients, patterns, animations) ---
+  let svg = `<defs>
+    <style>
+      @media print {
+        .sld-anim-particle { display: none !important; }
+        .sld-glow { display: none !important; }
+        .sld-screen-only { display: none !important; }
+        text { fill: #000 !important; }
+        line, path, rect, circle { stroke: #000 !important; }
+        .sld-print-bg { fill: #fff !important; }
+      }
+      .sld-clickable { cursor: pointer; }
+      .sld-clickable:hover { filter: brightness(1.3); }
+    </style>
+    <filter id="sldGlow"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="sldShadow"><feDropShadow dx="1" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.4)"/></filter>
+    <filter id="sldSoftGlow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="sldBg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0c1a2e"/><stop offset="100%" stop-color="#06101c"/></linearGradient>
+    <linearGradient id="sldBusGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#00e6b0"/><stop offset="100%" stop-color="#008866"/></linearGradient>
+    <linearGradient id="sldTrafoHV" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff7043"/><stop offset="100%" stop-color="#d84315"/></linearGradient>
+    <linearGradient id="sldTrafoLV" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ffab40"/><stop offset="100%" stop-color="#ff6f00"/></linearGradient>
+    <linearGradient id="sldVdGreen" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#00c853"/><stop offset="100%" stop-color="#69f0ae"/></linearGradient>
+    <linearGradient id="sldVdAmber" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ff8f00"/><stop offset="100%" stop-color="#ffc107"/></linearGradient>
+    <linearGradient id="sldVdRed" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#d50000"/><stop offset="100%" stop-color="#ff5252"/></linearGradient>
+    <marker id="sldArrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#00e6b0" opacity="0.8"/></marker>
+    <marker id="sldArrowBrown" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#8B4513"/></marker>
+    <marker id="sldArrowBlack" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#333"/></marker>
+    <marker id="sldArrowGrey" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#888"/></marker>
   </defs>`;
 
-  // Build consumer rows with animated current flow
+  // --- BACKGROUND ---
+  svg += `<rect class="sld-print-bg" width="${W}" height="${H}" fill="url(#sldBg)" rx="10"/>`;
+  // Subtle grid (screen only)
+  svg += `<g class="sld-screen-only" opacity="0.03">`;
+  for(let gy=0; gy<H; gy+=40) svg += `<line x1="0" y1="${gy}" x2="${W}" y2="${gy}" stroke="#00e6b0" stroke-width="0.5"/>`;
+  for(let gx=0; gx<W; gx+=40) svg += `<line x1="${gx}" y1="0" x2="${gx}" y2="${H}" stroke="#00e6b0" stroke-width="0.5"/>`;
+  svg += `</g>`;
+
+  // --- HEADER with QI SCORE ---
+  svg += `<rect x="0" y="0" width="${W}" height="${headerH}" fill="rgba(0,20,40,0.95)" rx="10"/>`;
+  svg += `<line x1="0" y1="${headerH}" x2="${W}" y2="${headerH}" stroke="#00e6b0" stroke-width="1.5" opacity="0.4"/>`;
+  svg += `<text x="20" y="22" font-size="14" fill="#00e6b0" font-weight="800" font-family="monospace" letter-spacing="1">${lang==='da'?'ENSTREGSDIAGRAM':'SINGLE-LINE DIAGRAM'}</text>`;
+  svg += `<text x="20" y="42" font-size="10" fill="#6a9bb8">IEC 60617 / DS/HD 60364 | ${lang==='da'?'Automatisk genereret':'Auto-generated'} ${dateStr}</text>`;
+
+  // QI Badge
+  const qiX = W - 200;
+  svg += `<rect x="${qiX}" y="10" width="180" height="35" rx="6" fill="${allOk?'rgba(0,200,100,0.1)':'rgba(255,50,50,0.1)'}" stroke="${allOk?'#00c853':'#ff5252'}" stroke-width="1.5"/>`;
+  svg += `<text x="${qiX+12}" y="24" font-size="9" fill="${allOk?'#69f0ae':'#ff8a80'}" font-weight="700">QI SCORE</text>`;
+  svg += `<text x="${qiX+90}" y="24" font-size="10" fill="${allOk?'#00e676':'#ff5252'}" font-weight="800">${qi.score||100}%</text>`;
+  if(allOk){
+    svg += `<text x="${qiX+12}" y="39" font-size="8" fill="#69f0ae" font-weight="700">${lang==='da'?'DIMENSIONERET':'SIZED'} ${dateStr}</text>`;
+    svg += `<rect x="${qiX+140}" y="14" width="28" height="28" rx="4" fill="rgba(0,200,100,0.2)" stroke="#00c853" stroke-width="1"/>`;
+    svg += `<text x="${qiX+154}" y="34" text-anchor="middle" font-size="16" fill="#00e676">&#10003;</text>`;
+  } else {
+    svg += `<text x="${qiX+12}" y="39" font-size="8" fill="#ff8a80" font-weight="600">${qi.issues.length} ${lang==='da'?'problemer':'issues'}</text>`;
+    svg += `<rect x="${qiX+140}" y="14" width="28" height="28" rx="4" fill="rgba(255,50,50,0.2)" stroke="#ff5252" stroke-width="1"/>`;
+    svg += `<text x="${qiX+154}" y="34" text-anchor="middle" font-size="14" fill="#ff5252">&#9888;</text>`;
+  }
+
+  // --- TRANSFORMER (IEC 60617: two tangent circles with winding dots) ---
+  const tCx = busX;
+  const tCy = trafoTopY + 50;
+  svg += `<g class="sld-clickable" onclick="switchModule('trafo')">`;
+  // HV winding circle (top)
+  svg += `<circle cx="${tCx}" cy="${tCy-18}" r="22" fill="none" stroke="#ff7043" stroke-width="2.5"/>`;
+  // LV winding circle (bottom, tangent)
+  svg += `<circle cx="${tCx}" cy="${tCy+18}" r="22" fill="none" stroke="#ffab40" stroke-width="2.5"/>`;
+  // Winding polarity dots (IEC standard)
+  svg += `<circle cx="${tCx-8}" cy="${tCy-30}" r="2.5" fill="#ff7043"/>`;
+  svg += `<circle cx="${tCx-8}" cy="${tCy+6}" r="2.5" fill="#ffab40"/>`;
+  // Delta/Star symbols
+  svg += `<text x="${tCx+28}" y="${tCy-15}" font-size="11" fill="#ff7043" font-weight="700">Dyn11</text>`;
+  svg += `<text x="${tCx+28}" y="${tCy+24}" font-size="10" fill="#ffab40" font-weight="600">10/0,4 kV</text>`;
+  // Data labels
+  svg += `<text x="${tCx-50}" y="${tCy-35}" font-size="9" fill="#b0bec5" text-anchor="end">uk = ${ukPercent}%</text>`;
+  svg += `<text x="${tCx-50}" y="${tCy-22}" font-size="10" fill="#ffab40" font-weight="700" text-anchor="end">${trafoSize} kVA</text>`;
+  svg += `<text x="${tCx-50}" y="${tCy-9}" font-size="9" fill="#b0bec5" text-anchor="end">In = ${trafoIn.toFixed(1)} A</text>`;
+  svg += `<text x="${tCx-50}" y="${tCy+5}" font-size="9" fill="#b0bec5" text-anchor="end">Ik = ${ikBusbar.toFixed(0)} A</text>`;
+  svg += `</g>`;
+
+  // Supply line from transformer to main breaker
+  const supplyLineStartY = tCy + 40;
+  svg += `<line x1="${tCx}" y1="${supplyLineStartY}" x2="${tCx}" y2="${mainBreakerY-20}" stroke="#ffab40" stroke-width="2.5" stroke-linecap="round"/>`;
+  // Animated current particles on supply (screen only)
+  svg += `<g class="sld-screen-only sld-anim-particle">`;
+  for(let p=0; p<4; p++){
+    const dur = (1.5).toFixed(1);
+    const del = (p*0.35).toFixed(2);
+    svg += `<circle r="3" fill="#ffab40" opacity="0">
+      <animate attributeName="cy" values="${supplyLineStartY};${mainBreakerY-20}" dur="${dur}s" repeatCount="indefinite" begin="${del}s"/>
+      <animate attributeName="cx" values="${tCx};${tCx}" dur="${dur}s" repeatCount="indefinite" begin="${del}s"/>
+      <animate attributeName="opacity" values="0;0.9;0.9;0" dur="${dur}s" repeatCount="indefinite" begin="${del}s"/>
+    </circle>`;
+  }
+  svg += `</g>`;
+
+  // --- MAIN BREAKER (IEC 60617: circuit breaker symbol) ---
+  const mbY = mainBreakerY;
+  svg += `<g class="sld-clickable" onclick="switchModule('mcb')">`;
+  // IEC circuit breaker: two contacts with angled disconnect line and box
+  svg += `<rect x="${tCx-25}" y="${mbY-18}" width="50" height="36" rx="4" fill="rgba(10,20,35,0.9)" stroke="#26c6da" stroke-width="1.5"/>`;
+  // Fixed contact (bottom)
+  svg += `<circle cx="${tCx}" cy="${mbY+10}" r="3" fill="none" stroke="#26c6da" stroke-width="2"/>`;
+  // Moving contact (angled line to top)
+  svg += `<line x1="${tCx}" y1="${mbY+7}" x2="${tCx+8}" y2="${mbY-8}" stroke="#26c6da" stroke-width="2.5" stroke-linecap="round"/>`;
+  // Fixed contact (top)
+  svg += `<circle cx="${tCx}" cy="${mbY-10}" r="3" fill="none" stroke="#26c6da" stroke-width="2"/>`;
+  // Trip mechanism symbol (X)
+  svg += `<line x1="${tCx+14}" y1="${mbY-5}" x2="${tCx+20}" y2="${mbY+5}" stroke="#26c6da" stroke-width="1.2"/>`;
+  svg += `<line x1="${tCx+20}" y1="${mbY-5}" x2="${tCx+14}" y2="${mbY+5}" stroke="#26c6da" stroke-width="1.2"/>`;
+  // Rating label
+  svg += `<text x="${tCx+30}" y="${mbY-5}" font-size="10" fill="#80deea" font-weight="700">${mainProtName}</text>`;
+  svg += `<text x="${tCx+30}" y="${mbY+9}" font-size="9" fill="#546e7a">${mainProtType} | Icu=${ikBusbar.toFixed(0)}A</text>`;
+  // Vertical lines connecting to breaker
+  svg += `<line x1="${tCx}" y1="${mbY-18}" x2="${tCx}" y2="${mbY-20}" stroke="#26c6da" stroke-width="2"/>`;
+  svg += `<line x1="${tCx}" y1="${mbY+18}" x2="${tCx}" y2="${mbY+30}" stroke="#26c6da" stroke-width="2"/>`;
+  svg += `</g>`;
+
+  // Connect main breaker to busbar
+  svg += `<line x1="${tCx}" y1="${mbY+30}" x2="${tCx}" y2="${panelY}" stroke="#00e6b0" stroke-width="2.5"/>`;
+
+  // --- MAIN PANEL / BUSBAR LABEL ---
+  svg += `<g class="sld-clickable" onclick="switchModule('load')">`;
+  svg += `<rect x="${tCx-60}" y="${panelY-12}" width="120" height="24" rx="5" fill="rgba(0,230,176,0.08)" stroke="#00e6b0" stroke-width="1.5"/>`;
+  svg += `<text x="${tCx}" y="${panelY+5}" text-anchor="middle" font-size="11" fill="#00e6b0" font-weight="800">${lang==='da'?'HOVEDTAVLE':'MAIN PANEL'}</text>`;
+  svg += `</g>`;
+
+  // --- VERTICAL BUSBAR ---
+  svg += `<line x1="${busX}" y1="${busStartY}" x2="${busX}" y2="${busEndY}" stroke="#003d33" stroke-width="8" stroke-linecap="round"/>`;
+  svg += `<line x1="${busX}" y1="${busStartY}" x2="${busX}" y2="${busEndY}" stroke="url(#sldBusGrad)" stroke-width="4" stroke-linecap="round"/>`;
+  // Animated busbar glow (screen only)
+  svg += `<line class="sld-screen-only sld-glow" x1="${busX}" y1="${busStartY}" x2="${busX}" y2="${busEndY}" stroke="#00e6b0" stroke-width="2" stroke-dasharray="12 8" opacity="0.5"><animate attributeName="stroke-dashoffset" values="0;-40" dur="2s" repeatCount="indefinite"/></line>`;
+  // Busbar label
+  svg += `<text x="${busX}" y="${busStartY-8}" text-anchor="middle" font-size="8" fill="#4db6ac">IB = ${ibMain.toFixed(1)} A</text>`;
+
+  // --- BRANCH CIRCUIT ROWS ---
   let rows = '';
-  cons.forEach((c,i)=>{
-    const y = top + i*rowH + 26;
+  cons.forEach((c, i) => {
+    const y = firstRowY + i * rowH + rowH/2;
     const ci = (typeof lsConsumerCurrent==='function') ? lsConsumerCurrent(c) : {L1:0,L2:0,L3:0};
-    const cIb = Math.max(ci.L1||0, ci.L2||0, ci.L3||0) || (c.kW*1000/( (c.phase==='3'?Math.sqrt(3)*400:230)*c.cos));
+    const cIb = Math.max(ci.L1||0, ci.L2||0, ci.L3||0) || (c.kW*1000/((c.phase==='3'?Math.sqrt(3)*400:230)*c.cos));
     const cab = (typeof recommendCables==='function') ? recommendCables(cIb)[0] : null;
-    const mcb = (typeof recommendMCBs==='function') ? recommendMCBs(cIb,10)[0] : null;
-    const cableLbl = cab ? (cab.mm2+' mm\u00B2') : '';
-    const mcbLbl = mcb ? ('C'+mcb.rating) : '';
-    const delay = (i*0.15).toFixed(2);
-    const hue = i * 25;
+    const mcb = (typeof recommendMCBs==='function') ? recommendMCBs(cIb, 10)[0] : null;
+    const cabMm2 = cab ? cab.mm2 : (cCS || '?');
+    const cabType = cab ? (cab.type||cType) : cType;
+    const mcbRating = mcb ? mcb.rating : 0;
+    const mcbCurve = mcb ? 'C' : mcbState.curve;
+    const mcbLabel = mcb ? (mcbCurve + mcb.rating) : (mcbState.rating ? (mcbState.curve+mcbState.rating) : '--');
 
-    // Animated current-carrying line with direction arrows
-    rows += `
-      <!-- Row ${i} cable with animated current -->
-      <line x1="${busX}" y1="${y}" x2="${busX+25}" y2="${y}" stroke="rgba(0,255,200,0.5)" stroke-width="2"/>
-      <line x1="${busX+85}" y1="${y}" x2="${W-180}" y2="${y}" stroke="#1a3a50" stroke-width="2.5" stroke-linecap="round"/>
-      <line x1="${busX+85}" y1="${y}" x2="${W-180}" y2="${y}" stroke="rgba(0,208,255,0.6)" stroke-width="2" stroke-linecap="round" class="sld-current-line" style="animation-delay:${delay}s"/>
-      <!-- Current direction arrow -->
-      <polygon points="${busX+160},${y-4} ${busX+172},${y} ${busX+160},${y+4}" fill="#00d0ff" opacity="0.8" class="sld-glow-pulse" style="animation-delay:${delay}s"/>
-      <polygon points="${busX+220},${y-4} ${busX+232},${y} ${busX+220},${y+4}" fill="#00d0ff" opacity="0.5" class="sld-glow-pulse" style="animation-delay:${(parseFloat(delay)+0.3).toFixed(2)}s"/>
+    // Calculate per-branch Iz
+    const brIzBase = izTable[parseFloat(cabMm2)] || corrIz;
+    const brIz = brIzBase * kInst * kTemp * kGrp;
+    const brIn = mcbRating || mainProtRating;
 
-      <!-- MCB Symbol (IEC: angled line through contacts) -->
-      <g filter="url(#glSLD)">
-        <rect x="${busX+28}" y="${y-14}" width="54" height="28" rx="6" fill="url(#panelGrad)" stroke="#00b8d4" stroke-width="1.5"/>
-        <line x1="${busX+38}" y1="${y+6}" x2="${busX+50}" y2="${y-6}" stroke="#00e5ff" stroke-width="2.5" stroke-linecap="round"/>
-        <circle cx="${busX+38}" cy="${y+6}" r="2.5" fill="#00e5ff"/>
-        <circle cx="${busX+50}" cy="${y-6}" r="2.5" fill="#00e5ff"/>
-        <text x="${busX+66}" y="${y+4}" text-anchor="middle" font-size="9" fill="#9fe6ff" font-weight="700">${mcbLbl}</text>
-      </g>
+    // Per-branch voltage drop estimate (simplified)
+    const brVd = cLen > 0 && sc3 ? vdPercent * (cIb / Math.max(ibMain, 1)) : 0;
+    const vdColor = brVd <= 3 ? '#00c853' : (brVd <= 4 ? '#ff8f00' : '#ff1744');
+    const vdGrad = brVd <= 3 ? 'url(#sldVdGreen)' : (brVd <= 4 ? 'url(#sldVdAmber)' : 'url(#sldVdRed)');
 
-      <!-- Cable specification label -->
-      <text x="${busX+100}" y="${y-14}" font-size="10" fill="#5d9ab8" font-weight="500">${cableLbl}</text>
-      <text x="${busX+160}" y="${y-14}" font-size="9.5" fill="#4a8099">${c.phase==='3'?'3~+N+PE':c.phase+'+N+PE'}</text>
-      <text x="${busX+240}" y="${y-14}" font-size="9.5" fill="#4a8099">${cIb.toFixed(1)} A</text>
+    // Status checks for this branch
+    const ibOk = cIb <= brIn;
+    const inOk = brIn <= brIz;
+    const vdOk = brVd <= 4;
+    const branchOk = ibOk && inOk && vdOk;
 
-      <!-- Consumer icon -->
-      ${consumerIcon(c, W-160, y, 1)}
-      <text x="${W-130}" y="${y+4}" font-size="11" fill="#d4eaf5" font-weight="600">${c.name? c.name : ('K'+(i+1))}</text>
-      <text x="${W-130}" y="${y+17}" font-size="9" fill="#6a9bb5">${c.kW} kW</text>`;
+    // Phase colors (IEC: L1=brown, L2=black, L3=grey)
+    const phaseCol = c.phase==='3' ? '#00e6b0' : (c.phase==='L1' ? '#8B4513' : (c.phase==='L2' ? '#444' : '#888'));
+    const phaseLabel = c.phase==='3' ? '3L+N+PE' : c.phase+'+N+PE';
+
+    // Branch row layout positions
+    const mcbX = busX + 30;
+    const cableStartX = busX + 95;
+    const cableLineEndX = cableEndX - 40;
+    const consumerX = cableEndX;
+    const animDelay = (i * 0.2).toFixed(2);
+
+    // --- Busbar tap ---
+    rows += `<line x1="${busX}" y1="${y}" x2="${mcbX-5}" y2="${y}" stroke="#00e6b0" stroke-width="2.5"/>`;
+    // Tap dot
+    rows += `<circle cx="${busX}" cy="${y}" r="3.5" fill="#00e6b0"/>`;
+
+    // --- MCB SYMBOL (IEC 60617: angled contact + thermal trip) ---
+    rows += `<g class="sld-clickable" onclick="switchModule('mcb')">`;
+    rows += `<rect x="${mcbX-5}" y="${y-15}" width="60" height="30" rx="4" fill="rgba(8,18,30,0.95)" stroke="${branchOk?'#26c6da':'#ff5252'}" stroke-width="1.2"/>`;
+    // Fixed contact
+    rows += `<circle cx="${mcbX+5}" cy="${y+6}" r="2.5" fill="none" stroke="#26c6da" stroke-width="1.8"/>`;
+    // Moving contact (angled)
+    rows += `<line x1="${mcbX+5}" y1="${y+3}" x2="${mcbX+13}" y2="${y-7}" stroke="#26c6da" stroke-width="2" stroke-linecap="round"/>`;
+    // Fixed contact (top)
+    rows += `<circle cx="${mcbX+5}" cy="${y-9}" r="2.5" fill="none" stroke="#26c6da" stroke-width="1.8"/>`;
+    // Thermal trip symbol
+    rows += `<path d="M${mcbX+18},${y-4} Q${mcbX+21},${y} ${mcbX+18},${y+4}" fill="none" stroke="#26c6da" stroke-width="1.2"/>`;
+    // Rating text
+    rows += `<text x="${mcbX+28}" y="${y-3}" font-size="9" fill="#80deea" font-weight="700">${mcbLabel}</text>`;
+    rows += `<text x="${mcbX+28}" y="${y+9}" font-size="7.5" fill="#546e7a">${brIn}A</text>`;
+    rows += `</g>`;
+
+    // --- CABLE LINE (with phase color bands) ---
+    rows += `<g class="sld-clickable" onclick="switchModule('cable')">`;
+    // Main cable line
+    rows += `<line x1="${cableStartX}" y1="${y}" x2="${cableLineEndX}" y2="${y}" stroke="#1a3a50" stroke-width="3" stroke-linecap="round"/>`;
+    // Phase color band at start
+    if(c.phase==='3'){
+      rows += `<rect x="${cableStartX}" y="${y-4}" width="4" height="2.5" fill="#8B4513" rx="1"/>`;
+      rows += `<rect x="${cableStartX}" y="${y-1}" width="4" height="2.5" fill="#333" rx="1"/>`;
+      rows += `<rect x="${cableStartX}" y="${y+2}" width="4" height="2.5" fill="#888" rx="1"/>`;
+    } else {
+      rows += `<rect x="${cableStartX}" y="${y-2}" width="4" height="4" fill="${phaseCol}" rx="1"/>`;
+    }
+    // Cable specification text (above the line)
+    rows += `<text x="${cableStartX+20}" y="${y-10}" font-size="8.5" fill="#78909c" font-weight="600">${cabType} ${cabMm2}mm\u00B2 / ${cLen||'--'}m</text>`;
+    rows += `<text x="${cableStartX+20}" y="${y+18}" font-size="7.5" fill="#546e7a">${phaseLabel} | IB=${cIb.toFixed(1)}A | Iz=${brIz.toFixed(0)}A</text>`;
+    rows += `</g>`;
+
+    // --- VOLTAGE DROP INDICATOR BAR ---
+    const vdBarX = cableStartX + 180;
+    const vdBarW = 60;
+    rows += `<g class="sld-clickable" onclick="switchModule('vdrop')">`;
+    rows += `<rect x="${vdBarX}" y="${y-18}" width="${vdBarW}" height="5" rx="2.5" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>`;
+    rows += `<rect x="${vdBarX}" y="${y-18}" width="${Math.min(vdBarW, vdBarW*(brVd/5))}" height="5" rx="2.5" fill="${vdGrad}"/>`;
+    rows += `<text x="${vdBarX+vdBarW+5}" y="${y-14}" font-size="7.5" fill="${vdColor}" font-weight="700">${brVd.toFixed(1)}%</text>`;
+    rows += `</g>`;
+
+    // --- SHORT CIRCUIT CURRENT at branch ---
+    const brIk = ikBusbar * 0.8; // Simplified: reduced by cable impedance
+    rows += `<text x="${cableLineEndX-60}" y="${y-10}" font-size="7" fill="#78909c">Ik=${brIk.toFixed(0)}A</text>`;
+
+    // --- ANIMATED CURRENT FLOW PARTICLES (screen only, speed proportional to current) ---
+    const particleDur = Math.max(1, 4 - cIb/15).toFixed(1);
+    rows += `<g class="sld-screen-only sld-anim-particle">`;
+    const numParticles = Math.min(6, Math.max(2, Math.round(cIb/8)));
+    for(let p=0; p<numParticles; p++){
+      const pDel = (p * parseFloat(particleDur) / numParticles).toFixed(2);
+      const pCol = c.phase==='3' ? '#00e6b0' : phaseCol;
+      rows += `<circle r="2.5" fill="${pCol}" opacity="0">
+        <animate attributeName="cx" values="${cableStartX};${cableLineEndX}" dur="${particleDur}s" repeatCount="indefinite" begin="${pDel}s"/>
+        <animate attributeName="cy" values="${y};${y}" dur="${particleDur}s" repeatCount="indefinite" begin="${pDel}s"/>
+        <animate attributeName="opacity" values="0;0.8;0.8;0" dur="${particleDur}s" repeatCount="indefinite" begin="${pDel}s"/>
+      </circle>`;
+    }
+    rows += `</g>`;
+    // Direction arrow
+    rows += `<polygon points="${cableStartX+100},${y-3} ${cableStartX+107},${y} ${cableStartX+100},${y+3}" fill="${phaseCol}" opacity="0.6"/>`;
+
+    // --- RCD per branch (if applicable - show for socket circuits) ---
+    const nm = (c.name||'').toLowerCase();
+    const needsRCD = nm.includes('stik') || nm.includes('socket') || nm.includes('ev') || nm.includes('bad') || nm.includes('bath');
+    if(needsRCD){
+      const rcdX = cableStartX + 140;
+      rows += `<rect x="${rcdX}" y="${y-9}" width="22" height="18" rx="3" fill="rgba(120,60,200,0.1)" stroke="#9c27b0" stroke-width="1.2"/>`;
+      rows += `<text x="${rcdX+11}" y="${y+4}" text-anchor="middle" font-size="6.5" fill="#ce93d8" font-weight="700">RCD</text>`;
+      rows += `<text x="${rcdX+11}" y="${y+16}" text-anchor="middle" font-size="6" fill="#7b1fa2">30mA</text>`;
+    }
+
+    // --- CONSUMER ICON (IEC symbols) ---
+    rows += `<g class="sld-clickable" onclick="switchModule('load')">`;
+    rows += consumerIcon(c, consumerX, y, 0.9);
+    rows += `<text x="${consumerX+25}" y="${y-4}" font-size="10" fill="#e0f2f1" font-weight="700">${c.name||('K'+(i+1))}</text>`;
+    rows += `<text x="${consumerX+25}" y="${y+10}" font-size="8.5" fill="#78909c">${c.kW} kW | cos\u03C6=${c.cos}</text>`;
+    rows += `</g>`;
+
+    // --- STATUS INDICATOR (checkmark or warning) ---
+    const statusX = W - 35;
+    if(branchOk){
+      rows += `<circle cx="${statusX}" cy="${y}" r="9" fill="rgba(0,200,83,0.15)" stroke="#00c853" stroke-width="1.5"/>`;
+      rows += `<text x="${statusX}" y="${y+4}" text-anchor="middle" font-size="11" fill="#00e676">&#10003;</text>`;
+    } else {
+      rows += `<circle cx="${statusX}" cy="${y}" r="9" fill="rgba(255,23,68,0.15)" stroke="#ff1744" stroke-width="1.5"/>`;
+      rows += `<text x="${statusX}" y="${y+4}" text-anchor="middle" font-size="10" fill="#ff5252">&#9888;</text>`;
+    }
+
+    // --- DS/HD 60364 COMPLIANCE BADGE ---
+    rows += `<text x="${statusX}" y="${y+18}" text-anchor="middle" font-size="5.5" fill="${branchOk?'#4db6ac':'#ef9a9a'}">${branchOk?'HD60364':'CHECK'}</text>`;
   });
 
-  // Main diagram
-  return `
-  <svg viewBox="0 0 ${W} ${H}" width="100%" style="border-radius:14px;border:1px solid rgba(0,200,180,0.15);overflow:visible" xmlns="http://www.w3.org/2000/svg">
-    ${defs}
-    <!-- Background -->
-    <rect width="${W}" height="${H}" fill="url(#bgGrad)" rx="14"/>
-    <rect width="${W}" height="${H}" fill="url(#bgRadial)" rx="14"/>
-    <!-- Subtle grid pattern -->
-    <g opacity="0.04">
-      ${Array.from({length:Math.floor(H/30)},(_,i)=>`<line x1="0" y1="${i*30}" x2="${W}" y2="${i*30}" stroke="#00ffc8" stroke-width="0.5"/>`).join('')}
-      ${Array.from({length:Math.floor(W/30)},(_,i)=>`<line x1="${i*30}" y1="0" x2="${i*30}" y2="${H}" stroke="#00ffc8" stroke-width="0.5"/>`).join('')}
-    </g>
+  // --- LEGEND ---
+  const legY = busEndY + 20;
+  svg += `<rect x="15" y="${legY}" width="${W-30}" height="${legendH-5}" rx="6" fill="rgba(0,15,30,0.9)" stroke="rgba(0,230,176,0.15)" stroke-width="1"/>`;
+  svg += `<text x="30" y="${legY+16}" font-size="9" fill="#4db6ac" font-weight="700">${lang==='da'?'SYMBOLFORKLARING':'LEGEND'} (IEC 60617)</text>`;
+  // Legend items
+  const legItems = [
+    {x:30, sym:'cb', label:lang==='da'?'Automatsikring (MCB)':'Circuit breaker (MCB)'},
+    {x:200, sym:'trafo', label:lang==='da'?'Transformer':'Transformer'},
+    {x:370, sym:'rcd', label:lang==='da'?'Fejlstrømsrelæ (RCD)':'RCD'},
+    {x:530, sym:'motor', label:lang==='da'?'Motor/Forbruger':'Motor/Consumer'},
+    {x:700, sym:'cable', label:lang==='da'?'Kabel (fasefarver)':'Cable (phase colors)'}
+  ];
+  legItems.forEach(item => {
+    const ly = legY + 38;
+    if(item.sym === 'cb'){
+      svg += `<circle cx="${item.x+5}" cy="${ly}" r="2" fill="none" stroke="#26c6da" stroke-width="1.5"/>`;
+      svg += `<line x1="${item.x+5}" y1="${ly+2}" x2="${item.x+10}" y2="${ly-5}" stroke="#26c6da" stroke-width="1.5"/>`;
+      svg += `<circle cx="${item.x+5}" cy="${ly-7}" r="2" fill="none" stroke="#26c6da" stroke-width="1.5"/>`;
+    } else if(item.sym === 'trafo'){
+      svg += `<circle cx="${item.x+7}" cy="${ly-4}" r="5" fill="none" stroke="#ff7043" stroke-width="1.2"/>`;
+      svg += `<circle cx="${item.x+7}" cy="${ly+4}" r="5" fill="none" stroke="#ffab40" stroke-width="1.2"/>`;
+    } else if(item.sym === 'rcd'){
+      svg += `<rect x="${item.x}" y="${ly-6}" width="14" height="12" rx="2" fill="none" stroke="#9c27b0" stroke-width="1.2"/>`;
+      svg += `<text x="${item.x+7}" y="${ly+3}" text-anchor="middle" font-size="5" fill="#ce93d8">T</text>`;
+    } else if(item.sym === 'motor'){
+      svg += `<circle cx="${item.x+7}" cy="${ly}" r="6" fill="none" stroke="#00bcd4" stroke-width="1.2"/>`;
+      svg += `<text x="${item.x+7}" y="${ly+3}" text-anchor="middle" font-size="7" fill="#00bcd4" font-weight="700">M</text>`;
+    } else if(item.sym === 'cable'){
+      svg += `<line x1="${item.x}" y1="${ly-2}" x2="${item.x+14}" y2="${ly-2}" stroke="#8B4513" stroke-width="1.5"/>`;
+      svg += `<line x1="${item.x}" y1="${ly+1}" x2="${item.x+14}" y2="${ly+1}" stroke="#333" stroke-width="1.5"/>`;
+      svg += `<line x1="${item.x}" y1="${ly+4}" x2="${item.x+14}" y2="${ly+4}" stroke="#888" stroke-width="1.5"/>`;
+    }
+    svg += `<text x="${item.x+20}" y="${ly+3}" font-size="8" fill="#90a4ae">${item.label}</text>`;
+  });
+  // Phase color legend
+  svg += `<text x="30" y="${legY+58}" font-size="7.5" fill="#78909c">${lang==='da'?'Faser:':'Phases:'}</text>`;
+  svg += `<rect x="70" y="${legY+51}" width="12" height="8" rx="2" fill="#8B4513"/><text x="85" y="${legY+58}" font-size="7" fill="#90a4ae">L1</text>`;
+  svg += `<rect x="105" y="${legY+51}" width="12" height="8" rx="2" fill="#333"/><text x="120" y="${legY+58}" font-size="7" fill="#90a4ae">L2</text>`;
+  svg += `<rect x="140" y="${legY+51}" width="12" height="8" rx="2" fill="#888"/><text x="155" y="${legY+58}" font-size="7" fill="#90a4ae">L3</text>`;
+  svg += `<rect x="175" y="${legY+51}" width="12" height="8" rx="2" fill="#1565C0"/><text x="190" y="${legY+58}" font-size="7" fill="#90a4ae">N</text>`;
+  svg += `<rect x="205" y="${legY+51}" width="12" height="8" rx="2" fill="#2E7D32"/><text x="220" y="${legY+58}" font-size="7" fill="#90a4ae">PE</text>`;
+  // Status indicators in legend
+  svg += `<text x="300" y="${legY+58}" font-size="7.5" fill="#78909c">${lang==='da'?'Status:':'Status:'}</text>`;
+  svg += `<circle cx="345" cy="${legY+55}" r="5" fill="rgba(0,200,83,0.2)" stroke="#00c853" stroke-width="1"/><text x="345" y="${legY+58}" text-anchor="middle" font-size="7" fill="#00e676">&#10003;</text>`;
+  svg += `<text x="355" y="${legY+58}" font-size="7" fill="#90a4ae">${lang==='da'?'OK':'OK'}</text>`;
+  svg += `<circle cx="385" cy="${legY+55}" r="5" fill="rgba(255,23,68,0.2)" stroke="#ff1744" stroke-width="1"/><text x="385" y="${legY+58}" text-anchor="middle" font-size="7" fill="#ff5252">&#9888;</text>`;
+  svg += `<text x="395" y="${legY+58}" font-size="7" fill="#90a4ae">${lang==='da'?'Kontroller':'Check'}</text>`;
+  // Voltage drop color coding
+  svg += `<text x="450" y="${legY+58}" font-size="7.5" fill="#78909c">\u0394U:</text>`;
+  svg += `<rect x="468" y="${legY+51}" width="20" height="7" rx="2" fill="#00c853"/><text x="492" y="${legY+58}" font-size="6.5" fill="#90a4ae">\u22643%</text>`;
+  svg += `<rect x="515" y="${legY+51}" width="20" height="7" rx="2" fill="#ff8f00"/><text x="539" y="${legY+58}" font-size="6.5" fill="#90a4ae">3-4%</text>`;
+  svg += `<rect x="560" y="${legY+51}" width="20" height="7" rx="2" fill="#ff1744"/><text x="584" y="${legY+58}" font-size="6.5" fill="#90a4ae">&gt;4%</text>`;
 
-    <!-- === TRANSFORMER (IEC: two overlapping circles) === -->
-    <g filter="url(#glSLD2)">
-      <circle cx="85" cy="58" r="26" fill="rgba(255,143,92,0.05)" stroke="url(#trafoGrad1)" stroke-width="3"/>
-      <circle cx="85" cy="88" r="26" fill="rgba(255,179,71,0.05)" stroke="url(#trafoGrad2)" stroke-width="3"/>
-      <!-- HV winding symbol -->
-      <text x="85" y="62" text-anchor="middle" font-size="11" fill="#ff9f6b" font-weight="700">HV</text>
-      <text x="85" y="95" text-anchor="middle" font-size="11" fill="#ffb347" font-weight="700">LV</text>
-    </g>
-    <!-- Transformer glow ring -->
-    <circle cx="85" cy="73" r="38" fill="none" stroke="#ff8a5c" stroke-width="1" opacity="0.2" class="sld-glow-pulse"/>
-    <text x="85" y="132" text-anchor="middle" font-size="13" fill="#ffb38a" font-weight="700">${trafo} kVA</text>
-    <text x="85" y="148" text-anchor="middle" font-size="10" fill="#7a9a70" font-weight="600">10/0,4 kV</text>
+  // --- TITLE BLOCK (bottom right, professional engineering standard) ---
+  const tbX = W - 280;
+  const tbY = legY + legendH + 5;
+  svg += `<rect x="${tbX}" y="${tbY}" width="265" height="${titleBlockH-5}" rx="4" fill="rgba(0,15,30,0.95)" stroke="#4db6ac" stroke-width="1.5"/>`;
+  // Title block grid lines
+  svg += `<line x1="${tbX}" y1="${tbY+18}" x2="${tbX+265}" y2="${tbY+18}" stroke="#37474f" stroke-width="0.5"/>`;
+  svg += `<line x1="${tbX}" y1="${tbY+36}" x2="${tbX+265}" y2="${tbY+36}" stroke="#37474f" stroke-width="0.5"/>`;
+  svg += `<line x1="${tbX}" y1="${tbY+50}" x2="${tbX+265}" y2="${tbY+50}" stroke="#37474f" stroke-width="0.5"/>`;
+  svg += `<line x1="${tbX+130}" y1="${tbY}" x2="${tbX+130}" y2="${tbY+50}" stroke="#37474f" stroke-width="0.5"/>`;
+  // Title block content
+  svg += `<text x="${tbX+8}" y="${tbY+12}" font-size="7" fill="#78909c">${lang==='da'?'PROJEKT':'PROJECT'}</text>`;
+  svg += `<text x="${tbX+135}" y="${tbY+12}" font-size="7.5" fill="#b0bec5" font-weight="600">El-Dimensionering</text>`;
+  svg += `<text x="${tbX+8}" y="${tbY+30}" font-size="7" fill="#78909c">${lang==='da'?'STANDARD':'STANDARD'}</text>`;
+  svg += `<text x="${tbX+135}" y="${tbY+30}" font-size="7.5" fill="#b0bec5">DS/HD 60364 | IEC 60617</text>`;
+  svg += `<text x="${tbX+8}" y="${tbY+47}" font-size="7" fill="#78909c">${lang==='da'?'DATO':'DATE'}</text>`;
+  svg += `<text x="${tbX+135}" y="${tbY+47}" font-size="7.5" fill="#b0bec5">${dateStr}</text>`;
+  svg += `<text x="${tbX+8}" y="${tbY+62}" font-size="7" fill="#78909c">${lang==='da'?'VERSION':'VERSION'}</text>`;
+  svg += `<text x="${tbX+135}" y="${tbY+62}" font-size="7.5" fill="#b0bec5">v1.0 - ${lang==='da'?'Automatisk':'Auto'}</text>`;
 
-    <!-- Supply cable from transformer to panel (animated) -->
-    <line x1="85" y1="114" x2="85" y2="${top-55}" stroke="#ff8a5c" stroke-width="2.5" stroke-linecap="round"/>
-    <line x1="85" y1="114" x2="85" y2="${top-55}" stroke="rgba(255,138,92,0.5)" stroke-width="2" class="sld-current-line" style="animation-duration:1.8s"/>
-    <line x1="85" y1="${top-55}" x2="${busX-mainW/2+15}" y2="${top-55}" stroke="#ff8a5c" stroke-width="2.5" stroke-linecap="round"/>
-    <line x1="85" y1="${top-55}" x2="${busX-mainW/2+15}" y2="${top-55}" stroke="rgba(255,138,92,0.5)" stroke-width="2" class="sld-current-line" style="animation-duration:1.8s"/>
-    <!-- Direction arrow on supply -->
-    <polygon points="140,${top-59} 152,${top-55} 140,${top-51}" fill="#ff8a5c" opacity="0.8" class="sld-glow-pulse"/>
+  // --- DIMENSIONERET STAMP (if all OK) ---
+  if(allOk){
+    const stampX = 30;
+    const stampY = tbY + 8;
+    svg += `<g transform="rotate(-5, ${stampX+70}, ${stampY+25})">`;
+    svg += `<rect x="${stampX}" y="${stampY}" width="140" height="50" rx="6" fill="none" stroke="#00c853" stroke-width="2.5" stroke-dasharray="4 2"/>`;
+    svg += `<text x="${stampX+70}" y="${stampY+22}" text-anchor="middle" font-size="12" fill="#00c853" font-weight="900" letter-spacing="2">${lang==='da'?'DIMENSIONERET':'SIZED'}</text>`;
+    svg += `<text x="${stampX+70}" y="${stampY+38}" text-anchor="middle" font-size="8" fill="#4db6ac">${dateStr} | QI ${qi.score||100}%</text>`;
+    svg += `</g>`;
+  }
 
-    <!-- === RCD / HPFI (IEC symbol) === -->
-    <g filter="url(#glSLD)" transform="translate(${busX-mainW/2+20},${top-75})">
-      <rect x="0" y="0" width="40" height="22" rx="4" fill="rgba(168,85,247,0.08)" stroke="url(#rcdGrad)" stroke-width="1.8"/>
-      <text x="20" y="15" text-anchor="middle" font-size="8" fill="#c084fc" font-weight="700">HPFI</text>
-      <path d="M42,11 L52,11" stroke="#c084fc" stroke-width="1.5"/>
-    </g>
+  // --- SCALE REFERENCE BAR ---
+  svg += `<line x1="30" y1="${H-12}" x2="130" y2="${H-12}" stroke="#546e7a" stroke-width="1"/>`;
+  svg += `<line x1="30" y1="${H-15}" x2="30" y2="${H-9}" stroke="#546e7a" stroke-width="1"/>`;
+  svg += `<line x1="130" y1="${H-15}" x2="130" y2="${H-9}" stroke="#546e7a" stroke-width="1"/>`;
+  svg += `<text x="80" y="${H-15}" text-anchor="middle" font-size="6.5" fill="#546e7a">${lang==='da'?'Skematisk - ikke i skala':'Schematic - not to scale'}</text>`;
 
-    <!-- === MAIN PANEL / BUSBAR === -->
-    <g filter="url(#dropSh)">
-      <rect x="${busX-mainW/2}" y="${top-50}" width="${mainW}" height="40" rx="8" fill="url(#panelGrad)" stroke="url(#busGrad)" stroke-width="2.5"/>
-      <!-- Panel interior detail lines -->
-      <line x1="${busX-mainW/2+8}" y1="${top-38}" x2="${busX+mainW/2-8}" y2="${top-38}" stroke="rgba(0,255,200,0.15)" stroke-width="1"/>
-      <line x1="${busX-mainW/2+8}" y1="${top-22}" x2="${busX+mainW/2-8}" y2="${top-22}" stroke="rgba(0,255,200,0.15)" stroke-width="1"/>
-    </g>
-    <text x="${busX}" y="${top-26}" text-anchor="middle" font-size="12" fill="#00ffc8" font-weight="800" letter-spacing="1">${lang==='da'?'HOVEDTAVLE':'MAIN PANEL'}</text>
-    <text x="${busX}" y="${top-58}" text-anchor="middle" font-size="10" fill="#80d4e0" font-weight="600">I\u0042 = ${ib.toFixed(0)} A</text>
-    <!-- Panel glow -->
-    <rect x="${busX-mainW/2}" y="${top-50}" width="${mainW}" height="40" rx="8" fill="none" stroke="#00ffc8" stroke-width="1.5" opacity="0.3" class="sld-neon-pulse"/>
-
-    <!-- === BUSBAR (vertical) with animated flow === -->
-    <line x1="${busX}" y1="${top-10}" x2="${busX}" y2="${top + cons.length*rowH + 10}" stroke="#003d33" stroke-width="6" stroke-linecap="round"/>
-    <line x1="${busX}" y1="${top-10}" x2="${busX}" y2="${top + cons.length*rowH + 10}" stroke="url(#busGrad)" stroke-width="3.5" stroke-linecap="round"/>
-    <line x1="${busX}" y1="${top-10}" x2="${busX}" y2="${top + cons.length*rowH + 10}" stroke="rgba(0,255,200,0.4)" stroke-width="2" class="sld-current-line" style="animation-duration:2s;stroke-dasharray:16 12"/>
-    <!-- Busbar glow -->
-    <line x1="${busX}" y1="${top-10}" x2="${busX}" y2="${top + cons.length*rowH + 10}" stroke="#00ffc8" stroke-width="8" opacity="0.08" class="sld-glow-pulse"/>
-
-    <!-- Consumer rows -->
+  // Combine all parts
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="border-radius:10px;border:1px solid rgba(0,230,176,0.2);overflow:visible;background:#06101c" xmlns="http://www.w3.org/2000/svg">
+    ${svg}
     ${rows}
-
-    <!-- Footer -->
-    <text x="${W/2}" y="${H-18}" text-anchor="middle" font-size="10" fill="#3a6580" font-weight="500">${lang==='da'?'Enstregsdiagram':'Single-line diagram'} \u00B7 ${cons.length} ${lang==='da'?'grupper':'circuits'} \u00B7 IEC 60617</text>
-    <text x="${W/2}" y="${H-5}" text-anchor="middle" font-size="8" fill="#2a4a60">El-Dimensionering \u00B7 ${lang==='da'?'Automatisk genereret':'Auto-generated'}</text>
   </svg>`;
 }
 
