@@ -19,8 +19,24 @@ jobs:
   build-test:
     runs-on: ubuntu-latest
     env:
-      # Dummy connection string: Prisma validate/generate read it but never connect.
-      DATABASE_URL: "postgresql://ci:ci@localhost:5432/qi_ci?schema=public"
+      DATABASE_URL: "postgresql://qi:qi@localhost:5432/qi_platform?schema=public"
+      SESSION_SECRET: "ci-session-secret-min-16-chars"
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: qi
+          POSTGRES_PASSWORD: qi
+          POSTGRES_DB: qi_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U qi"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -38,6 +54,9 @@ jobs:
 
       - name: Generate Prisma client
         run: npm run prisma:generate
+
+      - name: Run migrations
+        run: npx prisma migrate deploy
 
       - name: Typecheck + build
         run: npm run build

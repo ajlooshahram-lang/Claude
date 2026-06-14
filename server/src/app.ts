@@ -37,7 +37,12 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   });
 
   // Baseline abuse protection; per-route auth limits tightened below.
-  await app.register(rateLimit, { max: 300, timeWindow: "1 minute" });
+  // In test mode, disable rate limiting so integration tests are not throttled.
+  await app.register(rateLimit, {
+    max: 300,
+    timeWindow: "1 minute",
+    allowList: config.nodeEnv === "test" ? ["127.0.0.1"] : [],
+  });
 
   // Cookie support for session tokens.
   const cookieSecret = config.sessionSecret ?? "dev-secret-not-for-prod";
