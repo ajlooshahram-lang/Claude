@@ -1,0 +1,35 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Add login/register screen, logout button, online mode toggle in Settings, and connection status indicator to the UI (qi-webapp/js/ui.js). Also add CSS for these new components (qi-webapp/css/styles.css).",
+  "status": "pending",
+  "steps": [
+    "In qi-webapp/js/ui.js, add a login/register screen: When mode='api' and no session exists (QIAPI.me() returns 401), show a login form instead of the dashboard. The login form has email + password text inputs + Login button. If MFA is required (response has mfaRequired:true), show a 6-digit code input. Include a 'Register' link that toggles to a register form (email + password + display name + Register button). On successful auth, proceed to dashboard. NOTE: text inputs for email/password are allowed here as the one exception to the click-only rule.",
+    "Add a logout button to the topbar in ui.js. When clicked (and mode='api'), call QIAPI.logout() and return to the login screen. When mode='local', hide the logout button.",
+    "Add an 'Online mode' section to RENDER.config in ui.js: A dropdown to switch between 'Offline (local storage)' and 'Online (server)'. When switching to Online, show a dropdown/input for backend URL (defaulting to same-origin ''). Call QIStore.setMode() accordingly. Show current connection status.",
+    "Add a connection status indicator to the topbar in ui.js: a small dot (green = connected/authenticated, red = offline/error, grey = local mode). Only visible when mode='api'. Check connection on app boot and periodically.",
+    "Add graceful degradation: if mode='api' but backend is unreachable, automatically fall back to local mode with a toast notification 'Server unreachable - working offline'. Never lose data.",
+    "Add CSS for login/register form, connection dot indicator, and online mode toggle to qi-webapp/css/styles.css. Login form should be centered, clean, and match the existing card styling.",
+    "Ensure the smoke tests still pass: the app boots in mode='local' by default, so the login screen should NOT show during smoke tests. The QIAPI module should gracefully handle not being loaded (smoke tests don't load api.js)."
+  ],
+  "acceptance_criteria": [
+    "When mode='api' and no session, a login form renders with email + password inputs",
+    "Login form handles MFA challenge (shows 6-digit code field when mfaRequired)",
+    "Register form shows email + password + displayName fields",
+    "Toggle between login/register via a link",
+    "Successful auth navigates to dashboard",
+    "Logout button appears in topbar when mode='api', calls QIAPI.logout()",
+    "Settings view has Online Mode section with dropdown",
+    "Connection status dot shows in topbar when mode='api'",
+    "If backend unreachable in api mode, falls back to local with toast",
+    "Existing 209 smoke tests still pass unchanged",
+    "No free-text inputs added to data views (login form is the only exception)"
+  ],
+  "verification": [
+    "Run 'node smoke.js' in qi-webapp/ and confirm ALL SMOKE TESTS PASSED",
+    "Run 'node test.js' in qi-webapp/ and confirm all suites PASS",
+    "Run 'node api.test.js' in qi-webapp/ and confirm it passes"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

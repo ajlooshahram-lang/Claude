@@ -1,0 +1,27 @@
+{
+  "project_type": "Vanilla JS single-page webapp (no bundler), IIFE modules loaded via script tags",
+  "language": "JavaScript (browser + Node.js for tests)",
+  "build_system": "None (static files). Tests run with node directly.",
+  "test_framework": "Custom assert-style smoke tests using jsdom (smoke.js), engine unit tests (test.js). No test runner framework.",
+  "build_command": "N/A (static files, no build step)",
+  "test_command": "cd qi-webapp && node smoke.js && node test.js",
+  "verification_instructions": "1. Run 'node smoke.js' in qi-webapp/ - must show ALL SMOKE TESTS PASSED (209 assertions). 2. Run 'node test.js' in qi-webapp/ - must show all 7 suite PASS lines.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "cd qi-webapp && npm install (installs jsdom for tests)",
+  "environment_constraints": "OPEN_INTERNET. Node 22.22.3. No build step needed. jsdom required for smoke tests.",
+  "contribution_requirements": "No free-text/number inputs in data views (click-only rule). Login/register forms are the ONE exception where text inputs for email/password are allowed. Existing 209 smoke tests must pass unchanged. New API integration is opt-in (mode='api'), default remains 'local'.",
+  "key_patterns": "IIFE modules exposing globals (window.QICalc, window.QIStore, window.QICharts). Store has API object exported as both module.exports and root.QIStore. UI uses RENDER/AFTER maps for each view. Script load order: calc.js -> store.js -> charts.js -> ui.js. Smoke tests inject all scripts into jsdom with runScripts:'dangerously'.",
+  "relevant_files": [
+    "qi-webapp/index.html",
+    "qi-webapp/js/store.js",
+    "qi-webapp/js/ui.js",
+    "qi-webapp/js/calc.js",
+    "qi-webapp/js/charts.js",
+    "qi-webapp/smoke.js",
+    "qi-webapp/test.js",
+    "qi-webapp/css/styles.css",
+    "server/dist/auth/routes.js",
+    "server/dist/routes/cases.js"
+  ],
+  "directory_structure": "qi-webapp/ - the frontend SPA (index.html + js/ + css/). server/ - the backend with dist/ containing compiled routes. server/dist/auth/routes.js has register/login/logout/me endpoints. server/dist/routes/cases.js has CRUD endpoints."
+}

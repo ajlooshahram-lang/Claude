@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Create the API client module (qi-webapp/js/api.js) and add mode switching to the store (qi-webapp/js/store.js). This feature creates the foundational API layer and store mode logic that the UI features depend on.",
+  "status": "in_progress",
+  "steps": [
+    "Create qi-webapp/js/api.js as an IIFE that exposes window.QIAPI (similar pattern to store.js). Include: API.register(email, password, displayName), API.login(email, password, mfaToken?), API.logout(), API.me(), API.listCases(projectId?), API.getCase(id), API.createCase(data), API.updateCase(id, data), API.deleteCase(id). All requests use credentials:'include'. Base URL from window.QI_API_URL || ''. All methods return { ok, data, error } normalized response objects.",
+    "Add mode switching to qi-webapp/js/store.js: Add a QIStore.setMode('local'|'api') function and QIStore.getMode() function. Store mode in localStorage under key 'qi_mode'. Default to 'local'. When mode='api', the addCase/updateCase/deleteCase functions should call the API module AND update local state from the response. Keep the existing localStorage behavior as fallback.",
+    "Add the api.js script tag to qi-webapp/index.html AFTER store.js and BEFORE ui.js: <script src=\"js/api.js\"></script>",
+    "Create qi-webapp/api.test.js that tests the API module's request shaping with a mock fetch (no real server). Verify: correct URLs, methods, headers, body serialization, credentials:'include', error normalization. Use the same pattern as test.js (simple console.log assertions, process.exit(1) on failure)."
+  ],
+  "acceptance_criteria": [
+    "qi-webapp/js/api.js exists and exposes window.QIAPI with all 9 methods",
+    "Each API method sends fetch with credentials:'include' and correct HTTP method/URL",
+    "Responses are normalized to { ok: boolean, data: any, error: string|null }",
+    "Base URL is configurable via window.QI_API_URL (defaults to '')",
+    "QIStore.setMode('api') switches mode, QIStore.getMode() returns current mode",
+    "Default mode is 'local' so existing tests pass unchanged",
+    "Mode persists in localStorage under 'qi_mode'",
+    "When mode='api', addCase/updateCase/deleteCase proxy through QIAPI",
+    "api.test.js passes with mocked fetch",
+    "Existing smoke.js (209 tests) and test.js (7 suites) still pass"
+  ],
+  "verification": [
+    "Run 'node smoke.js' in qi-webapp/ and confirm ALL SMOKE TESTS PASSED",
+    "Run 'node test.js' in qi-webapp/ and confirm all suites PASS",
+    "Run 'node api.test.js' in qi-webapp/ and confirm it passes"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

@@ -1,0 +1,7 @@
+{
+  "task_id": "task-ui-api-integration",
+  "task_description": "Wire the QI web UI to use the authenticated backend API (Phase 2). Create api.js client module, add mode switching to store, implement login/register screen, add logout button, online mode toggle in settings, and connection status indicator. Default mode remains 'local' so existing offline functionality and all 209 smoke tests continue to work unchanged.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

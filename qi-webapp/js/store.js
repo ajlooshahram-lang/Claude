@@ -537,6 +537,40 @@
     return issues;
   }
 
+  // ---- mode switching (local vs api) ----
+  var mode = (typeof localStorage !== "undefined" && localStorage.getItem("qi_mode")) || "local";
+  function setMode(m) {
+    mode = (m === "api") ? "api" : "local";
+    try { if (typeof localStorage !== "undefined") localStorage.setItem("qi_mode", mode); } catch (e) {}
+  }
+  function getMode() { return mode; }
+
+  // Wrap case mutations to also sync via API when mode='api'
+  var _addCase = addCase;
+  addCase = function (c) {
+    var result = _addCase(c);
+    if (mode === "api" && typeof root.QIAPI !== "undefined" && root.QIAPI) {
+      try { root.QIAPI.createCase(result); } catch (e) {}
+    }
+    return result;
+  };
+  var _updateCase = updateCase;
+  updateCase = function (id, patch) {
+    var result = _updateCase(id, patch);
+    if (mode === "api" && typeof root.QIAPI !== "undefined" && root.QIAPI) {
+      try { root.QIAPI.updateCase(id, patch); } catch (e) {}
+    }
+    return result;
+  };
+  var _deleteCase = deleteCase;
+  deleteCase = function (id) {
+    var result = _deleteCase(id);
+    if (mode === "api" && typeof root.QIAPI !== "undefined" && root.QIAPI) {
+      try { root.QIAPI.deleteCase(id); } catch (e) {}
+    }
+    return result;
+  };
+
   const API = { uid, seed, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
     undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete, togglePin, reorderPin,
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
@@ -547,7 +581,8 @@
     regRows, regAdd, regUpdate, regDelete, regLabel, regBulkDelete, regTogglePin, evm: () => C.evm(validCases(), get().project),
     gage, setGageCell, setGageConfig, gageResult, cashflow, setCashflow,
     xbar, setXbarCell, setXbarConfig, xbarResult, scorecard,
-    spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy };
+    spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy,
+    setMode, getMode };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);
