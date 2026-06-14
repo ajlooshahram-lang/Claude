@@ -822,7 +822,7 @@
     const budFilterOpts = vendorBudgets.map(b => `<option value="${esc(b)}">${esc(b)}</option>`).join("");
 
     const vendorHtml = `<div class="card" id="brainVendorPanel">
-      <h3>Vendor Directory <span class="tag">38 vendors</span></h3>
+      <h3>Vendor Directory <span class="tag">submarine telecom</span></h3>
       <div class="toolbar" style="flex-wrap:wrap;gap:8px;margin-bottom:12px">
         <label class="muted">Category</label>
         <select id="vendorCatFilter" style="max-width:200px">${catFilterOpts}</select>
