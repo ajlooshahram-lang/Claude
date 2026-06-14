@@ -823,6 +823,8 @@ const T = {
       plc: '\uD83E\uDD16 PLC/BMS',
       spd: '\u26A1 Overspænding',
       tray: '\uD83D\uDCD0 Kabelbakke',
+      pfc: '\uD83D\uDD0B Fasekompensering',
+      energy: '\uD83D\uDCB0 Energi',
       exam: '\uD83C\uDF93 Eksamen'
     },
     // Load module
@@ -932,6 +934,8 @@ const T = {
       plc: '\uD83E\uDD16 PLC/BMS',
       spd: '\u26A1 Surge Protection',
       tray: '\uD83D\uDCD0 Cable Tray',
+      pfc: '\uD83D\uDD0B Power Factor',
+      energy: '\uD83D\uDCB0 Energy',
       exam: '\uD83C\uDF93 Exam'
     },
     loadTitle: 'Load Calculation',
@@ -2090,6 +2094,10 @@ let plcState = { platform: 'siemens', plcLang: 'ST', protocol: 'bacnet', integra
 let spdState = { building: 'bolig', lightning: 'ingen', location: 'main', sensitive: 'ingen', supply: 'TN-S' };
 // Cable tray fill state
 let trayState = { type: 'tray', width: 300, height: 100, cables: [], qtyPending: 1 };
+// Power Factor Correction state
+let pfcState = { cosCurrent: 0.85, cosTarget: 0.95, power: 100, compType: 'fixed', voltage: 400 };
+// Energy Cost Estimator state
+let energyState = { profile: 8760, price: 2.5, power: 100, priceIncrease: 3 };
 // Short circuit state
 let scState = { zNet: 1, zTrafo: 5 };
 // Standards state
@@ -2227,6 +2235,8 @@ function renderModule(mod) {
     case 'plc': content += renderPlc(); break;
     case 'spd': content += renderSpd(); break;
     case 'tray': content += renderTray(); break;
+    case 'pfc': content += renderPfc(); break;
+    case 'energy': content += renderEnergy(); break;
     case 'exam': content = renderExam(); break;
   }
   // Append AI assistant to every module
@@ -14059,6 +14069,408 @@ function buildTrayViz(s, CABLE_PRESETS, fillPct, maxFill) {
   var pctColor = fillPct <= maxFill * 0.6 ? '#0c6' : fillPct <= maxFill ? '#fa0' : '#f44';
   svg += '<text x="' + (W / 2) + '" y="' + (H - 30) + '" text-anchor="middle" fill="' + pctColor + '" font-size="18" font-weight="bold">' + fillPct.toFixed(1) + '% ' + (lang === 'da' ? 'fyldning' : 'fill') + '</text>';
   svg += '<text x="' + (W / 2) + '" y="' + (H - 12) + '" text-anchor="middle" fill="#888" font-size="10">' + s.cables.length + ' ' + (lang === 'da' ? 'kabeltyper' : 'cable types') + ' | ' + (s.cables.reduce(function(a, c) { return a + c.qty; }, 0)) + ' ' + (lang === 'da' ? 'kabler total' : 'cables total') + '</text>';
+
+  svg += '</svg>';
+  return svg;
+}
+
+// ===== POWER FACTOR CORRECTION / CAPACITOR BANK SIZING =====
+function renderPfc() {
+  var da = lang === 'da';
+  var s = pfcState;
+
+  // Standard capacitor bank sizes (kVAr)
+  var BANK_SIZES = [5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100, 125, 150, 200, 250, 300, 400, 500];
+
+  // Calculate reactive power compensation
+  var phi1 = Math.acos(s.cosCurrent);
+  var phi2 = Math.acos(s.cosTarget);
+  var tanPhi1 = Math.tan(phi1);
+  var tanPhi2 = Math.tan(phi2);
+  var Qc = s.power * (tanPhi1 - tanPhi2);
+  if (Qc < 0) Qc = 0;
+
+  // Round up to nearest standard bank size
+  var bankSize = BANK_SIZES[BANK_SIZES.length - 1];
+  for (var i = 0; i < BANK_SIZES.length; i++) {
+    if (BANK_SIZES[i] >= Qc) { bankSize = BANK_SIZES[i]; break; }
+  }
+
+  // Current reduction
+  var deltaI = (Qc * 1000) / (Math.sqrt(3) * s.voltage);
+
+  // Before/after apparent power
+  var S_before = s.power / s.cosCurrent;
+  var S_after = s.power / s.cosTarget;
+  var I_before = (S_before * 1000) / (Math.sqrt(3) * s.voltage);
+  var I_after = (S_after * 1000) / (Math.sqrt(3) * s.voltage);
+
+  // Steps for stepped compensation
+  var numSteps = 0;
+  var stepSize = 0;
+  if (s.compType === 'stepped') {
+    if (bankSize <= 50) { numSteps = 6; }
+    else if (bankSize <= 150) { numSteps = 8; }
+    else if (bankSize <= 300) { numSteps = 10; }
+    else { numSteps = 12; }
+    stepSize = Math.ceil(bankSize / numSteps);
+  }
+
+  // Detuned reactor rating
+  var reactorPct = 7;
+  if (s.compType === 'detuned') {
+    reactorPct = 7; // 7% for typical, 14% for harmonic-rich (5th harmonic dominant)
+  }
+
+  // Annual savings (50 DKK/kVA/month penalty)
+  var kVA_saved = S_before - S_after;
+  var annualSavings = kVA_saved * 50 * 12;
+
+  // Build HTML
+  var html = '<div class="card fade-in"><div class="card-title">' + (da ? '\uD83D\uDD0B Fasekompensering / Kondensatorbatteri' : '\uD83D\uDD0B Power Factor Correction / Capacitor Bank') + '</div>';
+
+  // Current cos phi
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Nuvaerende cos \u03C6' : 'Current cos \u03C6') + '</div><div class="select-grid">';
+  [0.60, 0.65, 0.70, 0.75, 0.80, 0.82, 0.85, 0.87, 0.90, 0.92, 0.95].forEach(function(v) {
+    html += '<button class="sel-btn ' + (s.cosCurrent === v ? 'selected' : '') + '" onclick="pfcState.cosCurrent=' + v + ';renderModule(\'pfc\')">' + v.toFixed(2) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Target cos phi
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Oensket cos \u03C6' : 'Target cos \u03C6') + '</div><div class="select-grid">';
+  [0.90, 0.92, 0.95, 0.97, 0.98, 0.99, 1.00].forEach(function(v) {
+    html += '<button class="sel-btn ' + (s.cosTarget === v ? 'selected' : '') + '" onclick="pfcState.cosTarget=' + v + ';renderModule(\'pfc\')">' + v.toFixed(2) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Active power P
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Aktiv effekt P [kW]' : 'Active Power P [kW]') + '</div><div class="select-grid">';
+  [10, 20, 30, 50, 75, 100, 150, 200, 250, 300, 400, 500, 750, 1000].forEach(function(v) {
+    html += '<button class="sel-btn ' + (s.power === v ? 'selected' : '') + '" onclick="pfcState.power=' + v + ';renderModule(\'pfc\')">' + v + '</button>';
+  });
+  html += '</div></div>';
+
+  // Compensation type
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Kompensationstype' : 'Compensation Type') + '</div><div class="select-grid">';
+  var compTypes = [
+    { id: 'fixed', da: 'Fast', en: 'Fixed' },
+    { id: 'stepped', da: 'Trinvis (automatisk)', en: 'Stepped (automatic)' },
+    { id: 'detuned', da: 'Detuned (med reaktor)', en: 'Detuned (with reactor)' }
+  ];
+  compTypes.forEach(function(ct) {
+    html += '<button class="sel-btn ' + (s.compType === ct.id ? 'selected' : '') + '" onclick="pfcState.compType=\'' + ct.id + '\';renderModule(\'pfc\')">' + (da ? ct.da : ct.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Voltage
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Spaending' : 'Voltage') + '</div><div class="select-grid">';
+  [400, 690].forEach(function(v) {
+    html += '<button class="sel-btn ' + (s.voltage === v ? 'selected' : '') + '" onclick="pfcState.voltage=' + v + ';renderModule(\'pfc\')">' + v + 'V</button>';
+  });
+  html += '</div></div>';
+
+  html += '</div>'; // close input card
+
+  // Results
+  html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCCB ' + (da ? 'Resultat' : 'Result') + '</div>';
+
+  // Main results
+  html += '<div class="result-box"><div class="result-title">' + (da ? 'Reaktiv kompensering' : 'Reactive Compensation') + '</div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Beregnet Qc' : 'Required Qc') + '</span><span class="value">' + Qc.toFixed(1) + ' kVAr</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Anbefalet bankstorrelse' : 'Recommended bank size') + '</span><span class="value">' + bankSize + ' kVAr</span></div>';
+
+  if (s.compType === 'stepped') {
+    html += '<div class="result-row"><span class="label">' + (da ? 'Antal trin' : 'Number of steps') + '</span><span class="value">' + numSteps + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Trinstorrelse' : 'Step size') + '</span><span class="value">' + stepSize + ' kVAr</span></div>';
+  }
+
+  if (s.compType === 'detuned') {
+    html += '<div class="result-row"><span class="label">' + (da ? 'Reaktor' : 'Reactor') + '</span><span class="value">' + reactorPct + '% (p=' + reactorPct + ')</span></div>';
+    html += '<div class="result-row"><span class="label">' + (da ? 'Tuning-frekvens' : 'Tuning frequency') + '</span><span class="value">' + (reactorPct === 7 ? '189 Hz (3.78xf)' : '134 Hz (2.68xf)') + '</span></div>';
+  }
+
+  html += '<div class="result-row"><span class="label">' + (da ? 'Stroemreduktion' : 'Current reduction') + '</span><span class="value">\u0394I = ' + deltaI.toFixed(1) + ' A</span></div>';
+  html += '</div>';
+
+  // Before / After comparison
+  html += '<div class="result-box"><div class="result-title">' + (da ? 'Foer / Efter kompensering' : 'Before / After compensation') + '</div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Tilsyneladende effekt S (foer)' : 'Apparent power S (before)') + '</span><span class="value">' + S_before.toFixed(1) + ' kVA</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Tilsyneladende effekt S (efter)' : 'Apparent power S (after)') + '</span><span class="value">' + S_after.toFixed(1) + ' kVA</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Stroem I (foer)' : 'Current I (before)') + '</span><span class="value">' + I_before.toFixed(1) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Stroem I (efter)' : 'Current I (after)') + '</span><span class="value">' + I_after.toFixed(1) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">cos \u03C6 (' + (da ? 'foer' : 'before') + ')</span><span class="value">' + s.cosCurrent.toFixed(2) + '</span></div>';
+  html += '<div class="result-row"><span class="label">cos \u03C6 (' + (da ? 'efter' : 'after') + ')</span><span class="value">' + s.cosTarget.toFixed(2) + '</span></div>';
+  html += '</div>';
+
+  // Savings
+  html += '<div class="result-box"><div class="result-title">' + (da ? 'Besparelse' : 'Savings') + '</div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'kVA reduktion' : 'kVA reduction') + '</span><span class="value">' + kVA_saved.toFixed(1) + ' kVA</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Aarlig besparelse (50 DKK/kVA/md)' : 'Annual savings (50 DKK/kVA/mo)') + '</span><span class="value">' + Math.round(annualSavings).toLocaleString() + ' DKK</span></div>';
+  html += '</div>';
+
+  // Standards & warnings
+  html += '<div class="result-box"><div class="result-title">' + (da ? 'Standarder og advarsler' : 'Standards & Warnings') + '</div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Reference' : 'Reference') + '</span><span class="value">DS/HD 60364 + IEC 61921</span></div>';
+
+  if (s.compType !== 'detuned') {
+    html += '<div class="result-row" style="color:var(--warning)"><span class="label">\u26A0\uFE0F ' + (da ? 'Advarsel' : 'Warning') + '</span><span class="value">' + (da ? 'Hvis harmoniske er til stede (VFD, LED, UPS), anbefales detuned reaktor (p=7% eller p=14%)' : 'If harmonics present (VFD, LED, UPS), recommend detuned reactor (p=7% or p=14%)') + '</span></div>';
+  } else {
+    html += '<div class="result-row" style="color:var(--success)"><span class="label">\u2705 ' + (da ? 'Harmonisk beskyttelse' : 'Harmonic protection') + '</span><span class="value">' + (da ? 'Detuned reaktor forhindrer resonansforstaarkning' : 'Detuned reactor prevents resonance amplification') + '</span></div>';
+  }
+  html += '</div>';
+
+  html += '</div>'; // close results card
+
+  // Animated SVG - Power Triangle
+  html += '<div class="card fade-in"><div class="card-title">' + (da ? '\uD83D\uDCD0 Effekttrekant (animeret)' : '\uD83D\uDCD0 Power Triangle (animated)') + '</div>';
+  html += buildPfcSvg(s, Qc, S_before, S_after);
+  html += '</div>';
+
+  return html;
+}
+
+function buildPfcSvg(s, Qc, S_before, S_after) {
+  var W = 680, H = 400;
+  var da = lang === 'da';
+
+  var svg = '<svg width="100%" viewBox="0 0 ' + W + ' ' + H + '" style="background:rgba(0,0,0,0.3);border-radius:12px">';
+  svg += '<defs>';
+  svg += '<marker id="pfcArrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#0ff"/></marker>';
+  svg += '<marker id="pfcArrowR" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f44"/></marker>';
+  svg += '<marker id="pfcArrowG" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#0c6"/></marker>';
+  svg += '</defs>';
+
+  // Title
+  svg += '<text x="' + (W / 2) + '" y="25" text-anchor="middle" fill="#8af" font-size="14" font-weight="bold">' + (da ? 'Effekttrekant - Foer/Efter Kompensering' : 'Power Triangle - Before/After Compensation') + '</text>';
+
+  // Scale
+  var maxS = S_before;
+  var scale = 200 / maxS;
+  var P_px = s.power * scale;
+
+  var Q_before = s.power * Math.tan(Math.acos(s.cosCurrent));
+  var Q_after = s.power * Math.tan(Math.acos(s.cosTarget));
+  var Q_before_px = Q_before * scale;
+  var Q_after_px = Q_after * scale;
+  var S_before_px = S_before * scale;
+  var S_after_px = S_after * scale;
+
+  // Origin point
+  var ox = 120, oy = 100;
+
+  // BEFORE triangle (red/dim)
+  svg += '<line x1="' + ox + '" y1="' + oy + '" x2="' + (ox + P_px) + '" y2="' + oy + '" stroke="#0ff" stroke-width="3" marker-end="url(#pfcArrow)" opacity="0.8">';
+  svg += '<animate attributeName="opacity" from="0" to="0.8" dur="0.5s" fill="freeze"/></line>';
+  svg += '<text x="' + (ox + P_px / 2) + '" y="' + (oy - 10) + '" text-anchor="middle" fill="#0ff" font-size="11">P = ' + s.power + ' kW</text>';
+
+  // Q before (vertical down)
+  svg += '<line x1="' + (ox + P_px) + '" y1="' + oy + '" x2="' + (ox + P_px) + '" y2="' + (oy + Q_before_px) + '" stroke="#f44" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#pfcArrowR)">';
+  svg += '<animate attributeName="opacity" from="0" to="1" dur="0.7s" fill="freeze"/></line>';
+  svg += '<text x="' + (ox + P_px + 15) + '" y="' + (oy + Q_before_px / 2) + '" fill="#f44" font-size="10">Q\u2081 = ' + Q_before.toFixed(0) + ' kVAr</text>';
+
+  // S before (hypotenuse)
+  svg += '<line x1="' + ox + '" y1="' + oy + '" x2="' + (ox + P_px) + '" y2="' + (oy + Q_before_px) + '" stroke="#f88" stroke-width="2" stroke-dasharray="8,4">';
+  svg += '<animate attributeName="opacity" from="0" to="0.7" dur="0.9s" fill="freeze"/></line>';
+  svg += '<text x="' + (ox + P_px / 2 - 40) + '" y="' + (oy + Q_before_px / 2 + 5) + '" fill="#f88" font-size="10" transform="rotate(' + (Math.atan2(Q_before_px, P_px) * 180 / Math.PI) + ' ' + (ox + P_px / 2 - 40) + ' ' + (oy + Q_before_px / 2 + 5) + ')">S\u2081 = ' + S_before.toFixed(0) + ' kVA</text>';
+
+  // Q after (animated - shrinks)
+  svg += '<line x1="' + (ox + P_px) + '" y1="' + oy + '" x2="' + (ox + P_px) + '" y2="' + (oy + Q_after_px) + '" stroke="#0c6" stroke-width="3" marker-end="url(#pfcArrowG)">';
+  svg += '<animate attributeName="y2" from="' + (oy + Q_before_px) + '" to="' + (oy + Q_after_px) + '" dur="1.5s" fill="freeze"/>';
+  svg += '</line>';
+  svg += '<text x="' + (ox + P_px + 55) + '" y="' + (oy + Q_after_px / 2) + '" fill="#0c6" font-size="10">Q\u2082 = ' + Q_after.toFixed(0) + ' kVAr</text>';
+
+  // S after (animated hypotenuse)
+  svg += '<line x1="' + ox + '" y1="' + oy + '" x2="' + (ox + P_px) + '" y2="' + (oy + Q_after_px) + '" stroke="#0f8" stroke-width="3">';
+  svg += '<animate attributeName="y2" from="' + (oy + Q_before_px) + '" to="' + (oy + Q_after_px) + '" dur="1.5s" fill="freeze"/>';
+  svg += '</line>';
+  svg += '<text x="' + (ox + P_px / 2 - 40) + '" y="' + (oy + Q_after_px / 2 - 10) + '" fill="#0f8" font-size="11" font-weight="bold">S\u2082 = ' + S_after.toFixed(0) + ' kVA</text>';
+
+  // Qc arrow (compensation)
+  var qcY1 = oy + Q_after_px;
+  var qcY2 = oy + Q_before_px;
+  svg += '<line x1="' + (ox + P_px + 90) + '" y1="' + qcY1 + '" x2="' + (ox + P_px + 90) + '" y2="' + qcY2 + '" stroke="#ff0" stroke-width="2" stroke-dasharray="4,2">';
+  svg += '<animate attributeName="opacity" from="0" to="1" dur="2s" fill="freeze"/>';
+  svg += '</line>';
+  svg += '<text x="' + (ox + P_px + 100) + '" y="' + ((qcY1 + qcY2) / 2) + '" fill="#ff0" font-size="10" font-weight="bold">Qc = ' + Qc.toFixed(0) + ' kVAr</text>';
+
+  // Capacitor symbol (animated pulsing)
+  var capX = W / 2, capY = H - 100;
+  svg += '<g transform="translate(' + capX + ',' + capY + ')">';
+  svg += '<line x1="-20" y1="-25" x2="-20" y2="-5" stroke="#0ff" stroke-width="2"/>';
+  svg += '<line x1="-20" y1="5" x2="-20" y2="25" stroke="#0ff" stroke-width="2"/>';
+  svg += '<line x1="-35" y1="-5" x2="-5" y2="-5" stroke="#0ff" stroke-width="3"/>';
+  svg += '<line x1="-35" y1="5" x2="-5" y2="5" stroke="#0ff" stroke-width="3"/>';
+  // Pulsing reactive power flow
+  svg += '<circle cx="-20" cy="-20" r="3" fill="#0ff"><animate attributeName="cy" values="-20;20;-20" dur="1.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/></circle>';
+  svg += '<circle cx="-20" cy="0" r="2" fill="#0ff"><animate attributeName="cy" values="0;-20;0" dur="1.2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.5;1;0.5" dur="1.2s" repeatCount="indefinite"/></circle>';
+  svg += '<text x="10" y="5" fill="#0ff" font-size="11" font-weight="bold">' + (da ? 'Kondensator' : 'Capacitor') + '</text>';
+  svg += '<text x="10" y="20" fill="#8af" font-size="10">' + Qc.toFixed(0) + ' kVAr</text>';
+  svg += '</g>';
+
+  // Legend
+  svg += '<text x="20" y="' + (H - 20) + '" fill="#888" font-size="9">' + (da ? 'Roed=Foer | Groen=Efter | Gul=Kompensering' : 'Red=Before | Green=After | Yellow=Compensation') + '</text>';
+
+  svg += '</svg>';
+  return svg;
+}
+
+// ===== ENERGY COST ESTIMATOR =====
+function renderEnergy() {
+  var da = lang === 'da';
+  var s = energyState;
+
+  // Load profiles (hours per year)
+  var PROFILES = [
+    { id: 8760, da: 'Kontinuerlig (8760 h/aar)', en: 'Continuous (8760 h/yr)' },
+    { id: 2000, da: '1-skift (2000 h/aar)', en: '1-shift (2000 h/yr)' },
+    { id: 4000, da: '2-skift (4000 h/aar)', en: '2-shift (4000 h/yr)' },
+    { id: 6000, da: '3-skift (6000 h/aar)', en: '3-shift (6000 h/yr)' },
+    { id: 2500, da: 'Kontor (2500 h/aar)', en: 'Office (2500 h/yr)' }
+  ];
+
+  // Calculations
+  var annualKWh = s.power * s.profile;
+  var annualCost = annualKWh * s.price;
+  var monthlyCost = annualCost / 12;
+
+  // CO2 footprint (Danish grid ~0.14 kg CO2/kWh)
+  var co2Factor = 0.14;
+  var co2Tons = (annualKWh * co2Factor) / 1000;
+
+  // 5-year and 10-year projections
+  var pctIncrease = s.priceIncrease / 100;
+  var cost5yr = 0;
+  var cost10yr = 0;
+  for (var yr = 1; yr <= 10; yr++) {
+    var yearCost = annualCost * Math.pow(1 + pctIncrease, yr - 1);
+    if (yr <= 5) cost5yr += yearCost;
+    cost10yr += yearCost;
+  }
+
+  // Build HTML
+  var html = '<div class="card fade-in"><div class="card-title">' + (da ? '\uD83D\uDCB0 Energiomkostningsberegner' : '\uD83D\uDCB0 Energy Cost Estimator') + '</div>';
+
+  // Load profile
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Belastningsprofil' : 'Load Profile') + '</div><div class="select-grid">';
+  PROFILES.forEach(function(p) {
+    html += '<button class="sel-btn ' + (s.profile === p.id ? 'selected' : '') + '" onclick="energyState.profile=' + p.id + ';renderModule(\'energy\')">' + (da ? p.da : p.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Electricity price
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Elpris [DKK/kWh]' : 'Electricity Price [DKK/kWh]') + '</div><div class="select-grid">';
+  [1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0].forEach(function(v) {
+    html += '<button class="sel-btn ' + (s.price === v ? 'selected' : '') + '" onclick="energyState.price=' + v + ';renderModule(\'energy\')">' + v.toFixed(1) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Power
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Effekt [kW]' : 'Power [kW]') + '</div><div class="select-grid">';
+  [5, 10, 20, 30, 50, 75, 100, 150, 200, 300, 500, 1000].forEach(function(v) {
+    html += '<button class="sel-btn ' + (s.power === v ? 'selected' : '') + '" onclick="energyState.power=' + v + ';renderModule(\'energy\')">' + v + '</button>';
+  });
+  html += '</div></div>';
+
+  // Future price increase
+  html += '<div class="select-group"><div class="select-label">' + (da ? 'Forventet prisstigning pr. aar' : 'Expected price increase per year') + '</div><div class="select-grid">';
+  [0, 3, 5, 7, 10].forEach(function(v) {
+    html += '<button class="sel-btn ' + (s.priceIncrease === v ? 'selected' : '') + '" onclick="energyState.priceIncrease=' + v + ';renderModule(\'energy\')">' + v + '%</button>';
+  });
+  html += '</div></div>';
+
+  html += '</div>'; // close input card
+
+  // Results
+  html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCCB ' + (da ? 'Resultat' : 'Result') + '</div>';
+
+  // Annual consumption & cost
+  html += '<div class="result-box"><div class="result-title">' + (da ? 'Aarligt forbrug og omkostning' : 'Annual Consumption & Cost') + '</div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Aarligt forbrug' : 'Annual consumption') + '</span><span class="value">' + annualKWh.toLocaleString() + ' kWh</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Aarlig omkostning' : 'Annual cost') + '</span><span class="value">' + Math.round(annualCost).toLocaleString() + ' DKK</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Maanedlig omkostning' : 'Monthly cost') + '</span><span class="value">' + Math.round(monthlyCost).toLocaleString() + ' DKK</span></div>';
+  html += '</div>';
+
+  // CO2
+  html += '<div class="result-box"><div class="result-title">' + (da ? 'CO\u2082 Aftryk' : 'CO\u2082 Footprint') + '</div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'CO\u2082 pr. aar' : 'CO\u2082 per year') + '</span><span class="value">' + co2Tons.toFixed(1) + ' ' + (da ? 'ton' : 'tons') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? 'Emissionsfaktor (DK net)' : 'Emission factor (DK grid)') + '</span><span class="value">0.14 kg CO\u2082/kWh</span></div>';
+  html += '</div>';
+
+  // Projections
+  html += '<div class="result-box"><div class="result-title">' + (da ? 'Fremtidige omkostninger (' + s.priceIncrease + '% stigning/aar)' : 'Future costs (' + s.priceIncrease + '% increase/yr)') + '</div>';
+  html += '<div class="result-row"><span class="label">' + (da ? '5-aars total' : '5-year total') + '</span><span class="value">' + Math.round(cost5yr).toLocaleString() + ' DKK</span></div>';
+  html += '<div class="result-row"><span class="label">' + (da ? '10-aars total' : '10-year total') + '</span><span class="value">' + Math.round(cost10yr).toLocaleString() + ' DKK</span></div>';
+
+  // Year-by-year breakdown
+  html += '<div style="margin-top:8px;border-top:1px solid #333;padding-top:8px">';
+  html += '<div class="result-row" style="opacity:0.7"><span class="label">' + (da ? 'Aar' : 'Year') + '</span><span class="value">' + (da ? 'Aarlig omkostning' : 'Annual cost') + '</span></div>';
+  for (var y = 1; y <= 10; y++) {
+    var yCost = annualCost * Math.pow(1 + pctIncrease, y - 1);
+    var highlight = (y === 5 || y === 10) ? 'font-weight:bold;color:var(--accent)' : 'opacity:0.8';
+    html += '<div class="result-row" style="' + highlight + '"><span class="label">' + (da ? 'Aar ' : 'Year ') + y + '</span><span class="value">' + Math.round(yCost).toLocaleString() + ' DKK</span></div>';
+  }
+  html += '</div>';
+  html += '</div>';
+
+  html += '</div>'; // close results card
+
+  // SVG visualization - energy bar chart
+  html += '<div class="card fade-in"><div class="card-title">' + (da ? '\uD83D\uDCC8 10-aars projektion' : '\uD83D\uDCC8 10-year projection') + '</div>';
+  html += buildEnergySvg(s, annualCost, pctIncrease);
+  html += '</div>';
+
+  return html;
+}
+
+function buildEnergySvg(s, annualCost, pctIncrease) {
+  var W = 680, H = 320;
+  var da = lang === 'da';
+
+  var svg = '<svg width="100%" viewBox="0 0 ' + W + ' ' + H + '" style="background:rgba(0,0,0,0.3);border-radius:12px">';
+
+  // Title
+  svg += '<text x="' + (W / 2) + '" y="25" text-anchor="middle" fill="#8af" font-size="13" font-weight="bold">' + (da ? 'Aarlig energiomkostning - 10 aars projektion' : 'Annual Energy Cost - 10 Year Projection') + '</text>';
+
+  // Calculate max cost for scaling
+  var maxCost = annualCost * Math.pow(1 + pctIncrease, 9);
+  var chartX = 80, chartY = 45, chartW = W - 120, chartH = H - 100;
+  var barW = chartW / 10 - 8;
+
+  // Y-axis
+  svg += '<line x1="' + chartX + '" y1="' + chartY + '" x2="' + chartX + '" y2="' + (chartY + chartH) + '" stroke="#555" stroke-width="1"/>';
+  // X-axis
+  svg += '<line x1="' + chartX + '" y1="' + (chartY + chartH) + '" x2="' + (chartX + chartW) + '" y2="' + (chartY + chartH) + '" stroke="#555" stroke-width="1"/>';
+
+  // Y-axis labels
+  for (var g = 0; g <= 4; g++) {
+    var gVal = (maxCost / 4) * g;
+    var gY = chartY + chartH - (chartH * g / 4);
+    svg += '<text x="' + (chartX - 5) + '" y="' + (gY + 3) + '" text-anchor="end" fill="#888" font-size="9">' + (gVal >= 1000000 ? (gVal / 1000000).toFixed(1) + 'M' : gVal >= 1000 ? Math.round(gVal / 1000) + 'k' : Math.round(gVal)) + '</text>';
+    svg += '<line x1="' + chartX + '" y1="' + gY + '" x2="' + (chartX + chartW) + '" y2="' + gY + '" stroke="#333" stroke-width="0.5" stroke-dasharray="3,3"/>';
+  }
+
+  // Bars
+  for (var b = 0; b < 10; b++) {
+    var bCost = annualCost * Math.pow(1 + pctIncrease, b);
+    var bH = (bCost / maxCost) * chartH;
+    var bX = chartX + (chartW / 10) * b + 4;
+    var bY = chartY + chartH - bH;
+    var hue = 180 - (b * 15); // cyan to orange gradient
+    var barColor = 'hsl(' + hue + ', 80%, 55%)';
+
+    svg += '<rect x="' + bX + '" y="' + (chartY + chartH) + '" width="' + barW + '" height="0" fill="' + barColor + '" rx="2">';
+    svg += '<animate attributeName="y" from="' + (chartY + chartH) + '" to="' + bY + '" dur="' + (0.3 + b * 0.1) + 's" fill="freeze"/>';
+    svg += '<animate attributeName="height" from="0" to="' + bH + '" dur="' + (0.3 + b * 0.1) + 's" fill="freeze"/>';
+    svg += '</rect>';
+
+    // Year label
+    svg += '<text x="' + (bX + barW / 2) + '" y="' + (chartY + chartH + 14) + '" text-anchor="middle" fill="#aaa" font-size="9">' + (b + 1) + '</text>';
+  }
+
+  // X-axis label
+  svg += '<text x="' + (chartX + chartW / 2) + '" y="' + (H - 10) + '" text-anchor="middle" fill="#888" font-size="10">' + (da ? 'Aar' : 'Year') + '</text>';
+  // Y-axis label
+  svg += '<text x="15" y="' + (chartY + chartH / 2) + '" fill="#888" font-size="10" transform="rotate(-90 15 ' + (chartY + chartH / 2) + ')">DKK</text>';
 
   svg += '</svg>';
   return svg;
