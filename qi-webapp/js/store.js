@@ -537,6 +537,120 @@
     return issues;
   }
 
+  // ---- mode switching (local vs api) ----
+  var mode = (typeof localStorage !== "undefined" && localStorage.getItem("qi_mode")) || "local";
+  function setMode(m) { mode = (m === "api") ? "api" : "local"; try { if (typeof localStorage !== "undefined") localStorage.setItem("qi_mode", mode); } catch (e) {} }
+  function getMode() { return mode; }
+  function notifySyncError(action, err) {
+    var msg = "Sync failed (" + action + "): change saved locally";
+    if (typeof root.dispatchEvent === "function") root.dispatchEvent(new (root.CustomEvent || root.Event)("qi-sync-error", { detail: { action: action, error: err } }));
+    if (typeof console !== "undefined") console.warn("[QI sync]", msg, err);
+  }
+
+  // Wrap case mutations with API sync
+  var _addCase = addCase;
+  addCase = function (c) {
+    var result = _addCase(c);
+    if (mode === "api" && typeof root.QIAPI !== "undefined" && root.QIAPI) {
+      try { var p = root.QIAPI.createCase(result); if (p && typeof p.catch === "function") p.catch(function (e) { notifySyncError("createCase", e); }); } catch (e) { notifySyncError("createCase", e); }
+    }
+    return result;
+  };
+  var _updateCase = updateCase;
+  updateCase = function (id, patch) {
+    var result = _updateCase(id, patch);
+    if (mode === "api" && typeof root.QIAPI !== "undefined" && root.QIAPI) {
+      try { var p = root.QIAPI.updateCase(id, patch); if (p && typeof p.catch === "function") p.catch(function (e) { notifySyncError("updateCase", e); }); } catch (e) { notifySyncError("updateCase", e); }
+    }
+    return result;
+  };
+  var _deleteCase = deleteCase;
+  deleteCase = function (id) {
+    var result = _deleteCase(id);
+    if (mode === "api" && typeof root.QIAPI !== "undefined" && root.QIAPI) {
+      try { var p = root.QIAPI.deleteCase(id); if (p && typeof p.catch === "function") p.catch(function (e) { notifySyncError("deleteCase", e); }); } catch (e) { notifySyncError("deleteCase", e); }
+    }
+    return result;
+  };
+
+  // Wrap project mutations with API sync
+  var _addProject = addProject;
+  addProject = function (name) {
+    var result = _addProject(name);
+    if (mode === "api" && typeof root.QIAPI !== "undefined" && root.QIAPI) {
+      try { var p = root.QIAPI.createProject({ name: name || "New Project" }); if (p && typeof p.catch === "function") p.catch(function (e) { notifySyncError("createProject", e); }); } catch (e) { notifySyncError("createProject", e); }
+    }
+    return result;
+  };
+  var _deleteProject = deleteProject;
+  deleteProject = function (id) {
+    var result = _deleteProject(id);
+    if (mode === "api" && typeof root.QIAPI !== "undefined" && root.QIAPI) {
+      try { var p = root.QIAPI.deleteProject(id); if (p && typeof p.catch === "function") p.catch(function (e) { notifySyncError("deleteProject", e); }); } catch (e) { notifySyncError("deleteProject", e); }
+    }
+    return result;
+  };
+  var _renameProject = renameProject;
+  renameProject = function (id, name) {
+    var result = _renameProject(id, name);
+    if (mode === "api" && typeof root.QIAPI !== "undefined" && root.QIAPI) {
+      try { var p = root.QIAPI.updateProject(id, { name: name }); if (p && typeof p.catch === "function") p.catch(function (e) { notifySyncError("updateProject", e); }); } catch (e) { notifySyncError("updateProject", e); }
+    }
+    return result;
+  };
+
+  // Wrap register mutations with API sync
+  var _regAdd = regAdd;
+  regAdd = function (regId, row) {
+    var result = _regAdd(regId, row);
+    if (mode === "api" && typeof root.QIAPI !== "undefined" && root.QIAPI) {
+      try { var p = root.QIAPI.createRegister(regId, result); if (p && typeof p.catch === "function") p.catch(function (e) { notifySyncError("createRegister", e); }); } catch (e) { notifySyncError("createRegister", e); }
+    }
+    return result;
+  };
+  var _regUpdate = regUpdate;
+  regUpdate = function (regId, rowId, patch) {
+    var result = _regUpdate(regId, rowId, patch);
+    if (mode === "api" && typeof root.QIAPI !== "undefined" && root.QIAPI) {
+      try { var p = root.QIAPI.updateRegister(regId, rowId, patch); if (p && typeof p.catch === "function") p.catch(function (e) { notifySyncError("updateRegister", e); }); } catch (e) { notifySyncError("updateRegister", e); }
+    }
+    return result;
+  };
+  var _regDelete = regDelete;
+  regDelete = function (regId, rowId) {
+    var result = _regDelete(regId, rowId);
+    if (mode === "api" && typeof root.QIAPI !== "undefined" && root.QIAPI) {
+      try { var p = root.QIAPI.deleteRegister(regId, rowId); if (p && typeof p.catch === "function") p.catch(function (e) { notifySyncError("deleteRegister", e); }); } catch (e) { notifySyncError("deleteRegister", e); }
+    }
+    return result;
+  };
+
+  // Wrap snapshot mutations with API sync
+  var _takeSnapshot = takeSnapshot;
+  takeSnapshot = function (label) {
+    var result = _takeSnapshot(label);
+    if (mode === "api" && typeof root.QIAPI !== "undefined" && root.QIAPI) {
+      try { var p = root.QIAPI.createSnapshot({ projectId: activeProjectId(), label: label }); if (p && typeof p.catch === "function") p.catch(function (e) { notifySyncError("createSnapshot", e); }); } catch (e) { notifySyncError("createSnapshot", e); }
+    }
+    return result;
+  };
+  var _deleteSnapshot = deleteSnapshot;
+  deleteSnapshot = function (id) {
+    var result = _deleteSnapshot(id);
+    if (mode === "api" && typeof root.QIAPI !== "undefined" && root.QIAPI) {
+      try { var p = root.QIAPI.deleteSnapshot(id); if (p && typeof p.catch === "function") p.catch(function (e) { notifySyncError("deleteSnapshot", e); }); } catch (e) { notifySyncError("deleteSnapshot", e); }
+    }
+    return result;
+  };
+  var _restoreSnapshot = restoreSnapshot;
+  restoreSnapshot = function (id) {
+    var result = _restoreSnapshot(id);
+    if (mode === "api" && typeof root.QIAPI !== "undefined" && root.QIAPI) {
+      try { var p = root.QIAPI.restoreSnapshot(id); if (p && typeof p.catch === "function") p.catch(function (e) { notifySyncError("restoreSnapshot", e); }); } catch (e) { notifySyncError("restoreSnapshot", e); }
+    }
+    return result;
+  };
+
   const API = { uid, seed, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
     undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete, togglePin, reorderPin,
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
@@ -547,7 +661,8 @@
     regRows, regAdd, regUpdate, regDelete, regLabel, regBulkDelete, regTogglePin, evm: () => C.evm(validCases(), get().project),
     gage, setGageCell, setGageConfig, gageResult, cashflow, setCashflow,
     xbar, setXbarCell, setXbarConfig, xbarResult, scorecard,
-    spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy };
+    spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy,
+    setMode, getMode };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);

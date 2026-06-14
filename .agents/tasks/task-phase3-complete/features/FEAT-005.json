@@ -2,7 +2,7 @@
   "id": "FEAT-005",
   "type": "feat",
   "description": "Extend the frontend API client (qi-webapp/js/api.js) with all new endpoint methods, and extend store.js mode='api' sync to cover project/register/snapshot mutations.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Extend qi-webapp/js/api.js with new methods on the QIAPI object: listProjects(), createProject(data), updateProject(id, data), deleteProject(id), listRegisters(type, projectId), createRegister(type, data), updateRegister(type, id, data), deleteRegister(type, id), listSnapshots(projectId), createSnapshot(data), restoreSnapshot(id), deleteSnapshot(id), createShareToken(data), listShareTokens(projectId), revokeShareToken(id), changePassword(currentPassword, newPassword). Each method calls the request() helper with the appropriate HTTP method and path.",
     "Extend qi-webapp/js/store.js mode='api' sync: Wrap addProject, deleteProject, renameProject with the same pattern used for cases (call local function first, then fire-and-forget API call with .catch for error toast). Similarly wrap regAdd, regUpdate, regDelete, takeSnapshot, deleteSnapshot, restoreSnapshot.",
