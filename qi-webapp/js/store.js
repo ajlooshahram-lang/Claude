@@ -537,6 +537,90 @@
     return issues;
   }
 
+  // ---- Document Management sub-store ----
+  // Categories specific to submarine cable projects
+  var DOC_CATEGORIES = [
+    "survey-reports", "otdr-traces", "permits-licenses", "as-built-charts",
+    "correspondence", "payment-certificates", "method-statements", "test-certificates",
+    "environmental", "hse", "contracts", "design-drawings", "meeting-minutes", "progress-reports"
+  ];
+
+  function _docRegistry() {
+    var s = get();
+    if (!Array.isArray(s.documentRegistry)) s.documentRegistry = [];
+    return s.documentRegistry;
+  }
+
+  function addDocument(meta) {
+    meta = meta || {};
+    var doc = {
+      id: uid(),
+      title: meta.title || "",
+      category: meta.category || "",
+      phase: meta.phase || "",
+      packageRef: meta.packageRef || "",
+      description: meta.description || "",
+      fileType: meta.fileType || "",
+      fileSize: meta.fileSize || 0,
+      uploadedBy: meta.uploadedBy || "",
+      tags: Array.isArray(meta.tags) ? meta.tags : [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      status: "active",
+      deleted: false
+    };
+    _docRegistry().push(doc);
+    logAudit("Added", "Document", (doc.title || "").slice(0, 60));
+    save();
+    return doc;
+  }
+
+  function listDocuments(filter) {
+    filter = filter || {};
+    var docs = _docRegistry().filter(function(d) { return !d.deleted; });
+    if (filter.category) docs = docs.filter(function(d) { return d.category === filter.category; });
+    if (filter.phase) docs = docs.filter(function(d) { return d.phase === filter.phase; });
+    if (filter.packageRef) docs = docs.filter(function(d) { return d.packageRef === filter.packageRef; });
+    if (filter.status) docs = docs.filter(function(d) { return d.status === filter.status; });
+    if (filter.tags && filter.tags.length) {
+      docs = docs.filter(function(d) {
+        return filter.tags.some(function(t) { return d.tags.indexOf(t) >= 0; });
+      });
+    }
+    return docs;
+  }
+
+  function updateDocument(id, patch) {
+    var docs = _docRegistry();
+    var idx = -1;
+    for (var i = 0; i < docs.length; i++) { if (docs[i].id === id) { idx = i; break; } }
+    if (idx < 0) return null;
+    patch = patch || {};
+    var keys = Object.keys(patch);
+    for (var k = 0; k < keys.length; k++) {
+      if (keys[k] !== "id" && keys[k] !== "createdAt") docs[idx][keys[k]] = patch[keys[k]];
+    }
+    docs[idx].updatedAt = new Date().toISOString();
+    logAudit("Updated", "Document", (docs[idx].title || "").slice(0, 60));
+    save();
+    return docs[idx];
+  }
+
+  function deleteDocument(id) {
+    var docs = _docRegistry();
+    var idx = -1;
+    for (var i = 0; i < docs.length; i++) { if (docs[i].id === id) { idx = i; break; } }
+    if (idx < 0) return false;
+    docs[idx].deleted = true;
+    docs[idx].status = "archived";
+    docs[idx].updatedAt = new Date().toISOString();
+    logAudit("Deleted", "Document", (docs[idx].title || "").slice(0, 60));
+    save();
+    return true;
+  }
+
+  var DOC_CATEGORIES_LIST = DOC_CATEGORIES;
+
   const API = { uid, seed, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
     undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete, togglePin, reorderPin,
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
@@ -547,7 +631,8 @@
     regRows, regAdd, regUpdate, regDelete, regLabel, regBulkDelete, regTogglePin, evm: () => C.evm(validCases(), get().project),
     gage, setGageCell, setGageConfig, gageResult, cashflow, setCashflow,
     xbar, setXbarCell, setXbarConfig, xbarResult, scorecard,
-    spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy };
+    spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy,
+    addDocument, listDocuments, updateDocument, deleteDocument, DOC_CATEGORIES: DOC_CATEGORIES_LIST };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);

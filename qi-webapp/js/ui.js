@@ -242,6 +242,7 @@
     { id: "scorecard", label: "KPI Scorecard", icon: "▣" },
     { id: "health", label: "Data Health", icon: "✚" },
     { g: "Setup" },
+    { id: "documents", label: "Documents", icon: "📄" },
     { id: "report", label: "Report Pack", icon: "🖨" },
     { id: "audit", label: "History & Backups", icon: "⟲" },
     { id: "config", label: "Settings", icon: "⚙" },
@@ -2034,6 +2035,111 @@
         <div class="readout" style="margin-top:12px"><b>AI recommendation:</b> ${esc(c.ai)}</div></div>`;
   };
   AFTER.impact = function () { const s = $("#impactSel"); if (s) s.addEventListener("change", () => { uiState.impactCase = s.value; go("impact"); }); };
+
+  // ---------- Document Management ----------
+  RENDER.documents = function () {
+    const docs = S.listDocuments({});
+    const categories = S.DOC_CATEGORIES;
+    const phases = (window.QIBrain && window.QIBrain.fibreProfile && window.QIBrain.fibreProfile.phases)
+      ? window.QIBrain.fibreProfile.phases.map(function(p) { return p.name || p; })
+      : ["Planning", "Survey", "Permitting", "Procurement", "Installation", "Testing", "Commissioning", "Operations"];
+    const catBadge = function(cat) {
+      const colors = { "survey-reports": "#1e88e5", "otdr-traces": "#8e24aa", "permits-licenses": "#f57c00",
+        "as-built-charts": "#00897b", "correspondence": "#546e7a", "payment-certificates": "#43a047",
+        "method-statements": "#5e35b1", "test-certificates": "#d81b60", "environmental": "#2e7d32",
+        "hse": "#e53935", "contracts": "#3949ab", "design-drawings": "#00acc1",
+        "meeting-minutes": "#6d4c41", "progress-reports": "#fdd835" };
+      var c = colors[cat] || "#666";
+      return '<span class="badge" style="background:' + c + ';color:#fff;padding:2px 8px;border-radius:3px;font-size:11px">' + esc(cat) + '</span>';
+    };
+    const rows = docs.sort(function(a, b) { return new Date(b.createdAt) - new Date(a.createdAt); }).map(function(d) {
+      return '<tr data-docid="' + d.id + '">' +
+        '<td class="wrap">' + esc(d.title) + '</td>' +
+        '<td>' + catBadge(d.category) + '</td>' +
+        '<td>' + esc(d.phase) + '</td>' +
+        '<td>' + esc(d.packageRef) + '</td>' +
+        '<td>' + esc(d.fileType) + '</td>' +
+        '<td>' + esc(d.uploadedBy) + '</td>' +
+        '<td>' + (d.createdAt ? d.createdAt.slice(0, 10) : "") + '</td>' +
+        '</tr>';
+    }).join("");
+    const catOpts = categories.map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join("");
+    const phaseOpts = phases.map(function(p) { return '<option value="' + esc(p) + '">' + esc(p) + '</option>'; }).join("");
+    return '<div class="card">' +
+      '<div class="card-head"><h3>Document Management <span class="badge" style="background:#2e5496;color:#fff;padding:2px 8px;border-radius:3px;font-size:11px">' + docs.length + '</span></h3>' +
+      '<button class="btn btn-primary btn-sm" id="btnAddDocument">+ Add Document</button></div>' +
+      '<div class="doc-filters" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">' +
+        '<select id="docFilterCat" style="max-width:180px"><option value="">All Categories</option>' + catOpts + '</select>' +
+        '<select id="docFilterPhase" style="max-width:160px"><option value="">All Phases</option>' + phaseOpts + '</select>' +
+        '<select id="docFilterStatus" style="max-width:140px"><option value="">All Status</option><option value="active">Active</option><option value="archived">Archived</option></select>' +
+        '<select id="docSortBy" style="max-width:140px"><option value="date">Sort: Newest</option><option value="category">Sort: Category</option></select>' +
+      '</div>' +
+      '<div class="tbl-wrap"><table class="tbl" id="documentsTable"><thead><tr>' +
+        '<th>Title</th><th>Category</th><th>Phase</th><th>Package</th><th>Type</th><th>Uploaded By</th><th>Date</th>' +
+      '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="text-align:center;padding:24px">No documents yet. Click "Add Document" to begin tracking project documentation.</td></tr>') + '</tbody></table></div>' +
+      '</div>' +
+      '<div id="docFormModal" class="modal-overlay" style="display:none">' +
+        '<div class="modal" style="max-width:500px">' +
+          '<h3>Add Document</h3>' +
+          '<div style="display:flex;flex-direction:column;gap:10px">' +
+            '<input type="text" id="docTitle" placeholder="Document title" style="padding:6px;border:1px solid #ccc;border-radius:4px" />' +
+            '<select id="docCategory"><option value="">Select Category</option>' + catOpts + '</select>' +
+            '<select id="docPhase"><option value="">Select Phase</option>' + phaseOpts + '</select>' +
+            '<input type="text" id="docPackageRef" placeholder="Package reference" style="padding:6px;border:1px solid #ccc;border-radius:4px" />' +
+            '<input type="text" id="docDescription" placeholder="Description" style="padding:6px;border:1px solid #ccc;border-radius:4px" />' +
+            '<select id="docFileType"><option value="">File Type</option><option value="PDF">PDF</option><option value="DWG">DWG</option><option value="XLSX">XLSX</option><option value="DOCX">DOCX</option><option value="SOR">SOR</option><option value="KML">KML</option><option value="CSV">CSV</option><option value="JPG">JPG</option><option value="PNG">PNG</option></select>' +
+            '<input type="text" id="docUploadedBy" placeholder="Uploaded by" style="padding:6px;border:1px solid #ccc;border-radius:4px" />' +
+          '</div>' +
+          '<div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">' +
+            '<button class="btn" id="docFormCancel">Cancel</button>' +
+            '<button class="btn btn-primary" id="docFormSave">Save</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  };
+
+  AFTER.documents = function () {
+    var addBtn = $("#btnAddDocument");
+    if (addBtn) {
+      addBtn.addEventListener("click", function() {
+        var modal = $("#docFormModal");
+        if (modal) modal.style.display = "flex";
+      });
+    }
+    var cancelBtn = $("#docFormCancel");
+    if (cancelBtn) {
+      cancelBtn.addEventListener("click", function() {
+        var modal = $("#docFormModal");
+        if (modal) modal.style.display = "none";
+      });
+    }
+    var saveBtn = $("#docFormSave");
+    if (saveBtn) {
+      saveBtn.addEventListener("click", function() {
+        var title = ($("#docTitle") || {}).value || "";
+        var category = ($("#docCategory") || {}).value || "";
+        var phase = ($("#docPhase") || {}).value || "";
+        var packageRef = ($("#docPackageRef") || {}).value || "";
+        var description = ($("#docDescription") || {}).value || "";
+        var fileType = ($("#docFileType") || {}).value || "";
+        var uploadedBy = ($("#docUploadedBy") || {}).value || "";
+        if (title) {
+          S.addDocument({ title: title, category: category, phase: phase, packageRef: packageRef, description: description, fileType: fileType, uploadedBy: uploadedBy, tags: [] });
+          go("documents");
+        }
+      });
+    }
+    // Filter handlers
+    var filterCat = $("#docFilterCat");
+    var filterPhase = $("#docFilterPhase");
+    var filterStatus = $("#docFilterStatus");
+    var sortBy = $("#docSortBy");
+    function applyFilters() { go("documents"); }
+    if (filterCat) filterCat.addEventListener("change", applyFilters);
+    if (filterPhase) filterPhase.addEventListener("change", applyFilters);
+    if (filterStatus) filterStatus.addEventListener("change", applyFilters);
+    if (sortBy) sortBy.addEventListener("change", applyFilters);
+  };
 
   // ---------- Report Pack (printable) ----------
   RENDER.report = function () {

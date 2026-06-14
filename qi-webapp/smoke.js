@@ -32,7 +32,7 @@ ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard rende
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 
 // 2) navigate every view (simulate clicks)
-const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","report","audit","config","help"];
+const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","documents","report","audit","config","help"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -738,6 +738,17 @@ var brainNav2 = doc.querySelector('.nav-item[data-view="brain"]');
 if (brainNav2) brainNav2.dispatchEvent(new window.Event("click", { bubbles: true }));
 var brainAlertPanel = doc.getElementById("brainAlertPanel");
 ok(brainAlertPanel != null, "Alert: alert panel renders in brain intelligence view");
+
+// 47) Document Management System
+var docsNavBtn = doc.querySelector('.nav-item[data-view="documents"]');
+ok(docsNavBtn != null, "Documents nav item exists");
+
+if (docsNavBtn) docsNavBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+var docsTable = doc.getElementById("documentsTable");
+ok(docsTable != null && docsTable.tagName === "TABLE", "Documents view renders a table");
+
+var addDocBtn = doc.getElementById("btnAddDocument");
+ok(addDocBtn != null, "Add Document button exists");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
