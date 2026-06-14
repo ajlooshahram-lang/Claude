@@ -2191,30 +2191,32 @@ function renderModule(mod) {
   syncAxes(); // Dynamic coordination
   const main = document.getElementById('mainContent');
   let content = '';
+  // Circuit Manager card at top of every module (except exam)
+  if (mod !== 'exam') content += renderCircuitManager();
   switch(mod) {
-    case 'load': content = renderLoad(); break;
-    case 'fuse': content = renderFuse(); break;
-    case 'mcb': content = renderMCB(); break;
-    case 'mccb': content = renderMCCB(); break;
-    case 'cable': content = renderCable(); break;
-    case 'vdrop': content = renderVdrop(); break;
-    case 'scircuit': content = renderShortCircuit(); break;
-    case 'trafo': content = renderTrafo(); break;
-    case 'standards': content = renderStandards(); break;
-    case 'bank': content = renderBank(); break;
-    case 'ai': content = renderAiElectrician(); break;
-    case 'bid': content = renderBid(); break;
-    case 'projekt': content = renderProjekt(); break;
-    case 'verify': content = renderVerify(); break;
-    case 'draw': content = renderDrawing(); break;
-    case 'selectivity': content = renderSelectivity(); break;
-    case 'zs': content = renderZs(); break;
-    case 'motor': content = renderMotorStart(); break;
-    case 'curves': content = renderCurves(); break;
-    case 'ev': content = renderEvCharger(); break;
-    case 'harmonics': content = renderHarmonics(); break;
-    case 'gen': content = renderGenerator(); break;
-    case 'plc': content = renderPlc(); break;
+    case 'load': content += renderLoad(); break;
+    case 'fuse': content += renderFuse(); break;
+    case 'mcb': content += renderMCB(); break;
+    case 'mccb': content += renderMCCB(); break;
+    case 'cable': content += renderCable(); break;
+    case 'vdrop': content += renderVdrop(); break;
+    case 'scircuit': content += renderShortCircuit(); break;
+    case 'trafo': content += renderTrafo(); break;
+    case 'standards': content += renderStandards(); break;
+    case 'bank': content += renderBank(); break;
+    case 'ai': content += renderAiElectrician(); break;
+    case 'bid': content += renderBid(); break;
+    case 'projekt': content += renderProjekt(); break;
+    case 'verify': content += renderVerify(); break;
+    case 'draw': content += renderDrawing(); break;
+    case 'selectivity': content += renderSelectivity(); break;
+    case 'zs': content += renderZs(); break;
+    case 'motor': content += renderMotorStart(); break;
+    case 'curves': content += renderCurves(); break;
+    case 'ev': content += renderEvCharger(); break;
+    case 'harmonics': content += renderHarmonics(); break;
+    case 'gen': content += renderGenerator(); break;
+    case 'plc': content += renderPlc(); break;
     case 'exam': content = renderExam(); break;
   }
   // Append AI assistant to every module
@@ -6323,6 +6325,253 @@ let projectState = { name: 'Projekt 1', circuits: [] };
 (function restoreProject(){ try { const s = JSON.parse(localStorage.getItem('elProject')||'null'); if (s) projectState = s; } catch(e){} })();
 function saveProject(){ localStorage.setItem('elProject', JSON.stringify(projectState)); }
 
+// ===== MULTI-CIRCUIT PROJECT BUILDER =====
+// Full state save/restore per named circuit. localStorage key: 'projectCircuits'
+let circuitManagerState = { activeCircuitName: null };
+function getProjectCircuits() {
+  try { return JSON.parse(localStorage.getItem('projectCircuits') || '[]'); } catch(e) { return []; }
+}
+function saveProjectCircuits(circuits) {
+  localStorage.setItem('projectCircuits', JSON.stringify(circuits));
+}
+
+function captureCircuitState() {
+  return {
+    loadState: JSON.parse(JSON.stringify(loadState)),
+    loadList: JSON.parse(JSON.stringify(loadList)),
+    cableState: JSON.parse(JSON.stringify(cableState)),
+    vdropState: JSON.parse(JSON.stringify(vdropState)),
+    scState: JSON.parse(JSON.stringify(scState)),
+    mcbState: JSON.parse(JSON.stringify(mcbState)),
+    mccbState: JSON.parse(JSON.stringify(mccbState)),
+    fuseState: JSON.parse(JSON.stringify(fuseState))
+  };
+}
+
+function restoreCircuitState(state) {
+  if (state.loadState) Object.assign(loadState, state.loadState);
+  if (state.loadList) { loadList.length = 0; state.loadList.forEach(function(c){ loadList.push(Object.assign({}, c)); }); }
+  if (state.cableState) Object.assign(cableState, state.cableState);
+  if (state.vdropState) Object.assign(vdropState, state.vdropState);
+  if (state.scState) Object.assign(scState, state.scState);
+  if (state.mcbState) Object.assign(mcbState, state.mcbState);
+  if (state.mccbState) Object.assign(mccbState, state.mccbState);
+  if (state.fuseState) Object.assign(fuseState, state.fuseState);
+}
+
+function circuitGetIB(state) {
+  var P = state.loadState.power * 1000;
+  var cosP = state.loadState.cosPhi;
+  var sf = state.loadState.simFactor;
+  var ef = state.loadState.expFactor;
+  var ib;
+  if (state.loadState.voltage === '3x400') { ib = P / (Math.sqrt(3) * 400 * cosP); }
+  else { ib = P / (230 * cosP); }
+  return ib * sf * ef;
+}
+
+function circuitGetProtection(state) {
+  if (state.mcbState && state.mcbState.rating) return state.mcbState.curve + state.mcbState.rating + 'A';
+  if (state.fuseState && state.fuseState.size) return state.fuseState.holder + ' ' + state.fuseState.size + 'A';
+  if (state.mccbState && state.mccbState.inVal) return state.mccbState.frame + ' ' + state.mccbState.inVal + 'A';
+  return '--';
+}
+
+function circuitGetCable(state) {
+  if (state.cableState && state.cableState.crossSection) return state.cableState.crossSection + ' mm\u00B2';
+  return '--';
+}
+
+function circuitCheckOk(state) {
+  var ib = circuitGetIB(state);
+  var rating = 0;
+  if (state.mcbState && state.mcbState.rating) rating = state.mcbState.rating;
+  else if (state.fuseState && state.fuseState.size) rating = state.fuseState.size;
+  else if (state.mccbState && state.mccbState.inVal) rating = state.mccbState.inVal;
+  if (!rating) return false;
+  if (ib > rating) return false;
+  if (!state.cableState || !state.cableState.crossSection) return false;
+  return true;
+}
+
+// Show save-circuit modal (click-only name selection)
+function circuitShowSaveModal() {
+  var da = lang === 'da';
+  var circuits = getProjectCircuits();
+  var PRESETS = [
+    'Gruppe 1','Gruppe 2','Gruppe 3','Gruppe 4','Gruppe 5','Gruppe 6',
+    'Gruppe 7','Gruppe 8','Gruppe 9','Gruppe 10','Gruppe 11','Gruppe 12',
+    'EV-lader','Ovn','Varmepumpe','Motor 1','Belysning','Stik 1-6','Ventilation'
+  ];
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  var modal = document.createElement('div');
+  modal.style.cssText = 'background:var(--card);border-radius:var(--radius-lg);padding:24px;max-width:480px;width:100%;box-shadow:var(--shadow-lg);border:1px solid var(--border);max-height:80vh;overflow-y:auto';
+  var html = '<div style="font-weight:700;font-size:1rem;margin-bottom:12px;color:var(--primary)">' + (da ? 'Gem kreds' : 'Save circuit') + '</div>';
+  html += '<div style="font-size:0.82rem;color:var(--text-light);margin-bottom:16px">' + (da ? 'Klik et navn for at gemme den aktuelle dimensionering:' : 'Click a name to save the current dimensioning:') + '</div>';
+
+  // If updating existing, show update button first
+  if (circuitManagerState.activeCircuitName) {
+    html += '<div style="margin-bottom:14px"><button class="sel-btn" style="width:100%;text-align:left;background:var(--primary);color:#fff;border-color:var(--primary)" data-save-name="__UPDATE__">\u21BB ' + (da ? 'Opdater' : 'Update') + ' "' + circuitManagerState.activeCircuitName + '"</button></div>';
+    html += '<div style="border-bottom:1px solid var(--border);margin-bottom:12px"></div>';
+  }
+
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">';
+  PRESETS.forEach(function(name) {
+    var exists = circuits.some(function(c){ return c.name === name; });
+    var style = exists ? 'opacity:0.5;text-decoration:line-through' : '';
+    html += '<button class="sel-btn" style="' + style + '" data-save-name="' + name + '">' + name + '</button>';
+  });
+  html += '</div>';
+  html += '<div style="margin-top:14px;display:flex;justify-content:flex-end"><button class="sel-btn" id="circuitSaveCancel">' + (da ? 'Annuller' : 'Cancel') + '</button></div>';
+  modal.innerHTML = html;
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay || e.target.id === 'circuitSaveCancel') { document.body.removeChild(overlay); return; }
+    var btn = e.target.closest('[data-save-name]');
+    if (btn) {
+      var name = btn.getAttribute('data-save-name');
+      if (name === '__UPDATE__') { name = circuitManagerState.activeCircuitName; }
+      circuitSaveAs(name);
+      document.body.removeChild(overlay);
+    }
+  });
+}
+
+function circuitSaveAs(name) {
+  var circuits = getProjectCircuits();
+  var existIdx = -1;
+  for (var i = 0; i < circuits.length; i++) { if (circuits[i].name === name) { existIdx = i; break; } }
+  var entry = { name: name, state: captureCircuitState(), created: new Date().toISOString() };
+  if (existIdx >= 0) { circuits[existIdx] = entry; }
+  else { circuits.push(entry); }
+  saveProjectCircuits(circuits);
+  circuitManagerState.activeCircuitName = name;
+  renderModule(activeModule);
+}
+
+// Load a saved circuit
+function circuitLoad(idx) {
+  var circuits = getProjectCircuits();
+  if (!circuits[idx]) return;
+  restoreCircuitState(circuits[idx].state);
+  circuitManagerState.activeCircuitName = circuits[idx].name;
+  renderModule(activeModule);
+}
+
+// Delete circuit with confirm modal
+function circuitShowDeleteModal(idx) {
+  var da = lang === 'da';
+  var circuits = getProjectCircuits();
+  if (!circuits[idx]) return;
+  var cName = circuits[idx].name;
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  var modal = document.createElement('div');
+  modal.style.cssText = 'background:var(--card);border-radius:var(--radius-lg);padding:24px;max-width:360px;width:100%;box-shadow:var(--shadow-lg);border:1px solid var(--border)';
+  modal.innerHTML = '<div style="font-weight:700;font-size:1rem;margin-bottom:12px;color:var(--danger)">' + (da ? 'Slet kreds?' : 'Delete circuit?') + '</div>'
+    + '<div style="font-size:0.85rem;color:var(--text-light);margin-bottom:18px">' + (da ? 'Kreds "' + cName + '" slettes permanent.' : 'Circuit "' + cName + '" will be permanently deleted.') + '</div>'
+    + '<div style="display:flex;gap:10px;justify-content:flex-end">'
+    + '<button class="sel-btn" id="circuitDelCancel">' + (da ? 'Annuller' : 'Cancel') + '</button>'
+    + '<button class="sel-btn" style="background:var(--danger);color:#fff;border-color:var(--danger)" id="circuitDelConfirm">' + (da ? 'Ja, slet' : 'Yes, delete') + '</button>'
+    + '</div>';
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay || e.target.id === 'circuitDelCancel') { document.body.removeChild(overlay); return; }
+    if (e.target.id === 'circuitDelConfirm') {
+      circuits.splice(idx, 1);
+      saveProjectCircuits(circuits);
+      if (circuitManagerState.activeCircuitName === cName) circuitManagerState.activeCircuitName = null;
+      document.body.removeChild(overlay);
+      renderModule(activeModule);
+    }
+  });
+}
+
+// New circuit (clear state)
+function circuitNew() {
+  loadState.voltage = '3x400'; loadState.power = 10; loadState.cosPhi = 0.9; loadState.simFactor = 1.0; loadState.expFactor = 1.0;
+  loadList.length = 0;
+  cableState.material = 'copper'; cableState.type = 'NOIKLX'; cableState.cores = '5G'; cableState.crossSection = null; cableState.installMethod = 'C'; cableState.temp = 30; cableState.grouping = 1;
+  vdropState.length = 50;
+  scState.zNet = 1; scState.zTrafo = 5;
+  mcbState.type = 'C60N'; mcbState.curve = 'B'; mcbState.rating = null; mcbState.poles = 'multi';
+  mccbState.frame = 'NSX 400'; mccbState.trip = 'F'; mccbState.inVal = 400; mccbState.ioMult = 0.8; mccbState.isdMult = 2;
+  fuseState.holder = 'D02'; fuseState.size = null;
+  circuitManagerState.activeCircuitName = null;
+  renderModule(activeModule);
+}
+
+// Render the Circuit Manager card (shown at top of every module)
+function renderCircuitManager() {
+  var da = lang === 'da';
+  var circuits = getProjectCircuits();
+  var activeName = circuitManagerState.activeCircuitName || (da ? 'Unavngivet' : 'Unnamed');
+  var isActive = circuitManagerState.activeCircuitName !== null;
+
+  var html = '<div class="card fade-in no-print" style="border-left:4px solid var(--primary);margin-bottom:8px;padding:12px 16px">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">';
+  html += '<div style="display:flex;align-items:center;gap:8px">';
+  html += '<span style="font-size:1.1rem">\uD83D\uDD0C</span>';
+  html += '<span style="font-weight:700;font-size:0.9rem;color:var(--text)">' + (da ? 'Aktiv kreds:' : 'Active circuit:') + '</span>';
+  html += '<span style="font-weight:600;font-size:0.9rem;color:' + (isActive ? 'var(--primary)' : 'var(--text-light)') + '">' + activeName + '</span>';
+  html += '</div>';
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+  html += '<button class="sel-btn" onclick="circuitShowSaveModal()" style="font-size:0.78rem;padding:4px 10px">\uD83D\uDCBE ' + (da ? 'Gem kreds' : 'Save circuit') + '</button>';
+  html += '<button class="sel-btn" onclick="circuitNew()" style="font-size:0.78rem;padding:4px 10px">\u2795 ' + (da ? 'Ny kreds' : 'New circuit') + '</button>';
+  html += '</div>';
+  html += '</div>';
+
+  // Circuit list chips
+  if (circuits.length > 0) {
+    html += '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">';
+    circuits.forEach(function(c, idx) {
+      var ib = circuitGetIB(c.state);
+      var cable = circuitGetCable(c.state);
+      var prot = circuitGetProtection(c.state);
+      var ok = circuitCheckOk(c.state);
+      var isCurrentlyActive = (c.name === circuitManagerState.activeCircuitName);
+      var chipBg = ok ? 'rgba(0,200,83,0.08)' : 'rgba(255,50,50,0.08)';
+      var chipBorder = ok ? 'var(--success)' : 'var(--danger)';
+      if (isCurrentlyActive) { chipBg = 'rgba(59,130,246,0.12)'; chipBorder = 'var(--primary)'; }
+      html += '<div style="display:inline-flex;align-items:center;gap:4px;background:' + chipBg + ';border:1px solid ' + chipBorder + ';border-radius:8px;padding:4px 10px;font-size:0.76rem;cursor:pointer" onclick="circuitLoad(' + idx + ')">';
+      html += '<span style="font-weight:700;color:var(--text)">' + c.name + '</span>';
+      html += '<span style="color:var(--text-light)">' + ib.toFixed(1) + 'A</span>';
+      html += '<span style="color:var(--text-light)">' + cable + '</span>';
+      html += '<span style="color:var(--text-light)">' + prot + '</span>';
+      html += '<span style="color:' + (ok ? 'var(--success)' : 'var(--danger)') + '">' + (ok ? '\u2713' : '\u26A0') + '</span>';
+      html += '<span style="color:var(--danger);cursor:pointer;font-weight:700;margin-left:4px" onclick="event.stopPropagation();circuitShowDeleteModal(' + idx + ')">\u2717</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+
+    // Project totals
+    var totalIB = 0; var totalKW = 0; var allOkCount = 0;
+    circuits.forEach(function(c) {
+      totalIB += circuitGetIB(c.state);
+      totalKW += c.state.loadState.power * c.state.loadState.simFactor * c.state.loadState.expFactor;
+      if (circuitCheckOk(c.state)) allOkCount++;
+    });
+    html += '<div style="margin-top:8px;padding:6px 10px;background:var(--bg);border-radius:6px;font-size:0.78rem;color:var(--text-light);display:flex;gap:16px;flex-wrap:wrap">';
+    html += '<span>\u03A3 ' + (da ? 'Kredse' : 'Circuits') + ': <b style="color:var(--text)">' + circuits.length + '</b></span>';
+    html += '<span>\u03A3 IB: <b style="color:var(--text)">' + totalIB.toFixed(1) + ' A</b></span>';
+    html += '<span>\u03A3 P: <b style="color:var(--text)">' + totalKW.toFixed(1) + ' kW</b></span>';
+    html += '<span>' + (da ? 'OK' : 'OK') + ': <b style="color:' + (allOkCount === circuits.length ? 'var(--success)' : 'var(--danger)') + '">' + allOkCount + '/' + circuits.length + '</b></span>';
+    // Check against main fuse capacity
+    var mainRating = mcbState.rating || fuseState.size || mccbState.inVal || 0;
+    if (mainRating > 0) {
+      var overloaded = totalIB > mainRating;
+      html += '<span>' + (da ? 'Hovedsikring' : 'Main fuse') + ': <b style="color:' + (overloaded ? 'var(--danger)' : 'var(--success)') + '">' + mainRating + 'A ' + (overloaded ? '\u26A0 OVERBELASTET' : '\u2713') + '</b></span>';
+    }
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
 function currentVdropPct() {
   const cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
   const ct = cables[cableState.type]; const cc = ct && ct[cableState.cores] ? ct[cableState.cores] : {};
@@ -6893,10 +7142,26 @@ function buildSLD(){
   // Clickable, animated current flow, real project data on every element.
 
   // --- DATA GATHERING ---
-  let cons = loadList.length ? loadList.slice(0, 16) : [
+  // Include saved project circuits in SLD
+  let savedCircuits = getProjectCircuits();
+  let cons = [];
+  if (savedCircuits.length > 0) {
+    // Show all saved circuits as branches
+    savedCircuits.forEach(function(sc) {
+      var ib = circuitGetIB(sc.state);
+      var prot = circuitGetProtection(sc.state);
+      var cable = circuitGetCable(sc.state);
+      var phase = sc.state.loadState.voltage === '3x400' ? '3' : 'L1';
+      cons.push({ kW: sc.state.loadState.power, cos: sc.state.loadState.cosPhi, sf: sc.state.loadState.simFactor, phase: phase, name: sc.name, _prot: prot, _cable: cable, _ok: circuitCheckOk(sc.state) });
+    });
+  } else if (loadList.length) {
+    cons = loadList.slice(0, 16);
+  } else {
+    cons = [
     {kW:11,cos:0.9,sf:1,phase:'3',name:'EV Lader'},{kW:4,cos:0.9,sf:0.7,phase:'3',name:'Komfur'},
     {kW:2.3,cos:0.95,sf:0.6,phase:'L1',name:'Stikkontakter'},{kW:1.5,cos:0.95,sf:1,phase:'L2',name:'Belysning'}
   ];
+  }
   const sch = calcLoadSchedule();
   const totalKVA = loadList.length ? sch.kVA : 18.5;
   const totalKW = loadList.length ? sch.kW : 14.5;
