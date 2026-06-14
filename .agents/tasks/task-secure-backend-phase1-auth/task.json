@@ -1,7 +1,14 @@
 {
   "task_id": "task-secure-backend-phase1-auth",
   "task_description": "Phase 1 secure backend: authentication (Argon2id + server-side sessions + TOTP MFA), RBAC middleware, Case CRUD with tenant isolation, integration tests with real Postgres, and CI update.",
-  "status": "in_progress",
+  "status": "completed",
   "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
-  "blocked_reason": null
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "All 26 tests pass (10 auth + 11 cases + 5 health). Build (prisma generate + tsc) passes cleanly. Security fixes applied: cross-tenant projectId validation in POST /cases, register error handling for P2002/generic errors, and new test for cross-tenant case creation block."
+  }
 }
