@@ -930,7 +930,8 @@ const T = {
       test: '\uD83D\uDCCB Afpr\u00F8vning',
       light: '\uD83D\uDCA1 Belysning',
       fire: '\uD83D\uDD25 Brandalarm',
-      watchdog: '\uD83D\uDC15 Vagthund'
+      watchdog: '\uD83D\uDC15 Vagthund',
+      lcc: '\uD83D\uDCCA LCC-analyse'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1049,7 +1050,8 @@ const T = {
       test: '\uD83D\uDCCB Testing',
       light: '\uD83D\uDCA1 Lighting',
       fire: '\uD83D\uDD25 Fire Alarm',
-      watchdog: '\uD83D\uDC15 Watchdog'
+      watchdog: '\uD83D\uDC15 Watchdog',
+      lcc: '\uD83D\uDCCA LCC Analysis'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -2388,6 +2390,7 @@ function renderModule(mod) {
     case 'light': content += renderLight(); break;
     case 'fire': content += renderFire(); break;
     case 'watchdog': content += renderWatchdog(); break;
+    case 'lcc': content += renderLCC(); break;
     case 'home': content += renderDashboard(); break;
     case 'exam': content = renderExam(); break;
   }
@@ -17998,6 +18001,88 @@ function renderWatchdog(){
   html+='<div class="result-row"><span class="label">'+(da?'Over 25 \u00E5r (installationens levetid)':'Over 25 years (installation lifetime)')+'</span><span class="value" style="font-weight:700">'+(totalSaving*25).toLocaleString()+' DKK + '+(totalCo2*25/1000).toFixed(1)+' ton CO\u2082</span></div>';
   html+='<div style="padding:8px 2px;margin-top:8px;font-size:.88rem;color:var(--text-light)">'+(da?'Beregnet ud fra dansk el-net CO\u2082-faktor (0,14 kg/kWh) og aktuelle energipriser. Faktiske besparelser afh\u00E6nger af driftsprofil.':'Based on Danish grid CO\u2082 factor (0.14 kg/kWh) and current energy prices. Actual savings depend on usage profile.')+'</div>';
   html+='</div></div>';
+  return html;
+}
+
+// ===== LIFECYCLE COST ANALYSIS (LCC) =====
+function renderLCC(){
+  const da=lang==='da';
+  const ib=calcIB(), sch=calcLoadSchedule();
+  const findings=runEnergyWatchdog();
+  const H=watchdogState.hours||2500, P=watchdogState.price||2.5, LT=watchdogState.lifetime||25, DR=watchdogState.discountRate||0.04;
+  const CO2=watchdogState.co2factor||0.14;
+
+  // Standard design costs
+  const annualEnergy=sch.kW*H; // kWh/year
+  const annualCost=annualEnergy*P;
+  const annualCO2=annualEnergy*CO2/1000; // tons
+
+  // Optimized design costs (subtract all watchdog savings)
+  const totalAnnualSaving=findings.reduce(function(s,f){return s+f.saving_dkk;},0);
+  const totalAnnualKwhSaving=findings.reduce(function(s,f){return s+f.saving_kwh;},0);
+  const totalInvestment=findings.reduce(function(s,f){return s+(f.investment||0);},0);
+
+  const optAnnualCost=annualCost-totalAnnualSaving;
+  const optAnnualEnergy=annualEnergy-totalAnnualKwhSaving;
+  const optAnnualCO2=optAnnualEnergy*CO2/1000;
+
+  // NPV calculation over lifetime
+  var npvStd=0, npvOpt=0;
+  for(var yr=1;yr<=LT;yr++){
+    var factor=1/Math.pow(1+DR,yr);
+    npvStd+=annualCost*factor;
+    npvOpt+=optAnnualCost*factor;
+  }
+  npvOpt+=totalInvestment; // add upfront investment
+  var npvSaving=npvStd-npvOpt;
+  var co2Lifetime=(annualCO2-optAnnualCO2)*LT;
+
+  let html='<div class="card fade-in"><div class="card-title">\uD83D\uDCCA '+(da?'Livscyklusanalyse (LCC) \u2014 Standard vs. Optimeret':'Lifecycle Cost Analysis (LCC) \u2014 Standard vs. Optimized')+'</div>';
+  html+='<div class="info-row">'+(da?'Sammenligner det nuv\u00e6rende design med det fuldt optimerede design over '+LT+' \u00e5r (installationens levetid). Diskonteringsrente: '+(DR*100)+'%.':'Compares the current design with the fully optimized design over '+LT+' years (installation lifetime). Discount rate: '+(DR*100)+'%.')+'</div>';
+
+  // Configuration buttons
+  html+='<div class="select-group"><div class="select-label">'+(da?'Driftstimer/\u00e5r':'Operating hours/year')+'</div><div class="select-grid">';
+  [1000,1500,2000,2500,3000,4000,5000,6000,8760].forEach(function(h){
+    html+='<button class="sel-btn '+(H===h?'selected':'')+'" onclick="watchdogState.hours='+h+';renderModule(\'lcc\')">'+h+'</button>';
+  });
+  html+='</div></div>';
+  html+='<div class="select-group"><div class="select-label">'+(da?'Elpris [DKK/kWh]':'Electricity price [DKK/kWh]')+'</div><div class="select-grid">';
+  [1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0].forEach(function(p){
+    html+='<button class="sel-btn '+(P===p?'selected':'')+'" onclick="watchdogState.price='+p+';renderModule(\'lcc\')">'+p+'</button>';
+  });
+  html+='</div></div>';
+  html+='<div class="select-group"><div class="select-label">'+(da?'Levetid [\u00e5r]':'Lifetime [years]')+'</div><div class="select-grid">';
+  [10,15,20,25,30,40].forEach(function(l){
+    html+='<button class="sel-btn '+(LT===l?'selected':'')+'" onclick="watchdogState.lifetime='+l+';renderModule(\'lcc\')">'+l+'</button>';
+  });
+  html+='</div></div></div>';
+
+  // Comparison table
+  html+='<div class="card fade-in"><div class="card-title">'+(da?'Sammenligning':'Comparison')+'</div>';
+  html+='<div class="result-box"><div class="result-title">'+(da?'Standard design (nuv\u00e6rende)':'Standard design (current)')+'</div>';
+  html+='<div class="result-row"><span class="label">'+(da?'\u00c5rligt energiforbrug':'Annual energy')+'</span><span class="value">'+Math.round(annualEnergy).toLocaleString()+' kWh</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'\u00c5rlig omkostning':'Annual cost')+'</span><span class="value">'+Math.round(annualCost).toLocaleString()+' DKK</span></div>';
+  html+='<div class="result-row"><span class="label">CO\u2082/\u00e5r</span><span class="value">'+annualCO2.toFixed(1)+' ton</span></div>';
+  html+='<div class="result-row"><span class="label">NPV ('+LT+' \u00e5r)</span><span class="value" style="font-weight:700">'+Math.round(npvStd).toLocaleString()+' DKK</span></div>';
+  html+='</div>';
+
+  html+='<div class="result-box" style="margin-top:12px;border-color:var(--success)"><div class="result-title" style="color:var(--success)">'+(da?'Optimeret design (med alle Watchdog-anbefalinger)':'Optimized design (with all Watchdog recommendations)')+'</div>';
+  html+='<div class="result-row"><span class="label">'+(da?'\u00c5rligt energiforbrug':'Annual energy')+'</span><span class="value" style="color:var(--success)">'+Math.round(optAnnualEnergy).toLocaleString()+' kWh ('+(annualEnergy>0?'-'+Math.round((1-optAnnualEnergy/annualEnergy)*100)+'%':'N/A')+')</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'\u00c5rlig omkostning':'Annual cost')+'</span><span class="value" style="color:var(--success)">'+Math.round(optAnnualCost).toLocaleString()+' DKK</span></div>';
+  html+='<div class="result-row"><span class="label">CO\u2082/\u00e5r</span><span class="value" style="color:#4caf50">'+optAnnualCO2.toFixed(1)+' ton</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Investering (engangs)':'Investment (one-time)')+'</span><span class="value">'+Math.round(totalInvestment).toLocaleString()+' DKK</span></div>';
+  html+='<div class="result-row"><span class="label">NPV ('+LT+' \u00e5r)</span><span class="value" style="font-weight:700;color:var(--success)">'+Math.round(npvOpt).toLocaleString()+' DKK</span></div>';
+  html+='</div>';
+
+  // Bottom line
+  html+='<div class="result-box" style="margin-top:12px;border-color:var(--success);background:linear-gradient(135deg,rgba(6,214,160,0.08),rgba(0,200,255,0.04))"><div class="result-title" style="font-size:1.2em">\uD83C\uDFC6 '+(da?'Besparelse over levetiden':'Lifetime savings')+'</div>';
+  html+='<div class="result-row"><span class="label">'+(da?'NPV-besparelse':'NPV savings')+'</span><span class="value" style="font-size:1.4em;font-weight:800;color:var(--success)">'+Math.round(npvSaving).toLocaleString()+' DKK</span></div>';
+  html+='<div class="result-row"><span class="label">CO\u2082 '+(da?'undg\u00e5et over':'avoided over')+' '+LT+' '+(da?'\u00e5r':'years')+'</span><span class="value" style="font-weight:700;color:#4caf50">'+co2Lifetime.toFixed(1)+' ton</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Gennemsnitlig simple payback':'Average simple payback')+'</span><span class="value">'+(totalAnnualSaving>0?(totalInvestment/totalAnnualSaving).toFixed(1):'\u2014')+' '+(da?'\u00e5r':'years')+'</span></div>';
+  html+='</div></div>';
+
+  // Print button
+  html+='<div class="card fade-in"><div class="select-grid"><button class="sel-btn selected" onclick="window.print()">\uD83D\uDDA8\uFE0F '+(da?'Udskriv LCC-rapport':'Print LCC report')+'</button><button class="sel-btn" onclick="switchModule(\'watchdog\')">\uD83D\uDC15 '+(da?'Se detaljer i Vagthund':'View details in Watchdog')+'</button></div></div>';
   return html;
 }
 
