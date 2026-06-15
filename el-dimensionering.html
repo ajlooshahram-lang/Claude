@@ -926,7 +926,9 @@ const T = {
       exam: '\uD83C\uDF93 Eksamen',
       zones: '\uD83D\uDEBF Zoner/IP',
       earth: '\uD83C\uDF0D Jording',
-      test: '\uD83D\uDCCB Afpr\u00F8vning'
+      test: '\uD83D\uDCCB Afpr\u00F8vning',
+      light: '\uD83D\uDCA1 Belysning',
+      fire: '\uD83D\uDD25 Brandalarm'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1041,7 +1043,9 @@ const T = {
       exam: '\uD83C\uDF93 Exam',
       zones: '\uD83D\uDEBF Zones/IP',
       earth: '\uD83C\uDF0D Earthing',
-      test: '\uD83D\uDCCB Testing'
+      test: '\uD83D\uDCCB Testing',
+      light: '\uD83D\uDCA1 Lighting',
+      fire: '\uD83D\uDD25 Fire Alarm'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -2377,6 +2381,8 @@ function renderModule(mod) {
     case 'zones': content += renderZones(); break;
     case 'earth': content += renderEarth(); break;
     case 'test': content += renderTest(); break;
+    case 'light': content += renderLight(); break;
+    case 'fire': content += renderFire(); break;
     case 'exam': content = renderExam(); break;
   }
   // Append AI assistant to every module
@@ -17106,6 +17112,116 @@ function testProtocolBuildDoc() {
 
   doc += '</body></html>';
   return doc;
+}
+
+// ===== LIGHTING CALCULATION (DS/EN 12464-1) =====
+let lightState = { roomType:'office', length:5, width:4, height:2.7, luminaire:'panel40', mf:0.8 };
+const LIGHT_ROOMS = { office:{da:'Kontor',en:'Office',lux:500}, classroom:{da:'Klasseværelse',en:'Classroom',lux:300}, corridor:{da:'Gang',en:'Corridor',lux:100}, shop:{da:'Butik',en:'Shop',lux:300}, warehouse:{da:'Lager',en:'Warehouse',lux:200}, bathroom:{da:'Badeværelse',en:'Bathroom',lux:200}, living:{da:'Stue',en:'Living',lux:200}, kitchen:{da:'Køkken',en:'Kitchen',lux:500}, workshop:{da:'Værksted',en:'Workshop',lux:500} };
+const LIGHT_LUMINAIRES = { panel40:{da:'LED panel 40W/4000lm',en:'LED panel 40W/4000lm',w:40,lm:4000}, panel30:{da:'LED panel 30W/3000lm',en:'LED panel 30W/3000lm',w:30,lm:3000}, downlight:{da:'LED downlight 15W/1500lm',en:'LED downlight 15W/1500lm',w:15,lm:1500}, tube:{da:'LED rør 22W/2200lm',en:'LED tube 22W/2200lm',w:22,lm:2200}, highbay:{da:'LED highbay 150W/20000lm',en:'LED highbay 150W/20000lm',w:150,lm:20000}, strip:{da:'LED strip 14W/m/1400lm',en:'LED strip 14W/m/1400lm',w:14,lm:1400} };
+function renderLight(){
+  const da=lang==='da', s=lightState, rm=LIGHT_ROOMS[s.roomType], lum=LIGHT_LUMINAIRES[s.luminaire];
+  const area=s.length*s.width, hm=s.height-0.85;
+  const ri=(s.length*s.width)/(hm*(s.length+s.width));
+  const uf=Math.min(0.9, 0.35+ri*0.12);
+  const totalLm=rm.lux*area;
+  const nLum=Math.ceil(totalLm/(lum.lm*uf*s.mf));
+  const cols=Math.max(1,Math.round(Math.sqrt(nLum*s.width/s.length)));
+  const rows=Math.max(1,Math.ceil(nLum/cols));
+  const actual=rows*cols;
+  const totalW=actual*lum.w;
+  const wperm2=(totalW/area).toFixed(1);
+  const luxAchieved=Math.round((actual*lum.lm*uf*s.mf)/area);
+  let html='<div class="card fade-in"><div class="card-title">\uD83D\uDCA1 '+(da?'Belysningsberegning (DS/EN 12464-1)':'Lighting Calculation (DS/EN 12464-1)')+'</div>';
+  html+='<div class="info-row">'+(da?'Vælg rumtype, dimensioner og armatur. Beregningen følger lumen-metoden.':'Select room type, dimensions and luminaire. Calculation follows the lumen method.')+'</div>';
+  html+='<div class="select-group"><div class="select-label">'+(da?'Rumtype (krav-lux)':'Room type (required lux)')+'</div><div class="select-grid">';
+  Object.entries(LIGHT_ROOMS).forEach(function([k,v]){ html+='<button class="sel-btn '+(s.roomType===k?'selected':'')+'" onclick="lightState.roomType=\''+k+'\';renderModule(\'light\')">'+(da?v.da:v.en)+' ('+v.lux+' lux)</button>'; });
+  html+='</div></div>';
+  html+='<div class="select-group"><div class="select-label">'+(da?'Længde [m]':'Length [m]')+'</div><div class="select-grid">';
+  [2,3,4,5,6,7,8,10,12,15,20].forEach(function(v){ html+='<button class="sel-btn '+(s.length===v?'selected':'')+'" onclick="lightState.length='+v+';renderModule(\'light\')">'+v+'</button>'; });
+  html+='</div></div>';
+  html+='<div class="select-group"><div class="select-label">'+(da?'Bredde [m]':'Width [m]')+'</div><div class="select-grid">';
+  [2,3,4,5,6,7,8,10,12,15].forEach(function(v){ html+='<button class="sel-btn '+(s.width===v?'selected':'')+'" onclick="lightState.width='+v+';renderModule(\'light\')">'+v+'</button>'; });
+  html+='</div></div>';
+  html+='<div class="select-group"><div class="select-label">'+(da?'Monteringshøjde [m]':'Mounting height [m]')+'</div><div class="select-grid">';
+  [2.4,2.7,3.0,3.5,4.0,5.0,6.0,8.0].forEach(function(v){ html+='<button class="sel-btn '+(s.height===v?'selected':'')+'" onclick="lightState.height='+v+';renderModule(\'light\')">'+v+'</button>'; });
+  html+='</div></div>';
+  html+='<div class="select-group"><div class="select-label">'+(da?'Armaturtype':'Luminaire type')+'</div><div class="select-grid">';
+  Object.entries(LIGHT_LUMINAIRES).forEach(function([k,v]){ html+='<button class="sel-btn '+(s.luminaire===k?'selected':'')+'" onclick="lightState.luminaire=\''+k+'\';renderModule(\'light\')">'+(da?v.da:v.en)+'</button>'; });
+  html+='</div></div>';
+  html+='<div class="select-group"><div class="select-label">'+(da?'Vedligeholdelsesfaktor':'Maintenance factor')+'</div><div class="select-grid">';
+  [0.7,0.8,0.85,0.9].forEach(function(v){ html+='<button class="sel-btn '+(s.mf===v?'selected':'')+'" onclick="lightState.mf='+v+';renderModule(\'light\')">'+v+'</button>'; });
+  html+='</div></div></div>';
+  html+='<div class="card fade-in"><div class="card-title">'+(da?'Resultat':'Result')+'</div><div class="result-box">';
+  html+='<div class="result-title">'+(da?'Belysningsplan':'Lighting plan')+'</div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Krav':'Required')+'</span><span class="value">'+rm.lux+' lux ('+(da?rm.da:rm.en)+')</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Areal':'Area')+'</span><span class="value">'+area+' m\u00B2</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Rumindeks (RI)':'Room Index (RI)')+'</span><span class="value">'+ri.toFixed(2)+'</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Udnyttelsesfaktor (UF)':'Utilization Factor (UF)')+'</span><span class="value">'+uf.toFixed(2)+'</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Antal armaturer':'Number of luminaires')+'</span><span class="value" style="font-weight:800;font-size:1.2em">'+actual+' ('+(da?rows+' rækker \u00D7 '+cols+' søjler':rows+' rows \u00D7 '+cols+' columns')+')</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Opnået belysning':'Achieved illumination')+'</span><span class="value" style="color:'+(luxAchieved>=rm.lux?'var(--success)':'var(--danger)')+'">'+luxAchieved+' lux '+(luxAchieved>=rm.lux?'\u2713':'\u2717')+'</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Total effekt':'Total power')+'</span><span class="value">'+totalW+' W</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Effekttæthed':'Power density')+'</span><span class="value">'+wperm2+' W/m\u00B2 '+(parseFloat(wperm2)<=10?'(\u2713 '+( da?'Moderne LED-mål':'Modern LED target')+')':'')+'</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Standard':'Standard')+'</span><span class="value">DS/EN 12464-1</span></div>';
+  html+='</div>';
+  html+='<div class="result-box warning" style="margin-top:10px"><div class="result-title">\u26A0\uFE0F '+(da?'Nødbelysning':'Emergency lighting')+'</div><div style="padding:6px">'+(da?'Flugtveje: min. 1 lux. Anti-panik: min. 0,5 lux. Skal have separat forsyning (batteri/UPS). DS/EN 1838.':'Escape routes: min. 1 lux. Anti-panic: min. 0.5 lux. Must have separate supply (battery/UPS). DS/EN 1838.')+'</div></div></div>';
+  // SVG plan view
+  const svgW=400, svgH=300, pad=40;
+  const rW=svgW-2*pad, rH=svgH-2*pad;
+  const spX=rW/(cols+1), spY=rH/(rows+1);
+  let svg='<svg viewBox="0 0 '+svgW+' '+svgH+'" width="100%" style="border-radius:12px;border:1px solid var(--border);background:#0a1520" xmlns="http://www.w3.org/2000/svg">';
+  svg+='<rect x="'+pad+'" y="'+pad+'" width="'+rW+'" height="'+rH+'" fill="none" stroke="#3a5a70" stroke-width="2" rx="3"/>';
+  svg+='<text x="'+(svgW/2)+'" y="18" text-anchor="middle" fill="#8ab4d0" font-size="11" font-weight="700">'+(da?'Armaturplan ('+rows+'\u00D7'+cols+')':'Luminaire plan ('+rows+'\u00D7'+cols+')')+'</text>';
+  for(let r=0;r<rows;r++){for(let c=0;c<cols;c++){const cx=pad+spX*(c+1),cy=pad+spY*(r+1); svg+='<circle cx="'+cx+'" cy="'+cy+'" r="12" fill="rgba(255,220,80,0.15)" stroke="#ffd166" stroke-width="1.5"/><circle cx="'+cx+'" cy="'+cy+'" r="4" fill="#ffd166" opacity="0.9"/><circle cx="'+cx+'" cy="'+cy+'" r="20" fill="none" stroke="rgba(255,209,102,0.15)" stroke-width="1" style="animation:pulseGlow 3s ease-in-out infinite;animation-delay:'+(r*0.2+c*0.15).toFixed(2)+'s"/>';}}
+  svg+='<text x="'+(svgW/2)+'" y="'+(svgH-8)+'" text-anchor="middle" fill="#5b7790" font-size="9">'+s.length+'m \u00D7 '+s.width+'m \u00B7 '+actual+' '+(da?'armaturer':'luminaires')+' \u00B7 '+luxAchieved+' lux</text></svg>';
+  html+='<div class="card fade-in"><div class="card-title">'+(da?'Armaturplan':'Luminaire plan')+'</div>'+svg+'</div>';
+  return html;
+}
+
+// ===== FIRE ALARM BASICS (DS/EN 54) =====
+let fireState = { building:'office', areaPerFloor:200, floors:2, category:1, detector:'optical' };
+const FIRE_BUILDINGS = { dwelling:{da:'Bolig',en:'Dwelling'}, office:{da:'Kontor',en:'Office'}, shop:{da:'Butik',en:'Shop'}, hotel:{da:'Hotel',en:'Hotel'}, hospital:{da:'Hospital',en:'Hospital'}, industrial:{da:'Industri',en:'Industrial'}, school:{da:'Skole',en:'School'}, parking:{da:'Parkering',en:'Parking'} };
+const FIRE_DETECTORS = { optical:{da:'Optisk røg',en:'Optical smoke',coverage:60}, heat:{da:'Termisk',en:'Heat',coverage:30}, multi:{da:'Multi-sensor',en:'Multi-sensor',coverage:60}, flame:{da:'Flamme',en:'Flame',coverage:80}, beam:{da:'Linjedetektor',en:'Beam',coverage:200} };
+function renderFire(){
+  const da=lang==='da', s=fireState;
+  const det=FIRE_DETECTORS[s.detector], bld=FIRE_BUILDINGS[s.building];
+  const totalArea=s.areaPerFloor*s.floors;
+  const nDetectors=Math.ceil(totalArea/det.coverage);
+  const nLoops=Math.ceil(nDetectors/126);
+  const nSounders=Math.max(s.floors*2, Math.ceil(totalArea/500));
+  const batteryAh=Math.ceil((nDetectors*0.002+nLoops*0.5+0.5)*72 + (nSounders*0.05+2)*0.5);
+  const cableM=Math.ceil(totalArea*0.8+s.floors*20);
+  let html='<div class="card fade-in"><div class="card-title">\uD83D\uDD25 '+(da?'Brandalarm (DS/EN 54)':'Fire Alarm (DS/EN 54)')+'</div>';
+  html+='<div class="info-row">'+(da?'Overslagsberegning for brandalarmanlæg. Bemærk: Brandalarmsystemer skal projekteres af certificeret rådgiver (DBI-certificeret).':'Rough calculation for fire alarm systems. Note: Fire alarm systems must be designed by a certified consultant (DBI-certified).')+'</div>';
+  html+='<div class="result-box warning"><div class="result-title">\u26A0\uFE0F '+(da?'Vigtigt':'Important')+'</div><div style="padding:6px">'+(da?'Denne beregning er kun vejledende. Brandalarmsystemer SKAL projekteres af en DBI-certificeret rådgiver iht. DS/EN 54 og DS/CEN TS 54-14.':'This calculation is indicative only. Fire alarm systems MUST be designed by a DBI-certified consultant per DS/EN 54 and DS/CEN TS 54-14.')+'</div></div>';
+  html+='<div class="select-group"><div class="select-label">'+(da?'Bygningstype':'Building type')+'</div><div class="select-grid">';
+  Object.entries(FIRE_BUILDINGS).forEach(function([k,v]){ html+='<button class="sel-btn '+(s.building===k?'selected':'')+'" onclick="fireState.building=\''+k+'\';renderModule(\'fire\')">'+(da?v.da:v.en)+'</button>'; });
+  html+='</div></div>';
+  html+='<div class="select-group"><div class="select-label">'+(da?'Areal pr. etage [m\u00B2]':'Area per floor [m\u00B2]')+'</div><div class="select-grid">';
+  [50,100,200,300,500,750,1000,1500,2000,5000].forEach(function(v){ html+='<button class="sel-btn '+(s.areaPerFloor===v?'selected':'')+'" onclick="fireState.areaPerFloor='+v+';renderModule(\'fire\')">'+v+'</button>'; });
+  html+='</div></div>';
+  html+='<div class="select-group"><div class="select-label">'+(da?'Antal etager':'Number of floors')+'</div><div class="select-grid">';
+  [1,2,3,4,5,6,7,8].forEach(function(v){ html+='<button class="sel-btn '+(s.floors===v?'selected':'')+'" onclick="fireState.floors='+v+';renderModule(\'fire\')">'+v+'</button>'; });
+  html+='</div></div>';
+  html+='<div class="select-group"><div class="select-label">'+(da?'Systemkategori':'System category')+'</div><div class="select-grid">';
+  html+='<button class="sel-btn '+(s.category===1?'selected':'')+'" onclick="fireState.category=1;renderModule(\'fire\')">'+(da?'Kat. 1 (fuld dækning)':'Cat. 1 (full coverage)')+'</button>';
+  html+='<button class="sel-btn '+(s.category===2?'selected':'')+'" onclick="fireState.category=2;renderModule(\'fire\')">'+(da?'Kat. 2 (delvis)':'Cat. 2 (partial)')+'</button>';
+  html+='<button class="sel-btn '+(s.category===3?'selected':'')+'" onclick="fireState.category=3;renderModule(\'fire\')">'+(da?'Kun røgalarmer':'Smoke alarms only')+'</button>';
+  html+='</div></div>';
+  html+='<div class="select-group"><div class="select-label">'+(da?'Detektortype':'Detector type')+'</div><div class="select-grid">';
+  Object.entries(FIRE_DETECTORS).forEach(function([k,v]){ html+='<button class="sel-btn '+(s.detector===k?'selected':'')+'" onclick="fireState.detector=\''+k+'\';renderModule(\'fire\')">'+(da?v.da:v.en)+' (~'+v.coverage+' m\u00B2)</button>'; });
+  html+='</div></div></div>';
+  html+='<div class="card fade-in"><div class="card-title">'+(da?'Resultat':'Result')+'</div><div class="result-box">';
+  html+='<div class="result-title">'+(da?'Anlægsoversigt':'System overview')+'</div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Samlet areal':'Total area')+'</span><span class="value">'+totalArea+' m\u00B2 ('+s.floors+(da?' etager':' floors')+')</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Antal detektorer':'Number of detectors')+'</span><span class="value" style="font-weight:800;font-size:1.1em">'+nDetectors+'</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Antal sløjfer':'Number of loops')+'</span><span class="value">'+nLoops+' (maks. 126 pr. sløjfe)</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Alarmgivere/sirener':'Sounders/beacons')+'</span><span class="value">'+nSounders+'</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Batteri (72t standby + 30 min alarm)':'Battery (72h standby + 30 min alarm)')+'</span><span class="value">'+batteryAh+' Ah</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Kabeltype':'Cable type')+'</span><span class="value">FE180/E30 ('+(da?'brandbestandig':'fire-resistant')+')</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Estimeret kabellængde':'Estimated cable length')+'</span><span class="value">~'+cableM+' m</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Standard':'Standard')+'</span><span class="value">DS/EN 54 + DS/CEN TS 54-14</span></div>';
+  html+='</div></div>';
+  return html;
 }
 
 // ===== INIT =====
