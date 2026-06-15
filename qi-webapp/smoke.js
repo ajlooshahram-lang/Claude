@@ -1037,5 +1037,48 @@ ok(commSegTables != null && commSegTables.length >= 5, "Commissioning Checklist 
 var commHoldPoints = doc.getElementById("commissioningHoldPoints");
 ok(commHoldPoints != null && commHoldPoints.querySelectorAll('tbody tr').length >= 5, "Commissioning Checklist shows hold points table");
 
+// 87) Wavelength Assignment Planner
+var wlNav = doc.querySelector('.nav-item[data-view="wavelengths"]');
+ok(wlNav != null, "Wavelength Planner nav item exists");
+if (wlNav) wlNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var wlKpis = doc.getElementById("wlKpis");
+ok(wlKpis != null && wlKpis.querySelectorAll('.kpi').length >= 5, "Wavelength Planner shows KPI cards");
+var wlGrid = doc.querySelector('.wlGridTable');
+ok(wlGrid != null && wlGrid.querySelectorAll('tbody tr').length >= 10, "Wavelength Planner shows DWDM channel grid - got " + (wlGrid ? wlGrid.querySelectorAll('tbody tr').length : 0));
+ok(doc.getElementById("wlRefs") != null && doc.getElementById("wlRefs").innerHTML.indexOf("G.694.1") !== -1, "Wavelength Planner cites ITU-T G.694.1");
+// 88) Click-only recompute: switch to C+L band and re-evaluate
+var wlBand = doc.getElementById("wlBand");
+if (wlBand) { wlBand.value = "C+L"; wlBand.dispatchEvent(new window.Event("change", { bubbles: true })); }
+ok(doc.getElementById("wlKpis") != null && /C\+L/.test(doc.getElementById("wlResults").innerHTML), "Wavelength Planner recomputes on band change (C+L)");
+
+// 89) Latency Calculator
+var latNav = doc.querySelector('.nav-item[data-view="latency"]');
+ok(latNav != null, "Latency Calculator nav item exists");
+if (latNav) latNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var latKpis = doc.getElementById("latKpis");
+ok(latKpis != null && latKpis.querySelectorAll('.kpi').length >= 5, "Latency Calculator shows KPI cards");
+var latBudget = doc.querySelector('.latBudgetTable');
+ok(latBudget != null && latBudget.querySelectorAll('tbody tr').length >= 3, "Latency Calculator shows latency budget table");
+ok(doc.getElementById("latCompare") != null && doc.getElementById("latCompare").innerHTML.indexOf("GEO satellite") !== -1, "Latency Calculator benchmarks against GEO satellite");
+// 90) Click-only recompute on route change
+var latRoute = doc.getElementById("latRoute");
+if (latRoute) { latRoute.value = "10000"; latRoute.dispatchEvent(new window.Event("change", { bubbles: true })); }
+ok(doc.getElementById("latKpis") != null, "Latency Calculator recomputes on route change");
+
+// 91) Cable Protection Awareness
+var cpNav = doc.querySelector('.nav-item[data-view="cableprotect"]');
+ok(cpNav != null, "Cable Protection nav item exists");
+if (cpNav) cpNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var cpKpis = doc.getElementById("cpKpis");
+ok(cpKpis != null && cpKpis.querySelectorAll('.kpi').length >= 5, "Cable Protection shows KPI cards");
+var cpSeg = doc.querySelector('.cableProtectSegTable');
+ok(cpSeg != null && cpSeg.querySelectorAll('tbody tr').length >= 4, "Cable Protection shows per-depth-band plan - got " + (cpSeg ? cpSeg.querySelectorAll('tbody tr').length : 0));
+ok(doc.getElementById("cpRefs") != null && doc.getElementById("cpRefs").innerHTML.indexOf("UNCLOS") !== -1, "Cable Protection cites UNCLOS");
+ok(doc.getElementById("cpMitigations") != null, "Cable Protection lists recommended mitigations");
+// 92) Click-only recompute on threat-environment change
+var cpTrawl = doc.getElementById("cpTrawl");
+if (cpTrawl) { cpTrawl.value = "high"; cpTrawl.dispatchEvent(new window.Event("change", { bubbles: true })); }
+ok(doc.querySelector('.cableProtectSegTable') != null, "Cable Protection recomputes on trawling-intensity change");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

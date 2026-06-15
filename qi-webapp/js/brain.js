@@ -4409,6 +4409,438 @@
     };
   }
 
+  // ---------- Wavelength Assignment Planner (ITU-T G.694.1 DWDM grid) ----------
+  // Deterministic DWDM/WDM channel planner. Builds the ITU-T G.694.1 frequency
+  // grid anchored at 193.1 THz, sizes the usable C / L / C+L spectrum for a
+  // chosen channel spacing, computes capacity & spectral efficiency, runs a
+  // first-fit Routing-and-Wavelength-Assignment (RWA) over a demand list, and
+  // flags transmission feasibility (modulation vs spacing). Pure & offline.
+  //
+  // Physics: lambda_nm = 299792.458 / f_THz  (c expressed as nm*THz).
+  // ITU-T G.694.1 anchor: 193.1 THz = 1552.524 nm. C-band 191.30-196.10 THz,
+  // L-band 186.00-190.80 THz. 50 GHz spacing -> 96 C-band channels (matches the
+  // platform's cable-system design model: C=96, C+L=192 channels).
+  function planWavelengths(params) {
+    params = params || {};
+    var spacingGHz = Number(params.spacingGHz) || 50;          // 12.5 | 25 | 50 | 100
+    var band = params.band || "C";                              // "C" | "L" | "C+L"
+    var bitrate = Number(params.bitratePerChannelGbps) || 200;  // 100 | 200 | 400 | 600 | 800
+    var fiberPairs = Number(params.fiberPairs) || 1;
+    var demands = Array.isArray(params.demands) ? params.demands : [];
+
+    var LIGHT = 299792.458;       // nm*THz (and km/s) — same numeric constant
+    var ANCHOR_THZ = 193.1;       // ITU-T G.694.1 reference frequency
+    var spacingTHz = spacingGHz / 1000;
+
+    var BANDS = {
+      C: { fMin: 191.30, fMax: 196.10, label: "C-band (1530-1565 nm)" },
+      L: { fMin: 186.00, fMax: 190.80, label: "L-band (1565-1625 nm)" }
+    };
+    var segIds = band === "C+L" ? ["C", "L"] : [band];
+    var bandLabel = band === "C+L"
+      ? "C+L-band (1530-1625 nm)"
+      : (BANDS[band] ? BANDS[band].label : band);
+
+    // Build the grid: all anchored frequencies that fall inside each band window.
+    var channels = [];
+    segIds.forEach(function (id) {
+      var b = BANDS[id];
+      if (!b) return;
+      // First grid point >= fMin (grid is f = ANCHOR + k*spacing).
+      var kMin = Math.ceil((b.fMin - ANCHOR_THZ) / spacingTHz);
+      var kMax = Math.floor((b.fMax - ANCHOR_THZ) / spacingTHz);
+      for (var k = kMin; k <= kMax; k++) {
+        var f = ANCHOR_THZ + k * spacingTHz;
+        // round to 5 decimals to avoid binary float noise
+        var fTHz = Math.round(f * 1e5) / 1e5;
+        var lambda = Math.round((LIGHT / fTHz) * 1000) / 1000;
+        // ITU-T 100 GHz channel number convention: (f - 190.0)/0.1 (for reference)
+        var ituCh = Math.round((fTHz - 190.0) / 0.1 * 10) / 10;
+        channels.push({
+          index: 0, // assigned after sort
+          band: id,
+          frequencyTHz: fTHz,
+          wavelengthNm: lambda,
+          ituChannel: ituCh,
+          slotGHz: spacingGHz
+        });
+      }
+    });
+    // Sort by ascending wavelength (descending frequency) and number them.
+    channels.sort(function (a, b) { return a.wavelengthNm - b.wavelengthNm; });
+    channels.forEach(function (c, i) { c.index = i + 1; });
+
+    var channelsPerPair = channels.length;
+    var channelCount = channelsPerPair; // alias
+
+    // Spectral efficiency (b/s/Hz) for the chosen modulation loading.
+    var spectralEfficiency = Math.round((bitrate / spacingGHz) * 1000) / 1000;
+
+    // Capacity.
+    var capacityPerPairTbps = Math.round((channelsPerPair * bitrate / 1000) * 100) / 100;
+    var systemCapacityTbps = Math.round((capacityPerPairTbps * fiberPairs) * 100) / 100;
+
+    // Feasibility: recommended minimum channel spacing for a coherent line rate.
+    // (Industry rule-of-thumb for 50/75/100 GHz flexible-grid deployments.)
+    var recMap = { 100: 37.5, 200: 50, 300: 62.5, 400: 75, 600: 100, 800: 100 };
+    var recommendedMinSpacingGHz = recMap[bitrate] || 50;
+    var feasOk = spacingGHz >= recommendedMinSpacingGHz;
+    var feasNote = feasOk
+      ? bitrate + "G fits within a " + spacingGHz + " GHz slot (SE " + spectralEfficiency + " b/s/Hz)."
+      : bitrate + "G typically needs >=" + recommendedMinSpacingGHz + " GHz; a " + spacingGHz + " GHz slot risks inter-channel crosstalk / OSNR shortfall.";
+
+    var warnings = [];
+    if (!feasOk) warnings.push("Modulation/spacing mismatch: " + feasNote);
+    if (spectralEfficiency > 8) warnings.push("Spectral efficiency " + spectralEfficiency + " b/s/Hz is beyond practical coherent limits (~8 b/s/Hz) for long-haul submarine links.");
+    if (band === "L" || band === "C+L") warnings.push("L-band operation requires L-band EDFAs/Raman and wider-band line equipment — verify amplifier support end-to-end.");
+
+    // First-fit Routing & Wavelength Assignment over the demand list.
+    var totalSlots = channelsPerPair * fiberPairs;
+    var assignedRows = [];
+    var assignedCount = 0, blockedCount = 0;
+    var cursor = 0; // next free slot index across pairs
+    demands.forEach(function (d, di) {
+      var label = (d && d.label) || ("Demand " + (di + 1));
+      var needGbps = (d && Number(d.capacityGbps)) || bitrate;
+      var slotsNeeded = Math.max(1, Math.ceil(needGbps / bitrate));
+      if (cursor + slotsNeeded <= totalSlots) {
+        var pair = Math.floor(cursor / channelsPerPair) + 1;
+        var chIdx = (cursor % channelsPerPair);
+        var ch = channels[chIdx];
+        assignedRows.push({
+          demand: label,
+          capacityGbps: needGbps,
+          slots: slotsNeeded,
+          fiberPair: pair,
+          channelIndex: ch.index,
+          frequencyTHz: ch.frequencyTHz,
+          wavelengthNm: ch.wavelengthNm,
+          status: "ASSIGNED"
+        });
+        assignedCount++;
+        cursor += slotsNeeded;
+      } else {
+        assignedRows.push({ demand: label, capacityGbps: needGbps, slots: slotsNeeded, status: "BLOCKED" });
+        blockedCount++;
+      }
+    });
+    var utilizationPct = totalSlots > 0 ? Math.round((cursor / totalSlots) * 1000) / 10 : 0;
+    if (blockedCount > 0) warnings.push(blockedCount + " demand(s) blocked — insufficient spectrum; add fiber pairs, widen the band, or use a tighter grid.");
+
+    return {
+      band: band,
+      bandLabel: bandLabel,
+      anchorTHz: ANCHOR_THZ,
+      spacingGHz: spacingGHz,
+      bitratePerChannelGbps: bitrate,
+      fiberPairs: fiberPairs,
+      channelCount: channelCount,
+      channelsPerPair: channelsPerPair,
+      channels: channels,
+      spectralEfficiency: spectralEfficiency,
+      capacityPerPairTbps: capacityPerPairTbps,
+      systemCapacityTbps: systemCapacityTbps,
+      feasibility: { ok: feasOk, recommendedMinSpacingGHz: recommendedMinSpacingGHz, note: feasNote },
+      assignment: {
+        totalDemands: demands.length,
+        assigned: assignedCount,
+        blocked: blockedCount,
+        totalSlots: totalSlots,
+        usedSlots: cursor,
+        utilizationPct: utilizationPct,
+        rows: assignedRows
+      },
+      warnings: warnings,
+      references: [
+        "ITU-T G.694.1 (2020) — Spectral grids for WDM applications: DWDM frequency grid",
+        "ITU-T G.694.2 — Spectral grids for WDM applications: CWDM wavelength grid",
+        "ITU-T G.698.2 — Amplified multichannel DWDM applications with single-channel optical interfaces",
+        "ITU-T G.692 — Optical interfaces for multichannel systems with optical amplifiers",
+        "ITU-T G.872 — Architecture of optical transport networks (OTN)"
+      ]
+    };
+  }
+
+  // ---------- Latency Calculator (fiber propagation + equipment delay) ----------
+  // Deterministic end-to-end latency model for a fibre/submarine link.
+  // Propagation uses the fibre GROUP index (not the phase index): one-way delay
+  // per km = n_g / c. For G.652.D, n_g ~ 1.4682 -> 4.897 us/km one-way
+  // (9.79 us/km round trip). Adds route slack and active-equipment latency,
+  // and benchmarks against a vacuum great-circle minimum and a GEO satellite.
+  function calcLatency(params) {
+    params = params || {};
+    var routeKm = Number(params.routeKm) || 1000;
+    var fiberType = params.fiberType || "G.652.D";
+    var slackPct = params.slackPct != null ? Number(params.slackPct) : 7; // cable slack/slope
+    var repeaterCount = Number(params.repeaterCount) || 0;  // submarine EDFAs (near-zero delay)
+    var regenCount = Number(params.regenCount) || 0;        // intermediate OEO regen sites
+    var roadmCount = Number(params.roadmCount) || 0;        // express ROADM/WSS nodes
+    var fecEnabled = params.fecEnabled !== false;           // soft-decision FEC interleaver
+    var straightLineKm = params.straightLineKm != null ? Number(params.straightLineKm) : null;
+
+    var C_KM_S = 299792.458; // speed of light in vacuum, km/s
+    // Group index by fibre type (at 1550 nm).
+    var GROUP_INDEX = { "G.652.D": 1.4682, "G.654.E": 1.4680, "G.655": 1.4700, "G.657.A1": 1.4682 };
+    var nG = GROUP_INDEX[fiberType] || 1.4682;
+
+    var perKmOneWayUs = Math.round((nG / C_KM_S * 1e6) * 1e4) / 1e4; // us/km
+    var fiberLengthKm = Math.round((routeKm * (1 + slackPct / 100)) * 100) / 100;
+    var propagationOneWayUs = perKmOneWayUs * fiberLengthKm;
+
+    // Active-equipment latency budget (one-way), in microseconds.
+    var EDFA_US = 0.05;        // amplifier is passive fibre+pump: sub-microsecond
+    var ROADM_US = 0.5;        // express WSS pass incl. short patch fibre
+    var TXP_PAIR_US = 30;      // coherent transponder DSP (Tx+Rx) baseline
+    var FEC_US = 18;           // SD-FEC interleaver depth (one terminal pass)
+    var REGEN_US = 30;         // intermediate OEO regeneration (full DSP pass)
+
+    var eqRows = [];
+    function eq(item, count, usEach) {
+      var usTotal = Math.round((count * usEach) * 1000) / 1000;
+      eqRows.push({ item: item, count: count, usEach: usEach, usTotal: usTotal });
+      return usTotal;
+    }
+    var equipmentUs = 0;
+    equipmentUs += eq("Terminal transponders (Tx+Rx DSP)", 1, TXP_PAIR_US);
+    if (fecEnabled) equipmentUs += eq("Soft-decision FEC", 1, FEC_US);
+    if (regenCount > 0) equipmentUs += eq("OEO regeneration sites", regenCount, REGEN_US);
+    if (roadmCount > 0) equipmentUs += eq("Express ROADM/WSS nodes", roadmCount, ROADM_US);
+    if (repeaterCount > 0) equipmentUs += eq("Submarine repeaters (EDFA)", repeaterCount, EDFA_US);
+    equipmentUs = Math.round(equipmentUs * 1000) / 1000;
+
+    var totalOneWayUs = Math.round((propagationOneWayUs + equipmentUs) * 1000) / 1000;
+    var oneWayMs = Math.round((totalOneWayUs / 1000) * 1000) / 1000;
+    var rttMs = Math.round((oneWayMs * 2) * 1000) / 1000;
+    var propagationRttMs = Math.round((propagationOneWayUs * 2 / 1000) * 1000) / 1000;
+
+    // Vacuum great-circle minimum (theoretical floor).
+    var vacRefKm = straightLineKm != null ? straightLineKm : routeKm;
+    var vacuumOneWayMs = Math.round((vacRefKm / C_KM_S * 1000) * 1000) / 1000;
+    var overheadPct = vacuumOneWayMs > 0 ? Math.round(((oneWayMs / vacuumOneWayMs) - 1) * 1000) / 10 : 0;
+
+    // GEO satellite reference: up+down = 2 x 35786 km per direction.
+    var GEO_KM = 35786;
+    var geoOneWayMs = Math.round((2 * GEO_KM / C_KM_S * 1000) * 1000) / 1000;
+    var geoRttMs = Math.round((geoOneWayMs * 2) * 1000) / 1000;
+    var fiberFasterTimes = oneWayMs > 0 ? Math.round((geoOneWayMs / oneWayMs) * 10) / 10 : 0;
+
+    // ITU-T G.114 one-way transmission time guidance (voice/interactive).
+    var rating, note;
+    if (oneWayMs <= 150) { rating = "Good"; note = "<=150 ms: acceptable for most interactive/voice applications (ITU-T G.114)."; }
+    else if (oneWayMs <= 400) { rating = "Acceptable"; note = "150-400 ms: usable but with noticeable interactivity impact (ITU-T G.114)."; }
+    else { rating = "Poor"; note = ">400 ms: unacceptable for interactive applications (ITU-T G.114)."; }
+
+    var warnings = [];
+    if (slackPct < 0) warnings.push("Negative slack is non-physical — fibre length cannot be shorter than the route.");
+    if (straightLineKm != null && straightLineKm > routeKm) warnings.push("Straight-line distance exceeds route length — check inputs (route should be >= great-circle distance).");
+
+    return {
+      routeKm: routeKm,
+      fiberType: fiberType,
+      groupIndex: nG,
+      slackPct: slackPct,
+      fiberLengthKm: fiberLengthKm,
+      perKmOneWayUs: perKmOneWayUs,
+      perKmRttUs: Math.round((perKmOneWayUs * 2) * 1e4) / 1e4,
+      propagationOneWayUs: Math.round(propagationOneWayUs * 1000) / 1000,
+      equipmentUs: equipmentUs,
+      equipmentBreakdown: eqRows,
+      totalOneWayUs: totalOneWayUs,
+      oneWayMs: oneWayMs,
+      rttMs: rttMs,
+      propagationRttMs: propagationRttMs,
+      vacuum: { refKm: vacRefKm, oneWayMs: vacuumOneWayMs, overheadPct: overheadPct },
+      geoSatellite: { oneWayMs: geoOneWayMs, rttMs: geoRttMs, fiberFasterTimes: fiberFasterTimes },
+      g114Verdict: { oneWayMs: oneWayMs, rating: rating, note: note },
+      warnings: warnings,
+      references: [
+        "ITU-T G.114 — One-way transmission time (latency budget guidance)",
+        "ITU-T G.652 — Characteristics of a single-mode optical fibre and cable (group index)",
+        "ITU-T G.654 — Cut-off shifted single-mode fibre (submarine, low loss)",
+        "ITU-T G.Sup47 / vendor data — coherent transponder & FEC processing latency"
+      ]
+    };
+  }
+
+  // ---------- Cable Protection Awareness (threat vs depth -> burial/armour) ----------
+  // Deterministic submarine-cable protection assessment. For each depth band it
+  // rates the dominant external-aggression threats (anchoring, bottom trawling,
+  // abrasion, natural hazards), then recommends a burial depth and armour class
+  // following ICPC guidance (target ~1 m burial in trawled grounds, heavier in
+  // high-risk shallow water; surface lay in the deep ocean). Produces a
+  // length-weighted protection-adequacy score and residual-risk per segment.
+  function assessCableProtection(params) {
+    params = params || {};
+    var trawl = (params.trawlingIntensity || "medium").toLowerCase();   // high|medium|low|none
+    var anchor = (params.anchoringActivity || "medium").toLowerCase();  // high|medium|low|none
+    var seabed = (params.seabed || "sand").toLowerCase();               // sand|mud|rock|coral|mixed
+    var seismicZone = !!params.seismicZone;
+
+    // Depth profile in km. Default = a typical mixed coastal->deep transoceanic route.
+    var routeKm = Number(params.routeKm) || 1000;
+    var dp = params.depthProfile || null;
+    if (!dp) {
+      dp = {
+        shoreEndKm: Math.round(routeKm * 0.01 * 100) / 100,
+        shelfKm: Math.round(routeKm * 0.10 * 100) / 100,
+        slopeKm: Math.round(routeKm * 0.14 * 100) / 100,
+        deepUpperKm: Math.round(routeKm * 0.15 * 100) / 100,
+        deepKm: 0
+      };
+      dp.deepKm = Math.round((routeKm - dp.shoreEndKm - dp.shelfKm - dp.slopeKm - dp.deepUpperKm) * 100) / 100;
+      if (dp.deepKm < 0) dp.deepKm = 0;
+    }
+
+    var intensity = { high: 1.0, medium: 0.6, low: 0.3, none: 0.0 };
+    var trawlF = intensity[trawl] != null ? intensity[trawl] : 0.6;
+    var anchorF = intensity[anchor] != null ? intensity[anchor] : 0.6;
+    var abrasive = (seabed === "rock" || seabed === "coral" || seabed === "mixed");
+
+    // Band definitions: anchoring credible < ~1000 m; bottom trawling reaches
+    // ~1500 m; abrasion mainly shallow/rocky; natural hazards rise in deep
+    // canyons / seismic zones.
+    var BANDS = [
+      { key: "shoreEnd", depthRange: "0-20 m (shore end)", lengthKm: dp.shoreEndKm || 0, anchorBase: 1.0, trawlBase: 0.7, abrasionBase: 1.0, naturalBase: 0.6 },
+      { key: "shelf", depthRange: "20-200 m (shelf)", lengthKm: dp.shelfKm || 0, anchorBase: 1.0, trawlBase: 1.0, abrasionBase: 0.6, naturalBase: 0.3 },
+      { key: "slope", depthRange: "200-1000 m (slope)", lengthKm: dp.slopeKm || 0, anchorBase: 0.4, trawlBase: 0.7, abrasionBase: 0.4, naturalBase: 0.5 },
+      { key: "deepUpper", depthRange: "1000-2000 m", lengthKm: dp.deepUpperKm || 0, anchorBase: 0.0, trawlBase: 0.2, abrasionBase: 0.2, naturalBase: 0.4 },
+      { key: "deep", depthRange: ">2000 m (deep ocean)", lengthKm: dp.deepKm || 0, anchorBase: 0.0, trawlBase: 0.0, abrasionBase: 0.1, naturalBase: 0.3 }
+    ];
+
+    function levelFromScore(s) {
+      if (s >= 7.5) return "Critical";
+      if (s >= 5.5) return "High";
+      if (s >= 3.5) return "Medium";
+      if (s >= 1.5) return "Low";
+      return "Minimal";
+    }
+
+    var segments = [];
+    var totalLen = 0, weightedThreat = 0, protectedKm = 0, surfaceKm = 0, highThreatKm = 0;
+    var weightedResidual = 0;
+
+    BANDS.forEach(function (b) {
+      if (b.lengthKm <= 0) return;
+      var threats = [];
+      // Weighted threat components (0..10 each contribution scaled).
+      var aScore = b.anchorBase * anchorF * 10;
+      var tScore = b.trawlBase * trawlF * 10;
+      var abScore = b.abrasionBase * (abrasive ? 1.0 : 0.3) * 10;
+      var nScore = b.naturalBase * (seismicZone ? 1.0 : 0.55) * 10;
+
+      if (aScore >= 2) threats.push("Ship anchoring");
+      if (tScore >= 2) threats.push("Bottom trawling / fishing gear");
+      if (abScore >= 2) threats.push("Abrasion / seabed movement");
+      if (nScore >= 2) threats.push(seismicZone ? "Seismic / turbidity currents" : "Natural seabed dynamics");
+
+      // Dominant threat score drives the band level (worst-case governs).
+      var threatScore = Math.max(aScore, tScore, abScore, nScore);
+      threatScore = Math.round(threatScore * 10) / 10;
+      var level = levelFromScore(threatScore);
+
+      // Recommended burial depth (m) & armour class by band + threat.
+      var burialM = 0, armour = "", mitigations = [];
+      if (b.key === "shoreEnd") {
+        burialM = (anchorF >= 0.6 || abrasive) ? 3.0 : 1.5;
+        armour = "Double armour (DA) / Rock armour (RA)";
+        mitigations.push("Directional drilling (HDD) through the surf zone where feasible");
+        mitigations.push("Articulated pipe / cast-iron shells + rock berm over the cable");
+      } else if (b.key === "shelf") {
+        burialM = threatScore >= 5.5 ? 1.5 : 1.0;
+        armour = threatScore >= 5.5 ? "Double armour (DA)" : "Single armour (SA)";
+        mitigations.push("Bury by jetting / ploughing to target depth-of-lowering");
+        mitigations.push("Publish cable on charts; engage fishing & port authorities (ICPC liaison)");
+      } else if (b.key === "slope") {
+        burialM = tScore >= 4 ? 0.6 : 0;
+        armour = tScore >= 4 ? "Single armour (SA)" : "Lightweight protected (LWP)";
+        if (burialM > 0) mitigations.push("Selective burial where deepwater trawling is recorded");
+        else mitigations.push("Surface lay with route engineering around hazards");
+      } else if (b.key === "deepUpper") {
+        burialM = 0;
+        armour = "Lightweight protected (LWP) / Lightweight (LW)";
+        mitigations.push("Surface lay; avoid canyons & steep slopes in route engineering");
+      } else { // deep
+        burialM = 0;
+        armour = "Lightweight (LW)";
+        mitigations.push("Surface lay on stable abyssal seabed; rely on water depth for protection");
+      }
+      if (seismicZone && (b.key === "slope" || b.key === "deepUpper")) {
+        mitigations.push("Route away from active faults & turbidity-current pathways (seismic zone)");
+      }
+
+      // Residual risk after recommended mitigation (burial/armour reduce threat).
+      var reduction = 0;
+      if (burialM >= 3) reduction = 0.9;
+      else if (burialM >= 1.5) reduction = 0.8;
+      else if (burialM >= 1.0) reduction = 0.7;
+      else if (burialM >= 0.6) reduction = 0.5;
+      else if (/Lightweight protected|Single armour|Double armour|Rock armour/.test(armour)) reduction = 0.25;
+      else reduction = 0.1; // depth-only protection in the deep ocean
+      var residualScore = Math.round(threatScore * (1 - reduction) * 10) / 10;
+
+      segments.push({
+        band: b.key,
+        depthRange: b.depthRange,
+        lengthKm: b.lengthKm,
+        threats: threats,
+        threatScore: threatScore,
+        threatLevel: level,
+        recommendedBurialM: burialM,
+        recommendedArmour: armour,
+        mitigations: mitigations,
+        residualScore: residualScore,
+        residualLevel: levelFromScore(residualScore)
+      });
+
+      totalLen += b.lengthKm;
+      weightedThreat += threatScore * b.lengthKm;
+      weightedResidual += residualScore * b.lengthKm;
+      if (burialM > 0) protectedKm += b.lengthKm; else surfaceKm += b.lengthKm;
+      if (level === "High" || level === "Critical") highThreatKm += b.lengthKm;
+    });
+
+    var weightedThreatScore = totalLen > 0 ? Math.round((weightedThreat / totalLen) * 10) / 10 : 0;
+    var weightedResidualScore = totalLen > 0 ? Math.round((weightedResidual / totalLen) * 10) / 10 : 0;
+    // Protection adequacy: how much of the inherent threat the plan removes.
+    var protectionAdequacyPct = weightedThreatScore > 0
+      ? Math.round((1 - weightedResidualScore / weightedThreatScore) * 100)
+      : 100;
+
+    var warnings = [];
+    if (highThreatKm > 0 && trawl === "none" && anchor === "none") {
+      warnings.push("High-threat length flagged despite no fishing/anchoring activity — driven by seabed/natural hazards; verify survey data.");
+    }
+    segments.forEach(function (s) {
+      if ((s.threatLevel === "High" || s.threatLevel === "Critical") && s.recommendedBurialM === 0 && !/armour/i.test(s.recommendedArmour)) {
+        warnings.push(s.depthRange + ": high threat with no burial — confirm armour/route mitigation is sufficient.");
+      }
+    });
+
+    return {
+      routeKm: routeKm,
+      inputs: { trawlingIntensity: trawl, anchoringActivity: anchor, seabed: seabed, seismicZone: seismicZone },
+      depthProfile: dp,
+      segments: segments,
+      summary: {
+        totalAssessedKm: Math.round(totalLen * 100) / 100,
+        protectedKm: Math.round(protectedKm * 100) / 100,
+        surfaceLaidKm: Math.round(surfaceKm * 100) / 100,
+        highThreatKm: Math.round(highThreatKm * 100) / 100,
+        weightedThreatScore: weightedThreatScore,
+        weightedResidualScore: weightedResidualScore,
+        protectionAdequacyPct: protectionAdequacyPct
+      },
+      warnings: warnings,
+      references: [
+        "ICPC Recommendation No. 2 — Cable routing and reporting criteria",
+        "ICPC Recommendation No. 3 — Criteria to be applied to proposed crossings & burial",
+        "ICPC/UNEP-WCMC (Carter et al. 2009) — Submarine Cables and the Oceans: burial in trawled grounds",
+        "UNCLOS 1982, Articles 113-115 — Protection of submarine cables & pipelines",
+        "ITU-T / ISO seabed survey practice — Depth of Lowering (DoL) & Burial Protection Index (BPI)"
+      ]
+    };
+  }
+
   var API = {
     analyzeProject: analyzeProject,
     listProfiles: listProfiles,
@@ -4442,6 +4874,9 @@
     energyWatchdog: energyWatchdog,
     powerBudgetAnalysis: powerBudgetAnalysis,
     generateCommissioningChecklist: generateCommissioningChecklist,
+    planWavelengths: planWavelengths,
+    calcLatency: calcLatency,
+    assessCableProtection: assessCableProtection,
     COUNTRY_ENERGY_DATA: COUNTRY_ENERGY_DATA
   };
   if (typeof module !== "undefined" && module.exports) module.exports = API;

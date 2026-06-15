@@ -1502,5 +1502,83 @@ console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
     "Power feed tests marked not_applicable when repeaterCount=0 (" + pfTests.length + " PFE tests)");
 })();
 
+// ===== Wavelength Assignment Planner Tests (ITU-T G.694.1) =====
+(function () {
+  console.log("\n--- Wavelength Assignment Planner ---");
+  var w = B.planWavelengths({ band: "C", spacingGHz: 50, bitratePerChannelGbps: 200, fiberPairs: 4 });
+  ok(w.channelsPerPair === 96, "C-band @50GHz yields 96 channels (got " + w.channelsPerPair + ")");
+  ok(B.planWavelengths({ band: "C+L", spacingGHz: 50 }).channelCount === 192, "C+L-band @50GHz yields 192 channels");
+  ok(B.planWavelengths({ band: "C", spacingGHz: 100 }).channelCount === 48, "C-band @100GHz yields 48 channels");
+  ok(B.planWavelengths({ band: "C", spacingGHz: 25 }).channelCount === 192, "C-band @25GHz yields 192 channels");
+  var anchor = w.channels.filter(function (c) { return Math.abs(c.frequencyTHz - 193.1) < 1e-6; })[0];
+  ok(anchor && Math.abs(anchor.wavelengthNm - 1552.524) < 0.01, "anchor 193.1 THz maps to 1552.524 nm (ITU-T G.694.1)");
+  ok(w.channels[0].index === 1 && w.channels[0].wavelengthNm < w.channels[w.channels.length - 1].wavelengthNm, "channels numbered from 1, sorted by ascending wavelength");
+  ok(w.capacityPerPairTbps === 19.2, "96 ch x 200G = 19.2 Tbps/pair (got " + w.capacityPerPairTbps + ")");
+  ok(w.systemCapacityTbps === 76.8, "4 pairs x 19.2 = 76.8 Tbps system (got " + w.systemCapacityTbps + ")");
+  ok(w.spectralEfficiency === 4, "spectral efficiency 200/50 = 4 b/s/Hz");
+  ok(B.planWavelengths({ band: "C", spacingGHz: 50, bitratePerChannelGbps: 800 }).feasibility.ok === false, "800G in a 50 GHz slot flagged infeasible");
+  ok(B.planWavelengths({ band: "C", spacingGHz: 100, bitratePerChannelGbps: 800 }).feasibility.ok === true, "800G in a 100 GHz slot is feasible");
+  // RWA: a 400G demand needs 2 x 200G slots; ensure assignment + blocking
+  var rwa = B.planWavelengths({ band: "C", spacingGHz: 100, bitratePerChannelGbps: 200, fiberPairs: 1, demands: [{ label: "Big", capacityGbps: 400 }, { label: "Small" }] });
+  var bigRow = rwa.assignment.rows.filter(function (r) { return r.demand === "Big"; })[0];
+  ok(bigRow && bigRow.slots === 2 && bigRow.status === "ASSIGNED", "400G demand consumes 2 slots and is assigned");
+  var blockTest = B.planWavelengths({ band: "C", spacingGHz: 100, bitratePerChannelGbps: 100, fiberPairs: 1, demands: Array.from({ length: 60 }, function (_, i) { return { label: "D" + i }; }) });
+  ok(blockTest.assignment.assigned === 48 && blockTest.assignment.blocked === 12, "48-channel pair assigns 48, blocks 12 of 60 demands");
+  ok(blockTest.warnings.some(function (x) { return /blocked/i.test(x); }), "blocking produces a warning");
+  ok(w.references.some(function (x) { return x.indexOf("G.694.1") >= 0; }), "references cite ITU-T G.694.1");
+})();
+
+// ===== Latency Calculator Tests (ITU-T G.114 / group index) =====
+(function () {
+  console.log("\n--- Latency Calculator ---");
+  var l = B.calcLatency({ routeKm: 1000, fiberType: "G.652.D", slackPct: 7 });
+  ok(Math.abs(l.perKmOneWayUs - 4.8974) < 0.001, "G.652.D group index gives 4.8974 us/km one-way (got " + l.perKmOneWayUs + ")");
+  ok(l.fiberLengthKm === 1070, "1000 km + 7% slack = 1070 km fibre");
+  ok(Math.abs(l.oneWayMs - 5.288) < 0.01, "one-way latency ~5.288 ms (got " + l.oneWayMs + ")");
+  ok(Math.abs(l.rttMs - l.oneWayMs * 2) < 0.001, "RTT = 2 x one-way");
+  ok(Math.abs(l.vacuum.oneWayMs - 3.336) < 0.01, "vacuum great-circle floor ~3.336 ms for 1000 km");
+  ok(l.vacuum.overheadPct > 0, "fibre overhead vs vacuum floor is positive (" + l.vacuum.overheadPct + "%)");
+  ok(Math.abs(l.geoSatellite.oneWayMs - 238.738) < 0.1, "GEO satellite one-way ~238.7 ms");
+  ok(l.geoSatellite.fiberFasterTimes > 1, "fibre is faster than GEO satellite (" + l.geoSatellite.fiberFasterTimes + "x)");
+  ok(l.g114Verdict.rating === "Good", "1000 km link rated Good per G.114 (<=150 ms one-way)");
+  var lLong = B.calcLatency({ routeKm: 40000, slackPct: 7 });
+  ok(lLong.g114Verdict.rating === "Acceptable", "40,000 km link rated Acceptable (150-400 ms) - got " + lLong.g114Verdict.rating + " @ " + lLong.oneWayMs + " ms");
+  var lFec = B.calcLatency({ routeKm: 1000, fecEnabled: false });
+  var lNoFec = B.calcLatency({ routeKm: 1000, fecEnabled: true });
+  ok(lNoFec.equipmentUs - lFec.equipmentUs === 18, "enabling SD-FEC adds 18 us to the equipment budget");
+  var lRegen = B.calcLatency({ routeKm: 1000, regenCount: 2 });
+  ok(lRegen.equipmentBreakdown.some(function (e) { return /regen/i.test(e.item) && e.count === 2; }), "regen sites appear in the equipment breakdown");
+  ok(B.calcLatency({ routeKm: 1000, fiberType: "G.654.E" }).groupIndex === 1.468, "G.654.E uses a distinct group index (1.468)");
+  ok(l.references.some(function (x) { return x.indexOf("G.114") >= 0; }), "references cite ITU-T G.114");
+})();
+
+// ===== Cable Protection Awareness Tests (ICPC / UNCLOS) =====
+(function () {
+  console.log("\n--- Cable Protection Awareness ---");
+  var p = B.assessCableProtection({ routeKm: 1000, trawlingIntensity: "high", anchoringActivity: "high", seabed: "rock", seismicZone: true });
+  ok(p.segments.length === 5, "default profile produces 5 depth-band segments (got " + p.segments.length + ")");
+  var byKey = {};
+  p.segments.forEach(function (s) { byKey[s.band] = s; });
+  ok(byKey.shoreEnd && byKey.shoreEnd.recommendedBurialM === 3, "high-threat shore end recommends 3 m burial");
+  ok(byKey.shelf && (byKey.shelf.threatLevel === "Critical" || byKey.shelf.threatLevel === "High"), "shelf under heavy trawl/anchor is High/Critical threat");
+  ok(byKey.shelf && /Double armour/.test(byKey.shelf.recommendedArmour), "high-threat shelf recommends double armour");
+  ok(byKey.deep && byKey.deep.recommendedBurialM === 0, "deep ocean (>2000 m) is surface-laid (no burial)");
+  // Burial decreases monotonically with depth
+  ok(byKey.shoreEnd.recommendedBurialM >= byKey.shelf.recommendedBurialM && byKey.shelf.recommendedBurialM >= byKey.slope.recommendedBurialM && byKey.slope.recommendedBurialM >= byKey.deep.recommendedBurialM, "recommended burial decreases monotonically with depth");
+  // Residual never exceeds inherent threat
+  ok(p.segments.every(function (s) { return s.residualScore <= s.threatScore; }), "residual risk never exceeds inherent threat for any segment");
+  ok(p.summary.protectedKm > 0 && p.summary.surfaceLaidKm > 0, "summary splits protected vs surface-laid length");
+  ok(p.summary.protectionAdequacyPct >= 0 && p.summary.protectionAdequacyPct <= 100, "threat-reduction percentage is within 0-100");
+  ok(p.summary.highThreatKm > 0, "heavy-activity route flags high-threat length");
+  // Quiet deep route: minimal threat
+  var pq = B.assessCableProtection({ routeKm: 800, trawlingIntensity: "none", anchoringActivity: "none", seabed: "mud" });
+  ok(pq.summary.highThreatKm === 0, "no fishing/anchoring -> zero high-threat length");
+  ok(pq.summary.weightedResidualScore <= p.summary.weightedResidualScore, "quiet route has lower absolute residual risk than heavy-activity route");
+  ok(p.references.some(function (x) { return /ICPC/.test(x); }) && p.references.some(function (x) { return /UNCLOS/.test(x); }), "references cite ICPC and UNCLOS");
+  // Explicit depth profile is honoured
+  var pExp = B.assessCableProtection({ depthProfile: { shoreEndKm: 5, shelfKm: 0, slopeKm: 0, deepUpperKm: 0, deepKm: 95 } });
+  ok(pExp.segments.length === 2 && pExp.segments.some(function (s) { return s.band === "deep"; }), "explicit depth profile with empty bands is honoured (2 segments)");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);

@@ -249,6 +249,8 @@
     { g: "Intelligence" },
     { id: "competitive", label: "Market Intel", icon: "🔍" },
     { id: "systemdesign", label: "System Design", icon: "\u26A1" },
+    { id: "wavelengths", label: "Wavelength Planner", icon: "\uD83C\uDF08" },
+    { id: "latency", label: "Latency Calculator", icon: "\u23F1" },
     { id: "revenue", label: "Revenue Model", icon: "\uD83D\uDCB0" },
     { id: "routeopt", label: "Route Optimizer", icon: "\uD83D\uDEE4" },
     { id: "predictive", label: "Fault Forecast", icon: "\uD83D\uDCE1" },
@@ -276,6 +278,7 @@
     items.push({ id: "bowtie", label: "Bow-tie (HAZOP)", icon: "🎀" });
     items.push({ id: "spares", label: "Spare Parts", icon: "\uD83D\uDDC4" });
     items.push({ id: "protection", label: "Protection Zones", icon: "\uD83D\uDEA7" });
+    items.push({ id: "cableprotect", label: "Cable Protection", icon: "\uD83D\uDEE1" });
     items.push({ id: "commissioning", label: "Commissioning", icon: "\u2705" });
     items.push({ g: "Business" }, { id: "evm", label: "Earned Value (EVM)", icon: "∑" }, { id: "cashflow", label: "Cash Flow / S-curve", icon: "〽" }, { id: "prioritise", label: "Prioritisation (RICE/WSJF)", icon: "⤒" });
     C.REGISTERS.filter(r => r.group === "Business").forEach(r => items.push({ id: r.id, label: r.label, icon: r.icon }));
@@ -1810,9 +1813,235 @@
       kpis + segTables + holdTable + refs;
   };
 
+  // ---------- Wavelength Assignment Planner (ITU-T G.694.1) ----------
+  function wlOpts(values, sel, suffix) {
+    return values.map(function (v) {
+      return '<option value="' + v + '"' + (v === sel ? ' selected' : '') + '>' + v + (suffix || '') + '</option>';
+    }).join('');
+  }
+  function wlResultsHtml(r) {
+    if (!r) return '<div class="muted">Wavelength engine unavailable.</div>';
+    var feasColor = r.feasibility.ok ? 'var(--green,#1e7e34)' : 'var(--red,#c0392b)';
+    var kpis = '<div class="grid kpis" id="wlKpis" style="margin-bottom:16px">' +
+      '<div class="kpi"><div class="label">Channels / pair</div><div class="value">' + r.channelsPerPair + '</div></div>' +
+      '<div class="kpi"><div class="label">Capacity / pair</div><div class="value">' + r.capacityPerPairTbps + ' Tbps</div></div>' +
+      '<div class="kpi"><div class="label">System capacity</div><div class="value">' + r.systemCapacityTbps + ' Tbps</div></div>' +
+      '<div class="kpi"><div class="label">Spectral efficiency</div><div class="value">' + r.spectralEfficiency + ' b/s/Hz</div></div>' +
+      '<div class="kpi"><div class="label">Feasibility</div><div class="value" style="color:' + feasColor + '">' + (r.feasibility.ok ? 'OK' : 'Review') + '</div></div>' +
+      '</div>';
+    var shown = r.channels.slice(0, 16);
+    var chRows = shown.map(function (c) {
+      return '<tr><td>' + c.index + '</td><td>' + c.band + '</td><td>' + c.frequencyTHz.toFixed(2) + '</td><td>' + c.wavelengthNm.toFixed(3) + '</td><td>' + c.ituChannel + '</td></tr>';
+    }).join('');
+    var chNote = r.channels.length > shown.length ? '<p class="muted" style="margin-top:6px">Showing first ' + shown.length + ' of ' + r.channels.length + ' channels.</p>' : '';
+    var chTable = '<div class="card"><h3>DWDM Channel Grid <span class="tag">' + esc(r.bandLabel) + ' @ ' + r.spacingGHz + ' GHz</span></h3>' +
+      '<div class="table-wrap"><table class="wlGridTable"><thead><tr><th>#</th><th>Band</th><th>Freq (THz)</th><th>&lambda; (nm)</th><th>ITU ch</th></tr></thead><tbody>' + chRows + '</tbody></table></div>' + chNote + '</div>';
+    var asg = r.assignment;
+    var asgRows = asg.rows.map(function (a) {
+      var detail = a.status === 'ASSIGNED'
+        ? ('Pair ' + a.fiberPair + ' / ch ' + a.channelIndex + ' (' + a.wavelengthNm.toFixed(2) + ' nm)')
+        : '&mdash;';
+      var color = a.status === 'ASSIGNED' ? 'var(--green,#1e7e34)' : 'var(--red,#c0392b)';
+      return '<tr><td>' + esc(a.demand) + '</td><td>' + a.capacityGbps + ' G</td><td>' + a.slots + '</td><td>' + detail + '</td><td style="color:' + color + ';font-weight:600">' + a.status + '</td></tr>';
+    }).join('');
+    var asgTable = asg.totalDemands > 0
+      ? ('<div class="card" id="wlAssign"><h3>Wavelength Assignment (first-fit RWA)</h3>' +
+         '<p class="muted">Assigned ' + asg.assigned + ' / ' + asg.totalDemands + ' demands &middot; ' + asg.blocked + ' blocked &middot; ' + asg.usedSlots + '/' + asg.totalSlots + ' slots used (' + asg.utilizationPct + '%)</p>' +
+         '<div class="table-wrap"><table><thead><tr><th>Demand</th><th>Need</th><th>Slots</th><th>Assignment</th><th>Status</th></tr></thead><tbody>' + asgRows + '</tbody></table></div></div>')
+      : '<div class="card" id="wlAssign"><h3>Wavelength Assignment</h3><p class="muted">Total spectrum: ' + asg.totalSlots + ' channel-slots across ' + r.fiberPairs + ' fibre pair(s). Add demands to run first-fit RWA.</p></div>';
+    var warns = r.warnings.length
+      ? '<div class="card" style="border-left:4px solid var(--gold,#e0a800)"><h3>Notes &amp; Warnings</h3><ul style="margin:0;padding-left:20px">' + r.warnings.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul></div>'
+      : '';
+    var refs = '<div class="card" id="wlRefs"><h3>Standards References</h3><ul style="margin:0;padding-left:20px">' + r.references.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>';
+    return kpis + chTable + asgTable + warns + refs;
+  }
+  RENDER.wavelengths = function () {
+    var B = window.QIBrain;
+    var form = '<div class="card"><h3>Optical Spectrum Parameters</h3>' +
+      '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px">' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Band</span><select id="wlBand"><option value="C" selected>C-band</option><option value="L">L-band</option><option value="C+L">C+L-band</option></select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Channel spacing</span><select id="wlSpacing">' + wlOpts([12.5, 25, 50, 100], 50, ' GHz') + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Bitrate / channel</span><select id="wlBitrate">' + wlOpts([100, 200, 400, 600, 800], 200, ' G') + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Fibre pairs</span><select id="wlPairs">' + wlOpts([1, 2, 4, 6, 8, 12, 16], 8, ' pairs') + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Demand load</span><select id="wlDemands"><option value="0" selected>None</option><option value="50">50 x 100G</option><option value="100">100 x 100G</option><option value="200">200 x 200G</option></select></label>' +
+      '</div></div>';
+    var initial = B && B.planWavelengths ? wlResultsHtml(B.planWavelengths({ band: "C", spacingGHz: 50, bitratePerChannelGbps: 200, fiberPairs: 8 })) : '';
+    return '<h2 style="margin-bottom:16px">Wavelength Assignment Planner</h2>' +
+      '<p style="margin-bottom:16px" class="muted">DWDM grid, capacity &amp; routing-and-wavelength assignment per ITU-T G.694.1</p>' +
+      form + '<div id="wlResults">' + initial + '</div>';
+  };
+  AFTER.wavelengths = function () {
+    var B = window.QIBrain;
+    function recompute() {
+      if (!B || !B.planWavelengths) return;
+      var nDemand = Number(document.getElementById("wlDemands").value) || 0;
+      var demandGbps = document.getElementById("wlDemands").value === "200" ? 200 : 100;
+      var demands = [];
+      for (var i = 0; i < nDemand; i++) demands.push({ label: "Service " + (i + 1), capacityGbps: demandGbps });
+      var r = B.planWavelengths({
+        band: document.getElementById("wlBand").value,
+        spacingGHz: Number(document.getElementById("wlSpacing").value),
+        bitratePerChannelGbps: Number(document.getElementById("wlBitrate").value),
+        fiberPairs: Number(document.getElementById("wlPairs").value),
+        demands: demands
+      });
+      document.getElementById("wlResults").innerHTML = wlResultsHtml(r);
+    }
+    ["wlBand", "wlSpacing", "wlBitrate", "wlPairs", "wlDemands"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener("change", recompute);
+    });
+  };
+
+  // ---------- Latency Calculator (ITU-T G.114 / fibre group index) ----------
+  function latResultsHtml(r) {
+    if (!r) return '<div class="muted">Latency engine unavailable.</div>';
+    var ratingColor = r.g114Verdict.rating === 'Good' ? 'var(--green,#1e7e34)' : (r.g114Verdict.rating === 'Acceptable' ? 'var(--gold,#e0a800)' : 'var(--red,#c0392b)');
+    var kpis = '<div class="grid kpis" id="latKpis" style="margin-bottom:16px">' +
+      '<div class="kpi"><div class="label">One-way latency</div><div class="value">' + r.oneWayMs + ' ms</div></div>' +
+      '<div class="kpi"><div class="label">Round-trip (RTT)</div><div class="value">' + r.rttMs + ' ms</div></div>' +
+      '<div class="kpi"><div class="label">Per km (one-way)</div><div class="value">' + r.perKmOneWayUs + ' &micro;s</div></div>' +
+      '<div class="kpi"><div class="label">vs GEO satellite</div><div class="value">' + r.geoSatellite.fiberFasterTimes + '&times; faster</div></div>' +
+      '<div class="kpi"><div class="label">G.114 verdict</div><div class="value" style="color:' + ratingColor + '">' + r.g114Verdict.rating + '</div></div>' +
+      '</div>';
+    var eqRows = r.equipmentBreakdown.map(function (e) {
+      return '<tr><td>' + esc(e.item) + '</td><td>' + e.count + '</td><td>' + e.usEach + ' &micro;s</td><td>' + e.usTotal + ' &micro;s</td></tr>';
+    }).join('');
+    var eqTable = '<div class="card"><h3>Latency Budget</h3>' +
+      '<div class="table-wrap"><table class="latBudgetTable"><thead><tr><th>Component</th><th>Count</th><th>Each</th><th>Total</th></tr></thead><tbody>' +
+      '<tr><td>Fibre propagation (' + r.fiberType + ', n<sub>g</sub>=' + r.groupIndex + ')</td><td>' + r.fiberLengthKm + ' km</td><td>' + r.perKmOneWayUs + ' &micro;s/km</td><td>' + (Math.round(r.propagationOneWayUs / 10) / 100) + ' ms</td></tr>' +
+      eqRows +
+      '<tr style="font-weight:700"><td>Total one-way</td><td colspan="2"></td><td>' + r.oneWayMs + ' ms</td></tr>' +
+      '</tbody></table></div>' +
+      '<p class="muted" style="margin-top:8px">Route ' + r.routeKm + ' km &rarr; fibre length ' + r.fiberLengthKm + ' km (' + r.slackPct + '% slack). ' + esc(r.g114Verdict.note) + '</p></div>';
+    var cmp = '<div class="card" id="latCompare"><h3>Benchmark</h3><div class="table-wrap"><table><thead><tr><th>Path</th><th>One-way</th><th>RTT</th></tr></thead><tbody>' +
+      '<tr><td>This fibre link</td><td>' + r.oneWayMs + ' ms</td><td>' + r.rttMs + ' ms</td></tr>' +
+      '<tr><td>Vacuum great-circle floor (' + r.vacuum.refKm + ' km)</td><td>' + r.vacuum.oneWayMs + ' ms</td><td>' + (Math.round(r.vacuum.oneWayMs * 2 * 1000) / 1000) + ' ms</td></tr>' +
+      '<tr><td>GEO satellite</td><td>' + r.geoSatellite.oneWayMs + ' ms</td><td>' + r.geoSatellite.rttMs + ' ms</td></tr>' +
+      '</tbody></table></div><p class="muted" style="margin-top:8px">Fibre overhead vs vacuum floor: ' + r.vacuum.overheadPct + '% (group index + cable slack + equipment).</p></div>';
+    var warns = r.warnings.length
+      ? '<div class="card" style="border-left:4px solid var(--gold,#e0a800)"><h3>Warnings</h3><ul style="margin:0;padding-left:20px">' + r.warnings.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul></div>'
+      : '';
+    var refs = '<div class="card" id="latRefs"><h3>Standards References</h3><ul style="margin:0;padding-left:20px">' + r.references.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>';
+    return kpis + eqTable + cmp + warns + refs;
+  }
+  RENDER.latency = function () {
+    var B = window.QIBrain;
+    var routeVals = [];
+    for (var k = 100; k <= 12000; k += (k < 1000 ? 100 : (k < 3000 ? 250 : 1000))) routeVals.push(k);
+    var form = '<div class="card"><h3>Link Parameters</h3>' +
+      '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px">' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Route length</span><select id="latRoute">' + wlOpts(routeVals, 1000, ' km') + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Fibre type</span><select id="latFiber"><option value="G.652.D" selected>G.652.D</option><option value="G.654.E">G.654.E (submarine)</option><option value="G.655">G.655</option></select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Cable slack</span><select id="latSlack">' + wlOpts([0, 3, 5, 7, 10, 15], 7, ' %') + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>OEO regen sites</span><select id="latRegen">' + wlOpts([0, 1, 2, 3, 4], 0, '') + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Express ROADMs</span><select id="latRoadm">' + wlOpts([0, 1, 2, 4, 6], 0, '') + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>SD-FEC</span><select id="latFec"><option value="1" selected>Enabled</option><option value="0">Disabled</option></select></label>' +
+      '</div></div>';
+    var initial = B && B.calcLatency ? latResultsHtml(B.calcLatency({ routeKm: 1000, fiberType: "G.652.D", slackPct: 7 })) : '';
+    return '<h2 style="margin-bottom:16px">Latency Calculator</h2>' +
+      '<p style="margin-bottom:16px" class="muted">End-to-end fibre propagation &amp; equipment latency, benchmarked per ITU-T G.114</p>' +
+      form + '<div id="latResults">' + initial + '</div>';
+  };
+  AFTER.latency = function () {
+    var B = window.QIBrain;
+    function recompute() {
+      if (!B || !B.calcLatency) return;
+      var r = B.calcLatency({
+        routeKm: Number(document.getElementById("latRoute").value),
+        fiberType: document.getElementById("latFiber").value,
+        slackPct: Number(document.getElementById("latSlack").value),
+        regenCount: Number(document.getElementById("latRegen").value),
+        roadmCount: Number(document.getElementById("latRoadm").value),
+        fecEnabled: document.getElementById("latFec").value === "1"
+      });
+      document.getElementById("latResults").innerHTML = latResultsHtml(r);
+    }
+    ["latRoute", "latFiber", "latSlack", "latRegen", "latRoadm", "latFec"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener("change", recompute);
+    });
+  };
+
+  // ---------- Cable Protection Awareness (ICPC / UNCLOS) ----------
+  function cpLevelColor(level) {
+    return level === 'Critical' ? 'var(--red,#c0392b)' : level === 'High' ? '#e67e22' : level === 'Medium' ? 'var(--gold,#e0a800)' : level === 'Low' ? '#3498db' : 'var(--green,#1e7e34)';
+  }
+  function cpResultsHtml(r) {
+    if (!r) return '<div class="muted">Protection engine unavailable.</div>';
+    var s = r.summary;
+    var residColor = s.weightedResidualScore >= 5.5 ? 'var(--red,#c0392b)' : s.weightedResidualScore >= 3.5 ? 'var(--gold,#e0a800)' : 'var(--green,#1e7e34)';
+    var kpis = '<div class="grid kpis" id="cpKpis" style="margin-bottom:16px">' +
+      '<div class="kpi"><div class="label">Residual risk (0-10)</div><div class="value" style="color:' + residColor + '">' + s.weightedResidualScore + '</div></div>' +
+      '<div class="kpi"><div class="label">High-threat length</div><div class="value">' + s.highThreatKm + ' km</div></div>' +
+      '<div class="kpi"><div class="label">Buried / protected</div><div class="value">' + s.protectedKm + ' km</div></div>' +
+      '<div class="kpi"><div class="label">Surface-laid</div><div class="value">' + s.surfaceLaidKm + ' km</div></div>' +
+      '<div class="kpi"><div class="label">Threat reduction</div><div class="value">' + s.protectionAdequacyPct + '%</div></div>' +
+      '</div>';
+    var segRows = r.segments.map(function (sg) {
+      var threats = sg.threats.length ? sg.threats.join(', ') : 'None significant';
+      var bury = sg.recommendedBurialM > 0 ? (sg.recommendedBurialM + ' m') : 'Surface lay';
+      return '<tr><td>' + esc(sg.depthRange) + '</td><td>' + sg.lengthKm + ' km</td>' +
+        '<td style="color:' + cpLevelColor(sg.threatLevel) + ';font-weight:600">' + sg.threatLevel + '</td>' +
+        '<td>' + esc(threats) + '</td><td>' + bury + '</td><td>' + esc(sg.recommendedArmour) + '</td>' +
+        '<td style="color:' + cpLevelColor(sg.residualLevel) + ';font-weight:600">' + sg.residualLevel + '</td></tr>';
+    }).join('');
+    var segTable = '<div class="card"><h3>Protection Plan by Depth Band</h3>' +
+      '<div class="table-wrap"><table class="cableProtectSegTable"><thead><tr><th>Depth band</th><th>Length</th><th>Threat</th><th>Aggressors</th><th>Burial</th><th>Armour</th><th>Residual</th></tr></thead><tbody>' + segRows + '</tbody></table></div></div>';
+    // Mitigations grouped per band
+    var mitHtml = r.segments.map(function (sg) {
+      return '<div style="margin-bottom:8px"><strong>' + esc(sg.depthRange) + ':</strong><ul style="margin:4px 0;padding-left:20px">' + sg.mitigations.map(function (m) { return '<li>' + esc(m) + '</li>'; }).join('') + '</ul></div>';
+    }).join('');
+    var mitCard = '<div class="card" id="cpMitigations"><h3>Recommended Mitigations</h3>' + mitHtml + '</div>';
+    var warns = r.warnings.length
+      ? '<div class="card" style="border-left:4px solid var(--gold,#e0a800)"><h3>Warnings</h3><ul style="margin:0;padding-left:20px">' + r.warnings.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul></div>'
+      : '';
+    var refs = '<div class="card" id="cpRefs"><h3>Standards &amp; References</h3><ul style="margin:0;padding-left:20px">' + r.references.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>';
+    return kpis + segTable + mitCard + warns + refs;
+  }
+  RENDER.cableprotect = function () {
+    var B = window.QIBrain;
+    var routeVals = [];
+    for (var k = 100; k <= 10000; k += (k < 1000 ? 100 : 500)) routeVals.push(k);
+    var intensitySel = function (id, sel) {
+      return '<select id="' + id + '"><option value="high"' + (sel === 'high' ? ' selected' : '') + '>High</option><option value="medium"' + (sel === 'medium' ? ' selected' : '') + '>Medium</option><option value="low"' + (sel === 'low' ? ' selected' : '') + '>Low</option><option value="none"' + (sel === 'none' ? ' selected' : '') + '>None</option></select>';
+    };
+    var form = '<div class="card"><h3>Route &amp; Threat Environment</h3>' +
+      '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px">' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Route length</span><select id="cpRoute">' + wlOpts(routeVals, 1000, ' km') + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Bottom trawling</span>' + intensitySel('cpTrawl', 'medium') + '</label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Anchoring</span>' + intensitySel('cpAnchor', 'medium') + '</label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Seabed</span><select id="cpSeabed"><option value="sand" selected>Sand</option><option value="mud">Mud</option><option value="rock">Rock</option><option value="coral">Coral</option><option value="mixed">Mixed</option></select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Seismic zone</span><select id="cpSeismic"><option value="0" selected>No</option><option value="1">Yes</option></select></label>' +
+      '</div></div>';
+    var initial = B && B.assessCableProtection ? cpResultsHtml(B.assessCableProtection({ routeKm: 1000, trawlingIntensity: "medium", anchoringActivity: "medium", seabed: "sand" })) : '';
+    return '<h2 style="margin-bottom:16px">Cable Protection Awareness</h2>' +
+      '<p style="margin-bottom:16px" class="muted">Threat-vs-depth burial &amp; armour assessment per ICPC guidance and UNCLOS Articles 113-115</p>' +
+      form + '<div id="cpResults">' + initial + '</div>';
+  };
+  AFTER.cableprotect = function () {
+    var B = window.QIBrain;
+    function recompute() {
+      if (!B || !B.assessCableProtection) return;
+      var r = B.assessCableProtection({
+        routeKm: Number(document.getElementById("cpRoute").value),
+        trawlingIntensity: document.getElementById("cpTrawl").value,
+        anchoringActivity: document.getElementById("cpAnchor").value,
+        seabed: document.getElementById("cpSeabed").value,
+        seismicZone: document.getElementById("cpSeismic").value === "1"
+      });
+      document.getElementById("cpResults").innerHTML = cpResultsHtml(r);
+    }
+    ["cpRoute", "cpTrawl", "cpAnchor", "cpSeabed", "cpSeismic"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener("change", recompute);
+    });
+  };
+
   // ---------- Training & Competency Register ----------
   RENDER.training = function () {
     var records = S.listTrainingRecords();
+
 
     // Summary stats
     var totalStaff = records.length;

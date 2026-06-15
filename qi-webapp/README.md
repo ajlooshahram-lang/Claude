@@ -36,10 +36,19 @@ No install, no build step, no server, works offline.
 **Risk & Quality:** Risk Register · FMEA · Six Sigma (+ SPC I-MR) · Gage R&R (MSA) · Risk Matrix · X̄-R Control Chart · **Process Capability (Cp/Cpk)** · **NCR Pareto**
 **Improve:** PDCA · Action Log
 **People & Cost:** Stakeholders (RACI) · Budget
-**Engineering registers:** HAZOP (guidewords & parameters) · Bow-tie diagram · Calibration · Punch List · SIL · Requirements Traceability · Document Register · NCR · MOC
+**Engineering registers:** HAZOP (guidewords & parameters) · Bow-tie diagram · Calibration · Punch List · SIL · Requirements Traceability · Document Register · NCR · MOC · **Cable Protection (ICPC/UNCLOS)**
 **Business management:** Earned Value (EVM) · Cash Flow / S-curve · **Prioritisation (RICE/WSJF)** · Milestones · Decision Log · Procurement · Resources / Capacity · OKR Scorecard
+**Submarine optical engineering:** Cable System Design · **Wavelength Assignment Planner (ITU-T G.694.1)** · **Latency Calculator (ITU-T G.114)** · Route Optimizer · Fault Forecast · Digital Twin · Energy Watchdog · Commissioning Checklist
 **Intelligence:** AI Assistant · Change Impact (traceability) · KPI Scorecard (RAG) · Data Health
 **Setup:** Report Pack (printable) · History & Backups · Settings · Help
+
+## Submarine optical & cable-protection engineering
+
+Three deterministic, offline engineering tools for the fibre/submarine programme — every input is a dropdown (click-only), and each result cites the governing ITU-T / ICPC / UNCLOS reference:
+
+- **Wavelength Assignment Planner (ITU-T G.694.1).** Builds the DWDM frequency grid anchored at 193.1 THz for C / L / C+L bands and a chosen channel spacing (12.5–100 GHz), computes channel count, per-pair & system capacity, and spectral efficiency, flags modulation-vs-spacing feasibility (e.g. 800G needs ≥100 GHz), and runs a **first-fit routing-and-wavelength assignment (RWA)** over a demand list with blocking/utilisation reporting. (96 C-band channels at 50 GHz, 193.1 THz = 1552.524 nm — consistent with the cable-system design model.)
+- **Latency Calculator (ITU-T G.114).** Uses the fibre **group index** (G.652.D n_g ≈ 1.4682 → 4.897 µs/km one-way) plus cable slack and an active-equipment budget (transponder DSP, SD-FEC, OEO regen, express ROADMs) to give one-way and round-trip latency, a vacuum great-circle floor, a GEO-satellite benchmark, and a G.114 verdict.
+- **Cable Protection Awareness (ICPC / UNCLOS Art. 113–115).** Rates external-aggression threats (anchoring, bottom trawling, abrasion, natural hazards) per depth band and recommends a **burial depth and armour class** (≈1 m target burial in trawled grounds, heavier shallow protection, surface lay in the deep ocean), with a length-weighted residual-risk score and threat-reduction percentage.
 
 ## Engineering & business management
 
@@ -99,7 +108,7 @@ Every operational field in the app is a **dropdown or picker** — there is no f
 - **Print-ready.** Print or save-as-PDF (top-bar Print, or the dedicated **Report Pack** view): the print stylesheet hides the chrome, keeps tables and KPI cards from breaking across pages, repeats table headers, and forces colour fidelity for badges.
 - **Screen-reader hints.** Active sidebar items expose `aria-current="page"`; modals are `role="dialog"`; icon-only topbar buttons carry `aria-label`s.
 - **Themed charts.** Chart.js axis ticks, grid lines, legends and tooltips re-colour automatically when you toggle dark mode.
-- **Verified.** 6/6 engine test suites and **199/199** jsdom smoke checks across 43 views, including regression checks for the command palette, quick-filter chips, manage-saved-views, saved views, snapshot rename, FAB quick-add, pagination, register pinning, bulk-delete, sortable headers, row-patch perf, hash routing, focus trap, inline edit, bulk ops, undo toast, tour, print CSS, drag-and-drop import, snapshot diff, sidebar collapse, empty-state CTA and the storage-quota event.
+- **Verified.** 6/6 engine test suites and **786 jsdom/engine assertions** (361 smoke + 425 brain) all green, including the Wavelength Assignment Planner, Latency Calculator and Cable Protection Awareness modules, plus regression checks for the command palette, quick-filter chips, manage-saved-views, saved views, snapshot rename, FAB quick-add, pagination, register pinning, bulk-delete, sortable headers, row-patch perf, hash routing, focus trap, inline edit, bulk ops, undo toast, tour, print CSS, drag-and-drop import, snapshot diff, sidebar collapse, empty-state CTA and the storage-quota event.
 
 ## Files
 
