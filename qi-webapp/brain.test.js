@@ -1629,5 +1629,42 @@ console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
   ok(r.references.some(function (x) { return /ICPC/.test(x); }) && r.references.some(function (x) { return /ITU-T/.test(x); }), "references cite ICPC and ITU-T submarine practice");
 })();
 
+// ===== Country Intelligence Tests (8 programme countries) =====
+(function () {
+  console.log("\n--- Country Intelligence ---");
+  var all = B.listCountries();
+  ok(all.length === 8, "listCountries returns all 8 programme countries (got " + all.length + ")");
+  var wantCodes = ["ID", "TH", "VN", "TW", "PH", "GU", "MY", "BN"];
+  ok(wantCodes.every(function (c) { return all.some(function (x) { return x.code === c; }); }), "all 8 country codes present");
+  // Every country has the 5 regulatory domains + challenge lists + phase contacts
+  var complete = all.every(function (c) {
+    var a = c.regulatoryAuthorities || {};
+    var hasAuth = a.telecom && a.maritime && a.environment && a.coastal && a.investment;
+    var hasFull = a.telecom && a.telecom.name && a.telecom.fullName && a.telecom.jurisdiction;
+    var kc = c.keyContacts || {};
+    return hasAuth && hasFull &&
+      (c.geopoliticalChallenges || []).length >= 3 &&
+      (c.geographicalChallenges || []).length >= 3 &&
+      kc.feasibility && kc.permitting && kc.construction && kc.operations;
+  });
+  ok(complete, "each country has 5 regulators (name+fullName+jurisdiction), >=3 geopolitical, >=3 geographical, and 4 phase-contact groups");
+  // Real-institution spot checks (not generic)
+  ok(B.getCountryInfo("PH").regulatoryAuthorities.telecom.name === "NTC", "Philippines telecom regulator is NTC");
+  ok(B.getCountryInfo("ID").regulatoryAuthorities.telecom.name.indexOf("Kominfo") >= 0, "Indonesia telecom regulator is Kominfo/BAKTI");
+  ok(B.getCountryInfo("GU").regulatoryAuthorities.telecom.name === "FCC", "Guam (US territory) telecom regulator is the FCC");
+  // Lookup by code, name and alias; unknown -> null
+  ok(B.getCountryInfo("saigon") && B.getCountryInfo("saigon").code === "VN", "alias lookup resolves 'saigon' -> Vietnam");
+  ok(B.getCountryInfo("Taiwan") && B.getCountryInfo("Taiwan").code === "TW", "name lookup resolves 'Taiwan'");
+  ok(B.getCountryInfo("Atlantis") === null, "unknown country returns null");
+  // Phase -> authority auto-surfacing
+  var perm = B.authoritiesForPhase("ID", "Cable Landing Permits");
+  ok(perm && perm.group === "permitting" && perm.contacts.length > 0, "permitting phase surfaces Indonesia permitting contacts");
+  var marine = B.authoritiesForPhase("TW", "Marine Installation");
+  ok(marine && marine.group === "construction", "marine installation phase maps to construction contacts");
+  var ops = B.authoritiesForPhase("MY", "System Testing");
+  ok(ops && ops.group === "operations", "system testing phase maps to operations contacts");
+  ok(B.authoritiesForPhase("ZZ", "anything") === null, "unknown country phase lookup returns null");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);

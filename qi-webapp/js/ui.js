@@ -223,6 +223,7 @@
     { id: "cases", label: "Cases (Master)", icon: "★" },
     { g: "Delivery" },
     { id: "permits", label: "Permit Tracker", icon: "⏱" },
+    { id: "countryintel", label: "Country Intelligence", icon: "\uD83C\uDF0F" },
     { id: "pm", label: "PM Tasks", icon: "✔" },
     { id: "kanban", label: "Kanban Board", icon: "▥" },
     { id: "timeline", label: "Timeline", icon: "▦" },
@@ -2339,6 +2340,101 @@
     });
 
     applyState(0);
+  };
+
+  // ---------- Country Intelligence Hub (8 programme countries) ----------
+  var CI_AUTH_LABELS = {
+    telecom: "Telecom / Licensing", maritime: "Maritime / Seabed",
+    environment: "Environment", coastal: "Coastal / Marine", investment: "Investment / Security"
+  };
+  var CI_PHASE_GROUPS = [
+    { key: "feasibility", label: "Feasibility & Design", icon: "\uD83D\uDCD0" },
+    { key: "permitting", label: "Permitting & Landing", icon: "\uD83D\uDCDD" },
+    { key: "construction", label: "Construction & Marine", icon: "\u2693" },
+    { key: "operations", label: "Test & Operations", icon: "\uD83D\uDEF0" }
+  ];
+  function countryDossierHtml(c) {
+    if (!c) return '<div class="muted">Select a country.</div>';
+    var auths = c.regulatoryAuthorities || {};
+    var authRows = Object.keys(auths).map(function (k) {
+      var a = auths[k];
+      return '<tr><td><strong>' + esc(CI_AUTH_LABELS[k] || k) + '</strong></td>' +
+        '<td><strong>' + esc(a.name) + '</strong><div class="muted" style="font-size:.85rem">' + esc(a.fullName || "") + '</div></td>' +
+        '<td>' + esc(a.jurisdiction || "") + '</td></tr>';
+    }).join("");
+    var authTable = '<div class="card"><h3>Regulatory Authorities <span class="tag">who to contact</span></h3>' +
+      '<div class="table-wrap"><table class="ciAuthTable"><thead><tr><th>Domain</th><th>Authority</th><th>Jurisdiction</th></tr></thead><tbody>' + authRows + '</tbody></table></div></div>';
+    var geopol = '<div class="card"><h3>Geopolitical Challenges</h3><ul style="margin:0;padding-left:20px;line-height:1.7">' +
+      (c.geopoliticalChallenges || []).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul></div>';
+    var geog = '<div class="card"><h3>Geographical &amp; Environmental Challenges</h3><ul style="margin:0;padding-left:20px;line-height:1.7">' +
+      (c.geographicalChallenges || []).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul></div>';
+    var kc = c.keyContacts || {};
+    var phaseCards = CI_PHASE_GROUPS.map(function (g) {
+      var list = (kc[g.key] || []).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("");
+      return '<div style="flex:1;min-width:210px;border:1px solid var(--border,#e2e8f0);border-radius:8px;padding:10px">' +
+        '<div style="font-weight:700;margin-bottom:6px">' + g.icon + ' ' + esc(g.label) + '</div>' +
+        '<ul style="margin:0;padding-left:18px;font-size:.88rem;line-height:1.6">' + list + '</ul></div>';
+    }).join("");
+    var contacts = '<div class="card" id="ciContacts"><h3>Key Contacts by Project Phase <span class="tag">auto-surfaced</span></h3>' +
+      '<p class="muted">These authorities surface automatically at the matching phase of the project plan.</p>' +
+      '<div style="display:flex;gap:12px;flex-wrap:wrap">' + phaseCards + '</div></div>';
+    return authTable + '<div style="display:grid;grid-template-columns:1fr;gap:0">' + geopol + geog + '</div>' + contacts;
+  }
+  function ciSelectorHtml(countries, activeCode) {
+    return countries.map(function (c) {
+      var on = c.code === activeCode;
+      return '<button class="btn ci-country-btn' + (on ? ' btn-primary' : '') + '" data-code="' + esc(c.code) + '" style="margin:2px">' + esc(c.name) + '</button>';
+    }).join("");
+  }
+  RENDER.countryintel = function () {
+    var B = window.QIBrain;
+    if (!B || !B.listCountries) return '<h2>Country Intelligence</h2><p class="muted">Country database unavailable.</p>';
+    var countries = B.listCountries();
+    if (!countries.length) return '<h2>Country Intelligence</h2><p class="muted">No country data loaded.</p>';
+    var totalAuth = 0, totalGeopol = 0, totalGeog = 0;
+    countries.forEach(function (c) {
+      totalAuth += Object.keys(c.regulatoryAuthorities || {}).length;
+      totalGeopol += (c.geopoliticalChallenges || []).length;
+      totalGeog += (c.geographicalChallenges || []).length;
+    });
+    var activeCode = (uiState.countryIntel && uiState.countryIntel.code) || countries[0].code;
+    uiState.countryIntel = { code: activeCode };
+    var active = B.getCountryInfo(activeCode) || countries[0];
+    var kpis = '<div class="grid kpis" style="margin-bottom:14px">' +
+      '<div class="kpi"><div class="label">Programme countries</div><div class="value">' + countries.length + '</div></div>' +
+      '<div class="kpi"><div class="label">Regulatory bodies</div><div class="value">' + totalAuth + '</div></div>' +
+      '<div class="kpi"><div class="label">Geopolitical factors</div><div class="value">' + totalGeopol + '</div></div>' +
+      '<div class="kpi"><div class="label">Geo/environmental factors</div><div class="value">' + totalGeog + '</div></div>' +
+      '</div>';
+    var selector = '<div class="card" style="margin-bottom:14px"><h3>Select country</h3><div id="ciSelector">' + ciSelectorHtml(countries, activeCode) + '</div></div>';
+    var header = '<div class="card" id="ciHeaderCard" style="margin-bottom:14px"><h2 id="ciCountryName" style="margin:0">' + esc(active.name) + '</h2>' +
+      '<div class="muted" id="ciCountryCode">Country code: ' + esc(active.code) + '</div></div>';
+    var note = '<div class="card" style="margin-top:14px;border-left:4px solid var(--gold,#e0a800)"><p style="margin:0;font-size:.9rem">Reference intelligence for permitting & route planning. Named authorities, jurisdictions and hazards are compiled for guidance &mdash; always confirm current requirements directly with each authority before committing the programme.</p></div>';
+    return '<h2 style="margin-bottom:6px">Country Intelligence Hub</h2>' +
+      '<p class="muted" style="margin-bottom:14px">Regulators, geopolitical &amp; geographical risk and phase-based contacts for the 8 programme countries (Indonesia, Thailand, Vietnam, Taiwan, Philippines, Guam, Malaysia, Brunei).</p>' +
+      kpis + selector + header + '<div id="ciDossier">' + countryDossierHtml(active) + '</div>' + note;
+  };
+  AFTER.countryintel = function () {
+    var B = window.QIBrain;
+    if (!B || !B.getCountryInfo) return;
+    var sel = document.getElementById("ciSelector");
+    if (!sel) return;
+    sel.addEventListener("click", function (e) {
+      var btn = e.target.closest ? e.target.closest(".ci-country-btn") : null;
+      if (!btn) return;
+      var code = btn.getAttribute("data-code");
+      uiState.countryIntel = { code: code };
+      var c = B.getCountryInfo(code);
+      var dossier = document.getElementById("ciDossier");
+      if (dossier && c) dossier.innerHTML = countryDossierHtml(c);
+      var nm = document.getElementById("ciCountryName"); if (nm && c) nm.textContent = c.name;
+      var cc = document.getElementById("ciCountryCode"); if (cc && c) cc.textContent = "Country code: " + c.code;
+      var btns = sel.querySelectorAll(".ci-country-btn");
+      for (var i = 0; i < btns.length; i++) {
+        if (btns[i].getAttribute("data-code") === code) btns[i].classList.add("btn-primary");
+        else btns[i].classList.remove("btn-primary");
+      }
+    });
   };
 
   // ---------- Training & Competency Register ----------

@@ -1508,6 +1508,31 @@
     return country || null;
   }
 
+  // Return the full programme-country intelligence list (regulators, geopolitical
+  // & geographical challenges, and phase-based key contacts) for all 8 countries.
+  function listCountries() {
+    var profile = PROFILES.find(function (p) { return p.id === "fibre-telecom"; });
+    return (profile && profile.COUNTRY_DATABASE) ? profile.COUNTRY_DATABASE.slice() : [];
+  }
+
+  // Map a project/plan phase to the relevant key-contact group, so the right
+  // authorities auto-surface at the appropriate phase of the project plan.
+  function authoritiesForPhase(countryCode, phase) {
+    var c = getCountryInfo(countryCode);
+    if (!c) return null;
+    var p = norm(phase);
+    var group = "feasibility";
+    if (/permit|licen|landing|wayleave|environ|eia|amdal|consent/.test(p)) group = "permitting";
+    else if (/survey|design|feasib|planning|route/.test(p)) group = "feasibility";
+    else if (/install|marine|civil|shore|lay|splice|build|construct/.test(p)) group = "construction";
+    else if (/test|commission|operat|handover|acceptance|maintenance|o&m/.test(p)) group = "operations";
+    return {
+      country: c.name, code: c.code, phase: phase, group: group,
+      contacts: (c.keyContacts && c.keyContacts[group]) || [],
+      primaryRegulator: c.regulatoryAuthorities && c.regulatoryAuthorities.telecom ? c.regulatoryAuthorities.telecom.name : null
+    };
+  }
+
   // ---- Intelligence Engine: localStorage with in-memory fallback ----------
   var _memoryStore = {};
   function storageGet(key) {
@@ -5033,6 +5058,8 @@
     listProfiles: listProfiles,
     extractScale: extractScale,
     getCountryInfo: getCountryInfo,
+    listCountries: listCountries,
+    authoritiesForPhase: authoritiesForPhase,
     _profiles: PROFILES,
     analyzeStatus: analyzeStatus,
     recordLesson: recordLesson,

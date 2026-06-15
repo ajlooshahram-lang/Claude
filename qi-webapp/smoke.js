@@ -1109,5 +1109,21 @@ var buildFirstRow = doc.querySelector('.qi-step-row[data-step="0"]');
 if (buildFirstRow) buildFirstRow.dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(doc.getElementById("buildCounter").textContent.indexOf("Step 1 /") !== -1 && buildFirstRow.classList.contains("active"), "clicking a timeline step jumps the animation to it");
 
+// 98) Country Intelligence Hub
+var ciNav = doc.querySelector('.nav-item[data-view="countryintel"]');
+ok(ciNav != null, "Country Intelligence nav item exists");
+if (ciNav) ciNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var ciSelector = doc.getElementById("ciSelector");
+ok(ciSelector != null && ciSelector.querySelectorAll('.ci-country-btn').length === 8, "Country Intelligence shows 8 country selector buttons - got " + (ciSelector ? ciSelector.querySelectorAll('.ci-country-btn').length : 0));
+var ciAuth = doc.querySelector('.ciAuthTable');
+ok(ciAuth != null && ciAuth.querySelectorAll('tbody tr').length === 5, "Country dossier shows 5 regulatory authorities");
+ok(doc.getElementById("ciContacts") != null && doc.getElementById("ciContacts").innerHTML.indexOf("Permitting") !== -1, "Country dossier shows phase-based key contacts");
+// 99) Switching country updates the dossier
+var phBtn = doc.querySelector('.ci-country-btn[data-code="PH"]');
+if (phBtn) phBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("ciCountryName").textContent === "Philippines", "selecting Philippines updates the dossier header");
+ok(doc.querySelector('.ciAuthTable').innerHTML.indexOf("NTC") !== -1, "Philippines dossier names its real regulator (NTC)");
+ok(phBtn.classList.contains("btn-primary"), "selected country button is highlighted active");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
