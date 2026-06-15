@@ -910,5 +910,29 @@ if (competitiveNav) competitiveNav.dispatchEvent(new window.Event("click", { bub
 var cableSystemsTable = doc.getElementById("cableSystemsTable");
 ok(cableSystemsTable != null && cableSystemsTable.querySelectorAll('tbody tr').length >= 7, "Market Intel shows cable systems");
 
+// 67) Route Optimizer
+var routeoptNav = doc.querySelector('.nav-item[data-view="routeopt"]');
+ok(routeoptNav != null, "Route Optimizer nav item exists");
+
+if (routeoptNav) routeoptNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var roCalcBtn = doc.getElementById("roCalcBtn");
+ok(roCalcBtn != null, "Route Optimizer has calculate button");
+
+// 68) Fault Forecast
+var predictiveNav = doc.querySelector('.nav-item[data-view="predictive"]');
+ok(predictiveNav != null, "Fault Forecast nav item exists");
+
+if (predictiveNav) predictiveNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var predictiveTable = doc.getElementById("predictiveTable");
+ok(predictiveTable != null && predictiveTable.querySelectorAll('tbody tr').length >= 6, "Fault Forecast renders segment table");
+
+// 69) Digital Twin
+var digitaltwinNav = doc.querySelector('.nav-item[data-view="digitaltwin"]');
+ok(digitaltwinNav != null, "Digital Twin nav item exists");
+
+if (digitaltwinNav) digitaltwinNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var dtSegments = doc.getElementById("dtSegments");
+ok(dtSegments != null && dtSegments.querySelectorAll('[data-segment]').length >= 6, "Digital Twin renders health scores");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

@@ -247,6 +247,9 @@
     { id: "competitive", label: "Market Intel", icon: "🔍" },
     { id: "systemdesign", label: "System Design", icon: "\u26A1" },
     { id: "revenue", label: "Revenue Model", icon: "\uD83D\uDCB0" },
+    { id: "routeopt", label: "Route Optimizer", icon: "\uD83D\uDEE4" },
+    { id: "predictive", label: "Fault Forecast", icon: "\uD83D\uDCE1" },
+    { id: "digitaltwin", label: "Digital Twin", icon: "\uD83D\uDD2E" },
     { id: "lessons", label: "Lessons Library", icon: "\uD83D\uDCDA" },
     { id: "ai", label: "AI Assistant", icon: "✦" },
     { id: "impact", label: "Change Impact", icon: "⇄" },
@@ -1379,6 +1382,223 @@
         document.getElementById("rvResults").innerHTML = html;
       });
     }
+  };
+
+  // ---------- Cable Route Optimization Engine ----------
+  RENDER.routeopt = function () {
+    var SEA_SEGMENTS = [
+      { name: "Singapore-Jakarta", startLat: 1.35, startLng: 103.82, endLat: -6.21, endLng: 106.85, maxDepth: 100 },
+      { name: "Jakarta-Surabaya-Bali", startLat: -6.21, startLng: 106.85, endLat: -8.34, endLng: 115.17, maxDepth: 200 },
+      { name: "Singapore-Bangkok", startLat: 1.35, startLng: 103.82, endLat: 13.76, endLng: 100.50, maxDepth: 80 },
+      { name: "Bangkok-HCMC", startLat: 13.76, startLng: 100.50, endLat: 10.82, endLng: 106.63, maxDepth: 60 },
+      { name: "Manila-Kaohsiung", startLat: 14.60, startLng: 120.98, endLat: 22.63, endLng: 120.30, maxDepth: 4500 },
+      { name: "Manila-Guam", startLat: 14.60, startLng: 120.98, endLat: 13.44, endLng: 144.79, maxDepth: 6000 }
+    ];
+
+    var HAZARDS = [
+      { lat: 3.50, lng: 105.50, radius: 80, type: "seismic zone" },
+      { lat: -5.00, lng: 109.00, radius: 50, type: "coral reef" },
+      { lat: 15.00, lng: 117.00, radius: 100, type: "military zone" },
+      { lat: 20.00, lng: 122.00, radius: 60, type: "seismic zone" },
+      { lat: 8.00, lng: 130.00, radius: 40, type: "coral reef" }
+    ];
+
+    var SHIPPING_LANES = [
+      { lat: 1.20, lng: 104.00, width: 20 },
+      { lat: 5.50, lng: 108.00, width: 30 },
+      { lat: 12.00, lng: 110.00, width: 25 },
+      { lat: 22.00, lng: 120.50, width: 15 }
+    ];
+
+    var segOpts = SEA_SEGMENTS.map(function (s, i) {
+      return '<option value="' + i + '">' + esc(s.name) + '</option>';
+    }).join('');
+
+    var form = '<div class="card"><h3>Route Optimization Parameters</h3>' +
+      '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px">' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Select Segment</span><select id="roSegment">' +
+      '<option value="all">All Segments</option>' + segOpts + '</select></label>' +
+      '<button id="roCalcBtn" class="btn-primary" style="padding:8px 16px">Calculate Route</button>' +
+      '</div></div>';
+
+    var results = '<div id="roResults" class="muted" style="margin-top:8px">Select a segment and click Calculate Route to optimize.</div>';
+
+    return '<h2 style="margin-bottom:16px">Cable Route Optimization Engine</h2>' + form + results;
+  };
+
+  AFTER.routeopt = function () {
+    var btn = document.getElementById("roCalcBtn");
+    if (btn) {
+      btn.addEventListener("click", function () {
+        var B = window.QIBrain;
+        if (!B || !B.optimizeRoute) return;
+
+        var SEA_SEGMENTS = [
+          { name: "Singapore-Jakarta", startLat: 1.35, startLng: 103.82, endLat: -6.21, endLng: 106.85, maxDepth: 100 },
+          { name: "Jakarta-Surabaya-Bali", startLat: -6.21, startLng: 106.85, endLat: -8.34, endLng: 115.17, maxDepth: 200 },
+          { name: "Singapore-Bangkok", startLat: 1.35, startLng: 103.82, endLat: 13.76, endLng: 100.50, maxDepth: 80 },
+          { name: "Bangkok-HCMC", startLat: 13.76, startLng: 100.50, endLat: 10.82, endLng: 106.63, maxDepth: 60 },
+          { name: "Manila-Kaohsiung", startLat: 14.60, startLng: 120.98, endLat: 22.63, endLng: 120.30, maxDepth: 4500 },
+          { name: "Manila-Guam", startLat: 14.60, startLng: 120.98, endLat: 13.44, endLng: 144.79, maxDepth: 6000 }
+        ];
+
+        var HAZARDS = [
+          { lat: 3.50, lng: 105.50, radius: 80, type: "seismic zone" },
+          { lat: -5.00, lng: 109.00, radius: 50, type: "coral reef" },
+          { lat: 15.00, lng: 117.00, radius: 100, type: "military zone" },
+          { lat: 20.00, lng: 122.00, radius: 60, type: "seismic zone" },
+          { lat: 8.00, lng: 130.00, radius: 40, type: "coral reef" }
+        ];
+
+        var SHIPPING_LANES = [
+          { lat: 1.20, lng: 104.00, width: 20 },
+          { lat: 5.50, lng: 108.00, width: 30 },
+          { lat: 12.00, lng: 110.00, width: 25 },
+          { lat: 22.00, lng: 120.50, width: 15 }
+        ];
+
+        var sel = document.getElementById("roSegment").value;
+        var segments = sel === "all" ? SEA_SEGMENTS : [SEA_SEGMENTS[Number(sel)]];
+
+        var result = B.optimizeRoute({
+          segments: segments,
+          hazards: HAZARDS,
+          shippingLanes: SHIPPING_LANES
+        });
+
+        // Score card
+        var scoreColor = result.routeScore < 5000 ? "#27ae60" : result.routeScore < 10000 ? "#f39c12" : "#e74c3c";
+        var scoreCard = '<div class="grid kpis" style="margin-bottom:16px">' +
+          '<div class="kpi"><div class="label">Total Distance</div><div class="value">' + result.totalDistanceKm.toLocaleString() + ' km</div></div>' +
+          '<div class="kpi"><div class="label">Route Score</div><div class="value" style="color:' + scoreColor + '">' + result.routeScore.toLocaleString() + '</div></div>' +
+          '<div class="kpi"><div class="label">Hazards Near Route</div><div class="value">' + result.hazardsNearRoute.length + '</div></div>' +
+          '<div class="kpi"><div class="label">Lanes Crossed</div><div class="value">' + result.lanesCrossed + '</div></div>' +
+          '<div class="kpi"><div class="label">Alt. Route Deviation</div><div class="value">+' + result.alternativeKm + ' km</div></div>' +
+          '</div>';
+
+        // Recommendations list
+        var recsHtml = result.recommendations.length > 0
+          ? '<ul>' + result.recommendations.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('') + '</ul>'
+          : '<p class="muted">No recommendations - route is clear.</p>';
+
+        // Hazards table
+        var hazardRows = result.hazardsNearRoute.map(function (h) {
+          return '<tr><td>' + h.type + '</td><td>' + h.lat.toFixed(2) + '</td><td>' + h.lng.toFixed(2) + '</td><td>' + h.radius + ' km</td><td>' + h.distanceKm + ' km</td></tr>';
+        }).join('');
+        var hazardsTable = hazardRows
+          ? '<div class="table-wrap"><table id="roHazardsTable"><thead><tr><th>Type</th><th>Lat</th><th>Lng</th><th>Radius</th><th>Distance</th></tr></thead><tbody>' + hazardRows + '</tbody></table></div>'
+          : '<p class="muted">No hazards within proximity of this route.</p>';
+
+        var html = '<div class="card" style="margin-top:16px"><h3>Route Optimization Results</h3>' +
+          scoreCard +
+          '<h4>Recommendations</h4>' + recsHtml +
+          '<h4 style="margin-top:16px">Hazards Near Route</h4>' + hazardsTable + '</div>';
+
+        document.getElementById("roResults").innerHTML = html;
+      });
+    }
+  };
+
+  // ---------- Predictive Maintenance / Fault Forecasting ----------
+  RENDER.predictive = function () {
+    var B = window.QIBrain;
+    if (!B || !B.predictFaults) return '<h2>Fault Forecast</h2><p class="muted">Brain module not loaded.</p>';
+
+    var SEA_SEGMENTS = [
+      { name: "Singapore-Jakarta", routeKm: 900, depthAvg: 50, shippingDensity: "high", fishingActivity: "high", seismicRisk: "med", ageYears: 3 },
+      { name: "Jakarta-Surabaya-Bali", routeKm: 1200, depthAvg: 150, shippingDensity: "med", fishingActivity: "high", seismicRisk: "high", ageYears: 3 },
+      { name: "Singapore-Bangkok", routeKm: 1800, depthAvg: 60, shippingDensity: "high", fishingActivity: "med", seismicRisk: "low", ageYears: 3 },
+      { name: "Bangkok-HCMC", routeKm: 1400, depthAvg: 50, shippingDensity: "med", fishingActivity: "med", seismicRisk: "low", ageYears: 3 },
+      { name: "Manila-Kaohsiung", routeKm: 1100, depthAvg: 3500, shippingDensity: "med", fishingActivity: "low", seismicRisk: "high", ageYears: 3 },
+      { name: "Manila-Guam", routeKm: 2500, depthAvg: 5000, shippingDensity: "low", fishingActivity: "low", seismicRisk: "med", ageYears: 3 }
+    ];
+
+    var result = B.predictFaults(SEA_SEGMENTS);
+
+    var rows = result.segments.map(function (seg) {
+      var riskColor = seg.riskLevel === "high" ? "#e74c3c" : seg.riskLevel === "medium" ? "#f39c12" : "#27ae60";
+      var riskBadge = '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:' + riskColor + ';margin-right:6px"></span>' + seg.riskLevel;
+      var recsHtml = seg.recommendations.length > 0 ? seg.recommendations.join('; ') : 'No action required';
+      return '<tr>' +
+        '<td>' + esc(seg.name) + '</td>' +
+        '<td class="center">' + seg.annualFaultProb.toFixed(3) + '</td>' +
+        '<td class="center">' + seg.mtbfYears + ' yrs</td>' +
+        '<td class="center">' + riskBadge + '</td>' +
+        '<td class="wrap">' + esc(recsHtml) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    var reliabilityColor = result.totalSystemReliability > 0.9 ? "#27ae60" : result.totalSystemReliability > 0.7 ? "#f39c12" : "#e74c3c";
+
+    var summary = '<div class="grid kpis" style="margin-bottom:16px">' +
+      '<div class="kpi"><div class="label">System Reliability</div><div class="value" style="color:' + reliabilityColor + '">' + (result.totalSystemReliability * 100).toFixed(2) + '%</div></div>' +
+      '<div class="kpi"><div class="label">Segments Analyzed</div><div class="value">' + result.segments.length + '</div></div>' +
+      '<div class="kpi"><div class="label">High Risk</div><div class="value" style="color:#e74c3c">' + result.segments.filter(function (s) { return s.riskLevel === "high"; }).length + '</div></div>' +
+      '<div class="kpi"><div class="label">Methodology</div><div class="value" style="font-size:0.85em">ICPC Industry Average</div></div>' +
+      '</div>';
+
+    var table = '<div class="card"><h3>Segment Fault Predictions</h3>' + summary +
+      '<div class="table-wrap"><table id="predictiveTable"><thead><tr>' +
+      '<th>Segment</th><th>Annual Fault Prob</th><th>MTBF</th><th>Risk Level</th><th>Recommendations</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+
+    return '<h2 style="margin-bottom:16px">Predictive Maintenance - Fault Forecast</h2>' + table;
+  };
+
+  // ---------- Digital Twin Status ----------
+  RENDER.digitaltwin = function () {
+    var B = window.QIBrain;
+    if (!B || !B.digitalTwinStatus) return '<h2>Digital Twin</h2><p class="muted">Brain module not loaded.</p>';
+
+    var SYSTEM_STATE = {
+      segments: [
+        { name: "Singapore-Jakarta", fiberPairs: 8, wavelengthsActive: 580, opticalPowerDbm: -2.1, amplifierGainDb: 22, ageMonths: 36 },
+        { name: "Jakarta-Surabaya-Bali", fiberPairs: 8, wavelengthsActive: 420, opticalPowerDbm: -1.8, amplifierGainDb: 20, ageMonths: 36 },
+        { name: "Singapore-Bangkok", fiberPairs: 8, wavelengthsActive: 720, opticalPowerDbm: -3.2, amplifierGainDb: 24, ageMonths: 36 },
+        { name: "Bangkok-HCMC", fiberPairs: 8, wavelengthsActive: 350, opticalPowerDbm: -1.5, amplifierGainDb: 20, ageMonths: 36 },
+        { name: "Manila-Kaohsiung", fiberPairs: 8, wavelengthsActive: 480, opticalPowerDbm: -2.5, amplifierGainDb: 22, ageMonths: 36 },
+        { name: "Manila-Guam", fiberPairs: 8, wavelengthsActive: 200, opticalPowerDbm: -4.0, amplifierGainDb: 26, ageMonths: 36 }
+      ]
+    };
+
+    var result = B.digitalTwinStatus(SYSTEM_STATE);
+
+    var overallColor = result.overallSystemHealth >= 80 ? "#27ae60" : result.overallSystemHealth >= 60 ? "#f39c12" : "#e74c3c";
+
+    var summary = '<div class="grid kpis" style="margin-bottom:16px">' +
+      '<div class="kpi"><div class="label">Overall System Health</div><div class="value" style="color:' + overallColor + '">' + result.overallSystemHealth + '%</div></div>' +
+      '<div class="kpi"><div class="label">Segments Monitored</div><div class="value">' + result.segments.length + '</div></div>' +
+      '<div class="kpi"><div class="label">Alerts Active</div><div class="value" style="color:#e74c3c">' + result.segments.reduce(function (sum, s) { return sum + s.alerts.length; }, 0) + '</div></div>' +
+      '</div>';
+
+    var segCards = result.segments.map(function (seg) {
+      var healthColor = seg.healthScore >= 80 ? "#27ae60" : seg.healthScore >= 60 ? "#f39c12" : "#e74c3c";
+      var capColor = seg.capacityUtilization > 80 ? "#e74c3c" : seg.capacityUtilization > 60 ? "#f39c12" : "#27ae60";
+      var ampColor = seg.amplifierLife.status === "aging" ? "#e74c3c" : "#27ae60";
+
+      var alertsHtml = seg.alerts.length > 0
+        ? '<div style="margin-top:8px">' + seg.alerts.map(function (a) { return '<div style="color:#e74c3c;font-size:0.85em">&#9888; ' + esc(a) + '</div>'; }).join('') + '</div>'
+        : '';
+
+      var healthBar = '<div style="background:#eee;border-radius:4px;height:12px;width:100%;margin-top:4px">' +
+        '<div style="background:' + healthColor + ';border-radius:4px;height:12px;width:' + seg.healthScore + '%"></div></div>';
+
+      var capBar = '<div style="background:#eee;border-radius:4px;height:8px;width:100%;margin-top:4px">' +
+        '<div style="background:' + capColor + ';border-radius:4px;height:8px;width:' + Math.min(100, seg.capacityUtilization) + '%"></div></div>';
+
+      return '<div class="card" style="padding:12px" data-segment="' + esc(seg.name) + '">' +
+        '<h4 style="margin:0 0 8px 0">' + esc(seg.name) + '</h4>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div><span class="muted">Health Score</span><div style="font-size:1.3em;font-weight:700;color:' + healthColor + '">' + seg.healthScore + '/100</div>' + healthBar + '</div>' +
+        '<div><span class="muted">Capacity Utilization</span><div style="font-size:1.1em;font-weight:600;color:' + capColor + '">' + seg.capacityUtilization + '%</div>' + capBar + '</div>' +
+        '<div><span class="muted">Fiber Degradation</span><div>' + (seg.fiberDegradation > 0 ? '+' + seg.fiberDegradation + ' dB/km' : 'None') + '</div></div>' +
+        '<div><span class="muted">Amplifier Life</span><div style="color:' + ampColor + '">' + seg.amplifierLife.usedPct + '% used (' + seg.amplifierLife.remainingYears + ' yr remaining)</div></div>' +
+        '</div>' +
+        alertsHtml + '</div>';
+    }).join('');
+
+    return '<h2 style="margin-bottom:16px">Digital Twin - System Status</h2>' + summary +
+      '<div id="dtSegments" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(380px, 1fr));gap:16px">' + segCards + '</div>';
   };
 
   // ---------- Permit Tracker ----------

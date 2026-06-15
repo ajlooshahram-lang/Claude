@@ -3028,6 +3028,254 @@
     };
   }
 
+  // ---------- Cable Route Optimization Engine ----------
+  function optimizeRoute(params) {
+    var segments = params.segments || [];
+    var hazards = params.hazards || [];
+    var shippingLanes = params.shippingLanes || [];
+
+    var totalDistanceKm = 0;
+    var hazardsNearRoute = [];
+    var lanesCrossed = 0;
+    var recommendations = [];
+    var alternativeKm = 0;
+
+    // Calculate great-circle distance for each segment
+    for (var i = 0; i < segments.length; i++) {
+      var seg = segments[i];
+      var R = 6371; // Earth radius in km
+      var lat1 = seg.startLat * Math.PI / 180;
+      var lat2 = seg.endLat * Math.PI / 180;
+      var dLat = (seg.endLat - seg.startLat) * Math.PI / 180;
+      var dLng = (seg.endLng - seg.startLng) * Math.PI / 180;
+      var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1) * Math.cos(lat2) *
+              Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      var dist = R * c;
+      totalDistanceKm += dist;
+
+      // Check hazard proximity for this segment
+      for (var h = 0; h < hazards.length; h++) {
+        var hazard = hazards[h];
+        // Simple proximity check: distance from hazard center to segment midpoint
+        var midLat = (seg.startLat + seg.endLat) / 2;
+        var midLng = (seg.startLng + seg.endLng) / 2;
+        var hLat1 = midLat * Math.PI / 180;
+        var hLat2 = hazard.lat * Math.PI / 180;
+        var hdLat = (hazard.lat - midLat) * Math.PI / 180;
+        var hdLng = (hazard.lng - midLng) * Math.PI / 180;
+        var ha = Math.sin(hdLat / 2) * Math.sin(hdLat / 2) +
+                 Math.cos(hLat1) * Math.cos(hLat2) *
+                 Math.sin(hdLng / 2) * Math.sin(hdLng / 2);
+        var hc = 2 * Math.atan2(Math.sqrt(ha), Math.sqrt(1 - ha));
+        var hDist = R * hc;
+
+        if (hDist <= hazard.radius) {
+          var alreadyFound = false;
+          for (var x = 0; x < hazardsNearRoute.length; x++) {
+            if (hazardsNearRoute[x].lat === hazard.lat && hazardsNearRoute[x].lng === hazard.lng) {
+              alreadyFound = true;
+              break;
+            }
+          }
+          if (!alreadyFound) {
+            hazardsNearRoute.push({
+              lat: hazard.lat,
+              lng: hazard.lng,
+              type: hazard.type,
+              radius: hazard.radius,
+              distanceKm: Math.round(hDist * 10) / 10
+            });
+            // Recommend avoidance and estimate deviation
+            var deviationKm = Math.round((hazard.radius - hDist + 10) * 1.4);
+            alternativeKm += deviationKm;
+            recommendations.push("Avoid " + hazard.type + " at " + hazard.lat.toFixed(2) + "/" + hazard.lng.toFixed(2) + " - offset route by ~" + deviationKm + " km");
+          }
+        }
+      }
+
+      // Check shipping lane crossings
+      for (var l = 0; l < shippingLanes.length; l++) {
+        var lane = shippingLanes[l];
+        var lLat1 = midLat * Math.PI / 180;
+        var lLat2 = lane.lat * Math.PI / 180;
+        var ldLat = (lane.lat - midLat) * Math.PI / 180;
+        var ldLng = (lane.lng - midLng) * Math.PI / 180;
+        var la = Math.sin(ldLat / 2) * Math.sin(ldLat / 2) +
+                 Math.cos(lLat1) * Math.cos(lLat2) *
+                 Math.sin(ldLng / 2) * Math.sin(ldLng / 2);
+        var lc = 2 * Math.atan2(Math.sqrt(la), Math.sqrt(1 - la));
+        var lDist = R * lc;
+        if (lDist <= lane.width / 2) {
+          lanesCrossed++;
+        }
+      }
+    }
+
+    totalDistanceKm = Math.round(totalDistanceKm * 10) / 10;
+
+    // Score: distance x 1 + hazardProximity x 5 + lanesCrossed x 2
+    var routeScore = Math.round((totalDistanceKm * 1 + hazardsNearRoute.length * 5 + lanesCrossed * 2) * 10) / 10;
+
+    if (lanesCrossed > 0) {
+      recommendations.push("Route crosses " + lanesCrossed + " shipping lane(s) - additional burial depth required at crossings");
+    }
+
+    return {
+      totalDistanceKm: totalDistanceKm,
+      hazardsNearRoute: hazardsNearRoute,
+      lanesCrossed: lanesCrossed,
+      routeScore: routeScore,
+      recommendations: recommendations,
+      alternativeKm: alternativeKm
+    };
+  }
+
+  // ---------- Predictive Maintenance / Fault Forecasting ----------
+  function predictFaults(segments) {
+    var results = [];
+    var totalReliability = 1;
+
+    for (var i = 0; i < segments.length; i++) {
+      var seg = segments[i];
+      var routeKm = seg.routeKm || 1000;
+      var ageYears = seg.ageYears || 1;
+
+      // Base fault rate: 0.5 faults per 1000km per year
+      var baseFaultRate = 0.5 * (routeKm / 1000);
+
+      // Adjustment multipliers
+      var shippingMult = 1;
+      if (seg.shippingDensity === "high") shippingMult = 2.5;
+      else if (seg.shippingDensity === "med") shippingMult = 1.5;
+
+      var fishingMult = 1;
+      if (seg.fishingActivity === "high") fishingMult = 2.0;
+      else if (seg.fishingActivity === "med") fishingMult = 1.3;
+
+      var seismicMult = 1;
+      if (seg.seismicRisk === "high") seismicMult = 1.8;
+      else if (seg.seismicRisk === "med") seismicMult = 1.2;
+
+      var ageMult = 1;
+      if (ageYears > 20) ageMult = 2.0;
+      else if (ageYears > 10) ageMult = 1.5;
+
+      var annualFaultProb = baseFaultRate * shippingMult * fishingMult * seismicMult * ageMult;
+      annualFaultProb = Math.round(annualFaultProb * 1000) / 1000;
+
+      // MTBF in years
+      var mtbfYears = annualFaultProb > 0 ? Math.round((1 / annualFaultProb) * 10) / 10 : 999;
+
+      // Risk level
+      var riskLevel = "low";
+      if (annualFaultProb >= 2.0) riskLevel = "high";
+      else if (annualFaultProb >= 1.0) riskLevel = "medium";
+
+      // Recommendations
+      var segRecommendations = [];
+      if (shippingMult > 1) segRecommendations.push("Install additional cable burial protection in shipping zones");
+      if (fishingMult > 1) segRecommendations.push("Deploy fishing activity monitoring and cable awareness campaign");
+      if (seismicMult > 1) segRecommendations.push("Route diversification to reduce seismic exposure");
+      if (ageMult > 1) segRecommendations.push("Schedule proactive replacement or upgrade within " + (ageYears > 20 ? "2" : "5") + " years");
+
+      // Segment reliability (probability of no fault in a year)
+      var segReliability = Math.exp(-annualFaultProb);
+      totalReliability *= segReliability;
+
+      results.push({
+        name: seg.name,
+        annualFaultProb: annualFaultProb,
+        mtbfYears: mtbfYears,
+        riskLevel: riskLevel,
+        recommendations: segRecommendations
+      });
+    }
+
+    return {
+      segments: results,
+      totalSystemReliability: Math.round(totalReliability * 10000) / 10000
+    };
+  }
+
+  // ---------- Digital Twin Status ----------
+  function digitalTwinStatus(systemState) {
+    var segments = systemState.segments || [];
+    var results = [];
+    var totalHealth = 0;
+
+    for (var i = 0; i < segments.length; i++) {
+      var seg = segments[i];
+      var fiberPairs = seg.fiberPairs || 8;
+      var wavelengthsActive = seg.wavelengthsActive || 0;
+      var opticalPowerDbm = seg.opticalPowerDbm || 0;
+      var amplifierGainDb = seg.amplifierGainDb || 20;
+      var ageMonths = seg.ageMonths || 0;
+      var ageYears = ageMonths / 12;
+
+      // Fiber degradation: 0.01 dB/km/year additional loss after year 5
+      var fiberDegradation = 0;
+      if (ageYears > 5) {
+        fiberDegradation = Math.round((ageYears - 5) * 0.01 * 1000) / 1000;
+      }
+
+      // Amplifier lifetime: typical 25-year life, flag when >80% consumed
+      var amplifierLifePct = Math.round((ageYears / 25) * 100 * 10) / 10;
+      var amplifierLife = {
+        usedPct: amplifierLifePct,
+        remainingYears: Math.round((25 - ageYears) * 10) / 10,
+        status: amplifierLifePct >= 80 ? "aging" : "healthy"
+      };
+
+      // Capacity utilization: wavelengthsActive / (fiberPairs x 120) x 100
+      var maxWavelengths = fiberPairs * 120;
+      var capacityUtilization = Math.round((wavelengthsActive / maxWavelengths) * 100 * 10) / 10;
+
+      // Alerts
+      var alerts = [];
+      if (capacityUtilization > 80) {
+        alerts.push("Approaching capacity limit (" + capacityUtilization + "% utilized)");
+      }
+      if (fiberDegradation > 0.05) {
+        alerts.push("Fiber degradation above 5% baseline (+" + fiberDegradation + " dB/km)");
+      }
+      if (amplifierLife.status === "aging") {
+        alerts.push("Amplifier aging - " + amplifierLifePct + "% of 25-year lifetime consumed");
+      }
+
+      // Health score (0-100): composite of capacity headroom, degradation, amplifier status
+      var healthScore = 100;
+      // Deduct for capacity utilization over 70%
+      if (capacityUtilization > 70) healthScore -= Math.round((capacityUtilization - 70) * 1.5);
+      // Deduct for fiber degradation
+      healthScore -= Math.round(fiberDegradation * 200);
+      // Deduct for amplifier aging
+      if (amplifierLifePct > 60) healthScore -= Math.round((amplifierLifePct - 60) * 0.5);
+      // Clamp to 0-100
+      if (healthScore < 0) healthScore = 0;
+      if (healthScore > 100) healthScore = 100;
+
+      totalHealth += healthScore;
+
+      results.push({
+        name: seg.name,
+        healthScore: healthScore,
+        capacityUtilization: capacityUtilization,
+        fiberDegradation: fiberDegradation,
+        amplifierLife: amplifierLife,
+        alerts: alerts
+      });
+    }
+
+    var overallSystemHealth = segments.length > 0 ? Math.round(totalHealth / segments.length) : 100;
+
+    return {
+      segments: results,
+      overallSystemHealth: overallSystemHealth
+    };
+  }
+
   var API = {
     analyzeProject: analyzeProject,
     listProfiles: listProfiles,
@@ -3054,7 +3302,10 @@
     estimateRepairCost: estimateRepairCost,
     getRepairStrategy: getRepairStrategy,
     designCableSystem: designCableSystem,
-    revenueModel: revenueModel
+    revenueModel: revenueModel,
+    optimizeRoute: optimizeRoute,
+    predictFaults: predictFaults,
+    digitalTwinStatus: digitalTwinStatus
   };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIBrain = API;
