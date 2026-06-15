@@ -912,6 +912,67 @@
     return s.environmentalCompliance;
   }
 
+  // ---------- Permit Tracker ----------
+  function defaultPermits() {
+    return [
+      { id: uid(), country: "Indonesia", authority: "DJPL", permitType: "Submarine Cable Route Approval", submittedDate: "2025-06-01", expectedDays: 120, status: "in-progress", notes: "Requires coordination with TNI-AL naval clearance" },
+      { id: uid(), country: "Thailand", authority: "Marine Department", permitType: "Seabed Usage Permit", submittedDate: "2025-06-10", expectedDays: 90, status: "in-progress", notes: "Gulf of Thailand route section" },
+      { id: uid(), country: "Vietnam", authority: "Vinamarine", permitType: "Maritime Safety Zone Approval", submittedDate: "2025-05-15", expectedDays: 150, status: "in-progress", notes: "Central coast landing site" },
+      { id: uid(), country: "Taiwan", authority: "NCC", permitType: "Submarine Cable Landing License", submittedDate: "2025-04-20", expectedDays: 100, status: "approved", notes: "Toucheng landing station approved" },
+      { id: uid(), country: "Philippines", authority: "DENR", permitType: "Environmental Compliance Certificate", submittedDate: "2025-05-01", expectedDays: 180, status: "in-progress", notes: "ECC for Luzon Strait segment" },
+      { id: uid(), country: "Guam", authority: "USACE", permitType: "Section 10/404 Cable Installation Permit", submittedDate: "2025-07-01", expectedDays: 200, status: "in-progress", notes: "NEPA review in progress, coral mitigation plan required" },
+      { id: uid(), country: "Malaysia", authority: "MCMC", permitType: "Network Facility Provider License", submittedDate: "2025-03-15", expectedDays: 60, status: "approved", notes: "NFP license granted for submarine cable operation" },
+      { id: uid(), country: "Brunei", authority: "AITI", permitType: "Telecom Infrastructure License", submittedDate: "2025-08-01", expectedDays: 90, status: "in-progress", notes: "Pending BEDB foreign investment clearance" }
+    ];
+  }
+
+  function _permits() {
+    var s = get();
+    if (!Array.isArray(s.permits)) { s.permits = defaultPermits(); save(); }
+    return s.permits;
+  }
+
+  function addPermit(opts) {
+    opts = opts || {};
+    var permit = {
+      id: uid(),
+      country: opts.country || "",
+      authority: opts.authority || "",
+      permitType: opts.permitType || "",
+      submittedDate: opts.submittedDate || new Date().toISOString().slice(0, 10),
+      expectedDays: Number(opts.expectedDays) || 90,
+      status: opts.status || "in-progress",
+      notes: opts.notes || ""
+    };
+    _permits().push(permit);
+    logAudit("Added", "Permit", (permit.permitType || "").slice(0, 60));
+    save();
+    return permit;
+  }
+
+  function listPermits(filter) {
+    filter = filter || {};
+    var permits = _permits().slice();
+    if (filter.country) permits = permits.filter(function (p) { return p.country === filter.country; });
+    if (filter.status) permits = permits.filter(function (p) { return p.status === filter.status; });
+    return permits;
+  }
+
+  function updatePermit(id, patch) {
+    var permits = _permits();
+    var idx = -1;
+    for (var i = 0; i < permits.length; i++) { if (permits[i].id === id) { idx = i; break; } }
+    if (idx < 0) return null;
+    patch = patch || {};
+    var keys = Object.keys(patch);
+    for (var k = 0; k < keys.length; k++) {
+      if (keys[k] !== "id") permits[idx][keys[k]] = patch[keys[k]];
+    }
+    logAudit("Updated", "Permit", (permits[idx].permitType || "").slice(0, 60));
+    save();
+    return permits[idx];
+  }
+
   const API = { uid, seed, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
     undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete, togglePin, reorderPin,
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
@@ -925,7 +986,8 @@
     spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy,
     addDocument, listDocuments, updateDocument, deleteDocument, DOC_CATEGORIES: DOC_CATEGORIES_LIST,
     addWorkflow, listWorkflows, deleteWorkflow, startWorkflowInstance, advanceWorkflow, rejectWorkflow, getWorkflowStatus,
-    listSpares, updateSpare, insuranceRegistry, environmentalCompliance };
+    listSpares, updateSpare, insuranceRegistry, environmentalCompliance,
+    addPermit, listPermits, updatePermit };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);

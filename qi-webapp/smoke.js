@@ -32,7 +32,7 @@ ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard rende
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 
 // 2) navigate every view (simulate clicks)
-const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","raci","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","workflows","documents","report","audit","config","help","repair","clientview","spares","insurance","environmental"];
+const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","raci","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","workflows","documents","report","audit","config","help","repair","clientview","spares","insurance","environmental","permits","competitive"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -893,6 +893,22 @@ ok(revenueNav != null, "Revenue Model nav item exists");
 if (revenueNav) revenueNav.dispatchEvent(new window.Event("click", { bubbles: true }));
 var rvCalcBtn = doc.getElementById("rvCalcBtn");
 ok(rvCalcBtn != null, "Revenue Model calculate button exists");
+
+// 65) Permit Tracker
+var permitsNav = doc.querySelector('.nav-item[data-view="permits"]');
+ok(permitsNav != null, "Permit Tracker nav item exists");
+
+if (permitsNav) permitsNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var permitsTable = doc.getElementById("permitsTable");
+ok(permitsTable != null && permitsTable.querySelectorAll('tbody tr').length >= 8, "Permit Tracker renders permits table");
+
+// 66) Competitive Intelligence (Market Intel)
+var competitiveNav = doc.querySelector('.nav-item[data-view="competitive"]');
+ok(competitiveNav != null, "Market Intel nav item exists");
+
+if (competitiveNav) competitiveNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var cableSystemsTable = doc.getElementById("cableSystemsTable");
+ok(cableSystemsTable != null && cableSystemsTable.querySelectorAll('tbody tr').length >= 7, "Market Intel shows cable systems");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

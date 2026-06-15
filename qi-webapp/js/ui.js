@@ -221,6 +221,7 @@
     { id: "dashboard", label: "Dashboard", icon: "▤" },
     { id: "cases", label: "Cases (Master)", icon: "★" },
     { g: "Delivery" },
+    { id: "permits", label: "Permit Tracker", icon: "⏱" },
     { id: "pm", label: "PM Tasks", icon: "✔" },
     { id: "kanban", label: "Kanban Board", icon: "▥" },
     { id: "timeline", label: "Timeline", icon: "▦" },
@@ -243,6 +244,7 @@
     { id: "raci", label: "RACI Matrix", icon: "⊞" },
     { id: "budget", label: "Budget", icon: "$" },
     { g: "Intelligence" },
+    { id: "competitive", label: "Market Intel", icon: "🔍" },
     { id: "systemdesign", label: "System Design", icon: "\u26A1" },
     { id: "revenue", label: "Revenue Model", icon: "\uD83D\uDCB0" },
     { id: "lessons", label: "Lessons Library", icon: "\uD83D\uDCDA" },
@@ -1375,6 +1377,205 @@
           '<p style="margin-top:12px;font-weight:600">' + paybackText + '</p></div>';
 
         document.getElementById("rvResults").innerHTML = html;
+      });
+    }
+  };
+
+  // ---------- Permit Tracker ----------
+  RENDER.permits = function () {
+    var permits = S.listPermits();
+    var now = new Date();
+
+    // Summary stats
+    var approved = 0, inProgress = 0, overdue = 0;
+    permits.forEach(function (p) {
+      if (p.status === "approved") { approved++; return; }
+      var submitted = new Date(p.submittedDate);
+      var elapsed = Math.floor((now - submitted) / (1000 * 60 * 60 * 24));
+      if (elapsed > p.expectedDays) overdue++;
+      else inProgress++;
+    });
+
+    var summary = '<div class="grid kpis" style="margin-bottom:16px">' +
+      '<div class="kpi green"><div class="label">Approved</div><div class="value">' + approved + '</div></div>' +
+      '<div class="kpi blue"><div class="label">In Progress</div><div class="value">' + inProgress + '</div></div>' +
+      '<div class="kpi red"><div class="label">Overdue</div><div class="value">' + overdue + '</div></div>' +
+      '</div>';
+
+    // Build table rows
+    var rows = permits.map(function (p) {
+      var submitted = new Date(p.submittedDate);
+      var elapsed = Math.floor((now - submitted) / (1000 * 60 * 60 * 24));
+      var remaining = p.expectedDays - elapsed;
+      var progressPct = Math.min(100, Math.round((elapsed / p.expectedDays) * 100));
+
+      var statusColor, statusLabel;
+      if (p.status === "approved") {
+        statusColor = "#27ae60"; statusLabel = "Approved";
+      } else if (remaining < 0) {
+        statusColor = "#e74c3c"; statusLabel = "Overdue";
+      } else if (remaining <= 10) {
+        statusColor = "#e74c3c"; statusLabel = "Critical";
+      } else if (remaining <= 30) {
+        statusColor = "#f39c12"; statusLabel = "Amber";
+      } else {
+        statusColor = "#27ae60"; statusLabel = "On Track";
+      }
+
+      var progressBar = '<div style="background:#eee;border-radius:4px;height:8px;width:100%;position:relative">' +
+        '<div style="background:' + statusColor + ';border-radius:4px;height:8px;width:' + progressPct + '%"></div></div>';
+
+      var overdueBadge = (p.status !== "approved" && remaining < 0) ? ' <span class="badge b-critical">Overdue</span>' : '';
+
+      return '<tr>' +
+        '<td>' + esc(p.country) + '</td>' +
+        '<td>' + esc(p.authority) + '</td>' +
+        '<td class="wrap">' + esc(p.permitType) + '</td>' +
+        '<td>' + esc(p.submittedDate) + '</td>' +
+        '<td class="center">' + p.expectedDays + '</td>' +
+        '<td class="center">' + elapsed + '</td>' +
+        '<td class="center">' + (p.status === "approved" ? "-" : remaining) + '</td>' +
+        '<td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + statusColor + '"></span> ' + statusLabel + overdueBadge + '</td>' +
+        '<td>' + progressBar + '</td>' +
+        '</tr>';
+    }).join('');
+
+    var table = '<div class="card"><h3>Regulatory Permits</h3>' +
+      '<div class="table-wrap"><table id="permitsTable"><thead><tr>' +
+      '<th>Country</th><th>Authority</th><th>Permit Type</th><th>Submitted</th><th>Expected (days)</th><th>Days Elapsed</th><th>Days Remaining</th><th>Status</th><th>Progress</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+
+    // Add Permit button (opens modal)
+    var addBtn = '<div style="margin-bottom:16px"><button id="addPermitBtn" class="btn btn-primary">+ Add Permit</button></div>';
+
+    return '<h2 style="margin-bottom:16px">Regulatory Approval Tracker</h2>' + summary + addBtn + table;
+  };
+
+  AFTER.permits = function () {
+    var btn = document.getElementById("addPermitBtn");
+    if (btn) {
+      btn.addEventListener("click", function () {
+        // Build country options from COUNTRY_DATABASE
+        var B = window.QIBrain;
+        var countries = [];
+        if (B && B._profiles) {
+          var fp = B._profiles.find(function (p) { return p.id === "fibre-telecom"; });
+          if (fp && fp.COUNTRY_DATABASE) {
+            countries = fp.COUNTRY_DATABASE.map(function (c) { return c.name; });
+          }
+        }
+        var countryOpts = countries.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('');
+
+        var modal = document.createElement("div");
+        modal.className = "modal-overlay";
+        modal.innerHTML = '<div class="modal" style="max-width:500px">' +
+          '<h3>Add Permit</h3>' +
+          '<label style="display:block;margin-bottom:8px">Country<br><select id="permitCountry" style="width:100%"><option value="">Select...</option>' + countryOpts + '</select></label>' +
+          '<label style="display:block;margin-bottom:8px">Authority<br><input id="permitAuthority" style="width:100%"></label>' +
+          '<label style="display:block;margin-bottom:8px">Permit Type<br><input id="permitType" style="width:100%"></label>' +
+          '<label style="display:block;margin-bottom:8px">Submitted Date<br><input id="permitDate" type="date" style="width:100%"></label>' +
+          '<label style="display:block;margin-bottom:8px">Expected Days<br><input id="permitDays" type="number" value="90" style="width:100%"></label>' +
+          '<label style="display:block;margin-bottom:8px">Notes<br><input id="permitNotes" style="width:100%"></label>' +
+          '<div style="display:flex;gap:8px;margin-top:16px"><button id="permitSave" class="btn btn-primary">Save</button><button id="permitCancel" class="btn">Cancel</button></div>' +
+          '</div>';
+        document.body.appendChild(modal);
+
+        document.getElementById("permitCancel").addEventListener("click", function () { modal.remove(); });
+        document.getElementById("permitSave").addEventListener("click", function () {
+          var country = document.getElementById("permitCountry").value;
+          var authority = document.getElementById("permitAuthority").value;
+          var permitType = document.getElementById("permitType").value;
+          if (!country || !permitType) { toast("Country and Permit Type are required"); return; }
+          S.addPermit({
+            country: country,
+            authority: authority,
+            permitType: permitType,
+            submittedDate: document.getElementById("permitDate").value || new Date().toISOString().slice(0, 10),
+            expectedDays: Number(document.getElementById("permitDays").value) || 90,
+            status: "in-progress",
+            notes: document.getElementById("permitNotes").value
+          });
+          modal.remove();
+          go("permits");
+          toast("Permit added");
+        });
+      });
+    }
+  };
+
+  // ---------- Competitive Intelligence ----------
+  RENDER.competitive = function () {
+    var CABLE_SYSTEMS = [
+      { name: "APG (Asia Pacific Gateway)", route: "Japan-Korea-China-Taiwan-HK-Vietnam-Thailand-Singapore-Malaysia", totalKm: 10400, capacity: "54.8 Tbps", landingCountries: ["Japan","Korea","China","Taiwan","Hong Kong","Vietnam","Thailand","Singapore","Malaysia"], status: "Operational", owner: "Consortium (NTT, KDDI, China Telecom, others)", rfsYear: 2016 },
+      { name: "AAG (Asia America Gateway)", route: "USA-Philippines-HK-Vietnam-Singapore-Malaysia-Thailand-Brunei", totalKm: 20000, capacity: "2.88 Tbps", landingCountries: ["USA","Philippines","Hong Kong","Vietnam","Singapore","Malaysia","Thailand","Brunei"], status: "Operational", owner: "Consortium (AT&T, VNPT, others)", rfsYear: 2009 },
+      { name: "SJC2 (Southeast Asia-Japan Cable 2)", route: "Japan-Korea-China-Taiwan-HK-Philippines-Singapore-Thailand", totalKm: 10500, capacity: "144 Tbps", landingCountries: ["Japan","Korea","China","Taiwan","Hong Kong","Philippines","Singapore","Thailand"], status: "Operational", owner: "Consortium (China Mobile, KDDI, SK Broadband, others)", rfsYear: 2023 },
+      { name: "PLCN (Pacific Light Cable Network)", route: "USA-Taiwan-Philippines-HK", totalKm: 12800, capacity: "144 Tbps", landingCountries: ["USA","Taiwan","Philippines","Hong Kong"], status: "Operational", owner: "Google, Meta (partial)", rfsYear: 2022 },
+      { name: "SEA-ME-WE 5", route: "Singapore-Myanmar-Sri Lanka-UAE-Europe", totalKm: 20000, capacity: "24 Tbps", landingCountries: ["Singapore","Myanmar","Sri Lanka","UAE","Saudi Arabia","France","Italy"], status: "Operational", owner: "Consortium (Singtel, Telekom Malaysia, others)", rfsYear: 2017 },
+      { name: "IGG (Indigo-Central)", route: "Singapore-Indonesia-Australia", totalKm: 4600, capacity: "36 Tbps", landingCountries: ["Singapore","Indonesia","Australia"], status: "Operational", owner: "Consortium (AARNet, Google, Indosat, Singtel, SubPartners)", rfsYear: 2019 },
+      { name: "UNITY", route: "Japan-Guam-USA", totalKm: 9620, capacity: "7.68 Tbps", landingCountries: ["Japan","Guam","USA"], status: "Operational", owner: "Consortium (Google, KDDI, Bharti Airtel, others)", rfsYear: 2010 }
+    ];
+
+    // Our 8 target countries for filtering
+    var TARGET_COUNTRIES = ["Indonesia", "Thailand", "Vietnam", "Taiwan", "Philippines", "Guam", "Malaysia", "Brunei"];
+
+    var filterOpts = '<option value="">All Countries</option>' +
+      TARGET_COUNTRIES.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('');
+
+    // Cable table
+    var cableRows = CABLE_SYSTEMS.map(function (cable) {
+      return '<tr data-cable="' + esc(cable.name) + '">' +
+        '<td>' + esc(cable.name) + '</td>' +
+        '<td class="wrap">' + esc(cable.route) + '</td>' +
+        '<td class="center">' + cable.totalKm.toLocaleString() + '</td>' +
+        '<td class="center">' + esc(cable.capacity) + '</td>' +
+        '<td class="wrap">' + cable.landingCountries.join(', ') + '</td>' +
+        '<td>' + esc(cable.status) + '</td>' +
+        '<td class="wrap">' + esc(cable.owner) + '</td>' +
+        '<td class="center">' + cable.rfsYear + '</td>' +
+        '</tr>';
+    }).join('');
+
+    var table = '<div class="card"><h3>Regional Submarine Cable Systems</h3>' +
+      '<div style="margin-bottom:12px"><label>Filter by Country: <select id="cableCountryFilter">' + filterOpts + '</select></label></div>' +
+      '<div class="table-wrap"><table id="cableSystemsTable"><thead><tr>' +
+      '<th>Cable System</th><th>Route</th><th>Length (km)</th><th>Capacity</th><th>Landing Countries</th><th>Status</th><th>Owner</th><th>RFS Year</th>' +
+      '</tr></thead><tbody>' + cableRows + '</tbody></table></div></div>';
+
+    // Market Position card - compare our 6 SEA segments
+    var OUR_SEGMENTS = [
+      { name: "Segment 1: Singapore-Jakarta", routeKm: 900, capacity: "384 Tbps" },
+      { name: "Segment 2: Jakarta-Surabaya-Bali", routeKm: 1200, capacity: "384 Tbps" },
+      { name: "Segment 3: Singapore-Bangkok (via Gulf)", routeKm: 1800, capacity: "384 Tbps" },
+      { name: "Segment 4: Bangkok-HCMC", routeKm: 1400, capacity: "384 Tbps" },
+      { name: "Segment 5: Manila-Kaohsiung", routeKm: 1100, capacity: "384 Tbps" },
+      { name: "Segment 6: Manila-Guam", routeKm: 2500, capacity: "384 Tbps" }
+    ];
+
+    var segRows = OUR_SEGMENTS.map(function (seg) {
+      return '<tr><td>' + esc(seg.name) + '</td><td class="center">' + seg.routeKm.toLocaleString() + '</td><td class="center">' + esc(seg.capacity) + '</td></tr>';
+    }).join('');
+
+    var positionCard = '<div class="card"><h3>Market Position - Our Cable System</h3>' +
+      '<p class="muted">Comparison of planned capacity against existing regional cables. Our system targets next-generation 384 Tbps capacity per segment using SDM technology.</p>' +
+      '<div class="table-wrap"><table><thead><tr><th>Segment</th><th>Route (km)</th><th>Design Capacity</th></tr></thead><tbody>' + segRows + '</tbody></table></div>' +
+      '<div style="margin-top:12px;padding:12px;background:var(--bg-2,#f8f9fa);border-radius:6px">' +
+      '<b>Competitive Advantage:</b> Our system offers 384 Tbps per segment (Space Division Multiplexing), exceeding even the newest cables like SJC2 (144 Tbps). ' +
+      'Combined route length of 8,900 km connecting 8 countries with latest-generation technology positions the system as a premium capacity provider.</div></div>';
+
+    return '<h2 style="margin-bottom:16px">Competitive Intelligence - Market Overview</h2>' + table + positionCard;
+  };
+
+  AFTER.competitive = function () {
+    var filter = document.getElementById("cableCountryFilter");
+    if (filter) {
+      filter.addEventListener("change", function () {
+        var selected = filter.value.toLowerCase();
+        var rows = document.querySelectorAll('#cableSystemsTable tbody tr');
+        rows.forEach(function (row) {
+          if (!selected) { row.style.display = ''; return; }
+          var countries = row.querySelectorAll('td')[4].textContent.toLowerCase();
+          row.style.display = countries.indexOf(selected) >= 0 ? '' : 'none';
+        });
       });
     }
   };
