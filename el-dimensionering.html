@@ -7120,7 +7120,7 @@ function configurePriceFeed() {
 })();
 
 // ===== DATA VERSION & CHANGELOG =====
-const DATA_VERSION = '2026.14';
+const DATA_VERSION = '2026.15';
 const DATA_CHANGELOG = [
   { v: '2026.13', date: '2026-06-14', da: 'Motorstart-beregner: DOL/Y-\u0394/Softstart/VFD, startstr\u00F8m, sp\u00E6ndingsfald under start, k\u00B2S\u00B2-verifikation, MCB-kurve, kabelvalg, termisk rel\u00E6 og animeret SVG-visualisering (IEC 60947-4-1, DS/HD 60364-5-52 \u00A7525).', en: 'Motor start calculator: DOL/Y-\u0394/Soft starter/VFD, starting current, voltage drop during start, k\u00B2S\u00B2 verification, MCB curve, cable selection, thermal relay and animated SVG visualization (IEC 60947-4-1, DS/HD 60364-5-52 \u00A7525).' },
   { v: '2026.12', date: '2026-06-13', da: 'Mock kan nu v\u00e6lges: Fuld (alle 11/68 trin) eller Hurtig (1 tilf\u00e6ldigt scenarie pr. kategori, ~18 trin) til hurtig, varieret \u00f8velse. Separate bedste-scorer pr. type.', en: 'Mock is now selectable: Full (all 11/68 steps) or Quick (1 random scenario per category, ~18 steps) for fast, varied practice. Separate best scores per type.' },
@@ -17665,6 +17665,10 @@ function renderDashboard(){
   html+='<button class="sel-btn" onclick="switchModule(\'draw\')">\uD83D\uDDBC\uFE0F '+(da?'Se tegning':'View drawing')+'</button>';
   html+='<button class="sel-btn" onclick="switchModule(\'projekt\')">\uD83D\uDCCB '+(da?'Generér rapport':'Generate report')+'</button>';
   html+='<button class="sel-btn" onclick="switchModule(\'exam\')">\uD83C\uDF93 '+(da?'Øv til prøven':'Practice for exam')+'</button>';
+  html+='</div></div>';
+  html+='<div class="select-group"><div class="select-label">'+(da?'Projektfil':'Project file')+'</div><div class="select-grid">';
+  html+='<button class="sel-btn" onclick="exportProject()">\u2B07\uFE0F '+(da?'Eksportér projekt (.json)':'Export project (.json)')+'</button>';
+  html+='<button class="sel-btn" onclick="importProject()">\u2B06\uFE0F '+(da?'Importér projekt':'Import project')+'</button>';
   html+='</div></div></div>';
 
   // Design review summary (if any findings)
@@ -17683,6 +17687,52 @@ function renderDashboard(){
     }
   }
   return html;
+}
+
+// ===== PROJECT EXPORT/IMPORT =====
+function exportProject(){
+  const data = { version:DATA_VERSION, exported:new Date().toISOString(), lang:lang,
+    loadState:JSON.parse(JSON.stringify(loadState)), loadList:JSON.parse(JSON.stringify(loadList)),
+    cableState:JSON.parse(JSON.stringify(cableState)), vdropState:JSON.parse(JSON.stringify(vdropState)),
+    scState:JSON.parse(JSON.stringify(scState)), mcbState:JSON.parse(JSON.stringify(mcbState)),
+    mccbState:JSON.parse(JSON.stringify(mccbState)), fuseState:JSON.parse(JSON.stringify(fuseState)),
+    trafoState:JSON.parse(JSON.stringify(trafoState)),
+    circuits:JSON.parse(localStorage.getItem('projectCircuits')||'[]'),
+    examStore:JSON.parse(localStorage.getItem('examStore')||'{}')
+  };
+  try { const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='el-projekt-'+new Date().toISOString().slice(0,10)+'.json'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); } catch(e){}
+}
+function importProject(){
+  const overlay=document.createElement('div'); overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  const modal=document.createElement('div'); modal.style.cssText='background:var(--card,#fff);border-radius:var(--radius-lg,12px);padding:24px;max-width:400px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,0.3);border:1px solid var(--border,#ddd)';
+  const da=lang==='da';
+  modal.innerHTML='<div style="font-weight:700;font-size:1rem;margin-bottom:12px;color:var(--primary,#0f4c75)">'+(da?'Importér projekt':'Import project')+'</div>'
+    +'<div style="margin-bottom:16px;font-size:.88rem;color:var(--text-light,#666)">'+(da?'Vælg en .json projektfil eksporteret fra El-Dimensionering:':'Select a .json project file exported from El-Dimensionering:')+'</div>'
+    +'<input type="file" id="importFileInput" accept=".json" style="margin-bottom:16px;display:block;width:100%">'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end"><button class="sel-btn" id="importCancel">'+(da?'Annullér':'Cancel')+'</button><button class="sel-btn selected" id="importConfirm">'+(da?'Importér':'Import')+'</button></div>';
+  overlay.appendChild(modal); document.body.appendChild(overlay);
+  overlay.addEventListener('click',function(e){if(e.target===overlay||e.target.id==='importCancel'){document.body.removeChild(overlay);}});
+  document.getElementById('importConfirm').addEventListener('click',function(){
+    const input=document.getElementById('importFileInput'); if(!input.files||!input.files[0]){return;}
+    const reader=new FileReader(); reader.onload=function(ev){
+      try{
+        const data=JSON.parse(ev.target.result);
+        if(data.loadState) Object.assign(loadState,data.loadState);
+        if(data.loadList) { loadList.length=0; data.loadList.forEach(function(c){loadList.push(c);}); }
+        if(data.cableState) Object.assign(cableState,data.cableState);
+        if(data.vdropState) Object.assign(vdropState,data.vdropState);
+        if(data.scState) Object.assign(scState,data.scState);
+        if(data.mcbState) Object.assign(mcbState,data.mcbState);
+        if(data.mccbState) Object.assign(mccbState,data.mccbState);
+        if(data.fuseState) Object.assign(fuseState,data.fuseState);
+        if(data.trafoState) Object.assign(trafoState,data.trafoState);
+        if(data.circuits) localStorage.setItem('projectCircuits',JSON.stringify(data.circuits));
+        if(data.examStore) localStorage.setItem('examStore',JSON.stringify(data.examStore));
+        document.body.removeChild(overlay);
+        renderNav(); renderStatusBar(); renderModule(activeModule);
+      }catch(err){ alert((da?'Fejl ved import: ':'Import error: ')+err.message); }
+    }; reader.readAsText(input.files[0]);
+  });
 }
 
 // ===== INIT =====
