@@ -1883,23 +1883,20 @@
   // ---------- Energy Watchdog ----------
   RENDER.energy = function () {
     var B = window.QIBrain;
-    // Pre-populate with realistic submarine cable system data
+    // Use default config (all 8 countries, engineering defaults)
     var systemConfig = {
       segments: [
-        { name: "Singapore-Jakarta", routeKm: 1200, repeaterCount: 12, landingStations: 2 },
-        { name: "Jakarta-Bangkok", routeKm: 2800, repeaterCount: 14, landingStations: 2 },
-        { name: "Bangkok-Ho Chi Minh", routeKm: 1500, repeaterCount: 10, landingStations: 2 },
-        { name: "Ho Chi Minh-Manila", routeKm: 1800, repeaterCount: 12, landingStations: 2 },
-        { name: "Manila-Taipei", routeKm: 1100, repeaterCount: 12, landingStations: 2 },
-        { name: "Taipei-Guam", routeKm: 2700, repeaterCount: 12, landingStations: 2 }
+        { name: "Singapore-Jakarta", lengthKm: 1200, repeaterCount: 15 },
+        { name: "Jakarta-Bangkok", lengthKm: 2800, repeaterCount: 35 },
+        { name: "Bangkok-Ho Chi Minh", lengthKm: 1500, repeaterCount: 19 },
+        { name: "Ho Chi Minh-Manila", lengthKm: 1800, repeaterCount: 23 },
+        { name: "Manila-Taipei", lengthKm: 1100, repeaterCount: 14 },
+        { name: "Taipei-Guam", lengthKm: 2700, repeaterCount: 34 }
       ],
-      powerFeedVoltage: 15000,
-      powerFeedCurrent: 1.6,
-      landingStationPowerKW: 50,
-      coolingEfficiency: 1.6,
-      electricityRatePerKWH: 0.12,
-      carbonIntensityKgPerKWH: 0.5,
-      renewablePercent: 20
+      routeKm: 11100,
+      wavelengthCount: 96,
+      fiberType: "G.654.E",
+      pue: 1.6
     };
 
     var result = B.energyWatchdog(systemConfig);
@@ -1914,12 +1911,12 @@
       '<div class="kpi"><div class="label">Annual Energy</div><div class="value">' + sum.annualEnergyMWH.toLocaleString() + ' MWh</div></div>' +
       '<div class="kpi"><div class="label">Annual Cost</div><div class="value" style="color:#e67e22">$' + sum.annualCostUSD.toLocaleString() + '</div></div>' +
       '<div class="kpi"><div class="label">Annual CO\u2082</div><div class="value" style="color:#e74c3c">' + sum.annualCO2Tonnes.toLocaleString() + ' t</div></div>' +
-      '<div class="kpi"><div class="label">Renewable %</div><div class="value" style="color:#27ae60">' + systemConfig.renewablePercent + '%</div></div>' +
+      '<div class="kpi"><div class="label">Countries</div><div class="value" style="color:#27ae60">' + sum.totalCountries + '</div></div>' +
       '</div>';
 
     // Current vs Optimized comparison bars
-    var optCost = lc.withOptimizations.totalEnergyCost / 25;
-    var optCO2 = lc.withOptimizations.totalCO2 / 25;
+    var optCost = lc.optimizedCase.totalEnergyCost / 25;
+    var optCO2 = lc.optimizedCase.totalCO2 / 25;
     var maxCost = sum.annualCostUSD;
     var maxCO2 = sum.annualCO2Tonnes;
 
@@ -1964,19 +1961,19 @@
       '</tr></thead><tbody>' + optRows + '</tbody></table></div></div>';
 
     // 25-year lifecycle summary
-    var carsEquivalent = Math.round(lc.withOptimizations.savings.co2Saved / 4.6); // ~4.6 tonnes CO2/car/year * 25 = per car over 25 years
+    var carsEquivalent = Math.round(lc.savings.co2Saved / 4.6);
     var lifecycle = '<div class="card" id="energyLifecycle"><h3>25-Year Lifecycle Projection</h3>' +
       '<div class="grid kpis" style="margin-bottom:12px">' +
-      '<div class="kpi"><div class="label">Current Path Total Cost</div><div class="value" style="color:#e74c3c">$' + lc.totalEnergyCost.toLocaleString() + '</div></div>' +
-      '<div class="kpi"><div class="label">Optimized Path Total Cost</div><div class="value" style="color:#27ae60">$' + lc.withOptimizations.totalEnergyCost.toLocaleString() + '</div></div>' +
-      '<div class="kpi"><div class="label">Total Savings</div><div class="value" style="color:#27ae60">$' + lc.withOptimizations.savings.costSaved.toLocaleString() + '</div></div>' +
+      '<div class="kpi"><div class="label">Base Case Total Cost</div><div class="value" style="color:#e74c3c">$' + lc.baseCase.totalEnergyCost.toLocaleString() + '</div></div>' +
+      '<div class="kpi"><div class="label">Optimized Total Cost</div><div class="value" style="color:#27ae60">$' + lc.optimizedCase.totalEnergyCost.toLocaleString() + '</div></div>' +
+      '<div class="kpi"><div class="label">Total Savings</div><div class="value" style="color:#27ae60">$' + lc.savings.costSaved.toLocaleString() + '</div></div>' +
       '</div>' +
       '<div class="grid kpis">' +
-      '<div class="kpi"><div class="label">Current Path CO\u2082</div><div class="value">' + lc.totalCO2.toLocaleString() + ' t</div></div>' +
-      '<div class="kpi"><div class="label">Optimized CO\u2082</div><div class="value" style="color:#27ae60">' + lc.withOptimizations.totalCO2.toLocaleString() + ' t</div></div>' +
-      '<div class="kpi"><div class="label">CO\u2082 Saved</div><div class="value" style="color:#27ae60">' + lc.withOptimizations.savings.co2Saved.toLocaleString() + ' t</div></div>' +
+      '<div class="kpi"><div class="label">Base Case CO\u2082</div><div class="value">' + lc.baseCase.totalCO2.toLocaleString() + ' t</div></div>' +
+      '<div class="kpi"><div class="label">Optimized CO\u2082</div><div class="value" style="color:#27ae60">' + lc.optimizedCase.totalCO2.toLocaleString() + ' t</div></div>' +
+      '<div class="kpi"><div class="label">CO\u2082 Saved</div><div class="value" style="color:#27ae60">' + lc.savings.co2Saved.toLocaleString() + ' t</div></div>' +
       '</div>' +
-      '<p style="margin-top:12px;font-style:italic;color:var(--muted)">Equivalent to removing ~' + carsEquivalent.toLocaleString() + ' cars off the road for 25 years</p>' +
+      '<p style="margin-top:12px;font-style:italic;color:var(--muted)">NPV of savings (10% discount): $' + lc.npv10pct.netSavings.toLocaleString() + ' | Equivalent to removing ~' + carsEquivalent.toLocaleString() + ' cars off the road for 25 years</p>' +
       '</div>';
 
     return '<h2 style="margin-bottom:16px">\uD83C\uDF31 Energy Optimization / Cost-Benefit Watchdog</h2>' + kpis + comparison + optTable + lifecycle;

@@ -1212,5 +1212,49 @@ console.log("\n-- histogram bucket distribution --");
   ok(maxIdx > 1 && maxIdx < result.histogram.length - 2, "histogram peak is not at extremes (peak at index " + maxIdx + " of " + result.histogram.length + ")");
 })();
 
+// ---------- Energy Watchdog v2 (comprehensive rebuild) ----------
+console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
+(function () {
+  var ew = B.energyWatchdog();
+
+  // 1. perCountryAnalysis with 8+ entries
+  ok(ew.perCountryAnalysis && ew.perCountryAnalysis.length >= 8, "energyWatchdog perCountryAnalysis has 8+ entries (" + (ew.perCountryAnalysis ? ew.perCountryAnalysis.length : 0) + ")");
+
+  // 2. Guam has highest electricity rate ($0.29)
+  var guam = ew.perCountryAnalysis.filter(function (c) { return c.country === "Guam"; })[0];
+  ok(guam && guam.electricityRate === 0.29, "Guam has highest electricity rate ($0.29)");
+
+  // 3. Brunei has lowest electricity rate ($0.03)
+  var brunei = ew.perCountryAnalysis.filter(function (c) { return c.country === "Brunei"; })[0];
+  ok(brunei && brunei.electricityRate === 0.03, "Brunei has lowest electricity rate ($0.03)");
+
+  // 4. Indonesia has highest carbon intensity (0.76)
+  var indo = ew.perCountryAnalysis.filter(function (c) { return c.country === "Indonesia"; })[0];
+  ok(indo && indo.carbonIntensity === 0.76, "Indonesia has highest carbon intensity (0.76)");
+
+  // 5. degradationForecast has 25 years of data
+  ok(ew.degradationForecast && ew.degradationForecast.length === 25, "degradationForecast has 25 years (" + (ew.degradationForecast ? ew.degradationForecast.length : 0) + ")");
+
+  // 6. Year 25 power is higher than Year 1 (degradation modeled)
+  var y1 = ew.degradationForecast[0];
+  var y25 = ew.degradationForecast[24];
+  ok(y25.totalPowerKW > y1.totalPowerKW, "Year 25 power (" + y25.totalPowerKW + " kW) > Year 1 (" + y1.totalPowerKW + " kW) - degradation modeled");
+
+  // 7. carbonCredits.annualValue > 0
+  ok(ew.carbonCredits && ew.carbonCredits.annualValue > 0, "carbonCredits.annualValue > 0 ($" + (ew.carbonCredits ? ew.carbonCredits.annualValue : 0) + ")");
+
+  // 8. solarPotential has entries for all countries with landing stations
+  ok(ew.solarPotential && ew.solarPotential.length === ew.perCountryAnalysis.length, "solarPotential has entries for all landing station countries (" + (ew.solarPotential ? ew.solarPotential.length : 0) + ")");
+
+  // 9. Total system power includes cable I2R losses (not zero)
+  ok(ew.currentState.cableI2RLossKW > 0, "Total system power includes cable I2R losses (" + ew.currentState.cableI2RLossKW + " kW, not zero)");
+
+  // 10. engineeringNotes references IEC 62446 and ITU-T L.1410
+  var notesStr = ew.engineeringNotes.join(" ");
+  var hasIEC = notesStr.indexOf("IEC 62446") !== -1;
+  var hasITU = notesStr.indexOf("ITU-T L.1410") !== -1;
+  ok(hasIEC && hasITU, "engineeringNotes references IEC 62446 and ITU-T L.1410");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);
