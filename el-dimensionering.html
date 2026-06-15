@@ -929,7 +929,8 @@ const T = {
       earth: '\uD83C\uDF0D Jording',
       test: '\uD83D\uDCCB Afpr\u00F8vning',
       light: '\uD83D\uDCA1 Belysning',
-      fire: '\uD83D\uDD25 Brandalarm'
+      fire: '\uD83D\uDD25 Brandalarm',
+      watchdog: '\uD83D\uDC15 Vagthund'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1047,7 +1048,8 @@ const T = {
       earth: '\uD83C\uDF0D Earthing',
       test: '\uD83D\uDCCB Testing',
       light: '\uD83D\uDCA1 Lighting',
-      fire: '\uD83D\uDD25 Fire Alarm'
+      fire: '\uD83D\uDD25 Fire Alarm',
+      watchdog: '\uD83D\uDC15 Watchdog'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -2385,6 +2387,7 @@ function renderModule(mod) {
     case 'test': content += renderTest(); break;
     case 'light': content += renderLight(); break;
     case 'fire': content += renderFire(); break;
+    case 'watchdog': content += renderWatchdog(); break;
     case 'home': content += renderDashboard(); break;
     case 'exam': content = renderExam(); break;
   }
@@ -17794,6 +17797,132 @@ function importProject(){
       }catch(err){ alert((da?'Fejl ved import: ':'Import error: ')+err.message); }
     }; reader.readAsText(input.files[0]);
   });
+}
+
+// ===== ENERGY WATCHDOG / OPTIMIZATION BRAIN =====
+let watchdogState = { showDetails: false };
+function runEnergyWatchdog(){
+  const da=lang==='da';
+  const ib=calcIB(), sch=calcLoadSchedule();
+  const findings=[];
+  const annualHours=2500; // default office assumption
+  const pricePerKwh=2.5; // DKK
+  const co2PerKwh=0.14; // kg CO2 Danish grid
+
+  // 1. Cable loss optimization
+  if(cableState.crossSection && vdropState.length>0){
+    const cables=cableState.material==='copper'?CABLES_COPPER:CABLES_ALU;
+    const ct=cables[cableState.type]; const cc=ct&&ct[cableState.cores]?ct[cableState.cores]:{};
+    const sel=cc[cableState.crossSection];
+    if(sel && ib>0){
+      const L=vdropState.length/1000;
+      const pLoss=3*ib*ib*sel.r*L/1000; // kW loss in cable
+      const annualLoss=pLoss*annualHours;
+      const costLoss=annualLoss*pricePerKwh;
+      if(costLoss>100){
+        // Check next size up
+        var keys=Object.keys(cc).map(Number).sort(function(a,b){return a-b;});
+        var idx=keys.indexOf(parseFloat(cableState.crossSection));
+        if(idx>=0 && idx<keys.length-1){
+          var nextCS=keys[idx+1], nextCable=cc[nextCS];
+          if(nextCable){
+            var pLossNext=3*ib*ib*nextCable.r*L/1000;
+            var saving=(pLoss-pLossNext)*annualHours*pricePerKwh;
+            if(saving>50) findings.push({category:'cable',severity:'money',saving_dkk:Math.round(saving),saving_kwh:Math.round((pLoss-pLossNext)*annualHours),co2_kg:Math.round((pLoss-pLossNext)*annualHours*co2PerKwh),msg_da:'Opgradering til '+nextCS+' mm\u00B2 sparer '+Math.round(saving)+' DKK/\u00E5r i kabeltab ('+Math.round((pLoss-pLossNext)*annualHours)+' kWh)',msg_en:'Upgrading to '+nextCS+' mm\u00B2 saves '+Math.round(saving)+' DKK/year in cable losses ('+Math.round((pLoss-pLossNext)*annualHours)+' kWh)',payback_years:Math.round(vdropState.length*5/saving*10)/10});
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Power factor penalty
+  if(sch.kW>0 && loadState.cosPhi<0.92){
+    var penaltyKVA=sch.kVA-sch.kW/0.95;
+    var annualPenalty=penaltyKVA*50*12; // 50 DKK/kVA/month
+    if(annualPenalty>500) findings.push({category:'pfc',severity:'money',saving_dkk:Math.round(annualPenalty),saving_kwh:0,co2_kg:0,msg_da:'Fasekompensering til cos\u03C6 0.95 sparer ~'+Math.round(annualPenalty)+' DKK/\u00E5r i effektafgift',msg_en:'Power factor correction to cos\u03C6 0.95 saves ~'+Math.round(annualPenalty)+' DKK/year in demand charges',payback_years:Math.round(penaltyKVA*200/annualPenalty*10)/10});
+  }
+
+  // 3. LED upgrade potential
+  var hasOldLighting=loadList.some(function(c){var nm=(c.name||'').toLowerCase();return (nm.indexOf('lys')>=0||nm.indexOf('light')>=0||nm.indexOf('belys')>=0)&&c.kW>1;});
+  if(hasOldLighting){
+    var lightKW=loadList.filter(function(c){var nm=(c.name||'').toLowerCase();return nm.indexOf('lys')>=0||nm.indexOf('light')>=0||nm.indexOf('belys')>=0;}).reduce(function(s,c){return s+c.kW;},0);
+    var ledSaving=lightKW*0.5*annualHours; // 50% reduction with modern LED
+    if(ledSaving>200) findings.push({category:'led',severity:'energy',saving_dkk:Math.round(ledSaving*pricePerKwh),saving_kwh:Math.round(ledSaving),co2_kg:Math.round(ledSaving*co2PerKwh),msg_da:'Opgradering til moderne LED sparer ~'+Math.round(ledSaving)+' kWh/\u00E5r ('+Math.round(ledSaving*pricePerKwh)+' DKK)',msg_en:'Upgrading to modern LED saves ~'+Math.round(ledSaving)+' kWh/year ('+Math.round(ledSaving*pricePerKwh)+' DKK)',payback_years:1.5});
+  }
+
+  // 4. VFD on motors
+  var motors=loadList.filter(function(c){return c.phase==='3'&&c.kW>=5.5;});
+  motors.forEach(function(m){
+    var vfdSaving=m.kW*0.25*annualHours; // 25% avg saving with VFD on pumps/fans
+    if(vfdSaving>500) findings.push({category:'vfd',severity:'energy',saving_dkk:Math.round(vfdSaving*pricePerKwh),saving_kwh:Math.round(vfdSaving),co2_kg:Math.round(vfdSaving*co2PerKwh),msg_da:'Frekvensomformer p\u00E5 '+(m.name||m.kW+'kW motor')+' sparer ~'+Math.round(vfdSaving)+' kWh/\u00E5r',msg_en:'VFD on '+(m.name||m.kW+'kW motor')+' saves ~'+Math.round(vfdSaving)+' kWh/year',payback_years:Math.round(m.kW*1500/(vfdSaving*pricePerKwh)*10)/10});
+  });
+
+  // 5. Timer/sensor on circuits
+  if(loadList.length>3){
+    var loadWithoutControl=loadList.filter(function(c){var nm=(c.name||'').toLowerCase();return nm.indexOf('stik')>=0||nm.indexOf('socket')>=0;});
+    if(loadWithoutControl.length>2) findings.push({category:'control',severity:'energy',saving_dkk:Math.round(loadWithoutControl.length*200),saving_kwh:Math.round(loadWithoutControl.length*80),co2_kg:Math.round(loadWithoutControl.length*80*co2PerKwh),msg_da:'Bev\u00E6gelsessensorer p\u00E5 '+loadWithoutControl.length+' stikkredse sparer standby-forbrug',msg_en:'Motion sensors on '+loadWithoutControl.length+' socket circuits save standby consumption',payback_years:0.8});
+  }
+
+  // 6. Oversized transformer losses
+  if(trafoState.size>0 && sch.kVA>0){
+    var loadPct=sch.kVA/trafoState.size*100;
+    if(loadPct<40){
+      var optSize=Math.ceil(sch.kVA/0.75/50)*50;
+      if(optSize<trafoState.size) findings.push({category:'trafo',severity:'energy',saving_dkk:Math.round((trafoState.size-optSize)*0.5*annualHours*pricePerKwh/1000),saving_kwh:Math.round((trafoState.size-optSize)*0.5*annualHours/1000),co2_kg:Math.round((trafoState.size-optSize)*0.5*annualHours/1000*co2PerKwh),msg_da:'Transformer er kun '+Math.round(loadPct)+'% belastet \u2014 '+optSize+' kVA ville reducere tomgangstab',msg_en:'Transformer is only '+Math.round(loadPct)+'% loaded \u2014 '+optSize+' kVA would reduce no-load losses',payback_years:5});
+    }
+  }
+
+  // Sort by saving
+  findings.sort(function(a,b){return b.saving_dkk-a.saving_dkk;});
+  return findings;
+}
+
+function renderWatchdog(){
+  const da=lang==='da';
+  const findings=runEnergyWatchdog();
+  const totalSaving=findings.reduce(function(s,f){return s+f.saving_dkk;},0);
+  const totalKwh=findings.reduce(function(s,f){return s+f.saving_kwh;},0);
+  const totalCo2=findings.reduce(function(s,f){return s+f.co2_kg;},0);
+  const icons={cable:'\uD83D\uDD0C',pfc:'\uD83D\uDD0B',led:'\uD83D\uDCA1',vfd:'\u2699\uFE0F',control:'\uD83D\uDCF1',trafo:'\uD83D\uDD04'};
+
+  let html='<div class="card fade-in"><div class="card-title">\uD83D\uDC15 '+(da?'Energi-vagthund \u2014 Optimeringsanalyse':'Energy Watchdog \u2014 Optimization Analysis')+'</div>';
+  html+='<div class="info-row">'+(da?'Vagthunden analyserer dit HELE projekt og finder muligheder for at spare energi, penge og CO\u2082 \u2014 b\u00E5de i anl\u00E6gsinvestering og livslangt drift.':'The Watchdog analyzes your ENTIRE project and finds opportunities to save energy, money and CO\u2082 \u2014 both in installation investment and lifelong operation.')+'</div>';
+
+  if(findings.length===0){
+    html+='<div class="result-box"><div class="result-title">\u2705 '+(da?'Ingen optimeringer fundet \u2014 projektet er allerede effektivt':'No optimizations found \u2014 project is already efficient')+'</div>';
+    html+='<div style="padding:6px">'+(da?'Tilf\u00F8j flere forbrugere i Belastning-modulet for at f\u00E5 anbefalinger.':'Add more consumers in the Load module to get recommendations.')+'</div></div></div>';
+    return html;
+  }
+
+  // Summary card
+  html+='<div class="result-box" style="border-color:var(--success)"><div class="result-title">\uD83D\uDCB0 '+(da?'Samlet besparelsespotentiale':'Total savings potential')+'</div>';
+  html+='<div class="result-row"><span class="label">'+(da?'\u00C5rlig besparelse':'Annual savings')+'</span><span class="value" style="font-weight:800;font-size:1.3em;color:var(--success)">'+totalSaving.toLocaleString()+' DKK</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Energireduktion':'Energy reduction')+'</span><span class="value">'+totalKwh.toLocaleString()+' kWh/\u00E5r</span></div>';
+  html+='<div class="result-row"><span class="label">CO\u2082 '+(da?'reduktion':'reduction')+'</span><span class="value" style="color:#4caf50">'+totalCo2.toLocaleString()+' kg/\u00E5r ('+(totalCo2/1000).toFixed(1)+' ton)</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'10-\u00E5rs besparelse':'10-year savings')+'</span><span class="value" style="font-weight:700">'+(totalSaving*10).toLocaleString()+' DKK</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Antal anbefalinger':'Number of recommendations')+'</span><span class="value">'+findings.length+'</span></div></div>';
+
+  // Individual findings
+  html+='<div class="card-title" style="margin-top:14px">'+(da?'Anbefalinger (sorteret efter besparelse)':'Recommendations (sorted by savings)')+'</div>';
+  findings.forEach(function(f,i){
+    html+='<div class="result-box" style="margin-top:10px;border-color:'+(f.saving_dkk>1000?'var(--success)':'#b8860b')+'"><div class="result-title">'+(icons[f.category]||'\u26A1')+' '+(da?f.msg_da:f.msg_en)+'</div>';
+    html+='<div class="result-row"><span class="label">'+(da?'Besparelse':'Savings')+'</span><span class="value" style="color:var(--success);font-weight:700">'+f.saving_dkk.toLocaleString()+' DKK/\u00E5r</span></div>';
+    if(f.saving_kwh>0) html+='<div class="result-row"><span class="label">'+(da?'Energi':'Energy')+'</span><span class="value">'+f.saving_kwh.toLocaleString()+' kWh/\u00E5r</span></div>';
+    if(f.co2_kg>0) html+='<div class="result-row"><span class="label">CO\u2082</span><span class="value" style="color:#4caf50">-'+f.co2_kg+' kg/\u00E5r</span></div>';
+    if(f.payback_years) html+='<div class="result-row"><span class="label">'+(da?'Tilbagebetalingstid':'Payback period')+'</span><span class="value">~'+f.payback_years+' '+(da?'\u00E5r':'years')+'</span></div>';
+    html+='</div>';
+  });
+
+  // Customer-facing summary (print-ready)
+  html+='</div><div class="card fade-in"><div class="card-title">\uD83D\uDCCB '+(da?'Kundeopsummering (udskriv/del)':'Customer summary (print/share)')+'</div>';
+  html+='<div class="result-box" style="background:linear-gradient(135deg,rgba(6,214,160,0.05),rgba(0,200,255,0.03));border-color:var(--success)">';
+  html+='<div class="result-title" style="font-size:1.1em">'+(da?'\uD83C\uDF31 Dit projekts milj\u00F8- og \u00F8konomiprofil':'\uD83C\uDF31 Your project\u2019s environmental & economic profile')+'</div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Mulig \u00E5rlig besparelse':'Potential annual savings')+'</span><span class="value" style="font-size:1.2em;font-weight:800;color:var(--success)">'+totalSaving.toLocaleString()+' DKK</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'CO\u2082-reduktion pr. \u00E5r':'CO\u2082 reduction per year')+'</span><span class="value" style="color:#4caf50">'+(totalCo2/1000).toFixed(2)+' ton</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Over 25 \u00E5r (installationens levetid)':'Over 25 years (installation lifetime)')+'</span><span class="value" style="font-weight:700">'+(totalSaving*25).toLocaleString()+' DKK + '+(totalCo2*25/1000).toFixed(1)+' ton CO\u2082</span></div>';
+  html+='<div style="padding:8px 2px;margin-top:8px;font-size:.88rem;color:var(--text-light)">'+(da?'Beregnet ud fra dansk el-net CO\u2082-faktor (0,14 kg/kWh) og aktuelle energipriser. Faktiske besparelser afh\u00E6nger af driftsprofil.':'Based on Danish grid CO\u2082 factor (0.14 kg/kWh) and current energy prices. Actual savings depend on usage profile.')+'</div>';
+  html+='</div></div>';
+  return html;
 }
 
 // ===== INIT =====
