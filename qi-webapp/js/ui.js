@@ -243,6 +243,7 @@
     { id: "stakeholders", label: "Stakeholders", icon: "♟" },
     { id: "raci", label: "RACI Matrix", icon: "⊞" },
     { id: "budget", label: "Budget", icon: "$" },
+    { id: "training", label: "Training", icon: "\uD83C\uDF93" },
     { g: "Intelligence" },
     { id: "competitive", label: "Market Intel", icon: "🔍" },
     { id: "systemdesign", label: "System Design", icon: "\u26A1" },
@@ -269,9 +270,11 @@
     C.REGISTERS.filter(r => r.group === "Engineering").forEach(r => items.push({ id: r.id, label: r.label, icon: r.icon }));
     items.push({ id: "bowtie", label: "Bow-tie (HAZOP)", icon: "🎀" });
     items.push({ id: "spares", label: "Spare Parts", icon: "\uD83D\uDDC4" });
+    items.push({ id: "protection", label: "Protection Zones", icon: "\uD83D\uDEA7" });
     items.push({ g: "Business" }, { id: "evm", label: "Earned Value (EVM)", icon: "∑" }, { id: "cashflow", label: "Cash Flow / S-curve", icon: "〽" }, { id: "prioritise", label: "Prioritisation (RICE/WSJF)", icon: "⤒" });
     C.REGISTERS.filter(r => r.group === "Business").forEach(r => items.push({ id: r.id, label: r.label, icon: r.icon }));
     items.push({ id: "insurance", label: "Insurance", icon: "\uD83D\uDEE1" });
+    items.push({ id: "sla", label: "SLA Management", icon: "\uD83D\uDCCA" });
     const idx = VIEWS.findIndex(v => v.g === "Intelligence");
     VIEWS.splice(idx, 0, ...items);
   })();
@@ -1599,6 +1602,162 @@
 
     return '<h2 style="margin-bottom:16px">Digital Twin - System Status</h2>' + summary +
       '<div id="dtSegments" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(380px, 1fr));gap:16px">' + segCards + '</div>';
+  };
+
+  // ---------- SLA & Availability Management ----------
+  RENDER.sla = function () {
+    var slas = S.listSLAs();
+
+    // KPI summary
+    var availability = "99.995%";
+    var incidentsThisYear = 2;
+    var slaBreaches = 0;
+    var uptimeStreak = 147;
+
+    var summary = '<div class="grid kpis" style="margin-bottom:16px">' +
+      '<div class="kpi"><div class="label">Overall Availability</div><div class="value" style="color:#27ae60">' + availability + '</div></div>' +
+      '<div class="kpi"><div class="label">Incidents This Year</div><div class="value">' + incidentsThisYear + '</div></div>' +
+      '<div class="kpi"><div class="label">SLA Breaches</div><div class="value" style="color:#27ae60">' + slaBreaches + '</div></div>' +
+      '<div class="kpi"><div class="label">Uptime Streak (days)</div><div class="value" style="color:#27ae60">' + uptimeStreak + '</div></div>' +
+      '</div>';
+
+    // SLA Table
+    var trendArrow = function (t) { return t === "up" ? "\u2191" : t === "down" ? "\u2193" : "\u2192"; };
+    var statusColor = function (s) { return s === "green" ? "#27ae60" : s === "amber" ? "#f39c12" : "#e74c3c"; };
+    var slaRows = slas.map(function (s) {
+      return '<tr>' +
+        '<td>' + esc(s.metric) + '</td>' +
+        '<td>' + esc(s.target) + '</td>' +
+        '<td>' + esc(s.actual) + '</td>' +
+        '<td style="color:' + statusColor(s.status) + ';font-weight:700">' + esc(s.status.toUpperCase()) + '</td>' +
+        '<td style="font-size:1.2em">' + trendArrow(s.trend) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    var slaTable = '<div class="card"><h3>SLA Performance</h3>' +
+      '<div class="table-wrap"><table id="slaTable"><thead><tr>' +
+      '<th>Metric</th><th>Target</th><th>Actual</th><th>Status</th><th>Trend</th>' +
+      '</tr></thead><tbody>' + slaRows + '</tbody></table></div></div>';
+
+    // Monthly availability trend (text table)
+    var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    var values = [99.998, 99.995, 99.999, 100.0, 99.994, 99.997, 99.995, 99.999, 99.996, 99.998, 99.995, 99.997];
+    var trendRows = months.map(function (m, i) {
+      var v = values[i];
+      var color = v >= 99.99 ? "#27ae60" : v >= 99.95 ? "#f39c12" : "#e74c3c";
+      var bar = Math.round((v - 99.9) * 1000);
+      return '<tr><td>' + m + '</td><td style="color:' + color + ';font-weight:600">' + v.toFixed(3) + '%</td>' +
+        '<td><div style="background:#eee;border-radius:3px;height:10px;width:100px"><div style="background:' + color + ';border-radius:3px;height:10px;width:' + Math.min(100, bar) + 'px"></div></div></td></tr>';
+    }).join('');
+
+    var trendTable = '<div class="card"><h3>Monthly Availability Trend (Last 12 Months)</h3>' +
+      '<div class="table-wrap"><table id="slaTrend"><thead><tr><th>Month</th><th>Availability</th><th>Visual</th></tr></thead>' +
+      '<tbody>' + trendRows + '</tbody></table></div></div>';
+
+    return '<h2 style="margin-bottom:16px">SLA & Availability Management</h2>' + summary + slaTable + trendTable;
+  };
+
+  // ---------- Cable Protection Zone Registry ----------
+  RENDER.protection = function () {
+    var zones = [
+      { segment: "Singapore-Jakarta", zoneType: "Exclusive Economic Zone", location: "0-45 km", authority: "Maritime and Port Authority of Singapore (MPA)", status: "Active", enforcement: "AIS Monitoring + Patrol Vessels" },
+      { segment: "Singapore-Jakarta", zoneType: "Anchoring Prohibition Zone", location: "45-120 km", authority: "Indonesian Navy (TNI-AL)", status: "Active", enforcement: "Restricted Area Notice to Mariners" },
+      { segment: "Jakarta-Surabaya", zoneType: "Fishing Exclusion Zone", location: "0-30 km", authority: "Ministry of Marine Affairs (KKP)", status: "Active", enforcement: "Buoy Markers + GPS Fencing" },
+      { segment: "Singapore-Bangkok", zoneType: "Territorial Waters Protection", location: "0-22 km", authority: "Royal Thai Navy", status: "Active", enforcement: "Naval Patrol + AIS Alerts" },
+      { segment: "Singapore-Bangkok", zoneType: "Continental Shelf Zone", location: "22-180 km", authority: "Department of Mineral Resources Thailand", status: "Pending", enforcement: "Seabed License Agreement" },
+      { segment: "Bangkok-HCMC", zoneType: "Cable Corridor", location: "0-95 km", authority: "Vietnam Maritime Administration (VINAMARINE)", status: "Active", enforcement: "Charted Protection Zone + Penalties" },
+      { segment: "Manila-Kaohsiung", zoneType: "Deep Water Protection", location: "120-380 km", authority: "National Communications Commission (NCC Taiwan)", status: "Active", enforcement: "International Cable Treaty" },
+      { segment: "Manila-Guam", zoneType: "Exclusive Economic Zone", location: "0-200 nm", authority: "Philippine Coast Guard (PCG)", status: "Active", enforcement: "UNCLOS Article 113 + Local Ordinance" },
+      { segment: "Malaysia-Brunei", zoneType: "Nearshore Protection", location: "0-15 km", authority: "Malaysian Communications Commission (MCMC)", status: "Active", enforcement: "Licensed Cable Corridor + CCTV" },
+      { segment: "Malaysia-Brunei", zoneType: "Joint Development Area", location: "15-85 km", authority: "Authority for Info-communications (AITI Brunei)", status: "Pending", enforcement: "Bilateral Agreement" },
+      { segment: "Philippines-Vietnam", zoneType: "Disputed Waters Transit", location: "80-250 km", authority: "Joint Maritime Authority (pending)", status: "Expired", enforcement: "Diplomatic Note Verbale" },
+      { segment: "Indonesia-Malaysia", zoneType: "Strait of Malacca Protection", location: "0-60 km", authority: "Malacca Strait Council", status: "Active", enforcement: "TSS Compliance + VTS Monitoring" }
+    ];
+
+    // Summary
+    var totalKm = 0;
+    zones.forEach(function (z) {
+      var parts = z.location.replace(/[^0-9\-]/g, '').split('-');
+      if (parts.length === 2) totalKm += (parseInt(parts[1]) - parseInt(parts[0]));
+    });
+    var activeZones = zones.filter(function (z) { return z.status === "Active"; }).length;
+    var pendingZones = zones.filter(function (z) { return z.status === "Pending"; }).length;
+    var expiredZones = zones.filter(function (z) { return z.status === "Expired"; }).length;
+
+    var summaryCards = '<div class="grid kpis" style="margin-bottom:16px">' +
+      '<div class="kpi"><div class="label">Total Protected Distance</div><div class="value">' + totalKm + ' km</div></div>' +
+      '<div class="kpi"><div class="label">Active Zones</div><div class="value" style="color:#27ae60">' + activeZones + '</div></div>' +
+      '<div class="kpi"><div class="label">Pending Zones</div><div class="value" style="color:#f39c12">' + pendingZones + '</div></div>' +
+      '<div class="kpi"><div class="label">Expired/Gap Zones</div><div class="value" style="color:#e74c3c">' + expiredZones + '</div></div>' +
+      '</div>';
+
+    // Table
+    var statusColor = function (s) { return s === "Active" ? "#27ae60" : s === "Pending" ? "#f39c12" : "#e74c3c"; };
+    var rows = zones.map(function (z) {
+      return '<tr>' +
+        '<td>' + esc(z.segment) + '</td>' +
+        '<td>' + esc(z.zoneType) + '</td>' +
+        '<td>' + esc(z.location) + '</td>' +
+        '<td>' + esc(z.authority) + '</td>' +
+        '<td style="color:' + statusColor(z.status) + ';font-weight:600">' + esc(z.status) + '</td>' +
+        '<td>' + esc(z.enforcement) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    var table = '<div class="card"><h3>Protection Zones by Segment</h3>' +
+      '<div class="table-wrap"><table id="protectionTable"><thead><tr>' +
+      '<th>Segment</th><th>Zone Type</th><th>Location</th><th>Authority</th><th>Status</th><th>Enforcement Method</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+
+    // Recommendations
+    var recs = '<div class="card"><h3>Recommendations</h3><ul style="margin:0;padding-left:20px">' +
+      '<li>Renew bilateral agreement for Malaysia-Brunei Joint Development Area (expiring Q3 2026)</li>' +
+      '<li>Escalate Philippines-Vietnam Disputed Waters Transit zone through diplomatic channels</li>' +
+      '<li>Add GPS-based vessel alert system for Indonesia anchoring prohibition zones</li>' +
+      '<li>Coordinate with Malacca Strait Council for enhanced vessel traffic monitoring</li>' +
+      '<li>Establish cable protection awareness campaign for fishing communities in KKP zones</li>' +
+      '</ul></div>';
+
+    return '<h2 style="margin-bottom:16px">Cable Protection Zone Registry</h2>' + summaryCards + table + recs;
+  };
+
+  // ---------- Training & Competency Register ----------
+  RENDER.training = function () {
+    var records = S.listTrainingRecords();
+
+    // Summary stats
+    var totalStaff = records.length;
+    var validCount = records.filter(function (r) { return r.status === "Valid"; }).length;
+    var expiringCount = records.filter(function (r) { return r.status === "Expiring"; }).length;
+    var expiredCount = records.filter(function (r) { return r.status === "Expired"; }).length;
+    var certifiedPct = Math.round((validCount / totalStaff) * 100);
+
+    var summaryCards = '<div class="grid kpis" style="margin-bottom:16px">' +
+      '<div class="kpi"><div class="label">Total Staff</div><div class="value">' + totalStaff + '</div></div>' +
+      '<div class="kpi"><div class="label">Certified %</div><div class="value" style="color:#27ae60">' + certifiedPct + '%</div></div>' +
+      '<div class="kpi"><div class="label">Expiring (90 days)</div><div class="value" style="color:#f39c12">' + expiringCount + '</div></div>' +
+      '<div class="kpi"><div class="label">Expired</div><div class="value" style="color:#e74c3c">' + expiredCount + '</div></div>' +
+      '</div>';
+
+    // Table with traffic light colors
+    var statusColor = function (s) { return s === "Valid" ? "#27ae60" : s === "Expiring" ? "#f39c12" : "#e74c3c"; };
+    var rows = records.map(function (r) {
+      return '<tr>' +
+        '<td>' + esc(r.name) + '</td>' +
+        '<td>' + esc(r.role) + '</td>' +
+        '<td>' + esc(r.certification) + '</td>' +
+        '<td>' + esc(r.issued) + '</td>' +
+        '<td>' + esc(r.expiry) + '</td>' +
+        '<td style="color:' + statusColor(r.status) + ';font-weight:700">' + esc(r.status) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    var table = '<div class="card"><h3>Competency Records</h3>' +
+      '<div class="table-wrap"><table id="trainingTable"><thead><tr>' +
+      '<th>Name</th><th>Role</th><th>Certification</th><th>Issued</th><th>Expiry</th><th>Status</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+
+    return '<h2 style="margin-bottom:16px">Training & Competency Register</h2>' + summaryCards + table;
   };
 
   // ---------- Permit Tracker ----------

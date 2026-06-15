@@ -934,5 +934,29 @@ if (digitaltwinNav) digitaltwinNav.dispatchEvent(new window.Event("click", { bub
 var dtSegments = doc.getElementById("dtSegments");
 ok(dtSegments != null && dtSegments.querySelectorAll('[data-segment]').length >= 6, "Digital Twin renders health scores");
 
+// 70) SLA Management
+var slaNav = doc.querySelector('.nav-item[data-view="sla"]');
+ok(slaNav != null, "SLA Management nav item exists");
+
+if (slaNav) slaNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var slaTable = doc.getElementById("slaTable");
+ok(slaTable != null && slaTable.querySelectorAll('tbody tr').length >= 7, "SLA table renders metrics with targets");
+
+// 71) Cable Protection Zones
+var protectionNav = doc.querySelector('.nav-item[data-view="protection"]');
+ok(protectionNav != null, "Protection Zones nav item exists");
+
+if (protectionNav) protectionNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var protectionTable = doc.getElementById("protectionTable");
+ok(protectionTable != null && protectionTable.querySelectorAll('tbody tr').length >= 8, "Protection Zones table renders zones for multiple countries");
+
+// 72) Training & Competency
+var trainingNav = doc.querySelector('.nav-item[data-view="training"]');
+ok(trainingNav != null, "Training nav item exists");
+
+if (trainingNav) trainingNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var trainingTable = doc.getElementById("trainingTable");
+ok(trainingTable != null && trainingTable.querySelectorAll('tbody tr').length >= 10, "Training table renders competency records");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

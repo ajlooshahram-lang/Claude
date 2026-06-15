@@ -973,6 +973,38 @@
     return permits[idx];
   }
 
+  // ---------- SLA & Availability Management ----------
+  function listSLAs() {
+    return [
+      { id: "sla-1", metric: "System Availability", target: "99.99% (52.6 min downtime/year max)", actual: "99.995%", actualNum: 99.995, targetNum: 99.99, status: "green", trend: "up" },
+      { id: "sla-2", metric: "Fault Restoration Time (Shallow <200m)", target: "<24 hours", actual: "Avg 18 hours", actualNum: 18, targetNum: 24, status: "green", trend: "stable" },
+      { id: "sla-3", metric: "Fault Restoration Time (Deep >1000m)", target: "<72 hours", actual: "Avg 36 hours", actualNum: 36, targetNum: 72, status: "green", trend: "up" },
+      { id: "sla-4", metric: "Latency (One-way Singapore-Guam)", target: "<120ms", actual: "95ms", actualNum: 95, targetNum: 120, status: "green", trend: "stable" },
+      { id: "sla-5", metric: "Packet Loss", target: "<0.001%", actual: "0.0003%", actualNum: 0.0003, targetNum: 0.001, status: "green", trend: "up" },
+      { id: "sla-6", metric: "Planned Maintenance Windows", target: "Max 4 per year per segment", actual: "2 per year avg", actualNum: 2, targetNum: 4, status: "green", trend: "stable" },
+      { id: "sla-7", metric: "Spare Cable Availability", target: ">2% of system length at each depot", actual: "2.4% avg across depots", actualNum: 2.4, targetNum: 2, status: "green", trend: "stable" },
+      { id: "sla-8", metric: "Mean Time Between Failures (MTBF)", target: ">5 years per segment", actual: "6.2 years", actualNum: 6.2, targetNum: 5, status: "green", trend: "up" },
+      { id: "sla-9", metric: "Network Utilization Alert Threshold", target: "Alert at >80% capacity", actual: "Currently at 62%", actualNum: 62, targetNum: 80, status: "amber", trend: "up" },
+      { id: "sla-10", metric: "Incident Response Time", target: "<30 minutes acknowledgment", actual: "22 minutes avg", actualNum: 22, targetNum: 30, status: "green", trend: "stable" }
+    ];
+  }
+
+  // ---------- Training & Competency Register ----------
+  function listTrainingRecords() {
+    return [
+      { id: "tr-1", name: "Ahmad Razak", role: "Cable Jointing Engineer", certification: "IEC 60794 Submarine Cable Jointing", issued: "2024-03-15", expiry: "2026-03-15", status: "Valid" },
+      { id: "tr-2", name: "Nguyen Van Minh", role: "ROV Pilot", certification: "IMCA ROV Pilot/Technician Class II", issued: "2023-11-01", expiry: "2025-11-01", status: "Expired" },
+      { id: "tr-3", name: "Maria Santos", role: "Marine Operations Manager", certification: "STCW Master Mariner (Unlimited)", issued: "2024-06-20", expiry: "2029-06-20", status: "Valid" },
+      { id: "tr-4", name: "Chen Wei Lin", role: "Fiber Test Engineer", certification: "OTDR & Fiber Characterization (FOA CFOT)", issued: "2025-01-10", expiry: "2027-01-10", status: "Valid" },
+      { id: "tr-5", name: "Takeshi Yamamoto", role: "System Design Engineer", certification: "SubOptic Submarine System Design", issued: "2024-09-05", expiry: "2026-09-05", status: "Expiring" },
+      { id: "tr-6", name: "Budi Santoso", role: "Shore End Installation Lead", certification: "Horizontal Directional Drilling (HDD) Level 3", issued: "2023-08-12", expiry: "2025-08-12", status: "Expired" },
+      { id: "tr-7", name: "Priya Chandra", role: "Quality Inspector", certification: "ISO 9001:2015 Lead Auditor (IRCA)", issued: "2025-02-28", expiry: "2028-02-28", status: "Valid" },
+      { id: "tr-8", name: "David Thompson", role: "Health & Safety Officer", certification: "NEBOSH International General Certificate", issued: "2024-12-01", expiry: "2026-12-01", status: "Expiring" },
+      { id: "tr-9", name: "Somchai Prasert", role: "Cable Ship Captain", certification: "DP2 Dynamic Positioning Operator", issued: "2024-04-18", expiry: "2026-04-18", status: "Expiring" },
+      { id: "tr-10", name: "Rizal Fernandez", role: "Network Operations Engineer", certification: "DWDM Systems (Ciena/Infinera Certified)", issued: "2025-05-01", expiry: "2027-05-01", status: "Valid" }
+    ];
+  }
+
   const API = { uid, seed, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
     undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete, togglePin, reorderPin,
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
@@ -987,7 +1019,8 @@
     addDocument, listDocuments, updateDocument, deleteDocument, DOC_CATEGORIES: DOC_CATEGORIES_LIST,
     addWorkflow, listWorkflows, deleteWorkflow, startWorkflowInstance, advanceWorkflow, rejectWorkflow, getWorkflowStatus,
     listSpares, updateSpare, insuranceRegistry, environmentalCompliance,
-    addPermit, listPermits, updatePermit };
+    addPermit, listPermits, updatePermit,
+    listSLAs, listTrainingRecords };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);
