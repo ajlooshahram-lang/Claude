@@ -1580,5 +1580,54 @@ console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
   ok(pExp.segments.length === 2 && pExp.segments.some(function (s) { return s.band === "deep"; }), "explicit depth profile with empty bands is honoured (2 segments)");
 })();
 
+// ===== 3D Build-Sequence Engine Tests =====
+(function () {
+  console.log("\n--- 3D Build-Sequence Engine ---");
+  var r = B.generateBuildSequence();
+  ok(r.summary.totalStations === 8, "default scene has 8 landing stations (got " + r.summary.totalStations + ")");
+  ok(r.summary.totalSegments === 7, "default scene has 7 cable links (got " + r.summary.totalSegments + ")");
+  ok(r.steps.length === r.summary.totalSteps && r.steps.length > 0, "steps array matches summary count");
+  // All 8 programme countries present
+  var want = ["Indonesia", "Thailand", "Vietnam", "Taiwan", "Philippines", "Guam", "Malaysia", "Brunei"];
+  ok(want.every(function (c) { return r.summary.countries.indexOf(c) >= 0; }), "scene covers all 8 programme countries");
+  // Phase order
+  var expPhases = ["Marine Survey", "Landing Stations", "Cable Lay", "Splice & Branching", "Test & Commission", "Handover"];
+  ok(JSON.stringify(r.summary.phases) === JSON.stringify(expPhases), "phases appear in build order: " + r.summary.phases.join(" > "));
+  // Step-kind counts
+  var k = {};
+  r.steps.forEach(function (s) { k[s.kind] = (k[s.kind] || 0) + 1; });
+  ok(k.survey === 7 && k.landing === 8 && k.splice === 7 && k.test === 7 && k.handover === 1, "step kinds: " + JSON.stringify(k));
+  ok(k.lay >= 7, "at least one lay (extrusion) step per segment - got " + k.lay);
+  // Ordering: all surveys before landings before first lay; handover last
+  var firstLanding = r.steps.findIndex(function (s) { return s.kind === "landing"; });
+  var lastSurvey = r.steps.map(function (s) { return s.kind; }).lastIndexOf("survey");
+  var firstLay = r.steps.findIndex(function (s) { return s.kind === "lay"; });
+  ok(lastSurvey < firstLanding && firstLanding < firstLay, "ordering: surveys -> landings -> cable lay");
+  ok(r.steps[r.steps.length - 1].kind === "handover", "final step is handover (system ready for service)");
+  // Lay increments are valid fractions
+  var lay = r.steps.filter(function (s) { return s.kind === "lay"; });
+  ok(lay.every(function (s) { return s.fromFrac < s.toFrac && s.toFrac <= 1 && s.incrementKm > 0; }), "lay steps have valid increasing fractions and positive km");
+  // Progress monotonic and ends at 100
+  var monoLaid = true, prev = -1;
+  r.steps.forEach(function (s) { if (s.laidKm < prev) monoLaid = false; prev = s.laidKm; });
+  ok(monoLaid, "cumulative laid km never decreases across steps");
+  ok(r.steps[r.steps.length - 1].progressPct === 100 && r.steps[r.steps.length - 1].layProgressPct === 100, "final step is 100% complete and 100% laid");
+  // Total laid km reconciles with network length (within rounding)
+  var finalLaid = r.steps[r.steps.length - 1].laidKm;
+  ok(Math.abs(finalLaid - r.summary.totalKm) <= r.summary.totalSegments * 10, "laid km reconciles with total network km (" + finalLaid + " vs " + r.summary.totalKm + ")");
+  // Haversine length sanity for Malaysia->Indonesia trunk
+  var s1 = r.scene.segments.filter(function (g) { return g.id === "S1"; })[0];
+  ok(s1 && s1.lengthKm > 700 && s1.lengthKm < 1200, "Mersing->Jakarta length is geographically plausible (" + (s1 ? s1.lengthKm : "n/a") + " km)");
+  // Determinism
+  ok(JSON.stringify(r) === JSON.stringify(B.generateBuildSequence()), "same inputs -> identical build sequence (deterministic)");
+  // Custom topology honoured
+  var c = B.generateBuildSequence({
+    stations: [{ id: "A", name: "A CLS", country: "X", lon: 100, lat: 0 }, { id: "Z", name: "Z CLS", country: "Y", lon: 110, lat: 0 }],
+    segments: [{ id: "L1", from: "A", to: "Z", cableType: "G.652.D" }]
+  });
+  ok(c.summary.totalStations === 2 && c.summary.totalSegments === 1 && c.steps[c.steps.length - 1].kind === "handover", "custom 2-station/1-link topology produces a complete sequence");
+  ok(r.references.some(function (x) { return /ICPC/.test(x); }) && r.references.some(function (x) { return /ITU-T/.test(x); }), "references cite ICPC and ITU-T submarine practice");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);

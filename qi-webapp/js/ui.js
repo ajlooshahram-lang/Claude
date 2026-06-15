@@ -251,6 +251,7 @@
     { id: "systemdesign", label: "System Design", icon: "\u26A1" },
     { id: "wavelengths", label: "Wavelength Planner", icon: "\uD83C\uDF08" },
     { id: "latency", label: "Latency Calculator", icon: "\u23F1" },
+    { id: "buildanim", label: "3D Build Visualisation", icon: "\uD83C\uDFD7\uFE0F" },
     { id: "revenue", label: "Revenue Model", icon: "\uD83D\uDCB0" },
     { id: "routeopt", label: "Route Optimizer", icon: "\uD83D\uDEE4" },
     { id: "predictive", label: "Fault Forecast", icon: "\uD83D\uDCE1" },
@@ -2036,6 +2037,308 @@
       var el = document.getElementById(id);
       if (el) el.addEventListener("change", recompute);
     });
+  };
+
+  // ---------- 3D Build Visualisation (animated construction "3D printer") ----------
+  // Turns QIBrain.generateBuildSequence() into an animated isometric scene that
+  // shows a non-technical customer, step by step, how the submarine network is
+  // built. Self-contained SVG (offline, no CDN). The SVG is built ONCE with
+  // stable element ids; stepping mutates attributes so CSS transitions animate
+  // the cable "extrusion", the travelling print head and the light flow.
+  function buildAnimGeometry(plan) {
+    var sts = plan.scene.stations, segs = plan.scene.segments;
+    var lons = sts.map(function (s) { return s.lon; }), lats = sts.map(function (s) { return s.lat; });
+    var minLon = Math.min.apply(null, lons), maxLon = Math.max.apply(null, lons);
+    var minLat = Math.min.apply(null, lats), maxLat = Math.max.apply(null, lats);
+    var dLon = (maxLon - minLon) || 1, dLat = (maxLat - minLat) || 1;
+    function project(lon, lat) {
+      var nx = (lon - minLon) / dLon, ny = (lat - minLat) / dLat;
+      var back = ny; // higher latitude = further back (up + right)
+      return { x: 110 + nx * 600 + back * 150, y: 440 - back * 250 };
+    }
+    var stationXY = {};
+    sts.forEach(function (s) { var p = project(s.lon, s.lat); stationXY[s.id] = { x: p.x, y: p.y }; });
+
+    function pointAtFrac(points, len, frac) {
+      var target = len * frac, acc = 0;
+      for (var i = 1; i < points.length; i++) {
+        var seg = points[i].cum - points[i - 1].cum;
+        if (acc + seg >= target) {
+          var t = seg > 0 ? (target - acc) / seg : 0;
+          return { x: points[i - 1].x + (points[i].x - points[i - 1].x) * t, y: points[i - 1].y + (points[i].y - points[i - 1].y) * t };
+        }
+        acc += seg;
+      }
+      return points[points.length - 1];
+    }
+
+    var segGeo = {};
+    segs.forEach(function (g, idx) {
+      var a = stationXY[g.from], b = stationXY[g.to];
+      var dx = b.x - a.x, dy = b.y - a.y;
+      var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      var px = -dy / dist, py = dx / dist; // perpendicular
+      var bow = (idx % 2 ? 1 : -1) * Math.min(70, dist * 0.18); // bow so links don't overlap
+      var N = 28, points = [], cum = 0, prev = null;
+      for (var i = 0; i <= N; i++) {
+        var t = i / N;
+        var bend = Math.sin(Math.PI * t) * bow;
+        var x = a.x + dx * t + px * bend, y = a.y + dy * t + py * bend;
+        if (prev) cum += Math.sqrt((x - prev.x) * (x - prev.x) + (y - prev.y) * (y - prev.y));
+        points.push({ x: x, y: y, cum: cum });
+        prev = { x: x, y: y };
+      }
+      var d = "M" + points.map(function (p) { return p.x.toFixed(1) + " " + p.y.toFixed(1); }).join(" L");
+      segGeo[g.id] = { points: points, len: cum, d: d, pointAt: function (f) { return pointAtFrac(points, cum, f); } };
+    });
+    return { stationXY: stationXY, segGeo: segGeo, project: project };
+  }
+
+  function buildAnimReveal(plan, stepIdx) {
+    var surveyed = {}, built = {}, segFrac = {}, tested = {}, head = null;
+    plan.scene.segments.forEach(function (g) { segFrac[g.id] = 0; });
+    for (var i = 0; i <= stepIdx && i < plan.steps.length; i++) {
+      var st = plan.steps[i];
+      if (st.kind === "survey") surveyed[st.segmentId] = true;
+      else if (st.kind === "landing") built[st.stationId] = true;
+      else if (st.kind === "lay") {
+        surveyed[st.segmentId] = true;
+        var g = plan.scene.segments.filter(function (x) { return x.id === st.segmentId; })[0];
+        if (g) built[g.from] = true;
+        segFrac[st.segmentId] = Math.max(segFrac[st.segmentId], st.toFrac);
+        head = (i === stepIdx) ? { segId: st.segmentId, frac: st.toFrac } : head;
+      } else if (st.kind === "splice") { segFrac[st.segmentId] = 1; if (st.stationId) built[st.stationId] = true; }
+      else if (st.kind === "test") { tested[st.segmentId] = true; segFrac[st.segmentId] = 1; }
+      else if (st.kind === "handover") {
+        plan.scene.segments.forEach(function (x) { segFrac[x.id] = 1; tested[x.id] = true; });
+        plan.scene.stations.forEach(function (s) { built[s.id] = true; });
+      }
+      if (st.kind !== "lay" && i === stepIdx) head = null;
+    }
+    return { surveyed: surveyed, built: built, segFrac: segFrac, tested: tested, head: head };
+  }
+
+  var CABLE_COLORS = { "G.654.E": "#22d3ee", "G.652.D": "#a78bfa", "G.657.A2": "#34d399" };
+  function cableColor(t) { return CABLE_COLORS[t] || "#22d3ee"; }
+
+  function buildAnimSvg(plan, geo) {
+    var segs = plan.scene.segments, sts = plan.scene.stations;
+    var segPaths = segs.map(function (g) {
+      var col = cableColor(g.cableType);
+      var gg = geo.segGeo[g.id];
+      return '' +
+        '<path id="plan-' + g.id + '" d="' + gg.d + '" fill="none" stroke="#3b5168" stroke-width="2" stroke-dasharray="2 9" opacity="0" stroke-linecap="round"></path>' +
+        '<path id="seg-' + g.id + '" class="qi-seg" d="' + gg.d + '" fill="none" stroke="' + col + '" stroke-width="4.5" stroke-linecap="round" ' +
+        'stroke-dasharray="' + gg.len.toFixed(1) + '" stroke-dashoffset="' + gg.len.toFixed(1) + '" opacity="0" filter="url(#qiGlow)"></path>' +
+        '<path id="flow-' + g.id + '" d="' + gg.d + '" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0"></path>';
+    }).join("");
+
+    var stationMarks = sts.map(function (s) {
+      var p = geo.stationXY[s.id];
+      var hub = s.type === "hub";
+      var h = hub ? 34 : 26, r = hub ? 9 : 7;
+      var col = hub ? "#f5d90a" : "#38e0a6";
+      return '' +
+        '<g id="st-' + s.id + '" class="qi-st" opacity="0" transform="translate(' + p.x.toFixed(1) + ',' + p.y.toFixed(1) + ')">' +
+        '<ellipse cx="0" cy="6" rx="' + (r + 7) + '" ry="6" fill="#0a2a3a" opacity="0.55"></ellipse>' +
+        '<line x1="0" y1="0" x2="0" y2="' + (-h) + '" stroke="' + col + '" stroke-width="3"></line>' +
+        '<circle class="qi-pulse" cx="0" cy="' + (-h) + '" r="' + r + '" fill="' + col + '" filter="url(#qiGlow)"></circle>' +
+        '<circle cx="0" cy="' + (-h) + '" r="' + (r - 3) + '" fill="#04141d"></circle>' +
+        '<text class="qi-label" x="0" y="' + (-h - 14) + '" text-anchor="middle" fill="#dbeafc" font-size="12" font-weight="700">' + esc(s.country) + '</text>' +
+        '<text class="qi-label" x="0" y="' + (-h - 1) + '" text-anchor="middle" fill="#8fb6cf" font-size="9.5">' + esc(s.name) + '</text>' +
+        '</g>';
+    }).join("");
+
+    return '' +
+      '<svg id="buildSvg" viewBox="0 0 900 470" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block;background:radial-gradient(120% 90% at 50% 18%, #0b3350 0%, #072438 45%, #04141f 100%);border-radius:12px">' +
+      '<defs>' +
+      '<filter id="qiGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3.2" result="b"></feGaussianBlur><feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter>' +
+      '</defs>' +
+      segPaths +
+      stationMarks +
+      '<g id="buildHead" opacity="0"><circle r="9" fill="#fff7d6" filter="url(#qiGlow)"></circle><circle r="4" fill="#ff8a3d"></circle></g>' +
+      '</svg>';
+  }
+
+  RENDER.buildanim = function () {
+    var B = window.QIBrain;
+    if (!B || !B.generateBuildSequence) return '<h2>3D Build Visualisation</h2><p class="muted">Visualisation engine unavailable.</p>';
+    var plan = B.generateBuildSequence();
+    var geo = buildAnimGeometry(plan);
+    uiState.buildAnim = { plan: plan, geo: geo, step: 0, playing: false, speed: 1, labels: true, timer: null };
+    var sm = plan.summary;
+    var stats = '<div class="grid kpis" id="buildStats" style="margin-bottom:14px">' +
+      '<div class="kpi"><div class="label">Network length</div><div class="value">' + sm.totalKm.toLocaleString() + ' km</div></div>' +
+      '<div class="kpi"><div class="label">Landing stations</div><div class="value">' + sm.totalStations + '</div></div>' +
+      '<div class="kpi"><div class="label">Cable links</div><div class="value">' + sm.totalSegments + '</div></div>' +
+      '<div class="kpi"><div class="label">Build steps</div><div class="value">' + sm.totalSteps + '</div></div>' +
+      '<div class="kpi"><div class="label">Programme</div><div class="value">' + sm.totalDurationMonths + ' mo</div></div>' +
+      '</div>';
+    var controls = '<div class="card" style="margin-bottom:14px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+      '<button class="btn" id="buildFirst" title="First">&#9198;</button>' +
+      '<button class="btn" id="buildPrev" title="Previous step">&#9664;</button>' +
+      '<button class="btn btn-primary" id="buildPlay" title="Play">&#9654; Play</button>' +
+      '<button class="btn" id="buildNext" title="Next step">&#9654;</button>' +
+      '<button class="btn" id="buildLast" title="Last">&#9197;</button>' +
+      '<label class="muted" for="buildSpeed" style="margin-left:8px">Speed</label>' +
+      '<select id="buildSpeed"><option value="0.5">0.5&times;</option><option value="1" selected>1&times;</option><option value="2">2&times;</option><option value="4">4&times;</option></select>' +
+      '<button class="btn" id="buildLabels" title="Toggle labels">Labels: On</button>' +
+      '<button class="btn" id="buildReset" title="Reset">Reset</button>' +
+      '<span style="flex:1"></span>' +
+      '<span class="muted" id="buildCounter">Step 1 / ' + sm.totalSteps + '</span>' +
+      '</div>' +
+      '<input type="range" id="buildScrubber" min="0" max="' + (sm.totalSteps - 1) + '" value="0" step="1" style="width:100%;margin-top:12px">' +
+      '</div>';
+    var stage = '<div class="card" style="padding:10px"><div id="buildStageWrap">' + buildAnimSvg(plan, geo) + '</div></div>';
+    var narration = '<div class="card" id="buildNarrationCard" style="margin-top:14px">' +
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
+      '<span class="tag" id="buildPhase">Marine Survey</span>' +
+      '<h3 id="buildTitle" style="margin:0">&nbsp;</h3></div>' +
+      '<p id="buildNarration" style="line-height:1.6;margin:10px 0 12px">&nbsp;</p>' +
+      '<div style="background:var(--border,#e2e8f0);border-radius:6px;height:10px;overflow:hidden">' +
+      '<div id="buildProgressBar" style="height:100%;width:0%;background:linear-gradient(90deg,#22d3ee,#34d399);transition:width .6s ease"></div></div>' +
+      '<div class="muted" id="buildProgressLabel" style="margin-top:6px;font-size:.85rem">0% complete &middot; 0 km laid</div>' +
+      '</div>';
+    var legend = '<div class="card" id="buildLegend" style="margin-top:14px"><h3>Legend</h3>' +
+      '<div style="display:flex;gap:18px;flex-wrap:wrap;font-size:.9rem">' +
+      '<span><span style="display:inline-block;width:22px;height:4px;background:#22d3ee;vertical-align:middle;border-radius:2px"></span> G.654.E trunk</span>' +
+      '<span><span style="display:inline-block;width:22px;height:4px;background:#a78bfa;vertical-align:middle;border-radius:2px"></span> G.652.D branch</span>' +
+      '<span><span style="display:inline-block;width:10px;height:10px;background:#f5d90a;border-radius:50%;vertical-align:middle"></span> Hub / branching station</span>' +
+      '<span><span style="display:inline-block;width:10px;height:10px;background:#38e0a6;border-radius:50%;vertical-align:middle"></span> Landing station</span>' +
+      '<span><span style="display:inline-block;width:10px;height:10px;background:#ff8a3d;border-radius:50%;vertical-align:middle"></span> Cable-lay head</span>' +
+      '</div></div>';
+    // Timeline (grouped by phase)
+    var rows = "", lastPhase = "";
+    plan.steps.forEach(function (st) {
+      if (st.phase !== lastPhase) { rows += '<div class="muted" style="font-weight:700;margin:8px 0 4px">' + esc(st.phase) + '</div>'; lastPhase = st.phase; }
+      rows += '<div class="qi-step-row" data-step="' + st.index + '" style="padding:6px 8px;border-radius:6px;cursor:pointer;font-size:.88rem">' +
+        (st.index + 1) + '. ' + esc(st.title) + '</div>';
+    });
+    var timeline = '<div class="card" id="buildTimelineCard" style="margin-top:14px"><h3>Build steps</h3>' +
+      '<div id="buildSteps" style="max-height:260px;overflow:auto">' + rows + '</div></div>';
+    var styleBlock = '<style>' +
+      '.qi-seg{transition:stroke-dashoffset .7s ease,opacity .4s ease}' +
+      '#buildHead{transition:transform .7s ease,opacity .3s ease}' +
+      '.qi-st{transition:opacity .5s ease}' +
+      '.qi-flow{stroke-dasharray:3 16 !important;animation:qiFlow 1.1s linear infinite}' +
+      '@keyframes qiFlow{to{stroke-dashoffset:-38}}' +
+      '@keyframes qiPulse{0%,100%{opacity:.95}50%{opacity:.45}}' +
+      '.qi-pulse{animation:qiPulse 2.2s ease-in-out infinite}' +
+      '.qi-step-row.active{background:rgba(34,211,238,.16);font-weight:700}' +
+      '.qi-step-row:hover{background:rgba(34,211,238,.10)}' +
+      '@media (prefers-reduced-motion: reduce){.qi-flow,.qi-pulse{animation:none}.qi-seg,#buildHead,#buildProgressBar{transition:none}}' +
+      '</style>';
+    return styleBlock +
+      '<h2 style="margin-bottom:6px">3D Build Visualisation</h2>' +
+      '<p class="muted" style="margin-bottom:14px">Watch the submarine network build itself, step by step \u2014 survey, landing stations, cable lay, splicing, testing and handover. Press Play, scrub the timeline, or click any step.</p>' +
+      stats + controls + stage +
+      '<div style="display:grid;grid-template-columns:1fr;gap:0">' + narration + timeline + legend + '</div>';
+  };
+
+  AFTER.buildanim = function () {
+    var BA = uiState.buildAnim;
+    if (!BA || !BA.plan) return;
+    var plan = BA.plan, geo = BA.geo, steps = plan.steps, n = steps.length;
+    if (BA.timer) { clearTimeout(BA.timer); BA.timer = null; }
+
+    function setAttr(id, attr, val) { var el = document.getElementById(id); if (el) el.setAttribute(attr, val); }
+
+    function applyState(idx) {
+      var rv = buildAnimReveal(plan, idx);
+      plan.scene.segments.forEach(function (g) {
+        var gg = geo.segGeo[g.id];
+        var planEl = document.getElementById("plan-" + g.id);
+        if (planEl) planEl.setAttribute("opacity", rv.surveyed[g.id] ? "0.7" : "0");
+        var frac = rv.segFrac[g.id] || 0;
+        var segEl = document.getElementById("seg-" + g.id);
+        if (segEl) {
+          segEl.setAttribute("opacity", frac > 0 ? "1" : "0");
+          segEl.setAttribute("stroke-dashoffset", (gg.len * (1 - frac)).toFixed(1));
+        }
+        var flowEl = document.getElementById("flow-" + g.id);
+        if (flowEl) {
+          if (rv.tested[g.id]) { flowEl.setAttribute("opacity", "0.85"); flowEl.setAttribute("class", "qi-flow"); }
+          else { flowEl.setAttribute("opacity", "0"); flowEl.setAttribute("class", ""); }
+        }
+      });
+      plan.scene.stations.forEach(function (s) {
+        setAttr("st-" + s.id, "opacity", rv.built[s.id] ? "1" : "0.12");
+      });
+      // print head
+      var head = document.getElementById("buildHead");
+      if (head) {
+        if (rv.head) {
+          var pt = geo.segGeo[rv.head.segId].pointAt(rv.head.frac);
+          head.setAttribute("transform", "translate(" + pt.x.toFixed(1) + "," + pt.y.toFixed(1) + ")");
+          head.setAttribute("opacity", "1");
+        } else { head.setAttribute("opacity", "0"); }
+      }
+      // labels
+      var showLabels = BA.labels;
+      var labels = document.querySelectorAll(".qi-label");
+      for (var li = 0; li < labels.length; li++) labels[li].setAttribute("opacity", showLabels ? "1" : "0");
+      // narration + chrome
+      var st = steps[idx];
+      var tEl = document.getElementById("buildTitle"); if (tEl) tEl.textContent = st.title;
+      var nEl = document.getElementById("buildNarration"); if (nEl) nEl.textContent = st.narration;
+      var pEl = document.getElementById("buildPhase"); if (pEl) pEl.textContent = st.phase;
+      var bar = document.getElementById("buildProgressBar"); if (bar) bar.style.width = st.progressPct + "%";
+      var pl = document.getElementById("buildProgressLabel");
+      if (pl) pl.textContent = st.progressPct + "% complete \u00b7 " + st.laidKm.toLocaleString() + " km laid";
+      var cnt = document.getElementById("buildCounter"); if (cnt) cnt.textContent = "Step " + (idx + 1) + " / " + n;
+      var scr = document.getElementById("buildScrubber"); if (scr && Number(scr.value) !== idx) scr.value = idx;
+      var rows = document.querySelectorAll(".qi-step-row");
+      for (var ri = 0; ri < rows.length; ri++) {
+        if (Number(rows[ri].getAttribute("data-step")) === idx) { rows[ri].classList.add("active"); if (rows[ri].scrollIntoView) rows[ri].scrollIntoView({ block: "nearest" }); }
+        else rows[ri].classList.remove("active");
+      }
+    }
+
+    function stepTo(idx) { BA.step = Math.max(0, Math.min(n - 1, idx)); applyState(BA.step); }
+
+    function stop() {
+      BA.playing = false;
+      if (BA.timer) { clearTimeout(BA.timer); BA.timer = null; }
+      var pb = document.getElementById("buildPlay"); if (pb) pb.innerHTML = "&#9654; Play";
+    }
+    function tick() {
+      if (!BA.playing) return;
+      if (BA.step >= n - 1) { stop(); return; }
+      stepTo(BA.step + 1);
+      var base = Math.max(260, Math.min(1400, (steps[BA.step].durationDays || 5) * 22));
+      BA.timer = setTimeout(tick, base / BA.speed);
+    }
+    function play() {
+      if (BA.step >= n - 1) BA.step = 0;
+      BA.playing = true;
+      var pb = document.getElementById("buildPlay"); if (pb) pb.innerHTML = "&#10073;&#10073; Pause";
+      tick();
+    }
+
+    var playBtn = document.getElementById("buildPlay");
+    if (playBtn) playBtn.addEventListener("click", function () { if (BA.playing) stop(); else play(); });
+    var bind = function (id, fn) { var el = document.getElementById(id); if (el) el.addEventListener("click", fn); };
+    bind("buildFirst", function () { stop(); stepTo(0); });
+    bind("buildPrev", function () { stop(); stepTo(BA.step - 1); });
+    bind("buildNext", function () { stop(); stepTo(BA.step + 1); });
+    bind("buildLast", function () { stop(); stepTo(n - 1); });
+    bind("buildReset", function () { stop(); stepTo(0); });
+    bind("buildLabels", function () {
+      BA.labels = !BA.labels;
+      var b = document.getElementById("buildLabels"); if (b) b.textContent = "Labels: " + (BA.labels ? "On" : "Off");
+      applyState(BA.step);
+    });
+    var spd = document.getElementById("buildSpeed");
+    if (spd) spd.addEventListener("change", function () { BA.speed = Number(spd.value) || 1; });
+    var scr = document.getElementById("buildScrubber");
+    if (scr) scr.addEventListener("input", function () { stop(); stepTo(Number(scr.value)); });
+    var stepsBox = document.getElementById("buildSteps");
+    if (stepsBox) stepsBox.addEventListener("click", function (e) {
+      var row = e.target.closest ? e.target.closest(".qi-step-row") : null;
+      if (row) { stop(); stepTo(Number(row.getAttribute("data-step"))); }
+    });
+
+    applyState(0);
   };
 
   // ---------- Training & Competency Register ----------

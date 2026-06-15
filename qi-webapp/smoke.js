@@ -1080,5 +1080,34 @@ var cpTrawl = doc.getElementById("cpTrawl");
 if (cpTrawl) { cpTrawl.value = "high"; cpTrawl.dispatchEvent(new window.Event("change", { bubbles: true })); }
 ok(doc.querySelector('.cableProtectSegTable') != null, "Cable Protection recomputes on trawling-intensity change");
 
+// 93) 3D Build Visualisation
+var buildNav = doc.querySelector('.nav-item[data-view="buildanim"]');
+ok(buildNav != null, "3D Build Visualisation nav item exists");
+if (buildNav) buildNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var buildSvg = doc.getElementById("buildSvg");
+ok(buildSvg != null && buildSvg.querySelectorAll('path[id^="seg-"]').length >= 7, "Build view renders the animated SVG scene with cable paths - got " + (buildSvg ? buildSvg.querySelectorAll('path[id^="seg-"]').length : 0));
+ok(buildSvg != null && buildSvg.querySelectorAll('g[id^="st-"]').length === 8, "Build scene renders 8 landing-station markers");
+var buildStats = doc.getElementById("buildStats");
+ok(buildStats != null && buildStats.querySelectorAll('.kpi').length >= 5, "Build view shows the stats bar (KPIs)");
+ok(doc.getElementById("buildPlay") != null && doc.getElementById("buildScrubber") != null, "Build view has play control + timeline scrubber");
+var buildRows = doc.querySelectorAll('.qi-step-row');
+ok(buildRows.length >= 40, "Build view lists every construction step in the timeline - got " + buildRows.length);
+// 94) Narration populated at step 0
+var buildTitle = doc.getElementById("buildTitle");
+ok(buildTitle != null && buildTitle.textContent.length > 0 && doc.getElementById("buildNarration").textContent.length > 0, "Build view shows step narration at start");
+// 95) Scrubber to last step -> handover + 100% progress
+var scrubber = doc.getElementById("buildScrubber");
+if (scrubber) { scrubber.value = scrubber.max; scrubber.dispatchEvent(new window.Event("input", { bubbles: true })); }
+ok(doc.getElementById("buildProgressBar").style.width === "100%", "scrubbing to the end shows 100% build progress");
+ok(/service/i.test(doc.getElementById("buildTitle").textContent), "final step narrates system ready for service");
+// 96) Step-back button decrements the counter
+var prevBtn = doc.getElementById("buildPrev");
+if (prevBtn) prevBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(/Step \d+ \/ /.test(doc.getElementById("buildCounter").textContent) && doc.getElementById("buildProgressBar").style.width !== "100%", "step-back control moves earlier in the sequence");
+// 97) Clicking a timeline row jumps to that step
+var buildFirstRow = doc.querySelector('.qi-step-row[data-step="0"]');
+if (buildFirstRow) buildFirstRow.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("buildCounter").textContent.indexOf("Step 1 /") !== -1 && buildFirstRow.classList.contains("active"), "clicking a timeline step jumps the animation to it");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

@@ -4841,6 +4841,193 @@
     };
   }
 
+  // ---------- 3D Build-Sequence Engine (animated construction visualisation) ----------
+  // Generates a deterministic, OFFLINE "scene + build sequence" that drives a
+  // 3D-printer-style animation: it shows a non-technical customer, step by step,
+  // how the submarine fibre network is physically built — marine survey, cable
+  // landing stations rising, cable being "extruded" along the seabed, splicing &
+  // branching units, OTDR testing, and final handover. Pure data only; the UI
+  // renderer turns this into the animated isometric scene.
+  //
+  // Default scene is the 8-country Asian submarine system (Indonesia, Thailand,
+  // Vietnam, Taiwan, Philippines, Guam, Malaysia, Brunei) with real landing
+  // points; callers may pass their own { stations, segments }.
+
+  function haversineKm(aLon, aLat, bLon, bLat) {
+    var R = 6371;
+    var toRad = function (d) { return d * Math.PI / 180; };
+    var dLat = toRad(bLat - aLat), dLon = toRad(bLon - aLon);
+    var s = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return Math.round(2 * R * Math.asin(Math.min(1, Math.sqrt(s))) / 10) * 10; // round to 10 km
+  }
+
+  // Real cable landing points for the 8 programme countries.
+  var DEFAULT_SUBSEA_STATIONS = [
+    { id: "MY", name: "Mersing CLS", country: "Malaysia", lon: 103.84, lat: 2.43, type: "hub" },
+    { id: "ID", name: "Jakarta CLS", country: "Indonesia", lon: 106.85, lat: -6.20, type: "landing" },
+    { id: "TH", name: "Songkhla CLS", country: "Thailand", lon: 100.60, lat: 7.20, type: "landing" },
+    { id: "BN", name: "Tungku CLS", country: "Brunei", lon: 114.92, lat: 4.98, type: "hub" },
+    { id: "VN", name: "Da Nang CLS", country: "Vietnam", lon: 108.22, lat: 16.07, type: "landing" },
+    { id: "PH", name: "Batangas CLS", country: "Philippines", lon: 121.05, lat: 13.76, type: "hub" },
+    { id: "TW", name: "Kaohsiung CLS", country: "Taiwan", lon: 120.30, lat: 22.62, type: "landing" },
+    { id: "GU", name: "Piti CLS", country: "Guam", lon: 144.69, lat: 13.46, type: "landing" }
+  ];
+  // Trunk + branch topology. cableType drives colour in the renderer.
+  var DEFAULT_SUBSEA_SEGMENTS = [
+    { id: "S1", from: "MY", to: "ID", cableType: "G.654.E", branch: true },
+    { id: "S2", from: "MY", to: "TH", cableType: "G.652.D", branch: true },
+    { id: "S3", from: "MY", to: "BN", cableType: "G.654.E", branch: false },
+    { id: "S4", from: "BN", to: "VN", cableType: "G.654.E", branch: true },
+    { id: "S5", from: "BN", to: "PH", cableType: "G.654.E", branch: false },
+    { id: "S6", from: "PH", to: "TW", cableType: "G.654.E", branch: false },
+    { id: "S7", from: "PH", to: "GU", cableType: "G.654.E", branch: false }
+  ];
+
+  function generateBuildSequence(params) {
+    params = params || {};
+    var stations = (params.stations && params.stations.length ? params.stations : DEFAULT_SUBSEA_STATIONS)
+      .map(function (s) { return { id: s.id, name: s.name, country: s.country, lon: s.lon, lat: s.lat, type: s.type || "landing" }; });
+    var stById = {};
+    stations.forEach(function (s) { stById[s.id] = s; });
+
+    var segIn = (params.segments && params.segments.length ? params.segments : DEFAULT_SUBSEA_SEGMENTS);
+    var laySegmentKm = Number(params.laySegmentKm) || 500; // km per "extrusion" increment
+    var surveyKmPerDay = 120, layKmPerDay = 150; // indicative marine productivity
+
+    // Resolve segment geometry & lengths.
+    var segments = segIn.map(function (sg) {
+      var a = stById[sg.from], b = stById[sg.to];
+      var lengthKm = (a && b) ? haversineKm(a.lon, a.lat, b.lon, b.lat) : (sg.lengthKm || 0);
+      return {
+        id: sg.id, from: sg.from, to: sg.to, cableType: sg.cableType || "G.654.E",
+        branch: !!sg.branch, lengthKm: lengthKm,
+        fromName: a ? a.name : sg.from, toName: b ? b.name : sg.to,
+        fromCountry: a ? a.country : "", toCountry: b ? b.country : ""
+      };
+    });
+
+    var totalKm = segments.reduce(function (s, g) { return s + g.lengthKm; }, 0);
+    var totalDurationDays = 0;
+    var steps = [];
+    var laidKm = 0;
+
+    function pushStep(o) {
+      o.index = steps.length;
+      o.laidKm = laidKm;
+      o.cumulativeKm = laidKm;
+      steps.push(o);
+      totalDurationDays += (o.durationDays || 0);
+    }
+
+    // PHASE 1 — Marine route survey (route appears as a planned dashed line).
+    segments.forEach(function (g) {
+      pushStep({
+        kind: "survey", phase: "Marine Survey",
+        title: "Survey route: " + g.fromCountry + " \u2192 " + g.toCountry,
+        narration: "A survey ship maps the seabed and clears the planned " + g.lengthKm.toLocaleString() +
+          " km route between " + g.fromName + " and " + g.toName + ", checking depth, hazards and existing cables before any cable is laid.",
+        segmentId: g.id,
+        durationDays: Math.max(1, Math.round(g.lengthKm / surveyKmPerDay))
+      });
+    });
+
+    // PHASE 2 — Cable landing stations rise at each shore.
+    stations.forEach(function (s) {
+      pushStep({
+        kind: "landing", phase: "Landing Stations",
+        title: "Build landing station: " + s.name,
+        narration: "The cable landing station in " + s.country + " (" + s.name +
+          ") is constructed on shore — the secure building where the undersea cable connects to the land network and power.",
+        stationId: s.id,
+        durationDays: 30
+      });
+    });
+
+    // PHASE 3 — Cable lay (extruded in increments) + PHASE 4 splice/branching at the far end.
+    segments.forEach(function (g) {
+      var nInc = Math.max(1, Math.ceil(g.lengthKm / laySegmentKm));
+      for (var i = 0; i < nInc; i++) {
+        var fromFrac = i / nInc, toFrac = (i + 1) / nInc;
+        var incKm = Math.round(g.lengthKm * (toFrac - fromFrac));
+        laidKm += incKm;
+        pushStep({
+          kind: "lay", phase: "Cable Lay",
+          title: "Lay cable: " + g.fromCountry + " \u2192 " + g.toCountry + " (" + (i + 1) + "/" + nInc + ")",
+          narration: "The cable ship pays out " + g.cableType + " fibre cable onto the seabed, section " + (i + 1) +
+            " of " + nInc + " on the " + g.fromName + "\u2013" + g.toName + " link. About " + incKm.toLocaleString() +
+            " km is laid and buried in this pass.",
+          segmentId: g.id, fromFrac: fromFrac, toFrac: toFrac, incrementKm: incKm,
+          durationDays: Math.max(1, Math.round(incKm / layKmPerDay))
+        });
+      }
+      // Splice / branching unit at the destination station.
+      pushStep({
+        kind: "splice", phase: "Splice & Branching",
+        title: (g.branch ? "Install branching unit" : "Splice & terminate") + ": " + g.toCountry,
+        narration: (g.branch
+          ? "A subsea branching unit is installed so the trunk can split toward " + g.toCountry + " — "
+          : "Technicians fusion-splice and terminate the cable at " + g.toName + " in " + g.toCountry + " — ") +
+          "joining the fibres with very low loss and sealing the joint against the deep ocean.",
+        segmentId: g.id, stationId: g.to,
+        durationDays: 4
+      });
+    });
+
+    // PHASE 5 — Testing & commissioning (OTDR light sweep per link).
+    segments.forEach(function (g) {
+      pushStep({
+        kind: "test", phase: "Test & Commission",
+        title: "Test & commission: " + g.fromCountry + " \u2192 " + g.toCountry,
+        narration: "Light is sent end-to-end and measured (OTDR + power tests) on the " + g.fromName + "\u2013" + g.toName +
+          " link to prove the fibre meets its loss budget before it carries live traffic.",
+        segmentId: g.id,
+        durationDays: 2
+      });
+    });
+
+    // PHASE 6 — Handover (whole network lit).
+    pushStep({
+      kind: "handover", phase: "Handover",
+      title: "System ready for service (RFS)",
+      narration: "The complete " + Math.round(totalKm).toLocaleString() + " km network across " + stations.length +
+        " countries is accepted and ready for service — every route lit and carrying traffic.",
+      durationDays: 5
+    });
+
+    // Global progress per step (index-based, monotonic 0..100).
+    var totalSteps = steps.length;
+    steps.forEach(function (st) {
+      st.progressPct = totalSteps > 1 ? Math.round((st.index + 1) / totalSteps * 100) : 100;
+      st.layProgressPct = totalKm > 0 ? Math.round(st.laidKm / totalKm * 100) : 0;
+    });
+
+    var phases = [];
+    steps.forEach(function (st) { if (phases.indexOf(st.phase) < 0) phases.push(st.phase); });
+    var countries = stations.map(function (s) { return s.country; });
+
+    return {
+      scene: { stations: stations, segments: segments },
+      steps: steps,
+      summary: {
+        totalSteps: totalSteps,
+        totalStations: stations.length,
+        totalSegments: segments.length,
+        totalKm: Math.round(totalKm),
+        totalDurationDays: totalDurationDays,
+        totalDurationMonths: Math.round(totalDurationDays / 30 * 10) / 10,
+        phases: phases,
+        countries: countries
+      },
+      references: [
+        "ICPC Recommendation No. 2 / No. 3 — Marine route survey & cable burial practice",
+        "ITU-T G.971 / G.977 — Submarine optical cable systems (general & design)",
+        "IEC 61280 — Fibre-optic communication subsystem test procedures (commissioning)",
+        "Deterministic offline scene generation — no project data leaves the device"
+      ]
+    };
+  }
+
   var API = {
     analyzeProject: analyzeProject,
     listProfiles: listProfiles,
@@ -4877,6 +5064,7 @@
     planWavelengths: planWavelengths,
     calcLatency: calcLatency,
     assessCableProtection: assessCableProtection,
+    generateBuildSequence: generateBuildSequence,
     COUNTRY_ENERGY_DATA: COUNTRY_ENERGY_DATA
   };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
