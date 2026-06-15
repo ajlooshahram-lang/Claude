@@ -958,5 +958,29 @@ if (trainingNav) trainingNav.dispatchEvent(new window.Event("click", { bubbles: 
 var trainingTable = doc.getElementById("trainingTable");
 ok(trainingTable != null && trainingTable.querySelectorAll('tbody tr').length >= 10, "Training table renders competency records");
 
+// 73) Capacity Dashboard
+var capacityNav = doc.querySelector('.nav-item[data-view="capacity"]');
+ok(capacityNav != null, "Capacity nav item exists");
+
+if (capacityNav) capacityNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var capacityTable = doc.getElementById("capacityTable");
+ok(capacityTable != null && capacityTable.querySelectorAll('tbody tr').length >= 6, "Capacity table renders 6 SEA segments with utilization");
+
+// 74) Incident Management
+var incidentNav = doc.querySelector('.nav-item[data-view="incidents"]');
+ok(incidentNav != null, "Incidents nav item exists");
+
+if (incidentNav) incidentNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var incidentTable = doc.getElementById("incidentTable");
+ok(incidentTable != null && incidentTable.querySelectorAll('tbody tr').length >= 5, "Incident table renders 5 submarine cable incidents");
+
+// 75) Performance Benchmarking
+var benchmarkNav = doc.querySelector('.nav-item[data-view="benchmark"]');
+ok(benchmarkNav != null, "Benchmarking nav item exists");
+
+if (benchmarkNav) benchmarkNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var benchmarkTable = doc.getElementById("benchmarkTable");
+ok(benchmarkTable != null && benchmarkTable.querySelectorAll('tbody tr').length >= 4, "Benchmark table renders metrics with industry comparison");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

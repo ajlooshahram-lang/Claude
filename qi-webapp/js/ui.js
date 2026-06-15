@@ -235,6 +235,7 @@
     { id: "capability", label: "Process Capability", icon: "◊" },
     { id: "ncrpareto", label: "NCR Pareto", icon: "▟" },
     { id: "riskheat", label: "Risk Heat Map", icon: "\uD83D\uDD25" },
+    { id: "incidents", label: "Incidents", icon: "\u26A1" },
     { id: "environmental", label: "Environmental", icon: "\uD83C\uDF0A" },
     { g: "Improve" },
     { id: "pdca", label: "PDCA", icon: "↻" },
@@ -251,6 +252,7 @@
     { id: "routeopt", label: "Route Optimizer", icon: "\uD83D\uDEE4" },
     { id: "predictive", label: "Fault Forecast", icon: "\uD83D\uDCE1" },
     { id: "digitaltwin", label: "Digital Twin", icon: "\uD83D\uDD2E" },
+    { id: "benchmark", label: "Benchmarking", icon: "\uD83C\uDFC6" },
     { id: "lessons", label: "Lessons Library", icon: "\uD83D\uDCDA" },
     { id: "ai", label: "AI Assistant", icon: "✦" },
     { id: "impact", label: "Change Impact", icon: "⇄" },
@@ -275,6 +277,7 @@
     C.REGISTERS.filter(r => r.group === "Business").forEach(r => items.push({ id: r.id, label: r.label, icon: r.icon }));
     items.push({ id: "insurance", label: "Insurance", icon: "\uD83D\uDEE1" });
     items.push({ id: "sla", label: "SLA Management", icon: "\uD83D\uDCCA" });
+    items.push({ id: "capacity", label: "Capacity", icon: "\uD83D\uDCF6" });
     const idx = VIEWS.findIndex(v => v.g === "Intelligence");
     VIEWS.splice(idx, 0, ...items);
   })();
@@ -1758,6 +1761,178 @@
       '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
 
     return '<h2 style="margin-bottom:16px">Training & Competency Register</h2>' + summaryCards + table;
+  };
+
+  // ---------- Capacity Dashboard ----------
+  RENDER.capacity = function () {
+    var segments = S.listCapacity();
+    var revenuePerLambda = 800; // $800/month estimate
+
+    var totalLambdas = 0, soldLambdas = 0, totalRevenue = 0;
+    var rows = segments.map(function (seg) {
+      var total = seg.fiberPairs * seg.wavelengthsPerPair;
+      var sold = Math.round(total * (seg.soldPercent / 100));
+      var available = total - sold;
+      var utilPct = seg.soldPercent;
+      var revenue = sold * revenuePerLambda;
+      totalLambdas += total;
+      soldLambdas += sold;
+      totalRevenue += revenue;
+
+      var barColor = utilPct < 60 ? "#27ae60" : utilPct <= 80 ? "#f39c12" : "#e74c3c";
+      var progressBar = '<div style="background:#eee;border-radius:4px;height:14px;width:120px;display:inline-block;vertical-align:middle">' +
+        '<div style="background:' + barColor + ';border-radius:4px;height:14px;width:' + Math.round(utilPct * 1.2) + 'px"></div></div>' +
+        ' <span style="color:' + barColor + ';font-weight:600">' + utilPct + '%</span>';
+
+      return '<tr>' +
+        '<td>' + esc(seg.segment) + '</td>' +
+        '<td>' + seg.fiberPairs + '</td>' +
+        '<td>' + seg.wavelengthsPerPair + '</td>' +
+        '<td>' + total + '</td>' +
+        '<td>' + sold + '</td>' +
+        '<td>' + available + '</td>' +
+        '<td>' + progressBar + '</td>' +
+        '<td>$' + revenue.toLocaleString() + '/mo</td>' +
+        '</tr>';
+    }).join('');
+
+    var availableLambdas = totalLambdas - soldLambdas;
+    var overallUtil = totalLambdas ? Math.round((soldLambdas / totalLambdas) * 100) : 0;
+
+    var summary = '<div class="grid kpis" style="margin-bottom:16px">' +
+      '<div class="kpi"><div class="label">Total Lambdas</div><div class="value">' + totalLambdas + '</div></div>' +
+      '<div class="kpi"><div class="label">Sold Lambdas</div><div class="value" style="color:#2e5496">' + soldLambdas + '</div></div>' +
+      '<div class="kpi"><div class="label">Available</div><div class="value" style="color:#27ae60">' + availableLambdas + '</div></div>' +
+      '<div class="kpi"><div class="label">Overall Utilization</div><div class="value">' + overallUtil + '%</div></div>' +
+      '<div class="kpi"><div class="label">Monthly Revenue</div><div class="value" style="color:#27ae60">$' + totalRevenue.toLocaleString() + '</div></div>' +
+      '</div>';
+
+    var table = '<div class="card"><h3>Wavelength / Lambda Utilization by Segment</h3>' +
+      '<div class="table-wrap"><table id="capacityTable"><thead><tr>' +
+      '<th>Segment</th><th>Fiber Pairs</th><th>Wavelengths/Pair</th><th>Total Lambdas</th><th>Sold</th><th>Available</th><th>Utilization</th><th>Revenue</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+
+    return '<h2 style="margin-bottom:16px">Capacity Dashboard</h2>' + summary + table;
+  };
+
+  // ---------- Incident Management ----------
+  RENDER.incidents = function () {
+    var incidents = S.listIncidents();
+
+    // Summary KPIs
+    var totalIncidents = incidents.length;
+    var totalDowntime = incidents.reduce(function (s, i) { return s + i.impactMinutes; }, 0);
+    var openIncidents = incidents.filter(function (i) { return i.status !== "Resolved"; }).length;
+    var totalMinutesInYear = 525600;
+    var uptimePct = ((totalMinutesInYear - totalDowntime) / totalMinutesInYear * 100).toFixed(3);
+    var mtbfDays = totalIncidents > 1 ? Math.round(365 / totalIncidents) : 365;
+
+    var summary = '<div class="grid kpis" style="margin-bottom:16px">' +
+      '<div class="kpi"><div class="label">Total Incidents</div><div class="value">' + totalIncidents + '</div></div>' +
+      '<div class="kpi"><div class="label">MTBF (days)</div><div class="value">' + mtbfDays + '</div></div>' +
+      '<div class="kpi"><div class="label">Uptime %</div><div class="value" style="color:#27ae60">' + uptimePct + '%</div></div>' +
+      '<div class="kpi"><div class="label">Open Incidents</div><div class="value" style="color:' + (openIncidents > 0 ? "#f39c12" : "#27ae60") + '">' + openIncidents + '</div></div>' +
+      '</div>';
+
+    // Incident table
+    var statusColor = function (s) { return s === "Resolved" ? "#27ae60" : s === "Monitoring" ? "#f39c12" : "#e74c3c"; };
+    var rows = incidents.map(function (inc) {
+      return '<tr>' +
+        '<td>' + esc(inc.date) + '</td>' +
+        '<td>' + esc(inc.segment) + '</td>' +
+        '<td>' + esc(inc.description) + '</td>' +
+        '<td>' + esc(inc.rfo) + '</td>' +
+        '<td>' + (inc.impactMinutes > 0 ? inc.impactMinutes + ' min' : 'None') + '</td>' +
+        '<td style="color:' + statusColor(inc.status) + ';font-weight:600">' + esc(inc.status) + '</td>' +
+        '<td>' + esc(inc.resolution) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    var table = '<div class="card"><h3>Incident Register</h3>' +
+      '<div class="table-wrap"><table id="incidentTable"><thead><tr>' +
+      '<th>Date</th><th>Segment</th><th>Description</th><th>RFO</th><th>Impact</th><th>Status</th><th>Resolution</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+
+    // RFO breakdown
+    var rfoCounts = {};
+    incidents.forEach(function (inc) {
+      rfoCounts[inc.rfo] = (rfoCounts[inc.rfo] || 0) + 1;
+    });
+    var rfoCategories = Object.keys(rfoCounts);
+    var rfoColors = { "External Aggression": "#e74c3c", "Equipment Failure": "#f39c12", "Natural Event": "#3498db", "Component Aging": "#9b59b6", "Human Error": "#e67e22" };
+    var totalRfo = incidents.length;
+    var rfoRows = rfoCategories.map(function (cat) {
+      var count = rfoCounts[cat];
+      var pct = Math.round((count / totalRfo) * 100);
+      var color = rfoColors[cat] || "#95a5a6";
+      var bar = '<div style="background:#eee;border-radius:4px;height:14px;width:150px;display:inline-block;vertical-align:middle">' +
+        '<div style="background:' + color + ';border-radius:4px;height:14px;width:' + Math.round(pct * 1.5) + 'px"></div></div>';
+      return '<tr><td>' + esc(cat) + '</td><td>' + count + '</td><td>' + pct + '%</td><td>' + bar + '</td></tr>';
+    }).join('');
+
+    var rfoBreakdown = '<div class="card"><h3>RFO Breakdown (Reason for Outage)</h3>' +
+      '<div class="table-wrap"><table id="rfoTable"><thead><tr><th>Category</th><th>Count</th><th>%</th><th>Distribution</th></tr></thead>' +
+      '<tbody>' + rfoRows + '</tbody></table></div></div>';
+
+    return '<h2 style="margin-bottom:16px">Incident Management</h2>' + summary + table + rfoBreakdown;
+  };
+
+  // ---------- Performance Benchmarking ----------
+  RENDER.benchmark = function () {
+    var metrics = [
+      { metric: "Faults per 1000km/year", yours: 0.3, industry: 0.5, unit: "", lowerIsBetter: true },
+      { metric: "System Availability", yours: 99.995, industry: 99.95, unit: "%", lowerIsBetter: false },
+      { metric: "Mean Time to Repair (MTTR)", yours: 27, industry: 48, unit: "hours", lowerIsBetter: true },
+      { metric: "Splice Loss Average", yours: 0.08, industry: 0.12, unit: "dB", lowerIsBetter: true }
+    ];
+
+    var aboveCount = 0, belowCount = 0, atParCount = 0;
+    var rows = metrics.map(function (m) {
+      var rating, badge, color;
+      if (m.lowerIsBetter) {
+        if (m.yours < m.industry * 0.9) { rating = "Above Average"; badge = "\uD83C\uDFC5"; color = "#27ae60"; aboveCount++; }
+        else if (m.yours > m.industry * 1.1) { rating = "Below Average"; badge = ""; color = "#e74c3c"; belowCount++; }
+        else { rating = "At Par"; badge = ""; color = "#f39c12"; atParCount++; }
+      } else {
+        if (m.yours > m.industry * 1.001) { rating = "Above Average"; badge = "\uD83C\uDFC5"; color = "#27ae60"; aboveCount++; }
+        else if (m.yours < m.industry * 0.999) { rating = "Below Average"; badge = ""; color = "#e74c3c"; belowCount++; }
+        else { rating = "At Par"; badge = ""; color = "#f39c12"; atParCount++; }
+      }
+      var yourDisplay = m.unit === "%" ? m.yours + m.unit : m.yours + (m.unit ? " " + m.unit : "");
+      var indDisplay = m.unit === "%" ? m.industry + m.unit : m.industry + (m.unit ? " " + m.unit : "");
+      return '<tr>' +
+        '<td>' + esc(m.metric) + '</td>' +
+        '<td style="font-weight:600">' + yourDisplay + '</td>' +
+        '<td>' + indDisplay + '</td>' +
+        '<td style="color:' + color + ';font-weight:600">' + badge + ' ' + rating + '</td>' +
+        '</tr>';
+    }).join('');
+
+    var overallScore = aboveCount * 3 + atParCount * 1;
+    var maxScore = metrics.length * 3;
+    var scorePct = Math.round((overallScore / maxScore) * 100);
+    var quartile = scorePct >= 75 ? "top quartile" : scorePct >= 50 ? "second quartile" : scorePct >= 25 ? "third quartile" : "bottom quartile";
+
+    var summary = '<div class="grid kpis" style="margin-bottom:16px">' +
+      '<div class="kpi"><div class="label">Above Average</div><div class="value" style="color:#27ae60">' + aboveCount + '</div></div>' +
+      '<div class="kpi"><div class="label">At Par</div><div class="value" style="color:#f39c12">' + atParCount + '</div></div>' +
+      '<div class="kpi"><div class="label">Below Average</div><div class="value" style="color:#e74c3c">' + belowCount + '</div></div>' +
+      '<div class="kpi"><div class="label">Overall Score</div><div class="value">' + scorePct + '%</div></div>' +
+      '</div>';
+
+    var table = '<div class="card"><h3>Performance vs Industry Averages (ICPC Annual Reports)</h3>' +
+      '<div class="table-wrap"><table id="benchmarkTable"><thead><tr>' +
+      '<th>Metric</th><th>Your System</th><th>Industry Average</th><th>Rating</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+
+    var scoreCard = '<div class="card" style="text-align:center;padding:20px">' +
+      '<h3>Overall Performance Rating</h3>' +
+      '<p style="font-size:1.4em;margin:12px 0">\uD83C\uDFC6 Your system ranks in the <strong>' + quartile + '</strong></p>' +
+      '<p style="color:#666">Score: ' + overallScore + '/' + maxScore + ' (' + scorePct + '%) based on ' + metrics.length + ' key metrics from ICPC benchmarking data</p>' +
+      '<div style="margin-top:12px">' + (aboveCount === metrics.length ? '<span style="background:#27ae60;color:#fff;padding:6px 16px;border-radius:20px;font-weight:700">Best in Class</span>' : '') + '</div>' +
+      '</div>';
+
+    return '<h2 style="margin-bottom:16px">Performance Benchmarking</h2>' + summary + table + scoreCard;
   };
 
   // ---------- Permit Tracker ----------

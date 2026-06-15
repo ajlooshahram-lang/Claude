@@ -1005,6 +1005,29 @@
     ];
   }
 
+  // ---------- Incident Management ----------
+  function listIncidents() {
+    return [
+      { id: "inc-1", date: "2026-02-14", segment: "SEA-2", description: "Anchor strike - bulk carrier MV Pacific Fortune dragged anchor in anchorage zone", rfo: "External Aggression", impactMinutes: 342, status: "Resolved", resolution: "Emergency splice repair, reroute via protection path, full restoration in 5.7 hours" },
+      { id: "inc-2", date: "2026-04-03", segment: "SEA-4", description: "Power feed equipment alarm - PFE voltage fluctuation at CLS Bangkok", rfo: "Equipment Failure", impactMinutes: 78, status: "Resolved", resolution: "Redundant PFE switchover, faulty module replaced during maintenance window" },
+      { id: "inc-3", date: "2025-11-22", segment: "SEA-1", description: "Fishing trawler bottom-trawl net entanglement near Batam approach", rfo: "External Aggression", impactMinutes: 520, status: "Resolved", resolution: "Cable ship mobilized from Singapore depot, disentanglement and inspection complete" },
+      { id: "inc-4", date: "2025-08-09", segment: "SEA-6", description: "Seabed movement detected via DTS monitoring - lateral displacement 2.3m", rfo: "Natural Event", impactMinutes: 0, status: "Monitoring", resolution: "No service impact, scheduled survey for next maintenance window, route re-profiling planned" },
+      { id: "inc-5", date: "2026-01-18", segment: "SEA-3", description: "Amplifier degradation - EDFA output power drop 1.8dB at repeater RP-31", rfo: "Component Aging", impactMinutes: 0, status: "Scheduled Repair", resolution: "Compensated via gain equalization, repeater replacement planned Q3 2026" }
+    ];
+  }
+
+  // ---------- Capacity Dashboard ----------
+  function listCapacity() {
+    return [
+      { segment: "SEA-1", fiberPairs: 8, wavelengthsPerPair: 120, soldPercent: 45 },
+      { segment: "SEA-2", fiberPairs: 6, wavelengthsPerPair: 120, soldPercent: 30 },
+      { segment: "SEA-3", fiberPairs: 4, wavelengthsPerPair: 120, soldPercent: 15 },
+      { segment: "SEA-4", fiberPairs: 6, wavelengthsPerPair: 120, soldPercent: 55 },
+      { segment: "SEA-5", fiberPairs: 8, wavelengthsPerPair: 120, soldPercent: 72 },
+      { segment: "SEA-6", fiberPairs: 4, wavelengthsPerPair: 120, soldPercent: 25 }
+    ];
+  }
+
   const API = { uid, seed, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
     undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete, togglePin, reorderPin,
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
@@ -1020,7 +1043,7 @@
     addWorkflow, listWorkflows, deleteWorkflow, startWorkflowInstance, advanceWorkflow, rejectWorkflow, getWorkflowStatus,
     listSpares, updateSpare, insuranceRegistry, environmentalCompliance,
     addPermit, listPermits, updatePermit,
-    listSLAs, listTrainingRecords };
+    listSLAs, listTrainingRecords, listIncidents, listCapacity };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);
