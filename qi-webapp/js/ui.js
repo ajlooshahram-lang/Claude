@@ -220,6 +220,7 @@
     { id: "repair", label: "Repair Planning", icon: "🔧" },
     { id: "portfolio", label: "Portfolio", icon: "▣" },
     { id: "dashboard", label: "Dashboard", icon: "▤" },
+    { id: "progreport", label: "Programme Report", icon: "\uD83D\uDCCA" },
     { id: "cases", label: "Cases (Master)", icon: "★" },
     { g: "Delivery" },
     { id: "permits", label: "Permit Tracker", icon: "⏱" },
@@ -2040,6 +2041,48 @@
       var el = document.getElementById(id);
       if (el) el.addEventListener("change", recompute);
     });
+  };
+
+  // ---------- Programme Status Report (executive / lender) ----------
+  function progRagColor(r) { return r === "Green" ? "#1e7e34" : r === "Amber" ? "#e0a800" : "#c0392b"; }
+  RENDER.progreport = function () {
+    var B = window.QIBrain;
+    if (!B || !B.programmeStatusReport) return '<h2>Programme Report</h2><p class="muted">Reporting engine unavailable.</p>';
+    var r = B.programmeStatusReport();
+    var k = r.kpis;
+    var rc = progRagColor(r.rag);
+    var banner = '<div class="card" id="progBanner" style="border-left:6px solid ' + rc + ';margin-bottom:14px">' +
+      '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">' +
+      '<span style="display:inline-block;min-width:90px;text-align:center;background:' + rc + ';color:#fff;font-weight:800;padding:8px 14px;border-radius:8px;font-size:1.1rem">' + r.rag.toUpperCase() + '</span>' +
+      '<div><div style="font-weight:700;font-size:1.05rem">$1.3B Asia Submarine Fibre Programme &mdash; Monthly Status</div>' +
+      '<div class="muted">' + k.physicalPct + '% physical complete &middot; ' + k.schedule + ' (' + (k.scheduleVariancePct > 0 ? "+" : "") + k.scheduleVariancePct + '%) &middot; ' + k.disbursedPct + '% disbursed &middot; ' + k.countries + ' countries</div></div>' +
+      '</div></div>';
+    var money = function (v) { return Math.abs(v) >= 1e9 ? "$" + (v / 1e9).toFixed(2) + "B" : "$" + (v / 1e6).toFixed(1) + "M"; };
+    var kpis = '<div class="grid kpis" id="progKpis" style="margin-bottom:14px">' +
+      '<div class="kpi"><div class="label">Physical complete</div><div class="value">' + k.physicalPct + '%</div></div>' +
+      '<div class="kpi"><div class="label">Cable laid</div><div class="value">' + k.kmLaid.toLocaleString() + ' km</div></div>' +
+      '<div class="kpi"><div class="label">Disbursed</div><div class="value">' + k.disbursedPct + '%</div></div>' +
+      '<div class="kpi"><div class="label">Revised contract</div><div class="value">' + money(k.revisedContractUsd) + '</div></div>' +
+      '<div class="kpi"><div class="label">Open hold points</div><div class="value">' + k.holdPoints + '</div></div>' +
+      '<div class="kpi"><div class="label">Forecast to complete</div><div class="value">' + money(k.forecastToCompleteUsd) + '</div></div>' +
+      '</div>';
+    var sec = r.sections;
+    var sectionCards = '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px">' +
+      '<div class="card" style="flex:1;min-width:210px"><h3>Route progress</h3><p style="margin:0;line-height:1.8">Complete: <strong>' + sec.progress.complete + '</strong> / ' + sec.progress.total + '<br>In progress: <strong>' + sec.progress.inProgress + '</strong><br>Not started: <strong>' + sec.progress.notStarted + '</strong></p></div>' +
+      '<div class="card" style="flex:1;min-width:210px"><h3>Finance</h3><p style="margin:0;line-height:1.8">Disbursed: <strong>' + sec.finance.disbursedPct + '%</strong><br>Retention held: <strong>' + money(sec.finance.retentionHeldUsd) + '</strong><br>Advance: <strong>' + money(sec.finance.advanceUsd) + '</strong></p></div>' +
+      '<div class="card" style="flex:1;min-width:210px"><h3>Contract variations</h3><p style="margin:0;line-height:1.8">Approved: <strong>' + money(sec.contract.approvedUsd) + '</strong><br>Pending: <strong>' + money(sec.contract.pendingUsd) + '</strong><br>Rejected: <strong>' + money(sec.contract.rejectedUsd) + '</strong></p></div>' +
+      '<div class="card" style="flex:1;min-width:210px"><h3>Quality (ITP)</h3><p style="margin:0;line-height:1.8">Hold points: <strong>' + sec.quality.holdPoints + '</strong><br>Witness points: <strong>' + sec.quality.witnessPoints + '</strong><br>Total ITP items: <strong>' + sec.quality.totalItp + '</strong></p></div>' +
+      '</div>';
+    var alertRows = r.alerts.map(function (a) {
+      var ac = progRagColor(a.level);
+      return '<li style="margin-bottom:6px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + ac + ';margin-right:8px"></span>' + esc(a.text) + '</li>';
+    }).join("");
+    var alerts = '<div class="card" id="progAlerts"><h3>Exceptions &amp; Alerts</h3><ul style="margin:0;padding-left:6px;list-style:none">' + alertRows + '</ul></div>';
+    var refs = '<div class="card" id="progRefs"><h3>Basis</h3><ul style="margin:0;padding-left:20px">' + r.references.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' +
+      '<p class="muted" style="margin-top:8px">Auto-composed from the Route Progress, Disbursement, Contracts, ITP and Build engines. Open those views for detail.</p></div>';
+    return '<h2 style="margin-bottom:6px">Programme Status Report</h2>' +
+      '<p class="muted" style="margin-bottom:14px">Board &amp; lender monthly snapshot &mdash; an at-a-glance RAG roll-up across progress, finance, contracts, quality and risk.</p>' +
+      banner + kpis + sectionCards + alerts + refs;
   };
 
   // ---------- Route Progress Tracker ----------

@@ -5413,6 +5413,79 @@
     };
   }
 
+  // ---------- Programme Status Report (executive / monthly lender report) ----------
+  // Deterministic one-page roll-up that composes the route-progress, disbursement,
+  // contract-variation, ITP-quality and risk engines into a single board/lender
+  // snapshot with an overall RAG status and an alert list. Everything it reads is
+  // deterministic, so the report is reproducible.
+  function programmeStatusReport(params) {
+    params = params || {};
+    var route = routeProgress(params.route || {});
+    var disb = disbursementForecast(params.disbursement || {});
+    var vary = variationImpact(params.contract || {});
+    var itp = generateITP();
+    var build = generateBuildSequence(params.network || {});
+    var countries = (listCountries() || []).length;
+
+    var physicalPct = route.summary.overallPct;
+    var scheduleVariance = route.summary.variancePct;
+    var schedule = route.summary.schedule;
+    var disbursedPct = disb.lenderReport.disbursedPct;
+    var costChangePct = vary.summary.pctChange;
+    var pendingExposurePct = vary.summary.exposurePct - vary.summary.pctChange; // pending-only share
+    if (pendingExposurePct < 0) pendingExposurePct = 0;
+    pendingExposurePct = Math.round(pendingExposurePct * 10) / 10;
+
+    // Overall RAG.
+    var rag = "Green";
+    if ((schedule === "Behind" && scheduleVariance <= -10) || costChangePct > 5) rag = "Red";
+    else if (schedule === "Behind" || costChangePct > 2 || (disbursedPct - physicalPct) > 15) rag = "Amber";
+
+    // Alerts (most material first).
+    var alerts = [];
+    if (schedule === "Behind") alerts.push({ level: scheduleVariance <= -10 ? "Red" : "Amber", text: "Schedule: " + Math.abs(scheduleVariance) + "% behind the planned baseline (" + physicalPct + "% vs " + route.summary.plannedPct + "%)." });
+    if (route.summary.segmentsNotStarted > 0) alerts.push({ level: "Amber", text: route.summary.segmentsNotStarted + " route segment(s) not yet started." });
+    if (vary.summary.pendingVariationsUsd > 0) alerts.push({ level: "Amber", text: "Variations: " + (vary.summary.pendingVariationsUsd / 1e6).toFixed(1) + "M USD pending assessment (" + pendingExposurePct + "% exposure)." });
+    if (costChangePct > 2) alerts.push({ level: costChangePct > 5 ? "Red" : "Amber", text: "Approved variations have grown the contract sum by " + costChangePct + "%." });
+    if (disbursedPct - physicalPct > 10) alerts.push({ level: "Amber", text: "Disbursement (" + disbursedPct + "%) is ahead of physical progress (" + physicalPct + "%) — verify valuation." });
+    if (!alerts.length) alerts.push({ level: "Green", text: "No material exceptions — programme within thresholds." });
+
+    return {
+      rag: rag,
+      generatedAt: new Date().toISOString(),
+      kpis: {
+        physicalPct: physicalPct,
+        schedule: schedule,
+        scheduleVariancePct: scheduleVariance,
+        kmLaid: route.summary.kmLaid,
+        totalKm: route.summary.totalKm,
+        disbursedPct: disbursedPct,
+        disbursedUsd: disb.lenderReport.disbursedToDateUsd,
+        forecastToCompleteUsd: disb.lenderReport.forecastToCompleteUsd,
+        originalContractUsd: vary.summary.originalContractSumUsd,
+        revisedContractUsd: vary.summary.revisedContractSumUsd,
+        contractChangePct: costChangePct,
+        pendingVariationsUsd: vary.summary.pendingVariationsUsd,
+        holdPoints: itp.summary.holdPoints,
+        ncrTriggerPoints: itp.summary.ncrTriggers,
+        countries: countries,
+        buildSteps: build.summary.totalSteps
+      },
+      sections: {
+        progress: { complete: route.summary.segmentsComplete, inProgress: route.summary.segmentsInProgress, notStarted: route.summary.segmentsNotStarted, total: route.summary.totalSegments },
+        finance: { disbursedPct: disbursedPct, retentionHeldUsd: disb.summary.totalRetentionUsd, advanceUsd: disb.summary.advanceUsd },
+        contract: { approvedUsd: vary.summary.approvedVariationsUsd, pendingUsd: vary.summary.pendingVariationsUsd, rejectedUsd: vary.summary.rejectedVariationsUsd },
+        quality: { holdPoints: itp.summary.holdPoints, witnessPoints: itp.summary.witnessPoints, totalItp: itp.summary.total }
+      },
+      alerts: alerts,
+      references: [
+        "Lender monthly progress report — physical %, disbursement, variations, quality status",
+        "EVM (PMI/ISO 21508) — physical % complete underpins SPI/CPI",
+        "Composed from the route, disbursement, contract, ITP and build engines"
+      ]
+    };
+  }
+
   var API = {
     analyzeProject: analyzeProject,
     listProfiles: listProfiles,
@@ -5437,6 +5510,7 @@
     variationImpact: variationImpact,
     generateITP: generateITP,
     routeProgress: routeProgress,
+    programmeStatusReport: programmeStatusReport,
     checkAlerts: checkAlerts,
     monteCarloSchedule: monteCarloSchedule,
     monteCarloCost: monteCarloCost,

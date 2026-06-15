@@ -1210,5 +1210,17 @@ var rpPlanned = doc.getElementById("rpPlanned");
 if (rpPlanned) { rpPlanned.value = "35"; rpPlanned.dispatchEvent(new window.Event("input", { bubbles: true })); }
 ok(/Ahead/.test(doc.getElementById("rpKpis").innerHTML), "lowering the planned baseline to 35% flips the verdict to Ahead");
 
+// 111) Programme Status Report (executive)
+var progNav = doc.querySelector('.nav-item[data-view="progreport"]');
+ok(progNav != null, "Programme Report nav item exists");
+if (progNav) progNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var progBanner = doc.getElementById("progBanner");
+ok(progBanner != null && /RED|AMBER|GREEN/.test(progBanner.textContent), "Programme Report shows the RAG banner");
+var progKpis = doc.getElementById("progKpis");
+ok(progKpis != null && progKpis.querySelectorAll('.kpi').length >= 6, "Programme Report shows the executive KPI grid");
+var progAlerts = doc.getElementById("progAlerts");
+ok(progAlerts != null && progAlerts.querySelectorAll('li').length >= 1, "Programme Report shows the exceptions/alerts list");
+ok(progAlerts != null && /behind/i.test(progAlerts.textContent), "Programme Report alert flags the schedule slippage");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

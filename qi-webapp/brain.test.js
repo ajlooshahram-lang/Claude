@@ -1810,5 +1810,28 @@ console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
   ok(JSON.stringify(r) === JSON.stringify(B.routeProgress()), "route progress is deterministic");
 })();
 
+// ===== Programme Status Report (executive composition) =====
+(function () {
+  console.log("\n--- Programme Status Report ---");
+  var r = B.programmeStatusReport();
+  ok(["Green", "Amber", "Red"].indexOf(r.rag) >= 0, "produces an overall RAG status (" + r.rag + ")");
+  ok(r.rag === "Red", "default scenario is Red (14.9% behind + disbursement ahead of physical)");
+  var k = r.kpis;
+  ok(k.physicalPct === 40.1 && k.totalKm === 9080, "physical % and total km roll up from route progress");
+  ok(k.disbursedPct > 0 && k.revisedContractUsd === 428300000, "finance KPIs roll up from disbursement & contracts");
+  ok(k.holdPoints === 7 && k.countries === 8 && k.buildSteps === 52, "quality/country/build KPIs roll up from their engines");
+  ok(Array.isArray(r.alerts) && r.alerts.length >= 1 && r.alerts.every(function (a) { return a.level && a.text; }), "produces an alert list with level + text");
+  ok(r.alerts.some(function (a) { return /behind/i.test(a.text); }), "flags the schedule slippage");
+  ok(r.alerts.some(function (a) { return /ahead of physical/i.test(a.text); }), "flags disbursement running ahead of physical progress");
+  ok(r.sections.progress && r.sections.finance && r.sections.contract && r.sections.quality, "report has progress/finance/contract/quality sections");
+  // Green path when ahead of a low baseline
+  var g = B.programmeStatusReport({ route: { plannedPct: 35 } });
+  ok(g.rag === "Green" && g.kpis.schedule === "Ahead", "ahead of a 35% baseline yields a Green status");
+  // Red path on cost blow-out
+  var red = B.programmeStatusReport({ contract: { contractSumUsd: 100000000 } });
+  ok(red.kpis.contractChangePct > 5 && red.rag === "Red", "a large variation:contract ratio (>5%) forces Red");
+  ok(JSON.stringify(r.kpis) === JSON.stringify(B.programmeStatusReport().kpis), "report KPIs are deterministic");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);
