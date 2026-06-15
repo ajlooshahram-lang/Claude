@@ -282,7 +282,7 @@
     items.push({ id: "protection", label: "Protection Zones", icon: "\uD83D\uDEA7" });
     items.push({ id: "cableprotect", label: "Cable Protection", icon: "\uD83D\uDEE1" });
     items.push({ id: "commissioning", label: "Commissioning", icon: "\u2705" });
-    items.push({ g: "Business" }, { id: "evm", label: "Earned Value (EVM)", icon: "∑" }, { id: "cashflow", label: "Cash Flow / S-curve", icon: "〽" }, { id: "disbursement", label: "Disbursement / Lender", icon: "\uD83C\uDFE6" }, { id: "prioritise", label: "Prioritisation (RICE/WSJF)", icon: "⤒" });
+    items.push({ g: "Business" }, { id: "evm", label: "Earned Value (EVM)", icon: "∑" }, { id: "cashflow", label: "Cash Flow / S-curve", icon: "〽" }, { id: "disbursement", label: "Disbursement / Lender", icon: "\uD83C\uDFE6" }, { id: "contracts", label: "Contracts & Variations", icon: "\uD83D\uDCDC" }, { id: "prioritise", label: "Prioritisation (RICE/WSJF)", icon: "⤒" });
     C.REGISTERS.filter(r => r.group === "Business").forEach(r => items.push({ id: r.id, label: r.label, icon: r.icon }));
     items.push({ id: "insurance", label: "Insurance", icon: "\uD83D\uDEE1" });
     items.push({ id: "sla", label: "SLA Management", icon: "\uD83D\uDCCA" });
@@ -2340,6 +2340,90 @@
     });
 
     applyState(0);
+  };
+
+  // ---------- Contract & Variation Hub (NEC4 / FIDIC) ----------
+  function ctrStatusColor(b) {
+    return b === "approved" ? "var(--green,#1e7e34)" : b === "rejected" ? "var(--red,#c0392b)" : "var(--gold,#e0a800)";
+  }
+  function ctrResultsHtml(vi) {
+    if (!vi) return '<div class="muted">Contract engine unavailable.</div>';
+    var s = vi.summary;
+    var changeColor = s.pctChange > 5 ? "var(--red,#c0392b)" : s.pctChange > 0 ? "var(--gold,#e0a800)" : "var(--green,#1e7e34)";
+    var kpis = '<div class="grid kpis" id="ctrKpis" style="margin-bottom:14px">' +
+      '<div class="kpi"><div class="label">Original contract sum</div><div class="value">' + disbUsd(s.originalContractSumUsd) + '</div></div>' +
+      '<div class="kpi"><div class="label">Approved variations</div><div class="value" style="color:' + changeColor + '">' + disbUsd(s.approvedVariationsUsd) + ' (+' + s.pctChange + '%)</div></div>' +
+      '<div class="kpi"><div class="label">Revised contract sum</div><div class="value">' + disbUsd(s.revisedContractSumUsd) + '</div></div>' +
+      '<div class="kpi"><div class="label">Pending exposure</div><div class="value">' + disbUsd(s.pendingVariationsUsd) + ' (' + s.exposurePct + '%)</div></div>' +
+      '<div class="kpi"><div class="label">Approved time impact</div><div class="value">' + s.approvedTimeImpactDays + ' days</div></div>' +
+      '</div>';
+    var rows = vi.variations.map(function (v) {
+      return '<tr><td><strong>' + esc(v.ref) + '</strong></td><td>' + esc(v.title) + '</td>' +
+        '<td>' + esc(v.form) + ' ' + esc(v.clause) + '</td><td class="right">' + disbUsd(v.valueUsd) + '</td>' +
+        '<td style="color:' + ctrStatusColor(v._bucket) + ';font-weight:600">' + esc(v.status) + '</td>' +
+        '<td class="right">' + (v.timeImpactDays ? "+" + v.timeImpactDays + "d" : "&mdash;") + '</td></tr>';
+    }).join("");
+    var table = '<div class="card"><h3>Variations &amp; Compensation Events <span class="tag">' + s.total + ' items</span></h3>' +
+      '<div class="table-wrap"><table class="ctrVarTable"><thead><tr><th>Ref</th><th>Title</th><th>Form / Clause</th><th class="right">Value</th><th>Status</th><th class="right">Time</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<p class="muted" style="margin-top:8px">Approved ' + s.counts.approved + ' &middot; Pending ' + s.counts.pending + ' &middot; Rejected ' + s.counts.rejected + ' &middot; Retention on revised sum ' + disbUsd(s.retentionOnRevisedUsd) + '</p></div>';
+    var refs = '<div class="card" id="ctrRefs"><h3>Contract Basis</h3><ul style="margin:0;padding-left:20px">' + vi.references.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul></div>';
+    return kpis + table + refs;
+  }
+  function ctrTemplatesHtml(form) {
+    var B = window.QIBrain;
+    var filter = (form && form !== "all") ? { contractForm: form } : {};
+    var tpls = B.getContractTemplates(filter);
+    var rows = tpls.map(function (t) {
+      return '<tr><td><strong>' + esc(t.name) + '</strong></td><td>' + esc(t.contractForm) + '</td><td>' + esc(t.clause || "") + '</td>' +
+        '<td>' + esc(t.purpose || "") + '</td><td>' + esc(t.whenToUse || "") + '</td></tr>';
+    }).join("");
+    return '<div class="table-wrap"><table class="ctrTemplateTable"><thead><tr><th>Template</th><th>Form</th><th>Clause</th><th>Purpose</th><th>When to use</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+  RENDER.contracts = function () {
+    var B = window.QIBrain;
+    if (!B || !B.variationImpact) return '<h2>Contracts &amp; Variations</h2><p class="muted">Contract engine unavailable.</p>';
+    uiState.contractsView = { form: "all" };
+    var vi = B.variationImpact();
+    var optSel = function (vals, sel, fmt) { return vals.map(function (v) { return '<option value="' + v + '"' + (v === sel ? ' selected' : '') + '>' + (fmt ? fmt(v) : v) + '</option>'; }).join(""); };
+    var form = '<div class="card" style="margin-bottom:14px"><h3>Contract package</h3>' +
+      '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Contract sum</span><select id="ctrSum">' + optSel([200000000, 420000000, 650000000, 1300000000], 420000000, function (v) { return "$" + (v / 1e6).toFixed(0) + "M"; }) + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Retention</span><select id="ctrRet">' + optSel([0, 5, 10], 5, function (v) { return v + "%"; }) + '</select></label>' +
+      '</div></div>';
+    var clauses = B.listClauses();
+    var clauseRows = clauses.map(function (c) {
+      return '<tr><td>' + esc(c.form) + '</td><td>' + esc(c.number) + '</td><td><strong>' + esc(c.title) + '</strong></td><td>' + esc(c.submarineRelevance || c.summary || "") + '</td></tr>';
+    }).join("");
+    var templatesCard = '<div class="card"><h3>NEC4 / FIDIC template letters &amp; notices</h3>' +
+      '<div id="ctrFormFilter" style="margin-bottom:8px">' +
+      ['all', 'NEC4', 'FIDIC'].map(function (f) { return '<button class="btn ctr-form-btn' + (f === 'all' ? ' btn-primary' : '') + '" data-form="' + f + '" style="margin:2px">' + (f === 'all' ? 'All' : f) + '</button>'; }).join("") +
+      '</div><div id="ctrTemplates">' + ctrTemplatesHtml("all") + '</div></div>';
+    var clauseCard = '<div class="card" id="ctrClauses"><h3>Clause reference library <span class="tag">' + clauses.length + ' clauses</span></h3>' +
+      '<div class="table-wrap" style="max-height:320px;overflow:auto"><table class="ctrClauseTable"><thead><tr><th>Form</th><th>Clause</th><th>Title</th><th>Submarine relevance</th></tr></thead><tbody>' + clauseRows + '</tbody></table></div></div>';
+    return '<h2 style="margin-bottom:6px">Contracts &amp; Variations</h2>' +
+      '<p class="muted" style="margin-bottom:14px">NEC4 compensation events &amp; FIDIC variations: revised contract sum, retention and time impact, with the template letters and clause library for the submarine programme.</p>' +
+      form + '<div id="ctrResults">' + ctrResultsHtml(vi) + '</div>' + templatesCard + clauseCard;
+  };
+  AFTER.contracts = function () {
+    var B = window.QIBrain;
+    if (!B || !B.variationImpact) return;
+    function recompute() {
+      var vi = B.variationImpact({
+        contractSumUsd: Number(document.getElementById("ctrSum").value),
+        retentionPct: Number(document.getElementById("ctrRet").value)
+      });
+      document.getElementById("ctrResults").innerHTML = ctrResultsHtml(vi);
+    }
+    ["ctrSum", "ctrRet"].forEach(function (id) { var el = document.getElementById(id); if (el) el.addEventListener("change", recompute); });
+    var ff = document.getElementById("ctrFormFilter");
+    if (ff) ff.addEventListener("click", function (e) {
+      var btn = e.target.closest ? e.target.closest(".ctr-form-btn") : null;
+      if (!btn) return;
+      var form = btn.getAttribute("data-form");
+      document.getElementById("ctrTemplates").innerHTML = ctrTemplatesHtml(form);
+      var btns = ff.querySelectorAll(".ctr-form-btn");
+      for (var i = 0; i < btns.length; i++) { if (btns[i].getAttribute("data-form") === form) btns[i].classList.add("btn-primary"); else btns[i].classList.remove("btn-primary"); }
+    });
   };
 
   // ---------- Multi-Currency Disbursement & Lender Reporting ----------

@@ -1743,5 +1743,28 @@ console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
   ok(JSON.stringify(r.risks) === JSON.stringify(B.analyzeProject("Submarine fibre cable landing in Indonesia, Philippines and Taiwan, 3000 km route, marine survey, OTDR, splicing").risks), "country risks are deterministic");
 })();
 
+// ===== Contract Variation / Compensation-Event impact engine =====
+(function () {
+  console.log("\n--- Contract & Variation engine ---");
+  var r = B.variationImpact();
+  var s = r.summary;
+  ok(s.originalContractSumUsd === 420000000, "defaults to a $420M contract package");
+  ok(s.approvedVariationsUsd === 8300000, "approved variations total $8.3M (3.2M + 5.1M)");
+  ok(s.revisedContractSumUsd === s.originalContractSumUsd + s.approvedVariationsUsd, "revised sum = original + approved variations");
+  ok(s.pctChange === 2, "approved change is +2% of contract sum");
+  ok(s.pendingVariationsUsd === 10900000 && s.rejectedVariationsUsd === 1800000, "pending $10.9M and rejected $1.8M are tracked separately");
+  ok(s.counts.approved === 2 && s.counts.pending === 2 && s.counts.rejected === 1, "status breakdown: 2 approved / 2 pending / 1 rejected");
+  ok(s.approvedTimeImpactDays === 32, "approved time impact = 32 days (12 + 20)");
+  ok(s.retentionOnRevisedUsd === Math.round(s.revisedContractSumUsd * 0.05), "retention computed on the revised contract sum");
+  ok(r.variations.every(function (v) { return v._bucket; }), "each variation is bucketed by status");
+  ok(JSON.stringify(r) === JSON.stringify(B.variationImpact()), "variation impact is deterministic");
+  var c = B.variationImpact({ contractSumUsd: 1300000000, retentionPct: 10 });
+  ok(c.summary.originalContractSumUsd === 1300000000 && c.summary.retentionOnRevisedUsd === Math.round(c.summary.revisedContractSumUsd * 0.10), "custom contract sum + 10% retention honoured");
+  ok(r.references.some(function (x) { return /FIDIC/.test(x); }) && r.references.some(function (x) { return /NEC4/.test(x); }), "references cite FIDIC cl.13 and NEC4 compensation events");
+  // Clause + template accessors
+  ok(B.listClauses().length === 27 && B.listClauses("NEC4").length === 18 && B.listClauses("FIDIC").length === 9, "listClauses returns 27 clauses (18 NEC4 / 9 FIDIC)");
+  ok(B.getContractTemplates({ contractForm: "NEC4" }).length >= 10 && B.getContractTemplates({ contractForm: "FIDIC" }).length >= 10, "template library filters by contract form");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);

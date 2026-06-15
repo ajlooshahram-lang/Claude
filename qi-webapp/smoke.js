@@ -1161,5 +1161,24 @@ var brainOut2 = doc.getElementById("brainOut").innerHTML;
 ok(/natural-hazard|geographical/.test(brainOut2), "Brain risk table includes country geographical/natural-hazard risks");
 ok(/geopolitical/.test(brainOut2), "Brain risk table includes country geopolitical risks");
 
+// 104) Contracts & Variations Hub
+var ctrNav = doc.querySelector('.nav-item[data-view="contracts"]');
+ok(ctrNav != null, "Contracts & Variations nav item exists");
+if (ctrNav) ctrNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var ctrKpis = doc.getElementById("ctrKpis");
+ok(ctrKpis != null && ctrKpis.querySelectorAll('.kpi').length >= 5, "Contracts view shows variation KPI cards");
+var ctrVar = doc.querySelector('.ctrVarTable');
+ok(ctrVar != null && ctrVar.querySelectorAll('tbody tr').length === 5, "Contracts view lists the 5 variations/compensation events");
+var ctrClause = doc.querySelector('.ctrClauseTable');
+ok(ctrClause != null && ctrClause.querySelectorAll('tbody tr').length === 27, "Contracts view shows the 27-clause reference library");
+// 105) Template form filter (FIDIC) updates the template table
+var fidicBtn = doc.querySelector('.ctr-form-btn[data-form="FIDIC"]');
+if (fidicBtn) fidicBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector('.ctrTemplateTable').querySelectorAll('tbody tr').length >= 10 && fidicBtn.classList.contains("btn-primary"), "filtering templates to FIDIC updates the table and highlights the button");
+// 106) Recompute on contract sum change
+var ctrSum = doc.getElementById("ctrSum");
+if (ctrSum) { ctrSum.value = "1300000000"; ctrSum.dispatchEvent(new window.Event("change", { bubbles: true })); }
+ok(doc.getElementById("ctrKpis").innerHTML.indexOf("1.30B") !== -1, "changing the contract sum to $1.3B recomputes the KPIs");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

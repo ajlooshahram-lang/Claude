@@ -2282,6 +2282,85 @@
     return null;
   }
 
+  // List the whole clause-reference library (with its key), optionally filtered
+  // by contract form inferred from the key prefix (NEC4-* / FIDIC-*).
+  function listClauses(form) {
+    var ref = fibreProfile.CLAUSE_REFERENCE || {};
+    var f = form ? norm(form) : null;
+    return Object.keys(ref).map(function (k) {
+      var o = ref[k];
+      var src = /^nec4/i.test(k) ? "NEC4" : (/^fidic/i.test(k) ? "FIDIC" : "BOTH");
+      return { key: k, form: src, number: o.number, title: o.title, summary: o.summary, submarineRelevance: o.submarineRelevance };
+    }).filter(function (c) { return !f || norm(c.form) === f; });
+  }
+
+  // ---- Contract Variation / Compensation-Event impact engine --------------
+  // Deterministic assessment of variations (FIDIC cl.13) / compensation events
+  // (NEC4 cl.60) against a contract package: revised contract sum, retention
+  // impact, time impact and status breakdown. Ships with submarine-realistic
+  // sample variations so it renders out of the box; callers may pass their own.
+  var SAMPLE_VARIATIONS = [
+    { ref: "VO-001", title: "Additional cable burial depth at shipping-lane crossing", form: "FIDIC", clause: "13.1", valueUsd: 3200000, status: "Approved", timeImpactDays: 12 },
+    { ref: "CE-014", title: "Reroute around disputed maritime boundary", form: "NEC4", clause: "60.1", valueUsd: 8500000, status: "Quotation Submitted", timeImpactDays: 45 },
+    { ref: "VO-007", title: "Additional branching unit & repeater for extended spur", form: "FIDIC", clause: "13.3", valueUsd: 5100000, status: "Approved", timeImpactDays: 20 },
+    { ref: "CE-021", title: "Weather standby — extended monsoon window", form: "NEC4", clause: "60.1", valueUsd: 2400000, status: "Notified", timeImpactDays: 30 },
+    { ref: "VO-009", title: "Substitute armour type (non-compliant)", form: "FIDIC", clause: "13.1", valueUsd: 1800000, status: "Rejected", timeImpactDays: 0 }
+  ];
+  function variationImpact(params) {
+    params = params || {};
+    var contractSumUsd = Number(params.contractSumUsd) || 420000000;
+    var retentionPct = params.retentionPct != null ? Number(params.retentionPct) : 5;
+    var variations = (params.variations && params.variations.length ? params.variations : SAMPLE_VARIATIONS).map(function (v) {
+      return {
+        ref: v.ref, title: v.title, form: v.form || "FIDIC", clause: v.clause || "",
+        valueUsd: Number(v.valueUsd) || 0, status: v.status || "Notified",
+        timeImpactDays: Number(v.timeImpactDays) || 0
+      };
+    });
+    var APPROVED = ["approved", "implemented"], PENDING = ["notified", "quotation submitted", "under assessment"], REJECTED = ["rejected"];
+    function bucket(s) {
+      var n = norm(s);
+      if (APPROVED.indexOf(n) >= 0) return "approved";
+      if (REJECTED.indexOf(n) >= 0) return "rejected";
+      return "pending";
+    }
+    var approvedTotal = 0, pendingTotal = 0, rejectedTotal = 0, approvedDays = 0, pendingDays = 0;
+    var counts = { approved: 0, pending: 0, rejected: 0 };
+    variations.forEach(function (v) {
+      var b = bucket(v.status); v._bucket = b; counts[b]++;
+      if (b === "approved") { approvedTotal += v.valueUsd; approvedDays += v.timeImpactDays; }
+      else if (b === "pending") { pendingTotal += v.valueUsd; pendingDays += v.timeImpactDays; }
+      else rejectedTotal += v.valueUsd;
+    });
+    var revisedContractSum = contractSumUsd + approvedTotal;
+    var pctChange = contractSumUsd > 0 ? Math.round(approvedTotal / contractSumUsd * 1000) / 10 : 0;
+    var exposurePct = contractSumUsd > 0 ? Math.round((approvedTotal + pendingTotal) / contractSumUsd * 1000) / 10 : 0;
+    return {
+      inputs: { contractSumUsd: contractSumUsd, retentionPct: retentionPct },
+      variations: variations,
+      summary: {
+        originalContractSumUsd: contractSumUsd,
+        approvedVariationsUsd: approvedTotal,
+        pendingVariationsUsd: pendingTotal,
+        rejectedVariationsUsd: rejectedTotal,
+        revisedContractSumUsd: revisedContractSum,
+        pctChange: pctChange,
+        exposurePct: exposurePct,
+        retentionOnRevisedUsd: Math.round(revisedContractSum * retentionPct / 100),
+        approvedTimeImpactDays: approvedDays,
+        pendingTimeImpactDays: pendingDays,
+        counts: counts,
+        total: variations.length
+      },
+      references: [
+        "FIDIC Red Book cl.13 — Variations and Adjustments (instruction, valuation, dayworks)",
+        "NEC4 cl.60-65 — Compensation Events (notification, quotation, assessment, implementation)",
+        "FIDIC cl.14.3 / NEC4 cl.50 — Interim payments & retention on the revised contract price",
+        "NEC4 cl.61.3 — 8-week time-bar for compensation-event notification"
+      ]
+    };
+  }
+
   function checkAlerts(projectState, config) {
     var cfg = {};
     var k;
@@ -5234,6 +5313,8 @@
     vendorComparison: vendorComparison,
     getContractTemplates: getContractTemplates,
     getClauseReference: getClauseReference,
+    listClauses: listClauses,
+    variationImpact: variationImpact,
     checkAlerts: checkAlerts,
     monteCarloSchedule: monteCarloSchedule,
     monteCarloCost: monteCarloCost,
