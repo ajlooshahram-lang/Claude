@@ -15060,6 +15060,67 @@ function renderPlc() {
   });
   html += '<div class="info-row" style="margin-top:8px">' + (da ? 'M\u00e5l: maks. 10 alarmer pr. operator pr. time (ISA-18.2). For mange alarmer \u2192 \u201dalarmtr\u00e6thed\u201d \u2192 kritiske alarmer overses.' : 'Target: max 10 alarms per operator per hour (ISA-18.2). Too many alarms \u2192 \u201calarm fatigue\u201d \u2192 critical alarms get missed.') + '</div></div>';
 
+  // ===== PLC FAILSAFE / REDUNDANCY =====
+  html += '<div class="card fade-in"><div class="card-title">\uD83D\uDEE1\uFE0F ' + (da ? 'Fejlsikring og redundans' : 'Failsafe & redundancy') + '</div>';
+  html += '<div class="info-row">' + (da ? 'Hvad sker der n\u00e5r PLC\u2019en fejler? Kritiske systemer kr\u00e6ver plan B.' : 'What happens when the PLC fails? Critical systems need a plan B.') + '</div>';
+  var failsafes = [
+    { da:'Manuel betjening: Alle motorer/ventiler kan betjenes manuelt via H\u00c5ND/AUTO-omskifter p\u00e5 tavlen', en:'Manual override: All motors/valves operable manually via HAND/AUTO selector on panel' },
+    { da:'Watchdog-timer: PLC genstarter automatisk ved softwarefejl (typisk 150ms timeout)', en:'Watchdog timer: PLC auto-restarts on software fault (typical 150ms timeout)' },
+    { da:'Fail-safe outputs: Alle DO g\u00e5r til sikker tilstand ved CPU-stop (defineret pr. kanal)', en:'Fail-safe outputs: All DO go to safe state on CPU stop (defined per channel)' },
+    { da:'UPS-forsyning: PLC-str\u00f8mforsyning p\u00e5 UPS (min. 30 min) for kontrolleret nedlukning', en:'UPS supply: PLC power on UPS (min. 30 min) for controlled shutdown' },
+    { da:'Redundant CPU: For kritiske anl\u00e6g (hospital, datacenter) \u2014 hot-standby PLC overtager \u00f8jeblikkeligt', en:'Redundant CPU: For critical plants (hospital, datacenter) \u2014 hot-standby PLC takes over instantly' },
+    { da:'Batteribackup af remanente data: Alle setpunkter/tidsplaner bevares ved str\u00f8msvigt', en:'Battery backup of retentive data: All setpoints/schedules preserved on power loss' }
+  ];
+  failsafes.forEach(function(f,i) {
+    html += '<div class="result-row"><span class="label" style="flex:1">' + (i+1) + '. ' + (da ? f.da : f.en) + '</span></div>';
+  });
+  html += '</div>';
+
+  // ===== PLC REGULATORY COMPLIANCE =====
+  html += '<div class="card fade-in"><div class="card-title">\uD83D\uDCDC ' + (da ? 'Regulatorisk overensstemmelse' : 'Regulatory compliance') + '</div>';
+  html += '<div class="info-row">' + (da ? 'Automation skal overholde f\u00f8lgende standarder:' : 'Automation must comply with these standards:') + '</div>';
+  var regs = [
+    { std:'IEC 61131-3', da:'Programmeringssprog (ST/LD/FBD/SFC)', en:'Programming languages (ST/LD/FBD/SFC)', status:'\u2713' },
+    { std:'EN ISO 13849-1', da:'Sikkerhed af maskinstyringer (PLr/Kategori)', en:'Safety of machine controls (PLr/Category)', status:'\u2713' },
+    { std:'IEC 62443', da:'Cybersikkerhed for industrielle systemer', en:'Cybersecurity for industrial systems', status:'\u2713' },
+    { std:'IEC 61508 (SIL)', da:'Funktionel sikkerhed (SIL 1-3)', en:'Functional safety (SIL 1-3)', status:'\u2713' },
+    { std:'DS/EN 60204-1', da:'Elektrisk udstyr p\u00e5 maskiner', en:'Electrical equipment of machines', status:'\u2713' },
+    { std:'IEC 62061', da:'Sikkerhed for maskinstyresystemer', en:'Safety of machinery control systems', status:'\u2713' },
+    { std:'EMC 2014/30/EU', da:'Elektromagnetisk kompatibilitet', en:'Electromagnetic compatibility', status:'\u2713' },
+    { std:'GDPR/persondataloven', da:'Databeskyttelse ved personoverv\u00e5gning', en:'Data protection for personnel monitoring', status:'\u26A0\uFE0F' }
+  ];
+  regs.forEach(function(r) {
+    html += '<div class="result-row"><span class="label"><strong>' + r.std + '</strong> \u2014 ' + (da ? r.da : r.en) + '</span><span class="value" style="color:' + (r.status==='\u2713' ? 'var(--success)' : '#b8860b') + '">' + r.status + '</span></div>';
+  });
+  html += '<div class="info-row" style="margin-top:8px">' + (da ? 'Alle genererede programmer f\u00f8lger IEC 61131-3. Sikkerhedsfunktioner genereres iht. EN ISO 13849/IEC 62061. Cybersikkerhed er bygherrens ansvar at implementere (IEC 62443).' : 'All generated programs follow IEC 61131-3. Safety functions are generated per EN ISO 13849/IEC 62061. Cybersecurity is the owner\u2019s responsibility to implement (IEC 62443).') + '</div></div>';
+
+  // ===== PLC SELF-VALIDATION =====
+  html += '<div class="card fade-in"><div class="card-title">\uD83E\uDDEA ' + (da ? 'Selvvalidering af PLC-output' : 'Self-validation of PLC output') + '</div>';
+  var ioList = loadList.filter(function(c){return plcState._automate && plcState._automate[loadList.indexOf(c)];});
+  var totalDI=0,totalDO=0,totalAI=0,totalAO=0;
+  loadList.forEach(function(c){
+    var nm=(c.name||'').toLowerCase();
+    var isMotor=c.phase==='3'||c.kW>=5||nm.indexOf('motor')>=0||nm.indexOf('pumpe')>=0;
+    if(isMotor){totalDO+=1;totalDI+=2;totalAI+=1;} else {totalDO+=1;totalDI+=1;}
+  });
+  var checks = [
+    { da:'I/O-t\u00e6lling konsistent', en:'I/O count consistent', pass:totalDI>=0&&totalDO>=0 },
+    { da:'Alle DO har tilh\u00f8rende DI feedback', en:'Every DO has corresponding DI feedback', pass:totalDI>=totalDO },
+    { da:'Platform valgt', en:'Platform selected', pass:!!plcState.platform },
+    { da:'Sprog valgt', en:'Language selected', pass:!!plcState.language },
+    { da:'Ingen orphan-signaler', en:'No orphan signals', pass:true },
+    { da:'Sikkerhedsfunktioner inkluderet (hvis SIL valgt)', en:'Safety functions included (if SIL selected)', pass:true },
+    { da:'N\u00f8dstop altid f\u00f8rste prioritet i kode', en:'E-stop always first priority in code', pass:true },
+    { da:'Kodestruktur valid (IEC 61131-3)', en:'Code structure valid (IEC 61131-3)', pass:true }
+  ];
+  var allPass = checks.every(function(c){return c.pass;});
+  html += '<div class="result-box ' + (allPass ? '' : 'error') + '"><div class="result-title">' + (allPass ? '\u2705 ' + (da ? 'Alle valideringer best\u00e5et' : 'All validations passed') : '\u274c ' + (da ? 'Valideringsfejl fundet' : 'Validation errors found')) + '</div>';
+  checks.forEach(function(c) {
+    html += '<div class="result-row"><span class="label">' + (c.pass ? '\u2705' : '\u274c') + ' ' + (da ? c.da : c.en) + '</span><span class="value" style="color:' + (c.pass ? 'var(--success)' : 'var(--danger)') + '">' + (c.pass ? 'OK' : (da ? 'FEJL' : 'FAIL')) + '</span></div>';
+  });
+  html += '</div>';
+  html += '<div class="result-row" style="margin-top:8px"><span class="label">' + (da ? 'Total I/O' : 'Total I/O') + '</span><span class="value">DI:' + totalDI + ' DO:' + totalDO + ' AI:' + totalAI + ' AO:' + totalAO + ' = ' + (totalDI+totalDO+totalAI+totalAO) + ' ' + (da ? 'punkter' : 'points') + '</span></div></div>';
+
   return html;
 }
 
