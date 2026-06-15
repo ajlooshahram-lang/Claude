@@ -2882,88 +2882,289 @@
   }
 
   // ---------- Cable System Design Calculator ----------
+  // Engineering-grade submarine cable system design per ITU-T G.977, G.978, IEC 60708, ITU-T G.654.E
   function designCableSystem(params) {
     var routeKm = params.routeKm || 1000;
     var fiberPairs = params.fiberPairs || 8;
     var targetCapacityTbps = params.targetCapacityTbps || 100;
     var landingCount = params.landingCount || 2;
     var maxDepthM = params.maxDepthM || 4000;
+    var fiberType = params.fiberType || "G.654.E"; // G.654.E or G.652.D
+    var band = params.band || "C"; // C or C+L
+    var depthProfile = params.depthProfile || null; // optional: {shallow0_200: %, shelf200_1000: %, slope1000_2000: %, deep2000plus: %}
 
-    // Repeater spacing: 80km standard, 60km deep water
-    var repeaterSpacing = maxDepthM > 4000 ? 60 : 80;
-    var repeaterCount = Math.ceil(routeKm / repeaterSpacing) - 1;
+    // --- 1. Fiber Parameters ---
+    var fiberAttenuation = fiberType === "G.654.E" ? 0.17 : 0.20; // dB/km at 1550nm
+    var spliceLoss = 0.1; // dB per factory splice every 25km cable length
+    var connectorLoss = 0.3; // dB per pair at landing stations
 
-    // Power feed
-    var voltage = repeaterCount * 50 + 1000;
-    var current = 0.9;
+    // --- 2. Amplifier Parameters (Submarine EDFA) ---
+    var amplifierGain = 18; // dB for modern submarine EDFA (range 14-18)
+    var noiseFigure = 5.5; // dB for modern submarine EDFA
+    var requiredMargin = 3; // dB system margin + aging
 
-    // Cable type by depth
-    var cableTypes = [];
-    if (maxDepthM <= 1000) {
-      cableTypes.push({ depthRange: "0-1000m", type: "DA", lengthKm: routeKm });
-    } else if (maxDepthM <= 3000) {
-      cableTypes.push({ depthRange: "0-1000m", type: "DA", lengthKm: Math.round(routeKm * 0.2) });
-      cableTypes.push({ depthRange: "1000-3000m", type: "SA", lengthKm: Math.round(routeKm * 0.8) });
+    // --- 3. Span Loss Budget (foundation of repeater spacing) ---
+    var maxSpanLoss = amplifierGain - requiredMargin; // max allowable span loss in dB
+    // Effective attenuation includes splices every 25km
+    var effectiveAttenuation = fiberAttenuation + (spliceLoss / 25); // dB/km including splices
+    var repeaterSpacingRaw = maxSpanLoss / effectiveAttenuation;
+    var repeaterSpacing = Math.floor(repeaterSpacingRaw / 5) * 5; // round down to nearest 5km
+    if (repeaterSpacing < 40) repeaterSpacing = 40; // minimum practical spacing
+    if (repeaterSpacing > 120) repeaterSpacing = 120; // maximum practical spacing
+
+    var repeaterCount = Math.max(0, Math.ceil(routeKm / repeaterSpacing) - 1);
+    var numberOfSpans = repeaterCount + 1;
+    var averageSpanLength = routeKm / numberOfSpans;
+
+    // Actual span loss for the average span
+    var splicesPerSpan = Math.floor(averageSpanLength / 25);
+    var spanLossdB = fiberAttenuation * averageSpanLength + splicesPerSpan * spliceLoss;
+
+    // --- 4. OSNR Calculation (determines if the system works) ---
+    // OSNR per span = 58 - NF - span_loss (reference formula for submarine systems)
+    var osnrPerSpan = 58 - noiseFigure - spanLossdB;
+    // Total OSNR degrades with number of spans: OSNR_total = OSNR_per_span - 10*log10(N)
+    var osnrTotal = osnrPerSpan - 10 * Math.log10(numberOfSpans);
+
+    // Modulation format selection based on route length and OSNR
+    var modulationFormat, channelRate, requiredOSNR;
+    if (routeKm < 2000 && osnrTotal >= 20) {
+      modulationFormat = "16-QAM";
+      channelRate = 400; // Gbps per channel
+      requiredOSNR = 20; // dB
+    } else if (routeKm < 4000 && osnrTotal >= 14) {
+      modulationFormat = "QPSK";
+      channelRate = 200; // Gbps
+      requiredOSNR = 14;
     } else {
-      cableTypes.push({ depthRange: "0-1000m", type: "DA", lengthKm: Math.round(routeKm * 0.1) });
-      cableTypes.push({ depthRange: "1000-3000m", type: "SA", lengthKm: Math.round(routeKm * 0.2) });
-      cableTypes.push({ depthRange: ">3000m", type: "LW", lengthKm: Math.round(routeKm * 0.7) });
+      modulationFormat = "QPSK";
+      channelRate = 100; // Gbps conservative for ultra-long haul
+      requiredOSNR = 12;
+    }
+    var osnrMargin = osnrTotal - requiredOSNR;
+
+    // --- 5. Capacity Calculation ---
+    var channels;
+    if (band === "C+L") {
+      channels = 192; // C+L band: 192 channels x 50GHz grid = 9.6 THz
+    } else {
+      channels = 96; // C-band: 96 channels x 50GHz grid = 4.8 THz
+    }
+    var capacityPerPairTbps = (channels * channelRate) / 1000; // convert Gbps to Tbps
+    var totalCapacityTbps = fiberPairs * capacityPerPairTbps;
+    var fiberPairsRequired = Math.ceil(targetCapacityTbps / capacityPerPairTbps);
+
+    // --- 6. Power Feed Design (constant-current system per ITU-T G.977) ---
+    var repeaterVoltageDrop = 40; // V per repeater (30-50V range, depends on pump current)
+    var cableResistance = 1.0; // ohm/km for submarine power conductor
+    // Higher current for more fiber pairs
+    var current;
+    if (fiberPairs <= 4) {
+      current = 0.7;
+    } else if (fiberPairs <= 8) {
+      current = 0.9;
+    } else if (fiberPairs <= 12) {
+      current = 1.2;
+    } else {
+      current = 1.6;
+    }
+    var cableIRDrop = current * cableResistance * routeKm;
+    var totalRepeaterVoltage = repeaterVoltageDrop * repeaterCount;
+    var totalSystemVoltage = totalRepeaterVoltage + cableIRDrop;
+
+    // Feeding mode: double-ended for routes > 5000km
+    var feeding;
+    if (routeKm > 5000) {
+      feeding = "double";
+    } else {
+      feeding = "single";
     }
 
-    // Per-fiber-pair capacity: 120 wavelengths x 400Gbps = 48 Tbps
-    var wavelengthsPerPair = 120;
-    var capacityPerPair = 48; // Tbps
-    var fiberPairsRequired = Math.ceil(targetCapacityTbps / capacityPerPair);
-    var totalCapacityTbps = fiberPairs * capacityPerPair;
+    var pfVoltage; // power feed equipment voltage
+    var maxReachKm;
+    if (feeding === "double") {
+      // Double-ended: each PFE handles half the route, max +/-10kV = 20kV total
+      pfVoltage = Math.ceil((totalSystemVoltage / 2 + 1000) / 100) * 100; // round up with 1kV headroom
+      if (pfVoltage > 10000) pfVoltage = 10000; // max single-end of double-ended
+      maxReachKm = (10000 * 2 - 2000) / (current * cableResistance + (repeaterVoltageDrop / repeaterSpacing));
+    } else {
+      // Single-ended: max 15kV
+      pfVoltage = Math.ceil((totalSystemVoltage + 1000) / 100) * 100; // round up with 1kV headroom
+      if (pfVoltage > 15000) pfVoltage = 15000;
+      maxReachKm = (15000 - 1000) / (current * cableResistance + (repeaterVoltageDrop / repeaterSpacing));
+    }
 
-    // Branching units
-    var branchingUnits = landingCount - 2;
-    if (branchingUnits < 0) branchingUnits = 0;
+    var powerMarginV = (feeding === "double" ? 20000 : 15000) - totalSystemVoltage;
 
-    // Cost estimate
-    var cableCost = 35000 * routeKm;
-    var repeaterCost = 500000 * repeaterCount;
-    var buCost = 2000000 * branchingUnits;
-    var slteCost = 5000000 * landingCount * fiberPairs;
-    var shoreEndsCost = 4000000 * landingCount;
-    var subtotal = cableCost + repeaterCost + buCost + slteCost + shoreEndsCost;
-    var contingency = Math.round(subtotal * 0.15);
+    // --- 7. Cable Profile (based on depth profile) ---
+    var profile;
+    if (depthProfile) {
+      profile = depthProfile;
+    } else {
+      // Default depth distribution based on typical transoceanic route
+      if (maxDepthM <= 200) {
+        profile = { shallow0_200: 100, shelf200_1000: 0, slope1000_2000: 0, deep2000plus: 0 };
+      } else if (maxDepthM <= 1000) {
+        profile = { shallow0_200: 20, shelf200_1000: 80, slope1000_2000: 0, deep2000plus: 0 };
+      } else if (maxDepthM <= 2000) {
+        profile = { shallow0_200: 10, shelf200_1000: 20, slope1000_2000: 70, deep2000plus: 0 };
+      } else {
+        // Deep ocean route
+        profile = { shallow0_200: 5, shelf200_1000: 10, slope1000_2000: 15, deep2000plus: 70 };
+      }
+    }
+
+    // Shore-end cable: 2km per landing station (Rock Armour)
+    var shoreEndKmPerLanding = 2;
+    var totalShoreEndKm = shoreEndKmPerLanding * landingCount;
+    var mainRouteKm = routeKm - totalShoreEndKm;
+    if (mainRouteKm < 0) mainRouteKm = 0;
+
+    var cableProfile = [];
+    // Always include shore ends (RA type)
+    cableProfile.push({
+      depthRange: "0-20m (Shore End)",
+      type: "RA",
+      lengthKm: totalShoreEndKm,
+      costPerKm: 95000
+    });
+
+    var shallowKm = Math.round(mainRouteKm * profile.shallow0_200 / 100);
+    var shelfKm = Math.round(mainRouteKm * profile.shelf200_1000 / 100);
+    var slopeKm = Math.round(mainRouteKm * profile.slope1000_2000 / 100);
+    var deepKm = mainRouteKm - shallowKm - shelfKm - slopeKm;
+    if (deepKm < 0) deepKm = 0;
+
+    if (shallowKm > 0) {
+      cableProfile.push({ depthRange: "0-200m", type: "DA", lengthKm: shallowKm, costPerKm: 65000 });
+    }
+    if (shelfKm > 0) {
+      cableProfile.push({ depthRange: "200-1000m", type: "SA", lengthKm: shelfKm, costPerKm: 45000 });
+    }
+    if (slopeKm > 0) {
+      cableProfile.push({ depthRange: "1000-2000m", type: "LWP", lengthKm: slopeKm, costPerKm: 35000 });
+    }
+    if (deepKm > 0) {
+      cableProfile.push({ depthRange: ">2000m", type: "LW", lengthKm: deepKm, costPerKm: 25000 });
+    }
+
+    // --- 8. Wet Plant Components ---
+    var branchingUnits = landingCount > 2 ? landingCount - 2 : 0;
+    var couplers = branchingUnits; // one coupler per BU typically
+
+    // --- 9. Cost Breakdown ---
+    var cableCost = 0;
+    for (var ci = 0; ci < cableProfile.length; ci++) {
+      cableCost += cableProfile[ci].lengthKm * cableProfile[ci].costPerKm;
+    }
+    var repeaterCost = repeaterCount * 500000; // $500K per repeater (wet plant)
+    var buCost = branchingUnits * 2000000; // $2M per branching unit
+    var slteCost = landingCount * fiberPairs * 5000000; // $5M per terminal per fiber pair
+    var pfeCost = (feeding === "double" ? 2 : 1) * landingCount * 1500000; // $1.5M per PFE
+    var shoreEndsCost = totalShoreEndKm * 95000 + landingCount * 3000000; // cable + civil works
+    var installationCost = Math.round(routeKm * 8000); // $8K/km for ship time and laying
+    var subtotal = cableCost + repeaterCost + buCost + slteCost + pfeCost + shoreEndsCost + installationCost;
+    var contingency = Math.round(subtotal * 0.15); // 15% contingency
     var total = subtotal + contingency;
 
-    // Design notes
-    var designNotes = [];
-    if (maxDepthM > 4000) {
-      designNotes.push("Deep water route requires reduced repeater spacing (60km)");
+    // --- 10. Engineering Notes ---
+    var engineeringNotes = [];
+    engineeringNotes.push("Fiber type: " + fiberType + " at " + fiberAttenuation + " dB/km (1550nm)");
+    engineeringNotes.push("Repeater spacing: " + repeaterSpacing + " km (max span loss " + maxSpanLoss.toFixed(1) + " dB)");
+    engineeringNotes.push("OSNR margin: " + osnrMargin.toFixed(1) + " dB (" + modulationFormat + " @ " + channelRate + "G)");
+    if (feeding === "double") {
+      engineeringNotes.push("Double-ended power feeding required (route > 5000km)");
+    }
+    if (osnrMargin < 2) {
+      engineeringNotes.push("WARNING: OSNR margin below 2 dB - consider reduced channel rate or Raman amplification");
     }
     if (fiberPairsRequired > fiberPairs) {
-      designNotes.push("Target capacity requires " + fiberPairsRequired + " fiber pairs but only " + fiberPairs + " specified");
+      engineeringNotes.push("Target capacity requires " + fiberPairsRequired + " fiber pairs but only " + fiberPairs + " specified");
     }
     if (branchingUnits > 0) {
-      designNotes.push(branchingUnits + " branching unit(s) required for " + landingCount + " landing points");
+      engineeringNotes.push(branchingUnits + " branching unit(s) for " + landingCount + " landing points");
     }
-    if (routeKm > 5000) {
-      designNotes.push("Long-haul route (>" + 5000 + "km) may require mid-point power feed");
+    if (powerMarginV < 2000) {
+      engineeringNotes.push("WARNING: Power margin only " + Math.round(powerMarginV) + "V - near system voltage limit");
     }
 
+    // --- 11. References ---
+    var references = ["ITU-T G.977", "ITU-T G.978", "IEC 60708", "ITU-T G.654.E"];
+    if (band === "C+L") {
+      references.push("ITU-T G.698.2");
+    }
+
+    // --- Build backward-compatible cableTypes for UI ---
+    var cableTypes = cableProfile.map(function(entry) {
+      return { depthRange: entry.depthRange, type: entry.type, lengthKm: entry.lengthKm };
+    });
+
+    // --- Build designNotes for backward-compatible UI ---
+    var designNotes = engineeringNotes.slice();
+
     return {
+      // Backward-compatible fields (used by ui.js)
       repeaterCount: repeaterCount,
       repeaterSpacing: repeaterSpacing,
-      powerFeed: { voltage: voltage, current: current },
+      powerFeed: {
+        voltage: pfVoltage,
+        current: current,
+        totalVdrop: Math.round(totalSystemVoltage),
+        feeding: feeding,
+        maxReach: Math.round(maxReachKm)
+      },
       cableTypes: cableTypes,
       fiberPairsRequired: fiberPairsRequired,
-      wavelengthsPerPair: wavelengthsPerPair,
-      totalCapacityTbps: totalCapacityTbps,
+      wavelengthsPerPair: channels,
+      totalCapacityTbps: Math.round(totalCapacityTbps * 10) / 10,
       branchingUnits: branchingUnits,
       costBreakdown: {
         cable: cableCost,
         repeaters: repeaterCost,
-        bus: buCost,
+        branchingUnits: buCost,
+        bus: buCost, // backward compat alias
         slte: slteCost,
+        pfe: pfeCost,
         shoreEnds: shoreEndsCost,
+        installation: installationCost,
         contingency: contingency,
         total: total
       },
-      designNotes: designNotes
+      designNotes: designNotes,
+
+      // New engineering-grade output structure
+      spans: {
+        count: numberOfSpans,
+        averageLength: Math.round(averageSpanLength * 10) / 10,
+        maxLoss: Math.round(spanLossdB * 100) / 100
+      },
+      osnr: {
+        perSpan: Math.round(osnrPerSpan * 100) / 100,
+        total: Math.round(osnrTotal * 100) / 100,
+        margin: Math.round(osnrMargin * 100) / 100,
+        modulation: modulationFormat,
+        channelRate: channelRate
+      },
+      capacity: {
+        perPair: capacityPerPairTbps,
+        totalSystem: Math.round(totalCapacityTbps * 10) / 10,
+        band: band,
+        channels: channels,
+        modulationFormat: modulationFormat
+      },
+      cableProfile: cableProfile,
+      wetPlant: {
+        repeaters: repeaterCount,
+        branchingUnits: branchingUnits,
+        couplers: couplers
+      },
+      margins: {
+        osnrMargin: Math.round(osnrMargin * 100) / 100,
+        powerMargin: Math.round(powerMarginV),
+        capacityMargin: Math.round((totalCapacityTbps - targetCapacityTbps) * 10) / 10
+      },
+      engineeringNotes: engineeringNotes,
+      references: references
     };
   }
 

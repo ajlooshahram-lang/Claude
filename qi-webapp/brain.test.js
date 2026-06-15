@@ -1256,5 +1256,69 @@ console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
   ok(hasIEC && hasITU, "engineeringNotes references IEC 62446 and ITU-T L.1410");
 })();
 
+// ---------- designCableSystem Engineering Tests ----------
+(function() {
+  console.log("\n--- designCableSystem Engineering Tests ---");
+  var B = require("./js/brain.js");
+
+  // Test 1: designCableSystem returns spans.count > 0 for 1000km route
+  var r1 = B.designCableSystem({ routeKm: 1000, fiberPairs: 8, maxDepthM: 4000 });
+  ok(r1.spans && r1.spans.count > 0, "designCableSystem returns spans.count > 0 for 1000km route (got " + (r1.spans ? r1.spans.count : 0) + ")");
+
+  // Test 2: OSNR margin > 0 for a standard 1000km system
+  ok(r1.osnr && r1.osnr.margin > 0, "OSNR margin > 0 for 1000km system (got " + (r1.osnr ? r1.osnr.margin : "N/A") + " dB)");
+
+  // Test 3: Repeater spacing based on fiber attenuation (G.654.E gives longer spans than 80km)
+  var r654 = B.designCableSystem({ routeKm: 1000, fiberPairs: 8, maxDepthM: 4000, fiberType: "G.654.E" });
+  ok(r654.repeaterSpacing > 80, "G.654.E repeater spacing > 80km (got " + r654.repeaterSpacing + " km)");
+
+  // Test 4: Power feed voltage scales with repeater count
+  var rShort = B.designCableSystem({ routeKm: 500, fiberPairs: 8, maxDepthM: 4000 });
+  var rLong = B.designCableSystem({ routeKm: 5000, fiberPairs: 8, maxDepthM: 4000 });
+  ok(rLong.powerFeed.voltage > rShort.powerFeed.voltage, "Power feed voltage scales with repeater count (500km=" + rShort.powerFeed.voltage + "V, 5000km=" + rLong.powerFeed.voltage + "V)");
+
+  // Test 5: Cable profile has multiple types for deep-water routes
+  var rDeep = B.designCableSystem({ routeKm: 3000, fiberPairs: 8, maxDepthM: 5000 });
+  ok(rDeep.cableProfile && rDeep.cableProfile.length >= 3, "Cable profile has multiple types for deep-water routes (got " + (rDeep.cableProfile ? rDeep.cableProfile.length : 0) + " types)");
+
+  // Test 6: G.654.E fiber gives longer spans than G.652.D
+  var r652 = B.designCableSystem({ routeKm: 1000, fiberPairs: 8, maxDepthM: 4000, fiberType: "G.652.D" });
+  ok(r654.repeaterSpacing > r652.repeaterSpacing, "G.654.E gives longer spans than G.652.D (" + r654.repeaterSpacing + "km vs " + r652.repeaterSpacing + "km)");
+
+  // Test 7: C+L band gives more capacity than C-band alone
+  var rC = B.designCableSystem({ routeKm: 1000, fiberPairs: 8, maxDepthM: 4000, band: "C" });
+  var rCL = B.designCableSystem({ routeKm: 1000, fiberPairs: 8, maxDepthM: 4000, band: "C+L" });
+  ok(rCL.capacity.totalSystem > rC.capacity.totalSystem, "C+L band gives more capacity than C-band (" + rCL.capacity.totalSystem + " vs " + rC.capacity.totalSystem + " Tbps)");
+
+  // Test 8: Routes >5000km use double-ended feeding
+  var rUltraLong = B.designCableSystem({ routeKm: 6000, fiberPairs: 8, maxDepthM: 4000 });
+  ok(rUltraLong.powerFeed.feeding === "double", "Routes >5000km use double-ended feeding (got '" + rUltraLong.powerFeed.feeding + "')");
+
+  // Test 9: Cost total includes cable + repeaters + SLTE + shore ends + contingency
+  ok(r1.costBreakdown.total > 0 &&
+     r1.costBreakdown.cable > 0 &&
+     r1.costBreakdown.repeaters > 0 &&
+     r1.costBreakdown.slte > 0 &&
+     r1.costBreakdown.shoreEnds > 0 &&
+     r1.costBreakdown.contingency > 0,
+    "Cost total includes cable + repeaters + SLTE + shore ends + contingency (total=$" + r1.costBreakdown.total.toLocaleString() + ")");
+
+  // Test 10: Engineering references include ITU-T G.977
+  ok(r1.references && r1.references.indexOf("ITU-T G.977") !== -1, "Engineering references include ITU-T G.977");
+
+  // Test 11: 400G modulation only used for routes <2000km
+  var rShortRoute = B.designCableSystem({ routeKm: 1000, fiberPairs: 8, maxDepthM: 2000, fiberType: "G.654.E" });
+  var rLongRoute = B.designCableSystem({ routeKm: 4000, fiberPairs: 8, maxDepthM: 4000, fiberType: "G.654.E" });
+  ok(rShortRoute.osnr.modulation === "16-QAM" && rLongRoute.osnr.modulation !== "16-QAM",
+    "400G (16-QAM) only for routes <2000km (1000km=" + rShortRoute.osnr.modulation + ", 4000km=" + rLongRoute.osnr.modulation + ")");
+
+  // Test 12: Shore-end cable (RA type) included in cable profile
+  var hasRA = false;
+  for (var i = 0; i < r1.cableProfile.length; i++) {
+    if (r1.cableProfile[i].type === "RA") { hasRA = true; break; }
+  }
+  ok(hasRA, "Shore-end cable (RA type) included in cable profile");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);
