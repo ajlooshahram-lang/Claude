@@ -18,9 +18,9 @@
     });
     return {
       project: {
-        name: "QI Intelligence Program", sponsor: "", manager: "",
-        org: "Engineering", start: "2026-06-01", end: "2026-12-31",
-        status: "IN PROGRESS", version: "v9.0", currency: "$",
+        name: "SEA Submarine Cable Programme \u2014 $1.3B", sponsor: "Pacific Telecommunications Consortium", manager: "Programme Director",
+        org: "SEA Cable Programme Office", start: "2025-01-01", end: "2030-06-30",
+        status: "IN PROGRESS", version: "v9.0", currency: "USD",
         spec: { usl: 11, lsl: 9, target: 10 }   // process-capability spec limits
       },
       roster: ["PM", "Dev Lead", "QA Lead", "Ops Lead", "Architect", "BA",
@@ -1028,7 +1028,32 @@
     ];
   }
 
-  const API = { uid, seed, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
+  // ---------- Full Demo Seeder ----------
+  function seedFullDemo() {
+    reset();
+    var demoCases = [
+      { problem: "Route survey complete - SEA-1 segment", category: "Delivery / Schedule", priority: "1-CRITICAL", sev: 9, occ: 4, det: 3, rootCause: "Marine survey vessel completed bathymetric mapping", leanMethod: "Value Stream Mapping", owner: "PM", target: "Survey data validated and route finalized", startDate: "2025-02-01", status: "RESOLVED", percent: 1.0, costCat: "External / Consultant", estCost: 2800000, actCost: 3100000, reach: 2000, impact: 9, confidence: 95, effort: 7, userValue: 9, timeCrit: 9, riskRed: 8, jobSize: 7 },
+      { problem: "Cable manufacturing started - Segment 2", category: "Delivery / Schedule", priority: "2-HIGH", sev: 7, occ: 5, det: 4, rootCause: "NEC Submarine Networks factory allocation confirmed", leanMethod: "Standard Work", owner: "Engineering Lead", target: "12,400km cable produced to G.654.E spec", startDate: "2025-04-15", status: "IN PROGRESS", percent: 0.45, costCat: "Materials", estCost: 180000000, actCost: 82000000, reach: 1500, impact: 8, confidence: 80, effort: 9, userValue: 8, timeCrit: 8, riskRed: 7, jobSize: 9 },
+      { problem: "Permitting delayed - Vietnam MONRE", category: "Process / Flow", priority: "1-CRITICAL", sev: 9, occ: 7, det: 6, rootCause: "Environmental Impact Assessment requires additional marine biology study", leanMethod: "Root-Cause Analysis", owner: "BA", target: "EIA approval from Vietnam MONRE within 60 days", startDate: "2025-03-10", status: "BLOCKED", percent: 0.3, costCat: "External / Consultant", estCost: 450000, actCost: 520000, reach: 800, impact: 9, confidence: 60, effort: 5, userValue: 7, timeCrit: 9, riskRed: 9, jobSize: 5 },
+      { problem: "Shore-end installation Batam CLS complete", category: "Quality / Defects", priority: "2-HIGH", sev: 7, occ: 3, det: 2, rootCause: "HDD crossing and beach manhole installation finished", leanMethod: "Mistake-Proofing / Poka-Yoke", owner: "Ops Lead", target: "Shore-end cable tested to -40dB insertion loss", startDate: "2025-01-20", status: "RESOLVED", percent: 1.0, costCat: "Labour / Effort", estCost: 5200000, actCost: 5800000, reach: 1200, impact: 7, confidence: 90, effort: 8, userValue: 8, timeCrit: 7, riskRed: 6, jobSize: 8 },
+      { problem: "Repeater qualification testing", category: "Quality / Defects", priority: "3-MEDIUM", sev: 6, occ: 4, det: 3, rootCause: "Factory acceptance tests for 180 repeater units", leanMethod: "Standard Work", owner: "QA Lead", target: "All repeaters pass 8000hr accelerated life test", startDate: "2025-05-01", status: "IN PROGRESS", percent: 0.6, costCat: "Materials", estCost: 45000000, actCost: 27500000, reach: 1000, impact: 6, confidence: 75, effort: 6, userValue: 7, timeCrit: 6, riskRed: 7, jobSize: 6 },
+      { problem: "Typhoon season weather window analysis", category: "People / Training", priority: "3-MEDIUM", sev: 5, occ: 8, det: 5, rootCause: "Cable lay operations must avoid May-November typhoon corridor", leanMethod: "Gemba Walk", owner: "Tech Lead", target: "Lay schedule aligned with weather windows for all 6 segments", startDate: "2025-06-01", status: "IN PROGRESS", percent: 0.5, costCat: "Tooling / Software", estCost: 180000, actCost: 95000, reach: 600, impact: 5, confidence: 70, effort: 4, userValue: 6, timeCrit: 8, riskRed: 6, jobSize: 4 },
+      { problem: "Submarine cable protection zone marking", category: "Process / Flow", priority: "2-HIGH", sev: 8, occ: 6, det: 4, rootCause: "Coordination with 8 national maritime authorities for exclusion zones", leanMethod: "Value Stream Mapping", owner: "PM", target: "All protection zones gazetted and marked on nautical charts", startDate: "2025-03-01", status: "OPEN", percent: 0.15, costCat: "External / Consultant", estCost: 920000, actCost: 140000, reach: 900, impact: 8, confidence: 65, effort: 6, userValue: 7, timeCrit: 7, riskRed: 8, jobSize: 6 },
+      { problem: "DWDM terminal equipment procurement", category: "Delivery / Schedule", priority: "3-MEDIUM", sev: 5, occ: 4, det: 4, rootCause: "Long lead-time for Ciena 6500 coherent transponders", leanMethod: "Kanban", owner: "DevOps", target: "All terminal equipment delivered to 8 CLS sites", startDate: "2025-07-01", status: "OPEN", percent: 0.1, costCat: "Materials", estCost: 62000000, actCost: 6200000, reach: 700, impact: 5, confidence: 70, effort: 7, userValue: 6, timeCrit: 5, riskRed: 4, jobSize: 7 },
+      { problem: "Marine route survey - SEA-3 Luzon Strait", category: "Delivery / Schedule", priority: "4-LOW", sev: 4, occ: 3, det: 3, rootCause: "Deep water survey (>4000m) requires specialized ROV", leanMethod: "Standard Work", owner: "Architect", target: "Complete seabed profile and hazard assessment", startDate: "2025-02-15", status: "RESOLVED", percent: 1.0, costCat: "External / Consultant", estCost: 3500000, actCost: 3900000, reach: 500, impact: 4, confidence: 85, effort: 5, userValue: 5, timeCrit: 4, riskRed: 5, jobSize: 5 },
+      { problem: "Stakeholder engagement - Philippines NTC", category: "People / Training", priority: "4-LOW", sev: 4, occ: 5, det: 5, rootCause: "National Telecommunications Commission requires updated cable landing license", leanMethod: "Root-Cause Analysis", owner: "BA", target: "Landing license renewal approved for Luzon site", startDate: "2025-04-01", status: "ON HOLD", percent: 0.25, costCat: "Training", estCost: 85000, actCost: 32000, reach: 400, impact: 4, confidence: 60, effort: 3, userValue: 4, timeCrit: 3, riskRed: 3, jobSize: 3 }
+    ];
+    demoCases.forEach(function(c) {
+      c.id = uid();
+      c.dateLogged = c.startDate || "2025-01-15";
+      if (!c.whys) c.whys = ["", "", "", "", ""];
+      addCase(c);
+    });
+    save();
+    return get();
+  }
+
+  const API = { uid, seed, seedFullDemo, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
     undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete, togglePin, reorderPin,
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
     auditList, clearAudit, takeSnapshot, snapshots, restoreSnapshot, deleteSnapshot, renameSnapshot, diffSnapshots, paretoRPN, controlChartData,

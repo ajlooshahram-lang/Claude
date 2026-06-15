@@ -998,5 +998,14 @@ if (dataimportNav) dataimportNav.dispatchEvent(new window.Event("click", { bubbl
 var importUpload = doc.getElementById("importUploadArea");
 ok(importUpload != null && doc.getElementById("importCsvFile") != null, "Data Import has upload area");
 
+// 78) seedFullDemo creates 16+ cases (6 base + 10 demo)
+S.seedFullDemo();
+ok(S.validCases().length >= 16, "seedFullDemo creates 16+ cases (6 base + 10 demo) - got " + S.validCases().length);
+
+// 79) Demo cases have mixed statuses for dashboard variety
+var demoStatuses = {};
+S.validCases().forEach(function(c) { demoStatuses[c.status] = (demoStatuses[c.status] || 0) + 1; });
+ok(demoStatuses["RESOLVED"] >= 3 && demoStatuses["IN PROGRESS"] >= 3 && demoStatuses["OPEN"] >= 2 && demoStatuses["BLOCKED"] >= 1 && demoStatuses["ON HOLD"] >= 1, "Demo cases have mixed statuses for dashboard variety");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
