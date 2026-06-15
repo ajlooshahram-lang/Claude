@@ -2881,6 +2881,153 @@
     };
   }
 
+  // ---------- Cable System Design Calculator ----------
+  function designCableSystem(params) {
+    var routeKm = params.routeKm || 1000;
+    var fiberPairs = params.fiberPairs || 8;
+    var targetCapacityTbps = params.targetCapacityTbps || 100;
+    var landingCount = params.landingCount || 2;
+    var maxDepthM = params.maxDepthM || 4000;
+
+    // Repeater spacing: 80km standard, 60km deep water
+    var repeaterSpacing = maxDepthM > 4000 ? 60 : 80;
+    var repeaterCount = Math.ceil(routeKm / repeaterSpacing) - 1;
+
+    // Power feed
+    var voltage = repeaterCount * 50 + 1000;
+    var current = 0.9;
+
+    // Cable type by depth
+    var cableTypes = [];
+    if (maxDepthM <= 1000) {
+      cableTypes.push({ depthRange: "0-1000m", type: "DA", lengthKm: routeKm });
+    } else if (maxDepthM <= 3000) {
+      cableTypes.push({ depthRange: "0-1000m", type: "DA", lengthKm: Math.round(routeKm * 0.2) });
+      cableTypes.push({ depthRange: "1000-3000m", type: "SA", lengthKm: Math.round(routeKm * 0.8) });
+    } else {
+      cableTypes.push({ depthRange: "0-1000m", type: "DA", lengthKm: Math.round(routeKm * 0.1) });
+      cableTypes.push({ depthRange: "1000-3000m", type: "SA", lengthKm: Math.round(routeKm * 0.2) });
+      cableTypes.push({ depthRange: ">3000m", type: "LW", lengthKm: Math.round(routeKm * 0.7) });
+    }
+
+    // Per-fiber-pair capacity: 120 wavelengths x 400Gbps = 48 Tbps
+    var wavelengthsPerPair = 120;
+    var capacityPerPair = 48; // Tbps
+    var fiberPairsRequired = Math.ceil(targetCapacityTbps / capacityPerPair);
+    var totalCapacityTbps = fiberPairs * capacityPerPair;
+
+    // Branching units
+    var branchingUnits = landingCount - 2;
+    if (branchingUnits < 0) branchingUnits = 0;
+
+    // Cost estimate
+    var cableCost = 35000 * routeKm;
+    var repeaterCost = 500000 * repeaterCount;
+    var buCost = 2000000 * branchingUnits;
+    var slteCost = 5000000 * landingCount * fiberPairs;
+    var shoreEndsCost = 4000000 * landingCount;
+    var subtotal = cableCost + repeaterCost + buCost + slteCost + shoreEndsCost;
+    var contingency = Math.round(subtotal * 0.15);
+    var total = subtotal + contingency;
+
+    // Design notes
+    var designNotes = [];
+    if (maxDepthM > 4000) {
+      designNotes.push("Deep water route requires reduced repeater spacing (60km)");
+    }
+    if (fiberPairsRequired > fiberPairs) {
+      designNotes.push("Target capacity requires " + fiberPairsRequired + " fiber pairs but only " + fiberPairs + " specified");
+    }
+    if (branchingUnits > 0) {
+      designNotes.push(branchingUnits + " branching unit(s) required for " + landingCount + " landing points");
+    }
+    if (routeKm > 5000) {
+      designNotes.push("Long-haul route (>" + 5000 + "km) may require mid-point power feed");
+    }
+
+    return {
+      repeaterCount: repeaterCount,
+      repeaterSpacing: repeaterSpacing,
+      powerFeed: { voltage: voltage, current: current },
+      cableTypes: cableTypes,
+      fiberPairsRequired: fiberPairsRequired,
+      wavelengthsPerPair: wavelengthsPerPair,
+      totalCapacityTbps: totalCapacityTbps,
+      branchingUnits: branchingUnits,
+      costBreakdown: {
+        cable: cableCost,
+        repeaters: repeaterCost,
+        bus: buCost,
+        slte: slteCost,
+        shoreEnds: shoreEndsCost,
+        contingency: contingency,
+        total: total
+      },
+      designNotes: designNotes
+    };
+  }
+
+  // ---------- Capacity & Revenue Planning ----------
+  function revenueModel(params) {
+    var totalCapacityTbps = params.totalCapacityTbps || 100;
+    var pricePerLambdaPerMonth = params.pricePerLambdaPerMonth || 1000;
+    var takeUpRateYear1Pct = params.takeUpRateYear1Pct || 20;
+    var growthRateAnnualPct = params.growthRateAnnualPct || 15;
+    var operatingCostAnnualM = params.operatingCostAnnualM || 20;
+    var capex = params.capex || 500000000;
+
+    // Total lambdas: totalCapacityTbps * 1000 / 400
+    var totalLambdas = totalCapacityTbps * 1000 / 400;
+
+    // 5-year projection
+    var yearlyProjection = [];
+    var cumulative = 0;
+    var paybackMonths = null;
+
+    for (var year = 1; year <= 5; year++) {
+      // Take-up rate for this year, capped at 100%
+      var takeUpPct = takeUpRateYear1Pct * Math.pow(1 + growthRateAnnualPct / 100, year - 1);
+      if (takeUpPct > 100) takeUpPct = 100;
+
+      var sold = Math.round(totalLambdas * takeUpPct / 100);
+      var revenue = sold * pricePerLambdaPerMonth * 12;
+      var opex = operatingCostAnnualM * 1000000;
+      var profit = revenue - opex;
+      cumulative += profit;
+
+      yearlyProjection.push({
+        year: year,
+        sold: sold,
+        revenue: revenue,
+        opex: opex,
+        profit: profit,
+        cumulative: cumulative
+      });
+
+      // Calculate payback month within this year
+      if (paybackMonths === null && cumulative >= capex) {
+        // Interpolate month within this year
+        var prevCumulative = cumulative - profit;
+        var remainingToPayback = capex - prevCumulative;
+        var monthlyProfit = profit / 12;
+        if (monthlyProfit > 0) {
+          var monthsInYear = Math.ceil(remainingToPayback / monthlyProfit);
+          paybackMonths = (year - 1) * 12 + monthsInYear;
+        }
+      }
+    }
+
+    // Simple ROI: (5-year cumulative profit / capex) * 100
+    var simpleROI = Math.round((cumulative / capex) * 100 * 10) / 10;
+
+    return {
+      totalLambdas: totalLambdas,
+      yearlyProjection: yearlyProjection,
+      paybackMonths: paybackMonths,
+      simpleROI: simpleROI
+    };
+  }
+
   var API = {
     analyzeProject: analyzeProject,
     listProfiles: listProfiles,
@@ -2905,7 +3052,9 @@
     riskQuantification: riskQuantification,
     pertRandom: pertRandom,
     estimateRepairCost: estimateRepairCost,
-    getRepairStrategy: getRepairStrategy
+    getRepairStrategy: getRepairStrategy,
+    designCableSystem: designCableSystem,
+    revenueModel: revenueModel
   };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIBrain = API;

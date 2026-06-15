@@ -878,5 +878,21 @@ if (environmentalNav) environmentalNav.dispatchEvent(new window.Event("click", {
 var environmentalTable = doc.getElementById("environmentalTable");
 ok(environmentalTable != null && environmentalTable.querySelectorAll('tr[data-country]').length === 8, "Environmental renders country status");
 
+// 63) System Design Calculator
+var systemdesignNav = doc.querySelector('.nav-item[data-view="systemdesign"]');
+ok(systemdesignNav != null, "System Design nav item exists");
+
+if (systemdesignNav) systemdesignNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var sdCalcBtn = doc.getElementById("sdCalcBtn");
+ok(sdCalcBtn != null, "System Design calculate button exists");
+
+// 64) Revenue Model
+var revenueNav = doc.querySelector('.nav-item[data-view="revenue"]');
+ok(revenueNav != null, "Revenue Model nav item exists");
+
+if (revenueNav) revenueNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var rvCalcBtn = doc.getElementById("rvCalcBtn");
+ok(rvCalcBtn != null, "Revenue Model calculate button exists");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

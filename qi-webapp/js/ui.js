@@ -243,6 +243,8 @@
     { id: "raci", label: "RACI Matrix", icon: "⊞" },
     { id: "budget", label: "Budget", icon: "$" },
     { g: "Intelligence" },
+    { id: "systemdesign", label: "System Design", icon: "\u26A1" },
+    { id: "revenue", label: "Revenue Model", icon: "\uD83D\uDCB0" },
     { id: "lessons", label: "Lessons Library", icon: "\uD83D\uDCDA" },
     { id: "ai", label: "AI Assistant", icon: "✦" },
     { id: "impact", label: "Change Impact", icon: "⇄" },
@@ -1199,6 +1201,182 @@
       '</tbody></table></div></div>';
 
     return '<h2 style="margin-bottom:16px">Environmental Compliance</h2>' + summaryCards + countryTable + sensitivities;
+  };
+
+  // ---------- Cable System Design Calculator ----------
+  RENDER.systemdesign = function () {
+    var routeOptions = '';
+    for (var r = 500; r <= 10000; r += 500) {
+      routeOptions += '<option value="' + r + '"' + (r === 3000 ? ' selected' : '') + '>' + r + ' km</option>';
+    }
+    var fiberOptions = '';
+    for (var f = 2; f <= 24; f += 2) {
+      fiberOptions += '<option value="' + f + '"' + (f === 8 ? ' selected' : '') + '>' + f + ' pairs</option>';
+    }
+    var capacityOptions = '';
+    for (var c = 10; c <= 500; c += 10) {
+      capacityOptions += '<option value="' + c + '"' + (c === 100 ? ' selected' : '') + '>' + c + ' Tbps</option>';
+    }
+    var landingOptions = '';
+    for (var l = 2; l <= 10; l++) {
+      landingOptions += '<option value="' + l + '"' + (l === 4 ? ' selected' : '') + '>' + l + ' landings</option>';
+    }
+    var depthOptions = '';
+    for (var d = 1000; d <= 8000; d += 1000) {
+      depthOptions += '<option value="' + d + '"' + (d === 4000 ? ' selected' : '') + '>' + d + ' m</option>';
+    }
+
+    var form = '<div class="card"><h3>Cable System Parameters</h3>' +
+      '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px">' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Route Length</span><select id="sdRouteKm">' + routeOptions + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Fiber Pairs</span><select id="sdFiberPairs">' + fiberOptions + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Target Capacity</span><select id="sdCapacity">' + capacityOptions + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Landing Count</span><select id="sdLandings">' + landingOptions + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Max Depth</span><select id="sdDepth">' + depthOptions + '</select></label>' +
+      '<button id="sdCalcBtn" class="btn-primary" style="padding:8px 16px">Calculate</button>' +
+      '</div></div>';
+
+    var results = '<div id="sdResults" class="muted" style="margin-top:8px">Select parameters and click Calculate to generate system design.</div>';
+
+    return '<h2 style="margin-bottom:16px">Cable System Design Calculator</h2>' + form + results;
+  };
+
+  AFTER.systemdesign = function () {
+    var btn = document.getElementById("sdCalcBtn");
+    if (btn) {
+      btn.addEventListener("click", function () {
+        var B = window.QIBrain;
+        if (!B || !B.designCableSystem) return;
+        var params = {
+          routeKm: Number(document.getElementById("sdRouteKm").value),
+          fiberPairs: Number(document.getElementById("sdFiberPairs").value),
+          targetCapacityTbps: Number(document.getElementById("sdCapacity").value),
+          landingCount: Number(document.getElementById("sdLandings").value),
+          maxDepthM: Number(document.getElementById("sdDepth").value)
+        };
+        var result = B.designCableSystem(params);
+        if (!result) return;
+
+        var fmt = function (n) { return '$' + n.toLocaleString(); };
+
+        // Cable types table
+        var cableRows = result.cableTypes.map(function (ct) {
+          return '<tr><td>' + ct.depthRange + '</td><td>' + ct.type + '</td><td>' + ct.lengthKm + ' km</td></tr>';
+        }).join('');
+
+        // Cost breakdown table
+        var costRows = '<tr><td>Cable</td><td>' + fmt(result.costBreakdown.cable) + '</td></tr>' +
+          '<tr><td>Repeaters</td><td>' + fmt(result.costBreakdown.repeaters) + '</td></tr>' +
+          '<tr><td>Branching Units</td><td>' + fmt(result.costBreakdown.bus) + '</td></tr>' +
+          '<tr><td>SLTE</td><td>' + fmt(result.costBreakdown.slte) + '</td></tr>' +
+          '<tr><td>Shore Ends</td><td>' + fmt(result.costBreakdown.shoreEnds) + '</td></tr>' +
+          '<tr><td>Contingency (15%)</td><td>' + fmt(result.costBreakdown.contingency) + '</td></tr>' +
+          '<tr style="font-weight:700"><td>Total</td><td>' + fmt(result.costBreakdown.total) + '</td></tr>';
+
+        // Design notes
+        var notesHtml = result.designNotes.length > 0
+          ? '<ul>' + result.designNotes.map(function (n) { return '<li>' + n + '</li>'; }).join('') + '</ul>'
+          : '<p class="muted">No special design notes.</p>';
+
+        var html = '<div class="card" style="margin-top:16px"><h3>System Design Results</h3>' +
+          '<div class="grid kpis" style="margin-bottom:16px">' +
+          '<div class="kpi"><div class="label">Repeaters</div><div class="value">' + result.repeaterCount + '</div></div>' +
+          '<div class="kpi"><div class="label">Spacing</div><div class="value">' + result.repeaterSpacing + ' km</div></div>' +
+          '<div class="kpi"><div class="label">Power Feed</div><div class="value">' + result.powerFeed.voltage + 'V / ' + result.powerFeed.current + 'A</div></div>' +
+          '<div class="kpi"><div class="label">Fiber Pairs Req.</div><div class="value">' + result.fiberPairsRequired + '</div></div>' +
+          '<div class="kpi"><div class="label">Total Capacity</div><div class="value">' + result.totalCapacityTbps + ' Tbps</div></div>' +
+          '<div class="kpi"><div class="label">Branching Units</div><div class="value">' + result.branchingUnits + '</div></div>' +
+          '</div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">' +
+          '<div><h4>Cable Types</h4><table id="sdCableTable"><thead><tr><th>Depth Range</th><th>Type</th><th>Length</th></tr></thead><tbody>' + cableRows + '</tbody></table></div>' +
+          '<div><h4>Cost Breakdown</h4><table id="sdCostTable"><thead><tr><th>Item</th><th>Cost</th></tr></thead><tbody>' + costRows + '</tbody></table></div>' +
+          '</div>' +
+          '<div style="margin-top:16px"><h4>Design Notes</h4>' + notesHtml + '</div></div>';
+
+        document.getElementById("sdResults").innerHTML = html;
+      });
+    }
+  };
+
+  // ---------- Revenue Model ----------
+  RENDER.revenue = function () {
+    var priceOptions = '';
+    for (var p = 200; p <= 2000; p += 100) {
+      priceOptions += '<option value="' + p + '"' + (p === 1000 ? ' selected' : '') + '>$' + p + '</option>';
+    }
+    var takeUpOptions = '';
+    for (var t = 10; t <= 50; t += 5) {
+      takeUpOptions += '<option value="' + t + '"' + (t === 20 ? ' selected' : '') + '>' + t + '%</option>';
+    }
+    var growthOptions = '';
+    for (var g = 5; g <= 30; g += 5) {
+      growthOptions += '<option value="' + g + '"' + (g === 15 ? ' selected' : '') + '>' + g + '%</option>';
+    }
+    var opexOptions = '';
+    for (var o = 5; o <= 50; o += 5) {
+      opexOptions += '<option value="' + o + '"' + (o === 20 ? ' selected' : '') + '>$' + o + 'M</option>';
+    }
+
+    var form = '<div class="card"><h3>Revenue Model Parameters</h3>' +
+      '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px">' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Price/Lambda/Month</span><select id="rvPrice">' + priceOptions + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Take-up Y1</span><select id="rvTakeUp">' + takeUpOptions + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Annual Growth</span><select id="rvGrowth">' + growthOptions + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Annual Opex</span><select id="rvOpex">' + opexOptions + '</select></label>' +
+      '<button id="rvCalcBtn" class="btn-primary" style="padding:8px 16px">Calculate</button>' +
+      '</div></div>';
+
+    var results = '<div id="rvResults" class="muted" style="margin-top:8px">Select parameters and click Calculate to generate revenue projection.</div>';
+
+    return '<h2 style="margin-bottom:16px">Capacity & Revenue Planning</h2>' + form + results;
+  };
+
+  AFTER.revenue = function () {
+    var btn = document.getElementById("rvCalcBtn");
+    if (btn) {
+      btn.addEventListener("click", function () {
+        var B = window.QIBrain;
+        if (!B || !B.revenueModel || !B.designCableSystem) return;
+        // Get capex from a default system design
+        var sysResult = B.designCableSystem({ routeKm: 3000, fiberPairs: 8, targetCapacityTbps: 384, landingCount: 4, maxDepthM: 4000 });
+        var capex = sysResult.costBreakdown.total;
+        var totalCapacityTbps = sysResult.totalCapacityTbps;
+
+        var params = {
+          totalCapacityTbps: totalCapacityTbps,
+          pricePerLambdaPerMonth: Number(document.getElementById("rvPrice").value),
+          takeUpRateYear1Pct: Number(document.getElementById("rvTakeUp").value),
+          growthRateAnnualPct: Number(document.getElementById("rvGrowth").value),
+          operatingCostAnnualM: Number(document.getElementById("rvOpex").value),
+          capex: capex
+        };
+        var result = B.revenueModel(params);
+        if (!result) return;
+
+        var fmt = function (n) { return '$' + Math.round(n).toLocaleString(); };
+
+        // Yearly projection table
+        var projRows = result.yearlyProjection.map(function (yr) {
+          return '<tr><td>Year ' + yr.year + '</td><td>' + yr.sold + '</td><td>' + fmt(yr.revenue) + '</td><td>' + fmt(yr.opex) + '</td><td>' + fmt(yr.profit) + '</td><td>' + fmt(yr.cumulative) + '</td></tr>';
+        }).join('');
+
+        var paybackText = result.paybackMonths
+          ? 'Payback in ' + result.paybackMonths + ' months (' + (result.paybackMonths / 12).toFixed(1) + ' years)'
+          : 'Payback not achieved within 5 years';
+
+        var html = '<div class="card" style="margin-top:16px"><h3>5-Year Revenue Projection</h3>' +
+          '<div class="grid kpis" style="margin-bottom:16px">' +
+          '<div class="kpi"><div class="label">Total Lambdas</div><div class="value">' + result.totalLambdas + '</div></div>' +
+          '<div class="kpi"><div class="label">Payback</div><div class="value">' + (result.paybackMonths ? result.paybackMonths + ' mo' : 'N/A') + '</div></div>' +
+          '<div class="kpi"><div class="label">Simple ROI</div><div class="value">' + result.simpleROI + '%</div></div>' +
+          '<div class="kpi"><div class="label">CAPEX</div><div class="value">' + fmt(capex) + '</div></div>' +
+          '</div>' +
+          '<div class="table-wrap"><table id="rvProjectionTable"><thead><tr><th>Year</th><th>Lambdas Sold</th><th>Revenue</th><th>OPEX</th><th>Profit</th><th>Cumulative</th></tr></thead><tbody>' + projRows + '</tbody></table></div>' +
+          '<p style="margin-top:12px;font-weight:600">' + paybackText + '</p></div>';
+
+        document.getElementById("rvResults").innerHTML = html;
+      });
+    }
   };
 
   // ---------- Lessons Learned Library ----------
