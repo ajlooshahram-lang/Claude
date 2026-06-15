@@ -1196,5 +1196,19 @@ var itpHoldRows = doc.querySelector('.itpTable').querySelectorAll('tbody tr');
 ok(itpHoldRows.length < 14 && holdBtn.classList.contains("btn-primary"), "filtering to Hold points narrows the ITP table and highlights the button");
 ok(doc.getElementById("itpRefs") != null && /ISO 9001/.test(doc.getElementById("itpRefs").innerHTML), "ITP cites ISO 9001 basis");
 
+// 109) Route Progress Tracker
+var rpNav = doc.querySelector('.nav-item[data-view="routeprogress"]');
+ok(rpNav != null, "Route Progress nav item exists");
+if (rpNav) rpNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var rpKpis = doc.getElementById("rpKpis");
+ok(rpKpis != null && rpKpis.querySelectorAll('.kpi').length >= 5, "Route Progress shows roll-up KPI cards");
+var rpSeg = doc.querySelector('.rpSegTable');
+ok(rpSeg != null && rpSeg.querySelectorAll('tbody tr').length === 7, "Route Progress lists all 7 segments");
+ok(rpKpis != null && /Behind/.test(rpKpis.innerHTML), "Route Progress shows the schedule verdict (Behind vs 55% baseline)");
+// 110) Planned baseline slider flips the verdict
+var rpPlanned = doc.getElementById("rpPlanned");
+if (rpPlanned) { rpPlanned.value = "35"; rpPlanned.dispatchEvent(new window.Event("input", { bubbles: true })); }
+ok(/Ahead/.test(doc.getElementById("rpKpis").innerHTML), "lowering the planned baseline to 35% flips the verdict to Ahead");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

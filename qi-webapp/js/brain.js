@@ -5358,6 +5358,61 @@
     };
   }
 
+  // ---------- Route Progress Tracker (per-segment km laid) ----------
+  // Deterministic GIS-style progress model over the 8-country network. For each
+  // cable segment it tracks km laid vs total, the current works phase/status,
+  // and rolls up to an overall programme % with a planned-vs-actual (SPI-like)
+  // variance. Reuses the build-sequence scene so geometry stays consistent.
+  function routeProgressStatus(pct) {
+    if (pct <= 0) return "Planned";
+    if (pct < 31) return "Survey & Clearance";
+    if (pct < 71) return "Cable Lay";
+    if (pct < 91) return "Splicing & Jointing";
+    if (pct < 100) return "Testing";
+    return "Complete";
+  }
+  function routeProgress(params) {
+    params = params || {};
+    var plan = generateBuildSequence(params.network || {});
+    var segs = plan.scene.segments;
+    var defaultPct = { S1: 100, S2: 100, S3: 78, S4: 45, S5: 30, S6: 0, S7: 0 };
+    var override = params.progress || {};
+    var plannedPct = params.plannedPct != null ? Number(params.plannedPct) : 55;
+
+    var totalKm = 0, kmLaid = 0, complete = 0, inProgress = 0, notStarted = 0;
+    var segments = segs.map(function (g) {
+      var pct = override[g.id] != null ? Number(override[g.id]) : (defaultPct[g.id] != null ? defaultPct[g.id] : 0);
+      pct = Math.max(0, Math.min(100, pct));
+      var segKmLaid = Math.round(g.lengthKm * pct / 100);
+      totalKm += g.lengthKm; kmLaid += segKmLaid;
+      var status = routeProgressStatus(pct);
+      if (pct >= 100) complete++; else if (pct > 0) inProgress++; else notStarted++;
+      return {
+        id: g.id, from: g.fromName, to: g.toName, fromCountry: g.fromCountry, toCountry: g.toCountry,
+        cableType: g.cableType, lengthKm: g.lengthKm, kmLaid: segKmLaid,
+        pctComplete: pct, status: status
+      };
+    });
+    var overallPct = totalKm > 0 ? Math.round(kmLaid / totalKm * 1000) / 10 : 0;
+    var variance = Math.round((overallPct - plannedPct) * 10) / 10;
+    var schedule = variance > 2 ? "Ahead" : (variance < -2 ? "Behind" : "On track");
+
+    return {
+      segments: segments,
+      summary: {
+        totalKm: Math.round(totalKm), kmLaid: kmLaid, remainingKm: Math.round(totalKm) - kmLaid,
+        overallPct: overallPct, plannedPct: plannedPct, variancePct: variance, schedule: schedule,
+        segmentsComplete: complete, segmentsInProgress: inProgress, segmentsNotStarted: notStarted,
+        totalSegments: segments.length
+      },
+      references: [
+        "Route Position List (RPL) & post-lay survey — as-laid km verification",
+        "EVM (ITU/PMI) — physical % complete feeds SPI/CPI",
+        "ICPC Rec. No. 2 — as-cleared / as-laid route charting"
+      ]
+    };
+  }
+
   var API = {
     analyzeProject: analyzeProject,
     listProfiles: listProfiles,
@@ -5381,6 +5436,7 @@
     listClauses: listClauses,
     variationImpact: variationImpact,
     generateITP: generateITP,
+    routeProgress: routeProgress,
     checkAlerts: checkAlerts,
     monteCarloSchedule: monteCarloSchedule,
     monteCarloCost: monteCarloCost,

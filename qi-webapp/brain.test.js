@@ -1786,5 +1786,29 @@ console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
   ok(custom.summary.total === 1 && custom.summary.holdPoints === 1, "custom ITP items honoured");
 })();
 
+// ===== Route Progress Tracker =====
+(function () {
+  console.log("\n--- Route Progress Tracker ---");
+  var r = B.routeProgress();
+  var s = r.summary;
+  ok(s.totalSegments === 7 && s.totalKm === 9080, "tracks the 7-segment, 9,080 km network");
+  ok(r.segments.reduce(function (a, x) { return a + x.kmLaid; }, 0) === s.kmLaid, "segment km-laid sums to the programme total");
+  ok(s.kmLaid + s.remainingKm === s.totalKm, "laid + remaining = total km");
+  ok(s.overallPct === 40.1, "default profile is 40.1% complete (got " + s.overallPct + ")");
+  ok(s.segmentsComplete === 2 && s.segmentsInProgress === 3 && s.segmentsNotStarted === 2, "segment status split: 2 complete / 3 in progress / 2 not started");
+  ok(s.plannedPct === 55 && s.variancePct === -14.9 && s.schedule === "Behind", "behind the 55% planned baseline (variance -14.9%)");
+  var s3 = r.segments.filter(function (x) { return x.id === "S3"; })[0];
+  ok(s3 && s3.pctComplete === 78 && s3.status === "Splicing & Jointing", "78% segment maps to the Splicing & Jointing phase");
+  var s5 = r.segments.filter(function (x) { return x.id === "S5"; })[0];
+  ok(s5 && s5.status === "Survey & Clearance", "30% segment maps to Survey & Clearance");
+  ok(r.segments.every(function (x) { return x.kmLaid === Math.round(x.lengthKm * x.pctComplete / 100); }), "km laid is consistent with each segment's percent complete");
+  // Planned baseline drives the schedule verdict
+  ok(B.routeProgress({ plannedPct: 35 }).summary.schedule === "Ahead", "lowering the planned baseline to 35% flips the verdict to Ahead");
+  ok(B.routeProgress({ plannedPct: 40 }).summary.schedule === "On track", "a 40% planned baseline is On track");
+  // Override + determinism
+  ok(B.routeProgress({ progress: { S6: 50 } }).segments.filter(function (x) { return x.id === "S6"; })[0].pctComplete === 50, "per-segment progress override is honoured");
+  ok(JSON.stringify(r) === JSON.stringify(B.routeProgress()), "route progress is deterministic");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);

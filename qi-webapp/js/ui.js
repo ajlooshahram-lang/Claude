@@ -254,6 +254,7 @@
     { id: "wavelengths", label: "Wavelength Planner", icon: "\uD83C\uDF08" },
     { id: "latency", label: "Latency Calculator", icon: "\u23F1" },
     { id: "buildanim", label: "3D Build Visualisation", icon: "\uD83C\uDFD7\uFE0F" },
+    { id: "routeprogress", label: "Route Progress", icon: "\uD83D\uDCCD" },
     { id: "revenue", label: "Revenue Model", icon: "\uD83D\uDCB0" },
     { id: "routeopt", label: "Route Optimizer", icon: "\uD83D\uDEE4" },
     { id: "predictive", label: "Fault Forecast", icon: "\uD83D\uDCE1" },
@@ -2038,6 +2039,61 @@
     ["cpRoute", "cpTrawl", "cpAnchor", "cpSeabed", "cpSeismic"].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.addEventListener("change", recompute);
+    });
+  };
+
+  // ---------- Route Progress Tracker ----------
+  function rpStatusColor(st) {
+    return st === "Complete" ? "var(--green,#1e7e34)" : st === "Testing" || st === "Splicing & Jointing" ? "#3498db" :
+      st === "Cable Lay" ? "#22a3c4" : st === "Survey & Clearance" ? "var(--gold,#e0a800)" : "var(--text-muted,#8fa3b5)";
+  }
+  function rpResultsHtml(r) {
+    if (!r) return '<div class="muted">Route engine unavailable.</div>';
+    var s = r.summary;
+    var schedColor = s.schedule === "Ahead" ? "var(--green,#1e7e34)" : s.schedule === "Behind" ? "var(--red,#c0392b)" : "#3498db";
+    var kpis = '<div class="grid kpis" id="rpKpis" style="margin-bottom:14px">' +
+      '<div class="kpi"><div class="label">Overall complete</div><div class="value">' + s.overallPct + '%</div></div>' +
+      '<div class="kpi"><div class="label">Cable laid</div><div class="value">' + s.kmLaid.toLocaleString() + ' / ' + s.totalKm.toLocaleString() + ' km</div></div>' +
+      '<div class="kpi"><div class="label">Schedule</div><div class="value" style="color:' + schedColor + '">' + s.schedule + ' (' + (s.variancePct > 0 ? "+" : "") + s.variancePct + '%)</div></div>' +
+      '<div class="kpi"><div class="label">Segments complete</div><div class="value">' + s.segmentsComplete + ' / ' + s.totalSegments + '</div></div>' +
+      '<div class="kpi"><div class="label">Remaining</div><div class="value">' + s.remainingKm.toLocaleString() + ' km</div></div>' +
+      '</div>';
+    var rows = r.segments.map(function (g) {
+      var col = rpStatusColor(g.status);
+      var bar = '<div style="background:var(--border,#e2e8f0);border-radius:5px;height:10px;overflow:hidden;min-width:90px">' +
+        '<div style="height:100%;width:' + g.pctComplete + '%;background:' + col + '"></div></div>';
+      return '<tr><td><strong>' + esc(g.id) + '</strong></td><td>' + esc(g.fromCountry) + ' &rarr; ' + esc(g.toCountry) + '</td>' +
+        '<td>' + esc(g.cableType) + '</td><td class="right">' + g.lengthKm.toLocaleString() + '</td>' +
+        '<td class="right">' + g.kmLaid.toLocaleString() + '</td><td>' + bar + '</td>' +
+        '<td class="right">' + g.pctComplete + '%</td><td style="color:' + col + ';font-weight:600">' + esc(g.status) + '</td></tr>';
+    }).join("");
+    var table = '<div class="card"><h3>Route segments</h3><div class="table-wrap"><table class="rpSegTable"><thead><tr>' +
+      '<th>ID</th><th>Route</th><th>Cable</th><th class="right">Length km</th><th class="right">Laid km</th><th>Progress</th><th class="right">%</th><th>Status</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<p class="muted" style="margin-top:8px">In progress ' + s.segmentsInProgress + ' &middot; Not started ' + s.segmentsNotStarted + ' &middot; Planned baseline ' + s.plannedPct + '%</p></div>';
+    var refs = '<div class="card" id="rpRefs"><h3>Basis</h3><ul style="margin:0;padding-left:20px">' + r.references.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul></div>';
+    return kpis + table + refs;
+  }
+  RENDER.routeprogress = function () {
+    var B = window.QIBrain;
+    if (!B || !B.routeProgress) return '<h2>Route Progress</h2><p class="muted">Route engine unavailable.</p>';
+    uiState.routeProg = { plannedPct: 55 };
+    var r = B.routeProgress();
+    var form = '<div class="card" style="margin-bottom:14px"><h3>Planned baseline</h3>' +
+      '<label class="muted" for="rpPlanned">Planned % complete to date: <span id="rpPlannedLabel">55</span>%</label>' +
+      '<input type="range" id="rpPlanned" min="0" max="100" value="55" step="5" style="width:100%">' +
+      '</div>';
+    return '<h2 style="margin-bottom:6px">Route Progress Tracker</h2>' +
+      '<p class="muted" style="margin-bottom:14px">Per-segment km-laid progress across the 8-country network, rolled up to overall % with a planned-vs-actual schedule variance.</p>' +
+      form + '<div id="rpResults">' + rpResultsHtml(r) + '</div>';
+  };
+  AFTER.routeprogress = function () {
+    var B = window.QIBrain;
+    if (!B || !B.routeProgress) return;
+    var sl = document.getElementById("rpPlanned");
+    if (sl) sl.addEventListener("input", function () {
+      var lbl = document.getElementById("rpPlannedLabel"); if (lbl) lbl.textContent = sl.value;
+      document.getElementById("rpResults").innerHTML = rpResultsHtml(B.routeProgress({ plannedPct: Number(sl.value) }));
     });
   };
 
