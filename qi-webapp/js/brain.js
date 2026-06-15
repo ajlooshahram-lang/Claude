@@ -3369,23 +3369,41 @@
       var dist = R * c;
       totalDistanceKm += dist;
 
-      // Check hazard proximity for this segment
+      // Proper proximity check: sample points along the segment densely enough
+      // that no hazard within its radius can be missed. Sample spacing must be
+      // less than the smallest hazard radius. Use max(20, route_length/max_radius) samples.
+      var minHazRadius = Infinity;
+      for (var hr = 0; hr < hazards.length; hr++) {
+        if (hazards[hr].radius < minHazRadius) minHazRadius = hazards[hr].radius;
+      }
+      // Approximate segment length in km for sample count calculation
+      var segApproxKm = dist; // from Haversine above
+      var SAMPLES = Math.max(20, Math.ceil(segApproxKm / (minHazRadius > 0 ? minHazRadius * 0.8 : 50)));
+      if (SAMPLES > 500) SAMPLES = 500; // cap for performance
+
       for (var h = 0; h < hazards.length; h++) {
         var hazard = hazards[h];
-        // Simple proximity check: distance from hazard center to segment midpoint
-        var midLat = (seg.startLat + seg.endLat) / 2;
-        var midLng = (seg.startLng + seg.endLng) / 2;
-        var hLat1 = midLat * Math.PI / 180;
-        var hLat2 = hazard.lat * Math.PI / 180;
-        var hdLat = (hazard.lat - midLat) * Math.PI / 180;
-        var hdLng = (hazard.lng - midLng) * Math.PI / 180;
-        var ha = Math.sin(hdLat / 2) * Math.sin(hdLat / 2) +
-                 Math.cos(hLat1) * Math.cos(hLat2) *
-                 Math.sin(hdLng / 2) * Math.sin(hdLng / 2);
-        var hc = 2 * Math.atan2(Math.sqrt(ha), Math.sqrt(1 - ha));
-        var hDist = R * hc;
+        var minHazDist = Infinity;
 
-        if (hDist <= hazard.radius) {
+        for (var s = 0; s <= SAMPLES; s++) {
+          var t = s / SAMPLES;
+          var sampleLat = seg.startLat + t * (seg.endLat - seg.startLat);
+          var sampleLng = seg.startLng + t * (seg.endLng - seg.startLng);
+
+          var hLat1 = sampleLat * Math.PI / 180;
+          var hLat2 = hazard.lat * Math.PI / 180;
+          var hdLat = (hazard.lat - sampleLat) * Math.PI / 180;
+          var hdLng = (hazard.lng - sampleLng) * Math.PI / 180;
+          var ha = Math.sin(hdLat / 2) * Math.sin(hdLat / 2) +
+                   Math.cos(hLat1) * Math.cos(hLat2) *
+                   Math.sin(hdLng / 2) * Math.sin(hdLng / 2);
+          var hc = 2 * Math.atan2(Math.sqrt(ha), Math.sqrt(1 - ha));
+          var hDist = R * hc;
+
+          if (hDist < minHazDist) minHazDist = hDist;
+        }
+
+        if (minHazDist <= hazard.radius) {
           var alreadyFound = false;
           for (var x = 0; x < hazardsNearRoute.length; x++) {
             if (hazardsNearRoute[x].lat === hazard.lat && hazardsNearRoute[x].lng === hazard.lng) {
@@ -3399,30 +3417,38 @@
               lng: hazard.lng,
               type: hazard.type,
               radius: hazard.radius,
-              distanceKm: Math.round(hDist * 10) / 10
+              distanceKm: Math.round(minHazDist * 10) / 10
             });
             // Recommend avoidance and estimate deviation
-            var deviationKm = Math.round((hazard.radius - hDist + 10) * 1.4);
+            var deviationKm = Math.round((hazard.radius - minHazDist + 10) * 1.4);
             alternativeKm += deviationKm;
             recommendations.push("Avoid " + hazard.type + " at " + hazard.lat.toFixed(2) + "/" + hazard.lng.toFixed(2) + " - offset route by ~" + deviationKm + " km");
           }
         }
       }
 
-      // Check shipping lane crossings
+      // Check shipping lane crossings — sample along segment
       for (var l = 0; l < shippingLanes.length; l++) {
         var lane = shippingLanes[l];
-        var lLat1 = midLat * Math.PI / 180;
-        var lLat2 = lane.lat * Math.PI / 180;
-        var ldLat = (lane.lat - midLat) * Math.PI / 180;
-        var ldLng = (lane.lng - midLng) * Math.PI / 180;
-        var la = Math.sin(ldLat / 2) * Math.sin(ldLat / 2) +
-                 Math.cos(lLat1) * Math.cos(lLat2) *
-                 Math.sin(ldLng / 2) * Math.sin(ldLng / 2);
-        var lc = 2 * Math.atan2(Math.sqrt(la), Math.sqrt(1 - la));
-        var lDist = R * lc;
-        if (lDist <= lane.width / 2) {
-          lanesCrossed++;
+        var laneDetected = false;
+        for (var sl = 0; sl <= SAMPLES; sl++) {
+          var lt = sl / SAMPLES;
+          var lSampleLat = seg.startLat + lt * (seg.endLat - seg.startLat);
+          var lSampleLng = seg.startLng + lt * (seg.endLng - seg.startLng);
+          var lLat1 = lSampleLat * Math.PI / 180;
+          var lLat2 = lane.lat * Math.PI / 180;
+          var ldLat = (lane.lat - lSampleLat) * Math.PI / 180;
+          var ldLng = (lane.lng - lSampleLng) * Math.PI / 180;
+          var la = Math.sin(ldLat / 2) * Math.sin(ldLat / 2) +
+                   Math.cos(lLat1) * Math.cos(lLat2) *
+                   Math.sin(ldLng / 2) * Math.sin(ldLng / 2);
+          var lc = 2 * Math.atan2(Math.sqrt(la), Math.sqrt(1 - la));
+          var lDist = R * lc;
+          if (lDist <= lane.width / 2) {
+            lanesCrossed++;
+            laneDetected = true;
+            break; // count each lane only once per segment
+          }
         }
       }
     }
