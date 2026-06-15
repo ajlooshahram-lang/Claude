@@ -32,7 +32,7 @@ ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard rende
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 
 // 2) navigate every view (simulate clicks)
-const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","raci","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","workflows","documents","report","audit","config","help","repair","clientview","spares","insurance","environmental","permits","competitive"];
+const views = ["guide","portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","raci","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","workflows","documents","report","audit","config","help","repair","clientview","spares","insurance","environmental","permits","competitive","dataimport"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -981,6 +981,22 @@ ok(benchmarkNav != null, "Benchmarking nav item exists");
 if (benchmarkNav) benchmarkNav.dispatchEvent(new window.Event("click", { bubbles: true }));
 var benchmarkTable = doc.getElementById("benchmarkTable");
 ok(benchmarkTable != null && benchmarkTable.querySelectorAll('tbody tr').length >= 4, "Benchmark table renders metrics with industry comparison");
+
+// 76) Getting Started / Onboarding Guide
+var guideNav = doc.querySelector('.nav-item[data-view="guide"]');
+ok(guideNav != null, "Getting Started nav item exists");
+
+if (guideNav) guideNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var guideContent = doc.getElementById("content").innerHTML;
+ok(guideContent.indexOf("guide-go-btn") !== -1 && guideContent.indexOf("data-target=") !== -1, "Getting Started has step navigation buttons");
+
+// 77) Data Import Wizard
+var dataimportNav = doc.querySelector('.nav-item[data-view="dataimport"]');
+ok(dataimportNav != null, "Data Import nav item exists");
+
+if (dataimportNav) dataimportNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var importUpload = doc.getElementById("importUploadArea");
+ok(importUpload != null && doc.getElementById("importCsvFile") != null, "Data Import has upload area");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

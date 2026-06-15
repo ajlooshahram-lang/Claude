@@ -212,6 +212,7 @@
 
   // ---------- views config ----------
   const VIEWS = [
+    { id: "guide", label: "Getting Started", icon: "\uD83D\uDE80" },
     { g: "Overview" },
     { id: "clientview", label: "Client Portal", icon: "👁" },
     { id: "brain", label: "Project Brain", icon: "🧠" },
@@ -259,6 +260,7 @@
     { id: "scorecard", label: "KPI Scorecard", icon: "▣" },
     { id: "health", label: "Data Health", icon: "✚" },
     { g: "Setup" },
+    { id: "dataimport", label: "Import Data", icon: "\uD83D\uDCE5" },
     { id: "workflows", label: "Workflows", icon: "⇉" },
     { id: "documents", label: "Documents", icon: "📄" },
     { id: "report", label: "Report Pack", icon: "🖨" },
@@ -3191,6 +3193,279 @@
       const fr = new FileReader();
       fr.onload = () => { S.setBrand({ logo: fr.result }); refreshHeader(); go("config"); toast("Logo set."); };
       fr.readAsDataURL(f);
+    });
+  };
+
+  // ---------- Getting Started / Onboarding Guide ----------
+  RENDER.guide = function () {
+    var dontShow = false;
+    try { dontShow = localStorage.getItem("qi_guide_dismiss") === "1"; } catch (e) {}
+    return '<h2 style="margin-bottom:16px">\uD83D\uDE80 Getting Started</h2>' +
+      '<div class="card"><h3>Welcome to QI Platform</h3>' +
+      '<p style="line-height:1.7">Welcome to QI Platform &mdash; your submarine cable programme command center. ' +
+      'This guide walks you through the key steps to get your project up and running.</p></div>' +
+
+      '<div class="card"><h3>Step 1: Upload your project description</h3>' +
+      '<p style="line-height:1.7">The <b>Project Brain</b> analyses your project description locally on this device and generates ' +
+      'a full plan: tasks, risks, milestones, procurement, and a budget skeleton. Nothing is sent to any server.</p>' +
+      '<button class="btn btn-primary guide-go-btn" data-target="brain">Go there \u2192</button></div>' +
+
+      '<div class="card"><h3>Step 2: Review and apply the generated plan</h3>' +
+      '<p style="line-height:1.7">After analysis, the Brain presents a preview of everything it created: tasks with owners and timelines, ' +
+      'a risk register with RPN scores, milestones for each phase, procurement packages, and budget allocations. ' +
+      'Review the plan and click <b>Apply</b> to populate your project.</p>' +
+      '<button class="btn guide-go-btn" data-target="brain">Go there \u2192</button></div>' +
+
+      '<div class="card"><h3>Step 3: Explore your programme</h3>' +
+      '<p style="line-height:1.7">Once the plan is applied, explore the generated programme data across multiple views:</p>' +
+      '<ul style="line-height:1.9;margin:8px 0">' +
+      '<li><b>Programme Timeline</b> &mdash; Gantt chart of all phases and segments</li>' +
+      '<li><b>3D Globe</b> &mdash; Interactive CesiumJS visualization of cable routes</li>' +
+      '<li><b>Risk Heat Map</b> &mdash; Visual severity matrix for all identified risks</li>' +
+      '<li><b>Client Portal</b> &mdash; Investor-ready progress dashboard</li></ul>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button class="btn guide-go-btn" data-target="programme">Programme Timeline</button>' +
+      '<button class="btn guide-go-btn" data-target="riskheat">Risk Heat Map</button>' +
+      '<button class="btn guide-go-btn" data-target="clientview">Client Portal</button></div></div>' +
+
+      '<div class="card"><h3>Step 4: Track permits and contracts</h3>' +
+      '<p style="line-height:1.7">Manage regulatory submissions, workflow approvals, and project documentation:</p>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button class="btn guide-go-btn" data-target="permits">Permit Tracker</button>' +
+      '<button class="btn guide-go-btn" data-target="workflows">Workflows</button>' +
+      '<button class="btn guide-go-btn" data-target="documents">Documents</button></div></div>' +
+
+      '<div class="card"><h3>Step 5: Monitor performance</h3>' +
+      '<p style="line-height:1.7">Track SLAs, simulate failures, forecast faults, and benchmark against industry standards:</p>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button class="btn guide-go-btn" data-target="sla">SLA Management</button>' +
+      '<button class="btn guide-go-btn" data-target="digitaltwin">Digital Twin</button>' +
+      '<button class="btn guide-go-btn" data-target="predictive">Fault Forecast</button>' +
+      '<button class="btn guide-go-btn" data-target="benchmark">Benchmarking</button></div></div>' +
+
+      '<div class="card"><h3>Step 6: Report to stakeholders</h3>' +
+      '<p style="line-height:1.7">Generate professional reports for investors, regulators, and project boards:</p>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button class="btn guide-go-btn" data-target="clientview">Client Portal</button>' +
+      '<button class="btn guide-go-btn" data-target="report">Report Pack</button></div></div>' +
+
+      '<div class="card"><h3>Pro Tips</h3>' +
+      '<ul style="line-height:1.9;margin:8px 0">' +
+      '<li><b>Keyboard shortcuts:</b> Press <kbd>?</kbd> for the full list. <kbd>N</kbd> = new case, <kbd>D</kbd> = dashboard, <kbd>T</kbd> = toggle dark mode</li>' +
+      '<li><b>Dark mode:</b> Great for projector presentations &mdash; press <kbd>T</kbd> or use Settings</li>' +
+      '<li><b>Language switching:</b> Change language in Settings to Thai, Vietnamese, Indonesian, or Danish</li>' +
+      '<li><b>Presentation Mode:</b> Auto-cycles key views for boardroom display</li></ul></div>' +
+
+      '<div class="card"><label style="display:flex;align-items:center;gap:8px;cursor:pointer">' +
+      '<input type="checkbox" id="guideDismiss" ' + (dontShow ? 'checked' : '') + ' />' +
+      '<span>Don\'t show again on first load</span></label></div>';
+  };
+  AFTER.guide = function () {
+    var btns = document.querySelectorAll(".guide-go-btn");
+    btns.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var target = btn.getAttribute("data-target");
+        if (target && RENDER[target]) go(target);
+      });
+    });
+    var chk = document.getElementById("guideDismiss");
+    if (chk) chk.addEventListener("change", function () {
+      try { localStorage.setItem("qi_guide_dismiss", chk.checked ? "1" : "0"); } catch (e) {}
+    });
+  };
+
+  // ---------- Data Import Wizard ----------
+  RENDER.dataimport = function () {
+    var history = [];
+    try { history = JSON.parse(localStorage.getItem("qi_import_history") || "[]"); } catch (e) {}
+    history = history.slice(-3);
+
+    var historyRows = history.length > 0
+      ? history.map(function (h) {
+          return '<tr><td>' + esc(h.date) + '</td><td>' + esc(h.type) + '</td><td>' + h.rows + '</td></tr>';
+        }).join('')
+      : '<tr><td colspan="3" class="muted">No imports yet</td></tr>';
+
+    return '<h2 style="margin-bottom:16px">\uD83D\uDCE5 Data Import Wizard</h2>' +
+
+      '<div class="card" id="importUploadArea">' +
+      '<h3>Upload CSV File</h3>' +
+      '<p style="line-height:1.7;margin-bottom:12px">Select a .csv file to import project data. Choose the data type first, then upload the file matching that template.</p>' +
+      '<div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Data Type</span>' +
+      '<select id="importType">' +
+      '<option value="cases">Cases</option>' +
+      '<option value="milestones">Milestones</option>' +
+      '<option value="procurement">Procurement</option>' +
+      '<option value="permits">Permits</option>' +
+      '</select></label>' +
+      '<label class="btn btn-primary" for="importCsvFile" style="cursor:pointer;padding:8px 16px">Choose CSV File</label>' +
+      '<input id="importCsvFile" type="file" accept=".csv" hidden />' +
+      '<span id="importFileName" class="muted"></span></div>' +
+      '<div id="importPreview" style="margin-top:16px"></div>' +
+      '<div id="importActions" style="margin-top:12px;display:none">' +
+      '<button class="btn btn-primary" id="importConfirmBtn">Import</button>' +
+      '<button class="btn" id="importCancelBtn">Cancel</button></div></div>' +
+
+      '<div class="card"><h3>CSV Templates</h3>' +
+      '<p style="line-height:1.7;margin-bottom:12px">Download a template with the correct column headers for each data type:</p>' +
+      '<table style="width:100%;border-collapse:collapse;margin-bottom:12px"><thead><tr><th style="text-align:left">Type</th><th style="text-align:left">Columns</th><th></th></tr></thead><tbody>' +
+      '<tr><td><b>Cases</b></td><td class="muted" style="font-size:0.85em">problem, category, priority, sev, occ, det, owner, status, estCost, actCost</td>' +
+      '<td><button class="btn btn-sm import-dl-btn" data-tmpl="cases">Download</button></td></tr>' +
+      '<tr><td><b>Milestones</b></td><td class="muted" style="font-size:0.85em">milestone, baseline, forecast, actual, status, owner</td>' +
+      '<td><button class="btn btn-sm import-dl-btn" data-tmpl="milestones">Download</button></td></tr>' +
+      '<tr><td><b>Procurement</b></td><td class="muted" style="font-size:0.85em">package, vendor, value, poStatus, owner</td>' +
+      '<td><button class="btn btn-sm import-dl-btn" data-tmpl="procurement">Download</button></td></tr>' +
+      '<tr><td><b>Permits</b></td><td class="muted" style="font-size:0.85em">country, authority, permitType, submittedDate, expectedDays, status</td>' +
+      '<td><button class="btn btn-sm import-dl-btn" data-tmpl="permits">Download</button></td></tr>' +
+      '</tbody></table></div>' +
+
+      '<div class="card"><h3>Import History</h3>' +
+      '<div class="table-wrap"><table id="importHistoryTable"><thead><tr><th>Date</th><th>Type</th><th>Rows</th></tr></thead><tbody>' +
+      historyRows + '</tbody></table></div></div>';
+  };
+  AFTER.dataimport = function () {
+    var TEMPLATES = {
+      cases: "problem,category,priority,sev,occ,det,owner,status,estCost,actCost",
+      milestones: "milestone,baseline,forecast,actual,status,owner",
+      procurement: "package,vendor,value,poStatus,owner",
+      permits: "country,authority,permitType,submittedDate,expectedDays,status"
+    };
+
+    var parsedRows = [];
+
+    // Download template buttons
+    document.querySelectorAll(".import-dl-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var tmpl = btn.getAttribute("data-tmpl");
+        var csv = TEMPLATES[tmpl] + "\n";
+        var blob = new (window.Blob || function () {})([csv], { type: "text/csv" });
+        var a = document.createElement("a");
+        a.href = window.URL ? window.URL.createObjectURL(blob) : "";
+        a.download = tmpl + "_template.csv";
+        a.click();
+      });
+    });
+
+    // File upload
+    var fileInput = document.getElementById("importCsvFile");
+    var nameEl = document.getElementById("importFileName");
+    var previewEl = document.getElementById("importPreview");
+    var actionsEl = document.getElementById("importActions");
+
+    if (fileInput) fileInput.addEventListener("change", function () {
+      var f = fileInput.files && fileInput.files[0];
+      if (!f) return;
+      nameEl.textContent = f.name;
+      var reader = new FileReader();
+      reader.onload = function () {
+        var text = String(reader.result || "");
+        var lines = text.trim().split("\n").map(function (l) { return l.split(","); });
+        if (lines.length < 2) { previewEl.innerHTML = '<p class="muted">File is empty or has no data rows.</p>'; return; }
+        var headers = lines[0].map(function (h) { return h.trim(); });
+        var dataType = document.getElementById("importType").value;
+        var expectedCols = TEMPLATES[dataType].split(",");
+        var valid = expectedCols.every(function (c) { return headers.indexOf(c) >= 0; });
+        if (!valid) {
+          previewEl.innerHTML = '<p style="color:var(--red)">Column mismatch. Expected: ' + esc(expectedCols.join(", ")) + '</p>';
+          actionsEl.style.display = "none";
+          parsedRows = [];
+          return;
+        }
+        parsedRows = lines.slice(1, 6).map(function (row) {
+          var obj = {};
+          headers.forEach(function (h, i) { obj[h] = (row[i] || "").trim(); });
+          return obj;
+        });
+        var allRows = lines.slice(1).map(function (row) {
+          var obj = {};
+          headers.forEach(function (h, i) { obj[h] = (row[i] || "").trim(); });
+          return obj;
+        });
+        // Store all rows for import
+        parsedRows._allRows = allRows;
+
+        // Preview table
+        var previewHtml = '<p><b>Preview</b> (first ' + Math.min(5, allRows.length) + ' of ' + allRows.length + ' rows):</p>' +
+          '<div class="table-wrap"><table><thead><tr>' + headers.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') +
+          '</tr></thead><tbody>' +
+          parsedRows.map(function (row) {
+            return '<tr>' + headers.map(function (h) { return '<td>' + esc(row[h] || '') + '</td>'; }).join('') + '</tr>';
+          }).join('') + '</tbody></table></div>';
+        previewEl.innerHTML = previewHtml;
+        actionsEl.style.display = "";
+      };
+      reader.readAsText(f);
+    });
+
+    // Import button
+    var confirmBtn = document.getElementById("importConfirmBtn");
+    if (confirmBtn) confirmBtn.addEventListener("click", function () {
+      var dataType = document.getElementById("importType").value;
+      var rows = parsedRows._allRows || parsedRows;
+      if (!rows || rows.length === 0) { toast("No data to import."); return; }
+
+      var imported = 0;
+      if (dataType === "cases") {
+        rows.forEach(function (row) {
+          S.addCase({
+            problem: row.problem || "", category: row.category || "Other",
+            priority: row.priority || "4-LOW", sev: Number(row.sev) || 1,
+            occ: Number(row.occ) || 1, det: Number(row.det) || 1,
+            owner: row.owner || "", status: row.status || "OPEN",
+            estCost: Number(row.estCost) || 0, actCost: Number(row.actCost) || 0,
+            percent: 0, startDate: new Date().toISOString().slice(0, 10),
+            dateLogged: new Date().toISOString().slice(0, 10), costCat: "Other"
+          });
+          imported++;
+        });
+      } else if (dataType === "milestones") {
+        rows.forEach(function (row) {
+          S.regAdd("milestones", {
+            milestone: row.milestone || "", baseline: row.baseline || "",
+            forecast: row.forecast || "", actual: row.actual || "",
+            status: row.status || "Planned", owner: row.owner || ""
+          });
+          imported++;
+        });
+      } else if (dataType === "procurement") {
+        rows.forEach(function (row) {
+          S.regAdd("procurement", {
+            package: row["package"] || "", vendor: row.vendor || "",
+            value: Number(row.value) || 0, poStatus: row.poStatus || "Draft",
+            owner: row.owner || ""
+          });
+          imported++;
+        });
+      } else if (dataType === "permits") {
+        rows.forEach(function (row) {
+          S.regAdd("permits", {
+            country: row.country || "", authority: row.authority || "",
+            permitType: row.permitType || "", submittedDate: row.submittedDate || "",
+            expectedDays: Number(row.expectedDays) || 0, status: row.status || "Pending"
+          });
+          imported++;
+        });
+      }
+
+      // Record import history
+      var history = [];
+      try { history = JSON.parse(localStorage.getItem("qi_import_history") || "[]"); } catch (e) {}
+      history.push({ date: new Date().toISOString().slice(0, 10), type: dataType, rows: imported });
+      if (history.length > 3) history = history.slice(-3);
+      try { localStorage.setItem("qi_import_history", JSON.stringify(history)); } catch (e) {}
+
+      toast(imported + " " + dataType + " imported successfully.");
+      go("dataimport");
+    });
+
+    // Cancel button
+    var cancelBtn = document.getElementById("importCancelBtn");
+    if (cancelBtn) cancelBtn.addEventListener("click", function () {
+      previewEl.innerHTML = "";
+      actionsEl.style.display = "none";
+      nameEl.textContent = "";
+      parsedRows = [];
     });
   };
 
