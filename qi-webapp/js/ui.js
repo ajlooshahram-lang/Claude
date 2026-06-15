@@ -276,6 +276,7 @@
     items.push({ id: "bowtie", label: "Bow-tie (HAZOP)", icon: "🎀" });
     items.push({ id: "spares", label: "Spare Parts", icon: "\uD83D\uDDC4" });
     items.push({ id: "protection", label: "Protection Zones", icon: "\uD83D\uDEA7" });
+    items.push({ id: "commissioning", label: "Commissioning", icon: "\u2705" });
     items.push({ g: "Business" }, { id: "evm", label: "Earned Value (EVM)", icon: "∑" }, { id: "cashflow", label: "Cash Flow / S-curve", icon: "〽" }, { id: "prioritise", label: "Prioritisation (RICE/WSJF)", icon: "⤒" });
     C.REGISTERS.filter(r => r.group === "Business").forEach(r => items.push({ id: r.id, label: r.label, icon: r.icon }));
     items.push({ id: "insurance", label: "Insurance", icon: "\uD83D\uDEE1" });
@@ -1737,6 +1738,76 @@
       '</ul></div>';
 
     return '<h2 style="margin-bottom:16px">Cable Protection Zone Registry</h2>' + summaryCards + table + recs;
+  };
+
+  // ---------- Commissioning Checklist Generator ----------
+  RENDER.commissioning = function () {
+    var B = window.QIBrain;
+    var result = B.generateCommissioningChecklist({
+      segments: [
+        { name: "Singapore-Jakarta", lengthKm: 1200, fiberPairs: 8, repeaterCount: 15 },
+        { name: "Jakarta-Bangkok", lengthKm: 2800, fiberPairs: 8, repeaterCount: 35 },
+        { name: "Bangkok-Ho Chi Minh", lengthKm: 1500, fiberPairs: 8, repeaterCount: 19 },
+        { name: "Ho Chi Minh-Manila", lengthKm: 1800, fiberPairs: 8, repeaterCount: 23 },
+        { name: "Manila-Taipei", lengthKm: 1100, fiberPairs: 8, repeaterCount: 14 },
+        { name: "Taipei-Guam", lengthKm: 2700, fiberPairs: 8, repeaterCount: 34 }
+      ],
+      fiberType: "G.654.E",
+      wavelength: 1550,
+      systemDesignLife: 25
+    });
+
+    var sum = result.summary;
+
+    // KPI cards
+    var kpis = '<div class="grid kpis" id="commissioningKpis" style="margin-bottom:16px">' +
+      '<div class="kpi"><div class="label">Total Segments</div><div class="value">' + sum.totalSegments + '</div></div>' +
+      '<div class="kpi"><div class="label">Total Tests</div><div class="value">' + sum.applicableTests + '</div></div>' +
+      '<div class="kpi"><div class="label">Critical Tests</div><div class="value" style="color:#e74c3c">' + sum.criticalTests + '</div></div>' +
+      '<div class="kpi"><div class="label">Completion</div><div class="value" style="color:#f39c12">' + sum.completionPercentage + '%</div></div>' +
+      '<div class="kpi"><div class="label">Ready for Acceptance</div><div class="value" style="color:' + (sum.readyForAcceptance ? '#27ae60' : '#e74c3c') + '">' + (sum.readyForAcceptance ? 'YES' : 'NO') + '</div></div>' +
+      '</div>';
+
+    // Segment checklist tables
+    var segTables = '';
+    for (var i = 0; i < result.segments.length; i++) {
+      var seg = result.segments[i];
+      var segRows = '';
+      for (var j = 0; j < seg.tests.length; j++) {
+        var t = seg.tests[j];
+        if (t.applicability === "not_applicable") continue;
+        var critBadge = t.critical ? '<span style="background:#e74c3c;color:#fff;padding:1px 6px;border-radius:8px;font-size:0.75em;margin-left:4px">CRITICAL</span>' : '';
+        var statusColor = t.status === "passed" ? "#27ae60" : t.status === "failed" ? "#e74c3c" : "#95a5a6";
+        segRows += '<tr>' +
+          '<td style="font-family:monospace;font-size:0.85em">' + esc(t.testId) + '</td>' +
+          '<td>' + esc(t.category) + '</td>' +
+          '<td>' + esc(t.test) + critBadge + '</td>' +
+          '<td style="font-size:0.85em">' + esc(t.standard) + '</td>' +
+          '<td>' + esc(t.tolerance) + '</td>' +
+          '<td style="color:' + statusColor + ';font-weight:600;text-transform:uppercase">' + esc(t.status) + '</td>' +
+          '</tr>';
+      }
+      segTables += '<div class="card" style="margin-bottom:12px"><h3>' + esc(seg.segment) + ' (' + seg.lengthKm + ' km, ' + seg.repeaterCount + ' repeaters)</h3>' +
+        '<div class="table-wrap"><table class="commissioningSegTable"><thead><tr>' +
+        '<th>ID</th><th>Category</th><th>Test</th><th>Standard</th><th>Tolerance</th><th>Status</th>' +
+        '</tr></thead><tbody>' + segRows + '</tbody></table></div>' +
+        '<div style="margin-top:8px;font-size:0.85em;color:#7f8c8d">Applicable: ' + seg.summary.applicableTests + ' | Critical: ' + seg.summary.criticalTests + ' | Pending: ' + seg.summary.pendingTests + '</div></div>';
+    }
+
+    // Hold points
+    var holdRows = result.holdPoints.map(function (hp) {
+      return '<tr><td style="font-weight:600">' + esc(hp.phase) + '</td><td>' + esc(hp.description) + '</td><td style="font-size:0.85em">' + esc(hp.standard) + '</td></tr>';
+    }).join('');
+    var holdTable = '<div class="card" id="commissioningHoldPoints"><h3>Commissioning Hold Points</h3>' +
+      '<div class="table-wrap"><table><thead><tr><th>Phase</th><th>Description</th><th>Standard Reference</th></tr></thead><tbody>' + holdRows + '</tbody></table></div></div>';
+
+    // References
+    var refList = result.references.map(function (r) { return '<li style="font-size:0.85em">' + esc(r) + '</li>'; }).join('');
+    var refs = '<div class="card" id="commissioningRefs"><h3>Standards References</h3><ul style="margin:0;padding-left:20px">' + refList + '</ul></div>';
+
+    return '<h2 style="margin-bottom:16px">Commissioning Checklist Generator</h2>' +
+      '<p style="margin-bottom:16px;color:#7f8c8d">Segment-specific acceptance test checklists per IEC 61280 and ITU-T G.977</p>' +
+      kpis + segTables + holdTable + refs;
   };
 
   // ---------- Training & Competency Register ----------

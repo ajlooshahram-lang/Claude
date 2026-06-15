@@ -1446,5 +1446,61 @@ console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
     "References include ITU-T G.977 and IEC 61280 (" + r10.references.length + " total refs)");
 })();
 
+// ===== Commissioning Checklist Generator Tests =====
+(function() {
+  console.log("\n--- Commissioning Checklist Generator ---");
+
+  // Test 1: Returns valid checklist structure with segments
+  var r1 = B.generateCommissioningChecklist({
+    segments: [
+      { name: "Segment-A", lengthKm: 1000, fiberPairs: 8, repeaterCount: 12 },
+      { name: "Segment-B", lengthKm: 2000, fiberPairs: 4, repeaterCount: 25 }
+    ]
+  });
+  ok(r1.segments.length === 2 && r1.segments[0].segment === "Segment-A" && r1.segments[1].segment === "Segment-B",
+    "Returns checklist with " + r1.segments.length + " segments (Segment-A, Segment-B)");
+
+  // Test 2: Each segment has IEC 61280 and ITU-T G.977 tests
+  var seg1Tests = r1.segments[0].tests;
+  var hasIEC = seg1Tests.some(function(t) { return t.standard.indexOf("IEC 61280") >= 0; });
+  var hasG977 = seg1Tests.some(function(t) { return t.standard.indexOf("ITU-T G.977") >= 0; });
+  ok(hasIEC && hasG977,
+    "Segment tests include both IEC 61280 and ITU-T G.977 standards");
+
+  // Test 3: Critical tests are flagged correctly
+  var criticalTests = seg1Tests.filter(function(t) { return t.critical === true; });
+  ok(criticalTests.length >= 10,
+    "At least 10 critical tests per segment - got " + criticalTests.length);
+
+  // Test 4: Segment-specific expected values are calculated (attenuation scales with distance)
+  var attTest = seg1Tests.find(function(t) { return t.testId === "ATT-01"; });
+  ok(attTest && attTest.expectedValue && attTest.expectedValue.indexOf("1000") >= 0,
+    "ATT-01 expected value references segment length: " + (attTest ? attTest.expectedValue : "null"));
+
+  // Test 5: Summary counts are correct
+  var sum = r1.summary;
+  ok(sum.totalSegments === 2 && sum.criticalTests > 0 && sum.applicableTests > sum.criticalTests,
+    "Summary: " + sum.totalSegments + " segments, " + sum.criticalTests + " critical, " + sum.applicableTests + " applicable");
+
+  // Test 6: Hold points cover commissioning phases
+  ok(r1.holdPoints.length >= 5 && r1.holdPoints[0].phase === "Pre-lay" && r1.holdPoints[r1.holdPoints.length - 1].phase === "Final acceptance",
+    "Hold points: " + r1.holdPoints.length + " phases from Pre-lay to Final acceptance");
+
+  // Test 7: References array includes IEC 61280 and ITU-T G.977 documents
+  var refIEC = r1.references.some(function(ref) { return ref.indexOf("IEC 61280") >= 0; });
+  var refG977 = r1.references.some(function(ref) { return ref.indexOf("ITU-T G.977") >= 0; });
+  ok(refIEC && refG977 && r1.references.length >= 6,
+    "References include IEC 61280 and ITU-T G.977 (" + r1.references.length + " total)");
+
+  // Test 8: Power feed tests are not applicable when repeaterCount is 0
+  var r2 = B.generateCommissioningChecklist({
+    segments: [{ name: "Short-Link", lengthKm: 50, fiberPairs: 2, repeaterCount: 0 }]
+  });
+  var pfTests = r2.segments[0].tests.filter(function(t) { return t.category === "Power Feed"; });
+  var allNA = pfTests.every(function(t) { return t.applicability === "not_applicable"; });
+  ok(allNA && pfTests.length >= 2,
+    "Power feed tests marked not_applicable when repeaterCount=0 (" + pfTests.length + " PFE tests)");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);

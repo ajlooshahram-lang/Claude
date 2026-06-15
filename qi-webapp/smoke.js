@@ -1024,5 +1024,18 @@ ok(energyOptTable != null && energyOptTable.querySelectorAll('tbody tr').length 
 var energyLifecycle = doc.getElementById("energyLifecycle");
 ok(energyLifecycle != null && energyLifecycle.innerHTML.indexOf("25-Year") !== -1, "Energy Watchdog shows 25-year lifecycle projection");
 
+// 84) Commissioning Checklist nav item exists
+var commNav = doc.querySelector('.nav-item[data-view="commissioning"]');
+ok(commNav != null, "Commissioning Checklist nav item exists");
+
+// 85) Commissioning Checklist shows segment tables
+if (commNav) commNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var commSegTables = doc.querySelectorAll('.commissioningSegTable');
+ok(commSegTables != null && commSegTables.length >= 5, "Commissioning Checklist shows segment tables - got " + (commSegTables ? commSegTables.length : 0));
+
+// 86) Commissioning Checklist shows hold points
+var commHoldPoints = doc.getElementById("commissioningHoldPoints");
+ok(commHoldPoints != null && commHoldPoints.querySelectorAll('tbody tr').length >= 5, "Commissioning Checklist shows hold points table");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

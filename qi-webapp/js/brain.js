@@ -4228,6 +4228,187 @@
     };
   }
 
+  // ---------- Commissioning Checklist Generator (IEC 61280 / ITU-T G.977) ----------
+  function generateCommissioningChecklist(params) {
+    params = params || {};
+    var segments = params.segments || [
+      { name: "Singapore-Jakarta", lengthKm: 1200, fiberPairs: 8, repeaterCount: 15 },
+      { name: "Jakarta-Bangkok", lengthKm: 2800, fiberPairs: 8, repeaterCount: 35 },
+      { name: "Bangkok-Ho Chi Minh", lengthKm: 1500, fiberPairs: 8, repeaterCount: 19 }
+    ];
+    var wavelength = params.wavelength || 1550;
+    var fiberType = params.fiberType || "G.654.E";
+    var systemDesignLife = params.systemDesignLife || 25;
+    var projectPhase = params.projectPhase || "commissioning";
+
+    // IEC 61280 test categories for submarine optical systems
+    var IEC_61280_TESTS = [
+      { id: "OPM-01", category: "Optical Power", test: "Transmitter output power verification", standard: "IEC 61280-2-1", unit: "dBm", tolerance: "+/- 0.5 dB", critical: true },
+      { id: "OPM-02", category: "Optical Power", test: "Receiver sensitivity threshold measurement", standard: "IEC 61280-2-1", unit: "dBm", tolerance: "+/- 1.0 dB", critical: true },
+      { id: "OPM-03", category: "Optical Power", test: "Per-channel OSNR verification", standard: "IEC 61280-2-9", unit: "dB", tolerance: "> 18 dB", critical: true },
+      { id: "ATT-01", category: "Attenuation", test: "End-to-end link attenuation", standard: "IEC 61280-4-1", unit: "dB", tolerance: "+/- 0.2 dB/km", critical: true },
+      { id: "ATT-02", category: "Attenuation", test: "Per-span attenuation uniformity", standard: "IEC 61280-4-1", unit: "dB", tolerance: "+/- 5% of design", critical: true },
+      { id: "ATT-03", category: "Attenuation", test: "Splice loss verification (OTDR)", standard: "IEC 61280-4-2", unit: "dB", tolerance: "< 0.1 dB/splice", critical: false },
+      { id: "OTDR-01", category: "OTDR", test: "Bidirectional OTDR trace (full route)", standard: "IEC 61280-4-2", unit: "km/dB", tolerance: "No anomalies > 0.5 dB", critical: true },
+      { id: "OTDR-02", category: "OTDR", test: "Reflectance measurement at connectors", standard: "IEC 61280-4-2", unit: "dB", tolerance: "< -45 dB", critical: false },
+      { id: "DISP-01", category: "Dispersion", test: "Chromatic dispersion measurement", standard: "IEC 61280-2-10", unit: "ps/nm-km", tolerance: "< 17 ps/nm-km @ 1550nm", critical: true },
+      { id: "DISP-02", category: "Dispersion", test: "Polarization mode dispersion (PMD)", standard: "IEC 61280-2-10", unit: "ps", tolerance: "< 0.1 ps/sqrt(km)", critical: true },
+      { id: "BER-01", category: "Bit Error Rate", test: "Pre-FEC BER measurement (24hr soak)", standard: "IEC 61280-2-3", unit: "BER", tolerance: "< 1e-3", critical: true },
+      { id: "BER-02", category: "Bit Error Rate", test: "Post-FEC BER confirmation", standard: "IEC 61280-2-3", unit: "BER", tolerance: "< 1e-15", critical: true }
+    ];
+
+    // ITU-T G.977 commissioning verification items
+    var G977_TESTS = [
+      { id: "G977-01", category: "System Margin", test: "End-of-life system margin verification", standard: "ITU-T G.977", unit: "dB", tolerance: "> 3 dB", critical: true },
+      { id: "G977-02", category: "System Margin", test: "Repeater gain flatness check", standard: "ITU-T G.977", unit: "dB", tolerance: "+/- 1 dB across band", critical: true },
+      { id: "G977-03", category: "System Margin", test: "Supervisory channel functionality", standard: "ITU-T G.977", unit: "pass/fail", tolerance: "All channels responding", critical: true },
+      { id: "G977-04", category: "Power Feed", test: "Power feed equipment (PFE) voltage test", standard: "ITU-T G.977", unit: "kV", tolerance: "+/- 2% of rated voltage", critical: true },
+      { id: "G977-05", category: "Power Feed", test: "PFE current stability under load", standard: "ITU-T G.977", unit: "mA", tolerance: "+/- 5 mA over 24hr", critical: true },
+      { id: "G977-06", category: "Power Feed", test: "Earth fault detection and isolation", standard: "ITU-T G.977", unit: "pass/fail", tolerance: "Isolation within 100ms", critical: false },
+      { id: "G977-07", category: "Redundancy", test: "Protection switching time (1+1)", standard: "ITU-T G.977", unit: "ms", tolerance: "< 50 ms", critical: true },
+      { id: "G977-08", category: "Redundancy", test: "Line monitoring system (LMS) accuracy", standard: "ITU-T G.977", unit: "km", tolerance: "+/- 100m fault location", critical: false },
+      { id: "G977-09", category: "Environmental", test: "Cable landing station temperature tolerance", standard: "ITU-T G.977", unit: "degC", tolerance: "5-40 degC operating range", critical: false },
+      { id: "G977-10", category: "Environmental", test: "Humidity resilience of terminal equipment", standard: "ITU-T G.977", unit: "%RH", tolerance: "< 85% non-condensing", critical: false }
+    ];
+
+    var allTests = IEC_61280_TESTS.concat(G977_TESTS);
+
+    // Generate segment-specific checklist items
+    var segmentChecklists = [];
+    for (var i = 0; i < segments.length; i++) {
+      var seg = segments[i];
+      var segTests = [];
+      for (var j = 0; j < allTests.length; j++) {
+        var t = allTests[j];
+        // Calculate expected values based on segment parameters
+        var expectedValue = null;
+        var applicability = "required";
+
+        if (t.id === "ATT-01") {
+          expectedValue = Math.round(seg.lengthKm * 0.17 * 100) / 100 + " dB total (" + seg.lengthKm + " km x 0.17 dB/km)";
+        } else if (t.id === "OTDR-01") {
+          expectedValue = seg.lengthKm + " km trace length, " + (seg.repeaterCount || 0) + " repeater locations marked";
+        } else if (t.id === "G977-04") {
+          // PFE voltage scales with distance: ~1V/km for modern systems
+          var voltage = Math.round(seg.lengthKm * 1.0 / 1000 * 10) / 10;
+          expectedValue = voltage + " kV (nominal for " + seg.lengthKm + " km)";
+        } else if (t.id === "G977-01") {
+          expectedValue = "> 3 dB after " + systemDesignLife + " year aging";
+        } else if (t.id === "G977-02") {
+          expectedValue = (seg.repeaterCount || 0) + " repeaters, each +/- 1 dB across C-band";
+        } else if (t.id === "DISP-01") {
+          var totalDispersion = Math.round(seg.lengthKm * 17 * 100) / 100;
+          expectedValue = totalDispersion + " ps/nm cumulative (compensated by DCM)";
+        } else if (t.id === "BER-01") {
+          expectedValue = "24-hour continuous traffic at line rate on " + (seg.fiberPairs || 8) + " fiber pairs";
+        } else if (t.id === "G977-07") {
+          applicability = (seg.fiberPairs || 8) > 1 ? "required" : "not_applicable";
+          expectedValue = "Switch between fiber pairs within 50 ms";
+        }
+
+        // Determine if test is applicable based on segment characteristics
+        if (t.id === "G977-06" && seg.lengthKm < 100) {
+          applicability = "optional";
+        }
+        if (t.category === "Power Feed" && (seg.repeaterCount || 0) === 0) {
+          applicability = "not_applicable";
+        }
+
+        segTests.push({
+          testId: t.id,
+          category: t.category,
+          test: t.test,
+          standard: t.standard,
+          unit: t.unit,
+          tolerance: t.tolerance,
+          critical: t.critical,
+          expectedValue: expectedValue,
+          applicability: applicability,
+          status: "pending",
+          result: null,
+          notes: ""
+        });
+      }
+
+      var criticalCount = 0;
+      var totalApplicable = 0;
+      for (var k = 0; k < segTests.length; k++) {
+        if (segTests[k].applicability !== "not_applicable") {
+          totalApplicable++;
+          if (segTests[k].critical) criticalCount++;
+        }
+      }
+
+      segmentChecklists.push({
+        segment: seg.name,
+        lengthKm: seg.lengthKm,
+        fiberPairs: seg.fiberPairs || 8,
+        repeaterCount: seg.repeaterCount || 0,
+        tests: segTests,
+        summary: {
+          totalTests: segTests.length,
+          applicableTests: totalApplicable,
+          criticalTests: criticalCount,
+          completedTests: 0,
+          passedTests: 0,
+          failedTests: 0,
+          pendingTests: totalApplicable
+        }
+      });
+    }
+
+    // Overall commissioning summary
+    var totalSegments = segmentChecklists.length;
+    var overallCritical = 0;
+    var overallApplicable = 0;
+    var overallTotal = 0;
+    for (var m = 0; m < segmentChecklists.length; m++) {
+      overallCritical += segmentChecklists[m].summary.criticalTests;
+      overallApplicable += segmentChecklists[m].summary.applicableTests;
+      overallTotal += segmentChecklists[m].summary.totalTests;
+    }
+
+    var references = [
+      "IEC 61280-2-1: Fibre optic communication subsystem test procedures - Digital systems, Transmitter/receiver",
+      "IEC 61280-2-3: Fibre optic communication subsystem test procedures - Digital systems, BER measurement",
+      "IEC 61280-2-9: Fibre optic communication subsystem test procedures - Digital systems, OSNR",
+      "IEC 61280-2-10: Fibre optic communication subsystem test procedures - Dispersion measurement",
+      "IEC 61280-4-1: Fibre optic communication subsystem test procedures - Installed cable plant, Multimode/single-mode attenuation",
+      "IEC 61280-4-2: Fibre optic communication subsystem test procedures - Installed cable plant, OTDR",
+      "ITU-T G.977: Characteristics of optically amplified submarine cable systems",
+      "ITU-T G.977.1: Characteristics of DWDM submarine cable systems"
+    ];
+
+    var holdPoints = [
+      { phase: "Pre-lay", description: "Verify factory acceptance test (FAT) records for all repeaters and terminal equipment", standard: "ITU-T G.977 Clause 7" },
+      { phase: "Post-lay", description: "Complete OTDR testing of all installed segments before burial/protection", standard: "IEC 61280-4-2" },
+      { phase: "Wet plant", description: "Confirm repeater supervisory response on all spans before terminal connection", standard: "ITU-T G.977 Clause 8" },
+      { phase: "System turn-up", description: "24-hour BER soak test with all channels loaded at design capacity", standard: "IEC 61280-2-3" },
+      { phase: "Provisional acceptance", description: "All critical tests passed, non-critical items documented in punch list", standard: "ITU-T G.977 Clause 9" },
+      { phase: "Final acceptance", description: "30-day reliability run with < 3 SES events, all punch items cleared", standard: "ITU-T G.977 Clause 10" }
+    ];
+
+    return {
+      projectPhase: projectPhase,
+      fiberType: fiberType,
+      wavelength: wavelength,
+      systemDesignLife: systemDesignLife,
+      segments: segmentChecklists,
+      holdPoints: holdPoints,
+      summary: {
+        totalSegments: totalSegments,
+        totalTests: overallTotal,
+        applicableTests: overallApplicable,
+        criticalTests: overallCritical,
+        completionPercentage: 0,
+        readyForAcceptance: false
+      },
+      standards: ["IEC 61280", "ITU-T G.977"],
+      references: references,
+      generatedAt: new Date().toISOString()
+    };
+  }
+
   var API = {
     analyzeProject: analyzeProject,
     listProfiles: listProfiles,
@@ -4260,6 +4441,7 @@
     digitalTwinStatus: digitalTwinStatus,
     energyWatchdog: energyWatchdog,
     powerBudgetAnalysis: powerBudgetAnalysis,
+    generateCommissioningChecklist: generateCommissioningChecklist,
     COUNTRY_ENERGY_DATA: COUNTRY_ENERGY_DATA
   };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
