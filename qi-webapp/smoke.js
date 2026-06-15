@@ -1180,5 +1180,21 @@ var ctrSum = doc.getElementById("ctrSum");
 if (ctrSum) { ctrSum.value = "1300000000"; ctrSum.dispatchEvent(new window.Event("change", { bubbles: true })); }
 ok(doc.getElementById("ctrKpis").innerHTML.indexOf("1.30B") !== -1, "changing the contract sum to $1.3B recomputes the KPIs");
 
+// 107) Inspection & Test Plan (ITP)
+var itpNav = doc.querySelector('.nav-item[data-view="itp"]');
+ok(itpNav != null, "Inspection & Test Plan nav item exists");
+if (itpNav) itpNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var itpKpis = doc.getElementById("itpKpis");
+ok(itpKpis != null && itpKpis.querySelectorAll('.kpi').length >= 5, "ITP view shows point-type KPI cards");
+var itpTable = doc.querySelector('.itpTable');
+ok(itpTable != null && itpTable.querySelectorAll('tbody tr').length >= 14, "ITP table lists all items (incl. phase headers) - got " + (itpTable ? itpTable.querySelectorAll('tbody tr').length : 0));
+// 108) Filter to Hold points
+var holdBtn = doc.querySelector('.itp-filter-btn[data-point="H"]');
+if (holdBtn) holdBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+var itpHoldRows = doc.querySelector('.itpTable').querySelectorAll('tbody tr');
+// 7 hold items + up to 4 phase-header rows = <= 11, and definitely fewer than the full 14+4
+ok(itpHoldRows.length < 14 && holdBtn.classList.contains("btn-primary"), "filtering to Hold points narrows the ITP table and highlights the button");
+ok(doc.getElementById("itpRefs") != null && /ISO 9001/.test(doc.getElementById("itpRefs").innerHTML), "ITP cites ISO 9001 basis");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

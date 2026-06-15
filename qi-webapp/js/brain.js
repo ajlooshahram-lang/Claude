@@ -5293,6 +5293,71 @@
     };
   }
 
+  // ---------- Inspection & Test Plan (ITP) generator ----------
+  // Deterministic master quality-control plan for the submarine programme.
+  // Each activity is classified as a Hold (H), Witness (W), Surveillance (S) or
+  // Review (R) point per ISO 9001 / project QA practice, with the inspection
+  // method, acceptance criteria, governing standard, responsible party and the
+  // record that verifies it. Hold/Witness failures raise an NCR (links the ITP
+  // to the existing NCR register).
+  var ITP_POINT_LABELS = { H: "Hold", W: "Witness", S: "Surveillance", R: "Review" };
+  var ITP_MASTER = [
+    // Manufacturing
+    { phase: "Manufacturing", activity: "Optical fibre incoming inspection", method: "Document & sample review", acceptance: "Attenuation <=0.20 dB/km @1550 nm; PMD/CD within spec", reference: "IEC 60793 / ITU-T G.654", point: "R", responsible: "QA/QC Manager" },
+    { phase: "Manufacturing", activity: "Cable Factory Acceptance Test (FAT)", method: "Electrical + optical + dimensional", acceptance: "Continuity, attenuation, insulation & armour per spec; no out-of-tolerance", reference: "IEC 60794", point: "H", responsible: "Client QA + Manufacturer" },
+    { phase: "Manufacturing", activity: "Repeater / branching-unit test", method: "Pressure & optical gain test", acceptance: "Pressure-tight to rated depth; gain & tilt within spec", reference: "ITU-T G.977", point: "W", responsible: "Test & Commissioning Lead" },
+    { phase: "Manufacturing", activity: "Cable loading & coil survey (ship)", method: "Visual + tension log", acceptance: "No damage; coiling tension & bend radius within limits", reference: "ICPC Rec. / OEM", point: "W", responsible: "Cable Installation Supervisor" },
+    // Installation
+    { phase: "Installation", activity: "Pre-lay grapnel run / route clearance", method: "Survey + debris recovery log", acceptance: "Route cleared of debris/abandoned cable; as-cleared chart", reference: "ICPC Rec. No. 2", point: "S", responsible: "Survey Lead" },
+    { phase: "Installation", activity: "Shore-end landing & shore protection", method: "Visual + as-built dimensional", acceptance: "Articulated pipe/rock berm installed; burial >= design at landing", reference: "ICPC Rec. No. 3", point: "H", responsible: "Client Rep + Civil Works Manager" },
+    { phase: "Installation", activity: "Cable lay tension & touchdown monitoring", method: "Continuous tension/ROV monitoring", acceptance: "Tension < limit; slack within plan; no suspensions/free spans", reference: "Marine install procedure", point: "S", responsible: "Cable Installation Supervisor" },
+    { phase: "Installation", activity: "Burial depth-of-lowering (post-lay survey)", method: "Post-lay-burial survey (ROV)", acceptance: "DoL >= target per Cable Protection plan in trawled/anchoring zones", reference: "ICPC Rec. No. 3 / DoL", point: "H", responsible: "Client Rep + Survey Lead" },
+    { phase: "Installation", activity: "Jointing / final splice & branching unit", method: "Fusion splice loss + visual", acceptance: "Splice loss <=0.05 dB; joint housing sealed & pressure-tested", reference: "IEC 61300 / ITU-T G.977", point: "W", responsible: "Splicing Supervisor" },
+    // Testing
+    { phase: "Testing", activity: "OTDR bidirectional per segment", method: "OTDR @1550/1625 nm both directions", acceptance: "No anomalies; averaged splice loss within loss budget", reference: "IEC 61746 / IEC 61280", point: "H", responsible: "Test & Commissioning Lead" },
+    { phase: "Testing", activity: "End-to-end loss / OSNR", method: "Power meter + OSA", acceptance: "Total loss <= design loss budget; OSNR >= required margin", reference: "IEC 61280 / ITU-T G.977", point: "H", responsible: "Client Rep + T&C Lead" },
+    { phase: "Testing", activity: "System BER / commissioning", method: "BER test over commissioning period", acceptance: "BER < 1e-12 post-FEC over the soak period", reference: "ITU-T G.977", point: "H", responsible: "NOC Manager + T&C Lead" },
+    // Handover
+    { phase: "Handover", activity: "As-built & GIS records review", method: "Documentation review", acceptance: "Complete as-built, route position list & test records accepted", reference: "Project QA plan", point: "R", responsible: "GIS/Documentation Specialist" },
+    { phase: "Handover", activity: "Provisional Acceptance (PAC) sign-off", method: "Acceptance review", acceptance: "All hold points released; punch list cleared; PAC issued", reference: "FIDIC cl.10 / NEC4 cl.30", point: "H", responsible: "Programme Director + Client" }
+  ];
+  function generateITP(params) {
+    params = params || {};
+    var items = (params.items && params.items.length ? params.items : ITP_MASTER).map(function (it, i) {
+      var pt = it.point || "S";
+      return {
+        id: "ITP-" + String(i + 1).padStart(3, "0"),
+        phase: it.phase, activity: it.activity, method: it.method,
+        acceptance: it.acceptance, reference: it.reference,
+        point: pt, pointLabel: ITP_POINT_LABELS[pt] || pt,
+        responsible: it.responsible,
+        verifyingRecord: it.verifyingRecord || (it.activity + " report / certificate"),
+        raisesNcrOnFail: pt === "H" || pt === "W"
+      };
+    });
+    var counts = { H: 0, W: 0, S: 0, R: 0 };
+    items.forEach(function (it) { counts[it.point] = (counts[it.point] || 0) + 1; });
+    var phases = [];
+    items.forEach(function (it) { if (phases.indexOf(it.phase) < 0) phases.push(it.phase); });
+    return {
+      items: items,
+      summary: {
+        total: items.length,
+        holdPoints: counts.H, witnessPoints: counts.W,
+        surveillancePoints: counts.S, reviewPoints: counts.R,
+        ncrTriggers: items.filter(function (x) { return x.raisesNcrOnFail; }).length,
+        phases: phases, counts: counts
+      },
+      references: [
+        "ISO 9001 — Quality management systems (inspection & test planning)",
+        "IEC 61280 / IEC 61746 — Fibre-optic test procedures (OTDR, loss)",
+        "ITU-T G.977 — Submarine optical systems (FAT, commissioning)",
+        "ICPC Recommendations No. 2 & 3 — route clearance & burial verification",
+        "Hold/Witness failures raise a Non-Conformance Report (NCR register)"
+      ]
+    };
+  }
+
   var API = {
     analyzeProject: analyzeProject,
     listProfiles: listProfiles,
@@ -5315,6 +5380,7 @@
     getClauseReference: getClauseReference,
     listClauses: listClauses,
     variationImpact: variationImpact,
+    generateITP: generateITP,
     checkAlerts: checkAlerts,
     monteCarloSchedule: monteCarloSchedule,
     monteCarloCost: monteCarloCost,

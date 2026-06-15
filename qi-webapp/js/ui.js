@@ -236,6 +236,7 @@
     { id: "xbarr", label: "X̄-R Control Chart", icon: "⎍" },
     { id: "capability", label: "Process Capability", icon: "◊" },
     { id: "ncrpareto", label: "NCR Pareto", icon: "▟" },
+    { id: "itp", label: "Inspection & Test Plan", icon: "\u2611" },
     { id: "riskheat", label: "Risk Heat Map", icon: "\uD83D\uDD25" },
     { id: "incidents", label: "Incidents", icon: "\u26A1" },
     { id: "environmental", label: "Environmental", icon: "\uD83C\uDF0A" },
@@ -2340,6 +2341,59 @@
     });
 
     applyState(0);
+  };
+
+  // ---------- Inspection & Test Plan (ITP) ----------
+  function itpPointColor(p) {
+    return p === "H" ? "var(--red,#c0392b)" : p === "W" ? "var(--gold,#e0a800)" : p === "S" ? "#3498db" : "var(--green,#1e7e34)";
+  }
+  function itpTableHtml(filter) {
+    var B = window.QIBrain;
+    var r = B.generateITP();
+    var items = r.items.filter(function (it) { return !filter || filter === "all" || it.point === filter; });
+    var rows = "", lastPhase = "";
+    items.forEach(function (it) {
+      if (it.phase !== lastPhase) { rows += '<tr><td colspan="7" style="background:rgba(34,211,238,.08);font-weight:700">' + esc(it.phase) + '</td></tr>'; lastPhase = it.phase; }
+      rows += '<tr><td><strong>' + esc(it.id) + '</strong></td><td>' + esc(it.activity) + '</td><td>' + esc(it.method) + '</td>' +
+        '<td>' + esc(it.acceptance) + '</td><td>' + esc(it.reference) + '</td>' +
+        '<td style="color:' + itpPointColor(it.point) + ';font-weight:700" title="' + esc(it.pointLabel) + '">' + esc(it.point) + (it.raisesNcrOnFail ? ' &#9888;' : '') + '</td>' +
+        '<td>' + esc(it.responsible) + '</td></tr>';
+    });
+    return '<div class="table-wrap"><table class="itpTable"><thead><tr><th>ID</th><th>Activity</th><th>Method</th><th>Acceptance criteria</th><th>Reference</th><th>Pt</th><th>Responsible</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+  RENDER.itp = function () {
+    var B = window.QIBrain;
+    if (!B || !B.generateITP) return '<h2>Inspection &amp; Test Plan</h2><p class="muted">ITP engine unavailable.</p>';
+    uiState.itpView = { filter: "all" };
+    var r = B.generateITP(); var s = r.summary;
+    var kpis = '<div class="grid kpis" id="itpKpis" style="margin-bottom:14px">' +
+      '<div class="kpi"><div class="label">Total ITP items</div><div class="value">' + s.total + '</div></div>' +
+      '<div class="kpi"><div class="label">Hold points</div><div class="value" style="color:var(--red,#c0392b)">' + s.holdPoints + '</div></div>' +
+      '<div class="kpi"><div class="label">Witness points</div><div class="value" style="color:var(--gold,#e0a800)">' + s.witnessPoints + '</div></div>' +
+      '<div class="kpi"><div class="label">Surveillance</div><div class="value">' + s.surveillancePoints + '</div></div>' +
+      '<div class="kpi"><div class="label">Review</div><div class="value">' + s.reviewPoints + '</div></div>' +
+      '</div>';
+    var filterBtns = '<div class="card" style="margin-bottom:14px"><div id="itpFilter">' +
+      [["all", "All"], ["H", "Hold"], ["W", "Witness"], ["S", "Surveillance"], ["R", "Review"]].map(function (f) {
+        return '<button class="btn itp-filter-btn' + (f[0] === "all" ? " btn-primary" : "") + '" data-point="' + f[0] + '" style="margin:2px">' + f[1] + '</button>';
+      }).join("") + '</div></div>';
+    var legend = '<p class="muted" style="margin-bottom:10px"><strong>H</strong> Hold (work stops until released) &middot; <strong>W</strong> Witness &middot; <strong>S</strong> Surveillance &middot; <strong>R</strong> Review &middot; &#9888; = failure raises an NCR (' + s.ncrTriggers + ' points)</p>';
+    var refs = '<div class="card" id="itpRefs"><h3>Basis &amp; References</h3><ul style="margin:0;padding-left:20px">' + r.references.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul></div>';
+    return '<h2 style="margin-bottom:6px">Inspection &amp; Test Plan (ITP)</h2>' +
+      '<p class="muted" style="margin-bottom:14px">Master quality-control plan: Hold / Witness / Surveillance / Review points across manufacturing, installation, testing and handover &mdash; a failed hold/witness point raises an NCR.</p>' +
+      kpis + filterBtns + legend + '<div class="card"><div id="itpTableWrap">' + itpTableHtml("all") + '</div></div>' + refs;
+  };
+  AFTER.itp = function () {
+    var ff = document.getElementById("itpFilter");
+    if (!ff) return;
+    ff.addEventListener("click", function (e) {
+      var btn = e.target.closest ? e.target.closest(".itp-filter-btn") : null;
+      if (!btn) return;
+      var p = btn.getAttribute("data-point");
+      document.getElementById("itpTableWrap").innerHTML = itpTableHtml(p);
+      var btns = ff.querySelectorAll(".itp-filter-btn");
+      for (var i = 0; i < btns.length; i++) { if (btns[i].getAttribute("data-point") === p) btns[i].classList.add("btn-primary"); else btns[i].classList.remove("btn-primary"); }
+    });
   };
 
   // ---------- Contract & Variation Hub (NEC4 / FIDIC) ----------

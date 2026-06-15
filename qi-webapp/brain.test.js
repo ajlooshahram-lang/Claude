@@ -1766,5 +1766,25 @@ console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
   ok(B.getContractTemplates({ contractForm: "NEC4" }).length >= 10 && B.getContractTemplates({ contractForm: "FIDIC" }).length >= 10, "template library filters by contract form");
 })();
 
+// ===== Inspection & Test Plan (ITP) generator =====
+(function () {
+  console.log("\n--- Inspection & Test Plan ---");
+  var r = B.generateITP();
+  var s = r.summary;
+  ok(s.total === 14, "ITP has 14 items (got " + s.total + ")");
+  ok(s.holdPoints + s.witnessPoints + s.surveillancePoints + s.reviewPoints === s.total, "point-type counts sum to the total");
+  ok(s.holdPoints === 7 && s.witnessPoints === 3 && s.surveillancePoints === 2 && s.reviewPoints === 2, "point mix: 7H / 3W / 2S / 2R");
+  ok(JSON.stringify(s.phases) === JSON.stringify(["Manufacturing", "Installation", "Testing", "Handover"]), "ITP spans manufacturing -> installation -> testing -> handover");
+  ok(r.items.every(function (it) { return it.id && it.activity && it.method && it.acceptance && it.reference && it.point && it.responsible && it.verifyingRecord; }), "every ITP item has id/activity/method/acceptance/reference/point/responsible/record");
+  ok(r.items.every(function (it) { return ["H", "W", "S", "R"].indexOf(it.point) >= 0; }), "every item is classified H/W/S/R");
+  ok(r.items.filter(function (it) { return it.raisesNcrOnFail; }).length === s.ncrTriggers && s.ncrTriggers === 10, "hold+witness points (10) raise an NCR on failure");
+  ok(r.items.every(function (it) { return (it.point === "H" || it.point === "W") === it.raisesNcrOnFail; }), "NCR trigger flag aligns exactly with Hold/Witness classification");
+  ok(/ITP-001/.test(r.items[0].id) && /ITP-014/.test(r.items[13].id), "items carry zero-padded sequential IDs");
+  ok(r.references.some(function (x) { return /ISO 9001/.test(x); }) && r.references.some(function (x) { return /NCR/.test(x); }), "references cite ISO 9001 and the NCR linkage");
+  ok(JSON.stringify(r) === JSON.stringify(B.generateITP()), "ITP generation is deterministic");
+  var custom = B.generateITP({ items: [{ phase: "Manufacturing", activity: "X", method: "m", acceptance: "a", reference: "IEC", point: "H", responsible: "QA" }] });
+  ok(custom.summary.total === 1 && custom.summary.holdPoints === 1, "custom ITP items honoured");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);
