@@ -3664,6 +3664,135 @@ function renderCable() {
         </div>
       </div>
     </div>
+
+    ${(function() {
+      // ===== WHAT-IF COMPARATOR =====
+      var da = lang === 'da';
+      var ib = calcIB();
+      if (!cableState.crossSection || ib <= 0) return '';
+
+      var izTbl = izTableFor();
+      var allCS = Object.keys(izTbl).map(Number).sort(function(a,b){return a-b;});
+      var currentCS = parseFloat(cableState.crossSection);
+      var currentIdx = allCS.indexOf(currentCS);
+      if (currentIdx < 0 || currentIdx >= allCS.length - 1) return '';
+
+      var nextCS = allCS[currentIdx + 1];
+      var kI = INSTALL_METHODS[cableState.installMethod] || 1.0;
+      var kT = TEMP_FACTORS[cableState.temp] || 1.0;
+      var kG = GROUP_FACTORS[cableState.grouping] || 1.0;
+      var kTot = kI * kT * kG;
+
+      var currentBaseIz = izTbl[currentCS] || 0;
+      var currentCorrIz = currentBaseIz * kTot;
+      var nextBaseIz = izTbl[nextCS] || 0;
+      var nextCorrIz = nextBaseIz * kTot;
+
+      // Voltage drop comparison
+      var currentVdP = 0, nextVdP = 0;
+      var cbls = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
+      var cType = cbls[cableState.type];
+      var cCores = cType && cType[cableState.cores] ? cType[cableState.cores] : {};
+      var currentCable = cCores[cableState.crossSection];
+      var nextCableKey = Object.keys(cCores).find(function(k) { return parseFloat(k) === nextCS; });
+      var nextCable = nextCableKey ? cCores[nextCableKey] : null;
+
+      if (currentCable && vdropState.length) {
+        var L = vdropState.length / 1000;
+        var cosP = loadState.cosPhi;
+        var sinP = Math.sin(Math.acos(cosP));
+        var Un = loadState.voltage === '3x400' ? 400 : 230;
+        var vdCurr = loadState.voltage === '3x400'
+          ? Math.sqrt(3) * ib * L * (currentCable.r * cosP + currentCable.x * sinP)
+          : 2 * ib * L * (currentCable.r * cosP + currentCable.x * sinP);
+        currentVdP = (vdCurr / Un) * 100;
+      }
+      if (nextCable && vdropState.length) {
+        var L2 = vdropState.length / 1000;
+        var cosP2 = loadState.cosPhi;
+        var sinP2 = Math.sin(Math.acos(cosP2));
+        var Un2 = loadState.voltage === '3x400' ? 400 : 230;
+        var vdNext = loadState.voltage === '3x400'
+          ? Math.sqrt(3) * ib * L2 * (nextCable.r * cosP2 + nextCable.x * sinP2)
+          : 2 * ib * L2 * (nextCable.r * cosP2 + nextCable.x * sinP2);
+        nextVdP = (vdNext / Un2) * 100;
+      }
+
+      // Cost estimate (DKK/m approx based on cross-section)
+      var cuPriceFactor = cableState.material === 'copper' ? 1.0 : 0.4;
+      var currentCostPerM = (8 + currentCS * 2.5) * cuPriceFactor;
+      var nextCostPerM = (8 + nextCS * 2.5) * cuPriceFactor;
+
+      // Weight estimate (kg/m)
+      var density = cableState.material === 'copper' ? 8.96 : 2.70;
+      var currentWeightPerM = (currentCS * density * 3 / 1000).toFixed(2);
+      var nextWeightPerM = (nextCS * density * 3 / 1000).toFixed(2);
+
+      // Utilization
+      var currentUtil = currentCorrIz > 0 ? (ib / currentCorrIz * 100) : 0;
+      var nextUtil = nextCorrIz > 0 ? (ib / nextCorrIz * 100) : 0;
+
+      // Verdict: conservative approach
+      var suggestLarger = currentUtil > 70;
+      var verdictColor = suggestLarger ? '#ffa726' : '#06d6a0';
+      var verdict = suggestLarger
+        ? (da ? 'Overvej ' + nextCS + ' mm\u00B2 for bedre margin og fremtidssikring' : 'Consider ' + nextCS + ' mm\u00B2 for better margin and future-proofing')
+        : (da ? 'Anbefaling: ' + currentCS + ' mm\u00B2 er tilstr\u00E6kkeligt med god margin' : 'Recommendation: ' + currentCS + ' mm\u00B2 is sufficient with good margin');
+
+      var html = '<div class="card fade-in" style="border-left:4px solid #ffd166">';
+      html += '<div class="card-title">\uD83D\uDD2E ' + (da ? 'Hvad hvis? - Kabelsammenligning' : 'What if? - Cable Comparison') + '</div>';
+      html += '<div class="info-row">' + (da ? 'Automatisk sammenligning mellem dit valg og n\u00E6ste st\u00F8rrelse op. Konservativ tilgang: >70% udnyttelse foresl\u00E5r opgradering.' : 'Automatic comparison between your selection and next size up. Conservative approach: >70% utilization suggests upgrading.') + '</div>';
+
+      // Comparison table
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">';
+
+      // Current selection
+      html += '<div style="background:rgba(6,214,160,0.06);border-radius:10px;padding:14px;border:1px solid rgba(6,214,160,0.25)">';
+      html += '<div style="text-align:center;margin-bottom:10px">';
+      html += '<div style="font-size:2em;font-weight:bold;color:#06d6a0">' + currentCS + '</div>';
+      html += '<div style="font-size:0.8em;color:rgba(255,255,255,0.5)">mm\u00B2 (' + (da ? 'valgt' : 'selected') + ')</div>';
+      html += '</div>';
+      html += '<div class="result-row"><span class="label">Iz (korr.)</span><span class="value">' + currentCorrIz.toFixed(1) + ' A</span></div>';
+      html += '<div class="result-row"><span class="label">\u0394U</span><span class="value">' + currentVdP.toFixed(2) + ' %</span></div>';
+      html += '<div class="result-row"><span class="label">' + (da ? 'Pris' : 'Cost') + '</span><span class="value">\u2248' + currentCostPerM.toFixed(0) + ' DKK/m</span></div>';
+      html += '<div class="result-row"><span class="label">' + (da ? 'V\u00E6gt' : 'Weight') + '</span><span class="value">\u2248' + currentWeightPerM + ' kg/m</span></div>';
+      html += '<div class="result-row"><span class="label">' + (da ? 'Udnyttelse' : 'Utilization') + '</span><span class="value" style="color:' + (currentUtil > 80 ? '#ef476f' : currentUtil > 70 ? '#ffa726' : '#06d6a0') + '">' + currentUtil.toFixed(0) + '%</span></div>';
+      html += '</div>';
+
+      // Next size up
+      html += '<div style="background:rgba(255,210,100,0.06);border-radius:10px;padding:14px;border:1px solid rgba(255,210,100,0.25)">';
+      html += '<div style="text-align:center;margin-bottom:10px">';
+      html += '<div style="font-size:2em;font-weight:bold;color:#ffd166">' + nextCS + '</div>';
+      html += '<div style="font-size:0.8em;color:rgba(255,255,255,0.5)">mm\u00B2 (' + (da ? 'n\u00E6ste' : 'next up') + ')</div>';
+      html += '</div>';
+      html += '<div class="result-row"><span class="label">Iz (korr.)</span><span class="value" style="color:#06d6a0">' + nextCorrIz.toFixed(1) + ' A \u2191</span></div>';
+      html += '<div class="result-row"><span class="label">\u0394U</span><span class="value" style="color:#06d6a0">' + (nextCable ? nextVdP.toFixed(2) : '--') + ' % \u2193</span></div>';
+      html += '<div class="result-row"><span class="label">' + (da ? 'Pris' : 'Cost') + '</span><span class="value">\u2248' + nextCostPerM.toFixed(0) + ' DKK/m</span></div>';
+      html += '<div class="result-row"><span class="label">' + (da ? 'V\u00E6gt' : 'Weight') + '</span><span class="value">\u2248' + nextWeightPerM + ' kg/m</span></div>';
+      html += '<div class="result-row"><span class="label">' + (da ? 'Udnyttelse' : 'Utilization') + '</span><span class="value" style="color:#06d6a0">' + nextUtil.toFixed(0) + '% \u2193</span></div>';
+      html += '</div>';
+
+      html += '</div>';
+
+      // Verdict
+      html += '<div style="padding:12px;border-radius:8px;background:rgba(' + (suggestLarger ? '255,167,38' : '6,214,160') + ',0.08);border:1px solid rgba(' + (suggestLarger ? '255,167,38' : '6,214,160') + ',0.3)">';
+      html += '<div style="display:flex;align-items:center;gap:8px">';
+      html += '<span style="font-size:1.5em">' + (suggestLarger ? '\uD83D\uDCA1' : '\u2705') + '</span>';
+      html += '<div>';
+      html += '<div style="font-weight:bold;color:' + verdictColor + ';font-size:0.95em">' + verdict + '</div>';
+      html += '<div style="color:rgba(255,255,255,0.5);font-size:0.78em;margin-top:3px">' + (da ? 'Baseret p\u00E5 DS/HD 60364-5-52 og god dimensioneringspraksis (konservativ tilgang).' : 'Based on DS/HD 60364-5-52 and good sizing practice (conservative approach).') + '</div>';
+      html += '</div></div></div>';
+
+      // Quick-select button
+      if (nextCableKey) {
+        html += '<div style="text-align:center;margin-top:12px">';
+        html += '<button class="sel-btn" onclick="cableState.crossSection=\'' + nextCableKey + '\';renderModule(\'cable\')" style="padding:8px 20px;font-size:0.9em">' + (da ? 'V\u00E6lg ' : 'Select ') + nextCS + ' mm\u00B2</button>';
+        html += '</div>';
+      }
+
+      html += '</div>';
+      return html;
+    })()}
   `;
 }
 
@@ -7730,6 +7859,189 @@ function runSelfTests() {
   return T;
 }
 
+// ===== SECOND OPINION DESIGN REVIEW ENGINE =====
+function runDesignReview() {
+  const findings = [];
+  const da = lang === 'da';
+  const ib = calcIB();
+  const izTable = izTableFor();
+  const baseIz = izTable[parseFloat(cableState.crossSection)] || 0;
+  const kInstall = INSTALL_METHODS[cableState.installMethod] || 1.0;
+  const kTemp = TEMP_FACTORS[cableState.temp] || 1.0;
+  const kGroup = GROUP_FACTORS[cableState.grouping] || 1.0;
+  const kTotal = kInstall * kTemp * kGroup;
+  const corrIz = baseIz * kTotal;
+  const inRating = mcbState.rating || fuseState.size || mccbState.inVal || 0;
+
+  // 1. IB <= In <= Iz coordination check
+  if (ib > 0 && inRating > 0 && corrIz > 0) {
+    if (ib > inRating) {
+      findings.push({ severity: 'critical', msg: da ? 'IB > In: Driftsstr\u00F8m (' + ib.toFixed(1) + ' A) overstiger beskyttelsens m\u00E6rkestr\u00F8m (' + inRating + ' A). Kredsl\u00F8bet er IKKE beskyttet!' : 'IB > In: Operating current (' + ib.toFixed(1) + ' A) exceeds protection device rating (' + inRating + ' A). Circuit is NOT protected!', ref: 'DS/HD 60364-4-43 \u00A7433.1', action: da ? 'V\u00E6lg en st\u00F8rre beskyttelsesanordning eller reducer belastningen.' : 'Select a larger protection device or reduce the load.' });
+    } else if (inRating > corrIz) {
+      findings.push({ severity: 'critical', msg: da ? 'In > Iz: Beskyttelsens m\u00E6rkestr\u00F8m (' + inRating + ' A) overstiger kabelens str\u00F8mb\u00E6reevne (' + corrIz.toFixed(1) + ' A). Kablet er IKKE beskyttet mod overbelastning!' : 'In > Iz: Protection rating (' + inRating + ' A) exceeds cable ampacity (' + corrIz.toFixed(1) + ' A). Cable is NOT protected against overload!', ref: 'DS/HD 60364-4-43 \u00A7433.1', action: da ? 'V\u00E6lg et st\u00F8rre kabeltv\u00E6rsnit eller en mindre sikring/MCB.' : 'Select a larger cable cross-section or a smaller fuse/MCB.' });
+    }
+  }
+
+  // 2. Voltage drop check (3% for lighting, 4% for power)
+  if (ib > 0 && cableState.crossSection && vdropState.length) {
+    var cables = cableState.material === 'copper' ? CABLES_COPPER : CABLES_ALU;
+    var ct = cables[cableState.type];
+    var cc = ct && ct[cableState.cores] ? ct[cableState.cores] : {};
+    var sc = cc[cableState.crossSection];
+    if (sc) {
+      var L = vdropState.length / 1000;
+      var cosP = loadState.cosPhi;
+      var sinP = Math.sin(Math.acos(cosP));
+      var Un = loadState.voltage === '3x400' ? 400 : 230;
+      var vd = loadState.voltage === '3x400'
+        ? Math.sqrt(3) * ib * L * (sc.r * cosP + sc.x * sinP)
+        : 2 * ib * L * (sc.r * cosP + sc.x * sinP);
+      var vdP = (vd / Un) * 100;
+      var isLighting = loadList.some(function(c) { var nm = (c.name||'').toLowerCase(); return nm.includes('lys') || nm.includes('light') || nm.includes('belys') || nm.includes('lamp'); });
+      if (isLighting && vdP > 3) {
+        findings.push({ severity: 'warning', msg: da ? 'Sp\u00E6ndingsfald ' + vdP.toFixed(2) + '% overstiger 3% for belysningskredsl\u00F8b.' : 'Voltage drop ' + vdP.toFixed(2) + '% exceeds 3% for lighting circuits.', ref: 'DS/HD 60364-5-52 \u00A7525', action: da ? 'Forh\u00F8j kabeltv\u00E6rsnit eller reducer kabellængden.' : 'Increase cable cross-section or reduce cable length.' });
+      } else if (!isLighting && vdP > 4) {
+        findings.push({ severity: 'warning', msg: da ? 'Sp\u00E6ndingsfald ' + vdP.toFixed(2) + '% overstiger 4% for kraftkredsl\u00F8b.' : 'Voltage drop ' + vdP.toFixed(2) + '% exceeds 4% for power circuits.', ref: 'DS/HD 60364-5-52 \u00A7525', action: da ? 'Forh\u00F8j kabeltv\u00E6rsnit eller reducer kabellængden.' : 'Increase cable cross-section or reduce cable length.' });
+      }
+    }
+  }
+
+  // 3. Short-circuit: Icu < Ik max
+  if (cableState.crossSection && (mcbState.rating || mccbState.inVal)) {
+    var Un3 = loadState.voltage === '3x400' ? 400 : 230;
+    var ikMax = (1.05 * Un3) / (Math.sqrt(3) * (scState.zNet + scState.zTrafo) / 1000);
+    var deviceIcu = 0;
+    if (mcbState.rating) {
+      var mcbInfo = MCB_TYPES[mcbState.type];
+      deviceIcu = (mcbState.poles === '1p' ? mcbInfo.icu1p : mcbInfo.icuMp) * 1000;
+    } else if (mccbState.inVal) {
+      deviceIcu = MCCB_TRIPS[mccbState.trip] * 1000;
+    }
+    if (deviceIcu > 0 && deviceIcu < ikMax) {
+      findings.push({ severity: 'critical', msg: da ? 'KRITISK: Brydeevne Icu (' + (deviceIcu/1000).toFixed(1) + ' kA) er MINDRE end Ik max (' + (ikMax/1000).toFixed(1) + ' kA). Apparatet kan eksplodere ved kortslutning!' : 'CRITICAL: Breaking capacity Icu (' + (deviceIcu/1000).toFixed(1) + ' kA) is LESS than Ik max (' + (ikMax/1000).toFixed(1) + ' kA). Device may explode during short-circuit!', ref: 'DS/HD 60364-4-43 \u00A7434.3.1', action: da ? 'V\u00E6lg en komponent med h\u00F8jere brydeevne eller tilf\u00F8j back-up beskyttelse.' : 'Select a component with higher breaking capacity or add back-up protection.' });
+    }
+  }
+
+  // 4. Motor start nuisance trip (DOL + curve B)
+  if (mcbState.rating && mcbState.curve === 'B') {
+    var hasMotor = loadList.some(function(c) { var nm = (c.name||'').toLowerCase(); return nm.includes('motor') || nm.includes('pumpe') || nm.includes('pump') || nm.includes('kompressor'); });
+    if (hasMotor) {
+      findings.push({ severity: 'warning', msg: da ? 'Kurve B MCB med DOL motorstart: Starttransient (6-8x In) kan udl\u00F8se magnetudl\u00F8seren (3.2-4.8x In). Risiko for utilsigtet udkobling.' : 'Curve B MCB with DOL motor start: Start transient (6-8x In) may trip the magnetic release (3.2-4.8x In). Risk of nuisance tripping.', ref: 'IEC 60898-1 \u00A78.6.1', action: da ? 'Brug kurve C (7-10x) eller D (10-20x) for motorstartere, eller anvend softstarter.' : 'Use curve C (7-10x) or D (10-20x) for motor starters, or apply soft starter.' });
+    }
+  }
+
+  // 5. Selectivity: main and branch ratio < 1.6:1
+  if (selState && selState.upRating && selState.dnRating) {
+    var ratio = selState.upRating / selState.dnRating;
+    if (ratio < 1.6 && ratio > 0) {
+      findings.push({ severity: 'warning', msg: da ? 'Selektivitetsforhold (' + ratio.toFixed(2) + ':1) er under 1.6:1. Fuld selektivitet er muligvis ikke opn\u00E5et.' : 'Selectivity ratio (' + ratio.toFixed(2) + ':1) is below 1.6:1. Full selectivity may not be achieved.', ref: 'DS/HD 60364-5-53 \u00A7536.1', action: da ? 'Forh\u00F8j forskellen mellem hovedsikring og gruppeafbryder, eller brug tidsforsinket selektivitet.' : 'Increase the difference between main fuse and branch breaker, or use time-delayed selectivity.' });
+    }
+  }
+
+  // 6. Cable grouping reminder (>3 circuits)
+  if (loadList.length > 3 && cableState.grouping <= 1) {
+    findings.push({ severity: 'info', msg: da ? 'Belastningsskemaet har ' + loadList.length + ' kredsl\u00F8b, men gruppering er sat til 1 (ingen derating). Husk gruppeafklassificering hvis kabler samf\u00F8res.' : 'Load schedule has ' + loadList.length + ' circuits, but grouping is set to 1 (no derating). Remember grouping derating if cables are bundled.', ref: 'DS/HD 60364-5-52 Tabel B.52.17', action: da ? 'S\u00E6t grupperingsantal svarende til antal samf\u00F8rte kabler.' : 'Set grouping count matching the number of bundled cables.' });
+  }
+
+  // 7. EV continuous load (100% sizing)
+  if (loadList.length > 0) {
+    var evLoads = loadList.filter(function(c) { var nm = (c.name||'').toLowerCase(); return nm.includes('ev') || nm.includes('lader') || nm.includes('charger'); });
+    evLoads.forEach(function(c) {
+      if (c.sf < 1.0) {
+        findings.push({ severity: 'warning', msg: da ? 'EV-lader "' + (c.name||'EV') + '" har samtidighedsfaktor ' + c.sf + '. EV-ladere er kontinuerlig belastning og skal dimensioneres til 100% (sf=1.0).' : 'EV charger "' + (c.name||'EV') + '" has simultaneity factor ' + c.sf + '. EV chargers are continuous loads and must be sized at 100% (sf=1.0).', ref: 'DS/HD 60364-7-722 \u00A7722.311', action: da ? 'S\u00E6t samtidighedsfaktor til 1.0 for EV-ladere.' : 'Set simultaneity factor to 1.0 for EV chargers.' });
+      }
+    });
+  }
+
+  // 8. Harmonics: >3 LED/IT loads => neutral sizing
+  if (loadList.length > 0) {
+    var ledItCount = loadList.filter(function(c) { var nm = (c.name||'').toLowerCase(); return nm.includes('led') || nm.includes('it') || nm.includes('server') || nm.includes('pc') || nm.includes('computer') || nm.includes('belys') || nm.includes('light'); }).length;
+    if (ledItCount > 3) {
+      findings.push({ severity: 'info', msg: da ? ledItCount + ' LED/IT-belastninger fundet. 3. harmonisk (150 Hz) adderer i nullederen. Overvej at kontrollere N-dimensionering.' : ledItCount + ' LED/IT loads found. 3rd harmonic (150 Hz) adds in the neutral. Consider checking neutral sizing.', ref: 'DS/HD 60364-5-52 \u00A7524', action: da ? 'V\u00E6lg N-leder = faseleders tv\u00E6rsnit eller st\u00F8rre ved h\u00F8j THD. Overvej 5G kabel i stedet for 4G.' : 'Select N-conductor = phase conductor cross-section or larger at high THD. Consider 5G cable instead of 4G.' });
+    }
+  }
+
+  // 9. Temperature: harsh derating (>40 deg C) => suggest XLPE
+  if (cableState.temp > 40) {
+    var isXLPE = /NOIKLX|NOIKX|NOIK-AL|NOSP/i.test(cableState.type || '');
+    if (!isXLPE) {
+      findings.push({ severity: 'info', msg: da ? 'Omgivelsestemperatur ' + cableState.temp + '\u00B0C med PVC-isolation. XLPE (90\u00B0C) t\u00E5ler h\u00F8jere temperaturer og giver bedre str\u00F8mb\u00E6reevne.' : 'Ambient temperature ' + cableState.temp + '\u00B0C with PVC insulation. XLPE (90\u00B0C) tolerates higher temperatures and provides better ampacity.', ref: 'DS/HD 60364-5-52 Tabel C.52.1', action: da ? 'Overvej XLPE-isoleret kabel (f.eks. NOIKLX) for bedre varmeafledning.' : 'Consider XLPE-insulated cable (e.g. NOIKLX) for better thermal performance.' });
+    }
+  }
+
+  // 10. Spare capacity: IB > 80% of In
+  if (ib > 0 && inRating > 0 && corrIz > 0) {
+    var utilization = (ib / inRating) * 100;
+    if (utilization > 80) {
+      findings.push({ severity: 'info', msg: da ? 'Udnyttelsesgrad ' + utilization.toFixed(0) + '% (IB/In). Minimal reservekapacitet til fremtidig udvidelse.' : 'Utilization ' + utilization.toFixed(0) + '% (IB/In). Minimal spare capacity for future expansion.', ref: 'DS/HD 60364-8-1 \u00A7810.1 (fremtidssikring)', action: da ? 'Overvej n\u00E6ste st\u00F8rrelse op for beskyttelse og kabel, s\u00E5 der er plads til udvidelser.' : 'Consider next size up for protection and cable, allowing room for expansion.' });
+    }
+  }
+
+  // 11. RCD: residential/socket circuit without RCD
+  if (ib > 0 && loadList.length > 0) {
+    var hasSocketOrResidential = loadList.some(function(c) { var nm = (c.name||'').toLowerCase(); return nm.includes('stik') || nm.includes('socket') || nm.includes('bolig') || nm.includes('residential') || nm.includes('badeværelse') || nm.includes('bathroom') || nm.includes('udend\u00F8rs') || nm.includes('outdoor'); });
+    var rcdSelected = (typeof zsState !== 'undefined' && zsState.deviceType === 'rcd') || (typeof testState !== 'undefined' && testState.rcd && testState.rcd.rcdType);
+    if (hasSocketOrResidential && !rcdSelected) {
+      findings.push({ severity: 'warning', msg: da ? 'Stikontakter/boligkredsl\u00F8b fundet uden synlig HPFI/RCD-valg. Alle stikkontakter \u226420A i boliger skal beskyttes med 30mA RCD.' : 'Socket/residential circuits found without visible RCD selection. All sockets \u226420A in dwellings must be protected by 30mA RCD.', ref: 'DS/HD 60364-4-41 \u00A7411.3.3', action: da ? 'Tilf\u00F8j 30mA Type A eller Type F HPFI (Type B for EV-ladere).' : 'Add 30mA Type A or Type F RCD (Type B for EV chargers).' });
+    }
+  }
+
+  // 12. Cable length > 50m => check impedance carefully
+  if (vdropState.length > 50) {
+    findings.push({ severity: 'info', msg: da ? 'Kabellængde ' + vdropState.length + ' m (>50m). Ved lange kabler stiger impedansen markant. Kontroller at afbrydelsesbetingelsen stadig er opfyldt (Zs).' : 'Cable length ' + vdropState.length + ' m (>50m). At long cable runs, impedance increases significantly. Verify that disconnection conditions are still met (Zs).', ref: 'DS/HD 60364-4-41 \u00A7411.4.4', action: da ? 'Beregn sløjfeimpedans Zs og verificer at Ik min > magnetisk udl\u00F8sestr\u00F8m inden for krævet tid.' : 'Calculate loop impedance Zs and verify that Ik min > magnetic trip current within required time.' });
+  }
+
+  return findings;
+}
+
+function renderDesignReviewCard() {
+  var da = lang === 'da';
+  var findings = runDesignReview();
+  var criticals = findings.filter(function(f) { return f.severity === 'critical'; });
+  var warnings = findings.filter(function(f) { return f.severity === 'warning'; });
+  var infos = findings.filter(function(f) { return f.severity === 'info'; });
+
+  if (findings.length === 0) {
+    return '<div class="card fade-in" style="border-left:4px solid var(--success)">' +
+      '<div class="card-title">\uD83D\uDD0D ' + (da ? 'Second Opinion - Designgennemgang' : 'Second Opinion - Design Review') + '</div>' +
+      '<div class="info-row">' + (da ? 'Automatisk analyse af hele projekttilstanden baseret p\u00E5 danske normer og god praksis.' : 'Automatic analysis of the entire project state based on Danish standards and best practice.') + '</div>' +
+      '<div class="result-box"><div class="result-title" style="color:var(--success)">\u2705 ' + (da ? 'Ingen fund - designet ser korrekt ud!' : 'No findings - design looks correct!') + '</div>' +
+      '<div class="result-row"><span class="label">' + (da ? 'Status' : 'Status') + '</span><span class="value" style="color:var(--success)">' + (da ? 'Alle 12 kontroller best\u00E5et' : 'All 12 checks passed') + '</span></div></div></div>';
+  }
+
+  var borderColor = criticals.length > 0 ? 'var(--danger)' : (warnings.length > 0 ? '#ffa726' : 'var(--primary)');
+  var html = '<div class="card fade-in" style="border-left:4px solid ' + borderColor + '">';
+  html += '<div class="card-title">\uD83D\uDD0D ' + (da ? 'Second Opinion - Designgennemgang' : 'Second Opinion - Design Review') + '</div>';
+  html += '<div class="info-row">' + (da ? 'Automatisk analyse baseret p\u00E5 DS/HD 60364, IEC 60898/60947 og god dansk projekteringspraksis.' : 'Automatic analysis based on DS/HD 60364, IEC 60898/60947 and good Danish engineering practice.') + '</div>';
+
+  // Summary bar
+  html += '<div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">';
+  if (criticals.length > 0) html += '<div style="padding:6px 12px;border-radius:6px;background:rgba(239,71,111,0.15);border:1px solid rgba(239,71,111,0.4);color:#ef476f;font-weight:bold;font-size:0.85em">\u26A0 ' + criticals.length + ' ' + (da ? 'kritisk' : 'critical') + '</div>';
+  if (warnings.length > 0) html += '<div style="padding:6px 12px;border-radius:6px;background:rgba(255,167,38,0.12);border:1px solid rgba(255,167,38,0.3);color:#ffa726;font-weight:bold;font-size:0.85em">\u26A0 ' + warnings.length + ' ' + (da ? 'advarsel' : 'warning') + '</div>';
+  if (infos.length > 0) html += '<div style="padding:6px 12px;border-radius:6px;background:rgba(0,208,255,0.1);border:1px solid rgba(0,208,255,0.3);color:#00d0ff;font-weight:bold;font-size:0.85em">\u2139 ' + infos.length + ' ' + (da ? 'information' : 'info') + '</div>';
+  html += '</div>';
+
+  // Findings list
+  findings.forEach(function(f) {
+    var bgColor, borderCol, textColor, icon, pulseClass;
+    if (f.severity === 'critical') { bgColor = 'rgba(239,71,111,0.08)'; borderCol = 'rgba(239,71,111,0.4)'; textColor = '#ef476f'; icon = '\uD83D\uDED1'; pulseClass = 'style="animation:pulse 1.5s ease-in-out infinite"'; }
+    else if (f.severity === 'warning') { bgColor = 'rgba(255,167,38,0.06)'; borderCol = 'rgba(255,167,38,0.3)'; textColor = '#ffa726'; icon = '\u26A0\uFE0F'; pulseClass = ''; }
+    else { bgColor = 'rgba(0,208,255,0.05)'; borderCol = 'rgba(0,208,255,0.2)'; textColor = '#00d0ff'; icon = '\u2139\uFE0F'; pulseClass = ''; }
+
+    html += '<div style="background:' + bgColor + ';border:1px solid ' + borderCol + ';border-radius:8px;padding:12px;margin-bottom:10px" ' + pulseClass + '>';
+    html += '<div style="display:flex;align-items:flex-start;gap:8px">';
+    html += '<span style="font-size:1.3em">' + icon + '</span>';
+    html += '<div style="flex:1">';
+    html += '<div style="color:' + textColor + ';font-weight:bold;font-size:0.92em;margin-bottom:4px">' + f.msg + '</div>';
+    html += '<div style="color:rgba(255,255,255,0.5);font-size:0.78em;margin-bottom:4px">\uD83D\uDCC4 ' + f.ref + '</div>';
+    html += '<div style="color:rgba(255,255,255,0.7);font-size:0.82em;background:rgba(255,255,255,0.03);border-radius:4px;padding:6px 8px;border-left:2px solid ' + textColor + '">\uD83D\uDCA1 ' + f.action + '</div>';
+    html += '</div></div></div>';
+  });
+
+  html += '</div>';
+  return html;
+}
+
 function renderVerify() {
   const tests = runSelfTests();
   const passed = tests.filter(t=>t.pass).length;
@@ -7748,6 +8060,7 @@ function renderVerify() {
         ${rows}
       </div>
     </div>
+    ${renderDesignReviewCard()}
     <div class="card fade-in">
       <div class="card-title">${lang==='da'?'Datakilder & sporbarhed':'Data sources & traceability'}</div>
       <div class="result-box" style="background:var(--primary-glow);border-color:var(--primary-light)">
