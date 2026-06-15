@@ -1152,5 +1152,14 @@ if (disbMonths) { disbMonths.value = "48"; disbMonths.dispatchEvent(new window.E
 ok(doc.querySelector('.disbYearTable').querySelectorAll('tbody tr').length === 4, "changing duration to 48 months yields 4 annual rows");
 ok(doc.getElementById("disbRefs") != null && /FIDIC|NEC4/.test(doc.getElementById("disbRefs").innerHTML), "Disbursement cites FIDIC/NEC payment basis");
 
+// 103) Country challenges surface as scored risks in the Brain plan preview
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+doc.getElementById("brainText").value =
+  "Submarine fibre cable landing in Indonesia, Philippines and Taiwan, 3000 km route, marine survey, OTDR splicing";
+doc.getElementById("brainAnalyze").click();
+var brainOut2 = doc.getElementById("brainOut").innerHTML;
+ok(/natural-hazard|geographical/.test(brainOut2), "Brain risk table includes country geographical/natural-hazard risks");
+ok(/geopolitical/.test(brainOut2), "Brain risk table includes country geopolitical risks");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

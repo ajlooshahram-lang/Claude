@@ -1720,5 +1720,28 @@ console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
   ok(r.references.some(function (x) { return /FIDIC|NEC4/.test(x); }) && r.references.some(function (x) { return /IFRS|IAS 21/.test(x); }), "references cite FIDIC/NEC payment and IFRS FX translation");
 })();
 
+// ===== Country challenges -> scored FMEA risks in the plan =====
+(function () {
+  console.log("\n--- Country risks in the plan register ---");
+  var r = B.analyzeProject("Submarine fibre cable landing in Indonesia, Philippines and Taiwan, 3000 km route, marine survey, OTDR, splicing");
+  var cr = r.risks.filter(function (x) { return x._country; });
+  ok(cr.length === 6, "3 detected countries add 6 scored country risks (2 each) - got " + cr.length);
+  ok(cr.every(function (x) { return x._brain === "risk"; }), "country risks are tagged as risks");
+  var ids = {}; cr.forEach(function (x) { ids[x._country] = (ids[x._country] || 0) + 1; });
+  ok(ids.ID === 2 && ids.PH === 2 && ids.TW === 2, "each detected country contributes a geographical + geopolitical risk");
+  var geo = cr.filter(function (x) { return /geographical/.test(x.problem) && x._country === "ID"; })[0];
+  ok(geo && geo.sev === 8 && geo.occ === 6 && geo.det === 4, "geographical risk scored S8/O6/D4 (RPN 192)");
+  ok(geo && geo.priority === "1-CRITICAL", "Indonesia natural-hazard risk flagged CRITICAL (seismic/volcanic/typhoon)");
+  ok(geo && geo.rootCause.length > 10, "geographical risk lists the specific hazards in its root cause");
+  var pol = cr.filter(function (x) { return /geopolitical/.test(x.problem) && x._country === "PH"; })[0];
+  ok(pol && pol.sev === 7 && pol.occ === 5 && pol.det === 5, "geopolitical risk scored S7/O5/D5 (RPN 175)");
+  // Regression: a brief with no programme country adds no country risks
+  var sub = B.analyzeProject("Submarine undersea cable system, 2000 km seabed route, repeater every 80 km, cable ship, landing station, branching unit, ocean.");
+  ok(sub.risks.filter(function (x) { return x._country; }).length === 0 && sub.risks.length === 10, "no detected country -> no country risks (submarine plan stays at 10)");
+  // Zero-cost so the budget is unaffected; deterministic
+  ok(cr.every(function (x) { return x.estCost === 0; }), "country risks carry no direct cost (budget unaffected)");
+  ok(JSON.stringify(r.risks) === JSON.stringify(B.analyzeProject("Submarine fibre cable landing in Indonesia, Philippines and Taiwan, 3000 km route, marine survey, OTDR, splicing").risks), "country risks are deterministic");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);

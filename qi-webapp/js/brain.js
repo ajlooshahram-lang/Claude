@@ -1431,6 +1431,32 @@
           code: country.code,
           keyContacts: country.keyContacts
         });
+        // Convert each country's challenges into scored FMEA risks that flow
+        // into the plan's risk register (conservative scoring — natural hazards
+        // that threaten the marine programme are treated as critical).
+        var geoTxt = (country.geographicalChallenges || []).join("; ");
+        var polTxt = (country.geopoliticalChallenges || []).join("; ");
+        if (geoTxt) {
+          var critNat = /earthquake|typhoon|volcan|trench|tsunami|seismic|monsoon/i.test(geoTxt);
+          var gr = mkCase({
+            problem: "RISK: " + country.name + " geographical / natural-hazard exposure",
+            category: "Delivery / Schedule", sev: 8, occ: 6, det: 4,
+            priority: critNat ? "1-CRITICAL" : "2-HIGH",
+            rootCause: geoTxt, leanMethod: "FMEA", _brain: "risk"
+          });
+          gr._country = country.code;
+          risks.push(gr);
+        }
+        if (polTxt) {
+          var pr = mkCase({
+            problem: "RISK: " + country.name + " geopolitical / regulatory exposure",
+            category: "Delivery / Schedule", sev: 7, occ: 5, det: 5,
+            priority: "2-HIGH",
+            rootCause: polTxt, leanMethod: "FMEA", _brain: "risk"
+          });
+          pr._country = country.code;
+          risks.push(pr);
+        }
       });
     }
 
