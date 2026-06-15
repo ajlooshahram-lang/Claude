@@ -12911,6 +12911,10 @@ function plcSetEnergy(key, val) { plcState.energy[key] = val; renderModule('plc'
 function plcSetNetwork(key, val) { plcState.network[key] = val; renderModule('plc'); }
 function plcSetAutomation(idx, enabled) { if (!plcState.automation) plcState.automation = {}; if (enabled) { if (!plcState.automation[idx]) plcState.automation[idx] = { enabled: true, level: 'standard' }; else plcState.automation[idx].enabled = true; } else { if (plcState.automation[idx]) plcState.automation[idx].enabled = false; } renderModule('plc'); }
 function plcSetAutoLevel(idx, level) { if (!plcState.automation) plcState.automation = {}; if (!plcState.automation[idx]) plcState.automation[idx] = { enabled: true, level: level }; else plcState.automation[idx].level = level; renderModule('plc'); }
+function plcCommToggle(idx) { if (!plcState.commChecklist) plcState.commChecklist = {}; plcState.commChecklist[idx] = plcState.commChecklist[idx] === 'pass' ? 'fail' : plcState.commChecklist[idx] === 'fail' ? '' : 'pass'; renderModule('plc'); }
+function plcSetAppExample(idx) { plcState.appExample = idx; renderModule('plc'); }
+function plcSetTroubleCase(idx) { plcState.troubleCase = idx; renderModule('plc'); }
+function plcSetAlarmView(view) { plcState.alarmView = view; renderModule('plc'); }
 
 function plcGenerateSafetyCode() {
   var st = plcState;
@@ -14982,6 +14986,76 @@ function renderPlc() {
     html += '<div style="margin-top:14px;text-align:center"><button class="sel-btn" onclick="window.print()" style="font-size:0.9rem;padding:10px 24px">\uD83D\uDDA8\uFE0F ' + (da ? 'Print kundeopsummering' : 'Print customer summary') + '</button></div>';
     html += '</div>';
   }
+
+  // ===== PLC REAL-WORLD EXAMPLES =====
+  html += '<div class="card fade-in"><div class="card-title">\uD83C\uDFE0 ' + (da ? 'Praktiske eksempler' : 'Real-world examples') + '</div>';
+  html += '<div class="info-row">' + (da ? 'Se hvordan PLC-automatik fungerer i virkelige installationer:' : 'See how PLC automation works in real installations:') + '</div>';
+  var examples = [
+    { icon:'\uD83C\uDFE0', title_da:'Parcelhus med varmepumpe', title_en:'House with heat pump', desc_da:'PLC styrer varmepumpe efter udetemperatur + rumtemperatur, skifter til nattilstand kl. 22:00, overvåger elforbrug og sender alarm ved fejl. Besparelse: ~15-25% energi.', desc_en:'PLC controls heat pump based on outdoor + room temperature, switches to night mode at 22:00, monitors power consumption and sends alarm on fault. Savings: ~15-25% energy.' },
+    { icon:'\uD83C\uDFE2', title_da:'Kontor: belysning + ventilation', title_en:'Office: lighting + ventilation', desc_da:'Lys styres efter bevægelse + dagslyssensor (dimmring). Ventilation reguleres efter CO2-niveau. Månedlig energirapport genereres automatisk. Besparelse: ~30-40% energi.', desc_en:'Lighting controlled by motion + daylight sensor (dimming). Ventilation regulated by CO2 level. Monthly energy report auto-generated. Savings: ~30-40% energy.' },
+    { icon:'\u2699\uFE0F', title_da:'Værksted med motorgruppe', title_en:'Workshop with motor group', desc_da:'PLC starter motorer i sekvens (3s forsinkelse \u2014 undgår samtidige startstrømme). Overvåger vibration og temperatur. Fejlmelding direkte til montørens telefon via app.', desc_en:'PLC starts motors in sequence (3s delay \u2014 avoids simultaneous inrush). Monitors vibration and temperature. Fault notification direct to technician phone via app.' },
+    { icon:'\uD83D\uDE97', title_da:'EV-ladeplads (4 ladere)', title_en:'EV charging (4 chargers)', desc_da:'Dynamisk laststyring: PLC fordeler strøm efter ledig kapacitet. Prioriterer efter ankomst. Rapporterer kWh per bruger til fakturering. Forhindrer overbelastning af hovedsikring.', desc_en:'Dynamic load management: PLC distributes current by available capacity. Prioritizes by arrival. Reports kWh per user for billing. Prevents main fuse overload.' }
+  ];
+  examples.forEach(function(ex) {
+    html += '<div class="result-box" style="margin-top:10px"><div class="result-title">' + ex.icon + ' ' + (da ? ex.title_da : ex.title_en) + '</div>';
+    html += '<div style="padding:6px 2px;line-height:1.5">' + (da ? ex.desc_da : ex.desc_en) + '</div></div>';
+  });
+  html += '</div>';
+
+  // ===== PLC COMMISSIONING CHECKLIST =====
+  if (!plcState._commission) plcState._commission = {};
+  var commSteps = [
+    { id:'c1', da:'Kontroll\u00e9r I/O-forbindelser (m\u00e5l 24VDC forsyning)', en:'Verify I/O connections (measure 24VDC supply)' },
+    { id:'c2', da:'Test hvert input manuelt (aktiv\u00e9r sensor \u2192 bekr\u00e6ft PLC ser det)', en:'Test each input manually (activate sensor \u2192 confirm PLC sees it)' },
+    { id:'c3', da:'Test hvert output manuelt (tving output \u2192 bekr\u00e6ft aktuator reagerer)', en:'Test each output manually (force output \u2192 confirm actuator responds)' },
+    { id:'c4', da:'K\u00f8r program i manuel tilstand (observer sekvenser)', en:'Run program in manual mode (observe sequences)' },
+    { id:'c5', da:'Test sikkerhedsfunktioner (n\u00f8dstop, vagtbetjening, d\u00f8rkontakt)', en:'Test safety functions (E-stop, guard interlock, door contact)' },
+    { id:'c6', da:'Indstil parametre (tider, setpunkter, alarmgr\u00e6nser)', en:'Set parameters (timers, setpoints, alarm limits)' },
+    { id:'c7', da:'Idrifts\u00e6t i automatik (overv\u00e5g minimum 24 timer)', en:'Commission in auto mode (monitor minimum 24 hours)' },
+    { id:'c8', da:'Dokumentation: backup, parametre, screenshots, aflevering', en:'Documentation: backup, parameters, screenshots, handover' }
+  ];
+  html += '<div class="card fade-in"><div class="card-title">\u2705 ' + (da ? 'Idrifts\u00e6ttelse \u2014 Tjekliste' : 'Commissioning \u2014 Checklist') + '</div>';
+  html += '<div class="info-row">' + (da ? 'Klik OK/Fejl for hvert trin under idrifts\u00e6ttelse p\u00e5 anl\u00e6gget.' : 'Click OK/Fail for each step during on-site commissioning.') + '</div>';
+  commSteps.forEach(function(step, idx) {
+    var st = plcState._commission[step.id] || 'none';
+    html += '<div class="result-row"><span class="label" style="flex:1">' + (idx+1) + '. ' + (da ? step.da : step.en) + '</span>';
+    html += '<span class="value" style="display:flex;gap:4px">';
+    html += '<button class="sel-btn' + (st==='ok'?' selected':'') + '" style="padding:4px 10px;min-width:0;font-size:.75rem' + (st==='ok'?';border-color:var(--success);color:var(--success)':'') + '" onclick="plcState._commission[\'' + step.id + '\']=\'ok\';renderModule(\'plc\')">OK</button>';
+    html += '<button class="sel-btn' + (st==='fail'?' selected':'') + '" style="padding:4px 10px;min-width:0;font-size:.75rem' + (st==='fail'?';border-color:var(--danger);color:var(--danger)':'') + '" onclick="plcState._commission[\'' + step.id + '\']=\'fail\';renderModule(\'plc\')">' + (da?'Fejl':'Fail') + '</button>';
+    html += '</span></div>';
+  });
+  var commDone = commSteps.filter(function(s){return plcState._commission[s.id]==='ok';}).length;
+  var commFail = commSteps.filter(function(s){return plcState._commission[s.id]==='fail';}).length;
+  html += '<div class="result-box ' + (commFail>0?'error':(commDone===commSteps.length?'':'warning')) + '" style="margin-top:10px"><div class="result-title">' + (commDone===commSteps.length && commFail===0 ? (da?'\u2705 Idrifts\u00e6ttelse godkendt':'\u2705 Commissioning approved') : (commFail>0?(da?'\u274c Fejl fundet \u2014 afhjælp f\u00f8r idrifts\u00e6ttelse':'\u274c Faults found \u2014 fix before commissioning'):(da?'\u23f3 '+commDone+'/'+commSteps.length+' gennemf\u00f8rt':'\u23f3 '+commDone+'/'+commSteps.length+' completed'))) + '</div></div></div>';
+
+  // ===== PLC TROUBLESHOOTING =====
+  html += '<div class="card fade-in"><div class="card-title">\uD83D\uDD27 ' + (da ? 'Fejlfinding' : 'Troubleshooting') + '</div>';
+  html += '<div class="info-row">' + (da ? 'Typiske fejlscenarier og diagnosevejledning:' : 'Typical fault scenarios and diagnosis guide:') + '</div>';
+  var faults = [
+    { title_da:'Motor starter ikke', title_en:'Motor won\u2019t start', steps_da:'1. DI feedback aktiv? 2. DO kommando aktiv? 3. Kontaktor tiltrukket? 4. Termorel\u00e6 udl\u00f8st? 5. Faseudfald? 6. N\u00f8dstop aktiv?', steps_en:'1. DI feedback active? 2. DO command active? 3. Contactor engaged? 4. Overload tripped? 5. Phase loss? 6. E-stop active?' },
+    { title_da:'Kommunikationsfejl (BMS)', title_en:'Communication fault (BMS)', steps_da:'1. Kabel tilsluttet? 2. LED p\u00e5 switch? 3. IP-adresse korrekt? 4. Modbus register korrekt? 5. Baud rate match? 6. Firewall?', steps_en:'1. Cable connected? 2. Switch LED on? 3. IP address correct? 4. Modbus register correct? 5. Baud rate match? 6. Firewall?' },
+    { title_da:'Temperatur for h\u00f8j', title_en:'Temperature too high', steps_da:'1. Sensor kalibreret? 2. Ventil \u00e5ben? 3. Pumpe k\u00f8rer? 4. Filter rent? 5. PID tuning? 6. Belastning \u00f8get?', steps_en:'1. Sensor calibrated? 2. Valve open? 3. Pump running? 4. Filter clean? 5. PID tuning? 6. Load increased?' },
+    { title_da:'HPFI udl\u00f8ser gentagne gange', title_en:'RCD trips repeatedly', steps_da:'1. Isolationsm\u00e5ling? 2. VFD EMC-filter? 3. Fugt i klemmer? 4. Kabelskade? 5. Type B p\u00e5kr\u00e6vet? 6. L\u00e6kstr\u00f8m for h\u00f8j?', steps_en:'1. Insulation test? 2. VFD EMC filter? 3. Moisture in terminals? 4. Cable damage? 5. Type B required? 6. Leakage too high?' }
+  ];
+  faults.forEach(function(f) {
+    html += '<div class="result-box" style="margin-top:8px"><div class="result-title">\u26A0\uFE0F ' + (da ? f.title_da : f.title_en) + '</div>';
+    html += '<div style="padding:6px 2px;line-height:1.6;font-size:.88rem">' + (da ? f.steps_da : f.steps_en) + '</div></div>';
+  });
+  html += '</div>';
+
+  // ===== ALARM MANAGEMENT (ISA-18.2) =====
+  html += '<div class="card fade-in"><div class="card-title">\uD83D\uDEA8 ' + (da ? 'Alarmh\u00e5ndtering (ISA-18.2 / IEC 62682)' : 'Alarm Management (ISA-18.2 / IEC 62682)') + '</div>';
+  html += '<div class="info-row">' + (da ? 'Professionel alarmstruktur sikrer at kritiske alarmer f\u00e5r \u00f8jeblikkelig opm\u00e6rksomhed.' : 'Professional alarm structure ensures critical alarms get immediate attention.') + '</div>';
+  var priorities = [
+    { p:'P1', da:'Kritisk \u2014 handler NU', en:'Critical \u2014 act NOW', color:'#ef476f', route_da:'SMS + sirene + blinkende lys', route_en:'SMS + siren + flashing light', ex_da:'N\u00f8dstop aktiveret, brand, personfare', ex_en:'E-stop activated, fire, personnel danger' },
+    { p:'P2', da:'H\u00f8j \u2014 inden 1 time', en:'High \u2014 within 1 hour', color:'#ff8c42', route_da:'App push-notifikation + HMI popup', route_en:'App push notification + HMI popup', ex_da:'Motor overbelastning, temp over gr\u00e6nse', ex_en:'Motor overload, temp above limit' },
+    { p:'P3', da:'Medium \u2014 inden 8 timer', en:'Medium \u2014 within 8 hours', color:'#ffd166', route_da:'Email + HMI-liste', route_en:'Email + HMI list', ex_da:'Filter tilstoppet, vibration stigende', ex_en:'Filter clogged, vibration rising' },
+    { p:'P4', da:'Lav \u2014 vedligehold', en:'Low \u2014 maintenance', color:'#8ab4d0', route_da:'Logfil + vedligeholdelsesrapport', route_en:'Log file + maintenance report', ex_da:'Driftstimer n\u00e5et, n\u00e6ste service', ex_en:'Operating hours reached, next service' }
+  ];
+  priorities.forEach(function(pr) {
+    html += '<div class="result-row" style="border-left:4px solid ' + pr.color + ';padding-left:10px;margin:6px 0"><span class="label" style="flex:1"><strong style="color:' + pr.color + '">' + pr.p + '</strong> ' + (da ? pr.da : pr.en) + '<br><span style="font-size:.8rem;color:var(--text-light)">' + (da ? pr.route_da : pr.route_en) + '</span></span><span class="value" style="font-size:.82rem;text-align:right;max-width:40%">' + (da ? pr.ex_da : pr.ex_en) + '</span></div>';
+  });
+  html += '<div class="info-row" style="margin-top:8px">' + (da ? 'M\u00e5l: maks. 10 alarmer pr. operator pr. time (ISA-18.2). For mange alarmer \u2192 \u201dalarmtr\u00e6thed\u201d \u2192 kritiske alarmer overses.' : 'Target: max 10 alarms per operator per hour (ISA-18.2). Too many alarms \u2192 \u201calarm fatigue\u201d \u2192 critical alarms get missed.') + '</div></div>';
 
   return html;
 }
