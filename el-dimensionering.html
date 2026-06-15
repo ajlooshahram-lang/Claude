@@ -931,7 +931,8 @@ const T = {
       light: '\uD83D\uDCA1 Belysning',
       fire: '\uD83D\uDD25 Brandalarm',
       watchdog: '\uD83D\uDC15 Vagthund',
-      lcc: '\uD83D\uDCCA LCC-analyse'
+      lcc: '\uD83D\uDCCA LCC-analyse',
+      maint: '\uD83D\uDD27 Vedligehold'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1051,7 +1052,8 @@ const T = {
       light: '\uD83D\uDCA1 Lighting',
       fire: '\uD83D\uDD25 Fire Alarm',
       watchdog: '\uD83D\uDC15 Watchdog',
-      lcc: '\uD83D\uDCCA LCC Analysis'
+      lcc: '\uD83D\uDCCA LCC Analysis',
+      maint: '\uD83D\uDD27 Maintenance'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -2391,6 +2393,7 @@ function renderModule(mod) {
     case 'fire': content += renderFire(); break;
     case 'watchdog': content += renderWatchdog(); break;
     case 'lcc': content += renderLCC(); break;
+    case 'maint': content += renderMaint(); break;
     case 'home': content += renderDashboard(); break;
     case 'exam': content = renderExam(); break;
   }
@@ -18083,6 +18086,75 @@ function renderLCC(){
 
   // Print button
   html+='<div class="card fade-in"><div class="select-grid"><button class="sel-btn selected" onclick="window.print()">\uD83D\uDDA8\uFE0F '+(da?'Udskriv LCC-rapport':'Print LCC report')+'</button><button class="sel-btn" onclick="switchModule(\'watchdog\')">\uD83D\uDC15 '+(da?'Se detaljer i Vagthund':'View details in Watchdog')+'</button></div></div>';
+  return html;
+}
+
+// ===== MAINTENANCE PLANNING MODULE =====
+let maintState = { interval:'annual', environment:'normal' };
+function renderMaint(){
+  const da=lang==='da';
+  const s=maintState;
+  const sch=calcLoadSchedule();
+
+  // Generate maintenance items from project data
+  var items=[];
+  // Transformer
+  if(trafoState.size>0) items.push({comp:da?'Transformer '+trafoState.size+' kVA':'Transformer '+trafoState.size+' kVA',tasks_da:'Olienieau kontrol, termografi, bøsningskontrol, jordforbindelse',tasks_en:'Oil level check, thermography, bushing inspection, earth connection',interval_da:'Årligt',interval_en:'Annually',standard:'DS/HD 60076',critical:true});
+  // Main panel
+  items.push({comp:da?'Hovedtavle':'Main panel',tasks_da:'Termografi af samlinger, momentkontrol, visuel inspektion, RCD-test, rengøring',tasks_en:'Thermography of connections, torque check, visual inspection, RCD test, cleaning',interval_da:'Årligt',interval_en:'Annually',standard:'DS/HD 60364-6',critical:true});
+  // Protection devices
+  if(mcbState.rating>0) items.push({comp:da?'Automatsikringer (MCB)':'Circuit breakers (MCB)',tasks_da:'Funktionstest (trip-test), visuel inspektion, termografi af tilslutninger',tasks_en:'Function test (trip test), visual inspection, thermography of connections',interval_da:'Hvert 3. år',interval_en:'Every 3 years',standard:'IEC 60898',critical:true});
+  // RCD
+  items.push({comp:da?'HPFI/RCD':'RCD',tasks_da:'Testknap månedligt (bruger), udløsetid-måling årligt (elektriker), udskiftning hvert 10. år',tasks_en:'Test button monthly (user), trip time measurement annually (electrician), replacement every 10 years',interval_da:'Månedligt / Årligt',interval_en:'Monthly / Annually',standard:'DS/HD 60364-6 §62.2',critical:true});
+  // Cables
+  if(cableState.crossSection) items.push({comp:da?'Kabler og installationer':'Cables and installations',tasks_da:'Isolationsmåling, termografi af klemmer, visuel inspektion af føringsveje, kontrol af bøjningsradier',tasks_en:'Insulation measurement, thermography of terminals, visual inspection of routes, bend radius check',interval_da:'Hvert 5. år',interval_en:'Every 5 years',standard:'DS/HD 60364-6',critical:false});
+  // Motors
+  var motors=loadList.filter(function(c){return c.phase==='3'&&c.kW>=3;});
+  if(motors.length>0) items.push({comp:da?'Motorer ('+motors.length+' stk)':'Motors ('+motors.length+' pcs)',tasks_da:'Vibrationsmåling, isolationsmåling, lejeskift ved behov, alignment, rengøring af køleflader',tasks_en:'Vibration measurement, insulation measurement, bearing replacement as needed, alignment, cooling surface cleaning',interval_da:'Halvårligt',interval_en:'Semi-annually',standard:'IEC 60034',critical:false});
+  // EV chargers
+  var evs=loadList.filter(function(c){var nm=(c.name||'').toLowerCase();return nm.indexOf('ev')>=0||nm.indexOf('lad')>=0;});
+  if(evs.length>0) items.push({comp:da?'EV-ladere ('+evs.length+' stk)':'EV chargers ('+evs.length+' pcs)',tasks_da:'Kabelinspektion, stikforbindelse, RCD-test, software-opdatering, rengøring',tasks_en:'Cable inspection, connector check, RCD test, firmware update, cleaning',interval_da:'Halvårligt',interval_en:'Semi-annually',standard:'DS/HD 60364-7-722',critical:false});
+  // Earthing
+  items.push({comp:da?'Jordelektrode og udligningsforbindelser':'Earth electrode and bonding connections',tasks_da:'Jordelektrodemodstand (måling), visuel kontrol af udligningsforbindelser, momentkontrol',tasks_en:'Earth electrode resistance (measurement), visual check of bonding, torque check',interval_da:'Hvert 3. år',interval_en:'Every 3 years',standard:'DS/HD 60364-5-54',critical:true});
+  // SPD
+  items.push({comp:da?'Overspændingsbeskyttelse (SPD)':'Surge protection (SPD)',tasks_da:'Statusindikator kontrol (grøn/rød), udskiftning ved rød indikator, tællerværk',tasks_en:'Status indicator check (green/red), replacement on red indicator, event counter',interval_da:'Årligt',interval_en:'Annually',standard:'IEC 61643-11',critical:false});
+  // Emergency lighting
+  items.push({comp:da?'Nødbelysning':'Emergency lighting',tasks_da:'Funktionstest (30 sek) månedligt, fuld batteritest (1-3 timer) årligt, udskiftning af batterier hvert 4. år',tasks_en:'Function test (30 sec) monthly, full battery test (1-3 hours) annually, battery replacement every 4 years',interval_da:'Månedligt / Årligt',interval_en:'Monthly / Annually',standard:'DS/EN 50172; DS/EN 1838',critical:true});
+
+  // Calculate annual cost estimate
+  var annualMaintHours=items.length*1.5 + motors.length*2 + (trafoState.size>0?3:0);
+  var hourRate=650; // DKK/hour Danish electrician rate
+  var annualMaintCost=Math.round(annualMaintHours*hourRate);
+
+  let html='<div class="card fade-in"><div class="card-title">\uD83D\uDD27 '+(da?'Vedligeholdelsesplan':'Maintenance Plan')+'</div>';
+  html+='<div class="info-row">'+(da?'Genereret forebyggende vedligeholdelsesplan baseret på dit projekt. Alle intervaller følger DS/HD 60364-6 og komponentstandarder. Regelmæssig vedligehold forlænger installationens levetid og forebygger brand/fejl.':'Generated preventive maintenance plan based on your project. All intervals follow DS/HD 60364-6 and component standards. Regular maintenance extends installation lifetime and prevents fire/faults.')+'</div>';
+
+  // Environment selection
+  html+='<div class="select-group"><div class="select-label">'+(da?'Driftsmiljø (påvirker intervaller)':'Operating environment (affects intervals)')+'</div><div class="select-grid">';
+  [{id:'clean',da:'Rent (kontor)',en:'Clean (office)'},{id:'normal',da:'Normal (bolig/butik)',en:'Normal (dwelling/shop)'},{id:'dusty',da:'Støvet (industri)',en:'Dusty (industrial)'},{id:'harsh',da:'Hårdt (udendørs/kemi)',en:'Harsh (outdoor/chemical)'}].forEach(function(e){
+    html+='<button class="sel-btn '+(s.environment===e.id?'selected':'')+'" onclick="maintState.environment=\''+e.id+'\';renderModule(\'maint\')">'+(da?e.da:e.en)+'</button>';
+  });
+  html+='</div></div></div>';
+
+  // Maintenance schedule table
+  html+='<div class="card fade-in"><div class="card-title">'+(da?'Vedligeholdelsesopgaver':'Maintenance tasks')+'</div>';
+  items.forEach(function(item){
+    html+='<div class="result-box'+(item.critical?' warning':'')+'" style="margin-top:8px"><div class="result-title">'+(item.critical?'\u26A0\uFE0F ':'')+''+item.comp+'</div>';
+    html+='<div class="result-row"><span class="label">'+(da?'Opgaver':'Tasks')+'</span><span class="value" style="text-align:right;max-width:65%">'+(da?item.tasks_da:item.tasks_en)+'</span></div>';
+    html+='<div class="result-row"><span class="label">'+(da?'Interval':'Interval')+'</span><span class="value">'+(da?item.interval_da:item.interval_en)+'</span></div>';
+    html+='<div class="result-row"><span class="label">'+(da?'Standard':'Standard')+'</span><span class="value">'+item.standard+'</span></div>';
+    html+='</div>';
+  });
+  html+='</div>';
+
+  // Cost estimate + download
+  html+='<div class="card fade-in"><div class="card-title">'+(da?'Estimeret årlig vedligeholdelsesomkostning':'Estimated annual maintenance cost')+'</div>';
+  html+='<div class="result-box"><div class="result-row"><span class="label">'+(da?'Estimerede timer/år':'Estimated hours/year')+'</span><span class="value">'+annualMaintHours.toFixed(0)+' timer</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Timesats (autoriseret)':'Hourly rate (authorized)')+'</span><span class="value">'+hourRate+' DKK</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Årlig omkostning (arbejdsløn)':'Annual cost (labor)')+'</span><span class="value" style="font-weight:700">~'+annualMaintCost.toLocaleString()+' DKK</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'+ Materialer/reservedele':'+ Materials/spare parts')+'</span><span class="value">~'+Math.round(annualMaintCost*0.2).toLocaleString()+' DKK</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Samlet estimat':'Total estimate')+'</span><span class="value" style="font-weight:800;font-size:1.1em">~'+Math.round(annualMaintCost*1.2).toLocaleString()+' DKK/år</span></div></div>';
+  html+='<div class="info-row" style="margin-top:8px">'+(da?'Serviceaftale anbefales — forebyggende vedligehold forhindrer dyre nedbrud og er et krav i henhold til Elsikkerhedsloven og virksomhedens KLS.':'Service agreement recommended — preventive maintenance prevents costly breakdowns and is a requirement per the Electrical Safety Act and the company KLS.')+'</div></div>';
   return html;
 }
 
