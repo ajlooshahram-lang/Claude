@@ -5081,6 +5081,113 @@
     };
   }
 
+  // ---------- Multi-Currency Disbursement & Lender Reporting ----------
+  // Deterministic programme cash-flow / disbursement forecast for the $1.3B
+  // multi-country deployment. Models an S-curve work profile with retention,
+  // advance-payment recovery, a per-country split and USD->local conversion —
+  // the figures lenders and the client need for monthly drawdown reporting.
+  var FX_PER_USD = { USD: 1, IDR: 15800, THB: 35.5, VND: 25400, TWD: 32.0, PHP: 57.5, MYR: 4.45, BND: 1.34 };
+  var DISB_COUNTRY_ALLOC = [
+    { country: "Indonesia", code: "ID", currency: "IDR", weight: 0.18 },
+    { country: "Philippines", code: "PH", currency: "PHP", weight: 0.17 },
+    { country: "Vietnam", code: "VN", currency: "VND", weight: 0.14 },
+    { country: "Malaysia", code: "MY", currency: "MYR", weight: 0.13 },
+    { country: "Taiwan", code: "TW", currency: "TWD", weight: 0.12 },
+    { country: "Thailand", code: "TH", currency: "THB", weight: 0.10 },
+    { country: "Guam", code: "GU", currency: "USD", weight: 0.09 },
+    { country: "Brunei", code: "BN", currency: "BND", weight: 0.07 }
+  ];
+
+  function disbursementForecast(params) {
+    params = params || {};
+    var totalUsd = Number(params.totalUsd) || 1300000000;
+    var months = Math.max(1, Math.round(Number(params.months) || 60));
+    var retentionPct = params.retentionPct != null ? Number(params.retentionPct) : 5;
+    var advancePct = params.advancePct != null ? Number(params.advancePct) : 10;
+    var asOfMonth = params.asOfMonth != null ? Math.max(0, Math.min(months, Math.round(Number(params.asOfMonth)))) : Math.round(months / 2);
+    var retFrac = retentionPct / 100, advance = totalUsd * (advancePct / 100);
+
+    // Smoothstep S-curve: cumulative work fraction f(t) = t^2(3-2t).
+    function f(t) { return t * t * (3 - 2 * t); }
+
+    var schedule = [], cum = 0, retentionHeld = 0, peakNet = -Infinity, peakMonth = 1;
+    for (var m = 1; m <= months; m++) {
+      var progFrac = f(m / months) - f((m - 1) / months); // share of work this month
+      var grossProgress = totalUsd * progFrac;
+      var retentionThis = grossProgress * retFrac;
+      retentionHeld += retentionThis;
+      var recovery = advance * progFrac; // advance recouped pro-rata to progress
+      var net = grossProgress - retentionThis - recovery;
+      if (m === 1) net += advance;                 // advance paid up front
+      if (m === months) { net += retentionHeld; }   // retention released at completion
+      net = Math.round(net);
+      cum += net;
+      if (net > peakNet) { peakNet = net; peakMonth = m; }
+      schedule.push({
+        month: m,
+        grossProgressUsd: Math.round(grossProgress),
+        retentionThisUsd: Math.round(retentionThis),
+        netPaymentUsd: net,
+        cumulativeUsd: cum,
+        cumulativePct: Math.round(cum / totalUsd * 1000) / 10
+      });
+    }
+    // Numerical reconciliation: net payments must sum to the total (rounding only).
+    var sumNet = schedule.reduce(function (s, r) { return s + r.netPaymentUsd; }, 0);
+    var reconcileDeltaUsd = sumNet - totalUsd;
+
+    // Per-country multi-currency allocation.
+    var totalWeight = DISB_COUNTRY_ALLOC.reduce(function (s, c) { return s + c.weight; }, 0) || 1;
+    var byCountry = DISB_COUNTRY_ALLOC.map(function (c) {
+      var usd = Math.round(totalUsd * (c.weight / totalWeight));
+      var fx = FX_PER_USD[c.currency] || 1;
+      return {
+        country: c.country, code: c.code, currency: c.currency, fxRate: fx,
+        allocationUsd: usd, allocationLocal: Math.round(usd * fx),
+        pct: Math.round(c.weight / totalWeight * 1000) / 10
+      };
+    });
+
+    // Yearly roll-up for compact reporting.
+    var yearly = [];
+    for (var y = 0; y * 12 < months; y++) {
+      var slice = schedule.slice(y * 12, Math.min(months, y * 12 + 12));
+      var net = slice.reduce(function (s, r) { return s + r.netPaymentUsd; }, 0);
+      yearly.push({ year: y + 1, netPaymentUsd: net, cumulativeUsd: slice[slice.length - 1].cumulativeUsd, cumulativePct: slice[slice.length - 1].cumulativePct });
+    }
+
+    var asOf = asOfMonth > 0 ? schedule[asOfMonth - 1] : { cumulativeUsd: 0, cumulativePct: 0 };
+    var disbursedToDate = asOf.cumulativeUsd, forecastToComplete = totalUsd - disbursedToDate;
+
+    return {
+      inputs: { totalUsd: totalUsd, months: months, retentionPct: retentionPct, advancePct: advancePct, asOfMonth: asOfMonth },
+      summary: {
+        totalUsd: totalUsd,
+        advanceUsd: Math.round(advance),
+        totalRetentionUsd: Math.round(retentionHeld),
+        peakMonth: peakMonth, peakMonthUsd: Math.round(peakNet),
+        months: months,
+        reconcileDeltaUsd: reconcileDeltaUsd
+      },
+      lenderReport: {
+        asOfMonth: asOfMonth,
+        disbursedToDateUsd: disbursedToDate,
+        disbursedPct: Math.round(disbursedToDate / totalUsd * 1000) / 10,
+        forecastToCompleteUsd: forecastToComplete
+      },
+      schedule: schedule,
+      yearly: yearly,
+      byCountry: byCountry,
+      fxRates: FX_PER_USD,
+      references: [
+        "FIDIC / NEC4 — advance payment, retention & interim payment certificates",
+        "Lender common terms agreement — monthly disbursement / drawdown reporting",
+        "IAS 21 / IFRS — foreign-currency translation (USD functional, local presentation)",
+        "Indicative FX rates — confirm against the facility's agreed rate-setting mechanism"
+      ]
+    };
+  }
+
   var API = {
     analyzeProject: analyzeProject,
     listProfiles: listProfiles,
@@ -5120,6 +5227,7 @@
     calcLatency: calcLatency,
     assessCableProtection: assessCableProtection,
     generateBuildSequence: generateBuildSequence,
+    disbursementForecast: disbursementForecast,
     COUNTRY_ENERGY_DATA: COUNTRY_ENERGY_DATA
   };
   if (typeof module !== "undefined" && module.exports) module.exports = API;

@@ -1135,5 +1135,22 @@ ok(brainPhaseAuth != null, "Brain plan surfaces an 'Authorities by phase' sectio
 ok(brainPhaseAuth != null && /NTC|Kominfo|NCC/.test(brainPhaseAuth.innerHTML), "Authorities-by-phase names real regulators (NTC/Kominfo/NCC)");
 ok(brainPhaseAuth != null && /Permitting/.test(brainPhaseAuth.innerHTML), "Authorities-by-phase shows the permitting group");
 
+// 101) Disbursement & Lender Reporting
+var disbNav = doc.querySelector('.nav-item[data-view="disbursement"]');
+ok(disbNav != null, "Disbursement / Lender nav item exists");
+if (disbNav) disbNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var disbKpis = doc.getElementById("disbKpis");
+ok(disbKpis != null && disbKpis.querySelectorAll('.kpi').length >= 5, "Disbursement view shows lender KPI cards");
+var disbCc = doc.querySelector('.disbCountryTable');
+ok(disbCc != null && disbCc.querySelectorAll('tbody tr').length === 8, "Disbursement shows the 8-country multi-currency allocation");
+ok(disbCc != null && /IDR/.test(disbCc.innerHTML) && /PHP/.test(disbCc.innerHTML), "allocation table shows local currencies (IDR, PHP)");
+var disbYr = doc.querySelector('.disbYearTable');
+ok(disbYr != null && disbYr.querySelectorAll('tbody tr').length >= 5, "Disbursement shows the annual drawdown schedule");
+// 102) Recompute on parameter change (duration -> shorter schedule)
+var disbMonths = doc.getElementById("disbMonths");
+if (disbMonths) { disbMonths.value = "48"; disbMonths.dispatchEvent(new window.Event("change", { bubbles: true })); }
+ok(doc.querySelector('.disbYearTable').querySelectorAll('tbody tr').length === 4, "changing duration to 48 months yields 4 annual rows");
+ok(doc.getElementById("disbRefs") != null && /FIDIC|NEC4/.test(doc.getElementById("disbRefs").innerHTML), "Disbursement cites FIDIC/NEC payment basis");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

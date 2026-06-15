@@ -37,7 +37,7 @@ No install, no build step, no server, works offline.
 **Improve:** PDCA · Action Log
 **People & Cost:** Stakeholders (RACI) · Budget
 **Engineering registers:** HAZOP (guidewords & parameters) · Bow-tie diagram · Calibration · Punch List · SIL · Requirements Traceability · Document Register · NCR · MOC · **Cable Protection (ICPC/UNCLOS)**
-**Business management:** Earned Value (EVM) · Cash Flow / S-curve · **Prioritisation (RICE/WSJF)** · Milestones · Decision Log · Procurement · Resources / Capacity · OKR Scorecard
+**Business management:** Earned Value (EVM) · Cash Flow / S-curve · **Disbursement & Lender Reporting (multi-currency)** · **Prioritisation (RICE/WSJF)** · Milestones · Decision Log · Procurement · Resources / Capacity · OKR Scorecard
 **Submarine optical engineering:** Cable System Design · **Wavelength Assignment Planner (ITU-T G.694.1)** · **Latency Calculator (ITU-T G.114)** · **3D Build Visualisation (animated construction)** · Route Optimizer · Fault Forecast · Digital Twin · Energy Watchdog · Commissioning Checklist
 **Intelligence:** AI Assistant · Change Impact (traceability) · KPI Scorecard (RAG) · Data Health · **Country Intelligence Hub (8 programme countries)**
 **Setup:** Report Pack (printable) · History & Backups · Settings · Help
@@ -109,7 +109,7 @@ Every operational field in the app is a **dropdown or picker** — there is no f
 - **Print-ready.** Print or save-as-PDF (top-bar Print, or the dedicated **Report Pack** view): the print stylesheet hides the chrome, keeps tables and KPI cards from breaking across pages, repeats table headers, and forces colour fidelity for badges.
 - **Screen-reader hints.** Active sidebar items expose `aria-current="page"`; modals are `role="dialog"`; icon-only topbar buttons carry `aria-label`s.
 - **Themed charts.** Chart.js axis ticks, grid lines, legends and tooltips re-colour automatically when you toggle dark mode.
-- **Verified.** 6/6 engine test suites and **844 jsdom/engine assertions** (382 smoke + 462 brain) all green, including the Wavelength Assignment Planner, Latency Calculator, Cable Protection Awareness, the animated 3D Build Visualisation, the Country Intelligence Hub and the Project Brain's per-phase authority auto-surfacing, plus regression checks for the command palette, quick-filter chips, manage-saved-views, saved views, snapshot rename, FAB quick-add, pagination, register pinning, bulk-delete, sortable headers, row-patch perf, hash routing, focus trap, inline edit, bulk ops, undo toast, tour, print CSS, drag-and-drop import, snapshot diff, sidebar collapse, empty-state CTA and the storage-quota event.
+- **Verified.** 6/6 engine test suites and **867 jsdom/engine assertions** (389 smoke + 478 brain) all green, including the Wavelength Assignment Planner, Latency Calculator, Cable Protection Awareness, the animated 3D Build Visualisation, the Country Intelligence Hub, the Project Brain's per-phase authority auto-surfacing and the multi-currency Disbursement & Lender Reporting forecast, plus regression checks for the command palette, quick-filter chips, manage-saved-views, saved views, snapshot rename, FAB quick-add, pagination, register pinning, bulk-delete, sortable headers, row-patch perf, hash routing, focus trap, inline edit, bulk ops, undo toast, tour, print CSS, drag-and-drop import, snapshot diff, sidebar collapse, empty-state CTA and the storage-quota event.
 
 ## Files
 

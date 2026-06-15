@@ -282,7 +282,7 @@
     items.push({ id: "protection", label: "Protection Zones", icon: "\uD83D\uDEA7" });
     items.push({ id: "cableprotect", label: "Cable Protection", icon: "\uD83D\uDEE1" });
     items.push({ id: "commissioning", label: "Commissioning", icon: "\u2705" });
-    items.push({ g: "Business" }, { id: "evm", label: "Earned Value (EVM)", icon: "∑" }, { id: "cashflow", label: "Cash Flow / S-curve", icon: "〽" }, { id: "prioritise", label: "Prioritisation (RICE/WSJF)", icon: "⤒" });
+    items.push({ g: "Business" }, { id: "evm", label: "Earned Value (EVM)", icon: "∑" }, { id: "cashflow", label: "Cash Flow / S-curve", icon: "〽" }, { id: "disbursement", label: "Disbursement / Lender", icon: "\uD83C\uDFE6" }, { id: "prioritise", label: "Prioritisation (RICE/WSJF)", icon: "⤒" });
     C.REGISTERS.filter(r => r.group === "Business").forEach(r => items.push({ id: r.id, label: r.label, icon: r.icon }));
     items.push({ id: "insurance", label: "Insurance", icon: "\uD83D\uDEE1" });
     items.push({ id: "sla", label: "SLA Management", icon: "\uD83D\uDCCA" });
@@ -2340,6 +2340,101 @@
     });
 
     applyState(0);
+  };
+
+  // ---------- Multi-Currency Disbursement & Lender Reporting ----------
+  function disbUsd(v) {
+    if (Math.abs(v) >= 1e9) return "$" + (v / 1e9).toFixed(2) + "B";
+    if (Math.abs(v) >= 1e6) return "$" + (v / 1e6).toFixed(1) + "M";
+    return "$" + Math.round(v).toLocaleString();
+  }
+  function disbLocal(v, cur) {
+    if (v >= 1e12) return (v / 1e12).toFixed(2) + "T " + cur;
+    if (v >= 1e9) return (v / 1e9).toFixed(2) + "B " + cur;
+    if (v >= 1e6) return (v / 1e6).toFixed(1) + "M " + cur;
+    return Math.round(v).toLocaleString() + " " + cur;
+  }
+  function disbSparkline(schedule) {
+    var n = schedule.length; if (!n) return "";
+    var W = 320, H = 70, pts = schedule.map(function (s, i) {
+      var x = (n > 1 ? i / (n - 1) : 0) * W;
+      var y = H - (s.cumulativePct / 100) * H;
+      return x.toFixed(1) + "," + y.toFixed(1);
+    }).join(" ");
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" style="width:100%;height:80px;display:block">' +
+      '<polyline points="0,' + H + ' ' + pts + ' ' + W + ',' + H + '" fill="rgba(34,211,238,.12)" stroke="none"></polyline>' +
+      '<polyline points="' + pts + '" fill="none" stroke="#22d3ee" stroke-width="2.5"></polyline>' +
+      '</svg>';
+  }
+  function disbResultsHtml(r) {
+    if (!r) return '<div class="muted">Disbursement engine unavailable.</div>';
+    var s = r.summary, lr = r.lenderReport;
+    var kpis = '<div class="grid kpis" id="disbKpis" style="margin-bottom:14px">' +
+      '<div class="kpi"><div class="label">Programme value</div><div class="value">' + disbUsd(s.totalUsd) + '</div></div>' +
+      '<div class="kpi"><div class="label">Advance payment</div><div class="value">' + disbUsd(s.advanceUsd) + '</div></div>' +
+      '<div class="kpi"><div class="label">Retention held</div><div class="value">' + disbUsd(s.totalRetentionUsd) + '</div></div>' +
+      '<div class="kpi"><div class="label">Disbursed to date</div><div class="value">' + lr.disbursedPct + '%</div></div>' +
+      '<div class="kpi"><div class="label">Forecast to complete</div><div class="value">' + disbUsd(lr.forecastToCompleteUsd) + '</div></div>' +
+      '</div>';
+    var spark = '<div class="card"><h3>Cumulative disbursement S-curve</h3>' + disbSparkline(r.schedule) +
+      '<p class="muted" style="margin-top:6px">As of month ' + lr.asOfMonth + ' of ' + s.months + ': ' + disbUsd(lr.disbursedToDateUsd) + ' drawn (' + lr.disbursedPct + '%). Peak monthly draw ' + disbUsd(s.peakMonthUsd) + ' in month ' + s.peakMonth + ' (incl. advance).</p></div>';
+    var ccRows = r.byCountry.map(function (c) {
+      return '<tr><td><strong>' + esc(c.country) + '</strong></td><td>' + c.pct + '%</td><td class="right">' + disbUsd(c.allocationUsd) + '</td>' +
+        '<td class="right">' + disbLocal(c.allocationLocal, c.currency) + '</td><td class="right">' + c.fxRate.toLocaleString() + '</td></tr>';
+    }).join("");
+    var ccTable = '<div class="card"><h3>Per-country allocation (multi-currency)</h3>' +
+      '<div class="table-wrap"><table class="disbCountryTable"><thead><tr><th>Country</th><th>Share</th><th class="right">USD</th><th class="right">Local currency</th><th class="right">FX / USD</th></tr></thead><tbody>' + ccRows + '</tbody></table></div></div>';
+    var yrRows = r.yearly.map(function (y) {
+      return '<tr><td>Year ' + y.year + '</td><td class="right">' + disbUsd(y.netPaymentUsd) + '</td><td class="right">' + disbUsd(y.cumulativeUsd) + '</td><td class="right">' + y.cumulativePct + '%</td></tr>';
+    }).join("");
+    var yrTable = '<div class="card"><h3>Annual drawdown schedule</h3>' +
+      '<div class="table-wrap"><table class="disbYearTable"><thead><tr><th>Period</th><th class="right">Net disbursement</th><th class="right">Cumulative</th><th class="right">% complete</th></tr></thead><tbody>' + yrRows + '</tbody></table></div></div>';
+    var recon = Math.abs(s.reconcileDeltaUsd) > 100 ? '<div class="card" style="border-left:4px solid var(--gold,#e0a800)"><p style="margin:0">Reconciliation delta ' + disbUsd(s.reconcileDeltaUsd) + ' (rounding) &mdash; review rate-setting.</p></div>' : '';
+    var refs = '<div class="card" id="disbRefs"><h3>Basis &amp; References</h3><ul style="margin:0;padding-left:20px">' + r.references.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul></div>';
+    return kpis + spark + ccTable + yrTable + recon + refs;
+  }
+  RENDER.disbursement = function () {
+    var B = window.QIBrain;
+    if (!B || !B.disbursementForecast) return '<h2>Disbursement & Lender Reporting</h2><p class="muted">Engine unavailable.</p>';
+    var def = B.disbursementForecast();
+    var optSel = function (vals, sel, fmt) {
+      return vals.map(function (v) { return '<option value="' + v + '"' + (v === sel ? ' selected' : '') + '>' + (fmt ? fmt(v) : v) + '</option>'; }).join("");
+    };
+    var form = '<div class="card" style="margin-bottom:14px"><h3>Facility parameters</h3>' +
+      '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Programme value</span><select id="disbTotal">' + optSel([1000000000, 1300000000, 1500000000, 2000000000], 1300000000, function (v) { return "$" + (v / 1e9).toFixed(2) + "B"; }) + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Duration</span><select id="disbMonths">' + optSel([36, 48, 60, 72], 60, function (v) { return v + " mo"; }) + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Retention</span><select id="disbRet">' + optSel([0, 5, 10], 5, function (v) { return v + "%"; }) + '</select></label>' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Advance</span><select id="disbAdv">' + optSel([0, 10, 15], 10, function (v) { return v + "%"; }) + '</select></label>' +
+      '</div>' +
+      '<label class="muted" for="disbAsOf" style="display:block;margin-top:12px">Report as of month: <span id="disbAsOfLabel">' + def.lenderReport.asOfMonth + '</span></label>' +
+      '<input type="range" id="disbAsOf" min="0" max="60" value="' + def.lenderReport.asOfMonth + '" step="1" style="width:100%">' +
+      '</div>';
+    return '<h2 style="margin-bottom:6px">Disbursement &amp; Lender Reporting</h2>' +
+      '<p class="muted" style="margin-bottom:14px">Programme cash-flow forecast: S-curve drawdown with advance recovery &amp; retention, split across the 8 countries in USD and local currency for monthly lender/client reporting.</p>' +
+      form + '<div id="disbResults">' + disbResultsHtml(def) + '</div>';
+  };
+  AFTER.disbursement = function () {
+    var B = window.QIBrain;
+    if (!B || !B.disbursementForecast) return;
+    function recompute() {
+      var months = Number(document.getElementById("disbMonths").value);
+      var asOfEl = document.getElementById("disbAsOf");
+      if (asOfEl) { asOfEl.max = months; if (Number(asOfEl.value) > months) asOfEl.value = months; }
+      var lbl = document.getElementById("disbAsOfLabel"); if (lbl && asOfEl) lbl.textContent = asOfEl.value;
+      var r = B.disbursementForecast({
+        totalUsd: Number(document.getElementById("disbTotal").value),
+        months: months,
+        retentionPct: Number(document.getElementById("disbRet").value),
+        advancePct: Number(document.getElementById("disbAdv").value),
+        asOfMonth: asOfEl ? Number(asOfEl.value) : Math.round(months / 2)
+      });
+      document.getElementById("disbResults").innerHTML = disbResultsHtml(r);
+    }
+    ["disbTotal", "disbMonths", "disbRet", "disbAdv"].forEach(function (id) {
+      var el = document.getElementById(id); if (el) el.addEventListener("change", recompute);
+    });
+    var asOf = document.getElementById("disbAsOf"); if (asOf) asOf.addEventListener("input", recompute);
   };
 
   // ---------- Country Intelligence Hub (8 programme countries) ----------

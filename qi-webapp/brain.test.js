@@ -1682,5 +1682,43 @@ console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
   ok(JSON.stringify(r.phaseAuthorities) === JSON.stringify(B.analyzeProject("Submarine fibre cable system landing in Indonesia, Philippines and Taiwan, 3000 km route, marine survey, OTDR, splicing, commissioning").phaseAuthorities), "phaseAuthorities is deterministic");
 })();
 
+// ===== Multi-Currency Disbursement & Lender Reporting Tests =====
+(function () {
+  console.log("\n--- Disbursement & Lender Reporting ---");
+  var r = B.disbursementForecast();
+  ok(r.summary.totalUsd === 1300000000 && r.summary.months === 60, "defaults to $1.3B over 60 months");
+  ok(r.summary.advanceUsd === 130000000, "10% advance payment = $130M");
+  ok(r.summary.totalRetentionUsd === 65000000, "5% retention held = $65M");
+  ok(r.schedule.length === 60, "monthly schedule has 60 rows");
+  // Conservation: net payments sum to the total (within rounding)
+  var sumNet = r.schedule.reduce(function (s, x) { return s + x.netPaymentUsd; }, 0);
+  ok(Math.abs(sumNet - r.summary.totalUsd) < 1000, "net disbursements reconcile to programme total (delta " + (sumNet - r.summary.totalUsd) + ")");
+  ok(Math.abs(r.summary.reconcileDeltaUsd) < 1000, "reported reconciliation delta is rounding-only");
+  // Cumulative monotonic, ends at ~100%
+  var mono = true, prev = -1;
+  r.schedule.forEach(function (x) { if (x.cumulativeUsd < prev) mono = false; prev = x.cumulativeUsd; });
+  ok(mono, "cumulative disbursement never decreases");
+  ok(r.schedule[59].cumulativePct === 100, "final month reaches 100% disbursed");
+  // S-curve shape: mid-life slope steeper than first/last year
+  ok(r.yearly.length === 5 && r.yearly[2].netPaymentUsd > r.yearly[0].netPaymentUsd && r.yearly[2].netPaymentUsd > r.yearly[4].netPaymentUsd, "S-curve: middle years disburse more than the first/last (got Y1/Y3/Y5)");
+  // Per-country allocation sums to the total and 100%
+  var ccUsd = r.byCountry.reduce(function (s, c) { return s + c.allocationUsd; }, 0);
+  var ccPct = r.byCountry.reduce(function (s, c) { return s + c.pct; }, 0);
+  ok(r.byCountry.length === 8 && Math.abs(ccUsd - r.summary.totalUsd) < 8 && Math.round(ccPct) === 100, "8-country split reconciles to total USD and 100%");
+  // Multi-currency conversion correct
+  var id = r.byCountry.filter(function (c) { return c.code === "ID"; })[0];
+  ok(id && id.currency === "IDR" && id.allocationLocal === Math.round(id.allocationUsd * id.fxRate), "Indonesia allocation converts USD->IDR at the stated FX rate");
+  var gu = r.byCountry.filter(function (c) { return c.code === "GU"; })[0];
+  ok(gu && gu.currency === "USD" && gu.fxRate === 1, "Guam (US territory) is denominated in USD at FX 1.0");
+  // Lender report as-of math
+  ok(r.lenderReport.disbursedToDateUsd + r.lenderReport.forecastToCompleteUsd === r.summary.totalUsd, "disbursed-to-date + forecast-to-complete = total");
+  // Determinism
+  ok(JSON.stringify(r) === JSON.stringify(B.disbursementForecast()), "same inputs -> identical forecast (deterministic)");
+  // Custom params honoured
+  var c = B.disbursementForecast({ totalUsd: 1000000000, months: 48, retentionPct: 10, advancePct: 15, asOfMonth: 24 });
+  ok(c.summary.months === 48 && c.schedule.length === 48 && c.summary.advanceUsd === 150000000 && c.summary.totalRetentionUsd === 100000000, "custom 1.0B/48mo/10%ret/15%adv honoured");
+  ok(r.references.some(function (x) { return /FIDIC|NEC4/.test(x); }) && r.references.some(function (x) { return /IFRS|IAS 21/.test(x); }), "references cite FIDIC/NEC payment and IFRS FX translation");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);
