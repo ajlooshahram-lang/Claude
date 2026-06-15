@@ -3276,6 +3276,185 @@
     };
   }
 
+  // ---------- Energy Optimization / Cost-Benefit Watchdog ----------
+  function energyWatchdog(systemConfig) {
+    var cfg = systemConfig || {};
+    var segments = cfg.segments || [];
+    var powerFeedVoltage = cfg.powerFeedVoltage || 15000;
+    var powerFeedCurrent = cfg.powerFeedCurrent || 1.6;
+    var landingStationPowerKW = cfg.landingStationPowerKW || 50;
+    var coolingEfficiency = cfg.coolingEfficiency || 1.6;
+    var electricityRatePerKWH = cfg.electricityRatePerKWH || 0.12;
+    var carbonIntensityKgPerKWH = cfg.carbonIntensityKgPerKWH || 0.5;
+    var renewablePercent = cfg.renewablePercent || 20;
+
+    // Count totals from segments
+    var totalRepeaters = 0;
+    var landingStationCount = 0;
+    for (var i = 0; i < segments.length; i++) {
+      totalRepeaters += (segments[i].repeaterCount || 0);
+      landingStationCount += (segments[i].landingStations || 0);
+    }
+    if (landingStationCount === 0) landingStationCount = 10;
+
+    // Power calculations
+    var repeaterPowerW = totalRepeaters * 15; // 15W per EDFA repeater
+    var repeaterPowerKW = repeaterPowerW / 1000;
+
+    var powerFeedLossKW = (powerFeedVoltage * powerFeedCurrent * 0.03) / 1000;
+
+    var landingStationTotalKW = landingStationCount * landingStationPowerKW * coolingEfficiency;
+
+    var totalSystemPowerKW = repeaterPowerKW + powerFeedLossKW + landingStationTotalKW;
+
+    // Annual figures
+    var annualEnergyMWH = totalSystemPowerKW * 8760 / 1000;
+    var annualCostUSD = annualEnergyMWH * 1000 * electricityRatePerKWH;
+    var annualCO2Tonnes = annualEnergyMWH * carbonIntensityKgPerKWH;
+    var renewableOffset = annualCO2Tonnes * (renewablePercent / 100);
+    var netCO2Tonnes = annualCO2Tonnes - renewableOffset;
+
+    var currentState = {
+      totalRepeaters: totalRepeaters,
+      landingStationCount: landingStationCount,
+      repeaterPowerKW: Math.round(repeaterPowerKW * 100) / 100,
+      powerFeedLossKW: Math.round(powerFeedLossKW * 100) / 100,
+      landingStationTotalKW: Math.round(landingStationTotalKW * 100) / 100,
+      totalSystemPowerKW: Math.round(totalSystemPowerKW * 100) / 100,
+      annualEnergyMWH: Math.round(annualEnergyMWH * 10) / 10,
+      annualCostUSD: Math.round(annualCostUSD),
+      annualCO2Tonnes: Math.round(annualCO2Tonnes * 10) / 10,
+      renewableOffsetTonnes: Math.round(renewableOffset * 10) / 10,
+      netCO2Tonnes: Math.round(netCO2Tonnes * 10) / 10
+    };
+
+    // Optimization recommendations
+    var optimizations = [];
+
+    // 1. Upgrade to high-efficiency EDFA repeaters (12W vs 15W)
+    var repeaterSavingKW = repeaterPowerKW * 0.2;
+    var repeaterSavingKWH = repeaterSavingKW * 8760;
+    var repeaterSavingUSD = repeaterSavingKWH * electricityRatePerKWH;
+    var repeaterCO2Saving = (repeaterSavingKWH / 1000) * carbonIntensityKgPerKWH;
+    optimizations.push({
+      title: "Upgrade to high-efficiency EDFA repeaters (12W vs 15W)",
+      annualSavingKWH: Math.round(repeaterSavingKWH),
+      annualSavingUSD: Math.round(repeaterSavingUSD),
+      annualCO2ReductionTonnes: Math.round(repeaterCO2Saving * 10) / 10,
+      implementationCost: totalRepeaters * 25000,
+      paybackYears: Math.round((totalRepeaters * 25000) / repeaterSavingUSD * 10) / 10,
+      priority: "medium"
+    });
+
+    // 2. Improve landing station PUE
+    var pueSaving = (coolingEfficiency - 1.3) / coolingEfficiency;
+    var pueSavingKW = landingStationTotalKW * pueSaving;
+    var pueSavingKWH = pueSavingKW * 8760;
+    var pueSavingUSD = pueSavingKWH * electricityRatePerKWH;
+    var pueCO2Saving = (pueSavingKWH / 1000) * carbonIntensityKgPerKWH;
+    optimizations.push({
+      title: "Improve landing station PUE from " + coolingEfficiency.toFixed(1) + " to 1.3 (best practice)",
+      annualSavingKWH: Math.round(pueSavingKWH),
+      annualSavingUSD: Math.round(pueSavingUSD),
+      annualCO2ReductionTonnes: Math.round(pueCO2Saving * 10) / 10,
+      implementationCost: landingStationCount * 500000,
+      paybackYears: Math.round((landingStationCount * 500000) / (pueSavingUSD || 1) * 10) / 10,
+      priority: "high"
+    });
+
+    // 3. Switch to 100% renewable energy at landing stations
+    var landingCO2 = (landingStationTotalKW * 8760 / 1000) * carbonIntensityKgPerKWH;
+    var renewableSavingCO2 = landingCO2 * ((100 - renewablePercent) / 100);
+    optimizations.push({
+      title: "Switch to 100% renewable energy at landing stations",
+      annualSavingKWH: 0,
+      annualSavingUSD: Math.round(landingStationTotalKW * 8760 * electricityRatePerKWH * 0.05),
+      annualCO2ReductionTonnes: Math.round(renewableSavingCO2 * 10) / 10,
+      implementationCost: landingStationCount * 2000000,
+      paybackYears: Math.round((landingStationCount * 2000000) / ((landingStationTotalKW * 8760 * electricityRatePerKWH * 0.05) || 1) * 10) / 10,
+      priority: "high"
+    });
+
+    // 4. Smart power management (dim unused wavelengths)
+    var smartSavingKW = totalSystemPowerKW * 0.10;
+    var smartSavingKWH = smartSavingKW * 8760;
+    var smartSavingUSD = smartSavingKWH * electricityRatePerKWH;
+    var smartCO2Saving = (smartSavingKWH / 1000) * carbonIntensityKgPerKWH;
+    optimizations.push({
+      title: "Implement smart power management (dim unused wavelengths)",
+      annualSavingKWH: Math.round(smartSavingKWH),
+      annualSavingUSD: Math.round(smartSavingUSD),
+      annualCO2ReductionTonnes: Math.round(smartCO2Saving * 10) / 10,
+      implementationCost: 1500000,
+      paybackYears: Math.round(1500000 / (smartSavingUSD || 1) * 10) / 10,
+      priority: "medium"
+    });
+
+    // 5. Install solar panels at tropical landing stations
+    var solarOffsetKWH = annualEnergyMWH * 1000 * 0.30;
+    var solarSavingUSD = solarOffsetKWH * electricityRatePerKWH;
+    var solarCO2Saving = (solarOffsetKWH / 1000) * carbonIntensityKgPerKWH;
+    optimizations.push({
+      title: "Install solar panels at tropical landing stations (8 of 8 countries are in solar belt)",
+      annualSavingKWH: Math.round(solarOffsetKWH),
+      annualSavingUSD: Math.round(solarSavingUSD),
+      annualCO2ReductionTonnes: Math.round(solarCO2Saving * 10) / 10,
+      implementationCost: landingStationCount * 800000,
+      paybackYears: Math.round((landingStationCount * 800000) / (solarSavingUSD || 1) * 10) / 10,
+      priority: "high"
+    });
+
+    // Total potential savings
+    var totalSavingKWH = 0;
+    var totalSavingUSD = 0;
+    var totalCO2Reduction = 0;
+    for (var j = 0; j < optimizations.length; j++) {
+      totalSavingKWH += optimizations[j].annualSavingKWH;
+      totalSavingUSD += optimizations[j].annualSavingUSD;
+      totalCO2Reduction += optimizations[j].annualCO2ReductionTonnes;
+    }
+
+    // 25-year lifecycle projection
+    var totalEnergyCost25 = annualCostUSD * 25;
+    var totalCO2_25 = netCO2Tonnes * 25;
+    var optimizedAnnualCost = annualCostUSD - totalSavingUSD;
+    if (optimizedAnnualCost < 0) optimizedAnnualCost = 0;
+    var optimizedCO2 = netCO2Tonnes - totalCO2Reduction;
+    if (optimizedCO2 < 0) optimizedCO2 = 0;
+
+    var lifecycle25Year = {
+      totalEnergyCost: Math.round(totalEnergyCost25),
+      totalCO2: Math.round(totalCO2_25),
+      withOptimizations: {
+        totalEnergyCost: Math.round(optimizedAnnualCost * 25),
+        totalCO2: Math.round(optimizedCO2 * 25),
+        savings: {
+          costSaved: Math.round((totalEnergyCost25 - optimizedAnnualCost * 25)),
+          co2Saved: Math.round((totalCO2_25 - optimizedCO2 * 25))
+        }
+      }
+    };
+
+    var bestCaseReductionPercent = annualCO2Tonnes > 0
+      ? Math.round((totalCO2Reduction / annualCO2Tonnes) * 100)
+      : 0;
+
+    var summary = {
+      annualPowerKW: Math.round(totalSystemPowerKW * 100) / 100,
+      annualEnergyMWH: Math.round(annualEnergyMWH * 10) / 10,
+      annualCostUSD: Math.round(annualCostUSD),
+      annualCO2Tonnes: Math.round(netCO2Tonnes * 10) / 10,
+      bestCaseReductionPercent: bestCaseReductionPercent
+    };
+
+    return {
+      currentState: currentState,
+      optimizations: optimizations,
+      lifecycle25Year: lifecycle25Year,
+      summary: summary
+    };
+  }
+
   var API = {
     analyzeProject: analyzeProject,
     listProfiles: listProfiles,
@@ -3305,7 +3484,8 @@
     revenueModel: revenueModel,
     optimizeRoute: optimizeRoute,
     predictFaults: predictFaults,
-    digitalTwinStatus: digitalTwinStatus
+    digitalTwinStatus: digitalTwinStatus,
+    energyWatchdog: energyWatchdog
   };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIBrain = API;

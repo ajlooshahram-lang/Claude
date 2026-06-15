@@ -1007,5 +1007,22 @@ var demoStatuses = {};
 S.validCases().forEach(function(c) { demoStatuses[c.status] = (demoStatuses[c.status] || 0) + 1; });
 ok(demoStatuses["RESOLVED"] >= 3 && demoStatuses["IN PROGRESS"] >= 3 && demoStatuses["OPEN"] >= 2 && demoStatuses["BLOCKED"] >= 1 && demoStatuses["ON HOLD"] >= 1, "Demo cases have mixed statuses for dashboard variety");
 
+// 80) Energy Watchdog nav item exists
+var energyNav = doc.querySelector('.nav-item[data-view="energy"]');
+ok(energyNav != null, "Energy Watchdog nav item exists");
+
+// 81) Energy Watchdog shows KPI cards
+if (energyNav) energyNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var energyKpis = doc.getElementById("energyKpis");
+ok(energyKpis != null && energyKpis.querySelectorAll('.kpi').length >= 5, "Energy Watchdog shows KPI cards");
+
+// 82) Energy Watchdog shows optimization recommendations
+var energyOptTable = doc.getElementById("energyOptTable");
+ok(energyOptTable != null && energyOptTable.querySelectorAll('tbody tr').length >= 4, "Energy Watchdog shows optimization recommendations");
+
+// 83) Energy Watchdog shows 25-year lifecycle projection
+var energyLifecycle = doc.getElementById("energyLifecycle");
+ok(energyLifecycle != null && energyLifecycle.innerHTML.indexOf("25-Year") !== -1, "Energy Watchdog shows 25-year lifecycle projection");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

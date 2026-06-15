@@ -253,6 +253,7 @@
     { id: "routeopt", label: "Route Optimizer", icon: "\uD83D\uDEE4" },
     { id: "predictive", label: "Fault Forecast", icon: "\uD83D\uDCE1" },
     { id: "digitaltwin", label: "Digital Twin", icon: "\uD83D\uDD2E" },
+    { id: "energy", label: "Energy Watchdog", icon: "\uD83C\uDF31" },
     { id: "benchmark", label: "Benchmarking", icon: "\uD83C\uDFC6" },
     { id: "lessons", label: "Lessons Library", icon: "\uD83D\uDCDA" },
     { id: "ai", label: "AI Assistant", icon: "✦" },
@@ -1877,6 +1878,108 @@
       '<tbody>' + rfoRows + '</tbody></table></div></div>';
 
     return '<h2 style="margin-bottom:16px">Incident Management</h2>' + summary + table + rfoBreakdown;
+  };
+
+  // ---------- Energy Watchdog ----------
+  RENDER.energy = function () {
+    var B = window.QIBrain;
+    // Pre-populate with realistic submarine cable system data
+    var systemConfig = {
+      segments: [
+        { name: "Singapore-Jakarta", routeKm: 1200, repeaterCount: 12, landingStations: 2 },
+        { name: "Jakarta-Bangkok", routeKm: 2800, repeaterCount: 14, landingStations: 2 },
+        { name: "Bangkok-Ho Chi Minh", routeKm: 1500, repeaterCount: 10, landingStations: 2 },
+        { name: "Ho Chi Minh-Manila", routeKm: 1800, repeaterCount: 12, landingStations: 2 },
+        { name: "Manila-Taipei", routeKm: 1100, repeaterCount: 12, landingStations: 2 },
+        { name: "Taipei-Guam", routeKm: 2700, repeaterCount: 12, landingStations: 2 }
+      ],
+      powerFeedVoltage: 15000,
+      powerFeedCurrent: 1.6,
+      landingStationPowerKW: 50,
+      coolingEfficiency: 1.6,
+      electricityRatePerKWH: 0.12,
+      carbonIntensityKgPerKWH: 0.5,
+      renewablePercent: 20
+    };
+
+    var result = B.energyWatchdog(systemConfig);
+    var cs = result.currentState;
+    var opts = result.optimizations;
+    var lc = result.lifecycle25Year;
+    var sum = result.summary;
+
+    // KPI cards
+    var kpis = '<div class="grid kpis" id="energyKpis" style="margin-bottom:16px">' +
+      '<div class="kpi"><div class="label">Total System Power</div><div class="value">' + sum.annualPowerKW.toLocaleString() + ' kW</div></div>' +
+      '<div class="kpi"><div class="label">Annual Energy</div><div class="value">' + sum.annualEnergyMWH.toLocaleString() + ' MWh</div></div>' +
+      '<div class="kpi"><div class="label">Annual Cost</div><div class="value" style="color:#e67e22">$' + sum.annualCostUSD.toLocaleString() + '</div></div>' +
+      '<div class="kpi"><div class="label">Annual CO\u2082</div><div class="value" style="color:#e74c3c">' + sum.annualCO2Tonnes.toLocaleString() + ' t</div></div>' +
+      '<div class="kpi"><div class="label">Renewable %</div><div class="value" style="color:#27ae60">' + systemConfig.renewablePercent + '%</div></div>' +
+      '</div>';
+
+    // Current vs Optimized comparison bars
+    var optCost = lc.withOptimizations.totalEnergyCost / 25;
+    var optCO2 = lc.withOptimizations.totalCO2 / 25;
+    var maxCost = sum.annualCostUSD;
+    var maxCO2 = sum.annualCO2Tonnes;
+
+    function bar(label, current, optimized, unit, maxVal) {
+      var cPct = maxVal > 0 ? Math.round((current / maxVal) * 100) : 100;
+      var oPct = maxVal > 0 ? Math.round((optimized / maxVal) * 100) : 0;
+      return '<div style="margin-bottom:12px">' +
+        '<div style="font-weight:600;margin-bottom:4px">' + label + '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span style="width:70px;font-size:0.85em">Current</span><div style="background:#e74c3c;height:14px;border-radius:3px;width:' + cPct + '%;min-width:4px"></div><span style="font-size:0.85em">' + current.toLocaleString() + ' ' + unit + '</span></div>' +
+        '<div style="display:flex;align-items:center;gap:8px"><span style="width:70px;font-size:0.85em">Optimized</span><div style="background:#27ae60;height:14px;border-radius:3px;width:' + oPct + '%;min-width:4px"></div><span style="font-size:0.85em">' + Math.round(optimized).toLocaleString() + ' ' + unit + '</span></div>' +
+        '</div>';
+    }
+
+    var annualEnergyOpt = sum.annualEnergyMWH - (opts.reduce(function(a, o) { return a + o.annualSavingKWH; }, 0) / 1000);
+    if (annualEnergyOpt < 0) annualEnergyOpt = 0;
+
+    var comparison = '<div class="card" id="energyComparison"><h3>Current vs Optimized (Annual)</h3>' +
+      bar("Energy (MWh)", sum.annualEnergyMWH, annualEnergyOpt, "MWh", sum.annualEnergyMWH) +
+      bar("Cost (USD)", sum.annualCostUSD, optCost, "USD", maxCost) +
+      bar("CO\u2082 (tonnes)", sum.annualCO2Tonnes, optCO2, "tonnes", maxCO2) +
+      '</div>';
+
+    // Optimization recommendations table
+    var priorityBadge = function (p) {
+      var color = p === "high" ? "#e74c3c" : p === "medium" ? "#f39c12" : "#27ae60";
+      return '<span style="background:' + color + ';color:#fff;padding:2px 8px;border-radius:10px;font-size:0.8em;font-weight:600">' + p.toUpperCase() + '</span>';
+    };
+
+    var optRows = opts.map(function (o) {
+      return '<tr>' +
+        '<td>' + esc(o.title) + '</td>' +
+        '<td style="text-align:right">$' + o.annualSavingUSD.toLocaleString() + '</td>' +
+        '<td style="text-align:right">' + o.annualCO2ReductionTonnes.toLocaleString() + ' t</td>' +
+        '<td style="text-align:right">' + o.paybackYears + ' yrs</td>' +
+        '<td>' + priorityBadge(o.priority) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    var optTable = '<div class="card" id="energyOptimizations"><h3>Optimization Recommendations</h3>' +
+      '<div class="table-wrap"><table id="energyOptTable"><thead><tr>' +
+      '<th>Recommendation</th><th>Annual Savings</th><th>CO\u2082 Reduction</th><th>Payback</th><th>Priority</th>' +
+      '</tr></thead><tbody>' + optRows + '</tbody></table></div></div>';
+
+    // 25-year lifecycle summary
+    var carsEquivalent = Math.round(lc.withOptimizations.savings.co2Saved / 4.6); // ~4.6 tonnes CO2/car/year * 25 = per car over 25 years
+    var lifecycle = '<div class="card" id="energyLifecycle"><h3>25-Year Lifecycle Projection</h3>' +
+      '<div class="grid kpis" style="margin-bottom:12px">' +
+      '<div class="kpi"><div class="label">Current Path Total Cost</div><div class="value" style="color:#e74c3c">$' + lc.totalEnergyCost.toLocaleString() + '</div></div>' +
+      '<div class="kpi"><div class="label">Optimized Path Total Cost</div><div class="value" style="color:#27ae60">$' + lc.withOptimizations.totalEnergyCost.toLocaleString() + '</div></div>' +
+      '<div class="kpi"><div class="label">Total Savings</div><div class="value" style="color:#27ae60">$' + lc.withOptimizations.savings.costSaved.toLocaleString() + '</div></div>' +
+      '</div>' +
+      '<div class="grid kpis">' +
+      '<div class="kpi"><div class="label">Current Path CO\u2082</div><div class="value">' + lc.totalCO2.toLocaleString() + ' t</div></div>' +
+      '<div class="kpi"><div class="label">Optimized CO\u2082</div><div class="value" style="color:#27ae60">' + lc.withOptimizations.totalCO2.toLocaleString() + ' t</div></div>' +
+      '<div class="kpi"><div class="label">CO\u2082 Saved</div><div class="value" style="color:#27ae60">' + lc.withOptimizations.savings.co2Saved.toLocaleString() + ' t</div></div>' +
+      '</div>' +
+      '<p style="margin-top:12px;font-style:italic;color:var(--muted)">Equivalent to removing ~' + carsEquivalent.toLocaleString() + ' cars off the road for 25 years</p>' +
+      '</div>';
+
+    return '<h2 style="margin-bottom:16px">\uD83C\uDF31 Energy Optimization / Cost-Benefit Watchdog</h2>' + kpis + comparison + optTable + lifecycle;
   };
 
   // ---------- Performance Benchmarking ----------
