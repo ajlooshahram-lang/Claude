@@ -4076,6 +4076,158 @@
     };
   }
 
+  // ============================================================
+  // OPTICAL POWER BUDGET ANALYSIS (ITU-T G.977 / IEC 61280)
+  // ============================================================
+  function powerBudgetAnalysis(params) {
+    params = params || {};
+    var routeKm = params.routeKm || 1000;
+    var fiberType = params.fiberType || "G.654.E";
+    var wavelength = params.wavelength || 1550;
+    var spans = params.spans || 1;
+    var spliceCount = params.spliceCount || 0;
+    var connectorPairs = params.connectorPairs || 2;
+    var repeaterGain = params.repeaterGain || 0;
+    var transmitPower = params.transmitPower || 0;
+    var receiverSensitivity = params.receiverSensitivity || -28;
+    var additionalLosses = params.additionalLosses || 0;
+
+    // Fiber attenuation coefficients per ITU-T G.977
+    var fiberCoefficients = {
+      "G.654.E": { 1550: 0.17, 1310: 0.35 },
+      "G.652.D": { 1550: 0.20, 1310: 0.35 }
+    };
+
+    var coeffs = fiberCoefficients[fiberType] || fiberCoefficients["G.654.E"];
+    var attenuationPerKm = coeffs[wavelength] || coeffs[1550];
+
+    // Core losses
+    var fiberLoss = routeKm * attenuationPerKm;
+    var spliceLoss = spliceCount * 0.1;       // IEC 61073: 0.1 dB/splice
+    var connectorLoss = connectorPairs * 0.3; // IEC 61755: 0.3 dB/mated pair
+
+    // System margins
+    var agingMargin = routeKm * 0.02;         // 0.02 dB/km over 25 years
+    var expectedRepairs = Math.ceil(routeKm / 1000);
+    var repairMargin = expectedRepairs * 0.5; // 0.5 dB per expected repair
+    var temperatureMargin = routeKm * 0.01;   // 0.01 dB/km thermal variation
+
+    // Total link loss
+    var totalLoss = fiberLoss + spliceLoss + connectorLoss + agingMargin + repairMargin + temperatureMargin + additionalLosses;
+
+    // Amplification
+    var repeaterCount = spans > 1 ? spans - 1 : 0;
+    var totalGain = repeaterCount * repeaterGain;
+
+    // Power balance
+    var netSystemLoss = totalLoss - totalGain;
+    var availablePower = transmitPower - receiverSensitivity;
+    var systemMargin = availablePower - netSystemLoss;
+
+    // Verdict per ITU-T G.977 recommended margins
+    var verdict, verdictDetail;
+    if (systemMargin > 6) {
+      verdict = "EXCELLENT";
+      verdictDetail = "System margin of " + (Math.round(systemMargin * 100) / 100) + " dB exceeds 6 dB threshold. Link has significant headroom for future upgrades and unexpected degradation.";
+    } else if (systemMargin >= 3) {
+      verdict = "GOOD";
+      verdictDetail = "System margin of " + (Math.round(systemMargin * 100) / 100) + " dB is within 3-6 dB range. Link meets commissioning requirements with adequate safety margin.";
+    } else if (systemMargin >= 1) {
+      verdict = "MARGINAL";
+      verdictDetail = "System margin of " + (Math.round(systemMargin * 100) / 100) + " dB is within 1-3 dB range. Link may fail after aging or repairs. Consider additional amplification.";
+    } else {
+      verdict = "FAIL";
+      verdictDetail = "System margin of " + (Math.round(systemMargin * 100) / 100) + " dB is below 1 dB threshold. Link will not deliver reliable data. Redesign required.";
+    }
+
+    // Per-span analysis
+    var perSpanAnalysis = [];
+    var spanLength = routeKm / spans;
+    var splicesPerSpan = Math.floor(spliceCount / spans);
+    for (var i = 0; i < spans; i++) {
+      var spanFiberLoss = spanLength * attenuationPerKm;
+      var spanSpliceLoss = splicesPerSpan * 0.1;
+      var spanAgingMargin = spanLength * 0.02;
+      var spanTempMargin = spanLength * 0.01;
+      var spanTotalLoss = spanFiberLoss + spanSpliceLoss + spanAgingMargin + spanTempMargin;
+      var spanGain = (i < repeaterCount) ? repeaterGain : 0;
+      var spanNet = spanTotalLoss - spanGain;
+      perSpanAnalysis.push({
+        span: i + 1,
+        lengthKm: Math.round(spanLength * 100) / 100,
+        fiberLoss: Math.round(spanFiberLoss * 100) / 100,
+        spliceLoss: Math.round(spanSpliceLoss * 100) / 100,
+        totalLoss: Math.round(spanTotalLoss * 100) / 100,
+        gain: spanGain,
+        netLoss: Math.round(spanNet * 100) / 100
+      });
+    }
+
+    // Recommendations
+    var recommendations = [];
+    if (verdict === "FAIL") {
+      recommendations.push("CRITICAL: Add repeaters to reduce net system loss below available power budget");
+      recommendations.push("Consider upgrading to G.654.E fiber if using G.652.D (saves " + ((0.20 - 0.17) * routeKm).toFixed(1) + " dB at 1550nm)");
+      recommendations.push("Reduce splice count through longer cable manufacturing lengths");
+    } else if (verdict === "MARGINAL") {
+      recommendations.push("WARNING: Consider adding 1-2 additional repeaters for aging margin");
+      recommendations.push("Minimize connector pairs at branching units");
+      recommendations.push("Use fusion splices exclusively (avoid mechanical splices)");
+    } else if (verdict === "GOOD") {
+      recommendations.push("System meets commissioning requirements");
+      recommendations.push("Monitor aging margin annually - retest at year 10");
+    } else {
+      recommendations.push("System has excellent margin for future capacity upgrades");
+      recommendations.push("Consider higher-order modulation formats (16-QAM) to increase throughput");
+      recommendations.push("Margin sufficient for potential future branching unit insertion");
+    }
+
+    // References
+    var references = [
+      "ITU-T G.977: Characteristics of optically amplified submarine cable systems",
+      "IEC 61280: Fibre optic communication subsystem test procedures",
+      "IEC 61073: Splice loss requirements for single-mode optical fibre",
+      "IEC 61755: Fibre optic connector optical interfaces - connector loss requirements",
+      "ITU-T G.654.E: Characteristics of a cut-off shifted single-mode optical fibre",
+      "ITU-T G.652.D: Characteristics of a single-mode optical fibre and cable"
+    ];
+
+    return {
+      linkBudget: {
+        fiberLoss: Math.round(fiberLoss * 100) / 100,
+        spliceLoss: Math.round(spliceLoss * 100) / 100,
+        connectorLoss: Math.round(connectorLoss * 100) / 100,
+        agingMargin: Math.round(agingMargin * 100) / 100,
+        repairMargin: Math.round(repairMargin * 100) / 100,
+        temperatureMargin: Math.round(temperatureMargin * 100) / 100,
+        additionalLosses: additionalLosses,
+        totalLoss: Math.round(totalLoss * 100) / 100,
+        attenuationPerKm: attenuationPerKm,
+        fiberType: fiberType,
+        wavelength: wavelength,
+        routeKm: routeKm
+      },
+      amplification: {
+        repeaterCount: repeaterCount,
+        repeaterGain: repeaterGain,
+        totalGain: Math.round(totalGain * 100) / 100,
+        spans: spans
+      },
+      powerBalance: {
+        transmitPower: transmitPower,
+        receiverSensitivity: receiverSensitivity,
+        availablePower: Math.round(availablePower * 100) / 100,
+        netSystemLoss: Math.round(netSystemLoss * 100) / 100,
+        systemMargin: Math.round(systemMargin * 100) / 100
+      },
+      verdict: verdict,
+      verdictDetail: verdictDetail,
+      perSpanAnalysis: perSpanAnalysis,
+      recommendations: recommendations,
+      references: references
+    };
+  }
+
   var API = {
     analyzeProject: analyzeProject,
     listProfiles: listProfiles,
@@ -4107,6 +4259,7 @@
     predictFaults: predictFaults,
     digitalTwinStatus: digitalTwinStatus,
     energyWatchdog: energyWatchdog,
+    powerBudgetAnalysis: powerBudgetAnalysis,
     COUNTRY_ENERGY_DATA: COUNTRY_ENERGY_DATA
   };
   if (typeof module !== "undefined" && module.exports) module.exports = API;

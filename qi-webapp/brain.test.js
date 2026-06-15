@@ -1391,5 +1391,60 @@ console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
     "breakEvenUtilization calculated: " + rMarket.breakEvenUtilization + "%");
 })();
 
+// === Power Budget Analysis Tests (ITU-T G.977 / IEC 61280) ===
+(function() {
+  // Test 1: G.654.E at 1550nm uses 0.17 dB/km attenuation coefficient
+  var r1 = B.powerBudgetAnalysis({ routeKm: 1000, fiberType: "G.654.E", wavelength: 1550, spans: 1, spliceCount: 0, connectorPairs: 0, transmitPower: 0, receiverSensitivity: -28, additionalLosses: 0 });
+  ok(r1.linkBudget.attenuationPerKm === 0.17,
+    "G.654.E@1550nm attenuation: " + r1.linkBudget.attenuationPerKm + " dB/km (ITU-T G.977)");
+
+  // Test 2: G.652.D at 1550nm uses 0.20 dB/km
+  var r2 = B.powerBudgetAnalysis({ routeKm: 100, fiberType: "G.652.D", wavelength: 1550, spans: 1, spliceCount: 0, connectorPairs: 0 });
+  ok(r2.linkBudget.attenuationPerKm === 0.20,
+    "G.652.D@1550nm attenuation: " + r2.linkBudget.attenuationPerKm + " dB/km");
+
+  // Test 3: Splice loss = 0.1 dB per splice (IEC 61073)
+  var r3 = B.powerBudgetAnalysis({ routeKm: 100, fiberType: "G.654.E", wavelength: 1550, spans: 1, spliceCount: 20, connectorPairs: 0 });
+  ok(r3.linkBudget.spliceLoss === 2.0,
+    "Splice loss 20 splices x 0.1 dB = " + r3.linkBudget.spliceLoss + " dB (IEC 61073)");
+
+  // Test 4: Connector loss = 0.3 dB per mated pair (IEC 61755)
+  var r4 = B.powerBudgetAnalysis({ routeKm: 100, fiberType: "G.654.E", wavelength: 1550, spans: 1, spliceCount: 0, connectorPairs: 4 });
+  ok(r4.linkBudget.connectorLoss === 1.2,
+    "Connector loss 4 pairs x 0.3 dB = " + r4.linkBudget.connectorLoss + " dB (IEC 61755)");
+
+  // Test 5: Amplification correctly calculates repeaterCount = spans - 1
+  var r5 = B.powerBudgetAnalysis({ routeKm: 3000, fiberType: "G.654.E", wavelength: 1550, spans: 10, spliceCount: 50, connectorPairs: 2, repeaterGain: 15 });
+  ok(r5.amplification.repeaterCount === 9 && r5.amplification.totalGain === 135,
+    "Repeaters: " + r5.amplification.repeaterCount + " units, total gain: " + r5.amplification.totalGain + " dB");
+
+  // Test 6: System margin > 6 dB gives EXCELLENT verdict
+  var r6 = B.powerBudgetAnalysis({ routeKm: 100, fiberType: "G.654.E", wavelength: 1550, spans: 1, spliceCount: 5, connectorPairs: 2, transmitPower: 4, receiverSensitivity: -28 });
+  ok(r6.verdict === "EXCELLENT" && r6.powerBalance.systemMargin > 6,
+    "EXCELLENT verdict at " + r6.powerBalance.systemMargin + " dB margin (>6 dB)");
+
+  // Test 7: System with no amplification on long route gives FAIL verdict
+  var r7 = B.powerBudgetAnalysis({ routeKm: 500, fiberType: "G.652.D", wavelength: 1550, spans: 1, spliceCount: 100, connectorPairs: 4, transmitPower: 0, receiverSensitivity: -28 });
+  ok(r7.verdict === "FAIL" && r7.powerBalance.systemMargin < 1,
+    "FAIL verdict at " + r7.powerBalance.systemMargin + " dB margin (<1 dB) - redesign required");
+
+  // Test 8: Per-span analysis returns correct number of spans with proper structure
+  var r8 = B.powerBudgetAnalysis({ routeKm: 600, fiberType: "G.654.E", wavelength: 1550, spans: 6, spliceCount: 30, connectorPairs: 2, repeaterGain: 20 });
+  ok(r8.perSpanAnalysis.length === 6 && r8.perSpanAnalysis[0].lengthKm === 100 && r8.perSpanAnalysis[0].fiberLoss === 17,
+    "Per-span: " + r8.perSpanAnalysis.length + " spans, span 1 length=" + r8.perSpanAnalysis[0].lengthKm + "km, fiber loss=" + r8.perSpanAnalysis[0].fiberLoss + " dB");
+
+  // Test 9: Aging margin = 0.02 dB/km, repair margin = 0.5 dB per 1000km, temperature = 0.01 dB/km
+  var r9 = B.powerBudgetAnalysis({ routeKm: 2000, fiberType: "G.654.E", wavelength: 1550, spans: 1, spliceCount: 0, connectorPairs: 0 });
+  ok(r9.linkBudget.agingMargin === 40 && r9.linkBudget.repairMargin === 1 && r9.linkBudget.temperatureMargin === 20,
+    "Margins: aging=" + r9.linkBudget.agingMargin + " dB, repair=" + r9.linkBudget.repairMargin + " dB, temp=" + r9.linkBudget.temperatureMargin + " dB");
+
+  // Test 10: References include ITU-T G.977 and IEC 61280
+  var r10 = B.powerBudgetAnalysis({ routeKm: 100 });
+  var hasG977 = r10.references.some(function(ref) { return ref.indexOf("ITU-T G.977") >= 0; });
+  var hasIEC61280 = r10.references.some(function(ref) { return ref.indexOf("IEC 61280") >= 0; });
+  ok(hasG977 && hasIEC61280,
+    "References include ITU-T G.977 and IEC 61280 (" + r10.references.length + " total refs)");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);
