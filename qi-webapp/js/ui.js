@@ -1353,7 +1353,8 @@
         if (!B || !B.revenueModel || !B.designCableSystem) return;
         // Get capex from a default system design
         var sysResult = B.designCableSystem({ routeKm: 3000, fiberPairs: 8, targetCapacityTbps: 384, landingCount: 4, maxDepthM: 4000 });
-        var capex = sysResult.costBreakdown.total;
+        var capexAbsolute = sysResult.costBreakdown.total;
+        var capexMillions = Math.round(capexAbsolute / 1000000); // Convert to millions
         var totalCapacityTbps = sysResult.totalCapacityTbps;
 
         var params = {
@@ -1362,31 +1363,42 @@
           takeUpRateYear1Pct: Number(document.getElementById("rvTakeUp").value),
           growthRateAnnualPct: Number(document.getElementById("rvGrowth").value),
           operatingCostAnnualM: Number(document.getElementById("rvOpex").value),
-          capex: capex
+          capex: capexMillions
         };
         var result = B.revenueModel(params);
         if (!result) return;
 
         var fmt = function (n) { return '$' + Math.round(n).toLocaleString(); };
+        var fmtM = function (n) { return '$' + n.toLocaleString() + 'M'; };
 
-        // Yearly projection table
-        var projRows = result.yearlyProjection.map(function (yr) {
-          return '<tr><td>Year ' + yr.year + '</td><td>' + yr.sold + '</td><td>' + fmt(yr.revenue) + '</td><td>' + fmt(yr.opex) + '</td><td>' + fmt(yr.profit) + '</td><td>' + fmt(yr.cumulative) + '</td></tr>';
-        }).join('');
+        // Show first 10 years in the table for readability
+        var showYears = Math.min(result.yearlyProjection.length, 10);
+        var projRows = '';
+        for (var i = 0; i < showYears; i++) {
+          var yr = result.yearlyProjection[i];
+          projRows += '<tr><td>Year ' + yr.year + '</td><td>' + yr.sold + '</td><td>' + yr.takeUpPct + '%</td><td>' + fmt(yr.revenue) + '</td><td>' + fmt(yr.opex) + '</td><td>' + fmt(yr.ebitda) + '</td><td>' + fmt(yr.cumulative) + '</td></tr>';
+        }
 
-        var paybackText = result.paybackMonths
-          ? 'Payback in ' + result.paybackMonths + ' months (' + (result.paybackMonths / 12).toFixed(1) + ' years)'
-          : 'Payback not achieved within 5 years';
+        var paybackText = result.paybackYears
+          ? 'Payback in ' + result.paybackYears + ' years (' + result.paybackMonths + ' months)'
+          : 'Payback not achieved within ' + result.projectionYears + ' years';
 
-        var html = '<div class="card" style="margin-top:16px"><h3>5-Year Revenue Projection</h3>' +
+        var irrText = result.irr !== null ? (result.irr * 100).toFixed(2) + '%' : 'N/A';
+        var npvText = result.npv >= 0 ? fmt(result.npv) : '-' + fmt(Math.abs(result.npv));
+
+        var html = '<div class="card" style="margin-top:16px"><h3>' + result.projectionYears + '-Year Revenue Projection</h3>' +
           '<div class="grid kpis" style="margin-bottom:16px">' +
-          '<div class="kpi"><div class="label">Total Lambdas</div><div class="value">' + result.totalLambdas + '</div></div>' +
-          '<div class="kpi"><div class="label">Payback</div><div class="value">' + (result.paybackMonths ? result.paybackMonths + ' mo' : 'N/A') + '</div></div>' +
-          '<div class="kpi"><div class="label">Simple ROI</div><div class="value">' + result.simpleROI + '%</div></div>' +
-          '<div class="kpi"><div class="label">CAPEX</div><div class="value">' + fmt(capex) + '</div></div>' +
+          '<div class="kpi"><div class="label">Total Lambdas (' + result.serviceUnit + 'G)</div><div class="value">' + result.totalLambdas + '</div></div>' +
+          '<div class="kpi"><div class="label">IRR</div><div class="value">' + irrText + '</div></div>' +
+          '<div class="kpi"><div class="label">NPV (10%)</div><div class="value">' + npvText + '</div></div>' +
+          '<div class="kpi"><div class="label">Payback</div><div class="value">' + (result.paybackYears ? result.paybackYears + ' yr' : 'N/A') + '</div></div>' +
+          '<div class="kpi"><div class="label">Break-even</div><div class="value">' + result.breakEvenUtilization + '%</div></div>' +
+          '<div class="kpi"><div class="label">CAPEX</div><div class="value">' + fmtM(capexMillions) + '</div></div>' +
           '</div>' +
-          '<div class="table-wrap"><table id="rvProjectionTable"><thead><tr><th>Year</th><th>Lambdas Sold</th><th>Revenue</th><th>OPEX</th><th>Profit</th><th>Cumulative</th></tr></thead><tbody>' + projRows + '</tbody></table></div>' +
-          '<p style="margin-top:12px;font-weight:600">' + paybackText + '</p></div>';
+          '<div class="table-wrap"><table id="rvProjectionTable"><thead><tr><th>Year</th><th>Lambdas Sold</th><th>Take-up</th><th>Revenue</th><th>OPEX</th><th>EBITDA</th><th>Cumulative</th></tr></thead><tbody>' + projRows + '</tbody></table></div>' +
+          '<p style="margin-top:12px;font-weight:600">' + paybackText + '</p>' +
+          '<p class="muted" style="margin-top:8px;font-size:12px">Source: ' + result.marketContext.source + ' | Asia traffic growth: ' + result.marketContext.benchmarks.asiaTrafficGrowth + '</p>' +
+          '</div>';
 
         document.getElementById("rvResults").innerHTML = html;
       });

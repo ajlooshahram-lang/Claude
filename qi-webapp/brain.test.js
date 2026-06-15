@@ -1320,5 +1320,76 @@ console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
   ok(hasRA, "Shore-end cable (RA type) included in cable profile");
 })();
 
+// ========== Revenue Model (revenueModel) ==========
+(function () {
+  var B = require("./js/brain.js");
+  console.log("\n--- revenueModel tests ---");
+
+  // Test 1: serviceUnit parameter controls totalLambdas calculation
+  var r100 = B.revenueModel({ totalCapacityTbps: 100, serviceUnit: 100 });
+  var r400 = B.revenueModel({ totalCapacityTbps: 100, serviceUnit: 400 });
+  var r10 = B.revenueModel({ totalCapacityTbps: 100, serviceUnit: 10 });
+  ok(r100.totalLambdas === 1000 && r400.totalLambdas === 250 && r10.totalLambdas === 10000,
+    "serviceUnit controls totalLambdas: 100G=" + r100.totalLambdas + " (expect 1000), 400G=" + r400.totalLambdas + " (expect 250), 10G=" + r10.totalLambdas + " (expect 10000)");
+
+  // Test 2: capex accepted in MILLIONS (1300 = $1.3B)
+  var rCapex = B.revenueModel({ totalCapacityTbps: 100, capex: 1300 });
+  ok(rCapex.capexMillions === 1300, "capex in millions: capexMillions=" + rCapex.capexMillions + " (expect 1300)");
+
+  // Test 3: Projects over 25 years by default with configurable projectionYears
+  var rDefault = B.revenueModel({ totalCapacityTbps: 100 });
+  var r15 = B.revenueModel({ totalCapacityTbps: 100, projectionYears: 15 });
+  ok(rDefault.yearlyProjection.length === 25 && r15.yearlyProjection.length === 15,
+    "projectionYears: default=" + rDefault.yearlyProjection.length + " (expect 25), custom=" + r15.yearlyProjection.length + " (expect 15)");
+
+  // Test 4: Take-up capped at 95%
+  var rHighGrowth = B.revenueModel({ totalCapacityTbps: 100, takeUpRateYear1Pct: 50, growthRateAnnualPct: 30 });
+  var maxTakeUp = 0;
+  for (var i = 0; i < rHighGrowth.yearlyProjection.length; i++) {
+    if (rHighGrowth.yearlyProjection[i].takeUpPct > maxTakeUp) {
+      maxTakeUp = rHighGrowth.yearlyProjection[i].takeUpPct;
+    }
+  }
+  ok(maxTakeUp <= 95, "Take-up capped at 95%: max observed=" + maxTakeUp + "%");
+
+  // Test 5: OpEx includes 3%/year inflation
+  var rInflation = B.revenueModel({ totalCapacityTbps: 100, operatingCostAnnualM: 20 });
+  var year1Opex = rInflation.yearlyProjection[0].opex;
+  var year5Opex = rInflation.yearlyProjection[4].opex;
+  var expectedYear5 = 20000000 * Math.pow(1.03, 4);
+  ok(Math.abs(year5Opex - Math.round(expectedYear5)) <= 1,
+    "OpEx inflates 3%/yr: Y1=" + year1Opex + " Y5=" + year5Opex + " (expect ~" + Math.round(expectedYear5) + ")");
+
+  // Test 6: IRR calculated via Newton-Raphson, NPV at 10%
+  var rFinancials = B.revenueModel({
+    totalCapacityTbps: 100,
+    serviceUnit: 100,
+    pricePerLambdaPerMonth: 8000,
+    takeUpRateYear1Pct: 30,
+    growthRateAnnualPct: 20,
+    operatingCostAnnualM: 30,
+    capex: 500
+  });
+  ok(typeof rFinancials.irr === "number" && rFinancials.irr > 0,
+    "IRR calculated via Newton-Raphson: " + (rFinancials.irr * 100).toFixed(2) + "% (positive return)");
+  ok(typeof rFinancials.npv === "number",
+    "NPV calculated at 10%: $" + rFinancials.npv.toLocaleString());
+
+  // Test 7: EBITDA tracked in yearly projection and paybackYears returned as decimal
+  var rEbitda = B.revenueModel({ totalCapacityTbps: 100, serviceUnit: 100, capex: 200, takeUpRateYear1Pct: 40, pricePerLambdaPerMonth: 5000, operatingCostAnnualM: 10 });
+  var hasEbitda = rEbitda.yearlyProjection[0].ebitda !== undefined;
+  ok(hasEbitda, "EBITDA tracked in projection: Year 1 EBITDA=$" + rEbitda.yearlyProjection[0].ebitda.toLocaleString());
+  ok(rEbitda.paybackYears !== null && typeof rEbitda.paybackYears === "number",
+    "paybackYears as decimal: " + rEbitda.paybackYears + " years");
+
+  // Test 8: marketContext with TeleGeography references and breakEvenUtilization
+  var rMarket = B.revenueModel({ totalCapacityTbps: 100, serviceUnit: 100, pricePerLambdaPerMonth: 5000 });
+  ok(rMarket.marketContext && rMarket.marketContext.source === "TeleGeography" &&
+     rMarket.marketContext.references.length >= 3,
+    "marketContext includes TeleGeography references (" + rMarket.marketContext.references.length + " refs)");
+  ok(typeof rMarket.breakEvenUtilization === "number" && rMarket.breakEvenUtilization > 0,
+    "breakEvenUtilization calculated: " + rMarket.breakEvenUtilization + "%");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);

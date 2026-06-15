@@ -3169,64 +3169,177 @@
   }
 
   // ---------- Capacity & Revenue Planning ----------
+  // Engineering-grade revenue model with IRR, NPV, EBITDA, 25-year projection,
+  // configurable service unit, OpEx inflation, and TeleGeography market context.
   function revenueModel(params) {
-    var totalCapacityTbps = params.totalCapacityTbps || 100;
-    var pricePerLambdaPerMonth = params.pricePerLambdaPerMonth || 1000;
-    var takeUpRateYear1Pct = params.takeUpRateYear1Pct || 20;
-    var growthRateAnnualPct = params.growthRateAnnualPct || 15;
-    var operatingCostAnnualM = params.operatingCostAnnualM || 20;
-    var capex = params.capex || 500000000;
+    var p = params || {};
+    var totalCapacityTbps = p.totalCapacityTbps || 100;
+    var serviceUnit = p.serviceUnit || 100; // Gbps per lambda: 10, 100, or 400
+    var pricePerLambdaPerMonth = p.pricePerLambdaPerMonth || 1000;
+    var takeUpRateYear1Pct = p.takeUpRateYear1Pct || 20;
+    var growthRateAnnualPct = p.growthRateAnnualPct || 15;
+    var operatingCostAnnualM = p.operatingCostAnnualM || 20; // $ millions Year 1
+    var capex = p.capex || 1300; // In MILLIONS (1300 = $1.3B)
+    var projectionYears = p.projectionYears || 25;
+    var discountRate = p.discountRate || 0.10; // 10% for NPV
+    var opexInflationRate = p.opexInflationRate || 0.03; // 3%/year OpEx inflation
+    var takeUpCapPct = 95; // Hard cap at 95% utilization
 
-    // Total lambdas: totalCapacityTbps * 1000 / 400
-    var totalLambdas = totalCapacityTbps * 1000 / 400;
+    // Total lambdas: totalCapacityTbps * 1000 / serviceUnit
+    var totalLambdas = Math.round(totalCapacityTbps * 1000 / serviceUnit);
 
-    // 5-year projection
+    // Capex in absolute dollars (input is in millions)
+    var capexAbsolute = capex * 1000000;
+
+    // Break-even utilization: minimum take-up % to cover Year 1 opex
+    var opexYear1Absolute = operatingCostAnnualM * 1000000;
+    var annualRevenuePerLambda = pricePerLambdaPerMonth * 12;
+    var breakEvenLambdas = annualRevenuePerLambda > 0
+      ? Math.ceil(opexYear1Absolute / annualRevenuePerLambda)
+      : totalLambdas;
+    var breakEvenUtilization = totalLambdas > 0
+      ? Math.round((breakEvenLambdas / totalLambdas) * 1000) / 10
+      : 100;
+
+    // Yearly projection over configurable years
     var yearlyProjection = [];
     var cumulative = 0;
-    var paybackMonths = null;
+    var paybackYears = null;
+    var cashFlows = [-capexAbsolute]; // Year 0 is capex outflow for IRR
+    var npv = -capexAbsolute; // Start NPV with initial investment
 
-    for (var year = 1; year <= 5; year++) {
-      // Take-up rate for this year, capped at 100%
+    for (var year = 1; year <= projectionYears; year++) {
+      // Take-up rate for this year, capped at 95%
       var takeUpPct = takeUpRateYear1Pct * Math.pow(1 + growthRateAnnualPct / 100, year - 1);
-      if (takeUpPct > 100) takeUpPct = 100;
+      if (takeUpPct > takeUpCapPct) takeUpPct = takeUpCapPct;
 
       var sold = Math.round(totalLambdas * takeUpPct / 100);
-      var revenue = sold * pricePerLambdaPerMonth * 12;
-      var opex = operatingCostAnnualM * 1000000;
-      var profit = revenue - opex;
-      cumulative += profit;
+      var revenue = sold * annualRevenuePerLambda;
+
+      // OpEx with 3%/year inflation
+      var opex = opexYear1Absolute * Math.pow(1 + opexInflationRate, year - 1);
+
+      // EBITDA = Revenue - OpEx (before depreciation, interest, tax)
+      var ebitda = revenue - opex;
+
+      // Net cash flow (simplified: EBITDA as proxy for free cash flow)
+      var netCashFlow = ebitda;
+      cumulative += netCashFlow;
+
+      // NPV: discount each year's cash flow at 10%
+      var discountFactor = Math.pow(1 + discountRate, year);
+      npv += netCashFlow / discountFactor;
+
+      cashFlows.push(netCashFlow);
 
       yearlyProjection.push({
         year: year,
         sold: sold,
-        revenue: revenue,
-        opex: opex,
-        profit: profit,
-        cumulative: cumulative
+        takeUpPct: Math.round(takeUpPct * 10) / 10,
+        revenue: Math.round(revenue),
+        opex: Math.round(opex),
+        ebitda: Math.round(ebitda),
+        profit: Math.round(netCashFlow),
+        cumulative: Math.round(cumulative)
       });
 
-      // Calculate payback month within this year
-      if (paybackMonths === null && cumulative >= capex) {
-        // Interpolate month within this year
-        var prevCumulative = cumulative - profit;
-        var remainingToPayback = capex - prevCumulative;
-        var monthlyProfit = profit / 12;
-        if (monthlyProfit > 0) {
-          var monthsInYear = Math.ceil(remainingToPayback / monthlyProfit);
-          paybackMonths = (year - 1) * 12 + monthsInYear;
+      // Calculate payback year as decimal
+      if (paybackYears === null && cumulative >= capexAbsolute) {
+        var prevCumulative = cumulative - netCashFlow;
+        var remainingToPayback = capexAbsolute - prevCumulative;
+        if (netCashFlow > 0) {
+          paybackYears = Math.round(((year - 1) + remainingToPayback / netCashFlow) * 10) / 10;
         }
       }
     }
 
-    // Simple ROI: (5-year cumulative profit / capex) * 100
-    var simpleROI = Math.round((cumulative / capex) * 100 * 10) / 10;
+    // IRR via Newton-Raphson method
+    var irr = _calculateIRR(cashFlows);
+
+    // Simple ROI: (total cumulative / capex) * 100
+    var simpleROI = Math.round((cumulative / capexAbsolute) * 100 * 10) / 10;
+
+    // Payback in months for backward compatibility
+    var paybackMonths = paybackYears !== null ? Math.round(paybackYears * 12) : null;
+
+    // NPV rounded to nearest dollar
+    npv = Math.round(npv);
+
+    // Market context with TeleGeography references
+    var marketContext = {
+      source: "TeleGeography",
+      references: [
+        "TeleGeography Submarine Cable Map 2024",
+        "TeleGeography Global Bandwidth Research Service",
+        "TeleGeography Wholesale WAN Pricing (international private line)",
+        "PTC Submarine Telecoms Forum market reports"
+      ],
+      assumptions: {
+        pricingBasis: "International private line " + serviceUnit + "G wavelength service",
+        demandModel: "Compound growth from " + takeUpRateYear1Pct + "% Y1 at " + growthRateAnnualPct + "%/yr CAGR",
+        utilizationCap: takeUpCapPct + "% maximum (maintenance/protection capacity reserved)",
+        opexModel: operatingCostAnnualM + "M Year 1 with " + (opexInflationRate * 100) + "% annual inflation",
+        marketTrend: "Asia-Pacific international bandwidth demand growing 30-40% CAGR (TeleGeography 2023)",
+        pricingTrend: "Wavelength pricing declining 10-15% annually on competitive routes"
+      },
+      benchmarks: {
+        typicalSubmarineCableIRR: "12-18%",
+        typicalPayback: "7-12 years",
+        asiaTrafficGrowth: "35% CAGR (2020-2025 measured)"
+      }
+    };
 
     return {
       totalLambdas: totalLambdas,
+      serviceUnit: serviceUnit,
+      capexMillions: capex,
+      projectionYears: projectionYears,
       yearlyProjection: yearlyProjection,
+      paybackYears: paybackYears,
       paybackMonths: paybackMonths,
-      simpleROI: simpleROI
+      irr: irr,
+      npv: npv,
+      simpleROI: simpleROI,
+      breakEvenUtilization: breakEvenUtilization,
+      marketContext: marketContext
     };
+  }
+
+  // IRR calculation using Newton-Raphson method
+  function _calculateIRR(cashFlows) {
+    var maxIterations = 100;
+    var tolerance = 0.00001;
+    var guess = 0.10; // Start with 10% guess
+
+    for (var iter = 0; iter < maxIterations; iter++) {
+      var npvAtGuess = 0;
+      var derivativeAtGuess = 0;
+
+      for (var t = 0; t < cashFlows.length; t++) {
+        var discountFactor = Math.pow(1 + guess, t);
+        npvAtGuess += cashFlows[t] / discountFactor;
+        if (t > 0) {
+          derivativeAtGuess -= t * cashFlows[t] / Math.pow(1 + guess, t + 1);
+        }
+      }
+
+      if (Math.abs(derivativeAtGuess) < 1e-12) break; // Avoid division by zero
+
+      var newGuess = guess - npvAtGuess / derivativeAtGuess;
+
+      // Guard against divergence
+      if (newGuess < -0.99) newGuess = -0.5;
+      if (newGuess > 10) newGuess = 5;
+
+      if (Math.abs(newGuess - guess) < tolerance) {
+        return Math.round(newGuess * 10000) / 10000; // 4 decimal places
+      }
+
+      guess = newGuess;
+    }
+
+    // Return best estimate if convergence not achieved
+    return Math.round(guess * 10000) / 10000;
   }
 
   // ---------- Cable Route Optimization Engine ----------
