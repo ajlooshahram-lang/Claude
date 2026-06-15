@@ -895,6 +895,7 @@ const T = {
   da: {
     appTitle: 'El-Dimensionering',
     modules: {
+      home: '\uD83C\uDFE0 Oversigt',
       load: 'Belastning',
       fuse: 'Sikringer',
       mcb: 'Automatsikring',
@@ -1012,6 +1013,7 @@ const T = {
   en: {
     appTitle: 'Electrical Dimensioning',
     modules: {
+      home: '\uD83C\uDFE0 Overview',
       load: 'Load Calc',
       fuse: 'Fuses',
       mcb: 'MCB',
@@ -2091,7 +2093,7 @@ const RCD_TYPES = {
 };
 
 // ===== STATE =====
-let activeModule = 'load';
+let activeModule = 'home';
 
 // Load state
 let loadState = { voltage: '3x400', power: 10, cosPhi: 0.9, simFactor: 1.0, expFactor: 1.0 };
@@ -2383,6 +2385,7 @@ function renderModule(mod) {
     case 'test': content += renderTest(); break;
     case 'light': content += renderLight(); break;
     case 'fire': content += renderFire(); break;
+    case 'home': content += renderDashboard(); break;
     case 'exam': content = renderExam(); break;
   }
   // Append AI assistant to every module
@@ -17608,6 +17611,77 @@ function renderFire(){
   html+='<div class="result-row"><span class="label">'+(da?'Estimeret kabellængde':'Estimated cable length')+'</span><span class="value">~'+cableM+' m</span></div>';
   html+='<div class="result-row"><span class="label">'+(da?'Standard':'Standard')+'</span><span class="value">DS/EN 54 + DS/CEN TS 54-14</span></div>';
   html+='</div></div>';
+  return html;
+}
+
+// ===== QUICK-START DASHBOARD =====
+function renderDashboard(){
+  const da=lang==='da';
+  const ib=calcIB(), sch=calcLoadSchedule(), qi=runQiValidation();
+  const circuits=JSON.parse(localStorage.getItem('projectCircuits')||'[]');
+  const nCircuits=circuits.length;
+  const totalKW=sch.kW||0;
+  const trafoOk=trafoState.size>0;
+  const cableOk=!!cableState.crossSection;
+  const protOk=mcbState.rating>0||fuseState.size>0;
+
+  // Project phases
+  const phases=[
+    {id:'dim',da:'Dimensionering',en:'Dimensioning',done:ib>0&&cableOk,icon:'\u2699\uFE0F',mod:'load'},
+    {id:'prot',da:'Beskyttelse',en:'Protection',done:protOk,icon:'\uD83D\uDEE1\uFE0F',mod:'mcb'},
+    {id:'panel',da:'Tavle',en:'Panel',done:nCircuits>2,icon:'\uD83D\uDDC4\uFE0F',mod:'panel'},
+    {id:'dok',da:'Dokumentation',en:'Documentation',done:false,icon:'\uD83D\uDCCB',mod:'projekt'},
+    {id:'test',da:'Afprøvning',en:'Testing',done:false,icon:'\u2705',mod:'test'},
+    {id:'aflev',da:'Aflevering',en:'Handover',done:false,icon:'\uD83C\uDFC1',mod:'projekt'}
+  ];
+  const phaseDone=phases.filter(function(p){return p.done;}).length;
+
+  let html='<div class="card fade-in"><div class="card-title">\uD83C\uDFE0 '+(da?'Projektoverblik':'Project overview')+'</div>';
+
+  // Progress bar
+  html+='<div style="margin:12px 0"><div style="display:flex;justify-content:space-between;font-size:.8rem;color:var(--text-light);margin-bottom:4px"><span>'+phaseDone+'/'+phases.length+' '+(da?'faser':'phases')+'</span><span>'+Math.round(100*phaseDone/phases.length)+'%</span></div>';
+  html+='<div style="height:8px;background:rgba(0,200,180,0.1);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+Math.round(100*phaseDone/phases.length)+'%;background:linear-gradient(90deg,var(--success),#00e5ff);border-radius:4px;transition:width .5s"></div></div></div>';
+
+  // Phase chips
+  html+='<div class="select-grid" style="margin-bottom:14px">';
+  phases.forEach(function(p){
+    html+='<button class="sel-btn" style="'+(p.done?'border-color:var(--success);color:var(--success)':'')+'" onclick="switchModule(\''+p.mod+'\')">'+p.icon+' '+(da?p.da:p.en)+(p.done?' \u2713':'')+'</button>';
+  });
+  html+='</div>';
+
+  // Quick stats
+  html+='<div class="result-box"><div class="result-title">'+(da?'Nøgletal':'Key figures')+'</div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Designstrøm IB':'Design current IB')+'</span><span class="value">'+(ib>0?ib.toFixed(1)+' A':'–')+'</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Total effekt':'Total power')+'</span><span class="value">'+(totalKW>0?totalKW.toFixed(1)+' kW':'–')+'</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Gemte kredse':'Saved circuits')+'</span><span class="value">'+nCircuits+'</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Transformer':'Transformer')+'</span><span class="value">'+(trafoOk?trafoState.size+' kVA':'–')+'</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Kabel':'Cable')+'</span><span class="value">'+(cableOk?cableState.crossSection+' mm\u00B2':'–')+'</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Beskyttelse':'Protection')+'</span><span class="value">'+(mcbState.rating>0?mcbState.curve+mcbState.rating+' A':(fuseState.size>0?fuseState.size+' A gG':'–'))+'</span></div>';
+  html+='</div>';
+
+  // Quick actions
+  html+='<div class="select-group"><div class="select-label">'+(da?'Hurtighandlinger':'Quick actions')+'</div><div class="select-grid">';
+  html+='<button class="sel-btn selected" onclick="switchModule(\'load\')">\u26A1 '+(da?'Start dimensionering':'Start dimensioning')+'</button>';
+  html+='<button class="sel-btn" onclick="switchModule(\'draw\')">\uD83D\uDDBC\uFE0F '+(da?'Se tegning':'View drawing')+'</button>';
+  html+='<button class="sel-btn" onclick="switchModule(\'projekt\')">\uD83D\uDCCB '+(da?'Generér rapport':'Generate report')+'</button>';
+  html+='<button class="sel-btn" onclick="switchModule(\'exam\')">\uD83C\uDF93 '+(da?'Øv til prøven':'Practice for exam')+'</button>';
+  html+='</div></div></div>';
+
+  // Design review summary (if any findings)
+  if(typeof runDesignReview==='function'){
+    var findings=runDesignReview();
+    if(findings&&findings.length>0){
+      var crit=findings.filter(function(f){return f.severity==='critical';}).length;
+      var warn=findings.filter(function(f){return f.severity==='warning';}).length;
+      html+='<div class="card fade-in"><div class="card-title">\uD83E\uDDE0 '+(da?'Second Opinion':'Second Opinion')+'</div>';
+      html+='<div class="result-box '+(crit>0?'error':'warning')+'"><div class="result-title">'+(crit>0?(da?'\u274c '+crit+' kritiske fund':'\u274c '+crit+' critical findings'):(da?'\u26A0\uFE0F '+warn+' advarsler':'\u26A0\uFE0F '+warn+' warnings'))+'</div>';
+      findings.slice(0,3).forEach(function(f){
+        html+='<div class="result-row"><span class="label" style="color:'+(f.severity==='critical'?'var(--danger)':'#b8860b')+'">'+(da?f.msg_da:f.msg_en)+'</span></div>';
+      });
+      if(findings.length>3) html+='<div class="result-row"><span class="label">+ '+(findings.length-3)+' '+(da?'mere...':'more...')+'</span></div>';
+      html+='</div><div class="select-grid" style="margin-top:8px"><button class="sel-btn" onclick="switchModule(\'verify\')">'+(da?'Se alle fund':'View all findings')+' \u25B6</button></div></div>';
+    }
+  }
   return html;
 }
 
