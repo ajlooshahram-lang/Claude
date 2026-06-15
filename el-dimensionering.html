@@ -17805,75 +17805,151 @@ function runEnergyWatchdog(){
   const da=lang==='da';
   const ib=calcIB(), sch=calcLoadSchedule();
   const findings=[];
-  const annualHours=2500; // default office assumption
-  const pricePerKwh=2.5; // DKK
-  const co2PerKwh=0.14; // kg CO2 Danish grid
 
-  // 1. Cable loss optimization
+  // ===== CONFIGURABLE PARAMETERS (user can adjust via watchdogState) =====
+  if(!watchdogState.hours) watchdogState.hours=2500;
+  if(!watchdogState.price) watchdogState.price=2.5;
+  if(!watchdogState.co2factor) watchdogState.co2factor=0.14;
+  if(!watchdogState.lifetime) watchdogState.lifetime=25;
+  if(!watchdogState.discountRate) watchdogState.discountRate=0.04;
+  const H=watchdogState.hours; // annual operating hours
+  const P=watchdogState.price; // DKK/kWh (2024 Danish avg incl. taxes)
+  const CO2=watchdogState.co2factor; // kg CO2/kWh (Danish grid 2024)
+  const LT=watchdogState.lifetime; // installation lifetime years
+  const DR=watchdogState.discountRate; // discount rate for NPV
+  // NPV factor: sum of 1/(1+r)^n for n=1..LT
+  const npvFactor=(function(){ var s=0; for(var n=1;n<=LT;n++) s+=1/Math.pow(1+DR,n); return s; })();
+
+  // ===== CHECK 1: Cable I²R loss optimization =====
   if(cableState.crossSection && vdropState.length>0){
     const cables=cableState.material==='copper'?CABLES_COPPER:CABLES_ALU;
     const ct=cables[cableState.type]; const cc=ct&&ct[cableState.cores]?ct[cableState.cores]:{};
     const sel=cc[cableState.crossSection];
     if(sel && ib>0){
       const L=vdropState.length/1000;
-      const pLoss=3*ib*ib*sel.r*L/1000; // kW loss in cable
-      const annualLoss=pLoss*annualHours;
-      const costLoss=annualLoss*pricePerKwh;
-      if(costLoss>100){
-        // Check next size up
-        var keys=Object.keys(cc).map(Number).sort(function(a,b){return a-b;});
-        var idx=keys.indexOf(parseFloat(cableState.crossSection));
-        if(idx>=0 && idx<keys.length-1){
-          var nextCS=keys[idx+1], nextCable=cc[nextCS];
+      const pLoss=(loadState.voltage==='3x400'?3:2)*ib*ib*sel.r*L/1000; // kW
+      const annualLossKwh=pLoss*H;
+      const costLoss=annualLossKwh*P;
+      // Check ALL larger sizes and find optimal
+      var keys=Object.keys(cc).map(Number).sort(function(a,b){return a-b;});
+      var idx=keys.indexOf(parseFloat(cableState.crossSection));
+      if(idx>=0 && costLoss>50){
+        for(var ci=idx+1;ci<keys.length&&ci<=idx+3;ci++){
+          var nextCS=keys[ci], nextCable=cc[nextCS];
           if(nextCable){
-            var pLossNext=3*ib*ib*nextCable.r*L/1000;
-            var saving=(pLoss-pLossNext)*annualHours*pricePerKwh;
-            if(saving>50) findings.push({category:'cable',severity:'money',saving_dkk:Math.round(saving),saving_kwh:Math.round((pLoss-pLossNext)*annualHours),co2_kg:Math.round((pLoss-pLossNext)*annualHours*co2PerKwh),msg_da:'Opgradering til '+nextCS+' mm\u00B2 sparer '+Math.round(saving)+' DKK/\u00E5r i kabeltab ('+Math.round((pLoss-pLossNext)*annualHours)+' kWh)',msg_en:'Upgrading to '+nextCS+' mm\u00B2 saves '+Math.round(saving)+' DKK/year in cable losses ('+Math.round((pLoss-pLossNext)*annualHours)+' kWh)',payback_years:Math.round(vdropState.length*5/saving*10)/10});
+            var pLossNext=(loadState.voltage==='3x400'?3:2)*ib*ib*nextCable.r*L/1000;
+            var savingKwh=(pLoss-pLossNext)*H;
+            var savingDKK=savingKwh*P;
+            var extraCost=vdropState.length*(nextCS-parseFloat(cableState.crossSection))*2.5; // rough cable cost diff
+            var simplePayback=extraCost/savingDKK;
+            var npv=savingDKK*npvFactor-extraCost;
+            if(savingDKK>50 && npv>0) findings.push({category:'cable',severity:savingDKK>1000?'critical':'money',saving_dkk:Math.round(savingDKK),saving_kwh:Math.round(savingKwh),co2_kg:Math.round(savingKwh*CO2),npv:Math.round(npv),investment:Math.round(extraCost),msg_da:'Kabel '+cableState.crossSection+'\u2192'+nextCS+' mm\u00B2: sparer '+Math.round(savingDKK)+' DKK/\u00E5r i I\u00B2R-tab. NPV over '+LT+' \u00E5r: '+Math.round(npv)+' DKK',msg_en:'Cable '+cableState.crossSection+'\u2192'+nextCS+' mm\u00B2: saves '+Math.round(savingDKK)+' DKK/year in I\u00B2R losses. NPV over '+LT+' years: '+Math.round(npv)+' DKK',payback_years:Math.round(simplePayback*10)/10,action_da:'Opgrad\u00e9r kabel til '+nextCS+' mm\u00B2 ('+cableState.material+')',action_en:'Upgrade cable to '+nextCS+' mm\u00B2 ('+cableState.material+')',ds_ref:'DS/HD 60364-5-52 \u00A7524'});
+            break; // only show best option
           }
         }
       }
     }
   }
 
-  // 2. Power factor penalty
+  // ===== CHECK 2: Power factor penalty + reactive energy =====
   if(sch.kW>0 && loadState.cosPhi<0.92){
-    var penaltyKVA=sch.kVA-sch.kW/0.95;
-    var annualPenalty=penaltyKVA*50*12; // 50 DKK/kVA/month
-    if(annualPenalty>500) findings.push({category:'pfc',severity:'money',saving_dkk:Math.round(annualPenalty),saving_kwh:0,co2_kg:0,msg_da:'Fasekompensering til cos\u03C6 0.95 sparer ~'+Math.round(annualPenalty)+' DKK/\u00E5r i effektafgift',msg_en:'Power factor correction to cos\u03C6 0.95 saves ~'+Math.round(annualPenalty)+' DKK/year in demand charges',payback_years:Math.round(penaltyKVA*200/annualPenalty*10)/10});
+    var Qexcess=sch.kW*(Math.tan(Math.acos(loadState.cosPhi))-Math.tan(Math.acos(0.95)));
+    var penaltyKVA=Qexcess/Math.tan(Math.acos(0.95)); // excess kVA above target
+    var annualPenalty=Math.abs(penaltyKVA)*50*12; // 50 DKK/kVA/month typical penalty
+    var capacitorCost=Qexcess*300; // ~300 DKK/kVAr for fixed compensation
+    var npv=annualPenalty*npvFactor-capacitorCost;
+    if(annualPenalty>200) findings.push({category:'pfc',severity:'money',saving_dkk:Math.round(annualPenalty),saving_kwh:0,co2_kg:0,npv:Math.round(npv),investment:Math.round(capacitorCost),msg_da:'cos\u03C6 = '+loadState.cosPhi+' \u2192 0.95: Kondensator '+Math.round(Qexcess)+' kVAr sparer '+Math.round(annualPenalty)+' DKK/\u00E5r i effektafgift. Reducerer ogs\u00E5 str\u00F8m (I) og dermed kabeltab.',msg_en:'cos\u03C6 = '+loadState.cosPhi+' \u2192 0.95: Capacitor '+Math.round(Qexcess)+' kVAr saves '+Math.round(annualPenalty)+' DKK/year in demand charges. Also reduces current (I) and cable losses.',payback_years:Math.round(capacitorCost/annualPenalty*10)/10,action_da:'Install\u00e9r '+Math.round(Qexcess)+' kVAr fasekompensering (fast eller automatisk)',action_en:'Install '+Math.round(Qexcess)+' kVAr power factor correction (fixed or automatic)',ds_ref:'IEC 61921; DS/HD 60364-5-55'});
   }
 
-  // 3. LED upgrade potential
-  var hasOldLighting=loadList.some(function(c){var nm=(c.name||'').toLowerCase();return (nm.indexOf('lys')>=0||nm.indexOf('light')>=0||nm.indexOf('belys')>=0)&&c.kW>1;});
-  if(hasOldLighting){
-    var lightKW=loadList.filter(function(c){var nm=(c.name||'').toLowerCase();return nm.indexOf('lys')>=0||nm.indexOf('light')>=0||nm.indexOf('belys')>=0;}).reduce(function(s,c){return s+c.kW;},0);
-    var ledSaving=lightKW*0.5*annualHours; // 50% reduction with modern LED
-    if(ledSaving>200) findings.push({category:'led',severity:'energy',saving_dkk:Math.round(ledSaving*pricePerKwh),saving_kwh:Math.round(ledSaving),co2_kg:Math.round(ledSaving*co2PerKwh),msg_da:'Opgradering til moderne LED sparer ~'+Math.round(ledSaving)+' kWh/\u00E5r ('+Math.round(ledSaving*pricePerKwh)+' DKK)',msg_en:'Upgrading to modern LED saves ~'+Math.round(ledSaving)+' kWh/year ('+Math.round(ledSaving*pricePerKwh)+' DKK)',payback_years:1.5});
+  // ===== CHECK 3: LED upgrade potential =====
+  var lightLoads=loadList.filter(function(c){var nm=(c.name||'').toLowerCase();return nm.indexOf('lys')>=0||nm.indexOf('light')>=0||nm.indexOf('belys')>=0||nm.indexOf('lamp')>=0;});
+  if(lightLoads.length>0){
+    var lightKW=lightLoads.reduce(function(s,c){return s+c.kW;},0);
+    var ledSavingKwh=lightKW*0.5*H; // Modern LED = 50% less than older LED/fluorescent
+    var ledSavingDKK=ledSavingKwh*P;
+    var ledCost=lightKW*2000; // ~2000 DKK/kW installed
+    var npv=ledSavingDKK*npvFactor-ledCost;
+    if(ledSavingDKK>200) findings.push({category:'led',severity:'energy',saving_dkk:Math.round(ledSavingDKK),saving_kwh:Math.round(ledSavingKwh),co2_kg:Math.round(ledSavingKwh*CO2),npv:Math.round(npv),investment:Math.round(ledCost),msg_da:'Moderne LED-opgradering ('+lightLoads.length+' kredse, '+lightKW.toFixed(1)+' kW): sparer '+Math.round(ledSavingKwh)+' kWh/\u00E5r. Bonus: lavere varmebelastning + l\u00e6ngere levetid.',msg_en:'Modern LED upgrade ('+lightLoads.length+' circuits, '+lightKW.toFixed(1)+' kW): saves '+Math.round(ledSavingKwh)+' kWh/year. Bonus: lower heat load + longer lifespan.',payback_years:Math.round(ledCost/ledSavingDKK*10)/10,action_da:'Udskift til LED med dimmring + bev\u00e6gelsessensor',action_en:'Replace with LED + dimming + motion sensor',ds_ref:'DS/EN 12464-1; Energistyrelsen'});
   }
 
-  // 4. VFD on motors
-  var motors=loadList.filter(function(c){return c.phase==='3'&&c.kW>=5.5;});
+  // ===== CHECK 4: VFD on motors (variable torque: pumps, fans) =====
+  var motors=loadList.filter(function(c){return c.phase==='3'&&c.kW>=3;});
   motors.forEach(function(m){
-    var vfdSaving=m.kW*0.25*annualHours; // 25% avg saving with VFD on pumps/fans
-    if(vfdSaving>500) findings.push({category:'vfd',severity:'energy',saving_dkk:Math.round(vfdSaving*pricePerKwh),saving_kwh:Math.round(vfdSaving),co2_kg:Math.round(vfdSaving*co2PerKwh),msg_da:'Frekvensomformer p\u00E5 '+(m.name||m.kW+'kW motor')+' sparer ~'+Math.round(vfdSaving)+' kWh/\u00E5r',msg_en:'VFD on '+(m.name||m.kW+'kW motor')+' saves ~'+Math.round(vfdSaving)+' kWh/year',payback_years:Math.round(m.kW*1500/(vfdSaving*pricePerKwh)*10)/10});
+    var nm=(m.name||'').toLowerCase();
+    var isVarTorque=nm.indexOf('pumpe')>=0||nm.indexOf('pump')>=0||nm.indexOf('vent')>=0||nm.indexOf('fan')>=0||nm.indexOf('bl\u00e6s')>=0;
+    var savingPct=isVarTorque?0.35:0.15; // 35% for variable torque (affinity laws), 15% for constant torque
+    var vfdSavingKwh=m.kW*savingPct*H;
+    var vfdSavingDKK=vfdSavingKwh*P;
+    var vfdCost=m.kW*800+3000; // VFD cost: ~800 DKK/kW + installation
+    var npv=vfdSavingDKK*npvFactor-vfdCost;
+    if(vfdSavingDKK>500 && npv>0) findings.push({category:'vfd',severity:'energy',saving_dkk:Math.round(vfdSavingDKK),saving_kwh:Math.round(vfdSavingKwh),co2_kg:Math.round(vfdSavingKwh*CO2),npv:Math.round(npv),investment:Math.round(vfdCost),msg_da:'Frekvensomformer p\u00E5 '+(m.name||m.kW+' kW')+' ('+(isVarTorque?'variabelt moment \u2014 affinitetslove':'konstant moment')+' \u2192 '+Math.round(savingPct*100)+'% besparelse): '+Math.round(vfdSavingKwh)+' kWh/\u00E5r',msg_en:'VFD on '+(m.name||m.kW+' kW')+' ('+(isVarTorque?'variable torque \u2014 affinity laws':'constant torque')+' \u2192 '+Math.round(savingPct*100)+'% saving): '+Math.round(vfdSavingKwh)+' kWh/year',payback_years:Math.round(vfdCost/vfdSavingDKK*10)/10,action_da:'Install\u00e9r VFD (frekvensomformer) \u2014 v\u00e6lg kurve C MCB + EMC-filter',action_en:'Install VFD \u2014 choose curve C MCB + EMC filter',ds_ref:'IEC 61800; DS/HD 60364-5-52'});
   });
 
-  // 5. Timer/sensor on circuits
-  if(loadList.length>3){
-    var loadWithoutControl=loadList.filter(function(c){var nm=(c.name||'').toLowerCase();return nm.indexOf('stik')>=0||nm.indexOf('socket')>=0;});
-    if(loadWithoutControl.length>2) findings.push({category:'control',severity:'energy',saving_dkk:Math.round(loadWithoutControl.length*200),saving_kwh:Math.round(loadWithoutControl.length*80),co2_kg:Math.round(loadWithoutControl.length*80*co2PerKwh),msg_da:'Bev\u00E6gelsessensorer p\u00E5 '+loadWithoutControl.length+' stikkredse sparer standby-forbrug',msg_en:'Motion sensors on '+loadWithoutControl.length+' socket circuits save standby consumption',payback_years:0.8});
+  // ===== CHECK 5: Standby/phantom load elimination =====
+  var socketCircuits=loadList.filter(function(c){var nm=(c.name||'').toLowerCase();return nm.indexOf('stik')>=0||nm.indexOf('socket')>=0||nm.indexOf('kontor')>=0||nm.indexOf('office')>=0;});
+  if(socketCircuits.length>1){
+    var standbyKwh=socketCircuits.length*0.05*8760; // 50W standby per circuit, all year
+    var standbySaving=standbyKwh*P;
+    var sensorCost=socketCircuits.length*500;
+    if(standbySaving>100) findings.push({category:'control',severity:'energy',saving_dkk:Math.round(standbySaving),saving_kwh:Math.round(standbyKwh),co2_kg:Math.round(standbyKwh*CO2),npv:Math.round(standbySaving*npvFactor-sensorCost),investment:Math.round(sensorCost),msg_da:'Standby-eliminering p\u00E5 '+socketCircuits.length+' stikkredse (skemalagt afbrydelse nattetid): '+Math.round(standbyKwh)+' kWh/\u00E5r',msg_en:'Standby elimination on '+socketCircuits.length+' socket circuits (scheduled disconnect overnight): '+Math.round(standbyKwh)+' kWh/year',payback_years:Math.round(sensorCost/standbySaving*10)/10,action_da:'Tidsur/smartrelæ p\u00E5 stikgrupper \u2014 afbryd 22:00-06:00',action_en:'Timer/smart relay on socket circuits \u2014 disconnect 22:00-06:00',ds_ref:'Energistyrelsen; DS/EN 15232'});
   }
 
-  // 6. Oversized transformer losses
+  // ===== CHECK 6: Transformer right-sizing =====
   if(trafoState.size>0 && sch.kVA>0){
     var loadPct=sch.kVA/trafoState.size*100;
+    var p0_current=(typeof TRAFO_LOSSES!=='undefined'&&TRAFO_LOSSES[trafoState.size])?TRAFO_LOSSES[trafoState.size].p0:trafoState.size*0.3;
     if(loadPct<40){
       var optSize=Math.ceil(sch.kVA/0.75/50)*50;
-      if(optSize<trafoState.size) findings.push({category:'trafo',severity:'energy',saving_dkk:Math.round((trafoState.size-optSize)*0.5*annualHours*pricePerKwh/1000),saving_kwh:Math.round((trafoState.size-optSize)*0.5*annualHours/1000),co2_kg:Math.round((trafoState.size-optSize)*0.5*annualHours/1000*co2PerKwh),msg_da:'Transformer er kun '+Math.round(loadPct)+'% belastet \u2014 '+optSize+' kVA ville reducere tomgangstab',msg_en:'Transformer is only '+Math.round(loadPct)+'% loaded \u2014 '+optSize+' kVA would reduce no-load losses',payback_years:5});
+      if(optSize<trafoState.size){
+        var p0_opt=(typeof TRAFO_LOSSES!=='undefined'&&TRAFO_LOSSES[optSize])?TRAFO_LOSSES[optSize].p0:optSize*0.3;
+        var savingW=(p0_current-p0_opt);
+        var savingKwh=savingW*8760/1000; // no-load runs 24/7
+        var savingDKK=savingKwh*P;
+        if(savingDKK>200) findings.push({category:'trafo',severity:'energy',saving_dkk:Math.round(savingDKK),saving_kwh:Math.round(savingKwh),co2_kg:Math.round(savingKwh*CO2),npv:Math.round(savingDKK*npvFactor),investment:0,msg_da:'Trafo '+trafoState.size+' kVA er kun '+Math.round(loadPct)+'% belastet. '+optSize+' kVA reducerer tomgangstab med '+Math.round(savingW)+' W ('+Math.round(savingKwh)+' kWh/\u00E5r)',msg_en:'Transformer '+trafoState.size+' kVA is only '+Math.round(loadPct)+'% loaded. '+optSize+' kVA reduces no-load losses by '+Math.round(savingW)+' W ('+Math.round(savingKwh)+' kWh/year)',payback_years:0,action_da:'Overvej '+optSize+' kVA trafo (kun ved nyanl\u00e6g \u2014 eksisterende: acceptér)',action_en:'Consider '+optSize+' kVA transformer (only for new installations \u2014 existing: accept)',ds_ref:'F\u00e6llesregulativet 2019'});
+      }
     }
   }
 
-  // Sort by saving
-  findings.sort(function(a,b){return b.saving_dkk-a.saving_dkk;});
+  // ===== CHECK 7: EV charger scheduling (avoid peak tariff) =====
+  var evLoads=loadList.filter(function(c){var nm=(c.name||'').toLowerCase();return nm.indexOf('ev')>=0||nm.indexOf('lad')>=0||nm.indexOf('charg')>=0;});
+  if(evLoads.length>0){
+    var evKW=evLoads.reduce(function(s,c){return s+c.kW;},0);
+    var peakAvoidSaving=evKW*0.5*250; // 0.5 DKK/kWh peak premium × 250 charging sessions
+    if(peakAvoidSaving>200) findings.push({category:'ev_schedule',severity:'money',saving_dkk:Math.round(peakAvoidSaving),saving_kwh:0,co2_kg:Math.round(evKW*250*4*CO2*0.3),npv:Math.round(peakAvoidSaving*npvFactor),investment:0,msg_da:'Intelligent EV-ladning (undg\u00E5 spidsbelastning 17-20): sparer ~'+Math.round(peakAvoidSaving)+' DKK/\u00E5r i variabel tarifdifference',msg_en:'Smart EV charging (avoid peak 17-20): saves ~'+Math.round(peakAvoidSaving)+' DKK/year in variable tariff difference',payback_years:0,action_da:'Aktiv\u00e9r tidsbaseret ladning i laderens app / PLC-styring',action_en:'Enable time-based charging in charger app / PLC control',ds_ref:'Elforsyningslovens \u00A751a; DS/HD 60364-7-722'});
+  }
+
+  // ===== CHECK 8: Heat recovery from ventilation =====
+  var ventLoads=loadList.filter(function(c){var nm=(c.name||'').toLowerCase();return nm.indexOf('vent')>=0||nm.indexOf('luft')>=0||nm.indexOf('air')>=0;});
+  if(ventLoads.length>0){
+    var ventKW=ventLoads.reduce(function(s,c){return s+c.kW;},0);
+    var heatRecoveryKwh=ventKW*3*H*0.7; // COP~3 equivalent, 70% recovery
+    var heatRecoveryDKK=heatRecoveryKwh*0.8; // heating value at ~0.8 DKK/kWh
+    if(heatRecoveryDKK>500) findings.push({category:'heat_recovery',severity:'energy',saving_dkk:Math.round(heatRecoveryDKK),saving_kwh:Math.round(heatRecoveryKwh),co2_kg:Math.round(heatRecoveryKwh*CO2),npv:Math.round(heatRecoveryDKK*npvFactor-ventKW*5000),investment:Math.round(ventKW*5000),msg_da:'Varmegenvinding p\u00E5 ventilation: ~'+Math.round(heatRecoveryKwh)+' kWh/\u00E5r varmebesparelse (modstrøms-veksler)',msg_en:'Heat recovery on ventilation: ~'+Math.round(heatRecoveryKwh)+' kWh/year heating savings (counter-flow exchanger)',payback_years:Math.round(ventKW*5000/heatRecoveryDKK*10)/10,action_da:'Install\u00e9r modstr\u00F8ms-varmeveksler p\u00E5 ventilationsaggregat',action_en:'Install counter-flow heat exchanger on air handling unit',ds_ref:'BR18 \u00A7376-378; DS 447'});
+  }
+
+  // ===== CHECK 9: Solar PV potential =====
+  if(sch.kW>5 && !loadList.some(function(c){var nm=(c.name||'').toLowerCase();return nm.indexOf('sol')>=0||nm.indexOf('pv')>=0||nm.indexOf('solar')>=0;})){
+    var pvSize=Math.min(sch.kW*0.7, 50); // size to 70% of demand, max 50 kW
+    var pvKwh=pvSize*950; // 950 kWh/kWp in Denmark
+    var pvSelfConsume=pvKwh*0.6; // 60% self-consumption without battery
+    var pvSaving=pvSelfConsume*P+pvKwh*0.4*0.5; // self-consume at full price + export at 0.5 DKK
+    var pvCost=pvSize*8000; // 8000 DKK/kWp installed (2024)
+    var npv=pvSaving*npvFactor-pvCost;
+    if(npv>0) findings.push({category:'pv',severity:'energy',saving_dkk:Math.round(pvSaving),saving_kwh:Math.round(pvKwh),co2_kg:Math.round(pvKwh*CO2),npv:Math.round(npv),investment:Math.round(pvCost),msg_da:'Solcelleanl\u00e6g '+Math.round(pvSize)+' kWp: producerer '+Math.round(pvKwh)+' kWh/\u00E5r, sparer '+Math.round(pvSaving)+' DKK/\u00E5r. NPV: '+Math.round(npv)+' DKK',msg_en:'Solar PV '+Math.round(pvSize)+' kWp: produces '+Math.round(pvKwh)+' kWh/year, saves '+Math.round(pvSaving)+' DKK/year. NPV: '+Math.round(npv)+' DKK',payback_years:Math.round(pvCost/pvSaving*10)/10,action_da:'Projektér '+Math.round(pvSize)+' kWp solceller (syd-orienteret, 30\u00B0 h\u00e6ldning)',action_en:'Design '+Math.round(pvSize)+' kWp solar PV (south-facing, 30\u00B0 tilt)',ds_ref:'DS/HD 60364-7-712; Energistyrelsen'});
+  }
+
+  // ===== CHECK 10: Battery storage for peak shaving =====
+  if(evLoads.length>0 || sch.kW>30){
+    var peakKW=ib*(loadState.voltage==='3x400'?400*1.732:230)/1000;
+    var battSizeKwh=peakKW*2; // 2 hours of peak
+    var peakSaving=peakKW*0.3*250*P; // 30% peak reduction × 250 working days
+    var battCost=battSizeKwh*4000; // 4000 DKK/kWh battery
+    var npv10=peakSaving*((function(){var s=0;for(var n=1;n<=10;n++)s+=1/Math.pow(1+DR,n);return s;})())-battCost;
+    if(npv10>0 && peakSaving>1000) findings.push({category:'battery',severity:'money',saving_dkk:Math.round(peakSaving),saving_kwh:0,co2_kg:Math.round(peakKW*0.3*250*CO2),npv:Math.round(npv10),investment:Math.round(battCost),msg_da:'Batterilager '+Math.round(battSizeKwh)+' kWh til spidsafladning: reducerer spidseffekt 30% og sparer '+Math.round(peakSaving)+' DKK/\u00E5r',msg_en:'Battery storage '+Math.round(battSizeKwh)+' kWh for peak shaving: reduces peak demand 30%, saves '+Math.round(peakSaving)+' DKK/year',payback_years:Math.round(battCost/peakSaving*10)/10,action_da:'Install\u00e9r batterilager med PLC-styret spidsafladning',action_en:'Install battery storage with PLC-controlled peak shaving',ds_ref:'DS/HD 60364-7-712; Elforsyningsloven'});
+  }
+
+  // Sort by NPV (highest lifetime value first)
+  findings.sort(function(a,b){return (b.npv||0)-(a.npv||0);});
   return findings;
 }
 
