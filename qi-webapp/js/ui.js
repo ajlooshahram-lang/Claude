@@ -3888,6 +3888,19 @@
     const phaseRows = plan.phases.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.owner)}</td><td class="center">${p.taskCount}</td></tr>`).join("");
     const riskRows = plan.risks.map(r => `<tr><td class="wrap">${esc(r.problem.replace(/^RISK:\s*/, ""))}</td><td class="center">${r.sev}</td><td class="center">${r.occ}</td><td class="center">${r.det}</td><td class="center"><b>${r.sev * r.occ * r.det}</b></td></tr>`).join("");
     const budgetRows = plan.budget.rows.map(b => `<tr><td>${esc(b.category)}</td><td class="right">${money(b.est)}</td></tr>`).join("");
+    const phaseAuth = plan.phaseAuthorities || [];
+    let phaseAuthCard = "";
+    if (phaseAuth.length) {
+      const groupLabel = { feasibility: "Feasibility", permitting: "Permitting", construction: "Construction", operations: "Operations" };
+      const paRows = phaseAuth.map(pa => {
+        const list = pa.authorities.map(a => `${esc(a.country)}${a.primaryRegulator ? " (" + esc(a.primaryRegulator) + ")" : ""}`).join(", ");
+        return `<tr><td>${esc(pa.phase)}</td><td><span class="badge">${esc(groupLabel[pa.group] || pa.group)}</span></td><td class="wrap">${list}</td></tr>`;
+      }).join("");
+      const cc = phaseAuth[0].authorities.map(a => esc(a.country)).join(", ");
+      phaseAuthCard = `<div class="card" id="brainPhaseAuth"><h3>Authorities by phase <span class="tag">auto-surfaced</span></h3>
+        <p class="muted">Detected countries: ${cc}. The relevant regulator/contacts surface at each phase — see Country Intelligence for the full dossier.</p>
+        ${tableWrap("<th>Phase</th><th>Group</th><th class='wrap'>Authorities</th>", paRows)}</div>`;
+    }
     $("#brainOut").innerHTML = `
       <div class="card"><div class="card-head"><h3>Analysis — ${esc(s.title)}</h3>
         <span class="tag">${esc(s.domainLabel)} · ${Math.round(plan.coverage.confidence * 100)}% confidence</span></div>
@@ -3910,6 +3923,7 @@
         <div class="card"><h3>Top risks (FMEA RPN)</h3>${tableWrap("<th class='wrap'>Risk</th><th>S</th><th>O</th><th>D</th><th>RPN</th>", riskRows)}</div>
       </div>
       <div class="card"><h3>Budget skeleton</h3>${tableWrap("<th>Category</th><th class='right'>Estimate</th>", budgetRows)}</div>
+      ${phaseAuthCard}
       <div class="card"><h3>Suggested roles</h3><p>${plan.roles.map(r => `<span class="badge">${esc(r)}</span>`).join(" ")}</p></div>`;
     const applyBtn = $("#brainApply");
     if (applyBtn) applyBtn.addEventListener("click", () => {

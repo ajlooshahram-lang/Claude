@@ -1125,5 +1125,15 @@ ok(doc.getElementById("ciCountryName").textContent === "Philippines", "selecting
 ok(doc.querySelector('.ciAuthTable').innerHTML.indexOf("NTC") !== -1, "Philippines dossier names its real regulator (NTC)");
 ok(phBtn.classList.contains("btn-primary"), "selected country button is highlighted active");
 
+// 100) Brain plan preview surfaces authorities by phase when countries are detected
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+doc.getElementById("brainText").value =
+  "Submarine fibre cable system landing in Indonesia, Philippines and Taiwan, 3000 km route, marine survey, OTDR splicing, commissioning";
+doc.getElementById("brainAnalyze").click();
+var brainPhaseAuth = doc.getElementById("brainPhaseAuth");
+ok(brainPhaseAuth != null, "Brain plan surfaces an 'Authorities by phase' section when countries are detected");
+ok(brainPhaseAuth != null && /NTC|Kominfo|NCC/.test(brainPhaseAuth.innerHTML), "Authorities-by-phase names real regulators (NTC/Kominfo/NCC)");
+ok(brainPhaseAuth != null && /Permitting/.test(brainPhaseAuth.innerHTML), "Authorities-by-phase shows the permitting group");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

@@ -1434,6 +1434,28 @@
       });
     }
 
+    // ---- Authorities auto-surfaced per plan phase -------------------------
+    // For every phase, surface the relevant authority/contacts for each detected
+    // country (e.g. the permitting phase shows each country's landing-permit body).
+    var phaseAuthorities = [];
+    if (detectedCountries.length > 0) {
+      phases.forEach(function (ph) {
+        var group = phaseToContactGroup(ph.name);
+        phaseAuthorities.push({
+          phase: ph.name,
+          group: group,
+          authorities: detectedCountries.map(function (c) {
+            return {
+              country: c.name,
+              code: c.code,
+              primaryRegulator: c.regulatoryAuthorities && c.regulatoryAuthorities.telecom ? c.regulatoryAuthorities.telecom.name : null,
+              contacts: (c.keyContacts && c.keyContacts[group]) || []
+            };
+          })
+        });
+      });
+    }
+
     // Coverage / confidence & honest warnings.
     var warnings = [];
     if (picked.profile.id === "generic-pm") warnings.push("Domain not confidently detected — used the generic PM template. Add more detail (e.g. 'fibre', 'OTDR', 'route km') for a tailored plan.");
@@ -1461,6 +1483,7 @@
       regulatoryAuthorities: regulatoryAuthorities,
       countryRisks: countryRisks,
       countryTasks: countryTasks,
+      phaseAuthorities: phaseAuthorities,
       coverage: { profile: profile.id, confidence: Math.round(confidence * 100) / 100, matched: picked.matched, warnings: warnings },
     };
   }
@@ -1515,17 +1538,22 @@
     return (profile && profile.COUNTRY_DATABASE) ? profile.COUNTRY_DATABASE.slice() : [];
   }
 
+  // Map a project/plan phase name to the relevant key-contact group.
+  function phaseToContactGroup(phase) {
+    var p = norm(phase);
+    if (/survey|design|feasib|planning|desktop|route engineering/.test(p)) return "feasibility";
+    if (/permit|licen|landing|wayleave|environ|eia|amdal|consent|approv/.test(p)) return "permitting";
+    if (/install|marine|civil|shore|lay|splice|build|construct|manufactur/.test(p)) return "construction";
+    if (/test|commission|operat|handover|acceptance|maintenance|o&m|service|noc/.test(p)) return "operations";
+    return "feasibility";
+  }
+
   // Map a project/plan phase to the relevant key-contact group, so the right
   // authorities auto-surface at the appropriate phase of the project plan.
   function authoritiesForPhase(countryCode, phase) {
     var c = getCountryInfo(countryCode);
     if (!c) return null;
-    var p = norm(phase);
-    var group = "feasibility";
-    if (/permit|licen|landing|wayleave|environ|eia|amdal|consent/.test(p)) group = "permitting";
-    else if (/survey|design|feasib|planning|route/.test(p)) group = "feasibility";
-    else if (/install|marine|civil|shore|lay|splice|build|construct/.test(p)) group = "construction";
-    else if (/test|commission|operat|handover|acceptance|maintenance|o&m/.test(p)) group = "operations";
+    var group = phaseToContactGroup(phase);
     return {
       country: c.name, code: c.code, phase: phase, group: group,
       contacts: (c.keyContacts && c.keyContacts[group]) || [],

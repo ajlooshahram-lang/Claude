@@ -1666,5 +1666,21 @@ console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
   ok(B.authoritiesForPhase("ZZ", "anything") === null, "unknown country phase lookup returns null");
 })();
 
+// ===== Phase-authority auto-surfacing in analyzeProject =====
+(function () {
+  console.log("\n--- Phase authorities (auto-surface) ---");
+  var r = B.analyzeProject("Submarine fibre cable system landing in Indonesia, Philippines and Taiwan, 3000 km route, marine survey, OTDR, splicing, commissioning");
+  ok(Array.isArray(r.phaseAuthorities) && r.phaseAuthorities.length === r.phases.length, "phaseAuthorities has one entry per phase (" + r.phaseAuthorities.length + "/" + r.phases.length + ")");
+  ok(r.phaseAuthorities.every(function (pa) { return pa.phase && pa.group && Array.isArray(pa.authorities) && pa.authorities.length === 3; }), "each phase surfaces all 3 detected countries with a contact group");
+  ok(r.phaseAuthorities.every(function (pa) { return pa.authorities.every(function (a) { return a.primaryRegulator; }); }), "each surfaced authority names its primary regulator");
+  var perm = r.phaseAuthorities.filter(function (pa) { return pa.group === "permitting"; });
+  ok(perm.length >= 1 && perm[0].authorities[0].contacts.length > 0, "a permitting-group phase surfaces permitting contacts");
+  var survey = r.phaseAuthorities.filter(function (pa) { return /survey/i.test(pa.phase); })[0];
+  ok(survey && survey.group === "feasibility", "a 'survey' phase maps to the feasibility contact group (not construction)");
+  var noCountry = B.analyzeProject("FTTH fibre OTDR splicing project, 50 km route");
+  ok(noCountry.phaseAuthorities.length === 0, "no detected countries -> no phase authorities");
+  ok(JSON.stringify(r.phaseAuthorities) === JSON.stringify(B.analyzeProject("Submarine fibre cable system landing in Indonesia, Philippines and Taiwan, 3000 km route, marine survey, OTDR, splicing, commissioning").phaseAuthorities), "phaseAuthorities is deterministic");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);
