@@ -17720,6 +17720,13 @@ function renderDashboard(){
   html+='</div>';
 
   // Quick stats
+  var health=calcProjectHealth();
+  var gradeColor=health.grade==='A'?'var(--success)':health.grade==='B'?'#4caf50':health.grade==='C'?'#b8860b':health.grade==='D'?'#ff8c42':'var(--danger)';
+  html+='<div class="result-box" style="border-color:'+gradeColor+'"><div class="result-title" style="display:flex;justify-content:space-between;align-items:center"><span>'+(da?'Projektsundhed':'Project health')+'</span><span style="font-size:1.8em;font-weight:900;color:'+gradeColor+'">'+health.grade+' ('+health.score+'/100)</span></div>';
+  if(health.issues.length>0){html+='<div style="margin-top:6px">';health.issues.slice(0,3).forEach(function(i){html+='<div class="result-row"><span class="label" style="color:var(--danger)">\u274c '+(da?i.msg_da:i.msg_en)+'</span></div>';});html+='</div>';}
+  if(health.strengths.length>0){html+='<div style="margin-top:6px">';health.strengths.slice(0,3).forEach(function(s){html+='<div class="result-row"><span class="label" style="color:var(--success)">\u2705 '+(da?s.msg_da:s.msg_en)+'</span></div>';});html+='</div>';}
+  html+='</div>';
+
   html+='<div class="result-box"><div class="result-title">'+(da?'Nøgletal':'Key figures')+'</div>';
   html+='<div class="result-row"><span class="label">'+(da?'Designstrøm IB':'Design current IB')+'</span><span class="value">'+(ib>0?ib.toFixed(1)+' A':'–')+'</span></div>';
   html+='<div class="result-row"><span class="label">'+(da?'Total effekt':'Total power')+'</span><span class="value">'+(totalKW>0?totalKW.toFixed(1)+' kW':'–')+'</span></div>';
@@ -18156,6 +18163,63 @@ function renderMaint(){
   html+='<div class="result-row"><span class="label">'+(da?'Samlet estimat':'Total estimate')+'</span><span class="value" style="font-weight:800;font-size:1.1em">~'+Math.round(annualMaintCost*1.2).toLocaleString()+' DKK/år</span></div></div>';
   html+='<div class="info-row" style="margin-top:8px">'+(da?'Serviceaftale anbefales — forebyggende vedligehold forhindrer dyre nedbrud og er et krav i henhold til Elsikkerhedsloven og virksomhedens KLS.':'Service agreement recommended — preventive maintenance prevents costly breakdowns and is a requirement per the Electrical Safety Act and the company KLS.')+'</div></div>';
   return html;
+}
+
+// ===== PROJECT HEALTH SCORE (aggregates all intelligence) =====
+function calcProjectHealth(){
+  var score=100, issues=[], strengths=[];
+  var da=lang==='da';
+
+  // 1. Design review (Second Opinion)
+  if(typeof runDesignReview==='function'){
+    var dr=runDesignReview();
+    var critical=dr.filter(function(f){return f.severity==='critical';}).length;
+    var warnings=dr.filter(function(f){return f.severity==='warning';}).length;
+    score-=critical*20+warnings*5;
+    if(critical>0) issues.push({msg_da:critical+' kritiske designfejl',msg_en:critical+' critical design flaws',mod:'verify'});
+    if(warnings>0) issues.push({msg_da:warnings+' advarsler',msg_en:warnings+' warnings',mod:'verify'});
+    if(critical===0&&warnings===0) strengths.push({msg_da:'Design godkendt (ingen fejl)',msg_en:'Design approved (no flaws)'});
+  }
+
+  // 2. Energy efficiency (Watchdog)
+  var findings=runEnergyWatchdog();
+  var bigFindings=findings.filter(function(f){return f.saving_dkk>2000;});
+  if(bigFindings.length>3) { score-=10; issues.push({msg_da:bigFindings.length+' store energioptimeringer ikke implementeret',msg_en:bigFindings.length+' major energy optimizations not implemented',mod:'watchdog'}); }
+  else if(bigFindings.length===0) strengths.push({msg_da:'Energioptimeret design',msg_en:'Energy-optimized design'});
+
+  // 3. Protection coordination
+  var ib=calcIB();
+  if(ib>0&&mcbState.rating>0){
+    if(ib>mcbState.rating){score-=25;issues.push({msg_da:'IB > In (overbelastning!)',msg_en:'IB > In (overload!)',mod:'mcb'});}
+    else strengths.push({msg_da:'IB \u2264 In \u2264 Iz OK',msg_en:'IB \u2264 In \u2264 Iz OK'});
+  }
+
+  // 4. Voltage drop
+  if(cableState.crossSection && vdropState.length>0){
+    var cables=cableState.material==='copper'?CABLES_COPPER:CABLES_ALU;
+    var ct=cables[cableState.type], cc=ct&&ct[cableState.cores]?ct[cableState.cores]:{};
+    var sel=cc[cableState.crossSection];
+    if(sel&&ib>0){
+      var L=vdropState.length/1000, Un=loadState.voltage==='3x400'?400:230;
+      var vd=Math.sqrt(3)*ib*L*(sel.r*loadState.cosPhi+sel.x*Math.sin(Math.acos(loadState.cosPhi)));
+      var vdPct=(vd/Un)*100;
+      if(vdPct>5){score-=15;issues.push({msg_da:'Spændingsfald '+vdPct.toFixed(1)+'% > 5%',msg_en:'Voltage drop '+vdPct.toFixed(1)+'% > 5%',mod:'vdrop'});}
+      else if(vdPct>3){score-=5;issues.push({msg_da:'Spændingsfald '+vdPct.toFixed(1)+'% (>3% for belysning)',msg_en:'Voltage drop '+vdPct.toFixed(1)+'% (>3% for lighting)',mod:'vdrop'});}
+      else strengths.push({msg_da:'Spændingsfald OK ('+vdPct.toFixed(1)+'%)',msg_en:'Voltage drop OK ('+vdPct.toFixed(1)+'%)'});
+    }
+  }
+
+  // 5. Multi-circuit completeness
+  var circuits=JSON.parse(localStorage.getItem('projectCircuits')||'[]');
+  if(circuits.length>=3) strengths.push({msg_da:circuits.length+' kredse dokumenteret',msg_en:circuits.length+' circuits documented'});
+  else if(loadList.length>0) issues.push({msg_da:'Gem kredse i projektet (nu: '+circuits.length+')',msg_en:'Save circuits to project (current: '+circuits.length+')',mod:'home'});
+
+  // 6. Documentation completeness
+  if(trafoState.size>0&&cableState.crossSection&&mcbState.rating>0) strengths.push({msg_da:'Komplet dimensionering',msg_en:'Complete dimensioning'});
+  else { score-=5; issues.push({msg_da:'Ufuldst\u00e6ndig dimensionering',msg_en:'Incomplete dimensioning',mod:'load'}); }
+
+  score=Math.max(0,Math.min(100,score));
+  return {score:score,issues:issues,strengths:strengths,grade:score>=90?'A':score>=75?'B':score>=60?'C':score>=40?'D':'F'};
 }
 
 // ===== INIT =====
