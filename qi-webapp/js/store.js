@@ -831,6 +831,87 @@
     };
   }
 
+  // ---------- Spare Parts Inventory ----------
+  function defaultSpareInventory() {
+    return [
+      { id: uid(), item: "Spare Cable (G.654.E, 48F)", depot: "Singapore", quantity: 25, unit: "km", minStock: 20, lastChecked: "2026-05-01" },
+      { id: uid(), item: "Spare Cable (G.654.E, 48F)", depot: "Guam", quantity: 15, unit: "km", minStock: 20, lastChecked: "2026-04-20" },
+      { id: uid(), item: "Spare Cable (G.654.E, 48F)", depot: "Manila", quantity: 22, unit: "km", minStock: 20, lastChecked: "2026-05-10" },
+      { id: uid(), item: "Spare Cable (G.652.D, 96F)", depot: "Singapore", quantity: 18, unit: "km", minStock: 15, lastChecked: "2026-05-01" },
+      { id: uid(), item: "Spare Cable (G.652.D, 96F)", depot: "Guam", quantity: 8, unit: "km", minStock: 15, lastChecked: "2026-04-15" },
+      { id: uid(), item: "Spare Cable (G.652.D, 96F)", depot: "Manila", quantity: 16, unit: "km", minStock: 15, lastChecked: "2026-05-12" },
+      { id: uid(), item: "Universal Jointing Kit (UJ-500)", depot: "Singapore", quantity: 12, unit: "sets", minStock: 8, lastChecked: "2026-05-05" },
+      { id: uid(), item: "Universal Jointing Kit (UJ-500)", depot: "Guam", quantity: 6, unit: "sets", minStock: 8, lastChecked: "2026-04-28" },
+      { id: uid(), item: "Universal Jointing Kit (UJ-500)", depot: "Manila", quantity: 9, unit: "sets", minStock: 8, lastChecked: "2026-05-08" },
+      { id: uid(), item: "OTDR (Optical Time Domain Reflectometer)", depot: "Singapore", quantity: 4, unit: "units", minStock: 3, lastChecked: "2026-05-02" },
+      { id: uid(), item: "OTDR (Optical Time Domain Reflectometer)", depot: "Guam", quantity: 2, unit: "units", minStock: 3, lastChecked: "2026-04-25" },
+      { id: uid(), item: "OTDR (Optical Time Domain Reflectometer)", depot: "Manila", quantity: 3, unit: "units", minStock: 3, lastChecked: "2026-05-11" },
+      { id: uid(), item: "Repair Accessories (splice trays, closures)", depot: "Singapore", quantity: 30, unit: "sets", minStock: 20, lastChecked: "2026-05-03" },
+      { id: uid(), item: "Repair Accessories (splice trays, closures)", depot: "Guam", quantity: 5, unit: "sets", minStock: 20, lastChecked: "2026-04-18" },
+      { id: uid(), item: "Repair Accessories (splice trays, closures)", depot: "Manila", quantity: 25, unit: "sets", minStock: 20, lastChecked: "2026-05-09" },
+      { id: uid(), item: "Repeater Spare Module (SDM-16)", depot: "Singapore", quantity: 3, unit: "units", minStock: 2, lastChecked: "2026-05-04" },
+      { id: uid(), item: "Repeater Spare Module (SDM-16)", depot: "Guam", quantity: 1, unit: "units", minStock: 2, lastChecked: "2026-04-22" },
+      { id: uid(), item: "Repeater Spare Module (SDM-16)", depot: "Manila", quantity: 2, unit: "units", minStock: 2, lastChecked: "2026-05-07" }
+    ];
+  }
+
+  function listSpares() {
+    var s = get();
+    if (!s.spareInventory) { s.spareInventory = defaultSpareInventory(); save(); }
+    return s.spareInventory;
+  }
+
+  function updateSpare(id, patch) {
+    var spares = listSpares();
+    var item = spares.find(function (sp) { return sp.id === id; });
+    if (!item) return null;
+    Object.assign(item, patch);
+    save();
+    return item;
+  }
+
+  // ---------- Insurance & Claims Register ----------
+  function defaultInsuranceRegistry() {
+    return {
+      policies: [
+        { id: uid(), name: "Marine All Risks", insurer: "Lloyd's Syndicate 2623", coverType: "marine all-risks", sumInsured: 1300000000, premium: 3900000, deductible: 500000, expiry: "2027-12-31", status: "Active" },
+        { id: uid(), name: "Delay in Start-Up (DSU)", insurer: "Swiss Re Corporate Solutions", coverType: "delay-in-startup", sumInsured: 200000000, premium: 1200000, deductible: 2000000, expiry: "2027-06-30", status: "Active" },
+        { id: uid(), name: "Third Party Liability", insurer: "Allianz Global Corporate", coverType: "third-party", sumInsured: 100000000, premium: 450000, deductible: 250000, expiry: "2027-12-31", status: "Active" }
+      ],
+      claims: [
+        { id: uid(), ref: "CLM-2026-001", policyName: "Marine All Risks", eventDate: "2026-03-15", description: "Anchor strike damage, segment S3 (Luzon Strait)", amountClaimed: 4200000, status: "Under review", amountPaid: 0 },
+        { id: uid(), ref: "CLM-2026-002", policyName: "Third Party Liability", eventDate: "2026-01-22", description: "Fishing trawler net entanglement compensation", amountClaimed: 180000, status: "Paid", amountPaid: 155000 },
+        { id: uid(), ref: "CLM-2025-003", policyName: "Marine All Risks", eventDate: "2025-11-08", description: "Seabed movement cable displacement (Java Sea)", amountClaimed: 2800000, status: "Paid", amountPaid: 2300000 }
+      ]
+    };
+  }
+
+  function insuranceRegistry() {
+    var s = get();
+    if (!s.insuranceRegistry) { s.insuranceRegistry = defaultInsuranceRegistry(); save(); }
+    return s.insuranceRegistry;
+  }
+
+  // ---------- Environmental Compliance ----------
+  function defaultEnvironmentalCompliance() {
+    return [
+      { id: uid(), country: "Indonesia", eiaStatus: "approved", marineLicense: "approved", protectedAreas: "Coral Triangle overlap (3 segments)", mitigation: "Route deviation around coral reefs, seasonal dredging restrictions", monitoringRequired: "Quarterly marine surveys, coral health reports" },
+      { id: uid(), country: "Thailand", eiaStatus: "approved", marineLicense: "approved", protectedAreas: "Gulf of Thailand fisheries zone", mitigation: "Night-time cable lay to avoid fishing, compensation fund", monitoringRequired: "Bi-annual seabed impact assessment" },
+      { id: uid(), country: "Vietnam", eiaStatus: "in-progress", marineLicense: "in-progress", protectedAreas: "Con Dao marine park buffer zone", mitigation: "100m exclusion from park boundary, HDD shore crossing", monitoringRequired: "Monthly turbidity monitoring during installation" },
+      { id: uid(), country: "Taiwan", eiaStatus: "approved", marineLicense: "approved", protectedAreas: "Penghu marine sanctuary (avoided)", mitigation: "Alternative route south of Penghu, whale migration timing", monitoringRequired: "Marine mammal observation during cable lay" },
+      { id: uid(), country: "Philippines", eiaStatus: "approved", marineLicense: "in-progress", protectedAreas: "Tubbataha Reef Natural Park (avoided), Apo Reef", mitigation: "30km buffer from Tubbataha, pre-lay grapnel run, coral relocation", monitoringRequired: "Annual reef health survey, fisher livelihood monitoring" },
+      { id: uid(), country: "Guam", eiaStatus: "in-progress", marineLicense: "not-started", protectedAreas: "Mariana Trench Monument buffer, coral habitat", mitigation: "Directional drilling shore approach, silt curtains", monitoringRequired: "NOAA compliance reporting, coral monitoring program" },
+      { id: uid(), country: "Malaysia", eiaStatus: "approved", marineLicense: "approved", protectedAreas: "Sipadan marine park (avoided), Sabah coastal waters", mitigation: "Route south of protected areas, mangrove avoidance", monitoringRequired: "Quarterly environmental audit, mangrove health check" },
+      { id: uid(), country: "Brunei", eiaStatus: "not-started", marineLicense: "not-started", protectedAreas: "Brunei Bay heritage site", mitigation: "Pending EIA - preliminary HDD assessment for shore crossing", monitoringRequired: "To be determined post-EIA" }
+    ];
+  }
+
+  function environmentalCompliance() {
+    var s = get();
+    if (!s.environmentalCompliance) { s.environmentalCompliance = defaultEnvironmentalCompliance(); save(); }
+    return s.environmentalCompliance;
+  }
+
   const API = { uid, seed, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
     undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete, togglePin, reorderPin,
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
@@ -843,7 +924,8 @@
     xbar, setXbarCell, setXbarConfig, xbarResult, scorecard,
     spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy,
     addDocument, listDocuments, updateDocument, deleteDocument, DOC_CATEGORIES: DOC_CATEGORIES_LIST,
-    addWorkflow, listWorkflows, deleteWorkflow, startWorkflowInstance, advanceWorkflow, rejectWorkflow, getWorkflowStatus };
+    addWorkflow, listWorkflows, deleteWorkflow, startWorkflowInstance, advanceWorkflow, rejectWorkflow, getWorkflowStatus,
+    listSpares, updateSpare, insuranceRegistry, environmentalCompliance };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);

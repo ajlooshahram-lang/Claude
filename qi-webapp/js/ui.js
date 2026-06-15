@@ -234,6 +234,7 @@
     { id: "capability", label: "Process Capability", icon: "◊" },
     { id: "ncrpareto", label: "NCR Pareto", icon: "▟" },
     { id: "riskheat", label: "Risk Heat Map", icon: "\uD83D\uDD25" },
+    { id: "environmental", label: "Environmental", icon: "\uD83C\uDF0A" },
     { g: "Improve" },
     { id: "pdca", label: "PDCA", icon: "↻" },
     { id: "log", label: "Action Log", icon: "✎" },
@@ -260,8 +261,10 @@
     const items = [{ g: "Engineering" }];
     C.REGISTERS.filter(r => r.group === "Engineering").forEach(r => items.push({ id: r.id, label: r.label, icon: r.icon }));
     items.push({ id: "bowtie", label: "Bow-tie (HAZOP)", icon: "🎀" });
+    items.push({ id: "spares", label: "Spare Parts", icon: "\uD83D\uDDC4" });
     items.push({ g: "Business" }, { id: "evm", label: "Earned Value (EVM)", icon: "∑" }, { id: "cashflow", label: "Cash Flow / S-curve", icon: "〽" }, { id: "prioritise", label: "Prioritisation (RICE/WSJF)", icon: "⤒" });
     C.REGISTERS.filter(r => r.group === "Business").forEach(r => items.push({ id: r.id, label: r.label, icon: r.icon }));
+    items.push({ id: "insurance", label: "Insurance", icon: "\uD83D\uDEE1" });
     const idx = VIEWS.findIndex(v => v.g === "Intelligence");
     VIEWS.splice(idx, 0, ...items);
   })();
@@ -1053,6 +1056,149 @@
         document.getElementById("repairResult").innerHTML = html;
       });
     }
+  };
+
+  // ---------- Spare Parts Inventory ----------
+  RENDER.spares = function () {
+    var spares = S.listSpares();
+    var rows = spares.map(function (sp) {
+      var ratio = sp.quantity / sp.minStock;
+      var status, statusClass;
+      if (ratio >= 1) { status = "OK"; statusClass = "color:#27ae60;font-weight:600"; }
+      else if (ratio >= 0.5) { status = "Low"; statusClass = "color:#f39c12;font-weight:600"; }
+      else { status = "Critical"; statusClass = "color:#e74c3c;font-weight:600"; }
+      return '<tr>' +
+        '<td>' + esc(sp.item) + '</td>' +
+        '<td>' + esc(sp.depot) + '</td>' +
+        '<td>' + sp.quantity + '</td>' +
+        '<td>' + esc(sp.unit) + '</td>' +
+        '<td>' + sp.minStock + '</td>' +
+        '<td style="' + statusClass + '">' + status + '</td>' +
+        '<td>' + esc(sp.lastChecked) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    var depots = ["Singapore", "Guam", "Manila"];
+    var summaryCards = depots.map(function (d) {
+      var items = spares.filter(function (sp) { return sp.depot === d; });
+      var critical = items.filter(function (sp) { return sp.quantity / sp.minStock < 0.5; }).length;
+      var low = items.filter(function (sp) { var r = sp.quantity / sp.minStock; return r >= 0.5 && r < 1; }).length;
+      return '<div class="kpi"><div class="label">' + esc(d) + '</div><div class="value">' + items.length + ' items</div>' +
+        '<div class="muted">' + (critical > 0 ? '<span style="color:#e74c3c">' + critical + ' critical</span> ' : '') +
+        (low > 0 ? '<span style="color:#f39c12">' + low + ' low</span>' : '') +
+        (critical === 0 && low === 0 ? '<span style="color:#27ae60">All OK</span>' : '') + '</div></div>';
+    }).join('');
+
+    return '<h2 style="margin-bottom:16px">Spare Parts Inventory</h2>' +
+      '<div class="grid kpis" style="margin-bottom:16px">' + summaryCards + '</div>' +
+      '<div class="card"><h3>Inventory by Depot</h3>' +
+      '<div class="table-wrap"><table id="sparesTable"><thead><tr>' +
+      '<th>Item</th><th>Depot</th><th>Quantity</th><th>Unit</th><th>Min Stock</th><th>Status</th><th>Last Checked</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<button class="btn" style="margin-top:12px" disabled>Reorder</button></div>';
+  };
+
+  // ---------- Insurance & Claims Register ----------
+  RENDER.insurance = function () {
+    var reg = S.insuranceRegistry();
+    var policies = reg.policies;
+    var claims = reg.claims;
+
+    var totalInsured = policies.reduce(function (s, p) { return s + (p.sumInsured || 0); }, 0);
+    var activePolicies = policies.filter(function (p) { return p.status === "Active"; }).length;
+    var openClaims = claims.filter(function (c) { return c.status !== "Paid"; }).length;
+    var paidValue = claims.reduce(function (s, c) { return s + (c.amountPaid || 0); }, 0);
+
+    var summaryCards = '<div class="grid kpis" style="margin-bottom:16px">' +
+      '<div class="kpi"><div class="label">Total Insured Value</div><div class="value">$' + (totalInsured / 1e9).toFixed(1) + 'B</div></div>' +
+      '<div class="kpi"><div class="label">Active Policies</div><div class="value">' + activePolicies + '</div></div>' +
+      '<div class="kpi"><div class="label">Open Claims</div><div class="value">' + openClaims + '</div></div>' +
+      '<div class="kpi"><div class="label">Paid Claims Value</div><div class="value">$' + (paidValue / 1e6).toFixed(1) + 'M</div></div>' +
+      '</div>';
+
+    var policyRows = policies.map(function (p) {
+      return '<tr>' +
+        '<td>' + esc(p.name) + '</td>' +
+        '<td>' + esc(p.insurer) + '</td>' +
+        '<td>' + esc(p.coverType) + '</td>' +
+        '<td>$' + (p.premium / 1e6).toFixed(1) + 'M</td>' +
+        '<td>$' + (p.deductible / 1e3).toFixed(0) + 'K</td>' +
+        '<td>' + esc(p.expiry) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    var policyTable = '<div class="card"><h3>Policies</h3>' +
+      '<div class="table-wrap"><table id="insurancePoliciesTable"><thead><tr>' +
+      '<th>Policy Name</th><th>Insurer</th><th>Cover Type</th><th>Premium</th><th>Deductible</th><th>Expiry</th>' +
+      '</tr></thead><tbody>' + policyRows + '</tbody></table></div></div>';
+
+    var claimRows = claims.map(function (c) {
+      var statusStyle = c.status === "Paid" ? "color:#27ae60;font-weight:600" : "color:#f39c12;font-weight:600";
+      return '<tr>' +
+        '<td>' + esc(c.ref) + '</td>' +
+        '<td>' + esc(c.policyName) + '</td>' +
+        '<td>' + esc(c.eventDate) + '</td>' +
+        '<td>' + esc(c.description) + '</td>' +
+        '<td>$' + (c.amountClaimed / 1e6).toFixed(2) + 'M</td>' +
+        '<td style="' + statusStyle + '">' + esc(c.status) + '</td>' +
+        '<td>' + (c.amountPaid > 0 ? '$' + (c.amountPaid / 1e6).toFixed(2) + 'M' : '-') + '</td>' +
+        '</tr>';
+    }).join('');
+
+    var claimTable = '<div class="card"><h3>Claims</h3>' +
+      '<div class="table-wrap"><table id="insuranceClaimsTable"><thead><tr>' +
+      '<th>Claim Ref</th><th>Policy</th><th>Event Date</th><th>Description</th><th>Amount Claimed</th><th>Status</th><th>Amount Paid</th>' +
+      '</tr></thead><tbody>' + claimRows + '</tbody></table></div></div>';
+
+    return '<h2 style="margin-bottom:16px">Insurance & Claims Register</h2>' + summaryCards + policyTable + claimTable;
+  };
+
+  // ---------- Environmental Compliance ----------
+  RENDER.environmental = function () {
+    var data = S.environmentalCompliance();
+
+    var statusLabel = function (s) {
+      if (s === "approved") return '<span style="color:#27ae60;font-weight:600">Approved</span>';
+      if (s === "in-progress") return '<span style="color:#f39c12;font-weight:600">In Progress</span>';
+      return '<span style="color:#e74c3c;font-weight:600">Not Started</span>';
+    };
+
+    var approved = data.filter(function (d) { return d.eiaStatus === "approved" && d.marineLicense === "approved"; }).length;
+    var inProgress = data.filter(function (d) { return d.eiaStatus === "in-progress" || d.marineLicense === "in-progress"; }).length;
+    var notStarted = data.filter(function (d) { return d.eiaStatus === "not-started" || d.marineLicense === "not-started"; }).length;
+
+    var summaryCards = '<div class="grid kpis" style="margin-bottom:16px">' +
+      '<div class="kpi"><div class="label">Fully Approved</div><div class="value" style="color:#27ae60">' + approved + '</div></div>' +
+      '<div class="kpi"><div class="label">In Progress</div><div class="value" style="color:#f39c12">' + inProgress + '</div></div>' +
+      '<div class="kpi"><div class="label">Not Started</div><div class="value" style="color:#e74c3c">' + notStarted + '</div></div>' +
+      '<div class="kpi"><div class="label">Countries Total</div><div class="value">' + data.length + '</div></div>' +
+      '</div>';
+
+    var rows = data.map(function (d) {
+      return '<tr data-country="' + esc(d.country) + '">' +
+        '<td><strong>' + esc(d.country) + '</strong></td>' +
+        '<td>' + statusLabel(d.eiaStatus) + '</td>' +
+        '<td>' + statusLabel(d.marineLicense) + '</td>' +
+        '<td>' + esc(d.protectedAreas) + '</td>' +
+        '<td class="wrap">' + esc(d.mitigation) + '</td>' +
+        '<td class="wrap">' + esc(d.monitoringRequired) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    var countryTable = '<div class="card"><h3>Country Environmental Status</h3>' +
+      '<div class="table-wrap"><table id="environmentalTable"><thead><tr>' +
+      '<th>Country</th><th>EIA Status</th><th>Marine License</th><th>Protected Areas Impact</th><th>Mitigation Measures</th><th>Monitoring Required</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+
+    var sensitivities = '<div class="card"><h3>Key Environmental Sensitivities</h3>' +
+      '<div class="table-wrap"><table><thead><tr><th>Sensitivity</th><th>Affected Countries</th><th>Risk Level</th></tr></thead><tbody>' +
+      '<tr><td>Coral Reefs</td><td>Indonesia, Philippines, Guam</td><td style="color:#e74c3c;font-weight:600">High</td></tr>' +
+      '<tr><td>Marine Mammals</td><td>All 8 countries</td><td style="color:#f39c12;font-weight:600">Medium</td></tr>' +
+      '<tr><td>Fishing Grounds</td><td>All 8 countries</td><td style="color:#f39c12;font-weight:600">Medium</td></tr>' +
+      '<tr><td>Heritage Sites</td><td>Brunei, Guam, Philippines</td><td style="color:#f39c12;font-weight:600">Medium</td></tr>' +
+      '</tbody></table></div></div>';
+
+    return '<h2 style="margin-bottom:16px">Environmental Compliance</h2>' + summaryCards + countryTable + sensitivities;
   };
 
   // ---------- Lessons Learned Library ----------

@@ -32,7 +32,7 @@ ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard rende
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 
 // 2) navigate every view (simulate clicks)
-const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","raci","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","workflows","documents","report","audit","config","help","repair","clientview"];
+const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","raci","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","workflows","documents","report","audit","config","help","repair","clientview","spares","insurance","environmental"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -853,6 +853,30 @@ ok(/Total Lessons/.test(lessonsContent) && /Most Recalled/.test(lessonsContent) 
 
 var lessonsRecordBtn = doc.getElementById("lessonsRecordBtn");
 ok(lessonsRecordBtn != null, "Lessons Library has Record New Lesson button");
+
+// 60) Spare Parts Inventory
+var sparesNav = doc.querySelector('.nav-item[data-view="spares"]');
+ok(sparesNav != null, "Spare Parts nav item exists");
+
+if (sparesNav) sparesNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var sparesTable = doc.getElementById("sparesTable");
+ok(sparesTable != null && sparesTable.querySelectorAll('tbody tr').length >= 3, "Spare Parts renders depot table");
+
+// 61) Insurance & Claims Register
+var insuranceNav = doc.querySelector('.nav-item[data-view="insurance"]');
+ok(insuranceNav != null, "Insurance nav item exists");
+
+if (insuranceNav) insuranceNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var insurancePoliciesTable = doc.getElementById("insurancePoliciesTable");
+ok(insurancePoliciesTable != null && insurancePoliciesTable.querySelectorAll('tbody tr').length >= 3, "Insurance renders policies table");
+
+// 62) Environmental Compliance
+var environmentalNav = doc.querySelector('.nav-item[data-view="environmental"]');
+ok(environmentalNav != null, "Environmental nav item exists");
+
+if (environmentalNav) environmentalNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var environmentalTable = doc.getElementById("environmentalTable");
+ok(environmentalTable != null && environmentalTable.querySelectorAll('tr[data-country]').length === 8, "Environmental renders country status");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
