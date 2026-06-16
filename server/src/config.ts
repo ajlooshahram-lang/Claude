@@ -14,6 +14,7 @@ const EnvSchema = z.object({
     .transform((s) => s.split(",").map((o) => o.trim()).filter(Boolean)),
   DATABASE_URL: z.string().min(1).optional(),
   SESSION_SECRET: z.string().min(16).optional(),
+  SESSION_EXPIRY_DAYS: z.coerce.number().int().min(1).max(90).default(7),
   DATA_ENCRYPTION_KEY: z.string().min(16).optional(),
   DATA_REGION: z.string().default("eu-west"),
 });
@@ -24,6 +25,7 @@ export type AppConfig = {
   corsOrigins: string[];
   databaseUrl: string | undefined;
   sessionSecret: string | undefined;
+  sessionExpiryDays: number;
   dataEncryptionKey: string | undefined;
   dataRegion: string;
   isProd: boolean;
@@ -53,6 +55,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     corsOrigins: e.CORS_ORIGINS,
     databaseUrl: e.DATABASE_URL,
     sessionSecret: e.SESSION_SECRET,
+    sessionExpiryDays: e.SESSION_EXPIRY_DAYS,
     dataEncryptionKey: e.DATA_ENCRYPTION_KEY,
     dataRegion: e.DATA_REGION,
     isProd,

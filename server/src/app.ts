@@ -2,13 +2,16 @@ import Fastify, { type FastifyInstance } from "fastify";
 import helmet from "@fastify/helmet";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
+import cookie from "@fastify/cookie";
 import { loadConfig, type AppConfig } from "./config.js";
 import { checkDatabase } from "./db.js";
+import { registerAuthRoutes } from "./auth/routes.js";
+import type { AuthDbHelpers } from "./auth/db-helpers.js";
 
 const SERVICE = "qi-platform-server";
 const VERSION = "0.1.0";
 
-export type BuildOptions = { config?: AppConfig };
+export type BuildOptions = { config?: AppConfig; dbHelpers?: AuthDbHelpers };
 
 /**
  * Build the Fastify application. Pure factory (no listen) so tests can drive it
@@ -27,6 +30,11 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   // Security headers on every response.
   await app.register(helmet, { contentSecurityPolicy: false });
 
+  // Cookie plugin for session management.
+  await app.register(cookie, {
+    ...(config.sessionSecret ? { secret: config.sessionSecret } : {}),
+  });
+
   // Strict CORS: only the configured UI origins, credentials allowed for sessions.
   await app.register(cors, {
     origin: config.corsOrigins.length > 0 ? config.corsOrigins : false,
@@ -35,6 +43,11 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
 
   // Baseline abuse protection; per-route auth limits tightened in Phase 1.
   await app.register(rateLimit, { max: 300, timeWindow: "1 minute" });
+
+  // Register auth routes if db helpers are provided (tests inject mocks).
+  if (opts.dbHelpers) {
+    registerAuthRoutes(app, opts.dbHelpers, config);
+  }
 
   // Liveness: process is up. Never touches the database.
   app.get("/health", async () => ({
