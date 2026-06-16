@@ -32,6 +32,17 @@
         <button class="hamburger" id="hamburger" aria-label="Menu">&#9776;</button>
         <h1 id="viewTitle">Dashboard</h1>
         <div class="topbar-actions">
+          <select id="langSelect" data-i18n-skip title="Language" aria-label="Language">
+            <option value="en">English</option>
+            <option value="da">Dansk</option>
+            <option value="th">&#3652;&#3607;&#3618;</option>
+            <option value="vi">Ti&#7871;ng Vi&#7879;t</option>
+            <option value="id">Bahasa Indonesia</option>
+            <option value="ja">&#26085;&#26412;&#35486;</option>
+            <option value="zh">&#20013;&#25991;</option>
+          </select>
+          <button class="btn btn-icon" id="btnAlerts" title="Alerts" aria-label="Alerts" style="position:relative">&#128276;<span id="alertBadge" class="alert-badge" hidden></span></button>
+          <button class="btn btn-icon" id="btnPresent" title="Presentation mode" aria-label="Presentation mode">▶</button>
           <button class="btn btn-icon" id="btnTheme" title="Toggle dark mode (t)" aria-label="Toggle theme">◐</button>
           <button class="btn btn-icon" id="btnChecks" title="Run all checks (c)" aria-label="Run checks">✓</button>
           <button class="btn btn-icon" id="btnHelp" title="Keyboard shortcuts (?)" aria-label="Help">?</button>
@@ -41,6 +52,7 @@
           <button class="btn" id="btnImport">Import</button>
           <input type="file" id="fileImport" accept="application/json" hidden />
         </div>
+        <div id="alertDropdown" class="alert-dropdown" hidden></div>
       </header>
       <section class="content" id="content"></section>
     </main>

@@ -18,9 +18,9 @@
     });
     return {
       project: {
-        name: "QI Intelligence Program", sponsor: "", manager: "",
-        org: "Engineering", start: "2026-06-01", end: "2026-12-31",
-        status: "IN PROGRESS", version: "v9.0", currency: "$",
+        name: "SEA Submarine Cable Programme \u2014 $1.3B", sponsor: "Pacific Telecommunications Consortium", manager: "Programme Director",
+        org: "SEA Cable Programme Office", start: "2025-01-01", end: "2030-06-30",
+        status: "IN PROGRESS", version: "v9.0", currency: "USD",
         spec: { usl: 11, lsl: 9, target: 10 }   // process-capability spec limits
       },
       roster: ["PM", "Dev Lead", "QA Lead", "Ops Lead", "Architect", "BA",
@@ -537,7 +537,523 @@
     return issues;
   }
 
-  const API = { uid, seed, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
+  // ---- Document Management sub-store ----
+  // Categories specific to submarine cable projects
+  var DOC_CATEGORIES = [
+    "survey-reports", "otdr-traces", "permits-licenses", "as-built-charts",
+    "correspondence", "payment-certificates", "method-statements", "test-certificates",
+    "environmental", "hse", "contracts", "design-drawings", "meeting-minutes", "progress-reports"
+  ];
+
+  function _docRegistry() {
+    var s = get();
+    if (!Array.isArray(s.documentRegistry)) s.documentRegistry = [];
+    return s.documentRegistry;
+  }
+
+  function addDocument(meta) {
+    meta = meta || {};
+    var doc = {
+      id: uid(),
+      title: meta.title || "",
+      category: meta.category || "",
+      phase: meta.phase || "",
+      packageRef: meta.packageRef || "",
+      description: meta.description || "",
+      fileType: meta.fileType || "",
+      fileSize: meta.fileSize || 0,
+      uploadedBy: meta.uploadedBy || "",
+      tags: Array.isArray(meta.tags) ? meta.tags : [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      status: "active",
+      deleted: false
+    };
+    _docRegistry().push(doc);
+    logAudit("Added", "Document", (doc.title || "").slice(0, 60));
+    save();
+    return doc;
+  }
+
+  function listDocuments(filter) {
+    filter = filter || {};
+    var docs = _docRegistry().filter(function(d) { return !d.deleted; });
+    if (filter.category) docs = docs.filter(function(d) { return d.category === filter.category; });
+    if (filter.phase) docs = docs.filter(function(d) { return d.phase === filter.phase; });
+    if (filter.packageRef) docs = docs.filter(function(d) { return d.packageRef === filter.packageRef; });
+    if (filter.status) docs = docs.filter(function(d) { return d.status === filter.status; });
+    if (filter.tags && filter.tags.length) {
+      docs = docs.filter(function(d) {
+        return filter.tags.some(function(t) { return d.tags.indexOf(t) >= 0; });
+      });
+    }
+    return docs;
+  }
+
+  function updateDocument(id, patch) {
+    var docs = _docRegistry();
+    var idx = -1;
+    for (var i = 0; i < docs.length; i++) { if (docs[i].id === id) { idx = i; break; } }
+    if (idx < 0) return null;
+    patch = patch || {};
+    var keys = Object.keys(patch);
+    for (var k = 0; k < keys.length; k++) {
+      if (keys[k] !== "id" && keys[k] !== "createdAt") docs[idx][keys[k]] = patch[keys[k]];
+    }
+    docs[idx].updatedAt = new Date().toISOString();
+    logAudit("Updated", "Document", (docs[idx].title || "").slice(0, 60));
+    save();
+    return docs[idx];
+  }
+
+  function deleteDocument(id) {
+    var docs = _docRegistry();
+    var idx = -1;
+    for (var i = 0; i < docs.length; i++) { if (docs[i].id === id) { idx = i; break; } }
+    if (idx < 0) return false;
+    docs[idx].deleted = true;
+    docs[idx].status = "archived";
+    docs[idx].updatedAt = new Date().toISOString();
+    logAudit("Deleted", "Document", (docs[idx].title || "").slice(0, 60));
+    save();
+    return true;
+  }
+
+  var DOC_CATEGORIES_LIST = DOC_CATEGORIES;
+
+  // ---- Workflow Engine sub-store ----
+  // Default workflow templates pre-seeded on first load
+  var DEFAULT_WORKFLOWS = [
+    {
+      id: "wf_cable_landing_permit",
+      name: "Cable Landing Permit Approval",
+      stages: [
+        { name: "Draft", approver: "Project Manager", requiredDocuments: ["Application Form", "Route Survey"], autoAdvance: false },
+        { name: "Submitted to Authority", approver: "Regulatory Lead", requiredDocuments: ["Submission Receipt"], autoAdvance: false },
+        { name: "Under Review", approver: "Government Authority", requiredDocuments: ["Review Comments"], autoAdvance: false },
+        { name: "Approved/Rejected", approver: "Government Authority", requiredDocuments: ["Permit Certificate"], autoAdvance: false }
+      ],
+      createdAt: "2026-01-01T00:00:00.000Z",
+      deleted: false
+    },
+    {
+      id: "wf_payment_certificate",
+      name: "Payment Certificate",
+      stages: [
+        { name: "Draft", approver: "Quantity Surveyor", requiredDocuments: ["Measurement Sheet"], autoAdvance: false },
+        { name: "Contractor Submitted", approver: "Contractor PM", requiredDocuments: ["Invoice", "Progress Photos"], autoAdvance: false },
+        { name: "PM Certified", approver: "Project Manager", requiredDocuments: ["Certification Letter"], autoAdvance: false },
+        { name: "Client Approved", approver: "Client Representative", requiredDocuments: ["Approval Letter"], autoAdvance: false },
+        { name: "Paid", approver: "Finance Manager", requiredDocuments: ["Payment Receipt"], autoAdvance: true }
+      ],
+      createdAt: "2026-01-01T00:00:00.000Z",
+      deleted: false
+    },
+    {
+      id: "wf_variation_order",
+      name: "Variation Order",
+      stages: [
+        { name: "Proposed", approver: "Contractor PM", requiredDocuments: ["Variation Request"], autoAdvance: false },
+        { name: "Impact Assessed", approver: "Project Manager", requiredDocuments: ["Impact Assessment", "Cost Estimate"], autoAdvance: false },
+        { name: "Commercially Agreed", approver: "Commercial Manager", requiredDocuments: ["Agreement Letter"], autoAdvance: false },
+        { name: "Instructed", approver: "Client Representative", requiredDocuments: ["Instruction Notice"], autoAdvance: false },
+        { name: "Implemented", approver: "Project Manager", requiredDocuments: ["Completion Certificate"], autoAdvance: true }
+      ],
+      createdAt: "2026-01-01T00:00:00.000Z",
+      deleted: false
+    }
+  ];
+
+  function _workflows() {
+    var s = get();
+    if (!Array.isArray(s.workflows)) {
+      s.workflows = JSON.parse(JSON.stringify(DEFAULT_WORKFLOWS));
+    }
+    return s.workflows;
+  }
+
+  function _workflowInstances() {
+    var s = get();
+    if (!Array.isArray(s.workflowInstances)) s.workflowInstances = [];
+    return s.workflowInstances;
+  }
+
+  function addWorkflow(opts) {
+    opts = opts || {};
+    var wf = {
+      id: uid(),
+      name: opts.name || "Untitled Workflow",
+      stages: Array.isArray(opts.stages) ? opts.stages.map(function(st) {
+        return {
+          name: st.name || "",
+          approver: st.approver || "",
+          requiredDocuments: Array.isArray(st.requiredDocuments) ? st.requiredDocuments : [],
+          autoAdvance: !!st.autoAdvance
+        };
+      }) : [],
+      createdAt: new Date().toISOString(),
+      deleted: false
+    };
+    _workflows().push(wf);
+    logAudit("Added", "Workflow", (wf.name || "").slice(0, 60));
+    save();
+    return wf;
+  }
+
+  function listWorkflows() {
+    return _workflows().filter(function(w) { return !w.deleted; });
+  }
+
+  function deleteWorkflow(id) {
+    var wfs = _workflows();
+    var idx = -1;
+    for (var i = 0; i < wfs.length; i++) { if (wfs[i].id === id) { idx = i; break; } }
+    if (idx < 0) return false;
+    wfs[idx].deleted = true;
+    logAudit("Deleted", "Workflow", (wfs[idx].name || "").slice(0, 60));
+    save();
+    return true;
+  }
+
+  function startWorkflowInstance(workflowId, entityId, entityType) {
+    var wf = _workflows().find(function(w) { return w.id === workflowId && !w.deleted; });
+    if (!wf || !wf.stages || wf.stages.length === 0) return null;
+    var instance = {
+      id: uid(),
+      workflowId: workflowId,
+      workflowName: wf.name,
+      entityId: entityId || "",
+      entityType: entityType || "",
+      currentStage: 0,
+      status: "in-progress",
+      history: [{
+        stage: 0,
+        stageName: wf.stages[0].name,
+        action: "started",
+        timestamp: new Date().toISOString(),
+        approver: ""
+      }],
+      startedAt: new Date().toISOString(),
+      completedAt: null,
+      rejectedAt: null,
+      rejectedReason: null
+    };
+    _workflowInstances().push(instance);
+    logAudit("Started", "Workflow Instance", (wf.name + " for " + (entityType || "entity")).slice(0, 60));
+    save();
+    return instance;
+  }
+
+  function advanceWorkflow(instanceId) {
+    var instances = _workflowInstances();
+    var inst = null;
+    for (var i = 0; i < instances.length; i++) { if (instances[i].id === instanceId) { inst = instances[i]; break; } }
+    if (!inst || inst.status !== "in-progress") return null;
+    var wf = _workflows().find(function(w) { return w.id === inst.workflowId; });
+    if (!wf) return null;
+    var nextStage = inst.currentStage + 1;
+    if (nextStage >= wf.stages.length) {
+      // Completing the workflow
+      inst.currentStage = wf.stages.length - 1;
+      inst.status = "completed";
+      inst.completedAt = new Date().toISOString();
+      inst.history.push({
+        stage: inst.currentStage,
+        stageName: wf.stages[inst.currentStage].name,
+        action: "completed",
+        timestamp: new Date().toISOString(),
+        approver: wf.stages[inst.currentStage].approver || ""
+      });
+    } else {
+      inst.history.push({
+        stage: nextStage,
+        stageName: wf.stages[nextStage].name,
+        action: "advanced",
+        timestamp: new Date().toISOString(),
+        approver: wf.stages[inst.currentStage].approver || ""
+      });
+      inst.currentStage = nextStage;
+    }
+    logAudit("Advanced", "Workflow Instance", (inst.workflowName || "").slice(0, 60));
+    save();
+    return inst;
+  }
+
+  function rejectWorkflow(instanceId, reason) {
+    var instances = _workflowInstances();
+    var inst = null;
+    for (var i = 0; i < instances.length; i++) { if (instances[i].id === instanceId) { inst = instances[i]; break; } }
+    if (!inst || inst.status !== "in-progress") return null;
+    var wf = _workflows().find(function(w) { return w.id === inst.workflowId; });
+    inst.status = "rejected";
+    inst.rejectedAt = new Date().toISOString();
+    inst.rejectedReason = reason || "";
+    var stageName = (wf && wf.stages[inst.currentStage]) ? wf.stages[inst.currentStage].name : "";
+    inst.history.push({
+      stage: inst.currentStage,
+      stageName: stageName,
+      action: "rejected",
+      timestamp: new Date().toISOString(),
+      approver: (wf && wf.stages[inst.currentStage]) ? wf.stages[inst.currentStage].approver : "",
+      reason: reason || ""
+    });
+    logAudit("Rejected", "Workflow Instance", (inst.workflowName || "").slice(0, 60));
+    save();
+    return inst;
+  }
+
+  function getWorkflowStatus(instanceId) {
+    var instances = _workflowInstances();
+    var inst = null;
+    for (var i = 0; i < instances.length; i++) { if (instances[i].id === instanceId) { inst = instances[i]; break; } }
+    if (!inst) return null;
+    var wf = _workflows().find(function(w) { return w.id === inst.workflowId; });
+    var totalStages = (wf && wf.stages) ? wf.stages.length : 0;
+    var currentStageName = (wf && wf.stages[inst.currentStage]) ? wf.stages[inst.currentStage].name : "";
+    var progress = totalStages > 0 ? Math.round((inst.currentStage / (totalStages - 1)) * 100) : 0;
+    if (inst.status === "completed") progress = 100;
+    return {
+      id: inst.id,
+      workflowId: inst.workflowId,
+      workflowName: inst.workflowName,
+      entityId: inst.entityId,
+      entityType: inst.entityType,
+      currentStage: inst.currentStage,
+      currentStageName: currentStageName,
+      totalStages: totalStages,
+      status: inst.status,
+      progress: progress,
+      history: inst.history,
+      startedAt: inst.startedAt,
+      completedAt: inst.completedAt,
+      rejectedAt: inst.rejectedAt,
+      rejectedReason: inst.rejectedReason
+    };
+  }
+
+  // ---------- Spare Parts Inventory ----------
+  function defaultSpareInventory() {
+    return [
+      { id: uid(), item: "Spare Cable (G.654.E, 48F)", depot: "Singapore", quantity: 25, unit: "km", minStock: 20, lastChecked: "2026-05-01" },
+      { id: uid(), item: "Spare Cable (G.654.E, 48F)", depot: "Guam", quantity: 15, unit: "km", minStock: 20, lastChecked: "2026-04-20" },
+      { id: uid(), item: "Spare Cable (G.654.E, 48F)", depot: "Manila", quantity: 22, unit: "km", minStock: 20, lastChecked: "2026-05-10" },
+      { id: uid(), item: "Spare Cable (G.652.D, 96F)", depot: "Singapore", quantity: 18, unit: "km", minStock: 15, lastChecked: "2026-05-01" },
+      { id: uid(), item: "Spare Cable (G.652.D, 96F)", depot: "Guam", quantity: 8, unit: "km", minStock: 15, lastChecked: "2026-04-15" },
+      { id: uid(), item: "Spare Cable (G.652.D, 96F)", depot: "Manila", quantity: 16, unit: "km", minStock: 15, lastChecked: "2026-05-12" },
+      { id: uid(), item: "Universal Jointing Kit (UJ-500)", depot: "Singapore", quantity: 12, unit: "sets", minStock: 8, lastChecked: "2026-05-05" },
+      { id: uid(), item: "Universal Jointing Kit (UJ-500)", depot: "Guam", quantity: 6, unit: "sets", minStock: 8, lastChecked: "2026-04-28" },
+      { id: uid(), item: "Universal Jointing Kit (UJ-500)", depot: "Manila", quantity: 9, unit: "sets", minStock: 8, lastChecked: "2026-05-08" },
+      { id: uid(), item: "OTDR (Optical Time Domain Reflectometer)", depot: "Singapore", quantity: 4, unit: "units", minStock: 3, lastChecked: "2026-05-02" },
+      { id: uid(), item: "OTDR (Optical Time Domain Reflectometer)", depot: "Guam", quantity: 2, unit: "units", minStock: 3, lastChecked: "2026-04-25" },
+      { id: uid(), item: "OTDR (Optical Time Domain Reflectometer)", depot: "Manila", quantity: 3, unit: "units", minStock: 3, lastChecked: "2026-05-11" },
+      { id: uid(), item: "Repair Accessories (splice trays, closures)", depot: "Singapore", quantity: 30, unit: "sets", minStock: 20, lastChecked: "2026-05-03" },
+      { id: uid(), item: "Repair Accessories (splice trays, closures)", depot: "Guam", quantity: 5, unit: "sets", minStock: 20, lastChecked: "2026-04-18" },
+      { id: uid(), item: "Repair Accessories (splice trays, closures)", depot: "Manila", quantity: 25, unit: "sets", minStock: 20, lastChecked: "2026-05-09" },
+      { id: uid(), item: "Repeater Spare Module (SDM-16)", depot: "Singapore", quantity: 3, unit: "units", minStock: 2, lastChecked: "2026-05-04" },
+      { id: uid(), item: "Repeater Spare Module (SDM-16)", depot: "Guam", quantity: 1, unit: "units", minStock: 2, lastChecked: "2026-04-22" },
+      { id: uid(), item: "Repeater Spare Module (SDM-16)", depot: "Manila", quantity: 2, unit: "units", minStock: 2, lastChecked: "2026-05-07" }
+    ];
+  }
+
+  function listSpares() {
+    var s = get();
+    if (!s.spareInventory) { s.spareInventory = defaultSpareInventory(); save(); }
+    return s.spareInventory;
+  }
+
+  function updateSpare(id, patch) {
+    var spares = listSpares();
+    var item = spares.find(function (sp) { return sp.id === id; });
+    if (!item) return null;
+    Object.assign(item, patch);
+    save();
+    return item;
+  }
+
+  // ---------- Insurance & Claims Register ----------
+  function defaultInsuranceRegistry() {
+    return {
+      policies: [
+        { id: uid(), name: "Marine All Risks", insurer: "Lloyd's Syndicate 2623", coverType: "marine all-risks", sumInsured: 1300000000, premium: 3900000, deductible: 500000, expiry: "2027-12-31", status: "Active" },
+        { id: uid(), name: "Delay in Start-Up (DSU)", insurer: "Swiss Re Corporate Solutions", coverType: "delay-in-startup", sumInsured: 200000000, premium: 1200000, deductible: 2000000, expiry: "2027-06-30", status: "Active" },
+        { id: uid(), name: "Third Party Liability", insurer: "Allianz Global Corporate", coverType: "third-party", sumInsured: 100000000, premium: 450000, deductible: 250000, expiry: "2027-12-31", status: "Active" }
+      ],
+      claims: [
+        { id: uid(), ref: "CLM-2026-001", policyName: "Marine All Risks", eventDate: "2026-03-15", description: "Anchor strike damage, segment S3 (Luzon Strait)", amountClaimed: 4200000, status: "Under review", amountPaid: 0 },
+        { id: uid(), ref: "CLM-2026-002", policyName: "Third Party Liability", eventDate: "2026-01-22", description: "Fishing trawler net entanglement compensation", amountClaimed: 180000, status: "Paid", amountPaid: 155000 },
+        { id: uid(), ref: "CLM-2025-003", policyName: "Marine All Risks", eventDate: "2025-11-08", description: "Seabed movement cable displacement (Java Sea)", amountClaimed: 2800000, status: "Paid", amountPaid: 2300000 }
+      ]
+    };
+  }
+
+  function insuranceRegistry() {
+    var s = get();
+    if (!s.insuranceRegistry) { s.insuranceRegistry = defaultInsuranceRegistry(); save(); }
+    return s.insuranceRegistry;
+  }
+
+  // ---------- Environmental Compliance ----------
+  function defaultEnvironmentalCompliance() {
+    return [
+      { id: uid(), country: "Indonesia", eiaStatus: "approved", marineLicense: "approved", protectedAreas: "Coral Triangle overlap (3 segments)", mitigation: "Route deviation around coral reefs, seasonal dredging restrictions", monitoringRequired: "Quarterly marine surveys, coral health reports" },
+      { id: uid(), country: "Thailand", eiaStatus: "approved", marineLicense: "approved", protectedAreas: "Gulf of Thailand fisheries zone", mitigation: "Night-time cable lay to avoid fishing, compensation fund", monitoringRequired: "Bi-annual seabed impact assessment" },
+      { id: uid(), country: "Vietnam", eiaStatus: "in-progress", marineLicense: "in-progress", protectedAreas: "Con Dao marine park buffer zone", mitigation: "100m exclusion from park boundary, HDD shore crossing", monitoringRequired: "Monthly turbidity monitoring during installation" },
+      { id: uid(), country: "Taiwan", eiaStatus: "approved", marineLicense: "approved", protectedAreas: "Penghu marine sanctuary (avoided)", mitigation: "Alternative route south of Penghu, whale migration timing", monitoringRequired: "Marine mammal observation during cable lay" },
+      { id: uid(), country: "Philippines", eiaStatus: "approved", marineLicense: "in-progress", protectedAreas: "Tubbataha Reef Natural Park (avoided), Apo Reef", mitigation: "30km buffer from Tubbataha, pre-lay grapnel run, coral relocation", monitoringRequired: "Annual reef health survey, fisher livelihood monitoring" },
+      { id: uid(), country: "Guam", eiaStatus: "in-progress", marineLicense: "not-started", protectedAreas: "Mariana Trench Monument buffer, coral habitat", mitigation: "Directional drilling shore approach, silt curtains", monitoringRequired: "NOAA compliance reporting, coral monitoring program" },
+      { id: uid(), country: "Malaysia", eiaStatus: "approved", marineLicense: "approved", protectedAreas: "Sipadan marine park (avoided), Sabah coastal waters", mitigation: "Route south of protected areas, mangrove avoidance", monitoringRequired: "Quarterly environmental audit, mangrove health check" },
+      { id: uid(), country: "Brunei", eiaStatus: "not-started", marineLicense: "not-started", protectedAreas: "Brunei Bay heritage site", mitigation: "Pending EIA - preliminary HDD assessment for shore crossing", monitoringRequired: "To be determined post-EIA" }
+    ];
+  }
+
+  function environmentalCompliance() {
+    var s = get();
+    if (!s.environmentalCompliance) { s.environmentalCompliance = defaultEnvironmentalCompliance(); save(); }
+    return s.environmentalCompliance;
+  }
+
+  // ---------- Permit Tracker ----------
+  function defaultPermits() {
+    return [
+      { id: uid(), country: "Indonesia", authority: "DJPL", permitType: "Submarine Cable Route Approval", submittedDate: "2025-06-01", expectedDays: 120, status: "in-progress", notes: "Requires coordination with TNI-AL naval clearance" },
+      { id: uid(), country: "Thailand", authority: "Marine Department", permitType: "Seabed Usage Permit", submittedDate: "2025-06-10", expectedDays: 90, status: "in-progress", notes: "Gulf of Thailand route section" },
+      { id: uid(), country: "Vietnam", authority: "Vinamarine", permitType: "Maritime Safety Zone Approval", submittedDate: "2025-05-15", expectedDays: 150, status: "in-progress", notes: "Central coast landing site" },
+      { id: uid(), country: "Taiwan", authority: "NCC", permitType: "Submarine Cable Landing License", submittedDate: "2025-04-20", expectedDays: 100, status: "approved", notes: "Toucheng landing station approved" },
+      { id: uid(), country: "Philippines", authority: "DENR", permitType: "Environmental Compliance Certificate", submittedDate: "2025-05-01", expectedDays: 180, status: "in-progress", notes: "ECC for Luzon Strait segment" },
+      { id: uid(), country: "Guam", authority: "USACE", permitType: "Section 10/404 Cable Installation Permit", submittedDate: "2025-07-01", expectedDays: 200, status: "in-progress", notes: "NEPA review in progress, coral mitigation plan required" },
+      { id: uid(), country: "Malaysia", authority: "MCMC", permitType: "Network Facility Provider License", submittedDate: "2025-03-15", expectedDays: 60, status: "approved", notes: "NFP license granted for submarine cable operation" },
+      { id: uid(), country: "Brunei", authority: "AITI", permitType: "Telecom Infrastructure License", submittedDate: "2025-08-01", expectedDays: 90, status: "in-progress", notes: "Pending BEDB foreign investment clearance" }
+    ];
+  }
+
+  function _permits() {
+    var s = get();
+    if (!Array.isArray(s.permits)) { s.permits = defaultPermits(); save(); }
+    return s.permits;
+  }
+
+  function addPermit(opts) {
+    opts = opts || {};
+    var permit = {
+      id: uid(),
+      country: opts.country || "",
+      authority: opts.authority || "",
+      permitType: opts.permitType || "",
+      submittedDate: opts.submittedDate || new Date().toISOString().slice(0, 10),
+      expectedDays: Number(opts.expectedDays) || 90,
+      status: opts.status || "in-progress",
+      notes: opts.notes || ""
+    };
+    _permits().push(permit);
+    logAudit("Added", "Permit", (permit.permitType || "").slice(0, 60));
+    save();
+    return permit;
+  }
+
+  function listPermits(filter) {
+    filter = filter || {};
+    var permits = _permits().slice();
+    if (filter.country) permits = permits.filter(function (p) { return p.country === filter.country; });
+    if (filter.status) permits = permits.filter(function (p) { return p.status === filter.status; });
+    return permits;
+  }
+
+  function updatePermit(id, patch) {
+    var permits = _permits();
+    var idx = -1;
+    for (var i = 0; i < permits.length; i++) { if (permits[i].id === id) { idx = i; break; } }
+    if (idx < 0) return null;
+    patch = patch || {};
+    var keys = Object.keys(patch);
+    for (var k = 0; k < keys.length; k++) {
+      if (keys[k] !== "id") permits[idx][keys[k]] = patch[keys[k]];
+    }
+    logAudit("Updated", "Permit", (permits[idx].permitType || "").slice(0, 60));
+    save();
+    return permits[idx];
+  }
+
+  // ---------- SLA & Availability Management ----------
+  function listSLAs() {
+    return [
+      { id: "sla-1", metric: "System Availability", target: "99.99% (52.6 min downtime/year max)", actual: "99.995%", actualNum: 99.995, targetNum: 99.99, status: "green", trend: "up" },
+      { id: "sla-2", metric: "Fault Restoration Time (Shallow <200m)", target: "<24 hours", actual: "Avg 18 hours", actualNum: 18, targetNum: 24, status: "green", trend: "stable" },
+      { id: "sla-3", metric: "Fault Restoration Time (Deep >1000m)", target: "<72 hours", actual: "Avg 36 hours", actualNum: 36, targetNum: 72, status: "green", trend: "up" },
+      { id: "sla-4", metric: "Latency (One-way Singapore-Guam)", target: "<120ms", actual: "95ms", actualNum: 95, targetNum: 120, status: "green", trend: "stable" },
+      { id: "sla-5", metric: "Packet Loss", target: "<0.001%", actual: "0.0003%", actualNum: 0.0003, targetNum: 0.001, status: "green", trend: "up" },
+      { id: "sla-6", metric: "Planned Maintenance Windows", target: "Max 4 per year per segment", actual: "2 per year avg", actualNum: 2, targetNum: 4, status: "green", trend: "stable" },
+      { id: "sla-7", metric: "Spare Cable Availability", target: ">2% of system length at each depot", actual: "2.4% avg across depots", actualNum: 2.4, targetNum: 2, status: "green", trend: "stable" },
+      { id: "sla-8", metric: "Mean Time Between Failures (MTBF)", target: ">5 years per segment", actual: "6.2 years", actualNum: 6.2, targetNum: 5, status: "green", trend: "up" },
+      { id: "sla-9", metric: "Network Utilization Alert Threshold", target: "Alert at >80% capacity", actual: "Currently at 62%", actualNum: 62, targetNum: 80, status: "amber", trend: "up" },
+      { id: "sla-10", metric: "Incident Response Time", target: "<30 minutes acknowledgment", actual: "22 minutes avg", actualNum: 22, targetNum: 30, status: "green", trend: "stable" }
+    ];
+  }
+
+  // ---------- Training & Competency Register ----------
+  function listTrainingRecords() {
+    return [
+      { id: "tr-1", name: "Ahmad Razak", role: "Cable Jointing Engineer", certification: "IEC 60794 Submarine Cable Jointing", issued: "2024-03-15", expiry: "2026-03-15", status: "Valid" },
+      { id: "tr-2", name: "Nguyen Van Minh", role: "ROV Pilot", certification: "IMCA ROV Pilot/Technician Class II", issued: "2023-11-01", expiry: "2025-11-01", status: "Expired" },
+      { id: "tr-3", name: "Maria Santos", role: "Marine Operations Manager", certification: "STCW Master Mariner (Unlimited)", issued: "2024-06-20", expiry: "2029-06-20", status: "Valid" },
+      { id: "tr-4", name: "Chen Wei Lin", role: "Fiber Test Engineer", certification: "OTDR & Fiber Characterization (FOA CFOT)", issued: "2025-01-10", expiry: "2027-01-10", status: "Valid" },
+      { id: "tr-5", name: "Takeshi Yamamoto", role: "System Design Engineer", certification: "SubOptic Submarine System Design", issued: "2024-09-05", expiry: "2026-09-05", status: "Expiring" },
+      { id: "tr-6", name: "Budi Santoso", role: "Shore End Installation Lead", certification: "Horizontal Directional Drilling (HDD) Level 3", issued: "2023-08-12", expiry: "2025-08-12", status: "Expired" },
+      { id: "tr-7", name: "Priya Chandra", role: "Quality Inspector", certification: "ISO 9001:2015 Lead Auditor (IRCA)", issued: "2025-02-28", expiry: "2028-02-28", status: "Valid" },
+      { id: "tr-8", name: "David Thompson", role: "Health & Safety Officer", certification: "NEBOSH International General Certificate", issued: "2024-12-01", expiry: "2026-12-01", status: "Expiring" },
+      { id: "tr-9", name: "Somchai Prasert", role: "Cable Ship Captain", certification: "DP2 Dynamic Positioning Operator", issued: "2024-04-18", expiry: "2026-04-18", status: "Expiring" },
+      { id: "tr-10", name: "Rizal Fernandez", role: "Network Operations Engineer", certification: "DWDM Systems (Ciena/Infinera Certified)", issued: "2025-05-01", expiry: "2027-05-01", status: "Valid" }
+    ];
+  }
+
+  // ---------- Incident Management ----------
+  function listIncidents() {
+    return [
+      { id: "inc-1", date: "2026-02-14", segment: "SEA-2", description: "Anchor strike - bulk carrier MV Pacific Fortune dragged anchor in anchorage zone", rfo: "External Aggression", impactMinutes: 342, status: "Resolved", resolution: "Emergency splice repair, reroute via protection path, full restoration in 5.7 hours" },
+      { id: "inc-2", date: "2026-04-03", segment: "SEA-4", description: "Power feed equipment alarm - PFE voltage fluctuation at CLS Bangkok", rfo: "Equipment Failure", impactMinutes: 78, status: "Resolved", resolution: "Redundant PFE switchover, faulty module replaced during maintenance window" },
+      { id: "inc-3", date: "2025-11-22", segment: "SEA-1", description: "Fishing trawler bottom-trawl net entanglement near Batam approach", rfo: "External Aggression", impactMinutes: 520, status: "Resolved", resolution: "Cable ship mobilized from Singapore depot, disentanglement and inspection complete" },
+      { id: "inc-4", date: "2025-08-09", segment: "SEA-6", description: "Seabed movement detected via DTS monitoring - lateral displacement 2.3m", rfo: "Natural Event", impactMinutes: 0, status: "Monitoring", resolution: "No service impact, scheduled survey for next maintenance window, route re-profiling planned" },
+      { id: "inc-5", date: "2026-01-18", segment: "SEA-3", description: "Amplifier degradation - EDFA output power drop 1.8dB at repeater RP-31", rfo: "Component Aging", impactMinutes: 0, status: "Scheduled Repair", resolution: "Compensated via gain equalization, repeater replacement planned Q3 2026" }
+    ];
+  }
+
+  // ---------- Capacity Dashboard ----------
+  function listCapacity() {
+    return [
+      { segment: "SEA-1", fiberPairs: 8, wavelengthsPerPair: 120, soldPercent: 45 },
+      { segment: "SEA-2", fiberPairs: 6, wavelengthsPerPair: 120, soldPercent: 30 },
+      { segment: "SEA-3", fiberPairs: 4, wavelengthsPerPair: 120, soldPercent: 15 },
+      { segment: "SEA-4", fiberPairs: 6, wavelengthsPerPair: 120, soldPercent: 55 },
+      { segment: "SEA-5", fiberPairs: 8, wavelengthsPerPair: 120, soldPercent: 72 },
+      { segment: "SEA-6", fiberPairs: 4, wavelengthsPerPair: 120, soldPercent: 25 }
+    ];
+  }
+
+  // ---------- Full Demo Seeder ----------
+  function seedFullDemo() {
+    reset();
+    var demoCases = [
+      { problem: "Route survey complete - SEA-1 segment", category: "Delivery / Schedule", priority: "1-CRITICAL", sev: 9, occ: 4, det: 3, rootCause: "Marine survey vessel completed bathymetric mapping", leanMethod: "Value Stream Mapping", owner: "PM", target: "Survey data validated and route finalized", startDate: "2025-02-01", status: "RESOLVED", percent: 1.0, costCat: "External / Consultant", estCost: 2800000, actCost: 3100000, reach: 2000, impact: 9, confidence: 95, effort: 7, userValue: 9, timeCrit: 9, riskRed: 8, jobSize: 7 },
+      { problem: "Cable manufacturing started - Segment 2", category: "Delivery / Schedule", priority: "2-HIGH", sev: 7, occ: 5, det: 4, rootCause: "NEC Submarine Networks factory allocation confirmed", leanMethod: "Standard Work", owner: "Engineering Lead", target: "12,400km cable produced to G.654.E spec", startDate: "2025-04-15", status: "IN PROGRESS", percent: 0.45, costCat: "Materials", estCost: 180000000, actCost: 82000000, reach: 1500, impact: 8, confidence: 80, effort: 9, userValue: 8, timeCrit: 8, riskRed: 7, jobSize: 9 },
+      { problem: "Permitting delayed - Vietnam MONRE", category: "Process / Flow", priority: "1-CRITICAL", sev: 9, occ: 7, det: 6, rootCause: "Environmental Impact Assessment requires additional marine biology study", leanMethod: "Root-Cause Analysis", owner: "BA", target: "EIA approval from Vietnam MONRE within 60 days", startDate: "2025-03-10", status: "BLOCKED", percent: 0.3, costCat: "External / Consultant", estCost: 450000, actCost: 520000, reach: 800, impact: 9, confidence: 60, effort: 5, userValue: 7, timeCrit: 9, riskRed: 9, jobSize: 5 },
+      { problem: "Shore-end installation Batam CLS complete", category: "Quality / Defects", priority: "2-HIGH", sev: 7, occ: 3, det: 2, rootCause: "HDD crossing and beach manhole installation finished", leanMethod: "Mistake-Proofing / Poka-Yoke", owner: "Ops Lead", target: "Shore-end cable tested to -40dB insertion loss", startDate: "2025-01-20", status: "RESOLVED", percent: 1.0, costCat: "Labour / Effort", estCost: 5200000, actCost: 5800000, reach: 1200, impact: 7, confidence: 90, effort: 8, userValue: 8, timeCrit: 7, riskRed: 6, jobSize: 8 },
+      { problem: "Repeater qualification testing", category: "Quality / Defects", priority: "3-MEDIUM", sev: 6, occ: 4, det: 3, rootCause: "Factory acceptance tests for 180 repeater units", leanMethod: "Standard Work", owner: "QA Lead", target: "All repeaters pass 8000hr accelerated life test", startDate: "2025-05-01", status: "IN PROGRESS", percent: 0.6, costCat: "Materials", estCost: 45000000, actCost: 27500000, reach: 1000, impact: 6, confidence: 75, effort: 6, userValue: 7, timeCrit: 6, riskRed: 7, jobSize: 6 },
+      { problem: "Typhoon season weather window analysis", category: "People / Training", priority: "3-MEDIUM", sev: 5, occ: 8, det: 5, rootCause: "Cable lay operations must avoid May-November typhoon corridor", leanMethod: "Gemba Walk", owner: "Tech Lead", target: "Lay schedule aligned with weather windows for all 6 segments", startDate: "2025-06-01", status: "IN PROGRESS", percent: 0.5, costCat: "Tooling / Software", estCost: 180000, actCost: 95000, reach: 600, impact: 5, confidence: 70, effort: 4, userValue: 6, timeCrit: 8, riskRed: 6, jobSize: 4 },
+      { problem: "Submarine cable protection zone marking", category: "Process / Flow", priority: "2-HIGH", sev: 8, occ: 6, det: 4, rootCause: "Coordination with 8 national maritime authorities for exclusion zones", leanMethod: "Value Stream Mapping", owner: "PM", target: "All protection zones gazetted and marked on nautical charts", startDate: "2025-03-01", status: "OPEN", percent: 0.15, costCat: "External / Consultant", estCost: 920000, actCost: 140000, reach: 900, impact: 8, confidence: 65, effort: 6, userValue: 7, timeCrit: 7, riskRed: 8, jobSize: 6 },
+      { problem: "DWDM terminal equipment procurement", category: "Delivery / Schedule", priority: "3-MEDIUM", sev: 5, occ: 4, det: 4, rootCause: "Long lead-time for Ciena 6500 coherent transponders", leanMethod: "Kanban", owner: "DevOps", target: "All terminal equipment delivered to 8 CLS sites", startDate: "2025-07-01", status: "OPEN", percent: 0.1, costCat: "Materials", estCost: 62000000, actCost: 6200000, reach: 700, impact: 5, confidence: 70, effort: 7, userValue: 6, timeCrit: 5, riskRed: 4, jobSize: 7 },
+      { problem: "Marine route survey - SEA-3 Luzon Strait", category: "Delivery / Schedule", priority: "4-LOW", sev: 4, occ: 3, det: 3, rootCause: "Deep water survey (>4000m) requires specialized ROV", leanMethod: "Standard Work", owner: "Architect", target: "Complete seabed profile and hazard assessment", startDate: "2025-02-15", status: "RESOLVED", percent: 1.0, costCat: "External / Consultant", estCost: 3500000, actCost: 3900000, reach: 500, impact: 4, confidence: 85, effort: 5, userValue: 5, timeCrit: 4, riskRed: 5, jobSize: 5 },
+      { problem: "Stakeholder engagement - Philippines NTC", category: "People / Training", priority: "4-LOW", sev: 4, occ: 5, det: 5, rootCause: "National Telecommunications Commission requires updated cable landing license", leanMethod: "Root-Cause Analysis", owner: "BA", target: "Landing license renewal approved for Luzon site", startDate: "2025-04-01", status: "ON HOLD", percent: 0.25, costCat: "Training", estCost: 85000, actCost: 32000, reach: 400, impact: 4, confidence: 60, effort: 3, userValue: 4, timeCrit: 3, riskRed: 3, jobSize: 3 }
+    ];
+    demoCases.forEach(function(c) {
+      c.id = uid();
+      c.dateLogged = c.startDate || "2025-01-15";
+      if (!c.whys) c.whys = ["", "", "", "", ""];
+      addCase(c);
+    });
+    save();
+    return get();
+  }
+
+  const API = { uid, seed, seedFullDemo, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
     undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete, togglePin, reorderPin,
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
     auditList, clearAudit, takeSnapshot, snapshots, restoreSnapshot, deleteSnapshot, renameSnapshot, diffSnapshots, paretoRPN, controlChartData,
@@ -547,7 +1063,12 @@
     regRows, regAdd, regUpdate, regDelete, regLabel, regBulkDelete, regTogglePin, evm: () => C.evm(validCases(), get().project),
     gage, setGageCell, setGageConfig, gageResult, cashflow, setCashflow,
     xbar, setXbarCell, setXbarConfig, xbarResult, scorecard,
-    spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy };
+    spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy,
+    addDocument, listDocuments, updateDocument, deleteDocument, DOC_CATEGORIES: DOC_CATEGORIES_LIST,
+    addWorkflow, listWorkflows, deleteWorkflow, startWorkflowInstance, advanceWorkflow, rejectWorkflow, getWorkflowStatus,
+    listSpares, updateSpare, insuranceRegistry, environmentalCompliance,
+    addPermit, listPermits, updatePermit,
+    listSLAs, listTrainingRecords, listIncidents, listCapacity };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);

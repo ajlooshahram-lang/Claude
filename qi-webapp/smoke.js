@@ -15,7 +15,7 @@ const html = fs.readFileSync(path.join(root, "index.html"), "utf8")
   .replace('<script src="js/store.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/store.js"))}</script>`)
   .replace('<script src="js/brain.js"></script>', () => `<script>${fs.readFileSync(path.join(root, "js/brain.js"))}</script>`)
   .replace('<script src="js/charts.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/charts.js"))}</script>`)
-  .replace('<script src="js/ui.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/ui.js"))}</script>`);
+  .replace('<script src="js/ui.js"></script>', () => `<script>${fs.readFileSync(path.join(root, "js/ui.js"))}</script>`);
 
 const dom = new JSDOM(html, { runScripts: "dangerously", url: "http://localhost/", pretendToBeVisual: true });
 const { window } = dom;
@@ -32,7 +32,7 @@ ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard rende
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 
 // 2) navigate every view (simulate clicks)
-const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","report","audit","config","help"];
+const views = ["guide","portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","raci","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","workflows","documents","report","audit","config","help","repair","clientview","spares","insurance","environmental","permits","competitive","dataimport"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -603,6 +603,694 @@ ok(S.regRows("milestones").length > brainMsBefore, "Apply adds generated milesto
 ok(S.regRows("procurement").length > brainProcBefore, "Apply adds generated procurement items");
 // click-only / privacy sanity: analysis must not call out to the network
 ok(window.__promptCalls === 0, "Brain flow used no prompt()");
+
+// 39) Intelligence Engine UI panels
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const intelContainer = doc.getElementById("brainIntel");
+ok(intelContainer != null, "Intel: brainIntel container rendered");
+ok(intelContainer.innerHTML.length > 0, "Intel: intelligence panels rendered with content");
+
+// Health Dashboard
+const healthDash = doc.getElementById("brainHealthDashboard");
+ok(healthDash != null, "Intel: Health Dashboard panel exists");
+ok(/Health Dashboard/.test(healthDash.innerHTML), "Intel: Health Dashboard title rendered");
+ok(/SPI/.test(healthDash.innerHTML) && /CPI/.test(healthDash.innerHTML), "Intel: Health Dashboard shows SPI and CPI scores");
+ok(/Risk Exposure/.test(healthDash.innerHTML), "Intel: Health Dashboard shows Risk Exposure");
+ok(/Quality Index/.test(healthDash.innerHTML), "Intel: Health Dashboard shows Quality Index");
+ok(/badge/.test(healthDash.innerHTML), "Intel: Health Dashboard shows overall health badge");
+
+// Findings list
+const findingsList = doc.getElementById("brainFindingsList");
+ok(findingsList != null, "Intel: Findings list panel exists");
+ok(/Findings/.test(findingsList.innerHTML), "Intel: Findings list title rendered");
+
+// Patterns panel
+const patternsPanel = doc.getElementById("brainPatternsPanel");
+ok(patternsPanel != null, "Intel: Patterns panel exists");
+ok(/Detected Patterns/.test(patternsPanel.innerHTML), "Intel: Patterns panel title rendered");
+
+// Recommendations panel
+const recsPanel = doc.getElementById("brainRecommendationsPanel");
+ok(recsPanel != null, "Intel: Recommendations panel exists");
+ok(/Recommendations/.test(recsPanel.innerHTML), "Intel: Recommendations panel title rendered");
+
+// Lessons panel
+const lessonsPanel = doc.getElementById("brainLessonsPanel");
+ok(lessonsPanel != null, "Intel: Lessons panel exists");
+ok(/Lessons Learned/.test(lessonsPanel.innerHTML), "Intel: Lessons panel title rendered");
+const recordBtn = doc.getElementById("brainRecordLesson");
+ok(recordBtn != null, "Intel: Record lesson button exists");
+
+// Click Record lesson opens modal
+recordBtn.click();
+const modalOverlay = doc.getElementById("modalOverlay");
+ok(modalOverlay && !modalOverlay.hidden, "Intel: Clicking Record lesson opens modal");
+const lessonModal = doc.getElementById("modal");
+ok(lessonModal && /Record Lesson/.test(lessonModal.innerHTML), "Intel: Lesson modal shows title");
+ok(doc.getElementById("les_category") != null, "Intel: Lesson modal has category dropdown");
+ok(doc.getElementById("les_impact") != null, "Intel: Lesson modal has impact dropdown");
+ok(doc.getElementById("les_tag") != null, "Intel: Lesson modal has tag dropdown");
+ok(doc.getElementById("les_projType") != null, "Intel: Lesson modal has project type dropdown");
+ok(doc.getElementById("les_description") != null, "Intel: Lesson modal has description textarea");
+
+// Verify click-only: no free-text inputs in brain view EXCEPT lesson description textarea
+const brainContent = doc.getElementById("content");
+const brainInputs = brainContent.querySelectorAll('input[type="text"], input[type="number"]');
+const nonExemptInputs = Array.from(brainInputs).filter(i => !i.hidden && i.id !== "brainText");
+ok(nonExemptInputs.length === 0, "Intel: No free-text/number inputs in brain view (click-only enforced)");
+
+// Close the modal
+const cancelBtn = lessonModal.querySelector("[data-act=cancel]");
+if (cancelBtn) cancelBtn.click();
+
+// 40) Vendor Directory UI panel in Brain view
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const vendorPanel = doc.getElementById("brainVendorPanel");
+ok(vendorPanel != null, "Vendor: panel exists in Brain view");
+ok(/Vendor Directory/.test(vendorPanel.innerHTML), "Vendor: panel title rendered");
+ok(doc.getElementById("vendorCatFilter") != null, "Vendor: category filter dropdown exists");
+ok(doc.getElementById("vendorRegFilter") != null, "Vendor: region filter dropdown exists");
+ok(doc.getElementById("vendorBudFilter") != null, "Vendor: budget tier filter dropdown exists");
+ok(doc.getElementById("vendorCompareBtn") != null, "Vendor: Compare Selected button exists");
+const vendorTableWrap = doc.getElementById("vendorTableWrap");
+ok(vendorTableWrap != null && vendorTableWrap.innerHTML.length > 100, "Vendor: table renders with vendor data");
+const vendorChks = vendorTableWrap.querySelectorAll(".vendor-chk");
+ok(vendorChks.length >= 30, "Vendor: all 38 vendors shown by default");
+
+// 41) Vendor comparison modal
+// Select first two vendors and click compare
+vendorChks[0].checked = true;
+vendorChks[0].dispatchEvent(new window.Event("change", { bubbles: true }));
+vendorChks[1].checked = true;
+vendorChks[1].dispatchEvent(new window.Event("change", { bubbles: true }));
+const compareBtn2 = doc.getElementById("vendorCompareBtn");
+ok(!compareBtn2.disabled, "Vendor: Compare button enabled after selecting 2 vendors");
+compareBtn2.click();
+const vendorModal = doc.getElementById("modal");
+ok(vendorModal && /Vendor Comparison/.test(vendorModal.innerHTML), "Vendor: comparison modal opens with title");
+ok(/Attribute/.test(vendorModal.innerHTML), "Vendor: comparison modal has attribute column");
+ok(/Capabilities/.test(vendorModal.innerHTML) && /Products/.test(vendorModal.innerHTML), "Vendor: comparison modal shows capabilities and products");
+ok(/Price Range/.test(vendorModal.innerHTML) && /Lead Time/.test(vendorModal.innerHTML), "Vendor: comparison modal shows price range and lead time");
+// Verify Print / Save as PDF button exists in comparison modal
+ok(doc.getElementById("vendorPrintBtn") != null, "Vendor: comparison modal has Print / Save as PDF button");
+// Close comparison modal
+const vendorModalClose = vendorModal.querySelector("[data-act=cancel]");
+if (vendorModalClose) vendorModalClose.click();
+
+// Responsive design smoke tests
+ok(doc.querySelector('meta[name="viewport"]') != null, "viewport meta tag present");
+ok(/@media/.test(cssAll), "CSS contains responsive @media rules");
+
+// 42) Presentation mode
+ok(doc.getElementById("btnPresent") != null, "Present button exists in topbar");
+ok(/body\.presenting/.test(cssAll), "Presentation mode CSS class defined in stylesheet");
+
+// 43) i18n language system
+var langSelectEl = doc.getElementById("langSelect");
+ok(langSelectEl && langSelectEl.querySelectorAll("option").length >= 7, "Language dropdown has 7+ language options");
+
+// 44) Setting language to 'th' translates Dashboard content
+var i18nApi = window.QII18N;
+if (i18nApi && i18nApi.setLanguage) {
+  // Navigate to dashboard first, then switch language
+  var dashNav = doc.querySelector('.nav-item[data-view="dashboard"]');
+  if (dashNav) dashNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  i18nApi.setLanguage("th");
+  var dashContent = doc.getElementById("content").innerHTML;
+  ok(/\u0e01\u0e23\u0e13\u0e35\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14/.test(dashContent), "Setting language to 'th' translates Dashboard content");
+  // Reset back to English for any subsequent tests
+  i18nApi.setLanguage("en");
+} else {
+  ok(false, "Setting language to 'th' translates Dashboard content");
+}
+
+// 45) Alert notification system
+ok(doc.getElementById("btnAlerts") != null, "Alert: bell icon button exists in topbar");
+var bellBtn = doc.getElementById("btnAlerts");
+bellBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+var alertDropdown = doc.getElementById("alertDropdown");
+ok(alertDropdown && !alertDropdown.hidden, "Alert: clicking bell icon opens the alert dropdown panel");
+// Close the dropdown by clicking on document
+doc.dispatchEvent(new window.Event("click", { bubbles: true }));
+
+// 46) Alert panel renders in brain view
+var brainNav2 = doc.querySelector('.nav-item[data-view="brain"]');
+if (brainNav2) brainNav2.dispatchEvent(new window.Event("click", { bubbles: true }));
+var brainAlertPanel = doc.getElementById("brainAlertPanel");
+ok(brainAlertPanel != null, "Alert: alert panel renders in brain intelligence view");
+
+// 47) Document Management System
+var docsNavBtn = doc.querySelector('.nav-item[data-view="documents"]');
+ok(docsNavBtn != null, "Documents nav item exists");
+
+if (docsNavBtn) docsNavBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+var docsTable = doc.getElementById("documentsTable");
+ok(docsTable != null && docsTable.tagName === "TABLE", "Documents view renders a table");
+
+var addDocBtn = doc.getElementById("btnAddDocument");
+ok(addDocBtn != null, "Add Document button exists");
+
+// 48) Programme Timeline
+var progNavBtn = doc.querySelector('.nav-item[data-view="programme"]');
+ok(progNavBtn != null, "Programme Timeline nav item exists");
+
+if (progNavBtn) progNavBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+var progGantt = doc.getElementById("programmeGantt");
+var progBars = progGantt ? progGantt.querySelectorAll(".prog-bar") : [];
+ok(progBars.length === 6, "Programme Timeline renders segment bars");
+
+var todayMarker = progGantt ? progGantt.querySelector(".prog-today-marker") : null;
+ok(todayMarker != null, "Programme Timeline shows today marker");
+
+// 49) S-Curve visualization
+var sCurveCanvas = doc.getElementById("chSCurve");
+ok(sCurveCanvas != null, "S-Curve canvas element exists in programme view");
+
+var sCurveCard = doc.getElementById("sCurveCard");
+var sCurveTitle = sCurveCard ? sCurveCard.querySelector("h3") : null;
+ok(sCurveTitle != null && /Cumulative Programme Spend/.test(sCurveTitle.textContent), "S-Curve has chart title rendered nearby");
+
+// 50) Weather Windows
+var weatherSection = doc.getElementById("weatherWindowSection");
+ok(weatherSection != null, "Weather window section renders in programme view");
+
+var weatherToggle = doc.getElementById("weatherToggle");
+ok(weatherToggle != null && weatherToggle.type === "checkbox", "Weather toggle checkbox exists");
+
+// 51) RACI Matrix
+var raciNavBtn = doc.querySelector('.nav-item[data-view="raci"]');
+ok(raciNavBtn != null, "RACI nav item exists");
+
+if (raciNavBtn) raciNavBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+var raciTable = doc.getElementById("raciTable");
+ok(raciTable != null && raciTable.tagName === "TABLE", "RACI matrix renders a table");
+
+var raciCountry = doc.getElementById("raciCountryAuthorities");
+ok(raciCountry != null, "RACI country authorities section exists");
+
+// 52) Repair Planning
+var repairNavBtn = doc.querySelector('.nav-item[data-view="repair"]');
+ok(repairNavBtn != null, "Repair Planning nav item exists");
+
+if (repairNavBtn) repairNavBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+var repairShipTable = doc.getElementById("repairShipTable");
+ok(repairShipTable != null && repairShipTable.tagName === "TABLE", "Repair ship table renders");
+
+var repairCalc = doc.getElementById("repairCalculator");
+ok(repairCalc != null, "Repair scenario calculator exists");
+
+// 53) Project Template System - Profile list has 5+ project types
+var profileList = window.QIBrain.listProfiles();
+ok(profileList.length >= 5, "Profile list has 5+ project types");
+
+// 54) Data center profile detected from description
+var dcPlan = window.QIBrain.analyzeProject("Build a hyperscale data center with raised floor, UPS redundancy, and cooling systems");
+ok(dcPlan.summary.domain === "data-center", "Data center profile detected from description");
+
+// 55) FTTH profile detected from description
+var ftthPlan = window.QIBrain.analyzeProject("Deploy FTTH last mile network passing 50000 homes with splitter cabinets and ONT installation");
+ok(ftthPlan.summary.domain === "terrestrial-ftth", "FTTH profile detected from description");
+
+// 56) Client Portal
+var clientNavBtn = doc.querySelector('.nav-item[data-view="clientview"]');
+ok(clientNavBtn != null, "Client Portal nav item exists");
+
+if (clientNavBtn) clientNavBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+var clientContent = doc.getElementById("content").innerHTML;
+ok(/client-progress-bar-fill/.test(clientContent) && /Progress Indicators/.test(clientContent), "Client Portal renders progress indicators");
+ok(!/FMEA/.test(clientContent) && !/RPN/.test(clientContent), "Client Portal does NOT show FMEA/RPN scores");
+
+// 57) Custom Workflow Engine
+var wfNavBtn = doc.querySelector('.nav-item[data-view="workflows"]');
+ok(wfNavBtn != null, "Workflows nav item exists");
+
+if (wfNavBtn) wfNavBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+var wfTemplates = doc.getElementById("workflowTemplates");
+ok(wfTemplates != null && wfTemplates.querySelectorAll(".wf-template-card").length > 0, "Workflows view renders template cards");
+
+var wfList = S.listWorkflows();
+ok(wfList.length >= 3, "Default workflow templates are pre-seeded (3+)");
+
+// 58) Risk Heat Map
+var riskHeatNav = doc.querySelector('.nav-item[data-view="riskheat"]');
+ok(riskHeatNav != null, "Risk Heat Map nav item exists");
+
+if (riskHeatNav) riskHeatNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var riskHeatTable = doc.getElementById("riskHeatTable");
+ok(riskHeatTable != null && riskHeatTable.querySelectorAll('tr[data-country]').length === 8, "Risk Heat Map renders country rows");
+
+var riskHeatCells = riskHeatTable ? riskHeatTable.querySelectorAll('.riskheat-cell') : [];
+var hasColors = Array.from(riskHeatCells).some(function (c) { return /background:#e74c3c|background:#f39c12|background:#f1c40f|background:#27ae60/.test(c.getAttribute("style")); });
+ok(hasColors, "Risk Heat Map shows severity colors");
+
+// 59) Lessons Library
+var lessonsNav = doc.querySelector('.nav-item[data-view="lessons"]');
+ok(lessonsNav != null, "Lessons Library nav item exists");
+
+if (lessonsNav) lessonsNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var lessonsContent = doc.getElementById("content").innerHTML;
+ok(/Total Lessons/.test(lessonsContent) && /Most Recalled/.test(lessonsContent) && /By Category/.test(lessonsContent), "Lessons Library renders summary cards");
+
+var lessonsRecordBtn = doc.getElementById("lessonsRecordBtn");
+ok(lessonsRecordBtn != null, "Lessons Library has Record New Lesson button");
+
+// 60) Spare Parts Inventory
+var sparesNav = doc.querySelector('.nav-item[data-view="spares"]');
+ok(sparesNav != null, "Spare Parts nav item exists");
+
+if (sparesNav) sparesNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var sparesTable = doc.getElementById("sparesTable");
+ok(sparesTable != null && sparesTable.querySelectorAll('tbody tr').length >= 3, "Spare Parts renders depot table");
+
+// 61) Insurance & Claims Register
+var insuranceNav = doc.querySelector('.nav-item[data-view="insurance"]');
+ok(insuranceNav != null, "Insurance nav item exists");
+
+if (insuranceNav) insuranceNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var insurancePoliciesTable = doc.getElementById("insurancePoliciesTable");
+ok(insurancePoliciesTable != null && insurancePoliciesTable.querySelectorAll('tbody tr').length >= 3, "Insurance renders policies table");
+
+// 62) Environmental Compliance
+var environmentalNav = doc.querySelector('.nav-item[data-view="environmental"]');
+ok(environmentalNav != null, "Environmental nav item exists");
+
+if (environmentalNav) environmentalNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var environmentalTable = doc.getElementById("environmentalTable");
+ok(environmentalTable != null && environmentalTable.querySelectorAll('tr[data-country]').length === 8, "Environmental renders country status");
+
+// 63) System Design Calculator
+var systemdesignNav = doc.querySelector('.nav-item[data-view="systemdesign"]');
+ok(systemdesignNav != null, "System Design nav item exists");
+
+if (systemdesignNav) systemdesignNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var sdCalcBtn = doc.getElementById("sdCalcBtn");
+ok(sdCalcBtn != null, "System Design calculate button exists");
+
+// 64) Revenue Model
+var revenueNav = doc.querySelector('.nav-item[data-view="revenue"]');
+ok(revenueNav != null, "Revenue Model nav item exists");
+
+if (revenueNav) revenueNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var rvCalcBtn = doc.getElementById("rvCalcBtn");
+ok(rvCalcBtn != null, "Revenue Model calculate button exists");
+
+// 65) Permit Tracker
+var permitsNav = doc.querySelector('.nav-item[data-view="permits"]');
+ok(permitsNav != null, "Permit Tracker nav item exists");
+
+if (permitsNav) permitsNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var permitsTable = doc.getElementById("permitsTable");
+ok(permitsTable != null && permitsTable.querySelectorAll('tbody tr').length >= 8, "Permit Tracker renders permits table");
+
+// 66) Competitive Intelligence (Market Intel)
+var competitiveNav = doc.querySelector('.nav-item[data-view="competitive"]');
+ok(competitiveNav != null, "Market Intel nav item exists");
+
+if (competitiveNav) competitiveNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var cableSystemsTable = doc.getElementById("cableSystemsTable");
+ok(cableSystemsTable != null && cableSystemsTable.querySelectorAll('tbody tr').length >= 7, "Market Intel shows cable systems");
+
+// 67) Route Optimizer
+var routeoptNav = doc.querySelector('.nav-item[data-view="routeopt"]');
+ok(routeoptNav != null, "Route Optimizer nav item exists");
+
+if (routeoptNav) routeoptNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var roCalcBtn = doc.getElementById("roCalcBtn");
+ok(roCalcBtn != null, "Route Optimizer has calculate button");
+
+// 68) Fault Forecast
+var predictiveNav = doc.querySelector('.nav-item[data-view="predictive"]');
+ok(predictiveNav != null, "Fault Forecast nav item exists");
+
+if (predictiveNav) predictiveNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var predictiveTable = doc.getElementById("predictiveTable");
+ok(predictiveTable != null && predictiveTable.querySelectorAll('tbody tr').length >= 6, "Fault Forecast renders segment table");
+
+// 69) Digital Twin
+var digitaltwinNav = doc.querySelector('.nav-item[data-view="digitaltwin"]');
+ok(digitaltwinNav != null, "Digital Twin nav item exists");
+
+if (digitaltwinNav) digitaltwinNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var dtSegments = doc.getElementById("dtSegments");
+ok(dtSegments != null && dtSegments.querySelectorAll('[data-segment]').length >= 6, "Digital Twin renders health scores");
+
+// 70) SLA Management
+var slaNav = doc.querySelector('.nav-item[data-view="sla"]');
+ok(slaNav != null, "SLA Management nav item exists");
+
+if (slaNav) slaNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var slaTable = doc.getElementById("slaTable");
+ok(slaTable != null && slaTable.querySelectorAll('tbody tr').length >= 7, "SLA table renders metrics with targets");
+
+// 71) Cable Protection Zones
+var protectionNav = doc.querySelector('.nav-item[data-view="protection"]');
+ok(protectionNav != null, "Protection Zones nav item exists");
+
+if (protectionNav) protectionNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var protectionTable = doc.getElementById("protectionTable");
+ok(protectionTable != null && protectionTable.querySelectorAll('tbody tr').length >= 8, "Protection Zones table renders zones for multiple countries");
+
+// 72) Training & Competency
+var trainingNav = doc.querySelector('.nav-item[data-view="training"]');
+ok(trainingNav != null, "Training nav item exists");
+
+if (trainingNav) trainingNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var trainingTable = doc.getElementById("trainingTable");
+ok(trainingTable != null && trainingTable.querySelectorAll('tbody tr').length >= 10, "Training table renders competency records");
+
+// 73) Capacity Dashboard
+var capacityNav = doc.querySelector('.nav-item[data-view="capacity"]');
+ok(capacityNav != null, "Capacity nav item exists");
+
+if (capacityNav) capacityNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var capacityTable = doc.getElementById("capacityTable");
+ok(capacityTable != null && capacityTable.querySelectorAll('tbody tr').length >= 6, "Capacity table renders 6 SEA segments with utilization");
+
+// 74) Incident Management
+var incidentNav = doc.querySelector('.nav-item[data-view="incidents"]');
+ok(incidentNav != null, "Incidents nav item exists");
+
+if (incidentNav) incidentNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var incidentTable = doc.getElementById("incidentTable");
+ok(incidentTable != null && incidentTable.querySelectorAll('tbody tr').length >= 5, "Incident table renders 5 submarine cable incidents");
+
+// 75) Performance Benchmarking
+var benchmarkNav = doc.querySelector('.nav-item[data-view="benchmark"]');
+ok(benchmarkNav != null, "Benchmarking nav item exists");
+
+if (benchmarkNav) benchmarkNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var benchmarkTable = doc.getElementById("benchmarkTable");
+ok(benchmarkTable != null && benchmarkTable.querySelectorAll('tbody tr').length >= 4, "Benchmark table renders metrics with industry comparison");
+
+// 76) Getting Started / Onboarding Guide
+var guideNav = doc.querySelector('.nav-item[data-view="guide"]');
+ok(guideNav != null, "Getting Started nav item exists");
+
+if (guideNav) guideNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var guideContent = doc.getElementById("content").innerHTML;
+ok(guideContent.indexOf("guide-go-btn") !== -1 && guideContent.indexOf("data-target=") !== -1, "Getting Started has step navigation buttons");
+
+// 77) Data Import Wizard
+var dataimportNav = doc.querySelector('.nav-item[data-view="dataimport"]');
+ok(dataimportNav != null, "Data Import nav item exists");
+
+if (dataimportNav) dataimportNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var importUpload = doc.getElementById("importUploadArea");
+ok(importUpload != null && doc.getElementById("importCsvFile") != null, "Data Import has upload area");
+
+// 78) seedFullDemo creates 16+ cases (6 base + 10 demo)
+S.seedFullDemo();
+ok(S.validCases().length >= 16, "seedFullDemo creates 16+ cases (6 base + 10 demo) - got " + S.validCases().length);
+
+// 79) Demo cases have mixed statuses for dashboard variety
+var demoStatuses = {};
+S.validCases().forEach(function(c) { demoStatuses[c.status] = (demoStatuses[c.status] || 0) + 1; });
+ok(demoStatuses["RESOLVED"] >= 3 && demoStatuses["IN PROGRESS"] >= 3 && demoStatuses["OPEN"] >= 2 && demoStatuses["BLOCKED"] >= 1 && demoStatuses["ON HOLD"] >= 1, "Demo cases have mixed statuses for dashboard variety");
+
+// 80) Energy Watchdog nav item exists
+var energyNav = doc.querySelector('.nav-item[data-view="energy"]');
+ok(energyNav != null, "Energy Watchdog nav item exists");
+
+// 81) Energy Watchdog shows KPI cards
+if (energyNav) energyNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var energyKpis = doc.getElementById("energyKpis");
+ok(energyKpis != null && energyKpis.querySelectorAll('.kpi').length >= 5, "Energy Watchdog shows KPI cards");
+
+// 82) Energy Watchdog shows optimization recommendations
+var energyOptTable = doc.getElementById("energyOptTable");
+ok(energyOptTable != null && energyOptTable.querySelectorAll('tbody tr').length >= 4, "Energy Watchdog shows optimization recommendations");
+
+// 83) Energy Watchdog shows 25-year lifecycle projection
+var energyLifecycle = doc.getElementById("energyLifecycle");
+ok(energyLifecycle != null && energyLifecycle.innerHTML.indexOf("25-Year") !== -1, "Energy Watchdog shows 25-year lifecycle projection");
+
+// 84) Commissioning Checklist nav item exists
+var commNav = doc.querySelector('.nav-item[data-view="commissioning"]');
+ok(commNav != null, "Commissioning Checklist nav item exists");
+
+// 85) Commissioning Checklist shows segment tables
+if (commNav) commNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var commSegTables = doc.querySelectorAll('.commissioningSegTable');
+ok(commSegTables != null && commSegTables.length >= 5, "Commissioning Checklist shows segment tables - got " + (commSegTables ? commSegTables.length : 0));
+
+// 86) Commissioning Checklist shows hold points
+var commHoldPoints = doc.getElementById("commissioningHoldPoints");
+ok(commHoldPoints != null && commHoldPoints.querySelectorAll('tbody tr').length >= 5, "Commissioning Checklist shows hold points table");
+
+// 87) Wavelength Assignment Planner
+var wlNav = doc.querySelector('.nav-item[data-view="wavelengths"]');
+ok(wlNav != null, "Wavelength Planner nav item exists");
+if (wlNav) wlNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var wlKpis = doc.getElementById("wlKpis");
+ok(wlKpis != null && wlKpis.querySelectorAll('.kpi').length >= 5, "Wavelength Planner shows KPI cards");
+var wlGrid = doc.querySelector('.wlGridTable');
+ok(wlGrid != null && wlGrid.querySelectorAll('tbody tr').length >= 10, "Wavelength Planner shows DWDM channel grid - got " + (wlGrid ? wlGrid.querySelectorAll('tbody tr').length : 0));
+ok(doc.getElementById("wlRefs") != null && doc.getElementById("wlRefs").innerHTML.indexOf("G.694.1") !== -1, "Wavelength Planner cites ITU-T G.694.1");
+// 88) Click-only recompute: switch to C+L band and re-evaluate
+var wlBand = doc.getElementById("wlBand");
+if (wlBand) { wlBand.value = "C+L"; wlBand.dispatchEvent(new window.Event("change", { bubbles: true })); }
+ok(doc.getElementById("wlKpis") != null && /C\+L/.test(doc.getElementById("wlResults").innerHTML), "Wavelength Planner recomputes on band change (C+L)");
+
+// 89) Latency Calculator
+var latNav = doc.querySelector('.nav-item[data-view="latency"]');
+ok(latNav != null, "Latency Calculator nav item exists");
+if (latNav) latNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var latKpis = doc.getElementById("latKpis");
+ok(latKpis != null && latKpis.querySelectorAll('.kpi').length >= 5, "Latency Calculator shows KPI cards");
+var latBudget = doc.querySelector('.latBudgetTable');
+ok(latBudget != null && latBudget.querySelectorAll('tbody tr').length >= 3, "Latency Calculator shows latency budget table");
+ok(doc.getElementById("latCompare") != null && doc.getElementById("latCompare").innerHTML.indexOf("GEO satellite") !== -1, "Latency Calculator benchmarks against GEO satellite");
+// 90) Click-only recompute on route change
+var latRoute = doc.getElementById("latRoute");
+if (latRoute) { latRoute.value = "10000"; latRoute.dispatchEvent(new window.Event("change", { bubbles: true })); }
+ok(doc.getElementById("latKpis") != null, "Latency Calculator recomputes on route change");
+
+// 91) Cable Protection Awareness
+var cpNav = doc.querySelector('.nav-item[data-view="cableprotect"]');
+ok(cpNav != null, "Cable Protection nav item exists");
+if (cpNav) cpNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var cpKpis = doc.getElementById("cpKpis");
+ok(cpKpis != null && cpKpis.querySelectorAll('.kpi').length >= 5, "Cable Protection shows KPI cards");
+var cpSeg = doc.querySelector('.cableProtectSegTable');
+ok(cpSeg != null && cpSeg.querySelectorAll('tbody tr').length >= 4, "Cable Protection shows per-depth-band plan - got " + (cpSeg ? cpSeg.querySelectorAll('tbody tr').length : 0));
+ok(doc.getElementById("cpRefs") != null && doc.getElementById("cpRefs").innerHTML.indexOf("UNCLOS") !== -1, "Cable Protection cites UNCLOS");
+ok(doc.getElementById("cpMitigations") != null, "Cable Protection lists recommended mitigations");
+// 92) Click-only recompute on threat-environment change
+var cpTrawl = doc.getElementById("cpTrawl");
+if (cpTrawl) { cpTrawl.value = "high"; cpTrawl.dispatchEvent(new window.Event("change", { bubbles: true })); }
+ok(doc.querySelector('.cableProtectSegTable') != null, "Cable Protection recomputes on trawling-intensity change");
+
+// 93) 3D Build Visualisation
+var buildNav = doc.querySelector('.nav-item[data-view="buildanim"]');
+ok(buildNav != null, "3D Build Visualisation nav item exists");
+if (buildNav) buildNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var buildSvg = doc.getElementById("buildSvg");
+ok(buildSvg != null && buildSvg.querySelectorAll('path[id^="seg-"]').length >= 7, "Build view renders the animated SVG scene with cable paths - got " + (buildSvg ? buildSvg.querySelectorAll('path[id^="seg-"]').length : 0));
+ok(buildSvg != null && buildSvg.querySelectorAll('g[id^="st-"]').length === 8, "Build scene renders 8 landing-station markers");
+var buildStats = doc.getElementById("buildStats");
+ok(buildStats != null && buildStats.querySelectorAll('.kpi').length >= 5, "Build view shows the stats bar (KPIs)");
+ok(doc.getElementById("buildPlay") != null && doc.getElementById("buildScrubber") != null, "Build view has play control + timeline scrubber");
+var buildRows = doc.querySelectorAll('.qi-step-row');
+ok(buildRows.length >= 40, "Build view lists every construction step in the timeline - got " + buildRows.length);
+// 94) Narration populated at step 0
+var buildTitle = doc.getElementById("buildTitle");
+ok(buildTitle != null && buildTitle.textContent.length > 0 && doc.getElementById("buildNarration").textContent.length > 0, "Build view shows step narration at start");
+// 95) Scrubber to last step -> handover + 100% progress
+var scrubber = doc.getElementById("buildScrubber");
+if (scrubber) { scrubber.value = scrubber.max; scrubber.dispatchEvent(new window.Event("input", { bubbles: true })); }
+ok(doc.getElementById("buildProgressBar").style.width === "100%", "scrubbing to the end shows 100% build progress");
+ok(/service/i.test(doc.getElementById("buildTitle").textContent), "final step narrates system ready for service");
+// 96) Step-back button decrements the counter
+var prevBtn = doc.getElementById("buildPrev");
+if (prevBtn) prevBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(/Step \d+ \/ /.test(doc.getElementById("buildCounter").textContent) && doc.getElementById("buildProgressBar").style.width !== "100%", "step-back control moves earlier in the sequence");
+// 97) Clicking a timeline row jumps to that step
+var buildFirstRow = doc.querySelector('.qi-step-row[data-step="0"]');
+if (buildFirstRow) buildFirstRow.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("buildCounter").textContent.indexOf("Step 1 /") !== -1 && buildFirstRow.classList.contains("active"), "clicking a timeline step jumps the animation to it");
+
+// 98) Country Intelligence Hub
+var ciNav = doc.querySelector('.nav-item[data-view="countryintel"]');
+ok(ciNav != null, "Country Intelligence nav item exists");
+if (ciNav) ciNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var ciSelector = doc.getElementById("ciSelector");
+ok(ciSelector != null && ciSelector.querySelectorAll('.ci-country-btn').length === 8, "Country Intelligence shows 8 country selector buttons - got " + (ciSelector ? ciSelector.querySelectorAll('.ci-country-btn').length : 0));
+var ciAuth = doc.querySelector('.ciAuthTable');
+ok(ciAuth != null && ciAuth.querySelectorAll('tbody tr').length === 5, "Country dossier shows 5 regulatory authorities");
+ok(doc.getElementById("ciContacts") != null && doc.getElementById("ciContacts").innerHTML.indexOf("Permitting") !== -1, "Country dossier shows phase-based key contacts");
+// 99) Switching country updates the dossier
+var phBtn = doc.querySelector('.ci-country-btn[data-code="PH"]');
+if (phBtn) phBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("ciCountryName").textContent === "Philippines", "selecting Philippines updates the dossier header");
+ok(doc.querySelector('.ciAuthTable').innerHTML.indexOf("NTC") !== -1, "Philippines dossier names its real regulator (NTC)");
+ok(phBtn.classList.contains("btn-primary"), "selected country button is highlighted active");
+
+// 100) Brain plan preview surfaces authorities by phase when countries are detected
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+doc.getElementById("brainText").value =
+  "Submarine fibre cable system landing in Indonesia, Philippines and Taiwan, 3000 km route, marine survey, OTDR splicing, commissioning";
+doc.getElementById("brainAnalyze").click();
+var brainPhaseAuth = doc.getElementById("brainPhaseAuth");
+ok(brainPhaseAuth != null, "Brain plan surfaces an 'Authorities by phase' section when countries are detected");
+ok(brainPhaseAuth != null && /NTC|Kominfo|NCC/.test(brainPhaseAuth.innerHTML), "Authorities-by-phase names real regulators (NTC/Kominfo/NCC)");
+ok(brainPhaseAuth != null && /Permitting/.test(brainPhaseAuth.innerHTML), "Authorities-by-phase shows the permitting group");
+
+// 101) Disbursement & Lender Reporting
+var disbNav = doc.querySelector('.nav-item[data-view="disbursement"]');
+ok(disbNav != null, "Disbursement / Lender nav item exists");
+if (disbNav) disbNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var disbKpis = doc.getElementById("disbKpis");
+ok(disbKpis != null && disbKpis.querySelectorAll('.kpi').length >= 5, "Disbursement view shows lender KPI cards");
+var disbCc = doc.querySelector('.disbCountryTable');
+ok(disbCc != null && disbCc.querySelectorAll('tbody tr').length === 8, "Disbursement shows the 8-country multi-currency allocation");
+ok(disbCc != null && /IDR/.test(disbCc.innerHTML) && /PHP/.test(disbCc.innerHTML), "allocation table shows local currencies (IDR, PHP)");
+var disbYr = doc.querySelector('.disbYearTable');
+ok(disbYr != null && disbYr.querySelectorAll('tbody tr').length >= 5, "Disbursement shows the annual drawdown schedule");
+// 102) Recompute on parameter change (duration -> shorter schedule)
+var disbMonths = doc.getElementById("disbMonths");
+if (disbMonths) { disbMonths.value = "48"; disbMonths.dispatchEvent(new window.Event("change", { bubbles: true })); }
+ok(doc.querySelector('.disbYearTable').querySelectorAll('tbody tr').length === 4, "changing duration to 48 months yields 4 annual rows");
+ok(doc.getElementById("disbRefs") != null && /FIDIC|NEC4/.test(doc.getElementById("disbRefs").innerHTML), "Disbursement cites FIDIC/NEC payment basis");
+
+// 103) Country challenges surface as scored risks in the Brain plan preview
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+doc.getElementById("brainText").value =
+  "Submarine fibre cable landing in Indonesia, Philippines and Taiwan, 3000 km route, marine survey, OTDR splicing";
+doc.getElementById("brainAnalyze").click();
+var brainOut2 = doc.getElementById("brainOut").innerHTML;
+ok(/natural-hazard|geographical/.test(brainOut2), "Brain risk table includes country geographical/natural-hazard risks");
+ok(/geopolitical/.test(brainOut2), "Brain risk table includes country geopolitical risks");
+
+// 104) Contracts & Variations Hub
+var ctrNav = doc.querySelector('.nav-item[data-view="contracts"]');
+ok(ctrNav != null, "Contracts & Variations nav item exists");
+if (ctrNav) ctrNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var ctrKpis = doc.getElementById("ctrKpis");
+ok(ctrKpis != null && ctrKpis.querySelectorAll('.kpi').length >= 5, "Contracts view shows variation KPI cards");
+var ctrVar = doc.querySelector('.ctrVarTable');
+ok(ctrVar != null && ctrVar.querySelectorAll('tbody tr').length === 5, "Contracts view lists the 5 variations/compensation events");
+var ctrClause = doc.querySelector('.ctrClauseTable');
+ok(ctrClause != null && ctrClause.querySelectorAll('tbody tr').length === 27, "Contracts view shows the 27-clause reference library");
+// 105) Template form filter (FIDIC) updates the template table
+var fidicBtn = doc.querySelector('.ctr-form-btn[data-form="FIDIC"]');
+if (fidicBtn) fidicBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector('.ctrTemplateTable').querySelectorAll('tbody tr').length >= 10 && fidicBtn.classList.contains("btn-primary"), "filtering templates to FIDIC updates the table and highlights the button");
+// 106) Recompute on contract sum change
+var ctrSum = doc.getElementById("ctrSum");
+if (ctrSum) { ctrSum.value = "1300000000"; ctrSum.dispatchEvent(new window.Event("change", { bubbles: true })); }
+ok(doc.getElementById("ctrKpis").innerHTML.indexOf("1.30B") !== -1, "changing the contract sum to $1.3B recomputes the KPIs");
+
+// 107) Inspection & Test Plan (ITP)
+var itpNav = doc.querySelector('.nav-item[data-view="itp"]');
+ok(itpNav != null, "Inspection & Test Plan nav item exists");
+if (itpNav) itpNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var itpKpis = doc.getElementById("itpKpis");
+ok(itpKpis != null && itpKpis.querySelectorAll('.kpi').length >= 5, "ITP view shows point-type KPI cards");
+var itpTable = doc.querySelector('.itpTable');
+ok(itpTable != null && itpTable.querySelectorAll('tbody tr').length >= 14, "ITP table lists all items (incl. phase headers) - got " + (itpTable ? itpTable.querySelectorAll('tbody tr').length : 0));
+// 108) Filter to Hold points
+var holdBtn = doc.querySelector('.itp-filter-btn[data-point="H"]');
+if (holdBtn) holdBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+var itpHoldRows = doc.querySelector('.itpTable').querySelectorAll('tbody tr');
+// 7 hold items + up to 4 phase-header rows = <= 11, and definitely fewer than the full 14+4
+ok(itpHoldRows.length < 14 && holdBtn.classList.contains("btn-primary"), "filtering to Hold points narrows the ITP table and highlights the button");
+ok(doc.getElementById("itpRefs") != null && /ISO 9001/.test(doc.getElementById("itpRefs").innerHTML), "ITP cites ISO 9001 basis");
+
+// 109) Route Progress Tracker
+var rpNav = doc.querySelector('.nav-item[data-view="routeprogress"]');
+ok(rpNav != null, "Route Progress nav item exists");
+if (rpNav) rpNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var rpKpis = doc.getElementById("rpKpis");
+ok(rpKpis != null && rpKpis.querySelectorAll('.kpi').length >= 5, "Route Progress shows roll-up KPI cards");
+var rpSeg = doc.querySelector('.rpSegTable');
+ok(rpSeg != null && rpSeg.querySelectorAll('tbody tr').length === 7, "Route Progress lists all 7 segments");
+ok(rpKpis != null && /Behind/.test(rpKpis.innerHTML), "Route Progress shows the schedule verdict (Behind vs 55% baseline)");
+// 110) Planned baseline slider flips the verdict
+var rpPlanned = doc.getElementById("rpPlanned");
+if (rpPlanned) { rpPlanned.value = "35"; rpPlanned.dispatchEvent(new window.Event("input", { bubbles: true })); }
+ok(/Ahead/.test(doc.getElementById("rpKpis").innerHTML), "lowering the planned baseline to 35% flips the verdict to Ahead");
+
+// 111) Programme Status Report (executive)
+var progNav = doc.querySelector('.nav-item[data-view="progreport"]');
+ok(progNav != null, "Programme Report nav item exists");
+if (progNav) progNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var progBanner = doc.getElementById("progBanner");
+ok(progBanner != null && /RED|AMBER|GREEN/.test(progBanner.textContent), "Programme Report shows the RAG banner");
+var progKpis = doc.getElementById("progKpis");
+ok(progKpis != null && progKpis.querySelectorAll('.kpi').length >= 6, "Programme Report shows the executive KPI grid");
+var progAlerts = doc.getElementById("progAlerts");
+ok(progAlerts != null && progAlerts.querySelectorAll('li').length >= 1, "Programme Report shows the exceptions/alerts list");
+ok(progAlerts != null && /behind/i.test(progAlerts.textContent), "Programme Report alert flags the schedule slippage");
+ok(progAlerts != null && /marine-window constrained/.test(progAlerts.textContent), "Programme Report folds in the marine-window recovery constraint");
+
+// 112) Quantitative Risk (Monte Carlo)
+var qrNav = doc.querySelector('.nav-item[data-view="qrisk"]');
+ok(qrNav != null, "Quantitative Risk nav item exists");
+if (qrNav) qrNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var qrKpis = doc.getElementById("qrKpis");
+ok(qrKpis != null && qrKpis.querySelectorAll('.kpi').length >= 5, "Quantitative Risk shows P50/P80/P90 + contingency KPIs");
+ok(qrKpis != null && /P90/.test(qrKpis.innerHTML), "Quantitative Risk surfaces a P90 contingency");
+var qrCp = doc.querySelector('.qrCpTable');
+ok(qrCp != null && qrCp.querySelectorAll('tbody tr').length >= 1, "Quantitative Risk shows critical-path criticality");
+ok(doc.getElementById("qrResults").querySelectorAll('svg').length >= 2, "Quantitative Risk renders cost + schedule histograms");
+
+// 113) Marine Weather-Window Planner
+var wxNav = doc.querySelector('.nav-item[data-view="weather"]');
+ok(wxNav != null, "Weather Windows nav item exists");
+if (wxNav) wxNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var wxKpis = doc.getElementById("wxKpis");
+ok(wxKpis != null && wxKpis.querySelectorAll('.kpi').length >= 4, "Weather Windows shows campaign-window KPIs");
+var wxMatrix = doc.querySelector('.wxMatrix');
+ok(wxMatrix != null && wxMatrix.querySelectorAll('tbody tr').length === 9, "operability matrix shows 8 country rows + an operable-count row");
+ok(wxKpis != null && /Apr/.test(wxKpis.innerHTML), "Weather Windows surfaces the Apr-May campaign window");
+// 114) Threshold slider widens the window
+var wxThr = doc.getElementById("wxThreshold");
+if (wxThr) { wxThr.value = "6"; wxThr.dispatchEvent(new window.Event("input", { bubbles: true })); }
+ok(/Jun/.test(doc.getElementById("wxKpis").innerHTML), "relaxing the threshold to 6 countries extends the window to June");
+
+// 115) Exhaustive regression net: every navigable view renders, no duplicate ids
+var allNavBtns = Array.prototype.slice.call(doc.querySelectorAll('.nav-item[data-view]'));
+var navIds = allNavBtns.map(function (b) { return b.getAttribute("data-view"); });
+var seenNav = {}, dupNav = [];
+navIds.forEach(function (id) { if (seenNav[id]) dupNav.push(id); seenNav[id] = 1; });
+ok(dupNav.length === 0, "no duplicate nav data-view ids" + (dupNav.length ? " (dups: " + dupNav.join(",") + ")" : ""));
+ok(allNavBtns.length >= 75, "platform exposes 75+ navigable views (got " + allNavBtns.length + ")");
+var uniqueNavIds = Object.keys(seenNav);
+var renderFailures = [];
+uniqueNavIds.forEach(function (v) {
+  var btn = doc.querySelector('.nav-item[data-view="' + v + '"]');
+  try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
+  catch (e) { renderFailures.push(v + " threw: " + e.message); return; }
+  var c = doc.getElementById("content").innerHTML;
+  if (!(c && c.length > 20)) renderFailures.push(v + " empty");
+});
+ok(renderFailures.length === 0, "every navigable view renders without error" + (renderFailures.length ? " (failures: " + renderFailures.join(" | ") + ")" : " (" + uniqueNavIds.length + " views)"));
+// the hardcoded smoke list must remain a subset of the live nav (don't silently drift)
+var missingFromNav = views.filter(function (v) { return !seenNav[v]; });
+ok(missingFromNav.length === 0, "hardcoded view list stays in sync with the nav" + (missingFromNav.length ? " (missing: " + missingFromNav.join(",") + ")" : ""));
+
+// 116) Programme Work Breakdown (packages)
+var pkgNav = doc.querySelector('.nav-item[data-view="packages"]');
+ok(pkgNav != null, "Work Breakdown nav item exists");
+if (pkgNav) pkgNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var pkgKpis = doc.getElementById("pkgKpis");
+ok(pkgKpis != null && pkgKpis.querySelectorAll('.kpi').length >= 5, "Work Breakdown shows roll-up KPIs");
+var pkgTable = doc.querySelector('.pkgTable');
+ok(pkgTable != null && pkgTable.querySelectorAll('tbody tr').length === 8, "Work Breakdown lists all 8 contract packages");
+ok(doc.querySelector('.pkgCatTable') != null && doc.querySelector('.pkgCatTable').querySelectorAll('tbody tr').length >= 5, "Work Breakdown shows the value-by-category breakdown");
+
+// 117) Work Orders (field-task tier)
+var woNav = doc.querySelector('.nav-item[data-view="workorders"]');
+ok(woNav != null, "Work Orders nav item exists");
+if (woNav) woNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var woKpis = doc.getElementById("woKpis");
+ok(woKpis != null && woKpis.querySelectorAll('.kpi').length >= 5, "Work Orders shows status KPIs");
+var woTable = doc.querySelector('.woTable');
+ok(woTable != null && woTable.querySelectorAll('tbody tr').length === 20, "Work Orders lists all 20 field tasks");
+// filter to Complete
+var woComplete = doc.querySelector('.wo-filter-btn[data-status="Complete"]');
+if (woComplete) woComplete.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector('.woTable').querySelectorAll('tbody tr').length === 6 && woComplete.classList.contains("btn-primary"), "filtering to Complete shows the 6 finished work orders");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
