@@ -808,7 +808,36 @@
           <div class="field full"><label>API base URL</label><select id="ai_base">${opts(["https://api.openai.com/v1"], ai.baseUrl || "https://api.openai.com/v1")}</select></div>
           <div class="field full"><label>API key (the only typed field)</label><input type="password" id="ai_key" value="${esc(ai.key || "")}" placeholder="sk-…"></div>
         </div>
-        <div style="margin-top:14px"><button class="btn btn-primary" data-act="saveai">Save AI settings</button></div></div>`;
+        <div style="margin-top:14px"><button class="btn btn-primary" data-act="saveai">Save AI settings</button></div></div>
+
+      <div class="card"><h3>Account Security</h3>
+        <div class="mfa-status">
+          <span>Multi-Factor Authentication (MFA):</span>
+          <span class="mfa-badge ${(window.QIAuth && window.QIAuth.currentUser && window.QIAuth.currentUser.mfaEnabled) ? 'enabled' : 'disabled'}">${(window.QIAuth && window.QIAuth.currentUser && window.QIAuth.currentUser.mfaEnabled) ? 'Enabled' : 'Disabled'}</span>
+        </div>
+        <div id="mfaSettingsContent">
+          ${(window.QIAuth && window.QIAuth.currentUser && window.QIAuth.currentUser.mfaEnabled) ?
+            '<p class="muted">MFA is active on your account. To disable it, enter your password and a current TOTP code.</p>' +
+            '<div class="mfa-enroll-form">' +
+            '  <div class="auth-field"><label for="mfaDisablePw">Password</label><input type="password" id="mfaDisablePw" placeholder="Your password"></div>' +
+            '  <div class="auth-field"><label for="mfaDisableCode">TOTP Code</label><input type="text" id="mfaDisableCode" maxlength="6" pattern="[0-9]{6}" placeholder="000000" inputmode="numeric"></div>' +
+            '  <button class="btn btn-danger" id="btnDisableMfa">Disable MFA</button>' +
+            '</div>'
+            :
+            '<p class="muted">Protect your account with time-based one-time passwords (TOTP). Works with any authenticator app.</p>' +
+            '<button class="btn btn-primary" id="btnEnrollMfa">Enable MFA</button>' +
+            '<div id="mfaEnrollArea" hidden>' +
+            '  <div class="mfa-secret" id="mfaSecretUri"></div>' +
+            '  <p class="muted">Scan the URI above with your authenticator app, then enter the 6-digit code to confirm.</p>' +
+            '  <div class="mfa-enroll-form">' +
+            '    <div class="auth-field"><label for="mfaVerifyCode">TOTP Code</label><input type="text" id="mfaVerifyCode" maxlength="6" pattern="[0-9]{6}" placeholder="000000" inputmode="numeric"></div>' +
+            '    <button class="btn btn-primary" id="btnVerifyMfa">Verify and activate</button>' +
+            '  </div>' +
+            '</div>'
+          }
+        </div>
+        <div class="auth-error" id="mfaError" hidden style="margin-top:12px"></div>
+      </div>`;
   };
   AFTER.config = function () {
     content.querySelectorAll("input[data-ro],select[data-ro]").forEach(inp => inp.addEventListener("change", () => {
@@ -822,6 +851,57 @@
       const fr = new FileReader();
       fr.onload = () => { S.setBrand({ logo: fr.result }); refreshHeader(); go("config"); toast("Logo set."); };
       fr.readAsDataURL(f);
+    });
+    // MFA settings wiring
+    const btnEnroll = $("#btnEnrollMfa");
+    if (btnEnroll) btnEnroll.addEventListener("click", function () {
+      if (!window.QIAuth) return;
+      btnEnroll.disabled = true;
+      window.QIAuth.enrollMfa().then(function (data) {
+        if (data.uri || data.secret) {
+          var area = $("#mfaEnrollArea");
+          var uriEl = $("#mfaSecretUri");
+          if (uriEl) uriEl.textContent = data.uri || data.secret;
+          if (area) area.hidden = false;
+        } else {
+          var err = $("#mfaError"); if (err) { err.textContent = data.message || data.error || "Enrollment failed."; err.hidden = false; }
+        }
+        btnEnroll.disabled = false;
+      }).catch(function () {
+        var err = $("#mfaError"); if (err) { err.textContent = "Unable to reach the server."; err.hidden = false; }
+        btnEnroll.disabled = false;
+      });
+    });
+    const btnVerify = $("#btnVerifyMfa");
+    if (btnVerify) btnVerify.addEventListener("click", function () {
+      if (!window.QIAuth) return;
+      var code = ($("#mfaVerifyCode") || {}).value || "";
+      var err = $("#mfaError");
+      if (err) err.hidden = true;
+      window.QIAuth.verifyMfa(code).then(function (data) {
+        if (data.success || data.mfaEnabled) {
+          toast("MFA enabled successfully.");
+          go("config");
+        } else {
+          if (err) { err.textContent = data.message || data.error || "Verification failed."; err.hidden = false; }
+        }
+      }).catch(function () { if (err) { err.textContent = "Unable to reach the server."; err.hidden = false; } });
+    });
+    const btnDisable = $("#btnDisableMfa");
+    if (btnDisable) btnDisable.addEventListener("click", function () {
+      if (!window.QIAuth) return;
+      var pw = ($("#mfaDisablePw") || {}).value || "";
+      var code = ($("#mfaDisableCode") || {}).value || "";
+      var err = $("#mfaError");
+      if (err) err.hidden = true;
+      window.QIAuth.disableMfa(pw, code).then(function (data) {
+        if (data.success) {
+          toast("MFA disabled.");
+          go("config");
+        } else {
+          if (err) { err.textContent = data.message || data.error || "Failed to disable MFA."; err.hidden = false; }
+        }
+      }).catch(function () { if (err) { err.textContent = "Unable to reach the server."; err.hidden = false; } });
     });
   };
 
@@ -2206,8 +2286,18 @@
     toast("Storage full — export a JSON backup and delete old snapshots.");
   });
 
-  // ---------- init ----------
-  S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
-  const initialHash = (location.hash || "").replace(/^#/, "");
-  go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
+  // ---------- init (called by auth.js after successful authentication) ----------
+  window.QIBoot = function () {
+    S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
+    const initialHash = (location.hash || "").replace(/^#/, "");
+    go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
+    // Wire up logout button after boot
+    const btnLogout = $("#btnLogout");
+    if (btnLogout && window.QIAuth) btnLogout.addEventListener("click", function () { window.QIAuth.logout(); });
+  };
+
+  // When __SKIP_AUTH is set (e.g. smoke tests), boot immediately without waiting for auth.js DOMContentLoaded
+  if (typeof window.__SKIP_AUTH !== "undefined" && window.__SKIP_AUTH) {
+    window.QIBoot();
+  }
 })();

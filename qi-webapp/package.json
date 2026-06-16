@@ -1,0 +1,16 @@
+{
+  "name": "qi-webapp",
+  "version": "1.0.0",
+  "description": "A self-contained, browser-based version of the QI/PM Excel platform. Register a case **once** and it flows into every view — PM tasks, risk register, FMEA, PDCA, action log, timeline, budget, dashboard and an AI assistant — all updated live.",
+  "main": "brain.test.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "jsdom": "^29.1.1"
+  }
+}

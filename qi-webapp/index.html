@@ -7,7 +7,68 @@
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <div id="app">
+  <!-- Auth Gate: shown when user is not authenticated -->
+  <div id="authGate" class="auth-gate">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="auth-brand-mark">QI</div>
+        <h1>QI Intelligence Platform</h1>
+        <p class="auth-subtitle">Submarine Telecom Project Application</p>
+      </div>
+
+      <div class="auth-error" id="authError" hidden></div>
+
+      <!-- Login panel -->
+      <form id="loginForm" class="auth-form" autocomplete="on">
+        <div id="authLogin">
+          <div class="auth-field">
+            <label for="loginEmail">Email</label>
+            <input type="email" id="loginEmail" name="email" required autocomplete="email" placeholder="you@example.com">
+          </div>
+          <div class="auth-field">
+            <label for="loginPassword">Password</label>
+            <input type="password" id="loginPassword" name="password" required autocomplete="current-password" placeholder="Enter password">
+          </div>
+          <button type="submit" class="btn btn-primary auth-submit">Sign In</button>
+          <p class="auth-switch">No account? <a href="#" id="showRegister">Create account</a></p>
+        </div>
+      </form>
+
+      <!-- Register panel -->
+      <form id="registerForm" class="auth-form" autocomplete="on">
+        <div id="authRegister" hidden>
+          <div class="auth-field">
+            <label for="regEmail">Email</label>
+            <input type="email" id="regEmail" name="email" required autocomplete="email" placeholder="you@example.com">
+          </div>
+          <div class="auth-field">
+            <label for="regPassword">Password</label>
+            <input type="password" id="regPassword" name="password" required autocomplete="new-password" placeholder="Min 10 characters">
+          </div>
+          <div class="auth-field">
+            <label for="regDisplayName">Display name</label>
+            <input type="text" id="regDisplayName" name="displayName" required autocomplete="name" placeholder="Your name">
+          </div>
+          <button type="submit" class="btn btn-primary auth-submit">Register</button>
+          <p class="auth-switch">Already have an account? <a href="#" id="showLogin">Back to login</a></p>
+        </div>
+      </form>
+
+      <!-- MFA challenge panel -->
+      <form id="mfaForm" class="auth-form">
+        <div id="authMfa" hidden>
+          <p class="auth-mfa-label">Enter your 6-digit authenticator code</p>
+          <div class="auth-field">
+            <label for="mfaCode">TOTP Code</label>
+            <input type="text" id="mfaCode" name="totpCode" required maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" placeholder="000000" inputmode="numeric">
+          </div>
+          <button type="submit" class="btn btn-primary auth-submit">Verify</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="app" hidden>
     <aside class="sidebar" id="sidebar">
       <div class="brand">
         <div class="brand-mark" id="brandMark">QI<img id="brandLogo" alt="" hidden></div>
@@ -40,6 +101,7 @@
           <button class="btn" id="btnExport">Export</button>
           <button class="btn" id="btnImport">Import</button>
           <input type="file" id="fileImport" accept="application/json" hidden />
+          <button class="btn btn-icon" id="btnLogout" title="Logout" aria-label="Logout">&#9211;</button>
         </div>
       </header>
       <section class="content" id="content"></section>
@@ -54,6 +116,7 @@
   <div class="toast" id="toast" hidden></div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="js/auth.js"></script>
   <script src="js/calc.js"></script>
   <script src="js/store.js"></script>
   <script src="js/brain.js"></script>
