@@ -257,6 +257,7 @@
     { id: "latency", label: "Latency Calculator", icon: "\u23F1" },
     { id: "buildanim", label: "3D Build Visualisation", icon: "\uD83C\uDFD7\uFE0F" },
     { id: "routeprogress", label: "Route Progress", icon: "\uD83D\uDCCD" },
+    { id: "weather", label: "Weather Windows", icon: "\uD83C\uDF00" },
     { id: "revenue", label: "Revenue Model", icon: "\uD83D\uDCB0" },
     { id: "routeopt", label: "Route Optimizer", icon: "\uD83D\uDEE4" },
     { id: "predictive", label: "Fault Forecast", icon: "\uD83D\uDCE1" },
@@ -2178,6 +2179,65 @@
     return '<h2 style="margin-bottom:6px">Programme Status Report</h2>' +
       '<p class="muted" style="margin-bottom:14px">Board &amp; lender monthly snapshot &mdash; an at-a-glance RAG roll-up across progress, finance, contracts, quality and risk.</p>' +
       banner + kpis + sectionCards + alerts + refs;
+  };
+
+  // ---------- Marine Weather-Window planner ----------
+  function weatherResultsHtml(r) {
+    if (!r) return '<div class="muted">Weather engine unavailable.</div>';
+    var s = r.summary;
+    var cw = s.campaignWindow ? (s.campaignWindow.from + "&ndash;" + s.campaignWindow.to + " (" + s.campaignWindow.months + " mo)") : "None";
+    var kpis = '<div class="grid kpis" id="wxKpis" style="margin-bottom:14px">' +
+      '<div class="kpi"><div class="label">Campaign window</div><div class="value">' + cw + '</div></div>' +
+      '<div class="kpi"><div class="label">All-clear months</div><div class="value">' + (s.allClearMonths.length ? s.allClearMonths.join(", ") : "None") + '</div></div>' +
+      '<div class="kpi"><div class="label">Worst month</div><div class="value" style="color:var(--red,#c0392b)">' + s.worstMonth.name + ' (' + s.worstMonth.operableCount + '/' + s.countries + ')</div></div>' +
+      '<div class="kpi"><div class="label">Avg operable</div><div class="value">' + s.avgOperablePct + '%</div></div>' +
+      '</div>';
+    // 12-month matrix
+    var head = '<tr><th>Country</th>' + r.monthNames.map(function (m) { return '<th style="text-align:center;font-size:.75rem">' + m + '</th>'; }).join("") + '</tr>';
+    var rows = r.perCountry.map(function (c) {
+      var restricted = {}; c.restrictedMonths.forEach(function (m) { restricted[m] = true; });
+      var cells = "";
+      for (var m = 1; m <= 12; m++) {
+        var go = !restricted[m];
+        cells += '<td title="' + (go ? "Operable" : esc(c.reason)) + '" style="text-align:center;background:' + (go ? "rgba(30,126,52,.22)" : "rgba(192,57,43,.30)") + '">' + (go ? "&#10003;" : "&#10007;") + '</td>';
+      }
+      return '<tr><td><strong>' + esc(c.country) + '</strong> <span class="muted" style="font-size:.78rem">' + esc(c.sea) + '</span></td>' + cells + '</tr>';
+    }).join("");
+    var operRow = '<tr><td class="muted">Operable / ' + s.countries + '</td>' + r.monthly.map(function (x) {
+      var col = x.operableCount === s.countries ? "var(--green,#1e7e34)" : x.operableCount <= 3 ? "var(--red,#c0392b)" : "var(--gold,#e0a800)";
+      return '<td style="text-align:center;font-weight:700;color:' + col + '">' + x.operableCount + '</td>';
+    }).join("") + '</tr>';
+    var matrix = '<div class="card"><h3>12-month marine operability matrix</h3>' +
+      '<div class="table-wrap"><table class="wxMatrix"><thead>' + head + '</thead><tbody>' + rows + operRow + '</tbody></table></div>' +
+      '<p class="muted" style="margin-top:6px">&#10003; operable &middot; &#10007; restricted (monsoon/typhoon). Threshold: campaign window needs &ge; ' + s.requiredCountries + ' of ' + s.countries + ' countries operable.</p></div>';
+    var winRows = r.perCountry.map(function (c) {
+      return '<tr><td>' + esc(c.country) + '</td><td>' + c.operablePct + '%</td><td>' + c.longestWindow.from + '&ndash;' + c.longestWindow.to + ' (' + c.longestWindow.months + ' mo)</td><td>' + esc(c.reason) + '</td></tr>';
+    }).join("");
+    var winTable = '<div class="card"><h3>Per-country viable windows</h3><div class="table-wrap"><table class="wxWindowTable"><thead><tr><th>Country</th><th>Operable</th><th>Longest window</th><th>Restriction</th></tr></thead><tbody>' + winRows + '</tbody></table></div></div>';
+    var refs = '<div class="card" id="wxRefs"><h3>Basis</h3><ul style="margin:0;padding-left:20px">' + r.references.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul></div>';
+    return kpis + matrix + winTable + refs;
+  }
+  RENDER.weather = function () {
+    var B = window.QIBrain;
+    if (!B || !B.weatherWindows) return '<h2>Weather Windows</h2><p class="muted">Weather engine unavailable.</p>';
+    uiState.weather = { required: 8 };
+    var r = B.weatherWindows();
+    var form = '<div class="card" style="margin-bottom:14px">' +
+      '<label class="muted" for="wxThreshold">Campaign requires operability in at least <span id="wxThresholdLabel">8</span> of 8 countries</label>' +
+      '<input type="range" id="wxThreshold" min="1" max="8" value="8" step="1" style="width:100%">' +
+      '</div>';
+    return '<h2 style="margin-bottom:6px">Marine Weather-Window Planner</h2>' +
+      '<p class="muted" style="margin-bottom:14px">When can marine cable operations run? Monsoon/typhoon restrictions per country, the 12-month operability matrix, and the cross-route campaign window.</p>' +
+      form + '<div id="wxResults">' + weatherResultsHtml(r) + '</div>';
+  };
+  AFTER.weather = function () {
+    var B = window.QIBrain;
+    if (!B || !B.weatherWindows) return;
+    var sl = document.getElementById("wxThreshold");
+    if (sl) sl.addEventListener("input", function () {
+      var lbl = document.getElementById("wxThresholdLabel"); if (lbl) lbl.textContent = sl.value;
+      document.getElementById("wxResults").innerHTML = weatherResultsHtml(B.weatherWindows({ requiredCountries: Number(sl.value) }));
+    });
   };
 
   // ---------- Route Progress Tracker ----------

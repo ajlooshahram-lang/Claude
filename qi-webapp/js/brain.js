@@ -5486,6 +5486,96 @@
     };
   }
 
+  // ---------- Marine Operations Weather-Window analysis ----------
+  // Deterministic analysis of when marine cable operations can run, per country
+  // and across the whole multi-country campaign. Monsoon/typhoon restricted
+  // months come from the programme's geographical intelligence. Computes each
+  // country's viable window, a 12-month operability matrix, and the cross-route
+  // campaign window (months operable across the required number of countries).
+  var WEATHER_RESTRICTED = [
+    { country: "Indonesia", code: "ID", sea: "Java Sea", restricted: [12, 1, 2, 3], reason: "Northwest monsoon, high seas" },
+    { country: "Thailand", code: "TH", sea: "Gulf of Thailand", restricted: [11, 12, 1, 2], reason: "Northeast monsoon" },
+    { country: "Vietnam", code: "VN", sea: "South China Sea", restricted: [6, 7, 8, 9, 10, 11], reason: "Typhoon season" },
+    { country: "Taiwan", code: "TW", sea: "Pacific", restricted: [7, 8, 9, 10], reason: "Typhoon belt" },
+    { country: "Philippines", code: "PH", sea: "Philippine Sea", restricted: [7, 8, 9, 10, 11], reason: "Typhoon alley (20+/yr)" },
+    { country: "Guam", code: "GU", sea: "Western Pacific", restricted: [8, 9, 10, 11], reason: "Typhoon exposure" },
+    { country: "Malaysia", code: "MY", sea: "South China Sea / Strait", restricted: [11, 12, 1, 2, 3], reason: "Northeast monsoon" },
+    { country: "Brunei", code: "BN", sea: "South China Sea", restricted: [11, 12, 1, 2, 3], reason: "Northeast monsoon" }
+  ];
+  var MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  // Longest run of viable (true) months over a circular 12-month year.
+  function longestViableRun(viable) {
+    var n = viable.length, best = 0, start = -1, bestStart = -1;
+    if (viable.every(function (v) { return v; })) return { length: 12, startMonth: 1, endMonth: 12 };
+    for (var i = 0; i < n * 2; i++) {
+      var idx = i % n;
+      if (viable[idx]) { if (start < 0) start = i; var len = i - start + 1; if (len > best) { best = len; bestStart = start; } }
+      else start = -1;
+    }
+    if (best > n) best = n;
+    return { length: best, startMonth: (bestStart % n) + 1, endMonth: ((bestStart + best - 1) % n) + 1 };
+  }
+  function weatherWindows(params) {
+    params = params || {};
+    var data = params.windows && params.windows.length ? params.windows : WEATHER_RESTRICTED;
+    var requiredCountries = params.requiredCountries != null ? Number(params.requiredCountries) : data.length; // default: all
+
+    var perCountry = data.map(function (c) {
+      var restrictedSet = {};
+      c.restricted.forEach(function (m) { restrictedSet[m] = true; });
+      var viable = [];
+      for (var m = 1; m <= 12; m++) viable.push(!restrictedSet[m]);
+      var viableMonths = [];
+      for (var k = 0; k < 12; k++) if (viable[k]) viableMonths.push(k + 1);
+      var run = longestViableRun(viable);
+      return {
+        country: c.country, code: c.code, sea: c.sea, reason: c.reason,
+        restrictedMonths: c.restricted.slice(),
+        viableMonths: viableMonths,
+        operablePct: Math.round(viableMonths.length / 12 * 1000) / 10,
+        longestWindow: { months: run.length, from: MONTH_NAMES[run.startMonth - 1], to: MONTH_NAMES[run.endMonth - 1] }
+      };
+    });
+
+    // Per-month operability across the campaign.
+    var monthly = [];
+    for (var m = 1; m <= 12; m++) {
+      var operable = 0, restrictedCountries = [];
+      data.forEach(function (c) {
+        if (c.restricted.indexOf(m) < 0) operable++; else restrictedCountries.push(c.code);
+      });
+      monthly.push({ month: m, name: MONTH_NAMES[m - 1], operableCount: operable, restrictedCountries: restrictedCountries, allClear: operable === data.length, meetsThreshold: operable >= requiredCountries });
+    }
+
+    var bestMonths = monthly.filter(function (x) { return x.operableCount === data.length; }).map(function (x) { return x.name; });
+    var worst = monthly.slice().sort(function (a, b) { return a.operableCount - b.operableCount; })[0];
+    var avgOperablePct = Math.round(monthly.reduce(function (s, x) { return s + x.operableCount; }, 0) / (12 * data.length) * 1000) / 10;
+
+    // Campaign window: longest run of months meeting the country threshold.
+    var meets = monthly.map(function (x) { return x.meetsThreshold; });
+    var run = longestViableRun(meets);
+    var campaignWindow = meets.some(function (v) { return v; }) ? { months: run.length, from: MONTH_NAMES[run.startMonth - 1], to: MONTH_NAMES[run.endMonth - 1] } : null;
+
+    return {
+      perCountry: perCountry,
+      monthly: monthly,
+      monthNames: MONTH_NAMES,
+      summary: {
+        countries: data.length,
+        requiredCountries: requiredCountries,
+        allClearMonths: bestMonths,
+        worstMonth: { name: worst.name, operableCount: worst.operableCount, restrictedCountries: worst.restrictedCountries },
+        avgOperablePct: avgOperablePct,
+        campaignWindow: campaignWindow
+      },
+      references: [
+        "Monsoon/typhoon restricted months from the programme's geographical intelligence",
+        "Marine operability — significant wave height & weather-downtime planning (cable-lay vessels)",
+        "ICPC marine operations guidance — seasonal route campaign planning"
+      ]
+    };
+  }
+
   var API = {
     analyzeProject: analyzeProject,
     listProfiles: listProfiles,
@@ -5511,6 +5601,7 @@
     generateITP: generateITP,
     routeProgress: routeProgress,
     programmeStatusReport: programmeStatusReport,
+    weatherWindows: weatherWindows,
     checkAlerts: checkAlerts,
     monteCarloSchedule: monteCarloSchedule,
     monteCarloCost: monteCarloCost,

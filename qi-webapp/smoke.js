@@ -1233,5 +1233,19 @@ var qrCp = doc.querySelector('.qrCpTable');
 ok(qrCp != null && qrCp.querySelectorAll('tbody tr').length >= 1, "Quantitative Risk shows critical-path criticality");
 ok(doc.getElementById("qrResults").querySelectorAll('svg').length >= 2, "Quantitative Risk renders cost + schedule histograms");
 
+// 113) Marine Weather-Window Planner
+var wxNav = doc.querySelector('.nav-item[data-view="weather"]');
+ok(wxNav != null, "Weather Windows nav item exists");
+if (wxNav) wxNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var wxKpis = doc.getElementById("wxKpis");
+ok(wxKpis != null && wxKpis.querySelectorAll('.kpi').length >= 4, "Weather Windows shows campaign-window KPIs");
+var wxMatrix = doc.querySelector('.wxMatrix');
+ok(wxMatrix != null && wxMatrix.querySelectorAll('tbody tr').length === 9, "operability matrix shows 8 country rows + an operable-count row");
+ok(wxKpis != null && /Apr/.test(wxKpis.innerHTML), "Weather Windows surfaces the Apr-May campaign window");
+// 114) Threshold slider widens the window
+var wxThr = doc.getElementById("wxThreshold");
+if (wxThr) { wxThr.value = "6"; wxThr.dispatchEvent(new window.Event("input", { bubbles: true })); }
+ok(/Jun/.test(doc.getElementById("wxKpis").innerHTML), "relaxing the threshold to 6 countries extends the window to June");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

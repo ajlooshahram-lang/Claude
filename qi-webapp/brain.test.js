@@ -1859,5 +1859,25 @@ console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
   ok(B.riskQuantification({ cases: [] }).summary.costItemsAnalyzed === 0, "empty project yields zero analysed items");
 })();
 
+// ===== Marine Weather-Window analysis =====
+(function () {
+  console.log("\n--- Weather Windows ---");
+  var r = B.weatherWindows();
+  var s = r.summary;
+  ok(r.perCountry.length === 8 && r.monthly.length === 12, "covers 8 countries across 12 months");
+  ok(JSON.stringify(s.allClearMonths) === JSON.stringify(["Apr", "May"]), "only April & May are all-clear across all 8 countries (got " + s.allClearMonths.join(",") + ")");
+  ok(s.worstMonth.name === "Nov" && s.worstMonth.operableCount === 2, "November is the worst month (only 2 of 8 operable)");
+  ok(s.campaignWindow && s.campaignWindow.from === "Apr" && s.campaignWindow.to === "May" && s.campaignWindow.months === 2, "all-8 campaign window is Apr-May (2 months)");
+  ok(r.monthly.every(function (m) { return m.operableCount + m.restrictedCountries.length === 8; }), "each month's operable + restricted counts reconcile to 8");
+  var vn = r.perCountry.filter(function (c) { return c.code === "VN"; })[0];
+  ok(vn && vn.longestWindow.from === "Dec" && vn.longestWindow.to === "May" && vn.longestWindow.months === 6, "Vietnam's longest viable window wraps the year (Dec-May, 6 months)");
+  ok(r.perCountry.every(function (c) { return c.operablePct === Math.round((12 - c.restrictedMonths.length) / 12 * 1000) / 10; }), "operable % is consistent with restricted-month count");
+  // Relaxing the threshold widens the campaign window
+  var t6 = B.weatherWindows({ requiredCountries: 6 });
+  ok(t6.summary.campaignWindow.months >= s.campaignWindow.months, "relaxing the threshold to 6 countries does not shrink the campaign window");
+  ok(t6.summary.campaignWindow.from === "Apr" && t6.summary.campaignWindow.to === "Jun", "at >=6 countries the window extends to Apr-Jun");
+  ok(JSON.stringify(r) === JSON.stringify(B.weatherWindows()), "weather analysis is deterministic");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);
