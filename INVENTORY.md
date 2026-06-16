@@ -96,7 +96,53 @@ products relevant to the submarine telecom deployment.
 
 ---
 
-## 5. Architecture Overview
+## 5. Deployment
+
+Docker Compose orchestrates three services for production deployment:
+
+| Service | Image | Purpose | Network |
+|---------|-------|---------|---------|
+| `db` | postgres:16-alpine | PostgreSQL database | internal only |
+| `backend` | node:22-alpine (multi-stage) | Fastify 5 API server | internal only |
+| `frontend` | nginx:alpine | Static files + reverse proxy | internal + web |
+
+### Quick Start
+
+```bash
+# 1. Copy and fill environment secrets
+cp .env.example .env
+# Edit .env — generate secrets with:
+#   openssl rand -hex 16    (POSTGRES_PASSWORD)
+#   openssl rand -hex 32    (SESSION_SECRET)
+#   openssl rand -base64 32 (DATA_ENCRYPTION_KEY)
+
+# 2. Build and start
+docker compose up --build -d
+
+# 3. Initialize database schema
+docker compose exec backend npx prisma db push
+
+# 4. Seed admin user
+docker compose exec backend npx tsx prisma/seed.ts
+```
+
+### Security Notes
+
+- **Database isolation:** PostgreSQL is on an internal-only network, never
+  exposed to the host or internet.
+- **Backend isolation:** The Fastify server is only reachable through nginx on
+  the internal network. No host port mapping.
+- **Non-root containers:** Both the backend and database run as non-root users.
+- **Security headers:** nginx enforces X-Frame-Options DENY,
+  X-Content-Type-Options nosniff, strict CSP, and Referrer-Policy.
+- **Rate limiting:** API and auth endpoints have per-IP rate limits enforced
+  at the nginx layer.
+- **Same-origin architecture:** Frontend and API are served from the same
+  origin, enabling SameSite=Strict cookies without CORS complexity.
+
+---
+
+## 6. Architecture Overview
 
 ```
 Browser (11 users)
