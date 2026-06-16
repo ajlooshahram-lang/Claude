@@ -75,6 +75,7 @@
     { g: "Visualization" },
     { id: "globe3d", label: "3D Network Map", icon: "🌐" },
     { g: "Intelligence" },
+    { id: "country", label: "Country Intelligence", icon: "🗺" },
     { id: "ai", label: "AI Assistant", icon: "✦" },
     { id: "impact", label: "Change Impact", icon: "⇄" },
     { id: "scorecard", label: "KPI Scorecard", icon: "▣" },
@@ -799,6 +800,19 @@
     const phaseRows = plan.phases.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.owner)}</td><td class="center">${p.taskCount}</td></tr>`).join("");
     const riskRows = plan.risks.map(r => `<tr><td class="wrap">${esc(r.problem.replace(/^RISK:\s*/, ""))}</td><td class="center">${r.sev}</td><td class="center">${r.occ}</td><td class="center">${r.det}</td><td class="center"><b>${r.sev * r.occ * r.det}</b></td></tr>`).join("");
     const budgetRows = plan.budget.rows.map(b => `<tr><td>${esc(b.category)}</td><td class="right">${money(b.est)}</td></tr>`).join("");
+    const intel = plan.countryIntel || [];
+    const intelSection = intel.length ? `
+      <div class="card"><h3>Regulatory &amp; Country Intelligence <span class="tag">${intel.length} ${intel.length === 1 ? "country" : "countries"}</span></h3>
+        <p class="muted">Detected from your description. Permit tasks and FMEA-scored risks for these have been added to the plan.</p>
+        <div class="country-grid">${intel.map(c => `
+          <div class="card country-card">
+            <div class="card-head"><h3>${esc(c.name)}</h3><span class="tag">${esc(c.authority.abbrev)}</span></div>
+            <div class="country-auth"><div class="country-auth-name">${esc(c.authority.name)}</div>
+              <div class="muted">${esc(c.authority.role)}</div></div>
+            <div class="country-section"><h4>Top geopolitical</h4><ul>${(c.geopolitical || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+            <div class="country-section"><h4>Top geographical hazards</h4><ul>${(c.geographical || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+          </div>`).join("")}</div>
+      </div>` : "";
     $("#brainOut").innerHTML = `
       <div class="card"><div class="card-head"><h3>Analysis — ${esc(s.title)}</h3>
         <span class="tag">${esc(s.domainLabel)} · ${Math.round(plan.coverage.confidence * 100)}% confidence</span></div>
@@ -821,6 +835,7 @@
         <div class="card"><h3>Top risks (FMEA RPN)</h3>${tableWrap("<th class='wrap'>Risk</th><th>S</th><th>O</th><th>D</th><th>RPN</th>", riskRows)}</div>
       </div>
       <div class="card"><h3>Budget skeleton</h3>${tableWrap("<th>Category</th><th class='right'>Estimate</th>", budgetRows)}</div>
+      ${intelSection}
       <div class="card"><h3>Suggested roles</h3><p>${plan.roles.map(r => `<span class="badge">${esc(r)}</span>`).join(" ")}</p></div>`;
     const applyBtn = $("#brainApply");
     if (applyBtn) applyBtn.addEventListener("click", () => {
@@ -838,6 +853,45 @@
     plan.procurement.forEach(p => S.regAdd("procurement", Object.assign({}, p)));
     return n;
   }
+
+  // Read-only Country Intelligence: real regulatory authority, marine/EIA body,
+  // and the dominant geopolitical & geographical hazards for each of the 8 STP
+  // countries/territories. Data is bundled & offline (window.QICountryData).
+  RENDER.country = function () {
+    const CD = window.QICountryData;
+    const countries = (CD && typeof CD.list === "function") ? CD.list() : [];
+    if (!countries.length) {
+      return `<div class="card"><p class="muted">Country intelligence data is not loaded.</p></div>`;
+    }
+    const li = arr => (arr || []).map(x => `<li>${esc(x)}</li>`).join("");
+    const cards = countries.map(c => `
+      <div class="card country-card" data-country="${esc(c.key)}">
+        <div class="card-head">
+          <h3>${esc(c.name)}</h3>
+          <span class="tag">${esc(c.authority.abbrev)}</span>
+        </div>
+        <div class="country-auth">
+          <div class="country-auth-name">${esc(c.authority.name)}</div>
+          <div class="muted">${esc(c.authority.role)}</div>
+          ${c.authority.url ? `<div class="muted"><a href="${esc(c.authority.url)}" target="_blank" rel="noopener noreferrer">${esc(c.authority.url)}</a></div>` : ""}
+        </div>
+        ${c.environmental ? `<div class="country-section"><h4>Environmental / marine permitting</h4>
+          <p><b>${esc(c.environmental.abbrev)}</b> — ${esc(c.environmental.body)}.<br><span class="muted">${esc(c.environmental.role)}</span></p></div>` : ""}
+        <div class="country-cols">
+          <div class="country-section"><h4>Geopolitical</h4><ul>${li(c.geopolitical)}</ul></div>
+          <div class="country-section"><h4>Geographical / environmental hazards</h4><ul>${li(c.geographical)}</ul></div>
+        </div>
+      </div>`).join("");
+    return `<div class="card">
+        <h3>Country &amp; Regulatory Intelligence <span class="tag">${countries.length} countries</span></h3>
+        <p style="line-height:1.6">Real, named reference data for the Submarine Telecom Project's
+        ${countries.length} countries/territories — the telecom regulator that issues cable-landing
+        licences, the marine/environmental permitting body, and the dominant geopolitical and
+        geographical hazards along each route. The Project Brain folds these into generated permit
+        tasks and FMEA-scored risks when it detects a country in your description.</p>
+      </div>
+      <div class="country-grid">${cards}</div>`;
+  };
 
   RENDER.health = function () {
     const issues = S.health();

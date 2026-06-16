@@ -15,6 +15,7 @@ const html = fs.readFileSync(path.join(root, "index.html"), "utf8")
   .replace('<script src="js/sync.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/sync.js"))}</script>`)
   .replace('<script src="js/calc.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/calc.js"))}</script>`)
   .replace('<script src="js/store.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/store.js"))}</script>`)
+  .replace('<script src="js/country-data.js"></script>', () => `<script>${fs.readFileSync(path.join(root, "js/country-data.js"))}</script>`)
   .replace('<script src="js/brain.js"></script>', () => `<script>${fs.readFileSync(path.join(root, "js/brain.js"))}</script>`)
   .replace('<script src="js/charts.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/charts.js"))}</script>`)
   .replace('<script src="js/globe.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/globe.js"))}</script>`)
@@ -35,7 +36,7 @@ ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard rende
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 
 // 2) navigate every view (simulate clicks)
-const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","budget","globe3d","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","report","audit","config","help"];
+const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","budget","globe3d","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","country","ai","impact","scorecard","health","report","audit","config","help"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -619,6 +620,36 @@ ok(S.regRows("milestones").length > brainMsBefore, "Apply adds generated milesto
 ok(S.regRows("procurement").length > brainProcBefore, "Apply adds generated procurement items");
 // click-only / privacy sanity: analysis must not call out to the network
 ok(window.__promptCalls === 0, "Brain flow used no prompt()");
+
+// 39) Country Intelligence — bundled data, dedicated view, and Brain integration
+ok(typeof window.QICountryData === "object" && typeof window.QICountryData.list === "function", "Country data module exposed");
+ok(window.QICountryData.list().length === 8, "Country data covers all 8 STP countries (got " + window.QICountryData.list().length + ")");
+ok(window.QICountryData.list().every(c => c.authority && c.authority.abbrev && c.authority.name && c.authority.role), "Every country names a real regulatory authority with a role");
+doc.querySelector('.nav-item[data-view="country"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const countryOut = doc.getElementById("content").innerHTML;
+ok(doc.querySelectorAll(".country-card").length === 8, "Country Intelligence view renders 8 country cards");
+["NBTC","NTC","MCMC","AITI","FCC","NCC","Komdigi"].forEach(ab =>
+  ok(countryOut.indexOf(ab) !== -1, "Country view names the real authority " + ab));
+ok(/South China Sea|East Sea/i.test(countryOut), "Country view surfaces geopolitical (South China Sea) hazards");
+ok(/typhoon/i.test(countryOut), "Country view surfaces geographical (typhoon) hazards");
+// Brain detects named countries and injects permit tasks + FMEA risks
+S.reset();
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const ciCasesBefore = S.validCases().length;
+doc.getElementById("brainText").value =
+  "Submarine fibre optic cable system, 5000 km route, landing stations in the Philippines, Taiwan and Indonesia, OTDR splicing, 36 months";
+doc.getElementById("brainAnalyze").click();
+const ciOut = doc.getElementById("brainOut").innerHTML;
+ok(/Regulatory & Country Intelligence|Regulatory &amp; Country Intelligence/.test(ciOut), "Brain preview shows the Country Intelligence section");
+ok(/NTC|NCC|Komdigi/.test(ciOut), "Brain preview names detected authorities");
+const ciPlan = window.QIBrain.analyzeProject(
+  "Submarine fibre cable, landing stations in the Philippines, Taiwan and Indonesia");
+ok(ciPlan.countryIntel.length === 3, "Brain detects exactly the 3 named countries (got " + ciPlan.countryIntel.length + ")");
+ok(ciPlan.risks.some(r => /Philippines/.test(r.problem)) && ciPlan.cases.some(c => /Obtain cable landing license — NTC/.test(c.problem)), "Brain adds country risks + a permit task naming the authority");
+const allEight = window.QIBrain.analyzeProject("Submarine subsea fibre cable backbone, 8000 km, 48 months");
+ok(allEight.countryIntel.length === 8, "Submarine project with no named country includes all 8 (got " + allEight.countryIntel.length + ")");
+doc.getElementById("brainApply").click();
+ok(S.validCases().length > ciCasesBefore, "Applying the plan adds the country-enriched cases");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

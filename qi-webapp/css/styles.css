@@ -532,3 +532,15 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .globe-station-country{color:#9fb0cf;font-size:11px}
 .globe-station-coord{margin-left:auto;color:#7e90b3;font-size:10.5px;font-family:ui-monospace,Menlo,Consolas,monospace}
 .globe-panel .muted{color:#7e90b3}
+
+
+/* ---- Country Intelligence ---- */
+.country-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+.country-card{display:flex;flex-direction:column;gap:10px}
+.country-card .card-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.country-auth-name{font-weight:700;line-height:1.35}
+.country-section{margin-top:4px}
+.country-section h4{margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#7e90b3}
+.country-section ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:13px;line-height:1.45}
+.country-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:640px){.country-cols{grid-template-columns:1fr}}
