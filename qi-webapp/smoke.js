@@ -1279,5 +1279,18 @@ var pkgTable = doc.querySelector('.pkgTable');
 ok(pkgTable != null && pkgTable.querySelectorAll('tbody tr').length === 8, "Work Breakdown lists all 8 contract packages");
 ok(doc.querySelector('.pkgCatTable') != null && doc.querySelector('.pkgCatTable').querySelectorAll('tbody tr').length >= 5, "Work Breakdown shows the value-by-category breakdown");
 
+// 117) Work Orders (field-task tier)
+var woNav = doc.querySelector('.nav-item[data-view="workorders"]');
+ok(woNav != null, "Work Orders nav item exists");
+if (woNav) woNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var woKpis = doc.getElementById("woKpis");
+ok(woKpis != null && woKpis.querySelectorAll('.kpi').length >= 5, "Work Orders shows status KPIs");
+var woTable = doc.querySelector('.woTable');
+ok(woTable != null && woTable.querySelectorAll('tbody tr').length === 20, "Work Orders lists all 20 field tasks");
+// filter to Complete
+var woComplete = doc.querySelector('.wo-filter-btn[data-status="Complete"]');
+if (woComplete) woComplete.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector('.woTable').querySelectorAll('tbody tr').length === 6 && woComplete.classList.contains("btn-primary"), "filtering to Complete shows the 6 finished work orders");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

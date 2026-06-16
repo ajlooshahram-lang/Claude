@@ -222,6 +222,7 @@
     { id: "dashboard", label: "Dashboard", icon: "▤" },
     { id: "progreport", label: "Programme Report", icon: "\uD83D\uDCCA" },
     { id: "packages", label: "Work Breakdown (WBS)", icon: "\uD83D\uDDC2\uFE0F" },
+    { id: "workorders", label: "Work Orders", icon: "\uD83D\uDD27" },
     { id: "cases", label: "Cases (Master)", icon: "★" },
     { g: "Delivery" },
     { id: "permits", label: "Permit Tracker", icon: "⏱" },
@@ -2137,6 +2138,56 @@
       var cases = (live.length >= 3) ? live : QR_DEFAULT_CASES;
       var r = B.riskQuantification({ cases: cases, options: { seed: 42, iterations: Number(sel.value) || 2000 } });
       document.getElementById("qrResults").innerHTML = qrResultsHtml(r);
+    });
+  };
+
+  // ---------- Work Orders (field-task tier) ----------
+  function woStatusColor(st) { return st === "Complete" ? "var(--green,#1e7e34)" : st === "In progress" ? "#3498db" : "var(--text-muted,#8fa3b5)"; }
+  function woTableHtml(filter) {
+    var B = window.QIBrain;
+    var r = B.workOrders();
+    var orders = r.workOrders.filter(function (w) { return !filter || filter === "all" || w.status === filter; });
+    var rows = orders.map(function (w) {
+      var col = woStatusColor(w.status);
+      var bar = '<div style="background:var(--border,#e2e8f0);border-radius:5px;height:9px;overflow:hidden;min-width:70px"><div style="height:100%;width:' + w.pctComplete + '%;background:' + col + '"></div></div>';
+      return '<tr><td><strong>' + esc(w.id) + '</strong></td><td>' + esc(w.packageId) + '</td><td>' + esc(w.title) + '</td><td>' + esc(w.type) + '</td>' +
+        '<td>' + esc(w.country) + '</td><td>' + esc(w.assignee) + '</td><td>' + bar + '</td><td class="right">' + w.pctComplete + '%</td>' +
+        '<td style="color:' + col + ';font-weight:600">' + esc(w.status) + '</td></tr>';
+    }).join("");
+    return '<div class="table-wrap"><table class="woTable"><thead><tr><th>WO</th><th>Package</th><th>Task</th><th>Type</th><th>Country</th><th>Owner</th><th>Progress</th><th class="right">%</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+  RENDER.workorders = function () {
+    var B = window.QIBrain;
+    if (!B || !B.workOrders) return '<h2>Work Orders</h2><p class="muted">Engine unavailable.</p>';
+    uiState.workOrders = { filter: "all" };
+    var r = B.workOrders(); var s = r.summary;
+    var kpis = '<div class="grid kpis" id="woKpis" style="margin-bottom:14px">' +
+      '<div class="kpi"><div class="label">Work orders</div><div class="value">' + s.total + '</div></div>' +
+      '<div class="kpi"><div class="label">Complete</div><div class="value" style="color:var(--green,#1e7e34)">' + s.statusCounts["Complete"] + '</div></div>' +
+      '<div class="kpi"><div class="label">In progress</div><div class="value" style="color:#3498db">' + s.statusCounts["In progress"] + '</div></div>' +
+      '<div class="kpi"><div class="label">Not started</div><div class="value">' + s.statusCounts["Not started"] + '</div></div>' +
+      '<div class="kpi"><div class="label">Overall complete</div><div class="value">' + s.overallPctComplete + '%</div></div>' +
+      '</div>';
+    var filters = '<div class="card" style="margin-bottom:14px"><div id="woFilter">' +
+      [["all", "All"], ["Complete", "Complete"], ["In progress", "In progress"], ["Not started", "Not started"]].map(function (f) {
+        return '<button class="btn wo-filter-btn' + (f[0] === "all" ? " btn-primary" : "") + '" data-status="' + esc(f[0]) + '" style="margin:2px">' + esc(f[1]) + '</button>';
+      }).join("") + '</div></div>';
+    var refs = '<div class="card" id="woRefs"><h3>Basis</h3><ul style="margin:0;padding-left:20px">' + r.references.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' +
+      '<p class="muted" style="margin-top:6px">Work orders roll up to the Work Breakdown (packages) and overall programme progress.</p></div>';
+    return '<h2 style="margin-bottom:6px">Work Orders (field tasks)</h2>' +
+      '<p class="muted" style="margin-bottom:14px">The field-execution tier: Programme &rarr; Package &rarr; Work Order. Each task carries its package, type, country, owner and status.</p>' +
+      kpis + filters + '<div class="card"><div id="woTableWrap">' + woTableHtml("all") + '</div></div>' + refs;
+  };
+  AFTER.workorders = function () {
+    var ff = document.getElementById("woFilter");
+    if (!ff) return;
+    ff.addEventListener("click", function (e) {
+      var btn = e.target.closest ? e.target.closest(".wo-filter-btn") : null;
+      if (!btn) return;
+      var st = btn.getAttribute("data-status");
+      document.getElementById("woTableWrap").innerHTML = woTableHtml(st);
+      var btns = ff.querySelectorAll(".wo-filter-btn");
+      for (var i = 0; i < btns.length; i++) { if (btns[i].getAttribute("data-status") === st) btns[i].classList.add("btn-primary"); else btns[i].classList.remove("btn-primary"); }
     });
   };
 

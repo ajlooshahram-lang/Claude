@@ -1902,5 +1902,23 @@ console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
   ok(c.summary.totalValueUsd === 1000000 && c.summary.weightedPctComplete === 100, "custom package set honoured");
 })();
 
+// ===== Work Orders (field-task tier) =====
+(function () {
+  console.log("\n--- Work Orders ---");
+  var r = B.workOrders();
+  var s = r.summary;
+  ok(s.total === 20 && s.packagesCovered === 8, "20 work orders spanning all 8 packages");
+  ok(s.statusCounts["Complete"] + s.statusCounts["In progress"] + s.statusCounts["Not started"] === s.total, "status counts reconcile to the total");
+  ok(s.statusCounts["Complete"] === 6 && s.statusCounts["In progress"] === 7 && s.statusCounts["Not started"] === 7, "status mix: 6 complete / 7 in progress / 7 not started");
+  ok(s.overallPctComplete === 47.5, "overall completion averages 47.5%");
+  // Hierarchy integrity: every WO maps to a real package
+  var pkgIds = B.programmePackages().packages.map(function (p) { return p.id; });
+  ok(r.workOrders.every(function (w) { return pkgIds.indexOf(w.packageId) >= 0; }), "every work order maps to a real contract package (hierarchy integrity)");
+  ok(B.workOrders({ packageId: "PKG-01" }).summary.total === 4, "package filter returns only that package's work orders (PKG-01 -> 4)");
+  ok(r.workOrders.every(function (w) { return w.id && w.title && w.type && w.assignee && w.status; }), "every work order has id/title/type/owner/status");
+  ok(r.references.some(function (x) { return /Work Order/.test(x); }), "references describe the work-order tier");
+  ok(JSON.stringify(r) === JSON.stringify(B.workOrders()), "work orders are deterministic");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);

@@ -5640,6 +5640,68 @@
     };
   }
 
+  // ---------- Work Orders (field-task tier of the WBS) ----------
+  // Deterministic Programme -> Package -> Work-Order drill-down: the field tasks
+  // executed under each contract package, with type, country, owner role, status
+  // and % complete. Rolls up by status, by package and by type. Completes the
+  // three-tier programme hierarchy (packages from programmePackages()).
+  var PROGRAMME_WORK_ORDERS = [
+    { id: "WO-001", packageId: "PKG-06", title: "Desktop route study", type: "Survey", country: "Regional", assignee: "Survey Lead", status: "Complete", pctComplete: 100 },
+    { id: "WO-002", packageId: "PKG-06", title: "Marine geophysical survey", type: "Survey", country: "Regional", assignee: "Survey Lead", status: "Complete", pctComplete: 100 },
+    { id: "WO-003", packageId: "PKG-03", title: "Mersing CLS civil works", type: "Civil", country: "Malaysia", assignee: "Civil Works Manager", status: "Complete", pctComplete: 100 },
+    { id: "WO-004", packageId: "PKG-03", title: "Jakarta CLS civil works", type: "Civil", country: "Indonesia", assignee: "Civil Works Manager", status: "In progress", pctComplete: 60 },
+    { id: "WO-005", packageId: "PKG-03", title: "Batangas CLS civil works", type: "Civil", country: "Philippines", assignee: "Civil Works Manager", status: "In progress", pctComplete: 40 },
+    { id: "WO-006", packageId: "PKG-02", title: "Cable manufacture - lot 1", type: "Supply", country: "Factory", assignee: "Procurement Manager", status: "Complete", pctComplete: 100 },
+    { id: "WO-007", packageId: "PKG-02", title: "Repeater & BU manufacture", type: "Supply", country: "Factory", assignee: "Procurement Manager", status: "In progress", pctComplete: 65 },
+    { id: "WO-008", packageId: "PKG-02", title: "Factory Acceptance Test witness", type: "Test", country: "Factory", assignee: "QA/QC Manager", status: "In progress", pctComplete: 50 },
+    { id: "WO-009", packageId: "PKG-01", title: "Cable ship mobilisation", type: "Marine", country: "Regional", assignee: "Cable Installation Supervisor", status: "Complete", pctComplete: 100 },
+    { id: "WO-010", packageId: "PKG-01", title: "Lay trunk Mersing-Jakarta", type: "Marine", country: "Malaysia/Indonesia", assignee: "Cable Installation Supervisor", status: "Complete", pctComplete: 100 },
+    { id: "WO-011", packageId: "PKG-01", title: "Lay trunk Mersing-Brunei", type: "Marine", country: "Malaysia/Brunei", assignee: "Cable Installation Supervisor", status: "In progress", pctComplete: 55 },
+    { id: "WO-012", packageId: "PKG-01", title: "Lay trunk Brunei-Batangas", type: "Marine", country: "Brunei/Philippines", assignee: "Cable Installation Supervisor", status: "Not started", pctComplete: 0 },
+    { id: "WO-013", packageId: "PKG-04", title: "Lay branch Brunei-Da Nang", type: "Marine", country: "Vietnam", assignee: "Cable Installation Supervisor", status: "In progress", pctComplete: 30 },
+    { id: "WO-014", packageId: "PKG-04", title: "Lay branch Batangas spur", type: "Marine", country: "Philippines", assignee: "Cable Installation Supervisor", status: "Not started", pctComplete: 0 },
+    { id: "WO-015", packageId: "PKG-04", title: "Branching-unit installation", type: "Splice", country: "Brunei", assignee: "Splicing Supervisor", status: "Not started", pctComplete: 0 },
+    { id: "WO-016", packageId: "PKG-05", title: "SLTE install - Mersing", type: "Equipment", country: "Malaysia", assignee: "OSP Engineer", status: "Not started", pctComplete: 0 },
+    { id: "WO-017", packageId: "PKG-05", title: "Power Feed Equipment install", type: "Equipment", country: "Regional", assignee: "OSP Engineer", status: "Not started", pctComplete: 0 },
+    { id: "WO-018", packageId: "PKG-07", title: "Monthly lender progress report", type: "PM", country: "Programme", assignee: "Project Manager", status: "In progress", pctComplete: 50 },
+    { id: "WO-019", packageId: "PKG-08", title: "OTDR commissioning - laid segments", type: "Test", country: "Regional", assignee: "Test & Commissioning Lead", status: "Not started", pctComplete: 0 },
+    { id: "WO-020", packageId: "PKG-08", title: "System BER soak test", type: "Test", country: "Programme", assignee: "NOC Manager", status: "Not started", pctComplete: 0 }
+  ];
+  function workOrders(params) {
+    params = params || {};
+    var src = params.workOrders && params.workOrders.length ? params.workOrders : PROGRAMME_WORK_ORDERS;
+    var filterPackage = params.packageId || null;
+    var orders = src.filter(function (w) { return !filterPackage || w.packageId === filterPackage; }).map(function (w) {
+      var pct = Math.max(0, Math.min(100, Number(w.pctComplete) || 0));
+      return { id: w.id, packageId: w.packageId, title: w.title, type: w.type, country: w.country, assignee: w.assignee, status: w.status || "Not started", pctComplete: pct };
+    });
+    var statusCounts = { "Complete": 0, "In progress": 0, "Not started": 0 };
+    orders.forEach(function (w) { statusCounts[w.status] = (statusCounts[w.status] || 0) + 1; });
+    var overallPct = orders.length ? Math.round(orders.reduce(function (s, w) { return s + w.pctComplete; }, 0) / orders.length * 10) / 10 : 0;
+    var byPackage = {}, byType = {};
+    orders.forEach(function (w) {
+      (byPackage[w.packageId] = byPackage[w.packageId] || { count: 0, sum: 0 }), byPackage[w.packageId].count++, byPackage[w.packageId].sum += w.pctComplete;
+      byType[w.type] = (byType[w.type] || 0) + 1;
+    });
+    var perPackage = Object.keys(byPackage).map(function (k) { return { packageId: k, count: byPackage[k].count, avgPct: Math.round(byPackage[k].sum / byPackage[k].count * 10) / 10 }; });
+    return {
+      workOrders: orders,
+      summary: {
+        total: orders.length,
+        statusCounts: statusCounts,
+        overallPctComplete: overallPct,
+        perPackage: perPackage,
+        byType: byType,
+        packagesCovered: perPackage.length
+      },
+      references: [
+        "Programme WBS: Programme -> Package -> Work Order (field task)",
+        "Field execution tier — owner role, location and status per work order",
+        "Work-order completion rolls up to package and programme progress"
+      ]
+    };
+  }
+
   var API = {
     analyzeProject: analyzeProject,
     listProfiles: listProfiles,
@@ -5667,6 +5729,7 @@
     programmeStatusReport: programmeStatusReport,
     weatherWindows: weatherWindows,
     programmePackages: programmePackages,
+    workOrders: workOrders,
     checkAlerts: checkAlerts,
     monteCarloSchedule: monteCarloSchedule,
     monteCarloCost: monteCarloCost,
