@@ -487,3 +487,48 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .auth-invite-heading{color:#fff;font-size:20px;text-align:center;margin:0 0 8px}
 .auth-invite-desc{color:#94a0bc;font-size:13px;text-align:center;margin:0 0 20px}
 .auth-field-hint{font-size:11px;color:#6b7a94;margin-top:4px;display:block}
+
+
+/* 3D submarine cable network map ----------------------------------------- */
+.globe-view{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:stretch}
+@media(max-width:980px){.globe-view{grid-template-columns:1fr}}
+.globe-stage{position:relative;min-height:560px;height:calc(100vh - 150px);border-radius:var(--radius);overflow:hidden;
+  background:radial-gradient(ellipse at 50% 38%,#142a52 0%,#0b1628 55%,#070d18 100%);
+  border:1px solid var(--line);box-shadow:var(--shadow)}
+.globe-stage canvas{display:block;width:100%;height:100%}
+.globe-hint{position:absolute;left:14px;bottom:12px;z-index:2;font-size:11px;letter-spacing:.04em;text-transform:uppercase;
+  color:#9fb0cf;background:rgba(8,16,32,.5);padding:6px 12px;border-radius:999px;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(125,167,240,.18);pointer-events:none}
+.globe-fallback{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:32px;color:#cbd6ee}
+.globe-fallback-mark{font-size:54px;margin-bottom:10px;filter:drop-shadow(0 0 18px rgba(78,161,255,.6))}
+.globe-fallback h3{margin:0 0 8px;color:#fff;font-size:18px}
+.globe-fallback p{margin:0;max-width:440px;font-size:13px;color:#9fb0cf;line-height:1.5}
+
+/* glassmorphism info / legend panel */
+.globe-panel{align-self:start;border-radius:var(--radius);padding:18px;color:#e6eaf3;max-height:calc(100vh - 150px);overflow:auto;
+  background:rgba(16,28,50,.72);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid rgba(125,167,240,.18);box-shadow:0 8px 32px rgba(0,0,0,.32)}
+.globe-panel-head h3{margin:0 0 2px;font-size:16px;color:#fff}
+.globe-sub{margin:0;font-size:12px;color:#9fb0cf}
+.globe-stats{display:flex;gap:10px;margin:14px 0}
+.globe-stat{flex:1;text-align:center;background:rgba(125,167,240,.08);border:1px solid rgba(125,167,240,.14);border-radius:10px;padding:10px 6px}
+.globe-stat-val{display:block;font-size:18px;font-weight:800;color:#7da7f0;line-height:1.1}
+.globe-stat-lab{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#9fb0cf;margin-top:3px}
+.globe-statkeys{display:flex;flex-wrap:wrap;gap:12px;margin:6px 0 14px;font-size:12px;color:#cbd6ee}
+.globe-statkey{display:inline-flex;align-items:center;gap:6px}
+.globe-dot{width:9px;height:9px;border-radius:50%;display:inline-block;box-shadow:0 0 7px currentColor}
+.globe-section{margin-top:14px}
+.globe-section h4{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#7e90b3}
+.globe-list,.globe-stationlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.globe-item{background:rgba(11,22,40,.5);border:1px solid rgba(125,167,240,.12);border-radius:9px;padding:9px 11px}
+.globe-item-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.globe-item-name{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:#e6eaf3}
+.globe-item-id{font-size:10px;color:#7e90b3;font-family:ui-monospace,Menlo,Consolas,monospace}
+.globe-item-meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:5px;font-size:11px;color:#9fb0cf}
+.globe-item-status{margin-left:auto;color:#cbd6ee}
+.globe-station{display:flex;align-items:baseline;gap:8px;font-size:12.5px;padding:6px 4px;border-bottom:1px solid rgba(125,167,240,.08)}
+.globe-station-name{font-weight:600;color:#e6eaf3}
+.globe-station-country{color:#9fb0cf;font-size:11px}
+.globe-station-coord{margin-left:auto;color:#7e90b3;font-size:10.5px;font-family:ui-monospace,Menlo,Consolas,monospace}
+.globe-panel .muted{color:#7e90b3}

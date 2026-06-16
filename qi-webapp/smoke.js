@@ -17,6 +17,7 @@ const html = fs.readFileSync(path.join(root, "index.html"), "utf8")
   .replace('<script src="js/store.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/store.js"))}</script>`)
   .replace('<script src="js/brain.js"></script>', () => `<script>${fs.readFileSync(path.join(root, "js/brain.js"))}</script>`)
   .replace('<script src="js/charts.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/charts.js"))}</script>`)
+  .replace('<script src="js/globe.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/globe.js"))}</script>`)
   .replace('<script src="js/ui.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/ui.js"))}</script>`);
 
 const dom = new JSDOM(html, { runScripts: "dangerously", url: "http://localhost/", pretendToBeVisual: true });
@@ -34,7 +35,7 @@ ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard rende
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 
 // 2) navigate every view (simulate clicks)
-const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","report","audit","config","help"];
+const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","budget","globe3d","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","report","audit","config","help"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -42,6 +43,19 @@ views.forEach(v => {
   const c = doc.getElementById("content").innerHTML;
   ok(c && c.length > 20, `view ${v} renders (${c.length} chars)`);
 });
+
+// 2b) 3D Network Map view — data exposed, legend renders, dispose is no-throw in jsdom
+ok(window.QIGlobe && Array.isArray(window.QIGlobe.STATIONS) && window.QIGlobe.STATIONS.length === 8, "QIGlobe exposes 8 landing stations");
+ok(window.QIGlobe && Array.isArray(window.QIGlobe.CABLES) && window.QIGlobe.CABLES.length >= 6, "QIGlobe exposes cable segments");
+ok(window.QIGlobe.CABLES.every(c => c.lengthKm > 0 && c.capacityTbps > 0 && c.fibrePairs > 0), "every cable segment has length/capacity/fibre-pair data");
+doc.querySelector('.nav-item[data-view="globe3d"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".globe-stage") != null, "3D Network Map renders the globe stage container");
+ok(doc.querySelectorAll(".globe-item").length >= 6, "3D Network Map legend lists cable segments");
+ok(doc.querySelectorAll(".globe-station").length === 8, "3D Network Map legend lists 8 landing stations");
+ok(window.QIGlobe.init(doc.getElementById("globeStage")) === false, "QIGlobe.init no-throws and returns false without WebGL");
+// navigating away must dispose without throwing
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(true, "navigating away from globe3d disposes cleanly");
 
 // 3) data integrity via exposed globals
 const S = window.QIStore;

@@ -72,6 +72,8 @@
     { g: "People & Cost" },
     { id: "stakeholders", label: "Stakeholders", icon: "♟" },
     { id: "budget", label: "Budget", icon: "$" },
+    { g: "Visualization" },
+    { id: "globe3d", label: "3D Network Map", icon: "🌐" },
     { g: "Intelligence" },
     { id: "ai", label: "AI Assistant", icon: "✦" },
     { id: "impact", label: "Change Impact", icon: "⇄" },
@@ -106,6 +108,11 @@
   let current = "dashboard";
   function go(view, opts) {
     if (!RENDER[view]) view = "dashboard";
+    const prev = current;
+    // Tear down heavy 3D resources when navigating away from the globe view.
+    if (prev === "globe3d" && view !== "globe3d" && window.QIGlobe) {
+      try { window.QIGlobe.dispose(); } catch (e) {}
+    }
     current = view;
     $("#viewTitle").textContent = TITLES[view] || "QI Platform";
     document.querySelectorAll(".nav-item").forEach(b => {
@@ -130,6 +137,92 @@
   // ---------- renderers ----------
   const RENDER = {};
   const AFTER = {};
+
+  // 3D submarine cable network visualization (Three.js globe + glass legend).
+  RENDER.globe3d = function () {
+    const G = window.QIGlobe || {};
+    const cables = G.CABLES || [];
+    const stations = G.STATIONS || [];
+    const SC = G.STATUS_COLOR || {
+      "commissioned": { css: "#42d6a4" }, "in-progress": { css: "#4ea1ff" }, "planned": { css: "#e6b84a" }
+    };
+    const statusLabel = { "commissioned": "Commissioned", "in-progress": "In progress", "planned": "Planned" };
+    const dot = st => `<span class="globe-dot" style="background:${(SC[st] || {}).css || "#888"}"></span>`;
+    const fmtKm = n => (Number(n) || 0).toLocaleString() + " km";
+
+    const legendStatuses = ["commissioned", "in-progress", "planned"].map(st =>
+      `<span class="globe-statkey">${dot(st)}${esc(statusLabel[st] || st)}</span>`).join("");
+
+    const cableRows = cables.map(c => `
+      <li class="globe-item">
+        <div class="globe-item-top">
+          <span class="globe-item-name">${dot(c.status)}${esc(c.name)}</span>
+          <span class="globe-item-id">${esc(c.id)}</span>
+        </div>
+        <div class="globe-item-meta">
+          <span>${fmtKm(c.lengthKm)}</span>
+          <span>${esc(String(c.capacityTbps))} Tbps</span>
+          <span>${esc(String(c.fibrePairs))} pairs</span>
+          <span class="globe-item-status">${esc(statusLabel[c.status] || c.status)}</span>
+        </div>
+      </li>`).join("");
+
+    const stationRows = stations.map(s => `
+      <li class="globe-station">
+        <span class="globe-station-name">${esc(s.name)}</span>
+        <span class="globe-station-country">${esc(s.country)}</span>
+        <span class="globe-station-coord">${esc(s.lat.toFixed(1))}, ${esc(s.lon.toFixed(1))}</span>
+      </li>`).join("");
+
+    const totalKm = cables.reduce((a, c) => a + (Number(c.lengthKm) || 0), 0);
+    const totalCap = cables.reduce((a, c) => a + (Number(c.capacityTbps) || 0), 0);
+
+    return `
+      <div class="globe-view">
+        <div class="globe-stage" id="globeStage">
+          <div class="globe-fallback" id="globeFallback">
+            <div class="globe-fallback-mark">🌐</div>
+            <h3>Submarine Telecom Project — Network Map</h3>
+            <p>An interactive 3D view of the STP submarine cable system renders here when WebGL is available. The full cable inventory is listed in the panel.</p>
+          </div>
+          <div class="globe-hint" id="globeHint">Drag to rotate · scroll to zoom</div>
+        </div>
+        <aside class="globe-panel">
+          <div class="globe-panel-head">
+            <h3>Submarine Cable Network</h3>
+            <p class="globe-sub">${stations.length} landing stations · ${cables.length} cable segments</p>
+          </div>
+          <div class="globe-stats">
+            <div class="globe-stat"><span class="globe-stat-val">${totalKm.toLocaleString()}</span><span class="globe-stat-lab">total km</span></div>
+            <div class="globe-stat"><span class="globe-stat-val">${totalCap.toLocaleString()}</span><span class="globe-stat-lab">Tbps capacity</span></div>
+            <div class="globe-stat"><span class="globe-stat-val">${stations.length}</span><span class="globe-stat-lab">countries</span></div>
+          </div>
+          <div class="globe-statkeys">${legendStatuses}</div>
+          <div class="globe-section">
+            <h4>Cable Segments</h4>
+            <ul class="globe-list">${cableRows || '<li class="globe-item muted">No cable data.</li>'}</ul>
+          </div>
+          <div class="globe-section">
+            <h4>Landing Stations</h4>
+            <ul class="globe-stationlist">${stationRows || '<li class="globe-station muted">No station data.</li>'}</ul>
+          </div>
+        </aside>
+      </div>`;
+  };
+  AFTER.globe3d = function () {
+    const stage = $("#globeStage");
+    if (!stage || !window.QIGlobe) return;
+    let ok = false;
+    try { ok = window.QIGlobe.init(stage); } catch (e) { ok = false; }
+    const fb = $("#globeFallback"), hint = $("#globeHint");
+    if (ok) {
+      if (fb) fb.style.display = "none";
+      if (hint) hint.style.display = "";
+    } else {
+      if (fb) fb.style.display = "";
+      if (hint) hint.style.display = "none";
+    }
+  };
 
   RENDER.dashboard = function () {
     const k = S.kpis();
