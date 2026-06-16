@@ -1221,6 +1221,7 @@ ok(progKpis != null && progKpis.querySelectorAll('.kpi').length >= 6, "Programme
 var progAlerts = doc.getElementById("progAlerts");
 ok(progAlerts != null && progAlerts.querySelectorAll('li').length >= 1, "Programme Report shows the exceptions/alerts list");
 ok(progAlerts != null && /behind/i.test(progAlerts.textContent), "Programme Report alert flags the schedule slippage");
+ok(progAlerts != null && /marine-window constrained/.test(progAlerts.textContent), "Programme Report folds in the marine-window recovery constraint");
 
 // 112) Quantitative Risk (Monte Carlo)
 var qrNav = doc.querySelector('.nav-item[data-view="qrisk"]');

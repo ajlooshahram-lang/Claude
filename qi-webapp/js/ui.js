@@ -2168,6 +2168,7 @@
       '<div class="card" style="flex:1;min-width:210px"><h3>Finance</h3><p style="margin:0;line-height:1.8">Disbursed: <strong>' + sec.finance.disbursedPct + '%</strong><br>Retention held: <strong>' + money(sec.finance.retentionHeldUsd) + '</strong><br>Advance: <strong>' + money(sec.finance.advanceUsd) + '</strong></p></div>' +
       '<div class="card" style="flex:1;min-width:210px"><h3>Contract variations</h3><p style="margin:0;line-height:1.8">Approved: <strong>' + money(sec.contract.approvedUsd) + '</strong><br>Pending: <strong>' + money(sec.contract.pendingUsd) + '</strong><br>Rejected: <strong>' + money(sec.contract.rejectedUsd) + '</strong></p></div>' +
       '<div class="card" style="flex:1;min-width:210px"><h3>Quality (ITP)</h3><p style="margin:0;line-height:1.8">Hold points: <strong>' + sec.quality.holdPoints + '</strong><br>Witness points: <strong>' + sec.quality.witnessPoints + '</strong><br>Total ITP items: <strong>' + sec.quality.totalItp + '</strong></p></div>' +
+      '<div class="card" style="flex:1;min-width:210px"><h3>Marine ops window</h3><p style="margin:0;line-height:1.8">Campaign window: <strong>' + (sec.marine.campaignWindow ? esc(sec.marine.campaignWindow.from + "\u2013" + sec.marine.campaignWindow.to) : "None") + '</strong><br>All-clear: <strong>' + (sec.marine.allClearMonths.join(", ") || "None") + '</strong><br>Worst month: <strong>' + esc(sec.marine.worstMonth) + '</strong></p></div>' +
       '</div>';
     var alertRows = r.alerts.map(function (a) {
       var ac = progRagColor(a.level);

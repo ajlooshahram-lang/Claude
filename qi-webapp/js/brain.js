@@ -5426,6 +5426,8 @@
     var itp = generateITP();
     var build = generateBuildSequence(params.network || {});
     var countries = (listCountries() || []).length;
+    var weather = weatherWindows(params.weather || {});
+    var campaign = weather.summary.campaignWindow;
 
     var physicalPct = route.summary.overallPct;
     var scheduleVariance = route.summary.variancePct;
@@ -5448,6 +5450,7 @@
     if (vary.summary.pendingVariationsUsd > 0) alerts.push({ level: "Amber", text: "Variations: " + (vary.summary.pendingVariationsUsd / 1e6).toFixed(1) + "M USD pending assessment (" + pendingExposurePct + "% exposure)." });
     if (costChangePct > 2) alerts.push({ level: costChangePct > 5 ? "Red" : "Amber", text: "Approved variations have grown the contract sum by " + costChangePct + "%." });
     if (disbursedPct - physicalPct > 10) alerts.push({ level: "Amber", text: "Disbursement (" + disbursedPct + "%) is ahead of physical progress (" + physicalPct + "%) — verify valuation." });
+    if (schedule === "Behind" && campaign && campaign.months <= 3) alerts.push({ level: "Amber", text: "Schedule recovery is marine-window constrained: the all-country campaign window is only " + campaign.months + " month(s) (" + campaign.from + "\u2013" + campaign.to + ") — slippage may not be recoverable until the next season." });
     if (!alerts.length) alerts.push({ level: "Green", text: "No material exceptions — programme within thresholds." });
 
     return {
@@ -5469,13 +5472,16 @@
         holdPoints: itp.summary.holdPoints,
         ncrTriggerPoints: itp.summary.ncrTriggers,
         countries: countries,
-        buildSteps: build.summary.totalSteps
+        buildSteps: build.summary.totalSteps,
+        marineCampaignWindow: campaign ? (campaign.from + "\u2013" + campaign.to) : "None",
+        marineCampaignMonths: campaign ? campaign.months : 0
       },
       sections: {
         progress: { complete: route.summary.segmentsComplete, inProgress: route.summary.segmentsInProgress, notStarted: route.summary.segmentsNotStarted, total: route.summary.totalSegments },
         finance: { disbursedPct: disbursedPct, retentionHeldUsd: disb.summary.totalRetentionUsd, advanceUsd: disb.summary.advanceUsd },
         contract: { approvedUsd: vary.summary.approvedVariationsUsd, pendingUsd: vary.summary.pendingVariationsUsd, rejectedUsd: vary.summary.rejectedVariationsUsd },
-        quality: { holdPoints: itp.summary.holdPoints, witnessPoints: itp.summary.witnessPoints, totalItp: itp.summary.total }
+        quality: { holdPoints: itp.summary.holdPoints, witnessPoints: itp.summary.witnessPoints, totalItp: itp.summary.total },
+        marine: { allClearMonths: weather.summary.allClearMonths, campaignWindow: campaign, worstMonth: weather.summary.worstMonth.name }
       },
       alerts: alerts,
       references: [

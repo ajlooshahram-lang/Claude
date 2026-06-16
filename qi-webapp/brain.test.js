@@ -1824,6 +1824,8 @@ console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
   ok(r.alerts.some(function (a) { return /behind/i.test(a.text); }), "flags the schedule slippage");
   ok(r.alerts.some(function (a) { return /ahead of physical/i.test(a.text); }), "flags disbursement running ahead of physical progress");
   ok(r.sections.progress && r.sections.finance && r.sections.contract && r.sections.quality, "report has progress/finance/contract/quality sections");
+  ok(r.sections.marine && r.kpis.marineCampaignWindow === "Apr\u2013May" && r.kpis.marineCampaignMonths === 2, "report folds in the marine campaign window (Apr-May)");
+  ok(r.alerts.some(function (a) { return /marine-window constrained/.test(a.text); }), "flags that schedule recovery is marine-window constrained");
   // Green path when ahead of a low baseline
   var g = B.programmeStatusReport({ route: { plannedPct: 35 } });
   ok(g.rag === "Green" && g.kpis.schedule === "Ahead", "ahead of a 35% baseline yields a Green status");
