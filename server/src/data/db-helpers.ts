@@ -74,6 +74,37 @@ export type DbRegisterRow = {
   deletedAt: Date | null;
 };
 
+export type DbSnapshot = {
+  id: string;
+  tenantId: string;
+  projectId: string;
+  label: string;
+  data: unknown;
+  createdBy: string;
+  createdAt: Date;
+};
+
+export type DbProjectWithData = DbProject & {
+  spec: unknown;
+  roster: unknown;
+  stakeholders: unknown;
+  sigma: unknown;
+  gage: unknown;
+  cashflow: unknown;
+  xbarR: unknown;
+};
+
+/** Input type for updating a project's analytical data blobs. */
+export type UpdateProjectDataInput = {
+  spec?: unknown;
+  roster?: unknown;
+  stakeholders?: unknown;
+  sigma?: unknown;
+  gage?: unknown;
+  cashflow?: unknown;
+  xbarR?: unknown;
+};
+
 export type CreateAuditLogInput = {
   tenantId: string;
   actorId: string | null;
@@ -195,6 +226,18 @@ export type DataDbHelpers = {
   deleteRegisterRow(tenantId: string, projectId: string, rowId: string): Promise<DbRegisterRow | null>;
   bulkDeleteRegisterRows(tenantId: string, projectId: string, registerType: string, ids: string[]): Promise<number>;
   togglePinRegisterRow(tenantId: string, projectId: string, rowId: string): Promise<DbRegisterRow | null>;
+
+  // Snapshot methods
+  listSnapshots(tenantId: string, projectId: string): Promise<DbSnapshot[]>;
+  createSnapshot(tenantId: string, projectId: string, label: string, data: unknown, createdBy: string): Promise<DbSnapshot>;
+  getSnapshot(tenantId: string, projectId: string, snapshotId: string): Promise<DbSnapshot | null>;
+  updateSnapshotLabel(tenantId: string, projectId: string, snapshotId: string, label: string): Promise<DbSnapshot | null>;
+  deleteSnapshot(tenantId: string, projectId: string, snapshotId: string): Promise<DbSnapshot | null>;
+
+  // Project analytical data methods
+  getProjectWithData(tenantId: string, projectId: string): Promise<DbProjectWithData | null>;
+  updateProjectData(tenantId: string, projectId: string, data: UpdateProjectDataInput): Promise<DbProjectWithData | null>;
+  restoreSnapshotData(tenantId: string, projectId: string, snapshotData: unknown): Promise<void>;
 
   createAuditLog(data: CreateAuditLogInput): Promise<void>;
 };
@@ -482,6 +525,118 @@ export async function createPrismaDataDbHelpers(): Promise<DataDbHelpers> {
         data: { pinned: !existing.pinned },
       });
       return { ...updated, data: updated.data as Record<string, unknown> } as DbRegisterRow;
+    },
+
+    // ─── Snapshot implementations ─────────────────────────────────────────
+
+    async listSnapshots(tenantId, projectId) {
+      const snapshots = await prisma.snapshot.findMany({
+        where: { tenantId, projectId },
+        orderBy: { createdAt: "desc" },
+        take: 25,
+      });
+      return snapshots as unknown as DbSnapshot[];
+    },
+
+    async createSnapshot(tenantId, projectId, label, data, createdBy) {
+      const snapshot = await prisma.snapshot.create({
+        data: {
+          tenantId,
+          projectId,
+          label,
+          data: data as object,
+          createdBy,
+        },
+      });
+      return snapshot as unknown as DbSnapshot;
+    },
+
+    async getSnapshot(tenantId, projectId, snapshotId) {
+      const snapshot = await prisma.snapshot.findFirst({
+        where: { id: snapshotId, tenantId, projectId },
+      });
+      return snapshot as unknown as DbSnapshot | null;
+    },
+
+    async updateSnapshotLabel(tenantId, projectId, snapshotId, label) {
+      const existing = await prisma.snapshot.findFirst({
+        where: { id: snapshotId, tenantId, projectId },
+      });
+      if (!existing) return null;
+
+      const updated = await prisma.snapshot.update({
+        where: { id: snapshotId },
+        data: { label },
+      });
+      return updated as unknown as DbSnapshot;
+    },
+
+    async deleteSnapshot(tenantId, projectId, snapshotId) {
+      const existing = await prisma.snapshot.findFirst({
+        where: { id: snapshotId, tenantId, projectId },
+      });
+      if (!existing) return null;
+
+      const deleted = await prisma.snapshot.delete({
+        where: { id: snapshotId },
+      });
+      return deleted as unknown as DbSnapshot;
+    },
+
+    // ─── Project analytical data implementations ──────────────────────────
+
+    async getProjectWithData(tenantId, projectId) {
+      const project = await prisma.project.findFirst({
+        where: { id: projectId, tenantId, deletedAt: null },
+      });
+      if (!project) return null;
+      return project as unknown as DbProjectWithData;
+    },
+
+    async updateProjectData(tenantId, projectId, data) {
+      const existing = await prisma.project.findFirst({
+        where: { id: projectId, tenantId, deletedAt: null },
+      });
+      if (!existing) return null;
+
+      const updateData: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(data)) {
+        if (value !== undefined) {
+          updateData[key] = value as object;
+        }
+      }
+
+      const updated = await prisma.project.update({
+        where: { id: projectId },
+        data: updateData,
+      });
+      return updated as unknown as DbProjectWithData;
+    },
+
+    async restoreSnapshotData(tenantId, projectId, snapshotData) {
+      // Restore analytical blobs from snapshot data
+      const data = snapshotData as Record<string, unknown>;
+      const analyticalFields: Record<string, unknown> = {};
+      const fieldNames = ["spec", "roster", "stakeholders", "sigma", "gage", "cashflow", "xbarR"];
+      for (const field of fieldNames) {
+        if (data[field] !== undefined) {
+          analyticalFields[field] = data[field] as object;
+        }
+      }
+
+      const existing = await prisma.project.findFirst({
+        where: { id: projectId, tenantId, deletedAt: null },
+      });
+      if (!existing) return;
+
+      if (Object.keys(analyticalFields).length > 0) {
+        await prisma.project.update({
+          where: { id: projectId },
+          data: analyticalFields,
+        });
+      }
+      // NOTE: Full case/register restore from snapshot data is a future enhancement.
+      // Currently only analytical blobs (spec, roster, stakeholders, sigma, gage, cashflow, xbarR) are restored.
     },
   };
 }

@@ -156,3 +156,29 @@ export const UpdateRegisterRowSchema = z.object({
 export const BulkDeleteRegisterRowSchema = z.object({
   ids: z.array(z.string().max(SHORT_TEXT_MAX)).min(1, "At least one ID is required").max(BULK_IDS_MAX),
 });
+
+// ─── Snapshot Schemas ─────────────────────────────────────────────────────
+
+/** Maximum body size for analytical data updates (500KB). */
+const MAX_PROJECT_DATA_SIZE = 500 * 1024;
+
+export const CreateSnapshotSchema = z.object({
+  label: z.string().max(SHORT_TEXT_MAX).optional(),
+});
+
+export const UpdateSnapshotLabelSchema = z.object({
+  label: z.string().min(1, "Label is required").max(SHORT_TEXT_MAX),
+});
+
+export const UpdateProjectDataSchema = z.object({
+  spec: z.unknown().optional(),
+  roster: z.unknown().optional(),
+  stakeholders: z.unknown().optional(),
+  sigma: z.unknown().optional(),
+  gage: z.unknown().optional(),
+  cashflow: z.unknown().optional(),
+  xbarR: z.unknown().optional(),
+}).refine(
+  (val) => JSON.stringify(val).length <= MAX_PROJECT_DATA_SIZE,
+  "Project data payload exceeds 500KB limit",
+);

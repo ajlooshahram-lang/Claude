@@ -207,6 +207,38 @@
     apiFetch("/api/projects/" + projectServerId + "/registers/" + regType + "/" + rowServerId + "/pin", { method: "PATCH" });
   }
 
+  // ---- Project analytical data sync ----
+
+  function syncProjectData(projectServerId, field, value) {
+    if (!projectServerId || !field) return;
+    var body = {};
+    body[field] = value;
+    apiFetch("/api/projects/" + projectServerId + "/data", {
+      method: "PATCH",
+      body: JSON.stringify(body)
+    });
+  }
+
+  // ---- Snapshot sync ----
+
+  function syncTakeSnapshot(projectServerId, label) {
+    if (!projectServerId) return;
+    var body = {};
+    if (label) body.label = label;
+    apiFetch("/api/projects/" + projectServerId + "/snapshots", {
+      method: "POST",
+      body: JSON.stringify(body)
+    });
+  }
+
+  function syncRestoreSnapshot(projectServerId, snapshotId) {
+    if (!projectServerId || !snapshotId) return;
+    apiFetch("/api/projects/" + projectServerId + "/snapshots/" + snapshotId + "/restore", {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+  }
+
   // ---- Load from server (async, returns workspace-compatible structure) ----
   function loadFromServer() {
     if (!syncEnabled()) return Promise.resolve(null);
@@ -243,6 +275,15 @@
       });
     });
 
+    // Fetch analytical data for each project
+    var dataPromises = projects.map(function (proj) {
+      return apiFetch("/api/projects/" + proj.id + "/data", { method: "GET" }).then(function (data) {
+        return { projectId: proj.id, projectData: (data && data.project) || null };
+      }).catch(function () {
+        return { projectId: proj.id, projectData: null };
+      });
+    });
+
     // Fetch register rows for each project in parallel (all 13 types per project)
     var regPromises = [];
     projects.forEach(function (proj) {
@@ -255,9 +296,10 @@
       });
     });
 
-    return Promise.all([Promise.all(casePromises), Promise.all(regPromises)]).then(function (allResults) {
+    return Promise.all([Promise.all(casePromises), Promise.all(regPromises), Promise.all(dataPromises)]).then(function (allResults) {
       var caseResults = allResults[0];
       var regResults = allResults[1];
+      var dataResults = allResults[2];
 
       var caseMap = {};
       caseResults.forEach(function (r) { caseMap[r.projectId] = r.cases; });
@@ -269,6 +311,10 @@
         regMap[r.projectId][r.regType] = r.rows;
       });
 
+      // Build analytical data map: { projectId: projectData }
+      var analyticalMap = {};
+      dataResults.forEach(function (r) { analyticalMap[r.projectId] = r.projectData; });
+
       // Build structure for each project
       var wsProjects = {};
       var order = [];
@@ -276,6 +322,8 @@
         var localId = mapServerToLocal(proj.id) || proj.id;
         registerMapping(localId, proj.id);
         order.push(localId);
+
+        var projAnalytical = analyticalMap[proj.id] || null;
 
         var serverCases = (caseMap[proj.id] || []).map(function (sc) {
           var caseLocalId = mapServerToLocal(sc.id) || sc.id;
@@ -329,18 +377,18 @@
             status: proj.status || "PLANNING",
             sponsor: "", manager: "", org: "",
             start: "", end: "", version: "", currency: "$",
-            spec: { usl: 11, lsl: 9, target: 10 }
+            spec: (projAnalytical && projAnalytical.spec) || { usl: 11, lsl: 9, target: 10 }
           },
           cases: serverCases,
-          roster: [],
-          sigma: [],
-          stakeholders: [],
+          roster: (projAnalytical && projAnalytical.roster) || [],
+          sigma: (projAnalytical && projAnalytical.sigma) || [],
+          stakeholders: (projAnalytical && projAnalytical.stakeholders) || [],
           registers: registers,
           audit: [],
           snapshots: [],
-          gage: null,
-          cashflow: null,
-          xbarR: null
+          gage: (projAnalytical && projAnalytical.gage) || null,
+          cashflow: (projAnalytical && projAnalytical.cashflow) || null,
+          xbarR: (projAnalytical && projAnalytical.xbarR) || null
         };
       });
 
@@ -369,6 +417,9 @@
     syncRegDelete: syncRegDelete,
     syncRegBulkDelete: syncRegBulkDelete,
     syncRegTogglePin: syncRegTogglePin,
+    syncProjectData: syncProjectData,
+    syncTakeSnapshot: syncTakeSnapshot,
+    syncRestoreSnapshot: syncRestoreSnapshot,
     registerMapping: registerMapping,
     mapLocalToServer: mapLocalToServer,
     mapServerToLocal: mapServerToLocal

@@ -462,17 +462,35 @@
 
   // ---- Gage R&R + cash flow ----
   function gage() { const s = get(); if (!s.gage) s.gage = defaultGage(); return s.gage; }
-  function setGageCell(o, p, t, v) { gage().data[`${o}_${p}_${t}`] = (v === "" ? "" : Number(v)); save(); }
-  function setGageConfig(patch) { Object.assign(gage(), patch); save(); }
+  function setGageCell(o, p, t, v) {
+    gage().data[`${o}_${p}_${t}`] = (v === "" ? "" : Number(v)); save();
+    if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncProjectData(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, 'gage', gage()); }
+  }
+  function setGageConfig(patch) {
+    Object.assign(gage(), patch); save();
+    if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncProjectData(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, 'gage', gage()); }
+  }
   function gageResult() { return C.gageRR(gage()); }
   function cashflow() { const s = get(); if (!Array.isArray(s.cashflow)) s.cashflow = defaultCashflow(); return s.cashflow; }
-  function setCashflow(i, field, v) { const c = cashflow(); if (c[i]) { c[i][field] = (field === "month") ? v : (v === "" ? null : Number(v)); save(); } }
+  function setCashflow(i, field, v) {
+    const c = cashflow(); if (c[i]) { c[i][field] = (field === "month") ? v : (v === "" ? null : Number(v)); save(); }
+    if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncProjectData(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, 'cashflow', cashflow()); }
+  }
   function xbar() { const s = get(); if (!s.xbarR) s.xbarR = defaultXbar(); return s.xbarR; }
-  function setXbarCell(i, j, v) { xbar().data[`${i}_${j}`] = (v === "" ? "" : Number(v)); save(); }
-  function setXbarConfig(patch) { Object.assign(xbar(), patch); save(); }
+  function setXbarCell(i, j, v) {
+    xbar().data[`${i}_${j}`] = (v === "" ? "" : Number(v)); save();
+    if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncProjectData(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, 'xbarR', xbar()); }
+  }
+  function setXbarConfig(patch) {
+    Object.assign(xbar(), patch); save();
+    if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncProjectData(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, 'xbarR', xbar()); }
+  }
   function xbarResult() { return C.xbarR(xbar()); }
   function spec() { const s = get(); s.project.spec = s.project.spec || { usl: "", lsl: "", target: "" }; return s.project.spec; }
-  function setSpec(patch) { Object.assign(spec(), patch); save(); }
+  function setSpec(patch) {
+    Object.assign(spec(), patch); save();
+    if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncProjectData(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, 'spec', spec()); }
+  }
   function capabilityResult() { return C.capability(xbar(), spec()); }
   function prioritised(method) { return C.prioritise(validCases().map(c => Object.assign({}, c)), method); }
   function ncrPareto() {
@@ -511,6 +529,9 @@
     s.snapshots.unshift({ id: uid(), ts: new Date().toISOString(), label: label || ("Snapshot " + new Date().toLocaleString()), data: copy });
     if (s.snapshots.length > 25) s.snapshots.length = 25;
     logAudit("Snapshot", "", label || "manual"); save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      root.QISync.syncTakeSnapshot(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, label || ("Snapshot " + new Date().toLocaleString()));
+    }
     return s.snapshots[0];
   }
   function snapshots() { return get().snapshots; }
@@ -519,7 +540,11 @@
     takeSnapshot("Auto-backup before restore");
     const s = get(), d = JSON.parse(JSON.stringify(snap.data));
     s.project = d.project; s.roster = d.roster; s.cases = d.cases; s.sigma = d.sigma; s.stakeholders = d.stakeholders; if (d.registers) s.registers = d.registers; if (d.gage) s.gage = d.gage; if (d.cashflow) s.cashflow = d.cashflow; if (d.xbarR) s.xbarR = d.xbarR;
-    normalize(s); logAudit("Restored", "", snap.label); save(); return true;
+    normalize(s); logAudit("Restored", "", snap.label); save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      root.QISync.syncRestoreSnapshot(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, root.QISync.mapLocalToServer(id) || id);
+    }
+    return true;
   }
   function deleteSnapshot(id) {
     const i = get().snapshots.findIndex(x => x.id === id); if (i < 0) return false;

@@ -20,6 +20,10 @@ import {
   CreateRegisterRowSchema,
   UpdateRegisterRowSchema,
   BulkDeleteRegisterRowSchema,
+  CreateSnapshotSchema,
+  UpdateSnapshotLabelSchema,
+  UpdateProjectDataSchema,
+  VALID_REGISTER_TYPES,
 } from "./schemas.js";
 
 export type DataRouteDeps = {
@@ -611,6 +615,239 @@ export function registerDataRoutes(
       });
 
       return reply.code(200).send({ row: toggled });
+    },
+  );
+
+  // ─── Project Analytical Data ────────────────────────────────────────────
+
+  app.patch(
+    "/api/projects/:id/data",
+    { preHandler: [requireAuth] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const authed = request as AuthenticatedRequest;
+      const { id } = request.params as { id: string };
+
+      const parseResult = UpdateProjectDataSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.code(400).send({
+          error: "Validation failed",
+          details: parseResult.error.issues,
+        });
+      }
+
+      const updated = await db.updateProjectData(authed.user.tenantId, id, parseResult.data);
+      if (!updated) {
+        return reply.code(404).send({ error: "Project not found" });
+      }
+
+      await db.createAuditLog({
+        tenantId: authed.user.tenantId,
+        actorId: authed.user.id,
+        action: "project.data.update",
+        entity: "Project",
+        entityId: id,
+        detail: { fields: Object.keys(parseResult.data).filter(k => (parseResult.data as Record<string, unknown>)[k] !== undefined) },
+        ip: request.ip,
+      });
+
+      return reply.code(200).send({ project: updated });
+    },
+  );
+
+  // ─── Snapshots ──────────────────────────────────────────────────────────
+
+  app.get(
+    "/api/projects/:projectId/snapshots",
+    { preHandler: [requireAuth] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const authed = request as AuthenticatedRequest;
+      const { projectId } = request.params as { projectId: string };
+
+      const project = await db.getProject(authed.user.tenantId, projectId);
+      if (!project) {
+        return reply.code(404).send({ error: "Project not found" });
+      }
+
+      const snapshots = await db.listSnapshots(authed.user.tenantId, projectId);
+      return reply.code(200).send({ snapshots });
+    },
+  );
+
+  app.post(
+    "/api/projects/:projectId/snapshots",
+    { preHandler: [requireAuth] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const authed = request as AuthenticatedRequest;
+      const { projectId } = request.params as { projectId: string };
+
+      const project = await db.getProject(authed.user.tenantId, projectId);
+      if (!project) {
+        return reply.code(404).send({ error: "Project not found" });
+      }
+
+      const parseResult = CreateSnapshotSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.code(400).send({
+          error: "Validation failed",
+          details: parseResult.error.issues,
+        });
+      }
+
+      // Capture current project state: analytical fields + cases + all register types
+      const projectWithData = await db.getProjectWithData(authed.user.tenantId, projectId);
+      const cases = await db.listCases(authed.user.tenantId, projectId);
+
+      const registers: Record<string, unknown> = {};
+      for (const regType of VALID_REGISTER_TYPES) {
+        registers[regType] = await db.listRegisterRows(authed.user.tenantId, projectId, regType);
+      }
+
+      const snapshotData = {
+        cases,
+        registers,
+        sigma: projectWithData?.sigma ?? null,
+        gage: projectWithData?.gage ?? null,
+        cashflow: projectWithData?.cashflow ?? null,
+        xbarR: projectWithData?.xbarR ?? null,
+        roster: projectWithData?.roster ?? null,
+        stakeholders: projectWithData?.stakeholders ?? null,
+        spec: projectWithData?.spec ?? null,
+      };
+
+      const label = parseResult.data.label || `Snapshot ${new Date().toISOString()}`;
+      const snapshot = await db.createSnapshot(
+        authed.user.tenantId,
+        projectId,
+        label,
+        snapshotData,
+        authed.user.id,
+      );
+
+      await db.createAuditLog({
+        tenantId: authed.user.tenantId,
+        actorId: authed.user.id,
+        action: "snapshot.create",
+        entity: "Snapshot",
+        entityId: snapshot.id,
+        detail: { projectId, label },
+        ip: request.ip,
+      });
+
+      return reply.code(201).send({ snapshot });
+    },
+  );
+
+  app.get(
+    "/api/projects/:projectId/snapshots/:id",
+    { preHandler: [requireAuth] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const authed = request as AuthenticatedRequest;
+      const { projectId, id } = request.params as { projectId: string; id: string };
+
+      const project = await db.getProject(authed.user.tenantId, projectId);
+      if (!project) {
+        return reply.code(404).send({ error: "Project not found" });
+      }
+
+      const snapshot = await db.getSnapshot(authed.user.tenantId, projectId, id);
+      if (!snapshot) {
+        return reply.code(404).send({ error: "Snapshot not found" });
+      }
+
+      return reply.code(200).send({ snapshot });
+    },
+  );
+
+  app.put(
+    "/api/projects/:projectId/snapshots/:id",
+    { preHandler: [requireAuth] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const authed = request as AuthenticatedRequest;
+      const { projectId, id } = request.params as { projectId: string; id: string };
+
+      const project = await db.getProject(authed.user.tenantId, projectId);
+      if (!project) {
+        return reply.code(404).send({ error: "Project not found" });
+      }
+
+      const parseResult = UpdateSnapshotLabelSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.code(400).send({
+          error: "Validation failed",
+          details: parseResult.error.issues,
+        });
+      }
+
+      const updated = await db.updateSnapshotLabel(authed.user.tenantId, projectId, id, parseResult.data.label);
+      if (!updated) {
+        return reply.code(404).send({ error: "Snapshot not found" });
+      }
+
+      return reply.code(200).send({ snapshot: updated });
+    },
+  );
+
+  app.delete(
+    "/api/projects/:projectId/snapshots/:id",
+    { preHandler: [requireAuth] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const authed = request as AuthenticatedRequest;
+      const { projectId, id } = request.params as { projectId: string; id: string };
+
+      const project = await db.getProject(authed.user.tenantId, projectId);
+      if (!project) {
+        return reply.code(404).send({ error: "Project not found" });
+      }
+
+      const deleted = await db.deleteSnapshot(authed.user.tenantId, projectId, id);
+      if (!deleted) {
+        return reply.code(404).send({ error: "Snapshot not found" });
+      }
+
+      await db.createAuditLog({
+        tenantId: authed.user.tenantId,
+        actorId: authed.user.id,
+        action: "snapshot.delete",
+        entity: "Snapshot",
+        entityId: id,
+        detail: { projectId },
+        ip: request.ip,
+      });
+
+      return reply.code(200).send({ success: true });
+    },
+  );
+
+  app.post(
+    "/api/projects/:projectId/snapshots/:id/restore",
+    { preHandler: [requireAuth] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const authed = request as AuthenticatedRequest;
+      const { projectId, id } = request.params as { projectId: string; id: string };
+
+      const project = await db.getProject(authed.user.tenantId, projectId);
+      if (!project) {
+        return reply.code(404).send({ error: "Project not found" });
+      }
+
+      const snapshot = await db.getSnapshot(authed.user.tenantId, projectId, id);
+      if (!snapshot) {
+        return reply.code(404).send({ error: "Snapshot not found" });
+      }
+
+      await db.restoreSnapshotData(authed.user.tenantId, projectId, snapshot.data);
+
+      await db.createAuditLog({
+        tenantId: authed.user.tenantId,
+        actorId: authed.user.id,
+        action: "snapshot.restore",
+        entity: "Snapshot",
+        entityId: id,
+        detail: { projectId, label: snapshot.label },
+        ip: request.ip,
+      });
+
+      return reply.code(200).send({ success: true });
     },
   );
 }
