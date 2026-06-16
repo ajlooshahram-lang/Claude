@@ -47,6 +47,39 @@ All authentication endpoints are live, tested, and production-ready.
 
 ---
 
+## Invite Endpoints (Phase 2)
+
+Team invitation system for adding users to an existing tenant.
+
+| Method | Path | Purpose | Auth Required |
+|--------|------|---------|---------------|
+| POST | `/api/invites` | Create invite, returns one-time token (OWNER/ADMIN only, rate-limited 10/min) | Yes (ADMIN+) |
+| GET | `/api/invites` | List pending invites for tenant | Yes (ADMIN+) |
+| DELETE | `/api/invites/:id` | Revoke a pending invite | Yes (ADMIN+) |
+| POST | `/auth/accept-invite` | Accept invite with token, create user + session (public, rate-limited 10/min) | No |
+| GET | `/api/team` | List team members in tenant | Yes |
+
+### Invite Flow
+
+1. OWNER or ADMIN calls `POST /api/invites` with `{ email, role }`.
+2. Server generates a 32-byte CSPRNG token, stores only its SHA-256 hash.
+3. The raw token is returned **once** in the response (must be shared out-of-band with the invitee).
+4. Invitee calls `POST /auth/accept-invite` with `{ token, password, displayName }`.
+5. Server validates the token hash, checks expiry (7 days) and not already used.
+6. Server creates the user in the inviter's tenant with the specified role, creates a session.
+7. All actions are audit-logged: `invite.create`, `invite.accept`, `invite.revoke`.
+
+### Security Controls
+
+- Invite tokens use the same security model as sessions: 32-byte CSPRNG, SHA-256 hash stored.
+- Tokens expire after 7 days.
+- Cannot invite an email that already exists in the tenant (409).
+- Cannot invite with a role equal to or higher than your own (ADMIN cannot invite OWNER or ADMIN).
+- Password strength validation applies on accept (12+ chars, not common).
+- `POST /auth/accept-invite` is CSRF-exempt (like login/register).
+
+---
+
 ## Security Model
 
 ### Password Hashing -- Argon2id

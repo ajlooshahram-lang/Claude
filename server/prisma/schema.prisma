@@ -52,6 +52,7 @@ model Tenant {
   users       User[]
   projects    Project[]
   auditLogs   AuditLog[]
+  invites     Invite[]
 
   @@index([deletedAt])
 }
@@ -279,4 +280,25 @@ model AuditLog {
 
   @@index([tenantId, createdAt])
   @@index([tenantId, action])
+}
+
+/// A pending invitation for a user to join a tenant.
+/// Only the SHA-256 hash of the invite token is stored (same security model as
+/// sessions). The raw token is returned once at creation time.
+model Invite {
+  id         String    @id @default(cuid())
+  tenantId   String
+  email      String
+  role       Role      @default(MANAGER)
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  createdBy  String?
+  createdAt  DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([expiresAt])
 }

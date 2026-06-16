@@ -10,11 +10,13 @@ import { registerDataRoutes } from "./data/routes.js";
 import { validateCsrf } from "./auth/csrf.js";
 import type { AuthDbHelpers } from "./auth/db-helpers.js";
 import type { DataDbHelpers } from "./data/db-helpers.js";
+import type { InviteDbHelpers } from "./invite/db-helpers.js";
+import { registerInviteRoutes } from "./invite/routes.js";
 
 const SERVICE = "qi-platform-server";
 const VERSION = "0.1.0";
 
-export type BuildOptions = { config?: AppConfig; dbHelpers?: AuthDbHelpers; dataDbHelpers?: DataDbHelpers };
+export type BuildOptions = { config?: AppConfig; dbHelpers?: AuthDbHelpers; dataDbHelpers?: DataDbHelpers; inviteDbHelpers?: InviteDbHelpers };
 
 /**
  * Build the Fastify application. Pure factory (no listen) so tests can drive it
@@ -58,7 +60,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     // CSRF enforcement: validate the double-submit cookie on state-changing
     // methods. Exempt: /auth/register and /auth/login (initial auth flows where
     // the client does not yet have a CSRF token).
-    const CSRF_EXEMPT_ROUTES = new Set(["/auth/register", "/auth/login", "/auth/login/mfa"]);
+    const CSRF_EXEMPT_ROUTES = new Set(["/auth/register", "/auth/login", "/auth/login/mfa", "/auth/accept-invite"]);
     const CSRF_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
     app.addHook("preHandler", async (request, reply) => {
@@ -86,6 +88,11 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   // Register data routes if data db helpers are provided.
   if (opts.dataDbHelpers && opts.dbHelpers) {
     registerDataRoutes(app, { authDb: opts.dbHelpers, dataDb: opts.dataDbHelpers }, config);
+  }
+
+  // Register invite routes if invite db helpers are provided.
+  if (opts.inviteDbHelpers && opts.dbHelpers) {
+    registerInviteRoutes(app, { authDb: opts.dbHelpers, inviteDb: opts.inviteDbHelpers }, config);
   }
 
   // Readiness: can the process serve traffic (incl. database connectivity)?

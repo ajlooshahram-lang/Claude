@@ -11,7 +11,7 @@
 | # | Product | Type | Location | Status |
 |---|---------|------|----------|--------|
 | 1 | **QI Intelligence Platform -- Web App (v9)** | Multi-file web app | `qi-webapp/` | Active |
-| 2 | **STP Backend** | Fastify 5 + TypeScript + Prisma + PostgreSQL | `server/` | Active (Phase 1 auth complete) |
+| 2 | **STP Backend** | Fastify 5 + TypeScript + Prisma + PostgreSQL | `server/` | Active (Phase 2 invite system complete) |
 | 3 | **QI Platform v9 Integrated** | Excel workbook (.xlsx) | `QI_Platform_v9_Integrated.xlsx` | Active |
 | 4 | **FMEA-Lite** | Single-file web app | `fmea-lite.html` | Active |
 | 5 | **Trend Product Finder** | Single-file web app | `trend-product-finder/` | Active |
@@ -83,7 +83,7 @@ products relevant to the submarine telecom deployment.
 | `node qi-webapp/test.js` (engine: MSA, cashflow, resource, Cp/Cpk, RICE/WSJF, NCR Pareto, theme, soft-delete/bulk) | PASS |
 | `node qi-webapp/brain.test.js` (domain detect, scale parse, cost scaling, fallback, determinism) | 24/24 PASS |
 | `cd server && npm run build` | OK (TypeScript compiles cleanly, strict mode) |
-| `cd server && npm test` | 64/64 PASS (health + auth tests) |
+| `cd server && npm test` | 139/139 PASS (health + auth + data + invite tests) |
 
 ---
 
@@ -92,7 +92,7 @@ products relevant to the submarine telecom deployment.
 | Session | What shipped |
 |---------|--------------|
 | **STP v1** | QI Platform v9 web app, integrated workbook, FMEA-Lite, Trend Product Finder, Neon Shooter, Project Brain with fibre/telecom domain profile. |
-| **STP v2** | Secure backend scaffold (Fastify 5 + Prisma + PostgreSQL), Phase 1 authentication system (Argon2id, sessions, TOTP MFA, CSRF, lockout, audit logging, RBAC), CI pipeline. |
+| **STP v2** | Secure backend scaffold (Fastify 5 + Prisma + PostgreSQL), Phase 1 authentication system (Argon2id, sessions, TOTP MFA, CSRF, lockout, audit logging, RBAC), Phase 2 invitation system (invite/accept/revoke, team listing), Project/Case CRUD API, CI pipeline, Docker Compose deployment. |
 
 ---
 
