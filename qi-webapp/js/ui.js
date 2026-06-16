@@ -221,6 +221,7 @@
     { id: "portfolio", label: "Portfolio", icon: "▣" },
     { id: "dashboard", label: "Dashboard", icon: "▤" },
     { id: "progreport", label: "Programme Report", icon: "\uD83D\uDCCA" },
+    { id: "packages", label: "Work Breakdown (WBS)", icon: "\uD83D\uDDC2\uFE0F" },
     { id: "cases", label: "Cases (Master)", icon: "★" },
     { g: "Delivery" },
     { id: "permits", label: "Permit Tracker", icon: "⏱" },
@@ -2137,6 +2138,44 @@
       var r = B.riskQuantification({ cases: cases, options: { seed: 42, iterations: Number(sel.value) || 2000 } });
       document.getElementById("qrResults").innerHTML = qrResultsHtml(r);
     });
+  };
+
+  // ---------- Programme Work Breakdown (packages) ----------
+  function pkgStatusColor(st) { return st === "Complete" ? "var(--green,#1e7e34)" : st === "In progress" ? "#3498db" : "var(--text-muted,#8fa3b5)"; }
+  RENDER.packages = function () {
+    var B = window.QIBrain;
+    if (!B || !B.programmePackages) return '<h2>Work Breakdown</h2><p class="muted">Engine unavailable.</p>';
+    var r = B.programmePackages(); var s = r.summary;
+    var money = function (v) { return Math.abs(v) >= 1e9 ? "$" + (v / 1e9).toFixed(2) + "B" : "$" + (v / 1e6).toFixed(0) + "M"; };
+    var fidic = (s.byContractType.filter(function (x) { return x.key === "FIDIC"; })[0] || { pct: 0 }).pct;
+    var nec4 = (s.byContractType.filter(function (x) { return x.key === "NEC4"; })[0] || { pct: 0 }).pct;
+    var kpis = '<div class="grid kpis" id="pkgKpis" style="margin-bottom:14px">' +
+      '<div class="kpi"><div class="label">Programme value</div><div class="value">' + money(s.totalValueUsd) + '</div></div>' +
+      '<div class="kpi"><div class="label">Packages</div><div class="value">' + s.totalPackages + '</div></div>' +
+      '<div class="kpi"><div class="label">Earned value</div><div class="value">' + money(s.earnedValueUsd) + '</div></div>' +
+      '<div class="kpi"><div class="label">Weighted complete</div><div class="value">' + s.weightedPctComplete + '%</div></div>' +
+      '<div class="kpi"><div class="label">FIDIC / NEC4</div><div class="value">' + fidic + '% / ' + nec4 + '%</div></div>' +
+      '</div>';
+    var rows = r.packages.map(function (p) {
+      var col = pkgStatusColor(p.status);
+      var bar = '<div style="background:var(--border,#e2e8f0);border-radius:5px;height:10px;overflow:hidden;min-width:80px"><div style="height:100%;width:' + p.pctComplete + '%;background:' + col + '"></div></div>';
+      return '<tr><td><strong>' + esc(p.id) + '</strong></td><td>' + esc(p.name) + '</td><td>' + esc(p.category) + '</td>' +
+        '<td>' + esc(p.contractType) + '</td><td class="right">' + money(p.valueUsd) + '</td>' +
+        '<td>' + bar + '</td><td class="right">' + p.pctComplete + '%</td>' +
+        '<td class="right">' + money(p.earnedValueUsd) + '</td>' +
+        '<td style="color:' + col + ';font-weight:600">' + esc(p.status) + '</td><td>' + esc(p.contractor) + '</td></tr>';
+    }).join("");
+    var table = '<div class="card"><h3>Contract packages (WBS)</h3><div class="table-wrap"><table class="pkgTable"><thead><tr>' +
+      '<th>ID</th><th>Package</th><th>Category</th><th>Form</th><th class="right">Value</th><th>Progress</th><th class="right">%</th><th class="right">Earned</th><th>Status</th><th>Contractor</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    var catRows = s.byCategory.slice().sort(function (a, b) { return b.valueUsd - a.valueUsd; }).map(function (c) {
+      return '<tr><td>' + esc(c.key) + '</td><td class="right">' + money(c.valueUsd) + '</td><td class="right">' + c.pct + '%</td></tr>';
+    }).join("");
+    var catCard = '<div class="card"><h3>Value by category</h3><div class="table-wrap"><table class="pkgCatTable"><thead><tr><th>Category</th><th class="right">Value</th><th class="right">Share</th></tr></thead><tbody>' + catRows + '</tbody></table></div></div>';
+    var refs = '<div class="card" id="pkgRefs"><h3>Basis</h3><ul style="margin:0;padding-left:20px">' + r.references.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul></div>';
+    return '<h2 style="margin-bottom:6px">Programme Work Breakdown</h2>' +
+      '<p class="muted" style="margin-bottom:14px">The contract packages (Programme &rarr; Package tier of the WBS) that make up the $1.3B programme, with value, contract form, status and earned value.</p>' +
+      kpis + table + catCard + refs;
   };
 
   // ---------- Programme Status Report (executive / lender) ----------

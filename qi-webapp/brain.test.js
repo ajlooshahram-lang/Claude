@@ -1881,5 +1881,26 @@ console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
   ok(JSON.stringify(r) === JSON.stringify(B.weatherWindows()), "weather analysis is deterministic");
 })();
 
+// ===== Programme Work Breakdown (contract packages) =====
+(function () {
+  console.log("\n--- Programme Work Breakdown ---");
+  var r = B.programmePackages();
+  var s = r.summary;
+  ok(s.totalPackages === 8 && s.totalValueUsd === 1300000000, "8 packages summing to exactly $1.3B");
+  ok(r.packages.reduce(function (a, p) { return a + p.earnedValueUsd; }, 0) === s.earnedValueUsd, "earned value sums across packages");
+  ok(s.earnedValueUsd === 582000000 && s.weightedPctComplete === 44.8, "value-weighted % complete = 44.8% ($582M earned)");
+  ok(r.packages.every(function (p) { return p.earnedValueUsd === Math.round(p.valueUsd * p.pctComplete / 100); }), "each package's earned value = value x % complete");
+  var ct = {};
+  s.byContractType.forEach(function (x) { ct[x.key] = x.valueUsd; });
+  ok(ct.FIDIC === 790000000 && ct.NEC4 === 510000000, "contract-form split: FIDIC $790M / NEC4 $510M");
+  ok(s.byContractType.reduce(function (a, x) { return a + x.valueUsd; }, 0) === s.totalValueUsd, "contract-form values reconcile to the total");
+  ok(s.byCategory.reduce(function (a, x) { return a + x.valueUsd; }, 0) === s.totalValueUsd, "category values reconcile to the total");
+  ok(s.statusCounts["In progress"] === 5 && s.statusCounts["Complete"] === 1 && s.statusCounts["Not started"] === 2, "status breakdown: 5 in progress / 1 complete / 2 not started");
+  ok(r.references.some(function (x) { return /WBS|Package/.test(x); }), "references describe the WBS package tier");
+  ok(JSON.stringify(r) === JSON.stringify(B.programmePackages()), "work breakdown is deterministic");
+  var c = B.programmePackages({ packages: [{ id: "X", name: "x", category: "Marine", contractType: "FIDIC", valueUsd: 1000000, status: "Complete", pctComplete: 100 }] });
+  ok(c.summary.totalValueUsd === 1000000 && c.summary.weightedPctComplete === 100, "custom package set honoured");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);

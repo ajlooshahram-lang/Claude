@@ -1269,5 +1269,15 @@ ok(renderFailures.length === 0, "every navigable view renders without error" + (
 var missingFromNav = views.filter(function (v) { return !seenNav[v]; });
 ok(missingFromNav.length === 0, "hardcoded view list stays in sync with the nav" + (missingFromNav.length ? " (missing: " + missingFromNav.join(",") + ")" : ""));
 
+// 116) Programme Work Breakdown (packages)
+var pkgNav = doc.querySelector('.nav-item[data-view="packages"]');
+ok(pkgNav != null, "Work Breakdown nav item exists");
+if (pkgNav) pkgNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var pkgKpis = doc.getElementById("pkgKpis");
+ok(pkgKpis != null && pkgKpis.querySelectorAll('.kpi').length >= 5, "Work Breakdown shows roll-up KPIs");
+var pkgTable = doc.querySelector('.pkgTable');
+ok(pkgTable != null && pkgTable.querySelectorAll('tbody tr').length === 8, "Work Breakdown lists all 8 contract packages");
+ok(doc.querySelector('.pkgCatTable') != null && doc.querySelector('.pkgCatTable').querySelectorAll('tbody tr').length >= 5, "Work Breakdown shows the value-by-category breakdown");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

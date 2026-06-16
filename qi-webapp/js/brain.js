@@ -5582,6 +5582,64 @@
     };
   }
 
+  // ---------- Programme Work Breakdown (contract packages) ----------
+  // Deterministic programme->package tier of the WBS: the contract packages that
+  // make up the $1.3B programme, each with value, contract form, status and
+  // physical % complete. Rolls up to earned value, a value-weighted % complete,
+  // and NEC4/FIDIC + category splits. Package values sum to the programme value.
+  var PROGRAMME_PACKAGES = [
+    { id: "PKG-01", name: "Marine Installation - Trunk", category: "Marine", contractType: "FIDIC", valueUsd: 380000000, status: "In progress", pctComplete: 45, contractor: "Global Marine Group" },
+    { id: "PKG-02", name: "Submarine Cable & Repeater Supply", category: "Supply", contractType: "FIDIC", valueUsd: 260000000, status: "In progress", pctComplete: 70, contractor: "NEC / SubCom" },
+    { id: "PKG-03", name: "Cable Landing Stations & Civil", category: "Civil", contractType: "NEC4", valueUsd: 180000000, status: "In progress", pctComplete: 55, contractor: "Regional JV" },
+    { id: "PKG-04", name: "Branch Installation (ID/PH/VN)", category: "Marine", contractType: "FIDIC", valueUsd: 150000000, status: "In progress", pctComplete: 20, contractor: "Global Marine Group" },
+    { id: "PKG-05", name: "Network Equipment (SLTE/PFE)", category: "Equipment", contractType: "NEC4", valueUsd: 140000000, status: "Not started", pctComplete: 0, contractor: "Ciena / NEC" },
+    { id: "PKG-06", name: "Survey & Route Engineering", category: "Survey", contractType: "NEC4", valueUsd: 60000000, status: "Complete", pctComplete: 100, contractor: "EGS Survey" },
+    { id: "PKG-07", name: "Programme Management & Engineering", category: "PM", contractType: "NEC4", valueUsd: 80000000, status: "In progress", pctComplete: 50, contractor: "Owner's Engineer" },
+    { id: "PKG-08", name: "Spares, Testing & Commissioning", category: "Testing", contractType: "NEC4", valueUsd: 50000000, status: "Not started", pctComplete: 0, contractor: "TBD" }
+  ];
+  function programmePackages(params) {
+    params = params || {};
+    var src = params.packages && params.packages.length ? params.packages : PROGRAMME_PACKAGES;
+    var packages = src.map(function (p) {
+      var pct = Math.max(0, Math.min(100, Number(p.pctComplete) || 0));
+      var value = Number(p.valueUsd) || 0;
+      return {
+        id: p.id, name: p.name, category: p.category, contractType: p.contractType || "NEC4",
+        valueUsd: value, status: p.status || "Not started", pctComplete: pct,
+        contractor: p.contractor || "TBD", earnedValueUsd: Math.round(value * pct / 100)
+      };
+    });
+    var totalValue = packages.reduce(function (s, p) { return s + p.valueUsd; }, 0);
+    var earned = packages.reduce(function (s, p) { return s + p.earnedValueUsd; }, 0);
+    var weightedPct = totalValue > 0 ? Math.round(earned / totalValue * 1000) / 10 : 0;
+
+    function group(keyFn) {
+      var m = {};
+      packages.forEach(function (p) { var k = keyFn(p); m[k] = (m[k] || 0) + p.valueUsd; });
+      return Object.keys(m).map(function (k) { return { key: k, valueUsd: m[k], pct: totalValue > 0 ? Math.round(m[k] / totalValue * 1000) / 10 : 0 }; });
+    }
+    var statusCounts = {};
+    packages.forEach(function (p) { statusCounts[p.status] = (statusCounts[p.status] || 0) + 1; });
+
+    return {
+      packages: packages,
+      summary: {
+        totalPackages: packages.length,
+        totalValueUsd: totalValue,
+        earnedValueUsd: earned,
+        weightedPctComplete: weightedPct,
+        byCategory: group(function (p) { return p.category; }),
+        byContractType: group(function (p) { return p.contractType; }),
+        statusCounts: statusCounts
+      },
+      references: [
+        "Programme WBS: Programme -> Package (contract) -> Work Order",
+        "NEC4 / FIDIC contract packaging — value & risk allocation per package",
+        "EVM — value-weighted physical % complete (earned value / budget)"
+      ]
+    };
+  }
+
   var API = {
     analyzeProject: analyzeProject,
     listProfiles: listProfiles,
@@ -5608,6 +5666,7 @@
     routeProgress: routeProgress,
     programmeStatusReport: programmeStatusReport,
     weatherWindows: weatherWindows,
+    programmePackages: programmePackages,
     checkAlerts: checkAlerts,
     monteCarloSchedule: monteCarloSchedule,
     monteCarloCost: monteCarloCost,
