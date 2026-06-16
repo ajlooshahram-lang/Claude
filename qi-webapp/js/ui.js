@@ -773,6 +773,35 @@
       </div>
       <div style="margin-top:14px"><button class="btn btn-primary" data-act="saveproj">Save project</button></div></div>
 
+      <div class="card team-card"><div class="card-head"><h3>Team Management</h3></div>
+        <div id="teamMembersArea"><p class="muted">Loading team members...</p></div>
+        <div id="teamInviteArea" hidden>
+          <hr style="border:none;border-top:1px solid var(--line);margin:16px 0">
+          <h4 style="margin:0 0 12px;font-size:14px">Invite New Member</h4>
+          <div class="invite-form" id="inviteFormArea">
+            <div class="form-grid" style="max-width:500px">
+              <div class="field"><label>Email</label><input type="email" id="inviteEmail" placeholder="user@example.com" required></div>
+              <div class="field"><label>Role</label><select id="inviteRole"><option value="ADMIN">Admin</option><option value="MANAGER" selected>Manager</option><option value="VIEWER">Viewer</option></select></div>
+            </div>
+            <div style="margin-top:12px"><button class="btn btn-primary" id="btnSendInvite">Send Invite</button></div>
+          </div>
+          <div id="inviteLinkArea" hidden>
+            <div class="invite-link-box">
+              <label style="font-size:12px;font-weight:600;color:#42506a;display:block;margin-bottom:6px">Invite Link (share this with the user)</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="text" id="inviteLinkValue" readonly style="flex:1;font-family:monospace;font-size:12px">
+                <button class="btn btn-sm" id="btnCopyInviteLink">Copy</button>
+              </div>
+              <p class="muted" style="margin-top:6px;font-size:11px">This link is valid for 7 days. It can only be used once.</p>
+            </div>
+          </div>
+          <div id="pendingInvitesArea" style="margin-top:16px">
+            <h4 style="margin:0 0 10px;font-size:14px">Pending Invites</h4>
+            <div id="pendingInvitesList"><p class="muted">Loading...</p></div>
+          </div>
+        </div>
+      </div>
+
       <div class="card"><div class="card-head"><h3>Team roster</h3>
         <button class="btn btn-sm btn-primary" data-act="addro">+ Add member</button></div>
         <p class="muted" style="margin-top:-6px">These names populate the Owner &amp; Stakeholder dropdowns.</p>
@@ -840,6 +869,138 @@
       </div>`;
   };
   AFTER.config = function () {
+    // ---- Team Management wiring ----
+    var teamArea = document.getElementById("teamMembersArea");
+    var inviteArea = document.getElementById("teamInviteArea");
+
+    if (teamArea && window.QIAuth && window.QIAuth.listTeam) {
+      window.QIAuth.listTeam().then(function (data) {
+        var members = (data && data.members) || [];
+        if (members.length === 0) {
+          teamArea.innerHTML = '<p class="muted">No team members found.</p>';
+          return;
+        }
+        // Determine current user role from team list
+        var cu = window.QIAuth.currentUser;
+        var myRole = null;
+        if (cu) {
+          for (var i = 0; i < members.length; i++) {
+            if (members[i].id === cu.id) { myRole = members[i].role; break; }
+          }
+        }
+        var isAdmin = myRole === "OWNER" || myRole === "ADMIN";
+
+        // Build team members table
+        var roleClass = function (r) { return "role-badge role-" + (r || "viewer").toLowerCase(); };
+        var rows = members.map(function (m) {
+          var joined = m.createdAt ? new Date(m.createdAt).toLocaleDateString() : "";
+          return "<tr><td>" + esc(m.displayName || m.email) + "</td><td>" + esc(m.email) + "</td><td><span class=\"" + roleClass(m.role) + "\">" + esc(m.role) + "</span></td><td>" + esc(joined) + "</td></tr>";
+        }).join("");
+        teamArea.innerHTML = '<div class="table-wrap"><table class="team-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+
+        // Show invite management if OWNER or ADMIN
+        if (isAdmin && inviteArea) {
+          inviteArea.hidden = false;
+          loadPendingInvites();
+        }
+      }).catch(function () {
+        teamArea.innerHTML = '<p class="muted">Unable to load team members.</p>';
+      });
+    }
+
+    // Send invite handler
+    var btnSend = document.getElementById("btnSendInvite");
+    if (btnSend) {
+      btnSend.addEventListener("click", function () {
+        var email = (document.getElementById("inviteEmail") || {}).value || "";
+        var role = (document.getElementById("inviteRole") || {}).value || "MANAGER";
+        if (!email) { toast("Please enter an email address."); return; }
+        btnSend.disabled = true;
+        window.QIAuth.createInvite(email, role).then(function (data) {
+          btnSend.disabled = false;
+          if (data && data.token) {
+            var link = window.location.origin + "/?invite=" + data.token;
+            var linkInput = document.getElementById("inviteLinkValue");
+            var linkArea = document.getElementById("inviteLinkArea");
+            if (linkInput) linkInput.value = link;
+            if (linkArea) linkArea.hidden = false;
+            toast("Invite created successfully.");
+            // Clear form
+            var emailInput = document.getElementById("inviteEmail");
+            if (emailInput) emailInput.value = "";
+            loadPendingInvites();
+          } else {
+            toast(data.message || data.error || "Failed to create invite.");
+          }
+        }).catch(function () {
+          btnSend.disabled = false;
+          toast("Unable to reach the server.");
+        });
+      });
+    }
+
+    // Copy invite link handler
+    var btnCopy = document.getElementById("btnCopyInviteLink");
+    if (btnCopy) {
+      btnCopy.addEventListener("click", function () {
+        var linkInput = document.getElementById("inviteLinkValue");
+        if (linkInput && linkInput.value) {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(linkInput.value).then(function () {
+              toast("Invite link copied to clipboard.");
+            }).catch(function () {
+              linkInput.select();
+              toast("Press Ctrl+C to copy.");
+            });
+          } else {
+            linkInput.select();
+            try { document.execCommand("copy"); toast("Invite link copied."); } catch (ex) { toast("Press Ctrl+C to copy."); }
+          }
+        }
+      });
+    }
+
+    // Load pending invites
+    function loadPendingInvites() {
+      var listEl = document.getElementById("pendingInvitesList");
+      if (!listEl || !window.QIAuth || !window.QIAuth.listInvites) return;
+      window.QIAuth.listInvites().then(function (data) {
+        var invites = (data && data.invites) || [];
+        if (invites.length === 0) {
+          listEl.innerHTML = '<p class="muted">No pending invites.</p>';
+          return;
+        }
+        var rows = invites.map(function (inv) {
+          var expires = inv.expiresAt ? new Date(inv.expiresAt).toLocaleDateString() : "";
+          return '<tr><td>' + esc(inv.email) + '</td><td><span class="role-badge role-' + (inv.role || "manager").toLowerCase() + '">' + esc(inv.role) + '</span></td><td>' + esc(expires) + '</td><td><button class="btn btn-sm btn-danger" data-revoke="' + esc(inv.id) + '">Revoke</button></td></tr>';
+        }).join("");
+        listEl.innerHTML = '<div class="table-wrap"><table class="team-table"><thead><tr><th>Email</th><th>Role</th><th>Expires</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+
+        // Wire revoke buttons
+        listEl.querySelectorAll("button[data-revoke]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var id = btn.getAttribute("data-revoke");
+            btn.disabled = true;
+            window.QIAuth.revokeInvite(id).then(function (data) {
+              if (data && data.success) {
+                toast("Invite revoked.");
+                loadPendingInvites();
+              } else {
+                toast(data.message || data.error || "Failed to revoke invite.");
+                btn.disabled = false;
+              }
+            }).catch(function () {
+              toast("Unable to reach the server.");
+              btn.disabled = false;
+            });
+          });
+        });
+      }).catch(function () {
+        listEl.innerHTML = '<p class="muted">Unable to load invites.</p>';
+      });
+    }
+
+    // ---- Existing config wiring ----
     content.querySelectorAll("input[data-ro],select[data-ro]").forEach(inp => inp.addEventListener("change", () => {
       const i = +inp.dataset.ro; S.get().roster[i][inp.dataset.f] = inp.value; S.save();
       if (inp.dataset.f === "name") refreshHeader();

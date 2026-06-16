@@ -107,21 +107,56 @@
     }).then(function (res) { return res.json(); });
   }
 
+  // ---- Invite & Team API functions ----
+  function createInvite(email, role) {
+    return authFetch("/api/invites", {
+      method: "POST",
+      body: JSON.stringify({ email: email, role: role })
+    }).then(function (res) { return res.json(); });
+  }
+
+  function listInvites() {
+    return authFetch("/api/invites", { method: "GET" })
+      .then(function (res) { return res.json(); });
+  }
+
+  function revokeInvite(id) {
+    return authFetch("/api/invites/" + id, { method: "DELETE" })
+      .then(function (res) { return res.json(); });
+  }
+
+  function listTeam() {
+    return authFetch("/api/team", { method: "GET" })
+      .then(function (res) { return res.json(); });
+  }
+
+  function acceptInvite(token, password, displayName) {
+    var fullUrl = API_BASE + "/auth/accept-invite";
+    return fetch(fullUrl, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: token, password: password, displayName: displayName })
+    }).then(function (res) { return res.json(); });
+  }
+
   // ---- UI manipulation ----
   function showLoginScreen() {
     var gate = document.getElementById("authGate");
     var app = document.getElementById("app");
     if (gate) gate.hidden = false;
     if (app) app.hidden = true;
-    // Show login panel, hide register and MFA
+    // Show login panel, hide register, MFA, and accept-invite
     var lp = document.getElementById("authLogin");
     var rp = document.getElementById("authRegister");
     var mp = document.getElementById("authMfa");
     var ep = document.getElementById("authError");
+    var ap = document.getElementById("authAcceptInvite");
     if (lp) lp.hidden = false;
     if (rp) rp.hidden = true;
     if (mp) mp.hidden = true;
     if (ep) ep.hidden = true;
+    if (ap) ap.hidden = true;
   }
 
   function showRegisterScreen() {
@@ -129,10 +164,12 @@
     var rp = document.getElementById("authRegister");
     var mp = document.getElementById("authMfa");
     var ep = document.getElementById("authError");
+    var ap = document.getElementById("authAcceptInvite");
     if (lp) lp.hidden = true;
     if (rp) rp.hidden = false;
     if (mp) mp.hidden = true;
     if (ep) ep.hidden = true;
+    if (ap) ap.hidden = true;
   }
 
   function showMfaScreen() {
@@ -140,10 +177,29 @@
     var rp = document.getElementById("authRegister");
     var mp = document.getElementById("authMfa");
     var ep = document.getElementById("authError");
+    var ap = document.getElementById("authAcceptInvite");
     if (lp) lp.hidden = true;
     if (rp) rp.hidden = true;
     if (mp) mp.hidden = false;
     if (ep) ep.hidden = true;
+    if (ap) ap.hidden = true;
+  }
+
+  function showAcceptInviteScreen() {
+    var gate = document.getElementById("authGate");
+    var app = document.getElementById("app");
+    var lp = document.getElementById("authLogin");
+    var rp = document.getElementById("authRegister");
+    var mp = document.getElementById("authMfa");
+    var ep = document.getElementById("authError");
+    var ap = document.getElementById("authAcceptInvite");
+    if (gate) gate.hidden = false;
+    if (app) app.hidden = true;
+    if (lp) lp.hidden = true;
+    if (rp) rp.hidden = true;
+    if (mp) mp.hidden = true;
+    if (ep) ep.hidden = true;
+    if (ap) ap.hidden = false;
   }
 
   function showAuthError(msg) {
@@ -165,6 +221,57 @@
     if (!gate) {
       if (window.QIBoot) window.QIBoot();
       return;
+    }
+
+    // Detect ?invite= query parameter for accept-invite flow
+    var params = new URLSearchParams(window.location.search);
+    var inviteToken = params.get("invite");
+
+    if (inviteToken) {
+      showAcceptInviteScreen();
+
+      // Wire up accept-invite form
+      var acceptForm = document.getElementById("acceptInviteForm");
+      if (acceptForm) {
+        acceptForm.addEventListener("submit", function (e) {
+          e.preventDefault();
+          var pw = document.getElementById("invitePassword").value;
+          var name = document.getElementById("inviteDisplayName").value;
+          var ep = document.getElementById("authError");
+          if (ep) ep.hidden = true;
+
+          if (pw.length < 12) {
+            if (ep) { ep.textContent = "Password must be at least 12 characters."; ep.hidden = false; }
+            return;
+          }
+
+          acceptInvite(inviteToken, pw, name).then(function (data) {
+            if (data.user) {
+              currentUser = data.user;
+              // Clear the invite query param from URL
+              var cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
+              try { history.replaceState(null, "", cleanUrl); } catch (ex) {}
+              hideAuthGate();
+              if (window.QIBoot) window.QIBoot();
+            } else {
+              if (ep) { ep.textContent = data.message || data.error || "Failed to accept invite. The link may be expired or invalid."; ep.hidden = false; }
+            }
+          }).catch(function () {
+            if (ep) { ep.textContent = "Unable to reach the server. Please check your connection."; ep.hidden = false; }
+          });
+        });
+      }
+
+      // Wire back-to-login link
+      var backLink = document.getElementById("showLoginFromInvite");
+      if (backLink) backLink.addEventListener("click", function (e) {
+        e.preventDefault();
+        var cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
+        try { history.replaceState(null, "", cleanUrl); } catch (ex) {}
+        showLoginScreen();
+      });
+
+      return; // Do not proceed with normal login check
     }
 
     showLoginScreen();
@@ -274,6 +381,11 @@
     enrollMfa: enrollMfa,
     verifyMfa: verifyMfa,
     disableMfa: disableMfa,
+    createInvite: createInvite,
+    listInvites: listInvites,
+    revokeInvite: revokeInvite,
+    listTeam: listTeam,
+    acceptInvite: acceptInvite,
     checkSession: checkSession,
     getCsrfToken: getCsrfToken,
     authFetch: authFetch,

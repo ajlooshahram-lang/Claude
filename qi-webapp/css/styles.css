@@ -454,3 +454,36 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .mfa-secret{word-break:break-all;font-family:monospace;font-size:12px;background:rgba(46,84,150,.08);padding:10px;border-radius:8px;margin:10px 0;color:var(--ink)}
 .mfa-enroll-form{margin-top:12px}
 .mfa-enroll-form .auth-field{margin-bottom:12px}
+
+/* Team Management */
+.team-card{position:relative}
+.team-card h4{color:#42506a;font-weight:600}
+.team-table{border-collapse:collapse;width:100%;font-size:13px}
+.team-table th{background:#f0f3f9;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#42506a;padding:9px 11px;text-align:left;border-bottom:1px solid var(--line)}
+.team-table td{padding:9px 11px;border-bottom:1px solid var(--line)}
+.team-table tr:hover td{background:#f8fafd}
+[data-theme="dark"] .team-table th{background:#1e2a44;color:#cbd6ee}
+[data-theme="dark"] .team-table tr:hover td{background:#1c2538}
+
+/* Invite link box */
+.invite-link-box{background:rgba(46,84,150,.06);border:1px solid rgba(46,84,150,.18);border-radius:10px;padding:14px 16px;margin-top:14px}
+[data-theme="dark"] .invite-link-box{background:rgba(125,167,240,.08);border-color:rgba(125,167,240,.2)}
+
+/* Role badges */
+.role-badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.role-owner{background:#fde2e2;color:#b21f1f}
+.role-admin{background:#fff0d6;color:#9a6500}
+.role-manager{background:#e3edff;color:#274b8f}
+.role-viewer{background:#e8eaee;color:#445}
+[data-theme="dark"] .role-owner{background:rgba(192,0,0,.2);color:#ff8a8a}
+[data-theme="dark"] .role-admin{background:rgba(230,167,0,.15);color:#ffd28a}
+[data-theme="dark"] .role-manager{background:rgba(125,167,240,.15);color:#a8c8f0}
+[data-theme="dark"] .role-viewer{background:rgba(148,160,188,.15);color:#94a0bc}
+
+/* Invite form */
+.invite-form{margin-bottom:12px}
+
+/* Accept invite page styling */
+.auth-invite-heading{color:#fff;font-size:20px;text-align:center;margin:0 0 8px}
+.auth-invite-desc{color:#94a0bc;font-size:13px;text-align:center;margin:0 0 20px}
+.auth-field-hint{font-size:11px;color:#6b7a94;margin-top:4px;display:block}

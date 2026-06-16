@@ -65,6 +65,25 @@
           <button type="submit" class="btn btn-primary auth-submit">Verify</button>
         </div>
       </form>
+
+      <!-- Accept Invite panel -->
+      <form id="acceptInviteForm" class="auth-form" autocomplete="on">
+        <div id="authAcceptInvite" hidden>
+          <h2 class="auth-invite-heading">Join Team</h2>
+          <p class="auth-invite-desc">You have been invited to join a team. Create your account to get started.</p>
+          <div class="auth-field">
+            <label for="inviteDisplayName">Display Name</label>
+            <input type="text" id="inviteDisplayName" name="displayName" required autocomplete="name" placeholder="Your name">
+          </div>
+          <div class="auth-field">
+            <label for="invitePassword">Password</label>
+            <input type="password" id="invitePassword" name="password" required autocomplete="new-password" placeholder="Min 12 characters">
+            <span class="auth-field-hint">Must be at least 12 characters</span>
+          </div>
+          <button type="submit" class="btn btn-primary auth-submit">Join Team</button>
+          <p class="auth-switch">Already have an account? <a href="#" id="showLoginFromInvite">Back to login</a></p>
+        </div>
+      </form>
     </div>
   </div>
 
