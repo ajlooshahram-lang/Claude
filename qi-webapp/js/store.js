@@ -186,7 +186,37 @@
         if (old) ws.projects[ws.order[0]] = JSON.parse(old);  // migrate legacy single project
       }
     } catch (e) { ws = defaultWorkspace(); }
-    normalizeWs(ws); bind(); save(); return state;
+    normalizeWs(ws); bind(); save();
+
+    // If sync is enabled, fire an async server load in the background
+    if (root.QISync && root.QISync.syncEnabled()) {
+      root.QISync.loadFromServer().then(function (serverWs) {
+        if (!serverWs) return;
+        // Merge: server is authoritative for projects/cases; preserve local-only data
+        serverWs.order.forEach(function (id) {
+          var sp = serverWs.projects[id];
+          var localProj = ws.projects[id];
+          if (localProj) {
+            // Server is authoritative for cases and project metadata
+            localProj.project.name = sp.project.name;
+            localProj.project.status = sp.project.status;
+            localProj.cases = sp.cases;
+          } else {
+            ws.projects[id] = sp;
+            if (ws.order.indexOf(id) < 0) ws.order.push(id);
+          }
+        });
+        normalizeWs(ws); bind(); save();
+        // Notify the UI that data refreshed from server
+        try {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("qi-data-refreshed"));
+          }
+        } catch (e) { /* ignore */ }
+      }).catch(function () { /* network failure - continue with localStorage */ });
+    }
+
+    return state;
   }
   function save() {
     try { if (typeof localStorage !== "undefined") localStorage.setItem(WKEY, JSON.stringify(ws)); }
@@ -210,9 +240,16 @@
   function addProject(name) {
     const id = uid(), s = seed();
     s.project.name = name || "New Project"; s.cases = []; s.audit = []; s.snapshots = []; s.stakeholders = [];
-    workspace().projects[id] = normalize(s); ws.order.push(id); ws.activeId = id; bind(); save(); return id;
+    workspace().projects[id] = normalize(s); ws.order.push(id); ws.activeId = id; bind(); save();
+    if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncCreateProject(name || "New Project", id); }
+    return id;
   }
-  function renameProject(id, name) { if (workspace().projects[id]) { ws.projects[id].project.name = name; save(); } }
+  function renameProject(id, name) {
+    if (workspace().projects[id]) {
+      ws.projects[id].project.name = name; save();
+      if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncRenameProject(root.QISync.mapLocalToServer(id) || id, name); }
+    }
+  }
   function duplicateProject(id) {
     const src = workspace().projects[id]; if (!src) return null;
     const nid = uid(), copy = JSON.parse(JSON.stringify(src));
@@ -221,9 +258,12 @@
   }
   function deleteProject(id) {
     if (workspace().order.length <= 1) return false;
+    var serverId = (root.QISync && root.QISync.mapLocalToServer) ? root.QISync.mapLocalToServer(id) || id : null;
     delete ws.projects[id]; ws.order = ws.order.filter(x => x !== id);
     if (ws.activeId === id) ws.activeId = ws.order[0];
-    bind(); save(); return true;
+    bind(); save();
+    if (root.QISync && root.QISync.syncEnabled() && serverId) { root.QISync.syncDeleteProject(serverId); }
+    return true;
   }
   function importAsProject(obj) { const id = uid(); workspace().projects[id] = normalize(obj); ws.order.push(id); ws.activeId = id; bind(); save(); return id; }
 
@@ -256,7 +296,12 @@
     c.id = c.id || uid(); if (!c.whys) c.whys = ["", "", "", "", ""];
     get().cases.push(c);
     logAudit("Added", codeOf(get().cases.length - 1), (c.problem || "").slice(0, 60));
-    save(); return c;
+    save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      root.QISync.syncCreateCase(projServerId, c, c.id);
+    }
+    return c;
   }
   function updateCase(id, patch) {
     const i = caseIndex(id); if (i < 0) return null;
@@ -265,7 +310,13 @@
       .map(k => `${k}: ${old[k] === "" || old[k] == null ? "—" : old[k]}→${patch[k] === "" || patch[k] == null ? "—" : patch[k]}`);
     Object.assign(get().cases[i], patch);
     if (changes.length) logAudit("Updated", codeOf(i), changes.slice(0, 4).join("; ").slice(0, 120));
-    save(); return get().cases[i];
+    save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var caseServerId = root.QISync.mapLocalToServer(id) || id;
+      root.QISync.syncUpdateCase(projServerId, caseServerId, patch);
+    }
+    return get().cases[i];
   }
   let __lastDelete = null;
   function deleteCase(id) {
@@ -274,7 +325,13 @@
     __lastDelete = { record: get().cases[i], index: i, code };
     get().cases.splice(i, 1);
     logAudit("Deleted", code, prob);
-    save(); return true;
+    save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var caseServerId = root.QISync.mapLocalToServer(id) || id;
+      root.QISync.syncDeleteCase(projServerId, caseServerId);
+    }
+    return true;
   }
   // Soft-undo of the last deletion. Restores the record at its original index.
   function undoDelete() {
@@ -294,9 +351,20 @@
     ids.forEach(id => { const c = get().cases.find(x => x.id === id); if (c) Object.assign(c, patch); map[id] = !!c; });
     const k = Object.keys(patch)[0];
     if (k) logAudit("Bulk updated", "", `${ids.length} case(s) · ${k}=${patch[k]}`);
-    save(); return map;
+    save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var serverIds = ids.map(function (id) { return root.QISync.mapLocalToServer(id) || id; });
+      root.QISync.syncBulkUpdate(projServerId, serverIds, patch);
+    }
+    return map;
   }
   function bulkDelete(ids) {
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var serverIds = ids.map(function (id) { return root.QISync.mapLocalToServer(id) || id; });
+      root.QISync.syncBulkDelete(projServerId, serverIds);
+    }
     let n = 0;
     ids.slice().sort((a, b) => caseIndex(b) - caseIndex(a)).forEach(id => { if (deleteCase(id)) n++; });
     return n;
