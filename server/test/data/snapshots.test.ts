@@ -25,6 +25,7 @@ function createMockUser(overrides: Partial<DbUser> = {}): DbUser {
     displayName: "Test User",
     mfaSecret: null,
     mfaEnabled: false,
+    mfaLastUsedStep: null,
     lastLoginAt: null,
     createdAt: new Date(),
     ...overrides,
@@ -66,6 +67,7 @@ function createMockAuthDb(user: DbUser, tokenHash: string): AuthDbHelpers {
       role: "OWNER" as const,
     }),
     updateUserMfa: async () => {},
+    updateUserMfaLastStep: async () => {},
     updateUserLastLogin: async () => {},
     createAuditLog: async () => {},
   };

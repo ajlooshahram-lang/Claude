@@ -117,10 +117,25 @@ function getTimeCounter(timeMs?: number): bigint {
 }
 
 /**
- * Verify a TOTP code against a secret, allowing a window of +/- steps.
+ * Result of a TOTP verification that also reports the matched time-step.
  */
-export function verifyTotp(secret: string, code: string, window: number = 1): boolean {
-  if (code.length !== TOTP_DIGITS) return false;
+export type TotpVerifyResult = {
+  /** Whether the supplied code matched within the allowed window. */
+  valid: boolean;
+  /**
+   * The absolute time-step counter that matched (only present when valid).
+   * Callers persist this to reject replay of a code within its window.
+   */
+  step?: number;
+};
+
+/**
+ * Verify a TOTP code against a secret, allowing a window of +/- steps, and
+ * return the matched absolute time-step counter so the caller can persist it
+ * for replay protection.
+ */
+export function verifyTotpWithStep(secret: string, code: string, window: number = 1): TotpVerifyResult {
+  if (code.length !== TOTP_DIGITS) return { valid: false };
 
   const counter = getTimeCounter();
 
@@ -129,10 +144,20 @@ export function verifyTotp(secret: string, code: string, window: number = 1): bo
     const expected = generateCode(secret, testCounter);
     // Constant-time comparison to prevent timing attacks
     if (timingSafeEqual(code, expected)) {
-      return true;
+      return { valid: true, step: Number(testCounter) };
     }
   }
-  return false;
+  return { valid: false };
+}
+
+/**
+ * Verify a TOTP code against a secret, allowing a window of +/- steps.
+ *
+ * Backward-compatible boolean wrapper around {@link verifyTotpWithStep} for
+ * callers (enroll/verify/disable) that do not need the matched step.
+ */
+export function verifyTotp(secret: string, code: string, window: number = 1): boolean {
+  return verifyTotpWithStep(secret, code, window).valid;
 }
 
 /**

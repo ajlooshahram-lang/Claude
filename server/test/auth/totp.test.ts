@@ -4,6 +4,7 @@ import {
   generateTotpSecret,
   generateTotpUri,
   verifyTotp,
+  verifyTotpWithStep,
   generateCurrentTotp,
 } from "../../src/auth/totp.js";
 
@@ -76,4 +77,45 @@ test("totp: different secrets produce different codes", () => {
   // We just verify both are valid format, not necessarily different
   assert.match(code1, /^\d{6}$/);
   assert.match(code2, /^\d{6}$/);
+});
+
+
+test("totp: verifyTotpWithStep returns the matched step for the current code", () => {
+  const secret = generateTotpSecret();
+  const code = generateCurrentTotp(secret);
+  const result = verifyTotpWithStep(secret, code);
+  assert.equal(result.valid, true);
+  assert.equal(typeof result.step, "number");
+  // The matched step should equal the current time-step counter.
+  const expectedStep = Math.floor(Date.now() / 1000 / 30);
+  assert.equal(result.step, expectedStep);
+});
+
+test("totp: verifyTotpWithStep returns valid:false and no step for a wrong code", () => {
+  const secret = generateTotpSecret();
+  const result = verifyTotpWithStep(secret, "000000");
+  // Astronomically unlikely that the random secret's current code is 000000.
+  assert.equal(result.valid, false);
+  assert.equal(result.step, undefined);
+});
+
+test("totp: verifyTotpWithStep still validates the +/- 1 window", () => {
+  const secret = generateTotpSecret();
+  const code = generateCurrentTotp(secret);
+  const currentStep = Math.floor(Date.now() / 1000 / 30);
+  // window=1 (default) must accept the current code and report its step.
+  const r1 = verifyTotpWithStep(secret, code, 1);
+  assert.equal(r1.valid, true);
+  assert.equal(r1.step, currentStep);
+  // window=0 must also accept the current code (it is the exact step).
+  const r0 = verifyTotpWithStep(secret, code, 0);
+  assert.equal(r0.valid, true);
+  assert.equal(r0.step, currentStep);
+});
+
+test("totp: verifyTotp boolean wrapper matches verifyTotpWithStep.valid", () => {
+  const secret = generateTotpSecret();
+  const code = generateCurrentTotp(secret);
+  assert.equal(verifyTotp(secret, code), verifyTotpWithStep(secret, code).valid);
+  assert.equal(verifyTotp(secret, "000000"), verifyTotpWithStep(secret, "000000").valid);
 });

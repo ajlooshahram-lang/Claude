@@ -7,6 +7,7 @@ import type { AuthDbHelpers } from "./db-helpers.js";
  *  - auth.register
  *  - auth.login
  *  - auth.login.failed
+ *  - auth.login.mfa.failed
  *  - auth.logout
  *  - auth.mfa.enroll
  *  - auth.mfa.verify
@@ -21,6 +22,7 @@ export type AuditAction =
   | "auth.register"
   | "auth.login"
   | "auth.login.failed"
+  | "auth.login.mfa.failed"
   | "auth.logout"
   | "auth.mfa.enroll"
   | "auth.mfa.verify"

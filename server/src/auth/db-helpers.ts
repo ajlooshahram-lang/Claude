@@ -13,6 +13,11 @@ export type DbUser = {
   displayName: string | null;
   mfaSecret: string | null;
   mfaEnabled: boolean;
+  /**
+   * Last accepted TOTP time-step counter. Used to reject replay of a TOTP code
+   * within its ±1-step validity window. Null until the first MFA login.
+   */
+  mfaLastUsedStep: bigint | null;
   lastLoginAt: Date | null;
   createdAt: Date;
 };
@@ -66,6 +71,10 @@ export type AuthDbHelpers = {
   revokeAllUserSessions(userId: string, exceptSessionId?: string): Promise<void>;
   findMembershipByUserId(userId: string): Promise<DbMembership | null>;
   updateUserMfa(userId: string, data: { mfaSecret: string | null; mfaEnabled: boolean }): Promise<void>;
+  /**
+   * Persist the last accepted TOTP time-step counter for replay protection.
+   */
+  updateUserMfaLastStep(userId: string, step: number): Promise<void>;
   updateUserPassword(userId: string, passwordHash: string): Promise<void>;
   updateUserLastLogin(userId: string): Promise<void>;
   createAuditLog(data: CreateAuditLogInput): Promise<void>;
@@ -170,6 +179,13 @@ export async function createPrismaDbHelpers(): Promise<AuthDbHelpers> {
       await prisma.user.update({
         where: { id: userId },
         data: { mfaSecret: data.mfaSecret, mfaEnabled: data.mfaEnabled },
+      });
+    },
+
+    async updateUserMfaLastStep(userId: string, step: number) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { mfaLastUsedStep: BigInt(step) },
       });
     },
 

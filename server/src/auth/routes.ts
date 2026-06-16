@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { z } from "zod";
 import { hashPassword, verifyPassword, validatePasswordStrength } from "./password.js";
 import { generateSessionToken, hashToken, getSessionCookieOptions, SESSION_COOKIE_NAME } from "./session.js";
-import { generateTotpSecret, generateTotpUri, verifyTotp } from "./totp.js";
+import { generateTotpSecret, generateTotpUri, verifyTotp, verifyTotpWithStep } from "./totp.js";
 import { generateCsrfToken, setCsrfCookie } from "./csrf.js";
 import { encryptField, decryptField, isEncryptedValue } from "./crypto.js";
 import { isLocked, recordFailedAttempt, resetAttempts } from "./lockout.js";
@@ -303,13 +303,49 @@ export function registerAuthRoutes(
       return reply.code(401).send({ error: "MFA not configured" });
     }
 
+    // MFA brute-force is bounded by the same account-lockout policy as password
+    // login, keyed by user id so it cannot be bypassed by varying the email.
+    const lockoutKey = "mfa:" + mfaUser.id;
+    if (isLocked(lockoutKey)) {
+      return reply.code(423).send({ error: "Account temporarily locked due to too many failed attempts" });
+    }
+
     // Decrypt the stored MFA secret before verification
     const mfaSecret = decryptMfaSecret(mfaUser.mfaSecret, config.dataEncryptionKey);
 
-    // Verify TOTP
-    if (!verifyTotp(mfaSecret, totpCode)) {
+    // Verify TOTP and capture the matched time-step for replay protection.
+    const totpResult = verifyTotpWithStep(mfaSecret, totpCode);
+    if (!totpResult.valid) {
+      const lockResult = recordFailedAttempt(lockoutKey);
+      await logAuditEvent(db, {
+        tenantId: mfaUser.tenantId,
+        actorId: mfaUser.id,
+        action: "auth.login.mfa.failed",
+        detail: { reason: "invalid_totp", locked: lockResult.locked },
+        ip: request.ip,
+      });
       return reply.code(401).send({ error: "Invalid TOTP code" });
     }
+
+    // Replay protection: reject a code whose time-step has already been used.
+    // mfaLastUsedStep persists the highest accepted step; any step <= it is a
+    // replay (or an older code within the window) and must be rejected.
+    const matchedStep = totpResult.step as number;
+    if (mfaUser.mfaLastUsedStep !== null && BigInt(matchedStep) <= mfaUser.mfaLastUsedStep) {
+      const lockResult = recordFailedAttempt(lockoutKey);
+      await logAuditEvent(db, {
+        tenantId: mfaUser.tenantId,
+        actorId: mfaUser.id,
+        action: "auth.login.mfa.failed",
+        detail: { reason: "totp_replay", locked: lockResult.locked },
+        ip: request.ip,
+      });
+      return reply.code(401).send({ error: "Invalid TOTP code" });
+    }
+
+    // Successful MFA: clear the lockout counter and persist the accepted step.
+    resetAttempts(lockoutKey);
+    await db.updateUserMfaLastStep(mfaUser.id, matchedStep);
 
     // Create session
     const { token, tokenHash } = generateSessionToken();
@@ -501,6 +537,13 @@ export function registerAuthRoutes(
         return reply.code(400).send({ error: "MFA is not enabled" });
       }
 
+      // Same per-user MFA lockout as the login flow bounds brute-force of the
+      // TOTP confirmation required to disable MFA.
+      const lockoutKey = "mfa:" + user.id;
+      if (isLocked(lockoutKey)) {
+        return reply.code(423).send({ error: "Account temporarily locked due to too many failed attempts" });
+      }
+
       // Verify password
       const passwordValid = await verifyPassword(password, user.passwordHash);
       if (!passwordValid) {
@@ -510,8 +553,19 @@ export function registerAuthRoutes(
       // Decrypt and verify TOTP
       const mfaSecret = decryptMfaSecret(user.mfaSecret, config.dataEncryptionKey);
       if (!verifyTotp(mfaSecret, totpCode)) {
+        const lockResult = recordFailedAttempt(lockoutKey);
+        await logAuditEvent(db, {
+          tenantId: user.tenantId,
+          actorId: user.id,
+          action: "auth.login.mfa.failed",
+          detail: { reason: "invalid_totp", context: "disable", locked: lockResult.locked },
+          ip: request.ip,
+        });
         return reply.code(401).send({ error: "Invalid TOTP code" });
       }
+
+      // TOTP confirmed - clear any accumulated MFA failures.
+      resetAttempts(lockoutKey);
 
       // Disable MFA
       await db.updateUserMfa(user.id, { mfaSecret: null, mfaEnabled: false });

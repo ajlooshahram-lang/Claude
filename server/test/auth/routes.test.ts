@@ -6,7 +6,7 @@ import { generateSessionToken } from "../../src/auth/session.js";
 import { SESSION_COOKIE_NAME } from "../../src/auth/session.js";
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "../../src/auth/csrf.js";
 import { hashPassword } from "../../src/auth/password.js";
-import { generateTotpSecret, generateCurrentTotp } from "../../src/auth/totp.js";
+import { generateTotpSecret, generateCurrentTotp, verifyTotpWithStep } from "../../src/auth/totp.js";
 import { clearLockoutStore } from "../../src/auth/lockout.js";
 import { clearPendingMfaTokens } from "../../src/auth/routes.js";
 import type { AuthDbHelpers, DbUser, DbSession } from "../../src/auth/db-helpers.js";
@@ -27,6 +27,7 @@ function createMockUser(overrides: Partial<DbUser> = {}): DbUser {
     displayName: "Test User",
     mfaSecret: null,
     mfaEnabled: false,
+    mfaLastUsedStep: null,
     lastLoginAt: null,
     createdAt: new Date(),
     ...overrides,
@@ -66,6 +67,7 @@ function createMockDb(overrides: Partial<AuthDbHelpers> = {}): AuthDbHelpers {
     revokeAllUserSessions: async () => {},
     findMembershipByUserId: async () => ({ id: "m-1", tenantId: "tenant-1", userId: "user-1", role: "OWNER" as const }),
     updateUserMfa: async () => {},
+    updateUserMfaLastStep: async () => {},
     updateUserLastLogin: async () => {},
     createAuditLog: async () => {},
     ...overrides,
@@ -378,4 +380,91 @@ test("routes: POST /auth/mfa/disable with valid creds succeeds", async (t) => {
   });
   assert.equal(res.statusCode, 200);
   assert.equal(mfaDisabled, true);
+});
+
+
+test("routes: POST /auth/login/mfa locks the account after 5 failed TOTP attempts", async (t) => {
+  const pw = await hashPassword("Correct@Pass123!");
+  const secret = generateTotpSecret();
+  const user = createMockUser({ passwordHash: pw, mfaEnabled: true, mfaSecret: secret });
+  const db = createMockDb({
+    findUserByEmail: async () => user,
+    findUserById: async () => user,
+  });
+  const app = await buildApp({ config: testConfig, dbHelpers: db });
+  t.after(() => app.close());
+
+  async function loginThenMfa(totpCode: string) {
+    const loginRes = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: "test@example.com", password: "Correct@Pass123!" },
+    });
+    const { pendingToken } = loginRes.json();
+    return app.inject({
+      method: "POST",
+      url: "/auth/login/mfa",
+      payload: { pendingToken, totpCode },
+    });
+  }
+
+  // 5 wrong TOTP submissions -> each rejected 401, accumulating lockout.
+  for (let i = 0; i < 5; i++) {
+    const res = await loginThenMfa("000000");
+    assert.equal(res.statusCode, 401);
+  }
+
+  // 6th attempt is blocked by the lockout even before TOTP verification.
+  const locked = await loginThenMfa("000000");
+  assert.equal(locked.statusCode, 423);
+
+  // Even a correct code is refused while the account is locked.
+  const lockedValid = await loginThenMfa(generateCurrentTotp(secret));
+  assert.equal(lockedValid.statusCode, 423);
+});
+
+test("routes: POST /auth/login/mfa rejects replay of an already-used TOTP code", async (t) => {
+  const pw = await hashPassword("Correct@Pass123!");
+  const secret = generateTotpSecret();
+  const user = createMockUser({ passwordHash: pw, mfaEnabled: true, mfaSecret: secret });
+  let recordedStep: number | null = null;
+  const db = createMockDb({
+    findUserByEmail: async () => user,
+    findUserById: async () => user,
+    updateUserMfaLastStep: async (_id, step) => {
+      recordedStep = step;
+      // Reflect the persisted step back onto the user record (as a real DB would).
+      user.mfaLastUsedStep = BigInt(step);
+    },
+  });
+  const app = await buildApp({ config: testConfig, dbHelpers: db });
+  t.after(() => app.close());
+
+  async function loginThenMfa(totpCode: string) {
+    const loginRes = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: "test@example.com", password: "Correct@Pass123!" },
+    });
+    const { pendingToken } = loginRes.json();
+    return app.inject({
+      method: "POST",
+      url: "/auth/login/mfa",
+      payload: { pendingToken, totpCode },
+    });
+  }
+
+  const code = generateCurrentTotp(secret);
+  const expectedStep = verifyTotpWithStep(secret, code).step;
+
+  // First use succeeds and persists the matched step.
+  const first = await loginThenMfa(code);
+  assert.equal(first.statusCode, 200);
+  assert.notEqual(recordedStep, null);
+  assert.equal(recordedStep, expectedStep);
+
+  // Replaying the same code (same time-step) is rejected as invalid.
+  const replay = await loginThenMfa(code);
+  assert.equal(replay.statusCode, 401);
+  assert.equal(replay.json().error, "Invalid TOTP code");
 });

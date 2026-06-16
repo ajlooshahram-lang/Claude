@@ -1013,6 +1013,17 @@
           }
         </div>
         <div class="auth-error" id="mfaError" hidden style="margin-top:12px"></div>
+
+        <hr style="border:none;border-top:1px solid var(--line);margin:18px 0">
+        <h4 style="margin:0 0 8px;font-size:14px">Change password</h4>
+        <p class="muted" style="margin-top:0">Choose a strong password of at least 12 characters. Changing it signs out all of your other sessions.</p>
+        <div class="mfa-enroll-form">
+          <div class="auth-field"><label for="cpCurrent">Current password</label><input type="password" id="cpCurrent" autocomplete="current-password" placeholder="Current password"></div>
+          <div class="auth-field"><label for="cpNew">New password</label><input type="password" id="cpNew" autocomplete="new-password" placeholder="At least 12 characters"></div>
+          <div class="auth-field"><label for="cpConfirm">Confirm new password</label><input type="password" id="cpConfirm" autocomplete="new-password" placeholder="Re-enter new password"></div>
+          <button class="btn btn-primary" id="btnChangePassword">Change password</button>
+        </div>
+        <div class="auth-error" id="cpError" hidden style="margin-top:12px"></div>
       </div>`;
   };
   AFTER.config = function () {
@@ -1211,6 +1222,41 @@
         }
       }).catch(function () { if (err) { err.textContent = "Unable to reach the server."; err.hidden = false; } });
     });
+
+    // Change password wiring. Guarded so the Settings view still renders when
+    // QIAuth is the headless/test stub without a changePassword method.
+    const btnChangePw = $("#btnChangePassword");
+    if (btnChangePw && window.QIAuth && window.QIAuth.changePassword) {
+      btnChangePw.addEventListener("click", function () {
+        var current = ($("#cpCurrent") || {}).value || "";
+        var next = ($("#cpNew") || {}).value || "";
+        var confirm = ($("#cpConfirm") || {}).value || "";
+        var err = $("#cpError");
+        if (err) err.hidden = true;
+
+        function showCpError(msg) { if (err) { err.textContent = msg; err.hidden = false; } }
+
+        if (!current) { showCpError("Enter your current password."); return; }
+        if (next !== confirm) { showCpError("New password and confirmation do not match."); return; }
+        if (next.length < 12) { showCpError("New password must be at least 12 characters."); return; }
+
+        btnChangePw.disabled = true;
+        window.QIAuth.changePassword(current, next).then(function (data) {
+          btnChangePw.disabled = false;
+          if (data && data.success) {
+            var c = $("#cpCurrent"); if (c) c.value = "";
+            var n = $("#cpNew"); if (n) n.value = "";
+            var cf = $("#cpConfirm"); if (cf) cf.value = "";
+            toast("Password changed — other sessions signed out.");
+          } else {
+            showCpError((data && (data.error || data.message)) || "Failed to change password.");
+          }
+        }).catch(function () {
+          btnChangePw.disabled = false;
+          showCpError("Unable to reach the server.");
+        });
+      });
+    }
   };
 
   RENDER.help = function () {

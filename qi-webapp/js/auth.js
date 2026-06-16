@@ -107,6 +107,13 @@
     }).then(function (res) { return res.json(); });
   }
 
+  function changePassword(currentPassword, newPassword) {
+    return authFetch("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ currentPassword: currentPassword, newPassword: newPassword })
+    }).then(function (res) { return res.json(); });
+  }
+
   // ---- Invite & Team API functions ----
   function createInvite(email, role) {
     return authFetch("/api/invites", {
@@ -381,6 +388,7 @@
     enrollMfa: enrollMfa,
     verifyMfa: verifyMfa,
     disableMfa: disableMfa,
+    changePassword: changePassword,
     createInvite: createInvite,
     listInvites: listInvites,
     revokeInvite: revokeInvite,

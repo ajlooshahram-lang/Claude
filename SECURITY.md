@@ -56,10 +56,11 @@ report a vulnerability.
 | **Session cookie flags** | `HttpOnly`, `Secure` (in prod), `SameSite=Strict`, `Path=/`; max-age = session expiry | `getSessionCookieOptions()` in `server/src/auth/session.ts` |
 | **No session fixation** | A fresh session token is minted on every successful login / MFA completion / invite acceptance (the client never supplies its own session id) | `server/src/auth/routes.ts`, `server/src/invite/routes.ts` |
 | **MFA (TOTP, RFC 6238)** | HMAC-SHA1, 30s step, 6 digits, ±1 window; verified with a constant-time compare | `server/src/auth/totp.ts` |
+| **MFA replay protection** | The last accepted TOTP time-step is persisted (`User.mfaLastUsedStep`); any code whose matched step is ≤ the stored value is rejected as a replay, so a captured code cannot be reused within its ±1-step window | `server/src/auth/totp.ts` (`verifyTotpWithStep`), `server/src/auth/routes.ts`, `updateUserMfaLastStep()` in `server/src/auth/db-helpers.ts` |
 | **MFA secret encryption at rest** | AES-256-GCM with random IV + auth tag, keyed by `DATA_ENCRYPTION_KEY` | `server/src/auth/crypto.ts`, used in `server/src/auth/routes.ts` |
 | **CSRF protection** | Double-submit cookie: random token in a JS-readable cookie must match the `X-CSRF-Token` header; enforced on all POST/PUT/PATCH/DELETE | `server/src/auth/csrf.ts`, global preHandler in `server/src/app.ts` |
 | **CSRF exemptions** | Only the initial unauthenticated flows: `/auth/register`, `/auth/login`, `/auth/login/mfa`, `/auth/accept-invite` | `CSRF_EXEMPT_ROUTES` in `server/src/app.ts` |
-| **Account lockout** | 5 failed attempts / 15 min → 15-min lock, keyed per email (lowercased); counts attempts even for unknown emails | `server/src/auth/lockout.ts` |
+| **Account lockout** | 5 failed attempts / 15 min → 15-min lock. Password login is keyed per email (lowercased; counts unknown emails too); **MFA second-factor failures are also lockout-tracked**, keyed per user (`mfa:<userId>`) on `/auth/login/mfa` and `/auth/mfa/disable`, so MFA brute-force is bounded by the same policy | `server/src/auth/lockout.ts`, `server/src/auth/routes.ts` |
 | **Rate limiting (app layer)** | Global 300/min; `/auth/register` 5/min; `/auth/login` 10/min; `/auth/login/mfa` 10/min; `/api/invites` & `/auth/accept-invite` 10/min | `server/src/app.ts`, `server/src/auth/routes.ts`, `server/src/invite/routes.ts` |
 | **Rate limiting (edge)** | nginx `auth` zone 5 r/s (burst 10), `api` zone 30 r/s (burst 20) | `nginx/nginx.conf` |
 | **RBAC** | Role hierarchy OWNER > ADMIN > MANAGER > VIEWER via `requireAuth` + `requireRole`; invites cannot grant a role ≥ the inviter's | `server/src/auth/middleware.ts`, `server/src/invite/routes.ts` |
@@ -145,14 +146,6 @@ operation.
 - **No 2FA recovery codes.** A user who loses their TOTP device must be recovered
   manually by the admin (disable MFA in the DB). *Roadmap:* one-time recovery
   codes at enrolment.
-- **MFA second-factor brute-force is only rate-limited, not lockout-tracked.**
-  TOTP failures do not feed the per-email account-lockout counter; they are
-  bounded by the per-route rate limit (10/min) + single-use pending tokens +
-  nginx edge limit. *Roadmap:* count MFA failures toward lockout.
-- **TOTP replay within the validity window.** A captured code can be reused
-  within its ±1-step window because the last-used counter is not persisted. Low
-  impact (each use still requires a fresh single-use pending token from a
-  password login). *Roadmap:* store and reject the last-accepted time-step.
 - **User enumeration on registration / invite creation.** `/auth/register` and
   `POST /api/invites` return `409` for an existing email. Accepted trade-off for
   a fixed, known user base; revisit if the user base ever opens up.
@@ -171,7 +164,7 @@ operation.
 
 **Where the evidence is**
 - **Audit log:** the `AuditLog` table in PostgreSQL records authentication events
-  (`auth.login`, `auth.login.failed`, `auth.logout`, `auth.register`,
+  (`auth.login`, `auth.login.failed`, `auth.login.mfa.failed`, `auth.logout`, `auth.register`,
   `auth.mfa.*`, `auth.password.change`, `auth.password.change.failed`,
   `auth.password.admin-reset`) and data mutations (`project.*`, `case.*`, `register.*`,
   `snapshot.*`, `invite.*`) with tenant, actor, entity, and source IP.
