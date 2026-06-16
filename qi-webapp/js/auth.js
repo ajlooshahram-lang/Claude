@@ -18,6 +18,7 @@
   })();
 
   var currentUser = null;
+  var pendingMfaToken = null;
 
   // ---- Cookie helpers ----
   function getCsrfToken() {
@@ -34,7 +35,14 @@
     var csrf = getCsrfToken();
     if (csrf) opts.headers["x-csrf-token"] = csrf;
     var fullUrl = API_BASE + url;
-    return fetch(fullUrl, opts);
+    return fetch(fullUrl, opts).then(function (res) {
+      // 401 interceptor: if session expired, re-gate the UI
+      if (res.status === 401 && url !== "/auth/me" && url !== "/auth/login" && url !== "/auth/login/mfa") {
+        currentUser = null;
+        showLoginScreen();
+      }
+      return res;
+    });
   }
 
   // ---- Auth API functions ----
@@ -185,7 +193,7 @@
 
         login(email, pw).then(function (data) {
           if (data.mfaRequired) {
-            window.__pendingMfaToken = data.pendingToken;
+            pendingMfaToken = data.pendingToken;
             showMfaScreen();
           } else if (data.user) {
             currentUser = data.user;
@@ -231,7 +239,7 @@
       mfaForm.addEventListener("submit", function (e) {
         e.preventDefault();
         var code = document.getElementById("mfaCode").value;
-        var token = window.__pendingMfaToken;
+        var token = pendingMfaToken;
         var ep = document.getElementById("authError");
         if (ep) ep.hidden = true;
 
