@@ -161,6 +161,47 @@ async function buildAuthenticatedApp(dataDbOverrides: Partial<DataDbHelpers> = {
   return { app, token, user, dataDb };
 }
 
+// ─── GET /api/projects/:id/data Tests ────────────────────────────────────
+
+test("project-data: GET /api/projects/:id/data returns analytical data", async (t) => {
+  const mockData = createMockProjectWithData({
+    spec: { usl: 15, lsl: 5, target: 10 },
+    gage: { parts: 3, operators: 2, trials: 2, data: {} },
+    cashflow: [{ month: "M1", planned: 1000, actual: 900 }],
+  });
+  const { app, token } = await buildAuthenticatedApp({
+    getProjectWithData: async () => mockData,
+  });
+  t.after(() => app.close());
+
+  const res = await app.inject({
+    method: "GET",
+    url: "/api/projects/proj-1/data",
+    cookies: { [SESSION_COOKIE_NAME]: token },
+  });
+  assert.equal(res.statusCode, 200);
+  const body = res.json();
+  assert.ok(body.project);
+  assert.deepEqual(body.project.spec, { usl: 15, lsl: 5, target: 10 });
+  assert.deepEqual(body.project.gage, { parts: 3, operators: 2, trials: 2, data: {} });
+  assert.deepEqual(body.project.cashflow, [{ month: "M1", planned: 1000, actual: 900 }]);
+  assert.equal(body.project.id, "proj-1");
+});
+
+test("project-data: GET /api/projects/:id/data returns 404 for non-existent project", async (t) => {
+  const { app, token } = await buildAuthenticatedApp({
+    getProjectWithData: async () => null,
+  });
+  t.after(() => app.close());
+
+  const res = await app.inject({
+    method: "GET",
+    url: "/api/projects/nonexistent/data",
+    cookies: { [SESSION_COOKIE_NAME]: token },
+  });
+  assert.equal(res.statusCode, 404);
+});
+
 // ─── PATCH /api/projects/:id/data Tests ─────────────────────────────────────
 
 test("project-data: PATCH /api/projects/:id/data updates partial analytical data", async (t) => {

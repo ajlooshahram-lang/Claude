@@ -620,6 +620,33 @@ export function registerDataRoutes(
 
   // ─── Project Analytical Data ────────────────────────────────────────────
 
+  app.get(
+    "/api/projects/:id/data",
+    { preHandler: [requireAuth] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const authed = request as AuthenticatedRequest;
+      const { id } = request.params as { id: string };
+
+      const projectWithData = await db.getProjectWithData(authed.user.tenantId, id);
+      if (!projectWithData) {
+        return reply.code(404).send({ error: "Project not found" });
+      }
+
+      return reply.code(200).send({
+        project: {
+          id: projectWithData.id,
+          spec: projectWithData.spec,
+          roster: projectWithData.roster,
+          stakeholders: projectWithData.stakeholders,
+          sigma: projectWithData.sigma,
+          gage: projectWithData.gage,
+          cashflow: projectWithData.cashflow,
+          xbarR: projectWithData.xbarR,
+        },
+      });
+    },
+  );
+
   app.patch(
     "/api/projects/:id/data",
     { preHandler: [requireAuth] },
@@ -694,13 +721,19 @@ export function registerDataRoutes(
       }
 
       // Capture current project state: analytical fields + cases + all register types
-      const projectWithData = await db.getProjectWithData(authed.user.tenantId, projectId);
-      const cases = await db.listCases(authed.user.tenantId, projectId);
+      // Parallelize register queries for better performance.
+      const [projectWithData, cases, ...registerResults] = await Promise.all([
+        db.getProjectWithData(authed.user.tenantId, projectId),
+        db.listCases(authed.user.tenantId, projectId),
+        ...VALID_REGISTER_TYPES.map((regType) =>
+          db.listRegisterRows(authed.user.tenantId, projectId, regType),
+        ),
+      ]);
 
       const registers: Record<string, unknown> = {};
-      for (const regType of VALID_REGISTER_TYPES) {
-        registers[regType] = await db.listRegisterRows(authed.user.tenantId, projectId, regType);
-      }
+      VALID_REGISTER_TYPES.forEach((regType, i) => {
+        registers[regType] = registerResults[i];
+      });
 
       const snapshotData = {
         cases,

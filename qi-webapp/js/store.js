@@ -526,11 +526,12 @@
   function takeSnapshot(label) {
     const s = get();
     const copy = JSON.parse(JSON.stringify({ project: s.project, roster: s.roster, cases: s.cases, sigma: s.sigma, stakeholders: s.stakeholders, registers: s.registers, gage: s.gage, cashflow: s.cashflow, xbarR: s.xbarR }));
-    s.snapshots.unshift({ id: uid(), ts: new Date().toISOString(), label: label || ("Snapshot " + new Date().toLocaleString()), data: copy });
+    var snapId = uid();
+    s.snapshots.unshift({ id: snapId, ts: new Date().toISOString(), label: label || ("Snapshot " + new Date().toLocaleString()), data: copy });
     if (s.snapshots.length > 25) s.snapshots.length = 25;
     logAudit("Snapshot", "", label || "manual"); save();
     if (root.QISync && root.QISync.syncEnabled()) {
-      root.QISync.syncTakeSnapshot(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, label || ("Snapshot " + new Date().toLocaleString()));
+      root.QISync.syncTakeSnapshot(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, label || ("Snapshot " + new Date().toLocaleString()), snapId);
     }
     return s.snapshots[0];
   }
@@ -542,19 +543,40 @@
     s.project = d.project; s.roster = d.roster; s.cases = d.cases; s.sigma = d.sigma; s.stakeholders = d.stakeholders; if (d.registers) s.registers = d.registers; if (d.gage) s.gage = d.gage; if (d.cashflow) s.cashflow = d.cashflow; if (d.xbarR) s.xbarR = d.xbarR;
     normalize(s); logAudit("Restored", "", snap.label); save();
     if (root.QISync && root.QISync.syncEnabled()) {
-      root.QISync.syncRestoreSnapshot(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, root.QISync.mapLocalToServer(id) || id);
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var snapshotServerId = root.QISync.mapLocalToServer(id);
+      // Only sync restore if the snapshot has a known server-side ID
+      if (snapshotServerId) {
+        root.QISync.syncRestoreSnapshot(projServerId, snapshotServerId);
+      }
     }
     return true;
   }
   function deleteSnapshot(id) {
     const i = get().snapshots.findIndex(x => x.id === id); if (i < 0) return false;
-    get().snapshots.splice(i, 1); save(); return true;
+    get().snapshots.splice(i, 1); save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var snapshotServerId = root.QISync.mapLocalToServer(id);
+      if (snapshotServerId) {
+        root.QISync.syncDeleteSnapshot(projServerId, snapshotServerId);
+      }
+    }
+    return true;
   }
   function renameSnapshot(id, label) {
     const s = get().snapshots.find(x => x.id === id); if (!s) return false;
     s.label = label || s.label;
     logAudit("Renamed snapshot", "", s.label);
-    save(); return true;
+    save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var snapshotServerId = root.QISync.mapLocalToServer(id);
+      if (snapshotServerId) {
+        root.QISync.syncRenameSnapshot(projServerId, snapshotServerId, s.label);
+      }
+    }
+    return true;
   }
   // ---- saved views (per-project filter presets, choose-only names) ----
   function savedViews() { const s = get(); s.savedViews = s.savedViews || []; return s.savedViews; }

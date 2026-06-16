@@ -171,6 +171,9 @@ export const UpdateSnapshotLabelSchema = z.object({
 });
 
 export const UpdateProjectDataSchema = z.object({
+  // Intentionally accepts arbitrary JSON for each analytical field. This is a private
+  // deployment with 11 users and a 500KB total payload cap. Structural validation is
+  // deliberately omitted to allow flexible, schema-free analytical data storage.
   spec: z.unknown().optional(),
   roster: z.unknown().optional(),
   stakeholders: z.unknown().optional(),

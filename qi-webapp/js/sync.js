@@ -221,21 +221,40 @@
 
   // ---- Snapshot sync ----
 
-  function syncTakeSnapshot(projectServerId, label) {
+  function syncTakeSnapshot(projectServerId, label, localSnapshotId) {
     if (!projectServerId) return;
     var body = {};
     if (label) body.label = label;
     apiFetch("/api/projects/" + projectServerId + "/snapshots", {
       method: "POST",
       body: JSON.stringify(body)
+    }).then(function (data) {
+      if (data && data.snapshot && data.snapshot.id && localSnapshotId) {
+        registerMapping(localSnapshotId, data.snapshot.id);
+      }
     });
   }
 
-  function syncRestoreSnapshot(projectServerId, snapshotId) {
-    if (!projectServerId || !snapshotId) return;
-    apiFetch("/api/projects/" + projectServerId + "/snapshots/" + snapshotId + "/restore", {
+  function syncRestoreSnapshot(projectServerId, snapshotServerId) {
+    if (!projectServerId || !snapshotServerId) return;
+    apiFetch("/api/projects/" + projectServerId + "/snapshots/" + snapshotServerId + "/restore", {
       method: "POST",
       body: JSON.stringify({})
+    });
+  }
+
+  function syncDeleteSnapshot(projectServerId, snapshotServerId) {
+    if (!projectServerId || !snapshotServerId) return;
+    apiFetch("/api/projects/" + projectServerId + "/snapshots/" + snapshotServerId, {
+      method: "DELETE"
+    });
+  }
+
+  function syncRenameSnapshot(projectServerId, snapshotServerId, label) {
+    if (!projectServerId || !snapshotServerId || !label) return;
+    apiFetch("/api/projects/" + projectServerId + "/snapshots/" + snapshotServerId, {
+      method: "PUT",
+      body: JSON.stringify({ label: label })
     });
   }
 
@@ -296,10 +315,20 @@
       });
     });
 
-    return Promise.all([Promise.all(casePromises), Promise.all(regPromises), Promise.all(dataPromises)]).then(function (allResults) {
+    // Fetch snapshots for each project to register ID mappings
+    var snapshotPromises = projects.map(function (proj) {
+      return apiFetch("/api/projects/" + proj.id + "/snapshots", { method: "GET" }).then(function (data) {
+        return { projectId: proj.id, snapshots: (data && data.snapshots) || [] };
+      }).catch(function () {
+        return { projectId: proj.id, snapshots: [] };
+      });
+    });
+
+    return Promise.all([Promise.all(casePromises), Promise.all(regPromises), Promise.all(dataPromises), Promise.all(snapshotPromises)]).then(function (allResults) {
       var caseResults = allResults[0];
       var regResults = allResults[1];
       var dataResults = allResults[2];
+      var snapshotResults = allResults[3];
 
       var caseMap = {};
       caseResults.forEach(function (r) { caseMap[r.projectId] = r.cases; });
@@ -314,6 +343,17 @@
       // Build analytical data map: { projectId: projectData }
       var analyticalMap = {};
       dataResults.forEach(function (r) { analyticalMap[r.projectId] = r.projectData; });
+
+      // Register snapshot ID mappings so restore/delete/rename can find server IDs
+      var snapshotMap = {};
+      snapshotResults.forEach(function (r) {
+        snapshotMap[r.projectId] = r.snapshots;
+        r.snapshots.forEach(function (snap) {
+          // Register server snapshot IDs; use server ID as local ID if no prior mapping
+          var snapLocalId = mapServerToLocal(snap.id) || snap.id;
+          registerMapping(snapLocalId, snap.id);
+        });
+      });
 
       // Build structure for each project
       var wsProjects = {};
@@ -385,7 +425,10 @@
           stakeholders: (projAnalytical && projAnalytical.stakeholders) || [],
           registers: registers,
           audit: [],
-          snapshots: [],
+          snapshots: (snapshotMap[proj.id] || []).map(function (snap) {
+            var snapLocalId = mapServerToLocal(snap.id) || snap.id;
+            return { id: snapLocalId, ts: snap.createdAt || "", label: snap.label || "", data: snap.data || {} };
+          }),
           gage: (projAnalytical && projAnalytical.gage) || null,
           cashflow: (projAnalytical && projAnalytical.cashflow) || null,
           xbarR: (projAnalytical && projAnalytical.xbarR) || null
@@ -420,6 +463,8 @@
     syncProjectData: syncProjectData,
     syncTakeSnapshot: syncTakeSnapshot,
     syncRestoreSnapshot: syncRestoreSnapshot,
+    syncDeleteSnapshot: syncDeleteSnapshot,
+    syncRenameSnapshot: syncRenameSnapshot,
     registerMapping: registerMapping,
     mapLocalToServer: mapLocalToServer,
     mapServerToLocal: mapServerToLocal
