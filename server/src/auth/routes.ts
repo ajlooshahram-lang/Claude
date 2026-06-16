@@ -149,8 +149,20 @@ export function registerAuthRoutes(
   /**
    * POST /auth/login
    * Authenticate with email + password. If MFA is enabled, return a pending token.
+   *
+   * Per-route rate limit (defence in depth on top of the per-email account
+   * lockout and the nginx edge limit) to blunt credential-stuffing and to cap
+   * how fast an attacker who already knows a password can request fresh pending
+   * MFA tokens to brute-force the second factor.
    */
-  app.post("/auth/login", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post(
+    "/auth/login",
+    {
+      config: {
+        rateLimit: { max: 10, timeWindow: "1 minute" },
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
     const parseResult = LoginSchema.safeParse(request.body);
     if (!parseResult.success) {
       return reply.code(400).send({ error: "Validation failed" });
@@ -246,8 +258,19 @@ export function registerAuthRoutes(
   /**
    * POST /auth/login/mfa
    * Complete MFA login with a pending token and TOTP code.
+   *
+   * Per-route rate limit caps brute-force attempts against the 6-digit TOTP
+   * second factor. Pending tokens are also single-use (consumed before
+   * verification), so each guess additionally costs a fresh password login.
    */
-  app.post("/auth/login/mfa", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post(
+    "/auth/login/mfa",
+    {
+      config: {
+        rateLimit: { max: 10, timeWindow: "1 minute" },
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
     const parseResult = MfaLoginSchema.safeParse(request.body);
     if (!parseResult.success) {
       return reply.code(400).send({ error: "Validation failed" });
