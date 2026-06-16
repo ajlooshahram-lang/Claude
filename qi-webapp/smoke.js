@@ -1222,5 +1222,16 @@ var progAlerts = doc.getElementById("progAlerts");
 ok(progAlerts != null && progAlerts.querySelectorAll('li').length >= 1, "Programme Report shows the exceptions/alerts list");
 ok(progAlerts != null && /behind/i.test(progAlerts.textContent), "Programme Report alert flags the schedule slippage");
 
+// 112) Quantitative Risk (Monte Carlo)
+var qrNav = doc.querySelector('.nav-item[data-view="qrisk"]');
+ok(qrNav != null, "Quantitative Risk nav item exists");
+if (qrNav) qrNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+var qrKpis = doc.getElementById("qrKpis");
+ok(qrKpis != null && qrKpis.querySelectorAll('.kpi').length >= 5, "Quantitative Risk shows P50/P80/P90 + contingency KPIs");
+ok(qrKpis != null && /P90/.test(qrKpis.innerHTML), "Quantitative Risk surfaces a P90 contingency");
+var qrCp = doc.querySelector('.qrCpTable');
+ok(qrCp != null && qrCp.querySelectorAll('tbody tr').length >= 1, "Quantitative Risk shows critical-path criticality");
+ok(doc.getElementById("qrResults").querySelectorAll('svg').length >= 2, "Quantitative Risk renders cost + schedule histograms");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

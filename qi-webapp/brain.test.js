@@ -1833,5 +1833,31 @@ console.log("\n-- energyWatchdog v2: country-specific, engineering-grade --");
   ok(JSON.stringify(r.kpis) === JSON.stringify(B.programmeStatusReport().kpis), "report KPIs are deterministic");
 })();
 
+// ===== Quantitative Risk (Monte Carlo) =====
+(function () {
+  console.log("\n--- Quantitative Risk ---");
+  var cases = [
+    { id: "c1", problem: "Marine install", estCost: 120000, sev: 8, occ: 6, det: 4, priority: "1-CRITICAL", _brain: "task" },
+    { id: "c2", problem: "Cable supply", estCost: 80000, sev: 6, occ: 5, det: 4, _brain: "task" },
+    { id: "c3", problem: "Splicing", estCost: 40000, sev: 5, occ: 3, det: 3, _brain: "task" },
+    { id: "c4", problem: "Survey", estCost: 25000, sev: 4, occ: 3, det: 3, _brain: "task" },
+    { id: "c5", problem: "Permitting", estCost: 60000, sev: 7, occ: 5, det: 5, _brain: "task" }
+  ];
+  var r = B.riskQuantification({ cases: cases, options: { seed: 42, iterations: 2000 } });
+  ok(r.cost.p50 <= r.cost.p80 && r.cost.p80 <= r.cost.p90, "cost percentiles are ordered P50 <= P80 <= P90");
+  ok(r.schedule.p50 <= r.schedule.p80 && r.schedule.p80 <= r.schedule.p90, "schedule percentiles are ordered");
+  ok(r.summary.totalBaseEstimate === 325000, "base estimate sums the cost items ($325k)");
+  ok(r.cost.p90 >= r.summary.totalBaseEstimate, "P90 cost is at least the base estimate (risk adds cost)");
+  ok(r.summary.recommendedContingency.p90Amount > r.summary.recommendedContingency.p80Amount, "P90 contingency exceeds P80 contingency");
+  ok(r.summary.recommendedContingency.percentOfBase > 0, "a positive contingency % is recommended");
+  ok(r.cost.histogram.length >= 2 && r.cost.histogram.every(function (b) { return typeof b.bucket === "number" && typeof b.count === "number"; }), "cost histogram has {bucket,count} bins");
+  ok(r.summary.costItemsAnalyzed === 5 && r.summary.tasksAnalyzed === 5, "analyses all 5 cost items and schedule tasks");
+  ok(r.schedule.criticalPathFrequency.length === 5, "reports critical-path frequency per task");
+  // Determinism with a fixed seed; sensitivity to the seed
+  ok(JSON.stringify(r) === JSON.stringify(B.riskQuantification({ cases: cases, options: { seed: 42, iterations: 2000 } })), "seeded run is reproducible (deterministic)");
+  ok(JSON.stringify(r) !== JSON.stringify(B.riskQuantification({ cases: cases, options: { seed: 7, iterations: 2000 } })), "a different seed changes the sampled outcome");
+  ok(B.riskQuantification({ cases: [] }).summary.costItemsAnalyzed === 0, "empty project yields zero analysed items");
+})();
+
 console.log(fails === 0 ? "\nALL BRAIN TESTS PASSED" : "\n" + fails + " FAILURES");
 process.exit(fails ? 1 : 0);

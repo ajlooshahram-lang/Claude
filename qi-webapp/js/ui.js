@@ -239,6 +239,7 @@
     { id: "ncrpareto", label: "NCR Pareto", icon: "▟" },
     { id: "itp", label: "Inspection & Test Plan", icon: "\u2611" },
     { id: "riskheat", label: "Risk Heat Map", icon: "\uD83D\uDD25" },
+    { id: "qrisk", label: "Quantitative Risk (MC)", icon: "\uD83C\uDFB2" },
     { id: "incidents", label: "Incidents", icon: "\u26A1" },
     { id: "environmental", label: "Environmental", icon: "\uD83C\uDF0A" },
     { g: "Improve" },
@@ -2040,6 +2041,100 @@
     ["cpRoute", "cpTrawl", "cpAnchor", "cpSeabed", "cpSeismic"].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.addEventListener("change", recompute);
+    });
+  };
+
+  // ---------- Quantitative Risk (Monte Carlo) ----------
+  var QR_DEFAULT_CASES = [
+    { id: "q1", problem: "Marine installation (cable ship)", estCost: 120000, sev: 8, occ: 6, det: 4, priority: "1-CRITICAL", _brain: "task" },
+    { id: "q2", problem: "Cable & repeater supply", estCost: 90000, sev: 7, occ: 5, det: 4, _brain: "task" },
+    { id: "q3", problem: "Permitting & landing rights", estCost: 60000, sev: 7, occ: 5, det: 5, priority: "1-CRITICAL", _brain: "task" },
+    { id: "q4", problem: "Splicing & jointing", estCost: 45000, sev: 5, occ: 3, det: 3, _brain: "task" },
+    { id: "q5", problem: "Marine route survey", estCost: 30000, sev: 4, occ: 3, det: 3, _brain: "task" },
+    { id: "q6", problem: "OTDR testing & commissioning", estCost: 25000, sev: 5, occ: 3, det: 4, _brain: "task" }
+  ];
+  function qrHistogramSvg(hist, markers) {
+    if (!hist || !hist.length) return '<p class="muted">No data.</p>';
+    var W = 600, H = 140, pad = 4;
+    var maxCount = hist.reduce(function (m, b) { return Math.max(m, b.count); }, 1);
+    var minV = hist[0].bucket, maxV = hist[hist.length - 1].bucket;
+    var span = (maxV - minV) || 1;
+    var bw = (W - pad * 2) / hist.length;
+    var bars = hist.map(function (b, i) {
+      var h = Math.round((b.count / maxCount) * (H - 20));
+      var x = pad + i * bw;
+      return '<rect x="' + x.toFixed(1) + '" y="' + (H - h) + '" width="' + Math.max(1, bw - 1).toFixed(1) + '" height="' + h + '" fill="#3282b8"></rect>';
+    }).join("");
+    var lines = (markers || []).map(function (m) {
+      var x = pad + ((m.value - minV) / span) * (W - pad * 2);
+      x = Math.max(pad, Math.min(W - pad, x));
+      return '<line x1="' + x.toFixed(1) + '" y1="0" x2="' + x.toFixed(1) + '" y2="' + H + '" stroke="' + m.color + '" stroke-width="2" stroke-dasharray="4 3"></line>' +
+        '<text x="' + x.toFixed(1) + '" y="12" fill="' + m.color + '" font-size="10" text-anchor="middle">' + esc(m.label) + '</text>';
+    }).join("");
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" style="width:100%;height:150px;display:block;background:var(--card,#fff);border-radius:8px">' + bars + lines + '</svg>';
+  }
+  RENDER.qrisk = function () {
+    var B = window.QIBrain;
+    if (!B || !B.riskQuantification) return '<h2>Quantitative Risk</h2><p class="muted">Risk engine unavailable.</p>';
+    var live = (S.validCases ? S.validCases() : (S.cases ? S.cases() : [])).filter(function (c) { return (Number(c.estCost) || 0) > 0; });
+    var usingLive = live.length >= 3;
+    uiState.qrisk = { iterations: 2000, usingLive: usingLive };
+    var cases = usingLive ? live : QR_DEFAULT_CASES;
+    var r = B.riskQuantification({ cases: cases, options: { seed: 42, iterations: 2000 } });
+    var form = '<div class="card" style="margin-bottom:14px"><div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">' +
+      '<label style="display:flex;flex-direction:column;gap:4px"><span>Iterations</span><select id="qrIters"><option value="1000">1,000</option><option value="2000" selected>2,000</option><option value="5000">5,000</option></select></label>' +
+      '<span class="muted">Source: ' + (usingLive ? (live.length + " live project cases with cost") : "representative submarine risk set (no live cost data)") + ' &middot; seed-fixed (reproducible)</span>' +
+      '</div></div>';
+    return '<h2 style="margin-bottom:6px">Quantitative Risk (Monte Carlo)</h2>' +
+      '<p class="muted" style="margin-bottom:14px">Cost &amp; schedule confidence (P50/P80/P90) by PERT/triangular simulation, with a recommended contingency &mdash; the quantitative basis for the risk reserve.</p>' +
+      form + '<div id="qrResults">' + qrResultsHtml(r) + '</div>';
+  };
+  function qrResultsHtml(r) {
+    if (!r) return '<div class="muted">Risk engine unavailable.</div>';
+    var cont = r.summary.recommendedContingency;
+    var kpis = '<div class="grid kpis" id="qrKpis" style="margin-bottom:14px">' +
+      '<div class="kpi"><div class="label">Cost P50</div><div class="value">' + disbUsd(r.cost.p50) + '</div></div>' +
+      '<div class="kpi"><div class="label">Cost P80</div><div class="value">' + disbUsd(r.cost.p80) + '</div></div>' +
+      '<div class="kpi"><div class="label">Cost P90</div><div class="value">' + disbUsd(r.cost.p90) + '</div></div>' +
+      '<div class="kpi"><div class="label">Recommended contingency (P90)</div><div class="value">' + disbUsd(cont.p90Amount) + ' (' + cont.percentOfBase + '%)</div></div>' +
+      '<div class="kpi"><div class="label">Schedule P80</div><div class="value">' + r.schedule.p80 + ' d</div></div>' +
+      '</div>';
+    var costHist = '<div class="card"><h3>Cost outcome distribution</h3>' +
+      qrHistogramSvg(r.cost.histogram, [
+        { value: r.cost.p50, label: "P50", color: "#1e7e34" },
+        { value: r.cost.p80, label: "P80", color: "#e0a800" },
+        { value: r.cost.p90, label: "P90", color: "#c0392b" }
+      ]) +
+      '<p class="muted" style="margin-top:6px">Base estimate ' + disbUsd(r.summary.totalBaseEstimate) + ' from ' + r.summary.costItemsAnalyzed + ' cost items &middot; mean ' + disbUsd(r.cost.mean) + ' &middot; sd ' + disbUsd(r.cost.stdDev) + '</p></div>';
+    var schedHist = '<div class="card"><h3>Schedule outcome distribution (days)</h3>' +
+      qrHistogramSvg(r.schedule.histogram, [
+        { value: r.schedule.p50, label: "P50", color: "#1e7e34" },
+        { value: r.schedule.p80, label: "P80", color: "#e0a800" },
+        { value: r.schedule.p90, label: "P90", color: "#c0392b" }
+      ]) +
+      '<p class="muted" style="margin-top:6px">P50 ' + r.schedule.p50 + ' d &middot; P80 ' + r.schedule.p80 + ' d &middot; P90 ' + r.schedule.p90 + ' d across ' + r.summary.tasksAnalyzed + ' tasks</p></div>';
+    var cpRows = r.schedule.criticalPathFrequency.slice(0, 8).map(function (c) {
+      return '<tr><td>' + esc(c.taskId) + '</td><td class="right">' + Math.round(c.frequency * 100) + '%</td></tr>';
+    }).join("");
+    var cpCard = '<div class="card" id="qrCritical"><h3>Critical-path criticality (top tasks)</h3>' +
+      '<div class="table-wrap"><table class="qrCpTable"><thead><tr><th>Task</th><th class="right">On critical path</th></tr></thead><tbody>' + cpRows + '</tbody></table></div></div>';
+    var refs = '<div class="card" id="qrRefs"><h3>Method &amp; References</h3><ul style="margin:0;padding-left:20px">' +
+      '<li>Monte Carlo simulation (PERT for schedule, triangular/normal/uniform for cost)</li>' +
+      '<li>P80/P90 contingency setting &mdash; AACE / PMI quantitative risk practice</li>' +
+      '<li>ISO 21500 / ISO 31000 &mdash; risk-based reserve quantification</li>' +
+      '<li>Seed-fixed run &mdash; reproducible for audit</li></ul></div>';
+    return kpis + costHist + schedHist + cpCard + refs;
+  }
+  AFTER.qrisk = function () {
+    var B = window.QIBrain;
+    if (!B || !B.riskQuantification) return;
+    var sel = document.getElementById("qrIters");
+    if (!sel) return;
+    sel.addEventListener("change", function () {
+      var live = (S.validCases ? S.validCases() : (S.cases ? S.cases() : [])).filter(function (c) { return (Number(c.estCost) || 0) > 0; });
+      var cases = (live.length >= 3) ? live : QR_DEFAULT_CASES;
+      var r = B.riskQuantification({ cases: cases, options: { seed: 42, iterations: Number(sel.value) || 2000 } });
+      document.getElementById("qrResults").innerHTML = qrResultsHtml(r);
     });
   };
 
