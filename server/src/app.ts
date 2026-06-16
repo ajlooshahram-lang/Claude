@@ -6,13 +6,15 @@ import cookie from "@fastify/cookie";
 import { loadConfig, type AppConfig } from "./config.js";
 import { checkDatabase } from "./db.js";
 import { registerAuthRoutes, startMfaTokenGc, stopMfaTokenGc } from "./auth/routes.js";
+import { registerDataRoutes } from "./data/routes.js";
 import { validateCsrf } from "./auth/csrf.js";
 import type { AuthDbHelpers } from "./auth/db-helpers.js";
+import type { DataDbHelpers } from "./data/db-helpers.js";
 
 const SERVICE = "qi-platform-server";
 const VERSION = "0.1.0";
 
-export type BuildOptions = { config?: AppConfig; dbHelpers?: AuthDbHelpers };
+export type BuildOptions = { config?: AppConfig; dbHelpers?: AuthDbHelpers; dataDbHelpers?: DataDbHelpers };
 
 /**
  * Build the Fastify application. Pure factory (no listen) so tests can drive it
@@ -80,6 +82,11 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     region: config.dataRegion,
     time: new Date().toISOString(),
   }));
+
+  // Register data routes if data db helpers are provided.
+  if (opts.dataDbHelpers && opts.dbHelpers) {
+    registerDataRoutes(app, { authDb: opts.dbHelpers, dataDb: opts.dataDbHelpers }, config);
+  }
 
   // Readiness: can the process serve traffic (incl. database connectivity)?
   app.get("/ready", async (_req, reply) => {
