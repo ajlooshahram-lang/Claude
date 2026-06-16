@@ -4,12 +4,13 @@ import { hashPassword, verifyPassword, validatePasswordStrength } from "./passwo
 import { generateSessionToken, hashToken, getSessionCookieOptions, SESSION_COOKIE_NAME } from "./session.js";
 import { generateTotpSecret, generateTotpUri, verifyTotp } from "./totp.js";
 import { generateCsrfToken, setCsrfCookie } from "./csrf.js";
+import { encryptField, decryptField, isEncryptedValue } from "./crypto.js";
 import { isLocked, recordFailedAttempt, resetAttempts } from "./lockout.js";
 import { logAuditEvent } from "./audit.js";
 import { createRequireAuth, type AuthenticatedRequest } from "./middleware.js";
 import type { AuthDbHelpers } from "./db-helpers.js";
 import type { AppConfig } from "../config.js";
-import { randomBytes, createHash } from "node:crypto";
+import { randomBytes } from "node:crypto";
 
 /**
  * Auth route schemas (Zod for validation).
@@ -85,6 +86,10 @@ export function registerAuthRoutes(
       }
 
       // Check if user already exists
+      // NOTE: Returning 409 for existing emails reveals email registration status (enumeration).
+      // This is an acceptable trade-off for an 11-user private deployment where all users
+      // are known project owners. A "check your email" pattern would add UX complexity with
+      // minimal security benefit given the fixed, known user base.
       const existing = await db.findUserByEmail(email);
       if (existing) {
         return reply.code(409).send({ error: "Email already registered" });
@@ -257,24 +262,18 @@ export function registerAuthRoutes(
       return reply.code(401).send({ error: "Invalid or expired pending token" });
     }
 
-    // Look up user to get TOTP secret
-    const user = await db.findUserByEmail(""); // We need to look up by ID
-    // Actually we need findSessionByTokenHash or findUserById - let's use the userId from pending
-    // We'll get the user from the pending token data and look them up
     pendingMfaTokens.delete(pendingToken);
 
-    // For MFA verification, we need the user's mfaSecret. 
-    // Let's look up the user by email (we stored userId in pending)
-    // We need a way to get the user. Let's search by iterating or add a helper.
-    // The pending has userId - use findSessionByTokenHash won't work. 
-    // Let's use a db helper to find by ID that we'll add.
     const mfaUser = await db.findUserById(pending.userId);
     if (!mfaUser || !mfaUser.mfaSecret) {
       return reply.code(401).send({ error: "MFA not configured" });
     }
 
+    // Decrypt the stored MFA secret before verification
+    const mfaSecret = decryptMfaSecret(mfaUser.mfaSecret, config.dataEncryptionKey);
+
     // Verify TOTP
-    if (!verifyTotp(mfaUser.mfaSecret, totpCode)) {
+    if (!verifyTotp(mfaSecret, totpCode)) {
       return reply.code(401).send({ error: "Invalid TOTP code" });
     }
 
@@ -385,8 +384,9 @@ export function registerAuthRoutes(
       const secret = generateTotpSecret();
       const uri = generateTotpUri(secret, authed.user.email);
 
-      // Store the secret temporarily - it becomes permanent after verify
-      await db.updateUserMfa(authed.user.id, { mfaSecret: secret, mfaEnabled: false });
+      // Encrypt the secret before storing in the database
+      const encryptedSecret = encryptMfaSecret(secret, config.dataEncryptionKey);
+      await db.updateUserMfa(authed.user.id, { mfaSecret: encryptedSecret, mfaEnabled: false });
 
       // Audit log
       await logAuditEvent(db, {
@@ -422,12 +422,15 @@ export function registerAuthRoutes(
         return reply.code(400).send({ error: "MFA not enrolled. Call /auth/mfa/enroll first" });
       }
 
+      // Decrypt the MFA secret for verification
+      const mfaSecret = decryptMfaSecret(user.mfaSecret, config.dataEncryptionKey);
+
       // Verify the code
-      if (!verifyTotp(user.mfaSecret, totpCode)) {
+      if (!verifyTotp(mfaSecret, totpCode)) {
         return reply.code(400).send({ error: "Invalid TOTP code" });
       }
 
-      // Enable MFA
+      // Enable MFA (keep the encrypted secret as-is)
       await db.updateUserMfa(user.id, { mfaSecret: user.mfaSecret, mfaEnabled: true });
 
       // Audit log
@@ -470,8 +473,9 @@ export function registerAuthRoutes(
         return reply.code(401).send({ error: "Invalid password" });
       }
 
-      // Verify TOTP
-      if (!verifyTotp(user.mfaSecret, totpCode)) {
+      // Decrypt and verify TOTP
+      const mfaSecret = decryptMfaSecret(user.mfaSecret, config.dataEncryptionKey);
+      if (!verifyTotp(mfaSecret, totpCode)) {
         return reply.code(401).send({ error: "Invalid TOTP code" });
       }
 
@@ -496,4 +500,65 @@ export function registerAuthRoutes(
  */
 export function clearPendingMfaTokens(): void {
   pendingMfaTokens.clear();
+}
+
+/**
+ * Sweep expired entries from the pending MFA token store.
+ * Called periodically to prevent unbounded memory growth.
+ */
+export function sweepExpiredMfaTokens(): number {
+  const now = Date.now();
+  let swept = 0;
+  for (const [token, entry] of pendingMfaTokens) {
+    if (now > entry.expiresAt) {
+      pendingMfaTokens.delete(token);
+      swept++;
+    }
+  }
+  return swept;
+}
+
+/** GC interval handle (exported for test cleanup) */
+let gcInterval: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Start the periodic garbage collection for expired pending MFA tokens.
+ * Sweeps every 60 seconds. Safe for the 11-user deployment -- this is a
+ * defensive measure to ensure expired entries do not accumulate indefinitely.
+ */
+export function startMfaTokenGc(): void {
+  if (gcInterval) return; // already running
+  gcInterval = setInterval(sweepExpiredMfaTokens, 60_000);
+  // Allow the process to exit without waiting for this timer
+  gcInterval.unref();
+}
+
+/**
+ * Stop the periodic garbage collection (for testing / graceful shutdown).
+ */
+export function stopMfaTokenGc(): void {
+  if (gcInterval) {
+    clearInterval(gcInterval);
+    gcInterval = null;
+  }
+}
+
+/**
+ * Encrypt an MFA secret before storing in the database.
+ * If no encryption key is available (test/dev without key), stores plaintext.
+ */
+function encryptMfaSecret(secret: string, key: string | undefined): string {
+  if (!key) return secret;
+  return encryptField(secret, key);
+}
+
+/**
+ * Decrypt an MFA secret read from the database.
+ * Handles both encrypted values and legacy plaintext (for migration).
+ */
+function decryptMfaSecret(storedValue: string, key: string | undefined): string {
+  if (!key) return storedValue;
+  // If the value is a plain base32 TOTP secret (legacy), return as-is
+  if (!isEncryptedValue(storedValue)) return storedValue;
+  return decryptField(storedValue, key);
 }

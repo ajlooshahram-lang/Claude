@@ -5,7 +5,8 @@ import rateLimit from "@fastify/rate-limit";
 import cookie from "@fastify/cookie";
 import { loadConfig, type AppConfig } from "./config.js";
 import { checkDatabase } from "./db.js";
-import { registerAuthRoutes } from "./auth/routes.js";
+import { registerAuthRoutes, startMfaTokenGc, stopMfaTokenGc } from "./auth/routes.js";
+import { validateCsrf } from "./auth/csrf.js";
 import type { AuthDbHelpers } from "./auth/db-helpers.js";
 
 const SERVICE = "qi-platform-server";
@@ -47,6 +48,28 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   // Register auth routes if db helpers are provided (tests inject mocks).
   if (opts.dbHelpers) {
     registerAuthRoutes(app, opts.dbHelpers, config);
+
+    // Start periodic garbage collection for expired pending MFA tokens.
+    startMfaTokenGc();
+    app.addHook("onClose", () => { stopMfaTokenGc(); });
+
+    // CSRF enforcement: validate the double-submit cookie on state-changing
+    // methods. Exempt: /auth/register and /auth/login (initial auth flows where
+    // the client does not yet have a CSRF token).
+    const CSRF_EXEMPT_ROUTES = new Set(["/auth/register", "/auth/login", "/auth/login/mfa"]);
+    const CSRF_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+    app.addHook("preHandler", async (request, reply) => {
+      if (!CSRF_METHODS.has(request.method)) return;
+      if (CSRF_EXEMPT_ROUTES.has(request.url)) return;
+      // Strip query string for matching
+      const path = request.url.split("?")[0] ?? request.url;
+      if (CSRF_EXEMPT_ROUTES.has(path)) return;
+
+      if (!validateCsrf(request)) {
+        return reply.code(403).send({ error: "CSRF validation failed" });
+      }
+    });
   }
 
   // Liveness: process is up. Never touches the database.

@@ -142,6 +142,11 @@ export type PasswordValidation = {
 /**
  * Validate password strength before hashing.
  * Returns { valid: true } or { valid: false, reason: string }.
+ *
+ * Requirements:
+ * - Minimum 12 characters
+ * - Not in the common passwords list
+ * - At least 2 character classes (uppercase, lowercase, digit, symbol)
  */
 export function validatePasswordStrength(password: string): PasswordValidation {
   if (password.length < MIN_PASSWORD_LENGTH) {
@@ -150,7 +155,25 @@ export function validatePasswordStrength(password: string): PasswordValidation {
   if (COMMON_PASSWORDS.has(password.toLowerCase())) {
     return { valid: false, reason: "Password is too common" };
   }
+  // Require at least 2 of 4 character classes for diversity
+  const classes = countCharacterClasses(password);
+  if (classes < 2) {
+    return { valid: false, reason: "Password must contain at least 2 character classes (uppercase, lowercase, digit, symbol)" };
+  }
   return { valid: true };
+}
+
+/**
+ * Count the number of distinct character classes present in a password.
+ * Classes: uppercase letter, lowercase letter, digit, symbol.
+ */
+function countCharacterClasses(password: string): number {
+  let classes = 0;
+  if (/[A-Z]/.test(password)) classes++;
+  if (/[a-z]/.test(password)) classes++;
+  if (/[0-9]/.test(password)) classes++;
+  if (/[^A-Za-z0-9]/.test(password)) classes++;
+  return classes;
 }
 
 /**

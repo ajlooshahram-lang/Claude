@@ -4,6 +4,7 @@ import { buildApp } from "../../src/app.js";
 import { loadConfig } from "../../src/config.js";
 import { generateSessionToken } from "../../src/auth/session.js";
 import { SESSION_COOKIE_NAME } from "../../src/auth/session.js";
+import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "../../src/auth/csrf.js";
 import { hashPassword } from "../../src/auth/password.js";
 import { generateTotpSecret, generateCurrentTotp } from "../../src/auth/totp.js";
 import { clearLockoutStore } from "../../src/auth/lockout.js";
@@ -75,6 +76,9 @@ beforeEach(() => {
   clearLockoutStore();
   clearPendingMfaTokens();
 });
+
+/** CSRF token value used in tests to satisfy the double-submit cookie check. */
+const TEST_CSRF_TOKEN = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2";
 
 test("routes: POST /auth/register success returns 201", async (t) => {
   const db = createMockDb();
@@ -265,7 +269,8 @@ test("routes: POST /auth/logout clears session", async (t) => {
   const res = await app.inject({
     method: "POST",
     url: "/auth/logout",
-    cookies: { [SESSION_COOKIE_NAME]: token },
+    cookies: { [SESSION_COOKIE_NAME]: token, [CSRF_COOKIE_NAME]: TEST_CSRF_TOKEN },
+    headers: { [CSRF_HEADER_NAME]: TEST_CSRF_TOKEN },
   });
   assert.equal(res.statusCode, 200);
   assert.equal(revoked, true);
@@ -313,7 +318,8 @@ test("routes: POST /auth/mfa/enroll returns secret and URI", async (t) => {
   const res = await app.inject({
     method: "POST",
     url: "/auth/mfa/enroll",
-    cookies: { [SESSION_COOKIE_NAME]: token },
+    cookies: { [SESSION_COOKIE_NAME]: token, [CSRF_COOKIE_NAME]: TEST_CSRF_TOKEN },
+    headers: { [CSRF_HEADER_NAME]: TEST_CSRF_TOKEN },
   });
   assert.equal(res.statusCode, 200);
   const body = res.json();
@@ -339,7 +345,8 @@ test("routes: POST /auth/mfa/verify enables MFA", async (t) => {
   const res = await app.inject({
     method: "POST",
     url: "/auth/mfa/verify",
-    cookies: { [SESSION_COOKIE_NAME]: token },
+    cookies: { [SESSION_COOKIE_NAME]: token, [CSRF_COOKIE_NAME]: TEST_CSRF_TOKEN },
+    headers: { [CSRF_HEADER_NAME]: TEST_CSRF_TOKEN },
     payload: { totpCode: code },
   });
   assert.equal(res.statusCode, 200);
@@ -365,7 +372,8 @@ test("routes: POST /auth/mfa/disable with valid creds succeeds", async (t) => {
   const res = await app.inject({
     method: "POST",
     url: "/auth/mfa/disable",
-    cookies: { [SESSION_COOKIE_NAME]: token },
+    cookies: { [SESSION_COOKIE_NAME]: token, [CSRF_COOKIE_NAME]: TEST_CSRF_TOKEN },
+    headers: { [CSRF_HEADER_NAME]: TEST_CSRF_TOKEN },
     payload: { password: "Correct@Pass123!", totpCode: code },
   });
   assert.equal(res.statusCode, 200);
