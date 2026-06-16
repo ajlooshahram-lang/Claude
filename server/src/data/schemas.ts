@@ -110,3 +110,43 @@ export const BulkUpdateSchema = z.object({
 export const BulkDeleteSchema = z.object({
   ids: z.array(z.string().max(SHORT_TEXT_MAX)).min(1, "At least one ID is required").max(BULK_IDS_MAX),
 });
+
+// ─── Register Row Schemas ─────────────────────────────────────────────────────
+
+export const VALID_REGISTER_TYPES = [
+  "hazop",
+  "calibration",
+  "punch",
+  "sil",
+  "rtm",
+  "docs",
+  "ncr",
+  "moc",
+  "milestones",
+  "decisions",
+  "procurement",
+  "resources",
+  "okr",
+] as const;
+
+export const RegisterTypeSchema = z.enum(VALID_REGISTER_TYPES);
+
+export const CreateRegisterRowSchema = z.object({
+  data: z.record(z.unknown()).refine(
+    (val) => JSON.stringify(val).length <= 5000,
+    "Data too large",
+  ),
+  pinned: z.boolean().optional(),
+});
+
+export const UpdateRegisterRowSchema = z.object({
+  data: z.record(z.unknown()).refine(
+    (val) => JSON.stringify(val).length <= 5000,
+    "Data too large",
+  ).optional(),
+  pinned: z.boolean().optional(),
+});
+
+export const BulkDeleteRegisterRowSchema = z.object({
+  ids: z.array(z.string().max(SHORT_TEXT_MAX)).min(1, "At least one ID is required").max(BULK_IDS_MAX),
+});

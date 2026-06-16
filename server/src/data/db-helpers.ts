@@ -61,6 +61,19 @@ export type DbCase = {
   deletedAt: Date | null;
 };
 
+export type DbRegisterRow = {
+  id: string;
+  tenantId: string;
+  projectId: string;
+  registerType: string;
+  data: Record<string, unknown>;
+  pinned: boolean;
+  sortOrder: number;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+};
+
 export type CreateAuditLogInput = {
   tenantId: string;
   actorId: string | null;
@@ -175,6 +188,13 @@ export type DataDbHelpers = {
   deleteCase(tenantId: string, caseId: string): Promise<DbCase | null>;
   bulkUpdateCases(tenantId: string, projectId: string, ids: string[], data: UpdateCaseInput): Promise<number>;
   bulkDeleteCases(tenantId: string, projectId: string, ids: string[]): Promise<number>;
+
+  listRegisterRows(tenantId: string, projectId: string, registerType: string): Promise<DbRegisterRow[]>;
+  createRegisterRow(tenantId: string, projectId: string, registerType: string, data: Record<string, unknown>, pinned?: boolean): Promise<DbRegisterRow>;
+  updateRegisterRow(tenantId: string, rowId: string, data?: Record<string, unknown>, pinned?: boolean): Promise<DbRegisterRow | null>;
+  deleteRegisterRow(tenantId: string, rowId: string): Promise<DbRegisterRow | null>;
+  bulkDeleteRegisterRows(tenantId: string, projectId: string, registerType: string, ids: string[]): Promise<number>;
+  togglePinRegisterRow(tenantId: string, rowId: string): Promise<DbRegisterRow | null>;
 
   createAuditLog(data: CreateAuditLogInput): Promise<void>;
 };
@@ -386,6 +406,82 @@ export async function createPrismaDataDbHelpers(): Promise<DataDbHelpers> {
           ip: data.ip,
         },
       });
+    },
+
+    async listRegisterRows(tenantId, projectId, registerType) {
+      const rows = await prisma.registerRow.findMany({
+        where: { tenantId, projectId, registerType, deletedAt: null },
+        orderBy: [{ pinned: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
+      });
+      return rows.map((r) => ({ ...r, data: r.data as Record<string, unknown> })) as DbRegisterRow[];
+    },
+
+    async createRegisterRow(tenantId, projectId, registerType, data, pinned) {
+      const row = await prisma.registerRow.create({
+        data: {
+          tenantId,
+          projectId,
+          registerType,
+          data: data as object,
+          pinned: pinned ?? false,
+        },
+      });
+      return { ...row, data: row.data as Record<string, unknown> } as DbRegisterRow;
+    },
+
+    async updateRegisterRow(tenantId, rowId, data, pinned) {
+      const existing = await prisma.registerRow.findFirst({
+        where: { id: rowId, tenantId, deletedAt: null },
+      });
+      if (!existing) return null;
+
+      const updateData: Record<string, unknown> = {};
+      if (data !== undefined) {
+        updateData.data = data as object;
+      }
+      if (pinned !== undefined) {
+        updateData.pinned = pinned;
+      }
+
+      const updated = await prisma.registerRow.update({
+        where: { id: rowId },
+        data: updateData,
+      });
+      return { ...updated, data: updated.data as Record<string, unknown> } as DbRegisterRow;
+    },
+
+    async deleteRegisterRow(tenantId, rowId) {
+      const existing = await prisma.registerRow.findFirst({
+        where: { id: rowId, tenantId, deletedAt: null },
+      });
+      if (!existing) return null;
+
+      const deleted = await prisma.registerRow.update({
+        where: { id: rowId },
+        data: { deletedAt: new Date() },
+      });
+      return { ...deleted, data: deleted.data as Record<string, unknown> } as DbRegisterRow;
+    },
+
+    async bulkDeleteRegisterRows(tenantId, projectId, registerType, ids) {
+      const result = await prisma.registerRow.updateMany({
+        where: { id: { in: ids }, tenantId, projectId, registerType, deletedAt: null },
+        data: { deletedAt: new Date() },
+      });
+      return result.count;
+    },
+
+    async togglePinRegisterRow(tenantId, rowId) {
+      const existing = await prisma.registerRow.findFirst({
+        where: { id: rowId, tenantId, deletedAt: null },
+      });
+      if (!existing) return null;
+
+      const updated = await prisma.registerRow.update({
+        where: { id: rowId },
+        data: { pinned: !existing.pinned },
+      });
+      return { ...updated, data: updated.data as Record<string, unknown> } as DbRegisterRow;
     },
   };
 }

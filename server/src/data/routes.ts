@@ -16,6 +16,10 @@ import {
   UpdateCaseSchema,
   BulkUpdateSchema,
   BulkDeleteSchema,
+  RegisterTypeSchema,
+  CreateRegisterRowSchema,
+  UpdateRegisterRowSchema,
+  BulkDeleteRegisterRowSchema,
 } from "./schemas.js";
 
 export type DataRouteDeps = {
@@ -372,6 +376,240 @@ export function registerDataRoutes(
       });
 
       return reply.code(200).send({ deleted: count });
+    },
+  );
+
+  // ─── Register Rows ──────────────────────────────────────────────────
+
+  app.get(
+    "/api/projects/:projectId/registers/:type",
+    { preHandler: [requireAuth] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const authed = request as AuthenticatedRequest;
+      const { projectId, type } = request.params as { projectId: string; type: string };
+
+      const typeResult = RegisterTypeSchema.safeParse(type);
+      if (!typeResult.success) {
+        return reply.code(400).send({ error: "Invalid register type" });
+      }
+
+      const project = await db.getProject(authed.user.tenantId, projectId);
+      if (!project) {
+        return reply.code(404).send({ error: "Project not found" });
+      }
+
+      const rows = await db.listRegisterRows(authed.user.tenantId, projectId, typeResult.data);
+      return reply.code(200).send({ rows });
+    },
+  );
+
+  app.post(
+    "/api/projects/:projectId/registers/:type",
+    { preHandler: [requireAuth] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const authed = request as AuthenticatedRequest;
+      const { projectId, type } = request.params as { projectId: string; type: string };
+
+      const typeResult = RegisterTypeSchema.safeParse(type);
+      if (!typeResult.success) {
+        return reply.code(400).send({ error: "Invalid register type" });
+      }
+
+      const project = await db.getProject(authed.user.tenantId, projectId);
+      if (!project) {
+        return reply.code(404).send({ error: "Project not found" });
+      }
+
+      const parseResult = CreateRegisterRowSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.code(400).send({
+          error: "Validation failed",
+          details: parseResult.error.issues,
+        });
+      }
+
+      const row = await db.createRegisterRow(
+        authed.user.tenantId,
+        projectId,
+        typeResult.data,
+        parseResult.data.data,
+        parseResult.data.pinned,
+      );
+
+      await db.createAuditLog({
+        tenantId: authed.user.tenantId,
+        actorId: authed.user.id,
+        action: "register.create",
+        entity: "RegisterRow",
+        entityId: row.id,
+        detail: { projectId, registerType: typeResult.data },
+        ip: request.ip,
+      });
+
+      return reply.code(201).send({ row });
+    },
+  );
+
+  app.put(
+    "/api/projects/:projectId/registers/:type/:id",
+    { preHandler: [requireAuth] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const authed = request as AuthenticatedRequest;
+      const { projectId, type, id } = request.params as { projectId: string; type: string; id: string };
+
+      const typeResult = RegisterTypeSchema.safeParse(type);
+      if (!typeResult.success) {
+        return reply.code(400).send({ error: "Invalid register type" });
+      }
+
+      const project = await db.getProject(authed.user.tenantId, projectId);
+      if (!project) {
+        return reply.code(404).send({ error: "Project not found" });
+      }
+
+      const parseResult = UpdateRegisterRowSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.code(400).send({
+          error: "Validation failed",
+          details: parseResult.error.issues,
+        });
+      }
+
+      const updated = await db.updateRegisterRow(
+        authed.user.tenantId,
+        id,
+        parseResult.data.data,
+        parseResult.data.pinned,
+      );
+      if (!updated) {
+        return reply.code(404).send({ error: "Register row not found" });
+      }
+
+      await db.createAuditLog({
+        tenantId: authed.user.tenantId,
+        actorId: authed.user.id,
+        action: "register.update",
+        entity: "RegisterRow",
+        entityId: id,
+        detail: { projectId, registerType: typeResult.data },
+        ip: request.ip,
+      });
+
+      return reply.code(200).send({ row: updated });
+    },
+  );
+
+  app.delete(
+    "/api/projects/:projectId/registers/:type/:id",
+    { preHandler: [requireAuth] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const authed = request as AuthenticatedRequest;
+      const { projectId, type, id } = request.params as { projectId: string; type: string; id: string };
+
+      const typeResult = RegisterTypeSchema.safeParse(type);
+      if (!typeResult.success) {
+        return reply.code(400).send({ error: "Invalid register type" });
+      }
+
+      const project = await db.getProject(authed.user.tenantId, projectId);
+      if (!project) {
+        return reply.code(404).send({ error: "Project not found" });
+      }
+
+      const deleted = await db.deleteRegisterRow(authed.user.tenantId, id);
+      if (!deleted) {
+        return reply.code(404).send({ error: "Register row not found" });
+      }
+
+      await db.createAuditLog({
+        tenantId: authed.user.tenantId,
+        actorId: authed.user.id,
+        action: "register.delete",
+        entity: "RegisterRow",
+        entityId: id,
+        detail: { projectId, registerType: typeResult.data },
+        ip: request.ip,
+      });
+
+      return reply.code(200).send({ success: true });
+    },
+  );
+
+  app.post(
+    "/api/projects/:projectId/registers/:type/bulk-delete",
+    { preHandler: [requireAuth] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const authed = request as AuthenticatedRequest;
+      const { projectId, type } = request.params as { projectId: string; type: string };
+
+      const typeResult = RegisterTypeSchema.safeParse(type);
+      if (!typeResult.success) {
+        return reply.code(400).send({ error: "Invalid register type" });
+      }
+
+      const project = await db.getProject(authed.user.tenantId, projectId);
+      if (!project) {
+        return reply.code(404).send({ error: "Project not found" });
+      }
+
+      const parseResult = BulkDeleteRegisterRowSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.code(400).send({
+          error: "Validation failed",
+          details: parseResult.error.issues,
+        });
+      }
+
+      const { ids } = parseResult.data;
+      const count = await db.bulkDeleteRegisterRows(authed.user.tenantId, projectId, typeResult.data, ids);
+
+      await db.createAuditLog({
+        tenantId: authed.user.tenantId,
+        actorId: authed.user.id,
+        action: "register.bulk-delete",
+        entity: "RegisterRow",
+        entityId: null,
+        detail: { projectId, registerType: typeResult.data, ids },
+        ip: request.ip,
+      });
+
+      return reply.code(200).send({ deleted: count });
+    },
+  );
+
+  app.patch(
+    "/api/projects/:projectId/registers/:type/:id/pin",
+    { preHandler: [requireAuth] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const authed = request as AuthenticatedRequest;
+      const { projectId, type, id } = request.params as { projectId: string; type: string; id: string };
+
+      const typeResult = RegisterTypeSchema.safeParse(type);
+      if (!typeResult.success) {
+        return reply.code(400).send({ error: "Invalid register type" });
+      }
+
+      const project = await db.getProject(authed.user.tenantId, projectId);
+      if (!project) {
+        return reply.code(404).send({ error: "Project not found" });
+      }
+
+      const toggled = await db.togglePinRegisterRow(authed.user.tenantId, id);
+      if (!toggled) {
+        return reply.code(404).send({ error: "Register row not found" });
+      }
+
+      await db.createAuditLog({
+        tenantId: authed.user.tenantId,
+        actorId: authed.user.id,
+        action: "register.toggle-pin",
+        entity: "RegisterRow",
+        entityId: id,
+        detail: { projectId, registerType: typeResult.data, pinned: toggled.pinned },
+        ip: request.ip,
+      });
+
+      return reply.code(200).send({ row: toggled });
     },
   );
 }
