@@ -7,7 +7,7 @@ import { generateCsrfToken, setCsrfCookie } from "./csrf.js";
 import { encryptField, decryptField, isEncryptedValue } from "./crypto.js";
 import { isLocked, recordFailedAttempt, resetAttempts } from "./lockout.js";
 import { logAuditEvent } from "./audit.js";
-import { createRequireAuth, type AuthenticatedRequest } from "./middleware.js";
+import { createRequireAuth, createRequireRole, type AuthenticatedRequest } from "./middleware.js";
 import type { AuthDbHelpers } from "./db-helpers.js";
 import type { AppConfig } from "../config.js";
 import { randomBytes } from "node:crypto";
@@ -40,6 +40,16 @@ const MfaDisableSchema = z.object({
   totpCode: z.string().length(6),
 });
 
+const ChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(1),
+});
+
+const AdminResetPasswordSchema = z.object({
+  userId: z.string().min(1),
+  newPassword: z.string().min(1),
+});
+
 /** In-memory store for pending MFA tokens (token -> {userId, tenantId, expiresAt}) */
 const pendingMfaTokens = new Map<string, { userId: string; tenantId: string; expiresAt: number }>();
 
@@ -55,6 +65,7 @@ export function registerAuthRoutes(
   config: AppConfig,
 ): void {
   const requireAuth = createRequireAuth(db);
+  const requireAdmin = createRequireRole(db, "ADMIN");
   const sessionExpiryDays = config.sessionExpiryDays ?? DEFAULT_SESSION_EXPIRY_DAYS;
 
   /**
@@ -514,6 +525,142 @@ export function registerAuthRoutes(
       });
 
       return reply.code(200).send({ success: true, mfaEnabled: false });
+    },
+  );
+
+  /**
+   * POST /auth/change-password
+   * Self-service password change for the authenticated user.
+   *
+   * Requires the current password (so a hijacked-but-unlocked browser tab cannot
+   * silently rotate credentials) and revokes every OTHER session on success, so
+   * any attacker who had stolen a session is forced out. The caller's current
+   * session is intentionally kept alive so the user stays logged in.
+   *
+   * Per-route rate limit (defence in depth) caps how fast the current-password
+   * check can be brute-forced from an already-authenticated context.
+   */
+  app.post(
+    "/auth/change-password",
+    {
+      preHandler: [requireAuth],
+      config: { rateLimit: { max: 5, timeWindow: "1 minute" } },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const authed = request as AuthenticatedRequest;
+      const parseResult = ChangePasswordSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.code(400).send({ error: "Validation failed" });
+      }
+
+      const { currentPassword, newPassword } = parseResult.data;
+
+      // Load the full user record (need the password hash).
+      const user = await db.findUserById(authed.user.id);
+      if (!user) {
+        return reply.code(401).send({ error: "Invalid password" });
+      }
+
+      // Verify the current password.
+      const currentValid = await verifyPassword(currentPassword, user.passwordHash);
+      if (!currentValid) {
+        await logAuditEvent(db, {
+          tenantId: user.tenantId,
+          actorId: user.id,
+          action: "auth.password.change.failed",
+          ip: request.ip,
+        });
+        return reply.code(401).send({ error: "Invalid password" });
+      }
+
+      // Enforce password strength on the new password.
+      const strength = validatePasswordStrength(newPassword);
+      if (!strength.valid) {
+        return reply.code(400).send({ error: strength.reason });
+      }
+
+      // Reject reusing the current password.
+      const sameAsCurrent = await verifyPassword(newPassword, user.passwordHash);
+      if (sameAsCurrent) {
+        return reply.code(400).send({ error: "New password must be different from the current password" });
+      }
+
+      // Hash and persist the new password.
+      const passwordHash = await hashPassword(newPassword);
+      await db.updateUserPassword(user.id, passwordHash);
+
+      // Revoke all OTHER sessions; keep the current one so the user stays logged in.
+      await db.revokeAllUserSessions(user.id, authed.sessionData.sessionId);
+
+      // Audit log.
+      await logAuditEvent(db, {
+        tenantId: user.tenantId,
+        actorId: user.id,
+        action: "auth.password.change",
+        ip: request.ip,
+      });
+
+      return reply.code(200).send({ success: true });
+    },
+  );
+
+  /**
+   * POST /auth/admin/reset-password
+   * Admin-initiated password reset (OWNER/ADMIN only).
+   *
+   * For this 11-user private deployment there is no transactional mailer, so an
+   * admin sets the new password directly. The reset is tenant-scoped (no
+   * cross-tenant resets, no user enumeration) and revokes ALL of the target
+   * user's sessions to force a full re-login.
+   */
+  app.post(
+    "/auth/admin/reset-password",
+    {
+      preHandler: [requireAuth, requireAdmin],
+      config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const authed = request as AuthenticatedRequest;
+      const parseResult = AdminResetPasswordSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.code(400).send({ error: "Validation failed" });
+      }
+
+      const { userId, newPassword } = parseResult.data;
+
+      // Tenant scoping: the target must exist and belong to the admin's tenant.
+      // A mismatch returns 404 (same as "not found") to avoid cross-tenant
+      // enumeration.
+      const target = await db.findUserById(userId);
+      if (!target || target.tenantId !== authed.user.tenantId) {
+        return reply.code(404).send({ error: "User not found" });
+      }
+
+      // Enforce password strength.
+      const strength = validatePasswordStrength(newPassword);
+      if (!strength.valid) {
+        return reply.code(400).send({ error: strength.reason });
+      }
+
+      // Hash and persist the new password.
+      const passwordHash = await hashPassword(newPassword);
+      await db.updateUserPassword(target.id, passwordHash);
+
+      // Revoke ALL of the target user's sessions (no exception) - force re-login.
+      await db.revokeAllUserSessions(target.id);
+
+      // Audit log (actor is the admin).
+      await logAuditEvent(db, {
+        tenantId: authed.user.tenantId,
+        actorId: authed.user.id,
+        action: "auth.password.admin-reset",
+        entity: "User",
+        entityId: target.id,
+        detail: { targetUserId: target.id },
+        ip: request.ip,
+      });
+
+      return reply.code(200).send({ success: true });
     },
   );
 }

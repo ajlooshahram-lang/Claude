@@ -12,6 +12,9 @@ import type { AuthDbHelpers } from "./db-helpers.js";
  *  - auth.mfa.verify
  *  - auth.mfa.disable
  *  - auth.session.revoke
+ *  - auth.password.change
+ *  - auth.password.change.failed
+ *  - auth.password.admin-reset
  */
 
 export type AuditAction =
@@ -22,7 +25,10 @@ export type AuditAction =
   | "auth.mfa.enroll"
   | "auth.mfa.verify"
   | "auth.mfa.disable"
-  | "auth.session.revoke";
+  | "auth.session.revoke"
+  | "auth.password.change"
+  | "auth.password.change.failed"
+  | "auth.password.admin-reset";
 
 export type AuditEventParams = {
   tenantId: string;

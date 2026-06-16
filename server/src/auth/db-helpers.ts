@@ -66,6 +66,7 @@ export type AuthDbHelpers = {
   revokeAllUserSessions(userId: string, exceptSessionId?: string): Promise<void>;
   findMembershipByUserId(userId: string): Promise<DbMembership | null>;
   updateUserMfa(userId: string, data: { mfaSecret: string | null; mfaEnabled: boolean }): Promise<void>;
+  updateUserPassword(userId: string, passwordHash: string): Promise<void>;
   updateUserLastLogin(userId: string): Promise<void>;
   createAuditLog(data: CreateAuditLogInput): Promise<void>;
 };
@@ -169,6 +170,13 @@ export async function createPrismaDbHelpers(): Promise<AuthDbHelpers> {
       await prisma.user.update({
         where: { id: userId },
         data: { mfaSecret: data.mfaSecret, mfaEnabled: data.mfaEnabled },
+      });
+    },
+
+    async updateUserPassword(userId: string, passwordHash: string) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { passwordHash },
       });
     },
 

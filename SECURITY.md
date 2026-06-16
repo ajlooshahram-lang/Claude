@@ -51,6 +51,7 @@ report a vulnerability.
 |--------|--------------------|----------------|
 | **Password hashing** | Argon2id, memory 64 MB, time cost 3, parallelism 4; versioned PHC prefix for future re-hash | `server/src/auth/password.ts` |
 | **Password policy** | Min 12 chars, ≥2 character classes, rejects a common-password list | `validatePasswordStrength()` in `server/src/auth/password.ts` |
+| **Password change / reset + revocation on credential change** | Self-service `POST /auth/change-password` requires the current password, enforces the password policy, rejects reuse, and revokes **all other** sessions (current session kept alive). Admin `POST /auth/admin/reset-password` is OWNER/ADMIN-only, tenant-scoped (cross-tenant → 404, no enumeration), and revokes **all** of the target user's sessions. Both audited. | `server/src/auth/routes.ts` (`updateUserPassword` + `revokeAllUserSessions` in `server/src/auth/db-helpers.ts`) |
 | **Server-side sessions** | 32-byte CSPRNG token; only its SHA-256 hash is stored; validated on every request; expiry + revocation checked | `server/src/auth/session.ts`, `server/src/auth/middleware.ts` |
 | **Session cookie flags** | `HttpOnly`, `Secure` (in prod), `SameSite=Strict`, `Path=/`; max-age = session expiry | `getSessionCookieOptions()` in `server/src/auth/session.ts` |
 | **No session fixation** | A fresh session token is minted on every successful login / MFA completion / invite acceptance (the client never supplies its own session id) | `server/src/auth/routes.ts`, `server/src/invite/routes.ts` |
@@ -138,12 +139,6 @@ These are **not yet implemented**. None is a critical hole for the current
 private 11-user deployment, but each should be closed for a hardened long-term
 operation.
 
-- **No password reset / change flow.** There is no self-service password change
-  or reset endpoint, and therefore no session revocation on credential change.
-  A `revokeAllUserSessions()` helper exists but is not yet wired to any route.
-  *Roadmap:* add `POST /auth/change-password` (re-auth + revoke all other
-  sessions) and an admin-driven reset. **Until then, account recovery is a
-  manual DB/admin operation.**
 - **No email verification or transactional email.** Invites return the raw token
   in the API response for the admin to deliver out-of-band; there is no built-in
   mailer.
@@ -177,7 +172,8 @@ operation.
 **Where the evidence is**
 - **Audit log:** the `AuditLog` table in PostgreSQL records authentication events
   (`auth.login`, `auth.login.failed`, `auth.logout`, `auth.register`,
-  `auth.mfa.*`) and data mutations (`project.*`, `case.*`, `register.*`,
+  `auth.mfa.*`, `auth.password.change`, `auth.password.change.failed`,
+  `auth.password.admin-reset`) and data mutations (`project.*`, `case.*`, `register.*`,
   `snapshot.*`, `invite.*`) with tenant, actor, entity, and source IP.
 - **Application logs:** stdout of the `backend` container (`docker compose logs
   backend`). Request logging is on outside of the test environment.
@@ -189,8 +185,9 @@ operation.
 
 **Revoke ALL sessions (e.g. suspected compromise)**
 - Bulk-set `revokedAt = now()` on all `Session` rows (or per user). A helper,
-  `revokeAllUserSessions(userId)`, exists in
-  `server/src/auth/db-helpers.ts` for per-user revocation.
+  `revokeAllUserSessions(userId, exceptSessionId?)`, exists in
+  `server/src/auth/db-helpers.ts` for per-user revocation and is wired into the
+  password change/reset flows (`server/src/auth/routes.ts`).
 - A platform-wide "log everyone out" can also be achieved by rotating
   `SESSION_SECRET` and redeploying.
 
