@@ -164,6 +164,46 @@
     });
   }
 
+  // ---- Register row sync wrappers ----
+
+  function syncRegAdd(projectServerId, regType, rowData, localId) {
+    if (!projectServerId || !regType) return;
+    apiFetch("/api/projects/" + projectServerId + "/registers/" + regType, {
+      method: "POST",
+      body: JSON.stringify({ data: rowData })
+    }).then(function (data) {
+      if (data && data.row && data.row.id) {
+        registerMapping(localId, data.row.id);
+      }
+    });
+  }
+
+  function syncRegUpdate(projectServerId, regType, rowServerId, patch) {
+    if (!projectServerId || !regType || !rowServerId) return;
+    apiFetch("/api/projects/" + projectServerId + "/registers/" + regType + "/" + rowServerId, {
+      method: "PUT",
+      body: JSON.stringify({ data: patch })
+    });
+  }
+
+  function syncRegDelete(projectServerId, regType, rowServerId) {
+    if (!projectServerId || !regType || !rowServerId) return;
+    apiFetch("/api/projects/" + projectServerId + "/registers/" + regType + "/" + rowServerId, { method: "DELETE" });
+  }
+
+  function syncRegBulkDelete(projectServerId, regType, serverIds) {
+    if (!projectServerId || !regType || !serverIds || !serverIds.length) return;
+    apiFetch("/api/projects/" + projectServerId + "/registers/" + regType + "/bulk-delete", {
+      method: "POST",
+      body: JSON.stringify({ ids: serverIds })
+    });
+  }
+
+  function syncRegTogglePin(projectServerId, regType, rowServerId) {
+    if (!projectServerId || !regType || !rowServerId) return;
+    apiFetch("/api/projects/" + projectServerId + "/registers/" + regType + "/" + rowServerId + "/pin", { method: "PATCH" });
+  }
+
   // ---- Load from server (async, returns workspace-compatible structure) ----
   function loadFromServer() {
     if (!syncEnabled()) return Promise.resolve(null);
@@ -190,6 +230,8 @@
     });
   }
 
+  var REGISTER_TYPES = ["hazop", "calibration", "punch", "sil", "rtm", "docs", "ncr", "moc", "milestones", "decisions", "procurement", "resources", "okr"];
+
   function buildWorkspaceFromServer(projects) {
     // Fetch cases for each project in parallel
     var casePromises = projects.map(function (proj) {
@@ -198,9 +240,31 @@
       });
     });
 
-    return Promise.all(casePromises).then(function (results) {
+    // Fetch register rows for each project in parallel (all 13 types per project)
+    var regPromises = [];
+    projects.forEach(function (proj) {
+      REGISTER_TYPES.forEach(function (regType) {
+        regPromises.push(
+          apiFetch("/api/projects/" + proj.id + "/registers/" + regType, { method: "GET" }).then(function (data) {
+            return { projectId: proj.id, regType: regType, rows: (data && data.rows) || [] };
+          })
+        );
+      });
+    });
+
+    return Promise.all([Promise.all(casePromises), Promise.all(regPromises)]).then(function (allResults) {
+      var caseResults = allResults[0];
+      var regResults = allResults[1];
+
       var caseMap = {};
-      results.forEach(function (r) { caseMap[r.projectId] = r.cases; });
+      caseResults.forEach(function (r) { caseMap[r.projectId] = r.cases; });
+
+      // Build register map: { projectId: { regType: [rows] } }
+      var regMap = {};
+      regResults.forEach(function (r) {
+        if (!regMap[r.projectId]) regMap[r.projectId] = {};
+        regMap[r.projectId][r.regType] = r.rows;
+      });
 
       // Build structure for each project
       var wsProjects = {};
@@ -237,6 +301,25 @@
           };
         });
 
+        // Map register rows from server into local format
+        var registers = {};
+        var projRegs = regMap[proj.id] || {};
+        REGISTER_TYPES.forEach(function (regType) {
+          var serverRows = projRegs[regType] || [];
+          registers[regType] = serverRows.map(function (row) {
+            var rowLocalId = mapServerToLocal(row.id) || row.id;
+            registerMapping(rowLocalId, row.id);
+            var mapped = { _id: rowLocalId, _pinned: !!row.pinned };
+            if (row.data && typeof row.data === "object") {
+              var keys = Object.keys(row.data);
+              for (var k = 0; k < keys.length; k++) {
+                mapped[keys[k]] = row.data[keys[k]];
+              }
+            }
+            return mapped;
+          });
+        });
+
         wsProjects[localId] = {
           project: {
             name: proj.name || "Untitled",
@@ -249,7 +332,7 @@
           roster: [],
           sigma: [],
           stakeholders: [],
-          registers: {},
+          registers: registers,
           audit: [],
           snapshots: [],
           gage: null,
@@ -278,6 +361,11 @@
     syncDeleteCase: syncDeleteCase,
     syncBulkUpdate: syncBulkUpdate,
     syncBulkDelete: syncBulkDelete,
+    syncRegAdd: syncRegAdd,
+    syncRegUpdate: syncRegUpdate,
+    syncRegDelete: syncRegDelete,
+    syncRegBulkDelete: syncRegBulkDelete,
+    syncRegTogglePin: syncRegTogglePin,
     registerMapping: registerMapping,
     mapLocalToServer: mapLocalToServer,
     mapServerToLocal: mapServerToLocal

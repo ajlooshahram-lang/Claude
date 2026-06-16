@@ -403,19 +403,41 @@
   // ---- generic registers ----
   function regLabel(regId) { const r = C.REGISTERS.find(x => x.id === regId); return r ? r.label : regId; }
   function regRows(regId) { const s = get(); s.registers = s.registers || {}; return s.registers[regId] || (s.registers[regId] = []); }
-  function regAdd(regId, row) { row = row || {}; row._id = row._id || uid(); if (typeof row._pinned !== "boolean") row._pinned = false; regRows(regId).push(row); logAudit("Added", regLabel(regId), ""); save(); return row; }
+  function regAdd(regId, row) { row = row || {}; row._id = row._id || uid(); if (typeof row._pinned !== "boolean") row._pinned = false; regRows(regId).push(row); logAudit("Added", regLabel(regId), ""); save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      root.QISync.syncRegAdd(projServerId, regId, row, row._id);
+    }
+    return row; }
   function regUpdate(regId, rowId, patch) {
     const rows = regRows(regId), i = rows.findIndex(r => r._id === rowId); if (i < 0) return null;
     const changed = Object.keys(patch).filter(k => String(rows[i][k]) !== String(patch[k]));
     Object.assign(rows[i], patch);
     if (changed.length) logAudit("Updated", regLabel(regId), changed.slice(0, 3).map(k => `${k}→${patch[k]}`).join("; ").slice(0, 100));
-    save(); return rows[i];
+    save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var rowServerId = root.QISync.mapLocalToServer(rowId) || rowId;
+      root.QISync.syncRegUpdate(projServerId, regId, rowServerId, patch);
+    }
+    return rows[i];
   }
   function regDelete(regId, rowId) {
     const rows = regRows(regId), i = rows.findIndex(r => r._id === rowId); if (i < 0) return false;
-    rows.splice(i, 1); logAudit("Deleted", regLabel(regId), ""); save(); return true;
+    rows.splice(i, 1); logAudit("Deleted", regLabel(regId), ""); save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var rowServerId = root.QISync.mapLocalToServer(rowId) || rowId;
+      root.QISync.syncRegDelete(projServerId, regId, rowServerId);
+    }
+    return true;
   }
   function regBulkDelete(regId, ids) {
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var serverIds = ids.map(function (id) { return root.QISync.mapLocalToServer(id) || id; });
+      root.QISync.syncRegBulkDelete(projServerId, regId, serverIds);
+    }
     const rows = regRows(regId);
     let n = 0;
     ids.slice().sort((a, b) => rows.findIndex(r => r._id === b) - rows.findIndex(r => r._id === a)).forEach(id => { if (regDelete(regId, id)) n++; });
@@ -425,7 +447,13 @@
     const r = regRows(regId).find(x => x._id === rowId); if (!r) return false;
     r._pinned = !r._pinned;
     logAudit(r._pinned ? "Pinned" : "Unpinned", regLabel(regId), "");
-    save(); return r._pinned;
+    save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var rowServerId = root.QISync.mapLocalToServer(rowId) || rowId;
+      root.QISync.syncRegTogglePin(projServerId, regId, rowServerId);
+    }
+    return r._pinned;
   }
 
   // ---- Gage R&R + cash flow ----
