@@ -168,9 +168,12 @@
 
   function syncRegAdd(projectServerId, regType, rowData, localId) {
     if (!projectServerId || !regType) return;
+    // Filter out internal keys (prefixed with _) before sending to server
+    var cleanData = {};
+    Object.keys(rowData).forEach(function(k) { if (k.charAt(0) !== '_') cleanData[k] = rowData[k]; });
     apiFetch("/api/projects/" + projectServerId + "/registers/" + regType, {
       method: "POST",
-      body: JSON.stringify({ data: rowData })
+      body: JSON.stringify({ data: cleanData })
     }).then(function (data) {
       if (data && data.row && data.row.id) {
         registerMapping(localId, data.row.id);

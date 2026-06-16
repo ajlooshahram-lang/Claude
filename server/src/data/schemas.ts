@@ -131,8 +131,14 @@ export const VALID_REGISTER_TYPES = [
 
 export const RegisterTypeSchema = z.enum(VALID_REGISTER_TYPES);
 
+/** Register row data must be a flat key-value record (no nested objects/arrays). */
+const FlatDataSchema = z.record(
+  z.string(),
+  z.union([z.string(), z.number(), z.boolean(), z.null()]),
+);
+
 export const CreateRegisterRowSchema = z.object({
-  data: z.record(z.unknown()).refine(
+  data: FlatDataSchema.refine(
     (val) => JSON.stringify(val).length <= 5000,
     "Data too large",
   ),
@@ -140,7 +146,7 @@ export const CreateRegisterRowSchema = z.object({
 });
 
 export const UpdateRegisterRowSchema = z.object({
-  data: z.record(z.unknown()).refine(
+  data: FlatDataSchema.refine(
     (val) => JSON.stringify(val).length <= 5000,
     "Data too large",
   ).optional(),

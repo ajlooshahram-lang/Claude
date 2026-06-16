@@ -477,6 +477,7 @@ export function registerDataRoutes(
 
       const updated = await db.updateRegisterRow(
         authed.user.tenantId,
+        projectId,
         id,
         parseResult.data.data,
         parseResult.data.pinned,
@@ -516,7 +517,7 @@ export function registerDataRoutes(
         return reply.code(404).send({ error: "Project not found" });
       }
 
-      const deleted = await db.deleteRegisterRow(authed.user.tenantId, id);
+      const deleted = await db.deleteRegisterRow(authed.user.tenantId, projectId, id);
       if (!deleted) {
         return reply.code(404).send({ error: "Register row not found" });
       }
@@ -594,7 +595,7 @@ export function registerDataRoutes(
         return reply.code(404).send({ error: "Project not found" });
       }
 
-      const toggled = await db.togglePinRegisterRow(authed.user.tenantId, id);
+      const toggled = await db.togglePinRegisterRow(authed.user.tenantId, projectId, id);
       if (!toggled) {
         return reply.code(404).send({ error: "Register row not found" });
       }

@@ -440,7 +440,11 @@
     }
     const rows = regRows(regId);
     let n = 0;
-    ids.slice().sort((a, b) => rows.findIndex(r => r._id === b) - rows.findIndex(r => r._id === a)).forEach(id => { if (regDelete(regId, id)) n++; });
+    ids.slice().sort((a, b) => rows.findIndex(r => r._id === b) - rows.findIndex(r => r._id === a)).forEach(id => {
+      const i = rows.findIndex(r => r._id === id);
+      if (i >= 0) { rows.splice(i, 1); n++; }
+    });
+    if (n) { logAudit("Bulk deleted", regLabel(regId), n + " row(s)"); save(); }
     return n;
   }
   function regTogglePin(regId, rowId) {

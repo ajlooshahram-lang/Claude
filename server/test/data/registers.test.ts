@@ -120,7 +120,7 @@ function createMockDataDb(overrides: Partial<DataDbHelpers> = {}): DataDbHelpers
     listRegisterRows: async () => [],
     createRegisterRow: async (_t, _p, _rt, data, pinned) =>
       createMockRegisterRow({ data: data as Record<string, unknown>, pinned: pinned ?? false }),
-    updateRegisterRow: async (_t, _id, data, pinned) =>
+    updateRegisterRow: async (_t, _p, _id, data, pinned) =>
       createMockRegisterRow({
         data: data ?? {},
         pinned: pinned ?? false,
@@ -245,7 +245,7 @@ test("register: POST rejects oversized data with 400", async (t) => {
 test("register: PUT /api/projects/:projectId/registers/hazop/:id updates row", async (t) => {
   let auditAction = "";
   const { app, token } = await buildAuthenticatedApp({
-    updateRegisterRow: async (_t, _id, data, pinned) =>
+    updateRegisterRow: async (_t, _p, _id, data, pinned) =>
       createMockRegisterRow({ data: data ?? {}, pinned: pinned ?? false }),
     createAuditLog: async (d) => { auditAction = d.action; },
   });

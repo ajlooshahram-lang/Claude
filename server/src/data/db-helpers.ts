@@ -191,10 +191,10 @@ export type DataDbHelpers = {
 
   listRegisterRows(tenantId: string, projectId: string, registerType: string): Promise<DbRegisterRow[]>;
   createRegisterRow(tenantId: string, projectId: string, registerType: string, data: Record<string, unknown>, pinned?: boolean): Promise<DbRegisterRow>;
-  updateRegisterRow(tenantId: string, rowId: string, data?: Record<string, unknown>, pinned?: boolean): Promise<DbRegisterRow | null>;
-  deleteRegisterRow(tenantId: string, rowId: string): Promise<DbRegisterRow | null>;
+  updateRegisterRow(tenantId: string, projectId: string, rowId: string, data?: Record<string, unknown>, pinned?: boolean): Promise<DbRegisterRow | null>;
+  deleteRegisterRow(tenantId: string, projectId: string, rowId: string): Promise<DbRegisterRow | null>;
   bulkDeleteRegisterRows(tenantId: string, projectId: string, registerType: string, ids: string[]): Promise<number>;
-  togglePinRegisterRow(tenantId: string, rowId: string): Promise<DbRegisterRow | null>;
+  togglePinRegisterRow(tenantId: string, projectId: string, rowId: string): Promise<DbRegisterRow | null>;
 
   createAuditLog(data: CreateAuditLogInput): Promise<void>;
 };
@@ -429,9 +429,9 @@ export async function createPrismaDataDbHelpers(): Promise<DataDbHelpers> {
       return { ...row, data: row.data as Record<string, unknown> } as DbRegisterRow;
     },
 
-    async updateRegisterRow(tenantId, rowId, data, pinned) {
+    async updateRegisterRow(tenantId, projectId, rowId, data, pinned) {
       const existing = await prisma.registerRow.findFirst({
-        where: { id: rowId, tenantId, deletedAt: null },
+        where: { id: rowId, tenantId, projectId, deletedAt: null },
       });
       if (!existing) return null;
 
@@ -450,9 +450,9 @@ export async function createPrismaDataDbHelpers(): Promise<DataDbHelpers> {
       return { ...updated, data: updated.data as Record<string, unknown> } as DbRegisterRow;
     },
 
-    async deleteRegisterRow(tenantId, rowId) {
+    async deleteRegisterRow(tenantId, projectId, rowId) {
       const existing = await prisma.registerRow.findFirst({
-        where: { id: rowId, tenantId, deletedAt: null },
+        where: { id: rowId, tenantId, projectId, deletedAt: null },
       });
       if (!existing) return null;
 
@@ -471,9 +471,9 @@ export async function createPrismaDataDbHelpers(): Promise<DataDbHelpers> {
       return result.count;
     },
 
-    async togglePinRegisterRow(tenantId, rowId) {
+    async togglePinRegisterRow(tenantId, projectId, rowId) {
       const existing = await prisma.registerRow.findFirst({
-        where: { id: rowId, tenantId, deletedAt: null },
+        where: { id: rowId, tenantId, projectId, deletedAt: null },
       });
       if (!existing) return null;
 
