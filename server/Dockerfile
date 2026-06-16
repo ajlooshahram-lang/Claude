@@ -30,11 +30,17 @@ WORKDIR /app
 # Create non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Copy only what's needed for production
-COPY --from=builder /app/dist/ ./dist/
-COPY --from=builder /app/node_modules/ ./node_modules/
-COPY --from=builder /app/prisma/ ./prisma/
+# Install production dependencies only (excludes devDependencies)
 COPY --from=builder /app/package.json ./
+COPY --from=builder /app/package-lock.json ./
+RUN npm ci --omit=dev
+
+# Generate Prisma client against production node_modules
+COPY --from=builder /app/prisma/ ./prisma/
+RUN npx prisma generate
+
+# Copy compiled application code
+COPY --from=builder /app/dist/ ./dist/
 
 ENV NODE_ENV=production
 EXPOSE 8080

@@ -7,6 +7,15 @@
 #   docker compose exec backend npx prisma db push
 #   docker compose exec backend npx tsx prisma/seed.ts
 # ---------------------------------------------------------------------------
+# TLS REQUIREMENT:
+# Session cookies set Secure=true in production, so a TLS-terminating reverse
+# proxy MUST sit in front of nginx for production use. Options include:
+#   - Cloudflare Tunnel (recommended for zero-config TLS)
+#   - Caddy (automatic HTTPS via Let's Encrypt)
+#   - Traefik or a cloud load balancer with TLS termination
+# Without TLS, browsers will reject the session cookie and login will fail.
+# For local testing without TLS, set NODE_ENV=development in .env.
+# ---------------------------------------------------------------------------
 
 services:
   # PostgreSQL database — isolated on internal network only

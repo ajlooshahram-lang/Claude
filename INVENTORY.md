@@ -128,6 +128,11 @@ docker compose exec backend npx tsx prisma/seed.ts
 
 ### Security Notes
 
+- **TLS requirement:** Session cookies use the `Secure` flag in production,
+  which requires HTTPS. A TLS-terminating reverse proxy (Cloudflare Tunnel,
+  Caddy, Traefik, or a cloud load balancer) MUST sit in front of nginx for
+  production deployments. For local testing without TLS, set
+  `NODE_ENV=development` in your `.env` file.
 - **Database isolation:** PostgreSQL is on an internal-only network, never
   exposed to the host or internet.
 - **Backend isolation:** The Fastify server is only reachable through nginx on

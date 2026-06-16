@@ -6,7 +6,7 @@
  *
  * Environment variables:
  *   ADMIN_EMAIL    — Admin email (default: admin@stp.local)
- *   ADMIN_PASSWORD — Admin password (default: changeme-strong-password)
+ *   ADMIN_PASSWORD — Admin password (REQUIRED, no default)
  */
 
 import { PrismaClient, Role } from '@prisma/client';
@@ -15,7 +15,19 @@ import { hash } from '@node-rs/argon2';
 const prisma = new PrismaClient();
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@stp.local';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme-strong-password';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+if (!ADMIN_PASSWORD) {
+  console.error('ERROR: ADMIN_PASSWORD environment variable is required.');
+  console.error('Set it in your .env file or pass it directly:');
+  console.error('  ADMIN_PASSWORD=your-secure-password npx tsx prisma/seed.ts');
+  process.exit(1);
+}
+
+if (ADMIN_PASSWORD.length < 12) {
+  console.error('ERROR: ADMIN_PASSWORD must be at least 12 characters.');
+  process.exit(1);
+}
 
 async function main() {
   console.log(`Seeding database with admin: ${ADMIN_EMAIL}`);
