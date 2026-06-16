@@ -13,6 +13,7 @@ export type DbInvite = {
   tokenHash: string;
   expiresAt: Date;
   acceptedAt: Date | null;
+  revokedAt: Date | null;
   createdBy: string | null;
   createdAt: Date;
 };
@@ -41,7 +42,7 @@ export type InviteDbHelpers = {
 
   findInviteByTokenHash(tokenHash: string): Promise<DbInvite | null>;
 
-  markInviteAccepted(id: string): Promise<void>;
+  markInviteAccepted(id: string): Promise<boolean>;
 
   revokeInvite(tenantId: string, id: string): Promise<void>;
 
@@ -86,6 +87,7 @@ export async function createPrismaInviteDbHelpers(): Promise<InviteDbHelpers> {
         where: {
           tenantId,
           acceptedAt: null,
+          revokedAt: null,
           expiresAt: { gt: new Date() },
         },
         orderBy: { createdAt: "desc" },
@@ -108,15 +110,20 @@ export async function createPrismaInviteDbHelpers(): Promise<InviteDbHelpers> {
     },
 
     async markInviteAccepted(id) {
-      await prisma.invite.update({
-        where: { id },
+      // Conditional update: only mark as accepted if not already accepted.
+      // Returns true if exactly one row was updated, false if the invite was
+      // already accepted (TOCTOU protection against concurrent requests).
+      const result = await prisma.invite.updateMany({
+        where: { id, acceptedAt: null },
         data: { acceptedAt: new Date() },
       });
+      return result.count === 1;
     },
 
     async revokeInvite(tenantId, id) {
-      await prisma.invite.delete({
+      await prisma.invite.update({
         where: { id, tenantId },
+        data: { revokedAt: new Date() },
       });
     },
 

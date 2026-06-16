@@ -82,13 +82,14 @@ function createMockInviteDb(overrides: Partial<InviteDbHelpers> = {}): InviteDbH
       tokenHash: data.tokenHash,
       expiresAt: data.expiresAt,
       acceptedAt: null,
+      revokedAt: null,
       createdBy: data.createdBy,
       createdAt: new Date(),
     }),
     findPendingInvitesByTenant: async () => [],
     findInviteById: async () => null,
     findInviteByTokenHash: async () => null,
-    markInviteAccepted: async () => {},
+    markInviteAccepted: async () => true,
     revokeInvite: async () => {},
     findUserByEmailInTenant: async () => null,
     createUserInTenant: async () => ({ userId: "new-user-1" }),
@@ -247,6 +248,7 @@ test("invite: POST /auth/accept-invite success (creates user + session)", async 
     tokenHash: inviteTokenHash,
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     acceptedAt: null,
+    revokedAt: null,
     createdBy: "user-1",
     createdAt: new Date(),
   };
@@ -256,7 +258,7 @@ test("invite: POST /auth/accept-invite success (creates user + session)", async 
   const authDb = createMockAuthDb(createMockUser(), "no-match-needed");
   const inviteDb = createMockInviteDb({
     findInviteByTokenHash: async (hash: string) => (hash === inviteTokenHash ? mockInvite : null),
-    markInviteAccepted: async (id: string) => { acceptedId = id; },
+    markInviteAccepted: async (id: string) => { acceptedId = id; return true; },
     createUserInTenant: async (data) => { createdUserData = data; return { userId: "new-user-1" }; },
   });
 
@@ -300,6 +302,7 @@ test("invite: POST /auth/accept-invite with expired invite returns 401", async (
     tokenHash: inviteTokenHash,
     expiresAt: new Date(Date.now() - 1000), // expired
     acceptedAt: null,
+    revokedAt: null,
     createdBy: "user-1",
     createdAt: new Date(),
   };
@@ -335,6 +338,7 @@ test("invite: POST /auth/accept-invite with already-used invite returns 401", as
     tokenHash: inviteTokenHash,
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     acceptedAt: new Date(), // already accepted
+    revokedAt: null,
     createdBy: "user-1",
     createdAt: new Date(),
   };
@@ -390,6 +394,7 @@ test("invite: POST /auth/accept-invite with weak password returns 400", async (t
     tokenHash: inviteTokenHash,
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     acceptedAt: null,
+    revokedAt: null,
     createdBy: "user-1",
     createdAt: new Date(),
   };
@@ -426,6 +431,7 @@ test("invite: GET /api/invites lists pending invites", async (t) => {
       tokenHash: "hash1",
       expiresAt: new Date(Date.now() + 86400000),
       acceptedAt: null,
+      revokedAt: null,
       createdBy: "user-1",
       createdAt: new Date(),
     },
@@ -466,6 +472,7 @@ test("invite: DELETE /api/invites/:id revokes invite", async (t) => {
       tokenHash: "hash-x",
       expiresAt: new Date(Date.now() + 86400000),
       acceptedAt: null,
+      revokedAt: null,
       createdBy: "user-1",
       createdAt: new Date(),
     }),
@@ -587,6 +594,7 @@ test("invite: POST /auth/accept-invite creates audit log entry", async (t) => {
     tokenHash: inviteTokenHash,
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     acceptedAt: null,
+    revokedAt: null,
     createdBy: "user-1",
     createdAt: new Date(),
   };
@@ -632,6 +640,7 @@ test("invite: DELETE /api/invites/:id creates audit log entry", async (t) => {
       tokenHash: "hash-del",
       expiresAt: new Date(Date.now() + 86400000),
       acceptedAt: null,
+      revokedAt: null,
       createdBy: "user-1",
       createdAt: new Date(),
     }),
@@ -647,4 +656,122 @@ test("invite: DELETE /api/invites/:id creates audit log entry", async (t) => {
   });
 
   assert.ok(auditLogs.some((l) => l.action === "invite.revoke"));
+});
+
+// ─── TOCTOU protection ──────────────────────────────────────────────────
+
+test("invite: POST /auth/accept-invite returns 401 if markInviteAccepted fails (TOCTOU)", async (t) => {
+  const inviteTokenBuffer = randomBytes(32);
+  const inviteToken = inviteTokenBuffer.toString("hex");
+  const inviteTokenHash = createHash("sha256").update(inviteTokenBuffer).digest("hex");
+
+  const mockInvite: DbInvite = {
+    id: "invite-race",
+    tenantId: "tenant-1",
+    email: "race@example.com",
+    role: "MANAGER",
+    tokenHash: inviteTokenHash,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    acceptedAt: null,
+    revokedAt: null,
+    createdBy: "user-1",
+    createdAt: new Date(),
+  };
+
+  const authDb = createMockAuthDb(createMockUser(), "no-match");
+  const inviteDb = createMockInviteDb({
+    findInviteByTokenHash: async (hash: string) => (hash === inviteTokenHash ? mockInvite : null),
+    // Simulate another request already accepted the invite (conditional update returns false)
+    markInviteAccepted: async () => false,
+  });
+
+  const app = await buildApp({ config: testConfig, dbHelpers: authDb, inviteDbHelpers: inviteDb });
+  t.after(() => app.close());
+
+  const res = await app.inject({
+    method: "POST",
+    url: "/auth/accept-invite",
+    payload: { token: inviteToken, password: "SecureP@ss2024!", displayName: "Race User" },
+  });
+
+  assert.equal(res.statusCode, 401);
+  assert.match(res.json().error, /already been used/i);
+});
+
+// ─── Revoked invite rejection ───────────────────────────────────────────
+
+test("invite: POST /auth/accept-invite with revoked invite returns 401", async (t) => {
+  const inviteTokenBuffer = randomBytes(32);
+  const inviteToken = inviteTokenBuffer.toString("hex");
+  const inviteTokenHash = createHash("sha256").update(inviteTokenBuffer).digest("hex");
+
+  const mockInvite: DbInvite = {
+    id: "invite-revoked",
+    tenantId: "tenant-1",
+    email: "revoked@example.com",
+    role: "MANAGER",
+    tokenHash: inviteTokenHash,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    acceptedAt: null,
+    revokedAt: new Date(), // revoked
+    createdBy: "user-1",
+    createdAt: new Date(),
+  };
+
+  const authDb = createMockAuthDb(createMockUser(), "no-match");
+  const inviteDb = createMockInviteDb({
+    findInviteByTokenHash: async (hash: string) => (hash === inviteTokenHash ? mockInvite : null),
+  });
+
+  const app = await buildApp({ config: testConfig, dbHelpers: authDb, inviteDbHelpers: inviteDb });
+  t.after(() => app.close());
+
+  const res = await app.inject({
+    method: "POST",
+    url: "/auth/accept-invite",
+    payload: { token: inviteToken, password: "SecureP@ss2024!", displayName: "User" },
+  });
+
+  assert.equal(res.statusCode, 401);
+  assert.match(res.json().error, /revoked/i);
+});
+
+// ─── Email already exists at acceptance time ────────────────────────────
+
+test("invite: POST /auth/accept-invite with email already in tenant returns 409", async (t) => {
+  const inviteTokenBuffer = randomBytes(32);
+  const inviteToken = inviteTokenBuffer.toString("hex");
+  const inviteTokenHash = createHash("sha256").update(inviteTokenBuffer).digest("hex");
+
+  const mockInvite: DbInvite = {
+    id: "invite-dup",
+    tenantId: "tenant-1",
+    email: "duplicate@example.com",
+    role: "MANAGER",
+    tokenHash: inviteTokenHash,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    acceptedAt: null,
+    revokedAt: null,
+    createdBy: "user-1",
+    createdAt: new Date(),
+  };
+
+  const authDb = createMockAuthDb(createMockUser(), "no-match");
+  const inviteDb = createMockInviteDb({
+    findInviteByTokenHash: async (hash: string) => (hash === inviteTokenHash ? mockInvite : null),
+    // Email already exists in tenant at acceptance time
+    findUserByEmailInTenant: async () => ({ id: "existing-user-dup" }),
+  });
+
+  const app = await buildApp({ config: testConfig, dbHelpers: authDb, inviteDbHelpers: inviteDb });
+  t.after(() => app.close());
+
+  const res = await app.inject({
+    method: "POST",
+    url: "/auth/accept-invite",
+    payload: { token: inviteToken, password: "SecureP@ss2024!", displayName: "Dup User" },
+  });
+
+  assert.equal(res.statusCode, 409);
+  assert.match(res.json().error, /already exists/i);
 });

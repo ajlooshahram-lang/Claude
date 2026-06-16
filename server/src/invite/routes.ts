@@ -225,6 +225,26 @@ export function registerInviteRoutes(
         return reply.code(401).send({ error: "Invite has already been used" });
       }
 
+      // Check if invite was revoked
+      if (invite.revokedAt !== null) {
+        return reply.code(401).send({ error: "Invite has been revoked" });
+      }
+
+      // Check if user already exists in tenant at acceptance time
+      // (guards against race between invite creation and acceptance)
+      const existingUser = await db.findUserByEmailInTenant(invite.tenantId, invite.email);
+      if (existingUser) {
+        return reply.code(409).send({ error: "A user with this email already exists in the tenant" });
+      }
+
+      // Atomically mark invite as accepted (conditional update: only succeeds if
+      // acceptedAt is still NULL). This prevents TOCTOU races where two concurrent
+      // requests could both pass the above checks.
+      const accepted = await db.markInviteAccepted(invite.id);
+      if (!accepted) {
+        return reply.code(401).send({ error: "Invite has already been used" });
+      }
+
       // Create user in the inviter's tenant
       const passwordHash = await hashPassword(password);
       const { userId } = await db.createUserInTenant({
@@ -234,9 +254,6 @@ export function registerInviteRoutes(
         displayName,
         role: invite.role as "ADMIN" | "MANAGER" | "VIEWER",
       });
-
-      // Mark invite as accepted
-      await db.markInviteAccepted(invite.id);
 
       // Create session for the new user
       const { token: sessionToken, tokenHash: sessionTokenHash } = generateSessionToken();
