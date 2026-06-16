@@ -1247,5 +1247,26 @@ var wxThr = doc.getElementById("wxThreshold");
 if (wxThr) { wxThr.value = "6"; wxThr.dispatchEvent(new window.Event("input", { bubbles: true })); }
 ok(/Jun/.test(doc.getElementById("wxKpis").innerHTML), "relaxing the threshold to 6 countries extends the window to June");
 
+// 115) Exhaustive regression net: every navigable view renders, no duplicate ids
+var allNavBtns = Array.prototype.slice.call(doc.querySelectorAll('.nav-item[data-view]'));
+var navIds = allNavBtns.map(function (b) { return b.getAttribute("data-view"); });
+var seenNav = {}, dupNav = [];
+navIds.forEach(function (id) { if (seenNav[id]) dupNav.push(id); seenNav[id] = 1; });
+ok(dupNav.length === 0, "no duplicate nav data-view ids" + (dupNav.length ? " (dups: " + dupNav.join(",") + ")" : ""));
+ok(allNavBtns.length >= 75, "platform exposes 75+ navigable views (got " + allNavBtns.length + ")");
+var uniqueNavIds = Object.keys(seenNav);
+var renderFailures = [];
+uniqueNavIds.forEach(function (v) {
+  var btn = doc.querySelector('.nav-item[data-view="' + v + '"]');
+  try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
+  catch (e) { renderFailures.push(v + " threw: " + e.message); return; }
+  var c = doc.getElementById("content").innerHTML;
+  if (!(c && c.length > 20)) renderFailures.push(v + " empty");
+});
+ok(renderFailures.length === 0, "every navigable view renders without error" + (renderFailures.length ? " (failures: " + renderFailures.join(" | ") + ")" : " (" + uniqueNavIds.length + " views)"));
+// the hardcoded smoke list must remain a subset of the live nav (don't silently drift)
+var missingFromNav = views.filter(function (v) { return !seenNav[v]; });
+ok(missingFromNav.length === 0, "hardcoded view list stays in sync with the nav" + (missingFromNav.length ? " (missing: " + missingFromNav.join(",") + ")" : ""));
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
