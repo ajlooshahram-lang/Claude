@@ -144,8 +144,8 @@ function createMockDataDb(overrides: Partial<DataDbHelpers> = {}): DataDbHelpers
     getCase: async () => createMockCase(),
     updateCase: async () => createMockCase(),
     deleteCase: async () => createMockCase(),
-    bulkUpdateCases: async (_tenantId, ids) => ids.length,
-    bulkDeleteCases: async (_tenantId, ids) => ids.length,
+    bulkUpdateCases: async (_tenantId, _projectId, ids) => ids.length,
+    bulkDeleteCases: async (_tenantId, _projectId, ids) => ids.length,
     createAuditLog: async () => {},
     ...overrides,
   };
@@ -321,6 +321,28 @@ test("data: DELETE /api/projects/:id soft-deletes", async (t) => {
   assert.equal(auditAction, "project.delete");
 });
 
+test("data: DELETE /api/projects/:id cascades soft-delete to child cases (verified via deleteProject call)", async (t) => {
+  // This tests that the route calls deleteProject which is responsible for cascade.
+  // The Prisma implementation cascades; here we verify the route returns success.
+  let deleteProjectCalled = false;
+  const { app, token } = await buildAuthenticatedApp({
+    deleteProject: async () => {
+      deleteProjectCalled = true;
+      return createMockProject({ deletedAt: new Date() });
+    },
+  });
+  t.after(() => app.close());
+
+  const res = await app.inject({
+    method: "DELETE",
+    url: "/api/projects/proj-1",
+    cookies: { [SESSION_COOKIE_NAME]: token, [CSRF_COOKIE_NAME]: TEST_CSRF_TOKEN },
+    headers: { [CSRF_HEADER_NAME]: TEST_CSRF_TOKEN },
+  });
+  assert.equal(res.statusCode, 200);
+  assert.equal(deleteProjectCalled, true);
+});
+
 // ─── Case CRUD Tests ────────────────────────────────────────────────────────
 
 test("data: POST /api/projects/:projectId/cases creates case", async (t) => {
@@ -437,7 +459,7 @@ test("data: DELETE /api/projects/:projectId/cases/:id soft-deletes case", async 
 test("data: POST bulk-update changes multiple cases", async (t) => {
   let auditAction = "";
   const { app, token } = await buildAuthenticatedApp({
-    bulkUpdateCases: async (_t, ids) => ids.length,
+    bulkUpdateCases: async (_t, _p, ids) => ids.length,
     createAuditLog: async (data) => { auditAction = data.action; },
   });
   t.after(() => app.close());
@@ -458,7 +480,7 @@ test("data: POST bulk-update changes multiple cases", async (t) => {
 test("data: POST bulk-delete soft-deletes multiple cases", async (t) => {
   let auditAction = "";
   const { app, token } = await buildAuthenticatedApp({
-    bulkDeleteCases: async (_t, ids) => ids.length,
+    bulkDeleteCases: async (_t, _p, ids) => ids.length,
     createAuditLog: async (data) => { auditAction = data.action; },
   });
   t.after(() => app.close());
@@ -488,6 +510,48 @@ test("data: POST bulk-update validates ids required", async (t) => {
     payload: { ids: [], updates: { status: "CLOSED" } },
   });
   assert.equal(res.statusCode, 400);
+});
+
+test("data: POST bulk-update passes projectId to db helper (scopes to project)", async (t) => {
+  let receivedProjectId = "";
+  const { app, token } = await buildAuthenticatedApp({
+    bulkUpdateCases: async (_tenantId, projectId, ids) => {
+      receivedProjectId = projectId;
+      return ids.length;
+    },
+  });
+  t.after(() => app.close());
+
+  const res = await app.inject({
+    method: "POST",
+    url: "/api/projects/proj-1/cases/bulk-update",
+    cookies: { [SESSION_COOKIE_NAME]: token, [CSRF_COOKIE_NAME]: TEST_CSRF_TOKEN },
+    headers: { [CSRF_HEADER_NAME]: TEST_CSRF_TOKEN },
+    payload: { ids: ["case-1", "case-2"], updates: { status: "OPEN" } },
+  });
+  assert.equal(res.statusCode, 200);
+  assert.equal(receivedProjectId, "proj-1");
+});
+
+test("data: POST bulk-delete passes projectId to db helper (scopes to project)", async (t) => {
+  let receivedProjectId = "";
+  const { app, token } = await buildAuthenticatedApp({
+    bulkDeleteCases: async (_tenantId, projectId, ids) => {
+      receivedProjectId = projectId;
+      return ids.length;
+    },
+  });
+  t.after(() => app.close());
+
+  const res = await app.inject({
+    method: "POST",
+    url: "/api/projects/proj-1/cases/bulk-delete",
+    cookies: { [SESSION_COOKIE_NAME]: token, [CSRF_COOKIE_NAME]: TEST_CSRF_TOKEN },
+    headers: { [CSRF_HEADER_NAME]: TEST_CSRF_TOKEN },
+    payload: { ids: ["case-1"] },
+  });
+  assert.equal(res.statusCode, 200);
+  assert.equal(receivedProjectId, "proj-1");
 });
 
 // ─── Tenant Isolation ───────────────────────────────────────────────────────

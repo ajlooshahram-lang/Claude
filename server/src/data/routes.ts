@@ -321,7 +321,7 @@ export function registerDataRoutes(
       }
 
       const { ids, updates } = parseResult.data;
-      const count = await db.bulkUpdateCases(authed.user.tenantId, ids, updates);
+      const count = await db.bulkUpdateCases(authed.user.tenantId, projectId, ids, updates);
 
       await db.createAuditLog({
         tenantId: authed.user.tenantId,
@@ -359,7 +359,7 @@ export function registerDataRoutes(
       }
 
       const { ids } = parseResult.data;
-      const count = await db.bulkDeleteCases(authed.user.tenantId, ids);
+      const count = await db.bulkDeleteCases(authed.user.tenantId, projectId, ids);
 
       await db.createAuditLog({
         tenantId: authed.user.tenantId,

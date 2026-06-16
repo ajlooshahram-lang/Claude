@@ -173,8 +173,8 @@ export type DataDbHelpers = {
   getCase(tenantId: string, caseId: string): Promise<DbCase | null>;
   updateCase(tenantId: string, caseId: string, data: UpdateCaseInput): Promise<DbCase | null>;
   deleteCase(tenantId: string, caseId: string): Promise<DbCase | null>;
-  bulkUpdateCases(tenantId: string, ids: string[], data: UpdateCaseInput): Promise<number>;
-  bulkDeleteCases(tenantId: string, ids: string[]): Promise<number>;
+  bulkUpdateCases(tenantId: string, projectId: string, ids: string[], data: UpdateCaseInput): Promise<number>;
+  bulkDeleteCases(tenantId: string, projectId: string, ids: string[]): Promise<number>;
 
   createAuditLog(data: CreateAuditLogInput): Promise<void>;
 };
@@ -249,9 +249,17 @@ export async function createPrismaDataDbHelpers(): Promise<DataDbHelpers> {
       });
       if (!existing) return null;
 
+      const now = new Date();
+
+      // Cascade soft-delete to all child cases
+      await prisma.case.updateMany({
+        where: { projectId, tenantId, deletedAt: null },
+        data: { deletedAt: now },
+      });
+
       const deleted = await prisma.project.update({
         where: { id: projectId },
-        data: { deletedAt: new Date() },
+        data: { deletedAt: now },
       });
       return deleted as unknown as DbProject;
     },
@@ -342,7 +350,7 @@ export async function createPrismaDataDbHelpers(): Promise<DataDbHelpers> {
       return deleted as unknown as DbCase;
     },
 
-    async bulkUpdateCases(tenantId, ids, data) {
+    async bulkUpdateCases(tenantId, projectId, ids, data) {
       // Filter out undefined values for Prisma
       const updateData: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(data)) {
@@ -352,15 +360,15 @@ export async function createPrismaDataDbHelpers(): Promise<DataDbHelpers> {
       }
 
       const result = await prisma.case.updateMany({
-        where: { id: { in: ids }, tenantId, deletedAt: null },
+        where: { id: { in: ids }, tenantId, projectId, deletedAt: null },
         data: updateData,
       });
       return result.count;
     },
 
-    async bulkDeleteCases(tenantId, ids) {
+    async bulkDeleteCases(tenantId, projectId, ids) {
       const result = await prisma.case.updateMany({
-        where: { id: { in: ids }, tenantId, deletedAt: null },
+        where: { id: { in: ids }, tenantId, projectId, deletedAt: null },
         data: { deletedAt: new Date() },
       });
       return result.count;
