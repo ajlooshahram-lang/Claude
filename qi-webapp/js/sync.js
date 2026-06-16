@@ -3,13 +3,47 @@
   "use strict";
 
   // ---- ID mapping: local uid() <-> server cuid ----
+  var ID_MAP_KEY = "qi_sync_id_map";
   var localToServer = {};
   var serverToLocal = {};
+
+  // Persist the ID map to localStorage so it survives page reloads.
+  function persistIdMap() {
+    try {
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(ID_MAP_KEY, JSON.stringify(localToServer));
+      }
+    } catch (e) { /* ignore storage errors */ }
+  }
+
+  // Restore the ID map from localStorage on module init.
+  function restoreIdMap() {
+    try {
+      if (typeof localStorage !== "undefined") {
+        var raw = localStorage.getItem(ID_MAP_KEY);
+        if (raw) {
+          var parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object") {
+            localToServer = parsed;
+            // Rebuild the reverse map
+            var keys = Object.keys(localToServer);
+            for (var i = 0; i < keys.length; i++) {
+              serverToLocal[localToServer[keys[i]]] = keys[i];
+            }
+          }
+        }
+      }
+    } catch (e) { /* ignore parse errors */ }
+  }
+
+  // Initialize ID map from localStorage
+  restoreIdMap();
 
   function registerMapping(localId, serverId) {
     if (localId && serverId) {
       localToServer[localId] = serverId;
       serverToLocal[serverId] = localId;
+      persistIdMap();
     }
   }
   function mapLocalToServer(localId) { return localToServer[localId] || null; }
@@ -79,14 +113,14 @@
   function syncCreateCase(projectServerId, caseData, localId) {
     if (!projectServerId) return;
     var body = {};
-    if (caseData.problem) body.problem = caseData.problem;
-    if (caseData.category) body.category = caseData.category;
-    if (caseData.priority) body.priority = caseData.priority;
-    if (caseData.status) body.status = caseData.status;
-    if (caseData.owner) body.owner = caseData.owner;
-    if (caseData.leanMethod) body.leanMethod = caseData.leanMethod;
-    if (caseData.target) body.target = caseData.target;
-    if (caseData.rootCause) body.rootCause = caseData.rootCause;
+    if (caseData.problem != null) body.problem = caseData.problem;
+    if (caseData.category != null) body.category = caseData.category;
+    if (caseData.priority != null) body.priority = caseData.priority;
+    if (caseData.status != null) body.status = caseData.status;
+    if (caseData.owner != null) body.owner = caseData.owner;
+    if (caseData.leanMethod != null) body.leanMethod = caseData.leanMethod;
+    if (caseData.target != null) body.target = caseData.target;
+    if (caseData.rootCause != null) body.rootCause = caseData.rootCause;
     if (caseData.sev != null) body.sev = Number(caseData.sev);
     if (caseData.occ != null) body.occ = Number(caseData.occ);
     if (caseData.det != null) body.det = Number(caseData.det);

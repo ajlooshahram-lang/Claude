@@ -197,10 +197,18 @@
           var sp = serverWs.projects[id];
           var localProj = ws.projects[id];
           if (localProj) {
-            // Server is authoritative for cases and project metadata
+            // Server is authoritative for project metadata
             localProj.project.name = sp.project.name;
             localProj.project.status = sp.project.status;
-            localProj.cases = sp.cases;
+            // Merge cases at the case level: keep local-only cases (created offline, not yet synced)
+            var serverCaseIds = {};
+            sp.cases.forEach(function (sc) { serverCaseIds[sc.id] = true; });
+            // Identify local cases that do not exist on the server (offline additions)
+            var localOnlyCases = (localProj.cases || []).filter(function (lc) {
+              return !serverCaseIds[lc.id];
+            });
+            // Server cases are authoritative; append local-only cases
+            localProj.cases = sp.cases.concat(localOnlyCases);
           } else {
             ws.projects[id] = sp;
             if (ws.order.indexOf(id) < 0) ws.order.push(id);
@@ -319,6 +327,7 @@
     return get().cases[i];
   }
   let __lastDelete = null;
+  let __bulkDeleteInProgress = false;
   function deleteCase(id) {
     const i = caseIndex(id); if (i < 0) return false;
     const code = codeOf(i), prob = (get().cases[i].problem || "").slice(0, 60);
@@ -326,7 +335,7 @@
     get().cases.splice(i, 1);
     logAudit("Deleted", code, prob);
     save();
-    if (root.QISync && root.QISync.syncEnabled()) {
+    if (!__bulkDeleteInProgress && root.QISync && root.QISync.syncEnabled()) {
       var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
       var caseServerId = root.QISync.mapLocalToServer(id) || id;
       root.QISync.syncDeleteCase(projServerId, caseServerId);
@@ -365,8 +374,10 @@
       var serverIds = ids.map(function (id) { return root.QISync.mapLocalToServer(id) || id; });
       root.QISync.syncBulkDelete(projServerId, serverIds);
     }
+    __bulkDeleteInProgress = true;
     let n = 0;
     ids.slice().sort((a, b) => caseIndex(b) - caseIndex(a)).forEach(id => { if (deleteCase(id)) n++; });
+    __bulkDeleteInProgress = false;
     return n;
   }
   function moveStatus(id, status) { return updateCase(id, { status }); }
