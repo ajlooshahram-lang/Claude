@@ -188,6 +188,7 @@
             <p>An interactive 3D view of the STP submarine cable system renders here when WebGL is available. The full cable inventory is listed in the panel.</p>
           </div>
           <div class="globe-controls" id="globeControls" hidden>
+            <button class="globe-btn" id="globeLay" type="button">⏱ Replay construction</button>
             <button class="globe-btn" id="globeTour" type="button">▶ Cinematic tour</button>
             <button class="globe-btn is-on" id="globeSpin" type="button" aria-pressed="true">⏸ Rotation</button>
           </div>
@@ -303,6 +304,8 @@
     // HUD buttons
     if (tourBtn) tourBtn.addEventListener("click", () => G.toggleTour());
     if (spinBtn) spinBtn.addEventListener("click", () => G.toggleSpin());
+    const layBtn = $("#globeLay");
+    if (layBtn) layBtn.addEventListener("click", () => { G.playLaying(); });
 
     // click a station / cable in the inventory panel to fly to it
     const panel = stage.closest(".globe-view");

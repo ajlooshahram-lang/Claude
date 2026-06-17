@@ -35,6 +35,19 @@
   a full project plan (WBS, FMEA risks, milestones, procurement, budget) from a
   description. Includes a built-in fibre/telecom domain profile tuned for
   submarine cable deployment projects.
+- **3D Network Map** (`js/globe.js`): Photoreal Three.js (r128) globe with real
+  Earth day/normal/specular/cloud/night-lights textures, atmosphere glow, ACES
+  tone mapping and UnrealBloom + FXAA. Renders the 8 STP landing stations and the
+  submarine cable topology as glowing tubes. **Interactive stakeholder tool:**
+  click any station or cable to fly the camera to it, a cinematic auto-tour of
+  all stations, a rotation play/pause toggle, in-stage glass detail cards, and a
+  **construction replay** that "lays" each cable along its route up to its real
+  `% laid` from the Route Progress data (faint full line = planned route, bright
+  segment = laid cable). Fully feature-detected — degrades gracefully (2D legend)
+  where WebGL/Three.js is unavailable, and never throws.
+- **Route Progress** (`js/store.js` + `routeprogress` view): Tracks each cable
+  segment through 7 real lifecycle phases plus overall `% laid`, persisted
+  server-side via the login-gated `/api/projects/:id/data` endpoint.
 
 ### 2 -- STP Backend (server/)
 
@@ -79,9 +92,10 @@ products relevant to the submarine telecom deployment.
 
 | Check | Result |
 |-------|--------|
-| `node --check` on all `qi-webapp/js/*.js` + tests | 8/8 OK |
+| `node --check` on all `qi-webapp/js/*.js` + tests | 12/12 OK |
 | `node qi-webapp/test.js` (engine: MSA, cashflow, resource, Cp/Cpk, RICE/WSJF, NCR Pareto, theme, soft-delete/bulk) | PASS |
 | `node qi-webapp/brain.test.js` (domain detect, scale parse, cost scaling, fallback, determinism) | 24/24 PASS |
+| `node qi-webapp/smoke.js` (all 43+ views, country intelligence, 3D map datasets + interactive API no-throw, Route Progress) | 270/270 PASS |
 | `cd server && npm run build` | OK (TypeScript compiles cleanly, strict mode) |
 | `cd server && npm test` | 139/139 PASS (health + auth + data + invite tests) |
 

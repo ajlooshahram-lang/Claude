@@ -56,7 +56,7 @@ ok(doc.querySelectorAll(".globe-station").length === 8, "3D Network Map legend l
 ok(window.QIGlobe.init(doc.getElementById("globeStage")) === false, "QIGlobe.init no-throws and returns false without WebGL");
 // 2b-i) interactive API surface exists and is a safe no-op while unmounted (jsdom/no WebGL)
 ["focusStation","focusCable","clearSelection","startTour","stopTour","toggleTour","isTouring",
- "setSpin","toggleSpin","isSpinning","selectedId","onSelect","onTour","onSpin"].forEach(fn =>
+ "setSpin","toggleSpin","isSpinning","playLaying","selectedId","onSelect","onTour","onSpin"].forEach(fn =>
   ok(typeof window.QIGlobe[fn] === "function", "QIGlobe exposes " + fn + "()"));
 let apiThrew = false;
 try {
@@ -67,6 +67,7 @@ try {
   window.QIGlobe.focusCable("STP-T1");
   window.QIGlobe.toggleTour();
   window.QIGlobe.toggleSpin();
+  window.QIGlobe.playLaying();
   window.QIGlobe.clearSelection();
 } catch (e) { apiThrew = true; }
 ok(!apiThrew, "interactive API calls are safe no-ops when the globe is not mounted");

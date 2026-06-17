@@ -443,6 +443,7 @@
       // ---- submarine cables: glowing tube + halo + flowing pulse -----------
       var pulses = [];
       var cableTubes = [];   // keep tube materials so progress can recolour them
+      var TUBULAR = 80, RADIAL = 10, RING_IDX = RADIAL * 6;  // TubeGeometry index layout
       CABLES.forEach(function (cab) {
         var a = STATION_BY_ID[cab.from], b = STATION_BY_ID[cab.to];
         var start = latLonToVec3(a.lat, a.lon, GLOBE_R * 1.008);
@@ -456,8 +457,8 @@
         // thickness scales subtly with fibre-pair count (12..24 -> ~0.011..0.018)
         var radius = 0.010 + 0.0035 * ((cab.fibrePairs || 12) / 12);
 
-        // bright core tube (picked up by bloom)
-        var tubeGeo = new THREE.TubeGeometry(curve, 80, radius, 10, false);
+        // bright core tube (picked up by bloom) — drawn only up to the laid %.
+        var tubeGeo = new THREE.TubeGeometry(curve, TUBULAR, radius, RADIAL, false);
         var tubeMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.92 });
         var tube = new THREE.Mesh(tubeGeo, tubeMat);
         tube.userData = { type: "cable", id: cab.id, cable: cab };
@@ -465,25 +466,32 @@
         disposables.push(tubeGeo, tubeMat);
         pickables.push(tube);
 
-        // wide faint halo underneath for a glow base
-        var haloGeo = new THREE.TubeGeometry(curve, 80, radius * 3.2, 10, false);
+        // wide faint halo = the full PLANNED route ghost (always full length).
+        var haloGeo = new THREE.TubeGeometry(curve, TUBULAR, radius * 3.2, RADIAL, false);
         var haloMat = new THREE.MeshBasicMaterial({
           color: col, transparent: true, opacity: 0.16,
           blending: THREE.AdditiveBlending, depthWrite: false
         });
         var halo = new THREE.Mesh(haloGeo, haloMat);
+        halo.userData = { type: "cable", id: cab.id, cable: cab };
         world.add(halo);
         disposables.push(haloGeo, haloMat);
+        pickables.push(halo);   // full-length ghost stays pickable even at 0% laid
 
-        cableTubes.push({ id: cab.id, cable: cab, mat: tubeMat, haloMat: haloMat, baseHex: col });
+        var entry = {
+          id: cab.id, cable: cab, mat: tubeMat, haloMat: haloMat, baseHex: col,
+          tubeGeo: tubeGeo, tubular: TUBULAR, ring: RING_IDX,
+          drawFrac: 1, targetFrac: 1
+        };
+        cableTubes.push(entry);
 
-        // flowing light pulse travelling along the cable
+        // flowing light pulse — travels only along the LAID portion of the cable.
         var pGeo = new THREE.SphereGeometry(0.045, 14, 14);
         var pMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.98, blending: THREE.AdditiveBlending, depthWrite: false });
         var pulse = new THREE.Mesh(pGeo, pMat);
         world.add(pulse);
         disposables.push(pGeo, pMat);
-        pulses.push({ curve: curve, mesh: pulse, speed: 0.06 + Math.random() * 0.05, offset: Math.random() });
+        pulses.push({ curve: curve, mesh: pulse, speed: 0.06 + Math.random() * 0.05, offset: Math.random(), entry: entry });
 
         // mid-cable id label for orientation
         var seg = makeLabelSprite(cab.id, { fontSize: 22, scale: 0.3, color: (STATUS_COLOR[cab.status] || STATUS_COLOR.planned).css, bg: "rgba(8,16,32,0.62)" });
@@ -562,8 +570,16 @@
       var selectedId = null;         // currently selected station|cable id
       var hovered = null;            // mesh under the pointer (for cursor/scale)
       var tourState = { active: false, idx: 0, timer: 0 };
+      var layAnim = { active: false, t: 0, dur: 4.6 };
 
       function easeInOut(k) { return k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; }
+
+      // Animate every cable from 0% up to its current laid % — a construction replay.
+      function playLaying() {
+        layAnim.active = true; layAnim.t = 0;
+        for (var i = 0; i < cableTubes.length; i++) setTubeExtent(cableTubes[i], 0);
+        return true;
+      }
 
       // Smoothly rotate the globe so (lat,lon) faces the camera and gently dolly in.
       function startFocus(lat, lon, radius) {
@@ -793,6 +809,20 @@
 
         if (clouds) clouds.rotation.y += 0.00045;   // clouds drift a touch faster
 
+        // construction replay: grow each cable from 0 up to its laid %
+        if (layAnim.active) {
+          layAnim.t += dt;
+          var lp = Math.min(1, layAnim.t / layAnim.dur);
+          var le = easeInOut(lp);
+          for (var ci = 0; ci < cableTubes.length; ci++) {
+            setTubeExtent(cableTubes[ci], (cableTubes[ci].targetFrac || 0) * le);
+          }
+          if (lp >= 1) {
+            layAnim.active = false;
+            for (var cj = 0; cj < cableTubes.length; cj++) setTubeExtent(cableTubes[cj], cableTubes[cj].targetFrac || 0);
+          }
+        }
+
         // slowly drift the sun for a living terminator, keep night-lights in sync
         sun.position.x = 5 * Math.cos(t * 0.015);
         sun.position.z = 4.2 * Math.sin(t * 0.015) + 2.0;
@@ -801,12 +831,15 @@
           night.material.uniforms.uSunDir.value.copy(sunDir);
         }
 
-        // flowing cable pulses (brightest mid-span)
+        // flowing cable pulses — travel only along the laid portion (brightest mid-span)
         for (var i = 0; i < pulses.length; i++) {
           var pu = pulses[i];
-          var u = (t * pu.speed + pu.offset) % 1;
+          var frac = pu.entry ? (pu.entry.drawFrac || 0) : 1;
+          if (frac <= 0.001) { pu.mesh.visible = false; continue; }
+          pu.mesh.visible = true;
+          var u = ((t * pu.speed + pu.offset) % 1) * frac;
           pu.curve.getPoint(u, pu.mesh.position);
-          pu.mesh.scale.setScalar(0.7 + 0.5 * Math.sin(u * Math.PI));
+          pu.mesh.scale.setScalar(0.7 + 0.5 * Math.sin((u / Math.max(0.001, frac)) * Math.PI));
         }
         // expanding station pulse rings
         for (var k = 0; k < rings.length; k++) {
@@ -837,6 +870,7 @@
           isTouring: function () { return !!tourState.active; },
           setSpin: setSpin,
           isSpinning: function () { return !!spinEnabled; },
+          playLaying: playLaying,
           selectedId: function () { return selectedId; }
         },
         stop: function () { alive = false; stopTour(); if (raf) window.cancelAnimationFrame(raf); }
@@ -869,6 +903,17 @@
   // explicit { cableId: percent } map; when omitted it reads QIStore.routeProgress()
   // if that module is available. Fully guarded — a no-op when the globe is not
   // mounted (e.g. the jsdom smoke run) or when no progress data exists.
+  // Draw a cable's bright core tube only up to `frac` (0..1) of its route, by
+  // limiting the TubeGeometry index draw-range to whole radial rings. The faint
+  // halo stays full-length as the "planned route" ghost. Guarded for jsdom.
+  function setTubeExtent(entry, frac) {
+    if (!entry || !entry.tubeGeo || typeof entry.tubeGeo.setDrawRange !== "function") return;
+    frac = Math.max(0, Math.min(1, Number(frac) || 0));
+    var rings = Math.round((entry.tubular || 80) * frac);
+    entry.tubeGeo.setDrawRange(0, rings * (entry.ring || 60));
+    entry.drawFrac = frac;
+  }
+
   function progressColor(THREE, pct) {
     // amber (0%) -> blue (50%) -> green (100%)
     var p = Math.max(0, Math.min(100, Number(pct) || 0)) / 100;
@@ -900,9 +945,13 @@
       if (!t.mat) return;
       if (Object.prototype.hasOwnProperty.call(map, t.id)) {
         try {
-          var col = progressColor(THREE, map[t.id]);
+          var pct = Number(map[t.id]) || 0;
+          var col = progressColor(THREE, pct);
           t.mat.color = col; t.mat.needsUpdate = true;
           if (t.haloMat) { t.haloMat.color = col.clone(); t.haloMat.needsUpdate = true; }
+          // record the laid fraction and draw the core tube up to it
+          t.targetFrac = Math.max(0, Math.min(1, pct / 100));
+          setTubeExtent(t, t.targetFrac);
         } catch (e) {}
       }
     });
@@ -976,6 +1025,7 @@
     setSpin: function (on) { return apiCall("setSpin", on); },
     toggleSpin: function () { return apiCall("setSpin", !apiCall("isSpinning")); },
     isSpinning: function () { return apiCall("isSpinning"); },
+    playLaying: function () { return apiCall("playLaying"); },
     selectedId: function () { return apiCall("selectedId"); },
     // subscriptions (persist across mount/unmount)
     onSelect: function (cb) { selectHandler = (typeof cb === "function") ? cb : null; },
