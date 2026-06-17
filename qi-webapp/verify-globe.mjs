@@ -378,6 +378,20 @@ async function main() {
   ok(spend.chips === 8 && spend.b.lit > spend.a.lit,
     "countries-coming-online chips light up progressively (" + spend.a.lit + " lit at 10% → " + spend.b.lit + " at 90%)");
 
+  // Clicking a 'countries online' chip flies to that station + opens its briefing.
+  const chipClick = await page.evaluate(() => {
+    window.QIGlobe.setDeployment(100);
+    const chip = document.querySelector("#globeOnline .globe-online-chip[data-station]");
+    if (!chip) return { ok: false };
+    const country = chip.textContent, station = chip.getAttribute("data-station");
+    chip.click();
+    const d = document.getElementById("globeDetail");
+    return { ok: true, country, station, detailShown: !!d && d.hidden === false, detailText: d ? d.textContent : "" };
+  });
+  ok(chipClick.ok && chipClick.detailShown, "clicking a 'countries online' chip opens that station's briefing card");
+  ok(chipClick.detailText.indexOf(chipClick.country) !== -1 && /What this means for you/.test(chipClick.detailText),
+    "the opened briefing matches the clicked country (" + chipClick.country + ")");
+
   // Auto-play must advance the build over time, then pause cleanly.
   await page.evaluate(() => { window.QIGlobe.setDeployment(0); window.QIGlobe.playDeployment(); });
   const playing = await page.evaluate(() => window.QIGlobe.isDeploying());

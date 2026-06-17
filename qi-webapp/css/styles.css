@@ -588,8 +588,12 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .globe-online-title{margin-top:9px}
 .globe-online{display:flex;flex-wrap:wrap;gap:4px}
 .globe-online-chip{font-size:9.5px;padding:2px 7px;border-radius:999px;border:1px solid rgba(125,167,240,.25);
-  color:#7e90b3;background:rgba(11,22,40,.4);transition:background .25s ease,color .25s ease,border-color .25s ease}
+  color:#7e90b3;background:rgba(11,22,40,.4);cursor:pointer;
+  transition:background .25s ease,color .25s ease,border-color .25s ease}
+.globe-online-chip:hover{border-color:rgba(125,167,240,.6);color:#dce6ff}
+.globe-online-chip:focus-visible{outline:2px solid #7da7f0;outline-offset:1px}
 .globe-online-chip.is-on{color:#0a1428;background:#42d6a4;border-color:#42d6a4;font-weight:700}
+.globe-online-chip.is-on:hover{background:#5fe0b6}
 @media (max-width:980px){.globe-spend{width:200px}}
 @media (max-width:680px){.globe-spend{display:none}}  /* keep the small screen uncluttered */
 

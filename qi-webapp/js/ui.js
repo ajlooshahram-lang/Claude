@@ -323,7 +323,15 @@
     const onlineBox = $("#globeOnline");
     if (onlineBox && typeof G.onlineSchedule === "function") {
       onlineBox.innerHTML = G.onlineSchedule().map(o =>
-        `<span class="globe-online-chip" data-g="${o.g.toFixed(4)}" title="Live around month ${esc(String(o.month))}">${esc(o.country)}</span>`).join("");
+        `<span class="globe-online-chip" data-g="${o.g.toFixed(4)}" data-station="${esc(o.id)}" role="button" tabindex="0" title="${esc(o.country)} — live around month ${esc(String(o.month))}. Click for details.">${esc(o.country)}</span>`).join("");
+      // Click / keyboard a chip → fly to that station + open its briefing.
+      const focusFromChip = el => { const id = el && el.getAttribute("data-station"); if (id) G.focusStation(id); };
+      onlineBox.addEventListener("click", e => { const c = e.target.closest(".globe-online-chip"); if (c) focusFromChip(c); });
+      onlineBox.addEventListener("keydown", e => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        const c = e.target.closest(".globe-online-chip");
+        if (c) { e.preventDefault(); focusFromChip(c); }
+      });
     }
     const updateSpend = st => {
       if (!st || !st.budgetUsd) return;
