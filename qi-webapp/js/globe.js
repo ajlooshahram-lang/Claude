@@ -95,6 +95,34 @@
     return Math.max(1, (Number(c.lengthKm) || 0) * (Number(c.fibrePairs) || 0));
   }
 
+  // Cumulative cost & schedule curve for the whole A–Z build, sampled across
+  // the programme. Module-level + pure, so it is available even when the globe
+  // is NOT mounted (jsdom / the printable Investor Brief) and always matches
+  // the live deployState() numbers (same route weighting, same window math).
+  function deployCurve(samples) {
+    var n = Math.max(2, Math.floor(Number(samples) || 60));
+    var N = CABLES.length || 1;
+    var totalW = 0, i;
+    for (i = 0; i < CABLES.length; i++) totalW += cableCostWeight(CABLES[i]);
+    totalW = totalW || 1;
+    var out = [];
+    for (var s = 0; s <= n; s++) {
+      var g = s / n, w = 0;
+      for (i = 0; i < CABLES.length; i++) {
+        var local = Math.max(0, Math.min(1, (g - i / N) / (1 / N)));
+        w += cableCostWeight(CABLES[i]) * local;
+      }
+      var frac = w / totalW;
+      out.push({
+        g: g, pct: Math.round(g * 100),
+        month: Math.round(g * PROGRAMME.durationMonths), monthsTotal: PROGRAMME.durationMonths,
+        costUsd: Math.round(PROGRAMME.budgetUsd * frac), costPct: Math.round(frac * 100),
+        budgetUsd: PROGRAMME.budgetUsd
+      });
+    }
+    return out;
+  }
+
   // Self-hosted Earth textures (relative to index.html → same-origin, CSP-safe).
   var TEX = {
     day:      "textures/earth_day.jpg",
@@ -1148,6 +1176,7 @@
     STATIONS: STATIONS,
     CABLES: CABLES,
     PROGRAMME: PROGRAMME,
+    deployCurve: deployCurve,
     STATUS_COLOR: STATUS_COLOR
   };
 })();

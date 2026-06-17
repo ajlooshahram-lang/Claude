@@ -359,6 +359,22 @@ async function main() {
   ok(!/\bRPN\b|\bFMEA\b|\bEVM\b|baseline|\bCPI\b|\bSPI\b|burn-?rate/i.test(meta.at50 + " " + meta.at100),
     "cost & schedule line uses plain language (no PM jargon)");
 
+  // the live spending S-curve overlay must show during a build and its marker +
+  // fill must advance as the build progresses (proves the SVG updates live).
+  const spend = await page.evaluate(() => {
+    const box = document.getElementById("globeSpend");
+    window.QIGlobe.setDeployment(10);
+    const dot = document.getElementById("globeSpendDot");
+    const clip = document.getElementById("globeSpendClipRect");
+    const a = { cx: dot ? +dot.getAttribute("cx") : null, w: clip ? +clip.getAttribute("width") : null, visible: box ? box.hidden === false : false };
+    window.QIGlobe.setDeployment(90);
+    const b = { cx: dot ? +dot.getAttribute("cx") : null, w: clip ? +clip.getAttribute("width") : null };
+    return { a, b, hasSvg: !!document.querySelector("#globeSpend svg.spend-svg") };
+  });
+  ok(spend.hasSvg && spend.a.visible, "spending S-curve overlay renders and is shown during the build");
+  ok(spend.b.cx > spend.a.cx && spend.b.w > spend.a.w,
+    "spend marker + area fill advance as the build progresses (marker x " + spend.a.cx + " → " + spend.b.cx + ")");
+
   // Auto-play must advance the build over time, then pause cleanly.
   await page.evaluate(() => { window.QIGlobe.setDeployment(0); window.QIGlobe.playDeployment(); });
   const playing = await page.evaluate(() => window.QIGlobe.isDeploying());
@@ -449,6 +465,7 @@ async function main() {
       verdicts: el.querySelectorAll(".brief-verdict").length,
       cableRows: el.querySelectorAll(".brief-table tbody tr").length,
       risks: el.querySelectorAll(".brief-risks li").length,
+      spendSvg: !!el.querySelector(".brief-spend svg.spend-svg path.spend-line"),
       text: el.textContent || "",
       hasInlineOnclick: btn ? !!btn.getAttribute("onclick") : true,
       printed: window.__printed, printErr
@@ -457,6 +474,7 @@ async function main() {
   ok(!!invBrief, "Investor Brief view renders in the browser");
   ok(invBrief && invBrief.countries === 8 && invBrief.verdicts === 8, "Investor Brief shows all 8 countries with market-entry verdicts");
   ok(invBrief && invBrief.cableRows >= 8 && invBrief.risks > 0, "Investor Brief lists every cable segment + the biggest things to watch");
+  ok(invBrief && invBrief.spendSvg, "Investor Brief renders the spending-over-time S-curve (inline SVG, prints cleanly)");
   ok(invBrief && /USD\s*1\.3B/.test(invBrief.text) && /60 months/.test(invBrief.text), "Investor Brief shows the headline budget (USD 1.3B) + build time (60 months)");
   ok(invBrief && !invBrief.hasInlineOnclick && invBrief.printed === 1,
     "print button is CSP-safe (no inline onclick) and fires window.print() under strict CSP");

@@ -59,6 +59,16 @@ ok(doc.getElementById("globeDeployMeta") != null, "3D build bar renders the cost
 // programme headline figures are exposed for the cost/schedule overlay
 ok(window.QIGlobe.PROGRAMME && window.QIGlobe.PROGRAMME.budgetUsd === 1300e6 && window.QIGlobe.PROGRAMME.durationMonths === 60,
    "QIGlobe.PROGRAMME exposes the headline figures (USD 1.3B over 60 months)");
+// cumulative spend curve (powers the spend S-curve overlay + the Investor Brief)
+ok(typeof window.QIGlobe.deployCurve === "function", "QIGlobe.deployCurve() exposed for the spending S-curve");
+const spendCurve = window.QIGlobe.deployCurve(60);
+ok(Array.isArray(spendCurve) && spendCurve.length === 61, "deployCurve(60) returns 61 samples (got " + (spendCurve ? spendCurve.length : "n/a") + ")");
+ok(spendCurve[0].costUsd === 0 && spendCurve[0].month === 0, "spend curve starts at zero spend, month 0");
+ok((function () { for (let i = 1; i < spendCurve.length; i++) { if (spendCurve[i].costUsd < spendCurve[i - 1].costUsd) return false; } return true; })(),
+   "spend curve is monotonic non-decreasing (spend never goes down)");
+ok(spendCurve[60].costUsd === 1300e6 && spendCurve[60].costPct === 100 && spendCurve[60].month === 60,
+   "spend curve ends at the full USD 1.3B at month 60");
+ok(doc.getElementById("globeSpend") != null && doc.getElementById("globeSpendChart") != null, "3D map renders the spending S-curve overlay container");
 ok(window.QIGlobe.init(doc.getElementById("globeStage")) === false, "QIGlobe.init no-throws and returns false without WebGL");
 // 2b-i) interactive API surface exists and is a safe no-op while unmounted (jsdom/no WebGL)
 ["focusStation","focusCable","clearSelection","startTour","stopTour","toggleTour","isTouring",
@@ -743,6 +753,9 @@ ok(doc.querySelectorAll(".brief-country").length === 8, "Investor Brief shows al
 ok(doc.querySelectorAll(".brief-table tbody tr").length === window.QIGlobe.CABLES.length, "Investor Brief lists every cable segment");
 ok(/USD\s*1\.3B/.test(briefOut) && /60 months/.test(briefOut), "Investor Brief shows the headline budget (USD 1.3B) and build time (60 months)");
 ok(doc.querySelectorAll(".brief-verdict").length === 8, "Investor Brief shows a market-entry verdict for each country");
+ok(doc.querySelector(".brief-spend svg.spend-svg") != null && doc.querySelector(".brief-spend path.spend-line") != null,
+   "Investor Brief renders the spending-over-time S-curve (inline SVG)");
+ok(/Spending over time/.test(briefOut), "Investor Brief includes the 'Spending over time' section");
 ok(doc.querySelectorAll(".brief-risks li").length > 0, "Investor Brief lists the biggest things to watch");
 ["FCC","NCC","NBTC","MCMC"].forEach(ab => ok(briefOut.indexOf(ab) !== -1, "Investor Brief names the real authority " + ab));
 // the print button must be CSP-safe (wired via addEventListener, NOT an inline onclick)

@@ -145,6 +145,56 @@
   const RENDER = {};
   const AFTER = {};
 
+  // ---- Spending-over-time S-curve (pure inline SVG; CSP-safe, prints cleanly)
+  // Shared by the 3D build overlay (live marker that fills as the A–Z build
+  // plays) and the printable Investor Brief (static full curve). A single scale
+  // is used everywhere so the live updater and the drawn path always agree.
+  const SPEND = { W: 320, H: 120, padL: 34, padT: 12, padB: 18, padR: 10 };
+  const spendPlotW = SPEND.W - SPEND.padL - SPEND.padR;
+  const spendPlotH = SPEND.H - SPEND.padT - SPEND.padB;
+  const spendBaseY = SPEND.padT + spendPlotH;
+  const clamp01 = v => Math.max(0, Math.min(1, Number(v) || 0));
+  const spendX = g => SPEND.padL + clamp01(g) * spendPlotW;
+  const spendY = frac => SPEND.padT + (1 - clamp01(frac)) * spendPlotH;
+  const fmtUsdShort = n => {
+    n = Number(n) || 0;
+    if (n >= 1e9) { const b = n / 1e9; return "USD " + (b >= 10 ? Math.round(b) : (Math.round(b * 10) / 10)) + "B"; }
+    if (n >= 1e6) return "USD " + Math.round(n / 1e6) + "M";
+    if (n >= 1e3) return "USD " + Math.round(n / 1e3) + "K";
+    return "USD " + n;
+  };
+  function spendCurveSVG(curve, opts) {
+    opts = opts || {};
+    if (!Array.isArray(curve) || curve.length < 2) return "";
+    const id = opts.id || "spend";
+    const live = !!opts.live;
+    const budget = curve[curve.length - 1].budgetUsd || 1;
+    const months = curve[curve.length - 1].monthsTotal || 60;
+    const pts = curve.map(p => spendX(p.g).toFixed(1) + "," + spendY(p.costUsd / budget).toFixed(1));
+    const line = "M" + pts.join(" L");
+    const area = "M" + spendX(0).toFixed(1) + "," + spendBaseY.toFixed(1) +
+      " L" + pts.join(" L") + " L" + spendX(1).toFixed(1) + "," + spendBaseY.toFixed(1) + " Z";
+    const clipW = (spendX(live ? 0 : 1) - SPEND.padL).toFixed(1);
+    const midMonth = Math.round(months / 2);
+    const marker = live
+      ? `<line class="spend-guide" id="${esc(id)}Guide" x1="${spendX(0).toFixed(1)}" y1="${spendBaseY.toFixed(1)}" x2="${spendX(0).toFixed(1)}" y2="${spendBaseY.toFixed(1)}"></line>
+         <circle class="spend-dot" id="${esc(id)}Dot" cx="${spendX(0).toFixed(1)}" cy="${spendBaseY.toFixed(1)}" r="3.2"></circle>`
+      : "";
+    return `<svg class="spend-svg" viewBox="0 0 ${SPEND.W} ${SPEND.H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Cumulative spending across the build">
+      <defs><clipPath id="${esc(id)}Clip"><rect id="${esc(id)}ClipRect" x="${SPEND.padL}" y="0" width="${clipW}" height="${SPEND.H}"></rect></clipPath></defs>
+      <line class="spend-grid" x1="${SPEND.padL}" y1="${SPEND.padT}" x2="${(SPEND.W - SPEND.padR)}" y2="${SPEND.padT}"></line>
+      <line class="spend-axis" x1="${SPEND.padL}" y1="${spendBaseY.toFixed(1)}" x2="${(SPEND.W - SPEND.padR)}" y2="${spendBaseY.toFixed(1)}"></line>
+      <path class="spend-area" d="${area}" clip-path="url(#${esc(id)}Clip)"></path>
+      <path class="spend-line" d="${line}"></path>
+      ${marker}
+      <text class="spend-lbl" x="2" y="${(SPEND.padT + 3)}">${esc(fmtUsdShort(budget))}</text>
+      <text class="spend-lbl" x="2" y="${spendBaseY.toFixed(1)}">USD 0</text>
+      <text class="spend-lbl spend-lbl-x" x="${spendX(0).toFixed(1)}" y="${(SPEND.H - 5)}">Mo 0</text>
+      <text class="spend-lbl spend-lbl-x" x="${spendX(0.5).toFixed(1)}" y="${(SPEND.H - 5)}" text-anchor="middle">${midMonth}</text>
+      <text class="spend-lbl spend-lbl-x" x="${spendX(1).toFixed(1)}" y="${(SPEND.H - 5)}" text-anchor="end">${months}</text>
+    </svg>`;
+  }
+
   // 3D submarine cable network visualization (Three.js globe + glass legend).
   RENDER.globe3d = function () {
     const G = window.QIGlobe || {};
@@ -206,6 +256,10 @@
             <button class="globe-btn globe-deploy-exit" id="globeDeployExit" type="button" hidden>Back to live view</button>
           </div>
           <div class="globe-detail" id="globeDetail" hidden></div>
+          <div class="globe-spend" id="globeSpend" hidden>
+            <div class="globe-spend-title">Spending over time</div>
+            <div class="globe-spend-chart" id="globeSpendChart"></div>
+          </div>
           <div class="globe-hint" id="globeHint">Drag to rotate · scroll to zoom · click a station or cable</div>
         </div>
         <aside class="globe-panel">
@@ -257,6 +311,22 @@
     if (deployPlay) deployPlay.addEventListener("click", () => G.toggleDeployment());
     if (deployRange) deployRange.addEventListener("input", () => G.setDeployment(Number(deployRange.value) || 0));
     if (deployExit) deployExit.addEventListener("click", () => G.exitDeployment());
+    // Spending-over-time S-curve overlay (fills as the A–Z build plays).
+    const spendBox = $("#globeSpend"), spendChart = $("#globeSpendChart");
+    if (spendChart && typeof G.deployCurve === "function") {
+      spendChart.innerHTML = spendCurveSVG(G.deployCurve(60), { id: "globeSpend", live: true });
+    }
+    const spendClip = $("#globeSpendClipRect"), spendDot = $("#globeSpendDot"), spendGuide = $("#globeSpendGuide");
+    const updateSpend = st => {
+      if (!st || !st.budgetUsd) return;
+      const x = spendX(st.g), y = spendY(st.costUsd / st.budgetUsd);
+      if (spendClip) spendClip.setAttribute("width", Math.max(0, x - SPEND.padL).toFixed(1));
+      if (spendDot) { spendDot.setAttribute("cx", x.toFixed(1)); spendDot.setAttribute("cy", y.toFixed(1)); }
+      if (spendGuide) {
+        spendGuide.setAttribute("x1", x.toFixed(1)); spendGuide.setAttribute("x2", x.toFixed(1));
+        spendGuide.setAttribute("y1", spendBaseY.toFixed(1)); spendGuide.setAttribute("y2", y.toFixed(1));
+      }
+    };
     // plain-language money: "about USD 1.3B" / "USD 640M" — no jargon, no cents
     const fmtUsd = n => {
       n = Number(n) || 0;
@@ -286,6 +356,8 @@
           deployMeta.textContent = `Month ${st.month} of ${st.monthsTotal} · about ${fmtUsd(st.costUsd)} committed (${st.costPct}%) · ${st.online} of ${st.stations} countries live`;
         }
       }
+      if (spendBox) spendBox.hidden = !st.mode;
+      updateSpend(st);
     });
 
     const SC = G.STATUS_COLOR || {};
@@ -592,6 +664,12 @@
             <thead><tr><th>Cable segment</th><th>Route</th><th class="brief-num">Length</th><th class="brief-num">Capacity</th><th>Status</th></tr></thead>
             <tbody>${cableRows || '<tr><td colspan="5" class="muted">No cable data</td></tr>'}</tbody>
           </table>
+        </section>
+
+        <section class="brief-section">
+          <h3>Spending over time</h3>
+          <p class="brief-lead">How the money is committed as the network is built, month by month. Spend starts slowly during permitting and surveys, then rises as the cable ships lay the longer trunk routes — reaching the full budget of about ${esc(fmtUsd(prog.budgetUsd))} by month ${esc(String(prog.durationMonths))}.</p>
+          <div class="brief-spend">${(typeof G.deployCurve === "function") ? spendCurveSVG(G.deployCurve(60), { id: "briefSpend", live: false }) : '<p class="muted">No schedule data</p>'}</div>
         </section>
 
         <section class="brief-section">
