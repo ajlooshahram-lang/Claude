@@ -612,6 +612,63 @@
     };
   }
 
+  // ---- per-country briefing (powers the 3D map station drill-down) --------
+  // Returns ONE country's complete, plain-language briefing for a free-text
+  // hint (a station id, a country name, or any description). Pure & local:
+  // reuses the framework builders above so there is a single source of truth.
+  // Risk priorities are translated to plain words — no FMEA/RPN jargon leaks
+  // out, because the people reading this have no project-management background.
+  var RISK_LEVEL = {
+    "1-CRITICAL": { label: "Top concern", rank: 1 },
+    "2-HIGH":     { label: "Important",   rank: 2 },
+    "3-MEDIUM":   { label: "Worth watching", rank: 3 }
+  };
+  function briefing(hint) {
+    var d = detect(hint, { includeAllOnSubsea: false });
+    var c = (d.countries && d.countries[0]) || null;
+    if (!c) return null;
+    var me = marketEntryFramework([c]).countries[0] || {};
+    var lic = licensingFramework([c]).countries[0] || {};
+    var lp = landingPartnerFramework([c]).countries[0] || {};
+    var risks = (c.risks || []).map(function (r) {
+      var lvl = RISK_LEVEL[r.priority] || { label: "Worth watching", rank: 3 };
+      return {
+        text: String(r.problem).replace(/^RISK:\s*/i, ""),
+        level: lvl.label,
+        rank: lvl.rank,
+        phase: r.phase || ""
+      };
+    }).sort(function (a, b) { return a.rank - b.rank; });
+    return {
+      key: c.key,
+      name: c.name,
+      authority: { name: c.authority.name, abbrev: c.authority.abbrev, role: c.authority.role, url: c.authority.url || "" },
+      environmental: c.environmental ? { abbrev: c.environmental.abbrev, body: c.environmental.body, role: c.environmental.role } : null,
+      marketEntry: {
+        verdict: me.verdict || "Conditional Go",
+        recommendation: me.recommendation || "",
+        foreignOwnership: me.foreignOwnership || "",
+        recommendedMode: me.recommendedMode || "",
+        demand: me.demand || ""
+      },
+      licensing: {
+        licenses: lic.licenses || [],
+        criticalPathItem: lic.criticalPathItem || "",
+        criticalPathMonths: lic.criticalPathMonths || 0,
+        criticalPathAuthority: lic.criticalPathAuthority || ""
+      },
+      landingParties: {
+        candidates: lp.candidates || [],
+        wants: lp.wants || [],
+        structures: lp.structures || [],
+        note: lp.note || ""
+      },
+      risks: risks,
+      geographical: c.geographical.slice(0),
+      geopolitical: c.geopolitical.slice(0)
+    };
+  }
+
   var API = {
     COUNTRIES: COUNTRIES,
     list: list,
@@ -622,7 +679,8 @@
     summarize: summarize,
     marketEntryFramework: marketEntryFramework,
     licensingFramework: licensingFramework,
-    landingPartnerFramework: landingPartnerFramework
+    landingPartnerFramework: landingPartnerFramework,
+    briefing: briefing
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = API;

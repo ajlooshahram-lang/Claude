@@ -353,6 +353,61 @@ async function main() {
   ok(pageErrors.length === 0 && cspAfter === 0 && consoleCSP.length === 0,
     "no page errors / CSP violations during the build animation");
 
+  // ---- Per-country drill-down briefing (Brain ↔ 3D map) ------------------
+  // Selecting a landing station must open a plain-language country briefing in
+  // the detail card (regulator, market-entry verdict, approvals, who can land
+  // the cable, risks, hazards) — the interactive briefing tool for investors.
+  const brief = await page.evaluate(() => {
+    window.QIGlobe.focusStation("piti");   // Guam (US) — FCC
+    const d = document.getElementById("globeDetail");
+    if (!d || d.hidden) return null;
+    return {
+      text: d.textContent || "",
+      accordions: d.querySelectorAll(".gd-acc").length,
+      hasVerdict: !!d.querySelector(".gd-verdict"),
+      verdictText: (d.querySelector(".gd-verdict") || {}).textContent || "",
+      hasRiskTag: !!d.querySelector(".gd-risk-tag"),
+      hasPermits: d.querySelectorAll(".gd-permits li").length,
+      hasLink: !!d.querySelector(".gd-link"),
+    };
+  });
+  ok(!!brief, "selecting a station opens the detail card with a country briefing");
+  ok(brief && brief.accordions >= 6, "briefing shows the 6 plain-language sections (got " + (brief ? brief.accordions : 0) + ")");
+  ok(brief && /FCC/.test(brief.text), "briefing names Guam's real regulator (FCC)");
+  ok(brief && brief.hasVerdict && /^(Go|Conditional Go|Caution)$/.test(brief.verdictText.trim()),
+    "briefing shows a plain market-entry verdict (" + (brief ? brief.verdictText.trim() : "") + ")");
+  ok(brief && /Start this first/i.test(brief.text) && brief.hasPermits > 0,
+    "briefing surfaces the 'start-first' approval + an approvals list");
+  ok(brief && /GTA TeleGuam|Docomo Pacific|IT&E/.test(brief.text), "briefing lists who can bring the cable ashore in Guam");
+  ok(brief && brief.hasRiskTag && /(Top concern|Important|Worth watching)/.test(brief.text),
+    "briefing shows plain-language risk levels");
+  ok(brief && /typhoon|Mariana/i.test(brief.text), "briefing surfaces Guam's natural hazards");
+  // CRITICAL: a non-technical reader must see NO project-management jargon.
+  ok(brief && !/\bRPN\b|\bFMEA\b|RISK:|\bsev\b|\bocc\b|\bdet\b/.test(brief.text),
+    "briefing leaks no PM/FMEA jargon to the reader");
+
+  // Switching stations re-renders the briefing for the new country.
+  const brief2 = await page.evaluate(() => {
+    window.QIGlobe.focusStation("tamsui");   // Taiwan — NCC, verdict Caution
+    const d = document.getElementById("globeDetail");
+    return d && !d.hidden ? (d.textContent || "") : "";
+  });
+  ok(/NCC/.test(brief2) && /Taiwan/.test(brief2), "switching to another station re-renders its briefing (Taiwan / NCC)");
+
+  // Closing the card clears the selection cleanly.
+  const closed = await page.evaluate(() => {
+    const b = document.getElementById("gdClose");
+    if (b) b.click();
+    const d = document.getElementById("globeDetail");
+    return d ? d.hidden : null;
+  });
+  ok(closed === true, "closing the briefing card clears the selection");
+
+  // The drill-down must not have introduced any errors/CSP violations.
+  const cspFinal = await page.evaluate(() => (window.__csp || []).length);
+  ok(pageErrors.length === 0 && cspFinal === 0 && consoleCSP.length === 0,
+    "no page errors / CSP violations during the country drill-down");
+
   await browser.close();
   server.close();
 

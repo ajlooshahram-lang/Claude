@@ -579,6 +579,7 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 
 /* in-stage detail card (shown when a node is selected) */
 .globe-detail{position:absolute;left:14px;top:14px;z-index:3;width:264px;max-width:calc(100% - 28px);color:#e6eaf3;
+  max-height:calc(100% - 28px);overflow-y:auto;overscroll-behavior:contain;
   background:rgba(12,22,42,.82);border:1px solid rgba(125,167,240,.26);border-radius:14px;padding:14px 15px;
   backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 10px 36px rgba(0,0,0,.42);
   animation:gdIn .22s ease both}
@@ -601,6 +602,45 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .globe-detail .gd-chip{font-size:11.5px;color:#cbd6ee;background:rgba(125,167,240,.1);border:1px solid rgba(125,167,240,.18);
   border-radius:999px;padding:4px 11px}
 @media(max-width:980px){.globe-detail{width:220px}}
+
+/* country briefing inside the station detail card (Brain ↔ 3D drill-down) */
+.gd-brief{margin-top:12px;border-top:1px solid rgba(125,167,240,.16);padding-top:4px}
+.gd-acc{border-bottom:1px solid rgba(125,167,240,.12)}
+.gd-acc>summary{list-style:none;cursor:pointer;padding:9px 2px;font-size:12px;font-weight:700;color:#dce6ff;
+  display:flex;align-items:center;gap:7px;flex-wrap:wrap;user-select:none}
+.gd-acc>summary::-webkit-details-marker{display:none}
+.gd-acc>summary::before{content:"▸";color:#7da7f0;font-size:10px;transition:transform .15s ease}
+.gd-acc[open]>summary::before{transform:rotate(90deg)}
+.gd-acc>summary:hover{color:#fff}
+.gd-acc-body{padding:2px 2px 11px;font-size:12px;line-height:1.5;color:#c4d0ea}
+.gd-acc-body p{margin:0 0 7px}
+.gd-acc-body strong{color:#e6eaf3}
+.gd-acc-body h6{margin:9px 0 4px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#7e90b3}
+.gd-reg{font-weight:700;color:#fff;line-height:1.35;margin-bottom:5px}
+.gd-link{display:inline-block;margin:2px 0 4px;font-size:11.5px;color:#7da7f0;text-decoration:none}
+.gd-link:hover{text-decoration:underline}
+.gd-env{margin-top:6px;font-size:11.5px;color:#aebbd9}
+.gd-verdict{margin-left:auto;font-size:10px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;
+  padding:2px 9px;border-radius:999px;white-space:nowrap}
+.gd-verdict--go{background:rgba(66,214,164,.18);color:#7df0c4;border:1px solid rgba(66,214,164,.4)}
+.gd-verdict--cond{background:rgba(230,184,74,.18);color:#f3d27a;border:1px solid rgba(230,184,74,.4)}
+.gd-verdict--caution{background:rgba(255,128,110,.18);color:#ffb3a3;border:1px solid rgba(255,128,110,.42)}
+.gd-cp{background:rgba(125,167,240,.1);border:1px solid rgba(125,167,240,.2);border-radius:8px;padding:7px 9px;margin-bottom:8px}
+.gd-permits,.gd-risks,.gd-haz{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.gd-haz{padding-left:16px;list-style:disc}
+.gd-permits li{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;background:rgba(11,22,40,.5);
+  border:1px solid rgba(125,167,240,.12);border-radius:8px;padding:6px 9px}
+.gd-perm-name{flex:1 1 60%;font-size:11.5px}
+.gd-mo{color:#7da7f0;font-weight:700;font-size:11.5px;white-space:nowrap}
+.gd-perm-auth{flex-basis:100%;color:#8fa0c2;font-size:10.5px}
+.gd-risks li{display:flex;align-items:flex-start;gap:7px;font-size:11.5px}
+.gd-risk-tag{flex:none;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;
+  padding:2px 7px;border-radius:999px;margin-top:1px;white-space:nowrap}
+.gd-risk--crit{background:rgba(255,128,110,.18);color:#ffb3a3;border:1px solid rgba(255,128,110,.42)}
+.gd-risk--high{background:rgba(230,184,74,.18);color:#f3d27a;border:1px solid rgba(230,184,74,.4)}
+.gd-risk--med{background:rgba(125,167,240,.16);color:#aecbff;border:1px solid rgba(125,167,240,.34)}
+.gd-risk-text{flex:1}
+.gd-note{margin-top:7px;font-size:11.5px;color:#9fb0cf;font-style:italic}
 
 
 /* ---- Country Intelligence ---- */
@@ -6866,6 +6906,63 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
     };
   }
 
+  // ---- per-country briefing (powers the 3D map station drill-down) --------
+  // Returns ONE country's complete, plain-language briefing for a free-text
+  // hint (a station id, a country name, or any description). Pure & local:
+  // reuses the framework builders above so there is a single source of truth.
+  // Risk priorities are translated to plain words — no FMEA/RPN jargon leaks
+  // out, because the people reading this have no project-management background.
+  var RISK_LEVEL = {
+    "1-CRITICAL": { label: "Top concern", rank: 1 },
+    "2-HIGH":     { label: "Important",   rank: 2 },
+    "3-MEDIUM":   { label: "Worth watching", rank: 3 }
+  };
+  function briefing(hint) {
+    var d = detect(hint, { includeAllOnSubsea: false });
+    var c = (d.countries && d.countries[0]) || null;
+    if (!c) return null;
+    var me = marketEntryFramework([c]).countries[0] || {};
+    var lic = licensingFramework([c]).countries[0] || {};
+    var lp = landingPartnerFramework([c]).countries[0] || {};
+    var risks = (c.risks || []).map(function (r) {
+      var lvl = RISK_LEVEL[r.priority] || { label: "Worth watching", rank: 3 };
+      return {
+        text: String(r.problem).replace(/^RISK:\s*/i, ""),
+        level: lvl.label,
+        rank: lvl.rank,
+        phase: r.phase || ""
+      };
+    }).sort(function (a, b) { return a.rank - b.rank; });
+    return {
+      key: c.key,
+      name: c.name,
+      authority: { name: c.authority.name, abbrev: c.authority.abbrev, role: c.authority.role, url: c.authority.url || "" },
+      environmental: c.environmental ? { abbrev: c.environmental.abbrev, body: c.environmental.body, role: c.environmental.role } : null,
+      marketEntry: {
+        verdict: me.verdict || "Conditional Go",
+        recommendation: me.recommendation || "",
+        foreignOwnership: me.foreignOwnership || "",
+        recommendedMode: me.recommendedMode || "",
+        demand: me.demand || ""
+      },
+      licensing: {
+        licenses: lic.licenses || [],
+        criticalPathItem: lic.criticalPathItem || "",
+        criticalPathMonths: lic.criticalPathMonths || 0,
+        criticalPathAuthority: lic.criticalPathAuthority || ""
+      },
+      landingParties: {
+        candidates: lp.candidates || [],
+        wants: lp.wants || [],
+        structures: lp.structures || [],
+        note: lp.note || ""
+      },
+      risks: risks,
+      geographical: c.geographical.slice(0),
+      geopolitical: c.geopolitical.slice(0)
+    };
+  }
+
   var API = {
     COUNTRIES: COUNTRIES,
     list: list,
@@ -6876,7 +6973,8 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
     summarize: summarize,
     marketEntryFramework: marketEntryFramework,
     licensingFramework: licensingFramework,
-    landingPartnerFramework: landingPartnerFramework
+    landingPartnerFramework: landingPartnerFramework,
+    briefing: briefing
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = API;
@@ -8879,6 +8977,103 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
     const sdot = st => `<span class="globe-dot" style="background:${(SC[st] || {}).css || "#888"}"></span>`;
     const fmtKm = n => (Number(n) || 0).toLocaleString() + " km";
 
+    // Plain-language country briefing for the selected landing station, drawn
+    // from the on-device Brain (QICountryData). Turns the 3D map into an
+    // interactive briefing tool for non-technical decision-makers: who approves
+    // it, whether it's worth entering, how long approvals take, who can land the
+    // cable, what could go wrong, and the nature/politics to plan around.
+    const verdictSlug = v => {
+      const s = String(v || "").toLowerCase();
+      if (s.indexOf("caution") !== -1) return "caution";
+      if (s.indexOf("conditional") !== -1) return "cond";
+      if (s === "go" || s.indexOf(" go") !== -1 || s.indexOf("go") === 0) return "go";
+      return "cond";
+    };
+    const riskSlug = lvl => {
+      const s = String(lvl || "").toLowerCase();
+      if (s.indexOf("top") !== -1) return "crit";
+      if (s.indexOf("important") !== -1) return "high";
+      return "med";
+    };
+    function briefingHTML(info) {
+      const CD = window.QICountryData;
+      if (!CD || typeof CD.briefing !== "function") return "";
+      let b;
+      try { b = CD.briefing((info.id || "") + " " + (info.country || "")); } catch (e) { b = null; }
+      if (!b) return "";
+      const a = b.authority || {};
+      const me = b.marketEntry || {};
+      const lic = b.licensing || {};
+      const lp = b.landingParties || {};
+      const link = a.url
+        ? `<a class="gd-link" href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">Official site ↗</a>`
+        : "";
+      const env = b.environmental
+        ? `<p class="gd-env"><strong>Environment:</strong> ${esc(b.environmental.abbrev || "")} — ${esc(b.environmental.role || b.environmental.body || "")}</p>`
+        : "";
+      const permits = (lic.licenses || []).map(l => `
+        <li><span class="gd-perm-name">${esc(l.license)}</span>
+          <span class="gd-mo">~${esc(String(l.leadTimeMonths || 0))} mo</span>
+          <small class="gd-perm-auth">${esc(l.authority || "")}</small></li>`).join("");
+      const cp = lic.criticalPathItem
+        ? `<p class="gd-cp"><strong>Start this first:</strong> ${esc(lic.criticalPathItem)} — usually about ${esc(String(lic.criticalPathMonths || 0))} months (${esc(lic.criticalPathAuthority || "")}). It takes the longest, so begin it early.</p>`
+        : "";
+      const candidates = (lp.candidates || []).map(n => `<span class="gd-chip">${esc(n)}</span>`).join("");
+      const risks = (b.risks || []).map(r => `
+        <li><span class="gd-risk-tag gd-risk--${riskSlug(r.level)}">${esc(r.level)}</span>
+          <span class="gd-risk-text">${esc(r.text)}</span></li>`).join("");
+      const geo = (b.geographical || []).map(g => `<li>${esc(g)}</li>`).join("");
+      const pol = (b.geopolitical || []).map(g => `<li>${esc(g)}</li>`).join("");
+
+      return `
+        <div class="gd-brief">
+          <details class="gd-acc" open>
+            <summary>Who approves it here</summary>
+            <div class="gd-acc-body">
+              <div class="gd-reg">${esc(a.abbrev || "")} — ${esc(a.name || "")}</div>
+              <p>${esc(a.role || "")}</p>
+              ${link}
+              ${env}
+            </div>
+          </details>
+          <details class="gd-acc">
+            <summary>Is it worth going in? <span class="gd-verdict gd-verdict--${verdictSlug(me.verdict)}">${esc(me.verdict || "")}</span></summary>
+            <div class="gd-acc-body">
+              <p>${esc(me.recommendation || "")}</p>
+              <p><strong>How much you can own:</strong> ${esc(me.foreignOwnership || "")}</p>
+              <p><strong>Simplest way in:</strong> ${esc(me.recommendedMode || "")}</p>
+            </div>
+          </details>
+          <details class="gd-acc">
+            <summary>Approvals &amp; how long they take</summary>
+            <div class="gd-acc-body">
+              ${cp}
+              <ul class="gd-permits">${permits || '<li class="muted">No approvals listed</li>'}</ul>
+            </div>
+          </details>
+          <details class="gd-acc">
+            <summary>Who can bring the cable ashore</summary>
+            <div class="gd-acc-body">
+              <div class="gd-chips">${candidates || '<span class="muted">No partners listed</span>'}</div>
+              ${lp.note ? `<p class="gd-note">${esc(lp.note)}</p>` : ""}
+            </div>
+          </details>
+          <details class="gd-acc">
+            <summary>What could go wrong here</summary>
+            <div class="gd-acc-body">
+              <ul class="gd-risks">${risks || '<li class="muted">No risks listed</li>'}</ul>
+            </div>
+          </details>
+          <details class="gd-acc">
+            <summary>Nature &amp; politics to plan around</summary>
+            <div class="gd-acc-body">
+              ${geo ? `<h6>Natural hazards</h6><ul class="gd-haz">${geo}</ul>` : ""}
+              ${pol ? `<h6>Political &amp; cross-border</h6><ul class="gd-haz">${pol}</ul>` : ""}
+            </div>
+          </details>
+        </div>`;
+    }
+
     // highlight the matching list row when something is selected
     function markActive(info) {
       stage.ownerDocument.querySelectorAll(".globe-item--click.is-active, .globe-station--click.is-active")
@@ -8906,7 +9101,8 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
           <h4>${esc(info.name)}</h4>
           <div class="gd-sub">${esc(info.country)} · ${esc(info.lat.toFixed(1))}, ${esc(info.lon.toFixed(1))}</div>
           <div class="gd-count"><strong>${(info.cables || []).length}</strong> connected segment(s)</div>
-          <ul class="gd-links">${links || '<li class="muted">No segments</li>'}</ul>`;
+          <ul class="gd-links">${links || '<li class="muted">No segments</li>'}</ul>
+          ${briefingHTML(info)}`;
       } else {
         body = `
           <div class="gd-kind">Cable segment ${sdot(info.status)}${esc(statusLabel[info.status] || info.status)}</div>
@@ -11827,7 +12023,7 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 </script>
 <script>
 (function () {
-  var BUILD_ID = "2026-06-17 (552ad60)";
+  var BUILD_ID = "2026-06-17 (4f54014)";
   function hideStrayOverlays() {
     // Defensive: an empty modal scrim / toast must never paint over the app.
     ["modalOverlay", "toast"].forEach(function (id) {

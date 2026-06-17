@@ -748,5 +748,32 @@ ok(allEight.countryIntel.length === 8, "Submarine project with no named country 
 doc.getElementById("brainApply").click();
 ok(S.validCases().length > ciCasesBefore, "Applying the plan adds the country-enriched cases");
 
+// 40) Per-country briefing (powers the 3D map station drill-down) — pure data
+ok(typeof window.QICountryData.briefing === "function", "QICountryData.briefing() exposed for the 3D drill-down");
+const STN = [
+  ["jakarta", "Indonesia", "Indonesia"], ["songkhla", "Thailand", "Thailand"],
+  ["danang", "Vietnam", "Vietnam"], ["tamsui", "Taiwan", "Taiwan"],
+  ["batangas", "Philippines", "Philippines"], ["piti", "Guam (US)", "Guam"],
+  ["mersing", "Malaysia", "Malaysia"], ["bsb", "Brunei", "Brunei"]
+];
+STN.forEach(([id, country, nameFrag]) => {
+  const b = window.QICountryData.briefing(id + " " + country);
+  ok(!!b && b.name.indexOf(nameFrag) !== -1, "Station " + id + " maps to its country briefing (" + nameFrag + ")");
+  ok(!!b && b.authority && /.+/.test(b.authority.abbrev) && /.+/.test(b.authority.role), "Briefing for " + id + " names the real regulator with a role");
+  ok(!!b && /^(Go|Conditional Go|Caution)$/.test(b.marketEntry.verdict), "Briefing for " + id + " has a plain market-entry verdict");
+  ok(!!b && b.licensing.criticalPathMonths > 0 && /.+/.test(b.licensing.criticalPathItem), "Briefing for " + id + " has a slowest 'start-first' approval");
+  ok(!!b && Array.isArray(b.landingParties.candidates) && b.landingParties.candidates.length > 0, "Briefing for " + id + " lists who can land the cable");
+  ok(!!b && b.risks.length > 0 && b.risks.every(r => /^(Top concern|Important|Worth watching)$/.test(r.level)), "Briefing for " + id + " uses plain risk levels");
+  ok(!!b && b.geographical.length > 0 && b.geopolitical.length > 0, "Briefing for " + id + " surfaces nature + politics");
+  // zero PM/FMEA jargon must leak to non-technical readers
+  const blob = JSON.stringify(b);
+  ok(!/RISK:|\bRPN\b|\bFMEA\b|"sev"|"occ"|"det"|priority/.test(blob), "Briefing for " + id + " leaks no PM/FMEA jargon");
+});
+// risks are ordered worst-first (Top concern before Worth watching)
+const taiwanB = window.QICountryData.briefing("tamsui Taiwan");
+ok(taiwanB.risks[0].level === "Top concern", "Briefing orders risks worst-first (Taiwan top risk is a 'Top concern')");
+// an unknown hint returns null rather than throwing
+ok(window.QICountryData.briefing("somewhere with no station") === null, "Briefing returns null for an unknown location (no throw)");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

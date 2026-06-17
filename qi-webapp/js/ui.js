@@ -273,6 +273,103 @@
     const sdot = st => `<span class="globe-dot" style="background:${(SC[st] || {}).css || "#888"}"></span>`;
     const fmtKm = n => (Number(n) || 0).toLocaleString() + " km";
 
+    // Plain-language country briefing for the selected landing station, drawn
+    // from the on-device Brain (QICountryData). Turns the 3D map into an
+    // interactive briefing tool for non-technical decision-makers: who approves
+    // it, whether it's worth entering, how long approvals take, who can land the
+    // cable, what could go wrong, and the nature/politics to plan around.
+    const verdictSlug = v => {
+      const s = String(v || "").toLowerCase();
+      if (s.indexOf("caution") !== -1) return "caution";
+      if (s.indexOf("conditional") !== -1) return "cond";
+      if (s === "go" || s.indexOf(" go") !== -1 || s.indexOf("go") === 0) return "go";
+      return "cond";
+    };
+    const riskSlug = lvl => {
+      const s = String(lvl || "").toLowerCase();
+      if (s.indexOf("top") !== -1) return "crit";
+      if (s.indexOf("important") !== -1) return "high";
+      return "med";
+    };
+    function briefingHTML(info) {
+      const CD = window.QICountryData;
+      if (!CD || typeof CD.briefing !== "function") return "";
+      let b;
+      try { b = CD.briefing((info.id || "") + " " + (info.country || "")); } catch (e) { b = null; }
+      if (!b) return "";
+      const a = b.authority || {};
+      const me = b.marketEntry || {};
+      const lic = b.licensing || {};
+      const lp = b.landingParties || {};
+      const link = a.url
+        ? `<a class="gd-link" href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">Official site ↗</a>`
+        : "";
+      const env = b.environmental
+        ? `<p class="gd-env"><strong>Environment:</strong> ${esc(b.environmental.abbrev || "")} — ${esc(b.environmental.role || b.environmental.body || "")}</p>`
+        : "";
+      const permits = (lic.licenses || []).map(l => `
+        <li><span class="gd-perm-name">${esc(l.license)}</span>
+          <span class="gd-mo">~${esc(String(l.leadTimeMonths || 0))} mo</span>
+          <small class="gd-perm-auth">${esc(l.authority || "")}</small></li>`).join("");
+      const cp = lic.criticalPathItem
+        ? `<p class="gd-cp"><strong>Start this first:</strong> ${esc(lic.criticalPathItem)} — usually about ${esc(String(lic.criticalPathMonths || 0))} months (${esc(lic.criticalPathAuthority || "")}). It takes the longest, so begin it early.</p>`
+        : "";
+      const candidates = (lp.candidates || []).map(n => `<span class="gd-chip">${esc(n)}</span>`).join("");
+      const risks = (b.risks || []).map(r => `
+        <li><span class="gd-risk-tag gd-risk--${riskSlug(r.level)}">${esc(r.level)}</span>
+          <span class="gd-risk-text">${esc(r.text)}</span></li>`).join("");
+      const geo = (b.geographical || []).map(g => `<li>${esc(g)}</li>`).join("");
+      const pol = (b.geopolitical || []).map(g => `<li>${esc(g)}</li>`).join("");
+
+      return `
+        <div class="gd-brief">
+          <details class="gd-acc" open>
+            <summary>Who approves it here</summary>
+            <div class="gd-acc-body">
+              <div class="gd-reg">${esc(a.abbrev || "")} — ${esc(a.name || "")}</div>
+              <p>${esc(a.role || "")}</p>
+              ${link}
+              ${env}
+            </div>
+          </details>
+          <details class="gd-acc">
+            <summary>Is it worth going in? <span class="gd-verdict gd-verdict--${verdictSlug(me.verdict)}">${esc(me.verdict || "")}</span></summary>
+            <div class="gd-acc-body">
+              <p>${esc(me.recommendation || "")}</p>
+              <p><strong>How much you can own:</strong> ${esc(me.foreignOwnership || "")}</p>
+              <p><strong>Simplest way in:</strong> ${esc(me.recommendedMode || "")}</p>
+            </div>
+          </details>
+          <details class="gd-acc">
+            <summary>Approvals &amp; how long they take</summary>
+            <div class="gd-acc-body">
+              ${cp}
+              <ul class="gd-permits">${permits || '<li class="muted">No approvals listed</li>'}</ul>
+            </div>
+          </details>
+          <details class="gd-acc">
+            <summary>Who can bring the cable ashore</summary>
+            <div class="gd-acc-body">
+              <div class="gd-chips">${candidates || '<span class="muted">No partners listed</span>'}</div>
+              ${lp.note ? `<p class="gd-note">${esc(lp.note)}</p>` : ""}
+            </div>
+          </details>
+          <details class="gd-acc">
+            <summary>What could go wrong here</summary>
+            <div class="gd-acc-body">
+              <ul class="gd-risks">${risks || '<li class="muted">No risks listed</li>'}</ul>
+            </div>
+          </details>
+          <details class="gd-acc">
+            <summary>Nature &amp; politics to plan around</summary>
+            <div class="gd-acc-body">
+              ${geo ? `<h6>Natural hazards</h6><ul class="gd-haz">${geo}</ul>` : ""}
+              ${pol ? `<h6>Political &amp; cross-border</h6><ul class="gd-haz">${pol}</ul>` : ""}
+            </div>
+          </details>
+        </div>`;
+    }
+
     // highlight the matching list row when something is selected
     function markActive(info) {
       stage.ownerDocument.querySelectorAll(".globe-item--click.is-active, .globe-station--click.is-active")
@@ -300,7 +397,8 @@
           <h4>${esc(info.name)}</h4>
           <div class="gd-sub">${esc(info.country)} · ${esc(info.lat.toFixed(1))}, ${esc(info.lon.toFixed(1))}</div>
           <div class="gd-count"><strong>${(info.cables || []).length}</strong> connected segment(s)</div>
-          <ul class="gd-links">${links || '<li class="muted">No segments</li>'}</ul>`;
+          <ul class="gd-links">${links || '<li class="muted">No segments</li>'}</ul>
+          ${briefingHTML(info)}`;
       } else {
         body = `
           <div class="gd-kind">Cable segment ${sdot(info.status)}${esc(statusLabel[info.status] || info.status)}</div>
