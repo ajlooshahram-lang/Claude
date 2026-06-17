@@ -154,6 +154,7 @@
     if (!s.gage || !s.gage.data) s.gage = defaultGage();
     if (!Array.isArray(s.cashflow)) s.cashflow = defaultCashflow();
     if (!s.xbarR || !s.xbarR.data) s.xbarR = defaultXbar();
+    if (!s.routeProgress || typeof s.routeProgress !== "object") s.routeProgress = {};
     return s;
   }
   function defaultWorkspace() {
@@ -695,6 +696,119 @@
     return issues;
   }
 
+  // ---- Route Progress (submarine-cable construction / GIS delivery tracking) ----
+  // Each cable segment from QIGlobe.CABLES tracks the real submarine-cable
+  // lifecycle through 7 phases plus an overall "% laid" (km completed). Data is
+  // persisted per project under s.routeProgress, keyed by cable id.
+  const ROUTE_PHASES = [
+    { key: "survey",   label: "Marine Route Survey",          abbr: "Survey" },
+    { key: "permit",   label: "Permitting & Landing Licence", abbr: "Permit" },
+    { key: "shore",    label: "Shore-end / HDD & Civil",      abbr: "Shore" },
+    { key: "lay",      label: "Cable Lay (main lay)",         abbr: "Lay" },
+    { key: "joint",    label: "Jointing / Splicing",          abbr: "Joint" },
+    { key: "otdr",     label: "OTDR & Commissioning Test",    abbr: "OTDR" },
+    { key: "handover", label: "Handover / Commissioned",      abbr: "Handover" }
+  ];
+  const ROUTE_STATUS = ["Not started", "In progress", "Complete"];
+
+  // The cable inventory comes from the (separately-loaded) globe module. Stay
+  // resilient when it is absent (e.g. the jsdom smoke run without globe data).
+  function routeCables() {
+    try {
+      if (root.QIGlobe && Array.isArray(root.QIGlobe.CABLES)) return root.QIGlobe.CABLES;
+    } catch (e) { /* ignore */ }
+    return [];
+  }
+  // Derive a sensible initial per-segment state from the cable's existing status.
+  function seedRouteEntry(cable) {
+    const phases = {};
+    ROUTE_PHASES.forEach(p => { phases[p.key] = "Not started"; });
+    let laidKm = 0;
+    const len = Number(cable.lengthKm) || 0;
+    if (cable.status === "commissioned") {
+      ROUTE_PHASES.forEach(p => { phases[p.key] = "Complete"; });
+      laidKm = len;                                   // 100% laid
+    } else if (cable.status === "in-progress") {
+      phases.survey = "Complete"; phases.permit = "Complete"; phases.shore = "Complete";
+      phases.lay = "In progress";                     // mid main-lay
+      laidKm = Math.round(len * 0.6);                 // ~60% laid
+    }
+    return { phases, laidKm };
+  }
+  // Getter — seeds any missing segments from QIGlobe.CABLES and back-fills phases.
+  function routeProgress() {
+    const s = get();
+    if (!s.routeProgress || typeof s.routeProgress !== "object") s.routeProgress = {};
+    const rp = s.routeProgress;
+    let changed = false;
+    routeCables().forEach(cable => {
+      if (!rp[cable.id]) { rp[cable.id] = seedRouteEntry(cable); changed = true; return; }
+      const e = rp[cable.id];
+      e.phases = e.phases || {};
+      ROUTE_PHASES.forEach(p => { if (ROUTE_STATUS.indexOf(e.phases[p.key]) < 0) { e.phases[p.key] = "Not started"; changed = true; } });
+      if (typeof e.laidKm !== "number") { e.laidKm = Number(e.laidKm) || 0; changed = true; }
+    });
+    if (changed) save();
+    return rp;
+  }
+  function routeEntry(cableId) {
+    const rp = routeProgress();
+    if (!rp[cableId]) { rp[cableId] = { phases: {}, laidKm: 0 }; ROUTE_PHASES.forEach(p => { rp[cableId].phases[p.key] = "Not started"; }); }
+    return rp[cableId];
+  }
+  function setRoutePhase(cableId, phaseKey, status) {
+    if (ROUTE_STATUS.indexOf(status) < 0) return null;
+    if (!ROUTE_PHASES.some(p => p.key === phaseKey)) return null;
+    const e = routeEntry(cableId);
+    e.phases[phaseKey] = status;
+    logAudit("Route phase", cableId, phaseKey + " \u2192 " + status);
+    save();
+    return e;
+  }
+  function setRouteLaidKm(cableId, km) {
+    const e = routeEntry(cableId);
+    e.laidKm = Math.max(0, Number(km) || 0);
+    logAudit("Route % laid", cableId, e.laidKm + " km");
+    save();
+    return e;
+  }
+  // Phase-weighted completion fraction (In progress counts as half).
+  function routePhaseFraction(entry) {
+    if (!entry || !entry.phases) return 0;
+    let done = 0;
+    ROUTE_PHASES.forEach(p => { const st = entry.phases[p.key]; if (st === "Complete") done += 1; else if (st === "In progress") done += 0.5; });
+    return done / ROUTE_PHASES.length;
+  }
+  // Blended overall progress (0..100): half phase-weighted, half physical km laid.
+  function routeOverall(cable, entry) {
+    const phaseFrac = routePhaseFraction(entry);
+    const len = Number(cable && cable.lengthKm) || 0;
+    const laidFrac = len ? Math.min(1, (Number(entry && entry.laidKm) || 0) / len) : 0;
+    return Math.round(((phaseFrac * 0.5) + (laidFrac * 0.5)) * 100);
+  }
+  // Programme-level rollup across every cable segment.
+  function routeRollup() {
+    const rp = routeProgress();
+    const cables = routeCables();
+    let totalKm = 0, laidKm = 0, commissioned = 0, inProgress = 0, planned = 0, overallSum = 0;
+    cables.forEach(c => {
+      const len = Number(c.lengthKm) || 0;
+      const e = rp[c.id] || { phases: {}, laidKm: 0 };
+      totalKm += len;
+      laidKm += Math.min(Number(e.laidKm) || 0, len);
+      if (c.status === "commissioned") commissioned++;
+      else if (c.status === "in-progress") inProgress++;
+      else planned++;
+      overallSum += routeOverall(c, e);
+    });
+    return {
+      segments: cables.length, totalKm, laidKm,
+      pctComplete: totalKm ? laidKm / totalKm : 0,
+      avgOverall: cables.length ? Math.round(overallSum / cables.length) : 0,
+      commissioned, inProgress, planned
+    };
+  }
+
   const API = { uid, seed, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
     undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete, togglePin, reorderPin,
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
@@ -705,7 +819,8 @@
     regRows, regAdd, regUpdate, regDelete, regLabel, regBulkDelete, regTogglePin, evm: () => C.evm(validCases(), get().project),
     gage, setGageCell, setGageConfig, gageResult, cashflow, setCashflow,
     xbar, setXbarCell, setXbarConfig, xbarResult, scorecard,
-    spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy };
+    spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy,
+    ROUTE_PHASES, ROUTE_STATUS, routeProgress, setRoutePhase, setRouteLaidKm, routeOverall, routePhaseFraction, routeRollup };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -544,3 +544,41 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .country-section ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:13px;line-height:1.45}
 .country-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media (max-width:640px){.country-cols{grid-template-columns:1fr}}
+
+/* ---- Route Progress (submarine-cable construction tracking) ---- */
+.route-legend{display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin:4px 2px 14px;font-size:12.5px;color:var(--muted)}
+.route-legend .rp-key{display:inline-flex;align-items:center;gap:7px}
+.route-legend .rp-key-hint{margin-left:auto;font-size:12px;color:var(--muted);font-style:italic}
+.rp-swatch{width:13px;height:13px;border-radius:4px;display:inline-block;border:1px solid rgba(125,167,240,.25)}
+.route-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px}
+.route-seg{display:flex;flex-direction:column;gap:10px}
+.route-seg-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.route-seg-name{display:block;font-weight:700;line-height:1.3}
+.route-seg-route{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.route-badge{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.route-badge.route-commissioned{background:rgba(66,214,164,.16);color:#1d8f6c}
+.route-badge.route-in-progress{background:rgba(78,161,255,.16);color:#2f6fc0}
+.route-badge.route-planned{background:rgba(230,184,74,.18);color:#9a7715}
+.route-seg-meta{display:flex;flex-wrap:wrap;gap:12px;font-size:11.5px;color:var(--muted)}
+.route-seg-meta .route-seg-id{margin-left:auto;font-family:ui-monospace,Menlo,Consolas,monospace}
+.rp-strip{display:flex;gap:5px}
+.rp-cell{flex:1;border:1px solid var(--line);border-radius:7px;padding:8px 4px;cursor:pointer;background:var(--card);
+  font:inherit;text-align:center;transition:transform .08s ease,box-shadow .12s ease}
+.rp-cell:hover{transform:translateY(-1px);box-shadow:0 3px 10px rgba(0,0,0,.12)}
+.rp-cell:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.rp-cell-lab{display:block;font-size:10px;font-weight:600;letter-spacing:.02em}
+.rp-cell.rp-not{background:#eef2f8;color:#7e90b3}
+.rp-cell.rp-prog{background:rgba(78,161,255,.18);color:#2f6fc0;border-color:rgba(78,161,255,.4)}
+.rp-cell.rp-done{background:rgba(66,214,164,.2);color:#1d8f6c;border-color:rgba(66,214,164,.45)}
+.rp-swatch.rp-not{background:#eef2f8}
+.rp-swatch.rp-prog{background:rgba(78,161,255,.6)}
+.rp-swatch.rp-done{background:rgba(66,214,164,.7)}
+.route-seg-foot{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:2px}
+.route-laid{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:7px}
+.route-laid select{max-width:90px}
+.route-overall{display:flex;align-items:center;gap:8px;flex:1;justify-content:flex-end}
+.route-overall-lab{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+[data-theme="dark"] .rp-cell.rp-not{background:rgba(125,167,240,.08);color:#9fb0cf}
+[data-theme="dark"] .route-badge.route-commissioned{color:#42d6a4}
+[data-theme="dark"] .route-badge.route-in-progress{color:#7da7f0}
+[data-theme="dark"] .route-badge.route-planned{color:#e6b84a}

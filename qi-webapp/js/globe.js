@@ -265,6 +265,7 @@
 
       // Submarine cables — curved arcs lifted off the surface + flowing pulses.
       var pulses = [];
+      var cableTubes = [];   // keep tube materials so progress can recolour them later
       CABLES.forEach(function (cab) {
         var a = STATION_BY_ID[cab.from], b = STATION_BY_ID[cab.to];
         var start = latLonToVec3(a.lat, a.lon, GLOBE_R * 1.01);
@@ -282,6 +283,7 @@
         var tube = new THREE.Mesh(tubeGeo, tubeMat);
         world.add(tube);
         disposables.push(tubeGeo, tubeMat);
+        cableTubes.push({ id: cab.id, cable: cab, mat: tubeMat, baseHex: col });
 
         // Flowing light pulse travelling along the cable.
         var pGeo = new THREE.SphereGeometry(0.04, 12, 12);
@@ -378,9 +380,13 @@
       state = {
         renderer: renderer, scene: scene, camera: camera, world: world,
         disposables: disposables, el: el, ro: ro, containerEl: containerEl,
+        cableTubes: cableTubes,
         listeners: { onPointerDown: onPointerDown, onPointerMove: onPointerMove, onPointerUp: onPointerUp, onWheel: onWheel, resize: resize },
         stop: function () { alive = false; if (raf) window.cancelAnimationFrame(raf); }
       };
+
+      // Best-effort: reflect any saved route progress on first mount.
+      try { setProgress(); } catch (e) {}
 
       // Only drive the loop when frames are actually available (not in jsdom).
       if (typeof window.requestAnimationFrame === "function") {
@@ -395,6 +401,47 @@
       if (window.console && console.warn) console.warn("QIGlobe init failed:", err && err.message);
       return false;
     }
+  }
+
+  /* ----------------------------------------------------------- progress --- */
+  // Recolour each cable tube by its construction progress (0..100). Accepts an
+  // explicit { cableId: percent } map; when omitted it reads QIStore.routeProgress()
+  // if that module is available. Fully guarded — a no-op when the globe is not
+  // mounted (e.g. the jsdom smoke run) or when no progress data exists.
+  function progressColor(THREE, pct) {
+    // amber (0%) -> blue (50%) -> green (100%)
+    var p = Math.max(0, Math.min(100, Number(pct) || 0)) / 100;
+    var amber = new THREE.Color(0xe6b84a), blue = new THREE.Color(0x4ea1ff), green = new THREE.Color(0x42d6a4);
+    var c = new THREE.Color();
+    if (p < 0.5) c.copy(amber).lerp(blue, p / 0.5);
+    else c.copy(blue).lerp(green, (p - 0.5) / 0.5);
+    return c;
+  }
+  function setProgress(map) {
+    if (!state || !state.cableTubes || typeof window.THREE === "undefined") return false;
+    var THREE = window.THREE;
+    // Derive a percent map from the store when none is supplied.
+    if (!map && window.QIStore && typeof window.QIStore.routeProgress === "function") {
+      try {
+        var rp = window.QIStore.routeProgress();
+        map = {};
+        CABLES.forEach(function (c) {
+          var e = rp[c.id];
+          if (!e) return;
+          map[c.id] = (typeof window.QIStore.routeOverall === "function")
+            ? window.QIStore.routeOverall(c, e)
+            : (c.lengthKm ? Math.round((Number(e.laidKm) || 0) / c.lengthKm * 100) : 0);
+        });
+      } catch (e) { map = null; }
+    }
+    if (!map) return false;
+    state.cableTubes.forEach(function (t) {
+      if (!t.mat) return;
+      if (Object.prototype.hasOwnProperty.call(map, t.id)) {
+        try { t.mat.color = progressColor(THREE, map[t.id]); t.mat.needsUpdate = true; } catch (e) {}
+      }
+    });
+    return true;
   }
 
   /* -------------------------------------------------------------- dispose --- */
@@ -432,6 +479,7 @@
   window.QIGlobe = {
     init: init,
     dispose: dispose,
+    setProgress: setProgress,
     isSupported: function () { return typeof window.THREE !== "undefined" && hasWebGL(); },
     STATIONS: STATIONS,
     CABLES: CABLES,

@@ -58,6 +58,55 @@ ok(window.QIGlobe.init(doc.getElementById("globeStage")) === false, "QIGlobe.ini
 doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(true, "navigating away from globe3d disposes cleanly");
 
+// 2c) Route Progress view — KPIs, per-segment tracking, phase cycling, % laid persist
+const RPS = window.QIStore;
+RPS.reset();
+ok(typeof RPS.routeProgress === "function", "QIStore exposes routeProgress()");
+const RP0 = RPS.routeProgress();
+ok(RP0 && typeof RP0 === "object" && Object.keys(RP0).length === window.QIGlobe.CABLES.length,
+  "routeProgress() seeds an entry per cable segment (" + Object.keys(RP0).length + ")");
+ok(window.QIGlobe.CABLES.every(c => RP0[c.id] && RP0[c.id].phases && Array.isArray(RPS.ROUTE_PHASES) &&
+  RPS.ROUTE_PHASES.every(p => typeof RP0[c.id].phases[p.key] === "string")), "every seeded entry has all 7 lifecycle phases");
+ok(RPS.ROUTE_PHASES.length === 7, "7 submarine-cable lifecycle phases defined");
+// commissioned segments seed to 100% laid; planned segments seed to 0
+const commCable = window.QIGlobe.CABLES.find(c => c.status === "commissioned");
+const planCable = window.QIGlobe.CABLES.find(c => c.status === "planned");
+ok(RP0[commCable.id].laidKm === commCable.lengthKm, "commissioned segment seeds to 100% laid");
+ok(RP0[planCable.id].laidKm === 0, "planned segment seeds to 0% laid");
+// navigate to the view
+doc.querySelector('.nav-item[data-view="routeprogress"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const rpHtml = doc.getElementById("content").innerHTML;
+ok(/Overall % Complete/.test(rpHtml) && /Km Completed/.test(rpHtml), "Route Progress view renders KPI row");
+ok(doc.querySelectorAll(".kpi").length >= 6, "Route Progress KPI row has 6 metrics");
+ok(doc.querySelectorAll(".route-seg").length === window.QIGlobe.CABLES.length,
+  "Route Progress lists every cable segment (" + doc.querySelectorAll(".route-seg").length + ")");
+ok(doc.querySelectorAll("[data-rp-phase]").length === window.QIGlobe.CABLES.length * 7, "renders a 7-phase strip per segment");
+ok(doc.querySelector("#chRoute") != null, "Route Progress renders the programme rollup chart");
+// click-only: no free-text/number inputs in the view
+let rpFreeText = 0;
+doc.querySelectorAll("#content input").forEach(inp => { const t = (inp.getAttribute("type") || "text").toLowerCase(); if (t === "text" || t === "number") rpFreeText++; });
+ok(rpFreeText === 0, "Route Progress view has no free-text/number inputs (click-only)");
+// phase cycling persists
+const phaseCell = doc.querySelector("[data-rp-phase]");
+const pcCable = phaseCell.dataset.cable, pcPhase = phaseCell.dataset.phase;
+const cycleMap = { "Not started": "In progress", "In progress": "Complete", "Complete": "Not started" };
+const beforePhase = RPS.routeProgress()[pcCable].phases[pcPhase];
+phaseCell.dispatchEvent(new window.Event("click", { bubbles: true }));
+const afterPhase = RPS.routeProgress()[pcCable].phases[pcPhase];
+ok(afterPhase === cycleMap[beforePhase], "phase cell click cycles & persists status (" + beforePhase + " -> " + afterPhase + ")");
+// % laid dropdown persists (convert percentage to km against segment length)
+doc.querySelector('.nav-item[data-view="routeprogress"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const kmSel = Array.from(doc.querySelectorAll("[data-rp-km]")).find(s => s.dataset.cable === planCable.id);
+const beforeKm = RPS.routeProgress()[planCable.id].laidKm;
+kmSel.value = "50%"; kmSel.dispatchEvent(new window.Event("change", { bubbles: true }));
+const afterKm = RPS.routeProgress()[planCable.id].laidKm;
+ok(afterKm === Math.round(planCable.lengthKm * 0.5) && afterKm !== beforeKm,
+  "% laid dropdown sets km and persists (" + beforeKm + " -> " + afterKm + ")");
+ok(typeof window.QIGlobe.setProgress === "function" && window.QIGlobe.setProgress({ "STP-T1": 100 }) === false,
+  "QIGlobe.setProgress is exposed and no-throws/returns false when globe is not mounted");
+RPS.reset();
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+
 // 3) data integrity via exposed globals
 const S = window.QIStore;
 const C = window.QICalc;

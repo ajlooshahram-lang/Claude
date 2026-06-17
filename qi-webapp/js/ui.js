@@ -74,6 +74,7 @@
     { id: "budget", label: "Budget", icon: "$" },
     { g: "Visualization" },
     { id: "globe3d", label: "3D Network Map", icon: "🌐" },
+    { id: "routeprogress", label: "Route Progress", icon: "📡" },
     { g: "Intelligence" },
     { id: "country", label: "Country Intelligence", icon: "🗺" },
     { id: "ai", label: "AI Assistant", icon: "✦" },
@@ -222,6 +223,143 @@
     } else {
       if (fb) fb.style.display = "";
       if (hint) hint.style.display = "none";
+    }
+  };
+
+  // Route Progress — submarine-cable construction tracking (GIS delivery view).
+  // Tracks each cable segment through the 7 real lifecycle phases plus % laid.
+  RENDER.routeprogress = function () {
+    const G = window.QIGlobe || {};
+    const cables = Array.isArray(G.CABLES) ? G.CABLES : [];
+    const stations = Array.isArray(G.STATIONS) ? G.STATIONS : [];
+    const PH = S.ROUTE_PHASES || [];
+    const stName = {}; stations.forEach(s => { stName[s.id] = s.name; });
+    const statusLabel = { "commissioned": "Commissioned", "in-progress": "In progress", "planned": "Planned" };
+    const phaseCls = { "Not started": "rp-not", "In progress": "rp-prog", "Complete": "rp-done" };
+    const fmtKm = n => (Number(n) || 0).toLocaleString() + " km";
+
+    if (!cables.length) {
+      return `<div class="card empty-cta">
+          <h2>No cable segments to track yet</h2>
+          <p>Route Progress tracks each submarine-cable segment through its construction lifecycle.
+             The cable inventory is provided by the 3D Network Map — once it is available, every
+             segment will appear here with a 7-phase delivery strip and a % laid control.</p>
+        </div>`;
+    }
+
+    const r = S.routeRollup();
+    const rp = S.routeProgress();
+    const kpi = (cls, label, val) => `<div class="kpi ${cls}"><div class="label">${label}</div><div class="value">${val}</div></div>`;
+    const kpis = `
+      <div class="grid kpis" style="margin-bottom:16px">
+        ${kpi("navy", "Total Route", fmtKm(r.totalKm))}
+        ${kpi("blue", "Km Completed", fmtKm(r.laidKm))}
+        ${kpi("teal", "Overall % Complete", pct(r.pctComplete))}
+        ${kpi("green", "Commissioned", r.commissioned)}
+        ${kpi("gold", "In Progress", r.inProgress)}
+        ${kpi("red", "Planned", r.planned)}
+      </div>`;
+
+    // % laid options as a curated dropdown (click-only): 0,10,…,100.
+    const pctVals = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+
+    const cards = cables.map(c => {
+      const e = rp[c.id] || { phases: {}, laidKm: 0 };
+      const overall = S.routeOverall(c, e);
+      const len = Number(c.lengthKm) || 0;
+      const laidPct = len ? Math.round((Number(e.laidKm) || 0) / len * 100) : 0;
+      // snap current laid% to the nearest 10 for the dropdown selection
+      const laidPctSnap = Math.round(laidPct / 10) * 10;
+      const fromTo = `${esc(stName[c.from] || c.from)} \u2192 ${esc(stName[c.to] || c.to)}`;
+
+      const strip = PH.map(p => {
+        const st = (e.phases && e.phases[p.key]) || "Not started";
+        return `<button type="button" class="rp-cell ${phaseCls[st] || "rp-not"}"
+            data-rp-phase data-cable="${esc(c.id)}" data-phase="${esc(p.key)}"
+            title="${esc(p.label)}: ${esc(st)} — click to advance" aria-label="${esc(p.label)}: ${esc(st)}">
+            <span class="rp-cell-lab">${esc(p.abbr)}</span></button>`;
+      }).join("");
+
+      return `
+        <div class="route-seg card" data-cable="${esc(c.id)}">
+          <div class="route-seg-head">
+            <div>
+              <span class="route-seg-name">${esc(c.name)}</span>
+              <span class="route-seg-route">${fromTo}</span>
+            </div>
+            <span class="route-badge route-${c.status}">${esc(statusLabel[c.status] || c.status)}</span>
+          </div>
+          <div class="route-seg-meta">
+            <span>${fmtKm(c.lengthKm)}</span>
+            <span>${esc(String(c.capacityTbps))} Tbps</span>
+            <span>${esc(String(c.fibrePairs))} fibre pairs</span>
+            <span class="route-seg-id">${esc(c.id)}</span>
+          </div>
+          <div class="rp-strip" role="group" aria-label="Construction phases">${strip}</div>
+          <div class="route-seg-foot">
+            <label class="route-laid">% laid
+              <select data-rp-km data-cable="${esc(c.id)}">
+                ${opts(pctVals.map(v => v + "%"), laidPctSnap + "%")}
+              </select>
+            </label>
+            <div class="route-overall">
+              <span class="route-overall-lab">Overall</span>
+              ${barCell(overall / 100)}
+            </div>
+          </div>
+        </div>`;
+    }).join("");
+
+    return `
+      ${kpis}
+      <div class="card">
+        <div class="card-head"><h3>Programme rollup — % complete by segment</h3></div>
+        <div class="chart-box"><canvas id="chRoute"></canvas></div>
+      </div>
+      <div class="route-legend">
+        <span class="rp-key"><span class="rp-swatch rp-not"></span>Not started</span>
+        <span class="rp-key"><span class="rp-swatch rp-prog"></span>In progress</span>
+        <span class="rp-key"><span class="rp-swatch rp-done"></span>Complete</span>
+        <span class="rp-key-hint">Click a phase cell to advance: Not started → In progress → Complete</span>
+      </div>
+      <div class="route-grid">${cards}</div>`;
+  };
+  AFTER.routeprogress = function () {
+    const G = window.QIGlobe || {};
+    const cables = Array.isArray(G.CABLES) ? G.CABLES : [];
+    if (!cables.length) return;
+
+    // phase-cell cycling (click-only): Not started → In progress → Complete → …
+    const cycle = { "Not started": "In progress", "In progress": "Complete", "Complete": "Not started" };
+    content.querySelectorAll("[data-rp-phase]").forEach(btn => btn.addEventListener("click", () => {
+      const rp = S.routeProgress();
+      const e = rp[btn.dataset.cable] || { phases: {} };
+      const cur = (e.phases && e.phases[btn.dataset.phase]) || "Not started";
+      S.setRoutePhase(btn.dataset.cable, btn.dataset.phase, cycle[cur] || "In progress");
+      go("routeprogress");
+    }));
+
+    // % laid dropdown — converts the chosen percentage to km against segment length
+    content.querySelectorAll("[data-rp-km]").forEach(sel => sel.addEventListener("change", () => {
+      const id = sel.dataset.cable;
+      const cab = cables.find(c => c.id === id);
+      const len = Number(cab && cab.lengthKm) || 0;
+      const p = parseInt(String(sel.value).replace(/[^0-9]/g, ""), 10) || 0;
+      S.setRouteLaidKm(id, Math.round(len * p / 100));
+      go("routeprogress");
+    }));
+
+    // programme rollup chart — % complete per segment
+    const rp = S.routeProgress();
+    const labels = cables.map(c => c.id);
+    const data = cables.map(c => S.routeOverall(c, rp[c.id] || { phases: {}, laidKm: 0 }));
+    if (typeof CH !== "undefined" && CH && typeof CH.bar === "function") {
+      try { CH.bar("chRoute", labels, data, "% complete"); } catch (e) { /* chart optional */ }
+    }
+
+    // best-effort: tint the 3D globe cables by progress if it happens to be live
+    if (window.QIGlobe && typeof window.QIGlobe.setProgress === "function") {
+      try { window.QIGlobe.setProgress(); } catch (e) { /* globe optional */ }
     }
   };
 
