@@ -177,8 +177,19 @@ async function main() {
   // 5) after boot, reveal the app and hide the (unused) login gate
   const reveal =
     "<script>(function(){\n" +
+    "  // Reveal immediately (scripts above already ran synchronously)\n" +
     "  var g = document.getElementById('authGate'); if (g) g.style.display = 'none';\n" +
     "  var a = document.getElementById('app'); if (a) a.hidden = false;\n" +
+    "  // Safety net: if QIBoot didn't fire within 2s, show an error message\n" +
+    "  setTimeout(function(){\n" +
+    "    var c = document.getElementById('content');\n" +
+    "    if (c && !c.innerHTML.trim()) {\n" +
+    "      c.innerHTML = '<div style=\"padding:40px;text-align:center;color:#ff6b6b;font-size:16px\">' +\n" +
+    "        '<h2>Something went wrong</h2>' +\n" +
+    "        '<p>The app failed to start. Please open the browser console (F12 > Console) and share any red error messages.</p>' +\n" +
+    "        '<p style=\"color:#94a0bc;font-size:13px\">If you see nothing in the console, try a different browser (Chrome or Edge recommended).</p></div>';\n" +
+    "    }\n" +
+    "  }, 2000);\n" +
     "})();</script>\n" + ATTRACT_JS;
 
   // 6) replace the entire original <script ...> tail with our inlined blocks
