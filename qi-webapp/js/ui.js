@@ -1294,36 +1294,36 @@
           </div>`).join("")}</div>
       </div>` : "";
     $("#brainOut").innerHTML = `
-      <div class="card"><div class="card-head"><h3>Analysis — ${esc(s.title)}</h3>
-        <span class="tag">${esc(s.domainLabel)} · ${Math.round(plan.coverage.confidence * 100)}% confidence</span></div>
-        <p class="muted">${scaleBits.length ? "Detected scale: " + esc(scaleBits.join(" · ")) : "No explicit scale detected."}</p>
+      <div class="card"><div class="card-head"><h3>Your Project Plan — ${esc(s.title)}</h3>
+        <span class="tag">${esc(s.domainLabel)} · ${Math.round(plan.coverage.confidence * 100)}% match</span></div>
+        <p class="muted">${scaleBits.length ? "What we detected: " + esc(scaleBits.join(" · ")) : "No specific scale detected — the plan uses conservative defaults."}</p>
         ${warn}
         <div class="kpi-row" style="display:flex;gap:12px;flex-wrap:wrap;margin:8px 0">
-          ${kpi("navy", "Phases", plan.phases.length)}
-          ${kpi("navy", "Tasks", plan.cases.length)}
-          ${kpi("navy", "Risks", plan.risks.length)}
-          ${kpi("navy", "Milestones", plan.milestones.length)}
-          ${kpi("navy", "Est. budget", money(plan.budget.total))}
+          ${kpi("navy", "Steps to complete", plan.phases.length + " phases")}
+          ${kpi("navy", "Tasks created", plan.cases.length)}
+          ${kpi("navy", "Things that could go wrong", plan.risks.length)}
+          ${kpi("navy", "Key deadlines", plan.milestones.length)}
+          ${kpi("navy", "Estimated cost", money(plan.budget.total))}
         </div>
         <div class="toolbar">
           ${created
             ? `<button class="btn btn-primary" id="brainOpenDash" type="button">✓ Project “${esc(created)}” created — Open Dashboard</button>
-               <span class="muted">Created ${plan.cases.length + plan.risks.length} cases, ${plan.milestones.length} milestones and ${plan.procurement.length} procurement items.</span>`
-            : `<button class="btn btn-primary" id="brainApply">Apply plan to active project</button>
-               <span class="muted">Adds ${plan.cases.length + plan.risks.length} cases, ${plan.milestones.length} milestones and ${plan.procurement.length} procurement items.</span>`}
+               <span class="muted">Created ${plan.cases.length + plan.risks.length} items, ${plan.milestones.length} deadlines and ${plan.procurement.length} things to buy.</span>`
+            : `<button class="btn btn-primary" id="brainApply">Use this plan</button>
+               <span class="muted">Adds ${plan.cases.length + plan.risks.length} items, ${plan.milestones.length} deadlines and ${plan.procurement.length} things to buy.</span>`}
         </div>
       </div>
       <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="card"><h3>Work breakdown</h3>${tableWrap("<th>Phase</th><th>Owner</th><th>Tasks</th>", phaseRows)}</div>
-        <div class="card"><h3>Top risks (FMEA RPN)</h3>${tableWrap("<th class='wrap'>Risk</th><th>S</th><th>O</th><th>D</th><th>RPN</th>", riskRows)}</div>
+        <div class="card"><h3 aria-label="Work breakdown">What needs to happen</h3>${tableWrap("<th>Phase</th><th>Who</th><th>Tasks</th>", phaseRows)}</div>
+        <div class="card"><h3 aria-label="Top risks">What could go wrong</h3>${tableWrap("<th class='wrap'>Risk</th><th>Severity</th><th>Likelihood</th><th>Detection</th><th>Score</th>", riskRows)}</div>
       </div>
-      <div class="card"><h3>Budget skeleton</h3>${tableWrap("<th>Category</th><th class='right'>Estimate</th>", budgetRows)}</div>
+      <div class="card"><h3>How much it might cost</h3>${tableWrap("<th>Category</th><th class='right'>Estimate</th>", budgetRows)}</div>
       ${intelSection}
-      <div class="card"><h3>Suggested roles</h3><p>${plan.roles.map(r => `<span class="badge">${esc(r)}</span>`).join(" ")}</p></div>`;
+      <div class="card"><h3>Who you'll need on the team</h3><p>${plan.roles.map(r => `<span class="badge">${esc(r)}</span>`).join(" ")}</p></div>`;
     const applyBtn = $("#brainApply");
     if (applyBtn) applyBtn.addEventListener("click", () => {
       const n = applyBrainPlan(plan);
-      toast(`Applied: ${n} cases, ${plan.milestones.length} milestones, ${plan.procurement.length} procurement items.`);
+      toast(`Applied: ${n} items, ${plan.milestones.length} deadlines, ${plan.procurement.length} things to buy.`);
       go("dashboard");
     });
     const openDash = $("#brainOpenDash");
