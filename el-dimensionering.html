@@ -932,7 +932,8 @@ const T = {
       fire: '\uD83D\uDD25 Brandalarm',
       watchdog: '\uD83D\uDC15 Vagthund',
       lcc: '\uD83D\uDCCA LCC-analyse',
-      maint: '\uD83D\uDD27 Vedligehold'
+      maint: '\uD83D\uDD27 Vedligehold',
+      afdd: '\uD83D\uDD25 Gnistdetektor'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1053,7 +1054,8 @@ const T = {
       fire: '\uD83D\uDD25 Fire Alarm',
       watchdog: '\uD83D\uDC15 Watchdog',
       lcc: '\uD83D\uDCCA LCC Analysis',
-      maint: '\uD83D\uDD27 Maintenance'
+      maint: '\uD83D\uDD27 Maintenance',
+      afdd: '\uD83D\uDD25 Arc Fault (AFDD)'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -2394,6 +2396,7 @@ function renderModule(mod) {
     case 'watchdog': content += renderWatchdog(); break;
     case 'lcc': content += renderLCC(); break;
     case 'maint': content += renderMaint(); break;
+    case 'afdd': content += renderAfdd(); break;
     case 'home': content += renderDashboard(); break;
     case 'exam': content = renderExam(); break;
   }
@@ -18416,6 +18419,77 @@ function plcModbusWrite(slave, reg, val){
   var c=crc16(f); f.push(c&0xFF); f.push((c>>8)&0xFF);
   var hex=f.map(function(b){return ('0'+b.toString(16)).slice(-2).toUpperCase();}).join(' ');
   plcSerialSend(hex);
+}
+
+// ===== AFDD / ARC FAULT DETECTION DEVICE ADVISOR (DS/HD 60364-4-42 §421.7) =====
+let afddState = { building:'dwelling', sleeping:false, woodStruct:false, irreplaceable:false, fireHazard:false, elderly:false };
+function renderAfdd(){
+  const da=lang==='da', s=afddState;
+  // Risk scoring per IEC/DS-HD 60364-4-42 §421.7 (AFDD recommended where arc faults pose fire risk)
+  var risk=0, reasons=[];
+  var BLD={dwelling:{da:'Bolig',en:'Dwelling',base:2},hotel:{da:'Hotel/overnatning',en:'Hotel/accommodation',base:3},care:{da:'Plejehjem/institution',en:'Care home/institution',base:3},school:{da:'Skole/daginstitution',en:'School/daycare',base:2},office:{da:'Kontor',en:'Office',base:1},museum:{da:'Museum/kulturarv',en:'Museum/heritage',base:3},barn:{da:'Lade/landbrug (br\u00e6ndbart)',en:'Barn/agriculture (combustible)',base:4},wooden:{da:'Tr\u00e6bygning (BR-klasse)',en:'Timber building',base:4}};
+  var bld=BLD[s.building]||BLD.dwelling;
+  risk+=bld.base;
+  if(s.sleeping){risk+=3;reasons.push({da:'Soverum / personer der sover',en:'Sleeping accommodation'});}
+  if(s.woodStruct){risk+=3;reasons.push({da:'Br\u00e6ndbar bygningskonstruktion (tr\u00e6)',en:'Combustible building structure (timber)'});}
+  if(s.irreplaceable){risk+=2;reasons.push({da:'Uerstattelige v\u00e6rdier (kulturarv, arkiv)',en:'Irreplaceable goods (heritage, archive)'});}
+  if(s.fireHazard){risk+=3;reasons.push({da:'Br\u00e6ndbare materialer / br\u00e6ndbart lager',en:'Combustible materials / storage'});}
+  if(s.elderly){risk+=2;reasons.push({da:'S\u00e5rbare personer (\u00e6ldre, b\u00f8rn, handicap)',en:'Vulnerable persons (elderly, children, disabled)'});}
+
+  var verdict, vColor, vIcon;
+  if(risk>=6){verdict=da?'AFDD ST\u00c6RKT P\u00c5KR\u00c6VET':'AFDD STRONGLY REQUIRED';vColor='var(--danger)';vIcon='\uD83D\uDD34';}
+  else if(risk>=4){verdict=da?'AFDD ANBEFALES KRAFTIGT':'AFDD STRONGLY RECOMMENDED';vColor='#ff8c42';vIcon='\uD83D\uDFE0';}
+  else if(risk>=2){verdict=da?'AFDD ANBEFALES':'AFDD RECOMMENDED';vColor='#ffd166';vIcon='\uD83D\uDFE1';}
+  else {verdict=da?'AFDD VALGFRI (god praksis)':'AFDD OPTIONAL (good practice)';vColor='var(--success)';vIcon='\uD83D\uDFE2';}
+
+  let html='<div class="card fade-in"><div class="card-title">\uD83D\uDD25 '+(da?'Gnistdetektor (AFDD) \u2014 DS/HD 60364-4-42 \u00A7421.7':'Arc Fault Detection (AFDD) \u2014 DS/HD 60364-4-42 \u00A7421.7')+'</div>';
+  html+='<div class="info-row">'+(da?'En AFDD (Arc Fault Detection Device) opdager seriel og parallel lysbuefejl i ledninger \u2014 en hyppig \u00e5rsag til elbrande som HPFI og automatsikringer IKKE fanger. Vurder behovet for dit projekt herunder.':'An AFDD detects series and parallel arc faults in wiring \u2014 a frequent cause of electrical fires that RCDs and circuit breakers do NOT catch. Assess the need for your project below.')+'</div>';
+
+  // Building type
+  html+='<div class="select-group"><div class="select-label">'+(da?'Bygningstype':'Building type')+'</div><div class="select-grid">';
+  Object.keys(BLD).forEach(function(k){ html+='<button class="sel-btn '+(s.building===k?'selected':'')+'" onclick="afddState.building=\''+k+'\';renderModule(\'afdd\')">'+(da?BLD[k].da:BLD[k].en)+'</button>'; });
+  html+='</div></div>';
+
+  // Risk factors (toggle)
+  html+='<div class="select-group"><div class="select-label">'+(da?'Risikofaktorer (klik for at v\u00e6lge)':'Risk factors (click to select)')+'</div><div class="select-grid">';
+  var factors=[{k:'sleeping',da:'Soverum',en:'Sleeping areas'},{k:'woodStruct',da:'Tr\u00e6konstruktion',en:'Timber structure'},{k:'irreplaceable',da:'Uerstattelige v\u00e6rdier',en:'Irreplaceable goods'},{k:'fireHazard',da:'Br\u00e6ndbart lager',en:'Combustible storage'},{k:'elderly',da:'S\u00e5rbare personer',en:'Vulnerable persons'}];
+  factors.forEach(function(f){ html+='<button class="sel-btn '+(s[f.k]?'selected':'')+'" onclick="afddState.'+f.k+'=!afddState.'+f.k+';renderModule(\'afdd\')">'+(s[f.k]?'\u2713 ':'')+(da?f.da:f.en)+'</button>'; });
+  html+='</div></div></div>';
+
+  // Verdict
+  html+='<div class="card fade-in"><div class="card-title">'+(da?'Vurdering':'Assessment')+'</div>';
+  html+='<div class="result-box" style="border-color:'+vColor+'"><div class="result-title" style="color:'+vColor+';font-size:1.15em">'+vIcon+' '+verdict+'</div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Risikoscore':'Risk score')+'</span><span class="value" style="font-weight:800;color:'+vColor+'">'+risk+'/15</span></div>';
+  if(reasons.length>0){ html+='<div style="padding:6px 2px"><strong>'+(da?'Begrundelse:':'Reasons:')+'</strong></div>'; reasons.forEach(function(r){ html+='<div class="result-row"><span class="label">\u2022 '+(da?r.da:r.en)+'</span></div>'; }); }
+  html+='<div class="result-row"><span class="label">'+(da?'Standard':'Standard')+'</span><span class="value">DS/HD 60364-4-42 \u00A7421.7</span></div></div>';
+
+  // Which circuits
+  html+='<div class="result-box" style="background:var(--primary-glow);border-color:var(--primary-light)"><div class="result-title">'+(da?'Hvilke kredse?':'Which circuits?')+'</div>';
+  html+='<div style="padding:6px 2px;line-height:1.6">'+(da?'AFDD anbefales is\u00e6r p\u00e5 <strong>1-faset endegrupper \u2264 16 A</strong> til stikkontakter og belysning i risikoomr\u00e5der. Typisk: soverum, opholdsrum, og kredse i br\u00e6ndbare konstruktioner. AFDD\u2019en placeres i tavlen i serie med kredsens beskyttelse.':'AFDD is recommended especially on <strong>single-phase final circuits \u2264 16 A</strong> for sockets and lighting in risk areas. Typically: bedrooms, living areas, and circuits in combustible structures. The AFDD is placed in the panel in series with the circuit protection.')+'</div></div>';
+
+  // Product type
+  html+='<div class="result-box"><div class="result-title">'+(da?'Produktvalg (verificeret til DK)':'Product selection (verified for DK)')+'</div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Anbefalet':'Recommended')+'</span><span class="value">AFDD + RCBO '+(da?'(kombineret: lysbue + overstr\u00f8m + fejlstr\u00f8m)':'(combined: arc + overcurrent + earth fault)')+'</span></div>';
+  html+='<div class="result-row"><span class="label">Schneider</span><span class="value">Acti9 iARC + iC60 / Resi9</span></div>';
+  html+='<div class="result-row"><span class="label">ABB</span><span class="value">S-ARC1 / DS-ARC1</span></div>';
+  html+='<div class="result-row"><span class="label">Hager</span><span class="value">ARC900-serien</span></div>';
+  html+='<div class="result-row"><span class="label">Siemens</span><span class="value">5SM6 AFDD</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Standard for AFDD':'AFDD standard')+'</span><span class="value">IEC 62606</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Modulbredde':'Module width')+'</span><span class="value">'+(da?'2 moduler (AFDD+MCB) eller 3 (AFDD+RCBO)':'2 modules (AFDD+MCB) or 3 (AFDD+RCBO)')+'</span></div></div>';
+
+  // Warning + animated arc SVG
+  html+='<div class="result-box warning"><div class="result-title">\u26A0\uFE0F '+(da?'Hvorfor det betyder noget':'Why it matters')+'</div><div style="padding:6px 2px;line-height:1.5">'+(da?'Serielle lysbuefejl (l\u00f8se forbindelser, knuste ledere) skaber temperaturer over 1000\u00b0C uden at udl\u00f8se HPFI eller automatsikring \u2014 fordi str\u00f8mmen ikke \u00f8ges. Lysbuen antænder is\u00f8lering og st\u00f8v. AFDD\u2019en m\u00e5ler lysbuens karakteristiske h\u00f8jfrekvente \u201dsignatur\u201d og afbryder. Kilde til mange uforklarede elbrande.':'Series arc faults (loose connections, crushed conductors) create temperatures above 1000\u00b0C without tripping the RCD or breaker \u2014 because current does not increase. The arc ignites insulation and dust. The AFDD detects the arc\u2019s characteristic high-frequency signature and disconnects. A source of many unexplained electrical fires.')+'</div></div>';
+  // arc visualization
+  var svg='<svg viewBox="0 0 400 110" width="100%" style="background:#05101c;border-radius:8px;margin-top:8px" xmlns="http://www.w3.org/2000/svg">';
+  svg+='<line x1="20" y1="55" x2="175" y2="55" stroke="#8B4513" stroke-width="4"/><line x1="225" y1="55" x2="380" y2="55" stroke="#8B4513" stroke-width="4"/>';
+  // arc gap with animated spark
+  svg+='<path d="M175,55 L185,48 L178,55 L190,60 L182,55 L200,50 L195,55 L210,58 L205,55 L225,55" stroke="#00e5ff" stroke-width="2" fill="none" filter="url(#g3)" opacity="0.9"><animate attributeName="opacity" values="0.3;1;0.3" dur="0.4s" repeatCount="indefinite"/></path>';
+  svg+='<circle cx="200" cy="53" r="14" fill="none" stroke="#ff4444" stroke-width="1.5" opacity="0.5"><animate attributeName="r" values="8;18;8" dur="0.8s" repeatCount="indefinite"/></circle>';
+  svg+='<text x="200" y="28" text-anchor="middle" font-size="11" fill="#ff6b6b" font-weight="700">'+(da?'Seriel lysbuefejl >1000\u00b0C':'Series arc fault >1000\u00b0C')+'</text>';
+  svg+='<text x="200" y="95" text-anchor="middle" font-size="9" fill="#5b7790">'+(da?'AFDD opdager h\u00f8jfrekvent signatur \u2192 afbryder p\u00e5 <1s':'AFDD detects high-frequency signature \u2192 disconnects in <1s')+'</text>';
+  svg+='<defs><filter id="g3"><feGaussianBlur stdDeviation="2"/></filter></defs></svg>';
+  html+=svg+'</div>';
+  return html;
 }
 
 // ===== INIT =====
