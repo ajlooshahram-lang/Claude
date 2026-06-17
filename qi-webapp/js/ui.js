@@ -2585,30 +2585,30 @@
     const pctSel = [0, .1, .2, .3, .4, .5, .6, .7, .8, .9, 1];
     const modal = $("#modal");
     modal.innerHTML = `
-      <h2>${editing ? "Edit case" : "New case"}</h2>
+      <h2>${editing ? "Edit item" : "New item"}</h2>
       <div class="sub">Pick from the dropdowns. Grey box shows what auto-calculates.</div>
       <form id="caseForm">
         <div class="form-grid">
-          <div class="field full"><label>Problem / challenge statement *</label>
+          <div class="field full"><label>What's the problem or challenge? *</label>
             <select id="f_problem" required>${opts(C.SUGGEST.problem, c.problem, "— choose —")}</select></div>
           <div class="field"><label>Category</label><select id="f_category">${opts(C.LISTS.category, c.category, "—")}</select></div>
           <div class="field"><label>Priority</label><select id="f_priority">${opts(C.LISTS.priority, c.priority, "—")}</select></div>
-          <div class="field"><label>Severity (1-10)</label><select id="f_sev">${opts(C.LISTS.score, c.sev, "—")}</select></div>
-          <div class="field"><label>Occurrence (1-10)</label><select id="f_occ">${opts(C.LISTS.score, c.occ, "—")}</select></div>
-          <div class="field"><label>Detection (1-10)</label><select id="f_det">${opts(C.LISTS.score, c.det, "—")}</select></div>
-          <div class="field"><label>Owner</label><select id="f_owner">${opts(names, c.owner, "—")}</select></div>
-          <div class="field full"><label>Root cause hypothesis</label>
+          <div class="field"><label>How serious? (1-10)</label><select id="f_sev">${opts(C.LISTS.score, c.sev, "—")}</select></div>
+          <div class="field"><label>How often? (1-10)</label><select id="f_occ">${opts(C.LISTS.score, c.occ, "—")}</select></div>
+          <div class="field"><label>How hard to spot? (1-10)</label><select id="f_det">${opts(C.LISTS.score, c.det, "—")}</select></div>
+          <div class="field"><label>Who's responsible?</label><select id="f_owner">${opts(names, c.owner, "—")}</select></div>
+          <div class="field full"><label>Why is it happening?</label>
             <select id="f_rootCause">${opts(C.SUGGEST.root, c.rootCause, "— choose —")}</select></div>
-          <div class="field"><label>Lean method</label><select id="f_leanMethod">${opts(C.LISTS.leanMethod, c.leanMethod, "—")}</select></div>
-          <div class="field full"><label>Target outcome (measurable)</label>
+          <div class="field"><label>Fix approach</label><select id="f_leanMethod">${opts(C.LISTS.leanMethod, c.leanMethod, "—")}</select></div>
+          <div class="field full"><label>What does success look like?</label>
             <select id="f_target">${opts(C.SUGGEST.target, c.target, "— choose —")}</select></div>
           <div class="field"><label>Start date</label><input type="date" id="f_startDate" value="${esc(c.startDate)}"></div>
           <div class="field"><label>Status</label><select id="f_status">${opts(C.LISTS.status, c.status)}</select></div>
           <div class="field"><label>% Done</label><select id="f_percent">${pctSel.map(v => `<option value="${v}" ${Number(c.percent) === v ? "selected" : ""}>${Math.round(v * 100)}%</option>`).join("")}</select></div>
-          <div class="field"><label>Cost category</label><select id="f_costCat">${opts(C.LISTS.costCat, c.costCat, "—")}</select></div>
-          <div class="field"><label>Est. cost</label><select id="f_estCost">${opts(C.MONEY, c.estCost === "" || c.estCost == null ? "" : c.estCost, "—")}</select></div>
+          <div class="field"><label>Cost type</label><select id="f_costCat">${opts(C.LISTS.costCat, c.costCat, "—")}</select></div>
+          <div class="field"><label>Estimated cost</label><select id="f_estCost">${opts(C.MONEY, c.estCost === "" || c.estCost == null ? "" : c.estCost, "—")}</select></div>
           <div class="field"><label>Actual cost</label><select id="f_actCost">${opts(C.MONEY, c.actCost === "" || c.actCost == null ? "" : c.actCost, "—")}</select></div>
-          <div class="field full"><label>5 Whys (drill to root cause)</label>
+          <div class="field full"><label>Dig deeper — why? (5 levels)</label>
             ${[0,1,2,3,4].map(i => `<select id="f_why${i}" style="margin-bottom:6px">${opts(C.SUGGEST.root, (c.whys||[])[i]||"", "Why "+(i+1)+"? — choose")}</select>`).join("")}</div>
           <div class="field full"><label>Auto-calculated</label><div class="readout" id="f_readout"></div></div>
         </div>
