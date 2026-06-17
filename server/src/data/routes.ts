@@ -642,6 +642,7 @@ export function registerDataRoutes(
           gage: projectWithData.gage,
           cashflow: projectWithData.cashflow,
           xbarR: projectWithData.xbarR,
+          routeProgress: projectWithData.routeProgress,
         },
       });
     },
@@ -745,6 +746,7 @@ export function registerDataRoutes(
         roster: projectWithData?.roster ?? null,
         stakeholders: projectWithData?.stakeholders ?? null,
         spec: projectWithData?.spec ?? null,
+        routeProgress: projectWithData?.routeProgress ?? null,
       };
 
       const label = parseResult.data.label || `Snapshot ${new Date().toISOString()}`;

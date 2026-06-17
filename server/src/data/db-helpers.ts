@@ -92,6 +92,7 @@ export type DbProjectWithData = DbProject & {
   gage: unknown;
   cashflow: unknown;
   xbarR: unknown;
+  routeProgress: unknown;
 };
 
 /** Input type for updating a project's analytical data blobs. */
@@ -103,6 +104,7 @@ export type UpdateProjectDataInput = {
   gage?: unknown;
   cashflow?: unknown;
   xbarR?: unknown;
+  routeProgress?: unknown;
 };
 
 export type CreateAuditLogInput = {
@@ -617,7 +619,7 @@ export async function createPrismaDataDbHelpers(): Promise<DataDbHelpers> {
       // Restore analytical blobs from snapshot data
       const data = snapshotData as Record<string, unknown>;
       const analyticalFields: Record<string, unknown> = {};
-      const fieldNames = ["spec", "roster", "stakeholders", "sigma", "gage", "cashflow", "xbarR"];
+      const fieldNames = ["spec", "roster", "stakeholders", "sigma", "gage", "cashflow", "xbarR", "routeProgress"];
       for (const field of fieldNames) {
         if (data[field] !== undefined) {
           analyticalFields[field] = data[field] as object;

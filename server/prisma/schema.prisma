@@ -160,6 +160,7 @@ model Project {
   gage         Json @default("{}")
   cashflow     Json @default("[]")
   xbarR        Json @default("{}")
+  routeProgress Json @default("{}") // { [cableId]: { phase, laidKm } } — STP route laying progress
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

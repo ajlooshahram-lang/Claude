@@ -431,7 +431,8 @@
           }),
           gage: (projAnalytical && projAnalytical.gage) || null,
           cashflow: (projAnalytical && projAnalytical.cashflow) || null,
-          xbarR: (projAnalytical && projAnalytical.xbarR) || null
+          xbarR: (projAnalytical && projAnalytical.xbarR) || null,
+          routeProgress: (projAnalytical && projAnalytical.routeProgress) || {}
         };
       });
 

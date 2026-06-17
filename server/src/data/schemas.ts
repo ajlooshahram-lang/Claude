@@ -181,6 +181,7 @@ export const UpdateProjectDataSchema = z.object({
   gage: z.unknown().optional(),
   cashflow: z.unknown().optional(),
   xbarR: z.unknown().optional(),
+  routeProgress: z.unknown().optional(),
 }).refine(
   (val) => JSON.stringify(val).length <= MAX_PROJECT_DATA_SIZE,
   "Project data payload exceeds 500KB limit",

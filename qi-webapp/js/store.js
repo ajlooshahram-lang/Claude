@@ -763,6 +763,7 @@
     e.phases[phaseKey] = status;
     logAudit("Route phase", cableId, phaseKey + " \u2192 " + status);
     save();
+    if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncProjectData(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, 'routeProgress', routeProgress()); }
     return e;
   }
   function setRouteLaidKm(cableId, km) {
@@ -770,6 +771,7 @@
     e.laidKm = Math.max(0, Number(km) || 0);
     logAudit("Route % laid", cableId, e.laidKm + " km");
     save();
+    if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncProjectData(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, 'routeProgress', routeProgress()); }
     return e;
   }
   // Phase-weighted completion fraction (In progress counts as half).

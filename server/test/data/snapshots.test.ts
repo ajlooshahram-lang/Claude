@@ -116,6 +116,7 @@ function createMockProjectWithData(overrides: Partial<DbProjectWithData> = {}): 
     gage: null,
     cashflow: null,
     xbarR: null,
+    routeProgress: {},
     ...overrides,
   };
 }

@@ -103,6 +103,7 @@ function createMockProjectWithData(overrides: Partial<DbProjectWithData> = {}): 
     gage: null,
     cashflow: null,
     xbarR: null,
+    routeProgress: {},
     ...overrides,
   };
 }
@@ -194,6 +195,72 @@ test("project-data: GET /api/projects/:id/data returns analytical data", async (
   assert.deepEqual(body.project.gage, { parts: 3, operators: 2, trials: 2, data: {} });
   assert.deepEqual(body.project.cashflow, [{ month: "M1", planned: 1000, actual: 900 }]);
   assert.equal(body.project.id, "proj-1");
+});
+
+test("project-data: GET /api/projects/:id/data returns routeProgress", async (t) => {
+  const mockData = createMockProjectWithData({
+    routeProgress: { "cable-a": { phase: "laying", laidKm: 42.5 } },
+  });
+  const { app, token } = await buildAuthenticatedApp({
+    getProjectWithData: async () => mockData,
+  });
+  t.after(() => app.close());
+
+  const res = await app.inject({
+    method: "GET",
+    url: "/api/projects/proj-1/data",
+    cookies: { [SESSION_COOKIE_NAME]: token },
+  });
+  assert.equal(res.statusCode, 200);
+  const body = res.json();
+  assert.deepEqual(body.project.routeProgress, { "cable-a": { phase: "laying", laidKm: 42.5 } });
+});
+
+test("project-data: PATCH /api/projects/:id/data persists routeProgress and GET returns it", async (t) => {
+  let stored: unknown = null;
+  const { app, token } = await buildAuthenticatedApp({
+    updateProjectData: async (_t, _p, data) => {
+      stored = (data as Record<string, unknown>).routeProgress;
+      return createMockProjectWithData(data as Partial<DbProjectWithData>);
+    },
+    getProjectWithData: async () => createMockProjectWithData({ routeProgress: stored }),
+  });
+  t.after(() => app.close());
+
+  const payload = { routeProgress: { "cable-1": { phase: "complete", laidKm: 120 } } };
+  const patchRes = await app.inject({
+    method: "PATCH",
+    url: "/api/projects/proj-1/data",
+    cookies: { [SESSION_COOKIE_NAME]: token, [CSRF_COOKIE_NAME]: TEST_CSRF_TOKEN },
+    headers: { [CSRF_HEADER_NAME]: TEST_CSRF_TOKEN },
+    payload,
+  });
+  assert.equal(patchRes.statusCode, 200);
+  assert.deepEqual(stored, { "cable-1": { phase: "complete", laidKm: 120 } });
+
+  const getRes = await app.inject({
+    method: "GET",
+    url: "/api/projects/proj-1/data",
+    cookies: { [SESSION_COOKIE_NAME]: token },
+  });
+  assert.equal(getRes.statusCode, 200);
+  assert.deepEqual(getRes.json().project.routeProgress, { "cable-1": { phase: "complete", laidKm: 120 } });
+});
+
+test("project-data: tenant isolation - routeProgress PATCH on other tenant's project returns 404", async (t) => {
+  const { app, token } = await buildAuthenticatedApp({
+    updateProjectData: async () => null,
+  });
+  t.after(() => app.close());
+
+  const res = await app.inject({
+    method: "PATCH",
+    url: "/api/projects/other-proj/data",
+    cookies: { [SESSION_COOKIE_NAME]: token, [CSRF_COOKIE_NAME]: TEST_CSRF_TOKEN },
+    headers: { [CSRF_HEADER_NAME]: TEST_CSRF_TOKEN },
+    payload: { routeProgress: { "cable-x": { phase: "survey", laidKm: 0 } } },
+  });
+  assert.equal(res.statusCode, 404);
 });
 
 test("project-data: GET /api/projects/:id/data returns 404 for non-existent project", async (t) => {
