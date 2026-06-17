@@ -2,19 +2,20 @@
 (function (root) {
   "use strict";
   const registry = {};
-  const PALETTE = ["#2e5496", "#1f8a8a", "#c00000", "#c9a227", "#548235", "#7030a0", "#c55a11", "#44546a"];
+  // Neon dataset palette — high-contrast, game-grade, matches the neon skin.
+  const PALETTE = ["#22e1e6", "#3aa0ff", "#ff3fa4", "#9b6bff", "#2ee6a6", "#ffd23b", "#ff9d45", "#9dff57"];
 
-  // Read CSS theme tokens so charts visually match light / dark mode.
+  // Read CSS theme tokens so charts visually match the (dark) neon theme.
   function themeTokens() {
     if (typeof document === "undefined") return null;
     const s = getComputedStyle(document.documentElement);
-    const dark = document.documentElement.getAttribute("data-theme") === "dark";
+    // The neon skin is dark in every state; use HUD-style grid/tooltip throughout.
     return {
-      ink: s.getPropertyValue("--ink").trim() || (dark ? "#e6eaf3" : "#1f2733"),
-      muted: s.getPropertyValue("--muted").trim() || (dark ? "#94a0bc" : "#6b7686"),
-      grid: dark ? "rgba(255,255,255,.08)" : "rgba(20,30,60,.08)",
-      tooltipBg: dark ? "#1e2a44" : "#1f2733",
-      tooltipFg: dark ? "#e6eaf3" : "#fff"
+      ink: s.getPropertyValue("--ink").trim() || "#eaf1ff",
+      muted: s.getPropertyValue("--muted").trim() || "#93a6cc",
+      grid: "rgba(122,162,255,.12)",
+      tooltipBg: "rgba(12,20,40,.95)",
+      tooltipFg: "#eaf1ff"
     };
   }
   function applyTheme() {

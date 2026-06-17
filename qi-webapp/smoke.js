@@ -286,15 +286,16 @@ doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.E
 const activeNavs = doc.querySelectorAll('.nav-item[aria-current="page"]');
 ok(activeNavs.length === 1 && activeNavs[0].dataset.view === "dashboard", "exactly one nav-item has aria-current=page");
 
-// 13d) chart theming: applyTheme exists and updates Chart.defaults colors
+// 13d) chart theming: applyTheme exists and uses the neon HUD tokens
 ok(typeof window.QICharts.applyTheme === "function", "QICharts.applyTheme exposed");
 window.QICharts.applyTheme();
 const lightInk = window.Chart.defaults.color;
-ok(lightInk !== "", "Chart.defaults.color set in light mode (" + lightInk + ")");
+ok(lightInk !== "", "Chart.defaults.color set for the neon theme (" + lightInk + ")");
+ok(/rgba\(122,\s*162,\s*255/.test(window.Chart.defaults.borderColor || ""), "Chart grid uses the neon HUD grid colour");
 doc.getElementById("btnTheme").click();
 const darkInk = window.Chart.defaults.color;
-ok(darkInk && darkInk !== lightInk, "Chart.defaults.color flips on theme toggle (" + lightInk + " -> " + darkInk + ")");
-doc.getElementById("btnTheme").click(); // back to light
+ok(darkInk && darkInk !== "", "Chart.defaults.color stays valid after theme toggle (" + darkInk + ")");
+doc.getElementById("btnTheme").click(); // back to default
 
 // 13e) toast styling actually applies (not the default unstyled span)
 window.QIStore && window.QIStore.save && (function () {

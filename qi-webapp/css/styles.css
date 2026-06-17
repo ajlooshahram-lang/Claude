@@ -623,3 +623,182 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 [data-theme="dark"] .route-badge.route-commissioned{color:#42d6a4}
 [data-theme="dark"] .route-badge.route-in-progress{color:#7da7f0}
 [data-theme="dark"] .route-badge.route-planned{color:#e6b84a}
+
+
+
+
+/* =========================================================================
+   NEON GAME THEME  — high-contrast cyberpunk/synthwave skin (default look)
+   Appended last so it overrides the base palette via source order. Purely a
+   visual layer: no layout/markup assumptions, safe to remove to revert.
+   ========================================================================= */
+:root{
+  /* base surfaces */
+  --bg:#070b16; --bg-2:#0b1022;
+  --card:rgba(16,26,52,.82); --card-solid:#0f1830; --glass:rgba(16,26,52,.66);
+  --line:rgba(122,162,255,.18);
+  --ink:#eaf1ff; --muted:#93a6cc;
+  /* neon accents */
+  --neon-cyan:#22e1e6; --neon-pink:#ff3fa4; --neon-purple:#9b6bff;
+  --neon-blue:#3aa0ff; --neon-lime:#9dff57; --neon-gold:#ffd23b;
+  /* remap the semantic palette to neon equivalents (used everywhere) */
+  --navy:#0e1a36; --blue:#3aa0ff; --teal:#22e1e6; --red:#ff4d6d;
+  --green:#2ee6a6; --gold:#ffd23b; --amber:#ff9d45; --purple:#9b6bff; --slate:#5d6f93;
+  --input:rgba(18,28,52,.85); --calc:rgba(18,42,42,.5);
+  --shadow:0 6px 22px rgba(0,0,0,.55);
+  --radius:14px;
+  --glow-cyan:0 0 10px rgba(34,225,230,.55),0 0 26px rgba(34,225,230,.25);
+  --glow-pink:0 0 10px rgba(255,63,164,.55),0 0 26px rgba(255,63,164,.22);
+  --glow-blue:0 0 10px rgba(58,160,255,.55),0 0 26px rgba(58,160,255,.22);
+}
+
+/* deep-space backdrop with drifting neon blooms + faint HUD grid */
+body{background:#05070f;color:var(--ink)}
+body::before{content:"";position:fixed;inset:-25%;z-index:-2;pointer-events:none;
+  background:
+    radial-gradient(38% 38% at 16% 10%,rgba(34,225,230,.18),transparent 70%),
+    radial-gradient(42% 42% at 86% 90%,rgba(255,63,164,.16),transparent 70%),
+    radial-gradient(48% 48% at 62% 44%,rgba(155,107,255,.13),transparent 70%);
+  filter:blur(8px);animation:neonDrift 20s ease-in-out infinite alternate}
+body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background-image:linear-gradient(rgba(122,162,255,.05) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(122,162,255,.05) 1px,transparent 1px);
+  background-size:44px 44px;
+  -webkit-mask-image:radial-gradient(circle at 50% 38%,#000 55%,transparent 100%);
+          mask-image:radial-gradient(circle at 50% 38%,#000 55%,transparent 100%)}
+@keyframes neonDrift{from{transform:translate3d(-2%,-1%,0) scale(1.03)}to{transform:translate3d(2%,1%,0) scale(1.07)}}
+
+/* glassy panels with neon edges */
+.topbar,.card,.kpi,.table-wrap,.modal{
+  background:var(--glass);
+  -webkit-backdrop-filter:blur(12px) saturate(1.25);backdrop-filter:blur(12px) saturate(1.25);
+  border:1px solid var(--line);
+  box-shadow:0 8px 28px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.04)}
+.topbar{border-left:0;border-right:0;border-top:0;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,rgba(12,20,40,.92),rgba(9,15,32,.78))}
+.topbar h1{background:linear-gradient(90deg,var(--neon-cyan),var(--neon-blue));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  font-weight:800;letter-spacing:.01em}
+
+/* sidebar: darker glass + neon right edge */
+.sidebar{background:linear-gradient(180deg,#0a1226,#070c1a);
+  border-right:1px solid var(--line);box-shadow:2px 0 24px rgba(0,0,0,.45)}
+.brand-mark{background:linear-gradient(135deg,var(--neon-cyan),var(--neon-purple));color:#04101f;
+  box-shadow:var(--glow-cyan)}
+.brand-text strong{color:#fff;text-shadow:0 0 12px rgba(34,225,230,.35)}
+.nav-item{position:relative;color:#c2d2f0}
+.nav-item:hover{background:rgba(58,160,255,.10);color:#fff}
+.nav-item.active{color:#fff;font-weight:700;
+  background:linear-gradient(90deg,rgba(34,225,230,.22),rgba(58,160,255,.05));
+  box-shadow:inset 0 0 0 1px rgba(34,225,230,.3)}
+.nav-item.active::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:3px;border-radius:3px;
+  background:linear-gradient(180deg,var(--neon-cyan),var(--neon-blue));box-shadow:var(--glow-cyan)}
+.nav-sep{color:#6f86b6}
+
+/* KPI cards: neon top edge, glowing values, hover lift */
+.kpi{border-top:2px solid var(--neon-blue);transition:transform .15s,box-shadow .15s}
+.kpi:hover{transform:translateY(-3px);box-shadow:0 12px 34px rgba(0,0,0,.55),0 0 18px rgba(58,160,255,.18)}
+.kpi .value{color:#fff;text-shadow:0 0 14px rgba(34,225,230,.45)}
+.kpi .label{color:var(--muted)}
+.kpi.navy .value{text-shadow:0 0 14px rgba(58,160,255,.5)}
+.kpi.red .value{text-shadow:0 0 14px rgba(255,77,109,.55)}
+.kpi.green .value{text-shadow:0 0 14px rgba(46,230,166,.5)}
+.kpi.teal .value{text-shadow:0 0 14px rgba(34,225,230,.55)}
+.kpi.gold .value{text-shadow:0 0 14px rgba(255,210,59,.5)}
+.kpi.purple .value{text-shadow:0 0 14px rgba(155,107,255,.55)}
+.kpi.amber .value{text-shadow:0 0 14px rgba(255,157,69,.5)}
+.kpi.red{border-top-color:var(--red)} .kpi.green{border-top-color:var(--green)}
+.kpi.teal{border-top-color:var(--neon-cyan)} .kpi.gold{border-top-color:var(--gold)}
+.kpi.purple{border-top-color:var(--neon-purple)} .kpi.amber{border-top-color:var(--amber)}
+.kpi.navy{border-top-color:var(--neon-blue)} .kpi.slate{border-top-color:var(--slate)}
+
+/* section headings: neon accent bar */
+.card h3,.card-head h3{color:#eaf1ff}
+.card-head h3{position:relative;padding-left:12px}
+.card-head h3::before{content:"";position:absolute;left:0;top:2px;bottom:2px;width:3px;border-radius:3px;
+  background:linear-gradient(180deg,var(--neon-cyan),var(--neon-pink));box-shadow:var(--glow-cyan)}
+
+/* buttons: neon outline + glow */
+.btn{background:rgba(20,30,56,.7);border:1px solid var(--line);color:#d4e0fb}
+.btn:hover{border-color:var(--neon-cyan);color:#fff;box-shadow:var(--glow-cyan)}
+.btn-primary{background:linear-gradient(135deg,var(--neon-cyan),var(--neon-blue));border-color:transparent;color:#04101f;font-weight:700;
+  box-shadow:0 0 14px rgba(34,225,230,.4)}
+.btn-primary:hover{background:linear-gradient(135deg,#41f0f4,#56b0ff);color:#04101f;box-shadow:0 0 22px rgba(34,225,230,.6)}
+.btn-danger{background:rgba(40,16,28,.7);border-color:var(--red);color:#ff8ba1}
+.btn-danger:hover{background:var(--red);color:#fff;box-shadow:var(--glow-pink)}
+.btn-icon:hover{box-shadow:var(--glow-cyan)}
+.btn:focus-visible,.nav-item:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--neon-cyan);outline-offset:2px}
+
+/* inputs */
+input,select,textarea{background:var(--input);border:1px solid var(--line);color:var(--ink)}
+select,input[list]{background:var(--input)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--neon-cyan);box-shadow:0 0 0 3px rgba(34,225,230,.18),var(--glow-cyan)}
+
+/* tables */
+.table-wrap{background:var(--card)}
+th{background:rgba(14,24,48,.95);color:var(--neon-cyan);text-transform:uppercase;letter-spacing:.06em;
+  border-bottom:1px solid var(--line)}
+td{border-bottom:1px solid rgba(122,162,255,.10)}
+tr:hover td{background:rgba(58,160,255,.08)}
+
+/* badges → translucent neon pills */
+.badge{border:1px solid transparent}
+.b-critical,.b-blocked{background:rgba(255,77,109,.16);color:#ff8ba1;border-color:rgba(255,77,109,.4)}
+.b-high{background:rgba(255,157,69,.16);color:#ffc189;border-color:rgba(255,157,69,.4)}
+.b-ontrack{background:rgba(46,230,166,.15);color:#74f0c6;border-color:rgba(46,230,166,.4)}
+.b-open{background:rgba(58,160,255,.16);color:#9ccbff;border-color:rgba(58,160,255,.4)}
+.b-progress{background:rgba(34,225,230,.15);color:#7ef0f3;border-color:rgba(34,225,230,.4)}
+.b-hold{background:rgba(155,107,255,.16);color:#c2a8ff;border-color:rgba(155,107,255,.4)}
+.b-resolved,.b-closed{background:rgba(120,140,180,.16);color:#aebbd6;border-color:rgba(120,140,180,.35)}
+.pill,.tag{background:rgba(58,160,255,.14);color:#bcd4ff}
+.bar{background:rgba(122,162,255,.14)}
+.bar>span{background:linear-gradient(90deg,var(--neon-cyan),var(--neon-blue));box-shadow:0 0 8px rgba(34,225,230,.5)}
+
+/* kanban / a3 / bowtie surfaces */
+.kcol{background:rgba(12,20,40,.6);border:1px solid var(--line)}
+.kcol-head{color:#aebbd6}
+.kcard{background:var(--card);border:1px solid var(--line);color:var(--ink)}
+.kcard-title:hover{color:var(--neon-cyan)}
+.kcol-body.kover{background:rgba(58,160,255,.12);outline:2px dashed var(--neon-cyan)}
+.a3-box,.bt-chip{background:var(--card);border:1px solid var(--line);color:var(--ink)}
+.a3-box h4{color:var(--neon-cyan)}
+.bt-top{background:linear-gradient(135deg,var(--neon-purple),var(--neon-blue));box-shadow:0 0 18px rgba(155,107,255,.4)}
+.kbd{background:rgba(20,30,56,.9);color:#cfe0ff;border-color:var(--line)}
+
+/* modal */
+.modal{background:var(--card-solid);border:1px solid var(--line);box-shadow:0 0 0 1px rgba(34,225,230,.18),0 24px 70px rgba(0,0,0,.7)}
+.modal-overlay{background:rgba(3,6,15,.72);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+
+/* readout / calc panels */
+.readout{background:var(--calc);border:1px solid rgba(34,225,230,.25)}
+.readout b{color:var(--neon-cyan)}
+
+/* fix: empty toast must not show; neon toast styling when it does */
+#toast{display:none}
+#toast:not([hidden]){display:flex;align-items:center;gap:14px}
+.toast{background:rgba(12,20,40,.92);color:#eaf1ff;border:1px solid var(--neon-cyan);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:var(--glow-cyan)}
+.toast-action{color:var(--neon-cyan)}
+
+/* tour banner → neon */
+.tour-banner{background:linear-gradient(90deg,rgba(34,225,230,.22),rgba(155,107,255,.22));
+  border:1px solid var(--line);color:#eaf1ff;box-shadow:0 0 18px rgba(34,225,230,.18)}
+.tour-banner .btn{background:rgba(255,255,255,.10);border:1px solid var(--line);color:#fff}
+.tour-banner .btn:hover{box-shadow:var(--glow-cyan)}
+
+/* FAB: glowing neon orb with a soft pulse */
+.fab{background:linear-gradient(135deg,var(--neon-cyan),var(--neon-blue));color:#04101f;border:none;
+  box-shadow:0 0 18px rgba(34,225,230,.55);animation:fabPulse 2.6s ease-in-out infinite}
+@keyframes fabPulse{0%,100%{box-shadow:0 0 16px rgba(34,225,230,.45)}50%{box-shadow:0 0 28px rgba(34,225,230,.75)}}
+
+/* empty-state CTA */
+.empty-cta{background:linear-gradient(180deg,rgba(16,26,52,.8),rgba(11,16,34,.8));border:1px dashed var(--line)}
+
+/* neon scrollbars */
+*{scrollbar-width:thin;scrollbar-color:rgba(34,225,230,.4) transparent}
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-thumb{background:linear-gradient(180deg,rgba(34,225,230,.5),rgba(58,160,255,.5));border-radius:8px}
+*::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,rgba(34,225,230,.8),rgba(58,160,255,.8))}
+
+/* keep the dark-mode toggle from fighting the neon skin (neon is already dark) */
+[data-theme="dark"]{--bg:#070b16;--card:rgba(16,26,52,.82);--line:rgba(122,162,255,.18);--ink:#eaf1ff;--muted:#93a6cc}
