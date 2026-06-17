@@ -1623,6 +1623,7 @@
           <select id="brainProfile" style="max-width:280px">${profOpts}</select>
           <label class="btn btn-sm" for="brainFile">Upload .txt / .md</label>
           <input id="brainFile" type="file" accept=".txt,.md,text/plain,text/markdown" hidden />
+          <button class="btn btn-sm" id="brainExample" type="button">Try an example</button>
           <span class="muted" id="brainFileName"></span>
         </div>
         <details id="brainWizard" style="margin-top:10px;border:1.5px dashed var(--border);border-radius:8px;padding:10px 12px">
@@ -1782,6 +1783,21 @@
 
     const analyzeBtn = $("#brainAnalyze");
     if (analyzeBtn) analyzeBtn.addEventListener("click", () => { if (runAnalyze({ scroll: true })) toast("Analysis complete — your plan & country frameworks are below."); });
+
+    // 'Try an example' — load a bundled 8-country brief and analyse it, so a
+    // first-time user sees the whole result with a single click (zero typing).
+    const exampleBtn = $("#brainExample");
+    if (exampleBtn) exampleBtn.addEventListener("click", () => {
+      ta.value = "Submarine fibre optic cable system connecting eight countries across Asia and the Pacific: " +
+        "Indonesia (Jakarta), Malaysia (Mersing), Thailand (Songkhla), Vietnam (Da Nang), Philippines (Batangas), " +
+        "Taiwan (Tamsui), Brunei (Bandar Seri Begawan) and Guam (Piti). About 9,500 km of trunk route, 24 fibre pairs, " +
+        "approximately USD 1.3 billion over 60 months. Scope: marine route survey, multi-country permitting and national " +
+        "cable-landing licences, submarine cable and repeater supply, marine installation and burial, cable landing " +
+        "stations, terrestrial backhaul, system integration and end-to-end testing (OTDR, BER, capacity) to " +
+        "ready-for-service.";
+      if (nameEl) nameEl.textContent = "Example: 8-country submarine cable programme";
+      if (runAnalyze({ scroll: true })) toast("Loaded an example project and analysed it — explore the results below.");
+    });
   };
   function renderBrainPreview(plan) {
     const kpi = (cls, l, v) => `<div class="kpi ${cls}"><div class="label">${l}</div><div class="value">${v}</div></div>`;

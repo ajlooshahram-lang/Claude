@@ -590,7 +590,7 @@ if (sevSel) {
 doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
 const fab = doc.getElementById("fab");
 ok(fab != null, "FAB present in shell");
-ok(fab.getAttribute("aria-label") === "Add new case", "FAB has accessible label");
+ok(fab.getAttribute("aria-label") === "Add an item", "FAB has accessible label");
 fab.click();
 ok(/New case|f_problem/.test(doc.getElementById("modal").innerHTML), "FAB opens the case form");
 doc.querySelector("#modal [data-act=cancel]").click();
@@ -702,6 +702,12 @@ doc.querySelector("#modal [data-act=cancel]") && doc.querySelector("#modal [data
 S.reset();
 doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(doc.getElementById("brainText") != null, "Brain view renders a description input");
+// 'Try an example' loads a bundled 8-country brief and analyses it (zero typing)
+const exBtn = doc.getElementById("brainExample");
+ok(exBtn != null && !exBtn.getAttribute("onclick"), "'Try an example' button exists and is CSP-safe");
+exBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("brainText").value.indexOf("Indonesia") !== -1 && doc.getElementById("brainText").value.indexOf("Guam") !== -1, "'Try an example' fills a real 8-country description");
+ok(window.QIBrain.analyzeProject(doc.getElementById("brainText").value).countryIntel.length === 8, "'Try an example' brief detects all 8 countries");
 ok(typeof window.QIBrain === "object" && typeof window.QIBrain.analyzeProject === "function", "Brain engine exposed to the UI");
 // 38a) 'Programme at a glance' front-door card → links to the two best outputs
 ok(doc.querySelector(".brain-hero") != null, "Brain home shows a 'Programme at a glance' front-door card");
