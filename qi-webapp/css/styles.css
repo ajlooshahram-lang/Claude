@@ -972,3 +972,13 @@ html.fx-on .topbar h1{background-size:220% 100%;animation:titleShift 9s linear i
 .brain-step-dot{width:10px;height:10px;border-radius:50%;border:2px solid rgba(122,162,255,.4);flex:none;transition:background .2s,border-color .2s,box-shadow .2s}
 .brain-step.done{color:#eaf1ff}
 .brain-step.done .brain-step-dot{background:var(--neon-cyan);border-color:var(--neon-cyan);box-shadow:0 0 8px rgba(34,225,230,.7)}
+
+/* --- My Duties personal view --- */
+.myduties-list{display:flex;flex-direction:column;gap:10px}
+.myduties-card{padding:14px 16px;border:1px solid var(--line);border-radius:12px;cursor:pointer;
+  background:var(--glass);transition:border-color .15s,transform .12s,box-shadow .15s}
+.myduties-card:hover,.myduties-card:focus-visible{border-color:var(--neon-cyan);transform:translateY(-2px);
+  box-shadow:0 8px 22px rgba(0,0,0,.4),0 0 12px rgba(34,225,230,.25);outline:none}
+.myduties-card-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.myduties-card-title{font-size:14px;font-weight:600;color:#eaf1ff;line-height:1.35}
+.myduties-card-bar{margin-top:8px;font-size:12px;color:var(--muted)}
