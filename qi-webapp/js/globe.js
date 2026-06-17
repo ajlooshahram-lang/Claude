@@ -1077,6 +1077,15 @@
       // Best-effort: reflect any saved route progress on first mount.
       try { setProgress(); } catch (e) {}
 
+      // Cinematic intro: on first mount, start the camera on a wider shot and
+      // ease it in to the framing (reuses the focus-anim path so it's cancelled
+      // cleanly the moment a build replay or a station selection takes over).
+      if (controls && camera.position.lengthSq() > 1e-6) {
+        camera.position.normalize().multiplyScalar(camDist * 1.5);
+        var introQ = world.quaternion.clone();
+        focusAnim = { fromQ: introQ, toQ: introQ, fromR: camDist * 1.5, toR: camDist, t: 0, dur: 1.7 };
+      }
+
       // Only drive the loop when frames are actually available (not in jsdom).
       if (typeof window.requestAnimationFrame === "function") {
         animate();
