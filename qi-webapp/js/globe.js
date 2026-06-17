@@ -468,7 +468,8 @@
       var pickables = [];        // meshes the raycaster can select
       var stationMeshes = {};    // id -> beacon mesh (for hover/selection scaling)
       var beaconGeo = new THREE.SphereGeometry(0.04, 18, 18);
-      disposables.push(beaconGeo);
+      var beaconGlowGeo = new THREE.SphereGeometry(0.09, 16, 16);
+      disposables.push(beaconGeo, beaconGlowGeo);
       STATIONS.forEach(function (st, i) {
         var p = latLonToVec3(st.lat, st.lon, GLOBE_R * 1.008);
 
@@ -476,6 +477,10 @@
         var beacon = new THREE.Mesh(beaconGeo, bMat);
         beacon.position.copy(p);
         beacon.userData = { type: "station", id: st.id, station: st, baseScale: 1 };
+        // soft additive glow halo so each station reads as a bright node
+        var bGlowMat = new THREE.MeshBasicMaterial({ color: 0xffd98a, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false });
+        beacon.add(new THREE.Mesh(beaconGlowGeo, bGlowMat));
+        disposables.push(bGlowMat);
         world.add(beacon);
         disposables.push(bMat);
         pickables.push(beacon);
@@ -544,13 +549,18 @@
           fullIndex: (tubeGeo.index ? tubeGeo.index.count : 0),
           haloIndex: (haloGeo.index ? haloGeo.index.count : 0) });
 
-        // flowing light pulse travelling along the cable
-        var pGeo = new THREE.SphereGeometry(0.045, 14, 14);
-        var pMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.98, blending: THREE.AdditiveBlending, depthWrite: false });
-        var pulse = new THREE.Mesh(pGeo, pMat);
-        world.add(pulse);
-        disposables.push(pGeo, pMat);
-        pulses.push({ curve: curve, mesh: pulse, speed: 0.06 + Math.random() * 0.05, offset: Math.random() });
+        // flowing light pulses travelling along the cable (twin, evenly spaced
+        // → a clearer sense of live data moving A–Z along each route)
+        var pGeo = new THREE.SphereGeometry(0.042, 14, 14);
+        disposables.push(pGeo);
+        var baseSpeed = 0.06 + Math.random() * 0.04;
+        for (var pp = 0; pp < 2; pp++) {
+          var pMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
+          var pulse = new THREE.Mesh(pGeo, pMat);
+          world.add(pulse);
+          disposables.push(pMat);
+          pulses.push({ curve: curve, mesh: pulse, speed: baseSpeed, offset: (Math.random() + pp * 0.5) % 1 });
+        }
 
         // mid-cable id label for orientation
         var seg = makeLabelSprite(cab.id, { fontSize: 22, scale: 0.3, color: (STATUS_COLOR[cab.status] || STATUS_COLOR.planned).css, bg: "rgba(8,16,32,0.62)" });
