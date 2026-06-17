@@ -2964,6 +2964,11 @@
       { label: "Keyboard shortcuts", icon: "⌨", run: () => showShortcuts() }
     );
     S.savedViews().forEach(v => cmds.push({ label: "View: " + v.name, icon: "★", run: () => { uiState.caseFilter = Object.assign({ q: "", status: "", priority: "", owner: "", sort: uiState.caseFilter.sort, pageSize: uiState.caseFilter.pageSize }, v.filter, { savedViewId: v.id }); go("cases"); } }));
+    // Content search: every case/risk is findable by its text; running opens it.
+    S.validCases().forEach(c => {
+      const title = String(c.problem || c.title || "Untitled").replace(/^RISK:\s*/, "");
+      cmds.push({ label: "Case: " + title, icon: "🔎", run: () => openCaseForm(c.id) });
+    });
     return cmds;
   }
   function openCommandPalette() {
@@ -2978,7 +2983,7 @@
       const body = $("#cmdList"); if (body) body.innerHTML = list;
     };
     $("#modal").innerHTML = `<h2 style="margin-bottom:8px">Command palette</h2>
-      <input id="cmdInput" class="cmd-input" placeholder="Type to filter… then Enter" autocomplete="off">
+      <input id="cmdInput" class="cmd-input" placeholder="Search views, actions & cases… then Enter" autocomplete="off">
       <div class="cmd-list" id="cmdList"></div>
       <div class="sub" style="margin-top:8px">↑/↓ to move · Enter to run · Esc to close</div>`;
     $("#modalOverlay").hidden = false;
@@ -3139,6 +3144,7 @@
   // Delegated print for in-content/modal print buttons (keeps CSP strict — no inline onclick).
   document.addEventListener("click", e => { if (e.target && e.target.closest && e.target.closest(".js-print")) window.print(); });
   $("#btnTheme").addEventListener("click", toggleTheme);
+  { const bsr = $("#btnSearch"); if (bsr) bsr.addEventListener("click", () => openCommandPalette()); }
   { const bfx = $("#btnFx"); if (bfx) bfx.addEventListener("click", toggleFX); }
   { const bs = $("#btnSound"); if (bs) bs.addEventListener("click", toggleSound); }
   $("#btnChecks").addEventListener("click", runChecks);

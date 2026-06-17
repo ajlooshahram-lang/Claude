@@ -771,5 +771,17 @@ ok(!!doc.getElementById("brainAuto") && doc.getElementById("brainAuto").checked,
   ok(doc.getElementById("brainOpenDash") != null, "auto-run shows the 'project created' CTA");
 }
 
+// 31) Content search: the command palette finds cases by their text and a Search button exists
+ok(!!doc.getElementById("btnSearch"), "topbar Search button present");
+{
+  doc.getElementById("btnSearch").dispatchEvent(new window.Event("click", { bubbles: true }));
+  const ci = doc.getElementById("cmdInput");
+  ok(!!ci, "command palette opens from the Search button");
+  ok(/Case:/.test(doc.getElementById("cmdList").textContent), "palette indexes project cases for search");
+  ci.value = "landing"; ci.dispatchEvent(new window.Event("input", { bubbles: true }));
+  ok(/Case:/.test(doc.getElementById("cmdList").textContent), "search filters cases by their text content");
+  doc.getElementById("modalOverlay").hidden = true;
+}
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
