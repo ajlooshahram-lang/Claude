@@ -3,14 +3,25 @@
  * Exposes window.QIGlobe with:
  *   - STATIONS : landing-station dataset (lat/long + metadata)
  *   - CABLES   : submarine cable-segment dataset (trunk-and-branch topology)
- *   - init(containerEl) : mounts an interactive 3D globe into containerEl
+ *   - STATUS_COLOR : status -> colour map shared with the 2D legend
+ *   - init(containerEl) : mounts an interactive, photoreal 3D globe
  *   - dispose()         : tears the scene down and frees GPU/listeners
+ *   - setProgress(map)  : recolours cable tubes by construction progress
  *
  * The module is built as a no-build global IIFE (loaded via <script src>).
- * It MUST be safe to run where WebGL / THREE is unavailable (e.g. the jsdom
+ * It targets Three.js r128 (UMD) plus its classic examples/js add-ons
+ * (OrbitControls, EffectComposer, UnrealBloomPass, FXAAShader ...) which all
+ * attach to the global THREE.* namespace. Every add-on is feature-detected:
+ * when one is missing the module degrades gracefully (plain renderer, custom
+ * drag/zoom) and NEVER throws.
+ *
+ * It MUST also be safe where WebGL / THREE is unavailable (e.g. the jsdom
  * smoke test): init() detects a missing THREE global or a non-functional
- * WebGL context and returns without throwing. The static datasets are always
- * available so the surrounding view can still render its legend.
+ * WebGL context and returns false without throwing. The static datasets are
+ * always available so the surrounding view can still render its legend.
+ *
+ * Earth textures are self-hosted under qi-webapp/textures/ (MIT three.js
+ * example assets) so the app honours the img-src 'self' CSP and works offline.
  */
 (function () {
   "use strict";
@@ -73,6 +84,15 @@
     "planned":      { hex: 0xe6b84a, css: "#e6b84a" }
   };
 
+  // Self-hosted Earth textures (relative to index.html → same-origin, CSP-safe).
+  var TEX = {
+    day:      "textures/earth_day.jpg",
+    normal:   "textures/earth_normal.jpg",
+    specular: "textures/earth_specular.jpg",
+    clouds:   "textures/earth_clouds.png",
+    lights:   "textures/earth_lights.png"
+  };
+
   /* ----------------------------------------------------------- internals --- */
   var GLOBE_R = 2;          // globe radius in scene units
   var state = null;         // holds live scene objects when mounted
@@ -97,34 +117,53 @@
     );
   }
 
+  // Tag a colour texture as sRGB (r128 API), guarded for older/newer builds.
+  function markSRGB(tex) {
+    var THREE = window.THREE;
+    if (!tex) return tex;
+    try {
+      if (THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
+      else if (THREE.SRGBColorSpace && "colorSpace" in tex) tex.colorSpace = THREE.SRGBColorSpace;
+    } catch (e) {}
+    return tex;
+  }
+
   // Build a text label as a camera-facing sprite backed by a 2D canvas.
+  // Rendered at an internal super-sample factor so labels stay crisp.
   function makeLabelSprite(text, opts) {
     var THREE = window.THREE;
     opts = opts || {};
-    var pad = 16, font = (opts.fontSize || 34) + "px 'Segoe UI', Arial, sans-serif";
+    var ss = 2;  // super-sample for crisp text
+    var fontPx = (opts.fontSize || 34) * ss;
+    var pad = 16 * ss, font = fontPx + "px 'Segoe UI', Arial, sans-serif";
     var cv = document.createElement("canvas");
     var ctx = cv.getContext("2d");
     if (!ctx) return null;
     ctx.font = font;
     var w = Math.ceil(ctx.measureText(text).width) + pad * 2;
-    var h = (opts.fontSize || 34) + pad * 2;
+    var h = fontPx + pad * 2;
     cv.width = w; cv.height = h;
     ctx.font = font;
     ctx.textBaseline = "middle";
-    // pill background
-    ctx.fillStyle = opts.bg || "rgba(11,22,40,0.72)";
-    var r = 10;
+    // rounded pill background
+    ctx.fillStyle = opts.bg || "rgba(11,22,40,0.74)";
+    var r = 12 * ss;
     ctx.beginPath();
     ctx.moveTo(r, 0); ctx.lineTo(w - r, 0); ctx.quadraticCurveTo(w, 0, w, r);
     ctx.lineTo(w, h - r); ctx.quadraticCurveTo(w, h, w - r, h);
     ctx.lineTo(r, h); ctx.quadraticCurveTo(0, h, 0, h - r);
     ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
     ctx.closePath(); ctx.fill();
+    // subtle border
+    ctx.lineWidth = 1 * ss;
+    ctx.strokeStyle = opts.border || "rgba(120,160,220,0.35)";
+    ctx.stroke();
     ctx.fillStyle = opts.color || "#e6eaf3";
     ctx.fillText(text, pad, h / 2 + 1);
 
     var tex = new THREE.CanvasTexture(cv);
-    if ("colorSpace" in tex && THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+    markSRGB(tex);
+    if (THREE.LinearFilter) tex.minFilter = THREE.LinearFilter;
     tex.needsUpdate = true;
     var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false });
     var sprite = new THREE.Sprite(mat);
@@ -136,13 +175,13 @@
 
   // Atmosphere fresnel glow via a lightweight shader (BackSide rim light).
   function makeAtmosphere(THREE) {
-    var geo = new THREE.SphereGeometry(GLOBE_R * 1.18, 48, 48);
+    var geo = new THREE.SphereGeometry(GLOBE_R * 1.16, 64, 64);
     var mat = new THREE.ShaderMaterial({
       transparent: true,
       blending: THREE.AdditiveBlending,
       side: THREE.BackSide,
       depthWrite: false,
-      uniforms: { uColor: { value: new THREE.Color(0x4ea1ff) } },
+      uniforms: { uColor: { value: new THREE.Color(0x5aa9ff) } },
       vertexShader: [
         "varying vec3 vNormal;",
         "void main(){",
@@ -154,19 +193,56 @@
         "varying vec3 vNormal;",
         "uniform vec3 uColor;",
         "void main(){",
-        "  float intensity = pow(0.62 - dot(vNormal, vec3(0.0,0.0,1.0)), 3.0);",
-        "  gl_FragColor = vec4(uColor, 1.0) * intensity;",
+        "  float intensity = pow(0.66 - dot(vNormal, vec3(0.0,0.0,1.0)), 3.2);",
+        "  gl_FragColor = vec4(uColor, 1.0) * clamp(intensity, 0.0, 1.4);",
         "}"
       ].join("\n")
     });
     return new THREE.Mesh(geo, mat);
   }
 
-  // Faint starfield so the globe sits in "space".
-  function makeStars(THREE) {
-    var n = 900, pos = new Float32Array(n * 3);
-    for (var i = 0; i < n; i++) {
-      var r = 40 + Math.random() * 40;
+  // City-lights night side: additive shader that only shows where the surface
+  // faces away from the sun. World-space normal keeps it correct as Earth spins.
+  function makeNightLights(THREE, lightsTex, sunDirRef) {
+    var geo = new THREE.SphereGeometry(GLOBE_R * 1.002, 64, 64);
+    var mat = new THREE.ShaderMaterial({
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      uniforms: {
+        uLights: { value: lightsTex },
+        uSunDir: { value: sunDirRef.clone() }
+      },
+      vertexShader: [
+        "varying vec3 vWorldNormal;",
+        "varying vec2 vUv;",
+        "void main(){",
+        "  vUv = uv;",
+        "  vWorldNormal = normalize(mat3(modelMatrix) * normal);",
+        "  gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);",
+        "}"
+      ].join("\n"),
+      fragmentShader: [
+        "uniform sampler2D uLights;",
+        "uniform vec3 uSunDir;",
+        "varying vec3 vWorldNormal;",
+        "varying vec2 vUv;",
+        "void main(){",
+        "  float lit = dot(normalize(vWorldNormal), normalize(uSunDir));",
+        "  float night = smoothstep(0.08, -0.28, lit);",   // 1 on dark side, 0 on lit side
+        "  vec3 c = texture2D(uLights, vUv).rgb;",
+        "  gl_FragColor = vec4(c * night * 1.5, 1.0);",
+        "}"
+      ].join("\n")
+    });
+    return new THREE.Mesh(geo, mat);
+  }
+
+  // Layered starfield so the globe sits in deep space (two sizes for depth).
+  function makeStars(THREE, count, size, color, opacity) {
+    var pos = new Float32Array(count * 3);
+    for (var i = 0; i < count; i++) {
+      var r = 60 + Math.random() * 60;
       var t = Math.random() * Math.PI * 2, p = Math.acos(2 * Math.random() - 1);
       pos[i * 3]     = r * Math.sin(p) * Math.cos(t);
       pos[i * 3 + 1] = r * Math.cos(p);
@@ -174,7 +250,7 @@
     }
     var g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    var m = new THREE.PointsMaterial({ color: 0x9fb0cf, size: 0.13, sizeAttenuation: true, transparent: true, opacity: 0.7 });
+    var m = new THREE.PointsMaterial({ color: color, size: size, sizeAttenuation: true, transparent: true, opacity: opacity, depthWrite: false });
     return new THREE.Points(g, m);
   }
 
@@ -191,6 +267,7 @@
     try {
       var width = containerEl.clientWidth || 800;
       var height = containerEl.clientHeight || 520;
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
 
       var scene = new THREE.Scene();
       var camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
@@ -198,64 +275,128 @@
       camera.position.set(0, 0, camDist);
 
       var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setPixelRatio(dpr);
       renderer.setSize(width, height);
+      // Colour management + cinematic tone mapping (all guarded for the r128 API).
+      try { if (THREE.sRGBEncoding) renderer.outputEncoding = THREE.sRGBEncoding; } catch (e) {}
+      try {
+        if (THREE.ACESFilmicToneMapping) {
+          renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          renderer.toneMappingExposure = 1.05;
+        }
+      } catch (e) {}
       renderer.domElement.style.display = "block";
       renderer.domElement.style.width = "100%";
       renderer.domElement.style.height = "100%";
       renderer.domElement.style.cursor = "grab";
       containerEl.appendChild(renderer.domElement);
 
-      // Lights
-      scene.add(new THREE.AmbientLight(0x4a5a7a, 1.1));
-      var key = new THREE.DirectionalLight(0xcfe0ff, 1.2);
-      key.position.set(5, 3, 5);
-      scene.add(key);
-      var rim = new THREE.PointLight(0x2e5496, 1.4, 50);
-      rim.position.set(-6, -2, -4);
-      scene.add(rim);
+      var disposables = [];
 
-      // The world group holds everything that rotates together.
+      // ---- textures (async, non-blocking — they pop in once decoded) -------
+      var loader = new THREE.TextureLoader();
+      function loadTex(url, srgb) {
+        var t = loader.load(url);
+        if (srgb) markSRGB(t);
+        if (THREE.LinearMipmapLinearFilter) t.minFilter = THREE.LinearMipmapLinearFilter;
+        disposables.push(t);
+        return t;
+      }
+      var dayTex      = loadTex(TEX.day, true);
+      var normalTex   = loadTex(TEX.normal, false);
+      var specularTex = loadTex(TEX.specular, false);
+      var cloudsTex   = loadTex(TEX.clouds, true);
+      var lightsTex   = loadTex(TEX.lights, true);
+
+      // ---- lighting --------------------------------------------------------
+      scene.add(new THREE.AmbientLight(0x3a4a66, 0.55));
+      var sun = new THREE.DirectionalLight(0xfff4e6, 2.0);
+      sun.position.set(5, 2.2, 4.2);     // lights SE-Asia / the Pacific rim
+      scene.add(sun);
+      var sunDir = sun.position.clone().normalize();
+      // faint cool fill from behind for rim separation
+      var fill = new THREE.DirectionalLight(0x2e5496, 0.35);
+      fill.position.set(-6, -1.5, -4);
+      scene.add(fill);
+
+      // The world group holds everything that rotates together with the Earth.
       var world = new THREE.Group();
       scene.add(world);
 
-      // Globe sphere — dark stylised ocean.
+      // ---- Earth -----------------------------------------------------------
       var globeMat = new THREE.MeshPhongMaterial({
-        color: 0x12233f, emissive: 0x0a1730, specular: 0x1b3a66, shininess: 18
+        map: dayTex,
+        normalMap: normalTex,
+        specularMap: specularTex,
+        specular: new THREE.Color(0x404a5a),  // oceans glint, land stays matte
+        shininess: 18
       });
-      var globe = new THREE.Mesh(new THREE.SphereGeometry(GLOBE_R, 64, 64), globeMat);
+      if (globeMat.normalScale && globeMat.normalScale.set) globeMat.normalScale.set(0.85, 0.85);
+      var globeGeo = new THREE.SphereGeometry(GLOBE_R, 96, 96);
+      var globe = new THREE.Mesh(globeGeo, globeMat);
       world.add(globe);
+      disposables.push(globeMat, globeGeo);
 
-      // Latitude/longitude wireframe overlay for a "data" look.
-      var gridMat = new THREE.MeshBasicMaterial({ color: 0x2e5496, wireframe: true, transparent: true, opacity: 0.12 });
-      var grid = new THREE.Mesh(new THREE.SphereGeometry(GLOBE_R * 1.001, 24, 18), gridMat);
-      world.add(grid);
+      // ---- night city lights (additive, dark-side only) --------------------
+      var night = null;
+      try {
+        night = makeNightLights(THREE, lightsTex, sunDir);
+        world.add(night);
+        disposables.push(night.geometry, night.material);
+      } catch (e) { night = null; }
 
-      world.add(makeAtmosphere(THREE));
-      scene.add(makeStars(THREE));
+      // ---- clouds (transparent, rotate a touch faster than the surface) ----
+      var clouds = null;
+      try {
+        var cloudGeo = new THREE.SphereGeometry(GLOBE_R * 1.01, 64, 64);
+        var cloudMat = new THREE.MeshBasicMaterial({
+          map: cloudsTex, transparent: true, opacity: 0.78,
+          blending: THREE.AdditiveBlending, depthWrite: false
+        });
+        clouds = new THREE.Mesh(cloudGeo, cloudMat);
+        world.add(clouds);
+        disposables.push(cloudGeo, cloudMat);
+      } catch (e) { clouds = null; }
 
-      // Landing-station markers + labels.
-      var markerGeo = new THREE.SphereGeometry(0.045, 16, 16);
-      var glowGeo = new THREE.SphereGeometry(0.09, 16, 16);
-      var disposables = [globeMat, globe.geometry, gridMat, grid.geometry, markerGeo, glowGeo];
+      // ---- atmosphere + starfield -----------------------------------------
+      var atmo = makeAtmosphere(THREE);
+      world.add(atmo);
+      disposables.push(atmo.geometry, atmo.material);
 
-      STATIONS.forEach(function (st) {
-        var p = latLonToVec3(st.lat, st.lon, GLOBE_R * 1.01);
-        var mMat = new THREE.MeshBasicMaterial({ color: 0xffe08a });
-        var marker = new THREE.Mesh(markerGeo, mMat);
-        marker.position.copy(p);
-        world.add(marker);
-        disposables.push(mMat);
+      var stars1 = makeStars(THREE, 1400, 0.13, 0xcdd8f0, 0.85);
+      var stars2 = makeStars(THREE, 700, 0.26, 0x9fb0cf, 0.55);
+      scene.add(stars1); scene.add(stars2);
+      disposables.push(stars1.geometry, stars1.material, stars2.geometry, stars2.material);
 
-        var gMat = new THREE.MeshBasicMaterial({ color: 0xffd24a, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
-        var glow = new THREE.Mesh(glowGeo, gMat);
-        glow.position.copy(p);
-        world.add(glow);
-        disposables.push(gMat);
+      // ---- landing stations: beacon + animated surface pulse ring ----------
+      var rings = [];
+      var beaconGeo = new THREE.SphereGeometry(0.04, 18, 18);
+      disposables.push(beaconGeo);
+      STATIONS.forEach(function (st, i) {
+        var p = latLonToVec3(st.lat, st.lon, GLOBE_R * 1.008);
+
+        var bMat = new THREE.MeshBasicMaterial({ color: 0xffe9b0 });
+        var beacon = new THREE.Mesh(beaconGeo, bMat);
+        beacon.position.copy(p);
+        world.add(beacon);
+        disposables.push(bMat);
+
+        // expanding / fading ring laid flat against the surface (live pulse)
+        var ringGeo = new THREE.RingGeometry(0.05, 0.075, 28);
+        var ringMat = new THREE.MeshBasicMaterial({
+          color: 0xffd24a, transparent: true, opacity: 0.6,
+          side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false
+        });
+        var ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.position.copy(p);
+        ring.lookAt(p.clone().multiplyScalar(2));   // orient normal radially outward
+        world.add(ring);
+        disposables.push(ringGeo, ringMat);
+        rings.push({ mesh: ring, mat: ringMat, offset: i / STATIONS.length });
 
         var label = makeLabelSprite(st.name, { fontSize: 30, scale: 0.42, color: "#ffe9b0" });
         if (label) {
-          var lp = latLonToVec3(st.lat, st.lon, GLOBE_R * 1.16);
+          var lp = latLonToVec3(st.lat, st.lon, GLOBE_R * 1.17);
           label.position.copy(lp);
           world.add(label);
           if (label.material.map) disposables.push(label.material.map);
@@ -263,38 +404,51 @@
         }
       });
 
-      // Submarine cables — curved arcs lifted off the surface + flowing pulses.
+      // ---- submarine cables: glowing tube + halo + flowing pulse -----------
       var pulses = [];
-      var cableTubes = [];   // keep tube materials so progress can recolour them later
+      var cableTubes = [];   // keep tube materials so progress can recolour them
       CABLES.forEach(function (cab) {
         var a = STATION_BY_ID[cab.from], b = STATION_BY_ID[cab.to];
-        var start = latLonToVec3(a.lat, a.lon, GLOBE_R * 1.01);
-        var end = latLonToVec3(b.lat, b.lon, GLOBE_R * 1.01);
+        var start = latLonToVec3(a.lat, a.lon, GLOBE_R * 1.008);
+        var end = latLonToVec3(b.lat, b.lon, GLOBE_R * 1.008);
         var mid = start.clone().add(end).multiplyScalar(0.5);
         var lift = 1 + 0.18 + 0.22 * (start.distanceTo(end) / GLOBE_R);
         mid.normalize().multiplyScalar(GLOBE_R * lift);
         var curve = new THREE.QuadraticBezierCurve3(start, mid, end);
 
         var col = (STATUS_COLOR[cab.status] || STATUS_COLOR.planned).hex;
+        // thickness scales subtly with fibre-pair count (12..24 -> ~0.011..0.018)
+        var radius = 0.010 + 0.0035 * ((cab.fibrePairs || 12) / 12);
 
-        // Cable as a thin glowing tube.
-        var tubeGeo = new THREE.TubeGeometry(curve, 64, 0.012, 8, false);
-        var tubeMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.82 });
+        // bright core tube (picked up by bloom)
+        var tubeGeo = new THREE.TubeGeometry(curve, 80, radius, 10, false);
+        var tubeMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.92 });
         var tube = new THREE.Mesh(tubeGeo, tubeMat);
         world.add(tube);
         disposables.push(tubeGeo, tubeMat);
-        cableTubes.push({ id: cab.id, cable: cab, mat: tubeMat, baseHex: col });
 
-        // Flowing light pulse travelling along the cable.
-        var pGeo = new THREE.SphereGeometry(0.04, 12, 12);
-        var pMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
+        // wide faint halo underneath for a glow base
+        var haloGeo = new THREE.TubeGeometry(curve, 80, radius * 3.2, 10, false);
+        var haloMat = new THREE.MeshBasicMaterial({
+          color: col, transparent: true, opacity: 0.16,
+          blending: THREE.AdditiveBlending, depthWrite: false
+        });
+        var halo = new THREE.Mesh(haloGeo, haloMat);
+        world.add(halo);
+        disposables.push(haloGeo, haloMat);
+
+        cableTubes.push({ id: cab.id, cable: cab, mat: tubeMat, haloMat: haloMat, baseHex: col });
+
+        // flowing light pulse travelling along the cable
+        var pGeo = new THREE.SphereGeometry(0.045, 14, 14);
+        var pMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.98, blending: THREE.AdditiveBlending, depthWrite: false });
         var pulse = new THREE.Mesh(pGeo, pMat);
         world.add(pulse);
         disposables.push(pGeo, pMat);
         pulses.push({ curve: curve, mesh: pulse, speed: 0.06 + Math.random() * 0.05, offset: Math.random() });
 
-        // Mid-cable label (short id) for orientation.
-        var seg = makeLabelSprite(cab.id, { fontSize: 22, scale: 0.3, color: (STATUS_COLOR[cab.status] || STATUS_COLOR.planned).css, bg: "rgba(8,16,32,0.6)" });
+        // mid-cable id label for orientation
+        var seg = makeLabelSprite(cab.id, { fontSize: 22, scale: 0.3, color: (STATUS_COLOR[cab.status] || STATUS_COLOR.planned).css, bg: "rgba(8,16,32,0.62)" });
         if (seg) {
           seg.position.copy(mid.clone().multiplyScalar(1.02));
           world.add(seg);
@@ -303,46 +457,93 @@
         }
       });
 
-      // --- interaction: drag to rotate, wheel to zoom -----------------------
-      var dragging = false, lastX = 0, lastY = 0;
-      var rotX = 0.35;            // tilt so SE-Asia faces the camera
-      world.rotation.x = rotX;
+      // initial orientation: tilt + spin so SE-Asia faces the camera
+      world.rotation.x = 0.32;
       world.rotation.y = -1.9;
 
-      function onPointerDown(e) {
-        dragging = true;
-        lastX = (e.touches ? e.touches[0].clientX : e.clientX);
-        lastY = (e.touches ? e.touches[0].clientY : e.clientY);
-        renderer.domElement.style.cursor = "grabbing";
-      }
-      function onPointerMove(e) {
-        if (!dragging) return;
-        var cx = (e.touches ? e.touches[0].clientX : e.clientX);
-        var cy = (e.touches ? e.touches[0].clientY : e.clientY);
-        world.rotation.y += (cx - lastX) * 0.005;
-        world.rotation.x += (cy - lastY) * 0.005;
-        world.rotation.x = Math.max(-1.3, Math.min(1.3, world.rotation.x));
-        lastX = cx; lastY = cy;
-        if (e.cancelable) e.preventDefault();
-      }
-      function onPointerUp() { dragging = false; renderer.domElement.style.cursor = "grab"; }
-      function onWheel(e) {
-        camDist += (e.deltaY > 0 ? 1 : -1) * 0.4;
-        camDist = Math.max(3.2, Math.min(12, camDist));
-        camera.position.z = camDist;
-        if (e.cancelable) e.preventDefault();
+      /* ---------------------------------------------- controls / interaction */
+      var controls = null;
+      var listeners = {};
+      var hasOrbit = typeof THREE.OrbitControls === "function";
+      if (hasOrbit) {
+        try {
+          controls = new THREE.OrbitControls(camera, renderer.domElement);
+          controls.enableDamping = true;
+          controls.dampingFactor = 0.05;
+          controls.enablePan = false;
+          controls.autoRotate = true;
+          controls.autoRotateSpeed = 0.3;
+          controls.minDistance = 3.2;
+          controls.maxDistance = 12;
+          controls.rotateSpeed = 0.6;
+          controls.zoomSpeed = 0.8;
+        } catch (e) { controls = null; }
       }
 
-      var el = renderer.domElement;
-      el.addEventListener("mousedown", onPointerDown);
-      window.addEventListener("mousemove", onPointerMove);
-      window.addEventListener("mouseup", onPointerUp);
-      el.addEventListener("touchstart", onPointerDown, { passive: true });
-      el.addEventListener("touchmove", onPointerMove, { passive: false });
-      el.addEventListener("touchend", onPointerUp);
-      el.addEventListener("wheel", onWheel, { passive: false });
+      if (!controls) {
+        // ---- fallback: custom drag-to-rotate + wheel-to-zoom ---------------
+        var dragging = false, lastX = 0, lastY = 0;
+        listeners.onPointerDown = function (e) {
+          dragging = true;
+          lastX = (e.touches ? e.touches[0].clientX : e.clientX);
+          lastY = (e.touches ? e.touches[0].clientY : e.clientY);
+          renderer.domElement.style.cursor = "grabbing";
+        };
+        listeners.onPointerMove = function (e) {
+          if (!dragging) return;
+          var cx = (e.touches ? e.touches[0].clientX : e.clientX);
+          var cy = (e.touches ? e.touches[0].clientY : e.clientY);
+          world.rotation.y += (cx - lastX) * 0.005;
+          world.rotation.x += (cy - lastY) * 0.005;
+          world.rotation.x = Math.max(-1.3, Math.min(1.3, world.rotation.x));
+          lastX = cx; lastY = cy;
+          if (e.cancelable) e.preventDefault();
+        };
+        listeners.onPointerUp = function () { dragging = false; renderer.domElement.style.cursor = "grab"; };
+        listeners.onWheel = function (e) {
+          camDist += (e.deltaY > 0 ? 1 : -1) * 0.4;
+          camDist = Math.max(3.2, Math.min(12, camDist));
+          camera.position.z = camDist;
+          if (e.cancelable) e.preventDefault();
+        };
+        var elc = renderer.domElement;
+        elc.addEventListener("mousedown", listeners.onPointerDown);
+        window.addEventListener("mousemove", listeners.onPointerMove);
+        window.addEventListener("mouseup", listeners.onPointerUp);
+        elc.addEventListener("touchstart", listeners.onPointerDown, { passive: true });
+        elc.addEventListener("touchmove", listeners.onPointerMove, { passive: false });
+        elc.addEventListener("touchend", listeners.onPointerUp);
+        elc.addEventListener("wheel", listeners.onWheel, { passive: false });
+        state = state || {};
+        state.__dragging = function () { return dragging; };
+      }
 
-      // --- resize -----------------------------------------------------------
+      /* ------------------------------------------------- post-processing ---- */
+      var composer = null, bloomPass = null, fxaaPass = null;
+      var canCompose = typeof THREE.EffectComposer === "function" &&
+                       typeof THREE.RenderPass === "function" &&
+                       typeof THREE.UnrealBloomPass === "function";
+      if (canCompose) {
+        try {
+          composer = new THREE.EffectComposer(renderer);
+          composer.setSize(width, height);
+          if (composer.setPixelRatio) composer.setPixelRatio(dpr);
+          composer.addPass(new THREE.RenderPass(scene, camera));
+          bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(width, height), 0.75, 0.4, 0.85);
+          composer.addPass(bloomPass);
+          var lastPass = bloomPass;
+          if (typeof THREE.ShaderPass === "function" && THREE.FXAAShader) {
+            fxaaPass = new THREE.ShaderPass(THREE.FXAAShader);
+            var pr = renderer.getPixelRatio();
+            fxaaPass.material.uniforms["resolution"].value.set(1 / (width * pr), 1 / (height * pr));
+            composer.addPass(fxaaPass);
+            lastPass = fxaaPass;
+          }
+          if (lastPass) lastPass.renderToScreen = true;
+        } catch (e) { composer = null; }
+      }
+
+      /* ------------------------------------------------------------- resize */
       function resize() {
         var w = containerEl.clientWidth || width;
         var h = containerEl.clientHeight || height;
@@ -350,7 +551,14 @@
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
         renderer.setSize(w, h);
+        if (composer) composer.setSize(w, h);
+        if (bloomPass && bloomPass.setSize) bloomPass.setSize(w, h);
+        if (fxaaPass) {
+          var pr2 = renderer.getPixelRatio();
+          fxaaPass.material.uniforms["resolution"].value.set(1 / (w * pr2), 1 / (h * pr2));
+        }
       }
+      listeners.resize = resize;
       var ro = null;
       if (typeof ResizeObserver !== "undefined") {
         ro = new ResizeObserver(resize);
@@ -358,32 +566,62 @@
       }
       window.addEventListener("resize", resize);
 
-      // --- animation loop ---------------------------------------------------
+      /* --------------------------------------------------- animation loop -- */
       var clock = new THREE.Clock();
       var raf = 0, alive = true;
+      var dragFn = state && state.__dragging ? state.__dragging : function () { return false; };
       function animate() {
         if (!alive) return;
         raf = window.requestAnimationFrame(animate);
         var t = clock.getElapsedTime();
-        if (!dragging) world.rotation.y += 0.0016;   // gentle auto-rotation
-        // glowing markers breathe slightly
+
+        if (controls) {
+          controls.update();
+        } else if (!dragFn()) {
+          world.rotation.y += 0.0016;     // gentle auto-rotation in fallback
+        }
+
+        if (clouds) clouds.rotation.y += 0.00045;   // clouds drift a touch faster
+
+        // slowly drift the sun for a living terminator, keep night-lights in sync
+        sun.position.x = 5 * Math.cos(t * 0.015);
+        sun.position.z = 4.2 * Math.sin(t * 0.015) + 2.0;
+        sunDir.copy(sun.position).normalize();
+        if (night && night.material && night.material.uniforms) {
+          night.material.uniforms.uSunDir.value.copy(sunDir);
+        }
+
+        // flowing cable pulses (brightest mid-span)
         for (var i = 0; i < pulses.length; i++) {
           var pu = pulses[i];
           var u = (t * pu.speed + pu.offset) % 1;
           pu.curve.getPoint(u, pu.mesh.position);
-          var s = 0.7 + 0.5 * Math.sin((u) * Math.PI);   // brightest mid-span
-          pu.mesh.scale.setScalar(s);
+          pu.mesh.scale.setScalar(0.7 + 0.5 * Math.sin(u * Math.PI));
         }
-        renderer.render(scene, camera);
+        // expanding station pulse rings
+        for (var k = 0; k < rings.length; k++) {
+          var rg = rings[k];
+          var rp = (t * 0.5 + rg.offset) % 1;
+          var sc = 1 + rp * 2.6;
+          rg.mesh.scale.set(sc, sc, sc);
+          rg.mat.opacity = 0.6 * (1 - rp);
+        }
+
+        if (composer) composer.render();
+        else renderer.render(scene, camera);
       }
 
+      var prevState = state || {};
       state = {
         renderer: renderer, scene: scene, camera: camera, world: world,
-        disposables: disposables, el: el, ro: ro, containerEl: containerEl,
-        cableTubes: cableTubes,
-        listeners: { onPointerDown: onPointerDown, onPointerMove: onPointerMove, onPointerUp: onPointerUp, onWheel: onWheel, resize: resize },
+        disposables: disposables, el: renderer.domElement, ro: ro, containerEl: containerEl,
+        cableTubes: cableTubes, controls: controls, composer: composer,
+        bloomPass: bloomPass, fxaaPass: fxaaPass,
+        listeners: listeners,
         stop: function () { alive = false; if (raf) window.cancelAnimationFrame(raf); }
       };
+      // carry over the fallback drag-probe if one was installed
+      if (prevState.__dragging) state.__dragging = prevState.__dragging;
 
       // Best-effort: reflect any saved route progress on first mount.
       try { setProgress(); } catch (e) {}
@@ -391,6 +629,8 @@
       // Only drive the loop when frames are actually available (not in jsdom).
       if (typeof window.requestAnimationFrame === "function") {
         animate();
+      } else if (composer) {
+        composer.render();
       } else {
         renderer.render(scene, camera);
       }
@@ -438,7 +678,11 @@
     state.cableTubes.forEach(function (t) {
       if (!t.mat) return;
       if (Object.prototype.hasOwnProperty.call(map, t.id)) {
-        try { t.mat.color = progressColor(THREE, map[t.id]); t.mat.needsUpdate = true; } catch (e) {}
+        try {
+          var col = progressColor(THREE, map[t.id]);
+          t.mat.color = col; t.mat.needsUpdate = true;
+          if (t.haloMat) { t.haloMat.color = col.clone(); t.haloMat.needsUpdate = true; }
+        } catch (e) {}
       }
     });
     return true;
@@ -453,18 +697,26 @@
     try {
       var l = s.listeners || {};
       if (s.el) {
-        s.el.removeEventListener("mousedown", l.onPointerDown);
-        s.el.removeEventListener("touchstart", l.onPointerDown);
-        s.el.removeEventListener("touchmove", l.onPointerMove);
-        s.el.removeEventListener("touchend", l.onPointerUp);
-        s.el.removeEventListener("wheel", l.onWheel);
+        if (l.onPointerDown) { s.el.removeEventListener("mousedown", l.onPointerDown); s.el.removeEventListener("touchstart", l.onPointerDown); }
+        if (l.onPointerMove) s.el.removeEventListener("touchmove", l.onPointerMove);
+        if (l.onPointerUp) s.el.removeEventListener("touchend", l.onPointerUp);
+        if (l.onWheel) s.el.removeEventListener("wheel", l.onWheel);
       }
-      window.removeEventListener("mousemove", l.onPointerMove);
-      window.removeEventListener("mouseup", l.onPointerUp);
-      window.removeEventListener("resize", l.resize);
+      if (l.onPointerMove) window.removeEventListener("mousemove", l.onPointerMove);
+      if (l.onPointerUp) window.removeEventListener("mouseup", l.onPointerUp);
+      if (l.resize) window.removeEventListener("resize", l.resize);
       if (s.ro) s.ro.disconnect();
     } catch (e) {}
+    try { if (s.controls && s.controls.dispose) s.controls.dispose(); } catch (e) {}
     try { (s.disposables || []).forEach(function (d) { if (d && typeof d.dispose === "function") d.dispose(); }); } catch (e) {}
+    try {
+      if (s.composer) {
+        if (s.composer.renderTarget1 && s.composer.renderTarget1.dispose) s.composer.renderTarget1.dispose();
+        if (s.composer.renderTarget2 && s.composer.renderTarget2.dispose) s.composer.renderTarget2.dispose();
+        if (s.bloomPass && s.bloomPass.dispose) s.bloomPass.dispose();
+        if (s.fxaaPass && s.fxaaPass.dispose) s.fxaaPass.dispose();
+      }
+    } catch (e) {}
     try {
       if (s.renderer) {
         s.renderer.dispose();
