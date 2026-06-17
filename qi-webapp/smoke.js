@@ -309,6 +309,14 @@ doc.getElementById("btnFx").click();
 ok(!doc.documentElement.classList.contains("fx-on") && S.brand().fx === false, "FX toggle off persists to brand.fx");
 doc.getElementById("btnFx").click();
 ok(doc.documentElement.classList.contains("fx-on") && S.brand().fx === true, "FX toggle back on persists");
+// 13f) UI sound toggle: button exists, defaults off, toggles + persists (no-throw without AudioContext)
+ok(!!doc.getElementById("btnSound"), "UI sound toggle button present");
+ok(!S.brand().sound, "UI sound is off by default");
+let soundThrew = false;
+try { doc.getElementById("btnSound").click(); } catch (e) { soundThrew = true; }
+ok(!soundThrew && S.brand().sound === true, "sound toggle on persists (no-throw without AudioContext)");
+doc.getElementById("btnSound").click();
+ok(S.brand().sound === false, "sound toggle off persists");
 
 // 13e) toast styling actually applies (not the default unstyled span)
 window.QIStore && window.QIStore.save && (function () {

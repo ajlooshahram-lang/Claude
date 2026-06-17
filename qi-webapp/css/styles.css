@@ -878,6 +878,7 @@ html.fx-on .fx-overlay{display:block;position:fixed;inset:0;z-index:60;pointer-e
   animation:fxFlicker 5s steps(40) infinite;will-change:opacity}
 @keyframes fxFlicker{0%,100%{opacity:.55}48%{opacity:.62}52%{opacity:.5}}
 #btnFx.is-on{color:var(--neon-cyan);box-shadow:var(--glow-cyan)}
+#btnSound.is-on{color:var(--neon-pink);box-shadow:var(--glow-pink)}
 /* FX-only accents (don't clobber base animations) */
 html.fx-on .card-head h3::before{animation:barGlow 2.6s ease-in-out infinite}
 @keyframes barGlow{0%,100%{box-shadow:var(--glow-cyan)}50%{box-shadow:0 0 16px rgba(34,225,230,.85),0 0 30px rgba(255,63,164,.4)}}

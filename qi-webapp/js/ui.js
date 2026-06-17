@@ -25,9 +25,46 @@
     return s ? `<span class="badge ${map[s] || ""}">${esc(s)}</span>` : "";
   }
   function barCell(p) { p = Number(p) || 0; return `<span class="bar"><span style="width:${Math.round(p * 100)}%"></span></span> ${pct(p)}`; }
+  // Optional UI sound cues — generated in-code via Web Audio (no files, offline).
+  // Off by default; enabled via brand.sound. Fully guarded: a no-op when disabled
+  // or when AudioContext is unavailable (e.g. jsdom), and never throws.
+  const Sound = (function () {
+    let ctx = null, enabled = false;
+    function ensure() {
+      if (!enabled) return null;
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        if (!ctx) ctx = new AC();
+        if (ctx.state === "suspended" && ctx.resume) ctx.resume();
+        return ctx;
+      } catch (e) { return null; }
+    }
+    function tone(freq, dur, type, vol) {
+      const c = ensure(); if (!c) return;
+      try {
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = type || "sine"; o.frequency.value = freq;
+        const t = c.currentTime;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(vol || 0.05, t + 0.008);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + (dur || 0.12));
+        o.connect(g); g.connect(c.destination);
+        o.start(t); o.stop(t + (dur || 0.12) + 0.02);
+      } catch (e) {}
+    }
+    return {
+      setEnabled(v) { enabled = !!v; },
+      isEnabled() { return enabled; },
+      nav() { tone(523, 0.08, "sine", 0.045); setTimeout(() => tone(784, 0.07, "sine", 0.035), 55); },
+      confirm() { tone(880, 0.09, "sine", 0.05); setTimeout(() => tone(1175, 0.11, "sine", 0.04), 85); }
+    };
+  })();
+
   function toast(msg, opts) {
     const t = $("#toast"); if (!t) return;
     opts = opts || {};
+    try { Sound.confirm(); } catch (e) {}
     const ms = opts.ms || (opts.action ? 5000 : 2200);
     t.innerHTML = `<span>${esc(msg)}</span>` + (opts.action ? `<button class="toast-action" id="toastAct">${esc(opts.action.label)}</button>` : "");
     t.hidden = false;
@@ -104,7 +141,7 @@
     nav.innerHTML = VIEWS.map(v => v.g
       ? `<div class="nav-sep">${esc(v.g)}</div>`
       : `<button class="nav-item" data-view="${v.id}"><span class="ico">${v.icon}</span><span class="lab">${esc(v.label)}</span></button>`).join("");
-    nav.querySelectorAll(".nav-item").forEach(b => b.addEventListener("click", () => go(b.dataset.view)));
+    nav.querySelectorAll(".nav-item").forEach(b => b.addEventListener("click", () => { try { Sound.nav(); } catch (e) {} go(b.dataset.view); }));
   }
 
   let current = "dashboard";
@@ -2699,6 +2736,20 @@
     S.setBrand({ fx: !on });
     applyFX(); toast("Arcade FX: " + (S.brand().fx === false ? "off" : "on"));
   }
+  // Optional UI sound cues — off by default, persisted in brand.sound.
+  function applySound() {
+    const on = !!(S.brand() && S.brand().sound === true);
+    Sound.setEnabled(on);
+    const btn = $("#btnSound");
+    if (btn) { btn.classList.toggle("is-on", on); btn.setAttribute("aria-pressed", on ? "true" : "false"); }
+  }
+  function toggleSound() {
+    const on = !!(S.brand() && S.brand().sound === true);
+    S.setBrand({ sound: !on });
+    applySound();
+    if (!on) { try { Sound.confirm(); } catch (e) {} }   // audible feedback when enabling
+    toast("Sound: " + (S.brand().sound ? "on" : "off"));
+  }
   function runChecks() {
     const issues = S.health();
     const k = S.kpis();
@@ -2960,6 +3011,7 @@
   $("#btnPrint").addEventListener("click", () => window.print());
   $("#btnTheme").addEventListener("click", toggleTheme);
   { const bfx = $("#btnFx"); if (bfx) bfx.addEventListener("click", toggleFX); }
+  { const bs = $("#btnSound"); if (bs) bs.addEventListener("click", toggleSound); }
   $("#btnChecks").addEventListener("click", runChecks);
   $("#btnHelp").addEventListener("click", showShortcuts);
   $("#fileImport").addEventListener("change", e => { if (e.target.files[0]) handleImport(e.target.files[0]); e.target.value = ""; });
@@ -3015,7 +3067,7 @@
 
   // ---------- init (called by auth.js after successful authentication) ----------
   window.QIBoot = function () {
-    S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); applyFX(); refreshHeader();
+    S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); applyFX(); applySound(); refreshHeader();
     const initialHash = (location.hash || "").replace(/^#/, "");
     go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
     // Wire up logout button after boot
