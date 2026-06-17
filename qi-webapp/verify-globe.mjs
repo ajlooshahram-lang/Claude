@@ -431,6 +431,42 @@ async function main() {
   ok(pageErrors.length === 0 && cspFinal === 0 && consoleCSP.length === 0,
     "no page errors / CSP violations during the country drill-down");
 
+  // ---- Investor Brief (plain-language, print-ready one-pager) ------------
+  // Proves the print button works under the STRICT served CSP — i.e. it is
+  // wired via addEventListener, not an inline onclick (which script-src 'self'
+  // would refuse). Also confirms the brief renders the whole auto-built story.
+  const invBrief = await page.evaluate(() => {
+    const nav = document.querySelector('.nav-item[data-view="investorbrief"]');
+    if (nav) nav.dispatchEvent(new Event("click", { bubbles: true }));
+    const el = document.getElementById("investorBrief");
+    if (!el) return null;
+    const btn = document.getElementById("briefPrint");
+    window.__printed = 0; window.print = () => { window.__printed++; };  // no blocking dialog in headless
+    let printErr = null;
+    try { if (btn) btn.click(); } catch (e) { printErr = String(e); }
+    return {
+      countries: el.querySelectorAll(".brief-country").length,
+      verdicts: el.querySelectorAll(".brief-verdict").length,
+      cableRows: el.querySelectorAll(".brief-table tbody tr").length,
+      risks: el.querySelectorAll(".brief-risks li").length,
+      text: el.textContent || "",
+      hasInlineOnclick: btn ? !!btn.getAttribute("onclick") : true,
+      printed: window.__printed, printErr
+    };
+  });
+  ok(!!invBrief, "Investor Brief view renders in the browser");
+  ok(invBrief && invBrief.countries === 8 && invBrief.verdicts === 8, "Investor Brief shows all 8 countries with market-entry verdicts");
+  ok(invBrief && invBrief.cableRows >= 8 && invBrief.risks > 0, "Investor Brief lists every cable segment + the biggest things to watch");
+  ok(invBrief && /USD\s*1\.3B/.test(invBrief.text) && /60 months/.test(invBrief.text), "Investor Brief shows the headline budget (USD 1.3B) + build time (60 months)");
+  ok(invBrief && !invBrief.hasInlineOnclick && invBrief.printed === 1,
+    "print button is CSP-safe (no inline onclick) and fires window.print() under strict CSP");
+  ok(invBrief && !/\bRPN\b|\bFMEA\b|\bEVM\b|\bWBS\b/.test(invBrief.text), "Investor Brief leaks no PM/FMEA jargon");
+
+  // The brief + print click must produce no CSP violations under the strict CSP.
+  const cspBrief = await page.evaluate(() => (window.__csp || []).length);
+  ok(pageErrors.length === 0 && cspBrief === 0 && consoleCSP.length === 0,
+    "no page errors / CSP violations rendering the Investor Brief or printing");
+
   await browser.close();
   server.close();
 

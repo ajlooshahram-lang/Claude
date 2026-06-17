@@ -50,6 +50,7 @@
   const VIEWS = [
     { g: "Overview" },
     { id: "brain", label: "Project Brain", icon: "🧠" },
+    { id: "investorbrief", label: "Investor Brief", icon: "📄" },
     { id: "portfolio", label: "Portfolio", icon: "▣" },
     { id: "dashboard", label: "Dashboard", icon: "▤" },
     { id: "cases", label: "Cases (Master)", icon: "★" },
@@ -472,6 +473,146 @@
         if (row) { e.preventDefault(); onRow(row); }
       });
     }
+  };
+
+  // Investor Brief — a plain-language, print-ready one-pager generated entirely
+  // from the auto-built plan. Built for non-technical decision-makers: it tells
+  // the whole story (what gets built, who to deal with in each country, when it
+  // goes live, how much it costs, and what to watch) on a single page a
+  // stakeholder can hand to their board. Reuses the on-device Brain
+  // (QICountryData) + the 3D network dataset (QIGlobe). No PM jargon.
+  RENDER.investorbrief = function () {
+    const G = window.QIGlobe || {};
+    const CD = window.QICountryData;
+    const cables = Array.isArray(G.CABLES) ? G.CABLES : [];
+    const stations = Array.isArray(G.STATIONS) ? G.STATIONS : [];
+    const prog = G.PROGRAMME || { budgetUsd: 1300e6, durationMonths: 60 };
+    const proj = (S && typeof S.get === "function" && S.get().project) || {};
+    const title = proj.name || "Submarine Telecom Project (STP)";
+    const statusLabel = { "commissioned": "Commissioned", "in-progress": "In progress", "planned": "Planned" };
+    const fmtUsd = n => {
+      n = Number(n) || 0;
+      if (n >= 1e9) { const b = n / 1e9; return "USD " + (b >= 10 ? Math.round(b) : (Math.round(b * 10) / 10)) + "B"; }
+      if (n >= 1e6) return "USD " + Math.round(n / 1e6) + "M";
+      if (n >= 1e3) return "USD " + Math.round(n / 1e3) + "K";
+      return "USD " + n;
+    };
+    const verdictSlug = v => {
+      const s = String(v || "").toLowerCase();
+      if (s.indexOf("caution") !== -1) return "caution";
+      if (s.indexOf("conditional") !== -1) return "cond";
+      return "go";
+    };
+    const riskSlug = lvl => {
+      const s = String(lvl || "").toLowerCase();
+      if (s.indexOf("top") !== -1) return "crit";
+      if (s.indexOf("important") !== -1) return "high";
+      return "med";
+    };
+
+    const totalKm = cables.reduce((a, c) => a + (Number(c.lengthKm) || 0), 0);
+    const totalCap = cables.reduce((a, c) => a + (Number(c.capacityTbps) || 0), 0);
+
+    // Pull every country's plain-language briefing from the Brain.
+    const list = (CD && typeof CD.list === "function") ? CD.list() : [];
+    const briefs = list
+      .map(c => (CD && typeof CD.briefing === "function") ? CD.briefing(c.key + " " + c.name) : null)
+      .filter(Boolean);
+
+    // Aggregate the biggest things to watch across all countries (worst-first).
+    const allRisks = [];
+    briefs.forEach(b => (b.risks || []).forEach(r =>
+      allRisks.push({ country: b.name, text: r.text, level: r.level, rank: r.rank })));
+    allRisks.sort((a, b) => a.rank - b.rank);
+    const topRisks = allRisks.slice(0, 8);
+
+    const statChips = [
+      { v: totalKm.toLocaleString() + " km", l: "Cable route" },
+      { v: totalCap.toLocaleString() + " Tbps", l: "Capacity" },
+      { v: String(stations.length), l: "Countries connected" },
+      { v: "about " + fmtUsd(prog.budgetUsd), l: "Programme budget" },
+      { v: prog.durationMonths + " months", l: "Build time" }
+    ].map(s => `<div class="brief-stat"><span class="brief-stat-v">${esc(s.v)}</span><span class="brief-stat-l">${esc(s.l)}</span></div>`).join("");
+
+    const cableRows = cables.map(c => {
+      const a = stations.find(s => s.id === c.from), b = stations.find(s => s.id === c.to);
+      return `<tr>
+        <td>${esc(c.name)}</td>
+        <td>${esc(a ? a.name : c.from)} → ${esc(b ? b.name : c.to)}</td>
+        <td class="brief-num">${(Number(c.lengthKm) || 0).toLocaleString()} km</td>
+        <td class="brief-num">${esc(String(c.capacityTbps))} Tbps</td>
+        <td><span class="brief-status brief-status--${esc(c.status)}">${esc(statusLabel[c.status] || c.status)}</span></td>
+      </tr>`;
+    }).join("");
+
+    const countryCards = briefs.map(b => {
+      const a = b.authority || {};
+      const me = b.marketEntry || {};
+      const lic = b.licensing || {};
+      const lp = b.landingParties || {};
+      const partners = (lp.candidates || []).slice(0, 3).join(", ");
+      const topRisk = (b.risks || [])[0];
+      return `<div class="brief-country">
+        <div class="brief-country-head">
+          <h4>${esc(b.name)}</h4>
+          <span class="brief-verdict brief-verdict--${verdictSlug(me.verdict)}">${esc(me.verdict || "")}</span>
+        </div>
+        <p class="brief-row"><span class="brief-k">Who approves it</span> ${esc(a.abbrev || "")} — ${esc(a.name || "")}</p>
+        <p class="brief-row"><span class="brief-k">Start this first</span> ${esc(lic.criticalPathItem || "—")}${lic.criticalPathMonths ? " (about " + esc(String(lic.criticalPathMonths)) + " months)" : ""}</p>
+        <p class="brief-row"><span class="brief-k">Can land the cable</span> ${esc(partners || "—")}</p>
+        ${topRisk ? `<p class="brief-row"><span class="brief-risk brief-risk--${riskSlug(topRisk.level)}">${esc(topRisk.level)}</span> ${esc(topRisk.text)}</p>` : ""}
+      </div>`;
+    }).join("");
+
+    const riskRows = topRisks.map(r => `<li>
+      <span class="brief-risk brief-risk--${riskSlug(r.level)}">${esc(r.level)}</span>
+      <span class="brief-risk-text">${esc(r.text)}</span>
+      <span class="brief-risk-where">${esc(r.country)}</span></li>`).join("");
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    return `
+      <div class="toolbar no-print">
+        <button class="btn btn-primary" id="briefPrint" type="button">🖨 Print / Save as PDF</button>
+        <span class="muted">A plain-language one-pager you can hand to your board — built automatically from your project. No jargon.</span>
+      </div>
+      <div class="brief" id="investorBrief">
+        <header class="brief-head">
+          <div class="brief-head-top">
+            <h1>${esc(title)}</h1>
+            <span class="brief-date">Prepared ${esc(today)}</span>
+          </div>
+          <p class="brief-tagline">A submarine fibre-optic network connecting ${stations.length} countries across Asia and the Pacific — what gets built, who to work with, when it goes live, and what it costs.</p>
+          <div class="brief-stats">${statChips}</div>
+        </header>
+
+        <section class="brief-section">
+          <h3>The network at a glance</h3>
+          <table class="brief-table">
+            <thead><tr><th>Cable segment</th><th>Route</th><th class="brief-num">Length</th><th class="brief-num">Capacity</th><th>Status</th></tr></thead>
+            <tbody>${cableRows || '<tr><td colspan="5" class="muted">No cable data</td></tr>'}</tbody>
+          </table>
+        </section>
+
+        <section class="brief-section">
+          <h3>Country by country</h3>
+          <p class="brief-lead">For each country: the official body you need on side, whether it's worth going in, the approval to start first (it takes the longest), who can bring the cable ashore, and the single biggest thing to watch.</p>
+          <div class="brief-countries">${countryCards || '<p class="muted">No country data</p>'}</div>
+        </section>
+
+        <section class="brief-section">
+          <h3>The biggest things to watch</h3>
+          <ul class="brief-risks">${riskRows || '<li class="muted">No risks listed</li>'}</ul>
+        </section>
+
+        <footer class="brief-foot">
+          <p>Verdicts are a quick traffic-light to focus attention, not a guarantee. Budget and timeline are the programme's headline figures; per-country detail is drawn from each country's regulator and route data. Speak to each named authority before committing.</p>
+        </footer>
+      </div>`;
+  };
+  AFTER.investorbrief = function () {
+    const btn = $("#briefPrint");
+    if (btn) btn.addEventListener("click", () => { try { window.print(); } catch (e) {} });
   };
 
   // Route Progress — submarine-cable construction tracking (GIS delivery view).

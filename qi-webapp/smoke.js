@@ -733,6 +733,26 @@ ok(doc.querySelectorAll(".country-card").length === 8, "Country Intelligence vie
   ok(countryOut.indexOf(ab) !== -1, "Country view names the real authority " + ab));
 ok(/South China Sea|East Sea/i.test(countryOut), "Country view surfaces geopolitical (South China Sea) hazards");
 ok(/typhoon/i.test(countryOut), "Country view surfaces geographical (typhoon) hazards");
+
+// 39b) Investor Brief — plain-language, print-ready one-pager from the auto-built plan
+window.print = function () { window.__printed = (window.__printed || 0) + 1; };
+doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const briefOut = doc.getElementById("content").innerHTML;
+ok(doc.getElementById("investorBrief") != null, "Investor Brief view renders");
+ok(doc.querySelectorAll(".brief-country").length === 8, "Investor Brief shows all 8 countries (got " + doc.querySelectorAll(".brief-country").length + ")");
+ok(doc.querySelectorAll(".brief-table tbody tr").length === window.QIGlobe.CABLES.length, "Investor Brief lists every cable segment");
+ok(/USD\s*1\.3B/.test(briefOut) && /60 months/.test(briefOut), "Investor Brief shows the headline budget (USD 1.3B) and build time (60 months)");
+ok(doc.querySelectorAll(".brief-verdict").length === 8, "Investor Brief shows a market-entry verdict for each country");
+ok(doc.querySelectorAll(".brief-risks li").length > 0, "Investor Brief lists the biggest things to watch");
+["FCC","NCC","NBTC","MCMC"].forEach(ab => ok(briefOut.indexOf(ab) !== -1, "Investor Brief names the real authority " + ab));
+// the print button must be CSP-safe (wired via addEventListener, NOT an inline onclick)
+const briefPrintBtn = doc.getElementById("briefPrint");
+ok(briefPrintBtn != null && !briefPrintBtn.getAttribute("onclick"), "Investor Brief print button has no inline onclick (CSP-safe)");
+window.__printed = 0;
+briefPrintBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(window.__printed === 1, "clicking 'Print / Save as PDF' invokes window.print() once");
+// zero PM/FMEA jargon for the non-technical reader
+ok(!/\bRPN\b|\bFMEA\b|\bEVM\b|\bWBS\b|\bSPI\b|\bCPI\b/.test(briefOut), "Investor Brief leaks no PM/FMEA jargon");
 // Brain detects named countries and injects permit tasks + FMEA risks
 S.reset();
 doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
