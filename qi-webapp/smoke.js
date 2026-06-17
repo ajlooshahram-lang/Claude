@@ -762,6 +762,7 @@ ok(doc.querySelectorAll(".brief-country").length === 8, "Investor Brief shows al
 ok(doc.querySelectorAll(".brief-table tbody tr").length === window.QIGlobe.CABLES.length, "Investor Brief lists every cable segment");
 ok(/USD\s*1\.3B/.test(briefOut) && /60 months/.test(briefOut), "Investor Brief shows the headline budget (USD 1.3B) and build time (60 months)");
 ok(doc.querySelectorAll(".brief-verdict").length === 8, "Investor Brief shows a market-entry verdict for each country");
+ok(doc.querySelectorAll(".brief-takeaway").length === 8, "Investor Brief gives a 'what this means for you' line for each country");
 ok(doc.querySelector(".brief-spend svg.spend-svg") != null && doc.querySelector(".brief-spend path.spend-line") != null,
    "Investor Brief renders the spending-over-time S-curve (inline SVG)");
 ok(/Spending over time/.test(briefOut), "Investor Brief includes the 'Spending over time' section");
@@ -829,6 +830,7 @@ STN.forEach(([id, country, nameFrag]) => {
   ok(!!b && Array.isArray(b.landingParties.candidates) && b.landingParties.candidates.length > 0, "Briefing for " + id + " lists who can land the cable");
   ok(!!b && b.risks.length > 0 && b.risks.every(r => /^(Top concern|Important|Worth watching)$/.test(r.level)), "Briefing for " + id + " uses plain risk levels");
   ok(!!b && b.geographical.length > 0 && b.geopolitical.length > 0, "Briefing for " + id + " surfaces nature + politics");
+  ok(!!b && typeof b.takeaway === "string" && b.takeaway.length > 30, "Briefing for " + id + " includes a 'what this means for you' takeaway");
   // zero PM/FMEA jargon must leak to non-technical readers
   const blob = JSON.stringify(b);
   ok(!/RISK:|\bRPN\b|\bFMEA\b|"sev"|"occ"|"det"|priority/.test(blob), "Briefing for " + id + " leaks no PM/FMEA jargon");

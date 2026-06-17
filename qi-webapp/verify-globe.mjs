@@ -424,6 +424,7 @@ async function main() {
   ok(brief && brief.hasRiskTag && /(Top concern|Important|Worth watching)/.test(brief.text),
     "briefing shows plain-language risk levels");
   ok(brief && /typhoon|Mariana/i.test(brief.text), "briefing surfaces Guam's natural hazards");
+  ok(brief && /What this means for you/i.test(brief.text), "briefing shows a 'what this means for you' takeaway");
   // CRITICAL: a non-technical reader must see NO project-management jargon.
   ok(brief && !/\bRPN\b|\bFMEA\b|RISK:|\bsev\b|\bocc\b|\bdet\b/.test(brief.text),
     "briefing leaks no PM/FMEA jargon to the reader");

@@ -430,6 +430,7 @@
 
       return `
         <div class="gd-brief">
+          ${b.takeaway ? `<div class="gd-takeaway"><span class="gd-takeaway-k">What this means for you</span>${esc(b.takeaway)}</div>` : ""}
           <details class="gd-acc" open>
             <summary>Who approves it here</summary>
             <div class="gd-acc-body">
@@ -738,6 +739,7 @@
         <p class="brief-row"><span class="brief-k">Start this first</span> ${esc(lic.criticalPathItem || "—")}${lic.criticalPathMonths ? " (about " + esc(String(lic.criticalPathMonths)) + " months)" : ""}</p>
         <p class="brief-row"><span class="brief-k">Can land the cable</span> ${esc(partners || "—")}</p>
         ${topRisk ? `<p class="brief-row"><span class="brief-risk brief-risk--${riskSlug(topRisk.level)}">${esc(topRisk.level)}</span> ${esc(topRisk.text)}</p>` : ""}
+        ${b.takeaway ? `<p class="brief-takeaway">${esc(b.takeaway)}</p>` : ""}
       </div>`;
     }).join("");
 

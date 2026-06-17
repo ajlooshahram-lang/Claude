@@ -630,6 +630,9 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 
 /* country briefing inside the station detail card (Brain ↔ 3D drill-down) */
 .gd-brief{margin-top:12px;border-top:1px solid rgba(125,167,240,.16);padding-top:4px}
+.gd-takeaway{margin:8px 0 4px;padding:9px 11px;border-radius:9px;font-size:12px;line-height:1.5;color:#eaf3ff;
+  background:rgba(66,214,164,.12);border:1px solid rgba(66,214,164,.32)}
+.gd-takeaway-k{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:#8fd9bf;font-weight:800;margin-bottom:3px}
 .gd-acc{border-bottom:1px solid rgba(125,167,240,.12)}
 .gd-acc>summary{list-style:none;cursor:pointer;padding:9px 2px;font-size:12px;font-weight:700;color:#dce6ff;
   display:flex;align-items:center;gap:7px;flex-wrap:wrap;user-select:none}
@@ -710,6 +713,8 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .brief-country-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
 .brief-country-head h4{margin:0;font-size:15px}
 .brief-row{margin:5px 0;font-size:12.5px;line-height:1.45}
+.brief-takeaway{margin:8px 0 0;padding:8px 10px;border-radius:8px;font-size:12.5px;line-height:1.5;
+  background:rgba(66,214,164,.1);border:1px solid rgba(66,214,164,.32);color:var(--ink,#1a2336)}
 .brief-k{display:inline-block;min-width:118px;font-weight:700;color:var(--muted,#6b7892)}
 .brief-verdict{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:2px 9px;border-radius:999px;white-space:nowrap}
 .brief-verdict--go{background:rgba(66,214,164,.16);color:#1d8e6a;border:1px solid rgba(66,214,164,.42)}

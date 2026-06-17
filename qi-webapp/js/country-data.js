@@ -639,9 +639,20 @@
         phase: r.phase || ""
       };
     }).sort(function (a, b) { return a.rank - b.rank; });
+    // One plain-language 'what this means for you' sentence, synthesised from
+    // the verdict + the slowest approval + the single biggest risk. No jargon.
+    var v = String(me.verdict || "").toLowerCase();
+    var lead;
+    if (v.indexOf("caution") !== -1) lead = "Approach " + c.name + " with caution";
+    else if (v.indexOf("conditional") !== -1) lead = c.name + " is a conditional yes — go ahead once the local conditions are met";
+    else lead = c.name + " is one of the more straightforward markets to enter";
+    var takeaway = lead + ".";
+    if (lic.criticalPathItem) takeaway += " Begin the " + lic.criticalPathItem + " early — about " + (lic.criticalPathMonths || 0) + " months, the longest approval.";
+    if (risks[0]) takeaway += " Keep an eye on " + risks[0].text + ".";
     return {
       key: c.key,
       name: c.name,
+      takeaway: takeaway,
       authority: { name: c.authority.name, abbrev: c.authority.abbrev, role: c.authority.role, url: c.authority.url || "" },
       environmental: c.environmental ? { abbrev: c.environmental.abbrev, body: c.environmental.body, role: c.environmental.role } : null,
       marketEntry: {
