@@ -28,7 +28,7 @@ body{font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;colo
 
 /* main */
 .main{flex:1;min-width:0;display:flex;flex-direction:column}
-.topbar{display:flex;align-items:center;gap:14px;padding:14px 22px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+.topbar{display:flex;align-items:center;gap:14px;padding:14px 22px;background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;position:sticky;top:0;z-index:5;flex-wrap:wrap;box-shadow:none}
 .topbar h1{font-size:18px;margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .topbar-actions{display:flex;gap:8px;flex-wrap:wrap}
 .hamburger{display:none;background:none;border:none;font-size:20px;cursor:pointer;color:var(--ink)}
@@ -222,7 +222,7 @@ table.riskmatrix th{background:#f0f3f9;font-size:11px}
   --light:#1e2a44;--light2:#1a2436;--grey:#1c2538;--input:#3a3018;--calc:#1f2a1c;
 }
 [data-theme="dark"] body{background:var(--bg);color:var(--ink)}
-[data-theme="dark"] .topbar,[data-theme="dark"] .card,[data-theme="dark"] .table-wrap,[data-theme="dark"] .modal,[data-theme="dark"] .kpi{background:var(--card);color:var(--ink)}
+[data-theme="dark"] .card,[data-theme="dark"] .table-wrap,[data-theme="dark"] .modal,[data-theme="dark"] .kpi{background:var(--card);color:var(--ink)}
 [data-theme="dark"] th{background:#1e2a44;color:#cbd6ee}
 [data-theme="dark"] tr:hover td{background:#1c2538}
 [data-theme="dark"] select,[data-theme="dark"] input,[data-theme="dark"] textarea{background:#1e2a44;color:var(--ink);border-color:var(--line)}
@@ -674,9 +674,9 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
   -webkit-backdrop-filter:blur(12px) saturate(1.25);backdrop-filter:blur(12px) saturate(1.25);
   border:1px solid var(--line);
   box-shadow:0 8px 28px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.04)}
-.topbar{border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:0 2px 14px rgba(0,0,0,.35);
+.topbar{border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:none;
   -webkit-backdrop-filter:blur(12px) saturate(1.25);backdrop-filter:blur(12px) saturate(1.25);
-  background:linear-gradient(180deg,rgba(12,20,40,.92),rgba(9,15,32,.78))}
+  background:linear-gradient(180deg,rgba(12,20,40,.95),rgba(9,15,32,.88))}
 .topbar h1{background:linear-gradient(90deg,var(--neon-cyan),var(--neon-blue));
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
   font-weight:800;letter-spacing:.01em}
