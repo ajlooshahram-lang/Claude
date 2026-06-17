@@ -484,6 +484,7 @@ async function main() {
       cableRows: el.querySelectorAll(".brief-table tbody tr").length,
       risks: el.querySelectorAll(".brief-risks li").length,
       spendSvg: !!el.querySelector(".brief-spend svg.spend-svg path.spend-line"),
+      mapDots: el.querySelectorAll(".brief-map .netmap-dot").length,
       summaryParas: el.querySelectorAll(".brief-summary p").length,
       goLiveRows: el.querySelectorAll(".brief-online-row").length,
       todoItems: el.querySelectorAll(".brief-todo-item").length,
@@ -497,6 +498,7 @@ async function main() {
   ok(invBrief && invBrief.countries === 8 && invBrief.verdicts === 8, "Investor Brief shows all 8 countries with market-entry verdicts");
   ok(invBrief && invBrief.cableRows >= 8 && invBrief.risks > 0, "Investor Brief lists every cable segment + the biggest things to watch");
   ok(invBrief && invBrief.spendSvg, "Investor Brief renders the spending-over-time S-curve (inline SVG, prints cleanly)");
+  ok(invBrief && invBrief.mapDots === 8, "Investor Brief renders a static network-map thumbnail with all 8 stations");
   ok(invBrief && invBrief.summaryParas >= 3 && /connects 8 countries/.test(invBrief.text),
     "Investor Brief opens with an auto-written 'In a nutshell' summary (" + (invBrief ? invBrief.summaryParas : 0) + " sentences)");
   ok(invBrief && invBrief.goLiveRows === 8 && /When each country goes live/.test(invBrief.text),

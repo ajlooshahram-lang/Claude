@@ -195,6 +195,39 @@
     </svg>`;
   }
 
+  // ---- Static network-map thumbnail (pure inline SVG, CSP-safe, prints) ----
+  // Plots the landing stations by real lat/long with the cable links coloured
+  // by status, so the printed/downloaded brief shows the network's shape.
+  function networkMapSVG(stations, cables) {
+    if (!Array.isArray(stations) || stations.length < 2) return "";
+    const W = 360, H = 210, padX = 30, padY = 22;
+    const lats = stations.map(s => s.lat), lons = stations.map(s => s.lon);
+    let minLa = Math.min.apply(null, lats), maxLa = Math.max.apply(null, lats);
+    let minLo = Math.min.apply(null, lons), maxLo = Math.max.apply(null, lons);
+    const laPad = (maxLa - minLa) * 0.12 || 1, loPad = (maxLo - minLo) * 0.12 || 1;
+    minLa -= laPad; maxLa += laPad; minLo -= loPad; maxLo += loPad;
+    const plotW = W - padX * 2, plotH = H - padY * 2;
+    const X = lon => padX + ((lon - minLo) / (maxLo - minLo)) * plotW;
+    const Y = lat => padY + ((maxLa - lat) / (maxLa - minLa)) * plotH;
+    const pos = {};
+    stations.forEach(s => { pos[s.id] = { x: X(s.lon), y: Y(s.lat), s: s }; });
+    const lines = (cables || []).map(c => {
+      const a = pos[c.from], b = pos[c.to];
+      if (!a || !b) return "";
+      return `<line class="netmap-line netmap-line--${esc(c.status)}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}"></line>`;
+    }).join("");
+    const nodes = stations.map(s => {
+      const p = pos[s.id];
+      const anchor = p.x > W * 0.62 ? "end" : (p.x < W * 0.38 ? "start" : "middle");
+      const dx = anchor === "end" ? -5 : (anchor === "start" ? 5 : 0);
+      return `<circle class="netmap-dot" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.4"></circle>
+        <text class="netmap-lbl" x="${(p.x + dx).toFixed(1)}" y="${(p.y - 6).toFixed(1)}" text-anchor="${anchor}">${esc(s.country)}</text>`;
+    }).join("");
+    return `<svg class="netmap-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Map of the submarine cable network and its landing stations">
+      ${lines}${nodes}
+    </svg>`;
+  }
+
   // 3D submarine cable network visualization (Three.js globe + glass legend).
   RENDER.globe3d = function () {
     const G = window.QIGlobe || {};
@@ -817,6 +850,7 @@
 
         <section class="brief-section">
           <h3>The network at a glance</h3>
+          <div class="brief-map">${networkMapSVG(stations, cables)}</div>
           <table class="brief-table">
             <thead><tr><th>Cable segment</th><th>Route</th><th class="brief-num">Length</th><th class="brief-num">Capacity</th><th>Status</th></tr></thead>
             <tbody>${cableRows || '<tr><td colspan="5" class="muted">No cable data</td></tr>'}</tbody>
