@@ -16,6 +16,6 @@
   "type": "commonjs",
   "devDependencies": {
     "jsdom": "^29.1.1",
-    "playwright": "^1.48.0"
+    "playwright": "^1.61.0"
   }
 }
