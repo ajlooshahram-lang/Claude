@@ -15148,6 +15148,16 @@ function renderPlc() {
       html += '<button class="sel-btn" onclick="plcModbusRead(1,100,5)">' + (da ? 'L\u00e6s reg 100-104' : 'Read reg 100-104') + '</button>';
       html += '<button class="sel-btn" onclick="plcModbusRead(2,0,10)">' + (da ? 'L\u00e6s reg 0-9 (slave 2)' : 'Read reg 0-9 (slave 2)') + '</button>';
       html += '</div></div>';
+      // WRITE / UPLOAD section (Modbus function 06)
+      html += '<div class="select-group"><div class="select-label">' + (da ? 'Modbus RTU - Skriv/upload til register (kommando 06)' : 'Modbus RTU - Write/upload to register (function 06)') + '</div>';
+      html += '<div style="font-size:.8rem;color:var(--text-light,#8ab4d0);margin-bottom:6px">' + (da ? 'Register: ' : 'Register: ') + plcWriteState.reg + ' \u00B7 ' + (da ? 'V\u00e6rdi: ' : 'Value: ') + plcWriteState.val + '</div>';
+      html += '<div class="select-grid"><span style="font-size:.78rem;align-self:center">' + (da ? 'Reg:' : 'Reg:') + '</span>';
+      [0,1,2,10,100,200].forEach(function(rg){ html += '<button class="sel-btn ' + (plcWriteState.reg===rg?'selected':'') + '" style="padding:4px 9px;min-width:0;font-size:.75rem" onclick="plcWriteState.reg=' + rg + ';renderModule(\'plc\')">' + rg + '</button>'; });
+      html += '</div>';
+      html += '<div class="select-grid" style="margin-top:4px"><span style="font-size:.78rem;align-self:center">' + (da ? 'V\u00e6rdi:' : 'Value:') + '</span>';
+      [0,1,10,50,100,500,1000].forEach(function(vl){ html += '<button class="sel-btn ' + (plcWriteState.val===vl?'selected':'') + '" style="padding:4px 9px;min-width:0;font-size:.75rem" onclick="plcWriteState.val=' + vl + ';renderModule(\'plc\')">' + vl + '</button>'; });
+      html += '</div>';
+      html += '<div class="select-grid" style="margin-top:6px"><button class="sel-btn" style="border-color:#ff8c42;color:#ff8c42" onclick="plcModbusWrite(1,plcWriteState.reg,plcWriteState.val)">\u2B06\uFE0F ' + (da ? 'Skriv til slave 1 (bekr\u00e6ft i log)' : 'Write to slave 1 (confirm in log)') + '</button></div></div>';
       html += '<div class="select-grid"><button class="sel-btn" style="border-color:var(--danger);color:var(--danger)" onclick="plcSerialDisconnect()">\u2715 ' + (da ? 'Afbryd' : 'Disconnect') + '</button></div>';
     }
     html += '<div class="select-group"><div class="select-label">' + (da ? 'Kommunikationslog' : 'Communication log') + '</div><div id="plcSerialLog" style="background:#05101c;border:1px solid var(--border,#2a3645);border-radius:8px;padding:10px;max-height:200px;overflow-y:auto;min-height:60px">' + (plcSerial.log.length?'':'<div style="color:#5b7790;font-size:.8rem">' + (da ? 'Ingen aktivitet endnu...' : 'No activity yet...') + '</div>') + '</div></div>';
@@ -18271,13 +18281,50 @@ async function plcSerialConnect(){
 async function plcSerialReadLoop(){
   try{
     plcSerial.reader=plcSerial.port.readable.getReader();
+    plcSerial._buf=[];
     while(plcSerial.connected){
       const {value,done}=await plcSerial.reader.read();
       if(done) break;
-      if(value && value.length){ var hex=Array.from(value).map(function(b){return ('0'+b.toString(16)).slice(-2).toUpperCase();}).join(' '); plcSerialLog(hex,'rx'); }
+      if(value && value.length){
+        var hex=Array.from(value).map(function(b){return ('0'+b.toString(16)).slice(-2).toUpperCase();}).join(' ');
+        plcSerialLog(hex,'rx');
+        // Buffer bytes and try to parse a complete Modbus RTU response
+        for(var i=0;i<value.length;i++) plcSerial._buf.push(value[i]);
+        plcModbusParse();
+      }
     }
   }catch(e){ if(plcSerial.connected) plcSerialLog('RX: '+e.message,'err'); }
   finally{ if(plcSerial.reader){ try{plcSerial.reader.releaseLock();}catch(e){} } }
+}
+// Parse a buffered Modbus RTU response (function 03/04 read, or 06 write echo)
+function plcModbusParse(){
+  var b=plcSerial._buf; if(!b||b.length<5) return;
+  function crc16(buf){ var crc=0xFFFF; for(var i=0;i<buf.length;i++){ crc^=buf[i]; for(var j=0;j<8;j++){ if(crc&1){crc=(crc>>1)^0xA001;}else{crc>>=1;} } } return crc; }
+  var da=lang==='da';
+  // Read response: [slave][03/04][byteCount][data...][crcLo][crcHi]
+  if((b[1]===0x03||b[1]===0x04) && b.length>=3){
+    var byteCount=b[2], frameLen=3+byteCount+2;
+    if(b.length>=frameLen){
+      var frame=b.slice(0,frameLen);
+      var calc=crc16(frame.slice(0,frameLen-2)), got=frame[frameLen-2]|(frame[frameLen-1]<<8);
+      if(calc===got){
+        var regs=[];
+        for(var r=0;r<byteCount/2;r++){ regs.push((frame[3+r*2]<<8)|frame[3+r*2+1]); }
+        plcSerialLog((da?'Afkodet (slave '+frame[0]+'): registre = ':'Decoded (slave '+frame[0]+'): registers = ')+regs.join(', '),'info');
+      } else { plcSerialLog((da?'CRC-fejl i svar':'CRC error in response'),'err'); }
+      plcSerial._buf=b.slice(frameLen);
+    }
+  } else if(b[1]===0x06 && b.length>=8){
+    // Write-single-register echo: [slave][06][regHi][regLo][valHi][valLo][crc]
+    var reg=(b[2]<<8)|b[3], val=(b[4]<<8)|b[5];
+    plcSerialLog((da?'Skrivning bekr\u00e6ftet: register '+reg+' = '+val:'Write confirmed: register '+reg+' = '+val),'info');
+    plcSerial._buf=b.slice(8);
+  } else if((b[1]&0x80) && b.length>=5){
+    // Exception response
+    var exCodes={1:'Illegal function',2:'Illegal data address',3:'Illegal data value',4:'Slave device failure',6:'Slave busy'};
+    plcSerialLog((da?'Modbus-fejl: ':'Modbus exception: ')+(exCodes[b[2]]||('code '+b[2])),'err');
+    plcSerial._buf=b.slice(5);
+  }
 }
 async function plcSerialSend(hexStr){
   var da=lang==='da';
@@ -18300,6 +18347,15 @@ async function plcSerialDisconnect(){
 function plcModbusRead(slave, startReg, count){
   function crc16(buf){ var crc=0xFFFF; for(var i=0;i<buf.length;i++){ crc^=buf[i]; for(var j=0;j<8;j++){ if(crc&1){crc=(crc>>1)^0xA001;}else{crc>>=1;} } } return crc; }
   var f=[slave,0x03,(startReg>>8)&0xFF,startReg&0xFF,(count>>8)&0xFF,count&0xFF];
+  var c=crc16(f); f.push(c&0xFF); f.push((c>>8)&0xFF);
+  var hex=f.map(function(b){return ('0'+b.toString(16)).slice(-2).toUpperCase();}).join(' ');
+  plcSerialSend(hex);
+}
+// Modbus RTU write-single-register (function 06) — UPLOAD a setpoint/command to PLC
+var plcWriteState={ reg:0, val:1 };
+function plcModbusWrite(slave, reg, val){
+  function crc16(buf){ var crc=0xFFFF; for(var i=0;i<buf.length;i++){ crc^=buf[i]; for(var j=0;j<8;j++){ if(crc&1){crc=(crc>>1)^0xA001;}else{crc>>=1;} } } return crc; }
+  var f=[slave,0x06,(reg>>8)&0xFF,reg&0xFF,(val>>8)&0xFF,val&0xFF];
   var c=crc16(f); f.push(c&0xFF); f.push((c>>8)&0xFF);
   var hex=f.map(function(b){return ('0'+b.toString(16)).slice(-2).toUpperCase();}).join(' ');
   plcSerialSend(hex);
