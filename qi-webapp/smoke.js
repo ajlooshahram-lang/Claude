@@ -781,6 +781,9 @@ ok(/Spending over time/.test(briefOut), "Investor Brief includes the 'Spending o
 ok(doc.querySelectorAll(".brief-online-row").length === 8, "Investor Brief shows the go-live timeline for all 8 countries");
 ok(/When each country goes live/.test(briefOut), "Investor Brief includes the 'When each country goes live' section");
 ok(doc.querySelector(".brief-summary") != null, "Investor Brief opens with an auto-written 'In a nutshell' summary");
+ok(doc.querySelector(".brief-health") != null && /Overall:/.test(doc.querySelector(".brief-health").textContent),
+   "Investor Brief shows a one-line confidence/health read");
+ok(/brief-health--(go|cond|caution)/.test(briefOut), "confidence read carries a programme-wide traffic-light class");
 ok(doc.querySelectorAll(".brief-todo-item").length === 5, "Investor Brief shows a prioritised 'What to do first' list (5 longest-lead approvals)");
 ok(/What to do first/.test(briefOut), "Investor Brief includes the 'What to do first' section");
 ok((function () {

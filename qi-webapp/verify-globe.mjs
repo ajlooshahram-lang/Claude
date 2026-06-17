@@ -473,6 +473,7 @@ async function main() {
       summaryParas: el.querySelectorAll(".brief-summary p").length,
       goLiveRows: el.querySelectorAll(".brief-online-row").length,
       todoItems: el.querySelectorAll(".brief-todo-item").length,
+      health: !!el.querySelector(".brief-health[class*='brief-health--']") && /Overall:/.test((el.querySelector(".brief-health") || {}).textContent || ""),
       text: el.textContent || "",
       hasInlineOnclick: btn ? !!btn.getAttribute("onclick") : true,
       printed: window.__printed, printErr
@@ -488,6 +489,7 @@ async function main() {
     "Investor Brief shows the 'when each country goes live' timeline for all 8 countries");
   ok(invBrief && invBrief.todoItems === 5 && /What to do first/.test(invBrief.text),
     "Investor Brief shows a prioritised 'What to do first' action list");
+  ok(invBrief && invBrief.health, "Investor Brief shows a one-line confidence/health read with a traffic-light");
   ok(invBrief && /USD\s*1\.3B/.test(invBrief.text) && /60 months/.test(invBrief.text), "Investor Brief shows the headline budget (USD 1.3B) + build time (60 months)");
   ok(invBrief && !invBrief.hasInlineOnclick && invBrief.printed === 1,
     "print button is CSP-safe (no inline onclick) and fires window.print() under strict CSP");

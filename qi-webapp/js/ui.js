@@ -715,6 +715,20 @@
       summaryParas.push(`There ${allRisks.length === 1 ? "is" : "are"} <strong>${allRisks.length}</strong> thing${allRisks.length === 1 ? "" : "s"} worth watching across the programme — the most pressing is ${esc(topRisk.text)} (${esc(topRisk.country)}).`);
     }
 
+    // One honest 'overall' confidence read for the whole programme (traffic-light).
+    const totalC = briefs.length || 1;
+    const vavg = (vc.go * 2 + vc.cond * 1) / totalC;
+    let healthLabel, healthSlug;
+    if (vavg >= 1.5) { healthLabel = "A strong, buildable programme"; healthSlug = "go"; }
+    else if (vavg >= 1.0) { healthLabel = "Buildable, with conditions to manage"; healthSlug = "cond"; }
+    else if (vavg >= 0.5) { healthLabel = "Workable, but with real hurdles to clear"; healthSlug = "cond"; }
+    else { healthLabel = "Challenging — proceed with care"; healthSlug = "caution"; }
+    const cautionNames = briefs.filter(b => verdictSlug(b.marketEntry.verdict) === "caution").map(b => b.name);
+    let healthWatch;
+    if (cautionNames.length) healthWatch = "The main places to take extra care are " + listJoin(cautionNames) + ".";
+    else if (topRisk) healthWatch = "The main thing to keep an eye on is " + topRisk.text + " (" + topRisk.country + ").";
+    else healthWatch = "";
+
     const statChips = [
       { v: totalKm.toLocaleString() + " km", l: "Cable route" },
       { v: totalCap.toLocaleString() + " Tbps", l: "Capacity" },
@@ -776,6 +790,11 @@
           <p class="brief-tagline">A submarine fibre-optic network connecting ${stations.length} countries across Asia and the Pacific — what gets built, who to work with, when it goes live, and what it costs.</p>
           <div class="brief-stats">${statChips}</div>
         </header>
+
+        <div class="brief-health brief-health--${healthSlug}">
+          <span class="brief-health-dot"></span>
+          <span class="brief-health-text"><strong>Overall: ${esc(healthLabel)}.</strong> ${esc(healthWatch)}</span>
+        </div>
 
         <section class="brief-section brief-summary">
           <h3>In a nutshell</h3>
