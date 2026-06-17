@@ -85,7 +85,10 @@
   };
 
   // Self-hosted Earth textures (relative to index.html → same-origin, CSP-safe).
-  var TEX = {
+  // A single-file/offline build may inject inlined data-URI textures by setting
+  // window.QIGLOBE_TEXTURES before this script runs; we honour that when present.
+  var TEX = (typeof window !== "undefined" && window.QIGLOBE_TEXTURES &&
+             typeof window.QIGLOBE_TEXTURES === "object") ? window.QIGLOBE_TEXTURES : {
     day:      "textures/earth_day.jpg",
     normal:   "textures/earth_normal.jpg",
     specular: "textures/earth_specular.jpg",
