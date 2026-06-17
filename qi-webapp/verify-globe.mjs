@@ -318,6 +318,15 @@ async function main() {
   ok(dz.full && dz.full.laid === dz.full.total && dz.full.online === dz.full.stations,
     "build at 100% — all cables laid & all " + (dz.full ? dz.full.stations : "?") + " countries online");
 
+  // cost & schedule overlay derived from the same build state (headline = the
+  // programme's figures; per-step spend distributed by real route weight).
+  ok(dz.zero.costUsd === 0 && dz.zero.month === 0 && dz.zero.budgetUsd === 1300000000 && dz.zero.monthsTotal === 60,
+    "cost/schedule at 0% — nothing committed, month 0 of 60 (headline USD 1.3B / 60mo)");
+  ok(dz.half.costUsd > 0 && dz.half.costUsd < dz.full.costUsd && dz.half.month > 0 && dz.half.month < 60,
+    "cost/schedule at 50% — partial spend, partway through schedule (USD " + (dz.half ? dz.half.costUsd : "?") + ", month " + (dz.half ? dz.half.month : "?") + ")");
+  ok(dz.full.costUsd === dz.full.budgetUsd && dz.full.costPct === 100 && dz.full.month === 60,
+    "cost/schedule at 100% — full programme committed (USD " + (dz.full ? dz.full.costUsd : "?") + ") at month 60");
+
   // The plain-language UI must reflect the build state (label + scrubber).
   const ui100 = await page.evaluate(() => ({
     phase: document.getElementById("globeDeployPhase").textContent,
@@ -335,6 +344,20 @@ async function main() {
   });
   ok(ui30.st.pct === 30 && /laying|online|complete|building/i.test(ui30.phase),
     "scrubbing to 30% updates the build state + phase label (" + JSON.stringify(ui30.phase) + ")");
+
+  // the plain-language cost & schedule line tracks the scrubber (no PM jargon).
+  const meta = await page.evaluate(() => {
+    const read = () => document.getElementById("globeDeployMeta").textContent;
+    window.QIGlobe.setDeployment(50); const at50 = read();
+    window.QIGlobe.setDeployment(100); const at100 = read();
+    return { at50, at100 };
+  });
+  ok(/Month\s+\d+\s+of\s+60/.test(meta.at50) && /USD/.test(meta.at50) && /committed/.test(meta.at50) && /countries live/i.test(meta.at50),
+    "cost & schedule line shows month + USD committed + countries live (" + JSON.stringify(meta.at50) + ")");
+  ok(/Month\s+60\s+of\s+60/.test(meta.at100) && /1\.3B/.test(meta.at100),
+    "at 100% the line shows the full USD 1.3B at month 60 (" + JSON.stringify(meta.at100) + ")");
+  ok(!/\bRPN\b|\bFMEA\b|\bEVM\b|baseline|\bCPI\b|\bSPI\b|burn-?rate/i.test(meta.at50 + " " + meta.at100),
+    "cost & schedule line uses plain language (no PM jargon)");
 
   // Auto-play must advance the build over time, then pause cleanly.
   await page.evaluate(() => { window.QIGlobe.setDeployment(0); window.QIGlobe.playDeployment(); });

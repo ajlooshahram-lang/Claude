@@ -55,6 +55,10 @@ ok(doc.querySelectorAll(".globe-item").length >= 6, "3D Network Map legend lists
 ok(doc.querySelectorAll(".globe-station").length === 8, "3D Network Map legend lists 8 landing stations");
 ok(doc.getElementById("globeDeploy") != null && doc.getElementById("globeDeployRange") != null && doc.getElementById("globeDeployPlay") != null,
    "3D Network Map renders the A–Z build-sequence controls (play + scrubber)");
+ok(doc.getElementById("globeDeployMeta") != null, "3D build bar renders the cost & schedule readout (#globeDeployMeta)");
+// programme headline figures are exposed for the cost/schedule overlay
+ok(window.QIGlobe.PROGRAMME && window.QIGlobe.PROGRAMME.budgetUsd === 1300e6 && window.QIGlobe.PROGRAMME.durationMonths === 60,
+   "QIGlobe.PROGRAMME exposes the headline figures (USD 1.3B over 60 months)");
 ok(window.QIGlobe.init(doc.getElementById("globeStage")) === false, "QIGlobe.init no-throws and returns false without WebGL");
 // 2b-i) interactive API surface exists and is a safe no-op while unmounted (jsdom/no WebGL)
 ["focusStation","focusCable","clearSelection","startTour","stopTour","toggleTour","isTouring",

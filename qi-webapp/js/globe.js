@@ -84,6 +84,17 @@
     "planned":      { hex: 0xe6b84a, css: "#e6b84a" }
   };
 
+  // Programme cost & schedule headline (the established figures for this
+  // $1.3B / 5-year trans-Asia system). The A–Z build overlay distributes the
+  // budget across segments by real route weight (length × fibre pairs) so the
+  // cumulative-spend story reflects the actual topology, not a flat ramp, while
+  // the headline total and timeline stay the known programme numbers.
+  var PROGRAMME = { budgetUsd: 1300e6, durationMonths: 60 };
+  function cableCostWeight(c) {
+    if (!c) return 1;
+    return Math.max(1, (Number(c.lengthKm) || 0) * (Number(c.fibrePairs) || 0));
+  }
+
   // Self-hosted Earth textures (relative to index.html → same-origin, CSP-safe).
   var TEX = {
     day:      "textures/earth_day.jpg",
@@ -710,15 +721,23 @@
       }
       function deployState() {
         var laid = 0, layingId = null, layingName = "", layingPct = 0, online = {};
+        var costW = 0, costWtotal = 0;
         for (var i = 0; i < cableTubes.length; i++) {
           var local = cableLocal(i, deploy.g), t = cableTubes[i];
+          var w = cableCostWeight(t.cable);
+          costWtotal += w; costW += w * local;
           if (local >= 1) { laid++; if (t.from) online[t.from] = 1; if (t.to) online[t.to] = 1; }
           else if (local > 0) { layingId = t.id; layingName = t.cable ? t.cable.name : t.id; layingPct = Math.round(local * 100); if (t.from) online[t.from] = 1; }
         }
+        var costFrac = costWtotal > 0 ? costW / costWtotal : 0;
         return {
           mode: deploy.mode, active: deploy.active, g: deploy.g, pct: Math.round(deploy.g * 100),
           laid: laid, total: cableTubes.length, online: Object.keys(online).length, stations: STATIONS.length,
-          layingId: layingId, layingName: layingName, layingPct: layingPct
+          layingId: layingId, layingName: layingName, layingPct: layingPct,
+          // cost & schedule overlay (headline totals are the programme's figures)
+          budgetUsd: PROGRAMME.budgetUsd, costUsd: Math.round(PROGRAMME.budgetUsd * costFrac),
+          costPct: Math.round(costFrac * 100),
+          month: Math.round(deploy.g * PROGRAMME.durationMonths), monthsTotal: PROGRAMME.durationMonths
         };
       }
       function emitDeploy() { if (deployHandler) try { deployHandler(deployState()); } catch (e) {} }
@@ -1128,6 +1147,7 @@
     // static datasets
     STATIONS: STATIONS,
     CABLES: CABLES,
+    PROGRAMME: PROGRAMME,
     STATUS_COLOR: STATUS_COLOR
   };
 })();

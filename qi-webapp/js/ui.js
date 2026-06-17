@@ -198,7 +198,10 @@
           <div class="globe-deploy" id="globeDeploy" hidden>
             <button class="globe-btn globe-deploy-play" id="globeDeployPlay" type="button">▶ Play build A–Z</button>
             <input class="globe-deploy-range" id="globeDeployRange" type="range" min="0" max="100" step="1" value="0" aria-label="Build progress" />
-            <span class="globe-deploy-phase" id="globeDeployPhase">Ready to build — press play to watch the network go live</span>
+            <div class="globe-deploy-text">
+              <span class="globe-deploy-phase" id="globeDeployPhase">Ready to build — press play to watch the network go live</span>
+              <span class="globe-deploy-meta" id="globeDeployMeta">Programme: about USD 1.3B over 60 months</span>
+            </div>
             <button class="globe-btn globe-deploy-exit" id="globeDeployExit" type="button" hidden>Back to live view</button>
           </div>
           <div class="globe-detail" id="globeDetail" hidden></div>
@@ -248,10 +251,19 @@
     // A–Z deployment / build-sequence controls
     const deployBar = $("#globeDeploy"), deployPlay = $("#globeDeployPlay");
     const deployRange = $("#globeDeployRange"), deployPhase = $("#globeDeployPhase"), deployExit = $("#globeDeployExit");
+    const deployMeta = $("#globeDeployMeta");
     if (deployBar) deployBar.hidden = false;
     if (deployPlay) deployPlay.addEventListener("click", () => G.toggleDeployment());
     if (deployRange) deployRange.addEventListener("input", () => G.setDeployment(Number(deployRange.value) || 0));
     if (deployExit) deployExit.addEventListener("click", () => G.exitDeployment());
+    // plain-language money: "about USD 1.3B" / "USD 640M" — no jargon, no cents
+    const fmtUsd = n => {
+      n = Number(n) || 0;
+      if (n >= 1e9) { const b = n / 1e9; return "USD " + (b >= 10 ? Math.round(b) : (Math.round(b * 10) / 10)) + "B"; }
+      if (n >= 1e6) return "USD " + Math.round(n / 1e6) + "M";
+      if (n >= 1e3) return "USD " + Math.round(n / 1e3) + "K";
+      return "USD " + n;
+    };
     G.onDeployment(st => {
       if (!st) return;
       if (deployRange) deployRange.value = String(st.pct);
@@ -265,6 +277,13 @@
         else if (st.layingName) msg = `Laying ${st.layingName} — ${st.layingPct}% · ${st.online}/${st.stations} countries online`;
         else msg = "Starting build…";
         deployPhase.textContent = msg;
+      }
+      if (deployMeta) {
+        if (!st.mode) {
+          deployMeta.textContent = `Programme: about ${fmtUsd(st.budgetUsd)} over ${st.monthsTotal} months`;
+        } else {
+          deployMeta.textContent = `Month ${st.month} of ${st.monthsTotal} · about ${fmtUsd(st.costUsd)} committed (${st.costPct}%) · ${st.online} of ${st.stations} countries live`;
+        }
       }
     });
 

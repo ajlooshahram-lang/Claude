@@ -566,8 +566,10 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .globe-deploy-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;
   background:#fff;border:2px solid #4ea1ff;box-shadow:0 2px 8px rgba(0,0,0,.5);cursor:pointer}
 .globe-deploy-range::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid #4ea1ff;cursor:pointer}
+.globe-deploy-text{display:flex;flex-direction:column;gap:1px;min-width:0;max-width:42vw}
 .globe-deploy-phase{font-size:12px;font-weight:600;letter-spacing:.01em;color:#cbd6ee;white-space:nowrap;overflow:hidden;
-  text-overflow:ellipsis;max-width:40vw}
+  text-overflow:ellipsis}
+.globe-deploy-meta{font-size:11px;font-weight:600;color:#8fd9bf;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:760px){.globe-deploy{flex-wrap:wrap;justify-content:center;border-radius:14px}.globe-deploy-phase{max-width:100%;white-space:normal}}
 
 /* in-stage detail card (shown when a node is selected) */
