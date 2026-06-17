@@ -1085,8 +1085,8 @@
         <div id="brainDrop" class="brain-drop" tabindex="0" role="button" aria-label="Upload a project description file">
           <div class="brain-drop-ico">⬆</div>
           <div class="brain-drop-main">Drop a project description here, or <u>browse</u></div>
-          <div class="brain-drop-sub muted">.txt · .md · .json · .docx — analysis runs automatically on upload</div>
-          <input id="brainFile" type="file" accept=".txt,.md,.json,.docx,text/plain,text/markdown,application/json,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden />
+          <div class="brain-drop-sub muted">.txt · .md · .json · .docx · .pdf — analysis runs automatically on upload</div>
+          <input id="brainFile" type="file" accept=".txt,.md,.json,.docx,.pdf,text/plain,text/markdown,application/json,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf" hidden />
         </div>
         <div class="toolbar" style="flex-wrap:wrap;gap:10px;margin-top:10px">
           <label class="muted" for="brainProfile">Domain</label>
@@ -1121,10 +1121,22 @@
     function readFile(f) {
       if (!f) return;
       const isDocx = /\.docx$/i.test(f.name) || (f.type || "").indexOf("wordprocessingml") !== -1;
-      if (isDocx) {
-        if (!window.fflate) { toast("Cannot read .docx here — paste the text instead."); return; }
+      const isPdf = /\.pdf$/i.test(f.name) || (f.type || "").indexOf("pdf") !== -1;
+      if (isDocx || isPdf) {
+        if (!window.fflate) { toast("Cannot read that file type here — paste the text instead."); return; }
         const r = new FileReader();
-        r.onload = () => { try { handleText(extractDocxText(r.result), f.name); } catch (e) { toast("Could not read that .docx file."); } };
+        r.onload = () => {
+          try {
+            if (isDocx) { handleText(extractDocxText(r.result), f.name); return; }
+            const txt = extractPdfText(new Uint8Array(r.result));
+            const letters = (txt.match(/[A-Za-z]/g) || []).length;
+            if (txt.length < 40 || letters < 20) {
+              toast("Couldn't extract text from that PDF (it may be scanned or use embedded fonts). Please paste the description, or upload .docx/.txt.", { ms: 6500 });
+              return;
+            }
+            handleText(txt, f.name);
+          } catch (e) { toast("Could not read that file."); }
+        };
         r.onerror = () => toast("Could not read that file.");
         r.readAsArrayBuffer(f);
         return;
@@ -1169,6 +1181,37 @@
     s = s.replace(/<\/w:p>/g, "\n").replace(/<w:tab\b[^>]*\/?>/g, "\t").replace(/<w:br\b[^>]*\/?>/g, "\n").replace(/<[^>]+>/g, "");
     s = s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'");
     return s.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  }
+
+  // Offline, best-effort .pdf -> text: inflate FlateDecode content streams (via
+  // fflate) and pull text from (..)Tj / [..]TJ operators. Handles typical
+  // text PDFs (e.g. Word "Save as PDF"); returns "" when it can't (scanned/encoded).
+  function unescapePdfStr(str) {
+    return str
+      .replace(/\\([nrtbf\\()])/g, (m, c) => ({ n: "\n", r: "\r", t: "\t", b: "\b", f: "\f", "\\": "\\", "(": "(", ")": ")" }[c] || c))
+      .replace(/\\([0-7]{1,3})/g, (m, o) => String.fromCharCode(parseInt(o, 8)));
+  }
+  function extractPdfText(u8) {
+    if (!window.fflate) return "";
+    let s = ""; for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
+    const out = [];
+    const streamRe = /stream\r?\n?([\s\S]*?)endstream/g;
+    const showRe = /(\[(?:[^\[\]]|\\.)*\]\s*TJ)|(\((?:\\.|[^\\()])*\)\s*Tj)/g;
+    const innerRe = /\((?:\\.|[^\\()])*\)/g;
+    let m;
+    while ((m = streamRe.exec(s))) {
+      const raw = m[1].replace(/\r?\n?$/, "");
+      const bytes = Uint8Array.from(raw, c => c.charCodeAt(0) & 0xff);
+      let data = raw;
+      try { data = window.fflate.strFromU8(window.fflate.unzlibSync(bytes), true); }
+      catch (e) { try { data = window.fflate.strFromU8(window.fflate.inflateSync(bytes), true); } catch (e2) {} }
+      let seg; showRe.lastIndex = 0;
+      while ((seg = showRe.exec(data))) {
+        let mm; innerRe.lastIndex = 0;
+        while ((mm = innerRe.exec(seg[0]))) out.push(unescapePdfStr(mm[0].slice(1, -1)));
+      }
+    }
+    return out.join(" ").replace(/\s+/g, " ").trim();
   }
 
   // Fully-automated pipeline: scan -> analyze -> generate -> CREATE a new project
