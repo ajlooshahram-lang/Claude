@@ -834,6 +834,17 @@ const dlBtn = doc.getElementById("briefDownload");
 ok(dlBtn != null && !dlBtn.getAttribute("onclick"), "Download button exists and is CSP-safe (no inline onclick)");
 // zero PM/FMEA jargon for the non-technical reader
 ok(!/\bRPN\b|\bFMEA\b|\bEVM\b|\bWBS\b|\bSPI\b|\bCPI\b/.test(briefOut), "Investor Brief leaks no PM/FMEA jargon");
+// 5a: DATA_PROVENANCE exposed and has correct shape
+ok(window.QICountryData.DATA_PROVENANCE && typeof window.QICountryData.DATA_PROVENANCE.asOf === "string" && window.QICountryData.DATA_PROVENANCE.asOf.length > 0,
+   "QICountryData.DATA_PROVENANCE has an asOf string");
+ok(Array.isArray(window.QICountryData.DATA_PROVENANCE.sources) && window.QICountryData.DATA_PROVENANCE.sources.length > 0,
+   "QICountryData.DATA_PROVENANCE has a non-empty sources array");
+// 5b: Investor Brief contains the cover page and provenance footer
+ok(doc.querySelector(".brief-cover") != null, "Investor Brief has a professional cover page (.brief-cover)");
+ok(doc.querySelector(".brief-cover-mark") != null && doc.querySelector(".brief-cover-mark").textContent === "QI", "cover page shows the QI mark");
+ok(doc.querySelector(".brief-cover-title") != null, "cover page shows the project title");
+ok(doc.querySelector(".brief-prov") != null, "Investor Brief has a provenance footer line (.brief-prov)");
+ok(/as of 2025-06/.test(doc.querySelector(".brief-prov").textContent), "provenance footer shows the data-as-of date");
 // Brain detects named countries and injects permit tasks + FMEA risks
 S.reset();
 doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));

@@ -787,6 +787,13 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .brief-risk-text{flex:1}
 .brief-risk-where{color:var(--muted,#6b7892);font-style:italic;white-space:nowrap}
 .brief-foot{border-top:1px solid var(--line,#e3e8f0);padding-top:12px;margin-top:18px}
+.brief-prov{font-size:11px;font-style:italic;color:var(--muted,#6b7892);margin:8px 0 0}
+.brief-cover{text-align:center;padding:30px 20px 24px;border-bottom:2px solid var(--line,#e3e8f0);margin-bottom:20px}
+.brief-cover-mark{font-size:42px;font-weight:900;color:var(--accent,#2e5496);letter-spacing:-.02em;margin-bottom:6px}
+.brief-cover-title{margin:0 0 6px;font-size:22px;color:var(--ink,#1a2336)}
+.brief-cover-sub{margin:0 0 4px;font-size:13px;color:var(--muted,#6b7892)}
+.brief-cover-tag{margin:0;font-size:11.5px;color:var(--muted,#6b7892);font-style:italic}
+@media print{.brief-cover{page-break-after:always}}
 .brief-summary{background:var(--chip-bg,rgba(46,84,150,.06));border:1px solid var(--line,#e3e8f0);border-left:4px solid var(--accent,#2e5496);
   border-radius:10px;padding:14px 16px;margin-top:18px}
 .brief-summary h3{border:none;margin:0 0 6px;padding:0}

@@ -856,6 +856,12 @@
         <span class="muted">A plain-language one-pager you can hand to your board — built automatically from your project. No jargon.</span>
       </div>
       <div class="brief" id="investorBrief">
+        <div class="brief-cover">
+          <div class="brief-cover-mark">QI</div>
+          <h1 class="brief-cover-title">${esc(title)}</h1>
+          <p class="brief-cover-sub">Investor Brief — prepared ${esc(today)}</p>
+          <p class="brief-cover-tag">Generated automatically by the QI Platform from a single project description.</p>
+        </div>
         <header class="brief-head">
           <div class="brief-head-top">
             <h1>${esc(title)}</h1>
@@ -920,6 +926,7 @@
 
         <footer class="brief-foot">
           <p>Verdicts are a quick traffic-light to focus attention, not a guarantee. Budget and timeline are the programme's headline figures; per-country detail is drawn from each country's regulator and route data. Speak to each named authority before committing.</p>
+          <p class="brief-prov">Country data as of ${esc((CD && CD.DATA_PROVENANCE) ? CD.DATA_PROVENANCE.asOf : "")}. Sources: ${esc((CD && CD.DATA_PROVENANCE && Array.isArray(CD.DATA_PROVENANCE.sources)) ? CD.DATA_PROVENANCE.sources.join(", ") : "")}.</p>
         </footer>
       </div>`;
   };

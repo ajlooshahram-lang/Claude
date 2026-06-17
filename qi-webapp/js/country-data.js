@@ -20,6 +20,9 @@
 (function (root) {
   "use strict";
 
+  // ---- provenance metadata -------------------------------------------------
+  var DATA_PROVENANCE = { asOf: "2025-06", sources: ["National regulator websites", "ITU/APT filings", "Industry press (SubCableWorld, TeleGeography)"] };
+
   // ---- the 8 STP countries/territories ------------------------------------
   // authority   : telecom regulator that issues licences / cable-landing rights
   // environmental: marine/coastal/EIA permitting body relevant to subsea works
@@ -681,6 +684,7 @@
   }
 
   var API = {
+    DATA_PROVENANCE: DATA_PROVENANCE,
     COUNTRIES: COUNTRIES,
     list: list,
     detect: detect,
