@@ -1,0 +1,15 @@
+export { hashPassword, verifyPassword, needsRehash, validatePasswordStrength } from "./password.js";
+export { generateSessionToken, hashToken, getSessionCookieOptions, SESSION_COOKIE_NAME } from "./session.js";
+export { generateTotpSecret, generateTotpUri, verifyTotp, generateCurrentTotp } from "./totp.js";
+export { generateCsrfToken, setCsrfCookie, validateCsrf, CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "./csrf.js";
+export { encryptField, decryptField, isEncryptedValue } from "./crypto.js";
+export { isLocked, recordFailedAttempt, resetAttempts, clearLockoutStore } from "./lockout.js";
+export { logAuditEvent } from "./audit.js";
+export { createRequireAuth, createRequireRole } from "./middleware.js";
+export { registerAuthRoutes, clearPendingMfaTokens, sweepExpiredMfaTokens, startMfaTokenGc, stopMfaTokenGc } from "./routes.js";
+export { runMaintenance, startMaintenanceJob, stopMaintenanceJob } from "./maintenance.js";
+export type { MaintenanceResult } from "./maintenance.js";
+export { createPrismaDbHelpers } from "./db-helpers.js";
+export type { AuthDbHelpers, DbUser, DbSession, DbMembership } from "./db-helpers.js";
+export type { AuthenticatedUser, SessionData, AuthenticatedRequest } from "./middleware.js";
+export type { AuditAction, AuditEventParams } from "./audit.js";

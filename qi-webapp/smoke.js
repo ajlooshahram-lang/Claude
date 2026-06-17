@@ -11,10 +11,14 @@ const cssText = fs.readFileSync(path.join(root, "css/styles.css"), "utf8");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8")
   .replace('<link rel="stylesheet" href="css/styles.css" />', `<style>${cssText}</style>`)
   .replace(/<script src="https:\/\/[^"]+"><\/script>/, `<script>${chartShim}</script>`)
+  .replace('<script src="js/auth.js"></script>', `<script>window.__SKIP_AUTH=true;${fs.readFileSync(path.join(root, "js/auth.js"))}</script>`)
+  .replace('<script src="js/sync.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/sync.js"))}</script>`)
   .replace('<script src="js/calc.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/calc.js"))}</script>`)
   .replace('<script src="js/store.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/store.js"))}</script>`)
+  .replace('<script src="js/country-data.js"></script>', () => `<script>${fs.readFileSync(path.join(root, "js/country-data.js"))}</script>`)
   .replace('<script src="js/brain.js"></script>', () => `<script>${fs.readFileSync(path.join(root, "js/brain.js"))}</script>`)
   .replace('<script src="js/charts.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/charts.js"))}</script>`)
+  .replace('<script src="js/globe.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/globe.js"))}</script>`)
   .replace('<script src="js/ui.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/ui.js"))}</script>`);
 
 const dom = new JSDOM(html, { runScripts: "dangerously", url: "http://localhost/", pretendToBeVisual: true });
@@ -32,7 +36,7 @@ ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard rende
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 
 // 2) navigate every view (simulate clicks)
-const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","budget","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","ai","impact","scorecard","health","report","audit","config","help"];
+const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","budget","globe3d","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","country","ai","impact","scorecard","health","report","audit","config","help"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -40,6 +44,87 @@ views.forEach(v => {
   const c = doc.getElementById("content").innerHTML;
   ok(c && c.length > 20, `view ${v} renders (${c.length} chars)`);
 });
+
+// 2b) 3D Network Map view — data exposed, legend renders, dispose is no-throw in jsdom
+ok(window.QIGlobe && Array.isArray(window.QIGlobe.STATIONS) && window.QIGlobe.STATIONS.length === 8, "QIGlobe exposes 8 landing stations");
+ok(window.QIGlobe && Array.isArray(window.QIGlobe.CABLES) && window.QIGlobe.CABLES.length >= 6, "QIGlobe exposes cable segments");
+ok(window.QIGlobe.CABLES.every(c => c.lengthKm > 0 && c.capacityTbps > 0 && c.fibrePairs > 0), "every cable segment has length/capacity/fibre-pair data");
+doc.querySelector('.nav-item[data-view="globe3d"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".globe-stage") != null, "3D Network Map renders the globe stage container");
+ok(doc.querySelectorAll(".globe-item").length >= 6, "3D Network Map legend lists cable segments");
+ok(doc.querySelectorAll(".globe-station").length === 8, "3D Network Map legend lists 8 landing stations");
+ok(window.QIGlobe.init(doc.getElementById("globeStage")) === false, "QIGlobe.init no-throws and returns false without WebGL");
+// 2b-i) interactive API surface exists and is a safe no-op while unmounted (jsdom/no WebGL)
+["focusStation","focusCable","clearSelection","startTour","stopTour","toggleTour","isTouring",
+ "setSpin","toggleSpin","isSpinning","selectedId","onSelect","onTour","onSpin"].forEach(fn =>
+  ok(typeof window.QIGlobe[fn] === "function", "QIGlobe exposes " + fn + "()"));
+let apiThrew = false;
+try {
+  window.QIGlobe.onSelect(() => {});
+  window.QIGlobe.onTour(() => {});
+  window.QIGlobe.onSpin(() => {});
+  window.QIGlobe.focusStation("jakarta");
+  window.QIGlobe.focusCable("STP-T1");
+  window.QIGlobe.toggleTour();
+  window.QIGlobe.toggleSpin();
+  window.QIGlobe.clearSelection();
+} catch (e) { apiThrew = true; }
+ok(!apiThrew, "interactive API calls are safe no-ops when the globe is not mounted");
+// re-render the view so the dispose assertion below acts on a fresh stage
+doc.querySelector('.nav-item[data-view="globe3d"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("globeControls") != null, "3D Network Map renders the cinematic tour / rotation HUD");
+// navigating away must dispose without throwing
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(true, "navigating away from globe3d disposes cleanly");
+
+// 2c) Route Progress view — KPIs, per-segment tracking, phase cycling, % laid persist
+const RPS = window.QIStore;
+RPS.reset();
+ok(typeof RPS.routeProgress === "function", "QIStore exposes routeProgress()");
+const RP0 = RPS.routeProgress();
+ok(RP0 && typeof RP0 === "object" && Object.keys(RP0).length === window.QIGlobe.CABLES.length,
+  "routeProgress() seeds an entry per cable segment (" + Object.keys(RP0).length + ")");
+ok(window.QIGlobe.CABLES.every(c => RP0[c.id] && RP0[c.id].phases && Array.isArray(RPS.ROUTE_PHASES) &&
+  RPS.ROUTE_PHASES.every(p => typeof RP0[c.id].phases[p.key] === "string")), "every seeded entry has all 7 lifecycle phases");
+ok(RPS.ROUTE_PHASES.length === 7, "7 submarine-cable lifecycle phases defined");
+// commissioned segments seed to 100% laid; planned segments seed to 0
+const commCable = window.QIGlobe.CABLES.find(c => c.status === "commissioned");
+const planCable = window.QIGlobe.CABLES.find(c => c.status === "planned");
+ok(RP0[commCable.id].laidKm === commCable.lengthKm, "commissioned segment seeds to 100% laid");
+ok(RP0[planCable.id].laidKm === 0, "planned segment seeds to 0% laid");
+// navigate to the view
+doc.querySelector('.nav-item[data-view="routeprogress"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const rpHtml = doc.getElementById("content").innerHTML;
+ok(/Overall % Complete/.test(rpHtml) && /Km Completed/.test(rpHtml), "Route Progress view renders KPI row");
+ok(doc.querySelectorAll(".kpi").length >= 6, "Route Progress KPI row has 6 metrics");
+ok(doc.querySelectorAll(".route-seg").length === window.QIGlobe.CABLES.length,
+  "Route Progress lists every cable segment (" + doc.querySelectorAll(".route-seg").length + ")");
+ok(doc.querySelectorAll("[data-rp-phase]").length === window.QIGlobe.CABLES.length * 7, "renders a 7-phase strip per segment");
+ok(doc.querySelector("#chRoute") != null, "Route Progress renders the programme rollup chart");
+// click-only: no free-text/number inputs in the view
+let rpFreeText = 0;
+doc.querySelectorAll("#content input").forEach(inp => { const t = (inp.getAttribute("type") || "text").toLowerCase(); if (t === "text" || t === "number") rpFreeText++; });
+ok(rpFreeText === 0, "Route Progress view has no free-text/number inputs (click-only)");
+// phase cycling persists
+const phaseCell = doc.querySelector("[data-rp-phase]");
+const pcCable = phaseCell.dataset.cable, pcPhase = phaseCell.dataset.phase;
+const cycleMap = { "Not started": "In progress", "In progress": "Complete", "Complete": "Not started" };
+const beforePhase = RPS.routeProgress()[pcCable].phases[pcPhase];
+phaseCell.dispatchEvent(new window.Event("click", { bubbles: true }));
+const afterPhase = RPS.routeProgress()[pcCable].phases[pcPhase];
+ok(afterPhase === cycleMap[beforePhase], "phase cell click cycles & persists status (" + beforePhase + " -> " + afterPhase + ")");
+// % laid dropdown persists (convert percentage to km against segment length)
+doc.querySelector('.nav-item[data-view="routeprogress"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const kmSel = Array.from(doc.querySelectorAll("[data-rp-km]")).find(s => s.dataset.cable === planCable.id);
+const beforeKm = RPS.routeProgress()[planCable.id].laidKm;
+kmSel.value = "50%"; kmSel.dispatchEvent(new window.Event("change", { bubbles: true }));
+const afterKm = RPS.routeProgress()[planCable.id].laidKm;
+ok(afterKm === Math.round(planCable.lengthKm * 0.5) && afterKm !== beforeKm,
+  "% laid dropdown sets km and persists (" + beforeKm + " -> " + afterKm + ")");
+ok(typeof window.QIGlobe.setProgress === "function" && window.QIGlobe.setProgress({ "STP-T1": 100 }) === false,
+  "QIGlobe.setProgress is exposed and no-throws/returns false when globe is not mounted");
+RPS.reset();
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
 
 // 3) data integrity via exposed globals
 const S = window.QIStore;
@@ -603,6 +688,36 @@ ok(S.regRows("milestones").length > brainMsBefore, "Apply adds generated milesto
 ok(S.regRows("procurement").length > brainProcBefore, "Apply adds generated procurement items");
 // click-only / privacy sanity: analysis must not call out to the network
 ok(window.__promptCalls === 0, "Brain flow used no prompt()");
+
+// 39) Country Intelligence — bundled data, dedicated view, and Brain integration
+ok(typeof window.QICountryData === "object" && typeof window.QICountryData.list === "function", "Country data module exposed");
+ok(window.QICountryData.list().length === 8, "Country data covers all 8 STP countries (got " + window.QICountryData.list().length + ")");
+ok(window.QICountryData.list().every(c => c.authority && c.authority.abbrev && c.authority.name && c.authority.role), "Every country names a real regulatory authority with a role");
+doc.querySelector('.nav-item[data-view="country"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const countryOut = doc.getElementById("content").innerHTML;
+ok(doc.querySelectorAll(".country-card").length === 8, "Country Intelligence view renders 8 country cards");
+["NBTC","NTC","MCMC","AITI","FCC","NCC","Komdigi"].forEach(ab =>
+  ok(countryOut.indexOf(ab) !== -1, "Country view names the real authority " + ab));
+ok(/South China Sea|East Sea/i.test(countryOut), "Country view surfaces geopolitical (South China Sea) hazards");
+ok(/typhoon/i.test(countryOut), "Country view surfaces geographical (typhoon) hazards");
+// Brain detects named countries and injects permit tasks + FMEA risks
+S.reset();
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const ciCasesBefore = S.validCases().length;
+doc.getElementById("brainText").value =
+  "Submarine fibre optic cable system, 5000 km route, landing stations in the Philippines, Taiwan and Indonesia, OTDR splicing, 36 months";
+doc.getElementById("brainAnalyze").click();
+const ciOut = doc.getElementById("brainOut").innerHTML;
+ok(/Regulatory & Country Intelligence|Regulatory &amp; Country Intelligence/.test(ciOut), "Brain preview shows the Country Intelligence section");
+ok(/NTC|NCC|Komdigi/.test(ciOut), "Brain preview names detected authorities");
+const ciPlan = window.QIBrain.analyzeProject(
+  "Submarine fibre cable, landing stations in the Philippines, Taiwan and Indonesia");
+ok(ciPlan.countryIntel.length === 3, "Brain detects exactly the 3 named countries (got " + ciPlan.countryIntel.length + ")");
+ok(ciPlan.risks.some(r => /Philippines/.test(r.problem)) && ciPlan.cases.some(c => /Obtain cable landing license — NTC/.test(c.problem)), "Brain adds country risks + a permit task naming the authority");
+const allEight = window.QIBrain.analyzeProject("Submarine subsea fibre cable backbone, 8000 km, 48 months");
+ok(allEight.countryIntel.length === 8, "Submarine project with no named country includes all 8 (got " + allEight.countryIntel.length + ")");
+doc.getElementById("brainApply").click();
+ok(S.validCases().length > ciCasesBefore, "Applying the plan adds the country-enriched cases");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

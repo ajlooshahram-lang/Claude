@@ -1,0 +1,328 @@
+// QI Platform — secure multi-tenant data model.
+//
+// Design principles:
+//  - Every tenant-owned row carries `tenantId` for hard isolation; queries are
+//    always scoped by tenant in the data-access layer (enforced in Phase 1).
+//  - RBAC via Membership.role. Authorization is enforced server-side per request.
+//  - GDPR: soft-delete (`deletedAt`) supports erasure workflows; AuditLog is
+//    append-only and provides the processing record.
+//  - Analytical sub-structures that the UI treats as opaque blobs (sigma, gage,
+//    cashflow, control charts, roster, stakeholders, spec) are stored as JSON on
+//    Project. First-class, queryable, access-controlled entities (cases,
+//    register rows, snapshots, audit, share tokens) are modelled as tables.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MANAGER
+  VIEWER
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+/// An organisation. The unit of isolation and billing.
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  region    String   @default("eu-west") // data-residency tag
+  brand     Json     @default("{}") // { company, logo, accent }
+  /// Tenant-scoped integration settings. Secret values (e.g. AI keys) are stored
+  /// encrypted at the application layer, never as plaintext.
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  memberships Membership[]
+  users       User[]
+  projects    Project[]
+  auditLogs   AuditLog[]
+  invites     Invite[]
+
+  @@index([deletedAt])
+}
+
+/// A human identity. Belongs to exactly one tenant in this single-org-per-user
+/// model; cross-tenant access (if ever needed) would be added via Membership.
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String
+  email        String
+  /// Argon2id hash. Never store plaintext or reversible encodings.
+  passwordHash String
+  displayName  String?
+  /// TOTP shared secret (encrypted at rest). Null until MFA is enrolled.
+  mfaSecret    String?
+  mfaEnabled   Boolean  @default(false)
+  /// Last accepted TOTP time-step counter. Used to reject replay of a code
+  /// within its ±1-step validity window. Null until the first MFA login.
+  mfaLastUsedStep BigInt?
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  memberships Membership[]
+  sessions    Session[]
+  recoveryCodes MfaRecoveryCode[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+}
+
+/// One-time MFA recovery (backup) code. Lets a user who has lost their TOTP
+/// authenticator self-recover at login without manual admin DB surgery.
+/// Only the Argon2id hash of each code is stored — the plaintext is shown to the
+/// user exactly once at generation time. Each code is single-use (`usedAt`).
+model MfaRecoveryCode {
+  id        String   @id @default(cuid())
+  userId    String
+  /// Argon2id hash of the recovery code (same hashing as passwords).
+  codeHash  String
+  /// Set when the code has been consumed; null while still usable.
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Binds a user to a tenant with a role. The RBAC anchor.
+model Membership {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String
+  role      Role     @default(VIEWER)
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@index([userId])
+}
+
+/// Server-side session. Only a hash of the session token is persisted so a DB
+/// leak cannot be replayed as a live session.
+model Session {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @unique
+  userAgent  String?
+  ip         String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// A program/project. Holds metadata plus the UI's opaque analytical blobs.
+model Project {
+  id           String        @id @default(cuid())
+  tenantId     String
+  name         String
+  sponsor      String?
+  manager      String?
+  org          String?
+  startDate    String? // ISO date string, mirroring the UI model
+  endDate      String?
+  status       ProjectStatus @default(IN_PROGRESS)
+  version      String?
+  currency     String        @default("$")
+  sortOrder    Int           @default(0)
+
+  // Opaque analytical sub-structures (validated by zod at the API edge).
+  spec         Json @default("{}") // { usl, lsl, target }
+  roster       Json @default("[]") // [{ name, role, email }]
+  stakeholders Json @default("[]")
+  sigma        Json @default("[]")
+  gage         Json @default("{}")
+  cashflow     Json @default("[]")
+  xbarR        Json @default("{}")
+  routeProgress Json @default("{}") // { [cableId]: { phase, laidKm } } — STP route laying progress
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  cases        Case[]
+  registerRows RegisterRow[]
+  snapshots    Snapshot[]
+  shareTokens  ShareToken[]
+
+  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+}
+
+/// A master improvement/risk case. First-class because the whole platform ranks,
+/// filters and authorizes on these fields.
+model Case {
+  id         String   @id @default(cuid())
+  tenantId   String
+  projectId  String
+
+  problem    String
+  category   String?
+  priority   String?
+  status     String?
+  owner      String?
+
+  // FMEA / RPN inputs
+  sev        Int?
+  occ        Int?
+  det        Int?
+
+  rootCause  String?
+  leanMethod String?
+  target     String?
+  whys       String[] @default([])
+
+  // Schedule + progress
+  dateLogged String?
+  startDate  String?
+  percent    Float    @default(0)
+
+  // Cost
+  costCat    String?
+  estCost    Float    @default(0)
+  actCost    Float    @default(0)
+
+  // Prioritisation (RICE / WSJF)
+  reach      Float?
+  impact     Float?
+  confidence Float?
+  effort     Float?
+  userValue  Float?
+  timeCrit   Float?
+  riskRed    Float?
+  jobSize    Float?
+
+  pinned     Boolean  @default(false)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deletedAt  DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([projectId, deletedAt])
+}
+
+/// Generic engineering/business register row. One table covers all 13 register
+/// types (hazop, calibration, punch, sil, rtm, docs, ncr, moc, milestones,
+/// decisions, procurement, resources, okr); the variable columns live in `data`.
+model RegisterRow {
+  id           String   @id @default(cuid())
+  tenantId     String
+  projectId    String
+  registerType String // e.g. "hazop", "calibration", ...
+  data         Json     @default("{}")
+  pinned       Boolean  @default(false)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([projectId, registerType, deletedAt])
+}
+
+/// Point-in-time backup of a project's full state (replaces client snapshots).
+model Snapshot {
+  id        String   @id @default(cuid())
+  tenantId  String
+  projectId String
+  label     String?
+  data      Json // full serialized project state at capture time
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+/// Scoped, revocable, expiring share grant — the secure replacement for the old
+/// base64-in-URL share link that embedded the entire dataset.
+model ShareToken {
+  id        String   @id @default(cuid())
+  tenantId  String
+  projectId String
+  /// Only the hash of the share secret is stored.
+  tokenHash String   @unique
+  scope     Role     @default(VIEWER) // max role granted to the holder
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([expiresAt])
+}
+
+/// Append-only audit trail. Also serves as the GDPR record of processing.
+model AuditLog {
+  id        String   @id @default(cuid())
+  tenantId  String
+  actorId   String? // user id, or null for system actions
+  action    String // e.g. "case.create", "auth.login", "share.revoke"
+  entity    String? // e.g. "Case"
+  entityId  String?
+  detail    Json     @default("{}")
+  ip        String?
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, action])
+}
+
+/// A pending invitation for a user to join a tenant.
+/// Only the SHA-256 hash of the invite token is stored (same security model as
+/// sessions). The raw token is returned once at creation time.
+model Invite {
+  id         String    @id @default(cuid())
+  tenantId   String
+  email      String
+  role       Role      @default(MANAGER)
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  revokedAt  DateTime?
+  createdBy  String?
+  createdAt  DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([expiresAt])
+}

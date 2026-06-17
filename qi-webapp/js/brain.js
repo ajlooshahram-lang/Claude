@@ -219,6 +219,18 @@
 
   const PROFILES = [fibreProfile, genericProfile];
 
+  // Resolve the bundled Country Intelligence module. In the browser it is a
+  // global (window.QICountryData, loaded before this script); under Node it is
+  // required relatively so headless tests can exercise the same logic. Either
+  // way the Brain stays 100% offline — the data is static & local.
+  function getCountryData() {
+    if (root && root.QICountryData) return root.QICountryData;
+    if (typeof require !== "undefined") {
+      try { return require("./country-data.js"); } catch (e) { /* not present */ }
+    }
+    return null;
+  }
+
   function pickProfile(text, forcedId) {
     if (forcedId) {
       const f = PROFILES.find(p => p.id === forcedId);
@@ -273,10 +285,37 @@
     const risks = (profile.buildRisks(text, scale) || []).map(r => mkCase(Object.assign({}, r, { leanMethod: r.leanMethod || "FMEA", _brain: "risk" })));
     const milestones = buildMilestones(phases, scale);
     const procurement = profile.buildProcurement(scale);
-    const budget = aggregateBudget(cases.concat(risks), procurement);
 
     // Coverage / confidence & honest warnings.
     const warnings = [];
+
+    // ---- Country Intelligence (STP) -------------------------------------
+    // For fibre/telecom plans, scan the description for the 8 STP countries.
+    // Detected countries inject real regulatory permit tasks (naming the true
+    // authority), FMEA-scored geopolitical/geographical risks and procurement
+    // lines. A submarine/subsea project with no named country includes all 8.
+    let countryIntel = [];
+    if (profile.id === "fibre-telecom") {
+      const CD = getCountryData();
+      if (CD && typeof CD.detect === "function") {
+        const det = CD.detect(text);
+        if (det.countries.length) {
+          CD.permitTaskCases(det.countries).forEach(t =>
+            cases.push(mkCase(Object.assign({}, t, { _phase: t._phase || "Permitting & Right-of-Way", _brain: "task" }))));
+          CD.riskCases(det.countries).forEach(r =>
+            risks.push(mkCase(Object.assign({}, r, { leanMethod: r.leanMethod || "FMEA", _brain: "risk" }))));
+          CD.procurementItems(det.countries).forEach(p => procurement.push(p));
+          countryIntel = CD.summarize(det.countries);
+          if (det.signal === "submarine") warnings.push("No specific country named — included all 8 STP countries/territories because a submarine/subsea project was detected. Name countries to narrow the set.");
+        } else {
+          warnings.push("No STP country detected — add country names (e.g. Philippines, Taiwan) or the word 'submarine' to attach regulatory authorities and country-specific risks.");
+        }
+      }
+    }
+
+    const budget = aggregateBudget(cases.concat(risks), procurement);
+
+    // Domain & scale warnings.
     if (picked.profile.id === "generic-pm") warnings.push("Domain not confidently detected — used the generic PM template. Add more detail (e.g. 'fibre', 'OTDR', 'route km') for a tailored plan.");
     if (!scale.routeKm && profile.id === "fibre-telecom") warnings.push("No route length (km) detected — civil/cable budgets use a 100 km placeholder. Edit quantities after applying.");
     const confidence = profile.id === "generic-pm" ? 0.4 : Math.min(0.95, 0.55 + picked.score * 0.03);
@@ -295,6 +334,7 @@
       procurement,
       budget,
       roles: profile.roles,
+      countryIntel,
       coverage: { profile: profile.id, confidence: Math.round(confidence * 100) / 100, matched: picked.matched, warnings },
     };
   }

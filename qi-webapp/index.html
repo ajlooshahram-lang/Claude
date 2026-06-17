@@ -7,7 +7,93 @@
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <div id="app">
+  <!-- Auth Gate: shown when user is not authenticated -->
+  <div id="authGate" class="auth-gate">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="auth-brand-mark">QI</div>
+        <h1>QI Intelligence Platform</h1>
+        <p class="auth-subtitle">Submarine Telecom Project Application</p>
+      </div>
+
+      <div class="auth-error" id="authError" hidden></div>
+
+      <!-- Login panel -->
+      <form id="loginForm" class="auth-form" autocomplete="on">
+        <div id="authLogin">
+          <div class="auth-field">
+            <label for="loginEmail">Email</label>
+            <input type="email" id="loginEmail" name="email" required autocomplete="email" placeholder="you@example.com">
+          </div>
+          <div class="auth-field">
+            <label for="loginPassword">Password</label>
+            <input type="password" id="loginPassword" name="password" required autocomplete="current-password" placeholder="Enter password">
+          </div>
+          <button type="submit" class="btn btn-primary auth-submit">Sign In</button>
+          <p class="auth-switch">No account? <a href="#" id="showRegister">Create account</a></p>
+        </div>
+      </form>
+
+      <!-- Register panel -->
+      <form id="registerForm" class="auth-form" autocomplete="on">
+        <div id="authRegister" hidden>
+          <div class="auth-field">
+            <label for="regEmail">Email</label>
+            <input type="email" id="regEmail" name="email" required autocomplete="email" placeholder="you@example.com">
+          </div>
+          <div class="auth-field">
+            <label for="regPassword">Password</label>
+            <input type="password" id="regPassword" name="password" required autocomplete="new-password" placeholder="Min 10 characters">
+          </div>
+          <div class="auth-field">
+            <label for="regDisplayName">Display name</label>
+            <input type="text" id="regDisplayName" name="displayName" required autocomplete="name" placeholder="Your name">
+          </div>
+          <button type="submit" class="btn btn-primary auth-submit">Register</button>
+          <p class="auth-switch">Already have an account? <a href="#" id="showLogin">Back to login</a></p>
+        </div>
+      </form>
+
+      <!-- MFA challenge panel -->
+      <form id="mfaForm" class="auth-form">
+        <div id="authMfa" hidden>
+          <p class="auth-mfa-label">Enter your 6-digit authenticator code</p>
+          <div class="auth-field" id="mfaTotpWrap">
+            <label for="mfaCode">TOTP Code</label>
+            <input type="text" id="mfaCode" name="totpCode" required maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" placeholder="000000" inputmode="numeric">
+          </div>
+          <div class="auth-field" id="mfaRecoveryWrap" hidden>
+            <label for="mfaRecoveryCode">Recovery code</label>
+            <input type="text" id="mfaRecoveryCode" name="recoveryCode" maxlength="32" autocomplete="off" placeholder="XXXXX-XXXXX">
+          </div>
+          <button type="submit" class="btn btn-primary auth-submit">Verify</button>
+          <p class="auth-switch" id="mfaUseRecovery"><a href="#">Use a recovery code</a></p>
+          <p class="auth-switch" id="mfaUseTotp" hidden><a href="#">Use your authenticator instead</a></p>
+        </div>
+      </form>
+
+      <!-- Accept Invite panel -->
+      <form id="acceptInviteForm" class="auth-form" autocomplete="on">
+        <div id="authAcceptInvite" hidden>
+          <h2 class="auth-invite-heading">Join Team</h2>
+          <p class="auth-invite-desc">You have been invited to join a team. Create your account to get started.</p>
+          <div class="auth-field">
+            <label for="inviteDisplayName">Display Name</label>
+            <input type="text" id="inviteDisplayName" name="displayName" required autocomplete="name" placeholder="Your name">
+          </div>
+          <div class="auth-field">
+            <label for="invitePassword">Password</label>
+            <input type="password" id="invitePassword" name="password" required autocomplete="new-password" placeholder="Min 12 characters">
+            <span class="auth-field-hint">Must be at least 12 characters</span>
+          </div>
+          <button type="submit" class="btn btn-primary auth-submit">Join Team</button>
+          <p class="auth-switch">Already have an account? <a href="#" id="showLoginFromInvite">Back to login</a></p>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="app" hidden>
     <aside class="sidebar" id="sidebar">
       <div class="brand">
         <div class="brand-mark" id="brandMark">QI<img id="brandLogo" alt="" hidden></div>
@@ -40,6 +126,7 @@
           <button class="btn" id="btnExport">Export</button>
           <button class="btn" id="btnImport">Import</button>
           <input type="file" id="fileImport" accept="application/json" hidden />
+          <button class="btn btn-icon" id="btnLogout" title="Logout" aria-label="Logout">&#9211;</button>
         </div>
       </header>
       <section class="content" id="content"></section>
@@ -54,10 +141,27 @@
   <div class="toast" id="toast" hidden></div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Three.js r128 UMD + classic examples/js add-ons (all attach to global THREE.*).
+       r128 is used because OrbitControls / EffectComposer / UnrealBloomPass ship as
+       plain <script> globals at this version, enabling a no-build photoreal pipeline.
+       globe.js feature-detects each add-on and falls back gracefully if any is missing. -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/FXAAShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/sync.js"></script>
   <script src="js/calc.js"></script>
   <script src="js/store.js"></script>
+  <script src="js/country-data.js"></script>
   <script src="js/brain.js"></script>
   <script src="js/charts.js"></script>
+  <script src="js/globe.js"></script>
   <script src="js/ui.js"></script>
 </body>
 </html>

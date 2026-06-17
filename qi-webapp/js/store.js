@@ -154,6 +154,7 @@
     if (!s.gage || !s.gage.data) s.gage = defaultGage();
     if (!Array.isArray(s.cashflow)) s.cashflow = defaultCashflow();
     if (!s.xbarR || !s.xbarR.data) s.xbarR = defaultXbar();
+    if (!s.routeProgress || typeof s.routeProgress !== "object") s.routeProgress = {};
     return s;
   }
   function defaultWorkspace() {
@@ -186,7 +187,45 @@
         if (old) ws.projects[ws.order[0]] = JSON.parse(old);  // migrate legacy single project
       }
     } catch (e) { ws = defaultWorkspace(); }
-    normalizeWs(ws); bind(); save(); return state;
+    normalizeWs(ws); bind(); save();
+
+    // If sync is enabled, fire an async server load in the background
+    if (root.QISync && root.QISync.syncEnabled()) {
+      root.QISync.loadFromServer().then(function (serverWs) {
+        if (!serverWs) return;
+        // Merge: server is authoritative for projects/cases; preserve local-only data
+        serverWs.order.forEach(function (id) {
+          var sp = serverWs.projects[id];
+          var localProj = ws.projects[id];
+          if (localProj) {
+            // Server is authoritative for project metadata
+            localProj.project.name = sp.project.name;
+            localProj.project.status = sp.project.status;
+            // Merge cases at the case level: keep local-only cases (created offline, not yet synced)
+            var serverCaseIds = {};
+            sp.cases.forEach(function (sc) { serverCaseIds[sc.id] = true; });
+            // Identify local cases that do not exist on the server (offline additions)
+            var localOnlyCases = (localProj.cases || []).filter(function (lc) {
+              return !serverCaseIds[lc.id];
+            });
+            // Server cases are authoritative; append local-only cases
+            localProj.cases = sp.cases.concat(localOnlyCases);
+          } else {
+            ws.projects[id] = sp;
+            if (ws.order.indexOf(id) < 0) ws.order.push(id);
+          }
+        });
+        normalizeWs(ws); bind(); save();
+        // Notify the UI that data refreshed from server
+        try {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("qi-data-refreshed"));
+          }
+        } catch (e) { /* ignore */ }
+      }).catch(function () { /* network failure - continue with localStorage */ });
+    }
+
+    return state;
   }
   function save() {
     try { if (typeof localStorage !== "undefined") localStorage.setItem(WKEY, JSON.stringify(ws)); }
@@ -210,9 +249,16 @@
   function addProject(name) {
     const id = uid(), s = seed();
     s.project.name = name || "New Project"; s.cases = []; s.audit = []; s.snapshots = []; s.stakeholders = [];
-    workspace().projects[id] = normalize(s); ws.order.push(id); ws.activeId = id; bind(); save(); return id;
+    workspace().projects[id] = normalize(s); ws.order.push(id); ws.activeId = id; bind(); save();
+    if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncCreateProject(name || "New Project", id); }
+    return id;
   }
-  function renameProject(id, name) { if (workspace().projects[id]) { ws.projects[id].project.name = name; save(); } }
+  function renameProject(id, name) {
+    if (workspace().projects[id]) {
+      ws.projects[id].project.name = name; save();
+      if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncRenameProject(root.QISync.mapLocalToServer(id) || id, name); }
+    }
+  }
   function duplicateProject(id) {
     const src = workspace().projects[id]; if (!src) return null;
     const nid = uid(), copy = JSON.parse(JSON.stringify(src));
@@ -221,9 +267,12 @@
   }
   function deleteProject(id) {
     if (workspace().order.length <= 1) return false;
+    var serverId = (root.QISync && root.QISync.mapLocalToServer) ? root.QISync.mapLocalToServer(id) || id : null;
     delete ws.projects[id]; ws.order = ws.order.filter(x => x !== id);
     if (ws.activeId === id) ws.activeId = ws.order[0];
-    bind(); save(); return true;
+    bind(); save();
+    if (root.QISync && root.QISync.syncEnabled() && serverId) { root.QISync.syncDeleteProject(serverId); }
+    return true;
   }
   function importAsProject(obj) { const id = uid(); workspace().projects[id] = normalize(obj); ws.order.push(id); ws.activeId = id; bind(); save(); return id; }
 
@@ -256,7 +305,12 @@
     c.id = c.id || uid(); if (!c.whys) c.whys = ["", "", "", "", ""];
     get().cases.push(c);
     logAudit("Added", codeOf(get().cases.length - 1), (c.problem || "").slice(0, 60));
-    save(); return c;
+    save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      root.QISync.syncCreateCase(projServerId, c, c.id);
+    }
+    return c;
   }
   function updateCase(id, patch) {
     const i = caseIndex(id); if (i < 0) return null;
@@ -265,16 +319,29 @@
       .map(k => `${k}: ${old[k] === "" || old[k] == null ? "—" : old[k]}→${patch[k] === "" || patch[k] == null ? "—" : patch[k]}`);
     Object.assign(get().cases[i], patch);
     if (changes.length) logAudit("Updated", codeOf(i), changes.slice(0, 4).join("; ").slice(0, 120));
-    save(); return get().cases[i];
+    save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var caseServerId = root.QISync.mapLocalToServer(id) || id;
+      root.QISync.syncUpdateCase(projServerId, caseServerId, patch);
+    }
+    return get().cases[i];
   }
   let __lastDelete = null;
+  let __bulkDeleteInProgress = false;
   function deleteCase(id) {
     const i = caseIndex(id); if (i < 0) return false;
     const code = codeOf(i), prob = (get().cases[i].problem || "").slice(0, 60);
     __lastDelete = { record: get().cases[i], index: i, code };
     get().cases.splice(i, 1);
     logAudit("Deleted", code, prob);
-    save(); return true;
+    save();
+    if (!__bulkDeleteInProgress && root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var caseServerId = root.QISync.mapLocalToServer(id) || id;
+      root.QISync.syncDeleteCase(projServerId, caseServerId);
+    }
+    return true;
   }
   // Soft-undo of the last deletion. Restores the record at its original index.
   function undoDelete() {
@@ -294,11 +361,24 @@
     ids.forEach(id => { const c = get().cases.find(x => x.id === id); if (c) Object.assign(c, patch); map[id] = !!c; });
     const k = Object.keys(patch)[0];
     if (k) logAudit("Bulk updated", "", `${ids.length} case(s) · ${k}=${patch[k]}`);
-    save(); return map;
+    save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var serverIds = ids.map(function (id) { return root.QISync.mapLocalToServer(id) || id; });
+      root.QISync.syncBulkUpdate(projServerId, serverIds, patch);
+    }
+    return map;
   }
   function bulkDelete(ids) {
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var serverIds = ids.map(function (id) { return root.QISync.mapLocalToServer(id) || id; });
+      root.QISync.syncBulkDelete(projServerId, serverIds);
+    }
+    __bulkDeleteInProgress = true;
     let n = 0;
     ids.slice().sort((a, b) => caseIndex(b) - caseIndex(a)).forEach(id => { if (deleteCase(id)) n++; });
+    __bulkDeleteInProgress = false;
     return n;
   }
   function moveStatus(id, status) { return updateCase(id, { status }); }
@@ -324,44 +404,94 @@
   // ---- generic registers ----
   function regLabel(regId) { const r = C.REGISTERS.find(x => x.id === regId); return r ? r.label : regId; }
   function regRows(regId) { const s = get(); s.registers = s.registers || {}; return s.registers[regId] || (s.registers[regId] = []); }
-  function regAdd(regId, row) { row = row || {}; row._id = row._id || uid(); if (typeof row._pinned !== "boolean") row._pinned = false; regRows(regId).push(row); logAudit("Added", regLabel(regId), ""); save(); return row; }
+  function regAdd(regId, row) { row = row || {}; row._id = row._id || uid(); if (typeof row._pinned !== "boolean") row._pinned = false; regRows(regId).push(row); logAudit("Added", regLabel(regId), ""); save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      root.QISync.syncRegAdd(projServerId, regId, row, row._id);
+    }
+    return row; }
   function regUpdate(regId, rowId, patch) {
     const rows = regRows(regId), i = rows.findIndex(r => r._id === rowId); if (i < 0) return null;
     const changed = Object.keys(patch).filter(k => String(rows[i][k]) !== String(patch[k]));
     Object.assign(rows[i], patch);
     if (changed.length) logAudit("Updated", regLabel(regId), changed.slice(0, 3).map(k => `${k}→${patch[k]}`).join("; ").slice(0, 100));
-    save(); return rows[i];
+    save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var rowServerId = root.QISync.mapLocalToServer(rowId) || rowId;
+      root.QISync.syncRegUpdate(projServerId, regId, rowServerId, patch);
+    }
+    return rows[i];
   }
   function regDelete(regId, rowId) {
     const rows = regRows(regId), i = rows.findIndex(r => r._id === rowId); if (i < 0) return false;
-    rows.splice(i, 1); logAudit("Deleted", regLabel(regId), ""); save(); return true;
+    rows.splice(i, 1); logAudit("Deleted", regLabel(regId), ""); save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var rowServerId = root.QISync.mapLocalToServer(rowId) || rowId;
+      root.QISync.syncRegDelete(projServerId, regId, rowServerId);
+    }
+    return true;
   }
   function regBulkDelete(regId, ids) {
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var serverIds = ids.map(function (id) { return root.QISync.mapLocalToServer(id) || id; });
+      root.QISync.syncRegBulkDelete(projServerId, regId, serverIds);
+    }
     const rows = regRows(regId);
     let n = 0;
-    ids.slice().sort((a, b) => rows.findIndex(r => r._id === b) - rows.findIndex(r => r._id === a)).forEach(id => { if (regDelete(regId, id)) n++; });
+    ids.slice().sort((a, b) => rows.findIndex(r => r._id === b) - rows.findIndex(r => r._id === a)).forEach(id => {
+      const i = rows.findIndex(r => r._id === id);
+      if (i >= 0) { rows.splice(i, 1); n++; }
+    });
+    if (n) { logAudit("Bulk deleted", regLabel(regId), n + " row(s)"); save(); }
     return n;
   }
   function regTogglePin(regId, rowId) {
     const r = regRows(regId).find(x => x._id === rowId); if (!r) return false;
     r._pinned = !r._pinned;
     logAudit(r._pinned ? "Pinned" : "Unpinned", regLabel(regId), "");
-    save(); return r._pinned;
+    save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var rowServerId = root.QISync.mapLocalToServer(rowId) || rowId;
+      root.QISync.syncRegTogglePin(projServerId, regId, rowServerId);
+    }
+    return r._pinned;
   }
 
   // ---- Gage R&R + cash flow ----
   function gage() { const s = get(); if (!s.gage) s.gage = defaultGage(); return s.gage; }
-  function setGageCell(o, p, t, v) { gage().data[`${o}_${p}_${t}`] = (v === "" ? "" : Number(v)); save(); }
-  function setGageConfig(patch) { Object.assign(gage(), patch); save(); }
+  function setGageCell(o, p, t, v) {
+    gage().data[`${o}_${p}_${t}`] = (v === "" ? "" : Number(v)); save();
+    if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncProjectData(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, 'gage', gage()); }
+  }
+  function setGageConfig(patch) {
+    Object.assign(gage(), patch); save();
+    if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncProjectData(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, 'gage', gage()); }
+  }
   function gageResult() { return C.gageRR(gage()); }
   function cashflow() { const s = get(); if (!Array.isArray(s.cashflow)) s.cashflow = defaultCashflow(); return s.cashflow; }
-  function setCashflow(i, field, v) { const c = cashflow(); if (c[i]) { c[i][field] = (field === "month") ? v : (v === "" ? null : Number(v)); save(); } }
+  function setCashflow(i, field, v) {
+    const c = cashflow(); if (c[i]) { c[i][field] = (field === "month") ? v : (v === "" ? null : Number(v)); save(); }
+    if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncProjectData(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, 'cashflow', cashflow()); }
+  }
   function xbar() { const s = get(); if (!s.xbarR) s.xbarR = defaultXbar(); return s.xbarR; }
-  function setXbarCell(i, j, v) { xbar().data[`${i}_${j}`] = (v === "" ? "" : Number(v)); save(); }
-  function setXbarConfig(patch) { Object.assign(xbar(), patch); save(); }
+  function setXbarCell(i, j, v) {
+    xbar().data[`${i}_${j}`] = (v === "" ? "" : Number(v)); save();
+    if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncProjectData(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, 'xbarR', xbar()); }
+  }
+  function setXbarConfig(patch) {
+    Object.assign(xbar(), patch); save();
+    if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncProjectData(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, 'xbarR', xbar()); }
+  }
   function xbarResult() { return C.xbarR(xbar()); }
   function spec() { const s = get(); s.project.spec = s.project.spec || { usl: "", lsl: "", target: "" }; return s.project.spec; }
-  function setSpec(patch) { Object.assign(spec(), patch); save(); }
+  function setSpec(patch) {
+    Object.assign(spec(), patch); save();
+    if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncProjectData(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, 'spec', spec()); }
+  }
   function capabilityResult() { return C.capability(xbar(), spec()); }
   function prioritised(method) { return C.prioritise(validCases().map(c => Object.assign({}, c)), method); }
   function ncrPareto() {
@@ -397,9 +527,13 @@
   function takeSnapshot(label) {
     const s = get();
     const copy = JSON.parse(JSON.stringify({ project: s.project, roster: s.roster, cases: s.cases, sigma: s.sigma, stakeholders: s.stakeholders, registers: s.registers, gage: s.gage, cashflow: s.cashflow, xbarR: s.xbarR }));
-    s.snapshots.unshift({ id: uid(), ts: new Date().toISOString(), label: label || ("Snapshot " + new Date().toLocaleString()), data: copy });
+    var snapId = uid();
+    s.snapshots.unshift({ id: snapId, ts: new Date().toISOString(), label: label || ("Snapshot " + new Date().toLocaleString()), data: copy });
     if (s.snapshots.length > 25) s.snapshots.length = 25;
     logAudit("Snapshot", "", label || "manual"); save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      root.QISync.syncTakeSnapshot(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, label || ("Snapshot " + new Date().toLocaleString()), snapId);
+    }
     return s.snapshots[0];
   }
   function snapshots() { return get().snapshots; }
@@ -408,17 +542,42 @@
     takeSnapshot("Auto-backup before restore");
     const s = get(), d = JSON.parse(JSON.stringify(snap.data));
     s.project = d.project; s.roster = d.roster; s.cases = d.cases; s.sigma = d.sigma; s.stakeholders = d.stakeholders; if (d.registers) s.registers = d.registers; if (d.gage) s.gage = d.gage; if (d.cashflow) s.cashflow = d.cashflow; if (d.xbarR) s.xbarR = d.xbarR;
-    normalize(s); logAudit("Restored", "", snap.label); save(); return true;
+    normalize(s); logAudit("Restored", "", snap.label); save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var snapshotServerId = root.QISync.mapLocalToServer(id);
+      // Only sync restore if the snapshot has a known server-side ID
+      if (snapshotServerId) {
+        root.QISync.syncRestoreSnapshot(projServerId, snapshotServerId);
+      }
+    }
+    return true;
   }
   function deleteSnapshot(id) {
     const i = get().snapshots.findIndex(x => x.id === id); if (i < 0) return false;
-    get().snapshots.splice(i, 1); save(); return true;
+    get().snapshots.splice(i, 1); save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var snapshotServerId = root.QISync.mapLocalToServer(id);
+      if (snapshotServerId) {
+        root.QISync.syncDeleteSnapshot(projServerId, snapshotServerId);
+      }
+    }
+    return true;
   }
   function renameSnapshot(id, label) {
     const s = get().snapshots.find(x => x.id === id); if (!s) return false;
     s.label = label || s.label;
     logAudit("Renamed snapshot", "", s.label);
-    save(); return true;
+    save();
+    if (root.QISync && root.QISync.syncEnabled()) {
+      var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
+      var snapshotServerId = root.QISync.mapLocalToServer(id);
+      if (snapshotServerId) {
+        root.QISync.syncRenameSnapshot(projServerId, snapshotServerId, s.label);
+      }
+    }
+    return true;
   }
   // ---- saved views (per-project filter presets, choose-only names) ----
   function savedViews() { const s = get(); s.savedViews = s.savedViews || []; return s.savedViews; }
@@ -537,6 +696,121 @@
     return issues;
   }
 
+  // ---- Route Progress (submarine-cable construction / GIS delivery tracking) ----
+  // Each cable segment from QIGlobe.CABLES tracks the real submarine-cable
+  // lifecycle through 7 phases plus an overall "% laid" (km completed). Data is
+  // persisted per project under s.routeProgress, keyed by cable id.
+  const ROUTE_PHASES = [
+    { key: "survey",   label: "Marine Route Survey",          abbr: "Survey" },
+    { key: "permit",   label: "Permitting & Landing Licence", abbr: "Permit" },
+    { key: "shore",    label: "Shore-end / HDD & Civil",      abbr: "Shore" },
+    { key: "lay",      label: "Cable Lay (main lay)",         abbr: "Lay" },
+    { key: "joint",    label: "Jointing / Splicing",          abbr: "Joint" },
+    { key: "otdr",     label: "OTDR & Commissioning Test",    abbr: "OTDR" },
+    { key: "handover", label: "Handover / Commissioned",      abbr: "Handover" }
+  ];
+  const ROUTE_STATUS = ["Not started", "In progress", "Complete"];
+
+  // The cable inventory comes from the (separately-loaded) globe module. Stay
+  // resilient when it is absent (e.g. the jsdom smoke run without globe data).
+  function routeCables() {
+    try {
+      if (root.QIGlobe && Array.isArray(root.QIGlobe.CABLES)) return root.QIGlobe.CABLES;
+    } catch (e) { /* ignore */ }
+    return [];
+  }
+  // Derive a sensible initial per-segment state from the cable's existing status.
+  function seedRouteEntry(cable) {
+    const phases = {};
+    ROUTE_PHASES.forEach(p => { phases[p.key] = "Not started"; });
+    let laidKm = 0;
+    const len = Number(cable.lengthKm) || 0;
+    if (cable.status === "commissioned") {
+      ROUTE_PHASES.forEach(p => { phases[p.key] = "Complete"; });
+      laidKm = len;                                   // 100% laid
+    } else if (cable.status === "in-progress") {
+      phases.survey = "Complete"; phases.permit = "Complete"; phases.shore = "Complete";
+      phases.lay = "In progress";                     // mid main-lay
+      laidKm = Math.round(len * 0.6);                 // ~60% laid
+    }
+    return { phases, laidKm };
+  }
+  // Getter — seeds any missing segments from QIGlobe.CABLES and back-fills phases.
+  function routeProgress() {
+    const s = get();
+    if (!s.routeProgress || typeof s.routeProgress !== "object") s.routeProgress = {};
+    const rp = s.routeProgress;
+    let changed = false;
+    routeCables().forEach(cable => {
+      if (!rp[cable.id]) { rp[cable.id] = seedRouteEntry(cable); changed = true; return; }
+      const e = rp[cable.id];
+      e.phases = e.phases || {};
+      ROUTE_PHASES.forEach(p => { if (ROUTE_STATUS.indexOf(e.phases[p.key]) < 0) { e.phases[p.key] = "Not started"; changed = true; } });
+      if (typeof e.laidKm !== "number") { e.laidKm = Number(e.laidKm) || 0; changed = true; }
+    });
+    if (changed) save();
+    return rp;
+  }
+  function routeEntry(cableId) {
+    const rp = routeProgress();
+    if (!rp[cableId]) { rp[cableId] = { phases: {}, laidKm: 0 }; ROUTE_PHASES.forEach(p => { rp[cableId].phases[p.key] = "Not started"; }); }
+    return rp[cableId];
+  }
+  function setRoutePhase(cableId, phaseKey, status) {
+    if (ROUTE_STATUS.indexOf(status) < 0) return null;
+    if (!ROUTE_PHASES.some(p => p.key === phaseKey)) return null;
+    const e = routeEntry(cableId);
+    e.phases[phaseKey] = status;
+    logAudit("Route phase", cableId, phaseKey + " \u2192 " + status);
+    save();
+    if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncProjectData(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, 'routeProgress', routeProgress()); }
+    return e;
+  }
+  function setRouteLaidKm(cableId, km) {
+    const e = routeEntry(cableId);
+    e.laidKm = Math.max(0, Number(km) || 0);
+    logAudit("Route % laid", cableId, e.laidKm + " km");
+    save();
+    if (root.QISync && root.QISync.syncEnabled()) { root.QISync.syncProjectData(root.QISync.mapLocalToServer(ws.activeId) || ws.activeId, 'routeProgress', routeProgress()); }
+    return e;
+  }
+  // Phase-weighted completion fraction (In progress counts as half).
+  function routePhaseFraction(entry) {
+    if (!entry || !entry.phases) return 0;
+    let done = 0;
+    ROUTE_PHASES.forEach(p => { const st = entry.phases[p.key]; if (st === "Complete") done += 1; else if (st === "In progress") done += 0.5; });
+    return done / ROUTE_PHASES.length;
+  }
+  // Blended overall progress (0..100): half phase-weighted, half physical km laid.
+  function routeOverall(cable, entry) {
+    const phaseFrac = routePhaseFraction(entry);
+    const len = Number(cable && cable.lengthKm) || 0;
+    const laidFrac = len ? Math.min(1, (Number(entry && entry.laidKm) || 0) / len) : 0;
+    return Math.round(((phaseFrac * 0.5) + (laidFrac * 0.5)) * 100);
+  }
+  // Programme-level rollup across every cable segment.
+  function routeRollup() {
+    const rp = routeProgress();
+    const cables = routeCables();
+    let totalKm = 0, laidKm = 0, commissioned = 0, inProgress = 0, planned = 0, overallSum = 0;
+    cables.forEach(c => {
+      const len = Number(c.lengthKm) || 0;
+      const e = rp[c.id] || { phases: {}, laidKm: 0 };
+      totalKm += len;
+      laidKm += Math.min(Number(e.laidKm) || 0, len);
+      if (c.status === "commissioned") commissioned++;
+      else if (c.status === "in-progress") inProgress++;
+      else planned++;
+      overallSum += routeOverall(c, e);
+    });
+    return {
+      segments: cables.length, totalKm, laidKm,
+      pctComplete: totalKm ? laidKm / totalKm : 0,
+      avgOverall: cables.length ? Math.round(overallSum / cables.length) : 0,
+      commissioned, inProgress, planned
+    };
+  }
+
   const API = { uid, seed, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
     undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete, togglePin, reorderPin,
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
@@ -547,7 +821,8 @@
     regRows, regAdd, regUpdate, regDelete, regLabel, regBulkDelete, regTogglePin, evm: () => C.evm(validCases(), get().project),
     gage, setGageCell, setGageConfig, gageResult, cashflow, setCashflow,
     xbar, setXbarCell, setXbarConfig, xbarResult, scorecard,
-    spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy };
+    spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy,
+    ROUTE_PHASES, ROUTE_STATUS, routeProgress, setRoutePhase, setRouteLaidKm, routeOverall, routePhaseFraction, routeRollup };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);

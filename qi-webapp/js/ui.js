@@ -72,7 +72,11 @@
     { g: "People & Cost" },
     { id: "stakeholders", label: "Stakeholders", icon: "♟" },
     { id: "budget", label: "Budget", icon: "$" },
+    { g: "Visualization" },
+    { id: "globe3d", label: "3D Network Map", icon: "🌐" },
+    { id: "routeprogress", label: "Route Progress", icon: "📡" },
     { g: "Intelligence" },
+    { id: "country", label: "Country Intelligence", icon: "🗺" },
     { id: "ai", label: "AI Assistant", icon: "✦" },
     { id: "impact", label: "Change Impact", icon: "⇄" },
     { id: "scorecard", label: "KPI Scorecard", icon: "▣" },
@@ -106,6 +110,11 @@
   let current = "dashboard";
   function go(view, opts) {
     if (!RENDER[view]) view = "dashboard";
+    const prev = current;
+    // Tear down heavy 3D resources when navigating away from the globe view.
+    if (prev === "globe3d" && view !== "globe3d" && window.QIGlobe) {
+      try { window.QIGlobe.dispose(); } catch (e) {}
+    }
     current = view;
     $("#viewTitle").textContent = TITLES[view] || "QI Platform";
     document.querySelectorAll(".nav-item").forEach(b => {
@@ -130,6 +139,327 @@
   // ---------- renderers ----------
   const RENDER = {};
   const AFTER = {};
+
+  // 3D submarine cable network visualization (Three.js globe + glass legend).
+  RENDER.globe3d = function () {
+    const G = window.QIGlobe || {};
+    const cables = G.CABLES || [];
+    const stations = G.STATIONS || [];
+    const SC = G.STATUS_COLOR || {
+      "commissioned": { css: "#42d6a4" }, "in-progress": { css: "#4ea1ff" }, "planned": { css: "#e6b84a" }
+    };
+    const statusLabel = { "commissioned": "Commissioned", "in-progress": "In progress", "planned": "Planned" };
+    const dot = st => `<span class="globe-dot" style="background:${(SC[st] || {}).css || "#888"}"></span>`;
+    const fmtKm = n => (Number(n) || 0).toLocaleString() + " km";
+
+    const legendStatuses = ["commissioned", "in-progress", "planned"].map(st =>
+      `<span class="globe-statkey">${dot(st)}${esc(statusLabel[st] || st)}</span>`).join("");
+
+    const cableRows = cables.map(c => `
+      <li class="globe-item globe-item--click" data-cable="${esc(c.id)}" tabindex="0" role="button">
+        <div class="globe-item-top">
+          <span class="globe-item-name">${dot(c.status)}${esc(c.name)}</span>
+          <span class="globe-item-id">${esc(c.id)}</span>
+        </div>
+        <div class="globe-item-meta">
+          <span>${fmtKm(c.lengthKm)}</span>
+          <span>${esc(String(c.capacityTbps))} Tbps</span>
+          <span>${esc(String(c.fibrePairs))} pairs</span>
+          <span class="globe-item-status">${esc(statusLabel[c.status] || c.status)}</span>
+        </div>
+      </li>`).join("");
+
+    const stationRows = stations.map(s => `
+      <li class="globe-station globe-station--click" data-station="${esc(s.id)}" tabindex="0" role="button">
+        <span class="globe-station-name">${esc(s.name)}</span>
+        <span class="globe-station-country">${esc(s.country)}</span>
+        <span class="globe-station-coord">${esc(s.lat.toFixed(1))}, ${esc(s.lon.toFixed(1))}</span>
+      </li>`).join("");
+
+    const totalKm = cables.reduce((a, c) => a + (Number(c.lengthKm) || 0), 0);
+    const totalCap = cables.reduce((a, c) => a + (Number(c.capacityTbps) || 0), 0);
+
+    return `
+      <div class="globe-view">
+        <div class="globe-stage" id="globeStage">
+          <div class="globe-fallback" id="globeFallback">
+            <div class="globe-fallback-mark">🌐</div>
+            <h3>Submarine Telecom Project — Network Map</h3>
+            <p>An interactive 3D view of the STP submarine cable system renders here when WebGL is available. The full cable inventory is listed in the panel.</p>
+          </div>
+          <div class="globe-controls" id="globeControls" hidden>
+            <button class="globe-btn" id="globeTour" type="button">▶ Cinematic tour</button>
+            <button class="globe-btn is-on" id="globeSpin" type="button" aria-pressed="true">⏸ Rotation</button>
+          </div>
+          <div class="globe-detail" id="globeDetail" hidden></div>
+          <div class="globe-hint" id="globeHint">Drag to rotate · scroll to zoom · click a station or cable</div>
+        </div>
+        <aside class="globe-panel">
+          <div class="globe-panel-head">
+            <h3>Submarine Cable Network</h3>
+            <p class="globe-sub">${stations.length} landing stations · ${cables.length} cable segments</p>
+          </div>
+          <div class="globe-stats">
+            <div class="globe-stat"><span class="globe-stat-val">${totalKm.toLocaleString()}</span><span class="globe-stat-lab">total km</span></div>
+            <div class="globe-stat"><span class="globe-stat-val">${totalCap.toLocaleString()}</span><span class="globe-stat-lab">Tbps capacity</span></div>
+            <div class="globe-stat"><span class="globe-stat-val">${stations.length}</span><span class="globe-stat-lab">countries</span></div>
+          </div>
+          <div class="globe-statkeys">${legendStatuses}</div>
+          <div class="globe-section">
+            <h4>Cable Segments</h4>
+            <ul class="globe-list">${cableRows || '<li class="globe-item muted">No cable data.</li>'}</ul>
+          </div>
+          <div class="globe-section">
+            <h4>Landing Stations</h4>
+            <ul class="globe-stationlist">${stationRows || '<li class="globe-station muted">No station data.</li>'}</ul>
+          </div>
+        </aside>
+      </div>`;
+  };
+  AFTER.globe3d = function () {
+    const stage = $("#globeStage");
+    if (!stage || !window.QIGlobe) return;
+    const G = window.QIGlobe;
+    let ok = false;
+    try { ok = G.init(stage); } catch (e) { ok = false; }
+    const fb = $("#globeFallback"), hint = $("#globeHint");
+    const controls = $("#globeControls"), detail = $("#globeDetail");
+    const tourBtn = $("#globeTour"), spinBtn = $("#globeSpin");
+
+    if (!ok) {
+      if (fb) fb.style.display = "";
+      if (hint) hint.style.display = "none";
+      return;   // 2D fallback + inventory panel only
+    }
+    if (fb) fb.style.display = "none";
+    if (hint) hint.style.display = "";
+    if (controls) controls.hidden = false;
+
+    const SC = G.STATUS_COLOR || {};
+    const statusLabel = { "commissioned": "Commissioned", "in-progress": "In progress", "planned": "Planned" };
+    const sdot = st => `<span class="globe-dot" style="background:${(SC[st] || {}).css || "#888"}"></span>`;
+    const fmtKm = n => (Number(n) || 0).toLocaleString() + " km";
+
+    // highlight the matching list row when something is selected
+    function markActive(info) {
+      stage.ownerDocument.querySelectorAll(".globe-item--click.is-active, .globe-station--click.is-active")
+        .forEach(el => el.classList.remove("is-active"));
+      const panel = stage.closest(".globe-view");
+      if (!info || !panel) return;
+      const sel = info.type === "station"
+        ? `.globe-station--click[data-station="${info.id}"]`
+        : `.globe-item--click[data-cable="${info.id}"]`;
+      const row = panel.querySelector(sel);
+      if (row) { row.classList.add("is-active"); }
+    }
+
+    function renderDetail(info) {
+      if (!detail) return;
+      if (!info) { detail.hidden = true; detail.innerHTML = ""; markActive(null); return; }
+      let body;
+      if (info.type === "station") {
+        const links = (info.cables || []).map(c => `
+          <li>${sdot(c.status)}<span class="gd-cid">${esc(c.id)}</span>
+            <span class="gd-cto">→ ${esc(c.toName)}</span>
+            <span class="gd-ccap">${esc(String(c.capacityTbps))} Tbps</span></li>`).join("");
+        body = `
+          <div class="gd-kind">Landing station</div>
+          <h4>${esc(info.name)}</h4>
+          <div class="gd-sub">${esc(info.country)} · ${esc(info.lat.toFixed(1))}, ${esc(info.lon.toFixed(1))}</div>
+          <div class="gd-count"><strong>${(info.cables || []).length}</strong> connected segment(s)</div>
+          <ul class="gd-links">${links || '<li class="muted">No segments</li>'}</ul>`;
+      } else {
+        body = `
+          <div class="gd-kind">Cable segment ${sdot(info.status)}${esc(statusLabel[info.status] || info.status)}</div>
+          <h4>${esc(info.name)}</h4>
+          <div class="gd-sub">${esc(info.fromName)} ↔ ${esc(info.toName)}</div>
+          <div class="gd-chips">
+            <span class="gd-chip">${fmtKm(info.lengthKm)}</span>
+            <span class="gd-chip">${esc(String(info.capacityTbps))} Tbps</span>
+            <span class="gd-chip">${esc(String(info.fibrePairs))} fibre pairs</span>
+          </div>`;
+      }
+      detail.innerHTML = `<button class="gd-close" id="gdClose" type="button" aria-label="Close">×</button>${body}`;
+      detail.hidden = false;
+      const close = $("#gdClose");
+      if (close) close.addEventListener("click", () => { G.clearSelection(); });
+      markActive(info);
+    }
+
+    // subscriptions
+    G.onSelect(renderDetail);
+    G.onTour(active => {
+      if (!tourBtn) return;
+      tourBtn.textContent = active ? "■ Stop tour" : "▶ Cinematic tour";
+      tourBtn.classList.toggle("is-on", active);
+    });
+    G.onSpin(spinning => {
+      if (!spinBtn) return;
+      spinBtn.classList.toggle("is-on", spinning);
+      spinBtn.setAttribute("aria-pressed", spinning ? "true" : "false");
+      spinBtn.textContent = spinning ? "⏸ Rotation" : "▶ Rotation";
+    });
+
+    // HUD buttons
+    if (tourBtn) tourBtn.addEventListener("click", () => G.toggleTour());
+    if (spinBtn) spinBtn.addEventListener("click", () => G.toggleSpin());
+
+    // click a station / cable in the inventory panel to fly to it
+    const panel = stage.closest(".globe-view");
+    if (panel) {
+      const onRow = el => {
+        if (!el) return;
+        if (el.dataset.station) G.focusStation(el.dataset.station);
+        else if (el.dataset.cable) G.focusCable(el.dataset.cable);
+      };
+      panel.addEventListener("click", e => {
+        const row = e.target.closest("[data-station],[data-cable]");
+        if (row) onRow(row);
+      });
+      panel.addEventListener("keydown", e => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        const row = e.target.closest("[data-station],[data-cable]");
+        if (row) { e.preventDefault(); onRow(row); }
+      });
+    }
+  };
+
+  // Route Progress — submarine-cable construction tracking (GIS delivery view).
+  // Tracks each cable segment through the 7 real lifecycle phases plus % laid.
+  RENDER.routeprogress = function () {
+    const G = window.QIGlobe || {};
+    const cables = Array.isArray(G.CABLES) ? G.CABLES : [];
+    const stations = Array.isArray(G.STATIONS) ? G.STATIONS : [];
+    const PH = S.ROUTE_PHASES || [];
+    const stName = {}; stations.forEach(s => { stName[s.id] = s.name; });
+    const statusLabel = { "commissioned": "Commissioned", "in-progress": "In progress", "planned": "Planned" };
+    const phaseCls = { "Not started": "rp-not", "In progress": "rp-prog", "Complete": "rp-done" };
+    const fmtKm = n => (Number(n) || 0).toLocaleString() + " km";
+
+    if (!cables.length) {
+      return `<div class="card empty-cta">
+          <h2>No cable segments to track yet</h2>
+          <p>Route Progress tracks each submarine-cable segment through its construction lifecycle.
+             The cable inventory is provided by the 3D Network Map — once it is available, every
+             segment will appear here with a 7-phase delivery strip and a % laid control.</p>
+        </div>`;
+    }
+
+    const r = S.routeRollup();
+    const rp = S.routeProgress();
+    const kpi = (cls, label, val) => `<div class="kpi ${cls}"><div class="label">${label}</div><div class="value">${val}</div></div>`;
+    const kpis = `
+      <div class="grid kpis" style="margin-bottom:16px">
+        ${kpi("navy", "Total Route", fmtKm(r.totalKm))}
+        ${kpi("blue", "Km Completed", fmtKm(r.laidKm))}
+        ${kpi("teal", "Overall % Complete", pct(r.pctComplete))}
+        ${kpi("green", "Commissioned", r.commissioned)}
+        ${kpi("gold", "In Progress", r.inProgress)}
+        ${kpi("red", "Planned", r.planned)}
+      </div>`;
+
+    // % laid options as a curated dropdown (click-only): 0,10,…,100.
+    const pctVals = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+
+    const cards = cables.map(c => {
+      const e = rp[c.id] || { phases: {}, laidKm: 0 };
+      const overall = S.routeOverall(c, e);
+      const len = Number(c.lengthKm) || 0;
+      const laidPct = len ? Math.round((Number(e.laidKm) || 0) / len * 100) : 0;
+      // snap current laid% to the nearest 10 for the dropdown selection
+      const laidPctSnap = Math.round(laidPct / 10) * 10;
+      const fromTo = `${esc(stName[c.from] || c.from)} \u2192 ${esc(stName[c.to] || c.to)}`;
+
+      const strip = PH.map(p => {
+        const st = (e.phases && e.phases[p.key]) || "Not started";
+        return `<button type="button" class="rp-cell ${phaseCls[st] || "rp-not"}"
+            data-rp-phase data-cable="${esc(c.id)}" data-phase="${esc(p.key)}"
+            title="${esc(p.label)}: ${esc(st)} — click to advance" aria-label="${esc(p.label)}: ${esc(st)}">
+            <span class="rp-cell-lab">${esc(p.abbr)}</span></button>`;
+      }).join("");
+
+      return `
+        <div class="route-seg card" data-cable="${esc(c.id)}">
+          <div class="route-seg-head">
+            <div>
+              <span class="route-seg-name">${esc(c.name)}</span>
+              <span class="route-seg-route">${fromTo}</span>
+            </div>
+            <span class="route-badge route-${c.status}">${esc(statusLabel[c.status] || c.status)}</span>
+          </div>
+          <div class="route-seg-meta">
+            <span>${fmtKm(c.lengthKm)}</span>
+            <span>${esc(String(c.capacityTbps))} Tbps</span>
+            <span>${esc(String(c.fibrePairs))} fibre pairs</span>
+            <span class="route-seg-id">${esc(c.id)}</span>
+          </div>
+          <div class="rp-strip" role="group" aria-label="Construction phases">${strip}</div>
+          <div class="route-seg-foot">
+            <label class="route-laid">% laid
+              <select data-rp-km data-cable="${esc(c.id)}">
+                ${opts(pctVals.map(v => v + "%"), laidPctSnap + "%")}
+              </select>
+            </label>
+            <div class="route-overall">
+              <span class="route-overall-lab">Overall</span>
+              ${barCell(overall / 100)}
+            </div>
+          </div>
+        </div>`;
+    }).join("");
+
+    return `
+      ${kpis}
+      <div class="card">
+        <div class="card-head"><h3>Programme rollup — % complete by segment</h3></div>
+        <div class="chart-box"><canvas id="chRoute"></canvas></div>
+      </div>
+      <div class="route-legend">
+        <span class="rp-key"><span class="rp-swatch rp-not"></span>Not started</span>
+        <span class="rp-key"><span class="rp-swatch rp-prog"></span>In progress</span>
+        <span class="rp-key"><span class="rp-swatch rp-done"></span>Complete</span>
+        <span class="rp-key-hint">Click a phase cell to advance: Not started → In progress → Complete</span>
+      </div>
+      <div class="route-grid">${cards}</div>`;
+  };
+  AFTER.routeprogress = function () {
+    const G = window.QIGlobe || {};
+    const cables = Array.isArray(G.CABLES) ? G.CABLES : [];
+    if (!cables.length) return;
+
+    // phase-cell cycling (click-only): Not started → In progress → Complete → …
+    const cycle = { "Not started": "In progress", "In progress": "Complete", "Complete": "Not started" };
+    content.querySelectorAll("[data-rp-phase]").forEach(btn => btn.addEventListener("click", () => {
+      const rp = S.routeProgress();
+      const e = rp[btn.dataset.cable] || { phases: {} };
+      const cur = (e.phases && e.phases[btn.dataset.phase]) || "Not started";
+      S.setRoutePhase(btn.dataset.cable, btn.dataset.phase, cycle[cur] || "In progress");
+      go("routeprogress");
+    }));
+
+    // % laid dropdown — converts the chosen percentage to km against segment length
+    content.querySelectorAll("[data-rp-km]").forEach(sel => sel.addEventListener("change", () => {
+      const id = sel.dataset.cable;
+      const cab = cables.find(c => c.id === id);
+      const len = Number(cab && cab.lengthKm) || 0;
+      const p = parseInt(String(sel.value).replace(/[^0-9]/g, ""), 10) || 0;
+      S.setRouteLaidKm(id, Math.round(len * p / 100));
+      go("routeprogress");
+    }));
+
+    // programme rollup chart — % complete per segment
+    const rp = S.routeProgress();
+    const labels = cables.map(c => c.id);
+    const data = cables.map(c => S.routeOverall(c, rp[c.id] || { phases: {}, laidKm: 0 }));
+    if (typeof CH !== "undefined" && CH && typeof CH.bar === "function") {
+      try { CH.bar("chRoute", labels, data, "% complete"); } catch (e) { /* chart optional */ }
+    }
+
+    // best-effort: tint the 3D globe cables by progress if it happens to be live
+    if (window.QIGlobe && typeof window.QIGlobe.setProgress === "function") {
+      try { window.QIGlobe.setProgress(); } catch (e) { /* globe optional */ }
+    }
+  };
 
   RENDER.dashboard = function () {
     const k = S.kpis();
@@ -706,6 +1036,19 @@
     const phaseRows = plan.phases.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.owner)}</td><td class="center">${p.taskCount}</td></tr>`).join("");
     const riskRows = plan.risks.map(r => `<tr><td class="wrap">${esc(r.problem.replace(/^RISK:\s*/, ""))}</td><td class="center">${r.sev}</td><td class="center">${r.occ}</td><td class="center">${r.det}</td><td class="center"><b>${r.sev * r.occ * r.det}</b></td></tr>`).join("");
     const budgetRows = plan.budget.rows.map(b => `<tr><td>${esc(b.category)}</td><td class="right">${money(b.est)}</td></tr>`).join("");
+    const intel = plan.countryIntel || [];
+    const intelSection = intel.length ? `
+      <div class="card"><h3>Regulatory &amp; Country Intelligence <span class="tag">${intel.length} ${intel.length === 1 ? "country" : "countries"}</span></h3>
+        <p class="muted">Detected from your description. Permit tasks and FMEA-scored risks for these have been added to the plan.</p>
+        <div class="country-grid">${intel.map(c => `
+          <div class="card country-card">
+            <div class="card-head"><h3>${esc(c.name)}</h3><span class="tag">${esc(c.authority.abbrev)}</span></div>
+            <div class="country-auth"><div class="country-auth-name">${esc(c.authority.name)}</div>
+              <div class="muted">${esc(c.authority.role)}</div></div>
+            <div class="country-section"><h4>Top geopolitical</h4><ul>${(c.geopolitical || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+            <div class="country-section"><h4>Top geographical hazards</h4><ul>${(c.geographical || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+          </div>`).join("")}</div>
+      </div>` : "";
     $("#brainOut").innerHTML = `
       <div class="card"><div class="card-head"><h3>Analysis — ${esc(s.title)}</h3>
         <span class="tag">${esc(s.domainLabel)} · ${Math.round(plan.coverage.confidence * 100)}% confidence</span></div>
@@ -728,6 +1071,7 @@
         <div class="card"><h3>Top risks (FMEA RPN)</h3>${tableWrap("<th class='wrap'>Risk</th><th>S</th><th>O</th><th>D</th><th>RPN</th>", riskRows)}</div>
       </div>
       <div class="card"><h3>Budget skeleton</h3>${tableWrap("<th>Category</th><th class='right'>Estimate</th>", budgetRows)}</div>
+      ${intelSection}
       <div class="card"><h3>Suggested roles</h3><p>${plan.roles.map(r => `<span class="badge">${esc(r)}</span>`).join(" ")}</p></div>`;
     const applyBtn = $("#brainApply");
     if (applyBtn) applyBtn.addEventListener("click", () => {
@@ -745,6 +1089,45 @@
     plan.procurement.forEach(p => S.regAdd("procurement", Object.assign({}, p)));
     return n;
   }
+
+  // Read-only Country Intelligence: real regulatory authority, marine/EIA body,
+  // and the dominant geopolitical & geographical hazards for each of the 8 STP
+  // countries/territories. Data is bundled & offline (window.QICountryData).
+  RENDER.country = function () {
+    const CD = window.QICountryData;
+    const countries = (CD && typeof CD.list === "function") ? CD.list() : [];
+    if (!countries.length) {
+      return `<div class="card"><p class="muted">Country intelligence data is not loaded.</p></div>`;
+    }
+    const li = arr => (arr || []).map(x => `<li>${esc(x)}</li>`).join("");
+    const cards = countries.map(c => `
+      <div class="card country-card" data-country="${esc(c.key)}">
+        <div class="card-head">
+          <h3>${esc(c.name)}</h3>
+          <span class="tag">${esc(c.authority.abbrev)}</span>
+        </div>
+        <div class="country-auth">
+          <div class="country-auth-name">${esc(c.authority.name)}</div>
+          <div class="muted">${esc(c.authority.role)}</div>
+          ${c.authority.url ? `<div class="muted"><a href="${esc(c.authority.url)}" target="_blank" rel="noopener noreferrer">${esc(c.authority.url)}</a></div>` : ""}
+        </div>
+        ${c.environmental ? `<div class="country-section"><h4>Environmental / marine permitting</h4>
+          <p><b>${esc(c.environmental.abbrev)}</b> — ${esc(c.environmental.body)}.<br><span class="muted">${esc(c.environmental.role)}</span></p></div>` : ""}
+        <div class="country-cols">
+          <div class="country-section"><h4>Geopolitical</h4><ul>${li(c.geopolitical)}</ul></div>
+          <div class="country-section"><h4>Geographical / environmental hazards</h4><ul>${li(c.geographical)}</ul></div>
+        </div>
+      </div>`).join("");
+    return `<div class="card">
+        <h3>Country &amp; Regulatory Intelligence <span class="tag">${countries.length} countries</span></h3>
+        <p style="line-height:1.6">Real, named reference data for the Submarine Telecom Project's
+        ${countries.length} countries/territories — the telecom regulator that issues cable-landing
+        licences, the marine/environmental permitting body, and the dominant geopolitical and
+        geographical hazards along each route. The Project Brain folds these into generated permit
+        tasks and FMEA-scored risks when it detects a country in your description.</p>
+      </div>
+      <div class="country-grid">${cards}</div>`;
+  };
 
   RENDER.health = function () {
     const issues = S.health();
@@ -772,6 +1155,35 @@
         <div class="field"><label>Currency symbol</label><select id="p_cur">${opts(["$", "€", "£", "kr", "₹", "¥"], p.currency)}</select></div>
       </div>
       <div style="margin-top:14px"><button class="btn btn-primary" data-act="saveproj">Save project</button></div></div>
+
+      <div class="card team-card"><div class="card-head"><h3>Team Management</h3></div>
+        <div id="teamMembersArea"><p class="muted">Loading team members...</p></div>
+        <div id="teamInviteArea" hidden>
+          <hr style="border:none;border-top:1px solid var(--line);margin:16px 0">
+          <h4 style="margin:0 0 12px;font-size:14px">Invite New Member</h4>
+          <div class="invite-form" id="inviteFormArea">
+            <div class="form-grid" style="max-width:500px">
+              <div class="field"><label>Email</label><input type="email" id="inviteEmail" placeholder="user@example.com" required></div>
+              <div class="field"><label>Role</label><select id="inviteRole"><option value="ADMIN">Admin</option><option value="MANAGER" selected>Manager</option><option value="VIEWER">Viewer</option></select></div>
+            </div>
+            <div style="margin-top:12px"><button class="btn btn-primary" id="btnSendInvite">Send Invite</button></div>
+          </div>
+          <div id="inviteLinkArea" hidden>
+            <div class="invite-link-box">
+              <label style="font-size:12px;font-weight:600;color:#42506a;display:block;margin-bottom:6px">Invite Link (share this with the user)</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="text" id="inviteLinkValue" readonly style="flex:1;font-family:monospace;font-size:12px">
+                <button class="btn btn-sm" id="btnCopyInviteLink">Copy</button>
+              </div>
+              <p class="muted" style="margin-top:6px;font-size:11px">This link is valid for 7 days. It can only be used once.</p>
+            </div>
+          </div>
+          <div id="pendingInvitesArea" style="margin-top:16px">
+            <h4 style="margin:0 0 10px;font-size:14px">Pending Invites</h4>
+            <div id="pendingInvitesList"><p class="muted">Loading...</p></div>
+          </div>
+        </div>
+      </div>
 
       <div class="card"><div class="card-head"><h3>Team roster</h3>
         <button class="btn btn-sm btn-primary" data-act="addro">+ Add member</button></div>
@@ -808,9 +1220,190 @@
           <div class="field full"><label>API base URL</label><select id="ai_base">${opts(["https://api.openai.com/v1"], ai.baseUrl || "https://api.openai.com/v1")}</select></div>
           <div class="field full"><label>API key (the only typed field)</label><input type="password" id="ai_key" value="${esc(ai.key || "")}" placeholder="sk-…"></div>
         </div>
-        <div style="margin-top:14px"><button class="btn btn-primary" data-act="saveai">Save AI settings</button></div></div>`;
+        <div style="margin-top:14px"><button class="btn btn-primary" data-act="saveai">Save AI settings</button></div></div>
+
+      <div class="card"><h3>Account Security</h3>
+        <div class="mfa-status">
+          <span>Multi-Factor Authentication (MFA):</span>
+          <span class="mfa-badge ${(window.QIAuth && window.QIAuth.currentUser && window.QIAuth.currentUser.mfaEnabled) ? 'enabled' : 'disabled'}">${(window.QIAuth && window.QIAuth.currentUser && window.QIAuth.currentUser.mfaEnabled) ? 'Enabled' : 'Disabled'}</span>
+        </div>
+        <div id="mfaSettingsContent">
+          ${(window.QIAuth && window.QIAuth.currentUser && window.QIAuth.currentUser.mfaEnabled) ?
+            '<p class="muted">MFA is active on your account. To disable it, enter your password and a current TOTP code.</p>' +
+            '<div class="mfa-enroll-form">' +
+            '  <div class="auth-field"><label for="mfaDisablePw">Password</label><input type="password" id="mfaDisablePw" placeholder="Your password"></div>' +
+            '  <div class="auth-field"><label for="mfaDisableCode">TOTP Code</label><input type="text" id="mfaDisableCode" maxlength="6" pattern="[0-9]{6}" placeholder="000000" inputmode="numeric"></div>' +
+            '  <button class="btn btn-danger" id="btnDisableMfa">Disable MFA</button>' +
+            '</div>' +
+            ((window.QIAuth && window.QIAuth.generateRecoveryCodes) ?
+              '<hr style="border:none;border-top:1px solid var(--line);margin:18px 0">' +
+              '<h4 style="margin:0 0 8px;font-size:14px">Recovery codes</h4>' +
+              '<p class="muted" style="margin-top:0">One-time backup codes let you sign in if you lose your authenticator. ' +
+              'Generating a new set replaces any previous codes.</p>' +
+              '<p class="muted" id="recoveryStatusLine">Checking recovery codes…</p>' +
+              '<button class="btn btn-primary" id="btnGenRecovery">Generate recovery codes</button>' +
+              '<div id="recoveryCodesOut" hidden></div>'
+              : '')
+            :
+            '<p class="muted">Protect your account with time-based one-time passwords (TOTP). Works with any authenticator app.</p>' +
+            '<button class="btn btn-primary" id="btnEnrollMfa">Enable MFA</button>' +
+            '<div id="mfaEnrollArea" hidden>' +
+            '  <div class="mfa-secret" id="mfaSecretUri"></div>' +
+            '  <p class="muted">Scan the URI above with your authenticator app, then enter the 6-digit code to confirm.</p>' +
+            '  <div class="mfa-enroll-form">' +
+            '    <div class="auth-field"><label for="mfaVerifyCode">TOTP Code</label><input type="text" id="mfaVerifyCode" maxlength="6" pattern="[0-9]{6}" placeholder="000000" inputmode="numeric"></div>' +
+            '    <button class="btn btn-primary" id="btnVerifyMfa">Verify and activate</button>' +
+            '  </div>' +
+            '</div>'
+          }
+        </div>
+        <div class="auth-error" id="mfaError" hidden style="margin-top:12px"></div>
+
+        <hr style="border:none;border-top:1px solid var(--line);margin:18px 0">
+        <h4 style="margin:0 0 8px;font-size:14px">Change password</h4>
+        <p class="muted" style="margin-top:0">Choose a strong password of at least 12 characters. Changing it signs out all of your other sessions.</p>
+        <div class="mfa-enroll-form">
+          <div class="auth-field"><label for="cpCurrent">Current password</label><input type="password" id="cpCurrent" autocomplete="current-password" placeholder="Current password"></div>
+          <div class="auth-field"><label for="cpNew">New password</label><input type="password" id="cpNew" autocomplete="new-password" placeholder="At least 12 characters"></div>
+          <div class="auth-field"><label for="cpConfirm">Confirm new password</label><input type="password" id="cpConfirm" autocomplete="new-password" placeholder="Re-enter new password"></div>
+          <button class="btn btn-primary" id="btnChangePassword">Change password</button>
+        </div>
+        <div class="auth-error" id="cpError" hidden style="margin-top:12px"></div>
+      </div>`;
   };
   AFTER.config = function () {
+    // ---- Team Management wiring ----
+    var teamArea = document.getElementById("teamMembersArea");
+    var inviteArea = document.getElementById("teamInviteArea");
+
+    if (teamArea && window.QIAuth && window.QIAuth.listTeam) {
+      window.QIAuth.listTeam().then(function (data) {
+        var members = (data && data.members) || [];
+        if (members.length === 0) {
+          teamArea.innerHTML = '<p class="muted">No team members found.</p>';
+          return;
+        }
+        // Determine current user role from team list
+        var cu = window.QIAuth.currentUser;
+        var myRole = null;
+        if (cu) {
+          for (var i = 0; i < members.length; i++) {
+            if (members[i].id === cu.id) { myRole = members[i].role; break; }
+          }
+        }
+        var isAdmin = myRole === "OWNER" || myRole === "ADMIN";
+
+        // Build team members table
+        var roleClass = function (r) { return "role-badge role-" + (r || "viewer").toLowerCase(); };
+        var rows = members.map(function (m) {
+          var joined = m.createdAt ? new Date(m.createdAt).toLocaleDateString() : "";
+          return "<tr><td>" + esc(m.displayName || m.email) + "</td><td>" + esc(m.email) + "</td><td><span class=\"" + roleClass(m.role) + "\">" + esc(m.role) + "</span></td><td>" + esc(joined) + "</td></tr>";
+        }).join("");
+        teamArea.innerHTML = '<div class="table-wrap"><table class="team-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+
+        // Show invite management if OWNER or ADMIN
+        if (isAdmin && inviteArea) {
+          inviteArea.hidden = false;
+          loadPendingInvites();
+        }
+      }).catch(function () {
+        teamArea.innerHTML = '<p class="muted">Unable to load team members.</p>';
+      });
+    }
+
+    // Send invite handler
+    var btnSend = document.getElementById("btnSendInvite");
+    if (btnSend) {
+      btnSend.addEventListener("click", function () {
+        var email = (document.getElementById("inviteEmail") || {}).value || "";
+        var role = (document.getElementById("inviteRole") || {}).value || "MANAGER";
+        if (!email) { toast("Please enter an email address."); return; }
+        btnSend.disabled = true;
+        window.QIAuth.createInvite(email, role).then(function (data) {
+          btnSend.disabled = false;
+          if (data && data.token) {
+            var link = window.location.origin + "/?invite=" + data.token;
+            var linkInput = document.getElementById("inviteLinkValue");
+            var linkArea = document.getElementById("inviteLinkArea");
+            if (linkInput) linkInput.value = link;
+            if (linkArea) linkArea.hidden = false;
+            toast("Invite created successfully.");
+            // Clear form
+            var emailInput = document.getElementById("inviteEmail");
+            if (emailInput) emailInput.value = "";
+            loadPendingInvites();
+          } else {
+            toast(data.message || data.error || "Failed to create invite.");
+          }
+        }).catch(function () {
+          btnSend.disabled = false;
+          toast("Unable to reach the server.");
+        });
+      });
+    }
+
+    // Copy invite link handler
+    var btnCopy = document.getElementById("btnCopyInviteLink");
+    if (btnCopy) {
+      btnCopy.addEventListener("click", function () {
+        var linkInput = document.getElementById("inviteLinkValue");
+        if (linkInput && linkInput.value) {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(linkInput.value).then(function () {
+              toast("Invite link copied to clipboard.");
+            }).catch(function () {
+              linkInput.select();
+              toast("Press Ctrl+C to copy.");
+            });
+          } else {
+            linkInput.select();
+            try { document.execCommand("copy"); toast("Invite link copied."); } catch (ex) { toast("Press Ctrl+C to copy."); }
+          }
+        }
+      });
+    }
+
+    // Load pending invites
+    function loadPendingInvites() {
+      var listEl = document.getElementById("pendingInvitesList");
+      if (!listEl || !window.QIAuth || !window.QIAuth.listInvites) return;
+      window.QIAuth.listInvites().then(function (data) {
+        var invites = (data && data.invites) || [];
+        if (invites.length === 0) {
+          listEl.innerHTML = '<p class="muted">No pending invites.</p>';
+          return;
+        }
+        var rows = invites.map(function (inv) {
+          var expires = inv.expiresAt ? new Date(inv.expiresAt).toLocaleDateString() : "";
+          return '<tr><td>' + esc(inv.email) + '</td><td><span class="role-badge role-' + (inv.role || "manager").toLowerCase() + '">' + esc(inv.role) + '</span></td><td>' + esc(expires) + '</td><td><button class="btn btn-sm btn-danger" data-revoke="' + esc(inv.id) + '">Revoke</button></td></tr>';
+        }).join("");
+        listEl.innerHTML = '<div class="table-wrap"><table class="team-table"><thead><tr><th>Email</th><th>Role</th><th>Expires</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+
+        // Wire revoke buttons
+        listEl.querySelectorAll("button[data-revoke]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var id = btn.getAttribute("data-revoke");
+            btn.disabled = true;
+            window.QIAuth.revokeInvite(id).then(function (data) {
+              if (data && data.success) {
+                toast("Invite revoked.");
+                loadPendingInvites();
+              } else {
+                toast(data.message || data.error || "Failed to revoke invite.");
+                btn.disabled = false;
+              }
+            }).catch(function () {
+              toast("Unable to reach the server.");
+              btn.disabled = false;
+            });
+          });
+        });
+      }).catch(function () {
+        listEl.innerHTML = '<p class="muted">Unable to load invites.</p>';
+      });
+    }
+
+    // ---- Existing config wiring ----
     content.querySelectorAll("input[data-ro],select[data-ro]").forEach(inp => inp.addEventListener("change", () => {
       const i = +inp.dataset.ro; S.get().roster[i][inp.dataset.f] = inp.value; S.save();
       if (inp.dataset.f === "name") refreshHeader();
@@ -823,6 +1416,146 @@
       fr.onload = () => { S.setBrand({ logo: fr.result }); refreshHeader(); go("config"); toast("Logo set."); };
       fr.readAsDataURL(f);
     });
+    // MFA settings wiring
+    const btnEnroll = $("#btnEnrollMfa");
+    if (btnEnroll) btnEnroll.addEventListener("click", function () {
+      if (!window.QIAuth) return;
+      btnEnroll.disabled = true;
+      window.QIAuth.enrollMfa().then(function (data) {
+        if (data.uri || data.secret) {
+          var area = $("#mfaEnrollArea");
+          var uriEl = $("#mfaSecretUri");
+          if (uriEl) uriEl.textContent = data.uri || data.secret;
+          if (area) area.hidden = false;
+        } else {
+          var err = $("#mfaError"); if (err) { err.textContent = data.message || data.error || "Enrollment failed."; err.hidden = false; }
+        }
+        btnEnroll.disabled = false;
+      }).catch(function () {
+        var err = $("#mfaError"); if (err) { err.textContent = "Unable to reach the server."; err.hidden = false; }
+        btnEnroll.disabled = false;
+      });
+    });
+    const btnVerify = $("#btnVerifyMfa");
+    if (btnVerify) btnVerify.addEventListener("click", function () {
+      if (!window.QIAuth) return;
+      var code = ($("#mfaVerifyCode") || {}).value || "";
+      var err = $("#mfaError");
+      if (err) err.hidden = true;
+      window.QIAuth.verifyMfa(code).then(function (data) {
+        if (data.success || data.mfaEnabled) {
+          toast("MFA enabled successfully.");
+          go("config");
+        } else {
+          if (err) { err.textContent = data.message || data.error || "Verification failed."; err.hidden = false; }
+        }
+      }).catch(function () { if (err) { err.textContent = "Unable to reach the server."; err.hidden = false; } });
+    });
+    const btnDisable = $("#btnDisableMfa");
+    if (btnDisable) btnDisable.addEventListener("click", function () {
+      if (!window.QIAuth) return;
+      var pw = ($("#mfaDisablePw") || {}).value || "";
+      var code = ($("#mfaDisableCode") || {}).value || "";
+      var err = $("#mfaError");
+      if (err) err.hidden = true;
+      window.QIAuth.disableMfa(pw, code).then(function (data) {
+        if (data.success) {
+          toast("MFA disabled.");
+          go("config");
+        } else {
+          if (err) { err.textContent = data.message || data.error || "Failed to disable MFA."; err.hidden = false; }
+        }
+      }).catch(function () { if (err) { err.textContent = "Unable to reach the server."; err.hidden = false; } });
+    });
+
+    // Recovery codes wiring. Guarded so the Settings view still renders when
+    // QIAuth is the headless/test stub without these methods.
+    if (window.QIAuth && window.QIAuth.recoveryStatus) {
+      var statusLine = $("#recoveryStatusLine");
+      window.QIAuth.recoveryStatus().then(function (data) {
+        if (statusLine) {
+          if (data && data.enabled) {
+            statusLine.textContent = "You have " + (data.remaining || 0) + " unused recovery code" + ((data.remaining === 1) ? "" : "s") + ".";
+          } else {
+            statusLine.textContent = "";
+          }
+        }
+      }).catch(function () {
+        if (statusLine) statusLine.textContent = "Unable to load recovery-code status.";
+      });
+    }
+    var btnGenRecovery = $("#btnGenRecovery");
+    if (btnGenRecovery && window.QIAuth && window.QIAuth.generateRecoveryCodes) {
+      btnGenRecovery.addEventListener("click", function () {
+        var err = $("#mfaError");
+        if (err) err.hidden = true;
+        btnGenRecovery.disabled = true;
+        window.QIAuth.generateRecoveryCodes().then(function (data) {
+          btnGenRecovery.disabled = false;
+          var out = $("#recoveryCodesOut");
+          if (data && data.codes && data.codes.length) {
+            var items = data.codes.map(function (c) { return "<li><code>" + esc(c) + "</code></li>"; }).join("");
+            if (out) {
+              out.innerHTML =
+                '<div class="recovery-warning">Save these codes now — each can be used once and they will NOT be shown again.</div>' +
+                '<ul class="recovery-codes">' + items + '</ul>' +
+                '<button class="btn btn-sm" id="btnCopyRecovery">Copy codes</button>';
+              out.hidden = false;
+            }
+            var statusLine2 = $("#recoveryStatusLine");
+            if (statusLine2) statusLine2.textContent = "You have " + data.codes.length + " unused recovery codes.";
+            var btnCopy = $("#btnCopyRecovery");
+            if (btnCopy) btnCopy.addEventListener("click", function () {
+              var text = data.codes.join("\n");
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function () { toast("Recovery codes copied."); }).catch(function () { toast("Press Ctrl+C to copy."); });
+              } else {
+                toast("Select and copy the codes above.");
+              }
+            });
+            toast("Recovery codes generated.");
+          } else {
+            if (err) { err.textContent = (data && (data.error || data.message)) || "Failed to generate recovery codes."; err.hidden = false; }
+          }
+        }).catch(function () {
+          btnGenRecovery.disabled = false;
+          if (err) { err.textContent = "Unable to reach the server."; err.hidden = false; }
+        });
+      });
+    }
+    // QIAuth is the headless/test stub without a changePassword method.
+    const btnChangePw = $("#btnChangePassword");
+    if (btnChangePw && window.QIAuth && window.QIAuth.changePassword) {
+      btnChangePw.addEventListener("click", function () {
+        var current = ($("#cpCurrent") || {}).value || "";
+        var next = ($("#cpNew") || {}).value || "";
+        var confirm = ($("#cpConfirm") || {}).value || "";
+        var err = $("#cpError");
+        if (err) err.hidden = true;
+
+        function showCpError(msg) { if (err) { err.textContent = msg; err.hidden = false; } }
+
+        if (!current) { showCpError("Enter your current password."); return; }
+        if (next !== confirm) { showCpError("New password and confirmation do not match."); return; }
+        if (next.length < 12) { showCpError("New password must be at least 12 characters."); return; }
+
+        btnChangePw.disabled = true;
+        window.QIAuth.changePassword(current, next).then(function (data) {
+          btnChangePw.disabled = false;
+          if (data && data.success) {
+            var c = $("#cpCurrent"); if (c) c.value = "";
+            var n = $("#cpNew"); if (n) n.value = "";
+            var cf = $("#cpConfirm"); if (cf) cf.value = "";
+            toast("Password changed — other sessions signed out.");
+          } else {
+            showCpError((data && (data.error || data.message)) || "Failed to change password.");
+          }
+        }).catch(function () {
+          btnChangePw.disabled = false;
+          showCpError("Unable to reach the server.");
+        });
+      });
+    }
   };
 
   RENDER.help = function () {
@@ -2206,8 +2939,18 @@
     toast("Storage full — export a JSON backup and delete old snapshots.");
   });
 
-  // ---------- init ----------
-  S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
-  const initialHash = (location.hash || "").replace(/^#/, "");
-  go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
+  // ---------- init (called by auth.js after successful authentication) ----------
+  window.QIBoot = function () {
+    S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
+    const initialHash = (location.hash || "").replace(/^#/, "");
+    go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
+    // Wire up logout button after boot
+    const btnLogout = $("#btnLogout");
+    if (btnLogout && window.QIAuth) btnLogout.addEventListener("click", function () { window.QIAuth.logout(); });
+  };
+
+  // When __SKIP_AUTH is set (e.g. smoke tests), boot immediately without waiting for auth.js DOMContentLoaded
+  if (typeof window.__SKIP_AUTH !== "undefined" && window.__SKIP_AUTH) {
+    window.QIBoot();
+  }
 })();
