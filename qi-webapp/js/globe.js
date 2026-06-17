@@ -916,7 +916,7 @@
           composer.setSize(width, height);
           if (composer.setPixelRatio) composer.setPixelRatio(dpr);
           composer.addPass(new THREE.RenderPass(scene, camera));
-          bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(width, height), 0.75, 0.4, 0.85);
+          bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(width, height), 0.92, 0.52, 0.82);
           composer.addPass(bloomPass);
           var lastPass = bloomPass;
           if (typeof THREE.ShaderPass === "function" && THREE.FXAAShader) {
@@ -1035,9 +1035,9 @@
             if (!sm || !sm.userData.deployOnline) { rg.mat.opacity = 0; continue; }
           }
           var rp = (t * 0.5 + rg.offset) % 1;
-          var sc = 1 + rp * 2.6;
+          var sc = 1 + rp * 3.2;
           rg.mesh.scale.set(sc, sc, sc);
-          rg.mat.opacity = 0.6 * (1 - rp);
+          rg.mat.opacity = 0.72 * (1 - rp);
         }
 
         if (composer) composer.render();
