@@ -1,0 +1,33 @@
+# ---------------------------------------------------------------------------
+# Caddyfile — TLS edge for the STP Application (automatic HTTPS)
+# ---------------------------------------------------------------------------
+# Caddy terminates TLS for $DOMAIN using Let's Encrypt (HTTP-01/TLS-ALPN-01),
+# adds HSTS, and reverse-proxies to the internal nginx (`frontend:80`). nginx
+# and the backend are NOT published to the host in the TLS topology — Caddy is
+# the only public entrypoint. Used by: ./deploy.sh --tls
+#
+# Requires DOMAIN and ACME_EMAIL (set in .env, passed through by compose).
+# ---------------------------------------------------------------------------
+
+{
+	# ACME account email for Let's Encrypt expiry/recovery notices.
+	email {$ACME_EMAIL}
+	# Be a good ACME citizen; uncomment to use the staging CA while testing:
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# HSTS at the TLS edge: 2 years, subdomains, preload-eligible.
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		# Caddy already strips most fingerprinting; drop the Server token too.
+		-Server
+	}
+
+	# Forward to the internal nginx which serves static files + proxies /api.
+	reverse_proxy frontend:80 {
+		header_up X-Forwarded-Proto https
+	}
+}
