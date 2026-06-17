@@ -77,6 +77,7 @@ ok((function () { for (let i = 1; i < goLive.length; i++) { if (goLive[i].month 
    "go-live schedule is sorted earliest-first");
 ok(goLive.filter(o => o.month <= 30).length === 5, "5 countries are live by month 30 (matches the live cost overlay)");
 ok(doc.getElementById("globeSpend") != null && doc.getElementById("globeSpendChart") != null, "3D map renders the spending S-curve overlay container");
+ok(doc.getElementById("globeOnline") != null, "3D map renders the 'countries coming online' strip container");
 ok(window.QIGlobe.init(doc.getElementById("globeStage")) === false, "QIGlobe.init no-throws and returns false without WebGL");
 // 2b-i) interactive API surface exists and is a safe no-op while unmounted (jsdom/no WebGL)
 ["focusStation","focusCable","clearSelection","startTour","stopTour","toggleTour","isTouring",

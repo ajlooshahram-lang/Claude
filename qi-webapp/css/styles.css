@@ -585,6 +585,11 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .spend-guide{stroke:#42d6a4;stroke-width:1;stroke-dasharray:2 2}
 .spend-dot{fill:#42d6a4;stroke:#fff;stroke-width:1.2}
 .globe-spend .spend-lbl{fill:#9fb0cf;font-size:9px;font-family:'Segoe UI',Arial,sans-serif}
+.globe-online-title{margin-top:9px}
+.globe-online{display:flex;flex-wrap:wrap;gap:4px}
+.globe-online-chip{font-size:9.5px;padding:2px 7px;border-radius:999px;border:1px solid rgba(125,167,240,.25);
+  color:#7e90b3;background:rgba(11,22,40,.4);transition:background .25s ease,color .25s ease,border-color .25s ease}
+.globe-online-chip.is-on{color:#0a1428;background:#42d6a4;border-color:#42d6a4;font-weight:700}
 @media (max-width:980px){.globe-spend{width:200px}}
 @media (max-width:680px){.globe-spend{display:none}}  /* keep the small screen uncluttered */
 

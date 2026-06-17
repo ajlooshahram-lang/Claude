@@ -363,17 +363,20 @@ async function main() {
   // fill must advance as the build progresses (proves the SVG updates live).
   const spend = await page.evaluate(() => {
     const box = document.getElementById("globeSpend");
+    const litCount = () => document.querySelectorAll("#globeOnline .globe-online-chip.is-on").length;
     window.QIGlobe.setDeployment(10);
     const dot = document.getElementById("globeSpendDot");
     const clip = document.getElementById("globeSpendClipRect");
-    const a = { cx: dot ? +dot.getAttribute("cx") : null, w: clip ? +clip.getAttribute("width") : null, visible: box ? box.hidden === false : false };
+    const a = { cx: dot ? +dot.getAttribute("cx") : null, w: clip ? +clip.getAttribute("width") : null, visible: box ? box.hidden === false : false, lit: litCount() };
     window.QIGlobe.setDeployment(90);
-    const b = { cx: dot ? +dot.getAttribute("cx") : null, w: clip ? +clip.getAttribute("width") : null };
-    return { a, b, hasSvg: !!document.querySelector("#globeSpend svg.spend-svg") };
+    const b = { cx: dot ? +dot.getAttribute("cx") : null, w: clip ? +clip.getAttribute("width") : null, lit: litCount() };
+    return { a, b, hasSvg: !!document.querySelector("#globeSpend svg.spend-svg"), chips: document.querySelectorAll("#globeOnline .globe-online-chip").length };
   });
   ok(spend.hasSvg && spend.a.visible, "spending S-curve overlay renders and is shown during the build");
   ok(spend.b.cx > spend.a.cx && spend.b.w > spend.a.w,
     "spend marker + area fill advance as the build progresses (marker x " + spend.a.cx + " → " + spend.b.cx + ")");
+  ok(spend.chips === 8 && spend.b.lit > spend.a.lit,
+    "countries-coming-online chips light up progressively (" + spend.a.lit + " lit at 10% → " + spend.b.lit + " at 90%)");
 
   // Auto-play must advance the build over time, then pause cleanly.
   await page.evaluate(() => { window.QIGlobe.setDeployment(0); window.QIGlobe.playDeployment(); });

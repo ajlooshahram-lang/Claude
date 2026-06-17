@@ -259,6 +259,8 @@
           <div class="globe-spend" id="globeSpend" hidden>
             <div class="globe-spend-title">Spending over time</div>
             <div class="globe-spend-chart" id="globeSpendChart"></div>
+            <div class="globe-spend-title globe-online-title">Countries coming online</div>
+            <div class="globe-online" id="globeOnline"></div>
           </div>
           <div class="globe-hint" id="globeHint">Drag to rotate · scroll to zoom · click a station or cable</div>
         </div>
@@ -317,6 +319,12 @@
       spendChart.innerHTML = spendCurveSVG(G.deployCurve(60), { id: "globeSpend", live: true });
     }
     const spendClip = $("#globeSpendClipRect"), spendDot = $("#globeSpendDot"), spendGuide = $("#globeSpendGuide");
+    // Country chips that light up in order as the build reaches each go-live month.
+    const onlineBox = $("#globeOnline");
+    if (onlineBox && typeof G.onlineSchedule === "function") {
+      onlineBox.innerHTML = G.onlineSchedule().map(o =>
+        `<span class="globe-online-chip" data-g="${o.g.toFixed(4)}" title="Live around month ${esc(String(o.month))}">${esc(o.country)}</span>`).join("");
+    }
     const updateSpend = st => {
       if (!st || !st.budgetUsd) return;
       const x = spendX(st.g), y = spendY(st.costUsd / st.budgetUsd);
@@ -325,6 +333,13 @@
       if (spendGuide) {
         spendGuide.setAttribute("x1", x.toFixed(1)); spendGuide.setAttribute("x2", x.toFixed(1));
         spendGuide.setAttribute("y1", spendBaseY.toFixed(1)); spendGuide.setAttribute("y2", y.toFixed(1));
+      }
+      if (onlineBox) {
+        const chips = onlineBox.children;
+        for (let i = 0; i < chips.length; i++) {
+          const cg = parseFloat(chips[i].getAttribute("data-g")) || 0;
+          chips[i].classList.toggle("is-on", !!st.mode && st.g >= cg - 1e-6);
+        }
       }
     };
     // plain-language money: "about USD 1.3B" / "USD 640M" — no jargon, no cents
