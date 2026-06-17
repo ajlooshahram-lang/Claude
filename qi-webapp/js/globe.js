@@ -97,6 +97,37 @@
   var GLOBE_R = 2;          // globe radius in scene units
   var state = null;         // holds live scene objects when mounted
 
+  // Persisted across init/dispose so the host UI can subscribe once and keep
+  // its callbacks even if the scene is torn down and remounted.
+  var selectHandler = null; // fn(info) — called when a station/cable is picked
+  var tourHandler = null;   // fn(active) — called when the auto-tour toggles
+  var spinHandler = null;   // fn(spinning) — called when auto-rotation toggles
+
+  // Mid-point lat/lon of a cable (for camera framing of a whole segment).
+  function cableMidLatLon(cab) {
+    var a = STATION_BY_ID[cab.from], b = STATION_BY_ID[cab.to];
+    if (!a || !b) return { lat: 0, lon: 0 };
+    return { lat: (a.lat + b.lat) / 2, lon: (a.lon + b.lon) / 2 };
+  }
+
+  // Build the rich info object the host UI renders in its detail card.
+  function stationInfo(st) {
+    var links = CABLES.filter(function (c) { return c.from === st.id || c.to === st.id; })
+      .map(function (c) {
+        var other = STATION_BY_ID[c.from === st.id ? c.to : c.from];
+        return { id: c.id, name: c.name, status: c.status, capacityTbps: c.capacityTbps,
+                 fibrePairs: c.fibrePairs, lengthKm: c.lengthKm, toName: other ? other.name : "" };
+      });
+    return { type: "station", id: st.id, name: st.name, country: st.country,
+             lat: st.lat, lon: st.lon, cables: links };
+  }
+  function cableInfo(cab) {
+    var a = STATION_BY_ID[cab.from], b = STATION_BY_ID[cab.to];
+    return { type: "cable", id: cab.id, name: cab.name, status: cab.status,
+             lengthKm: cab.lengthKm, capacityTbps: cab.capacityTbps, fibrePairs: cab.fibrePairs,
+             fromName: a ? a.name : cab.from, toName: b ? b.name : cab.to };
+  }
+
   function hasWebGL() {
     try {
       if (!window.WebGLRenderingContext) return false;
@@ -370,6 +401,8 @@
 
       // ---- landing stations: beacon + animated surface pulse ring ----------
       var rings = [];
+      var pickables = [];        // meshes the raycaster can select
+      var stationMeshes = {};    // id -> beacon mesh (for hover/selection scaling)
       var beaconGeo = new THREE.SphereGeometry(0.04, 18, 18);
       disposables.push(beaconGeo);
       STATIONS.forEach(function (st, i) {
@@ -378,8 +411,11 @@
         var bMat = new THREE.MeshBasicMaterial({ color: 0xffe9b0 });
         var beacon = new THREE.Mesh(beaconGeo, bMat);
         beacon.position.copy(p);
+        beacon.userData = { type: "station", id: st.id, station: st, baseScale: 1 };
         world.add(beacon);
         disposables.push(bMat);
+        pickables.push(beacon);
+        stationMeshes[st.id] = beacon;
 
         // expanding / fading ring laid flat against the surface (live pulse)
         var ringGeo = new THREE.RingGeometry(0.05, 0.075, 28);
@@ -424,8 +460,10 @@
         var tubeGeo = new THREE.TubeGeometry(curve, 80, radius, 10, false);
         var tubeMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.92 });
         var tube = new THREE.Mesh(tubeGeo, tubeMat);
+        tube.userData = { type: "cable", id: cab.id, cable: cab };
         world.add(tube);
         disposables.push(tubeGeo, tubeMat);
+        pickables.push(tube);
 
         // wide faint halo underneath for a glow base
         var haloGeo = new THREE.TubeGeometry(curve, 80, radius * 3.2, 10, false);
@@ -518,6 +556,155 @@
         state.__dragging = function () { return dragging; };
       }
 
+      /* ----------------------------------------- selection / focus / tour -- */
+      var spinEnabled = true;        // gates auto-rotation (controls + fallback)
+      var focusAnim = null;          // active camera/world framing animation
+      var selectedId = null;         // currently selected station|cable id
+      var hovered = null;            // mesh under the pointer (for cursor/scale)
+      var tourState = { active: false, idx: 0, timer: 0 };
+
+      function easeInOut(k) { return k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; }
+
+      // Smoothly rotate the globe so (lat,lon) faces the camera and gently dolly in.
+      function startFocus(lat, lon, radius) {
+        spinEnabled = false;
+        if (controls) controls.autoRotate = false;
+        if (spinHandler) try { spinHandler(false); } catch (e) {}
+        var u = latLonToVec3(lat, lon, 1).normalize();
+        var toQ = new THREE.Quaternion().setFromUnitVectors(u, new THREE.Vector3(0, 0, 1));
+        var curR = camera.position.length() || camDist;
+        focusAnim = {
+          fromQ: world.quaternion.clone(), toQ: toQ,
+          fromR: curR, toR: radius || Math.max(3.6, Math.min(curR, 4.6)),
+          t: 0, dur: 0.9
+        };
+      }
+
+      // Visually emphasise the selection: pulse a station beacon / brighten a cable.
+      function applyHighlight(type, id) {
+        // reset all beacons + cable opacities to their base look
+        Object.keys(stationMeshes).forEach(function (k) {
+          stationMeshes[k].userData.baseScale = (k === id && type === "station") ? 1.9 : 1;
+        });
+        cableTubes.forEach(function (t) {
+          var sel = (type === "cable" && t.id === id);
+          if (t.mat) t.mat.opacity = sel ? 1.0 : 0.92;
+          if (t.haloMat) t.haloMat.opacity = sel ? 0.42 : 0.16;
+        });
+      }
+
+      function selectStation(id, keepTour) {
+        var st = STATION_BY_ID[id];
+        if (!st) return false;
+        if (!keepTour) stopTour();
+        selectedId = id;
+        applyHighlight("station", id);
+        startFocus(st.lat, st.lon);
+        if (selectHandler) try { selectHandler(stationInfo(st)); } catch (e) {}
+        return true;
+      }
+      function selectCable(id, keepTour) {
+        var cab = null;
+        for (var i = 0; i < CABLES.length; i++) if (CABLES[i].id === id) { cab = CABLES[i]; break; }
+        if (!cab) return false;
+        if (!keepTour) stopTour();
+        selectedId = id;
+        applyHighlight("cable", id);
+        var m = cableMidLatLon(cab);
+        startFocus(m.lat, m.lon);
+        if (selectHandler) try { selectHandler(cableInfo(cab)); } catch (e) {}
+        return true;
+      }
+      function clearSelection() {
+        selectedId = null;
+        applyHighlight(null, null);
+        if (selectHandler) try { selectHandler(null); } catch (e) {}
+      }
+
+      // Cinematic auto-tour: fly between landing stations, dwelling on each.
+      function tourStep() {
+        if (!tourState.active) return;
+        var st = STATIONS[tourState.idx % STATIONS.length];
+        selectStation(st.id, true);
+        tourState.timer = window.setTimeout(function () {
+          if (!tourState.active) return;
+          tourState.idx++;
+          if (tourState.idx >= STATIONS.length) { stopTour(); return; }
+          tourStep();
+        }, 3200);
+      }
+      function startTour() {
+        if (tourState.active) return;
+        tourState.active = true; tourState.idx = 0;
+        if (tourHandler) try { tourHandler(true); } catch (e) {}
+        tourStep();
+      }
+      function stopTour() {
+        if (!tourState.active && !tourState.timer) return;
+        tourState.active = false;
+        if (tourState.timer) { window.clearTimeout(tourState.timer); tourState.timer = 0; }
+        if (tourHandler) try { tourHandler(false); } catch (e) {}
+      }
+      function setSpin(on) {
+        spinEnabled = !!on;
+        if (controls) controls.autoRotate = !!on;
+        if (on) { focusAnim = null; stopTour(); }
+        if (spinHandler) try { spinHandler(!!on); } catch (e) {}
+      }
+
+      // ---- pointer picking (tap to select, hover for cursor + beacon pop) --
+      var raycaster = new THREE.Raycaster();
+      var pointer = new THREE.Vector2();
+      var downXY = null;
+      function ndc(e, out) {
+        var rect = renderer.domElement.getBoundingClientRect();
+        var cx = (e.touches ? e.touches[0].clientX : e.clientX);
+        var cy = (e.touches ? e.touches[0].clientY : e.clientY);
+        out.x = ((cx - rect.left) / Math.max(1, rect.width)) * 2 - 1;
+        out.y = -((cy - rect.top) / Math.max(1, rect.height)) * 2 + 1;
+        return { cx: cx, cy: cy };
+      }
+      function pick(e) {
+        ndc(e, pointer);
+        raycaster.setFromCamera(pointer, camera);
+        var hits = raycaster.intersectObjects(pickables, false);
+        return hits.length ? hits[0].object : null;
+      }
+      listeners.onPickDown = function (e) {
+        var c = ndc(e, pointer);
+        downXY = { x: c.cx, y: c.cy };
+      };
+      listeners.onPickUp = function (e) {
+        if (!downXY) return;
+        var c = ndc(e, pointer);
+        var moved = Math.abs(c.cx - downXY.x) + Math.abs(c.cy - downXY.y);
+        downXY = null;
+        if (moved > 6) return;   // it was a drag, not a tap
+        var obj = pick(e);
+        if (!obj || !obj.userData) { return; }
+        if (obj.userData.type === "station") selectStation(obj.userData.id);
+        else if (obj.userData.type === "cable") selectCable(obj.userData.id);
+      };
+      listeners.onPickMove = function (e) {
+        if (downXY) return;  // don't fight a drag
+        var obj = pick(e);
+        if (obj !== hovered) {
+          if (hovered && hovered.userData && hovered.userData.type === "station") {
+            hovered.userData.hover = false;
+          }
+          hovered = obj;
+          if (hovered && hovered.userData && hovered.userData.type === "station") {
+            hovered.userData.hover = true;
+          }
+          renderer.domElement.style.cursor = obj ? "pointer" : (controls ? "grab" : renderer.domElement.style.cursor);
+        }
+      };
+      renderer.domElement.addEventListener("mousedown", listeners.onPickDown);
+      renderer.domElement.addEventListener("mouseup", listeners.onPickUp);
+      renderer.domElement.addEventListener("mousemove", listeners.onPickMove);
+      renderer.domElement.addEventListener("touchstart", listeners.onPickDown, { passive: true });
+      renderer.domElement.addEventListener("touchend", listeners.onPickUp);
+
       /* ------------------------------------------------- post-processing ---- */
       var composer = null, bloomPass = null, fxaaPass = null;
       var canCompose = typeof THREE.EffectComposer === "function" &&
@@ -568,17 +755,40 @@
 
       /* --------------------------------------------------- animation loop -- */
       var clock = new THREE.Clock();
-      var raf = 0, alive = true;
+      var raf = 0, alive = true, prevT = 0;
       var dragFn = state && state.__dragging ? state.__dragging : function () { return false; };
       function animate() {
         if (!alive) return;
         raf = window.requestAnimationFrame(animate);
         var t = clock.getElapsedTime();
+        var dt = Math.min(0.05, t - prevT); prevT = t;
 
-        if (controls) {
+        // camera/world framing animation takes priority over idle spin
+        if (focusAnim) {
+          focusAnim.t += dt;
+          var k = Math.min(1, focusAnim.t / focusAnim.dur);
+          var e = easeInOut(k);
+          world.quaternion.copy(focusAnim.fromQ).slerp(focusAnim.toQ, e);
+          var r = focusAnim.fromR + (focusAnim.toR - focusAnim.fromR) * e;
+          if (camera.position.lengthSq() > 1e-6) camera.position.normalize().multiplyScalar(r);
+          if (controls) controls.update();
+          if (k >= 1) focusAnim = null;
+        } else if (controls) {
+          controls.autoRotate = spinEnabled;
           controls.update();
-        } else if (!dragFn()) {
+        } else if (spinEnabled && !dragFn()) {
           world.rotation.y += 0.0016;     // gentle auto-rotation in fallback
+        }
+
+        // hover / selection beacon scaling (smoothed)
+        for (var sKey in stationMeshes) {
+          if (!Object.prototype.hasOwnProperty.call(stationMeshes, sKey)) continue;
+          var bm = stationMeshes[sKey];
+          var target = bm.userData.baseScale || 1;
+          if (bm.userData.hover) target = Math.max(target, 1.6);
+          if (sKey === selectedId) target += 0.25 * (0.5 + 0.5 * Math.sin(t * 3.0)); // gentle selected pulse
+          var cur = bm.scale.x + (target - bm.scale.x) * Math.min(1, dt * 10);
+          bm.scale.setScalar(cur);
         }
 
         if (clouds) clouds.rotation.y += 0.00045;   // clouds drift a touch faster
@@ -618,7 +828,18 @@
         cableTubes: cableTubes, controls: controls, composer: composer,
         bloomPass: bloomPass, fxaaPass: fxaaPass,
         listeners: listeners,
-        stop: function () { alive = false; if (raf) window.cancelAnimationFrame(raf); }
+        api: {
+          selectStation: selectStation,
+          selectCable: selectCable,
+          clearSelection: clearSelection,
+          startTour: startTour,
+          stopTour: stopTour,
+          isTouring: function () { return !!tourState.active; },
+          setSpin: setSpin,
+          isSpinning: function () { return !!spinEnabled; },
+          selectedId: function () { return selectedId; }
+        },
+        stop: function () { alive = false; stopTour(); if (raf) window.cancelAnimationFrame(raf); }
       };
       // carry over the fallback drag-probe if one was installed
       if (prevState.__dragging) state.__dragging = prevState.__dragging;
@@ -701,6 +922,9 @@
         if (l.onPointerMove) s.el.removeEventListener("touchmove", l.onPointerMove);
         if (l.onPointerUp) s.el.removeEventListener("touchend", l.onPointerUp);
         if (l.onWheel) s.el.removeEventListener("wheel", l.onWheel);
+        if (l.onPickDown) { s.el.removeEventListener("mousedown", l.onPickDown); s.el.removeEventListener("touchstart", l.onPickDown); }
+        if (l.onPickUp) { s.el.removeEventListener("mouseup", l.onPickUp); s.el.removeEventListener("touchend", l.onPickUp); }
+        if (l.onPickMove) s.el.removeEventListener("mousemove", l.onPickMove);
       }
       if (l.onPointerMove) window.removeEventListener("mousemove", l.onPointerMove);
       if (l.onPointerUp) window.removeEventListener("mouseup", l.onPointerUp);
@@ -728,11 +952,36 @@
   }
 
   /* --------------------------------------------------------------- export --- */
+  // Thin module-level delegators so the host UI has a stable surface whether or
+  // not the scene is currently mounted (each is a guarded no-op when inactive).
+  function apiCall(name, arg) {
+    if (state && state.api && typeof state.api[name] === "function") {
+      try { return state.api[name](arg); } catch (e) { return false; }
+    }
+    return false;
+  }
   window.QIGlobe = {
     init: init,
     dispose: dispose,
     setProgress: setProgress,
     isSupported: function () { return typeof window.THREE !== "undefined" && hasWebGL(); },
+    // selection / cinematic controls
+    focusStation: function (id) { return apiCall("selectStation", id); },
+    focusCable: function (id) { return apiCall("selectCable", id); },
+    clearSelection: function () { return apiCall("clearSelection"); },
+    startTour: function () { return apiCall("startTour"); },
+    stopTour: function () { return apiCall("stopTour"); },
+    toggleTour: function () { return apiCall(apiCall("isTouring") ? "stopTour" : "startTour"); },
+    isTouring: function () { return apiCall("isTouring"); },
+    setSpin: function (on) { return apiCall("setSpin", on); },
+    toggleSpin: function () { return apiCall("setSpin", !apiCall("isSpinning")); },
+    isSpinning: function () { return apiCall("isSpinning"); },
+    selectedId: function () { return apiCall("selectedId"); },
+    // subscriptions (persist across mount/unmount)
+    onSelect: function (cb) { selectHandler = (typeof cb === "function") ? cb : null; },
+    onTour: function (cb) { tourHandler = (typeof cb === "function") ? cb : null; },
+    onSpin: function (cb) { spinHandler = (typeof cb === "function") ? cb : null; },
+    // static datasets
     STATIONS: STATIONS,
     CABLES: CABLES,
     STATUS_COLOR: STATUS_COLOR

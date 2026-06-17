@@ -156,7 +156,7 @@
       `<span class="globe-statkey">${dot(st)}${esc(statusLabel[st] || st)}</span>`).join("");
 
     const cableRows = cables.map(c => `
-      <li class="globe-item">
+      <li class="globe-item globe-item--click" data-cable="${esc(c.id)}" tabindex="0" role="button">
         <div class="globe-item-top">
           <span class="globe-item-name">${dot(c.status)}${esc(c.name)}</span>
           <span class="globe-item-id">${esc(c.id)}</span>
@@ -170,7 +170,7 @@
       </li>`).join("");
 
     const stationRows = stations.map(s => `
-      <li class="globe-station">
+      <li class="globe-station globe-station--click" data-station="${esc(s.id)}" tabindex="0" role="button">
         <span class="globe-station-name">${esc(s.name)}</span>
         <span class="globe-station-country">${esc(s.country)}</span>
         <span class="globe-station-coord">${esc(s.lat.toFixed(1))}, ${esc(s.lon.toFixed(1))}</span>
@@ -187,7 +187,12 @@
             <h3>Submarine Telecom Project — Network Map</h3>
             <p>An interactive 3D view of the STP submarine cable system renders here when WebGL is available. The full cable inventory is listed in the panel.</p>
           </div>
-          <div class="globe-hint" id="globeHint">Drag to rotate · scroll to zoom</div>
+          <div class="globe-controls" id="globeControls" hidden>
+            <button class="globe-btn" id="globeTour" type="button">▶ Cinematic tour</button>
+            <button class="globe-btn is-on" id="globeSpin" type="button" aria-pressed="true">⏸ Rotation</button>
+          </div>
+          <div class="globe-detail" id="globeDetail" hidden></div>
+          <div class="globe-hint" id="globeHint">Drag to rotate · scroll to zoom · click a station or cable</div>
         </div>
         <aside class="globe-panel">
           <div class="globe-panel-head">
@@ -214,15 +219,108 @@
   AFTER.globe3d = function () {
     const stage = $("#globeStage");
     if (!stage || !window.QIGlobe) return;
+    const G = window.QIGlobe;
     let ok = false;
-    try { ok = window.QIGlobe.init(stage); } catch (e) { ok = false; }
+    try { ok = G.init(stage); } catch (e) { ok = false; }
     const fb = $("#globeFallback"), hint = $("#globeHint");
-    if (ok) {
-      if (fb) fb.style.display = "none";
-      if (hint) hint.style.display = "";
-    } else {
+    const controls = $("#globeControls"), detail = $("#globeDetail");
+    const tourBtn = $("#globeTour"), spinBtn = $("#globeSpin");
+
+    if (!ok) {
       if (fb) fb.style.display = "";
       if (hint) hint.style.display = "none";
+      return;   // 2D fallback + inventory panel only
+    }
+    if (fb) fb.style.display = "none";
+    if (hint) hint.style.display = "";
+    if (controls) controls.hidden = false;
+
+    const SC = G.STATUS_COLOR || {};
+    const statusLabel = { "commissioned": "Commissioned", "in-progress": "In progress", "planned": "Planned" };
+    const sdot = st => `<span class="globe-dot" style="background:${(SC[st] || {}).css || "#888"}"></span>`;
+    const fmtKm = n => (Number(n) || 0).toLocaleString() + " km";
+
+    // highlight the matching list row when something is selected
+    function markActive(info) {
+      stage.ownerDocument.querySelectorAll(".globe-item--click.is-active, .globe-station--click.is-active")
+        .forEach(el => el.classList.remove("is-active"));
+      const panel = stage.closest(".globe-view");
+      if (!info || !panel) return;
+      const sel = info.type === "station"
+        ? `.globe-station--click[data-station="${info.id}"]`
+        : `.globe-item--click[data-cable="${info.id}"]`;
+      const row = panel.querySelector(sel);
+      if (row) { row.classList.add("is-active"); }
+    }
+
+    function renderDetail(info) {
+      if (!detail) return;
+      if (!info) { detail.hidden = true; detail.innerHTML = ""; markActive(null); return; }
+      let body;
+      if (info.type === "station") {
+        const links = (info.cables || []).map(c => `
+          <li>${sdot(c.status)}<span class="gd-cid">${esc(c.id)}</span>
+            <span class="gd-cto">→ ${esc(c.toName)}</span>
+            <span class="gd-ccap">${esc(String(c.capacityTbps))} Tbps</span></li>`).join("");
+        body = `
+          <div class="gd-kind">Landing station</div>
+          <h4>${esc(info.name)}</h4>
+          <div class="gd-sub">${esc(info.country)} · ${esc(info.lat.toFixed(1))}, ${esc(info.lon.toFixed(1))}</div>
+          <div class="gd-count"><strong>${(info.cables || []).length}</strong> connected segment(s)</div>
+          <ul class="gd-links">${links || '<li class="muted">No segments</li>'}</ul>`;
+      } else {
+        body = `
+          <div class="gd-kind">Cable segment ${sdot(info.status)}${esc(statusLabel[info.status] || info.status)}</div>
+          <h4>${esc(info.name)}</h4>
+          <div class="gd-sub">${esc(info.fromName)} ↔ ${esc(info.toName)}</div>
+          <div class="gd-chips">
+            <span class="gd-chip">${fmtKm(info.lengthKm)}</span>
+            <span class="gd-chip">${esc(String(info.capacityTbps))} Tbps</span>
+            <span class="gd-chip">${esc(String(info.fibrePairs))} fibre pairs</span>
+          </div>`;
+      }
+      detail.innerHTML = `<button class="gd-close" id="gdClose" type="button" aria-label="Close">×</button>${body}`;
+      detail.hidden = false;
+      const close = $("#gdClose");
+      if (close) close.addEventListener("click", () => { G.clearSelection(); });
+      markActive(info);
+    }
+
+    // subscriptions
+    G.onSelect(renderDetail);
+    G.onTour(active => {
+      if (!tourBtn) return;
+      tourBtn.textContent = active ? "■ Stop tour" : "▶ Cinematic tour";
+      tourBtn.classList.toggle("is-on", active);
+    });
+    G.onSpin(spinning => {
+      if (!spinBtn) return;
+      spinBtn.classList.toggle("is-on", spinning);
+      spinBtn.setAttribute("aria-pressed", spinning ? "true" : "false");
+      spinBtn.textContent = spinning ? "⏸ Rotation" : "▶ Rotation";
+    });
+
+    // HUD buttons
+    if (tourBtn) tourBtn.addEventListener("click", () => G.toggleTour());
+    if (spinBtn) spinBtn.addEventListener("click", () => G.toggleSpin());
+
+    // click a station / cable in the inventory panel to fly to it
+    const panel = stage.closest(".globe-view");
+    if (panel) {
+      const onRow = el => {
+        if (!el) return;
+        if (el.dataset.station) G.focusStation(el.dataset.station);
+        else if (el.dataset.cable) G.focusCable(el.dataset.cable);
+      };
+      panel.addEventListener("click", e => {
+        const row = e.target.closest("[data-station],[data-cable]");
+        if (row) onRow(row);
+      });
+      panel.addEventListener("keydown", e => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        const row = e.target.closest("[data-station],[data-cable]");
+        if (row) { e.preventDefault(); onRow(row); }
+      });
     }
   };
 

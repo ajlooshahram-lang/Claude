@@ -54,6 +54,25 @@ ok(doc.querySelector(".globe-stage") != null, "3D Network Map renders the globe 
 ok(doc.querySelectorAll(".globe-item").length >= 6, "3D Network Map legend lists cable segments");
 ok(doc.querySelectorAll(".globe-station").length === 8, "3D Network Map legend lists 8 landing stations");
 ok(window.QIGlobe.init(doc.getElementById("globeStage")) === false, "QIGlobe.init no-throws and returns false without WebGL");
+// 2b-i) interactive API surface exists and is a safe no-op while unmounted (jsdom/no WebGL)
+["focusStation","focusCable","clearSelection","startTour","stopTour","toggleTour","isTouring",
+ "setSpin","toggleSpin","isSpinning","selectedId","onSelect","onTour","onSpin"].forEach(fn =>
+  ok(typeof window.QIGlobe[fn] === "function", "QIGlobe exposes " + fn + "()"));
+let apiThrew = false;
+try {
+  window.QIGlobe.onSelect(() => {});
+  window.QIGlobe.onTour(() => {});
+  window.QIGlobe.onSpin(() => {});
+  window.QIGlobe.focusStation("jakarta");
+  window.QIGlobe.focusCable("STP-T1");
+  window.QIGlobe.toggleTour();
+  window.QIGlobe.toggleSpin();
+  window.QIGlobe.clearSelection();
+} catch (e) { apiThrew = true; }
+ok(!apiThrew, "interactive API calls are safe no-ops when the globe is not mounted");
+// re-render the view so the dispose assertion below acts on a fresh stage
+doc.querySelector('.nav-item[data-view="globe3d"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("globeControls") != null, "3D Network Map renders the cinematic tour / rotation HUD");
 // navigating away must dispose without throwing
 doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(true, "navigating away from globe3d disposes cleanly");
