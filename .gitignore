@@ -4,3 +4,8 @@ node_modules/
 .env
 .env.*
 !.env.example
+
+
+# Globe visual-verification artifacts (verify-globe.mjs)
+qi-webapp/.artifacts/
+qi-webapp/_globe.png
