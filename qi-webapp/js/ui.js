@@ -679,6 +679,17 @@
       </div>`;
     }).join("");
 
+    // 'What to do first' — the longest-lead approvals across the whole
+    // programme (the real critical path that decides when work can begin).
+    const allApprovals = [];
+    briefs.forEach(b => (b.licensing.licenses || []).forEach(l =>
+      allApprovals.push({ country: b.name, license: l.license, months: Number(l.leadTimeMonths) || 0, authority: l.authority || "" })));
+    allApprovals.sort((a, b) => b.months - a.months);
+    const todoRows = allApprovals.slice(0, 5).map(t => `<li class="brief-todo-item">
+      <span class="brief-todo-when">~${esc(String(t.months))} mo</span>
+      <span class="brief-todo-what"><strong>${esc(t.license)}</strong> — ${esc(t.country)}<small>${esc(t.authority)}</small></span>
+    </li>`).join("");
+
     // Auto-written 'In a nutshell' executive summary — the whole story in a few
     // plain sentences for a reader who has never seen the project before.
     const listJoin = arr => arr.length <= 1 ? (arr[0] || "")
@@ -769,6 +780,12 @@
         <section class="brief-section brief-summary">
           <h3>In a nutshell</h3>
           ${summaryParas.map(p => `<p>${p}</p>`).join("")}
+        </section>
+
+        <section class="brief-section">
+          <h3>What to do first</h3>
+          <p class="brief-lead">These approvals take the longest, so they decide when work can begin — start them now, in parallel across the countries.</p>
+          <ol class="brief-todo">${todoRows || '<li class="muted">No approvals data</li>'}</ol>
         </section>
 
         <section class="brief-section">

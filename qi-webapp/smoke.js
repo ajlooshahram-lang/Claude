@@ -769,6 +769,13 @@ ok(/Spending over time/.test(briefOut), "Investor Brief includes the 'Spending o
 ok(doc.querySelectorAll(".brief-online-row").length === 8, "Investor Brief shows the go-live timeline for all 8 countries");
 ok(/When each country goes live/.test(briefOut), "Investor Brief includes the 'When each country goes live' section");
 ok(doc.querySelector(".brief-summary") != null, "Investor Brief opens with an auto-written 'In a nutshell' summary");
+ok(doc.querySelectorAll(".brief-todo-item").length === 5, "Investor Brief shows a prioritised 'What to do first' list (5 longest-lead approvals)");
+ok(/What to do first/.test(briefOut), "Investor Brief includes the 'What to do first' section");
+ok((function () {
+  const m = Array.from(doc.querySelectorAll(".brief-todo-when")).map(e => parseInt(e.textContent.replace(/\D/g, ""), 10) || 0);
+  for (let i = 1; i < m.length; i++) { if (m[i] > m[i - 1]) return false; }
+  return m.length === 5;
+})(), "'What to do first' is sorted longest-lead first");
 ok(doc.querySelectorAll(".brief-summary p").length >= 3, "summary tells the story in several plain sentences (got " + doc.querySelectorAll(".brief-summary p").length + ")");
 ok(/connects 8 countries/.test(doc.querySelector(".brief-summary").textContent) && /USD\s*1\.3B/.test(doc.querySelector(".brief-summary").textContent),
    "summary states the scale (8 countries) and headline cost (USD 1.3B)");
