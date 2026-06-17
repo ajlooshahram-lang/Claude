@@ -514,6 +514,22 @@ async function main() {
   ok(dlSelfContained && dlNoScript, "downloaded file is self-contained HTML (inline <style>, brief markup, no scripts)");
   ok(dlComplete, "downloaded file carries all 8 countries, the headline budget, and the brief's own CSS (drift-free)");
 
+  // ---- 'Programme at a glance' front door on the Brain home --------------
+  const frontDoor = await page.evaluate(() => {
+    const navBrain = document.querySelector('.nav-item[data-view="brain"]');
+    if (navBrain) navBrain.dispatchEvent(new Event("click", { bubbles: true }));
+    const hero = document.querySelector(".brain-hero");
+    const stats = document.querySelectorAll(".brain-hero .brain-hero-stat").length;
+    const hb = document.getElementById("heroBrief"), hg = document.getElementById("heroGlobe");
+    const inlineFree = !!hb && !!hg && !hb.getAttribute("onclick") && !hg.getAttribute("onclick");
+    if (hb) hb.click();
+    const wentToBrief = location.hash === "#investorbrief" && !!document.getElementById("investorBrief");
+    return { hasHero: !!hero, stats, inlineFree, wentToBrief };
+  });
+  ok(frontDoor.hasHero && frontDoor.stats === 5, "Brain home shows the 'Programme at a glance' card with 5 headline stats");
+  ok(frontDoor.inlineFree, "front-door buttons are CSP-safe (no inline onclick)");
+  ok(frontDoor.wentToBrief, "'Open the Investor Brief' button navigates to the brief under strict CSP");
+
   // The brief + print click must produce no CSP violations under the strict CSP.
   const cspBrief = await page.evaluate(() => (window.__csp || []).length);
   ok(pageErrors.length === 0 && cspBrief === 0 && consoleCSP.length === 0,

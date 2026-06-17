@@ -682,6 +682,17 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .country-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media (max-width:640px){.country-cols{grid-template-columns:1fr}}
 
+/* ---- Programme-at-a-glance front-door card (Project Brain home) ---- */
+.brain-hero{background:linear-gradient(135deg,rgba(46,84,150,.07),rgba(66,214,164,.06));border:1px solid var(--line,#e3e8f0)}
+.brain-hero-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.brain-hero-head h3{margin:0}
+.brain-hero-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px}
+@media (max-width:760px){.brain-hero-stats{grid-template-columns:repeat(2,1fr)}}
+.brain-hero-stat{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:10px;
+  background:var(--card,#fff);border:1px solid var(--line,#e3e8f0)}
+.brain-hero-v{font-size:17px;font-weight:800;color:var(--accent,#2e5496);line-height:1.15}
+.brain-hero-l{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted,#6b7892)}
+
 /* ---- Investor Brief (plain-language, print-ready one-pager) ---- */
 .brief{max-width:1040px;margin:0 auto;background:var(--card,#fff);border:1px solid var(--line,#e3e8f0);border-radius:14px;
   padding:30px 34px;color:var(--ink,#1a2336)}

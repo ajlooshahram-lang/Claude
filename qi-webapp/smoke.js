@@ -703,6 +703,18 @@ S.reset();
 doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(doc.getElementById("brainText") != null, "Brain view renders a description input");
 ok(typeof window.QIBrain === "object" && typeof window.QIBrain.analyzeProject === "function", "Brain engine exposed to the UI");
+// 38a) 'Programme at a glance' front-door card → links to the two best outputs
+ok(doc.querySelector(".brain-hero") != null, "Brain home shows a 'Programme at a glance' front-door card");
+ok(doc.querySelectorAll(".brain-hero .brain-hero-stat").length === 5, "front-door card shows 5 headline stats");
+const heroBriefBtn = doc.getElementById("heroBrief"), heroGlobeBtn = doc.getElementById("heroGlobe");
+ok(heroBriefBtn != null && heroGlobeBtn != null && !heroBriefBtn.getAttribute("onclick") && !heroGlobeBtn.getAttribute("onclick"),
+   "front-door buttons exist and are CSP-safe (no inline onclick)");
+heroBriefBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(window.location.hash === "#investorbrief" && doc.getElementById("investorBrief") != null, "'Open the Investor Brief' button navigates to the brief");
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+doc.getElementById("heroGlobe").dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(window.location.hash === "#globe3d", "'Watch it build in 3D' button navigates to the 3D map");
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
 const brainCasesBefore = S.validCases().length;
 const brainMsBefore = S.regRows("milestones").length;
 const brainProcBefore = S.regRows("procurement").length;

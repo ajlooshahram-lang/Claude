@@ -1486,7 +1486,32 @@
     const profiles = (window.QIBrain && QIBrain.listProfiles && QIBrain.listProfiles()) || [];
     const profOpts = `<option value="">Auto-detect domain</option>` +
       profiles.map(p => `<option value="${esc(p.id)}">${esc(p.label)}</option>`).join("");
-    return `<div class="card">
+    // Friendly 'Programme at a glance' front door → the two best outputs.
+    const BG = window.QIGlobe || {};
+    const bgCables = Array.isArray(BG.CABLES) ? BG.CABLES : [];
+    const bgStations = Array.isArray(BG.STATIONS) ? BG.STATIONS : [];
+    const bgProg = BG.PROGRAMME || { budgetUsd: 1300e6, durationMonths: 60 };
+    const bgKm = bgCables.reduce((a, c) => a + (Number(c.lengthKm) || 0), 0);
+    const bgCap = bgCables.reduce((a, c) => a + (Number(c.capacityTbps) || 0), 0);
+    const heroStat = (v, l) => `<div class="brain-hero-stat"><span class="brain-hero-v">${esc(v)}</span><span class="brain-hero-l">${esc(l)}</span></div>`;
+    const hero = bgCables.length ? `<div class="card brain-hero">
+        <div class="brain-hero-head">
+          <h3>Programme at a glance</h3>
+          <span class="muted">A quick orientation — then open the full brief or watch the network build itself in 3D.</span>
+        </div>
+        <div class="brain-hero-stats">
+          ${heroStat(bgStations.length + " countries", "Connected")}
+          ${heroStat(bgKm.toLocaleString() + " km", "Cable route")}
+          ${heroStat(bgCap.toLocaleString() + " Tbps", "Capacity")}
+          ${heroStat("about " + fmtUsdShort(bgProg.budgetUsd), "Budget")}
+          ${heroStat(bgProg.durationMonths + " months", "Build time")}
+        </div>
+        <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+          <button class="btn btn-primary" id="heroBrief" type="button">📄 Open the Investor Brief</button>
+          <button class="btn" id="heroGlobe" type="button">🌐 Watch it build in 3D</button>
+        </div>
+      </div>` : "";
+    return `${hero}<div class="card">
         <h3>Project Brain <span class="tag">auto-plan</span></h3>
         <p style="line-height:1.6">Paste or upload your <b>project description</b> — that is the only thing you need to do.
         The Brain analyses it <b>locally on this device</b> — nothing is uploaded or sent to any server — and the app
@@ -1576,6 +1601,10 @@
   };
   AFTER.brain = function () {
     const fileInput = $("#brainFile"), nameEl = $("#brainFileName"), ta = $("#brainText");
+    // 'Programme at a glance' front-door buttons → the two best outputs.
+    const heroBrief = $("#heroBrief"), heroGlobe = $("#heroGlobe");
+    if (heroBrief) heroBrief.addEventListener("click", () => go("investorbrief"));
+    if (heroGlobe) heroGlobe.addEventListener("click", () => go("globe3d"));
     // Single shared analysis path so the Analyze button and an upload behave identically.
     const runAnalyze = (opts) => {
       const text = (ta.value || "").trim();
