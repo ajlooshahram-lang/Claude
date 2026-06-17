@@ -126,6 +126,7 @@
     CH.destroyAll();
     content.innerHTML = (RENDER[view] || (() => "<div class='empty'>Not found</div>"))();
     if (AFTER[view]) AFTER[view]();
+    try { animateKPIs(content); } catch (e) {}
     // Reflect the current view in the URL so back/forward and bookmarks work.
     if (!(opts && opts.skipHash)) {
       const target = "#" + view;
@@ -139,6 +140,40 @@
   // ---------- renderers ----------
   const RENDER = {};
   const AFTER = {};
+
+  // Game-feel: count KPI numbers up from 0 on render. Purely cosmetic — it only
+  // mutates text on later animation frames (never synchronously), preserves the
+  // original prefix/suffix/formatting, restores the exact source text at the end,
+  // and is skipped when the user prefers reduced motion or rAF is unavailable.
+  function animateKPIs(root) {
+    if (!root || typeof window.requestAnimationFrame !== "function") return;
+    try { if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return; } catch (e) {}
+    const els = root.querySelectorAll(".kpi .value");
+    els.forEach(el => {
+      const raw = el.textContent.trim();
+      const m = raw.match(/^(\D*?)(-?[\d.,]+)([\s\S]*)$/);
+      if (!m) return;
+      const prefix = m[1], numStr = m[2], suffix = m[3];
+      const hasComma = numStr.indexOf(",") !== -1;
+      const cleaned = numStr.replace(/,/g, "");
+      const target = parseFloat(cleaned);
+      if (!isFinite(target)) return;
+      const decimals = (cleaned.split(".")[1] || "").length;
+      const dur = 620, t0 = Date.now();
+      const fmt = v => {
+        let s = decimals ? v.toFixed(decimals) : String(Math.round(v));
+        if (hasComma) s = Number(s).toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+        return prefix + s + suffix;
+      };
+      const step = () => {
+        const k = Math.min(1, (Date.now() - t0) / dur);
+        const e = 1 - Math.pow(1 - k, 3); // easeOutCubic
+        if (k < 1) { el.textContent = fmt(target * e); window.requestAnimationFrame(step); }
+        else { el.textContent = raw; }   // restore exact source text
+      };
+      window.requestAnimationFrame(step);
+    });
+  }
 
   // 3D submarine cable network visualization (Three.js globe + glass legend).
   RENDER.globe3d = function () {

@@ -34,6 +34,11 @@ function ok(cond, msg) { console.log((cond ? "  ok  " : "FAIL  ") + msg); if (!c
 // 1) booted on dashboard
 ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard renders KPIs");
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
+// 1b) KPI count-up animation must be async-safe: value text is intact right after render
+{
+  const kv = doc.querySelector(".kpi .value");
+  ok(kv && /\d/.test(kv.textContent.trim()), "KPI value is present/numeric immediately after render (count-up never zeroes synchronously)");
+}
 
 // 2) navigate every view (simulate clicks)
 const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","budget","globe3d","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","country","ai","impact","scorecard","health","report","audit","config","help"];

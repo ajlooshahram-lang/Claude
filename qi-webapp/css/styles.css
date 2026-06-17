@@ -834,3 +834,35 @@ tr:hover td{background:rgba(58,160,255,.08)}
   radial-gradient(60% 60% at 50% 50%,rgba(155,107,255,.14),transparent 75%),
   linear-gradient(135deg,#05070f 0%,#070d1c 45%,#0a1230 100%)}
 [data-theme="dark"] .auth-card{background:rgba(13,21,40,.72);border-color:rgba(34,225,230,.22)}
+
+
+
+/* --- NEON micro-interactions: entrance stagger + hover glow (game feel) --- */
+@media (prefers-reduced-motion: no-preference){
+  @keyframes neonRise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  .content .kpi,.content > .card,.content .grid > .card{animation:neonRise .42s cubic-bezier(.2,.7,.2,1) both}
+  .content .kpis .kpi:nth-child(1){animation-delay:.02s}
+  .content .kpis .kpi:nth-child(2){animation-delay:.07s}
+  .content .kpis .kpi:nth-child(3){animation-delay:.12s}
+  .content .kpis .kpi:nth-child(4){animation-delay:.17s}
+  .content .kpis .kpi:nth-child(5){animation-delay:.22s}
+  .content .kpis .kpi:nth-child(6){animation-delay:.27s}
+  .content .kpis .kpi:nth-child(7){animation-delay:.32s}
+  .content .kpis .kpi:nth-child(8){animation-delay:.37s}
+  .kpi .value{transition:text-shadow .3s}
+}
+/* nav: subtle slide + glow on hover */
+.nav-item{transition:background .15s,color .15s,transform .12s,box-shadow .15s}
+.nav-item:hover{transform:translateX(2px)}
+/* table rows: neon left marker + lift on hover */
+tbody tr{transition:background .12s}
+tr:hover td:first-child{box-shadow:inset 3px 0 0 var(--neon-cyan)}
+/* kanban cards: hover lift + neon edge glow */
+.kcard{transition:transform .12s,box-shadow .15s,border-color .15s}
+.kcard:hover{transform:translateY(-2px);border-color:rgba(34,225,230,.45);
+  box-shadow:0 8px 22px rgba(0,0,0,.5),0 0 14px rgba(34,225,230,.28)}
+/* badges / pills: tiny pop on hover for tactile feel */
+.badge,.pill{transition:transform .1s,box-shadow .15s}
+.badge:hover{transform:translateY(-1px)}
+/* buttons: press feedback */
+.btn:active{transform:translateY(1px)}
