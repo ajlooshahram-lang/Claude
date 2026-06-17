@@ -86,7 +86,7 @@
   // ---------- views config ----------
   const VIEWS = [
     { g: "Overview" },
-    { id: "brain", label: "Project Brain", icon: "🧠" },
+    { id: "brain", label: "Auto-Analyzer", icon: "🧠" },
     { id: "portfolio", label: "Portfolio", icon: "▣" },
     { id: "dashboard", label: "Dashboard", icon: "▤" },
     { id: "cases", label: "Cases (Master)", icon: "★" },
@@ -1085,8 +1085,8 @@
         <div id="brainDrop" class="brain-drop" tabindex="0" role="button" aria-label="Upload a project description file">
           <div class="brain-drop-ico">⬆</div>
           <div class="brain-drop-main">Drop a project description here, or <u>browse</u></div>
-          <div class="brain-drop-sub muted">.txt · .md · .json — analysis runs automatically on upload</div>
-          <input id="brainFile" type="file" accept=".txt,.md,.json,text/plain,text/markdown,application/json" hidden />
+          <div class="brain-drop-sub muted">.txt · .md · .json · .docx — analysis runs automatically on upload</div>
+          <input id="brainFile" type="file" accept=".txt,.md,.json,.docx,text/plain,text/markdown,application/json,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden />
         </div>
         <div class="toolbar" style="flex-wrap:wrap;gap:10px;margin-top:10px">
           <label class="muted" for="brainProfile">Domain</label>
@@ -1120,6 +1120,15 @@
     }
     function readFile(f) {
       if (!f) return;
+      const isDocx = /\.docx$/i.test(f.name) || (f.type || "").indexOf("wordprocessingml") !== -1;
+      if (isDocx) {
+        if (!window.fflate) { toast("Cannot read .docx here — paste the text instead."); return; }
+        const r = new FileReader();
+        r.onload = () => { try { handleText(extractDocxText(r.result), f.name); } catch (e) { toast("Could not read that .docx file."); } };
+        r.onerror = () => toast("Could not read that file.");
+        r.readAsArrayBuffer(f);
+        return;
+      }
       const reader = new FileReader();
       reader.onload = () => handleText(String(reader.result || ""), f.name);
       reader.onerror = () => toast("Could not read that file.");
@@ -1148,6 +1157,19 @@
     const autoRunBtn = $("#brainAutoRun");
     if (autoRunBtn) autoRunBtn.addEventListener("click", () => runAnalyzerAuto((ta.value || "").trim(), ""));
   };
+
+  // Offline .docx -> plain text: unzip (fflate) and strip word/document.xml markup.
+  // Fully local; no network, no server. Returns "" if the part is missing.
+  function extractDocxText(arrayBuffer) {
+    if (!window.fflate) return "";
+    const files = window.fflate.unzipSync(new Uint8Array(arrayBuffer));
+    const xmlBytes = files["word/document.xml"];
+    if (!xmlBytes) return "";
+    let s = window.fflate.strFromU8(xmlBytes);
+    s = s.replace(/<\/w:p>/g, "\n").replace(/<w:tab\b[^>]*\/?>/g, "\t").replace(/<w:br\b[^>]*\/?>/g, "\n").replace(/<[^>]+>/g, "");
+    s = s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'");
+    return s.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  }
 
   // Fully-automated pipeline: scan -> analyze -> generate -> CREATE a new project
   // (non-destructive) and apply the whole plan, with a live run status + Undo.

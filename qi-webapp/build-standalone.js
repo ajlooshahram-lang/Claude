@@ -26,6 +26,7 @@ const OUT_FILE = path.join(OUT_DIR, "STP-Application.html");
 // Libraries to inline — now self-hosted under vendor/ (no third-party CDN).
 const VENDOR = [
   "chart.umd.min.js",
+  "fflate.min.js",
   "three.min.js",
   "OrbitControls.js",
   "CopyShader.js",
