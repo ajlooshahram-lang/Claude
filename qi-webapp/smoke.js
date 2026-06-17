@@ -10,7 +10,7 @@ const chartShim = "window.Chart=function(){this.destroy=()=>{};this.update=()=>{
 const cssText = fs.readFileSync(path.join(root, "css/styles.css"), "utf8");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8")
   .replace('<link rel="stylesheet" href="css/styles.css" />', `<style>${cssText}</style>`)
-  .replace(/<script src="https:\/\/[^"]+"><\/script>/, `<script>${chartShim}</script>`)
+  .replace('<script src="vendor/chart.umd.min.js"></script>', `<script>${chartShim}</script>`)
   .replace('<script src="js/auth.js"></script>', `<script>window.__SKIP_AUTH=true;${fs.readFileSync(path.join(root, "js/auth.js"))}</script>`)
   .replace('<script src="js/sync.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/sync.js"))}</script>`)
   .replace('<script src="js/calc.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/calc.js"))}</script>`)

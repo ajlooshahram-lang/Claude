@@ -2194,7 +2194,7 @@
     const hzCrit = S.regRows("hazop").filter(r => (Number(r.sev) || 0) * (Number(r.lik) || 0) >= 15).map(r => `<tr><td class="wrap">${esc(r.node || "")}</td><td class="wrap">${esc(r.deviation || "")}</td><td>${(Number(r.sev) || 0) * (Number(r.lik) || 0)}</td><td class="wrap">${esc(r.action || "")}</td></tr>`).join("") || `<tr><td colspan="4" class="muted center">none high</td></tr>`;
     const punchOpen = S.regRows("punch").filter(r => r.status !== "CLOSED").length;
     const card = (l, v) => `<div class="kpi navy"><div class="label">${l}</div><div class="value">${v}</div></div>`;
-    return `<div class="toolbar no-print"><button class="btn btn-primary" onclick="window.print()">Print / Save as PDF</button>
+    return `<div class="toolbar no-print"><button class="btn btn-primary js-print" type="button">Print / Save as PDF</button>
         <span class="muted">A one-click consolidated pack: status, KPIs, EVM, top risks, milestones, NCRs, HAZOP criticals.</span></div>
       <div class="report">
         <h2 style="margin:0">${esc(b.company || "")} ${esc(b.company ? "—" : "")} ${esc(p.name)} — Project Report</h2>
@@ -2631,7 +2631,7 @@
       </div>
       <div class="modal-foot"><span></span><div style="display:flex;gap:8px">
         <button class="btn" data-act="cancel">Close</button>
-        <button class="btn btn-primary" onclick="window.print()">Print A3</button></div></div>`;
+        <button class="btn btn-primary js-print" type="button">Print A3</button></div></div>`;
     $("#modalOverlay").hidden = false;
   }
 
@@ -3041,6 +3041,8 @@
   $("#btnImport").addEventListener("click", importJSON);
   $("#btnShare").addEventListener("click", shareLink);
   $("#btnPrint").addEventListener("click", () => window.print());
+  // Delegated print for in-content/modal print buttons (keeps CSP strict — no inline onclick).
+  document.addEventListener("click", e => { if (e.target && e.target.closest && e.target.closest(".js-print")) window.print(); });
   $("#btnTheme").addEventListener("click", toggleTheme);
   { const bfx = $("#btnFx"); if (bfx) bfx.addEventListener("click", toggleFX); }
   { const bs = $("#btnSound"); if (bs) bs.addEventListener("click", toggleSound); }
