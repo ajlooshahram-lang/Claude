@@ -264,6 +264,95 @@
     return { rows, total: round(total * 1.1) };
   }
 
+  // ---- Advisor (the integrated "AI brain") --------------------------------
+  // Turns the analysis + frameworks into a short, PRIORITISED, plain-language
+  // action list so a user with no project-management background knows exactly
+  // what to do first to reach the best result. 100% deterministic & offline.
+  function buildAdvice(input) {
+    input = input || {};
+    const fw = input.frameworks || null;
+    const risks = input.risks || [];
+    const intel = input.countryIntel || [];
+    const recs = [];      // { priority, title, text, why }
+    const nextSteps = [];
+
+    // 1) The single most schedule-defining move: start the slowest approval.
+    if (fw && fw.licensing && fw.licensing.countries && fw.licensing.countries.length) {
+      const slowest = fw.licensing.countries.slice()
+        .sort((a, b) => (b.criticalPathMonths || 0) - (a.criticalPathMonths || 0))[0];
+      if (slowest && slowest.criticalPathMonths) {
+        recs.push({
+          priority: "Do first",
+          title: "Start the slowest approval now",
+          text: "Begin \u201c" + slowest.criticalPathItem + "\u201d with " + slowest.criticalPathAuthority + " in " + slowest.name + " straight away.",
+          why: "At roughly " + slowest.criticalPathMonths + " months it is the longest approval in the whole programme, so it decides your earliest possible start date. Other tasks can catch up later \u2014 this one cannot."
+        });
+        nextSteps.push("Open the " + slowest.name + " permit track with " + slowest.criticalPathAuthority + ".");
+      }
+    }
+
+    // 2) Lead with the most open markets; handle sensitive ones with care.
+    if (fw && fw.marketEntry && fw.marketEntry.countries) {
+      const go = fw.marketEntry.countries.filter(c => /^go$/i.test(c.verdict));
+      const caution = fw.marketEntry.countries.filter(c => /caution/i.test(c.verdict));
+      if (go.length) recs.push({
+        priority: "Quick win",
+        title: "Lead with the most open markets",
+        text: "Start commercial talks in " + go.map(c => c.name).join(", ") + " first.",
+        why: "These have the most open foreign-ownership rules, so deals close faster and take risk off the table early."
+      });
+      if (caution.length) recs.push({
+        priority: "Watch",
+        title: "Handle the sensitive markets carefully",
+        text: "In " + caution.map(c => c.name).join(", ") + ", line up the right local partner before committing money.",
+        why: "Tight ownership limits or a single available partner mean fewer fallback options if a deal stalls."
+      });
+    }
+
+    // 3) Sole-partner markets — get written intent before designing the branch.
+    if (fw && fw.landingPartners && fw.landingPartners.countries) {
+      const thin = fw.landingPartners.countries.filter(c => (c.candidates || []).length <= 1);
+      if (thin.length) recs.push({
+        priority: "Watch",
+        title: "Lock in the single-partner markets early",
+        text: "In " + thin.map(c => c.name).join(", ") + " there is effectively one landing partner \u2014 get a written letter of intent before you design that branch.",
+        why: "With no alternative supplier, the project is exposed if that one partner declines."
+      });
+    }
+
+    // 4) The biggest risk (highest likelihood \u00d7 impact \u00d7 hard-to-catch).
+    if (risks.length) {
+      const top = risks.slice().sort((a, b) => (b.sev * b.occ * b.det) - (a.sev * a.occ * a.det))[0];
+      if (top) recs.push({
+        priority: "Mitigate",
+        title: "Plan around the biggest risk",
+        text: top.problem.replace(/^RISK:\s*/, ""),
+        why: (top.rootCause ? "Main cause: " + top.rootCause + ". " : "") + "This scored highest on how likely it is, how damaging it would be, and how hard it is to spot in time \u2014 so build in margin (spare time, a backup route, or a second partner)."
+      });
+    }
+
+    // 5) Seasonal weather windows (typhoon/monsoon) from country hazards.
+    const weatherCountries = intel.filter(c =>
+      (c.geographical || []).some(g => /typhoon|monsoon|cyclone|storm/i.test(g)))
+      .map(c => c.name);
+    if (weatherCountries.length) recs.push({
+      priority: "Plan",
+      title: "Schedule sea work around the weather",
+      text: "Plan marine survey and cable-lay in " + weatherCountries.join(", ") + " for the calm season.",
+      why: "Typhoon and monsoon seasons stop ships from working safely, so the calendar \u2014 not the budget \u2014 often controls these stretches."
+    });
+
+    if (nextSteps.indexOf("Review the auto-built plan, then click \u201cApply\u201d to load it into the project.") === -1) {
+      nextSteps.push("Review the auto-built plan, then click \u201cApply\u201d to load it into the project.");
+    }
+
+    const headline = recs.length
+      ? "Here is how to get the best result \u2014 " + recs.length + " priority moves, most important first. The app worked these out from your description."
+      : "Add a project description (name the countries, or use the word \u201csubmarine\u201d) and the advisor will tell you exactly what to do first.";
+
+    return { headline, recommendations: recs, nextSteps };
+  }
+
   /**
    * Analyze a project description into a full management plan.
    * @param {string} text - the project description (stays local).
@@ -295,6 +384,7 @@
     // authority), FMEA-scored geopolitical/geographical risks and procurement
     // lines. A submarine/subsea project with no named country includes all 8.
     let countryIntel = [];
+    let frameworks = null;
     if (profile.id === "fibre-telecom") {
       const CD = getCountryData();
       if (CD && typeof CD.detect === "function") {
@@ -306,6 +396,13 @@
             risks.push(mkCase(Object.assign({}, r, { leanMethod: r.leanMethod || "FMEA", _brain: "risk" }))));
           CD.procurementItems(det.countries).forEach(p => procurement.push(p));
           countryIntel = CD.summarize(det.countries);
+          if (typeof CD.marketEntryFramework === "function") {
+            frameworks = {
+              marketEntry: CD.marketEntryFramework(det.countries),
+              licensing: CD.licensingFramework(det.countries),
+              landingPartners: CD.landingPartnerFramework(det.countries)
+            };
+          }
           if (det.signal === "submarine") warnings.push("No specific country named — included all 8 STP countries/territories because a submarine/subsea project was detected. Name countries to narrow the set.");
         } else {
           warnings.push("No STP country detected — add country names (e.g. Philippines, Taiwan) or the word 'submarine' to attach regulatory authorities and country-specific risks.");
@@ -314,6 +411,10 @@
     }
 
     const budget = aggregateBudget(cases.concat(risks), procurement);
+
+    // The integrated advisor turns everything above into prioritised, plain
+    // actions — so a single uploaded description yields a ready next-step list.
+    const advice = buildAdvice({ frameworks, risks, countryIntel });
 
     // Domain & scale warnings.
     if (picked.profile.id === "generic-pm") warnings.push("Domain not confidently detected — used the generic PM template. Add more detail (e.g. 'fibre', 'OTDR', 'route km') for a tailored plan.");
@@ -335,13 +436,15 @@
       budget,
       roles: profile.roles,
       countryIntel,
+      frameworks,
+      advice,
       coverage: { profile: profile.id, confidence: Math.round(confidence * 100) / 100, matched: picked.matched, warnings },
     };
   }
 
   function listProfiles() { return PROFILES.map(p => ({ id: p.id, label: p.label })); }
 
-  const API = { analyzeProject, listProfiles, extractScale, _profiles: PROFILES };
+  const API = { analyzeProject, listProfiles, extractScale, buildAdvice, _profiles: PROFILES };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIBrain = API;
 })(typeof window !== "undefined" ? window : globalThis);

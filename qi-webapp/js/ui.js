@@ -77,6 +77,10 @@
     { id: "routeprogress", label: "Route Progress", icon: "📡" },
     { g: "Intelligence" },
     { id: "country", label: "Country Intelligence", icon: "🗺" },
+    { id: "advisor", label: "Project Advisor (AI)", icon: "🧭" },
+    { id: "marketentry", label: "Market Entry", icon: "🚪" },
+    { id: "licensing", label: "Licensing & Permits", icon: "📜" },
+    { id: "landingpartners", label: "Landing Partners", icon: "🤝" },
     { id: "ai", label: "AI Assistant", icon: "✦" },
     { id: "impact", label: "Change Impact", icon: "⇄" },
     { id: "scorecard", label: "KPI Scorecard", icon: "▣" },
@@ -981,10 +985,12 @@
       profiles.map(p => `<option value="${esc(p.id)}">${esc(p.label)}</option>`).join("");
     return `<div class="card">
         <h3>Project Brain <span class="tag">auto-plan</span></h3>
-        <p style="line-height:1.6">Paste or upload your <b>project description</b>. The Brain analyses it
-        <b>locally on this device</b> — nothing is uploaded or sent to any server — and builds a full plan:
-        phases, tasks, a risk register, milestones, procurement and a budget skeleton. Review the preview,
-        then apply it to the active project. It structures and tracks the work; people still execute it.</p>
+        <p style="line-height:1.6">Paste or upload your <b>project description</b> — that is the only thing you need to do.
+        The Brain analyses it <b>locally on this device</b> — nothing is uploaded or sent to any server — and the app
+        does the rest automatically: it builds a full plan (phases, tasks, a risk register, milestones, procurement and a
+        budget), a <b>Market Entry</b>, <b>Licensing &amp; Permitting</b> and <b>Landing Partner</b> framework for every
+        country it detects, and an on-device <b>Advisor</b> that tells you, in plain English, what to do first to get the
+        best result. Review it, then apply it to the active project. It structures and tracks the work; people still execute it.</p>
         <div class="toolbar" style="flex-wrap:wrap;gap:8px">
           <label class="muted" for="brainProfile">Domain</label>
           <select id="brainProfile" style="max-width:280px">${profOpts}</select>
@@ -1049,6 +1055,18 @@
             <div class="country-section"><h4>Top geographical hazards</h4><ul>${(c.geographical || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
           </div>`).join("")}</div>
       </div>` : "";
+    const adv = plan.advice;
+    const advisorBlock = adv && adv.recommendations && adv.recommendations.length ? `
+      <div class="card" style="border-left:4px solid var(--navy,#1b3a6b)"><div class="card-head"><h3>🧭 Advisor — how to get the best result</h3><span class="tag">AI · on-device</span></div>
+        <p style="line-height:1.6">${esc(adv.headline)}</p>
+        <ol style="line-height:1.7">${adv.recommendations.map(r => `<li><b>[${esc(r.priority)}] ${esc(r.title)}</b> — ${esc(r.text)}<br><span class="muted">Why: ${esc(r.why)}</span></li>`).join("")}</ol>
+        <div class="toolbar" style="flex-wrap:wrap;gap:6px">
+          <button class="btn btn-sm" data-go="advisor">Full advisor</button>
+          <button class="btn btn-sm" data-go="marketentry">Market Entry</button>
+          <button class="btn btn-sm" data-go="licensing">Licensing &amp; Permits</button>
+          <button class="btn btn-sm" data-go="landingpartners">Landing Partners</button>
+          <button class="btn btn-sm" data-go="globe3d">3D map</button>
+        </div></div>` : "";
     $("#brainOut").innerHTML = `
       <div class="card"><div class="card-head"><h3>Analysis — ${esc(s.title)}</h3>
         <span class="tag">${esc(s.domainLabel)} · ${Math.round(plan.coverage.confidence * 100)}% confidence</span></div>
@@ -1066,6 +1084,7 @@
           <span class="muted">Adds ${plan.cases.length + plan.risks.length} cases, ${plan.milestones.length} milestones and ${plan.procurement.length} procurement items.</span>
         </div>
       </div>
+      ${advisorBlock}
       <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="card"><h3>Work breakdown</h3>${tableWrap("<th>Phase</th><th>Owner</th><th>Tasks</th>", phaseRows)}</div>
         <div class="card"><h3>Top risks (FMEA RPN)</h3>${tableWrap("<th class='wrap'>Risk</th><th>S</th><th>O</th><th>D</th><th>RPN</th>", riskRows)}</div>
@@ -1079,6 +1098,7 @@
       toast(`Applied: ${n} cases, ${plan.milestones.length} milestones, ${plan.procurement.length} procurement items.`);
       go("dashboard");
     });
+    bindGo();
   }
   function applyBrainPlan(plan) {
     let n = 0;
@@ -1089,6 +1109,98 @@
     plan.procurement.forEach(p => S.regAdd("procurement", Object.assign({}, p)));
     return n;
   }
+
+  // ---------- Frameworks & Advisor (auto-generated from a description) ------
+  // These views need only ONE input from the user: a project description in the
+  // Project Brain. Until then they show the full 8-country reference set so the
+  // app is useful out of the box. Everything is plain-language for non-PM users.
+  function verdictClass(v) { v = String(v || "").toLowerCase(); if (v === "go") return "b-ontrack"; if (v.indexOf("caution") >= 0) return "b-critical"; return "b-high"; }
+  function bindGo() { document.querySelectorAll("[data-go]").forEach(b => { if (b._goBound) return; b._goBound = true; b.addEventListener("click", () => go(b.dataset.go)); }); }
+  function fwBundle() {
+    if (uiState.brainPlan && uiState.brainPlan.frameworks) {
+      return { frameworks: uiState.brainPlan.frameworks, advice: uiState.brainPlan.advice, analysed: true, title: uiState.brainPlan.summary.title, scope: (uiState.brainPlan.countryIntel || []).length };
+    }
+    const CD = window.QICountryData;
+    if (!CD || typeof CD.list !== "function" || typeof CD.marketEntryFramework !== "function") return null;
+    const all = CD.list();
+    const frameworks = { marketEntry: CD.marketEntryFramework(all), licensing: CD.licensingFramework(all), landingPartners: CD.landingPartnerFramework(all) };
+    let advice = null;
+    if (window.QIBrain && QIBrain.buildAdvice) advice = QIBrain.buildAdvice({ frameworks, risks: CD.riskCases(all), countryIntel: CD.summarize(all) });
+    return { frameworks, advice, analysed: false, scope: all.length };
+  }
+  function fwBanner(b) {
+    const analysed = b && b.analysed;
+    return `<div class="readout" style="border-left:3px solid var(--navy,#1b3a6b)">
+      <b>One input, the app does the rest.</b> Paste or upload a project description in <b>Project Brain</b> and these fill in automatically.
+      ${analysed ? `Showing your analysed project <b>${esc(b.title)}</b> (${b.scope} ${b.scope === 1 ? "country" : "countries"} detected).` : `Nothing analysed yet — showing the full reference set for <b>all 8 countries</b>.`}
+      <span class="toolbar" style="display:inline-flex;gap:6px;margin-left:8px">
+        <button class="btn btn-sm btn-primary" data-go="brain">Open Project Brain</button>
+        <button class="btn btn-sm" data-go="globe3d">View on 3D map</button>
+      </span></div>`;
+  }
+  function fwLegend(legend) {
+    if (!legend) return "";
+    return `<p class="muted">${Object.keys(legend).map(k => `<b>${esc(k)}</b>: ${esc(legend[k])}`).join("<br>")}</p>`;
+  }
+  function renderMarketEntryHTML(fw) {
+    const rows = fw.countries.map(c => `<tr>
+      <td><b>${esc(c.name)}</b><div class="muted">${esc(c.regulator)}</div></td>
+      <td class="center"><span class="badge ${verdictClass(c.verdict)}">${esc(c.verdict)}</span></td>
+      <td class="wrap">${esc(c.foreignOwnership)}</td>
+      <td class="wrap">${esc(c.recommendedMode)}</td>
+      <td class="wrap">${esc(c.recommendation)}</td></tr>`).join("");
+    return `<div class="card"><h3>${esc(fw.title)} <span class="tag">${fw.countries.length} ${fw.countries.length === 1 ? "country" : "countries"}</span></h3>
+      <p style="line-height:1.6">${esc(fw.explainer)}</p>${fwLegend(fw.legend)}
+      ${tableWrap("<th>Country</th><th>Verdict</th><th class='wrap'>Who can own it</th><th class='wrap'>Simplest way in</th><th class='wrap'>Recommendation</th>", rows)}</div>`;
+  }
+  function renderLicensingHTML(fw) {
+    const cards = fw.countries.map(c => {
+      const rows = c.licenses.map(l => {
+        const crit = l.license === c.criticalPathItem;
+        return `<tr${crit ? ' style="background:rgba(224,168,0,.10)"' : ''}>
+          <td class="wrap">${crit ? "<b>" + esc(l.license) + "</b> <span class='badge b-high'>slowest</span>" : esc(l.license)}</td>
+          <td>${esc(l.authority)}</td><td class="center">${l.leadTimeMonths} mo</td>
+          <td class="wrap">${esc(l.dependsOn)}</td><td class="wrap muted">${esc(l.note)}</td></tr>`;
+      }).join("");
+      return `<div class="card"><div class="card-head"><h3>${esc(c.name)}</h3><span class="tag">${esc(c.regulator)}</span></div>
+        <div class="readout">Work here can realistically start in about <b>${c.criticalPathMonths} months</b> — set by the slowest approval, <b>${esc(c.criticalPathItem)}</b> (${esc(c.criticalPathAuthority)}). Begin that one first.</div>
+        ${tableWrap("<th class='wrap'>Approval needed</th><th>Who grants it</th><th>Time</th><th class='wrap'>Needs first</th><th class='wrap'>Note</th>", rows)}</div>`;
+    }).join("");
+    return `<div class="card"><h3>${esc(fw.title)} <span class="tag">${fw.countries.length} ${fw.countries.length === 1 ? "country" : "countries"}</span></h3><p style="line-height:1.6">${esc(fw.explainer)}</p></div>${cards}`;
+  }
+  function renderLandingPartnersHTML(fw) {
+    const cards = fw.countries.map(c => `
+      <div class="card country-card"><div class="card-head"><h3>${esc(c.name)}</h3><span class="tag">${(c.candidates || []).length} partners</span></div>
+        <div class="country-section"><h4>Who can bring the cable ashore</h4><p>${(c.candidates || []).map(x => `<span class="badge">${esc(x)}</span>`).join(" ")}</p></div>
+        <div class="country-cols">
+          <div class="country-section"><h4>What they usually want</h4><ul>${(c.wants || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+          <div class="country-section"><h4>Ways to structure the deal</h4><ul>${(c.structures || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+        </div>${c.note ? `<p class="muted">${esc(c.note)}</p>` : ""}</div>`).join("");
+    return `<div class="card"><h3>${esc(fw.title)} <span class="tag">${fw.countries.length} ${fw.countries.length === 1 ? "country" : "countries"}</span></h3>
+      <p style="line-height:1.6">${esc(fw.explainer)}</p>${fwLegend(fw.legend)}</div>
+      <div class="country-grid">${cards}</div>`;
+  }
+  function renderAdvisorHTML(advice) {
+    if (!advice) return `<div class="card"><p class="muted">Advisor unavailable — country data not loaded.</p></div>`;
+    const prClass = p => { p = String(p || "").toLowerCase(); if (p.indexOf("first") >= 0 || p.indexOf("mitigate") >= 0) return "b-critical"; if (p.indexOf("watch") >= 0) return "b-high"; if (p.indexOf("quick") >= 0) return "b-ontrack"; return "b-progress"; };
+    const recs = advice.recommendations.map((r, i) => `
+      <div class="card" style="border-left:4px solid var(--navy,#1b3a6b)">
+        <div class="card-head"><h3>${i + 1}. ${esc(r.title)}</h3><span class="badge ${prClass(r.priority)}">${esc(r.priority)}</span></div>
+        <p><b>${esc(r.text)}</b></p><p class="muted">Why: ${esc(r.why)}</p></div>`).join("");
+    const steps = (advice.nextSteps || []).map(s => `<li>${esc(s)}</li>`).join("");
+    return `<div class="card"><div class="card-head"><h3>Project Advisor</h3><span class="tag">AI · on-device</span></div>
+        <p style="line-height:1.6">${esc(advice.headline)}</p></div>
+      ${recs || `<div class="card"><p class="muted">Analyse a description in Project Brain to get tailored recommendations.</p></div>`}
+      ${steps ? `<div class="card"><h3>Your next steps</h3><ol style="line-height:1.7">${steps}</ol></div>` : ""}`;
+  }
+  RENDER.advisor = function () { const b = fwBundle(); return fwBanner(b) + renderAdvisorHTML(b ? b.advice : null); };
+  AFTER.advisor = bindGo;
+  RENDER.marketentry = function () { const b = fwBundle(); return b ? fwBanner(b) + renderMarketEntryHTML(b.frameworks.marketEntry) : `<div class="card"><p class="muted">Country data not loaded.</p></div>`; };
+  AFTER.marketentry = bindGo;
+  RENDER.licensing = function () { const b = fwBundle(); return b ? fwBanner(b) + renderLicensingHTML(b.frameworks.licensing) : `<div class="card"><p class="muted">Country data not loaded.</p></div>`; };
+  AFTER.licensing = bindGo;
+  RENDER.landingpartners = function () { const b = fwBundle(); return b ? fwBanner(b) + renderLandingPartnersHTML(b.frameworks.landingPartners) : `<div class="card"><p class="muted">Country data not loaded.</p></div>`; };
+  AFTER.landingpartners = bindGo;
 
   // Read-only Country Intelligence: real regulatory authority, marine/EIA body,
   // and the dominant geopolitical & geographical hazards for each of the 8 STP
