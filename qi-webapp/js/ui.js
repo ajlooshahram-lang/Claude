@@ -998,7 +998,16 @@
             '  <div class="auth-field"><label for="mfaDisablePw">Password</label><input type="password" id="mfaDisablePw" placeholder="Your password"></div>' +
             '  <div class="auth-field"><label for="mfaDisableCode">TOTP Code</label><input type="text" id="mfaDisableCode" maxlength="6" pattern="[0-9]{6}" placeholder="000000" inputmode="numeric"></div>' +
             '  <button class="btn btn-danger" id="btnDisableMfa">Disable MFA</button>' +
-            '</div>'
+            '</div>' +
+            ((window.QIAuth && window.QIAuth.generateRecoveryCodes) ?
+              '<hr style="border:none;border-top:1px solid var(--line);margin:18px 0">' +
+              '<h4 style="margin:0 0 8px;font-size:14px">Recovery codes</h4>' +
+              '<p class="muted" style="margin-top:0">One-time backup codes let you sign in if you lose your authenticator. ' +
+              'Generating a new set replaces any previous codes.</p>' +
+              '<p class="muted" id="recoveryStatusLine">Checking recovery codes…</p>' +
+              '<button class="btn btn-primary" id="btnGenRecovery">Generate recovery codes</button>' +
+              '<div id="recoveryCodesOut" hidden></div>'
+              : '')
             :
             '<p class="muted">Protect your account with time-based one-time passwords (TOTP). Works with any authenticator app.</p>' +
             '<button class="btn btn-primary" id="btnEnrollMfa">Enable MFA</button>' +
@@ -1223,7 +1232,61 @@
       }).catch(function () { if (err) { err.textContent = "Unable to reach the server."; err.hidden = false; } });
     });
 
-    // Change password wiring. Guarded so the Settings view still renders when
+    // Recovery codes wiring. Guarded so the Settings view still renders when
+    // QIAuth is the headless/test stub without these methods.
+    if (window.QIAuth && window.QIAuth.recoveryStatus) {
+      var statusLine = $("#recoveryStatusLine");
+      window.QIAuth.recoveryStatus().then(function (data) {
+        if (statusLine) {
+          if (data && data.enabled) {
+            statusLine.textContent = "You have " + (data.remaining || 0) + " unused recovery code" + ((data.remaining === 1) ? "" : "s") + ".";
+          } else {
+            statusLine.textContent = "";
+          }
+        }
+      }).catch(function () {
+        if (statusLine) statusLine.textContent = "Unable to load recovery-code status.";
+      });
+    }
+    var btnGenRecovery = $("#btnGenRecovery");
+    if (btnGenRecovery && window.QIAuth && window.QIAuth.generateRecoveryCodes) {
+      btnGenRecovery.addEventListener("click", function () {
+        var err = $("#mfaError");
+        if (err) err.hidden = true;
+        btnGenRecovery.disabled = true;
+        window.QIAuth.generateRecoveryCodes().then(function (data) {
+          btnGenRecovery.disabled = false;
+          var out = $("#recoveryCodesOut");
+          if (data && data.codes && data.codes.length) {
+            var items = data.codes.map(function (c) { return "<li><code>" + esc(c) + "</code></li>"; }).join("");
+            if (out) {
+              out.innerHTML =
+                '<div class="recovery-warning">Save these codes now — each can be used once and they will NOT be shown again.</div>' +
+                '<ul class="recovery-codes">' + items + '</ul>' +
+                '<button class="btn btn-sm" id="btnCopyRecovery">Copy codes</button>';
+              out.hidden = false;
+            }
+            var statusLine2 = $("#recoveryStatusLine");
+            if (statusLine2) statusLine2.textContent = "You have " + data.codes.length + " unused recovery codes.";
+            var btnCopy = $("#btnCopyRecovery");
+            if (btnCopy) btnCopy.addEventListener("click", function () {
+              var text = data.codes.join("\n");
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function () { toast("Recovery codes copied."); }).catch(function () { toast("Press Ctrl+C to copy."); });
+              } else {
+                toast("Select and copy the codes above.");
+              }
+            });
+            toast("Recovery codes generated.");
+          } else {
+            if (err) { err.textContent = (data && (data.error || data.message)) || "Failed to generate recovery codes."; err.hidden = false; }
+          }
+        }).catch(function () {
+          btnGenRecovery.disabled = false;
+          if (err) { err.textContent = "Unable to reach the server."; err.hidden = false; }
+        });
+      });
+    }
     // QIAuth is the headless/test stub without a changePassword method.
     const btnChangePw = $("#btnChangePassword");
     if (btnChangePw && window.QIAuth && window.QIAuth.changePassword) {

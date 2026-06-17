@@ -68,6 +68,10 @@ function createMockAuthDb(user: DbUser, tokenHash: string): AuthDbHelpers {
     }),
     updateUserMfa: async () => {},
     updateUserMfaLastStep: async () => {},
+    replaceRecoveryCodes: async () => {},
+    listRecoveryCodes: async () => [],
+    markRecoveryCodeUsed: async () => {},
+    countUnusedRecoveryCodes: async () => 0,
     updateUserLastLogin: async () => {},
     createAuditLog: async () => {},
   };

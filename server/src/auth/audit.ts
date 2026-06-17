@@ -12,6 +12,8 @@ import type { AuthDbHelpers } from "./db-helpers.js";
  *  - auth.mfa.enroll
  *  - auth.mfa.verify
  *  - auth.mfa.disable
+ *  - auth.mfa.recovery.generate
+ *  - auth.login.mfa.recovery
  *  - auth.session.revoke
  *  - auth.password.change
  *  - auth.password.change.failed
@@ -23,10 +25,12 @@ export type AuditAction =
   | "auth.login"
   | "auth.login.failed"
   | "auth.login.mfa.failed"
+  | "auth.login.mfa.recovery"
   | "auth.logout"
   | "auth.mfa.enroll"
   | "auth.mfa.verify"
   | "auth.mfa.disable"
+  | "auth.mfa.recovery.generate"
   | "auth.session.revoke"
   | "auth.password.change"
   | "auth.password.change.failed"

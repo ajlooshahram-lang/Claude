@@ -60,7 +60,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     // CSRF enforcement: validate the double-submit cookie on state-changing
     // methods. Exempt: /auth/register and /auth/login (initial auth flows where
     // the client does not yet have a CSRF token).
-    const CSRF_EXEMPT_ROUTES = new Set(["/auth/register", "/auth/login", "/auth/login/mfa", "/auth/accept-invite"]);
+    const CSRF_EXEMPT_ROUTES = new Set(["/auth/register", "/auth/login", "/auth/login/mfa", "/auth/login/mfa/recovery", "/auth/accept-invite"]);
     const CSRF_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
     app.addHook("preHandler", async (request, reply) => {

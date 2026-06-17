@@ -7,6 +7,7 @@ import { generateCsrfToken, setCsrfCookie } from "./csrf.js";
 import { encryptField, decryptField, isEncryptedValue } from "./crypto.js";
 import { isLocked, recordFailedAttempt, resetAttempts } from "./lockout.js";
 import { logAuditEvent } from "./audit.js";
+import { generateRecoveryCodes, normalizeCode, RECOVERY_CODE_COUNT } from "./recovery.js";
 import { createRequireAuth, createRequireRole, type AuthenticatedRequest } from "./middleware.js";
 import type { AuthDbHelpers } from "./db-helpers.js";
 import type { AppConfig } from "../config.js";
@@ -29,6 +30,11 @@ const LoginSchema = z.object({
 const MfaLoginSchema = z.object({
   pendingToken: z.string().min(1),
   totpCode: z.string().length(6),
+});
+
+const MfaRecoveryLoginSchema = z.object({
+  pendingToken: z.string().min(1),
+  recoveryCode: z.string().min(1).max(100),
 });
 
 const MfaVerifySchema = z.object({
@@ -390,6 +396,128 @@ export function registerAuthRoutes(
   });
 
   /**
+   * POST /auth/login/mfa/recovery
+   * Complete MFA login using a one-time recovery (backup) code instead of TOTP.
+   *
+   * This is the self-service escape hatch for a user who has lost their TOTP
+   * authenticator. It mirrors /auth/login/mfa: it consumes the same single-use
+   * pending token, applies the SAME per-user lockout (`mfa:<userId>`), and on
+   * success mints a fresh session. The supplied code is normalized (forgiving of
+   * spaces/hyphens/case) and verified against the user's UNUSED recovery code
+   * hashes with Argon2 verify; the matched code is then marked used so it cannot
+   * be replayed.
+   */
+  app.post(
+    "/auth/login/mfa/recovery",
+    {
+      config: {
+        rateLimit: { max: 10, timeWindow: "1 minute" },
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const parseResult = MfaRecoveryLoginSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.code(400).send({ error: "Validation failed" });
+      }
+
+      const { pendingToken, recoveryCode } = parseResult.data;
+
+      // Validate pending token (single-use, same store as the TOTP path).
+      const pending = pendingMfaTokens.get(pendingToken);
+      if (!pending || Date.now() > pending.expiresAt) {
+        pendingMfaTokens.delete(pendingToken);
+        return reply.code(401).send({ error: "Invalid or expired pending token" });
+      }
+
+      pendingMfaTokens.delete(pendingToken);
+
+      const mfaUser = await db.findUserById(pending.userId);
+      if (!mfaUser || !mfaUser.mfaEnabled) {
+        return reply.code(401).send({ error: "MFA not configured" });
+      }
+
+      // Bound brute-force with the same per-user lockout as the TOTP path.
+      const lockoutKey = "mfa:" + mfaUser.id;
+      if (isLocked(lockoutKey)) {
+        return reply.code(423).send({ error: "Account temporarily locked due to too many failed attempts" });
+      }
+
+      // Verify the normalized code against the user's UNUSED recovery codes.
+      const normalized = normalizeCode(recoveryCode);
+      const codes = await db.listRecoveryCodes(mfaUser.id);
+      let matchedId: string | null = null;
+      for (const code of codes) {
+        if (code.usedAt !== null) continue;
+        // Argon2 verify is constant-time per comparison; loop over all unused
+        // codes so a wrong code costs the same regardless of position.
+        const ok = await verifyPassword(normalized, code.codeHash);
+        if (ok) {
+          matchedId = code.id;
+          break;
+        }
+      }
+
+      if (!matchedId) {
+        const lockResult = recordFailedAttempt(lockoutKey);
+        await logAuditEvent(db, {
+          tenantId: mfaUser.tenantId,
+          actorId: mfaUser.id,
+          action: "auth.login.mfa.failed",
+          detail: { reason: "invalid_recovery_code", locked: lockResult.locked },
+          ip: request.ip,
+        });
+        return reply.code(401).send({ error: "Invalid recovery code" });
+      }
+
+      // Consume the code and clear the lockout counter.
+      await db.markRecoveryCodeUsed(matchedId);
+      resetAttempts(lockoutKey);
+
+      // Create session.
+      const { token, tokenHash } = generateSessionToken();
+      const expiresAt = new Date(Date.now() + sessionExpiryDays * 24 * 60 * 60 * 1000);
+      await db.createSession({
+        userId: mfaUser.id,
+        tokenHash,
+        ip: request.ip,
+        userAgent: request.headers["user-agent"] ?? null,
+        expiresAt,
+      });
+
+      await db.updateUserLastLogin(mfaUser.id);
+
+      // Set cookies.
+      const cookieOpts = getSessionCookieOptions(config.isProd);
+      void reply.setCookie(SESSION_COOKIE_NAME, token, {
+        ...cookieOpts,
+        maxAge: sessionExpiryDays * 24 * 60 * 60,
+      });
+      const csrfToken = generateCsrfToken();
+      setCsrfCookie(reply, csrfToken, config.isProd);
+
+      // Audit log: recovery-code login.
+      const remaining = await db.countUnusedRecoveryCodes(mfaUser.id);
+      await logAuditEvent(db, {
+        tenantId: mfaUser.tenantId,
+        actorId: mfaUser.id,
+        action: "auth.login.mfa.recovery",
+        detail: { remainingRecoveryCodes: remaining },
+        ip: request.ip,
+      });
+
+      return reply.code(200).send({
+        user: {
+          id: mfaUser.id,
+          email: mfaUser.email,
+          displayName: mfaUser.displayName,
+          mfaEnabled: mfaUser.mfaEnabled,
+        },
+        remainingRecoveryCodes: remaining,
+      });
+    },
+  );
+
+  /**
    * POST /auth/logout
    * Revoke current session and clear the session cookie.
    */
@@ -511,7 +639,11 @@ export function registerAuthRoutes(
         ip: request.ip,
       });
 
-      return reply.code(200).send({ success: true, mfaEnabled: true });
+      return reply.code(200).send({
+        success: true,
+        mfaEnabled: true,
+        recoveryCodesHint: "MFA is enabled. Generate recovery codes now so you can still sign in if you lose your authenticator.",
+      });
     },
   );
 
@@ -570,6 +702,10 @@ export function registerAuthRoutes(
       // Disable MFA
       await db.updateUserMfa(user.id, { mfaSecret: null, mfaEnabled: false });
 
+      // Clear any recovery codes: they are meaningless once MFA is off and must
+      // not linger to be used against a re-enabled account.
+      await db.replaceRecoveryCodes(user.id, []);
+
       // Audit log
       await logAuditEvent(db, {
         tenantId: authed.user.tenantId,
@@ -579,6 +715,67 @@ export function registerAuthRoutes(
       });
 
       return reply.code(200).send({ success: true, mfaEnabled: false });
+    },
+  );
+
+  /**
+   * POST /auth/mfa/recovery-codes/generate
+   * Generate a fresh set of one-time recovery codes (MFA must be enabled).
+   * Replaces any existing set and returns the plaintext codes ONCE — they are
+   * stored hashed and cannot be retrieved again.
+   */
+  app.post(
+    "/auth/mfa/recovery-codes/generate",
+    {
+      preHandler: [requireAuth],
+      config: { rateLimit: { max: 5, timeWindow: "1 minute" } },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const authed = request as AuthenticatedRequest;
+
+      // MFA must be enabled to have recovery codes.
+      const user = await db.findUserById(authed.user.id);
+      if (!user || !user.mfaEnabled) {
+        return reply.code(400).send({ error: "MFA is not enabled" });
+      }
+
+      // Generate plaintext codes, hash each one, and replace the stored set.
+      const codes = generateRecoveryCodes(RECOVERY_CODE_COUNT);
+      const hashes = await Promise.all(codes.map((c) => hashPassword(normalizeCode(c))));
+      await db.replaceRecoveryCodes(user.id, hashes);
+
+      // Audit log.
+      await logAuditEvent(db, {
+        tenantId: authed.user.tenantId,
+        actorId: authed.user.id,
+        action: "auth.mfa.recovery.generate",
+        detail: { count: codes.length },
+        ip: request.ip,
+      });
+
+      return reply.code(200).send({
+        codes,
+        count: codes.length,
+        note: "Save these recovery codes now. Each can be used once and they will not be shown again.",
+      });
+    },
+  );
+
+  /**
+   * GET /auth/mfa/recovery-codes/status
+   * Return whether MFA is enabled and how many recovery codes remain. Never
+   * returns the codes themselves.
+   */
+  app.get(
+    "/auth/mfa/recovery-codes/status",
+    { preHandler: [requireAuth] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const authed = request as AuthenticatedRequest;
+      const remaining = await db.countUnusedRecoveryCodes(authed.user.id);
+      return reply.code(200).send({
+        enabled: authed.user.mfaEnabled,
+        remaining,
+      });
     },
   );
 

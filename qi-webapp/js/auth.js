@@ -69,6 +69,13 @@
     }).then(function (res) { return res.json(); });
   }
 
+  function completeMfaRecovery(pendingToken, recoveryCode) {
+    return authFetch("/auth/login/mfa/recovery", {
+      method: "POST",
+      body: JSON.stringify({ pendingToken: pendingToken, recoveryCode: recoveryCode })
+    }).then(function (res) { return res.json(); });
+  }
+
   function register(email, password, displayName) {
     return authFetch("/auth/register", {
       method: "POST",
@@ -105,6 +112,16 @@
       method: "POST",
       body: JSON.stringify({ password: password, totpCode: totpCode })
     }).then(function (res) { return res.json(); });
+  }
+
+  function generateRecoveryCodes() {
+    return authFetch("/auth/mfa/recovery-codes/generate", { method: "POST" })
+      .then(function (res) { return res.json(); });
+  }
+
+  function recoveryStatus() {
+    return authFetch("/auth/mfa/recovery-codes/status", { method: "GET" })
+      .then(function (res) { return res.json(); });
   }
 
   function changePassword(currentPassword, newPassword) {
@@ -352,12 +369,14 @@
     if (mfaForm) {
       mfaForm.addEventListener("submit", function (e) {
         e.preventDefault();
-        var code = document.getElementById("mfaCode").value;
         var token = pendingMfaToken;
         var ep = document.getElementById("authError");
         if (ep) ep.hidden = true;
 
-        completeMfa(token, code).then(function (data) {
+        var recoveryWrap = document.getElementById("mfaRecoveryWrap");
+        var usingRecovery = recoveryWrap && !recoveryWrap.hidden;
+
+        function onResult(data) {
           if (data.user) {
             currentUser = data.user;
             hideAuthGate();
@@ -365,11 +384,42 @@
           } else {
             showAuthError(data.message || data.error || "MFA verification failed.");
           }
-        }).catch(function () {
-          showAuthError("Unable to reach the server.");
-        });
+        }
+        function onError() { showAuthError("Unable to reach the server."); }
+
+        if (usingRecovery) {
+          var rc = (document.getElementById("mfaRecoveryCode") || {}).value || "";
+          completeMfaRecovery(token, rc).then(onResult).catch(onError);
+        } else {
+          var code = (document.getElementById("mfaCode") || {}).value || "";
+          completeMfa(token, code).then(onResult).catch(onError);
+        }
       });
     }
+
+    // Wire up the "use a recovery code" / "use authenticator" toggle on the MFA screen.
+    function setMfaRecoveryMode(useRecovery) {
+      var totpWrap = document.getElementById("mfaTotpWrap");
+      var recoveryWrap = document.getElementById("mfaRecoveryWrap");
+      var toTotp = document.getElementById("mfaUseTotp");
+      var toRecovery = document.getElementById("mfaUseRecovery");
+      var totpInput = document.getElementById("mfaCode");
+      var recoveryInput = document.getElementById("mfaRecoveryCode");
+      var ep = document.getElementById("authError");
+      if (ep) ep.hidden = true;
+      if (totpWrap) totpWrap.hidden = useRecovery;
+      if (recoveryWrap) recoveryWrap.hidden = !useRecovery;
+      if (toTotp) toTotp.hidden = !useRecovery;
+      if (toRecovery) toRecovery.hidden = useRecovery;
+      // TOTP input has a numeric pattern + required; relax it when hidden so the
+      // form can submit a recovery code instead.
+      if (totpInput) totpInput.required = !useRecovery;
+      if (recoveryInput) recoveryInput.required = useRecovery;
+    }
+    var useRecoveryLink = document.getElementById("mfaUseRecovery");
+    if (useRecoveryLink) useRecoveryLink.addEventListener("click", function (e) { e.preventDefault(); setMfaRecoveryMode(true); });
+    var useTotpLink = document.getElementById("mfaUseTotp");
+    if (useTotpLink) useTotpLink.addEventListener("click", function (e) { e.preventDefault(); setMfaRecoveryMode(false); });
 
     // Wire up screen switch links
     var showRegLink = document.getElementById("showRegister");
@@ -384,10 +434,13 @@
     login: login,
     register: register,
     completeMfa: completeMfa,
+    completeMfaRecovery: completeMfaRecovery,
     logout: logout,
     enrollMfa: enrollMfa,
     verifyMfa: verifyMfa,
     disableMfa: disableMfa,
+    generateRecoveryCodes: generateRecoveryCodes,
+    recoveryStatus: recoveryStatus,
     changePassword: changePassword,
     createInvite: createInvite,
     listInvites: listInvites,

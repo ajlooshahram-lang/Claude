@@ -58,11 +58,17 @@
       <form id="mfaForm" class="auth-form">
         <div id="authMfa" hidden>
           <p class="auth-mfa-label">Enter your 6-digit authenticator code</p>
-          <div class="auth-field">
+          <div class="auth-field" id="mfaTotpWrap">
             <label for="mfaCode">TOTP Code</label>
             <input type="text" id="mfaCode" name="totpCode" required maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" placeholder="000000" inputmode="numeric">
           </div>
+          <div class="auth-field" id="mfaRecoveryWrap" hidden>
+            <label for="mfaRecoveryCode">Recovery code</label>
+            <input type="text" id="mfaRecoveryCode" name="recoveryCode" maxlength="32" autocomplete="off" placeholder="XXXXX-XXXXX">
+          </div>
           <button type="submit" class="btn btn-primary auth-submit">Verify</button>
+          <p class="auth-switch" id="mfaUseRecovery"><a href="#">Use a recovery code</a></p>
+          <p class="auth-switch" id="mfaUseTotp" hidden><a href="#">Use your authenticator instead</a></p>
         </div>
       </form>
 

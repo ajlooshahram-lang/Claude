@@ -41,6 +41,12 @@ export type DbMembership = {
   role: "OWNER" | "ADMIN" | "MANAGER" | "VIEWER";
 };
 
+export type DbRecoveryCode = {
+  id: string;
+  codeHash: string;
+  usedAt: Date | null;
+};
+
 export type CreateAuditLogInput = {
   tenantId: string;
   actorId: string | null;
@@ -78,6 +84,18 @@ export type AuthDbHelpers = {
   updateUserPassword(userId: string, passwordHash: string): Promise<void>;
   updateUserLastLogin(userId: string): Promise<void>;
   createAuditLog(data: CreateAuditLogInput): Promise<void>;
+  /**
+   * Replace the user's entire set of MFA recovery codes: delete all existing
+   * codes and insert the supplied hashes. Passing an empty array clears them
+   * (used when MFA is disabled).
+   */
+  replaceRecoveryCodes(userId: string, codeHashes: string[]): Promise<void>;
+  /** List all of the user's recovery codes (used and unused). */
+  listRecoveryCodes(userId: string): Promise<DbRecoveryCode[]>;
+  /** Mark a single recovery code as used (sets `usedAt = now()`). */
+  markRecoveryCodeUsed(id: string): Promise<void>;
+  /** Count the user's remaining (unused) recovery codes. */
+  countUnusedRecoveryCodes(userId: string): Promise<number>;
 };
 
 /**
@@ -214,6 +232,38 @@ export async function createPrismaDbHelpers(): Promise<AuthDbHelpers> {
           detail: data.detail as object,
           ip: data.ip,
         },
+      });
+    },
+
+    async replaceRecoveryCodes(userId: string, codeHashes: string[]) {
+      await prisma.$transaction(async (tx) => {
+        await tx.mfaRecoveryCode.deleteMany({ where: { userId } });
+        if (codeHashes.length > 0) {
+          await tx.mfaRecoveryCode.createMany({
+            data: codeHashes.map((codeHash) => ({ userId, codeHash })),
+          });
+        }
+      });
+    },
+
+    async listRecoveryCodes(userId: string) {
+      const codes = await prisma.mfaRecoveryCode.findMany({
+        where: { userId },
+        select: { id: true, codeHash: true, usedAt: true },
+      });
+      return codes;
+    },
+
+    async markRecoveryCodeUsed(id: string) {
+      await prisma.mfaRecoveryCode.update({
+        where: { id },
+        data: { usedAt: new Date() },
+      });
+    },
+
+    async countUnusedRecoveryCodes(userId: string) {
+      return prisma.mfaRecoveryCode.count({
+        where: { userId, usedAt: null },
       });
     },
   };

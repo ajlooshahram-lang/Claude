@@ -80,9 +80,28 @@ model User {
   tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   memberships Membership[]
   sessions    Session[]
+  recoveryCodes MfaRecoveryCode[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
+}
+
+/// One-time MFA recovery (backup) code. Lets a user who has lost their TOTP
+/// authenticator self-recover at login without manual admin DB surgery.
+/// Only the Argon2id hash of each code is stored — the plaintext is shown to the
+/// user exactly once at generation time. Each code is single-use (`usedAt`).
+model MfaRecoveryCode {
+  id        String   @id @default(cuid())
+  userId    String
+  /// Argon2id hash of the recovery code (same hashing as passwords).
+  codeHash  String
+  /// Set when the code has been consumed; null while still usable.
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 /// Binds a user to a tenant with a role. The RBAC anchor.

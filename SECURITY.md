@@ -58,6 +58,7 @@ report a vulnerability.
 | **MFA (TOTP, RFC 6238)** | HMAC-SHA1, 30s step, 6 digits, ±1 window; verified with a constant-time compare | `server/src/auth/totp.ts` |
 | **MFA replay protection** | The last accepted TOTP time-step is persisted (`User.mfaLastUsedStep`); any code whose matched step is ≤ the stored value is rejected as a replay, so a captured code cannot be reused within its ±1-step window | `server/src/auth/totp.ts` (`verifyTotpWithStep`), `server/src/auth/routes.ts`, `updateUserMfaLastStep()` in `server/src/auth/db-helpers.ts` |
 | **MFA secret encryption at rest** | AES-256-GCM with random IV + auth tag, keyed by `DATA_ENCRYPTION_KEY` | `server/src/auth/crypto.ts`, used in `server/src/auth/routes.ts` |
+| **MFA recovery codes** | 10 one-time backup codes (CSPRNG, `XXXXX-XXXXX` format) let a user who lost their TOTP authenticator self-recover. Stored **Argon2id-hashed** (never plaintext), shown once at generation, single-use (`MfaRecoveryCode.usedAt`). Recovery login consumes the same single-use pending token and is bounded by the same per-user MFA lockout (`mfa:<userId>`); codes are cleared when MFA is disabled. Generate/status routes require an authenticated session with MFA enabled | `server/src/auth/recovery.ts`, `server/src/auth/routes.ts` (`/auth/mfa/recovery-codes/generate`, `/auth/mfa/recovery-codes/status`, `/auth/login/mfa/recovery`), `MfaRecoveryCode` in `server/prisma/schema.prisma`, helpers in `server/src/auth/db-helpers.ts` |
 | **CSRF protection** | Double-submit cookie: random token in a JS-readable cookie must match the `X-CSRF-Token` header; enforced on all POST/PUT/PATCH/DELETE | `server/src/auth/csrf.ts`, global preHandler in `server/src/app.ts` |
 | **CSRF exemptions** | Only the initial unauthenticated flows: `/auth/register`, `/auth/login`, `/auth/login/mfa`, `/auth/accept-invite` | `CSRF_EXEMPT_ROUTES` in `server/src/app.ts` |
 | **Account lockout** | 5 failed attempts / 15 min → 15-min lock. Password login is keyed per email (lowercased; counts unknown emails too); **MFA second-factor failures are also lockout-tracked**, keyed per user (`mfa:<userId>`) on `/auth/login/mfa` and `/auth/mfa/disable`, so MFA brute-force is bounded by the same policy | `server/src/auth/lockout.ts`, `server/src/auth/routes.ts` |
@@ -111,7 +112,9 @@ Do **all** of the following before going live.
    running `prisma/seed.ts`, then unset it from the environment.
 
 7. **Enable MFA for every user**, including the admin, immediately after first
-   login (`/auth/mfa/enroll` → `/auth/mfa/verify`).
+   login (`/auth/mfa/enroll` → `/auth/mfa/verify`), then **generate recovery
+   codes** (`/auth/mfa/recovery-codes/generate`) and store them safely so a lost
+   authenticator does not require manual admin recovery.
 
 8. **Run migrations / seed** through the backend container:
    `docker compose exec backend npx prisma db push` then the seed.
@@ -143,9 +146,6 @@ operation.
 - **No email verification or transactional email.** Invites return the raw token
   in the API response for the admin to deliver out-of-band; there is no built-in
   mailer.
-- **No 2FA recovery codes.** A user who loses their TOTP device must be recovered
-  manually by the admin (disable MFA in the DB). *Roadmap:* one-time recovery
-  codes at enrolment.
 - **User enumeration on registration / invite creation.** `/auth/register` and
   `POST /api/invites` return `409` for an existing email. Accepted trade-off for
   a fixed, known user base; revisit if the user base ever opens up.
@@ -164,8 +164,8 @@ operation.
 
 **Where the evidence is**
 - **Audit log:** the `AuditLog` table in PostgreSQL records authentication events
-  (`auth.login`, `auth.login.failed`, `auth.login.mfa.failed`, `auth.logout`, `auth.register`,
-  `auth.mfa.*`, `auth.password.change`, `auth.password.change.failed`,
+  (`auth.login`, `auth.login.failed`, `auth.login.mfa.failed`, `auth.login.mfa.recovery`, `auth.logout`, `auth.register`,
+  `auth.mfa.*` (including `auth.mfa.recovery.generate`), `auth.password.change`, `auth.password.change.failed`,
   `auth.password.admin-reset`) and data mutations (`project.*`, `case.*`, `register.*`,
   `snapshot.*`, `invite.*`) with tenant, actor, entity, and source IP.
 - **Application logs:** stdout of the `backend` container (`docker compose logs
