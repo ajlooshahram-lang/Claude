@@ -1092,6 +1092,7 @@
           <label class="muted" for="brainProfile">Domain</label>
           <select id="brainProfile" style="max-width:260px">${profOpts}</select>
           <label class="brain-auto"><input type="checkbox" id="brainAuto" checked> Run everything automatically</label>
+          <button class="btn btn-sm" id="brainSample" type="button">✨ Try a sample</button>
           <span class="grow"></span>
           <span class="muted" id="brainFileName"></span>
         </div>
@@ -1168,7 +1169,17 @@
     });
     const autoRunBtn = $("#brainAutoRun");
     if (autoRunBtn) autoRunBtn.addEventListener("click", () => runAnalyzerAuto((ta.value || "").trim(), ""));
+    const sampleBtn = $("#brainSample");
+    if (sampleBtn) sampleBtn.addEventListener("click", () => { if (ta) ta.value = SAMPLE_BRIEF; runAnalyzerAuto(SAMPLE_BRIEF, "Sample STP brief"); });
   };
+
+  // Built-in sample project description so the auto-pipeline is instantly demoable.
+  const SAMPLE_BRIEF = "Submarine Telecom Project (STP): deploy an 8,000 km subsea fibre-optic cable " +
+    "system over 48 months connecting landing stations in Indonesia, Thailand, Vietnam, Taiwan, the " +
+    "Philippines, Guam, Malaysia and Brunei. Scope: marine route survey, permitting and cable landing " +
+    "licenses, subsea cable manufacturing, marine installation with branching units and optical repeaters " +
+    "every ~100 km, system integration, testing and commissioning. Multi-million USD programme with strict " +
+    "quality, HSE and regulatory compliance across all eight jurisdictions.";
 
   // Offline .docx -> plain text: unzip (fflate) and strip word/document.xml markup.
   // Fully local; no network, no server. Returns "" if the part is missing.

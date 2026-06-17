@@ -770,6 +770,14 @@ ok(!!doc.getElementById("brainAuto") && doc.getElementById("brainAuto").checked,
   ok(doc.querySelector("#brainRun .brain-step.done") != null, "auto-run shows completed run-status steps");
   ok(doc.getElementById("brainOpenDash") != null, "auto-run shows the 'project created' CTA");
 }
+// 30b) 'Try a sample' button instantly runs the full pipeline into a new project
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(!!doc.getElementById("brainSample"), "Auto-Analyzer offers a 'Try a sample' button");
+{
+  const before = S.listProjects().length;
+  doc.getElementById("brainSample").dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(S.listProjects().length === before + 1 && S.kpis().total > 0, "sample run creates a populated project");
+}
 
 // 31) Content search: the command palette finds cases by their text and a Search button exists
 ok(!!doc.getElementById("btnSearch"), "topbar Search button present");
