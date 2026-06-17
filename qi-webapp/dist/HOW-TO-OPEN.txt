@@ -1,0 +1,24 @@
+Submarine Telecom Project Application — Standalone Demo
+=======================================================
+
+HOW TO OPEN (no install, no server, no login):
+
+  1. Unzip this file.
+  2. Double-click  STP-Application.html
+  3. It opens in your web browser, straight into the app.
+
+That's it. It works offline. For the live 3D Network Map you just need a
+modern browser (Chrome, Edge, Firefox, or Safari) with WebGL enabled.
+
+WHAT THIS IS
+  A single, self-contained copy of the Submarine Telecom Project Application
+  front-end, for viewing and demos. Everything (code, 3D engine, Earth
+  textures) is embedded in the one HTML file. It deliberately has NO login
+  because it has NO backend — nothing here can reach your real data.
+
+YOUR SECURE, PRIVATE DEPLOYMENT IS SEPARATE
+  The real system for you and the 10 other project owners runs the
+  login-gated, server-backed stack (docker-compose) with the full security:
+  user accounts + passwords (Argon2id), two-factor authentication (TOTP +
+  recovery codes), CSRF protection, session revocation, role-based access,
+  tenant isolation and audit logging. That deployment is unchanged.
