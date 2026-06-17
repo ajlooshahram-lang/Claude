@@ -106,10 +106,15 @@ const bootDemo = `<script>
 (function () {
   var BUILD_ID = ${JSON.stringify(BUILD_ID)};
   function hideStrayOverlays() {
-    // Defensive: an empty modal scrim / toast must never paint over the app.
+    // Defensive: an empty modal scrim / toast must never paint over the app on
+    // boot. Set ONLY the hidden attribute. The global [hidden] display:none
+    // !important CSS guard hides it, and leaves NO inline style behind, so the
+    // app can later reveal modals/toasts by clearing hidden. Do NOT set
+    // el.style.display here: an inline style would permanently override the CSS
+    // and silently break every modal and toast.
     ["modalOverlay", "toast"].forEach(function (id) {
       var el = document.getElementById(id);
-      if (el) { el.hidden = true; el.style.display = "none"; }
+      if (el) { el.hidden = true; }
     });
   }
   function reveal() {

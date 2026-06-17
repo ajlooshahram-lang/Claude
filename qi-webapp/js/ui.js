@@ -3825,9 +3825,6 @@
     S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
     const initialHash = (location.hash || "").replace(/^#/, "");
     go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
-    // Wire up logout button after boot
-    const btnLogout = $("#btnLogout");
-    if (btnLogout && window.QIAuth) btnLogout.addEventListener("click", function () { window.QIAuth.logout(); });
   };
 
   // When __SKIP_AUTH is set (e.g. smoke tests), boot immediately without waiting for auth.js DOMContentLoaded

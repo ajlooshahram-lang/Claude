@@ -9,7 +9,8 @@
     "verify:standalone": "node verify-standalone.js",
     "build-and-verify": "node build-standalone.js && node verify-standalone.js",
     "verify:globe": "node verify-globe.mjs",
-    "verify:upload": "node verify-upload.mjs"
+    "verify:upload": "node verify-upload.mjs",
+    "verify:demo": "node verify-demo.mjs"
   },
   "keywords": [],
   "author": "",
