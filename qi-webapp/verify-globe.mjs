@@ -486,6 +486,27 @@ async function main() {
     "print button is CSP-safe (no inline onclick) and fires window.print() under strict CSP");
   ok(invBrief && !/\bRPN\b|\bFMEA\b|\bEVM\b|\bWBS\b/.test(invBrief.text), "Investor Brief leaks no PM/FMEA jargon");
 
+  // Real download: capture the generated one-pager + confirm it is self-contained.
+  let dlName = "", dlSelfContained = false, dlNoScript = false, dlComplete = false;
+  try {
+    const [ download ] = await Promise.all([
+      page.waitForEvent("download", { timeout: 8000 }),
+      page.evaluate(() => document.getElementById("briefDownload").click())
+    ]);
+    dlName = download.suggestedFilename();
+    const p = await download.path();
+    if (p) {
+      const content = fs.readFileSync(p, "utf8");
+      dlSelfContained = /^<!doctype html>/i.test(content) && /<style>[\s\S]*<\/style>/.test(content) && content.indexOf('id="investorBrief"') !== -1;
+      dlNoScript = content.indexOf("<script") === -1;
+      // .brief-country{...} present proves the CSS was harvested from the live sheet
+      dlComplete = (content.match(/brief-country/g) || []).length >= 8 && /USD\s*1\.3B/.test(content) && /\.brief-country\s*\{/.test(content);
+    }
+  } catch (e) { dlName = "ERR:" + (e && e.message); }
+  ok(dlName === "STP-Investor-Brief.html", "Download produces STP-Investor-Brief.html (got " + dlName + ")");
+  ok(dlSelfContained && dlNoScript, "downloaded file is self-contained HTML (inline <style>, brief markup, no scripts)");
+  ok(dlComplete, "downloaded file carries all 8 countries, the headline budget, and the brief's own CSS (drift-free)");
+
   // The brief + print click must produce no CSP violations under the strict CSP.
   const cspBrief = await page.evaluate(() => (window.__csp || []).length);
   ok(pageErrors.length === 0 && cspBrief === 0 && consoleCSP.length === 0,

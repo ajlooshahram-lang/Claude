@@ -780,6 +780,16 @@ ok(briefPrintBtn != null && !briefPrintBtn.getAttribute("onclick"), "Investor Br
 window.__printed = 0;
 briefPrintBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(window.__printed === 1, "clicking 'Print / Save as PDF' invokes window.print() once");
+// downloadable self-contained one-pager (built from the same data, drift-free CSS)
+ok(typeof window.QIBrief === "object" && typeof window.QIBrief.buildDocument === "function", "QIBrief.buildDocument() exposed for the HTML download");
+const briefDoc = window.QIBrief.buildDocument();
+ok(/^<!doctype html>/i.test(briefDoc), "downloaded brief is a complete HTML document");
+ok(/<style>[\s\S]*<\/style>/.test(briefDoc) && briefDoc.indexOf("id=\"investorBrief\"") !== -1, "download is self-contained (inline <style> + brief markup)");
+ok(briefDoc.indexOf("<script") === -1, "downloaded brief contains no scripts (safe to email/open)");
+ok((briefDoc.match(/brief-country/g) || []).length >= 8, "downloaded brief carries all 8 country blocks");
+ok(/USD\s*1\.3B/.test(briefDoc), "downloaded brief carries the headline budget");
+const dlBtn = doc.getElementById("briefDownload");
+ok(dlBtn != null && !dlBtn.getAttribute("onclick"), "Download button exists and is CSP-safe (no inline onclick)");
 // zero PM/FMEA jargon for the non-technical reader
 ok(!/\bRPN\b|\bFMEA\b|\bEVM\b|\bWBS\b|\bSPI\b|\bCPI\b/.test(briefOut), "Investor Brief leaks no PM/FMEA jargon");
 // Brain detects named countries and injects permit tasks + FMEA risks

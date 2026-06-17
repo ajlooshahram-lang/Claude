@@ -553,6 +553,60 @@
   // goes live, how much it costs, and what to watch) on a single page a
   // stakeholder can hand to their board. Reuses the on-device Brain
   // (QICountryData) + the 3D network dataset (QIGlobe). No PM jargon.
+
+  // Harvest the brief's own CSS rules from the live stylesheet so the
+  // downloadable one-pager is self-contained AND always matches what's on
+  // screen (single source of truth — no duplicated/ drifting CSS). Same-origin
+  // sheets only; guarded so a cross-origin/unreadable sheet is skipped.
+  function collectBriefCSS() {
+    const wanted = /\.(brief|spend)/;
+    let out = "";
+    const sheets = (typeof document !== "undefined" && document.styleSheets) ? document.styleSheets : [];
+    for (let i = 0; i < sheets.length; i++) {
+      let rules = null;
+      try { rules = sheets[i].cssRules; } catch (e) { rules = null; }
+      if (!rules) continue;
+      for (let j = 0; j < rules.length; j++) {
+        const r = rules[j];
+        if (r && r.type === 1 && r.selectorText && wanted.test(r.selectorText)) out += r.cssText + "\n";
+      }
+    }
+    return out;
+  }
+  // Build a complete, self-contained HTML document for the rendered brief.
+  function buildBriefDocument() {
+    const el = $("#investorBrief");
+    if (!el) return "";
+    const h1 = el.querySelector("h1");
+    const title = h1 ? h1.textContent : "Investor Brief";
+    const base = "body{margin:0;padding:24px;background:#fff;color:#1a2336;" +
+      "font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}" +
+      ".muted{color:#6b7892}\n";
+    return "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">" +
+      "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
+      "<title>" + esc(title) + "</title><style>" + base + collectBriefCSS() + "</style></head><body>" +
+      el.outerHTML + "</body></html>";
+  }
+  // Download the brief as a self-contained .html file (CSP-safe: a Blob + an
+  // <a download> click — no inline handler, no network, no external libs).
+  function downloadBrief() {
+    const html = buildBriefDocument();
+    if (!html) return false;
+    try {
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const URLApi = window.URL || window.webkitURL;
+      const url = URLApi.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "STP-Investor-Brief.html";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => { try { URLApi.revokeObjectURL(url); } catch (e) {} }, 0);
+      return true;
+    } catch (e) { return false; }
+  }
+  // Expose a tiny, legitimate API so the brief document can be produced/tested
+  // outside the click handler (used by the test suites).
+  window.QIBrief = { buildDocument: buildBriefDocument, download: downloadBrief };
+
   RENDER.investorbrief = function () {
     const G = window.QIGlobe || {};
     const CD = window.QICountryData;
@@ -682,6 +736,7 @@
     return `
       <div class="toolbar no-print">
         <button class="btn btn-primary" id="briefPrint" type="button">🖨 Print / Save as PDF</button>
+        <button class="btn" id="briefDownload" type="button">⬇ Download one-pager (HTML)</button>
         <span class="muted">A plain-language one-pager you can hand to your board — built automatically from your project. No jargon.</span>
       </div>
       <div class="brief" id="investorBrief">
@@ -738,6 +793,8 @@
   AFTER.investorbrief = function () {
     const btn = $("#briefPrint");
     if (btn) btn.addEventListener("click", () => { try { window.print(); } catch (e) {} });
+    const dl = $("#briefDownload");
+    if (dl) dl.addEventListener("click", () => downloadBrief());
   };
 
   // Route Progress — submarine-cable construction tracking (GIS delivery view).
