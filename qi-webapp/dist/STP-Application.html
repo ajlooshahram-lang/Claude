@@ -11069,17 +11069,26 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 </script>
 <script>
 (function () {
+  var BUILD_ID = "2026-06-17 (f0bfbdd)";
+  function hideStrayOverlays() {
+    // Defensive: an empty modal scrim / toast must never paint over the app.
+    ["modalOverlay", "toast"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) { el.hidden = true; el.style.display = "none"; }
+    });
+  }
   function reveal() {
     var gate = document.getElementById("authGate");
     if (gate && gate.parentNode) gate.parentNode.removeChild(gate);
     var app = document.getElementById("app");
     if (app) app.hidden = false;
     if (window.QIBoot) { try { window.QIBoot(); } catch (e) {} }
+    hideStrayOverlays();
     if (!document.getElementById("stpDemoBadge")) {
       var b = document.createElement("div");
       b.id = "stpDemoBadge";
-      b.textContent = "DEMO — local data only \u00b7 no backend";
-      b.title = "Offline showcase build. Changes are saved only in this browser.";
+      b.textContent = "DEMO — local data only \u00b7 no backend \u00b7 build " + BUILD_ID;
+      b.title = "Offline showcase build " + BUILD_ID + ". Changes are saved only in this browser.";
       b.setAttribute("style", [
         "position:fixed", "bottom:12px", "right:12px", "z-index:99999",
         "background:#c00000", "color:#fff", "font:600 11px/1 system-ui,Segoe UI,Arial,sans-serif",

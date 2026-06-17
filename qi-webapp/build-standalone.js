@@ -19,8 +19,24 @@
 "use strict";
 const fs = require("fs");
 const path = require("path");
+const { execSync } = require("child_process");
 
 const root = __dirname;
+
+// Build identifier so a viewer can tell a fresh file from a stale download.
+function buildId() {
+  const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  let sha = "";
+  try {
+    sha = execSync("git rev-parse --short HEAD", { cwd: root, stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+  } catch (e) {
+    sha = "";
+  }
+  return sha ? date + " (" + sha + ")" : date;
+}
+const BUILD_ID = buildId();
 const read = (p) => fs.readFileSync(path.join(root, p), "utf8");
 const readB64 = (p) => fs.readFileSync(path.join(root, p)).toString("base64");
 
@@ -88,17 +104,26 @@ const appScripts = APP.map((p) => {
 // Reveal the app, remove the login gate, and add a DEMO badge.
 const bootDemo = `<script>
 (function () {
+  var BUILD_ID = ${JSON.stringify(BUILD_ID)};
+  function hideStrayOverlays() {
+    // Defensive: an empty modal scrim / toast must never paint over the app.
+    ["modalOverlay", "toast"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) { el.hidden = true; el.style.display = "none"; }
+    });
+  }
   function reveal() {
     var gate = document.getElementById("authGate");
     if (gate && gate.parentNode) gate.parentNode.removeChild(gate);
     var app = document.getElementById("app");
     if (app) app.hidden = false;
     if (window.QIBoot) { try { window.QIBoot(); } catch (e) {} }
+    hideStrayOverlays();
     if (!document.getElementById("stpDemoBadge")) {
       var b = document.createElement("div");
       b.id = "stpDemoBadge";
-      b.textContent = "DEMO — local data only \\u00b7 no backend";
-      b.title = "Offline showcase build. Changes are saved only in this browser.";
+      b.textContent = "DEMO — local data only \\u00b7 no backend \\u00b7 build " + BUILD_ID;
+      b.title = "Offline showcase build " + BUILD_ID + ". Changes are saved only in this browser.";
       b.setAttribute("style", [
         "position:fixed", "bottom:12px", "right:12px", "z-index:99999",
         "background:#c00000", "color:#fff", "font:600 11px/1 system-ui,Segoe UI,Arial,sans-serif",
@@ -144,5 +169,6 @@ fs.writeFileSync(outFile, htmlOut, "utf8");
 
 const bytes = Buffer.byteLength(htmlOut, "utf8");
 console.log("Wrote " + outFile);
+console.log("Build: " + BUILD_ID);
 console.log("Size: " + (bytes / 1024 / 1024).toFixed(2) + " MB");
 console.log("Inlined: " + VENDOR.length + " vendor libs, " + APP.length + " app modules, " + Object.keys(TEXTURES).length + " textures");
