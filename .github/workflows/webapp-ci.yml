@@ -1,0 +1,43 @@
+name: Web App CI
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "qi-webapp/**"
+      - ".github/workflows/webapp-ci.yml"
+  pull_request:
+    paths:
+      - "qi-webapp/**"
+      - ".github/workflows/webapp-ci.yml"
+
+defaults:
+  run:
+    working-directory: qi-webapp
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: qi-webapp/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check all modules
+        run: for f in js/*.js *.js; do node --check "$f"; done
+
+      - name: Engine + brain + smoke tests
+        run: npm test
+
+      - name: Build single-file standalone
+        run: node build-standalone.js
+
+      - name: Verify standalone boots
+        run: node verify-standalone.js
