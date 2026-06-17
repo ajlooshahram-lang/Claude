@@ -89,23 +89,23 @@
     { id: "brain", label: "Auto-Analyzer", icon: "🧠" },
     { id: "portfolio", label: "Portfolio", icon: "▣" },
     { id: "dashboard", label: "Dashboard", icon: "▤" },
-    { id: "cases", label: "Cases (Master)", icon: "★" },
+    { id: "cases", label: "All Items", icon: "★" },
     { g: "Delivery" },
-    { id: "pm", label: "PM Tasks", icon: "✔" },
+    { id: "pm", label: "Task List", icon: "✔" },
     { id: "kanban", label: "Kanban Board", icon: "▥" },
     { id: "timeline", label: "Timeline", icon: "▦" },
     { g: "Risk & Quality" },
-    { id: "risks", label: "Risk Register", icon: "⚠" },
-    { id: "fmea", label: "FMEA", icon: "⌖" },
-    { id: "sigma", label: "Six Sigma", icon: "∿" },
-    { id: "gage", label: "Gage R&R (MSA)", icon: "📐" },
+    { id: "risks", label: "Risk Tracker", icon: "⚠" },
+    { id: "fmea", label: "Failure Analysis", icon: "⌖" },
+    { id: "sigma", label: "Quality Metrics", icon: "∿" },
+    { id: "gage", label: "Measurement Check", icon: "📐" },
     { id: "riskmatrix", label: "Risk Matrix", icon: "▦" },
-    { id: "xbarr", label: "X̄-R Control Chart", icon: "⎍" },
-    { id: "capability", label: "Process Capability", icon: "◊" },
-    { id: "ncrpareto", label: "NCR Pareto", icon: "▟" },
+    { id: "xbarr", label: "Process Control", icon: "⎍" },
+    { id: "capability", label: "Performance Index", icon: "◊" },
+    { id: "ncrpareto", label: "Top Issues", icon: "▟" },
     { g: "Improve" },
-    { id: "pdca", label: "PDCA", icon: "↻" },
-    { id: "log", label: "Action Log", icon: "✎" },
+    { id: "pdca", label: "Improvement Cycles", icon: "↻" },
+    { id: "log", label: "Action Items", icon: "✎" },
     { g: "People & Cost" },
     { id: "stakeholders", label: "Stakeholders", icon: "♟" },
     { id: "budget", label: "Budget", icon: "$" },
@@ -115,12 +115,12 @@
     { g: "Intelligence" },
     { id: "country", label: "Country Intelligence", icon: "🗺" },
     { id: "ai", label: "AI Assistant", icon: "✦" },
-    { id: "impact", label: "Change Impact", icon: "⇄" },
-    { id: "scorecard", label: "KPI Scorecard", icon: "▣" },
-    { id: "health", label: "Data Health", icon: "✚" },
+    { id: "impact", label: "Change Tracker", icon: "⇄" },
+    { id: "scorecard", label: "Performance Overview", icon: "▣" },
+    { id: "health", label: "Data Check", icon: "✚" },
     { g: "Setup" },
-    { id: "report", label: "Report Pack", icon: "🖨" },
-    { id: "audit", label: "History & Backups", icon: "⟲" },
+    { id: "report", label: "Summary Report", icon: "🖨" },
+    { id: "audit", label: "History", icon: "⟲" },
     { id: "config", label: "Settings", icon: "⚙" },
     { id: "help", label: "Help", icon: "?" }
   ];
@@ -128,8 +128,8 @@
   (function insertRegisters() {
     const items = [{ g: "Engineering" }];
     C.REGISTERS.filter(r => r.group === "Engineering").forEach(r => items.push({ id: r.id, label: r.label, icon: r.icon }));
-    items.push({ id: "bowtie", label: "Bow-tie (HAZOP)", icon: "🎀" });
-    items.push({ g: "Business" }, { id: "evm", label: "Earned Value (EVM)", icon: "∑" }, { id: "cashflow", label: "Cash Flow / S-curve", icon: "〽" }, { id: "prioritise", label: "Prioritisation (RICE/WSJF)", icon: "⤒" });
+    items.push({ id: "bowtie", label: "Hazard Analysis", icon: "🎀" });
+    items.push({ g: "Business" }, { id: "evm", label: "Cost vs Progress", icon: "∑" }, { id: "cashflow", label: "Cash Flow", icon: "〽" }, { id: "prioritise", label: "Priority Ranking", icon: "⤒" });
     C.REGISTERS.filter(r => r.group === "Business").forEach(r => items.push({ id: r.id, label: r.label, icon: r.icon }));
     const idx = VIEWS.findIndex(v => v.g === "Intelligence");
     VIEWS.splice(idx, 0, ...items);
@@ -580,12 +580,12 @@
     }
     return tourBanner + `
       <div class="grid kpis" style="margin-bottom:16px">
-        ${kpi("navy", "Total Cases", k.total)}
-        ${kpi("blue", "Open / Active", k.open)}
-        ${kpi("red", "Critical (RPN&ge;200)", k.crit)}
-        ${kpi("gold", "Avg RPN", k.avgRpn)}
-        ${kpi("green", "Avg % Done", pct(k.avgDone))}
-        ${kpi("teal", "Blocked", k.blocked)}
+        ${kpi("navy", "Total Items", k.total)}
+        ${kpi("blue", "In Progress", k.open)}
+        ${kpi("red", "High Priority", k.crit)}
+        ${kpi("gold", "Risk Score", k.avgRpn)}
+        ${kpi("green", "Progress", pct(k.avgDone))}
+        ${kpi("teal", "Stuck", k.blocked)}
       </div>
       <div class="card">
         <div class="card-head"><h3>Cases by</h3>
@@ -2351,7 +2351,7 @@
       <div class="report">
         <h2 style="margin:0">${esc(b.company || "")} ${esc(b.company ? "—" : "")} ${esc(p.name)} — Project Report</h2>
         <p class="muted">Status: ${esc(p.status)} · Manager: ${esc(p.manager || "—")} · ${C.fmtDate(p.start)} → ${C.fmtDate(p.end)} · Generated ${C.fmtDate(new Date().toISOString().slice(0, 10))}</p>
-        <div class="grid kpis">${card("Cases", k.total)}${card("Critical", k.crit)}${card("Open", k.open)}${card("Avg % done", pct(k.avgDone))}${card("Blocked", k.blocked)}${card("Punch open", punchOpen)}</div>
+        <div class="grid kpis">${card("Items", k.total)}${card("High Priority", k.crit)}${card("In Progress", k.open)}${card("Progress", pct(k.avgDone))}${card("Stuck", k.blocked)}${card("Open issues", punchOpen)}</div>
         <h3>Earned value</h3>
         <div class="grid kpis">${card("BAC", money(Math.round(e.bac)))}${card("EV", money(Math.round(e.ev)))}${card("AC", money(Math.round(e.ac)))}${card("CPI", e.cpi.toFixed(2))}${card("SPI", e.spi.toFixed(2))}${card("EAC", money(Math.round(e.eac)))}</div>
         <h3>Top risks</h3>${tableWrap("<th>#</th><th>Case</th><th class='wrap'>Problem</th><th>RPN</th><th>Owner</th><th>Status</th>", top)}

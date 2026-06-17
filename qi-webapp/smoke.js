@@ -32,7 +32,7 @@ let fails = 0;
 function ok(cond, msg) { console.log((cond ? "  ok  " : "FAIL  ") + msg); if (!cond) fails++; }
 
 // 1) booted on dashboard
-ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard renders KPIs");
+ok(/Total Items/.test(doc.getElementById("content").innerHTML), "dashboard renders KPIs");
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 // 1b) KPI count-up animation must be async-safe: value text is intact right after render
 {
