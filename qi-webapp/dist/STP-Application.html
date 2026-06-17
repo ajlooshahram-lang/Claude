@@ -9445,6 +9445,70 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
           <input id="brainFile" type="file" accept=".txt,.md,text/plain,text/markdown" hidden />
           <span class="muted" id="brainFileName"></span>
         </div>
+        <details id="brainWizard" style="margin-top:10px;border:1.5px dashed var(--border);border-radius:8px;padding:10px 12px">
+          <summary style="cursor:pointer;font-weight:600">Don't have a description? Build one with clicks — no typing</summary>
+          <p class="muted" style="margin:8px 0">Answer a few questions by clicking. We'll write the project description for you and analyse it automatically.</p>
+          <div class="wz-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+            <label>What are you building?<br>
+              <select id="wzType" style="width:100%">
+                <option value="submarine fibre optic cable system">Submarine fibre optic cable system</option>
+                <option value="terrestrial fibre optic backbone network">Terrestrial fibre backbone network</option>
+                <option value="mobile network (5G) rollout">Mobile network (5G) rollout</option>
+                <option value="data centre build">Data centre build</option>
+                <option value="general infrastructure project">General infrastructure project</option>
+              </select>
+            </label>
+            <label>How long is the route?<br>
+              <select id="wzLen" style="width:100%">
+                <option value="1,000 km">~1,000 km (short)</option>
+                <option value="3,000 km">~3,000 km</option>
+                <option value="5,000 km">~5,000 km</option>
+                <option value="9,500 km" selected>~9,500 km (regional)</option>
+                <option value="12,000 km">~12,000 km (very long)</option>
+              </select>
+            </label>
+            <label>How long will it take?<br>
+              <select id="wzDur" style="width:100%">
+                <option value="12 months">12 months</option>
+                <option value="24 months">24 months</option>
+                <option value="36 months">36 months</option>
+                <option value="48 months">48 months</option>
+                <option value="60 months" selected>60 months (5 years)</option>
+              </select>
+            </label>
+            <label>Roughly how much will it cost?<br>
+              <select id="wzBudget" style="width:100%">
+                <option value="USD 100 million">USD 100 million</option>
+                <option value="USD 300 million">USD 300 million</option>
+                <option value="USD 600 million">USD 600 million</option>
+                <option value="USD 1.3 billion" selected>USD 1.3 billion</option>
+                <option value="USD 2 billion">USD 2 billion</option>
+              </select>
+            </label>
+            <label>How much fibre?<br>
+              <select id="wzPairs" style="width:100%">
+                <option value="8 fibre pairs">8 fibre pairs</option>
+                <option value="16 fibre pairs">16 fibre pairs</option>
+                <option value="24 fibre pairs" selected>24 fibre pairs</option>
+                <option value="48 fibre pairs">48 fibre pairs</option>
+              </select>
+            </label>
+          </div>
+          <div style="margin-top:10px">
+            <div class="muted" style="margin-bottom:6px">Which countries are involved? (click to toggle)</div>
+            <div id="wzCountries" style="display:flex;flex-wrap:wrap;gap:6px">
+              ${["Indonesia","Malaysia","Brunei","Vietnam","Thailand","Philippines","Taiwan","Guam"].map(c =>
+                `<label class="wz-chip" style="border:1.5px solid var(--border);border-radius:999px;padding:4px 12px;cursor:pointer"><input type="checkbox" class="wzCountry" value="${c}" checked style="margin-right:6px">${c}</label>`).join("")}
+            </div>
+            <div class="toolbar" style="margin-top:8px;gap:8px">
+              <button class="btn btn-sm" id="wzAll" type="button">Select all 8</button>
+              <button class="btn btn-sm" id="wzNone" type="button">Clear countries</button>
+            </div>
+          </div>
+          <div class="toolbar" style="margin-top:12px">
+            <button class="btn btn-primary" id="wzBuild" type="button">Build my brief &amp; analyze</button>
+          </div>
+        </details>
         <textarea id="brainText" rows="9" style="width:100%;margin-top:8px;font:inherit;padding:10px;border:1.5px solid var(--border);border-radius:8px"
           placeholder="Paste your project description here (stays on this device)…"></textarea>
         <div class="toolbar" style="margin-top:8px">
@@ -9464,21 +9528,71 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
       const plan = QIBrain.analyzeProject(text, { profile: $("#brainProfile").value || undefined });
       uiState.brainPlan = plan;
       renderBrainPreview(plan);
-      if (opts && opts.scroll) { const out = $("#brainOut"); if (out && out.scrollIntoView) out.scrollIntoView({ behavior: "smooth", block: "start" }); }
+      if (opts && opts.scroll) { const out = $("#brainOut"); try { if (out && out.scrollIntoView) out.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) { /* jsdom / unsupported */ } }
       return true;
     };
     if (fileInput) fileInput.addEventListener("change", () => {
       const f = fileInput.files && fileInput.files[0]; if (!f) return;
+      const name = (f.name || "").toLowerCase();
+      // Graceful guard: we only read plain text. Word/PDF/Office/binary files
+      // would dump garbage into the analyser, so we stop and guide the user.
+      if (/\.(docx?|pdf|pptx?|xlsx?|rtf|odt|pages|key|numbers|zip)$/.test(name)) {
+        nameEl.textContent = `${f.name} — can't read this type yet`;
+        fileInput.value = "";
+        toast("I can't read Word/PDF files yet. Use \u201CBuild one with clicks\u201D below, or paste the text from the document.");
+        return;
+      }
       nameEl.textContent = f.name;
       const reader = new FileReader();
       reader.onload = () => {
-        ta.value = String(reader.result || "");
+        const txt = String(reader.result || "");
+        // Binary sniff: catch zip/PDF/null-byte content slipped through as "all files".
+        if (/^PK\x03\x04/.test(txt) || /^%PDF/.test(txt) || /\x00\x00/.test(txt.slice(0, 4000))) {
+          nameEl.textContent = `${f.name} — not plain text`;
+          fileInput.value = "";
+          toast("That looks like a Word/PDF/binary file, not text. Use \u201CBuild one with clicks\u201D or paste the text instead.");
+          return;
+        }
+        ta.value = txt;
         // Upload alone is enough — the app does the rest automatically.
         if (runAnalyze({ scroll: true })) toast(`Analysed "${f.name}" — your plan & country frameworks are below.`);
       };
       reader.onerror = () => toast("Could not read that file. Try a plain .txt or .md file.");
       reader.readAsText(f);
     });
+
+    // ---- Click-only "Build my brief" wizard (zero typing) -------------------
+    const qsa = (s) => Array.prototype.slice.call(document.querySelectorAll(s));
+    const wzBuild = $("#wzBuild");
+    if (wzBuild) {
+      const wzAll = $("#wzAll"), wzNone = $("#wzNone");
+      if (wzAll) wzAll.addEventListener("click", () => qsa(".wzCountry").forEach(c => { c.checked = true; }));
+      if (wzNone) wzNone.addEventListener("click", () => qsa(".wzCountry").forEach(c => { c.checked = false; }));
+      const joinList = (a) => a.length <= 1 ? (a[0] || "") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
+      wzBuild.addEventListener("click", () => {
+        const type = ($("#wzType") || {}).value || "infrastructure project";
+        const len = ($("#wzLen") || {}).value || "";
+        const dur = ($("#wzDur") || {}).value || "";
+        const budget = ($("#wzBudget") || {}).value || "";
+        const pairs = ($("#wzPairs") || {}).value || "";
+        const countries = qsa(".wzCountry").filter(c => c.checked).map(c => c.value);
+        const isFibre = /fibre|submarine/.test(type);
+        const countryClause = countries.length
+          ? ` The system lands in ${joinList(countries)}, with a cable landing station, terrestrial backhaul and a national cable landing licence in each country.`
+          : "";
+        const scopeClause = isFibre
+          ? " Scope includes marine route survey and multi-country permitting, submarine cable and repeater supply, marine installation and burial, cable landing stations, terrestrial backhaul, system integration, end-to-end testing (OTDR, BER, capacity) and acceptance to ready-for-service."
+          : " Scope includes design, permitting, procurement, construction, integration, testing and handover to operations.";
+        const text =
+          `We are delivering a ${type}. The route is about ${len} carrying ${pairs}.` +
+          countryClause +
+          ` The planned duration is ${dur} and the budget is approximately ${budget}.` +
+          scopeClause;
+        ta.value = text;
+        if (runAnalyze({ scroll: true })) toast("Built your brief from your choices and analysed it — see below.");
+      });
+    }
+
     const clearBtn = $("#brainClear");
     if (clearBtn) clearBtn.addEventListener("click", () => { ta.value = ""; nameEl.textContent = ""; if (fileInput) fileInput.value = ""; uiState.brainPlan = null; $("#brainOut").innerHTML = ""; });
 
@@ -11525,7 +11639,7 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 </script>
 <script>
 (function () {
-  var BUILD_ID = "2026-06-17 (e5bd19e)";
+  var BUILD_ID = "2026-06-17 (25046f5)";
   function hideStrayOverlays() {
     // Defensive: an empty modal scrim / toast must never paint over the app.
     ["modalOverlay", "toast"].forEach(function (id) {

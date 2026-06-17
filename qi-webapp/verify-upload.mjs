@@ -3,6 +3,8 @@
  * Run: node verify-upload.mjs   (requires playwright + the built dist file). */
 import { chromium } from 'playwright';
 import path from 'path';
+import fs from 'fs';
+import os from 'os';
 
 const dist = 'file://' + path.resolve('dist/STP-Application.html');
 const sample = path.resolve('samples/trans-asia-fibre-project-description.md');
@@ -54,6 +56,35 @@ ok(/Chunghwa Telecom|PLDT|Telkom|Viettel|GTA TeleGuam|Unified National Networks|
    'Landing Partner framework names real operators');
 
 ok(errs.length === 0, 'no page errors / CSP refusals during the upload flow' + (errs.length ? ' -> ' + errs.join(' | ') : ''));
+
+// ---- Click-only wizard: build a brief from clicks alone, no typing ----------
+await pg.click('.nav-item[data-view="brain"]');
+await pg.waitForTimeout(150);
+await pg.click('#brainWizard summary');
+await pg.selectOption('#wzType', 'submarine fibre optic cable system');
+await pg.click('#wzAll');
+await pg.click('#wzBuild');
+await pg.waitForSelector('#brainOut .card', { timeout: 8000 });
+await pg.waitForTimeout(200);
+const wzText = await pg.inputValue('#brainText');
+ok(/submarine fibre optic cable system/.test(wzText), 'Wizard composed a brief from clicks (no typing)');
+const wzOut = await pg.evaluate(() => document.getElementById('brainOut').innerText);
+ok(COUNTRIES.every(c => wzOut.includes(c)) || /Regulatory & Country Intelligence/.test(wzOut), 'Wizard brief auto-analysed with country intelligence');
+
+// ---- Graceful guard: a Word/PDF/binary upload must not break the app --------
+const fakeDocx = path.join(os.tmpdir(), 'fake-client-brief.docx');
+fs.writeFileSync(fakeDocx, Buffer.from([0x50, 0x4b, 0x03, 0x04, 0, 0, 0, 0, 1, 2, 3, 4]));
+await pg.click('#brainClear');
+await pg.waitForTimeout(100);
+await pg.setInputFiles('#brainFile', fakeDocx);
+await pg.waitForTimeout(400);
+const afterDocx = await pg.inputValue('#brainText');
+ok(afterDocx === '', 'Word/PDF upload is rejected — no binary garbage reaches the analyser');
+const fileNote = await pg.evaluate(() => document.getElementById('brainFileName').innerText);
+ok(/can't read|not plain text/i.test(fileNote), 'Unsupported upload shows a friendly guidance note: ' + JSON.stringify(fileNote));
+fs.unlinkSync(fakeDocx);
+
+ok(errs.length === 0, 'still no page errors after wizard + guard flows' + (errs.length ? ' -> ' + errs.join(' | ') : ''));
 
 await b.close();
 console.log(process.exitCode ? '\nUPLOAD FLOW CHECKS FAILED' : '\nALL UPLOAD-FLOW CHECKS PASSED');

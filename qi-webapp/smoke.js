@@ -689,6 +689,25 @@ ok(S.regRows("procurement").length > brainProcBefore, "Apply adds generated proc
 // click-only / privacy sanity: analysis must not call out to the network
 ok(window.__promptCalls === 0, "Brain flow used no prompt()");
 
+// 38b) Click-only "Build my brief" wizard — generates a description and analyses it with zero typing
+S.reset();
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("wzBuild") != null, "Brain wizard (build-by-clicks) renders");
+ok(doc.querySelectorAll(".wzCountry").length === 8, "Wizard offers all 8 countries as click toggles");
+doc.getElementById("wzAll").click();
+doc.getElementById("wzBuild").click();
+const wzText = doc.getElementById("brainText").value;
+ok(/submarine fibre optic cable system/.test(wzText), "Wizard composed a description from the clicks (no typing)");
+ok(/9,500 km/.test(wzText) && /60 months/.test(wzText) && /USD 1.3 billion/.test(wzText), "Wizard brief carries the chosen scale, duration and budget");
+["Indonesia","Malaysia","Brunei","Vietnam","Thailand","Philippines","Taiwan","Guam"].forEach(c =>
+  ok(wzText.indexOf(c) !== -1, "Wizard brief names " + c));
+ok(/Work breakdown/.test(doc.getElementById("brainOut").innerHTML), "Wizard auto-analysed (work-breakdown preview shown)");
+ok(window.QIBrain.analyzeProject(wzText).countryIntel.length === 8, "Wizard brief detected all 8 countries");
+ok(window.__promptCalls === 0, "Wizard used no prompt() (click-only)");
+// "Clear countries" empties the selection, so the wizard can scope to fewer markets
+doc.getElementById("wzNone").click();
+ok(doc.querySelectorAll(".wzCountry:checked").length === 0, "Wizard 'Clear countries' deselects all toggles");
+
 // 39) Country Intelligence — bundled data, dedicated view, and Brain integration
 ok(typeof window.QICountryData === "object" && typeof window.QICountryData.list === "function", "Country data module exposed");
 ok(window.QICountryData.list().length === 8, "Country data covers all 8 STP countries (got " + window.QICountryData.list().length + ")");
