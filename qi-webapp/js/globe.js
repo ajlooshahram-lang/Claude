@@ -549,8 +549,8 @@
           fullIndex: (tubeGeo.index ? tubeGeo.index.count : 0),
           haloIndex: (haloGeo.index ? haloGeo.index.count : 0) });
 
-        // flowing light pulses travelling along the cable (twin, evenly spaced
-        // → a clearer sense of live data moving A–Z along each route)
+        // flowing light pulses travelling along the cable (twin, evenly spaced)
+        // each with a short comet wake → data visibly streaks A–Z along the route
         var pGeo = new THREE.SphereGeometry(0.042, 14, 14);
         disposables.push(pGeo);
         var baseSpeed = 0.06 + Math.random() * 0.04;
@@ -559,7 +559,15 @@
           var pulse = new THREE.Mesh(pGeo, pMat);
           world.add(pulse);
           disposables.push(pMat);
-          pulses.push({ curve: curve, mesh: pulse, speed: baseSpeed, offset: (Math.random() + pp * 0.5) % 1 });
+          var trail = [];
+          for (var tk = 0; tk < 3; tk++) {
+            var tMat = new THREE.MeshBasicMaterial({ color: 0xbfe0ff, transparent: true, opacity: 0.42 - tk * 0.12, blending: THREE.AdditiveBlending, depthWrite: false });
+            var tMesh = new THREE.Mesh(pGeo, tMat);
+            world.add(tMesh);
+            disposables.push(tMat);
+            trail.push({ mesh: tMesh, lag: (tk + 1) * 0.018, sc: 0.62 - tk * 0.16 });
+          }
+          pulses.push({ curve: curve, mesh: pulse, speed: baseSpeed, offset: (Math.random() + pp * 0.5) % 1, trail: trail });
         }
 
         // mid-cable id label for orientation
@@ -1003,14 +1011,21 @@
           night.material.uniforms.uSunDir.value.copy(sunDir);
         }
 
-        // flowing cable pulses (brightest mid-span) — hidden during a build replay
+        // flowing cable pulses + comet wake (brightest mid-span) — hidden during a build replay
         for (var i = 0; i < pulses.length; i++) {
           var pu = pulses[i];
-          if (deploy.mode) { pu.mesh.visible = false; continue; }
-          pu.mesh.visible = true;
+          var vis = !deploy.mode;
+          pu.mesh.visible = vis;
+          if (pu.trail) for (var z = 0; z < pu.trail.length; z++) pu.trail[z].mesh.visible = vis;
+          if (!vis) continue;
           var u = (t * pu.speed + pu.offset) % 1;
           pu.curve.getPoint(u, pu.mesh.position);
           pu.mesh.scale.setScalar(0.7 + 0.5 * Math.sin(u * Math.PI));
+          if (pu.trail) for (var z2 = 0; z2 < pu.trail.length; z2++) {
+            var tu = (u - pu.trail[z2].lag + 1) % 1;
+            pu.curve.getPoint(tu, pu.trail[z2].mesh.position);
+            pu.trail[z2].mesh.scale.setScalar(pu.trail[z2].sc * (0.7 + 0.5 * Math.sin(tu * Math.PI)));
+          }
         }
         // expanding station pulse rings (offline stations stay dark during a build)
         for (var k = 0; k < rings.length; k++) {
