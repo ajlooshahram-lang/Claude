@@ -102,6 +102,7 @@
   var selectHandler = null; // fn(info) — called when a station/cable is picked
   var tourHandler = null;   // fn(active) — called when the auto-tour toggles
   var spinHandler = null;   // fn(spinning) — called when auto-rotation toggles
+  var deployHandler = null; // fn(state) — called as the A–Z build animation advances
 
   // Mid-point lat/lon of a cable (for camera framing of a whole segment).
   function cableMidLatLon(cab) {
@@ -428,7 +429,7 @@
         ring.lookAt(p.clone().multiplyScalar(2));   // orient normal radially outward
         world.add(ring);
         disposables.push(ringGeo, ringMat);
-        rings.push({ mesh: ring, mat: ringMat, offset: i / STATIONS.length });
+        rings.push({ mesh: ring, mat: ringMat, offset: i / STATIONS.length, id: st.id });
 
         var label = makeLabelSprite(st.name, { fontSize: 30, scale: 0.42, color: "#ffe9b0" });
         if (label) {
@@ -475,7 +476,10 @@
         world.add(halo);
         disposables.push(haloGeo, haloMat);
 
-        cableTubes.push({ id: cab.id, cable: cab, mat: tubeMat, haloMat: haloMat, baseHex: col });
+        cableTubes.push({ id: cab.id, cable: cab, mat: tubeMat, haloMat: haloMat, baseHex: col,
+          tubeGeo: tubeGeo, haloGeo: haloGeo, curve: curve, from: cab.from, to: cab.to, status: cab.status,
+          fullIndex: (tubeGeo.index ? tubeGeo.index.count : 0),
+          haloIndex: (haloGeo.index ? haloGeo.index.count : 0) });
 
         // flowing light pulse travelling along the cable
         var pGeo = new THREE.SphereGeometry(0.045, 14, 14);
@@ -494,6 +498,14 @@
           disposables.push(seg.material);
         }
       });
+
+      // ---- deployment "laying head": a bright marker at the cable-ship tip --
+      var headGeo = new THREE.SphereGeometry(0.06, 16, 16);
+      var headMat = new THREE.MeshBasicMaterial({ color: 0xfff4d0, transparent: true, opacity: 0.98, blending: THREE.AdditiveBlending, depthWrite: false });
+      var layHead = new THREE.Mesh(headGeo, headMat);
+      layHead.visible = false;
+      world.add(layHead);
+      disposables.push(headGeo, headMat);
 
       // initial orientation: tilt + spin so SE-Asia faces the camera
       world.rotation.x = 0.32;
@@ -652,6 +664,105 @@
         if (spinHandler) try { spinHandler(!!on); } catch (e) {}
       }
 
+      /* ------------------------------- A–Z deployment / build animation ----- */
+      // Plays the project from nothing to a fully-lit network: each cable is
+      // "laid" from its start station to its end (the tube grows along the
+      // route), stations light up as they come online, and a bright laying-head
+      // marks the cable-ship tip. Sequential build order = the CABLES order
+      // (trunk first, then branches). Scrubbable (setDeployment) or auto-played.
+      var deploy = { mode: false, active: false, g: 0, dur: 26, emitAcc: 0 };
+      var DEPLOY_N = cableTubes.length || 1;
+
+      // Local 0..1 progress of cable #i at global build progress g.
+      function cableLocal(i, g) {
+        var winStart = i / DEPLOY_N, winLen = 1 / DEPLOY_N;
+        return Math.max(0, Math.min(1, (g - winStart) / winLen));
+      }
+      function setDrawFrac(geo, full, frac) {
+        if (!geo || !geo.setDrawRange || !full) return;
+        if (frac >= 1) { geo.setDrawRange(0, Infinity); return; }
+        var c = Math.max(0, Math.floor((full * frac) / 3) * 3);
+        geo.setDrawRange(0, c);
+      }
+      function applyDeployment(g) {
+        var doneCol = STATUS_COLOR.commissioned.hex;     // green = laid & live
+        var layingCol = STATUS_COLOR["in-progress"].hex;  // blue  = being laid
+        var online = {};
+        var anyLaying = false;
+        for (var i = 0; i < cableTubes.length; i++) {
+          var t = cableTubes[i];
+          var local = cableLocal(i, g);
+          setDrawFrac(t.tubeGeo, t.fullIndex, local);
+          setDrawFrac(t.haloGeo, t.haloIndex, local);
+          var done = local >= 1, laying = local > 0 && local < 1;
+          var hex = done ? doneCol : layingCol;
+          if (t.mat) { try { t.mat.color.setHex(hex); } catch (e) {} t.mat.opacity = local > 0 ? 0.95 : 0.0; }
+          if (t.haloMat) { try { t.haloMat.color.setHex(hex); } catch (e) {} t.haloMat.opacity = local > 0 ? 0.24 : 0.0; }
+          if (local > 0 && t.from) online[t.from] = true;
+          if (done && t.to) online[t.to] = true;
+          if (laying) { try { t.curve.getPoint(local, layHead.position); } catch (e) {} anyLaying = true; }
+        }
+        layHead.visible = deploy.mode && anyLaying;
+        for (var k in stationMeshes) {
+          if (!Object.prototype.hasOwnProperty.call(stationMeshes, k)) continue;
+          stationMeshes[k].userData.deployOnline = !!online[k];
+        }
+      }
+      function deployState() {
+        var laid = 0, layingId = null, layingName = "", layingPct = 0, online = {};
+        for (var i = 0; i < cableTubes.length; i++) {
+          var local = cableLocal(i, deploy.g), t = cableTubes[i];
+          if (local >= 1) { laid++; if (t.from) online[t.from] = 1; if (t.to) online[t.to] = 1; }
+          else if (local > 0) { layingId = t.id; layingName = t.cable ? t.cable.name : t.id; layingPct = Math.round(local * 100); if (t.from) online[t.from] = 1; }
+        }
+        return {
+          mode: deploy.mode, active: deploy.active, g: deploy.g, pct: Math.round(deploy.g * 100),
+          laid: laid, total: cableTubes.length, online: Object.keys(online).length, stations: STATIONS.length,
+          layingId: layingId, layingName: layingName, layingPct: layingPct
+        };
+      }
+      function emitDeploy() { if (deployHandler) try { deployHandler(deployState()); } catch (e) {} }
+      function enterDeployMode() {
+        deploy.mode = true;
+        spinEnabled = false; focusAnim = null; stopTour();
+        if (controls) controls.autoRotate = false;
+        if (spinHandler) try { spinHandler(false); } catch (e) {}
+      }
+      function setDeployment(pct) {
+        enterDeployMode();
+        deploy.active = false;
+        deploy.g = Math.max(0, Math.min(1, (Number(pct) || 0) / 100));
+        applyDeployment(deploy.g);
+        emitDeploy();
+        return true;
+      }
+      function playDeployment() {
+        enterDeployMode();
+        if (deploy.g >= 1) deploy.g = 0;
+        deploy.active = true;
+        applyDeployment(deploy.g);
+        emitDeploy();
+        return true;
+      }
+      function pauseDeployment() { deploy.active = false; emitDeploy(); return true; }
+      function exitDeployment() {
+        deploy.active = false; deploy.mode = false;
+        layHead.visible = false;
+        for (var i = 0; i < cableTubes.length; i++) {
+          var t = cableTubes[i];
+          if (t.tubeGeo && t.tubeGeo.setDrawRange) t.tubeGeo.setDrawRange(0, Infinity);
+          if (t.haloGeo && t.haloGeo.setDrawRange) t.haloGeo.setDrawRange(0, Infinity);
+          if (t.mat) { try { t.mat.color.setHex(t.baseHex); } catch (e) {} t.mat.opacity = 0.92; }
+          if (t.haloMat) { try { t.haloMat.color.setHex(t.baseHex); } catch (e) {} t.haloMat.opacity = 0.16; }
+        }
+        for (var k in stationMeshes) {
+          if (Object.prototype.hasOwnProperty.call(stationMeshes, k)) stationMeshes[k].userData.deployOnline = false;
+        }
+        try { setProgress(); } catch (e) {}   // re-apply any saved route-progress colours
+        emitDeploy();
+        return true;
+      }
+
       // ---- pointer picking (tap to select, hover for cursor + beacon pop) --
       var raycaster = new THREE.Raycaster();
       var pointer = new THREE.Vector2();
@@ -780,11 +891,21 @@
           world.rotation.y += 0.0016;     // gentle auto-rotation in fallback
         }
 
+        // A–Z deployment build animation drives the scene when active
+        if (deploy.active) {
+          deploy.g += dt / deploy.dur;
+          if (deploy.g >= 1) { deploy.g = 1; deploy.active = false; }
+          applyDeployment(deploy.g);
+          deploy.emitAcc += dt;
+          if (deploy.emitAcc >= 0.08 || !deploy.active) { deploy.emitAcc = 0; emitDeploy(); }
+        }
+
         // hover / selection beacon scaling (smoothed)
         for (var sKey in stationMeshes) {
           if (!Object.prototype.hasOwnProperty.call(stationMeshes, sKey)) continue;
           var bm = stationMeshes[sKey];
           var target = bm.userData.baseScale || 1;
+          if (deploy.mode) target = bm.userData.deployOnline ? 1.5 : 0.3;
           if (bm.userData.hover) target = Math.max(target, 1.6);
           if (sKey === selectedId) target += 0.25 * (0.5 + 0.5 * Math.sin(t * 3.0)); // gentle selected pulse
           var cur = bm.scale.x + (target - bm.scale.x) * Math.min(1, dt * 10);
@@ -801,16 +922,22 @@
           night.material.uniforms.uSunDir.value.copy(sunDir);
         }
 
-        // flowing cable pulses (brightest mid-span)
+        // flowing cable pulses (brightest mid-span) — hidden during a build replay
         for (var i = 0; i < pulses.length; i++) {
           var pu = pulses[i];
+          if (deploy.mode) { pu.mesh.visible = false; continue; }
+          pu.mesh.visible = true;
           var u = (t * pu.speed + pu.offset) % 1;
           pu.curve.getPoint(u, pu.mesh.position);
           pu.mesh.scale.setScalar(0.7 + 0.5 * Math.sin(u * Math.PI));
         }
-        // expanding station pulse rings
+        // expanding station pulse rings (offline stations stay dark during a build)
         for (var k = 0; k < rings.length; k++) {
           var rg = rings[k];
+          if (deploy.mode) {
+            var sm = stationMeshes[rg.id];
+            if (!sm || !sm.userData.deployOnline) { rg.mat.opacity = 0; continue; }
+          }
           var rp = (t * 0.5 + rg.offset) % 1;
           var sc = 1 + rp * 2.6;
           rg.mesh.scale.set(sc, sc, sc);
@@ -837,7 +964,14 @@
           isTouring: function () { return !!tourState.active; },
           setSpin: setSpin,
           isSpinning: function () { return !!spinEnabled; },
-          selectedId: function () { return selectedId; }
+          selectedId: function () { return selectedId; },
+          setDeployment: setDeployment,
+          playDeployment: playDeployment,
+          pauseDeployment: pauseDeployment,
+          exitDeployment: exitDeployment,
+          isDeploying: function () { return !!deploy.active; },
+          inDeployMode: function () { return !!deploy.mode; },
+          deployState: deployState
         },
         stop: function () { alive = false; stopTour(); if (raf) window.cancelAnimationFrame(raf); }
       };
@@ -977,10 +1111,20 @@
     toggleSpin: function () { return apiCall("setSpin", !apiCall("isSpinning")); },
     isSpinning: function () { return apiCall("isSpinning"); },
     selectedId: function () { return apiCall("selectedId"); },
+    // A–Z deployment / build animation
+    setDeployment: function (pct) { return apiCall("setDeployment", pct); },
+    playDeployment: function () { return apiCall("playDeployment"); },
+    pauseDeployment: function () { return apiCall("pauseDeployment"); },
+    toggleDeployment: function () { return apiCall(apiCall("isDeploying") ? "pauseDeployment" : "playDeployment"); },
+    exitDeployment: function () { return apiCall("exitDeployment"); },
+    isDeploying: function () { return apiCall("isDeploying"); },
+    inDeployMode: function () { return apiCall("inDeployMode"); },
+    deployState: function () { return apiCall("deployState"); },
     // subscriptions (persist across mount/unmount)
     onSelect: function (cb) { selectHandler = (typeof cb === "function") ? cb : null; },
     onTour: function (cb) { tourHandler = (typeof cb === "function") ? cb : null; },
     onSpin: function (cb) { spinHandler = (typeof cb === "function") ? cb : null; },
+    onDeployment: function (cb) { deployHandler = (typeof cb === "function") ? cb : null; },
     // static datasets
     STATIONS: STATIONS,
     CABLES: CABLES,

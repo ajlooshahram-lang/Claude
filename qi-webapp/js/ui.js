@@ -195,6 +195,12 @@
             <button class="globe-btn" id="globeTour" type="button">▶ Cinematic tour</button>
             <button class="globe-btn is-on" id="globeSpin" type="button" aria-pressed="true">⏸ Rotation</button>
           </div>
+          <div class="globe-deploy" id="globeDeploy" hidden>
+            <button class="globe-btn globe-deploy-play" id="globeDeployPlay" type="button">▶ Play build A–Z</button>
+            <input class="globe-deploy-range" id="globeDeployRange" type="range" min="0" max="100" step="1" value="0" aria-label="Build progress" />
+            <span class="globe-deploy-phase" id="globeDeployPhase">Ready to build — press play to watch the network go live</span>
+            <button class="globe-btn globe-deploy-exit" id="globeDeployExit" type="button" hidden>Back to live view</button>
+          </div>
           <div class="globe-detail" id="globeDetail" hidden></div>
           <div class="globe-hint" id="globeHint">Drag to rotate · scroll to zoom · click a station or cable</div>
         </div>
@@ -238,6 +244,29 @@
     if (fb) fb.style.display = "none";
     if (hint) hint.style.display = "";
     if (controls) controls.hidden = false;
+
+    // A–Z deployment / build-sequence controls
+    const deployBar = $("#globeDeploy"), deployPlay = $("#globeDeployPlay");
+    const deployRange = $("#globeDeployRange"), deployPhase = $("#globeDeployPhase"), deployExit = $("#globeDeployExit");
+    if (deployBar) deployBar.hidden = false;
+    if (deployPlay) deployPlay.addEventListener("click", () => G.toggleDeployment());
+    if (deployRange) deployRange.addEventListener("input", () => G.setDeployment(Number(deployRange.value) || 0));
+    if (deployExit) deployExit.addEventListener("click", () => G.exitDeployment());
+    G.onDeployment(st => {
+      if (!st) return;
+      if (deployRange) deployRange.value = String(st.pct);
+      if (deployPlay) deployPlay.textContent = st.active ? "⏸ Pause" : (st.pct >= 100 ? "↻ Replay A–Z" : "▶ Play build A–Z");
+      if (deployPlay) deployPlay.classList.toggle("is-on", !!st.active);
+      if (deployExit) deployExit.hidden = !st.mode;
+      if (deployPhase) {
+        let msg;
+        if (!st.mode) msg = "Ready to build — press play to watch the network go live";
+        else if (st.pct >= 100 || st.laid >= st.total) msg = `Network complete — all ${st.online}/${st.stations} countries online, ${st.total} cable segments laid`;
+        else if (st.layingName) msg = `Laying ${st.layingName} — ${st.layingPct}% · ${st.online}/${st.stations} countries online`;
+        else msg = "Starting build…";
+        deployPhase.textContent = msg;
+      }
+    });
 
     const SC = G.STATUS_COLOR || {};
     const statusLabel = { "commissioned": "Commissioned", "in-progress": "In progress", "planned": "Planned" };

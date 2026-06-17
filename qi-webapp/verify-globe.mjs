@@ -296,6 +296,63 @@ async function main() {
   ok(pixelStats.nonBlackFrac >= 0.15,
     "canvas is not mostly black — " + Math.round(pixelStats.nonBlackFrac * 100) + "% lit pixels (the Earth is visible)");
 
+  // ---- A–Z deployment / build-sequence animation -------------------------
+  const deployBarVisible = await page.evaluate(() => {
+    const b = document.getElementById("globeDeploy");
+    return !!b && b.hidden === false;
+  });
+  ok(deployBarVisible, "build-sequence controls (play + scrubber) are visible on the 3D map");
+
+  // Scrub the build to 0 / 50 / 100% and read the engine's reported state.
+  const dz = await page.evaluate(() => {
+    const out = {};
+    window.QIGlobe.setDeployment(0);   out.zero = window.QIGlobe.deployState();
+    window.QIGlobe.setDeployment(50);  out.half = window.QIGlobe.deployState();
+    window.QIGlobe.setDeployment(100); out.full = window.QIGlobe.deployState();
+    return out;
+  });
+  ok(dz.zero && dz.zero.mode === true && dz.zero.pct === 0 && dz.zero.laid === 0,
+    "build at 0% — nothing laid yet, build mode engaged");
+  ok(dz.half && dz.half.laid > 0 && dz.half.laid < dz.half.total && dz.half.online > 0,
+    "build at 50% — some cables laid, some countries online (" + (dz.half ? dz.half.laid + "/" + dz.half.total + " cables" : "") + ")");
+  ok(dz.full && dz.full.laid === dz.full.total && dz.full.online === dz.full.stations,
+    "build at 100% — all cables laid & all " + (dz.full ? dz.full.stations : "?") + " countries online");
+
+  // The plain-language UI must reflect the build state (label + scrubber).
+  const ui100 = await page.evaluate(() => ({
+    phase: document.getElementById("globeDeployPhase").textContent,
+    range: document.getElementById("globeDeployRange").value,
+  }));
+  ok(/complete/i.test(ui100.phase) && ui100.range === "100",
+    "build UI shows completion + scrubber pinned to 100% (phase: " + JSON.stringify(ui100.phase) + ")");
+
+  // Dragging the scrubber drives the build (no typing — slider only).
+  const ui30 = await page.evaluate(() => {
+    const r = document.getElementById("globeDeployRange");
+    r.value = "30";
+    r.dispatchEvent(new Event("input", { bubbles: true }));
+    return { phase: document.getElementById("globeDeployPhase").textContent, st: window.QIGlobe.deployState() };
+  });
+  ok(ui30.st.pct === 30 && /laying|online|complete|building/i.test(ui30.phase),
+    "scrubbing to 30% updates the build state + phase label (" + JSON.stringify(ui30.phase) + ")");
+
+  // Auto-play must advance the build over time, then pause cleanly.
+  await page.evaluate(() => { window.QIGlobe.setDeployment(0); window.QIGlobe.playDeployment(); });
+  const playing = await page.evaluate(() => window.QIGlobe.isDeploying());
+  await page.waitForTimeout(1600);
+  const advanced = await page.evaluate(() => { const p = window.QIGlobe.deployState().pct; window.QIGlobe.pauseDeployment(); return p; });
+  ok(playing === true, "play starts the automatic A–Z build");
+  ok(advanced > 0, "the automatic build advances over time (reached " + advanced + "%)");
+
+  // Exiting returns to the normal live network view.
+  const exited = await page.evaluate(() => { window.QIGlobe.exitDeployment(); return window.QIGlobe.inDeployMode(); });
+  ok(exited === false, "exit returns to the live network view");
+
+  // The build animation must not have introduced any errors/CSP violations.
+  const cspAfter = await page.evaluate(() => (window.__csp || []).length);
+  ok(pageErrors.length === 0 && cspAfter === 0 && consoleCSP.length === 0,
+    "no page errors / CSP violations during the build animation");
+
   await browser.close();
   server.close();
 

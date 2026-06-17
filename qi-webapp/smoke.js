@@ -53,11 +53,21 @@ doc.querySelector('.nav-item[data-view="globe3d"]').dispatchEvent(new window.Eve
 ok(doc.querySelector(".globe-stage") != null, "3D Network Map renders the globe stage container");
 ok(doc.querySelectorAll(".globe-item").length >= 6, "3D Network Map legend lists cable segments");
 ok(doc.querySelectorAll(".globe-station").length === 8, "3D Network Map legend lists 8 landing stations");
+ok(doc.getElementById("globeDeploy") != null && doc.getElementById("globeDeployRange") != null && doc.getElementById("globeDeployPlay") != null,
+   "3D Network Map renders the A–Z build-sequence controls (play + scrubber)");
 ok(window.QIGlobe.init(doc.getElementById("globeStage")) === false, "QIGlobe.init no-throws and returns false without WebGL");
 // 2b-i) interactive API surface exists and is a safe no-op while unmounted (jsdom/no WebGL)
 ["focusStation","focusCable","clearSelection","startTour","stopTour","toggleTour","isTouring",
- "setSpin","toggleSpin","isSpinning","selectedId","onSelect","onTour","onSpin"].forEach(fn =>
+ "setSpin","toggleSpin","isSpinning","selectedId","onSelect","onTour","onSpin",
+ "setDeployment","playDeployment","pauseDeployment","toggleDeployment","exitDeployment",
+ "isDeploying","inDeployMode","deployState","onDeployment"].forEach(fn =>
   ok(typeof window.QIGlobe[fn] === "function", "QIGlobe exposes " + fn + "()"));
+// deployment delegators must be safe no-ops while unmounted (jsdom / no WebGL)
+ok(window.QIGlobe.setDeployment(50) === false && window.QIGlobe.playDeployment() === false &&
+   window.QIGlobe.exitDeployment() === false && window.QIGlobe.isDeploying() === false,
+   "deployment API is a guarded no-op when the globe is not mounted");
+ok((function () { try { window.QIGlobe.onDeployment(function () {}); window.QIGlobe.onDeployment(null); return true; } catch (e) { return false; } })(),
+   "onDeployment subscribe/unsubscribe never throws");
 let apiThrew = false;
 try {
   window.QIGlobe.onSelect(() => {});
