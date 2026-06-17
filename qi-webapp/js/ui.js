@@ -196,11 +196,12 @@
   }
 
   // ---- Static network-map thumbnail (pure inline SVG, CSP-safe, prints) ----
-  // Plots the landing stations by real lat/long with the cable links coloured
-  // by status, so the printed/downloaded brief shows the network's shape.
+  // Plots the landing stations by real lat/long with the cable links drawn as
+  // glowing curved submarine-style arcs, coloured by status, so the
+  // printed/downloaded brief shows the network's shape with real polish.
   function networkMapSVG(stations, cables) {
     if (!Array.isArray(stations) || stations.length < 2) return "";
-    const W = 360, H = 210, padX = 30, padY = 22;
+    const W = 380, H = 224, padX = 34, padY = 26;
     const lats = stations.map(s => s.lat), lons = stations.map(s => s.lon);
     let minLa = Math.min.apply(null, lats), maxLa = Math.max.apply(null, lats);
     let minLo = Math.min.apply(null, lons), maxLo = Math.max.apply(null, lons);
@@ -211,20 +212,47 @@
     const Y = lat => padY + ((maxLa - lat) / (maxLa - minLa)) * plotH;
     const pos = {};
     stations.forEach(s => { pos[s.id] = { x: X(s.lon), y: Y(s.lat), s: s }; });
-    const lines = (cables || []).map(c => {
+    // curved great-circle-style arc between two stations (bowed perpendicular)
+    const arc = (a, b) => {
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const bow = Math.min(26, len * 0.16);
+      const cx = mx + (-dy / len) * bow, cy = my + (dx / len) * bow;
+      return `M${a.x.toFixed(1)},${a.y.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}`;
+    };
+    // faint lat/long grid for a real "map" feel
+    let grid = "";
+    for (let i = 1; i < 5; i++) {
+      const gx = padX + (plotW * i) / 5, gy = padY + (plotH * i) / 4;
+      grid += `<line class="netmap-grid" x1="${gx.toFixed(1)}" y1="${padY}" x2="${gx.toFixed(1)}" y2="${(padY + plotH).toFixed(1)}"></line>`;
+      grid += `<line class="netmap-grid" x1="${padX}" y1="${gy.toFixed(1)}" x2="${(padX + plotW).toFixed(1)}" y2="${gy.toFixed(1)}"></line>`;
+    }
+    const paths = (cables || []).map(c => {
       const a = pos[c.from], b = pos[c.to];
-      if (!a || !b) return "";
-      return `<line class="netmap-line netmap-line--${esc(c.status)}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}"></line>`;
-    }).join("");
+      if (!a || !b) return { glow: "", line: "" };
+      const d = arc(a, b);
+      return {
+        glow: `<path class="netmap-glow netmap-stroke--${esc(c.status)}" d="${d}"></path>`,
+        line: `<path class="netmap-line netmap-stroke--${esc(c.status)}" d="${d}"></path>`
+      };
+    });
+    const glowLayer = paths.map(p => p.glow).join("");
+    const lineLayer = paths.map(p => p.line).join("");
     const nodes = stations.map(s => {
       const p = pos[s.id];
-      const anchor = p.x > W * 0.62 ? "end" : (p.x < W * 0.38 ? "start" : "middle");
-      const dx = anchor === "end" ? -5 : (anchor === "start" ? 5 : 0);
-      return `<circle class="netmap-dot" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.4"></circle>
-        <text class="netmap-lbl" x="${(p.x + dx).toFixed(1)}" y="${(p.y - 6).toFixed(1)}" text-anchor="${anchor}">${esc(s.country)}</text>`;
+      const anchor = p.x > W * 0.66 ? "end" : (p.x < W * 0.34 ? "start" : "middle");
+      const dx = anchor === "end" ? -7 : (anchor === "start" ? 7 : 0);
+      return `<circle class="netmap-halo" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="7"></circle>
+        <circle class="netmap-dot" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.6"></circle>
+        <text class="netmap-lbl" x="${(p.x + dx).toFixed(1)}" y="${(p.y - 8).toFixed(1)}" text-anchor="${anchor}">${esc(s.country)}</text>`;
     }).join("");
     return `<svg class="netmap-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Map of the submarine cable network and its landing stations">
-      ${lines}${nodes}
+      <defs><filter id="netGlow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.4"></feGaussianBlur></filter></defs>
+      <g>${grid}</g>
+      <g filter="url(#netGlow)">${glowLayer}</g>
+      <g>${lineLayer}</g>
+      <g>${nodes}</g>
     </svg>`;
   }
 
@@ -343,6 +371,7 @@
     const deployRange = $("#globeDeployRange"), deployPhase = $("#globeDeployPhase"), deployExit = $("#globeDeployExit");
     const deployMeta = $("#globeDeployMeta");
     if (deployBar) deployBar.hidden = false;
+    let deployDone = false;  // one-shot guard for the 'build complete' toast
     if (deployPlay) deployPlay.addEventListener("click", () => G.toggleDeployment());
     if (deployRange) deployRange.addEventListener("input", () => G.setDeployment(Number(deployRange.value) || 0));
     if (deployExit) deployExit.addEventListener("click", () => G.exitDeployment());
@@ -414,6 +443,10 @@
       }
       if (spendBox) spendBox.hidden = !st.mode;
       updateSpend(st);
+      // Notify once when the A–Z build finishes.
+      if (st.mode && (st.pct >= 100 || st.laid >= st.total)) {
+        if (!deployDone) { deployDone = true; toast(`Network build complete — all ${st.stations} countries online.`); }
+      } else { deployDone = false; }
     });
 
     const SC = G.STATUS_COLOR || {};
@@ -851,6 +884,11 @@
         <section class="brief-section">
           <h3>The network at a glance</h3>
           <div class="brief-map">${networkMapSVG(stations, cables)}</div>
+          <div class="brief-map-legend">
+            <span><i class="lg-comm"></i> Commissioned</span>
+            <span><i class="lg-prog"></i> In progress</span>
+            <span><i class="lg-plan"></i> Planned</span>
+          </div>
           <table class="brief-table">
             <thead><tr><th>Cable segment</th><th>Route</th><th class="brief-num">Length</th><th class="brief-num">Capacity</th><th>Status</th></tr></thead>
             <tbody>${cableRows || '<tr><td colspan="5" class="muted">No cable data</td></tr>'}</tbody>
@@ -887,9 +925,9 @@
   };
   AFTER.investorbrief = function () {
     const btn = $("#briefPrint");
-    if (btn) btn.addEventListener("click", () => { try { window.print(); } catch (e) {} });
+    if (btn) btn.addEventListener("click", () => { toast("Opening the print dialog — choose 'Save as PDF' to keep a copy."); try { window.print(); } catch (e) {} });
     const dl = $("#briefDownload");
-    if (dl) dl.addEventListener("click", () => downloadBrief());
+    if (dl) dl.addEventListener("click", () => { if (downloadBrief()) toast("Downloaded: STP-Investor-Brief.html — a self-contained one-pager you can email."); });
   };
 
   // Route Progress — submarine-cable construction tracking (GIS delivery view).
@@ -1743,7 +1781,7 @@
     if (clearBtn) clearBtn.addEventListener("click", () => { ta.value = ""; nameEl.textContent = ""; if (fileInput) fileInput.value = ""; uiState.brainPlan = null; $("#brainOut").innerHTML = ""; });
 
     const analyzeBtn = $("#brainAnalyze");
-    if (analyzeBtn) analyzeBtn.addEventListener("click", () => runAnalyze());
+    if (analyzeBtn) analyzeBtn.addEventListener("click", () => { if (runAnalyze({ scroll: true })) toast("Analysis complete — your plan & country frameworks are below."); });
   };
   function renderBrainPreview(plan) {
     const kpi = (cls, l, v) => `<div class="kpi ${cls}"><div class="label">${l}</div><div class="value">${v}</div></div>`;
@@ -3715,6 +3753,21 @@
   $("#btnPrint").addEventListener("click", () => window.print());
   $("#btnTheme").addEventListener("click", toggleTheme);
   $("#btnChecks").addEventListener("click", runChecks);
+  // Logout button was unwired (a dead button). Wire it: real sign-out when a
+  // backend session exists, otherwise a clear message in the offline demo.
+  (function () {
+    const lo = $("#btnLogout");
+    if (!lo) return;
+    lo.addEventListener("click", () => {
+      const hasSession = !!(window.QIAuth && window.QIAuth.currentUser && typeof QIAuth.logout === "function");
+      if (hasSession) {
+        toast("Signing out…");
+        try { const r = QIAuth.logout(); if (r && typeof r.then === "function") r.catch(() => {}); } catch (e) {}
+      } else {
+        toast("You're in the offline demo — there's no account to sign out of. Your data stays on this device.");
+      }
+    });
+  })();
   $("#btnHelp").addEventListener("click", showShortcuts);
   $("#fileImport").addEventListener("change", e => { if (e.target.files[0]) handleImport(e.target.files[0]); e.target.value = ""; });
   $("#hamburger").addEventListener("click", () => $("#sidebar").classList.toggle("open"));

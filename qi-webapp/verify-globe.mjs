@@ -327,6 +327,17 @@ async function main() {
   ok(dz.full.costUsd === dz.full.budgetUsd && dz.full.costPct === 100 && dz.full.month === 60,
     "cost/schedule at 100% — full programme committed (USD " + (dz.full ? dz.full.costUsd : "?") + ") at month 60");
 
+  // A notification must pop when the A–Z build finishes.
+  const buildToast = await page.evaluate(() => {
+    const t = document.getElementById("toast");
+    if (t) t.hidden = true;
+    window.QIGlobe.setDeployment(0);
+    window.QIGlobe.setDeployment(100);
+    return t ? { hidden: t.hidden, text: t.textContent || "" } : null;
+  });
+  ok(buildToast && buildToast.hidden === false && /complete/i.test(buildToast.text),
+    "a notification pops when the A–Z build finishes (" + (buildToast ? JSON.stringify(buildToast.text) : "none") + ")");
+
   // The plain-language UI must reflect the build state (label + scrubber).
   const ui100 = await page.evaluate(() => ({
     phase: document.getElementById("globeDeployPhase").textContent,
@@ -485,6 +496,8 @@ async function main() {
       risks: el.querySelectorAll(".brief-risks li").length,
       spendSvg: !!el.querySelector(".brief-spend svg.spend-svg path.spend-line"),
       mapDots: el.querySelectorAll(".brief-map .netmap-dot").length,
+      mapGlow: el.querySelectorAll(".brief-map .netmap-glow").length,
+      mapLegend: !!el.querySelector(".brief-map-legend"),
       summaryParas: el.querySelectorAll(".brief-summary p").length,
       goLiveRows: el.querySelectorAll(".brief-online-row").length,
       todoItems: el.querySelectorAll(".brief-todo-item").length,
@@ -499,6 +512,7 @@ async function main() {
   ok(invBrief && invBrief.cableRows >= 8 && invBrief.risks > 0, "Investor Brief lists every cable segment + the biggest things to watch");
   ok(invBrief && invBrief.spendSvg, "Investor Brief renders the spending-over-time S-curve (inline SVG, prints cleanly)");
   ok(invBrief && invBrief.mapDots === 8, "Investor Brief renders a static network-map thumbnail with all 8 stations");
+  ok(invBrief && invBrief.mapGlow === 8 && invBrief.mapLegend, "network map uses glowing curved arcs + a status legend (polished route painting)");
   ok(invBrief && invBrief.summaryParas >= 3 && /connects 8 countries/.test(invBrief.text),
     "Investor Brief opens with an auto-written 'In a nutshell' summary (" + (invBrief ? invBrief.summaryParas : 0) + " sentences)");
   ok(invBrief && invBrief.goLiveRows === 8 && /When each country goes live/.test(invBrief.text),

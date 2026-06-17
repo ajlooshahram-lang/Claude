@@ -715,6 +715,13 @@ doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event
 doc.getElementById("heroGlobe").dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(window.location.hash === "#globe3d", "'Watch it build in 3D' button navigates to the 3D map");
 doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+// 38a-ii) the Logout button used to be a dead button — now it gives feedback
+const logoutBtn = doc.getElementById("btnLogout");
+ok(logoutBtn != null, "Logout button exists in the topbar");
+const toastEl0 = doc.getElementById("toast"); if (toastEl0) toastEl0.hidden = true;
+logoutBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("toast") && doc.getElementById("toast").hidden === false && /demo|sign out|signing/i.test(doc.getElementById("toast").textContent),
+   "clicking Logout now gives feedback (no longer a dead button)");
 const brainCasesBefore = S.validCases().length;
 const brainMsBefore = S.regRows("milestones").length;
 const brainProcBefore = S.regRows("procurement").length;
@@ -775,6 +782,8 @@ ok(doc.querySelectorAll(".brief-table tbody tr").length === window.QIGlobe.CABLE
 ok(doc.querySelector(".brief-map svg.netmap-svg") != null, "Investor Brief renders a static network-map thumbnail (inline SVG)");
 ok(doc.querySelectorAll(".brief-map .netmap-dot").length === window.QIGlobe.STATIONS.length, "network map plots all 8 landing stations");
 ok(doc.querySelectorAll(".brief-map .netmap-line").length === window.QIGlobe.CABLES.length, "network map draws every cable link");
+ok(doc.querySelectorAll(".brief-map .netmap-glow").length === window.QIGlobe.CABLES.length, "network map renders a glow arc under every link (polished route painting)");
+ok(doc.querySelector(".brief-map-legend") != null, "network map has a plain-language status legend");
 ok(/USD\s*1\.3B/.test(briefOut) && /60 months/.test(briefOut), "Investor Brief shows the headline budget (USD 1.3B) and build time (60 months)");
 ok(doc.querySelectorAll(".brief-verdict").length === 8, "Investor Brief shows a market-entry verdict for each country");
 ok(doc.querySelectorAll(".brief-takeaway").length === 8, "Investor Brief gives a 'what this means for you' line for each country");

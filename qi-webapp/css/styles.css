@@ -726,14 +726,25 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .brief-table th,.brief-table td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line,#e3e8f0);vertical-align:top}
 .brief-table th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted,#6b7892)}
 .brief-num{text-align:right;white-space:nowrap}
-.brief-map{max-width:380px;margin:2px 0 12px}
-.netmap-svg{width:100%;height:auto;display:block;background:rgba(46,84,150,.04);border:1px solid var(--line,#e3e8f0);border-radius:8px}
-.netmap-line{stroke-width:1.6;fill:none;opacity:.85}
-.netmap-line--commissioned{stroke:#1d8e6a}
-.netmap-line--in-progress{stroke:#2a6ec2}
-.netmap-line--planned{stroke:#9a7414;stroke-dasharray:4 3}
-.netmap-dot{fill:#2e5496;stroke:#fff;stroke-width:1.2}
-.netmap-lbl{fill:#33405c;font-size:8px;font-family:'Segoe UI',Arial,sans-serif}
+.brief-map{max-width:400px;margin:2px 0 12px}
+.netmap-svg{width:100%;height:auto;display:block;background:linear-gradient(180deg,rgba(46,84,150,.06),rgba(46,84,150,.02));
+  border:1px solid var(--line,#e3e8f0);border-radius:10px}
+.netmap-grid{stroke:rgba(46,84,150,.10);stroke-width:1}
+.netmap-glow{fill:none;stroke-width:3.8;opacity:.45;stroke-linecap:round}
+.netmap-line{fill:none;stroke-width:1.9;opacity:.98;stroke-linecap:round}
+.netmap-stroke--commissioned{stroke:#1d8e6a}
+.netmap-stroke--in-progress{stroke:#2a6ec2}
+.netmap-stroke--planned{stroke:#9a7414}
+.netmap-line.netmap-stroke--planned{stroke-dasharray:5 4}
+.netmap-halo{fill:rgba(46,84,150,.16)}
+.netmap-dot{fill:#2e5496;stroke:#fff;stroke-width:1.4}
+.netmap-lbl{fill:#33405c;font-size:8.5px;font-weight:600;font-family:'Segoe UI',Arial,sans-serif}
+.brief-map-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:7px;font-size:11.5px;color:var(--muted,#6b7892)}
+.brief-map-legend span{display:inline-flex;align-items:center;gap:6px}
+.brief-map-legend i{width:16px;height:0;border-top-width:3px;border-top-style:solid;border-radius:2px;display:inline-block}
+.brief-map-legend .lg-comm{border-top-color:#1d8e6a}
+.brief-map-legend .lg-prog{border-top-color:#2a6ec2}
+.brief-map-legend .lg-plan{border-top-color:#9a7414;border-top-style:dashed}
 .brief-status{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
 .brief-status--commissioned{background:rgba(66,214,164,.16);color:#1d8e6a;border:1px solid rgba(66,214,164,.4)}
 .brief-status--in-progress{background:rgba(78,161,255,.16);color:#2a6ec2;border:1px solid rgba(78,161,255,.4)}
