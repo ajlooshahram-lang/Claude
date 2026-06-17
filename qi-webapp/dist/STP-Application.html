@@ -810,6 +810,38 @@ tr:hover td{background:rgba(58,160,255,.08)}
 /* keep the dark-mode toggle from fighting the neon skin (neon is already dark) */
 [data-theme="dark"]{--bg:#070b16;--card:rgba(16,26,52,.82);--line:rgba(122,162,255,.18);--ink:#eaf1ff;--muted:#93a6cc}
 
+
+
+/* --- NEON login gate (first screen the 11 project owners see) --- */
+.auth-gate{background:
+  radial-gradient(40% 50% at 18% 16%,rgba(34,225,230,.22),transparent 70%),
+  radial-gradient(45% 55% at 84% 86%,rgba(255,63,164,.20),transparent 70%),
+  radial-gradient(60% 60% at 50% 50%,rgba(155,107,255,.14),transparent 75%),
+  linear-gradient(135deg,#05070f 0%,#070d1c 45%,#0a1230 100%)}
+.auth-gate::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(122,162,255,.06) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(122,162,255,.06) 1px,transparent 1px);
+  background-size:46px 46px;
+  -webkit-mask-image:radial-gradient(circle at 50% 42%,#000 50%,transparent 100%);
+          mask-image:radial-gradient(circle at 50% 42%,#000 50%,transparent 100%)}
+.auth-card{background:rgba(13,21,40,.72);border:1px solid rgba(34,225,230,.22);
+  box-shadow:0 0 0 1px rgba(34,225,230,.10),0 18px 60px rgba(0,0,0,.6),0 0 40px rgba(34,225,230,.10);
+  position:relative;z-index:1}
+.auth-brand-mark{background:linear-gradient(135deg,var(--neon-cyan),var(--neon-purple));color:#04101f;
+  box-shadow:0 0 18px rgba(34,225,230,.55),0 0 36px rgba(155,107,255,.3)}
+.auth-brand h1{background:linear-gradient(90deg,var(--neon-cyan),var(--neon-blue));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.auth-subtitle{color:var(--neon-cyan);opacity:.85}
+.auth-field input{background:rgba(14,25,48,.7);border:1px solid var(--line);color:#eaf1ff}
+.auth-field input:focus{border-color:var(--neon-cyan);box-shadow:0 0 0 3px rgba(34,225,230,.18),var(--glow-cyan)}
+.auth-switch a{color:var(--neon-cyan)}
+[data-theme="dark"] .auth-gate{background:
+  radial-gradient(40% 50% at 18% 16%,rgba(34,225,230,.22),transparent 70%),
+  radial-gradient(45% 55% at 84% 86%,rgba(255,63,164,.20),transparent 70%),
+  radial-gradient(60% 60% at 50% 50%,rgba(155,107,255,.14),transparent 75%),
+  linear-gradient(135deg,#05070f 0%,#070d1c 45%,#0a1230 100%)}
+[data-theme="dark"] .auth-card{background:rgba(13,21,40,.72);border-color:rgba(34,225,230,.22)}
+
 </style>
 <script>
 window.__SKIP_AUTH = true;            /* standalone demo: no server-backed login */
