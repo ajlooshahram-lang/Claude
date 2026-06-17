@@ -1009,25 +1009,34 @@
   };
   AFTER.brain = function () {
     const fileInput = $("#brainFile"), nameEl = $("#brainFileName"), ta = $("#brainText");
+    // Single shared analysis path so the Analyze button and an upload behave identically.
+    const runAnalyze = (opts) => {
+      const text = (ta.value || "").trim();
+      if (!text) { toast("Paste or upload a project description first."); return false; }
+      if (!window.QIBrain) { toast("Brain engine not loaded."); return false; }
+      const plan = QIBrain.analyzeProject(text, { profile: $("#brainProfile").value || undefined });
+      uiState.brainPlan = plan;
+      renderBrainPreview(plan);
+      if (opts && opts.scroll) { const out = $("#brainOut"); if (out && out.scrollIntoView) out.scrollIntoView({ behavior: "smooth", block: "start" }); }
+      return true;
+    };
     if (fileInput) fileInput.addEventListener("change", () => {
       const f = fileInput.files && fileInput.files[0]; if (!f) return;
       nameEl.textContent = f.name;
       const reader = new FileReader();
-      reader.onload = () => { ta.value = String(reader.result || ""); };
+      reader.onload = () => {
+        ta.value = String(reader.result || "");
+        // Upload alone is enough — the app does the rest automatically.
+        if (runAnalyze({ scroll: true })) toast(`Analysed "${f.name}" — your plan & country frameworks are below.`);
+      };
+      reader.onerror = () => toast("Could not read that file. Try a plain .txt or .md file.");
       reader.readAsText(f);
     });
     const clearBtn = $("#brainClear");
-    if (clearBtn) clearBtn.addEventListener("click", () => { ta.value = ""; nameEl.textContent = ""; uiState.brainPlan = null; $("#brainOut").innerHTML = ""; });
+    if (clearBtn) clearBtn.addEventListener("click", () => { ta.value = ""; nameEl.textContent = ""; if (fileInput) fileInput.value = ""; uiState.brainPlan = null; $("#brainOut").innerHTML = ""; });
 
     const analyzeBtn = $("#brainAnalyze");
-    if (analyzeBtn) analyzeBtn.addEventListener("click", () => {
-      const text = (ta.value || "").trim();
-      if (!text) { toast("Paste or upload a project description first."); return; }
-      if (!window.QIBrain) { toast("Brain engine not loaded."); return; }
-      const plan = QIBrain.analyzeProject(text, { profile: $("#brainProfile").value || undefined });
-      uiState.brainPlan = plan;
-      renderBrainPreview(plan);
-    });
+    if (analyzeBtn) analyzeBtn.addEventListener("click", () => runAnalyze());
   };
   function renderBrainPreview(plan) {
     const kpi = (cls, l, v) => `<div class="kpi ${cls}"><div class="label">${l}</div><div class="value">${v}</div></div>`;
