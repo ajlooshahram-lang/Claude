@@ -598,6 +598,17 @@
     allRisks.sort((a, b) => a.rank - b.rank);
     const topRisks = allRisks.slice(0, 8);
 
+    // When each country comes online during the build (same math as the live map).
+    const online = (typeof G.onlineSchedule === "function") ? G.onlineSchedule() : [];
+    const onlineRows = online.map(o => {
+      const pct = Math.max(0, Math.min(100, Math.round((o.month / (o.monthsTotal || 60)) * 100)));
+      return `<div class="brief-online-row">
+        <span class="brief-online-when">Month ${esc(String(o.month))}</span>
+        <span class="brief-online-name">${esc(o.country)} <small>${esc(o.name)}</small></span>
+        <span class="brief-online-track"><span class="brief-online-fill" style="width:${pct}%"></span><span class="brief-online-dot" style="left:${pct}%"></span></span>
+      </div>`;
+    }).join("");
+
     // Auto-written 'In a nutshell' executive summary — the whole story in a few
     // plain sentences for a reader who has never seen the project before.
     const listJoin = arr => arr.length <= 1 ? (arr[0] || "")
@@ -700,6 +711,12 @@
           <h3>Spending over time</h3>
           <p class="brief-lead">How the money is committed as the network is built, month by month. Spend starts slowly during permitting and surveys, then rises as the cable ships lay the longer trunk routes — reaching the full budget of about ${esc(fmtUsd(prog.budgetUsd))} by month ${esc(String(prog.durationMonths))}.</p>
           <div class="brief-spend">${(typeof G.deployCurve === "function") ? spendCurveSVG(G.deployCurve(60), { id: "briefSpend", live: false }) : '<p class="muted">No schedule data</p>'}</div>
+        </section>
+
+        <section class="brief-section">
+          <h3>When each country goes live</h3>
+          <p class="brief-lead">The order countries are connected, and roughly which month each one comes online as the cable is laid from one landing station to the next.</p>
+          <div class="brief-online">${onlineRows || '<p class="muted">No schedule data</p>'}</div>
         </section>
 
         <section class="brief-section">

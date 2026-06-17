@@ -123,6 +123,30 @@
     return out;
   }
 
+  // The month each country (landing station) comes online during the A–Z
+  // build — pure & module-level, mirroring the exact build math in
+  // deployState()/applyDeployment(): a 'from' station lights when its first
+  // cable starts laying (window start i/N); a 'to' station lights when that
+  // cable completes (window end (i+1)/N). Sorted earliest-first. Stays
+  // consistent with the live "N of 8 countries live" readout.
+  function onlineSchedule() {
+    var N = CABLES.length || 1, i;
+    var firstG = {};
+    for (i = 0; i < STATIONS.length; i++) firstG[STATIONS[i].id] = Infinity;
+    for (i = 0; i < CABLES.length; i++) {
+      var c = CABLES[i], fromG = i / N, toG = (i + 1) / N;
+      if (firstG[c.from] !== undefined) firstG[c.from] = Math.min(firstG[c.from], fromG);
+      if (firstG[c.to] !== undefined) firstG[c.to] = Math.min(firstG[c.to], toG);
+    }
+    var out = STATIONS.map(function (s) {
+      var g = isFinite(firstG[s.id]) ? firstG[s.id] : 0;
+      return { id: s.id, name: s.name, country: s.country, g: g,
+        month: Math.round(g * PROGRAMME.durationMonths), monthsTotal: PROGRAMME.durationMonths };
+    });
+    out.sort(function (a, b) { return a.g - b.g || a.month - b.month; });
+    return out;
+  }
+
   // Self-hosted Earth textures (relative to index.html → same-origin, CSP-safe).
   var TEX = {
     day:      "textures/earth_day.jpg",
@@ -1177,6 +1201,7 @@
     CABLES: CABLES,
     PROGRAMME: PROGRAMME,
     deployCurve: deployCurve,
+    onlineSchedule: onlineSchedule,
     STATUS_COLOR: STATUS_COLOR
   };
 })();

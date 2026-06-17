@@ -467,6 +467,7 @@ async function main() {
       risks: el.querySelectorAll(".brief-risks li").length,
       spendSvg: !!el.querySelector(".brief-spend svg.spend-svg path.spend-line"),
       summaryParas: el.querySelectorAll(".brief-summary p").length,
+      goLiveRows: el.querySelectorAll(".brief-online-row").length,
       text: el.textContent || "",
       hasInlineOnclick: btn ? !!btn.getAttribute("onclick") : true,
       printed: window.__printed, printErr
@@ -478,6 +479,8 @@ async function main() {
   ok(invBrief && invBrief.spendSvg, "Investor Brief renders the spending-over-time S-curve (inline SVG, prints cleanly)");
   ok(invBrief && invBrief.summaryParas >= 3 && /connects 8 countries/.test(invBrief.text),
     "Investor Brief opens with an auto-written 'In a nutshell' summary (" + (invBrief ? invBrief.summaryParas : 0) + " sentences)");
+  ok(invBrief && invBrief.goLiveRows === 8 && /When each country goes live/.test(invBrief.text),
+    "Investor Brief shows the 'when each country goes live' timeline for all 8 countries");
   ok(invBrief && /USD\s*1\.3B/.test(invBrief.text) && /60 months/.test(invBrief.text), "Investor Brief shows the headline budget (USD 1.3B) + build time (60 months)");
   ok(invBrief && !invBrief.hasInlineOnclick && invBrief.printed === 1,
     "print button is CSP-safe (no inline onclick) and fires window.print() under strict CSP");

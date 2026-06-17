@@ -68,6 +68,14 @@ ok((function () { for (let i = 1; i < spendCurve.length; i++) { if (spendCurve[i
    "spend curve is monotonic non-decreasing (spend never goes down)");
 ok(spendCurve[60].costUsd === 1300e6 && spendCurve[60].costPct === 100 && spendCurve[60].month === 60,
    "spend curve ends at the full USD 1.3B at month 60");
+// when each country comes online during the build (powers the brief timeline)
+ok(typeof window.QIGlobe.onlineSchedule === "function", "QIGlobe.onlineSchedule() exposed for the go-live timeline");
+const goLive = window.QIGlobe.onlineSchedule();
+ok(Array.isArray(goLive) && goLive.length === 8, "onlineSchedule lists all 8 countries (got " + (goLive ? goLive.length : "n/a") + ")");
+ok(goLive[0].month === 0 && goLive[goLive.length - 1].month <= 60, "first country is live at month 0, last by month 60");
+ok((function () { for (let i = 1; i < goLive.length; i++) { if (goLive[i].month < goLive[i - 1].month) return false; } return true; })(),
+   "go-live schedule is sorted earliest-first");
+ok(goLive.filter(o => o.month <= 30).length === 5, "5 countries are live by month 30 (matches the live cost overlay)");
 ok(doc.getElementById("globeSpend") != null && doc.getElementById("globeSpendChart") != null, "3D map renders the spending S-curve overlay container");
 ok(window.QIGlobe.init(doc.getElementById("globeStage")) === false, "QIGlobe.init no-throws and returns false without WebGL");
 // 2b-i) interactive API surface exists and is a safe no-op while unmounted (jsdom/no WebGL)
@@ -756,6 +764,8 @@ ok(doc.querySelectorAll(".brief-verdict").length === 8, "Investor Brief shows a 
 ok(doc.querySelector(".brief-spend svg.spend-svg") != null && doc.querySelector(".brief-spend path.spend-line") != null,
    "Investor Brief renders the spending-over-time S-curve (inline SVG)");
 ok(/Spending over time/.test(briefOut), "Investor Brief includes the 'Spending over time' section");
+ok(doc.querySelectorAll(".brief-online-row").length === 8, "Investor Brief shows the go-live timeline for all 8 countries");
+ok(/When each country goes live/.test(briefOut), "Investor Brief includes the 'When each country goes live' section");
 ok(doc.querySelector(".brief-summary") != null, "Investor Brief opens with an auto-written 'In a nutshell' summary");
 ok(doc.querySelectorAll(".brief-summary p").length >= 3, "summary tells the story in several plain sentences (got " + doc.querySelectorAll(".brief-summary p").length + ")");
 ok(/connects 8 countries/.test(doc.querySelector(".brief-summary").textContent) && /USD\s*1\.3B/.test(doc.querySelector(".brief-summary").textContent),
