@@ -1077,38 +1077,64 @@
     const profOpts = `<option value="">Auto-detect domain</option>` +
       profiles.map(p => `<option value="${esc(p.id)}">${esc(p.label)}</option>`).join("");
     return `<div class="card">
-        <h3>Project Brain <span class="tag">auto-plan</span></h3>
-        <p style="line-height:1.6">Paste or upload your <b>project description</b>. The Brain analyses it
-        <b>locally on this device</b> — nothing is uploaded or sent to any server — and builds a full plan:
-        phases, tasks, a risk register, milestones, procurement and a budget skeleton. Review the preview,
-        then apply it to the active project. It structures and tracks the work; people still execute it.</p>
-        <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+        <h3>Auto-Analyzer <span class="tag">upload → auto-plan</span></h3>
+        <p style="line-height:1.6">Upload (or drag &amp; drop) your <b>project description</b> and the app
+        <b>runs everything automatically</b>: it scans the text <b>locally on this device</b> (nothing is sent
+        to any server), detects the domain, scope, countries and risks, then builds and <b>creates a complete
+        new project</b> — phases, tasks, a risk register, milestones, procurement and a budget.</p>
+        <div id="brainDrop" class="brain-drop" tabindex="0" role="button" aria-label="Upload a project description file">
+          <div class="brain-drop-ico">⬆</div>
+          <div class="brain-drop-main">Drop a project description here, or <u>browse</u></div>
+          <div class="brain-drop-sub muted">.txt · .md · .json — analysis runs automatically on upload</div>
+          <input id="brainFile" type="file" accept=".txt,.md,.json,text/plain,text/markdown,application/json" hidden />
+        </div>
+        <div class="toolbar" style="flex-wrap:wrap;gap:10px;margin-top:10px">
           <label class="muted" for="brainProfile">Domain</label>
-          <select id="brainProfile" style="max-width:280px">${profOpts}</select>
-          <label class="btn btn-sm" for="brainFile">Upload .txt / .md</label>
-          <input id="brainFile" type="file" accept=".txt,.md,text/plain,text/markdown" hidden />
+          <select id="brainProfile" style="max-width:260px">${profOpts}</select>
+          <label class="brain-auto"><input type="checkbox" id="brainAuto" checked> Run everything automatically</label>
+          <span class="grow"></span>
           <span class="muted" id="brainFileName"></span>
         </div>
-        <textarea id="brainText" rows="9" style="width:100%;margin-top:8px;font:inherit;padding:10px;border:1.5px solid var(--border);border-radius:8px"
-          placeholder="Paste your project description here (stays on this device)…"></textarea>
-        <div class="toolbar" style="margin-top:8px">
-          <button class="btn btn-primary" id="brainAnalyze">Analyze</button>
-          <button class="btn" id="brainClear">Clear</button>
-        </div>
+        <div id="brainRun" class="brain-run" hidden></div>
+        <details class="brain-paste"><summary class="muted">…or paste the description manually</summary>
+          <textarea id="brainText" rows="7" style="width:100%;margin-top:8px;font:inherit;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--input);color:var(--ink)"
+            placeholder="Paste your project description here (stays on this device)…"></textarea>
+          <div class="toolbar" style="margin-top:8px">
+            <button class="btn btn-primary" id="brainAutoRun" type="button">▶ Run automatically</button>
+            <button class="btn" id="brainAnalyze" type="button">Analyze only</button>
+            <button class="btn" id="brainClear" type="button">Clear</button>
+          </div>
+        </details>
       </div>
       <div id="brainOut"></div>`;
   };
   AFTER.brain = function () {
-    const fileInput = $("#brainFile"), nameEl = $("#brainFileName"), ta = $("#brainText");
-    if (fileInput) fileInput.addEventListener("change", () => {
-      const f = fileInput.files && fileInput.files[0]; if (!f) return;
-      nameEl.textContent = f.name;
+    const fileInput = $("#brainFile"), nameEl = $("#brainFileName"), ta = $("#brainText"), drop = $("#brainDrop");
+    const autoOn = () => { const c = $("#brainAuto"); return c ? c.checked : true; };
+
+    function handleText(text, sourceName) {
+      if (nameEl && sourceName) nameEl.textContent = sourceName;
+      if (ta) ta.value = text;
+      if (autoOn()) runAnalyzerAuto(text, sourceName);
+      else toast("Loaded — click “Analyze only”.");
+    }
+    function readFile(f) {
+      if (!f) return;
       const reader = new FileReader();
-      reader.onload = () => { ta.value = String(reader.result || ""); };
+      reader.onload = () => handleText(String(reader.result || ""), f.name);
+      reader.onerror = () => toast("Could not read that file.");
       reader.readAsText(f);
-    });
+    }
+    if (fileInput) fileInput.addEventListener("change", () => { const f = fileInput.files && fileInput.files[0]; readFile(f); fileInput.value = ""; });
+    if (drop) {
+      drop.addEventListener("click", () => fileInput && fileInput.click());
+      drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput && fileInput.click(); } });
+      ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("dragover"); }));
+      ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("dragover"); }));
+      drop.addEventListener("drop", e => { const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; readFile(f); });
+    }
     const clearBtn = $("#brainClear");
-    if (clearBtn) clearBtn.addEventListener("click", () => { ta.value = ""; nameEl.textContent = ""; uiState.brainPlan = null; $("#brainOut").innerHTML = ""; });
+    if (clearBtn) clearBtn.addEventListener("click", () => { if (ta) ta.value = ""; if (nameEl) nameEl.textContent = ""; uiState.brainPlan = null; $("#brainOut").innerHTML = ""; const r = $("#brainRun"); if (r) { r.hidden = true; r.innerHTML = ""; } });
 
     const analyzeBtn = $("#brainAnalyze");
     if (analyzeBtn) analyzeBtn.addEventListener("click", () => {
@@ -1119,8 +1145,50 @@
       uiState.brainPlan = plan;
       renderBrainPreview(plan);
     });
+    const autoRunBtn = $("#brainAutoRun");
+    if (autoRunBtn) autoRunBtn.addEventListener("click", () => runAnalyzerAuto((ta.value || "").trim(), ""));
   };
-  function renderBrainPreview(plan) {
+
+  // Fully-automated pipeline: scan -> analyze -> generate -> CREATE a new project
+  // (non-destructive) and apply the whole plan, with a live run status + Undo.
+  function runAnalyzerAuto(text, sourceName) {
+    text = (text || "").trim();
+    if (!text) { toast("Upload or paste a project description first."); return null; }
+    if (!window.QIBrain) { toast("Brain engine not loaded."); return null; }
+    const runEl = $("#brainRun");
+    const steps = ["Reading description", "Searching & detecting domain", "Scanning for countries & scale",
+                   "Generating plan (WBS, risks, budget)", "Creating & populating project"];
+    if (runEl) {
+      runEl.hidden = false;
+      runEl.innerHTML = `<div class="brain-run-title">⚙ Automated run</div>` +
+        steps.map((s, i) => `<div class="brain-step" data-i="${i}"><span class="brain-step-dot"></span>${esc(s)}</div>`).join("");
+    }
+    const mark = i => { const el = runEl && runEl.querySelector(`.brain-step[data-i="${i}"]`); if (el) el.classList.add("done"); };
+
+    mark(0);
+    const plan = QIBrain.analyzeProject(text, { profile: $("#brainProfile") && $("#brainProfile").value || undefined });
+    uiState.brainPlan = plan;
+    mark(1); mark(2); mark(3);
+
+    const prevId = S.activeProjectId();
+    const projName = (plan.summary && plan.summary.title) ? plan.summary.title
+      : (sourceName ? String(sourceName).replace(/\.[^.]+$/, "") : "Imported project");
+    const newId = S.addProject(projName);
+    const n = applyBrainPlan(plan);
+    refreshHeader();
+    mark(4);
+    renderBrainPreview(plan, projName);
+    toast(`Auto-created “${projName}”: ${n} cases, ${plan.milestones.length} milestones, ${plan.procurement.length} procurement items.`, {
+      ms: 6000,
+      action: {
+        label: "Undo", handler: () => {
+          try { S.deleteProject(newId); if (prevId) S.switchProject(prevId); refreshHeader(); go("brain"); toast("Reverted — generated project removed."); } catch (e) {}
+        }
+      }
+    });
+    return newId;
+  }
+  function renderBrainPreview(plan, created) {
     const kpi = (cls, l, v) => `<div class="kpi ${cls}"><div class="label">${l}</div><div class="value">${v}</div></div>`;
     const s = plan.summary, sc = s.scale;
     const scaleBits = [];
@@ -1159,8 +1227,11 @@
           ${kpi("navy", "Est. budget", money(plan.budget.total))}
         </div>
         <div class="toolbar">
-          <button class="btn btn-primary" id="brainApply">Apply plan to active project</button>
-          <span class="muted">Adds ${plan.cases.length + plan.risks.length} cases, ${plan.milestones.length} milestones and ${plan.procurement.length} procurement items.</span>
+          ${created
+            ? `<button class="btn btn-primary" id="brainOpenDash" type="button">✓ Project “${esc(created)}” created — Open Dashboard</button>
+               <span class="muted">Created ${plan.cases.length + plan.risks.length} cases, ${plan.milestones.length} milestones and ${plan.procurement.length} procurement items.</span>`
+            : `<button class="btn btn-primary" id="brainApply">Apply plan to active project</button>
+               <span class="muted">Adds ${plan.cases.length + plan.risks.length} cases, ${plan.milestones.length} milestones and ${plan.procurement.length} procurement items.</span>`}
         </div>
       </div>
       <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -1176,6 +1247,8 @@
       toast(`Applied: ${n} cases, ${plan.milestones.length} milestones, ${plan.procurement.length} procurement items.`);
       go("dashboard");
     });
+    const openDash = $("#brainOpenDash");
+    if (openDash) openDash.addEventListener("click", () => go("dashboard"));
   }
   function applyBrainPlan(plan) {
     let n = 0;

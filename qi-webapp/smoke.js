@@ -756,5 +756,20 @@ ok(allEight.countryIntel.length === 8, "Submarine project with no named country 
 doc.getElementById("brainApply").click();
 ok(S.validCases().length > ciCasesBefore, "Applying the plan adds the country-enriched cases");
 
+// 30) Auto-Analyzer: upload-equivalent auto-run creates a populated NEW project
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(!!doc.getElementById("brainDrop"), "Auto-Analyzer renders an upload dropzone");
+ok(!!doc.getElementById("brainAuto") && doc.getElementById("brainAuto").checked, "Auto-run is on by default");
+{
+  const projectsBefore = S.listProjects().length;
+  doc.getElementById("brainText").value =
+    "Deploy a 1200 km submarine fiber optic cable system connecting landing stations in Indonesia, Vietnam and the Philippines over 30 months.";
+  doc.getElementById("brainAutoRun").dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(S.listProjects().length === projectsBefore + 1, "auto-run creates a new project (" + S.listProjects().length + ")");
+  ok(S.kpis().total > 0, "auto-run populates the new project with cases (" + S.kpis().total + ")");
+  ok(doc.querySelector("#brainRun .brain-step.done") != null, "auto-run shows completed run-status steps");
+  ok(doc.getElementById("brainOpenDash") != null, "auto-run shows the 'project created' CTA");
+}
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
