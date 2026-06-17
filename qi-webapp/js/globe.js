@@ -102,6 +102,7 @@
   var selectHandler = null; // fn(info) — called when a station/cable is picked
   var tourHandler = null;   // fn(active) — called when the auto-tour toggles
   var spinHandler = null;   // fn(spinning) — called when auto-rotation toggles
+  var equipmentHandler = null; // fn(visible) — called when the equipment layer toggles
 
   // Mid-point lat/lon of a cable (for camera framing of a whole segment).
   function cableMidLatLon(cab) {
@@ -405,6 +406,13 @@
       var stationMeshes = {};    // id -> beacon mesh (for hover/selection scaling)
       var beaconGeo = new THREE.SphereGeometry(0.04, 18, 18);
       disposables.push(beaconGeo);
+
+      // Equipment layer: branching units (junctions) + inline optical repeaters.
+      // A station where 3+ cables meet is modelled as a subsea Branching Unit.
+      var equipment = new THREE.Group();
+      world.add(equipment);
+      var degree = {};
+      CABLES.forEach(function (c) { degree[c.from] = (degree[c.from] || 0) + 1; degree[c.to] = (degree[c.to] || 0) + 1; });
       STATIONS.forEach(function (st, i) {
         var p = latLonToVec3(st.lat, st.lon, GLOBE_R * 1.008);
 
@@ -438,12 +446,39 @@
           if (label.material.map) disposables.push(label.material.map);
           disposables.push(label.material);
         }
+
+        // Branching Unit ring + label for junction stations (degree >= 3).
+        if ((degree[st.id] || 0) >= 3) {
+          var buGeo = new THREE.TorusGeometry(0.085, 0.013, 10, 28);
+          var buMat = new THREE.MeshBasicMaterial({
+            color: 0x8fd3ff, transparent: true, opacity: 0.9,
+            blending: THREE.AdditiveBlending, depthWrite: false
+          });
+          var bu = new THREE.Mesh(buGeo, buMat);
+          var bp = latLonToVec3(st.lat, st.lon, GLOBE_R * 1.011);
+          bu.position.copy(bp);
+          bu.lookAt(bp.clone().multiplyScalar(2));   // lay the ring flat on the surface
+          equipment.add(bu);
+          disposables.push(buGeo, buMat);
+
+          var buLabel = makeLabelSprite("BU " + st.name, { fontSize: 18, scale: 0.26, color: "#bfe9ff", bg: "rgba(8,16,32,0.62)" });
+          if (buLabel) {
+            buLabel.position.copy(latLonToVec3(st.lat, st.lon, GLOBE_R * 1.09));
+            equipment.add(buLabel);
+            if (buLabel.material.map) disposables.push(buLabel.material.map);
+            disposables.push(buLabel.material);
+          }
+        }
       });
 
       // ---- submarine cables: glowing tube + halo + flowing pulse -----------
       var pulses = [];
+      var repeaters = [];    // inline optical repeaters (equipment layer)
       var cableTubes = [];   // keep tube materials so progress can recolour them
       var TUBULAR = 80, RADIAL = 10, RING_IDX = RADIAL * 6;  // TubeGeometry index layout
+      var repGeo = new THREE.OctahedronGeometry(0.022, 0);
+      var repMat = new THREE.MeshBasicMaterial({ color: 0xbfe9ff, transparent: true, opacity: 0.92 });
+      disposables.push(repGeo, repMat);
       CABLES.forEach(function (cab) {
         var a = STATION_BY_ID[cab.from], b = STATION_BY_ID[cab.to];
         var start = latLonToVec3(a.lat, a.lon, GLOBE_R * 1.008);
@@ -492,6 +527,16 @@
         world.add(pulse);
         disposables.push(pGeo, pMat);
         pulses.push({ curve: curve, mesh: pulse, speed: 0.06 + Math.random() * 0.05, offset: Math.random(), entry: entry });
+
+        // inline optical repeaters every ~100 km (interior points along the route)
+        var repCount = Math.max(0, Math.round((cab.lengthKm || 0) / 100) - 1);
+        for (var ri = 1; ri <= repCount; ri++) {
+          var ru = ri / (repCount + 1);
+          var rm = new THREE.Mesh(repGeo, repMat);
+          curve.getPoint(ru, rm.position);
+          equipment.add(rm);
+          repeaters.push({ mesh: rm, u: ru, entry: entry });
+        }
 
         // mid-cable id label for orientation
         var seg = makeLabelSprite(cab.id, { fontSize: 22, scale: 0.3, color: (STATUS_COLOR[cab.status] || STATUS_COLOR.planned).css, bg: "rgba(8,16,32,0.62)" });
@@ -667,6 +712,10 @@
         if (on) { focusAnim = null; stopTour(); }
         if (spinHandler) try { spinHandler(!!on); } catch (e) {}
       }
+      function setEquipment(on) {
+        equipment.visible = !!on;
+        if (equipmentHandler) try { equipmentHandler(!!on); } catch (e) {}
+      }
 
       // ---- pointer picking (tap to select, hover for cursor + beacon pop) --
       var raycaster = new THREE.Raycaster();
@@ -841,6 +890,15 @@
           pu.curve.getPoint(u, pu.mesh.position);
           pu.mesh.scale.setScalar(0.7 + 0.5 * Math.sin((u / Math.max(0.001, frac)) * Math.PI));
         }
+        // inline repeaters: visible only where the cable is laid; gentle spin
+        if (equipment.visible) {
+          for (var ei = 0; ei < repeaters.length; ei++) {
+            var rr = repeaters[ei];
+            var rvis = rr.u <= (rr.entry.drawFrac || 0) + 1e-3;
+            rr.mesh.visible = rvis;
+            if (rvis) rr.mesh.rotation.y += 0.02;
+          }
+        }
         // expanding station pulse rings
         for (var k = 0; k < rings.length; k++) {
           var rg = rings[k];
@@ -871,6 +929,8 @@
           setSpin: setSpin,
           isSpinning: function () { return !!spinEnabled; },
           playLaying: playLaying,
+          setEquipment: setEquipment,
+          isEquipment: function () { return !!equipment.visible; },
           selectedId: function () { return selectedId; }
         },
         stop: function () { alive = false; stopTour(); if (raf) window.cancelAnimationFrame(raf); }
@@ -1026,11 +1086,15 @@
     toggleSpin: function () { return apiCall("setSpin", !apiCall("isSpinning")); },
     isSpinning: function () { return apiCall("isSpinning"); },
     playLaying: function () { return apiCall("playLaying"); },
+    setEquipment: function (on) { return apiCall("setEquipment", on); },
+    toggleEquipment: function () { return apiCall("setEquipment", !apiCall("isEquipment")); },
+    isEquipment: function () { return apiCall("isEquipment"); },
     selectedId: function () { return apiCall("selectedId"); },
     // subscriptions (persist across mount/unmount)
     onSelect: function (cb) { selectHandler = (typeof cb === "function") ? cb : null; },
     onTour: function (cb) { tourHandler = (typeof cb === "function") ? cb : null; },
     onSpin: function (cb) { spinHandler = (typeof cb === "function") ? cb : null; },
+    onEquipment: function (cb) { equipmentHandler = (typeof cb === "function") ? cb : null; },
     // static datasets
     STATIONS: STATIONS,
     CABLES: CABLES,

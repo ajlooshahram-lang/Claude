@@ -43,8 +43,10 @@
   all stations, a rotation play/pause toggle, in-stage glass detail cards, and a
   **construction replay** that "lays" each cable along its route up to its real
   `% laid` from the Route Progress data (faint full line = planned route, bright
-  segment = laid cable). Fully feature-detected — degrades gracefully (2D legend)
-  where WebGL/Three.js is unavailable, and never throws.
+  segment = laid cable), and an **equipment layer** (toggle) rendering subsea
+  Branching Units at junction stations plus inline optical repeaters every ~100 km
+  that appear only along the laid portion of each cable. Fully feature-detected —
+  degrades gracefully (2D legend) where WebGL/Three.js is unavailable, never throws.
 - **Route Progress** (`js/store.js` + `routeprogress` view): Tracks each cable
   segment through 7 real lifecycle phases plus overall `% laid`, persisted
   server-side via the login-gated `/api/projects/:id/data` endpoint.
@@ -95,7 +97,7 @@ products relevant to the submarine telecom deployment.
 | `node --check` on all `qi-webapp/js/*.js` + tests | 12/12 OK |
 | `node qi-webapp/test.js` (engine: MSA, cashflow, resource, Cp/Cpk, RICE/WSJF, NCR Pareto, theme, soft-delete/bulk) | PASS |
 | `node qi-webapp/brain.test.js` (domain detect, scale parse, cost scaling, fallback, determinism) | 24/24 PASS |
-| `node qi-webapp/smoke.js` (all 43+ views, country intelligence, 3D map datasets + interactive API no-throw, Route Progress) | 270/270 PASS |
+| `node qi-webapp/smoke.js` (all 43+ views, country intelligence, 3D map datasets + interactive API no-throw, Route Progress) | 274/274 PASS |
 | `cd server && npm run build` | OK (TypeScript compiles cleanly, strict mode) |
 | `cd server && npm test` | 139/139 PASS (health + auth + data + invite tests) |
 
