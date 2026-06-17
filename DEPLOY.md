@@ -80,6 +80,9 @@ docker compose exec backend npx tsx prisma/seed.ts
 ---
 
 ## Operations
+- **Verify hardening:** `./security-check.sh` (read-only; checks secrets, NODE_ENV,
+  internal-only DB/backend, `.env` ignored). Add `URL=https://stp.example.com` to
+  also probe live TLS/security headers (HSTS, CSP, X-Frame-Options, nosniff).
 - **Logs:** `docker compose logs -f backend`
 - **Stop:** `docker compose down` (data persists in the `pgdata` volume)
 - **Backups:** back up the `pgdata` volume regularly and **encrypt** the backups
