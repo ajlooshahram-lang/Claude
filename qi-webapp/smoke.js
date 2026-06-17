@@ -41,7 +41,7 @@ ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 }
 
 // 2) navigate every view (simulate clicks)
-const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","budget","globe3d","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","country","ai","impact","scorecard","health","report","audit","config","help"];
+const views = ["portfolio","dashboard","myduties","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","budget","globe3d","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","country","ai","impact","scorecard","health","report","audit","config","help"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -790,6 +790,11 @@ ok(!!doc.getElementById("btnSearch"), "topbar Search button present");
   ok(/Case:/.test(doc.getElementById("cmdList").textContent), "search filters cases by their text content");
   doc.getElementById("modalOverlay").hidden = true;
 }
+
+// 32) My Duties dedicated view
+ok(doc.querySelector('.nav-item[data-view="myduties"]') != null, "myduties nav item exists");
+doc.querySelector('.nav-item[data-view="myduties"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".myduties-list") != null || doc.querySelector(".empty-cta") != null, "myduties view renders content (list or empty state)");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

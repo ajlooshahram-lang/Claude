@@ -89,6 +89,8 @@
     { id: "brain", label: "Auto-Analyzer", icon: "🧠" },
     { id: "portfolio", label: "Portfolio", icon: "▣" },
     { id: "dashboard", label: "Dashboard", icon: "▤" },
+    { g: "PERSONAL" },
+    { id: "myduties", label: "My Duties", icon: "📋" },
     { id: "cases", label: "All Items", icon: "★" },
     { g: "Delivery" },
     { id: "pm", label: "Task List", icon: "✔" },
@@ -615,6 +617,46 @@
     const rm = S.rpnByCategory(); CH.hbar("chRpn", Object.keys(rm), Object.values(rm));
     const p = S.paretoRPN();
     CH.pareto("chPareto", p.map(x => x.label), p.map(x => x.value), p.map(x => Math.round(x.cum)));
+  };
+
+  RENDER.myduties = function () {
+    const authUser = (window.QIAuth && window.QIAuth.currentUser) ? (window.QIAuth.currentUser.displayName || window.QIAuth.currentUser.name || window.QIAuth.currentUser.email || "") : "";
+    const isSignedIn = !!authUser;
+    const allCases = S.validCases();
+    const myCases = isSignedIn ? allCases.filter(c => c.owner === authUser) : allCases;
+    const inProgress = myCases.filter(c => c.status === "IN PROGRESS");
+    const stuck = myCases.filter(c => c.status === "BLOCKED");
+    const completed = myCases.filter(c => c.status === "RESOLVED" || c.status === "CLOSED");
+    const prioOrder = { "1-CRITICAL": 0, "2-HIGH": 1, "3-MEDIUM": 2, "4-LOW": 3 };
+    const sorted = myCases.slice().sort((a, b) => (prioOrder[a.priority] ?? 9) - (prioOrder[b.priority] ?? 9));
+    const kpi = (cls, label, val) => `<div class="kpi ${cls}"><div class="label">${label}</div><div class="value">${val}</div></div>`;
+    const signInNote = !isSignedIn ? `<p class="muted" style="text-align:center;margin:8px 0">Sign in to see only your items</p>` : "";
+    if (myCases.length === 0) {
+      return `<h2>Your responsibilities</h2>
+        ${signInNote}
+        <div class="card empty-cta">
+          <p style="font-size:1.1rem;margin:24px 0">Nothing assigned to you yet. Items will appear here when someone sets you as responsible.</p>
+        </div>`;
+    }
+    const cards = sorted.map(c => `<div class="myduties-card" data-act="edit" data-id="${c.id}" tabindex="0" role="button" aria-label="${esc(c.problem)}">
+        <div class="myduties-card-head"><span class="pill">${esc(c.priority || "")}</span>${statusBadge(c.status)}</div>
+        <div class="myduties-card-title">${esc(c.problem)}</div>
+        <div class="myduties-card-bar">${barCell(c.percent)}</div>
+      </div>`).join("");
+    return `<h2>Your responsibilities</h2>
+      ${signInNote}
+      <div class="grid kpis" style="margin-bottom:16px">
+        ${kpi("navy", "Assigned to you", myCases.length)}
+        ${kpi("blue", "In progress", inProgress.length)}
+        ${kpi("red", "Stuck", stuck.length)}
+        ${kpi("green", "Completed", completed.length)}
+      </div>
+      <div class="myduties-list">${cards}</div>`;
+  };
+  AFTER.myduties = function () {
+    document.querySelectorAll(".myduties-card").forEach(card => {
+      card.addEventListener("click", () => { openCaseForm(card.dataset.id); });
+    });
   };
 
   RENDER.cases = function () {
