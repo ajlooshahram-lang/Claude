@@ -4,14 +4,18 @@
   "description": "A self-contained, browser-based version of the QI/PM Excel platform. Register a case **once** and it flows into every view — PM tasks, risk register, FMEA, PDCA, action log, timeline, budget, dashboard and an AI assistant — all updated live.",
   "main": "brain.test.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test.js && node brain.test.js && node smoke.js",
+    "build:standalone": "node build-standalone.js",
+    "verify:standalone": "node verify-standalone.js",
+    "build-and-verify": "node build-standalone.js && node verify-standalone.js",
+    "verify:globe": "node verify-globe.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
-  "dependencies": {},
   "devDependencies": {
-    "jsdom": "^29.1.1"
+    "jsdom": "^29.1.1",
+    "playwright": "^1.48.0"
   }
 }

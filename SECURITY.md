@@ -84,6 +84,22 @@ report a vulnerability.
 
 Do **all** of the following before going live.
 
+> **Automated path (recommended).** Two helper scripts now enforce and apply
+> most of this checklist:
+> - `./security-check.sh` — a preflight gate that mechanically verifies strong
+>   secrets, `.env` is git-ignored, `NODE_ENV=production`, no `*` CORS, the DB
+>   and backend are internal-only (no host `ports:`), the nginx **strict CSP**
+>   (`script-src 'self'`, no `'unsafe-inline'`, no CDN) and security headers,
+>   and — with `--tls` — that `DOMAIN`/`ACME_EMAIL`/`Caddyfile` HSTS are set.
+>   It exits non-zero on any FAIL.
+> - `./deploy.sh [--tls] [--seed]` — runs the preflight, then brings the stack
+>   up (`--tls` uses `docker-compose.tls.yml` + the `Caddyfile`, giving
+>   **automatic HTTPS via Let's Encrypt and HSTS at the Caddy edge**, with nginx
+>   and the backend unpublished), applies `prisma db push`, and optionally seeds.
+>
+> The manual steps below remain the source of truth; the scripts automate the
+> mechanical checks so nothing is forgotten.
+
 1. **Generate strong secrets** (never reuse the placeholders in `.env.example`):
    ```sh
    openssl rand -hex 16     # POSTGRES_PASSWORD
@@ -94,9 +110,13 @@ Do **all** of the following before going live.
 
 2. **Put TLS in front of nginx — REQUIRED.** Session and CSRF cookies use the
    `Secure` flag in production, so browsers will refuse them over plain HTTP and
-   login will fail. Use Cloudflare Tunnel, Caddy, Traefik, or a cloud load
-   balancer for TLS termination. Once TLS is confirmed, enable HSTS (the
-   commented block in `nginx/nginx.conf`).
+   login will fail. The bundled, zero-config option is **`./deploy.sh --tls`**,
+   which runs Caddy (`docker-compose.tls.yml` + `Caddyfile`) as the only public
+   entrypoint: it obtains a Let's Encrypt certificate for `DOMAIN`, sets HSTS at
+   the edge, and proxies to an internal-only nginx. Alternatives: Cloudflare
+   Tunnel, Traefik, or a cloud load balancer for TLS termination. (The HSTS
+   block in `nginx/nginx.conf` is only needed if you terminate TLS at nginx
+   itself rather than at Caddy.)
 
 3. **Keep PostgreSQL internal-only.** The provided `docker-compose.yml` already
    places `db` and `backend` on an `internal: true` network with no published

@@ -1,0 +1,95 @@
+# ---------------------------------------------------------------------------
+# docker-compose.tls.yml — STP production deployment WITH automatic HTTPS
+# ---------------------------------------------------------------------------
+# Self-contained TLS topology: Caddy is the only public entrypoint and
+# terminates HTTPS for $DOMAIN (Let's Encrypt), reverse-proxying to an
+# internal-only nginx. db, backend and nginx publish NO host ports.
+#
+# Bring up with:  ./deploy.sh --tls    (recommended — runs the security gate)
+# or directly:    docker compose -f docker-compose.tls.yml up --build -d
+#
+# Requires .env with: POSTGRES_*, SESSION_SECRET, DATA_ENCRYPTION_KEY,
+# NODE_ENV=production, DOMAIN, ACME_EMAIL.
+# ---------------------------------------------------------------------------
+
+services:
+  # PostgreSQL — internal network only, never published.
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - internal
+
+  # Fastify backend — internal network only, never published.
+  backend:
+    build:
+      context: ./server
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      SESSION_SECRET: ${SESSION_SECRET}
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY}
+      CORS_ORIGINS: ""
+      NODE_ENV: production
+      DATA_REGION: eu-west
+    networks:
+      - internal
+
+  # nginx — serves static files + proxies /api. NOT published to the host;
+  # only Caddy (on the 'web' network) can reach it.
+  frontend:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+      - web
+
+  # Caddy — the ONLY public entrypoint. Automatic HTTPS for $DOMAIN + HSTS.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3 (QUIC)
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - web
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+
+networks:
+  internal:
+    internal: true
+  web:
