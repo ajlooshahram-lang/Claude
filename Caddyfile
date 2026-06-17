@@ -1,0 +1,11 @@
+# Caddy reverse proxy with automatic HTTPS (Let's Encrypt) for the STP app.
+# DOMAIN and TLS_EMAIL are supplied by docker-compose.tls.yml from your .env.
+{
+	email {$TLS_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+	# Forward everything to the internal nginx frontend (static + /auth + /api).
+	reverse_proxy frontend:80
+}

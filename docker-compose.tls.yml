@@ -1,0 +1,38 @@
+# ---------------------------------------------------------------------------
+# Optional TLS overlay — automatic HTTPS via Caddy + Let's Encrypt.
+# Use together with the base compose file:
+#
+#   DOMAIN=stp.example.com TLS_EMAIL=you@example.com \
+#     docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build
+#
+# Requirements: a public DNS A/AAAA record for $DOMAIN pointing at this host,
+# and ports 80 + 443 reachable from the internet (Let's Encrypt HTTP/TLS-ALPN).
+# Caddy terminates TLS and reverse-proxies to the internal nginx frontend, so
+# the Secure session cookies work and login succeeds.
+# ---------------------------------------------------------------------------
+services:
+  # Stop publishing the plain-HTTP frontend to the host; only Caddy is public.
+  frontend:
+    ports: []
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+      TLS_EMAIL: ${TLS_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - web
+
+volumes:
+  caddy_data:
+  caddy_config:
