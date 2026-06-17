@@ -83,6 +83,7 @@ ok(!apiThrew, "interactive API calls are safe no-ops when the globe is not mount
 // re-render the view so the dispose assertion below acts on a fresh stage
 doc.querySelector('.nav-item[data-view="globe3d"]').dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(doc.getElementById("globeControls") != null, "3D Network Map renders the cinematic tour / rotation HUD");
+ok(doc.getElementById("globeLegend") != null && /Branching unit/.test(doc.getElementById("globeLegend").textContent), "3D Network Map renders the on-stage legend (stations, BU, repeater, planned/laid)");
 // navigating away must dispose without throwing
 doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(true, "navigating away from globe3d disposes cleanly");

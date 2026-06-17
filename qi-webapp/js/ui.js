@@ -190,6 +190,19 @@
     const legendStatuses = ["commissioned", "in-progress", "planned"].map(st =>
       `<span class="globe-statkey">${dot(st)}${esc(statusLabel[st] || st)}</span>`).join("");
 
+    // On-stage legend / key so non-technical viewers can read the 3D scene.
+    const lineKey = st => `<span class="gl-key"><span class="gl-line" style="background:${(SC[st] || {}).css || "#888"}"></span>${esc(statusLabel[st] || st)}</span>`;
+    const stageLegend = `
+      <div class="globe-legend" id="globeLegend">
+        <div class="gl-title">Legend</div>
+        ${["commissioned", "in-progress", "planned"].map(lineKey).join("")}
+        <span class="gl-key"><span class="gl-dot"></span>Landing station</span>
+        <span class="gl-key"><span class="gl-ring"></span>Branching unit</span>
+        <span class="gl-key"><span class="gl-rep"></span>Optical repeater</span>
+        <span class="gl-key"><span class="gl-line gl-ghost"></span>Planned route</span>
+        <span class="gl-key"><span class="gl-line gl-laid"></span>Laid cable</span>
+      </div>`;
+
     const cableRows = cables.map(c => `
       <li class="globe-item globe-item--click" data-cable="${esc(c.id)}" tabindex="0" role="button">
         <div class="globe-item-top">
@@ -229,6 +242,7 @@
             <button class="globe-btn is-on" id="globeSpin" type="button" aria-pressed="true">⏸ Rotation</button>
           </div>
           <div class="globe-detail" id="globeDetail" hidden></div>
+          ${stageLegend}
           <div class="globe-hint" id="globeHint">Drag to rotate · scroll to zoom · click a station or cable</div>
         </div>
         <aside class="globe-panel">
