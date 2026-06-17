@@ -6516,6 +6516,176 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
     };
   });
 
+  // ---- framework reference data (Market Entry / Licensing / Landing Party) -
+  // Merged onto each country record below. Kept as a separate map so the core
+  // records above stay readable. All figures are INDICATIVE planning lead times
+  // (months) and all operator names are real, well-known licensees as of 2025.
+  // Plain language is used throughout — these feed tools for users with NO
+  // project-management or telecom background.
+  var EXTRA = {
+    indonesia: {
+      marketEntry: {
+        demand: "Very large, fast-growing market (270M+ people) with a major data-centre build-out around Jakarta and Batam.",
+        foreignOwnership: "Telecom services are largely open to majority foreign ownership (up to ~67% under the Positive Investment List), but the cable-landing right itself is held through a locally-licensed company.",
+        recommendedMode: "Partner with a licensed Indonesian landing party (often via a local joint venture) and use their landing licence.",
+        recommendation: "Enter through a strong local partner and budget extra time for approvals across several provinces.",
+        verdict: "Conditional Go"
+      },
+      licensing: [
+        { license: "Cable-landing approval / telecom licence", authority: "Komdigi (DJID)", leadTimeMonths: 12, dependsOn: "A local landing-party company", note: "Needs central + provincial coordination." },
+        { license: "Marine spatial-use permit (sea corridor)", authority: "KKP", leadTimeMonths: 8, dependsOn: "Route survey", note: "Reserves the seabed corridor for the cable." },
+        { license: "AMDAL environmental clearance", authority: "KKP / AMDAL", leadTimeMonths: 9, dependsOn: "Marine survey", note: "Reefs and seismic zones widen the study." }
+      ],
+      landingParties: {
+        candidates: ["Telkom Indonesia / Telin", "Indosat Ooredoo Hutchison", "XL Axiata", "Moratelindo"],
+        wants: ["A share of capacity (fibre pairs)", "Local equity or revenue share", "Backhaul to Jakarta / Batam data centres"],
+        structures: ["Use the partner's landing licence + capacity swap (IRU)", "Local joint venture with the landing party"],
+        note: "Telin already runs regional systems and existing landing stations."
+      }
+    },
+    thailand: {
+      marketEntry: {
+        demand: "Solid regional-hub demand; established carriers and growing cloud/data-centre presence.",
+        foreignOwnership: "The Foreign Business Act generally caps foreign ownership at 49% in telecoms, so a Thai-majority structure is normally required.",
+        recommendedMode: "Thai-majority joint venture, or buy capacity through an existing NBTC-licensed landing party.",
+        recommendation: "Plan for a Thai-majority partner; the 49% cap shapes the whole deal.",
+        verdict: "Conditional Go"
+      },
+      licensing: [
+        { license: "Telecom licence + landing-station authorisation", authority: "NBTC", leadTimeMonths: 10, dependsOn: "Thai-majority licensee", note: "Sequential with environmental sign-off." },
+        { license: "Coastal / foreshore works approval", authority: "Marine Department", leadTimeMonths: 6, dependsOn: "Landing-site selection", note: "Shore-end construction permit." },
+        { license: "Environmental impact assessment", authority: "ONEP", leadTimeMonths: 8, dependsOn: "Marine survey", note: "" }
+      ],
+      landingParties: {
+        candidates: ["AIS (Advanced Info Service)", "True Corporation", "National Telecom (NT)"],
+        wants: ["Capacity for domestic + transit traffic", "Thai-majority equity position", "Backhaul to Bangkok"],
+        structures: ["Thai-majority JV holds the licence", "Capacity purchase (IRU) from an existing landing party"],
+        note: "National Telecom (state-owned) already operates landing stations."
+      }
+    },
+    vietnam: {
+      marketEntry: {
+        demand: "Large, young, fast-digitising market; strong need for more resilient international capacity after repeated cable faults.",
+        foreignOwnership: "Facilities-based telecom is limited to ~49% foreign ownership; the market is dominated by state-linked operators.",
+        recommendedMode: "Partner with a state-linked operator (Viettel/VNPT) or buy capacity into their landing stations.",
+        recommendation: "Engage a state-linked landing partner early; routing near disputed waters needs lead time.",
+        verdict: "Conditional Go"
+      },
+      licensing: [
+        { license: "Submarine-cable landing licence", authority: "MOST (ex-MIC)", leadTimeMonths: 12, dependsOn: "State-linked landing partner", note: "Sensitivity near East Sea routing." },
+        { license: "Sea-area use assignment", authority: "VASI", leadTimeMonths: 9, dependsOn: "Route survey", note: "Assigns the seabed corridor." },
+        { license: "Provincial environmental impact assessment", authority: "VASI / Province", leadTimeMonths: 7, dependsOn: "Marine survey", note: "" }
+      ],
+      landingParties: {
+        candidates: ["Viettel", "VNPT", "FPT Telecom", "CMC Telecom"],
+        wants: ["Capacity + redundancy for national networks", "Local control of the landing station", "Backhaul to Hanoi / Ho Chi Minh City"],
+        structures: ["Capacity swap (IRU) into a state-linked landing station", "Consortium membership with a Vietnamese operator"],
+        note: "Viettel and VNPT hold the main international gateways."
+      }
+    },
+    taiwan: {
+      marketEntry: {
+        demand: "High-value, high-tech market; critical interconnection point but politically sensitive.",
+        foreignOwnership: "Network (Type I) operators face foreign-ownership limits (broadly ~49% direct / ~60% total) and NCC scrutiny of foreign control.",
+        recommendedMode: "Partner with an incumbent (Chunghwa Telecom) and buy into their landing station.",
+        recommendation: "Use an established local carrier; expect heightened national-security review.",
+        verdict: "Caution"
+      },
+      licensing: [
+        { license: "Submarine cable-landing authorisation", authority: "NCC", leadTimeMonths: 12, dependsOn: "Local Type I carrier", note: "Security review of foreign control." },
+        { license: "Marine-area coordination", authority: "OAC", leadTimeMonths: 7, dependsOn: "Route survey", note: "Ocean Affairs Council." },
+        { license: "Environmental impact assessment", authority: "MOENV", leadTimeMonths: 8, dependsOn: "Marine survey", note: "" }
+      ],
+      landingParties: {
+        candidates: ["Chunghwa Telecom", "Taiwan Mobile", "Far EasTone"],
+        wants: ["Capacity + route diversity", "Operational control of the landing", "Backhaul to Taipei / Hsinchu"],
+        structures: ["Capacity swap (IRU) with the incumbent", "Consortium membership with a local carrier"],
+        note: "Chunghwa Telecom operates the principal landing stations."
+      }
+    },
+    philippines: {
+      marketEntry: {
+        demand: "Very large, under-served broadband market with rapid mobile/data growth.",
+        foreignOwnership: "The Public Service Act (2022) lets foreign investors own up to 100% of telecom companies — among the most open in the region.",
+        recommendedMode: "Direct entry is possible; a local landing partner still speeds local-government permits.",
+        recommendation: "Strong open-ownership rules make entry attractive; weather and multi-body permits are the real constraints.",
+        verdict: "Go"
+      },
+      licensing: [
+        { license: "Cable-landing licence + value-added/telecom registration", authority: "NTC", leadTimeMonths: 9, dependsOn: "Local entity registration", note: "" },
+        { license: "Environmental Compliance Certificate (ECC)", authority: "DENR-EMB", leadTimeMonths: 8, dependsOn: "Marine survey", note: "Under the EIS system." },
+        { license: "Foreshore lease + local-government permits", authority: "DENR-EMB / LGU", leadTimeMonths: 6, dependsOn: "Landing-site selection", note: "Several local units may be involved." }
+      ],
+      landingParties: {
+        candidates: ["PLDT", "Globe Telecom", "Converge ICT", "DITO Telecommunity"],
+        wants: ["Capacity for fast-growing data demand", "Backhaul to Metro Manila / Cebu / Davao", "Brand & coverage benefits"],
+        structures: ["Direct (100% allowed) with a local operating entity", "Capacity swap (IRU) with an incumbent"],
+        note: "PLDT and Globe own multiple existing landing stations."
+      }
+    },
+    guam: {
+      marketEntry: {
+        demand: "Small local market but the strategic Pacific hub — the gateway onward to the US mainland and Asia.",
+        foreignOwnership: "No general foreign-ownership cap, but a US national-security review (Team Telecom) examines foreign owners before the FCC grants the landing licence.",
+        recommendedMode: "Establish a US entity for the landing licence and partner with a Guam operator for the station.",
+        recommendation: "Essential hub; start the FCC + national-security track first because it gates everything.",
+        verdict: "Go"
+      },
+      licensing: [
+        { license: "Submarine Cable Landing Licence", authority: "FCC", leadTimeMonths: 12, dependsOn: "US entity + security review", note: "Under the Cable Landing License Act." },
+        { license: "National-security review", authority: "Team Telecom", leadTimeMonths: 12, dependsOn: "Disclosure of foreign owners", note: "Runs in parallel with the FCC licence." },
+        { license: "Marine-construction permits + NEPA", authority: "USACE / Guam EPA", leadTimeMonths: 9, dependsOn: "Marine survey", note: "Section 10/404 + reef protection." }
+      ],
+      landingParties: {
+        candidates: ["GTA TeleGuam", "Docomo Pacific", "IT&E"],
+        wants: ["Capacity + interconnection to trans-Pacific systems", "Landing-station hosting fees", "Local backhaul"],
+        structures: ["US entity holds the FCC licence", "Hosting / co-location at a Guam operator's station"],
+        note: "Guam is a hub for many trans-Pacific cables; hosting options are mature."
+      }
+    },
+    malaysia: {
+      marketEntry: {
+        demand: "Strong digital-economy push (MyDIGITAL) and growing data-centre clusters in Johor and Klang Valley.",
+        foreignOwnership: "Network facilities/services licences require MCMC approval and have historically carried foreign-equity conditions (commonly up to ~70%, lower for some licence classes).",
+        recommendedMode: "Local joint venture with an MCMC licensee; separate approvals for Peninsular and East Malaysia.",
+        recommendation: "Attractive market; plan for dual-jurisdiction permits and MCMC equity conditions.",
+        verdict: "Conditional Go"
+      },
+      licensing: [
+        { license: "Network facilities licence + landing approval", authority: "MCMC", leadTimeMonths: 10, dependsOn: "Licensed local entity", note: "Peninsular + East-Malaysia split." },
+        { license: "Environmental impact assessment", authority: "DOE", leadTimeMonths: 8, dependsOn: "Marine survey", note: "Marine-park avoidance." },
+        { license: "Coastal / marine-park works clearance", authority: "DOE / Fisheries", leadTimeMonths: 6, dependsOn: "Landing-site selection", note: "" }
+      ],
+      landingParties: {
+        candidates: ["Telekom Malaysia (TM)", "Maxis", "Time dotCom", "CelcomDigi"],
+        wants: ["Capacity + regional transit", "Backhaul to Johor / Klang Valley data centres", "Local equity position"],
+        structures: ["Local JV holding the MCMC licence", "Capacity swap (IRU) with TM"],
+        note: "Telekom Malaysia operates the main landing stations."
+      }
+    },
+    brunei: {
+      marketEntry: {
+        demand: "Small market, but a useful regional spur and diversification point off the main trunk.",
+        foreignOwnership: "Foreign participation is limited and the infrastructure layer is a single national operator, so options are narrow.",
+        recommendedMode: "Work through Unified National Networks (UNN), the sole infrastructure operator.",
+        recommendation: "Treat as a single-partner market; confirm UNN appetite before committing a branch.",
+        verdict: "Caution"
+      },
+      licensing: [
+        { license: "Telecom licence + cable-landing authorisation", authority: "AITI", leadTimeMonths: 9, dependsOn: "UNN as landing party", note: "Under the Telecommunications Order 2001." },
+        { license: "Environmental clearance", authority: "JASTRe", leadTimeMonths: 6, dependsOn: "Marine survey", note: "" },
+        { license: "Coastal / foreshore works permit", authority: "JASTRe", leadTimeMonths: 5, dependsOn: "Landing-site selection", note: "" }
+      ],
+      landingParties: {
+        candidates: ["Unified National Networks (UNN)", "DST (retail)", "imagine (retail)"],
+        wants: ["Capacity for the national network", "Control of the landing station", "Backhaul to Bandar Seri Begawan"],
+        structures: ["Capacity swap (IRU) via UNN", "Branch landing hosted by UNN"],
+        note: "UNN is the single wholesale infrastructure operator."
+      }
+    }
+  };
+  DATA.forEach(function (c) { if (EXTRA[c.key]) { c.marketEntry = EXTRA[c.key].marketEntry; c.licensing = EXTRA[c.key].licensing; c.landingParties = EXTRA[c.key].landingParties; } });
+
   var COUNTRIES = {};
   DATA.forEach(function (c) { COUNTRIES[c.key] = c; });
 
@@ -6622,6 +6792,65 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
     });
   }
 
+  // ---- framework generators (plain language, for non-PM users) ------------
+  // Each returns { title, explainer, legend?, countries:[...] }. Pure & local.
+
+  function marketEntryFramework(countries) {
+    return {
+      title: "Market Entry",
+      explainer: "For each country this answers three plain questions: is it worth going in, how much can a foreign investor own, and what is the simplest way in. The colour 'verdict' is a quick traffic-light to focus attention — not a guarantee.",
+      legend: { "IRU": "Indefeasible Right of Use — a long-term lease of capacity on the cable, used when you buy space instead of building the landing yourself." },
+      countries: (countries || []).map(function (c) {
+        var m = c.marketEntry || {};
+        return {
+          key: c.key, name: c.name, regulator: c.authority.abbrev,
+          demand: m.demand || "", foreignOwnership: m.foreignOwnership || "",
+          recommendedMode: m.recommendedMode || "", recommendation: m.recommendation || "",
+          verdict: m.verdict || "Conditional Go"
+        };
+      })
+    };
+  }
+
+  function licensingFramework(countries) {
+    var rows = (countries || []).map(function (c) {
+      var ls = (c.licensing || []).map(function (l) {
+        return { license: l.license, authority: l.authority, leadTimeMonths: Number(l.leadTimeMonths) || 0, dependsOn: l.dependsOn || "", note: l.note || "" };
+      });
+      var slowest = ls.slice().sort(function (a, b) { return b.leadTimeMonths - a.leadTimeMonths; })[0] || null;
+      return {
+        key: c.key, name: c.name, regulator: c.authority.abbrev,
+        licenses: ls,
+        criticalPathMonths: slowest ? slowest.leadTimeMonths : 0,
+        criticalPathItem: slowest ? slowest.license : "",
+        criticalPathAuthority: slowest ? slowest.authority : ""
+      };
+    });
+    return {
+      title: "Licensing & Permitting",
+      explainer: "Every official approval the project needs in each country, who grants it, and roughly how many months it usually takes. The slowest approval in a country decides when work there can realistically start — so those are the ones to begin first.",
+      countries: rows
+    };
+  }
+
+  function landingPartnerFramework(countries) {
+    return {
+      title: "Landing Partner Engagement",
+      explainer: "A 'landing party' is the licensed local company that brings the cable ashore and owns or operates the building where it lands. This shows who the realistic partners are in each country, what they usually want in return, and the common ways to structure a deal with them.",
+      legend: {
+        "Landing party": "The licensed local company that physically brings the cable ashore and operates the landing station.",
+        "IRU": "Indefeasible Right of Use — a long-term lease of capacity on the cable."
+      },
+      countries: (countries || []).map(function (c) {
+        var lp = c.landingParties || {};
+        return {
+          key: c.key, name: c.name,
+          candidates: lp.candidates || [], wants: lp.wants || [], structures: lp.structures || [], note: lp.note || ""
+        };
+      })
+    };
+  }
+
   var API = {
     COUNTRIES: COUNTRIES,
     list: list,
@@ -6629,7 +6858,10 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
     riskCases: riskCases,
     permitTaskCases: permitTaskCases,
     procurementItems: procurementItems,
-    summarize: summarize
+    summarize: summarize,
+    marketEntryFramework: marketEntryFramework,
+    licensingFramework: licensingFramework,
+    landingPartnerFramework: landingPartnerFramework
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = API;
@@ -6902,6 +7134,95 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
     return { rows, total: round(total * 1.1) };
   }
 
+  // ---- Advisor (the integrated "AI brain") --------------------------------
+  // Turns the analysis + frameworks into a short, PRIORITISED, plain-language
+  // action list so a user with no project-management background knows exactly
+  // what to do first to reach the best result. 100% deterministic & offline.
+  function buildAdvice(input) {
+    input = input || {};
+    const fw = input.frameworks || null;
+    const risks = input.risks || [];
+    const intel = input.countryIntel || [];
+    const recs = [];      // { priority, title, text, why }
+    const nextSteps = [];
+
+    // 1) The single most schedule-defining move: start the slowest approval.
+    if (fw && fw.licensing && fw.licensing.countries && fw.licensing.countries.length) {
+      const slowest = fw.licensing.countries.slice()
+        .sort((a, b) => (b.criticalPathMonths || 0) - (a.criticalPathMonths || 0))[0];
+      if (slowest && slowest.criticalPathMonths) {
+        recs.push({
+          priority: "Do first",
+          title: "Start the slowest approval now",
+          text: "Begin \u201c" + slowest.criticalPathItem + "\u201d with " + slowest.criticalPathAuthority + " in " + slowest.name + " straight away.",
+          why: "At roughly " + slowest.criticalPathMonths + " months it is the longest approval in the whole programme, so it decides your earliest possible start date. Other tasks can catch up later \u2014 this one cannot."
+        });
+        nextSteps.push("Open the " + slowest.name + " permit track with " + slowest.criticalPathAuthority + ".");
+      }
+    }
+
+    // 2) Lead with the most open markets; handle sensitive ones with care.
+    if (fw && fw.marketEntry && fw.marketEntry.countries) {
+      const go = fw.marketEntry.countries.filter(c => /^go$/i.test(c.verdict));
+      const caution = fw.marketEntry.countries.filter(c => /caution/i.test(c.verdict));
+      if (go.length) recs.push({
+        priority: "Quick win",
+        title: "Lead with the most open markets",
+        text: "Start commercial talks in " + go.map(c => c.name).join(", ") + " first.",
+        why: "These have the most open foreign-ownership rules, so deals close faster and take risk off the table early."
+      });
+      if (caution.length) recs.push({
+        priority: "Watch",
+        title: "Handle the sensitive markets carefully",
+        text: "In " + caution.map(c => c.name).join(", ") + ", line up the right local partner before committing money.",
+        why: "Tight ownership limits or a single available partner mean fewer fallback options if a deal stalls."
+      });
+    }
+
+    // 3) Sole-partner markets — get written intent before designing the branch.
+    if (fw && fw.landingPartners && fw.landingPartners.countries) {
+      const thin = fw.landingPartners.countries.filter(c => (c.candidates || []).length <= 1);
+      if (thin.length) recs.push({
+        priority: "Watch",
+        title: "Lock in the single-partner markets early",
+        text: "In " + thin.map(c => c.name).join(", ") + " there is effectively one landing partner \u2014 get a written letter of intent before you design that branch.",
+        why: "With no alternative supplier, the project is exposed if that one partner declines."
+      });
+    }
+
+    // 4) The biggest risk (highest likelihood \u00d7 impact \u00d7 hard-to-catch).
+    if (risks.length) {
+      const top = risks.slice().sort((a, b) => (b.sev * b.occ * b.det) - (a.sev * a.occ * a.det))[0];
+      if (top) recs.push({
+        priority: "Mitigate",
+        title: "Plan around the biggest risk",
+        text: top.problem.replace(/^RISK:\s*/, ""),
+        why: (top.rootCause ? "Main cause: " + top.rootCause + ". " : "") + "This scored highest on how likely it is, how damaging it would be, and how hard it is to spot in time \u2014 so build in margin (spare time, a backup route, or a second partner)."
+      });
+    }
+
+    // 5) Seasonal weather windows (typhoon/monsoon) from country hazards.
+    const weatherCountries = intel.filter(c =>
+      (c.geographical || []).some(g => /typhoon|monsoon|cyclone|storm/i.test(g)))
+      .map(c => c.name);
+    if (weatherCountries.length) recs.push({
+      priority: "Plan",
+      title: "Schedule sea work around the weather",
+      text: "Plan marine survey and cable-lay in " + weatherCountries.join(", ") + " for the calm season.",
+      why: "Typhoon and monsoon seasons stop ships from working safely, so the calendar \u2014 not the budget \u2014 often controls these stretches."
+    });
+
+    if (nextSteps.indexOf("Review the auto-built plan, then click \u201cApply\u201d to load it into the project.") === -1) {
+      nextSteps.push("Review the auto-built plan, then click \u201cApply\u201d to load it into the project.");
+    }
+
+    const headline = recs.length
+      ? "Here is how to get the best result \u2014 " + recs.length + " priority moves, most important first. The app worked these out from your description."
+      : "Add a project description (name the countries, or use the word \u201csubmarine\u201d) and the advisor will tell you exactly what to do first.";
+
+    return { headline, recommendations: recs, nextSteps };
+  }
+
   /**
    * Analyze a project description into a full management plan.
    * @param {string} text - the project description (stays local).
@@ -6933,6 +7254,7 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
     // authority), FMEA-scored geopolitical/geographical risks and procurement
     // lines. A submarine/subsea project with no named country includes all 8.
     let countryIntel = [];
+    let frameworks = null;
     if (profile.id === "fibre-telecom") {
       const CD = getCountryData();
       if (CD && typeof CD.detect === "function") {
@@ -6944,6 +7266,13 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
             risks.push(mkCase(Object.assign({}, r, { leanMethod: r.leanMethod || "FMEA", _brain: "risk" }))));
           CD.procurementItems(det.countries).forEach(p => procurement.push(p));
           countryIntel = CD.summarize(det.countries);
+          if (typeof CD.marketEntryFramework === "function") {
+            frameworks = {
+              marketEntry: CD.marketEntryFramework(det.countries),
+              licensing: CD.licensingFramework(det.countries),
+              landingPartners: CD.landingPartnerFramework(det.countries)
+            };
+          }
           if (det.signal === "submarine") warnings.push("No specific country named — included all 8 STP countries/territories because a submarine/subsea project was detected. Name countries to narrow the set.");
         } else {
           warnings.push("No STP country detected — add country names (e.g. Philippines, Taiwan) or the word 'submarine' to attach regulatory authorities and country-specific risks.");
@@ -6952,6 +7281,10 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
     }
 
     const budget = aggregateBudget(cases.concat(risks), procurement);
+
+    // The integrated advisor turns everything above into prioritised, plain
+    // actions — so a single uploaded description yields a ready next-step list.
+    const advice = buildAdvice({ frameworks, risks, countryIntel });
 
     // Domain & scale warnings.
     if (picked.profile.id === "generic-pm") warnings.push("Domain not confidently detected — used the generic PM template. Add more detail (e.g. 'fibre', 'OTDR', 'route km') for a tailored plan.");
@@ -6973,13 +7306,15 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
       budget,
       roles: profile.roles,
       countryIntel,
+      frameworks,
+      advice,
       coverage: { profile: profile.id, confidence: Math.round(confidence * 100) / 100, matched: picked.matched, warnings },
     };
   }
 
   function listProfiles() { return PROFILES.map(p => ({ id: p.id, label: p.label })); }
 
-  const API = { analyzeProject, listProfiles, extractScale, _profiles: PROFILES };
+  const API = { analyzeProject, listProfiles, extractScale, buildAdvice, _profiles: PROFILES };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIBrain = API;
 })(typeof window !== "undefined" ? window : globalThis);
@@ -8189,6 +8524,10 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
     { id: "routeprogress", label: "Route Progress", icon: "📡" },
     { g: "Intelligence" },
     { id: "country", label: "Country Intelligence", icon: "🗺" },
+    { id: "advisor", label: "Project Advisor (AI)", icon: "🧭" },
+    { id: "marketentry", label: "Market Entry", icon: "🚪" },
+    { id: "licensing", label: "Licensing & Permits", icon: "📜" },
+    { id: "landingpartners", label: "Landing Partners", icon: "🤝" },
     { id: "ai", label: "AI Assistant", icon: "✦" },
     { id: "impact", label: "Change Impact", icon: "⇄" },
     { id: "scorecard", label: "KPI Scorecard", icon: "▣" },
@@ -9093,10 +9432,12 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
       profiles.map(p => `<option value="${esc(p.id)}">${esc(p.label)}</option>`).join("");
     return `<div class="card">
         <h3>Project Brain <span class="tag">auto-plan</span></h3>
-        <p style="line-height:1.6">Paste or upload your <b>project description</b>. The Brain analyses it
-        <b>locally on this device</b> — nothing is uploaded or sent to any server — and builds a full plan:
-        phases, tasks, a risk register, milestones, procurement and a budget skeleton. Review the preview,
-        then apply it to the active project. It structures and tracks the work; people still execute it.</p>
+        <p style="line-height:1.6">Paste or upload your <b>project description</b> — that is the only thing you need to do.
+        The Brain analyses it <b>locally on this device</b> — nothing is uploaded or sent to any server — and the app
+        does the rest automatically: it builds a full plan (phases, tasks, a risk register, milestones, procurement and a
+        budget), a <b>Market Entry</b>, <b>Licensing &amp; Permitting</b> and <b>Landing Partner</b> framework for every
+        country it detects, and an on-device <b>Advisor</b> that tells you, in plain English, what to do first to get the
+        best result. Review it, then apply it to the active project. It structures and tracks the work; people still execute it.</p>
         <div class="toolbar" style="flex-wrap:wrap;gap:8px">
           <label class="muted" for="brainProfile">Domain</label>
           <select id="brainProfile" style="max-width:280px">${profOpts}</select>
@@ -9115,25 +9456,34 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
   };
   AFTER.brain = function () {
     const fileInput = $("#brainFile"), nameEl = $("#brainFileName"), ta = $("#brainText");
+    // Single shared analysis path so the Analyze button and an upload behave identically.
+    const runAnalyze = (opts) => {
+      const text = (ta.value || "").trim();
+      if (!text) { toast("Paste or upload a project description first."); return false; }
+      if (!window.QIBrain) { toast("Brain engine not loaded."); return false; }
+      const plan = QIBrain.analyzeProject(text, { profile: $("#brainProfile").value || undefined });
+      uiState.brainPlan = plan;
+      renderBrainPreview(plan);
+      if (opts && opts.scroll) { const out = $("#brainOut"); if (out && out.scrollIntoView) out.scrollIntoView({ behavior: "smooth", block: "start" }); }
+      return true;
+    };
     if (fileInput) fileInput.addEventListener("change", () => {
       const f = fileInput.files && fileInput.files[0]; if (!f) return;
       nameEl.textContent = f.name;
       const reader = new FileReader();
-      reader.onload = () => { ta.value = String(reader.result || ""); };
+      reader.onload = () => {
+        ta.value = String(reader.result || "");
+        // Upload alone is enough — the app does the rest automatically.
+        if (runAnalyze({ scroll: true })) toast(`Analysed "${f.name}" — your plan & country frameworks are below.`);
+      };
+      reader.onerror = () => toast("Could not read that file. Try a plain .txt or .md file.");
       reader.readAsText(f);
     });
     const clearBtn = $("#brainClear");
-    if (clearBtn) clearBtn.addEventListener("click", () => { ta.value = ""; nameEl.textContent = ""; uiState.brainPlan = null; $("#brainOut").innerHTML = ""; });
+    if (clearBtn) clearBtn.addEventListener("click", () => { ta.value = ""; nameEl.textContent = ""; if (fileInput) fileInput.value = ""; uiState.brainPlan = null; $("#brainOut").innerHTML = ""; });
 
     const analyzeBtn = $("#brainAnalyze");
-    if (analyzeBtn) analyzeBtn.addEventListener("click", () => {
-      const text = (ta.value || "").trim();
-      if (!text) { toast("Paste or upload a project description first."); return; }
-      if (!window.QIBrain) { toast("Brain engine not loaded."); return; }
-      const plan = QIBrain.analyzeProject(text, { profile: $("#brainProfile").value || undefined });
-      uiState.brainPlan = plan;
-      renderBrainPreview(plan);
-    });
+    if (analyzeBtn) analyzeBtn.addEventListener("click", () => runAnalyze());
   };
   function renderBrainPreview(plan) {
     const kpi = (cls, l, v) => `<div class="kpi ${cls}"><div class="label">${l}</div><div class="value">${v}</div></div>`;
@@ -9161,6 +9511,18 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
             <div class="country-section"><h4>Top geographical hazards</h4><ul>${(c.geographical || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
           </div>`).join("")}</div>
       </div>` : "";
+    const adv = plan.advice;
+    const advisorBlock = adv && adv.recommendations && adv.recommendations.length ? `
+      <div class="card" style="border-left:4px solid var(--navy,#1b3a6b)"><div class="card-head"><h3>🧭 Advisor — how to get the best result</h3><span class="tag">AI · on-device</span></div>
+        <p style="line-height:1.6">${esc(adv.headline)}</p>
+        <ol style="line-height:1.7">${adv.recommendations.map(r => `<li><b>[${esc(r.priority)}] ${esc(r.title)}</b> — ${esc(r.text)}<br><span class="muted">Why: ${esc(r.why)}</span></li>`).join("")}</ol>
+        <div class="toolbar" style="flex-wrap:wrap;gap:6px">
+          <button class="btn btn-sm" data-go="advisor">Full advisor</button>
+          <button class="btn btn-sm" data-go="marketentry">Market Entry</button>
+          <button class="btn btn-sm" data-go="licensing">Licensing &amp; Permits</button>
+          <button class="btn btn-sm" data-go="landingpartners">Landing Partners</button>
+          <button class="btn btn-sm" data-go="globe3d">3D map</button>
+        </div></div>` : "";
     $("#brainOut").innerHTML = `
       <div class="card"><div class="card-head"><h3>Analysis — ${esc(s.title)}</h3>
         <span class="tag">${esc(s.domainLabel)} · ${Math.round(plan.coverage.confidence * 100)}% confidence</span></div>
@@ -9178,6 +9540,7 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
           <span class="muted">Adds ${plan.cases.length + plan.risks.length} cases, ${plan.milestones.length} milestones and ${plan.procurement.length} procurement items.</span>
         </div>
       </div>
+      ${advisorBlock}
       <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="card"><h3>Work breakdown</h3>${tableWrap("<th>Phase</th><th>Owner</th><th>Tasks</th>", phaseRows)}</div>
         <div class="card"><h3>Top risks (FMEA RPN)</h3>${tableWrap("<th class='wrap'>Risk</th><th>S</th><th>O</th><th>D</th><th>RPN</th>", riskRows)}</div>
@@ -9191,6 +9554,7 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
       toast(`Applied: ${n} cases, ${plan.milestones.length} milestones, ${plan.procurement.length} procurement items.`);
       go("dashboard");
     });
+    bindGo();
   }
   function applyBrainPlan(plan) {
     let n = 0;
@@ -9201,6 +9565,98 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
     plan.procurement.forEach(p => S.regAdd("procurement", Object.assign({}, p)));
     return n;
   }
+
+  // ---------- Frameworks & Advisor (auto-generated from a description) ------
+  // These views need only ONE input from the user: a project description in the
+  // Project Brain. Until then they show the full 8-country reference set so the
+  // app is useful out of the box. Everything is plain-language for non-PM users.
+  function verdictClass(v) { v = String(v || "").toLowerCase(); if (v === "go") return "b-ontrack"; if (v.indexOf("caution") >= 0) return "b-critical"; return "b-high"; }
+  function bindGo() { document.querySelectorAll("[data-go]").forEach(b => { if (b._goBound) return; b._goBound = true; b.addEventListener("click", () => go(b.dataset.go)); }); }
+  function fwBundle() {
+    if (uiState.brainPlan && uiState.brainPlan.frameworks) {
+      return { frameworks: uiState.brainPlan.frameworks, advice: uiState.brainPlan.advice, analysed: true, title: uiState.brainPlan.summary.title, scope: (uiState.brainPlan.countryIntel || []).length };
+    }
+    const CD = window.QICountryData;
+    if (!CD || typeof CD.list !== "function" || typeof CD.marketEntryFramework !== "function") return null;
+    const all = CD.list();
+    const frameworks = { marketEntry: CD.marketEntryFramework(all), licensing: CD.licensingFramework(all), landingPartners: CD.landingPartnerFramework(all) };
+    let advice = null;
+    if (window.QIBrain && QIBrain.buildAdvice) advice = QIBrain.buildAdvice({ frameworks, risks: CD.riskCases(all), countryIntel: CD.summarize(all) });
+    return { frameworks, advice, analysed: false, scope: all.length };
+  }
+  function fwBanner(b) {
+    const analysed = b && b.analysed;
+    return `<div class="readout" style="border-left:3px solid var(--navy,#1b3a6b)">
+      <b>One input, the app does the rest.</b> Paste or upload a project description in <b>Project Brain</b> and these fill in automatically.
+      ${analysed ? `Showing your analysed project <b>${esc(b.title)}</b> (${b.scope} ${b.scope === 1 ? "country" : "countries"} detected).` : `Nothing analysed yet — showing the full reference set for <b>all 8 countries</b>.`}
+      <span class="toolbar" style="display:inline-flex;gap:6px;margin-left:8px">
+        <button class="btn btn-sm btn-primary" data-go="brain">Open Project Brain</button>
+        <button class="btn btn-sm" data-go="globe3d">View on 3D map</button>
+      </span></div>`;
+  }
+  function fwLegend(legend) {
+    if (!legend) return "";
+    return `<p class="muted">${Object.keys(legend).map(k => `<b>${esc(k)}</b>: ${esc(legend[k])}`).join("<br>")}</p>`;
+  }
+  function renderMarketEntryHTML(fw) {
+    const rows = fw.countries.map(c => `<tr>
+      <td><b>${esc(c.name)}</b><div class="muted">${esc(c.regulator)}</div></td>
+      <td class="center"><span class="badge ${verdictClass(c.verdict)}">${esc(c.verdict)}</span></td>
+      <td class="wrap">${esc(c.foreignOwnership)}</td>
+      <td class="wrap">${esc(c.recommendedMode)}</td>
+      <td class="wrap">${esc(c.recommendation)}</td></tr>`).join("");
+    return `<div class="card"><h3>${esc(fw.title)} <span class="tag">${fw.countries.length} ${fw.countries.length === 1 ? "country" : "countries"}</span></h3>
+      <p style="line-height:1.6">${esc(fw.explainer)}</p>${fwLegend(fw.legend)}
+      ${tableWrap("<th>Country</th><th>Verdict</th><th class='wrap'>Who can own it</th><th class='wrap'>Simplest way in</th><th class='wrap'>Recommendation</th>", rows)}</div>`;
+  }
+  function renderLicensingHTML(fw) {
+    const cards = fw.countries.map(c => {
+      const rows = c.licenses.map(l => {
+        const crit = l.license === c.criticalPathItem;
+        return `<tr${crit ? ' style="background:rgba(224,168,0,.10)"' : ''}>
+          <td class="wrap">${crit ? "<b>" + esc(l.license) + "</b> <span class='badge b-high'>slowest</span>" : esc(l.license)}</td>
+          <td>${esc(l.authority)}</td><td class="center">${l.leadTimeMonths} mo</td>
+          <td class="wrap">${esc(l.dependsOn)}</td><td class="wrap muted">${esc(l.note)}</td></tr>`;
+      }).join("");
+      return `<div class="card"><div class="card-head"><h3>${esc(c.name)}</h3><span class="tag">${esc(c.regulator)}</span></div>
+        <div class="readout">Work here can realistically start in about <b>${c.criticalPathMonths} months</b> — set by the slowest approval, <b>${esc(c.criticalPathItem)}</b> (${esc(c.criticalPathAuthority)}). Begin that one first.</div>
+        ${tableWrap("<th class='wrap'>Approval needed</th><th>Who grants it</th><th>Time</th><th class='wrap'>Needs first</th><th class='wrap'>Note</th>", rows)}</div>`;
+    }).join("");
+    return `<div class="card"><h3>${esc(fw.title)} <span class="tag">${fw.countries.length} ${fw.countries.length === 1 ? "country" : "countries"}</span></h3><p style="line-height:1.6">${esc(fw.explainer)}</p></div>${cards}`;
+  }
+  function renderLandingPartnersHTML(fw) {
+    const cards = fw.countries.map(c => `
+      <div class="card country-card"><div class="card-head"><h3>${esc(c.name)}</h3><span class="tag">${(c.candidates || []).length} partners</span></div>
+        <div class="country-section"><h4>Who can bring the cable ashore</h4><p>${(c.candidates || []).map(x => `<span class="badge">${esc(x)}</span>`).join(" ")}</p></div>
+        <div class="country-cols">
+          <div class="country-section"><h4>What they usually want</h4><ul>${(c.wants || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+          <div class="country-section"><h4>Ways to structure the deal</h4><ul>${(c.structures || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+        </div>${c.note ? `<p class="muted">${esc(c.note)}</p>` : ""}</div>`).join("");
+    return `<div class="card"><h3>${esc(fw.title)} <span class="tag">${fw.countries.length} ${fw.countries.length === 1 ? "country" : "countries"}</span></h3>
+      <p style="line-height:1.6">${esc(fw.explainer)}</p>${fwLegend(fw.legend)}</div>
+      <div class="country-grid">${cards}</div>`;
+  }
+  function renderAdvisorHTML(advice) {
+    if (!advice) return `<div class="card"><p class="muted">Advisor unavailable — country data not loaded.</p></div>`;
+    const prClass = p => { p = String(p || "").toLowerCase(); if (p.indexOf("first") >= 0 || p.indexOf("mitigate") >= 0) return "b-critical"; if (p.indexOf("watch") >= 0) return "b-high"; if (p.indexOf("quick") >= 0) return "b-ontrack"; return "b-progress"; };
+    const recs = advice.recommendations.map((r, i) => `
+      <div class="card" style="border-left:4px solid var(--navy,#1b3a6b)">
+        <div class="card-head"><h3>${i + 1}. ${esc(r.title)}</h3><span class="badge ${prClass(r.priority)}">${esc(r.priority)}</span></div>
+        <p><b>${esc(r.text)}</b></p><p class="muted">Why: ${esc(r.why)}</p></div>`).join("");
+    const steps = (advice.nextSteps || []).map(s => `<li>${esc(s)}</li>`).join("");
+    return `<div class="card"><div class="card-head"><h3>Project Advisor</h3><span class="tag">AI · on-device</span></div>
+        <p style="line-height:1.6">${esc(advice.headline)}</p></div>
+      ${recs || `<div class="card"><p class="muted">Analyse a description in Project Brain to get tailored recommendations.</p></div>`}
+      ${steps ? `<div class="card"><h3>Your next steps</h3><ol style="line-height:1.7">${steps}</ol></div>` : ""}`;
+  }
+  RENDER.advisor = function () { const b = fwBundle(); return fwBanner(b) + renderAdvisorHTML(b ? b.advice : null); };
+  AFTER.advisor = bindGo;
+  RENDER.marketentry = function () { const b = fwBundle(); return b ? fwBanner(b) + renderMarketEntryHTML(b.frameworks.marketEntry) : `<div class="card"><p class="muted">Country data not loaded.</p></div>`; };
+  AFTER.marketentry = bindGo;
+  RENDER.licensing = function () { const b = fwBundle(); return b ? fwBanner(b) + renderLicensingHTML(b.frameworks.licensing) : `<div class="card"><p class="muted">Country data not loaded.</p></div>`; };
+  AFTER.licensing = bindGo;
+  RENDER.landingpartners = function () { const b = fwBundle(); return b ? fwBanner(b) + renderLandingPartnersHTML(b.frameworks.landingPartners) : `<div class="card"><p class="muted">Country data not loaded.</p></div>`; };
+  AFTER.landingpartners = bindGo;
 
   // Read-only Country Intelligence: real regulatory authority, marine/EIA body,
   // and the dominant geopolitical & geographical hazards for each of the 8 STP
@@ -11069,7 +11525,7 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 </script>
 <script>
 (function () {
-  var BUILD_ID = "2026-06-17 (f0bfbdd)";
+  var BUILD_ID = "2026-06-17 (e5bd19e)";
   function hideStrayOverlays() {
     // Defensive: an empty modal scrim / toast must never paint over the app.
     ["modalOverlay", "toast"].forEach(function (id) {

@@ -277,6 +277,176 @@
     };
   });
 
+  // ---- framework reference data (Market Entry / Licensing / Landing Party) -
+  // Merged onto each country record below. Kept as a separate map so the core
+  // records above stay readable. All figures are INDICATIVE planning lead times
+  // (months) and all operator names are real, well-known licensees as of 2025.
+  // Plain language is used throughout — these feed tools for users with NO
+  // project-management or telecom background.
+  var EXTRA = {
+    indonesia: {
+      marketEntry: {
+        demand: "Very large, fast-growing market (270M+ people) with a major data-centre build-out around Jakarta and Batam.",
+        foreignOwnership: "Telecom services are largely open to majority foreign ownership (up to ~67% under the Positive Investment List), but the cable-landing right itself is held through a locally-licensed company.",
+        recommendedMode: "Partner with a licensed Indonesian landing party (often via a local joint venture) and use their landing licence.",
+        recommendation: "Enter through a strong local partner and budget extra time for approvals across several provinces.",
+        verdict: "Conditional Go"
+      },
+      licensing: [
+        { license: "Cable-landing approval / telecom licence", authority: "Komdigi (DJID)", leadTimeMonths: 12, dependsOn: "A local landing-party company", note: "Needs central + provincial coordination." },
+        { license: "Marine spatial-use permit (sea corridor)", authority: "KKP", leadTimeMonths: 8, dependsOn: "Route survey", note: "Reserves the seabed corridor for the cable." },
+        { license: "AMDAL environmental clearance", authority: "KKP / AMDAL", leadTimeMonths: 9, dependsOn: "Marine survey", note: "Reefs and seismic zones widen the study." }
+      ],
+      landingParties: {
+        candidates: ["Telkom Indonesia / Telin", "Indosat Ooredoo Hutchison", "XL Axiata", "Moratelindo"],
+        wants: ["A share of capacity (fibre pairs)", "Local equity or revenue share", "Backhaul to Jakarta / Batam data centres"],
+        structures: ["Use the partner's landing licence + capacity swap (IRU)", "Local joint venture with the landing party"],
+        note: "Telin already runs regional systems and existing landing stations."
+      }
+    },
+    thailand: {
+      marketEntry: {
+        demand: "Solid regional-hub demand; established carriers and growing cloud/data-centre presence.",
+        foreignOwnership: "The Foreign Business Act generally caps foreign ownership at 49% in telecoms, so a Thai-majority structure is normally required.",
+        recommendedMode: "Thai-majority joint venture, or buy capacity through an existing NBTC-licensed landing party.",
+        recommendation: "Plan for a Thai-majority partner; the 49% cap shapes the whole deal.",
+        verdict: "Conditional Go"
+      },
+      licensing: [
+        { license: "Telecom licence + landing-station authorisation", authority: "NBTC", leadTimeMonths: 10, dependsOn: "Thai-majority licensee", note: "Sequential with environmental sign-off." },
+        { license: "Coastal / foreshore works approval", authority: "Marine Department", leadTimeMonths: 6, dependsOn: "Landing-site selection", note: "Shore-end construction permit." },
+        { license: "Environmental impact assessment", authority: "ONEP", leadTimeMonths: 8, dependsOn: "Marine survey", note: "" }
+      ],
+      landingParties: {
+        candidates: ["AIS (Advanced Info Service)", "True Corporation", "National Telecom (NT)"],
+        wants: ["Capacity for domestic + transit traffic", "Thai-majority equity position", "Backhaul to Bangkok"],
+        structures: ["Thai-majority JV holds the licence", "Capacity purchase (IRU) from an existing landing party"],
+        note: "National Telecom (state-owned) already operates landing stations."
+      }
+    },
+    vietnam: {
+      marketEntry: {
+        demand: "Large, young, fast-digitising market; strong need for more resilient international capacity after repeated cable faults.",
+        foreignOwnership: "Facilities-based telecom is limited to ~49% foreign ownership; the market is dominated by state-linked operators.",
+        recommendedMode: "Partner with a state-linked operator (Viettel/VNPT) or buy capacity into their landing stations.",
+        recommendation: "Engage a state-linked landing partner early; routing near disputed waters needs lead time.",
+        verdict: "Conditional Go"
+      },
+      licensing: [
+        { license: "Submarine-cable landing licence", authority: "MOST (ex-MIC)", leadTimeMonths: 12, dependsOn: "State-linked landing partner", note: "Sensitivity near East Sea routing." },
+        { license: "Sea-area use assignment", authority: "VASI", leadTimeMonths: 9, dependsOn: "Route survey", note: "Assigns the seabed corridor." },
+        { license: "Provincial environmental impact assessment", authority: "VASI / Province", leadTimeMonths: 7, dependsOn: "Marine survey", note: "" }
+      ],
+      landingParties: {
+        candidates: ["Viettel", "VNPT", "FPT Telecom", "CMC Telecom"],
+        wants: ["Capacity + redundancy for national networks", "Local control of the landing station", "Backhaul to Hanoi / Ho Chi Minh City"],
+        structures: ["Capacity swap (IRU) into a state-linked landing station", "Consortium membership with a Vietnamese operator"],
+        note: "Viettel and VNPT hold the main international gateways."
+      }
+    },
+    taiwan: {
+      marketEntry: {
+        demand: "High-value, high-tech market; critical interconnection point but politically sensitive.",
+        foreignOwnership: "Network (Type I) operators face foreign-ownership limits (broadly ~49% direct / ~60% total) and NCC scrutiny of foreign control.",
+        recommendedMode: "Partner with an incumbent (Chunghwa Telecom) and buy into their landing station.",
+        recommendation: "Use an established local carrier; expect heightened national-security review.",
+        verdict: "Caution"
+      },
+      licensing: [
+        { license: "Submarine cable-landing authorisation", authority: "NCC", leadTimeMonths: 12, dependsOn: "Local Type I carrier", note: "Security review of foreign control." },
+        { license: "Marine-area coordination", authority: "OAC", leadTimeMonths: 7, dependsOn: "Route survey", note: "Ocean Affairs Council." },
+        { license: "Environmental impact assessment", authority: "MOENV", leadTimeMonths: 8, dependsOn: "Marine survey", note: "" }
+      ],
+      landingParties: {
+        candidates: ["Chunghwa Telecom", "Taiwan Mobile", "Far EasTone"],
+        wants: ["Capacity + route diversity", "Operational control of the landing", "Backhaul to Taipei / Hsinchu"],
+        structures: ["Capacity swap (IRU) with the incumbent", "Consortium membership with a local carrier"],
+        note: "Chunghwa Telecom operates the principal landing stations."
+      }
+    },
+    philippines: {
+      marketEntry: {
+        demand: "Very large, under-served broadband market with rapid mobile/data growth.",
+        foreignOwnership: "The Public Service Act (2022) lets foreign investors own up to 100% of telecom companies — among the most open in the region.",
+        recommendedMode: "Direct entry is possible; a local landing partner still speeds local-government permits.",
+        recommendation: "Strong open-ownership rules make entry attractive; weather and multi-body permits are the real constraints.",
+        verdict: "Go"
+      },
+      licensing: [
+        { license: "Cable-landing licence + value-added/telecom registration", authority: "NTC", leadTimeMonths: 9, dependsOn: "Local entity registration", note: "" },
+        { license: "Environmental Compliance Certificate (ECC)", authority: "DENR-EMB", leadTimeMonths: 8, dependsOn: "Marine survey", note: "Under the EIS system." },
+        { license: "Foreshore lease + local-government permits", authority: "DENR-EMB / LGU", leadTimeMonths: 6, dependsOn: "Landing-site selection", note: "Several local units may be involved." }
+      ],
+      landingParties: {
+        candidates: ["PLDT", "Globe Telecom", "Converge ICT", "DITO Telecommunity"],
+        wants: ["Capacity for fast-growing data demand", "Backhaul to Metro Manila / Cebu / Davao", "Brand & coverage benefits"],
+        structures: ["Direct (100% allowed) with a local operating entity", "Capacity swap (IRU) with an incumbent"],
+        note: "PLDT and Globe own multiple existing landing stations."
+      }
+    },
+    guam: {
+      marketEntry: {
+        demand: "Small local market but the strategic Pacific hub — the gateway onward to the US mainland and Asia.",
+        foreignOwnership: "No general foreign-ownership cap, but a US national-security review (Team Telecom) examines foreign owners before the FCC grants the landing licence.",
+        recommendedMode: "Establish a US entity for the landing licence and partner with a Guam operator for the station.",
+        recommendation: "Essential hub; start the FCC + national-security track first because it gates everything.",
+        verdict: "Go"
+      },
+      licensing: [
+        { license: "Submarine Cable Landing Licence", authority: "FCC", leadTimeMonths: 12, dependsOn: "US entity + security review", note: "Under the Cable Landing License Act." },
+        { license: "National-security review", authority: "Team Telecom", leadTimeMonths: 12, dependsOn: "Disclosure of foreign owners", note: "Runs in parallel with the FCC licence." },
+        { license: "Marine-construction permits + NEPA", authority: "USACE / Guam EPA", leadTimeMonths: 9, dependsOn: "Marine survey", note: "Section 10/404 + reef protection." }
+      ],
+      landingParties: {
+        candidates: ["GTA TeleGuam", "Docomo Pacific", "IT&E"],
+        wants: ["Capacity + interconnection to trans-Pacific systems", "Landing-station hosting fees", "Local backhaul"],
+        structures: ["US entity holds the FCC licence", "Hosting / co-location at a Guam operator's station"],
+        note: "Guam is a hub for many trans-Pacific cables; hosting options are mature."
+      }
+    },
+    malaysia: {
+      marketEntry: {
+        demand: "Strong digital-economy push (MyDIGITAL) and growing data-centre clusters in Johor and Klang Valley.",
+        foreignOwnership: "Network facilities/services licences require MCMC approval and have historically carried foreign-equity conditions (commonly up to ~70%, lower for some licence classes).",
+        recommendedMode: "Local joint venture with an MCMC licensee; separate approvals for Peninsular and East Malaysia.",
+        recommendation: "Attractive market; plan for dual-jurisdiction permits and MCMC equity conditions.",
+        verdict: "Conditional Go"
+      },
+      licensing: [
+        { license: "Network facilities licence + landing approval", authority: "MCMC", leadTimeMonths: 10, dependsOn: "Licensed local entity", note: "Peninsular + East-Malaysia split." },
+        { license: "Environmental impact assessment", authority: "DOE", leadTimeMonths: 8, dependsOn: "Marine survey", note: "Marine-park avoidance." },
+        { license: "Coastal / marine-park works clearance", authority: "DOE / Fisheries", leadTimeMonths: 6, dependsOn: "Landing-site selection", note: "" }
+      ],
+      landingParties: {
+        candidates: ["Telekom Malaysia (TM)", "Maxis", "Time dotCom", "CelcomDigi"],
+        wants: ["Capacity + regional transit", "Backhaul to Johor / Klang Valley data centres", "Local equity position"],
+        structures: ["Local JV holding the MCMC licence", "Capacity swap (IRU) with TM"],
+        note: "Telekom Malaysia operates the main landing stations."
+      }
+    },
+    brunei: {
+      marketEntry: {
+        demand: "Small market, but a useful regional spur and diversification point off the main trunk.",
+        foreignOwnership: "Foreign participation is limited and the infrastructure layer is a single national operator, so options are narrow.",
+        recommendedMode: "Work through Unified National Networks (UNN), the sole infrastructure operator.",
+        recommendation: "Treat as a single-partner market; confirm UNN appetite before committing a branch.",
+        verdict: "Caution"
+      },
+      licensing: [
+        { license: "Telecom licence + cable-landing authorisation", authority: "AITI", leadTimeMonths: 9, dependsOn: "UNN as landing party", note: "Under the Telecommunications Order 2001." },
+        { license: "Environmental clearance", authority: "JASTRe", leadTimeMonths: 6, dependsOn: "Marine survey", note: "" },
+        { license: "Coastal / foreshore works permit", authority: "JASTRe", leadTimeMonths: 5, dependsOn: "Landing-site selection", note: "" }
+      ],
+      landingParties: {
+        candidates: ["Unified National Networks (UNN)", "DST (retail)", "imagine (retail)"],
+        wants: ["Capacity for the national network", "Control of the landing station", "Backhaul to Bandar Seri Begawan"],
+        structures: ["Capacity swap (IRU) via UNN", "Branch landing hosted by UNN"],
+        note: "UNN is the single wholesale infrastructure operator."
+      }
+    }
+  };
+  DATA.forEach(function (c) { if (EXTRA[c.key]) { c.marketEntry = EXTRA[c.key].marketEntry; c.licensing = EXTRA[c.key].licensing; c.landingParties = EXTRA[c.key].landingParties; } });
+
   var COUNTRIES = {};
   DATA.forEach(function (c) { COUNTRIES[c.key] = c; });
 
@@ -383,6 +553,65 @@
     });
   }
 
+  // ---- framework generators (plain language, for non-PM users) ------------
+  // Each returns { title, explainer, legend?, countries:[...] }. Pure & local.
+
+  function marketEntryFramework(countries) {
+    return {
+      title: "Market Entry",
+      explainer: "For each country this answers three plain questions: is it worth going in, how much can a foreign investor own, and what is the simplest way in. The colour 'verdict' is a quick traffic-light to focus attention — not a guarantee.",
+      legend: { "IRU": "Indefeasible Right of Use — a long-term lease of capacity on the cable, used when you buy space instead of building the landing yourself." },
+      countries: (countries || []).map(function (c) {
+        var m = c.marketEntry || {};
+        return {
+          key: c.key, name: c.name, regulator: c.authority.abbrev,
+          demand: m.demand || "", foreignOwnership: m.foreignOwnership || "",
+          recommendedMode: m.recommendedMode || "", recommendation: m.recommendation || "",
+          verdict: m.verdict || "Conditional Go"
+        };
+      })
+    };
+  }
+
+  function licensingFramework(countries) {
+    var rows = (countries || []).map(function (c) {
+      var ls = (c.licensing || []).map(function (l) {
+        return { license: l.license, authority: l.authority, leadTimeMonths: Number(l.leadTimeMonths) || 0, dependsOn: l.dependsOn || "", note: l.note || "" };
+      });
+      var slowest = ls.slice().sort(function (a, b) { return b.leadTimeMonths - a.leadTimeMonths; })[0] || null;
+      return {
+        key: c.key, name: c.name, regulator: c.authority.abbrev,
+        licenses: ls,
+        criticalPathMonths: slowest ? slowest.leadTimeMonths : 0,
+        criticalPathItem: slowest ? slowest.license : "",
+        criticalPathAuthority: slowest ? slowest.authority : ""
+      };
+    });
+    return {
+      title: "Licensing & Permitting",
+      explainer: "Every official approval the project needs in each country, who grants it, and roughly how many months it usually takes. The slowest approval in a country decides when work there can realistically start — so those are the ones to begin first.",
+      countries: rows
+    };
+  }
+
+  function landingPartnerFramework(countries) {
+    return {
+      title: "Landing Partner Engagement",
+      explainer: "A 'landing party' is the licensed local company that brings the cable ashore and owns or operates the building where it lands. This shows who the realistic partners are in each country, what they usually want in return, and the common ways to structure a deal with them.",
+      legend: {
+        "Landing party": "The licensed local company that physically brings the cable ashore and operates the landing station.",
+        "IRU": "Indefeasible Right of Use — a long-term lease of capacity on the cable."
+      },
+      countries: (countries || []).map(function (c) {
+        var lp = c.landingParties || {};
+        return {
+          key: c.key, name: c.name,
+          candidates: lp.candidates || [], wants: lp.wants || [], structures: lp.structures || [], note: lp.note || ""
+        };
+      })
+    };
+  }
+
   var API = {
     COUNTRIES: COUNTRIES,
     list: list,
@@ -390,7 +619,10 @@
     riskCases: riskCases,
     permitTaskCases: permitTaskCases,
     procurementItems: procurementItems,
-    summarize: summarize
+    summarize: summarize,
+    marketEntryFramework: marketEntryFramework,
+    licensingFramework: licensingFramework,
+    landingPartnerFramework: landingPartnerFramework
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = API;

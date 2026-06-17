@@ -45,6 +45,24 @@ ok(g.coverage.warnings.length >= 1, "warns when domain is not confidently detect
 const noKm = B.analyzeProject("FTTH fibre OTDR splicing project with GPON");
 ok(noKm.coverage.warnings.some(w => /km/.test(w)), "warns when no route length detected");
 
+console.log("\n-- frameworks & advisor (country-aware, auto-generated) --");
+const sub = B.analyzeProject("Trans-Asia submarine fibre cable landing in Philippines, Taiwan, Guam, Vietnam, Indonesia, Thailand, Malaysia and Brunei. 9,000 km, 24 months.");
+ok(sub.frameworks && sub.frameworks.marketEntry && sub.frameworks.marketEntry.countries.length === 8, "Market Entry framework covers all 8 countries");
+ok(sub.frameworks.licensing.countries.every(c => c.criticalPathMonths > 0 && c.criticalPathItem), "Licensing framework has a critical-path permit per country");
+ok(sub.frameworks.landingPartners.countries.every(c => c.candidates.length >= 1), "Landing Partner framework lists partners per country");
+ok(sub.frameworks.marketEntry.countries.find(c => c.key === "philippines").verdict === "Go", "Philippines market-entry verdict is 'Go' (open ownership)");
+ok(sub.frameworks.marketEntry.countries.find(c => c.key === "taiwan").verdict === "Caution", "Taiwan market-entry verdict is 'Caution'");
+ok(sub.advice && sub.advice.recommendations.length >= 4, "Advisor produces prioritised recommendations (" + sub.advice.recommendations.length + ")");
+ok(sub.advice.recommendations[0].priority === "Do first" && /approval/i.test(sub.advice.recommendations[0].title), "top Advisor move is the critical-path approval");
+ok(sub.advice.recommendations.every(r => r.text && r.why), "every recommendation has an action and a plain-language 'why'");
+ok(sub.advice.nextSteps.length >= 1, "Advisor lists concrete next steps");
+ok(JSON.stringify(B.analyzeProject("submarine cable Philippines Taiwan Guam")) === JSON.stringify(B.analyzeProject("submarine cable Philippines Taiwan Guam")), "frameworks/advice are deterministic");
+
+console.log("\n-- generic project: no country frameworks, advisor still helps --");
+const gen = B.analyzeProject("Reorganise the office filing system and onboarding");
+ok(gen.frameworks === null, "non-telecom project has no country frameworks");
+ok(gen.advice && gen.advice.recommendations.length >= 1, "Advisor still surfaces the biggest risk for a generic project");
+
 console.log("\n-- determinism (no hidden randomness) --");
 ok(JSON.stringify(B.analyzeProject(fibreBrief)) === JSON.stringify(B.analyzeProject(fibreBrief)), "same input -> identical output");
 

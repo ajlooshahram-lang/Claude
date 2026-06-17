@@ -85,6 +85,16 @@ setTimeout(() => {
   ok(w.QICountryData && typeof w.QICountryData.list === "function" && w.QICountryData.list().length === 8,
     "country intelligence covers all 8 STP countries");
 
+  // 7b) auto-frameworks + advisor engine wired in
+  ok(w.QICountryData && typeof w.QICountryData.marketEntryFramework === "function"
+    && typeof w.QICountryData.licensingFramework === "function"
+    && typeof w.QICountryData.landingPartnerFramework === "function", "framework generators present");
+  ok(w.QIBrain && typeof w.QIBrain.buildAdvice === "function", "Advisor (buildAdvice) present");
+  ok(d.querySelector('.nav-item[data-view="advisor"]')
+    && d.querySelector('.nav-item[data-view="marketentry"]')
+    && d.querySelector('.nav-item[data-view="licensing"]')
+    && d.querySelector('.nav-item[data-view="landingpartners"]'), "Advisor + 3 framework nav items present");
+
   // 8) no genuine runtime errors (canvas/WebGL artifacts excluded)
   ok(hardErrors.length === 0, "no hard load/exec errors" + (hardErrors.length ? ": " + hardErrors.join(" | ") : ""));
 
