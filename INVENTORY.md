@@ -97,9 +97,9 @@ products relevant to the submarine telecom deployment.
 | `node --check` on all `qi-webapp/js/*.js` + tests | 12/12 OK |
 | `node qi-webapp/test.js` (engine: MSA, cashflow, resource, Cp/Cpk, RICE/WSJF, NCR Pareto, theme, soft-delete/bulk) | PASS |
 | `node qi-webapp/brain.test.js` (domain detect, scale parse, cost scaling, fallback, determinism) | 24/24 PASS |
-| `node qi-webapp/smoke.js` (all 43+ views, country intelligence, 3D map datasets + interactive API no-throw, Route Progress) | 274/274 PASS |
+| `node qi-webapp/smoke.js` (all 43+ views, country intelligence, 3D map datasets + interactive API no-throw, Route Progress) | 287/287 PASS |
 | `cd server && npm run build` | OK (TypeScript compiles cleanly, strict mode) |
-| `cd server && npm test` | 139/139 PASS (health + auth + data + invite tests) |
+| `cd server && npm test` | 218/218 PASS (health + auth/MFA + data + invite/TOCTOU security tests) |
 
 ---
 
