@@ -15130,6 +15130,30 @@ function renderPlc() {
   html += '</div>';
   html += '<div class="result-row" style="margin-top:8px"><span class="label">' + (da ? 'Total I/O' : 'Total I/O') + '</span><span class="value">DI:' + totalDI + ' DO:' + totalDO + ' AI:' + totalAI + ' AO:' + totalAO + ' = ' + (totalDI+totalDO+totalAI+totalAO) + ' ' + (da ? 'punkter' : 'points') + '</span></div></div>';
 
+  // ===== LIVE USB/SERIAL CONNECTION (Web Serial API) =====
+  html += '<div class="card fade-in"><div class="card-title">\uD83D\uDD0C ' + (da ? 'Live forbindelse til PLC (USB/seriel)' : 'Live PLC connection (USB/serial)') + '</div>';
+  html += '<div class="info-row">' + (da ? 'Forbind direkte til en PLC eller Modbus-enhed via USB-til-seriel adapter. Bruger browserens Web Serial API \u2014 ingen installation n\u00f8dvendig.' : 'Connect directly to a PLC or Modbus device via a USB-to-serial adapter. Uses the browser\u2019s Web Serial API \u2014 no installation needed.') + '</div>';
+  if(!plcSerialSupported()){
+    html += '<div class="result-box warning"><div class="result-title">\u26A0\uFE0F ' + (da ? 'Browser underst\u00f8tter ikke Web Serial' : 'Browser does not support Web Serial') + '</div><div style="padding:6px">' + (da ? 'Web Serial API kr\u00e6ver Chrome, Edge eller Opera p\u00e5 desktop (ikke Safari/Firefox/mobil). \u00c5bn appen i Chrome for at bruge live-forbindelse.' : 'Web Serial API requires Chrome, Edge or Opera on desktop (not Safari/Firefox/mobile). Open the app in Chrome to use live connection.') + '</div></div>';
+  } else {
+    html += '<div class="select-group"><div class="select-label">' + (da ? 'Baud-rate' : 'Baud rate') + '</div><div class="select-grid">';
+    [9600,19200,38400,57600,115200].forEach(function(b){ html += '<button class="sel-btn ' + (plcSerial.baud===b?'selected':'') + '" onclick="plcSerial.baud=' + b + ';renderModule(\'plc\')">' + b + '</button>'; });
+    html += '</div></div>';
+    if(!plcSerial.connected){
+      html += '<div class="select-grid"><button class="sel-btn selected" onclick="plcSerialConnect()">\uD83D\uDD0C ' + (da ? 'Forbind (v\u00e6lg port)' : 'Connect (select port)') + '</button></div>';
+    } else {
+      html += '<div class="result-box" style="border-color:var(--success)"><div class="result-title" style="color:var(--success)">\u25CF ' + (da ? 'Forbundet ved ' : 'Connected at ') + plcSerial.baud + ' baud</div></div>';
+      html += '<div class="select-group"><div class="select-label">' + (da ? 'Modbus RTU - L\u00e6s holderegistre' : 'Modbus RTU - Read holding registers') + '</div><div class="select-grid">';
+      html += '<button class="sel-btn" onclick="plcModbusRead(1,0,10)">' + (da ? 'L\u00e6s reg 0-9 (slave 1)' : 'Read reg 0-9 (slave 1)') + '</button>';
+      html += '<button class="sel-btn" onclick="plcModbusRead(1,100,5)">' + (da ? 'L\u00e6s reg 100-104' : 'Read reg 100-104') + '</button>';
+      html += '<button class="sel-btn" onclick="plcModbusRead(2,0,10)">' + (da ? 'L\u00e6s reg 0-9 (slave 2)' : 'Read reg 0-9 (slave 2)') + '</button>';
+      html += '</div></div>';
+      html += '<div class="select-grid"><button class="sel-btn" style="border-color:var(--danger);color:var(--danger)" onclick="plcSerialDisconnect()">\u2715 ' + (da ? 'Afbryd' : 'Disconnect') + '</button></div>';
+    }
+    html += '<div class="select-group"><div class="select-label">' + (da ? 'Kommunikationslog' : 'Communication log') + '</div><div id="plcSerialLog" style="background:#05101c;border:1px solid var(--border,#2a3645);border-radius:8px;padding:10px;max-height:200px;overflow-y:auto;min-height:60px">' + (plcSerial.log.length?'':'<div style="color:#5b7790;font-size:.8rem">' + (da ? 'Ingen aktivitet endnu...' : 'No activity yet...') + '</div>') + '</div></div>';
+  }
+  html += '<div class="info-row" style="margin-top:6px">' + (da ? '\u26A0\uFE0F Brug kun p\u00e5 anl\u00e6g du har autorisation til. Test altid i sikker tilstand f\u00f8rst. Forkerte kommandoer kan stoppe produktion eller skabe farlige tilstande.' : '\u26A0\uFE0F Only use on installations you are authorized for. Always test in safe mode first. Wrong commands can stop production or create dangerous states.') + '</div></div>';
+
   return html;
 }
 
@@ -18220,6 +18244,65 @@ function calcProjectHealth(){
 
   score=Math.max(0,Math.min(100,score));
   return {score:score,issues:issues,strengths:strengths,grade:score>=90?'A':score>=75?'B':score>=60?'C':score>=40?'D':'F'};
+}
+
+// ===== WEB SERIAL PLC LIVE CONNECTION (real USB/serial) =====
+var plcSerial = { port:null, reader:null, writer:null, connected:false, log:[], baud:9600 };
+function plcSerialSupported(){ return (typeof navigator!=='undefined') && ('serial' in navigator); }
+function plcSerialLog(msg, dir){
+  plcSerial.log.unshift({t:new Date().toLocaleTimeString(),msg:msg,dir:dir||'info'});
+  if(plcSerial.log.length>50) plcSerial.log.pop();
+  var box=document.getElementById('plcSerialLog');
+  if(box) box.innerHTML=plcSerial.log.map(function(l){ var c=l.dir==='tx'?'#00e5ff':l.dir==='rx'?'#06d6a0':l.dir==='err'?'#ef476f':'#8ab4d0'; return '<div style="color:'+c+';font-family:monospace;font-size:.78rem;padding:2px 0">['+l.t+'] '+(l.dir==='tx'?'\u25B6 TX: ':l.dir==='rx'?'\u25C0 RX: ':'')+l.msg+'</div>'; }).join('');
+}
+async function plcSerialConnect(){
+  var da=lang==='da';
+  if(!plcSerialSupported()){ plcSerialLog(da?'Web Serial API ikke underst\u00F8ttet i denne browser. Brug Chrome/Edge.':'Web Serial API not supported in this browser. Use Chrome/Edge.','err'); return; }
+  try{
+    plcSerial.port=await navigator.serial.requestPort();
+    await plcSerial.port.open({baudRate:plcSerial.baud, dataBits:8, stopBits:1, parity:'none'});
+    plcSerial.connected=true;
+    plcSerial.writer=plcSerial.port.writable.getWriter();
+    plcSerialLog((da?'Forbundet ved ':'Connected at ')+plcSerial.baud+' baud','info');
+    renderModule('plc');
+    plcSerialReadLoop();
+  }catch(e){ plcSerialLog((da?'Forbindelsesfejl: ':'Connection error: ')+e.message,'err'); }
+}
+async function plcSerialReadLoop(){
+  try{
+    plcSerial.reader=plcSerial.port.readable.getReader();
+    while(plcSerial.connected){
+      const {value,done}=await plcSerial.reader.read();
+      if(done) break;
+      if(value && value.length){ var hex=Array.from(value).map(function(b){return ('0'+b.toString(16)).slice(-2).toUpperCase();}).join(' '); plcSerialLog(hex,'rx'); }
+    }
+  }catch(e){ if(plcSerial.connected) plcSerialLog('RX: '+e.message,'err'); }
+  finally{ if(plcSerial.reader){ try{plcSerial.reader.releaseLock();}catch(e){} } }
+}
+async function plcSerialSend(hexStr){
+  var da=lang==='da';
+  if(!plcSerial.connected||!plcSerial.writer){ plcSerialLog(da?'Ikke forbundet':'Not connected','err'); return; }
+  try{
+    var bytes=hexStr.trim().split(/\s+/).map(function(h){return parseInt(h,16);}).filter(function(b){return !isNaN(b);});
+    await plcSerial.writer.write(new Uint8Array(bytes));
+    plcSerialLog(hexStr.toUpperCase(),'tx');
+  }catch(e){ plcSerialLog('TX: '+e.message,'err'); }
+}
+async function plcSerialDisconnect(){
+  plcSerial.connected=false;
+  try{ if(plcSerial.reader){ await plcSerial.reader.cancel(); plcSerial.reader.releaseLock(); plcSerial.reader=null; } }catch(e){}
+  try{ if(plcSerial.writer){ plcSerial.writer.releaseLock(); plcSerial.writer=null; } }catch(e){}
+  try{ if(plcSerial.port){ await plcSerial.port.close(); plcSerial.port=null; } }catch(e){}
+  plcSerialLog(lang==='da'?'Afbrudt':'Disconnected','info');
+  renderModule('plc');
+}
+// Modbus RTU helper: build read-holding-registers frame with CRC16
+function plcModbusRead(slave, startReg, count){
+  function crc16(buf){ var crc=0xFFFF; for(var i=0;i<buf.length;i++){ crc^=buf[i]; for(var j=0;j<8;j++){ if(crc&1){crc=(crc>>1)^0xA001;}else{crc>>=1;} } } return crc; }
+  var f=[slave,0x03,(startReg>>8)&0xFF,startReg&0xFF,(count>>8)&0xFF,count&0xFF];
+  var c=crc16(f); f.push(c&0xFF); f.push((c>>8)&0xFF);
+  var hex=f.map(function(b){return ('0'+b.toString(16)).slice(-2).toUpperCase();}).join(' ');
+  plcSerialSend(hex);
 }
 
 // ===== INIT =====
