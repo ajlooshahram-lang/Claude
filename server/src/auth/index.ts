@@ -7,6 +7,8 @@ export { isLocked, recordFailedAttempt, resetAttempts, clearLockoutStore } from 
 export { logAuditEvent } from "./audit.js";
 export { createRequireAuth, createRequireRole } from "./middleware.js";
 export { registerAuthRoutes, clearPendingMfaTokens, sweepExpiredMfaTokens, startMfaTokenGc, stopMfaTokenGc } from "./routes.js";
+export { runMaintenance, startMaintenanceJob, stopMaintenanceJob } from "./maintenance.js";
+export type { MaintenanceResult } from "./maintenance.js";
 export { createPrismaDbHelpers } from "./db-helpers.js";
 export type { AuthDbHelpers, DbUser, DbSession, DbMembership } from "./db-helpers.js";
 export type { AuthenticatedUser, SessionData, AuthenticatedRequest } from "./middleware.js";

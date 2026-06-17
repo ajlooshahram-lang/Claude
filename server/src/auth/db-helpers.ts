@@ -96,6 +96,19 @@ export type AuthDbHelpers = {
   markRecoveryCodeUsed(id: string): Promise<void>;
   /** Count the user's remaining (unused) recovery codes. */
   countUnusedRecoveryCodes(userId: string): Promise<number>;
+  /**
+   * Hard-delete expired session rows (`expiresAt < now`). These sessions are
+   * already invalid -- validation rejects them -- so removing them is pure
+   * hygiene that keeps the session store from growing without bound. Returns
+   * the number of rows deleted.
+   */
+  deleteExpiredSessions(now: Date): Promise<number>;
+  /**
+   * Delete audit-log rows older than the supplied cutoff (`createdAt < cutoff`).
+   * Only ever called when an operator has explicitly enabled audit retention
+   * (AUDIT_LOG_RETENTION_DAYS > 0). Returns the number of rows deleted.
+   */
+  deleteAuditLogsOlderThan(cutoff: Date): Promise<number>;
 };
 
 /**
@@ -265,6 +278,20 @@ export async function createPrismaDbHelpers(): Promise<AuthDbHelpers> {
       return prisma.mfaRecoveryCode.count({
         where: { userId, usedAt: null },
       });
+    },
+
+    async deleteExpiredSessions(now: Date) {
+      const result = await prisma.session.deleteMany({
+        where: { expiresAt: { lt: now } },
+      });
+      return result.count;
+    },
+
+    async deleteAuditLogsOlderThan(cutoff: Date) {
+      const result = await prisma.auditLog.deleteMany({
+        where: { createdAt: { lt: cutoff } },
+      });
+      return result.count;
     },
   };
 }

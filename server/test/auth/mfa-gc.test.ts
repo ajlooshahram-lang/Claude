@@ -51,6 +51,8 @@ function createMockDb(overrides: Partial<AuthDbHelpers> = {}): AuthDbHelpers {
     listRecoveryCodes: async () => [],
     markRecoveryCodeUsed: async () => {},
     countUnusedRecoveryCodes: async () => 0,
+    deleteExpiredSessions: async () => 0,
+    deleteAuditLogsOlderThan: async () => 0,
     updateUserLastLogin: async () => {},
     createAuditLog: async () => {},
     ...overrides,

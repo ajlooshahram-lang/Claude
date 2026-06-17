@@ -15,6 +15,13 @@ const EnvSchema = z.object({
   DATABASE_URL: z.string().min(1).optional(),
   SESSION_SECRET: z.string().min(16).optional(),
   SESSION_EXPIRY_DAYS: z.coerce.number().int().min(1).max(90).default(7),
+  // How often the maintenance job runs (expired-session cleanup, optional
+  // audit-log rotation). Minimum 1 minute; defaults to hourly.
+  SESSION_CLEANUP_INTERVAL_MINUTES: z.coerce.number().int().min(1).default(60),
+  // Audit-log retention window in days. 0 (the default) means "retain forever"
+  // -- audit logs are a compliance record, so they are never deleted unless an
+  // operator explicitly opts in by setting this above 0.
+  AUDIT_LOG_RETENTION_DAYS: z.coerce.number().int().min(0).default(0),
   DATA_ENCRYPTION_KEY: z.string().min(16).optional(),
   DATA_REGION: z.string().default("eu-west"),
 });
@@ -26,6 +33,8 @@ export type AppConfig = {
   databaseUrl: string | undefined;
   sessionSecret: string | undefined;
   sessionExpiryDays: number;
+  sessionCleanupIntervalMinutes: number;
+  auditLogRetentionDays: number;
   dataEncryptionKey: string | undefined;
   dataRegion: string;
   isProd: boolean;
@@ -56,6 +65,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     databaseUrl: e.DATABASE_URL,
     sessionSecret: e.SESSION_SECRET,
     sessionExpiryDays: e.SESSION_EXPIRY_DAYS,
+    sessionCleanupIntervalMinutes: e.SESSION_CLEANUP_INTERVAL_MINUTES,
+    auditLogRetentionDays: e.AUDIT_LOG_RETENTION_DAYS,
     dataEncryptionKey: e.DATA_ENCRYPTION_KEY,
     dataRegion: e.DATA_REGION,
     isProd,

@@ -6,6 +6,7 @@ import cookie from "@fastify/cookie";
 import { loadConfig, type AppConfig } from "./config.js";
 import { checkDatabase } from "./db.js";
 import { registerAuthRoutes, startMfaTokenGc, stopMfaTokenGc } from "./auth/routes.js";
+import { startMaintenanceJob, stopMaintenanceJob } from "./auth/maintenance.js";
 import { registerDataRoutes } from "./data/routes.js";
 import { validateCsrf } from "./auth/csrf.js";
 import type { AuthDbHelpers } from "./auth/db-helpers.js";
@@ -56,6 +57,14 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     // Start periodic garbage collection for expired pending MFA tokens.
     startMfaTokenGc();
     app.addHook("onClose", () => { stopMfaTokenGc(); });
+
+    // Start the maintenance job (expired-session cleanup + optional audit-log
+    // rotation). Gated out of the test env so building the app in tests never
+    // spawns real timers; tests exercise runMaintenance directly.
+    if (config.nodeEnv !== "test") {
+      startMaintenanceJob(opts.dbHelpers, config);
+      app.addHook("onClose", () => { stopMaintenanceJob(); });
+    }
 
     // CSRF enforcement: validate the double-submit cookie on state-changing
     // methods. Exempt: /auth/register and /auth/login (initial auth flows where

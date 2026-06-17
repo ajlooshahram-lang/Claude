@@ -68,6 +68,8 @@ report a vulnerability.
 | **Tenant isolation** | Every data query takes `tenantId` from the **session** (never from the body/params) as its first filter; cross-tenant access returns 404, not 403 | `server/src/data/db-helpers.ts`, `server/src/data/routes.ts` |
 | **Invite system** | 32-byte CSPRNG token, only SHA-256 hash stored, 7-day expiry, single-use via atomic conditional update (TOCTOU-safe) | `server/src/invite/routes.ts`, `server/src/invite/db-helpers.ts` |
 | **Audit logging** | All auth events and data mutations write an `AuditLog` row (tenant, actor, action, entity, ip) | `server/src/auth/audit.ts`, audit calls throughout `*/routes.ts` |
+| **Automated session-store cleanup** | A background maintenance job hard-deletes expired `Session` rows (`expiresAt < now`) on a configurable interval (`SESSION_CLEANUP_INTERVAL_MINUTES`, default 60). Expired sessions are already rejected at validation time, so this is pure hygiene that bounds session-store growth. Idempotent start/stop with an `unref()`'d timer; the scheduled run swallows + logs transient DB errors so it can never crash the process | `runMaintenance` / `startMaintenanceJob` in `server/src/auth/maintenance.ts`, wired in `server/src/app.ts`, `deleteExpiredSessions()` in `server/src/auth/db-helpers.ts` |
+| **Automated audit-log retention/rotation (opt-in)** | The same maintenance job deletes `AuditLog` rows older than `AUDIT_LOG_RETENTION_DAYS`. **Default is 0 = retain forever**: audit logs are a compliance record, so nothing is ever deleted unless an operator explicitly sets a retention window > 0 | `runMaintenance` in `server/src/auth/maintenance.ts`, `deleteAuditLogsOlderThan()` in `server/src/auth/db-helpers.ts`, config in `server/src/config.ts` |
 | **Input validation** | Zod schemas on every request body/param, with explicit max lengths and bulk-operation caps; analytical-data payloads capped at 500 KB | `server/src/auth/routes.ts`, `server/src/data/schemas.ts`, `server/src/invite/schemas.ts` |
 | **Security headers** | helmet on every response; nginx adds X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy, CSP, Permissions-Policy | `server/src/app.ts`, `nginx/nginx.conf` |
 | **Strict CORS** | Only configured origins; credentials allowed; **wildcard rejected in production** | `server/src/app.ts`, `loadConfig()` in `server/src/config.ts` |
@@ -135,6 +137,14 @@ Do **all** of the following before going live.
     allow-list / VPN / Cloudflare Access in front of the public endpoint as an
     extra layer.
 
+13. **Decide your audit-log retention.** The maintenance job runs automatically
+    (`SESSION_CLEANUP_INTERVAL_MINUTES`, default hourly) and always cleans up
+    expired sessions. Audit-log rotation is **off by default**
+    (`AUDIT_LOG_RETENTION_DAYS=0` = keep forever) so audit data is never
+    silently destroyed. Only set a retention window > 0 if your compliance
+    posture explicitly calls for it — and confirm your DB backups still cover
+    whatever you purge.
+
 ---
 
 ## 4. Known gaps / roadmap (honest list)
@@ -154,9 +164,6 @@ operation.
 - **No WAF / IDS.** Protection relies on nginx rate limiting, app-layer
   validation, and network isolation. *Roadmap:* front with a WAF (e.g.
   Cloudflare) for an additional layer.
-- **No automated session-store cleanup job** for expired session rows (expiry is
-  enforced at validation time, so this is hygiene only).
-- **Audit log retention/rotation** is not yet automated (see §5).
 
 ---
 

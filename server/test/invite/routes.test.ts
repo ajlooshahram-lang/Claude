@@ -73,6 +73,8 @@ function createMockAuthDb(user: DbUser, tokenHash: string, role: "OWNER" | "ADMI
     listRecoveryCodes: async () => [],
     markRecoveryCodeUsed: async () => {},
     countUnusedRecoveryCodes: async () => 0,
+    deleteExpiredSessions: async () => 0,
+    deleteAuditLogsOlderThan: async () => 0,
     updateUserLastLogin: async () => {},
     createAuditLog: async () => {},
   };
