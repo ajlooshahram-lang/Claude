@@ -6,6 +6,11 @@
 
 {$DOMAIN} {
 	encode zstd gzip
+	# Security headers at the public TLS edge (upstream nginx headers pass through).
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		-Server
+	}
 	# Forward everything to the internal nginx frontend (static + /auth + /api).
 	reverse_proxy frontend:80
 }
