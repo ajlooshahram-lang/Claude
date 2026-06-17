@@ -881,5 +881,18 @@ ok(taiwanB.risks[0].level === "Top concern", "Briefing orders risks worst-first 
 // an unknown hint returns null rather than throwing
 ok(window.QICountryData.briefing("somewhere with no station") === null, "Briefing returns null for an unknown location (no throw)");
 
+// Start-here guide on Brain view (first-run only)
+S.setBrand({ tourDone: false });
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".start-here") != null, "start-here guide shows on Brain view when tourDone is false");
+ok(/Upload a project description/.test(doc.querySelector(".start-here").textContent), "start-here step 1 tells user to upload");
+ok(/Review the auto-built plan/.test(doc.querySelector(".start-here").textContent), "start-here step 2 tells user to review");
+ok(/Present it/.test(doc.querySelector(".start-here").textContent), "start-here step 3 tells user to present");
+doc.querySelector("[data-act=dismissGuide]").click();
+ok(doc.querySelector(".start-here") == null, "start-here guide removed after 'Got it' click");
+ok(S.brand().tourDone === true, "dismissGuide persists tourDone=true");
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".start-here") == null, "start-here guide does NOT show again after dismissal");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

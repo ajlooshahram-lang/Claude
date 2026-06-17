@@ -1585,6 +1585,17 @@
     const profiles = (window.QIBrain && QIBrain.listProfiles && QIBrain.listProfiles()) || [];
     const profOpts = `<option value="">Auto-detect domain</option>` +
       profiles.map(p => `<option value="${esc(p.id)}">${esc(p.label)}</option>`).join("");
+    // First-run "Start here" 3-step guide — shown only once
+    const startHere = (S.brand() && S.brand().tourDone) ? "" : `
+      <div class="start-here" id="startHereGuide" role="region" aria-label="Start here guide">
+        <div class="start-here-title"><span>&#x1F44B;</span> Start here</div>
+        <ol class="start-here-steps">
+          <li><span class="start-here-num">1</span><span>Upload a project description (or click "Try an example" below)</span></li>
+          <li><span class="start-here-num">2</span><span>Review the auto-built plan, frameworks and recommendations</span></li>
+          <li><span class="start-here-num">3</span><span>Present it: open the Investor Brief or watch the 3D build</span></li>
+        </ol>
+        <button class="btn btn-sm" data-act="dismissGuide" type="button">Got it</button>
+      </div>`;
     // Friendly 'Programme at a glance' front door → the two best outputs.
     const BG = window.QIGlobe || {};
     const bgCables = Array.isArray(BG.CABLES) ? BG.CABLES : [];
@@ -1610,7 +1621,7 @@
           <button class="btn" id="heroGlobe" type="button">🌐 Watch it build in 3D</button>
         </div>
       </div>` : "";
-    return `${hero}<div class="card">
+    return `${startHere}${hero}<div class="card">
         <h3>Project Brain <span class="tag">auto-plan</span></h3>
         <p style="line-height:1.6">Paste or upload your <b>project description</b> — that is the only thing you need to do.
         The Brain analyses it <b>locally on this device</b> — nothing is uploaded or sent to any server — and the app
@@ -3660,6 +3671,7 @@
     if (act === "goHelp") return go("help");
     if (act === "startTour") return showTour(0);
     if (act === "skipTour") { S.setBrand({ tourDone: true }); toast("Tour skipped — open it anytime from Help."); return go("dashboard"); }
+    if (act === "dismissGuide") { S.setBrand({ tourDone: true }); const g = $("#startHereGuide"); if (g) g.remove(); return; }
     if (act === "add") openCaseForm();
     else if (act === "edit") openCaseForm(id);
     else if (act === "del") confirmDelete(id);

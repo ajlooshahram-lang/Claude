@@ -4,6 +4,14 @@
   --bg:#f4f6fb; --card:#ffffff; --line:#e3e8f0; --ink:#1f2733; --muted:#6b7686;
   --input:#fff7e0; --calc:#eaf4e6; --shadow:0 1px 3px rgba(20,30,60,.08),0 6px 18px rgba(20,30,60,.06);
   --radius:12px;
+  /* design tokens — spacing */
+  --space-xs:4px; --space-sm:8px; --space-md:14px; --space-lg:22px; --space-xl:34px;
+  /* design tokens — radii */
+  --radius-sm:6px; --radius-md:10px; --radius-lg:14px;
+  /* design tokens — shadows */
+  --shadow-sm:0 2px 8px rgba(0,0,0,.08); --shadow-md:0 6px 20px rgba(0,0,0,.12); --shadow-lg:0 12px 40px rgba(0,0,0,.18);
+  /* design tokens — motion */
+  --transition:.18s ease;
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
@@ -18,7 +26,7 @@ body{font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;colo
 .brand-text strong{font-size:15px;color:#fff}
 .brand-text span{font-size:11px;color:#9fb0cf;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #nav{flex:1;overflow:auto;padding:8px}
-.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:#cdd8ec;cursor:pointer;font-size:13px;border:none;background:none;width:100%;text-align:left}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:#cdd8ec;cursor:pointer;font-size:13px;border:none;background:none;width:100%;text-align:left;transition:var(--transition)}
 .nav-item:hover{background:rgba(255,255,255,.07);color:#fff}
 .nav-item.active{background:var(--teal);color:#fff;font-weight:600}
 .nav-item .ico{width:18px;text-align:center;opacity:.9}
@@ -35,7 +43,7 @@ body{font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;colo
 .content{padding:22px;max-width:1280px;width:100%;margin:0 auto}
 
 /* buttons */
-.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;transition:var(--transition)}
 .btn:hover{border-color:var(--blue);color:var(--blue)}
 .btn:focus-visible,.nav-item:focus-visible,select:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .btn-primary{background:var(--blue);border-color:var(--blue);color:#fff}
@@ -56,7 +64,7 @@ body{font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;colo
 .kpi.teal{border-color:var(--teal)} .kpi.gold{border-color:var(--gold)} .kpi.purple{border-color:var(--purple)}
 .kpi.amber{border-color:var(--amber)} .kpi.blue{border-color:var(--blue)} .kpi.slate{border-color:var(--slate)}
 
-.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;margin-bottom:16px}
+.card{background:var(--card);border-radius:var(--radius-md);box-shadow:var(--shadow);padding:18px;margin-bottom:16px;transition:var(--transition)}
 .card h3{margin:0 0 12px;font-size:15px}
 .card-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
 .card-head h3{margin:0;flex:1}
@@ -107,7 +115,7 @@ select,input[list]{background:var(--input)}
    always wins. It only matches elements currently carrying the attribute —
    the app shows elements by REMOVING `hidden`, so nothing visible is affected. */
 [hidden]{display:none!important}
-.modal-overlay{position:fixed;inset:0;background:rgba(20,30,55,.5);display:flex;align-items:flex-start;justify-content:center;padding:30px 16px;z-index:50;overflow:auto}
+.modal-overlay{position:fixed;inset:0;background:rgba(20,30,55,.5);display:flex;align-items:flex-start;justify-content:center;padding:30px 16px;z-index:50;overflow:auto;transition:var(--transition)}
 .modal{background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:760px;max-width:100%;padding:22px}
 .modal h2{margin:0 0 4px;font-size:18px}
 .modal .sub{color:var(--muted);font-size:12px;margin-bottom:16px}
@@ -306,6 +314,14 @@ table:focus-within thead th{box-shadow:inset 0 -2px 0 var(--blue)}
 .tour-banner span{flex:1;font-size:13px}
 .tour-banner .btn{background:rgba(255,255,255,.18);border-color:transparent;color:#fff}
 .tour-banner .btn:hover{background:rgba(255,255,255,.28);color:#fff}
+
+/* first-run "Start here" 3-step guide (Brain view) */
+.start-here{padding:16px 20px;margin-bottom:16px;background:linear-gradient(135deg,rgba(31,138,138,.08),rgba(46,84,150,.06));border:1.5px solid var(--teal);border-radius:var(--radius-md);box-shadow:var(--shadow-sm)}
+.start-here-title{margin:0 0 10px;font-size:16px;font-weight:700;color:var(--navy);display:flex;align-items:center;gap:8px}
+.start-here-steps{list-style:none;margin:0 0 12px;padding:0;display:flex;flex-direction:column;gap:8px}
+.start-here-steps li{display:flex;align-items:flex-start;gap:10px;font-size:13.5px;line-height:1.5}
+.start-here-num{width:24px;height:24px;border-radius:50%;background:var(--teal);color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.start-here .btn{margin-top:2px}
 
 /* tour modal step indicator */
 .tour-steps{display:flex;gap:6px;margin-bottom:10px}
