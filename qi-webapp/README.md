@@ -13,8 +13,8 @@ No install, no build step, no server, works offline.
 **Host it for your team (free):** push this folder to GitHub and enable
 **GitHub Pages** (Settings → Pages → deploy from branch). The app is then a normal URL.
 
-> The only online dependency is the Chart.js chart library, loaded from a CDN.
-> Everything else runs in your browser.
+> The app is fully self-contained: Chart.js and Three.js are vendored locally
+> under `vendor/`, so it works completely offline with no third-party requests.
 
 ## How it works
 
