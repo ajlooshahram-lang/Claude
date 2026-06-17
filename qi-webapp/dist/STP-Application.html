@@ -108,6 +108,12 @@ select,input[list]{background:var(--input)}
 .readout b{color:var(--navy)}
 
 /* modal */
+/* The `hidden` attribute toggles overlays/panels app-wide, but an author rule
+   that sets `display` (e.g. .modal-overlay{display:flex}) silently overrides
+   the UA `[hidden]{display:none}`. This global guard guarantees `hidden`
+   always wins. It only matches elements currently carrying the attribute —
+   the app shows elements by REMOVING `hidden`, so nothing visible is affected. */
+[hidden]{display:none!important}
 .modal-overlay{position:fixed;inset:0;background:rgba(20,30,55,.5);display:flex;align-items:flex-start;justify-content:center;padding:30px 16px;z-index:50;overflow:auto}
 .modal{background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:760px;max-width:100%;padding:22px}
 .modal h2{margin:0 0 4px;font-size:18px}
