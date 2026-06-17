@@ -1486,7 +1486,7 @@
       const refresh = () => {
         const br = S.brand() || {};
         syncBtn("setTheme", br.theme !== "light", "Dark", "Light");
-        syncBtn("setFx", br.fx !== false, "On", "Off");
+        syncBtn("setFx", br.fx === true, "On", "Off");
         syncBtn("setSound", br.sound === true, "On", "Off");
       };
       refresh();
@@ -2853,15 +2853,15 @@
   // Arcade CRT/scanline + vignette overlay (cosmetic). Default ON; persisted in
   // brand.fx; reflected as the .fx-on class on <html>. Disabled in print CSS.
   function applyFX() {
-    const on = !(S.brand() && S.brand().fx === false);   // default ON
+    const on = !!(S.brand() && S.brand().fx === true);   // default OFF (crisp/readable; arcade mode is opt-in)
     document.documentElement.classList.toggle("fx-on", on);
     const btn = $("#btnFx");
     if (btn) { btn.classList.toggle("is-on", on); btn.setAttribute("aria-pressed", on ? "true" : "false"); }
   }
   function toggleFX() {
-    const on = !(S.brand() && S.brand().fx === false);
+    const on = !!(S.brand() && S.brand().fx === true);
     S.setBrand({ fx: !on });
-    applyFX(); toast("Arcade FX: " + (S.brand().fx === false ? "off" : "on"));
+    applyFX(); toast("Arcade FX: " + (S.brand().fx ? "on" : "off"));
   }
   // Optional UI sound cues — off by default, persisted in brand.sound.
   function applySound() {

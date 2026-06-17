@@ -304,11 +304,11 @@ ok(darkInk && darkInk !== "", "Chart.defaults.color stays valid after theme togg
 doc.getElementById("btnTheme").click(); // back to default
 // 13e) arcade FX toggle: button exists, defaults on, toggles the html.fx-on class + persists
 ok(!!doc.getElementById("btnFx"), "arcade FX toggle button present");
-ok(doc.documentElement.classList.contains("fx-on"), "arcade FX is on by default");
+ok(!doc.documentElement.classList.contains("fx-on"), "arcade FX is OFF by default (crisp/readable)");
 doc.getElementById("btnFx").click();
-ok(!doc.documentElement.classList.contains("fx-on") && S.brand().fx === false, "FX toggle off persists to brand.fx");
+ok(doc.documentElement.classList.contains("fx-on") && S.brand().fx === true, "FX toggle on persists to brand.fx");
 doc.getElementById("btnFx").click();
-ok(doc.documentElement.classList.contains("fx-on") && S.brand().fx === true, "FX toggle back on persists");
+ok(!doc.documentElement.classList.contains("fx-on") && S.brand().fx === false, "FX toggle back off persists");
 // 13f) UI sound toggle: button exists, defaults off, toggles + persists (no-throw without AudioContext)
 ok(!!doc.getElementById("btnSound"), "UI sound toggle button present");
 ok(!S.brand().sound, "UI sound is off by default");
