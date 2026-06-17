@@ -756,6 +756,12 @@ ok(doc.querySelectorAll(".brief-verdict").length === 8, "Investor Brief shows a 
 ok(doc.querySelector(".brief-spend svg.spend-svg") != null && doc.querySelector(".brief-spend path.spend-line") != null,
    "Investor Brief renders the spending-over-time S-curve (inline SVG)");
 ok(/Spending over time/.test(briefOut), "Investor Brief includes the 'Spending over time' section");
+ok(doc.querySelector(".brief-summary") != null, "Investor Brief opens with an auto-written 'In a nutshell' summary");
+ok(doc.querySelectorAll(".brief-summary p").length >= 3, "summary tells the story in several plain sentences (got " + doc.querySelectorAll(".brief-summary p").length + ")");
+ok(/connects 8 countries/.test(doc.querySelector(".brief-summary").textContent) && /USD\s*1\.3B/.test(doc.querySelector(".brief-summary").textContent),
+   "summary states the scale (8 countries) and headline cost (USD 1.3B)");
+ok(/straightforward to enter|conditions are met|extra caution/.test(doc.querySelector(".brief-summary").textContent),
+   "summary gives the plain go / conditional / caution mix");
 ok(doc.querySelectorAll(".brief-risks li").length > 0, "Investor Brief lists the biggest things to watch");
 ["FCC","NCC","NBTC","MCMC"].forEach(ab => ok(briefOut.indexOf(ab) !== -1, "Investor Brief names the real authority " + ab));
 // the print button must be CSP-safe (wired via addEventListener, NOT an inline onclick)

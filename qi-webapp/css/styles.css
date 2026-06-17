@@ -719,6 +719,11 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .brief-risk-text{flex:1}
 .brief-risk-where{color:var(--muted,#6b7892);font-style:italic;white-space:nowrap}
 .brief-foot{border-top:1px solid var(--line,#e3e8f0);padding-top:12px;margin-top:18px}
+.brief-summary{background:var(--chip-bg,rgba(46,84,150,.06));border:1px solid var(--line,#e3e8f0);border-left:4px solid var(--accent,#2e5496);
+  border-radius:10px;padding:14px 16px;margin-top:18px}
+.brief-summary h3{border:none;margin:0 0 6px;padding:0}
+.brief-summary p{margin:0 0 8px;font-size:13.5px;line-height:1.55}
+.brief-summary p:last-child{margin-bottom:0}
 @media print{
   .brief{border:none;border-radius:0;padding:0;max-width:none}
   .brief-country,.brief-risks li{break-inside:avoid}

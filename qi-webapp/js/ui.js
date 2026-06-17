@@ -598,6 +598,31 @@
     allRisks.sort((a, b) => a.rank - b.rank);
     const topRisks = allRisks.slice(0, 8);
 
+    // Auto-written 'In a nutshell' executive summary — the whole story in a few
+    // plain sentences for a reader who has never seen the project before.
+    const listJoin = arr => arr.length <= 1 ? (arr[0] || "")
+      : arr.slice(0, -1).join(", ") + " and " + arr[arr.length - 1];
+    const vc = { go: 0, cond: 0, caution: 0 };
+    briefs.forEach(b => { vc[verdictSlug(b.marketEntry.verdict)]++; });
+    const slowest = briefs.slice()
+      .sort((a, b) => (b.licensing.criticalPathMonths || 0) - (a.licensing.criticalPathMonths || 0))
+      .filter(s => s.licensing.criticalPathMonths > 0).slice(0, 3);
+    const topRisk = allRisks[0];
+    const summaryParas = [];
+    summaryParas.push(`This programme connects <strong>${stations.length} countries</strong> across Asia and the Pacific with about <strong>${esc(totalKm.toLocaleString())} km</strong> of undersea fibre carrying up to <strong>${esc(totalCap.toLocaleString())} Tbps</strong>. The headline cost is about <strong>${esc(fmtUsd(prog.budgetUsd))}</strong>, built over roughly <strong>${esc(String(prog.durationMonths))} months</strong>.`);
+    const vparts = [];
+    if (vc.go) vparts.push(`<strong>${vc.go}</strong> look straightforward to enter`);
+    if (vc.cond) vparts.push(`<strong>${vc.cond}</strong> can go ahead once local conditions are met`);
+    if (vc.caution) vparts.push(`<strong>${vc.caution}</strong> need extra caution`);
+    if (vparts.length) summaryParas.push(`Of the ${briefs.length} countries, ${listJoin(vparts)}.`);
+    if (slowest.length) {
+      const items = slowest.map(s => `${esc(s.name)} (${esc(s.licensing.criticalPathItem)}, about ${esc(String(s.licensing.criticalPathMonths))} months)`);
+      summaryParas.push(`Begin the slowest approvals first, because they decide when work can start: ${listJoin(items)}.`);
+    }
+    if (topRisk) {
+      summaryParas.push(`There ${allRisks.length === 1 ? "is" : "are"} <strong>${allRisks.length}</strong> thing${allRisks.length === 1 ? "" : "s"} worth watching across the programme — the most pressing is ${esc(topRisk.text)} (${esc(topRisk.country)}).`);
+    }
+
     const statChips = [
       { v: totalKm.toLocaleString() + " km", l: "Cable route" },
       { v: totalCap.toLocaleString() + " Tbps", l: "Capacity" },
@@ -657,6 +682,11 @@
           <p class="brief-tagline">A submarine fibre-optic network connecting ${stations.length} countries across Asia and the Pacific — what gets built, who to work with, when it goes live, and what it costs.</p>
           <div class="brief-stats">${statChips}</div>
         </header>
+
+        <section class="brief-section brief-summary">
+          <h3>In a nutshell</h3>
+          ${summaryParas.map(p => `<p>${p}</p>`).join("")}
+        </section>
 
         <section class="brief-section">
           <h3>The network at a glance</h3>
