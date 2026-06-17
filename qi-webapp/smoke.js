@@ -678,12 +678,12 @@ ok(window.location.hash === "#kanban", "palette 'Go to Kanban' navigates (hash "
 // 37) Quick filter chips
 doc.querySelector('.nav-item[data-view="cases"]').dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(doc.querySelectorAll(".chip").length >= 5, "quick filter chips render");
-const blockedChip = Array.from(doc.querySelectorAll(".chip")).find(c => /Blocked/.test(c.textContent));
+const blockedChip = Array.from(doc.querySelectorAll(".chip")).find(c => /Stuck/.test(c.textContent));
 blockedChip.dispatchEvent(new window.Event("click", { bubbles: true }));
-ok(doc.getElementById("fltStatus").value === "BLOCKED", "Blocked chip sets status filter");
-const criticalChip = Array.from(doc.querySelectorAll(".chip")).find(c => /Critical/.test(c.textContent));
+ok(doc.getElementById("fltStatus").value === "BLOCKED", "Stuck chip sets status filter");
+const criticalChip = Array.from(doc.querySelectorAll(".chip")).find(c => /High priority/.test(c.textContent));
 criticalChip.dispatchEvent(new window.Event("click", { bubbles: true }));
-ok(doc.getElementById("fltPriority").value === "1-CRITICAL" && doc.getElementById("fltStatus").value === "", "Critical chip swaps to priority filter");
+ok(doc.getElementById("fltPriority").value === "1-CRITICAL" && doc.getElementById("fltStatus").value === "", "High priority chip swaps to priority filter");
 const allChip = Array.from(doc.querySelectorAll(".chip")).find(c => c.textContent.trim() === "All");
 allChip.dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(doc.getElementById("fltStatus").value === "" && doc.getElementById("fltPriority").value === "", "All chip clears filters");

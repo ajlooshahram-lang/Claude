@@ -667,13 +667,15 @@
     const head = `<th class="center"><input type="checkbox" id="bulkAll" ${allSelected ? "checked" : ""} aria-label="Select all"></th>` +
       `<th aria-label="Pinned"></th><th>ID</th><th class='wrap'>Problem</th><th>Category</th><th>Priority</th><th>RPN</th><th>Health</th><th>Owner</th><th>Status</th><th>% Done</th><th></th>`;
     // quick filter chips — one-click presets (still click-only)
+    const myName = (window.QIAuth && window.QIAuth.currentUser) ? (window.QIAuth.currentUser.displayName || window.QIAuth.currentUser.name || "") : "";
     const chipDefs = [
       { id: "all", label: "All", on: !f.status && !f.priority && !f.owner },
+      { id: "mine", label: "My duties", on: !!(myName && f.owner === myName) },
       { id: "open", label: "Open", on: f.status === "OPEN" },
       { id: "inprogress", label: "In progress", on: f.status === "IN PROGRESS" },
-      { id: "blocked", label: "Blocked", on: f.status === "BLOCKED" },
-      { id: "critical", label: "Critical", on: f.priority === "1-CRITICAL" },
-      { id: "resolved", label: "Resolved", on: f.status === "RESOLVED" }
+      { id: "blocked", label: "Stuck", on: f.status === "BLOCKED" },
+      { id: "critical", label: "High priority", on: f.priority === "1-CRITICAL" },
+      { id: "resolved", label: "Done", on: f.status === "RESOLVED" }
     ];
     const chips = `<div class="chips">${chipDefs.map(c => `<button class="chip ${c.on ? "on" : ""}" data-act="chip" data-chip="${c.id}">${esc(c.label)}</button>`).join("")}</div>`;
     return `
@@ -3101,7 +3103,7 @@
     else if (act === "chip") {
       const f = uiState.caseFilter; const sort = f.sort, pageSize = f.pageSize;
       const base = { q: "", status: "", priority: "", owner: "", sort, pageSize };
-      const m = { all: {}, open: { status: "OPEN" }, inprogress: { status: "IN PROGRESS" }, blocked: { status: "BLOCKED" }, critical: { priority: "1-CRITICAL" }, resolved: { status: "RESOLVED" } };
+      const m = { all: {}, mine: { owner: ((window.QIAuth && window.QIAuth.currentUser) ? (window.QIAuth.currentUser.displayName || window.QIAuth.currentUser.name || "") : "") }, open: { status: "OPEN" }, inprogress: { status: "IN PROGRESS" }, blocked: { status: "BLOCKED" }, critical: { priority: "1-CRITICAL" }, resolved: { status: "RESOLVED" } };
       uiState.caseFilter = Object.assign(base, m[b.dataset.chip] || {});
       go("cases");
     }
@@ -3258,8 +3260,39 @@
   });
 
   // ---------- init (called by auth.js after successful authentication) ----------
+  // Auto-inject authenticated user(s) into the project roster so their names
+  // appear in the "Who's responsible?" dropdown without manual configuration.
+  // Called at boot; also async-enriches from the team list when available.
+  function ensureAuthUsersInRoster() {
+    const roster = S.get().roster;
+    const existingNames = new Set(roster.map(r => (r.name || "").toLowerCase()));
+    function inject(name, role) {
+      if (!name || existingNames.has(name.toLowerCase())) return;
+      roster.push({ name: name, role: role || "" });
+      existingNames.add(name.toLowerCase());
+      S.save();
+    }
+    // 1) Inject the current logged-in user immediately.
+    if (window.QIAuth && window.QIAuth.currentUser) {
+      const u = window.QIAuth.currentUser;
+      inject(u.displayName || u.name || u.email, u.role || "");
+    }
+    // 2) Async: when the team API is available, inject ALL team member display names.
+    if (window.QIAuth && typeof window.QIAuth.listTeam === "function") {
+      try {
+        window.QIAuth.listTeam().then(function (data) {
+          var members = (data && data.members) || [];
+          members.forEach(function (m) { inject(m.displayName || m.name || m.email, m.role || ""); });
+        }).catch(function () {});
+      } catch (e) {}
+    }
+  }
+
   window.QIBoot = function () {
-    S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); applyFX(); applySound(); refreshHeader();
+    S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); applyFX(); applySound();
+    // Auto-inject signed-in users into the roster so they appear in "Who's responsible?" dropdowns.
+    ensureAuthUsersInRoster();
+    refreshHeader();
     const initialHash = (location.hash || "").replace(/^#/, "");
     go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
     // Wire up logout button after boot
