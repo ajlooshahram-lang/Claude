@@ -1204,7 +1204,10 @@
   }
   function extractPdfText(u8) {
     if (!window.fflate) return "";
-    let s = ""; for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
+    if (u8.length > 25 * 1024 * 1024) return "";   // guard against pathological inputs
+    let s;
+    try { s = window.fflate.strFromU8(u8, true); }   // fast native latin1 decode
+    catch (e) { s = ""; for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]); }
     const out = [];
     const streamRe = /stream\r?\n?([\s\S]*?)endstream/g;
     const showRe = /(\[(?:[^\[\]]|\\.)*\]\s*TJ)|(\((?:\\.|[^\\()])*\)\s*Tj)/g;
