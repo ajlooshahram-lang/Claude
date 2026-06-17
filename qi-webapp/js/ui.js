@@ -1287,6 +1287,17 @@
         <p class="muted" style="margin-top:-6px">These names populate the Owner &amp; Stakeholder dropdowns.</p>
         ${tableWrap("<th>Name / Owner</th><th>Role</th><th></th>", rrows)}</div>
 
+      <div class="card"><h3>Display &amp; Effects</h3>
+        <p class="muted" style="margin-top:-6px">Personalize the look &amp; feel. Saved in this browser.</p>
+        <div class="fx-settings">
+          <div class="fx-set-row"><div class="fx-set-label"><strong>Theme</strong><span class="muted">Neon dark interface</span></div>
+            <button class="btn btn-sm" id="setTheme" type="button">—</button></div>
+          <div class="fx-set-row"><div class="fx-set-label"><strong>Arcade FX</strong><span class="muted">CRT scanlines &amp; vignette overlay</span></div>
+            <button class="btn btn-sm" id="setFx" type="button">—</button></div>
+          <div class="fx-set-row"><div class="fx-set-label"><strong>UI Sounds</strong><span class="muted">Subtle neon blips on actions (off by default)</span></div>
+            <button class="btn btn-sm" id="setSound" type="button">—</button></div>
+        </div></div>
+
       <div class="card"><h3>Data</h3>
         <div class="linkbtns">
           <button class="btn" data-act="export">Export JSON (backup)</button>
@@ -1369,6 +1380,27 @@
       </div>`;
   };
   AFTER.config = function () {
+    // ---- Display & Effects toggles ----
+    (function () {
+      const syncBtn = (id, on, onLabel, offLabel) => {
+        const b = $("#" + id); if (!b) return;
+        b.textContent = on ? onLabel : offLabel;
+        b.classList.toggle("is-on", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+      };
+      const refresh = () => {
+        const br = S.brand() || {};
+        syncBtn("setTheme", br.theme !== "light", "Dark", "Light");
+        syncBtn("setFx", br.fx !== false, "On", "Off");
+        syncBtn("setSound", br.sound === true, "On", "Off");
+      };
+      refresh();
+      const wire = (id, fn) => { const b = $("#" + id); if (b) b.addEventListener("click", () => { fn(); refresh(); }); };
+      wire("setTheme", toggleTheme);
+      wire("setFx", toggleFX);
+      wire("setSound", toggleSound);
+    })();
+
     // ---- Team Management wiring ----
     var teamArea = document.getElementById("teamMembersArea");
     var inviteArea = document.getElementById("teamInviteArea");

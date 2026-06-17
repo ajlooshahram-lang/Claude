@@ -945,6 +945,18 @@ html.fx-on .topbar h1{background-size:220% 100%;animation:titleShift 9s linear i
 .topbar h1,.kpi .value,.card-head h3,.brand-text strong,.auth-brand h1,.nav-sep,.globe-stat-val{font-family:var(--font-display);letter-spacing:.02em}
 .kpi .value{letter-spacing:.01em}
 
+
+
+/* --- Display & Effects settings card --- */
+.fx-settings{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.fx-set-row{display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:11px 14px;border:1px solid var(--line);border-radius:10px;background:rgba(20,30,56,.4)}
+.fx-set-label{display:flex;flex-direction:column;gap:2px}
+.fx-set-label strong{font-size:13.5px}
+.fx-set-label .muted{font-size:11.5px}
+.fx-set-row .btn{min-width:74px;text-align:center}
+.fx-set-row .btn.is-on{background:linear-gradient(135deg,var(--neon-cyan),var(--neon-blue));color:#04101f;border-color:transparent;box-shadow:0 0 12px rgba(34,225,230,.4)}
+
 </style>
 <script>
 window.__SKIP_AUTH = true;            /* standalone demo: no server-backed login */
@@ -9909,6 +9921,17 @@ window.QIGLOBE_TEXTURES = {"day":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASAB
         <p class="muted" style="margin-top:-6px">These names populate the Owner &amp; Stakeholder dropdowns.</p>
         ${tableWrap("<th>Name / Owner</th><th>Role</th><th></th>", rrows)}</div>
 
+      <div class="card"><h3>Display &amp; Effects</h3>
+        <p class="muted" style="margin-top:-6px">Personalize the look &amp; feel. Saved in this browser.</p>
+        <div class="fx-settings">
+          <div class="fx-set-row"><div class="fx-set-label"><strong>Theme</strong><span class="muted">Neon dark interface</span></div>
+            <button class="btn btn-sm" id="setTheme" type="button">—</button></div>
+          <div class="fx-set-row"><div class="fx-set-label"><strong>Arcade FX</strong><span class="muted">CRT scanlines &amp; vignette overlay</span></div>
+            <button class="btn btn-sm" id="setFx" type="button">—</button></div>
+          <div class="fx-set-row"><div class="fx-set-label"><strong>UI Sounds</strong><span class="muted">Subtle neon blips on actions (off by default)</span></div>
+            <button class="btn btn-sm" id="setSound" type="button">—</button></div>
+        </div></div>
+
       <div class="card"><h3>Data</h3>
         <div class="linkbtns">
           <button class="btn" data-act="export">Export JSON (backup)</button>
@@ -9991,6 +10014,27 @@ window.QIGLOBE_TEXTURES = {"day":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASAB
       </div>`;
   };
   AFTER.config = function () {
+    // ---- Display & Effects toggles ----
+    (function () {
+      const syncBtn = (id, on, onLabel, offLabel) => {
+        const b = $("#" + id); if (!b) return;
+        b.textContent = on ? onLabel : offLabel;
+        b.classList.toggle("is-on", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+      };
+      const refresh = () => {
+        const br = S.brand() || {};
+        syncBtn("setTheme", br.theme !== "light", "Dark", "Light");
+        syncBtn("setFx", br.fx !== false, "On", "Off");
+        syncBtn("setSound", br.sound === true, "On", "Off");
+      };
+      refresh();
+      const wire = (id, fn) => { const b = $("#" + id); if (b) b.addEventListener("click", () => { fn(); refresh(); }); };
+      wire("setTheme", toggleTheme);
+      wire("setFx", toggleFX);
+      wire("setSound", toggleSound);
+    })();
+
     // ---- Team Management wiring ----
     var teamArea = document.getElementById("teamMembersArea");
     var inviteArea = document.getElementById("teamInviteArea");

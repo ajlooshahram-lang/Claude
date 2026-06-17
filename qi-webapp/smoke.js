@@ -317,6 +317,16 @@ try { doc.getElementById("btnSound").click(); } catch (e) { soundThrew = true; }
 ok(!soundThrew && S.brand().sound === true, "sound toggle on persists (no-throw without AudioContext)");
 doc.getElementById("btnSound").click();
 ok(S.brand().sound === false, "sound toggle off persists");
+// 13g) Settings view groups the Display & Effects toggles (discoverability)
+doc.querySelector('.nav-item[data-view="config"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("setTheme") && doc.getElementById("setFx") && doc.getElementById("setSound"),
+  "Settings view exposes Theme / Arcade FX / UI Sounds toggles");
+{
+  const before = !!(S.brand() && S.brand().fx !== false);
+  doc.getElementById("setFx").click();
+  ok((S.brand().fx !== false) === !before, "Settings Arcade-FX toggle flips the persisted preference");
+  doc.getElementById("setFx").click(); // restore
+}
 
 // 13e) toast styling actually applies (not the default unstyled span)
 window.QIStore && window.QIStore.save && (function () {
