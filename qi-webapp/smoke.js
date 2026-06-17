@@ -301,6 +301,13 @@ doc.getElementById("btnTheme").click();
 const darkInk = window.Chart.defaults.color;
 ok(darkInk && darkInk !== "", "Chart.defaults.color stays valid after theme toggle (" + darkInk + ")");
 doc.getElementById("btnTheme").click(); // back to default
+// 13e) arcade FX toggle: button exists, defaults on, toggles the html.fx-on class + persists
+ok(!!doc.getElementById("btnFx"), "arcade FX toggle button present");
+ok(doc.documentElement.classList.contains("fx-on"), "arcade FX is on by default");
+doc.getElementById("btnFx").click();
+ok(!doc.documentElement.classList.contains("fx-on") && S.brand().fx === false, "FX toggle off persists to brand.fx");
+doc.getElementById("btnFx").click();
+ok(doc.documentElement.classList.contains("fx-on") && S.brand().fx === true, "FX toggle back on persists");
 
 // 13e) toast styling actually applies (not the default unstyled span)
 window.QIStore && window.QIStore.save && (function () {

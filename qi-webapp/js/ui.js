@@ -2672,6 +2672,19 @@
     S.setBrand({ theme: cur === "dark" ? "light" : "dark" });
     applyTheme(); toast("Theme: " + (S.brand().theme === "dark" ? "dark" : "light"));
   }
+  // Arcade CRT/scanline + vignette overlay (cosmetic). Default ON; persisted in
+  // brand.fx; reflected as the .fx-on class on <html>. Disabled in print CSS.
+  function applyFX() {
+    const on = !(S.brand() && S.brand().fx === false);   // default ON
+    document.documentElement.classList.toggle("fx-on", on);
+    const btn = $("#btnFx");
+    if (btn) { btn.classList.toggle("is-on", on); btn.setAttribute("aria-pressed", on ? "true" : "false"); }
+  }
+  function toggleFX() {
+    const on = !(S.brand() && S.brand().fx === false);
+    S.setBrand({ fx: !on });
+    applyFX(); toast("Arcade FX: " + (S.brand().fx === false ? "off" : "on"));
+  }
   function runChecks() {
     const issues = S.health();
     const k = S.kpis();
@@ -2932,6 +2945,7 @@
   $("#btnShare").addEventListener("click", shareLink);
   $("#btnPrint").addEventListener("click", () => window.print());
   $("#btnTheme").addEventListener("click", toggleTheme);
+  { const bfx = $("#btnFx"); if (bfx) bfx.addEventListener("click", toggleFX); }
   $("#btnChecks").addEventListener("click", runChecks);
   $("#btnHelp").addEventListener("click", showShortcuts);
   $("#fileImport").addEventListener("change", e => { if (e.target.files[0]) handleImport(e.target.files[0]); e.target.value = ""; });
@@ -2987,7 +3001,7 @@
 
   // ---------- init (called by auth.js after successful authentication) ----------
   window.QIBoot = function () {
-    S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
+    S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); applyFX(); refreshHeader();
     const initialHash = (location.hash || "").replace(/^#/, "");
     go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
     // Wire up logout button after boot

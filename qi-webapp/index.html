@@ -119,6 +119,7 @@
         <h1 id="viewTitle">Dashboard</h1>
         <div class="topbar-actions">
           <button class="btn btn-icon" id="btnTheme" title="Toggle dark mode (t)" aria-label="Toggle theme">◐</button>
+          <button class="btn btn-icon is-on" id="btnFx" title="Toggle arcade FX (scanlines)" aria-label="Toggle visual FX" aria-pressed="true">▥</button>
           <button class="btn btn-icon" id="btnChecks" title="Run all checks (c)" aria-label="Run checks">✓</button>
           <button class="btn btn-icon" id="btnHelp" title="Keyboard shortcuts (?)" aria-label="Help">?</button>
           <button class="btn" id="btnShare">Share</button>
@@ -139,6 +140,9 @@
   </div>
   <button class="fab" id="fab" title="Add new case (n)" aria-label="Add new case">+</button>
   <div class="toast" id="toast" hidden></div>
+
+  <!-- Arcade CRT/scanline + vignette overlay (toggled via #btnFx; never captures clicks) -->
+  <div class="fx-overlay" id="fxOverlay" aria-hidden="true"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <!-- Three.js r128 UMD + classic examples/js add-ons (all attach to global THREE.*).

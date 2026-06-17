@@ -874,6 +874,25 @@ tr:hover td:first-child{box-shadow:inset 3px 0 0 var(--neon-cyan)}
 /* buttons: press feedback */
 .btn:active{transform:translateY(1px)}
 
+
+
+/* --- Arcade CRT / scanline + vignette overlay (toggle via #btnFx) --- */
+.fx-overlay{display:none}
+html.fx-on .fx-overlay{display:block;position:fixed;inset:0;z-index:60;pointer-events:none;
+  background:
+    repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0px,rgba(0,0,0,.16) 1px,transparent 2px,transparent 3px),
+    radial-gradient(125% 125% at 50% 48%,transparent 58%,rgba(0,4,12,.42) 100%);
+  animation:fxFlicker 5s steps(40) infinite;will-change:opacity}
+@keyframes fxFlicker{0%,100%{opacity:.55}48%{opacity:.62}52%{opacity:.5}}
+#btnFx.is-on{color:var(--neon-cyan);box-shadow:var(--glow-cyan)}
+/* FX-only accents (don't clobber base animations) */
+html.fx-on .card-head h3::before{animation:barGlow 2.6s ease-in-out infinite}
+@keyframes barGlow{0%,100%{box-shadow:var(--glow-cyan)}50%{box-shadow:0 0 16px rgba(34,225,230,.85),0 0 30px rgba(255,63,164,.4)}}
+html.fx-on .topbar h1{background-size:220% 100%;animation:titleShift 9s linear infinite}
+@keyframes titleShift{from{background-position:0% 0}to{background-position:220% 0}}
+@media print{.fx-overlay{display:none!important}}
+@media (prefers-reduced-motion: reduce){html.fx-on .fx-overlay{animation:none}}
+
 </style>
 <script>
 window.__SKIP_AUTH = true;            /* standalone demo: no server-backed login */
@@ -993,6 +1012,7 @@ window.QIGLOBE_TEXTURES = {"day":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASAB
         <h1 id="viewTitle">Dashboard</h1>
         <div class="topbar-actions">
           <button class="btn btn-icon" id="btnTheme" title="Toggle dark mode (t)" aria-label="Toggle theme">◐</button>
+          <button class="btn btn-icon is-on" id="btnFx" title="Toggle arcade FX (scanlines)" aria-label="Toggle visual FX" aria-pressed="true">▥</button>
           <button class="btn btn-icon" id="btnChecks" title="Run all checks (c)" aria-label="Run checks">✓</button>
           <button class="btn btn-icon" id="btnHelp" title="Keyboard shortcuts (?)" aria-label="Help">?</button>
           <button class="btn" id="btnShare">Share</button>
@@ -1013,6 +1033,9 @@ window.QIGLOBE_TEXTURES = {"day":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASAB
   </div>
   <button class="fab" id="fab" title="Add new case (n)" aria-label="Add new case">+</button>
   <div class="toast" id="toast" hidden></div>
+
+  <!-- Arcade CRT/scanline + vignette overlay (toggled via #btnFx; never captures clicks) -->
+  <div class="fx-overlay" id="fxOverlay" aria-hidden="true"></div>
 
   <script>/* https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js */
 /**
@@ -11177,6 +11200,19 @@ window.QIGLOBE_TEXTURES = {"day":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASAB
     S.setBrand({ theme: cur === "dark" ? "light" : "dark" });
     applyTheme(); toast("Theme: " + (S.brand().theme === "dark" ? "dark" : "light"));
   }
+  // Arcade CRT/scanline + vignette overlay (cosmetic). Default ON; persisted in
+  // brand.fx; reflected as the .fx-on class on <html>. Disabled in print CSS.
+  function applyFX() {
+    const on = !(S.brand() && S.brand().fx === false);   // default ON
+    document.documentElement.classList.toggle("fx-on", on);
+    const btn = $("#btnFx");
+    if (btn) { btn.classList.toggle("is-on", on); btn.setAttribute("aria-pressed", on ? "true" : "false"); }
+  }
+  function toggleFX() {
+    const on = !(S.brand() && S.brand().fx === false);
+    S.setBrand({ fx: !on });
+    applyFX(); toast("Arcade FX: " + (S.brand().fx === false ? "off" : "on"));
+  }
   function runChecks() {
     const issues = S.health();
     const k = S.kpis();
@@ -11437,6 +11473,7 @@ window.QIGLOBE_TEXTURES = {"day":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASAB
   $("#btnShare").addEventListener("click", shareLink);
   $("#btnPrint").addEventListener("click", () => window.print());
   $("#btnTheme").addEventListener("click", toggleTheme);
+  { const bfx = $("#btnFx"); if (bfx) bfx.addEventListener("click", toggleFX); }
   $("#btnChecks").addEventListener("click", runChecks);
   $("#btnHelp").addEventListener("click", showShortcuts);
   $("#fileImport").addEventListener("change", e => { if (e.target.files[0]) handleImport(e.target.files[0]); e.target.value = ""; });
@@ -11492,7 +11529,7 @@ window.QIGLOBE_TEXTURES = {"day":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASAB
 
   // ---------- init (called by auth.js after successful authentication) ----------
   window.QIBoot = function () {
-    S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
+    S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); applyFX(); refreshHeader();
     const initialHash = (location.hash || "").replace(/^#/, "");
     go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
     // Wire up logout button after boot

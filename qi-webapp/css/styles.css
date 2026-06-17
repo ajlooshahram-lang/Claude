@@ -866,3 +866,22 @@ tr:hover td:first-child{box-shadow:inset 3px 0 0 var(--neon-cyan)}
 .badge:hover{transform:translateY(-1px)}
 /* buttons: press feedback */
 .btn:active{transform:translateY(1px)}
+
+
+
+/* --- Arcade CRT / scanline + vignette overlay (toggle via #btnFx) --- */
+.fx-overlay{display:none}
+html.fx-on .fx-overlay{display:block;position:fixed;inset:0;z-index:60;pointer-events:none;
+  background:
+    repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0px,rgba(0,0,0,.16) 1px,transparent 2px,transparent 3px),
+    radial-gradient(125% 125% at 50% 48%,transparent 58%,rgba(0,4,12,.42) 100%);
+  animation:fxFlicker 5s steps(40) infinite;will-change:opacity}
+@keyframes fxFlicker{0%,100%{opacity:.55}48%{opacity:.62}52%{opacity:.5}}
+#btnFx.is-on{color:var(--neon-cyan);box-shadow:var(--glow-cyan)}
+/* FX-only accents (don't clobber base animations) */
+html.fx-on .card-head h3::before{animation:barGlow 2.6s ease-in-out infinite}
+@keyframes barGlow{0%,100%{box-shadow:var(--glow-cyan)}50%{box-shadow:0 0 16px rgba(34,225,230,.85),0 0 30px rgba(255,63,164,.4)}}
+html.fx-on .topbar h1{background-size:220% 100%;animation:titleShift 9s linear infinite}
+@keyframes titleShift{from{background-position:0% 0}to{background-position:220% 0}}
+@media print{.fx-overlay{display:none!important}}
+@media (prefers-reduced-motion: reduce){html.fx-on .fx-overlay{animation:none}}
