@@ -79,10 +79,10 @@ const ATTRACT_CSS = `<style id="stpAttractCss">
 .stp-attract.hide{opacity:0;pointer-events:none}
 .stp-attract-inner{position:relative;text-align:center;padding:24px;animation:stpIn .9s cubic-bezier(.2,.7,.2,1) both}
 .stp-attract-mark{width:96px;height:96px;margin:0 auto 22px;border-radius:22px;display:grid;place-items:center;
-  font:800 42px/1 "Segoe UI",system-ui,sans-serif;color:#04101f;
+  font:800 42px/1 'Orbitron',"Segoe UI",system-ui,sans-serif;color:#04101f;
   background:linear-gradient(135deg,#22e1e6,#9b6bff);box-shadow:0 0 30px rgba(34,225,230,.6),0 0 60px rgba(155,107,255,.35);
   animation:stpPulse 2.4s ease-in-out infinite}
-.stp-attract-word{font:800 30px/1.15 "Segoe UI",system-ui,sans-serif;letter-spacing:.14em;
+.stp-attract-word{font:800 30px/1.15 'Orbitron',"Segoe UI",system-ui,sans-serif;letter-spacing:.14em;
   background:linear-gradient(90deg,#22e1e6,#3aa0ff,#ff3fa4);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
   text-shadow:0 0 22px rgba(34,225,230,.25)}
 .stp-attract-sub{margin-top:12px;font:500 13px/1.5 "Segoe UI",system-ui,sans-serif;letter-spacing:.06em;color:#9fb6e0;text-transform:uppercase}
