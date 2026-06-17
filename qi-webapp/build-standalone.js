@@ -51,6 +51,64 @@ const TEXTURES = {
   lights: "textures/earth_lights.png"
 };
 
+// ---- demo-only "attract" intro splash (game title-screen opening) ----------
+// Injected by this build into the standalone demo ONLY. The secure server build
+// (index.html) never includes it. Auto-dismisses, skippable, reduced-motion aware.
+const ATTRACT_HTML = `
+<div id="stpAttract" class="stp-attract" role="dialog" aria-label="Submarine Telecom Project">
+  <div class="stp-attract-inner">
+    <div class="stp-attract-mark">QI</div>
+    <div class="stp-attract-word">SUBMARINE TELECOM PROJECT</div>
+    <div class="stp-attract-sub">Programme Intelligence Platform &middot; $1.3B Asia Fiber Network</div>
+    <div class="stp-attract-bar"><span></span></div>
+    <div class="stp-attract-hint">Click anywhere to enter</div>
+  </div>
+</div>`;
+
+const ATTRACT_CSS = `<style id="stpAttractCss">
+.stp-attract{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;cursor:pointer;
+  background:
+    radial-gradient(40% 50% at 18% 16%,rgba(34,225,230,.22),transparent 70%),
+    radial-gradient(45% 55% at 84% 86%,rgba(255,63,164,.20),transparent 70%),
+    radial-gradient(60% 60% at 50% 50%,rgba(155,107,255,.16),transparent 75%),
+    linear-gradient(135deg,#04060d 0%,#070d1c 45%,#0a1230 100%);
+  transition:opacity .55s ease}
+.stp-attract::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(122,162,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(122,162,255,.06) 1px,transparent 1px);
+  background-size:46px 46px;-webkit-mask-image:radial-gradient(circle at 50% 45%,#000 50%,transparent 100%);mask-image:radial-gradient(circle at 50% 45%,#000 50%,transparent 100%)}
+.stp-attract.hide{opacity:0;pointer-events:none}
+.stp-attract-inner{position:relative;text-align:center;padding:24px;animation:stpIn .9s cubic-bezier(.2,.7,.2,1) both}
+.stp-attract-mark{width:96px;height:96px;margin:0 auto 22px;border-radius:22px;display:grid;place-items:center;
+  font:800 42px/1 "Segoe UI",system-ui,sans-serif;color:#04101f;
+  background:linear-gradient(135deg,#22e1e6,#9b6bff);box-shadow:0 0 30px rgba(34,225,230,.6),0 0 60px rgba(155,107,255,.35);
+  animation:stpPulse 2.4s ease-in-out infinite}
+.stp-attract-word{font:800 30px/1.15 "Segoe UI",system-ui,sans-serif;letter-spacing:.14em;
+  background:linear-gradient(90deg,#22e1e6,#3aa0ff,#ff3fa4);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  text-shadow:0 0 22px rgba(34,225,230,.25)}
+.stp-attract-sub{margin-top:12px;font:500 13px/1.5 "Segoe UI",system-ui,sans-serif;letter-spacing:.06em;color:#9fb6e0;text-transform:uppercase}
+.stp-attract-bar{width:240px;max-width:70vw;height:3px;margin:26px auto 0;border-radius:3px;background:rgba(122,162,255,.18);overflow:hidden}
+.stp-attract-bar>span{display:block;height:100%;width:40%;border-radius:3px;background:linear-gradient(90deg,#22e1e6,#3aa0ff);box-shadow:0 0 10px rgba(34,225,230,.7);animation:stpLoad 2.6s ease-in-out forwards}
+.stp-attract-hint{margin-top:22px;font:600 11px/1 "Segoe UI",system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#6f86b6;animation:stpBlink 1.4s steps(2) infinite}
+@keyframes stpIn{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes stpPulse{0%,100%{box-shadow:0 0 26px rgba(34,225,230,.5),0 0 52px rgba(155,107,255,.3)}50%{box-shadow:0 0 40px rgba(34,225,230,.85),0 0 80px rgba(155,107,255,.45)}}
+@keyframes stpLoad{0%{width:6%}70%{width:88%}100%{width:100%}}
+@keyframes stpBlink{0%{opacity:.4}50%{opacity:1}}
+@media (prefers-reduced-motion: reduce){.stp-attract-inner,.stp-attract-mark,.stp-attract-bar>span,.stp-attract-hint{animation:none}}
+@media print{.stp-attract{display:none!important}}
+</style>`;
+
+const ATTRACT_JS = `<script>(function(){
+  var a = document.getElementById("stpAttract"); if (!a) return;
+  var reduce = false; try { reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch(e){}
+  var done = false;
+  function dismiss(){ if(done) return; done = true; a.classList.add("hide");
+    setTimeout(function(){ if(a && a.parentNode) a.parentNode.removeChild(a); }, 650); }
+  a.addEventListener("click", dismiss);
+  function onKey(e){ document.removeEventListener("keydown", onKey); dismiss(); }
+  document.addEventListener("keydown", onKey);
+  setTimeout(dismiss, reduce ? 900 : 3000);
+})();</script>`;
+
 function fetchText(url, redirects) {
   redirects = redirects || 0;
   return new Promise((resolve, reject) => {
@@ -97,7 +155,7 @@ async function main() {
     "<script>\n" +
     "window.__SKIP_AUTH = true;            /* standalone demo: no server-backed login */\n" +
     "window.QIGLOBE_TEXTURES = " + safeScript(JSON.stringify(textureObj)) + ";\n" +
-    "</script>";
+    "</script>\n" + ATTRACT_CSS;
   html = html.replace("</head>", bootstrap + "\n</head>");
 
   // 3) fetch + inline the external libraries (fall back to CDN tag if offline)
@@ -125,7 +183,7 @@ async function main() {
     "<script>(function(){\n" +
     "  var g = document.getElementById('authGate'); if (g) g.style.display = 'none';\n" +
     "  var a = document.getElementById('app'); if (a) a.hidden = false;\n" +
-    "})();</script>";
+    "})();</script>\n" + ATTRACT_JS;
 
   // 6) replace the entire original <script ...> tail with our inlined blocks
   const firstScript = html.indexOf('<script src="https://cdn.jsdelivr.net/npm/chart.js');
@@ -138,6 +196,9 @@ async function main() {
   // tidy a couple of cosmetic labels for the demo build
   html = html.replace("<title>QI Intelligence Platform</title>",
     "<title>Submarine Telecom Project Application</title>");
+
+  // attract intro splash (demo only) — injected right after <body>
+  html = html.replace("<body>", "<body>\n" + ATTRACT_HTML);
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
   fs.writeFileSync(OUT_FILE, html);

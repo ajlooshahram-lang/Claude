@@ -15,6 +15,7 @@ const html = fs.readFileSync(file, "utf8");
 // --- static structure checks (cheap, catch packaging mistakes) ---
 ok(/window\.__SKIP_AUTH\s*=\s*true/.test(html), "sets __SKIP_AUTH (no login gate)");
 ok(/window\.QIGLOBE_TEXTURES\s*=\s*\{[^]*data:image\/jpeg;base64,/.test(html), "inlines Earth textures as data URIs");
+ok(html.indexOf('id="stpAttract"') !== -1, "standalone embeds the attract intro splash (demo only)");
 ok(!/<script\s+src=/i.test(html), "no external <script src> tags remain (fully self-contained)");
 ok(html.indexOf("THREE") !== -1 && html.indexOf("OrbitControls") !== -1, "Three.js + add-ons inlined");
 ok(html.indexOf("/* js/ui.js */") !== -1 && html.indexOf("/* js/globe.js */") !== -1, "app modules inlined");
@@ -48,6 +49,12 @@ setTimeout(() => {
   } catch (e) { threw = true; console.log("    (globe click error: " + e.message + ")"); }
   ok(!threw, "runtime: opening the 3D Network Map view does not throw");
   ok(!!doc.getElementById("globeStage"), "runtime: 3D Network Map stage rendered");
+
+  // attract splash present on load, and dismissable
+  const splash = doc.getElementById("stpAttract");
+  ok(!!splash, "runtime: attract intro splash present on load");
+  if (splash) { splash.dispatchEvent(new window.Event("click", { bubbles: true })); }
+  ok(!splash || splash.classList.contains("hide"), "runtime: attract splash dismisses on click");
 
   console.log("\n" + (fail ? "FAILED " + fail + " / " + (pass + fail) : "ALL STANDALONE CHECKS PASSED (" + pass + ")"));
   process.exit(fail ? 1 : 0);
