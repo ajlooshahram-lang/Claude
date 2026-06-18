@@ -1258,3 +1258,18 @@ body.focus-mode .card:hover,body.focus-mode .card:focus-within{opacity:1}
 .inline-edit select.inline-sel:focus{outline:2px solid var(--accent,#2e5496);border-radius:4px}
 .inline-select{position:absolute;z-index:10;background:var(--card,#fff);border:1.5px solid var(--accent,#2e5496);border-radius:6px;box-shadow:var(--shadow-md,0 4px 12px rgba(0,0,0,.12));padding:4px 0;min-width:140px}
 .inline-select option{padding:4px 10px;font-size:12px}
+
+/* Step 101: Lessons learned list */
+.lessons-list{margin:10px 0 0;padding-left:22px;line-height:1.7}
+.lessons-list li{margin-bottom:8px;color:var(--ink,#1f2733)}
+
+/* Step 102: Status-change animation */
+tr.status-flash{animation:statusFlash .5s ease}
+@keyframes statusFlash{0%{background:rgba(66,214,164,.3)}100%{background:transparent}}
+
+/* Step 103: Key dates summary card */
+.key-dates{border-left:3px solid var(--teal,#1f8a8a)}
+.key-dates .kd-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06)}
+.key-dates .kd-row:last-child{border-bottom:none}
+.key-dates .kd-label{font-size:12px;color:var(--muted,#6b7a99)}
+.key-dates .kd-value{font-size:13px;font-weight:600}

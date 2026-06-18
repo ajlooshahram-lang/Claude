@@ -1475,5 +1475,19 @@ ok(caseFilterEl != null && caseFilterEl.tagName === "INPUT", "#caseFilter input 
 var inlineEditCells = doc.querySelectorAll("td.inline-edit");
 ok(inlineEditCells.length > 0, ".inline-edit cells exist in the cases table");
 
+// Step 101: .lessons-list on Investor Brief with 5+ li elements
+doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+var lessonsListEl = doc.querySelector(".lessons-list");
+ok(lessonsListEl != null && lessonsListEl.querySelectorAll("li").length >= 5, ".lessons-list exists on brief with 5+ li elements");
+
+// Step 102: @keyframes statusFlash exists in stylesheet
+var allStyles = Array.from(doc.querySelectorAll("style")).map(function (s) { return s.textContent; }).join("");
+ok(allStyles.indexOf("@keyframes statusFlash") !== -1, "@keyframes statusFlash exists in stylesheet");
+
+// Step 103: key-dates content exists on dashboard
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+var dashHtml103 = doc.getElementById("content").innerHTML;
+ok(dashHtml103.indexOf("key-dates") !== -1 || dashHtml103.indexOf("Key dates") !== -1, "key-dates content exists on dashboard");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

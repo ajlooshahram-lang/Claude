@@ -1333,6 +1333,18 @@
         </section>
 
         <section class="brief-section">
+          <h3>Lessons learned</h3>
+          <p class="brief-lead">Common lessons from past submarine cable programmes that every new project team should keep in mind from day one.</p>
+          <ol class="lessons-list">
+            <li>Permit timelines are almost always underestimated; start regulatory engagement at least 18 months before planned cable landing.</li>
+            <li>Marine route surveys regularly uncover seabed obstacles that force costly re-routes; budget a 10-15% contingency for route changes.</li>
+            <li>Landing party agreements in multiple jurisdictions run in parallel but rarely finish together; identify the slowest country early and resource it first.</li>
+            <li>Cable ship availability is a global bottleneck; lock in vessel slots 12-18 months ahead or risk a full-season delay.</li>
+            <li>Stakeholder communication gaps between consortium partners cause more schedule slippage than technical problems; establish a single shared dashboard from kick-off.</li>
+          </ol>
+        </section>
+
+        <section class="brief-section">
           <h3>When each country goes live</h3>
           <p class="brief-lead">The order countries are connected, and roughly which month each one comes online as the cable is laid from one landing station to the next.</p>
           <div class="brief-online">${onlineRows || '<p class="muted">No schedule data</p>'}</div>
@@ -2073,7 +2085,21 @@
       return { problem: c.problem || "Untitled", rpn: rpn };
     }).sort(function (a, b) { return a.rpn - b.rpn; }).slice(0, 5);
     const quickWinsCard = quickWinCandidates.length ? `<div class="card quick-wins"><h3>\u26A1 Quick wins</h3><p class="muted">Items easiest to close right now:</p><ul class="qw-list">${quickWinCandidates.map(function (q) { return '<li>' + esc(q.problem) + '</li>'; }).join('')}</ul></div>` : '';
-    return tourBanner + progressCard + nextCard + quickWinsCard + dqCard + healthCard + `
+    // Step 103: Key dates summary card — earliest start & latest target
+    const keyDatesCard = (function () {
+      var allCases = S.validCases();
+      var starts = allCases.map(function (c) { return c.startDate || c.dateLogged || ""; }).filter(function (d) { return d; }).sort();
+      var targets = allCases.map(function (c) { return c.target || c.estEnd || ""; }).filter(function (d) { return d; }).sort();
+      if (!starts.length && !targets.length) return "";
+      var earliest = starts.length ? starts[0] : null;
+      var latest = targets.length ? targets[targets.length - 1] : null;
+      var fmtD = function (d) { if (!d) return "—"; try { return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); } catch (e) { return d; } };
+      return '<div class="card key-dates"><h3>\uD83D\uDCC5 Key dates</h3>' +
+        '<div class="kd-row"><span class="kd-label">Earliest start</span><span class="kd-value">' + esc(fmtD(earliest)) + '</span></div>' +
+        '<div class="kd-row"><span class="kd-label">Latest target</span><span class="kd-value">' + esc(fmtD(latest)) + '</span></div>' +
+        '</div>';
+    })();
+    return tourBanner + progressCard + nextCard + quickWinsCard + keyDatesCard + dqCard + healthCard + `
       <div class="dash-toolbar" style="display:flex;gap:8px;margin-bottom:12px"><button class="btn btn-sm" id="emailSummary" type="button">\u2709 Copy status email</button><button class="btn btn-sm" id="meetingAgenda" type="button">\uD83D\uDCCB Copy meeting agenda</button></div>
       <div class="grid kpis" style="margin-bottom:16px">
         ${kpi("navy", "Total Cases", k.total)}
