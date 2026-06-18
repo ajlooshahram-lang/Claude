@@ -281,6 +281,12 @@ table.riskmatrix th{background:#f0f3f9;font-size:11px}
 [data-theme="dark"] .netmap-svg{background:rgba(125,167,240,.04);border-color:rgba(125,167,240,.18)}
 [data-theme="dark"] .netmap-lbl{fill:#cbd6ee}
 [data-theme="dark"] .cmp-table th,[data-theme="dark"] .cmp-table td{border-bottom-color:rgba(125,167,240,.15)}
+/* dark-mode risk matrix colours */
+[data-theme="dark"] .rm-green{background:rgba(66,214,164,.25)!important;color:#7df0c4}
+[data-theme="dark"] .rm-amber{background:rgba(230,184,74,.25)!important;color:#f3d27a}
+[data-theme="dark"] .rm-red{background:rgba(255,128,110,.25)!important;color:#ffb3a3}
+[data-theme="dark"] .rmcell{border-color:var(--line)}
+[data-theme="dark"] table.riskmatrix th{background:#1e2a44;color:#cbd6ee}
 
 /* shortcut/help overlay */
 .kbd{display:inline-block;background:#fff;border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:1px 7px;font:11px/1.4 ui-monospace,Menlo,Consolas,monospace;color:var(--ink);margin-right:6px}

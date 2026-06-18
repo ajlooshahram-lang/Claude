@@ -72,7 +72,7 @@
     toast(_soundEnabled ? "Notification sound on" : "Notification sound off");
   }
   function tableWrap(head, rows, cls) {
-    if (!rows) return `<div class="empty">No data yet. Click <b>+ New Case</b> to start.</div>`;
+    if (!rows) return `<div class="empty"><p>No items yet. Go to <b>Project Brain</b>, upload a project description and click <b>Apply plan</b> &mdash; the app will create your risk register, FMEA and tasks automatically.</p><button class="btn btn-sm" onclick="document.querySelector('[data-view=brain]')&&document.querySelector('[data-view=brain]').click()" type="button">🧠 Go to Project Brain</button></div>`;
     return `<div class="table-wrap"><table class="${cls || ""}"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 
@@ -1824,6 +1824,7 @@
     }).join("");
 
     return `
+      <div style="margin-bottom:12px"><button class="btn btn-sm" id="rpGlobe" type="button">\u{1F310} View routes on 3D map</button></div>
       ${kpis}
       <div class="card">
         <div class="card-head"><h3>Programme rollup — % complete by segment</h3></div>
@@ -1841,6 +1842,10 @@
     const G = window.QIGlobe || {};
     const cables = Array.isArray(G.CABLES) ? G.CABLES : [];
     if (!cables.length) return;
+
+    // "View routes on 3D map" button
+    const rpGlobeBtn = content.querySelector("#rpGlobe");
+    if (rpGlobeBtn) rpGlobeBtn.addEventListener("click", () => go("globe3d"));
 
     // phase-cell cycling (click-only): Not started → In progress → Complete → …
     const cycle = { "Not started": "In progress", "In progress": "Complete", "Complete": "Not started" };
