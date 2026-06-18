@@ -1362,43 +1362,156 @@
       });
     }
 
-    // --- Presentation / Slideshow mode (step 52) ---
+    // --- Presentation / Slideshow mode (steps 52, 55, 56, 57) ---
     const presentBtn = $("#briefPresent");
     if (presentBtn && briefEl) {
       presentBtn.addEventListener("click", function () {
         var slides = Array.prototype.slice.call(briefEl.querySelectorAll(".brief-section, .brief-cover"));
         if (!slides.length) return;
         var idx = 0;
+        var notesVisible = false;
+        var overviewVisible = false;
         briefEl.classList.add("presenting");
         slides.forEach(function (s) { s.classList.remove("slide-active"); });
         slides[0].classList.add("slide-active");
 
-        // Create nav overlay
+        // Progress bar (step 55)
+        var progressBar = document.createElement("div");
+        progressBar.className = "slide-progress";
+        progressBar.innerHTML = '<div class="slide-progress-fill"></div>';
+        document.body.appendChild(progressBar);
+        var progressFill = progressBar.querySelector(".slide-progress-fill");
+
+        // Slide overview container (step 57)
+        var overviewEl = document.createElement("div");
+        overviewEl.className = "slide-overview";
+        overviewEl.style.display = "none";
+        briefEl.appendChild(overviewEl);
+
+        // Build overview thumbnails
+        slides.forEach(function (s, i) {
+          var heading = s.querySelector("h2, h3, h4");
+          var label = heading ? heading.textContent : ("Slide " + (i + 1));
+          var thumb = document.createElement("div");
+          thumb.className = "slide-thumb";
+          thumb.textContent = label;
+          thumb.setAttribute("data-slide-idx", String(i));
+          overviewEl.appendChild(thumb);
+        });
+        overviewEl.addEventListener("click", function (e) {
+          var t = e.target.closest(".slide-thumb");
+          if (!t) return;
+          var target = parseInt(t.getAttribute("data-slide-idx"), 10);
+          if (!isNaN(target)) {
+            overviewVisible = false;
+            overviewEl.style.display = "none";
+            showSlide(target);
+          }
+        });
+
+        // Create nav overlay with counter, notes toggle, and overview toggle
         var nav = document.createElement("div");
         nav.className = "slide-nav";
-        nav.innerHTML = '<button type="button" id="slidePrev">&#9664; Prev</button><button type="button" id="slideNext">Next &#9654;</button><button type="button" id="slideExit">&#10005; Exit</button>';
+        nav.innerHTML = '<button type="button" id="slidePrev">&#9664; Prev</button>' +
+          '<span id="slideCounter">Slide 1 of ' + slides.length + '</span>' +
+          '<button type="button" id="slideNext">Next &#9654;</button>' +
+          '<button type="button" id="slideNotes">&#128221; Notes</button>' +
+          '<button type="button" id="slideOverview">&#9638; Overview</button>' +
+          '<button type="button" id="slideExit">&#10005; Exit</button>';
         document.body.appendChild(nav);
 
+        var counterEl = document.getElementById("slideCounter");
+
+        function updateProgress() {
+          var pct = slides.length > 1 ? ((idx) / (slides.length - 1)) * 100 : 100;
+          progressFill.style.width = pct + "%";
+          if (counterEl) counterEl.textContent = "Slide " + (idx + 1) + " of " + slides.length;
+          // Update overview current indicator
+          var thumbs = overviewEl.querySelectorAll(".slide-thumb");
+          thumbs.forEach(function (th, i) {
+            th.classList.toggle("is-current", i === idx);
+          });
+        }
+
+        function getSpeakerNote(slide) {
+          // Use the first paragraph or .brief-takeaway in the section as note content
+          var takeaway = slide.querySelector(".brief-takeaway, .takeaway, p");
+          return takeaway ? takeaway.textContent.trim() : "";
+        }
+
+        function showNotePanel() {
+          // Remove existing note panel
+          var existing = briefEl.querySelector(".speaker-note");
+          if (existing) existing.parentNode.removeChild(existing);
+          if (!notesVisible) return;
+          var noteText = getSpeakerNote(slides[idx]);
+          if (!noteText) noteText = "No speaker notes for this slide.";
+          var noteDiv = document.createElement("div");
+          noteDiv.className = "speaker-note";
+          noteDiv.textContent = noteText;
+          slides[idx].appendChild(noteDiv);
+        }
+
         function showSlide(i) {
+          // Remove existing note
+          var existingNote = briefEl.querySelector(".speaker-note");
+          if (existingNote) existingNote.parentNode.removeChild(existingNote);
           slides.forEach(function (s) { s.classList.remove("slide-active"); });
           idx = Math.max(0, Math.min(slides.length - 1, i));
           slides[idx].classList.add("slide-active");
+          updateProgress();
+          showNotePanel();
         }
+
         function exitPresent() {
           briefEl.classList.remove("presenting");
           slides.forEach(function (s) { s.classList.remove("slide-active"); });
+          // Clean up speaker note
+          var existingNote = briefEl.querySelector(".speaker-note");
+          if (existingNote) existingNote.parentNode.removeChild(existingNote);
+          // Clean up overview
+          if (overviewEl.parentNode) overviewEl.parentNode.removeChild(overviewEl);
+          // Clean up progress bar
+          if (progressBar.parentNode) progressBar.parentNode.removeChild(progressBar);
           if (nav.parentNode) nav.parentNode.removeChild(nav);
           document.removeEventListener("keydown", onKey);
         }
+
+        function toggleNotes() {
+          notesVisible = !notesVisible;
+          var btn = document.getElementById("slideNotes");
+          if (btn) btn.classList.toggle("active", notesVisible);
+          showNotePanel();
+        }
+
+        function toggleOverview() {
+          overviewVisible = !overviewVisible;
+          overviewEl.style.display = overviewVisible ? "grid" : "none";
+          var btn = document.getElementById("slideOverview");
+          if (btn) btn.classList.toggle("active", overviewVisible);
+          // Hide current slide when overview open, show when closed
+          if (overviewVisible) {
+            slides.forEach(function (s) { s.classList.remove("slide-active"); });
+          } else {
+            slides[idx].classList.add("slide-active");
+          }
+          updateProgress();
+        }
+
         function onKey(e) {
           if (e.key === "ArrowRight" || e.key === "ArrowDown") showSlide(idx + 1);
           else if (e.key === "ArrowLeft" || e.key === "ArrowUp") showSlide(idx - 1);
           else if (e.key === "Escape") exitPresent();
+          else if (e.key === "n" || e.key === "N") toggleNotes();
+          else if (e.key === "o" || e.key === "O") toggleOverview();
         }
         document.addEventListener("keydown", onKey);
         document.getElementById("slidePrev").addEventListener("click", function () { showSlide(idx - 1); });
         document.getElementById("slideNext").addEventListener("click", function () { showSlide(idx + 1); });
+        document.getElementById("slideNotes").addEventListener("click", toggleNotes);
+        document.getElementById("slideOverview").addEventListener("click", toggleOverview);
         document.getElementById("slideExit").addEventListener("click", exitPresent);
+        updateProgress();
       });
     }
   };

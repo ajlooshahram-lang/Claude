@@ -1237,6 +1237,15 @@ ok(doc.querySelector("[data-act='restore']") != null || doc.querySelector("td.mu
 doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(doc.getElementById("briefPresent") != null, "#briefPresent button exists on the brief toolbar");
 
+// Step 55-57: Enter presentation mode and verify enhancements
+doc.getElementById("briefPresent").dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("slideCounter") != null, "#slideCounter exists after entering presentation mode");
+ok(doc.querySelector(".slide-progress-fill") != null, ".slide-progress-fill exists during presentation");
+ok(doc.getElementById("slideNotes") != null, "Speaker notes toggle button exists in the slide-nav");
+ok(doc.getElementById("slideOverview") != null, "Overview button exists in the slide-nav");
+// Exit presentation to restore normal state
+doc.getElementById("slideExit").dispatchEvent(new window.Event("click", { bubbles: true }));
+
 // Step 53: Country progress ring SVG on brief country cards
 var countryRings = doc.querySelectorAll(".country-ring");
 ok(countryRings.length >= 8, ".country-ring SVG exists on brief country cards (count " + countryRings.length + " >= 8)");
