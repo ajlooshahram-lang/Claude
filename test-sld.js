@@ -685,6 +685,257 @@ test('sldPropagateAll stores _z1 positive-sequence impedance on nodes', function
   });
 });
 
+// ===== SELECTIVITY COORDINATION TESTS =====
+console.log('\n=== Selectivity Coordination Tests ===\n');
+
+// Test 29: sldDeviceCurve returns valid curve points for MCB
+test('sldDeviceCurve returns valid points for MCB (curve B, 16A)', function() {
+  var mcb = PRODUCTS.mcbs.find(function(m){ return m.curve === 'B' && m.rating === 16; });
+  assert(mcb, 'Should find a B16 MCB');
+  var curve = sldDeviceCurve(mcb, 16);
+  assert(curve.length > 5, 'Curve should have multiple points, got ' + curve.length);
+  // Verify all points have valid structure
+  curve.forEach(function(pt) {
+    assert(pt.i > 0, 'Current must be positive');
+    assert(pt.tMin > 0, 'tMin must be positive');
+    assert(pt.tMax >= pt.tMin, 'tMax must be >= tMin');
+  });
+  // Verify thermal region exists (low current, high time)
+  var thermalPt = curve[0];
+  assert(thermalPt.tMax > 1, 'First point should be in thermal region (time > 1s)');
+  // Verify instantaneous region exists (high current, very low time)
+  var lastPt = curve[curve.length - 1];
+  assert(lastPt.tMax < 0.1, 'Last point should be instantaneous (time < 0.1s)');
+});
+
+// Test 30: sldDeviceCurve returns valid curve points for fuse
+test('sldDeviceCurve returns valid points for gG fuse', function() {
+  var fuse = PRODUCTS.fuses.find(function(f){ return f.rating === 63; });
+  assert(fuse, 'Should find a 63A fuse');
+  var curve = sldDeviceCurve(fuse, 63);
+  assert(curve.length > 5, 'Fuse curve should have multiple points, got ' + curve.length);
+  curve.forEach(function(pt) {
+    assert(pt.i > 0, 'Current must be positive');
+    assert(pt.tMin > 0, 'tMin must be positive');
+    assert(pt.tMax >= pt.tMin, 'tMax must be >= tMin');
+  });
+});
+
+// Test 31: sldDeviceCurve returns valid curve points for MCCB
+test('sldDeviceCurve returns valid points for MCCB', function() {
+  var mccb = PRODUCTS.mccbs.find(function(m){ return m.frame === 'NSX 250'; });
+  assert(mccb, 'Should find NSX 250 MCCB');
+  var curve = sldDeviceCurve(mccb, 250, {io: 0.8, isd: 5});
+  assert(curve.length > 5, 'MCCB curve should have multiple points, got ' + curve.length);
+  curve.forEach(function(pt) {
+    assert(pt.i > 0, 'Current must be positive');
+    assert(pt.tMin > 0, 'tMin must be positive');
+    assert(pt.tMax >= pt.tMin, 'tMax must be >= tMin');
+  });
+});
+
+// Test 32: sldAnalyzeSelectivity returns 'full' for fuse pair with ratio >= 1.6
+test('sldAnalyzeSelectivity: full selectivity for fuse ratio >= 1.6:1', function() {
+  sldNextId = 2000;
+  var tree = sldCreateTree();
+  var root = tree.nodes[tree.rootId];
+  var mainBoardId = root.childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+
+  // Set upstream (main board) with 100A fuse
+  var fuse100 = PRODUCTS.fuses.find(function(f){ return f.rating === 100; });
+  mainBoard.protection = fuse100;
+  mainBoard.protectionIn = 100;
+
+  // Add sub-board with 32A fuse (ratio 100/32 = 3.125 > 1.6)
+  var fuse32 = PRODUCTS.fuses.find(function(f){ return f.rating === 32; });
+  var cable10 = PRODUCTS.cables.find(function(c){ return c.mm2 === 10 && c.material === 'Cu'; });
+  var sb = sldCreateNode('sub_board', mainBoardId, {
+    cable: cable10, length_m: 10, phases: '3x400', voltage: 400,
+    power_kW: 15, protection: fuse32, protectionIn: 32
+  });
+  tree.nodes[sb.id] = sb;
+  mainBoard.childIds.push(sb.id);
+  sldPropagateAll(tree);
+
+  var result = sldAnalyzeSelectivity(tree, sb.id);
+  assert(result, 'Should return a result');
+  assert.strictEqual(result.verdict, 'full', 'Fuse 100A/32A (ratio 3.1:1) should be fully selective. Got: ' + result.verdict + ' - ' + result.details);
+});
+
+// Test 33: sldAnalyzeSelectivity returns 'none' for equal-rated fuses
+test('sldAnalyzeSelectivity: no selectivity for equal-rated fuses', function() {
+  sldNextId = 3000;
+  var tree = sldCreateTree();
+  var root = tree.nodes[tree.rootId];
+  var mainBoardId = root.childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+
+  var fuse63 = PRODUCTS.fuses.find(function(f){ return f.rating === 63 && f.size === 'D02'; });
+  mainBoard.protection = fuse63;
+  mainBoard.protectionIn = 63;
+
+  // Sub-board with same 63A fuse (ratio 1:1)
+  var cable10 = PRODUCTS.cables.find(function(c){ return c.mm2 === 10 && c.material === 'Cu'; });
+  var sb = sldCreateNode('sub_board', mainBoardId, {
+    cable: cable10, length_m: 10, phases: '3x400', voltage: 400,
+    power_kW: 15, protection: fuse63, protectionIn: 63
+  });
+  tree.nodes[sb.id] = sb;
+  mainBoard.childIds.push(sb.id);
+  sldPropagateAll(tree);
+
+  var result = sldAnalyzeSelectivity(tree, sb.id);
+  assert(result, 'Should return a result');
+  assert.strictEqual(result.verdict, 'none', 'Equal-rated fuses should be non-selective. Got: ' + result.verdict);
+});
+
+// Test 34: sldAnalyzeSelectivity returns 'partial' for MCB vs upstream fuse
+test('sldAnalyzeSelectivity: partial selectivity for MCB vs upstream fuse', function() {
+  sldNextId = 4000;
+  var tree = sldCreateTree();
+  var root = tree.nodes[tree.rootId];
+  var mainBoardId = root.childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+
+  // Main board with 100A fuse
+  var fuse100 = PRODUCTS.fuses.find(function(f){ return f.rating === 100; });
+  mainBoard.protection = fuse100;
+  mainBoard.protectionIn = 100;
+
+  // Sub-board with MCB B16
+  var mcb = PRODUCTS.mcbs.find(function(m){ return m.curve === 'B' && m.rating === 16; });
+  var cable = PRODUCTS.cables.find(function(c){ return c.mm2 === 2.5 && c.material === 'Cu'; });
+  var sb = sldCreateNode('final_circuit', mainBoardId, {
+    cable: cable, length_m: 20, phases: '1x230', voltage: 230,
+    power_kW: 3.68, protection: mcb, protectionIn: 16
+  });
+  tree.nodes[sb.id] = sb;
+  mainBoard.childIds.push(sb.id);
+  sldPropagateAll(tree);
+
+  var result = sldAnalyzeSelectivity(tree, sb.id);
+  assert(result, 'Should return a result');
+  assert.strictEqual(result.verdict, 'partial', 'MCB B16 vs 100A fuse should be partially selective. Got: ' + result.verdict);
+  assert(result.limitCurrent > 0, 'Should have a limit current. Got: ' + result.limitCurrent);
+});
+
+// Test 35: MCCB time-grading check
+test('sldAnalyzeSelectivity: MCCB with delay vs downstream MCB', function() {
+  sldNextId = 5000;
+  var tree = sldCreateTree();
+  var root = tree.nodes[tree.rootId];
+  var mainBoardId = root.childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+
+  // Main board with MCCB NSX 250 with short-time delay
+  var mccb = PRODUCTS.mccbs.find(function(m){ return m.frame === 'NSX 250' && m.trip === 'N'; });
+  mainBoard.protection = mccb;
+  mainBoard.protectionIn = 250;
+  mainBoard.mccbSettings = { io: 1.0, isd: 5, isdDelay: 0.1 };
+
+  // Sub-board with MCB C32
+  var mcb = PRODUCTS.mcbs.find(function(m){ return m.curve === 'C' && m.rating === 32; });
+  var cable = PRODUCTS.cables.find(function(c){ return c.mm2 === 10 && c.material === 'Cu'; });
+  var sb = sldCreateNode('sub_board', mainBoardId, {
+    cable: cable, length_m: 15, phases: '3x400', voltage: 400,
+    power_kW: 20, protection: mcb, protectionIn: 32
+  });
+  tree.nodes[sb.id] = sb;
+  mainBoard.childIds.push(sb.id);
+  sldPropagateAll(tree);
+
+  var result = sldAnalyzeSelectivity(tree, sb.id);
+  assert(result, 'Should return a result');
+  assert(result.verdict === 'full' || result.verdict === 'partial',
+    'MCCB with 100ms delay vs MCB C32 should be full or partial. Got: ' + result.verdict + ' - ' + result.details);
+});
+
+// Test 36: sldRenderTCCChart returns valid SVG
+test('sldRenderTCCChart returns valid SVG string', function() {
+  var mcb = PRODUCTS.mcbs.find(function(m){ return m.curve === 'B' && m.rating === 16; });
+  var fuse = PRODUCTS.fuses.find(function(f){ return f.rating === 100; });
+  var dsCurve = sldDeviceCurve(mcb, 16);
+  var usCurve = sldDeviceCurve(fuse, 100);
+  var result = { verdict: 'partial', limitCurrent: 80, details: 'test' };
+  var svg = sldRenderTCCChart(usCurve, dsCurve, result);
+  assert(svg.indexOf('<svg') === 0, 'Should start with <svg. Got: ' + svg.substring(0, 20));
+  assert(svg.indexOf('</svg>') > 0, 'Should end with </svg>');
+  assert(svg.indexOf('viewBox') > 0, 'Should have viewBox for responsive sizing');
+  assert(svg.indexOf('Upstream') > 0 || svg.indexOf('Opstr') > 0, 'Should have upstream label');
+  assert(svg.indexOf('Downstream') > 0 || svg.indexOf('Nedstr') > 0, 'Should have downstream label');
+});
+
+// Test 37: sldVerifySelectivityAll produces compliance results
+test('sldVerifySelectivityAll produces results for tree with protection', function() {
+  sldNextId = 6000;
+  var tree = sldCreateTree();
+  var root = tree.nodes[tree.rootId];
+  var mainBoardId = root.childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+
+  // Set up protection on main board
+  var fuse100 = PRODUCTS.fuses.find(function(f){ return f.rating === 100; });
+  mainBoard.protection = fuse100;
+  mainBoard.protectionIn = 100;
+
+  // Set protection on final circuits (they should have MCBs by default)
+  mainBoard.childIds.forEach(function(cid) {
+    var fc = tree.nodes[cid];
+    if (!fc.protection) {
+      var mcb = PRODUCTS.mcbs.find(function(m){ return m.curve === 'B' && m.rating === 16; });
+      fc.protection = mcb;
+      fc.protectionIn = 16;
+    }
+  });
+
+  sldPropagateAll(tree);
+  var results = sldVerifySelectivityAll(tree);
+  assert(results.length > 0, 'Should have selectivity results for protected pairs. Got: ' + results.length);
+  results.forEach(function(r) {
+    assert(r.verdict, 'Each result should have a verdict');
+    assert(r.clause, 'Each result should cite a DS/HD 60364 clause');
+    assert(r.childId, 'Each result should reference a childId');
+    assert(r.parentId, 'Each result should reference a parentId');
+  });
+});
+
+// Test 38: sldVerifyNode includes selectivity check
+test('sldVerifyNode includes selectivity compliance check', function() {
+  sldNextId = 7000;
+  var tree = sldCreateTree();
+  var root = tree.nodes[tree.rootId];
+  var mainBoardId = root.childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+
+  var fuse100 = PRODUCTS.fuses.find(function(f){ return f.rating === 100; });
+  mainBoard.protection = fuse100;
+  mainBoard.protectionIn = 100;
+
+  // Final circuit with MCB
+  var fc = tree.nodes[mainBoard.childIds[0]];
+  var mcb = PRODUCTS.mcbs.find(function(m){ return m.curve === 'B' && m.rating === 16; });
+  fc.protection = mcb;
+  fc.protectionIn = 16;
+
+  sldPropagateAll(tree);
+  var results = sldVerifyNode(tree, fc.id);
+  var selCheck = results.find(function(r) { return r.rule.indexOf('Selectiv') >= 0 || r.rule.indexOf('selectiv') >= 0 || r.rule.indexOf('Selektiv') >= 0 || r.rule.indexOf('selektiv') >= 0; });
+  assert(selCheck, 'Should include selectivity check in verification results. Rules found: ' + results.map(function(r){return r.rule;}).join(', '));
+  assert(selCheck.clause.indexOf('536') >= 0, 'Should cite cl.536. Got: ' + selCheck.clause);
+});
+
+// Test 39: All new functions are defined at global scope
+test('All selectivity functions are defined', function() {
+  assert(typeof sldDeviceCurve === 'function', 'sldDeviceCurve must be a function');
+  assert(typeof sldAnalyzeSelectivity === 'function', 'sldAnalyzeSelectivity must be a function');
+  assert(typeof sldRenderTCCChart === 'function', 'sldRenderTCCChart must be a function');
+  assert(typeof sldShowSelectivity === 'function', 'sldShowSelectivity must be a function');
+  assert(typeof sldVerifySelectivityAll === 'function', 'sldVerifySelectivityAll must be a function');
+  assert(typeof sldCloseSelectivity === 'function', 'sldCloseSelectivity must be a function');
+  assert(typeof sldRenderSelectivityPanel === 'function', 'sldRenderSelectivityPanel must be a function');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

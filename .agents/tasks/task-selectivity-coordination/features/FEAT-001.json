@@ -1,0 +1,37 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Selectivity analysis engine with time-current curve data, selectivity verdict computation, and SVG log-log chart visualization. Integrates with the existing SLD via clickable connections between nodes. Includes DS/HD 60364-5-53 section 536 compliance checks.",
+  "status": "in_progress",
+  "steps": [
+    "STEP 1 - Time-current curve data model: Add constants/functions that generate time-current curve points for each device type. For MCBs: thermal region (inverse-time, 1.13*In to Isd using IEC 60898 time-current model) and instantaneous region (Isd based on MCB_CURVES B/C/D). For fuses (gG): use IEC 60269 time-current characteristics derived from i5s data - compute I^2t from (i5s)^2 * 5, model the inverse-time curve as t = I2t / I^2 for times > 0.01s, and the minimum pre-arcing curve below. For MCCBs: thermal trip at 1.05-1.3*Ir (adjustable via Io setting), short-time delay Isd region (programmable delay 0-0.4s), and instantaneous Ii. Add these as a function sldDeviceCurve(device, In, settings) that returns arrays of {i, tMin, tMax} points for plotting.",
+
+    "STEP 2 - Selectivity analysis engine: Add function sldAnalyzeSelectivity(tree, childNodeId) that takes a child node and compares its protection device curve against the upstream (parent) device curve. Implement three analysis modes: (A) Fuse vs Fuse (gG): check rating ratio >= 1.6:1 rule per DS/HD 60364-5-53 Annex A, AND verify I2t let-through of downstream fuse is less than pre-arcing I2t of upstream fuse. (B) MCB vs upstream Fuse: find the selectivity limit current where MCB instantaneous trip intersects fuse minimum pre-arcing curve. Below that current = selective; above = non-selective. (C) MCCB with short-time delay vs downstream MCB/fuse: verify time-grading - MCCB Isd delay must be greater than downstream device clearing time at the same fault level. The function returns: {verdict: 'full'|'partial'|'none', limitCurrent: number|null, details: string, clause: 'DS/HD 60364-5-53 cl.536.x', upstreamDevice: {...}, downstreamDevice: {...}}.",
+
+    "STEP 3 - SVG log-log time-current chart renderer: Add function sldRenderTCCChart(upstreamCurve, downstreamCurve, selectivityResult) that produces an SVG element with: logarithmic X-axis (current, 1A to 100kA), logarithmic Y-axis (time, 0.001s to 10000s), upstream device curve (red/orange band between tMin and tMax), downstream device curve (blue/cyan band), the selectivity zone highlighted in green (where downstream trips before upstream), and the non-selective zone in red. Include axis labels, grid lines, device labels, and a legend. SVG should be responsive (viewBox-based). Use IEC-standard chart style.",
+
+    "STEP 4 - SLD integration and UI: (A) Modify sldRenderCanvas to make the connection lines between nodes clickable - add onclick handler that calls sldShowSelectivity(parentId, childId). (B) Add sldShowSelectivity(parentId, childId) function that computes the selectivity analysis and renders a modal/panel showing: the TCC chart, the verdict (with traffic-light icon), detailed textual explanation with DS/HD 60364 clause citation, and the Zs path from transformer to the child node. (C) Add a 'Selectivity' section to sldRenderNodePanel for non-transformer nodes showing the selectivity status with their upstream device and a button to open the full TCC chart. (D) All text must use tx() for trilingual support (da/en/fa).",
+
+    "STEP 5 - DS/HD 60364-5-53 section 536 compliance verification: Add sldVerifySelectivityAll(tree) function that iterates over all parent-child pairs in the tree and reports overall selectivity compliance. Add the results to sldVerifyNode() as an additional compliance check with status ok/warning/fail. Verdict 'full' = ok, 'partial' = warning (with limit current noted), 'none' = fail. Cite DS/HD 60364-5-53 cl.536.1 (general requirement), cl.536.2 (overload selectivity), cl.536.4 (short-circuit selectivity).",
+
+    "STEP 6 - Translations: Add all new UI strings to the T object in all three languages (da, en, fa). Key strings needed: 'Selektivitet' / 'Selectivity', 'Fuld selektivitet' / 'Full selectivity', 'Delvis selektiv op til' / 'Partially selective up to', 'Ingen selektivitet' / 'No selectivity', 'Tid-strøm karakteristik' / 'Time-current characteristic', 'Opstrøms' / 'Upstream', 'Nedstrøms' / 'Downstream', 'Selektivitetsgrænse' / 'Selectivity limit', and relevant clause text.",
+
+    "STEP 7 - Tests: Add comprehensive tests to test-sld.js covering: (1) sldDeviceCurve returns valid curve points for MCB, MCCB, and fuse devices, (2) sldAnalyzeSelectivity correctly returns 'full' for gG fuse pair with ratio >= 1.6, (3) returns 'none' for equal-rated fuses, (4) returns 'partial' for MCB vs upstream fuse (finds correct limit current), (5) MCCB time-grading check with short-time delay, (6) sldRenderTCCChart returns valid SVG string, (7) sldVerifySelectivityAll produces compliance results for default tree. All existing 28 tests must still pass."
+  ],
+  "acceptance_criteria": [
+    "Running 'node test-sld.js' passes all 28 existing tests plus all new selectivity tests (at least 7 new tests)",
+    "sldAnalyzeSelectivity returns correct verdict for fuse-vs-fuse (1.6:1 rule), MCB-vs-fuse, and MCCB-vs-MCB scenarios",
+    "sldRenderTCCChart produces a valid SVG with log-log axes showing both device curves",
+    "Clicking a connection line in the SLD canvas opens the selectivity analysis panel with TCC chart",
+    "sldVerifyNode includes selectivity compliance check citing DS/HD 60364-5-53 cl.536",
+    "All strings are trilingual (da/en/fa) via the tx() pattern or T object",
+    "Click-only UI - no text input required",
+    "Life-safety conservative: when uncertain, report non-selective (conservative assumption)"
+  ],
+  "verification": [
+    "Run 'node test-sld.js' and confirm all tests pass (existing 28 + new selectivity tests)",
+    "Verify the new functions are defined: sldDeviceCurve, sldAnalyzeSelectivity, sldRenderTCCChart, sldShowSelectivity, sldVerifySelectivityAll"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
