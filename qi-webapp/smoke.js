@@ -1376,5 +1376,19 @@ doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.E
 var viewDescEl = doc.getElementById("viewDesc");
 ok(viewDescEl && viewDescEl.textContent.length > 0, "#viewDesc shows descriptive text after navigating (got: " + (viewDescEl ? viewDescEl.textContent.slice(0, 50) : "null") + ")");
 
+// Step 83: .scroll-top-btn exists in DOM after boot
+var scrollBtn = doc.querySelector(".scroll-top-btn");
+ok(scrollBtn != null, ".scroll-top-btn exists in DOM after boot");
+
+// Step 84: Dashboard card h3 elements have data-tip attributes (jargon tooltips)
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+var jargonTips = doc.querySelectorAll('.jargon[data-tip]');
+ok(jargonTips.length >= 2, "dashboard card h3 elements have data-tip attributes (found " + jargonTips.length + ")");
+
+// Step 85: Cases nav badge shows total count
+var casesBadge = doc.querySelector('.nav-item[data-view="cases"] .nav-badge');
+var totalCases = window.QIStore.validCases().length;
+ok(casesBadge != null && Number(casesBadge.textContent) === totalCases, "Cases nav badge shows total count (" + (casesBadge ? casesBadge.textContent : "null") + " === " + totalCases + ")");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

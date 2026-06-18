@@ -206,9 +206,9 @@
   function refreshBadges() {
     // Remove existing badges
     document.querySelectorAll(".nav-badge").forEach(b => b.remove());
-    // Cases (Master) badge: count of OPEN + BLOCKED items
+    // Cases (Master) badge: show TOTAL count (step 85)
     const cases = S.validCases();
-    const casesCount = cases.filter(c => c.status === "OPEN" || c.status === "BLOCKED").length;
+    const casesCount = cases.length;
     if (casesCount > 0) {
       const casesBtn = document.querySelector('.nav-item[data-view="cases"]');
       if (casesBtn) { const b = document.createElement("span"); b.className = "nav-badge"; b.textContent = casesCount; casesBtn.appendChild(b); }
@@ -1969,7 +1969,7 @@
     const planPct = totalKm ? Math.max(100 - commPct - progPct, 0) : 0;
     const fmtKm = n => n.toLocaleString();
     const progressCard = totalKm ? `<div class="card">
-  <h3>Programme Progress</h3>
+  <h3><span class="jargon" data-tip="How much of the cable network is built vs planned">Programme Progress</span></h3>
   <div class="prog-bar">
     <div class="prog-seg prog-comm" style="width:${commPct}%" title="${fmtKm(commKm)} km commissioned"></div>
     <div class="prog-seg prog-prog" style="width:${progPct}%" title="${fmtKm(progKm)} km in progress"></div>
@@ -2002,7 +2002,7 @@
     else if (openCritical.length > 0) nextRec = "Focus on the " + openCritical.length + " critical open item" + (openCritical.length > 1 ? "s" : "") + " — they need attention first: " + openCritical.slice(0, 2).map(c => c.problem || "Untitled").join("; ") + ".";
     else if (blocked.length > 0) nextRec = "Unblock the " + blocked.length + " stuck item" + (blocked.length > 1 ? "s" : "") + " — nothing can move forward until these are resolved.";
     else nextRec = "Things are on track. Review the timeline and keep the team moving on their assigned items.";
-    const nextCard = `<div class="card next-card"><h3>\uD83D\uDCA1 What to focus on next</h3><p class="next-text">${esc(nextRec)}</p></div>`;
+    const nextCard = `<div class="card next-card"><h3><span class="jargon" data-tip="The AI Brain's recommendation based on your current project state">\uD83D\uDCA1 What to focus on next</span></h3><p class="next-text">${esc(nextRec)}</p></div>`;
     // Data-quality warnings (step 32)
     const noOwner = cases.filter(c => !c.owner);
     const noPriority = cases.filter(c => !c.priority);
@@ -2012,7 +2012,7 @@
     if (noPriority.length) dqWarnings.push(noPriority.length + " item" + (noPriority.length > 1 ? "s" : "") + " have no priority set");
     if (noScores.length) dqWarnings.push(noScores.length + " item" + (noScores.length > 1 ? "s" : "") + " are missing risk scores (severity/occurrence/detection)");
     const dqCard = dqWarnings.length ? `<div class="card dq-card">
-  <h3>\u26A0 Data quality</h3>
+  <h3><span class="jargon" data-tip="Items that need more detail for accurate calculations">\u26A0 Data quality</span></h3>
   <p class="muted">These items need a bit more detail to give you accurate calculations.</p>
   <ul class="dq-list">${dqWarnings.map(w => '<li>' + esc(w) + '</li>').join('')}</ul>
 </div>` : '';
@@ -2064,7 +2064,7 @@
       (function () {
         var ac = S.validCases().slice().sort(function (a, b) { return (b.dateLogged || "").localeCompare(a.dateLogged || ""); });
         var latestCases = ac.slice(0, 5);
-        return latestCases.length ? '<div class="card"><h3>Recent activity</h3><ul class="activity-log">' + latestCases.map(function (c) { return '<li class="al-item"><span class="al-time">' + esc(c.dateLogged || "") + '</span><span class="al-text">Added: ' + esc((c.problem || "Untitled").slice(0, 60)) + '</span></li>'; }).join('') + '</ul></div>' : '';
+        return latestCases.length ? '<div class="card"><h3><span class="jargon" data-tip="The last items added to your project">Recent activity</span></h3><ul class="activity-log">' + latestCases.map(function (c) { return '<li class="al-item"><span class="al-time">' + esc(c.dateLogged || "") + '</span><span class="al-text">Added: ' + esc((c.problem || "Untitled").slice(0, 60)) + '</span></li>'; }).join('') + '</ul></div>' : '';
       })() +
       (function () {
         var now = new Date();
@@ -5056,6 +5056,21 @@
   // ---------- init (called by auth.js after successful authentication) ----------
   window.QIBoot = function () {
     S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
+    // Step 83: Scroll-to-top button
+    (function initScrollTop() {
+      var btn = document.createElement("button");
+      btn.className = "scroll-top-btn";
+      btn.type = "button";
+      btn.setAttribute("aria-label", "Scroll to top");
+      btn.textContent = "\u2191";
+      document.body.appendChild(btn);
+      window.addEventListener("scroll", function () {
+        btn.classList.toggle("is-visible", window.scrollY > 300);
+      }, { passive: true });
+      btn.addEventListener("click", function () {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    })();
     // Step 67: Keyboard shortcut badges on key buttons
     (function addKbdBadges() {
       var badges = [
