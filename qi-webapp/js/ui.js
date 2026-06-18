@@ -47,6 +47,25 @@
     return `<div class="table-wrap"><table class="${cls || ""}"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 
+  // --- Confetti celebration effect (step 64) ---
+  function spawnConfetti() {
+    var colors = ["#f44336","#e91e63","#9c27b0","#3f51b5","#03a9f4","#009688","#8bc34a","#ffeb3b","#ff9800","#00bcd4"];
+    var container = document.createElement("div");
+    container.className = "confetti-container";
+    for (var i = 0; i < 40; i++) {
+      var piece = document.createElement("div");
+      piece.className = "confetti-piece";
+      piece.style.left = Math.random() * 100 + "%";
+      piece.style.background = colors[i % colors.length];
+      piece.style.animationDelay = (Math.random() * 1.5) + "s";
+      piece.style.width = (6 + Math.random() * 8) + "px";
+      piece.style.height = (6 + Math.random() * 8) + "px";
+      container.appendChild(piece);
+    }
+    document.body.appendChild(container);
+    setTimeout(function () { if (container.parentNode) container.parentNode.removeChild(container); }, 4000);
+  }
+
   // ---------- views config ----------
   const VIEWS = [
     { g: "Overview" },
@@ -493,7 +512,7 @@
       updateSpend(st);
       // Notify once when the A–Z build finishes.
       if (st.mode && (st.pct >= 100 || st.laid >= st.total)) {
-        if (!deployDone) { deployDone = true; toast(`Network build complete — all ${st.stations} countries online.`); }
+        if (!deployDone) { deployDone = true; toast(`Network build complete — all ${st.stations} countries online.`); spawnConfetti(); }
       } else { deployDone = false; }
     });
 
@@ -1451,6 +1470,7 @@
           '<select id="slideTransition"><option value="fade">Fade</option><option value="slide">Slide</option><option value="zoom">Zoom</option></select>' +
           '<button type="button" id="slideNotes">&#128221; Notes</button>' +
           '<button type="button" id="slideOverview">&#9638; Overview</button>' +
+          '<button type="button" id="slidePresenter">&#127916; Presenter</button>' +
           '<button type="button" id="slideExit">&#10005; Exit</button>';
         document.body.appendChild(nav);
 
@@ -1574,6 +1594,39 @@
         document.getElementById("slideNotes").addEventListener("click", toggleNotes);
         document.getElementById("slideOverview").addEventListener("click", toggleOverview);
         document.getElementById("slideExit").addEventListener("click", exitPresent);
+
+        // --- Presenter view: opens a popup with current slide number + speaker note (step 66) ---
+        var presenterWin = null;
+        function updatePresenterView() {
+          if (!presenterWin || presenterWin.closed) { presenterWin = null; return; }
+          var noteText = getSpeakerNote(slides[idx]) || "(No notes for this slide)";
+          var body = presenterWin.document.body;
+          if (body) {
+            body.innerHTML = '<div style="font-family:system-ui,sans-serif;padding:30px;max-width:600px;margin:0 auto">' +
+              '<h2 style="margin:0 0 8px">Slide ' + (idx + 1) + ' of ' + slides.length + '</h2>' +
+              '<div style="font-size:14px;color:#666;margin-bottom:16px">' + (slides[idx].querySelector("h3,h2,h1") ? slides[idx].querySelector("h3,h2,h1").textContent : "Untitled") + '</div>' +
+              '<hr style="border:none;border-top:1px solid #ddd;margin:12px 0">' +
+              '<h3 style="margin:0 0 8px">Speaker Notes</h3>' +
+              '<p style="font-size:15px;line-height:1.7;color:#333">' + noteText.replace(/</g, "&lt;") + '</p>' +
+              '</div>';
+          }
+        }
+        function openPresenterView() {
+          presenterWin = window.open("", "presenterView", "width=500,height=400,menubar=no,toolbar=no");
+          if (presenterWin) {
+            presenterWin.document.title = "Presenter View";
+            updatePresenterView();
+          }
+        }
+        document.getElementById("slidePresenter").addEventListener("click", openPresenterView);
+
+        // Patch showSlide to also update presenter view
+        var _origShowSlide = showSlide;
+        showSlide = function (i) {
+          _origShowSlide(i);
+          updatePresenterView();
+        };
+
         updateProgress();
       });
     }
@@ -4433,7 +4486,7 @@
   }
   function toggleTheme() {
     const cur = (S.brand() && S.brand().theme) || "light";
-    S.setBrand({ theme: cur === "dark" ? "light" : "dark" });
+    S.setBrand({ theme: cur === "dark" ? "light" : "dark", themeManual: true });
     applyTheme(); toast("Theme: " + (S.brand().theme === "dark" ? "dark" : "light"));
   }
   function runChecks() {
@@ -4769,6 +4822,26 @@
   window.addEventListener("qi-storage-error", () => {
     toast("Storage full — export a JSON backup and delete old snapshots.");
   });
+
+  // --- Dark-mode auto-detect: follow system preference unless user manually toggled (step 65) ---
+  (function initDarkModeAutoDetect() {
+    if (typeof window.matchMedia !== "function") return;
+    var mq = window.matchMedia("(prefers-color-scheme: dark)");
+    function applySystemTheme(e) {
+      var brand = S.brand && S.brand();
+      if (brand && brand.themeManual) return; // user overrode, respect their choice
+      S.setBrand({ theme: e.matches ? "dark" : "light" });
+      applyTheme();
+    }
+    // Initial check at load time (only if not already manually set)
+    var brand = S.brand && S.brand();
+    if (!brand || !brand.themeManual) {
+      if (mq.matches) { S.setBrand({ theme: "dark" }); }
+    }
+    // Listen for system changes
+    if (mq.addEventListener) { mq.addEventListener("change", applySystemTheme); }
+    else if (mq.addListener) { mq.addListener(applySystemTheme); }
+  })();
 
   // ---------- init (called by auth.js after successful authentication) ----------
   window.QIBoot = function () {
