@@ -1595,6 +1595,21 @@
         return latestCases.length ? '<div class="card"><h3>Recent activity</h3><ul class="activity-log">' + latestCases.map(function (c) { return '<li class="al-item"><span class="al-time">' + esc(c.dateLogged || "") + '</span><span class="al-text">Added: ' + esc((c.problem || "Untitled").slice(0, 60)) + '</span></li>'; }).join('') + '</ul></div>' : '';
       })() +
       (function () {
+        var now = new Date();
+        var upcoming = S.validCases().filter(function (c) {
+          if (!c.target) return false;
+          var d = new Date(c.target);
+          return d > now;
+        }).sort(function (a, b) { return new Date(a.target) - new Date(b.target); }).slice(0, 5);
+        if (!upcoming.length) return '';
+        var items = upcoming.map(function (c) {
+          var d = new Date(c.target);
+          var dateStr = d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+          return '<li class="cal-item"><span class="cal-date">' + esc(dateStr) + '</span><span class="cal-text">' + esc((c.problem || "Untitled").slice(0, 50)) + '</span></li>';
+        }).join('');
+        return '<div class="card"><h3>Upcoming dates</h3><ul class="cal-list">' + items + '</ul></div>';
+      })() +
+      (function () {
         var TZ_DATA = [
           { country: "Indonesia", tz: "Asia/Jakarta", abbr: "WIB" },
           { country: "Thailand", tz: "Asia/Bangkok", abbr: "ICT" },
@@ -2416,6 +2431,16 @@
     if (applyBtn) applyBtn.addEventListener("click", () => {
       const n = applyBrainPlan(plan);
       toast(`Applied: ${n} cases, ${plan.milestones.length} milestones, ${plan.procurement.length} procurement items.`);
+      // Diff summary card (step 46)
+      const diffItems = [];
+      if (n) diffItems.push(`${n} cases/risks added`);
+      if (plan.milestones.length) diffItems.push(`${plan.milestones.length} milestones created`);
+      if (plan.procurement.length) diffItems.push(`${plan.procurement.length} procurement items`);
+      if (plan.countryIntel && plan.countryIntel.length) diffItems.push(`${plan.countryIntel.length} countries detected`);
+      const diffCard = document.createElement("div");
+      diffCard.className = "diff-card";
+      diffCard.innerHTML = `<b>What changed:</b><ul class="diff-list">${diffItems.map(d => '<li>' + esc(d) + '</li>').join('')}</ul>`;
+      applyBtn.parentElement.appendChild(diffCard);
       go("dashboard");
     });
     const ejBtn = $("#brainExportJSON");

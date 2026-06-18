@@ -1064,3 +1064,14 @@ mark.hl{background:rgba(230,184,74,.4);border-radius:2px;padding:0 1px}
 .print-preview .brief-section{margin-bottom:12px}
 .print-preview h1{font-size:16px}
 .print-preview h3{font-size:13px}
+
+/* Diff summary card after Brain apply (step 46) */
+.diff-card{border-left:4px solid #1d8e6a;background:rgba(66,214,164,.06);margin-top:12px;padding:10px 14px;border-radius:var(--radius-sm,6px);font-size:13px}
+.diff-list{margin:6px 0;padding-left:18px;font-size:13px;line-height:1.7}
+
+/* Mini calendar - upcoming dates (step 48) */
+.cal-list{list-style:none;padding:0;margin:0}
+.cal-item{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--line,#e3e8f0);font-size:13px}
+.cal-item:last-child{border-bottom:none}
+.cal-date{flex:none;min-width:56px;font-weight:700;color:var(--accent,#2e5496);font-size:12px}
+.cal-text{flex:1;color:var(--ink,#1a2336)}
