@@ -1160,5 +1160,19 @@ ok(doc.querySelector(".dq-list") != null, ".dq-list inside the data-quality card
 ok(doc.getElementById("btnCmdK") != null, "#btnCmdK exists in the topbar");
 ok(/cmd-hint/.test(doc.getElementById("btnCmdK").className), "#btnCmdK has cmd-hint class");
 
+// Step 40: Activity log timeline on the Dashboard
+S.reset();
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".activity-log") != null, ".activity-log exists on the dashboard");
+ok(doc.querySelectorAll(".al-item").length > 0, ".al-item elements present when cases exist (got " + doc.querySelectorAll(".al-item").length + ")");
+
+// Step 41: Search-within-brief input on the Investor Brief
+doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("briefSearch") != null, "#briefSearch input exists on the Investor Brief");
+
+// Step 42: Table-of-contents for the Investor Brief
+ok(doc.querySelector(".brief-toc") != null, ".brief-toc exists on the Investor Brief");
+ok(doc.querySelectorAll(".brief-toc-link").length > 0, ".brief-toc-link elements exist on the Investor Brief (got " + doc.querySelectorAll(".brief-toc-link").length + ")");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

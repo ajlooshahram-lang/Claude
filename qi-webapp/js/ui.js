@@ -950,6 +950,7 @@
         <button class="btn btn-primary" id="briefPrint" type="button">🖨 Print / Save as PDF</button>
         <button class="btn" id="briefDownload" type="button">⬇ Download one-pager (HTML)</button>
         <button class="btn" id="briefShare" type="button">🔗 Share link</button>
+        <input class="brief-search" id="briefSearch" type="search" placeholder="Search the brief..." aria-label="Search within brief" />
         <span class="muted">A plain-language one-pager you can hand to your board — built automatically from your project. No jargon.</span>
       </div>
       <div class="brief" id="investorBrief">
@@ -965,6 +966,10 @@
           <button class="btn btn-sm" id="bfAll" type="button">All</button>
           <button class="btn btn-sm" id="bfNone" type="button">None</button>
         </div>
+        <details class="brief-toc no-print">
+          <summary>Jump to section</summary>
+          <nav class="brief-toc-nav" id="briefTocNav"></nav>
+        </details>
         <header class="brief-head">
           <div class="brief-head-top">
             <h1>${esc(title)}</h1>
@@ -1273,6 +1278,37 @@
       }, { threshold: 0.1 });
       sections.forEach(function(s) { obs.observe(s); });
     }
+
+    // Search-within-brief (step 41)
+    const searchInput = $("#briefSearch"), briefEl = $("#investorBrief");
+    if (searchInput && briefEl) {
+      searchInput.addEventListener("input", function () {
+        briefEl.querySelectorAll("mark.hl").forEach(function (m) { m.replaceWith(m.textContent); });
+        var q = searchInput.value.trim();
+        if (q.length < 2) return;
+        var walker = document.createTreeWalker(briefEl, NodeFilter.SHOW_TEXT);
+        var nodes = [];
+        while (walker.nextNode()) nodes.push(walker.currentNode);
+        var re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, function (ch) { return '\\' + ch; }) + ')', 'gi');
+        nodes.forEach(function (n) {
+          if (!re.test(n.textContent)) return;
+          re.lastIndex = 0;
+          var span = document.createElement("span");
+          span.innerHTML = n.textContent.replace(re, '<mark class="hl">$1</mark>');
+          n.parentNode.replaceChild(span, n);
+        });
+      });
+    }
+
+    // Table-of-contents for the Investor Brief (step 42)
+    const tocNav = $("#briefTocNav"), briefSections = briefEl ? briefEl.querySelectorAll(".brief-section h3, .brief-cover-title") : [];
+    if (tocNav && briefSections.length) {
+      var links = Array.prototype.slice.call(briefSections).map(function (h, i) {
+        var id = "bs-" + i; h.id = id;
+        return '<a class="brief-toc-link" href="#' + id + '">' + esc(h.textContent) + '</a>';
+      });
+      tocNav.innerHTML = links.join('');
+    }
   };
 
   // Route Progress — submarine-cable construction tracking (GIS delivery view).
@@ -1526,7 +1562,12 @@
         <div class="card"><h3>Status mix</h3><div class="chart-box sm"><canvas id="chStatus"></canvas></div></div>
         <div class="card"><h3>Risk exposure (RPN) by category</h3><div class="chart-box sm"><canvas id="chRpn"></canvas></div></div>
       </div>
-      <div class="card"><h3>Pareto — where the risk concentrates (80/20)</h3><div class="chart-box"><canvas id="chPareto"></canvas></div></div>`;
+      <div class="card"><h3>Pareto — where the risk concentrates (80/20)</h3><div class="chart-box"><canvas id="chPareto"></canvas></div></div>` +
+      (function () {
+        var ac = S.validCases().slice().sort(function (a, b) { return (b.dateLogged || "").localeCompare(a.dateLogged || ""); });
+        var latestCases = ac.slice(0, 5);
+        return latestCases.length ? '<div class="card"><h3>Recent activity</h3><ul class="activity-log">' + latestCases.map(function (c) { return '<li class="al-item"><span class="al-time">' + esc(c.dateLogged || "") + '</span><span class="al-text">Added: ' + esc((c.problem || "Untitled").slice(0, 60)) + '</span></li>'; }).join('') + '</ul></div>' : '';
+      })();
   };
   AFTER.dashboard = function () {
     if (!$("#groupSel")) return;   // empty-state branch — nothing to wire
