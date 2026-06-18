@@ -3923,6 +3923,23 @@
     S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
     const initialHash = (location.hash || "").replace(/^#/, "");
     go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
+
+    // "Resume where you left off" — show a banner for returning users who have data
+    (function showResumeBanner() {
+      var proj = S.get().project;
+      var hasCases = S.validCases().length > 0;
+      if (!hasCases && !proj.name) return;  // first-time user, nothing to resume
+      var name = proj.name || "your project";
+      var banner = document.createElement("div");
+      banner.className = "resume-banner";
+      banner.innerHTML = '<span class="resume-text">Welcome back \u2014 <strong>' + esc(name) + '</strong> is here with ' + S.validCases().length + ' items.</span>' +
+        '<button class="btn btn-sm resume-go" id="resumeGo" type="button">Go to Dashboard</button>' +
+        '<button class="btn btn-sm resume-dismiss" id="resumeDismiss" type="button">Dismiss</button>';
+      var content = document.getElementById("content");
+      if (content && content.parentNode) content.parentNode.insertBefore(banner, content);
+      document.getElementById("resumeGo").addEventListener("click", function () { banner.remove(); go("dashboard"); });
+      document.getElementById("resumeDismiss").addEventListener("click", function () { banner.remove(); });
+    })();
   };
 
   // When __SKIP_AUTH is set (e.g. smoke tests), boot immediately without waiting for auth.js DOMContentLoaded

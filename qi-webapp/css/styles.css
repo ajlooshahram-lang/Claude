@@ -866,3 +866,8 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 [data-theme="dark"] .route-badge.route-commissioned{color:#42d6a4}
 [data-theme="dark"] .route-badge.route-in-progress{color:#7da7f0}
 [data-theme="dark"] .route-badge.route-planned{color:#e6b84a}
+.resume-banner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 16px;margin:0 0 2px;background:linear-gradient(90deg,rgba(66,214,164,.12),rgba(78,161,255,.08));border:1px solid rgba(66,214,164,.3);border-radius:var(--radius-md,10px);font-size:13px;color:var(--ink,#1a2336)}
+.resume-text{flex:1}
+.resume-dismiss{opacity:.7}
+.resume-dismiss:hover{opacity:1}
+@media print{.resume-banner{display:none}}

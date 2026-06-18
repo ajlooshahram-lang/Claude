@@ -960,5 +960,24 @@ ok(idBrief && Array.isArray(idBrief.interconnects) && idBrief.interconnects.leng
 ok(idBrief && typeof idBrief.iruBand === "string" && /USD/.test(idBrief.iruBand),
   "briefing('jakarta Indonesia').iruBand contains 'USD'");
 
+// Resume banner: appears when data exists
+// Reset state and re-boot to simulate a returning user with data
+window.QIStore.reset();
+window.QIStore.get().project.name = "TestProj";
+window.QIStore.save();
+// Remove any existing banner
+const oldBanner = doc.querySelector(".resume-banner");
+if (oldBanner) oldBanner.remove();
+// Re-boot
+window.QIBoot();
+ok(doc.querySelector(".resume-banner") != null, "resume banner appears after boot when data exists");
+ok(/TestProj/.test(doc.querySelector(".resume-banner").innerHTML), "resume banner shows project name");
+ok(/\d+ items/.test(doc.querySelector(".resume-banner").innerHTML), "resume banner shows item count");
+
+// Resume banner: dismiss removes it
+const dismissBtn = doc.getElementById("resumeDismiss");
+dismissBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".resume-banner") == null, "resume banner removed after clicking dismiss");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
