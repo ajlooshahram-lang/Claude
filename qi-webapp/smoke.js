@@ -1253,5 +1253,22 @@ ok(countryRings.length >= 8, ".country-ring SVG exists on brief country cards (c
 // Step 54: Floating quick stats widget
 ok(doc.getElementById("briefFloat") != null, ".brief-float element exists on the brief");
 
+// Step 58: Auto-play button in presentation mode
+doc.getElementById("briefPresent").dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("slideAuto") != null, "#slideAuto button exists during presentation mode");
+ok(/Auto/.test(doc.getElementById("slideAuto").textContent), "#slideAuto shows 'Auto (8s)' text initially");
+doc.getElementById("slideExit").dispatchEvent(new window.Event("click", { bubbles: true }));
+
+// Step 59: Slide transition select with 3 options
+doc.getElementById("briefPresent").dispatchEvent(new window.Event("click", { bubbles: true }));
+var transSel = doc.getElementById("slideTransition");
+ok(transSel != null, "#slideTransition select exists during presentation mode");
+ok(transSel.querySelectorAll("option").length === 3, "#slideTransition has 3 options (Fade, Slide, Zoom)");
+doc.getElementById("slideExit").dispatchEvent(new window.Event("click", { bubbles: true }));
+
+// Step 60: Meeting agenda button on dashboard
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("meetingAgenda") != null, "#meetingAgenda button exists on the dashboard");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

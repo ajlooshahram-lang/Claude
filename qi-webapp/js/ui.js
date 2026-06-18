@@ -1409,18 +1409,47 @@
           }
         });
 
-        // Create nav overlay with counter, notes toggle, and overview toggle
+        // Create nav overlay with counter, notes toggle, overview toggle, auto-play and transition selector
         var nav = document.createElement("div");
         nav.className = "slide-nav";
         nav.innerHTML = '<button type="button" id="slidePrev">&#9664; Prev</button>' +
           '<span id="slideCounter">Slide 1 of ' + slides.length + '</span>' +
           '<button type="button" id="slideNext">Next &#9654;</button>' +
+          '<button type="button" id="slideAuto">Auto (8s)</button>' +
+          '<select id="slideTransition"><option value="fade">Fade</option><option value="slide">Slide</option><option value="zoom">Zoom</option></select>' +
           '<button type="button" id="slideNotes">&#128221; Notes</button>' +
           '<button type="button" id="slideOverview">&#9638; Overview</button>' +
           '<button type="button" id="slideExit">&#10005; Exit</button>';
         document.body.appendChild(nav);
 
         var counterEl = document.getElementById("slideCounter");
+
+        // --- Auto-play / kiosk mode (step 58) ---
+        var autoTimer = null;
+        var autoBtn = document.getElementById("slideAuto");
+        function startAuto() {
+          if (autoTimer) return;
+          autoBtn.textContent = "Pause";
+          autoTimer = setInterval(function () {
+            if (idx >= slides.length - 1) { stopAuto(); return; }
+            showSlide(idx + 1);
+          }, 8000);
+        }
+        function stopAuto() {
+          if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+          autoBtn.textContent = "Auto (8s)";
+        }
+        autoBtn.addEventListener("click", function () {
+          if (autoTimer) stopAuto(); else startAuto();
+        });
+
+        // --- Transition theme (step 59) ---
+        var transSelect = document.getElementById("slideTransition");
+        briefEl.classList.add("trans-fade"); // default
+        transSelect.addEventListener("change", function () {
+          briefEl.classList.remove("trans-fade", "trans-slide", "trans-zoom");
+          briefEl.classList.add("trans-" + transSelect.value);
+        });
 
         function updateProgress() {
           var pct = slides.length > 1 ? ((idx) / (slides.length - 1)) * 100 : 100;
@@ -1464,7 +1493,9 @@
         }
 
         function exitPresent() {
+          stopAuto();
           briefEl.classList.remove("presenting");
+          briefEl.classList.remove("trans-fade", "trans-slide", "trans-zoom");
           slides.forEach(function (s) { s.classList.remove("slide-active"); });
           // Clean up speaker note
           var existingNote = briefEl.querySelector(".speaker-note");
@@ -1499,15 +1530,15 @@
         }
 
         function onKey(e) {
-          if (e.key === "ArrowRight" || e.key === "ArrowDown") showSlide(idx + 1);
-          else if (e.key === "ArrowLeft" || e.key === "ArrowUp") showSlide(idx - 1);
+          if (e.key === "ArrowRight" || e.key === "ArrowDown") { stopAuto(); showSlide(idx + 1); }
+          else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { stopAuto(); showSlide(idx - 1); }
           else if (e.key === "Escape") exitPresent();
           else if (e.key === "n" || e.key === "N") toggleNotes();
           else if (e.key === "o" || e.key === "O") toggleOverview();
         }
         document.addEventListener("keydown", onKey);
-        document.getElementById("slidePrev").addEventListener("click", function () { showSlide(idx - 1); });
-        document.getElementById("slideNext").addEventListener("click", function () { showSlide(idx + 1); });
+        document.getElementById("slidePrev").addEventListener("click", function () { stopAuto(); showSlide(idx - 1); });
+        document.getElementById("slideNext").addEventListener("click", function () { stopAuto(); showSlide(idx + 1); });
         document.getElementById("slideNotes").addEventListener("click", toggleNotes);
         document.getElementById("slideOverview").addEventListener("click", toggleOverview);
         document.getElementById("slideExit").addEventListener("click", exitPresent);
@@ -1744,7 +1775,7 @@
     const sparkSVG = '<svg class="health-spark" viewBox="0 0 ' + sparkW + ' ' + sparkH + '" preserveAspectRatio="none" aria-label="Health trend"><polyline fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" points="' + sparkPoints + '"/></svg>';
     const healthCard = `<div class="health-score health-${healthCls}"><span class="health-num">${healthScore}</span><span class="health-lab">Programme health</span>${sparkSVG}</div>`;
     return tourBanner + progressCard + nextCard + dqCard + healthCard + `
-      <div class="dash-toolbar" style="display:flex;gap:8px;margin-bottom:12px"><button class="btn btn-sm" id="emailSummary" type="button">\u2709 Copy status email</button></div>
+      <div class="dash-toolbar" style="display:flex;gap:8px;margin-bottom:12px"><button class="btn btn-sm" id="emailSummary" type="button">\u2709 Copy status email</button><button class="btn btn-sm" id="meetingAgenda" type="button">\uD83D\uDCCB Copy meeting agenda</button></div>
       <div class="grid kpis" style="margin-bottom:16px">
         ${kpi("navy", "Total Cases", k.total)}
         ${kpi("blue", "Open / Active", k.open)}
@@ -1837,6 +1868,53 @@
       ].join("\n");
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(() => toast("Status email copied to clipboard -- paste it into your email."), () => toast("Could not copy."));
+      } else { toast("Could not access clipboard."); }
+    });
+    // Meeting agenda copy-to-clipboard (step 60)
+    const agendaBtn = $("#meetingAgenda");
+    if (agendaBtn) agendaBtn.addEventListener("click", () => {
+      const proj = S.get().project;
+      const cases = S.validCases();
+      const open = cases.filter(c => c.status === "OPEN").length;
+      const blocked = cases.filter(c => c.status === "BLOCKED").length;
+      const critical = cases.filter(c => c.priority === "1-CRITICAL" && c.status !== "CLOSED" && c.status !== "RESOLVED");
+      const name = proj.name || "Submarine Telecom Project";
+      const today = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+      const agendaLines = [
+        "MEETING AGENDA",
+        name,
+        "Date: " + today,
+        "=".repeat(40),
+        "",
+        "1. Welcome and roll call (2 min)",
+        "",
+        "2. Programme status overview (5 min)",
+        "   - Total items: " + cases.length,
+        "   - Open: " + open + " | Blocked: " + blocked,
+        "",
+        "3. Critical items requiring decisions (" + critical.length + " items, 10 min)"
+      ];
+      critical.slice(0, 5).forEach(function (c, i) {
+        agendaLines.push("   " + (i + 1) + ". " + (c.problem || "Untitled").slice(0, 60));
+      });
+      if (critical.length > 5) agendaLines.push("   ... and " + (critical.length - 5) + " more");
+      agendaLines.push("");
+      agendaLines.push("4. Blocked items review (5 min)");
+      var blockedItems = cases.filter(c => c.status === "BLOCKED");
+      blockedItems.slice(0, 3).forEach(function (c, i) {
+        agendaLines.push("   " + (i + 1) + ". " + (c.problem || "Untitled").slice(0, 60));
+      });
+      if (blockedItems.length > 3) agendaLines.push("   ... and " + (blockedItems.length - 3) + " more");
+      agendaLines.push("");
+      agendaLines.push("5. Upcoming milestones and deadlines (5 min)");
+      agendaLines.push("");
+      agendaLines.push("6. Actions and next steps (3 min)");
+      agendaLines.push("");
+      agendaLines.push("---");
+      agendaLines.push("Generated by the QI Platform");
+      var agendaText = agendaLines.join("\n");
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(agendaText).then(() => toast("Meeting agenda copied to clipboard."), () => toast("Could not copy."));
       } else { toast("Could not access clipboard."); }
     });
     // Animated counters: numbers count up from 0 to their final value on load (step 31)
