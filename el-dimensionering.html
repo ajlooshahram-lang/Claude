@@ -933,7 +933,8 @@ const T = {
       watchdog: '\uD83D\uDC15 Vagthund',
       lcc: '\uD83D\uDCCA LCC-analyse',
       maint: '\uD83D\uDD27 Vedligehold',
-      afdd: '\uD83D\uDD25 Gnistdetektor'
+      afdd: '\uD83D\uDD25 Gnistdetektor',
+      twin: '\uD83C\uDF10 Digital Tvilling'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1055,7 +1056,8 @@ const T = {
       watchdog: '\uD83D\uDC15 Watchdog',
       lcc: '\uD83D\uDCCA LCC Analysis',
       maint: '\uD83D\uDD27 Maintenance',
-      afdd: '\uD83D\uDD25 Arc Fault (AFDD)'
+      afdd: '\uD83D\uDD25 Arc Fault (AFDD)',
+      twin: '\uD83C\uDF10 Digital Twin'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -2397,6 +2399,7 @@ function renderModule(mod) {
     case 'lcc': content += renderLCC(); break;
     case 'maint': content += renderMaint(); break;
     case 'afdd': content += renderAfdd(); break;
+    case 'twin': content += renderTwin(); break;
     case 'home': content += renderDashboard(); break;
     case 'exam': content = renderExam(); break;
   }
@@ -18489,6 +18492,107 @@ function renderAfdd(){
   svg+='<text x="200" y="95" text-anchor="middle" font-size="9" fill="#5b7790">'+(da?'AFDD opdager h\u00f8jfrekvent signatur \u2192 afbryder p\u00e5 <1s':'AFDD detects high-frequency signature \u2192 disconnects in <1s')+'</text>';
   svg+='<defs><filter id="g3"><feGaussianBlur stdDeviation="2"/></filter></defs></svg>';
   html+=svg+'</div>';
+  return html;
+}
+
+// ===== DIGITAL TWIN — interactive whole-installation model =====
+let twinState = { selected:null };
+function twinBuildNodes(){
+  // Assemble the full installation from saved circuits + current project state
+  var circuits=[];
+  try{ circuits=JSON.parse(localStorage.getItem('projectCircuits')||'[]'); }catch(e){ circuits=[]; }
+  var nodes=[];
+  nodes.push({id:'grid',type:'grid',label:(lang==='da'?'EL-net':'Grid'),sub:'400/230V',data:{}});
+  if(trafoState.size>0){ var ik=(trafoState.size*1000)/(Math.sqrt(3)*400*((TRAFO_UK&&TRAFO_UK[trafoState.size]||4)/100)); nodes.push({id:'trafo',type:'trafo',label:trafoState.size+' kVA',sub:(TRAFO_UK&&TRAFO_UK[trafoState.size]?'uk '+TRAFO_UK[trafoState.size]+'%':''),data:{kVA:trafoState.size,Ik:(ik/1000).toFixed(1)+' kA'}}); }
+  var ib=(typeof calcIB==='function')?calcIB():0;
+  nodes.push({id:'panel',type:'panel',label:(lang==='da'?'Hovedtavle':'Main panel'),sub:'IB '+ib.toFixed(0)+' A',data:{IB:ib.toFixed(1)+' A'}});
+  // Circuits: prefer saved circuits, else current loadList
+  if(circuits.length>0){
+    circuits.forEach(function(c,i){
+      var st=c.state||{}; var cib=0;
+      try{ var sl=st.loadState||{}; cib=(sl.power*1000)/((sl.voltage==='3x400'?Math.sqrt(3)*400:230)*(sl.cosPhi||0.9)); }catch(e){}
+      var cs=st.cableState?st.cableState.crossSection:null;
+      var mcb=st.mcbState&&st.mcbState.rating?st.mcbState.curve+st.mcbState.rating:(st.fuseState&&st.fuseState.size?st.fuseState.size+'A gG':'');
+      nodes.push({id:'c'+i,type:'circuit',label:c.name||('Gruppe '+(i+1)),sub:(mcb||'')+(cs?' \u00b7 '+cs+'mm\u00b2':''),data:{IB:cib?cib.toFixed(1)+' A':'\u2013',Beskyttelse:mcb||'\u2013',Kabel:cs?cs+' mm\u00b2':'\u2013',Spc3nding:st.loadState?st.loadState.voltage:'\u2013'}});
+    });
+  } else {
+    loadList.forEach(function(c,i){
+      var cib=(c.kW*1000)/((c.phase==='3'?Math.sqrt(3)*400:230)*(c.cos||0.9));
+      nodes.push({id:'c'+i,type:'circuit',label:c.name||('K'+(i+1)),sub:c.kW+' kW \u00b7 '+(c.phase==='3'?'3~':c.phase),data:{Effekt:c.kW+' kW',IB:cib.toFixed(1)+' A',Fase:c.phase==='3'?'3-faset':c.phase,'cos\u03c6':c.cos||0.9}});
+    });
+  }
+  return nodes;
+}
+function renderTwin(){
+  const da=lang==='da';
+  var nodes=twinBuildNodes();
+  var circuits=nodes.filter(function(n){return n.type==='circuit';});
+  var spine=nodes.filter(function(n){return n.type!=='circuit';});
+  const ICON={grid:'\u26A1',trafo:'\uD83D\uDD0C',panel:'\uD83D\uDCCB',circuit:'\uD83D\uDD0C'};
+  const COLOR={grid:'#7fc8ff',trafo:'#ff8a5c',panel:'#00ffc8',circuit:'#9fe6ff'};
+
+  let html='<div class="card fade-in"><div class="card-title">\uD83C\uDF10 '+(da?'Digital Tvilling \u2014 hele installationen':'Digital Twin \u2014 the whole installation')+'</div>';
+  html+='<div class="info-row">'+(da?'Interaktiv model af HELE dit projekt, samlet automatisk fra gemte kredse og aktuelle data. Klik p\u00e5 en komponent for at se dens virkelige tekniske data. Str\u00f8m animeres gennem systemet.':'Interactive model of your WHOLE project, auto-assembled from saved circuits and current data. Click a component to see its real technical data. Current is animated through the system.')+'</div>';
+
+  // Build isometric-ish SVG scene
+  var W=Math.max(720, 280+circuits.length*110), H=440;
+  var defs='<defs><filter id="twGlow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><linearGradient id="twBg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0a1628"/><stop offset="100%" stop-color="#040a14"/></linearGradient></defs>';
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="border-radius:14px;border:1px solid rgba(0,200,180,0.2);overflow:visible" xmlns="http://www.w3.org/2000/svg">'+defs;
+  svg+='<rect width="'+W+'" height="'+H+'" fill="url(#twBg)" rx="14"/>';
+  // ground grid
+  for(var g=0;g<10;g++){ svg+='<line x1="0" y1="'+(300+g*14)+'" x2="'+W+'" y2="'+(300+g*14)+'" stroke="rgba(0,180,255,'+(0.05-g*0.004)+')"/>'; }
+  // Spine (grid -> trafo -> panel) horizontally on the left
+  var sx=70, sy=120, sgap=150;
+  spine.forEach(function(n,i){
+    var x=sx+i*sgap;
+    var sel=twinState.selected===n.id;
+    // connection line to next
+    if(i<spine.length-1){ svg+='<line x1="'+(x+42)+'" y1="'+sy+'" x2="'+(x+sgap-42)+'" y2="'+sy+'" stroke="'+COLOR[n.type]+'" stroke-width="3" opacity="0.5"/>'; svg+='<line x1="'+(x+42)+'" y1="'+sy+'" x2="'+(x+sgap-42)+'" y2="'+sy+'" stroke="#fff" stroke-width="2" stroke-dasharray="4 10" opacity="0.8"><animate attributeName="stroke-dashoffset" values="14;0" dur="0.6s" repeatCount="indefinite"/></line>'; }
+    svg+='<g style="cursor:pointer" onclick="twinState.selected=\''+n.id+'\';renderModule(\'twin\')">';
+    svg+='<rect x="'+(x-42)+'" y="'+(sy-38)+'" width="84" height="76" rx="10" fill="rgba(10,25,45,0.95)" stroke="'+COLOR[n.type]+'" stroke-width="'+(sel?'3.5':'2')+'"'+(sel?' filter="url(#twGlow)"':'')+'/>';
+    svg+='<text x="'+x+'" y="'+(sy-8)+'" text-anchor="middle" font-size="22">'+ICON[n.type]+'</text>';
+    svg+='<text x="'+x+'" y="'+(sy+14)+'" text-anchor="middle" font-size="10" fill="'+COLOR[n.type]+'" font-weight="800">'+n.label+'</text>';
+    if(n.sub) svg+='<text x="'+x+'" y="'+(sy+28)+'" text-anchor="middle" font-size="8" fill="#8ab4d0">'+n.sub+'</text>';
+    svg+='</g>';
+  });
+  // Panel busbar down to circuits
+  var panelX=sx+(spine.length-1)*sgap;
+  var busY=sy+60, cy=300;
+  svg+='<line x1="'+panelX+'" y1="'+sy+'" x2="'+panelX+'" y2="'+busY+'" stroke="#00ffc8" stroke-width="3"/>';
+  var cStartX=panelX+30, cGap=Math.min(110,(W-cStartX-40)/Math.max(circuits.length,1));
+  svg+='<line x1="'+panelX+'" y1="'+busY+'" x2="'+(cStartX+(circuits.length-1)*cGap)+'" y2="'+busY+'" stroke="#00ffc8" stroke-width="4" filter="url(#twGlow)"/>';
+  circuits.forEach(function(n,i){
+    var x=cStartX+i*cGap; var sel=twinState.selected===n.id;
+    // drop line with animated current
+    svg+='<line x1="'+x+'" y1="'+busY+'" x2="'+x+'" y2="'+(cy-30)+'" stroke="#9fe6ff" stroke-width="2.5" opacity="0.5"/>';
+    svg+='<circle cx="'+x+'" cy="'+busY+'" r="3" fill="#00ffc8"/>';
+    svg+='<circle cx="'+x+'" cy="'+busY+'" r="3" fill="#fff"><animate attributeName="cy" values="'+busY+';'+(cy-30)+'" dur="'+(1+i*0.1)+'s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0" dur="'+(1+i*0.1)+'s" repeatCount="indefinite"/></circle>';
+    svg+='<g style="cursor:pointer" onclick="twinState.selected=\''+n.id+'\';renderModule(\'twin\')">';
+    svg+='<rect x="'+(x-44)+'" y="'+(cy-30)+'" width="88" height="64" rx="9" fill="rgba(10,25,45,0.95)" stroke="'+COLOR.circuit+'" stroke-width="'+(sel?'3.5':'1.8')+'"'+(sel?' filter="url(#twGlow)"':'')+'/>';
+    svg+='<text x="'+x+'" y="'+(cy-8)+'" text-anchor="middle" font-size="16">'+ICON.circuit+'</text>';
+    svg+='<text x="'+x+'" y="'+(cy+10)+'" text-anchor="middle" font-size="9" fill="#cfe3f2" font-weight="700">'+(n.label.length>12?n.label.slice(0,11)+'\u2026':n.label)+'</text>';
+    if(n.sub) svg+='<text x="'+x+'" y="'+(cy+24)+'" text-anchor="middle" font-size="7.5" fill="#8ab4d0">'+n.sub+'</text>';
+    svg+='</g>';
+  });
+  svg+='<text x="'+(W/2)+'" y="'+(H-10)+'" text-anchor="middle" font-size="9" fill="#4a7090">'+(da?'Digital Tvilling':'Digital Twin')+' \u00b7 '+nodes.length+' '+(da?'komponenter':'components')+' \u00b7 '+circuits.length+' '+(da?'kredse':'circuits')+' \u00b7 El-Dimensionering</text>';
+  svg+='</svg>';
+  html+=svg+'</div>';
+
+  // Detail panel for selected component
+  if(twinState.selected){
+    var sel=nodes.find(function(n){return n.id===twinState.selected;});
+    if(sel){
+      html+='<div class="card fade-in"><div class="card-title">'+ICON[sel.type]+' '+sel.label+' \u2014 '+(da?'detaljer':'details')+'</div><div class="result-box">';
+      var keys=Object.keys(sel.data);
+      if(keys.length===0) html+='<div class="result-row"><span class="label">'+(da?'Type':'Type')+'</span><span class="value">'+sel.type+'</span></div>';
+      keys.forEach(function(k){ html+='<div class="result-row"><span class="label">'+k.replace('Spc3nding',da?'Sp\u00e6nding':'Voltage')+'</span><span class="value">'+sel.data[k]+'</span></div>'; });
+      html+='</div>';
+      var modMap={grid:'trafo',trafo:'trafo',panel:'panel',circuit:'load'};
+      html+='<div class="select-grid" style="margin-top:8px"><button class="sel-btn" onclick="switchModule(\''+(modMap[sel.type]||'load')+'\')">\u2192 '+(da?'\u00c5bn relevant modul':'Open relevant module')+'</button><button class="sel-btn" onclick="twinState.selected=null;renderModule(\'twin\')">\u2715 '+(da?'Luk':'Close')+'</button></div></div>';
+    }
+  } else {
+    html+='<div class="card fade-in"><div class="info-row">'+(da?'\uD83D\uDC46 Klik p\u00e5 en komponent i modellen for at inspicere dens data. Gem kredse i projektet (via "Gem kreds") for at se hele installationen her.':'\uD83D\uDC46 Click a component in the model to inspect its data. Save circuits to the project (via "Save circuit") to see the whole installation here.')+'</div></div>';
+  }
   return html;
 }
 
