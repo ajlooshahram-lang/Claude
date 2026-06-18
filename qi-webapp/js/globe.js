@@ -297,7 +297,7 @@
         "uniform vec3 uColor;",
         "void main(){",
         "  float intensity = pow(0.66 - dot(vNormal, vec3(0.0,0.0,1.0)), 3.2);",
-        "  gl_FragColor = vec4(uColor, 1.0) * clamp(intensity, 0.0, 1.4);",
+        "  gl_FragColor = vec4(uColor, 1.0) * clamp(intensity, 0.0, 0.9);",
         "}"
       ].join("\n")
     });
@@ -385,7 +385,7 @@
       try {
         if (THREE.ACESFilmicToneMapping) {
           renderer.toneMapping = THREE.ACESFilmicToneMapping;
-          renderer.toneMappingExposure = 1.05;
+          renderer.toneMappingExposure = 0.88;
         }
       } catch (e) {}
       renderer.domElement.style.display = "block";
@@ -488,7 +488,7 @@
         beacon.position.copy(p);
         beacon.userData = { type: "station", id: st.id, station: st, baseScale: 1 };
         // soft additive glow halo so each station reads as a bright node
-        var bGlowMat = new THREE.MeshBasicMaterial({ color: 0xffd98a, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false });
+        var bGlowMat = new THREE.MeshBasicMaterial({ color: 0xffd98a, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false });
         beacon.add(new THREE.Mesh(beaconGlowGeo, bGlowMat));
         disposables.push(bGlowMat);
         world.add(beacon);
@@ -546,7 +546,7 @@
         pickables.push(tube);
 
         // wide faint halo underneath for a glow base
-        var haloGeo = new THREE.TubeGeometry(curve, 80, radius * 3.2, 10, false);
+        var haloGeo = new THREE.TubeGeometry(curve, 80, radius * 2.0, 10, false);
         var haloMat = new THREE.MeshBasicMaterial({
           color: col, transparent: true, opacity: 0.16,
           blending: THREE.AdditiveBlending, depthWrite: false
@@ -928,7 +928,7 @@
           composer.setSize(width, height);
           if (composer.setPixelRatio) composer.setPixelRatio(dpr);
           composer.addPass(new THREE.RenderPass(scene, camera));
-          bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(width, height), 0.92, 0.52, 0.82);
+          bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(width, height), 0.42, 0.48, 0.92);
           composer.addPass(bloomPass);
           var lastPass = bloomPass;
           if (typeof THREE.ShaderPass === "function" && THREE.FXAAShader) {
