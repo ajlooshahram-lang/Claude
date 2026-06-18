@@ -1129,3 +1129,15 @@ mark.hl{background:rgba(230,184,74,.4);border-radius:2px;padding:0 1px}
 
 /* Presenter view button styling (step 66) */
 #slidePresenter{font-weight:600}
+
+/* Keyboard shortcut badges (step 67) */
+.kbd-badge{display:inline-block;margin-left:4px;padding:1px 4px;border-radius:3px;font-size:9px;font-weight:600;background:rgba(125,167,240,.15);border:1px solid rgba(125,167,240,.3);color:var(--muted,#6b7892);vertical-align:middle;line-height:1.2}
+
+/* Focus timer card (step 68) */
+.focus-card{text-align:center}
+.focus-display{font-size:36px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--accent,#2e5496);margin:8px 0}
+
+/* Animated page transitions (step 69) */
+.view-enter{animation:viewFade .25s ease both}
+@keyframes viewFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.view-enter{animation:none}}

@@ -194,6 +194,10 @@
     if (VIEW_TIPS[view] && !tipDismissed) {
       content.insertAdjacentHTML('afterbegin', '<div class="help-tip"><span class="help-tip-text">' + esc(VIEW_TIPS[view]) + '</span><button class="help-tip-dismiss" data-dismiss-tip="' + esc(view) + '" type="button" aria-label="Dismiss tip">&times;</button></div>');
     }
+    // Step 69: Animated page transitions between views
+    content.classList.remove("view-enter");
+    void content.offsetWidth;
+    content.classList.add("view-enter");
     if (AFTER[view]) AFTER[view]();
     // Reflect the current view in the URL so back/forward and bookmarks work.
     if (!(opts && opts.skipHash)) {
@@ -1937,7 +1941,8 @@
           return '<span class="tz-chip"><span class="tz-country">' + esc(d.country) + '</span><span class="tz-time">' + esc(now) + '</span></span>';
         }).join('');
         return '<div class="card"><h3>Local time across the programme</h3><div class="tz-strip">' + chips + '</div></div>';
-      })();
+      })() +
+      '<div class="card focus-card"><h3>Focus Timer</h3><div class="focus-display" id="focusDisplay">25:00</div><div style="display:flex;gap:8px;justify-content:center"><button class="btn btn-sm btn-primary" id="focusStart" type="button">Start</button><button class="btn btn-sm" id="focusReset" type="button">Reset</button></div></div>';
   };
   AFTER.dashboard = function () {
     if (!$("#groupSel")) return;   // empty-state branch — nothing to wire
@@ -2041,6 +2046,39 @@
     const rm = S.rpnByCategory(); CH.hbar("chRpn", Object.keys(rm), Object.values(rm));
     const p = S.paretoRPN();
     CH.pareto("chPareto", p.map(x => x.label), p.map(x => x.value), p.map(x => Math.round(x.cum)));
+    // Step 68: Focus timer (Pomodoro-style) wiring
+    (function wireFocusTimer() {
+      var display = document.getElementById("focusDisplay");
+      var startBtn = document.getElementById("focusStart");
+      var resetBtn = document.getElementById("focusReset");
+      if (!display || !startBtn || !resetBtn) return;
+      var totalSec = 25 * 60;
+      var remaining = totalSec;
+      var interval = null;
+      var running = false;
+      function fmt(s) { var m = Math.floor(s / 60); var sec = s % 60; return (m < 10 ? "0" : "") + m + ":" + (sec < 10 ? "0" : "") + sec; }
+      function tick() {
+        remaining--;
+        display.textContent = fmt(remaining);
+        if (remaining <= 0) {
+          clearInterval(interval); interval = null; running = false;
+          startBtn.textContent = "Start";
+          toast("Focus session complete -- take a break!");
+          remaining = totalSec;
+          display.textContent = fmt(remaining);
+        }
+      }
+      startBtn.addEventListener("click", function () {
+        if (running) { clearInterval(interval); interval = null; running = false; startBtn.textContent = "Start"; }
+        else { interval = setInterval(tick, 1000); running = true; startBtn.textContent = "Pause"; }
+      });
+      resetBtn.addEventListener("click", function () {
+        if (interval) { clearInterval(interval); interval = null; }
+        running = false; remaining = totalSec;
+        display.textContent = fmt(remaining);
+        startBtn.textContent = "Start";
+      });
+    })();
   };
 
   RENDER.cases = function () {
@@ -4846,6 +4884,23 @@
   // ---------- init (called by auth.js after successful authentication) ----------
   window.QIBoot = function () {
     S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
+    // Step 67: Keyboard shortcut badges on key buttons
+    (function addKbdBadges() {
+      var badges = [
+        { id: "btnTheme", key: "T" },
+        { id: "btnChecks", key: "C" },
+        { id: "btnCmdK", key: "\u2318K" }
+      ];
+      badges.forEach(function (b) {
+        var el = document.getElementById(b.id);
+        if (el && !el.querySelector(".kbd-badge")) {
+          var kbd = document.createElement("kbd");
+          kbd.className = "kbd-badge";
+          kbd.textContent = b.key;
+          el.appendChild(kbd);
+        }
+      });
+    })();
     const initialHash = (location.hash || "").replace(/^#/, "");
     go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
 

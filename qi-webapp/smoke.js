@@ -1293,5 +1293,28 @@ ok(doc.getElementById("globeScreenshot") != null, "#globeScreenshot button exist
 doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(doc.getElementById("briefCopyText") != null, "#briefCopyText button exists on the Investor Brief toolbar");
 
+// Step 67: .kbd-badge elements exist on topbar buttons
+var kbdBadges = doc.querySelectorAll(".kbd-badge");
+ok(kbdBadges.length >= 3, ".kbd-badge elements exist on the topbar buttons (found " + kbdBadges.length + ")");
+
+// Step 68: #focusDisplay and #focusStart exist on the dashboard
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("focusDisplay") != null, "#focusDisplay exists on the dashboard");
+ok(doc.getElementById("focusStart") != null, "#focusStart exists on the dashboard");
+
+// Step 69: .view-enter or viewFade keyframes exist in the stylesheet
+var hasViewFade = false;
+for (var si2 = 0; si2 < doc.styleSheets.length; si2++) {
+  try {
+    var rules2 = doc.styleSheets[si2].cssRules;
+    for (var ri2 = 0; ri2 < rules2.length; ri2++) {
+      var ruleText2 = rules2[ri2].cssText || "";
+      if (ruleText2.indexOf("viewFade") !== -1 || ruleText2.indexOf("view-enter") !== -1) { hasViewFade = true; break; }
+    }
+  } catch (e) {}
+  if (hasViewFade) break;
+}
+ok(hasViewFade, ".view-enter or viewFade keyframes exist in the stylesheet");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
