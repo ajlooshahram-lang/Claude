@@ -105,6 +105,7 @@
     VIEWS.splice(idx, 0, ...items);
   })();
   const TITLES = {}; VIEWS.forEach(v => { if (v.id) TITLES[v.id] = v.label; });
+  const recentViews = [];
 
   function buildNav() {
     const nav = $("#nav");
@@ -143,6 +144,7 @@
       try { window.QIGlobe.dispose(); } catch (e) {}
     }
     current = view;
+    if (recentViews[recentViews.length - 1] !== view) { recentViews.push(view); if (recentViews.length > 6) recentViews.shift(); }
     $("#viewTitle").textContent = TITLES[view] || "QI Platform";
     document.querySelectorAll(".nav-item").forEach(b => {
       const active = b.dataset.view === view;
@@ -151,7 +153,14 @@
     });
     $("#sidebar").classList.remove("open");
     CH.destroyAll();
+    content.innerHTML = '<div class="shimmer-wrap"><div class="shimmer-line"></div><div class="shimmer-line short"></div><div class="shimmer-block"></div></div>';
     content.innerHTML = (RENDER[view] || (() => "<div class='empty'>Not found</div>"))();
+    if (recentViews.length > 1) {
+      var pills = recentViews.slice(0, -1).reverse().slice(0, 5).map(function(v) {
+        return '<button class="recent-pill" data-recent-view="' + esc(v) + '" type="button">' + esc(TITLES[v] || v) + '</button>';
+      }).join('');
+      content.insertAdjacentHTML('afterbegin', '<div class="recent-bar">' + pills + '</div>');
+    }
     if (AFTER[view]) AFTER[view]();
     // Reflect the current view in the URL so back/forward and bookmarks work.
     if (!(opts && opts.skipHash)) {
@@ -1240,6 +1249,16 @@
     if (cmpA) cmpA.addEventListener("change", renderCompare);
     if (cmpB) cmpB.addEventListener("change", renderCompare);
     renderCompare();
+
+    // Scroll-triggered reveal animations (step 36)
+    if (typeof IntersectionObserver !== "undefined") {
+      var sections = document.querySelectorAll("#investorBrief .brief-section, #investorBrief .brief-health, #investorBrief .brief-cover");
+      sections.forEach(function(s) { s.classList.add("reveal-hidden"); });
+      var obs = new IntersectionObserver(function(entries) {
+        entries.forEach(function(e) { if (e.isIntersecting) { e.target.classList.add("reveal-visible"); obs.unobserve(e.target); } });
+      }, { threshold: 0.1 });
+      sections.forEach(function(s) { obs.observe(s); });
+    }
   };
 
   // Route Progress — submarine-cable construction tracking (GIS delivery view).
@@ -4098,6 +4117,7 @@
   function setBrand() { refreshHeader(); }   // back-compat alias
 
   content.addEventListener("click", e => {
+    const p = e.target.closest("[data-recent-view]"); if (p) { go(p.dataset.recentView); return; }
     const b = e.target.closest("[data-act]"); if (!b) return;
     const act = b.dataset.act, id = b.dataset.id;
     if (act === "goHelp") return go("help");

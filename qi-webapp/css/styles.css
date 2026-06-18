@@ -1000,3 +1000,22 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 /* Command palette hint (step 33) */
 .cmd-hint{font-size:10px!important;padding:3px 7px!important;border-radius:4px!important;opacity:.7;letter-spacing:.02em}
 .cmd-hint:hover{opacity:1}
+
+/* Shimmer loading skeleton (step 34) */
+.shimmer-wrap{padding:20px;display:flex;flex-direction:column;gap:14px}
+.shimmer-line{height:14px;border-radius:6px;background:linear-gradient(90deg,var(--chip-bg,rgba(46,84,150,.08)) 25%,rgba(46,84,150,.14) 50%,var(--chip-bg,rgba(46,84,150,.08)) 75%);background-size:200% 100%;animation:shimmer 1.2s infinite}
+.shimmer-line.short{width:60%}
+.shimmer-block{height:120px;border-radius:var(--radius-md,10px);background:linear-gradient(90deg,var(--chip-bg,rgba(46,84,150,.08)) 25%,rgba(46,84,150,.14) 50%,var(--chip-bg,rgba(46,84,150,.08)) 75%);background-size:200% 100%;animation:shimmer 1.2s infinite}
+@keyframes shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+
+/* Recently viewed quick-links bar (step 35) */
+.recent-bar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--line,#e3e8f0)}
+.recent-pill{font-size:11px;padding:3px 10px;border-radius:999px;border:1px solid var(--line,#e3e8f0);background:transparent;cursor:pointer;color:var(--muted,#6b7892);transition:var(--transition,.18s ease)}
+.recent-pill:hover{background:var(--accent,#2e5496);color:#fff;border-color:var(--accent,#2e5496)}
+@media print{.recent-bar{display:none}}
+
+/* Scroll-triggered reveal animations (step 36) */
+.reveal-hidden{opacity:0;transform:translateY(16px);transition:opacity .4s ease,transform .4s ease}
+.reveal-visible{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.reveal-hidden{opacity:1;transform:none;transition:none}}
+@media print{.reveal-hidden{opacity:1;transform:none}}
