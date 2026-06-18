@@ -1108,5 +1108,26 @@ ok(doc.querySelectorAll(".cost-legend .cost-row").length === 6, "cost-legend has
 // Step 24: Stakeholder directory
 ok(doc.querySelectorAll(".sh-grid .sh-card").length === 7, "sh-grid has 7 .sh-card elements (got " + doc.querySelectorAll(".sh-grid .sh-card").length + ")");
 
+// Step 25: "What's next" AI recommendation card on the Dashboard
+S.reset();
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".next-card") != null, "dashboard renders a .next-card element");
+ok(doc.querySelector(".next-card .next-text") != null && doc.querySelector(".next-card .next-text").textContent.length > 10, ".next-card has .next-text with content (got " + (doc.querySelector(".next-card .next-text") ? doc.querySelector(".next-card .next-text").textContent.length : 0) + " chars)");
+
+// Step 26: Programme health score (0-100)
+ok(doc.querySelector(".health-score") != null, "dashboard renders a .health-score element");
+const healthNum = doc.querySelector(".health-score .health-num");
+ok(healthNum != null, ".health-score has a .health-num child");
+const healthVal = parseInt(healthNum.textContent, 10);
+ok(healthVal >= 0 && healthVal <= 100, "health score is between 0 and 100 (got " + healthVal + ")");
+ok(/health-(green|amber|red)/.test(doc.querySelector(".health-score").className), "health score has a traffic-light class");
+
+// Step 27: Quick-filter "Done" chip sets status to CLOSED
+doc.querySelector('.nav-item[data-view="cases"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const doneChip = Array.from(doc.querySelectorAll(".chip")).find(c => /Done/.test(c.textContent));
+ok(doneChip != null, "Done chip exists in the chip bar");
+doneChip.dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("fltStatus").value === "CLOSED", "Done chip sets status filter to CLOSED (got " + doc.getElementById("fltStatus").value + ")");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

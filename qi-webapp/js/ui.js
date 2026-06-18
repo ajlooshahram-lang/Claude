@@ -1402,7 +1402,27 @@
         </div>
         <p class="muted" style="text-align:center;margin-top:14px">Tip — press <span class="kbd">n</span> any time to add a new case, or <span class="kbd">?</span> to see all keyboard shortcuts.</p>`;
     }
-    return tourBanner + progressCard + `
+    // "What's next" — the Brain's one-liner recommendation based on current state
+    const cases = S.validCases();
+    const openCritical = cases.filter(c => c.status === "OPEN" && c.priority === "1-CRITICAL");
+    const blocked = cases.filter(c => c.status === "BLOCKED");
+    let nextRec;
+    if (cases.length === 0) nextRec = "Upload a project description on the Project Brain screen — the app will build your plan automatically.";
+    else if (openCritical.length > 0) nextRec = "Focus on the " + openCritical.length + " critical open item" + (openCritical.length > 1 ? "s" : "") + " — they need attention first: " + openCritical.slice(0, 2).map(c => c.problem || "Untitled").join("; ") + ".";
+    else if (blocked.length > 0) nextRec = "Unblock the " + blocked.length + " stuck item" + (blocked.length > 1 ? "s" : "") + " — nothing can move forward until these are resolved.";
+    else nextRec = "Things are on track. Review the timeline and keep the team moving on their assigned items.";
+    const nextCard = `<div class="card next-card"><h3>\uD83D\uDCA1 What to focus on next</h3><p class="next-text">${esc(nextRec)}</p></div>`;
+    // Programme health score (0-100)
+    const closedDone = cases.filter(c => c.status === "CLOSED" || c.status === "RESOLVED").length;
+    const notBlocked = cases.filter(c => c.status !== "BLOCKED").length;
+    const pctClosed = cases.length ? closedDone / cases.length : 0;
+    const pctNotBlocked = cases.length ? notBlocked / cases.length : 0;
+    const msDone = 2, msTotal = 7;
+    const pctMilestones = msTotal ? msDone / msTotal : 0;
+    const healthScore = Math.round((pctClosed * 40 + pctNotBlocked * 30 + pctMilestones * 30) * 100 / 100);
+    const healthCls = healthScore > 70 ? "green" : healthScore >= 40 ? "amber" : "red";
+    const healthCard = `<div class="health-score health-${healthCls}"><span class="health-num">${healthScore}</span><span class="health-lab">Programme health</span></div>`;
+    return tourBanner + progressCard + nextCard + healthCard + `
       <div class="grid kpis" style="margin-bottom:16px">
         ${kpi("navy", "Total Cases", k.total)}
         ${kpi("blue", "Open / Active", k.open)}
@@ -1497,6 +1517,7 @@
       { id: "inprogress", label: "In progress", on: f.status === "IN PROGRESS" },
       { id: "blocked", label: "Blocked", on: f.status === "BLOCKED" },
       { id: "critical", label: "Critical", on: f.priority === "1-CRITICAL" },
+      { id: "done", label: "Done", on: f.status === "CLOSED" },
       { id: "resolved", label: "Resolved", on: f.status === "RESOLVED" }
     ];
     const chips = `<div class="chips">${chipDefs.map(c => `<button class="chip ${c.on ? "on" : ""}" data-act="chip" data-chip="${c.id}">${esc(c.label)}</button>`).join("")}</div>`;
@@ -4020,7 +4041,7 @@
     else if (act === "chip") {
       const f = uiState.caseFilter; const sort = f.sort, pageSize = f.pageSize;
       const base = { q: "", status: "", priority: "", owner: "", sort, pageSize };
-      const m = { all: {}, open: { status: "OPEN" }, inprogress: { status: "IN PROGRESS" }, blocked: { status: "BLOCKED" }, critical: { priority: "1-CRITICAL" }, resolved: { status: "RESOLVED" } };
+      const m = { all: {}, open: { status: "OPEN" }, inprogress: { status: "IN PROGRESS" }, blocked: { status: "BLOCKED" }, critical: { priority: "1-CRITICAL" }, done: { status: "CLOSED" }, resolved: { status: "RESOLVED" } };
       uiState.caseFilter = Object.assign(base, m[b.dataset.chip] || {});
       go("cases");
     }

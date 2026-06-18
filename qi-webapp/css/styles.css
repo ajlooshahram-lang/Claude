@@ -471,6 +471,18 @@ th.sortable:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
 .chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
 .chip:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 
+/* "What's next" recommendation card */
+.next-card{border-left:4px solid var(--accent,#2e5496);background:linear-gradient(90deg,rgba(78,161,255,.06),transparent)}
+.next-text{font-size:14px;line-height:1.6;margin:6px 0 0}
+
+/* Programme health score */
+.health-score{display:inline-flex;flex-direction:column;align-items:center;gap:2px;padding:10px 16px;border-radius:var(--radius-md,10px);border:2px solid;margin-bottom:16px}
+.health-num{font-size:28px;font-weight:900;line-height:1}
+.health-lab{font-size:10px;text-transform:uppercase;letter-spacing:.04em}
+.health-green{border-color:#1d8e6a;color:#1d8e6a;background:rgba(66,214,164,.08)}
+.health-amber{border-color:#c79a2a;color:#9a7414;background:rgba(230,184,74,.08)}
+.health-red{border-color:#c2452e;color:#c2452e;background:rgba(255,128,110,.08)}
+
 
 
 /* drag-to-reorder pinned rows */
