@@ -845,6 +845,36 @@ ok(doc.querySelector(".brief-cover-mark") != null && doc.querySelector(".brief-c
 ok(doc.querySelector(".brief-cover-title") != null, "cover page shows the project title");
 ok(doc.querySelector(".brief-prov") != null, "Investor Brief has a provenance footer line (.brief-prov)");
 ok(/as of 2025-06/.test(doc.querySelector(".brief-prov").textContent), "provenance footer shows the data-as-of date");
+
+// 6) "What if" country toggles — click-only filter bar
+ok(doc.getElementById("briefFilter") != null, "Investor Brief has a .brief-filter bar with country toggles");
+ok(doc.querySelectorAll(".bfCountry").length === 8, "brief filter has 8 country checkboxes (got " + doc.querySelectorAll(".bfCountry").length + ")");
+ok(doc.getElementById("bfAll") != null && doc.getElementById("bfNone") != null, "brief filter has All and None buttons");
+// Unchecking one country hides its .brief-country card
+const firstCb = doc.querySelector(".bfCountry");
+const firstKey = firstCb.value;
+firstCb.checked = false;
+firstCb.dispatchEvent(new window.Event("change", { bubbles: true }));
+const hiddenCard = doc.querySelector('.brief-country[data-country-key="' + firstKey + '"]');
+ok(hiddenCard != null && hiddenCard.style.display === "none", "unchecking a country hides its .brief-country card");
+const hiddenRow = doc.querySelector('.brief-online-row[data-country-key="' + firstKey + '"]');
+ok(hiddenRow != null && hiddenRow.style.display === "none", "unchecking a country hides its .brief-online-row");
+// The stat chip for 'Countries connected' updates
+const statChips2 = Array.from(doc.querySelectorAll(".brief-stat"));
+const ccChip = statChips2.find(function (c) { return c.querySelector(".brief-stat-l") && c.querySelector(".brief-stat-l").textContent === "Countries connected"; });
+ok(ccChip != null && ccChip.querySelector(".brief-stat-v").textContent === "7", "stat chip updates to 7 countries after unchecking one");
+// "All" button re-shows all cards
+doc.getElementById("bfAll").dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(hiddenCard.style.display === "", "'All' button re-shows hidden country card");
+ok(doc.querySelectorAll(".bfCountry:checked").length === 8, "'All' button checks all 8 checkboxes");
+// "None" button hides everything
+doc.getElementById("bfNone").dispatchEvent(new window.Event("click", { bubbles: true }));
+const allCards = doc.querySelectorAll(".brief-country[data-country-key]");
+const allHidden = Array.from(allCards).every(function (c) { return c.style.display === "none"; });
+ok(allHidden, "'None' button hides all country cards");
+// Restore all for the rest of tests
+doc.getElementById("bfAll").dispatchEvent(new window.Event("click", { bubbles: true }));
+
 // Brain detects named countries and injects permit tasks + FMEA risks
 S.reset();
 doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));

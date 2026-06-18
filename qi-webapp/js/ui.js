@@ -744,9 +744,16 @@
 
     // When each country comes online during the build (same math as the live map).
     const online = (typeof G.onlineSchedule === "function") ? G.onlineSchedule() : [];
+    // Map station IDs to country-data keys (used by the "What if" toggles).
+    const stationKeyMap = {};
+    stations.forEach(s => {
+      const b = (CD && typeof CD.briefing === "function") ? CD.briefing(s.id + " " + s.name) : null;
+      if (b) stationKeyMap[s.id] = b.key;
+    });
     const onlineRows = online.map(o => {
+      const countryKey = stationKeyMap[o.id] || o.id;
       const pct = Math.max(0, Math.min(100, Math.round((o.month / (o.monthsTotal || 60)) * 100)));
-      return `<div class="brief-online-row">
+      return `<div class="brief-online-row" data-country-key="${esc(countryKey)}">
         <span class="brief-online-when">Month ${esc(String(o.month))}</span>
         <span class="brief-online-name">${esc(o.country)} <small>${esc(o.name)}</small></span>
         <span class="brief-online-track"><span class="brief-online-fill" style="width:${pct}%"></span><span class="brief-online-dot" style="left:${pct}%"></span></span>
@@ -829,7 +836,7 @@
       const lp = b.landingParties || {};
       const partners = (lp.candidates || []).slice(0, 3).join(", ");
       const topRisk = (b.risks || [])[0];
-      return `<div class="brief-country">
+      return `<div class="brief-country" data-country-key="${esc(b.key)}">
         <div class="brief-country-head">
           <h4>${esc(b.name)}</h4>
           <span class="brief-verdict brief-verdict--${verdictSlug(me.verdict)}">${esc(me.verdict || "")}</span>
@@ -842,7 +849,7 @@
       </div>`;
     }).join("");
 
-    const riskRows = topRisks.map(r => `<li>
+    const riskRows = topRisks.map(r => `<li data-country="${esc(r.country)}">
       <span class="brief-risk brief-risk--${riskSlug(r.level)}">${esc(r.level)}</span>
       <span class="brief-risk-text">${esc(r.text)}</span>
       <span class="brief-risk-where">${esc(r.country)}</span></li>`).join("");
@@ -861,6 +868,12 @@
           <h1 class="brief-cover-title">${esc(title)}</h1>
           <p class="brief-cover-sub">Investor Brief — prepared ${esc(today)}</p>
           <p class="brief-cover-tag">Generated automatically by the QI Platform from a single project description.</p>
+        </div>
+        <div class="brief-filter no-print" id="briefFilter">
+          <span class="brief-filter-label">Include countries:</span>
+          ${briefs.map(b => `<label class="brief-filter-chip"><input type="checkbox" class="bfCountry" value="${esc(b.key)}" data-country-name="${esc(b.name)}" checked> ${esc(b.name)}</label>`).join("")}
+          <button class="btn btn-sm" id="bfAll" type="button">All</button>
+          <button class="btn btn-sm" id="bfNone" type="button">None</button>
         </div>
         <header class="brief-head">
           <div class="brief-head-top">
@@ -935,6 +948,45 @@
     if (btn) btn.addEventListener("click", () => { toast("Opening the print dialog — choose 'Save as PDF' to keep a copy."); try { window.print(); } catch (e) {} });
     const dl = $("#briefDownload");
     if (dl) dl.addEventListener("click", () => { if (downloadBrief()) toast("Downloaded: STP-Investor-Brief.html — a self-contained one-pager you can email."); });
+
+    // --- "What if" country toggles ---
+    const qsa = (s) => Array.prototype.slice.call(document.querySelectorAll(s));
+    const bfAll = $("#bfAll"), bfNone = $("#bfNone");
+
+    function refreshBrief() {
+      const checked = qsa(".bfCountry").filter(c => c.checked).map(c => c.value);
+      const checkedSet = {};
+      checked.forEach(id => { checkedSet[id] = true; });
+      // Also build a name-based lookup (risks use country name, not id)
+      const nameSet = {};
+      qsa(".bfCountry").forEach(c => { if (c.checked) nameSet[c.getAttribute("data-country-name")] = true; });
+
+      // Show/hide country cards
+      qsa(".brief-country[data-country-key]").forEach(el => {
+        el.style.display = checkedSet[el.getAttribute("data-country-key")] ? "" : "none";
+      });
+      // Show/hide online schedule rows
+      qsa(".brief-online-row[data-country-key]").forEach(el => {
+        el.style.display = checkedSet[el.getAttribute("data-country-key")] ? "" : "none";
+      });
+      // Show/hide risk items (keyed by country name)
+      qsa(".brief-risks li[data-country]").forEach(el => {
+        el.style.display = nameSet[el.getAttribute("data-country")] ? "" : "none";
+      });
+      // Update the "Countries connected" stat chip
+      const statChips = qsa(".brief-stat");
+      statChips.forEach(chip => {
+        const label = chip.querySelector(".brief-stat-l");
+        if (label && label.textContent === "Countries connected") {
+          const vEl = chip.querySelector(".brief-stat-v");
+          if (vEl) vEl.textContent = String(checked.length);
+        }
+      });
+    }
+
+    if (bfAll) bfAll.addEventListener("click", () => { qsa(".bfCountry").forEach(c => { c.checked = true; }); refreshBrief(); });
+    if (bfNone) bfNone.addEventListener("click", () => { qsa(".bfCountry").forEach(c => { c.checked = false; }); refreshBrief(); });
+    qsa(".bfCountry").forEach(c => c.addEventListener("change", refreshBrief));
   };
 
   // Route Progress — submarine-cable construction tracking (GIS delivery view).
