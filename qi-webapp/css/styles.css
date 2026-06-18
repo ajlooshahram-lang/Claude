@@ -294,10 +294,10 @@ table.riskmatrix th{background:#f0f3f9;font-size:11px}
   position:fixed;right:20px;bottom:20px;z-index:200;
   background:var(--ink);color:#fff;padding:12px 18px;border-radius:10px;
   box-shadow:0 6px 24px rgba(0,0,0,.18);font-size:13px;font-weight:500;
-  max-width:340px;animation:toastIn .18s ease-out
+  max-width:340px;animation:toastIn .3s ease both
 }
 [data-theme="dark"] .toast{background:#e6eaf3;color:#0e1320}
-@keyframes toastIn{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes toastIn{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:none}}
 
 /* dark-mode chart canvas labels (Chart.js reads these via JS defaults) */
 [data-theme="dark"] canvas{filter:none}
@@ -825,6 +825,15 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .brief-risk--med{background:rgba(78,161,255,.14);color:#2a6ec2;border:1px solid rgba(78,161,255,.4)}
 .brief-risk-text{flex:1}
 .brief-risk-where{color:var(--muted,#6b7892);font-style:italic;white-space:nowrap}
+.heatmap{display:grid;grid-template-columns:40px repeat(5,1fr);grid-template-rows:repeat(5,32px) 24px;gap:2px;max-width:360px;margin:8px 0 12px;font-size:10px}
+.hm-cell{border-radius:4px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:#fff}
+.hm-cell--0{background:rgba(66,214,164,.3);color:var(--ink,#1a2336)}
+.hm-cell--1{background:rgba(66,214,164,.6)}
+.hm-cell--2{background:rgba(230,184,74,.6)}
+.hm-cell--3{background:rgba(255,128,110,.6)}
+.hm-cell--4{background:rgba(200,50,30,.8)}
+.hm-ylabel{display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--muted,#6b7892);writing-mode:vertical-lr;transform:rotate(180deg)}
+.hm-xlabel{display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--muted,#6b7892)}
 .brief-foot{border-top:1px solid var(--line,#e3e8f0);padding-top:12px;margin-top:18px}
 .brief-prov{font-size:11px;font-style:italic;color:var(--muted,#6b7892);margin:8px 0 0}
 .brief-cover{text-align:center;padding:30px 20px 24px;border-bottom:2px solid var(--line,#e3e8f0);margin-bottom:20px}

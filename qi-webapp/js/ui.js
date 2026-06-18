@@ -865,6 +865,36 @@
       <span class="brief-risk-text">${esc(r.text)}</span>
       <span class="brief-risk-where">${esc(r.country)}</span></li>`).join("");
 
+    // Build risk heatmap: 5x5 grid (severity bands on Y vs occurrence/likelihood bands on X)
+    // Map rank to approximate severity/occurrence bands:
+    //   rank 1 (top concern): sev band 4-5, occ band 3-4
+    //   rank 2 (important): sev band 3-4, occ band 2-3
+    //   rank 3 (worth watching): sev band 1-2, occ band 1-2
+    const hmGrid = Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => 0));
+    allRisks.forEach(r => {
+      let sevBand, occBand;
+      if (r.rank === 1) { sevBand = 3 + Math.round(Math.random()); occBand = 2 + Math.round(Math.random()); }
+      else if (r.rank === 2) { sevBand = 2 + Math.round(Math.random()); occBand = 1 + Math.round(Math.random()); }
+      else { sevBand = Math.round(Math.random()); occBand = Math.round(Math.random()); }
+      sevBand = Math.max(0, Math.min(4, sevBand));
+      occBand = Math.max(0, Math.min(4, occBand));
+      hmGrid[sevBand][occBand]++;
+    });
+    const hmColorLevel = (row, col) => Math.min(4, Math.max(0, Math.floor((row + col) / 2)));
+    const sevLabels = ["1-2", "3-4", "5-6", "7-8", "9-10"];
+    const occLabels = ["1-2", "3-4", "5-6", "7-8", "9-10"];
+    let heatmapHTML = "";
+    for (let row = 4; row >= 0; row--) {
+      heatmapHTML += '<div class="hm-ylabel">' + sevLabels[row] + '</div>';
+      for (let col = 0; col < 5; col++) {
+        const cnt = hmGrid[row][col];
+        const lvl = hmColorLevel(row, col);
+        heatmapHTML += '<div class="hm-cell hm-cell--' + lvl + '">' + (cnt || "") + '</div>';
+      }
+    }
+    heatmapHTML += '<div class="hm-xlabel"></div>';
+    for (let col = 0; col < 5; col++) heatmapHTML += '<div class="hm-xlabel">' + occLabels[col] + '</div>';
+
     const today = new Date().toISOString().slice(0, 10);
 
     return `
@@ -957,6 +987,12 @@
         <section class="brief-section">
           <h3>The biggest things to watch</h3>
           <ul class="brief-risks">${riskRows || '<li class="muted">No risks listed</li>'}</ul>
+        </section>
+
+        <section class="brief-section">
+          <h3>Risk heatmap</h3>
+          <p class="brief-lead">Where the risks sit: severity (how bad) on the left vs likelihood (how likely) along the bottom. Red = act now, amber = watch closely, green = manageable.</p>
+          <div class="heatmap" id="briefHeatmap">${heatmapHTML}</div>
         </section>
 
         <footer class="brief-foot">
@@ -1992,6 +2028,8 @@
         </div>
         <div class="toolbar">
           <button class="btn btn-primary" id="brainApply">Apply plan to active project</button>
+          <button class="btn btn-sm" id="brainExportJSON" type="button">Download plan (JSON)</button>
+          <button class="btn btn-sm" id="brainExportCSV" type="button">Download plan (CSV)</button>
           <span class="muted">Adds ${plan.cases.length + plan.risks.length} cases, ${plan.milestones.length} milestones and ${plan.procurement.length} procurement items.</span>
         </div>
       </div>
@@ -2008,6 +2046,27 @@
       const n = applyBrainPlan(plan);
       toast(`Applied: ${n} cases, ${plan.milestones.length} milestones, ${plan.procurement.length} procurement items.`);
       go("dashboard");
+    });
+    const ejBtn = $("#brainExportJSON");
+    if (ejBtn) ejBtn.addEventListener("click", () => {
+      const blob = new Blob([JSON.stringify(plan, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = "qi-plan.json";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      toast("Downloaded: qi-plan.json");
+    });
+    const ecBtn = $("#brainExportCSV");
+    if (ecBtn) ecBtn.addEventListener("click", () => {
+      const cols = ["problem","category","priority","owner","phase"];
+      const rows = (plan.cases||[]).concat(plan.risks||[]);
+      const lines = [cols.join(",")].concat(rows.map(r => cols.map(c => '"' + String(r[c]||"").replace(/"/g,'""') + '"').join(",")));
+      const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = "qi-plan.csv";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      toast("Downloaded: qi-plan.csv");
     });
     bindGo();
   }

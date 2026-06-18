@@ -1052,5 +1052,27 @@ doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new wind
 const cmpSection = doc.querySelector(".brief-compare");
 ok(cmpSection != null && cmpSection.closest(".no-print") != null, "compare section has .no-print class (hidden from print)");
 
+// Step 16: Risk heatmap in the Investor Brief
+doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".heatmap") != null, "Investor Brief renders a .heatmap element");
+ok(doc.querySelectorAll(".heatmap .hm-cell").length >= 1, "heatmap has at least one .hm-cell");
+ok(doc.getElementById("briefHeatmap") != null, "heatmap has id='briefHeatmap'");
+
+// Step 17: Export buttons exist after analysis
+S.reset();
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+doc.getElementById("brainText").value = "Submarine fibre optic cable system, 9500 km, 8 landing stations, 60 months";
+doc.getElementById("brainAnalyze").click();
+ok(doc.getElementById("brainExportJSON") != null, "#brainExportJSON button exists after analysis");
+ok(doc.getElementById("brainExportCSV") != null, "#brainExportCSV button exists after analysis");
+
+// Step 18: Toast animation property check
+const toastEl = doc.getElementById("toast");
+toastEl.hidden = false; toastEl.textContent = "anim test";
+const toastCss = Array.from(doc.styleSheets).map(function(s) { try { return Array.from(s.cssRules || []).map(function(r) { return r.cssText; }).join("\n"); } catch (e) { return ""; } }).join("\n");
+ok(/\.toast[\s\S]*animation/.test(toastCss), ".toast has an animation property in the stylesheet");
+ok(/toastIn/.test(toastCss) && /scale\(/.test(toastCss), "toastIn keyframes include scale+translate entrance");
+toastEl.hidden = true;
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
