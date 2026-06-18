@@ -4,6 +4,7 @@
   const C = window.QICalc, S = window.QIStore, CH = window.QICharts;
   const $ = sel => document.querySelector(sel);
   const content = $("#content");
+  content.setAttribute("aria-live", "polite");
   const uiState = { caseFilter: { q: "", status: "", priority: "", owner: "", sort: "rpn" }, regFilter: {}, regSelected: {}, regSort: {}, selected: new Set() };
 
   // ---------- helpers ----------
@@ -109,6 +110,8 @@
     nav.innerHTML = VIEWS.map(v => v.g
       ? `<div class="nav-sep">${esc(v.g)}</div>`
       : `<button class="nav-item" data-view="${v.id}"><span class="ico">${v.icon}</span><span class="lab">${esc(v.label)}</span></button>`).join("");
+    nav.setAttribute("role", "navigation");
+    nav.setAttribute("aria-label", "Main menu");
     nav.querySelectorAll(".nav-item").forEach(b => b.addEventListener("click", () => go(b.dataset.view)));
   }
 

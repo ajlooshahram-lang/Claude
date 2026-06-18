@@ -13,6 +13,9 @@
   /* design tokens — motion */
   --transition:.18s ease;
 }
+:focus-visible{outline:2px solid var(--accent,#2e5496);outline-offset:2px;border-radius:var(--radius-sm,6px)}
+.skip-link{position:absolute;top:-40px;left:0;background:var(--accent,#2e5496);color:#fff;padding:8px 16px;z-index:10000;font-size:13px;border-radius:0 0 8px 0;transition:top .2s ease}
+.skip-link:focus{top:0}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);font-size:14px}
@@ -29,6 +32,7 @@ body{font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;colo
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:#cdd8ec;cursor:pointer;font-size:13px;border:none;background:none;width:100%;text-align:left;transition:var(--transition)}
 .nav-item:hover{background:rgba(255,255,255,.07);color:#fff}
 .nav-item.active{background:var(--teal);color:#fff;font-weight:600}
+.nav-item:focus-visible{background:rgba(125,167,240,.18);color:#fff}
 .nav-item .ico{width:18px;text-align:center;opacity:.9}
 .nav-sep{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#7e90b3;padding:12px 12px 4px}
 .sidebar-foot{padding:12px;border-top:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:8px}

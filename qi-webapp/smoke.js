@@ -935,5 +935,17 @@ ok(S.brand().tourDone === true, "dismissGuide persists tourDone=true");
 doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(doc.querySelector(".start-here") == null, "start-here guide does NOT show again after dismissal");
 
+// Accessibility smoke tests
+ok(doc.querySelector("a.skip-link[href='#content']") != null, "skip-link exists in the DOM");
+ok(doc.getElementById("content").getAttribute("role") === "main", "#content has role=main");
+ok(doc.getElementById("nav").getAttribute("role") === "navigation", "#nav has role=navigation");
+ok(doc.getElementById("nav").getAttribute("aria-label") === "Main menu", "#nav has aria-label='Main menu'");
+ok(doc.querySelector("header.topbar").getAttribute("role") === "banner", "topbar header has role=banner");
+ok(doc.getElementById("content").getAttribute("aria-live") === "polite", "#content has aria-live=polite for screen reader announcements");
+// focus-visible outline style exists in the stylesheet
+const allCss = Array.from(doc.styleSheets).map(s => { try { return Array.from(s.cssRules || []).map(r => r.cssText).join("\n"); } catch (e) { return ""; } }).join("\n");
+ok(/:focus-visible/.test(allCss), "focus-visible outline style exists in the stylesheet");
+ok(/\.skip-link/.test(allCss), "skip-link styles exist in the stylesheet");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

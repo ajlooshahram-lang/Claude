@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
+  <a class="skip-link" href="#content">Skip to content</a>
   <!-- Auth Gate: shown when user is not authenticated -->
   <div id="authGate" class="auth-gate">
     <div class="auth-card">
@@ -105,7 +106,7 @@
       <div class="projswitch">
         <select id="projectSwitch" title="Switch project"></select>
       </div>
-      <nav id="nav"></nav>
+      <nav id="nav" role="navigation" aria-label="Main menu"></nav>
       <div class="sidebar-foot">
         <button class="btn btn-primary block" id="navAddCase">+ Add an item</button>
         <button class="sidebar-toggle" id="btnSidebar" title="Collapse sidebar" aria-label="Collapse sidebar">«</button>
@@ -114,7 +115,7 @@
     </aside>
 
     <main class="main">
-      <header class="topbar">
+      <header class="topbar" role="banner">
         <button class="hamburger" id="hamburger" aria-label="Menu">&#9776;</button>
         <h1 id="viewTitle">Dashboard</h1>
         <div class="topbar-actions">
@@ -129,7 +130,7 @@
           <button class="btn btn-icon" id="btnLogout" title="Logout" aria-label="Logout">&#9211;</button>
         </div>
       </header>
-      <section class="content" id="content"></section>
+      <section class="content" id="content" role="main"></section>
     </main>
   </div>
 
