@@ -1437,6 +1437,19 @@
     else if (blocked.length > 0) nextRec = "Unblock the " + blocked.length + " stuck item" + (blocked.length > 1 ? "s" : "") + " — nothing can move forward until these are resolved.";
     else nextRec = "Things are on track. Review the timeline and keep the team moving on their assigned items.";
     const nextCard = `<div class="card next-card"><h3>\uD83D\uDCA1 What to focus on next</h3><p class="next-text">${esc(nextRec)}</p></div>`;
+    // Data-quality warnings (step 32)
+    const noOwner = cases.filter(c => !c.owner);
+    const noPriority = cases.filter(c => !c.priority);
+    const noScores = cases.filter(c => !c.sev || !c.occ || !c.det);
+    const dqWarnings = [];
+    if (noOwner.length) dqWarnings.push(noOwner.length + " item" + (noOwner.length > 1 ? "s" : "") + " have no owner assigned");
+    if (noPriority.length) dqWarnings.push(noPriority.length + " item" + (noPriority.length > 1 ? "s" : "") + " have no priority set");
+    if (noScores.length) dqWarnings.push(noScores.length + " item" + (noScores.length > 1 ? "s" : "") + " are missing risk scores (severity/occurrence/detection)");
+    const dqCard = dqWarnings.length ? `<div class="card dq-card">
+  <h3>\u26A0 Data quality</h3>
+  <p class="muted">These items need a bit more detail to give you accurate calculations.</p>
+  <ul class="dq-list">${dqWarnings.map(w => '<li>' + esc(w) + '</li>').join('')}</ul>
+</div>` : '';
     // Programme health score (0-100)
     const closedDone = cases.filter(c => c.status === "CLOSED" || c.status === "RESOLVED").length;
     const notBlocked = cases.filter(c => c.status !== "BLOCKED").length;
@@ -1447,7 +1460,7 @@
     const healthScore = Math.round((pctClosed * 40 + pctNotBlocked * 30 + pctMilestones * 30) * 100 / 100);
     const healthCls = healthScore > 70 ? "green" : healthScore >= 40 ? "amber" : "red";
     const healthCard = `<div class="health-score health-${healthCls}"><span class="health-num">${healthScore}</span><span class="health-lab">Programme health</span></div>`;
-    return tourBanner + progressCard + nextCard + healthCard + `
+    return tourBanner + progressCard + nextCard + dqCard + healthCard + `
       <div class="grid kpis" style="margin-bottom:16px">
         ${kpi("navy", "Total Cases", k.total)}
         ${kpi("blue", "Open / Active", k.open)}
@@ -1475,6 +1488,22 @@
   };
   AFTER.dashboard = function () {
     if (!$("#groupSel")) return;   // empty-state branch — nothing to wire
+    // Animated counters: numbers count up from 0 to their final value on load (step 31)
+    (function animateCounters() {
+      var els = document.querySelectorAll(".kpi .value");
+      els.forEach(function (el) {
+        var final = parseInt(el.textContent, 10);
+        if (isNaN(final) || final <= 0) return;
+        var current = 0;
+        var step = Math.max(1, Math.ceil(final / 30));
+        el.textContent = "0";
+        var interval = setInterval(function () {
+          current = Math.min(current + step, final);
+          el.textContent = String(current);
+          if (current >= final) clearInterval(interval);
+        }, 25);
+      });
+    })();
     const drawGroup = () => {
       const f = $("#groupSel").value;
       const m = S.groupCounts(f); CH.bar("chGroup", Object.keys(m), Object.values(m));
@@ -4200,6 +4229,8 @@
     });
   })();
   $("#btnHelp").addEventListener("click", showShortcuts);
+  var cmdBtn = $("#btnCmdK");
+  if (cmdBtn) cmdBtn.addEventListener("click", openCommandPalette);
   $("#fileImport").addEventListener("change", e => { if (e.target.files[0]) handleImport(e.target.files[0]); e.target.value = ""; });
   $("#hamburger").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
   const fab = $("#fab"); if (fab) fab.addEventListener("click", () => openCaseForm());

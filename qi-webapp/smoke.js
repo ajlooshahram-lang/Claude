@@ -1145,5 +1145,20 @@ ok(doc.querySelector(".my-list") != null, "RENDER.myitems renders .my-list when 
 const cssCheck = Array.from(doc.styleSheets).map(function(s) { try { return Array.from(s.cssRules || []).map(function(r) { return r.cssText; }).join("\n"); } catch (e) { return ""; } }).join("\n");
 ok(/\.gd-cable-status/.test(cssCheck), "Cable detail has .gd-cable-status CSS rule in the stylesheet");
 
+// Step 31: Animated counter numbers — .kpi .value elements exist
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const kpiVals = doc.querySelectorAll(".kpi .value");
+ok(kpiVals.length > 0, ".kpi .value elements exist on dashboard (counter targets, got " + kpiVals.length + ")");
+
+// Step 32: Data-quality warnings card (add a case with no owner to trigger it)
+S.addCase({ problem: "Test item no owner", category: "Test", priority: "", sev: 0, occ: 0, det: 0, owner: "", status: "OPEN" });
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".dq-card") != null, ".dq-card data-quality warnings card renders on dashboard");
+ok(doc.querySelector(".dq-list") != null, ".dq-list inside the data-quality card has items");
+
+// Step 33: Command palette hint button in the topbar
+ok(doc.getElementById("btnCmdK") != null, "#btnCmdK exists in the topbar");
+ok(/cmd-hint/.test(doc.getElementById("btnCmdK").className), "#btnCmdK has cmd-hint class");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
