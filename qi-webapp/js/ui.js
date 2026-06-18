@@ -3346,6 +3346,17 @@
     plan.risks.forEach(add);
     plan.milestones.forEach(m => S.regAdd("milestones", Object.assign({}, m)));
     plan.procurement.forEach(p => S.regAdd("procurement", Object.assign({}, p)));
+    // Update the active project's name to match the Brain's detected title so
+    // the sidebar project-switcher dropdown reflects it immediately.
+    if (plan.summary && plan.summary.title) {
+      const cur = S.get();
+      if (cur && cur.project) {
+        // Cap at 60 chars for a clean dropdown label; the full title lives in the Brain analysis.
+        cur.project.name = plan.summary.title.slice(0, 60);
+        if (S.save) S.save();
+      }
+    }
+    refreshHeader();
     return n;
   }
 
