@@ -36,7 +36,7 @@ ok(/Total Cases/.test(doc.getElementById("content").innerHTML), "dashboard rende
 ok(doc.querySelectorAll(".nav-item").length >= 12, "nav has all items");
 
 // 2) navigate every view (simulate clicks)
-const views = ["portfolio","dashboard","cases","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","budget","globe3d","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","country","ai","impact","scorecard","health","report","audit","config","help"];
+const views = ["portfolio","dashboard","cases","myitems","pm","kanban","timeline","risks","fmea","sigma","gage","riskmatrix","xbarr","capability","ncrpareto","pdca","log","stakeholders","budget","globe3d","hazop","calibration","punch","sil","rtm","docs","ncr","moc","bowtie","evm","cashflow","prioritise","milestones","decisions","procurement","resources","okr","country","ai","impact","scorecard","health","report","audit","config","help"];
 views.forEach(v => {
   const btn = doc.querySelector(`.nav-item[data-view="${v}"]`);
   try { btn.dispatchEvent(new window.Event("click", { bubbles: true })); }
@@ -1128,6 +1128,22 @@ const doneChip = Array.from(doc.querySelectorAll(".chip")).find(c => /Done/.test
 ok(doneChip != null, "Done chip exists in the chip bar");
 doneChip.dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(doc.getElementById("fltStatus").value === "CLOSED", "Done chip sets status filter to CLOSED (got " + doc.getElementById("fltStatus").value + ")");
+
+// Step 28: Notification badge count on nav items
+S.reset();
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".nav-badge") != null, ".nav-badge appears on a nav item after data is loaded");
+ok(doc.querySelector('.nav-item[data-view="cases"] .nav-badge') != null, ".nav-badge appears on the Cases nav item");
+
+// Step 29: "My Items" personal todo view
+ok(doc.querySelector('.nav-item[data-view="myitems"]') != null, "My Items nav item exists");
+doc.querySelector('.nav-item[data-view="myitems"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".my-list") != null, "RENDER.myitems renders .my-list when cases exist");
+
+// Step 30: Enhanced cable-segment detail with status badge
+// Since WebGL is unavailable in jsdom, verify .gd-cable-status exists in the stylesheet
+const cssCheck = Array.from(doc.styleSheets).map(function(s) { try { return Array.from(s.cssRules || []).map(function(r) { return r.cssText; }).join("\n"); } catch (e) { return ""; } }).join("\n");
+ok(/\.gd-cable-status/.test(cssCheck), "Cable detail has .gd-cable-status CSS rule in the stylesheet");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

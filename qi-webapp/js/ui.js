@@ -56,6 +56,7 @@
     { id: "dashboard", label: "Dashboard", icon: "▤" },
     { id: "cases", label: "Cases (Master)", icon: "★" },
     { g: "Delivery" },
+    { id: "myitems", label: "My Items", icon: "👤" },
     { id: "pm", label: "PM Tasks", icon: "✔" },
     { id: "kanban", label: "Kanban Board", icon: "▥" },
     { id: "timeline", label: "Timeline", icon: "▦" },
@@ -115,6 +116,24 @@
     nav.querySelectorAll(".nav-item").forEach(b => b.addEventListener("click", () => go(b.dataset.view)));
   }
 
+  function refreshBadges() {
+    // Remove existing badges
+    document.querySelectorAll(".nav-badge").forEach(b => b.remove());
+    // Cases (Master) badge: count of OPEN + BLOCKED items
+    const cases = S.validCases();
+    const casesCount = cases.filter(c => c.status === "OPEN" || c.status === "BLOCKED").length;
+    if (casesCount > 0) {
+      const casesBtn = document.querySelector('.nav-item[data-view="cases"]');
+      if (casesBtn) { const b = document.createElement("span"); b.className = "nav-badge"; b.textContent = casesCount; casesBtn.appendChild(b); }
+    }
+    // Risk Register badge: count of 1-CRITICAL items
+    const critCount = cases.filter(c => c.priority === "1-CRITICAL").length;
+    if (critCount > 0) {
+      const risksBtn = document.querySelector('.nav-item[data-view="risks"]');
+      if (risksBtn) { const b = document.createElement("span"); b.className = "nav-badge"; b.textContent = critCount; risksBtn.appendChild(b); }
+    }
+  }
+
   let current = "dashboard";
   function go(view, opts) {
     if (!RENDER[view]) view = "dashboard";
@@ -142,6 +161,7 @@
       }
     }
     window.scrollTo(0, 0);
+    refreshBadges();
   }
 
   // ---------- renderers ----------
@@ -592,6 +612,7 @@
           <ul class="gd-links">${links || '<li class="muted">No segments</li>'}</ul>
           ${briefingHTML(info)}`;
       } else {
+        const cableNotes = { "commissioned": "This segment is live and carrying traffic.", "in-progress": "Cable is being laid \u2014 marine installation in progress.", "planned": "Planned for a future installation campaign." };
         body = `
           <div class="gd-kind">Cable segment ${sdot(info.status)}${esc(statusLabel[info.status] || info.status)}</div>
           <h4>${esc(info.name)}</h4>
@@ -600,6 +621,10 @@
             <span class="gd-chip">${fmtKm(info.lengthKm)}</span>
             <span class="gd-chip">${esc(String(info.capacityTbps))} Tbps</span>
             <span class="gd-chip">${esc(String(info.fibrePairs))} fibre pairs</span>
+          </div>
+          <div class="gd-cable-status">
+            <span class="gd-cable-badge--${esc(info.status)}">${esc(statusLabel[info.status] || info.status)}</span>
+            <span class="gd-cable-note">${esc(cableNotes[info.status] || "")}</span>
           </div>`;
       }
       detail.innerHTML = `<button class="gd-close" id="gdClose" type="button" aria-label="Close">×</button>${body}`;
@@ -1679,6 +1704,25 @@
       <td>${C.fmtDate(c.estEnd)}</td><td class="center">${c.estDays ?? ""}</td>
       <td>${barCell(c.percent)}</td><td>${statusBadge(c.status)}</td><td>${healthBadge(c.health)}</td></tr>`).join("");
     return tableWrap("<th>Task ID</th><th class='wrap'>Task</th><th>Owner</th><th>Priority</th><th>Start</th><th>Due</th><th>Est days</th><th>% Done</th><th>Status</th><th>Health</th>", rows);
+  };
+
+  RENDER.myitems = function () {
+    const roster = S.get().roster || [];
+    const myOwner = roster.length > 0 ? roster[0].name : "";
+    const cases = S.validCases().filter(c => !myOwner || (c.owner || "") === myOwner || !(c.owner));
+    const open = cases.filter(c => c.status === "OPEN" || c.status === "IN PROGRESS");
+    const blocked = cases.filter(c => c.status === "BLOCKED" || c.status === "ON HOLD");
+    const done = cases.filter(c => c.status === "RESOLVED" || c.status === "CLOSED");
+    function section(title, items) {
+      if (!items.length) return "";
+      return `<h3>${esc(title)} (${items.length})</h3><div class="my-list">${items.map(c =>
+        `<div class="my-item"><span class="my-status">${esc(c.status)}</span><span class="my-text">${esc(c.problem)}</span></div>`).join("")}</div>`;
+    }
+    if (!cases.length) return `<div class="empty">No items assigned yet.</div>`;
+    return `<div class="card"><h3>Showing items for: ${esc(myOwner || "Unassigned")}</h3>
+      ${section("Open / In progress", open)}
+      ${section("Blocked / On hold", blocked)}
+      ${section("Done", done)}</div>`;
   };
 
   RENDER.risks = function () {
@@ -4229,6 +4273,7 @@
       document.getElementById("resumeGo").addEventListener("click", function () { banner.remove(); go("dashboard"); });
       document.getElementById("resumeDismiss").addEventListener("click", function () { banner.remove(); });
     })();
+    refreshBadges();
   };
 
   // When __SKIP_AUTH is set (e.g. smoke tests), boot immediately without waiting for auth.js DOMContentLoaded

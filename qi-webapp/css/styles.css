@@ -975,3 +975,20 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .sh-card strong{font-size:13px;color:var(--ink,#1a2336)}
 .sh-card p{margin:0;font-size:12px;color:var(--muted,#6b7892);line-height:1.45}
 .sh-icon{font-size:22px;margin-bottom:2px}
+
+/* nav badge (step 28) */
+.nav-item{position:relative}
+.nav-badge{position:absolute;top:4px;right:6px;min-width:16px;height:16px;border-radius:8px;background:var(--red,#d94452);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;line-height:1;pointer-events:none}
+
+/* my items view (step 29) */
+.my-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.my-item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;background:var(--card,#fff);border:1px solid var(--line,#e3e8f0)}
+.my-status{flex:none;font-size:11px;font-weight:700;text-transform:uppercase;min-width:70px}
+.my-text{flex:1;font-size:13px;color:var(--ink,#1a2336)}
+
+/* cable status badge (step 30) */
+.gd-cable-status{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.gd-cable-badge--commissioned{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:#42d6a4;color:#0d3d2a}
+.gd-cable-badge--in-progress{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:#4ea1ff;color:#0a2c55}
+.gd-cable-badge--planned{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:#e6b84a;color:#3d2e09}
+.gd-cable-note{font-size:12px;color:var(--muted,#6b7892);line-height:1.45;margin-top:2px}
