@@ -120,6 +120,7 @@
     { g: "Improve" },
     { id: "pdca", label: "PDCA", icon: "↻" },
     { id: "log", label: "Action Log", icon: "✎" },
+    { id: "decisions", label: "Decision Log", icon: "📝" },
     { g: "People & Cost" },
     { id: "stakeholders", label: "Stakeholders", icon: "♟" },
     { id: "budget", label: "Budget", icon: "$" },
@@ -2323,6 +2324,16 @@
   RENDER.cases = function () {
     const f = uiState.caseFilter;
     let list = S.enriched().filter(c => c.problem);
+    // Step 99: Natural-language text filter
+    if (f.q) {
+      var q = f.q.toLowerCase();
+      list = list.filter(function(c) {
+        return (c.problem || "").toLowerCase().indexOf(q) !== -1 ||
+          (c.category || "").toLowerCase().indexOf(q) !== -1 ||
+          (c.priority || "").toLowerCase().indexOf(q) !== -1 ||
+          (c.owner || "").toLowerCase().indexOf(q) !== -1;
+      });
+    }
     if (f.status) list = list.filter(c => c.status === f.status);
     if (f.priority) list = list.filter(c => c.priority === f.priority);
     if (f.owner) list = list.filter(c => c.owner === f.owner);
@@ -2378,11 +2389,11 @@
         <td>${esc(c.code)}</td>
         <td class="wrap">${esc(c.problem)}</td>
         <td>${esc(c.category)}</td>
-        <td><select data-edit="priority" data-id="${c.id}" class="inline-sel">${opts(C.LISTS.priority, c.priority, "\u2014")}</select></td>
+        <td class="inline-edit"><select data-edit="priority" data-id="${c.id}" class="inline-sel">${opts(C.LISTS.priority, c.priority, "\u2014")}</select></td>
         <td class="center">${c.rpn == null ? "" : c.rpn}</td>
         <td>${healthBadge(c.health)}</td>
         <td><select data-edit="owner" data-id="${c.id}" class="inline-sel">${opts(names, c.owner, "\u2014")}</select></td>
-        <td><select data-edit="status" data-id="${c.id}" class="inline-sel">${opts(C.LISTS.status, c.status, "\u2014")}</select></td>
+        <td class="inline-edit"><select data-edit="status" data-id="${c.id}" class="inline-sel">${opts(C.LISTS.status, c.status, "\u2014")}</select></td>
         <td>${barCell(c.percent)}</td>
         <td class="center">
           <button class="btn btn-sm" data-act="edit" data-id="${c.id}">Edit</button>
@@ -2407,6 +2418,7 @@
     return `
       <div class="toolbar">
         <button class="btn btn-primary" data-act="add">+ New Case</button>
+        <input type="text" id="caseFilter" class="global-search" placeholder="Filter: Thailand, critical, blocked..." value="${esc(f.q || "")}" style="width:200px">
         <select id="fltStatus" style="max-width:150px">${opts(C.LISTS.status, f.status, "All status")}</select>
         <select id="fltPriority" style="max-width:150px">${opts(C.LISTS.priority, f.priority, "All priority")}</select>
         <select id="fltOwner" style="max-width:150px">${opts(names, f.owner, "All owners")}</select>
@@ -2452,6 +2464,18 @@
   AFTER.cases = function () {
     const bind = (id, key) => { const el = $("#" + id); if (el) el.addEventListener("change", () => { uiState.caseFilter[key] = el.value; go("cases"); }); };
     bind("fltStatus", "status"); bind("fltPriority", "priority"); bind("fltOwner", "owner"); bind("fltSort", "sort");
+    // Step 99: Natural-language case filter with debounce
+    var cfEl = $("#caseFilter");
+    if (cfEl) {
+      var _cfTimer = null;
+      cfEl.addEventListener("input", function () {
+        clearTimeout(_cfTimer);
+        _cfTimer = setTimeout(function () {
+          uiState.caseFilter.q = cfEl.value;
+          go("cases");
+        }, 250);
+      });
+    }
     // Group by dropdown (Step 90)
     const gb = $("#fltGroupBy");
     if (gb) gb.addEventListener("change", () => { uiState.caseFilter.groupBy = gb.value; go("cases"); });
@@ -4070,6 +4094,44 @@
     });
   }
   C.REGISTERS.forEach(reg => { RENDER[reg.id] = () => renderRegister(reg); AFTER[reg.id] = () => afterRegister(reg); });
+
+  // Step 98: Decision Log — chronological list of decisions with click-only "Log a decision" form
+  // Override the generic register renderer for decisions with a custom chronological view
+  RENDER.decisions = function () {
+    var decisions = S.get().decisions || [];
+    var decTypes = ["Include country", "Exclude country", "Change priority", "Accept risk", "Defer item", "Other"];
+    var rationales = ["Risk reduction outweighs cost", "Budget constraint", "Client preference", "Resource availability", "Lessons from prior project", "Best value of three bids", "WIP too high", "Regulatory requirement", "Schedule impact acceptable", "No viable alternative"];
+    var listHtml = "";
+    if (decisions.length) {
+      listHtml = '<div class="dec-list">' + decisions.slice().reverse().map(function(d) {
+        return '<div class="dec-item"><span class="dec-time">' + esc(C.fmtDate(d.date) || d.date || "\u2014") + '</span> <span class="dec-text"><b>' + esc(d.decision || d.type || "") + '</b>' + (d.context ? " \u2014 " + esc(d.context) : "") + (d.owner ? ' <span class="muted">(' + esc(d.owner) + ')</span>' : "") + '</span></div>';
+      }).join("") + '</div>';
+    } else {
+      listHtml = '<p class="muted">No decisions logged yet. Use the form below to record a decision.</p>';
+    }
+    return '<div class="card"><h3>Decision Log</h3>' + listHtml + '</div>' +
+      '<div class="card"><h3>Log a decision</h3>' +
+      '<div class="toolbar" style="flex-wrap:wrap;gap:8px">' +
+      '<select id="decType"><option value="">Decision type...</option>' + decTypes.map(function(t) { return '<option value="' + esc(t) + '">' + esc(t) + '</option>'; }).join("") + '</select>' +
+      '<select id="decRationale"><option value="">Rationale...</option>' + rationales.map(function(r) { return '<option value="' + esc(r) + '">' + esc(r) + '</option>'; }).join("") + '</select>' +
+      '<button class="btn btn-primary" id="decSubmit" type="button">Log decision</button>' +
+      '</div></div>';
+  };
+  AFTER.decisions = function () {
+    var btn = $("#decSubmit");
+    if (btn) btn.addEventListener("click", function () {
+      var typeEl = $("#decType"), ratEl = $("#decRationale");
+      var type = typeEl ? typeEl.value : "";
+      var rationale = ratEl ? ratEl.value : "";
+      if (!type) { toast("Pick a decision type first"); return; }
+      var decisions = S.get().decisions || [];
+      decisions.push({ _id: (Date.now().toString(36) + Math.random().toString(36).slice(2, 7)), decision: type, context: rationale, owner: "", date: new Date().toISOString().slice(0, 10), status: "Approved" });
+      S.get().decisions = decisions;
+      S.save();
+      toast("Decision logged");
+      go("decisions");
+    });
+  };
 
   // ---------- Earned Value (EVM) ----------
   RENDER.evm = function () {

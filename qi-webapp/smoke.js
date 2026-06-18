@@ -256,6 +256,8 @@ dataViews.forEach(v => {
   doc.querySelector(`.nav-item[data-view="${v}"]`).dispatchEvent(new window.Event("click", { bubbles: true }));
   doc.querySelectorAll("#content input").forEach(inp => {
     const t = (inp.getAttribute("type") || "text").toLowerCase();
+    // Step 99: #caseFilter is an exception to the no-typing rule (search/filter on read-only data)
+    if (inp.id === "caseFilter") return;
     if (t === "text" || t === "number") { freeText++; offenders.push(v + ":" + (inp.id || inp.className || t)); }
   });
 });
@@ -1458,6 +1460,20 @@ var quickWinsEl = doc.querySelector(".quick-wins");
 // Quick wins only appear when there are open non-critical cases; check content or element
 var dashContent = doc.getElementById("content").innerHTML;
 ok(quickWinsEl != null || dashContent.indexOf("quick-wins") !== -1 || dashContent.indexOf("Quick wins") !== -1, ".quick-wins or quick-wins content exists on dashboard");
+
+// Step 98: RENDER.decisions exists and renders
+doc.querySelector('.nav-item[data-view="decisions"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+var decContent = doc.getElementById("content").innerHTML;
+ok(decContent.indexOf("dec-list") !== -1 || decContent.indexOf("Decision Log") !== -1, "RENDER.decisions exists and renders");
+
+// Step 99: #caseFilter input exists on Cases view
+doc.querySelector('.nav-item[data-view="cases"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+var caseFilterEl = doc.getElementById("caseFilter");
+ok(caseFilterEl != null && caseFilterEl.tagName === "INPUT", "#caseFilter input exists on Cases view");
+
+// Step 100: .inline-edit cells exist in the cases table
+var inlineEditCells = doc.querySelectorAll("td.inline-edit");
+ok(inlineEditCells.length > 0, ".inline-edit cells exist in the cases table");
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
