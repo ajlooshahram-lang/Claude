@@ -3,6 +3,7 @@ import { loadConfig } from "./config.js";
 import { createPrismaDbHelpers } from "./auth/db-helpers.js";
 import { createPrismaDataDbHelpers } from "./data/db-helpers.js";
 import { createPrismaInviteDbHelpers } from "./invite/db-helpers.js";
+import { attachWebSocketServer, stopPresenceInterval } from "./ws.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -23,6 +24,7 @@ async function main(): Promise<void> {
 
   const shutdown = async (signal: string): Promise<void> => {
     app.log.info({ signal }, "shutting down");
+    stopPresenceInterval();
     await app.close();
     process.exit(0);
   };
@@ -30,6 +32,12 @@ async function main(): Promise<void> {
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
 
   await app.listen({ port: config.port, host: "0.0.0.0" });
+
+  // Attach the WebSocket server to the underlying Node HTTP server.
+  // This must happen after listen() so the server object exists.
+  const httpServer = app.server;
+  attachWebSocketServer(httpServer, dbHelpers);
+  app.log.info("WebSocket server attached at /ws");
 }
 
 main().catch((err) => {

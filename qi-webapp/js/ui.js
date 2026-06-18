@@ -5383,7 +5383,13 @@
       });
     })();
     const initialHash = (location.hash || "").replace(/^#/, "");
-    go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
+    // Render the initial view defensively: a single failing widget/chart must
+    // never abort the rest of boot (presence/sync, banners, keyboard shortcuts).
+    try {
+      go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
+    } catch (bootRenderErr) {
+      try { console.warn("Initial view render failed; continuing boot:", bootRenderErr); } catch (e) {}
+    }
 
     // "Resume where you left off" — show a banner for returning users who have data
     (function showResumeBanner() {
@@ -5424,6 +5430,121 @@
         toast("Welcome! The app loaded an example project to explore. Upload your own on the Project Brain screen.");
       } catch (e) {}
     }
+
+    // ---- Real-time collaboration: online presence + activity feed ----
+    (function initRealTimeSync() {
+      if (!window.QISync || !window.QISync.wsConnect) return;
+
+      // Create presence indicator in topbar
+      var actions = document.querySelector(".topbar-actions");
+      if (!actions) return;
+
+      var presenceEl = document.createElement("span");
+      presenceEl.className = "rt-presence";
+      presenceEl.id = "rtPresence";
+      presenceEl.title = "Online collaborators";
+      presenceEl.textContent = "";
+      presenceEl.hidden = true;
+      actions.insertBefore(presenceEl, actions.firstChild);
+
+      // Create activity feed dropdown
+      var feedWrap = document.createElement("div");
+      feedWrap.className = "rt-feed-wrap";
+      feedWrap.id = "rtFeedWrap";
+
+      var feedBtn = document.createElement("button");
+      feedBtn.className = "btn btn-icon rt-feed-btn";
+      feedBtn.id = "rtFeedBtn";
+      feedBtn.title = "Activity feed";
+      feedBtn.setAttribute("aria-label", "Activity feed");
+      feedBtn.textContent = "\uD83D\uDD14"; // bell emoji
+      feedBtn.hidden = true;
+
+      var feedBadge = document.createElement("span");
+      feedBadge.className = "rt-feed-badge";
+      feedBadge.id = "rtFeedBadge";
+      feedBadge.hidden = true;
+
+      var feedDropdown = document.createElement("div");
+      feedDropdown.className = "rt-feed-dropdown";
+      feedDropdown.id = "rtFeedDropdown";
+      feedDropdown.hidden = true;
+      feedDropdown.innerHTML = '<div class="rt-feed-header">Recent Activity</div><div class="rt-feed-list" id="rtFeedList"><p class="muted">No activity yet</p></div>';
+
+      feedWrap.appendChild(feedBtn);
+      feedWrap.appendChild(feedBadge);
+      feedWrap.appendChild(feedDropdown);
+      actions.insertBefore(feedWrap, actions.firstChild);
+
+      var unreadCount = 0;
+
+      feedBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        feedDropdown.hidden = !feedDropdown.hidden;
+        if (!feedDropdown.hidden) {
+          unreadCount = 0;
+          feedBadge.hidden = true;
+        }
+      });
+      document.addEventListener("click", function (e) {
+        if (!feedWrap.contains(e.target)) feedDropdown.hidden = true;
+      });
+
+      function updatePresence(users) {
+        var otherCount = (users || []).length - 1; // subtract self
+        if (otherCount < 0) otherCount = 0;
+        if (otherCount > 0) {
+          presenceEl.textContent = "\uD83D\uDFE2 " + otherCount + " online";
+          presenceEl.hidden = false;
+          presenceEl.title = (users || []).map(function (u) { return u.name; }).join(", ");
+        } else {
+          presenceEl.hidden = true;
+        }
+      }
+
+      function updateActivityFeed(events) {
+        var list = document.getElementById("rtFeedList");
+        if (!list) return;
+        if (!events || events.length === 0) {
+          list.innerHTML = '<p class="muted">No activity yet</p>';
+          return;
+        }
+        list.innerHTML = events.slice(0, 5).map(function (ev) {
+          var time = ev.ts ? new Date(ev.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+          return '<div class="rt-feed-item"><strong>' + esc(ev.user || "Someone") + '</strong> ' +
+            esc(ev.action || "updated") + ' a ' + esc(ev.entity || "item") + ' <span class="muted">' + time + '</span></div>';
+        }).join("");
+      }
+
+      function handleWsEvent(eventType, payload) {
+        if (eventType === "connected") {
+          feedBtn.hidden = false;
+        } else if (eventType === "disconnected") {
+          presenceEl.hidden = true;
+          feedBtn.hidden = true;
+          feedDropdown.hidden = true;
+        } else if (eventType === "presence") {
+          updatePresence(payload);
+        } else if (eventType === "change") {
+          // Show toast for other users' changes
+          var msg = (payload.user || "Someone") + " " + (payload.action || "updated") + " a " + (payload.entity || "item");
+          toast(msg, { ms: 3000 });
+          unreadCount++;
+          feedBadge.textContent = String(unreadCount);
+          feedBadge.hidden = false;
+          updateActivityFeed(window.QISync.wsActivityFeed());
+        } else if (eventType === "activity") {
+          updateActivityFeed(payload);
+        }
+      }
+
+      window.QISync.wsAddListener(handleWsEvent);
+
+      // Connect if authenticated
+      if (window.QISync.syncEnabled()) {
+        window.QISync.wsConnect();
+      }
+    })();
   };
 
   // When __SKIP_AUTH is set (e.g. smoke tests), boot immediately without waiting for auth.js DOMContentLoaded

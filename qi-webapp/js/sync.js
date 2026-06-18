@@ -444,6 +444,119 @@
     });
   }
 
+  // ---- Real-time WebSocket sync ----
+
+  var _ws = null;
+  var _wsReconnectTimer = null;
+  var _wsReconnectDelay = 1000;
+  var _wsMaxReconnectDelay = 30000;
+  var _wsPingInterval = null;
+  var _wsOnlineUsers = [];
+  var _wsActivityFeed = [];
+  var _wsActivityMax = 5;
+  var _wsListeners = [];
+
+  function wsConnect() {
+    if (_ws && (_ws.readyState === 0 || _ws.readyState === 1)) return; // already connecting/open
+    if (typeof WebSocket === "undefined") return; // no WebSocket support (e.g. offline demo)
+
+    var proto = (root.location && root.location.protocol === "https:") ? "wss:" : "ws:";
+    var host = (root.location && root.location.host) || "localhost:8080";
+    var url = proto + "//" + host + "/ws";
+
+    try {
+      _ws = new WebSocket(url);
+    } catch (e) {
+      // Graceful degradation: no WebSocket server available (offline demo)
+      return;
+    }
+
+    _ws.onopen = function () {
+      _wsReconnectDelay = 1000; // reset backoff on successful connect
+      // Start periodic ping to keep connection alive
+      if (_wsPingInterval) clearInterval(_wsPingInterval);
+      _wsPingInterval = setInterval(function () {
+        if (_ws && _ws.readyState === 1) {
+          _ws.send(JSON.stringify({ type: "ping" }));
+        }
+      }, 25000);
+      notifyListeners("connected", null);
+    };
+
+    _ws.onmessage = function (event) {
+      var msg;
+      try { msg = JSON.parse(event.data); } catch (e) { return; }
+
+      if (msg.type === "change") {
+        // Add to local activity feed
+        _wsActivityFeed.unshift(msg);
+        if (_wsActivityFeed.length > _wsActivityMax) _wsActivityFeed.pop();
+        notifyListeners("change", msg);
+      } else if (msg.type === "presence") {
+        _wsOnlineUsers = msg.users || [];
+        notifyListeners("presence", _wsOnlineUsers);
+      } else if (msg.type === "activity") {
+        // Initial activity log from server
+        _wsActivityFeed = (msg.events || []).slice(-_wsActivityMax).reverse();
+        notifyListeners("activity", _wsActivityFeed);
+      }
+    };
+
+    _ws.onclose = function () {
+      if (_wsPingInterval) { clearInterval(_wsPingInterval); _wsPingInterval = null; }
+      _ws = null;
+      _wsOnlineUsers = [];
+      notifyListeners("disconnected", null);
+      // Reconnect with exponential backoff
+      scheduleReconnect();
+    };
+
+    _ws.onerror = function () {
+      // onerror is always followed by onclose, so just let onclose handle reconnect
+      if (_ws) { try { _ws.close(); } catch (e) {} }
+    };
+  }
+
+  function scheduleReconnect() {
+    if (_wsReconnectTimer) return;
+    _wsReconnectTimer = setTimeout(function () {
+      _wsReconnectTimer = null;
+      if (syncEnabled()) wsConnect();
+    }, _wsReconnectDelay);
+    // Exponential backoff
+    _wsReconnectDelay = Math.min(_wsReconnectDelay * 2, _wsMaxReconnectDelay);
+  }
+
+  function wsDisconnect() {
+    if (_wsReconnectTimer) { clearTimeout(_wsReconnectTimer); _wsReconnectTimer = null; }
+    if (_wsPingInterval) { clearInterval(_wsPingInterval); _wsPingInterval = null; }
+    if (_ws) { try { _ws.close(); } catch (e) {} _ws = null; }
+    _wsOnlineUsers = [];
+  }
+
+  function wsSendChange(entity, action, data) {
+    if (!_ws || _ws.readyState !== 1) return;
+    try {
+      _ws.send(JSON.stringify({ type: "change", entity: entity, action: action, data: data || {} }));
+    } catch (e) { /* ignore send errors */ }
+  }
+
+  function wsOnlineUsers() { return _wsOnlineUsers.slice(); }
+  function wsActivityFeed() { return _wsActivityFeed.slice(); }
+  function wsIsConnected() { return _ws && _ws.readyState === 1; }
+
+  function wsAddListener(fn) {
+    if (typeof fn === "function") _wsListeners.push(fn);
+  }
+  function wsRemoveListener(fn) {
+    _wsListeners = _wsListeners.filter(function (f) { return f !== fn; });
+  }
+  function notifyListeners(eventType, payload) {
+    for (var i = 0; i < _wsListeners.length; i++) {
+      try { _wsListeners[i](eventType, payload); } catch (e) { /* ignore */ }
+    }
+  }
+
   // ---- Expose module ----
   root.QISync = {
     syncEnabled: syncEnabled,
@@ -468,7 +581,16 @@
     syncRenameSnapshot: syncRenameSnapshot,
     registerMapping: registerMapping,
     mapLocalToServer: mapLocalToServer,
-    mapServerToLocal: mapServerToLocal
+    mapServerToLocal: mapServerToLocal,
+    // Real-time WebSocket API
+    wsConnect: wsConnect,
+    wsDisconnect: wsDisconnect,
+    wsSendChange: wsSendChange,
+    wsOnlineUsers: wsOnlineUsers,
+    wsActivityFeed: wsActivityFeed,
+    wsIsConnected: wsIsConnected,
+    wsAddListener: wsAddListener,
+    wsRemoveListener: wsRemoveListener
   };
 
 })(typeof window !== "undefined" ? window : globalThis);

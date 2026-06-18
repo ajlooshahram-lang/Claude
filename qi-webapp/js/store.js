@@ -310,13 +310,17 @@
       var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
       root.QISync.syncCreateCase(projServerId, c, c.id);
     }
+    // Real-time broadcast
+    if (root.QISync && root.QISync.wsSendChange) {
+      root.QISync.wsSendChange("case", "add", { id: c.id, problem: (c.problem || "").slice(0, 80) });
+    }
     return c;
   }
   function updateCase(id, patch) {
     const i = caseIndex(id); if (i < 0) return null;
     const old = get().cases[i];
     const changes = Object.keys(patch).filter(k => k !== "whys" && String(old[k]) !== String(patch[k]))
-      .map(k => `${k}: ${old[k] === "" || old[k] == null ? "—" : old[k]}→${patch[k] === "" || patch[k] == null ? "—" : patch[k]}`);
+      .map(k => `${k}: ${old[k] === "" || old[k] == null ? "\u2014" : old[k]}\u2192${patch[k] === "" || patch[k] == null ? "\u2014" : patch[k]}`);
     Object.assign(get().cases[i], patch);
     if (changes.length) logAudit("Updated", codeOf(i), changes.slice(0, 4).join("; ").slice(0, 120));
     save();
@@ -324,6 +328,10 @@
       var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
       var caseServerId = root.QISync.mapLocalToServer(id) || id;
       root.QISync.syncUpdateCase(projServerId, caseServerId, patch);
+    }
+    // Real-time broadcast
+    if (root.QISync && root.QISync.wsSendChange && changes.length) {
+      root.QISync.wsSendChange("case", "update", { id: id, fields: changes.slice(0, 3) });
     }
     return get().cases[i];
   }
@@ -340,6 +348,10 @@
       var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
       var caseServerId = root.QISync.mapLocalToServer(id) || id;
       root.QISync.syncDeleteCase(projServerId, caseServerId);
+    }
+    // Real-time broadcast
+    if (!__bulkDeleteInProgress && root.QISync && root.QISync.wsSendChange) {
+      root.QISync.wsSendChange("case", "delete", { id: id, problem: prob });
     }
     return true;
   }
@@ -409,6 +421,9 @@
       var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
       root.QISync.syncRegAdd(projServerId, regId, row, row._id);
     }
+    if (root.QISync && root.QISync.wsSendChange) {
+      root.QISync.wsSendChange(regLabel(regId), "add", { id: row._id, regId: regId });
+    }
     return row; }
   function regUpdate(regId, rowId, patch) {
     const rows = regRows(regId), i = rows.findIndex(r => r._id === rowId); if (i < 0) return null;
@@ -421,6 +436,9 @@
       var rowServerId = root.QISync.mapLocalToServer(rowId) || rowId;
       root.QISync.syncRegUpdate(projServerId, regId, rowServerId, patch);
     }
+    if (root.QISync && root.QISync.wsSendChange && changed.length) {
+      root.QISync.wsSendChange(regLabel(regId), "update", { id: rowId, regId: regId, fields: changed.slice(0, 3) });
+    }
     return rows[i];
   }
   function regDelete(regId, rowId) {
@@ -430,6 +448,9 @@
       var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
       var rowServerId = root.QISync.mapLocalToServer(rowId) || rowId;
       root.QISync.syncRegDelete(projServerId, regId, rowServerId);
+    }
+    if (root.QISync && root.QISync.wsSendChange) {
+      root.QISync.wsSendChange(regLabel(regId), "delete", { id: rowId, regId: regId });
     }
     return true;
   }
