@@ -938,7 +938,8 @@ const T = {
       auto: '\uD83E\uDDE0 Auto-Design',
       matlist: '\uD83D\uDED2 Materialeliste',
       fault: '\u26A1 Fejlsimulator',
-      thermal: '\uD83C\uDF21\uFE0F Termisk'
+      thermal: '\uD83C\uDF21\uFE0F Termisk',
+      route: '\uD83D\uDDFA\uFE0F Kabelrute'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1065,7 +1066,8 @@ const T = {
       auto: '\uD83E\uDDE0 Auto-Design',
       matlist: '\uD83D\uDED2 Materialeliste',
       fault: '\u26A1 Fault Sim',
-      thermal: '\uD83C\uDF21\uFE0F Thermal'
+      thermal: '\uD83C\uDF21\uFE0F Thermal',
+      route: '\uD83D\uDDFA\uFE0F Cable Route'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -2412,6 +2414,7 @@ function renderModule(mod) {
     case 'matlist': content += renderMaterialList(); break;
     case 'fault': content += renderFaultSim(); break;
     case 'thermal': content += renderThermal(); break;
+    case 'route': content += renderRoute(); break;
     case 'home': content += renderDashboard(); break;
     case 'exam': content = renderExam(); break;
   }
@@ -18906,6 +18909,60 @@ function renderThermal(){
     html+='<div class="result-box" style="margin-top:12px"><div class="result-title">\u2705 '+(da?'Ingen overbelastede komponenter':'No overloaded components')+'</div></div>';
   }
   html+='<div class="info-row" style="margin-top:8px">'+(da?'Termografi er et krav ved \u00e5rlig vedligehold af tavler (DS/HD 60364-6 \u00a762.1.6). Udf\u00f8r altid fysisk termografering \u2014 denne simulering erstatter IKKE m\u00e5ling.':'Thermography is required at annual panel maintenance (DS/HD 60364-6 \u00a762.1.6). Always perform physical thermography \u2014 this simulation does NOT replace measurement.')+'</div></div>';
+  return html;
+}
+
+// ===== CABLE ROUTE PLANNER =====
+let routeState = { segments:[], bendFactor:1.1 };
+function routeAdd(len){ routeState.segments.push({len:len,bend:false}); renderModule('route'); }
+function routeAddBend(){ if(routeState.segments.length>0) routeState.segments[routeState.segments.length-1].bend=true; renderModule('route'); }
+function routeRemoveLast(){ routeState.segments.pop(); renderModule('route'); }
+function routeClear(){ routeState.segments=[]; renderModule('route'); }
+function routeApply(){ vdropState.length=routeTotalLen(); renderModule('route'); }
+function routeTotalLen(){ var t=routeState.segments.reduce(function(s,seg){return s+seg.len;},0); var bends=routeState.segments.filter(function(seg){return seg.bend;}).length; return Math.round(t*routeState.bendFactor+bends*0.3); }
+function renderRoute(){
+  const da=lang==='da';
+  var segs=routeState.segments;
+  var totalLen=routeTotalLen();
+  var bends=segs.filter(function(seg){return seg.bend;}).length;
+  var straightLen=segs.reduce(function(s,seg){return s+seg.len;},0);
+  let html='<div class="card fade-in"><div class="card-title">\uD83D\uDDFA\uFE0F '+(da?'Kabelrute-planlægger':'Cable Route Planner')+'</div>';
+  html+='<div class="info-row">'+(da?'Byg din kabelrute segment for segment. Appen beregner den samlede længde inkl. bøjninger, og overf\u00f8rer den til sp\u00e6ndingsfaldsberegningen. Slut med at g\u00e6tte — m\u00e5l op!':'Build your cable route segment by segment. The app calculates total length incl. bends, and transfers it to the voltage drop calculation. Stop guessing — measure!')+'</div>';
+  // Add segment buttons
+  html+='<div class="select-group"><div class="select-label">'+(da?'Tilf\u00f8j segment [m]':'Add segment [m]')+'</div><div class="select-grid">';
+  [1,2,3,4,5,6,7,8,10,12,15,20,25,30,40,50].forEach(function(l){ html+='<button class="sel-btn" onclick="routeAdd('+l+')">'+l+'m</button>'; });
+  html+='</div></div>';
+  html+='<div class="select-grid" style="margin-bottom:12px">';
+  html+='<button class="sel-btn" onclick="routeAddBend()">\u21AA '+(da?'Tilf\u00f8j b\u00f8jning (90\u00b0)':'Add bend (90\u00b0)')+'</button>';
+  html+='<button class="sel-btn" onclick="routeRemoveLast()">\u2715 '+(da?'Fjern sidste':'Remove last')+'</button>';
+  html+='<button class="sel-btn" onclick="routeClear()">\uD83D\uDDD1\uFE0F '+(da?'Ryd rute':'Clear route')+'</button>';
+  html+='</div></div>';
+  // Visual route
+  if(segs.length>0){
+    var W=560,H=80;
+    var svg='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="background:#05101c;border-radius:8px;border:1px solid var(--border,#2a3645)" xmlns="http://www.w3.org/2000/svg">';
+    var x=20,y=H/2, maxX=W-20;
+    var scale=(maxX-20)/(straightLen||1);
+    segs.forEach(function(seg,i){
+      var segW=seg.len*scale;
+      svg+='<line x1="'+x+'" y1="'+y+'" x2="'+(x+segW)+'" y2="'+y+'" stroke="#00ffc8" stroke-width="4" stroke-linecap="round"/>';
+      svg+='<text x="'+(x+segW/2)+'" y="'+(y-10)+'" text-anchor="middle" font-size="9" fill="#8ab4d0">'+seg.len+'m</text>';
+      if(seg.bend) svg+='<circle cx="'+(x+segW)+'" cy="'+y+'" r="6" fill="none" stroke="#ff8c42" stroke-width="2"/><text x="'+(x+segW)+'" y="'+(y+18)+'" text-anchor="middle" font-size="7" fill="#ff8c42">90\u00b0</text>';
+      x+=segW;
+    });
+    svg+='<circle cx="20" cy="'+y+'" r="5" fill="#00ffc8"/><circle cx="'+x+'" cy="'+y+'" r="5" fill="#9fe6ff"/>';
+    svg+='<text x="20" y="'+(y+20)+'" font-size="8" fill="#5b7790">'+(da?'Tavle':'Panel')+'</text>';
+    svg+='<text x="'+x+'" y="'+(y+20)+'" text-anchor="end" font-size="8" fill="#5b7790">'+(da?'Forbruger':'Consumer')+'</text>';
+    svg+='</svg>';
+    html+='<div class="card fade-in"><div class="card-title">'+(da?'Rute':'Route')+'</div>'+svg;
+    html+='<div class="result-box" style="margin-top:10px"><div class="result-title">'+(da?'Beregnet kabellængde':'Calculated cable length')+'</div>';
+    html+='<div class="result-row"><span class="label">'+(da?'Segmenter':'Segments')+'</span><span class="value">'+segs.length+'</span></div>';
+    html+='<div class="result-row"><span class="label">'+(da?'Lige l\u00e6ngde':'Straight length')+'</span><span class="value">'+straightLen+' m</span></div>';
+    html+='<div class="result-row"><span class="label">'+(da?'B\u00f8jninger':'Bends')+'</span><span class="value">'+bends+'</span></div>';
+    html+='<div class="result-row"><span class="label">'+(da?'Total (inkl. tillæg)':'Total (incl. allowance)')+'</span><span class="value" style="font-weight:800;font-size:1.2em">'+totalLen+' m</span></div>';
+    html+='<div class="result-row"><span class="label">'+(da?'Sp\u00e6ndingsfaldslængde nu':'Voltage drop length now')+'</span><span class="value">'+vdropState.length+' m</span></div></div>';
+    html+='<div class="select-grid" style="margin-top:8px"><button class="sel-btn selected" onclick="routeApply()">\u2705 '+(da?'Overf\u00f8r '+totalLen+'m til sp\u00e6ndingsfald':'Transfer '+totalLen+'m to voltage drop')+'</button></div></div>';
+  }
   return html;
 }
 
