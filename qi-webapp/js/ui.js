@@ -901,6 +901,7 @@
       <div class="toolbar no-print">
         <button class="btn btn-primary" id="briefPrint" type="button">🖨 Print / Save as PDF</button>
         <button class="btn" id="briefDownload" type="button">⬇ Download one-pager (HTML)</button>
+        <button class="btn" id="briefShare" type="button">🔗 Share link</button>
         <span class="muted">A plain-language one-pager you can hand to your board — built automatically from your project. No jargon.</span>
       </div>
       <div class="brief" id="investorBrief">
@@ -962,6 +963,30 @@
         </section>
 
         <section class="brief-section">
+          <h3>Programme phases (illustrative timeline)</h3>
+          <p class="brief-lead">How the main work streams overlap across the 60 months. Several run in parallel — the early ones (permitting, procurement) must start first because they take the longest.</p>
+          <div class="gantt">
+            <div class="gantt-axis"><span>Mo 0</span><span>15</span><span>30</span><span>45</span><span>60</span></div>
+            ${(function () {
+              var PHASES = [
+                { name: "Permitting & Survey", startMo: 0, endMo: 14, color: "#2a6ec2" },
+                { name: "Cable & Repeater Procurement", startMo: 6, endMo: 24, color: "#1d8e6a" },
+                { name: "Landing Station Civil Works", startMo: 10, endMo: 30, color: "#7b5ea7" },
+                { name: "Marine Installation", startMo: 18, endMo: 48, color: "#4ea1ff" },
+                { name: "Shore-end & Burial", startMo: 36, endMo: 52, color: "#c79a2a" },
+                { name: "Integration & Testing", startMo: 44, endMo: 56, color: "#e07040" },
+                { name: "Acceptance & RFS", startMo: 54, endMo: 60, color: "#42d6a4" }
+              ];
+              return PHASES.map(function (p) {
+                var startPct = (p.startMo / 60) * 100;
+                var widthPct = ((p.endMo - p.startMo) / 60) * 100;
+                return '<div class="gantt-row"><span class="gantt-label">' + esc(p.name) + '</span><div class="gantt-track"><div class="gantt-bar" style="left:' + startPct.toFixed(1) + '%;width:' + widthPct.toFixed(1) + '%;background:' + p.color + '"></div></div></div>';
+              }).join("");
+            })()}
+          </div>
+        </section>
+
+        <section class="brief-section">
           <h3>When each country goes live</h3>
           <p class="brief-lead">The order countries are connected, and roughly which month each one comes online as the cable is laid from one landing station to the next.</p>
           <div class="brief-online">${onlineRows || '<p class="muted">No schedule data</p>'}</div>
@@ -1006,6 +1031,20 @@
     if (btn) btn.addEventListener("click", () => { toast("Opening the print dialog — choose 'Save as PDF' to keep a copy."); try { window.print(); } catch (e) {} });
     const dl = $("#briefDownload");
     if (dl) dl.addEventListener("click", () => { if (downloadBrief()) toast("Downloaded: STP-Investor-Brief.html — a self-contained one-pager you can email."); });
+
+    // --- Share button ---
+    const shareBtn = $("#briefShare");
+    if (shareBtn) shareBtn.addEventListener("click", () => {
+      try {
+        const data = { title: document.querySelector(".brief-cover-title") ? document.querySelector(".brief-cover-title").textContent : "Brief", countries: 8 };
+        const url = location.origin + location.pathname + "#brief";
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(() => toast("Brief link copied to clipboard."), () => toast("Could not copy — try manually."));
+        } else {
+          toast("Share: copy this page's URL to share the brief view.");
+        }
+      } catch (e) { toast("Could not generate share link."); }
+    });
 
     // --- "What if" country toggles ---
     const qsa = (s) => Array.prototype.slice.call(document.querySelectorAll(s));

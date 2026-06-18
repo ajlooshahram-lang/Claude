@@ -659,6 +659,15 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .brief-spend .spend-grid{stroke:rgba(46,84,150,.3)}
 .brief-spend .spend-axis{stroke:rgba(46,84,150,.4)}
 .brief-spend .spend-lbl{fill:#6b7892;font-size:9px;font-family:'Segoe UI',Arial,sans-serif}
+
+/* programme phase Gantt timeline (illustrative, in the Investor Brief) */
+.gantt{max-width:560px;margin:8px 0 14px}
+.gantt-axis{display:flex;justify-content:space-between;font-size:10px;color:var(--muted,#6b7892);margin-bottom:4px;padding-left:160px}
+.gantt-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.gantt-label{width:152px;flex:none;font-size:11.5px;text-align:right;color:var(--ink,#1a2336);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gantt-track{flex:1;position:relative;height:14px;border-radius:999px;background:var(--chip-bg,rgba(46,84,150,.08))}
+.gantt-bar{position:absolute;top:0;height:100%;border-radius:999px;min-width:4px}
+@media (max-width:560px){.gantt-label{width:80px;font-size:10px}}
 @media (max-width:760px){.globe-deploy{flex-wrap:wrap;justify-content:center;border-radius:14px}.globe-deploy-phase{max-width:100%;white-space:normal}}
 
 /* in-stage detail card (shown when a node is selected) */

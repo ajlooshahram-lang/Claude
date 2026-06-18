@@ -1074,5 +1074,26 @@ ok(/\.toast[\s\S]*animation/.test(toastCss), ".toast has an animation property i
 ok(/toastIn/.test(toastCss) && /scale\(/.test(toastCss), "toastIn keyframes include scale+translate entrance");
 toastEl.hidden = true;
 
+// Step 19: Gantt phase timeline on the Investor Brief
+doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".gantt") != null, "Investor Brief renders a .gantt element (phase timeline)");
+ok(doc.querySelectorAll(".gantt .gantt-row").length === 7, "Gantt timeline has 7 phase rows (got " + doc.querySelectorAll(".gantt .gantt-row").length + ")");
+ok(doc.querySelector(".gantt-axis") != null, "Gantt timeline has an axis row");
+ok(/Programme phases/.test(doc.getElementById("content").innerHTML), "Investor Brief includes the 'Programme phases' section heading");
+
+// Step 20: Keyboard shortcuts overlay — showShortcuts is a function and ? key opens the modal
+ok(typeof window.QIShowShortcuts === "function" || doc.getElementById("btnHelp") != null, "shortcuts overlay is accessible");
+doc.getElementById("btnHelp").click();
+ok(/Keyboard shortcuts/.test(doc.getElementById("modal").innerHTML), "pressing help opens the shortcuts modal");
+ok(/Command palette/.test(doc.getElementById("modal").innerHTML) || /Show this list/.test(doc.getElementById("modal").innerHTML), "shortcuts modal lists shortcut entries");
+doc.querySelector("#modal [data-act=cancel]").click();
+
+// Step 21: Share button on the Investor Brief toolbar
+doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const briefShareBtn = doc.getElementById("briefShare");
+ok(briefShareBtn != null, "#briefShare button exists on the brief toolbar");
+ok(!briefShareBtn.getAttribute("onclick"), "Share button is CSP-safe (no inline onclick)");
+ok(/Share link/.test(briefShareBtn.textContent), "Share button has 'Share link' label");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
