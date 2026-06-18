@@ -2104,6 +2104,50 @@
   };
   AFTER.dashboard = function () {
     if (!$("#groupSel")) return;   // empty-state branch — nothing to wire
+    // Step 93: Animated progress segments + count-up for pct-badge and health-num
+    (function animateProgSegments() {
+      var segs = document.querySelectorAll(".prog-seg");
+      segs.forEach(function (seg) {
+        var realWidth = seg.style.width;
+        seg.style.width = "0";
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            seg.style.width = realWidth;
+          });
+        });
+      });
+      // Animate pct-badge count-up
+      var pctBadge = document.querySelector(".pct-badge");
+      if (pctBadge) {
+        var match = pctBadge.textContent.match(/(\d+)/);
+        if (match) {
+          var target = parseInt(match[1], 10);
+          var cur = 0;
+          var step = Math.max(1, Math.ceil(target / 30));
+          pctBadge.textContent = "0% complete";
+          var iv = setInterval(function () {
+            cur = Math.min(cur + step, target);
+            pctBadge.textContent = cur + "% complete";
+            if (cur >= target) clearInterval(iv);
+          }, 25);
+        }
+      }
+      // Animate health-num count-up
+      var healthNum = document.querySelector(".health-num");
+      if (healthNum) {
+        var hTarget = parseInt(healthNum.textContent, 10);
+        if (!isNaN(hTarget) && hTarget > 0) {
+          var hCur = 0;
+          var hStep = Math.max(1, Math.ceil(hTarget / 30));
+          healthNum.textContent = "0";
+          var hIv = setInterval(function () {
+            hCur = Math.min(hCur + hStep, hTarget);
+            healthNum.textContent = String(hCur);
+            if (hCur >= hTarget) clearInterval(hIv);
+          }, 25);
+        }
+      }
+    })();
     // Email summary copy-to-clipboard (step 50)
     const emailBtn = $("#emailSummary");
     if (emailBtn) emailBtn.addEventListener("click", () => {
@@ -5144,6 +5188,75 @@
         }
       });
     })();
+    // Step 92: Global search across all views
+    (function initGlobalSearch() {
+      var input = document.getElementById("globalSearch");
+      if (!input) return;
+      var wrapper = document.createElement("div");
+      wrapper.style.position = "relative";
+      wrapper.style.display = "inline-block";
+      input.parentNode.insertBefore(wrapper, input);
+      wrapper.appendChild(input);
+      var dropdown = document.createElement("div");
+      dropdown.className = "search-results";
+      dropdown.hidden = true;
+      wrapper.appendChild(dropdown);
+      input.addEventListener("input", function () {
+        var q = input.value.trim().toLowerCase();
+        if (!q) { dropdown.hidden = true; return; }
+        var cases = S.validCases();
+        var matches = cases.filter(function (c) {
+          return (c.problem || "").toLowerCase().indexOf(q) !== -1;
+        }).slice(0, 8);
+        if (matches.length === 0) { dropdown.hidden = true; return; }
+        dropdown.innerHTML = matches.map(function (c) {
+          return '<div class="search-result" data-code="' + esc(c.code || "") + '">' + esc((c.code || "") + " \u2014 " + (c.problem || "").slice(0, 60)) + '</div>';
+        }).join("");
+        dropdown.hidden = false;
+      });
+      dropdown.addEventListener("click", function (e) {
+        var item = e.target.closest(".search-result");
+        if (!item) return;
+        var code = item.dataset.code;
+        dropdown.hidden = true;
+        input.value = "";
+        go("cases");
+        setTimeout(function () {
+          var row = document.querySelector('tr[data-id] td');
+          var rows = document.querySelectorAll("tr[data-id]");
+          for (var i = 0; i < rows.length; i++) {
+            var cells = rows[i].querySelectorAll("td");
+            for (var j = 0; j < cells.length; j++) {
+              if (cells[j].textContent.trim() === code) {
+                rows[i].style.background = "rgba(46,84,150,.12)";
+                rows[i].scrollIntoView({ block: "center", behavior: "smooth" });
+                setTimeout(function () { rows[i].style.background = ""; }, 2500);
+                return;
+              }
+            }
+          }
+        }, 80);
+      });
+      document.addEventListener("click", function (e) {
+        if (!wrapper.contains(e.target)) dropdown.hidden = true;
+      });
+    })();
+    // Step 94: Focus mode toggle
+    (function initFocusMode() {
+      var btn = document.getElementById("btnFocus");
+      if (!btn) return;
+      btn.addEventListener("click", function () {
+        document.body.classList.toggle("focus-mode");
+        btn.classList.toggle("active", document.body.classList.contains("focus-mode"));
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT" || e.target.isContentEditable) return;
+        if (e.key === "f" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          document.body.classList.toggle("focus-mode");
+          btn.classList.toggle("active", document.body.classList.contains("focus-mode"));
+        }
+      });
+    })();
     const initialHash = (location.hash || "").replace(/^#/, "");
     go(initialHash && RENDER[initialHash] ? initialHash : "dashboard", { skipHash: !!(initialHash && RENDER[initialHash]) });
 
@@ -5167,11 +5280,11 @@
 
     // Step 89: "What's new" changelog toast
     (function showWhatsNew() {
-      var VERSION = "2.0.88";
+      var VERSION = "2.0.91";
       try {
         var last = localStorage.getItem("qi_lastVersion");
         if (last !== VERSION) {
-          toast("What\u2019s new: 88+ improvements \u2014 navigation, presentation mode, auto-analysis, dark mode and more.", { ms: 5000 });
+          toast("What\u2019s new: 91+ improvements \u2014 navigation, presentation mode, auto-analysis, dark mode and more.", { ms: 5000 });
           localStorage.setItem("qi_lastVersion", VERSION);
         }
       } catch (e) {}

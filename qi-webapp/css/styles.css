@@ -1211,3 +1211,19 @@ mark.hl{background:rgba(230,184,74,.4);border-radius:2px;padding:0 1px}
 /* Step 91: Quick-copy button */
 .copy-btn{cursor:pointer;font-size:13px;padding:2px 4px;background:none;border:none;opacity:.6;transition:opacity .15s}
 .copy-btn:hover{opacity:1}
+
+/* Step 92: Global search */
+.global-search{font-size:12px;padding:4px 10px;border-radius:var(--radius-sm,6px);border:1.5px solid var(--line,#e3e8f0);width:160px;background:var(--card,#fff);color:var(--ink,#1a2336)}
+.search-results{position:absolute;top:100%;right:0;z-index:100;background:var(--card,#fff);border:1px solid var(--line,#e3e8f0);border-radius:var(--radius-md,10px);box-shadow:var(--shadow-md);max-height:240px;overflow-y:auto;width:280px}
+.search-result{padding:8px 12px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--line,#e3e8f0)}
+.search-result:hover{background:var(--accent,#2e5496);color:#fff}
+[data-theme="dark"] .global-search{background:var(--card,#1a2336);border-color:rgba(125,167,240,.25);color:#e6eaf3}
+[data-theme="dark"] .search-results{background:var(--card,#1a2336);border-color:rgba(125,167,240,.2)}
+@media print{.global-search,.search-results{display:none}}
+
+/* Step 93: Animated progress segments */
+.prog-seg{transition:width .8s ease}
+
+/* Step 94: Focus mode */
+body.focus-mode .card{opacity:.3;transition:opacity .2s}
+body.focus-mode .card:hover,body.focus-mode .card:focus-within{opacity:1}

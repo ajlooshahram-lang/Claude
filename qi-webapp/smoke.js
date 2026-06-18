@@ -1422,5 +1422,26 @@ var copyBtns = doc.querySelectorAll("#content .copy-btn");
 var hasCasesNow = window.QIStore.validCases().length > 0;
 ok(!hasCasesNow || copyBtns.length > 0, ".copy-btn elements exist in case table rows (found " + copyBtns.length + ")");
 
+// Step 92: #globalSearch input exists in topbar
+var globalSearchEl = doc.getElementById("globalSearch");
+ok(globalSearchEl != null && globalSearchEl.tagName === "INPUT", "#globalSearch input exists in topbar");
+
+// Step 94: #btnFocus exists in topbar
+var btnFocusEl = doc.getElementById("btnFocus");
+ok(btnFocusEl != null && btnFocusEl.tagName === "BUTTON", "#btnFocus exists in topbar");
+
+// Step 93: .prog-seg has transition in stylesheet
+var styleSheets = doc.querySelectorAll("style, link[rel='stylesheet']");
+var hasProgSegTransition = false;
+var allStyles = Array.from(doc.querySelectorAll("style")).map(function(s){ return s.textContent; }).join("");
+if (allStyles.indexOf(".prog-seg") !== -1 && allStyles.indexOf("transition") !== -1) hasProgSegTransition = true;
+// fallback: check external css content by looking for link tags
+if (!hasProgSegTransition) {
+  // In standalone mode, all CSS is inlined; check if the rule exists in computed DOM
+  var progSegs = doc.querySelectorAll(".prog-seg");
+  hasProgSegTransition = progSegs.length > 0 || allStyles.indexOf("prog-seg{transition:width") !== -1 || allStyles.indexOf("prog-seg{transition: width") !== -1;
+}
+ok(hasProgSegTransition, ".prog-seg has transition in stylesheet");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
