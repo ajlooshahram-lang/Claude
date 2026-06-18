@@ -936,7 +936,8 @@ const T = {
       afdd: '\uD83D\uDD25 Gnistdetektor',
       twin: '\uD83C\uDF10 Digital Tvilling',
       auto: '\uD83E\uDDE0 Auto-Design',
-      matlist: '\uD83D\uDED2 Materialeliste'
+      matlist: '\uD83D\uDED2 Materialeliste',
+      fault: '\u26A1 Fejlsimulator'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1061,7 +1062,8 @@ const T = {
       afdd: '\uD83D\uDD25 Arc Fault (AFDD)',
       twin: '\uD83C\uDF10 Digital Twin',
       auto: '\uD83E\uDDE0 Auto-Design',
-      matlist: '\uD83D\uDED2 Materialeliste'
+      matlist: '\uD83D\uDED2 Materialeliste',
+      fault: '\u26A1 Fejlsimulator'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -2406,6 +2408,7 @@ function renderModule(mod) {
     case 'twin': content += renderTwin(); break;
     case 'auto': content += renderAutoDesign(); break;
     case 'matlist': content += renderMaterialList(); break;
+    case 'fault': content += renderFaultSim(); break;
     case 'home': content += renderDashboard(); break;
     case 'exam': content = renderExam(); break;
   }
@@ -18756,6 +18759,72 @@ function downloadMaterialCSV(){
   var rows=[(da?'Nr;Kategori;Beskrivelse;Antal;Enhed;Standard':'Nr;Category;Description;Qty;Unit;Standard')];
   ml.items.forEach(function(item){ rows.push(item.nr+';'+item.cat+';'+item.desc+';'+item.qty+';'+item.unit+';'+item.ref); });
   try{ var blob=new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8'}); var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='materialeliste-'+new Date().toISOString().slice(0,10)+'.csv'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); }catch(e){}
+}
+
+// ===== FAULT SCENARIO SIMULATOR =====
+let faultState = { point:'end', type:'3ph' };
+function renderFaultSim(){
+  const da=lang==='da';
+  const s=faultState;
+  const ib=calcIB(), sch=calcLoadSchedule();
+  // Calculate fault currents based on point and impedances
+  var Un=loadState.voltage==='3x400'?400:230;
+  var zNet=scState.zNet||2, zTrafo=scState.zTrafo||5;
+  var cables=cableState.material==='copper'?CABLES_COPPER:CABLES_ALU;
+  var ct=cables[cableState.type]||{}; var cc=(ct[cableState.cores]||{}); var sel=cc[cableState.crossSection];
+  var zCable=0;
+  if(sel&&vdropState.length>0){ var L=vdropState.length/1000; zCable=Math.sqrt(sel.r*sel.r+sel.x*sel.x)*L*1000; }
+  var zTotal, ikFault, faultLabel;
+  if(s.point==='busbar'){ zTotal=zNet+zTrafo; faultLabel=da?'Ved tavle (maks. Ik)':'At panel (max Ik)'; }
+  else if(s.point==='mid'){ zTotal=zNet+zTrafo+zCable*0.5; faultLabel=da?'Midtvejs p\u00e5 kabel':'Mid-point of cable'; }
+  else { zTotal=zNet+zTrafo+zCable; faultLabel=da?'I kabelenden (min. Ik)':'At cable end (min Ik)'; }
+  var cFactor=s.type==='3ph'?1.05:0.95;
+  var divisor=s.type==='3ph'?Math.sqrt(3):2;
+  ikFault=(cFactor*Un)/(divisor*zTotal/1000);
+  // Protection response
+  var mcbRating=mcbState.rating||16, mcbCurve=mcbState.curve||'B';
+  var magTrip={B:5,C:10,D:20}; var magThreshold=mcbRating*(magTrip[mcbCurve]||5);
+  var trips=ikFault>=magThreshold;
+  var tripTime=trips?(ikFault>magThreshold*1.5?'<0.01s':'<0.1s'):(da?'UDLØSER IKKE':'DOES NOT TRIP');
+  var icuOk=(mcbState.type&&MCB_TYPES[mcbState.type])?(MCB_TYPES[mcbState.type].icuMp*1000>=ikFault):true;
+  // Disconnection time requirement
+  var reqTime=(ib<=32&&loadState.voltage!=='3x400')?0.4:5;
+  var discOk=trips; // if magnetic trips, it's well within 0.4s
+  // adiabatic k²S² check
+  var k=115; // Cu/PVC default
+  var S2=parseFloat(cableState.crossSection)||2.5;
+  var k2s2=k*k*S2*S2;
+  var i2t=ikFault*ikFault*0.01; // assume 10ms clearing
+  var thermalOk=k2s2>=i2t;
+
+  let html='<div class="card fade-in"><div class="card-title">\u26A1 '+(da?'Fejlscenarie-simulator':'Fault Scenario Simulator')+'</div>';
+  html+='<div class="info-row">'+(da?'Simulér en kortslutning ved forskellige punkter i installationen. Se hvad der sker: hvilken beskyttelse udl\u00f8ser, hvor hurtigt, og om selektiviteten holder.':'Simulate a short-circuit at different points in the installation. See what happens: which protection trips, how fast, and whether selectivity holds.')+'</div>';
+  // Fault point selection
+  html+='<div class="select-group"><div class="select-label">'+(da?'Fejlpunkt':'Fault point')+'</div><div class="select-grid">';
+  [{id:'busbar',da:'Ved tavlen (maks Ik)',en:'At panel (max Ik)'},{id:'mid',da:'Midtvejs p\u00e5 kabel',en:'Mid-point of cable'},{id:'end',da:'I kabelenden (min Ik)',en:'At cable end (min Ik)'}].forEach(function(p){ html+='<button class="sel-btn '+(s.point===p.id?'selected':'')+'" onclick="faultState.point=\''+p.id+'\';renderModule(\'fault\')">'+(da?p.da:p.en)+'</button>'; });
+  html+='</div></div>';
+  // Fault type
+  html+='<div class="select-group"><div class="select-label">'+(da?'Fejltype':'Fault type')+'</div><div class="select-grid">';
+  html+='<button class="sel-btn '+(s.type==='3ph'?'selected':'')+'" onclick="faultState.type=\'3ph\';renderModule(\'fault\')">'+(da?'3-faset (maks)':'3-phase (max)')+'</button>';
+  html+='<button class="sel-btn '+(s.type==='1ph'?'selected':'')+'" onclick="faultState.type=\'1ph\';renderModule(\'fault\')">'+(da?'1-faset L-PE (min)':'1-phase L-PE (min)')+'</button>';
+  html+='</div></div></div>';
+  // Results — what happens
+  html+='<div class="card fade-in"><div class="card-title">'+(da?'Hvad sker der?':'What happens?')+'</div>';
+  html+='<div class="result-box '+(trips&&icuOk&&thermalOk?'':'error')+'"><div class="result-title">'+(trips?'\u26A1 '+(da?'BESKYTTELSE UDLØSER':'PROTECTION TRIPS'):'\u274c '+(da?'FEJL RYDDES IKKE I TIDE':'FAULT NOT CLEARED IN TIME'))+'</div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Fejlpunkt':'Fault point')+'</span><span class="value">'+faultLabel+'</span></div>';
+  html+='<div class="result-row"><span class="label">Ik '+(s.type==='3ph'?'(3-faset)':'(1-faset L-PE)')+'</span><span class="value" style="font-weight:800;font-size:1.2em">'+(ikFault/1000).toFixed(2)+' kA ('+Math.round(ikFault)+' A)</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Impedans til fejl':'Impedance to fault')+'</span><span class="value">'+zTotal.toFixed(1)+' m\u03a9 (Znet:'+zNet+' + Ztrafo:'+zTrafo+' + Zkabel:'+zCable.toFixed(1)+')</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Beskyttelse':'Protection')+'</span><span class="value">'+mcbCurve+mcbRating+' A (magnetisk: '+magThreshold+' A)</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Udl\u00f8setid':'Trip time')+'</span><span class="value" style="color:'+(trips?'var(--success)':'var(--danger)')+';font-weight:700">'+tripTime+'</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Frakobling OK (\u2264'+reqTime+'s)?':'Disconnection OK (\u2264'+reqTime+'s)?')+'</span><span class="value" style="color:'+(discOk?'var(--success)':'var(--danger)')+'">'+(discOk?'\u2713 OK':'\u2717 '+(da?'FEJL':'FAIL'))+'</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Brydeevne Icu':'Breaking capacity Icu')+'</span><span class="value" style="color:'+(icuOk?'var(--success)':'var(--danger)')+'">'+(icuOk?'\u2713 OK':'\u2717 '+(da?'UTILSTR\u00c6KKELIG':'INSUFFICIENT'))+'</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Termisk k\u00b2S\u00b2 \u2265 I\u00b2t':'Thermal k\u00b2S\u00b2 \u2265 I\u00b2t')+'</span><span class="value" style="color:'+(thermalOk?'var(--success)':'var(--danger)')+'">k\u00b2S\u00b2='+Math.round(k2s2).toLocaleString()+' '+(thermalOk?'\u2265':'\u003C')+' I\u00b2t='+Math.round(i2t).toLocaleString()+' '+(thermalOk?'\u2713':'\u2717')+'</span></div>';
+  html+='</div>';
+  // Safety verdict
+  if(!trips) html+='<div class="result-box error"><div class="result-title">\uD83D\uDEA8 '+(da?'FARLIGT: Ik for lav til at udl\u00f8se '+mcbCurve+mcbRating+'. Fejlen forbliver aktiv! L\u00f8sning: kortere kabel, st\u00f8rre tv\u00e6rsnit, hurtigere beskyttelse, eller suppl\u00e9r med HPFI 30 mA.':'DANGEROUS: Ik too low to trip '+mcbCurve+mcbRating+'. The fault remains active! Solution: shorter cable, larger cross-section, faster protection, or supplement with RCD 30 mA.')+'</div></div>';
+  if(!icuOk) html+='<div class="result-box error"><div class="result-title">\uD83D\uDEA8 '+(da?'FARLIGT: Brydeevne (Icu) er utilstr\u00e6kkelig for Ik! Afbryderen kan \u00f8del\u00e6gges. V\u00e6lg h\u00f8jere Icu.':'DANGEROUS: Breaking capacity (Icu) insufficient for Ik! The breaker can be destroyed. Choose higher Icu.')+'</div></div>';
+  html+='<div class="info-row" style="margin-top:8px">'+(da?'Ref: DS/HD 60364-4-41 \u00a7411.3.2 (frakoblingstid), DS/HD 60364-4-43 \u00a7434.5 (brydeevne + k\u00b2S\u00b2).':'Ref: DS/HD 60364-4-41 \u00a7411.3.2 (disconnection time), DS/HD 60364-4-43 \u00a7434.5 (breaking capacity + k\u00b2S\u00b2).')+'</div></div>';
+  return html;
 }
 
 // ===== INIT =====
