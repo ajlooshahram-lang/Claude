@@ -72,7 +72,7 @@
     toast(_soundEnabled ? "Notification sound on" : "Notification sound off");
   }
   function tableWrap(head, rows, cls) {
-    if (!rows) return `<div class="empty"><p>No items yet. Go to <b>Project Brain</b>, upload a project description and click <b>Apply plan</b> &mdash; the app will create your risk register, FMEA and tasks automatically.</p><button class="btn btn-sm" onclick="document.querySelector('[data-view=brain]')&&document.querySelector('[data-view=brain]').click()" type="button">🧠 Go to Project Brain</button></div>`;
+    if (!rows) return `<div class="empty"><p>No items yet. Go to <b>Project Brain</b>, upload a project description and click <b>Analyze</b> &mdash; the app will create your risk register, FMEA and tasks automatically.</p><button class="btn btn-sm" onclick="document.querySelector('[data-view=brain]')&&document.querySelector('[data-view=brain]').click()" type="button">🧠 Go to Project Brain</button></div>`;
     return `<div class="table-wrap"><table class="${cls || ""}"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 
@@ -2450,7 +2450,7 @@
 
   RENDER.timeline = function () {
     const cs = S.validCases().filter(c => c.startDate && c.estEnd);
-    if (!cs.length) return `<div class="empty">Add cases with a start date to see the timeline.</div>`;
+    if (!cs.length) return `<div class="empty"><p>No items with start/end dates yet. Go to <b>Project Brain</b>, upload a project description and click <b>Analyze</b> — the app will create your timeline automatically.</p><button class="btn btn-sm" onclick="document.querySelector('[data-view=brain]')&&document.querySelector('[data-view=brain]').click()" type="button">🧠 Go to Project Brain</button></div>`;
     let min = Math.min(...cs.map(c => +new Date(c.startDate))), max = Math.max(...cs.map(c => +new Date(c.estEnd)));
     const span = Math.max(max - min, 86400000);
     const day = 86400000, weeks = Math.ceil(span / (7 * day));
@@ -2703,7 +2703,7 @@
           <select id="brainProfile" style="max-width:280px">${profOpts}</select>
           <label class="btn btn-sm" for="brainFile">Upload .txt / .md</label>
           <input id="brainFile" type="file" accept=".txt,.md,text/plain,text/markdown" hidden />
-          <button class="btn btn-sm" id="brainExample" type="button">Try an example</button>
+          <button class="btn btn-primary" id="brainExample" type="button">Try an example</button>
           <span class="muted" id="brainFileName"></span>
         </div>
         <details id="brainWizard" style="margin-top:10px;border:1.5px dashed var(--border);border-radius:8px;padding:10px 12px">
@@ -3606,6 +3606,7 @@
   const KCOLS = ["OPEN", "IN PROGRESS", "ON HOLD", "BLOCKED", "RESOLVED", "CLOSED"];
   RENDER.kanban = function () {
     const e = S.validCases();
+    if (!e.length) return `<div class="empty"><p>No items yet. Go to <b>Project Brain</b>, upload a project description and click <b>Analyze</b> — the app will create your Kanban board automatically.</p><button class="btn btn-sm" onclick="document.querySelector('[data-view=brain]')&&document.querySelector('[data-view=brain]').click()" type="button">🧠 Go to Project Brain</button></div>`;
     const cols = KCOLS.map(st => {
       const cards = e.filter(c => c.status === st).map(c => `
         <div class="kcard" draggable="true" tabindex="0" data-id="${c.id}" aria-label="${esc(c.code)} · ${esc(c.problem)}">
@@ -5028,6 +5029,16 @@
       document.getElementById("resumeDismiss").addEventListener("click", function () { banner.remove(); });
     })();
     refreshBadges();
+
+    // Step 76: Auto-populate with the example if this is a fresh empty project
+    if (S.validCases().length === 0 && window.QIBrain) {
+      const exText = "Submarine fibre optic cable system connecting eight countries across Asia and the Pacific: Indonesia (Jakarta), Malaysia (Mersing), Thailand (Songkhla), Vietnam (Da Nang), Philippines (Batangas), Taiwan (Tamsui), Brunei (Bandar Seri Begawan) and Guam (Piti). About 9,500 km of trunk route, 24 fibre pairs, approximately USD 1.3 billion over 60 months. Scope: marine route survey, multi-country permitting, submarine cable and repeater supply, marine installation, cable landing stations, terrestrial backhaul, system integration and end-to-end testing to ready-for-service.";
+      try {
+        const plan = QIBrain.analyzeProject(exText);
+        applyBrainPlan(plan);
+        toast("Welcome! The app loaded an example project to explore. Upload your own on the Project Brain screen.");
+      } catch (e) {}
+    }
   };
 
   // When __SKIP_AUTH is set (e.g. smoke tests), boot immediately without waiting for auth.js DOMContentLoaded
