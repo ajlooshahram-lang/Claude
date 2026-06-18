@@ -1430,7 +1430,7 @@
       <td class="wrap">${esc(c.rootCause || "")}</td><td class="center">${c.sev ?? ""}</td><td class="center">${c.occ ?? ""}</td>
       <td class="center">${c.det ?? ""}</td><td class="center"><b>${c.rpn ?? ""}</b></td><td><span class="pill">${esc(c.rpnBand)}</span></td>
       <td class="wrap">${esc(c.ai)}</td><td>${esc(c.owner || "")}</td></tr>`).join("");
-    return tableWrap("<th>Case</th><th>Area</th><th class='wrap'>Failure mode</th><th class='wrap'>Potential cause</th><th>Sev</th><th>Occ</th><th>Det</th><th>RPN</th><th>Band</th><th class='wrap'>Recommended action (AI)</th><th>Owner</th>", rows);
+    return tableWrap("<th>Case</th><th>Area</th><th class='wrap'>Failure mode</th><th class='wrap'>Potential cause</th><th>Sev</th><th>Occ</th><th>Det</th><th><span class='jargon' data-tip='Risk Priority Number — higher means more urgent to fix' tabindex='0'>RPN</span></th><th>Band</th><th class='wrap'>Recommended action (AI)</th><th>Owner</th>", rows);
   };
 
   RENDER.pdca = function () {
@@ -1938,7 +1938,7 @@
       ${advisorBlock}
       <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="card"><h3>Work breakdown</h3>${tableWrap("<th>Phase</th><th>Owner</th><th>Tasks</th>", phaseRows)}</div>
-        <div class="card"><h3>Top risks (FMEA RPN)</h3>${tableWrap("<th class='wrap'>Risk</th><th>S</th><th>O</th><th>D</th><th>RPN</th>", riskRows)}</div>
+        <div class="card"><h3>Top risks (<span class="jargon" data-tip="Failure Mode &amp; Effects Analysis — a way to find what could go wrong and how serious it is" tabindex="0">FMEA</span> <span class="jargon" data-tip="Risk Priority Number — higher means more urgent to fix" tabindex="0">RPN</span>)</h3>${tableWrap("<th class='wrap'>Risk</th><th>S</th><th>O</th><th>D</th><th><span class='jargon' data-tip='Risk Priority Number — higher means more urgent to fix' tabindex='0'>RPN</span></th>", riskRows)}</div>
       </div>
       <div class="card"><h3>Budget skeleton</h3>${tableWrap("<th>Category</th><th class='right'>Estimate</th>", budgetRows)}</div>
       ${intelSection}
@@ -3316,7 +3316,7 @@
     const preview = () => {
       const en = C.enrich(readForm());
       $("#f_readout").innerHTML = en.problem
-        ? `<b>RPN</b> ${en.rpn ?? "—"} (${en.rpnBand || "—"}) &nbsp;·&nbsp; <b>Est. duration</b> ${en.estDays ?? "—"} days &nbsp;·&nbsp; <b>Est. end</b> ${C.fmtDate(en.estEnd) || "—"} &nbsp;·&nbsp; <b>Health</b> ${en.health}<br><b>AI:</b> ${esc(en.ai)}`
+        ? `<b class="jargon" data-tip="Risk Priority Number — higher means more urgent to fix" tabindex="0">RPN</b> ${en.rpn ?? "—"} (${en.rpnBand || "—"}) &nbsp;·&nbsp; <b>Est. duration</b> ${en.estDays ?? "—"} days &nbsp;·&nbsp; <b>Est. end</b> ${C.fmtDate(en.estEnd) || "—"} &nbsp;·&nbsp; <b>Health</b> ${en.health}<br><b>AI:</b> ${esc(en.ai)}`
         : `<span class="muted">Fill the problem statement and scores to see live calculations.</span>`;
     };
     modal.querySelectorAll("input,select").forEach(i => { i.addEventListener("input", preview); i.addEventListener("change", preview); });

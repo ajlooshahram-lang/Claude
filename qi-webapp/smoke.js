@@ -979,5 +979,33 @@ const dismissBtn = doc.getElementById("resumeDismiss");
 dismissBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(doc.querySelector(".resume-banner") == null, "resume banner removed after clicking dismiss");
 
+// Step 10: Jargon tooltips — plain-language explanations on hover/focus
+S.reset();
+doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+doc.getElementById("brainText").value = "Submarine fibre optic cable system, 9500 km, 8 landing stations, 60 months";
+doc.getElementById("brainAnalyze").click();
+const jargonEls = doc.querySelectorAll("#brainOut .jargon[data-tip]");
+ok(jargonEls.length >= 2, "Brain analysis renders .jargon tooltip spans (got " + jargonEls.length + ")");
+const tipTexts = Array.from(jargonEls).map(e => e.getAttribute("data-tip")).join(" ");
+ok(/plain|higher means|find what could go wrong|Risk Priority Number|Failure Mode/i.test(tipTexts), "tooltip text contains plain language (not more jargon)");
+// FMEA view also has jargon tooltip on the RPN column header
+doc.querySelector('.nav-item[data-view="fmea"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const fmeaJargon = doc.querySelector("#content th .jargon[data-tip]");
+ok(fmeaJargon != null && /Risk Priority Number/.test(fmeaJargon.getAttribute("data-tip")), "FMEA view table header has RPN jargon tooltip");
+
+// Step 11: Branding controls — project name flows to topbar + Investor Brief
+S.reset();
+S.get().project.name = "Capital Project Alpha";
+S.save();
+// Navigate to config and use the save button (which calls refreshHeader internally)
+doc.querySelector('.nav-item[data-view="config"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+doc.getElementById("p_name").value = "Capital Project Alpha";
+doc.querySelector("[data-act=saveproj]").dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("brandProject").textContent === "Capital Project Alpha", "topbar shows updated project name after settings save");
+// Check the Investor Brief title shows the name
+doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const coverTitle = doc.querySelector(".brief-cover-title");
+ok(coverTitle != null && /Capital Project Alpha/.test(coverTitle.textContent), "Investor Brief cover title shows the project name");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
