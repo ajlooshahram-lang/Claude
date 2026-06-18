@@ -9,6 +9,7 @@ import {
   getConnectedClientCount,
   __resetStateForTest,
   isOriginAllowed,
+  revalidateClientSessions,
 } from "../../src/ws.js";
 import { hashToken } from "../../src/auth/session.js";
 import type { AuthDbHelpers, DbSession, DbUser } from "../../src/auth/db-helpers.js";
@@ -399,4 +400,75 @@ test("WS: oversized/garbage change fields are sanitized before broadcast", async
   assert.equal(received.action.includes("\n"), false, "newlines stripped from action");
   a.ws.close();
   b.ws.close();
+});
+
+
+// ---- Live session revalidation (logout / revocation enforcement) ----
+
+test("WS: a socket whose session is revoked is dropped on revalidation", async (t) => {
+  const { server, port } = await startServer();
+  t.after(() => { stopPresenceInterval(); server.close(); });
+
+  // Dedicated session we can revoke without affecting other tests.
+  const TOKEN_DAN = "d".repeat(64);
+  const dan = makeUser("dan", "tenant-A", "Dan");
+  const danSession = makeSession(TOKEN_DAN, dan);
+  sessionsByHash.set(hashToken(TOKEN_DAN), danSession);
+  t.after(() => { sessionsByHash.delete(hashToken(TOKEN_DAN)); });
+
+  const c = connect(port, TOKEN_DAN);
+  await waitOpen(c);
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(getConnectedClientCount(), 1);
+
+  const closed = new Promise<void>((resolve) => c.ws.once("close", () => resolve()));
+
+  // Simulate a logout/revocation, then run the revalidation sweep.
+  danSession.revokedAt = new Date();
+  await revalidateClientSessions(stubDb);
+
+  await closed;
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(getConnectedClientCount(), 0, "revoked session must be dropped from live sockets");
+});
+
+test("WS: a socket whose session is expired is dropped on revalidation", async (t) => {
+  const { server, port } = await startServer();
+  t.after(() => { stopPresenceInterval(); server.close(); });
+
+  const TOKEN_EVE = "e".repeat(64);
+  const eve = makeUser("eve", "tenant-A", "Eve");
+  const eveSession = makeSession(TOKEN_EVE, eve);
+  sessionsByHash.set(hashToken(TOKEN_EVE), eveSession);
+  t.after(() => { sessionsByHash.delete(hashToken(TOKEN_EVE)); });
+
+  const c = connect(port, TOKEN_EVE);
+  await waitOpen(c);
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(getConnectedClientCount(), 1);
+
+  const closed = new Promise<void>((resolve) => c.ws.once("close", () => resolve()));
+
+  // Expire the session in the past, then revalidate.
+  eveSession.expiresAt = new Date(Date.now() - 1000);
+  await revalidateClientSessions(stubDb);
+
+  await closed;
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(getConnectedClientCount(), 0, "expired session must be dropped from live sockets");
+});
+
+test("WS: a still-valid session survives revalidation", async (t) => {
+  const { server, port } = await startServer();
+  t.after(() => { stopPresenceInterval(); server.close(); });
+
+  const c = connect(port, TOKEN_ALICE);
+  await waitOpen(c);
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(getConnectedClientCount(), 1);
+
+  await revalidateClientSessions(stubDb);
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(getConnectedClientCount(), 1, "valid session must stay connected");
+  c.ws.close();
 });

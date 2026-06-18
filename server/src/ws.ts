@@ -45,6 +45,8 @@ type ConnectedClient = {
   tenantId: string;
   displayName: string;
   connectedAt: string;
+  /** SHA-256 hash of the session token, for periodic re-validation. */
+  tokenHash: string;
 };
 
 // ---- State ----
@@ -282,6 +284,10 @@ export function attachWebSocketServer(
     for (const tenantId of tenants) {
       broadcastPresence(tenantId);
     }
+
+    // Re-validate sessions so logged-out / revoked / expired users are dropped
+    // from live sockets (auth is otherwise only checked at the handshake).
+    void revalidateClientSessions(db);
   }, 30_000);
   if (typeof presenceInterval.unref === "function") presenceInterval.unref();
 
@@ -347,7 +353,40 @@ async function authenticateUpgrade(
     tenantId: session.user.tenantId,
     displayName: session.user.displayName || session.user.email,
     connectedAt: new Date().toISOString(),
+    tokenHash,
   };
+}
+
+/**
+ * Re-validate every connected socket's session against the database and
+ * terminate any whose session has been revoked (logout / admin action) or has
+ * expired. The WebSocket is only authenticated once, at the upgrade handshake;
+ * without this a logged-out user's open socket would keep receiving live
+ * project broadcasts until they closed the tab. Running this on the heartbeat
+ * sweep bounds that exposure to one sweep interval.
+ */
+export async function revalidateClientSessions(db: AuthDbHelpers): Promise<void> {
+  const entries = [...clients.entries()];
+  await Promise.all(
+    entries.map(async ([ws, client]) => {
+      let valid = false;
+      try {
+        const session = await db.findSessionByTokenHash(client.tokenHash);
+        valid = !!session && session.revokedAt === null && new Date() <= session.expiresAt;
+      } catch {
+        // On a transient DB error, do NOT tear down the socket (fail-open for
+        // availability); the next sweep will re-check.
+        valid = true;
+      }
+      if (!valid) {
+        const removed = clients.get(ws);
+        clients.delete(ws);
+        try { ws.close(4001, "session ended"); } catch { /* ignore */ }
+        try { ws.terminate(); } catch { /* ignore */ }
+        if (removed) broadcastPresence(removed.tenantId);
+      }
+    }),
+  );
 }
 
 function broadcastToTenant(tenantId: string, message: unknown, exclude?: WebSocket): void {

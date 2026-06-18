@@ -84,6 +84,10 @@
   }
 
   function logout() {
+    // Proactively tear down the real-time socket so no further broadcasts are
+    // received the instant the user logs out (the server also enforces this on
+    // its next session-revalidation sweep as defence in depth).
+    try { if (window.QISync && window.QISync.wsDisconnect) window.QISync.wsDisconnect(); } catch (e) { /* ignore */ }
     return authFetch("/auth/logout", { method: "POST" })
       .then(function () {
         currentUser = null;
