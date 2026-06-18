@@ -1362,5 +1362,19 @@ var nextLabel = doc.getElementById("navNext").textContent;
 doc.getElementById("navNext").dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(doc.getElementById("navFooter") != null, "#navFooter persists after clicking Next (navigated to next view)");
 
+// Step 80: Nav items have title attributes (tooltips)
+var navWithTitle = doc.querySelectorAll('.nav-item[title]');
+ok(navWithTitle.length >= 10, "nav items have title attributes for tooltips (found " + navWithTitle.length + ")");
+
+// Step 81: .visited class added after navigating
+doc.querySelector('.nav-item[data-view="risks"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+var risksNav = doc.querySelector('.nav-item[data-view="risks"]');
+ok(risksNav && risksNav.classList.contains("visited"), ".visited class added to nav item after navigating to that view");
+
+// Step 82: #viewDesc shows text from NAV_TIPS
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+var viewDescEl = doc.getElementById("viewDesc");
+ok(viewDescEl && viewDescEl.textContent.length > 0, "#viewDesc shows descriptive text after navigating (got: " + (viewDescEl ? viewDescEl.textContent.slice(0, 50) : "null") + ")");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

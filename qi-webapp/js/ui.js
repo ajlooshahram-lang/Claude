@@ -161,14 +161,43 @@
     globe3d: "An interactive 3D map of the submarine cable network. Drag to rotate, click a station for details.",
     dashboard: "Your project at a glance \u2014 health score, what to focus on next, and key metrics.",
     cases: "Every item in your project. Use the chips above to filter, or click any row to edit.",
-    myitems: "Items assigned to you \u2014 your personal to-do list."
+    myitems: "Items assigned to you \u2014 your personal to-do list.",
+    pm: "All project management tasks with status, priority, and owner tracking.",
+    kanban: "Visual drag-and-drop board showing work items by status column.",
+    timeline: "Gantt-style timeline of milestones, phases, and deadlines.",
+    risks: "Comprehensive risk register with severity, likelihood, and mitigation plans.",
+    fmea: "Failure Mode and Effects Analysis for systematic risk prioritisation.",
+    routeprogress: "Track cable route segments, completion percentage, and deployment status.",
+    country: "Country-by-country intelligence on regulations, partners, and market conditions.",
+    advisor: "AI-powered recommendations on what to focus on next for project success."
   };
+
+  // Step 80: Plain-language tooltip descriptions for nav items
+  const NAV_TIPS = {
+    brain: "Upload a project description and let the AI Brain generate your full project plan.",
+    investorbrief: "One-page investor summary with financials, network map, and key metrics.",
+    dashboard: "Live overview of project health, progress, and upcoming actions.",
+    cases: "Master list of all project items including tasks, risks, and issues.",
+    myitems: "Your personal to-do list filtered by assignment.",
+    pm: "Project management tasks with owners, deadlines, and priorities.",
+    kanban: "Visual board with drag-and-drop columns for workflow tracking.",
+    timeline: "Gantt-style view of project phases, milestones, and deadlines.",
+    risks: "Risk register showing all identified risks with severity and mitigation.",
+    fmea: "Failure Mode and Effects Analysis for systematic quality control.",
+    globe3d: "Interactive 3D globe showing cable routes and landing stations.",
+    routeprogress: "Route-by-route build progress with completion percentages.",
+    country: "Regulatory, licensing, and market intelligence for each country.",
+    advisor: "AI-powered project advisor recommending your next best actions."
+  };
+
+  // Step 81: Visit-progress tracker (module-level Set)
+  const visitedViews = new Set();
 
   function buildNav() {
     const nav = $("#nav");
     nav.innerHTML = VIEWS.map(v => v.g
       ? `<div class="nav-sep">${esc(v.g)}</div>`
-      : `<button class="nav-item" data-view="${v.id}"><span class="ico">${v.icon}</span><span class="lab">${esc(v.label)}</span></button>`).join("");
+      : `<button class="nav-item" data-view="${v.id}"${NAV_TIPS[v.id] ? ` title="${esc(NAV_TIPS[v.id])}"` : ""}><span class="ico">${v.icon}</span><span class="lab">${esc(v.label)}</span></button>`).join("");
     nav.setAttribute("role", "navigation");
     nav.setAttribute("aria-label", "Main menu");
     nav.querySelectorAll(".nav-item").forEach(b => b.addEventListener("click", () => go(b.dataset.view)));
@@ -201,8 +230,13 @@
       try { window.QIGlobe.dispose(); } catch (e) {}
     }
     current = view;
+    // Step 81: Track visited views
+    visitedViews.add(view);
     if (recentViews[recentViews.length - 1] !== view) { recentViews.push(view); if (recentViews.length > 6) recentViews.shift(); }
     $("#viewTitle").textContent = TITLES[view] || "QI Platform";
+    // Step 82: Update view description header
+    var descEl = $("#viewDesc");
+    if (descEl) descEl.textContent = NAV_TIPS[view] || "";
     const bc = $("#breadcrumb");
     if (bc) {
       let grp = "";
@@ -215,6 +249,8 @@
     document.querySelectorAll(".nav-item").forEach(b => {
       const active = b.dataset.view === view;
       b.classList.toggle("active", active);
+      // Step 81: Apply .visited class to visited nav items
+      if (visitedViews.has(b.dataset.view)) b.classList.add("visited");
       if (active) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
     });
     $("#sidebar").classList.remove("open");
