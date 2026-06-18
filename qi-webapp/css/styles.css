@@ -1203,3 +1203,11 @@ mark.hl{background:rgba(230,184,74,.4);border-radius:2px;padding:0 1px}
 
 /* Project completeness percentage badge (step 88) */
 .pct-badge{font-size:11px;padding:2px 8px;border-radius:999px;background:rgba(66,214,164,.15);color:#1d8e6a;font-weight:700;margin-left:8px}
+
+/* Step 90: Group-by sub-header rows */
+.group-header td{background:var(--bg-alt,#f4f6f8);padding:6px 10px;font-size:13px;border-bottom:1px solid var(--border,#dde3ec)}
+.dark .group-header td{background:var(--bg-alt,#1e2433)}
+
+/* Step 91: Quick-copy button */
+.copy-btn{cursor:pointer;font-size:13px;padding:2px 4px;background:none;border:none;opacity:.6;transition:opacity .15s}
+.copy-btn:hover{opacity:1}

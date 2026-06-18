@@ -5,7 +5,7 @@
   const $ = sel => document.querySelector(sel);
   const content = $("#content");
   content.setAttribute("aria-live", "polite");
-  const uiState = { caseFilter: { q: "", status: "", priority: "", owner: "", sort: "rpn" }, regFilter: {}, regSelected: {}, regSort: {}, selected: new Set() };
+  const uiState = { caseFilter: { q: "", status: "", priority: "", owner: "", sort: "rpn", groupBy: "none" }, regFilter: {}, regSelected: {}, regSort: {}, selected: new Set() };
 
   // ---------- helpers ----------
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
@@ -2268,24 +2268,48 @@
     [...uiState.selected].forEach(id => { if (!visibleIds.has(id)) uiState.selected.delete(id); });
     const allSelected = visibleCases.length > 0 && visibleCases.every(c => uiState.selected.has(c.id));
     const someSelected = uiState.selected.size > 0;
-    const rows = visibleCases.map(c => `
+    const rows = (function buildRows() {
+      var groupBy = f.groupBy || "none";
+      if (groupBy === "none") {
+        return visibleCases.map(c => renderCaseRow(c)).join("");
+      }
+      // Group rows with sub-header tr elements
+      var groups = {};
+      var order = [];
+      visibleCases.forEach(function (c) {
+        var key = (groupBy === "category" ? c.category : c.priority) || "(none)";
+        if (!groups[key]) { groups[key] = []; order.push(key); }
+        groups[key].push(c);
+      });
+      order.sort();
+      var out = "";
+      order.forEach(function (key) {
+        out += '<tr class="group-header"><td colspan="13"><strong>' + esc(key) + '</strong> <span class="muted">(' + groups[key].length + ')</span></td></tr>';
+        out += groups[key].map(c => renderCaseRow(c)).join("");
+      });
+      return out;
+    })();
+    function renderCaseRow(c) {
+      return `
       <tr data-id="${c.id}" class="${uiState.selected.has(c.id) ? "row-selected" : ""} ${c.pinned ? "pinned-row" : ""}" ${c.pinned ? 'draggable="true"' : ""}>
         <td class="center"><input type="checkbox" data-bulk="row" data-id="${c.id}" ${uiState.selected.has(c.id) ? "checked" : ""} aria-label="Select ${esc(c.code)}"></td>
-        <td class="pin-cell ${c.pinned ? "pin-on" : ""}" data-act="pin" data-id="${c.id}" title="${c.pinned ? "Unpin (drag to reorder)" : "Pin to top"}">${c.pinned ? "📌" : "<span class='muted'>📍</span>"}</td>
+        <td class="pin-cell ${c.pinned ? "pin-on" : ""}" data-act="pin" data-id="${c.id}" title="${c.pinned ? "Unpin (drag to reorder)" : "Pin to top"}">${c.pinned ? "\ud83d\udccc" : "<span class='muted'>\ud83d\udccd</span>"}</td>
         <td>${esc(c.code)}</td>
         <td class="wrap">${esc(c.problem)}</td>
         <td>${esc(c.category)}</td>
-        <td><select data-edit="priority" data-id="${c.id}" class="inline-sel">${opts(C.LISTS.priority, c.priority, "—")}</select></td>
+        <td><select data-edit="priority" data-id="${c.id}" class="inline-sel">${opts(C.LISTS.priority, c.priority, "\u2014")}</select></td>
         <td class="center">${c.rpn == null ? "" : c.rpn}</td>
         <td>${healthBadge(c.health)}</td>
-        <td><select data-edit="owner" data-id="${c.id}" class="inline-sel">${opts(names, c.owner, "—")}</select></td>
-        <td><select data-edit="status" data-id="${c.id}" class="inline-sel">${opts(C.LISTS.status, c.status, "—")}</select></td>
+        <td><select data-edit="owner" data-id="${c.id}" class="inline-sel">${opts(names, c.owner, "\u2014")}</select></td>
+        <td><select data-edit="status" data-id="${c.id}" class="inline-sel">${opts(C.LISTS.status, c.status, "\u2014")}</select></td>
         <td>${barCell(c.percent)}</td>
         <td class="center">
           <button class="btn btn-sm" data-act="edit" data-id="${c.id}">Edit</button>
           <button class="btn btn-sm btn-danger" data-act="del" data-id="${c.id}">Del</button>
+          <button class="btn btn-sm copy-btn" data-problem="${esc(c.problem)}" title="Copy problem to clipboard">\ud83d\udccb</button>
         </td>
-      </tr>`).join("");
+      </tr>`;
+    }
     const head = `<th class="center"><input type="checkbox" id="bulkAll" ${allSelected ? "checked" : ""} aria-label="Select all"></th>` +
       `<th aria-label="Pinned"></th><th>ID</th><th class='wrap'>Problem</th><th>Category</th><th>Priority</th><th>RPN</th><th>Health</th><th>Owner</th><th>Status</th><th>% Done</th><th></th>`;
     // quick filter chips — one-click presets (still click-only)
@@ -2308,6 +2332,11 @@
         <select id="fltSort" style="max-width:160px">
           <option value="rpn">Sort: RPN</option><option value="priority" ${f.sort==="priority"?"selected":""}>Sort: Priority</option>
           <option value="status" ${f.sort==="status"?"selected":""}>Sort: Status</option><option value="code" ${f.sort==="code"?"selected":""}>Sort: ID</option>
+        </select>
+        <select id="fltGroupBy" style="max-width:140px" title="Group rows by field">
+          <option value="none"${(f.groupBy||"none")==="none"?" selected":""}>Group: None</option>
+          <option value="category"${f.groupBy==="category"?" selected":""}>Group: Category</option>
+          <option value="priority"${f.groupBy==="priority"?" selected":""}>Group: Priority</option>
         </select>
         <select id="pageSize" style="max-width:100px" title="Rows per page">
           <option value="50" ${f.pageSize===50?"selected":""}>50</option>
@@ -2342,6 +2371,9 @@
   AFTER.cases = function () {
     const bind = (id, key) => { const el = $("#" + id); if (el) el.addEventListener("change", () => { uiState.caseFilter[key] = el.value; go("cases"); }); };
     bind("fltStatus", "status"); bind("fltPriority", "priority"); bind("fltOwner", "owner"); bind("fltSort", "sort");
+    // Group by dropdown (Step 90)
+    const gb = $("#fltGroupBy");
+    if (gb) gb.addEventListener("change", () => { uiState.caseFilter.groupBy = gb.value; go("cases"); });
     // Page size dropdown
     const ps = $("#pageSize");
     if (ps) ps.addEventListener("change", () => { uiState.caseFilter.pageSize = Number(ps.value); go("cases"); });
@@ -4840,6 +4872,17 @@
   content.addEventListener("click", e => {
     // Dismiss help tip (step 38)
     const dt = e.target.closest("[data-dismiss-tip]"); if (dt) { try { localStorage.setItem('qi_tip_' + dt.dataset.dismissTip, '1'); } catch(e2){} const tip = dt.closest('.help-tip'); if (tip) tip.remove(); return; }
+    // Step 91: Quick-copy button — copies the row's problem text to clipboard
+    const cpBtn = e.target.closest(".copy-btn");
+    if (cpBtn) {
+      const text = cpBtn.getAttribute("data-problem") || "";
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { toast("Copied to clipboard"); }).catch(function () { toast("Copy failed"); });
+      } else {
+        toast("Clipboard not available");
+      }
+      return;
+    }
     const p = e.target.closest("[data-recent-view]"); if (p) { go(p.dataset.recentView); return; }
     const b = e.target.closest("[data-act]"); if (!b) return;
     const act = b.dataset.act, id = b.dataset.id;
@@ -5121,6 +5164,18 @@
       document.getElementById("resumeDismiss").addEventListener("click", function () { banner.remove(); });
     })();
     refreshBadges();
+
+    // Step 89: "What's new" changelog toast
+    (function showWhatsNew() {
+      var VERSION = "2.0.88";
+      try {
+        var last = localStorage.getItem("qi_lastVersion");
+        if (last !== VERSION) {
+          toast("What\u2019s new: 88+ improvements \u2014 navigation, presentation mode, auto-analysis, dark mode and more.", { ms: 5000 });
+          localStorage.setItem("qi_lastVersion", VERSION);
+        }
+      } catch (e) {}
+    })();
 
     // Step 76: Auto-populate with the example if this is a fresh empty project
     if (S.validCases().length === 0 && window.QIBrain) {

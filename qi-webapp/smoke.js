@@ -1403,5 +1403,24 @@ doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.E
 var pctBadge = doc.querySelector('.pct-badge');
 ok(pctBadge != null, ".pct-badge exists on dashboard");
 
+// Step 89: qi_lastVersion is set in localStorage after boot
+var lastVer = window.localStorage.getItem("qi_lastVersion");
+ok(lastVer != null && lastVer.length > 0, "localStorage qi_lastVersion is set after boot (got: " + lastVer + ")");
+
+// Step 90: A select#fltGroupBy for grouping exists on Cases view
+doc.querySelector('.nav-item[data-view="cases"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+// Ensure no stale filter is blocking rows: click the "All" chip
+var allChipReset = Array.from(doc.querySelectorAll(".chip")).find(function(c){ return c.textContent.trim() === "All"; });
+if (allChipReset) allChipReset.dispatchEvent(new window.Event("click", { bubbles: true }));
+var groupBySelect = doc.getElementById("fltGroupBy");
+ok(groupBySelect != null && groupBySelect.tagName === "SELECT", "select#fltGroupBy for grouping exists on Cases view");
+
+// Step 91: .copy-btn elements exist in case table rows (when cases exist)
+// (already on cases view from step 90 above)
+// DEBUG: check what's actually in content
+var copyBtns = doc.querySelectorAll("#content .copy-btn");
+var hasCasesNow = window.QIStore.validCases().length > 0;
+ok(!hasCasesNow || copyBtns.length > 0, ".copy-btn elements exist in case table rows (found " + copyBtns.length + ")");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
