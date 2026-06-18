@@ -2793,6 +2793,11 @@
       const plan = QIBrain.analyzeProject(text, { profile: $("#brainProfile").value || undefined });
       uiState.brainPlan = plan;
       renderBrainPreview(plan);
+      // Auto-apply the plan to the active project so Risk Register, FMEA, etc.
+      // are populated immediately — the user expects Analyze = done, not a
+      // separate "Apply" step. The preview still shows for review, and the
+      // Apply button remains for re-applying if the user changes the description.
+      applyBrainPlan(plan);
       if (opts && opts.scroll) { const out = $("#brainOut"); try { if (out && out.scrollIntoView) out.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) { /* jsdom / unsupported */ } }
       return true;
     };
