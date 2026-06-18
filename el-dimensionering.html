@@ -937,7 +937,8 @@ const T = {
       twin: '\uD83C\uDF10 Digital Tvilling',
       auto: '\uD83E\uDDE0 Auto-Design',
       matlist: '\uD83D\uDED2 Materialeliste',
-      fault: '\u26A1 Fejlsimulator'
+      fault: '\u26A1 Fejlsimulator',
+      thermal: '\uD83C\uDF21\uFE0F Termisk'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1063,7 +1064,8 @@ const T = {
       twin: '\uD83C\uDF10 Digital Twin',
       auto: '\uD83E\uDDE0 Auto-Design',
       matlist: '\uD83D\uDED2 Materialeliste',
-      fault: '\u26A1 Fejlsimulator'
+      fault: '\u26A1 Fault Sim',
+      thermal: '\uD83C\uDF21\uFE0F Thermal'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -2409,6 +2411,7 @@ function renderModule(mod) {
     case 'auto': content += renderAutoDesign(); break;
     case 'matlist': content += renderMaterialList(); break;
     case 'fault': content += renderFaultSim(); break;
+    case 'thermal': content += renderThermal(); break;
     case 'home': content += renderDashboard(); break;
     case 'exam': content = renderExam(); break;
   }
@@ -18824,6 +18827,85 @@ function renderFaultSim(){
   if(!trips) html+='<div class="result-box error"><div class="result-title">\uD83D\uDEA8 '+(da?'FARLIGT: Ik for lav til at udl\u00f8se '+mcbCurve+mcbRating+'. Fejlen forbliver aktiv! L\u00f8sning: kortere kabel, st\u00f8rre tv\u00e6rsnit, hurtigere beskyttelse, eller suppl\u00e9r med HPFI 30 mA.':'DANGEROUS: Ik too low to trip '+mcbCurve+mcbRating+'. The fault remains active! Solution: shorter cable, larger cross-section, faster protection, or supplement with RCD 30 mA.')+'</div></div>';
   if(!icuOk) html+='<div class="result-box error"><div class="result-title">\uD83D\uDEA8 '+(da?'FARLIGT: Brydeevne (Icu) er utilstr\u00e6kkelig for Ik! Afbryderen kan \u00f8del\u00e6gges. V\u00e6lg h\u00f8jere Icu.':'DANGEROUS: Breaking capacity (Icu) insufficient for Ik! The breaker can be destroyed. Choose higher Icu.')+'</div></div>';
   html+='<div class="info-row" style="margin-top:8px">'+(da?'Ref: DS/HD 60364-4-41 \u00a7411.3.2 (frakoblingstid), DS/HD 60364-4-43 \u00a7434.5 (brydeevne + k\u00b2S\u00b2).':'Ref: DS/HD 60364-4-41 \u00a7411.3.2 (disconnection time), DS/HD 60364-4-43 \u00a7434.5 (breaking capacity + k\u00b2S\u00b2).')+'</div></div>';
+  return html;
+}
+
+// ===== THERMAL CAMERA VIEW =====
+function thermalColor(ratio){ // ratio=0 (cold) to 1+ (overloaded)
+  if(ratio>=1.0) return '#ff0000'; if(ratio>=0.85) return '#ff4400'; if(ratio>=0.7) return '#ff8800';
+  if(ratio>=0.5) return '#ffcc00'; if(ratio>=0.3) return '#88ff00'; return '#0088ff';
+}
+function renderThermal(){
+  const da=lang==='da';
+  const ib=calcIB(), sch=calcLoadSchedule();
+  var circuits=[];
+  try{ circuits=JSON.parse(localStorage.getItem('projectCircuits')||'[]'); }catch(e){}
+  // Build thermal data from project
+  var items=[];
+  if(trafoState.size>0){
+    var loadPct=sch.kVA/trafoState.size;
+    items.push({name:(da?'Transformer ':'Transformer ')+trafoState.size+' kVA',load:loadPct,temp:Math.round(40+loadPct*50),type:'trafo'});
+  }
+  items.push({name:da?'Hovedtavle':'Main panel',load:0.6,temp:35,type:'panel'});
+  // From loadList or saved circuits
+  var sources=circuits.length>0?circuits.map(function(c){var st=c.state||{};var sl=st.loadState||{};var cib=(sl.power||5)*1000/((sl.voltage==='3x400'?693:230)*(sl.cosPhi||0.9));var cs=st.cableState?st.cableState.crossSection:4;return{name:c.name||'Kreds',ib:cib,cs:cs};}):loadList.map(function(c,i){var cib=c.kW*1000/((c.phase==='3'?693:230)*(c.cos||0.9));return{name:c.name||('K'+(i+1)),ib:cib,cs:parseFloat(cableState.crossSection)||4};});
+  sources.forEach(function(s){
+    var izBase=s.cs*8; // rough Iz estimate from cross-section
+    var ratio=s.ib/(izBase*0.9); // with conservative derating
+    var temp=Math.round(20+ratio*60);
+    items.push({name:s.name,load:Math.min(ratio,1.5),temp:temp,type:'circuit'});
+  });
+
+  let html='<div class="card fade-in"><div class="card-title">\uD83C\uDF21\uFE0F '+(da?'Termisk kameravisning \u2014 varmebillede af installationen':'Thermal Camera View \u2014 heat map of the installation')+'</div>';
+  html+='<div class="info-row">'+(da?'Simulerer hvad du ville se med et termografikamera (FLIR) under drift. R\u00f8d = overbelastet/varm, bl\u00e5 = k\u00f8lig/lav last. Bruges til at opdage l\u00f8se forbindelser, overbelastede kabler og fejl.':'Simulates what you would see with a thermal imaging camera (FLIR) during operation. Red = overloaded/hot, blue = cool/low load. Used to detect loose connections, overloaded cables and faults.')+'</div>';
+
+  // Thermal legend
+  html+='<div style="display:flex;align-items:center;gap:8px;margin:10px 0;padding:8px 12px;background:rgba(0,0,0,0.3);border-radius:8px">';
+  html+='<span style="font-size:.75rem;color:#0088ff">'+(da?'K\u00f8lig':'Cool')+'</span>';
+  html+='<div style="flex:1;height:12px;border-radius:6px;background:linear-gradient(90deg,#0088ff,#88ff00,#ffcc00,#ff8800,#ff4400,#ff0000)"></div>';
+  html+='<span style="font-size:.75rem;color:#ff0000">'+(da?'Varm/overbelastet':'Hot/overloaded')+'</span>';
+  html+='</div>';
+
+  // SVG thermal scene
+  var W=600,H=Math.max(280, 80+items.length*36);
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="background:#111;border-radius:12px;border:1px solid #333" xmlns="http://www.w3.org/2000/svg">';
+  // Grid background (IR camera look)
+  for(var g=0;g<H;g+=20) svg+='<line x1="0" y1="'+g+'" x2="'+W+'" y2="'+g+'" stroke="rgba(255,255,255,0.03)"/>';
+  for(var g=0;g<W;g+=20) svg+='<line x1="'+g+'" y1="0" x2="'+g+'" y2="'+H+'" stroke="rgba(255,255,255,0.03)"/>';
+  // Crosshair
+  svg+='<line x1="'+(W/2-20)+'" y1="'+(H/2)+'" x2="'+(W/2+20)+'" y2="'+(H/2)+'" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>';
+  svg+='<line x1="'+(W/2)+'" y1="'+(H/2-20)+'" x2="'+(W/2)+'" y2="'+(H/2+20)+'" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>';
+  svg+='<text x="10" y="20" font-size="11" fill="#fff" font-weight="700">FLIR '+(da?'Simulering':'Simulation')+'</text>';
+  svg+='<text x="'+(W-10)+'" y="20" text-anchor="end" font-size="9" fill="#aaa">DS/HD 60364-6 \u00a762.1.6</text>';
+  // Items as thermal blocks
+  items.forEach(function(item,i){
+    var y=50+i*36, x=60;
+    var barW=Math.min(item.load,1.5)*300;
+    var col=thermalColor(item.load);
+    // Thermal block with glow
+    svg+='<rect x="'+x+'" y="'+y+'" width="'+barW+'" height="24" rx="4" fill="'+col+'" opacity="0.85"/>';
+    svg+='<rect x="'+x+'" y="'+y+'" width="'+barW+'" height="24" rx="4" fill="'+col+'" opacity="0.3" filter="url(#g3)"/>';
+    // Label
+    svg+='<text x="'+(x-8)+'" y="'+(y+16)+'" text-anchor="end" font-size="9" fill="#ddd">'+item.name+'</text>';
+    // Temperature
+    svg+='<text x="'+(x+barW+8)+'" y="'+(y+16)+'" font-size="10" fill="'+col+'" font-weight="700">'+item.temp+'\u00b0C</text>';
+    // Load %
+    svg+='<text x="'+(x+barW+55)+'" y="'+(y+16)+'" font-size="8" fill="#aaa">'+Math.round(item.load*100)+'%</text>';
+  });
+  svg+='<defs><filter id="g3"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>';
+  svg+='</svg>';
+  html+=svg;
+
+  // Findings
+  var hot=items.filter(function(i){return i.load>=0.85;});
+  if(hot.length>0){
+    html+='<div class="result-box error" style="margin-top:12px"><div class="result-title">\uD83D\uDD34 '+(da?'Varme punkter fundet':'Hot spots found')+'</div>';
+    hot.forEach(function(h){ html+='<div class="result-row"><span class="label" style="color:'+thermalColor(h.load)+'">'+h.name+'</span><span class="value" style="color:'+thermalColor(h.load)+'">'+h.temp+'\u00b0C ('+Math.round(h.load*100)+'% '+(da?'belastning':'load')+')</span></div>'; });
+    html+='<div style="padding:6px 2px">'+(da?'Anbefaling: Inspic\u00e9r forbindelser med termografkamera, kontroll\u00e9r momenttilsp\u00e6nding, overvej st\u00f8rre tv\u00e6rsnit.':'Recommendation: Inspect connections with thermal camera, check torque, consider larger cross-section.')+'</div></div>';
+  } else {
+    html+='<div class="result-box" style="margin-top:12px"><div class="result-title">\u2705 '+(da?'Ingen overbelastede komponenter':'No overloaded components')+'</div></div>';
+  }
+  html+='<div class="info-row" style="margin-top:8px">'+(da?'Termografi er et krav ved \u00e5rlig vedligehold af tavler (DS/HD 60364-6 \u00a762.1.6). Udf\u00f8r altid fysisk termografering \u2014 denne simulering erstatter IKKE m\u00e5ling.':'Thermography is required at annual panel maintenance (DS/HD 60364-6 \u00a762.1.6). Always perform physical thermography \u2014 this simulation does NOT replace measurement.')+'</div></div>';
   return html;
 }
 
