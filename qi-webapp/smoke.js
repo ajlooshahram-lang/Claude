@@ -1220,5 +1220,18 @@ ok(doc.querySelectorAll(".cal-item").length > 0, ".cal-item elements present in 
 ok(doc.querySelector(".cal-date") != null, ".cal-date element present in calendar items");
 ok(doc.querySelector(".cal-text") != null, ".cal-text element present in calendar items");
 
+// Step 49: Fullscreen button on the 3D map view
+doc.querySelector('.nav-item[data-view="globe3d"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("globeFullscreen") != null, "#globeFullscreen button exists on the 3D map view");
+
+// Step 50: Email-summary button on the Dashboard
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("emailSummary") != null, "#emailSummary button exists on the dashboard");
+
+// Step 51: History & Backups view renders snapshot-related content
+doc.querySelector('.nav-item[data-view="audit"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector("[data-act='snap']") != null, "History & Backups has a 'Take snapshot' button (restore capability)");
+ok(doc.querySelector("[data-act='restore']") != null || doc.querySelector("td.muted") != null, "History & Backups shows snapshots or empty-state message");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
