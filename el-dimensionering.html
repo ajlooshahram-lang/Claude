@@ -1142,7 +1142,7 @@ function izTableFor() {
 // Correction factors from installation methods (simplified)
 const INSTALL_METHODS = {
   'A1': 0.87, 'A2': 0.83, 'B1': 1.0, 'B2': 0.96,
-  'C': 1.0, 'D': 1.0, 'E': 1.04, 'F': 1.09, 'G': 1.17
+  'C': 1.0, 'D': 1.0, 'D1': 1.0, 'D2': 1.0, 'E': 1.04, 'F': 1.09, 'G': 1.17
 };
 
 // Temperature correction
@@ -2117,6 +2117,32 @@ function sldCalcNodeZs(tree, nodeId) {
   return zs;
 }
 
+// Positive-sequence impedance for three-phase Ikmax calculation (IEC 60909).
+// Unlike Zs (earth-fault loop with factor 2), Z1 uses factor 1 and sqrt(r^2 + x^2)
+// per segment. This gives the correct prospective three-phase fault current.
+function sldCalcNodeZ1(tree, nodeId) {
+  const path = sldGetPath(tree, nodeId);
+  let z1 = 0;
+  for (let i = 0; i < path.length; i++) {
+    const node = tree.nodes[path[i]];
+    if (!node) continue;
+    if (node.type === 'transformer') {
+      // Transformer positive-sequence impedance is the same: Zt = (uk/100) * U^2 / Sn
+      const uk = node.uk_pct || TRAFO_UK[node.power_kVA] || 4;
+      const sn = (node.power_kVA || 630) * 1000;
+      const u = 400;
+      z1 += (uk / 100) * (u * u) / sn;
+    } else if (node.cable && node.length_m > 0) {
+      const r = node.cable.r || 0;
+      const x = node.cable.x || 0;
+      const L = node.length_m;
+      // Positive-sequence: L * sqrt(r^2 + x^2) / 1000 (no factor of 2, geometric sum)
+      z1 += L * Math.sqrt(r * r + x * x) / 1000;
+    }
+  }
+  return z1;
+}
+
 function sldCalcNodeVdrop(tree, nodeId) {
   const path = sldGetPath(tree, nodeId);
   let vdropTotal = 0;
@@ -2144,27 +2170,31 @@ function sldCalcNodeVdrop(tree, nodeId) {
 
 function sldCalcNodeIk(tree, nodeId) {
   const zs = sldCalcNodeZs(tree, nodeId);
-  if (zs <= 0) return { ikmax: 0, ikmin: 0, zs: 0 };
+  if (zs <= 0) return { ikmax: 0, ikmin: 0, zs: 0, z1: 0 };
+  const z1 = sldCalcNodeZ1(tree, nodeId);
   const cmax = 1.05;
   const cmin = 0.95;
   const node = tree.nodes[nodeId];
   var ikmax, ikmin;
   if (node && (node.phases === '1x230' || (node.voltage === 230 && node.phases !== '3x400'))) {
     // Single-phase fault: Ik = c * U0 / Zs (IEC 60909 for single-phase)
+    // Uses earth-fault loop impedance (Zs with factor 2) - correct for single-phase faults
     ikmax = (cmax * 230) / zs;
     // The 1.5 factor accounts for increased conductor resistance at end-of-fault
-    // temperature per Danish engineering practice (Stærkstrømsbekendtgørelsen, DS/HD 60364-4-41 Annex).
+    // temperature per Danish engineering practice (DS/HD 60364-4-41 Annex).
     // This is conservative for the disconnection check (understates Ikmin).
     ikmin = (cmin * 230) / (zs * 1.5);
   } else {
-    // Three-phase fault: Ik = c * U / (sqrt(3) * Zs) (IEC 60909 clause 4.2)
+    // Three-phase symmetrical fault: Ik = c * U / (sqrt(3) * Z1) (IEC 60909 clause 4.2)
+    // Uses positive-sequence impedance Z1 (factor 1, geometric sum) for accurate Ikmax.
     var U = 400;
-    ikmax = (cmax * U) / (Math.sqrt(3) * zs);
+    ikmax = (z1 > 0) ? (cmax * U) / (Math.sqrt(3) * z1) : 0;
+    // For Ikmin (disconnection time check), use Zs (loop, conservative - understates current)
     // 1.5 factor: Danish simplification for minimum Ik at end-of-fault conductor temp.
     // Conservative for disconnection time check (DS/HD 60364-4-41, Danish annex practice).
     ikmin = (cmin * U) / (Math.sqrt(3) * zs * 1.5);
   }
-  return { ikmax: ikmax, ikmin: ikmin, zs: zs };
+  return { ikmax: ikmax, ikmin: ikmin, zs: zs, z1: z1 };
 }
 
 function sldPropagateAll(tree) {
@@ -2206,6 +2236,7 @@ function sldPropagateAll(tree) {
     if (!nd) continue;
     nd._ib = sldCalcNodeIB(nd);
     nd._zs = sldCalcNodeZs(tree, nid);
+    nd._z1 = sldCalcNodeZ1(tree, nid);
     nd._vdrop = sldCalcNodeVdrop(tree, nid);
     var ik = sldCalcNodeIk(tree, nid);
     nd._ikmax = ik.ikmax;
@@ -2259,10 +2290,35 @@ function sldVerifyNode(tree, nodeId) {
 
   if (node.protection && ikmax > 0) {
     const icu = (node.protection.icu || 0) * 1000;
-    if (icu >= ikmax) {
-      results.push({ rule: 'Icu >= Ikmax', clause: 'DS/HD 60364-4-43 cl. 434.5.1', status: 'ok', detail: (icu / 1000).toFixed(1) + 'kA >= ' + (ikmax / 1000).toFixed(1) + 'kA' });
+    // DS/HD 60364-4-43 cl. 434.5.1: Icu must be >= maximum prospective fault current
+    // at the device terminals (not at cable far end). This is the parent node's Ikmax,
+    // i.e. the fault current at the busbar where the device is installed.
+    let ikAtTerminals = ikmax; // fallback to own Ikmax if parent not available
+    if (node.parentId) {
+      const parent = tree.nodes[node.parentId];
+      if (parent && parent.type === 'transformer') {
+        // First device after transformer: Ik at terminals = Ik with only Ztrafo
+        ikAtTerminals = sldCalcNodeIk(tree, node.parentId).ikmax;
+        // If transformer has no downstream cable, use the three-phase formula with Ztrafo
+        if (ikAtTerminals <= 0) {
+          const uk = parent.uk_pct || TRAFO_UK[parent.power_kVA] || 4;
+          const sn = (parent.power_kVA || 630) * 1000;
+          const zTrafo = (uk / 100) * (400 * 400) / sn;
+          ikAtTerminals = (1.05 * 400) / (Math.sqrt(3) * zTrafo);
+        }
+      } else if (parent && parent._ikmax > 0) {
+        // For other nodes: fault current at device terminals = parent's Ikmax
+        ikAtTerminals = parent._ikmax;
+      } else if (parent) {
+        // Parent not yet propagated: compute on the fly
+        ikAtTerminals = sldCalcNodeIk(tree, node.parentId).ikmax;
+      }
+    }
+    if (ikAtTerminals <= 0) ikAtTerminals = ikmax; // safety fallback
+    if (icu >= ikAtTerminals) {
+      results.push({ rule: 'Icu >= Ikmax', clause: 'DS/HD 60364-4-43 cl. 434.5.1', status: 'ok', detail: (icu / 1000).toFixed(1) + 'kA >= ' + (ikAtTerminals / 1000).toFixed(1) + 'kA (at device terminals)' });
     } else {
-      results.push({ rule: 'Icu >= Ikmax', clause: 'DS/HD 60364-4-43 cl. 434.5.1', status: 'fail', detail: 'Icu=' + (icu / 1000).toFixed(1) + 'kA < Ikmax=' + (ikmax / 1000).toFixed(1) + 'kA' });
+      results.push({ rule: 'Icu >= Ikmax', clause: 'DS/HD 60364-4-43 cl. 434.5.1', status: 'fail', detail: 'Icu=' + (icu / 1000).toFixed(1) + 'kA < Ikmax=' + (ikAtTerminals / 1000).toFixed(1) + 'kA (at device terminals)' });
     }
   }
 

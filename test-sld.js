@@ -426,8 +426,8 @@ test('sldCalcNodeIk uses correct formula for single-phase circuits', function() 
     'Should not match three-phase formula result (' + wrongIkmax.toFixed(1) + 'A)');
 });
 
-// Test 19: Three-phase Ik formula unchanged for 3-phase circuits
-test('sldCalcNodeIk uses three-phase formula for 3x400 circuits', function() {
+// Test 19: Three-phase Ik formula uses Z1 (positive-sequence impedance)
+test('sldCalcNodeIk uses Z1 for three-phase Ikmax', function() {
   sldNextId = 300;
   var tree = { nodes: {}, rootId: null };
   var trafo = sldCreateNode('transformer', null, { power_kVA: 630, uk_pct: 6 });
@@ -438,11 +438,17 @@ test('sldCalcNodeIk uses three-phase formula for 3x400 circuits', function() {
   trafo.childIds.push(mb.id);
 
   var ik = sldCalcNodeIk(tree, mb.id);
-  var zs = sldCalcNodeZs(tree, mb.id);
-  // Three-phase formula: Ikmax = cmax * 400 / (sqrt(3) * Zs)
-  var expectedIkmax = 1.05 * 400 / (Math.sqrt(3) * zs);
+  var z1 = sldCalcNodeZ1(tree, mb.id);
+  // Three-phase formula uses Z1: Ikmax = cmax * 400 / (sqrt(3) * Z1)
+  var expectedIkmax = 1.05 * 400 / (Math.sqrt(3) * z1);
   assert(Math.abs(ik.ikmax - expectedIkmax) < 0.1,
-    'Three-phase Ikmax should be ' + expectedIkmax.toFixed(1) + 'A, got ' + ik.ikmax.toFixed(1) + 'A');
+    'Three-phase Ikmax should use Z1: ' + expectedIkmax.toFixed(1) + 'A, got ' + ik.ikmax.toFixed(1) + 'A');
+  // Z1 should be less than Zs for the same path (no factor 2, geometric sum)
+  var zs = sldCalcNodeZs(tree, mb.id);
+  assert(z1 < zs, 'Z1 (' + z1.toFixed(5) + ') should be less than Zs (' + zs.toFixed(5) + ')');
+  // Therefore Ikmax with Z1 should be HIGHER than if using Zs (more conservative for Icu check)
+  var oldIkmax = 1.05 * 400 / (Math.sqrt(3) * zs);
+  assert(ik.ikmax > oldIkmax, 'Ikmax with Z1 (' + ik.ikmax.toFixed(0) + ') should be higher than with Zs (' + oldIkmax.toFixed(0) + ')');
 });
 
 // Test 20: Installation derating applied to Iz in compliance check
@@ -530,6 +536,153 @@ test('sldVerifyNode detects I2 > 1.45*Iz failure', function() {
   // I2 = 1.3 * 100 = 130A; 1.45 * 17.5 = 25.4A -> 130 > 25.4 -> fail
   assert.strictEqual(i2Check.status, 'fail',
     'Undersized cable should fail I2 check. Got: ' + i2Check.status + ' ' + i2Check.detail);
+});
+
+// Test 23: D1 and D2 installation methods are defined in INSTALL_METHODS
+test('INSTALL_METHODS includes D1 and D2 entries', function() {
+  assert.strictEqual(INSTALL_METHODS['D1'], 1.0, 'D1 should be 1.0, got ' + INSTALL_METHODS['D1']);
+  assert.strictEqual(INSTALL_METHODS['D2'], 1.0, 'D2 should be 1.0, got ' + INSTALL_METHODS['D2']);
+  // Original D should still exist
+  assert.strictEqual(INSTALL_METHODS['D'], 1.0, 'D should still be 1.0');
+});
+
+// Test 24: Z1 (positive-sequence) is correctly separated from Zs (loop)
+test('sldCalcNodeZ1 uses geometric sum and no factor 2', function() {
+  sldNextId = 700;
+  var tree = { nodes: {}, rootId: null };
+  var trafo = sldCreateNode('transformer', null, { power_kVA: 630, uk_pct: 6 });
+  tree.nodes[trafo.id] = trafo;
+  tree.rootId = trafo.id;
+  // 50mm2 cable: r=0.388, x=0.084
+  var cable50 = PRODUCTS.cables.find(function(c){ return c.mm2 === 50 && c.material === 'Cu'; });
+  var mb = sldCreateNode('main_board', trafo.id, { cable: cable50, length_m: 10, phases: '3x400' });
+  tree.nodes[mb.id] = mb;
+  trafo.childIds.push(mb.id);
+
+  var zs = sldCalcNodeZs(tree, mb.id);
+  var z1 = sldCalcNodeZ1(tree, mb.id);
+
+  // Ztrafo = (6/100) * 400^2 / 630000 = 0.015238 ohm (same for both)
+  var zTrafo = (6/100) * 160000 / 630000;
+  // Zs cable: 2 * 10 * (0.388 + 0.084) / 1000 = 0.00944 ohm
+  var zsExpectedCable = 2 * 10 * (0.388 + 0.084) / 1000;
+  // Z1 cable: 10 * sqrt(0.388^2 + 0.084^2) / 1000 = 10 * 0.397 / 1000 = 0.00397 ohm
+  var z1ExpectedCable = 10 * Math.sqrt(0.388 * 0.388 + 0.084 * 0.084) / 1000;
+
+  var expectedZs = zTrafo + zsExpectedCable;
+  var expectedZ1 = zTrafo + z1ExpectedCable;
+
+  assert(Math.abs(zs - expectedZs) < 0.0001,
+    'Zs should be ' + expectedZs.toFixed(5) + ', got ' + zs.toFixed(5));
+  assert(Math.abs(z1 - expectedZ1) < 0.0001,
+    'Z1 should be ' + expectedZ1.toFixed(5) + ', got ' + z1.toFixed(5));
+  // Z1 < Zs because no factor 2 and geometric < arithmetic for r and x
+  assert(z1 < zs, 'Z1 (' + z1.toFixed(5) + ') must be < Zs (' + zs.toFixed(5) + ')');
+  // The ratio matters for safety: Ikmax_Z1 / Ikmax_Zs > 1
+  var ikmaxZ1 = 1.05 * 400 / (Math.sqrt(3) * z1);
+  var ikmaxZs = 1.05 * 400 / (Math.sqrt(3) * zs);
+  assert(ikmaxZ1 > ikmaxZs, 'Ikmax with Z1 (' + ikmaxZ1.toFixed(0) + ') > Ikmax with Zs (' + ikmaxZs.toFixed(0) + ')');
+});
+
+// Test 25: Icu check uses parent node Ikmax (fault current at device terminals)
+test('sldVerifyNode Icu check uses prospective fault current at device terminals', function() {
+  sldNextId = 800;
+  var tree = { nodes: {}, rootId: null };
+  var trafo = sldCreateNode('transformer', null, { power_kVA: 630, uk_pct: 6 });
+  tree.nodes[trafo.id] = trafo;
+  tree.rootId = trafo.id;
+  var cable50 = PRODUCTS.cables.find(function(c){ return c.mm2 === 50 && c.material === 'Cu'; });
+  var mb = sldCreateNode('main_board', trafo.id, {
+    cable: cable50, length_m: 10, phases: '3x400', voltage: 400,
+    protectionIn: 100
+  });
+  tree.nodes[mb.id] = mb;
+  trafo.childIds.push(mb.id);
+
+  // Add a final circuit with a 6kA MCB
+  var cable25 = PRODUCTS.cables.find(function(c){ return c.mm2 === 2.5 && c.material === 'Cu'; });
+  var mcb6ka = PRODUCTS.mcbs.find(function(m){ return m.icu === 6; });
+  var fc = sldCreateNode('final_circuit', mb.id, {
+    cable: cable25, length_m: 25, phases: '1x230', voltage: 230,
+    power_kW: 3.45, protection: mcb6ka, protectionIn: 16
+  });
+  tree.nodes[fc.id] = fc;
+  mb.childIds.push(fc.id);
+
+  sldPropagateAll(tree);
+
+  // The Icu check on the final circuit should use the PARENT's Ikmax (main board's Ikmax)
+  // not the final circuit's own Ikmax (which is lower due to 25m of 2.5mm2 cable)
+  var results = sldVerifyNode(tree, fc.id);
+  var icuCheck = results.find(function(r) { return r.rule === 'Icu >= Ikmax'; });
+  assert(icuCheck, 'Should have Icu check result');
+  // The detail should mention "at device terminals"
+  assert(icuCheck.detail.indexOf('at device terminals') >= 0,
+    'Icu check detail should reference device terminals. Got: ' + icuCheck.detail);
+
+  // Verify the parent Ikmax is higher than the node's own Ikmax
+  var parentIkmax = mb._ikmax;
+  var nodeIkmax = fc._ikmax;
+  assert(parentIkmax > nodeIkmax,
+    'Parent Ikmax (' + parentIkmax.toFixed(0) + ') should be > node Ikmax (' + nodeIkmax.toFixed(0) + ')');
+});
+
+// Test 26: Icu check detects undersized breaker at device terminals
+test('sldVerifyNode Icu check fails when breaker undersized for terminal fault current', function() {
+  sldNextId = 900;
+  var tree = { nodes: {}, rootId: null };
+  // Use a large transformer to get high fault current
+  var trafo = sldCreateNode('transformer', null, { power_kVA: 630, uk_pct: 4 });
+  tree.nodes[trafo.id] = trafo;
+  tree.rootId = trafo.id;
+  var cable50 = PRODUCTS.cables.find(function(c){ return c.mm2 === 50 && c.material === 'Cu'; });
+  var mb = sldCreateNode('main_board', trafo.id, {
+    cable: cable50, length_m: 5, phases: '3x400', voltage: 400,
+    protectionIn: 100
+  });
+  tree.nodes[mb.id] = mb;
+  trafo.childIds.push(mb.id);
+
+  // Add a sub-board with a small MCB (only 6kA Icu)
+  // The main board's Ikmax will be much higher than 6kA
+  var cable10 = PRODUCTS.cables.find(function(c){ return c.mm2 === 10 && c.material === 'Cu'; });
+  var mcb6ka = PRODUCTS.mcbs.find(function(m){ return m.icu === 6; });
+  var sb = sldCreateNode('sub_board', mb.id, {
+    cable: cable10, length_m: 5, phases: '3x400', voltage: 400,
+    power_kW: 20, protection: mcb6ka, protectionIn: 32
+  });
+  tree.nodes[sb.id] = sb;
+  mb.childIds.push(sb.id);
+
+  sldPropagateAll(tree);
+
+  // Main board's Ikmax (at the sub-board device terminals) should be > 6kA
+  assert(mb._ikmax > 6000,
+    'Main board Ikmax should be > 6kA. Got: ' + (mb._ikmax / 1000).toFixed(1) + 'kA');
+
+  var results = sldVerifyNode(tree, sb.id);
+  var icuCheck = results.find(function(r) { return r.rule === 'Icu >= Ikmax'; });
+  assert(icuCheck, 'Should have Icu check result');
+  assert.strictEqual(icuCheck.status, 'fail',
+    'MCB with 6kA Icu should fail when terminal fault current > 6kA. Got: ' + icuCheck.status + ' ' + icuCheck.detail);
+});
+
+// Test 27: Propagation stores _z1 on each node
+test('sldPropagateAll stores _z1 positive-sequence impedance on nodes', function() {
+  sldNextId = 1000;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var root = tree.nodes[tree.rootId];
+  var mainBoardId = root.childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+  // _z1 should be computed for all non-transformer nodes
+  assert(mainBoard._z1 > 0, 'Main board should have _z1 > 0, got ' + mainBoard._z1);
+  assert(mainBoard._z1 < mainBoard._zs, 'Z1 should be < Zs. Z1=' + mainBoard._z1.toFixed(5) + ' Zs=' + mainBoard._zs.toFixed(5));
+  // Final circuits should also have _z1
+  mainBoard.childIds.forEach(function(cid) {
+    var fc = tree.nodes[cid];
+    assert(fc._z1 > 0, 'Final circuit should have _z1 > 0');
+  });
 });
 
 // --- Summary ---
