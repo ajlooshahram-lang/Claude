@@ -935,7 +935,8 @@ const T = {
       maint: '\uD83D\uDD27 Vedligehold',
       afdd: '\uD83D\uDD25 Gnistdetektor',
       twin: '\uD83C\uDF10 Digital Tvilling',
-      auto: '\uD83E\uDDE0 Auto-Design'
+      auto: '\uD83E\uDDE0 Auto-Design',
+      matlist: '\uD83D\uDED2 Materialeliste'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1059,7 +1060,8 @@ const T = {
       maint: '\uD83D\uDD27 Maintenance',
       afdd: '\uD83D\uDD25 Arc Fault (AFDD)',
       twin: '\uD83C\uDF10 Digital Twin',
-      auto: '\uD83E\uDDE0 Auto-Design'
+      auto: '\uD83E\uDDE0 Auto-Design',
+      matlist: '\uD83D\uDED2 Materialeliste'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -2403,6 +2405,7 @@ function renderModule(mod) {
     case 'afdd': content += renderAfdd(); break;
     case 'twin': content += renderTwin(); break;
     case 'auto': content += renderAutoDesign(); break;
+    case 'matlist': content += renderMaterialList(); break;
     case 'home': content += renderDashboard(); break;
     case 'exam': content = renderExam(); break;
   }
@@ -18692,6 +18695,67 @@ function renderAutoDesign(){
   html+='</div>';
   html+='<div class="info-row" style="margin-top:8px">'+(da?'Konservativ: kurve D for motorer, Type B RCD for EV, AFDD anbefalet for stik/lys, IB aldrig over In, Iz aldrig under In. DS/HD 60364-4-43 + 5-52 + 7-722.':'Conservative: curve D for motors, Type B RCD for EV, AFDD recommended for sockets/lighting, IB never exceeds In, Iz never below In. DS/HD 60364-4-43 + 5-52 + 7-722.')+'</div></div>';
   return html;
+}
+
+// ===== SMART MATERIAL LIST (auto-generated BOM for ordering) =====
+function generateMaterialList(){
+  const da=lang==='da';
+  var design=autoDesign();
+  if(!design.ok) return {ok:false,items:[],msg:design.msg};
+  var items=[];
+  var id=1;
+  // Main panel enclosure
+  var totalModules=design.results.length*4+6; // ~4 modules per circuit + main + RCD + SPD
+  var rows=Math.ceil(totalModules/24);
+  items.push({nr:id++,cat:da?'Tavle':'Panel',desc:da?'Gruppetavle '+rows+'×24 moduler, IP30, plast':'Distribution board '+rows+'×24 modules, IP30, plastic',qty:1,unit:'stk',ref:'IEC 61439'});
+  items.push({nr:id++,cat:da?'Tavle':'Panel',desc:da?'DIN-skinne 35mm (1m pr. række)':'DIN rail 35mm (1m per row)',qty:rows,unit:'m',ref:'IEC 60715'});
+  items.push({nr:id++,cat:da?'Hovedafbryder':'Main switch',desc:da?'Lastadskiller 3P+N, 63A':'Load break switch 3P+N, 63A',qty:1,unit:'stk',ref:'IEC 60947-3'});
+  items.push({nr:id++,cat:'SPD',desc:da?'Overspændingsbeskyttelse Type 2, 3P+N, 40kA':'Surge protection Type 2, 3P+N, 40kA',qty:1,unit:'stk',ref:'IEC 61643-11'});
+  // Per circuit
+  design.results.forEach(function(r){
+    items.push({nr:id++,cat:'MCB',desc:r.mcb+' A '+(r.phase==='3'?'3P+N':'1P+N')+', Icu \u226510kA',qty:1,unit:'stk',ref:'IEC 60898-1'});
+    items.push({nr:id++,cat:'RCD/HPFI',desc:'HPFI '+r.rcd+' '+(r.phase==='3'?'4P':'2P'),qty:1,unit:'stk',ref:'IEC 61008/61009'});
+    if(r.afdd) items.push({nr:id++,cat:'AFDD',desc:'AFDD + MCB '+(r.curve||'B')+(r.mcbRating||16)+' A (IEC 62606)',qty:1,unit:'stk',ref:'IEC 62606'});
+    items.push({nr:id++,cat:da?'Kabel':'Cable',desc:(r.phase==='3'?'5G':'3G')+r.cableCS+' mm\u00B2 Cu '+(da?'(XLPE/halogenfri)':'(XLPE/halogen-free)'),qty:r.length||20,unit:'m',ref:'IEC 60228'});
+    items.push({nr:id++,cat:da?'Klemme':'Terminal',desc:(da?'Rekkeklemme':'Terminal block')+' '+r.cableCS+' mm\u00B2',qty:r.phase==='3'?5:3,unit:'stk',ref:'IEC 60947-7'});
+  });
+  // PE/N bars
+  items.push({nr:id++,cat:'PE',desc:da?'PE-skinne (antal poler = kredse+2)':'PE bar (poles = circuits+2)',qty:1,unit:'stk',ref:'DS/HD 60364-5-54'});
+  items.push({nr:id++,cat:'N',desc:da?'N-skinne (antal poler = kredse+2)':'N bar (poles = circuits+2)',qty:1,unit:'stk',ref:'DS/HD 60364-5-54'});
+  // Cable glands
+  items.push({nr:id++,cat:da?'Forskruning':'Gland',desc:da?'Kabelforskruninger M20/M25 (1 pr. kabel)':'Cable glands M20/M25 (1 per cable)',qty:design.results.length,unit:'stk',ref:'IEC 62444'});
+  // Labels
+  items.push({nr:id++,cat:da?'Mærkning':'Labels',desc:da?'Kredsmarkering + tavlemærkning':'Circuit labels + panel labelling',qty:1,unit:'sæt',ref:'DS/HD 60364-5-14'});
+  return {ok:true, items:items, circuitCount:design.results.length};
+}
+
+function renderMaterialList(){
+  const da=lang==='da';
+  var ml=generateMaterialList();
+  let html='<div class="card fade-in"><div class="card-title">\uD83D\uDED2 '+(da?'Smart Materialeliste \u2014 bestillingsklar':'Smart Material List \u2014 order-ready')+'</div>';
+  html+='<div class="info-row">'+(da?'Auto-genereret fra dit projekt. Klar til at sende til grossist (Solar, Lemvigh-M\u00fcller, Wex\u00f8e). Alle produkter CE-m\u00e6rkede og godkendt til DK.':'Auto-generated from your project. Ready to send to wholesaler (Solar, Lemvigh-M\u00fcller, Wex\u00f8e). All products CE-marked and approved for DK.')+'</div>';
+  if(!ml.ok){
+    html+='<div class="result-box warning"><div class="result-title">\u26A0\uFE0F '+ml.msg+'</div></div></div>';
+    return html;
+  }
+  html+='<div class="result-box" style="border-color:var(--success)"><div class="result-title">\u2705 '+ml.items.length+' '+(da?'varelinger genereret fra '+ml.circuitCount+' kredse':'items generated from '+ml.circuitCount+' circuits')+'</div></div>';
+  // Table
+  html+='<div style="overflow-x:auto"><table class="data-table" style="width:100%;font-size:.82rem"><thead><tr><th>Nr</th><th>'+(da?'Kategori':'Category')+'</th><th>'+(da?'Beskrivelse':'Description')+'</th><th>'+(da?'Antal':'Qty')+'</th><th>'+(da?'Enhed':'Unit')+'</th><th>Ref</th></tr></thead><tbody>';
+  ml.items.forEach(function(item){
+    html+='<tr><td>'+item.nr+'</td><td>'+item.cat+'</td><td>'+item.desc+'</td><td style="text-align:center;font-weight:700">'+item.qty+'</td><td>'+item.unit+'</td><td style="font-size:.7rem;color:var(--text-light)">'+item.ref+'</td></tr>';
+  });
+  html+='</tbody></table></div>';
+  // Download CSV
+  html+='<div class="select-grid" style="margin-top:12px"><button class="sel-btn selected" onclick="downloadMaterialCSV()">\u2B07\uFE0F '+(da?'Download CSV (til grossist)':'Download CSV (for wholesaler)')+'</button><button class="sel-btn" onclick="window.print()">\uD83D\uDDA8\uFE0F '+(da?'Udskriv':'Print')+'</button></div>';
+  html+='<div class="info-row" style="margin-top:8px">'+(da?'Priser: Kontakt din grossist for aktuelle priser. CSV-filen kan importeres direkte i Solar/Lemvigh-M\u00fcllers bestillingssystemer.':'Prices: Contact your wholesaler for current prices. The CSV can be imported directly into Solar/Lemvigh-M\u00fcller ordering systems.')+'</div></div>';
+  return html;
+}
+function downloadMaterialCSV(){
+  var ml=generateMaterialList(); if(!ml.ok) return;
+  var da=lang==='da';
+  var rows=[(da?'Nr;Kategori;Beskrivelse;Antal;Enhed;Standard':'Nr;Category;Description;Qty;Unit;Standard')];
+  ml.items.forEach(function(item){ rows.push(item.nr+';'+item.cat+';'+item.desc+';'+item.qty+';'+item.unit+';'+item.ref); });
+  try{ var blob=new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8'}); var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='materialeliste-'+new Date().toISOString().slice(0,10)+'.csv'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); }catch(e){}
 }
 
 // ===== INIT =====
