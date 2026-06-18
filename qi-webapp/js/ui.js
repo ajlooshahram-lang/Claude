@@ -950,6 +950,7 @@
         <button class="btn btn-primary" id="briefPrint" type="button">🖨 Print / Save as PDF</button>
         <button class="btn" id="briefDownload" type="button">⬇ Download one-pager (HTML)</button>
         <button class="btn" id="briefShare" type="button">🔗 Share link</button>
+        <button class="btn" id="briefPreview" type="button">👁 Preview</button>
         <input class="brief-search" id="briefSearch" type="search" placeholder="Search the brief..." aria-label="Search within brief" />
         <span class="muted">A plain-language one-pager you can hand to your board — built automatically from your project. No jargon.</span>
       </div>
@@ -1309,6 +1310,31 @@
       });
       tocNav.innerHTML = links.join('');
     }
+
+    // Print preview modal (step 45)
+    const previewBtn = $("#briefPreview");
+    if (previewBtn && briefEl) {
+      previewBtn.addEventListener("click", function () {
+        var existing = document.getElementById("printPreviewModal");
+        if (existing) existing.remove();
+        var modal = document.createElement("div");
+        modal.id = "printPreviewModal";
+        modal.className = "modal-overlay";
+        modal.setAttribute("role", "dialog");
+        modal.setAttribute("aria-label", "Print preview");
+        var inner = document.createElement("div");
+        inner.className = "modal";
+        inner.style.maxWidth = "720px";
+        inner.innerHTML = '<div class="modal-head"><h2>Print Preview</h2><button class="modal-x" id="previewClose" type="button" aria-label="Close">&times;</button></div><div class="print-preview">' + briefEl.innerHTML + '</div><div class="modal-foot"><button class="btn" id="previewDone" type="button">Close</button></div>';
+        modal.appendChild(inner);
+        document.body.appendChild(modal);
+        modal.style.display = "flex";
+        var closeModal = function () { modal.remove(); };
+        document.getElementById("previewClose").addEventListener("click", closeModal);
+        document.getElementById("previewDone").addEventListener("click", closeModal);
+        modal.addEventListener("click", function (e) { if (e.target === modal) closeModal(); });
+      });
+    }
   };
 
   // Route Progress — submarine-cable construction tracking (GIS delivery view).
@@ -1567,6 +1593,25 @@
         var ac = S.validCases().slice().sort(function (a, b) { return (b.dateLogged || "").localeCompare(a.dateLogged || ""); });
         var latestCases = ac.slice(0, 5);
         return latestCases.length ? '<div class="card"><h3>Recent activity</h3><ul class="activity-log">' + latestCases.map(function (c) { return '<li class="al-item"><span class="al-time">' + esc(c.dateLogged || "") + '</span><span class="al-text">Added: ' + esc((c.problem || "Untitled").slice(0, 60)) + '</span></li>'; }).join('') + '</ul></div>' : '';
+      })() +
+      (function () {
+        var TZ_DATA = [
+          { country: "Indonesia", tz: "Asia/Jakarta", abbr: "WIB" },
+          { country: "Thailand", tz: "Asia/Bangkok", abbr: "ICT" },
+          { country: "Vietnam", tz: "Asia/Ho_Chi_Minh", abbr: "ICT" },
+          { country: "Taiwan", tz: "Asia/Taipei", abbr: "CST" },
+          { country: "Philippines", tz: "Asia/Manila", abbr: "PHT" },
+          { country: "Guam", tz: "Pacific/Guam", abbr: "ChST" },
+          { country: "Malaysia", tz: "Asia/Kuala_Lumpur", abbr: "MYT" },
+          { country: "Brunei", tz: "Asia/Brunei", abbr: "BNT" }
+        ];
+        var chips = TZ_DATA.map(function (d) {
+          var now;
+          try { now = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: d.tz }); }
+          catch (e) { now = "--:--"; }
+          return '<span class="tz-chip"><span class="tz-country">' + esc(d.country) + '</span><span class="tz-time">' + esc(now) + '</span></span>';
+        }).join('');
+        return '<div class="card"><h3>Local time across the programme</h3><div class="tz-strip">' + chips + '</div></div>';
       })();
   };
   AFTER.dashboard = function () {

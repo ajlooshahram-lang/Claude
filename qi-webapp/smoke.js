@@ -1174,5 +1174,18 @@ ok(doc.getElementById("briefSearch") != null, "#briefSearch input exists on the 
 ok(doc.querySelector(".brief-toc") != null, ".brief-toc exists on the Investor Brief");
 ok(doc.querySelectorAll(".brief-toc-link").length > 0, ".brief-toc-link elements exist on the Investor Brief (got " + doc.querySelectorAll(".brief-toc-link").length + ")");
 
+// Step 43: Bulk-action bar CSS exists in the stylesheet
+var cssCheckAll = Array.from(doc.styleSheets).map(function(s) { try { return Array.from(s.cssRules || []).map(function(r) { return r.cssText; }).join("\n"); } catch (e) { return ""; } }).join("\n");
+ok(/\.bulkbar/.test(cssCheckAll), ".bulkbar CSS exists in the stylesheet (bulk-action bar)");
+
+// Step 44: Time-zone clock strip on the Dashboard
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".tz-strip") != null, ".tz-strip exists on the dashboard");
+ok(doc.querySelectorAll(".tz-chip").length === 8, ".tz-strip has 8 .tz-chip elements (got " + doc.querySelectorAll(".tz-chip").length + ")");
+
+// Step 45: Print preview button on the Investor Brief toolbar
+doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("briefPreview") != null, "#briefPreview button exists on the Investor Brief toolbar");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
