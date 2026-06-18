@@ -1233,5 +1233,16 @@ doc.querySelector('.nav-item[data-view="audit"]').dispatchEvent(new window.Event
 ok(doc.querySelector("[data-act='snap']") != null, "History & Backups has a 'Take snapshot' button (restore capability)");
 ok(doc.querySelector("[data-act='restore']") != null || doc.querySelector("td.muted") != null, "History & Backups shows snapshots or empty-state message");
 
+// Step 52: Present button on the Investor Brief toolbar
+doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("briefPresent") != null, "#briefPresent button exists on the brief toolbar");
+
+// Step 53: Country progress ring SVG on brief country cards
+var countryRings = doc.querySelectorAll(".country-ring");
+ok(countryRings.length >= 8, ".country-ring SVG exists on brief country cards (count " + countryRings.length + " >= 8)");
+
+// Step 54: Floating quick stats widget
+ok(doc.getElementById("briefFloat") != null, ".brief-float element exists on the brief");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

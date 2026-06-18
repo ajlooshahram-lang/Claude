@@ -909,6 +909,7 @@
       const lp = b.landingParties || {};
       const partners = (lp.candidates || []).slice(0, 3).join(", ");
       const topRisk = (b.risks || [])[0];
+      const ringPct = Math.round((1 - ((lic.criticalPathMonths || 0) / 60)) * 100);
       return `<div class="brief-country" data-country-key="${esc(b.key)}">
         <div class="brief-country-head">
           <h4>${esc(b.name)}</h4>
@@ -920,6 +921,10 @@
         <p class="brief-row"><span class="brief-k">Connects to</span> ${esc((b.interconnects || [])[0] || "—")}</p>
         ${topRisk ? `<p class="brief-row"><span class="brief-risk brief-risk--${riskSlug(topRisk.level)}">${esc(topRisk.level)}</span> ${esc(topRisk.text)}</p>` : ""}
         ${b.takeaway ? `<p class="brief-takeaway">${esc(b.takeaway)}</p>` : ""}
+        <svg class="country-ring" viewBox="0 0 36 36" width="32" height="32">
+          <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--line,#e3e8f0)" stroke-width="3"></circle>
+          <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--accent,#2e5496)" stroke-width="3" stroke-dasharray="${ringPct} ${100-ringPct}" stroke-dashoffset="25" stroke-linecap="round"></circle>
+        </svg>
       </div>`;
     }).join("");
 
@@ -966,6 +971,7 @@
         <button class="btn" id="briefDownload" type="button">⬇ Download one-pager (HTML)</button>
         <button class="btn" id="briefShare" type="button">🔗 Share link</button>
         <button class="btn" id="briefPreview" type="button">👁 Preview</button>
+        <button class="btn" id="briefPresent" type="button">▶ Present</button>
         <input class="brief-search" id="briefSearch" type="search" placeholder="Search the brief..." aria-label="Search within brief" />
         <span class="muted">A plain-language one-pager you can hand to your board — built automatically from your project. No jargon.</span>
       </div>
@@ -1203,6 +1209,11 @@
           <p>Verdicts are a quick traffic-light to focus attention, not a guarantee. Budget and timeline are the programme's headline figures; per-country detail is drawn from each country's regulator and route data. Speak to each named authority before committing.</p>
           <p class="brief-prov">Country data as of ${esc((CD && CD.DATA_PROVENANCE) ? CD.DATA_PROVENANCE.asOf : "")}. Sources: ${esc((CD && CD.DATA_PROVENANCE && Array.isArray(CD.DATA_PROVENANCE.sources)) ? CD.DATA_PROVENANCE.sources.join(", ") : "")}.</p>
         </footer>
+        <div class="brief-float no-print" id="briefFloat">
+          <span>${stations.length} countries</span>
+          <span>${totalKm.toLocaleString()} km</span>
+          <span>${fmtUsd(prog.budgetUsd)}</span>
+        </div>
       </div>`;
   };
   AFTER.investorbrief = function () {
@@ -1348,6 +1359,46 @@
         document.getElementById("previewClose").addEventListener("click", closeModal);
         document.getElementById("previewDone").addEventListener("click", closeModal);
         modal.addEventListener("click", function (e) { if (e.target === modal) closeModal(); });
+      });
+    }
+
+    // --- Presentation / Slideshow mode (step 52) ---
+    const presentBtn = $("#briefPresent");
+    if (presentBtn && briefEl) {
+      presentBtn.addEventListener("click", function () {
+        var slides = Array.prototype.slice.call(briefEl.querySelectorAll(".brief-section, .brief-cover"));
+        if (!slides.length) return;
+        var idx = 0;
+        briefEl.classList.add("presenting");
+        slides.forEach(function (s) { s.classList.remove("slide-active"); });
+        slides[0].classList.add("slide-active");
+
+        // Create nav overlay
+        var nav = document.createElement("div");
+        nav.className = "slide-nav";
+        nav.innerHTML = '<button type="button" id="slidePrev">&#9664; Prev</button><button type="button" id="slideNext">Next &#9654;</button><button type="button" id="slideExit">&#10005; Exit</button>';
+        document.body.appendChild(nav);
+
+        function showSlide(i) {
+          slides.forEach(function (s) { s.classList.remove("slide-active"); });
+          idx = Math.max(0, Math.min(slides.length - 1, i));
+          slides[idx].classList.add("slide-active");
+        }
+        function exitPresent() {
+          briefEl.classList.remove("presenting");
+          slides.forEach(function (s) { s.classList.remove("slide-active"); });
+          if (nav.parentNode) nav.parentNode.removeChild(nav);
+          document.removeEventListener("keydown", onKey);
+        }
+        function onKey(e) {
+          if (e.key === "ArrowRight" || e.key === "ArrowDown") showSlide(idx + 1);
+          else if (e.key === "ArrowLeft" || e.key === "ArrowUp") showSlide(idx - 1);
+          else if (e.key === "Escape") exitPresent();
+        }
+        document.addEventListener("keydown", onKey);
+        document.getElementById("slidePrev").addEventListener("click", function () { showSlide(idx - 1); });
+        document.getElementById("slideNext").addEventListener("click", function () { showSlide(idx + 1); });
+        document.getElementById("slideExit").addEventListener("click", exitPresent);
       });
     }
   };
