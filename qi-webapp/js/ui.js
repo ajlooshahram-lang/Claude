@@ -1106,6 +1106,21 @@
     heatmapHTML += '<div class="hm-xlabel"></div>';
     for (let col = 0; col < 5; col++) heatmapHTML += '<div class="hm-xlabel">' + occLabels[col] + '</div>';
 
+    // Cross-country dependency note (step 96) — which countries share a direct cable link
+    const stCountryLookup = {};
+    stations.forEach(function (s) { stCountryLookup[s.id] = s.country; });
+    const depLinks = cables.map(function (c) {
+      var cA = stCountryLookup[c.from] || c.from;
+      var cB = stCountryLookup[c.to] || c.to;
+      return { a: cA, b: cB, name: c.name || c.id };
+    }).filter(function (l) { return l.a !== l.b; });
+    var depNote = "";
+    if (depLinks.length > 0) {
+      var first = depLinks[0];
+      var cableName = first.name.split(":")[0].trim();
+      depNote = '<p class="brief-dep">Cross-country dependency: ' + esc(first.a) + ' and ' + esc(first.b) + ' share a direct cable link (' + esc(cableName) + ') — a permit delay in either country affects the connection between them.</p>';
+    }
+
     const today = new Date().toISOString().slice(0, 10);
 
     return `
@@ -1116,6 +1131,7 @@
         <button class="btn" id="briefPreview" type="button">👁 Preview</button>
         <button class="btn" id="briefPresent" type="button">▶ Present</button>
         <button class="btn" id="briefCopyText" type="button">📋 Copy as text</button>
+        <button class="btn" id="briefReadMode" type="button">📖 Reading mode</button>
         <input class="brief-search" id="briefSearch" type="search" placeholder="Search the brief..." aria-label="Search within brief" />
         <span class="muted">A plain-language one-pager you can hand to your board — built automatically from your project. No jargon.</span>
       </div>
@@ -1324,6 +1340,7 @@
         <section class="brief-section">
           <h3>Country by country</h3>
           <p class="brief-lead">For each country: the official body you need on side, whether it's worth going in, the approval to start first (it takes the longest), who can bring the cable ashore, and the single biggest thing to watch.</p>
+          ${depNote}
           <div class="brief-countries">${countryCards || '<p class="muted">No country data</p>'}</div>
         </section>
 
@@ -1391,6 +1408,15 @@
       } else {
         toast("Clipboard not available in this browser.");
       }
+    });
+
+    // --- Reading mode toggle (step 95) ---
+    const readModeBtn = $("#briefReadMode");
+    if (readModeBtn) readModeBtn.addEventListener("click", function () {
+      var brief = $("#investorBrief");
+      if (!brief) return;
+      brief.classList.toggle("reading-mode");
+      readModeBtn.textContent = brief.classList.contains("reading-mode") ? "\u2716 Exit reading mode" : "\uD83D\uDCD6 Reading mode";
     });
 
     // --- "What if" country toggles ---
@@ -2035,7 +2061,18 @@
     }).join(' ');
     const sparkSVG = '<svg class="health-spark" viewBox="0 0 ' + sparkW + ' ' + sparkH + '" preserveAspectRatio="none" aria-label="Health trend"><polyline fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" points="' + sparkPoints + '"/></svg>';
     const healthCard = `<div class="health-score health-${healthCls}"><span class="health-num">${healthScore}</span><span class="health-lab">Programme health</span>${sparkSVG}</div>`;
-    return tourBanner + progressCard + nextCard + dqCard + healthCard + `
+    // Quick wins card (step 97) — up to 5 easiest items to close (OPEN, not critical, low RPN)
+    const quickWinCandidates = cases.filter(function (c) {
+      if (c.status !== "OPEN") return false;
+      var p = String(c.priority || "").toLowerCase();
+      if (p === "1-critical" || p === "critical") return false;
+      return true;
+    }).map(function (c) {
+      var rpn = (Number(c.sev) || 0) * (Number(c.occ) || 0) * (Number(c.det) || 0);
+      return { problem: c.problem || "Untitled", rpn: rpn };
+    }).sort(function (a, b) { return a.rpn - b.rpn; }).slice(0, 5);
+    const quickWinsCard = quickWinCandidates.length ? `<div class="card quick-wins"><h3>\u26A1 Quick wins</h3><p class="muted">Items easiest to close right now:</p><ul class="qw-list">${quickWinCandidates.map(function (q) { return '<li>' + esc(q.problem) + '</li>'; }).join('')}</ul></div>` : '';
+    return tourBanner + progressCard + nextCard + quickWinsCard + dqCard + healthCard + `
       <div class="dash-toolbar" style="display:flex;gap:8px;margin-bottom:12px"><button class="btn btn-sm" id="emailSummary" type="button">\u2709 Copy status email</button><button class="btn btn-sm" id="meetingAgenda" type="button">\uD83D\uDCCB Copy meeting agenda</button></div>
       <div class="grid kpis" style="margin-bottom:16px">
         ${kpi("navy", "Total Cases", k.total)}

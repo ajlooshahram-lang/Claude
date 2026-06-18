@@ -1443,5 +1443,21 @@ if (!hasProgSegTransition) {
 }
 ok(hasProgSegTransition, ".prog-seg has transition in stylesheet");
 
+// Step 95: #briefReadMode button exists on brief view
+doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+var briefReadModeBtn = doc.getElementById("briefReadMode");
+ok(briefReadModeBtn != null && briefReadModeBtn.tagName === "BUTTON", "#briefReadMode button exists on brief");
+
+// Step 96: .brief-dep paragraph exists on brief view
+var briefDepEl = doc.querySelector(".brief-dep");
+ok(briefDepEl != null, ".brief-dep paragraph exists on brief");
+
+// Step 97: .quick-wins card exists on dashboard
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+var quickWinsEl = doc.querySelector(".quick-wins");
+// Quick wins only appear when there are open non-critical cases; check content or element
+var dashContent = doc.getElementById("content").innerHTML;
+ok(quickWinsEl != null || dashContent.indexOf("quick-wins") !== -1 || dashContent.indexOf("Quick wins") !== -1, ".quick-wins or quick-wins content exists on dashboard");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

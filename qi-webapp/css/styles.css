@@ -1227,3 +1227,16 @@ mark.hl{background:rgba(230,184,74,.4);border-radius:2px;padding:0 1px}
 /* Step 94: Focus mode */
 body.focus-mode .card{opacity:.3;transition:opacity .2s}
 body.focus-mode .card:hover,body.focus-mode .card:focus-within{opacity:1}
+
+/* Step 95: Reading mode for Investor Brief */
+#investorBrief.reading-mode .brief-filter,#investorBrief.reading-mode .brief-compare-controls,#investorBrief.reading-mode .section-reviewed,#investorBrief.reading-mode .brief-toc,#investorBrief.reading-mode .brief-search,#investorBrief.reading-mode .no-print{display:none!important}
+#investorBrief.reading-mode{font-size:15px;line-height:1.7;max-width:720px;margin:0 auto}
+
+/* Step 96: Cross-country dependency note */
+.brief-dep{font-style:italic;color:var(--muted,#6b7a99);margin:8px 0 12px;padding:8px 12px;border-left:3px solid var(--accent,#4ea1ff);background:rgba(78,161,255,.04)}
+
+/* Step 97: Quick wins card */
+.quick-wins{border-left:3px solid #42d6a4}
+.qw-list{list-style:none;padding:0;margin:8px 0 0}
+.qw-list li{padding:4px 0;border-bottom:1px solid rgba(0,0,0,.06)}
+.qw-list li:last-child{border-bottom:none}
