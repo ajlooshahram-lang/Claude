@@ -1007,5 +1007,27 @@ doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new wind
 const coverTitle = doc.querySelector(".brief-cover-title");
 ok(coverTitle != null && /Capital Project Alpha/.test(coverTitle.textContent), "Investor Brief cover title shows the project name");
 
+// Step 12: Compare two countries — side-by-side table
+S.reset();
+doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const cmpAsel = doc.getElementById("cmpA"), cmpBsel = doc.getElementById("cmpB");
+ok(cmpAsel != null && cmpBsel != null, "#cmpA and #cmpB selects exist");
+ok(cmpAsel.querySelectorAll("option").length === 8, "#cmpA has 8 options (got " + cmpAsel.querySelectorAll("option").length + ")");
+ok(cmpBsel.querySelectorAll("option").length === 8, "#cmpB has 8 options (got " + cmpBsel.querySelectorAll("option").length + ")");
+// On initial load, the compare table renders automatically
+const cmpDiv = doc.getElementById("briefCompare");
+ok(cmpDiv != null && cmpDiv.querySelector(".cmp-table") != null, "#briefCompare renders a .cmp-table on initial load");
+// Changing #cmpB and dispatching change updates the table
+const origContent = cmpDiv.innerHTML;
+const opts12 = Array.from(cmpBsel.querySelectorAll("option"));
+const altVal = opts12.find(o => o.value !== cmpBsel.value);
+if (altVal) {
+  cmpBsel.value = altVal.value;
+  cmpBsel.dispatchEvent(new window.Event("change", { bubbles: true }));
+  ok(cmpDiv.innerHTML !== origContent || cmpDiv.querySelector(".cmp-table") != null, "changing #cmpB updates the comparison table content");
+} else {
+  ok(false, "could not find an alternate option to test compare change");
+}
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

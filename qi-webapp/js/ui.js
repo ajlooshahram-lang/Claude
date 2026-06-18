@@ -943,6 +943,17 @@
           <div class="brief-countries">${countryCards || '<p class="muted">No country data</p>'}</div>
         </section>
 
+        <section class="brief-section no-print">
+          <h3>Compare two countries</h3>
+          <p class="brief-lead">Pick any two countries to see them side by side.</p>
+          <div class="brief-compare-controls" id="briefCompareControls">
+            <select id="cmpA">${stations.map((s,i) => '<option value="'+esc(s.id)+'"'+(i===0?' selected':'')+'>'+esc(s.country)+'</option>').join('')}</select>
+            <span>vs</span>
+            <select id="cmpB">${stations.map((s,i) => '<option value="'+esc(s.id)+'"'+(i===1?' selected':'')+'>'+esc(s.country)+'</option>').join('')}</select>
+          </div>
+          <div class="brief-compare" id="briefCompare"></div>
+        </section>
+
         <section class="brief-section">
           <h3>The biggest things to watch</h3>
           <ul class="brief-risks">${riskRows || '<li class="muted">No risks listed</li>'}</ul>
@@ -998,6 +1009,27 @@
     if (bfAll) bfAll.addEventListener("click", () => { qsa(".bfCountry").forEach(c => { c.checked = true; }); refreshBrief(); });
     if (bfNone) bfNone.addEventListener("click", () => { qsa(".bfCountry").forEach(c => { c.checked = false; }); refreshBrief(); });
     qsa(".bfCountry").forEach(c => c.addEventListener("change", refreshBrief));
+
+    // --- Compare two countries ---
+    const cmpA = $("#cmpA"), cmpB = $("#cmpB"), cmpOut = $("#briefCompare");
+    function renderCompare() {
+      const CD = window.QICountryData;
+      if (!CD || !cmpA || !cmpB || !cmpOut) return;
+      const a = CD.briefing(cmpA.value), b = CD.briefing(cmpB.value);
+      if (!a || !b) { cmpOut.innerHTML = '<p class="muted">Select two countries above.</p>'; return; }
+      const row = (label, va, vb) => '<tr><td class="cmp-label">' + esc(label) + '</td><td>' + esc(va) + '</td><td>' + esc(vb) + '</td></tr>';
+      cmpOut.innerHTML = '<table class="cmp-table"><thead><tr><th></th><th>' + esc(a.name) + '</th><th>' + esc(b.name) + '</th></tr></thead><tbody>' +
+        row("Verdict", a.marketEntry.verdict, b.marketEntry.verdict) +
+        row("Regulator", a.authority.abbrev, b.authority.abbrev) +
+        row("Slowest approval", a.licensing.criticalPathItem + " (~" + a.licensing.criticalPathMonths + " mo)", b.licensing.criticalPathItem + " (~" + b.licensing.criticalPathMonths + " mo)") +
+        row("Key interconnect", (a.interconnects || [])[0] || "\u2014", (b.interconnects || [])[0] || "\u2014") +
+        row("IRU pricing", a.iruBand || "\u2014", b.iruBand || "\u2014") +
+        row("Top risk", (a.risks[0] || {}).text || "\u2014", (b.risks[0] || {}).text || "\u2014") +
+        '</tbody></table>';
+    }
+    if (cmpA) cmpA.addEventListener("change", renderCompare);
+    if (cmpB) cmpB.addEventListener("change", renderCompare);
+    renderCompare();
   };
 
   // Route Progress — submarine-cable construction tracking (GIS delivery view).

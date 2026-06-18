@@ -829,6 +829,15 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
   .brief-section{break-inside:avoid-page}
 }
 
+/* ---- Compare two countries ---- */
+.brief-compare-controls{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.brief-compare-controls select{font-size:13px;padding:6px 12px;border-radius:var(--radius-sm,6px);border:1.5px solid var(--line,#e3e8f0);background:var(--card,#fff);color:var(--ink,#1a2336)}
+.brief-compare-controls span{font-weight:700;color:var(--muted,#6b7892)}
+.cmp-table{width:100%;border-collapse:collapse;font-size:13px}
+.cmp-table th,.cmp-table td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line,#e3e8f0);vertical-align:top}
+.cmp-table th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted,#6b7892)}
+.cmp-label{font-weight:700;color:var(--muted,#6b7892);white-space:nowrap;width:140px}
+
 /* ---- Route Progress (submarine-cable construction tracking) ---- */
 .route-legend{display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin:4px 2px 14px;font-size:12.5px;color:var(--muted)}
 .route-legend .rp-key{display:inline-flex;align-items:center;gap:7px}
