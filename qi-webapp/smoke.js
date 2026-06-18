@@ -1029,5 +1029,28 @@ if (altVal) {
   ok(false, "could not find an alternate option to test compare change");
 }
 
+// Step 13: Programme Progress card on the dashboard
+S.reset();
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".prog-bar") != null, "Programme Progress bar exists on the dashboard");
+ok(doc.querySelectorAll(".prog-bar .prog-seg").length >= 1, "prog-bar has at least one .prog-seg child");
+// km totals sum correctly
+const totalsEl = doc.querySelector(".prog-totals");
+ok(totalsEl != null, "prog-totals element present");
+const commKmVal = Number(totalsEl.getAttribute("data-comm-km")) || 0;
+const progKmVal = Number(totalsEl.getAttribute("data-prog-km")) || 0;
+const planKmVal = Number(totalsEl.getAttribute("data-plan-km")) || 0;
+const totalKmVal = Number(totalsEl.getAttribute("data-total-km")) || 0;
+ok(commKmVal + progKmVal + planKmVal === totalKmVal && totalKmVal > 0, "Programme Progress km totals sum correctly (" + commKmVal + "+" + progKmVal + "+" + planKmVal + "=" + totalKmVal + ")");
+
+// Step 14: Dark-mode brief rules exist in the stylesheet
+const cssAllFull = Array.from(doc.styleSheets).map(function(s) { try { return Array.from(s.cssRules || []).map(function(r) { return r.cssText; }).join("\n"); } catch (e) { return ""; } }).join("\n");
+ok(/\[data-theme="dark"\]\s*\.brief/.test(cssAllFull), "dark-mode .brief rule exists in the stylesheet");
+
+// Step 15: Compare section has .no-print (hidden from print)
+doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+const cmpSection = doc.querySelector(".brief-compare");
+ok(cmpSection != null && cmpSection.closest(".no-print") != null, "compare section has .no-print class (hidden from print)");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

@@ -1178,8 +1178,36 @@
         <button class="btn btn-sm" data-act="startTour">Take the tour</button>
         <button class="btn btn-sm" data-act="skipTour">Skip</button>
       </div>`;
+    // Programme Progress card — aggregates cable network status from QIGlobe.CABLES
+    const cables = (window.QIGlobe && Array.isArray(window.QIGlobe.CABLES)) ? window.QIGlobe.CABLES : [];
+    let commKm = 0, progKm = 0, planKm = 0;
+    cables.forEach(function (c) {
+      const km = Number(c.lengthKm) || 0;
+      if (c.status === "commissioned") commKm += km;
+      else if (c.status === "in-progress") progKm += km;
+      else planKm += km;
+    });
+    const totalKm = commKm + progKm + planKm;
+    const commPct = totalKm ? Math.round(commKm / totalKm * 100) : 0;
+    const progPct = totalKm ? Math.round(progKm / totalKm * 100) : 0;
+    const planPct = totalKm ? Math.max(100 - commPct - progPct, 0) : 0;
+    const fmtKm = n => n.toLocaleString();
+    const progressCard = totalKm ? `<div class="card">
+  <h3>Programme Progress</h3>
+  <div class="prog-bar">
+    <div class="prog-seg prog-comm" style="width:${commPct}%" title="${fmtKm(commKm)} km commissioned"></div>
+    <div class="prog-seg prog-prog" style="width:${progPct}%" title="${fmtKm(progKm)} km in progress"></div>
+    <div class="prog-seg prog-plan" style="width:${planPct}%" title="${fmtKm(planKm)} km planned"></div>
+  </div>
+  <div class="prog-legend">
+    <span><i class="prog-dot prog-comm"></i> Commissioned (${fmtKm(commKm)} km)</span>
+    <span><i class="prog-dot prog-prog"></i> In progress (${fmtKm(progKm)} km)</span>
+    <span><i class="prog-dot prog-plan"></i> Planned (${fmtKm(planKm)} km)</span>
+  </div>
+  <div class="prog-totals" data-comm-km="${commKm}" data-prog-km="${progKm}" data-plan-km="${planKm}" data-total-km="${totalKm}"></div>
+</div>` : "";
     if (k.total === 0) {
-      return tourBanner + `<div class="card empty-cta">
+      return tourBanner + progressCard + `<div class="card empty-cta">
           <h2>You haven't added any cases yet</h2>
           <p>Get started by adding your first case. It will automatically populate every other view — PM tasks, scored risk, FMEA line, PDCA cycle, action-log entry, Gantt bar and budget line — all live.</p>
           <div class="empty-cta-actions">
@@ -1189,7 +1217,7 @@
         </div>
         <p class="muted" style="text-align:center;margin-top:14px">Tip — press <span class="kbd">n</span> any time to add a new case, or <span class="kbd">?</span> to see all keyboard shortcuts.</p>`;
     }
-    return tourBanner + `
+    return tourBanner + progressCard + `
       <div class="grid kpis" style="margin-bottom:16px">
         ${kpi("navy", "Total Cases", k.total)}
         ${kpi("blue", "Open / Active", k.open)}
