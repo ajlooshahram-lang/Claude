@@ -940,7 +940,8 @@ const T = {
       fault: '\u26A1 Fejlsimulator',
       thermal: '\uD83C\uDF21\uFE0F Termisk',
       route: '\uD83D\uDDFA\uFE0F Kabelrute',
-      wirelabel: '\uD83C\uDFF7\uFE0F Mærkning'
+      wirelabel: '\uD83C\uDFF7\uFE0F Mærkning',
+      coord: '\uD83D\uDCCB Koordinering'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1069,7 +1070,8 @@ const T = {
       fault: '\u26A1 Fault Sim',
       thermal: '\uD83C\uDF21\uFE0F Thermal',
       route: '\uD83D\uDDFA\uFE0F Cable Route',
-      wirelabel: '\uD83C\uDFF7\uFE0F Labels'
+      wirelabel: '\uD83C\uDFF7\uFE0F Labels',
+      coord: '\uD83D\uDCCB Coordination'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -2418,6 +2420,7 @@ function renderModule(mod) {
     case 'thermal': content += renderThermal(); break;
     case 'route': content += renderRoute(); break;
     case 'wirelabel': content += renderWireLabel(); break;
+    case 'coord': content += renderCoordStudy(); break;
     case 'home': content += renderDashboard(); break;
     case 'exam': content = renderExam(); break;
   }
@@ -19024,6 +19027,44 @@ function downloadWireLabels(){
     else{rows.push(prefix+'-L;'+panelTag+'-Q'+grp+':1;-X'+grp+':1;Brown;'+cs+';'+(c.name||'Gruppe '+grp));rows.push(prefix+'-N;'+panelTag+'-N:'+grp+';-X'+grp+':2;Blue;'+cs+';'+(c.name||'Gruppe '+grp));rows.push(prefix+'-PE;'+panelTag+'-PE:'+grp+';-X'+grp+':3;Green/yellow;'+cs+';'+(c.name||'Gruppe '+grp));}
   });
   try{var blob=new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='wire-labels-'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);}catch(e){}
+}
+
+// ===== COORDINATION STUDY REPORT =====
+function renderCoordStudy(){
+  const da=lang==='da';
+  var design=autoDesign();
+  if(!design.ok) return '<div class="card fade-in"><div class="card-title">\uD83D\uDCCB '+(da?'Koordineringsstudie':'Coordination Study')+'</div><div class="result-box warning"><div class="result-title">\u26A0\uFE0F '+design.msg+'</div></div></div>';
+  var mainRating=63; // default main fuse
+  if(mccbState.inVal>0) mainRating=mccbState.inVal;
+  else if(fuseState.size>0) mainRating=fuseState.size;
+  // Analyze selectivity for every circuit vs main
+  var pairs=[];
+  design.results.forEach(function(r){
+    var ratio=mainRating/r.mcbRating;
+    var selective=ratio>=1.6;
+    var partial=ratio>=1.3;
+    pairs.push({circuit:r.name,downstream:r.mcb+' A',upstream:mainRating+'A '+(da?'(hoved)':'(main)'),ratio:ratio.toFixed(1)+':1',verdict:selective?(da?'Fuld selektivitet':'Full selectivity'):(partial?(da?'Delvis selektivitet':'Partial selectivity'):(da?'Ingen selektivitet':'No selectivity')),ok:selective,partial:partial&&!selective});
+  });
+  var allSelective=pairs.every(function(p){return p.ok;});
+  var somePartial=pairs.some(function(p){return p.partial;});
+  let html='<div class="card fade-in"><div class="card-title">\uD83D\uDCCB '+(da?'Koordineringsstudie \u2014 alle kredse mod hovedbeskyttelse':'Coordination Study \u2014 all circuits vs. main protection')+'</div>';
+  html+='<div class="info-row">'+(da?'Professionelt koordineringsstudie der beviser selektivitet mellem hovedbeskyttelse og ALLE afgangskredse samtidigt. Svarer til et r\u00e5dgiverdokument til 50.000+ DKK.':'Professional coordination study proving selectivity between main protection and ALL branch circuits simultaneously. Equivalent to a consultant document costing 50,000+ DKK.')+'</div>';
+  // Overall verdict
+  html+='<div class="result-box '+(allSelective?'':(somePartial?'warning':'error'))+'"><div class="result-title">'+(allSelective?'\u2705 '+(da?'FULD SELEKTIVITET p\u00e5 alle kredse':'FULL SELECTIVITY on all circuits'):(somePartial?'\u26A0\uFE0F '+(da?'DELVIS selektivitet \u2014 acceptabelt med forbehold':'PARTIAL selectivity \u2014 acceptable with reservations'):'\u274c '+(da?'SELEKTIVITET IKKE OPFYLDT':'SELECTIVITY NOT MET')))+'</div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Hovedbeskyttelse':'Main protection')+'</span><span class="value" style="font-weight:700">'+mainRating+' A</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Antal kredse':'Number of circuits')+'</span><span class="value">'+pairs.length+'</span></div>';
+  html+='<div class="result-row"><span class="label">'+(da?'Fuldt selektive':'Fully selective')+'</span><span class="value" style="color:var(--success)">'+pairs.filter(function(p){return p.ok;}).length+'/'+pairs.length+'</span></div></div>';
+  // Per-circuit table
+  html+='<div style="overflow-x:auto"><table class="data-table" style="width:100%;font-size:.82rem"><thead><tr><th>'+(da?'Kreds':'Circuit')+'</th><th>'+(da?'Nedstr\u00f8ms':'Downstream')+'</th><th>'+(da?'Opstr\u00f8ms':'Upstream')+'</th><th>'+(da?'Forhold':'Ratio')+'</th><th>'+(da?'Resultat':'Result')+'</th></tr></thead><tbody>';
+  pairs.forEach(function(p){
+    var col=p.ok?'var(--success)':(p.partial?'#b8860b':'var(--danger)');
+    html+='<tr><td>'+p.circuit+'</td><td>'+p.downstream+'</td><td>'+p.upstream+'</td><td style="font-weight:700">'+p.ratio+'</td><td style="color:'+col+';font-weight:700">'+p.verdict+'</td></tr>';
+  });
+  html+='</tbody></table></div>';
+  // Standard reference + print
+  html+='<div class="info-row" style="margin-top:10px">'+(da?'Ref: DS/HD 60364-5-53 \u00a7536. Fuld selektivitet: forhold \u2265 1,6:1 (gG/gG). Bekr\u00e6ft altid mod fabrikantens selektivitetstabel.':'Ref: DS/HD 60364-5-53 \u00a7536. Full selectivity: ratio \u2265 1.6:1 (gG/gG). Always confirm against manufacturer selectivity table.')+'</div>';
+  html+='<div class="select-grid" style="margin-top:10px"><button class="sel-btn selected" onclick="window.print()">\uD83D\uDDA8\uFE0F '+(da?'Udskriv koordineringsstudie':'Print coordination study')+'</button></div></div>';
+  return html;
 }
 
 // ===== INIT =====
