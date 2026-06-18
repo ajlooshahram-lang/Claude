@@ -1372,3 +1372,12 @@ html.hi-contrast[data-theme="dark"]{--ink:#ffffff;--muted:#d2dcf0;--line:rgba(17
 [dir="rtl"] .modal{text-align:right}
 [dir="rtl"] .auth-card{text-align:right}
 [dir="rtl"] .empty{text-align:right}
+[dir="rtl"] .toolbar{flex-direction:row-reverse}
+[dir="rtl"] .kpi .label,[dir="rtl"] .kpi .value{text-align:right}
+[dir="rtl"] .field label{text-align:right}
+[dir="rtl"] .upd-item-head{flex-direction:row-reverse}
+[dir="rtl"] .upd-del{margin-left:0;margin-right:auto}
+[dir="rtl"] .interp-fixes{direction:rtl}
+[dir="rtl"] select,[dir="rtl"] input,[dir="rtl"] textarea{text-align:right}
+[dir="rtl"] .projswitch{direction:rtl}
+[dir="rtl"] .nav-footer{flex-direction:row-reverse}

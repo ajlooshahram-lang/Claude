@@ -5553,8 +5553,28 @@
         applyLang();
         buildNav();
         go(current);
+        toast(I.t("toast.langChanged", I.getLang().toUpperCase()));
       };
     }
+    // Translate topbar buttons
+    var btnMap = { btnShare: "btn.share", btnPrint: "btn.print", btnExport: "btn.export", btnImport: "btn.import" };
+    Object.keys(btnMap).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = I.t(btnMap[id]);
+    });
+    var btnLogout = document.getElementById("btnLogout");
+    if (btnLogout) btnLogout.title = I.t("btn.logout");
+    var btnHelp = document.getElementById("btnHelp");
+    if (btnHelp) btnHelp.title = I.t("label.help");
+    // Translate global search placeholder
+    var searchEl = document.getElementById("globalSearch");
+    if (searchEl) searchEl.placeholder = I.t("label.search");
+    // Translate the "Add an item" FAB
+    var fab = document.getElementById("navAddCase");
+    if (fab) fab.textContent = I.t("btn.addItem");
+    // Translate the saved-locally hint
+    var savedHint = document.querySelector(".savedhint");
+    if (savedHint) savedHint.textContent = I.t("label.savedHint");
   }
 
   // ---------- init (called by auth.js after successful authentication) ----------
