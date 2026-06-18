@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Selectivity analysis engine with time-current curve data, selectivity verdict computation, and SVG log-log chart visualization. Integrates with the existing SLD via clickable connections between nodes. Includes DS/HD 60364-5-53 section 536 compliance checks.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "STEP 1 - Time-current curve data model: Add constants/functions that generate time-current curve points for each device type. For MCBs: thermal region (inverse-time, 1.13*In to Isd using IEC 60898 time-current model) and instantaneous region (Isd based on MCB_CURVES B/C/D). For fuses (gG): use IEC 60269 time-current characteristics derived from i5s data - compute I^2t from (i5s)^2 * 5, model the inverse-time curve as t = I2t / I^2 for times > 0.01s, and the minimum pre-arcing curve below. For MCCBs: thermal trip at 1.05-1.3*Ir (adjustable via Io setting), short-time delay Isd region (programmable delay 0-0.4s), and instantaneous Ii. Add these as a function sldDeviceCurve(device, In, settings) that returns arrays of {i, tMin, tMax} points for plotting.",
 
@@ -33,5 +33,5 @@
     "Verify the new functions are defined: sldDeviceCurve, sldAnalyzeSelectivity, sldRenderTCCChart, sldShowSelectivity, sldVerifySelectivityAll"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 39 tests pass (28 original + 11 new). The _FA translation object was initially empty and is now populated with Farsi strings for the selectivity module. The test for sldVerifyNode selectivity check needed to match both Danish 'Selektiv' and English 'Selectiv' patterns since the default lang is 'da'. The connection lines in the SLD canvas now have invisible 14px-wide hit areas for click interaction overlaid on the 2px visible lines."
 }
