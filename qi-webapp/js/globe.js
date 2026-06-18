@@ -262,8 +262,16 @@
     tex.needsUpdate = true;
     var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false });
     var sprite = new THREE.Sprite(mat);
-    var scale = (opts.scale || 0.5);
-    sprite.scale.set(scale * (w / h), scale, 1);
+    // Store the aspect ratio + desired on-screen size factor so the animation
+    // loop can keep this label a constant, readable size on screen regardless
+    // of zoom (fixed world-size sprites otherwise balloon when zoomed in and
+    // swamp the globe). screenK ~= fraction of viewport height * 0.83.
+    var aspect = w / h;
+    sprite.userData.aspect = aspect;
+    sprite.userData.screenK = opts.screenK || 0.026;
+    // Initial scale based on a mid-range camera distance; refined every frame.
+    var initH = sprite.userData.screenK * 6;
+    sprite.scale.set(initH * aspect, initH, 1);
     sprite.renderOrder = 10;
     return sprite;
   }
@@ -467,6 +475,8 @@
       var rings = [];
       var pickables = [];        // meshes the raycaster can select
       var stationMeshes = {};    // id -> beacon mesh (for hover/selection scaling)
+      var labels = [];           // text sprites, kept a constant on-screen size each frame
+      var labelTmp = new THREE.Vector3();  // scratch vector for per-frame label work
       var beaconGeo = new THREE.SphereGeometry(0.04, 18, 18);
       var beaconGlowGeo = new THREE.SphereGeometry(0.09, 16, 16);
       disposables.push(beaconGeo, beaconGlowGeo);
@@ -499,11 +509,12 @@
         disposables.push(ringGeo, ringMat);
         rings.push({ mesh: ring, mat: ringMat, offset: i / STATIONS.length, id: st.id });
 
-        var label = makeLabelSprite(st.name, { fontSize: 30, scale: 0.42, color: "#ffe9b0" });
+        var label = makeLabelSprite(st.name, { fontSize: 30, screenK: 0.030, color: "#ffe9b0" });
         if (label) {
           var lp = latLonToVec3(st.lat, st.lon, GLOBE_R * 1.17);
           label.position.copy(lp);
           world.add(label);
+          labels.push(label);
           if (label.material.map) disposables.push(label.material.map);
           disposables.push(label.material);
         }
@@ -571,10 +582,11 @@
         }
 
         // mid-cable id label for orientation
-        var seg = makeLabelSprite(cab.id, { fontSize: 22, scale: 0.3, color: (STATUS_COLOR[cab.status] || STATUS_COLOR.planned).css, bg: "rgba(8,16,32,0.62)" });
+        var seg = makeLabelSprite(cab.id, { fontSize: 22, screenK: 0.020, color: (STATUS_COLOR[cab.status] || STATUS_COLOR.planned).css, bg: "rgba(8,16,32,0.62)" });
         if (seg) {
           seg.position.copy(mid.clone().multiplyScalar(1.02));
           world.add(seg);
+          labels.push(seg);
           if (seg.material.map) disposables.push(seg.material.map);
           disposables.push(seg.material);
         }
@@ -999,6 +1011,35 @@
           if (sKey === selectedId) target += 0.25 * (0.5 + 0.5 * Math.sin(t * 3.0)); // gentle selected pulse
           var cur = bm.scale.x + (target - bm.scale.x) * Math.min(1, dt * 10);
           bm.scale.setScalar(cur);
+        }
+
+        // Keep name/route labels a constant, readable on-screen size (so they
+        // never balloon when zoomed in and swamp the globe) and fade out labels
+        // on the far hemisphere so back-side names don't bleed through and
+        // clutter the cable-laying animation.
+        if (labels.length) {
+          var camN = camera.position.clone();
+          var camLen = camN.length() || 1;
+          camN.multiplyScalar(1 / camLen);
+          for (var li = 0; li < labels.length; li++) {
+            var lb = labels[li];
+            lb.getWorldPosition(labelTmp);
+            var d = labelTmp.distanceTo(camera.position) || camLen;
+            var aspect = (lb.userData && lb.userData.aspect) || 4;
+            var hk = (lb.userData && lb.userData.screenK) || 0.026;
+            var hgt = d * hk;
+            if (hgt < 0.05) hgt = 0.05; else if (hgt > 0.42) hgt = 0.42;
+            lb.scale.set(hgt * aspect, hgt, 1);
+            // Front-facing test: dot of the label's outward direction with the
+            // camera direction. >0 = near hemisphere, <0 = behind the globe.
+            var facing = (labelTmp.lengthSq() > 1e-6)
+              ? labelTmp.normalize().dot(camN)
+              : 1;
+            var op = (facing + 0.05) / 0.35;   // ramp from just-behind to front
+            if (op < 0) op = 0; else if (op > 1) op = 1;
+            if (lb.material) lb.material.opacity = op;
+            lb.visible = op > 0.02;
+          }
         }
 
         if (clouds) clouds.rotation.y += 0.00045;   // clouds drift a touch faster

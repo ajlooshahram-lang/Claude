@@ -1489,5 +1489,14 @@ doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.E
 var dashHtml103 = doc.getElementById("content").innerHTML;
 ok(dashHtml103.indexOf("key-dates") !== -1 || dashHtml103.indexOf("Key dates") !== -1, "key-dates content exists on dashboard");
 
+// Step 104: Responsive layout — topbar never overflows off-screen
+var allStylesResp = Array.from(doc.querySelectorAll("style")).map(function (s) { return s.textContent; }).join("");
+ok(/\.main\{[^}]*overflow-x:hidden/.test(allStylesResp), ".main clips horizontal overflow so the sticky topbar can't be dragged off-screen");
+ok(/\.topbar-actions\{[^}]*flex-wrap:wrap/.test(allStylesResp), ".topbar-actions wraps so action buttons reflow instead of overflowing");
+ok(allStylesResp.indexOf("@media(max-width:1024px)") !== -1 || allStylesResp.indexOf("@media (max-width:1024px)") !== -1, "responsive @media(max-width:1024px) topbar rule exists");
+ok(allStylesResp.indexOf("@media(max-width:560px)") !== -1 || allStylesResp.indexOf("@media (max-width:560px)") !== -1, "responsive @media(max-width:560px) topbar rule exists");
+// Viewport meta is required for correct scaling on any device
+ok(/name=["']viewport["'][^>]*width=device-width/.test(html), "viewport meta tag enables device-width responsive scaling");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
