@@ -1686,6 +1686,57 @@
         setTimeout(function () { if (dot.parentNode) dot.parentNode.removeChild(dot); }, 600);
       });
     }
+
+    // --- Reading time estimate (step 73) ---
+    if (briefEl) {
+      var briefBody = briefEl.innerText || briefEl.textContent || "";
+      var wordCount = briefBody.trim().split(/\s+/).length;
+      var readMin = Math.max(1, Math.round(wordCount / 200));
+      var subEl = briefEl.querySelector(".brief-cover-sub");
+      if (subEl) {
+        var rtSpan = document.createElement("span");
+        rtSpan.className = "brief-readtime";
+        rtSpan.textContent = "~" + readMin + " min read";
+        subEl.appendChild(rtSpan);
+      }
+    }
+
+    // --- "Mark as reviewed" checkbox per brief section (step 74) ---
+    if (briefEl) {
+      var allSections = Array.prototype.slice.call(briefEl.querySelectorAll(".brief-section"));
+      allSections.forEach(function (sec, i) {
+        var cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.className = "section-reviewed";
+        cb.setAttribute("aria-label", "Mark section as reviewed");
+        cb.setAttribute("data-review-idx", String(i));
+        // Restore persisted state
+        try {
+          if (localStorage.getItem("qi_reviewed_" + i) === "1") {
+            cb.checked = true;
+            sec.classList.add("is-reviewed");
+          }
+        } catch (e) {}
+        cb.addEventListener("change", function () {
+          if (cb.checked) {
+            sec.classList.add("is-reviewed");
+            try { localStorage.setItem("qi_reviewed_" + i, "1"); } catch (e) {}
+          } else {
+            sec.classList.remove("is-reviewed");
+            try { localStorage.removeItem("qi_reviewed_" + i); } catch (e) {}
+          }
+        });
+        sec.appendChild(cb);
+      });
+
+      // --- Auto-scroll to first unreviewed section (step 75) ---
+      setTimeout(function () {
+        var firstUnreviewed = briefEl.querySelector(".brief-section:not(.is-reviewed)");
+        if (firstUnreviewed) {
+          firstUnreviewed.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 400);
+    }
   };
 
   // Route Progress — submarine-cable construction tracking (GIS delivery view).

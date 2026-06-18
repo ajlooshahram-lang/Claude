@@ -1334,5 +1334,23 @@ ok(pinAfter !== pinBefore, "togglePin flips pinned state (was " + pinBefore + " 
 // Step 72: Notification sound toggle
 ok(doc.getElementById("btnSound") != null, "#btnSound button exists in the topbar");
 
+// Step 73: .brief-readtime exists on the investor brief
+doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".brief-readtime") != null, ".brief-readtime exists on the Investor Brief");
+
+// Step 74: .section-reviewed checkboxes exist
+var reviewCBs = doc.querySelectorAll(".section-reviewed");
+ok(reviewCBs.length > 0, ".section-reviewed checkboxes exist (found " + reviewCBs.length + ")");
+
+// Step 75: Checking a checkbox adds .is-reviewed class
+if (reviewCBs.length > 0) {
+  var parentSec = reviewCBs[0].closest(".brief-section");
+  reviewCBs[0].checked = true;
+  reviewCBs[0].dispatchEvent(new window.Event("change", { bubbles: true }));
+  ok(parentSec && parentSec.classList.contains("is-reviewed"), "checking a .section-reviewed checkbox adds .is-reviewed class");
+} else {
+  ok(false, "checking a .section-reviewed checkbox adds .is-reviewed class (no checkboxes found)");
+}
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

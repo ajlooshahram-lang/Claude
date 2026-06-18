@@ -1147,3 +1147,11 @@ mark.hl{background:rgba(230,184,74,.4);border-radius:2px;padding:0 1px}
 
 /* Sound toggle active state (step 72) */
 #btnSound.sound-off{opacity:.45}
+
+/* Reading time indicator (step 73) */
+.brief-readtime{margin-left:10px;font-size:11px;color:var(--muted,#6b7892)}
+
+/* "Mark as reviewed" checkbox per section (step 74) */
+.brief-section{position:relative}
+.section-reviewed{position:absolute;top:8px;right:8px;width:16px;height:16px;accent-color:#1d8e6a;cursor:pointer}
+.brief-section.is-reviewed{border-left:3px solid rgba(66,214,164,.5);padding-left:12px}
