@@ -8,6 +8,7 @@ import {
   stopPresenceInterval,
   getConnectedClientCount,
   __resetStateForTest,
+  isOriginAllowed,
 } from "../../src/ws.js";
 import { hashToken } from "../../src/auth/session.js";
 import type { AuthDbHelpers, DbSession, DbUser } from "../../src/auth/db-helpers.js";
@@ -80,11 +81,11 @@ type TestClient = {
   waiters: Array<{ pred: (m: any) => boolean; resolve: (m: any) => void; timer: NodeJS.Timeout }>;
 };
 
-function startServer(): Promise<{ server: Server; port: number }> {
+function startServer(opts: { allowedOrigins?: string[] } = {}): Promise<{ server: Server; port: number }> {
   return new Promise((resolve) => {
     __resetStateForTest();
     const server = createServer();
-    attachWebSocketServer(server, stubDb);
+    attachWebSocketServer(server, stubDb, { allowedOrigins: opts.allowedOrigins ?? [] });
     server.listen(0, () => {
       const port = (server.address() as AddressInfo).port;
       resolve({ server, port });
@@ -95,9 +96,19 @@ function startServer(): Promise<{ server: Server; port: number }> {
 // Connect and immediately start buffering messages, so we never miss a message
 // the server sends synchronously on connect (presence/activity) due to a race
 // between the client 'open' event and listener attachment.
-function connect(port: number, token: string | null): TestClient {
+//
+// By default sends a same-origin Origin header (http://127.0.0.1:<port>) so the
+// anti-CSWSH origin check passes. Pass { origin: null } to omit it, or a string
+// to send a specific (e.g. malicious) Origin.
+function connect(
+  port: number,
+  token: string | null,
+  opts: { origin?: string | null } = {},
+): TestClient {
   const headers: Record<string, string> = {};
   if (token) headers.Cookie = `qi_session=${token}`;
+  const origin = opts.origin === undefined ? `http://127.0.0.1:${port}` : opts.origin;
+  if (origin !== null) headers.Origin = origin;
   const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, { headers });
   const client: TestClient = { ws, messages: [], waiters: [] };
   ws.on("message", (raw: unknown) => {
@@ -286,4 +297,106 @@ test("WS: getConnectedClientCount drops to zero after clients disconnect", async
   await new Promise<void>((resolve) => { b.ws.once("close", () => resolve()); b.ws.close(); });
   await new Promise((r) => setTimeout(r, 200));
   assert.equal(getConnectedClientCount(), 0);
+});
+
+
+// ---- Anti-CSWSH (Cross-Site WebSocket Hijacking) origin enforcement ----
+
+test("isOriginAllowed: rejects a missing Origin header", () => {
+  assert.equal(isOriginAllowed(undefined, "app.example.com", []), false);
+  assert.equal(isOriginAllowed(undefined, "app.example.com", ["https://app.example.com"]), false);
+});
+
+test("isOriginAllowed: same-origin mode (no allowlist) accepts matching host, rejects others", () => {
+  assert.equal(isOriginAllowed("https://app.example.com", "app.example.com", []), true);
+  assert.equal(isOriginAllowed("https://evil.example.net", "app.example.com", []), false);
+  // A cross-site page whose Origin host differs from the served Host is blocked.
+  assert.equal(isOriginAllowed("http://127.0.0.1:9999", "127.0.0.1:8080", []), false);
+  assert.equal(isOriginAllowed("not-a-url", "app.example.com", []), false);
+});
+
+test("isOriginAllowed: allowlist mode accepts only listed origins", () => {
+  const allow = ["https://app.example.com", "https://stp.example.com"];
+  assert.equal(isOriginAllowed("https://app.example.com", "ignored", allow), true);
+  assert.equal(isOriginAllowed("https://stp.example.com", "ignored", allow), true);
+  assert.equal(isOriginAllowed("https://evil.example.net", "ignored", allow), false);
+});
+
+test("WS: rejects an upgrade with NO Origin header (non-browser/CSWSH guard)", async (t) => {
+  const { server, port } = await startServer();
+  t.after(() => { stopPresenceInterval(); server.close(); });
+
+  // Valid cookie but no Origin -> must be rejected by the origin gate.
+  const client = connect(port, TOKEN_ALICE, { origin: null });
+  const result = await new Promise<string>((resolve) => {
+    client.ws.once("open", () => resolve("opened"));
+    client.ws.once("error", () => resolve("error"));
+    client.ws.once("unexpected-response", () => resolve("unexpected-response"));
+  });
+  assert.notEqual(result, "opened", "connection with no Origin must not open");
+  try { client.ws.close(); } catch { /* ignore */ }
+});
+
+test("WS: rejects an upgrade with a cross-site Origin even with a valid cookie", async (t) => {
+  const { server, port } = await startServer();
+  t.after(() => { stopPresenceInterval(); server.close(); });
+
+  // This is the core CSWSH scenario: the browser auto-sends the victim's
+  // cookie, but the Origin is the attacker's site.
+  const client = connect(port, TOKEN_ALICE, { origin: "https://attacker.example.com" });
+  const result = await new Promise<string>((resolve) => {
+    client.ws.once("open", () => resolve("opened"));
+    client.ws.once("error", () => resolve("error"));
+    client.ws.once("unexpected-response", () => resolve("unexpected-response"));
+  });
+  assert.notEqual(result, "opened", "cross-site Origin must not open even with a valid cookie");
+  try { client.ws.close(); } catch { /* ignore */ }
+});
+
+test("WS: accepts an upgrade whose Origin is in the configured allowlist", async (t) => {
+  const allowed = "https://stp.example.com";
+  const { server, port } = await startServer({ allowedOrigins: [allowed] });
+  t.after(() => { stopPresenceInterval(); server.close(); });
+
+  const ok = connect(port, TOKEN_ALICE, { origin: allowed });
+  await waitOpen(ok);
+  const presence = await waitFor<{ type: string }>(ok, (m) => m.type === "presence");
+  assert.equal(presence.type, "presence");
+  ok.ws.close();
+
+  // A different origin is rejected under the same allowlist.
+  const bad = connect(port, TOKEN_BOB, { origin: "https://app.other.com" });
+  const result = await new Promise<string>((resolve) => {
+    bad.ws.once("open", () => resolve("opened"));
+    bad.ws.once("error", () => resolve("error"));
+    bad.ws.once("unexpected-response", () => resolve("unexpected-response"));
+  });
+  assert.notEqual(result, "opened", "origin outside the allowlist must not open");
+  try { bad.ws.close(); } catch { /* ignore */ }
+});
+
+test("WS: oversized/garbage change fields are sanitized before broadcast", async (t) => {
+  const { server, port } = await startServer();
+  t.after(() => { stopPresenceInterval(); server.close(); });
+
+  const a = connect(port, TOKEN_ALICE);
+  const b = connect(port, TOKEN_BOB);
+  await Promise.all([waitOpen(a), waitOpen(b)]);
+
+  const bobGetsChange = waitFor<{ entity: string; action: string }>(b, (m) => m.type === "change");
+
+  // entity far longer than the 80-char cap, action with control chars.
+  a.ws.send(JSON.stringify({
+    type: "change",
+    entity: "X".repeat(5000),
+    action: "up\u0000da\nte",
+    data: { id: "z1" },
+  }));
+
+  const received = await bobGetsChange;
+  assert.ok(received.entity.length <= 80, "entity must be capped to 80 chars");
+  assert.equal(received.action.includes("\u0000"), false, "control chars stripped from action");
+  assert.equal(received.action.includes("\n"), false, "newlines stripped from action");
+  a.ws.close();
+  b.ws.close();
 });

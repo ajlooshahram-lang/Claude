@@ -34,9 +34,11 @@ async function main(): Promise<void> {
   await app.listen({ port: config.port, host: "0.0.0.0" });
 
   // Attach the WebSocket server to the underlying Node HTTP server.
-  // This must happen after listen() so the server object exists.
+  // This must happen after listen() so the server object exists. The configured
+  // CORS origins double as the WebSocket Origin allowlist; when empty (the
+  // same-origin production topology) the WS layer enforces strict same-origin.
   const httpServer = app.server;
-  attachWebSocketServer(httpServer, dbHelpers);
+  attachWebSocketServer(httpServer, dbHelpers, { allowedOrigins: config.corsOrigins });
   app.log.info("WebSocket server attached at /ws");
 }
 
