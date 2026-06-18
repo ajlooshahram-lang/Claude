@@ -825,14 +825,20 @@
     const fsBtn = $("#globeFullscreen");
     if (fsBtn) fsBtn.addEventListener("click", () => {
       const el = stage.closest(".globe-view") || stage;
-      if (document.fullscreenElement) {
-        document.exitFullscreen().catch(() => {});
+      if (!el) return;
+      if (document.fullscreenElement || document.webkitFullscreenElement) {
+        (document.exitFullscreen || document.webkitExitFullscreen || function(){}).call(document);
       } else {
-        (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen || function(){}).call(el).catch(() => {});
+        var fn = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+        if (fn) { try { fn.call(el); } catch(e) {} }
       }
     });
-    document.addEventListener("fullscreenchange", () => {
-      if (fsBtn) fsBtn.textContent = document.fullscreenElement ? "\u26F6 Exit fullscreen" : "\u26F6 Fullscreen";
+    var fsChangeEvents = ["fullscreenchange", "webkitfullscreenchange"];
+    fsChangeEvents.forEach(function(evt) {
+      document.addEventListener(evt, () => {
+        var isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        if (fsBtn) fsBtn.textContent = isFs ? "\u26F6 Exit fullscreen" : "\u26F6 Fullscreen";
+      });
     });
 
     // Screenshot button (step 62)
