@@ -3004,7 +3004,31 @@
           <button class="btn" id="brainClear">Clear</button>
         </div>
       </div>
-      <div id="brainOut"></div>`;
+      <div id="brainOut"></div>
+      <div class="card" id="brainUpdatesCard">
+        <div class="card-head"><h3>Project Updates &amp; References <span class="tag">live log</span></h3></div>
+        <p class="muted" style="line-height:1.6;margin-top:0">Keep the project current: post <b>news</b>, <b>results</b>, and <b>reference links</b> here.
+        Everything you add is saved to this project and — when you are signed in to the shared workspace — every other
+        team member is notified of the change. Use it as the running journal of duties, decisions and milestones.</p>
+        <div class="upd-add">
+          <div class="toolbar" style="gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <label class="muted" style="display:flex;flex-direction:column;gap:4px;font-size:12px">Type
+              <select id="updType" style="min-width:170px">
+                <option value="news">📰 News</option>
+                <option value="result">✅ Result</option>
+                <option value="reference">🔗 Reference / link</option>
+                <option value="decision">📌 Decision</option>
+                <option value="risk">⚠️ Risk note</option>
+                <option value="note">📝 General note</option>
+              </select>
+            </label>
+            <textarea id="updText" rows="2" style="flex:1 1 320px;min-width:220px;font:inherit;padding:8px;border:1.5px solid var(--border);border-radius:8px"
+              placeholder="What happened? Paste a result, a news item, or a reference link…"></textarea>
+            <button class="btn btn-primary" id="updAdd" type="button">Add to log</button>
+          </div>
+        </div>
+        <div id="updFeed" class="upd-feed" style="margin-top:14px"></div>
+      </div>`;
   };
   AFTER.brain = function () {
     const fileInput = $("#brainFile"), nameEl = $("#brainFileName"), ta = $("#brainText");
@@ -3110,7 +3134,92 @@
       if (nameEl) nameEl.textContent = "Example: 8-country submarine cable programme";
       if (runAnalyze({ scroll: true })) toast("Loaded an example project and analysed it — explore the results below.");
     });
+
+    // ---- Project Updates & References: post news/results/links, notify the team ----
+    refreshUpdatesFeed();
+    var updAdd = $("#updAdd"), updText = $("#updText"), updType = $("#updType");
+    function postUpdate() {
+      if (!updText) return;
+      var txt = (updText.value || "").trim();
+      if (!txt) { toast("Write a short note, result or link first."); return; }
+      var author = (window.QIAuth && QIAuth.currentUser && (QIAuth.currentUser.displayName || QIAuth.currentUser.email)) || "";
+      var entry = S.addUpdate((updType && updType.value) || "note", txt, author);
+      if (entry) {
+        updText.value = "";
+        refreshUpdatesFeed();
+        toast("Added to the project log" + (window.QISync && QISync.wsIsConnected && QISync.wsIsConnected() ? " — your team has been notified." : "."));
+      }
+    }
+    if (updAdd) updAdd.addEventListener("click", postUpdate);
+    // Ctrl/Cmd+Enter posts quickly from the textarea.
+    if (updText) updText.addEventListener("keydown", function (e) {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "Enter" || e.keyCode === 13)) { e.preventDefault(); postUpdate(); }
+    });
+    var updFeed = $("#updFeed");
+    if (updFeed) updFeed.addEventListener("click", function (e) {
+      var del = e.target.closest && e.target.closest("[data-upd-del]");
+      if (del) {
+        var id = del.getAttribute("data-upd-del");
+        if (S.deleteUpdate(id)) { refreshUpdatesFeed(); toast("Entry removed from the log."); }
+      }
+    });
+    // Live-refresh the feed when a teammate posts an update over the realtime channel.
+    if (window.QISync && QISync.wsAddListener) {
+      QISync.wsAddListener(function (type, payload) {
+        if (type === "change" && payload && payload.entity === "Project update") {
+          // Re-render only if we're still on the Brain view.
+          if ($("#updFeed")) refreshUpdatesFeed();
+        }
+      });
+    }
   };
+  // ---- Project Updates / References feed (the Brain's living log) ----
+  var UPDATE_TYPE_META = {
+    news:      { icon: "📰", label: "News",      cls: "upd-news" },
+    result:    { icon: "✅", label: "Result",    cls: "upd-result" },
+    reference: { icon: "🔗", label: "Reference", cls: "upd-reference" },
+    decision:  { icon: "📌", label: "Decision",  cls: "upd-decision" },
+    risk:      { icon: "⚠️", label: "Risk note", cls: "upd-risk" },
+    note:      { icon: "📝", label: "Note",      cls: "upd-note" }
+  };
+  function updTypeMeta(t) { return UPDATE_TYPE_META[t] || UPDATE_TYPE_META.note; }
+  // Escape first, THEN turn bare URLs into safe links (target=_blank, noopener).
+  function linkifyEscaped(text) {
+    var safe = esc(String(text == null ? "" : text));
+    return safe.replace(/(https?:\/\/[^\s<]+)/g, function (u) {
+      return '<a href="' + u + '" target="_blank" rel="noopener noreferrer">' + u + '</a>';
+    });
+  }
+  function relTime(iso) {
+    try {
+      var d = new Date(iso), diff = (Date.now() - d.getTime()) / 1000;
+      if (diff < 60) return "just now";
+      if (diff < 3600) return Math.floor(diff / 60) + "m ago";
+      if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
+      if (diff < 604800) return Math.floor(diff / 86400) + "d ago";
+      return d.toISOString().slice(0, 10);
+    } catch (e) { return ""; }
+  }
+  function renderUpdatesFeed() {
+    var items = (S.updatesList && S.updatesList()) || [];
+    if (!items.length) {
+      return '<p class="muted" style="text-align:center;padding:16px 0">No updates yet. Post the first news item, result or reference above.</p>';
+    }
+    return items.map(function (u) {
+      var m = updTypeMeta(u.type);
+      var who = u.author ? esc(u.author) + " · " : "";
+      return '<div class="upd-item ' + m.cls + '" data-upd-id="' + esc(u.id) + '">' +
+        '<div class="upd-item-head"><span class="upd-badge">' + m.icon + ' ' + esc(m.label) + '</span>' +
+        '<span class="upd-meta">' + who + esc(relTime(u.ts)) + '</span>' +
+        '<button class="upd-del" type="button" data-upd-del="' + esc(u.id) + '" title="Remove this entry" aria-label="Remove">✕</button></div>' +
+        '<div class="upd-text">' + linkifyEscaped(u.text) + '</div></div>';
+    }).join("");
+  }
+  function refreshUpdatesFeed() {
+    var box = $("#updFeed");
+    if (box) box.innerHTML = renderUpdatesFeed();
+  }
+
   function renderBrainPreview(plan) {
     const kpi = (cls, l, v) => `<div class="kpi ${cls}"><div class="label">${l}</div><div class="value">${v}</div></div>`;
     const s = plan.summary, sc = s.scale;

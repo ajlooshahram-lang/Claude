@@ -155,6 +155,7 @@
     if (!Array.isArray(s.cashflow)) s.cashflow = defaultCashflow();
     if (!s.xbarR || !s.xbarR.data) s.xbarR = defaultXbar();
     if (!s.routeProgress || typeof s.routeProgress !== "object") s.routeProgress = {};
+    if (!Array.isArray(s.updates)) s.updates = [];
     return s;
   }
   function defaultWorkspace() {
@@ -415,7 +416,43 @@
 
   // ---- generic registers ----
   function regLabel(regId) { const r = C.REGISTERS.find(x => x.id === regId); return r ? r.label : regId; }
-  function regRows(regId) { const s = get(); s.registers = s.registers || {}; return s.registers[regId] || (s.registers[regId] = []); }
+
+  // ---- Project updates / news / references (the living project log) ----
+  // A simple, persisted, per-project feed the team uses to post news, results
+  // and reference links. Each add/delete is broadcast over the real-time
+  // channel so every signed-in user is informed of the change.
+  function updatesList() { const s = get(); if (!Array.isArray(s.updates)) s.updates = []; return s.updates; }
+  function addUpdate(type, text, author) {
+    text = String(text == null ? "" : text).trim();
+    if (!text) return null;
+    var entry = {
+      id: uid(),
+      type: String(type || "note").slice(0, 24),
+      text: text.slice(0, 2000),
+      author: String(author || "").slice(0, 80),
+      ts: new Date().toISOString()
+    };
+    updatesList().unshift(entry);
+    if (get().updates.length > 200) get().updates.length = 200;
+    logAudit("Added", "Project update", entry.type);
+    save();
+    if (root.QISync && root.QISync.wsSendChange) {
+      root.QISync.wsSendChange("Project update", "add", { id: entry.id, type: entry.type, text: entry.text.slice(0, 80) });
+    }
+    return entry;
+  }
+  function deleteUpdate(id) {
+    var arr = updatesList();
+    var i = arr.findIndex(function (u) { return u.id === id; });
+    if (i < 0) return false;
+    arr.splice(i, 1);
+    logAudit("Deleted", "Project update", "");
+    save();
+    if (root.QISync && root.QISync.wsSendChange) {
+      root.QISync.wsSendChange("Project update", "delete", { id: id });
+    }
+    return true;
+  }  function regRows(regId) { const s = get(); s.registers = s.registers || {}; return s.registers[regId] || (s.registers[regId] = []); }
   function regAdd(regId, row) { row = row || {}; row._id = row._id || uid(); if (typeof row._pinned !== "boolean") row._pinned = false; regRows(regId).push(row); logAudit("Added", regLabel(regId), ""); save();
     if (root.QISync && root.QISync.syncEnabled()) {
       var projServerId = root.QISync.mapLocalToServer(ws.activeId) || ws.activeId;
@@ -840,6 +877,7 @@
     listProjects, activeProjectId, switchProject, addProject, renameProject, duplicateProject, deleteProject, importAsProject,
     brand, setBrand, aiSettings, setAi, portfolio,
     regRows, regAdd, regUpdate, regDelete, regLabel, regBulkDelete, regTogglePin, evm: () => C.evm(validCases(), get().project),
+    updatesList, addUpdate, deleteUpdate,
     gage, setGageCell, setGageConfig, gageResult, cashflow, setCashflow,
     xbar, setXbarCell, setXbarConfig, xbarResult, scorecard,
     spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy,

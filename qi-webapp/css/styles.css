@@ -1319,3 +1319,22 @@ tr.status-flash{animation:statusFlash .5s ease}
    no layout change. */
 html.hi-contrast{--ink:#0b1220;--muted:#36405a;--line:#9aa7c2}
 html.hi-contrast[data-theme="dark"]{--ink:#ffffff;--muted:#d2dcf0;--line:rgba(170,198,245,.55)}
+
+
+/* ---- Project Updates & References feed (Brain living log) ---- */
+.upd-add{background:var(--bg,#f5f7fb);border:1px solid var(--line,#e3e8f0);border-radius:10px;padding:12px}
+.upd-feed{display:flex;flex-direction:column;gap:10px}
+.upd-item{border:1px solid var(--line,#e3e8f0);border-left:4px solid var(--accent,#2e5496);border-radius:8px;padding:10px 12px;background:var(--card,#fff)}
+.upd-item-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.upd-badge{font-size:12px;font-weight:700;color:var(--ink,#1a2336)}
+.upd-meta{font-size:11px;color:var(--muted,#6b7a99)}
+.upd-del{margin-left:auto;background:none;border:none;color:var(--muted,#6b7a99);cursor:pointer;font-size:13px;line-height:1;padding:2px 6px;border-radius:6px}
+.upd-del:hover{background:rgba(244,67,54,.12);color:#f44336}
+.upd-text{font-size:13px;line-height:1.5;color:var(--ink,#1a2336);white-space:pre-wrap;word-break:break-word}
+.upd-text a{color:var(--accent,#2e5496);text-decoration:underline}
+.upd-news{border-left-color:#2e86de}
+.upd-result{border-left-color:#27ae60}
+.upd-reference{border-left-color:#8e44ad}
+.upd-decision{border-left-color:#e67e22}
+.upd-risk{border-left-color:#e74c3c}
+.upd-note{border-left-color:#7f8c9b}

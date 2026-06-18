@@ -1528,5 +1528,40 @@ if (window.QIDisplay) {
   ok(!doc.documentElement.classList.contains("hi-contrast"), "high-contrast is off in a dark room");
 }
 
+// Step 106: Project Updates & References feed (Brain living log)
+(function testUpdatesFeed() {
+  var brainNav = doc.querySelector('.nav-item[data-view="brain"]');
+  ok(!!brainNav, "Brain nav item exists");
+  if (brainNav) brainNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(!!doc.getElementById("brainUpdatesCard"), "Brain view shows the Updates & References card");
+  ok(!!doc.getElementById("updType") && !!doc.getElementById("updText") && !!doc.getElementById("updAdd"), "Updates add controls (type, text, button) exist");
+  // Add a news item with a URL via the store API + re-render the view.
+  var broadcasts = [];
+  if (window.QISync) window.QISync.wsSendChange = function (e, a) { broadcasts.push(e + ":" + a); };
+  var entry = S.addUpdate("news", "Permit approved in Vietnam — see https://example.com/permit", "Alice");
+  ok(entry && entry.id, "S.addUpdate returns a stored entry");
+  ok(S.updatesList().length >= 1, "update is stored in the project log");
+  ok(broadcasts.indexOf("Project update:add") !== -1, "adding an update broadcasts a change to other users");
+  // Persisted to localStorage so it survives reloads.
+  var saved = window.localStorage.getItem("qi_workspace_v9") || "";
+  ok(saved.indexOf("Permit approved in Vietnam") >= 0, "update persists to localStorage");
+  // Re-render the Brain view and check the feed renders the item + linkifies the URL.
+  brainNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  var feed = doc.getElementById("updFeed");
+  var feedHtml = feed ? feed.innerHTML : "";
+  ok(feedHtml.indexOf("Permit approved in Vietnam") >= 0, "feed displays the posted update");
+  ok(/<a [^>]*href="https:\/\/example\.com\/permit"/.test(feedHtml), "URLs in updates are turned into safe links");
+  // XSS safety: HTML in an update must be escaped, not executed.
+  S.addUpdate("note", "<script>bad()</script>", "X");
+  brainNav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  var fh2 = doc.getElementById("updFeed").innerHTML;
+  ok(fh2.indexOf("<script>bad") < 0 && fh2.indexOf("&lt;script&gt;") >= 0, "update text is HTML-escaped (no stored XSS)");
+  // Delete works and broadcasts.
+  var before = S.updatesList().length;
+  S.deleteUpdate(entry.id);
+  ok(S.updatesList().length === before - 1, "S.deleteUpdate removes the entry");
+  ok(broadcasts.indexOf("Project update:delete") !== -1, "deleting an update broadcasts to other users");
+})();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
