@@ -1563,5 +1563,24 @@ if (window.QIDisplay) {
   ok(broadcasts.indexOf("Project update:delete") !== -1, "deleting an update broadcasts to other users");
 })();
 
+// Step 107: Brain language-tolerant interpreter (understands messy/typo'd input)
+(function testInterpreter() {
+  if (!window.QIBrain || typeof window.QIBrain.analyzeProject !== "function") { ok(false, "QIBrain available for interpreter test"); return; }
+  ok(typeof window.QIBrain.interpretText === "function", "Brain exposes interpretText()");
+  var messy = "we are biulding a submarin fibre optik cabel sistem conecting indonisia, malaysa, vietnam, philipines, thailnd, taiwann, brunei and guam. the rout is aprox 9500 klm, budjet arround usd 1.3 bn over 60 mnths.";
+  var plan = window.QIBrain.analyzeProject(messy);
+  ok(plan.summary.domain === "fibre-telecom", "messy text still detected as fibre-telecom domain");
+  ok((plan.countryIntel || []).length === 8, "all 8 countries detected despite misspellings (got " + (plan.countryIntel || []).length + ")");
+  ok(plan.summary.scale.routeKm === 9500, "route km parsed from '9500 klm' shorthand");
+  ok(plan.summary.scale.durationMonths === 60, "duration parsed from '60 mnths' typo");
+  ok(plan.summary.interpreted && plan.summary.interpreted.correctionCount > 0, "interpreter recorded linguistic corrections");
+  var fixes = plan.summary.interpreted.corrections.map(function (c) { return c.from + ">" + c.to; }).join(" ");
+  ok(/philipines>Philippines/i.test(fixes), "country misspelling 'philipines' corrected to Philippines");
+  ok(/klm>.*km/i.test(fixes) || /9500 klm>9500 km/i.test(fixes), "unit shorthand 'klm' normalised to km");
+  // Clean input must NOT be over-corrected (no false positives).
+  var clean = window.QIBrain.analyzeProject("Submarine fibre optic cable connecting Indonesia and Taiwan, 3000 km over 24 months.");
+  ok(clean.summary.interpreted.correctionCount === 0, "clean, well-formed text triggers zero corrections (no false positives)");
+})();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

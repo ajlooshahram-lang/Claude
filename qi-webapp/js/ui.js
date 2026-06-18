@@ -3230,6 +3230,20 @@
     if (sc.durationMonths) scaleBits.push(`${sc.durationMonths} months`);
     const warn = plan.coverage.warnings.length
       ? `<div class="readout" style="border-left:3px solid var(--amber,#e0a800)">${plan.coverage.warnings.map(esc).join("<br>")}</div>` : "";
+    // "What the Brain understood" — surfaces linguistic clean-up so a user who
+    // wrote with typos/grammar errors can confirm the Brain read them correctly.
+    const interp = s.interpreted || { correctionCount: 0, corrections: [] };
+    const interpFixes = (interp.corrections || []).length
+      ? `<div class="interp-fixes">${interp.corrections.map(c => `<span class="interp-chip"><s>${esc(c.from)}</s> → <b>${esc(c.to)}</b></span>`).join("")}</div>`
+      : "";
+    const interpBlock = `
+      <div class="card interp-card">
+        <div class="card-head"><h3>📖 What the Brain understood</h3><span class="tag">smart interpreter</span></div>
+        <p style="margin:0 0 6px">I read your description as a <b>${esc(s.domainLabel)}</b>${
+          (plan.countryIntel && plan.countryIntel.length) ? ` involving <b>${plan.countryIntel.length}</b> ${plan.countryIntel.length === 1 ? "country" : "countries"} (${plan.countryIntel.map(c => esc(c.name)).join(", ")})` : ""
+        }${scaleBits.length ? `, scale: ${esc(scaleBits.join(" · "))}` : ""}.</p>
+        ${interp.correctionCount ? `<p class="muted" style="margin:0">${esc(interp.note)}</p>${interpFixes}` : `<p class="muted" style="margin:0">No spelling fixes were needed — your description was clear.</p>`}
+      </div>`;
     const phaseRows = plan.phases.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.owner)}</td><td class="center">${p.taskCount}</td></tr>`).join("");
     const riskRows = plan.risks.map(r => `<tr><td class="wrap">${esc(r.problem.replace(/^RISK:\s*/, ""))}</td><td class="center">${r.sev}</td><td class="center">${r.occ}</td><td class="center">${r.det}</td><td class="center"><b>${r.sev * r.occ * r.det}</b></td></tr>`).join("");
     const budgetRows = plan.budget.rows.map(b => `<tr><td>${esc(b.category)}</td><td class="right">${money(b.est)}</td></tr>`).join("");
@@ -3259,6 +3273,7 @@
           <button class="btn btn-sm" data-go="globe3d">3D map</button>
         </div></div>` : "";
     $("#brainOut").innerHTML = `
+      ${interpBlock}
       <div class="card"><div class="card-head"><h3>Analysis — ${esc(s.title)}</h3>
         <span class="tag">${esc(s.domainLabel)} · ${Math.round(plan.coverage.confidence * 100)}% confidence</span></div>
         <p class="muted">${scaleBits.length ? "Detected scale: " + esc(scaleBits.join(" · ")) : "No explicit scale detected."}</p>

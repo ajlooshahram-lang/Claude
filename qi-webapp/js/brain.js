@@ -75,6 +75,149 @@
     };
   }
 
+  // ---- Language-tolerant interpreter --------------------------------------
+  // Many users write in a second language with typos and broken grammar. The
+  // analyzer is keyword/heuristic based, so we first clean the text up: fix
+  // common misspellings of the domain terms, the 8 STP countries and their
+  // landing cities, and normalise number/unit forms (bn->billion, mio->million,
+  // klm->km). This is fully deterministic and offline. We also return the list
+  // of corrections so the UI can show the user exactly what the Brain understood.
+
+  // Canonical vocabulary the fuzzy pass repairs typos *towards*.
+  var INTERP_DICT = [
+    // countries
+    "indonesia", "malaysia", "brunei", "vietnam", "thailand", "philippines", "taiwan", "guam",
+    // landing cities
+    "jakarta", "mersing", "songkhla", "danang", "batangas", "tamsui", "begawan", "piti",
+    // domain terms
+    "submarine", "subsea", "fibre", "fiber", "optic", "optical", "cable", "telecom",
+    "network", "backbone", "backhaul", "repeater", "landing", "station", "permit",
+    "licence", "license", "licensing", "regulatory", "authority", "marine", "survey",
+    "installation", "burial", "splice", "otdr", "capacity", "budget", "route",
+    "kilometre", "kilometer", "duration", "months", "procurement", "milestone",
+    "country", "countries", "approximately", "billion", "million"
+  ];
+  // Explicit phrase/number fixes applied first (regex -> replacement).
+  var INTERP_PHRASES = [
+    // number + magnitude shorthands
+    [/\b(\d[\d.,]*)\s*bn\b/gi, "$1 billion"],
+    [/\b(\d[\d.,]*)\s*bln\b/gi, "$1 billion"],
+    [/\b(\d[\d.,]*)\s*mio\b/gi, "$1 million"],
+    [/\b(\d[\d.,]*)\s*mln\b/gi, "$1 million"],
+    [/\b(\d[\d.,]*)\s*mn\b/gi, "$1 million"],
+    // unit shorthands
+    [/\b(\d[\d.,]*)\s*(?:klm|kms|k\.m\.?)\b/gi, "$1 km"],
+    [/\bmnths?\b/gi, "months"],
+    [/\bmths?\b/gi, "months"],
+    [/\byrs?\b/gi, "years"],
+    [/\bapprox\.?\b/gi, "approximately"],
+    [/\babt\b/gi, "about"],
+    // common country / domain spellings (multi-spelling tolerant)
+    [/\bphil+i?p+(?:ines?|iens?|enes?)\b/gi, "Philippines"],
+    [/\bviet\s*nam\b/gi, "Vietnam"],
+    [/\bindonesi?a?n?\b/gi, "Indonesia"],
+    [/\bmalaysi?a\b/gi, "Malaysia"],
+    [/\bthai?land\b/gi, "Thailand"],
+    [/\btaiwan?\b/gi, "Taiwan"],
+    [/\bbrunei?\b/gi, "Brunei"],
+    [/\bda\s*nang\b/gi, "Da Nang"],
+    [/\bbandar\s*seri\s*begawan\b/gi, "Bandar Seri Begawan"],
+    [/\bsub\s*marine\b/gi, "submarine"],
+    [/\bfiber\s*optic\b/gi, "fibre optic"],
+    [/\bfibre?\s*optic(?:al)?\b/gi, "fibre optic"],
+    [/\bbud?j?et\b/gi, "budget"],
+    [/\bkilo\s*met(?:er|re)s?\b/gi, "kilometre"]
+  ];
+
+  function levenshtein(a, b) {
+    if (a === b) return 0;
+    var m = a.length, n = b.length;
+    if (!m) return n; if (!n) return m;
+    var prev = new Array(n + 1), cur = new Array(n + 1), i, j;
+    for (j = 0; j <= n; j++) prev[j] = j;
+    for (i = 1; i <= m; i++) {
+      cur[0] = i;
+      for (j = 1; j <= n; j++) {
+        var cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
+        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      }
+      var tmp = prev; prev = cur; cur = tmp;
+    }
+    return prev[n];
+  }
+
+  // Find the single closest dictionary term within an edit-distance threshold
+  // scaled to word length. Returns null if ambiguous or nothing close enough.
+  function closestDictTerm(tokenLower) {
+    if (tokenLower.length < 4) return null;
+    if (INTERP_DICT.indexOf(tokenLower) !== -1) return null; // already valid
+    var thresh = tokenLower.length >= 7 ? 2 : 1;
+    var best = null, bestD = thresh + 1, ties = 0;
+    for (var i = 0; i < INTERP_DICT.length; i++) {
+      var d = levenshtein(tokenLower, INTERP_DICT[i]);
+      if (d < bestD) { bestD = d; best = INTERP_DICT[i]; ties = 1; }
+      else if (d === bestD) { ties++; }
+    }
+    if (best && bestD <= thresh && ties === 1) return best;
+    return null;
+  }
+
+  // Preserve the original capitalisation pattern when substituting a word.
+  function matchCase(original, replacement) {
+    if (original === original.toUpperCase() && original.length > 1) return replacement.toUpperCase();
+    if (original[0] === original[0].toUpperCase()) return replacement.charAt(0).toUpperCase() + replacement.slice(1);
+    return replacement;
+  }
+
+  function interpretText(text) {
+    var original = String(text == null ? "" : text);
+    // 1) Unicode + punctuation normalisation (smart quotes, NBSP, runs of space).
+    var cleaned = original;
+    try { cleaned = cleaned.normalize("NFKC"); } catch (e) { /* older runtimes */ }
+    cleaned = cleaned
+      .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
+      .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
+      .replace(/[\u2013\u2014]/g, "-")
+      .replace(/\u00A0/g, " ")
+      .replace(/[ \t]{2,}/g, " ");
+    var corrections = [];
+    function record(from, to) {
+      if (from.toLowerCase() === to.toLowerCase()) return;
+      if (corrections.length < 50 && !corrections.some(function (c) { return c.from === from && c.to === to; })) {
+        corrections.push({ from: from, to: to });
+      }
+    }
+    // 2) Explicit phrase / number fixes.
+    INTERP_PHRASES.forEach(function (pair) {
+      var before = cleaned;
+      cleaned = cleaned.replace(pair[0], pair[1]);
+      if (cleaned !== before) {
+        // Capture one representative example of the fix for the user-facing list.
+        var single = new RegExp(pair[0].source, pair[0].flags.replace("g", ""));
+        var m = before.match(single);
+        if (m) record(m[0].trim(), m[0].replace(single, pair[1]).trim());
+      }
+    });
+    // 3) Token-level fuzzy correction towards the domain dictionary.
+    cleaned = cleaned.replace(/[A-Za-z][A-Za-z'’-]*/g, function (tok) {
+      var lower = tok.toLowerCase().replace(/[''-]/g, "");
+      var hit = closestDictTerm(lower);
+      if (hit) {
+        var rep = matchCase(tok, hit);
+        record(tok, rep);
+        return rep;
+      }
+      return tok;
+    });
+    cleaned = cleaned.replace(/[ \t]{2,}/g, " ");
+    var note = "";
+    if (corrections.length) {
+      note = "The Brain tidied up " + corrections.length + " wording" + (corrections.length === 1 ? "" : "s") +
+        " (spelling/typos) so it could read your description correctly. Your original text is unchanged.";
+    }
+    return { original: original, cleaned: cleaned, corrections: corrections, note: note };
+  }
+
   // ---- case factory --------------------------------------------------------
   // Maps a planned task into the platform's "case" shape (drives FMEA/RPN,
   // schedule, budget, etc.). Keep field vocabulary consistent with the app.
@@ -360,9 +503,14 @@
    */
   function analyzeProject(text, opts) {
     opts = opts || {};
-    const picked = pickProfile(text, opts.profile);
+    // Language-tolerant interpretation FIRST: clean up typos/grammar so the
+    // keyword-based analysis reads the user's intent correctly even when the
+    // description has spelling/grammar errors or is written in a second language.
+    const interp = interpretText(text);
+    const workText = interp.cleaned || String(text || "");
+    const picked = pickProfile(workText, opts.profile);
     const profile = picked.profile;
-    const scale = extractScale(text);
+    const scale = extractScale(workText);
 
     const phases = profile.buildPhases(scale);
     const cases = [];
@@ -371,7 +519,7 @@
         cases.push(mkCase(Object.assign({}, t, { owner: t.owner || ph.owner, _phase: ph.name, _brain: "task" })));
       });
     });
-    const risks = (profile.buildRisks(text, scale) || []).map(r => mkCase(Object.assign({}, r, { leanMethod: r.leanMethod || "FMEA", _brain: "risk" })));
+    const risks = (profile.buildRisks(workText, scale) || []).map(r => mkCase(Object.assign({}, r, { leanMethod: r.leanMethod || "FMEA", _brain: "risk" })));
     const milestones = buildMilestones(phases, scale);
     const procurement = profile.buildProcurement(scale);
 
@@ -388,7 +536,7 @@
     if (profile.id === "fibre-telecom") {
       const CD = getCountryData();
       if (CD && typeof CD.detect === "function") {
-        const det = CD.detect(text);
+        const det = CD.detect(workText);
         if (det.countries.length) {
           CD.permitTaskCases(det.countries).forEach(t =>
             cases.push(mkCase(Object.assign({}, t, { _phase: t._phase || "Permitting & Right-of-Way", _brain: "task" }))));
@@ -423,10 +571,17 @@
 
     return {
       summary: {
-        title: deriveTitle(text),
+        title: deriveTitle(workText),
         domain: profile.id,
         domainLabel: profile.label,
         scale,
+        // What the Brain understood after linguistic clean-up.
+        interpreted: {
+          correctionCount: interp.corrections.length,
+          corrections: interp.corrections.slice(0, 12),
+          note: interp.note,
+          cleanedText: interp.cleaned
+        }
       },
       phases: phases.map(p => ({ name: p.name, owner: p.owner, taskCount: (p.tasks || []).length })),
       cases,
@@ -444,7 +599,7 @@
 
   function listProfiles() { return PROFILES.map(p => ({ id: p.id, label: p.label })); }
 
-  const API = { analyzeProject, listProfiles, extractScale, buildAdvice, _profiles: PROFILES };
+  const API = { analyzeProject, listProfiles, extractScale, buildAdvice, interpretText, _profiles: PROFILES };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIBrain = API;
 })(typeof window !== "undefined" ? window : globalThis);

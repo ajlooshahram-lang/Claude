@@ -1338,3 +1338,11 @@ html.hi-contrast[data-theme="dark"]{--ink:#ffffff;--muted:#d2dcf0;--line:rgba(17
 .upd-decision{border-left-color:#e67e22}
 .upd-risk{border-left-color:#e74c3c}
 .upd-note{border-left-color:#7f8c9b}
+
+
+/* ---- Brain "what I understood" interpreter banner ---- */
+.interp-card{border-left:4px solid var(--accent,#2e5496)}
+.interp-fixes{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.interp-chip{font-size:12px;background:var(--bg,#f5f7fb);border:1px solid var(--line,#e3e8f0);border-radius:999px;padding:3px 10px}
+.interp-chip s{color:var(--muted,#6b7a99)}
+.interp-chip b{color:var(--accent,#2e5496)}
