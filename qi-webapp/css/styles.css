@@ -1141,3 +1141,9 @@ mark.hl{background:rgba(230,184,74,.4);border-radius:2px;padding:0 1px}
 .view-enter{animation:viewFade .25s ease both}
 @keyframes viewFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.view-enter{animation:none}}
+
+/* Breadcrumb navigation (step 70) */
+.breadcrumb{font-size:11px;color:var(--muted,#6b7892);margin-left:12px}
+
+/* Sound toggle active state (step 72) */
+#btnSound.sound-off{opacity:.45}

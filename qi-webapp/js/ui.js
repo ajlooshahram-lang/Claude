@@ -32,6 +32,7 @@
     const ms = opts.ms || (opts.action ? 5000 : 2200);
     t.innerHTML = `<span>${esc(msg)}</span>` + (opts.action ? `<button class="toast-action" id="toastAct">${esc(opts.action.label)}</button>` : "");
     t.hidden = false;
+    playNotifSound();
     clearTimeout(t._t);
     t._t = setTimeout(() => { t.hidden = true; if (opts.onTimeout) opts.onTimeout(); }, ms);
     if (opts.action) {
@@ -41,6 +42,34 @@
         try { opts.action.handler(); } catch (e) {}
       });
     }
+  }
+  // Step 72: Notification sound toggle (Web Audio API beep, CSP-safe)
+  var _soundEnabled = (function() { try { return localStorage.getItem("qi_sound") !== "off"; } catch(e) { return true; } })();
+  function playNotifSound() {
+    if (!_soundEnabled) return;
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      var ctx = new AC();
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.15);
+      setTimeout(function() { ctx.close(); }, 200);
+    } catch(e) {}
+  }
+  function toggleSound() {
+    _soundEnabled = !_soundEnabled;
+    try { localStorage.setItem("qi_sound", _soundEnabled ? "on" : "off"); } catch(e) {}
+    var btn = $("#btnSound");
+    if (btn) btn.classList.toggle("sound-off", !_soundEnabled);
+    toast(_soundEnabled ? "Notification sound on" : "Notification sound off");
   }
   function tableWrap(head, rows, cls) {
     if (!rows) return `<div class="empty">No data yet. Click <b>+ New Case</b> to start.</div>`;
@@ -174,6 +203,15 @@
     current = view;
     if (recentViews[recentViews.length - 1] !== view) { recentViews.push(view); if (recentViews.length > 6) recentViews.shift(); }
     $("#viewTitle").textContent = TITLES[view] || "QI Platform";
+    const bc = $("#breadcrumb");
+    if (bc) {
+      let grp = "";
+      for (let i = 0; i < VIEWS.length; i++) {
+        if (VIEWS[i].g) grp = VIEWS[i].g;
+        if (VIEWS[i].id === view) break;
+      }
+      bc.textContent = grp ? "Home \u203a " + grp + " \u203a " + (TITLES[view] || view) : "Home \u203a " + (TITLES[view] || view);
+    }
     document.querySelectorAll(".nav-item").forEach(b => {
       const active = b.dataset.view === view;
       b.classList.toggle("active", active);
@@ -4792,6 +4830,14 @@
   $("#btnPrint").addEventListener("click", () => window.print());
   $("#btnTheme").addEventListener("click", toggleTheme);
   $("#btnChecks").addEventListener("click", runChecks);
+  // Sound toggle button (step 72)
+  (function() {
+    var sb = $("#btnSound");
+    if (sb) {
+      sb.classList.toggle("sound-off", !_soundEnabled);
+      sb.addEventListener("click", toggleSound);
+    }
+  })();
   // Logout button was unwired (a dead button). Wire it: real sign-out when a
   // backend session exists, otherwise a clear message in the offline demo.
   (function () {

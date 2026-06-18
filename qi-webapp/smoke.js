@@ -1316,5 +1316,23 @@ for (var si2 = 0; si2 < doc.styleSheets.length; si2++) {
 }
 ok(hasViewFade, ".view-enter or viewFade keyframes exist in the stylesheet");
 
+// Step 70: Breadcrumb navigation
+S.reset();
+doc.querySelector('.nav-item[data-view="risks"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+var bcEl = doc.getElementById("breadcrumb");
+ok(bcEl != null, "#breadcrumb element exists");
+ok(bcEl && bcEl.textContent && bcEl.textContent.length > 0, "#breadcrumb has text content after navigation (got: " + (bcEl ? bcEl.textContent : "") + ")");
+
+// Step 71: Pin functionality exists (already implemented)
+ok(typeof window.QIStore.togglePin === "function", "QIStore.togglePin function exists (pin feature)");
+var pinCaseId = S.validCases()[0].id;
+var pinBefore = S.get().cases.find(function(c){return c.id===pinCaseId;}).pinned;
+S.togglePin(pinCaseId);
+var pinAfter = S.get().cases.find(function(c){return c.id===pinCaseId;}).pinned;
+ok(pinAfter !== pinBefore, "togglePin flips pinned state (was " + pinBefore + " now " + pinAfter + ")");
+
+// Step 72: Notification sound toggle
+ok(doc.getElementById("btnSound") != null, "#btnSound button exists in the topbar");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
