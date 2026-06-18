@@ -909,6 +909,10 @@ const T = {
 };
 
 function t(key) { return T[lang][key] || key; }
+// _FA: reverse-lookup dictionary mapping English strings to Farsi.
+// Populated entries provide Persian translations for tx()-routed strings.
+// Missing entries fall back to the English string gracefully.
+const _FA = {};
 function tx(da, en) { if(lang === 'da') return da; if(lang === 'fa') return _FA[en] || en; return en; }
 function tl(obj, prefix) { return obj[prefix + '_' + lang] || obj[prefix + '_en'] || ''; }
 function tp(obj) { return obj[lang] || obj['en'] || ''; }
@@ -2143,34 +2147,69 @@ function sldCalcNodeIk(tree, nodeId) {
   if (zs <= 0) return { ikmax: 0, ikmin: 0, zs: 0 };
   const cmax = 1.05;
   const cmin = 0.95;
-  const U = 400;
-  const ikmax = (cmax * U) / (Math.sqrt(3) * zs);
-  const ikmin = (cmin * U) / (Math.sqrt(3) * zs * 1.5);
+  const node = tree.nodes[nodeId];
+  var ikmax, ikmin;
+  if (node && (node.phases === '1x230' || (node.voltage === 230 && node.phases !== '3x400'))) {
+    // Single-phase fault: Ik = c * U0 / Zs (IEC 60909 for single-phase)
+    ikmax = (cmax * 230) / zs;
+    // The 1.5 factor accounts for increased conductor resistance at end-of-fault
+    // temperature per Danish engineering practice (Stærkstrømsbekendtgørelsen, DS/HD 60364-4-41 Annex).
+    // This is conservative for the disconnection check (understates Ikmin).
+    ikmin = (cmin * 230) / (zs * 1.5);
+  } else {
+    // Three-phase fault: Ik = c * U / (sqrt(3) * Zs) (IEC 60909 clause 4.2)
+    var U = 400;
+    ikmax = (cmax * U) / (Math.sqrt(3) * zs);
+    // 1.5 factor: Danish simplification for minimum Ik at end-of-fault conductor temp.
+    // Conservative for disconnection time check (DS/HD 60364-4-41, Danish annex practice).
+    ikmin = (cmin * U) / (Math.sqrt(3) * zs * 1.5);
+  }
   return { ikmax: ikmax, ikmin: ikmin, zs: zs };
 }
 
 function sldPropagateAll(tree) {
   if (!tree || !tree.rootId) return;
-  const queue = [tree.rootId];
+  // Two-pass propagation:
+  // Pass 1 (leaf-to-root): aggregate power_kW so parent boards reflect children's actual load.
+  // Pass 2 (root-to-leaf): compute Zs, Vdrop, and Ik which depend on upstream impedance.
+
+  // Build BFS order (root-to-leaf), then reverse for leaf-to-root pass
+  var bfsOrder = [];
+  var queue = [tree.rootId];
   while (queue.length > 0) {
-    const id = queue.shift();
-    const node = tree.nodes[id];
+    var id = queue.shift();
+    var node = tree.nodes[id];
     if (!node) continue;
-    if (node.type === 'main_board' || node.type === 'sub_board') {
-      let totalPower = 0;
-      node.childIds.forEach(function(cid) {
-        const child = tree.nodes[cid];
+    bfsOrder.push(id);
+    node.childIds.forEach(function(cid) { queue.push(cid); });
+  }
+
+  // Pass 1: Leaf-to-root - aggregate power_kW for boards
+  for (var i = bfsOrder.length - 1; i >= 0; i--) {
+    var nodeId = bfsOrder[i];
+    var n = tree.nodes[nodeId];
+    if (!n) continue;
+    if (n.type === 'main_board' || n.type === 'sub_board') {
+      var totalPower = 0;
+      n.childIds.forEach(function(cid) {
+        var child = tree.nodes[cid];
         if (child) totalPower += (child.power_kW || 0);
       });
-      node.power_kW = totalPower;
+      n.power_kW = totalPower;
     }
-    node._ib = sldCalcNodeIB(node);
-    node._zs = sldCalcNodeZs(tree, id);
-    node._vdrop = sldCalcNodeVdrop(tree, id);
-    const ik = sldCalcNodeIk(tree, id);
-    node._ikmax = ik.ikmax;
-    node._ikmin = ik.ikmin;
-    node.childIds.forEach(function(cid) { queue.push(cid); });
+  }
+
+  // Pass 2: Root-to-leaf - compute IB, Zs, Vdrop, Ik (depends on upstream values)
+  for (var j = 0; j < bfsOrder.length; j++) {
+    var nid = bfsOrder[j];
+    var nd = tree.nodes[nid];
+    if (!nd) continue;
+    nd._ib = sldCalcNodeIB(nd);
+    nd._zs = sldCalcNodeZs(tree, nid);
+    nd._vdrop = sldCalcNodeVdrop(tree, nid);
+    var ik = sldCalcNodeIk(tree, nid);
+    nd._ikmax = ik.ikmax;
+    nd._ikmin = ik.ikmin;
   }
 }
 
@@ -2180,7 +2219,13 @@ function sldVerifyNode(tree, nodeId) {
   if (!node || node.type === 'transformer') return [];
   const results = [];
   const ib = node._ib || sldCalcNodeIB(node);
-  const iz = node.cable ? (node.cable.iz || 0) : 0;
+  const rawIz = node.cable ? (node.cable.iz || 0) : 0;
+  // Apply installation method, temperature, and grouping derating factors to Iz
+  // per DS/HD 60364-5-52 (correction factors for current-carrying capacity)
+  const kInstall = INSTALL_METHODS[node.installMethod] || 1.0;
+  const kTemp = TEMP_FACTORS[node.temp] || 1.0;
+  const kGroup = GROUP_FACTORS[node.grouping] || 1.0;
+  const iz = rawIz * kInstall * kTemp * kGroup;
   const protIn = node.protectionIn || (node.protection ? node.protection.rating : 0);
   const ikmax = node._ikmax || sldCalcNodeIk(tree, nodeId).ikmax;
   const vdrop = node._vdrop || sldCalcNodeVdrop(tree, nodeId);
@@ -2188,11 +2233,27 @@ function sldVerifyNode(tree, nodeId) {
 
   if (protIn > 0 && iz > 0) {
     if (ib <= protIn && protIn <= iz) {
-      results.push({ rule: 'IB <= In <= Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'ok', detail: ib.toFixed(1) + 'A <= ' + protIn + 'A <= ' + iz + 'A' });
+      results.push({ rule: 'IB <= In <= Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'ok', detail: ib.toFixed(1) + 'A <= ' + protIn + 'A <= ' + iz.toFixed(1) + 'A' });
     } else if (ib > protIn) {
       results.push({ rule: 'IB <= In <= Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'fail', detail: 'IB=' + ib.toFixed(1) + 'A > In=' + protIn + 'A' });
     } else if (protIn > iz) {
-      results.push({ rule: 'IB <= In <= Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'fail', detail: 'In=' + protIn + 'A > Iz=' + iz + 'A' });
+      results.push({ rule: 'IB <= In <= Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'fail', detail: 'In=' + protIn + 'A > Iz=' + iz.toFixed(1) + 'A' });
+    }
+  }
+
+  // I2 <= 1.45 * Iz check (DS/HD 60364-4-43 cl. 433.1)
+  // For MCBs, I2 = 1.45*In by construction (IEC 60898), so this is always satisfied when In <= Iz.
+  // For MCCBs with adjustable trip units, verify the conventional tripping current.
+  if (protIn > 0 && iz > 0 && node.protection) {
+    const isMCCB = node.protection.frame || node.protection.inOptions;
+    if (isMCCB) {
+      // MCCB conventional tripping current I2 = 1.3 * In (IEC 60947-2)
+      const i2 = 1.3 * protIn;
+      if (i2 <= 1.45 * iz) {
+        results.push({ rule: 'I2 <= 1.45*Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'ok', detail: 'I2=' + i2.toFixed(1) + 'A <= 1.45*Iz=' + (1.45 * iz).toFixed(1) + 'A' });
+      } else {
+        results.push({ rule: 'I2 <= 1.45*Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'fail', detail: 'I2=' + i2.toFixed(1) + 'A > 1.45*Iz=' + (1.45 * iz).toFixed(1) + 'A' });
+      }
     }
   }
 

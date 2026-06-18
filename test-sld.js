@@ -61,8 +61,9 @@ let jsCode = scriptMatch[1];
 // Remove the INIT calls at end that try to render to actual DOM
 jsCode = jsCode.replace(/renderNav\(\);\s*renderStatusBar\(\);\s*renderModule\(activeModule\);/, '// INIT calls removed for testing');
 jsCode = jsCode.replace(/\(function\(\)\{[^}]*verBadge[^}]*\}\)\(\);/, '// verBadge removed for testing');
-// Convert const to var so they are accessible in this scope after eval
+// Convert const and let to var so they are accessible in this scope after eval
 jsCode = jsCode.replace(/^const /gm, 'var ');
+jsCode = jsCode.replace(/^let /gm, 'var ');
 
 try {
   eval(jsCode);
@@ -336,6 +337,199 @@ test('runSelfTests still passes', function() {
       assert.strictEqual(results.failed, 0, 'Self-tests should all pass. Failed: ' + results.failed);
     }
   }
+});
+
+// Test 16: Farsi mode does not crash (fix for _FA undefined)
+test('tx() function does not crash in Farsi mode', function() {
+  var prevLang = lang;
+  lang = 'fa';
+  try {
+    var result = tx('Belysning', 'Lighting');
+    // Should return English text as fallback (since _FA is empty by default)
+    assert.strictEqual(result, 'Lighting', 'tx() in Farsi should return English fallback');
+    // Also test that a Danish call still works
+    lang = 'da';
+    result = tx('Belysning', 'Lighting');
+    assert.strictEqual(result, 'Belysning', 'tx() in Danish should return Danish text');
+    lang = 'en';
+    result = tx('Belysning', 'Lighting');
+    assert.strictEqual(result, 'Lighting', 'tx() in English should return English text');
+  } finally {
+    lang = prevLang;
+  }
+});
+
+// Test 17: Nested sub-board propagation correctness (two-pass fix)
+test('Nested sub-board propagation computes correct power aggregation', function() {
+  sldNextId = 100;
+  var tree = { nodes: {}, rootId: null };
+  // Build: transformer -> main_board -> sub_board -> 2 final circuits
+  var trafo = sldCreateNode('transformer', null);
+  tree.nodes[trafo.id] = trafo;
+  tree.rootId = trafo.id;
+  var mb = sldCreateNode('main_board', trafo.id);
+  tree.nodes[mb.id] = mb;
+  trafo.childIds.push(mb.id);
+  var sb = sldCreateNode('sub_board', mb.id, { power_kW: 0 });
+  tree.nodes[sb.id] = sb;
+  mb.childIds.push(sb.id);
+  var fc1 = sldCreateNode('final_circuit', sb.id, { power_kW: 5.0 });
+  tree.nodes[fc1.id] = fc1;
+  sb.childIds.push(fc1.id);
+  var fc2 = sldCreateNode('final_circuit', sb.id, { power_kW: 3.0 });
+  tree.nodes[fc2.id] = fc2;
+  sb.childIds.push(fc2.id);
+
+  // Single call to propagateAll should correctly aggregate even nested boards
+  sldPropagateAll(tree);
+
+  // Sub-board should have sum of final circuits
+  assert.strictEqual(sb.power_kW, 8.0, 'Sub-board power should be 8.0 kW, got ' + sb.power_kW);
+  // Main board should also reflect the sub-board's aggregated power
+  assert.strictEqual(mb.power_kW, 8.0, 'Main board power should be 8.0 kW, got ' + mb.power_kW);
+  // IB should reflect the actual aggregated power
+  var expectedIB = 8000 / (Math.sqrt(3) * 400 * 0.9);
+  assert(Math.abs(mb._ib - expectedIB) < 0.01,
+    'Main board IB should be ' + expectedIB.toFixed(2) + 'A, got ' + mb._ib.toFixed(2) + 'A');
+});
+
+// Test 18: Single-phase Ik formula accuracy
+test('sldCalcNodeIk uses correct formula for single-phase circuits', function() {
+  sldNextId = 200;
+  var tree = { nodes: {}, rootId: null };
+  var trafo = sldCreateNode('transformer', null, { power_kVA: 630, uk_pct: 6 });
+  tree.nodes[trafo.id] = trafo;
+  tree.rootId = trafo.id;
+  var mb = sldCreateNode('main_board', trafo.id);
+  tree.nodes[mb.id] = mb;
+  trafo.childIds.push(mb.id);
+  // Single-phase final circuit with known cable
+  var cable25 = PRODUCTS.cables.find(function(c){ return c.mm2 === 2.5 && c.material === 'Cu'; });
+  var fc = sldCreateNode('final_circuit', mb.id, {
+    phases: '1x230', voltage: 230, power_kW: 3.45, length_m: 25, cable: cable25
+  });
+  tree.nodes[fc.id] = fc;
+  mb.childIds.push(fc.id);
+
+  var ik = sldCalcNodeIk(tree, fc.id);
+  var zs = sldCalcNodeZs(tree, fc.id);
+  // Single-phase formula: Ikmax = cmax * 230 / Zs
+  var expectedIkmax = 1.05 * 230 / zs;
+  var expectedIkmin = 0.95 * 230 / (zs * 1.5);
+  assert(Math.abs(ik.ikmax - expectedIkmax) < 0.1,
+    'Single-phase Ikmax should be ' + expectedIkmax.toFixed(1) + 'A, got ' + ik.ikmax.toFixed(1) + 'A');
+  assert(Math.abs(ik.ikmin - expectedIkmin) < 0.1,
+    'Single-phase Ikmin should be ' + expectedIkmin.toFixed(1) + 'A, got ' + ik.ikmin.toFixed(1) + 'A');
+  // Verify it is NOT using three-phase formula
+  var wrongIkmax = 1.05 * 400 / (Math.sqrt(3) * zs);
+  assert(Math.abs(ik.ikmax - wrongIkmax) > 1,
+    'Should not match three-phase formula result (' + wrongIkmax.toFixed(1) + 'A)');
+});
+
+// Test 19: Three-phase Ik formula unchanged for 3-phase circuits
+test('sldCalcNodeIk uses three-phase formula for 3x400 circuits', function() {
+  sldNextId = 300;
+  var tree = { nodes: {}, rootId: null };
+  var trafo = sldCreateNode('transformer', null, { power_kVA: 630, uk_pct: 6 });
+  tree.nodes[trafo.id] = trafo;
+  tree.rootId = trafo.id;
+  var mb = sldCreateNode('main_board', trafo.id, { phases: '3x400', voltage: 400 });
+  tree.nodes[mb.id] = mb;
+  trafo.childIds.push(mb.id);
+
+  var ik = sldCalcNodeIk(tree, mb.id);
+  var zs = sldCalcNodeZs(tree, mb.id);
+  // Three-phase formula: Ikmax = cmax * 400 / (sqrt(3) * Zs)
+  var expectedIkmax = 1.05 * 400 / (Math.sqrt(3) * zs);
+  assert(Math.abs(ik.ikmax - expectedIkmax) < 0.1,
+    'Three-phase Ikmax should be ' + expectedIkmax.toFixed(1) + 'A, got ' + ik.ikmax.toFixed(1) + 'A');
+});
+
+// Test 20: Installation derating applied to Iz in compliance check
+test('sldVerifyNode applies installation method derating to Iz', function() {
+  sldNextId = 400;
+  var tree = { nodes: {}, rootId: null };
+  var trafo = sldCreateNode('transformer', null);
+  tree.nodes[trafo.id] = trafo;
+  tree.rootId = trafo.id;
+  var mb = sldCreateNode('main_board', trafo.id);
+  tree.nodes[mb.id] = mb;
+  trafo.childIds.push(mb.id);
+  // Create a circuit with restrictive installation method A1 (factor 0.87)
+  // Cable 2.5mm2 Cu has raw iz=24A. With A1: corrected Iz = 24 * 0.87 = 20.88A
+  // Set In=21A (hypothetically) which is > corrected Iz but < raw Iz
+  var cable25 = PRODUCTS.cables.find(function(c){ return c.mm2 === 2.5 && c.material === 'Cu'; });
+  var fc = sldCreateNode('final_circuit', mb.id, {
+    power_kW: 3.0, cable: cable25, protectionIn: 21,
+    installMethod: 'A1', temp: 30, grouping: 1, phases: '1x230'
+  });
+  tree.nodes[fc.id] = fc;
+  mb.childIds.push(fc.id);
+  sldPropagateAll(tree);
+
+  var results = sldVerifyNode(tree, fc.id);
+  var ibCheck = results.find(function(r) { return r.rule === 'IB <= In <= Iz'; });
+  // Corrected Iz = 24 * 0.87 = 20.88A; In=21A > corrected Iz -> fail
+  assert(ibCheck, 'Should have IB <= In <= Iz check result');
+  assert.strictEqual(ibCheck.status, 'fail',
+    'In=21A > corrected Iz=20.88A should fail. Got: ' + ibCheck.status + ' ' + ibCheck.detail);
+});
+
+// Test 21: I2 <= 1.45*Iz check for MCCB-protected nodes
+test('sldVerifyNode checks I2 <= 1.45*Iz for MCCB-protected nodes', function() {
+  sldNextId = 500;
+  var tree = { nodes: {}, rootId: null };
+  var trafo = sldCreateNode('transformer', null);
+  tree.nodes[trafo.id] = trafo;
+  tree.rootId = trafo.id;
+  // Main board with MCCB - should trigger I2 check
+  var mb = sldCreateNode('main_board', trafo.id);
+  tree.nodes[mb.id] = mb;
+  trafo.childIds.push(mb.id);
+  // Add a final circuit so the board has power
+  var fc = sldCreateNode('final_circuit', mb.id, { power_kW: 50 });
+  tree.nodes[fc.id] = fc;
+  mb.childIds.push(fc.id);
+  sldPropagateAll(tree);
+
+  var results = sldVerifyNode(tree, mb.id);
+  var i2Check = results.find(function(r) { return r.rule === 'I2 <= 1.45*Iz'; });
+  // Main board has MCCB (PRODUCTS.mccbs[0] which has frame property)
+  assert(i2Check, 'Should have I2 <= 1.45*Iz check for MCCB-protected node');
+  // With default settings (100A MCCB, 50mm2 cable with Iz~142A in method C):
+  // I2 = 1.3 * 100 = 130A; 1.45 * correctedIz should be well above -> ok
+  assert.strictEqual(i2Check.status, 'ok',
+    'Default MCCB setup should pass I2 check. Got: ' + i2Check.status + ' ' + i2Check.detail);
+});
+
+// Test 22: I2 <= 1.45*Iz fails with undersized cable for MCCB
+test('sldVerifyNode detects I2 > 1.45*Iz failure', function() {
+  sldNextId = 600;
+  var tree = { nodes: {}, rootId: null };
+  var trafo = sldCreateNode('transformer', null);
+  tree.nodes[trafo.id] = trafo;
+  tree.rootId = trafo.id;
+  // Board with large MCCB rating but small cable
+  var cable15 = PRODUCTS.cables.find(function(c){ return c.mm2 === 1.5 && c.material === 'Cu'; });
+  var mccb = PRODUCTS.mccbs.find(function(m){ return m.frame === 'NSX 100'; });
+  var mb = sldCreateNode('main_board', trafo.id, {
+    cable: cable15, protection: mccb, protectionIn: 100,
+    installMethod: 'C', temp: 30, grouping: 1
+  });
+  tree.nodes[mb.id] = mb;
+  trafo.childIds.push(mb.id);
+  var fc = sldCreateNode('final_circuit', mb.id, { power_kW: 5 });
+  tree.nodes[fc.id] = fc;
+  mb.childIds.push(fc.id);
+  sldPropagateAll(tree);
+
+  var results = sldVerifyNode(tree, mb.id);
+  var i2Check = results.find(function(r) { return r.rule === 'I2 <= 1.45*Iz'; });
+  assert(i2Check, 'Should have I2 check for MCCB');
+  // 1.5mm2 cable: raw Iz ~17.5A, corrected with C,30,1 = 17.5A
+  // I2 = 1.3 * 100 = 130A; 1.45 * 17.5 = 25.4A -> 130 > 25.4 -> fail
+  assert.strictEqual(i2Check.status, 'fail',
+    'Undersized cable should fail I2 check. Got: ' + i2Check.status + ' ' + i2Check.detail);
 });
 
 // --- Summary ---
