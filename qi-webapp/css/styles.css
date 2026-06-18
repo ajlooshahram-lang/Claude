@@ -1302,3 +1302,20 @@ tr.status-flash{animation:statusFlash .5s ease}
 .rt-feed-item strong{color:var(--accent,#2e5496)}
 [data-theme="dark"] .rt-feed-dropdown{background:var(--card,#1e293b);border-color:rgba(125,167,240,.2)}
 [data-theme="dark"] .rt-presence{background:rgba(31,138,138,.2);color:#5eead4}
+
+
+/* ---- Ambient display adaptation (Auto mode) ----
+   A full-viewport, click-through veil that gently dims the whole UI in dark
+   surroundings / at night to reduce glare and eye strain. Opacity is driven by
+   JS from the ambient-light sensor (or time-of-day) and is clamped to <=0.14 so
+   the app is never made unreadable. pointer-events:none keeps every control
+   fully usable; the smooth transition avoids any jarring flips. */
+#ambientVeil{position:fixed;inset:0;background:#0a1020;opacity:0;pointer-events:none;z-index:2147483000;transition:opacity .9s ease}
+@media print{#ambientVeil{display:none!important}}
+@media (prefers-reduced-motion:reduce){#ambientVeil{transition:none}}
+
+/* High-contrast nudge for bright / direct-sunlight conditions: strengthen text,
+   muted text and border tokens so content stays legible in glare. Tokens only —
+   no layout change. */
+html.hi-contrast{--ink:#0b1220;--muted:#36405a;--line:#9aa7c2}
+html.hi-contrast[data-theme="dark"]{--ink:#ffffff;--muted:#d2dcf0;--line:rgba(170,198,245,.55)}

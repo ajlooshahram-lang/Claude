@@ -4866,12 +4866,118 @@
     }
   }
 
-  // ---------- theme / shortcuts / run checks ----------
+  // ---------- theme / display adaptation / shortcuts / run checks ----------
+  // Colour system note: all colours come from CSS custom-property design tokens
+  // (--ink, --bg, --card, --line, --accent, ...) defined once in styles.css and
+  // flipped wholesale by the [data-theme] attribute. Nothing hard-codes a colour,
+  // so contrast stays consistent and a single ambient engine can re-theme the
+  // whole app safely.
+  //
+  // Display modes: "auto" (adapts to the room's light), "light", "dark".
+  var _ambientPref = null;   // sensor/time suggestion: "dark" | "light" | null
+  var _ambientDim = 0;       // gentle night-dimming veil opacity (0 .. 0.14)
+  var _ambientHiContrast = false; // bump contrast in bright/glare conditions
+  var _sensorActive = false; // a real ambient-light sensor is feeding readings
+  var _ambientStarted = false;
+
+  function getThemeMode() {
+    var b = (S.brand && S.brand()) || {};
+    if (b.themeMode === "light" || b.themeMode === "dark" || b.themeMode === "auto") return b.themeMode;
+    // Migrate legacy {theme, themeManual} -> mode
+    if (b.themeManual) return (b.theme === "dark" ? "dark" : "light");
+    return "auto";
+  }
+
+  function resolveTheme(mode) {
+    if (mode === "light" || mode === "dark") return mode;
+    // Auto: a live light sensor wins; else the OS preference; else time-of-day.
+    if (_ambientPref === "dark" || _ambientPref === "light") return _ambientPref;
+    try {
+      if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
+    } catch (e) { /* ignore */ }
+    var h = new Date().getHours();
+    return (h >= 19 || h < 7) ? "dark" : "light";
+  }
+
+  function applyAmbientVeil() {
+    var veil = document.getElementById("ambientVeil");
+    if (!veil) {
+      veil = document.createElement("div");
+      veil.id = "ambientVeil";
+      veil.setAttribute("aria-hidden", "true");
+      if (document.body) document.body.appendChild(veil);
+    }
+    // Only adapt brightness in Auto mode; manual modes are a fixed look.
+    var dim = (getThemeMode() === "auto") ? _ambientDim : 0;
+    if (veil) veil.style.opacity = String(dim);
+    var hi = (getThemeMode() === "auto") && _ambientHiContrast;
+    document.documentElement.classList.toggle("hi-contrast", hi);
+  }
+
   function applyTheme() {
-    const dark = !!(S.brand() && S.brand().theme === "dark");
-    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
-    const btn = $("#btnTheme"); if (btn) btn.textContent = dark ? "☼" : "◐";
+    var mode = getThemeMode();
+    var eff = resolveTheme(mode);
+    document.documentElement.setAttribute("data-theme", eff === "dark" ? "dark" : "light");
+    var btn = $("#btnTheme");
+    if (btn) {
+      btn.textContent = mode === "auto" ? "◐" : (eff === "dark" ? "☼" : "○");
+      btn.title = (mode === "auto"
+        ? "Display: Auto — adapts brightness to your surroundings (click to change)"
+        : "Display: " + mode.charAt(0).toUpperCase() + mode.slice(1) + " (click to change)");
+      btn.setAttribute("aria-label", btn.title);
+      btn.setAttribute("data-mode", mode);
+    }
+    applyAmbientVeil();
     if (window.QICharts && QICharts.refresh) QICharts.refresh();
+  }
+
+  // Map a lux reading to a theme suggestion + dimming. Clamped so the UI is
+  // never made unreadable: dim tops out at 0.14, and we only ever switch theme
+  // or nudge contrast — we never wash the colours out.
+  function setAmbientFromLux(lux) {
+    if (typeof lux !== "number" || isNaN(lux)) return;
+    _sensorActive = true;
+    if (lux <= 8) { _ambientPref = "dark"; _ambientDim = 0.14; _ambientHiContrast = false; }        // dark room
+    else if (lux <= 60) { _ambientPref = "dark"; _ambientDim = 0.06; _ambientHiContrast = false; }   // dim
+    else if (lux <= 1500) { _ambientPref = "light"; _ambientDim = 0; _ambientHiContrast = false; }    // normal indoor
+    else { _ambientPref = "light"; _ambientDim = 0; _ambientHiContrast = true; }                       // bright / sunlight glare
+    if (getThemeMode() === "auto") applyTheme();
+  }
+
+  function startAmbientAdaptation() {
+    if (_ambientStarted) return; _ambientStarted = true;
+    // Time-of-day baseline for the (common) case of no hardware light sensor.
+    function timeBaseline() {
+      if (_sensorActive) return; // a real sensor, if present, overrides this
+      var h = new Date().getHours();
+      if (h >= 21 || h < 6) { _ambientPref = "dark"; _ambientDim = 0.10; }
+      else if (h >= 19 || h < 7) { _ambientPref = "dark"; _ambientDim = 0.05; }
+      else { _ambientPref = null; _ambientDim = 0; }
+      _ambientHiContrast = false;
+      if (getThemeMode() === "auto") applyTheme();
+    }
+    timeBaseline();
+    try { setInterval(timeBaseline, 10 * 60 * 1000); } catch (e) { /* ignore */ }
+    // Real ambient-light sensor (Chrome/Android, gated behind a permission).
+    try {
+      if (typeof window.AmbientLightSensor === "function") {
+        var startSensor = function () {
+          try {
+            var sensor = new window.AmbientLightSensor({ frequency: 0.5 });
+            sensor.addEventListener("reading", function () { setAmbientFromLux(sensor.illuminance); });
+            sensor.addEventListener("error", function () { /* unreadable/denied: keep time baseline */ });
+            sensor.start();
+          } catch (e) { /* construction blocked by permissions policy */ }
+        };
+        if (navigator.permissions && navigator.permissions.query) {
+          navigator.permissions.query({ name: "ambient-light-sensor" })
+            .then(function (res) { if (res && res.state !== "denied") startSensor(); })
+            .catch(function () { startSensor(); });
+        } else {
+          startSensor();
+        }
+      }
+    } catch (e) { /* ignore */ }
   }
   function applySidebar() {
     const collapsed = !!(S.brand() && S.brand().sidebarCollapsed);
@@ -4888,9 +4994,19 @@
     applySidebar();
   }
   function toggleTheme() {
-    const cur = (S.brand() && S.brand().theme) || "light";
-    S.setBrand({ theme: cur === "dark" ? "light" : "dark", themeManual: true });
-    applyTheme(); toast("Theme: " + (S.brand().theme === "dark" ? "dark" : "light"));
+    // Cycle: Auto -> Light -> Dark -> Auto. "Auto" re-enables ambient adaptation.
+    var order = ["auto", "light", "dark"];
+    var cur = getThemeMode();
+    var next = order[(order.indexOf(cur) + 1) % order.length];
+    var resolved = next === "auto" ? resolveTheme("auto") : next;
+    S.setBrand({ themeMode: next, theme: resolved, themeManual: next !== "auto" });
+    applyTheme();
+    if (next === "auto") {
+      startAmbientAdaptation();
+      toast("Display: Auto — the app now adjusts brightness to your surroundings");
+    } else {
+      toast("Display: " + next.charAt(0).toUpperCase() + next.slice(1));
+    }
   }
   function runChecks() {
     const issues = S.health();
@@ -4950,7 +5066,7 @@
       ["p", "Portfolio"],
       ["r", "Report Pack"],
       ["c", "Run checks"],
-      ["t", "Toggle theme"],
+      ["t", "Cycle display (Auto/Light/Dark)"],
       ["↑ / ↓", "Move between sidebar items (when nav is focused)"],
       ["Tab / Shift+Tab", "Move focus inside a dialog (focus is trapped)"],
       ["Esc", "Close dialog"]
@@ -4971,7 +5087,7 @@
       { label: "New case", icon: "＋", run: () => openCaseForm() },
       { label: "Run all checks", icon: "✓", run: () => runChecks() },
       { label: "Take snapshot", icon: "⟲", run: () => { S.takeSnapshot(); toast("Snapshot saved."); go("audit"); } },
-      { label: "Toggle dark mode", icon: "◐", run: () => toggleTheme() },
+      { label: "Cycle display (Auto / Light / Dark)", icon: "◐", run: () => toggleTheme() },
       { label: "Collapse / expand sidebar", icon: "«", run: () => toggleSidebar() },
       { label: "Export JSON backup", icon: "⭳", run: () => exportJSON() },
       { label: "Share link", icon: "🔗", run: () => shareLink() },
@@ -5245,29 +5361,32 @@
     toast("Storage full — export a JSON backup and delete old snapshots.");
   });
 
-  // --- Dark-mode auto-detect: follow system preference unless user manually toggled (step 65) ---
-  (function initDarkModeAutoDetect() {
+  // --- Display auto-adaptation: in Auto mode, follow the OS colour preference
+  //     live (the ambient-light sensor + time-of-day are handled separately). ---
+  (function initDisplayAutoDetect() {
     if (typeof window.matchMedia !== "function") return;
     var mq = window.matchMedia("(prefers-color-scheme: dark)");
-    function applySystemTheme(e) {
-      var brand = S.brand && S.brand();
-      if (brand && brand.themeManual) return; // user overrode, respect their choice
-      S.setBrand({ theme: e.matches ? "dark" : "light" });
+    function onSystemChange() {
+      if (getThemeMode() !== "auto") return; // user pinned Light/Dark — respect it
       applyTheme();
     }
-    // Initial check at load time (only if not already manually set)
-    var brand = S.brand && S.brand();
-    if (!brand || !brand.themeManual) {
-      if (mq.matches) { S.setBrand({ theme: "dark" }); }
-    }
-    // Listen for system changes
-    if (mq.addEventListener) { mq.addEventListener("change", applySystemTheme); }
-    else if (mq.addListener) { mq.addListener(applySystemTheme); }
+    if (mq.addEventListener) { mq.addEventListener("change", onSystemChange); }
+    else if (mq.addListener) { mq.addListener(onSystemChange); }
   })();
+
+  // Expose a small display/ambient control surface (used by tests and available
+  // for any future settings UI to drive theme + ambient adaptation directly).
+  window.QIDisplay = {
+    setLux: function (lux) { setAmbientFromLux(lux); },
+    getMode: getThemeMode,
+    resolve: resolveTheme,
+    apply: applyTheme
+  };
 
   // ---------- init (called by auth.js after successful authentication) ----------
   window.QIBoot = function () {
     S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
+    startAmbientAdaptation();
     // Step 87: Session duration timer
     (function initSessionTimer() {
       var sessionStart = Date.now();

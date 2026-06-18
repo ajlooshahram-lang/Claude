@@ -279,13 +279,19 @@ ok(doc.querySelector('select[data-prio]') != null, "Prioritisation table has dro
 ok(typeof C.rice === "function" && C.rice({ reach: 1000, impact: 3, confidence: 80, effort: 5 }) === 480, "RICE math correct");
 ok(typeof C.wsjf === "function" && C.wsjf({ userValue: 8, timeCrit: 5, riskRed: 3, jobSize: 5 }) === 3.2, "WSJF math correct");
 
-// 12) polish: dark mode toggle, run-checks dialog, shortcuts overlay
-ok(doc.documentElement.getAttribute("data-theme") === "light", "theme starts light");
-doc.getElementById("btnTheme").click();
-ok(doc.documentElement.getAttribute("data-theme") === "dark", "theme toggles to dark");
+// 12) polish: display modes (Auto -> Light -> Dark -> Auto), run-checks, shortcuts
+var btnTheme12 = doc.getElementById("btnTheme");
+// Drive to a known Light state regardless of boot-time Auto resolution.
+var g12a = 0; while (!(S.brand() && S.brand().themeMode === "light") && g12a++ < 4) btnTheme12.click();
+ok(doc.documentElement.getAttribute("data-theme") === "light" && S.brand().themeMode === "light", "display Light mode applies the light theme");
+btnTheme12.click(); // Light -> Dark
+ok(doc.documentElement.getAttribute("data-theme") === "dark" && S.brand().themeMode === "dark", "display cycles to Dark");
 ok(S.brand().theme === "dark", "theme persisted to brand");
-doc.getElementById("btnTheme").click();
-ok(doc.documentElement.getAttribute("data-theme") === "light", "theme toggles back to light");
+btnTheme12.click(); // Dark -> Auto
+ok(S.brand().themeMode === "auto", "display cycles back to Auto (ambient adaptation re-enabled)");
+// Leave in a known Light state for the chart-theming test below.
+var g12b = 0; while (!(S.brand() && S.brand().themeMode === "light") && g12b++ < 4) btnTheme12.click();
+ok(doc.documentElement.getAttribute("data-theme") === "light", "display returns to Light for following tests");
 doc.getElementById("btnHelp").click();
 ok(/Keyboard shortcuts/.test(doc.getElementById("modal").innerHTML), "shortcut overlay opens");
 doc.querySelector("#modal [data-act=cancel]").click();
@@ -1497,6 +1503,30 @@ ok(allStylesResp.indexOf("@media(max-width:1024px)") !== -1 || allStylesResp.ind
 ok(allStylesResp.indexOf("@media(max-width:560px)") !== -1 || allStylesResp.indexOf("@media (max-width:560px)") !== -1, "responsive @media(max-width:560px) topbar rule exists");
 // Viewport meta is required for correct scaling on any device
 ok(/name=["']viewport["'][^>]*width=device-width/.test(html), "viewport meta tag enables device-width responsive scaling");
+
+// Step 105: Ambient display adaptation (auto contrast/brightness for the environment)
+ok(doc.getElementById("ambientVeil") != null, "ambient dimming veil element is present in the DOM");
+ok(/#ambientVeil\{[^}]*pointer-events:none/.test(allStylesResp), "ambient veil is click-through (pointer-events:none) so it never blocks controls");
+ok(/#ambientVeil\{[^}]*position:fixed/.test(allStylesResp), "ambient veil is a fixed full-viewport overlay");
+ok(/html\.hi-contrast/.test(allStylesResp), "high-contrast token override exists for bright/sunlight conditions");
+ok(typeof window.QIDisplay === "object" && typeof window.QIDisplay.setLux === "function", "QIDisplay ambient control surface is exposed");
+if (window.QIDisplay) {
+  // Put the app in Auto mode so ambient readings drive the theme.
+  var btnA = doc.getElementById("btnTheme");
+  var ga = 0; while (window.QIDisplay.getMode() !== "auto" && ga++ < 4) btnA.click();
+  ok(window.QIDisplay.getMode() === "auto", "display can return to Auto mode");
+  // Bright sunlight -> light theme + high-contrast, no dimming.
+  window.QIDisplay.setLux(20000);
+  ok(doc.documentElement.getAttribute("data-theme") === "light", "bright light (20000 lux) selects the light theme");
+  ok(doc.documentElement.classList.contains("hi-contrast"), "bright light enables high-contrast for legibility in glare");
+  ok(parseFloat(doc.getElementById("ambientVeil").style.opacity || "0") === 0, "no dimming applied in bright light");
+  // Dark room -> dark theme + gentle dimming, contrast nudge removed.
+  window.QIDisplay.setLux(2);
+  ok(doc.documentElement.getAttribute("data-theme") === "dark", "dark room (2 lux) selects the dark theme");
+  ok(parseFloat(doc.getElementById("ambientVeil").style.opacity || "0") > 0, "dark room applies gentle dimming for eye comfort");
+  ok(parseFloat(doc.getElementById("ambientVeil").style.opacity || "0") <= 0.14, "dimming is clamped (<=0.14) so the UI is never unreadable");
+  ok(!doc.documentElement.classList.contains("hi-contrast"), "high-contrast is off in a dark room");
+}
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
