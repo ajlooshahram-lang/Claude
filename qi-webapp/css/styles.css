@@ -940,3 +940,26 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
   padding:6px 10px;border-radius:6px;font-size:11.5px;font-weight:400;line-height:1.4;color:#fff;background:#1a2336;
   white-space:normal;width:max-content;max-width:220px;opacity:0;pointer-events:none;transition:opacity .15s ease;z-index:100}
 .jargon:hover::after,.jargon:focus::after{opacity:1}
+
+/* milestones checklist */
+.milestones{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.ms-row{display:flex;align-items:center;gap:12px;font-size:13px;line-height:1.45}
+.ms-check{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--line,#e3e8f0);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--muted,#6b7892)}
+.ms-done{background:var(--accent,#2e5496);border-color:var(--accent,#2e5496);color:#fff}
+.ms-month{flex:none;min-width:64px;font-weight:700;color:var(--accent,#2e5496);white-space:nowrap}
+.ms-label{color:var(--ink,#1a2336)}
+
+/* cost-breakdown donut */
+.cost-layout{display:flex;align-items:center;gap:28px;flex-wrap:wrap;margin-top:8px}
+.cost-donut{flex:none}
+.cost-legend{display:flex;flex-direction:column;gap:8px}
+.cost-row{display:flex;align-items:center;gap:10px;font-size:12.5px;line-height:1.4}
+.cost-swatch{flex:none;width:14px;height:14px;border-radius:3px}
+.cost-pct{flex:none;min-width:36px;font-weight:700;color:var(--ink,#1a2336)}
+
+/* stakeholder directory */
+.sh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:8px}
+.sh-card{border:1px solid var(--line,#e3e8f0);border-radius:var(--radius-md,10px);padding:14px 16px;background:var(--card,#fff);display:flex;flex-direction:column;gap:4px}
+.sh-card strong{font-size:13px;color:var(--ink,#1a2336)}
+.sh-card p{margin:0;font-size:12px;color:var(--muted,#6b7892);line-height:1.45}
+.sh-icon{font-size:22px;margin-bottom:2px}

@@ -1095,5 +1095,18 @@ ok(briefShareBtn != null, "#briefShare button exists on the brief toolbar");
 ok(!briefShareBtn.getAttribute("onclick"), "Share button is CSP-safe (no inline onclick)");
 ok(/Share link/.test(briefShareBtn.textContent), "Share button has 'Share link' label");
 
+// Step 22: Milestone tracker on the Investor Brief
+doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.querySelector(".milestones") != null, "Investor Brief renders a .milestones element");
+ok(doc.querySelectorAll(".milestones .ms-row").length === 7, "milestones has 7 .ms-row elements (got " + doc.querySelectorAll(".milestones .ms-row").length + ")");
+
+// Step 23: Cost-breakdown pie chart (inline SVG donut)
+ok(doc.querySelector(".cost-donut") != null, "Investor Brief renders a .cost-donut SVG");
+ok(doc.querySelectorAll(".cost-donut path").length >= 5, "cost-donut SVG has at least 5 path elements (got " + doc.querySelectorAll(".cost-donut path").length + ")");
+ok(doc.querySelectorAll(".cost-legend .cost-row").length === 6, "cost-legend has 6 .cost-row elements (got " + doc.querySelectorAll(".cost-legend .cost-row").length + ")");
+
+// Step 24: Stakeholder directory
+ok(doc.querySelectorAll(".sh-grid .sh-card").length === 7, "sh-grid has 7 .sh-card elements (got " + doc.querySelectorAll(".sh-grid .sh-card").length + ")");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

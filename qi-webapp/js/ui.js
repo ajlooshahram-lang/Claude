@@ -987,6 +987,116 @@
         </section>
 
         <section class="brief-section">
+          <h3>Key milestones</h3>
+          <p class="brief-lead">The programme's major gates and delivery targets. Ticked items are already complete; the rest are ahead.</p>
+          <div class="milestones">
+            ${(function () {
+              var MILESTONES = [
+                { month: 0, label: "Contract award & programme mobilisation", done: true },
+                { month: 6, label: "All marine route surveys complete", done: true },
+                { month: 14, label: "All 8 cable-landing licences secured", done: false },
+                { month: 24, label: "Cable & repeater supply contracts signed", done: false },
+                { month: 30, label: "Phase-1: first 2 countries lit (revenue milestone)", done: false },
+                { month: 48, label: "Marine installation complete across all segments", done: false },
+                { month: 60, label: "Full system ready-for-service (RFS)", done: false }
+              ];
+              return MILESTONES.map(function (m) {
+                return '<div class="ms-row">' +
+                  '<span class="ms-check' + (m.done ? ' ms-done' : '') + '">' + (m.done ? '&#10003;' : '') + '</span>' +
+                  '<span class="ms-month">Month ' + m.month + '</span>' +
+                  '<span class="ms-label">' + esc(m.label) + '</span>' +
+                '</div>';
+              }).join("");
+            })()}
+          </div>
+        </section>
+
+        <section class="brief-section">
+          <h3>Where the money goes</h3>
+          <p class="brief-lead">A breakdown of the programme budget by major cost category. Cable and marine installation together account for about two-thirds of the total spend.</p>
+          <div class="cost-layout">
+            <svg class="cost-donut" viewBox="0 0 200 200" width="200" height="200">
+              ${(function () {
+                var COSTS = [
+                  { label: "Submarine cable & repeaters", pct: 42, color: "#2a6ec2" },
+                  { label: "Marine installation", pct: 24, color: "#4ea1ff" },
+                  { label: "Landing stations & civils", pct: 14, color: "#1d8e6a" },
+                  { label: "Permitting & surveys", pct: 8, color: "#c79a2a" },
+                  { label: "Integration & testing", pct: 7, color: "#7b5ea7" },
+                  { label: "Programme management", pct: 5, color: "#e07040" }
+                ];
+                var cx = 100, cy = 100, r = 80, innerR = 50;
+                var cumulative = 0;
+                return COSTS.map(function (c) {
+                  var startAngle = (cumulative / 100) * 2 * Math.PI - Math.PI / 2;
+                  cumulative += c.pct;
+                  var endAngle = (cumulative / 100) * 2 * Math.PI - Math.PI / 2;
+                  var largeArc = c.pct > 50 ? 1 : 0;
+                  var x1 = cx + r * Math.cos(startAngle);
+                  var y1 = cy + r * Math.sin(startAngle);
+                  var x2 = cx + r * Math.cos(endAngle);
+                  var y2 = cy + r * Math.sin(endAngle);
+                  var ix1 = cx + innerR * Math.cos(endAngle);
+                  var iy1 = cy + innerR * Math.sin(endAngle);
+                  var ix2 = cx + innerR * Math.cos(startAngle);
+                  var iy2 = cy + innerR * Math.sin(startAngle);
+                  var d = 'M ' + x1.toFixed(2) + ' ' + y1.toFixed(2) +
+                    ' A ' + r + ' ' + r + ' 0 ' + largeArc + ' 1 ' + x2.toFixed(2) + ' ' + y2.toFixed(2) +
+                    ' L ' + ix1.toFixed(2) + ' ' + iy1.toFixed(2) +
+                    ' A ' + innerR + ' ' + innerR + ' 0 ' + largeArc + ' 0 ' + ix2.toFixed(2) + ' ' + iy2.toFixed(2) +
+                    ' Z';
+                  return '<path d="' + d + '" fill="' + c.color + '"/>';
+                }).join("");
+              })()}
+            </svg>
+            <div class="cost-legend">
+              ${(function () {
+                var COSTS = [
+                  { label: "Submarine cable & repeaters", pct: 42, color: "#2a6ec2" },
+                  { label: "Marine installation", pct: 24, color: "#4ea1ff" },
+                  { label: "Landing stations & civils", pct: 14, color: "#1d8e6a" },
+                  { label: "Permitting & surveys", pct: 8, color: "#c79a2a" },
+                  { label: "Integration & testing", pct: 7, color: "#7b5ea7" },
+                  { label: "Programme management", pct: 5, color: "#e07040" }
+                ];
+                return COSTS.map(function (c) {
+                  return '<div class="cost-row">' +
+                    '<span class="cost-swatch" style="background:' + c.color + '"></span>' +
+                    '<span class="cost-pct">' + c.pct + '%</span>' +
+                    '<span>' + esc(c.label) + '</span>' +
+                  '</div>';
+                }).join("");
+              })()}
+            </div>
+          </div>
+        </section>
+
+        <section class="brief-section">
+          <h3>Key stakeholders</h3>
+          <p class="brief-lead">The main parties involved in a submarine cable programme and what each one does. Understanding who does what helps a first-time reader see the full picture.</p>
+          <div class="sh-grid">
+            ${(function () {
+              var STAKEHOLDERS = [
+                { role: "Owning consortium", desc: "The investors and anchor customers funding the build", icon: "\uD83D\uDC65" },
+                { role: "National regulators", desc: "Telecom authorities in all 8 countries who grant cable-landing licences", icon: "\uD83C\uDFDB" },
+                { role: "Landing-party operators", desc: "Licensed local companies who bring the cable ashore in each country", icon: "\u2693" },
+                { role: "Marine contractor", desc: "The cable-ship operator who lays and buries the submarine cable", icon: "\uD83D\uDEA2" },
+                { role: "Cable & repeater supplier", desc: "Manufactures and delivers the submarine cable and optical repeaters", icon: "\uD83D\uDD0C" },
+                { role: "Lenders' technical advisor", desc: "Independent engineers who verify progress for the banks", icon: "\uD83C\uDFE6" },
+                { role: "Environmental consultant", desc: "Manages EIA studies and marine-protected-area approvals", icon: "\uD83C\uDF0A" }
+              ];
+              return STAKEHOLDERS.map(function (s) {
+                return '<div class="sh-card">' +
+                  '<span class="sh-icon">' + s.icon + '</span>' +
+                  '<strong>' + esc(s.role) + '</strong>' +
+                  '<p>' + esc(s.desc) + '</p>' +
+                '</div>';
+              }).join("");
+            })()}
+          </div>
+        </section>
+
+        <section class="brief-section">
           <h3>When each country goes live</h3>
           <p class="brief-lead">The order countries are connected, and roughly which month each one comes online as the cable is laid from one landing station to the next.</p>
           <div class="brief-online">${onlineRows || '<p class="muted">No schedule data</p>'}</div>
