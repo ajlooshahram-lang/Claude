@@ -540,6 +540,13 @@
             </div>
           </details>
           <details class="gd-acc">
+            <summary>Where the cable connects to</summary>
+            <div class="gd-acc-body">
+              <p><strong>Key interconnect points:</strong> ${(b.interconnects || []).map(i => esc(i)).join(', ')}</p>
+              ${b.iruBand ? '<p><strong>Typical capacity pricing:</strong> ' + esc(b.iruBand) + '</p>' : ''}
+            </div>
+          </details>
+          <details class="gd-acc">
             <summary>What could go wrong here</summary>
             <div class="gd-acc-body">
               <ul class="gd-risks">${risks || '<li class="muted">No risks listed</li>'}</ul>
@@ -847,6 +854,7 @@
         <p class="brief-row"><span class="brief-k">Who approves it</span> ${esc(a.abbrev || "")} — ${esc(a.name || "")}</p>
         <p class="brief-row"><span class="brief-k">Start this first</span> ${esc(lic.criticalPathItem || "—")}${lic.criticalPathMonths ? " (about " + esc(String(lic.criticalPathMonths)) + " months)" : ""}</p>
         <p class="brief-row"><span class="brief-k">Can land the cable</span> ${esc(partners || "—")}</p>
+        <p class="brief-row"><span class="brief-k">Connects to</span> ${esc((b.interconnects || [])[0] || "—")}</p>
         ${topRisk ? `<p class="brief-row"><span class="brief-risk brief-risk--${riskSlug(topRisk.level)}">${esc(topRisk.level)}</span> ${esc(topRisk.text)}</p>` : ""}
         ${b.takeaway ? `<p class="brief-takeaway">${esc(b.takeaway)}</p>` : ""}
       </div>`;

@@ -947,5 +947,18 @@ const allCss = Array.from(doc.styleSheets).map(s => { try { return Array.from(s.
 ok(/:focus-visible/.test(allCss), "focus-visible outline style exists in the stylesheet");
 ok(/\.skip-link/.test(allCss), "skip-link styles exist in the stylesheet");
 
+// Country dataset enrichment: interconnects & iruBand
+const CD = window.QICountryData;
+const allCountries = CD.list();
+ok(allCountries.every(c => Array.isArray(c.interconnects) && c.interconnects.length >= 2),
+  "every country has interconnects array with length >= 2");
+ok(allCountries.every(c => typeof c.iruBand === "string" && c.iruBand.length > 10),
+  "every country has iruBand string with length > 10");
+const idBrief = CD.briefing("jakarta Indonesia");
+ok(idBrief && Array.isArray(idBrief.interconnects) && idBrief.interconnects.length >= 2,
+  "briefing('jakarta Indonesia').interconnects.length >= 2");
+ok(idBrief && typeof idBrief.iruBand === "string" && /USD/.test(idBrief.iruBand),
+  "briefing('jakarta Indonesia').iruBand contains 'USD'");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

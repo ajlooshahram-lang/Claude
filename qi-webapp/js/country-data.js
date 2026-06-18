@@ -34,6 +34,8 @@
     {
       key: "indonesia",
       name: "Indonesia",
+      interconnects: ["Jakarta (NeutraDC / DCI Indonesia)", "Batam (Telin Batam)"],
+      iruBand: "USD 3,000\u20135,000 per Gbps/month for a 15-year term",
       authority: {
         name: "Kementerian Komunikasi dan Digital (Ministry of Communication and Digital Affairs)",
         abbrev: "Komdigi",
@@ -65,6 +67,8 @@
     {
       key: "thailand",
       name: "Thailand",
+      interconnects: ["Bangkok (INTERLINK)", "Songkhla (CAT Telecom)"],
+      iruBand: "USD 2,500\u20134,000 per Gbps/month for a 15-year term",
       authority: {
         name: "National Broadcasting and Telecommunications Commission",
         abbrev: "NBTC",
@@ -94,6 +98,8 @@
     {
       key: "vietnam",
       name: "Vietnam",
+      interconnects: ["Ho Chi Minh City (VNPT-IDC / Viettel IDC)", "Da Nang (FPT Telecom)"],
+      iruBand: "USD 3,500\u20135,500 per Gbps/month for a 15-year term",
       authority: {
         name: "Ministry of Science and Technology (absorbed the former Ministry of Information & Communications on 18 Feb 2025)",
         abbrev: "MOST (ex-MIC)",
@@ -123,6 +129,8 @@
     {
       key: "taiwan",
       name: "Taiwan",
+      interconnects: ["Taipei (Chief Telecom / Taiwan Fixed Network)", "Tamsui CLS"],
+      iruBand: "USD 2,000\u20133,500 per Gbps/month for a 15-year term",
       authority: {
         name: "National Communications Commission",
         abbrev: "NCC",
@@ -152,6 +160,8 @@
     {
       key: "philippines",
       name: "Philippines",
+      interconnects: ["Manila (PLDT Vitro)", "Batangas CLS"],
+      iruBand: "USD 3,000\u20134,500 per Gbps/month for a 15-year term",
       authority: {
         name: "National Telecommunications Commission",
         abbrev: "NTC",
@@ -182,6 +192,8 @@
     {
       key: "guam",
       name: "Guam (US territory)",
+      interconnects: ["Piti (GTA TeleGuam)", "Barrigada (Docomo Pacific)"],
+      iruBand: "USD 4,000\u20136,000 per Gbps/month for a 15-year term",
       authority: {
         name: "Federal Communications Commission",
         abbrev: "FCC",
@@ -211,6 +223,8 @@
     {
       key: "malaysia",
       name: "Malaysia",
+      interconnects: ["Kuala Lumpur (AIMS / Equinix KL)", "Mersing CLS"],
+      iruBand: "USD 2,500\u20133,800 per Gbps/month for a 15-year term",
       authority: {
         name: "Malaysian Communications and Multimedia Commission (Suruhanjaya Komunikasi dan Multimedia Malaysia)",
         abbrev: "MCMC",
@@ -240,6 +254,8 @@
     {
       key: "brunei",
       name: "Brunei",
+      interconnects: ["Bandar Seri Begawan (Datastream / Telbru DC)", "Tutong CLS"],
+      iruBand: "USD 5,000\u20137,000 per Gbps/month for a 15-year term",
       authority: {
         name: "Authority for Info-communications Technology Industry of Brunei Darussalam",
         abbrev: "AITI",
@@ -677,6 +693,8 @@
         structures: lp.structures || [],
         note: lp.note || ""
       },
+      interconnects: c.interconnects || [],
+      iruBand: c.iruBand || "",
       risks: risks,
       geographical: c.geographical.slice(0),
       geopolitical: c.geopolitical.slice(0)
