@@ -13,6 +13,7 @@
   /* design tokens — motion */
   --transition:.18s ease;
 }
+html,body,.sidebar,.topbar,.card,.modal-overlay,.modal,.brief{transition:background-color .3s ease,color .3s ease,border-color .3s ease}
 :focus-visible{outline:2px solid var(--accent,#2e5496);outline-offset:2px;border-radius:var(--radius-sm,6px)}
 .skip-link{position:absolute;top:-40px;left:0;background:var(--accent,#2e5496);color:#fff;padding:8px 16px;z-index:10000;font-size:13px;border-radius:0 0 8px 0;transition:top .2s ease}
 .skip-link:focus{top:0}
@@ -1019,3 +1020,14 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .reveal-visible{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){.reveal-hidden{opacity:1;transform:none;transition:none}}
 @media print{.reveal-hidden{opacity:1;transform:none}}
+
+/* Contextual help tips (step 38) */
+.help-tip{display:flex;align-items:center;gap:12px;padding:11px 16px;margin-bottom:14px;background:rgba(46,84,150,.06);border:1px solid rgba(46,84,150,.22);border-left:4px solid var(--blue,#2e5496);border-radius:var(--radius-md,10px);font-size:13px;line-height:1.5;color:var(--ink)}
+.help-tip-text{flex:1}
+.help-tip-dismiss{background:none;border:none;cursor:pointer;font-size:18px;color:var(--muted,#6b7892);padding:4px 6px;border-radius:6px;line-height:1}
+.help-tip-dismiss:hover{background:rgba(46,84,150,.1);color:var(--ink)}
+[data-theme="dark"] .help-tip{background:rgba(125,167,240,.08);border-color:rgba(125,167,240,.22);border-left-color:#7da7f0}
+@media print{.help-tip{display:none}}
+
+/* Health trend sparkline (step 39) */
+.health-spark{width:56px;height:22px;display:block;margin-top:4px;color:inherit;opacity:.7}

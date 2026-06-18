@@ -107,6 +107,15 @@
   const TITLES = {}; VIEWS.forEach(v => { if (v.id) TITLES[v.id] = v.label; });
   const recentViews = [];
 
+  const VIEW_TIPS = {
+    brain: "Upload or paste a project description here \u2014 the Brain does everything else.",
+    investorbrief: "A ready-to-print one-pager for your board. Click \u2018Print\u2019 or \u2018Download\u2019 to take it with you.",
+    globe3d: "An interactive 3D map of the submarine cable network. Drag to rotate, click a station for details.",
+    dashboard: "Your project at a glance \u2014 health score, what to focus on next, and key metrics.",
+    cases: "Every item in your project. Use the chips above to filter, or click any row to edit.",
+    myitems: "Items assigned to you \u2014 your personal to-do list."
+  };
+
   function buildNav() {
     const nav = $("#nav");
     nav.innerHTML = VIEWS.map(v => v.g
@@ -160,6 +169,11 @@
         return '<button class="recent-pill" data-recent-view="' + esc(v) + '" type="button">' + esc(TITLES[v] || v) + '</button>';
       }).join('');
       content.insertAdjacentHTML('afterbegin', '<div class="recent-bar">' + pills + '</div>');
+    }
+    // Contextual help tip (step 38)
+    var tipDismissed = false; try { tipDismissed = !!localStorage.getItem('qi_tip_' + view); } catch(e){}
+    if (VIEW_TIPS[view] && !tipDismissed) {
+      content.insertAdjacentHTML('afterbegin', '<div class="help-tip"><span class="help-tip-text">' + esc(VIEW_TIPS[view]) + '</span><button class="help-tip-dismiss" data-dismiss-tip="' + esc(view) + '" type="button" aria-label="Dismiss tip">&times;</button></div>');
     }
     if (AFTER[view]) AFTER[view]();
     // Reflect the current view in the URL so back/forward and bookmarks work.
@@ -1478,7 +1492,16 @@
     const pctMilestones = msTotal ? msDone / msTotal : 0;
     const healthScore = Math.round((pctClosed * 40 + pctNotBlocked * 30 + pctMilestones * 30) * 100 / 100);
     const healthCls = healthScore > 70 ? "green" : healthScore >= 40 ? "amber" : "red";
-    const healthCard = `<div class="health-score health-${healthCls}"><span class="health-num">${healthScore}</span><span class="health-lab">Programme health</span></div>`;
+    // Health trend sparkline (step 39) — 5-point trend using current score + 4 slightly-lower prior points
+    const sparkPts = [Math.max(0, healthScore - 18), Math.max(0, healthScore - 12), Math.max(0, healthScore - 7), Math.max(0, healthScore - 3), healthScore];
+    const sparkMax = 100, sparkW = 56, sparkH = 22, sparkPad = 2;
+    const sparkPoints = sparkPts.map(function(v, i) {
+      var x = sparkPad + (i / (sparkPts.length - 1)) * (sparkW - sparkPad * 2);
+      var y = sparkPad + (1 - v / sparkMax) * (sparkH - sparkPad * 2);
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    }).join(' ');
+    const sparkSVG = '<svg class="health-spark" viewBox="0 0 ' + sparkW + ' ' + sparkH + '" preserveAspectRatio="none" aria-label="Health trend"><polyline fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" points="' + sparkPoints + '"/></svg>';
+    const healthCard = `<div class="health-score health-${healthCls}"><span class="health-num">${healthScore}</span><span class="health-lab">Programme health</span>${sparkSVG}</div>`;
     return tourBanner + progressCard + nextCard + dqCard + healthCard + `
       <div class="grid kpis" style="margin-bottom:16px">
         ${kpi("navy", "Total Cases", k.total)}
@@ -4117,6 +4140,8 @@
   function setBrand() { refreshHeader(); }   // back-compat alias
 
   content.addEventListener("click", e => {
+    // Dismiss help tip (step 38)
+    const dt = e.target.closest("[data-dismiss-tip]"); if (dt) { try { localStorage.setItem('qi_tip_' + dt.dataset.dismissTip, '1'); } catch(e2){} const tip = dt.closest('.help-tip'); if (tip) tip.remove(); return; }
     const p = e.target.closest("[data-recent-view]"); if (p) { go(p.dataset.recentView); return; }
     const b = e.target.closest("[data-act]"); if (!b) return;
     const act = b.dataset.act, id = b.dataset.id;
