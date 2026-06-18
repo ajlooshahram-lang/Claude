@@ -1352,5 +1352,15 @@ if (reviewCBs.length > 0) {
   ok(false, "checking a .section-reviewed checkbox adds .is-reviewed class (no checkboxes found)");
 }
 
+// Step 79: Previous/Next navigation footer
+S.reset();
+doc.querySelector('.nav-item[data-view="cases"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("navFooter") != null, "#navFooter exists after navigating to a view");
+ok(doc.getElementById("navPrev") != null && doc.getElementById("navNext") != null, "#navPrev and #navNext buttons exist");
+// Clicking navNext should navigate to the next view in VIEWS order
+var nextLabel = doc.getElementById("navNext").textContent;
+doc.getElementById("navNext").dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("navFooter") != null, "#navFooter persists after clicking Next (navigated to next view)");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

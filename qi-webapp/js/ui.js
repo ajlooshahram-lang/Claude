@@ -237,6 +237,34 @@
     void content.offsetWidth;
     content.classList.add("view-enter");
     if (AFTER[view]) AFTER[view]();
+    // Step 79: Previous / Next navigation footer
+    (function renderNavFooter() {
+      var flat = VIEWS.filter(function(v) { return !!v.id; });
+      var idx = -1;
+      for (var i = 0; i < flat.length; i++) { if (flat[i].id === view) { idx = i; break; } }
+      if (idx === -1) return;
+      var prevView = idx > 0 ? flat[idx - 1] : null;
+      var nextView = idx < flat.length - 1 ? flat[idx + 1] : null;
+      var posText = (idx + 1) + " of " + flat.length;
+      var footerHtml = '<div class="nav-footer" id="navFooter">';
+      if (prevView) {
+        footerHtml += '<button class="nav-prev" id="navPrev" type="button">\u2190 Previous: ' + esc(prevView.label) + '</button>';
+      } else {
+        footerHtml += '<button class="nav-prev" id="navPrev" type="button" disabled>\u2190 Previous</button>';
+      }
+      footerHtml += '<span class="nav-pos">' + esc(posText) + '</span>';
+      if (nextView) {
+        footerHtml += '<button class="nav-next" id="navNext" type="button">Next: ' + esc(nextView.label) + ' \u2192</button>';
+      } else {
+        footerHtml += '<button class="nav-next" id="navNext" type="button" disabled>Next \u2192</button>';
+      }
+      footerHtml += '</div>';
+      content.insertAdjacentHTML('beforeend', footerHtml);
+      var prevBtn = document.getElementById("navPrev");
+      var nextBtn = document.getElementById("navNext");
+      if (prevBtn && prevView) prevBtn.addEventListener("click", function() { go(prevView.id); });
+      if (nextBtn && nextView) nextBtn.addEventListener("click", function() { go(nextView.id); });
+    })();
     // Reflect the current view in the URL so back/forward and bookmarks work.
     if (!(opts && opts.skipHash)) {
       const target = "#" + view;
