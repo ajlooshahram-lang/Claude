@@ -353,6 +353,7 @@
             <button class="globe-btn" id="globeTour" type="button">▶ Cinematic tour</button>
             <button class="globe-btn is-on" id="globeSpin" type="button" aria-pressed="true">⏸ Rotation</button>
             <button class="globe-btn" id="globeFullscreen" type="button">⛶ Fullscreen</button>
+            <button class="globe-btn" id="globeScreenshot" type="button">📷 Screenshot</button>
           </div>
           <div class="globe-deploy" id="globeDeploy" hidden>
             <button class="globe-btn globe-deploy-play" id="globeDeployPlay" type="button">▶ Play build A–Z</button>
@@ -690,6 +691,23 @@
       if (fsBtn) fsBtn.textContent = document.fullscreenElement ? "\u26F6 Exit fullscreen" : "\u26F6 Fullscreen";
     });
 
+    // Screenshot button (step 62)
+    const ssBtn = $("#globeScreenshot");
+    if (ssBtn) ssBtn.addEventListener("click", () => {
+      try {
+        var canvas = stage.querySelector("canvas");
+        if (!canvas) { toast("No WebGL canvas found."); return; }
+        var dataUrl = canvas.toDataURL("image/png");
+        var a = document.createElement("a");
+        a.href = dataUrl;
+        a.download = "STP-Globe-Screenshot.png";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        toast("Screenshot saved as PNG.");
+      } catch (e) { toast("Could not capture screenshot."); }
+    });
+
     // click a station / cable in the inventory panel to fly to it
     const panel = stage.closest(".globe-view");
     if (panel) {
@@ -972,6 +990,7 @@
         <button class="btn" id="briefShare" type="button">🔗 Share link</button>
         <button class="btn" id="briefPreview" type="button">👁 Preview</button>
         <button class="btn" id="briefPresent" type="button">▶ Present</button>
+        <button class="btn" id="briefCopyText" type="button">📋 Copy as text</button>
         <input class="brief-search" id="briefSearch" type="search" placeholder="Search the brief..." aria-label="Search within brief" />
         <span class="muted">A plain-language one-pager you can hand to your board — built automatically from your project. No jargon.</span>
       </div>
@@ -1234,6 +1253,19 @@
           toast("Share: copy this page's URL to share the brief view.");
         }
       } catch (e) { toast("Could not generate share link."); }
+    });
+
+    // --- Copy as text button (step 63) ---
+    const copyTextBtn = $("#briefCopyText");
+    if (copyTextBtn) copyTextBtn.addEventListener("click", function () {
+      var briefContent = $("#investorBrief");
+      if (!briefContent) { toast("No brief content found."); return; }
+      var text = briefContent.innerText || briefContent.textContent || "";
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { toast("Brief copied as plain text."); }, function () { toast("Could not copy to clipboard."); });
+      } else {
+        toast("Clipboard not available in this browser.");
+      }
     });
 
     // --- "What if" country toggles ---
@@ -1543,6 +1575,20 @@
         document.getElementById("slideOverview").addEventListener("click", toggleOverview);
         document.getElementById("slideExit").addEventListener("click", exitPresent);
         updateProgress();
+      });
+    }
+
+    // --- Laser-pointer / spotlight effect during presentation (step 61) ---
+    if (briefEl) {
+      briefEl.addEventListener("click", function (e) {
+        if (!briefEl.classList.contains("presenting")) return;
+        if (e.target.closest(".slide-nav")) return;
+        var dot = document.createElement("div");
+        dot.className = "laser-dot";
+        dot.style.left = e.clientX + "px";
+        dot.style.top = e.clientY + "px";
+        document.body.appendChild(dot);
+        setTimeout(function () { if (dot.parentNode) dot.parentNode.removeChild(dot); }, 600);
       });
     }
   };

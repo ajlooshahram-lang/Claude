@@ -1270,5 +1270,28 @@ doc.getElementById("slideExit").dispatchEvent(new window.Event("click", { bubble
 doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(doc.getElementById("meetingAgenda") != null, "#meetingAgenda button exists on the dashboard");
 
+// Step 61: Laser-dot / laserPulse keyframes exist in the stylesheet
+var hasLaser = false;
+var sheets = doc.styleSheets;
+for (var si = 0; si < sheets.length; si++) {
+  try {
+    var rules = sheets[si].cssRules;
+    for (var ri = 0; ri < rules.length; ri++) {
+      var ruleText = rules[ri].cssText || "";
+      if (ruleText.indexOf("laserPulse") !== -1 || ruleText.indexOf("laser-dot") !== -1) { hasLaser = true; break; }
+    }
+  } catch (e) {}
+  if (hasLaser) break;
+}
+ok(hasLaser, ".laser-dot or laserPulse keyframes exist in the stylesheet");
+
+// Step 62: #globeScreenshot button exists on the 3D map view
+doc.querySelector('.nav-item[data-view="globe3d"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("globeScreenshot") != null, "#globeScreenshot button exists on the 3D map view");
+
+// Step 63: #briefCopyText button exists on the Investor Brief toolbar
+doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+ok(doc.getElementById("briefCopyText") != null, "#briefCopyText button exists on the Investor Brief toolbar");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

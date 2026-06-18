@@ -1117,3 +1117,7 @@ mark.hl{background:rgba(230,184,74,.4);border-radius:2px;padding:0 1px}
 /* Floating quick stats widget (step 54) */
 .brief-float{position:sticky;bottom:14px;left:14px;z-index:10;display:inline-flex;gap:10px;padding:6px 14px;border-radius:999px;font-size:11px;font-weight:700;color:var(--accent,#2e5496);background:var(--card,#fff);border:1px solid var(--line,#e3e8f0);box-shadow:var(--shadow-md,0 6px 20px rgba(0,0,0,.12));opacity:.9}
 .brief-float:hover{opacity:1}
+
+/* Laser-pointer dot during presentation (step 61) */
+.laser-dot{position:fixed;width:20px;height:20px;border-radius:50%;background:rgba(255,60,60,.7);box-shadow:0 0 12px 4px rgba(255,60,60,.5);pointer-events:none;z-index:10002;transform:translate(-50%,-50%);animation:laserPulse .6s ease both}
+@keyframes laserPulse{0%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(2.5)}}
