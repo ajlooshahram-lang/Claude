@@ -939,7 +939,8 @@ const T = {
       matlist: '\uD83D\uDED2 Materialeliste',
       fault: '\u26A1 Fejlsimulator',
       thermal: '\uD83C\uDF21\uFE0F Termisk',
-      route: '\uD83D\uDDFA\uFE0F Kabelrute'
+      route: '\uD83D\uDDFA\uFE0F Kabelrute',
+      wirelabel: '\uD83C\uDFF7\uFE0F Mærkning'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1067,7 +1068,8 @@ const T = {
       matlist: '\uD83D\uDED2 Materialeliste',
       fault: '\u26A1 Fault Sim',
       thermal: '\uD83C\uDF21\uFE0F Thermal',
-      route: '\uD83D\uDDFA\uFE0F Cable Route'
+      route: '\uD83D\uDDFA\uFE0F Cable Route',
+      wirelabel: '\uD83C\uDFF7\uFE0F Labels'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -2415,6 +2417,7 @@ function renderModule(mod) {
     case 'fault': content += renderFaultSim(); break;
     case 'thermal': content += renderThermal(); break;
     case 'route': content += renderRoute(); break;
+    case 'wirelabel': content += renderWireLabel(); break;
     case 'home': content += renderDashboard(); break;
     case 'exam': content = renderExam(); break;
   }
@@ -18964,6 +18967,63 @@ function renderRoute(){
     html+='<div class="select-grid" style="margin-top:8px"><button class="sel-btn selected" onclick="routeApply()">\u2705 '+(da?'Overf\u00f8r '+totalLen+'m til sp\u00e6ndingsfald':'Transfer '+totalLen+'m to voltage drop')+'</button></div></div>';
   }
   return html;
+}
+
+// ===== WIRE NUMBERING & LABELING (IEC 81346) =====
+function renderWireLabel(){
+  const da=lang==='da';
+  var circuits=[];
+  try{ circuits=JSON.parse(localStorage.getItem('projectCircuits')||'[]'); }catch(e){}
+  var sources=circuits.length>0?circuits:loadList.map(function(c,i){return{name:c.name||('K'+(i+1)),state:{loadState:{voltage:loadState.voltage},cableState:{crossSection:cableState.crossSection},mcbState:{curve:mcbState.curve,rating:mcbState.rating}}};});
+  // Generate wire labels
+  var labels=[];
+  var panelTag='=HS01'; // IEC 81346 panel designation
+  sources.forEach(function(c,i){
+    var grp=i+1; var prefix='W'+('0'+grp).slice(-2);
+    var cs=(c.state&&c.state.cableState?c.state.cableState.crossSection:cableState.crossSection)||'2.5';
+    var phase=(c.state&&c.state.loadState&&c.state.loadState.voltage==='3x400')?'3':'1';
+    var mcb=(c.state&&c.state.mcbState)?(c.state.mcbState.curve||'B')+(c.state.mcbState.rating||16):'B16';
+    // Wires per circuit
+    if(phase==='3'){
+      labels.push({wire:prefix+'-L1',from:panelTag+'-Q'+grp+':1',to:'-X'+grp+':1',color:(da?'Brun':'Brown'),cs:cs,circuit:c.name||('Gruppe '+grp)});
+      labels.push({wire:prefix+'-L2',from:panelTag+'-Q'+grp+':3',to:'-X'+grp+':2',color:(da?'Sort':'Black'),cs:cs,circuit:c.name||('Gruppe '+grp)});
+      labels.push({wire:prefix+'-L3',from:panelTag+'-Q'+grp+':5',to:'-X'+grp+':3',color:(da?'Grå':'Grey'),cs:cs,circuit:c.name||('Gruppe '+grp)});
+      labels.push({wire:prefix+'-N',from:panelTag+'-N:'+grp,to:'-X'+grp+':4',color:(da?'Blå':'Blue'),cs:cs,circuit:c.name||('Gruppe '+grp)});
+      labels.push({wire:prefix+'-PE',from:panelTag+'-PE:'+grp,to:'-X'+grp+':5',color:(da?'Grøn/gul':'Green/yellow'),cs:cs,circuit:c.name||('Gruppe '+grp)});
+    } else {
+      labels.push({wire:prefix+'-L',from:panelTag+'-Q'+grp+':1',to:'-X'+grp+':1',color:(da?'Brun':'Brown'),cs:cs,circuit:c.name||('Gruppe '+grp)});
+      labels.push({wire:prefix+'-N',from:panelTag+'-N:'+grp,to:'-X'+grp+':2',color:(da?'Blå':'Blue'),cs:cs,circuit:c.name||('Gruppe '+grp)});
+      labels.push({wire:prefix+'-PE',from:panelTag+'-PE:'+grp,to:'-X'+grp+':3',color:(da?'Grøn/gul':'Green/yellow'),cs:cs,circuit:c.name||('Gruppe '+grp)});
+    }
+  });
+
+  let html='<div class="card fade-in"><div class="card-title">\uD83C\uDFF7\uFE0F '+(da?'Ledningsmærkning & terminalnumre (IEC 81346)':'Wire Labeling & Terminal Numbers (IEC 81346)')+'</div>';
+  html+='<div class="info-row">'+(da?'Auto-genereret mærkningsskema for hele projektet. Print og p\u00e5sæt. F\u00f8lger IEC 81346 (designationssystem) og HD 60364-5-51 (lederfarver).':'Auto-generated labeling scheme for the entire project. Print and apply. Follows IEC 81346 (designation system) and HD 60364-5-51 (conductor colors).')+'</div>';
+  if(labels.length===0){
+    html+='<div class="result-box warning"><div class="result-title">\u26A0\uFE0F '+(da?'Tilføj forbrugere eller gem kredse for at generere mærkninger':'Add consumers or save circuits to generate labels')+'</div></div></div>';
+    return html;
+  }
+  html+='<div class="result-box" style="border-color:var(--success)"><div class="result-title">\u2705 '+labels.length+' '+(da?'ledermærkninger genereret fra '+sources.length+' kredse':'wire labels generated from '+sources.length+' circuits')+'</div></div>';
+  // Table
+  html+='<div style="overflow-x:auto"><table class="data-table" style="width:100%;font-size:.8rem"><thead><tr><th>'+(da?'Ledning':'Wire')+'</th><th>'+(da?'Fra':'From')+'</th><th>'+(da?'Til':'To')+'</th><th>'+(da?'Farve':'Color')+'</th><th>mm\u00B2</th><th>'+(da?'Kreds':'Circuit')+'</th></tr></thead><tbody>';
+  labels.forEach(function(l){
+    html+='<tr><td style="font-weight:700;font-family:monospace">'+l.wire+'</td><td style="font-family:monospace;font-size:.75rem">'+l.from+'</td><td style="font-family:monospace;font-size:.75rem">'+l.to+'</td><td>'+l.color+'</td><td>'+l.cs+'</td><td>'+l.circuit+'</td></tr>';
+  });
+  html+='</tbody></table></div>';
+  html+='<div class="select-grid" style="margin-top:12px"><button class="sel-btn selected" onclick="downloadWireLabels()">\u2B07\uFE0F '+(da?'Download CSV (til m\u00e6rkemaskine)':'Download CSV (for label printer)')+'</button><button class="sel-btn" onclick="window.print()">\uD83D\uDDA8\uFE0F '+(da?'Udskriv':'Print')+'</button></div>';
+  html+='<div class="info-row" style="margin-top:8px">'+(da?'CSV-filen kan importeres direkte i Brother/Brady/Weidm\u00fcller m\u00e6rkemaskiner. Paneldesignation: '+panelTag+' (IEC 81346).':'CSV can be imported directly into Brother/Brady/Weidm\u00fcller label printers. Panel designation: '+panelTag+' (IEC 81346).')+'</div></div>';
+  return html;
+}
+function downloadWireLabels(){
+  var da=lang==='da'; var circuits=[]; try{circuits=JSON.parse(localStorage.getItem('projectCircuits')||'[]');}catch(e){}
+  var sources=circuits.length>0?circuits:loadList.map(function(c,i){return{name:c.name||('K'+(i+1)),state:{loadState:{voltage:loadState.voltage},cableState:{crossSection:cableState.crossSection},mcbState:{curve:mcbState.curve,rating:mcbState.rating}}};});
+  var rows=[(da?'Ledning;Fra;Til;Farve;mm2;Kreds':'Wire;From;To;Color;mm2;Circuit')];
+  var panelTag='=HS01';
+  sources.forEach(function(c,i){ var grp=i+1;var prefix='W'+('0'+grp).slice(-2);var cs=(c.state&&c.state.cableState?c.state.cableState.crossSection:cableState.crossSection)||'2.5';var phase=(c.state&&c.state.loadState&&c.state.loadState.voltage==='3x400')?'3':'1';
+    if(phase==='3'){rows.push(prefix+'-L1;'+panelTag+'-Q'+grp+':1;-X'+grp+':1;Brown;'+cs+';'+(c.name||'Gruppe '+grp));rows.push(prefix+'-L2;'+panelTag+'-Q'+grp+':3;-X'+grp+':2;Black;'+cs+';'+(c.name||'Gruppe '+grp));rows.push(prefix+'-L3;'+panelTag+'-Q'+grp+':5;-X'+grp+':3;Grey;'+cs+';'+(c.name||'Gruppe '+grp));rows.push(prefix+'-N;'+panelTag+'-N:'+grp+';-X'+grp+':4;Blue;'+cs+';'+(c.name||'Gruppe '+grp));rows.push(prefix+'-PE;'+panelTag+'-PE:'+grp+';-X'+grp+':5;Green/yellow;'+cs+';'+(c.name||'Gruppe '+grp));}
+    else{rows.push(prefix+'-L;'+panelTag+'-Q'+grp+':1;-X'+grp+':1;Brown;'+cs+';'+(c.name||'Gruppe '+grp));rows.push(prefix+'-N;'+panelTag+'-N:'+grp+';-X'+grp+':2;Blue;'+cs+';'+(c.name||'Gruppe '+grp));rows.push(prefix+'-PE;'+panelTag+'-PE:'+grp+';-X'+grp+':3;Green/yellow;'+cs+';'+(c.name||'Gruppe '+grp));}
+  });
+  try{var blob=new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='wire-labels-'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);}catch(e){}
 }
 
 // ===== INIT =====
