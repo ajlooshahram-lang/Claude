@@ -477,8 +477,8 @@
       var stationMeshes = {};    // id -> beacon mesh (for hover/selection scaling)
       var labels = [];           // text sprites, kept a constant on-screen size each frame
       var labelTmp = new THREE.Vector3();  // scratch vector for per-frame label work
-      var beaconGeo = new THREE.SphereGeometry(0.04, 18, 18);
-      var beaconGlowGeo = new THREE.SphereGeometry(0.09, 16, 16);
+      var beaconGeo = new THREE.SphereGeometry(0.03, 18, 18);
+      var beaconGlowGeo = new THREE.SphereGeometry(0.045, 16, 16);
       disposables.push(beaconGeo, beaconGlowGeo);
       STATIONS.forEach(function (st, i) {
         var p = latLonToVec3(st.lat, st.lon, GLOBE_R * 1.008);
@@ -488,7 +488,7 @@
         beacon.position.copy(p);
         beacon.userData = { type: "station", id: st.id, station: st, baseScale: 1 };
         // soft additive glow halo so each station reads as a bright node
-        var bGlowMat = new THREE.MeshBasicMaterial({ color: 0xffd98a, transparent: true, opacity: 0.12, blending: THREE.NormalBlending, depthWrite: false });
+        var bGlowMat = new THREE.MeshBasicMaterial({ color: 0xffd98a, transparent: true, opacity: 0.08, depthWrite: false });
         beacon.add(new THREE.Mesh(beaconGlowGeo, bGlowMat));
         disposables.push(bGlowMat);
         world.add(beacon);
@@ -497,10 +497,10 @@
         stationMeshes[st.id] = beacon;
 
         // expanding / fading ring laid flat against the surface (live pulse)
-        var ringGeo = new THREE.RingGeometry(0.05, 0.075, 28);
+        var ringGeo = new THREE.RingGeometry(0.035, 0.042, 28);
         var ringMat = new THREE.MeshBasicMaterial({
-          color: 0xffd24a, transparent: true, opacity: 0.18,
-          side: THREE.DoubleSide, blending: THREE.NormalBlending, depthWrite: false
+          color: 0xffd24a, transparent: true, opacity: 0.10,
+          side: THREE.DoubleSide, depthWrite: false
         });
         var ring = new THREE.Mesh(ringGeo, ringMat);
         ring.position.copy(p);
@@ -562,7 +562,7 @@
 
         // flowing light pulses travelling along the cable (twin, evenly spaced)
         // each with a short comet wake → data visibly streaks A–Z along the route
-        var pGeo = new THREE.SphereGeometry(0.042, 14, 14);
+        var pGeo = new THREE.SphereGeometry(0.022, 14, 14);
         disposables.push(pGeo);
         var baseSpeed = 0.06 + Math.random() * 0.04;
         for (var pp = 0; pp < 2; pp++) {
@@ -593,7 +593,7 @@
       });
 
       // ---- deployment "laying head": a bright marker at the cable-ship tip --
-      var headGeo = new THREE.SphereGeometry(0.06, 16, 16);
+      var headGeo = new THREE.SphereGeometry(0.035, 16, 16);
       var headMat = new THREE.MeshBasicMaterial({ color: 0xfff4d0, transparent: true, opacity: 0.98, blending: THREE.NormalBlending, depthWrite: false });
       var layHead = new THREE.Mesh(headGeo, headMat);
       layHead.visible = false;
