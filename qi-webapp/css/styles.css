@@ -1186,3 +1186,20 @@ mark.hl{background:rgba(230,184,74,.4);border-radius:2px;padding:0 1px}
 /* View description header (step 82) */
 .view-desc{display:block;font-size:12px;color:var(--muted,#6b7892);font-weight:400;margin-left:0;max-width:480px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:768px){.view-desc{display:none}}
+
+/* Color-coded nav section headers (step 86) */
+.nav-sep[data-group]{border-left:3px solid transparent;padding-left:8px;margin-left:4px}
+.nav-sep[data-group="overview"]{border-left-color:#4ea1ff}
+.nav-sep[data-group="delivery"]{border-left-color:#42d6a4}
+.nav-sep[data-group="risk&quality"]{border-left-color:#e6b84a}
+.nav-sep[data-group="engineering"]{border-left-color:#7b5ea7}
+.nav-sep[data-group="business"]{border-left-color:#2a9d8f}
+.nav-sep[data-group="visualization"]{border-left-color:#4ea1ff}
+.nav-sep[data-group="intelligence"]{border-left-color:#e07040}
+.nav-sep[data-group="setup"]{border-left-color:#6b7892}
+
+/* Session duration timer (step 87) */
+#sessionTime{font-size:10px;color:var(--muted,#6b7892);margin-left:8px}
+
+/* Project completeness percentage badge (step 88) */
+.pct-badge{font-size:11px;padding:2px 8px;border-radius:999px;background:rgba(66,214,164,.15);color:#1d8e6a;font-weight:700;margin-left:8px}

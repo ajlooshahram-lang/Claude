@@ -1390,5 +1390,18 @@ var casesBadge = doc.querySelector('.nav-item[data-view="cases"] .nav-badge');
 var totalCases = window.QIStore.validCases().length;
 ok(casesBadge != null && Number(casesBadge.textContent) === totalCases, "Cases nav badge shows total count (" + (casesBadge ? casesBadge.textContent : "null") + " === " + totalCases + ")");
 
+// Step 86: nav-sep elements have data-group attributes
+var navSeps = doc.querySelectorAll('.nav-sep[data-group]');
+ok(navSeps.length >= 4, ".nav-sep elements have data-group attributes (found " + navSeps.length + ")");
+
+// Step 87: #sessionTime exists after boot
+var sessionEl = doc.getElementById("sessionTime");
+ok(sessionEl != null, "#sessionTime exists after boot");
+
+// Step 88: .pct-badge exists on dashboard
+doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+var pctBadge = doc.querySelector('.pct-badge');
+ok(pctBadge != null, ".pct-badge exists on dashboard");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

@@ -196,7 +196,7 @@
   function buildNav() {
     const nav = $("#nav");
     nav.innerHTML = VIEWS.map(v => v.g
-      ? `<div class="nav-sep">${esc(v.g)}</div>`
+      ? `<div class="nav-sep" data-group="${v.g.toLowerCase().replace(/[^a-z&]/g,'')}">${esc(v.g)}</div>`
       : `<button class="nav-item" data-view="${v.id}"${NAV_TIPS[v.id] ? ` title="${esc(NAV_TIPS[v.id])}"` : ""}><span class="ico">${v.icon}</span><span class="lab">${esc(v.label)}</span></button>`).join("");
     nav.setAttribute("role", "navigation");
     nav.setAttribute("aria-label", "Main menu");
@@ -1969,7 +1969,7 @@
     const planPct = totalKm ? Math.max(100 - commPct - progPct, 0) : 0;
     const fmtKm = n => n.toLocaleString();
     const progressCard = totalKm ? `<div class="card">
-  <h3><span class="jargon" data-tip="How much of the cable network is built vs planned">Programme Progress</span></h3>
+  <h3><span class="jargon" data-tip="How much of the cable network is built vs planned">Programme Progress</span> <span class="pct-badge">${(function(){var cs=S.validCases();var closed=cs.filter(function(c){return c.status==="CLOSED"||c.status==="RESOLVED"}).length;var total=cs.length;return Math.round((closed/Math.max(1,total))*100)}())}% complete</span></h3>
   <div class="prog-bar">
     <div class="prog-seg prog-comm" style="width:${commPct}%" title="${fmtKm(commKm)} km commissioned"></div>
     <div class="prog-seg prog-prog" style="width:${progPct}%" title="${fmtKm(progKm)} km in progress"></div>
@@ -5056,6 +5056,19 @@
   // ---------- init (called by auth.js after successful authentication) ----------
   window.QIBoot = function () {
     S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
+    // Step 87: Session duration timer
+    (function initSessionTimer() {
+      var sessionStart = Date.now();
+      var span = document.createElement("span");
+      span.id = "sessionTime";
+      span.textContent = "Session: 0m";
+      var actions = document.querySelector(".topbar-actions");
+      if (actions) actions.appendChild(span);
+      setInterval(function () {
+        var mins = Math.floor((Date.now() - sessionStart) / 60000);
+        span.textContent = "Session: " + mins + "m";
+      }, 60000);
+    })();
     // Step 83: Scroll-to-top button
     (function initScrollTop() {
       var btn = document.createElement("button");
