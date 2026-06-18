@@ -5622,8 +5622,12 @@ function sldRenderCanvas(tree) {
       const y1 = pos.y + nodeH;
       const x2 = cpos.x + nodeW / 2;
       const y2 = cpos.y;
-      // Invisible wider hit area for click (selectivity analysis)
-      svg += '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="transparent" stroke-width="14" style="cursor:pointer" onclick="sldShowSelectivity(\'' + id + '\',\'' + cid + '\')"/>';
+      // Only add clickable overlay when child node has a protection device assigned,
+      // since selectivity analysis requires both upstream and downstream protection.
+      const childNode = tree.nodes[cid];
+      if (childNode && childNode.protection) {
+        svg += '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="transparent" stroke-width="14" style="cursor:pointer" onclick="sldShowSelectivity(\'' + id + '\',\'' + cid + '\')"/>';
+      }
       // Visible line
       svg += '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="var(--text-muted,#666)" stroke-width="2" pointer-events="none"/>';
     });
@@ -5847,7 +5851,10 @@ function sldDeviceCurve(device, In, settings) {
     // i5s = current that fuses in 5 seconds
     // I^2t = (i5s)^2 * 5 (total clearing energy)
     var i2t = device.i5s * device.i5s * 5;
-    // Pre-arcing I^2t is approximately 60-80% of total I^2t for gG fuses
+    // Pre-arcing I^2t is approximately 40-80% of total I^2t for gG fuses depending
+    // on fuse size (small D01: ~0.4, large NH3: ~0.8). Using 0.65 midpoint for chart
+    // display only. Safety-critical verdicts in sldAnalyzeSelectivity use conservative
+    // bounds (0.4) to avoid false "full selectivity" claims.
     var i2tPreArc = i2t * 0.65;
     var rating = device.rating;
     // Fuse thermal region: inverse-time curve t = I2t / I^2
@@ -5952,7 +5959,11 @@ function sldAnalyzeSelectivity(tree, childNodeId) {
   if (dsIsFuse && usIsFuse) {
     var ratio = usIn / dsIn;
     var dsI2t = downstream.i5s * downstream.i5s * 5;
-    var usI2tPreArc = upstream.i5s * upstream.i5s * 5 * 0.65;
+    // Conservative pre-arcing ratio: use 0.4 (lowest end of the 0.4-0.8 range for gG fuses).
+    // This makes upstream pre-arcing I2t SMALLER, so the condition dsI2t < usI2tPreArc
+    // is HARDER to satisfy. If we still report "full selectivity", it genuinely holds
+    // even for the worst-case fuse construction (small D01 fuses with low pre-arcing ratio).
+    var usI2tPreArc = upstream.i5s * upstream.i5s * 5 * 0.4;
 
     if (ratio >= 1.6 && dsI2t < usI2tPreArc) {
       result.verdict = 'full';
@@ -5982,11 +5993,21 @@ function sldAnalyzeSelectivity(tree, childNodeId) {
   }
 
   // (B) MCB vs upstream Fuse: find selectivity limit current
+  // NOTE: This analysis checks selectivity only at the MCB's instantaneous threshold
+  // (where the MCB trips magnetically). It does NOT sweep the thermal region for
+  // crossover. This is conservative for typical installations where fuse rating >> MCB
+  // rating (e.g., 100A fuse upstream of 16A MCB), because the fuse will be far slower
+  // than the MCB throughout the thermal range. For close ratings (e.g., 32A fuse above
+  // 25A MCB), thermal crossover could occur and the reported limit may overstate the
+  // actual selectivity boundary. A full thermal sweep would require iterating the MCB
+  // inverse-time curve against the fuse curve at multiple points.
   if (dsIsMCB && usIsFuse) {
     var mcbCurve = MCB_CURVES[downstream.curve] || MCB_CURVES['B'];
     var isdMax = mcbCurve.isdMax * dsIn; // MCB instantaneous trip max
-    // Fuse pre-arcing time at MCB instantaneous current
-    var usI2tPre = upstream.i5s * upstream.i5s * 5 * 0.65;
+    // Conservative pre-arcing ratio: use 0.4 (lowest bound). This makes the upstream
+    // fuse appear FASTER (less pre-arcing time), so it is HARDER to declare selectivity.
+    // If we still report "partial selective", the fuse is genuinely slow enough.
+    var usI2tPre = upstream.i5s * upstream.i5s * 5 * 0.4;
     var fuseTimeAtIsd = usI2tPre / (isdMax * isdMax);
 
     if (fuseTimeAtIsd > 0.01) {
@@ -6023,7 +6044,10 @@ function sldAnalyzeSelectivity(tree, childNodeId) {
     if (dsIsMCB) {
       var dsCurve = MCB_CURVES[downstream.curve] || MCB_CURVES['B'];
       var dsIsdMax = dsCurve.isdMax * dsIn;
-      // MCB clears in < 0.01s at instantaneous. MCCB needs delay > clearing time
+      // Per IEC 60947-2 Annex A, typical MCB instantaneous clearing time is 5-15 ms.
+      // A 50 ms short-time delay provides adequate time margin (at least 3x) to ensure
+      // the downstream MCB fully clears before the MCCB begins to trip. Below 50 ms,
+      // the margin is insufficient for guaranteed time-grading, so we report partial.
       if (usIsdDelay >= 0.05 && usIsd > dsIsdMax) {
         result.verdict = 'full';
         result.details = tx(
@@ -6049,6 +6073,7 @@ function sldAnalyzeSelectivity(tree, childNodeId) {
       var dsI2tTotal = downstream.i5s * downstream.i5s * 5;
       var dsTimeAtUsIsd = dsI2tTotal / (usIsd * usIsd);
       if (usIsdDelay > dsTimeAtUsIsd && usIsdDelay >= 0.05) {
+        // 50 ms minimum per IEC 60947-2 Annex A reasoning (see MCB branch comment above)
         result.verdict = 'full';
         result.details = tx(
           'MCCB forsinkelse (' + (usIsdDelay * 1000).toFixed(0) + 'ms) > sikringsudkobling (' + (dsTimeAtUsIsd * 1000).toFixed(1) + 'ms)',
