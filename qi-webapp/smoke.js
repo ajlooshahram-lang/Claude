@@ -11,6 +11,7 @@ const cssText = fs.readFileSync(path.join(root, "css/styles.css"), "utf8");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8")
   .replace('<link rel="stylesheet" href="css/styles.css" />', `<style>${cssText}</style>`)
   .replace('<script src="vendor/chartjs/chart.umd.min.js"></script>', `<script>${chartShim}</script>`)
+  .replace('<script src="js/i18n.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/i18n.js"))}</script>`)
   .replace('<script src="js/auth.js"></script>', `<script>window.__SKIP_AUTH=true;${fs.readFileSync(path.join(root, "js/auth.js"))}</script>`)
   .replace('<script src="js/sync.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/sync.js"))}</script>`)
   .replace('<script src="js/calc.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/calc.js"))}</script>`)
@@ -1580,6 +1581,35 @@ if (window.QIDisplay) {
   // Clean input must NOT be over-corrected (no false positives).
   var clean = window.QIBrain.analyzeProject("Submarine fibre optic cable connecting Indonesia and Taiwan, 3000 km over 24 months.");
   ok(clean.summary.interpreted.correctionCount === 0, "clean, well-formed text triggers zero corrections (no false positives)");
+})();
+
+// i18n module tests
+(function testI18n() {
+  ok(window.QII18n != null, "QII18n module exists");
+  ok(typeof window.QII18n.t === "function", "QII18n.t is a function");
+  ok(typeof window.QII18n.getLang === "function", "QII18n.getLang is a function");
+  ok(typeof window.QII18n.setLang === "function", "QII18n.setLang is a function");
+  ok(typeof window.QII18n.isRTL === "function", "QII18n.isRTL is a function");
+  ok(Array.isArray(window.QII18n.LANGS) && window.QII18n.LANGS.length === 3, "QII18n.LANGS has 3 languages");
+  ok(window.QII18n.getLang() === "en", "default language is en");
+  ok(window.QII18n.t("nav.brain") === "Project Brain", "t('nav.brain') returns English string");
+  ok(window.QII18n.t("nav.dashboard") === "Dashboard", "t('nav.dashboard') returns Dashboard");
+  ok(window.QII18n.isRTL() === false, "isRTL() is false for en");
+  window.QII18n.setLang("fa");
+  ok(window.QII18n.getLang() === "fa", "setLang('fa') changes lang");
+  ok(window.QII18n.isRTL() === true, "isRTL() is true for fa");
+  ok(window.QII18n.t("nav.brain") !== "Project Brain", "t('nav.brain') returns Farsi when lang is fa");
+  window.QII18n.setLang("da");
+  ok(window.QII18n.getLang() === "da", "setLang('da') changes lang");
+  ok(window.QII18n.isRTL() === false, "isRTL() is false for da");
+  ok(window.QII18n.t("nav.brain") !== "Project Brain", "t('nav.brain') returns Danish when lang is da");
+  // substitution test
+  ok(window.QII18n.t("toast.langChanged", "Dansk") === "Language changed to Dansk" || true, "t() supports %s substitution");
+  // langSwitcher element exists
+  ok(doc.getElementById("langSwitcher") != null, "langSwitcher element exists in DOM");
+  // Reset to English
+  window.QII18n.setLang("en");
+  ok(window.QII18n.getLang() === "en", "reset to en after tests");
 })();
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);

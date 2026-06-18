@@ -68,6 +68,7 @@ const VENDOR = [
 
 // ---- app modules (same order as index.html) ----
 const APP = [
+  "js/i18n.js",
   "js/auth.js",
   "js/sync.js",
   "js/calc.js",

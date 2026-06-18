@@ -69,10 +69,15 @@
     try { localStorage.setItem("qi_sound", _soundEnabled ? "on" : "off"); } catch(e) {}
     var btn = $("#btnSound");
     if (btn) btn.classList.toggle("sound-off", !_soundEnabled);
-    toast(_soundEnabled ? "Notification sound on" : "Notification sound off");
+    toast(_soundEnabled ? (window.QII18n ? window.QII18n.t("toast.soundOn") : "Notification sound on") : (window.QII18n ? window.QII18n.t("toast.soundOff") : "Notification sound off"));
   }
   function tableWrap(head, rows, cls) {
-    if (!rows) return `<div class="empty"><p>No items yet. Go to <b>Project Brain</b>, upload a project description and click <b>Analyze</b> &mdash; the app will create your risk register, FMEA and tasks automatically.</p><button class="btn btn-sm" onclick="document.querySelector('[data-view=brain]')&&document.querySelector('[data-view=brain]').click()" type="button">🧠 Go to Project Brain</button></div>`;
+    if (!rows) {
+      var T = window.QII18n ? window.QII18n.t : function(k) { return null; };
+      var emptyMsg = T("empty.noItems") || "No items yet. Go to <b>Project Brain</b>, upload a project description and click <b>Analyze</b> &mdash; the app will create your risk register, FMEA and tasks automatically.";
+      var btnLabel = T("empty.goToBrain") || "Go to Project Brain";
+      return `<div class="empty"><p>${emptyMsg}</p><button class="btn btn-sm" onclick="document.querySelector('[data-view=brain]')&&document.querySelector('[data-view=brain]').click()" type="button">\ud83e\udde0 ${btnLabel}</button></div>`;
+    }
     return `<div class="table-wrap"><table class="${cls || ""}"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 
@@ -154,6 +159,11 @@
     VIEWS.splice(idx, 0, ...items);
   })();
   const TITLES = {}; VIEWS.forEach(v => { if (v.id) TITLES[v.id] = v.label; });
+  function getTitle(id) {
+    var T = window.QII18n ? window.QII18n.t : null;
+    if (T) { var k = "nav." + id; var r = T(k); if (r !== k) return r; }
+    return TITLES[id] || id;
+  }
   const recentViews = [];
 
   const VIEW_TIPS = {
@@ -196,9 +206,17 @@
 
   function buildNav() {
     const nav = $("#nav");
-    nav.innerHTML = VIEWS.map(v => v.g
-      ? `<div class="nav-sep" data-group="${v.g.toLowerCase().replace(/[^a-z&]/g,'')}">${esc(v.g)}</div>`
-      : `<button class="nav-item" data-view="${v.id}"${NAV_TIPS[v.id] ? ` title="${esc(NAV_TIPS[v.id])}"` : ""}><span class="ico">${v.icon}</span><span class="lab">${esc(v.label)}</span></button>`).join("");
+    const T = window.QII18n ? window.QII18n.t : function(k) { return k; };
+    nav.innerHTML = VIEWS.map(v => {
+      if (v.g) {
+        var gKey = "group." + v.g.toLowerCase().replace(/[^a-z&]/g,'').replace('&','');
+        var gLabel = T(gKey) !== gKey ? T(gKey) : v.g;
+        return `<div class="nav-sep" data-group="${v.g.toLowerCase().replace(/[^a-z&]/g,'')}">${esc(gLabel)}</div>`;
+      }
+      var navLabel = T("nav." + v.id);
+      if (navLabel === "nav." + v.id) navLabel = v.label;
+      return `<button class="nav-item" data-view="${v.id}"${NAV_TIPS[v.id] ? ` title="${esc(NAV_TIPS[v.id])}"` : ""}><span class="ico">${v.icon}</span><span class="lab">${esc(navLabel)}</span></button>`;
+    }).join("");
     nav.setAttribute("role", "navigation");
     nav.setAttribute("aria-label", "Main menu");
     nav.querySelectorAll(".nav-item").forEach(b => b.addEventListener("click", () => go(b.dataset.view)));
@@ -234,7 +252,7 @@
     // Step 81: Track visited views
     visitedViews.add(view);
     if (recentViews[recentViews.length - 1] !== view) { recentViews.push(view); if (recentViews.length > 6) recentViews.shift(); }
-    $("#viewTitle").textContent = TITLES[view] || "QI Platform";
+    $("#viewTitle").textContent = getTitle(view) || "QI Platform";
     // Step 82: Update view description header
     var descEl = $("#viewDesc");
     if (descEl) descEl.textContent = NAV_TIPS[view] || "";
@@ -245,7 +263,7 @@
         if (VIEWS[i].g) grp = VIEWS[i].g;
         if (VIEWS[i].id === view) break;
       }
-      bc.textContent = grp ? "Home \u203a " + grp + " \u203a " + (TITLES[view] || view) : "Home \u203a " + (TITLES[view] || view);
+      bc.textContent = grp ? "Home \u203a " + grp + " \u203a " + (getTitle(view) || view) : "Home \u203a " + (getTitle(view) || view);
     }
     document.querySelectorAll(".nav-item").forEach(b => {
       const active = b.dataset.view === view;
@@ -260,7 +278,7 @@
     content.innerHTML = (RENDER[view] || (() => "<div class='empty'>Not found</div>"))();
     if (recentViews.length > 1) {
       var pills = recentViews.slice(0, -1).reverse().slice(0, 5).map(function(v) {
-        return '<button class="recent-pill" data-recent-view="' + esc(v) + '" type="button">' + esc(TITLES[v] || v) + '</button>';
+        return '<button class="recent-pill" data-recent-view="' + esc(v) + '" type="button">' + esc(getTitle(v) || v) + '</button>';
       }).join('');
       content.insertAdjacentHTML('afterbegin', '<div class="recent-bar">' + pills + '</div>');
     }
@@ -5518,9 +5536,30 @@
     apply: applyTheme
   };
 
+  // ---------- i18n: language application ----------
+  function applyLang() {
+    var I = window.QII18n;
+    if (!I) return;
+    document.documentElement.lang = I.getLang();
+    document.dir = I.isRTL() ? "rtl" : "ltr";
+    // Populate the lang switcher
+    var sel = document.getElementById("langSwitcher");
+    if (sel) {
+      sel.innerHTML = I.LANGS.map(function (l) {
+        return '<option value="' + l.code + '"' + (l.code === I.getLang() ? ' selected' : '') + '>' + l.flag + ' ' + l.code.toUpperCase() + '</option>';
+      }).join("");
+      sel.onchange = function () {
+        I.setLang(sel.value);
+        applyLang();
+        buildNav();
+        go(current);
+      };
+    }
+  }
+
   // ---------- init (called by auth.js after successful authentication) ----------
   window.QIBoot = function () {
-    S.load(); checkShareHash(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
+    S.load(); checkShareHash(); applyLang(); buildNav(); applyTheme(); applySidebar(); refreshHeader();
     startAmbientAdaptation();
     // Step 87: Session duration timer
     (function initSessionTimer() {
