@@ -281,7 +281,7 @@
     var geo = new THREE.SphereGeometry(GLOBE_R * 1.16, 64, 64);
     var mat = new THREE.ShaderMaterial({
       transparent: true,
-      blending: THREE.AdditiveBlending,
+      blending: THREE.NormalBlending,
       side: THREE.BackSide,
       depthWrite: false,
       uniforms: { uColor: { value: new THREE.Color(0x5aa9ff) } },
@@ -297,7 +297,7 @@
         "uniform vec3 uColor;",
         "void main(){",
         "  float intensity = pow(0.66 - dot(vNormal, vec3(0.0,0.0,1.0)), 3.2);",
-        "  gl_FragColor = vec4(uColor, 1.0) * clamp(intensity, 0.0, 0.55);",
+        "  gl_FragColor = vec4(uColor, 1.0) * clamp(intensity, 0.0, 0.35);",
         "}"
       ].join("\n")
     });
@@ -310,7 +310,7 @@
     var geo = new THREE.SphereGeometry(GLOBE_R * 1.002, 64, 64);
     var mat = new THREE.ShaderMaterial({
       transparent: true,
-      blending: THREE.AdditiveBlending,
+      blending: THREE.NormalBlending,
       depthWrite: false,
       uniforms: {
         uLights: { value: lightsTex },
@@ -454,7 +454,7 @@
         var cloudGeo = new THREE.SphereGeometry(GLOBE_R * 1.01, 64, 64);
         var cloudMat = new THREE.MeshBasicMaterial({
           map: cloudsTex, transparent: true, opacity: 0.35,
-          blending: THREE.AdditiveBlending, depthWrite: false
+          blending: THREE.NormalBlending, depthWrite: false
         });
         clouds = new THREE.Mesh(cloudGeo, cloudMat);
         world.add(clouds);
@@ -488,7 +488,7 @@
         beacon.position.copy(p);
         beacon.userData = { type: "station", id: st.id, station: st, baseScale: 1 };
         // soft additive glow halo so each station reads as a bright node
-        var bGlowMat = new THREE.MeshBasicMaterial({ color: 0xffd98a, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false });
+        var bGlowMat = new THREE.MeshBasicMaterial({ color: 0xffd98a, transparent: true, opacity: 0.12, blending: THREE.NormalBlending, depthWrite: false });
         beacon.add(new THREE.Mesh(beaconGlowGeo, bGlowMat));
         disposables.push(bGlowMat);
         world.add(beacon);
@@ -500,7 +500,7 @@
         var ringGeo = new THREE.RingGeometry(0.05, 0.075, 28);
         var ringMat = new THREE.MeshBasicMaterial({
           color: 0xffd24a, transparent: true, opacity: 0.18,
-          side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false
+          side: THREE.DoubleSide, blending: THREE.NormalBlending, depthWrite: false
         });
         var ring = new THREE.Mesh(ringGeo, ringMat);
         ring.position.copy(p);
@@ -549,7 +549,7 @@
         var haloGeo = new THREE.TubeGeometry(curve, 80, radius * 2.0, 10, false);
         var haloMat = new THREE.MeshBasicMaterial({
           color: col, transparent: true, opacity: 0.08,
-          blending: THREE.AdditiveBlending, depthWrite: false
+          blending: THREE.NormalBlending, depthWrite: false
         });
         var halo = new THREE.Mesh(haloGeo, haloMat);
         world.add(halo);
@@ -566,13 +566,13 @@
         disposables.push(pGeo);
         var baseSpeed = 0.06 + Math.random() * 0.04;
         for (var pp = 0; pp < 2; pp++) {
-          var pMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false });
+          var pMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, blending: THREE.NormalBlending, depthWrite: false });
           var pulse = new THREE.Mesh(pGeo, pMat);
           world.add(pulse);
           disposables.push(pMat);
           var trail = [];
           for (var tk = 0; tk < 3; tk++) {
-            var tMat = new THREE.MeshBasicMaterial({ color: 0xbfe0ff, transparent: true, opacity: 0.42 - tk * 0.12, blending: THREE.AdditiveBlending, depthWrite: false });
+            var tMat = new THREE.MeshBasicMaterial({ color: 0xbfe0ff, transparent: true, opacity: 0.42 - tk * 0.12, blending: THREE.NormalBlending, depthWrite: false });
             var tMesh = new THREE.Mesh(pGeo, tMat);
             world.add(tMesh);
             disposables.push(tMat);
@@ -594,7 +594,7 @@
 
       // ---- deployment "laying head": a bright marker at the cable-ship tip --
       var headGeo = new THREE.SphereGeometry(0.06, 16, 16);
-      var headMat = new THREE.MeshBasicMaterial({ color: 0xfff4d0, transparent: true, opacity: 0.98, blending: THREE.AdditiveBlending, depthWrite: false });
+      var headMat = new THREE.MeshBasicMaterial({ color: 0xfff4d0, transparent: true, opacity: 0.98, blending: THREE.NormalBlending, depthWrite: false });
       var layHead = new THREE.Mesh(headGeo, headMat);
       layHead.visible = false;
       world.add(layHead);
@@ -919,9 +919,7 @@
 
       /* ------------------------------------------------- post-processing ---- */
       var composer = null, bloomPass = null, fxaaPass = null;
-      var canCompose = typeof THREE.EffectComposer === "function" &&
-                       typeof THREE.RenderPass === "function" &&
-                       typeof THREE.UnrealBloomPass === "function";
+      var canCompose = false; // Bloom disabled: the additive glow washed out the globe.
       if (canCompose) {
         try {
           composer = new THREE.EffectComposer(renderer);
