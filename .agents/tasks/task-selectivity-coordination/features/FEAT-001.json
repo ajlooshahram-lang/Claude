@@ -33,5 +33,5 @@
     "Verify the new functions are defined: sldDeviceCurve, sldAnalyzeSelectivity, sldRenderTCCChart, sldShowSelectivity, sldVerifySelectivityAll"
   ],
   "blocked_reason": null,
-  "findings": "All 39 tests pass (28 original + 11 new). The _FA translation object was initially empty and is now populated with Farsi strings for the selectivity module. The test for sldVerifyNode selectivity check needed to match both Danish 'Selektiv' and English 'Selectiv' patterns since the default lang is 'da'. The connection lines in the SLD canvas now have invisible 14px-wide hit areas for click interaction overlaid on the 2px visible lines."
+  "findings": "All 39 tests pass (28 original + 11 new). Post-review fixes applied: (1) Pre-arcing ratio changed from fixed 0.65 to conservative 0.4 for safety-critical verdict computations, ensuring 'full selectivity' claims hold even for worst-case fuse construction. Chart display retains 0.65 midpoint. (2) IEC 60947-2 Annex A cited for the 50ms time-grading threshold. (3) Connection line click overlays now only appear when child node has a protection device. (4) MCB-vs-fuse thermal simplification documented with explanatory comment."
 }
