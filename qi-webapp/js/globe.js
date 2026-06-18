@@ -461,53 +461,31 @@
         disposables.push(cloudGeo, cloudMat);
       } catch (e) { clouds = null; }
 
-      // ---- atmosphere + starfield -----------------------------------------
-      var atmo = makeAtmosphere(THREE);
-      world.add(atmo);
-      disposables.push(atmo.geometry, atmo.material);
+      // ---- starfield (atmosphere glow removed for clean look) -------------
 
       var stars1 = makeStars(THREE, 1400, 0.13, 0xcdd8f0, 0.85);
       var stars2 = makeStars(THREE, 700, 0.26, 0x9fb0cf, 0.55);
       scene.add(stars1); scene.add(stars2);
       disposables.push(stars1.geometry, stars1.material, stars2.geometry, stars2.material);
 
-      // ---- landing stations: beacon + animated surface pulse ring ----------
-      var rings = [];
+      // ---- landing stations: simple small beacon dots ----------------------
       var pickables = [];        // meshes the raycaster can select
       var stationMeshes = {};    // id -> beacon mesh (for hover/selection scaling)
       var labels = [];           // text sprites, kept a constant on-screen size each frame
       var labelTmp = new THREE.Vector3();  // scratch vector for per-frame label work
-      var beaconGeo = new THREE.SphereGeometry(0.03, 18, 18);
-      var beaconGlowGeo = new THREE.SphereGeometry(0.045, 16, 16);
-      disposables.push(beaconGeo, beaconGlowGeo);
-      STATIONS.forEach(function (st, i) {
-        var p = latLonToVec3(st.lat, st.lon, GLOBE_R * 1.008);
+      var beaconGeo = new THREE.SphereGeometry(0.025, 16, 16);
+      disposables.push(beaconGeo);
+      STATIONS.forEach(function (st) {
+        var p = latLonToVec3(st.lat, st.lon, GLOBE_R * 1.006);
 
         var bMat = new THREE.MeshBasicMaterial({ color: 0xffe9b0 });
         var beacon = new THREE.Mesh(beaconGeo, bMat);
         beacon.position.copy(p);
         beacon.userData = { type: "station", id: st.id, station: st, baseScale: 1 };
-        // soft additive glow halo so each station reads as a bright node
-        var bGlowMat = new THREE.MeshBasicMaterial({ color: 0xffd98a, transparent: true, opacity: 0.08, depthWrite: false });
-        beacon.add(new THREE.Mesh(beaconGlowGeo, bGlowMat));
-        disposables.push(bGlowMat);
         world.add(beacon);
         disposables.push(bMat);
         pickables.push(beacon);
         stationMeshes[st.id] = beacon;
-
-        // expanding / fading ring laid flat against the surface (live pulse)
-        var ringGeo = new THREE.RingGeometry(0.035, 0.042, 28);
-        var ringMat = new THREE.MeshBasicMaterial({
-          color: 0xffd24a, transparent: true, opacity: 0.10,
-          side: THREE.DoubleSide, depthWrite: false
-        });
-        var ring = new THREE.Mesh(ringGeo, ringMat);
-        ring.position.copy(p);
-        ring.lookAt(p.clone().multiplyScalar(2));   // orient normal radially outward
-        world.add(ring);
-        disposables.push(ringGeo, ringMat);
-        rings.push({ mesh: ring, mat: ringMat, offset: i / STATIONS.length, id: st.id });
 
         var label = makeLabelSprite(st.name, { fontSize: 30, screenK: 0.030, color: "#ffe9b0" });
         if (label) {
@@ -520,66 +498,34 @@
         }
       });
 
-      // ---- submarine cables: glowing tube + halo + flowing pulse -----------
-      var pulses = [];
+      // ---- submarine cables: clean solid tubes ------------------------------
       var cableTubes = [];   // keep tube materials so progress can recolour them
       CABLES.forEach(function (cab) {
         var a = STATION_BY_ID[cab.from], b = STATION_BY_ID[cab.to];
-        var start = latLonToVec3(a.lat, a.lon, GLOBE_R * 1.008);
-        var end = latLonToVec3(b.lat, b.lon, GLOBE_R * 1.008);
+        var start = latLonToVec3(a.lat, a.lon, GLOBE_R * 1.006);
+        var end = latLonToVec3(b.lat, b.lon, GLOBE_R * 1.006);
         var mid = start.clone().add(end).multiplyScalar(0.5);
         var lift = 1 + 0.18 + 0.22 * (start.distanceTo(end) / GLOBE_R);
         mid.normalize().multiplyScalar(GLOBE_R * lift);
         var curve = new THREE.QuadraticBezierCurve3(start, mid, end);
 
         var col = (STATUS_COLOR[cab.status] || STATUS_COLOR.planned).hex;
-        // thickness scales subtly with fibre-pair count (12..24 -> ~0.011..0.018)
-        var radius = 0.010 + 0.0035 * ((cab.fibrePairs || 12) / 12);
+        // thickness scales subtly with fibre-pair count (12..24 -> ~0.014..0.022)
+        var radius = 0.014 + 0.004 * ((cab.fibrePairs || 12) / 12);
 
-        // bright core tube (picked up by bloom)
+        // solid core tube
         var tubeGeo = new THREE.TubeGeometry(curve, 80, radius, 10, false);
-        var tubeMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.75 });
+        var tubeMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.88 });
         var tube = new THREE.Mesh(tubeGeo, tubeMat);
         tube.userData = { type: "cable", id: cab.id, cable: cab };
         world.add(tube);
         disposables.push(tubeGeo, tubeMat);
         pickables.push(tube);
 
-        // wide faint halo underneath for a glow base
-        var haloGeo = new THREE.TubeGeometry(curve, 80, radius * 2.0, 10, false);
-        var haloMat = new THREE.MeshBasicMaterial({
-          color: col, transparent: true, opacity: 0.08,
-          blending: THREE.NormalBlending, depthWrite: false
-        });
-        var halo = new THREE.Mesh(haloGeo, haloMat);
-        world.add(halo);
-        disposables.push(haloGeo, haloMat);
-
-        cableTubes.push({ id: cab.id, cable: cab, mat: tubeMat, haloMat: haloMat, baseHex: col,
-          tubeGeo: tubeGeo, haloGeo: haloGeo, curve: curve, from: cab.from, to: cab.to, status: cab.status,
+        cableTubes.push({ id: cab.id, cable: cab, mat: tubeMat, haloMat: null, baseHex: col,
+          tubeGeo: tubeGeo, haloGeo: null, curve: curve, from: cab.from, to: cab.to, status: cab.status,
           fullIndex: (tubeGeo.index ? tubeGeo.index.count : 0),
-          haloIndex: (haloGeo.index ? haloGeo.index.count : 0) });
-
-        // flowing light pulses travelling along the cable (twin, evenly spaced)
-        // each with a short comet wake → data visibly streaks A–Z along the route
-        var pGeo = new THREE.SphereGeometry(0.022, 14, 14);
-        disposables.push(pGeo);
-        var baseSpeed = 0.06 + Math.random() * 0.04;
-        for (var pp = 0; pp < 2; pp++) {
-          var pMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, blending: THREE.NormalBlending, depthWrite: false });
-          var pulse = new THREE.Mesh(pGeo, pMat);
-          world.add(pulse);
-          disposables.push(pMat);
-          var trail = [];
-          for (var tk = 0; tk < 3; tk++) {
-            var tMat = new THREE.MeshBasicMaterial({ color: 0xbfe0ff, transparent: true, opacity: 0.42 - tk * 0.12, blending: THREE.NormalBlending, depthWrite: false });
-            var tMesh = new THREE.Mesh(pGeo, tMat);
-            world.add(tMesh);
-            disposables.push(tMat);
-            trail.push({ mesh: tMesh, lag: (tk + 1) * 0.018, sc: 0.62 - tk * 0.16 });
-          }
-          pulses.push({ curve: curve, mesh: pulse, speed: baseSpeed, offset: (Math.random() + pp * 0.5) % 1, trail: trail });
-        }
+          haloIndex: 0 });
 
         // mid-cable id label for orientation
         var seg = makeLabelSprite(cab.id, { fontSize: 22, screenK: 0.020, color: (STATUS_COLOR[cab.status] || STATUS_COLOR.planned).css, bg: "rgba(8,16,32,0.62)" });
@@ -592,9 +538,9 @@
         }
       });
 
-      // ---- deployment "laying head": a bright marker at the cable-ship tip --
-      var headGeo = new THREE.SphereGeometry(0.035, 16, 16);
-      var headMat = new THREE.MeshBasicMaterial({ color: 0xfff4d0, transparent: true, opacity: 0.98, blending: THREE.NormalBlending, depthWrite: false });
+      // ---- deployment "laying head": a small bright dot at the cable-ship tip
+      var headGeo = new THREE.SphereGeometry(0.018, 12, 12);
+      var headMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthWrite: false });
       var layHead = new THREE.Mesh(headGeo, headMat);
       layHead.visible = false;
       world.add(layHead);
@@ -693,8 +639,7 @@
         });
         cableTubes.forEach(function (t) {
           var sel = (type === "cable" && t.id === id);
-          if (t.mat) t.mat.opacity = sel ? 1.0 : 0.92;
-          if (t.haloMat) t.haloMat.opacity = sel ? 0.42 : 0.16;
+          if (t.mat) t.mat.opacity = sel ? 1.0 : 0.88;
         });
       }
 
@@ -786,11 +731,9 @@
           var t = cableTubes[i];
           var local = cableLocal(i, g);
           setDrawFrac(t.tubeGeo, t.fullIndex, local);
-          setDrawFrac(t.haloGeo, t.haloIndex, local);
           var done = local >= 1, laying = local > 0 && local < 1;
           var hex = done ? doneCol : layingCol;
           if (t.mat) { try { t.mat.color.setHex(hex); } catch (e) {} t.mat.opacity = local > 0 ? 0.95 : 0.0; }
-          if (t.haloMat) { try { t.haloMat.color.setHex(hex); } catch (e) {} t.haloMat.opacity = local > 0 ? 0.24 : 0.0; }
           if (local > 0 && t.from) online[t.from] = true;
           if (done && t.to) online[t.to] = true;
           if (laying) { try { t.curve.getPoint(local, layHead.position); } catch (e) {} anyLaying = true; }
@@ -852,9 +795,7 @@
         for (var i = 0; i < cableTubes.length; i++) {
           var t = cableTubes[i];
           if (t.tubeGeo && t.tubeGeo.setDrawRange) t.tubeGeo.setDrawRange(0, Infinity);
-          if (t.haloGeo && t.haloGeo.setDrawRange) t.haloGeo.setDrawRange(0, Infinity);
-          if (t.mat) { try { t.mat.color.setHex(t.baseHex); } catch (e) {} t.mat.opacity = 0.92; }
-          if (t.haloMat) { try { t.haloMat.color.setHex(t.baseHex); } catch (e) {} t.haloMat.opacity = 0.16; }
+          if (t.mat) { try { t.mat.color.setHex(t.baseHex); } catch (e) {} t.mat.opacity = 0.88; }
         }
         for (var k in stationMeshes) {
           if (Object.prototype.hasOwnProperty.call(stationMeshes, k)) stationMeshes[k].userData.deployOnline = false;
@@ -1050,35 +991,6 @@
           night.material.uniforms.uSunDir.value.copy(sunDir);
         }
 
-        // flowing cable pulses + comet wake (brightest mid-span) — hidden during a build replay
-        for (var i = 0; i < pulses.length; i++) {
-          var pu = pulses[i];
-          var vis = !deploy.mode;
-          pu.mesh.visible = vis;
-          if (pu.trail) for (var z = 0; z < pu.trail.length; z++) pu.trail[z].mesh.visible = vis;
-          if (!vis) continue;
-          var u = (t * pu.speed + pu.offset) % 1;
-          pu.curve.getPoint(u, pu.mesh.position);
-          pu.mesh.scale.setScalar(0.7 + 0.5 * Math.sin(u * Math.PI));
-          if (pu.trail) for (var z2 = 0; z2 < pu.trail.length; z2++) {
-            var tu = (u - pu.trail[z2].lag + 1) % 1;
-            pu.curve.getPoint(tu, pu.trail[z2].mesh.position);
-            pu.trail[z2].mesh.scale.setScalar(pu.trail[z2].sc * (0.7 + 0.5 * Math.sin(tu * Math.PI)));
-          }
-        }
-        // expanding station pulse rings (offline stations stay dark during a build)
-        for (var k = 0; k < rings.length; k++) {
-          var rg = rings[k];
-          if (deploy.mode) {
-            var sm = stationMeshes[rg.id];
-            if (!sm || !sm.userData.deployOnline) { rg.mat.opacity = 0; continue; }
-          }
-          var rp = (t * 0.5 + rg.offset) % 1;
-          var sc = 1 + rp * 3.2;
-          rg.mesh.scale.set(sc, sc, sc);
-          rg.mat.opacity = 0.72 * (1 - rp);
-        }
-
         if (composer) composer.render();
         else renderer.render(scene, camera);
       }
@@ -1180,7 +1092,6 @@
         try {
           var col = progressColor(THREE, map[t.id]);
           t.mat.color = col; t.mat.needsUpdate = true;
-          if (t.haloMat) { t.haloMat.color = col.clone(); t.haloMat.needsUpdate = true; }
         } catch (e) {}
       }
     });
