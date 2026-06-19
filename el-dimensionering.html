@@ -1549,7 +1549,207 @@ const PRODUCTS = {
     { id: 'LK-FUGA-LYSDÆMP', brand: 'LK (Lauritz Knudsen)', model: 'FUGA Lysdæmper', cat: 'switch', rating: 10, desc_da: 'LED lysdæmper', desc_en: 'LED dimmer' },
     { id: 'LK-OPUS-STIK', brand: 'LK (Lauritz Knudsen)', model: 'OPUS Stikkontakt', cat: 'socket', rating: 16, desc_da: 'Premium stikkontakt', desc_en: 'Premium socket' },
     { id: 'LK-IHC-AFB', brand: 'LK (Lauritz Knudsen)', model: 'IHC Wireless afbryder', cat: 'switch', rating: 10, desc_da: 'Trådløs intelligent afbryder', desc_en: 'Wireless smart switch' },
+  ],
+
+  // === SUPPLY CABLES (Forsyningskabler) - Service entrance per DS/HD 60364-5-52 Method D ===
+  supplyCables: [
+    // NKT NOIK-AL-M - Aluminium service cable, most common for utility supply in Denmark
+    { id: 'SC-NOIK-AL-16', brand: 'NKT', model: 'NOIK-AL-M', cores: '4X', mm2: 16, material: 'Al', iz: 73, r: 1.91, x: 0.069, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Forsyning bolig (alu)', use_en: 'Residential supply (alu)' },
+    { id: 'SC-NOIK-AL-25', brand: 'NKT', model: 'NOIK-AL-M', cores: '4X', mm2: 25, material: 'Al', iz: 90, r: 1.2, x: 0.084, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Forsyning bolig/erhverv (alu)', use_en: 'Residential/commercial supply (alu)' },
+    { id: 'SC-NOIK-AL-50', brand: 'NKT', model: 'NOIK-AL-M', cores: '4X', mm2: 50, material: 'Al', iz: 134, r: 0.641, x: 0.081, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Erhverv (alu)', use_en: 'Commercial supply (alu)' },
+    { id: 'SC-NOIK-AL-95', brand: 'NKT', model: 'NOIK-AL-M', cores: '4X', mm2: 95, material: 'Al', iz: 199, r: 0.321, x: 0.078, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Industri (alu)', use_en: 'Industrial supply (alu)' },
+    { id: 'SC-NOIK-AL-150', brand: 'NKT', model: 'NOIK-AL-M', cores: '4X', mm2: 150, material: 'Al', iz: 259, r: 0.207, x: 0.078, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Stor industri (alu)', use_en: 'Large industrial (alu)' },
+    { id: 'SC-NOIK-AL-240', brand: 'NKT', model: 'NOIK-AL-M', cores: '4X', mm2: 240, material: 'Al', iz: 344, r: 0.127, x: 0.077, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Stor industri (alu)', use_en: 'Large industrial (alu)' },
+    // NKT NOPOVIC-J - PVC service cable, older installations
+    { id: 'SC-NOPOVIC-10', brand: 'NKT', model: 'NOPOVIC-J', cores: '4G', mm2: 10, material: 'Cu', iz: 65, r: 1.83, x: 0.092, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Forsyning aeldre bolig', use_en: 'Older residential supply' },
+    { id: 'SC-NOPOVIC-16', brand: 'NKT', model: 'NOPOVIC-J', cores: '4G', mm2: 16, material: 'Cu', iz: 84, r: 1.15, x: 0.088, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Forsyning aeldre bolig', use_en: 'Older residential supply' },
+    { id: 'SC-NOPOVIC-25', brand: 'NKT', model: 'NOPOVIC-J', cores: '4G', mm2: 25, material: 'Cu', iz: 110, r: 0.727, x: 0.086, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Forsyning aeldre bolig/erhverv', use_en: 'Older residential/commercial supply' },
+    // NKT AXAL-TT - Aluminium armoured underground cable
+    { id: 'SC-AXAL-16', brand: 'NKT', model: 'AXAL-TT', cores: '4X', mm2: 16, material: 'Al', iz: 70, r: 1.91, x: 0.069, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Jordkabel armeret (alu)', use_en: 'Armoured underground (alu)' },
+    { id: 'SC-AXAL-25', brand: 'NKT', model: 'AXAL-TT', cores: '4X', mm2: 25, material: 'Al', iz: 87, r: 1.2, x: 0.084, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Jordkabel armeret (alu)', use_en: 'Armoured underground (alu)' },
+    { id: 'SC-AXAL-50', brand: 'NKT', model: 'AXAL-TT', cores: '4X', mm2: 50, material: 'Al', iz: 129, r: 0.641, x: 0.081, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Jordkabel armeret (alu)', use_en: 'Armoured underground (alu)' },
+    { id: 'SC-AXAL-95', brand: 'NKT', model: 'AXAL-TT', cores: '4X', mm2: 95, material: 'Al', iz: 192, r: 0.321, x: 0.078, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Jordkabel armeret (alu)', use_en: 'Armoured underground (alu)' },
+    { id: 'SC-AXAL-150', brand: 'NKT', model: 'AXAL-TT', cores: '4X', mm2: 150, material: 'Al', iz: 251, r: 0.207, x: 0.078, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Jordkabel armeret (alu)', use_en: 'Armoured underground (alu)' },
+    { id: 'SC-AXAL-240', brand: 'NKT', model: 'AXAL-TT', cores: '4X', mm2: 240, material: 'Al', iz: 332, r: 0.127, x: 0.077, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Jordkabel armeret (alu)', use_en: 'Armoured underground (alu)' },
+    // Prysmian PFSP - Armoured underground cable
+    { id: 'SC-PFSP-4x16', brand: 'Prysmian', model: 'PFSP', cores: '4X', mm2: 16, material: 'Cu', iz: 82, r: 1.15, x: 0.088, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Jordkabel armeret (Cu)', use_en: 'Armoured underground (Cu)' },
+    { id: 'SC-PFSP-4x25', brand: 'Prysmian', model: 'PFSP', cores: '4X', mm2: 25, material: 'Cu', iz: 108, r: 0.727, x: 0.086, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Jordkabel armeret (Cu)', use_en: 'Armoured underground (Cu)' },
+    { id: 'SC-PFSP-4x50', brand: 'Prysmian', model: 'PFSP', cores: '4X', mm2: 50, material: 'Cu', iz: 159, r: 0.388, x: 0.084, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Jordkabel armeret (Cu)', use_en: 'Armoured underground (Cu)' },
+    { id: 'SC-PFSP-4x95', brand: 'Prysmian', model: 'PFSP', cores: '4X', mm2: 95, material: 'Cu', iz: 241, r: 0.194, x: 0.082, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Jordkabel armeret (Cu)', use_en: 'Armoured underground (Cu)' },
+    { id: 'SC-PFSP-4x150', brand: 'Prysmian', model: 'PFSP', cores: '4X', mm2: 150, material: 'Cu', iz: 310, r: 0.126, x: 0.084, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Jordkabel armeret (Cu)', use_en: 'Armoured underground (Cu)' },
+    { id: 'SC-PFSP-4x240', brand: 'Prysmian', model: 'PFSP', cores: '4X', mm2: 240, material: 'Cu', iz: 411, r: 0.0787, x: 0.083, standard: 'DS/HD 60364-5-52', method: 'D', use_da: 'Jordkabel armeret (Cu)', use_en: 'Armoured underground (Cu)' },
+  ],
+
+  // === METER CABINETS & METERING (Maalerskab & Maalerudstyr) ===
+  metering: [
+    // Meter cabinets
+    { id: 'MT-HAGER-ZB31S', brand: 'Hager', model: 'ZB31S Maalerskab', cat: 'cabinet', type: 'single', rating: 63, use_da: 'Enkeltfamilie maalerskab', use_en: 'Single-family meter cabinet', standard: 'DS/EN 61439-3' },
+    { id: 'MT-HAGER-ZB32M', brand: 'Hager', model: 'ZB32M Maalerskab', cat: 'cabinet', type: 'multi', rating: 160, use_da: 'Flerfamilie maalerskab (2-6 boliger)', use_en: 'Multi-family meter cabinet (2-6 units)', standard: 'DS/EN 61439-3' },
+    { id: 'MT-LK-MSKAB1', brand: 'LK (Lauritz Knudsen)', model: 'LK Maalerskab Standard', cat: 'cabinet', type: 'single', rating: 63, use_da: 'Standard maalerskab parcelhus', use_en: 'Standard residential meter cabinet', standard: 'DS/EN 61439-3' },
+    { id: 'MT-ELKO-RS1', brand: 'ELKO', model: 'RS Maalerskab', cat: 'cabinet', type: 'single', rating: 63, use_da: 'Maalerskab med HFI-afdeling', use_en: 'Meter cabinet with RCD section', standard: 'DS/EN 61439-3' },
+    // Smart meters - Kamstrup (standard Danish utility meter)
+    { id: 'MT-KAM-OMNIA3', brand: 'Kamstrup', model: 'OMNIA 3-fase', cat: 'meter', type: 'smart', phases: 3, maxA: 63, method: 'direct', use_da: 'Smart maaler 3-fase (standard DK)', use_en: 'Smart meter 3-phase (DK standard)', standard: 'EN 50470/IEC 62052' },
+    { id: 'MT-KAM-OMNIA1', brand: 'Kamstrup', model: 'OMNIA 1-fase', cat: 'meter', type: 'smart', phases: 1, maxA: 63, method: 'direct', use_da: 'Smart maaler 1-fase', use_en: 'Smart meter 1-phase', standard: 'EN 50470/IEC 62052' },
+    { id: 'MT-KAM-382L', brand: 'Kamstrup', model: '382L 3-fase', cat: 'meter', type: 'legacy', phases: 3, maxA: 63, method: 'direct', use_da: 'Aeldre maaler 3-fase', use_en: 'Legacy meter 3-phase', standard: 'EN 50470' },
+    // Current transformers for CT-measured installations (above 63A)
+    { id: 'MT-CT-100-5', brand: 'Hobut', model: 'CT132 100/5A', cat: 'ct', ratio: '100/5', primaryA: 100, secondaryA: 5, accuracy: 0.5, use_da: 'Stroemtrafo 100/5A', use_en: 'CT 100/5A', standard: 'IEC 61869-2' },
+    { id: 'MT-CT-150-5', brand: 'Hobut', model: 'CT132 150/5A', cat: 'ct', ratio: '150/5', primaryA: 150, secondaryA: 5, accuracy: 0.5, use_da: 'Stroemtrafo 150/5A', use_en: 'CT 150/5A', standard: 'IEC 61869-2' },
+    { id: 'MT-CT-200-5', brand: 'ABB', model: 'CT MAX 200/5A', cat: 'ct', ratio: '200/5', primaryA: 200, secondaryA: 5, accuracy: 0.5, use_da: 'Stroemtrafo 200/5A', use_en: 'CT 200/5A', standard: 'IEC 61869-2' },
+    { id: 'MT-CT-250-5', brand: 'ABB', model: 'CT MAX 250/5A', cat: 'ct', ratio: '250/5', primaryA: 250, secondaryA: 5, accuracy: 0.5, use_da: 'Stroemtrafo 250/5A', use_en: 'CT 250/5A', standard: 'IEC 61869-2' },
+    { id: 'MT-CT-400-5', brand: 'Schneider', model: 'METSECT 400/5A', cat: 'ct', ratio: '400/5', primaryA: 400, secondaryA: 5, accuracy: 0.5, use_da: 'Stroemtrafo 400/5A', use_en: 'CT 400/5A', standard: 'IEC 61869-2' },
+    { id: 'MT-CT-600-5', brand: 'Schneider', model: 'METSECT 600/5A', cat: 'ct', ratio: '600/5', primaryA: 600, secondaryA: 5, accuracy: 0.5, use_da: 'Stroemtrafo 600/5A', use_en: 'CT 600/5A', standard: 'IEC 61869-2' },
+    { id: 'MT-CT-800-5', brand: 'Schneider', model: 'METSECT 800/5A', cat: 'ct', ratio: '800/5', primaryA: 800, secondaryA: 5, accuracy: 0.5, use_da: 'Stroemtrafo 800/5A', use_en: 'CT 800/5A', standard: 'IEC 61869-2' },
+    // Meter terminal cabinet
+    { id: 'MT-MKLEMSKAB', brand: 'Hager', model: 'Maalerklemmeskab', cat: 'terminalCab', rating: 250, use_da: 'Maalerklemmeskab', use_en: 'Meter terminal cabinet', standard: 'DS/EN 61439-3' },
+  ],
+
+  // === MAIN FUSES (Hovedsikringer) - Utility-side, sealed (plomberet) ===
+  mainFuses: [
+    // D02 fuses - Standard Danish residential (Eaton TYTAN II system)
+    { id: 'MF-D02-25', brand: 'Eaton', model: 'TYTAN II D02', size: 'D02', rating: 25, icu: 50, sealed: true, use_da: 'Bolig hovedsikring 25A', use_en: 'Residential main fuse 25A', standard: 'IEC 60269-3' },
+    { id: 'MF-D02-35', brand: 'Eaton', model: 'TYTAN II D02', size: 'D02', rating: 35, icu: 50, sealed: true, use_da: 'Bolig hovedsikring 35A', use_en: 'Residential main fuse 35A', standard: 'IEC 60269-3' },
+    { id: 'MF-D02-50', brand: 'Eaton', model: 'TYTAN II D02', size: 'D02', rating: 50, icu: 50, sealed: true, use_da: 'Bolig hovedsikring 50A', use_en: 'Residential main fuse 50A', standard: 'IEC 60269-3' },
+    { id: 'MF-D02-63', brand: 'Eaton', model: 'TYTAN II D02', size: 'D02', rating: 63, icu: 50, sealed: true, use_da: 'Bolig hovedsikring 63A', use_en: 'Residential main fuse 63A', standard: 'IEC 60269-3' },
+    // NH00 fuses - Commercial/light industrial (Eaton/Siemens)
+    { id: 'MF-NH00-63', brand: 'Eaton', model: 'NH00 gG', size: 'NH00', rating: 63, icu: 120, sealed: true, use_da: 'Erhverv hovedsikring 63A', use_en: 'Commercial main fuse 63A', standard: 'IEC 60269-2' },
+    { id: 'MF-NH00-80', brand: 'Eaton', model: 'NH00 gG', size: 'NH00', rating: 80, icu: 120, sealed: true, use_da: 'Erhverv hovedsikring 80A', use_en: 'Commercial main fuse 80A', standard: 'IEC 60269-2' },
+    { id: 'MF-NH00-100', brand: 'Eaton', model: 'NH00 gG', size: 'NH00', rating: 100, icu: 120, sealed: true, use_da: 'Erhverv hovedsikring 100A', use_en: 'Commercial main fuse 100A', standard: 'IEC 60269-2' },
+    { id: 'MF-NH00-125', brand: 'Eaton', model: 'NH00 gG', size: 'NH00', rating: 125, icu: 120, sealed: true, use_da: 'Erhverv hovedsikring 125A', use_en: 'Commercial main fuse 125A', standard: 'IEC 60269-2' },
+    { id: 'MF-NH00-160', brand: 'Siemens', model: 'NH00 gG', size: 'NH00', rating: 160, icu: 120, sealed: true, use_da: 'Erhverv hovedsikring 160A', use_en: 'Commercial main fuse 160A', standard: 'IEC 60269-2' },
+    // NH1 fuses
+    { id: 'MF-NH1-200', brand: 'Eaton', model: 'NH1 gG', size: 'NH1', rating: 200, icu: 120, sealed: true, use_da: 'Industri hovedsikring 200A', use_en: 'Industrial main fuse 200A', standard: 'IEC 60269-2' },
+    { id: 'MF-NH1-250', brand: 'Eaton', model: 'NH1 gG', size: 'NH1', rating: 250, icu: 120, sealed: true, use_da: 'Industri hovedsikring 250A', use_en: 'Industrial main fuse 250A', standard: 'IEC 60269-2' },
+    // NH2 fuses
+    { id: 'MF-NH2-315', brand: 'Siemens', model: 'NH2 gG', size: 'NH2', rating: 315, icu: 120, sealed: true, use_da: 'Industri hovedsikring 315A', use_en: 'Industrial main fuse 315A', standard: 'IEC 60269-2' },
+    { id: 'MF-NH2-400', brand: 'Siemens', model: 'NH2 gG', size: 'NH2', rating: 400, icu: 120, sealed: true, use_da: 'Industri hovedsikring 400A', use_en: 'Industrial main fuse 400A', standard: 'IEC 60269-2' },
+    // NH3 fuses
+    { id: 'MF-NH3-500', brand: 'Eaton', model: 'NH3 gG', size: 'NH3', rating: 500, icu: 120, sealed: true, use_da: 'Stor industri hovedsikring 500A', use_en: 'Large industrial main fuse 500A', standard: 'IEC 60269-2' },
+    { id: 'MF-NH3-630', brand: 'Eaton', model: 'NH3 gG', size: 'NH3', rating: 630, icu: 120, sealed: true, use_da: 'Stor industri hovedsikring 630A', use_en: 'Large industrial main fuse 630A', standard: 'IEC 60269-2' },
+  ],
+
+  // === EARTHING SYSTEM (Jordingssystem) - Per DS/HD 60364-5-54 ===
+  earthing: [
+    // Earth electrodes - OBO Bettermann galvanized steel rods
+    { id: 'EA-ROD-1500', brand: 'OBO Bettermann', model: '219 20 ST FT', cat: 'electrode', type: 'rod', length_m: 1.5, material: 'galv. steel', diameter_mm: 20, resistance_ohm_typical: 50, use_da: 'Jordelektrode staalstang 1.5m', use_en: 'Earth electrode steel rod 1.5m', standard: 'DS/HD 60364-5-54' },
+    { id: 'EA-ROD-3000', brand: 'OBO Bettermann', model: '219 30 ST FT', cat: 'electrode', type: 'rod', length_m: 3.0, material: 'galv. steel', diameter_mm: 20, resistance_ohm_typical: 25, use_da: 'Jordelektrode staalstang 3m', use_en: 'Earth electrode steel rod 3m', standard: 'DS/HD 60364-5-54' },
+    // Foundation earth - OBO flat steel
+    { id: 'EA-FUND-25', brand: 'OBO Bettermann', model: '5052 DIN 25x4', cat: 'foundation', type: 'flatSteel', mm2: 100, material: 'galv. steel', width_mm: 25, thickness_mm: 4, use_da: 'Fundamentsjord fladstaal 25x4mm', use_en: 'Foundation earth flat steel 25x4mm', standard: 'DS/HD 60364-5-54' },
+    // Earth conductors - bare copper
+    { id: 'EA-CU-16', brand: 'NKT', model: 'Jordleder Cu blank', cat: 'conductor', mm2: 16, material: 'Cu', use_da: 'Jordleder 16mm2 kobber blank', use_en: 'Earth conductor 16mm2 bare Cu', standard: 'DS/HD 60364-5-54' },
+    { id: 'EA-CU-25', brand: 'NKT', model: 'Jordleder Cu blank', cat: 'conductor', mm2: 25, material: 'Cu', use_da: 'Jordleder 25mm2 kobber blank', use_en: 'Earth conductor 25mm2 bare Cu', standard: 'DS/HD 60364-5-54' },
+    { id: 'EA-CU-50', brand: 'Nexans', model: 'Jordleder Cu blank', cat: 'conductor', mm2: 50, material: 'Cu', use_da: 'Jordleder 50mm2 kobber blank', use_en: 'Earth conductor 50mm2 bare Cu', standard: 'DS/HD 60364-5-54' },
+    // Earth terminal box
+    { id: 'EA-TERMBOX', brand: 'OBO Bettermann', model: '1801 VDE', cat: 'terminalBox', use_da: 'Jordklemmeboks (OBO 1801 VDE)', use_en: 'Earth terminal box (OBO 1801 VDE)', standard: 'DS/HD 60364-5-54' },
+    { id: 'EA-WAGO-222', brand: 'Wago', model: '222-415', cat: 'terminalBox', use_da: 'Jordklemme Wago 222', use_en: 'Earth terminal Wago 222', standard: 'DS/HD 60364-5-54' },
+    // Equipotential bonding bar
+    { id: 'EA-BONDING-OBO', brand: 'OBO Bettermann', model: '1801 Potentialudligning', cat: 'bondingBar', connections: 14, use_da: 'Potentialudligningsskinne 14 tilslutninger', use_en: 'Equipotential bonding bar 14 connections', standard: 'DS/HD 60364-5-54' },
+    { id: 'EA-BONDING-HAG', brand: 'Hager', model: 'KJ02B', cat: 'bondingBar', connections: 7, use_da: 'Potentialudligningsskinne 7 tilslutninger', use_en: 'Equipotential bonding bar 7 connections', standard: 'DS/HD 60364-5-54' },
+    // Cross-bonding clamp and test joint
+    { id: 'EA-CROSSCLAMP', brand: 'OBO Bettermann', model: '5001 Krydsforbindelse', cat: 'clamp', use_da: 'Krydsforbindelsesklemme', use_en: 'Cross-bonding clamp', standard: 'DS/HD 60364-5-54' },
+    { id: 'EA-TESTJOINT', brand: 'OBO Bettermann', model: '5012 Proevesamling', cat: 'testJoint', use_da: 'Proevesamling (afbrydelig)', use_en: 'Test joint (disconnectable)', standard: 'DS/HD 60364-5-54' },
+    // TN-C-S PEN split point
+    { id: 'EA-PENSPLIT', brand: 'Hager', model: 'KJ10A PEN-klemme', cat: 'penSplit', use_da: 'PEN-splittepunkt (TN-C-S)', use_en: 'PEN split point (TN-C-S)', standard: 'DS/HD 60364-5-54 cl.544.1' },
+  ],
+
+  // === CABLE JOINTS & TERMINATIONS (Kabelmuffer & Endestykker) ===
+  cableJoints: [
+    // Raychem/TE Connectivity heat-shrink joints
+    { id: 'CJ-SMOE-81512', brand: 'Raychem (TE)', model: 'SMOE-81512', cat: 'joint', type: 'heatShrink', voltageClass: '0.6/1kV', sizeRange: '1.5-6', use_da: 'Varmekrympmuffe 1.5-6mm2', use_en: 'Heat-shrink joint 1.5-6mm2', standard: 'IEC 60502' },
+    { id: 'CJ-SMOE-81517', brand: 'Raychem (TE)', model: 'SMOE-81517', cat: 'joint', type: 'heatShrink', voltageClass: '0.6/1kV', sizeRange: '6-25', use_da: 'Varmekrympmuffe 6-25mm2', use_en: 'Heat-shrink joint 6-25mm2', standard: 'IEC 60502' },
+    { id: 'CJ-SMOE-81521', brand: 'Raychem (TE)', model: 'SMOE-81521', cat: 'joint', type: 'heatShrink', voltageClass: '0.6/1kV', sizeRange: '25-95', use_da: 'Varmekrympmuffe 25-95mm2', use_en: 'Heat-shrink joint 25-95mm2', standard: 'IEC 60502' },
+    { id: 'CJ-SMOE-81525', brand: 'Raychem (TE)', model: 'SMOE-81525', cat: 'joint', type: 'heatShrink', voltageClass: '0.6/1kV', sizeRange: '95-240', use_da: 'Varmekrympmuffe 95-240mm2', use_en: 'Heat-shrink joint 95-240mm2', standard: 'IEC 60502' },
+    // Raychem GUST terminations
+    { id: 'CJ-GUST-01', brand: 'Raychem (TE)', model: 'GUST-01/4x25-70', cat: 'termination', type: 'indoor', voltageClass: '0.6/1kV', sizeRange: '25-70', use_da: 'Endestykke indendoers 25-70mm2', use_en: 'Indoor termination 25-70mm2', standard: 'IEC 60502' },
+    { id: 'CJ-GUST-02', brand: 'Raychem (TE)', model: 'GUST-01/4x70-240', cat: 'termination', type: 'indoor', voltageClass: '0.6/1kV', sizeRange: '70-240', use_da: 'Endestykke indendoers 70-240mm2', use_en: 'Indoor termination 70-240mm2', standard: 'IEC 60502' },
+    { id: 'CJ-GUST-OUTD', brand: 'Raychem (TE)', model: 'GUST-12/70-240 Outdoor', cat: 'termination', type: 'outdoor', voltageClass: '0.6/1kV', sizeRange: '70-240', use_da: 'Endestykke udendoers 70-240mm2', use_en: 'Outdoor termination 70-240mm2', standard: 'IEC 60502' },
+    // Cellpack resin joints
+    { id: 'CJ-CELL-10', brand: 'Cellpack', model: 'CellCast C 1-10mm2', cat: 'joint', type: 'resin', voltageClass: '0.6/1kV', sizeRange: '1.5-10', use_da: 'Stoebningsmuffe 1.5-10mm2', use_en: 'Resin cast joint 1.5-10mm2', standard: 'IEC 60502' },
+    { id: 'CJ-CELL-95', brand: 'Cellpack', model: 'CellCast C 10-95mm2', cat: 'joint', type: 'resin', voltageClass: '0.6/1kV', sizeRange: '10-95', use_da: 'Stoebningsmuffe 10-95mm2', use_en: 'Resin cast joint 10-95mm2', standard: 'IEC 60502' },
+    { id: 'CJ-CELL-240', brand: 'Cellpack', model: 'CellCast C 95-240mm2', cat: 'joint', type: 'resin', voltageClass: '0.6/1kV', sizeRange: '95-240', use_da: 'Stoebningsmuffe 95-240mm2', use_en: 'Resin cast joint 95-240mm2', standard: 'IEC 60502' },
+    // Mechanical shear-bolt connectors
+    { id: 'CJ-ENSTO-SL25', brand: 'Ensto', model: 'SL 11.25', cat: 'connector', type: 'shearBolt', sizeRange: '16-95', use_da: 'Afskaeringsbolt konnektor 16-95mm2', use_en: 'Shear-bolt connector 16-95mm2', standard: 'EN 50483' },
+    { id: 'CJ-ENSTO-SL50', brand: 'Ensto', model: 'SL 11.50', cat: 'connector', type: 'shearBolt', sizeRange: '50-240', use_da: 'Afskaeringsbolt konnektor 50-240mm2', use_en: 'Shear-bolt connector 50-240mm2', standard: 'EN 50483' },
+    { id: 'CJ-SICAME-TTD', brand: 'Sicame', model: 'TTD 151', cat: 'connector', type: 'shearBolt', sizeRange: '25-150', use_da: 'Afskaeringsbolt konnektor 25-150mm2', use_en: 'Shear-bolt connector 25-150mm2', standard: 'EN 50483' },
+  ],
+
+  // === CABLE DUCTS & PITS (Kabelroer & Broende) ===
+  cableDucts: [
+    // Cable protection pipes - Uponor/Wavin/Evocab
+    { id: 'CD-EVOCAB-50R', brand: 'Evocab (Uponor)', model: 'Evocab SRS 50mm', cat: 'pipe', diameter_mm: 50, color: 'red', material: 'PE', use_da: 'Kabelroer 50mm roed (staerkstroem)', use_en: 'Cable duct 50mm red (power)', standard: 'EN 61386' },
+    { id: 'CD-EVOCAB-75R', brand: 'Evocab (Uponor)', model: 'Evocab SRS 75mm', cat: 'pipe', diameter_mm: 75, color: 'red', material: 'PE', use_da: 'Kabelroer 75mm roed (staerkstroem)', use_en: 'Cable duct 75mm red (power)', standard: 'EN 61386' },
+    { id: 'CD-EVOCAB-110R', brand: 'Evocab (Uponor)', model: 'Evocab SRS 110mm', cat: 'pipe', diameter_mm: 110, color: 'red', material: 'PE', use_da: 'Kabelroer 110mm roed (staerkstroem)', use_en: 'Cable duct 110mm red (power)', standard: 'EN 61386' },
+    { id: 'CD-EVOCAB-160R', brand: 'Evocab (Uponor)', model: 'Evocab SRS 160mm', cat: 'pipe', diameter_mm: 160, color: 'red', material: 'PE', use_da: 'Kabelroer 160mm roed (staerkstroem)', use_en: 'Cable duct 160mm red (power)', standard: 'EN 61386' },
+    { id: 'CD-WAVIN-50B', brand: 'Wavin', model: 'Wavin PVC 50mm', cat: 'pipe', diameter_mm: 50, color: 'blue', material: 'PVC', use_da: 'Kabelroer 50mm blaa (tele)', use_en: 'Cable duct 50mm blue (telecom)', standard: 'EN 61386' },
+    { id: 'CD-WAVIN-110B', brand: 'Wavin', model: 'Wavin PVC 110mm', cat: 'pipe', diameter_mm: 110, color: 'blue', material: 'PVC', use_da: 'Kabelroer 110mm blaa (tele)', use_en: 'Cable duct 110mm blue (telecom)', standard: 'EN 61386' },
+    { id: 'CD-EVOCAB-50G', brand: 'Evocab (Uponor)', model: 'Evocab SRS 50mm', cat: 'pipe', diameter_mm: 50, color: 'green', material: 'PE', use_da: 'Kabelroer 50mm groen (fiber)', use_en: 'Cable duct 50mm green (fiber)', standard: 'EN 61386' },
+    // Cable pits
+    { id: 'CD-PIT-MINI', brand: 'BEWA', model: 'Mini kabelbroend 200x200', cat: 'pit', size: 'mini', dimensions: '200x200mm', use_da: 'Mini kabelbroend 200x200mm', use_en: 'Mini cable pit 200x200mm', standard: 'EN 124' },
+    { id: 'CD-PIT-STD', brand: 'Pipelife', model: 'Standard kabelbroend 400x400', cat: 'pit', size: 'standard', dimensions: '400x400mm', use_da: 'Standard kabelbroend 400x400mm', use_en: 'Standard cable pit 400x400mm', standard: 'EN 124' },
+    { id: 'CD-PIT-LARGE', brand: 'Uponor', model: 'Stor kabelbroend 600x600', cat: 'pit', size: 'large', dimensions: '600x600mm', use_da: 'Stor kabelbroend 600x600mm', use_en: 'Large cable pit 600x600mm', standard: 'EN 124' },
+    // Pulling accessories
+    { id: 'CD-PULL-EYE', brand: 'Ensto', model: 'Traekstroempe', cat: 'accessory', use_da: 'Traekstroempe/traekoeje', use_en: 'Pulling eye/grip', standard: 'EN 61386' },
+    { id: 'CD-PULL-WIRE', brand: 'Bolta', model: 'Traektraad 30m', cat: 'accessory', use_da: 'Traektraad 30m nylon', use_en: 'Pull wire 30m nylon', standard: 'EN 61386' },
+  ],
+
+  // === DISTRIBUTION TRANSFORMERS (Transformere) - IEC 60076 / EN 50464-1 ===
+  transformers: [
+    // Oil-filled (ONAN) 10/0.4 kV
+    { id: 'TR-ABB-50-OIL', brand: 'ABB', model: 'Distribution Transformer', cooling: 'ONAN', kva: 50, hvKv: 10, lvKv: 0.4, ukPct: 4.0, pkW: 1.1, p0W: 125, standard: 'EN 50464-1', use_da: '50 kVA oliekoelet 10/0.4kV', use_en: '50 kVA oil-filled 10/0.4kV' },
+    { id: 'TR-ABB-100-OIL', brand: 'ABB', model: 'Distribution Transformer', cooling: 'ONAN', kva: 100, hvKv: 10, lvKv: 0.4, ukPct: 4.0, pkW: 1.75, p0W: 210, standard: 'EN 50464-1', use_da: '100 kVA oliekoelet 10/0.4kV', use_en: '100 kVA oil-filled 10/0.4kV' },
+    { id: 'TR-ABB-200-OIL', brand: 'ABB', model: 'Distribution Transformer', cooling: 'ONAN', kva: 200, hvKv: 10, lvKv: 0.4, ukPct: 4.0, pkW: 3.25, p0W: 380, standard: 'EN 50464-1', use_da: '200 kVA oliekoelet 10/0.4kV', use_en: '200 kVA oil-filled 10/0.4kV' },
+    { id: 'TR-ABB-315-OIL', brand: 'ABB', model: 'Distribution Transformer', cooling: 'ONAN', kva: 315, hvKv: 10, lvKv: 0.4, ukPct: 4.0, pkW: 4.6, p0W: 520, standard: 'EN 50464-1', use_da: '315 kVA oliekoelet 10/0.4kV', use_en: '315 kVA oil-filled 10/0.4kV' },
+    { id: 'TR-SE-400-OIL', brand: 'Schneider', model: 'Minera', cooling: 'ONAN', kva: 400, hvKv: 10, lvKv: 0.4, ukPct: 4.0, pkW: 5.5, p0W: 610, standard: 'EN 50464-1', use_da: '400 kVA oliekoelet 10/0.4kV', use_en: '400 kVA oil-filled 10/0.4kV' },
+    { id: 'TR-SE-500-OIL', brand: 'Schneider', model: 'Minera', cooling: 'ONAN', kva: 500, hvKv: 10, lvKv: 0.4, ukPct: 4.0, pkW: 6.5, p0W: 720, standard: 'EN 50464-1', use_da: '500 kVA oliekoelet 10/0.4kV', use_en: '500 kVA oil-filled 10/0.4kV' },
+    { id: 'TR-SI-630-OIL', brand: 'Siemens', model: 'TUNORMA', cooling: 'ONAN', kva: 630, hvKv: 10, lvKv: 0.4, ukPct: 4.0, pkW: 7.6, p0W: 860, standard: 'EN 50464-1', use_da: '630 kVA oliekoelet 10/0.4kV', use_en: '630 kVA oil-filled 10/0.4kV' },
+    { id: 'TR-SI-800-OIL', brand: 'Siemens', model: 'TUNORMA', cooling: 'ONAN', kva: 800, hvKv: 10, lvKv: 0.4, ukPct: 6.0, pkW: 9.4, p0W: 1030, standard: 'EN 50464-1', use_da: '800 kVA oliekoelet 10/0.4kV', use_en: '800 kVA oil-filled 10/0.4kV' },
+    { id: 'TR-ABB-1000-OIL', brand: 'ABB', model: 'Distribution Transformer', cooling: 'ONAN', kva: 1000, hvKv: 10, lvKv: 0.4, ukPct: 6.0, pkW: 10.5, p0W: 1200, standard: 'EN 50464-1', use_da: '1000 kVA oliekoelet 10/0.4kV', use_en: '1000 kVA oil-filled 10/0.4kV' },
+    { id: 'TR-SE-1250-OIL', brand: 'Schneider', model: 'Minera', cooling: 'ONAN', kva: 1250, hvKv: 10, lvKv: 0.4, ukPct: 6.0, pkW: 12.0, p0W: 1400, standard: 'EN 50464-1', use_da: '1250 kVA oliekoelet 10/0.4kV', use_en: '1250 kVA oil-filled 10/0.4kV' },
+    { id: 'TR-SI-1600-OIL', brand: 'Siemens', model: 'TUNORMA', cooling: 'ONAN', kva: 1600, hvKv: 10, lvKv: 0.4, ukPct: 6.0, pkW: 14.0, p0W: 1700, standard: 'EN 50464-1', use_da: '1600 kVA oliekoelet 10/0.4kV', use_en: '1600 kVA oil-filled 10/0.4kV' },
+    { id: 'TR-ABB-2000-OIL', brand: 'ABB', model: 'Distribution Transformer', cooling: 'ONAN', kva: 2000, hvKv: 10, lvKv: 0.4, ukPct: 6.0, pkW: 18.0, p0W: 2100, standard: 'EN 50464-1', use_da: '2000 kVA oliekoelet 10/0.4kV', use_en: '2000 kVA oil-filled 10/0.4kV' },
+    { id: 'TR-SE-2500-OIL', brand: 'Schneider', model: 'Minera', cooling: 'ONAN', kva: 2500, hvKv: 10, lvKv: 0.4, ukPct: 6.0, pkW: 21.5, p0W: 2500, standard: 'EN 50464-1', use_da: '2500 kVA oliekoelet 10/0.4kV', use_en: '2500 kVA oil-filled 10/0.4kV' },
+    // Oil-filled (ONAN) 20/0.4 kV (Danish MV level)
+    { id: 'TR-ABB-400-OIL20', brand: 'ABB', model: 'Distribution Transformer', cooling: 'ONAN', kva: 400, hvKv: 20, lvKv: 0.4, ukPct: 4.5, pkW: 5.75, p0W: 650, standard: 'EN 50464-1', use_da: '400 kVA oliekoelet 20/0.4kV', use_en: '400 kVA oil-filled 20/0.4kV' },
+    { id: 'TR-SI-630-OIL20', brand: 'Siemens', model: 'TUNORMA', cooling: 'ONAN', kva: 630, hvKv: 20, lvKv: 0.4, ukPct: 4.5, pkW: 8.0, p0W: 920, standard: 'EN 50464-1', use_da: '630 kVA oliekoelet 20/0.4kV', use_en: '630 kVA oil-filled 20/0.4kV' },
+    { id: 'TR-SE-1000-OIL20', brand: 'Schneider', model: 'Minera', cooling: 'ONAN', kva: 1000, hvKv: 20, lvKv: 0.4, ukPct: 6.0, pkW: 11.0, p0W: 1300, standard: 'EN 50464-1', use_da: '1000 kVA oliekoelet 20/0.4kV', use_en: '1000 kVA oil-filled 20/0.4kV' },
+    { id: 'TR-ABB-1600-OIL20', brand: 'ABB', model: 'Distribution Transformer', cooling: 'ONAN', kva: 1600, hvKv: 20, lvKv: 0.4, ukPct: 6.0, pkW: 15.0, p0W: 1800, standard: 'EN 50464-1', use_da: '1600 kVA oliekoelet 20/0.4kV', use_en: '1600 kVA oil-filled 20/0.4kV' },
+    // Dry-type (AN) transformers
+    { id: 'TR-ABB-400-DRY', brand: 'ABB', model: 'RESIBLOC', cooling: 'AN', kva: 400, hvKv: 10, lvKv: 0.4, ukPct: 6.0, pkW: 5.5, p0W: 750, standard: 'EN 50464-1', use_da: '400 kVA toertype 10/0.4kV', use_en: '400 kVA dry-type 10/0.4kV' },
+    { id: 'TR-SE-630-DRY', brand: 'Schneider', model: 'Trihal', cooling: 'AN', kva: 630, hvKv: 10, lvKv: 0.4, ukPct: 6.0, pkW: 7.5, p0W: 1050, standard: 'EN 50464-1', use_da: '630 kVA toertype 10/0.4kV', use_en: '630 kVA dry-type 10/0.4kV' },
+    { id: 'TR-SI-1000-DRY', brand: 'Siemens', model: 'GEAFOL', cooling: 'AN', kva: 1000, hvKv: 10, lvKv: 0.4, ukPct: 6.0, pkW: 10.0, p0W: 1500, standard: 'EN 50464-1', use_da: '1000 kVA toertype 10/0.4kV', use_en: '1000 kVA dry-type 10/0.4kV' },
+    { id: 'TR-ABB-1600-DRY', brand: 'ABB', model: 'RESIBLOC', cooling: 'AN', kva: 1600, hvKv: 10, lvKv: 0.4, ukPct: 6.0, pkW: 14.5, p0W: 2100, standard: 'EN 50464-1', use_da: '1600 kVA toertype 10/0.4kV', use_en: '1600 kVA dry-type 10/0.4kV' },
+    { id: 'TR-SE-2000-DRY', brand: 'Schneider', model: 'Trihal', cooling: 'AN', kva: 2000, hvKv: 10, lvKv: 0.4, ukPct: 6.0, pkW: 18.0, p0W: 2600, standard: 'EN 50464-1', use_da: '2000 kVA toertype 10/0.4kV', use_en: '2000 kVA dry-type 10/0.4kV' },
+    { id: 'TR-EAT-2500-DRY', brand: 'Eaton', model: 'DryFormer', cooling: 'AN', kva: 2500, hvKv: 10, lvKv: 0.4, ukPct: 6.0, pkW: 22.0, p0W: 3100, standard: 'EN 50464-1', use_da: '2500 kVA toertype 10/0.4kV', use_en: '2500 kVA dry-type 10/0.4kV' },
+  ],
+
+  // === CONNECTION TERMINALS & JOINTS (Tilslutningsklemmer & Samlinger) ===
+  terminals: [
+    // Wago 221 lever connectors
+    { id: 'TM-WAGO-221-2', brand: 'Wago', model: '221-412', cat: 'lever', poles: 2, sizeRange: '0.5-6', use_da: 'Lever-klemme 2-pol 0.5-6mm2', use_en: 'Lever connector 2-pole 0.5-6mm2', standard: 'IEC 60998' },
+    { id: 'TM-WAGO-221-3', brand: 'Wago', model: '221-413', cat: 'lever', poles: 3, sizeRange: '0.5-6', use_da: 'Lever-klemme 3-pol 0.5-6mm2', use_en: 'Lever connector 3-pole 0.5-6mm2', standard: 'IEC 60998' },
+    { id: 'TM-WAGO-221-5', brand: 'Wago', model: '221-415', cat: 'lever', poles: 5, sizeRange: '0.5-6', use_da: 'Lever-klemme 5-pol 0.5-6mm2', use_en: 'Lever connector 5-pole 0.5-6mm2', standard: 'IEC 60998' },
+    // Wago 773 push-wire
+    { id: 'TM-WAGO-773-3', brand: 'Wago', model: '773-173', cat: 'pushWire', poles: 3, sizeRange: '1.5-6', use_da: 'Push-wire klemme 3-pol 1.5-6mm2', use_en: 'Push-wire connector 3-pole 1.5-6mm2', standard: 'IEC 60998' },
+    { id: 'TM-WAGO-773-5', brand: 'Wago', model: '773-175', cat: 'pushWire', poles: 5, sizeRange: '1.5-6', use_da: 'Push-wire klemme 5-pol 1.5-6mm2', use_en: 'Push-wire connector 5-pole 1.5-6mm2', standard: 'IEC 60998' },
+    // Wago 2273 compact
+    { id: 'TM-WAGO-2273-3', brand: 'Wago', model: '2273-203', cat: 'compact', poles: 3, sizeRange: '0.5-2.5', use_da: 'Kompaktklemme 3-pol 0.5-2.5mm2', use_en: 'Compact connector 3-pole 0.5-2.5mm2', standard: 'IEC 60998' },
+    { id: 'TM-WAGO-2273-5', brand: 'Wago', model: '2273-205', cat: 'compact', poles: 5, sizeRange: '0.5-2.5', use_da: 'Kompaktklemme 5-pol 0.5-2.5mm2', use_en: 'Compact connector 5-pole 0.5-2.5mm2', standard: 'IEC 60998' },
+    // DIN-rail terminals
+    { id: 'TM-WM-WDU2.5', brand: 'Weidmuller', model: 'WDU 2.5', cat: 'dinRail', mm2: 2.5, use_da: 'DIN-skinne klemme 2.5mm2', use_en: 'DIN-rail terminal 2.5mm2', standard: 'IEC 60947-7-1' },
+    { id: 'TM-WM-WDU4', brand: 'Weidmuller', model: 'WDU 4', cat: 'dinRail', mm2: 4, use_da: 'DIN-skinne klemme 4mm2', use_en: 'DIN-rail terminal 4mm2', standard: 'IEC 60947-7-1' },
+    { id: 'TM-WM-WDU6', brand: 'Weidmuller', model: 'WDU 6', cat: 'dinRail', mm2: 6, use_da: 'DIN-skinne klemme 6mm2', use_en: 'DIN-rail terminal 6mm2', standard: 'IEC 60947-7-1' },
+    { id: 'TM-WM-WDU10', brand: 'Weidmuller', model: 'WDU 10', cat: 'dinRail', mm2: 10, use_da: 'DIN-skinne klemme 10mm2', use_en: 'DIN-rail terminal 10mm2', standard: 'IEC 60947-7-1' },
+    { id: 'TM-PC-UK16', brand: 'Phoenix Contact', model: 'UK 16 N', cat: 'dinRail', mm2: 16, use_da: 'DIN-skinne klemme 16mm2', use_en: 'DIN-rail terminal 16mm2', standard: 'IEC 60947-7-1' },
+    { id: 'TM-PC-UK35', brand: 'Phoenix Contact', model: 'UK 35 N', cat: 'dinRail', mm2: 35, use_da: 'DIN-skinne klemme 35mm2', use_en: 'DIN-rail terminal 35mm2', standard: 'IEC 60947-7-1' },
+    { id: 'TM-ABB-D70', brand: 'ABB', model: 'D70/22.SF', cat: 'dinRail', mm2: 70, use_da: 'DIN-skinne klemme 70mm2', use_en: 'DIN-rail terminal 70mm2', standard: 'IEC 60947-7-1' },
+    { id: 'TM-ABB-D95', brand: 'ABB', model: 'D95/22.SF', cat: 'dinRail', mm2: 95, use_da: 'DIN-skinne klemme 95mm2', use_en: 'DIN-rail terminal 95mm2', standard: 'IEC 60947-7-1' },
+    // Cu/Al bimetal transition connectors
+    { id: 'TM-KLAUKE-16AL', brand: 'Klauke', model: '269R/16 Cu/Al', cat: 'bimetal', mm2: 16, use_da: 'Cu/Al overgang 16mm2', use_en: 'Cu/Al transition 16mm2', standard: 'EN 61238-1' },
+    { id: 'TM-KLAUKE-50AL', brand: 'Klauke', model: '269R/50 Cu/Al', cat: 'bimetal', mm2: 50, use_da: 'Cu/Al overgang 50mm2', use_en: 'Cu/Al transition 50mm2', standard: 'EN 61238-1' },
+    { id: 'TM-KLAUKE-95AL', brand: 'Klauke', model: '269R/95 Cu/Al', cat: 'bimetal', mm2: 95, use_da: 'Cu/Al overgang 95mm2', use_en: 'Cu/Al transition 95mm2', standard: 'EN 61238-1' },
+    { id: 'TM-CEMBRE-150AL', brand: 'Cembre', model: 'BTA 150 Cu/Al', cat: 'bimetal', mm2: 150, use_da: 'Cu/Al overgang 150mm2', use_en: 'Cu/Al transition 150mm2', standard: 'EN 61238-1' },
+    { id: 'TM-CEMBRE-240AL', brand: 'Cembre', model: 'BTA 240 Cu/Al', cat: 'bimetal', mm2: 240, use_da: 'Cu/Al overgang 240mm2', use_en: 'Cu/Al transition 240mm2', standard: 'EN 61238-1' },
   ]
+
 };
 
 // ===== SMART RECOMMENDATION ENGINE =====
@@ -3908,6 +4108,36 @@ function getComponentSvg(category, p) {
       // Switch face
       return wrap(`<rect x="14" y="10" width="36" height="44" rx="4" fill="#fff" stroke="#d0d6dd" stroke-width="2"/><rect x="22" y="18" width="20" height="28" rx="3" fill="#f0f3f7" stroke="#c0c8d0"/><rect x="22" y="18" width="20" height="14" rx="3" fill="#e2e8f0"/>`);
     }
+    case 'supplyCables': {
+      const isAl = p.material === 'Al';
+      return wrap(`<circle cx="32" cy="32" r="22" fill="#1b1b1b"/><circle cx="32" cy="32" r="22" fill="none" stroke="#444" stroke-width="1.5"/><circle cx="24" cy="26" r="5" fill="${isAl?'#b0b0b0':'#b87333'}" stroke="#fff" stroke-width="0.8"/><circle cx="40" cy="26" r="5" fill="${isAl?'#b0b0b0':'#b87333'}" stroke="#fff" stroke-width="0.8"/><circle cx="24" cy="38" r="5" fill="${isAl?'#b0b0b0':'#b87333'}" stroke="#fff" stroke-width="0.8"/><circle cx="40" cy="38" r="5" fill="${isAl?'#b0b0b0':'#b87333'}" stroke="#fff" stroke-width="0.8"/><text x="32" y="58" font-size="6" fill="#888" text-anchor="middle" font-family="monospace">D-${p.mm2}</text>`);
+    }
+    case 'metering': {
+      if (p.cat === 'ct') return wrap(`<rect x="18" y="14" width="28" height="36" rx="3" fill="#f0f0f0" stroke="#666"/><circle cx="32" cy="28" r="10" fill="none" stroke="#1a5276" stroke-width="3"/><circle cx="32" cy="28" r="5" fill="none" stroke="#c0392b" stroke-width="2"/><text x="32" y="48" font-size="6" fill="#333" text-anchor="middle" font-family="monospace">CT</text>`);
+      if (p.cat === 'meter') return wrap(`<rect x="16" y="10" width="32" height="44" rx="3" fill="#f8f8f0" stroke="#999"/><rect x="20" y="16" width="24" height="14" rx="1" fill="#1a1a2e"/><text x="32" y="26" font-size="5" fill="#0f0" text-anchor="middle" font-family="monospace">kWh</text><circle cx="32" cy="42" r="3" fill="#c0392b"/><rect x="24" y="50" width="6" height="3" fill="#888"/><rect x="34" y="50" width="6" height="3" fill="#888"/>`);
+      return wrap(`<rect x="14" y="10" width="36" height="44" rx="3" fill="#e8eef5" stroke="#9aa5b1"/><rect x="18" y="16" width="28" height="32" rx="2" fill="#fff" stroke="#ccc"/><rect x="22" y="24" width="20" height="4" fill="#ddd"/><rect x="22" y="32" width="20" height="4" fill="#ddd"/><text x="32" y="52" font-size="5" fill="#666" text-anchor="middle" font-family="monospace">SKAB</text>`);
+    }
+    case 'mainFuses': {
+      const isNH = (p.size||'').indexOf('NH') === 0;
+      if (isNH) return wrap(`<rect x="18" y="14" width="28" height="36" rx="2" fill="#d9c8a0" stroke="#a89668"/><rect x="24" y="8" width="6" height="8" fill="#888"/><rect x="34" y="8" width="6" height="8" fill="#888"/><rect x="24" y="48" width="6" height="8" fill="#888"/><rect x="34" y="48" width="6" height="8" fill="#888"/><circle cx="32" cy="32" r="5" fill="#c0392b"/><text x="32" y="34" font-size="5" fill="#fff" text-anchor="middle">${p.rating}</text><circle cx="22" cy="22" r="3" fill="#f39c12" stroke="#c0392b" stroke-width="0.5"/>`);
+      return wrap(`<circle cx="32" cy="30" r="18" fill="#e8dcc0" stroke="#a89668" stroke-width="1.5"/><circle cx="32" cy="30" r="10" fill="#fff" stroke="#a89668"/><circle cx="32" cy="30" r="4" fill="#c0392b"/><circle cx="22" cy="16" r="3" fill="#f39c12" stroke="#c0392b" stroke-width="0.5"/><text x="32" y="54" font-size="6" fill="#7a6a45" text-anchor="middle" font-family="monospace">${p.rating}A</text>`);
+    }
+    case 'earthing': {
+      return wrap(`<rect x="10" y="40" width="44" height="6" fill="#8B4513"/><line x1="32" y1="10" x2="32" y2="40" stroke="#27ae60" stroke-width="3"/><circle cx="32" cy="10" r="4" fill="#27ae60"/><line x1="20" y1="46" x2="44" y2="46" stroke="#666" stroke-width="1.5"/><line x1="24" y1="50" x2="40" y2="50" stroke="#666" stroke-width="1.5"/><line x1="28" y1="54" x2="36" y2="54" stroke="#666" stroke-width="1.5"/>`);
+    }
+    case 'cableJoints': {
+      return wrap(`<rect x="6" y="26" width="20" height="12" rx="2" fill="#333" stroke="#000"/><rect x="38" y="26" width="20" height="12" rx="2" fill="#333" stroke="#000"/><rect x="22" y="22" width="20" height="20" rx="4" fill="#e74c3c" stroke="#c0392b"/><text x="32" y="35" font-size="6" fill="#fff" text-anchor="middle" font-family="monospace">MF</text>`);
+    }
+    case 'cableDucts': {
+      const col = p.color === 'red' ? '#e74c3c' : (p.color === 'blue' ? '#3498db' : (p.color === 'green' ? '#27ae60' : '#888'));
+      return wrap(`<ellipse cx="32" cy="32" rx="22" ry="14" fill="none" stroke="${col}" stroke-width="4"/><ellipse cx="32" cy="32" rx="14" ry="8" fill="${col}" opacity="0.2"/><text x="32" y="56" font-size="6" fill="${col}" text-anchor="middle" font-family="monospace">${p.diameter_mm||''}mm</text>`);
+    }
+    case 'transformers': {
+      return wrap(`<rect x="14" y="12" width="36" height="40" rx="3" fill="#2c3e50" stroke="#1a252f"/><circle cx="26" cy="28" r="8" fill="none" stroke="#f39c12" stroke-width="2"/><circle cx="38" cy="28" r="8" fill="none" stroke="#e74c3c" stroke-width="2"/><text x="32" y="48" font-size="5" fill="#ecf0f1" text-anchor="middle" font-family="monospace">${p.kva}kVA</text>`);
+    }
+    case 'terminals': {
+      return wrap(`<rect x="18" y="20" width="28" height="24" rx="3" fill="#f5f5f0" stroke="#ff8c00" stroke-width="1.5"/><rect x="22" y="18" width="6" height="4" fill="#888"/><rect x="29" y="18" width="6" height="4" fill="#888"/><rect x="36" y="18" width="6" height="4" fill="#888"/><rect x="22" y="42" width="6" height="4" fill="#888"/><rect x="29" y="42" width="6" height="4" fill="#888"/><rect x="36" y="42" width="6" height="4" fill="#888"/><rect x="20" y="30" width="24" height="4" fill="#ff8c00" rx="1"/>`);
+    }
     default:
       return wrap(`<rect x="16" y="16" width="32" height="32" rx="4" fill="#9aa5b1"/>`);
   }
@@ -3925,7 +4155,15 @@ function renderBank() {
     contactors: { da: 'Kontaktorer', en: 'Contactors', data: PRODUCTS.contactors },
     mpcbs: { da: 'Motorværn', en: 'Motor Protection', data: PRODUCTS.mpcbs },
     overloadRelays: { da: 'Termorelæer', en: 'Overload Relays', data: PRODUCTS.overloadRelays },
-    wiringDevices: { da: 'Stik & Afbrydere', en: 'Sockets & Switches', data: PRODUCTS.wiringDevices }
+    wiringDevices: { da: 'Stik & Afbrydere', en: 'Sockets & Switches', data: PRODUCTS.wiringDevices },
+    supplyCables: { da: 'Forsyningskabler', en: 'Supply Cables', data: PRODUCTS.supplyCables },
+    metering: { da: 'Målerskab', en: 'Metering', data: PRODUCTS.metering },
+    mainFuses: { da: 'Hovedsikringer', en: 'Main Fuses', data: PRODUCTS.mainFuses },
+    earthing: { da: 'Jordingssystem', en: 'Earthing', data: PRODUCTS.earthing },
+    cableJoints: { da: 'Kabelmuffer', en: 'Cable Joints', data: PRODUCTS.cableJoints },
+    cableDucts: { da: 'Kabelrør', en: 'Cable Ducts', data: PRODUCTS.cableDucts },
+    transformers: { da: 'Transformere', en: 'Transformers', data: PRODUCTS.transformers },
+    terminals: { da: 'Klemmer', en: 'Terminals', data: PRODUCTS.terminals }
   };
 
   const cat = categories[bankCategory];
@@ -3953,6 +4191,14 @@ function renderBank() {
     else if (bankCategory === 'mpcbs') spec = `${p.rangeMin}-${p.rangeMax}A / ${p.kW}kW`;
     else if (bankCategory === 'overloadRelays') spec = `${p.rangeMin}-${p.rangeMax}A`;
     else if (bankCategory === 'wiringDevices') spec = `${p.rating}A | ${tl(p, 'desc')}`;
+    else if (bankCategory === 'supplyCables') spec = `${p.cores} ${p.mm2}mm\u00B2 ${p.material} | Iz=${p.iz}A | Method ${p.method}`;
+    else if (bankCategory === 'metering') spec = p.cat === 'ct' ? `${p.ratio} | Kl.${p.accuracy}` : (p.cat === 'meter' ? `${p.phases}P ${p.maxA}A ${p.method}` : `${p.rating}A ${p.type}`);
+    else if (bankCategory === 'mainFuses') spec = `${p.rating}A | ${p.size} | Icu=${p.icu}kA | ${tx('Plomberet','Sealed')}`;
+    else if (bankCategory === 'earthing') spec = p.mm2 ? `${p.mm2}mm\u00B2 ${p.material||''}` : (p.length_m ? `${p.length_m}m ${p.material}` : (p.connections ? `${p.connections} ${tx('tilsl.','conn.')}` : ''));
+    else if (bankCategory === 'cableJoints') spec = `${p.type} | ${p.sizeRange||''}mm\u00B2 | ${p.voltageClass||''}`;
+    else if (bankCategory === 'cableDucts') spec = p.diameter_mm ? `\u00D8${p.diameter_mm}mm ${p.color}` : (p.dimensions || '');
+    else if (bankCategory === 'transformers') spec = `${p.kva}kVA | ${p.hvKv}/${p.lvKv}kV | uk=${p.ukPct}% | ${p.cooling}`;
+    else if (bankCategory === 'terminals') spec = p.mm2 ? `${p.mm2}mm\u00B2` : (p.poles ? `${p.poles}-pol ${p.sizeRange}mm\u00B2` : '');
 
     const useText = p.use_da ? (tl(p, 'use')) : '';
 

@@ -2481,6 +2481,207 @@ test('ENERGY_HARMONIC_SOURCES has valid THD and PF for all source types', functi
 });
 
 // --- Summary ---
+console.log('\n=== Elforsyning (Utility Supply) Product Category Tests ===\n');
+
+// Test 161: All new product categories exist
+test('PRODUCTS contains all 8 new elforsyning categories', function() {
+  assert.ok(Array.isArray(PRODUCTS.supplyCables), 'supplyCables must exist');
+  assert.ok(Array.isArray(PRODUCTS.metering), 'metering must exist');
+  assert.ok(Array.isArray(PRODUCTS.mainFuses), 'mainFuses must exist');
+  assert.ok(Array.isArray(PRODUCTS.earthing), 'earthing must exist');
+  assert.ok(Array.isArray(PRODUCTS.cableJoints), 'cableJoints must exist');
+  assert.ok(Array.isArray(PRODUCTS.cableDucts), 'cableDucts must exist');
+  assert.ok(Array.isArray(PRODUCTS.transformers), 'transformers must exist');
+  assert.ok(Array.isArray(PRODUCTS.terminals), 'terminals must exist');
+});
+
+// Test 162: Categories have data
+test('All new product categories have at least 5 entries', function() {
+  assert.ok(PRODUCTS.supplyCables.length >= 5, 'supplyCables: ' + PRODUCTS.supplyCables.length);
+  assert.ok(PRODUCTS.metering.length >= 5, 'metering: ' + PRODUCTS.metering.length);
+  assert.ok(PRODUCTS.mainFuses.length >= 5, 'mainFuses: ' + PRODUCTS.mainFuses.length);
+  assert.ok(PRODUCTS.earthing.length >= 5, 'earthing: ' + PRODUCTS.earthing.length);
+  assert.ok(PRODUCTS.cableJoints.length >= 5, 'cableJoints: ' + PRODUCTS.cableJoints.length);
+  assert.ok(PRODUCTS.cableDucts.length >= 5, 'cableDucts: ' + PRODUCTS.cableDucts.length);
+  assert.ok(PRODUCTS.transformers.length >= 5, 'transformers: ' + PRODUCTS.transformers.length);
+  assert.ok(PRODUCTS.terminals.length >= 5, 'terminals: ' + PRODUCTS.terminals.length);
+});
+
+// Test 163: All product IDs unique across all categories
+test('All product IDs are unique across all PRODUCTS categories', function() {
+  var allIds = [];
+  var cats = Object.keys(PRODUCTS);
+  for (var i = 0; i < cats.length; i++) {
+    var arr = PRODUCTS[cats[i]];
+    for (var j = 0; j < arr.length; j++) {
+      var id = arr[j].id;
+      assert.ok(allIds.indexOf(id) < 0, 'Duplicate ID: ' + id);
+      allIds.push(id);
+    }
+  }
+  assert.ok(allIds.length > 200, 'Total products: ' + allIds.length);
+});
+
+// Test 164: All products have required fields
+test('All new category products have id, brand, model fields', function() {
+  var newCats = ['supplyCables','metering','mainFuses','earthing','cableJoints','cableDucts','transformers','terminals'];
+  for (var i = 0; i < newCats.length; i++) {
+    var arr = PRODUCTS[newCats[i]];
+    for (var j = 0; j < arr.length; j++) {
+      var p = arr[j];
+      assert.ok(p.id && p.id.length > 0, newCats[i] + '[' + j + '] missing id');
+      assert.ok(p.brand && p.brand.length > 0, newCats[i] + '[' + j + '] missing brand: ' + p.id);
+      assert.ok(p.model && p.model.length > 0, newCats[i] + '[' + j + '] missing model: ' + p.id);
+    }
+  }
+});
+
+// Test 165: Supply cable Iz values conservative (method D underground)
+test('Supply cable Iz values are conservative for method D underground', function() {
+  var cables = PRODUCTS.supplyCables;
+  for (var i = 0; i < cables.length; i++) {
+    var c = cables[i];
+    assert.ok(c.iz > 0, c.id + ' must have positive Iz');
+    assert.ok(c.method === 'D', c.id + ' must use installation method D');
+    // Method D values for Al should be lower than method C values
+    if (c.material === 'Al' && c.mm2 === 16) assert.ok(c.iz <= 80, '16mm2 Al method D Iz must be <= 80A (conservative)');
+    if (c.material === 'Al' && c.mm2 === 240) assert.ok(c.iz <= 370, '240mm2 Al method D Iz must be <= 370A (conservative)');
+    if (c.material === 'Cu' && c.mm2 === 25) assert.ok(c.iz <= 120, '25mm2 Cu method D Iz must be <= 120A (conservative)');
+  }
+});
+
+// Test 166: Transformer impedance values within EN 50464-1 ranges
+test('Transformer ukPct values within EN 50464-1 standard ranges', function() {
+  var trafos = PRODUCTS.transformers;
+  for (var i = 0; i < trafos.length; i++) {
+    var t = trafos[i];
+    assert.ok(t.ukPct >= 3.5 && t.ukPct <= 8.0, t.id + ' ukPct=' + t.ukPct + ' must be 3.5-8.0%');
+    // EN 50464-1: up to 630 kVA typically 4%, above 630 kVA typically 6%
+    if (t.kva <= 630) assert.ok(t.ukPct >= 4.0 && t.ukPct <= 6.0, t.id + ' <=630kVA: ukPct should be 4-6%');
+    if (t.kva > 630) assert.ok(t.ukPct >= 5.0 && t.ukPct <= 7.0, t.id + ' >630kVA: ukPct should be 5-7%');
+    // Load losses must be positive and proportional to kVA
+    assert.ok(t.pkW > 0, t.id + ' must have positive load losses');
+    assert.ok(t.p0W > 0, t.id + ' must have positive no-load losses');
+    // pkW is in kW, p0W is in W - load losses in W must exceed no-load losses in W
+    assert.ok(t.pkW * 1000 > t.p0W, t.id + ' load losses (kW) must exceed no-load losses (W)');
+  }
+});
+
+// Test 167: Earth electrode resistance conservative
+test('Earth electrode resistance values are conservative', function() {
+  var electrodes = PRODUCTS.earthing.filter(function(e) { return e.cat === 'electrode'; });
+  assert.ok(electrodes.length >= 2, 'Must have at least 2 electrode types');
+  for (var i = 0; i < electrodes.length; i++) {
+    var e = electrodes[i];
+    assert.ok(e.resistance_ohm_typical > 0, e.id + ' must have positive resistance');
+    // Conservative: longer rod = lower resistance
+    if (e.length_m === 1.5) assert.ok(e.resistance_ohm_typical >= 40, '1.5m rod resistance must be >= 40 ohm (conservative)');
+    if (e.length_m === 3.0) assert.ok(e.resistance_ohm_typical >= 20, '3.0m rod resistance must be >= 20 ohm (conservative)');
+    // Shorter rod must have higher resistance
+  }
+  var rod15 = electrodes.filter(function(e) { return e.length_m === 1.5; })[0];
+  var rod30 = electrodes.filter(function(e) { return e.length_m === 3.0; })[0];
+  assert.ok(rod15.resistance_ohm_typical > rod30.resistance_ohm_typical, 'Shorter rod must have higher resistance');
+});
+
+// Test 168: CT ratio selections cover full main fuse range
+test('CT ratios cover the full main fuse range (100A to 800A)', function() {
+  var cts = PRODUCTS.metering.filter(function(m) { return m.cat === 'ct'; });
+  assert.ok(cts.length >= 7, 'Must have at least 7 CT ratios');
+  var primaries = cts.map(function(ct) { return ct.primaryA; }).sort(function(a,b){return a-b;});
+  assert.ok(primaries[0] <= 100, 'Smallest CT must cover 100A: got ' + primaries[0]);
+  assert.ok(primaries[primaries.length-1] >= 800, 'Largest CT must cover 800A: got ' + primaries[primaries.length-1]);
+  // All CTs must have secondary 5A
+  for (var i = 0; i < cts.length; i++) {
+    assert.strictEqual(cts[i].secondaryA, 5, 'CT secondary must be 5A');
+  }
+});
+
+// Test 169: Main fuses cover residential to industrial range
+test('Main fuses cover D02 25-63A and NH 63-630A full range', function() {
+  var mf = PRODUCTS.mainFuses;
+  var d02 = mf.filter(function(f) { return f.size === 'D02'; });
+  var nh = mf.filter(function(f) { return (f.size||'').indexOf('NH') === 0; });
+  assert.ok(d02.length >= 4, 'Must have at least 4 D02 fuses');
+  assert.ok(nh.length >= 8, 'Must have at least 8 NH fuses');
+  // Check sealed flag (utility plomberet)
+  for (var i = 0; i < mf.length; i++) {
+    assert.strictEqual(mf[i].sealed, true, mf[i].id + ' must be sealed (plomberet)');
+  }
+  // NH sizes cover full range
+  var nhRatings = nh.map(function(f) { return f.rating; }).sort(function(a,b){return a-b;});
+  assert.ok(nhRatings[0] <= 63, 'Smallest NH must be <= 63A');
+  assert.ok(nhRatings[nhRatings.length-1] >= 630, 'Largest NH must be >= 630A');
+});
+
+// Test 170: All products have use_da and use_en descriptions
+test('All new products have both use_da and use_en descriptions', function() {
+  var newCats = ['supplyCables','metering','mainFuses','earthing','cableJoints','cableDucts','transformers','terminals'];
+  for (var i = 0; i < newCats.length; i++) {
+    var arr = PRODUCTS[newCats[i]];
+    for (var j = 0; j < arr.length; j++) {
+      var p = arr[j];
+      assert.ok(p.use_da && p.use_da.length > 0, newCats[i] + '/' + p.id + ' missing use_da');
+      assert.ok(p.use_en && p.use_en.length > 0, newCats[i] + '/' + p.id + ' missing use_en');
+    }
+  }
+});
+
+// Test 171: All new products reference applicable standards
+test('All new products reference applicable standards', function() {
+  var newCats = ['supplyCables','metering','mainFuses','earthing','cableJoints','cableDucts','transformers','terminals'];
+  for (var i = 0; i < newCats.length; i++) {
+    var arr = PRODUCTS[newCats[i]];
+    for (var j = 0; j < arr.length; j++) {
+      var p = arr[j];
+      assert.ok(p.standard && p.standard.length > 0, newCats[i] + '/' + p.id + ' missing standard reference');
+    }
+  }
+});
+
+// Test 172: Transformers include both oil and dry types
+test('Transformers include both ONAN (oil) and AN (dry) cooling types', function() {
+  var trafos = PRODUCTS.transformers;
+  var oil = trafos.filter(function(t) { return t.cooling === 'ONAN'; });
+  var dry = trafos.filter(function(t) { return t.cooling === 'AN'; });
+  assert.ok(oil.length >= 5, 'Must have at least 5 oil-filled transformers');
+  assert.ok(dry.length >= 3, 'Must have at least 3 dry-type transformers');
+});
+
+// Test 173: Transformer kVA range covers 50-2500
+test('Transformer kVA range covers 50 to 2500 kVA', function() {
+  var kvas = PRODUCTS.transformers.map(function(t) { return t.kva; }).sort(function(a,b){return a-b;});
+  assert.ok(kvas[0] <= 50, 'Smallest transformer must be <= 50 kVA');
+  assert.ok(kvas[kvas.length-1] >= 2500, 'Largest transformer must be >= 2500 kVA');
+});
+
+// Test 174: Cable ducts have correct color codes
+test('Cable ducts use correct DK color codes (red=power, blue=telecom, green=fiber)', function() {
+  var pipes = PRODUCTS.cableDucts.filter(function(d) { return d.cat === 'pipe'; });
+  var red = pipes.filter(function(p) { return p.color === 'red'; });
+  var blue = pipes.filter(function(p) { return p.color === 'blue'; });
+  var green = pipes.filter(function(p) { return p.color === 'green'; });
+  assert.ok(red.length >= 3, 'Must have at least 3 red (power) ducts');
+  assert.ok(blue.length >= 1, 'Must have at least 1 blue (telecom) duct');
+  assert.ok(green.length >= 1, 'Must have at least 1 green (fiber) duct');
+  // Check use descriptions match color purpose
+  for (var i = 0; i < red.length; i++) {
+    assert.ok(red[i].use_en.indexOf('power') >= 0 || red[i].use_da.indexOf('staerkstroem') >= 0, 'Red duct must be for power');
+  }
+});
+
+// Test 175: renderBank includes new categories
+test('renderBank function output includes new category buttons', function() {
+  bankCategory = 'supplyCables';
+  bankBrand = 'all';
+  var html = renderBank();
+  assert.ok(html.indexOf('Forsyningskabler') >= 0 || html.indexOf('Supply Cables') >= 0, 'Must show supply cables category');
+  assert.ok(html.indexOf('Transformere') >= 0 || html.indexOf('Transformers') >= 0, 'Must show transformers category');
+  assert.ok(html.indexOf('Jordingssystem') >= 0 || html.indexOf('Earthing') >= 0, 'Must show earthing category');
+  assert.ok(html.indexOf('Klemmer') >= 0 || html.indexOf('Terminals') >= 0, 'Must show terminals category');
+});
+
+// --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
 console.log('All tests passed!');
