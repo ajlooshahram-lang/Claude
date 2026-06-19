@@ -232,11 +232,13 @@
       const casesBtn = document.querySelector('.nav-item[data-view="cases"]');
       if (casesBtn) { const b = document.createElement("span"); b.className = "nav-badge"; b.textContent = casesCount; casesBtn.appendChild(b); }
     }
-    // Risk Register badge: count of 1-CRITICAL items
+    // Risk Register badge: count of 1-CRITICAL items (a red "needs attention"
+    // badge — NOT the total count; the register lists all risks). The tooltip
+    // makes its meaning explicit so it isn't mistaken for the list size.
     const critCount = cases.filter(c => c.priority === "1-CRITICAL").length;
     if (critCount > 0) {
       const risksBtn = document.querySelector('.nav-item[data-view="risks"]');
-      if (risksBtn) { const b = document.createElement("span"); b.className = "nav-badge"; b.textContent = critCount; risksBtn.appendChild(b); }
+      if (risksBtn) { const b = document.createElement("span"); b.className = "nav-badge"; b.textContent = critCount; b.title = critCount + " critical risk" + (critCount === 1 ? "" : "s") + " need attention (of " + cases.length + " total)"; risksBtn.appendChild(b); }
     }
   }
 
@@ -2775,12 +2777,15 @@
   };
 
   RENDER.risks = function () {
-    const rows = S.validCases().map(c => `<tr>
+    const all = S.validCases();
+    const critN = all.filter(c => c.priority === "1-CRITICAL").length;
+    const rows = all.map(c => `<tr>
       <td>${esc(c.code.replace("CASE", "RISK"))}</td><td class="wrap">${esc(c.problem)}</td><td>${esc(c.category)}</td>
       <td class="center">${c.sev ?? ""}</td><td class="center">${c.occ ?? ""}</td><td class="center">${c.det ?? ""}</td>
       <td class="center"><b>${c.rpn ?? ""}</b></td><td><span class="pill">${esc(c.rpnBand)}</span></td>
       <td>${esc(c.leanMethod || "")}</td><td>${esc(c.owner || "")}</td><td>${statusBadge(c.status)}</td></tr>`).join("");
-    return tableWrap("<th>Risk ID</th><th class='wrap'>Risk</th><th>Category</th><th>Sev</th><th>Occ</th><th>Det</th><th>RPN</th><th>Band</th><th>Mitigation</th><th>Owner</th><th>Status</th>", rows);
+    const head = `<div class="card" style="padding:12px 16px;margin-bottom:14px"><b>${all.length}</b> risk${all.length === 1 ? "" : "s"} in the register · <span style="color:#e74c3c"><b>${critN}</b> critical</span>${critN ? ' <span class="muted">(the red badge counts only the critical ones that need attention)</span>' : ""}</div>`;
+    return head + tableWrap("<th>Risk ID</th><th class='wrap'>Risk</th><th>Category</th><th>Sev</th><th>Occ</th><th>Det</th><th>RPN</th><th>Band</th><th>Mitigation</th><th>Owner</th><th>Status</th>", rows);
   };
 
   RENDER.fmea = function () {

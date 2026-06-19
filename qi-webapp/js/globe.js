@@ -627,7 +627,7 @@
         var ang = 0; try { ang = world.quaternion.angleTo(toQ); } catch (e) { ang = 0; }
         focusAnim = {
           fromQ: world.quaternion.clone(), toQ: toQ,
-          fromR: curR, toR: radius || Math.max(3.6, Math.min(curR, 4.6)),
+          fromR: curR, toR: radius || 3.6,
           // Google-Earth-style flight: pull the camera back mid-hop then zoom
           // in, scaled to how far we're turning (bigger turn = higher arc).
           arc: Math.min(2.6, ang * 1.5),

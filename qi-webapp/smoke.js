@@ -164,7 +164,9 @@ doc.querySelector('.nav-item[data-view="dashboard"]').dispatchEvent(new window.E
 const S = window.QIStore;
 const C = window.QICalc;
 ok(S.validCases().length === 6, "6 seed cases");
-ok(S.kpis().crit === 5, "5 critical");
+// "Critical" is now unified to the visible 1-CRITICAL priority everywhere
+// (nav badge, KPIs, health, advisor) so counts always agree.
+ok(S.kpis().crit === S.validCases().filter(c => c.priority === "1-CRITICAL").length, "kpis.crit matches the 1-CRITICAL count shown in the register");
 ok(S.kpis().estTotal === 42500, "budget est total 42500");
 
 // 4) add a case -> appears everywhere
@@ -1736,6 +1738,17 @@ if (window.QIDisplay) {
   var targets = Array.prototype.map.call(recBtns, function (b) { return b.getAttribute("data-go"); });
   ok(targets.every(function (v) { return !!v; }), "every recommendation button has a target module");
   ok(targets.indexOf("risks") !== -1 || targets.indexOf("licensing") !== -1, "recommendations route to relevant modules (risks/licensing/etc.)");
+})();
+
+// Step 116: count consistency — "critical" agrees everywhere (badge/KPI/register)
+(function testCriticalConsistency() {
+  var byPriority = S.validCases().filter(function (c) { return c.priority === "1-CRITICAL"; }).length;
+  ok(S.kpis().crit === byPriority, "kpis.crit equals the 1-CRITICAL count (no 5-vs-7 mismatch)");
+  // Risk Register heading states the total + critical so the badge can't be mistaken for the list size.
+  var rnav = doc.querySelector('.nav-item[data-view="risks"]');
+  if (rnav) rnav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  var html = doc.querySelector(".content").innerHTML;
+  ok(/risks? in the register/.test(html), "Risk Register heading shows the total count, not just the critical badge");
 })();
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);

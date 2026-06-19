@@ -683,7 +683,9 @@
   function kpis() {
     const e = validCases();
     const open = e.filter(c => ["OPEN", "IN PROGRESS", "ON HOLD", "BLOCKED"].includes(c.status)).length;
-    const crit = e.filter(c => c.rpn !== null && c.rpn >= 200).length;
+    // "Critical" = items the user sees labelled 1-CRITICAL in the priority column.
+    // (Unified with the Risk Register nav badge so every "critical" count agrees.)
+    const crit = e.filter(c => c.priority === "1-CRITICAL").length;
     const rpns = e.filter(c => c.rpn).map(c => c.rpn);
     const avgRpn = rpns.length ? Math.round(rpns.reduce((a, b) => a + b, 0) / rpns.length) : 0;
     const pcts = e.map(c => Number(c.percent) || 0);
