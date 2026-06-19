@@ -544,19 +544,38 @@ body.dark .nav-panel-desc b { color: #00e5ff; }
   .main { max-width: 1080px; }
 }
 
-/* Animations */
-.fade-in {
-  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
+/* ===== SMOOTHNESS PASS — gentle, GPU-friendly content transitions ===== */
+/* The previous build re-ran the slideUp ENTRANCE animation on every render, so
+   every in-module value click made the whole content slide up 16px and fade from
+   zero opacity — the "jumping / flashing" the user complained about. We now only
+   play the entrance (opacity + transform, no layout-triggering props) on a genuine
+   MODULE SWITCH (#mainContent.module-switch). An in-module re-render gets a very
+   subtle opacity-only settle so the freshly-written DOM never blinks blank, while
+   staying perfectly still (no vertical jump). Combined with the scroll-position
+   retention above this makes value changes feel calm. */
+.fade-in { will-change: opacity, transform; }
 
+/* Entrance on a real module switch: slide up + fade in. opacity/transform only. */
+#mainContent.module-switch .fade-in {
+  animation: slideUp 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
+#mainContent.module-switch .card:nth-child(2) { animation-delay: 0.05s; }
+#mainContent.module-switch .card:nth-child(3) { animation-delay: 0.10s; }
+#mainContent.module-switch .card:nth-child(4) { animation-delay: 0.15s; }
 
-.card:nth-child(2) { animation-delay: 0.05s; }
-.card:nth-child(3) { animation-delay: 0.1s; }
-.card:nth-child(4) { animation-delay: 0.15s; }
+/* In-module re-render (a value change): no jump — just a soft opacity settle from
+   near-opaque, short enough to mask the innerHTML swap without any visible flicker. */
+#mainContent:not(.module-switch) .fade-in {
+  animation: contentSettle 0.14s ease both;
+}
+@keyframes contentSettle {
+  from { opacity: 0.82; }
+  to   { opacity: 1; }
+}
 
 /* ===== PROFESSIONAL SINGLE-LINE DIAGRAM (enstregsdiagram) ===== */
 /* Marching-dash "current flow" along energised conductors */
@@ -589,13 +608,41 @@ body.dark .nav-panel-desc b { color: #00e5ff; }
   50%      { opacity: 1; }
 }
 
-/* Respect users who prefer reduced motion — freeze all SLD animation */
+/* Respect users who prefer reduced motion — freeze all SLD animation, the content
+   entrance/settle transitions, the appearance-panel reveal, and smooth scrolling.
+   Users who disable motion at the OS level get a completely still interface. */
 @media (prefers-reduced-motion: reduce) {
   .sld-flow, .sld-flow-slow, .sld-bus, .sld-dev, .sld-live {
     animation: none !important;
   }
   .sld-flow, .sld-flow-slow { stroke-dasharray: 7 9; }
+  html { scroll-behavior: auto !important; }
+  #mainContent.module-switch .fade-in,
+  #mainContent:not(.module-switch) .fade-in,
+  .fade-in,
+  .appearance-panel.open {
+    animation: none !important;
+    transition: none !important;
+  }
+  .fade-in { will-change: auto; }
 }
+
+/* Click-only manual override: the 🎨 Appearance panel can force motion fully off
+   regardless of the OS setting (body.motion-off). Mirrors the reduced-motion block. */
+body.motion-off .sld-flow, body.motion-off .sld-flow-slow,
+body.motion-off .sld-bus, body.motion-off .sld-dev, body.motion-off .sld-live {
+  animation: none !important;
+}
+body.motion-off .sld-flow, body.motion-off .sld-flow-slow { stroke-dasharray: 7 9; }
+body.motion-off { scroll-behavior: auto; }
+body.motion-off #mainContent.module-switch .fade-in,
+body.motion-off #mainContent:not(.module-switch) .fade-in,
+body.motion-off .fade-in,
+body.motion-off .appearance-panel.open {
+  animation: none !important;
+  transition: none !important;
+}
+body.motion-off .fade-in { will-change: auto; }
 
 /* Info tooltip */
 .info-row {
@@ -769,7 +816,12 @@ body.dark img { filter: brightness(0.92); }
   text-align: left;
 }
 html[dir="rtl"] .appearance-panel { right: auto; left: 0; text-align: right; }
-.appearance-panel.open { display: block; }
+.appearance-panel.open { display: block; animation: apReveal 0.16s cubic-bezier(0.16, 1, 0.3, 1) both; }
+/* Gentle reveal for the Appearance panel — opacity + a tiny transform only. */
+@keyframes apReveal {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 .appearance-panel .ap-group { margin-bottom: 12px; }
 .appearance-panel .ap-group:last-child { margin-bottom: 0; }
 .appearance-panel .ap-label {
@@ -1304,6 +1356,8 @@ const _FA = {
   'Soft': '\u0645\u0644\u0627\u06CC\u0645',
   'Medium': '\u0645\u062A\u0648\u0633\u0637',
   'Vivid': '\u0632\u0646\u062F\u0647',
+  'Motion': '\u062D\u0631\u06A9\u062A',
+  'Auto': '\u062E\u0648\u062F\u06A9\u0627\u0631',
   // Calculation provenance + signed professional report (this feature)
   'Calculation report \u2014 electrical installation': '\u06AF\u0632\u0627\u0631\u0634 \u0645\u062D\u0627\u0633\u0628\u0627\u062A \u2014 \u062A\u0623\u0633\u06CC\u0633\u0627\u062A \u0628\u0631\u0642\u06CC',
   'Designed and verified to DS/HD 60364:2022.': '\u0637\u0631\u0627\u062D\u06CC \u0648 \u062A\u0623\u06CC\u06CC\u062F \u0634\u062F\u0647 \u0637\u0628\u0642 DS/HD 60364:2022.',
@@ -5552,6 +5606,42 @@ function _scrollWindowTo(y) {
   catch (e) { try { window.scrollTo(0, y); } catch (e2) { /* ignore */ } }
 }
 
+// ===== Focus retention across in-module re-renders =====
+// renderModule rebuilds the whole module DOM, which drops keyboard/click focus from
+// the control the user just used. When the SAME module re-renders we capture a stable
+// identity for the focused element (its id, or its inline onclick handler text as a
+// fallback) and re-focus the matching control afterwards, so keyboard users and the
+// active-button highlight stay put. Purely additive, fully guarded, low-risk.
+function _captureFocusKey() {
+  try {
+    var el = (typeof document !== 'undefined') ? document.activeElement : null;
+    if (!el || el === document.body) return null;
+    if (el.id) return { type: 'id', val: el.id };
+    if (el.getAttribute) {
+      var oc = el.getAttribute('onclick');
+      if (oc) return { type: 'onclick', val: oc };
+    }
+  } catch (e) { /* non-DOM/test env */ }
+  return null;
+}
+function _restoreFocusKey(k) {
+  if (!k) return;
+  try {
+    var el = null;
+    if (k.type === 'id' && document.getElementById) {
+      el = document.getElementById(k.val);
+    } else if (k.type === 'onclick' && document.querySelectorAll) {
+      var all = document.querySelectorAll('[onclick]');
+      for (var i = 0; i < all.length; i++) {
+        if (all[i].getAttribute && all[i].getAttribute('onclick') === k.val) { el = all[i]; break; }
+      }
+    }
+    if (el && typeof el.focus === 'function') {
+      try { el.focus({ preventScroll: true }); } catch (e2) { el.focus(); }
+    }
+  } catch (e) { /* ignore */ }
+}
+
 function renderModule(mod) {
   if (typeof Reactive !== 'undefined') Reactive.onRender(mod); // reactive propagation: recompute all linked verdicts first
   syncAxes(); // Dynamic coordination
@@ -5628,14 +5718,25 @@ function renderModule(mod) {
     content += renderQiCard(qi);
   }
   // Same-module re-render (a value change within the current module) must keep the
-  // viewport where it is; a genuine module switch resets to the top as before.
+  // viewport where it is AND keep keyboard/click focus on the control just used; a
+  // genuine module switch resets to the top and plays the entrance animation.
   const _sameModule = (_lastRenderedModule === mod);
   const _savedScroll = _sameModule ? _captureScrollState() : null;
+  const _savedFocus = _sameModule ? _captureFocusKey() : null;
+  // Gate the slide-up entrance animation: only a real module switch gets it, so an
+  // in-module re-render never re-runs slideUp (that was the "jumping/flashing").
+  try {
+    if (main.classList) {
+      if (_sameModule) main.classList.remove('module-switch');
+      else main.classList.add('module-switch');
+    }
+  } catch (e) { /* non-DOM env */ }
   main.innerHTML = content;
   if (_sameModule) {
     _restoreScrollState(_savedScroll);                       // synchronous restore (no visible flash)
+    _restoreFocusKey(_savedFocus);                           // keep focus on the control just used
     if (typeof requestAnimationFrame === 'function') {       // and once more after layout settles
-      requestAnimationFrame(function () { _restoreScrollState(_savedScroll); });
+      requestAnimationFrame(function () { _restoreScrollState(_savedScroll); _restoreFocusKey(_savedFocus); });
     }
   } else {
     _resetScrollTop();                                       // deliberate scroll-to-top on module switch
@@ -7779,7 +7880,7 @@ const GLOW_PRESETS = [
   { id:'medium', da:'Medium', en:'Medium', mult:0.75 },
   { id:'vivid',  da:'Klar',   en:'Vivid',  mult:1.0 }
 ];
-let appearanceState = { accent: 'cyan', glow: 'soft' };
+let appearanceState = { accent: 'cyan', glow: 'soft', motion: 'auto' };
 
 function _apCssVar(name, value) {
   try {
@@ -7794,10 +7895,21 @@ function applyAppearance() {
   _apCssVar('--neon-a', acc.a);
   _apCssVar('--neon-b', acc.b);
   _apCssVar('--glow', String(g.mult));
+  // Motion preference: 'auto' respects the OS prefers-reduced-motion setting; 'off'
+  // forces every transition/animation off via body.motion-off (CSS mirrors the
+  // reduced-motion block). Default 'auto' so nobody gets surprise motion.
+  try {
+    var b = (typeof document !== 'undefined') ? document.body : null;
+    if (b && b.classList) {
+      if (appearanceState.motion === 'off') b.classList.add('motion-off');
+      else b.classList.remove('motion-off');
+    }
+  } catch (e) { /* non-DOM env */ }
   try { localStorage.setItem('appearance', JSON.stringify(appearanceState)); } catch (e) { /* ignore */ }
 }
 function setAccent(id) { appearanceState.accent = id; applyAppearance(); renderAppearancePanel(); }
 function setGlow(id) { appearanceState.glow = id; applyAppearance(); renderAppearancePanel(); }
+function setMotion(id) { appearanceState.motion = id; applyAppearance(); renderAppearancePanel(); }
 function renderAppearancePanel() {
   var el = (typeof document !== 'undefined' && document.getElementById) ? document.getElementById('appearancePanel') : null;
   if (!el) return;
@@ -7819,6 +7931,10 @@ function renderAppearancePanel() {
       '" style="background:linear-gradient(135deg,' + p.a + ',' + p.b + ')" onclick="setAccent(\'' + p.id + '\')"></button>';
   });
   html += '</div></div>';
+  html += '<div class="ap-group"><div class="ap-label">' + tx('Bev\u00E6gelse', 'Motion') + '</div><div class="ap-row">';
+  html += '<button class="ap-btn ' + (appearanceState.motion !== 'off' ? 'active' : '') + '" onclick="setMotion(\'auto\')">' + tx('Auto', 'Auto') + '</button>';
+  html += '<button class="ap-btn ' + (appearanceState.motion === 'off' ? 'active' : '') + '" onclick="setMotion(\'off\')">' + tx('Fra', 'Off') + '</button>';
+  html += '</div></div>';
   el.innerHTML = html;
 }
 function toggleAppearancePanel() {
@@ -7834,6 +7950,7 @@ function toggleAppearancePanel() {
       var o = JSON.parse(saved);
       if (o && o.accent) appearanceState.accent = o.accent;
       if (o && o.glow) appearanceState.glow = o.glow;
+      if (o && o.motion) appearanceState.motion = o.motion;
     }
   } catch (e) { /* ignore */ }
   applyAppearance();

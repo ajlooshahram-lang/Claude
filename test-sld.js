@@ -8365,6 +8365,184 @@ test('Deeplinks GUARD: core calc math unchanged (officialIz + IB regression) wit
   assert(typeof getProductLink === 'function' && typeof officialIz === 'function', 'deep-link layer + engine coexist');
 });
 
+// ===================================================================
+// UX SMOOTHNESS PASS — gentle transitions, no re-render roughness.
+// All assertions are presentation-only; the calc guard below proves the
+// engine math is byte-identical to before this pass.
+// ===================================================================
+console.log('\n=== UX Smoothness Pass Tests ===\n');
+
+test('Smoothness: entrance animation is gated to genuine module switches (no jump on re-render)', function () {
+  assert(html.indexOf('#mainContent.module-switch .fade-in') >= 0, 'entrance animation scoped to module-switch');
+  assert(/#mainContent\.module-switch \.fade-in\s*\{[^}]*animation:\s*slideUp/.test(html), 'module-switch plays the slideUp entrance');
+  assert(html.indexOf('#mainContent:not(.module-switch) .fade-in') >= 0, 'in-module re-render has its own (gentle) rule, not the slide');
+  const si = html.indexOf('@keyframes slideUp');
+  assert(si >= 0, 'slideUp keyframes present');
+  const seg = html.slice(si, si + 200);
+  assert(/translateY/.test(seg) && /opacity/.test(seg), 'slideUp uses opacity + transform only (GPU-friendly)');
+  ['width:', 'height:', 'top:', 'left:', 'margin:', 'padding:'].forEach(function (prop) {
+    assert(seg.indexOf(prop) < 0, 'slideUp must not animate layout-triggering "' + prop + '"');
+  });
+});
+
+test('Smoothness: in-module settle is opacity-only (masks the innerHTML swap without flicker or movement)', function () {
+  const i = html.indexOf('@keyframes contentSettle');
+  assert(i >= 0, 'contentSettle keyframes present');
+  const seg = html.slice(i, i + 160);
+  assert(/opacity/.test(seg), 'contentSettle fades opacity to settle the new content');
+  assert(seg.indexOf('translate') < 0 && seg.indexOf('width') < 0 && seg.indexOf('height') < 0, 'settle has no movement / layout change');
+});
+
+test('Smoothness: renderModule gates the entrance class (entrance only on a real switch)', function () {
+  const src = renderModule.toString();
+  assert(src.indexOf("classList.add('module-switch')") >= 0, 'a real module switch adds the entrance class');
+  assert(src.indexOf("classList.remove('module-switch')") >= 0, 'an in-module re-render removes the entrance class');
+  assert(src.indexOf('_sameModule') >= 0 && src.indexOf('_lastRenderedModule') >= 0, 'same-module-vs-switch detection still intact');
+});
+
+test('Smoothness: module switch adds entrance class; same-module re-render does not (behavioural)', function () {
+  const realGet = document.getElementById;
+  const mc = {
+    _html: '', scrollTop: 0,
+    get innerHTML() { return this._html; },
+    set innerHTML(v) { this._html = v; this.scrollTop = 0; },
+    classList: {
+      _set: {},
+      add: function (c) { this._set[c] = true; },
+      remove: function (c) { delete this._set[c]; },
+      contains: function (c) { return !!this._set[c]; }
+    }
+  };
+  document.getElementById = function (id) {
+    if (id === 'mainContent') return mc;
+    return realGet ? realGet(id) : { innerHTML: '', textContent: '', style: {}, classList: { add() {}, remove() {}, toggle() {} } };
+  };
+  try {
+    renderModule('cable');
+    renderModule('load');
+    assert(mc.classList.contains('module-switch'), 'genuine module switch leaves the entrance class on (slide-in plays)');
+    renderModule('load');
+    assert(!mc.classList.contains('module-switch'), 'same-module re-render clears the entrance class (content stays put, no jump)');
+  } finally {
+    document.getElementById = realGet;
+  }
+});
+
+test('Smoothness: focus-retention helpers exist, are wired into renderModule, and are null-safe', function () {
+  assert(typeof _captureFocusKey === 'function' && typeof _restoreFocusKey === 'function', 'focus retention helpers exist');
+  const src = renderModule.toString();
+  assert(src.indexOf('_captureFocusKey') >= 0 && src.indexOf('_restoreFocusKey') >= 0, 'focus retention wired into renderModule');
+  assert.doesNotThrow(function () {
+    _restoreFocusKey(null);
+    _captureFocusKey();
+    _restoreFocusKey({ type: 'id', val: 'does-not-exist' });
+    _restoreFocusKey({ type: 'onclick', val: 'noop()' });
+  }, 'focus helpers are null-safe and never throw');
+});
+
+test('Smoothness: scroll-preservation helpers + logic are NOT regressed by this pass', function () {
+  assert(typeof _captureScrollState === 'function' && typeof _restoreScrollState === 'function', 'scroll helpers still exist');
+  assert(typeof _resetScrollTop === 'function' && typeof _scrollWindowTo === 'function', 'scroll reset/window helpers still exist');
+  const src = renderModule.toString();
+  assert(src.indexOf('_captureScrollState') >= 0 && src.indexOf('_restoreScrollState') >= 0, 'same-module scroll capture/restore still wired');
+  assert(src.indexOf('_resetScrollTop') >= 0, 'module switch still resets scroll to top');
+  assert.doesNotThrow(function () { _restoreScrollState(null); _captureScrollState(); }, 'scroll helpers still null-safe');
+});
+
+test('Smoothness: prefers-reduced-motion disables the new content + panel transitions and smooth scroll', function () {
+  const i = html.indexOf('@media (prefers-reduced-motion: reduce)');
+  assert(i >= 0, 'reduced-motion media query present');
+  const seg = html.slice(i, i + 700);
+  assert(seg.indexOf('.fade-in') >= 0, 'reduced-motion disables fade-in entrance/settle');
+  assert(seg.indexOf('.appearance-panel.open') >= 0, 'reduced-motion disables the appearance-panel reveal');
+  assert(seg.indexOf('animation: none !important') >= 0, 'reduced-motion forces animation off');
+  assert(seg.indexOf('scroll-behavior: auto') >= 0, 'reduced-motion disables smooth scrolling');
+});
+
+test('Smoothness: gentle appearance-panel reveal uses opacity/transform only', function () {
+  assert(html.indexOf('@keyframes apReveal') >= 0, 'appearance-panel reveal keyframes present');
+  const i = html.indexOf('@keyframes apReveal');
+  const seg = html.slice(i, i + 160);
+  assert(/opacity/.test(seg) && /translateY/.test(seg), 'apReveal uses opacity + transform');
+  assert(seg.indexOf('width') < 0 && seg.indexOf('height') < 0, 'apReveal does not animate layout-triggering size');
+});
+
+test('Smoothness: new transition CSS introduces no external resources and no JS animation library', function () {
+  assert(html.indexOf('<script src') < 0, 'no external <script src> introduced (single-file preserved)');
+  assert(html.indexOf('<link') < 0, 'no external stylesheet <link> introduced');
+  assert(html.indexOf('@import') < 0, 'no CSS @import introduced');
+  ['gsap', 'anime.min', 'velocity.js', 'popmotion', 'framer-motion'].forEach(function (lib) {
+    assert(html.toLowerCase().indexOf(lib) < 0, 'no JS animation library "' + lib + '" introduced (CSS transitions only)');
+  });
+});
+
+test('Smoothness: click-only preserved — no new typed inputs introduced by the motion control', function () {
+  const countText = (html.match(/<input type="text"/g) || []).length;
+  const countNum = (html.match(/<input type="number"/g) || []).length;
+  const countTextarea = (html.match(/<textarea/g) || []).length;
+  assert.strictEqual(countText, 0, 'still zero text inputs');
+  assert.strictEqual(countNum, 0, 'still zero number inputs');
+  assert(countTextarea <= 2, 'no new <textarea> added by this pass (baseline 2: the AI question box + a comment, got ' + countTextarea + ')');
+  const realGet = document.getElementById;
+  const panel = { innerHTML: '' };
+  document.getElementById = function (id) {
+    if (id === 'appearancePanel') return panel;
+    return realGet ? realGet(id) : null;
+  };
+  try {
+    renderAppearancePanel();
+    assert(panel.innerHTML.indexOf("setMotion('auto')") >= 0 && panel.innerHTML.indexOf("setMotion('off')") >= 0, 'motion control rendered as buttons');
+    assert(panel.innerHTML.indexOf('<input') < 0 && panel.innerHTML.indexOf('<textarea') < 0, 'appearance panel stays click-only');
+  } finally {
+    document.getElementById = realGet;
+  }
+});
+
+test('Smoothness: motion toggle is trilingual (da authoritative, en secondary, fa via _FA) and click-only', function () {
+  assert(typeof setMotion === 'function', 'setMotion control function exists');
+  assert(appearanceState.motion === 'auto' || appearanceState.motion === 'off', 'motion state is a known value');
+  assert(_FA['Motion'] && _FA['Motion'].length > 0, 'Farsi for "Motion" present in _FA');
+  assert(_FA['Auto'] && _FA['Auto'].length > 0, 'Farsi for "Auto" present in _FA');
+  assert(_FA['Off'] && _FA['Off'].length > 0, 'Farsi for "Off" present in _FA');
+  const prevLang = lang;
+  try {
+    lang = 'da'; assert(tx('Bev\u00E6gelse', 'Motion') === 'Bev\u00E6gelse', 'Danish authoritative');
+    lang = 'en'; assert(tx('Bev\u00E6gelse', 'Motion') === 'Motion', 'English secondary');
+    lang = 'fa'; assert(tx('Bev\u00E6gelse', 'Motion') === _FA['Motion'], 'Farsi via _FA');
+  } finally { lang = prevLang; }
+});
+
+test('Smoothness: motion=off toggles body.motion-off; default auto leaves it off (no engine touch)', function () {
+  const realBody = document.body;
+  const tracked = { _set: {}, add: function (c) { this._set[c] = true; }, remove: function (c) { delete this._set[c]; }, contains: function (c) { return !!this._set[c]; }, toggle: function () {} };
+  const prevAppearance = JSON.parse(JSON.stringify(appearanceState));
+  try {
+    document.body = { classList: tracked };
+    setMotion('off');
+    assert(tracked.contains('motion-off'), 'motion=off adds body.motion-off (kills transitions globally)');
+    setMotion('auto');
+    assert(!tracked.contains('motion-off'), 'motion=auto removes body.motion-off (respects OS preference)');
+  } finally {
+    document.body = realBody;
+    appearanceState.accent = prevAppearance.accent;
+    appearanceState.glow = prevAppearance.glow;
+    appearanceState.motion = prevAppearance.motion;
+    applyAppearance();
+  }
+});
+
+test('Smoothness GUARD: core calc math is byte-identical after the UX pass (officialIz + IB regression)', function () {
+  const cu25 = { material: 'Cu', mm2: 2.5, model: '', iz: 999 };
+  assert.strictEqual(officialIz(cu25), 23, 'officialIz(Cu 2.5mm2 PVC) == 23A (Table C.52.1) unchanged');
+  const cu16 = { material: 'Cu', mm2: 16, model: '', iz: 1 };
+  assert.strictEqual(officialIz(cu16), 73, 'officialIz(Cu 16mm2 PVC) == 73A unchanged');
+  const ib1 = sldCalcNodeIB({ type: 'final_circuit', power_kW: 3.68, cosPhi: 0.95, phases: '1x230', voltage: 230 });
+  assert(Math.abs(ib1 - 16.84) < 0.05, 'IB regression ~16.84A unchanged, got ' + ib1.toFixed(2));
+  const ib3 = sldCalcNodeIB({ type: 'final_circuit', power_kW: 7.36, cosPhi: 0.95, phases: '3x400', voltage: 400 });
+  const exp3 = 7360 / (Math.sqrt(3) * 400 * 0.95);
+  assert(Math.abs(ib3 - exp3) < 0.01, 'three-phase IB unchanged');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
