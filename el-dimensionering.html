@@ -663,7 +663,10 @@ const T = {
       data: 'Datainstallation',
       spd: 'Overspaending',
       ups: 'UPS / Noedstroem',
-      pfc: 'PF-korrektion'
+      pfc: 'PF-korrektion',
+      trayfill: 'Kabelbakke',
+      zs: 'Fejlsløjfe Zs',
+      commission: 'Idriftsættelse'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -785,7 +788,10 @@ const T = {
       data: 'Structured Cabling',
       spd: 'Surge Protection',
       ups: 'UPS Sizing',
-      pfc: 'Power Factor Correction'
+      pfc: 'Power Factor Correction',
+      trayfill: 'Cable Tray Fill',
+      zs: 'Earth Fault Loop',
+      commission: 'Commissioning'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -899,7 +905,10 @@ const T = {
       data: 'کابل‌کشی ساختاریافته',
       spd: 'حفاظت اضافه‌ولتاژ',
       ups: 'یو‌پی‌اس / برق اضطراری',
-      pfc: 'اصلاح ضریب توان'
+      pfc: 'اصلاح ضریب توان',
+      trayfill: 'سینی کابل',
+      zs: 'امپدانس حلقه خطا',
+      commission: 'راه‌اندازی'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -1460,7 +1469,45 @@ const _FA = {
   'Capacitor Current Ic': 'جریان خازن Ic',
   'Penalty Savings': 'صرفه‌جویی جریمه',
   'Short-circuit Power Sk [MVA]': 'توان اتصال کوتاه Sk [MVA]',
-  'No penalty (cos φ ≥ 0.90)': 'بدون جریمه (cos φ ≥ 0.90)'
+  'No penalty (cos φ ≥ 0.90)': 'بدون جریمه (cos φ ≥ 0.90)',
+  // Cable Tray Fill module
+  'Cable Tray Fill Calculator': 'محاسبه‌گر پرشدگی سینی کابل',
+  'Tray Type': 'نوع سینی',
+  'Perforated tray': 'سینی مشبک',
+  'Wire mesh tray': 'سینی توری',
+  'Solid tray (no ventilation)': 'سینی بسته',
+  'Cable ladder': 'نردبان کابل',
+  'Conduit/tube (IEC 61386)': 'لوله/کاندوئیت',
+  'Tray Size (W x H mm)': 'اندازه سینی',
+  'Fill Rate Calculation': 'محاسبه نرخ پرشدگی',
+  'Grouping Derating Factor': 'ضریب کاهش گروه‌بندی',
+  'Weight and Support': 'وزن و تکیه‌گاه',
+  'Weight per Meter': 'وزن بر متر',
+  'Support Spacing': 'فاصله تکیه‌گاه‌ها',
+  'Separation Requirement': 'الزام جداسازی',
+  'Power and data cables in same tray require divider': 'کابل‌های قدرت و دیتا نیاز به جداکننده دارند',
+  // Earth Fault Loop module
+  'Earth Fault Loop Impedance': 'امپدانس حلقه خطای زمین',
+  'Protection Device Type': 'نوع دستگاه حفاظتی',
+  'Source Impedance Ze': 'امپدانس منبع Ze',
+  'Cable Length': 'طول کابل',
+  'Cable Size': 'سایز کابل',
+  'Impedance Calculation': 'محاسبه امپدانس',
+  'Fault Current Analysis': 'تحلیل جریان خطا',
+  'Maximum Cable Length': 'حداکثر طول کابل',
+  'Prospective Fault Current': 'جریان خطای احتمالی',
+  // Commissioning module
+  'Commissioning Checklist': 'چک‌لیست راه‌اندازی',
+  'Installation Type': 'نوع تاسیسات',
+  'New installation': 'تاسیسات جدید',
+  'Addition/alteration': 'اضافه/تغییر',
+  'Periodic inspection': 'بازرسی دوره‌ای',
+  'Installation Category': 'دسته‌بندی تاسیسات',
+  'Visual Inspection': 'بازرسی چشمی',
+  'Testing': 'آزمایش',
+  'Certificate / Summary': 'گواهینامه / خلاصه',
+  'Required Instruments': 'ابزار مورد نیاز',
+  'Electrician Declaration': 'اعلامیه برقکار'
 };
 function tx(da, en) { if(lang === 'da') return da; if(lang === 'fa') return _FA[en] || en; return en; }
 function tl(obj, prefix) { return obj[prefix + '_' + lang] || obj[prefix + '_en'] || ''; }
@@ -4440,6 +4487,9 @@ function renderModule(mod) {
     case 'spd': content = renderSPD(); break;
     case 'ups': content = renderUPS(); break;
     case 'pfc': content = renderPFC(); break;
+    case 'trayfill': content = renderTrayFill(); break;
+    case 'zs': content = renderZs(); break;
+    case 'commission': content = renderCommission(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -12975,6 +13025,598 @@ function renderPFC() {
   html += '</div>';
   return html;
 }
+
+
+// ===== CABLE TRAY FILL CALCULATOR (DS/EN 50174-2 + DS/HD 60364-5-52) =====
+
+var TRAY_TYPES = {
+  perforated: { maxFill: 50, da: 'Perforeret bakke', en: 'Perforated tray' },
+  wiremesh: { maxFill: 50, da: 'Traadbakke', en: 'Wire mesh tray' },
+  solid: { maxFill: 45, da: 'Lukket bakke', en: 'Solid tray (no ventilation)' },
+  ladder: { maxFill: 50, da: 'Kabelstige', en: 'Cable ladder' },
+  conduit: { maxFill: 40, da: 'Roer/kanal', en: 'Conduit/tube (IEC 61386)' }
+};
+
+var TRAY_SIZES = [
+  { w: 100, h: 50 }, { w: 150, h: 50 }, { w: 200, h: 50 }, { w: 200, h: 100 },
+  { w: 300, h: 50 }, { w: 300, h: 100 }, { w: 400, h: 50 }, { w: 400, h: 100 },
+  { w: 500, h: 100 }, { w: 600, h: 100 }, { w: 600, h: 150 }, { w: 800, h: 100 }
+];
+
+var TRAY_CABLES = {
+  '3G1.5': { diam: 8.9, weight: 95, power: true },
+  '5G1.5': { diam: 10.0, weight: 135, power: true },
+  '3G2.5': { diam: 9.8, weight: 135, power: true },
+  '5G2.5': { diam: 11.2, weight: 200, power: true },
+  '5G4': { diam: 12.8, weight: 290, power: true },
+  '5G6': { diam: 14.2, weight: 405, power: true },
+  '4x10': { diam: 16.5, weight: 560, power: true },
+  '4x16': { diam: 19.0, weight: 845, power: true },
+  '4x25': { diam: 21.5, weight: 1270, power: true },
+  '4x35': { diam: 24.0, weight: 1735, power: true },
+  '4x50': { diam: 27.5, weight: 2350, power: true },
+  '4x95': { diam: 35.0, weight: 4380, power: true },
+  '4x150': { diam: 42.0, weight: 6900, power: true },
+  '4x240': { diam: 50.0, weight: 10850, power: true },
+  'Cat6A': { diam: 7.2, weight: 40, power: false },
+  'Fiber 12F': { diam: 8.5, weight: 40, power: false }
+};
+
+var TRAY_GROUPING_FACTORS = [
+  { min: 1, max: 1, factor: 1.00 },
+  { min: 2, max: 2, factor: 0.80 },
+  { min: 3, max: 3, factor: 0.70 },
+  { min: 4, max: 4, factor: 0.65 },
+  { min: 5, max: 5, factor: 0.60 },
+  { min: 6, max: 6, factor: 0.57 },
+  { min: 7, max: 9, factor: 0.54 },
+  { min: 10, max: 12, factor: 0.50 },
+  { min: 13, max: 16, factor: 0.45 },
+  { min: 17, max: 20, factor: 0.41 }
+];
+
+var trayFillState = {
+  trayType: 'perforated',
+  traySize: 0,
+  cables: {}
+};
+
+function trayCalcArea(w, h) {
+  return w * h;
+}
+
+function trayCalcCableArea(cables) {
+  var total = 0;
+  Object.keys(cables).forEach(function(key) {
+    var qty = cables[key] || 0;
+    if (qty > 0 && TRAY_CABLES[key]) {
+      var r = TRAY_CABLES[key].diam / 2;
+      total += Math.PI * r * r * qty;
+    }
+  });
+  return total;
+}
+
+function trayCalcFillRate(cableArea, trayArea) {
+  if (trayArea === 0) return 0;
+  return (cableArea / trayArea) * 100;
+}
+
+function trayGetGroupingFactor(numCircuits) {
+  if (numCircuits <= 0) return 1.0;
+  for (var i = 0; i < TRAY_GROUPING_FACTORS.length; i++) {
+    if (numCircuits >= TRAY_GROUPING_FACTORS[i].min && numCircuits <= TRAY_GROUPING_FACTORS[i].max) {
+      return TRAY_GROUPING_FACTORS[i].factor;
+    }
+  }
+  return 0.41;
+}
+
+function trayCalcWeight(cables) {
+  var total = 0;
+  Object.keys(cables).forEach(function(key) {
+    var qty = cables[key] || 0;
+    if (qty > 0 && TRAY_CABLES[key]) {
+      total += TRAY_CABLES[key].weight * qty;
+    }
+  });
+  return total / 1000;
+}
+
+function trayGetSupportSpacing(weightPerMeter) {
+  if (weightPerMeter > 20) return 1.0;
+  return 1.5;
+}
+
+function trayCheckSeparation(cables) {
+  var hasPower = false;
+  var hasData = false;
+  Object.keys(cables).forEach(function(key) {
+    var qty = cables[key] || 0;
+    if (qty > 0 && TRAY_CABLES[key]) {
+      if (TRAY_CABLES[key].power) hasPower = true;
+      else hasData = true;
+    }
+  });
+  return hasPower && hasData;
+}
+
+function trayCountCircuits(cables) {
+  var count = 0;
+  Object.keys(cables).forEach(function(key) {
+    var qty = cables[key] || 0;
+    if (qty > 0 && TRAY_CABLES[key] && TRAY_CABLES[key].power) {
+      count += qty;
+    }
+  });
+  return count;
+}
+
+function renderTrayFill() {
+  var size = TRAY_SIZES[trayFillState.traySize];
+  var trayArea = trayCalcArea(size.w, size.h);
+  var cableArea = trayCalcCableArea(trayFillState.cables);
+  var fillRate = trayCalcFillRate(cableArea, trayArea);
+  var maxFill = TRAY_TYPES[trayFillState.trayType].maxFill;
+  var numCircuits = trayCountCircuits(trayFillState.cables);
+  var groupFactor = trayGetGroupingFactor(numCircuits);
+  var weight = trayCalcWeight(trayFillState.cables);
+  var spacing = trayGetSupportSpacing(weight);
+  var needsSeparation = trayCheckSeparation(trayFillState.cables);
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Kabelbakke Fyldningsberegning (DS/EN 50174-2 + DS/HD 60364-5-52)', 'Cable Tray Fill Calculator (DS/EN 50174-2 + DS/HD 60364-5-52)') + '</div>';
+  html += '<div class="info-row">' + tx('Beregn fyldningsgrad, grupperingsfaktor og vaegt iht. standarder', 'Calculate fill rate, grouping factor and weight per standards') + '</div>';
+
+  // Tray Type selector
+  html += '<div class="select-group"><div class="select-label">' + tx('Bakketype', 'Tray Type') + '</div><div class="select-grid">';
+  Object.keys(TRAY_TYPES).forEach(function(key) {
+    var t = TRAY_TYPES[key];
+    html += '<button class="sel-btn' + (trayFillState.trayType === key ? ' selected' : '') + '" onclick="trayFillState.trayType=\'' + key + '\';renderModule(\'trayfill\')">' + tx(t.da, t.en) + ' (' + t.maxFill + '%)</button>';
+  });
+  html += '</div></div>';
+
+  // Tray Size selector
+  html += '<div class="select-group"><div class="select-label">' + tx('Bakkestaerrelse (B x H mm)', 'Tray Size (W x H mm)') + '</div><div class="select-grid">';
+  TRAY_SIZES.forEach(function(s, i) {
+    html += '<button class="sel-btn' + (trayFillState.traySize === i ? ' selected' : '') + '" onclick="trayFillState.traySize=' + i + ';renderModule(\'trayfill\')">' + s.w + '\u00D7' + s.h + '</button>';
+  });
+  html += '</div></div>';
+
+  // Cable entry
+  html += '<div class="select-group"><div class="select-label">' + tx('Kabler (klik +/- for at tilfoeje/fjerne)', 'Cables (click +/- to add/remove)') + '</div>';
+  Object.keys(TRAY_CABLES).forEach(function(key) {
+    var c = TRAY_CABLES[key];
+    var qty = trayFillState.cables[key] || 0;
+    html += '<div style="display:inline-flex;align-items:center;margin:4px 8px 4px 0;background:var(--bg-card,#1e293b);border-radius:8px;padding:4px 8px">';
+    html += '<span style="margin-right:6px;font-size:0.85em">' + key + ' (\u2300' + c.diam + 'mm)</span>';
+    html += '<button class="sel-btn" style="padding:2px 8px;min-width:28px" onclick="trayFillState.cables[\'' + key + '\']=Math.max(0,(trayFillState.cables[\'' + key + '\']||0)-1);renderModule(\'trayfill\')">-</button>';
+    html += '<span style="margin:0 6px;min-width:20px;text-align:center">' + qty + '</span>';
+    html += '<button class="sel-btn" style="padding:2px 8px;min-width:28px" onclick="trayFillState.cables[\'' + key + '\']=Math.min(20,(trayFillState.cables[\'' + key + '\']||0)+1);renderModule(\'trayfill\')">+</button>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Results
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Fyldningsberegning', 'Fill Rate Calculation') + ' - DS/EN 50174-2</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Bakketvaerareal', 'Tray Cross-Section') + '</span><span class="value">' + trayArea + ' mm\u00B2</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kabelareal (total)', 'Cable Area (total)') + '</span><span class="value">' + cableArea.toFixed(1) + ' mm\u00B2</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Fyldningsgrad', 'Fill Rate') + '</span><span class="value"' + (fillRate > maxFill ? ' style="color:var(--danger)"' : '') + '>' + fillRate.toFixed(1) + '% / ' + maxFill + '%</span></div>';
+  html += '</div>';
+
+  // Grouping derating
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Grupperingsfaktor', 'Grouping Derating Factor') + ' - DS/HD 60364-5-52 Table B.52.17</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Antal stroemfoerende kredse', 'Number of Current-Carrying Circuits') + '</span><span class="value">' + numCircuits + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Derating faktor', 'Derating Factor') + '</span><span class="value">' + groupFactor.toFixed(2) + '</span></div>';
+  html += '</div>';
+
+  // Weight
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Vaegt og understoetning', 'Weight and Support') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Vaegt pr. meter', 'Weight per Meter') + '</span><span class="value">' + weight.toFixed(2) + ' kg/m</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Anb. understoetningsafstand', 'Recommended Support Spacing') + '</span><span class="value">' + spacing.toFixed(1) + ' m' + (weight > 20 ? ' (' + tx('tung belastning', 'heavy load') + ')' : '') + '</span></div>';
+  html += '</div>';
+
+  // Separation warning
+  if (needsSeparation) {
+    html += '<div class="result-box" style="border-left:4px solid var(--danger)">';
+    html += '<div class="result-title">\u26A0\uFE0F ' + tx('Separationskrav', 'Separation Requirement') + ' - DS/EN 50174-2</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Advarsel', 'Warning') + '</span><span class="value" style="color:var(--danger)">' + tx('Staerk- og svagstroemskabler i samme bakke kraever skillevaeg', 'Power and data cables in same tray require divider') + '</span></div>';
+    html += '</div>';
+  }
+
+  // Verdict
+  var safe = fillRate <= maxFill;
+  var verdictText = '';
+  if (cableArea <= 0) {
+    verdictText = tx('Tilfoej kabler for beregning', 'Add cables to calculate');
+    safe = true;
+  } else if (safe) {
+    verdictText = tx('Fyldningsgrad OK iht. DS/EN 50174-2 og IEC 61386', 'Fill rate compliant per DS/EN 50174-2 and IEC 61386');
+  } else {
+    verdictText = tx('Fyldningsgrad overskredet - vaelg stoerre bakke eller fjern kabler', 'Fill rate exceeded - select larger tray or remove cables');
+  }
+  html += renderVerdict(safe, verdictText);
+
+  html += '</div>';
+  return html;
+}
+
+// ===== EARTH FAULT LOOP IMPEDANCE (DS/HD 60364-6) =====
+
+var ZS_MAX_TABLE = {
+  'B6': 7.67, 'B10': 4.60, 'B13': 3.54, 'B16': 2.88, 'B20': 2.30, 'B25': 1.84, 'B32': 1.44, 'B40': 1.15,
+  'C10': 2.30, 'C16': 1.44, 'C20': 1.15, 'C25': 0.92, 'C32': 0.72, 'C40': 0.58, 'C50': 0.46, 'C63': 0.37,
+  'gG6': 12.67, 'gG10': 7.67, 'gG16': 4.60, 'gG20': 3.07, 'gG25': 2.30, 'gG32': 1.84, 'gG40': 1.38, 'gG50': 1.04,
+  'gG63': 0.82, 'gG80': 0.55, 'gG100': 0.42, 'gG125': 0.34, 'gG160': 0.25
+};
+
+var ZS_R1R2_TABLE = {
+  1.5: 24.2,
+  2.5: 19.51,
+  4: 16.71,
+  6: 10.49,
+  10: 9.24,
+  16: 5.76,
+  25: 3.807,
+  35: 2.355,
+  50: 2.217
+};
+
+var ZS_DEVICE_TYPES = {
+  mcbB: { label: 'MCB B', devices: ['B6','B10','B13','B16','B20','B25','B32','B40'] },
+  mcbC: { label: 'MCB C', devices: ['C10','C16','C20','C25','C32','C40','C50','C63'] },
+  fuse: { label: 'Fuse gG', devices: ['gG6','gG10','gG16','gG20','gG25','gG32','gG40','gG50','gG63','gG80','gG100','gG125','gG160'] }
+};
+
+var zsState = {
+  deviceType: 'mcbB',
+  device: 'B16',
+  ze: 0.35,
+  cableLength: 20,
+  cableSize: 2.5
+};
+
+function zsCalcImpedance(ze, r1r2, length) {
+  return ze + (r1r2 / 1000) * length * 1.2;
+}
+
+function zsGetMaxZs(device) {
+  return ZS_MAX_TABLE[device] || 0;
+}
+
+function zsCheckDisconnection(zsCalc, zsMax) {
+  return zsCalc <= zsMax * 0.8;
+}
+
+function zsCalcFaultCurrent(zs) {
+  if (zs === 0) return 0;
+  return 230 / zs;
+}
+
+function zsCalcMaxLength(zsMax, ze, r1r2) {
+  if (r1r2 === 0) return 0;
+  return (zsMax * 0.8 - ze) / ((r1r2 / 1000) * 1.2);
+}
+
+function zsGetDeviceIn(device) {
+  var match = device.match(/\d+/);
+  return match ? parseInt(match[0]) : 0;
+}
+
+function zsCheckInstantTrip(faultCurrent, device) {
+  var inRating = zsGetDeviceIn(device);
+  if (device.charAt(0) === 'B') return faultCurrent >= 5 * inRating;
+  if (device.charAt(0) === 'C') return faultCurrent >= 10 * inRating;
+  return true;
+}
+
+function renderZs() {
+  var r1r2 = ZS_R1R2_TABLE[zsState.cableSize] || 24.2;
+  var zsCalc = zsCalcImpedance(zsState.ze, r1r2, zsState.cableLength);
+  var zsMax = zsGetMaxZs(zsState.device);
+  var pass = zsCheckDisconnection(zsCalc, zsMax);
+  var faultCurrent = zsCalcFaultCurrent(zsCalc);
+  var maxLength = zsCalcMaxLength(zsMax, zsState.ze, r1r2);
+  var instantTrip = zsCheckInstantTrip(faultCurrent, zsState.device);
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Fejlsloejfeimpedans (DS/HD 60364-6 + Tabel 41.1-4)', 'Earth Fault Loop Impedance (DS/HD 60364-6 + Table 41.1-4)') + '</div>';
+  html += '<div class="info-row">' + tx('Beregn Zs og verificer afbrydelsestid for TN-system ved 230V', 'Calculate Zs and verify disconnection time for TN system at 230V') + '</div>';
+
+  // Device type selector
+  html += '<div class="select-group"><div class="select-label">' + tx('Beskyttelsestype', 'Protection Device Type') + '</div><div class="select-grid">';
+  Object.keys(ZS_DEVICE_TYPES).forEach(function(key) {
+    var dt = ZS_DEVICE_TYPES[key];
+    html += '<button class="sel-btn' + (zsState.deviceType === key ? ' selected' : '') + '" onclick="zsState.deviceType=\'' + key + '\';zsState.device=ZS_DEVICE_TYPES[\'' + key + '\'].devices[0];renderModule(\'zs\')">' + dt.label + '</button>';
+  });
+  html += '</div></div>';
+
+  // Device selector
+  var devices = ZS_DEVICE_TYPES[zsState.deviceType].devices;
+  html += '<div class="select-group"><div class="select-label">' + tx('Beskyttelse (In)', 'Protection Device (In)') + '</div><div class="select-grid">';
+  devices.forEach(function(d) {
+    html += '<button class="sel-btn' + (zsState.device === d ? ' selected' : '') + '" onclick="zsState.device=\'' + d + '\';renderModule(\'zs\')">' + d + ' (Zs max: ' + ZS_MAX_TABLE[d] + '\u03A9)</button>';
+  });
+  html += '</div></div>';
+
+  // Source impedance Ze
+  html += '<div class="select-group"><div class="select-label">' + tx('Kildeimpedans Ze [\u03A9]', 'Source Impedance Ze [\u03A9]') + ' (TN-C-S: 0.35, TN-S: 0.80, PME: 0.20)</div><div class="select-grid">';
+  [0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.60, 0.80].forEach(function(v) {
+    html += '<button class="sel-btn' + (zsState.ze === v ? ' selected' : '') + '" onclick="zsState.ze=' + v + ';renderModule(\'zs\')">' + v.toFixed(2) + '\u03A9</button>';
+  });
+  html += '</div></div>';
+
+  // Cable length
+  html += '<div class="select-group"><div class="select-label">' + tx('Kabellaengde [m]', 'Cable Length [m]') + '</div><div class="select-grid">';
+  [5, 10, 15, 20, 25, 30, 40, 50, 60, 80, 100].forEach(function(v) {
+    html += '<button class="sel-btn' + (zsState.cableLength === v ? ' selected' : '') + '" onclick="zsState.cableLength=' + v + ';renderModule(\'zs\')">' + v + '</button>';
+  });
+  html += '</div></div>';
+
+  // Cable size
+  html += '<div class="select-group"><div class="select-label">' + tx('Kabeltvaersnit [mm\u00B2]', 'Cable Size [mm\u00B2]') + '</div><div class="select-grid">';
+  [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50].forEach(function(v) {
+    html += '<button class="sel-btn' + (zsState.cableSize === v ? ' selected' : '') + '" onclick="zsState.cableSize=' + v + ';renderModule(\'zs\')">' + v + '</button>';
+  });
+  html += '</div></div>';
+
+  // Calculation results
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Impedansberegning', 'Impedance Calculation') + ' - DS/HD 60364-6 cl.6.2.3.5</div>';
+  html += '<div class="result-row"><span class="label">Ze (' + tx('kilde', 'source') + ')</span><span class="value">' + zsState.ze.toFixed(2) + ' \u03A9</span></div>';
+  html += '<div class="result-row"><span class="label">R1+R2 (' + zsState.cableSize + 'mm\u00B2)</span><span class="value">' + r1r2.toFixed(2) + ' m\u03A9/m</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Temperaturkorrektion', 'Temperature Correction') + '</span><span class="value">\u00D71.2 (' + tx('drift ved maks. temp.', 'operating at max temp.') + ')</span></div>';
+  html += '<div class="result-row"><span class="label">Zs ' + tx('beregnet', 'calculated') + '</span><span class="value"' + (!pass ? ' style="color:var(--danger)"' : '') + '>' + zsCalc.toFixed(3) + ' \u03A9</span></div>';
+  html += '<div class="result-row"><span class="label">Zs max (' + zsState.device + ')</span><span class="value">' + zsMax.toFixed(2) + ' \u03A9</span></div>';
+  html += '<div class="result-row"><span class="label">Zs max \u00D7 0.8 (' + tx('sikkerhedsmargin', 'safety margin') + ')</span><span class="value">' + (zsMax * 0.8).toFixed(3) + ' \u03A9</span></div>';
+  html += '</div>';
+
+  // Fault current
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Fejlstroemsanalyse', 'Fault Current Analysis') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Fejlstroem If = Uo/Zs', 'Fault Current If = Uo/Zs') + '</span><span class="value">' + faultCurrent.toFixed(1) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Maks. kabellaengde', 'Maximum Cable Length') + '</span><span class="value">' + Math.max(0, maxLength).toFixed(1) + ' m</span></div>';
+  if (zsState.device.charAt(0) === 'B' || zsState.device.charAt(0) === 'C') {
+    var tripMult = zsState.device.charAt(0) === 'B' ? 5 : 10;
+    var inVal = zsGetDeviceIn(zsState.device);
+    html += '<div class="result-row"><span class="label">' + tx('Momentan udloesning', 'Instantaneous Trip') + ' (If > ' + tripMult + '\u00D7In)</span><span class="value"' + (!instantTrip ? ' style="color:var(--danger)"' : '') + '>' + faultCurrent.toFixed(0) + 'A ' + (instantTrip ? '\u2265' : '<') + ' ' + (tripMult * inVal) + 'A ' + (instantTrip ? '\u2705' : '\u274C') + '</span></div>';
+  }
+  html += '</div>';
+
+  // Verdict
+  var verdictText = '';
+  if (pass && instantTrip) {
+    verdictText = tx('Fejlsloejfeimpedans OK - afbrydelse inden 0.4s iht. DS/HD 60364-4-41', 'Earth fault loop OK - disconnection within 0.4s per DS/HD 60364-4-41');
+  } else if (!pass) {
+    verdictText = tx('Zs for hoej - fejl afbrydes IKKE inden 0.4s - livsfare', 'Zs too high - fault will NOT clear within 0.4s - DANGER');
+  } else {
+    verdictText = tx('Zs OK men momentan udloesning ikke sikret - kontroller kredsloeb', 'Zs OK but instantaneous trip not guaranteed - verify circuit');
+  }
+  html += renderVerdict(pass && instantTrip, verdictText);
+
+  html += '</div>';
+  return html;
+}
+
+// ===== COMMISSIONING CHECKLIST (DS/HD 60364-6) =====
+
+var COMMISSION_TYPES = {
+  newInstall: { da: 'Ny installation', en: 'New installation', clause: 'cl.6.2' },
+  addition: { da: 'Tilfoejelse/aendring', en: 'Addition/alteration', clause: 'cl.6.2 + 6.3' },
+  periodic: { da: 'Periodisk eftersyn', en: 'Periodic inspection', clause: 'cl.6.4' }
+};
+
+var COMMISSION_CATEGORIES = {
+  residential: { da: 'Bolig', en: 'Residential' },
+  commercial: { da: 'Erhverv', en: 'Commercial' },
+  industrial: { da: 'Industri', en: 'Industrial' },
+  special: { da: 'Saerlige rum', en: 'Special location' }
+};
+
+var COMMISSION_SPECIAL = {
+  bathroom: { da: 'Baderum', en: 'Bathroom' },
+  ev: { da: 'Elbillader', en: 'EV charger' },
+  solar: { da: 'Solcelle PV', en: 'Solar PV' },
+  firealarm: { da: 'Brandalarm', en: 'Fire alarm' }
+};
+
+var VISUAL_ITEMS = [
+  { id: 'v1', da: 'Ledertilslutninger (korrekt terminering)', en: 'Connection of conductors (correct termination)', method: 'Visual', instrument: 'None', pass: 'No loose/damaged connections' },
+  { id: 'v2', da: 'Lederidentifikation (farvekodning L/N/PE)', en: 'Identification of conductors (color coding L/N/PE)', method: 'Visual', instrument: 'None', pass: 'Correct colors per DS/HD 60364-5-51' },
+  { id: 'v3', da: 'Kabelforing og skadeinspektion', en: 'Cable routing and damage inspection', method: 'Visual', instrument: 'None', pass: 'No visible damage, correct support' },
+  { id: 'v4', da: 'Korrekte beskyttelsesenheder (type/maerkestrm)', en: 'Correct protective devices (type/rating per design)', method: 'Visual + docs', instrument: 'None', pass: 'Match design specification' },
+  { id: 'v5', da: 'Brandbarrierer og taetninger', en: 'Presence of fire barriers and seals', method: 'Visual', instrument: 'None', pass: 'All penetrations sealed' },
+  { id: 'v6', da: 'Korrekt IP-kapslingsklasse for placering', en: 'Correct IP rating for location', method: 'Visual', instrument: 'None', pass: 'IP matches environment' },
+  { id: 'v7', da: 'Kredsmaerkning ved tavle', en: 'Labeling of circuits at distribution board', method: 'Visual', instrument: 'None', pass: 'All circuits labeled clearly' },
+  { id: 'v8', da: 'Adgang til koblingsudstyr', en: 'Accessibility of switchgear', method: 'Visual', instrument: 'None', pass: 'Unobstructed access, correct height' },
+  { id: 'v9', da: 'Jordlederforbindelser', en: 'Earthing conductor connections', method: 'Visual', instrument: 'None', pass: 'Tight, corrosion-free connections' },
+  { id: 'v10', da: 'Supplerende udligningsforbindelser', en: 'Supplementary bonding (bathrooms, etc.)', method: 'Visual + test', instrument: 'Low-ohm meter', pass: 'R < 0.05 ohm where required' }
+];
+
+var TEST_ITEMS = [
+  { id: 't1', da: 'Kontinuitet af beskyttelsesledere (R < 1 ohm)', en: 'Continuity of protective conductors (R < 1 ohm)', method: 'Two-wire test', instrument: 'Low-resistance ohmmeter', pass: 'R < 1 ohm' },
+  { id: 't2', da: 'Isolationsmodstand (min 1M ohm ved 500V DC)', en: 'Insulation resistance (min 1M ohm at 500V DC)', method: '500V DC test', instrument: 'Insulation resistance meter', pass: '>= 1 M ohm' },
+  { id: 't3', da: 'SELV/PELV beskyttelse (separationstest)', en: 'Protection by SELV/PELV (separation test)', method: 'Insulation test', instrument: 'Insulation tester 500V', pass: '>= 1 M ohm separation' },
+  { id: 't4', da: 'Polaritet (korrekt L/N/E i alle punkter)', en: 'Polarity (correct L/N/E at every point)', method: 'Voltage/continuity', instrument: 'Multifunction tester', pass: 'Correct polarity all points' },
+  { id: 't5', da: 'Fejlsloejfeimpedans Zs (iht. tabelvaerdier)', en: 'Earth fault loop impedance Zs (per table values)', method: 'Loop test', instrument: 'Loop impedance tester', pass: 'Zs <= Zs_max x 0.8' },
+  { id: 't6', da: 'RCD funktion (udloesningstid <= 40ms ved 5xI_delta_n)', en: 'RCD operation (trip time <= 40ms at 5xI_delta_n, <= 200ms at I_delta_n)', method: 'RCD test', instrument: 'RCD tester', pass: '<= 40ms at 5x, <= 200ms at 1x' },
+  { id: 't7', da: 'Fasefoelge (for 3-fase installationer)', en: 'Phase sequence (for 3-phase installations)', method: 'Phase rotation', instrument: 'Phase rotation meter', pass: 'Correct L1-L2-L3 sequence' },
+  { id: 't8', da: 'Funktionstest (kontakter, styring, blokering)', en: 'Functional testing (all switches, controls, interlocks)', method: 'Operation test', instrument: 'N/A', pass: 'All devices function correctly' },
+  { id: 't9', da: 'Spaendingsfald (max 3% belysning, 5% oevrige)', en: 'Voltage drop measurement (<= 3% lighting, <= 5% other)', method: 'Voltage measurement', instrument: 'Multimeter / MFT', pass: '<= 3% lighting, <= 5% other' },
+  { id: 't10', da: 'Forventet kortslutningsstrm', en: 'Prospective fault current measurement', method: 'PSC test', instrument: 'Loop/PSC tester', pass: 'Within device rating' }
+];
+
+var SPECIAL_ITEMS = {
+  bathroom: [
+    { id: 'sb1', da: 'Supplerende udligningstest (baderum)', en: 'Supplementary bonding test (bathroom)', method: 'Bonding test', instrument: 'Low-ohm meter', pass: 'R < 0.05 ohm' },
+    { id: 'sb2', da: 'IP-verifikation pr. zone', en: 'IP verification per zone', method: 'Visual', instrument: 'None', pass: 'Zone 0: IPX7, Zone 1: IPX5, Zone 2: IPX4' }
+  ],
+  ev: [
+    { id: 'se1', da: 'Type B RCD test', en: 'Type B RCD test', method: 'RCD ramp test', instrument: 'Type B RCD tester', pass: 'Trips at rated DC fault' },
+    { id: 'se2', da: 'EVSE kommunikationstest', en: 'EVSE communication test', method: 'Functional', instrument: 'EV simulator', pass: 'CP signal correct, PP resistor OK' }
+  ],
+  solar: [
+    { id: 'ss1', da: 'DC isolationsmodstand (min 1M ohm/kWp)', en: 'Insulation resistance DC (min 1M ohm per kWp)', method: '1000V DC test', instrument: 'DC insulation tester', pass: '>= 1 M ohm per kWp' },
+    { id: 'ss2', da: 'Voc maaling', en: 'Voc measurement', method: 'DC voltage', instrument: 'DC voltmeter', pass: 'Within 10% of expected Voc' },
+    { id: 'ss3', da: 'DC polaritet', en: 'DC polarity', method: 'Voltage', instrument: 'Multimeter', pass: 'Correct +/- at all connections' }
+  ],
+  firealarm: [
+    { id: 'sf1', da: 'Sloejfemodstand', en: 'Loop resistance', method: 'Resistance test', instrument: 'Ohmmeter', pass: 'Within panel limits' },
+    { id: 'sf2', da: 'Sirenetest', en: 'Sounder test', method: 'Activation', instrument: 'Panel control', pass: 'All sounders audible (65dB min)' },
+    { id: 'sf3', da: 'Centralfunktioner', en: 'Panel functions', method: 'Full test', instrument: 'Panel', pass: 'All zones, faults, alarms correct' }
+  ]
+};
+
+var INSTRUMENTS = [
+  { da: 'Multifunktionstester (Megger/Fluke/Metrel)', en: 'Multifunction tester (Megger/Fluke/Metrel)' },
+  { da: 'Isolationsmodstandsmaaler (500V DC)', en: 'Insulation resistance meter (500V DC)' },
+  { da: 'Fejlsloejfeimpedanstester', en: 'Loop impedance tester' },
+  { da: 'RCD-tester', en: 'RCD tester' },
+  { da: 'Fasefoelgemaaler', en: 'Phase rotation meter' }
+];
+
+var commissionState = {
+  installType: 'newInstall',
+  category: 'residential',
+  specials: [],
+  itemStatus: {}
+};
+
+function commissionGetItems(installType, category, specials) {
+  var items = { visual: [], testing: [] };
+  items.visual = VISUAL_ITEMS.slice();
+  items.testing = TEST_ITEMS.slice();
+  specials.forEach(function(sp) {
+    if (SPECIAL_ITEMS[sp]) {
+      SPECIAL_ITEMS[sp].forEach(function(item) {
+        items.testing.push(item);
+      });
+    }
+  });
+  return items;
+}
+
+function commissionCountStatus(itemStatus) {
+  var total = 0, passed = 0, failed = 0;
+  Object.keys(itemStatus).forEach(function(k) {
+    total++;
+    if (itemStatus[k] === 'pass') passed++;
+    else if (itemStatus[k] === 'fail') failed++;
+  });
+  return { total: total, passed: passed, failed: failed };
+}
+
+function renderCommission() {
+  var items = commissionGetItems(commissionState.installType, commissionState.category, commissionState.specials);
+  var status = commissionCountStatus(commissionState.itemStatus);
+  var allItems = items.visual.concat(items.testing);
+  var totalCount = allItems.length;
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Idriftsaettelseskontrol (DS/HD 60364-6)', 'Commissioning Checklist (DS/HD 60364-6)') + '</div>';
+  html += '<div class="info-row">' + tx('Verificeringskontrol iht. DS/HD 60364-6 kap. 6.2-6.4', 'Verification checklist per DS/HD 60364-6 cl.6.2-6.4') + '</div>';
+
+  // Installation type
+  html += '<div class="select-group"><div class="select-label">' + tx('Installationstype', 'Installation Type') + '</div><div class="select-grid">';
+  Object.keys(COMMISSION_TYPES).forEach(function(key) {
+    var t = COMMISSION_TYPES[key];
+    html += '<button class="sel-btn' + (commissionState.installType === key ? ' selected' : '') + '" onclick="commissionState.installType=\'' + key + '\';commissionState.itemStatus={};renderModule(\'commission\')">' + tx(t.da, t.en) + ' (' + t.clause + ')</button>';
+  });
+  html += '</div></div>';
+
+  // Installation category
+  html += '<div class="select-group"><div class="select-label">' + tx('Installationskategori', 'Installation Category') + '</div><div class="select-grid">';
+  Object.keys(COMMISSION_CATEGORIES).forEach(function(key) {
+    var c = COMMISSION_CATEGORIES[key];
+    html += '<button class="sel-btn' + (commissionState.category === key ? ' selected' : '') + '" onclick="commissionState.category=\'' + key + '\';renderModule(\'commission\')">' + tx(c.da, c.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Special locations
+  html += '<div class="select-group"><div class="select-label">' + tx('Saerlige tillaeg', 'Special Additions') + '</div><div class="select-grid">';
+  Object.keys(COMMISSION_SPECIAL).forEach(function(key) {
+    var s = COMMISSION_SPECIAL[key];
+    var active = commissionState.specials.indexOf(key) >= 0;
+    html += '<button class="sel-btn' + (active ? ' selected' : '') + '" onclick="var i=commissionState.specials.indexOf(\'' + key + '\');if(i>=0)commissionState.specials.splice(i,1);else commissionState.specials.push(\'' + key + '\');renderModule(\'commission\')">' + tx(s.da, s.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Visual inspection checklist
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Visuel inspektion', 'Visual Inspection') + ' - DS/HD 60364-6 cl.6.2.2</div>';
+  items.visual.forEach(function(item) {
+    var st = commissionState.itemStatus[item.id] || 'pending';
+    var icon = st === 'pass' ? '\u2705' : (st === 'fail' ? '\u274C' : '\u2B55');
+    html += '<div class="result-row" style="border-bottom:1px solid rgba(255,255,255,0.05);padding:6px 0">';
+    html += '<span class="label">' + icon + ' ' + tx(item.da, item.en) + '</span>';
+    html += '<span class="value">';
+    html += '<button class="sel-btn' + (st === 'pass' ? ' selected' : '') + '" style="padding:2px 8px;font-size:0.8em" onclick="commissionState.itemStatus[\'' + item.id + '\']=\'pass\';renderModule(\'commission\')">OK</button>';
+    html += '<button class="sel-btn' + (st === 'fail' ? ' selected' : '') + '" style="padding:2px 8px;font-size:0.8em;margin-left:4px" onclick="commissionState.itemStatus[\'' + item.id + '\']=\'fail\';renderModule(\'commission\')">' + tx('Fejl','Fail') + '</button>';
+    html += '</span></div>';
+  });
+  html += '</div>';
+
+  // Testing checklist
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Afproevning', 'Testing') + ' - DS/HD 60364-6 cl.6.2.3</div>';
+  items.testing.forEach(function(item) {
+    var st = commissionState.itemStatus[item.id] || 'pending';
+    var icon = st === 'pass' ? '\u2705' : (st === 'fail' ? '\u274C' : '\u2B55');
+    html += '<div class="result-row" style="border-bottom:1px solid rgba(255,255,255,0.05);padding:6px 0">';
+    html += '<span class="label">' + icon + ' ' + tx(item.da, item.en) + '<br><small style="color:#888">' + tx('Instrument: ', 'Instrument: ') + item.instrument + ' | ' + tx('Krav: ', 'Pass: ') + item.pass + '</small></span>';
+    html += '<span class="value">';
+    html += '<button class="sel-btn' + (st === 'pass' ? ' selected' : '') + '" style="padding:2px 8px;font-size:0.8em" onclick="commissionState.itemStatus[\'' + item.id + '\']=\'pass\';renderModule(\'commission\')">OK</button>';
+    html += '<button class="sel-btn' + (st === 'fail' ? ' selected' : '') + '" style="padding:2px 8px;font-size:0.8em;margin-left:4px" onclick="commissionState.itemStatus[\'' + item.id + '\']=\'fail\';renderModule(\'commission\')">' + tx('Fejl','Fail') + '</button>';
+    html += '</span></div>';
+  });
+  html += '</div>';
+
+  // Required instruments
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Noedvendige instrumenter', 'Required Instruments') + '</div>';
+  INSTRUMENTS.forEach(function(inst) {
+    html += '<div class="result-row"><span class="label">\uD83D\uDCCF ' + tx(inst.da, inst.en) + '</span></div>';
+  });
+  html += '</div>';
+
+  // Summary / Certificate
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Certifikat / Opsummering', 'Certificate / Summary') + ' - DS/HD 60364-6 Annex A</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Samlet antal punkter', 'Total Items') + '</span><span class="value">' + totalCount + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Godkendt', 'Passed') + '</span><span class="value" style="color:var(--success)">' + status.passed + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Fejlet', 'Failed') + '</span><span class="value"' + (status.failed > 0 ? ' style="color:var(--danger)"' : '') + '>' + status.failed + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Udfyldt', 'Completed') + '</span><span class="value">' + status.total + ' / ' + totalCount + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Standard', 'Standard') + '</span><span class="value">DS/HD 60364-6 ' + COMMISSION_TYPES[commissionState.installType].clause + '</span></div>';
+  html += '</div>';
+
+  // Electrician declaration
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Installatoererklaering', 'Electrician Declaration') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Jeg erklaerer hermed at installationen er udfoert i overensstemmelse med gaeldende love, bekendtgoerelser og standarder, og at verifikation er gennemfoert iht. DS/HD 60364-6.', 'I hereby declare that the installation has been designed, constructed, inspected and tested in accordance with DS/HD 60364 (all parts) and is to the best of my knowledge fit for use.') + '</span></div>';
+  html += '</div>';
+
+  // Verdict
+  var allDone = status.total === totalCount;
+  var allPass = allDone && status.failed === 0;
+  var verdictText = '';
+  if (status.total === 0) {
+    verdictText = tx('Klik OK/Fejl for at udfylde kontrollisten iht. DS/HD 60364-6', 'Click OK/Fail to complete checklist per DS/HD 60364-6');
+  } else if (allPass) {
+    verdictText = tx('Alle punkter godkendt - installation kan idriftsaettes iht. DS/HD 60364-6', 'All items passed - installation may be energized per DS/HD 60364-6');
+  } else if (allDone && status.failed > 0) {
+    verdictText = tx('FEJL FUNDET - installation maa IKKE idriftsaettes foer udbedring', 'FAILURES FOUND - installation must NOT be energized until rectified');
+  } else {
+    verdictText = tx('Kontrolliste ikke fuldfoert - ' + status.total + '/' + totalCount + ' udfyldt', 'Checklist incomplete - ' + status.total + '/' + totalCount + ' completed');
+  }
+  html += renderVerdict(allPass || status.total === 0, verdictText);
+
+  html += '</div>';
+  return html;
+}
+
 
 // ===== INIT =====
 renderNav();

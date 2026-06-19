@@ -4537,6 +4537,367 @@ test('renderPFC references IEC 61921', function() {
 });
 
 
+// === Cable Tray Fill Module Tests ===
+console.log('\n=== Cable Tray Fill Module Tests ===\n');
+
+// Test 416: trayCalcArea basic calculation
+test('trayCalcArea: 100x50 = 5000 mm2', function() {
+  assert.strictEqual(trayCalcArea(100, 50), 5000);
+});
+
+// Test 417: trayCalcArea larger tray
+test('trayCalcArea: 600x150 = 90000 mm2', function() {
+  assert.strictEqual(trayCalcArea(600, 150), 90000);
+});
+
+// Test 418: trayCalcCableArea single cable
+test('trayCalcCableArea: single 3G1.5 (diam 8.9mm)', function() {
+  var area = trayCalcCableArea({'3G1.5': 1});
+  var expected = Math.PI * (8.9/2) * (8.9/2);
+  assert(Math.abs(area - expected) < 0.1);
+});
+
+// Test 419: trayCalcCableArea multiple cables
+test('trayCalcCableArea: 5x 5G2.5 cables', function() {
+  var area = trayCalcCableArea({'5G2.5': 5});
+  var expected = Math.PI * (11.2/2) * (11.2/2) * 5;
+  assert(Math.abs(area - expected) < 0.1);
+});
+
+// Test 420: trayCalcFillRate
+test('trayCalcFillRate: returns correct percentage', function() {
+  var rate = trayCalcFillRate(2500, 5000);
+  assert.strictEqual(rate, 50);
+});
+
+// Test 421: trayCalcFillRate zero area
+test('trayCalcFillRate: zero tray area returns 0', function() {
+  assert.strictEqual(trayCalcFillRate(100, 0), 0);
+});
+
+// Test 422: trayGetGroupingFactor 1 circuit
+test('trayGetGroupingFactor: 1 circuit = 1.0', function() {
+  assert.strictEqual(trayGetGroupingFactor(1), 1.0);
+});
+
+// Test 423: trayGetGroupingFactor 3 circuits
+test('trayGetGroupingFactor: 3 circuits = 0.70', function() {
+  assert.strictEqual(trayGetGroupingFactor(3), 0.70);
+});
+
+// Test 424: trayGetGroupingFactor 8 circuits (in 7-9 range)
+test('trayGetGroupingFactor: 8 circuits = 0.54', function() {
+  assert.strictEqual(trayGetGroupingFactor(8), 0.54);
+});
+
+// Test 425: trayGetGroupingFactor 15 circuits (in 13-16 range)
+test('trayGetGroupingFactor: 15 circuits = 0.45', function() {
+  assert.strictEqual(trayGetGroupingFactor(15), 0.45);
+});
+
+// Test 426: trayGetGroupingFactor 20 circuits (in 17-20 range)
+test('trayGetGroupingFactor: 20 circuits = 0.41', function() {
+  assert.strictEqual(trayGetGroupingFactor(20), 0.41);
+});
+
+// Test 427: trayCalcWeight
+test('trayCalcWeight: 10x 3G1.5 = 0.95 kg/m', function() {
+  var w = trayCalcWeight({'3G1.5': 10});
+  assert(Math.abs(w - 0.95) < 0.01);
+});
+
+// Test 428: trayGetSupportSpacing light load
+test('trayGetSupportSpacing: < 20 kg/m = 1.5m', function() {
+  assert.strictEqual(trayGetSupportSpacing(15), 1.5);
+});
+
+// Test 429: trayGetSupportSpacing heavy load
+test('trayGetSupportSpacing: > 20 kg/m = 1.0m', function() {
+  assert.strictEqual(trayGetSupportSpacing(25), 1.0);
+});
+
+// Test 430: trayCheckSeparation with power only
+test('trayCheckSeparation: power only = false', function() {
+  assert.strictEqual(trayCheckSeparation({'3G1.5': 5}), false);
+});
+
+// Test 431: trayCheckSeparation with power and data
+test('trayCheckSeparation: power + data = true', function() {
+  assert.strictEqual(trayCheckSeparation({'3G1.5': 3, 'Cat6A': 2}), true);
+});
+
+// Test 432: trayCountCircuits counts only power cables
+test('trayCountCircuits: counts only power cables', function() {
+  assert.strictEqual(trayCountCircuits({'3G1.5': 3, 'Cat6A': 5, '5G2.5': 2}), 5);
+});
+
+// Test 433: Fill rate exceeded detection
+test('trayFill: fill rate exceeded with many large cables in small tray', function() {
+  var trayArea = trayCalcArea(100, 50); // 5000 mm2
+  var cables = {'4x240': 5}; // 5 x pi*(50/2)^2 = 9817 mm2
+  var cableArea = trayCalcCableArea(cables);
+  var fillRate = trayCalcFillRate(cableArea, trayArea);
+  assert(fillRate > 50, 'Fill rate should exceed 50% max');
+});
+
+// Test 434: renderTrayFill has no text inputs
+test('renderTrayFill has no text input fields', function() {
+  var html = renderTrayFill();
+  assert.strictEqual(html.indexOf('<input type="text"'), -1);
+  assert.strictEqual(html.indexOf('<textarea'), -1);
+});
+
+// Test 435: renderTrayFill references standards
+test('renderTrayFill references DS/EN 50174-2 and DS/HD 60364-5-52', function() {
+  var html = renderTrayFill();
+  assert(html.indexOf('DS/EN 50174-2') >= 0);
+  assert(html.indexOf('DS/HD 60364-5-52') >= 0);
+});
+
+
+// === Earth Fault Loop Impedance Module Tests ===
+console.log('\n=== Earth Fault Loop Module Tests ===\n');
+
+// Test 436: zsCalcImpedance basic
+test('zsCalcImpedance: Ze=0.35, 2.5mm2, 20m', function() {
+  var zs = zsCalcImpedance(0.35, 19.51, 20);
+  // 0.35 + (19.51/1000) * 20 * 1.2 = 0.35 + 0.46824 = 0.81824
+  var expected = 0.35 + (19.51/1000) * 20 * 1.2;
+  assert(Math.abs(zs - expected) < 0.001);
+});
+
+// Test 437: zsCalcImpedance short cable
+test('zsCalcImpedance: Ze=0.20, 4mm2, 5m', function() {
+  var zs = zsCalcImpedance(0.20, 16.71, 5);
+  var expected = 0.20 + (16.71/1000) * 5 * 1.2;
+  assert(Math.abs(zs - expected) < 0.001);
+});
+
+// Test 438: zsGetMaxZs for B16
+test('zsGetMaxZs: B16 = 2.88 ohm', function() {
+  assert.strictEqual(zsGetMaxZs('B16'), 2.88);
+});
+
+// Test 439: zsGetMaxZs for C32
+test('zsGetMaxZs: C32 = 0.72 ohm', function() {
+  assert.strictEqual(zsGetMaxZs('C32'), 0.72);
+});
+
+// Test 440: zsGetMaxZs for gG63
+test('zsGetMaxZs: gG63 = 0.82 ohm', function() {
+  assert.strictEqual(zsGetMaxZs('gG63'), 0.82);
+});
+
+// Test 441: zsCheckDisconnection pass
+test('zsCheckDisconnection: 1.5 <= 2.88*0.8 = PASS', function() {
+  assert.strictEqual(zsCheckDisconnection(1.5, 2.88), true);
+});
+
+// Test 442: zsCheckDisconnection fail
+test('zsCheckDisconnection: 2.5 > 2.88*0.8 = FAIL', function() {
+  assert.strictEqual(zsCheckDisconnection(2.5, 2.88), false);
+});
+
+// Test 443: zsCalcFaultCurrent
+test('zsCalcFaultCurrent: Uo/Zs = 230/0.82 = 280.5A', function() {
+  var If = zsCalcFaultCurrent(0.82);
+  assert(Math.abs(If - 280.49) < 0.1);
+});
+
+// Test 444: zsCalcFaultCurrent zero
+test('zsCalcFaultCurrent: zs=0 returns 0', function() {
+  assert.strictEqual(zsCalcFaultCurrent(0), 0);
+});
+
+// Test 445: zsCalcMaxLength
+test('zsCalcMaxLength: B16, Ze=0.35, 2.5mm2', function() {
+  var maxL = zsCalcMaxLength(2.88, 0.35, 19.51);
+  // (2.88*0.8 - 0.35) / ((19.51/1000) * 1.2) = (2.304 - 0.35) / 0.023412 = 83.5m
+  var expected = (2.88 * 0.8 - 0.35) / ((19.51/1000) * 1.2);
+  assert(Math.abs(maxL - expected) < 0.1);
+});
+
+// Test 446: zsGetDeviceIn extracts rating
+test('zsGetDeviceIn: B16 = 16', function() {
+  assert.strictEqual(zsGetDeviceIn('B16'), 16);
+});
+
+// Test 447: zsGetDeviceIn fuse
+test('zsGetDeviceIn: gG63 = 63', function() {
+  assert.strictEqual(zsGetDeviceIn('gG63'), 63);
+});
+
+// Test 448: zsCheckInstantTrip B-curve pass
+test('zsCheckInstantTrip: 100A >= 5x16A (B16) = PASS', function() {
+  assert.strictEqual(zsCheckInstantTrip(100, 'B16'), true);
+});
+
+// Test 449: zsCheckInstantTrip B-curve fail
+test('zsCheckInstantTrip: 50A < 5x16A (B16) = FAIL', function() {
+  assert.strictEqual(zsCheckInstantTrip(50, 'B16'), false);
+});
+
+// Test 450: zsCheckInstantTrip C-curve
+test('zsCheckInstantTrip: 200A >= 10x16A (C16) = PASS', function() {
+  assert.strictEqual(zsCheckInstantTrip(200, 'C16'), true);
+});
+
+// Test 451: zsCheckInstantTrip C-curve fail
+test('zsCheckInstantTrip: 100A < 10x16A (C16) = FAIL', function() {
+  assert.strictEqual(zsCheckInstantTrip(100, 'C16'), false);
+});
+
+// Test 452: Long cable Zs exceeds limit
+test('zsCalcImpedance: 100m 1.5mm2 with Ze=0.80 exceeds B16 limit', function() {
+  var zs = zsCalcImpedance(0.80, 24.2, 100);
+  var zsMax = zsGetMaxZs('B16');
+  assert(zs > zsMax, 'Zs should exceed limit for very long cable');
+});
+
+// Test 453: renderZs has no text inputs
+test('renderZs has no text input fields', function() {
+  var html = renderZs();
+  assert.strictEqual(html.indexOf('<input type="text"'), -1);
+  assert.strictEqual(html.indexOf('<textarea'), -1);
+});
+
+// Test 454: renderZs references standards
+test('renderZs references DS/HD 60364-6 and Table 41', function() {
+  var html = renderZs();
+  assert(html.indexOf('DS/HD 60364-6') >= 0);
+  assert(html.indexOf('41') >= 0);
+});
+
+// Test 455: All Zs max values present
+test('ZS_MAX_TABLE has all required devices', function() {
+  assert(ZS_MAX_TABLE['B6'] === 7.67);
+  assert(ZS_MAX_TABLE['B40'] === 1.15);
+  assert(ZS_MAX_TABLE['C63'] === 0.37);
+  assert(ZS_MAX_TABLE['gG160'] === 0.25);
+});
+
+
+// === Commissioning Module Tests ===
+console.log('\n=== Commissioning Module Tests ===\n');
+
+// Test 456: commissionGetItems returns visual and testing items
+test('commissionGetItems: new install returns 10 visual + 10 test items', function() {
+  var items = commissionGetItems('newInstall', 'residential', []);
+  assert.strictEqual(items.visual.length, 10);
+  assert.strictEqual(items.testing.length, 10);
+});
+
+// Test 457: commissionGetItems with bathroom special adds 2 items
+test('commissionGetItems: with bathroom adds 2 extra test items', function() {
+  var items = commissionGetItems('newInstall', 'residential', ['bathroom']);
+  assert.strictEqual(items.testing.length, 12);
+});
+
+// Test 458: commissionGetItems with solar adds 3 items
+test('commissionGetItems: with solar adds 3 extra test items', function() {
+  var items = commissionGetItems('newInstall', 'residential', ['solar']);
+  assert.strictEqual(items.testing.length, 13);
+});
+
+// Test 459: commissionGetItems with multiple specials
+test('commissionGetItems: ev + firealarm adds 5 items', function() {
+  var items = commissionGetItems('newInstall', 'industrial', ['ev', 'firealarm']);
+  assert.strictEqual(items.testing.length, 15);
+});
+
+// Test 460: commissionCountStatus empty
+test('commissionCountStatus: empty = 0 total', function() {
+  var s = commissionCountStatus({});
+  assert.strictEqual(s.total, 0);
+  assert.strictEqual(s.passed, 0);
+  assert.strictEqual(s.failed, 0);
+});
+
+// Test 461: commissionCountStatus with items
+test('commissionCountStatus: counts pass/fail correctly', function() {
+  var s = commissionCountStatus({v1: 'pass', v2: 'pass', v3: 'fail', t1: 'pass'});
+  assert.strictEqual(s.total, 4);
+  assert.strictEqual(s.passed, 3);
+  assert.strictEqual(s.failed, 1);
+});
+
+// Test 462: Visual items have correct IDs
+test('VISUAL_ITEMS: all 10 items have unique IDs v1-v10', function() {
+  assert.strictEqual(VISUAL_ITEMS.length, 10);
+  for (var i = 0; i < 10; i++) {
+    assert.strictEqual(VISUAL_ITEMS[i].id, 'v' + (i+1));
+  }
+});
+
+// Test 463: Test items have correct IDs
+test('TEST_ITEMS: all 10 items have unique IDs t1-t10', function() {
+  assert.strictEqual(TEST_ITEMS.length, 10);
+  for (var i = 0; i < 10; i++) {
+    assert.strictEqual(TEST_ITEMS[i].id, 't' + (i+1));
+  }
+});
+
+// Test 464: Each item has required fields
+test('All checklist items have method, instrument, pass fields', function() {
+  VISUAL_ITEMS.concat(TEST_ITEMS).forEach(function(item) {
+    assert(item.method, item.id + ' missing method');
+    assert(item.instrument !== undefined, item.id + ' missing instrument');
+    assert(item.pass, item.id + ' missing pass criteria');
+  });
+});
+
+// Test 465: renderCommission has no text inputs
+test('renderCommission has no text input fields', function() {
+  var html = renderCommission();
+  assert.strictEqual(html.indexOf('<input type="text"'), -1);
+  assert.strictEqual(html.indexOf('<textarea'), -1);
+});
+
+// Test 466: renderCommission references DS/HD 60364-6
+test('renderCommission references DS/HD 60364-6', function() {
+  var html = renderCommission();
+  assert(html.indexOf('DS/HD 60364-6') >= 0);
+  assert(html.indexOf('cl.6.2') >= 0);
+});
+
+// Test 467: INSTRUMENTS list has 5 instruments
+test('INSTRUMENTS has 5 required instruments', function() {
+  assert.strictEqual(INSTRUMENTS.length, 5);
+  var names = INSTRUMENTS.map(function(i) { return i.en; }).join(',');
+  assert(names.indexOf('Multifunction tester') >= 0);
+  assert(names.indexOf('Loop impedance tester') >= 0);
+  assert(names.indexOf('RCD tester') >= 0);
+});
+
+// Test 468: COMMISSION_TYPES has 3 types
+test('COMMISSION_TYPES has newInstall, addition, periodic', function() {
+  assert(COMMISSION_TYPES.newInstall);
+  assert(COMMISSION_TYPES.addition);
+  assert(COMMISSION_TYPES.periodic);
+  assert.strictEqual(COMMISSION_TYPES.newInstall.clause, 'cl.6.2');
+});
+
+// Test 469: Special items for all 4 categories
+test('SPECIAL_ITEMS has bathroom, ev, solar, firealarm', function() {
+  assert(SPECIAL_ITEMS.bathroom.length === 2);
+  assert(SPECIAL_ITEMS.ev.length === 2);
+  assert(SPECIAL_ITEMS.solar.length === 3);
+  assert(SPECIAL_ITEMS.firealarm.length === 3);
+});
+
+// Test 470: Module translations exist for all 3 new modules
+test('Module translations exist for trayfill, zs, commission', function() {
+  assert(T.da.modules.trayfill, 'Danish trayfill missing');
+  assert(T.en.modules.trayfill, 'English trayfill missing');
+  assert(T.fa.modules.trayfill, 'Farsi trayfill missing');
+  assert(T.da.modules.zs, 'Danish zs missing');
+  assert(T.en.modules.zs, 'English zs missing');
+  assert(T.fa.modules.zs, 'Farsi zs missing');
+  assert(T.da.modules.commission, 'Danish commission missing');
+  assert(T.en.modules.commission, 'English commission missing');
+  assert(T.fa.modules.commission, 'Farsi commission missing');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
