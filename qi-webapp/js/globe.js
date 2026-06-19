@@ -385,7 +385,7 @@
       try {
         if (THREE.ACESFilmicToneMapping) {
           renderer.toneMapping = THREE.ACESFilmicToneMapping;
-          renderer.toneMappingExposure = 1.0;
+          renderer.toneMappingExposure = 1.6;
         }
       } catch (e) {}
       renderer.domElement.style.display = "block";
@@ -412,13 +412,13 @@
       var lightsTex   = loadTex(TEX.lights, true);
 
       // ---- lighting --------------------------------------------------------
-      scene.add(new THREE.AmbientLight(0x4a5a7a, 0.7));
-      var sun = new THREE.DirectionalLight(0xfff4e6, 2.0);
+      scene.add(new THREE.AmbientLight(0x6a7a9a, 1.2));
+      var sun = new THREE.DirectionalLight(0xfff4e6, 2.8);
       sun.position.set(5, 2.2, 4.2);     // lights SE-Asia / the Pacific rim
       scene.add(sun);
       var sunDir = sun.position.clone().normalize();
       // faint cool fill from behind for rim separation
-      var fill = new THREE.DirectionalLight(0x2e5496, 0.4);
+      var fill = new THREE.DirectionalLight(0x4a7ab8, 0.8);
       fill.position.set(-6, -1.5, -4);
       scene.add(fill);
 
@@ -453,7 +453,7 @@
       try {
         var cloudGeo = new THREE.SphereGeometry(GLOBE_R * 1.01, 64, 64);
         var cloudMat = new THREE.MeshBasicMaterial({
-          map: cloudsTex, transparent: true, opacity: 0.45,
+          map: cloudsTex, transparent: true, opacity: 0.6,
           blending: THREE.NormalBlending, depthWrite: false
         });
         clouds = new THREE.Mesh(cloudGeo, cloudMat);
