@@ -4,6 +4,9 @@
   const C = root.QICalc;
   const KEY = "qi_platform_v9";        // legacy single-project key (migrated)
   const WKEY = "qi_workspace_v9";      // workspace (multi-project) key
+  const SCHEMA_VERSION = 10;           // workspace schema version (forward-only,
+                                       // additive migrations in normalize/normalizeWs
+                                       // so a NEW app build never breaks OLD saves)
 
   function uid() { return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
@@ -174,6 +177,10 @@
     w.brand = w.brand || { company: "", logo: "", accent: "#2e5496" };
     w.ai = w.ai || { provider: "openai", baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini", key: "" };
     w.order.forEach(id => normalize(w.projects[id]));
+    // Stamp the schema version AFTER additive normalisation so old saves are
+    // brought fully up to date, then marked current. A future build can read
+    // w.schemaVersion to decide which forward migrations to run.
+    w.schemaVersion = SCHEMA_VERSION;
     return w;
   }
   function bind() { state = ws.projects[ws.activeId]; return state; }
@@ -276,6 +283,42 @@
     return true;
   }
   function importAsProject(obj) { const id = uid(); workspace().projects[id] = normalize(obj); ws.order.push(id); ws.activeId = id; bind(); save(); return id; }
+
+  // ---- full-workspace backup (ALL projects) — assurance for saved files ----
+  // Produces a single portable file containing EVERY saved project plus brand
+  // settings. The API key is deliberately stripped so a backup never leaks a
+  // secret. schemaVersion lets a future app build migrate the file safely.
+  function exportWorkspace() {
+    const clone = JSON.parse(JSON.stringify(workspace()));
+    if (clone.ai) clone.ai.key = "";   // never write secrets into a backup file
+    return {
+      app: "QI Platform", kind: "qi-workspace-backup", schemaVersion: SCHEMA_VERSION,
+      exportedAt: new Date().toISOString(), projectCount: (clone.order || []).length,
+      workspace: clone
+    };
+  }
+  // Restore a full backup WITHOUT destroying current data: every project in the
+  // backup is added ALONGSIDE the existing ones with fresh ids (no collisions,
+  // nothing overwritten). Returns the number of projects restored.
+  function importWorkspaceProjects(backup) {
+    const w = (backup && backup.workspace) ? backup.workspace : backup;
+    if (!w || !w.projects) return 0;
+    const order = (w.order && w.order.length) ? w.order.filter(id => w.projects[id]) : Object.keys(w.projects);
+    let n = 0, lastId = null;
+    order.forEach(function (id) {
+      try {
+        const proj = w.projects[id];
+        if (!proj || !proj.project) return;
+        const nid = uid();
+        workspace().projects[nid] = normalize(JSON.parse(JSON.stringify(proj)));
+        ws.order.push(nid); lastId = nid; n++;
+      } catch (e) { /* skip a corrupt project, keep the rest */ }
+    });
+    if (lastId) { ws.activeId = lastId; bind(); }
+    save();
+    return n;
+  }
+  function schemaVersion() { return SCHEMA_VERSION; }
 
   // ---- brand + AI settings (workspace-level) ----
   function brand() { return workspace().brand; }
@@ -902,6 +945,7 @@
     auditList, clearAudit, takeSnapshot, snapshots, restoreSnapshot, deleteSnapshot, renameSnapshot, diffSnapshots, paretoRPN, controlChartData,
     savedViews, saveView, deleteSavedView,
     listProjects, activeProjectId, switchProject, addProject, renameProject, duplicateProject, deleteProject, importAsProject,
+    exportWorkspace, importWorkspaceProjects, schemaVersion,
     brand, setBrand, aiSettings, setAi, portfolio,
     regRows, regAdd, regUpdate, regDelete, regLabel, regBulkDelete, regTogglePin, evm: () => C.evm(validCases(), get().project),
     updatesList, addUpdate, deleteUpdate,

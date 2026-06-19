@@ -3853,14 +3853,18 @@
         <p class="muted" style="margin-top:-6px">These names populate the Owner &amp; Stakeholder dropdowns.</p>
         ${tableWrap("<th>Name / Owner</th><th>Role</th><th></th>", rrows)}</div>
 
-      <div class="card"><h3>Data</h3>
+      <div class="card"><h3>Data &amp; backups</h3>
         <div class="linkbtns">
-          <button class="btn" data-act="export">Export JSON (backup)</button>
-          <button class="btn" data-act="import">Import JSON (as new project)</button>
+          <button class="btn btn-primary" data-act="exportAll">⭳ Back up EVERYTHING (all projects)</button>
+          <button class="btn" data-act="restoreAll">⭱ Restore from a full backup</button>
+        </div>
+        <div class="linkbtns" style="margin-top:8px">
+          <button class="btn" data-act="export">Export this project only</button>
+          <button class="btn" data-act="import">Import a project file</button>
           <button class="btn" data-act="csv">Export cases CSV</button>
           <button class="btn btn-danger" data-act="reset">Reset to sample data</button>
         </div>
-        <p class="muted" style="margin-top:10px">Your data is saved automatically in this browser. Export a JSON backup to move it to another device.</p></div>
+        <p class="muted" style="margin-top:10px">Your work is saved automatically in this browser. <b>Back up EVERYTHING</b> downloads a single file with <b>all</b> your projects — keep it safe (cloud drive / email) as your insurance. <b>Restore</b> adds the projects from a backup file back in, without deleting what you already have. Updating the app never touches your saved projects (data format v${esc(String((typeof S.schemaVersion === "function") ? S.schemaVersion() : ""))}).</p></div>
 
       <div class="card"><h3>Branding</h3>
         <div class="form-grid">
@@ -5226,6 +5230,37 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
   function exportJSON() { download("qi-platform-backup.json", JSON.stringify(S.get(), null, 2)); toast("Backup exported."); }
+  // Full backup: ALL projects in one timestamped file (the user's insurance).
+  function exportAllProjects() {
+    try {
+      const backup = S.exportWorkspace();
+      const stamp = new Date().toISOString().slice(0, 10);
+      download("qi-platform-FULL-backup-" + stamp + ".json", JSON.stringify(backup, null, 2));
+      const n = backup.projectCount || 0;
+      toast("Full backup saved — " + n + " project" + (n === 1 ? "" : "s") + " in one file. Keep it safe.");
+    } catch (e) { toast("Could not create the full backup."); }
+  }
+  function restoreAllProjects() { const el = $("#fileRestoreAll"); if (el) el.click(); }
+  function handleRestoreAll(file) {
+    const fr = new FileReader();
+    fr.onload = () => {
+      try {
+        const obj = JSON.parse(fr.result);
+        // Accept either a full-workspace backup or a bare workspace object.
+        const looksLikeWorkspace = obj && (obj.kind === "qi-workspace-backup" || obj.workspace || obj.projects);
+        if (!looksLikeWorkspace) {
+          // Fall back: a single-project backup → import as one project.
+          if (obj && obj.cases) { S.importAsProject(obj); refreshHeader(); toast("Restored 1 project from a single-project file."); return go("dashboard"); }
+          throw new Error("Not a QI backup");
+        }
+        const n = S.importWorkspaceProjects(obj);
+        refreshHeader();
+        if (n > 0) { toast("Restored " + n + " project" + (n === 1 ? "" : "s") + " from your backup (existing projects kept)."); go("dashboard"); }
+        else toast("No projects found in that backup file.");
+      } catch (e) { toast("Restore failed: that file is not a valid QI backup."); }
+    };
+    fr.readAsText(file);
+  }
   function exportCSV() {
     const cols = ["code", "problem", "category", "priority", "sev", "occ", "det", "rpn", "rpnBand", "rootCause", "leanMethod", "owner", "target", "startDate", "estEnd", "status", "percent", "estCost", "actCost", "health"];
     const head = cols.join(",");
@@ -5526,6 +5561,8 @@
       { label: "Cycle display (Auto / Light / Dark)", icon: "◐", run: () => toggleTheme() },
       { label: "Collapse / expand sidebar", icon: "«", run: () => toggleSidebar() },
       { label: "Export JSON backup", icon: "⭳", run: () => exportJSON() },
+      { label: "Back up EVERYTHING (all projects)", icon: "⭳", run: () => exportAllProjects() },
+      { label: "Restore from a full backup", icon: "⭱", run: () => restoreAllProjects() },
       { label: "Share link", icon: "🔗", run: () => shareLink() },
       { label: "Take the tour", icon: "👋", run: () => showTour(0) },
       { label: "Keyboard shortcuts", icon: "⌨", run: () => showShortcuts() }
@@ -5617,6 +5654,8 @@
     else if (act === "csv") exportCSV();
     else if (act === "export") exportJSON();
     else if (act === "import") importJSON();
+    else if (act === "exportAll") exportAllProjects();
+    else if (act === "restoreAll") restoreAllProjects();
     else if (act === "clearflt") { uiState.caseFilter = { q: "", status: "", priority: "", owner: "", sort: uiState.caseFilter.sort }; go("cases"); }
     else if (act === "chip") {
       const f = uiState.caseFilter; const sort = f.sort, pageSize = f.pageSize;
@@ -5747,6 +5786,7 @@
   var cmdBtn = $("#btnCmdK");
   if (cmdBtn) cmdBtn.addEventListener("click", openCommandPalette);
   $("#fileImport").addEventListener("change", e => { if (e.target.files[0]) handleImport(e.target.files[0]); e.target.value = ""; });
+  (function () { const el = $("#fileRestoreAll"); if (el) el.addEventListener("change", e => { if (e.target.files[0]) handleRestoreAll(e.target.files[0]); e.target.value = ""; }); })();
   $("#hamburger").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
   const fab = $("#fab"); if (fab) fab.addEventListener("click", () => openCaseForm());
   const btnSb = $("#btnSidebar"); if (btnSb) btnSb.addEventListener("click", toggleSidebar);

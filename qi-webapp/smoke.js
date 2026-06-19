@@ -1809,5 +1809,30 @@ if (window.QIDisplay) {
   ok(new RegExp(start.name).test(ghtml), "direction legend names the start station (" + start.name + ")");
 })();
 
+// Step 120: Maintenance & backup — schema version + full-workspace backup/restore
+(function testBackupAndMaintenance() {
+  ok(typeof S.schemaVersion === "function" && S.schemaVersion() >= 10, "store exposes a numeric schemaVersion (safe-update stamp)");
+  ok(typeof S.exportWorkspace === "function", "store can export the FULL workspace (all projects) as one backup");
+  ok(typeof S.importWorkspaceProjects === "function", "store can restore projects from a full backup");
+  var backup = S.exportWorkspace();
+  ok(backup && backup.kind === "qi-workspace-backup" && backup.workspace && backup.workspace.projects, "full backup is a self-describing object with all projects");
+  ok(backup.schemaVersion === S.schemaVersion(), "backup carries the schema version so future builds can migrate it");
+  ok(!backup.workspace.ai || backup.workspace.ai.key === "", "full backup never leaks the API key (secret stripped)");
+  // Restore must ADD projects without destroying existing ones.
+  var before = S.listProjects().length;
+  var restored = S.importWorkspaceProjects(backup);
+  var after = S.listProjects().length;
+  ok(restored >= 1, "restore brought back at least one project (" + restored + ")");
+  ok(after === before + restored, "restore ADDED projects without deleting existing ones (" + before + " -> " + after + ")");
+  // A new app build reading old saves must not throw: re-loading normalises in place.
+  ok(S.get() && S.get().project, "active project still valid after restore (no corruption)");
+  // Settings exposes the backup controls in plain language.
+  var cnav = doc.querySelector('.nav-item[data-view="config"]');
+  if (cnav) cnav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  var chtml = doc.querySelector(".content").innerHTML;
+  ok(/data-act="exportAll"/.test(chtml), "Settings shows a 'Back up EVERYTHING' button");
+  ok(/data-act="restoreAll"/.test(chtml), "Settings shows a 'Restore from a full backup' button");
+})();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
