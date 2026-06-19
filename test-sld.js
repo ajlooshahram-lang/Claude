@@ -7960,6 +7960,198 @@ test('Reactive: orchestration only — core calc functions are untouched and sti
   assert(typeof runQiValidation === 'function', 'runQiValidation intact');
 });
 
+// ============================================================================
+// ===== CALCULATION PROVENANCE + SIGNED REPORT (this feature) =====
+// ============================================================================
+
+// Build a representative, fully-specified unified project from REAL products.
+function provMakeProject(opts) {
+  opts = opts || {};
+  const tf = PRODUCTS.transformers[0];
+  const supCab = PRODUCTS.supplyCables[0];
+  const mainDev = PRODUCTS.mainFuses[0];
+  const cab = opts.cableId ? upCableProduct(opts.cableId) : PRODUCTS.cables.find(function(c){ return c.material === 'Cu' && c.mm2 >= 2.5; }) || PRODUCTS.cables[0];
+  const mcb = opts.mcbId ? upDeviceById(opts.mcbId).product : (PRODUCTS.mcbs.find(function(m){ return m.rating >= 16; }) || PRODUCTS.mcbs[0]);
+  return {
+    version: 1, earthing: opts.earthing || 'TN', transformerId: tf.id,
+    supply: { cableId: supCab.id, length_m: 30, deviceId: mainDev.id, deviceIn: null },
+    finals: [{
+      id: 'fcA', name_da: 'Stikkontakt', name_en: 'Socket', cableId: cab.id, length_m: opts.length_m || 25,
+      deviceId: mcb.id, deviceIn: null, loadKW: opts.loadKW != null ? opts.loadKW : 3.68,
+      phases: opts.phases || '1x230', cosPhi: 0.95, rcdMa: 30
+    }]
+  };
+}
+
+test('Provenance: provBuildProject builds supply + circuits with full structure', function() {
+  const p = provMakeProject();
+  const prov = provBuildProject(p);
+  assert(prov.ok === true, 'project with a transformer must build');
+  assert(prov.supply && prov.supply.entries.length > 0, 'supply segment has entries');
+  assert(prov.circuits.length === 1, 'one final circuit');
+  const seg = prov.circuits[0].seg;
+  const keys = seg.entries.map(function(e){ return e.key; });
+  ['ib','iz','overload','icu','zs'].forEach(function(k){
+    assert(keys.indexOf(k) >= 0, 'circuit provenance must include entry: ' + k + ' (have ' + keys.join(',') + ')');
+  });
+});
+
+test('Provenance: an entry carries formula, inputs, intermediate steps, clause AND table', function() {
+  const p = provMakeProject();
+  const prov = provBuildProject(p);
+  const overload = prov.circuits[0].seg.entries.find(function(e){ return e.key === 'overload'; });
+  assert(overload, 'overload entry exists');
+  assert(/IB/.test(overload.formula) && /In/.test(overload.formula) && /Iz/.test(overload.formula), 'formula shows IB<=In<=Iz, got: ' + overload.formula);
+  assert(Array.isArray(overload.inputs) && overload.inputs.length >= 3, 'inputs present');
+  assert(overload.inputs.some(function(i){ return i.sym === 'IB'; }), 'IB input present');
+  assert(Array.isArray(overload.steps) && overload.steps.length >= 1, 'intermediate steps present');
+  assert(/DS\/HD 60364-4-43/.test(overload.clause), 'clause cites 4-43, got: ' + overload.clause);
+  assert(overload.table && overload.table.indexOf('Table') >= 0, 'table cited, got: ' + overload.table);
+  assert(overload.assumption && overload.assumption.length > 0, 'conservative assumption present');
+});
+
+test('Provenance: Iz chain shows Ca/Cg/Ci factors with source tables', function() {
+  const p = provMakeProject();
+  const prov = provBuildProject(p);
+  const iz = prov.circuits[0].seg.entries.find(function(e){ return e.key === 'iz'; });
+  assert(iz, 'Iz entry exists');
+  assert(/Iz_tab/.test(iz.formula) && /Ca/.test(iz.formula) && /Cg/.test(iz.formula) && /Ci/.test(iz.formula), 'Iz chain formula, got: ' + iz.formula);
+  const stepsText = iz.steps.join(' | ');
+  assert(/Table C\.52\.1/.test(stepsText), 'cites Table C.52.1 for Iz_tab');
+  assert(/Table B\.52\.14/.test(stepsText), 'cites Table B.52.14 for Ca');
+  assert(/Table B\.52\.17/.test(stepsText), 'cites Table B.52.17 for Cg');
+});
+
+test('Provenance: numbers MATCH the verified engine (officialIz + sldCalcNodeIB)', function() {
+  const p = provMakeProject();
+  const prov = provBuildProject(p);
+  const built = upBuildTree(p);
+  const fId = built.finalIds[0];
+  const engineIB = sldCalcNodeIB(built.tree.nodes[fId]);
+  const cab = upCableProduct(p.finals[0].cableId);
+  const engineIz = officialIz(cab);
+  const ibEntry = prov.circuits[0].seg.entries.find(function(e){ return e.key === 'ib'; });
+  const izEntry = prov.circuits[0].seg.entries.find(function(e){ return e.key === 'iz'; });
+  const ibShown = parseFloat(ibEntry.value);
+  const izShown = parseFloat(izEntry.value);
+  assert(Math.abs(ibShown - engineIB) < 0.1, 'provenance IB (' + ibShown + ') matches engine IB (' + engineIB.toFixed(1) + ')');
+  assert(Math.abs(izShown - engineIz) < 0.5, 'provenance Iz (' + izShown + ') matches engine officialIz (' + engineIz + ')');
+  // The Iz must be the DERATED officialIz, never the nominal product.iz when they differ.
+  if (cab.iz && Math.abs(cab.iz - engineIz) > 0.5) {
+    assert(Math.abs(izShown - cab.iz) > 0.5, 'report must NOT use nominal product.iz (' + cab.iz + ')');
+  }
+});
+
+test('Provenance verdict equals the live auditor verdict (single source of truth)', function() {
+  const p = provMakeProject();
+  const audit = upAuditProject(p);
+  const prov = provBuildProject(p);
+  const overload = prov.circuits[0].seg.entries.find(function(e){ return e.key === 'overload'; });
+  // find the matching auditor overload finding
+  const f = audit.findings.find(function(x){ return String(x.scope).indexOf(prov.circuits[0].name) === 0 && /IB/.test(x.rule); });
+  assert(f, 'auditor produced an overload finding');
+  assert(overload.verdict === f.status, 'provenance verdict (' + overload.verdict + ') == auditor status (' + f.status + ')');
+});
+
+test('Report: builder produces non-empty report with all sections in da/en/fa', function() {
+  const realLang = lang;
+  ['da','en','fa'].forEach(function(L) {
+    lang = L;
+    upProject = provMakeProject();
+    const model = reportBuildModel(upProject);
+    const html = reportRenderHTML(model, true);
+    assert(html && html.length > 800, L + ': report non-empty');
+    assert(html.indexOf('<svg') >= 0, L + ': contains the SLD svg');
+    assert(/DS\/HD 60364/.test(html), L + ': contains DS/HD 60364 reference');
+    assert(/60364:2022/.test(html), L + ': contains the DS/HD 60364:2022 statement');
+    assert(html.indexOf(model.meta.earthing) >= 0, L + ': contains earthing metadata');
+    // load schedule current + per-circuit working
+    assert(/IB/.test(html), L + ': load schedule / working present');
+    assert(/Socket|Stikkontakt|\u0633\u0648\u06A9\u062A|#1/.test(html), L + ': per-circuit provenance present');
+  });
+  lang = realLang;
+});
+
+test('Report (SAFETY): a FAIL verdict is NEVER shown as safe/approved', function() {
+  // Force a fail: In (large MCB) > Iz (smallest cable) -> overload fail -> red.
+  const smallCab = PRODUCTS.cables.filter(function(c){ return c.material === 'Cu'; }).sort(function(a,b){ return a.mm2 - b.mm2; })[0];
+  const bigMcb = PRODUCTS.mcbs.slice().sort(function(a,b){ return b.rating - a.rating; })[0];
+  const p = provMakeProject({ cableId: smallCab.id, mcbId: bigMcb.id, loadKW: 0.5 });
+  upProject = p;
+  const model = reportBuildModel(p);
+  assert(model.verdict === 'red', 'forced design must be red, got: ' + model.verdict);
+  const html = reportRenderHTML(model, true);
+  const realLang = lang; lang = 'en';
+  const ap = reportApprovalText(model.verdict, model.stale);
+  assert(/NOT APPROVED/.test(ap.text), 'red verdict approval text says NOT APPROVED, got: ' + ap.text);
+  assert(reportApprovalText('green', false).text.indexOf('APPROVED for construction') >= 0, 'green => approved');
+  // The verdict banner must use the danger colour, never the success label.
+  assert(html.indexOf('var(--danger)') >= 0, 'danger colour shown for red verdict');
+  lang = realLang;
+});
+
+test('Report (SAFETY): a STALE verdict is flagged RECOMPUTING, never stale-OK', function() {
+  const p = provMakeProject();
+  upProject = p;
+  // Simulate a change after last compute: mark the kritisk verdict stale.
+  Reactive.verdicts['kritisk'] = { status: 'ok', stale: true, stamp: 1 };
+  const prov = provBuildProject(p);
+  assert(prov.stale === true, 'provenance picks up the stale flag from the reactive bus');
+  const model = reportBuildModel(p);
+  assert(model.stale === true, 'report model is stale');
+  const realLang = lang; lang = 'en';
+  const ap = reportApprovalText(model.verdict, model.stale);
+  assert(/RECOMPUTING/.test(ap.text), 'stale approval flagged RECOMPUTING, got: ' + ap.text);
+  const html = reportRenderHTML(model, true);
+  assert(/RECOMPUTING|recompute/i.test(html), 'stale banner present in report');
+  lang = realLang;
+  // cleanup so later tests are unaffected
+  delete Reactive.verdicts['kritisk'];
+});
+
+test('Report + provenance UI are 100% click-only (no text/number inputs, no textarea)', function() {
+  const realLang = lang; lang = 'da';
+  upProject = provMakeProject();
+  const ui = reportRenderUI();
+  ['<input type="text"','<input type="number"',"<input type='text'","<input type='number'",'<textarea'].forEach(function(bad){
+    assert(ui.indexOf(bad) < 0, 'report UI must not contain ' + bad);
+  });
+  // The whole documentation module (which embeds the report) stays click-only too.
+  const pdf = renderPDF();
+  ['<input type="text"','<input type="number"','<textarea'].forEach(function(bad){
+    assert(pdf.indexOf(bad) < 0, 'documentation module must not contain ' + bad);
+  });
+  // Identity is chosen by click (preset roles) + click date stamp, not typed.
+  assert(ui.indexOf('reportSetRole(') >= 0, 'designer chosen via click (preset role)');
+  assert(ui.indexOf('reportStampDate(') >= 0, 'date chosen via click stamp');
+  lang = realLang;
+});
+
+test('Report: provenance expands via native <details> (click-only "vis udregning")', function() {
+  const realLang = lang; lang = 'da';
+  upProject = provMakeProject();
+  const model = reportBuildModel(upProject);
+  const collapsed = reportRenderHTML(model, false);
+  const expanded = reportRenderHTML(model, true);
+  assert(collapsed.indexOf('<details') >= 0, 'collapsed preview uses <details> expanders');
+  assert(collapsed.indexOf('<details class="prov-entry" open') < 0, 'preview details are closed by default');
+  assert(expanded.indexOf('<details class="prov-entry" open') >= 0, 'print version forces details open');
+  lang = realLang;
+});
+
+test('Guard: core calc math is unchanged (officialIz + IB regression values)', function() {
+  // officialIz returns the DS/HD 60364-5-52 Table C.52.1 derated value.
+  const cu25 = { material: 'Cu', mm2: 2.5, model: '', iz: 999 };
+  assert.strictEqual(officialIz(cu25), 23, 'officialIz(Cu 2.5mm2 PVC) == 23A (Table C.52.1), not nominal');
+  const cu16 = { material: 'Cu', mm2: 16, model: '', iz: 1 };
+  assert.strictEqual(officialIz(cu16), 73, 'officialIz(Cu 16mm2 PVC) == 73A');
+  // IB regression (matches existing engine test): 3.68kW, 1x230, cos 0.95
+  const ib = sldCalcNodeIB({ type:'final_circuit', power_kW:3.68, cosPhi:0.95, phases:'1x230', voltage:230 });
+  assert(Math.abs(ib - 16.84) < 0.05, 'IB regression ~16.84A, got ' + ib.toFixed(2));
+  // provenance must not have redefined the engine functions
+  assert(typeof provBuildProject === 'function' && typeof officialIz === 'function', 'engine + provenance coexist');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

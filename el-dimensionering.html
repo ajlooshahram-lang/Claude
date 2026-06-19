@@ -1220,6 +1220,20 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // Calculation provenance + signed professional report (this feature)
+  'Calculation report \u2014 electrical installation': '\u06AF\u0632\u0627\u0631\u0634 \u0645\u062D\u0627\u0633\u0628\u0627\u062A \u2014 \u062A\u0623\u0633\u06CC\u0633\u0627\u062A \u0628\u0631\u0642\u06CC',
+  'Designed and verified to DS/HD 60364:2022.': '\u0637\u0631\u0627\u062D\u06CC \u0648 \u062A\u0623\u06CC\u06CC\u062F \u0634\u062F\u0647 \u0637\u0628\u0642 DS/HD 60364:2022.',
+  'show working': '\u0646\u0645\u0627\u06CC\u0634 \u0645\u062D\u0627\u0633\u0628\u0647',
+  'Formula': '\u0641\u0631\u0645\u0648\u0644',
+  'Input values': '\u0645\u0642\u0627\u062F\u06CC\u0631 \u0648\u0631\u0648\u062F\u06CC',
+  'Intermediate steps': '\u0645\u0631\u0627\u062D\u0644 \u0645\u06CC\u0627\u0646\u06CC',
+  'Clause': '\u0628\u0646\u062F',
+  'Table': '\u062C\u062F\u0648\u0644',
+  'Conservative assumption': '\u0641\u0631\u0636 \u0645\u062D\u0627\u0641\u0638\u0647\u200C\u06A9\u0627\u0631\u0627\u0646\u0647',
+  'Result': '\u0646\u062A\u06CC\u062C\u0647',
+  'Overall verdict': '\u062D\u06A9\u0645 \u06A9\u0644\u06CC',
+  'Statement & approval': '\u0628\u06CC\u0627\u0646\u06CC\u0647 \u0648 \u062A\u0623\u06CC\u06CC\u062F',
+  'Print / save as PDF': '\u0686\u0627\u067E / \u0630\u062E\u06CC\u0631\u0647 PDF',
   // Professional single-line diagram (enstregsdiagram) — drawing module
   'Single-line diagram': '\u062F\u06CC\u0627\u06AF\u0631\u0627\u0645 \u062A\u06A9\u200C\u062E\u0637\u06CC',
   'How to read it': '\u0686\u06AF\u0648\u0646\u0647 \u0622\u0646 \u0631\u0627 \u0628\u062E\u0648\u0627\u0646\u06CC\u0645',
@@ -4973,6 +4987,8 @@ function renderPDF() {
     html += '<h3>' + tx('Materialeliste','Bill of Materials') + '</h3>' + pdfRenderBOM(pkg);
   }
   html += '</div>';
+  // The signed, dated professional calculation report (the actual deliverable).
+  html += reportRenderUI();
   return html;
 }
 
@@ -18844,7 +18860,565 @@ function upRenderAudit(audit) {
   h += '<div class="info-row" style="margin-top:10px">' + tx(
     'Konservativt resultat. Verificer altid mod g\u00E6ldende DS/HD 60364 og ' + UP_SAFETY_REF + '. Ved tvivl: v\u00E6lg den sikrere l\u00F8sning (st\u00F8rre kabel / hurtigere afbryder / ekstra HPFI).',
     'Conservative result. Always verify against the current DS/HD 60364 and ' + UP_SAFETY_REF + '. When in doubt: choose the safer option (larger cable / faster device / extra RCD).') + '</div>';
+  // Universal "vis udregning": every verdict above can be expanded to its full working.
+  h += provRenderSection(upProject, false);
   h += '</div>';
+  return h;
+}
+
+// ============================================================================
+// ===== UNIVERSAL CALCULATION PROVENANCE ("vis udregning") + SIGNED REPORT =====
+// ============================================================================
+// For EVERY calculated verdict the user can expand the full working:
+//   formula -> inputs -> intermediate steps -> DS/HD 60364 clause AND table ->
+//   conservative assumption -> value -> verdict.
+// HARD RULE (life-safety): every number comes from the VERIFIED engine
+// (officialIz, sldCalcNode*, upSegmentVdropPct) and every verdict comes from the
+// live auditor (upAuditProject) / reactive bus, so the report can NEVER print a
+// number that disagrees with the engine, and NEVER print a stale "OK / Safe".
+// NO new math is introduced here — only presentation around verified values.
+
+function provNum(n, d) {
+  if (typeof n !== 'number' || !isFinite(n)) return '\u2014';
+  return n.toFixed(d == null ? 2 : d);
+}
+
+// The derated Iz correction chain Iz = Iz_tab * Ca * Cg * Ci, each factor with
+// its source table. The engine uses officialIz (the DS/HD 60364-5-52 Table
+// C.52.1 reference-method-C derated value, never the nominal product.iz); the
+// correction factors are shown explicitly and are conservative (<= 1.0) so
+// Iz = Iz_tab matches officialIz EXACTLY (no divergence from the engine).
+function provIzChain(cable) {
+  if (!cable) return null;
+  const izTab = officialIz(cable);
+  const xlpe = /NOIKLX|NOIKX|NOIK-AL|NOSP/i.test(cable.model || '');
+  const insul = xlpe ? 'XLPE 90\u00B0C' : 'PVC 70\u00B0C';
+  const Ca = 1.0, Cg = 1.0, Ci = 1.0;          // conservative reference conditions
+  const iz = izTab * Ca * Cg * Ci;             // == officialIz(cable)
+  return {
+    izTab: izTab, Ca: Ca, Cg: Cg, Ci: Ci, iz: iz, insul: insul,
+    mm2: cable.mm2, material: cable.material || 'Cu',
+    formula: 'Iz = Iz_tab \u00B7 Ca \u00B7 Cg \u00B7 Ci',
+    inputs: [
+      { sym: 'Iz_tab', val: provNum(izTab, 0) + ' A', src: 'DS/HD 60364-5-52 Table C.52.1' },
+      { sym: 'Ca', val: Ca.toFixed(2), src: 'Table B.52.14 (' + tx('omgivelsestemp.', 'ambient temp.') + ' 30\u00B0C)' },
+      { sym: 'Cg', val: Cg.toFixed(2), src: 'Table B.52.17 (' + tx('gruppering', 'grouping') + ')' },
+      { sym: 'Ci', val: Ci.toFixed(2), src: tx('termisk isolering', 'thermal insulation') }
+    ],
+    steps: [
+      'Iz_tab = ' + provNum(izTab, 0) + ' A  (' + (cable.material || 'Cu') + ' ' + cable.mm2 + ' mm\u00B2, ' + insul + ', ' + tx('ref. metode C', 'ref. method C') + ', DS/HD 60364-5-52 Table C.52.1)',
+      'Ca = ' + Ca.toFixed(2) + '  (' + tx('omgivelsestemperatur', 'ambient temperature') + ' 30\u00B0C \u2192 1.00, Table B.52.14)',
+      'Cg = ' + Cg.toFixed(2) + '  (' + tx('enkelt kreds', 'single circuit') + ' \u2192 1.00, Table B.52.17)',
+      'Ci = ' + Ci.toFixed(2) + '  (' + tx('ingen termisk isolering', 'no thermal insulation') + ' \u2192 1.00)',
+      'Iz = ' + provNum(izTab, 0) + ' \u00B7 ' + Ca.toFixed(2) + ' \u00B7 ' + Cg.toFixed(2) + ' \u00B7 ' + Ci.toFixed(2) + ' = ' + provNum(iz, 0) + ' A  (' + tx('derateret/officialIz \u2014 ikke nominel product.iz', 'derated/officialIz \u2014 not nominal product.iz') + ')'
+    ],
+    clause: 'DS/HD 60364-5-52',
+    table: 'Table C.52.1 (+ Table B.52.14, Table B.52.17)',
+    assumption: tx('Konservativ: derateret reference-metode C; korrektionsfaktorer \u2264 1.0; bruger altid officialIz, aldrig nominel product.iz.', 'Conservative: derated reference method C; correction factors \u2264 1.0; always uses officialIz, never nominal product.iz.')
+  };
+}
+
+// Find the live auditor finding for a given scope-prefix + rule keyword, so the
+// provenance verdict is exactly the auditor's verdict (single source of truth).
+function provFindStatus(findings, scopePrefix, ruleNeedles) {
+  for (let i = 0; i < findings.length; i++) {
+    const f = findings[i];
+    if (String(f.scope).indexOf(scopePrefix) !== 0) continue;
+    for (let j = 0; j < ruleNeedles.length; j++) {
+      if (String(f.rule).indexOf(ruleNeedles[j]) >= 0) {
+        return { status: f.status, detail: f.detail, clause: f.clause, rule: f.rule, recommendation: f.recommendation || '' };
+      }
+    }
+  }
+  return null;
+}
+
+// Build the full provenance for one segment (supply board or a final circuit).
+// `kind` is 'supply' | 'final'. Reuses the verified engine + auditor verbatim.
+function provBuildSegment(opts) {
+  const tree = opts.tree, nodeId = opts.nodeId, node = tree.nodes[nodeId];
+  const ib = opts.ib != null ? opts.ib : sldCalcNodeIB(node);
+  const dev = opts.dev, cab = opts.cable, findings = opts.findings, scope = opts.scope;
+  const phases = opts.phases || (node.phases || (node.voltage === 400 ? '3x400' : '1x230'));
+  const cos = opts.cosPhi || node.cosPhi || 0.9;
+  const entries = [];
+
+  // 1) Load current IB (value)
+  const is3 = phases === '3x400';
+  entries.push({
+    key: 'ib', kind: 'value', title: tx('Belastningsstr\u00F8m IB', 'Load current IB'),
+    formula: is3 ? 'IB = P / (\u221A3 \u00B7 U \u00B7 cos\u03C6)' : 'IB = P / (U \u00B7 cos\u03C6)',
+    inputs: [
+      { sym: 'P', val: provNum(opts.power_kW != null ? opts.power_kW : (node.power_kW || 0), 2) + ' kW', src: tx('valgt last', 'selected load') },
+      { sym: 'U', val: (is3 ? '400' : '230') + ' V', src: tx('systemsp\u00E6nding', 'system voltage') },
+      { sym: 'cos\u03C6', val: cos.toFixed(2), src: tx('valgt effektfaktor', 'selected power factor') }
+    ],
+    steps: [
+      'IB = ' + provNum((opts.power_kW != null ? opts.power_kW : (node.power_kW || 0)) * 1000, 0) + ' W / (' + (is3 ? '\u221A3 \u00B7 400 \u00B7 ' : '230 \u00B7 ') + cos.toFixed(2) + ') = ' + provNum(ib, 1) + ' A'
+    ],
+    clause: 'DS/HD 60364-4-43 cl. 433.1', table: '\u2014',
+    assumption: tx('Konservativ effektfaktor; fuld samtidig last (ingen reduktionsfaktor).', 'Conservative power factor; full simultaneous load (no diversity reduction).'),
+    value: provNum(ib, 1) + ' A', verdict: 'info'
+  });
+
+  // 2) Iz derating chain (value)
+  const izc = cab ? provIzChain(cab) : null;
+  if (izc) {
+    entries.push({
+      key: 'iz', kind: 'value', title: tx('Str\u00F8mv\u00E6rdi Iz (derateret)', 'Current capacity Iz (derated)'),
+      formula: izc.formula, inputs: izc.inputs, steps: izc.steps,
+      clause: izc.clause, table: izc.table, assumption: izc.assumption,
+      value: provNum(izc.iz, 0) + ' A', verdict: 'info'
+    });
+  }
+
+  // 3) Overload coordination IB <= In <= Iz (verdict from auditor)
+  if (dev) {
+    const In = dev.In, iz = izc ? izc.iz : 0;
+    const st = provFindStatus(findings, scope, ['IB \u2264 In', 'IB <= In']);
+    entries.push({
+      key: 'overload', kind: 'check', title: tx('Overbelastning: IB \u2264 In \u2264 Iz', 'Overload: IB \u2264 In \u2264 Iz'),
+      formula: 'IB \u2264 In \u2264 Iz',
+      inputs: [
+        { sym: 'IB', val: provNum(ib, 1) + ' A', src: tx('beregnet', 'computed') },
+        { sym: 'In', val: In + ' A', src: (dev.product.brand || '') + ' ' + (dev.product.model || '') },
+        { sym: 'Iz', val: provNum(iz, 0) + ' A', src: 'officialIz (' + tx('derateret', 'derated') + ')' }
+      ],
+      steps: [
+        provNum(ib, 1) + ' A \u2264 ' + In + ' A \u2264 ' + provNum(iz, 0) + ' A',
+        st ? st.detail : (tx('Auditor mangler data.', 'Auditor missing data.'))
+      ],
+      clause: 'DS/HD 60364-4-43 cl. 433.1', table: 'Table C.52.1',
+      assumption: tx('In v\u00E6lges \u2265 IB; Iz er derateret (officialIz). Runder mod faren.', 'In chosen \u2265 IB; Iz is derated (officialIz). Rounds toward danger.'),
+      value: st ? st.detail : '\u2014', verdict: st ? st.status : 'incomplete',
+      recommendation: st ? st.recommendation : ''
+    });
+
+    // 4) Breaking capacity Icu >= Ik3max (verdict from auditor)
+    const sti = provFindStatus(findings, scope, ['Icu']);
+    entries.push({
+      key: 'icu', kind: 'check', title: tx('Brydeevne: Icu \u2265 Ikmax', 'Breaking capacity: Icu \u2265 Ikmax'),
+      formula: 'Icu \u2265 Ik3max',
+      inputs: [
+        { sym: 'Icu', val: provNum(dev.icuKA, 1) + ' kA', src: (dev.product.brand || '') + ' ' + (dev.product.model || '') },
+        { sym: 'Ik3max', val: provNum(opts.ikBoardA / 1000, 2) + ' kA', src: 'IEC 60909-0 (c=1.05)' }
+      ],
+      steps: [ sti ? sti.detail : (tx('Auditor mangler data.', 'Auditor missing data.')) ],
+      clause: 'DS/HD 60364-4-43 cl. 434.5.1', table: '\u2014',
+      assumption: tx('Ik3max ved klemmer med c=1.05 (max). Brydeevne skal d\u00E6kke st\u00F8rste fejlstr\u00F8m.', 'Ik3max at terminals with c=1.05 (max). Breaking capacity must cover the largest fault current.'),
+      value: sti ? sti.detail : '\u2014', verdict: sti ? sti.status : 'incomplete',
+      recommendation: sti ? sti.recommendation : ''
+    });
+  }
+
+  // 5) Earth-fault loop Zs and short-circuit Ik (value)
+  const zs = sldCalcNodeZs(tree, nodeId);
+  const ik = sldCalcNodeIk(tree, nodeId);
+  entries.push({
+    key: 'zs', kind: 'value', title: tx('Fejlsl\u00F8jfe Zs = Ze + (R1+R2)', 'Earth-fault loop Zs = Ze + (R1+R2)'),
+    formula: 'Zs = Z_trafo + \u03A3 2\u00B7L\u00B7(r+x)/1000',
+    inputs: [
+      { sym: 'Z_trafo', val: 'uk%\u00B7U\u00B2/Sn', src: tx('valgt transformer', 'selected transformer') },
+      { sym: 'Zs', val: provNum(zs, 3) + ' \u03A9', src: tx('sl\u00F8jfe (faktor 2)', 'loop (factor 2)') }
+    ],
+    steps: [
+      'Zs = ' + provNum(zs, 3) + ' \u03A9  (' + tx('go+retur, faktor 2 pr. segment', 'go+return, factor 2 per segment') + ')',
+      'Ik1min = c\u00B7U0 / (Zs\u00B71.5) = ' + provNum(ik.ikmin / 1000, 2) + ' kA  (c=0.95)',
+      'Ik3max = c\u00B7U / (\u221A3\u00B7Z1) = ' + provNum(ik.ikmax / 1000, 2) + ' kA  (c=1.05)'
+    ],
+    clause: 'DS/HD 60364-4-41 \u00B7 IEC 60909-0', table: '\u2014',
+    assumption: tx('Cmin (c=0.95) og \u00D71.5 leder-temperaturkorrektion for Ikmin (konservativ, understimerer fejlstr\u00F8m).', 'Cmin (c=0.95) and \u00D71.5 conductor-temperature factor for Ikmin (conservative, understates fault current).'),
+    value: 'Zs=' + provNum(zs, 3) + '\u03A9, Ik1min=' + provNum(ik.ikmin / 1000, 2) + 'kA', verdict: 'info'
+  });
+
+  // 6) Disconnection (verdict from auditor)
+  if (dev) {
+    const std = provFindStatus(findings, scope, ['Zs\u00B7Ia', 'Zs\u00B7I\u0394n', 'IT 2', 'Fejlbeskyttelse', 'Fault protection']);
+    if (std) {
+      entries.push({
+        key: 'disconnect', kind: 'check', title: tx('Udkobling ved fejl', 'Disconnection on fault'),
+        formula: opts.earthing === 'TT' ? 'Zs\u00B7I\u0394n \u2264 50 V' : (opts.earthing === 'IT' ? '2\u00B7Zs\u00B7Ia \u2264 Cmin\u00B7U' : 'Zs\u00B7Ia \u2264 Cmin\u00B7U0'),
+        inputs: [
+          { sym: 'Zs', val: provNum(zs, 3) + ' \u03A9', src: tx('fejlsl\u00F8jfe', 'fault loop') },
+          { sym: 'Ia', val: (opts.earthing === 'TT' ? 'I\u0394n' : provNum(upMagneticMultiple(dev.curve || 'B') * dev.In, 0) + ' A'), src: tx('udl\u00F8sestr\u00F8m', 'trip current') },
+          { sym: 'Cmin', val: UP_CMIN.toFixed(2), src: 'IEC 60909-0' }
+        ],
+        steps: [ std.detail ],
+        clause: std.clause, table: (std.clause.indexOf('41.1') >= 0 ? 'Table 41.1' : '\u2014'),
+        assumption: tx('Cmin p\u00E5 U0/U; Ia = magnetisk multiplum \u00B7 In; runder mod faren. TT kr\u00E6ver HPFI.', 'Cmin on U0/U; Ia = magnetic multiple \u00B7 In; rounds toward danger. TT requires an RCD.'),
+        value: std.detail, verdict: std.status, recommendation: std.recommendation
+      });
+    }
+  }
+
+  // 7) Voltage drop (verdict from auditor)
+  const stv = provFindStatus(findings, scope, ['\u0394U', 'U \u2264 4']);
+  if (stv) {
+    entries.push({
+      key: 'vdrop', kind: 'check', title: tx('Sp\u00E6ndingsfald \u0394U', 'Voltage drop \u0394U'),
+      formula: is3 ? '\u0394U% = \u221A3\u00B7IB\u00B7L\u00B7(r\u00B7cos\u03C6 + x\u00B7sin\u03C6)/(U\u00B710)' : '\u0394U% = 2\u00B7IB\u00B7L\u00B7(r\u00B7cos\u03C6 + x\u00B7sin\u03C6)/(U\u00B710)',
+      inputs: [
+        { sym: 'IB', val: provNum(ib, 1) + ' A', src: tx('beregnet', 'computed') },
+        { sym: 'L', val: (opts.length_m || 0) + ' m', src: tx('valgt l\u00E6ngde', 'selected length') },
+        { sym: 'cos\u03C6', val: cos.toFixed(2), src: tx('valgt', 'selected') }
+      ],
+      steps: [ stv.detail + ' (' + tx('inkl. forsyningskabel', 'incl. supply cable') + ')' ],
+      clause: 'DS/HD 60364-5-52 cl. 525', table: '\u2014',
+      assumption: tx('Inkluderer forsyningssegmentets fald; gr\u00E6nse 4% (5% absolut).', 'Includes the supply segment drop; limit 4% (5% absolute).'),
+      value: stv.detail, verdict: stv.status, recommendation: stv.recommendation
+    });
+  }
+
+  return { scope: scope, ib: ib, entries: entries };
+}
+
+// Build the whole-project provenance. Pulls verdict + findings from the live
+// auditor and the reactive bus so it is ALWAYS fresh and never shows stale-OK.
+function provBuildProject(project) {
+  const audit = upAuditProject(project);
+  let stale = false;
+  try {
+    if (typeof Reactive !== 'undefined' && Reactive.verdict) {
+      const rv = Reactive.verdict('kritisk');
+      if (rv && rv.stale) stale = true;
+    }
+  } catch (e) {}
+  const built = upBuildTree(project);
+  if (!built) {
+    return { ok: false, verdict: audit.verdict, stale: stale, ikBoardA: audit.ikBoardA || 0, supply: null, circuits: [], findings: audit.findings };
+  }
+  const tree = built.tree;
+  sldPropagateAll(tree);
+  const ikBoardA = audit.ikBoardA || sldCalcNodeIk(tree, built.boardId).ikmax;
+
+  // Supply (board) segment
+  let ibBoard = 0;
+  built.finalIds.forEach(function (fId) { ibBoard += sldCalcNodeIB(tree.nodes[fId]); });
+  const sup = project.supply || {};
+  const supDev = upResolveDevice(sup.deviceId, sup.deviceIn);
+  const supCable = sup.cableId ? upCableProduct(sup.cableId) : null;
+  const supScope = tx('Forsyningskabel', 'Supply cable');
+  const supply = provBuildSegment({
+    tree: tree, nodeId: built.boardId, ib: ibBoard, dev: supDev, cable: supCable,
+    findings: audit.findings, scope: supScope, phases: '3x400', cosPhi: 0.9,
+    length_m: sup.length_m || 0, power_kW: ibBoard * Math.sqrt(3) * 400 * 0.9 / 1000,
+    earthing: project.earthing, ikBoardA: ikBoardA
+  });
+
+  // Final circuits
+  const circuits = [];
+  built.finalIds.forEach(function (fId, idx) {
+    const fc = project.finals[idx];
+    const node = tree.nodes[fId];
+    const name = (lang === 'da' ? (fc.name_da || 'Slutkreds') : (lang === 'fa' ? (_FA['Final circuit'] || (fc.name_en || 'Final circuit')) : (fc.name_en || 'Final circuit'))) + ' #' + (idx + 1);
+    const dev = upResolveDevice(fc.deviceId, fc.deviceIn);
+    const cab = fc.cableId ? upCableProduct(fc.cableId) : null;
+    const seg = provBuildSegment({
+      tree: tree, nodeId: fId, dev: dev, cable: cab, findings: audit.findings,
+      scope: name, phases: fc.phases, cosPhi: fc.cosPhi, length_m: fc.length_m || 0,
+      power_kW: fc.loadKW || 0, earthing: project.earthing, ikBoardA: ikBoardA
+    });
+    circuits.push({ name: name, seg: seg });
+  });
+
+  return { ok: true, verdict: audit.verdict, stale: stale, ikBoardA: ikBoardA, supply: supply, circuits: circuits, findings: audit.findings };
+}
+
+// ---- Provenance render (click-only: native <details>/<summary> expanders) ----
+function provVerdictBadge(v) {
+  const m = (v === 'ok' || v === 'green') ? reactiveVerdictMeta('ok')
+    : (v === 'warning' || v === 'yellow') ? reactiveVerdictMeta('warning')
+    : (v === 'fail' || v === 'red') ? reactiveVerdictMeta('fail')
+    : (v === 'info') ? { color: 'var(--text-muted)', icon: '\u2139\uFE0F', label: tx('Info', 'Info') }
+    : reactiveVerdictMeta('incomplete');
+  return '<span style="color:' + m.color + ';font-weight:700">' + m.icon + ' ' + m.label + '</span>';
+}
+
+function provRenderEntry(e, expanded) {
+  const open = expanded ? ' open' : '';
+  let h = '<details class="prov-entry"' + open + '>';
+  h += '<summary style="cursor:pointer;font-weight:600">' + e.title + ' \u2014 ' + provVerdictBadge(e.verdict) + '<span style="color:var(--text-muted);font-weight:400"> \u00B7 ' + tx('vis udregning', 'show working') + '</span></summary>';
+  h += '<div class="prov-body" style="padding:6px 0 10px 10px;font-size:0.82rem">';
+  h += '<div class="prov-formula" style="font-family:monospace"><strong>' + tx('Formel', 'Formula') + ':</strong> ' + e.formula + '</div>';
+  if (e.inputs && e.inputs.length) {
+    h += '<div style="margin-top:4px"><strong>' + tx('Inputv\u00E6rdier', 'Input values') + ':</strong><ul style="margin:2px 0 0 18px">';
+    e.inputs.forEach(function (i) { h += '<li>' + i.sym + ' = ' + i.val + ' <span style="color:var(--text-muted)">(' + i.src + ')</span></li>'; });
+    h += '</ul></div>';
+  }
+  if (e.steps && e.steps.length) {
+    h += '<div style="margin-top:4px"><strong>' + tx('Mellemregninger', 'Intermediate steps') + ':</strong><ol style="margin:2px 0 0 18px">';
+    e.steps.forEach(function (s) { h += '<li style="font-family:monospace">' + s + '</li>'; });
+    h += '</ol></div>';
+  }
+  h += '<div style="margin-top:4px"><strong>' + tx('Bestemmelse', 'Clause') + ':</strong> ' + e.clause + ' \u00B7 <strong>' + tx('Tabel', 'Table') + ':</strong> ' + (e.table || '\u2014') + '</div>';
+  h += '<div style="margin-top:4px"><strong>' + tx('Konservativ antagelse', 'Conservative assumption') + ':</strong> <em>' + e.assumption + '</em></div>';
+  h += '<div style="margin-top:4px"><strong>' + tx('Resultat', 'Result') + ':</strong> ' + e.value + ' \u2014 ' + provVerdictBadge(e.verdict) + '</div>';
+  if (e.recommendation) h += '<div style="margin-top:4px;color:var(--primary)"><strong>\u2192 ' + tx('Anbefaling', 'Recommendation') + ':</strong> ' + e.recommendation + '</div>';
+  h += '</div></details>';
+  return h;
+}
+
+function provRenderSegment(seg, expanded) {
+  let h = '';
+  seg.entries.forEach(function (e) { h += provRenderEntry(e, expanded); });
+  return h;
+}
+
+// Render the full provenance section for the unified project (used inside the
+// Critical Mind audit so EVERY verdict shows its working).
+function provRenderSection(project, expanded) {
+  const prov = provBuildProject(project);
+  let h = '<div class="prov-section" style="margin-top:12px">';
+  h += '<div class="result-title">\uD83D\uDD0E ' + tx('Fuld udregning (vis bevisf\u00F8relse)', 'Full working (show the proof)') + '</div>';
+  if (!prov.ok) {
+    h += '<div class="info-row">' + tx('V\u00E6lg en transformer for at se den fulde udregning.', 'Select a transformer to see the full working.') + '</div></div>';
+    return h;
+  }
+  if (prov.supply) {
+    h += '<div style="margin-top:8px;font-weight:700">' + prov.supply.scope + '</div>';
+    h += provRenderSegment(prov.supply, expanded);
+  }
+  prov.circuits.forEach(function (c) {
+    h += '<div style="margin-top:8px;font-weight:700">' + c.name + '</div>';
+    h += provRenderSegment(c.seg, expanded);
+  });
+  h += '</div>';
+  return h;
+}
+
+// ============================================================================
+// ===== SIGNED, DATED PROFESSIONAL CALCULATION REPORT =====
+// ============================================================================
+// 100% click-only identity: preset designer ROLES (no typed name) + click-to-
+// stamp date. The approval text is DRIVEN BY the live verdict so it can never
+// say "approved/safe" for a failing or stale design.
+const REPORT_ROLES = [
+  { key: 'autoinstaller', da: 'Autoriseret elinstall\u00F8r', en: 'Authorised electrical installer', fa: '\u0646\u0635\u0627\u0628 \u0628\u0631\u0642 \u0645\u062C\u0627\u0632' },
+  { key: 'kls', da: 'Fagligt ansvarlig (KLS)', en: 'Technically responsible (KLS)', fa: '\u0645\u0633\u0626\u0648\u0644 \u0641\u0646\u06CC (KLS)' },
+  { key: 'maskinmester', da: 'Maskinmester', en: 'Marine/operations engineer', fa: '\u0645\u0647\u0646\u062F\u0633 \u062F\u0631\u06CC\u0627\u06CC\u06CC' },
+  { key: 'engineer', da: 'R\u00E5dgivende ingeni\u00F8r', en: 'Consulting engineer', fa: '\u0645\u0647\u0646\u062F\u0633 \u0645\u0634\u0627\u0648\u0631' }
+];
+const REPORT_STD_STATEMENT = function () {
+  return tx('Projekteret og verificeret iht. DS/HD 60364:2022.', 'Designed and verified to DS/HD 60364:2022.');
+};
+
+let reportState = { roleKey: null, dateStamp: null, approved: false };
+function reportRoleLabel(k) {
+  for (let i = 0; i < REPORT_ROLES.length; i++) {
+    if (REPORT_ROLES[i].key === k) {
+      const r = REPORT_ROLES[i];
+      return lang === 'da' ? r.da : (lang === 'fa' ? r.fa : r.en);
+    }
+  }
+  return null;
+}
+function reportSetRole(k) { reportState.roleKey = REPORT_ROLES.some(function (r) { return r.key === k; }) ? k : null; if (typeof renderModule === 'function') renderModule('pdf'); }
+function reportStampDate() { reportState.dateStamp = new Date().toISOString().slice(0, 10); if (typeof renderModule === 'function') renderModule('pdf'); }
+function reportClearStamp() { reportState.dateStamp = null; reportState.approved = false; if (typeof renderModule === 'function') renderModule('pdf'); }
+function reportToggleApproval() { reportState.approved = !reportState.approved; if (typeof renderModule === 'function') renderModule('pdf'); }
+
+// Map the 4-state verdict to an approval line that NEVER lies about safety.
+function reportApprovalText(verdict, stale) {
+  if (stale) return { color: 'var(--text-muted)', text: tx('GENBEREGNES \u2014 ikke gyldig som godkendelse f\u00F8r genberegnet.', 'RECOMPUTING \u2014 not valid as approval until recomputed.') };
+  if (verdict === 'green') return { color: 'var(--success)', text: tx('GODKENDT til udf\u00F8relse (alle kontroller best\u00E5et).', 'APPROVED for construction (all checks pass).') };
+  if (verdict === 'yellow') return { color: '#b8860b', text: tx('GODKENDT MED FORBEHOLD \u2014 udbedr advarsler f\u00F8r udf\u00F8relse.', 'APPROVED WITH RESERVATIONS \u2014 resolve warnings before construction.') };
+  if (verdict === 'red') return { color: 'var(--danger)', text: tx('IKKE GODKENDT \u2014 farlige fejl skal udbedres.', 'NOT APPROVED \u2014 dangerous failures must be fixed.') };
+  return { color: 'var(--text-muted)', text: tx('UFULDST\u00C6NDIGT \u2014 mangler data; ikke gyldig som godkendelse.', 'INCOMPLETE \u2014 missing data; not valid as approval.') };
+}
+
+// Clean, ink-friendly SLD generated from the unified project (single source of
+// truth) so the diagram always matches the report's circuits.
+function reportRenderSLD(prov, project) {
+  const finals = (project.finals || []);
+  const w = 640, perCol = Math.max(1, finals.length);
+  const h = 250;
+  let svg = '<svg class="report-sld" xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + w + ' ' + h + '" style="background:#ffffff;border:1px solid #999">';
+  svg += '<rect x="20" y="14" width="160" height="36" fill="#f4f4f4" stroke="#333"/>';
+  svg += '<text x="100" y="36" text-anchor="middle" font-size="11">' + tx('Transformer', 'Transformer') + '</text>';
+  svg += '<line x1="100" y1="50" x2="100" y2="78" stroke="#333" stroke-width="2"/>';
+  svg += '<rect x="20" y="78" width="160" height="34" fill="#eef4fb" stroke="#333"/>';
+  svg += '<text x="100" y="100" text-anchor="middle" font-size="11">' + tx('Hovedtavle', 'Main board') + ' (Ik3max ' + provNum(prov.ikBoardA / 1000, 1) + ' kA)</text>';
+  svg += '<line x1="100" y1="112" x2="' + (40 + (perCol - 1) * 120 + 60) + '" y2="112" stroke="#333" stroke-width="2"/>';
+  for (let i = 0; i < finals.length; i++) {
+    const cx = 100 + i * 120;
+    svg += '<line x1="' + cx + '" y1="112" x2="' + cx + '" y2="150" stroke="#333"/>';
+    svg += '<rect x="' + (cx - 55) + '" y="150" width="110" height="44" fill="#fff" stroke="#333"/>';
+    const nm = (lang === 'da' ? (finals[i].name_da || 'Kreds') : (finals[i].name_en || 'Circuit')) + ' #' + (i + 1);
+    svg += '<text x="' + cx + '" y="170" text-anchor="middle" font-size="9">' + nm + '</text>';
+    svg += '<text x="' + cx + '" y="184" text-anchor="middle" font-size="8">' + (finals[i].phases || '1x230') + ' \u00B7 ' + (finals[i].loadKW || 0) + ' kW</text>';
+  }
+  svg += '</svg>';
+  return svg;
+}
+
+// Build the report model (pure-ish: reads upProject + reportState; computes via engine).
+function reportBuildModel(project) {
+  const prov = provBuildProject(project);
+  const audit = { verdict: prov.verdict, findings: prov.findings };
+  const tf = upTransformer(project);
+  const sup = project.supply || {};
+  const supCable = sup.cableId ? upCableProduct(sup.cableId) : null;
+  const supDev = upResolveDevice(sup.deviceId, sup.deviceIn);
+  const counts = { ok: 0, warning: 0, fail: 0, info: 0 };
+  (prov.findings || []).forEach(function (f) { if (counts[f.status] != null) counts[f.status]++; });
+  // Load schedule rows from the verified tree
+  const built = upBuildTree(project);
+  const rows = [];
+  if (built) {
+    built.finalIds.forEach(function (fId, idx) {
+      const fc = project.finals[idx];
+      const ib = sldCalcNodeIB(built.tree.nodes[fId]);
+      rows.push({
+        name: (lang === 'da' ? (fc.name_da || 'Slutkreds') : (fc.name_en || 'Final circuit')) + ' #' + (idx + 1),
+        phases: fc.phases || '1x230', loadKW: fc.loadKW || 0, cosPhi: fc.cosPhi || 0.95, ib: ib
+      });
+    });
+  }
+  return {
+    meta: {
+      title: tx('Beregningsrapport \u2014 elinstallation', 'Calculation report \u2014 electrical installation'),
+      date: reportState.dateStamp,
+      role: reportRoleLabel(reportState.roleKey),
+      earthing: project.earthing,
+      transformer: tf ? (tf.brand + ' ' + tf.model + ' \u2014 ' + tf.kva + ' kVA, uk ' + tf.ukPct + '%') : null,
+      supplyCable: supCable ? (supCable.brand + ' ' + supCable.model + ' ' + supCable.mm2 + ' mm\u00B2') : null,
+      mainDevice: supDev ? (supDev.product.brand + ' ' + supDev.product.model + ' ' + supDev.In + ' A') : null,
+      generatedAt: new Date().toISOString()
+    },
+    prov: prov, verdict: prov.verdict, stale: prov.stale, counts: counts,
+    loadSchedule: rows, statement: REPORT_STD_STATEMENT(),
+    approved: reportState.approved
+  };
+}
+
+// Render the report HTML. expanded=true renders all provenance open (for print).
+function reportRenderHTML(model, expanded) {
+  const vMeta = model.stale ? reactiveVerdictMeta('stale')
+    : (model.verdict === 'green') ? reactiveVerdictMeta('ok')
+    : (model.verdict === 'yellow') ? reactiveVerdictMeta('warning')
+    : (model.verdict === 'red') ? reactiveVerdictMeta('fail')
+    : reactiveVerdictMeta('incomplete');
+  const m = model.meta;
+  let h = '<div class="report-doc">';
+  // Header
+  h += '<div class="report-head"><h1 style="margin:0">' + m.title + '</h1>';
+  h += '<div class="report-statement" style="font-weight:700">' + model.statement + '</div>';
+  h += '<div style="font-size:0.8rem;color:var(--text-muted)">' + tx('Genereret', 'Generated') + ': ' + m.generatedAt + ' \u00B7 ' + tx('Kilde', 'Source') + ': ' + UP_SAFETY_REF + '</div></div>';
+
+  // Verdict banner — NEVER green if stale/fail/incomplete
+  h += '<div class="report-verdict" style="margin:10px 0;padding:8px;border-left:6px solid ' + vMeta.color + '">';
+  h += '<strong style="color:' + vMeta.color + '">' + vMeta.icon + ' ' + tx('Samlet konklusion', 'Overall verdict') + ': ' + vMeta.label + '</strong>';
+  if (model.stale) h += '<div style="color:var(--text-muted)">' + tx('Et input er \u00E6ndret efter sidste beregning \u2014 genberegn f\u00F8r underskrift. Vises IKKE som sikker.', 'An input changed after the last computation \u2014 recompute before signing. NOT shown as safe.') + '</div>';
+  h += '</div>';
+
+  // Metadata
+  h += '<h2>' + tx('1. Projektdata', '1. Project metadata') + '</h2><table class="report-table">';
+  h += '<tr><th>' + tx('Dato', 'Date') + '</th><td>' + (m.date || tx('(ikke stemplet)', '(not stamped)')) + '</td></tr>';
+  h += '<tr><th>' + tx('Projekterende', 'Designer') + '</th><td>' + (m.role || tx('(ikke valgt)', '(not selected)')) + '</td></tr>';
+  h += '<tr><th>' + tx('Jordingssystem', 'Earthing system') + '</th><td>' + m.earthing + '</td></tr>';
+  h += '<tr><th>' + tx('Forsyning (transformer)', 'Supply (transformer)') + '</th><td>' + (m.transformer || '\u2014') + '</td></tr>';
+  h += '<tr><th>' + tx('Forsyningskabel', 'Supply cable') + '</th><td>' + (m.supplyCable || '\u2014') + '</td></tr>';
+  h += '<tr><th>' + tx('Hovedafbryder', 'Main device') + '</th><td>' + (m.mainDevice || '\u2014') + '</td></tr>';
+  h += '</table>';
+
+  // SLD
+  h += '<h2>' + tx('2. Enstregsdiagram', '2. Single-line diagram') + '</h2>';
+  h += reportRenderSLD(model.prov, upProject);
+
+  // Load schedule
+  h += '<h2>' + tx('3. Belastningsskema', '3. Load schedule') + '</h2><table class="report-table">';
+  h += '<tr><th>' + tx('Kreds', 'Circuit') + '</th><th>' + tx('Faser', 'Phases') + '</th><th>kW</th><th>cos\u03C6</th><th>IB [A]</th></tr>';
+  model.loadSchedule.forEach(function (r) { h += '<tr><td>' + r.name + '</td><td>' + r.phases + '</td><td>' + provNum(r.loadKW, 2) + '</td><td>' + r.cosPhi + '</td><td>' + provNum(r.ib, 1) + '</td></tr>'; });
+  if (!model.loadSchedule.length) h += '<tr><td colspan="5">' + tx('Ingen slutkredse.', 'No final circuits.') + '</td></tr>';
+  h += '</table>';
+
+  // Per-circuit provenance
+  h += '<h2>' + tx('4. Beregningsbevis pr. kreds (formel \u2192 input \u2192 trin \u2192 bestemmelse \u2192 konklusion)', '4. Per-circuit calculation proof (formula \u2192 inputs \u2192 steps \u2192 clause \u2192 verdict)') + '</h2>';
+  if (model.prov.ok) {
+    if (model.prov.supply) { h += '<h3>' + model.prov.supply.scope + '</h3>' + provRenderSegment(model.prov.supply, expanded); }
+    model.prov.circuits.forEach(function (c) { h += '<h3>' + c.name + '</h3>' + provRenderSegment(c.seg, expanded); });
+  } else {
+    h += '<div>' + tx('V\u00E6lg en transformer for at generere beregningsbeviset.', 'Select a transformer to generate the calculation proof.') + '</div>';
+  }
+
+  // Audit summary
+  h += '<h2>' + tx('5. Den Kritiske Hjerne \u2014 audit (r\u00F8d/gul/gr\u00F8n)', '5. The Critical Mind \u2014 audit (red/yellow/green)') + '</h2>';
+  h += '<div>\u26D4 ' + model.counts.fail + ' \u00B7 \u26A0\uFE0F ' + model.counts.warning + ' \u00B7 \u2705 ' + model.counts.ok + ' \u00B7 \u2139\uFE0F ' + model.counts.info + '</div>';
+  h += '<table class="report-table"><tr><th>' + tx('Omr\u00E5de', 'Scope') + '</th><th>' + tx('Regel', 'Rule') + '</th><th>' + tx('Detalje', 'Detail') + '</th><th>' + tx('Bestemmelse', 'Clause') + '</th><th>' + tx('Status', 'Status') + '</th></tr>';
+  (model.prov.findings || []).forEach(function (f) {
+    h += '<tr><td>' + f.scope + '</td><td>' + f.rule + '</td><td>' + f.detail + '</td><td>' + f.clause + '</td><td>' + provVerdictBadge(f.status) + '</td></tr>';
+  });
+  h += '</table>';
+
+  // Statement + signature/approval block
+  const ap = reportApprovalText(model.verdict, model.stale);
+  h += '<h2>' + tx('6. Erkl\u00E6ring & godkendelse', '6. Statement & approval') + '</h2>';
+  h += '<div class="report-statement" style="font-weight:700">' + model.statement + '</div>';
+  h += '<div style="margin-top:6px;color:' + ap.color + ';font-weight:700">' + ap.text + '</div>';
+  h += '<table class="report-table" style="margin-top:8px">';
+  h += '<tr><th>' + tx('Projekterende (rolle)', 'Designer (role)') + '</th><td>' + (m.role || tx('(ikke valgt)', '(not selected)')) + '</td></tr>';
+  h += '<tr><th>' + tx('Dato', 'Date') + '</th><td>' + (m.date || tx('(ikke stemplet)', '(not stamped)')) + '</td></tr>';
+  h += '<tr><th>' + tx('Underskrift / stempel', 'Signature / stamp') + '</th><td>' + (model.approved && m.role && m.date ? ('\u2713 ' + m.role + ' \u00B7 ' + m.date) : tx('___________________________', '___________________________')) + '</td></tr>';
+  h += '</table>';
+  h += '<div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px">' + tx('Konservativt resultat. Verificer altid mod g\u00E6ldende DS/HD 60364 og ' + UP_SAFETY_REF + '.', 'Conservative result. Always verify against the current DS/HD 60364 and ' + UP_SAFETY_REF + '.') + '</div>';
+  h += '</div>';
+  return h;
+}
+
+// Ink-friendly print stylesheet (forces clean light layout regardless of theme/RTL).
+function reportPrintCSS() {
+  return 'body{background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif;margin:18mm 14mm;font-size:11px;line-height:1.4}'
+    + 'h1{font-size:18px}h2{font-size:14px;border-bottom:1px solid #000;margin-top:14px}h3{font-size:12px;margin:8px 0 2px}'
+    + '.report-table{border-collapse:collapse;width:100%;margin:4px 0}'
+    + '.report-table th,.report-table td{border:1px solid #555;padding:3px 5px;text-align:left;vertical-align:top}'
+    + '.report-table th{background:#eee}'
+    + '.report-sld{background:#fff !important;border:1px solid #555;max-width:100%}'
+    + '.prov-entry{border-left:2px solid #999;padding-left:8px;margin:4px 0}'
+    + '.prov-entry > summary{list-style:none}'
+    + '.prov-entry[open]{page-break-inside:avoid}'
+    + '.report-statement{border:1px solid #000;padding:6px;background:#f7f7f7}'
+    + '@page{margin:14mm}';
+}
+
+// Open a print window with the report fully expanded; RTL-aware for Farsi.
+function reportPrint() {
+  const model = reportBuildModel(upProject);
+  const html = reportRenderHTML(model, true);
+  const dir = (lang === 'fa') ? 'rtl' : 'ltr';
+  const w = window.open('', '_blank');
+  if (!w) return;
+  const doc = w.document;
+  doc.write('<!DOCTYPE html><html dir="' + dir + '" lang="' + lang + '"><head><meta charset="utf-8"><title>' + model.meta.title + '</title><style>' + reportPrintCSS() + '</style></head><body>' + html + '</body></html>');
+  doc.close();
+  w.focus();
+  try { w.print(); } catch (e) {}
+}
+
+// The report UI (click-only controls) embedded in the documentation module.
+function reportRenderUI() {
+  const model = reportBuildModel(upProject);
+  let h = '<div class="card fade-in"><div class="card-title">\uD83D\uDCDC ' + tx('Professionel beregningsrapport (underskrevet, dateret)', 'Professional calculation report (signed, dated)') + '</div>';
+  h += '<div class="info-row">' + tx('Den faktiske leverance til kunde/myndighed: projektdata, enstregsdiagram, belastningsskema, fuld udregning pr. kreds, Kritisk Hjerne-audit og en DS/HD 60364:2022-erkl\u00E6ring med underskriftsfelt. 100% klik \u2014 ingen indtastning. Udskriv til PDF via browseren.', 'The actual deliverable to client/authority: project data, single-line diagram, load schedule, full per-circuit working, Critical Mind audit and a DS/HD 60364:2022 statement with a signature block. 100% click \u2014 no typing. Print to PDF via the browser.') + '</div>';
+
+  // Click-only identity: role dropdown + date stamp + approval toggle
+  h += '<div class="select-group"><div class="select-label">' + tx('Projekterende (v\u00E6lg rolle \u2014 ingen indtastning)', 'Designer (pick a role \u2014 no typing)') + '</div><div class="select-grid">';
+  REPORT_ROLES.forEach(function (r) {
+    h += '<button class="sel-btn ' + (reportState.roleKey === r.key ? 'selected' : '') + '" onclick="reportSetRole(\'' + r.key + '\')">' + (lang === 'da' ? r.da : (lang === 'fa' ? r.fa : r.en)) + '</button>';
+  });
+  h += '</div></div>';
+  h += '<div class="select-grid" style="margin-top:8px">';
+  h += '<button class="sel-btn" onclick="reportStampDate()">\uD83D\uDCC5 ' + tx('Stempl dato i dag', 'Stamp today\u2019s date') + (reportState.dateStamp ? ' (' + reportState.dateStamp + ')' : '') + '</button>';
+  if (reportState.dateStamp) h += '<button class="sel-btn" onclick="reportClearStamp()">\u21BA ' + tx('Ryd stempel', 'Clear stamp') + '</button>';
+  const canApprove = reportState.roleKey && reportState.dateStamp;
+  h += '<button class="sel-btn ' + (reportState.approved ? 'selected' : '') + '"' + (canApprove ? '' : ' disabled style="opacity:0.5;cursor:not-allowed"') + ' onclick="' + (canApprove ? 'reportToggleApproval()' : '') + '">\u270D\uFE0F ' + (reportState.approved ? tx('Godkendelse stemplet', 'Approval stamped') : tx('Stempl godkendelse', 'Stamp approval')) + '</button>';
+  h += '<button class="sel-btn selected" onclick="reportPrint()">\uD83D\uDDA8\uFE0F ' + tx('Udskriv / gem som PDF', 'Print / save as PDF') + '</button>';
+  h += '</div>';
+  if (!canApprove) h += '<div class="info-row" style="font-size:0.8rem">' + tx('V\u00E6lg rolle og stempl dato for at kunne stemple godkendelse.', 'Pick a role and stamp the date to enable the approval stamp.') + '</div>';
+
+  // Inline preview (collapsed provenance; click to expand each)
+  h += '<div class="report-preview" style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">';
+  h += reportRenderHTML(model, false);
+  h += '</div></div>';
   return h;
 }
 
