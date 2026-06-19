@@ -7470,6 +7470,176 @@ test('Critical Mind: pick transformer -> Ik -> audit -> verdict renders in BOTH 
   upRestore(saved);
 });
 
+// ===== AI-GUIDER MODULE TESTS =====
+console.log('\n=== AI-Guider Module Tests ===\n');
+
+test('Guide: nav label exists and is FIRST key in da, en, fa', function() {
+  ['da', 'en', 'fa'].forEach(function(L) {
+    assert(T[L] && T[L].modules && T[L].modules.guide, 'guide nav label missing in ' + L);
+    assert.strictEqual(Object.keys(T[L].modules)[0], 'guide', 'guide must be the FIRST nav key in ' + L);
+  });
+});
+
+test('Guide: renders in Danish (da)', function() {
+  var savedLang = lang; var snap = JSON.stringify(guideState);
+  guideState = { projectType: null, earthing: null, done: {}, glossaryOpen: false };
+  lang = 'da';
+  var out = renderGuide();
+  assert(out.indexOf('AI-Guider') >= 0, 'da contains AI-Guider title');
+  assert(out.indexOf('start her') >= 0, 'da contains "start her"');
+  assert(out.indexOf('Hvad skal du dimensionere?') >= 0, 'da contains project-type question');
+  assert(out.indexOf('jordingssystem') >= 0, 'da contains earthing question');
+  lang = savedLang; guideState = JSON.parse(snap);
+});
+
+test('Guide: renders in English (en)', function() {
+  var savedLang = lang; var snap = JSON.stringify(guideState);
+  guideState = { projectType: null, earthing: null, done: {}, glossaryOpen: false };
+  lang = 'en';
+  var out = renderGuide();
+  assert(out.indexOf('AI Guide') >= 0, 'en contains AI Guide title');
+  assert(out.indexOf('start here') >= 0, 'en contains "start here"');
+  assert(out.indexOf('What are you designing?') >= 0, 'en contains project-type question');
+  assert(out.indexOf('Which earthing system?') >= 0, 'en contains earthing question');
+  lang = savedLang; guideState = JSON.parse(snap);
+});
+
+test('Guide: Farsi strings exist and render (fa)', function() {
+  var savedLang = lang; var snap = JSON.stringify(guideState);
+  guideState = { projectType: 'final', earthing: 'TN', done: {}, glossaryOpen: false };
+  // _FA must contain the guide entries
+  assert(_FA['AI Guide \u2014 start here'], '_FA has guide title');
+  assert(_FA['What are you designing?'], '_FA has project-type question');
+  assert(_FA['Open this step'], '_FA has "Open this step"');
+  lang = 'fa';
+  var out = renderGuide();
+  assert(typeof out === 'string' && out.length > 0, 'fa renders a non-empty string');
+  assert(out.indexOf(_FA['What are you designing?']) >= 0, 'fa renders translated question');
+  lang = savedLang; guideState = JSON.parse(snap);
+});
+
+test('Guide: UI is 100% click-only (no text input/textarea) in da, en, fa', function() {
+  var savedLang = lang; var snap = JSON.stringify(guideState);
+  guideState = { projectType: 'installation', earthing: 'TT', done: { load: true }, glossaryOpen: true };
+  ['da', 'en', 'fa'].forEach(function(L) {
+    lang = L;
+    var out = renderGuide();
+    assert(out.indexOf('<input') < 0, 'no <input> in ' + L);
+    assert(out.indexOf('<textarea') < 0, 'no <textarea> in ' + L);
+  });
+  lang = savedLang; guideState = JSON.parse(snap);
+});
+
+test('Guide: every step jump target is a real module key in renderModule', function() {
+  var switchSrc = renderModule.toString();
+  GUIDE_PROJECT_TYPES.forEach(function(pt) {
+    var steps = guideBuildSteps({ projectType: pt.key });
+    steps.forEach(function(key) {
+      assert(switchSrc.indexOf("case '" + key + "'") >= 0, 'jump target "' + key + '" must exist in renderModule (project ' + pt.key + ')');
+    });
+  });
+});
+
+test('Guide: rendered "Open this step" calls switchModule with real keys', function() {
+  var savedLang = lang; var snap = JSON.stringify(guideState);
+  var switchSrc = renderModule.toString();
+  guideState = { projectType: 'final', earthing: 'TN', done: {}, glossaryOpen: false };
+  lang = 'en';
+  var out = renderGuide();
+  // extract switchModule('xxx') targets from rendered HTML
+  var re = /switchModule\('([a-z]+)'\)/g, m, found = 0;
+  while ((m = re.exec(out)) !== null) {
+    found++;
+    assert(switchSrc.indexOf("case '" + m[1] + "'") >= 0, 'rendered jump "' + m[1] + '" is a real module');
+  }
+  assert(found > 0, 'at least one "Open this step" jump rendered');
+  lang = savedLang; guideState = JSON.parse(snap);
+});
+
+test('Guide: safe order IB(load)->In(mcb)->Iz(cable)->vdrop->scircuit->Zs->...->kritisk', function() {
+  GUIDE_PROJECT_TYPES.forEach(function(pt) {
+    var s = guideBuildSteps({ projectType: pt.key });
+    var iLoad = s.indexOf('load'), iMcb = s.indexOf('mcb'), iCable = s.indexOf('cable');
+    var iVdrop = s.indexOf('vdrop'), iSc = s.indexOf('scircuit'), iZs = s.indexOf('zs'), iK = s.indexOf('kritisk');
+    assert(iLoad >= 0 && iMcb > iLoad, 'load before mcb (' + pt.key + ')');
+    assert(iCable > iMcb, 'mcb before cable (' + pt.key + ')');
+    assert(iVdrop > iCable, 'cable before vdrop (' + pt.key + ')');
+    assert(iSc > iVdrop, 'vdrop before scircuit (' + pt.key + ')');
+    assert(iZs > iSc, 'scircuit before zs (' + pt.key + ')');
+    assert(iK > iZs, 'zs before kritisk (' + pt.key + ')');
+    assert.strictEqual(s[s.length - 1], 'kritisk', 'final step is kritisk (' + pt.key + ')');
+  });
+});
+
+test('Guide: application-specific projects start with their entry module', function() {
+  assert.strictEqual(guideBuildSteps({ projectType: 'ev' })[0], 'ev', 'ev starts at ev');
+  assert.strictEqual(guideBuildSteps({ projectType: 'solar' })[0], 'solar', 'solar starts at solar');
+  assert.strictEqual(guideBuildSteps({ projectType: 'heatpump' })[0], 'heatpump', 'heatpump starts at heatpump');
+  assert.strictEqual(guideBuildSteps({ projectType: 'final' })[0], 'load', 'final starts at load');
+  assert.strictEqual(guideBuildSteps({ projectType: 'installation' })[0], 'load', 'installation starts at load');
+});
+
+test('Guide: installation path includes selectivity, drawing and KLS', function() {
+  var s = guideBuildSteps({ projectType: 'installation' });
+  assert(s.indexOf('discrim') >= 0, 'includes discrim');
+  assert(s.indexOf('draw') >= 0, 'includes draw');
+  assert(s.indexOf('kls') >= 0, 'includes kls');
+  assert(s.indexOf('trafo') >= 0, 'includes trafo');
+});
+
+test('Guide: progress persistence round-trips through localStorage', function() {
+  var snap = JSON.stringify(guideState);
+  guideState = { projectType: 'ev', earthing: 'TT', done: { ev: true, load: true }, glossaryOpen: true };
+  guideSaveProgress();
+  // wipe in-memory state, then reload from storage
+  guideState = { projectType: null, earthing: null, done: {}, glossaryOpen: false };
+  guideLoadProgress();
+  assert.strictEqual(guideState.projectType, 'ev', 'projectType restored');
+  assert.strictEqual(guideState.earthing, 'TT', 'earthing restored');
+  assert.strictEqual(guideState.done.ev, true, 'done.ev restored');
+  assert.strictEqual(guideState.done.load, true, 'done.load restored');
+  localStorage.removeItem(GUIDE_STORAGE_KEY);
+  guideState = JSON.parse(snap);
+});
+
+test('Guide: storage key is el_guide_progress', function() {
+  assert.strictEqual(GUIDE_STORAGE_KEY, 'el_guide_progress', 'uses the namespaced guide key');
+});
+
+test('Guide: "you are here -> next" shows current step and the next one', function() {
+  var savedLang = lang; var snap = JSON.stringify(guideState);
+  lang = 'en';
+  guideState = { projectType: 'final', earthing: 'TN', done: { load: true }, glossaryOpen: false };
+  var out = renderGuide();
+  assert(out.indexOf('You are here') >= 0, 'shows "You are here"');
+  // load done -> current should be mcb (protective device)
+  assert(out.indexOf('protective device') >= 0, 'current step after load is the protective device step');
+  lang = savedLang; guideState = JSON.parse(snap);
+});
+
+test('Guide: "not sure" earthing shows how-to-find-out help', function() {
+  var savedLang = lang; var snap = JSON.stringify(guideState);
+  lang = 'en';
+  guideState = { projectType: 'final', earthing: 'unsure', done: {}, glossaryOpen: false };
+  var out = renderGuide();
+  assert(out.indexOf('How to find out') >= 0, 'unsure shows guidance on how to determine the earthing system');
+  lang = savedLang; guideState = JSON.parse(snap);
+});
+
+test('Guide: each step cites a DS/HD 60364 (or safety-law) clause', function() {
+  Object.keys(GUIDE_STEP_LIB).forEach(function(key) {
+    var c = GUIDE_STEP_LIB[key].clause;
+    assert(typeof c === 'string' && (c.indexOf('60364') >= 0 || c.indexOf('Elsikkerhedsloven') >= 0 || c.indexOf('62446') >= 0 || c.indexOf('Installationsbekendtg') >= 0), 'step "' + key + '" cites a real clause/standard');
+  });
+});
+
+test('Guide: glossary defines the core beginner terms (IB, In, Iz, Zs, RCD, TN/TT/IT, selectivity)', function() {
+  var blob = GUIDE_GLOSSARY.map(function(g) { return g.termEn + ' ' + g.en; }).join(' ');
+  ['IB', 'In', 'Iz', 'Zs', 'RCD', 'HPFI', 'TN / TT / IT', 'Selectivity', 'Breaking capacity'].forEach(function(term) {
+    assert(blob.indexOf(term) >= 0, 'glossary defines ' + term);
+  });
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

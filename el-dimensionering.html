@@ -638,6 +638,7 @@ const T = {
   da: {
     appTitle: 'El-Dimensionering',
     modules: {
+      guide: '\uD83E\uDDED AI-Guider',
       load: 'Belastning',
       fuse: 'Sikringer',
       mcb: 'Automatsikring',
@@ -780,6 +781,7 @@ const T = {
   en: {
     appTitle: 'Electrical Dimensioning',
     modules: {
+      guide: '\uD83E\uDDED AI Guide',
       load: 'Load Calc',
       fuse: 'Fuses',
       mcb: 'MCB',
@@ -914,6 +916,7 @@ const T = {
   fa: {
     appTitle: 'ابعادسنجی برق',
     modules: {
+      guide: '\uD83E\uDDED \u0631\u0627\u0647\u0646\u0645\u0627\u06CC AI',
       load: 'بار',
       fuse: 'فیوزها',
       mcb: 'کلید مینیاتوری',
@@ -1052,7 +1055,32 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
-  // Unified Project + Critical Mind safety auditor — new feature
+  // AI-Guider module (step-by-step beginner path) — new feature
+  'AI Guide \u2014 start here': '\u0631\u0627\u0647\u0646\u0645\u0627\u06CC AI \u2014 \u0627\u0632 \u0627\u06CC\u0646\u062C\u0627 \u0634\u0631\u0648\u0639 \u06A9\u0646\u06CC\u062F',
+  'What are you designing?': '\u0686\u0647 \u0686\u06CC\u0632\u06CC \u0631\u0627 \u0637\u0631\u0627\u062D\u06CC \u0645\u06CC\u200C\u06A9\u0646\u06CC\u062F\u061F',
+  'Which earthing system?': '\u06A9\u062F\u0627\u0645 \u0633\u06CC\u0633\u062A\u0645 \u0627\u062A\u0635\u0627\u0644 \u0632\u0645\u06CC\u0646\u061F',
+  'Your path \u2014 step by step': '\u0645\u0633\u06CC\u0631 \u0634\u0645\u0627 \u2014 \u06AF\u0627\u0645 \u0628\u0647 \u06AF\u0627\u0645',
+  'You are here': '\u0634\u0645\u0627 \u0627\u06CC\u0646\u062C\u0627 \u0647\u0633\u062A\u06CC\u062F',
+  'next': '\u0628\u0639\u062F\u06CC',
+  'Reset guide': '\u0628\u0627\u0632\u0646\u0634\u0627\u0646\u06CC \u0631\u0627\u0647\u0646\u0645\u0627',
+  'What is this step?': '\u0627\u06CC\u0646 \u0645\u0631\u062D\u0644\u0647 \u0686\u06CC\u0633\u062A\u061F',
+  'Why it matters for safety:': '\u0686\u0631\u0627 \u0628\u0631\u0627\u06CC \u0627\u06CC\u0645\u0646\u06CC \u0645\u0647\u0645 \u0627\u0633\u062A:',
+  'What you do here:': '\u062F\u0631 \u0627\u06CC\u0646\u062C\u0627 \u0686\u0647 \u06A9\u0627\u0631\u06CC \u0627\u0646\u062C\u0627\u0645 \u0645\u06CC\u200C\u062F\u0647\u06CC\u062F:',
+  'Open this step': '\u0628\u0627\u0632 \u06A9\u0631\u062F\u0646 \u0627\u06CC\u0646 \u0645\u0631\u062D\u0644\u0647',
+  'Mark as done': '\u0639\u0644\u0627\u0645\u062A\u200C\u06AF\u0630\u0627\u0631\u06CC \u0628\u0647 \u0639\u0646\u0648\u0627\u0646 \u0627\u0646\u062C\u0627\u0645\u200C\u0634\u062F\u0647',
+  'Mark as not done': '\u0639\u0644\u0627\u0645\u062A\u200C\u06AF\u0630\u0627\u0631\u06CC \u0628\u0647 \u0639\u0646\u0648\u0627\u0646 \u0627\u0646\u062C\u0627\u0645\u200C\u0646\u0634\u062F\u0647',
+  'Beginner glossary': '\u0648\u0627\u0698\u0647\u200C\u0646\u0627\u0645\u0647 \u0645\u0628\u062A\u062F\u06CC',
+  'Show glossary (click)': '\u0646\u0645\u0627\u06CC\u0634 \u0648\u0627\u0698\u0647\u200C\u0646\u0627\u0645\u0647 (\u06A9\u0644\u06CC\u06A9)',
+  'Hide glossary': '\u067E\u0646\u0647\u0627\u0646 \u06A9\u0631\u062F\u0646 \u0648\u0627\u0698\u0647\u200C\u0646\u0627\u0645\u0647',
+  'Find the load current (IB)': '\u062C\u0631\u06CC\u0627\u0646 \u0628\u0627\u0631 (IB) \u0631\u0627 \u067E\u06CC\u062F\u0627 \u06A9\u0646\u06CC\u062F',
+  'Choose the protective device rating (In)': '\u0627\u0646\u062A\u062E\u0627\u0628 \u062C\u0631\u06CC\u0627\u0646 \u0646\u0627\u0645\u06CC \u0648\u0633\u06CC\u0644\u0647 \u062D\u0641\u0627\u0638\u062A\u06CC (In)',
+  'Size the cable (Iz)': '\u0627\u0646\u062F\u0627\u0632\u0647\u200C\u06AF\u06CC\u0631\u06CC \u06A9\u0627\u0628\u0644 (Iz)',
+  'Check the voltage drop': '\u0628\u0631\u0631\u0633\u06CC \u0627\u0641\u062A \u0648\u0644\u062A\u0627\u0698',
+  'Check short-circuit & breaking capacity': '\u0628\u0631\u0631\u0633\u06CC \u0627\u062A\u0635\u0627\u0644 \u06A9\u0648\u062A\u0627\u0647 \u0648 \u0642\u062F\u0631\u062A \u0642\u0637\u0639',
+  'Check the earth-fault loop (Zs) \u2014 fast disconnection': '\u0628\u0631\u0631\u0633\u06CC \u062D\u0644\u0642\u0647 \u062E\u0637\u0627\u06CC \u0632\u0645\u06CC\u0646 (Zs) \u2014 \u0642\u0637\u0639 \u0633\u0631\u06CC\u0639',
+  'The Critical Mind \u2014 full safety audit': '\u0630\u0647\u0646 \u0627\u0646\u062A\u0642\u0627\u062F\u06CC \u2014 \u0645\u0645\u06CC\u0632\u06CC \u06A9\u0627\u0645\u0644 \u0627\u06CC\u0645\u0646\u06CC',
+
+
   'Project + Critical Mind': '\u067E\u0631\u0648\u0698\u0647 + \u0630\u0647\u0646 \u0627\u0646\u062A\u0642\u0627\u062F\u06CC',
   'Unified Project': '\u067E\u0631\u0648\u0698\u0647 \u06CC\u06A9\u067E\u0627\u0631\u0686\u0647',
   'Run the Critical Mind': '\u0627\u062C\u0631\u0627\u06CC \u0630\u0647\u0646 \u0627\u0646\u062A\u0642\u0627\u062F\u06CC',
@@ -4903,6 +4931,7 @@ function renderModule(mod) {
   const main = document.getElementById('mainContent');
   let content = '';
   switch(mod) {
+    case 'guide': content = renderGuide(); break;
     case 'load': content = renderLoad(); break;
     case 'fuse': content = renderFuse(); break;
     case 'mcb': content = renderMCB(); break;
@@ -4967,7 +4996,7 @@ function renderModule(mod) {
   if (mod !== 'exam') content += renderAiAssistant(mod);
   // Append QI validation summary if enough data exists
   const qi = runQiValidation();
-  const noQi = ['standards','bank','ai','bid','projekt','verify','draw','exam','kritisk'];
+  const noQi = ['standards','bank','ai','bid','projekt','verify','draw','exam','kritisk','guide'];
   if (qi.passed.length + qi.issues.length > 0 && noQi.indexOf(mod) < 0) {
     content += renderQiCard(qi);
   }
@@ -18176,7 +18205,297 @@ function upRenderAudit(audit) {
   return h;
 }
 
+// ===== AI-GUIDER MODULE (click-only, step-by-step path for non-experts) =====
+const GUIDE_STORAGE_KEY = 'el_guide_progress';
+
+// Project types the beginner can pick. startKey (optional) is an application-specific
+// entry module that comes BEFORE the core safe-design chain.
+const GUIDE_PROJECT_TYPES = [
+  { key: 'final',        icon: '\u2795', da: '\u00C9n enkelt kreds (fx en stikkontakt eller et apparat)', en: 'A single final circuit (e.g. one socket or appliance)' },
+  { key: 'installation', icon: '\uD83C\uDFE0', da: 'En hel installation (hele tavlen/boligen)', en: 'A whole installation (the whole board/home)' },
+  { key: 'ev',           icon: '\uD83D\uDD0C', da: 'Elbil-lader', en: 'EV charger', startKey: 'ev' },
+  { key: 'solar',        icon: '\u2600\uFE0F', da: 'Solceller & batteri', en: 'Solar PV & battery', startKey: 'solar' },
+  { key: 'heatpump',     icon: '\u2744\uFE0F', da: 'Varmepumpe', en: 'Heat pump', startKey: 'heatpump' }
+];
+
+// Earthing systems with plain-language explanations + a "not sure" option.
+const GUIDE_EARTHING = [
+  { key: 'TN',     label: 'TN', da: 'Mest almindeligt i Danmark. Stj\u00E6rnepunktet er jordet, og din PE/nul f\u00F8lger med fra n\u00E6ttet.', en: 'Most common in Denmark. The supply star-point is earthed and the PE/neutral comes from the grid.' },
+  { key: 'TT',     label: 'TT', da: 'Du har din egen jordelektrode (jordsp\u00E6r). Kr\u00E6ver n\u00E6sten altid HPFI/fejlstr\u00F8msafbryder.', en: 'You have your own earth electrode. Almost always requires an RCD/HPFI.' },
+  { key: 'IT',     label: 'IT', da: 'Specielt system (fx hospital/industri) hvor fors\u00E6lningen ikke er direkte jordet.', en: 'Special system (e.g. hospital/industry) where the supply is not directly earthed.' },
+  { key: 'unsure', label: '\u2753', da: 'Ikke sikker? V\u00E6lg dette \u2014 s\u00E5 forklarer vi hvordan du finder ud af det.', en: 'Not sure? Pick this \u2014 we explain how to find out.' }
+];
+
+// Step content library. Keys MUST be real module keys (jump targets in renderModule).
+// Each step carries plain-language What / Why / Do plus the exact DS/HD 60364 clause.
+const GUIDE_STEP_LIB = {
+  ev: {
+    titleDa: 'Elbil-lader: hvad skal installeres', titleEn: 'EV charger: what to install',
+    whatDa: 'Du fastl\u00E6gger ladeboksens effekt og antal ladere.', whatEn: 'You decide the charger power and the number of chargers.',
+    whyDa: 'En ladeboks tr\u00E6kker fuld str\u00F8m i mange timer i tr\u00E6k. Forkert dimensionering = overophedning og brandfare.', whyEn: 'A charger draws full current for many hours non-stop. Wrong sizing = overheating and fire risk.',
+    doDa: 'V\u00E6lg ladeeffekt. Resultatet bliver din belastningsstr\u00F8m (IB) i n\u00E6ste trin.', doEn: 'Pick the charge power. The result becomes your load current (IB) in the next step.',
+    clause: 'DS/HD 60364-7-722'
+  },
+  solar: {
+    titleDa: 'Solceller & batteri: hvad skal installeres', titleEn: 'Solar PV & battery: what to install',
+    whatDa: 'Du fastl\u00E6gger anl\u00E6ggets st\u00F8rrelse (kW) og om der er batteri.', whatEn: 'You decide the system size (kW) and whether there is a battery.',
+    whyDa: 'Solceller kan sende str\u00F8m TILBAGE i kablet, og DC kan ikke slukkes ved at trekke en sikring. Det stiller s\u00E6rlige sikkerhedskrav.', whyEn: 'Solar can push power BACK into the cable, and DC cannot be switched off by pulling a fuse. This creates special safety requirements.',
+    doDa: 'V\u00E6lg anl\u00E6gsst\u00F8rrelse. Resultatet bruges som belastning/produktion i de f\u00F8lgende trin.', doEn: 'Pick the system size. The result feeds the load/production in the following steps.',
+    clause: 'DS/HD 60364-7-712 + DS/EN 62446'
+  },
+  heatpump: {
+    titleDa: 'Varmepumpe: hvad skal installeres', titleEn: 'Heat pump: what to install',
+    whatDa: 'Du fastl\u00E6gger varmepumpens effekt og startstr\u00F8m.', whatEn: 'You decide the heat pump power and starting current.',
+    whyDa: 'Varmepumper k\u00F8rer l\u00E6nge og har en h\u00F8j startstr\u00F8m. Det p\u00E5virker b\u00E5de kabel og afbryder.', whyEn: 'Heat pumps run for long periods and have a high starting current. This affects both the cable and the protective device.',
+    doDa: 'V\u00E6lg effekt. Resultatet bliver din belastningsstr\u00F8m (IB) i n\u00E6ste trin.', doEn: 'Pick the power. The result becomes your load current (IB) in the next step.',
+    clause: 'DS/HD 60364 + Installationsbekendtg\u00F8relsen'
+  },
+  load: {
+    titleDa: 'Find belastningsstr\u00F8mmen (IB)', titleEn: 'Find the load current (IB)',
+    whatDa: 'IB er hvor mange ampere dit udstyr faktisk tr\u00E6kker, n\u00E5r det k\u00F8rer.', whatEn: 'IB is how many amperes your equipment actually draws when running.',
+    whyDa: 'Alt andet bygger oven p\u00E5 dette tal. Hele sikkerhedsk\u00E6den er IB \u2264 In \u2264 Iz \u2014 hvis IB er forkert, bliver alt det andet ogs\u00E5 forkert.', whyEn: 'Everything else is built on this number. The whole safety chain is IB \u2264 In \u2264 Iz \u2014 if IB is wrong, everything after it is wrong too.',
+    doDa: 'V\u00E6lg sp\u00E6nding, effekt og faser ved at klikke. Appen regner IB for dig.', doEn: 'Click to pick voltage, power and phases. The app computes IB for you.',
+    clause: 'DS/HD 60364-4-43 \u00A7433.1'
+  },
+  trafo: {
+    titleDa: 'Vurder transformer / forsyning (hvis relevant)', titleEn: 'Size the transformer / supply (if relevant)',
+    whatDa: 'Transformeren bestemmer hvor meget str\u00F8m der er til r\u00E5dighed \u2014 og hvor stor en kortslutningsstr\u00F8m der kan opst\u00E5.', whatEn: 'The transformer sets how much current is available \u2014 and how large a short-circuit current can occur.',
+    whyDa: 'For en hel installation skal forsyningen kunne klare den samlede belastning, og kortslutningsstr\u00F8mmen er afg\u00F8rende for valg af afbryder.', whyEn: 'For a whole installation the supply must handle the total load, and the short-circuit current decides which protective device you can use.',
+    doDa: 'V\u00E6lg transformerst\u00F8rrelse (kVA) og uk%. Bruges senere til kortslutning.', doEn: 'Pick the transformer size (kVA) and uk%. Used later for short-circuit.',
+    clause: 'DS/HD 60364-4-43 \u00A7433.1 + IEC 60076'
+  },
+  mcb: {
+    titleDa: 'V\u00E6lg afbryderens str\u00F8m (In)', titleEn: 'Choose the protective device rating (In)',
+    whatDa: 'In er den str\u00F8m sikringen/automatsikringen er m\u00E6rket til. Her v\u00E6lger du automatsikring (eller smeltesikring/maksimalafbryder).', whatEn: 'In is the rated current of the fuse/breaker. Here you choose an MCB (or a fuse/MCCB).',
+    whyDa: 'Afbryderen skal beskytte kablet: den skal v\u00E6re st\u00F8rre end IB, men aldrig st\u00F8rre end kablet kan t\u00E5le (Iz). Regel: IB \u2264 In \u2264 Iz.', whyEn: 'The device must protect the cable: it must be bigger than IB, but never bigger than the cable can take (Iz). Rule: IB \u2264 In \u2264 Iz.',
+    doDa: 'V\u00E6lg en m\u00E6rkestr\u00F8m In der lige netop d\u00E6kker IB. Klik dig frem.', doEn: 'Pick a rating In that just covers IB. Click to choose.',
+    clause: 'DS/HD 60364-4-43 \u00A7433.1'
+  },
+  cable: {
+    titleDa: 'Dimensioner kablet (Iz)', titleEn: 'Size the cable (Iz)',
+    whatDa: 'Iz er hvor meget str\u00F8m kablet kan f\u00F8re uden at blive for varmt.', whatEn: 'Iz is how much current the cable can carry without getting too hot.',
+    whyDa: 'Et for tyndt kabel bliver varmt og kan starte en brand. Kablet skal kunne t\u00E5le mindst lige s\u00E5 meget som afbryderen lukker igennem (In \u2264 Iz).', whyEn: 'A cable that is too thin gets hot and can start a fire. The cable must take at least what the device lets through (In \u2264 Iz).',
+    doDa: 'V\u00E6lg ledermateriale og tv\u00E6rsnit. Appen viser Iz og om IB \u2264 In \u2264 Iz holder.', doEn: 'Pick conductor material and cross-section. The app shows Iz and whether IB \u2264 In \u2264 Iz holds.',
+    clause: 'DS/HD 60364-5-52'
+  },
+  vdrop: {
+    titleDa: 'Tjek sp\u00E6ndingsfaldet', titleEn: 'Check the voltage drop',
+    whatDa: 'Sp\u00E6ndingsfald er hvor meget sp\u00E6nding der g\u00E5r tabt p\u00E5 vej ud i det lange kabel.', whatEn: 'Voltage drop is how much voltage is lost on the way out along a long cable.',
+    whyDa: 'For stort fald = udstyr virker d\u00E5rligt eller slet ikke. Gr\u00E6nse: max 3% til belysning, max 5% til \u00F8vrige.', whyEn: 'Too much drop = equipment works poorly or not at all. Limit: max 3% for lighting, max 5% for other loads.',
+    doDa: 'V\u00E6lg kabell\u00E6ngden. Appen regner faldet i % og fort\u00E6ller om det er OK.', doEn: 'Pick the cable length. The app computes the drop in % and tells you if it is OK.',
+    clause: 'DS/HD 60364-5-52 \u00A7525'
+  },
+  scircuit: {
+    titleDa: 'Tjek kortslutning & brydeevne', titleEn: 'Check short-circuit & breaking capacity',
+    whatDa: 'Kortslutning er den meget store str\u00F8m der l\u00F8ber hvis to ledere r\u00F8rer hinanden. Brydeevne (Icu) er hvor stor en kortslutning afbryderen kan slukke uden at eksplodere.', whatEn: 'A short-circuit is the very large current that flows if two conductors touch. Breaking capacity (Icu) is how big a short-circuit the device can interrupt without blowing apart.',
+    whyDa: 'Hvis afbryderens brydeevne er mindre end kortslutningsstr\u00F8mmen, kan den eksplodere i stedet for at slukke. Krav: Icu \u2265 Ik max.', whyEn: 'If the device breaking capacity is smaller than the short-circuit current, it can explode instead of clearing the fault. Requirement: Icu \u2265 Ik max.',
+    doDa: 'V\u00E6lg net-/transformerdata. Appen viser Ik max/min og om brydeevnen er nok.', doEn: 'Pick grid/transformer data. The app shows Ik max/min and whether the breaking capacity is enough.',
+    clause: 'DS/HD 60364-4-43 (434/435)'
+  },
+  zs: {
+    titleDa: 'Tjek fejlsl\u00F8jfen (Zs) \u2014 hurtig udkobling', titleEn: 'Check the earth-fault loop (Zs) \u2014 fast disconnection',
+    whatDa: 'Zs er modstanden i den sl\u00F8jfe str\u00F8mmen l\u00F8ber i ved en jordfejl. Lav Zs = afbryderen slukker hurtigt.', whatEn: 'Zs is the resistance of the loop the current flows in during an earth fault. Low Zs = the device disconnects fast.',
+    whyDa: 'Ved en fejl skal str\u00F8mmen afbrydes inden for f\u00E5 sekunder, ellers kan en r\u00F8rt metaldel give livsfarligt st\u00F8d. Det er den vigtigste personbeskyttelse.', whyEn: 'During a fault the supply must disconnect within a few seconds, otherwise a touched metal part can give a lethal shock. This is the key protection of people.',
+    doDa: 'V\u00E6lg afbrydertype og kabeldata. Appen tjekker om udkoblingstiden overholdes \u2014 ellers skal du bruge HPFI/RCD.', doEn: 'Pick the device type and cable data. The app checks the disconnection time \u2014 otherwise you need an RCD/HPFI.',
+    clause: 'DS/HD 60364-4-41'
+  },
+  discrim: {
+    titleDa: 'Selektivitet (samordning af afbrydere)', titleEn: 'Selectivity (coordination of devices)',
+    whatDa: 'Selektivitet betyder at KUN den afbryder t\u00E6ttest p\u00E5 fejlen springer \u2014 ikke hovedafbryderen.', whatEn: 'Selectivity means ONLY the device closest to the fault trips \u2014 not the main breaker.',
+    whyDa: 'Uden selektivitet slukker en lille fejl i \u00E9t rum hele huset/bygningen. Vigtigt for sikkerhed og drift.', whyEn: 'Without selectivity, one small fault in a single room shuts down the whole house/building. Important for safety and operation.',
+    doDa: 'Sammenlign afbryderne i serie og se om de er samordnet.', doEn: 'Compare the devices in series and check whether they are coordinated.',
+    clause: 'DS/HD 60364-4-43'
+  },
+  draw: {
+    titleDa: 'Tegn installationen', titleEn: 'Draw the installation',
+    whatDa: 'Et enstreget diagram der viser hvordan alt h\u00E6nger sammen.', whatEn: 'A single-line drawing showing how everything connects.',
+    whyDa: 'En tegning g\u00F8r fejl synlige og er n\u00F8dvendig dokumentation for en lovlig installation.', whyEn: 'A drawing makes mistakes visible and is required documentation for a legal installation.',
+    doDa: 'Byg tegningen ved at klikke komponenterne sammen.', doEn: 'Build the drawing by clicking the components together.',
+    clause: 'DS/HD 60364-5-51'
+  },
+  kls: {
+    titleDa: 'Kvalitetssikring (KLS)', titleEn: 'Quality control (KLS)',
+    whatDa: 'KLS er det kvalitetsledelsessystem en autoriseret elinstallat\u00F8r skal f\u00F8lge.', whatEn: 'KLS is the quality-management system an authorised electrician must follow.',
+    whyDa: 'Det sikrer at arbejdet er kontrolleret og dokumenteret \u2014 et lovkrav i Danmark.', whyEn: 'It ensures the work is checked and documented \u2014 a legal requirement in Denmark.',
+    doDa: 'G\u00E5 tjeklisten igennem og se om du er klar til kontrol.', doEn: 'Go through the checklist and see if you are ready for an audit.',
+    clause: 'Elsikkerhedsloven + Sikkerhedsstyrelsen'
+  },
+  kritisk: {
+    titleDa: 'Den Kritiske Hjerne \u2014 samlet sikkerhedsaudit', titleEn: 'The Critical Mind \u2014 full safety audit',
+    whatDa: 'Det sidste trin: en konservativ r\u00F8d/gul/gr\u00F8n kontrol af HELE projektet p\u00E5 \u00E9n gang.', whatEn: 'The final step: a conservative red/yellow/green check of the WHOLE project at once.',
+    whyDa: 'Her samles alt: belastning, afbryder, kabel, fald, kortslutning og jordfejl. Det fanger fejl du m\u00E5ske har overset \u2014 din sidste sikkerhedskontrol.', whyEn: 'Everything comes together: load, device, cable, drop, short-circuit and earth fault. It catches mistakes you may have missed \u2014 your final safety check.',
+    doDa: 'K\u00F8r auditen og l\u00E6s konklusionen. Gr\u00F8n = OK, gul = advarsel, r\u00F8d = farligt (ret det!).', doEn: 'Run the audit and read the verdict. Green = OK, yellow = warning, red = dangerous (fix it!).',
+    clause: 'DS/HD 60364 + Sikkerhedsstyrelsen'
+  }
+};
+
+// Beginner glossary: plain-language definitions, bilingual.
+const GUIDE_GLOSSARY = [
+  { termDa: 'IB \u2014 Belastningsstr\u00F8m', termEn: 'IB \u2014 Load current', da: 'Hvor mange ampere dit udstyr tr\u00E6kker, n\u00E5r det k\u00F8rer.', en: 'How many amperes your equipment draws when running.' },
+  { termDa: 'In \u2014 M\u00E6rkestr\u00F8m', termEn: 'In \u2014 Rated current', da: 'Den str\u00F8m sikringen/afbryderen er bygget til at bryde ved overbelastning.', en: 'The current the fuse/breaker is built to interrupt on overload.' },
+  { termDa: 'Iz \u2014 Kablets str\u00F8mevne', termEn: 'Iz \u2014 Cable current capacity', da: 'Hvor meget str\u00F8m kablet kan f\u00F8re uden at blive for varmt.', en: 'How much current the cable can carry without overheating.' },
+  { termDa: 'IB \u2264 In \u2264 Iz', termEn: 'IB \u2264 In \u2264 Iz', da: 'Grundreglen: udstyret f\u00F8rst, s\u00E5 afbryderen, s\u00E5 kablet \u2014 i den r\u00E6kkef\u00F8lge af str\u00F8mst\u00F8rrelser.', en: 'The golden rule: equipment first, then device, then cable \u2014 in that order of current sizes.' },
+  { termDa: 'Zs \u2014 Fejlsl\u00F8jfeimpedans', termEn: 'Zs \u2014 Earth-fault loop impedance', da: 'Modstanden i sl\u00F8jfen ved en jordfejl. Lav Zs = hurtig, sikker udkobling.', en: 'Resistance of the loop during an earth fault. Low Zs = fast, safe disconnection.' },
+  { termDa: 'RCD / HPFI \u2014 Fejlstr\u00F8msafbryder', termEn: 'RCD / HPFI \u2014 Residual-current device', da: 'En afbryder der slukker lynhurtigt hvis str\u00F8m l\u00E6kker til jord \u2014 beskytter mod st\u00F8d.', en: 'A device that trips instantly if current leaks to earth \u2014 protects against shock.' },
+  { termDa: 'TN / TT / IT \u2014 Jordingssystem', termEn: 'TN / TT / IT \u2014 Earthing system', da: 'Beskriver hvordan anl\u00E6gget er forbundet til jord. Det afg\u00F8r hvilken beskyttelse der kr\u00E6ves.', en: 'Describes how the installation is connected to earth. It decides which protection is required.' },
+  { termDa: 'Selektivitet', termEn: 'Selectivity', da: 'At kun den n\u00E6rmeste afbryder springer ved en fejl \u2014 ikke hele tavlen.', en: 'Only the nearest device trips on a fault \u2014 not the whole board.' },
+  { termDa: 'Kortslutning / Brydeevne (Icu)', termEn: 'Short-circuit / Breaking capacity (Icu)', da: 'Kortslutning = en meget stor fejlstr\u00F8m. Brydeevne = hvor stor en kortslutning afbryderen sikkert kan slukke.', en: 'Short-circuit = a very large fault current. Breaking capacity = how big a short-circuit the device can safely clear.' }
+];
+
+let guideState = { projectType: null, earthing: null, done: {}, glossaryOpen: false };
+
+function guideLoadProgress() {
+  try {
+    const raw = localStorage.getItem(GUIDE_STORAGE_KEY);
+    if (!raw) return guideState;
+    const data = JSON.parse(raw);
+    if (data && typeof data === 'object') {
+      guideState.projectType = data.projectType || null;
+      guideState.earthing = data.earthing || null;
+      guideState.done = (data.done && typeof data.done === 'object') ? data.done : {};
+    }
+  } catch (e) { /* ignore corrupt storage, keep defaults */ }
+  return guideState;
+}
+
+function guideSaveProgress() {
+  try {
+    localStorage.setItem(GUIDE_STORAGE_KEY, JSON.stringify({
+      projectType: guideState.projectType,
+      earthing: guideState.earthing,
+      done: guideState.done
+    }));
+  } catch (e) { /* ignore quota errors */ }
+}
+
+function guideSetType(type) { guideState.projectType = type; guideSaveProgress(); renderModule('guide'); }
+function guideSetEarthing(e) { guideState.earthing = e; guideSaveProgress(); renderModule('guide'); }
+function guideToggleDone(key) { guideState.done[key] = !guideState.done[key]; guideSaveProgress(); renderModule('guide'); }
+function guideToggleGlossary() { guideState.glossaryOpen = !guideState.glossaryOpen; renderModule('guide'); }
+function guideReset() { guideState.projectType = null; guideState.earthing = null; guideState.done = {}; guideSaveProgress(); renderModule('guide'); }
+
+// Build the ordered, numbered safe-design step list for the chosen project type.
+// The core chain ALWAYS follows the safety order: IB(load) -> In(mcb) -> Iz(cable)
+// -> voltage drop -> short-circuit -> Zs -> ... -> kritisk (final audit).
+function guideBuildSteps(state) {
+  const t = state.projectType;
+  const keys = [];
+  const pt = GUIDE_PROJECT_TYPES.filter(function(p) { return p.key === t; })[0];
+  if (pt && pt.startKey) keys.push(pt.startKey); // application-specific entry point first
+  keys.push('load');                              // IB
+  if (t === 'installation') keys.push('trafo');   // transformer/supply sizing for a whole installation
+  keys.push('mcb');                               // In
+  keys.push('cable');                             // Iz
+  keys.push('vdrop');                             // voltage drop
+  keys.push('scircuit');                          // short-circuit + breaking capacity
+  keys.push('zs');                                // earth-fault loop / disconnection
+  if (t === 'installation') { keys.push('discrim'); keys.push('draw'); keys.push('kls'); }
+  keys.push('kritisk');                           // FINAL safety audit
+  return keys;
+}
+
+function renderGuide() {
+  let h = '<div class="card fade-in">';
+  h += '<div class="card-title">\uD83E\uDDED ' + tx('AI-Guider \u2014 start her', 'AI Guide \u2014 start here') + '</div>';
+  h += '<div class="info-row">' + tx(
+    'Er du ikke el-ekspert? Det er helt fint. At "dimensionere" betyder bare at v\u00E6lge den rigtige sikring og det rigtige kabel, s\u00E5 intet bliver for varmt og ingen f\u00E5r st\u00F8d. Denne guide f\u00F8rer dig trin for trin gennem hele forl\u00F8bet og fort\u00E6ller hvor du skal starte og hvad der kommer bagefter.',
+    'Not an electrician? That is perfectly fine. To "dimension" simply means picking the right fuse and the right cable so nothing gets too hot and no one gets a shock. This guide walks you through the whole process step by step and tells you where to start and what comes next.') + '</div>';
+  h += '<div class="info-row">' + tx(
+    '\u26A0\uFE0F Elarbejde er livsfarligt. Guiden forklarer og henviser \u2014 men fast arbejde i installationen skal udf\u00F8res/kontrolleres af en autoriseret elinstallat\u00F8r. Hvert trin citerer den pr\u00E6cise DS/HD 60364-bestemmelse.',
+    '\u26A0\uFE0F Electrical work can kill. The guide explains and points the way \u2014 but fixed work in the installation must be done/checked by an authorised electrician. Each step cites the exact DS/HD 60364 clause.') + '</div>';
+  h += '</div>';
+
+  // Question 1: what are you designing?
+  h += '<div class="card fade-in"><div class="card-title">1\uFE0F\u20E3 ' + tx('Hvad skal du dimensionere?', 'What are you designing?') + '</div>';
+  h += '<div class="select-grid">';
+  GUIDE_PROJECT_TYPES.forEach(function(p) {
+    h += '<button class="sel-btn ' + (guideState.projectType === p.key ? 'selected' : '') + '" onclick="guideSetType(\'' + p.key + '\')">' + p.icon + ' ' + tx(p.da, p.en) + '</button>';
+  });
+  h += '</div></div>';
+
+  // Question 2: earthing system
+  h += '<div class="card fade-in"><div class="card-title">2\uFE0F\u20E3 ' + tx('Hvilket jordingssystem?', 'Which earthing system?') + '</div>';
+  h += '<div class="info-row">' + tx(
+    'Jordingssystemet beskriver hvordan anl\u00E6gget er forbundet til jord. Det afg\u00F8r blandt andet om du SKAL have en HPFI/fejlstr\u00F8msafbryder.',
+    'The earthing system describes how the installation is connected to earth. Among other things it decides whether you MUST have an RCD/HPFI.') + '</div>';
+  h += '<div class="select-grid">';
+  GUIDE_EARTHING.forEach(function(e) {
+    h += '<button class="sel-btn ' + (guideState.earthing === e.key ? 'selected' : '') + '" onclick="guideSetEarthing(\'' + e.key + '\')">' + e.label + '</button>';
+  });
+  h += '</div>';
+  if (guideState.earthing) {
+    const ez = GUIDE_EARTHING.filter(function(e) { return e.key === guideState.earthing; })[0];
+    h += '<div class="result-box"><div class="result-row"><span class="label">' + tx(ez.da, ez.en) + '</span></div>';
+    if (guideState.earthing === 'unsure') {
+      h += '<div class="result-row"><span class="label">' + tx(
+        '\uD83D\uDCA1 S\u00E5dan finder du ud af det: sp\u00F8rg dit netselskab, kig p\u00E5 m\u00E5lertavlen, eller f\u00E5 en autoriseret elinstallat\u00F8r til at m\u00E5le. I Danmark er det oftest TN. Indtil du ved det: antag det STRENGESTE krav (brug HPFI).',
+        '\uD83D\uDCA1 How to find out: ask your grid operator, look at the meter board, or have an authorised electrician measure it. In Denmark it is most often TN. Until you know: assume the STRICTEST requirement (use an RCD/HPFI).') + '</span></div>';
+    }
+    h += '<div class="result-row"><span class="label" style="font-size:0.72rem;color:var(--text-muted)">DS/HD 60364-1 \u00B7 411 (' + tx('jording & beskyttelse mod st\u00F8d', 'earthing & protection against shock') + ')</span></div>';
+    h += '</div>';
+  }
+  h += '</div>';
+
+  // Step list (shown once a project type is chosen)
+  if (guideState.projectType) {
+    const steps = guideBuildSteps(guideState);
+    const total = steps.length;
+    const doneCount = steps.filter(function(k) { return guideState.done[k]; }).length;
+    const currentKey = steps.filter(function(k) { return !guideState.done[k]; })[0] || null;
+    const nextKey = currentKey ? (steps[steps.indexOf(currentKey) + 1] || null) : null;
+
+    h += '<div class="card fade-in"><div class="card-title">\uD83E\uDDED ' + tx('Din vej \u2014 trin for trin', 'Your path \u2014 step by step') + ' (' + doneCount + '/' + total + ')</div>';
+    // "You are here -> next"
+    h += '<div class="info-row">';
+    if (currentKey) {
+      const cur = GUIDE_STEP_LIB[currentKey];
+      h += '\uD83D\uDCCD ' + tx('Du er her', 'You are here') + ': <strong>' + tx(cur.titleDa, cur.titleEn) + '</strong>';
+      if (nextKey) { const nx = GUIDE_STEP_LIB[nextKey]; h += ' \u2192 ' + tx('n\u00E6ste', 'next') + ': ' + tx(nx.titleDa, nx.titleEn); }
+    } else {
+      h += '\uD83C\uDF89 ' + tx('Alle trin er markeret som f\u00E6rdige! Husk altid at f\u00E5 en autoriseret elinstallat\u00F8r til at kontrollere.', 'All steps marked done! Always have an authorised electrician verify the result.');
+    }
+    h += '</div>';
+    h += '<div class="select-grid"><button class="sel-btn" onclick="guideReset()">\uD83D\uDD04 ' + tx('Nulstil guide', 'Reset guide') + '</button></div>';
+
+    steps.forEach(function(key, idx) {
+      const s = GUIDE_STEP_LIB[key];
+      const isDone = !!guideState.done[key];
+      const isCurrent = key === currentKey;
+      const border = isDone ? 'var(--success)' : (isCurrent ? 'var(--primary)' : 'var(--border)');
+      h += '<div class="result-box" style="margin-top:10px;border-left:5px solid ' + border + '">';
+      h += '<div class="result-title">' + (isDone ? '\u2705 ' : (isCurrent ? '\uD83D\uDC49 ' : '')) + (idx + 1) + '. ' + tx(s.titleDa, s.titleEn) + '</div>';
+      h += '<div class="result-row" style="flex-direction:column;align-items:flex-start;gap:4px">';
+      h += '<span class="label"><strong>' + tx('Hvad er dette trin?', 'What is this step?') + '</strong> ' + tx(s.whatDa, s.whatEn) + '</span>';
+      h += '<span class="label"><strong>' + tx('Hvorfor det betyder noget for sikkerheden:', 'Why it matters for safety:') + '</strong> ' + tx(s.whyDa, s.whyEn) + '</span>';
+      h += '<span class="label"><strong>' + tx('Hvad du g\u00F8r her:', 'What you do here:') + '</strong> ' + tx(s.doDa, s.doEn) + '</span>';
+      h += '<span class="label" style="font-size:0.72rem;color:var(--text-muted)">\uD83D\uDCD8 ' + s.clause + '</span>';
+      h += '</div>';
+      h += '<div class="select-grid" style="margin-top:6px">';
+      h += '<button class="sel-btn selected" onclick="switchModule(\'' + key + '\')">' + tx('\u00C5bn dette trin', 'Open this step') + ' \u2192</button>';
+      h += '<button class="sel-btn ' + (isDone ? 'selected' : '') + '" onclick="guideToggleDone(\'' + key + '\')">' + (isDone ? '\u21A9\uFE0F ' + tx('Marker som ikke f\u00E6rdig', 'Mark as not done') : '\u2714\uFE0F ' + tx('Marker som f\u00E6rdig', 'Mark as done')) + '</button>';
+      h += '</div></div>';
+    });
+    h += '</div>';
+  }
+
+  // Beginner glossary (collapsible, click-only)
+  h += '<div class="card fade-in"><div class="card-title">\uD83D\uDCDA ' + tx('Ordbog for begyndere', 'Beginner glossary') + '</div>';
+  h += '<div class="select-grid"><button class="sel-btn ' + (guideState.glossaryOpen ? 'selected' : '') + '" onclick="guideToggleGlossary()">' + (guideState.glossaryOpen ? '\u25BC ' + tx('Skjul ordbog', 'Hide glossary') : '\u25B6 ' + tx('Vis ordbog (klik)', 'Show glossary (click)')) + '</button></div>';
+  if (guideState.glossaryOpen) {
+    GUIDE_GLOSSARY.forEach(function(g) {
+      h += '<div class="result-box" style="margin-top:8px"><div class="result-row" style="flex-direction:column;align-items:flex-start;gap:2px">';
+      h += '<span class="label"><strong>' + tx(g.termDa, g.termEn) + '</strong></span>';
+      h += '<span class="label">' + tx(g.da, g.en) + '</span>';
+      h += '</div></div>';
+    });
+  }
+  h += '</div>';
+
+  return h;
+}
+
 // ===== INIT =====
+guideLoadProgress();
 renderNav();
 renderStatusBar();
 renderModule(activeModule);
