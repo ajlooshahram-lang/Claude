@@ -3673,13 +3673,33 @@
       <p style="line-height:1.6">${esc(fw.explainer)}</p>${fwLegend(fw.legend)}</div>
       <div class="country-grid">${cards}</div>`;
   }
+  // Map an AI recommendation to the module where the user executes that duty,
+  // so each suggestion gets its own "Go to →" navigation button.
+  function recToView(r) {
+    var s = ((r.title || "") + " " + (r.text || "") + " " + (r.priority || "")).toLowerCase();
+    if (/block/.test(s)) return { view: "kanban", label: t("nav.kanban") };
+    if (/critical|biggest risk|mitigat/.test(s)) return { view: "risks", label: t("nav.risks") };
+    if (/approval|licen|permit/.test(s)) return { view: "licensing", label: t("nav.licensing") };
+    if (/market|open market|commercial/.test(s)) return { view: "marketentry", label: t("nav.marketentry") };
+    if (/partner|landing/.test(s)) return { view: "landingpartners", label: t("nav.landingpartners") };
+    if (/weather|season|marine|survey|cable-lay|schedule|timeline/.test(s)) return { view: "timeline", label: t("nav.timeline") };
+    if (/spend|budget|cost|overrun/.test(s)) return { view: "budget", label: t("nav.budget") };
+    if (/done|complete|close|open item/.test(s)) return { view: "kanban", label: t("nav.kanban") };
+    return { view: "pm", label: t("nav.pm") };
+  }
+
   function renderAdvisorHTML(advice) {
     if (!advice) return `<div class="card"><p class="muted">Advisor unavailable — country data not loaded.</p></div>`;
     const prClass = p => { p = String(p || "").toLowerCase(); if (p.indexOf("first") >= 0 || p.indexOf("mitigate") >= 0) return "b-critical"; if (p.indexOf("watch") >= 0) return "b-high"; if (p.indexOf("quick") >= 0) return "b-ontrack"; return "b-progress"; };
-    const recs = advice.recommendations.map((r, i) => `
-      <div class="card" style="border-left:4px solid var(--navy,#1b3a6b)">
+    const recs = advice.recommendations.map((r, i) => {
+      const tv = recToView(r);
+      return `
+      <div class="card rec-card" style="border-left:4px solid var(--navy,#1b3a6b)">
         <div class="card-head"><h3>${i + 1}. ${esc(r.title)}</h3><span class="badge ${prClass(r.priority)}">${esc(r.priority)}</span></div>
-        <p><b>${esc(r.text)}</b></p><p class="muted">Why: ${esc(r.why)}</p></div>`).join("");
+        <p><b>${esc(r.text)}</b></p><p class="muted">Why: ${esc(r.why)}</p>
+        <div class="rec-actions"><button class="btn btn-primary btn-sm" data-go="${esc(tv.view)}">${esc(t("guide.goTo"))} ${esc(tv.label)} \u2192</button></div>
+      </div>`;
+    }).join("");
     const steps = (advice.nextSteps || []).map(s => `<li>${esc(s)}</li>`).join("");
     return `<div class="card"><div class="card-head"><h3>Project Advisor</h3><span class="tag">AI · on-device</span></div>
         <p style="line-height:1.6">${esc(advice.headline)}</p></div>

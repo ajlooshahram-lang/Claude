@@ -1727,5 +1727,16 @@ if (window.QIDisplay) {
   ok(failed.length === 0, "every view renders non-empty without throwing" + (failed.length ? " — failures: " + failed.join(", ") : ""));
 })();
 
+// Step 115: Each AI recommendation has its own "go execute this duty" button
+(function testRecActionButtons() {
+  var anav = doc.querySelector('.nav-item[data-view="advisor"]');
+  if (anav) anav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  var recBtns = doc.querySelectorAll(".rec-card .rec-actions [data-go]");
+  ok(recBtns.length >= 3, "each AI recommendation has its own execution button (" + recBtns.length + ")");
+  var targets = Array.prototype.map.call(recBtns, function (b) { return b.getAttribute("data-go"); });
+  ok(targets.every(function (v) { return !!v; }), "every recommendation button has a target module");
+  ok(targets.indexOf("risks") !== -1 || targets.indexOf("licensing") !== -1, "recommendations route to relevant modules (risks/licensing/etc.)");
+})();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

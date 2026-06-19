@@ -1462,3 +1462,8 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 /* Brain "description quality" coach */
 .dq-card{border-left:4px solid var(--teal,#1f8a8a)}
 .dq-card ul li{margin-bottom:3px}
+
+
+/* Per-recommendation "go execute this duty" action button */
+.rec-card .rec-actions{margin-top:10px}
+.rec-card .rec-actions .btn{white-space:nowrap}
