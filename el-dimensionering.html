@@ -646,7 +646,9 @@ const T = {
       pdf: 'Dokumentation',
       thermal: 'Termisk Sim.',
       cable3d: '3D Kabelfoering',
-      energy: 'Energi Monitor'
+      energy: 'Energi Monitor',
+      tcc: 'Kaskade-TCC',
+      panel: 'Tavle'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -751,7 +753,9 @@ const T = {
       pdf: 'Documentation',
       thermal: 'Thermal Sim',
       cable3d: '3D Cable Routing',
-      energy: 'Energy Monitor'
+      energy: 'Energy Monitor',
+      tcc: 'Cascade TCC',
+      panel: 'Panel'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -848,7 +852,9 @@ const T = {
       pdf: 'مستندات',
       thermal: 'شبیه\u200Cسازی حرارتی',
       cable3d: 'مسیر کابل سه\u200Cبعدی',
-      energy: 'مانیتور انرژی'
+      energy: 'مانیتور انرژی',
+      tcc: 'آبشاری TCC',
+      panel: 'تابلو'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -3150,6 +3156,694 @@ function renderEnergy() {
   </div>`;
 }
 
+// ===== PDF DOCUMENTATION MODULE =====
+var pdfState = { packageData: null };
+
+function pdfGetTree() {
+  return sldTree || sldCreateTree();
+}
+
+function pdfBuildCertData(tree) {
+  return { clause: 'DS/HD 60364-6-61 cl.6', installationType: 'TN-S', voltage: '400/230V', phases: '3+N+PE' };
+}
+
+function pdfBuildLoadSchedule(tree) {
+  var items = [];
+  var phaseLoads = { L1: 0, L2: 0, L3: 0 };
+  var nodeIds = Object.keys(tree.nodes);
+  var phaseIdx = 0;
+  for (var i = 0; i < nodeIds.length; i++) {
+    var node = tree.nodes[nodeIds[i]];
+    if (node.type === 'final_circuit') {
+      var ib = node._ib || sldCalcNodeIB(node);
+      items.push({ name: sldNodeName(node), ib: ib, power_kW: node.power_kW || 0, phases: node.phases || '1x230', cosPhi: node.cosPhi || 0.95 });
+      if (node.phases === '3x400' || node.voltage === 400) {
+        var perPhase = (node.power_kW || 0) / 3;
+        phaseLoads.L1 += perPhase;
+        phaseLoads.L2 += perPhase;
+        phaseLoads.L3 += perPhase;
+      } else {
+        var phases3 = ['L1','L2','L3'];
+        phaseLoads[phases3[phaseIdx % 3]] += (node.power_kW || 0);
+        phaseIdx++;
+      }
+    }
+  }
+  var totalPower = phaseLoads.L1 + phaseLoads.L2 + phaseLoads.L3;
+  var diversityFactor = 0.8;
+  var maxDemand = totalPower * diversityFactor;
+  return { items: items, phaseLoads: phaseLoads, diversityFactor: diversityFactor, maxDemand: maxDemand, clause: 'DS/HD 60364-5-52 cl.523' };
+}
+
+function pdfBuildCableSchedule(tree) {
+  var items = [];
+  var nodeIds = Object.keys(tree.nodes);
+  for (var i = 0; i < nodeIds.length; i++) {
+    var node = tree.nodes[nodeIds[i]];
+    if (node.cable && node.type !== 'transformer') {
+      var rawIz = node.cable.iz || 0;
+      var kTemp = TEMP_FACTORS[node.temp] || 1.0;
+      var kGroup = GROUP_FACTORS[node.grouping] || 1.0;
+      items.push({ name: sldNodeName(node), cable: node.cable.material + ' ' + node.cable.mm2 + 'mm2', mm2: node.cable.mm2, length: node.length_m || 0, iz: rawIz, corrTemp: kTemp, corrGroup: kGroup, clause: 'DS/HD 60364-5-52 Table B.52' });
+    }
+  }
+  return { items: items, clause: 'DS/HD 60364-5-52' };
+}
+
+function pdfBuildProtectionCoordination(tree) {
+  var items = [];
+  var nodeIds = Object.keys(tree.nodes);
+  for (var i = 0; i < nodeIds.length; i++) {
+    var node = tree.nodes[nodeIds[i]];
+    if (node.parentId && node.protection) {
+      var parentNode = tree.nodes[node.parentId];
+      var result = sldAnalyzeSelectivity(tree, nodeIds[i]);
+      if (result) {
+        items.push({ childName: sldNodeName(node), parentName: parentNode ? sldNodeName(parentNode) : '', verdict: result.verdict || 'none', clause: result.clause || 'DS/HD 60364-5-53 cl.536.4' });
+      }
+    }
+  }
+  return { items: items, clause: 'DS/HD 60364-5-53 cl.536.4' };
+}
+
+function pdfBuildTestProtocol(tree) {
+  var items = [];
+  var nodeIds = Object.keys(tree.nodes);
+  for (var i = 0; i < nodeIds.length; i++) {
+    var node = tree.nodes[nodeIds[i]];
+    if (node.type === 'final_circuit') {
+      var zs = node._zs || sldCalcNodeZs(tree, nodeIds[i]);
+      items.push({ name: sldNodeName(node), insulation: '>= 1 MOhm', loopImpedance: zs.toFixed(3) + ' Ohm', insulationClause: 'DS/HD 60364-6-61 cl.612.3', loopClause: 'DS/HD 60364-6-61 cl.612.6' });
+    }
+  }
+  return { items: items, clause: 'DS/HD 60364-6-61' };
+}
+
+function pdfBuildBOMData(tree) {
+  var items = [];
+  var grandTotal = 0;
+  var nodeIds = Object.keys(tree.nodes);
+  for (var i = 0; i < nodeIds.length; i++) {
+    var node = tree.nodes[nodeIds[i]];
+    if (node.protection) {
+      var cat = node.protection.frame ? 'mccbs' : (node.protection.curve ? 'mcbs' : (node.protection.rcdType ? 'rcds' : 'mcbs'));
+      var unitPrice = priceFor(cat, node.protection);
+      items.push({ name: sldNodeName(node), device: node.protection.frame || (node.protection.curve + node.protection.rating + 'A') || 'device', unitPrice: unitPrice, qty: 1, total: unitPrice });
+      grandTotal += unitPrice;
+    }
+    if (node.cable && node.length_m > 0) {
+      var cablePrice = priceFor('cables', node.cable) * node.length_m / 100;
+      items.push({ name: sldNodeName(node) + ' cable', device: node.cable.material + ' ' + node.cable.mm2 + 'mm2', unitPrice: Math.round(cablePrice), qty: 1, total: Math.round(cablePrice) });
+      grandTotal += Math.round(cablePrice);
+    }
+  }
+  return { items: items, grandTotal: grandTotal };
+}
+
+function pdfGeneratePackage(tree) {
+  if (!tree) tree = pdfGetTree();
+  sldPropagateAll(tree);
+  var pkg = {
+    cert: pdfBuildCertData(tree),
+    loadSchedule: pdfBuildLoadSchedule(tree),
+    cableSchedule: pdfBuildCableSchedule(tree),
+    protectionCoordination: pdfBuildProtectionCoordination(tree),
+    testProtocol: pdfBuildTestProtocol(tree),
+    bom: pdfBuildBOMData(tree),
+    generatedAt: new Date().toISOString()
+  };
+  pdfState.packageData = pkg;
+  return pkg;
+}
+
+function pdfRenderInstallationCert(pkg) {
+  var c = pkg.cert;
+  return '<table class="pdf-table"><tr><th>Parameter</th><th>Value</th></tr><tr><td>Installation Type</td><td>' + c.installationType + '</td></tr><tr><td>Voltage</td><td>' + c.voltage + '</td></tr><tr><td>Phases</td><td>' + c.phases + '</td></tr><tr><td>Clause</td><td>' + c.clause + '</td></tr></table>';
+}
+
+function pdfRenderLoadSchedule(pkg) {
+  var ls = pkg.loadSchedule;
+  var html = '<table class="pdf-table"><tr><th>Circuit</th><th>IB [A]</th><th>Power [kW]</th><th>Phases</th></tr>';
+  for (var i = 0; i < ls.items.length; i++) {
+    var it = ls.items[i];
+    html += '<tr><td>' + it.name + '</td><td>' + it.ib.toFixed(1) + '</td><td>' + it.power_kW.toFixed(2) + '</td><td>' + it.phases + '</td></tr>';
+  }
+  html += '<tr><td colspan="4">Phase Loads: L1=' + ls.phaseLoads.L1.toFixed(2) + ' kW, L2=' + ls.phaseLoads.L2.toFixed(2) + ' kW, L3=' + ls.phaseLoads.L3.toFixed(2) + ' kW</td></tr>';
+  html += '<tr><td colspan="4">Max Demand: ' + ls.maxDemand.toFixed(2) + ' kW (DF=' + ls.diversityFactor + ')</td></tr></table>';
+  return html;
+}
+
+function pdfRenderSLD(tree) {
+  if (!tree) tree = pdfGetTree();
+  var root = tree.nodes[tree.rootId];
+  var w = 600, h = 300;
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">';
+  svg += '<rect x="10" y="10" width="120" height="40" fill="#f0f0f0" stroke="#333"/>';
+  svg += '<text x="70" y="35" text-anchor="middle" font-size="10">' + sldNodeName(root) + '</text>';
+  var mainBoardId = root.childIds[0];
+  if (mainBoardId) {
+    var mb = tree.nodes[mainBoardId];
+    svg += '<line x1="70" y1="50" x2="70" y2="80" stroke="#333" stroke-width="2"/>';
+    svg += '<rect x="10" y="80" width="120" height="40" fill="#e8f4fd" stroke="#333"/>';
+    svg += '<text x="70" y="105" text-anchor="middle" font-size="10">' + sldNodeName(mb) + '</text>';
+    for (var ci = 0; ci < mb.childIds.length; ci++) {
+      var fc = tree.nodes[mb.childIds[ci]];
+      var cx = 50 + ci * 180;
+      svg += '<line x1="70" y1="120" x2="' + cx + '" y2="160" stroke="#333"/>';
+      svg += '<rect x="' + (cx - 60) + '" y="160" width="120" height="40" fill="#fff" stroke="#333"/>';
+      svg += '<text x="' + cx + '" y="185" text-anchor="middle" font-size="9">' + (fc ? sldNodeName(fc) : '') + '</text>';
+    }
+  }
+  svg += '</svg>';
+  return svg;
+}
+
+function pdfRenderCableSchedule(pkg) {
+  var cs = pkg.cableSchedule;
+  var html = '<table class="pdf-table"><tr><th>Circuit</th><th>Cable</th><th>mm2</th><th>Length [m]</th><th>Iz [A]</th><th>Corr.Temp</th><th>Corr.Group</th><th>Clause</th></tr>';
+  for (var i = 0; i < cs.items.length; i++) {
+    var it = cs.items[i];
+    html += '<tr><td>' + it.name + '</td><td>' + it.cable + '</td><td>' + it.mm2 + '</td><td>' + it.length + '</td><td>' + it.iz + '</td><td>' + it.corrTemp + '</td><td>' + it.corrGroup + '</td><td>' + it.clause + '</td></tr>';
+  }
+  html += '</table>';
+  return html;
+}
+
+function pdfRenderProtectionCoordination(pkg) {
+  var pc = pkg.protectionCoordination;
+  var html = '<table class="pdf-table"><tr><th>Downstream</th><th>Upstream</th><th>Verdict</th><th>Clause</th></tr>';
+  for (var i = 0; i < pc.items.length; i++) {
+    var it = pc.items[i];
+    html += '<tr><td>' + it.childName + '</td><td>' + it.parentName + '</td><td>' + it.verdict + '</td><td>' + it.clause + '</td></tr>';
+  }
+  html += '</table>';
+  return html;
+}
+
+function pdfRenderTestProtocol(pkg) {
+  var tp = pkg.testProtocol;
+  var html = '<table class="pdf-table"><tr><th>Circuit</th><th>Insulation</th><th>Loop Impedance</th><th>Ins. Clause</th><th>Loop Clause</th></tr>';
+  for (var i = 0; i < tp.items.length; i++) {
+    var it = tp.items[i];
+    html += '<tr><td>' + it.name + '</td><td>' + it.insulation + '</td><td>' + it.loopImpedance + '</td><td>' + it.insulationClause + '</td><td>' + it.loopClause + '</td></tr>';
+  }
+  html += '</table>';
+  return html;
+}
+
+function pdfRenderBOM(pkg) {
+  var bom = pkg.bom;
+  var html = '<table class="pdf-table"><tr><th>Item</th><th>Device</th><th>Unit Price</th><th>Qty</th><th>Total</th></tr>';
+  for (var i = 0; i < bom.items.length; i++) {
+    var it = bom.items[i];
+    html += '<tr><td>' + it.name + '</td><td>' + it.device + '</td><td>' + it.unitPrice + ' DKK</td><td>' + it.qty + '</td><td>' + it.total + ' DKK</td></tr>';
+  }
+  html += '<tr><td colspan="4"><strong>Grand Total</strong></td><td><strong>' + bom.grandTotal + ' DKK</strong></td></tr></table>';
+  return html;
+}
+
+function pdfPrintPackage() {
+  var tree = pdfGetTree();
+  sldPropagateAll(tree);
+  var pkg = pdfState.packageData || pdfGeneratePackage(tree);
+  var w = window.open('', '_blank');
+  var doc = w.document;
+  doc.write('<html><head><title>Installation Documentation - DS/HD 60364</title></head><body>');
+  doc.write('<h1>Installation Documentation</h1>');
+  doc.write('<h2>Installation Certificate</h2>' + pdfRenderInstallationCert(pkg));
+  doc.write('<h2>Load Schedule</h2>' + pdfRenderLoadSchedule(pkg));
+  doc.write('<h2>Single Line Diagram</h2>' + pdfRenderSLD(tree));
+  doc.write('<h2>Cable Schedule</h2>' + pdfRenderCableSchedule(pkg));
+  doc.write('<h2>Protection Coordination</h2>' + pdfRenderProtectionCoordination(pkg));
+  doc.write('<h2>Test Protocol</h2>' + pdfRenderTestProtocol(pkg));
+  doc.write('<h2>Bill of Materials</h2>' + pdfRenderBOM(pkg));
+  doc.write('</body></html>');
+  doc.close();
+  w.focus();
+  w.print();
+}
+
+function pdfDoGenerate() {
+  var tree = pdfGetTree();
+  sldPropagateAll(tree);
+  pdfGeneratePackage(tree);
+  renderModule('pdf');
+}
+
+function renderPDF() {
+  var tree = pdfGetTree();
+  sldPropagateAll(tree);
+  var pkg = pdfState.packageData;
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Dokumentationspakke','Documentation Package') + ' - DS/HD 60364</div>';
+  html += '<div class="info-row">' + tx('Generer komplet installationsdokumentation iht. DS/HD 60364-6-61','Generate complete installation documentation per DS/HD 60364-6-61') + '</div>';
+  html += '<div class="select-group"><div class="select-grid">';
+  html += '<button class="sel-btn" onclick="pdfDoGenerate()">' + tx('Generer pakke','Generate Package') + '</button>';
+  html += '<button class="sel-btn" onclick="pdfPrintPackage()">' + tx('Udskriv','Print') + '</button>';
+  html += '</div></div>';
+  if (pkg) {
+    html += '<div class="result-box"><div class="result-title">' + tx('Genereret','Generated') + ': ' + pkg.generatedAt + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Sektioner','Sections') + '</span><span class="value">7</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Reference','Reference') + '</span><span class="value">DS/HD 60364-6-61</span></div></div>';
+    html += '<h3>' + tx('Installationscertifikat','Installation Certificate') + '</h3>' + pdfRenderInstallationCert(pkg);
+    html += '<h3>' + tx('Belastningsskema','Load Schedule') + '</h3>' + pdfRenderLoadSchedule(pkg);
+    html += '<h3>' + tx('Enlinjediagram','Single Line Diagram') + '</h3>' + pdfRenderSLD(tree);
+    html += '<h3>' + tx('Kabelskema','Cable Schedule') + '</h3>' + pdfRenderCableSchedule(pkg);
+    html += '<h3>' + tx('Koordinering','Protection Coordination') + '</h3>' + pdfRenderProtectionCoordination(pkg);
+    html += '<h3>' + tx('Testprotokol','Test Protocol') + '</h3>' + pdfRenderTestProtocol(pkg);
+    html += '<h3>' + tx('Materialeliste','Bill of Materials') + '</h3>' + pdfRenderBOM(pkg);
+  }
+  html += '</div>';
+  return html;
+}
+
+// ===== CASCADE TCC MODULE =====
+var tccState = { selectedNodeId: null, cursorCurrent: 1000, tree: null };
+
+function tccGetFinalCircuits(tree) {
+  var results = [];
+  var nodeIds = Object.keys(tree.nodes);
+  for (var i = 0; i < nodeIds.length; i++) {
+    var node = tree.nodes[nodeIds[i]];
+    if (node.type === 'final_circuit') {
+      results.push(node);
+    }
+  }
+  return results;
+}
+
+function tccGetPathDevices(tree, nodeId) {
+  var path = sldGetPath(tree, nodeId);
+  var devices = [];
+  for (var i = 0; i < path.length; i++) {
+    var node = tree.nodes[path[i]];
+    if (!node || !node.protection) continue;
+    var In = node.protectionIn || node.protection.rating || 0;
+    devices.push({ nodeId: path[i], device: node.protection, In: In, depth: i, name: sldNodeName(node) });
+  }
+  return devices;
+}
+
+function tccGetTripOrder(devices, current) {
+  var results = [];
+  for (var i = 0; i < devices.length; i++) {
+    var d = devices[i];
+    var tMax = sldGetTripTime(d.device, d.In, current, null);
+    var trips = (tMax !== Infinity && tMax < 99999);
+    results.push({ nodeId: d.nodeId, device: d.device, In: d.In, depth: d.depth, name: d.name, tMax: trips ? tMax : null, trips: trips });
+  }
+  results.sort(function(a, b) {
+    if (!a.trips && !b.trips) return 0;
+    if (!a.trips) return 1;
+    if (!b.trips) return -1;
+    return a.tMax - b.tMax;
+  });
+  return results;
+}
+
+function tccSetCursor(current) {
+  tccState.cursorCurrent = current;
+  renderModule('tcc');
+}
+
+function tccSelectNode(nodeId) {
+  tccState.selectedNodeId = nodeId;
+  renderModule('tcc');
+}
+
+function tccRenderCascadeChart(devices, cursorCurrent) {
+  var w = 600, h = 400;
+  var marginL = 60, marginR = 20, marginT = 30, marginB = 40;
+  var plotW = w - marginL - marginR;
+  var plotH = h - marginT - marginB;
+  // Log scale: current 10A to 100kA, time 0.001s to 1000s
+  var logImin = Math.log10(10), logImax = Math.log10(100000);
+  var logTmin = Math.log10(0.001), logTmax = Math.log10(1000);
+  function xPos(I) { return marginL + (Math.log10(I) - logImin) / (logImax - logImin) * plotW; }
+  function yPos(t) { return marginT + (1 - (Math.log10(t) - logTmin) / (logTmax - logTmin)) * plotH; }
+
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">';
+  svg += '<rect width="' + w + '" height="' + h + '" fill="#fff"/>';
+
+  // Grid
+  var gridCurrents = [10, 100, 1000, 10000, 100000];
+  for (var gi = 0; gi < gridCurrents.length; gi++) {
+    var gx = xPos(gridCurrents[gi]);
+    svg += '<line x1="' + gx + '" y1="' + marginT + '" x2="' + gx + '" y2="' + (h - marginB) + '" stroke="#eee" stroke-width="1"/>';
+  }
+
+  // Device curves and selectivity zones
+  var colors = ['#2563eb', '#dc2626', '#059669', '#7c3aed', '#d97706'];
+  var tripOrder = tccGetTripOrder(devices, cursorCurrent);
+  // Determine selectivity zone color
+  var selective = true;
+  if (tripOrder.length >= 2 && tripOrder[0].trips && tripOrder[1].trips) {
+    selective = tripOrder[0].depth > tripOrder[1].depth;
+  }
+  var zoneColor = selective ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)';
+  // Draw selectivity zone
+  if (tripOrder.length >= 2 && tripOrder[0].trips && tripOrder[1].trips) {
+    var zoneY1 = yPos(tripOrder[0].tMax);
+    var zoneY2 = yPos(tripOrder[1].tMax);
+    if (zoneY1 > zoneY2) { var tmp = zoneY1; zoneY1 = zoneY2; zoneY2 = tmp; }
+    svg += '<rect x="' + marginL + '" y="' + zoneY1 + '" width="' + plotW + '" height="' + (zoneY2 - zoneY1) + '" fill="' + zoneColor + '"/>';
+  }
+
+  for (var di = 0; di < devices.length; di++) {
+    var dev = devices[di];
+    var color = colors[di % colors.length];
+    var curve = sldDeviceCurve(dev.device, dev.In, null);
+    if (!curve || curve.length === 0) continue;
+    curve.sort(function(a, b) { return a.i - b.i; });
+    // Draw curve as path
+    var pathD = '';
+    for (var ci = 0; ci < curve.length; ci++) {
+      var pt = curve[ci];
+      if (pt.i < 10 || pt.tMax <= 0) continue;
+      var px = xPos(pt.i);
+      var py = yPos(pt.tMax);
+      pathD += (pathD === '' ? 'M' : 'L') + px.toFixed(1) + ',' + py.toFixed(1);
+    }
+    if (pathD) {
+      svg += '<path d="' + pathD + '" fill="none" stroke="' + color + '" stroke-width="2"/>';
+    }
+    // Legend
+    svg += '<text x="' + (w - 150) + '" y="' + (marginT + 15 + di * 18) + '" font-size="11" fill="' + color + '">' + dev.name + ' (' + dev.In + 'A)</text>';
+  }
+
+  // Cursor line
+  var cursorX = xPos(cursorCurrent);
+  svg += '<line x1="' + cursorX + '" y1="' + marginT + '" x2="' + cursorX + '" y2="' + (h - marginB) + '" stroke="#f00" stroke-width="1.5" stroke-dasharray="6,4"/>';
+  var cursorLabel = cursorCurrent >= 1000 ? (cursorCurrent / 1000) + 'kA' : cursorCurrent + 'A';
+  svg += '<text x="' + (cursorX + 4) + '" y="' + (marginT - 5) + '" font-size="11" fill="#f00">' + cursorLabel + '</text>';
+
+  // Axes labels
+  svg += '<text x="' + (w / 2) + '" y="' + (h - 5) + '" text-anchor="middle" font-size="11">Current [A]</text>';
+  svg += '<text x="12" y="' + (h / 2) + '" text-anchor="middle" font-size="11" transform="rotate(-90,12,' + (h / 2) + ')">Time [s]</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function renderCascadeTCC() {
+  var tree = sldTree || sldCreateTree();
+  sldPropagateAll(tree);
+  var finals = tccGetFinalCircuits(tree);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Kaskade TCC - Selektivitetsanalyse','Cascade TCC - Selectivity Analysis') + '</div>';
+  html += '<div class="info-row">' + tx('Tidsstroemkarakteristik iht. DS/HD 60364-5-53 cl.536.4 - koordineringsmarginer','Time-current characteristics per DS/HD 60364-5-53 cl.536.4 - grading margins') + '</div>';
+  // Circuit selection buttons
+  html += '<div class="select-group"><div class="select-label">' + tx('Vaelg slutkreds','Select Final Circuit') + '</div><div class="select-grid">';
+  for (var fi = 0; fi < finals.length; fi++) {
+    var sel = (tccState.selectedNodeId === finals[fi].id) ? ' selected' : '';
+    html += '<button class="sel-btn' + sel + '" onclick="tccSelectNode(\'' + finals[fi].id + '\')">' + sldNodeName(finals[fi]) + '</button>';
+  }
+  html += '</div></div>';
+  if (tccState.selectedNodeId) {
+    var devices = tccGetPathDevices(tree, tccState.selectedNodeId);
+    var cursorCurrent = tccState.cursorCurrent || 1000;
+    // Cursor buttons
+    html += '<div class="select-group"><div class="select-label">' + tx('Fejlstroem-cursor','Fault Current Cursor') + '</div><div class="select-grid">';
+    var cursors = [100, 500, 1000, 2000, 5000, 10000, 20000, 50000];
+    for (var ci = 0; ci < cursors.length; ci++) {
+      var csel = (cursorCurrent === cursors[ci]) ? ' selected' : '';
+      html += '<button class="sel-btn' + csel + '" onclick="tccSetCursor(' + cursors[ci] + ')">' + (cursors[ci] >= 1000 ? (cursors[ci] / 1000) + 'kA' : cursors[ci] + 'A') + '</button>';
+    }
+    html += '</div></div>';
+    // SVG chart
+    html += tccRenderCascadeChart(devices, cursorCurrent);
+    // Trip order table
+    var tripOrder = tccGetTripOrder(devices, cursorCurrent);
+    html += '<table class="result-table"><tr><th>' + tx('Enhed','Device') + '</th><th>In [A]</th><th>' + tx('Udloesningstid','Trip Time') + ' [s]</th><th>' + tx('Udloest','Trips') + '</th></tr>';
+    for (var ti = 0; ti < tripOrder.length; ti++) {
+      var to = tripOrder[ti];
+      html += '<tr><td>' + to.name + '</td><td>' + to.In + '</td><td>' + (to.trips ? to.tMax.toFixed(3) : '-') + '</td><td>' + (to.trips ? 'Yes' : 'No') + '</td></tr>';
+    }
+    html += '</table>';
+    html += '<div class="result-box"><div class="result-title">' + tx('Koordineringsmargin','Grading Margin') + ' - DS/HD 60364-5-53 cl.536.4</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Reference','Reference') + '</span><span class="value">cl.536.4</span></div></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+// ===== PANEL BUILDER MODULE =====
+var PANEL_MODULE_DATA = {
+  mcb_1p: { modules: 1, powerLoss: 2.5 },
+  mcb_2p: { modules: 2, powerLoss: 5.0 },
+  mcb_3p: { modules: 3, powerLoss: 7.5 },
+  mcb_4p: { modules: 4, powerLoss: 10.0 },
+  mccb_100: { modules: 4, powerLoss: 25 },
+  mccb_160: { modules: 4, powerLoss: 30 },
+  mccb_250: { modules: 5, powerLoss: 35 },
+  mccb_400: { modules: 6, powerLoss: 45 },
+  mccb_630: { modules: 8, powerLoss: 60 },
+  rcd_2p: { modules: 2, powerLoss: 5 },
+  rcd_4p: { modules: 4, powerLoss: 8 },
+  rcbo_1p: { modules: 1, powerLoss: 3 },
+  rcbo_2p: { modules: 2, powerLoss: 5.5 },
+  spd_t1: { modules: 4, powerLoss: 1.5 },
+  spd_t2: { modules: 2, powerLoss: 1.0 },
+  contactor: { modules: 3, powerLoss: 5 }
+};
+
+var PANEL_ENCLOSURE_SIZES = [
+  { name: '1x12', modules: 12, rows: 1, modulesPerRow: 12, volume: 8 },
+  { name: '2x12', modules: 24, rows: 2, modulesPerRow: 12, volume: 15 },
+  { name: '2x18', modules: 36, rows: 2, modulesPerRow: 18, volume: 20 },
+  { name: '3x18', modules: 54, rows: 3, modulesPerRow: 18, volume: 30 },
+  { name: '4x18', modules: 72, rows: 4, modulesPerRow: 18, volume: 40 },
+  { name: '4x24', modules: 96, rows: 4, modulesPerRow: 24, volume: 55 },
+  { name: '5x24', modules: 120, rows: 5, modulesPerRow: 24, volume: 70 },
+  { name: '6x24', modules: 144, rows: 6, modulesPerRow: 24, volume: 90 }
+];
+
+var panelState = { boards: [], selectedBoardIdx: 0 };
+
+function panelCalcModules(device) {
+  if (!device) return 1;
+  // MCCB - by frame size
+  if (device.frame) {
+    if (device.frame.indexOf('100') >= 0) return PANEL_MODULE_DATA.mccb_100.modules;
+    if (device.frame.indexOf('160') >= 0) return PANEL_MODULE_DATA.mccb_160.modules;
+    if (device.frame.indexOf('250') >= 0) return PANEL_MODULE_DATA.mccb_250.modules;
+    if (device.frame.indexOf('400') >= 0) return PANEL_MODULE_DATA.mccb_400.modules;
+    if (device.frame.indexOf('630') >= 0) return PANEL_MODULE_DATA.mccb_630.modules;
+    return 4;
+  }
+  // RCD
+  if (device.rcdType) {
+    if (device.poles === '4P') return PANEL_MODULE_DATA.rcd_4p.modules;
+    if (device.poles === '2P') return PANEL_MODULE_DATA.rcd_2p.modules;
+    return 2;
+  }
+  // SPD
+  if (device.spdType) {
+    if (device.spdType.indexOf('1') >= 0) return PANEL_MODULE_DATA.spd_t1.modules;
+    return PANEL_MODULE_DATA.spd_t2.modules;
+  }
+  // MCB - by poles
+  if (device.curve || device.rating) {
+    if (device.poles === '4P') return PANEL_MODULE_DATA.mcb_4p.modules;
+    if (device.poles === '3P') return PANEL_MODULE_DATA.mcb_3p.modules;
+    if (device.poles === '2P') return PANEL_MODULE_DATA.mcb_2p.modules;
+    return PANEL_MODULE_DATA.mcb_1p.modules;
+  }
+  return 1;
+}
+
+function panelCalcPowerLoss(device) {
+  if (!device) return 2.5;
+  if (device.frame) {
+    if (device.frame.indexOf('100') >= 0) return PANEL_MODULE_DATA.mccb_100.powerLoss;
+    if (device.frame.indexOf('160') >= 0) return PANEL_MODULE_DATA.mccb_160.powerLoss;
+    if (device.frame.indexOf('250') >= 0) return PANEL_MODULE_DATA.mccb_250.powerLoss;
+    if (device.frame.indexOf('400') >= 0) return PANEL_MODULE_DATA.mccb_400.powerLoss;
+    if (device.frame.indexOf('630') >= 0) return PANEL_MODULE_DATA.mccb_630.powerLoss;
+    return 25;
+  }
+  if (device.rcdType) {
+    if (device.poles === '4P') return PANEL_MODULE_DATA.rcd_4p.powerLoss;
+    return PANEL_MODULE_DATA.rcd_2p.powerLoss;
+  }
+  if (device.spdType) {
+    if (device.spdType.indexOf('1') >= 0) return PANEL_MODULE_DATA.spd_t1.powerLoss;
+    return PANEL_MODULE_DATA.spd_t2.powerLoss;
+  }
+  if (device.curve || device.rating) {
+    if (device.poles === '4P') return PANEL_MODULE_DATA.mcb_4p.powerLoss;
+    if (device.poles === '3P') return PANEL_MODULE_DATA.mcb_3p.powerLoss;
+    if (device.poles === '2P') return PANEL_MODULE_DATA.mcb_2p.powerLoss;
+    return PANEL_MODULE_DATA.mcb_1p.powerLoss;
+  }
+  return 2.5;
+}
+
+function panelRecommendEnclosure(totalModules, reservePct) {
+  if (reservePct === undefined || reservePct === null) reservePct = 20;
+  var needed = totalModules * (1 + reservePct / 100);
+  for (var i = 0; i < PANEL_ENCLOSURE_SIZES.length; i++) {
+    if (PANEL_ENCLOSURE_SIZES[i].modules >= needed) {
+      return PANEL_ENCLOSURE_SIZES[i];
+    }
+  }
+  return PANEL_ENCLOSURE_SIZES[PANEL_ENCLOSURE_SIZES.length - 1];
+}
+
+function panelCalcDerating(powerLoss, volume) {
+  // Simplified thermal model: tempRise = powerLoss * thermalResistance
+  // thermalResistance approximated as 1/(volume * 0.1)
+  var thermalResistance = 1 / (volume * 0.1);
+  var tempRise = powerLoss * thermalResistance;
+  var deratingFactor = 1.0;
+  if (tempRise > 25) {
+    deratingFactor = Math.max(0.5, 1.0 - (tempRise - 25) * 0.01);
+  }
+  return { tempRise: tempRise, deratingFactor: deratingFactor };
+}
+
+function panelAutoPopulate(tree) {
+  if (!tree || !tree.rootId) return [];
+  var boards = [];
+  var nodeIds = Object.keys(tree.nodes);
+  // Find boards (main_board, sub_board)
+  for (var i = 0; i < nodeIds.length; i++) {
+    var node = tree.nodes[nodeIds[i]];
+    if (node.type === 'main_board' || node.type === 'sub_board') {
+      var rails = [];
+      var rail = [];
+      var totalModules = 0;
+      var totalPowerLoss = 0;
+      // Add the board's own protection device if present
+      if (node.protection) {
+        var mods = panelCalcModules(node.protection);
+        var pl = panelCalcPowerLoss(node.protection);
+        var inRating = node.protectionIn || node.protection.rating || 0;
+        rail.push({ nodeId: nodeIds[i], device: node.protection, In: inRating, modules: mods, powerLoss: pl, position: rail.length + 1, name: sldNodeName(node) });
+        totalModules += mods;
+        totalPowerLoss += pl;
+      }
+      // Add children devices
+      for (var ci = 0; ci < node.childIds.length; ci++) {
+        var child = tree.nodes[node.childIds[ci]];
+        if (child && child.protection) {
+          var cMods = panelCalcModules(child.protection);
+          var cPl = panelCalcPowerLoss(child.protection);
+          var cIn = child.protectionIn || child.protection.rating || 0;
+          rail.push({ nodeId: node.childIds[ci], device: child.protection, In: cIn, modules: cMods, powerLoss: cPl, position: rail.length + 1, name: sldNodeName(child) });
+          totalModules += cMods;
+          totalPowerLoss += cPl;
+        }
+      }
+      rails.push(rail);
+      var enc = panelRecommendEnclosure(totalModules);
+      boards.push({ nodeId: nodeIds[i], name: sldNodeName(node), rails: rails, totalModules: totalModules, totalPowerLoss: totalPowerLoss, enclosure: enc });
+    }
+  }
+  panelState.boards = boards;
+  return boards;
+}
+
+function panelVerifyBusbar(boardNode, tree) {
+  var ik = sldCalcNodeIk(tree, boardNode.id || Object.keys(tree.nodes).find(function(k) { return tree.nodes[k] === boardNode; }));
+  var ikmax = ik.ikmax || 0;
+  // Busbar rating: typically 25kA for main boards, derate if smaller
+  var rating = boardNode.protectionIn ? boardNode.protectionIn * 250 : 25000;
+  var verdict = ikmax <= rating ? 'pass' : 'fail';
+  return { rating: rating, ikmax: ikmax, clause: 'IEC 61439-1 cl.10.11', verdict: verdict };
+}
+
+function panelRenderDINRail(rail, railIdx) {
+  var w = 600, h = 80;
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">';
+  svg += '<rect x="0" y="30" width="' + w + '" height="20" fill="#c0c0c0" rx="2"/>';
+  var x = 10;
+  for (var i = 0; i < rail.length; i++) {
+    var dev = rail[i];
+    var devW = dev.modules * 18;
+    var color = '#2563eb'; // MCB blue
+    if (dev.device && dev.device.rcdType) color = '#ea580c'; // RCD orange
+    if (dev.device && dev.device.frame) color = '#7c3aed'; // MCCB purple
+    if (dev.device && dev.device.spdType) color = '#059669'; // SPD green
+    svg += '<rect x="' + x + '" y="10" width="' + devW + '" height="60" fill="' + color + '" rx="2" stroke="#333" stroke-width="0.5"/>';
+    svg += '<text x="' + (x + devW / 2) + '" y="45" text-anchor="middle" font-size="9" fill="#fff">' + dev.In + 'A</text>';
+    x += devW + 2;
+  }
+  svg += '</svg>';
+  return svg;
+}
+
+function panelRenderScheduleTable(board) {
+  var html = '<table class="panel-schedule"><tr><th>Pos.</th><th>' + tx('Kredsref.','Circuit Ref.') + '</th><th>' + tx('Enhedstype','Device Type') + '</th><th>In [A]</th><th>' + tx('Poler','Poles') + '</th><th>' + tx('Kabel','Cable') + '</th><th>Destination</th></tr>';
+  for (var r = 0; r < board.rails.length; r++) {
+    for (var d = 0; d < board.rails[r].length; d++) {
+      var dev = board.rails[r][d];
+      var devType = '';
+      if (dev.device) {
+        if (dev.device.frame) devType = 'MCCB ' + dev.device.frame;
+        else if (dev.device.rcdType) devType = 'RCD ' + dev.device.rcdType;
+        else if (dev.device.curve) devType = 'MCB ' + dev.device.curve;
+        else devType = 'Device';
+      }
+      var poles = dev.device ? (dev.device.poles || '1P') : '1P';
+      html += '<tr><td>' + dev.position + '</td><td>' + dev.name + '</td><td>' + devType + '</td><td>' + dev.In + '</td><td>' + poles + '</td><td>-</td><td>' + dev.name + '</td></tr>';
+    }
+  }
+  html += '</table>';
+  return html;
+}
+
+function panelMoveDevice(boardIdx, railIdx, fromDevIdx, toDevIdx) {
+  var board = panelState.boards[boardIdx];
+  if (!board) return;
+  var rail = board.rails[railIdx];
+  if (!rail) return;
+  if (fromDevIdx < 0 || fromDevIdx >= rail.length || toDevIdx < 0 || toDevIdx >= rail.length) return;
+  var temp = rail[fromDevIdx];
+  rail[fromDevIdx] = rail[toDevIdx];
+  rail[toDevIdx] = temp;
+}
+
+function panelRemoveDevice(boardIdx, railIdx, devIdx) {
+  var board = panelState.boards[boardIdx];
+  if (!board) return;
+  var rail = board.rails[railIdx];
+  if (!rail || devIdx < 0 || devIdx >= rail.length) return;
+  var removed = rail.splice(devIdx, 1)[0];
+  board.totalModules -= removed.modules;
+  board.totalPowerLoss -= removed.powerLoss;
+}
+
+function renderPanel() {
+  var tree = sldTree || sldCreateTree();
+  sldPropagateAll(tree);
+  if (panelState.boards.length === 0) {
+    panelAutoPopulate(tree);
+  }
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Tavlebygger','Panel Builder') + ' - IEC 61439</div>';
+  html += '<div class="info-row">' + tx('Automatisk tavleopbygning iht. IEC 61439-1','Automatic panel layout per IEC 61439-1') + '</div>';
+  html += '<div class="select-group"><div class="select-grid">';
+  html += '<button class="sel-btn" onclick="panelAutoPopulate(sldTree||sldCreateTree());renderModule(\'panel\')">' + tx('Genopbyg','Rebuild') + '</button>';
+  html += '</div></div>';
+  if (panelState.boards.length > 0) {
+    var board = panelState.boards[panelState.selectedBoardIdx || 0];
+    if (board) {
+      html += '<div class="result-box"><div class="result-title">' + board.name + '</div>';
+      html += '<div class="result-row"><span class="label">' + tx('Moduler','Modules') + '</span><span class="value">' + board.totalModules + '</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Effekttab','Power Loss') + '</span><span class="value">' + board.totalPowerLoss.toFixed(1) + ' W</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Kapslingsstr.','Enclosure') + '</span><span class="value">' + (board.enclosure ? board.enclosure.name : '-') + '</span></div></div>';
+      for (var r = 0; r < board.rails.length; r++) {
+        html += '<h4>' + tx('Skinne','Rail') + ' ' + (r + 1) + '</h4>';
+        html += panelRenderDINRail(board.rails[r], r);
+      }
+      html += panelRenderScheduleTable(board);
+      var busbar = panelVerifyBusbar(tree.nodes[board.nodeId] || {}, tree);
+      html += '<div class="result-box"><div class="result-title">' + tx('Samleskinne','Busbar') + ' - ' + busbar.clause + '</div>';
+      html += '<div class="result-row"><span class="label">Ik_max</span><span class="value">' + busbar.ikmax.toFixed(0) + ' A</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Vurdering','Verdict') + '</span><span class="value">' + busbar.verdict + '</span></div></div>';
+    }
+  }
+  html += '</div>';
+  return html;
+}
+
 function renderModule(mod) {
   syncAxes(); // Dynamic coordination
   const main = document.getElementById('mainContent');
@@ -3177,6 +3871,8 @@ function renderModule(mod) {
     case 'thermal': content = renderThermal(); break;
     case 'cable3d': content = renderCable3D(); break;
     case 'energy': content = renderEnergy(); break;
+    case 'tcc': content = renderCascadeTCC(); break;
+    case 'panel': content = renderPanel(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);

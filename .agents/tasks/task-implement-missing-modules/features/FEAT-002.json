@@ -1,0 +1,26 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Implement PDF Documentation Module + Cascade TCC Module + Panel Builder Module. These are the presentation/output modules that use data from FEAT-001. This covers tests 71-115 (44 failing tests).",
+  "status": "in_progress",
+  "steps": [
+    "1. Add PDF Documentation module: Add pdfState object with packageData:null. Implement pdfGeneratePackage(tree) that produces an object with 7 sections: cert (with clause referencing 60364), loadSchedule (with items array of circuit data, phaseLoads {L1,L2,L3}, diversityFactor>0, maxDemand, clause referencing 60364), cableSchedule (with items array containing cable/mm2/length/iz/corrTemp/corrGroup/clause per item, and top-level clause referencing 60364), testProtocol (with items having insulation:'>= 1 MOhm', loopImpedance with 'Ohm', insulationClause with '612.3', loopClause with '612.6', top-level clause referencing 60364), protectionCoordination (with items having verdict/clause/childName/parentName, top-level clause referencing 60364), bom (with items having unitPrice/total numbers, grandTotal>0). Implement pdfRenderInstallationCert(pkg) returning HTML with <table>. Implement pdfRenderLoadSchedule(pkg) with <table>. Implement pdfRenderSLD(tree) with <svg>. Implement pdfRenderCableSchedule(pkg) with <table>. Implement pdfRenderProtectionCoordination(pkg) with <table>. Implement pdfRenderTestProtocol(pkg) with <table>. Implement pdfRenderBOM(pkg) with <table>. Implement pdfPrintPackage() calling window.open. Implement renderPDF() with click-only UI (sel-btn buttons, references 60364, no text inputs).",
+    "2. Add Cascade TCC module: Add 'tcc' to T.da.modules ('Kaskade-TCC'), T.en.modules ('Cascade TCC'), T.fa.modules translations. Add tccState = {selectedNodeId:null, cursorCurrent:1000, tree:null}. Implement tccGetFinalCircuits(tree) returning array of nodes with type 'final_circuit'. Implement tccGetPathDevices(tree, nodeId) returning array of {nodeId, device, In, depth, name} for each node with protection along path from root to specified node (deepest first). Implement tccGetTripOrder(devices, current) returning devices sorted by trip time (tMax ascending) at given current. Implement tccRenderCascadeChart(devices, cursorCurrent) returning SVG string with device curves, legend, cursor line (dashed with 'stroke-dasharray'), current label (e.g. '5kA'), and selectivity zone highlighting (green rgba(34,197,94 or red rgba(239,68,68). Implement tccSetCursor(current) updating tccState and re-rendering. Implement renderCascadeTCC() with click-only UI containing cursor buttons for 100/500/1000/2000/5000/10000/20000/50000A values, sel-btn class, referencing 60364 and cl.536.4 for grading margins. When selectedNodeId is set, must show SVG chart and trip order table.",
+    "3. Add Panel Builder module: Add 'panel' to T.da.modules ('Tavle'), T.en.modules ('Panel'), T.fa.modules translations. Add PANEL_MODULE_DATA constant with module counts per device type (MCB:1, MCCB:3, RCD:2, etc) and power dissipation values. Add PANEL_ENCLOSURE_SIZES constant with available sizes. Implement panelCalcModules(devices) returning correct module counts. Implement panelCalcPowerLoss(devices) returning power dissipation in W. Implement panelRecommendEnclosure(totalModules) selecting correct size with 20% reserve. Implement panelCalcDerating(powerLoss, enclosureVolume) computing temperature rise and derating factor. Implement panelAutoPopulate(tree) creating panel entries from SLD tree with correct total module sums. Implement panelVerifyBusbar(ikMax, busbarRating) checking per IEC 61439-1 cl.10.11. Implement panelRenderDINRail(devices) returning SVG with colored device blocks. Implement panelRenderScheduleTable() with correct columns for contractor panel schedule. Implement panelMoveDevice(fromIdx, toIdx) and panelRemoveDevice(idx) modifying board state. Implement renderPanel() with click-only UI (no text inputs, uses sel-btn).",
+    "4. Register all new modules in the renderModule switch statement (around line 2691) and add them to the modules translations in T.da, T.en, T.fa so the navigation renders them."
+  ],
+  "acceptance_criteria": [
+    "Running 'node test-sld.js' shows tests 71-115 all passing (44 tests)",
+    "All render functions return HTML strings with no <input type='text'> or <textarea> elements",
+    "pdfGeneratePackage produces all 7 required sections with correct structure",
+    "TCC chart contains SVG with selectivity zones and cursor line",
+    "Panel builder correctly computes module counts and recommends enclosures",
+    "All new modules registered in renderModule switch and translations"
+  ],
+  "verification": [
+    "node /projects/sandbox/Claude/test-sld.js 2>&1 | grep 'Results:' should show 175 passed, 0 failed",
+    "node /projects/sandbox/Claude/test-sld.js 2>&1 | grep FAIL | wc -l should be 0"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
