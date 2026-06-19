@@ -7066,19 +7066,28 @@ function brainSelectCategory(cat) {
 
 // Core auto-design engine
 function brainGenerateInstallation(buildingTypeId, optionIds) {
+  var savedNextId = sldNextId;
   var bt = buildingTypeId ? brainGetBuildingType(buildingTypeId) : brainState.buildingType;
   if (!bt && typeof buildingTypeId === 'string') bt = brainGetBuildingType(buildingTypeId);
-  if (!bt) return null;
+  if (!bt) { sldNextId = savedNextId; return null; }
   var opts = (optionIds && optionIds.length > 0) ? optionIds : ((brainState.selectedOptions && brainState.selectedOptions.length > 0) ? brainState.selectedOptions : bt.defaultOptions);
   var diversity = bt.diversity || 0.5;
 
-  // Collect circuit templates
+  // Collect circuit templates with input validation on optionIds
   var circuits = [];
+  var brainWarnings = [];
   for (var i = 0; i < opts.length; i++) {
     var tmpl = BRAIN_CIRCUIT_TEMPLATES[opts[i]];
-    if (tmpl) circuits.push(Object.assign({}, tmpl));
+    if (tmpl) {
+      circuits.push(Object.assign({}, tmpl));
+    } else {
+      brainWarnings.push('Unknown optionId skipped: ' + opts[i]);
+    }
   }
-  if (circuits.length === 0) return null;
+  if (brainWarnings.length > 0) {
+    brainState._warnings = (brainState._warnings || []).concat(brainWarnings);
+  }
+  if (circuits.length === 0) { sldNextId = savedNextId; return null; }
 
   // Calculate total load with diversity
   var totalPower = 0;
@@ -7093,7 +7102,6 @@ function brainGenerateInstallation(buildingTypeId, optionIds) {
   var uk = TRAFO_UK[trafoSize] || 4;
 
   // Create SLD tree
-  var savedNextId = sldNextId;
   var tree = { nodes: {}, rootId: null };
 
   // Transformer
@@ -7225,22 +7233,31 @@ function brainGenerateInstallation(buildingTypeId, optionIds) {
   // Propagate calculations
   sldPropagateAll(tree);
 
-  // Check voltage drop and upsize cables if needed
-  var nodeIds = Object.keys(tree.nodes);
-  for (var v = 0; v < nodeIds.length; v++) {
-    var nd = tree.nodes[nodeIds[v]];
-    if (!nd || nd.type === 'transformer') continue;
-    if (nd._vdrop > 4.0 && nd.cable) {
-      // Upsize cable
-      var currentMm2 = nd.cable.mm2;
-      var biggerCable = PRODUCTS.cables.find(function(c) { return c.material === 'Cu' && c.mm2 > currentMm2; });
-      if (biggerCable) {
-        nd.cable = biggerCable;
+  // Check voltage drop and upsize cables if needed (iterate up to 5 times)
+  var vdropIteration = 0;
+  var vdropMaxIterations = 5;
+  var vdropExceeded = true;
+  while (vdropExceeded && vdropIteration < vdropMaxIterations) {
+    vdropExceeded = false;
+    var nodeIds = Object.keys(tree.nodes);
+    for (var v = 0; v < nodeIds.length; v++) {
+      var nd = tree.nodes[nodeIds[v]];
+      if (!nd || nd.type === 'transformer') continue;
+      if (nd._vdrop > 4.0 && nd.cable) {
+        // Upsize cable
+        var currentMm2 = nd.cable.mm2;
+        var biggerCable = PRODUCTS.cables.find(function(c) { return c.material === 'Cu' && c.mm2 > currentMm2; });
+        if (biggerCable) {
+          nd.cable = biggerCable;
+          vdropExceeded = true;
+        }
       }
     }
+    if (vdropExceeded) {
+      sldPropagateAll(tree);
+    }
+    vdropIteration++;
   }
-  // Re-propagate after cable upsizing
-  sldPropagateAll(tree);
 
   // Store in state
   brainState.generatedTree = tree;
