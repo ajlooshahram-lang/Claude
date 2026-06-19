@@ -7272,6 +7272,8 @@ function brainGenerateInstallation(buildingTypeId, optionIds) {
   }
 
   // Store in state
+  tree._diversity = diversity;
+  tree._buildingType = bt.id;
   brainState.generatedTree = tree;
   brainState.auditResults = null;
   brainState.bomItems = [];
@@ -7669,6 +7671,11 @@ function brainDoBOM() {
 
 var pdfState = { selectedTree: null, generatedAt: null, packageData: null };
 
+function pdfEscapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function pdfGetTree() {
   if (sldTree) return sldTree;
   if (typeof brainState !== 'undefined' && brainState.generatedTree) return brainState.generatedTree;
@@ -7742,11 +7749,18 @@ function pdfBuildLoadSchedule(tree) {
       assignedPhase: phase
     });
   }
+  // Pull diversity factor from tree metadata or brainState building type
+  var diversity = 0.8;
+  if (tree._diversity) {
+    diversity = tree._diversity;
+  } else if (typeof brainState !== 'undefined' && brainState.buildingType && brainState.buildingType.diversity) {
+    diversity = brainState.buildingType.diversity;
+  }
   return {
     items: schedule,
     phaseLoads: phaseLoads,
-    diversityFactor: 0.8,
-    maxDemand: (phaseLoads.L1 + phaseLoads.L2 + phaseLoads.L3) * 0.8,
+    diversityFactor: diversity,
+    maxDemand: (phaseLoads.L1 + phaseLoads.L2 + phaseLoads.L3) * diversity,
     clause: 'DS/HD 60364-3 cl.311'
   };
 }
@@ -7887,7 +7901,7 @@ function pdfRenderLoadSchedule(pkg) {
     else if (item.assignedPhase === 'L2') l2 = item.kw;
     else if (item.assignedPhase === 'L3') l3 = item.kw;
     else l1 = item.kw;
-    html += '<tr><td>' + item.name + '</td><td>' + item.phases + '</td><td>' + item.assignedPhase + '</td>';
+    html += '<tr><td>' + pdfEscapeHtml(item.name) + '</td><td>' + item.phases + '</td><td>' + item.assignedPhase + '</td>';
     html += '<td>' + item.kw.toFixed(2) + '</td><td>' + item.ib.toFixed(1) + '</td>';
     html += '<td>' + l1.toFixed(2) + '</td><td>' + l2.toFixed(2) + '</td><td>' + l3.toFixed(2) + '</td></tr>';
   }
@@ -7901,7 +7915,11 @@ function pdfRenderLoadSchedule(pkg) {
 function pdfRenderSLD(tree) {
   var html = '<div class="pdf-section"><h3>' + tx('Enstregsdiagram (SLD)', 'Single-Line Diagram (SLD)') + '</h3>';
   html += '<p style="font-size:0.8rem;color:#888">DS/HD 60364-1 cl.132</p>';
-  html += '<div class="pdf-sld-container">' + sldRenderCanvas(tree) + '</div>';
+  if (!tree || !tree.nodes || Object.keys(tree.nodes).length === 0 || !tree.rootId) {
+    html += '<p>' + tx('Ingen SLD-data tilgaengelig', 'No SLD data available') + '</p>';
+  } else {
+    html += '<div class="pdf-sld-container">' + sldRenderCanvas(tree) + '</div>';
+  }
   html += '</div>';
   return html;
 }
@@ -7922,7 +7940,7 @@ function pdfRenderCableSchedule(pkg) {
   html += '</tr></thead><tbody>';
   for (var i = 0; i < cs.items.length; i++) {
     var c = cs.items[i];
-    html += '<tr><td>' + c.name + '</td><td>' + c.cable + '</td><td>' + c.mm2 + '</td>';
+    html += '<tr><td>' + pdfEscapeHtml(c.name) + '</td><td>' + pdfEscapeHtml(c.cable) + '</td><td>' + c.mm2 + '</td>';
     html += '<td>' + c.length + '</td><td>' + c.iz + '</td><td>' + c.ib.toFixed(1) + '</td>';
     html += '<td>' + c.installMethod + '</td><td>' + c.corrTemp.toFixed(2) + '</td><td>' + c.corrGroup.toFixed(2) + '</td>';
     html += '<td style="font-size:0.7rem">' + c.clause + '</td></tr>';
@@ -7947,8 +7965,8 @@ function pdfRenderProtectionCoordination(pkg) {
     var verdictClass = r.verdict === 'full' ? 'color:#2ecc40' : r.verdict === 'partial' ? 'color:#ff851b' : 'color:#ff4136';
     var upDesc = r.upstream ? ((r.upstream.brand || '') + ' ' + (r.upstream.rating || '') + 'A') : 'N/A';
     var dnDesc = r.downstream ? ((r.downstream.brand || '') + ' ' + (r.downstream.rating || '') + 'A') : 'N/A';
-    html += '<tr><td>' + r.parentName + '<br><small>' + upDesc + '</small></td>';
-    html += '<td>' + r.childName + '<br><small>' + dnDesc + '</small></td>';
+    html += '<tr><td>' + pdfEscapeHtml(r.parentName) + '<br><small>' + pdfEscapeHtml(upDesc) + '</small></td>';
+    html += '<td>' + pdfEscapeHtml(r.childName) + '<br><small>' + pdfEscapeHtml(dnDesc) + '</small></td>';
     html += '<td style="' + verdictClass + ';font-weight:bold">' + r.verdict.toUpperCase() + '</td>';
     html += '<td>' + (r.limitCurrent ? r.limitCurrent.toFixed(0) : '-') + '</td>';
     html += '<td style="font-size:0.7rem">' + r.clause + '</td></tr>';
@@ -7971,7 +7989,7 @@ function pdfRenderTestProtocol(pkg) {
   html += '</tr></thead><tbody>';
   for (var i = 0; i < tp.items.length; i++) {
     var t = tp.items[i];
-    html += '<tr><td>' + t.name + '</td>';
+    html += '<tr><td>' + pdfEscapeHtml(t.name) + '</td>';
     html += '<td>' + t.insulation + '<br><small>' + t.insulationClause + '</small></td>';
     html += '<td>' + t.loopImpedance + '<br><small>' + t.loopClause + '</small></td>';
     html += '<td>' + t.continuity + '<br><small>' + t.continuityClause + '</small></td>';
@@ -7997,7 +8015,7 @@ function pdfRenderBOM(pkg) {
   html += '</tr></thead><tbody>';
   for (var i = 0; i < bom.items.length; i++) {
     var b = bom.items[i];
-    html += '<tr><td>' + b.cat + '</td><td>' + b.description + '</td><td>' + b.nodeName + '</td>';
+    html += '<tr><td>' + pdfEscapeHtml(b.cat) + '</td><td>' + pdfEscapeHtml(b.description) + '</td><td>' + pdfEscapeHtml(b.nodeName) + '</td>';
     html += '<td>' + b.qty + '</td><td>' + b.unitPrice.toFixed(0) + '</td><td>' + b.total.toFixed(0) + '</td></tr>';
   }
   html += '<tr style="font-weight:bold;border-top:2px solid #333"><td colspan="5">' + tx('Grand Total', 'Grand Total') + '</td>';
@@ -8273,7 +8291,16 @@ function tccRenderCascadeChart(devices, cursorCurrent) {
 
   // Selectivity zone highlighting - sweep currents to determine zones
   if (devices.length >= 2) {
-    var sweepCurrents = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000];
+    var sweepCurrents = [];
+    // Dense logarithmic sweep: 8 points per decade from 10A to 100kA (approx 40 points)
+    for (var sd = 1; sd <= 5; sd++) {
+      var base = Math.pow(10, sd);
+      var steps = [1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 6.5, 8.0];
+      for (var ss = 0; ss < steps.length; ss++) {
+        var sv = Math.round(base * steps[ss]);
+        if (sv >= 10 && sv <= 100000) sweepCurrents.push(sv);
+      }
+    }
     var lastSelective = null;
     var zoneStart = null;
     for (var si = 0; si < sweepCurrents.length; si++) {
@@ -8561,8 +8588,8 @@ var PANEL_MODULE_DATA = {
   'spd_t2': { modules: 2, powerLoss: 0.5, label_da: 'SPD T2', label_en: 'SPD T2', label_fa: 'SPD T2', color: '#16a34a' },
   'contactor': { modules: 3, powerLoss: 5, label_da: 'Kontaktor', label_en: 'Contactor', label_fa: 'کنتاکتور', color: '#7c3aed' },
   'mpcb': { modules: 3, powerLoss: 8, label_da: 'MPCB', label_en: 'MPCB', label_fa: 'MPCB', color: '#7c3aed' },
-  'fuse_d02': { modules: 1, powerLoss: 0, label_da: 'Sikring D02', label_en: 'Fuse D02', label_fa: 'فيوز D02', color: '#854d0e' },
-  'fuse_nh': { modules: 3, powerLoss: 0, label_da: 'NH sikringsbase', label_en: 'NH fuse base', label_fa: 'پايه فيوز NH', color: '#854d0e' }
+  'fuse_d02': { modules: 1, powerLoss: 3, label_da: 'Sikring D02', label_en: 'Fuse D02', label_fa: 'فيوز D02', color: '#854d0e' },
+  'fuse_nh': { modules: 3, powerLoss: 45, label_da: 'NH sikringsbase', label_en: 'NH fuse base', label_fa: 'پايه فيوز NH', color: '#854d0e' }
 };
 
 var PANEL_ENCLOSURE_SIZES = [
@@ -8645,12 +8672,15 @@ function panelRecommendEnclosure(totalModules, reservePercent) {
   return PANEL_ENCLOSURE_SIZES[PANEL_ENCLOSURE_SIZES.length - 1];
 }
 
-function panelCalcDerating(totalPowerLoss, enclosureVolume) {
+function panelCalcDerating(totalPowerLoss, enclosureVolume, ipRating) {
   // IEC 61439-1 Annex D: Temperature rise estimation
   // Simplified model: dT = P_total / (k * V^(2/3))
-  // k = 3.5 W/(K*dm^2) typical for ventilated enclosure
-  // Conservative: assume sealed enclosure k = 2.5
+  // k = 4.0 W/(K*dm^2) typical for ventilated enclosure (IP43)
+  // k = 2.5 W/(K*dm^2) for sealed enclosure (IP55)
   var k = 2.5;
+  if (ipRating === 'IP43' || ipRating === 'IP20' || ipRating === 'IP30' || ipRating === 'IP31') {
+    k = 4.0;
+  }
   var surfaceArea = Math.pow(enclosureVolume, 2.0 / 3.0);
   var tempRise = totalPowerLoss / (k * surfaceArea);
   // Maximum allowed temperature rise per IEC 61439-1 cl.9.2: 70C inside (at 35C ambient = 35K rise)
@@ -8972,7 +9002,7 @@ function renderPanel() {
   html += '</div></div>';
 
   // Power loss / derating card
-  var derating = panelCalcDerating(board.totalPowerLoss, enc.volume_dm3);
+  var derating = panelCalcDerating(board.totalPowerLoss, enc.volume_dm3, enc.ip);
   html += '<div class="card" style="margin-top:0.5rem">';
   html += '<div class="card-title" style="font-size:0.95rem">' + tx('Effekttab og derating', 'Power Loss and Derating') + '</div>';
   var plClass = derating.deratingFactor < 1.0 ? 'warning' : 'success';
