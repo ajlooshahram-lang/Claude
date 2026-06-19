@@ -1,0 +1,43 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "IEC 61439 Panel Builder - visual DIN-rail layout representation with auto-population from SLD tree, module counting, enclosure sizing, power loss/derating calculations, and busbar verification",
+  "status": "in_progress",
+  "steps": [
+    "Add 'panel' module to T.da/T.en/T.fa modules objects with names like 'Tavlebygger'/'Panel Builder'/'ساخت تابلو'",
+    "Add 'case panel: content = renderPanel(); break;' to the renderModule switch statement",
+    "Create PANEL_MODULE_DATA constant mapping device types to DIN-rail module widths and power loss (watts): MCB 1P=1 module/2.5W, MCB 3P=3 modules/7.5W, MCCB (NSX100-250)=4 modules/25W, MCCB (NSX400-630)=6 modules/45W, RCD 2P=2 modules/4W, RCD 4P=4 modules/8W, RCBO=2 modules/5W, SPD Type 1=4 modules/0.5W, SPD Type 2=2 modules/0.5W, Contactor=3 modules/5W, MPCB=3 modules/8W, Fuse switch D02=1 module/0W, NH fuse base=3 modules/0W",
+    "Create PANEL_ENCLOSURE_SIZES constant array with standard enclosure data: [{rows:1, modulesPerRow:12, name:'1x12'}, {rows:2, modulesPerRow:12, name:'2x12'}, {rows:3, modulesPerRow:12, name:'3x12'}, {rows:4, modulesPerRow:12, name:'4x12'}, {rows:3, modulesPerRow:18, name:'3x18'}, {rows:4, modulesPerRow:18, name:'4x18'}, {rows:5, modulesPerRow:24, name:'5x24'}, {rows:6, modulesPerRow:24, name:'6x24'}] - include IP rating and manufacturer reference",
+    "Create panelState object: { boards: [], selectedBoardId: null } where each board = { id, name, nodeId, rails: [[device entries]], totalModules, totalPowerLoss, enclosure, busbarRating }",
+    "Create function panelAutoPopulate(tree) that iterates the SLD tree, identifies boards (main_board, sub_board), and creates panel entries with their child devices placed on DIN rails. Each device entry = { nodeId, device, In, modules, powerLoss, position }",
+    "Create function panelCalcModules(device) that looks up PANEL_MODULE_DATA to return module count for a given protection device",
+    "Create function panelCalcPowerLoss(device) that returns power dissipation in watts for a device at rated current",
+    "Create function panelRecommendEnclosure(totalModules, reservePercent) that selects the smallest standard enclosure with at least (totalModules * (1 + reservePercent/100)) capacity. Reserve default 20% per IEC 61439-1 recommendation",
+    "Create function panelCalcDerating(totalPowerLoss, enclosureVolume) that computes temperature rise and derating factor per IEC 61439-1 Annex D. If total power loss > threshold for enclosure size, apply derating factor to device ratings. Return { tempRise, deratingFactor, maxAllowedPowerLoss }",
+    "Create function panelVerifyBusbar(boardNode, tree) that checks if the busbar rating at the board exceeds Ik_max at that point (from sldCalcNodeIk). Return { rating, ikmax, verdict: 'pass'|'fail', clause: 'IEC 61439-1 cl.10.11' }",
+    "Create function panelRenderDINRail(rail, railIndex) that renders an SVG representation of a DIN rail with device blocks sized proportional to their module count. Each block shows device name/rating. Color-code by type (blue=MCB, red=MCCB, orange=RCD, green=SPD)",
+    "Create function panelRenderScheduleTable(board) that generates the standard panel schedule table contractors produce: columns for position number, circuit reference, device type, rating, poles, cable size, destination",
+    "Create function renderPanel() with click-only UI: board selector buttons at top, DIN rail SVG visualization in the middle, enclosure recommendation card, power loss/derating card, busbar verification card, and panel schedule table. Add/remove/reorder buttons for devices on rails",
+    "Create functions panelMoveDevice(boardIdx, railIdx, deviceIdx, direction) and panelRemoveDevice(boardIdx, railIdx, deviceIdx) for click-based rail editing",
+    "Ensure all labels and text use tx() for trilingual support, all calculations cite IEC 61439 clauses"
+  ],
+  "acceptance_criteria": [
+    "panelAutoPopulate() creates panel entries from an SLD tree with correct module counts",
+    "DIN-rail SVG shows devices as colored blocks with proportional widths",
+    "Total modules calculation correctly sums all devices on a board",
+    "Enclosure size recommendation selects appropriate standard size with 20% reserve",
+    "Power loss calculation produces per-device watts and total heat dissipation",
+    "Derating factor is computed per IEC 61439-1 Annex D based on total power loss",
+    "Busbar verification checks Ik_max against busbar rating (from sldCalcNodeIk)",
+    "Panel schedule table has correct columns (position, circuit ref, device, rating, poles, cable, destination)",
+    "Add/remove/reorder buttons work for devices on rails (click-only)",
+    "renderPanel() returns HTML with no text input fields",
+    "All 70 existing tests pass plus new tests for panel builder functions"
+  ],
+  "verification": [
+    "node -e \"const fs=require('fs'); const html=fs.readFileSync('el-dimensionering.html','utf8'); const m=html.match(/<script>([\\s\\S]*?)<\\/script>/); if(!m){process.exit(1);} try{new Function(m[1]); console.log('Syntax OK');}catch(e){console.error(e.message); process.exit(1);}\"",
+    "node test-sld.js"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

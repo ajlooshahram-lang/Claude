@@ -1833,6 +1833,225 @@ test('Grading margin information is displayed in the TCC view', function() {
   assert(html.indexOf('536.4') >= 0, 'Must reference cl.536.4 for grading margins');
 });
 
+// === IEC 61439 Panel Builder Tests ===
+console.log('\n=== Panel Builder Module Tests ===\n');
+
+// Test 97: Panel module appears in all three language translations
+test('Panel module appears in all three language translation objects', function() {
+  assert(T.da.modules.panel, 'T.da must have panel module');
+  assert(T.en.modules.panel, 'T.en must have panel module');
+  assert(T.fa.modules.panel, 'T.fa must have panel module');
+});
+
+// Test 98: All panel functions are defined
+test('All panel builder functions are defined', function() {
+  assert.strictEqual(typeof panelCalcModules, 'function', 'panelCalcModules must be a function');
+  assert.strictEqual(typeof panelCalcPowerLoss, 'function', 'panelCalcPowerLoss must be a function');
+  assert.strictEqual(typeof panelRecommendEnclosure, 'function', 'panelRecommendEnclosure must be a function');
+  assert.strictEqual(typeof panelCalcDerating, 'function', 'panelCalcDerating must be a function');
+  assert.strictEqual(typeof panelVerifyBusbar, 'function', 'panelVerifyBusbar must be a function');
+  assert.strictEqual(typeof panelAutoPopulate, 'function', 'panelAutoPopulate must be a function');
+  assert.strictEqual(typeof panelRenderDINRail, 'function', 'panelRenderDINRail must be a function');
+  assert.strictEqual(typeof panelRenderScheduleTable, 'function', 'panelRenderScheduleTable must be a function');
+  assert.strictEqual(typeof panelMoveDevice, 'function', 'panelMoveDevice must be a function');
+  assert.strictEqual(typeof panelRemoveDevice, 'function', 'panelRemoveDevice must be a function');
+  assert.strictEqual(typeof renderPanel, 'function', 'renderPanel must be a function');
+});
+
+// Test 99: panelCalcModules returns correct module counts for devices
+test('panelCalcModules returns correct module counts for different device types', function() {
+  // MCB 1P
+  var mcb1p = { curve: 'B', rating: 16, poles: '1P' };
+  assert.strictEqual(panelCalcModules(mcb1p), 1, 'MCB 1P = 1 module');
+  // MCB 3P
+  var mcb3p = { curve: 'C', rating: 32, poles: '3P' };
+  assert.strictEqual(panelCalcModules(mcb3p), 3, 'MCB 3P = 3 modules');
+  // MCCB NSX100
+  var mccb100 = { frame: 'NSX 100', icu: 25 };
+  assert.strictEqual(panelCalcModules(mccb100), 4, 'MCCB NSX100 = 4 modules');
+  // MCCB NSX400
+  var mccb400 = { frame: 'NSX 400', icu: 36 };
+  assert.strictEqual(panelCalcModules(mccb400), 6, 'MCCB NSX400 = 6 modules');
+  // RCD 2P
+  var rcd2p = { rcdType: 'A', poles: '2P', rating: 40 };
+  assert.strictEqual(panelCalcModules(rcd2p), 2, 'RCD 2P = 2 modules');
+  // RCD 4P
+  var rcd4p = { rcdType: 'A', poles: '4P', rating: 63 };
+  assert.strictEqual(panelCalcModules(rcd4p), 4, 'RCD 4P = 4 modules');
+});
+
+// Test 100: panelCalcPowerLoss returns correct watts
+test('panelCalcPowerLoss returns correct power dissipation per device', function() {
+  var mcb1p = { curve: 'B', rating: 16, poles: '1P' };
+  assert.strictEqual(panelCalcPowerLoss(mcb1p), 2.5, 'MCB 1P = 2.5W');
+  var mcb3p = { curve: 'C', rating: 32, poles: '3P' };
+  assert.strictEqual(panelCalcPowerLoss(mcb3p), 7.5, 'MCB 3P = 7.5W');
+  var mccb100 = { frame: 'NSX 100', icu: 25 };
+  assert.strictEqual(panelCalcPowerLoss(mccb100), 25, 'MCCB 100 = 25W');
+  var mccb400 = { frame: 'NSX 400', icu: 36 };
+  assert.strictEqual(panelCalcPowerLoss(mccb400), 45, 'MCCB 400 = 45W');
+});
+
+// Test 101: panelRecommendEnclosure selects smallest enclosure with 20% reserve
+test('panelRecommendEnclosure selects correct enclosure with 20% reserve', function() {
+  // 10 modules => need 12 (10*1.2=12) => 1x12
+  var enc = panelRecommendEnclosure(10);
+  assert.strictEqual(enc.name, '1x12', '10 modules should get 1x12 enclosure');
+  // 11 modules => need 13.2 => 2x12 (24)
+  enc = panelRecommendEnclosure(11);
+  assert.strictEqual(enc.name, '2x12', '11 modules should get 2x12 enclosure');
+  // 20 modules => need 24 => 2x12
+  enc = panelRecommendEnclosure(20);
+  assert.strictEqual(enc.name, '2x12', '20 modules should get 2x12');
+  // 45 modules => need 54 => 3x18
+  enc = panelRecommendEnclosure(45);
+  assert.strictEqual(enc.name, '3x18', '45 modules should get 3x18');
+  // Custom reserve: 10 modules with 0% reserve
+  enc = panelRecommendEnclosure(10, 0);
+  assert.strictEqual(enc.name, '1x12', '10 modules with 0% reserve should get 1x12');
+});
+
+// Test 102: panelCalcDerating computes temperature rise and factor
+test('panelCalcDerating computes correct temperature rise and derating factor', function() {
+  // Low power loss: should not derate
+  var result = panelCalcDerating(10, 20);
+  assert(result.tempRise < 25, 'Low power should have low temperature rise');
+  assert.strictEqual(result.deratingFactor, 1.0, 'Low power should not require derating');
+  // High power loss: should trigger derating
+  var result2 = panelCalcDerating(200, 5);
+  assert(result2.tempRise > 25, 'High power in small enclosure should have high temp rise');
+  assert(result2.deratingFactor < 1.0, 'Should require derating for high power loss');
+  assert(result2.deratingFactor >= 0.5, 'Derating factor should not go below 0.5');
+});
+
+// Test 103: panelAutoPopulate creates boards from SLD tree
+test('panelAutoPopulate creates panel entries from SLD tree with correct module counts', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var boards = panelAutoPopulate(tree);
+  assert(boards.length >= 1, 'Must create at least one board');
+  assert(boards[0].rails.length >= 1, 'Board must have at least one rail');
+  assert(boards[0].totalModules > 0, 'Total modules must be > 0');
+  assert(boards[0].totalPowerLoss > 0, 'Total power loss must be > 0');
+  assert(boards[0].enclosure !== null, 'Must recommend an enclosure');
+  // Each device entry should have required fields
+  var firstDevice = boards[0].rails[0][0];
+  assert(firstDevice.modules > 0, 'Device must have module count');
+  assert(typeof firstDevice.powerLoss === 'number', 'Device must have power loss');
+  assert(typeof firstDevice.In === 'number', 'Device must have rated current');
+});
+
+// Test 104: panelVerifyBusbar checks Ik against busbar rating
+test('panelVerifyBusbar checks Ik_max against busbar rating per IEC 61439-1 cl.10.11', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var mainBoardId = tree.nodes[tree.rootId].childIds[0];
+  var boardNode = tree.nodes[mainBoardId];
+  var result = panelVerifyBusbar(boardNode, tree);
+  assert(result.rating > 0, 'Busbar rating must be positive');
+  assert(result.ikmax > 0, 'Ik_max must be positive');
+  assert(result.clause === 'IEC 61439-1 cl.10.11', 'Must cite correct IEC clause');
+  assert(result.verdict === 'pass' || result.verdict === 'fail', 'Verdict must be pass or fail');
+});
+
+// Test 105: DIN-rail SVG shows colored device blocks
+test('panelRenderDINRail renders SVG with colored device blocks', function() {
+  var rail = [
+    { nodeId: 'n1', device: { curve: 'B', rating: 16, poles: '1P' }, In: 16, modules: 1, powerLoss: 2.5, position: 1, name: 'MCB' },
+    { nodeId: 'n2', device: { rcdType: 'A', poles: '4P', rating: 63 }, In: 63, modules: 4, powerLoss: 8, position: 2, name: 'RCD' }
+  ];
+  var svg = panelRenderDINRail(rail, 0);
+  assert(svg.indexOf('<svg') >= 0, 'Must return SVG element');
+  assert(svg.indexOf('#2563eb') >= 0, 'Must have blue color for MCB');
+  assert(svg.indexOf('#ea580c') >= 0, 'Must have orange color for RCD');
+  assert(svg.indexOf('16A') >= 0, 'Must show MCB rating');
+  assert(svg.indexOf('63A') >= 0, 'Must show RCD rating');
+});
+
+// Test 106: Panel schedule table has correct columns
+test('panelRenderScheduleTable has correct columns for contractor panel schedule', function() {
+  var board = {
+    rails: [[
+      { nodeId: 'n1', device: { curve: 'B', rating: 16, poles: '1P' }, In: 16, modules: 1, powerLoss: 2.5, position: 1, name: 'Lighting' }
+    ]]
+  };
+  var html = panelRenderScheduleTable(board);
+  assert(html.indexOf('<table') >= 0, 'Must return table element');
+  assert(html.indexOf('Pos.') >= 0, 'Must have position column');
+  assert(html.indexOf('Circuit Ref.') >= 0 || html.indexOf('Kredsref.') >= 0, 'Must have circuit ref column');
+  assert(html.indexOf('Device Type') >= 0 || html.indexOf('Enhedstype') >= 0, 'Must have device type column');
+  assert(html.indexOf('In [A]') >= 0, 'Must have current rating column');
+  assert(html.indexOf('Poles') >= 0 || html.indexOf('Poler') >= 0, 'Must have poles column');
+  assert(html.indexOf('Cable') >= 0 || html.indexOf('Kabel') >= 0, 'Must have cable column');
+  assert(html.indexOf('Destination') >= 0, 'Must have destination column');
+});
+
+// Test 107: renderPanel returns HTML with no text inputs (click-only)
+test('renderPanel returns HTML with no text input fields (click-only UI)', function() {
+  sldNextId = 1;
+  sldTree = sldCreateTree();
+  sldPropagateAll(sldTree);
+  panelState.boards = [];
+  panelState.selectedBoardIdx = 0;
+  var html = renderPanel();
+  assert(html.indexOf('<input type="text"') < 0, 'No text inputs allowed');
+  assert(html.indexOf('<textarea') < 0, 'No textareas allowed');
+  assert(html.indexOf('IEC 61439') >= 0, 'Must reference IEC 61439');
+});
+
+// Test 108: PANEL_MODULE_DATA and PANEL_ENCLOSURE_SIZES constants defined correctly
+test('PANEL_MODULE_DATA and PANEL_ENCLOSURE_SIZES constants are correctly defined', function() {
+  assert(typeof PANEL_MODULE_DATA === 'object', 'PANEL_MODULE_DATA must be an object');
+  assert(PANEL_MODULE_DATA.mcb_1p.modules === 1, 'MCB 1P must be 1 module');
+  assert(PANEL_MODULE_DATA.mccb_400.modules === 6, 'MCCB 400 must be 6 modules');
+  assert(PANEL_MODULE_DATA.rcd_2p.modules === 2, 'RCD 2P must be 2 modules');
+  assert(PANEL_MODULE_DATA.spd_t1.modules === 4, 'SPD T1 must be 4 modules');
+  assert(Array.isArray(PANEL_ENCLOSURE_SIZES), 'PANEL_ENCLOSURE_SIZES must be an array');
+  assert(PANEL_ENCLOSURE_SIZES.length === 8, 'Must have 8 enclosure sizes');
+  assert(PANEL_ENCLOSURE_SIZES[0].name === '1x12', 'First enclosure must be 1x12');
+  assert(PANEL_ENCLOSURE_SIZES[7].name === '6x24', 'Last enclosure must be 6x24');
+});
+
+// Test 109: panelAutoPopulate totalModules sums correctly
+test('panelAutoPopulate total modules calculation correctly sums all devices', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var boards = panelAutoPopulate(tree);
+  var board = boards[0];
+  var manualSum = 0;
+  for (var r = 0; r < board.rails.length; r++) {
+    for (var d = 0; d < board.rails[r].length; d++) {
+      manualSum += board.rails[r][d].modules;
+    }
+  }
+  assert.strictEqual(board.totalModules, manualSum, 'totalModules must equal sum of all device modules');
+});
+
+// Test 110: panelMoveDevice and panelRemoveDevice work
+test('panelMoveDevice and panelRemoveDevice modify board state correctly', function() {
+  sldNextId = 1;
+  sldTree = sldCreateTree();
+  sldPropagateAll(sldTree);
+  panelState.boards = panelAutoPopulate(sldTree);
+  panelState.selectedBoardIdx = 0;
+  var board = panelState.boards[0];
+  var origLen = board.rails[0].length;
+  if (origLen >= 2) {
+    var first = board.rails[0][0].nodeId;
+    var second = board.rails[0][1].nodeId;
+    panelMoveDevice(0, 0, 0, 1);
+    assert.strictEqual(panelState.boards[0].rails[0][0].nodeId, second, 'After move right, second becomes first');
+    assert.strictEqual(panelState.boards[0].rails[0][1].nodeId, first, 'After move right, first becomes second');
+  }
+  var modulesBeforeRemove = panelState.boards[0].totalModules;
+  var removedModules = panelState.boards[0].rails[0][0].modules;
+  panelRemoveDevice(0, 0, 0);
+  assert.strictEqual(panelState.boards[0].totalModules, modulesBeforeRemove - removedModules, 'totalModules decreases after remove');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

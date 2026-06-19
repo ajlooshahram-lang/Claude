@@ -644,7 +644,8 @@ const T = {
       exam: '\uD83C\uDF93 Eksamen',
       brain: 'El-Hjerne',
       pdf: 'Dokumentation',
-      tcc: 'Kaskade-TCC'
+      tcc: 'Kaskade-TCC',
+      panel: 'Tavlebygger'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -747,7 +748,8 @@ const T = {
       exam: '\uD83C\uDF93 Exam',
       brain: 'Brain',
       pdf: 'Documentation',
-      tcc: 'Cascade TCC'
+      tcc: 'Cascade TCC',
+      panel: 'Panel Builder'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -842,7 +844,8 @@ const T = {
       exam: '🎓 آزمون',
       brain: 'مغز برقی',
       pdf: 'مستندات',
-      tcc: 'TCC آبشاری'
+      tcc: 'TCC آبشاری',
+      panel: 'ساخت تابلو'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -2716,6 +2719,7 @@ function renderModule(mod) {
     case 'brain': content = renderBrain(); break;
     case 'pdf': content = renderPDF(); break;
     case 'tcc': content = renderCascadeTCC(); break;
+    case 'panel': content = renderPanel(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -8533,6 +8537,479 @@ function renderCascadeTCC() {
     html += '</div>';
   }
 
+  return html;
+}
+
+// ===== IEC 61439 PANEL BUILDER MODULE =====
+// Physical DIN-rail layout, module counting, enclosure sizing,
+// power loss/derating per IEC 61439-1, busbar verification
+
+var PANEL_MODULE_DATA = {
+  'mcb_1p': { modules: 1, powerLoss: 2.5, label_da: 'MCB 1P', label_en: 'MCB 1P', label_fa: 'MCB 1P', color: '#2563eb' },
+  'mcb_2p': { modules: 2, powerLoss: 5.0, label_da: 'MCB 2P', label_en: 'MCB 2P', label_fa: 'MCB 2P', color: '#2563eb' },
+  'mcb_3p': { modules: 3, powerLoss: 7.5, label_da: 'MCB 3P', label_en: 'MCB 3P', label_fa: 'MCB 3P', color: '#2563eb' },
+  'mcb_4p': { modules: 4, powerLoss: 10.0, label_da: 'MCB 4P', label_en: 'MCB 4P', label_fa: 'MCB 4P', color: '#2563eb' },
+  'mccb_100': { modules: 4, powerLoss: 25, label_da: 'MCCB 100', label_en: 'MCCB 100', label_fa: 'MCCB 100', color: '#dc2626' },
+  'mccb_160': { modules: 4, powerLoss: 25, label_da: 'MCCB 160', label_en: 'MCCB 160', label_fa: 'MCCB 160', color: '#dc2626' },
+  'mccb_250': { modules: 4, powerLoss: 25, label_da: 'MCCB 250', label_en: 'MCCB 250', label_fa: 'MCCB 250', color: '#dc2626' },
+  'mccb_400': { modules: 6, powerLoss: 45, label_da: 'MCCB 400', label_en: 'MCCB 400', label_fa: 'MCCB 400', color: '#dc2626' },
+  'mccb_630': { modules: 6, powerLoss: 45, label_da: 'MCCB 630', label_en: 'MCCB 630', label_fa: 'MCCB 630', color: '#dc2626' },
+  'rcd_2p': { modules: 2, powerLoss: 4, label_da: 'RCD 2P', label_en: 'RCD 2P', label_fa: 'RCD 2P', color: '#ea580c' },
+  'rcd_4p': { modules: 4, powerLoss: 8, label_da: 'RCD 4P', label_en: 'RCD 4P', label_fa: 'RCD 4P', color: '#ea580c' },
+  'rcbo': { modules: 2, powerLoss: 5, label_da: 'RCBO', label_en: 'RCBO', label_fa: 'RCBO', color: '#ea580c' },
+  'spd_t1': { modules: 4, powerLoss: 0.5, label_da: 'SPD T1', label_en: 'SPD T1', label_fa: 'SPD T1', color: '#16a34a' },
+  'spd_t2': { modules: 2, powerLoss: 0.5, label_da: 'SPD T2', label_en: 'SPD T2', label_fa: 'SPD T2', color: '#16a34a' },
+  'contactor': { modules: 3, powerLoss: 5, label_da: 'Kontaktor', label_en: 'Contactor', label_fa: 'کنتاکتور', color: '#7c3aed' },
+  'mpcb': { modules: 3, powerLoss: 8, label_da: 'MPCB', label_en: 'MPCB', label_fa: 'MPCB', color: '#7c3aed' },
+  'fuse_d02': { modules: 1, powerLoss: 0, label_da: 'Sikring D02', label_en: 'Fuse D02', label_fa: 'فيوز D02', color: '#854d0e' },
+  'fuse_nh': { modules: 3, powerLoss: 0, label_da: 'NH sikringsbase', label_en: 'NH fuse base', label_fa: 'پايه فيوز NH', color: '#854d0e' }
+};
+
+var PANEL_ENCLOSURE_SIZES = [
+  { rows: 1, modulesPerRow: 12, name: '1x12', totalModules: 12, ip: 'IP43', volume_dm3: 5 },
+  { rows: 2, modulesPerRow: 12, name: '2x12', totalModules: 24, ip: 'IP43', volume_dm3: 10 },
+  { rows: 3, modulesPerRow: 12, name: '3x12', totalModules: 36, ip: 'IP43', volume_dm3: 15 },
+  { rows: 4, modulesPerRow: 12, name: '4x12', totalModules: 48, ip: 'IP43', volume_dm3: 20 },
+  { rows: 3, modulesPerRow: 18, name: '3x18', totalModules: 54, ip: 'IP55', volume_dm3: 25 },
+  { rows: 4, modulesPerRow: 18, name: '4x18', totalModules: 72, ip: 'IP55', volume_dm3: 32 },
+  { rows: 5, modulesPerRow: 24, name: '5x24', totalModules: 120, ip: 'IP55', volume_dm3: 55 },
+  { rows: 6, modulesPerRow: 24, name: '6x24', totalModules: 144, ip: 'IP55', volume_dm3: 70 }
+];
+
+var panelState = { boards: [], selectedBoardIdx: 0 };
+
+function panelGetDeviceKey(device) {
+  if (!device) return null;
+  // MCB
+  if (device.curve) {
+    var poles = device.poles || '1P';
+    if (poles === '1P') return 'mcb_1p';
+    if (poles === '2P') return 'mcb_2p';
+    if (poles === '3P') return 'mcb_3p';
+    if (poles === '4P') return 'mcb_4p';
+    return 'mcb_1p';
+  }
+  // MCCB
+  if (device.frame) {
+    var frameNum = parseInt(device.frame.replace(/[^0-9]/g, '')) || 100;
+    if (frameNum <= 250) return 'mccb_' + (frameNum <= 100 ? '100' : (frameNum <= 160 ? '160' : '250'));
+    if (frameNum <= 400) return 'mccb_400';
+    return 'mccb_630';
+  }
+  // RCD
+  if (device.rcdType) {
+    var rcdPoles = device.poles || '2P';
+    return rcdPoles === '4P' ? 'rcd_4p' : 'rcd_2p';
+  }
+  // RCBO
+  if (device.rcboType) return 'rcbo';
+  // SPD
+  if (device.spdType) {
+    return device.spdType === 'Type 1' ? 'spd_t1' : 'spd_t2';
+  }
+  // Contactor
+  if (device.contactorRating) return 'contactor';
+  // MPCB
+  if (device.mpcbRange) return 'mpcb';
+  // Fuse
+  if (device.i5s || device.size) {
+    var sz = device.size || '';
+    if (sz.indexOf('NH') >= 0) return 'fuse_nh';
+    return 'fuse_d02';
+  }
+  return 'mcb_1p';
+}
+
+function panelCalcModules(device) {
+  var key = panelGetDeviceKey(device);
+  if (!key || !PANEL_MODULE_DATA[key]) return 1;
+  return PANEL_MODULE_DATA[key].modules;
+}
+
+function panelCalcPowerLoss(device) {
+  var key = panelGetDeviceKey(device);
+  if (!key || !PANEL_MODULE_DATA[key]) return 2.5;
+  return PANEL_MODULE_DATA[key].powerLoss;
+}
+
+function panelRecommendEnclosure(totalModules, reservePercent) {
+  // IEC 61439-1 recommends minimum 20% reserve capacity
+  if (typeof reservePercent === 'undefined') reservePercent = 20;
+  var needed = totalModules * (1 + reservePercent / 100);
+  for (var i = 0; i < PANEL_ENCLOSURE_SIZES.length; i++) {
+    if (PANEL_ENCLOSURE_SIZES[i].totalModules >= needed) {
+      return PANEL_ENCLOSURE_SIZES[i];
+    }
+  }
+  // Return largest if nothing fits
+  return PANEL_ENCLOSURE_SIZES[PANEL_ENCLOSURE_SIZES.length - 1];
+}
+
+function panelCalcDerating(totalPowerLoss, enclosureVolume) {
+  // IEC 61439-1 Annex D: Temperature rise estimation
+  // Simplified model: dT = P_total / (k * V^(2/3))
+  // k = 3.5 W/(K*dm^2) typical for ventilated enclosure
+  // Conservative: assume sealed enclosure k = 2.5
+  var k = 2.5;
+  var surfaceArea = Math.pow(enclosureVolume, 2.0 / 3.0);
+  var tempRise = totalPowerLoss / (k * surfaceArea);
+  // Maximum allowed temperature rise per IEC 61439-1 cl.9.2: 70C inside (at 35C ambient = 35K rise)
+  var maxTempRise = 35;
+  var maxAllowedPowerLoss = maxTempRise * k * surfaceArea;
+  // Derating factor: if tempRise > 25K, reduce device ratings
+  // Per Annex D, derating = sqrt((maxT - ambient_rise) / maxT_device)
+  var deratingFactor = 1.0;
+  if (tempRise > 25) {
+    deratingFactor = Math.sqrt((55 - tempRise) / 55);
+    if (deratingFactor < 0.5) deratingFactor = 0.5;
+    if (deratingFactor > 1.0) deratingFactor = 1.0;
+  }
+  return { tempRise: Math.round(tempRise * 10) / 10, deratingFactor: Math.round(deratingFactor * 100) / 100, maxAllowedPowerLoss: Math.round(maxAllowedPowerLoss * 10) / 10 };
+}
+
+function panelVerifyBusbar(boardNode, tree) {
+  // IEC 61439-1 cl.10.11: Busbar must withstand short-circuit forces
+  // Standard busbar ratings for DIN-rail panels:
+  // 12-module row: 100A busbar (standard)
+  // 18-module row: 160A busbar
+  // 24-module row: 250A busbar
+  if (!boardNode || !tree) return { rating: 0, ikmax: 0, verdict: 'fail', clause: 'IEC 61439-1 cl.10.11' };
+  var ik = sldCalcNodeIk(tree, boardNode.id);
+  var ikmax = ik.ikmax || 0;
+  // Determine busbar rating from protection device at board
+  var busbarRating = 100; // default
+  if (boardNode.protectionIn) {
+    if (boardNode.protectionIn <= 100) busbarRating = 100;
+    else if (boardNode.protectionIn <= 160) busbarRating = 160;
+    else if (boardNode.protectionIn <= 250) busbarRating = 250;
+    else if (boardNode.protectionIn <= 400) busbarRating = 400;
+    else busbarRating = 630;
+  }
+  // Busbar short-circuit withstand (Icw) in kA, depends on rating
+  var icw = busbarRating <= 100 ? 10 : (busbarRating <= 250 ? 25 : 50);
+  var verdict = (ikmax / 1000) <= icw ? 'pass' : 'fail';
+  return { rating: busbarRating, ikmax: Math.round(ikmax), icw: icw, verdict: verdict, clause: 'IEC 61439-1 cl.10.11' };
+}
+
+function panelAutoPopulate(tree) {
+  if (!tree || !tree.nodes) return [];
+  var boards = [];
+  var nodeIds = Object.keys(tree.nodes);
+  for (var i = 0; i < nodeIds.length; i++) {
+    var node = tree.nodes[nodeIds[i]];
+    if (node.type !== 'main_board' && node.type !== 'sub_board') continue;
+    var board = {
+      id: node.id,
+      name: node.name_da || node.name_en || node.type,
+      nodeId: node.id,
+      rails: [],
+      totalModules: 0,
+      totalPowerLoss: 0,
+      enclosure: null,
+      busbarRating: node.protectionIn || 100
+    };
+    // Place child devices on DIN rails
+    var rail = [];
+    var railModules = 0;
+    var modulesPerRow = 12; // default
+    for (var c = 0; c < node.childIds.length; c++) {
+      var childNode = tree.nodes[node.childIds[c]];
+      if (!childNode) continue;
+      var device = childNode.protection;
+      var devModules = panelCalcModules(device);
+      var devPowerLoss = panelCalcPowerLoss(device);
+      var entry = {
+        nodeId: childNode.id,
+        device: device,
+        In: childNode.protectionIn || (device ? device.rating : 0) || 0,
+        modules: devModules,
+        powerLoss: devPowerLoss,
+        position: rail.length + 1,
+        name: childNode.name_da || childNode.name_en || childNode.type
+      };
+      // Check if rail is full
+      if (railModules + devModules > modulesPerRow) {
+        board.rails.push(rail);
+        rail = [];
+        railModules = 0;
+      }
+      rail.push(entry);
+      railModules += devModules;
+      board.totalModules += devModules;
+      board.totalPowerLoss += devPowerLoss;
+    }
+    if (rail.length > 0) board.rails.push(rail);
+    // Add RCD if present on board (_rcdProduct)
+    if (node._rcdProduct) {
+      var rcdModules = panelCalcModules(node._rcdProduct);
+      var rcdPL = panelCalcPowerLoss(node._rcdProduct);
+      board.totalModules += rcdModules;
+      board.totalPowerLoss += rcdPL;
+    }
+    board.enclosure = panelRecommendEnclosure(board.totalModules);
+    boards.push(board);
+  }
+  return boards;
+}
+
+function panelRenderDINRail(rail, railIndex) {
+  if (!rail || rail.length === 0) return '';
+  var railWidth = 600;
+  var railHeight = 60;
+  var moduleWidth = railWidth / 12; // 12-module rail as baseline
+  var svg = '<svg width="' + railWidth + '" height="' + (railHeight + 30) + '" style="display:block;margin:0.5rem auto;border:1px solid #ccc;border-radius:4px;background:#f8f9fa">';
+  // DIN rail background
+  svg += '<rect x="0" y="15" width="' + railWidth + '" height="8" fill="#999" rx="2"/>';
+  svg += '<rect x="0" y="' + (railHeight - 3) + '" width="' + railWidth + '" height="8" fill="#999" rx="2"/>';
+  var xPos = 2;
+  for (var d = 0; d < rail.length; d++) {
+    var entry = rail[d];
+    var w = entry.modules * moduleWidth - 4;
+    var key = panelGetDeviceKey(entry.device);
+    var color = (PANEL_MODULE_DATA[key] || {}).color || '#666';
+    svg += '<rect x="' + xPos + '" y="20" width="' + w + '" height="' + (railHeight - 20) + '" fill="' + color + '" rx="3" stroke="#333" stroke-width="0.5" opacity="0.9"/>';
+    // Device label (rating)
+    var label = (entry.In || '?') + 'A';
+    var fontSize = w > 40 ? 10 : 8;
+    svg += '<text x="' + (xPos + w / 2) + '" y="' + (railHeight / 2 + 8) + '" text-anchor="middle" font-size="' + fontSize + '" fill="#fff" font-weight="bold">' + label + '</text>';
+    // Type label on top
+    var typeLabel = key ? key.split('_')[0].toUpperCase() : '?';
+    svg += '<text x="' + (xPos + w / 2) + '" y="' + (railHeight + 24) + '" text-anchor="middle" font-size="8" fill="#333">' + typeLabel + '</text>';
+    xPos += entry.modules * moduleWidth;
+  }
+  // Rail index label
+  svg += '<text x="3" y="12" font-size="9" fill="#666">' + tx('Skinne', 'Rail') + ' ' + (railIndex + 1) + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function panelRenderScheduleTable(board) {
+  if (!board || !board.rails) return '';
+  var html = '<table style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-top:0.5rem">';
+  html += '<thead><tr style="background:var(--primary);color:#fff">';
+  html += '<th style="padding:0.4rem;border:1px solid #ddd">' + tx('Pos.', 'Pos.') + '</th>';
+  html += '<th style="padding:0.4rem;border:1px solid #ddd">' + tx('Kredsref.', 'Circuit Ref.') + '</th>';
+  html += '<th style="padding:0.4rem;border:1px solid #ddd">' + tx('Enhedstype', 'Device Type') + '</th>';
+  html += '<th style="padding:0.4rem;border:1px solid #ddd">' + tx('In [A]', 'In [A]') + '</th>';
+  html += '<th style="padding:0.4rem;border:1px solid #ddd">' + tx('Poler', 'Poles') + '</th>';
+  html += '<th style="padding:0.4rem;border:1px solid #ddd">' + tx('Kabel', 'Cable') + '</th>';
+  html += '<th style="padding:0.4rem;border:1px solid #ddd">' + tx('Destination', 'Destination') + '</th>';
+  html += '</tr></thead><tbody>';
+  var pos = 1;
+  for (var r = 0; r < board.rails.length; r++) {
+    for (var d = 0; d < board.rails[r].length; d++) {
+      var entry = board.rails[r][d];
+      var key = panelGetDeviceKey(entry.device);
+      var devType = key ? key.replace(/_/g, ' ').toUpperCase() : '-';
+      var poles = entry.device ? (entry.device.poles || '-') : '-';
+      var cable = '-';
+      // Try to get cable info from tree node
+      if (entry.nodeId && panelState._tree) {
+        var n = panelState._tree.nodes[entry.nodeId];
+        if (n && n.cable) cable = (n.cable.mm2 || '?') + ' mm2';
+      }
+      html += '<tr style="background:' + (pos % 2 === 0 ? '#f8f9fa' : '#fff') + '">';
+      html += '<td style="padding:0.3rem;border:1px solid #ddd;text-align:center">' + pos + '</td>';
+      html += '<td style="padding:0.3rem;border:1px solid #ddd">' + (entry.name || '-') + '</td>';
+      html += '<td style="padding:0.3rem;border:1px solid #ddd">' + devType + '</td>';
+      html += '<td style="padding:0.3rem;border:1px solid #ddd;text-align:center">' + (entry.In || '-') + '</td>';
+      html += '<td style="padding:0.3rem;border:1px solid #ddd;text-align:center">' + poles + '</td>';
+      html += '<td style="padding:0.3rem;border:1px solid #ddd">' + cable + '</td>';
+      html += '<td style="padding:0.3rem;border:1px solid #ddd">' + (entry.name || '-') + '</td>';
+      html += '</tr>';
+      pos++;
+    }
+  }
+  html += '</tbody></table>';
+  return html;
+}
+
+function panelMoveDevice(boardIdx, railIdx, deviceIdx, direction) {
+  if (!panelState.boards[boardIdx]) return;
+  var rail = panelState.boards[boardIdx].rails[railIdx];
+  if (!rail) return;
+  var newIdx = deviceIdx + direction;
+  if (newIdx < 0 || newIdx >= rail.length) return;
+  var temp = rail[deviceIdx];
+  rail[deviceIdx] = rail[newIdx];
+  rail[newIdx] = temp;
+  // Update positions
+  for (var i = 0; i < rail.length; i++) rail[i].position = i + 1;
+  renderModule('panel');
+}
+
+function panelRemoveDevice(boardIdx, railIdx, deviceIdx) {
+  if (!panelState.boards[boardIdx]) return;
+  var rail = panelState.boards[boardIdx].rails[railIdx];
+  if (!rail) return;
+  var removed = rail.splice(deviceIdx, 1)[0];
+  if (removed) {
+    panelState.boards[boardIdx].totalModules -= removed.modules;
+    panelState.boards[boardIdx].totalPowerLoss -= removed.powerLoss;
+    panelState.boards[boardIdx].enclosure = panelRecommendEnclosure(panelState.boards[boardIdx].totalModules);
+  }
+  // Remove empty rails
+  panelState.boards[boardIdx].rails = panelState.boards[boardIdx].rails.filter(function(r) { return r.length > 0; });
+  // Update positions
+  for (var r = 0; r < panelState.boards[boardIdx].rails.length; r++) {
+    for (var d = 0; d < panelState.boards[boardIdx].rails[r].length; d++) {
+      panelState.boards[boardIdx].rails[r][d].position = d + 1;
+    }
+  }
+  renderModule('panel');
+}
+
+function panelAddDevice(boardIdx, deviceKey) {
+  if (!panelState.boards[boardIdx]) return;
+  var data = PANEL_MODULE_DATA[deviceKey];
+  if (!data) return;
+  var entry = {
+    nodeId: null,
+    device: { _panelKey: deviceKey },
+    In: 0,
+    modules: data.modules,
+    powerLoss: data.powerLoss,
+    position: 1,
+    name: tx(data.label_da, data.label_en)
+  };
+  // Add to last rail if fits, else new rail
+  var board = panelState.boards[boardIdx];
+  var lastRail = board.rails.length > 0 ? board.rails[board.rails.length - 1] : null;
+  var lastRailModules = 0;
+  if (lastRail) {
+    for (var i = 0; i < lastRail.length; i++) lastRailModules += lastRail[i].modules;
+  }
+  if (lastRail && lastRailModules + data.modules <= 12) {
+    lastRail.push(entry);
+    entry.position = lastRail.length;
+  } else {
+    board.rails.push([entry]);
+    entry.position = 1;
+  }
+  board.totalModules += data.modules;
+  board.totalPowerLoss += data.powerLoss;
+  board.enclosure = panelRecommendEnclosure(board.totalModules);
+  renderModule('panel');
+}
+
+function renderPanel() {
+  // Get tree from SLD or Brain
+  var tree = null;
+  if (typeof sldTree !== 'undefined' && sldTree) tree = sldTree;
+  else if (typeof brainState !== 'undefined' && brainState.generatedTree) tree = brainState.generatedTree;
+  panelState._tree = tree;
+
+  // Auto-populate if we have a tree and no boards yet
+  if (tree && panelState.boards.length === 0) {
+    panelState.boards = panelAutoPopulate(tree);
+  }
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('IEC 61439 Tavlebygger', 'IEC 61439 Panel Builder') + '</div>';
+  html += '<p style="color:#555;font-size:0.85rem">' + tx(
+    'Fysisk DIN-skinne layout med moduloptaelling, kapslingsvalg, effekttab og busbar-verifikation per IEC 61439-1.',
+    'Physical DIN-rail layout with module counting, enclosure sizing, power loss/derating and busbar verification per IEC 61439-1.'
+  ) + '</p>';
+
+  if (panelState.boards.length === 0) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Ingen tavler fundet', 'No panels found') + '</div>';
+    html += '<p>' + tx('Opret en installation i SLD- eller El-Hjerne-modulet for at auto-populere tavlerne.',
+      'Create an installation in the SLD or Brain module to auto-populate panels.') + '</p></div>';
+    html += '</div>';
+    return html;
+  }
+
+  // Board selector buttons
+  html += '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin:1rem 0">';
+  for (var b = 0; b < panelState.boards.length; b++) {
+    var active = (b === panelState.selectedBoardIdx) ? 'background:var(--primary);color:#fff;' : 'background:#e2e8f0;';
+    html += '<button onclick="panelState.selectedBoardIdx=' + b + ';renderModule(\'panel\')" class="btn" style="' + active + 'padding:0.4rem 1rem;border-radius:6px;cursor:pointer;border:none;font-size:0.85rem">' + panelState.boards[b].name + '</button>';
+  }
+  html += '</div>';
+
+  var board = panelState.boards[panelState.selectedBoardIdx];
+  if (!board) { html += '</div>'; return html; }
+
+  // DIN-rail visualization
+  html += '<div class="card" style="background:#f1f5f9;margin-top:0.5rem">';
+  html += '<div class="card-title" style="font-size:0.95rem">' + tx('DIN-skinne layout', 'DIN-Rail Layout') + '</div>';
+  for (var r = 0; r < board.rails.length; r++) {
+    html += panelRenderDINRail(board.rails[r], r);
+    // Move/remove buttons for each device
+    html += '<div style="display:flex;gap:0.3rem;flex-wrap:wrap;justify-content:center;margin-bottom:0.5rem">';
+    for (var d = 0; d < board.rails[r].length; d++) {
+      html += '<span style="font-size:0.75rem;display:inline-flex;gap:2px;align-items:center;background:#fff;padding:2px 4px;border-radius:4px;border:1px solid #ddd">';
+      html += '<button onclick="panelMoveDevice(' + panelState.selectedBoardIdx + ',' + r + ',' + d + ',-1)" class="btn" style="padding:1px 4px;font-size:0.7rem;border:none;cursor:pointer" title="' + tx('Flyt venstre','Move left') + '">&larr;</button>';
+      html += '<span style="font-size:0.7rem">' + (board.rails[r][d].In || '?') + 'A</span>';
+      html += '<button onclick="panelMoveDevice(' + panelState.selectedBoardIdx + ',' + r + ',' + d + ',1)" class="btn" style="padding:1px 4px;font-size:0.7rem;border:none;cursor:pointer" title="' + tx('Flyt hoejre','Move right') + '">&rarr;</button>';
+      html += '<button onclick="panelRemoveDevice(' + panelState.selectedBoardIdx + ',' + r + ',' + d + ')" class="btn" style="padding:1px 4px;font-size:0.7rem;color:#dc2626;border:none;cursor:pointer" title="' + tx('Fjern','Remove') + '">&times;</button>';
+      html += '</span>';
+    }
+    html += '</div>';
+  }
+  // Add device buttons
+  html += '<div style="margin-top:0.5rem;border-top:1px solid #ddd;padding-top:0.5rem">';
+  html += '<div style="font-size:0.8rem;font-weight:bold;margin-bottom:0.3rem">' + tx('Tilfoej enhed:', 'Add device:') + '</div>';
+  html += '<div style="display:flex;gap:0.3rem;flex-wrap:wrap">';
+  var addKeys = ['mcb_1p','mcb_3p','mccb_100','rcd_2p','rcd_4p','rcbo','spd_t2','contactor','fuse_nh'];
+  for (var ak = 0; ak < addKeys.length; ak++) {
+    var aData = PANEL_MODULE_DATA[addKeys[ak]];
+    html += '<button onclick="panelAddDevice(' + panelState.selectedBoardIdx + ',\'' + addKeys[ak] + '\')" class="btn" style="padding:3px 8px;font-size:0.75rem;background:' + aData.color + ';color:#fff;border:none;border-radius:4px;cursor:pointer">' + tx(aData.label_da, aData.label_en) + '</button>';
+  }
+  html += '</div></div>';
+  html += '</div>';
+
+  // Enclosure recommendation card
+  var enc = board.enclosure || panelRecommendEnclosure(board.totalModules);
+  html += '<div class="card" style="margin-top:0.5rem">';
+  html += '<div class="card-title" style="font-size:0.95rem">' + tx('Kapslingsanbefaling', 'Enclosure Recommendation') + '</div>';
+  html += '<div class="result-box success">';
+  html += '<div class="result-row"><span class="label">' + tx('Samlet moduler', 'Total Modules') + '</span><span class="value">' + board.totalModules + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Anbefalet kapsling', 'Recommended Enclosure') + '</span><span class="value">' + enc.name + ' (' + enc.totalModules + ' ' + tx('moduler', 'modules') + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Reserve', 'Reserve') + '</span><span class="value">' + Math.round((enc.totalModules - board.totalModules) / enc.totalModules * 100) + '% (' + (enc.totalModules - board.totalModules) + ' ' + tx('moduler', 'modules') + ')</span></div>';
+  html += '<div class="result-row"><span class="label">IP</span><span class="value">' + enc.ip + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Ref.', 'Ref.') + '</span><span class="value">IEC 61439-1 cl.8.4</span></div>';
+  html += '</div></div>';
+
+  // Power loss / derating card
+  var derating = panelCalcDerating(board.totalPowerLoss, enc.volume_dm3);
+  html += '<div class="card" style="margin-top:0.5rem">';
+  html += '<div class="card-title" style="font-size:0.95rem">' + tx('Effekttab og derating', 'Power Loss and Derating') + '</div>';
+  var plClass = derating.deratingFactor < 1.0 ? 'warning' : 'success';
+  html += '<div class="result-box ' + plClass + '">';
+  html += '<div class="result-row"><span class="label">' + tx('Samlet effekttab', 'Total Power Loss') + '</span><span class="value">' + (Math.round(board.totalPowerLoss * 10) / 10) + ' W</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Temperaturstigning', 'Temperature Rise') + '</span><span class="value">' + derating.tempRise + ' K</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Maks. tilladt effekttab', 'Max Allowed Power Loss') + '</span><span class="value">' + derating.maxAllowedPowerLoss + ' W</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Derating-faktor', 'Derating Factor') + '</span><span class="value">' + derating.deratingFactor + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Ref.', 'Ref.') + '</span><span class="value">IEC 61439-1 Annex D</span></div>';
+  if (derating.deratingFactor < 1.0) {
+    html += '<div style="margin-top:0.5rem;color:#b45309;font-weight:bold">' + tx('Advarsel: Derating paakraevet - reducer belastning eller vaelg stoerre kapsling', 'Warning: Derating required - reduce load or choose larger enclosure') + '</div>';
+  }
+  html += '</div></div>';
+
+  // Busbar verification card
+  if (tree && board.nodeId) {
+    var boardNode = tree.nodes[board.nodeId];
+    var busbar = panelVerifyBusbar(boardNode, tree);
+    html += '<div class="card" style="margin-top:0.5rem">';
+    html += '<div class="card-title" style="font-size:0.95rem">' + tx('Busbar-verifikation', 'Busbar Verification') + '</div>';
+    var bbClass = busbar.verdict === 'pass' ? 'success' : 'error';
+    html += '<div class="result-box ' + bbClass + '">';
+    html += '<div class="result-row"><span class="label">' + tx('Busbar maerkevaerdi', 'Busbar Rating') + '</span><span class="value">' + busbar.rating + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Icw (kortslutningsfast)', 'Icw (short-circuit withstand)') + '</span><span class="value">' + busbar.icw + ' kA</span></div>';
+    html += '<div class="result-row"><span class="label">Ik_max</span><span class="value">' + busbar.ikmax + ' A (' + (Math.round(busbar.ikmax / 100) / 10) + ' kA)</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Vurdering', 'Verdict') + '</span><span class="value" style="color:' + (busbar.verdict === 'pass' ? '#16a34a' : '#dc2626') + ';font-weight:bold">' + (busbar.verdict === 'pass' ? tx('BESTAAET', 'PASS') : tx('FEJLET', 'FAIL')) + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Ref.', 'Ref.') + '</span><span class="value">' + busbar.clause + '</span></div>';
+    html += '</div></div>';
+  }
+
+  // Panel schedule table
+  html += '<div class="card" style="margin-top:0.5rem">';
+  html += '<div class="card-title" style="font-size:0.95rem">' + tx('Tavleskema', 'Panel Schedule') + '</div>';
+  html += panelRenderScheduleTable(board);
+  html += '</div>';
+
+  html += '</div>';
   return html;
 }
 
