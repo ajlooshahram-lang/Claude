@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "PDF Documentation Package Generator - one-click production of complete DS/HD 60364-6 handover documentation using window.open() with formatted HTML and print CSS",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Add 'pdf' module to the T.da/T.en/T.fa modules objects (around lines 627, 728, 821) with names like 'Dokumentation'/'Documentation'/'مستندات'",
     "Add 'case pdf: content = renderPDF(); break;' to the renderModule switch statement (around line 2688)",
@@ -37,5 +37,5 @@
     "node test-sld.js"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Implementation complete. All functions use var declarations (not const/let at top level) for test harness compatibility. The pdfGetTree() function checks both sldTree and brainState.generatedTree for the source tree. 12 new tests added (71-82) covering all acceptance criteria. The module uses window.open() approach for printing - no external PDF library needed."
 }
