@@ -586,6 +586,11 @@
             <div class="globe-online" id="globeOnline"></div>
           </div>
           <div class="globe-hint" id="globeHint">Drag to rotate · scroll to zoom · click a station or cable</div>
+          <div class="globe-tourhud" id="globeTourHud" hidden aria-live="polite">
+            <span class="globe-tourhud-badge">🎬 Cinematic tour</span>
+            <span class="globe-tourhud-step" id="globeTourStep"></span>
+            <span class="globe-tourhud-place" id="globeTourPlace"></span>
+          </div>
         </div>
         <aside class="globe-panel">
           <div class="globe-panel-head">
@@ -879,10 +884,21 @@
 
     // subscriptions
     G.onSelect(renderDetail);
+    const tourHud = $("#globeTourHud"), tourStepEl = $("#globeTourStep"), tourPlaceEl = $("#globeTourPlace");
     G.onTour(active => {
-      if (!tourBtn) return;
-      tourBtn.textContent = active ? "■ Stop tour" : "▶ Cinematic tour";
-      tourBtn.classList.toggle("is-on", active);
+      if (tourBtn) {
+        tourBtn.textContent = active ? "■ Stop tour" : "▶ Cinematic tour";
+        tourBtn.classList.toggle("is-on", active);
+      }
+      if (tourHud) tourHud.hidden = !active;
+      if (hint) hint.style.display = active ? "none" : "";
+    });
+    // Live caption that updates on every hop — an unmistakable, plain-language
+    // confirmation that the tour is running and where it is right now.
+    G.onTourStep(s => {
+      if (!s) return;
+      if (tourStepEl) tourStepEl.textContent = "Stop " + s.step + " of " + s.total;
+      if (tourPlaceEl) tourPlaceEl.textContent = s.name + ", " + s.country;
     });
     G.onSpin(spinning => {
       if (!spinBtn) return;

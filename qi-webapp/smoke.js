@@ -1751,5 +1751,21 @@ if (window.QIDisplay) {
   ok(/risks? in the register/.test(html), "Risk Register heading shows the total count, not just the critical badge");
 })();
 
+// Step 117: Cinematic Tour — distinct theme + live HUD caption are wired
+(function testCinematicTourHud() {
+  ok(typeof window.QIGlobe.onTourStep === "function", "QIGlobe exposes onTourStep() so the UI can caption each hop");
+  ok(typeof window.QIGlobe.toggleTour === "function" && typeof window.QIGlobe.startTour === "function",
+     "QIGlobe exposes tour controls (startTour/toggleTour)");
+  var gnav = doc.querySelector('.nav-item[data-view="globe3d"]');
+  if (gnav) gnav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(doc.getElementById("globeTourHud") != null, "3D map renders the Cinematic-tour HUD caption container");
+  ok(doc.getElementById("globeTourStep") != null && doc.getElementById("globeTourPlace") != null,
+     "tour HUD has a step counter (N of 8) and a place caption");
+  ok(doc.getElementById("globeTour") != null, "Cinematic-tour button is present");
+  // The HUD starts hidden until a tour begins (no false 'touring' state on load).
+  var hud = doc.getElementById("globeTourHud");
+  ok(hud && hud.hasAttribute("hidden"), "tour HUD is hidden until the tour starts");
+})();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

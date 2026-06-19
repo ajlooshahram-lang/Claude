@@ -620,6 +620,20 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .globe-fallback h3{margin:0 0 8px;color:#fff;font-size:18px}
 .globe-fallback p{margin:0;max-width:440px;font-size:13px;color:#9fb0cf;line-height:1.5}
 
+/* cinematic-tour HUD caption (top-centre) — unmistakable confirmation the tour
+   is running and which landing station it's flying to right now */
+.globe-tourhud{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:4;
+  display:flex;align-items:center;gap:10px;padding:9px 16px;border-radius:999px;
+  background:linear-gradient(135deg,rgba(11,28,58,.92),rgba(20,46,92,.92));
+  border:1px solid rgba(111,208,255,.45);box-shadow:0 8px 28px rgba(0,0,0,.45),0 0 22px rgba(111,208,255,.25);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);pointer-events:none;
+  animation:globeHudIn .35s ease both}
+@keyframes globeHudIn{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translate(-50%,0)}}
+.globe-tourhud-badge{font-size:12px;font-weight:700;letter-spacing:.03em;color:#9fe0ff;white-space:nowrap}
+.globe-tourhud-step{font-size:11px;font-weight:600;color:#cbd6ee;background:rgba(111,208,255,.18);
+  padding:3px 9px;border-radius:999px;white-space:nowrap}
+.globe-tourhud-place{font-size:13px;font-weight:600;color:#fff;white-space:nowrap}
+
 /* glassmorphism info / legend panel */
 .globe-panel{position:absolute;right:14px;bottom:14px;z-index:2;width:340px;max-width:calc(100% - 28px);
   border-radius:var(--radius);padding:18px;color:#e6eaf3;max-height:calc(100vh - 200px);overflow:auto;

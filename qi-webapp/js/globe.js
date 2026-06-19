@@ -164,6 +164,7 @@
   // its callbacks even if the scene is torn down and remounted.
   var selectHandler = null; // fn(info) — called when a station/cable is picked
   var tourHandler = null;   // fn(active) — called when the auto-tour toggles
+  var tourStepHandler = null; // fn({idx,total,name,country}) — called on each tour hop
   var spinHandler = null;   // fn(spinning) — called when auto-rotation toggles
   var deployHandler = null; // fn(state) — called as the A–Z build animation advances
 
@@ -680,6 +681,12 @@
         if (!tourState.active) return;
         var st = STATIONS[tourState.idx % STATIONS.length];
         selectStation(st.id, true);
+        if (tourStepHandler) {
+          try {
+            tourStepHandler({ idx: tourState.idx, step: tourState.idx + 1,
+              total: STATIONS.length, id: st.id, name: st.name, country: st.country });
+          } catch (e) {}
+        }
         tourState.timer = window.setTimeout(function () {
           if (!tourState.active) return;
           tourState.idx++;
@@ -691,6 +698,16 @@
       // theme so the route "pops" as a connected glowing network while the
       // camera flies between landing stations (Google-Earth-style guided tour).
       function setTourTheme(on) {
+        // Dim the Earth + clouds so the cable network reads as a glowing,
+        // connected route on a calm "night map" backdrop — an unmistakable,
+        // distinct theme the moment the Cinematic Tour starts (and instantly
+        // restored to the bright Google-Earth look when it stops).
+        try {
+          if (globeMat && globeMat.color) globeMat.color.setHex(on ? 0x55626f : 0xffffff);
+        } catch (e) {}
+        try {
+          if (clouds && clouds.material) clouds.material.opacity = on ? 0.16 : 0.6;
+        } catch (e) {}
         for (var i = 0; i < cableTubes.length; i++) {
           var tb = cableTubes[i];
           if (!tb.mat) continue;
@@ -1203,6 +1220,7 @@
     // subscriptions (persist across mount/unmount)
     onSelect: function (cb) { selectHandler = (typeof cb === "function") ? cb : null; },
     onTour: function (cb) { tourHandler = (typeof cb === "function") ? cb : null; },
+    onTourStep: function (cb) { tourStepHandler = (typeof cb === "function") ? cb : null; },
     onSpin: function (cb) { spinHandler = (typeof cb === "function") ? cb : null; },
     onDeployment: function (cb) { deployHandler = (typeof cb === "function") ? cb : null; },
     // static datasets
