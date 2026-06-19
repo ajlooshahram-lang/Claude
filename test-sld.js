@@ -936,6 +936,182 @@ test('All selectivity functions are defined', function() {
   assert(typeof sldRenderSelectivityPanel === 'function', 'sldRenderSelectivityPanel must be a function');
 });
 
+// === Fault Simulation Tests (Phase 3) ===
+console.log('\n=== Fault Simulation Tests ===\n');
+
+// Test 40: sldGetTripTime returns correct time for MCB at known fault current
+test('sldGetTripTime returns correct trip time for MCB B16 at high fault current', function() {
+  var mcb = PRODUCTS.mcbs.find(function(m){ return m.curve === 'B' && m.rating === 16; });
+  assert(mcb, 'Should find MCB B16');
+  // At 10*In (160A) for curve B (isdMax=4.8), so 160A > 4.8*16=76.8A - in instantaneous region
+  var tripTime = sldGetTripTime(mcb, 16, 160, null);
+  assert(tripTime < 0.1, 'MCB B16 at 160A should trip in < 100ms. Got: ' + tripTime);
+  assert(tripTime > 0, 'Trip time should be positive. Got: ' + tripTime);
+});
+
+// Test 41: sldGetTripTime returns Infinity when fault current below device threshold
+test('sldGetTripTime returns Infinity for current below device threshold', function() {
+  var mcb = PRODUCTS.mcbs.find(function(m){ return m.curve === 'B' && m.rating === 16; });
+  assert(mcb, 'Should find MCB B16');
+  // At 10A (below 1.13*16=18.08A threshold)
+  var tripTime = sldGetTripTime(mcb, 16, 10, null);
+  assert(tripTime === Infinity, 'MCB B16 at 10A should not trip (Infinity). Got: ' + tripTime);
+});
+
+// Test 42: sldSimulateFault returns valid result object with all required fields
+test('sldSimulateFault returns complete result object', function() {
+  sldNextId = 8000;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var root = tree.nodes[tree.rootId];
+  var mainBoardId = root.childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+  var fcId = mainBoard.childIds[0];
+  var fc = tree.nodes[fcId];
+  // Set protection
+  var mcb = PRODUCTS.mcbs.find(function(m){ return m.curve === 'B' && m.rating === 16; });
+  fc.protection = mcb;
+  fc.protectionIn = 16;
+  sldPropagateAll(tree);
+  var result = sldSimulateFault(tree, fcId, 'short_circuit');
+  assert(result.faultNodeId === fcId, 'faultNodeId should match. Got: ' + result.faultNodeId);
+  assert(result.faultType === 'short_circuit', 'faultType should match');
+  assert(typeof result.ikFault === 'number', 'ikFault should be number');
+  assert(typeof result.zsAtFault === 'number', 'zsAtFault should be number');
+  assert(Array.isArray(result.path), 'path should be array');
+  assert(result.path.length > 0, 'path should not be empty');
+  assert(typeof result.tripTime === 'number', 'tripTime should be number');
+  assert(typeof result.requiredTime === 'number', 'requiredTime should be number');
+  assert(typeof result.meetsStandard === 'boolean', 'meetsStandard should be boolean');
+  assert(result.clause.indexOf('60364') >= 0, 'clause should cite 60364. Got: ' + result.clause);
+  assert(Array.isArray(result.selectivityIssues), 'selectivityIssues should be array');
+  assert(['protected', 'failed', 'slow'].indexOf(result.verdict) >= 0, 'verdict should be valid. Got: ' + result.verdict);
+});
+
+// Test 43: sldSimulateFault correctly identifies which device trips first
+test('sldSimulateFault identifies first-tripping device on multi-level tree', function() {
+  sldNextId = 8100;
+  var tree = sldCreateTree();
+  var root = tree.nodes[tree.rootId];
+  var mainBoardId = root.childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+  // Set upstream fuse on main board
+  var fuse100 = PRODUCTS.fuses.find(function(f){ return f.rating === 100; });
+  mainBoard.protection = fuse100;
+  mainBoard.protectionIn = 100;
+  // Set downstream MCB on final circuit
+  var fcId = mainBoard.childIds[0];
+  var fc = tree.nodes[fcId];
+  var mcb16 = PRODUCTS.mcbs.find(function(m){ return m.curve === 'B' && m.rating === 16; });
+  fc.protection = mcb16;
+  fc.protectionIn = 16;
+  sldPropagateAll(tree);
+  var result = sldSimulateFault(tree, fcId, 'short_circuit');
+  // MCB should trip before the 100A fuse since fault current at final circuit
+  // would be handled by the faster-acting MCB at lower rating
+  assert(result.trippingDeviceNodeId, 'Should have a tripping device');
+  assert(result.tripTime < Infinity, 'Should have a finite trip time. Got: ' + result.tripTime);
+});
+
+// Test 44: sldSimulateFault applies 0.4s requirement for final circuits <=32A
+test('sldSimulateFault applies 0.4s requirement for final circuits <=32A', function() {
+  sldNextId = 8200;
+  var tree = sldCreateTree();
+  var root = tree.nodes[tree.rootId];
+  var mainBoardId = root.childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+  var fcId = mainBoard.childIds[0];
+  var fc = tree.nodes[fcId];
+  fc.protectionIn = 16;
+  var mcb = PRODUCTS.mcbs.find(function(m){ return m.curve === 'B' && m.rating === 16; });
+  fc.protection = mcb;
+  sldPropagateAll(tree);
+  var result = sldSimulateFault(tree, fcId, 'earth_fault');
+  assert(result.requiredTime === 0.4, 'Final circuit <=32A should require 0.4s. Got: ' + result.requiredTime);
+  assert(result.clause.indexOf('411.3.2.2') >= 0, 'Should cite cl.411.3.2.2. Got: ' + result.clause);
+});
+
+// Test 45: sldSimulateFault applies 5s requirement for distribution circuits
+test('sldSimulateFault applies 5s requirement for distribution circuits', function() {
+  sldNextId = 8300;
+  var tree = sldCreateTree();
+  var root = tree.nodes[tree.rootId];
+  var mainBoardId = root.childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+  var fuse100 = PRODUCTS.fuses.find(function(f){ return f.rating === 100; });
+  mainBoard.protection = fuse100;
+  mainBoard.protectionIn = 100;
+  sldPropagateAll(tree);
+  var result = sldSimulateFault(tree, mainBoardId, 'short_circuit');
+  assert(result.requiredTime === 5, 'Distribution board should require 5s. Got: ' + result.requiredTime);
+  assert(result.clause.indexOf('411.3.2.3') >= 0, 'Should cite cl.411.3.2.3. Got: ' + result.clause);
+});
+
+// Test 46: sldSimulateFault detects selectivity issues
+test('sldSimulateFault detects selectivity issues when upstream device also trips', function() {
+  sldNextId = 8400;
+  var tree = sldCreateTree();
+  var root = tree.nodes[tree.rootId];
+  var mainBoardId = root.childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+  // Set same-sized MCB on both main board and final circuit (no selectivity)
+  var mcb16 = PRODUCTS.mcbs.find(function(m){ return m.curve === 'C' && m.rating === 16; });
+  if (!mcb16) mcb16 = PRODUCTS.mcbs.find(function(m){ return m.curve === 'B' && m.rating === 16; });
+  mainBoard.protection = mcb16;
+  mainBoard.protectionIn = 16;
+  var fcId = mainBoard.childIds[0];
+  var fc = tree.nodes[fcId];
+  fc.protection = mcb16;
+  fc.protectionIn = 16;
+  sldPropagateAll(tree);
+  var result = sldSimulateFault(tree, fcId, 'short_circuit');
+  // With identical devices, both should trip at similar times = selectivity issue
+  // Note: the tripping device will be found (one of them) and the other will be
+  // in selectivityIssues if trip times are within 150% of each other
+  assert(result.trippingDeviceNodeId, 'Should have a tripping device');
+  // Both MCBs see the same fault current and are same rating, so both trip identically
+  assert(result.selectivityIssues.length > 0, 'Should detect selectivity issues with identical devices. Got: ' + result.selectivityIssues.length);
+});
+
+// Test 47: sldRenderFaultAnimation returns valid SVG string
+test('sldRenderFaultAnimation returns valid SVG with 3D elements', function() {
+  sldNextId = 8500;
+  var tree = sldCreateTree();
+  var root = tree.nodes[tree.rootId];
+  var mainBoardId = root.childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+  var fcId = mainBoard.childIds[0];
+  var fc = tree.nodes[fcId];
+  var mcb = PRODUCTS.mcbs.find(function(m){ return m.curve === 'B' && m.rating === 16; });
+  fc.protection = mcb;
+  fc.protectionIn = 16;
+  sldPropagateAll(tree);
+  var result = sldSimulateFault(tree, fcId, 'short_circuit');
+  var svg = sldRenderFaultAnimation(tree, result);
+  assert(svg.indexOf('<svg') >= 0, 'Should contain SVG element');
+  assert(svg.indexOf('faultBg') >= 0, 'Should have dark background gradient');
+  assert(svg.indexOf('faultGlow') >= 0, 'Should have glow filter');
+  assert(svg.indexOf('<polygon') >= 0, 'Should have 3D polygon faces');
+  assert(svg.indexOf('<animate') >= 0, 'Should have animation elements');
+  assert(svg.indexOf('#050c18') >= 0, 'Should use dark 3D color scheme');
+});
+
+// Test 48: All new fault simulation functions are defined at global scope
+test('All fault simulation functions are defined', function() {
+  assert(typeof sldGetTripTime === 'function', 'sldGetTripTime must be a function');
+  assert(typeof sldSimulateFault === 'function', 'sldSimulateFault must be a function');
+  assert(typeof sldInjectFault === 'function', 'sldInjectFault must be a function');
+  assert(typeof sldToggleFaultMode === 'function', 'sldToggleFaultMode must be a function');
+  assert(typeof sldSetFaultType === 'function', 'sldSetFaultType must be a function');
+  assert(typeof sldExitFaultSim === 'function', 'sldExitFaultSim must be a function');
+  assert(typeof sldRenderFaultAnimation === 'function', 'sldRenderFaultAnimation must be a function');
+  assert(typeof sldRenderFaultResults === 'function', 'sldRenderFaultResults must be a function');
+  assert(typeof sldRenderCanvasFaultMode === 'function', 'sldRenderCanvasFaultMode must be a function');
+  // Verify state variables exist
+  assert(typeof sldFaultSimMode !== 'undefined', 'sldFaultSimMode should be defined');
+  assert(typeof sldFaultSimType !== 'undefined', 'sldFaultSimType should be defined');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

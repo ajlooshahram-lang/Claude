@@ -1,0 +1,7 @@
+{
+  "task_id": "task-fault-simulation",
+  "task_description": "Phase 3: Animated 3D Fault Simulation for the el-dimensionering SLD module. Allows users to click any point on the installation SLD to inject a fault, animates fault current flow with 3D neon glow visual effects, shows which protection device trips first based on time-current curves, verifies DS/HD 60364-4-41 disconnection requirements, and displays comprehensive results including selectivity analysis.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null
+}

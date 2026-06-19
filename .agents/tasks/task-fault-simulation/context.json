@@ -1,0 +1,28 @@
+{
+  "project_type": "Single-file HTML/CSS/JS electrical dimensioning app (Danish/English/Farsi)",
+  "language": "JavaScript (ES5-compatible with some ES6, inside single HTML file)",
+  "build_system": "None - single HTML file, no bundler",
+  "test_framework": "Custom headless test runner in test-sld.js using Node.js assert module with DOM mocks",
+  "build_command": "node test-sld.js (validates JS syntax via eval + runs tests)",
+  "test_command": "node test-sld.js",
+  "verification_instructions": "1. Run 'node test-sld.js' and confirm all tests pass (39 existing + new tests). 2. Verify no syntax errors by successful eval in the test harness.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "No setup needed - Node.js is pre-installed, the app is a single HTML file.",
+  "environment_constraints": "Open internet. No Docker needed. Single HTML file architecture means all code goes in one file. Tests use eval() to extract <script> content.",
+  "contribution_requirements": "All existing 39 tests must continue to pass. New features must include headless tests in test-sld.js. Trilingual support (da/en/fa with RTL). Click-only UI. Life-safety critical calculations must be conservative.",
+  "key_patterns": {
+    "translation": "tx(danish, english) function with _FA dict for Farsi lookup. tp(obj) for {da,en,fa} objects.",
+    "module_rendering": "renderModule(mod) switch statement routes to renderXxx() functions returning HTML strings",
+    "state_management": "Global vars (sldTree, sldSelectedId, etc.) with sldSave()/sldLoad() for localStorage",
+    "SLD_architecture": "Tree data model with nodes (transformer, main_board, sub_board, final_circuit). sldPropagateAll() does two-pass computation. sldRenderCanvas() generates SVG.",
+    "selectivity": "sldAnalyzeSelectivity(tree, childNodeId) returns {verdict, limitCurrent, details, clause}. sldDeviceCurve(device, In, settings) returns [{i, tMin, tMax}] points.",
+    "3D_style": "build3D() uses dark background (linear-gradient #050c18 to #010408), neon glow (feGaussianBlur filter), isometric 3D boxes with polygon faces, color per node type",
+    "products": "PRODUCTS object with .cables[], .mcbs[], .mccbs[], .fuses[] arrays. MCB_CURVES constant.",
+    "calculation": "sldCalcNodeIk(tree, nodeId) returns {ikmax, ikmin, zs, z1}. sldGetPath(tree, nodeId) returns root-to-node path."
+  },
+  "relevant_files": [
+    "/projects/sandbox/Claude/el-dimensionering.html",
+    "/projects/sandbox/Claude/test-sld.js"
+  ],
+  "directory_structure": "Flat structure - single HTML file contains all code. test-sld.js is the headless test file. .agents/tasks/ for task state."
+}

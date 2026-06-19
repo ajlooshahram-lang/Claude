@@ -913,6 +913,26 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // Fault Simulation translations (Phase 3)
+  'Fault Simulation': '\u0634\u0628\u06CC\u0647\u200C\u0633\u0627\u0632\u06CC \u062E\u0637\u0627',
+  'Short-circuit': '\u0627\u062A\u0635\u0627\u0644 \u06A9\u0648\u062A\u0627\u0647',
+  'Earth fault': '\u062E\u0637\u0627\u06CC \u0632\u0645\u06CC\u0646',
+  'Fault Simulation - Results': '\u0634\u0628\u06CC\u0647\u200C\u0633\u0627\u0632\u06CC \u062E\u0637\u0627 - \u0646\u062A\u0627\u06CC\u062C',
+  'Fault type': '\u0646\u0648\u0639 \u062E\u0637\u0627',
+  'Fault current Ik': '\u062C\u0631\u06CC\u0627\u0646 \u062E\u0637\u0627 Ik',
+  'Device tripped': '\u062F\u0633\u062A\u06AF\u0627\u0647 \u0639\u0645\u0644 \u06A9\u0631\u062F\u0647',
+  'Trip time': '\u0632\u0645\u0627\u0646 \u0642\u0637\u0639',
+  'Required time': '\u0632\u0645\u0627\u0646 \u0645\u0648\u0631\u062F \u0646\u06CC\u0627\u0632',
+  'Protection adequate': '\u062D\u0641\u0627\u0638\u062A \u06A9\u0627\u0641\u06CC',
+  'Protection failed': '\u062D\u0641\u0627\u0638\u062A \u0646\u0627\u0645\u0648\u0641\u0642',
+  'Disconnection too slow': '\u0642\u0637\u0639 \u062E\u06CC\u0644\u06CC \u06A9\u0646\u062F',
+  'Selectivity issues': '\u0645\u0634\u06A9\u0644\u0627\u062A \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u067E\u0630\u06CC\u0631\u06CC',
+  'No trip': '\u0628\u062F\u0648\u0646 \u0642\u0637\u0639',
+  'at fault point': '\u062F\u0631 \u0646\u0642\u0637\u0647 \u062E\u0637\u0627',
+  'Exit simulation': '\u062E\u0631\u0648\u062C \u0627\u0632 \u0634\u0628\u06CC\u0647\u200C\u0633\u0627\u0632\u06CC',
+  '3D Fault Visualization': '\u0634\u0628\u06CC\u0647\u200C\u0633\u0627\u0632\u06CC \u0633\u0647\u200C\u0628\u0639\u062F\u06CC \u062E\u0637\u0627',
+  'FAULT SIMULATION ACTIVE - Click a node to inject fault': '\u0634\u0628\u06CC\u0647\u200C\u0633\u0627\u0632\u06CC \u062E\u0637\u0627 \u0641\u0639\u0627\u0644 - \u0628\u0631\u0627\u06CC \u062A\u0632\u0631\u06CC\u0642 \u062E\u0637\u0627 \u0631\u0648\u06CC \u06CC\u06A9 \u06AF\u0631\u0647 \u06A9\u0644\u06CC\u06A9 \u06A9\u0646\u06CC\u062F',
+  'Click to fault': '\u06A9\u0644\u06CC\u06A9 \u0628\u0631\u0627\u06CC \u062E\u0637\u0627',
   // Selectivity coordination translations (Phase 2)
   'Selectivity': '\u0627\u0646\u062A\u062E\u0627\u0628\u200C\u067E\u0630\u06CC\u0631\u06CC',
   'Full selectivity': '\u0627\u0646\u062A\u062E\u0627\u0628\u200C\u067E\u0630\u06CC\u0631\u06CC \u06A9\u0627\u0645\u0644',
@@ -6396,6 +6416,334 @@ function sldVerifySelectivityAll(tree) {
   return results;
 }
 
+// --- PHASE 3: Fault Simulation Engine ---
+
+// State variables for fault simulation mode
+var sldFaultSimMode = false;
+var sldFaultSimResult = null;
+var sldFaultSimAnimating = false;
+var sldFaultSimFrame = 0;
+var sldFaultSimType = 'short_circuit'; // 'short_circuit' or 'earth_fault'
+
+// STEP 2: Trip time interpolation helper
+function sldGetTripTime(device, In, Ifault, settings) {
+  // Returns conservative (worst-case) trip time tMax at given fault current.
+  // Uses log-log interpolation between curve points.
+  // Returns Infinity if device will not trip at this current.
+  if (!device || !In || !Ifault || Ifault <= 0) return Infinity;
+  var curve = sldDeviceCurve(device, In, settings);
+  if (!curve || curve.length === 0) return Infinity;
+  // Sort curve by current ascending
+  curve.sort(function(a, b) { return a.i - b.i; });
+  // If fault current is below the first curve point, device won't trip
+  if (Ifault < curve[0].i) return Infinity;
+  // If fault current is above or at the last curve point, return last tMax
+  if (Ifault >= curve[curve.length - 1].i) return curve[curve.length - 1].tMax;
+  // Find bracketing points and interpolate in log-log space
+  for (var k = 0; k < curve.length - 1; k++) {
+    if (Ifault >= curve[k].i && Ifault <= curve[k + 1].i) {
+      var logI1 = Math.log(curve[k].i);
+      var logI2 = Math.log(curve[k + 1].i);
+      var logT1 = Math.log(Math.max(curve[k].tMax, 0.001));
+      var logT2 = Math.log(Math.max(curve[k + 1].tMax, 0.001));
+      var logIfault = Math.log(Ifault);
+      var frac = (logIfault - logI1) / (logI2 - logI1);
+      var logT = logT1 + frac * (logT2 - logT1);
+      return Math.exp(logT);
+    }
+  }
+  return curve[curve.length - 1].tMax;
+}
+
+// STEP 1: Fault simulation calculation engine
+function sldSimulateFault(tree, nodeId, faultType) {
+  // Simulate a fault at given node.
+  // faultType: 'short_circuit' or 'earth_fault'
+  // Returns complete result object for visualization.
+  if (!tree || !nodeId || !tree.nodes[nodeId]) {
+    return { faultNodeId: nodeId, faultType: faultType, ikFault: 0, zsAtFault: 0,
+             path: [], trippingDeviceNodeId: null, tripTime: Infinity,
+             requiredTime: 5, meetsStandard: false, clause: 'DS/HD 60364-4-41',
+             selectivityIssues: [], verdict: 'failed' };
+  }
+  var node = tree.nodes[nodeId];
+  var path = sldGetPath(tree, nodeId);
+  var ikData = sldCalcNodeIk(tree, nodeId);
+  // For earth fault, use ikmin (conservative - lower current = longer trip time)
+  // For short circuit, also use ikmin for disconnection time check (conservative)
+  var ikFault = (faultType === 'earth_fault') ? ikData.ikmin : ikData.ikmin;
+  var zsAtFault = ikData.zs;
+
+  // Determine required disconnection time per DS/HD 60364-4-41
+  var requiredTime = 5; // Default: distribution circuits
+  var clause = 'DS/HD 60364-4-41 cl.411.3.2.3';
+  if (node.type === 'final_circuit') {
+    var nomCurrent = node.protectionIn || 0;
+    if (nomCurrent <= 32) {
+      requiredTime = 0.4; // Final circuits <=32A at 230V: 0.4s
+      clause = 'DS/HD 60364-4-41 cl.411.3.2.2';
+    }
+  }
+
+  // Walk path from fault point toward root, find which device trips first
+  var trippingDeviceNodeId = null;
+  var tripTime = Infinity;
+  var allTripTimes = []; // For selectivity analysis
+
+  for (var pi = path.length - 1; pi >= 0; pi--) {
+    var pathNodeId = path[pi];
+    var pathNode = tree.nodes[pathNodeId];
+    if (!pathNode || pathNode.type === 'transformer') continue;
+    if (!pathNode.protection || !pathNode.protectionIn) continue;
+    var devTripTime = sldGetTripTime(pathNode.protection, pathNode.protectionIn, ikFault, pathNode.mccbSettings);
+    allTripTimes.push({ nodeId: pathNodeId, tripTime: devTripTime, name: sldNodeName(pathNode) });
+    if (devTripTime < tripTime) {
+      tripTime = devTripTime;
+      trippingDeviceNodeId = pathNodeId;
+    }
+  }
+
+  // Check for selectivity issues: upstream devices that also trip
+  var selectivityIssues = [];
+  if (trippingDeviceNodeId) {
+    for (var si = 0; si < allTripTimes.length; si++) {
+      var entry = allTripTimes[si];
+      if (entry.nodeId === trippingDeviceNodeId) continue;
+      // If an upstream device trips within 150% of the first device trip time, it's a selectivity concern
+      if (entry.tripTime < Infinity && entry.tripTime < tripTime * 1.5) {
+        selectivityIssues.push({
+          nodeId: entry.nodeId,
+          name: entry.name,
+          tripTime: entry.tripTime
+        });
+      }
+    }
+  }
+
+  // Determine verdict
+  var meetsStandard = (tripTime <= requiredTime) && (tripTime < Infinity);
+  var verdict = 'failed';
+  if (tripTime === Infinity || !trippingDeviceNodeId) {
+    verdict = 'failed'; // No device trips
+  } else if (!meetsStandard) {
+    verdict = 'slow'; // Device trips but too slow
+  } else {
+    verdict = 'protected'; // Device trips within required time
+  }
+
+  return {
+    faultNodeId: nodeId,
+    faultType: faultType,
+    ikFault: ikFault,
+    zsAtFault: zsAtFault,
+    path: path,
+    trippingDeviceNodeId: trippingDeviceNodeId,
+    tripTime: tripTime,
+    requiredTime: requiredTime,
+    meetsStandard: meetsStandard,
+    clause: clause,
+    selectivityIssues: selectivityIssues,
+    verdict: verdict
+  };
+}
+
+// STEP 3: Fault injection trigger
+function sldInjectFault(nodeId) {
+  if (!sldTree || !nodeId) return;
+  var node = sldTree.nodes[nodeId];
+  if (!node || node.type === 'transformer') return;
+  sldPropagateAll(sldTree);
+  sldFaultSimResult = sldSimulateFault(sldTree, nodeId, sldFaultSimType);
+  sldFaultSimAnimating = true;
+  sldFaultSimFrame = 0;
+  renderModule('sld');
+}
+
+function sldToggleFaultMode() {
+  sldFaultSimMode = !sldFaultSimMode;
+  if (!sldFaultSimMode) {
+    sldFaultSimResult = null;
+    sldFaultSimAnimating = false;
+    sldFaultSimFrame = 0;
+  }
+  renderModule('sld');
+}
+
+function sldSetFaultType(ftype) {
+  sldFaultSimType = ftype;
+  renderModule('sld');
+}
+
+function sldExitFaultSim() {
+  sldFaultSimMode = false;
+  sldFaultSimResult = null;
+  sldFaultSimAnimating = false;
+  sldFaultSimFrame = 0;
+  renderModule('sld');
+}
+
+// STEP 4: Animated 3D SVG Fault Visualization
+function sldRenderFaultAnimation(tree, result) {
+  if (!tree || !result || !result.path || result.path.length === 0) return '';
+  var nodeW = 100, nodeH = 55, gapX = 20, gapY = 70;
+  var positions = {};
+  var maxX = 0, maxY = 0;
+
+  // Layout only path nodes vertically for focused view
+  for (var li = 0; li < result.path.length; li++) {
+    var nid = result.path[li];
+    var px = 200;
+    var py = 30 + li * (nodeH + gapY);
+    positions[nid] = { x: px, y: py };
+    if (px + nodeW > maxX) maxX = px + nodeW;
+    if (py + nodeH > maxY) maxY = py + nodeH;
+  }
+
+  var svgW = maxX + 200;
+  var svgH = maxY + 60;
+  var pathColor = result.verdict === 'protected' ? '#00ff88' : '#ff3344';
+  var glowColor = result.verdict === 'protected' ? '#00ff8855' : '#ff334455';
+  var currentIntensity = Math.min(1, (result.ikFault || 0) / 10000);
+  var glowStd = 3 + currentIntensity * 6;
+
+  var svg = '<svg width="100%" viewBox="0 0 ' + svgW + ' ' + svgH + '" style="min-height:250px;max-height:600px;border-radius:12px;overflow:hidden">';
+  // Dark background
+  svg += '<rect width="100%" height="100%" fill="url(#faultBg)"/>';
+  // Defs: gradients + glow filters
+  svg += '<defs>';
+  svg += '<linearGradient id="faultBg" x1="0" y1="0" x2="0" y2="1">';
+  svg += '<stop offset="0%" stop-color="#050c18"/>';
+  svg += '<stop offset="65%" stop-color="#020710"/>';
+  svg += '<stop offset="100%" stop-color="#010408"/>';
+  svg += '</linearGradient>';
+  svg += '<filter id="faultGlow"><feGaussianBlur stdDeviation="' + glowStd.toFixed(1) + '" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  svg += '<filter id="faultPulse"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  svg += '</defs>';
+
+  // Draw connection lines with animated current flow
+  for (var ci = 0; ci < result.path.length - 1; ci++) {
+    var fromId = result.path[ci];
+    var toId = result.path[ci + 1];
+    var fromPos = positions[fromId];
+    var toPos = positions[toId];
+    if (!fromPos || !toPos) continue;
+    var x1 = fromPos.x + nodeW / 2;
+    var y1 = fromPos.y + nodeH;
+    var x2 = toPos.x + nodeW / 2;
+    var y2 = toPos.y;
+    // Base cable line
+    svg += '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + pathColor + '" stroke-width="3" opacity="0.3" filter="url(#faultGlow)"/>';
+    // Animated dashed overlay (current flow)
+    svg += '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + pathColor + '" stroke-width="2" stroke-dasharray="8,12" filter="url(#faultGlow)">';
+    svg += '<animate attributeName="stroke-dashoffset" from="0" to="-40" dur="0.6s" repeatCount="indefinite"/>';
+    svg += '</line>';
+  }
+
+  // Draw nodes as isometric 3D boxes
+  for (var ni = 0; ni < result.path.length; ni++) {
+    var drawId = result.path[ni];
+    var drawNode = tree.nodes[drawId];
+    var dpos = positions[drawId];
+    if (!drawNode || !dpos) continue;
+    var isTripping = (drawId === result.trippingDeviceNodeId);
+    var isFault = (drawId === result.faultNodeId);
+    var boxColor = '#4488cc';
+    if (drawNode.type === 'transformer') boxColor = '#ff8a5c';
+    else if (drawNode.type === 'main_board') boxColor = '#7fc8ff';
+    else if (drawNode.type === 'sub_board') boxColor = '#a78bfa';
+    else boxColor = '#34d399';
+
+    if (isTripping) boxColor = '#ff3344';
+
+    // 3D isometric box (top, left, right faces)
+    var bw = nodeW, bh = nodeH, bd = 20;
+    var bx = dpos.x, by = dpos.y;
+    // Top face
+    var topPoly = (bx + bd) + ',' + by + ' ' + (bx + bw + bd) + ',' + by + ' ' + (bx + bw) + ',' + (by + bd) + ' ' + bx + ',' + (by + bd);
+    // Front face
+    var frontPoly = bx + ',' + (by + bd) + ' ' + (bx + bw) + ',' + (by + bd) + ' ' + (bx + bw) + ',' + (by + bh) + ' ' + bx + ',' + (by + bh);
+    // Right face
+    var rightPoly = (bx + bw) + ',' + (by + bd) + ' ' + (bx + bw + bd) + ',' + by + ' ' + (bx + bw + bd) + ',' + (by + bh - bd) + ' ' + (bx + bw) + ',' + (by + bh);
+
+    var nodeFilter = isTripping ? 'filter="url(#faultPulse)"' : 'filter="url(#faultGlow)"';
+    svg += '<g ' + nodeFilter + '>';
+    svg += '<polygon points="' + topPoly + '" fill="' + boxColor + '" opacity="0.7"/>';
+    svg += '<polygon points="' + frontPoly + '" fill="' + boxColor + '" opacity="0.9"/>';
+    svg += '<polygon points="' + rightPoly + '" fill="' + boxColor + '" opacity="0.5"/>';
+    // Label
+    svg += '<text x="' + (bx + bw / 2) + '" y="' + (by + bd + (bh - bd) / 2 + 4) + '" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">' + sldNodeName(drawNode) + '</text>';
+
+    // Tripping device animation (red strobe)
+    if (isTripping) {
+      svg += '<rect x="' + (bx - 4) + '" y="' + (by - 4) + '" width="' + (bw + bd + 8) + '" height="' + (bh + 8) + '" rx="4" fill="none" stroke="#ff3344" stroke-width="3">';
+      svg += '<animate attributeName="opacity" values="1;0.2;1" dur="0.5s" repeatCount="indefinite"/>';
+      svg += '</rect>';
+    }
+
+    // Fault injection point (lightning bolt)
+    if (isFault) {
+      var lx = bx + bw + bd + 15;
+      var ly = by + bh / 2 - 10;
+      svg += '<text x="' + lx + '" y="' + ly + '" font-size="24" fill="#ffdd00" filter="url(#faultGlow)">\u26A1</text>';
+    }
+    svg += '</g>';
+  }
+
+  svg += '</svg>';
+  return svg;
+}
+
+// STEP 5: Results Panel
+function sldRenderFaultResults(result) {
+  if (!result) return '';
+  var verdictColor = result.verdict === 'protected' ? 'var(--success,#28a745)' : (result.verdict === 'slow' ? '#b8860b' : 'var(--danger,#dc3545)');
+  var verdictIcon = result.verdict === 'protected' ? '\u2705' : (result.verdict === 'slow' ? '\u26A0\uFE0F' : '\u274C');
+  var verdictText = result.verdict === 'protected' ?
+    tx('Beskyttelse tilstraekkelig', 'Protection adequate') :
+    (result.verdict === 'slow' ?
+      tx('Frakobling for langsom', 'Disconnection too slow') :
+      tx('Beskyttelse fejlet', 'Protection failed'));
+
+  var faultTypeText = result.faultType === 'earth_fault' ?
+    tx('Jordfejl', 'Earth fault') :
+    tx('Kortslutning', 'Short-circuit');
+
+  var tripDeviceName = '---';
+  if (result.trippingDeviceNodeId && sldTree && sldTree.nodes[result.trippingDeviceNodeId]) {
+    var tNode = sldTree.nodes[result.trippingDeviceNodeId];
+    tripDeviceName = sldNodeName(tNode);
+    if (tNode.protection) {
+      tripDeviceName += ' (' + (tNode.protection.model || tNode.protection.curve || '') + ' ' + (tNode.protectionIn || '') + 'A)';
+    }
+  }
+
+  var html = '<div class="card fade-in" style="border-left:4px solid ' + verdictColor + '">';
+  html += '<div class="card-title">' + verdictIcon + ' ' + tx('Fejlsimulering - Resultater', 'Fault Simulation - Results') + '</div>';
+  html += '<div class="result-box">';
+  html += '<div class="result-title" style="color:' + verdictColor + '">' + verdictText + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Fejltype', 'Fault type') + '</span><span class="value">' + faultTypeText + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Fejlstroem Ik', 'Fault current Ik') + '</span><span class="value">' + (result.ikFault / 1000).toFixed(2) + ' kA</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Enhed udloest', 'Device tripped') + '</span><span class="value">' + tripDeviceName + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Udloesningstid', 'Trip time') + '</span><span class="value">' + (result.tripTime === Infinity ? tx('Ingen udloesning', 'No trip') : (result.tripTime * 1000).toFixed(0) + ' ms') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kraevet tid', 'Required time') + '</span><span class="value">' + (result.requiredTime * 1000).toFixed(0) + ' ms (' + result.clause + ')</span></div>';
+  html += '<div class="result-row"><span class="label">Zs ' + tx('ved fejlsted', 'at fault point') + '</span><span class="value">' + (result.zsAtFault * 1000).toFixed(1) + ' m\u03A9</span></div>';
+  html += '</div>';
+
+  // Selectivity issues
+  if (result.selectivityIssues && result.selectivityIssues.length > 0) {
+    html += '<div class="result-box" style="margin-top:8px;border-left:3px solid #b8860b">';
+    html += '<div class="result-title" style="color:#b8860b">\u26A0\uFE0F ' + tx('Selektivitetsproblemer', 'Selectivity issues') + '</div>';
+    for (var si = 0; si < result.selectivityIssues.length; si++) {
+      var issue = result.selectivityIssues[si];
+      html += '<div class="result-row"><span class="label">' + issue.name + '</span><span class="value">' + (issue.tripTime * 1000).toFixed(0) + ' ms</span></div>';
+    }
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
 // --- Main SLD Render Function ---
 function renderSLD() {
   if (!sldTree) sldInit();
@@ -6408,33 +6756,150 @@ function renderSLD() {
 
   let html = '<div class="card fade-in">';
   html += '<div class="card-title">\u26A1 ' + tx('Installationsplan (SLD)', 'Installation Plan (SLD)') + '</div>';
-  html += '<div class="info-row">' + tx('Klik paa en node for at vaelge den. Brug knapperne til at tilfoeje/fjerne noder.', 'Click a node to select it. Use buttons to add/remove nodes.') + '</div>';
+
+  // Fault simulation mode indicator and instructions
+  if (sldFaultSimMode && !sldFaultSimResult) {
+    html += '<div class="info-row" style="color:var(--danger);font-weight:bold">\u26A1 ' + tx('FEJLSIMULERING AKTIV - Klik paa en node for at injicere fejl', 'FAULT SIMULATION ACTIVE - Click a node to inject fault') + '</div>';
+  } else if (!sldFaultSimMode) {
+    html += '<div class="info-row">' + tx('Klik paa en node for at vaelge den. Brug knapperne til at tilfoeje/fjerne noder.', 'Click a node to select it. Use buttons to add/remove nodes.') + '</div>';
+  }
 
   html += '<div class="select-grid" style="margin-bottom:12px">';
-  if (canAddSubBoard) {
-    html += '<button class="sel-btn" onclick="sldAddNode(\'' + sldSelectedId + '\',\'sub_board\')">+ ' + tx('Undertavle', 'Sub-Board') + '</button>';
+  if (!sldFaultSimMode) {
+    if (canAddSubBoard) {
+      html += '<button class="sel-btn" onclick="sldAddNode(\'' + sldSelectedId + '\',\'sub_board\')">+ ' + tx('Undertavle', 'Sub-Board') + '</button>';
+    }
+    if (canAddCircuit) {
+      html += '<button class="sel-btn" onclick="sldAddNode(\'' + sldSelectedId + '\',\'final_circuit\')">+ ' + tx('Gruppe', 'Circuit') + '</button>';
+    }
+    if (canRemove) {
+      html += '<button class="sel-btn" style="color:var(--danger)" onclick="sldRemoveNode(\'' + sldSelectedId + '\')">\uD83D\uDDD1\uFE0F ' + tx('Fjern', 'Remove') + '</button>';
+    }
   }
-  if (canAddCircuit) {
-    html += '<button class="sel-btn" onclick="sldAddNode(\'' + sldSelectedId + '\',\'final_circuit\')">+ ' + tx('Gruppe', 'Circuit') + '</button>';
+  // Fault simulation toggle button
+  html += '<button class="sel-btn' + (sldFaultSimMode ? ' selected' : '') + '" style="' + (sldFaultSimMode ? 'background:var(--danger);color:#fff' : '') + '" onclick="sldToggleFaultMode()">\u26A1 ' + tx('Fejlsimulering', 'Fault Simulation') + '</button>';
+  html += '</div>';
+
+  // Fault type selection (visible when mode is active, before results)
+  if (sldFaultSimMode && !sldFaultSimResult) {
+    html += '<div class="select-grid" style="margin-bottom:12px">';
+    html += '<button class="sel-btn' + (sldFaultSimType === 'short_circuit' ? ' selected' : '') + '" onclick="sldSetFaultType(\'short_circuit\')">\u26A1 ' + tx('Kortslutning', 'Short-circuit') + '</button>';
+    html += '<button class="sel-btn' + (sldFaultSimType === 'earth_fault' ? ' selected' : '') + '" onclick="sldSetFaultType(\'earth_fault\')">\u23DA ' + tx('Jordfejl', 'Earth fault') + '</button>';
+    html += '</div>';
   }
-  if (canRemove) {
-    html += '<button class="sel-btn" style="color:var(--danger)" onclick="sldRemoveNode(\'' + sldSelectedId + '\')">\uD83D\uDDD1\uFE0F ' + tx('Fjern', 'Remove') + '</button>';
+
+  // Render SLD canvas - in fault sim mode, nodes trigger fault injection
+  if (sldFaultSimMode && !sldFaultSimResult) {
+    html += sldRenderCanvasFaultMode(sldTree);
+  } else {
+    html += sldRenderCanvas(sldTree);
   }
   html += '</div>';
 
-  html += sldRenderCanvas(sldTree);
-  html += '</div>';
+  // Fault simulation results
+  if (sldFaultSimMode && sldFaultSimResult) {
+    html += '<div class="card fade-in">';
+    html += '<div class="card-title">\u26A1 ' + tx('3D Fejlvisualisering', '3D Fault Visualization') + '</div>';
+    html += sldRenderFaultAnimation(sldTree, sldFaultSimResult);
+    html += '<div style="margin-top:12px;text-align:center">';
+    html += '<button class="sel-btn" style="color:var(--danger)" onclick="sldExitFaultSim()">\u2715 ' + tx('Afslut simulering', 'Exit simulation') + '</button>';
+    html += '</div>';
+    html += '</div>';
+    html += sldRenderFaultResults(sldFaultSimResult);
+  } else {
+    if (sldSelectedId) {
+      html += sldRenderNodePanel(sldTree, sldSelectedId);
+    }
 
-  if (sldSelectedId) {
-    html += sldRenderNodePanel(sldTree, sldSelectedId);
-  }
-
-  // Selectivity panel (shown when connection line is clicked)
-  if (sldSelectivityPanelOpen && sldSelectivityParentId && sldSelectivityChildId) {
-    html += sldRenderSelectivityPanel(sldTree, sldSelectivityParentId, sldSelectivityChildId);
+    // Selectivity panel (shown when connection line is clicked)
+    if (sldSelectivityPanelOpen && sldSelectivityParentId && sldSelectivityChildId) {
+      html += sldRenderSelectivityPanel(sldTree, sldSelectivityParentId, sldSelectivityChildId);
+    }
   }
 
   return html;
+}
+
+// SLD Canvas in Fault Simulation Mode (clicking nodes injects faults)
+function sldRenderCanvasFaultMode(tree) {
+  if (!tree || !tree.rootId) return '<svg width="100%" height="200"></svg>';
+  const root = tree.nodes[tree.rootId];
+  if (!root) return '<svg width="100%" height="200"></svg>';
+
+  const nodeW = 120, nodeH = 70, gapX = 30, gapY = 90;
+  let positions = {};
+  let maxX = 0, maxY = 0;
+
+  function layoutNode(id, x, y) {
+    positions[id] = { x: x, y: y };
+    if (x + nodeW > maxX) maxX = x + nodeW;
+    if (y + nodeH > maxY) maxY = y + nodeH;
+    const node = tree.nodes[id];
+    if (!node || node.childIds.length === 0) return x + nodeW + gapX;
+    let cx = x;
+    node.childIds.forEach(function(cid) {
+      cx = layoutNode(cid, cx, y + gapY + nodeH);
+    });
+    const firstChild = positions[node.childIds[0]];
+    const lastChild = positions[node.childIds[node.childIds.length - 1]];
+    positions[id].x = (firstChild.x + lastChild.x) / 2;
+    return cx;
+  }
+
+  layoutNode(root.id, 20, 20);
+  const svgW = maxX + 40;
+  const svgH = maxY + 40;
+
+  let svg = '<svg width="100%" viewBox="0 0 ' + svgW + ' ' + svgH + '" style="min-height:200px;max-height:500px;border:2px solid var(--danger);border-radius:8px;background:linear-gradient(180deg,#0a0a1a,#1a0a0a)">';
+  svg += '<defs><filter id="fSimGlow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>';
+
+  // Draw connections
+  Object.keys(tree.nodes).forEach(function(id) {
+    const node = tree.nodes[id];
+    const pos = positions[id];
+    if (!node || !pos) return;
+    node.childIds.forEach(function(cid) {
+      const cpos = positions[cid];
+      if (!cpos) return;
+      const x1 = pos.x + nodeW / 2;
+      const y1 = pos.y + nodeH;
+      const x2 = cpos.x + nodeW / 2;
+      const y2 = cpos.y;
+      svg += '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#446688" stroke-width="2" filter="url(#fSimGlow)"/>';
+    });
+  });
+
+  // Draw nodes - clicking non-transformer nodes triggers fault injection
+  Object.keys(tree.nodes).forEach(function(id) {
+    const node = tree.nodes[id];
+    const pos = positions[id];
+    if (!node || !pos) return;
+    const isTransformer = (node.type === 'transformer');
+    const fillColor = isTransformer ? '#334' : '#221111';
+    const borderColor = isTransformer ? '#5588bb' : '#ff4444';
+    const cursor = isTransformer ? 'not-allowed' : 'pointer';
+    const onclick = isTransformer ? '' : 'onclick="sldInjectFault(\'' + id + '\')"';
+
+    svg += '<g ' + onclick + ' style="cursor:' + cursor + '">';
+    if (isTransformer) {
+      const cx = pos.x + nodeW / 2;
+      const cy = pos.y + nodeH / 2;
+      svg += '<circle cx="' + (cx - 12) + '" cy="' + cy + '" r="18" fill="' + fillColor + '" stroke="' + borderColor + '" stroke-width="2" filter="url(#fSimGlow)"/>';
+      svg += '<circle cx="' + (cx + 12) + '" cy="' + cy + '" r="18" fill="' + fillColor + '" stroke="' + borderColor + '" stroke-width="2" filter="url(#fSimGlow)"/>';
+      svg += '<text x="' + cx + '" y="' + (cy + 30) + '" text-anchor="middle" font-size="9" fill="#aaa">' + (node.power_kVA || 630) + ' kVA</text>';
+    } else {
+      svg += '<rect x="' + pos.x + '" y="' + pos.y + '" width="' + nodeW + '" height="' + nodeH + '" rx="4" fill="' + fillColor + '" stroke="' + borderColor + '" stroke-width="2" filter="url(#fSimGlow)"/>';
+      svg += '<text x="' + (pos.x + nodeW / 2) + '" y="' + (pos.y + 25) + '" text-anchor="middle" font-size="9" fill="#eee">' + sldNodeName(node) + '</text>';
+      svg += '<text x="' + (pos.x + nodeW / 2) + '" y="' + (pos.y + 42) + '" text-anchor="middle" font-size="8" fill="#ff8888">\u26A1 ' + tx('Klik for fejl', 'Click to fault') + '</text>';
+      if (node.protectionIn) {
+        svg += '<text x="' + (pos.x + nodeW / 2) + '" y="' + (pos.y + 57) + '" text-anchor="middle" font-size="8" fill="#888">' + node.protectionIn + 'A</text>';
+      }
+    }
+    svg += '</g>';
+  });
+
+  svg += '</svg>';
+  return svg;
 }
 
 // ===== INIT =====
