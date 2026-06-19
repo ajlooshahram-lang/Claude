@@ -545,6 +545,98 @@
    * @param {string} text - the project description (stays local).
    * @param {object} [opts] - { profile?: "fibre-telecom"|"generic-pm" }
    */
+  // ---- Energy & cost optimisation analysis ---------------------------------
+  // Concrete, plain-language levers to cut cost and energy for the project,
+  // with conservative estimated savings derived from the detected scale. This
+  // makes the Brain analyse the project "to reduce energy and cost as much as
+  // possible", not just plan it.
+  function buildOptimization(input) {
+    input = input || {};
+    var s = input.scale || {};
+    var km = Number(s.routeKm) || 0;
+    var budget = Number(input.budget || s.statedBudget) || 0;
+    var months = Number(s.durationMonths) || 0;
+    var isFibre = input.profileId === "fibre-telecom";
+    var intel = input.countryIntel || [];
+    var fmtUsd = function (n) {
+      if (!n) return null;
+      if (n >= 1e9) return "$" + (n / 1e9).toFixed(2) + "B";
+      if (n >= 1e6) return "$" + Math.round(n / 1e6) + "M";
+      if (n >= 1e3) return "$" + Math.round(n / 1e3) + "k";
+      return "$" + Math.round(n);
+    };
+    var items = [];
+    var totalCostSaving = 0, totalEnergySaving = 0; // fractions of budget / energy
+
+    if (isFibre && km) {
+      // 1) Route optimisation — shorter route = less cable, fuel and repeater power.
+      var kmSaved = Math.round(km * 0.05);
+      var routeCost = budget ? budget * 0.04 : 0; totalCostSaving += 0.04; totalEnergySaving += 0.03;
+      items.push({
+        area: "Route", kind: "both",
+        title: "Optimise the cable route (cut slack)",
+        text: "Lay the cable on the shortest safe great-circle path and trim survey slack. About " + kmSaved + " km less cable means less material, less ship fuel, and fewer powered repeaters." + (routeCost ? " Estimated saving ~" + fmtUsd(routeCost) + "." : ""),
+      });
+      // 2) Repeater spacing / power.
+      var repCost = budget ? budget * 0.03 : 0; totalCostSaving += 0.03; totalEnergySaving += 0.06;
+      items.push({
+        area: "Energy", kind: "energy",
+        title: "Right-size repeater spacing & power feed",
+        text: "Use modern low-power repeaters at the widest safe spacing and a single optimised power-feed voltage. This is the biggest lever on lifetime energy use of a submarine system." + (repCost ? " Estimated capex saving ~" + fmtUsd(repCost) + " plus lower ongoing power." : ""),
+      });
+      // 3) Renewable landing stations.
+      items.push({
+        area: "Energy", kind: "energy",
+        title: "Solar + battery at landing stations",
+        text: "Power the " + (intel.length || "") + " landing stations partly from on-site solar + battery. Cuts grid energy cost and protects against local outages — especially valuable in remote Pacific sites.",
+      });
+    }
+
+    // 4) Procurement economies of scale (any project).
+    var procCost = budget ? budget * 0.05 : 0; totalCostSaving += 0.05;
+    items.push({
+      area: "Cost", kind: "cost",
+      title: "Bulk-buy and standardise equipment",
+      text: "Order cable, repeaters and terminal gear in one framework agreement and standardise on as few part types as possible." + (procCost ? " Volume pricing typically saves ~" + fmtUsd(procCost) + "." : " Volume pricing typically saves 4-6%."),
+    });
+
+    // 5) Vessel scheduling around weather windows (fuel + idle-day cost).
+    var weather = intel.filter(function (c) { return (c.geographical || []).some(function (g) { return /typhoon|monsoon|cyclone|storm/i.test(g); }); }).map(function (c) { return c.name; });
+    if (weather.length || isFibre) {
+      var vesselCost = budget ? budget * 0.03 : 0; totalCostSaving += 0.03; totalEnergySaving += 0.02;
+      items.push({
+        area: "Cost", kind: "both",
+        title: "Schedule marine work in the calm season",
+        text: "Plan survey and cable-lay" + (weather.length ? " in " + weather.join(", ") : "") + " for the calm season. Idle ship-days waiting out " + (weather.length ? "typhoon/monsoon" : "bad weather") + " are one of the largest avoidable costs and burn fuel for nothing." + (vesselCost ? " Estimated saving ~" + fmtUsd(vesselCost) + "." : ""),
+      });
+    }
+
+    // 6) Right-size capacity / phased build (avoid over-provisioning cash up front).
+    if (months) {
+      items.push({
+        area: "Cost", kind: "cost",
+        title: "Phase the build to match demand",
+        text: "Light up fibre pairs in phases as traffic grows instead of all at once. Defers spend, improves cash flow, and avoids paying to power capacity nobody is using yet.",
+      });
+    }
+
+    var costPct = Math.min(0.18, totalCostSaving);
+    var energyPct = Math.min(0.15, totalEnergySaving);
+    var headline = items.length
+      ? "Ways to cut cost and energy: " + items.length + " concrete moves. Acting on these could save roughly " +
+        Math.round(costPct * 100) + "% of budget" + (budget ? " (~" + fmtUsd(budget * costPct) + ")" : "") +
+        " and about " + Math.round(energyPct * 100) + "% of lifetime energy. These are planning estimates, not guarantees."
+      : "Add route length, budget and countries to your description and the app will suggest concrete cost and energy savings.";
+
+    return {
+      headline: headline,
+      items: items,
+      estCostSavingPct: Math.round(costPct * 100),
+      estEnergySavingPct: Math.round(energyPct * 100),
+      estCostSavingUsd: budget ? Math.round(budget * costPct) : null
+    };
+  }
+
   function analyzeProject(text, opts) {
     opts = opts || {};
     // Language-tolerant interpretation FIRST: clean up typos/grammar so the
@@ -607,6 +699,7 @@
     // The integrated advisor turns everything above into prioritised, plain
     // actions — so a single uploaded description yields a ready next-step list.
     const advice = buildAdvice({ frameworks, risks, countryIntel });
+    const optimization = buildOptimization({ scale, profileId: profile.id, countryIntel, budget: (budget && budget.total) || scale.statedBudget || 0 });
 
     // Domain & scale warnings.
     if (picked.profile.id === "generic-pm") warnings.push("Domain not confidently detected — used the generic PM template. Add more detail (e.g. 'fibre', 'OTDR', 'route km') for a tailored plan.");
@@ -637,13 +730,14 @@
       countryIntel,
       frameworks,
       advice,
+      optimization,
       coverage: { profile: profile.id, confidence: Math.round(confidence * 100) / 100, matched: picked.matched, warnings },
     };
   }
 
   function listProfiles() { return PROFILES.map(p => ({ id: p.id, label: p.label })); }
 
-  const API = { analyzeProject, listProfiles, extractScale, buildAdvice, interpretText, _profiles: PROFILES };
+  const API = { analyzeProject, listProfiles, extractScale, buildAdvice, buildOptimization, interpretText, _profiles: PROFILES };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIBrain = API;
 })(typeof window !== "undefined" ? window : globalThis);

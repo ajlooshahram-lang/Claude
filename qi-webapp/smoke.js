@@ -1648,5 +1648,24 @@ if (window.QIDisplay) {
   ok(!!doc.getElementById("navFooter"), "Previous/Next footer still present alongside the AI guide");
 })();
 
+// Step 110: Energy & cost optimisation analysis
+(function testOptimization() {
+  if (!window.QIBrain || typeof window.QIBrain.buildOptimization !== "function") { ok(false, "QIBrain.buildOptimization available"); return; }
+  var plan = window.QIBrain.analyzeProject("Submarine fibre optic cable connecting Indonesia, Thailand, Vietnam, Taiwan, Philippines, Guam, Malaysia and Brunei. 9500 km over 60 months budget USD 1.3 billion.");
+  var o = plan.optimization;
+  ok(o && o.items && o.items.length >= 4, "Brain produces concrete energy/cost optimisation moves (" + (o ? o.items.length : 0) + ")");
+  ok(o.estCostSavingPct > 0, "optimisation estimates a cost saving %");
+  ok(o.estEnergySavingPct > 0, "optimisation estimates an energy saving %");
+  ok(o.items.some(function (i) { return i.area === "Energy"; }), "optimisation includes energy-reduction moves");
+  ok(o.items.some(function (i) { return i.area === "Cost" || i.area === "Route"; }), "optimisation includes cost-reduction moves");
+  // It renders in the Brain view after analysis.
+  var bnav = doc.querySelector('.nav-item[data-view="brain"]');
+  if (bnav) bnav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  var ta = doc.getElementById("brainText");
+  if (ta) ta.value = "Submarine fibre optic cable connecting Indonesia and Taiwan. 3000 km over 24 months budget USD 600 million.";
+  var ab = doc.getElementById("brainAnalyze"); if (ab) ab.click();
+  ok(/Efficiency &amp; Savings|Efficiency & Savings/.test(doc.getElementById("brainOut").innerHTML), "Efficiency & Savings card renders in the Brain output");
+})();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

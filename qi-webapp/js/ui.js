@@ -3357,6 +3357,13 @@
           </div>`).join("")}</div>
       </div>` : "";
     const adv = plan.advice;
+    const opt = plan.optimization;
+    const optBlock = opt && opt.items && opt.items.length ? `
+      <div class="card" style="border-left:4px solid var(--teal,#1f8a8a)"><div class="card-head"><h3>\u267b\ufe0f Efficiency &amp; Savings \u2014 cut cost and energy</h3><span class="tag">AI \u00b7 estimate</span></div>
+        <p style="line-height:1.6">${esc(opt.headline)}</p>
+        <div class="opt-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px">
+          ${opt.items.map(o => `<div class="card" style="margin:0"><div class="card-head"><h4 style="margin:0">${esc(o.title)}</h4><span class="badge ${o.kind === "energy" ? "b-ontrack" : o.kind === "cost" ? "b-high" : "b-progress"}">${esc(o.area)}</span></div><p class="muted" style="margin:6px 0 0">${esc(o.text)}</p></div>`).join("")}
+        </div></div>` : "";
     const advisorBlock = adv && adv.recommendations && adv.recommendations.length ? `
       <div class="card" style="border-left:4px solid var(--navy,#1b3a6b)"><div class="card-head"><h3>🧭 Advisor — how to get the best result</h3><span class="tag">AI · on-device</span></div>
         <p style="line-height:1.6">${esc(adv.headline)}</p>
@@ -3389,6 +3396,7 @@
         </div>
       </div>
       ${advisorBlock}
+      ${optBlock}
       <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="card"><h3>Work breakdown</h3>${tableWrap("<th>Phase</th><th>Owner</th><th>Tasks</th>", phaseRows)}</div>
         <div class="card"><h3>Top risks (<span class="jargon" data-tip="Failure Mode &amp; Effects Analysis — a way to find what could go wrong and how serious it is" tabindex="0">FMEA</span> <span class="jargon" data-tip="Risk Priority Number — higher means more urgent to fix" tabindex="0">RPN</span>)</h3>${tableWrap("<th class='wrap'>Risk</th><th>S</th><th>O</th><th>D</th><th><span class='jargon' data-tip='Risk Priority Number — higher means more urgent to fix' tabindex='0'>RPN</span></th>", riskRows)}</div>
