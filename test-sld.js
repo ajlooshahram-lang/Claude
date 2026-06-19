@@ -1446,6 +1446,195 @@ test('renderBrain UI has no text input fields (click-only)', function() {
   assert(html.indexOf('sel-btn') >= 0, 'Should use sel-btn class for buttons');
 });
 
+// === PDF Documentation Package Tests ===
+console.log('\n=== PDF Documentation Package Tests ===\n');
+
+// Test 71: PDF module in translations
+test('PDF module appears in all three language translation objects', function() {
+  assert(T.da.modules.pdf, 'Danish translation must have pdf module');
+  assert(T.en.modules.pdf, 'English translation must have pdf module');
+  assert(T.fa.modules.pdf, 'Farsi translation must have pdf module');
+});
+
+// Test 72: All PDF functions are defined
+test('All PDF functions are defined', function() {
+  assert(typeof pdfState === 'object', 'pdfState must exist');
+  assert(typeof pdfGetTree === 'function', 'pdfGetTree must be a function');
+  assert(typeof pdfGeneratePackage === 'function', 'pdfGeneratePackage must be a function');
+  assert(typeof pdfBuildCertData === 'function', 'pdfBuildCertData must be a function');
+  assert(typeof pdfBuildLoadSchedule === 'function', 'pdfBuildLoadSchedule must be a function');
+  assert(typeof pdfBuildCableSchedule === 'function', 'pdfBuildCableSchedule must be a function');
+  assert(typeof pdfBuildProtectionCoordination === 'function', 'pdfBuildProtectionCoordination must be a function');
+  assert(typeof pdfBuildTestProtocol === 'function', 'pdfBuildTestProtocol must be a function');
+  assert(typeof pdfBuildBOMData === 'function', 'pdfBuildBOMData must be a function');
+  assert(typeof pdfRenderInstallationCert === 'function', 'pdfRenderInstallationCert must be a function');
+  assert(typeof pdfRenderLoadSchedule === 'function', 'pdfRenderLoadSchedule must be a function');
+  assert(typeof pdfRenderSLD === 'function', 'pdfRenderSLD must be a function');
+  assert(typeof pdfRenderCableSchedule === 'function', 'pdfRenderCableSchedule must be a function');
+  assert(typeof pdfRenderProtectionCoordination === 'function', 'pdfRenderProtectionCoordination must be a function');
+  assert(typeof pdfRenderTestProtocol === 'function', 'pdfRenderTestProtocol must be a function');
+  assert(typeof pdfRenderBOM === 'function', 'pdfRenderBOM must be a function');
+  assert(typeof pdfPrintPackage === 'function', 'pdfPrintPackage must be a function');
+  assert(typeof renderPDF === 'function', 'renderPDF must be a function');
+  assert(typeof pdfDoGenerate === 'function', 'pdfDoGenerate must be a function');
+});
+
+// Test 73: pdfGeneratePackage produces all 7 sections
+test('pdfGeneratePackage produces data for all 7 required sections', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var pkg = pdfGeneratePackage(tree);
+  assert(pkg !== null, 'Package must not be null');
+  assert(pkg.cert, 'Must have cert section');
+  assert(pkg.loadSchedule, 'Must have loadSchedule section');
+  assert(pkg.cableSchedule, 'Must have cableSchedule section');
+  assert(pkg.protectionCoordination, 'Must have protectionCoordination section');
+  assert(pkg.testProtocol, 'Must have testProtocol section');
+  assert(pkg.bom, 'Must have bom section');
+  assert(pkg.generatedAt, 'Must have generatedAt timestamp');
+});
+
+// Test 74: Load schedule includes phase balancing with L1/L2/L3 totals
+test('Load schedule includes phase balancing with L1/L2/L3 column totals', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var pkg = pdfGeneratePackage(tree);
+  var ls = pkg.loadSchedule;
+  assert(ls.phaseLoads, 'Must have phaseLoads');
+  assert(typeof ls.phaseLoads.L1 === 'number', 'L1 must be a number');
+  assert(typeof ls.phaseLoads.L2 === 'number', 'L2 must be a number');
+  assert(typeof ls.phaseLoads.L3 === 'number', 'L3 must be a number');
+  assert(ls.diversityFactor > 0, 'Must have diversity factor');
+  assert(ls.maxDemand >= 0, 'Must have max demand');
+});
+
+// Test 75: Cable schedule has per-circuit data
+test('Cable schedule has per-circuit data with type, length, Iz, correction factors', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var pkg = pdfGeneratePackage(tree);
+  var cs = pkg.cableSchedule;
+  assert(cs.items.length > 0, 'Must have cable schedule items');
+  var item = cs.items[0];
+  assert(item.cable, 'Must have cable type');
+  assert(typeof item.mm2 === 'number', 'Must have mm2');
+  assert(typeof item.length === 'number', 'Must have length');
+  assert(typeof item.iz === 'number', 'Must have Iz');
+  assert(typeof item.corrTemp === 'number', 'Must have temp correction');
+  assert(typeof item.corrGroup === 'number', 'Must have grouping correction');
+  assert(item.clause, 'Must cite clause reference');
+});
+
+// Test 76: Test protocol has pre-filled Zs values and insulation threshold
+test('Test protocol has pre-filled expected values (Zs, insulation >1MOhm)', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var pkg = pdfGeneratePackage(tree);
+  var tp = pkg.testProtocol;
+  assert(tp.items.length > 0, 'Must have test protocol items');
+  var item = tp.items[0];
+  assert(item.insulation.indexOf('1 MOhm') >= 0, 'Must reference >1 MOhm insulation');
+  assert(item.loopImpedance.indexOf('Ohm') >= 0, 'Must have loop impedance value');
+  assert(item.insulationClause.indexOf('612.3') >= 0, 'Must cite cl.612.3');
+  assert(item.loopClause.indexOf('612.6') >= 0, 'Must cite cl.612.6');
+});
+
+// Test 77: Protection coordination shows selectivity verdicts
+test('Protection coordination table shows selectivity verdicts from sldAnalyzeSelectivity', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var pkg = pdfGeneratePackage(tree);
+  var pc = pkg.protectionCoordination;
+  assert(pc.items.length > 0, 'Must have coordination items');
+  var item = pc.items[0];
+  assert(item.verdict, 'Must have verdict');
+  assert(item.clause, 'Must have clause reference');
+  assert(item.childName !== undefined, 'Must have child name');
+  assert(item.parentName !== undefined, 'Must have parent name');
+});
+
+// Test 78: BOM section shows prices from priceFor
+test('BOM section shows prices from priceFor() function', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var pkg = pdfGeneratePackage(tree);
+  var bom = pkg.bom;
+  assert(bom.items.length > 0, 'Must have BOM items');
+  assert(typeof bom.grandTotal === 'number', 'Must have grand total');
+  assert(bom.grandTotal > 0, 'Grand total must be > 0');
+  var item = bom.items[0];
+  assert(typeof item.unitPrice === 'number', 'Must have unit price');
+  assert(typeof item.total === 'number', 'Must have total');
+});
+
+// Test 79: All sections cite DS/HD 60364 clauses
+test('All sections cite relevant DS/HD 60364 clauses', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var pkg = pdfGeneratePackage(tree);
+  assert(pkg.cert.clause.indexOf('60364') >= 0, 'Cert must cite 60364');
+  assert(pkg.loadSchedule.clause.indexOf('60364') >= 0, 'Load schedule must cite 60364');
+  assert(pkg.cableSchedule.clause.indexOf('60364') >= 0, 'Cable schedule must cite 60364');
+  assert(pkg.protectionCoordination.clause.indexOf('60364') >= 0, 'Protection coordination must cite 60364');
+  assert(pkg.testProtocol.clause.indexOf('60364') >= 0, 'Test protocol must cite 60364');
+});
+
+// Test 80: renderPDF returns valid HTML with no text input fields
+test('renderPDF UI has no text input fields (click-only)', function() {
+  sldNextId = 1;
+  sldTree = sldCreateTree();
+  sldPropagateAll(sldTree);
+  pdfState.packageData = null;
+  var html = renderPDF();
+  assert(html.indexOf('<input type="text"') < 0, 'Should have no text input fields');
+  assert(html.indexOf('<input type=\'text\'') < 0, 'Should have no text input fields (single quotes)');
+  assert(html.indexOf('sel-btn') >= 0, 'Should use sel-btn class for buttons');
+  assert(html.indexOf('60364') >= 0, 'Should reference DS/HD 60364');
+});
+
+// Test 81: pdfPrintPackage calls window.open
+test('pdfPrintPackage uses window.open for formatted HTML output', function() {
+  sldNextId = 1;
+  sldTree = sldCreateTree();
+  sldPropagateAll(sldTree);
+  pdfGeneratePackage(sldTree);
+  var openCalled = false;
+  var originalOpen = window.open;
+  window.open = function() { openCalled = true; return { document: { write: function(){}, close: function(){} }, focus: function(){}, print: function(){} }; };
+  pdfPrintPackage();
+  window.open = originalOpen;
+  assert(openCalled, 'pdfPrintPackage must call window.open');
+});
+
+// Test 82: Render functions return valid HTML strings
+test('All PDF render functions return valid HTML strings', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var pkg = pdfGeneratePackage(tree);
+  var cert = pdfRenderInstallationCert(pkg);
+  var ls = pdfRenderLoadSchedule(pkg);
+  var sld = pdfRenderSLD(tree);
+  var cs = pdfRenderCableSchedule(pkg);
+  var pc = pdfRenderProtectionCoordination(pkg);
+  var tp = pdfRenderTestProtocol(pkg);
+  var bom = pdfRenderBOM(pkg);
+  assert(cert.indexOf('<table') >= 0, 'Cert must contain a table');
+  assert(ls.indexOf('<table') >= 0, 'Load schedule must contain a table');
+  assert(sld.indexOf('<svg') >= 0 || sld.indexOf('svg') >= 0, 'SLD must contain SVG');
+  assert(cs.indexOf('<table') >= 0, 'Cable schedule must contain a table');
+  assert(pc.indexOf('<table') >= 0, 'Protection coord must contain a table');
+  assert(tp.indexOf('<table') >= 0, 'Test protocol must contain a table');
+  assert(bom.indexOf('<table') >= 0, 'BOM must contain a table');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

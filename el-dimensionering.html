@@ -642,7 +642,8 @@ const T = {
       verify: 'Verifikation',
       draw: 'Tegning',
       exam: '\uD83C\uDF93 Eksamen',
-      brain: 'El-Hjerne'
+      brain: 'El-Hjerne',
+      pdf: 'Dokumentation'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -743,7 +744,8 @@ const T = {
       verify: 'Verify',
       draw: 'Drawing',
       exam: '\uD83C\uDF93 Exam',
-      brain: 'Brain'
+      brain: 'Brain',
+      pdf: 'Documentation'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -836,7 +838,8 @@ const T = {
       verify: 'صحت‌سنجی',
       draw: 'نقشه',
       exam: '🎓 آزمون',
-      brain: 'مغز برقی'
+      brain: 'مغز برقی',
+      pdf: 'مستندات'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -2708,6 +2711,7 @@ function renderModule(mod) {
     case 'sld': content = renderSLD(); break;
     case 'exam': content = renderExam(); break;
     case 'brain': content = renderBrain(); break;
+    case 'pdf': content = renderPDF(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -7650,6 +7654,450 @@ function brainDoAudit() {
 function brainDoBOM() {
   brainGenerateBOM();
   renderModule('brain');
+}
+
+// ===== PDF DOCUMENTATION PACKAGE MODULE =====
+// DS/HD 60364-6 compliant handover documentation generator
+
+var pdfState = { selectedTree: null, generatedAt: null, packageData: null };
+
+function pdfGetTree() {
+  if (sldTree) return sldTree;
+  if (typeof brainState !== 'undefined' && brainState.generatedTree) return brainState.generatedTree;
+  return null;
+}
+
+function pdfCollectNodes(tree) {
+  var nodes = [];
+  var ids = Object.keys(tree.nodes);
+  for (var i = 0; i < ids.length; i++) {
+    nodes.push(tree.nodes[ids[i]]);
+  }
+  return nodes;
+}
+
+function pdfGeneratePackage(tree) {
+  if (!tree || !tree.rootId) return null;
+  var pkg = {};
+  pkg.generatedAt = new Date().toISOString();
+  pkg.cert = pdfBuildCertData(tree);
+  pkg.loadSchedule = pdfBuildLoadSchedule(tree);
+  pkg.cableSchedule = pdfBuildCableSchedule(tree);
+  pkg.protectionCoordination = pdfBuildProtectionCoordination(tree);
+  pkg.testProtocol = pdfBuildTestProtocol(tree);
+  pkg.bom = pdfBuildBOMData(tree);
+  pdfState.selectedTree = tree;
+  pdfState.generatedAt = pkg.generatedAt;
+  pdfState.packageData = pkg;
+  return pkg;
+}
+function pdfBuildCertData(tree) {
+  var root = tree.nodes[tree.rootId];
+  var nodes = pdfCollectNodes(tree);
+  var totalKW = 0;
+  for (var i = 0; i < nodes.length; i++) {
+    if (nodes[i].type === 'final_circuit') totalKW += (nodes[i].power_kW || 0);
+  }
+  return {
+    date: new Date().toLocaleDateString('da-DK'),
+    earthingSystem: 'TN-S',
+    trafoKVA: root.power_kVA || 630,
+    totalLoadKW: totalKW,
+    circuitCount: nodes.length - 1,
+    clause: 'DS/HD 60364-6 Annex A'
+  };
+}
+
+function pdfBuildLoadSchedule(tree) {
+  var nodes = pdfCollectNodes(tree);
+  var schedule = [];
+  var phaseLoads = { L1: 0, L2: 0, L3: 0 };
+  for (var i = 0; i < nodes.length; i++) {
+    var n = nodes[i];
+    if (n.type === 'transformer') continue;
+    var ib = sldCalcNodeIB(n);
+    var phase = n._assignedPhase || 'L1';
+    var kw = n.power_kW || 0;
+    if (n.phases === '3x400' || n.voltage === 400) {
+      phaseLoads.L1 += kw / 3;
+      phaseLoads.L2 += kw / 3;
+      phaseLoads.L3 += kw / 3;
+    } else {
+      phaseLoads[phase] += kw;
+    }
+    schedule.push({
+      name: tl(n, 'name'),
+      type: n.type,
+      kw: kw,
+      ib: ib,
+      phases: n.phases || '1x230',
+      assignedPhase: phase
+    });
+  }
+  return {
+    items: schedule,
+    phaseLoads: phaseLoads,
+    diversityFactor: 0.8,
+    maxDemand: (phaseLoads.L1 + phaseLoads.L2 + phaseLoads.L3) * 0.8,
+    clause: 'DS/HD 60364-3 cl.311'
+  };
+}
+function pdfBuildCableSchedule(tree) {
+  var nodes = pdfCollectNodes(tree);
+  var schedule = [];
+  for (var i = 0; i < nodes.length; i++) {
+    var n = nodes[i];
+    if (n.type === 'transformer' || !n.cable) continue;
+    var ib = sldCalcNodeIB(n);
+    var iz = n.cable.iz || 0;
+    var corrMethod = 1.0;
+    if (n.installMethod === 'A1') corrMethod = 0.87;
+    else if (n.installMethod === 'A2') corrMethod = 0.81;
+    else if (n.installMethod === 'B1') corrMethod = 0.89;
+    else if (n.installMethod === 'B2') corrMethod = 0.85;
+    else if (n.installMethod === 'D') corrMethod = 1.04;
+    var corrTemp = 1.0;
+    if (n.temp > 30) corrTemp = Math.sqrt((70 - n.temp) / 40);
+    if (corrTemp < 0) corrTemp = 0;
+    var corrGroup = 1.0;
+    if (n.grouping > 1) corrGroup = 1.0 / Math.sqrt(n.grouping);
+    schedule.push({
+      name: tl(n, 'name'),
+      cable: n.cable.brand + ' ' + n.cable.model,
+      mm2: n.cable.mm2,
+      length: n.length_m || 0,
+      iz: iz,
+      ib: ib,
+      corrMethod: corrMethod,
+      corrTemp: corrTemp,
+      corrGroup: corrGroup,
+      installMethod: n.installMethod || 'C',
+      clause: 'DS/HD 60364-5-52 Table B.52.2'
+    });
+  }
+  return { items: schedule, clause: 'DS/HD 60364-5-52 cl.523' };
+}
+
+function pdfBuildProtectionCoordination(tree) {
+  var nodes = pdfCollectNodes(tree);
+  var results = [];
+  for (var i = 0; i < nodes.length; i++) {
+    var n = nodes[i];
+    if (!n.parentId) continue;
+    var analysis = sldAnalyzeSelectivity(tree, n.id);
+    if (analysis) {
+      results.push({
+        childName: tl(n, 'name'),
+        parentName: tl(tree.nodes[n.parentId], 'name'),
+        verdict: analysis.verdict,
+        limitCurrent: analysis.limitCurrent,
+        details: analysis.details,
+        clause: analysis.clause,
+        upstream: analysis.upstreamDevice,
+        downstream: analysis.downstreamDevice
+      });
+    }
+  }
+  return { items: results, clause: 'DS/HD 60364-5-53 cl.536' };
+}
+function pdfBuildTestProtocol(tree) {
+  var nodes = pdfCollectNodes(tree);
+  var tests = [];
+  for (var i = 0; i < nodes.length; i++) {
+    var n = nodes[i];
+    if (n.type === 'transformer') continue;
+    var zs = sldCalcNodeZs(tree, n.id);
+    var expectedRcd = '';
+    if (n._rcdProduct) {
+      expectedRcd = '<300ms (Type A), ref DS/HD 60364-6 cl.612.6';
+    }
+    tests.push({
+      name: tl(n, 'name'),
+      insulation: '>1 MOhm @ 500V DC',
+      insulationClause: 'DS/HD 60364-6 cl.612.3',
+      loopImpedance: zs.toFixed(3) + ' Ohm',
+      loopClause: 'DS/HD 60364-6 cl.612.6.3',
+      continuity: n.cable ? (n.cable.r * (n.length_m || 0) / 1000).toFixed(3) + ' Ohm' : 'N/A',
+      continuityClause: 'DS/HD 60364-6 cl.612.2',
+      rcdTrip: expectedRcd,
+      rcdClause: expectedRcd ? 'DS/HD 60364-6 cl.612.6.1' : ''
+    });
+  }
+  return { items: tests, clause: 'DS/HD 60364-6 cl.612' };
+}
+
+function pdfBuildBOMData(tree) {
+  var bom = brainGenerateBOM(tree);
+  var items = [];
+  for (var i = 0; i < bom.length; i++) {
+    var b = bom[i];
+    items.push({
+      cat: b.cat,
+      description: b.product ? (b.product.brand || '') + ' ' + (b.product.model || b.product.rating + 'A') : '',
+      qty: b.qty,
+      unitPrice: b.unitPrice || 0,
+      total: b.total || 0,
+      nodeName: b.nodeName || ''
+    });
+  }
+  var grandTotal = 0;
+  for (var j = 0; j < items.length; j++) grandTotal += items[j].total;
+  return { items: items, grandTotal: grandTotal, clause: 'DS/HD 60364-6 Annex B' };
+}
+function pdfRenderInstallationCert(pkg) {
+  var c = pkg.cert;
+  var html = '<div class="pdf-section"><h3>' + tx('Installationsrapport / Elinstallationsrapport', 'Installation Certificate') + '</h3>';
+  html += '<p style="font-size:0.8rem;color:#888">' + c.clause + '</p>';
+  html += '<table class="pdf-table"><tbody>';
+  html += '<tr><td><strong>' + tx('Dato', 'Date') + '</strong></td><td>' + c.date + '</td></tr>';
+  html += '<tr><td><strong>' + tx('Jordsystem', 'Earthing System') + '</strong></td><td>' + c.earthingSystem + '</td></tr>';
+  html += '<tr><td><strong>' + tx('Transformerkapacitet', 'Transformer Capacity') + '</strong></td><td>' + c.trafoKVA + ' kVA</td></tr>';
+  html += '<tr><td><strong>' + tx('Samlet belastning', 'Total Load') + '</strong></td><td>' + c.totalLoadKW.toFixed(1) + ' kW</td></tr>';
+  html += '<tr><td><strong>' + tx('Antal kredse', 'Circuit Count') + '</strong></td><td>' + c.circuitCount + '</td></tr>';
+  html += '<tr><td><strong>' + tx('Installationsadresse', 'Installation Address') + '</strong></td><td>____________________</td></tr>';
+  html += '<tr><td><strong>' + tx('Installator', 'Installer') + '</strong></td><td>____________________</td></tr>';
+  html += '<tr><td><strong>' + tx('Autorisationsnr.', 'Authorization No.') + '</strong></td><td>____________________</td></tr>';
+  html += '</tbody></table></div>';
+  return html;
+}
+
+function pdfRenderLoadSchedule(pkg) {
+  var ls = pkg.loadSchedule;
+  var html = '<div class="pdf-section"><h3>' + tx('Belastningsskema med fasebalancering', 'Load Schedule with Phase Balancing') + '</h3>';
+  html += '<p style="font-size:0.8rem;color:#888">' + ls.clause + '</p>';
+  html += '<table class="pdf-table"><thead><tr>';
+  html += '<th>' + tx('Kreds', 'Circuit') + '</th>';
+  html += '<th>' + tx('Faser', 'Phases') + '</th>';
+  html += '<th>' + tx('Fase', 'Phase') + '</th>';
+  html += '<th>kW</th><th>IB (A)</th>';
+  html += '<th>L1 (kW)</th><th>L2 (kW)</th><th>L3 (kW)</th>';
+  html += '</tr></thead><tbody>';
+  for (var i = 0; i < ls.items.length; i++) {
+    var item = ls.items[i];
+    var l1 = 0, l2 = 0, l3 = 0;
+    if (item.phases === '3x400') { l1 = item.kw/3; l2 = item.kw/3; l3 = item.kw/3; }
+    else if (item.assignedPhase === 'L2') l2 = item.kw;
+    else if (item.assignedPhase === 'L3') l3 = item.kw;
+    else l1 = item.kw;
+    html += '<tr><td>' + item.name + '</td><td>' + item.phases + '</td><td>' + item.assignedPhase + '</td>';
+    html += '<td>' + item.kw.toFixed(2) + '</td><td>' + item.ib.toFixed(1) + '</td>';
+    html += '<td>' + l1.toFixed(2) + '</td><td>' + l2.toFixed(2) + '</td><td>' + l3.toFixed(2) + '</td></tr>';
+  }
+  html += '<tr style="font-weight:bold;border-top:2px solid #333"><td colspan="5">' + tx('Total', 'Total') + '</td>';
+  html += '<td>' + ls.phaseLoads.L1.toFixed(2) + '</td><td>' + ls.phaseLoads.L2.toFixed(2) + '</td><td>' + ls.phaseLoads.L3.toFixed(2) + '</td></tr>';
+  html += '<tr><td colspan="5">' + tx('Diversitetsfaktor', 'Diversity Factor') + '</td><td colspan="3">' + ls.diversityFactor + '</td></tr>';
+  html += '<tr><td colspan="5"><strong>' + tx('Maks. effektbehov', 'Max Demand') + '</strong></td><td colspan="3"><strong>' + ls.maxDemand.toFixed(2) + ' kW</strong></td></tr>';
+  html += '</tbody></table></div>';
+  return html;
+}
+function pdfRenderSLD(tree) {
+  var html = '<div class="pdf-section"><h3>' + tx('Enstregsdiagram (SLD)', 'Single-Line Diagram (SLD)') + '</h3>';
+  html += '<p style="font-size:0.8rem;color:#888">DS/HD 60364-1 cl.132</p>';
+  html += '<div class="pdf-sld-container">' + sldRenderCanvas(tree) + '</div>';
+  html += '</div>';
+  return html;
+}
+
+function pdfRenderCableSchedule(pkg) {
+  var cs = pkg.cableSchedule;
+  var html = '<div class="pdf-section"><h3>' + tx('Kabelfortegnelse', 'Cable Schedule') + '</h3>';
+  html += '<p style="font-size:0.8rem;color:#888">' + cs.clause + '</p>';
+  html += '<table class="pdf-table"><thead><tr>';
+  html += '<th>' + tx('Kreds', 'Circuit') + '</th>';
+  html += '<th>' + tx('Kabeltype', 'Cable Type') + '</th>';
+  html += '<th>mm\u00B2</th>';
+  html += '<th>' + tx('Laengde (m)', 'Length (m)') + '</th>';
+  html += '<th>Iz (A)</th><th>IB (A)</th>';
+  html += '<th>' + tx('Ref. metode', 'Install Method') + '</th>';
+  html += '<th>K (temp)</th><th>K (group)</th>';
+  html += '<th>' + tx('Klausul', 'Clause') + '</th>';
+  html += '</tr></thead><tbody>';
+  for (var i = 0; i < cs.items.length; i++) {
+    var c = cs.items[i];
+    html += '<tr><td>' + c.name + '</td><td>' + c.cable + '</td><td>' + c.mm2 + '</td>';
+    html += '<td>' + c.length + '</td><td>' + c.iz + '</td><td>' + c.ib.toFixed(1) + '</td>';
+    html += '<td>' + c.installMethod + '</td><td>' + c.corrTemp.toFixed(2) + '</td><td>' + c.corrGroup.toFixed(2) + '</td>';
+    html += '<td style="font-size:0.7rem">' + c.clause + '</td></tr>';
+  }
+  html += '</tbody></table></div>';
+  return html;
+}
+
+function pdfRenderProtectionCoordination(pkg) {
+  var pc = pkg.protectionCoordination;
+  var html = '<div class="pdf-section"><h3>' + tx('Selektivitetsanalyse', 'Protection Coordination / Selectivity') + '</h3>';
+  html += '<p style="font-size:0.8rem;color:#888">' + pc.clause + '</p>';
+  html += '<table class="pdf-table"><thead><tr>';
+  html += '<th>' + tx('Opstroms', 'Upstream') + '</th>';
+  html += '<th>' + tx('Nedstroms', 'Downstream') + '</th>';
+  html += '<th>' + tx('Resultat', 'Verdict') + '</th>';
+  html += '<th>' + tx('Graensestrm (A)', 'Limit Current (A)') + '</th>';
+  html += '<th>' + tx('Klausul', 'Clause') + '</th>';
+  html += '</tr></thead><tbody>';
+  for (var i = 0; i < pc.items.length; i++) {
+    var r = pc.items[i];
+    var verdictClass = r.verdict === 'full' ? 'color:#2ecc40' : r.verdict === 'partial' ? 'color:#ff851b' : 'color:#ff4136';
+    var upDesc = r.upstream ? ((r.upstream.brand || '') + ' ' + (r.upstream.rating || '') + 'A') : 'N/A';
+    var dnDesc = r.downstream ? ((r.downstream.brand || '') + ' ' + (r.downstream.rating || '') + 'A') : 'N/A';
+    html += '<tr><td>' + r.parentName + '<br><small>' + upDesc + '</small></td>';
+    html += '<td>' + r.childName + '<br><small>' + dnDesc + '</small></td>';
+    html += '<td style="' + verdictClass + ';font-weight:bold">' + r.verdict.toUpperCase() + '</td>';
+    html += '<td>' + (r.limitCurrent ? r.limitCurrent.toFixed(0) : '-') + '</td>';
+    html += '<td style="font-size:0.7rem">' + r.clause + '</td></tr>';
+  }
+  html += '</tbody></table></div>';
+  return html;
+}
+function pdfRenderTestProtocol(pkg) {
+  var tp = pkg.testProtocol;
+  var html = '<div class="pdf-section"><h3>' + tx('Afprovningsprotokol', 'Test Protocol') + '</h3>';
+  html += '<p style="font-size:0.8rem;color:#888">' + tp.clause + '</p>';
+  html += '<table class="pdf-table"><thead><tr>';
+  html += '<th>' + tx('Kreds', 'Circuit') + '</th>';
+  html += '<th>' + tx('Isolation (500V DC)', 'Insulation (500V DC)') + '</th>';
+  html += '<th>' + tx('Sloejfeimpedans Zs', 'Loop Impedance Zs') + '</th>';
+  html += '<th>' + tx('Kontinuitet', 'Continuity') + '</th>';
+  html += '<th>' + tx('RCD udlosning', 'RCD Trip') + '</th>';
+  html += '<th>' + tx('Maalt', 'Measured') + '</th>';
+  html += '<th>' + tx('Bestaaet', 'Pass') + '</th>';
+  html += '</tr></thead><tbody>';
+  for (var i = 0; i < tp.items.length; i++) {
+    var t = tp.items[i];
+    html += '<tr><td>' + t.name + '</td>';
+    html += '<td>' + t.insulation + '<br><small>' + t.insulationClause + '</small></td>';
+    html += '<td>' + t.loopImpedance + '<br><small>' + t.loopClause + '</small></td>';
+    html += '<td>' + t.continuity + '<br><small>' + t.continuityClause + '</small></td>';
+    html += '<td>' + (t.rcdTrip || '-') + '</td>';
+    html += '<td>________</td>';
+    html += '<td>________</td></tr>';
+  }
+  html += '</tbody></table></div>';
+  return html;
+}
+
+function pdfRenderBOM(pkg) {
+  var bom = pkg.bom;
+  var html = '<div class="pdf-section"><h3>' + tx('Materialeliste (BOM) med priser', 'Bill of Materials (BOM) with Prices') + '</h3>';
+  html += '<p style="font-size:0.8rem;color:#888">' + bom.clause + '</p>';
+  html += '<table class="pdf-table"><thead><tr>';
+  html += '<th>' + tx('Kategori', 'Category') + '</th>';
+  html += '<th>' + tx('Beskrivelse', 'Description') + '</th>';
+  html += '<th>' + tx('Kreds', 'Circuit') + '</th>';
+  html += '<th>' + tx('Antal', 'Qty') + '</th>';
+  html += '<th>' + tx('Enhedspris (DKK)', 'Unit Price (DKK)') + '</th>';
+  html += '<th>' + tx('Total (DKK)', 'Total (DKK)') + '</th>';
+  html += '</tr></thead><tbody>';
+  for (var i = 0; i < bom.items.length; i++) {
+    var b = bom.items[i];
+    html += '<tr><td>' + b.cat + '</td><td>' + b.description + '</td><td>' + b.nodeName + '</td>';
+    html += '<td>' + b.qty + '</td><td>' + b.unitPrice.toFixed(0) + '</td><td>' + b.total.toFixed(0) + '</td></tr>';
+  }
+  html += '<tr style="font-weight:bold;border-top:2px solid #333"><td colspan="5">' + tx('Grand Total', 'Grand Total') + '</td>';
+  html += '<td>' + bom.grandTotal.toFixed(0) + ' DKK</td></tr>';
+  html += '</tbody></table></div>';
+  return html;
+}
+function pdfPrintPackage() {
+  var tree = pdfState.selectedTree || pdfGetTree();
+  if (!tree) return;
+  var pkg = pdfState.packageData || pdfGeneratePackage(tree);
+  if (!pkg) return;
+
+  var dir = (lang === 'fa') ? 'rtl' : 'ltr';
+  var printHtml = '<!DOCTYPE html><html dir="' + dir + '"><head><meta charset="utf-8">';
+  printHtml += '<title>' + tx('DS/HD 60364-6 Dokumentationspakke', 'DS/HD 60364-6 Documentation Package') + '</title>';
+  printHtml += '<style>';
+  printHtml += 'body { font-family: Arial, sans-serif; font-size: 11pt; color: #222; margin: 20mm; direction: ' + dir + '; }';
+  printHtml += 'h1 { font-size: 18pt; text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; }';
+  printHtml += 'h3 { font-size: 14pt; margin-top: 1.5em; border-bottom: 1px solid #666; padding-bottom: 4px; }';
+  printHtml += '.pdf-section { page-break-inside: avoid; margin-bottom: 2em; }';
+  printHtml += '.pdf-table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-top: 0.5em; }';
+  printHtml += '.pdf-table th, .pdf-table td { border: 1px solid #999; padding: 4px 6px; text-align: left; }';
+  printHtml += '.pdf-table th { background: #f0f0f0; font-weight: bold; }';
+  printHtml += '.pdf-sld-container svg { width: 100%; max-height: 400px; }';
+  printHtml += '.pdf-footer { text-align: center; font-size: 8pt; color: #666; margin-top: 2em; border-top: 1px solid #ccc; padding-top: 5px; }';
+  printHtml += '@media print { @page { size: A4; margin: 15mm; } .pdf-section { page-break-inside: avoid; } h3 { page-break-after: avoid; } }';
+  printHtml += '</style></head><body>';
+  printHtml += '<h1>' + tx('DS/HD 60364-6 Dokumentationspakke', 'DS/HD 60364-6 Documentation Package') + '</h1>';
+  printHtml += '<p style="text-align:center">' + tx('Genereret', 'Generated') + ': ' + pkg.generatedAt + '</p>';
+  printHtml += pdfRenderInstallationCert(pkg);
+  printHtml += pdfRenderLoadSchedule(pkg);
+  printHtml += pdfRenderSLD(tree);
+  printHtml += pdfRenderCableSchedule(pkg);
+  printHtml += pdfRenderProtectionCoordination(pkg);
+  printHtml += pdfRenderTestProtocol(pkg);
+  printHtml += pdfRenderBOM(pkg);
+  printHtml += '<div class="pdf-footer">' + tx('Genereret af El-Dimensionering. Alle beregninger er konservative iht. DS/HD 60364.', 'Generated by El-Dimensionering. All calculations are conservative per DS/HD 60364.') + '</div>';
+  printHtml += '</body></html>';
+
+  var w = window.open('', '_blank');
+  if (w) {
+    w.document.write(printHtml);
+    w.document.close();
+    w.focus();
+    w.print();
+  }
+}
+function renderPDF() {
+  var tree = pdfGetTree();
+  var html = '';
+
+  html += '<div class="card"><h2 class="card-title">' + tx('Dokumentationspakke (DS/HD 60364-6)', 'Documentation Package (DS/HD 60364-6)') + '</h2>';
+  html += '<p class="info-row">' + tx('Et-klik generering af komplet overdragelsesdokumentation', 'One-click generation of complete handover documentation') + '</p></div>';
+
+  if (!tree) {
+    html += '<div class="card"><p style="color:#ff851b">' + tx('Ingen installationsplan fundet. Opret en i SLD- eller El-Hjerne-modulet forst.', 'No installation plan found. Create one in the SLD or Brain module first.') + '</p></div>';
+    return html;
+  }
+
+  // Generate button
+  html += '<div class="card"><div class="card-title">' + tx('1. Generer dokumentation', '1. Generate Documentation') + '</div>';
+  html += '<div style="text-align:center;margin:1rem 0">';
+  html += '<button class="sel-btn" onclick="pdfDoGenerate()" style="font-size:1.1rem;padding:0.8rem 2rem">' + tx('Generer pakke', 'Generate Package') + '</button>';
+  html += '</div></div>';
+
+  // Show preview if generated
+  if (pdfState.packageData) {
+    var pkg = pdfState.packageData;
+    html += '<div class="card"><div class="card-title">' + tx('2. Forhandsvisning af sektioner', '2. Section Preview') + '</div>';
+
+    // Collapsible sections
+    var sections = [
+      { title: tx('Installationsrapport', 'Installation Certificate'), content: pdfRenderInstallationCert(pkg) },
+      { title: tx('Belastningsskema', 'Load Schedule'), content: pdfRenderLoadSchedule(pkg) },
+      { title: tx('Enstregsdiagram', 'Single-Line Diagram'), content: pdfRenderSLD(tree) },
+      { title: tx('Kabelfortegnelse', 'Cable Schedule'), content: pdfRenderCableSchedule(pkg) },
+      { title: tx('Selektivitet', 'Protection Coordination'), content: pdfRenderProtectionCoordination(pkg) },
+      { title: tx('Afprovningsprotokol', 'Test Protocol'), content: pdfRenderTestProtocol(pkg) },
+      { title: tx('Materialeliste', 'BOM'), content: pdfRenderBOM(pkg) }
+    ];
+
+    for (var i = 0; i < sections.length; i++) {
+      html += '<details style="margin:0.5rem 0;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:0.5rem">';
+      html += '<summary style="cursor:pointer;font-weight:bold">' + (i+1) + '. ' + sections[i].title + '</summary>';
+      html += '<div style="margin-top:0.5rem;overflow-x:auto">' + sections[i].content + '</div>';
+      html += '</details>';
+    }
+    html += '</div>';
+
+    // Print button
+    html += '<div class="card"><div class="card-title">' + tx('3. Print / Gem som PDF', '3. Print / Save as PDF') + '</div>';
+    html += '<div style="text-align:center;margin:1rem 0">';
+    html += '<button class="sel-btn" onclick="pdfPrintPackage()" style="font-size:1.1rem;padding:0.8rem 2rem;background:#2ecc40">' + tx('Print / Gem PDF', 'Print / Save PDF') + '</button>';
+    html += '</div>';
+    html += '<p class="info-row">' + tx('Aabner et nyt vindue med A4-formateret dokumentation. Brug browserens Print-funktion til at gemme som PDF.', 'Opens a new window with A4-formatted documentation. Use the browser Print function to save as PDF.') + '</p>';
+    html += '</div>';
+  }
+
+  return html;
+}
+
+function pdfDoGenerate() {
+  var tree = pdfGetTree();
+  if (tree) {
+    pdfGeneratePackage(tree);
+    renderModule('pdf');
+  }
 }
 
 // ===== INIT =====

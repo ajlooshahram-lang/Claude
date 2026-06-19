@@ -1,0 +1,41 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "PDF Documentation Package Generator - one-click production of complete DS/HD 60364-6 handover documentation using window.open() with formatted HTML and print CSS",
+  "status": "in_progress",
+  "steps": [
+    "Add 'pdf' module to the T.da/T.en/T.fa modules objects (around lines 627, 728, 821) with names like 'Dokumentation'/'Documentation'/'مستندات'",
+    "Add 'case pdf: content = renderPDF(); break;' to the renderModule switch statement (around line 2688)",
+    "Create pdfState object to hold generation state (selectedTree, generatedAt timestamp)",
+    "Create function pdfGeneratePackage(tree) that collects all data needed: installation certificate data, load schedule with phase balancing, cable schedule, protection coordination verdicts, test protocol expected values, and BOM with prices",
+    "Create function pdfRenderInstallationCert(tree) returning HTML string for installationsrapport per DS/HD 60364-6 Annex A - includes installation address, installer details, date, description, earthing system, test results summary",
+    "Create function pdfRenderLoadSchedule(tree) returning HTML table with phase balancing (L1/L2/L3 kW per circuit, totals, diversity factor, max demand) - uses sldCalcNodeIB for each node",
+    "Create function pdfRenderSLD(tree) that wraps the existing sldRenderCanvas(tree) SVG output in a print-friendly container",
+    "Create function pdfRenderCableSchedule(tree) returning HTML table with columns: circuit name, cable type (brand+model), mm2, length, Iz, IB, correction factors (install method, temp, grouping), reference clause",
+    "Create function pdfRenderProtectionCoordination(tree) that iterates all parent-child pairs calling sldAnalyzeSelectivity() and renders verdicts in a table (upstream device, downstream device, verdict, limit current, clause)",
+    "Create function pdfRenderTestProtocol(tree) generating test template with pre-filled expected values: isolation resistance (>1MOhm at 500V DC per DS/HD 60364-6 cl.612.3), loop impedance (Zs from sldCalcNodeZs), RCD trip time (<300ms Type A, <40ms Type B), continuity (expected values from cable resistance)",
+    "Create function pdfRenderBOM(tree) using brainGenerateBOM() and priceFor() to generate material specification with wholesaler prices",
+    "Create function renderPDF() that shows a UI with: button to generate from current SLD tree (sldState.tree or brainState.generatedTree), preview of each section as collapsible cards, and a 'Print / Save PDF' button that calls pdfPrintPackage()",
+    "Create function pdfPrintPackage() that opens a new window with all sections formatted for A4 printing using CSS @media print rules, proper page breaks between sections, headers/footers with page numbers, and calls window.print()",
+    "Add comprehensive @media print styles for the PDF output window: A4 page size, section headers, table borders, page break rules, company logo placeholder area",
+    "Ensure all text in the PDF package uses tx() for trilingual support - Danish is primary (this is Danish regulatory documentation)"
+  ],
+  "acceptance_criteria": [
+    "renderPDF() returns valid HTML with no text input fields (click-only UI)",
+    "pdfGeneratePackage() produces data for all 7 required sections when given a valid SLD tree",
+    "Load schedule includes phase balancing with L1/L2/L3 column totals",
+    "Cable schedule has per-circuit data: type, length, Iz, correction factors",
+    "Test protocol has pre-filled expected values calculated from the tree (Zs values, >1MOhm insulation)",
+    "Protection coordination table shows selectivity verdicts from sldAnalyzeSelectivity()",
+    "BOM section shows prices from priceFor() function",
+    "All sections cite relevant DS/HD 60364 clauses",
+    "Print function uses window.open() with formatted HTML (no external PDF library needed)",
+    "All 70 existing tests still pass plus new tests for PDF functions"
+  ],
+  "verification": [
+    "node -e \"const fs=require('fs'); const html=fs.readFileSync('el-dimensionering.html','utf8'); const m=html.match(/<script>([\\s\\S]*?)<\\/script>/); if(!m){process.exit(1);} try{new Function(m[1]); console.log('Syntax OK');}catch(e){console.error(e.message); process.exit(1);}\"",
+    "node test-sld.js"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
