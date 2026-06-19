@@ -648,7 +648,10 @@ const T = {
       cable3d: '3D Kabelfoering',
       energy: 'Energi Monitor',
       tcc: 'Kaskade-TCC',
-      panel: 'Tavle'
+      panel: 'Tavle',
+      ev: 'Elbil-lader',
+      solar: 'Solcelle & Batteri',
+      noed: 'Noedbelysning'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -755,7 +758,10 @@ const T = {
       cable3d: '3D Cable Routing',
       energy: 'Energy Monitor',
       tcc: 'Cascade TCC',
-      panel: 'Panel'
+      panel: 'Panel',
+      ev: 'EV Charger',
+      solar: 'Solar PV & Battery',
+      noed: 'Emergency Lighting'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -854,7 +860,10 @@ const T = {
       cable3d: 'مسیر کابل سه\u200Cبعدی',
       energy: 'مانیتور انرژی',
       tcc: 'آبشاری TCC',
-      panel: 'تابلو'
+      panel: 'تابلو',
+      ev: 'شارژر خودرو',
+      solar: 'پنل خورشیدی و باتری',
+      noed: 'روشنایی اضطراری'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -1081,7 +1090,58 @@ const _FA = {
   'Method': '\u0631\u0648\u0634',
   'Ambient': '\u0645\u062D\u06CC\u0637',
   'Power Dissipation': '\u0627\u062A\u0644\u0627\u0641 \u062A\u0648\u0627\u0646',
-  'Derating Factor': '\u0636\u0631\u06CC\u0628 \u06A9\u0627\u0647\u0634'
+  'Derating Factor': '\u0636\u0631\u06CC\u0628 \u06A9\u0627\u0647\u0634',
+  // EV Charging module translations
+  'EV Charger': '\u0634\u0627\u0631\u0698\u0631 \u062E\u0648\u062F\u0631\u0648',
+  'EV Charging Dimensioning': '\u0627\u0628\u0639\u0627\u062F\u0633\u0646\u062C\u06CC \u0634\u0627\u0631\u0698 \u062E\u0648\u062F\u0631\u0648',
+  'Charger Mode': '\u062D\u0627\u0644\u062A \u0634\u0627\u0631\u0698\u0631',
+  'Power Level': '\u0633\u0637\u062D \u062A\u0648\u0627\u0646',
+  'Number of Chargers': '\u062A\u0639\u062F\u0627\u062F \u0634\u0627\u0631\u0698\u0631\u0647\u0627',
+  'Simultaneity Factor': '\u0636\u0631\u06CC\u0628 \u0647\u0645\u200C\u0632\u0645\u0627\u0646\u06CC',
+  'Cable Length': '\u0637\u0648\u0644 \u06A9\u0627\u0628\u0644',
+  'Main Fuse': '\u0641\u06CC\u0648\u0632 \u0627\u0635\u0644\u06CC',
+  'Grid Capacity': '\u0638\u0631\u0641\u06CC\u062A \u0634\u0628\u06A9\u0647',
+  'Voltage Drop': '\u0627\u0641\u062A \u0648\u0644\u062A\u0627\u0698',
+  'Load Current': '\u062C\u0631\u06CC\u0627\u0646 \u0628\u0627\u0631',
+  'Protection': '\u062D\u0641\u0627\u0638\u062A',
+  'Cable Recommendation': '\u062A\u0648\u0635\u06CC\u0647 \u06A9\u0627\u0628\u0644',
+  'Smart Charging': '\u0634\u0627\u0631\u0698 \u0647\u0648\u0634\u0645\u0646\u062F',
+  'Load Balancing Recommended': '\u0645\u062A\u0639\u0627\u062F\u0644\u200C\u0633\u0627\u0632\u06CC \u0628\u0627\u0631 \u062A\u0648\u0635\u06CC\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F',
+  'Type B RCD Required': 'RCD \u0646\u0648\u0639 B \u0627\u0644\u0632\u0627\u0645\u06CC',
+  // Solar PV module translations
+  'Solar PV & Battery': '\u067E\u0646\u0644 \u062E\u0648\u0631\u0634\u06CC\u062F\u06CC \u0648 \u0628\u0627\u062A\u0631\u06CC',
+  'Solar PV Dimensioning': '\u0627\u0628\u0639\u0627\u062F\u0633\u0646\u062C\u06CC \u067E\u0646\u0644 \u062E\u0648\u0631\u0634\u06CC\u062F\u06CC',
+  'System Type': '\u0646\u0648\u0639 \u0633\u06CC\u0633\u062A\u0645',
+  'Grid-tied': '\u0645\u062A\u0635\u0644 \u0628\u0647 \u0634\u0628\u06A9\u0647',
+  'With Battery': '\u0628\u0627 \u0628\u0627\u062A\u0631\u06CC',
+  'Hybrid': '\u0647\u06CC\u0628\u0631\u06CC\u062F\u06CC',
+  'Panel Count': '\u062A\u0639\u062F\u0627\u062F \u067E\u0646\u0644',
+  'Panel Wattage': '\u062A\u0648\u0627\u0646 \u067E\u0646\u0644',
+  'Inverter Size': '\u0627\u0646\u062F\u0627\u0632\u0647 \u0627\u06CC\u0646\u0648\u0631\u062A\u0631',
+  'Battery Capacity': '\u0638\u0631\u0641\u06CC\u062A \u0628\u0627\u062A\u0631\u06CC',
+  'Annual Yield': '\u062A\u0648\u0644\u06CC\u062F \u0633\u0627\u0644\u0627\u0646\u0647',
+  'Self-consumption': '\u0645\u0635\u0631\u0641 \u0634\u062E\u0635\u06CC',
+  'Anti-islanding': '\u062D\u0641\u0627\u0638\u062A \u0636\u062F \u062C\u0632\u06CC\u0631\u0647\u200C\u0627\u06CC',
+  'DC Disconnect': '\u06A9\u0644\u06CC\u062F DC',
+  'Rapid Shutdown': '\u062E\u0627\u0645\u0648\u0634\u06CC \u0633\u0631\u06CC\u0639',
+  'String Voltage': '\u0648\u0644\u062A\u0627\u0698 \u0631\u0634\u062A\u0647',
+  'Payback Period': '\u062F\u0648\u0631\u0647 \u0628\u0627\u0632\u06AF\u0634\u062A',
+  // Emergency Lighting module translations
+  'Emergency Lighting': '\u0631\u0648\u0634\u0646\u0627\u06CC\u06CC \u0627\u0636\u0637\u0631\u0627\u0631\u06CC',
+  'Emergency Lighting Design': '\u0637\u0631\u0627\u062D\u06CC \u0631\u0648\u0634\u0646\u0627\u06CC\u06CC \u0627\u0636\u0637\u0631\u0627\u0631\u06CC',
+  'Building Type': '\u0646\u0648\u0639 \u0633\u0627\u062E\u062A\u0645\u0627\u0646',
+  'System Type': '\u0646\u0648\u0639 \u0633\u06CC\u0633\u062A\u0645',
+  'Escape Route': '\u0645\u0633\u06CC\u0631 \u0641\u0631\u0627\u0631',
+  'Anti-panic': '\u0636\u062F \u0648\u062D\u0634\u062A',
+  'High-risk Task': '\u06A9\u0627\u0631 \u067E\u0631\u062E\u0637\u0631',
+  'Duration': '\u0645\u062F\u062A \u0632\u0645\u0627\u0646',
+  'Fire-resistant Cable': '\u06A9\u0627\u0628\u0644 \u0645\u0642\u0627\u0648\u0645 \u062D\u0631\u06CC\u0642',
+  'Battery Size': '\u0627\u0646\u062F\u0627\u0632\u0647 \u0628\u0627\u062A\u0631\u06CC',
+  'Test Schedule': '\u0628\u0631\u0646\u0627\u0645\u0647 \u0622\u0632\u0645\u0648\u0646',
+  'Luminaire Count': '\u062A\u0639\u062F\u0627\u062F \u0686\u0631\u0627\u063A',
+  'Luminaire Spacing': '\u0641\u0627\u0635\u0644\u0647 \u0686\u0631\u0627\u063A\u200C\u0647\u0627',
+  'Changeover Time': '\u0632\u0645\u0627\u0646 \u062A\u063A\u06CC\u06CC\u0631',
+  'Compliance': '\u0627\u0646\u0637\u0628\u0627\u0642'
 };
 function tx(da, en) { if(lang === 'da') return da; if(lang === 'fa') return _FA[en] || en; return en; }
 function tl(obj, prefix) { return obj[prefix + '_' + lang] || obj[prefix + '_en'] || ''; }
@@ -4046,6 +4106,9 @@ function renderModule(mod) {
     case 'energy': content = renderEnergy(); break;
     case 'tcc': content = renderCascadeTCC(); break;
     case 'panel': content = renderPanel(); break;
+    case 'ev': content = renderEV(); break;
+    case 'solar': content = renderSolar(); break;
+    case 'noed': content = renderNoed(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -9004,6 +9067,698 @@ function brainDoAudit() {
 function brainDoBOM() {
   brainGenerateBOM();
   renderModule('brain');
+}
+
+
+// Helper: render a safety verdict card (green/red)
+function renderVerdict(safe, text) {
+  var color = safe ? 'var(--success, #22c55e)' : 'var(--danger, #ef4444)';
+  var icon = safe ? '\u2705' : '\u274C';
+  return '<div class="result-box" style="border-left:4px solid ' + color + ';margin-top:12px">' +
+    '<div class="result-row"><span class="label">' + icon + ' ' + (safe ? tx('GODKENDT','APPROVED') : tx('IKKE GODKENDT','NOT APPROVED')) + '</span>' +
+    '<span class="value" style="color:' + color + '">' + text + '</span></div></div>';
+}
+
+// ===== EV CHARGING MODULE (DS/HD 60364-7-722) =====
+
+var evState = {
+  mode: 3,           // Mode 2, 3, 4
+  phases: 3,         // 1 or 3
+  powerKW: 11,       // 3.7, 7.4, 11, 22
+  numChargers: 1,    // 1-10
+  cableLength: 15,   // meters
+  mainFuse: 50       // A
+};
+
+// Simultaneity factor per DS/HD 60364-7-722 Annex A
+function evGetSimultaneity(n) {
+  if (n <= 1) return 1.0;
+  if (n === 2) return 0.9;
+  if (n === 3) return 0.8;
+  if (n === 4) return 0.7;
+  return 0.6; // 5-10 chargers
+}
+
+// Calculate load current for single charger
+function evCalcCurrent(powerKW, phases) {
+  var voltage = phases === 1 ? 230 : 400;
+  var factor = phases === 1 ? 1 : Math.sqrt(3);
+  return Math.ceil((powerKW * 1000) / (voltage * factor));
+}
+
+// Calculate total design current after simultaneity
+function evCalcDesignCurrent(powerKW, phases, numChargers) {
+  var singleCurrent = evCalcCurrent(powerKW, phases);
+  var sf = evGetSimultaneity(numChargers);
+  return Math.ceil(singleCurrent * numChargers * sf);
+}
+
+// Select cable from PRODUCTS based on required current
+function evSelectCable(designCurrent) {
+  var cables = PRODUCTS.cables.filter(function(c) { return c.material === 'Cu'; });
+  cables.sort(function(a, b) { return a.iz - b.iz; });
+  for (var i = 0; i < cables.length; i++) {
+    if (cables[i].iz >= designCurrent) return cables[i];
+  }
+  return cables[cables.length - 1]; // largest available
+}
+
+// Select MCB - curve C for inrush per 722.531
+function evSelectMCB(designCurrent) {
+  var mcbs = PRODUCTS.mcbs.filter(function(m) { return m.curve === 'C'; });
+  mcbs.sort(function(a, b) { return a.rating - b.rating; });
+  for (var i = 0; i < mcbs.length; i++) {
+    if (mcbs[i].rating >= designCurrent) return mcbs[i];
+  }
+  return mcbs[mcbs.length - 1];
+}
+
+// Select RCD - Type B required per cl.722.531.3.101
+function evSelectRCD(phases) {
+  var rcds = PRODUCTS.rcds.filter(function(r) { return r.rcdType === 'B'; });
+  if (rcds.length === 0) {
+    rcds = PRODUCTS.rcds.filter(function(r) { return r.rcdType === 'A'; });
+  }
+  var poles = phases === 1 ? '2P' : '4P';
+  var match = rcds.filter(function(r) { return r.poles === poles; });
+  return match.length > 0 ? match[0] : rcds[0];
+}
+
+// Calculate voltage drop (%) per DS/HD 60364-5-52
+function evCalcVoltageDrop(cable, current, length, phases) {
+  if (!cable) return 0;
+  var voltage = phases === 1 ? 230 : 400;
+  var factor = phases === 1 ? 2 : Math.sqrt(3);
+  var vdrop = factor * current * (cable.r * length / 1000);
+  return Math.ceil((vdrop / voltage) * 10000) / 100; // conservative ceiling to 2 decimals
+}
+
+// Check grid capacity
+function evCheckGridCapacity(mainFuseA, designCurrent) {
+  var capacity = mainFuseA; // main fuse in Amps
+  var usage = Math.ceil((designCurrent / capacity) * 100);
+  var remaining = capacity - designCurrent;
+  return {
+    mainFuseA: mainFuseA,
+    designCurrent: designCurrent,
+    usagePercent: usage,
+    remainingA: remaining,
+    overloaded: remaining < 0,
+    needsLoadBalancing: usage > 80,
+    clause: 'DS/HD 60364-7-722 Annex A'
+  };
+}
+
+function renderEV() {
+  var current = evCalcCurrent(evState.powerKW, evState.phases);
+  var designCurrent = evCalcDesignCurrent(evState.powerKW, evState.phases, evState.numChargers);
+  var sf = evGetSimultaneity(evState.numChargers);
+  var cable = evSelectCable(designCurrent);
+  var mcb = evSelectMCB(designCurrent);
+  var rcd = evSelectRCD(evState.phases);
+  var vdrop = evCalcVoltageDrop(cable, designCurrent, evState.cableLength, evState.phases);
+  var grid = evCheckGridCapacity(evState.mainFuse, designCurrent);
+  var vdropOk = vdrop <= 3.0;
+  var rcdTypeB = rcd && rcd.rcdType === 'B';
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Elbil-lader dimensionering', 'EV Charging Dimensioning') + '</div>';
+  html += '<div class="info-row">' + tx('Beregning iht. DS/HD 60364-7-722', 'Calculation per DS/HD 60364-7-722') + '</div>';
+
+  // Charger Mode
+  html += '<div class="select-group"><div class="select-label">' + tx('Ladertilstand', 'Charger Mode') + '</div><div class="select-grid">';
+  [2, 3, 4].forEach(function(m) {
+    var label = 'Mode ' + m;
+    if (m === 2) label += ' (max 8A)';
+    if (m === 3) label += ' (Wallbox)';
+    if (m === 4) label += ' (DC Fast)';
+    html += '<button class="sel-btn' + (evState.mode === m ? ' selected' : '') + '" onclick="evState.mode=' + m + ';renderModule(\'ev\')">' + label + '</button>';
+  });
+  html += '</div></div>';
+
+  // Phases
+  html += '<div class="select-group"><div class="select-label">' + tx('Faser', 'Phases') + '</div><div class="select-grid">';
+  [1, 3].forEach(function(p) {
+    html += '<button class="sel-btn' + (evState.phases === p ? ' selected' : '') + '" onclick="evState.phases=' + p + ';renderModule(\'ev\')">' + p + tx('-faset', '-phase') + '</button>';
+  });
+  html += '</div></div>';
+
+  // Power Level
+  html += '<div class="select-group"><div class="select-label">' + tx('Effekt [kW]', 'Power Level [kW]') + '</div><div class="select-grid">';
+  [3.7, 7.4, 11, 22].forEach(function(kw) {
+    html += '<button class="sel-btn' + (evState.powerKW === kw ? ' selected' : '') + '" onclick="evState.powerKW=' + kw + ';renderModule(\'ev\')">' + kw + ' kW</button>';
+  });
+  html += '</div></div>';
+
+  // Number of chargers
+  html += '<div class="select-group"><div class="select-label">' + tx('Antal ladere', 'Number of Chargers') + '</div><div class="select-grid">';
+  for (var nc = 1; nc <= 10; nc++) {
+    html += '<button class="sel-btn' + (evState.numChargers === nc ? ' selected' : '') + '" onclick="evState.numChargers=' + nc + ';renderModule(\'ev\')">' + nc + '</button>';
+  }
+  html += '</div></div>';
+
+  // Cable length
+  html += '<div class="select-group"><div class="select-label">' + tx('Kabellengde [m]', 'Cable Length [m]') + '</div><div class="select-grid">';
+  [5, 10, 15, 20, 25, 30, 40, 50].forEach(function(len) {
+    html += '<button class="sel-btn' + (evState.cableLength === len ? ' selected' : '') + '" onclick="evState.cableLength=' + len + ';renderModule(\'ev\')">' + len + ' m</button>';
+  });
+  html += '</div></div>';
+
+  // Main Fuse
+  html += '<div class="select-group"><div class="select-label">' + tx('Hovedsikring [A]', 'Main Fuse [A]') + '</div><div class="select-grid">';
+  [25, 35, 50, 63].forEach(function(fuse) {
+    html += '<button class="sel-btn' + (evState.mainFuse === fuse ? ' selected' : '') + '" onclick="evState.mainFuse=' + fuse + ';renderModule(\'ev\')">' + fuse + ' A</button>';
+  });
+  html += '</div></div>';
+
+  // Results
+  html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-box">';
+  html += '<div class="result-row"><span class="label">' + tx('Enkeltstroem pr. lader', 'Single charger current') + '</span><span class="value">' + current + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Samtidighedsfaktor (722 Annex A)', 'Simultaneity factor (722 Annex A)') + '</span><span class="value">' + sf + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Dimensionerende stroem', 'Design current') + '</span><span class="value">' + designCurrent + ' A</span></div>';
+  html += '</div>';
+
+  // Cable recommendation
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Kabelanbefaling', 'Cable Recommendation') + '</div>';
+  if (cable) {
+    html += '<div class="result-row"><span class="label">' + tx('Kabel', 'Cable') + '</span><span class="value">' + cable.brand + ' ' + cable.model + ' ' + cable.mm2 + 'mm\u00B2</span></div>';
+    html += '<div class="result-row"><span class="label">Iz</span><span class="value">' + cable.iz + ' A</span></div>';
+  }
+  html += '<div class="result-row"><span class="label">' + tx('Spaendingsfald', 'Voltage drop') + '</span><span class="value">' + vdrop.toFixed(2) + ' % ' + (vdropOk ? '\u2705' : '\u274C') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Graense (Faellesregulativet)', 'Limit (Utility reg.)') + '</span><span class="value">max 3% (cl.722.525)</span></div>';
+  html += '</div>';
+
+  // Protection
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Beskyttelse', 'Protection') + '</div>';
+  if (mcb) {
+    html += '<div class="result-row"><span class="label">MCB</span><span class="value">' + mcb.brand + ' ' + mcb.model + ' C' + mcb.rating + 'A (cl.722.531)</span></div>';
+  }
+  if (rcd) {
+    html += '<div class="result-row"><span class="label">RCD</span><span class="value">' + rcd.brand + ' ' + rcd.model + ' Type ' + rcd.rcdType + ' ' + rcd.sensitivity + 'mA</span></div>';
+  }
+  if (!rcdTypeB) {
+    html += '<div class="result-row" style="color:var(--danger)"><span class="label">\u26A0\uFE0F ' + tx('ADVARSEL', 'WARNING') + '</span><span class="value">' + tx('Type B RCD paakraevet per cl.722.531.3.101 (DC fejlstroem)', 'Type B RCD required per cl.722.531.3.101 (DC fault current)') + '</span></div>';
+  } else {
+    html += '<div class="result-row" style="color:var(--success)"><span class="label">\u2705</span><span class="value">' + tx('Type B RCD korrekt per cl.722.531.3.101', 'Type B RCD correct per cl.722.531.3.101') + '</span></div>';
+  }
+  html += '</div>';
+
+  // Grid capacity
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Netkapacitet', 'Grid Capacity') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Hovedsikring', 'Main fuse') + '</span><span class="value">' + grid.mainFuseA + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Forbrug', 'Usage') + '</span><span class="value">' + grid.usagePercent + '% ' + (grid.overloaded ? '\u274C' : '\u2705') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Restkapacitet', 'Remaining') + '</span><span class="value">' + grid.remainingA + ' A</span></div>';
+  if (grid.needsLoadBalancing) {
+    html += '<div class="result-row" style="color:var(--warning)"><span class="label">\u26A0\uFE0F ' + tx('Anbefaling', 'Recommendation') + '</span><span class="value">' + tx('Lastbalancering anbefales (>80% af hovedsikring)', 'Load balancing recommended (>80% of main fuse)') + '</span></div>';
+  }
+  html += '</div>';
+
+  // Verdict
+  var safe = vdropOk && !grid.overloaded && rcdTypeB;
+  html += renderVerdict(safe, safe ? tx('Installation opfylder DS/HD 60364-7-722', 'Installation complies with DS/HD 60364-7-722') : tx('Krav IKKE opfyldt - se advarsler', 'Requirements NOT met - see warnings'));
+
+  html += '</div>';
+  return html;
+}
+
+// ===== SOLAR PV & BATTERY MODULE (DS/EN 62446 + DS/HD 60364-7-712) =====
+
+var solarState = {
+  systemType: 'grid',    // 'grid', 'gridbat', 'hybrid'
+  panelCount: 10,        // number of panels
+  panelWp: 440,          // Wp per panel
+  batteryKWh: 10,        // kWh
+  selfConsumption: 50,   // % (30, 50, 70, 90)
+  inverterMaxVdc: 600    // typical inverter max Vdc
+};
+
+// Constants for solar calculations
+var SOLAR_VOC_PER_PANEL = 42; // typical Voc for 440Wp panel
+var SOLAR_ANNUAL_YIELD_FACTOR = 900; // kWh/kWp Danish average
+var SOLAR_ELEC_PRICE_DKK = 2.5; // DKK/kWh average Danish electricity price
+
+// Calculate total system kWp
+function solarCalcKWp(panelCount, panelWp) {
+  return Math.round(panelCount * panelWp) / 1000;
+}
+
+// Inverter sizing: 0.8-1.0 x kWp (recommend 0.9)
+function solarCalcInverterSize(kWp) {
+  var min = Math.round(kWp * 0.8 * 10) / 10;
+  var max = kWp;
+  var recommended = Math.round(kWp * 0.9 * 10) / 10;
+  return { min: min, max: max, recommended: recommended, clause: 'DS/EN 62446-1' };
+}
+
+// DC cable sizing: 4mm2 up to 10A, 6mm2 above (PV1-F per EN 50618)
+function solarCalcDCCable(kWp) {
+  // Max DC current ~ kWp * 1000 / (Vmp ~ 35V * panels_in_series)
+  // Simplified: for residential typically 8-12A per string
+  var stringCurrent = Math.ceil(kWp * 1000 / (35 * 10)); // approximate
+  var mm2 = stringCurrent > 10 ? 6 : 4;
+  return { mm2: mm2, type: 'PV1-F', standard: 'EN 50618', clause: 'cl.712.522' };
+}
+
+// AC cable from inverter: based on inverter output current
+function solarCalcACCable(kWp, phases) {
+  var voltage = phases === 3 ? 400 : 230;
+  var factor = phases === 3 ? Math.sqrt(3) : 1;
+  var current = Math.ceil((kWp * 1000) / (voltage * factor));
+  var cables = PRODUCTS.cables.filter(function(c) { return c.material === 'Cu'; });
+  cables.sort(function(a, b) { return a.iz - b.iz; });
+  var cable = null;
+  for (var i = 0; i < cables.length; i++) {
+    if (cables[i].iz >= current) { cable = cables[i]; break; }
+  }
+  if (!cable) cable = cables[cables.length - 1];
+  return { cable: cable, current: current, clause: 'DS/HD 60364-7-712 cl.712.433' };
+}
+
+// String voltage check: Voc x panels vs inverter max Vdc
+function solarCheckStringVoltage(panelCount, vocPerPanel, inverterMaxVdc) {
+  var totalVoc = panelCount * vocPerPanel;
+  // Add 10% cold temperature factor (conservative)
+  var totalVocCold = Math.ceil(totalVoc * 1.10);
+  var ok = totalVocCold <= inverterMaxVdc;
+  return {
+    voc: totalVoc,
+    vocCold: totalVocCold,
+    maxVdc: inverterMaxVdc,
+    ok: ok,
+    clause: 'DS/HD 60364-7-712 cl.712.512.1.1'
+  };
+}
+
+// Annual yield estimate
+function solarCalcAnnualYield(kWp) {
+  return Math.round(kWp * SOLAR_ANNUAL_YIELD_FACTOR);
+}
+
+// Payback estimate
+function solarCalcPayback(kWp, selfConsumptionPct) {
+  var annualYield = solarCalcAnnualYield(kWp);
+  var selfConsumed = annualYield * (selfConsumptionPct / 100);
+  var exported = annualYield - selfConsumed;
+  var savingsSelf = selfConsumed * SOLAR_ELEC_PRICE_DKK;
+  var savingsExport = exported * 0.80; // feed-in ~0.80 DKK/kWh
+  var totalAnnualSaving = Math.round(savingsSelf + savingsExport);
+  var systemCost = Math.round(kWp * 12000); // ~12000 DKK/kWp installed
+  var paybackYears = systemCost > 0 ? Math.ceil(systemCost / totalAnnualSaving) : 0;
+  return {
+    annualYield: annualYield,
+    annualSaving: totalAnnualSaving,
+    systemCost: systemCost,
+    paybackYears: paybackYears
+  };
+}
+
+// MCB selection for AC side
+function solarSelectMCB(current) {
+  var mcbs = PRODUCTS.mcbs.filter(function(m) { return m.curve === 'C'; });
+  mcbs.sort(function(a, b) { return a.rating - b.rating; });
+  for (var i = 0; i < mcbs.length; i++) {
+    if (mcbs[i].rating >= current) return mcbs[i];
+  }
+  return mcbs[mcbs.length - 1];
+}
+
+// RCD for solar: Type B recommended (inverter DC component)
+function solarSelectRCD() {
+  var rcds = PRODUCTS.rcds.filter(function(r) { return r.rcdType === 'B'; });
+  return rcds.length > 0 ? rcds[0] : PRODUCTS.rcds[0];
+}
+
+function renderSolar() {
+  var kWp = solarCalcKWp(solarState.panelCount, solarState.panelWp);
+  var inverter = solarCalcInverterSize(kWp);
+  var dcCable = solarCalcDCCable(kWp);
+  var phases = kWp > 5 ? 3 : 1;
+  var acResult = solarCalcACCable(kWp, phases);
+  var stringCheck = solarCheckStringVoltage(solarState.panelCount, SOLAR_VOC_PER_PANEL, solarState.inverterMaxVdc);
+  var annualYield = solarCalcAnnualYield(kWp);
+  var payback = solarCalcPayback(kWp, solarState.selfConsumption);
+  var mcb = solarSelectMCB(acResult.current);
+  var rcd = solarSelectRCD();
+  var hasBattery = solarState.systemType === 'gridbat' || solarState.systemType === 'hybrid';
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Solcelle & Batteri dimensionering', 'Solar PV & Battery Dimensioning') + '</div>';
+  html += '<div class="info-row">' + tx('Beregning iht. DS/EN 62446 + DS/HD 60364-7-712', 'Calculation per DS/EN 62446 + DS/HD 60364-7-712') + '</div>';
+
+  // System type
+  html += '<div class="select-group"><div class="select-label">' + tx('Systemtype', 'System Type') + '</div><div class="select-grid">';
+  var sysTypes = [{k:'grid', da:'Nettilsluttet', en:'Grid-tied'}, {k:'gridbat', da:'Net + Batteri', en:'Grid + Battery'}, {k:'hybrid', da:'Hybrid', en:'Hybrid'}];
+  sysTypes.forEach(function(st) {
+    html += '<button class="sel-btn' + (solarState.systemType === st.k ? ' selected' : '') + '" onclick="solarState.systemType=\'' + st.k + '\';renderModule(\'solar\')">' + tx(st.da, st.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Panel count
+  html += '<div class="select-group"><div class="select-label">' + tx('Antal paneler', 'Panel Count') + '</div><div class="select-grid">';
+  [4, 6, 8, 10, 12, 14, 16, 18, 20, 24, 30].forEach(function(n) {
+    html += '<button class="sel-btn' + (solarState.panelCount === n ? ' selected' : '') + '" onclick="solarState.panelCount=' + n + ';renderModule(\'solar\')">' + n + '</button>';
+  });
+  html += '</div></div>';
+
+  // Panel wattage
+  html += '<div class="select-group"><div class="select-label">' + tx('Panel effekt [Wp]', 'Panel Wattage [Wp]') + '</div><div class="select-grid">';
+  [400, 420, 440, 460, 500].forEach(function(wp) {
+    html += '<button class="sel-btn' + (solarState.panelWp === wp ? ' selected' : '') + '" onclick="solarState.panelWp=' + wp + ';renderModule(\'solar\')">' + wp + ' Wp</button>';
+  });
+  html += '</div></div>';
+
+  // Battery (if applicable)
+  if (hasBattery) {
+    html += '<div class="select-group"><div class="select-label">' + tx('Batterikapacitet [kWh]', 'Battery Capacity [kWh]') + '</div><div class="select-grid">';
+    [5, 10, 13.5, 15, 20].forEach(function(kwh) {
+      html += '<button class="sel-btn' + (solarState.batteryKWh === kwh ? ' selected' : '') + '" onclick="solarState.batteryKWh=' + kwh + ';renderModule(\'solar\')">' + kwh + ' kWh</button>';
+    });
+    html += '</div></div>';
+  }
+
+  // Self-consumption ratio
+  html += '<div class="select-group"><div class="select-label">' + tx('Egetforbrug', 'Self-consumption') + '</div><div class="select-grid">';
+  [30, 50, 70, 90].forEach(function(pct) {
+    html += '<button class="sel-btn' + (solarState.selfConsumption === pct ? ' selected' : '') + '" onclick="solarState.selfConsumption=' + pct + ';renderModule(\'solar\')">' + pct + '%</button>';
+  });
+  html += '</div></div>';
+
+  // Results
+  html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
+
+  // System summary
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Systemoversigt', 'System Summary') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Total effekt', 'Total power') + '</span><span class="value">' + kWp.toFixed(1) + ' kWp</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Inverter anbefalet', 'Inverter recommended') + '</span><span class="value">' + inverter.recommended + ' kW (' + inverter.min + '-' + inverter.max + ' kW)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Aarlig produktion (DK gennemsnit)', 'Annual yield (DK average)') + '</span><span class="value">' + annualYield + ' kWh/year</span></div>';
+  if (hasBattery) {
+    html += '<div class="result-row"><span class="label">' + tx('Batteri', 'Battery') + '</span><span class="value">' + solarState.batteryKWh + ' kWh</span></div>';
+  }
+  html += '</div>';
+
+  // Cable specs
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Kabler', 'Cables') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('DC kabel (panel til inverter)', 'DC cable (panel to inverter)') + '</span><span class="value">' + dcCable.mm2 + 'mm\u00B2 ' + dcCable.type + ' (' + dcCable.standard + ')</span></div>';
+  if (acResult.cable) {
+    html += '<div class="result-row"><span class="label">' + tx('AC kabel (inverter til maaler)', 'AC cable (inverter to meter)') + '</span><span class="value">' + acResult.cable.brand + ' ' + acResult.cable.mm2 + 'mm\u00B2 (Iz=' + acResult.cable.iz + 'A)</span></div>';
+  }
+  html += '</div>';
+
+  // String voltage check
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Strengspaending kontrol', 'String Voltage Check') + '</div>';
+  html += '<div class="result-row"><span class="label">Voc (STC)</span><span class="value">' + stringCheck.voc + ' V</span></div>';
+  html += '<div class="result-row"><span class="label">Voc (kulde +10%)</span><span class="value">' + stringCheck.vocCold + ' V</span></div>';
+  html += '<div class="result-row"><span class="label">Inverter max Vdc</span><span class="value">' + stringCheck.maxVdc + ' V</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Status', 'Status') + '</span><span class="value">' + (stringCheck.ok ? '\u2705 OK' : '\u274C ' + tx('Overskrider maks Vdc!', 'Exceeds max Vdc!')) + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Klausul', 'Clause') + '</span><span class="value">' + stringCheck.clause + '</span></div>';
+  html += '</div>';
+
+  // Protection
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Beskyttelse', 'Protection') + '</div>';
+  if (mcb) {
+    html += '<div class="result-row"><span class="label">MCB (AC)</span><span class="value">' + mcb.brand + ' ' + mcb.model + ' C' + mcb.rating + 'A</span></div>';
+  }
+  if (rcd) {
+    html += '<div class="result-row"><span class="label">RCD</span><span class="value">' + rcd.brand + ' ' + rcd.model + ' Type ' + rcd.rcdType + ' (cl.712.531)</span></div>';
+  }
+  html += '<div class="result-row"><span class="label">' + tx('DC afbryder', 'DC switch-disconnector') + '</span><span class="value">' + tx('Paakraevet per cl.712.536.2.1', 'Mandatory per cl.712.536.2.1') + ' \u2705</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Anti-oedannelse', 'Anti-islanding') + '</span><span class="value">' + tx('Paakraevet per cl.712.536.2.2', 'Mandatory per cl.712.536.2.2') + ' \u2705</span></div>';
+  html += '<div class="result-row"><span class="label">SPD</span><span class="value">' + tx('Type 2 paa DC + AC side (cl.712.534)', 'Type 2 on DC + AC side (cl.712.534)') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Hurtig nedlukning', 'Rapid shutdown') + '</span><span class="value">' + tx('Krav for tagmontering (brandsikkerhed)', 'Required for rooftop (fire safety)') + '</span></div>';
+  html += '</div>';
+
+  // Payback
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Oekonomi', 'Economics') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Aarlig besparelse', 'Annual saving') + '</span><span class="value">' + payback.annualSaving + ' DKK</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Systemomkostning (estimat)', 'System cost (estimate)') + '</span><span class="value">' + payback.systemCost + ' DKK</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Tilbagebetalingstid', 'Payback period') + '</span><span class="value">~' + payback.paybackYears + ' ' + tx('aar', 'years') + '</span></div>';
+  html += '</div>';
+
+  // Verdict
+  var safe = stringCheck.ok;
+  html += renderVerdict(safe, safe ? tx('System opfylder DS/HD 60364-7-712 + DS/EN 62446', 'System complies with DS/HD 60364-7-712 + DS/EN 62446') : tx('Strengspaending overskrider inverter maks!', 'String voltage exceeds inverter maximum!'));
+
+  html += '</div>';
+  return html;
+}
+
+// ===== EMERGENCY LIGHTING MODULE (DS/EN 1838 + DS/EN 50172) =====
+
+var noedState = {
+  buildingType: 'office',  // residential, office, shop, assembly, industrial, parking, hospital
+  systemType: 'self',      // 'self' (self-contained), 'central', 'hybrid'
+  lightingType: 'escape',  // 'escape', 'antipanic', 'highrisk'
+  roomLength: 20,          // meters
+  roomWidth: 10,           // meters
+  roomHeight: 3.0,         // meters
+  duration: 1              // hours (1 or 3)
+};
+
+// Required lux levels per EN 1838
+var NOED_LUX_REQUIREMENTS = {
+  escape: { lux: 1.0, clause: 'EN 1838 cl.4.2', description_da: 'Min 1 lux paa gulv midterlinje', description_en: 'Min 1 lux on floor centerline' },
+  antipanic: { lux: 0.5, clause: 'EN 1838 cl.4.3', description_da: 'Min 0.5 lux over hele areal', description_en: 'Min 0.5 lux over entire area' },
+  highrisk: { lux: 15.0, clause: 'EN 1838 cl.4.4', description_da: 'Min 15 lux (eller 10% af normal)', description_en: 'Min 15 lux (or 10% of normal)' }
+};
+
+// Building types and their requirements
+var NOED_BUILDING_TYPES = {
+  residential: { required: false, duration: 0, da: 'Bolig (intet krav)', en: 'Residential (no requirement)' },
+  office: { required: true, duration: 1, da: 'Kontor', en: 'Office' },
+  shop: { required: true, duration: 1, da: 'Butik', en: 'Shop' },
+  assembly: { required: true, duration: 1, da: 'Forsamling', en: 'Assembly' },
+  industrial: { required: true, duration: 1, da: 'Industri', en: 'Industrial' },
+  parking: { required: true, duration: 1, da: 'Parkering', en: 'Parking' },
+  hospital: { required: true, duration: 3, da: 'Hospital', en: 'Hospital' }
+};
+
+// Fire cable types
+var NOED_CABLE_TYPES = {
+  E30: { da: 'E30 (standard)', en: 'E30 (standard)', resistance: 30 },
+  E60: { da: 'E60 (udvidet)', en: 'E60 (extended)', resistance: 60 },
+  E90: { da: 'E90 (hospital)', en: 'E90 (hospital)', resistance: 90 }
+};
+
+// Calculate luminaire spacing based on mounting height and lux requirement
+function noedCalcSpacing(mountingHeight, luxRequired) {
+  // Typical emergency luminaire: 1-3W LED, ~40-120 lm
+  // Spacing approx 4x mounting height for escape, 2x for highrisk
+  var factor = luxRequired >= 15 ? 2.0 : (luxRequired >= 1.0 ? 4.0 : 5.0);
+  var spacing = Math.floor(mountingHeight * factor * 10) / 10; // conservative (floor)
+  // Cap maximum spacing at practical limits
+  if (spacing > 12) spacing = 12;
+  if (spacing < 2) spacing = 2;
+  return spacing;
+}
+
+// Calculate number of luminaires needed
+function noedCalcLuminaireCount(roomLength, roomWidth, spacing) {
+  var countL = Math.ceil(roomLength / spacing);
+  var countW = Math.ceil(roomWidth / spacing);
+  // Minimum of countL along length, at least 1 row
+  var total = Math.max(countL, 1) * Math.max(countW, 1);
+  // Ensure at least 1
+  return Math.max(total, 1);
+}
+
+// Calculate battery size for central system
+function noedCalcBattery(luminaireCount, wattsPerLuminaire, durationHours) {
+  // Battery Ah at 24V DC system
+  var totalWatts = luminaireCount * wattsPerLuminaire;
+  var systemVoltage = 24; // typical central battery voltage
+  var current = totalWatts / systemVoltage;
+  // Safety factor 1.25 per DS/EN 50172
+  var ah = Math.ceil(current * durationHours * 1.25);
+  return {
+    totalWatts: totalWatts,
+    voltage: systemVoltage,
+    current: Math.ceil(current * 100) / 100,
+    ah: ah,
+    durationH: durationHours,
+    safetyFactor: 1.25,
+    clause: 'DS/EN 50172 cl.6.2'
+  };
+}
+
+// Get fire cable type recommendation
+function noedGetCableType(buildingType) {
+  if (buildingType === 'hospital') return 'E90';
+  if (buildingType === 'assembly') return 'E60';
+  return 'E30';
+}
+
+// Get duration requirement
+function noedGetDuration(buildingType) {
+  var bt = NOED_BUILDING_TYPES[buildingType];
+  if (!bt) return 1;
+  return bt.duration || 1;
+}
+
+// Changeover time check per EN 1838
+function noedGetChangeoverTime(lightingType) {
+  if (lightingType === 'escape') return { max: 0.5, clause: 'EN 1838 cl.4.2.5' };
+  return { max: 5.0, clause: 'EN 1838 cl.4.3.5' };
+}
+
+// Full calculation bundle
+function noedCalcAll(state) {
+  var bt = NOED_BUILDING_TYPES[state.buildingType];
+  if (!bt || !bt.required) {
+    return { required: false, buildingType: state.buildingType };
+  }
+
+  var luxReq = NOED_LUX_REQUIREMENTS[state.lightingType];
+  var spacing = noedCalcSpacing(state.roomHeight, luxReq.lux);
+  var luminaireCount = noedCalcLuminaireCount(state.roomLength, state.roomWidth, spacing);
+  var wattsPerLum = 3; // typical LED emergency, 3W
+  var duration = state.duration || noedGetDuration(state.buildingType);
+  var battery = noedCalcBattery(luminaireCount, wattsPerLum, duration);
+  var cableType = noedGetCableType(state.buildingType);
+  var changeover = noedGetChangeoverTime(state.lightingType);
+
+  return {
+    required: true,
+    buildingType: state.buildingType,
+    lightingType: state.lightingType,
+    luxRequired: luxReq.lux,
+    luxClause: luxReq.clause,
+    spacing: spacing,
+    luminaireCount: luminaireCount,
+    wattsPerLuminaire: wattsPerLum,
+    battery: battery,
+    cableType: cableType,
+    duration: duration,
+    changeover: changeover,
+    roomArea: state.roomLength * state.roomWidth
+  };
+}
+
+function renderNoed() {
+  var calc = noedCalcAll(noedState);
+  var bt = NOED_BUILDING_TYPES[noedState.buildingType];
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Noedbelysning dimensionering', 'Emergency Lighting Design') + '</div>';
+  html += '<div class="info-row">' + tx('Beregning iht. DS/EN 1838 + DS/EN 50172', 'Calculation per DS/EN 1838 + DS/EN 50172') + '</div>';
+
+  // Building type
+  html += '<div class="select-group"><div class="select-label">' + tx('Bygningstype', 'Building Type') + '</div><div class="select-grid">';
+  Object.keys(NOED_BUILDING_TYPES).forEach(function(key) {
+    var b = NOED_BUILDING_TYPES[key];
+    html += '<button class="sel-btn' + (noedState.buildingType === key ? ' selected' : '') + '" onclick="noedState.buildingType=\'' + key + '\';renderModule(\'noed\')">' + tx(b.da, b.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // System type
+  html += '<div class="select-group"><div class="select-label">' + tx('Systemtype', 'System Type') + '</div><div class="select-grid">';
+  var sysTypes = [{k:'self', da:'Individuel (batteri i armatur)', en:'Self-contained'}, {k:'central', da:'Centralt batteri', en:'Central battery'}, {k:'hybrid', da:'Hybrid', en:'Hybrid'}];
+  sysTypes.forEach(function(st) {
+    html += '<button class="sel-btn' + (noedState.systemType === st.k ? ' selected' : '') + '" onclick="noedState.systemType=\'' + st.k + '\';renderModule(\'noed\')">' + tx(st.da, st.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Lighting type
+  html += '<div class="select-group"><div class="select-label">' + tx('Belysningstype', 'Lighting Type') + '</div><div class="select-grid">';
+  var ltTypes = [{k:'escape', da:'Flugtvej', en:'Escape Route'}, {k:'antipanic', da:'Anti-panik', en:'Anti-panic'}, {k:'highrisk', da:'Hoejrisiko', en:'High-risk Task'}];
+  ltTypes.forEach(function(lt) {
+    html += '<button class="sel-btn' + (noedState.lightingType === lt.k ? ' selected' : '') + '" onclick="noedState.lightingType=\'' + lt.k + '\';renderModule(\'noed\')">' + tx(lt.da, lt.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Room dimensions - Length
+  html += '<div class="select-group"><div class="select-label">' + tx('Rum laengde [m]', 'Room Length [m]') + '</div><div class="select-grid">';
+  for (var rl = 2; rl <= 50; rl += 2) {
+    html += '<button class="sel-btn' + (noedState.roomLength === rl ? ' selected' : '') + '" onclick="noedState.roomLength=' + rl + ';renderModule(\'noed\')">' + rl + '</button>';
+  }
+  html += '</div></div>';
+
+  // Room dimensions - Width
+  html += '<div class="select-group"><div class="select-label">' + tx('Rum bredde [m]', 'Room Width [m]') + '</div><div class="select-grid">';
+  for (var rw = 2; rw <= 30; rw += 2) {
+    html += '<button class="sel-btn' + (noedState.roomWidth === rw ? ' selected' : '') + '" onclick="noedState.roomWidth=' + rw + ';renderModule(\'noed\')">' + rw + '</button>';
+  }
+  html += '</div></div>';
+
+  // Room height
+  html += '<div class="select-group"><div class="select-label">' + tx('Montagehoejde [m]', 'Mounting Height [m]') + '</div><div class="select-grid">';
+  var heights = [2.4, 2.7, 3.0, 3.3, 3.6, 3.9, 4.2, 4.5, 4.8, 5.1, 5.4, 5.7, 6.0];
+  heights.forEach(function(h) {
+    html += '<button class="sel-btn' + (noedState.roomHeight === h ? ' selected' : '') + '" onclick="noedState.roomHeight=' + h + ';renderModule(\'noed\')">' + h.toFixed(1) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Duration
+  html += '<div class="select-group"><div class="select-label">' + tx('Driftstid [timer]', 'Duration [hours]') + '</div><div class="select-grid">';
+  [1, 3].forEach(function(d) {
+    html += '<button class="sel-btn' + (noedState.duration === d ? ' selected' : '') + '" onclick="noedState.duration=' + d + ';renderModule(\'noed\')">' + d + ' ' + tx('time', 'hour') + (d > 1 ? 'r/' + 's' : '') + '</button>';
+  });
+  html += '</div></div>';
+
+  // Results
+  html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
+
+  if (!calc.required) {
+    html += '<div class="result-box"><div class="result-row"><span class="label">' + tx('Intet krav', 'No requirement') + '</span><span class="value">' + tx('Boliger har ikke krav om noedbelysning', 'Residential buildings have no emergency lighting requirement') + '</span></div></div>';
+  } else {
+    // Luminaire result
+    html += '<div class="result-box">';
+    html += '<div class="result-title">' + tx('Armaturer', 'Luminaires') + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Krav', 'Requirement') + '</span><span class="value">' + calc.luxRequired + ' lux (' + calc.luxClause + ')</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Afstand', 'Spacing') + '</span><span class="value">' + calc.spacing + ' m</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Antal armaturer', 'Luminaire count') + '</span><span class="value">' + calc.luminaireCount + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Rumareal', 'Room area') + '</span><span class="value">' + calc.roomArea + ' m\u00B2</span></div>';
+    html += '</div>';
+
+    // Cable type
+    html += '<div class="result-box">';
+    html += '<div class="result-title">' + tx('Kabeltype (brandmodstandsdygtig)', 'Cable Type (fire-resistant)') + '</div>';
+    var ct = NOED_CABLE_TYPES[calc.cableType];
+    html += '<div class="result-row"><span class="label">' + tx('Anbefalet', 'Recommended') + '</span><span class="value">' + ct.en + ' (' + ct.resistance + ' min)</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Standard', 'Standard') + '</span><span class="value">DS/HD 60364-5-56 + IEC 60331</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Kreds', 'Circuit') + '</span><span class="value">' + tx('Dedikeret kreds fra hovedtavle, adskilt fra normal belysning', 'Dedicated circuit from main panel, separate from normal lighting') + '</span></div>';
+    html += '</div>';
+
+    // Battery (for central system)
+    if (noedState.systemType === 'central' || noedState.systemType === 'hybrid') {
+      html += '<div class="result-box">';
+      html += '<div class="result-title">' + tx('Batteri (centralt system)', 'Battery (central system)') + '</div>';
+      html += '<div class="result-row"><span class="label">' + tx('Total effekt', 'Total power') + '</span><span class="value">' + calc.battery.totalWatts + ' W</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Systemspaending', 'System voltage') + '</span><span class="value">' + calc.battery.voltage + ' V DC</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Kapacitet (inkl. 1.25 sikkerhed)', 'Capacity (incl. 1.25 safety)') + '</span><span class="value">' + calc.battery.ah + ' Ah (' + calc.battery.clause + ')</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Driftstid', 'Duration') + '</span><span class="value">' + calc.battery.durationH + ' ' + tx('timer', 'hours') + '</span></div>';
+      html += '</div>';
+    }
+
+    // Changeover time
+    html += '<div class="result-box">';
+    html += '<div class="result-title">' + tx('Omskiftningstid', 'Changeover Time') + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Maks tilladt', 'Max allowed') + '</span><span class="value">' + calc.changeover.max + ' s (' + calc.changeover.clause + ')</span></div>';
+    html += '</div>';
+
+    // Test schedule per DS/EN 50172
+    html += '<div class="result-box">';
+    html += '<div class="result-title">' + tx('Testkrav (DS/EN 50172)', 'Test Schedule (DS/EN 50172)') + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Maanedlig', 'Monthly') + '</span><span class="value">' + tx('Funktionstest - kort aktivering og visuel kontrol', 'Functional test - brief activation and visual check') + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Aarlig', 'Annual') + '</span><span class="value">' + tx('Fuld varighedstest - ' + calc.duration + ' times drift', 'Full duration test - ' + calc.duration + ' hour operation') + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Dokumentation', 'Documentation') + '</span><span class="value">' + tx('Logbog paakraevet per DS/EN 50172 cl.6', 'Logbook required per DS/EN 50172 cl.6') + '</span></div>';
+    html += '</div>';
+
+    // Verdict
+    var safe = calc.required && calc.luminaireCount > 0;
+    html += renderVerdict(safe, safe ? tx('Design opfylder DS/EN 1838 + DS/EN 50172', 'Design complies with DS/EN 1838 + DS/EN 50172') : tx('Utilstraekkeligt design', 'Insufficient design'));
+  }
+
+  html += '</div>';
+  return html;
 }
 
 // ===== INIT =====

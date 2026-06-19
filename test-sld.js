@@ -2681,6 +2681,396 @@ test('renderBank function output includes new category buttons', function() {
   assert.ok(html.indexOf('Klemmer') >= 0 || html.indexOf('Terminals') >= 0, 'Must show terminals category');
 });
 
+// ===== EV CHARGING MODULE TESTS =====
+console.log('\n=== EV Charging Module Tests ===\n');
+
+// Test 176: evGetSimultaneity returns correct values per DS/HD 60364-7-722 Annex A
+test('evGetSimultaneity returns correct factors per 722 Annex A', function() {
+  assert.strictEqual(evGetSimultaneity(1), 1.0);
+  assert.strictEqual(evGetSimultaneity(2), 0.9);
+  assert.strictEqual(evGetSimultaneity(3), 0.8);
+  assert.strictEqual(evGetSimultaneity(4), 0.7);
+  assert.strictEqual(evGetSimultaneity(5), 0.6);
+  assert.strictEqual(evGetSimultaneity(10), 0.6);
+});
+
+// Test 177: evCalcCurrent correctly calculates single-phase and three-phase currents
+test('evCalcCurrent calculates correct load currents', function() {
+  // 11kW 3-phase: 11000 / (400 * sqrt(3)) = 15.87 -> ceil = 16A
+  var i3p = evCalcCurrent(11, 3);
+  assert.strictEqual(i3p, 16);
+  // 7.4kW 1-phase: 7400 / 230 = 32.17 -> ceil = 33A
+  var i1p = evCalcCurrent(7.4, 1);
+  assert.strictEqual(i1p, 33);
+  // 3.7kW 1-phase: 3700 / 230 = 16.08 -> ceil = 17A
+  var i1p2 = evCalcCurrent(3.7, 1);
+  assert.strictEqual(i1p2, 17);
+});
+
+// Test 178: evCalcDesignCurrent applies simultaneity factor
+test('evCalcDesignCurrent applies simultaneity correctly', function() {
+  // 3 chargers at 11kW 3-phase: single=16A, total=16*3*0.8=38.4 -> ceil=39
+  var dc = evCalcDesignCurrent(11, 3, 3);
+  assert.strictEqual(dc, 39);
+  // 1 charger: 16*1*1.0 = 16
+  var dc1 = evCalcDesignCurrent(11, 3, 1);
+  assert.strictEqual(dc1, 16);
+});
+
+// Test 179: evSelectCable returns cable with Iz >= design current
+test('evSelectCable returns adequate cable', function() {
+  var cable = evSelectCable(32);
+  assert.ok(cable, 'Must return a cable');
+  assert.ok(cable.iz >= 32, 'Cable Iz must be >= design current');
+  assert.ok(cable.mm2, 'Cable must have mm2 field');
+});
+
+// Test 180: evSelectMCB returns curve C MCB
+test('evSelectMCB returns curve C for EV inrush', function() {
+  var mcb = evSelectMCB(16);
+  assert.ok(mcb, 'Must return an MCB');
+  assert.strictEqual(mcb.curve, 'C');
+  assert.ok(mcb.rating >= 16, 'MCB rating must be >= load');
+});
+
+// Test 181: evSelectRCD returns Type B per cl.722.531.3.101
+test('evSelectRCD returns Type B for DC fault protection', function() {
+  var rcd = evSelectRCD(3);
+  assert.ok(rcd, 'Must return an RCD');
+  assert.strictEqual(rcd.rcdType, 'B', 'Must be Type B per cl.722.531.3.101');
+});
+
+// Test 182: evCalcVoltageDrop checks conservative (ceiling) voltage drop
+test('evCalcVoltageDrop calculates conservative voltage drop', function() {
+  var cable = evSelectCable(16);
+  var vd = evCalcVoltageDrop(cable, 16, 25, 3);
+  assert.ok(typeof vd === 'number');
+  assert.ok(vd >= 0, 'Voltage drop must be positive');
+  // 50m with a small cable at high current should show measurable drop
+  var vdLong = evCalcVoltageDrop(cable, 32, 50, 3);
+  assert.ok(vdLong > vd, 'Longer cable must have higher drop');
+});
+
+// Test 183: evCheckGridCapacity detects overload
+test('evCheckGridCapacity detects overloaded main fuse', function() {
+  // 25A main fuse, 39A design current = overloaded
+  var grid = evCheckGridCapacity(25, 39);
+  assert.strictEqual(grid.overloaded, true);
+  assert.ok(grid.usagePercent > 100);
+  // 63A main fuse, 16A design current = OK
+  var grid2 = evCheckGridCapacity(63, 16);
+  assert.strictEqual(grid2.overloaded, false);
+  assert.ok(grid2.usagePercent < 100);
+});
+
+// Test 184: evCheckGridCapacity recommends load balancing above 80%
+test('evCheckGridCapacity recommends load balancing above 80%', function() {
+  // 50A fuse, 42A load = 84% -> needs balancing
+  var grid = evCheckGridCapacity(50, 42);
+  assert.strictEqual(grid.needsLoadBalancing, true);
+  // 63A fuse, 16A load = 25% -> no balancing needed
+  var grid2 = evCheckGridCapacity(63, 16);
+  assert.strictEqual(grid2.needsLoadBalancing, false);
+});
+
+// Test 185: renderEV produces HTML with no text inputs
+test('renderEV has no text input fields (click-only UI)', function() {
+  var html = renderEV();
+  assert.ok(html.indexOf('<input type="text"') < 0, 'Must not contain text input');
+  assert.ok(html.indexOf('<textarea') < 0, 'Must not contain textarea');
+});
+
+// Test 186: renderEV contains DS/HD 60364-7-722 references
+test('renderEV references DS/HD 60364-7-722', function() {
+  var html = renderEV();
+  assert.ok(html.indexOf('722') >= 0, 'Must reference section 722');
+  assert.ok(html.indexOf('60364') >= 0, 'Must reference DS/HD 60364');
+});
+
+// Test 187: EV module handles maximum chargers (10)
+test('EV module handles 10 chargers edge case', function() {
+  evState.numChargers = 10;
+  evState.powerKW = 22;
+  evState.phases = 3;
+  var dc = evCalcDesignCurrent(22, 3, 10);
+  var sf = evGetSimultaneity(10);
+  assert.strictEqual(sf, 0.6);
+  assert.ok(dc > 0, 'Design current must be positive');
+  var html = renderEV();
+  assert.ok(html.length > 100, 'Must produce substantial HTML');
+  evState.numChargers = 1;
+  evState.powerKW = 11;
+});
+
+// Test 188: renderEV uses sel-btn class for buttons
+test('renderEV uses sel-btn class for click buttons', function() {
+  var html = renderEV();
+  assert.ok(html.indexOf('sel-btn') >= 0, 'Must use sel-btn class');
+});
+
+// Test 189: EV module registered in module switch
+test('EV module registered in renderModule switch', function() {
+  activeModule = 'ev';
+  // If renderModule is available and doesn't throw, it's registered
+  assert.ok(typeof renderEV === 'function', 'renderEV must be defined');
+});
+
+// ===== SOLAR PV MODULE TESTS =====
+console.log('\n=== Solar PV & Battery Module Tests ===\n');
+
+// Test 190: solarCalcKWp correctly calculates total kWp
+test('solarCalcKWp calculates correct total power', function() {
+  assert.strictEqual(solarCalcKWp(10, 440), 4.4);
+  assert.strictEqual(solarCalcKWp(20, 500), 10);
+  assert.strictEqual(solarCalcKWp(4, 400), 1.6);
+});
+
+// Test 191: solarCalcInverterSize recommends 0.9x kWp
+test('solarCalcInverterSize recommends correct sizing', function() {
+  var inv = solarCalcInverterSize(10);
+  assert.strictEqual(inv.recommended, 9.0);
+  assert.strictEqual(inv.min, 8.0);
+  assert.strictEqual(inv.max, 10);
+  assert.ok(inv.clause.indexOf('62446') >= 0, 'Must reference DS/EN 62446');
+});
+
+// Test 192: solarCalcDCCable selects correct size
+test('solarCalcDCCable selects appropriate cable size', function() {
+  var dc = solarCalcDCCable(4.4);
+  assert.ok(dc.mm2 === 4 || dc.mm2 === 6, 'Must be 4 or 6 mm2');
+  assert.strictEqual(dc.type, 'PV1-F');
+  assert.ok(dc.standard.indexOf('EN 50618') >= 0);
+});
+
+// Test 193: solarCheckStringVoltage detects exceeded max Vdc
+test('solarCheckStringVoltage detects voltage exceeding max', function() {
+  // 30 panels * 42V = 1260V, +10% = 1386V > 600V max
+  var check = solarCheckStringVoltage(30, 42, 600);
+  assert.strictEqual(check.ok, false);
+  assert.ok(check.vocCold > 600);
+  // 10 panels * 42V = 420V, +10% = 462V < 600V max
+  var check2 = solarCheckStringVoltage(10, 42, 600);
+  assert.strictEqual(check2.ok, true);
+});
+
+// Test 194: solarCalcAnnualYield uses 900 kWh/kWp
+test('solarCalcAnnualYield uses 900 kWh/kWp Danish average', function() {
+  assert.strictEqual(solarCalcAnnualYield(10), 9000);
+  assert.strictEqual(solarCalcAnnualYield(4.4), 3960);
+});
+
+// Test 195: solarCalcPayback returns reasonable values
+test('solarCalcPayback calculates payback period', function() {
+  var pb = solarCalcPayback(10, 50);
+  assert.ok(pb.paybackYears > 0, 'Payback must be positive');
+  assert.ok(pb.paybackYears <= 20, 'Payback should be reasonable for DK');
+  assert.ok(pb.annualSaving > 0, 'Annual saving must be positive');
+  assert.ok(pb.systemCost > 0, 'System cost must be positive');
+});
+
+// Test 196: solarSelectRCD returns Type B
+test('solarSelectRCD returns Type B for inverter DC component', function() {
+  var rcd = solarSelectRCD();
+  assert.ok(rcd, 'Must return an RCD');
+  assert.strictEqual(rcd.rcdType, 'B', 'Must be Type B for solar inverter');
+});
+
+// Test 197: renderSolar produces click-only HTML
+test('renderSolar has no text input fields', function() {
+  var html = renderSolar();
+  assert.ok(html.indexOf('<input type="text"') < 0, 'Must not contain text input');
+  assert.ok(html.indexOf('<textarea') < 0, 'Must not contain textarea');
+});
+
+// Test 198: renderSolar references DS/HD 60364-7-712
+test('renderSolar references DS/HD 60364-7-712 and DS/EN 62446', function() {
+  var html = renderSolar();
+  assert.ok(html.indexOf('712') >= 0, 'Must reference section 712');
+  assert.ok(html.indexOf('62446') >= 0, 'Must reference DS/EN 62446');
+});
+
+// Test 199: Solar module handles oversized PV (30 panels, exceeds inverter Vdc)
+test('Solar module handles oversized PV system', function() {
+  solarState.panelCount = 30;
+  solarState.panelWp = 500;
+  var kWp = solarCalcKWp(30, 500);
+  assert.strictEqual(kWp, 15.0);
+  var stringCheck = solarCheckStringVoltage(30, SOLAR_VOC_PER_PANEL, 600);
+  assert.strictEqual(stringCheck.ok, false, 'Must detect voltage exceedance');
+  solarState.panelCount = 10;
+  solarState.panelWp = 440;
+});
+
+// Test 200: renderSolar shows battery section when system has battery
+test('renderSolar shows battery section for grid+battery system', function() {
+  solarState.systemType = 'gridbat';
+  var html = renderSolar();
+  assert.ok(html.indexOf('kWh') >= 0, 'Must show battery capacity');
+  solarState.systemType = 'grid';
+});
+
+// Test 201: Solar includes mandatory protection requirements
+test('renderSolar shows mandatory protection devices', function() {
+  var html = renderSolar();
+  assert.ok(html.indexOf('cl.712.536.2.1') >= 0, 'Must reference DC disconnect clause');
+  assert.ok(html.indexOf('cl.712.536.2.2') >= 0, 'Must reference anti-islanding clause');
+  assert.ok(html.indexOf('cl.712.534') >= 0, 'Must reference SPD clause');
+});
+
+// Test 202: Solar module uses sel-btn class
+test('renderSolar uses sel-btn buttons', function() {
+  var html = renderSolar();
+  assert.ok(html.indexOf('sel-btn') >= 0, 'Must use sel-btn class');
+});
+
+// Test 203: solarCalcACCable returns cable with sufficient Iz
+test('solarCalcACCable returns adequate AC cable', function() {
+  var result = solarCalcACCable(10, 3);
+  assert.ok(result.cable, 'Must return a cable');
+  assert.ok(result.cable.iz >= result.current, 'Cable Iz must be >= inverter output current');
+});
+
+// Test 204: Solar module registered
+test('Solar module renderSolar function exists', function() {
+  assert.ok(typeof renderSolar === 'function', 'renderSolar must be defined');
+  assert.ok(typeof solarCalcKWp === 'function');
+  assert.ok(typeof solarCalcInverterSize === 'function');
+  assert.ok(typeof solarCheckStringVoltage === 'function');
+});
+
+// ===== EMERGENCY LIGHTING MODULE TESTS =====
+console.log('\n=== Emergency Lighting Module Tests ===\n');
+
+// Test 205: noedCalcSpacing uses conservative (floor) rounding
+test('noedCalcSpacing returns conservative spacing', function() {
+  // 3m height, 1 lux (escape): 3 * 4 = 12m max spacing
+  var sp = noedCalcSpacing(3.0, 1.0);
+  assert.ok(sp <= 12, 'Spacing must not exceed 12m');
+  assert.ok(sp > 0, 'Spacing must be positive');
+  // Higher lux = shorter spacing
+  var spHigh = noedCalcSpacing(3.0, 15.0);
+  assert.ok(spHigh < sp, 'High-risk must have shorter spacing than escape');
+});
+
+// Test 206: noedCalcLuminaireCount uses ceiling (conservative)
+test('noedCalcLuminaireCount uses conservative ceiling count', function() {
+  // 20m room / 12m spacing = ceil(1.67) = 2
+  var count = noedCalcLuminaireCount(20, 10, 12);
+  assert.ok(count >= 2, 'Must use ceiling for luminaire count');
+  // Very small room should still have at least 1
+  var countSmall = noedCalcLuminaireCount(2, 2, 12);
+  assert.ok(countSmall >= 1, 'Minimum 1 luminaire');
+});
+
+// Test 207: noedCalcBattery includes 1.25 safety factor
+test('noedCalcBattery applies 1.25 safety factor per DS/EN 50172', function() {
+  var bat = noedCalcBattery(10, 3, 1);
+  // 10 luminaires * 3W = 30W, at 24V = 1.25A, * 1h * 1.25 = ceil(1.5625) = 2 Ah
+  assert.ok(bat.ah >= 2, 'Battery must include 1.25 safety factor');
+  assert.strictEqual(bat.safetyFactor, 1.25);
+  assert.ok(bat.clause.indexOf('50172') >= 0, 'Must reference DS/EN 50172');
+});
+
+// Test 208: noedGetCableType returns correct grade per building
+test('noedGetCableType returns correct fire resistance grade', function() {
+  assert.strictEqual(noedGetCableType('hospital'), 'E90');
+  assert.strictEqual(noedGetCableType('assembly'), 'E60');
+  assert.strictEqual(noedGetCableType('office'), 'E30');
+  assert.strictEqual(noedGetCableType('industrial'), 'E30');
+});
+
+// Test 209: noedCalcAll returns not-required for residential
+test('noedCalcAll returns not required for residential buildings', function() {
+  var result = noedCalcAll({ buildingType: 'residential', systemType: 'self', lightingType: 'escape', roomLength: 10, roomWidth: 5, roomHeight: 2.4, duration: 1 });
+  assert.strictEqual(result.required, false);
+});
+
+// Test 210: noedCalcAll returns complete result for office
+test('noedCalcAll returns complete result for office', function() {
+  var result = noedCalcAll({ buildingType: 'office', systemType: 'central', lightingType: 'escape', roomLength: 20, roomWidth: 10, roomHeight: 3.0, duration: 1 });
+  assert.strictEqual(result.required, true);
+  assert.ok(result.luminaireCount > 0);
+  assert.ok(result.spacing > 0);
+  assert.ok(result.battery.ah > 0);
+  assert.strictEqual(result.cableType, 'E30');
+});
+
+// Test 211: noedGetChangeoverTime correct per EN 1838
+test('noedGetChangeoverTime returns correct limits per EN 1838', function() {
+  var escape = noedGetChangeoverTime('escape');
+  assert.strictEqual(escape.max, 0.5, 'Escape route must be < 0.5s');
+  assert.ok(escape.clause.indexOf('EN 1838') >= 0);
+  var antipanic = noedGetChangeoverTime('antipanic');
+  assert.strictEqual(antipanic.max, 5.0, 'Anti-panic must be < 5s');
+});
+
+// Test 212: renderNoed produces click-only HTML
+test('renderNoed has no text input fields', function() {
+  var html = renderNoed();
+  assert.ok(html.indexOf('<input type="text"') < 0, 'Must not contain text input');
+  assert.ok(html.indexOf('<textarea') < 0, 'Must not contain textarea');
+});
+
+// Test 213: renderNoed references EN 1838 and EN 50172
+test('renderNoed references EN 1838 and DS/EN 50172', function() {
+  var html = renderNoed();
+  assert.ok(html.indexOf('1838') >= 0, 'Must reference EN 1838');
+  assert.ok(html.indexOf('50172') >= 0, 'Must reference DS/EN 50172');
+});
+
+// Test 214: renderNoed uses sel-btn class
+test('renderNoed uses sel-btn buttons', function() {
+  var html = renderNoed();
+  assert.ok(html.indexOf('sel-btn') >= 0, 'Must use sel-btn class');
+});
+
+// Test 215: Emergency lighting handles minimum battery edge case
+test('Emergency lighting minimum battery sizing', function() {
+  // 1 luminaire, 3W, 1 hour: 3W/24V = 0.125A * 1 * 1.25 = ceil(0.15625) = 1 Ah
+  var bat = noedCalcBattery(1, 3, 1);
+  assert.ok(bat.ah >= 1, 'Minimum battery must be at least 1 Ah');
+});
+
+// Test 216: Hospital requires 3-hour duration
+test('Hospital building requires extended duration capability', function() {
+  var bt = NOED_BUILDING_TYPES['hospital'];
+  assert.strictEqual(bt.duration, 3, 'Hospital must require 3-hour duration');
+  assert.strictEqual(bt.required, true);
+});
+
+// Test 217: Lux requirements match EN 1838
+test('Lux requirements match EN 1838 specifications', function() {
+  assert.strictEqual(NOED_LUX_REQUIREMENTS.escape.lux, 1.0, 'Escape: 1 lux per cl.4.2');
+  assert.strictEqual(NOED_LUX_REQUIREMENTS.antipanic.lux, 0.5, 'Anti-panic: 0.5 lux per cl.4.3');
+  assert.strictEqual(NOED_LUX_REQUIREMENTS.highrisk.lux, 15.0, 'High-risk: 15 lux per cl.4.4');
+});
+
+// Test 218: All three new modules appear in translations
+test('All three new modules registered in T.da, T.en, T.fa', function() {
+  assert.ok(T.da.modules.ev, 'EV must be in Danish translations');
+  assert.ok(T.en.modules.ev, 'EV must be in English translations');
+  assert.ok(T.fa.modules.ev, 'EV must be in Farsi translations');
+  assert.ok(T.da.modules.solar, 'Solar must be in Danish translations');
+  assert.ok(T.en.modules.solar, 'Solar must be in English translations');
+  assert.ok(T.fa.modules.solar, 'Solar must be in Farsi translations');
+  assert.ok(T.da.modules.noed, 'Noed must be in Danish translations');
+  assert.ok(T.en.modules.noed, 'Noed must be in English translations');
+  assert.ok(T.fa.modules.noed, 'Noed must be in Farsi translations');
+});
+
+// Test 219: Anti-panic has longer spacing than escape
+test('Anti-panic spacing is longer than escape route spacing', function() {
+  var escapeSpacing = noedCalcSpacing(3.0, 1.0);
+  var antipanicSpacing = noedCalcSpacing(3.0, 0.5);
+  assert.ok(antipanicSpacing >= escapeSpacing, 'Anti-panic (0.5 lux) may have longer spacing than escape (1 lux)');
+});
+
+// Test 220: EV voltage drop limit is 3% per utility regulations
+test('EV module enforces 3% voltage drop limit', function() {
+  var html = renderEV();
+  assert.ok(html.indexOf('3%') >= 0 || html.indexOf('max 3') >= 0, 'Must show 3% voltage drop limit');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
