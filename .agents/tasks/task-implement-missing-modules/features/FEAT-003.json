@@ -1,0 +1,24 @@
+{
+  "id": "FEAT-003",
+  "type": "fix",
+  "description": "Address priority issues 1-4 from 2025-06-20-review-v1.md: wire energyState to renderEnergy UI, add cable selection UI to renderCable3D, fix cable3dCalcHeatDissipation to use cable Iz instead of hardcoded 10A, and add Farsi translations for new module strings.",
+  "status": "in_progress",
+  "steps": [
+    "1. Add energyState object and wire renderEnergy UI to use it - profile buttons update state.profile, power slider updates state.powerKW, calculations use state values",
+    "2. Add cable selection UI to renderCable3D - add cable3dState.selectedCables array, buttons to add/remove cables by index, pass state to fill rate calculation",
+    "3. Fix cable3dCalcHeatDissipation to use cable Iz (rated capacity) instead of hardcoded 10A current",
+    "4. Add Farsi translations to _FA dictionary for thermal, cable3d, and energy module strings"
+  ],
+  "acceptance_criteria": [
+    "All 175 tests continue to pass",
+    "renderEnergy uses energyState to drive calculations with user-selected profile and power",
+    "renderCable3D allows user to add/remove cables via buttons and uses selected cables for fill rate",
+    "cable3dCalcHeatDissipation uses cable Iz values instead of hardcoded 10A",
+    "Farsi translations exist in _FA for key thermal, cable3d, and energy labels"
+  ],
+  "verification": [
+    "node /projects/sandbox/Claude/test-sld.js 2>&1 | grep 'Results:' should show 175 passed, 0 failed"
+  ],
+  "blocked_reason": null,
+  "findings": null
+}
