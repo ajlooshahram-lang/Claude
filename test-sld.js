@@ -7640,6 +7640,89 @@ test('Guide: glossary defines the core beginner terms (IB, In, Iz, Zs, RCD, TN/T
   });
 });
 
+// ===== PROFESSIONAL SINGLE-LINE DIAGRAM (buildSLD) =====
+test('SLD: buildSLD returns a non-empty inline SVG string', function() {
+  var out = buildSLD();
+  assert(typeof out === 'string' && out.length > 200, 'output is a substantial string');
+  assert(out.indexOf('<svg') >= 0 && out.indexOf('</svg>') >= 0, 'contains an <svg> element');
+});
+
+test('SLD: renders in da, en and fa without crashing', function() {
+  var saved = lang;
+  ['da', 'en', 'fa'].forEach(function(L) {
+    lang = L;
+    var out = buildSLD();
+    assert(typeof out === 'string' && out.indexOf('<svg') >= 0, 'svg produced for lang=' + L);
+  });
+  lang = saved;
+});
+
+test('SLD: is click-only — no text inputs or textareas', function() {
+  var saved = lang; lang = 'en';
+  var out = buildSLD();
+  assert(out.indexOf('<input') < 0, 'no <input> element');
+  assert(out.indexOf('<textarea') < 0, 'no <textarea> element');
+  lang = saved;
+});
+
+test('SLD: includes the current-flow animation hook', function() {
+  var out = buildSLD();
+  assert(out.indexOf('sld-flow') >= 0, 'conductors carry the marching-dash flow class');
+  assert(out.indexOf('sld-bus') >= 0, 'busbar carries the energised-glow class');
+  assert(out.indexOf('sld-dev') >= 0, 'protective devices carry the pulse class');
+});
+
+test('SLD: includes a bilingual symbol legend / key (IEC 60617)', function() {
+  var saved = lang;
+  lang = 'en'; var en = buildSLD();
+  assert(en.indexOf('SYMBOL KEY') >= 0 && en.indexOf('IEC 60617') >= 0, 'EN legend header present');
+  lang = 'da'; var da = buildSLD();
+  assert(da.indexOf('SYMBOLFORKLARING') >= 0, 'DA legend header present');
+  lang = saved;
+});
+
+test('SLD: draws recognised electrical symbols (transformer, motor, earth)', function() {
+  var saved = lang; lang = 'en';
+  var out = buildSLD();
+  assert(out.indexOf('PE') >= 0, 'protective earth labelled');
+  assert(out.indexOf('>M<') >= 0, 'motor symbol carries an M');
+  assert(out.indexOf('kVA') >= 0, 'transformer rating shown from data');
+  lang = saved;
+});
+
+test('SLD: teaches the reading order and the core IB <= In <= Iz rule', function() {
+  var saved = lang; lang = 'en';
+  var out = buildSLD();
+  assert(out.indexOf('How to read it') >= 0, 'includes the how-to-read teaching note');
+  assert(out.indexOf('IB \u2264 In \u2264 Iz') >= 0, 'states the coordination rule');
+  lang = saved;
+});
+
+test('SLD: does not crash on an empty load list (uses sample) nor on a typical list', function() {
+  var savedList = loadList.slice();
+  loadList.length = 0;
+  var empty = buildSLD();
+  assert(empty.indexOf('<svg') >= 0, 'renders with empty load list');
+  loadList.push({ kW: 11, cos: 0.9, sf: 1, phase: '3', name: 'EV' });
+  loadList.push({ kW: 2, cos: 0.95, sf: 0.6, phase: 'L1', name: 'Stik' });
+  var typical = buildSLD();
+  assert(typical.indexOf('<svg') >= 0, 'renders with a typical load list');
+  assert(typical.indexOf('EV') >= 0, 'shows a real circuit name from the data');
+  loadList.length = 0;
+  savedList.forEach(function(x) { loadList.push(x); });
+});
+
+test('SLD: never invents an RCD where the node data has none', function() {
+  var out = buildSLD();
+  assert(out.toLowerCase().indexOf('rcd') < 0 && out.indexOf('HPFI') < 0, 'no fabricated residual-current device');
+});
+
+test('SLD: CSS respects prefers-reduced-motion and defines the flow keyframes', function() {
+  assert(html.indexOf('prefers-reduced-motion') >= 0, 'reduced-motion media query present');
+  assert(html.indexOf('@keyframes sldFlow') >= 0, 'sldFlow keyframes defined');
+  assert(html.indexOf('stroke-dashoffset') >= 0, 'marching-dash uses stroke-dashoffset');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
