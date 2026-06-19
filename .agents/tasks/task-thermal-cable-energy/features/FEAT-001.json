@@ -29,5 +29,5 @@
     "Verify each new module appears in T.da.modules, T.en.modules, and T.fa.modules"
   ],
   "blocked_reason": null,
-  "findings": "All 160 tests pass (110 existing + 50 new). Thermal module uses thermalState.loadFactor internally so tests must account for this. Color thresholds: blue <=0.5, green <=0.7, yellow <=0.85, red <=1.0, darkred >1.0 of max temp."
+  "findings": "All 160 tests pass (110 existing + 50 new). Thermal module uses thermalState.loadFactor internally so tests must account for this. Color thresholds: blue <=0.5, green <=0.7, yellow <=0.85, red <=1.0, darkred >1.0 of max temp. Review fixes applied: (1) THERMAL_AMPACITY_TABLE added with proper Iz lookup per cross-section/method/type, (2) thermalCalcDerating now accepts optional cableType param, (3) PQ section labeled illustrative, (4) cable3dCalcGroupDerating extrapolates beyond 9 with warning, (5) CABLE3D_GROUP_DERATING consolidated as reference to THERMAL_GROUP_FACTORS."
 }
