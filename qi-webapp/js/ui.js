@@ -565,6 +565,7 @@
           <div class="globe-controls" id="globeControls" hidden>
             <button class="globe-btn" id="globeTour" type="button">▶ Cinematic tour</button>
             <button class="globe-btn is-on" id="globeSpin" type="button" aria-pressed="true">⏸ Rotation</button>
+            <button class="globe-btn" id="globeRecenter" type="button">⊕ Recenter</button>
             <button class="globe-btn" id="globeFullscreen" type="button">⛶ Fullscreen</button>
             <button class="globe-btn" id="globeScreenshot" type="button">📷 Screenshot</button>
           </div>
@@ -910,6 +911,9 @@
     // HUD buttons
     if (tourBtn) tourBtn.addEventListener("click", () => G.toggleTour());
     if (spinBtn) spinBtn.addEventListener("click", () => G.toggleSpin());
+    // Recenter / calibrate — fly back to the default head-on framing.
+    const recenterBtn = $("#globeRecenter");
+    if (recenterBtn) recenterBtn.addEventListener("click", () => { G.resetView(); toast("View recentred."); });
 
     // Fullscreen toggle (step 49)
     const fsBtn = $("#globeFullscreen");
@@ -928,6 +932,13 @@
       document.addEventListener(evt, () => {
         var isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
         if (fsBtn) fsBtn.textContent = isFs ? "\u26F6 Exit fullscreen" : "\u26F6 Fullscreen";
+        // The stage changes size on fullscreen enter/exit — nudge the renderer
+        // to re-measure so the globe stays correctly framed (no stretch/off-centre).
+        try { window.dispatchEvent(new window.Event("resize")); } catch (e) {}
+        if (typeof window.requestAnimationFrame === "function") {
+          window.requestAnimationFrame(() => { try { window.dispatchEvent(new window.Event("resize")); } catch (e) {} });
+        }
+        window.setTimeout(() => { try { window.dispatchEvent(new window.Event("resize")); } catch (e) {} }, 120);
       });
     });
 

@@ -626,14 +626,45 @@
         var toQ = new THREE.Quaternion().setFromUnitVectors(u, new THREE.Vector3(0, 0, 1));
         var curR = camera.position.length() || camDist;
         var ang = 0; try { ang = world.quaternion.angleTo(toQ); } catch (e) { ang = 0; }
+        // The focus model rotates the GLOBE so the chosen point faces the +Z
+        // axis. If the user has orbited the camera off +Z (via OrbitControls),
+        // the point would no longer face them — so we also fly the CAMERA back
+        // onto the +Z axis. This guarantees the selected place ends up centred,
+        // facing the viewer head-on (the "calibration" the globe was missing).
+        var fromCamDir = (camera.position.lengthSq() > 1e-6)
+          ? camera.position.clone().normalize()
+          : new THREE.Vector3(0, 0, 1);
         focusAnim = {
           fromQ: world.quaternion.clone(), toQ: toQ,
           fromR: curR, toR: radius || 3.6,
+          fromCamDir: fromCamDir, toCamDir: new THREE.Vector3(0, 0, 1),
           // Google-Earth-style flight: pull the camera back mid-hop then zoom
           // in, scaled to how far we're turning (bigger turn = higher arc).
           arc: Math.min(2.6, ang * 1.5),
           t: 0, dur: ang > 0.5 ? 1.5 : 0.9
         };
+      }
+
+      // Re-centre / reset the framing to the default "home" view — the explicit
+      // calibration control. Gently flies back to the head-on globe shot,
+      // clears any selection, and resumes the idle rotation.
+      function resetView() {
+        selectedId = null;
+        applyHighlight(null, null);
+        if (selectHandler) try { selectHandler(null); } catch (e) {}
+        var homeQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.32, -1.9, 0, "XYZ"));
+        var fromCamDir = (camera.position.lengthSq() > 1e-6)
+          ? camera.position.clone().normalize()
+          : new THREE.Vector3(0, 0, 1);
+        focusAnim = {
+          fromQ: world.quaternion.clone(), toQ: homeQ,
+          fromR: camera.position.length() || camDist, toR: camDist,
+          fromCamDir: fromCamDir, toCamDir: new THREE.Vector3(0, 0, 1),
+          arc: 0, t: 0, dur: 0.9
+        };
+        spinEnabled = true;
+        if (controls) controls.autoRotate = true;
+        if (spinHandler) try { spinHandler(true); } catch (e) {}
       }
 
       // Visually emphasise the selection: pulse a station beacon / brighten a cable.
@@ -924,12 +955,13 @@
 
       /* ------------------------------------------------------------- resize */
       function resize() {
-        var w = containerEl.clientWidth || width;
-        var h = containerEl.clientHeight || height;
+        var rect = containerEl.getBoundingClientRect ? containerEl.getBoundingClientRect() : null;
+        var w = (rect && rect.width) || containerEl.clientWidth || width;
+        var h = (rect && rect.height) || containerEl.clientHeight || height;
         if (!w || !h) return;
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
-        renderer.setSize(w, h);
+        renderer.setSize(w, h, false);
         if (composer) composer.setSize(w, h);
         if (bloomPass && bloomPass.setSize) bloomPass.setSize(w, h);
         if (fxaaPass) {
@@ -944,6 +976,13 @@
         ro.observe(containerEl);
       }
       window.addEventListener("resize", resize);
+
+      // Calibrate the aspect/size once layout has settled. On first mount the
+      // stage may still be sizing (fonts, flex/grid, the view transition), which
+      // would otherwise bake a wrong aspect ratio and leave the globe off-centre
+      // or distorted. A few deferred passes guarantee a correctly-framed globe.
+      if (typeof window.requestAnimationFrame === "function") window.requestAnimationFrame(resize);
+      if (typeof window.setTimeout === "function") { window.setTimeout(resize, 60); window.setTimeout(resize, 260); }
 
       /* --------------------------------------------------- animation loop -- */
       var clock = new THREE.Clock();
@@ -963,7 +1002,16 @@
           world.quaternion.copy(focusAnim.fromQ).slerp(focusAnim.toQ, e);
           var r = focusAnim.fromR + (focusAnim.toR - focusAnim.fromR) * e;
           if (focusAnim.arc) r += Math.sin(Math.PI * e) * focusAnim.arc; // Google-Earth arc: out then in
-          if (camera.position.lengthSq() > 1e-6) camera.position.normalize().multiplyScalar(r);
+          if (focusAnim.fromCamDir && focusAnim.toCamDir) {
+            // Fly the camera direction onto the target axis so the focused
+            // point ends up centred & facing the viewer (fixes off-centre
+            // framing after the user has orbited the globe).
+            var cd = focusAnim.fromCamDir.clone().lerp(focusAnim.toCamDir, e);
+            if (cd.lengthSq() > 1e-6) camera.position.copy(cd.normalize().multiplyScalar(r));
+          } else if (camera.position.lengthSq() > 1e-6) {
+            camera.position.normalize().multiplyScalar(r);
+          }
+          if (controls && controls.target) camera.lookAt(controls.target);
           if (controls) controls.update();
           if (k >= 1) focusAnim = null;
         } else if (controls) {
@@ -1048,6 +1096,7 @@
           selectStation: selectStation,
           selectCable: selectCable,
           clearSelection: clearSelection,
+          resetView: resetView,
           startTour: startTour,
           stopTour: stopTour,
           isTouring: function () { return !!tourState.active; },
@@ -1200,6 +1249,7 @@
     focusStation: function (id) { return apiCall("selectStation", id); },
     focusCable: function (id) { return apiCall("selectCable", id); },
     clearSelection: function () { return apiCall("clearSelection"); },
+    resetView: function () { return apiCall("resetView"); },
     startTour: function () { return apiCall("startTour"); },
     stopTour: function () { return apiCall("stopTour"); },
     toggleTour: function () { return apiCall(apiCall("isTouring") ? "stopTour" : "startTour"); },

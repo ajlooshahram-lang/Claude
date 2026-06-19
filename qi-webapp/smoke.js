@@ -1767,5 +1767,14 @@ if (window.QIDisplay) {
   ok(hud && hud.hasAttribute("hidden"), "tour HUD is hidden until the tour starts");
 })();
 
+// Step 118: Globe calibration — Recenter control + resetView API are present
+(function testGlobeRecenter() {
+  ok(typeof window.QIGlobe.resetView === "function", "QIGlobe exposes resetView() so the globe can be re-centred/calibrated");
+  var gnav = doc.querySelector('.nav-item[data-view="globe3d"]');
+  if (gnav) gnav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(doc.getElementById("globeRecenter") != null, "3D map renders a Recenter (calibrate) button");
+  ok(typeof window.QIGlobe.focusStation === "function", "QIGlobe exposes focusStation() so a place can be centred head-on");
+})();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
