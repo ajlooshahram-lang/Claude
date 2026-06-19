@@ -1,0 +1,38 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Full Cascade Time-Current Coordination View - click a final circuit to overlay ALL devices in the path (transformer to final circuit) on one log-log TCC chart with interactive fault current cursor and selectivity zone highlighting",
+  "status": "in_progress",
+  "steps": [
+    "Add 'tcc' module to T.da/T.en/T.fa modules objects with names like 'Kaskade-TCC'/'Cascade TCC'/'TCC آبشاری'",
+    "Add 'case tcc: content = renderCascadeTCC(); break;' to the renderModule switch statement",
+    "Create tccState object: { selectedNodeId: null, tree: null, cursorCurrent: 1000 }",
+    "Create function tccGetPathDevices(tree, nodeId) that uses sldGetPath() to collect all protection devices along the path from transformer root to the selected final circuit node, returning array of {nodeId, device, In, depth, name} objects",
+    "Create function tccRenderCascadeChart(devices, cursorCurrent) that renders a log-log SVG TCC chart (reusing the scale/grid logic from sldRenderTCCChart at line 6166) but supports N overlaid device curves with distinct colors per device (using a color palette: blue for main MCCB, orange for sub-board, green for final circuit MCB, red for fuse)",
+    "Add draggable/clickable vertical 'fault current' cursor line on the chart - implemented as SVG rect overlay with onclick handlers at discrete current values (click-only, no drag since no typing). Use button row below chart: [100A] [500A] [1kA] [2kA] [5kA] [10kA] [20kA] [50kA] to set cursor position",
+    "Create function tccGetTripOrder(devices, faultCurrent) that for a given fault current, queries each device curve to find trip time and returns ordered list of which device trips first/second/etc. Use interpolation on sldDeviceCurve() points",
+    "Add grading margin display: for adjacent devices in the path, calculate time gap between their trip times at the cursor current. Display as annotation text on chart (e.g., 'margin: 0.15s' between curves)",
+    "Add selectivity zone highlighting: sweep fault currents across the range and color the background green where downstream trips first (selective) and red where upstream trips first or times overlap (non-selective). Implement as SVG rects behind the curves",
+    "Create function renderCascadeTCC() with click-only UI: top section shows tree node selector (buttons for each final circuit in the active tree), chart section shows the cascade TCC, bottom section shows trip order table at current cursor position and grading margins",
+    "Create function tccSelectNode(nodeId) that updates tccState.selectedNodeId and re-renders the module",
+    "Integrate with existing SLD tree: use sldState.tree (from the SLD module) or brainState.generatedTree as the source tree",
+    "Ensure trilingual labels on chart axes, legend, and trip order table"
+  ],
+  "acceptance_criteria": [
+    "Clicking a final circuit node shows ALL protection devices in the path on one TCC chart",
+    "Multiple device curves rendered with distinct colors and legend",
+    "Fault current cursor buttons allow selecting discrete current levels (click-only)",
+    "Trip order table shows which device trips first at the selected cursor current",
+    "Grading margin between adjacent devices is displayed",
+    "Selectivity zones are visually highlighted (green=selective, red=non-selective)",
+    "Uses existing sldDeviceCurve() and sldGetPath() functions",
+    "renderCascadeTCC() returns HTML with no text input fields",
+    "All 70 existing tests pass plus new tests for cascade TCC functions"
+  ],
+  "verification": [
+    "node -e \"const fs=require('fs'); const html=fs.readFileSync('el-dimensionering.html','utf8'); const m=html.match(/<script>([\\s\\S]*?)<\\/script>/); if(!m){process.exit(1);} try{new Function(m[1]); console.log('Syntax OK');}catch(e){console.error(e.message); process.exit(1);}\"",
+    "node test-sld.js"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

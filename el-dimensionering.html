@@ -643,7 +643,8 @@ const T = {
       draw: 'Tegning',
       exam: '\uD83C\uDF93 Eksamen',
       brain: 'El-Hjerne',
-      pdf: 'Dokumentation'
+      pdf: 'Dokumentation',
+      tcc: 'Kaskade-TCC'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -745,7 +746,8 @@ const T = {
       draw: 'Drawing',
       exam: '\uD83C\uDF93 Exam',
       brain: 'Brain',
-      pdf: 'Documentation'
+      pdf: 'Documentation',
+      tcc: 'Cascade TCC'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -839,7 +841,8 @@ const T = {
       draw: 'نقشه',
       exam: '🎓 آزمون',
       brain: 'مغز برقی',
-      pdf: 'مستندات'
+      pdf: 'مستندات',
+      tcc: 'TCC آبشاری'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -2712,6 +2715,7 @@ function renderModule(mod) {
     case 'exam': content = renderExam(); break;
     case 'brain': content = renderBrain(); break;
     case 'pdf': content = renderPDF(); break;
+    case 'tcc': content = renderCascadeTCC(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -8098,6 +8102,438 @@ function pdfDoGenerate() {
     pdfGeneratePackage(tree);
     renderModule('pdf');
   }
+}
+
+
+// ===== CASCADE TCC MODULE =====
+// Full cascade time-current coordination view per DS/HD 60364-5-53 cl.536
+
+var tccState = { selectedNodeId: null, tree: null, cursorCurrent: 1000 };
+
+function tccGetTree() {
+  if (sldTree) return sldTree;
+  if (typeof brainState !== 'undefined' && brainState.generatedTree) return brainState.generatedTree;
+  return null;
+}
+
+function tccGetPathDevices(tree, nodeId) {
+  // Returns array of {nodeId, device, In, depth, name} for all protected nodes
+  // from transformer root to the selected node
+  if (!tree || !nodeId) return [];
+  var path = sldGetPath(tree, nodeId);
+  var devices = [];
+  for (var i = 0; i < path.length; i++) {
+    var node = tree.nodes[path[i]];
+    if (!node || !node.protection) continue;
+    var name = node.name_da || node.name_en || node.type;
+    if (typeof lang !== 'undefined' && lang === 'en' && node.name_en) name = node.name_en;
+    if (typeof lang !== 'undefined' && lang === 'fa' && node.name_fa) name = node.name_fa;
+    devices.push({
+      nodeId: path[i],
+      device: node.protection,
+      In: node.protectionIn || node.protection.rating || 0,
+      depth: i,
+      name: name
+    });
+  }
+  return devices;
+}
+
+function tccGetTripOrder(devices, faultCurrent) {
+  // For a given fault current, find trip time for each device and return ordered list
+  // Uses linear interpolation on log-log scale of sldDeviceCurve() points
+  if (!devices || devices.length === 0 || !faultCurrent) return [];
+  var results = [];
+  for (var i = 0; i < devices.length; i++) {
+    var d = devices[i];
+    var curve = sldDeviceCurve(d.device, d.In, null);
+    if (!curve || curve.length === 0) {
+      results.push({ name: d.name, nodeId: d.nodeId, depth: d.depth, tMin: null, tMax: null, trips: false });
+      continue;
+    }
+    // Sort by current
+    var sorted = curve.slice().sort(function(a, b) { return a.i - b.i; });
+    // Check if fault current is in range
+    if (faultCurrent < sorted[0].i) {
+      results.push({ name: d.name, nodeId: d.nodeId, depth: d.depth, tMin: null, tMax: null, trips: false });
+      continue;
+    }
+    // Interpolate on log-log scale
+    var tMin = null, tMax = null;
+    if (faultCurrent >= sorted[sorted.length - 1].i) {
+      // Beyond last point - use last point values
+      tMin = sorted[sorted.length - 1].tMin;
+      tMax = sorted[sorted.length - 1].tMax;
+    } else {
+      // Find bracketing points
+      for (var j = 0; j < sorted.length - 1; j++) {
+        if (faultCurrent >= sorted[j].i && faultCurrent <= sorted[j + 1].i) {
+          var logI = Math.log10(faultCurrent);
+          var logI1 = Math.log10(sorted[j].i);
+          var logI2 = Math.log10(sorted[j + 1].i);
+          var frac = (logI2 > logI1) ? (logI - logI1) / (logI2 - logI1) : 0;
+          var logTMin1 = Math.log10(Math.max(0.001, sorted[j].tMin));
+          var logTMin2 = Math.log10(Math.max(0.001, sorted[j + 1].tMin));
+          var logTMax1 = Math.log10(Math.max(0.001, sorted[j].tMax));
+          var logTMax2 = Math.log10(Math.max(0.001, sorted[j + 1].tMax));
+          tMin = Math.pow(10, logTMin1 + frac * (logTMin2 - logTMin1));
+          tMax = Math.pow(10, logTMax1 + frac * (logTMax2 - logTMax1));
+          break;
+        }
+      }
+    }
+    results.push({ name: d.name, nodeId: d.nodeId, depth: d.depth, tMin: tMin, tMax: tMax, trips: (tMin !== null) });
+  }
+  // Sort by tMax (fastest first) - device that trips first
+  results.sort(function(a, b) {
+    if (!a.trips && !b.trips) return 0;
+    if (!a.trips) return 1;
+    if (!b.trips) return -1;
+    return (a.tMax || 9999) - (b.tMax || 9999);
+  });
+  return results;
+}
+
+function tccRenderCascadeChart(devices, cursorCurrent) {
+  // Renders a log-log SVG TCC chart with N overlaid device curves
+  if (!devices || devices.length === 0) return '<p>' + tx('Ingen enheder fundet', 'No devices found') + '</p>';
+
+  var w = 650, h = 520;
+  var ml = 70, mr = 30, mt = 40, mb = 50;
+  var pw = w - ml - mr, ph = h - mt - mb;
+
+  var xMin = 1, xMax = 100000;
+  var yMin = 0.001, yMax = 10000;
+  var logXMin = Math.log10(xMin), logXMax = Math.log10(xMax);
+  var logYMin = Math.log10(yMin), logYMax = Math.log10(yMax);
+
+  function xPos(current) {
+    if (current <= 0) return ml;
+    var logI = Math.log10(current);
+    return ml + ((logI - logXMin) / (logXMax - logXMin)) * pw;
+  }
+  function yPos(time) {
+    if (time <= 0) return mt + ph;
+    var logT = Math.log10(time);
+    return mt + ph - ((logT - logYMin) / (logYMax - logYMin)) * ph;
+  }
+
+  // Color palette for devices by depth/role
+  var colors = [
+    { fill: 'rgba(37,99,235,0.2)', stroke: '#2563eb', label: 'blue' },
+    { fill: 'rgba(234,88,12,0.2)', stroke: '#ea580c', label: 'orange' },
+    { fill: 'rgba(22,163,74,0.2)', stroke: '#16a34a', label: 'green' },
+    { fill: 'rgba(220,38,38,0.2)', stroke: '#dc2626', label: 'red' },
+    { fill: 'rgba(147,51,234,0.2)', stroke: '#9333ea', label: 'purple' },
+    { fill: 'rgba(14,116,144,0.2)', stroke: '#0e7490', label: 'teal' }
+  ];
+
+  var svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;max-width:650px;height:auto;background:#fafbfc;border:1px solid var(--border,#ddd);border-radius:8px" xmlns="http://www.w3.org/2000/svg">';
+
+  // Grid lines
+  svg += '<g stroke="#e0e0e0" stroke-width="0.5">';
+  for (var gx = 0; gx <= 5; gx++) {
+    var xg = ml + (gx / 5) * pw;
+    svg += '<line x1="' + xg + '" y1="' + mt + '" x2="' + xg + '" y2="' + (mt + ph) + '"/>';
+  }
+  for (var gy = 0; gy <= 7; gy++) {
+    var yg = mt + (gy / 7) * ph;
+    svg += '<line x1="' + ml + '" y1="' + yg + '" x2="' + (ml + pw) + '" y2="' + yg + '"/>';
+  }
+  svg += '</g>';
+
+  // Axes
+  svg += '<line x1="' + ml + '" y1="' + mt + '" x2="' + ml + '" y2="' + (mt + ph) + '" stroke="#333" stroke-width="1.5"/>';
+  svg += '<line x1="' + ml + '" y1="' + (mt + ph) + '" x2="' + (ml + pw) + '" y2="' + (mt + ph) + '" stroke="#333" stroke-width="1.5"/>';
+
+  // X-axis labels
+  var xLabels = [1, 10, 100, 1000, 10000, 100000];
+  for (var xi = 0; xi < xLabels.length; xi++) {
+    var xlv = xLabels[xi];
+    var xlx = xPos(xlv);
+    var xlLabel = xlv >= 1000 ? (xlv / 1000) + 'kA' : xlv + 'A';
+    svg += '<text x="' + xlx + '" y="' + (mt + ph + 20) + '" text-anchor="middle" font-size="9" fill="#555">' + xlLabel + '</text>';
+  }
+  // Y-axis labels
+  var yLabels = [0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000];
+  for (var yi = 0; yi < yLabels.length; yi++) {
+    var ylv = yLabels[yi];
+    var yly = yPos(ylv);
+    var ylLabel = ylv >= 1 ? ylv + 's' : (ylv * 1000) + 'ms';
+    svg += '<text x="' + (ml - 5) + '" y="' + (yly + 3) + '" text-anchor="end" font-size="9" fill="#555">' + ylLabel + '</text>';
+  }
+
+  // Axis titles
+  svg += '<text x="' + (ml + pw / 2) + '" y="' + (h - 5) + '" text-anchor="middle" font-size="10" fill="#333">' + tx('Strom (A)', 'Current (A)') + '</text>';
+  svg += '<text x="15" y="' + (mt + ph / 2) + '" text-anchor="middle" font-size="10" fill="#333" transform="rotate(-90,15,' + (mt + ph / 2) + ')">' + tx('Tid (s)', 'Time (s)') + '</text>';
+
+  // Selectivity zone highlighting - sweep currents to determine zones
+  if (devices.length >= 2) {
+    var sweepCurrents = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000];
+    var lastSelective = null;
+    var zoneStart = null;
+    for (var si = 0; si < sweepCurrents.length; si++) {
+      var sc = sweepCurrents[si];
+      var order = tccGetTripOrder(devices, sc);
+      // Selective if deepest device (largest depth) trips first
+      var selective = false;
+      if (order.length >= 2 && order[0].trips) {
+        var maxDepth = 0;
+        for (var od = 0; od < order.length; od++) {
+          if (order[od].trips && order[od].depth > maxDepth) maxDepth = order[od].depth;
+        }
+        selective = (order[0].depth === maxDepth);
+      }
+      if (lastSelective === null) {
+        zoneStart = sc;
+        lastSelective = selective;
+      } else if (selective !== lastSelective || si === sweepCurrents.length - 1) {
+        var zoneEnd = (si === sweepCurrents.length - 1) ? sc : sweepCurrents[si - 1];
+        if (si === sweepCurrents.length - 1 && selective === lastSelective) zoneEnd = sc;
+        var zoneColor = lastSelective ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)';
+        var zx1 = xPos(zoneStart);
+        var zx2 = xPos(zoneEnd);
+        if (zx2 > zx1) {
+          svg += '<rect x="' + zx1 + '" y="' + mt + '" width="' + (zx2 - zx1) + '" height="' + ph + '" fill="' + zoneColor + '"/>';
+        }
+        zoneStart = sc;
+        lastSelective = selective;
+      }
+    }
+  }
+
+  // Draw device curves
+  for (var di = 0; di < devices.length; di++) {
+    var dev = devices[di];
+    var curve = sldDeviceCurve(dev.device, dev.In, null);
+    if (!curve || curve.length < 2) continue;
+    var col = colors[di % colors.length];
+    var sortedCurve = curve.slice().sort(function(a, b) { return a.i - b.i; });
+
+    // Build filled band path
+    var pathMin = '', revMax = '';
+    var validPts = 0;
+    for (var ci = 0; ci < sortedCurve.length; ci++) {
+      var pt = sortedCurve[ci];
+      var px = xPos(pt.i);
+      var pyMin = yPos(pt.tMin);
+      var pyMax = yPos(pt.tMax);
+      if (px < ml || px > ml + pw) continue;
+      pyMin = Math.max(mt, Math.min(mt + ph, pyMin));
+      pyMax = Math.max(mt, Math.min(mt + ph, pyMax));
+      if (validPts === 0) {
+        pathMin = 'M' + px + ',' + pyMin;
+      } else {
+        pathMin += ' L' + px + ',' + pyMin;
+      }
+      validPts++;
+    }
+    for (var ri = sortedCurve.length - 1; ri >= 0; ri--) {
+      var rpt = sortedCurve[ri];
+      var rpx = xPos(rpt.i);
+      var rpyMax = yPos(rpt.tMax);
+      if (rpx < ml || rpx > ml + pw) continue;
+      rpyMax = Math.max(mt, Math.min(mt + ph, rpyMax));
+      revMax += ' L' + rpx + ',' + rpyMax;
+    }
+    if (validPts > 1) {
+      var band = pathMin + revMax + ' Z';
+      svg += '<path d="' + band + '" fill="' + col.fill + '" stroke="' + col.stroke + '" stroke-width="1.5" opacity="0.7"/>';
+    }
+  }
+
+  // Draw cursor line
+  if (cursorCurrent && cursorCurrent >= xMin && cursorCurrent <= xMax) {
+    var cx = xPos(cursorCurrent);
+    svg += '<line x1="' + cx + '" y1="' + mt + '" x2="' + cx + '" y2="' + (mt + ph) + '" stroke="#b91c1c" stroke-width="2" stroke-dasharray="6,3"/>';
+    var curLabel = cursorCurrent >= 1000 ? (cursorCurrent / 1000) + 'kA' : cursorCurrent + 'A';
+    svg += '<text x="' + (cx + 3) + '" y="' + (mt + 12) + '" font-size="9" font-weight="bold" fill="#b91c1c">' + curLabel + '</text>';
+
+    // Draw intersection dots and grading margins
+    var tripOrder = tccGetTripOrder(devices, cursorCurrent);
+    var prevTMax = null;
+    var prevY = null;
+    for (var ti = 0; ti < tripOrder.length; ti++) {
+      if (!tripOrder[ti].trips) continue;
+      var tripT = (tripOrder[ti].tMin + tripOrder[ti].tMax) / 2;
+      var dotY = yPos(tripT);
+      var dotCol = '#b91c1c';
+      // Find original device index for color
+      for (var dci = 0; dci < devices.length; dci++) {
+        if (devices[dci].nodeId === tripOrder[ti].nodeId) {
+          dotCol = colors[dci % colors.length].stroke;
+          break;
+        }
+      }
+      svg += '<circle cx="' + cx + '" cy="' + dotY + '" r="4" fill="' + dotCol + '" stroke="#fff" stroke-width="1"/>';
+
+      // Grading margin annotation between adjacent tripping devices
+      if (prevTMax !== null && tripOrder[ti].tMax) {
+        var margin = tripOrder[ti].tMax - prevTMax;
+        if (margin > 0) {
+          var marginY = (prevY + dotY) / 2;
+          svg += '<text x="' + (cx + 8) + '" y="' + marginY + '" font-size="8" fill="#6b7280">' + tx('margin: ', 'margin: ') + margin.toFixed(3) + 's</text>';
+        }
+      }
+      prevTMax = tripOrder[ti].tMax;
+      prevY = dotY;
+    }
+  }
+
+  // Legend
+  var legendX = ml + pw - 160;
+  var legendY = mt + 5;
+  var legendH = 15 * devices.length + 10;
+  svg += '<rect x="' + legendX + '" y="' + legendY + '" width="155" height="' + legendH + '" fill="rgba(255,255,255,0.92)" stroke="#ccc" rx="4"/>';
+  for (var li = 0; li < devices.length; li++) {
+    var lCol = colors[li % colors.length];
+    var ly = legendY + 15 + li * 15;
+    svg += '<line x1="' + (legendX + 5) + '" y1="' + ly + '" x2="' + (legendX + 25) + '" y2="' + ly + '" stroke="' + lCol.stroke + '" stroke-width="3"/>';
+    var devLabel = devices[li].name + ' (' + devices[li].In + 'A)';
+    if (devLabel.length > 20) devLabel = devLabel.substring(0, 18) + '..';
+    svg += '<text x="' + (legendX + 30) + '" y="' + (ly + 4) + '" font-size="8" fill="#333">' + devLabel + '</text>';
+  }
+
+  // Chart title
+  svg += '<text x="' + (ml + pw / 2) + '" y="' + (mt - 15) + '" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">' + tx('Kaskade tid-strom karakteristik (DS/HD 60364-5-53)', 'Cascade Time-Current Characteristic (DS/HD 60364-5-53)') + '</text>';
+
+  svg += '</svg>';
+  return svg;
+}
+
+function tccSelectNode(nodeId) {
+  tccState.selectedNodeId = nodeId;
+  renderModule('tcc');
+}
+
+function tccSetCursor(current) {
+  tccState.cursorCurrent = current;
+  renderModule('tcc');
+}
+
+function tccGetFinalCircuits(tree) {
+  // Get all final circuit nodes from the tree
+  if (!tree || !tree.nodes) return [];
+  var finals = [];
+  var keys = Object.keys(tree.nodes);
+  for (var i = 0; i < keys.length; i++) {
+    var node = tree.nodes[keys[i]];
+    if (node.type === 'final_circuit') {
+      finals.push(node);
+    }
+  }
+  return finals;
+}
+
+function renderCascadeTCC() {
+  var tree = tccGetTree();
+  tccState.tree = tree;
+  var html = '';
+
+  html += '<div class="card"><h2 class="card-title">' + tx('Kaskade TCC - Tid/Strom Koordinering (DS/HD 60364-5-53 cl.536)', 'Cascade TCC - Time/Current Coordination (DS/HD 60364-5-53 cl.536)') + '</h2>';
+  html += '<p class="info-row">' + tx('Vis ALLE beskyttelsesenheder fra trafo til slutkreds paa eet log-log diagram. Klik paa en slutkreds for at se kaskaden.', 'Show ALL protection devices from transformer to final circuit on one log-log chart. Click a final circuit to see the cascade.') + '</p></div>';
+
+  if (!tree) {
+    html += '<div class="card"><p style="color:#ff851b">' + tx('Ingen installationsplan fundet. Opret en i SLD- eller El-Hjerne-modulet forst.', 'No installation plan found. Create one in the SLD or Brain module first.') + '</p></div>';
+    return html;
+  }
+
+  // Node selector - buttons for each final circuit
+  var finals = tccGetFinalCircuits(tree);
+  html += '<div class="card"><div class="card-title">' + tx('1. Vaelg slutkreds', '1. Select Final Circuit') + '</div>';
+  html += '<div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin:0.5rem 0">';
+  for (var i = 0; i < finals.length; i++) {
+    var fc = finals[i];
+    var fcName = fc.name_da || fc.name_en || 'Circuit';
+    if (typeof lang !== 'undefined' && lang === 'en' && fc.name_en) fcName = fc.name_en;
+    if (typeof lang !== 'undefined' && lang === 'fa' && fc.name_fa) fcName = fc.name_fa;
+    var sel = (tccState.selectedNodeId === fc.id) ? ' selected' : '';
+    html += '<button class="sel-btn' + sel + '" onclick="tccSelectNode(\'' + fc.id + '\')">' + fcName + '</button>';
+  }
+  html += '</div></div>';
+
+  // If a node is selected, render the chart and trip info
+  if (tccState.selectedNodeId) {
+    var devices = tccGetPathDevices(tree, tccState.selectedNodeId);
+    if (devices.length === 0) {
+      html += '<div class="card"><p style="color:#ff851b">' + tx('Ingen beskyttelsesenheder fundet i stien.', 'No protection devices found in the path.') + '</p></div>';
+      return html;
+    }
+
+    // Cascade TCC chart
+    html += '<div class="card"><div class="card-title">' + tx('2. Kaskade TCC Diagram', '2. Cascade TCC Chart') + '</div>';
+    html += '<div style="text-align:center">' + tccRenderCascadeChart(devices, tccState.cursorCurrent) + '</div>';
+
+    // Fault current cursor buttons
+    html += '<div style="margin-top:1rem"><div style="font-weight:bold;margin-bottom:0.5rem">' + tx('Fejlstrom markering:', 'Fault current cursor:') + '</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:0.4rem">';
+    var cursorValues = [100, 500, 1000, 2000, 5000, 10000, 20000, 50000];
+    for (var ci = 0; ci < cursorValues.length; ci++) {
+      var cv = cursorValues[ci];
+      var cvLabel = cv >= 1000 ? (cv / 1000) + 'kA' : cv + 'A';
+      var csel = (tccState.cursorCurrent === cv) ? ' selected' : '';
+      html += '<button class="sel-btn' + csel + '" onclick="tccSetCursor(' + cv + ')">' + cvLabel + '</button>';
+    }
+    html += '</div></div>';
+    html += '</div>';
+
+    // Trip order table
+    var tripOrder = tccGetTripOrder(devices, tccState.cursorCurrent);
+    html += '<div class="card"><div class="card-title">' + tx('3. Udlosningsraekkefolge ved ', '3. Trip Order at ') + (tccState.cursorCurrent >= 1000 ? (tccState.cursorCurrent / 1000) + 'kA' : tccState.cursorCurrent + 'A') + '</div>';
+    html += '<table class="data-tbl"><thead><tr>';
+    html += '<th>#</th><th>' + tx('Enhed', 'Device') + '</th><th>' + tx('tMin', 'tMin') + '</th><th>' + tx('tMax', 'tMax') + '</th><th>' + tx('Status', 'Status') + '</th>';
+    html += '</tr></thead><tbody>';
+    for (var tr = 0; tr < tripOrder.length; tr++) {
+      var to = tripOrder[tr];
+      var statusText = to.trips ? tx('Udloser', 'Trips') : tx('Ikke i omraade', 'Out of range');
+      var statusColor = to.trips ? '#16a34a' : '#9ca3af';
+      html += '<tr><td>' + (tr + 1) + '</td><td>' + to.name + '</td>';
+      html += '<td>' + (to.tMin !== null ? to.tMin.toFixed(3) + 's' : '-') + '</td>';
+      html += '<td>' + (to.tMax !== null ? to.tMax.toFixed(3) + 's' : '-') + '</td>';
+      html += '<td style="color:' + statusColor + '">' + statusText + '</td></tr>';
+    }
+    html += '</tbody></table>';
+
+    // Grading margins section
+    html += '<div style="margin-top:1rem"><div style="font-weight:bold">' + tx('Graderingmarginer (DS/HD 60364-5-53 cl.536.4):', 'Grading Margins (DS/HD 60364-5-53 cl.536.4):') + '</div>';
+    html += '<ul style="margin:0.5rem 0;padding-left:1.5rem">';
+    var trippingDevices = tripOrder.filter(function(t) { return t.trips; });
+    for (var gm = 0; gm < trippingDevices.length - 1; gm++) {
+      var faster = trippingDevices[gm];
+      var slower = trippingDevices[gm + 1];
+      var margin = (slower.tMax || 0) - (faster.tMax || 0);
+      var marginOk = margin > 0.15;
+      var mColor = marginOk ? '#16a34a' : '#dc2626';
+      html += '<li style="color:' + mColor + '">' + faster.name + ' / ' + slower.name + ': ' + margin.toFixed(3) + 's';
+      html += marginOk ? ' OK' : (' ' + tx('UTILSTRAEKKELIG', 'INSUFFICIENT'));
+      html += '</li>';
+    }
+    if (trippingDevices.length < 2) {
+      html += '<li>' + tx('Ikke nok enheder udloser ved denne strom til at vurdere margin.', 'Not enough devices trip at this current to assess margin.') + '</li>';
+    }
+    html += '</ul></div>';
+
+    // Selectivity verdict
+    html += '<div style="margin-top:1rem"><div style="font-weight:bold">' + tx('Selektivitetsvurdering:', 'Selectivity Assessment:') + '</div>';
+    if (trippingDevices.length >= 2) {
+      var deepest = 0;
+      for (var sd = 0; sd < trippingDevices.length; sd++) {
+        if (trippingDevices[sd].depth > deepest) deepest = trippingDevices[sd].depth;
+      }
+      var isSelective = trippingDevices[0].depth === deepest;
+      if (isSelective) {
+        html += '<p style="color:#16a34a;font-weight:bold">' + tx('SELEKTIV ved denne strom - nedstroms enhed udloser forst', 'SELECTIVE at this current - downstream device trips first') + '</p>';
+      } else {
+        html += '<p style="color:#dc2626;font-weight:bold">' + tx('IKKE-SELEKTIV ved denne strom - opstroms enhed udloser forst eller samtidigt', 'NON-SELECTIVE at this current - upstream device trips first or simultaneously') + '</p>';
+      }
+    } else {
+      html += '<p>' + tx('Kan ikke vurdere - for faa enheder udloser', 'Cannot assess - too few devices trip') + '</p>';
+    }
+    html += '</div>';
+    html += '</div>';
+  }
+
+  return html;
 }
 
 // ===== INIT =====

@@ -1635,6 +1635,204 @@ test('All PDF render functions return valid HTML strings', function() {
   assert(bom.indexOf('<table') >= 0, 'BOM must contain a table');
 });
 
+// === Cascade TCC Module Tests ===
+console.log('\n=== Cascade TCC Module Tests ===\n');
+
+// Test 83: TCC module appears in all three language translation objects
+test('TCC module appears in all three language translation objects', function() {
+  assert(T.da.modules.tcc, 'T.da must have tcc module');
+  assert(T.en.modules.tcc, 'T.en must have tcc module');
+  assert(T.fa.modules.tcc, 'T.fa must have tcc module');
+  assert.strictEqual(T.da.modules.tcc, 'Kaskade-TCC');
+  assert.strictEqual(T.en.modules.tcc, 'Cascade TCC');
+});
+
+// Test 84: tccState is initialized
+test('tccState is initialized with correct defaults', function() {
+  assert(typeof tccState === 'object', 'tccState must exist');
+  assert.strictEqual(tccState.selectedNodeId, null);
+  assert.strictEqual(tccState.cursorCurrent, 1000);
+  assert.strictEqual(tccState.tree, null);
+});
+
+// Test 85: tccGetPathDevices returns devices along a path
+test('tccGetPathDevices returns devices along the path from root to final circuit', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var finals = tccGetFinalCircuits(tree);
+  assert(finals.length > 0, 'Must have final circuits');
+  var devices = tccGetPathDevices(tree, finals[0].id);
+  assert(devices.length >= 2, 'Must have at least 2 devices in path (main + final)');
+  // First device should be the deepest in path with protection (main board MCCB)
+  assert(devices[0].device, 'First device must have a protection device');
+  assert(devices[0].In > 0, 'First device must have rated current > 0');
+  // Last device should be the final circuit
+  assert.strictEqual(devices[devices.length - 1].nodeId, finals[0].id);
+});
+
+// Test 86: tccGetPathDevices returns nodeId, device, In, depth, name for each entry
+test('tccGetPathDevices returns correct structure for each device', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var finals = tccGetFinalCircuits(tree);
+  var devices = tccGetPathDevices(tree, finals[0].id);
+  for (var i = 0; i < devices.length; i++) {
+    assert(devices[i].nodeId, 'Each entry must have nodeId');
+    assert(devices[i].device, 'Each entry must have device');
+    assert(typeof devices[i].In === 'number', 'Each entry must have numeric In');
+    assert(typeof devices[i].depth === 'number', 'Each entry must have numeric depth');
+    assert(typeof devices[i].name === 'string', 'Each entry must have string name');
+  }
+});
+
+// Test 87: tccGetTripOrder returns ordered trip times
+test('tccGetTripOrder returns devices sorted by trip time at given current', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var finals = tccGetFinalCircuits(tree);
+  var devices = tccGetPathDevices(tree, finals[0].id);
+  var order = tccGetTripOrder(devices, 1000);
+  assert(order.length > 0, 'Must return results');
+  // Check sorted by tMax (ascending)
+  var lastT = -1;
+  for (var i = 0; i < order.length; i++) {
+    if (!order[i].trips) continue;
+    if (order[i].tMax !== null) {
+      assert(order[i].tMax >= lastT, 'Results must be sorted by tMax ascending');
+      lastT = order[i].tMax;
+    }
+  }
+});
+
+// Test 88: tccGetTripOrder at high current - downstream MCB should trip first (selective)
+test('tccGetTripOrder at moderate current shows downstream tripping first', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var finals = tccGetFinalCircuits(tree);
+  var devices = tccGetPathDevices(tree, finals[1].id);
+  // At 500A, the final circuit MCB B16 should trip faster than the main MCCB
+  var order = tccGetTripOrder(devices, 500);
+  var tripping = order.filter(function(o) { return o.trips; });
+  if (tripping.length >= 2) {
+    // The one with greater depth should trip first (be first in array)
+    assert(tripping[0].depth >= tripping[1].depth, 'Downstream device should trip first at moderate currents');
+  }
+});
+
+// Test 89: tccRenderCascadeChart returns SVG with multiple curves
+test('tccRenderCascadeChart returns SVG with device curves and legend', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var finals = tccGetFinalCircuits(tree);
+  var devices = tccGetPathDevices(tree, finals[0].id);
+  var svg = tccRenderCascadeChart(devices, 1000);
+  assert(svg.indexOf('<svg') >= 0, 'Must return SVG');
+  assert(svg.indexOf('path') >= 0, 'Must have path elements for curves');
+  assert(svg.indexOf('line') >= 0, 'Must have cursor line');
+  // Check legend exists
+  assert(svg.indexOf(devices[0].name) >= 0 || svg.indexOf('A)') >= 0, 'Must show device legend');
+});
+
+// Test 90: tccRenderCascadeChart shows cursor line at specified current
+test('tccRenderCascadeChart shows cursor line at the specified current', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var finals = tccGetFinalCircuits(tree);
+  var devices = tccGetPathDevices(tree, finals[0].id);
+  var svg = tccRenderCascadeChart(devices, 5000);
+  assert(svg.indexOf('5kA') >= 0, 'Must show 5kA cursor label');
+  assert(svg.indexOf('stroke-dasharray') >= 0, 'Must have dashed cursor line');
+});
+
+// Test 91: renderCascadeTCC returns HTML with no text input fields (click-only)
+test('renderCascadeTCC returns HTML with no text inputs (click-only UI)', function() {
+  sldNextId = 1;
+  sldTree = sldCreateTree();
+  sldPropagateAll(sldTree);
+  tccState.selectedNodeId = null;
+  tccState.cursorCurrent = 1000;
+  var html = renderCascadeTCC();
+  assert(html.indexOf('<input type="text"') < 0, 'No text input fields');
+  assert(html.indexOf('<input type=\'text\'') < 0, 'No text input fields (single quotes)');
+  assert(html.indexOf('sel-btn') >= 0, 'Must use sel-btn class');
+  assert(html.indexOf('60364') >= 0, 'Must reference DS/HD 60364');
+});
+
+// Test 92: renderCascadeTCC with selected node shows chart and trip table
+test('renderCascadeTCC with selected node shows chart and trip table', function() {
+  sldNextId = 1;
+  sldTree = sldCreateTree();
+  sldPropagateAll(sldTree);
+  var finals = tccGetFinalCircuits(sldTree);
+  tccState.selectedNodeId = finals[0].id;
+  tccState.cursorCurrent = 1000;
+  var html = renderCascadeTCC();
+  assert(html.indexOf('<svg') >= 0, 'Must contain SVG chart');
+  assert(html.indexOf('<table') >= 0, 'Must contain trip order table');
+  assert(html.indexOf('tccSetCursor') >= 0, 'Must have cursor buttons');
+});
+
+// Test 93: Fault current cursor buttons cover required discrete values
+test('Fault current cursor buttons include all required values', function() {
+  sldNextId = 1;
+  sldTree = sldCreateTree();
+  sldPropagateAll(sldTree);
+  var finals = tccGetFinalCircuits(sldTree);
+  tccState.selectedNodeId = finals[0].id;
+  var html = renderCascadeTCC();
+  assert(html.indexOf('tccSetCursor(100)') >= 0, 'Must have 100A button');
+  assert(html.indexOf('tccSetCursor(500)') >= 0, 'Must have 500A button');
+  assert(html.indexOf('tccSetCursor(1000)') >= 0, 'Must have 1kA button');
+  assert(html.indexOf('tccSetCursor(2000)') >= 0, 'Must have 2kA button');
+  assert(html.indexOf('tccSetCursor(5000)') >= 0, 'Must have 5kA button');
+  assert(html.indexOf('tccSetCursor(10000)') >= 0, 'Must have 10kA button');
+  assert(html.indexOf('tccSetCursor(20000)') >= 0, 'Must have 20kA button');
+  assert(html.indexOf('tccSetCursor(50000)') >= 0, 'Must have 50kA button');
+});
+
+// Test 94: tccGetFinalCircuits returns all final circuits from tree
+test('tccGetFinalCircuits returns all final circuit nodes', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  var finals = tccGetFinalCircuits(tree);
+  assert.strictEqual(finals.length, 3, 'Default tree has 3 final circuits');
+  finals.forEach(function(f) {
+    assert.strictEqual(f.type, 'final_circuit');
+  });
+});
+
+// Test 95: Selectivity zone highlighting appears in chart
+test('tccRenderCascadeChart includes selectivity zone highlighting', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var finals = tccGetFinalCircuits(tree);
+  var devices = tccGetPathDevices(tree, finals[0].id);
+  var svg = tccRenderCascadeChart(devices, 1000);
+  // Should have zone rects with green (selective) or red (non-selective) colors
+  var hasGreenZone = svg.indexOf('rgba(34,197,94') >= 0;
+  var hasRedZone = svg.indexOf('rgba(239,68,68') >= 0;
+  assert(hasGreenZone || hasRedZone, 'Must have selectivity zone highlighting');
+});
+
+// Test 96: Grading margin displayed in renderCascadeTCC
+test('Grading margin information is displayed in the TCC view', function() {
+  sldNextId = 1;
+  sldTree = sldCreateTree();
+  sldPropagateAll(sldTree);
+  var finals = tccGetFinalCircuits(sldTree);
+  tccState.selectedNodeId = finals[0].id;
+  tccState.cursorCurrent = 1000;
+  var html = renderCascadeTCC();
+  assert(html.indexOf('536.4') >= 0, 'Must reference cl.536.4 for grading margins');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
