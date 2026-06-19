@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Implement Motor Start Analysis, Harmonic Analysis & Filter, and VFD Sizing modules with full calculation engines, click-only trilingual UI, DS/HD 60364 compliance, and 45+ comprehensive tests.",
+  "status": "in_progress",
+  "steps": [
+    "1. Add module translations for 'motor', 'harmonic', 'vfd' to T.da.modules, T.en.modules, T.fa.modules",
+    "2. Add Farsi translations to _FA dictionary for all new module strings",
+    "3. Add case statements for 'motor', 'harmonic', 'vfd' in renderModule switch",
+    "4. Implement Motor Start Analysis module with IEC motor FLC table, starting current calculation, voltage dip, MPCB/contactor/relay selection from PRODUCTS",
+    "5. Implement Harmonic Analysis module with THD calculation, K-factor, filter sizing, neutral oversizing, EN 50160 compliance",
+    "6. Implement VFD Sizing module with application-based sizing, input/output cable selection, EMC category, braking resistor, no-RCD warning",
+    "7. Add 45+ tests to test-sld.js covering all three modules"
+  ],
+  "acceptance_criteria": [
+    "All existing 220 tests continue to pass",
+    "45+ new tests pass for motor, harmonic, and VFD modules",
+    "All render functions return HTML with no <input type='text'> or <textarea>",
+    "All calculations cite IEC/DS/HD 60364 clauses",
+    "Motor module selects correct MPCB, contactor, and overload relay from PRODUCTS",
+    "Harmonic module calculates THD and K-factor correctly",
+    "VFD module warns against RCD on output",
+    "Conservative calculations throughout (ceiling for danger, floor for capacity)"
+  ],
+  "verification": [
+    "node /projects/sandbox/Claude/test-sld.js 2>&1 | grep 'Results:' should show 265+ passed, 0 failed"
+  ],
+  "blocked_reason": null,
+  "findings": null
+}

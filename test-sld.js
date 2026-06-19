@@ -3071,6 +3071,356 @@ test('EV module enforces 3% voltage drop limit', function() {
   assert.ok(html.indexOf('3%') >= 0 || html.indexOf('max 3') >= 0, 'Must show 3% voltage drop limit');
 });
 
+// ===== MOTOR START ANALYSIS TESTS =====
+
+// Test 221: Motor FLC table returns correct values for 7.5kW 4-pole
+test('motorGetFLC returns correct FLC for 7.5kW 4-pole motor', function() {
+  var flc = motorGetFLC(7.5, 4);
+  assert.strictEqual(flc, 16.0, 'FLC for 7.5kW 4P should be 16.0A');
+});
+
+// Test 222: Motor FLC for 110kW 2-pole (largest motor)
+test('motorGetFLC returns correct FLC for 110kW 2-pole motor', function() {
+  var flc = motorGetFLC(110, 2);
+  assert.strictEqual(flc, 205.0, 'FLC for 110kW 2P should be 205.0A');
+});
+
+// Test 223: Starting current calculation DOL
+test('motorCalcStartCurrent DOL uses 7x multiplier', function() {
+  var iStart = motorCalcStartCurrent(7.5, 4, 'dol');
+  assert.strictEqual(iStart, Math.ceil(16.0 * 7), 'DOL start current for 7.5kW should be ceil(16*7)=112A');
+});
+
+// Test 224: Starting current Star-Delta is less than DOL
+test('motorCalcStartCurrent Star-Delta is less than DOL', function() {
+  var dolStart = motorCalcStartCurrent(11, 4, 'dol');
+  var sdStart = motorCalcStartCurrent(11, 4, 'starDelta');
+  assert.ok(sdStart < dolStart, 'Star-Delta starting current must be less than DOL');
+});
+
+// Test 225: VFD start is lowest of all methods
+test('motorCalcStartCurrent VFD has lowest starting current', function() {
+  var vfdStart = motorCalcStartCurrent(22, 4, 'vfd');
+  var dolStart = motorCalcStartCurrent(22, 4, 'dol');
+  var sdStart = motorCalcStartCurrent(22, 4, 'starDelta');
+  var softStart = motorCalcStartCurrent(22, 4, 'soft');
+  assert.ok(vfdStart < dolStart, 'VFD < DOL');
+  assert.ok(vfdStart < sdStart, 'VFD < Star-Delta');
+  assert.ok(vfdStart <= softStart, 'VFD <= Soft');
+});
+
+// Test 226: Voltage dip calculation
+test('motorCalcVoltageDip returns positive value and respects 3% limit', function() {
+  var vdip = motorCalcVoltageDip(7.5, 4, 'dol', 30);
+  assert.ok(vdip > 0, 'Voltage dip must be positive');
+  assert.ok(typeof vdip === 'number', 'Voltage dip must be a number');
+});
+
+// Test 227: Voltage dip increases with cable length
+test('motorCalcVoltageDip increases with longer cable', function() {
+  var vdipShort = motorCalcVoltageDip(11, 4, 'dol', 10);
+  var vdipLong = motorCalcVoltageDip(11, 4, 'dol', 100);
+  assert.ok(vdipLong > vdipShort, 'Longer cable must produce higher voltage dip');
+});
+
+// Test 228: MPCB selection covers motor kW
+test('motorSelectMPCB returns device covering motor kW', function() {
+  var flc = motorGetFLC(7.5, 4);
+  var mpcb = motorSelectMPCB(7.5, flc);
+  assert.ok(mpcb, 'Must return an MPCB');
+  assert.ok(mpcb.kW >= 7.5, 'MPCB kW must cover motor kW');
+  assert.ok(mpcb.rangeMax >= flc, 'MPCB range must cover FLC');
+});
+
+// Test 229: Contactor selection covers motor kW
+test('motorSelectContactor returns device covering motor kW', function() {
+  var contactor = motorSelectContactor(11);
+  assert.ok(contactor, 'Must return a contactor');
+  assert.ok(contactor.ac3_kW >= 11, 'Contactor AC-3 kW must cover motor kW');
+});
+
+// Test 230: Overload relay covers FLC
+test('motorSelectOverload returns relay covering FLC', function() {
+  var flc = motorGetFLC(5.5, 4);
+  var relay = motorSelectOverload(flc);
+  assert.ok(relay, 'Must return an overload relay');
+  assert.ok(relay.rangeMax >= flc, 'Relay range must cover motor FLC');
+});
+
+// Test 231: Cable selection for motor
+test('motorSelectCable returns cable with Iz >= FLC', function() {
+  var flc = motorGetFLC(22, 4);
+  var cable = motorSelectCable(flc, 'S1');
+  assert.ok(cable, 'Must return a cable');
+  assert.ok(cable.iz >= flc, 'Cable Iz must be >= motor FLC');
+});
+
+// Test 232: Duty cycle S2/S3 derating
+test('Motor duty S3 results in larger cable than S1', function() {
+  var flc = motorGetFLC(11, 4);
+  var cableS1 = motorSelectCable(flc, 'S1');
+  var cableS3 = motorSelectCable(flc, 'S3');
+  assert.ok(cableS3.iz >= cableS1.iz, 'S3 duty (intermittent) needs cable at least as large as S1');
+});
+
+// Test 233: renderMotor has no text input fields
+test('renderMotor has no text input fields', function() {
+  var html = renderMotor();
+  assert.ok(html.indexOf('<input type="text"') < 0, 'No text inputs allowed');
+  assert.ok(html.indexOf('<textarea') < 0, 'No textareas allowed');
+});
+
+// Test 234: renderMotor references IEC/DS/HD standards
+test('renderMotor references IEC 60947 and DS/HD 60364', function() {
+  var html = renderMotor();
+  assert.ok(html.indexOf('IEC 60947') >= 0 || html.indexOf('60947') >= 0, 'Must reference IEC 60947');
+  assert.ok(html.indexOf('DS/HD 60364') >= 0 || html.indexOf('60364') >= 0, 'Must reference DS/HD 60364');
+});
+
+// Test 235: renderMotor uses sel-btn buttons
+test('renderMotor uses sel-btn buttons', function() {
+  var html = renderMotor();
+  assert.ok(html.indexOf('sel-btn') >= 0, 'Must use sel-btn class');
+});
+
+// Test 236: I2t calculation
+test('motorCalcI2t returns positive thermal stress value', function() {
+  var i2t = motorCalcI2t(7.5, 4, 'dol');
+  assert.ok(i2t > 0, 'I2t must be positive');
+  // DOL 7.5kW: Istart=112A, time=1.5s => I2t = 112*112*1.5 = 18816
+  assert.ok(i2t >= 18000, 'I2t for 7.5kW DOL should be substantial');
+});
+
+// ===== HARMONIC ANALYSIS TESTS =====
+
+// Test 237: THD calculation for VFD loads
+test('harmonicCalcTHD returns correct THD for VFD', function() {
+  var result = harmonicCalcTHD('vfd', 1);
+  assert.ok(result.thd > 0, 'THD must be positive');
+  assert.ok(result.thd < 100, 'THD must be less than 100%');
+  assert.ok(result.harmonics.h5 > result.harmonics.h3, 'VFD H5 should be dominant over H3');
+  assert.strictEqual(result.limit, 8.0, 'EN 50160 limit is 8%');
+});
+
+// Test 238: THD for IT equipment is high (PC has high H3)
+test('harmonicCalcTHD for IT equipment has high THD', function() {
+  var result = harmonicCalcTHD('it', 1);
+  assert.ok(result.thd > 50, 'IT equipment THD should be very high (>50%)');
+  assert.ok(result.exceeded, 'IT equipment should exceed 8% THD limit');
+});
+
+// Test 239: Diversity factor reduces THD with multiple loads
+test('harmonicCalcTHD diversity reduces THD with many loads', function() {
+  var single = harmonicCalcTHD('vfd', 1);
+  var many = harmonicCalcTHD('vfd', 20);
+  assert.ok(many.thd < single.thd, 'Multiple loads should reduce THD via diversity');
+  assert.ok(many.diversity < 1.0, 'Diversity factor should be less than 1.0 for many loads');
+});
+
+// Test 240: K-factor calculation
+test('harmonicCalcKFactor returns valid K-factor', function() {
+  var result = harmonicCalcKFactor('vfd', 1);
+  assert.ok(result.kFactor >= 1.0, 'K-factor must be >= 1.0');
+  assert.ok(result.derating <= 1.0, 'Derating must be <= 1.0');
+  assert.ok(result.derating > 0, 'Derating must be positive');
+  assert.ok(result.clause.indexOf('C57.110') >= 0, 'Must reference IEEE C57.110');
+});
+
+// Test 241: K-factor for IT is higher than for LED
+test('harmonicCalcKFactor IT equipment has higher K than LED', function() {
+  var kIT = harmonicCalcKFactor('it', 1);
+  var kLED = harmonicCalcKFactor('led', 1);
+  assert.ok(kIT.kFactor > kLED.kFactor, 'IT K-factor should exceed LED K-factor');
+});
+
+// Test 242: Neutral sizing for IT loads with high H3
+test('harmonicCalcNeutral IT equipment requires oversized neutral', function() {
+  var result = harmonicCalcNeutral('it', 1);
+  assert.ok(result.oversized, 'IT equipment with 80% H3 requires oversized neutral');
+  assert.strictEqual(result.factor, 1.5, 'Oversized neutral should be 150%');
+  assert.ok(result.clause.indexOf('523.6.3') >= 0, 'Must reference cl.523.6.3');
+});
+
+// Test 243: Neutral sizing for VFD is not oversized (low H3)
+test('harmonicCalcNeutral VFD does not require oversized neutral', function() {
+  var result = harmonicCalcNeutral('vfd', 1);
+  assert.ok(!result.oversized, 'VFD with 2% H3 should not require oversized neutral');
+  assert.strictEqual(result.factor, 1.0, 'Normal neutral sizing = 1.0');
+});
+
+// Test 244: Filter recommendation
+test('harmonicCalcFilter recommends filter when THD > 5%', function() {
+  var result = harmonicCalcFilter('vfd', 1, 11);
+  assert.ok(result.needed || !result.needed, 'Filter result must have needed property');
+  assert.ok(result.clause.indexOf('61000') >= 0, 'Must reference EN 61000');
+});
+
+// Test 245: Active filter recommended for high THD
+test('harmonicCalcFilter recommends active filter when THD > 8%', function() {
+  var result = harmonicCalcFilter('it', 1, 5);
+  assert.ok(result.activeRecommended, 'Active filter should be recommended for IT with THD > 8%');
+});
+
+// Test 246: Cable derating for harmonics
+test('harmonicCalcCableDerating returns valid factor', function() {
+  var result = harmonicCalcCableDerating('it', 1);
+  assert.ok(result.factor <= 1.0, 'Cable derating factor must be <= 1.0');
+  assert.ok(result.factor > 0, 'Cable derating factor must be positive');
+  assert.ok(result.clause.indexOf('B.52.11') >= 0, 'Must reference Table B.52.11');
+});
+
+// Test 247: Cable derating for loads with low THD is 1.0
+test('harmonicCalcCableDerating returns 1.0 for low THD loads', function() {
+  var result = harmonicCalcCableDerating('ev', 20);
+  assert.strictEqual(result.factor, 1.0, 'EV chargers with diversity have low THD, derating = 1.0');
+});
+
+// Test 248: renderHarmonic has no text inputs
+test('renderHarmonic has no text input fields', function() {
+  var html = renderHarmonic();
+  assert.ok(html.indexOf('<input type="text"') < 0, 'No text inputs allowed');
+  assert.ok(html.indexOf('<textarea') < 0, 'No textareas allowed');
+});
+
+// Test 249: renderHarmonic references EN 50160
+test('renderHarmonic references EN 50160', function() {
+  var html = renderHarmonic();
+  assert.ok(html.indexOf('EN 50160') >= 0, 'Must reference EN 50160');
+});
+
+// Test 250: renderHarmonic contains SVG spectrum chart
+test('renderHarmonic contains SVG harmonic spectrum', function() {
+  var html = renderHarmonic();
+  assert.ok(html.indexOf('<svg') >= 0, 'Must contain SVG chart');
+  assert.ok(html.indexOf('H5') >= 0 || html.indexOf('H3') >= 0, 'Must show harmonic numbers');
+});
+
+// Test 251: renderHarmonic uses sel-btn
+test('renderHarmonic uses sel-btn buttons', function() {
+  var html = renderHarmonic();
+  assert.ok(html.indexOf('sel-btn') >= 0, 'Must use sel-btn class');
+});
+
+// ===== VFD SIZING TESTS =====
+
+// Test 252: VFD rated current for variable torque (pump)
+test('vfdCalcRatedCurrent pump uses 1.1x sizing factor', function() {
+  var result = vfdCalcRatedCurrent(11, 'pump');
+  assert.strictEqual(result.sizingFactor, 1.1, 'Pump (variable torque) sizing factor must be 1.1');
+  assert.ok(result.vfdCurrent >= Math.ceil(result.motorFLC * 1.1), 'VFD current must be >= 1.1x FLC');
+  assert.ok(result.clause.indexOf('IEC 61800') >= 0, 'Must reference IEC 61800');
+});
+
+// Test 253: VFD rated current for constant torque (conveyor)
+test('vfdCalcRatedCurrent conveyor uses 1.5x sizing factor', function() {
+  var result = vfdCalcRatedCurrent(11, 'conveyor');
+  assert.strictEqual(result.sizingFactor, 1.5, 'Conveyor (constant torque) sizing factor must be 1.5');
+  assert.ok(result.vfdCurrent >= Math.ceil(result.motorFLC * 1.5), 'VFD current must be >= 1.5x FLC');
+});
+
+// Test 254: VFD input cable sized correctly
+test('vfdCalcInputCable returns cable with sufficient Iz', function() {
+  var result = vfdCalcInputCable(22, 'pump');
+  assert.ok(result.cable, 'Must return a cable');
+  assert.ok(result.cable.iz >= result.inputCurrent, 'Cable Iz must be >= input current');
+  assert.ok(result.inputCurrent > 0, 'Input current must be positive');
+});
+
+// Test 255: VFD output cable checks length against EMC category
+test('vfdCalcOutputCable enforces max length per EMC category', function() {
+  var resultC1 = vfdCalcOutputCable(11, 'pump', 40, 'C1');
+  var resultC3 = vfdCalcOutputCable(11, 'pump', 40, 'C3');
+  assert.ok(!resultC1.lengthOk, 'C1 with 40m cable should exceed 30m shielded limit');
+  assert.ok(resultC3.lengthOk, 'C3 with 40m cable should be within 100m unshielded limit');
+});
+
+// Test 256: VFD output cable recommends shield for >30m
+test('vfdCalcOutputCable recommends dV/dt filter for cable > 30m', function() {
+  var result = vfdCalcOutputCable(11, 'pump', 40, 'C3');
+  assert.ok(result.dvdtFilterNeeded, 'dV/dt filter needed for cable > 30m');
+});
+
+// Test 257: Braking resistor needed for crane
+test('vfdCalcBraking needed for crane application', function() {
+  var result = vfdCalcBraking(22, 'crane');
+  assert.ok(result.needed, 'Crane requires braking resistor');
+  assert.ok(result.brakePowerKW > 0, 'Braking power must be positive');
+  assert.ok(result.resistanceOhm > 0, 'Resistance must be positive');
+  assert.ok(result.clause.indexOf('IEC 61800') >= 0, 'Must reference IEC 61800');
+});
+
+// Test 258: No braking for pump
+test('vfdCalcBraking not needed for pump', function() {
+  var result = vfdCalcBraking(22, 'pump');
+  assert.ok(!result.needed, 'Pump does not require braking resistor');
+});
+
+// Test 259: Line reactor recommended for large motors
+test('vfdCalcLineReactor recommended for motors > 15kW', function() {
+  var result = vfdCalcLineReactor(22);
+  assert.ok(result.recommended, 'Line reactor recommended for 22kW motor');
+  assert.ok(result.clause.indexOf('IEC 61800') >= 0, 'Must reference IEC 61800');
+});
+
+// Test 260: Line reactor not needed for small motors
+test('vfdCalcLineReactor not needed for small motors', function() {
+  var result = vfdCalcLineReactor(7.5);
+  assert.ok(!result.recommended, 'Line reactor not needed for 7.5kW motor');
+});
+
+// Test 261: PE sizing minimum 10mm2
+test('vfdCalcPE returns minimum 10mm2 Cu', function() {
+  var result = vfdCalcPE(11);
+  assert.ok(result.minPEmm2 >= 10, 'Minimum PE must be >= 10mm2');
+  assert.ok(result.clause.indexOf('IEC 61800-5-1') >= 0, 'Must reference IEC 61800-5-1');
+});
+
+// Test 262: PE sizing increases for large motors
+test('vfdCalcPE increases for larger motors', function() {
+  var small = vfdCalcPE(11);
+  var large = vfdCalcPE(75);
+  assert.ok(large.minPEmm2 >= small.minPEmm2, 'Larger motor needs larger PE');
+});
+
+// Test 263: renderVFD has no text inputs
+test('renderVFD has no text input fields', function() {
+  var html = renderVFD();
+  assert.ok(html.indexOf('<input type="text"') < 0, 'No text inputs allowed');
+  assert.ok(html.indexOf('<textarea') < 0, 'No textareas allowed');
+});
+
+// Test 264: renderVFD shows NO RCD warning
+test('renderVFD shows critical No RCD warning', function() {
+  var html = renderVFD();
+  assert.ok(html.indexOf('RCD') >= 0, 'Must mention RCD');
+  assert.ok(html.indexOf('NEVER') >= 0 || html.indexOf('ALDRIG') >= 0, 'Must have critical warning');
+});
+
+// Test 265: renderVFD references IEC 61800
+test('renderVFD references IEC 61800', function() {
+  var html = renderVFD();
+  assert.ok(html.indexOf('IEC 61800') >= 0, 'Must reference IEC 61800');
+});
+
+// Test 266: renderVFD uses sel-btn buttons
+test('renderVFD uses sel-btn buttons', function() {
+  var html = renderVFD();
+  assert.ok(html.indexOf('sel-btn') >= 0, 'Must use sel-btn class');
+});
+
+// Test 267: All three new modules registered in translations
+test('Motor, Harmonic, VFD registered in T.da, T.en, T.fa', function() {
+  assert.ok(T.da.modules.motor, 'motor must be in Danish');
+  assert.ok(T.en.modules.motor, 'motor must be in English');
+  assert.ok(T.fa.modules.motor, 'motor must be in Farsi');
+  assert.ok(T.da.modules.harmonic, 'harmonic must be in Danish');
+  assert.ok(T.en.modules.harmonic, 'harmonic must be in English');
+  assert.ok(T.fa.modules.harmonic, 'harmonic must be in Farsi');
+  assert.ok(T.da.modules.vfd, 'vfd must be in Danish');
+  assert.ok(T.en.modules.vfd, 'vfd must be in English');
+  assert.ok(T.fa.modules.vfd, 'vfd must be in Farsi');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

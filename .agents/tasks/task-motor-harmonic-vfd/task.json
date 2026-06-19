@@ -1,0 +1,8 @@
+{
+  "task_id": "task-motor-harmonic-vfd",
+  "task_description": "Implement three new professional modules: Motor Start Analysis (IEC 60947 + DS/HD 60364-5-52), Harmonic Analysis & Filter (EN 61000-3-2/12 + DS/HD 60364), and VFD/Frequency Converter Sizing (IEC 61800 + DS/HD 60364). Each with click-only trilingual UI, conservative calculations, and comprehensive tests.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null,
+  "verification": null
+}

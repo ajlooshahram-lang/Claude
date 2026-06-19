@@ -651,7 +651,10 @@ const T = {
       panel: 'Tavle',
       ev: 'Elbil-lader',
       solar: 'Solcelle & Batteri',
-      noed: 'Noedbelysning'
+      noed: 'Noedbelysning',
+      motor: 'Motorstart',
+      harmonic: 'Harmonisk',
+      vfd: 'Frekvensomformer'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -761,7 +764,10 @@ const T = {
       panel: 'Panel',
       ev: 'EV Charger',
       solar: 'Solar PV & Battery',
-      noed: 'Emergency Lighting'
+      noed: 'Emergency Lighting',
+      motor: 'Motor Starting',
+      harmonic: 'Harmonic Analysis',
+      vfd: 'VFD Sizing'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -863,7 +869,10 @@ const T = {
       panel: 'تابلو',
       ev: 'شارژر خودرو',
       solar: 'پنل خورشیدی و باتری',
-      noed: 'روشنایی اضطراری'
+      noed: 'روشنایی اضطراری',
+      motor: 'راه‌اندازی موتور',
+      harmonic: 'تحلیل هارمونیک',
+      vfd: 'درایو فرکانس'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -1141,7 +1150,65 @@ const _FA = {
   'Luminaire Count': '\u062A\u0639\u062F\u0627\u062F \u0686\u0631\u0627\u063A',
   'Luminaire Spacing': '\u0641\u0627\u0635\u0644\u0647 \u0686\u0631\u0627\u063A\u200C\u0647\u0627',
   'Changeover Time': '\u0632\u0645\u0627\u0646 \u062A\u063A\u06CC\u06CC\u0631',
-  'Compliance': '\u0627\u0646\u0637\u0628\u0627\u0642'
+  'Compliance': '\u0627\u0646\u0637\u0628\u0627\u0642',
+  // Motor Start Analysis translations
+  'Motor Start Analysis': '\u062A\u062D\u0644\u06CC\u0644 \u0631\u0627\u0647\u200C\u0627\u0646\u062F\u0627\u0632\u06CC \u0645\u0648\u062A\u0648\u0631',
+  'Motor Power': '\u062A\u0648\u0627\u0646 \u0645\u0648\u062A\u0648\u0631',
+  'Motor Poles': '\u0642\u0637\u0628 \u0645\u0648\u062A\u0648\u0631',
+  'Starting Method': '\u0631\u0648\u0634 \u0631\u0627\u0647\u200C\u0627\u0646\u062F\u0627\u0632\u06CC',
+  'DOL (Direct-On-Line)': '\u0645\u0633\u062A\u0642\u06CC\u0645 (DOL)',
+  'Star-Delta': '\u0633\u062A\u0627\u0631\u0647-\u0645\u062B\u0644\u062B',
+  'Soft Starter': '\u0633\u0627\u0641\u062A \u0627\u0633\u062A\u0627\u0631\u062A\u0631',
+  'VFD': '\u062F\u0631\u0627\u06CC\u0648 \u0641\u0631\u06A9\u0627\u0646\u0633',
+  'Full Load Current': '\u062C\u0631\u06CC\u0627\u0646 \u0628\u0627\u0631 \u06A9\u0627\u0645\u0644',
+  'Starting Current': '\u062C\u0631\u06CC\u0627\u0646 \u0631\u0627\u0647\u200C\u0627\u0646\u062F\u0627\u0632\u06CC',
+  'Voltage Dip': '\u0627\u0641\u062A \u0648\u0644\u062A\u0627\u0698',
+  'Motor Protection': '\u062D\u0641\u0627\u0638\u062A \u0645\u0648\u062A\u0648\u0631',
+  'MPCB': '\u06A9\u0644\u06CC\u062F \u0645\u062D\u0627\u0641\u0638 \u0645\u0648\u062A\u0648\u0631',
+  'Contactor': '\u06A9\u0646\u062A\u0627\u06A9\u062A\u0648\u0631',
+  'Overload Relay': '\u0631\u0644\u0647 \u0627\u0636\u0627\u0641\u0647 \u0628\u0627\u0631',
+  'Duty Cycle': '\u0686\u0631\u062E\u0647 \u06A9\u0627\u0631\u06CC',
+  'Cable Length': '\u0637\u0648\u0644 \u06A9\u0627\u0628\u0644',
+  'Voltage Dip OK': '\u0627\u0641\u062A \u0648\u0644\u062A\u0627\u0698 \u0645\u062C\u0627\u0632',
+  'Voltage Dip Exceeded': '\u0627\u0641\u062A \u0648\u0644\u062A\u0627\u0698 \u0628\u06CC\u0634 \u0627\u0632 \u062D\u062F',
+  'Starting Time': '\u0632\u0645\u0627\u0646 \u0631\u0627\u0647\u200C\u0627\u0646\u062F\u0627\u0632\u06CC',
+  'Bill of Materials': '\u0644\u06CC\u0633\u062A \u0645\u0648\u0627\u062F',
+  // Harmonic Analysis translations
+  'Harmonic Analysis': '\u062A\u062D\u0644\u06CC\u0644 \u0647\u0627\u0631\u0645\u0648\u0646\u06CC\u06A9',
+  'Load Type': '\u0646\u0648\u0639 \u0628\u0627\u0631',
+  'Number of Loads': '\u062A\u0639\u062F\u0627\u062F \u0628\u0627\u0631',
+  'THD Result': '\u0646\u062A\u06CC\u062C\u0647 THD',
+  'K-Factor': '\u0636\u0631\u06CC\u0628 K',
+  'Neutral Sizing': '\u0627\u0628\u0639\u0627\u062F \u0646\u0648\u0644',
+  'Filter Recommendation': '\u062A\u0648\u0635\u06CC\u0647 \u0641\u06CC\u0644\u062A\u0631',
+  'Transformer Derating': '\u06A9\u0627\u0647\u0634 \u0638\u0631\u0641\u06CC\u062A \u062A\u0631\u0627\u0646\u0633\u0641\u0648\u0631\u0645\u0627\u062A\u0648\u0631',
+  'Passive Filter': '\u0641\u06CC\u0644\u062A\u0631 \u067E\u0633\u06CC\u0648',
+  'Active Filter': '\u0641\u06CC\u0644\u062A\u0631 \u0627\u06A9\u062A\u06CC\u0648',
+  'Harmonic Spectrum': '\u0637\u06CC\u0641 \u0647\u0627\u0631\u0645\u0648\u0646\u06CC\u06A9',
+  'Diversity Factor': '\u0636\u0631\u06CC\u0628 \u062A\u0646\u0648\u0639',
+  'Neutral Current': '\u062C\u0631\u06CC\u0627\u0646 \u0646\u0648\u0644',
+  'Cable Derating': '\u06A9\u0627\u0647\u0634 \u0638\u0631\u0641\u06CC\u062A \u06A9\u0627\u0628\u0644',
+  'Compliant': '\u0645\u0646\u0637\u0628\u0642',
+  'Non-compliant': '\u063A\u06CC\u0631 \u0645\u0646\u0637\u0628\u0642',
+  // VFD Sizing translations
+  'VFD Sizing': '\u0627\u0628\u0639\u0627\u062F\u0633\u0646\u062C\u06CC \u062F\u0631\u0627\u06CC\u0648',
+  'Application Type': '\u0646\u0648\u0639 \u06A9\u0627\u0631\u0628\u0631\u062F',
+  'Pump': '\u067E\u0645\u067E',
+  'Fan': '\u0641\u0646',
+  'Conveyor': '\u0646\u0648\u0627\u0631 \u0646\u0642\u0627\u0644\u0647',
+  'Crane/Hoist': '\u062C\u0631\u062B\u0642\u06CC\u0644',
+  'Compressor': '\u06A9\u0645\u067E\u0631\u0633\u0648\u0631',
+  'EMC Category': '\u062F\u0633\u062A\u0647 EMC',
+  'Input Cable': '\u06A9\u0627\u0628\u0644 \u0648\u0631\u0648\u062F\u06CC',
+  'Output Cable': '\u06A9\u0627\u0628\u0644 \u062E\u0631\u0648\u062C\u06CC',
+  'Braking Resistor': '\u0645\u0642\u0627\u0648\u0645\u062A \u062A\u0631\u0645\u0632',
+  'Line Reactor': '\u0631\u0627\u06A9\u062A\u0648\u0631 \u062E\u0637',
+  'dV/dt Filter': '\u0641\u06CC\u0644\u062A\u0631 dV/dt',
+  'Shielded Cable Required': '\u06A9\u0627\u0628\u0644 \u0634\u06CC\u0644\u062F\u062F\u0627\u0631 \u0627\u0644\u0632\u0627\u0645\u06CC',
+  'No RCD on VFD output': '\u0628\u062F\u0648\u0646 RCD \u062F\u0631 \u062E\u0631\u0648\u062C\u06CC \u062F\u0631\u0627\u06CC\u0648',
+  'VFD Rated Current': '\u062C\u0631\u06CC\u0627\u0646 \u0646\u0627\u0645\u06CC \u062F\u0631\u0627\u06CC\u0648',
+  'Motor Cable Max Length': '\u062D\u062F\u0627\u06A9\u062B\u0631 \u0637\u0648\u0644 \u06A9\u0627\u0628\u0644 \u0645\u0648\u062A\u0648\u0631',
+  'PE Minimum': '\u062D\u062F\u0627\u0642\u0644 PE'
 };
 function tx(da, en) { if(lang === 'da') return da; if(lang === 'fa') return _FA[en] || en; return en; }
 function tl(obj, prefix) { return obj[prefix + '_' + lang] || obj[prefix + '_en'] || ''; }
@@ -4109,6 +4176,9 @@ function renderModule(mod) {
     case 'ev': content = renderEV(); break;
     case 'solar': content = renderSolar(); break;
     case 'noed': content = renderNoed(); break;
+    case 'motor': content = renderMotor(); break;
+    case 'harmonic': content = renderHarmonic(); break;
+    case 'vfd': content = renderVFD(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -9756,6 +9826,780 @@ function renderNoed() {
     var safe = calc.required && calc.luminaireCount > 0;
     html += renderVerdict(safe, safe ? tx('Design opfylder DS/EN 1838 + DS/EN 50172', 'Design complies with DS/EN 1838 + DS/EN 50172') : tx('Utilstraekkeligt design', 'Insufficient design'));
   }
+
+  html += '</div>';
+  return html;
+}
+
+// ===== MOTOR START ANALYSIS MODULE (IEC 60947 + DS/HD 60364-5-52) =====
+
+// IEC motor full-load current table (400V, 3-phase, 4-pole standard)
+var MOTOR_FLC_TABLE = {
+  // kW: { 2pole, 4pole, 6pole, 8pole } in Amps at 400V
+  0.55: { 2: 1.5, 4: 1.6, 6: 1.8, 8: 2.0 },
+  0.75: { 2: 1.9, 4: 2.0, 6: 2.2, 8: 2.5 },
+  1.1: { 2: 2.7, 4: 2.8, 6: 3.1, 8: 3.4 },
+  1.5: { 2: 3.5, 4: 3.7, 6: 4.0, 8: 4.4 },
+  2.2: { 2: 5.0, 4: 5.2, 6: 5.7, 8: 6.2 },
+  3: { 2: 6.6, 4: 6.9, 6: 7.5, 8: 8.2 },
+  4: { 2: 8.6, 4: 9.0, 6: 9.8, 8: 10.8 },
+  5.5: { 2: 11.5, 4: 12.0, 6: 13.2, 8: 14.5 },
+  7.5: { 2: 15.5, 4: 16.0, 6: 17.5, 8: 19.3 },
+  11: { 2: 22.0, 4: 23.0, 6: 25.0, 8: 27.5 },
+  15: { 2: 29.5, 4: 30.5, 6: 33.5, 8: 37.0 },
+  18.5: { 2: 36.0, 4: 37.5, 6: 41.0, 8: 45.0 },
+  22: { 2: 42.5, 4: 44.0, 6: 48.5, 8: 53.0 },
+  30: { 2: 57.0, 4: 59.0, 6: 65.0, 8: 71.0 },
+  37: { 2: 70.0, 4: 72.0, 6: 79.0, 8: 87.0 },
+  45: { 2: 85.0, 4: 87.0, 6: 96.0, 8: 105.0 },
+  55: { 2: 103.0, 4: 106.0, 6: 117.0, 8: 128.0 },
+  75: { 2: 140.0, 4: 144.0, 6: 158.0, 8: 173.0 },
+  90: { 2: 168.0, 4: 172.0, 6: 189.0, 8: 207.0 },
+  110: { 2: 205.0, 4: 210.0, 6: 231.0, 8: 253.0 }
+};
+
+// Starting current multipliers per method
+var MOTOR_START_MULTIPLIERS = {
+  dol: { min: 6, max: 8, typical: 7 },
+  starDelta: { min: 2, max: 3, typical: 2.5 },
+  soft: { min: 2, max: 4, typical: 3 },
+  vfd: { min: 1, max: 1.5, typical: 1.2 }
+};
+
+// Starting time ranges per method (seconds)
+var MOTOR_START_TIMES = {
+  dol: { min: 0.5, max: 3, typical: 1.5 },
+  starDelta: { min: 3, max: 8, typical: 5 },
+  soft: { min: 5, max: 15, typical: 10 },
+  vfd: { min: 2, max: 10, typical: 5 }
+};
+
+// Duty cycle derating factors per IEC 60034-1
+var MOTOR_DUTY_DERATING = {
+  S1: 1.0,   // Continuous
+  S2: 0.85,  // Short-time
+  S3: 0.75   // Intermittent
+};
+
+var motorState = {
+  kW: 7.5,
+  poles: 4,
+  startType: 'dol',
+  duty: 'S1',
+  cableLength: 30
+};
+
+// Get motor full-load current
+function motorGetFLC(kW, poles) {
+  var entry = MOTOR_FLC_TABLE[kW];
+  if (!entry) return 0;
+  return entry[poles] || entry[4];
+}
+
+// Calculate starting current
+function motorCalcStartCurrent(kW, poles, startType) {
+  var flc = motorGetFLC(kW, poles);
+  var mult = MOTOR_START_MULTIPLIERS[startType] || MOTOR_START_MULTIPLIERS.dol;
+  return Math.ceil(flc * mult.typical);
+}
+
+// Calculate voltage dip during start: deltaU% = (Istart * Zcable) / Un * 100
+function motorCalcVoltageDip(kW, poles, startType, cableLengthM) {
+  var iStart = motorCalcStartCurrent(kW, poles, startType);
+  // Use typical cable impedance for motor circuits (approx 0.5 mOhm/m for Cu 6mm2)
+  // Conservative: use higher impedance estimate
+  var flc = motorGetFLC(kW, poles);
+  // Select appropriate cable impedance based on motor size
+  var zPerM;
+  if (flc <= 10) zPerM = 3.08; // 6mm2
+  else if (flc <= 17) zPerM = 1.83; // 10mm2
+  else if (flc <= 24) zPerM = 1.15; // 16mm2
+  else if (flc <= 32) zPerM = 0.727; // 25mm2
+  else if (flc <= 41) zPerM = 0.525; // 35mm2
+  else if (flc <= 57) zPerM = 0.388; // 50mm2
+  else if (flc <= 76) zPerM = 0.269; // 70mm2
+  else zPerM = 0.194; // 95mm2
+
+  // Zcable in Ohms (r in Ohm/km * length in m / 1000) * sqrt(3) for 3-phase
+  var zCable = zPerM * cableLengthM / 1000;
+  var un = 400; // 3-phase 400V
+  var vdip = (iStart * Math.sqrt(3) * zCable / un) * 100;
+  return Math.ceil(vdip * 100) / 100; // Conservative ceiling to 2 decimals
+}
+
+// Select MPCB from PRODUCTS for given motor kW
+function motorSelectMPCB(kW, flc) {
+  var mpcbs = PRODUCTS.mpcbs;
+  for (var i = 0; i < mpcbs.length; i++) {
+    if (mpcbs[i].kW >= kW && mpcbs[i].rangeMax >= flc) return mpcbs[i];
+  }
+  return mpcbs[mpcbs.length - 1]; // largest available
+}
+
+// Select contactor from PRODUCTS for given motor kW
+function motorSelectContactor(kW) {
+  var contactors = PRODUCTS.contactors;
+  for (var i = 0; i < contactors.length; i++) {
+    if (contactors[i].ac3_kW >= kW) return contactors[i];
+  }
+  return contactors[contactors.length - 1];
+}
+
+// Select overload relay from PRODUCTS for given FLC
+function motorSelectOverload(flc) {
+  var relays = PRODUCTS.overloadRelays;
+  for (var i = 0; i < relays.length; i++) {
+    if (flc >= relays[i].rangeMin && flc <= relays[i].rangeMax) return relays[i];
+  }
+  // Find closest relay that covers the FLC
+  for (var j = 0; j < relays.length; j++) {
+    if (relays[j].rangeMax >= flc) return relays[j];
+  }
+  return relays[relays.length - 1];
+}
+
+// Select cable for motor based on FLC with derating
+function motorSelectCable(flc, duty) {
+  var derating = MOTOR_DUTY_DERATING[duty] || 1.0;
+  var requiredIz = Math.ceil(flc / derating);
+  var cables = PRODUCTS.cables.filter(function(c) { return c.material === 'Cu'; });
+  cables.sort(function(a, b) { return a.iz - b.iz; });
+  for (var i = 0; i < cables.length; i++) {
+    if (cables[i].iz >= requiredIz) return cables[i];
+  }
+  return cables[cables.length - 1];
+}
+
+// Get starting time estimate
+function motorGetStartTime(startType) {
+  return MOTOR_START_TIMES[startType] || MOTOR_START_TIMES.dol;
+}
+
+// Calculate I2t during start (thermal stress)
+function motorCalcI2t(kW, poles, startType) {
+  var iStart = motorCalcStartCurrent(kW, poles, startType);
+  var time = motorGetStartTime(startType).typical;
+  return Math.ceil(iStart * iStart * time);
+}
+
+function renderMotor() {
+  var flc = motorGetFLC(motorState.kW, motorState.poles);
+  var iStart = motorCalcStartCurrent(motorState.kW, motorState.poles, motorState.startType);
+  var vdip = motorCalcVoltageDip(motorState.kW, motorState.poles, motorState.startType, motorState.cableLength);
+  var mpcb = motorSelectMPCB(motorState.kW, flc);
+  var contactor = motorSelectContactor(motorState.kW);
+  var overload = motorSelectOverload(flc);
+  var cable = motorSelectCable(flc, motorState.duty);
+  var startTime = motorGetStartTime(motorState.startType);
+  var i2t = motorCalcI2t(motorState.kW, motorState.poles, motorState.startType);
+  var derating = MOTOR_DUTY_DERATING[motorState.duty];
+  var vdipOk = vdip <= 3.0;
+  var mult = MOTOR_START_MULTIPLIERS[motorState.startType];
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Motorstart-analyse', 'Motor Start Analysis') + '</div>';
+  html += '<div class="info-row">' + tx('Beregning iht. IEC 60947 + DS/HD 60364-5-52', 'Calculation per IEC 60947 + DS/HD 60364-5-52') + '</div>';
+
+  // Motor Power
+  html += '<div class="select-group"><div class="select-label">' + tx('Motoreffekt [kW]', 'Motor Power [kW]') + '</div><div class="select-grid">';
+  [0.55, 0.75, 1.1, 1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110].forEach(function(kw) {
+    html += '<button class="sel-btn' + (motorState.kW === kw ? ' selected' : '') + '" onclick="motorState.kW=' + kw + ';renderModule(\'motor\')">' + kw + '</button>';
+  });
+  html += '</div></div>';
+
+  // Motor Poles
+  html += '<div class="select-group"><div class="select-label">' + tx('Antal poler', 'Motor Poles') + '</div><div class="select-grid">';
+  [2, 4, 6, 8].forEach(function(p) {
+    var rpm = Math.round(3000 / (p / 2));
+    html += '<button class="sel-btn' + (motorState.poles === p ? ' selected' : '') + '" onclick="motorState.poles=' + p + ';renderModule(\'motor\')">' + p + 'P (' + rpm + ' rpm)</button>';
+  });
+  html += '</div></div>';
+
+  // Starting Method
+  html += '<div class="select-group"><div class="select-label">' + tx('Startmetode', 'Starting Method') + '</div><div class="select-grid">';
+  var methods = [
+    { key: 'dol', da: 'DOL (Direkte)', en: 'DOL (Direct-On-Line)' },
+    { key: 'starDelta', da: 'Stjerne-Trekant', en: 'Star-Delta' },
+    { key: 'soft', da: 'Soft Starter', en: 'Soft Starter' },
+    { key: 'vfd', da: 'Frekvensomformer', en: 'VFD' }
+  ];
+  methods.forEach(function(m) {
+    html += '<button class="sel-btn' + (motorState.startType === m.key ? ' selected' : '') + '" onclick="motorState.startType=\'' + m.key + '\';renderModule(\'motor\')">' + tx(m.da, m.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Duty Cycle
+  html += '<div class="select-group"><div class="select-label">' + tx('Driftsart (IEC 60034-1)', 'Duty Cycle (IEC 60034-1)') + '</div><div class="select-grid">';
+  [{ key: 'S1', da: 'S1 Kontinuerlig', en: 'S1 Continuous' },
+   { key: 'S2', da: 'S2 Kortvarig', en: 'S2 Short-time' },
+   { key: 'S3', da: 'S3 Intermitterende', en: 'S3 Intermittent' }].forEach(function(d) {
+    html += '<button class="sel-btn' + (motorState.duty === d.key ? ' selected' : '') + '" onclick="motorState.duty=\'' + d.key + '\';renderModule(\'motor\')">' + tx(d.da, d.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Cable Length
+  html += '<div class="select-group"><div class="select-label">' + tx('Kabellengde [m]', 'Cable Length [m]') + '</div><div class="select-grid">';
+  [10, 15, 20, 25, 30, 40, 50, 75, 100].forEach(function(len) {
+    html += '<button class="sel-btn' + (motorState.cableLength === len ? ' selected' : '') + '" onclick="motorState.cableLength=' + len + ';renderModule(\'motor\')">' + len + ' m</button>';
+  });
+  html += '</div></div>';
+
+  // Results
+  html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
+
+  // Motor Data
+  html += '<div class="result-box">';
+  html += '<div class="result-row"><span class="label">' + tx('Fuldlaststrøm (FLC)', 'Full Load Current (FLC)') + '</span><span class="value">' + flc + ' A (IEC 60947)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Startstrøm', 'Starting Current') + '</span><span class="value">' + iStart + ' A (' + mult.typical + 'x FLC)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Starttid', 'Starting Time') + '</span><span class="value">' + startTime.typical + ' s</span></div>';
+  html += '<div class="result-row"><span class="label">I\u00B2t (' + tx('termisk belastning', 'thermal stress') + ')</span><span class="value">' + i2t + ' A\u00B2s</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Driftsart reduktion', 'Duty derating') + '</span><span class="value">' + derating + ' (IEC 60034-1)</span></div>';
+  html += '</div>';
+
+  // Voltage Dip
+  html += '<div class="result-box">';
+  html += '<div class="result-row"><span class="label">' + tx('Spændingsdyk ved start', 'Voltage Dip') + '</span><span class="value">' + vdip.toFixed(2) + '% ' + (vdipOk ? '\u2705' : '\u274C') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Grænse (DS/HD 60364-5-52 cl.525)', 'Limit (DS/HD 60364-5-52 cl.525)') + '</span><span class="value">max 3%</span></div>';
+  html += '</div>';
+
+  // Protection Coordination
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Beskyttelseskoordinering (IEC 60947)', 'Protection Coordination (IEC 60947)') + '</div>';
+  if (mpcb) {
+    html += '<div class="result-row"><span class="label">MPCB</span><span class="value">' + mpcb.brand + ' ' + mpcb.model + ' (' + mpcb.rangeMin + '-' + mpcb.rangeMax + 'A)</span></div>';
+  }
+  if (contactor) {
+    html += '<div class="result-row"><span class="label">' + tx('Kontaktor', 'Contactor') + '</span><span class="value">' + contactor.brand + ' ' + contactor.model + ' (AC-3: ' + contactor.ac3_A + 'A / ' + contactor.ac3_kW + 'kW)</span></div>';
+  }
+  if (overload) {
+    html += '<div class="result-row"><span class="label">' + tx('Overbelastningsrelæ', 'Overload Relay') + '</span><span class="value">' + overload.brand + ' ' + overload.model + ' (' + overload.rangeMin + '-' + overload.rangeMax + 'A)</span></div>';
+  }
+  html += '</div>';
+
+  // Cable
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Kabelanbefaling', 'Cable Recommendation') + '</div>';
+  if (cable) {
+    html += '<div class="result-row"><span class="label">' + tx('Kabel', 'Cable') + '</span><span class="value">' + cable.brand + ' ' + cable.model + ' ' + cable.mm2 + 'mm\u00B2</span></div>';
+    html += '<div class="result-row"><span class="label">Iz</span><span class="value">' + cable.iz + ' A (DS/HD 60364-5-52)</span></div>';
+  }
+  html += '</div>';
+
+  // Verdict
+  html += renderVerdict(vdipOk, vdipOk ? tx('Spændingsdyk OK - starter opfylder DS/HD 60364-5-52 cl.525', 'Voltage dip OK - starter complies with DS/HD 60364-5-52 cl.525') : tx('Spændingsdyk for højt - brug blødere startmetode eller kortere kabel', 'Voltage dip exceeded - use softer starting method or shorter cable'));
+
+  html += '</div>';
+  return html;
+}
+// ===== HARMONIC ANALYSIS MODULE (EN 61000-3-2/12 + DS/HD 60364) =====
+
+// Characteristic harmonic spectra for common non-linear loads (% of fundamental)
+var HARMONIC_SPECTRA = {
+  vfd: { label_da: 'Frekvensomformer (VFD)', label_en: 'VFD/Frequency Converter', h3: 2, h5: 35, h7: 22, h11: 9, h13: 6 },
+  led: { label_da: 'LED belysning (SMPS)', label_en: 'LED Lighting (SMPS)', h3: 22, h5: 12, h7: 8, h11: 4, h13: 3 },
+  ev: { label_da: 'EV-lader', label_en: 'EV Charger', h3: 5, h5: 8, h7: 5, h11: 3, h13: 2 },
+  ups: { label_da: 'UPS', label_en: 'UPS', h3: 8, h5: 30, h7: 15, h11: 7, h13: 5 },
+  welding: { label_da: 'Svejsemaskine', label_en: 'Welding Machine', h3: 10, h5: 25, h7: 18, h11: 8, h13: 5 },
+  it: { label_da: 'IT-udstyr (PC)', label_en: 'IT Equipment (PC)', h3: 80, h5: 60, h7: 40, h11: 15, h13: 10 }
+};
+
+// Diversity factor for harmonics based on number of identical loads
+function harmonicDiversityFactor(n) {
+  if (n <= 1) return 1.0;
+  if (n <= 3) return 0.9;
+  if (n <= 6) return 0.85;
+  if (n <= 10) return 0.8;
+  return 0.7;
+}
+
+var harmonicState = {
+  loadType: 'vfd',
+  numLoads: 1,
+  loadKW: 11
+};
+
+// Calculate THD: sqrt(sum(Ih/I1)^2) * 100%
+function harmonicCalcTHD(loadType, numLoads) {
+  var spec = HARMONIC_SPECTRA[loadType];
+  if (!spec) return { thd: 0, harmonics: {}, diversity: 1, clause: 'EN 61000-3-2' };
+  var df = harmonicDiversityFactor(numLoads);
+  var h3 = spec.h3 * df;
+  var h5 = spec.h5 * df;
+  var h7 = spec.h7 * df;
+  var h11 = spec.h11 * df;
+  var h13 = spec.h13 * df;
+  var thd = Math.sqrt(h3*h3 + h5*h5 + h7*h7 + h11*h11 + h13*h13);
+  thd = Math.ceil(thd * 100) / 100; // Conservative ceiling
+  var exceeded = thd > 8.0;
+  return {
+    thd: thd,
+    harmonics: { h3: h3, h5: h5, h7: h7, h11: h11, h13: h13 },
+    diversity: df,
+    exceeded: exceeded,
+    limit: 8.0,
+    clause: 'EN 50160 cl.4.2.5'
+  };
+}
+
+// Calculate K-factor for transformer derating: K = sum(h^2 * Ih^2) / sum(Ih^2)
+function harmonicCalcKFactor(loadType, numLoads) {
+  var spec = HARMONIC_SPECTRA[loadType];
+  if (!spec) return { kFactor: 1, derating: 1.0, clause: 'IEEE C57.110' };
+  var df = harmonicDiversityFactor(numLoads);
+  // Normalize: fundamental = 100%
+  var I1 = 100;
+  var h3 = spec.h3 * df;
+  var h5 = spec.h5 * df;
+  var h7 = spec.h7 * df;
+  var h11 = spec.h11 * df;
+  var h13 = spec.h13 * df;
+
+  var numerator = (1*1*I1*I1) + (3*3*h3*h3) + (5*5*h5*h5) + (7*7*h7*h7) + (11*11*h11*h11) + (13*13*h13*h13);
+  var denominator = (I1*I1) + (h3*h3) + (h5*h5) + (h7*h7) + (h11*h11) + (h13*h13);
+  var kFactor = Math.ceil((numerator / denominator) * 100) / 100;
+
+  // Transformer derating = 1/sqrt(K)
+  var derating = Math.floor((1 / Math.sqrt(kFactor)) * 100) / 100;
+
+  return {
+    kFactor: kFactor,
+    derating: derating,
+    clause: 'IEEE C57.110'
+  };
+}
+
+// Calculate neutral conductor oversizing for triplen harmonics (3rd, 9th, 15th)
+function harmonicCalcNeutral(loadType, numLoads) {
+  var spec = HARMONIC_SPECTRA[loadType];
+  if (!spec) return { factor: 1.0, oversized: false, clause: 'DS/HD 60364-5-52 cl.523.6.3' };
+  var df = harmonicDiversityFactor(numLoads);
+  // 3rd harmonic in 3-phase adds in neutral (triplen harmonics)
+  var h3percent = spec.h3 * df;
+  // Neutral current factor: sqrt(3) * (h3/100) relative to phase current for balanced 3-phase
+  // If h3 > 33%, neutral carries more than phase current
+  var neutralFactor = Math.sqrt(3) * (h3percent / 100);
+  // But minimum is 1.0 (neutral cannot be smaller than phase)
+  var factor = Math.max(1.0, Math.ceil(neutralFactor * 100) / 100);
+  // If factor > 1.0, recommend 150% neutral (next standard size up)
+  var oversized = factor > 1.0;
+  var recommendation = oversized ? 1.5 : 1.0;
+  return {
+    factor: recommendation,
+    h3percent: h3percent,
+    neutralFactor: neutralFactor,
+    oversized: oversized,
+    clause: 'DS/HD 60364-5-52 cl.523.6.3'
+  };
+}
+
+// Calculate passive filter sizing (LC tuned to dominant harmonic)
+function harmonicCalcFilter(loadType, numLoads, loadKW) {
+  var spec = HARMONIC_SPECTRA[loadType];
+  if (!spec) return { needed: false, clause: 'EN 61000-3-12' };
+  var df = harmonicDiversityFactor(numLoads);
+  var thd = harmonicCalcTHD(loadType, numLoads).thd;
+
+  // Find dominant harmonic
+  var harmonics = { 5: spec.h5 * df, 7: spec.h7 * df, 11: spec.h11 * df, 13: spec.h13 * df };
+  var dominant = 5;
+  var maxVal = 0;
+  for (var h in harmonics) {
+    if (harmonics[h] > maxVal) { maxVal = harmonics[h]; dominant = parseInt(h); }
+  }
+
+  // Filter sizing: reactive power needed = load kVA * (dominant harmonic %)
+  var filterKvar = Math.ceil(loadKW * numLoads * (maxVal / 100) * df);
+  // LC tuned frequency: f_tune = f_fundamental * harmonic_order * 0.94 (4% below to avoid resonance)
+  var fTune = Math.round(50 * dominant * 0.94);
+
+  // Active filter recommended when THD > 8%
+  var activeRecommended = thd > 8.0;
+
+  return {
+    needed: thd > 5.0,
+    dominantHarmonic: dominant,
+    filterKvar: filterKvar,
+    tuneFreqHz: fTune,
+    activeRecommended: activeRecommended,
+    thd: thd,
+    clause: 'EN 61000-3-12'
+  };
+}
+
+// Cable derating for harmonics per DS/HD 60364-5-52 cl.523.6.3
+function harmonicCalcCableDerating(loadType, numLoads) {
+  var thd = harmonicCalcTHD(loadType, numLoads).thd;
+  // Table B.52.11 guidance: for THD > 15%, derate to 0.86; >25% to 0.82; >33% to 0.79
+  var factor;
+  if (thd <= 15) factor = 1.0;
+  else if (thd <= 25) factor = 0.86;
+  else if (thd <= 33) factor = 0.82;
+  else factor = 0.79;
+  return {
+    factor: factor,
+    thd: thd,
+    clause: 'DS/HD 60364-5-52 Table B.52.11'
+  };
+}
+
+function renderHarmonic() {
+  var thdResult = harmonicCalcTHD(harmonicState.loadType, harmonicState.numLoads);
+  var kResult = harmonicCalcKFactor(harmonicState.loadType, harmonicState.numLoads);
+  var neutralResult = harmonicCalcNeutral(harmonicState.loadType, harmonicState.numLoads);
+  var filterResult = harmonicCalcFilter(harmonicState.loadType, harmonicState.numLoads, harmonicState.loadKW);
+  var deratingResult = harmonicCalcCableDerating(harmonicState.loadType, harmonicState.numLoads);
+  var spec = HARMONIC_SPECTRA[harmonicState.loadType];
+  var thdOk = !thdResult.exceeded;
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Harmonisk analyse', 'Harmonic Analysis') + '</div>';
+  html += '<div class="info-row">' + tx('Beregning iht. EN 61000-3-2/12 + DS/HD 60364-5-52', 'Calculation per EN 61000-3-2/12 + DS/HD 60364-5-52') + '</div>';
+
+  // Load Type
+  html += '<div class="select-group"><div class="select-label">' + tx('Lasttype', 'Load Type') + '</div><div class="select-grid">';
+  var loadTypes = Object.keys(HARMONIC_SPECTRA);
+  loadTypes.forEach(function(lt) {
+    var s = HARMONIC_SPECTRA[lt];
+    html += '<button class="sel-btn' + (harmonicState.loadType === lt ? ' selected' : '') + '" onclick="harmonicState.loadType=\'' + lt + '\';renderModule(\'harmonic\')">' + tx(s.label_da, s.label_en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Number of loads
+  html += '<div class="select-group"><div class="select-label">' + tx('Antal identiske laster', 'Number of Identical Loads') + '</div><div class="select-grid">';
+  [1, 2, 3, 4, 5, 6, 8, 10, 15, 20].forEach(function(n) {
+    html += '<button class="sel-btn' + (harmonicState.numLoads === n ? ' selected' : '') + '" onclick="harmonicState.numLoads=' + n + ';renderModule(\'harmonic\')">' + n + '</button>';
+  });
+  html += '</div></div>';
+
+  // Load power
+  html += '<div class="select-group"><div class="select-label">' + tx('Effekt per last [kW]', 'Power per Load [kW]') + '</div><div class="select-grid">';
+  [1.5, 3, 5.5, 7.5, 11, 15, 22, 30, 45, 55].forEach(function(kw) {
+    html += '<button class="sel-btn' + (harmonicState.loadKW === kw ? ' selected' : '') + '" onclick="harmonicState.loadKW=' + kw + ';renderModule(\'harmonic\')">' + kw + '</button>';
+  });
+  html += '</div></div>';
+
+  // Results
+  html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
+
+  // THD
+  html += '<div class="result-box">';
+  html += '<div class="result-row"><span class="label">THD (' + tx('total harmonisk forvrængning', 'Total Harmonic Distortion') + ')</span><span class="value">' + thdResult.thd.toFixed(2) + '% ' + (thdOk ? '\u2705' : '\u274C') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Grænse (EN 50160)', 'Limit (EN 50160)') + '</span><span class="value">max 8.0%</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Diversitetsfaktor', 'Diversity Factor') + '</span><span class="value">' + thdResult.diversity + '</span></div>';
+  html += '</div>';
+
+  // Harmonic Spectrum SVG
+  html += '<div class="result-box"><div class="result-title">' + tx('Harmonisk spektrum', 'Harmonic Spectrum') + '</div>';
+  html += '<svg viewBox="0 0 300 120" style="width:100%;max-width:400px;height:auto">';
+  var barW = 40;
+  var harmonics = thdResult.harmonics;
+  var maxH = Math.max(harmonics.h3, harmonics.h5, harmonics.h7, harmonics.h11, harmonics.h13, 1);
+  var hArr = [{h:3, v:harmonics.h3}, {h:5, v:harmonics.h5}, {h:7, v:harmonics.h7}, {h:11, v:harmonics.h11}, {h:13, v:harmonics.h13}];
+  hArr.forEach(function(item, i) {
+    var bh = Math.max(2, (item.v / maxH) * 80);
+    var x = 20 + i * 56;
+    var color = item.v > 8 ? '#ef4444' : item.v > 5 ? '#f59e0b' : '#22c55e';
+    html += '<rect x="' + x + '" y="' + (95 - bh) + '" width="' + barW + '" height="' + bh + '" fill="' + color + '" rx="2"/>';
+    html += '<text x="' + (x + barW/2) + '" y="108" text-anchor="middle" font-size="9" fill="#666">H' + item.h + '</text>';
+    html += '<text x="' + (x + barW/2) + '" y="' + (90 - bh) + '" text-anchor="middle" font-size="8" fill="#333">' + item.v.toFixed(1) + '%</text>';
+  });
+  html += '</svg></div>';
+
+  // K-factor
+  html += '<div class="result-box">';
+  html += '<div class="result-row"><span class="label">K-' + tx('faktor (transformerbelastning)', 'Factor (transformer loading)') + '</span><span class="value">' + kResult.kFactor.toFixed(2) + ' (' + kResult.clause + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Transformer derating', 'Transformer Derating') + '</span><span class="value">' + (kResult.derating * 100).toFixed(0) + '% ' + tx('af mærkeeffekt', 'of rated power') + '</span></div>';
+  html += '</div>';
+
+  // Neutral sizing
+  html += '<div class="result-box">';
+  html += '<div class="result-row"><span class="label">' + tx('Neutral oversizing', 'Neutral Sizing') + '</span><span class="value">' + (neutralResult.factor * 100) + '% (' + neutralResult.clause + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('3. harmonisk i neutral', '3rd harmonic in neutral') + '</span><span class="value">' + neutralResult.h3percent.toFixed(1) + '% ' + (neutralResult.oversized ? '\u26A0\uFE0F' : '\u2705') + '</span></div>';
+  html += '</div>';
+
+  // Cable derating
+  html += '<div class="result-box">';
+  html += '<div class="result-row"><span class="label">' + tx('Kabel-derating for harmoniske', 'Cable Derating for Harmonics') + '</span><span class="value">' + deratingResult.factor + ' (' + deratingResult.clause + ')</span></div>';
+  html += '</div>';
+
+  // Filter recommendation
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Filteranbefaling', 'Filter Recommendation') + '</div>';
+  if (filterResult.needed) {
+    html += '<div class="result-row"><span class="label">' + tx('Dominant harmonisk', 'Dominant Harmonic') + '</span><span class="value">H' + filterResult.dominantHarmonic + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Passivt filter (LC)', 'Passive Filter (LC)') + '</span><span class="value">' + filterResult.filterKvar + ' kvar @ ' + filterResult.tuneFreqHz + ' Hz</span></div>';
+    if (filterResult.activeRecommended) {
+      html += '<div class="result-row"><span class="label">' + tx('Aktivt filter anbefales', 'Active Filter Recommended') + '</span><span class="value">THD > 8% (' + filterResult.clause + ')</span></div>';
+    }
+  } else {
+    html += '<div class="result-row"><span class="label">' + tx('Status', 'Status') + '</span><span class="value">' + tx('Intet filter nødvendigt', 'No filter required') + ' \u2705</span></div>';
+  }
+  html += '</div>';
+
+  // Verdict
+  html += renderVerdict(thdOk, thdOk ? tx('THD inden for grænse - opfylder EN 50160 cl.4.2.5', 'THD within limits - complies with EN 50160 cl.4.2.5') : tx('THD overskrider 8% - aktivt filter påkrævet per EN 50160', 'THD exceeds 8% - active filter required per EN 50160'));
+
+  html += '</div>';
+  return html;
+}
+// ===== VFD/FREQUENCY CONVERTER SIZING MODULE (IEC 61800 + DS/HD 60364) =====
+
+// VFD application types with sizing rules
+var VFD_APPLICATIONS = {
+  pump: { label_da: 'Pumpe', label_en: 'Pump', torqueType: 'variable', sizingFactor: 1.1, regen: false },
+  fan: { label_da: 'Ventilator', label_en: 'Fan', torqueType: 'variable', sizingFactor: 1.1, regen: false },
+  conveyor: { label_da: 'Transportbaand', label_en: 'Conveyor', torqueType: 'constant', sizingFactor: 1.5, regen: false },
+  crane: { label_da: 'Kran/Hejsevaerk', label_en: 'Crane/Hoist', torqueType: 'constant', sizingFactor: 1.5, regen: true },
+  compressor: { label_da: 'Kompressor', label_en: 'Compressor', torqueType: 'constant', sizingFactor: 1.5, regen: false }
+};
+
+// EMC categories per IEC 61800-3
+var VFD_EMC_CATEGORIES = {
+  C1: { label_da: 'C1 (Beboelse)', label_en: 'C1 (Residential)', maxCable: 30, shielded: true },
+  C2: { label_da: 'C2 (Industri 1. miljø)', label_en: 'C2 (Industrial 1st env.)', maxCable: 50, shielded: true },
+  C3: { label_da: 'C3 (Industri 2. miljø)', label_en: 'C3 (Industrial 2nd env.)', maxCable: 100, shielded: false }
+};
+
+var vfdState = {
+  application: 'pump',
+  motorKW: 11,
+  cableLength: 25,
+  emcCategory: 'C2'
+};
+
+// Calculate VFD rated current requirement
+function vfdCalcRatedCurrent(motorKW, application) {
+  var app = VFD_APPLICATIONS[application];
+  if (!app) app = VFD_APPLICATIONS.pump;
+  // Motor FLC at 400V, 4-pole (standard)
+  var flc = motorGetFLC(motorKW, 4);
+  var vfdCurrent = Math.ceil(flc * app.sizingFactor);
+  return {
+    motorFLC: flc,
+    vfdCurrent: vfdCurrent,
+    sizingFactor: app.sizingFactor,
+    torqueType: app.torqueType,
+    clause: 'IEC 61800-1 cl.5.2'
+  };
+}
+
+// Calculate input cable (mains to VFD)
+function vfdCalcInputCable(motorKW, application) {
+  var sizing = vfdCalcRatedCurrent(motorKW, application);
+  // Input current includes rectifier PF (~0.95) and efficiency (~0.97)
+  var inputCurrent = Math.ceil(sizing.vfdCurrent / (0.95 * 0.97));
+  // Select cable from PRODUCTS
+  var cables = PRODUCTS.cables.filter(function(c) { return c.material === 'Cu'; });
+  cables.sort(function(a, b) { return a.iz - b.iz; });
+  var selectedCable = null;
+  for (var i = 0; i < cables.length; i++) {
+    if (cables[i].iz >= inputCurrent) { selectedCable = cables[i]; break; }
+  }
+  if (!selectedCable) selectedCable = cables[cables.length - 1];
+  return {
+    inputCurrent: inputCurrent,
+    cable: selectedCable,
+    clause: 'DS/HD 60364-5-52'
+  };
+}
+
+// Calculate output cable (VFD to motor)
+function vfdCalcOutputCable(motorKW, application, cableLength, emcCategory) {
+  var sizing = vfdCalcRatedCurrent(motorKW, application);
+  var emc = VFD_EMC_CATEGORIES[emcCategory] || VFD_EMC_CATEGORIES.C2;
+  // Output cable sized for motor FLC (VFD limits current)
+  var outputCurrent = sizing.motorFLC;
+  var cables = PRODUCTS.cables.filter(function(c) { return c.material === 'Cu'; });
+  cables.sort(function(a, b) { return a.iz - b.iz; });
+  var selectedCable = null;
+  for (var i = 0; i < cables.length; i++) {
+    if (cables[i].iz >= outputCurrent) { selectedCable = cables[i]; break; }
+  }
+  if (!selectedCable) selectedCable = cables[cables.length - 1];
+
+  var maxLength = emc.maxCable;
+  var lengthOk = cableLength <= maxLength;
+  var shieldRequired = emc.shielded || cableLength > 30;
+  var dvdtFilterNeeded = cableLength > 30;
+
+  return {
+    outputCurrent: outputCurrent,
+    cable: selectedCable,
+    maxLength: maxLength,
+    lengthOk: lengthOk,
+    shieldRequired: shieldRequired,
+    dvdtFilterNeeded: dvdtFilterNeeded,
+    clause: 'IEC 61800-3'
+  };
+}
+
+// Check if braking resistor is needed
+function vfdCalcBraking(motorKW, application) {
+  var app = VFD_APPLICATIONS[application];
+  if (!app) return { needed: false, clause: 'IEC 61800-1' };
+  if (!app.regen) return { needed: false, reason_da: 'Ingen regenerativ drift', reason_en: 'No regenerative operation', clause: 'IEC 61800-1' };
+  // For crane/hoist: braking energy = potential energy during lowering
+  // P_brake >= motor kW (conservative: full rated power during deceleration)
+  var brakePower = Math.ceil(motorKW * 1.1); // 10% safety margin
+  // Braking resistor Ohm = Udc^2 / P_brake, Udc ~ 565V for 400V supply
+  var udc = 565;
+  var resistance = Math.floor((udc * udc / (brakePower * 1000)) * 10) / 10;
+  return {
+    needed: true,
+    brakePowerKW: brakePower,
+    resistanceOhm: resistance,
+    reason_da: 'Regenerativ drift kræver bremsemodstand',
+    reason_en: 'Regenerative operation requires braking resistor',
+    clause: 'IEC 61800-1 cl.5.5'
+  };
+}
+
+// Check if line reactor is needed
+function vfdCalcLineReactor(motorKW) {
+  // Recommended when ISC/IN > 120 at PCC
+  // Conservative: always recommend for motors > 15kW
+  var recommended = motorKW > 15;
+  return {
+    recommended: recommended,
+    reason_da: recommended ? 'Anbefalet for reduktion af harmoniske' : 'Ikke nødvendig ved lav kortslutningseffekt',
+    reason_en: recommended ? 'Recommended for harmonic reduction' : 'Not required at low short-circuit power',
+    clause: 'IEC 61800-3 cl.6.3'
+  };
+}
+
+// Select MCB for VFD input protection
+function vfdSelectInputMCB(inputCurrent) {
+  var mcbs = PRODUCTS.mcbs.filter(function(m) { return m.curve === 'C'; });
+  mcbs.sort(function(a, b) { return a.rating - b.rating; });
+  for (var i = 0; i < mcbs.length; i++) {
+    if (mcbs[i].rating >= inputCurrent) return mcbs[i];
+  }
+  return mcbs[mcbs.length - 1];
+}
+
+// PE sizing per IEC 61800-5-1
+function vfdCalcPE(motorKW) {
+  // Minimum 10mm2 Cu for EMC screening per IEC 61800-5-1
+  var minPE = 10;
+  if (motorKW > 30) minPE = 16;
+  if (motorKW > 55) minPE = 25;
+  return {
+    minPEmm2: minPE,
+    clause: 'IEC 61800-5-1'
+  };
+}
+
+function renderVFD() {
+  var sizing = vfdCalcRatedCurrent(vfdState.motorKW, vfdState.application);
+  var inputCable = vfdCalcInputCable(vfdState.motorKW, vfdState.application);
+  var outputCable = vfdCalcOutputCable(vfdState.motorKW, vfdState.application, vfdState.cableLength, vfdState.emcCategory);
+  var braking = vfdCalcBraking(vfdState.motorKW, vfdState.application);
+  var reactor = vfdCalcLineReactor(vfdState.motorKW);
+  var pe = vfdCalcPE(vfdState.motorKW);
+  var inputMCB = vfdSelectInputMCB(inputCable.inputCurrent);
+  var app = VFD_APPLICATIONS[vfdState.application];
+  var emc = VFD_EMC_CATEGORIES[vfdState.emcCategory];
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Frekvensomformer dimensionering', 'VFD Sizing') + '</div>';
+  html += '<div class="info-row">' + tx('Beregning iht. IEC 61800 + DS/HD 60364-5-52', 'Calculation per IEC 61800 + DS/HD 60364-5-52') + '</div>';
+
+  // Application Type
+  html += '<div class="select-group"><div class="select-label">' + tx('Applikationstype', 'Application Type') + '</div><div class="select-grid">';
+  var appKeys = Object.keys(VFD_APPLICATIONS);
+  appKeys.forEach(function(key) {
+    var a = VFD_APPLICATIONS[key];
+    html += '<button class="sel-btn' + (vfdState.application === key ? ' selected' : '') + '" onclick="vfdState.application=\'' + key + '\';renderModule(\'vfd\')">' + tx(a.label_da, a.label_en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Motor Power
+  html += '<div class="select-group"><div class="select-label">' + tx('Motoreffekt [kW]', 'Motor Power [kW]') + '</div><div class="select-grid">';
+  [0.55, 0.75, 1.1, 1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110].forEach(function(kw) {
+    html += '<button class="sel-btn' + (vfdState.motorKW === kw ? ' selected' : '') + '" onclick="vfdState.motorKW=' + kw + ';renderModule(\'vfd\')">' + kw + '</button>';
+  });
+  html += '</div></div>';
+
+  // EMC Category
+  html += '<div class="select-group"><div class="select-label">' + tx('EMC-kategori (IEC 61800-3)', 'EMC Category (IEC 61800-3)') + '</div><div class="select-grid">';
+  Object.keys(VFD_EMC_CATEGORIES).forEach(function(cat) {
+    var c = VFD_EMC_CATEGORIES[cat];
+    html += '<button class="sel-btn' + (vfdState.emcCategory === cat ? ' selected' : '') + '" onclick="vfdState.emcCategory=\'' + cat + '\';renderModule(\'vfd\')">' + tx(c.label_da, c.label_en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Cable Length (VFD to motor)
+  html += '<div class="select-group"><div class="select-label">' + tx('Motorkabel længde [m]', 'Motor Cable Length [m]') + '</div><div class="select-grid">';
+  [5, 10, 15, 20, 25, 30, 40, 50, 75, 100].forEach(function(len) {
+    html += '<button class="sel-btn' + (vfdState.cableLength === len ? ' selected' : '') + '" onclick="vfdState.cableLength=' + len + ';renderModule(\'vfd\')">' + len + ' m</button>';
+  });
+  html += '</div></div>';
+
+  // Results
+  html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
+
+  // VFD Sizing
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('VFD dimensionering', 'VFD Sizing') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Motor FLC', 'Motor FLC') + '</span><span class="value">' + sizing.motorFLC + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('VFD min. strøm', 'VFD Min. Current') + '</span><span class="value">' + sizing.vfdCurrent + ' A (' + sizing.sizingFactor + 'x FLC)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Momenttype', 'Torque Type') + '</span><span class="value">' + tx(app.torqueType === 'variable' ? 'Variabelt moment' : 'Konstant moment', app.torqueType === 'variable' ? 'Variable torque' : 'Constant torque') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Standard', 'Standard') + '</span><span class="value">' + sizing.clause + '</span></div>';
+  html += '</div>';
+
+  // Input Cable
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Indgangskabel (net til VFD)', 'Input Cable (mains to VFD)') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Indgangsstrøm', 'Input Current') + '</span><span class="value">' + inputCable.inputCurrent + ' A</span></div>';
+  if (inputCable.cable) {
+    html += '<div class="result-row"><span class="label">' + tx('Kabel', 'Cable') + '</span><span class="value">' + inputCable.cable.brand + ' ' + inputCable.cable.model + ' ' + inputCable.cable.mm2 + 'mm\u00B2 (Iz=' + inputCable.cable.iz + 'A)</span></div>';
+  }
+  if (inputMCB) {
+    html += '<div class="result-row"><span class="label">' + tx('Beskyttelse (MCB)', 'Protection (MCB)') + '</span><span class="value">' + inputMCB.brand + ' ' + inputMCB.model + ' ' + inputMCB.rating + 'A kurve C</span></div>';
+  }
+  html += '</div>';
+
+  // Output Cable
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Udgangskabel (VFD til motor)', 'Output Cable (VFD to motor)') + '</div>';
+  if (outputCable.cable) {
+    html += '<div class="result-row"><span class="label">' + tx('Kabel', 'Cable') + '</span><span class="value">' + outputCable.cable.brand + ' ' + outputCable.cable.model + ' ' + outputCable.cable.mm2 + 'mm\u00B2</span></div>';
+  }
+  html += '<div class="result-row"><span class="label">' + tx('Maks. kabellængde', 'Max Cable Length') + '</span><span class="value">' + outputCable.maxLength + ' m ' + (outputCable.lengthOk ? '\u2705' : '\u274C') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Skærmet kabel', 'Shielded Cable') + '</span><span class="value">' + (outputCable.shieldRequired ? tx('PÅKRÆVET (EMC)', 'REQUIRED (EMC)') : tx('Anbefalet', 'Recommended')) + '</span></div>';
+  if (outputCable.dvdtFilterNeeded) {
+    html += '<div class="result-row"><span class="label">dV/dt ' + tx('filter', 'Filter') + '</span><span class="value">' + tx('Anbefalet (kabel > 30m)', 'Recommended (cable > 30m)') + '</span></div>';
+  }
+  html += '</div>';
+
+  // EMC & Grounding
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('EMC og jording', 'EMC & Grounding') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('EMC-kategori', 'EMC Category') + '</span><span class="value">' + tx(emc.label_da, emc.label_en) + ' (IEC 61800-3)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('PE minimum', 'PE Minimum') + '</span><span class="value">' + pe.minPEmm2 + ' mm\u00B2 Cu (' + pe.clause + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('EMC-afslutning', 'EMC Termination') + '</span><span class="value">360\u00B0 ' + tx('forskruning', 'gland') + '</span></div>';
+  html += '</div>';
+
+  // Additional Requirements
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Yderligere krav', 'Additional Requirements') + '</div>';
+  if (braking.needed) {
+    html += '<div class="result-row"><span class="label">' + tx('Bremsemodstand', 'Braking Resistor') + '</span><span class="value">' + braking.brakePowerKW + ' kW / ' + braking.resistanceOhm + ' \u03A9 (' + braking.clause + ')</span></div>';
+  }
+  if (reactor.recommended) {
+    html += '<div class="result-row"><span class="label">' + tx('Linje-reaktor', 'Line Reactor') + '</span><span class="value">' + tx(reactor.reason_da, reactor.reason_en) + ' (' + reactor.clause + ')</span></div>';
+  }
+  html += '</div>';
+
+  // CRITICAL WARNING: No RCD on VFD output
+  html += '<div class="result-box" style="border-left:4px solid #ef4444;background:#fef2f2">';
+  html += '<div class="result-row"><span class="label" style="color:#ef4444;font-weight:bold">\u26A0\uFE0F ' + tx('ADVARSEL', 'WARNING') + '</span><span class="value" style="color:#ef4444">' + tx('ALDRIG installér RCD mellem VFD og motor!', 'NEVER install RCD between VFD and motor!') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Årsag', 'Reason') + '</span><span class="value">' + tx('Højfrekvens lækstrøm udløser RCD (IEC 61800-5-1)', 'High-frequency leakage current trips RCD (IEC 61800-5-1)') + '</span></div>';
+  html += '</div>';
+
+  // Verdict
+  var allOk = outputCable.lengthOk;
+  html += renderVerdict(allOk, allOk ? tx('VFD-installation opfylder IEC 61800 + DS/HD 60364', 'VFD installation complies with IEC 61800 + DS/HD 60364') : tx('Motorkabel for lang - reducer længde eller brug skærmet kabel', 'Motor cable too long - reduce length or use shielded cable'));
 
   html += '</div>';
   return html;
