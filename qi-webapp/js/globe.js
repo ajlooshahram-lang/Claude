@@ -383,9 +383,14 @@
       // Colour management + cinematic tone mapping (all guarded for the r128 API).
       try { if (THREE.sRGBEncoding) renderer.outputEncoding = THREE.sRGBEncoding; } catch (e) {}
       try {
-        if (THREE.ACESFilmicToneMapping) {
-          renderer.toneMapping = THREE.ACESFilmicToneMapping;
-          renderer.toneMappingExposure = 1.15;
+        // No tone mapping: the Earth texture is already a properly-exposed photo,
+        // so render it at its true (bright) sRGB values instead of letting ACES
+        // darken the mid-tones. This is what keeps it Google-Earth bright.
+        if (THREE.NoToneMapping !== undefined) {
+          renderer.toneMapping = THREE.NoToneMapping;
+        } else if (THREE.LinearToneMapping) {
+          renderer.toneMapping = THREE.LinearToneMapping;
+          renderer.toneMappingExposure = 1.3;
         }
       } catch (e) {}
       renderer.domElement.style.display = "block";
@@ -433,7 +438,7 @@
       // never black even if the texture is slow to decode.
       var globeMat = new THREE.MeshBasicMaterial({
         map: dayTex,
-        color: new THREE.Color(0xeaf0f8)
+        color: new THREE.Color(0xffffff)
       });
       var globeGeo = new THREE.SphereGeometry(GLOBE_R, 96, 96);
       var globe = new THREE.Mesh(globeGeo, globeMat);
@@ -619,10 +624,14 @@
         var u = latLonToVec3(lat, lon, 1).normalize();
         var toQ = new THREE.Quaternion().setFromUnitVectors(u, new THREE.Vector3(0, 0, 1));
         var curR = camera.position.length() || camDist;
+        var ang = 0; try { ang = world.quaternion.angleTo(toQ); } catch (e) { ang = 0; }
         focusAnim = {
           fromQ: world.quaternion.clone(), toQ: toQ,
           fromR: curR, toR: radius || Math.max(3.6, Math.min(curR, 4.6)),
-          t: 0, dur: 0.9
+          // Google-Earth-style flight: pull the camera back mid-hop then zoom
+          // in, scaled to how far we're turning (bigger turn = higher arc).
+          arc: Math.min(2.6, ang * 1.5),
+          t: 0, dur: ang > 0.5 ? 1.5 : 0.9
         };
       }
 
@@ -678,9 +687,27 @@
           tourStep();
         }, 3200);
       }
+      // During the Cinematic Tour, switch the cable network to a distinct, vivid
+      // theme so the route "pops" as a connected glowing network while the
+      // camera flies between landing stations (Google-Earth-style guided tour).
+      function setTourTheme(on) {
+        for (var i = 0; i < cableTubes.length; i++) {
+          var tb = cableTubes[i];
+          if (!tb.mat) continue;
+          if (on) {
+            try { tb.mat.color.setHex(0x6fd0ff); } catch (e) {}
+            tb.mat.opacity = 1.0;
+          } else {
+            try { tb.mat.color.setHex(tb.baseHex); } catch (e) {}
+            tb.mat.opacity = 0.88;
+          }
+        }
+      }
+
       function startTour() {
         if (tourState.active) return;
         tourState.active = true; tourState.idx = 0;
+        setTourTheme(true);
         if (tourHandler) try { tourHandler(true); } catch (e) {}
         tourStep();
       }
@@ -688,6 +715,8 @@
         if (!tourState.active && !tourState.timer) return;
         tourState.active = false;
         if (tourState.timer) { window.clearTimeout(tourState.timer); tourState.timer = 0; }
+        try { setTourTheme(false); } catch (e) {}
+        try { if (!deploy.mode) setProgress(); } catch (e) {}
         if (tourHandler) try { tourHandler(false); } catch (e) {}
       }
       function setSpin(on) {
@@ -916,6 +945,7 @@
           var e = easeInOut(k);
           world.quaternion.copy(focusAnim.fromQ).slerp(focusAnim.toQ, e);
           var r = focusAnim.fromR + (focusAnim.toR - focusAnim.fromR) * e;
+          if (focusAnim.arc) r += Math.sin(Math.PI * e) * focusAnim.arc; // Google-Earth arc: out then in
           if (camera.position.lengthSq() > 1e-6) camera.position.normalize().multiplyScalar(r);
           if (controls) controls.update();
           if (k >= 1) focusAnim = null;
