@@ -1036,6 +1036,43 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // Elforsyning BOM (supply-side bill of materials) — new feature
+  'Elforsyning materials': '\u0645\u0648\u0627\u062F \u062A\u0623\u0645\u06CC\u0646 \u0628\u0631\u0642',
+  'Pick all elforsyning materials': '\u0627\u0646\u062A\u062E\u0627\u0628 \u0647\u0645\u0647 \u0645\u0648\u0627\u062F \u062A\u0623\u0645\u06CC\u0646 \u0628\u0631\u0642',
+  'Supply Cables': '\u06A9\u0627\u0628\u0644\u200C\u0647\u0627\u06CC \u062A\u0623\u0645\u06CC\u0646',
+  'Metering': '\u0627\u0646\u062F\u0627\u0632\u0647\u200C\u06AF\u06CC\u0631\u06CC',
+  'Main Fuses': '\u0641\u06CC\u0648\u0632\u0647\u0627\u06CC \u0627\u0635\u0644\u06CC',
+  'Earthing': '\u0633\u06CC\u0633\u062A\u0645 \u0627\u062A\u0635\u0627\u0644 \u0632\u0645\u06CC\u0646',
+  'Cable Joints': '\u0645\u0641\u0635\u0644\u200C\u0647\u0627\u06CC \u06A9\u0627\u0628\u0644',
+  'Cable Ducts': '\u06A9\u0627\u0646\u0627\u0644\u200C\u0647\u0627\u06CC \u06A9\u0627\u0628\u0644',
+  'Transformers': '\u062A\u0631\u0627\u0646\u0633\u0641\u0648\u0631\u0645\u0627\u062A\u0648\u0631\u0647\u0627',
+  'Terminals': '\u062A\u0631\u0645\u06CC\u0646\u0627\u0644\u200C\u0647\u0627',
+  'CE-marked': '\u062F\u0627\u0631\u0627\u06CC \u0646\u0634\u0627\u0646 CE',
+  'Clear all': '\u067E\u0627\u06A9 \u06A9\u0631\u062F\u0646 \u0647\u0645\u0647',
+  'Clear the entire elforsyning list?': '\u06A9\u0644 \u0641\u0647\u0631\u0633\u062A \u062A\u0623\u0645\u06CC\u0646 \u0628\u0631\u0642 \u067E\u0627\u06A9 \u0634\u0648\u062F\u061F',
+  'Export JSON': '\u062E\u0631\u0648\u062C\u06CC JSON',
+  'Remove': '\u062D\u0630\u0641',
+  'Grand total (all categories)': '\u0645\u062C\u0645\u0648\u0639 \u06A9\u0644 (\u0647\u0645\u0647 \u062F\u0633\u062A\u0647\u200C\u0647\u0627)',
+  'Preset quantity': '\u062A\u0639\u062F\u0627\u062F \u0627\u0632 \u067E\u06CC\u0634 \u062A\u0639\u06CC\u06CC\u0646\u200C\u0634\u062F\u0647',
+  'preset': '\u0627\u0632 \u067E\u06CC\u0634',
+  'Brand': '\u0628\u0631\u0646\u062F',
+  'Model': '\u0645\u062F\u0644',
+  'Spec': '\u0645\u0634\u062E\u0635\u0627\u062A',
+  'Approval': '\u062A\u0623\u06CC\u06CC\u062F',
+  'Qty': '\u062A\u0639\u062F\u0627\u062F',
+  'Total line items': '\u0645\u062C\u0645\u0648\u0639 \u0627\u0642\u0644\u0627\u0645',
+  'The list is empty.': '\u0641\u0647\u0631\u0633\u062A \u062E\u0627\u0644\u06CC \u0627\u0633\u062A.',
+  'Generated': '\u062A\u0648\u0644\u06CC\u062F\u200C\u0634\u062F\u0647',
+  'Reference': '\u0645\u0631\u062C\u0639',
+  'Allow pop-ups to print.': '\u0628\u0631\u0627\u06CC \u0686\u0627\u067E\u060C \u067E\u0646\u062C\u0631\u0647\u200C\u0647\u0627\u06CC \u0628\u0627\u0632\u0634\u0648 \u0631\u0627 \u0645\u062C\u0627\u0632 \u06A9\u0646\u06CC\u062F.',
+  'Elforsyning \u2014 bill of materials': '\u062A\u0623\u0645\u06CC\u0646 \u0628\u0631\u0642 \u2014 \u0641\u0647\u0631\u0633\u062A \u0645\u0648\u0627\u062F',
+  'Elforsyning materials (bill of materials)': '\u0645\u0648\u0627\u062F \u062A\u0623\u0645\u06CC\u0646 \u0628\u0631\u0642 (\u0641\u0647\u0631\u0633\u062A \u0645\u0648\u0627\u062F)',
+  'Only real CE-marked products on the Danish market.': '\u0641\u0642\u0637 \u0645\u062D\u0635\u0648\u0644\u0627\u062A \u0648\u0627\u0642\u0639\u06CC \u062F\u0627\u0631\u0627\u06CC \u0646\u0634\u0627\u0646 CE \u062F\u0631 \u0628\u0627\u0632\u0627\u0631 \u062F\u0627\u0646\u0645\u0627\u0631\u06A9.',
+  'The list is empty. Click "Pick all elforsyning materials".': '\u0641\u0647\u0631\u0633\u062A \u062E\u0627\u0644\u06CC \u0627\u0633\u062A. \u0631\u0648\u06CC \xAB\u0627\u0646\u062A\u062E\u0627\u0628 \u0647\u0645\u0647 \u0645\u0648\u0627\u062F \u062A\u0623\u0645\u06CC\u0646 \u0628\u0631\u0642\xBB \u06A9\u0644\u06CC\u06A9 \u06A9\u0646\u06CC\u062F.',
+  'The supply side consists of 8 categories. Click to add ALL products to the bill of materials. 100% click \u2014 no typing. Only real CE-marked products; prices are never invented (DS/HD 60364).': '\u0633\u0645\u062A \u062A\u0623\u0645\u06CC\u0646 \u0634\u0627\u0645\u0644 \u06F8 \u062F\u0633\u062A\u0647 \u0627\u0633\u062A. \u0628\u0631\u0627\u06CC \u0627\u0641\u0632\u0648\u062F\u0646 \u0647\u0645\u0647 \u0645\u062D\u0635\u0648\u0644\u0627\u062A \u0628\u0647 \u0641\u0647\u0631\u0633\u062A \u0645\u0648\u0627\u062F \u06A9\u0644\u06CC\u06A9 \u06A9\u0646\u06CC\u062F. \u06F1\u06F0\u06F0\u066A \u06A9\u0644\u06CC\u06A9 \u2014 \u0628\u062F\u0648\u0646 \u062A\u0627\u06CC\u067E. \u0641\u0642\u0637 \u0645\u062D\u0635\u0648\u0644\u0627\u062A \u0648\u0627\u0642\u0639\u06CC \u062F\u0627\u0631\u0627\u06CC \u0646\u0634\u0627\u0646 CE\u061B \u0642\u06CC\u0645\u062A\u200C\u0647\u0627 \u0647\u0631\u06AF\u0632 \u0633\u0627\u062E\u062A\u06AF\u06CC \u0646\u06CC\u0633\u062A\u0646\u062F (DS/HD 60364).',
+  'Note: Verify current prices against Danish wholesaler catalogs (Solar, Lemvigh-M\u00FCller, Wex\u00F8e, Sanist\u00E5l). Dates are auto-generated.': '\u062A\u0648\u062C\u0647: \u0642\u06CC\u0645\u062A\u200C\u0647\u0627\u06CC \u0641\u0639\u0644\u06CC \u0631\u0627 \u0628\u0627 \u06A9\u0627\u062A\u0627\u0644\u0648\u06AF\u200C\u0647\u0627\u06CC \u0639\u0645\u062F\u0647\u200C\u0641\u0631\u0648\u0634\u06CC \u062F\u0627\u0646\u0645\u0627\u0631\u06A9 (Solar, Lemvigh-M\u00FCller, Wex\u00F8e, Sanist\u00E5l) \u0628\u0631\u0631\u0633\u06CC \u06A9\u0646\u06CC\u062F. \u062A\u0627\u0631\u06CC\u062E\u200C\u0647\u0627 \u0628\u0647\u200C\u0635\u0648\u0631\u062A \u062E\u0648\u062F\u06A9\u0627\u0631 \u062A\u0648\u0644\u06CC\u062F \u0645\u06CC\u200C\u0634\u0648\u0646\u062F.',
+  'Note: Verify current prices against Danish wholesaler catalogs (Solar, Lemvigh-M\u00FCller, Wex\u00F8e, Sanist\u00E5l). Prices are not included \u2014 they are not invented. Verify all selections against the current DS/HD 60364.': '\u062A\u0648\u062C\u0647: \u0642\u06CC\u0645\u062A\u200C\u0647\u0627\u06CC \u0641\u0639\u0644\u06CC \u0631\u0627 \u0628\u0627 \u06A9\u0627\u062A\u0627\u0644\u0648\u06AF\u200C\u0647\u0627\u06CC \u0639\u0645\u062F\u0647\u200C\u0641\u0631\u0648\u0634\u06CC \u062F\u0627\u0646\u0645\u0627\u0631\u06A9 (Solar, Lemvigh-M\u00FCller, Wex\u00F8e, Sanist\u00E5l) \u0628\u0631\u0631\u0633\u06CC \u06A9\u0646\u06CC\u062F. \u0642\u06CC\u0645\u062A\u200C\u0647\u0627 \u062F\u0631\u062C \u0646\u0634\u062F\u0647\u200C\u0627\u0646\u062F \u2014 \u0633\u0627\u062E\u062A\u06AF\u06CC \u0646\u06CC\u0633\u062A\u0646\u062F. \u0647\u0645\u0647 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0647\u0627 \u0631\u0627 \u0628\u0627 DS/HD 60364 \u062C\u0627\u0631\u06CC \u0628\u0631\u0631\u0633\u06CC \u06A9\u0646\u06CC\u062F.',
+
   // KLS audit-readiness / pre-audit gap report (new)
   'Pre-audit readiness (Phase 1 Pre-audit)': '\u0622\u0645\u0627\u062F\u06AF\u06CC \u067E\u06CC\u0634\u200C\u0645\u0645\u06CC\u0632\u06CC (\u0641\u0627\u0632 \u06F1 \u067E\u06CC\u0634\u200C\u0645\u0645\u06CC\u0632\u06CC)',
   'Readiness score': '\u0627\u0645\u062A\u06CC\u0627\u0632 \u0622\u0645\u0627\u062F\u06AF\u06CC',
@@ -6025,26 +6062,7 @@ function renderBank() {
 
   // Build rows based on category
   const rows = items.map(p => {
-    let spec = '';
-    if (bankCategory === 'cables') spec = `${p.cores} ${p.mm2} mm\u00B2 ${p.material} | Iz=${officialIz(p)}A`;
-    else if (bankCategory === 'mcbs') spec = `${p.curve}${p.rating} ${p.poles} | Icu=${p.icu}kA | ${p.standard}`;
-    else if (bankCategory === 'mccbs') spec = `${p.trip} | Icu=${p.icu}kA | In: ${p.inOptions.join('/')}A`;
-    else if (bankCategory === 'fuses') spec = `${p.rating}A | ${p.size} | Icu=${p.icu}kA`;
-    else if (bankCategory === 'rcds') spec = `${p.poles} ${p.rating}A | ${p.sensitivity}mA Type ${p.rcdType}`;
-    else if (bankCategory === 'rcbos') spec = `${p.poles} ${p.curve}${p.rating} | ${p.sensitivity}mA | Icu=${p.icu}kA`;
-    else if (bankCategory === 'spds') spec = `${p.spdType} ${p.poles} | Imax=${p.imax}kA | Up=${p.up}kV`;
-    else if (bankCategory === 'contactors') spec = `AC-3: ${p.ac3_A}A / ${p.ac3_kW}kW`;
-    else if (bankCategory === 'mpcbs') spec = `${p.rangeMin}-${p.rangeMax}A / ${p.kW}kW`;
-    else if (bankCategory === 'overloadRelays') spec = `${p.rangeMin}-${p.rangeMax}A`;
-    else if (bankCategory === 'wiringDevices') spec = `${p.rating}A | ${tl(p, 'desc')}`;
-    else if (bankCategory === 'supplyCables') spec = `${p.mm2}mm\u00B2 ${p.material} | Iz=${p.iz}A | Method ${p.method}`;
-    else if (bankCategory === 'metering') spec = p.cat === 'ct' ? `${p.primaryA}/${p.secondaryA}A` : p.model;
-    else if (bankCategory === 'mainFuses') spec = `${p.size} ${p.rating}A | ${p.sealed ? 'Plomberet' : ''}`;
-    else if (bankCategory === 'earthing') spec = p.resistance_ohm_typical ? `${p.length_m}m | ${p.resistance_ohm_typical}\u03A9` : p.model;
-    else if (bankCategory === 'cableJoints') spec = `${p.mm2}mm\u00B2 | ${p.cat}`;
-    else if (bankCategory === 'cableDucts') spec = p.diameter ? `\u00D8${p.diameter}mm | ${p.color}` : `${p.width}mm`;
-    else if (bankCategory === 'transformers') spec = `${p.kva}kVA | ${p.cooling} | uk=${p.ukPct}%`;
-    else if (bankCategory === 'terminals') spec = `${p.mm2}mm\u00B2 | ${p.cat}`;
+    const spec = bankSpec(bankCategory, p);
 
     const useText = p.use_da ? (tl(p, 'use')) : '';
 
@@ -6101,7 +6119,381 @@ function renderBank() {
         ${rows || '<div class="result-row"><span class="label">' + (tx('Ingen produkter', 'No products')) + '</span></div>'}
       </div>
     </div>
+    ${renderElforsyningBom()}
   `;
+}
+
+// ===== SHARED BANK SPEC (single source of truth for per-category spec strings) =====
+// Reused by both the Component Bank list and the Elforsyning BOM so the spec text
+// can never drift between the two views.
+function bankSpec(category, p) {
+  if (category === 'cables') return `${p.cores} ${p.mm2} mm\u00B2 ${p.material} | Iz=${officialIz(p)}A`;
+  if (category === 'mcbs') return `${p.curve}${p.rating} ${p.poles} | Icu=${p.icu}kA | ${p.standard}`;
+  if (category === 'mccbs') return `${p.trip} | Icu=${p.icu}kA | In: ${p.inOptions.join('/')}A`;
+  if (category === 'fuses') return `${p.rating}A | ${p.size} | Icu=${p.icu}kA`;
+  if (category === 'rcds') return `${p.poles} ${p.rating}A | ${p.sensitivity}mA Type ${p.rcdType}`;
+  if (category === 'rcbos') return `${p.poles} ${p.curve}${p.rating} | ${p.sensitivity}mA | Icu=${p.icu}kA`;
+  if (category === 'spds') return `${p.spdType} ${p.poles} | Imax=${p.imax}kA | Up=${p.up}kV`;
+  if (category === 'contactors') return `AC-3: ${p.ac3_A}A / ${p.ac3_kW}kW`;
+  if (category === 'mpcbs') return `${p.rangeMin}-${p.rangeMax}A / ${p.kW}kW`;
+  if (category === 'overloadRelays') return `${p.rangeMin}-${p.rangeMax}A`;
+  if (category === 'wiringDevices') return `${p.rating}A | ${tl(p, 'desc')}`;
+  if (category === 'supplyCables') return `${p.mm2}mm\u00B2 ${p.material} | Iz=${p.iz}A | Method ${p.method}`;
+  if (category === 'metering') return p.cat === 'ct' ? `${p.primaryA}/${p.secondaryA}A` : p.model;
+  if (category === 'mainFuses') return `${p.size} ${p.rating}A | ${p.sealed ? 'Plomberet' : ''}`;
+  if (category === 'earthing') return p.resistance_ohm_typical ? `${p.length_m}m | ${p.resistance_ohm_typical}\u03A9` : p.model;
+  if (category === 'cableJoints') return `${p.mm2}mm\u00B2 | ${p.cat}`;
+  if (category === 'cableDucts') return p.diameter ? `\u00D8${p.diameter}mm | ${p.color}` : `${p.width}mm`;
+  if (category === 'transformers') return `${p.kva}kVA | ${p.cooling} | uk=${p.ukPct}%`;
+  if (category === 'terminals') return `${p.mm2}mm\u00B2 | ${p.cat}`;
+  return '';
+}
+
+// ===== ELFORSYNING BOM MODULE (supply-side bill of materials / styklist) =====
+// "Elforsyning" = the utility-supply side of an installation. Exactly 8 supply-side
+// categories make up "elforsyning v1". 100% CLICK-ONLY: every quantity, date and action
+// is produced by a button or a preset dropdown — there is NO text input anywhere.
+// LIFE-SAFETY: only real CE-marked Danish-market products already present in PRODUCTS
+// are listed; prices are NEVER invented (verify against Danish wholesaler catalogs).
+
+const ELFORSYNING_CATEGORIES = ['supplyCables', 'metering', 'mainFuses', 'earthing', 'cableJoints', 'cableDucts', 'transformers', 'terminals'];
+const ELFORSYNING_BOM_KEY = 'elforsyning_bom_v1';
+const ELFORSYNING_QTY_PRESETS = [1, 2, 5, 10, 25, 50, 100];
+const ELFORSYNING_STD_REF = 'DS/HD 60364';
+const ELFORSYNING_WHOLESALERS = ['Solar', 'Lemvigh-M\u00FCller', 'Wex\u00F8e', 'Sanist\u00E5l'];
+
+// Trilingual labels for the 8 supply-side categories (da authoritative / en / fa via tx).
+function elforsyningCatLabel(cat) {
+  switch (cat) {
+    case 'supplyCables': return tx('Forsyningskabler', 'Supply Cables');
+    case 'metering': return tx('M\u00E5ling', 'Metering');
+    case 'mainFuses': return tx('Hovedsikringer', 'Main Fuses');
+    case 'earthing': return tx('Jordingssystem', 'Earthing');
+    case 'cableJoints': return tx('Kabelsamlinger', 'Cable Joints');
+    case 'cableDucts': return tx('Kabelkanaler', 'Cable Ducts');
+    case 'transformers': return tx('Transformere', 'Transformers');
+    case 'terminals': return tx('Klemmer', 'Terminals');
+    default: return cat;
+  }
+}
+
+// Finds a product (and its category) by id across the 8 elforsyning categories.
+function elforsyningProductById(id) {
+  for (let i = 0; i < ELFORSYNING_CATEGORIES.length; i++) {
+    const cat = ELFORSYNING_CATEGORIES[i];
+    const arr = PRODUCTS[cat] || [];
+    for (let j = 0; j < arr.length; j++) {
+      if (arr[j].id === id) return { product: arr[j], category: cat };
+    }
+  }
+  return null;
+}
+
+// Applicable standard for a line: every supply-side product carries its own `standard`
+// field (e.g. IEC 60269-2, IEC 60228, IEC 60840, DS/HD 60364-5-54). Falls back to the
+// installation standard so the column is never blank.
+function elforsyningStandard(p) {
+  return (p && p.standard) ? p.standard : ELFORSYNING_STD_REF;
+}
+
+// CE / approval status. Every product listed in PRODUCTS is a real CE-marked product
+// already on the Danish market — we state CE and surface the harmonised product standard.
+// We never fabricate certificate numbers.
+function elforsyningApproval(p) {
+  return tx('CE-m\u00E6rket', 'CE-marked');
+}
+
+// --- Persistence (NEW localStorage key, no collision with existing keys) ---
+let elforsyningBom = elforsyningLoadBom();
+
+function elforsyningLoadBom() {
+  try {
+    const raw = localStorage.getItem(ELFORSYNING_BOM_KEY);
+    if (!raw) return {};
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== 'object') return {};
+    const clean = {};
+    Object.keys(data).forEach(function(id) {
+      const found = elforsyningProductById(id);
+      if (!found) return; // drop unknown ids — never resurrect a product not in PRODUCTS
+      let qty = parseInt(data[id] && data[id].qty, 10);
+      if (!(qty >= 1)) qty = 1;
+      clean[id] = { category: found.category, qty: qty };
+    });
+    return clean;
+  } catch (e) {
+    return {};
+  }
+}
+
+function elforsyningSaveBom() {
+  try { localStorage.setItem(ELFORSYNING_BOM_KEY, JSON.stringify(elforsyningBom)); } catch (e) {}
+}
+
+// --- Actions (all click-only) ---
+// Adds EVERY product across the 8 supply-side categories. Existing quantities are kept;
+// new lines default to quantity 1.
+function elforsyningPickAll() {
+  ELFORSYNING_CATEGORIES.forEach(function(cat) {
+    (PRODUCTS[cat] || []).forEach(function(p) {
+      if (!elforsyningBom[p.id]) elforsyningBom[p.id] = { category: cat, qty: 1 };
+    });
+  });
+  elforsyningSaveBom();
+  if (typeof renderModule === 'function') renderModule('bank');
+}
+
+// Increment / decrement a line quantity. Clamps at a minimum of 1 (never 0/negative).
+function elforsyningChangeQty(id, delta) {
+  const line = elforsyningBom[id];
+  if (!line) return;
+  let q = line.qty + delta;
+  if (q < 1) q = 1;
+  line.qty = q;
+  elforsyningSaveBom();
+  if (typeof renderModule === 'function') renderModule('bank');
+}
+
+// Set a line quantity directly from a preset dropdown (click-only select, no typing).
+function elforsyningSetQty(id, qty) {
+  const line = elforsyningBom[id];
+  if (!line) return;
+  let q = parseInt(qty, 10);
+  if (!(q >= 1)) q = 1;
+  line.qty = q;
+  elforsyningSaveBom();
+  if (typeof renderModule === 'function') renderModule('bank');
+}
+
+function elforsyningRemove(id) {
+  if (elforsyningBom[id]) {
+    delete elforsyningBom[id];
+    elforsyningSaveBom();
+    if (typeof renderModule === 'function') renderModule('bank');
+  }
+}
+
+function elforsyningClearAll() {
+  if (typeof confirm === 'function' && !confirm(tx('Ryd hele elforsyningslisten?', 'Clear the entire elforsyning list?'))) return;
+  elforsyningBom = {};
+  elforsyningSaveBom();
+  if (typeof renderModule === 'function') renderModule('bank');
+}
+
+// --- Aggregates ---
+function elforsyningCategoryCount(cat) {
+  let n = 0;
+  Object.keys(elforsyningBom).forEach(function(id) {
+    if (elforsyningBom[id].category === cat) n += elforsyningBom[id].qty;
+  });
+  return n;
+}
+
+function elforsyningTotalCount() {
+  let n = 0;
+  Object.keys(elforsyningBom).forEach(function(id) { n += elforsyningBom[id].qty; });
+  return n;
+}
+
+// Returns ordered BOM lines grouped by the 8 categories, preserving PRODUCTS order.
+function elforsyningBomLines() {
+  const lines = [];
+  ELFORSYNING_CATEGORIES.forEach(function(cat) {
+    (PRODUCTS[cat] || []).forEach(function(p) {
+      if (elforsyningBom[p.id]) {
+        lines.push({ id: p.id, category: cat, qty: elforsyningBom[p.id].qty, product: p });
+      }
+    });
+  });
+  return lines;
+}
+
+// Structured export object (also used by the JSON download).
+function elforsyningExportData() {
+  const lines = elforsyningBomLines().map(function(l) {
+    return {
+      id: l.id,
+      category: l.category,
+      brand: l.product.brand,
+      model: l.product.model,
+      spec: bankSpec(l.category, l.product),
+      standard: elforsyningStandard(l.product),
+      approval: elforsyningApproval(l.product),
+      qty: l.qty
+    };
+  });
+  const categoryCounts = {};
+  ELFORSYNING_CATEGORIES.forEach(function(cat) { categoryCounts[cat] = elforsyningCategoryCount(cat); });
+  return {
+    type: 'elforsyning_bom',
+    version: 1,
+    generated: new Date().toISOString(),
+    standard: ELFORSYNING_STD_REF,
+    note_da: 'Verificer aktuelle priser mod danske grossistkataloger (' + ELFORSYNING_WHOLESALERS.join(', ') + '). Priser er ikke angivet i denne liste.',
+    note_en: 'Verify current prices against Danish wholesaler catalogs (' + ELFORSYNING_WHOLESALERS.join(', ') + '). Prices are not included in this list.',
+    categories: ELFORSYNING_CATEGORIES.slice(),
+    categoryCounts: categoryCounts,
+    totalCount: elforsyningTotalCount(),
+    lines: lines
+  };
+}
+
+function elforsyningExportJson() {
+  try {
+    const blob = new Blob([JSON.stringify(elforsyningExportData(), null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'elforsyning-stykliste-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {}
+}
+
+// --- Print report (reuses the app window.open + @media print pattern) ---
+function elforsyningReportHtml() {
+  function esc(s) { return ('' + s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  const lines = elforsyningBomLines();
+  let h = '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(tx('Elforsyning \u2014 stykliste', 'Elforsyning \u2014 bill of materials')) + '</title>';
+  h += '<style>body{font-family:Arial,Helvetica,sans-serif;color:#102030;margin:32px;line-height:1.5}'
+    + 'h1{color:#0f4c75;margin-bottom:4px}h2{color:#0f4c75;margin-top:24px;border-bottom:2px solid #3282b8;padding-bottom:4px}'
+    + 'table{border-collapse:collapse;width:100%;margin-top:8px}th,td{border:1px solid #ccd;padding:6px 10px;text-align:left}'
+    + 'th{background:#0f4c75;color:#fff}.muted{color:#667}'
+    + '.report-header{font-size:.95em;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #0f4c75;font-weight:bold}'
+    + '.report-footer{margin-top:24px;padding-top:8px;border-top:1px solid #0f4c75;font-size:.8em;color:#445}'
+    + '.warn{background:#fff6e0;border:1px solid #e0b000;padding:10px;border-radius:6px;margin-top:20px;font-size:.9em}'
+    + '@media print{'
+    + '@page{margin:14mm}'
+    + 'body{margin:0;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    + 'nav,.app-nav,.sel-btn,button,.no-print{display:none !important}'
+    + 'h1,h2{color:#000}'
+    + 'h2{page-break-before:always}'
+    + 'h2:first-of-type{page-break-before:avoid}'
+    + 'table{page-break-inside:auto}'
+    + 'tr{page-break-inside:avoid}'
+    + 'thead{display:table-header-group}'
+    + '.report-header{border-bottom:2px solid #000}'
+    + '.report-footer{border-top:1px solid #000;color:#000}'
+    + '.warn{page-break-inside:avoid}'
+    + '}'
+    + '</style></head><body>';
+  h += '<div class="report-header">' + esc(tx('Elforsyning \u2014 stykliste', 'Elforsyning \u2014 bill of materials')) + ' &middot; '
+    + esc(tx('Udskrevet', 'Printed')) + ': ' + new Date().toLocaleDateString() + ' &middot; ' + esc(ELFORSYNING_STD_REF) + '</div>';
+  h += '<h1>\uD83D\uDD0C ' + esc(tx('Elforsyningsmaterialer (stykliste)', 'Elforsyning materials (bill of materials)')) + '</h1>';
+  h += '<div class="muted">' + esc(tx('Genereret', 'Generated')) + ': ' + new Date().toLocaleString()
+    + ' &middot; ' + esc(tx('Reference', 'Reference')) + ': ' + esc(ELFORSYNING_STD_REF) + '</div>';
+  h += '<p>' + esc(tx('Antal varelinjer i alt', 'Total line items')) + ': <b>' + elforsyningTotalCount() + '</b></p>';
+  if (!lines.length) {
+    h += '<p class="muted">' + esc(tx('Listen er tom.', 'The list is empty.')) + '</p>';
+  } else {
+    ELFORSYNING_CATEGORIES.forEach(function(cat) {
+      const catLines = lines.filter(function(l) { return l.category === cat; });
+      if (!catLines.length) return;
+      h += '<h2>' + esc(elforsyningCatLabel(cat)) + ' (' + elforsyningCategoryCount(cat) + ')</h2>';
+      h += '<table><thead><tr><th>' + esc(tx('M\u00E6rke', 'Brand')) + '</th><th>' + esc(tx('Model', 'Model'))
+        + '</th><th>' + esc(tx('Specifikation', 'Spec')) + '</th><th>' + esc(tx('Standard', 'Standard'))
+        + '</th><th>' + esc(tx('Godkendelse', 'Approval')) + '</th><th>' + esc(tx('Antal', 'Qty')) + '</th></tr></thead><tbody>';
+      catLines.forEach(function(l) {
+        h += '<tr><td>' + esc(l.product.brand) + '</td><td>' + esc(l.product.model)
+          + '</td><td>' + esc(bankSpec(cat, l.product)) + '</td><td>' + esc(elforsyningStandard(l.product))
+          + '</td><td>' + esc(elforsyningApproval(l.product)) + '</td><td>' + l.qty + '</td></tr>';
+      });
+      h += '</tbody></table>';
+    });
+  }
+  h += '<div class="warn">' + esc(tx(
+    'Forbehold: Verificer aktuelle priser mod danske grossistkataloger (' + ELFORSYNING_WHOLESALERS.join(', ') + '). Priser er ikke angivet \u2014 de er ikke opfundet. Verificer alle valg mod g\u00E6ldende ' + ELFORSYNING_STD_REF + '.',
+    'Note: Verify current prices against Danish wholesaler catalogs (' + ELFORSYNING_WHOLESALERS.join(', ') + '). Prices are not included \u2014 they are not invented. Verify all selections against the current ' + ELFORSYNING_STD_REF + '.'
+  )) + '</div>';
+  h += '<div class="report-footer">' + esc(ELFORSYNING_STD_REF)
+    + ' &middot; ' + esc(tx('Kun reelle CE-m\u00E6rkede produkter p\u00E5 det danske marked.', 'Only real CE-marked products on the Danish market.')) + '</div>';
+  h += '</body></html>';
+  return h;
+}
+
+function elforsyningPrintReport() {
+  try {
+    const w = window.open('', '_blank');
+    if (!w) { if (typeof alert === 'function') alert(tx('Tillad pop op-vinduer for at udskrive.', 'Allow pop-ups to print.')); return; }
+    w.document.write(elforsyningReportHtml());
+    w.document.close();
+    w.focus();
+    setTimeout(function() { try { w.print(); } catch (e) {} }, 300);
+  } catch (e) {}
+}
+
+// --- Render (integrated into the Component Bank view) ---
+function elforsyningRenderQtyControl(id, qty) {
+  const presets = ELFORSYNING_QTY_PRESETS.map(function(q) {
+    return '<option value="' + q + '"' + (q === qty ? ' selected' : '') + '>' + q + '</option>';
+  }).join('');
+  // The current qty may not be a preset (after +/-); keep it selectable so the dropdown
+  // always reflects the true value without ever offering a text field.
+  const extra = ELFORSYNING_QTY_PRESETS.indexOf(qty) < 0
+    ? '<option value="' + qty + '" selected>' + qty + '</option>' : '';
+  return '<span style="display:inline-flex;align-items:center;gap:4px">'
+    + '<button class="sel-btn" style="padding:2px 9px;min-width:auto" title="\u2212" onclick="elforsyningChangeQty(\'' + id + '\',-1)">\u2212</button>'
+    + '<span style="min-width:24px;text-align:center;font-weight:600">' + qty + '</span>'
+    + '<button class="sel-btn" style="padding:2px 9px;min-width:auto" title="+" onclick="elforsyningChangeQty(\'' + id + '\',1)">+</button>'
+    + '<select class="sel-btn" style="padding:2px 4px" title="' + tx('Forindstillet antal', 'Preset quantity') + '" onchange="elforsyningSetQty(\'' + id + '\',this.value)">'
+    + '<option value="">' + tx('forindstil', 'preset') + '</option>' + extra + presets + '</select>'
+    + '</span>';
+}
+
+function renderElforsyningBom() {
+  const lines = elforsyningBomLines();
+  const total = elforsyningTotalCount();
+  let h = '<div class="card fade-in">';
+  h += '<div class="card-title">\uD83D\uDD0C ' + tx('Elforsyningsmaterialer', 'Elforsyning materials') + '</div>';
+  h += '<div class="info-row">' + tx(
+    'Forsyningssiden best\u00E5r af 8 kategorier. Klik for at tilf\u00F8je ALLE produkter til styklisten. 100% klik \u2014 ingen indtastning. Kun reelle CE-m\u00E6rkede produkter; priser opfindes ikke (' + ELFORSYNING_STD_REF + ').',
+    'The supply side consists of 8 categories. Click to add ALL products to the bill of materials. 100% click \u2014 no typing. Only real CE-marked products; prices are never invented (' + ELFORSYNING_STD_REF + ').') + '</div>';
+
+  // Action buttons (all click-only)
+  h += '<div class="select-group"><div class="select-grid">';
+  h += '<button class="sel-btn selected" onclick="elforsyningPickAll()">\u2795 ' + tx('V\u00E6lg alle elforsyningsmaterialer', 'Pick all elforsyning materials') + '</button>';
+  h += '<button class="sel-btn" onclick="elforsyningClearAll()">\uD83D\uDDD1\uFE0F ' + tx('Ryd alt', 'Clear all') + '</button>';
+  h += '<button class="sel-btn" onclick="elforsyningPrintReport()">\uD83D\uDDA8\uFE0F ' + tx('Udskriv / PDF', 'Print / PDF') + '</button>';
+  h += '<button class="sel-btn" onclick="elforsyningExportJson()">\u2B07\uFE0F ' + tx('Eksporter JSON', 'Export JSON') + '</button>';
+  h += '</div></div>';
+
+  if (!lines.length) {
+    h += '<div class="result-box"><div class="result-row"><span class="label">'
+      + tx('Styklisten er tom. Klik "V\u00E6lg alle elforsyningsmaterialer".', 'The list is empty. Click "Pick all elforsyning materials".')
+      + '</span></div></div></div>';
+    return h;
+  }
+
+  // Grouped table by the 8 categories
+  ELFORSYNING_CATEGORIES.forEach(function(cat) {
+    const catLines = lines.filter(function(l) { return l.category === cat; });
+    if (!catLines.length) return;
+    h += '<div class="result-box" style="margin-top:10px">';
+    h += '<div class="result-title">' + elforsyningCatLabel(cat) + ' (' + elforsyningCategoryCount(cat) + ')</div>';
+    catLines.forEach(function(l) {
+      const p = l.product;
+      h += '<div class="result-row" style="align-items:center;gap:8px;flex-wrap:wrap">';
+      h += '<div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:2px">';
+      h += '<span class="label"><strong>' + p.brand + '</strong> ' + p.model + '</span>';
+      h += '<span style="font-size:0.75rem;color:var(--text-muted)">' + bankSpec(cat, p)
+        + ' \u00B7 ' + tx('Standard', 'Standard') + ': ' + elforsyningStandard(p)
+        + ' \u00B7 ' + elforsyningApproval(p) + '</span>';
+      h += '</div>';
+      h += elforsyningRenderQtyControl(l.id, l.qty);
+      h += '<button class="sel-btn" style="padding:2px 9px;min-width:auto" title="' + tx('Fjern', 'Remove') + '" onclick="elforsyningRemove(\'' + l.id + '\')">\u2715</button>';
+      h += '</div>';
+    });
+    h += '</div>';
+  });
+
+  h += '<div class="result-box" style="margin-top:10px"><div class="result-row">'
+    + '<span class="label"><strong>' + tx('I alt (alle kategorier)', 'Grand total (all categories)') + '</strong></span>'
+    + '<span class="value"><strong>' + total + '</strong></span></div></div>';
+  h += '<div class="info-row" style="margin-top:8px">' + tx(
+    'Bem\u00E6rk: Verificer aktuelle priser mod danske grossistkataloger (' + ELFORSYNING_WHOLESALERS.join(', ') + '). Datoer genereres automatisk.',
+    'Note: Verify current prices against Danish wholesaler catalogs (' + ELFORSYNING_WHOLESALERS.join(', ') + '). Dates are auto-generated.') + '</div>';
+  h += '</div>';
+  return h;
 }
 
 // ===== AI-ELECTRICIAN MODULE =====

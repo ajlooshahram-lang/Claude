@@ -7118,6 +7118,229 @@ test('KLS: all 14 views still render non-empty with NO text input/textarea after
   assert(all.indexOf('<textarea') < 0, 'no <textarea>');
 });
 
+// ===== ELFORSYNING BOM (supply-side bill of materials) — new feature tests =====
+console.log('\n=== Elforsyning BOM Tests ===\n');
+
+var ELF_CATS = ['supplyCables', 'metering', 'mainFuses', 'earthing', 'cableJoints', 'cableDucts', 'transformers', 'terminals'];
+function elfExpectedProductCount() {
+  return ELF_CATS.reduce(function(sum, c) { return sum + (PRODUCTS[c] || []).length; }, 0);
+}
+// Isolate the action functions from the heavy full render pipeline during tests.
+var _realRenderModule = renderModule;
+function elfReset() {
+  renderModule = function() {};
+  elforsyningBom = {};
+  try { localStorage.removeItem(ELFORSYNING_BOM_KEY); } catch (e) {}
+}
+function elfRestore() { renderModule = _realRenderModule; }
+
+test('Elforsyning: the 8 supply-side categories are exactly the v1 set', function() {
+  assert.deepStrictEqual(ELFORSYNING_CATEGORIES.slice().sort(), ELF_CATS.slice().sort());
+  assert.strictEqual(ELFORSYNING_CATEGORIES.length, 8);
+  ELFORSYNING_CATEGORIES.forEach(function(c) { assert(Array.isArray(PRODUCTS[c]), 'PRODUCTS.' + c + ' exists'); });
+});
+
+test('Elforsyning: pick-all populates the BOM with the correct total across all 8 categories', function() {
+  elfReset();
+  elforsyningPickAll();
+  var expected = elfExpectedProductCount();
+  assert.strictEqual(Object.keys(elforsyningBom).length, expected, 'one line per product');
+  assert.strictEqual(elforsyningTotalCount(), expected, 'default qty 1 -> total == product count');
+  ELF_CATS.forEach(function(c) {
+    assert.strictEqual(elforsyningCategoryCount(c), (PRODUCTS[c] || []).length, 'category count ' + c);
+  });
+  elfRestore();
+});
+
+test('Elforsyning: pick-all defaults qty to 1 and never resets an existing qty', function() {
+  elfReset();
+  elforsyningPickAll();
+  var lines = elforsyningBomLines();
+  var firstId = lines[0].id;
+  elforsyningSetQty(firstId, 7);
+  elforsyningPickAll();
+  assert.strictEqual(elforsyningBom[firstId].qty, 7, 'existing qty preserved');
+  elfRestore();
+});
+
+test('Elforsyning: qty increment/decrement works and clamps at a minimum of 1', function() {
+  elfReset();
+  elforsyningPickAll();
+  var id = elforsyningBomLines()[0].id;
+  assert.strictEqual(elforsyningBom[id].qty, 1);
+  elforsyningChangeQty(id, 1); assert.strictEqual(elforsyningBom[id].qty, 2);
+  elforsyningChangeQty(id, 3); assert.strictEqual(elforsyningBom[id].qty, 5);
+  elforsyningChangeQty(id, -1); assert.strictEqual(elforsyningBom[id].qty, 4);
+  elforsyningChangeQty(id, -100); assert.strictEqual(elforsyningBom[id].qty, 1, 'clamped at 1');
+  elforsyningChangeQty(id, -1); assert.strictEqual(elforsyningBom[id].qty, 1, 'still 1');
+  elfRestore();
+});
+
+test('Elforsyning: preset-dropdown setQty accepts presets and clamps invalid values to 1', function() {
+  elfReset();
+  elforsyningPickAll();
+  var id = elforsyningBomLines()[0].id;
+  elforsyningSetQty(id, 25); assert.strictEqual(elforsyningBom[id].qty, 25);
+  elforsyningSetQty(id, '50'); assert.strictEqual(elforsyningBom[id].qty, 50, 'string preset parsed');
+  elforsyningSetQty(id, 0); assert.strictEqual(elforsyningBom[id].qty, 1, 'zero clamped to 1');
+  elforsyningSetQty(id, ''); assert.strictEqual(elforsyningBom[id].qty, 1, 'empty clamped to 1');
+  elfRestore();
+});
+
+test('Elforsyning: remove deletes a single line; clear-all empties the whole list', function() {
+  elfReset();
+  elforsyningPickAll();
+  var before = Object.keys(elforsyningBom).length;
+  var id = elforsyningBomLines()[0].id;
+  elforsyningRemove(id);
+  assert.strictEqual(Object.keys(elforsyningBom).length, before - 1, 'one line removed');
+  assert(!elforsyningBom[id], 'removed id gone');
+  elforsyningClearAll();
+  assert.strictEqual(Object.keys(elforsyningBom).length, 0, 'cleared');
+  assert.strictEqual(elforsyningTotalCount(), 0);
+  elfRestore();
+});
+
+test('Elforsyning: BOM persists to localStorage under elforsyning_bom_v1 and round-trips on load', function() {
+  elfReset();
+  elforsyningPickAll();
+  var id = elforsyningBomLines()[0].id;
+  elforsyningSetQty(id, 9);
+  var expectedTotal = elforsyningTotalCount();
+  var raw = localStorage.getItem(ELFORSYNING_BOM_KEY);
+  assert(raw, 'localStorage key written');
+  var parsed = JSON.parse(raw);
+  assert(parsed[id] && parsed[id].qty === 9, 'qty stored');
+  elforsyningBom = {};
+  elforsyningBom = elforsyningLoadBom();
+  assert.strictEqual(elforsyningTotalCount(), expectedTotal, 'total round-trips');
+  assert.strictEqual(elforsyningBom[id].qty, 9, 'qty round-trips');
+  elfRestore();
+});
+
+test('Elforsyning: load drops unknown product ids (never resurrects products not in PRODUCTS)', function() {
+  elfReset();
+  localStorage.setItem(ELFORSYNING_BOM_KEY, JSON.stringify({ 'NOT-A-REAL-ID': { category: 'metering', qty: 3 } }));
+  elforsyningBom = elforsyningLoadBom();
+  assert.strictEqual(Object.keys(elforsyningBom).length, 0, 'unknown id dropped');
+  elfRestore();
+});
+
+test('Elforsyning: render produces grouped rows with brand/spec/standard/CE in BOTH da and en', function() {
+  elfReset();
+  elforsyningPickAll();
+  var savedLang = lang;
+  lang = 'da';
+  var da = renderElforsyningBom();
+  assert(da.indexOf('Forsyningskabler') >= 0, 'da category label');
+  assert(da.indexOf('V\u00E6lg alle elforsyningsmaterialer') >= 0, 'da pick-all button');
+  assert(da.indexOf('NKT') >= 0, 'a real brand rendered');
+  assert(da.indexOf('IEC 60269-2') >= 0, 'a product standard rendered');
+  assert(da.indexOf('CE-m\u00E6rket') >= 0, 'CE status (da)');
+  lang = 'en';
+  var en = renderElforsyningBom();
+  assert(en.indexOf('Supply Cables') >= 0, 'en category label');
+  assert(en.indexOf('Pick all elforsyning materials') >= 0, 'en pick-all button');
+  assert(en.indexOf('CE-marked') >= 0, 'CE status (en)');
+  assert(en.indexOf('Grand total') >= 0, 'grand total label (en)');
+  lang = savedLang;
+  elfRestore();
+});
+
+test('Elforsyning: rendered BOM groups every non-empty category and shows per-category + grand total counts', function() {
+  elfReset();
+  elforsyningPickAll();
+  var html = renderElforsyningBom();
+  ELF_CATS.forEach(function(c) {
+    var label = elforsyningCatLabel(c);
+    assert(html.indexOf(label + ' (' + elforsyningCategoryCount(c) + ')') >= 0, 'group header + count for ' + c);
+  });
+  assert(html.indexOf('' + elforsyningTotalCount()) >= 0, 'grand total number present');
+  elfRestore();
+});
+
+test('Elforsyning: UI is 100% click-only — NO text input or textarea in the rendered region', function() {
+  elfReset();
+  elforsyningPickAll();
+  var savedLang = lang;
+  ['da', 'en', 'fa'].forEach(function(L) {
+    lang = L;
+    var html = renderElforsyningBom();
+    assert(html.indexOf('<input type="text"') < 0, 'no <input type="text"> (' + L + ')');
+    assert(html.indexOf("<input type='text'") < 0, "no <input type='text'> (" + L + ')');
+    assert(html.indexOf('<input') < 0, 'no <input> at all (' + L + ')');
+    assert(html.indexOf('<textarea') < 0, 'no <textarea> (' + L + ')');
+  });
+  lang = savedLang;
+  elfRestore();
+});
+
+test('Elforsyning: JSON export shape is correct (type/version/date/standard/lines/counts, prices absent)', function() {
+  elfReset();
+  elforsyningPickAll();
+  var id = elforsyningBomLines()[0].id;
+  elforsyningSetQty(id, 4);
+  var data = elforsyningExportData();
+  assert.strictEqual(data.type, 'elforsyning_bom');
+  assert.strictEqual(data.version, 1);
+  assert(/^\d{4}-\d{2}-\d{2}T/.test(data.generated), 'auto ISO date');
+  assert.strictEqual(data.standard, 'DS/HD 60364');
+  assert.deepStrictEqual(data.categories, ELF_CATS, 'all 8 categories listed in order');
+  assert.strictEqual(data.lines.length, Object.keys(elforsyningBom).length, 'one line per BOM entry');
+  assert.strictEqual(data.totalCount, elforsyningTotalCount(), 'total matches');
+  var line = data.lines.filter(function(l) { return l.id === id; })[0];
+  assert(line && line.qty === 4, 'qty exported');
+  ['id', 'category', 'brand', 'model', 'spec', 'standard', 'approval', 'qty'].forEach(function(k) {
+    assert(line.hasOwnProperty(k), 'line has ' + k);
+  });
+  assert(/Solar/.test(data.note_da) && /Sanist\u00E5l/.test(data.note_en), 'wholesaler note present');
+  var json = JSON.stringify(data);
+  assert(json.toLowerCase().indexOf('"price"') < 0, 'no price field');
+  assert(json.indexOf('kr.') < 0 && json.indexOf('DKK') < 0, 'no invented currency amounts');
+  elfRestore();
+});
+
+test('Elforsyning: print report has header(date)/DS-HD 60364 ref/grouped tables/wholesaler note + @media print', function() {
+  elfReset();
+  elforsyningPickAll();
+  var report = elforsyningReportHtml();
+  assert(report.indexOf('@media print') >= 0, 'print stylesheet present');
+  assert(report.indexOf('page-break-inside') >= 0, 'avoid breaking rows');
+  assert(report.indexOf('DS/HD 60364') >= 0, 'DS/HD 60364 reference');
+  assert(report.indexOf('report-header') >= 0, 'header present');
+  assert(report.indexOf('Solar') >= 0 && report.indexOf('Sanist\u00E5l') >= 0, 'wholesaler verification note');
+  assert(report.toLowerCase().indexOf('<script') < 0, 'no scripts in printed report');
+  assert(report.indexOf('http://') < 0 && report.indexOf('https://') < 0, 'no remote URLs');
+  assert(report.indexOf('<input') < 0 && report.indexOf('<textarea') < 0, 'no text entry in report');
+  assert(report.indexOf('Forsyningskabler') >= 0 || report.indexOf('Supply Cables') >= 0, 'category group header');
+  elfRestore();
+});
+
+test('Elforsyning: bankSpec is the single source of truth shared with the Component Bank list', function() {
+  var sc = PRODUCTS.supplyCables[0];
+  assert.strictEqual(bankSpec('supplyCables', sc), sc.mm2 + 'mm\u00B2 ' + sc.material + ' | Iz=' + sc.iz + 'A | Method ' + sc.method);
+  var mf = PRODUCTS.mainFuses[0];
+  assert.strictEqual(bankSpec('mainFuses', mf), mf.size + ' ' + mf.rating + 'A | ' + (mf.sealed ? 'Plomberet' : ''));
+});
+
+test('Elforsyning: Farsi strings exist in _FA for the key visible controls', function() {
+  assert(_FA['Pick all elforsyning materials'], 'pick-all fa');
+  assert(_FA['Clear all'], 'clear-all fa');
+  assert(_FA['Supply Cables'] && _FA['Transformers'], 'category labels fa');
+  assert(_FA['CE-marked'], 'CE status fa');
+  var savedLang = lang; lang = 'fa';
+  assert.strictEqual(tx('V\u00E6lg alle elforsyningsmaterialer', 'Pick all elforsyning materials'), _FA['Pick all elforsyning materials']);
+  lang = savedLang;
+});
+
+test('Elforsyning: Legionella rule is a MINIMUM at the tap (>=50C), not a maximum', function() {
+  var savedLang = lang; lang = 'da';
+  var html = klsRenderVvs();
+  assert(html.indexOf('\u2265 50\u00B0C ved udtag') >= 0, 'da rule uses >= at tap');
+  assert(html.indexOf('\u2264 50\u00B0C ved udtag') < 0, 'da rule is NOT a max at tap');
+  lang = savedLang;
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
