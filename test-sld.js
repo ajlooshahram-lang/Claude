@@ -1013,7 +1013,7 @@ test('sldSimulateFault identifies first-tripping device on multi-level tree', fu
   assert(result.tripTime < Infinity, 'Should have a finite trip time. Got: ' + result.tripTime);
 });
 
-// Test 44: sldSimulateFault applies 0.4s requirement for final circuits <=32A
+// Test 44: sldSimulateFault applies 0.4s requirement for all final circuits (Table 41.1)
 test('sldSimulateFault applies 0.4s requirement for final circuits <=32A', function() {
   sldNextId = 8200;
   var tree = sldCreateTree();
@@ -1110,6 +1110,83 @@ test('All fault simulation functions are defined', function() {
   // Verify state variables exist
   assert(typeof sldFaultSimMode !== 'undefined', 'sldFaultSimMode should be defined');
   assert(typeof sldFaultSimType !== 'undefined', 'sldFaultSimType should be defined');
+});
+
+// Test 49: 0.4s disconnection time applies to final circuits >32A (e.g., EV charger at 40A)
+test('sldSimulateFault applies 0.4s requirement for final circuits >32A', function() {
+  sldNextId = 8700;
+  var tree = sldCreateTree();
+  var root = tree.nodes[tree.rootId];
+  var mainBoardId = root.childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+  var fcId = mainBoard.childIds[0];
+  var fc = tree.nodes[fcId];
+  // Set up a 40A final circuit (e.g., EV charger)
+  var mcb40 = PRODUCTS.mcbs.find(function(m){ return m.curve === 'B' && m.rating === 40; });
+  fc.protection = mcb40;
+  fc.protectionIn = 40;
+  sldPropagateAll(tree);
+  var result = sldSimulateFault(tree, fcId, 'earth_fault');
+  assert(result.requiredTime === 0.4, 'Final circuit >32A should still require 0.4s per Table 41.1. Got: ' + result.requiredTime);
+  assert(result.clause.indexOf('411.3.2.2') >= 0, 'Should cite cl.411.3.2.2 for all final circuits. Got: ' + result.clause);
+});
+
+// Test 50: sldSimulateFault returns verdict 'failed' when no protection device exists on path
+test('sldSimulateFault returns failed when no protection exists on path', function() {
+  sldNextId = 8800;
+  var tree = sldCreateTree();
+  var root = tree.nodes[tree.rootId];
+  var mainBoardId = root.childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+  var fcId = mainBoard.childIds[0];
+  var fc = tree.nodes[fcId];
+  // Remove all protection from the path
+  mainBoard.protection = null;
+  mainBoard.protectionIn = 0;
+  fc.protection = null;
+  fc.protectionIn = 0;
+  sldPropagateAll(tree);
+  var result = sldSimulateFault(tree, fcId, 'short_circuit');
+  assert(result.verdict === 'failed', 'Should be failed when no protection exists. Got: ' + result.verdict);
+  assert(result.tripTime === Infinity, 'Trip time should be Infinity with no protection. Got: ' + result.tripTime);
+  assert(result.trippingDeviceNodeId === null, 'No device should trip. Got: ' + result.trippingDeviceNodeId);
+});
+
+// Test 51: 0.4s applies to final circuits at 63A rating (large final circuit)
+test('sldSimulateFault applies 0.4s for 63A final circuit', function() {
+  sldNextId = 8900;
+  var tree = sldCreateTree();
+  var root = tree.nodes[tree.rootId];
+  var mainBoardId = root.childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+  var fcId = mainBoard.childIds[0];
+  var fc = tree.nodes[fcId];
+  var mcb63 = PRODUCTS.mcbs.find(function(m){ return m.curve === 'C' && m.rating === 63; });
+  fc.protection = mcb63;
+  fc.protectionIn = 63;
+  sldPropagateAll(tree);
+  var result = sldSimulateFault(tree, fcId, 'short_circuit');
+  assert(result.requiredTime === 0.4, '63A final circuit should still require 0.4s per Table 41.1. Got: ' + result.requiredTime);
+});
+
+// Test 52: ikFault uses ikmin for both fault types (conservative for disconnection time)
+test('sldSimulateFault uses ikmin for both earth_fault and short_circuit', function() {
+  sldNextId = 9000;
+  var tree = sldCreateTree();
+  var root = tree.nodes[tree.rootId];
+  var mainBoardId = root.childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+  var fcId = mainBoard.childIds[0];
+  var fc = tree.nodes[fcId];
+  var mcb = PRODUCTS.mcbs.find(function(m){ return m.curve === 'B' && m.rating === 16; });
+  fc.protection = mcb;
+  fc.protectionIn = 16;
+  sldPropagateAll(tree);
+  var resultEarth = sldSimulateFault(tree, fcId, 'earth_fault');
+  var resultShort = sldSimulateFault(tree, fcId, 'short_circuit');
+  var ikData = sldCalcNodeIk(tree, fcId);
+  assert(resultEarth.ikFault === ikData.ikmin, 'Earth fault should use ikmin. Got: ' + resultEarth.ikFault);
+  assert(resultShort.ikFault === ikData.ikmin, 'Short circuit should use ikmin (conservative). Got: ' + resultShort.ikFault);
 });
 
 // --- Summary ---

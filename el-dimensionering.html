@@ -6469,20 +6469,21 @@ function sldSimulateFault(tree, nodeId, faultType) {
   var node = tree.nodes[nodeId];
   var path = sldGetPath(tree, nodeId);
   var ikData = sldCalcNodeIk(tree, nodeId);
-  // For earth fault, use ikmin (conservative - lower current = longer trip time)
-  // For short circuit, also use ikmin for disconnection time check (conservative)
-  var ikFault = (faultType === 'earth_fault') ? ikData.ikmin : ikData.ikmin;
+  // Use ikmin for both fault types: DS/HD 60364-4-41 cl.411.3.2 requires that the
+  // MINIMUM fault current trips the device within the allowed disconnection time.
+  // This is the conservative approach for life-safety verification.
+  var ikFault = ikData.ikmin;
   var zsAtFault = ikData.zs;
 
-  // Determine required disconnection time per DS/HD 60364-4-41
+  // Determine required disconnection time per DS/HD 60364-4-41 Table 41.1
+  // TN systems at U0=230V: 0.4s for ALL final circuits, 5s for distribution circuits.
+  // Note: The 32A threshold in cl.411.3.3 relates to additional RCD protection
+  // requirements, NOT to disconnection time.
   var requiredTime = 5; // Default: distribution circuits
   var clause = 'DS/HD 60364-4-41 cl.411.3.2.3';
   if (node.type === 'final_circuit') {
-    var nomCurrent = node.protectionIn || 0;
-    if (nomCurrent <= 32) {
-      requiredTime = 0.4; // Final circuits <=32A at 230V: 0.4s
-      clause = 'DS/HD 60364-4-41 cl.411.3.2.2';
-    }
+    requiredTime = 0.4; // All final circuits at U0=230V TN: 0.4s per Table 41.1
+    clause = 'DS/HD 60364-4-41 cl.411.3.2.2';
   }
 
   // Walk path from fault point toward root, find which device trips first
@@ -6509,7 +6510,10 @@ function sldSimulateFault(tree, nodeId, faultType) {
     for (var si = 0; si < allTripTimes.length; si++) {
       var entry = allTripTimes[si];
       if (entry.nodeId === trippingDeviceNodeId) continue;
-      // If an upstream device trips within 150% of the first device trip time, it's a selectivity concern
+      // If an upstream device trips within 150% of the first device trip time, flag as selectivity concern.
+      // NOTE: The 1.5x threshold is an approximation. MCB trip-time tolerance bands per IEC 60898
+      // are +/-20-30%, so real-world overlap may occur at higher ratios. This threshold provides
+      // a practical balance between false positives and missed cascading trips.
       if (entry.tripTime < Infinity && entry.tripTime < tripTime * 1.5) {
         selectivityIssues.push({
           nodeId: entry.nodeId,

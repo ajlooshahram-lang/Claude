@@ -29,5 +29,5 @@
     "Grep for '_FA' additions to confirm Farsi translations were added"
   ],
   "blocked_reason": null,
-  "findings": "All 48 tests pass (39 existing + 9 new). Implementation adds ~330 lines of JS for the fault simulation engine, animation, results panel, and SLD integration. The sldRenderCanvasFaultMode function provides a separate SVG render path with dark theme and click-to-fault UX. Trip times are calculated conservatively using tMax (worst-case) from device curves. The test for selectivity issues (Test 46) works by using identical MCBs on both upstream and downstream, which naturally results in both devices tripping at the same time."
+  "findings": "All 52 tests pass (39 existing + 9 original + 4 review-fix tests). Review fixes applied: (1) LIFE-SAFETY: Removed incorrect nomCurrent<=32 gate on disconnection time - 0.4s now applies to ALL final circuits per DS/HD 60364-4-41 Table 41.1 regardless of rating. (2) Dead-code ternary collapsed to plain assignment with comment explaining ikmin is used for both fault types per cl.411.3.2. (3) Selectivity 1.5x threshold documented as approximation noting MCB tolerance bands. (4) Added 4 new tests: 0.4s for >32A final circuits, 0.4s for 63A final circuits, verdict=failed when no protection exists, and ikmin usage for both fault types."
 }
