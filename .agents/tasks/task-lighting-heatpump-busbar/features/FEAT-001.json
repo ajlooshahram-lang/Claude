@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Implement Lighting Design (belysning), Heat Pump Installation (varmepumpe), and Busbar Trunking System (skinnesystem) modules with full calculation engines, click-only trilingual UI, DS/HD 60364 compliance, and 45+ comprehensive tests.",
+  "status": "completed",
+  "steps": [
+    "1. Add module translations for 'lighting', 'heatpump', 'busbar' to T.da.modules, T.en.modules, T.fa.modules",
+    "2. Add Farsi translations to _FA dictionary for all new module strings",
+    "3. Add case statements for 'lighting', 'heatpump', 'busbar' in renderModule switch",
+    "4. Implement Lighting Design module with lux calculation, luminaire count, uniformity check, circuit design per DS/EN 12464-1",
+    "5. Implement Heat Pump Installation module with COP-based power, cable sizing, MCB/RCD selection per DS/HD 60364",
+    "6. Implement Busbar Trunking module with derating, tap-off diversity, short-circuit withstand per IEC 61439-6",
+    "7. Add 45+ tests to test-sld.js covering all three modules"
+  ],
+  "acceptance_criteria": [
+    "All existing 267 tests continue to pass",
+    "45+ new tests pass for lighting, heatpump, and busbar modules",
+    "All render functions return HTML with no <input type='text'> or <textarea>",
+    "All calculations cite DS/EN 12464-1, DS/HD 60364, or IEC 61439-6 clauses",
+    "Lighting module calculates correct luminaire count and uniformity",
+    "Heat pump module selects correct MCB curve C and RCD type A",
+    "Busbar module applies derating and diversity factors correctly",
+    "Conservative calculations throughout (ceiling for danger, floor for capacity)"
+  ],
+  "verification": [
+    "node /projects/sandbox/Claude/test-sld.js 2>&1 | grep 'Results:' should show 317 passed, 0 failed"
+  ],
+  "blocked_reason": null,
+  "findings": "All 317 tests pass (267 existing + 50 new). Lighting module uses DS/EN 12464-1 Table 5.x lux requirements and room index for UF lookup. Heat pump module uses COP-based electrical input, curve C MCBs (3P available only, function falls back gracefully), 30mA Type A RCD mandatory. Busbar module uses IEC 61439-6 derating factors (temp, IP, installation) with floor rounding for conservative capacity. All render functions click-only with sel-btn buttons."
+}

@@ -1,0 +1,15 @@
+{
+  "project_type": "Single-file HTML app with inline JS/CSS - Danish electrical dimensioning tool",
+  "language": "JavaScript (ES5/ES6 mix, inline in HTML)",
+  "build_system": "None - single HTML file, no build step",
+  "test_framework": "Custom test runner in test-sld.js using Node.js assert module",
+  "build_command": "N/A - no build step required",
+  "test_command": "node /projects/sandbox/Claude/test-sld.js",
+  "verification_instructions": "Run 'node test-sld.js' from /projects/sandbox/Claude and verify all tests pass",
+  "setup_instructions": "No setup needed - just Node.js available on the host",
+  "environment_constraints": "Single HTML file architecture - all code must be added inline within the <script> tag.",
+  "relevant_files": [
+    "/projects/sandbox/Claude/el-dimensionering.html",
+    "/projects/sandbox/Claude/test-sld.js"
+  ]
+}

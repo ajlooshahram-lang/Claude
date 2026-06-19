@@ -3421,6 +3421,413 @@ test('Motor, Harmonic, VFD registered in T.da, T.en, T.fa', function() {
   assert.ok(T.fa.modules.vfd, 'vfd must be in Farsi');
 });
 
+// ===== LIGHTING DESIGN MODULE TESTS =====
+
+// Test 268: Lighting room types defined
+test('LIGHTING_ROOM_TYPES has required room types', function() {
+  assert.ok(LIGHTING_ROOM_TYPES.office, 'Office must exist');
+  assert.ok(LIGHTING_ROOM_TYPES.classroom, 'Classroom must exist');
+  assert.ok(LIGHTING_ROOM_TYPES.workshop, 'Workshop must exist');
+  assert.ok(LIGHTING_ROOM_TYPES.warehouse, 'Warehouse must exist');
+  assert.ok(LIGHTING_ROOM_TYPES.corridor, 'Corridor must exist');
+  assert.ok(LIGHTING_ROOM_TYPES.parking, 'Parking must exist');
+  assert.strictEqual(LIGHTING_ROOM_TYPES.office.lux, 500, 'Office must be 500 lux');
+  assert.strictEqual(LIGHTING_ROOM_TYPES.corridor.lux, 100, 'Corridor must be 100 lux');
+  assert.strictEqual(LIGHTING_ROOM_TYPES.parking.lux, 75, 'Parking must be 75 lux');
+});
+
+// Test 269: Light sources defined with correct lm/W
+test('LIGHTING_SOURCES has correct efficacy values', function() {
+  assert.strictEqual(LIGHTING_SOURCES.ledPanel.lmPerW, 120, 'LED panel 120 lm/W');
+  assert.strictEqual(LIGHTING_SOURCES.ledDownlight.lmPerW, 100, 'LED downlight 100 lm/W');
+  assert.strictEqual(LIGHTING_SOURCES.ledTubeT8.lmPerW, 130, 'LED tube T8 130 lm/W');
+  assert.strictEqual(LIGHTING_SOURCES.ledHighBay.lmPerW, 140, 'LED high-bay 140 lm/W');
+  assert.strictEqual(LIGHTING_SOURCES.ledStrip.lmPerW, 80, 'LED strip 80 lm/W');
+});
+
+// Test 270: Room index calculation
+test('lightingCalcRoomIndex correct for standard room', function() {
+  // k = L*W / (Hm * (L+W)), Hm = height - 0.85
+  // 8*6 / ((3-0.85) * (8+6)) = 48 / (2.15 * 14) = 48/30.1 = 1.59
+  var k = lightingCalcRoomIndex(8, 6, 3.0);
+  assert.ok(k > 1.5 && k < 1.7, 'Room index for 8x6x3 room should be ~1.59, got ' + k);
+});
+
+// Test 271: Utilization factor lookup
+test('lightingGetUF returns correct values per room index', function() {
+  assert.strictEqual(lightingGetUF(0.5), 0.30, 'k<0.6 gives UF=0.30');
+  assert.strictEqual(lightingGetUF(0.7), 0.40, 'k<0.8 gives UF=0.40');
+  assert.strictEqual(lightingGetUF(0.9), 0.45, 'k<1.0 gives UF=0.45');
+  assert.strictEqual(lightingGetUF(1.1), 0.50, 'k<1.25 gives UF=0.50');
+  assert.strictEqual(lightingGetUF(1.4), 0.55, 'k<1.5 gives UF=0.55');
+  assert.strictEqual(lightingGetUF(1.8), 0.60, 'k<2.0 gives UF=0.60');
+  assert.strictEqual(lightingGetUF(3.5), 0.75, 'k>=3.0 gives UF=0.75');
+});
+
+// Test 272: Luminaire calculation produces correct count
+test('lightingCalcLuminaires returns valid luminaire count', function() {
+  var result = lightingCalcLuminaires('office', 'ledPanel', 36, 8, 6, 3.0, 0.7);
+  assert.ok(result.count > 0, 'Must have at least 1 luminaire');
+  assert.ok(result.count <= 100, 'Count should be reasonable');
+  assert.ok(result.targetLux === 500, 'Office target must be 500 lux');
+  assert.ok(result.rows > 0, 'Must have rows');
+  assert.ok(result.cols > 0, 'Must have cols');
+});
+
+// Test 273: Luminaire count uses conservative ceiling rounding
+test('lightingCalcLuminaires uses ceiling for luminaire count', function() {
+  // For a small room with low lux requirement
+  var result = lightingCalcLuminaires('corridor', 'ledPanel', 36, 4, 2, 2.7, 0.8);
+  // N = (100 * 8) / (4320 * UF * 0.8). Even small N must be ceiling'd
+  assert.ok(result.count >= 1, 'Minimum 1 luminaire');
+  assert.ok(Number.isInteger(result.count), 'Count must be integer');
+});
+
+// Test 274: Uniformity check
+test('lightingCalcLuminaires checks uniformity ratio', function() {
+  var result = lightingCalcLuminaires('office', 'ledPanel', 36, 8, 6, 3.0, 0.7);
+  assert.ok(typeof result.uniformityOk === 'boolean', 'uniformityOk must be boolean');
+  assert.ok(typeof result.spacingRatio === 'number', 'spacingRatio must be number');
+});
+
+// Test 275: Circuit calculation (max 2000W per circuit)
+test('lightingCalcLuminaires correct circuits for high wattage', function() {
+  // Use high wattage and large room to need multiple circuits
+  var result = lightingCalcLuminaires('workshop', 'ledHighBay', 200, 30, 20, 6.0, 0.7);
+  assert.ok(result.circuitsNeeded >= 2, 'Large installation needs multiple circuits');
+  assert.ok(result.totalWattage === result.count * 200, 'Total wattage = count * wattage');
+});
+
+// Test 276: Power density and LENI
+test('lightingCalcLuminaires calculates power density', function() {
+  var result = lightingCalcLuminaires('office', 'ledPanel', 36, 8, 6, 3.0, 0.7);
+  assert.ok(result.powerDensity > 0, 'Power density must be positive');
+  assert.ok(typeof result.leniOk === 'boolean', 'leniOk must be boolean');
+  assert.ok(result.leniMax === 12, 'Office LENI max = 12 W/m2');
+});
+
+// Test 277: DS/EN 12464-1 clause reference
+test('lightingCalcLuminaires references DS/EN 12464-1', function() {
+  var result = lightingCalcLuminaires('office', 'ledPanel', 36, 8, 6, 3.0, 0.7);
+  assert.ok(result.clause.indexOf('DS/EN 12464-1') >= 0, 'Must reference DS/EN 12464-1');
+});
+
+// Test 278: renderLighting has no text inputs
+test('renderLighting has no text input fields', function() {
+  var html = renderLighting();
+  assert.ok(html.indexOf('<input type="text"') < 0, 'No text inputs allowed');
+  assert.ok(html.indexOf('<textarea') < 0, 'No textareas allowed');
+});
+
+// Test 279: renderLighting uses sel-btn
+test('renderLighting uses sel-btn buttons', function() {
+  var html = renderLighting();
+  assert.ok(html.indexOf('sel-btn') >= 0, 'Must use sel-btn class');
+});
+
+// Test 280: renderLighting references standard
+test('renderLighting references DS/EN 12464-1', function() {
+  var html = renderLighting();
+  assert.ok(html.indexOf('DS/EN 12464-1') >= 0, 'Must reference DS/EN 12464-1');
+});
+
+// Test 281: Large room edge case
+test('lightingCalcLuminaires handles large room (30x20)', function() {
+  var result = lightingCalcLuminaires('warehouse', 'ledHighBay', 150, 30, 20, 6.0, 0.6);
+  assert.ok(result.count > 10, 'Large warehouse needs many luminaires');
+  assert.ok(result.area === 600, 'Area must be 600m2');
+});
+
+// ===== HEAT PUMP INSTALLATION MODULE TESTS =====
+
+// Test 282: Electrical input calculation from COP
+test('heatpumpCalcElectricalInput correct for 10kW/COP 3.5', function() {
+  var result = heatpumpCalcElectricalInput(10, 3.5);
+  assert.ok(result > 2.8 && result < 2.9, 'Should be ~2.86 kW, got ' + result);
+});
+
+// Test 283: Phase selection
+test('heatpumpGetPhase returns 1-phase up to 5kW', function() {
+  assert.strictEqual(heatpumpGetPhase(4.9), 1, '4.9kW should be 1-phase');
+  assert.strictEqual(heatpumpGetPhase(5.1), 3, '5.1kW should be 3-phase');
+  assert.strictEqual(heatpumpGetPhase(5.0), 1, '5.0kW should be 1-phase');
+});
+
+// Test 284: FLC calculation for 1-phase
+test('heatpumpCalcFLC correct for 1-phase', function() {
+  // 3kW / 230V = 13.04 -> ceil = 14
+  var flc = heatpumpCalcFLC(3, 1);
+  assert.strictEqual(flc, 14, '3kW 1-phase FLC should be 14A, got ' + flc);
+});
+
+// Test 285: FLC calculation for 3-phase
+test('heatpumpCalcFLC correct for 3-phase', function() {
+  // 8kW / (400 * sqrt(3)) = 8000/692.8 = 11.55 -> ceil = 12
+  var flc = heatpumpCalcFLC(8, 3);
+  assert.strictEqual(flc, 12, '8kW 3-phase FLC should be 12A, got ' + flc);
+});
+
+// Test 286: Cable selection minimum 2.5mm2
+test('heatpumpSelectCable returns minimum 2.5mm2', function() {
+  var cable = heatpumpSelectCable(5);
+  assert.ok(cable, 'Must return a cable');
+  assert.ok(cable.mm2 >= 2.5, 'Minimum cable must be 2.5mm2');
+  assert.ok(cable.iz >= 5, 'Cable Iz must cover FLC');
+});
+
+// Test 287: MCB curve C selection
+test('heatpumpSelectMCB selects curve C', function() {
+  var mcb = heatpumpSelectMCB(15, 1);
+  assert.ok(mcb, 'Must return an MCB');
+  assert.strictEqual(mcb.curve, 'C', 'Must be curve C for compressor');
+  assert.ok(mcb.rating >= 15, 'MCB rating must cover FLC');
+});
+
+// Test 288: RCD 30mA Type A selection
+test('heatpumpSelectRCD returns 30mA Type A', function() {
+  var rcd = heatpumpSelectRCD(15, 1);
+  assert.ok(rcd, 'Must return an RCD');
+  assert.strictEqual(rcd.sensitivity, 30, 'Must be 30mA');
+  assert.strictEqual(rcd.rcdType, 'A', 'Must be Type A');
+});
+
+// Test 289: Voltage drop calculation
+test('heatpumpCalcVoltageDrop within 3% for short cable', function() {
+  var cable = heatpumpSelectCable(15);
+  var vdrop = heatpumpCalcVoltageDrop(15, cable, 10, 1);
+  assert.ok(vdrop.percent >= 0, 'Voltage drop must be positive');
+  assert.ok(vdrop.ok === true, 'Short cable should be within 3%');
+  assert.ok(vdrop.clause.indexOf('60364') >= 0, 'Must reference 60364');
+});
+
+// Test 290: Voltage drop exceeds 3% for long cable
+test('heatpumpCalcVoltageDrop exceeds 3% for very long cable', function() {
+  var cable = PRODUCTS.cables[0]; // 1.5mm2 cable
+  var vdrop = heatpumpCalcVoltageDrop(30, cable, 50, 1);
+  assert.ok(vdrop.percent > 3, 'Long cable with high current should exceed 3%');
+  assert.ok(vdrop.ok === false, 'Should not be OK');
+});
+
+// Test 291: Full installation calculation
+test('heatpumpCalcInstallation returns complete result', function() {
+  var result = heatpumpCalcInstallation('airToWater', 10, 3.5, 4, 15);
+  assert.ok(result.electricalKW > 0, 'Electrical input must be positive');
+  assert.ok(result.phase === 1 || result.phase === 3, 'Phase must be 1 or 3');
+  assert.ok(result.flc > 0, 'FLC must be positive');
+  assert.ok(result.cable, 'Must have cable');
+  assert.ok(result.mcb, 'Must have MCB');
+  assert.ok(result.rcd, 'Must have RCD');
+  assert.ok(result.spdRequired === true, 'SPD must be required');
+  assert.ok(result.disconnectRequired === true, 'Disconnect must be required');
+});
+
+// Test 292: Defrost load factor 1.15
+test('heatpumpCalcInstallation applies defrost factor 1.15', function() {
+  var result = heatpumpCalcInstallation('airToWater', 10, 3.5, 4, 15);
+  var expectedDefrost = Math.ceil(result.electricalKW * 1.15 * 100) / 100;
+  assert.strictEqual(result.defrostLoad, expectedDefrost, 'Defrost load must be elec * 1.15');
+});
+
+// Test 293: High COP reduces electrical input
+test('heatpumpCalcInstallation high COP gives lower current', function() {
+  var low = heatpumpCalcInstallation('airToWater', 10, 2.5, 4, 15);
+  var high = heatpumpCalcInstallation('airToWater', 10, 4.5, 4, 15);
+  assert.ok(high.flc < low.flc, 'Higher COP should give lower FLC');
+});
+
+// Test 294: renderHeatPump has no text inputs
+test('renderHeatPump has no text input fields', function() {
+  var html = renderHeatPump();
+  assert.ok(html.indexOf('<input type="text"') < 0, 'No text inputs allowed');
+  assert.ok(html.indexOf('<textarea') < 0, 'No textareas allowed');
+});
+
+// Test 295: renderHeatPump uses sel-btn
+test('renderHeatPump uses sel-btn buttons', function() {
+  var html = renderHeatPump();
+  assert.ok(html.indexOf('sel-btn') >= 0, 'Must use sel-btn class');
+});
+
+// Test 296: renderHeatPump references DS/HD 60364
+test('renderHeatPump references DS/HD 60364', function() {
+  var html = renderHeatPump();
+  assert.ok(html.indexOf('60364') >= 0, 'Must reference 60364');
+});
+
+// ===== BUSBAR TRUNKING SYSTEM MODULE TESTS =====
+
+// Test 297: Derating calculation at 35C horizontal IP54
+test('busbarCalcDerating correct at 35C horizontal_flat IP54', function() {
+  var result = busbarCalcDerating(35, 'horizontal_flat', 54);
+  assert.strictEqual(result.tempFactor, 0.95, 'Temp factor at 35C = 0.95');
+  assert.strictEqual(result.ipFactor, 0.90, 'IP54 factor = 0.90');
+  assert.strictEqual(result.installFactor, 1.0, 'Horizontal flat = 1.0');
+  // 0.95 * 0.90 * 1.0 = 0.855 -> floor to 0.855
+  assert.ok(result.combined >= 0.85 && result.combined <= 0.86, 'Combined ~0.855, got ' + result.combined);
+  assert.ok(result.clause.indexOf('IEC 61439-6') >= 0, 'Must reference IEC 61439-6');
+});
+
+// Test 298: Derating at worst case (50C vertical IP55)
+test('busbarCalcDerating worst case 50C vertical IP55', function() {
+  var result = busbarCalcDerating(50, 'vertical', 55);
+  assert.strictEqual(result.tempFactor, 0.80, 'Temp factor at 50C = 0.80');
+  assert.strictEqual(result.ipFactor, 0.85, 'IP55 factor = 0.85');
+  assert.strictEqual(result.installFactor, 0.90, 'Vertical = 0.90');
+  var expected = Math.floor(0.80 * 0.85 * 0.90 * 1000) / 1000;
+  assert.strictEqual(result.combined, expected, 'Combined must use floor');
+});
+
+// Test 299: Effective capacity calculation
+test('busbarCalcEffectiveCapacity applies derating', function() {
+  var derating = busbarCalcDerating(30, 'horizontal_flat', 31);
+  var effective = busbarCalcEffectiveCapacity(400, derating);
+  assert.strictEqual(effective, 400, 'At 30C, flat, IP31 all factors are 1.0, so 400A');
+});
+
+// Test 300: Diversity factor for tap-offs
+test('busbarCalcDiversity correct for various tap-off counts', function() {
+  assert.strictEqual(busbarCalcDiversity(1), 1.0, '1 tap-off = diversity 1.0');
+  assert.strictEqual(busbarCalcDiversity(3), 0.9, '3 tap-offs = diversity 0.9');
+  assert.strictEqual(busbarCalcDiversity(5), 0.8, '5 tap-offs = diversity 0.8');
+  assert.strictEqual(busbarCalcDiversity(8), 0.7, '8 tap-offs = diversity 0.7');
+  assert.strictEqual(busbarCalcDiversity(20), 0.5, '20 tap-offs = diversity 0.5');
+});
+
+// Test 301: System load calculation
+test('busbarCalcSystemLoad returns correct total demand', function() {
+  var result = busbarCalcSystemLoad(6, 63);
+  // 6 tap-offs * 63A * 0.8 diversity = 302.4 -> ceil = 303
+  assert.strictEqual(result.totalDemand, Math.ceil(6 * 63 * 0.8), 'Total demand with diversity');
+  assert.strictEqual(result.diversity, 0.8, '6 tap-offs gives diversity 0.8');
+  assert.ok(result.clause.indexOf('IEC 61439-6') >= 0, 'Must reference IEC 61439-6');
+});
+
+// Test 302: Thermal check pass
+test('busbarCheckThermal passes when load < capacity', function() {
+  var result = busbarCheckThermal(200, 400);
+  assert.ok(result.ok, 'Load 200A < Capacity 400A should pass');
+  assert.strictEqual(result.loadRatio, 50, 'Load ratio should be 50%');
+});
+
+// Test 303: Thermal check fail
+test('busbarCheckThermal fails when load > capacity', function() {
+  var result = busbarCheckThermal(500, 400);
+  assert.ok(!result.ok, 'Load 500A > Capacity 400A should fail');
+});
+
+// Test 304: Voltage drop calculation
+test('busbarCalcVoltageDrop returns valid result', function() {
+  var result = busbarCalcVoltageDrop('distribution', 400, 5);
+  assert.ok(result.lengthM === 15, '5 sections = 15m');
+  assert.ok(result.vdropMv >= 0, 'Voltage drop must be positive');
+  assert.ok(typeof result.ok === 'boolean', 'ok must be boolean');
+  assert.ok(result.clause.indexOf('IEC 61439-6') >= 0, 'Must reference IEC 61439-6');
+});
+
+// Test 305: Short-circuit withstand check
+test('busbarCheckShortCircuit Icw vs upstream Ik', function() {
+  // 400A busbar: Icw = floor(400 * 20 / 1000) = 8, but min 10
+  var result = busbarCheckShortCircuit(400, 8);
+  assert.ok(result.icw >= 10, 'Minimum Icw should be 10kA');
+  assert.ok(result.ok, 'Should pass when Icw >= Ik');
+  assert.ok(result.clause.indexOf('IEC 61439-6') >= 0, 'Must reference IEC 61439-6');
+});
+
+// Test 306: Short-circuit withstand fails
+test('busbarCheckShortCircuit fails when Ik too high', function() {
+  // 100A busbar: Icw = max(floor(100*20/1000), 10) = 10kA
+  var result = busbarCheckShortCircuit(100, 25);
+  assert.ok(!result.ok, 'Should fail when Icw < Ik');
+});
+
+// Test 307: Expansion joints calculation
+test('busbarCheckExpansion joints every 30m', function() {
+  var result = busbarCheckExpansion(10); // 30m
+  assert.strictEqual(result.lengthM, 30, '10 sections = 30m');
+  assert.strictEqual(result.jointsNeeded, 1, '30m needs 1 expansion joint');
+});
+
+// Test 308: MCCB selection for busbar
+test('busbarSelectMCCB returns valid MCCB', function() {
+  var mccb = busbarSelectMCCB(400);
+  assert.ok(mccb, 'Must return an MCCB');
+  assert.ok(mccb.brand, 'MCCB must have brand');
+  assert.ok(mccb.icu > 0, 'MCCB must have Icu');
+});
+
+// Test 309: Full busbar calculation
+test('busbarCalcFull returns complete result', function() {
+  var result = busbarCalcFull('distribution', 400, 'schneider', 35, 'horizontal_flat', 54, 6, 63, 5, 25);
+  assert.ok(result.derating, 'Must have derating');
+  assert.ok(result.effectiveCapacity > 0, 'Must have effective capacity');
+  assert.ok(result.systemLoad, 'Must have system load');
+  assert.ok(result.thermal, 'Must have thermal check');
+  assert.ok(result.vdrop, 'Must have voltage drop');
+  assert.ok(result.sc, 'Must have short-circuit check');
+  assert.ok(result.mccb, 'Must have MCCB');
+  assert.ok(typeof result.allOk === 'boolean', 'allOk must be boolean');
+});
+
+// Test 310: renderBusbar has no text inputs
+test('renderBusbar has no text input fields', function() {
+  var html = renderBusbar();
+  assert.ok(html.indexOf('<input type="text"') < 0, 'No text inputs allowed');
+  assert.ok(html.indexOf('<textarea') < 0, 'No textareas allowed');
+});
+
+// Test 311: renderBusbar uses sel-btn
+test('renderBusbar uses sel-btn buttons', function() {
+  var html = renderBusbar();
+  assert.ok(html.indexOf('sel-btn') >= 0, 'Must use sel-btn class');
+});
+
+// Test 312: renderBusbar references IEC 61439-6
+test('renderBusbar references IEC 61439-6', function() {
+  var html = renderBusbar();
+  assert.ok(html.indexOf('IEC 61439-6') >= 0, 'Must reference IEC 61439-6');
+});
+
+// Test 313: Maximum busbar rating edge case
+test('busbarCalcFull handles maximum 5000A rating', function() {
+  var result = busbarCalcFull('transport', 5000, 'siemens', 40, 'horizontal_flat', 31, 4, 160, 10, 50);
+  assert.ok(result.effectiveCapacity > 0, 'Must calculate effective capacity');
+  assert.ok(result.sc.icw >= 50, '5000A busbar should have high Icw');
+});
+
+// Test 314: All three new modules registered in translations
+test('Lighting, HeatPump, Busbar registered in T.da, T.en, T.fa', function() {
+  assert.ok(T.da.modules.lighting, 'lighting must be in Danish');
+  assert.ok(T.en.modules.lighting, 'lighting must be in English');
+  assert.ok(T.fa.modules.lighting, 'lighting must be in Farsi');
+  assert.ok(T.da.modules.heatpump, 'heatpump must be in Danish');
+  assert.ok(T.en.modules.heatpump, 'heatpump must be in English');
+  assert.ok(T.fa.modules.heatpump, 'heatpump must be in Farsi');
+  assert.ok(T.da.modules.busbar, 'busbar must be in Danish');
+  assert.ok(T.en.modules.busbar, 'busbar must be in English');
+  assert.ok(T.fa.modules.busbar, 'busbar must be in Farsi');
+});
+
+// Test 315: Farsi translations in _FA for lighting
+test('Farsi translations exist for lighting module', function() {
+  assert.ok(_FA['Lighting Design'], 'Lighting Design must have Farsi');
+  assert.ok(_FA['Room Type'], 'Room Type must have Farsi');
+  assert.ok(_FA['Maintenance Factor'], 'Maintenance Factor must have Farsi');
+});
+
+// Test 316: Farsi translations in _FA for heat pump
+test('Farsi translations exist for heat pump module', function() {
+  assert.ok(_FA['Heat Pump Installation'], 'Heat Pump Installation must have Farsi');
+  assert.ok(_FA['COP'], 'COP must have Farsi');
+  assert.ok(_FA['Starting Current'], 'Starting Current must have Farsi');
+});
+
+// Test 317: Farsi translations in _FA for busbar
+test('Farsi translations exist for busbar module', function() {
+  assert.ok(_FA['Busbar Trunking System'], 'Busbar Trunking System must have Farsi');
+  assert.ok(_FA['Rated Current'], 'Rated Current must have Farsi');
+  assert.ok(_FA['Diversity Factor'], 'Diversity Factor must have Farsi');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

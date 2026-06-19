@@ -654,7 +654,10 @@ const T = {
       noed: 'Noedbelysning',
       motor: 'Motorstart',
       harmonic: 'Harmonisk',
-      vfd: 'Frekvensomformer'
+      vfd: 'Frekvensomformer',
+      lighting: 'Belysning',
+      heatpump: 'Varmepumpe',
+      busbar: 'Skinnesystem'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -767,7 +770,10 @@ const T = {
       noed: 'Emergency Lighting',
       motor: 'Motor Starting',
       harmonic: 'Harmonic Analysis',
-      vfd: 'VFD Sizing'
+      vfd: 'VFD Sizing',
+      lighting: 'Lighting Design',
+      heatpump: 'Heat Pump',
+      busbar: 'Busbar Trunking'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -872,7 +878,10 @@ const T = {
       noed: 'روشنایی اضطراری',
       motor: 'راه‌اندازی موتور',
       harmonic: 'تحلیل هارمونیک',
-      vfd: 'درایو فرکانس'
+      vfd: 'درایو فرکانس',
+      lighting: 'طراحی روشنایی',
+      heatpump: 'پمپ حرارتی',
+      busbar: 'سیستم باسبار'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -1208,7 +1217,66 @@ const _FA = {
   'No RCD on VFD output': '\u0628\u062F\u0648\u0646 RCD \u062F\u0631 \u062E\u0631\u0648\u062C\u06CC \u062F\u0631\u0627\u06CC\u0648',
   'VFD Rated Current': '\u062C\u0631\u06CC\u0627\u0646 \u0646\u0627\u0645\u06CC \u062F\u0631\u0627\u06CC\u0648',
   'Motor Cable Max Length': '\u062D\u062F\u0627\u06A9\u062B\u0631 \u0637\u0648\u0644 \u06A9\u0627\u0628\u0644 \u0645\u0648\u062A\u0648\u0631',
-  'PE Minimum': '\u062D\u062F\u0627\u0642\u0644 PE'
+  'PE Minimum': '\u062D\u062F\u0627\u0642\u0644 PE',
+  // Lighting Design translations
+  'Lighting Design': 'طراحی روشنایی',
+  'Room Type': 'نوع اتاق',
+  'Light Source': 'منبع نور',
+  'Luminaire Wattage': 'توان چراغ',
+  'Room Dimensions': 'ابعاد اتاق',
+  'Length': 'طول',
+  'Width': 'عرض',
+  'Height': 'ارتفاع',
+  'Maintenance Factor': 'ضریب نگهداری',
+  'Utilization Factor': 'ضریب بهره‌برداری',
+  'Room Index': 'شاخص اتاق',
+  'Luminaire Count': 'تعداد چراغ',
+  'Grid Layout': 'چیدمان شبکه‌ای',
+  'Uniformity': 'یکنواختی',
+  'Spacing/Height Ratio': 'نسبت فاصله/ارتفاع',
+  'Circuits Needed': 'تعداد مدار مورد نیاز',
+  'Total Power': 'توان کل',
+  'Power Density': 'چگالی توان',
+  'LENI Benchmark': 'معیار LENI',
+  'Emergency Lighting': 'روشنایی اضطراری',
+  'Target Lux': 'لوکس هدف',
+  'Clean environment': 'محیط تمیز',
+  'Normal': 'معمولی',
+  'Dirty/Industrial': 'کثیف/صنعتی',
+  // Heat Pump translations
+  'Heat Pump Installation': 'نصب پمپ حرارتی',
+  'Heat Pump Type': 'نوع پمپ حرارتی',
+  'Heating Capacity': 'ظرفیت گرمایشی',
+  'COP': 'ضریب عملکرد',
+  'Electrical Input': 'ورودی الکتریکی',
+  'Starting Current': 'جریان راه‌اندازی',
+  'Cable Length': 'طول کابل',
+  'Inrush Factor': 'ضریب جریان هجومی',
+  'Outdoor Disconnect': 'قطع‌کننده بیرونی',
+  'Supplementary Bonding': 'اتصال تکمیلی',
+  'SPD Recommendation': 'توصیه SPD',
+  'Defrost Load': 'بار یخ‌زدایی',
+  'Phase Selection': 'انتخاب فاز',
+  'Voltage Drop Check': 'بررسی افت ولتاژ',
+  'Installation Checklist': 'چک‌لیست نصب',
+  // Busbar Trunking translations
+  'Busbar Trunking System': 'سیستم باسبار',
+  'System Type': 'نوع سیستم',
+  'Rated Current': 'جریان نامی',
+  'Temperature Derating': 'کاهش دما',
+  'Installation Method': 'روش نصب',
+  'IP Rating': 'درجه حفاظت IP',
+  'Tap-off Units': 'واحدهای انشعاب',
+  'Tap-off Rating': 'جریان انشعاب',
+  'Diversity Factor': 'ضریب تنوع',
+  'System Load': 'بار سیستم',
+  'Short-circuit Withstand': 'تحمل اتصال کوتاه',
+  'Busbar Length': 'طول باسبار',
+  'Expansion Joints': 'درزهای انبساط',
+  'Fire Barrier': 'مانع آتش',
+  'Supply MCCB': 'MCCB تغذیه',
+  'Thermal Check': 'بررسی حرارتی',
+  'Voltage Drop per Meter': 'افت ولتاژ بر متر'
 };
 function tx(da, en) { if(lang === 'da') return da; if(lang === 'fa') return _FA[en] || en; return en; }
 function tl(obj, prefix) { return obj[prefix + '_' + lang] || obj[prefix + '_en'] || ''; }
@@ -4179,6 +4247,9 @@ function renderModule(mod) {
     case 'motor': content = renderMotor(); break;
     case 'harmonic': content = renderHarmonic(); break;
     case 'vfd': content = renderVFD(); break;
+    case 'lighting': content = renderLighting(); break;
+    case 'heatpump': content = renderHeatPump(); break;
+    case 'busbar': content = renderBusbar(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -10605,6 +10676,729 @@ function renderVFD() {
   return html;
 }
 
+// ===== LIGHTING DESIGN MODULE (DS/EN 12464-1 + DS/HD 60364) =====
+
+var LIGHTING_ROOM_TYPES = {
+  office: { lux: 500, da: 'Kontor', en: 'Office', leniMax: 12 },
+  classroom: { lux: 300, da: 'Klassevarelse', en: 'Classroom', leniMax: 10 },
+  workshop: { lux: 500, da: 'Vaerksted', en: 'Workshop', leniMax: 15 },
+  warehouse: { lux: 200, da: 'Lager', en: 'Warehouse', leniMax: 8 },
+  retail: { lux: 300, da: 'Butik', en: 'Retail', leniMax: 14 },
+  hospital: { lux: 300, da: 'Sengestue', en: 'Hospital ward', leniMax: 12 },
+  corridor: { lux: 100, da: 'Korridor', en: 'Corridor', leniMax: 6 },
+  bathroom: { lux: 200, da: 'Badevarelse', en: 'Bathroom', leniMax: 8 },
+  kitchen: { lux: 500, da: 'Koekken', en: 'Kitchen', leniMax: 12 },
+  parking: { lux: 75, da: 'Parkering', en: 'Parking', leniMax: 5 }
+};
+
+var LIGHTING_SOURCES = {
+  ledPanel: { lmPerW: 120, da: 'LED panel', en: 'LED panel' },
+  ledDownlight: { lmPerW: 100, da: 'LED downlight', en: 'LED downlight' },
+  ledTubeT8: { lmPerW: 130, da: 'LED roer T8', en: 'LED tube T8' },
+  ledHighBay: { lmPerW: 140, da: 'LED high-bay', en: 'LED high-bay' },
+  ledStrip: { lmPerW: 80, da: 'LED strip', en: 'LED strip' }
+};
+
+var lightingState = {
+  roomType: 'office',
+  source: 'ledPanel',
+  wattage: 36,
+  length: 8,
+  width: 6,
+  height: 3.0,
+  maintenanceFactor: 0.7
+};
+
+// Calculate room index k = L*W / (Hm * (L+W)), Hm = mounting height - work plane (0.85m)
+function lightingCalcRoomIndex(length, width, height) {
+  var hm = height - 0.85;
+  if (hm <= 0) hm = 0.1;
+  var k = (length * width) / (hm * (length + width));
+  return Math.round(k * 100) / 100;
+}
+
+// Room index to utilization factor lookup per DS/EN 12464-1 Table
+function lightingGetUF(roomIndex) {
+  if (roomIndex < 0.6) return 0.30;
+  if (roomIndex < 0.8) return 0.40;
+  if (roomIndex < 1.0) return 0.45;
+  if (roomIndex < 1.25) return 0.50;
+  if (roomIndex < 1.5) return 0.55;
+  if (roomIndex < 2.0) return 0.60;
+  if (roomIndex < 2.5) return 0.65;
+  if (roomIndex < 3.0) return 0.70;
+  return 0.75;
+}
+
+// Calculate number of luminaires: N = (E * A) / (phi * UF * MF)
+function lightingCalcLuminaires(roomType, source, wattage, length, width, height, mf) {
+  var room = LIGHTING_ROOM_TYPES[roomType] || LIGHTING_ROOM_TYPES.office;
+  var src = LIGHTING_SOURCES[source] || LIGHTING_SOURCES.ledPanel;
+  var targetLux = room.lux;
+  var area = length * width;
+  var lumens = wattage * src.lmPerW;
+  var roomIndex = lightingCalcRoomIndex(length, width, height);
+  var uf = lightingGetUF(roomIndex);
+  var n = (targetLux * area) / (lumens * uf * mf);
+  var count = Math.ceil(n); // Conservative: always round up
+  // Grid layout
+  var ratio = length / width;
+  var cols = Math.ceil(Math.sqrt(count / ratio) * ratio);
+  var rows = Math.ceil(count / cols);
+  var actualCount = rows * cols;
+  // Uniformity: spacing/Hm <= 1.5
+  var hm = height - 0.85;
+  var spacingX = length / cols;
+  var spacingY = width / rows;
+  var maxSpacing = Math.max(spacingX, spacingY);
+  var spacingRatio = hm > 0 ? maxSpacing / hm : 99;
+  var uniformityOk = spacingRatio <= 1.5;
+  // Circuit design: max 2000W per 10A B-curve MCB
+  var totalWattage = actualCount * wattage;
+  var circuitsNeeded = Math.ceil(totalWattage / 2000);
+  // Power density
+  var powerDensity = Math.ceil((totalWattage / area) * 10) / 10;
+  return {
+    count: actualCount,
+    rows: rows,
+    cols: cols,
+    targetLux: targetLux,
+    area: area,
+    lumens: lumens,
+    roomIndex: roomIndex,
+    uf: uf,
+    mf: mf,
+    spacingX: Math.round(spacingX * 100) / 100,
+    spacingY: Math.round(spacingY * 100) / 100,
+    spacingRatio: Math.round(spacingRatio * 100) / 100,
+    uniformityOk: uniformityOk,
+    totalWattage: totalWattage,
+    circuitsNeeded: circuitsNeeded,
+    powerDensity: powerDensity,
+    leniMax: room.leniMax,
+    leniOk: powerDensity <= room.leniMax,
+    clause: 'DS/EN 12464-1 Table 5.x + DS/HD 60364-5-52'
+  };
+}
+function renderLighting() {
+  var calc = lightingCalcLuminaires(lightingState.roomType, lightingState.source, lightingState.wattage, lightingState.length, lightingState.width, lightingState.height, lightingState.maintenanceFactor);
+  var room = LIGHTING_ROOM_TYPES[lightingState.roomType];
+  var src = LIGHTING_SOURCES[lightingState.source];
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Belysningsdesign', 'Lighting Design') + '</div>';
+  html += '<div class="info-row">' + tx('Beregning iht. DS/EN 12464-1 + DS/HD 60364-5-52', 'Calculation per DS/EN 12464-1 + DS/HD 60364-5-52') + '</div>';
+
+  // Room Type
+  html += '<div class="select-group"><div class="select-label">' + tx('Rumtype (DS/EN 12464-1 Tabel 5.x)', 'Room Type (DS/EN 12464-1 Table 5.x)') + '</div><div class="select-grid">';
+  Object.keys(LIGHTING_ROOM_TYPES).forEach(function(key) {
+    var r = LIGHTING_ROOM_TYPES[key];
+    html += '<button class="sel-btn' + (lightingState.roomType === key ? ' selected' : '') + '" onclick="lightingState.roomType=\'' + key + '\';renderModule(\'lighting\')">' + tx(r.da, r.en) + ' (' + r.lux + ' lux)</button>';
+  });
+  html += '</div></div>';
+
+  // Light Source
+  html += '<div class="select-group"><div class="select-label">' + tx('Lyskildeype', 'Light Source Type') + '</div><div class="select-grid">';
+  Object.keys(LIGHTING_SOURCES).forEach(function(key) {
+    var s = LIGHTING_SOURCES[key];
+    html += '<button class="sel-btn' + (lightingState.source === key ? ' selected' : '') + '" onclick="lightingState.source=\'' + key + '\';renderModule(\'lighting\')">' + tx(s.da, s.en) + ' (' + s.lmPerW + ' lm/W)</button>';
+  });
+  html += '</div></div>';
+
+  // Luminaire Wattage
+  html += '<div class="select-group"><div class="select-label">' + tx('Armatureffekt [W]', 'Luminaire Wattage [W]') + '</div><div class="select-grid">';
+  [18, 25, 36, 40, 50, 60, 80, 100, 150, 200].forEach(function(w) {
+    html += '<button class="sel-btn' + (lightingState.wattage === w ? ' selected' : '') + '" onclick="lightingState.wattage=' + w + ';renderModule(\'lighting\')">' + w + 'W</button>';
+  });
+  html += '</div></div>';
+
+  // Room Length
+  html += '<div class="select-group"><div class="select-label">' + tx('Rumlangde [m]', 'Room Length [m]') + '</div><div class="select-grid">';
+  for (var l = 2; l <= 30; l += 2) {
+    html += '<button class="sel-btn' + (lightingState.length === l ? ' selected' : '') + '" onclick="lightingState.length=' + l + ';renderModule(\'lighting\')">' + l + '</button>';
+  }
+  html += '</div></div>';
+
+  // Room Width
+  html += '<div class="select-group"><div class="select-label">' + tx('Rumbredde [m]', 'Room Width [m]') + '</div><div class="select-grid">';
+  for (var w = 2; w <= 20; w += 2) {
+    html += '<button class="sel-btn' + (lightingState.width === w ? ' selected' : '') + '" onclick="lightingState.width=' + w + ';renderModule(\'lighting\')">' + w + '</button>';
+  }
+  html += '</div></div>';
+
+  // Room Height
+  html += '<div class="select-group"><div class="select-label">' + tx('Rumhoejde [m]', 'Room Height [m]') + '</div><div class="select-grid">';
+  for (var h = 2.4; h <= 6.0; h += 0.3) {
+    var hRound = Math.round(h * 10) / 10;
+    html += '<button class="sel-btn' + (lightingState.height === hRound ? ' selected' : '') + '" onclick="lightingState.height=' + hRound + ';renderModule(\'lighting\')">' + hRound + '</button>';
+  }
+  html += '</div></div>';
+
+  // Maintenance Factor
+  html += '<div class="select-group"><div class="select-label">' + tx('Vedligeholdelsesfaktor (MF)', 'Maintenance Factor (MF)') + '</div><div class="select-grid">';
+  [{v:0.8, da:'0.8 (Rent)', en:'0.8 (Clean environment)'}, {v:0.7, da:'0.7 (Normal)', en:'0.7 (Normal)'}, {v:0.6, da:'0.6 (Snavset/industri)', en:'0.6 (Dirty/Industrial)'}].forEach(function(item) {
+    html += '<button class="sel-btn' + (lightingState.maintenanceFactor === item.v ? ' selected' : '') + '" onclick="lightingState.maintenanceFactor=' + item.v + ';renderModule(\'lighting\')">' + tx(item.da, item.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Results
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Beregningsresultat', 'Calculation Results') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Maal-belysningsstyrke', 'Target Illuminance') + '</span><span class="value">' + calc.targetLux + ' lux (DS/EN 12464-1)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Rumareal', 'Room Area') + '</span><span class="value">' + calc.area + ' m\u00B2</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Rumindeks k', 'Room Index k') + '</span><span class="value">' + calc.roomIndex + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Udnyttelsesfaktor (UF)', 'Utilization Factor (UF)') + '</span><span class="value">' + calc.uf + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Armaturlumen', 'Luminaire Lumens') + '</span><span class="value">' + calc.lumens + ' lm</span></div>';
+  html += '</div>';
+
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Armaturantal og layout', 'Luminaire Count & Layout') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Antal armaturer', 'Luminaire Count') + '</span><span class="value">' + calc.count + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Grid layout', 'Grid Layout') + '</span><span class="value">' + calc.rows + ' x ' + calc.cols + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Armaturafstand X', 'Spacing X') + '</span><span class="value">' + calc.spacingX + ' m</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Armaturafstand Y', 'Spacing Y') + '</span><span class="value">' + calc.spacingY + ' m</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Afstand/Hoejde ratio', 'Spacing/Height Ratio') + '</span><span class="value">' + calc.spacingRatio + (calc.uniformityOk ? ' \u2264 1.5 \u2705' : ' > 1.5 \u274C') + '</span></div>';
+  html += '</div>';
+
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Kredsloeb og energi', 'Circuits & Energy') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Samlet effekt', 'Total Power') + '</span><span class="value">' + calc.totalWattage + ' W</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kredse (maks 2000W/kreds)', 'Circuits (max 2000W/circuit)') + '</span><span class="value">' + calc.circuitsNeeded + ' x 10A MCB kurve B</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Effektdensitet', 'Power Density') + '</span><span class="value">' + calc.powerDensity + ' W/m\u00B2' + (calc.leniOk ? ' \u2705' : ' \u274C') + ' (LENI maks ' + calc.leniMax + ' W/m\u00B2, DS/EN 15193)</span></div>';
+  html += '</div>';
+
+  // Emergency lighting note
+  html += '<div class="result-box">';
+  html += '<div class="result-row"><span class="label">\u26A0\uFE0F ' + tx('Noedbelysning', 'Emergency Lighting') + '</span><span class="value">' + tx('Se noedbelysningsmodulet for DS/EN 1838 krav', 'See Emergency Lighting module for DS/EN 1838 requirements') + '</span></div>';
+  html += '</div>';
+
+  // Verdict
+  var allOk = calc.uniformityOk && calc.leniOk;
+  html += renderVerdict(allOk, allOk ? tx('Belysningsdesign opfylder DS/EN 12464-1 + DS/EN 15193', 'Lighting design complies with DS/EN 12464-1 + DS/EN 15193') : tx('Tilpas layout - uniformitet eller energi overskrider graense', 'Adjust layout - uniformity or energy exceeds limit'));
+
+  html += '</div>';
+  return html;
+}
+// ===== HEAT PUMP INSTALLATION MODULE (DS/HD 60364 + Installationsbekendtgoerelsen) =====
+
+var HEATPUMP_TYPES = {
+  airToAir: { da: 'Luft-luft', en: 'Air-to-Air' },
+  airToWater: { da: 'Luft-vand', en: 'Air-to-Water' },
+  groundSource: { da: 'Jordvarme', en: 'Ground-source' },
+  hybrid: { da: 'Hybrid (gas+VP)', en: 'Hybrid (gas+HP)' }
+};
+
+var heatpumpState = {
+  type: 'airToWater',
+  heatingKW: 10,
+  cop: 3.5,
+  inrushFactor: 4,
+  cableLength: 15
+};
+
+// Calculate electrical input from heating capacity and COP
+function heatpumpCalcElectricalInput(heatingKW, cop) {
+  var elecKW = heatingKW / cop;
+  return Math.ceil(elecKW * 100) / 100;
+}
+
+// Determine phase requirement: 1-phase up to 5kW electrical, 3-phase above
+function heatpumpGetPhase(electricalKW) {
+  return electricalKW > 5 ? 3 : 1;
+}
+
+// Calculate full-load current
+function heatpumpCalcFLC(electricalKW, phase) {
+  if (phase === 1) {
+    return Math.ceil(electricalKW * 1000 / 230);
+  } else {
+    return Math.ceil(electricalKW * 1000 / (400 * Math.sqrt(3)));
+  }
+}
+
+// Select cable based on FLC, method C (wall/conduit), Cu
+function heatpumpSelectCable(flc) {
+  var cables = PRODUCTS.cables.filter(function(c) { return c.material === 'Cu'; });
+  cables.sort(function(a, b) { return a.iz - b.iz; });
+  // Minimum 2.5mm2 for small units, 6mm2 for larger
+  for (var i = 0; i < cables.length; i++) {
+    if (cables[i].iz >= flc && cables[i].mm2 >= 2.5) return cables[i];
+  }
+  return cables[cables.length - 1];
+}
+
+// Select MCB curve C for compressor inrush
+function heatpumpSelectMCB(flc, phase) {
+  var mcbs = PRODUCTS.mcbs.filter(function(m) {
+    return m.curve === 'C';
+  });
+  // Prefer matching poles, but use any curve C if none available for that pole count
+  var poleMcbs = mcbs.filter(function(m) {
+    return phase === 1 ? (m.poles === '1P' || m.poles === '2P') : (m.poles === '3P' || m.poles === '4P');
+  });
+  if (poleMcbs.length > 0) mcbs = poleMcbs;
+  mcbs.sort(function(a, b) { return a.rating - b.rating; });
+  for (var i = 0; i < mcbs.length; i++) {
+    if (mcbs[i].rating >= flc) return mcbs[i];
+  }
+  return mcbs[mcbs.length - 1];
+}
+
+// Select RCD 30mA Type A (mandatory per Installationsbekendtgoerelsen)
+function heatpumpSelectRCD(flc, phase) {
+  var rcds = PRODUCTS.rcds.filter(function(r) {
+    return r.sensitivity === 30 && r.rcdType === 'A';
+  });
+  rcds.sort(function(a, b) { return a.rating - b.rating; });
+  for (var i = 0; i < rcds.length; i++) {
+    if (rcds[i].rating >= flc) return rcds[i];
+  }
+  return rcds[rcds.length - 1];
+}
+
+// Calculate voltage drop
+function heatpumpCalcVoltageDrop(flc, cable, lengthM, phase) {
+  if (!cable) return { vdrop: 0, percent: 0, ok: true };
+  var un = phase === 1 ? 230 : 400;
+  var factor = phase === 1 ? 2 : Math.sqrt(3);
+  var vdrop = factor * flc * cable.r * lengthM / 1000;
+  var percent = Math.ceil((vdrop / un) * 10000) / 100; // Conservative ceiling to 2 decimals
+  return { vdrop: Math.round(vdrop * 100) / 100, percent: percent, ok: percent <= 3.0, clause: 'DS/HD 60364-5-52 cl.525' };
+}
+
+// Full heat pump calculation
+function heatpumpCalcInstallation(type, heatingKW, cop, inrushFactor, cableLength) {
+  var elecKW = heatpumpCalcElectricalInput(heatingKW, cop);
+  var phase = heatpumpGetPhase(elecKW);
+  var flc = heatpumpCalcFLC(elecKW, phase);
+  var startCurrent = Math.ceil(flc * inrushFactor);
+  var defrostLoad = Math.ceil(elecKW * 1.15 * 100) / 100;
+  var defrostFLC = heatpumpCalcFLC(defrostLoad, phase);
+  // Use defrost FLC for cable sizing (conservative)
+  var designCurrent = Math.max(flc, defrostFLC);
+  var cable = heatpumpSelectCable(designCurrent);
+  var mcb = heatpumpSelectMCB(designCurrent, phase);
+  var rcd = heatpumpSelectRCD(designCurrent, phase);
+  var vdrop = heatpumpCalcVoltageDrop(designCurrent, cable, cableLength, phase);
+
+  return {
+    electricalKW: elecKW,
+    phase: phase,
+    flc: flc,
+    startCurrent: startCurrent,
+    defrostLoad: defrostLoad,
+    defrostFLC: defrostFLC,
+    designCurrent: designCurrent,
+    cable: cable,
+    mcb: mcb,
+    rcd: rcd,
+    vdrop: vdrop,
+    spdRequired: true,
+    disconnectRequired: true,
+    bondingRequired: true,
+    clause: 'DS/HD 60364-5-52 + Installationsbekendtgoerelsen'
+  };
+}
+function renderHeatPump() {
+  var calc = heatpumpCalcInstallation(heatpumpState.type, heatpumpState.heatingKW, heatpumpState.cop, heatpumpState.inrushFactor, heatpumpState.cableLength);
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Varmepumpe-installation', 'Heat Pump Installation') + '</div>';
+  html += '<div class="info-row">' + tx('Beregning iht. DS/HD 60364 + Installationsbekendtgoerelsen', 'Calculation per DS/HD 60364 + Installationsbekendtgoerelsen') + '</div>';
+
+  // Heat Pump Type
+  html += '<div class="select-group"><div class="select-label">' + tx('Varmepumpetype', 'Heat Pump Type') + '</div><div class="select-grid">';
+  Object.keys(HEATPUMP_TYPES).forEach(function(key) {
+    var t = HEATPUMP_TYPES[key];
+    html += '<button class="sel-btn' + (heatpumpState.type === key ? ' selected' : '') + '" onclick="heatpumpState.type=\'' + key + '\';renderModule(\'heatpump\')">' + tx(t.da, t.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Heating Capacity
+  html += '<div class="select-group"><div class="select-label">' + tx('Varmeeffekt [kW]', 'Heating Capacity [kW]') + '</div><div class="select-grid">';
+  [4, 6, 8, 10, 12, 14, 16, 18, 20, 25].forEach(function(kw) {
+    html += '<button class="sel-btn' + (heatpumpState.heatingKW === kw ? ' selected' : '') + '" onclick="heatpumpState.heatingKW=' + kw + ';renderModule(\'heatpump\')">' + kw + '</button>';
+  });
+  html += '</div></div>';
+
+  // COP
+  html += '<div class="select-group"><div class="select-label">' + tx('COP (ydelseskoefficient)', 'COP (Coefficient of Performance)') + '</div><div class="select-grid">';
+  [2.5, 3.0, 3.5, 4.0, 4.5].forEach(function(c) {
+    html += '<button class="sel-btn' + (heatpumpState.cop === c ? ' selected' : '') + '" onclick="heatpumpState.cop=' + c + ';renderModule(\'heatpump\')">' + c + '</button>';
+  });
+  html += '</div></div>';
+
+  // Inrush Factor (LRA)
+  html += '<div class="select-group"><div class="select-label">' + tx('Startstroemsfaktor (LRA)', 'Starting Current Factor (LRA)') + '</div><div class="select-grid">';
+  [3, 4, 5, 6].forEach(function(f) {
+    html += '<button class="sel-btn' + (heatpumpState.inrushFactor === f ? ' selected' : '') + '" onclick="heatpumpState.inrushFactor=' + f + ';renderModule(\'heatpump\')">' + f + 'x</button>';
+  });
+  html += '</div></div>';
+
+  // Cable Length
+  html += '<div class="select-group"><div class="select-label">' + tx('Kabellaengde [m]', 'Cable Length [m]') + '</div><div class="select-grid">';
+  [5, 10, 15, 20, 25, 30, 40, 50].forEach(function(len) {
+    html += '<button class="sel-btn' + (heatpumpState.cableLength === len ? ' selected' : '') + '" onclick="heatpumpState.cableLength=' + len + ';renderModule(\'heatpump\')">' + len + '</button>';
+  });
+  html += '</div></div>';
+
+  // Results - Electrical
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Elektrisk dimensionering', 'Electrical Sizing') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Elektrisk indgangseffekt', 'Electrical Input Power') + '</span><span class="value">' + calc.electricalKW + ' kW (= ' + heatpumpState.heatingKW + '/' + heatpumpState.cop + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Faser', 'Phase') + '</span><span class="value">' + calc.phase + '-' + tx('faset', 'phase') + (calc.phase === 1 ? ' (230V)' : ' (400V)') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Driftsstroem (FLC)', 'Full Load Current (FLC)') + '</span><span class="value">' + calc.flc + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Startstroem', 'Starting Current') + '</span><span class="value">' + calc.startCurrent + ' A (' + heatpumpState.inrushFactor + 'x FLC)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Afrimningslast (x1.15)', 'Defrost Load (x1.15)') + '</span><span class="value">' + calc.defrostLoad + ' kW / ' + calc.defrostFLC + ' A</span></div>';
+  html += '</div>';
+
+  // Cable & Protection
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Kabel og beskyttelse', 'Cable & Protection') + '</div>';
+  if (calc.cable) {
+    html += '<div class="result-row"><span class="label">' + tx('Kabel', 'Cable') + '</span><span class="value">' + calc.cable.brand + ' ' + calc.cable.model + ' ' + calc.cable.mm2 + 'mm\u00B2 (Iz=' + calc.cable.iz + 'A)</span></div>';
+  }
+  if (calc.mcb) {
+    html += '<div class="result-row"><span class="label">' + tx('MCB (kurve C - kompressor)', 'MCB (curve C - compressor)') + '</span><span class="value">' + calc.mcb.brand + ' ' + calc.mcb.model + ' ' + calc.mcb.rating + 'A kurve C</span></div>';
+  }
+  if (calc.rcd) {
+    html += '<div class="result-row"><span class="label">' + tx('RCD (30mA Type A - obligatorisk)', 'RCD (30mA Type A - mandatory)') + '</span><span class="value">' + calc.rcd.brand + ' ' + calc.rcd.model + ' ' + calc.rcd.rating + 'A / 30mA Type A</span></div>';
+  }
+  html += '</div>';
+
+  // Voltage Drop
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Spaendingsfald', 'Voltage Drop') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Spaendingsfald', 'Voltage Drop') + '</span><span class="value">' + calc.vdrop.percent + '% (' + calc.vdrop.vdrop + 'V)' + (calc.vdrop.ok ? ' \u2705 \u2264 3%' : ' \u274C > 3%') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Standard', 'Standard') + '</span><span class="value">' + calc.vdrop.clause + '</span></div>';
+  html += '</div>';
+
+  // Installation Requirements
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Installationskrav', 'Installation Requirements') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Lastafbryder (udendoers)', 'Disconnect Switch (outdoor)') + '</span><span class="value">\u2705 ' + tx('Obligatorisk laasbar nær udedel', 'Mandatory lockable near outdoor unit') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Supplerende udligningsforbindelse', 'Supplementary Bonding') + '</span><span class="value">\u2705 ' + tx('Udedel metalvaerk til PE', 'Outdoor unit metalwork to PE') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('SPD Type 2 (cl.534)', 'SPD Type 2 (cl.534)') + '</span><span class="value">\u2705 ' + tx('Anbefalet for udendoers installation', 'Recommended for outdoor installation') + '</span></div>';
+  html += '</div>';
+
+  // Verdict
+  var allOk = calc.vdrop.ok;
+  html += renderVerdict(allOk, allOk ? tx('Varmepumpeinstallation opfylder DS/HD 60364', 'Heat pump installation complies with DS/HD 60364') : tx('Spaendingsfald for hoejt - vaelg stoerre kabel eller kortere laengde', 'Voltage drop too high - select larger cable or shorter length'));
+
+  html += '</div>';
+  return html;
+}
+// ===== BUSBAR TRUNKING SYSTEM MODULE (IEC 61439-6 + DS/HD 60364) =====
+
+var BUSBAR_SYSTEM_TYPES = {
+  lighting: { da: 'Lysskinne', en: 'Lighting busbar', minA: 25, maxA: 40, mvPerM: 0.4 },
+  power: { da: 'Kraftskinne', en: 'Power busbar', minA: 100, maxA: 160, mvPerM: 0.25 },
+  distribution: { da: 'Distributionsskinne', en: 'Distribution busbar', minA: 250, maxA: 630, mvPerM: 0.15 },
+  transport: { da: 'Transportskinne', en: 'Transport busbar', minA: 800, maxA: 5000, mvPerM: 0.08 }
+};
+
+var BUSBAR_BRANDS = {
+  schneider: { da: 'Schneider (Canalis)', en: 'Schneider (Canalis)' },
+  siemens: { da: 'Siemens (LDA/LI)', en: 'Siemens (LDA/LI)' },
+  abb: { da: 'ABB (BusbarPlus)', en: 'ABB (BusbarPlus)' }
+};
+
+var BUSBAR_TEMP_DERATING = {
+  25: 1.05, 30: 1.0, 35: 0.95, 40: 0.90, 45: 0.85, 50: 0.80
+};
+
+var BUSBAR_IP_DERATING = {
+  31: 1.0, 54: 0.90, 55: 0.85
+};
+
+var BUSBAR_INSTALL_DERATING = {
+  horizontal_flat: 1.0,
+  horizontal_edge: 0.95,
+  vertical: 0.90
+};
+
+var busbarState = {
+  systemType: 'distribution',
+  ratedCurrent: 400,
+  brand: 'schneider',
+  ambientTemp: 35,
+  installMethod: 'horizontal_flat',
+  ipRating: 54,
+  tapOffCount: 6,
+  tapOffRating: 63,
+  sections: 5,
+  upstreamIk: 25
+};
+
+// Calculate combined derating factor
+function busbarCalcDerating(ambientTemp, installMethod, ipRating) {
+  var tempFactor = BUSBAR_TEMP_DERATING[ambientTemp] || 1.0;
+  var ipFactor = BUSBAR_IP_DERATING[ipRating] || 1.0;
+  var installFactor = BUSBAR_INSTALL_DERATING[installMethod] || 1.0;
+  var combined = tempFactor * ipFactor * installFactor;
+  return {
+    tempFactor: tempFactor,
+    ipFactor: ipFactor,
+    installFactor: installFactor,
+    combined: Math.floor(combined * 1000) / 1000, // Floor for conservative capacity
+    clause: 'IEC 61439-6 cl.9.2'
+  };
+}
+
+// Calculate effective capacity after derating
+function busbarCalcEffectiveCapacity(ratedCurrent, derating) {
+  return Math.floor(ratedCurrent * derating.combined);
+}
+
+// Calculate diversity factor based on number of tap-offs
+function busbarCalcDiversity(tapOffCount) {
+  // Per IEC 61439-6, diversity for tap-offs:
+  if (tapOffCount <= 2) return 1.0;
+  if (tapOffCount <= 4) return 0.9;
+  if (tapOffCount <= 6) return 0.8;
+  if (tapOffCount <= 9) return 0.7;
+  if (tapOffCount <= 12) return 0.6;
+  if (tapOffCount <= 16) return 0.55;
+  return 0.5;
+}
+
+// Calculate total system load
+function busbarCalcSystemLoad(tapOffCount, tapOffRating) {
+  var diversity = busbarCalcDiversity(tapOffCount);
+  var totalDemand = Math.ceil(tapOffCount * tapOffRating * diversity);
+  return {
+    tapOffCount: tapOffCount,
+    tapOffRating: tapOffRating,
+    diversity: diversity,
+    totalDemand: totalDemand,
+    clause: 'IEC 61439-6 cl.8.4'
+  };
+}
+
+// Check thermal: system load vs derated capacity
+function busbarCheckThermal(systemLoad, effectiveCapacity) {
+  var loadRatio = systemLoad / effectiveCapacity;
+  return {
+    systemLoad: systemLoad,
+    effectiveCapacity: effectiveCapacity,
+    loadRatio: Math.ceil(loadRatio * 100),
+    ok: systemLoad <= effectiveCapacity,
+    clause: 'IEC 61439-6 cl.10.10'
+  };
+}
+
+// Calculate voltage drop along busbar
+function busbarCalcVoltageDrop(systemType, ratedCurrent, sections) {
+  var sys = BUSBAR_SYSTEM_TYPES[systemType] || BUSBAR_SYSTEM_TYPES.distribution;
+  var lengthM = sections * 3; // 3m per section
+  var vdropMv = sys.mvPerM * lengthM * (ratedCurrent / 1000);
+  var vdropPercent = Math.ceil((vdropMv / 400) * 100) / 100; // as % of 400V
+  return {
+    lengthM: lengthM,
+    vdropMv: Math.round(vdropMv * 10) / 10,
+    vdropPercent: vdropPercent,
+    ok: vdropPercent <= 1.0,
+    clause: 'IEC 61439-6 cl.10.5'
+  };
+}
+
+// Check short-circuit withstand (Icw)
+// Busbar Icw is typically 20x In for 1 second
+function busbarCheckShortCircuit(ratedCurrent, upstreamIk) {
+  var icw = Math.floor(ratedCurrent * 20 / 1000); // kA for 1 second
+  if (icw < 10) icw = 10; // minimum Icw for any busbar
+  return {
+    icw: icw,
+    upstreamIk: upstreamIk,
+    ok: icw >= upstreamIk,
+    clause: 'IEC 61439-6 cl.10.11'
+  };
+}
+
+// Select supply MCCB
+function busbarSelectMCCB(ratedCurrent) {
+  var mccbs = PRODUCTS.mccbs;
+  for (var i = 0; i < mccbs.length; i++) {
+    var maxIn = mccbs[i].inOptions[mccbs[i].inOptions.length - 1];
+    if (maxIn >= ratedCurrent) return mccbs[i];
+  }
+  return mccbs[mccbs.length - 1];
+}
+
+// Check expansion joints requirement (every 30m)
+function busbarCheckExpansion(sections) {
+  var lengthM = sections * 3;
+  var jointsNeeded = Math.floor(lengthM / 30);
+  return {
+    lengthM: lengthM,
+    jointsNeeded: jointsNeeded,
+    fireBarriers: Math.ceil(lengthM / 30), // assume one fire compartment per 30m
+    clause: 'IEC 61439-6 cl.8.6'
+  };
+}
+
+// Full busbar calculation
+function busbarCalcFull(systemType, ratedCurrent, brand, ambientTemp, installMethod, ipRating, tapOffCount, tapOffRating, sections, upstreamIk) {
+  var derating = busbarCalcDerating(ambientTemp, installMethod, ipRating);
+  var effectiveCapacity = busbarCalcEffectiveCapacity(ratedCurrent, derating);
+  var systemLoad = busbarCalcSystemLoad(tapOffCount, tapOffRating);
+  var thermal = busbarCheckThermal(systemLoad.totalDemand, effectiveCapacity);
+  var vdrop = busbarCalcVoltageDrop(systemType, ratedCurrent, sections);
+  var sc = busbarCheckShortCircuit(ratedCurrent, upstreamIk);
+  var expansion = busbarCheckExpansion(sections);
+  var mccb = busbarSelectMCCB(ratedCurrent);
+
+  return {
+    derating: derating,
+    effectiveCapacity: effectiveCapacity,
+    systemLoad: systemLoad,
+    thermal: thermal,
+    vdrop: vdrop,
+    sc: sc,
+    expansion: expansion,
+    mccb: mccb,
+    allOk: thermal.ok && vdrop.ok && sc.ok,
+    clause: 'IEC 61439-6 + DS/HD 60364'
+  };
+}
+function renderBusbar() {
+  var calc = busbarCalcFull(busbarState.systemType, busbarState.ratedCurrent, busbarState.brand, busbarState.ambientTemp, busbarState.installMethod, busbarState.ipRating, busbarState.tapOffCount, busbarState.tapOffRating, busbarState.sections, busbarState.upstreamIk);
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Skinnesystem (busbar)', 'Busbar Trunking System') + '</div>';
+  html += '<div class="info-row">' + tx('Beregning iht. IEC 61439-6 + DS/HD 60364', 'Calculation per IEC 61439-6 + DS/HD 60364') + '</div>';
+
+  // System Type
+  html += '<div class="select-group"><div class="select-label">' + tx('Systemtype', 'System Type') + '</div><div class="select-grid">';
+  Object.keys(BUSBAR_SYSTEM_TYPES).forEach(function(key) {
+    var s = BUSBAR_SYSTEM_TYPES[key];
+    html += '<button class="sel-btn' + (busbarState.systemType === key ? ' selected' : '') + '" onclick="busbarState.systemType=\'' + key + '\';renderModule(\'busbar\')">' + tx(s.da, s.en) + ' (' + s.minA + '-' + s.maxA + 'A)</button>';
+  });
+  html += '</div></div>';
+
+  // Rated Current
+  html += '<div class="select-group"><div class="select-label">' + tx('Maerkestr\u00F8m [A]', 'Rated Current [A]') + '</div><div class="select-grid">';
+  [25, 40, 63, 100, 160, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3000, 4000, 5000].forEach(function(a) {
+    html += '<button class="sel-btn' + (busbarState.ratedCurrent === a ? ' selected' : '') + '" onclick="busbarState.ratedCurrent=' + a + ';renderModule(\'busbar\')">' + a + '</button>';
+  });
+  html += '</div></div>';
+
+  // Brand
+  html += '<div class="select-group"><div class="select-label">' + tx('Fabrikat', 'Brand') + '</div><div class="select-grid">';
+  Object.keys(BUSBAR_BRANDS).forEach(function(key) {
+    var b = BUSBAR_BRANDS[key];
+    html += '<button class="sel-btn' + (busbarState.brand === key ? ' selected' : '') + '" onclick="busbarState.brand=\'' + key + '\';renderModule(\'busbar\')">' + tx(b.da, b.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Ambient Temperature
+  html += '<div class="select-group"><div class="select-label">' + tx('Omgivelsestemperatur [\u00B0C]', 'Ambient Temperature [\u00B0C]') + '</div><div class="select-grid">';
+  [25, 30, 35, 40, 45, 50].forEach(function(t) {
+    html += '<button class="sel-btn' + (busbarState.ambientTemp === t ? ' selected' : '') + '" onclick="busbarState.ambientTemp=' + t + ';renderModule(\'busbar\')">' + t + '\u00B0C</button>';
+  });
+  html += '</div></div>';
+
+  // Installation Method
+  html += '<div class="select-group"><div class="select-label">' + tx('Monteringsmetode', 'Installation Method') + '</div><div class="select-grid">';
+  [{k:'horizontal_flat', da:'Vandret flad', en:'Horizontal flat'}, {k:'horizontal_edge', da:'Vandret p\u00E5 kant', en:'Horizontal edge-on'}, {k:'vertical', da:'Lodret', en:'Vertical'}].forEach(function(m) {
+    html += '<button class="sel-btn' + (busbarState.installMethod === m.k ? ' selected' : '') + '" onclick="busbarState.installMethod=\'' + m.k + '\';renderModule(\'busbar\')">' + tx(m.da, m.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // IP Rating
+  html += '<div class="select-group"><div class="select-label">' + tx('IP-kapslingsklasse', 'IP Rating') + '</div><div class="select-grid">';
+  [{v:31, da:'IP31 (indend\u00F8rs)', en:'IP31 (indoor)'}, {v:54, da:'IP54 (beskyttet)', en:'IP54 (protected)'}, {v:55, da:'IP55 (udend\u00F8rs/fugt)', en:'IP55 (outdoor/humid)'}].forEach(function(ip) {
+    html += '<button class="sel-btn' + (busbarState.ipRating === ip.v ? ' selected' : '') + '" onclick="busbarState.ipRating=' + ip.v + ';renderModule(\'busbar\')">' + tx(ip.da, ip.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Tap-off Count
+  html += '<div class="select-group"><div class="select-label">' + tx('Antal aftag', 'Number of Tap-offs') + '</div><div class="select-grid">';
+  [1,2,3,4,5,6,7,8,9,10,12,14,16,18,20].forEach(function(n) {
+    html += '<button class="sel-btn' + (busbarState.tapOffCount === n ? ' selected' : '') + '" onclick="busbarState.tapOffCount=' + n + ';renderModule(\'busbar\')">' + n + '</button>';
+  });
+  html += '</div></div>';
+
+  // Tap-off Rating
+  html += '<div class="select-group"><div class="select-label">' + tx('Aftag-m\u00E6rkestr\u00F8m [A]', 'Tap-off Rating [A]') + '</div><div class="select-grid">';
+  [16, 32, 63, 100, 160].forEach(function(a) {
+    html += '<button class="sel-btn' + (busbarState.tapOffRating === a ? ' selected' : '') + '" onclick="busbarState.tapOffRating=' + a + ';renderModule(\'busbar\')">' + a + '</button>';
+  });
+  html += '</div></div>';
+
+  // Sections (length)
+  html += '<div class="select-group"><div class="select-label">' + tx('Antal sektioner (3m/sektion)', 'Number of Sections (3m/section)') + '</div><div class="select-grid">';
+  for (var s = 1; s <= 10; s++) {
+    html += '<button class="sel-btn' + (busbarState.sections === s ? ' selected' : '') + '" onclick="busbarState.sections=' + s + ';renderModule(\'busbar\')">' + s + ' (' + (s*3) + 'm)</button>';
+  }
+  html += '</div></div>';
+
+  // Upstream Ik
+  html += '<div class="select-group"><div class="select-label">' + tx('Upstream Ik [kA]', 'Upstream Ik [kA]') + '</div><div class="select-grid">';
+  [10, 15, 20, 25, 30, 35, 40, 50, 65, 80].forEach(function(ik) {
+    html += '<button class="sel-btn' + (busbarState.upstreamIk === ik ? ' selected' : '') + '" onclick="busbarState.upstreamIk=' + ik + ';renderModule(\'busbar\')">' + ik + '</button>';
+  });
+  html += '</div></div>';
+
+  // Results - Derating
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Dereringsfaktorer', 'Derating Factors') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Temperaturfaktor', 'Temperature Factor') + '</span><span class="value">' + calc.derating.tempFactor + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('IP-faktor', 'IP Factor') + '</span><span class="value">' + calc.derating.ipFactor + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Monteringsfaktor', 'Installation Factor') + '</span><span class="value">' + calc.derating.installFactor + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kombineret derating', 'Combined Derating') + '</span><span class="value">' + calc.derating.combined + ' (' + calc.derating.clause + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Effektiv kapacitet', 'Effective Capacity') + '</span><span class="value">' + calc.effectiveCapacity + ' A</span></div>';
+  html += '</div>';
+
+  // System Load
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Systembelastning', 'System Load') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Aftag', 'Tap-offs') + '</span><span class="value">' + calc.systemLoad.tapOffCount + ' x ' + calc.systemLoad.tapOffRating + 'A</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Samtidighedsfaktor', 'Diversity Factor') + '</span><span class="value">' + calc.systemLoad.diversity + ' (' + calc.systemLoad.clause + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Samlet behov', 'Total Demand') + '</span><span class="value">' + calc.systemLoad.totalDemand + ' A</span></div>';
+  html += '</div>';
+
+  // Thermal Check
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Termisk kontrol', 'Thermal Check') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Belastningsgrad', 'Load Ratio') + '</span><span class="value">' + calc.thermal.loadRatio + '% ' + (calc.thermal.ok ? '\u2705' : '\u274C') + ' (' + calc.thermal.clause + ')</span></div>';
+  html += '</div>';
+
+  // Voltage Drop
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Sp\u00E6ndingsfald', 'Voltage Drop') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Skinnel\u00E6ngde', 'Busbar Length') + '</span><span class="value">' + calc.vdrop.lengthM + ' m</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Sp\u00E6ndingsfald', 'Voltage Drop') + '</span><span class="value">' + calc.vdrop.vdropPercent + '% (' + calc.vdrop.vdropMv + ' mV) ' + (calc.vdrop.ok ? '\u2705 \u2264 1%' : '\u274C > 1%') + '</span></div>';
+  html += '</div>';
+
+  // Short-Circuit
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Kortslutningskontrol', 'Short-Circuit Check') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Icw (1s)', 'Icw (1s)') + '</span><span class="value">' + calc.sc.icw + ' kA</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Upstream Ik', 'Upstream Ik') + '</span><span class="value">' + calc.sc.upstreamIk + ' kA ' + (calc.sc.ok ? '\u2705 Icw \u2265 Ik' : '\u274C Icw < Ik') + ' (' + calc.sc.clause + ')</span></div>';
+  html += '</div>';
+
+  // Expansion & Fire
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Ekspansion og brandsektionering', 'Expansion & Fire Barriers') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Ekspansionssamlinger', 'Expansion Joints') + '</span><span class="value">' + calc.expansion.jointsNeeded + ' (' + tx('hver 30m', 'every 30m') + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Brandbarrierer', 'Fire Barriers') + '</span><span class="value">' + calc.expansion.fireBarriers + ' (' + calc.expansion.clause + ')</span></div>';
+  html += '</div>';
+
+  // Supply MCCB
+  if (calc.mccb) {
+    html += '<div class="result-box">';
+    html += '<div class="result-title">' + tx('Forsynings-MCCB', 'Supply MCCB') + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('MCCB', 'MCCB') + '</span><span class="value">' + calc.mccb.brand + ' ' + calc.mccb.model + ' (Icu=' + calc.mccb.icu + 'kA)</span></div>';
+    html += '</div>';
+  }
+
+  // Verdict
+  html += renderVerdict(calc.allOk, calc.allOk ? tx('Skinnesystem opfylder IEC 61439-6 + DS/HD 60364', 'Busbar trunking complies with IEC 61439-6 + DS/HD 60364') : tx('System overskider gr\u00E6nse - juster parametre', 'System exceeds limits - adjust parameters'));
+
+  html += '</div>';
+  return html;
+}
 // ===== INIT =====
 renderNav();
 renderStatusBar();
