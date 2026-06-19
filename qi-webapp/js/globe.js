@@ -147,6 +147,23 @@
     return out;
   }
 
+  // Where the A–Z build begins (the first cable's origin station) and the
+  // ordered list of route hops in build direction (from → to). Pure +
+  // module-level so the host UI / tests can read the direction story even when
+  // the globe is not mounted. Mirrors the direction arrows drawn on the globe.
+  function routeStart() {
+    var id = (CABLE_DEFS[0] && CABLE_DEFS[0].from) || (STATIONS[0] && STATIONS[0].id);
+    var s = STATION_BY_ID[id];
+    return s ? { id: s.id, name: s.name, country: s.country } : null;
+  }
+  function routeOrder() {
+    return CABLE_DEFS.map(function (c) {
+      var a = STATION_BY_ID[c.from], b = STATION_BY_ID[c.to];
+      return { id: c.id, from: c.from, fromName: a ? a.name : c.from,
+               to: c.to, toName: b ? b.name : c.to };
+    });
+  }
+
   // Self-hosted Earth textures (relative to index.html → same-origin, CSP-safe).
   var TEX = {
     day:      "textures/earth_day.jpg",
@@ -538,6 +555,50 @@
           disposables.push(seg.material);
         }
       });
+
+      // ---- direction arrows: WHERE the build starts and WHICH WAY it flows --
+      // A green "START" pin marks the first landing station of the A–Z build,
+      // and animated chevrons travel along every route in the build direction
+      // (from → to) so any non-technical viewer can instantly read where the
+      // project begins and how it spreads across the region.
+      var UP = new THREE.Vector3(0, 1, 0);
+      var flowArrows = [];   // { mesh, curve, phase, speed }
+      var arrowGeo = new THREE.ConeGeometry(0.026, 0.07, 12);
+      disposables.push(arrowGeo);
+      cableTubes.forEach(function (t, ci) {
+        if (!t.curve) return;
+        for (var a = 0; a < 2; a++) {   // two chevrons per segment = clear direction
+          var aMat = new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.92, depthWrite: false });
+          var arrow = new THREE.Mesh(arrowGeo, aMat);
+          world.add(arrow);
+          disposables.push(aMat);
+          flowArrows.push({ mesh: arrow, curve: t.curve, phase: (a / 2 + ci * 0.07) % 1, speed: 0.16 });
+        }
+      });
+
+      // START pin + label at the first station of the build sequence.
+      var startStationId = (CABLE_DEFS[0] && CABLE_DEFS[0].from) || (STATIONS[0] && STATIONS[0].id);
+      var startStation = STATION_BY_ID[startStationId];
+      if (startStation) {
+        var spGeo = new THREE.ConeGeometry(0.05, 0.15, 18);
+        var spMat = new THREE.MeshBasicMaterial({ color: 0x42d6a4, transparent: true, opacity: 0.96, depthWrite: false });
+        var startPin = new THREE.Mesh(spGeo, spMat);
+        var spPos = latLonToVec3(startStation.lat, startStation.lon, GLOBE_R * 1.085);
+        startPin.position.copy(spPos);
+        // tip points down toward the surface (a pin planted on the globe)
+        startPin.quaternion.setFromUnitVectors(UP, spPos.clone().normalize().negate());
+        world.add(startPin);
+        disposables.push(spGeo, spMat);
+
+        var startLabel = makeLabelSprite("START \u2192 " + startStation.name, { fontSize: 26, screenK: 0.030, color: "#bafadf", bg: "rgba(10,42,28,0.82)" });
+        if (startLabel) {
+          startLabel.position.copy(latLonToVec3(startStation.lat, startStation.lon, GLOBE_R * 1.30));
+          world.add(startLabel);
+          labels.push(startLabel);
+          if (startLabel.material.map) disposables.push(startLabel.material.map);
+          disposables.push(startLabel.material);
+        }
+      }
 
       // ---- deployment "laying head": a small bright dot at the cable-ship tip
       var headGeo = new THREE.SphereGeometry(0.018, 12, 12);
@@ -1073,6 +1134,25 @@
 
         if (clouds) clouds.rotation.y += 0.00045;   // clouds drift a touch faster
 
+        // direction chevrons: flow from→to along each route so the build
+        // direction is always readable (hidden during the A–Z replay, where the
+        // bright laying-head already shows the live direction).
+        if (flowArrows.length) {
+          for (var fa = 0; fa < flowArrows.length; fa++) {
+            var f = flowArrows[fa];
+            if (deploy.mode) { f.mesh.visible = false; continue; }
+            f.mesh.visible = true;
+            f.phase += dt * f.speed;
+            if (f.phase > 1) f.phase -= 1;
+            var pp = Math.max(0.001, Math.min(0.999, f.phase));
+            try {
+              var pt = f.curve.getPoint(pp); f.mesh.position.copy(pt);
+              var tan = f.curve.getTangent(pp);
+              if (tan && tan.lengthSq() > 1e-6) f.mesh.quaternion.setFromUnitVectors(UP, tan.normalize());
+            } catch (e) {}
+          }
+        }
+
         // slowly drift the sun for a living terminator, keep night-lights in sync
         sun.position.x = 5 * Math.cos(t * 0.015);
         sun.position.z = 4.2 * Math.sin(t * 0.015) + 2.0;
@@ -1279,6 +1359,8 @@
     PROGRAMME: PROGRAMME,
     deployCurve: deployCurve,
     onlineSchedule: onlineSchedule,
+    routeStart: routeStart,
+    routeOrder: routeOrder,
     STATUS_COLOR: STATUS_COLOR
   };
 })();

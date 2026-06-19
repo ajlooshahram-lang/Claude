@@ -526,6 +526,8 @@
     const statusLabel = { "commissioned": "Commissioned", "in-progress": "In progress", "planned": "Planned" };
     const dot = st => `<span class="globe-dot" style="background:${(SC[st] || {}).css || "#888"}"></span>`;
     const fmtKm = n => (Number(n) || 0).toLocaleString() + " km";
+    const startInfo = (typeof G.routeStart === "function") ? G.routeStart() : null;
+    const startName = startInfo ? startInfo.name : "";
 
     const legendStatuses = ["commissioned", "in-progress", "planned"].map(st =>
       `<span class="globe-statkey">${dot(st)}${esc(statusLabel[st] || st)}</span>`).join("");
@@ -604,6 +606,10 @@
             <div class="globe-stat"><span class="globe-stat-val">${stations.length}</span><span class="globe-stat-lab">countries</span></div>
           </div>
           <div class="globe-statkeys">${legendStatuses}</div>
+          <div class="globe-direction-key">
+            <span class="globe-dirk-pin">▾</span>
+            <span>Green <b>START</b> pin = where the build begins${startName ? ` (<b>${esc(startName)}</b>)` : ""}; the moving arrows show the build direction.</span>
+          </div>
           <div class="globe-section">
             <h4>Cable Segments</h4>
             <ul class="globe-list">${cableRows || '<li class="globe-item muted">No cable data.</li>'}</ul>

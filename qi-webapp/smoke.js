@@ -1790,5 +1790,24 @@ if (window.QIDisplay) {
   ok(typeof window.QIGlobe.focusStation === "function", "QIGlobe exposes focusStation() so a place can be centred head-on");
 })();
 
+// Step 119: Direction arrows — where the build STARTS and which way it flows
+(function testGlobeDirection() {
+  ok(typeof window.QIGlobe.routeStart === "function", "QIGlobe exposes routeStart() (where the A–Z build begins)");
+  ok(typeof window.QIGlobe.routeOrder === "function", "QIGlobe exposes routeOrder() (the build direction, from→to)");
+  var start = window.QIGlobe.routeStart();
+  ok(start && start.id && start.name, "routeStart() returns the first landing station (id + name)");
+  var order = window.QIGlobe.routeOrder();
+  ok(Array.isArray(order) && order.length >= 6, "routeOrder() lists every route hop in build order (" + (order ? order.length : 0) + ")");
+  // The start station must be the origin of the very first hop (direction is consistent).
+  ok(order[0] && start && order[0].from === start.id, "the START pin matches the origin of the first route hop");
+  ok(order.every(function (h) { return h.from && h.to && h.fromName && h.toName; }), "every hop has a from→to direction with readable names");
+  // The panel legend explains the START pin + arrows in plain language.
+  var gnav = doc.querySelector('.nav-item[data-view="globe3d"]');
+  if (gnav) gnav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  var ghtml = doc.querySelector(".content").innerHTML;
+  ok(/globe-direction-key/.test(ghtml), "3D map shows a plain-language direction legend (START pin + arrows)");
+  ok(new RegExp(start.name).test(ghtml), "direction legend names the start station (" + start.name + ")");
+})();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
