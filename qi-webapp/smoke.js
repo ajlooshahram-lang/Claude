@@ -750,9 +750,14 @@ ok(/Fibre|fibre-telecom/i.test(brainOut), "Brain detected the fibre domain in th
 const brainApply = doc.getElementById("brainApply");
 ok(brainApply != null, "Apply-plan button appears after analysis");
 brainApply.click();
-ok(S.validCases().length >= brainCasesBefore + 15, "Apply adds the generated task + risk cases (" + brainCasesBefore + " -> " + S.validCases().length + ")");
-ok(S.regRows("milestones").length > brainMsBefore, "Apply adds generated milestones");
-ok(S.regRows("procurement").length > brainProcBefore, "Apply adds generated procurement items");
+// applyBrainPlan now CLEARS prior generated content then applies a fresh full
+// plan (idempotent — re-analyzing never duplicates), so assert the generated
+// plan is present in absolute terms rather than appended to the demo seed.
+ok(S.validCases().length >= 15, "Apply loads the generated task + risk cases as a fresh plan (" + S.validCases().length + " cases)");
+ok(S.regRows("milestones").length >= 1, "Apply loads generated milestones");
+ok(S.regRows("procurement").length >= 1, "Apply loads generated procurement items");
+ok(S.get().stakeholders.length >= 2, "Apply populates stakeholders (incl. regulators) simultaneously");
+ok(S.regRows("decisions").length >= 1, "Apply seeds the decision log simultaneously");
 // click-only / privacy sanity: analysis must not call out to the network
 ok(window.__promptCalls === 0, "Brain flow used no prompt()");
 

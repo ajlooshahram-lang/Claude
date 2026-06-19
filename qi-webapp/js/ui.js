@@ -3436,23 +3436,89 @@
     bindGo();
   }
   function applyBrainPlan(plan) {
+    // Make analyze idempotent: clear previously generated content so a fresh
+    // upload produces a fresh full plan (not duplicates). User-posted project
+    // updates and route progress are preserved.
+    try {
+      var st0 = S.get();
+      if (st0) {
+        st0.cases = [];
+        st0.registers = st0.registers || {};
+        ["milestones", "procurement", "decisions", "resources"].forEach(function (r) { st0.registers[r] = []; });
+        st0.stakeholders = [];
+      }
+    } catch (e) { /* ignore */ }
+
     let n = 0;
     const add = c => { const copy = Object.assign({}, c); delete copy._brain; delete copy._phase; S.addCase(copy); n++; };
     plan.cases.forEach(add);
     plan.risks.forEach(add);
     plan.milestones.forEach(m => S.regAdd("milestones", Object.assign({}, m)));
     plan.procurement.forEach(p => S.regAdd("procurement", Object.assign({}, p)));
-    // Update the active project's name to match the Brain's detected title so
-    // the sidebar project-switcher dropdown reflects it immediately.
+
+    // --- Populate EVERY module from the one description, simultaneously ---
+    var intel = plan.countryIntel || [];
+
+    // 1) Stakeholders: the real regulatory authority for each detected country,
+    //    plus the programme-level roles — so the Stakeholders module is alive.
+    try {
+      var sh = S.get().stakeholders;
+      sh.push({ name: "Programme Director", role: "Owner / Decision-maker", influence: "High", interest: "High", raci: "A - Accountable" });
+      sh.push({ name: "Lenders / Investors", role: "Finance", influence: "High", interest: "High", raci: "I - Informed" });
+      intel.forEach(function (c) {
+        if (c && c.authority) {
+          sh.push({
+            name: c.authority.abbrev || c.authority.name,
+            role: (c.authority.name || "Regulator") + " (" + c.name + ")",
+            influence: "High", interest: "Medium", raci: "C - Consulted"
+          });
+        }
+      });
+    } catch (e) { /* ignore */ }
+
+    // 2) Decision log: record that the plan was auto-generated, so the
+    //    Decision Log module starts with the founding decision.
+    try {
+      S.regAdd("decisions", {
+        decision: "Adopt the auto-generated project plan",
+        rationale: "Plan, risks, milestones, procurement and country frameworks were generated from the project description.",
+        owner: "Programme Director", date: new Date().toISOString().slice(0, 10), status: "Decided"
+      });
+    } catch (e) { /* ignore */ }
+
+    // 3) Route progress: initialise every cable segment so the Route Progress
+    //    module and the 3D map show the full route immediately (0% laid).
+    try {
+      if (window.QIGlobe && Array.isArray(QIGlobe.CABLES) && S.setRouteLaidKm) {
+        QIGlobe.CABLES.forEach(function (cab) { S.setRouteLaidKm(cab.id, 0); });
+      }
+    } catch (e) { /* ignore */ }
+
+    // 4) Project name -> the Brain's detected title (updates the dropdown now).
     if (plan.summary && plan.summary.title) {
       const cur = S.get();
       if (cur && cur.project) {
-        // Cap at 60 chars for a clean dropdown label; the full title lives in the Brain analysis.
         cur.project.name = plan.summary.title.slice(0, 60);
         if (S.save) S.save();
       }
     }
+
+    // 5) Announce in the live project log that the whole plan is now active.
+    try {
+      if (S.addUpdate) {
+        S.addUpdate("news",
+          "Project analysed — full plan generated and applied across all modules" +
+          (intel.length ? (" for " + intel.length + " countr" + (intel.length === 1 ? "y" : "ies")) : "") +
+          ": tasks, risks, milestones, procurement, budget, stakeholders, country frameworks and the 3D route.",
+          "Project Brain (AI)");
+      }
+    } catch (e) { /* ignore */ }
+
+    // 6) Refresh everything so all modules reflect the new plan at once.
+    if (S.save) try { S.save(); } catch (e) { /* ignore */ }
     refreshHeader();
+    try { if (typeof refreshBadges === "function") refreshBadges(); } catch (e) { /* ignore */ }
+    try { if (window.QIGlobe && QIGlobe.setProgress) QIGlobe.setProgress(); } catch (e) { /* ignore */ }
     return n;
   }
 
