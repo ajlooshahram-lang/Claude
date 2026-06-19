@@ -7723,6 +7723,103 @@ test('SLD: CSS respects prefers-reduced-motion and defines the flow keyframes', 
   assert(html.indexOf('stroke-dashoffset') >= 0, 'marching-dash uses stroke-dashoffset');
 });
 
+console.log('\n=== Navigation Taxonomy Tests (professional + pedagogical UX) ===\n');
+
+test('NAV_GROUPS is defined as a non-empty ordered list', function() {
+  assert(Array.isArray(NAV_GROUPS) && NAV_GROUPS.length >= 5, 'expected several nav groups');
+});
+
+test('Nav: first group is the beginner "start here" entry point', function() {
+  assert.strictEqual(NAV_GROUPS[0].id, 'start', 'first group must be start');
+  assert(NAV_GROUPS[0].start === true, 'start group flagged as start');
+  assert(NAV_GROUPS[0].keys.indexOf('guide') >= 0, 'guide lives in the start group');
+});
+
+test('Nav: app opens on the pedagogical guide, not a raw calculation form', function() {
+  assert(/\bactiveModule\s*=\s*'guide'/.test(html), 'default module literal should be the guide');
+});
+
+test('Nav: every group carries a bilingual label and a teaching description', function() {
+  NAV_GROUPS.forEach(function (g) {
+    assert(g.da && g.en, 'group ' + g.id + ' needs da/en labels');
+    assert(g.descDa && g.descEn, 'group ' + g.id + ' needs da/en descriptions');
+    assert(Array.isArray(g.keys) && g.keys.length > 0, 'group ' + g.id + ' needs module keys');
+  });
+});
+
+test('Nav: every real module key is placed in exactly one group', function() {
+  const mods = T.da.modules;
+  const seen = {};
+  NAV_GROUPS.forEach(function (g) {
+    g.keys.forEach(function (k) {
+      assert(!seen[k], 'module ' + k + ' appears in more than one group');
+      seen[k] = true;
+    });
+  });
+  Object.keys(mods).forEach(function (k) {
+    assert(seen[k], 'module ' + k + ' is not reachable from any nav group');
+  });
+});
+
+test('Nav: no group lists a key that is not a real module', function() {
+  const mods = T.da.modules;
+  NAV_GROUPS.forEach(function (g) {
+    g.keys.forEach(function (k) {
+      assert(mods[k], 'group ' + g.id + ' references unknown module ' + k);
+    });
+  });
+});
+
+test('Nav: the core dimensioning chain follows the safe-design order', function() {
+  const core = NAV_GROUPS.filter(function (g) { return g.id === 'core'; })[0];
+  assert(core && core.numbered === true, 'core group must be numbered for teaching');
+  // IB (load) must come before the device (mcb), which comes before the cable.
+  assert(core.keys.indexOf('load') < core.keys.indexOf('mcb'), 'load before device');
+  assert(core.keys.indexOf('mcb') < core.keys.indexOf('cable'), 'device before cable');
+  assert(core.keys.indexOf('cable') < core.keys.indexOf('vdrop'), 'cable before voltage drop');
+  assert(core.keys.indexOf('vdrop') < core.keys.indexOf('scircuit'), 'voltage drop before short-circuit');
+});
+
+test('Nav: navGroupForKey resolves a module to its owning category', function() {
+  assert.strictEqual(navGroupForKey('load'), 'core', 'load -> core');
+  assert.strictEqual(navGroupForKey('guide'), 'start', 'guide -> start');
+  assert.strictEqual(navGroupForKey('ev'), 'apps', 'ev -> apps');
+});
+
+test('Nav: switchModule reveals the category that owns the chosen module', function() {
+  switchModule('cable');
+  assert.strictEqual(activeNavGroup, 'core', 'cable lives in core, so core opens');
+  switchModule('ev');
+  assert.strictEqual(activeNavGroup, 'apps', 'ev lives in apps, so apps opens');
+  switchModule('guide');
+  assert.strictEqual(activeNavGroup, 'start');
+});
+
+test('Nav: selectNavGroup switches the visible category without changing the module', function() {
+  switchModule('guide');
+  const mod = activeModule;
+  selectNavGroup('docs');
+  assert.strictEqual(activeNavGroup, 'docs', 'category changed');
+  assert.strictEqual(activeModule, mod, 'active module unchanged when only browsing categories');
+});
+
+test('Nav: renderNav builds a two-level grouped navigation (no flat tab wall)', function() {
+  let captured = '';
+  const realGet = document.getElementById;
+  document.getElementById = function (id) {
+    if (id === 'mainNav') return { set innerHTML(v) { captured = v; }, get innerHTML() { return captured; } };
+    return realGet(id);
+  };
+  try {
+    renderNav();
+  } finally {
+    document.getElementById = realGet;
+  }
+  assert(captured.indexOf('nav-cats') >= 0, 'renders the category rail');
+  assert(captured.indexOf('nav-panel') >= 0, 'renders the active-category panel with description');
+  assert(captured.indexOf('nav-cat') >= 0, 'renders category buttons');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

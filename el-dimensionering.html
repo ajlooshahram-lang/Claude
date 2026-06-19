@@ -146,6 +146,129 @@ body {
   transform: translateY(-1px);
 }
 
+/* ===== TWO-LEVEL PROFESSIONAL NAVIGATION ===== */
+/* Level 1: category rail. Level 2: the modules inside the active category.
+   Replaces the flat "wall of 60 tabs" (spreadsheet feel) with a discoverable,
+   hierarchical workbench that always tells a non-expert where to start. */
+.nav { flex-direction: column; align-items: stretch; gap: 0; padding: 0; }
+
+.nav-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 12px 20px 10px;
+  background: linear-gradient(180deg, rgba(15,76,117,0.04), transparent);
+}
+
+.nav-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text-light);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition);
+  letter-spacing: 0.2px;
+}
+.nav-cat .cat-ico { font-size: 1rem; line-height: 1; }
+.nav-cat .cat-count {
+  font-size: 0.62rem;
+  font-weight: 700;
+  background: var(--bg);
+  color: var(--text-muted);
+  border-radius: 9px;
+  padding: 1px 7px;
+}
+.nav-cat:hover {
+  border-color: var(--primary-light);
+  color: var(--primary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+.nav-cat.active {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(15,76,117,0.28);
+}
+.nav-cat.active .cat-count { background: rgba(255,255,255,0.22); color: #fff; }
+.nav-cat.start {
+  border-color: var(--success);
+  color: #047857;
+  background: var(--success-bg);
+}
+.nav-cat.start.active {
+  background: linear-gradient(135deg, var(--success), #04b88a);
+  color: #fff;
+  border-color: transparent;
+}
+
+.nav-panel {
+  padding: 12px 20px 16px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.nav-panel-desc {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-light);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+.nav-panel-desc .desc-ico {
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+.nav-panel-desc b { color: var(--primary); font-weight: 700; }
+.nav-mods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* Step-number badge that teaches the safe-design order on the core chain */
+.nav-btn .step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  vertical-align: middle;
+}
+.nav-btn.active .step-num { background: rgba(255,255,255,0.28); }
+
+body.dark .nav-cats { background: linear-gradient(180deg, rgba(0,200,255,0.06), transparent); }
+body.dark .nav-cat { background: #1a2535; color: #8ab4d0; border-color: #2a3f55; }
+body.dark .nav-cat:hover { border-color: #00e5ff; color: #e0f4ff; box-shadow: 0 0 8px rgba(0,229,255,0.3); }
+body.dark .nav-cat.active { background: linear-gradient(135deg, #00c8ff, #0080ff); color: #fff; border-color: transparent; box-shadow: 0 0 14px rgba(0,229,255,0.6); }
+body.dark .nav-cat.start { background: rgba(46,230,168,0.12); color: #2ee6a8; border-color: rgba(46,230,168,0.4); }
+body.dark .nav-cat.start.active { background: linear-gradient(135deg, #00e5b0, #00b894); color: #04202a; }
+body.dark .nav-cat .cat-count { background: #0f1a26; color: #6aa8c8; }
+body.dark .nav-panel { background: #0f1a26; border-color: #1f3048; }
+body.dark .nav-panel-desc { color: #8cc8e8; }
+body.dark .nav-panel-desc b { color: #00e5ff; }
+
+@media (max-width: 600px) {
+  .nav-cats { padding: 10px 12px 8px; gap: 6px; }
+  .nav-cat { font-size: 0.72rem; padding: 7px 12px; }
+  .nav-panel { padding: 10px 12px 14px; }
+  .nav-panel-desc { font-size: 0.74rem; }
+}
+
 /* Main Content */
 .main {
   padding: 20px;
@@ -653,7 +776,10 @@ html[dir="rtl"] .lang-toggle { direction: ltr; }
 <body>
 
 <div class="header">
-  <h1 id="appTitle" style="display:flex;align-items:center;gap:8px"><span id="appTitleText">El-Dimensionering</span><span id="verBadge" style="font-size:0.6rem;font-weight:700;background:rgba(255,255,255,0.18);padding:2px 7px;border-radius:10px;letter-spacing:0.5px"></span></h1>
+  <h1 id="appTitle" style="display:flex;flex-direction:column;gap:1px">
+    <span style="display:flex;align-items:center;gap:8px"><span id="appTitleText">El-Dimensionering</span><span id="verBadge" style="font-size:0.6rem;font-weight:700;background:rgba(255,255,255,0.18);padding:2px 7px;border-radius:10px;letter-spacing:0.5px"></span></span>
+    <span id="appSubtitle" style="font-size:0.64rem;font-weight:600;opacity:0.78;letter-spacing:0.3px"></span>
+  </h1>
   <div style="display:flex;align-items:center;gap:10px">
     <button id="themeBtn" class="theme-btn" onclick="toggleTheme()" title="Dark / Light">🌙</button>
     <div class="lang-toggle">
@@ -2061,6 +2187,8 @@ function setLang(l) {
   document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
   document.querySelector(`.lang-btn[onclick="setLang('${l}')"]`).classList.add('active');
   document.getElementById('appTitleText').textContent = t('appTitle');
+  var _sub = document.getElementById('appSubtitle');
+  if (_sub) _sub.textContent = tx('Professionelt el-design v\u00E6rkt\u00F8j \u00B7 DS/HD 60364', 'Professional electrical design workbench \u00B7 DS/HD 60364');
   document.documentElement.lang = l;
   document.documentElement.dir = l === 'fa' ? 'rtl' : 'ltr';
   document.body.classList.toggle('rtl', l === 'fa');
@@ -3113,7 +3241,7 @@ const RCD_TYPES = {
 };
 
 // ===== STATE =====
-let activeModule = 'load';
+let activeModule = 'guide';
 
 // Load state
 let loadState = { voltage: '3x400', power: 10, cosPhi: 0.9, simFactor: 1.0, expFactor: 1.0 };
@@ -3825,16 +3953,134 @@ function sldInit() {
 
 
 // ===== RENDERING =====
+
+// ---- Navigation taxonomy ----------------------------------------------------
+// The app has ~60 calculation modules. Presented as one flat row of tabs it felt
+// like a spreadsheet and gave a non-expert no idea where to begin. NAV_GROUPS
+// organises every module into a small set of meaningful, ordered categories so
+// the navigation reads like a professional engineering workbench and teaches the
+// natural project workflow. Each group carries a plain-language description, and
+// the core dimensioning chain is numbered so beginners learn the safe-design order
+// (IB -> In -> Iz -> voltage drop -> short-circuit -> Zs ...).
+// Every module key MUST appear exactly once; any key not listed is auto-appended
+// to the "more" group as a safety net so nothing can ever disappear from the UI.
+const NAV_GROUPS = [
+  {
+    id: 'start', icon: '\uD83E\uDDED', start: true,
+    da: 'Start her', en: 'Start here', fa: '\u0627\u0632 \u0627\u06CC\u0646\u062C\u0627 \u0634\u0631\u0648\u0639 \u06A9\u0646\u06CC\u062F',
+    descDa: 'Ny til el-design? Begynd her. Guiden f\u00F8rer dig trin for trin og fort\u00E6ller hvor du skal starte og hvad der kommer bagefter.',
+    descEn: 'New to electrical design? Begin here. The guide walks you step by step and tells you where to start and what comes next.',
+    keys: ['guide', 'projekt', 'brain', 'kritisk']
+  },
+  {
+    id: 'core', icon: '\u26A1', numbered: true,
+    da: 'Dimensionering (kerneforl\u00F8b)', en: 'Dimensioning (core path)', fa: '\u0637\u0631\u0627\u062D\u06CC (\u0645\u0633\u06CC\u0631 \u0627\u0635\u0644\u06CC)',
+    descDa: 'Det b\u00E6rende forl\u00F8b for enhver kreds \u2014 i r\u00E6kkef\u00F8lge. F\u00F8lg tallene: belastning \u2192 afbryder \u2192 kabel \u2192 sp\u00E6ndingsfald \u2192 kortslutning \u2192 jordfejl. Grundreglen er IB \u2264 In \u2264 Iz.',
+    descEn: 'The backbone for every circuit \u2014 in order. Follow the numbers: load \u2192 device \u2192 cable \u2192 voltage drop \u2192 short-circuit \u2192 earth fault. The golden rule is IB \u2264 In \u2264 Iz.',
+    keys: ['load', 'trafo', 'mcb', 'mccb', 'fuse', 'cable', 'vdrop', 'scircuit', 'zs', 'discrim']
+  },
+  {
+    id: 'protect', icon: '\uD83D\uDEE1\uFE0F',
+    da: 'Beskyttelse & jording', en: 'Protection & earthing', fa: '\u062D\u0641\u0627\u0638\u062A \u0648 \u0627\u062A\u0635\u0627\u0644 \u0632\u0645\u06CC\u0646',
+    descDa: 'Hvordan mennesker og udstyr beskyttes mod st\u00F8d, overspaending og lysbue \u2014 og s\u00E6rlige omr\u00E5der med skrappere krav (bad, pool, byggeplads, landbrug, Ex).',
+    descEn: 'How people and equipment are protected from shock, surges and arc flash \u2014 plus special locations with stricter rules (bathroom, pool, site, agriculture, Ex).',
+    keys: ['earthsys', 'spd', 'arcflash', 'bathroom', 'pool', 'construction', 'agri', 'atex']
+  },
+  {
+    id: 'apps', icon: '\uD83D\uDD0C',
+    da: 'Anvendelser & laster', en: 'Applications & loads', fa: '\u06A9\u0627\u0631\u0628\u0631\u062F\u0647\u0627 \u0648 \u0628\u0627\u0631\u0647\u0627',
+    descDa: 'Konkrete installationstyper med deres egne regler \u2014 fx elbil-lader, solceller, varmepumpe, motorer, belysning og sikkerhedssystemer. Start her hvis dit projekt er en bestemt type.',
+    descEn: 'Concrete installation types with their own rules \u2014 e.g. EV charging, solar, heat pump, motors, lighting and life-safety systems. Start here if your project is a specific type.',
+    keys: ['ev', 'solar', 'bess', 'heatpump', 'motor', 'vfd', 'lighting', 'noed', 'firealarm', 'shev', 'access', 'generator', 'data', 'smartgrid', 'metering']
+  },
+  {
+    id: 'quality', icon: '\u3030\uFE0F',
+    da: 'Str\u00F8mkvalitet & termisk', en: 'Power quality & thermal', fa: '\u06A9\u06CC\u0641\u06CC\u062A \u062A\u0648\u0627\u0646 \u0648 \u062D\u0631\u0627\u0631\u062A\u06CC',
+    descDa: 'Det der p\u00E5virker kvalitet og levetid: harmoniske, effektfaktor, n\u00F8dstr\u00F8m, varme i kablet og EMC.',
+    descEn: 'What affects quality and lifetime: harmonics, power factor, backup supply, cable heating and EMC.',
+    keys: ['harmonic', 'pfc', 'ups', 'thermal', 'cablelife', 'emc', 'energy']
+  },
+  {
+    id: 'layout', icon: '\uD83D\uDCD0',
+    da: 'Tavle, skinne & tegning', en: 'Panel, busbar & drawing', fa: '\u062A\u0627\u0628\u0644\u0648\u060C \u0634\u06CC\u0646\u0647 \u0648 \u0646\u0642\u0634\u0647',
+    descDa: 'Saml installationen fysisk: tavle og skinnesystem, kabelbakke, og det enstregede diagram (tegning) der dokumenterer hvordan alt h\u00E6nger sammen.',
+    descEn: 'Put the installation together physically: panel and busbar, cable tray, and the single-line diagram (drawing) that documents how everything connects.',
+    keys: ['panel', 'busbar', 'sld', 'draw', 'cable3d', 'tcc', 'trayfill']
+  },
+  {
+    id: 'docs', icon: '\uD83D\uDCCB',
+    da: 'Dokumentation & kvalitet', en: 'Documentation & quality', fa: '\u0645\u0633\u062A\u0646\u062F\u0627\u062A \u0648 \u06A9\u06CC\u0641\u06CC\u062A',
+    descDa: 'Det der g\u00F8r projektet lovligt og f\u00E6rdigt: standarder, komponentbank, tilbud, KLS-kvalitetssikring, idrifts\u00E6ttelse, dokumentation \u2014 og eksamenstr\u00E6ning.',
+    descEn: 'What makes the project legal and finished: standards, component bank, bids, KLS quality control, commissioning, documentation \u2014 and exam practice.',
+    keys: ['standards', 'bank', 'pdf', 'bid', 'kls', 'commission', 'verify', 'exam', 'ai']
+  }
+];
+
+// The category currently expanded in the navigation panel.
+let activeNavGroup = 'start';
+
+// Map every module key -> its group id (built once, includes auto-append safety net).
+function navGroupForKey(key) {
+  for (let i = 0; i < NAV_GROUPS.length; i++) {
+    if (NAV_GROUPS[i].keys.indexOf(key) >= 0) return NAV_GROUPS[i].id;
+  }
+  return NAV_GROUPS[0].id;
+}
+
+function selectNavGroup(gid) {
+  activeNavGroup = gid;
+  renderNav();
+}
+
 function renderNav() {
   const nav = document.getElementById('mainNav');
+  if (!nav) return;
   const mods = t('modules');
-  nav.innerHTML = Object.keys(mods).map(key =>
-    `<button class="nav-btn ${key === activeModule ? 'active' : ''}" onclick="switchModule('${key}')">${mods[key]}</button>`
-  ).join('');
+
+  // Safety net: ensure every translated module key is reachable. Any key not
+  // explicitly placed in a group is appended to the last ("docs") group so the
+  // UI can never silently drop a module after future additions.
+  const placed = {};
+  NAV_GROUPS.forEach(function (g) { g.keys.forEach(function (k) { placed[k] = true; }); });
+  Object.keys(mods).forEach(function (k) {
+    if (!placed[k]) { NAV_GROUPS[NAV_GROUPS.length - 1].keys.push(k); placed[k] = true; }
+  });
+
+  // Keep the visible category in sync with the active module.
+  if (!NAV_GROUPS.some(function (g) { return g.id === activeNavGroup; })) activeNavGroup = NAV_GROUPS[0].id;
+
+  // Level 1 — category rail.
+  const cats = NAV_GROUPS.map(function (g) {
+    const label = tx(g.da, g.en);
+    const isActive = g.id === activeNavGroup;
+    const count = g.keys.filter(function (k) { return mods[k]; }).length;
+    return '<button class="nav-cat' + (g.start ? ' start' : '') + (isActive ? ' active' : '') +
+      '" onclick="selectNavGroup(\'' + g.id + '\')" title="' + label + '">' +
+      '<span class="cat-ico">' + g.icon + '</span><span>' + label + '</span>' +
+      '<span class="cat-count">' + count + '</span></button>';
+  }).join('');
+
+  // Level 2 — modules inside the active category, with a teaching description.
+  const grp = NAV_GROUPS.filter(function (g) { return g.id === activeNavGroup; })[0] || NAV_GROUPS[0];
+  let step = 0;
+  const btns = grp.keys.filter(function (k) { return mods[k]; }).map(function (key) {
+    let numHtml = '';
+    if (grp.numbered) { step++; numHtml = '<span class="step-num">' + step + '</span>'; }
+    return '<button class="nav-btn ' + (key === activeModule ? 'active' : '') +
+      '" onclick="switchModule(\'' + key + '\')">' + numHtml + mods[key] + '</button>';
+  }).join('');
+
+  const desc = tx(grp.descDa, grp.descEn);
+  nav.innerHTML =
+    '<div class="nav-cats">' + cats + '</div>' +
+    '<div class="nav-panel"><div class="nav-panel-desc"><span class="desc-ico">' +
+    grp.icon + '</span><span>' + desc + '</span></div>' +
+    '<div class="nav-mods">' + btns + '</div></div>';
 }
 
 function switchModule(mod) {
   activeModule = mod;
+  activeNavGroup = navGroupForKey(mod); // reveal the category that owns this module
   renderNav();
   renderStatusBar();
   renderModule(mod);
@@ -18724,6 +18970,7 @@ renderNav();
 renderStatusBar();
 renderModule(activeModule);
 (function(){ var b=document.getElementById('verBadge'); if(b) b.textContent='v'+DATA_VERSION; })();
+(function(){ var s=document.getElementById('appSubtitle'); if(s) s.textContent=tx('Professionelt el-design v\u00E6rkt\u00F8j \u00B7 DS/HD 60364','Professional electrical design workbench \u00B7 DS/HD 60364'); })();
 </script>
 </body>
 </html>
