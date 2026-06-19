@@ -671,7 +671,12 @@ const T = {
       access: 'Adgangskontrol',
       generator: 'Nødgenerator',
       discrim: 'Selektivitet',
-      earthsys: 'Jordingssystem'
+      earthsys: 'Jordingssystem',
+      pool: 'Svoemmehal',
+      construction: 'Byggeplads',
+      agri: 'Landbrug',
+      arcflash: 'Lysbue-risiko',
+      cablelife: 'Kabellevetid'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -801,7 +806,12 @@ const T = {
       access: 'Access Control',
       generator: 'Generator Sizing',
       discrim: 'Discrimination',
-      earthsys: 'Earthing System'
+      earthsys: 'Earthing System',
+      pool: 'Pool & Fountain',
+      construction: 'Construction Site',
+      agri: 'Agricultural',
+      arcflash: 'Arc Flash Risk',
+      cablelife: 'Cable Lifetime'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -923,7 +933,12 @@ const T = {
       access: 'کنترل دسترسی',
       generator: 'ژنراتور اضطراری',
       discrim: 'انتخاب‌پذیری',
-      earthsys: 'سیستم ارتینگ'
+      earthsys: 'سیستم ارتینگ',
+      pool: 'استخر و آبنما',
+      construction: 'کارگاه ساختمانی',
+      agri: 'تاسیسات کشاورزی',
+      arcflash: 'خطر قوس الکتریکی',
+      cablelife: 'عمر کابل'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -1621,7 +1636,78 @@ const _FA = {
   'Supplementary Bonding': 'اتصال تکمیلی',
   'Parallel Rods': 'میله‌های موازی',
   'Target Resistance': 'مقاومت هدف',
-  'Fault Current Path': 'مسیر جریان خطا'
+  'Fault Current Path': 'مسیر جریان خطا',
+  'Pool & Fountain Electrical': 'برق استخر و آبنما',
+  'Pool Type': 'نوع استخر',
+  'Indoor Swimming Pool': 'استخر سرپوشیده',
+  'Outdoor Pool': 'استخر روباز',
+  'Hot Tub / Spa': 'جکوزی / اسپا',
+  'Decorative Fountain': 'آبنمای تزئینی',
+  'Paddling Pool': 'استخر بچه',
+  'Zone Classification': 'طبقه‌بندی مناطق',
+  'Equipment Check': 'بررسی تجهیزات',
+  'Equipotential Bonding': 'اتصال هم‌پتانسیل',
+  'Bonding conductor': 'هادی اتصال',
+  'Allowed': 'مجاز',
+  'Not Allowed': 'غیرمجاز',
+  'Construction Site Electrical': 'برق کارگاه ساختمانی',
+  'Supply Type': 'نوع تغذیه',
+  'Supply Rating': 'ظرفیت تغذیه',
+  'Equipment Type': 'نوع تجهیزات',
+  'Tower crane': 'جرثقیل برجی',
+  'Concrete pump': 'پمپ بتن',
+  'Hoist / Lift': 'بالابر',
+  'Lighting tower': 'برج نور',
+  'Welding set': 'دستگاه جوش',
+  'Power tools': 'ابزار برقی',
+  'Site heating': 'گرمایش کارگاه',
+  'Welfare unit': 'واحد رفاهی',
+  'Diversity Factor': 'ضریب تنوع',
+  'Cable Protection': 'حفاظت کابل',
+  'Inspection Schedule': 'برنامه بازرسی',
+  'Total Load': 'بار کل',
+  'Cable Selection': 'انتخاب کابل',
+  'Agricultural Installation': 'تاسیسات کشاورزی',
+  'Building Type': 'نوع ساختمان',
+  'Cattle house': 'گاوداری',
+  'Pig house': 'خوکداری',
+  'Poultry': 'مرغداری',
+  'Greenhouse': 'گلخانه',
+  'Milking parlour': 'سالن شیردوشی',
+  'Feed processing': 'فرآوری خوراک',
+  'Grain storage': 'انبار غلات',
+  'Special Hazards': 'خطرات ویژه',
+  'IP Rating Required': 'درجه IP الزامی',
+  'Cable Requirements': 'الزامات کابل',
+  'Bonding Requirements': 'الزامات اتصال',
+  'Motor Protection': 'حفاظت موتور',
+  'Lightning Protection': 'حفاظت صاعقه',
+  'Arc Flash Risk Assessment': 'ارزیابی خطر قوس الکتریکی',
+  'System Voltage': 'ولتاژ سیستم',
+  'Fault Current': 'جریان خطا',
+  'Clearing Time': 'زمان قطع',
+  'Working Distance': 'فاصله کاری',
+  'Incident Energy': 'انرژی برخوردی',
+  'Arc Flash Boundary': 'مرز قوس الکتریکی',
+  'PPE Category': 'دسته PPE',
+  'WORK PROHIBITED': 'کار ممنوع',
+  'Risk Reduction': 'کاهش ریسک',
+  'Warning Label': 'برچسب هشدار',
+  'Cable Ageing & Lifetime': 'پیرشدگی و عمر کابل',
+  'Cable Type': 'نوع کابل',
+  'Installation Environment': 'محیط نصب',
+  'Operating Temperature': 'دمای کاری',
+  'Load Factor': 'ضریب بار',
+  'Environmental Factors': 'عوامل محیطی',
+  'UV exposure (outdoor)': 'تابش UV',
+  'Chemical/hydrocarbon exposure': 'تماس شیمیایی',
+  'Moisture/water immersion': 'رطوبت',
+  'Vibration (near machinery)': 'لرزش',
+  'Estimated Total Life': 'عمر کل تخمینی',
+  'Remaining Life': 'عمر باقیمانده',
+  'Replacement Priority': 'اولویت تعویض',
+  'Next Test Date': 'تاریخ آزمون بعدی',
+  'Insulation Resistance': 'مقاومت عایقی'
 };
 function tx(da, en) { if(lang === 'da') return da; if(lang === 'fa') return _FA[en] || en; return en; }
 function tl(obj, prefix) { return obj[prefix + '_' + lang] || obj[prefix + '_en'] || ''; }
@@ -4609,6 +4695,11 @@ function renderModule(mod) {
     case 'generator': content = renderGenerator(); break;
     case 'discrim': content = renderDiscrim(); break;
     case 'earthsys': content = renderEarthsys(); break;
+    case 'pool': content = renderPool(); break;
+    case 'construction': content = renderConstruction(); break;
+    case 'agri': content = renderAgri(); break;
+    case 'arcflash': content = renderArcFlash(); break;
+    case 'cablelife': content = renderCableLife(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -14483,6 +14574,613 @@ function renderEarthsys() {
     tx('OK: Jordmodstand ' + totalRe.toFixed(2) + ' Ω ≤ 10 Ω. PE ' + peSize + ' mm² iht. DS/HD 60364-5-54 Tabel 54.2.', 'OK: Earth resistance ' + totalRe.toFixed(2) + ' Ohm <= 10 Ohm. PE ' + peSize + ' mm2 per DS/HD 60364-5-54 Table 54.2.') :
     tx('FEJL: Jordmodstand ' + totalRe.toFixed(2) + ' Ω > 10 Ω. Tilføj flere parallelstænger eller brug længere elektroder.', 'FAIL: Earth resistance ' + totalRe.toFixed(2) + ' Ohm > 10 Ohm. Add more parallel rods or use longer electrodes.');
   html += renderVerdict(safe, verdictText);
+  html += '</div>';
+  return html;
+}
+
+// ===== SWIMMING POOL & FOUNTAIN MODULE (DS/HD 60364-7-702) =====
+
+var POOL_ZONES = {
+  0: { da: 'Zone 0: Inde i bassin', en: 'Zone 0: Inside basin', ip: 'IPX8', maxV: 12, selvOnly: true },
+  1: { da: 'Zone 1: 2m fra kant, 2.5m hoejde', en: 'Zone 1: 2m from edge, 2.5m height', ip: 'IPX4', maxV: 25, selvOnly: true },
+  2: { da: 'Zone 2: 1.5m ud fra Zone 1', en: 'Zone 2: 1.5m beyond Zone 1', ip: 'IPX4', maxV: 230, selvOnly: false }
+};
+
+var POOL_TYPES = [
+  { k: 'indoor', da: 'Indendoers svoemmehal', en: 'Indoor Swimming Pool', hasZone2: true },
+  { k: 'outdoor', da: 'Udendoers pool', en: 'Outdoor Pool', hasZone2: false },
+  { k: 'hottub', da: 'Spabad / jacuzzi', en: 'Hot Tub / Spa', hasZone2: false },
+  { k: 'fountain', da: 'Dekorativ springvand', en: 'Decorative Fountain', hasZone2: false },
+  { k: 'paddling', da: 'Plaskebassin', en: 'Paddling Pool', hasZone2: false }
+];
+
+var POOL_EQUIPMENT = [
+  { k: 'submersible_luminaire', da: 'Nedsaenket armatur', en: 'Submersible luminaire' },
+  { k: 'circulation_pump', da: 'Cirkulationspumpe', en: 'Circulation pump' },
+  { k: 'underwater_light', da: 'Undervandsbelysning', en: 'Underwater light' },
+  { k: 'socket_outlet', da: 'Stikkontakt', en: 'Socket outlet' },
+  { k: 'fixed_equipment', da: 'Fast udstyr', en: 'Fixed equipment' },
+  { k: 'switchgear', da: 'Kontaktanlaeg', en: 'Switchgear' },
+  { k: 'heating_cable', da: 'Varmekabel i gulv', en: 'Underfloor heating cable' }
+];
+
+var poolState = {
+  poolType: 'indoor',
+  selectedZone: 0,
+  selectedEquipment: 'submersible_luminaire',
+  bondingConductor: 4
+};
+
+function poolCheckEquipment(zone, equipment) {
+  var z = parseInt(zone);
+  switch (equipment) {
+    case 'submersible_luminaire':
+      if (z === 0) return { allowed: true, reason: 'SELV 12V AC only, IPX8, fixed installation', clause: 'cl.702.55', ipRequired: 'IPX8' };
+      if (z === 1) return { allowed: true, reason: 'SELV/PELV up to 25V AC, IPX4/IPX5', clause: 'cl.702.55', ipRequired: 'IPX4' };
+      return { allowed: true, reason: 'Normal installation with RCD 30mA', clause: 'cl.702.411.3.3', ipRequired: 'IPX4' };
+    case 'circulation_pump':
+      if (z === 0) return { allowed: false, reason: 'Pump must be outside Zone 0', clause: 'cl.702.55', ipRequired: 'IPX8' };
+      if (z === 1) return { allowed: false, reason: 'Install pump outside Zone 1 where possible', clause: 'cl.702.55', ipRequired: 'IPX5' };
+      return { allowed: true, reason: 'Class II or SELV pump with RCD 30mA, earth bonding required', clause: 'cl.702.415.2', ipRequired: 'IPX4' };
+    case 'underwater_light':
+      if (z === 0) return { allowed: true, reason: 'SELV 12V AC mandatory, transformer outside Zone 0 and 1', clause: 'cl.702.55', ipRequired: 'IPX8' };
+      if (z === 1) return { allowed: true, reason: 'SELV/PELV up to 25V AC, transformer outside Zone 0 and 1', clause: 'cl.702.55', ipRequired: 'IPX5' };
+      return { allowed: true, reason: 'RCD 30mA protected', clause: 'cl.702.411.3.3', ipRequired: 'IPX4' };
+    case 'socket_outlet':
+      if (z === 0) return { allowed: false, reason: 'No socket outlets in Zone 0', clause: 'cl.702.55', ipRequired: 'IPX8' };
+      if (z === 1) return { allowed: false, reason: 'No socket outlets in Zone 1', clause: 'cl.702.55', ipRequired: 'IPX5' };
+      return { allowed: true, reason: 'Socket outlet with RCD 30mA', clause: 'cl.702.411.3.3', ipRequired: 'IPX4' };
+    case 'fixed_equipment':
+      if (z === 0) return { allowed: false, reason: 'Only SELV luminaires in Zone 0', clause: 'cl.702.55', ipRequired: 'IPX8' };
+      if (z === 1) return { allowed: true, reason: 'Fixed only, SELV/PELV up to 25V AC, no switchgear', clause: 'cl.702.55', ipRequired: 'IPX5' };
+      return { allowed: true, reason: 'Fixed equipment with RCD 30mA', clause: 'cl.702.411.3.3', ipRequired: 'IPX4' };
+    case 'switchgear':
+      if (z <= 1) return { allowed: false, reason: 'No switchgear in Zone 0 or 1', clause: 'cl.702.55', ipRequired: z === 0 ? 'IPX8' : 'IPX5' };
+      return { allowed: true, reason: 'Allowed in Zone 2 with RCD 30mA and IPX4', clause: 'cl.702.411.3.3', ipRequired: 'IPX4' };
+    case 'heating_cable':
+      if (z === 0) return { allowed: false, reason: 'No heating cables inside basin', clause: 'cl.702.753', ipRequired: 'IPX8' };
+      if (z === 1) return { allowed: true, reason: 'Earthed metallic sheath/grid required, min 1.5m from pool edge', clause: 'cl.702.753', ipRequired: 'IPX5' };
+      return { allowed: true, reason: 'Earthed metallic sheath/grid required per cl.702.753', clause: 'cl.702.753', ipRequired: 'IPX4' };
+    default:
+      return { allowed: false, reason: 'Unknown equipment', clause: 'cl.702.55', ipRequired: 'IPX8' };
+  }
+}
+
+function poolGetProtectionReqs(zone, poolType) {
+  var z = parseInt(zone);
+  var reqs = [];
+  reqs.push({ req: 'RCD 30mA mandatory on ALL circuits serving pool areas', clause: 'cl.702.411.3.3' });
+  reqs.push({ req: 'Supplementary equipotential bonding required', clause: 'cl.702.415.2' });
+  if (z === 0) {
+    reqs.push({ req: 'SELV 12V AC / 30V DC maximum', clause: 'cl.702.414.4.5' });
+    reqs.push({ req: 'IPX8 rated equipment only', clause: 'cl.702.512.2' });
+  } else if (z === 1) {
+    reqs.push({ req: 'SELV/PELV up to 25V AC only', clause: 'cl.702.414.4.5' });
+    var ipReq = (poolType === 'indoor' || poolType === 'hottub') ? 'IPX5 (jets/waves)' : 'IPX4 minimum';
+    reqs.push({ req: ipReq, clause: 'cl.702.512.2' });
+    reqs.push({ req: 'Fixed equipment only - no portable', clause: 'cl.702.55' });
+  } else {
+    reqs.push({ req: 'IPX4 minimum', clause: 'cl.702.512.2' });
+    reqs.push({ req: 'Socket outlets via RCD 30mA', clause: 'cl.702.411.3.3' });
+  }
+  if (poolType === 'fountain') {
+    reqs.push({ req: 'Public access fountain: treat as Zone 0 if accessible, SELV mandatory', clause: 'cl.702.55' });
+  }
+  return reqs;
+}
+
+function poolGetBondingReqs() {
+  return [
+    { da: 'Stiger og gelaendere', en: 'Ladders and handrails', clause: 'cl.702.415.2' },
+    { da: 'Armeringsst\u00e5l i poolstruktur', en: 'Reinforcing steel in pool structure', clause: 'cl.702.415.2' },
+    { da: 'Roerfoering (vand, varme)', en: 'Pipe work (water, heating)', clause: 'cl.702.415.2' },
+    { da: 'Kabelkanaler og bakker', en: 'Cable conduits and trays', clause: 'cl.702.415.2' },
+    { da: 'Metal vindues-/doerkarme indenfor 2m', en: 'Metal window/door frames within 2m', clause: 'cl.702.415.2' },
+    { da: 'Gulvriste og afloeb', en: 'Floor grids and drains', clause: 'cl.702.415.2' }
+  ];
+}
+
+function poolGetMinBondingConductor(mechanicalProtection) {
+  return mechanicalProtection ? 4 : 6;
+}
+
+function renderPool() {
+  var check = poolCheckEquipment(poolState.selectedZone, poolState.selectedEquipment);
+  var protReqs = poolGetProtectionReqs(poolState.selectedZone, poolState.poolType);
+  var bondingReqs = poolGetBondingReqs();
+  var minBond = poolGetMinBondingConductor(poolState.bondingConductor === 4);
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Svoemmehal / Springvand (DS/HD 60364-7-702)', 'Pool & Fountain Electrical (DS/HD 60364-7-702)') + '</div>';
+  html += '<div class="info-row">' + tx('Zoneklassifikation og krav til elektrisk installation ved pools iht. DS/HD 60364-7-702', 'Zone classification and electrical installation requirements for pools per DS/HD 60364-7-702') + '</div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Zonediagram (pool)', 'Zone Diagram (pool)') + '</div>';
+  html += '<svg viewBox="0 0 420 220" style="width:100%;max-width:420px;height:auto;display:block;margin:0 auto">';
+  html += '<rect x="5" y="5" width="410" height="210" fill="#f0f9ff" stroke="#333" stroke-width="1"/>';
+  html += '<rect x="60" y="130" width="100" height="70" fill="#0369a1" opacity="0.3" stroke="#0369a1" stroke-width="2"/>';
+  html += '<text x="80" y="170" font-size="11" fill="#0369a1" font-weight="bold">Zone 0</text>';
+  html += '<rect x="30" y="30" width="160" height="170" fill="#38bdf8" opacity="0.12" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4"/>';
+  html += '<text x="35" y="55" font-size="11" fill="#0284c7">Zone 1</text>';
+  html += '<rect x="190" y="30" width="60" height="170" fill="#7dd3fc" opacity="0.08" stroke="#7dd3fc" stroke-width="1" stroke-dasharray="4"/>';
+  html += '<text x="195" y="120" font-size="11" fill="#0ea5e9">Zone 2</text>';
+  html += '<line x1="5" y1="200" x2="415" y2="200" stroke="#333" stroke-width="2"/>';
+  html += '</svg></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Pooltype', 'Pool Type') + '</div><div class="select-grid">';
+  POOL_TYPES.forEach(function(pt) { html += '<button class="sel-btn' + (poolState.poolType === pt.k ? ' selected' : '') + '" onclick="poolState.poolType=\'' + pt.k + '\';renderModule(\'pool\')">' + tx(pt.da, pt.en) + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Vaelg zone', 'Select Zone') + '</div><div class="select-grid">';
+  [0, 1, 2].forEach(function(z) { html += '<button class="sel-btn' + (poolState.selectedZone === z ? ' selected' : '') + '" onclick="poolState.selectedZone=' + z + ';renderModule(\'pool\')">' + tx(POOL_ZONES[z].da, POOL_ZONES[z].en) + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Vaelg udstyr', 'Select Equipment') + '</div><div class="select-grid">';
+  POOL_EQUIPMENT.forEach(function(eq) { html += '<button class="sel-btn' + (poolState.selectedEquipment === eq.k ? ' selected' : '') + '" onclick="poolState.selectedEquipment=\'' + eq.k + '\';renderModule(\'pool\')">' + tx(eq.da, eq.en) + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Udstyrskontrol', 'Equipment Check') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Status', 'Status') + '</span><span class="value" style="color:' + (check.allowed ? 'var(--success)' : 'var(--danger)') + '">' + (check.allowed ? tx('TILLADT','ALLOWED') : tx('IKKE TILLADT','NOT ALLOWED')) + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Begrundelse', 'Reason') + '</span><span class="value">' + check.reason + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('IP-krav', 'IP Required') + '</span><span class="value">' + check.ipRequired + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Klausul', 'Clause') + '</span><span class="value">' + check.clause + '</span></div>';
+  html += '</div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Beskyttelseskrav', 'Protection Requirements') + '</div>';
+  protReqs.forEach(function(r) { html += '<div class="result-row"><span class="label">' + r.clause + '</span><span class="value">' + r.req + '</span></div>'; });
+  html += '</div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Potentialudligning (cl.702.415.2)', 'Equipotential Bonding (cl.702.415.2)') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Min. leder', 'Min. conductor') + '</span><span class="value">' + minBond + ' mm\u00B2 Cu</span></div>';
+  bondingReqs.forEach(function(b) { html += '<div class="result-row"><span class="label">\u2022</span><span class="value">' + tx(b.da, b.en) + '</span></div>'; });
+  html += '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Bindingsleder [mm\u00B2 Cu]', 'Bonding Conductor [mm\u00B2 Cu]') + '</div><div class="select-grid">';
+  [4, 6, 10, 16].forEach(function(s) { html += '<button class="sel-btn' + (poolState.bondingConductor === s ? ' selected' : '') + '" onclick="poolState.bondingConductor=' + s + ';renderModule(\'pool\')">' + s + ' mm\u00B2</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Undervandsbelysning (cl.702.55)', 'Underwater Lighting (cl.702.55)') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Spaending', 'Voltage') + '</span><span class="value">SELV 12V AC ' + tx('obligatorisk i Zone 0','mandatory in Zone 0') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Trafo', 'Transformer') + '</span><span class="value">' + tx('Uden for Zone 0 og 1','Outside Zone 0 and 1') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kabel', 'Cable') + '</span><span class="value">H07RN-F (IPX8)</span></div>';
+  html += '</div>';
+  var safe = check.allowed;
+  var verdictText = safe ? tx('OK: Udstyr tilladt iht. DS/HD 60364-7-702 ' + check.clause + '. RCD 30mA paakraevet.', 'OK: Equipment allowed per DS/HD 60364-7-702 ' + check.clause + '. RCD 30mA required.') : tx('FEJL: Udstyr IKKE tilladt iht. DS/HD 60364-7-702 ' + check.clause + '.', 'FAIL: Equipment NOT allowed per DS/HD 60364-7-702 ' + check.clause + '.');
+  html += renderVerdict(safe, verdictText);
+  html += '</div>';
+  return html;
+}
+// ===== CONSTRUCTION SITE MODULE (DS/HD 60364-7-704) =====
+
+var CONSTRUCTION_SUPPLY_TYPES = [
+  { k: 'csvb', da: 'CSVB fra forsyning', en: 'CSVB from utility' },
+  { k: 'temporary', da: 'Midlertidig fra bygning', en: 'Temporary from building' },
+  { k: 'generator', da: 'Generatorforsyning', en: 'Generator supply' }
+];
+
+var CONSTRUCTION_EQUIPMENT = [
+  { k: 'crane', da: 'Taarnkran', en: 'Tower crane', kw_min: 45, kw_max: 75, phases: 3 },
+  { k: 'concrete_pump', da: 'Betonpumpe', en: 'Concrete pump', kw_min: 55, kw_max: 55, phases: 3 },
+  { k: 'hoist', da: 'Byggepladselelevator', en: 'Hoist / Lift', kw_min: 15, kw_max: 30, phases: 3 },
+  { k: 'lighting_tower', da: 'Lysmaster', en: 'Lighting tower', kw_min: 4, kw_max: 10, phases: 1 },
+  { k: 'welding', da: 'Svejseapparat', en: 'Welding set', kw_min: 10, kw_max: 40, phases: 3 },
+  { k: 'power_tools', da: 'Elvaerktoej', en: 'Power tools', kw_min: 2, kw_max: 5, phases: 1 },
+  { k: 'heating', da: 'Opvarmning', en: 'Site heating', kw_min: 5, kw_max: 20, phases: 3 },
+  { k: 'welfare', da: 'Skurvogn', en: 'Welfare unit', kw_min: 10, kw_max: 30, phases: 3 }
+];
+
+var constructionState = { supplyType: 'csvb', supplyRating: 63, selectedEquipment: [], diversityFactor: 0.5 };
+
+function constructionCalcLoad(equipment, diversityFactor) {
+  var totalKW = 0;
+  equipment.forEach(function(eq) { var item = CONSTRUCTION_EQUIPMENT.find(function(e) { return e.k === eq; }); if (item) totalKW += item.kw_max; });
+  var diversifiedKW = totalKW * diversityFactor;
+  var current3ph = Math.ceil(diversifiedKW * 1000 / (400 * Math.sqrt(3) * 0.85));
+  return { totalKW: totalKW, diversifiedKW: diversifiedKW, current3ph: current3ph, diversityFactor: diversityFactor };
+}
+
+function constructionSelectCable(current) {
+  var sizes = [{mm2:2.5,iz:25},{mm2:4,iz:34},{mm2:6,iz:44},{mm2:10,iz:61},{mm2:16,iz:82},{mm2:25,iz:110},{mm2:35,iz:135},{mm2:50,iz:168},{mm2:70,iz:213},{mm2:95,iz:258},{mm2:120,iz:299},{mm2:150,iz:344},{mm2:185,iz:392},{mm2:240,iz:461}];
+  var selected = null;
+  for (var i = 0; i < sizes.length; i++) { if (sizes[i].iz >= current) { selected = sizes[i]; break; } }
+  if (!selected) selected = sizes[sizes.length - 1];
+  return { mm2: selected.mm2, iz: selected.iz, type: 'H07RN-F', clause: 'cl.704.52' };
+}
+
+function constructionGetProtectionReqs() {
+  return [
+    { req: 'ALL socket outlets <= 32A: 30mA RCD mandatory', clause: 'cl.704.411.3.3' },
+    { req: 'Socket outlets > 32A: 500mA RCD', clause: 'cl.704.411.3.3' },
+    { req: 'Supplementary protection: 30mA RCD on ALL circuits', clause: 'cl.704.411.3.3' },
+    { req: 'Automatic disconnection: 0.2s for portable equipment', clause: 'cl.704.411.3.2' },
+    { req: 'Minimum IP44 for all outdoor equipment', clause: 'cl.704.512.2' },
+    { req: 'No PVC cables - H07RN-F minimum', clause: 'cl.704.52' }
+  ];
+}
+
+function constructionGetCableReqs() {
+  return [
+    { req: 'Overhead: minimum 6m clearance for vehicle areas', clause: 'cl.704.52' },
+    { req: 'Underground: min 0.6m depth, marked tape, mechanical protection', clause: 'cl.704.52' },
+    { req: 'Surface: H07RN-F rubber minimum, protected from damage', clause: 'cl.704.52' },
+    { req: 'No PVC insulated cables on construction sites', clause: 'cl.704.52' }
+  ];
+}
+
+function constructionGetInspectionSchedule() {
+  return [
+    { da: 'Foer foerste brug', en: 'Before first use', interval: 'Once' },
+    { da: 'Periodisk eftersyn', en: 'Periodic inspection', interval: 'Every 3 months' },
+    { da: 'Efter aendring', en: 'After modification', interval: 'Each time' },
+    { da: 'Efter storm/oversvoemning', en: 'After storm/flooding', interval: 'Each time' }
+  ];
+}
+
+function renderConstruction() {
+  var load = constructionCalcLoad(constructionState.selectedEquipment, constructionState.diversityFactor);
+  var cable = constructionSelectCable(load.current3ph);
+  var protReqs = constructionGetProtectionReqs();
+  var cableReqs = constructionGetCableReqs();
+  var inspSchedule = constructionGetInspectionSchedule();
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Byggeplads Elinstallation (DS/HD 60364-7-704)', 'Construction Site Electrical (DS/HD 60364-7-704)') + '</div>';
+  html += '<div class="info-row">' + tx('Midlertidig elforsyning til byggepladser iht. DS/HD 60364-7-704', 'Temporary electrical supply for construction sites per DS/HD 60364-7-704') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Forsyningstype', 'Supply Type') + '</div><div class="select-grid">';
+  CONSTRUCTION_SUPPLY_TYPES.forEach(function(st) { html += '<button class="sel-btn' + (constructionState.supplyType === st.k ? ' selected' : '') + '" onclick="constructionState.supplyType=\'' + st.k + '\';renderModule(\'construction\')">' + tx(st.da, st.en) + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Forsyning [A]', 'Supply Rating [A]') + '</div><div class="select-grid">';
+  [16, 32, 63, 125, 200, 250, 400, 630].forEach(function(r) { html += '<button class="sel-btn' + (constructionState.supplyRating === r ? ' selected' : '') + '" onclick="constructionState.supplyRating=' + r + ';renderModule(\'construction\')">' + r + 'A</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Udstyr (klik tilfoej/fjern)', 'Equipment (click add/remove)') + '</div><div class="select-grid">';
+  CONSTRUCTION_EQUIPMENT.forEach(function(eq) { var sel = constructionState.selectedEquipment.indexOf(eq.k) >= 0; html += '<button class="sel-btn' + (sel ? ' selected' : '') + '" onclick="var i=constructionState.selectedEquipment.indexOf(\'' + eq.k + '\');if(i>=0)constructionState.selectedEquipment.splice(i,1);else constructionState.selectedEquipment.push(\'' + eq.k + '\');renderModule(\'construction\')">' + tx(eq.da, eq.en) + ' (' + eq.kw_max + 'kW)</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Samtidighedsfaktor', 'Diversity Factor') + '</div><div class="select-grid">';
+  [0.5, 0.7, 1.0].forEach(function(d) { html += '<button class="sel-btn' + (constructionState.diversityFactor === d ? ' selected' : '') + '" onclick="constructionState.diversityFactor=' + d + ';renderModule(\'construction\')">' + d + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Belastning', 'Load') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Total', 'Total') + '</span><span class="value">' + load.totalKW + ' kW</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Diversificeret', 'Diversified') + '</span><span class="value">' + load.diversifiedKW.toFixed(1) + ' kW</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Stroem 3-fas', 'Current 3-ph') + '</span><span class="value">' + load.current3ph + ' A</span></div>';
+  html += '</div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Kabel', 'Cable') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Type', 'Type') + '</span><span class="value">' + cable.type + ' ' + cable.mm2 + ' mm\u00B2</span></div>';
+  html += '<div class="result-row"><span class="label">Iz</span><span class="value">' + cable.iz + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">Ref.</span><span class="value">' + cable.clause + '</span></div>';
+  html += '</div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Beskyttelse', 'Protection') + '</div>';
+  protReqs.forEach(function(r) { html += '<div class="result-row"><span class="label">' + r.clause + '</span><span class="value">' + r.req + '</span></div>'; });
+  html += '</div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Kabelkrav', 'Cable Reqs') + '</div>';
+  cableReqs.forEach(function(r) { html += '<div class="result-row"><span class="label">' + r.clause + '</span><span class="value">' + r.req + '</span></div>'; });
+  html += '</div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Jord', 'Earthing') + '</div>';
+  html += '<div class="result-row"><span class="label">System</span><span class="value">TT / TN-C-S, PME + re-earth</span></div>';
+  html += '</div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Inspektion', 'Inspection') + '</div>';
+  inspSchedule.forEach(function(s) { html += '<div class="result-row"><span class="label">' + tx(s.da, s.en) + '</span><span class="value">' + s.interval + '</span></div>'; });
+  html += '</div>';
+  var ok = load.current3ph <= constructionState.supplyRating;
+  html += renderVerdict(ok, ok ? tx('OK: ' + load.current3ph + 'A <= ' + constructionState.supplyRating + 'A. H07RN-F ' + cable.mm2 + 'mm2 iht. cl.704.52.', 'OK: ' + load.current3ph + 'A <= ' + constructionState.supplyRating + 'A. H07RN-F ' + cable.mm2 + 'mm2 per cl.704.52.') : tx('FEJL: ' + load.current3ph + 'A > ' + constructionState.supplyRating + 'A.', 'FAIL: ' + load.current3ph + 'A > ' + constructionState.supplyRating + 'A. Upgrade supply.'));
+  html += '</div>';
+  return html;
+}
+// ===== AGRICULTURAL INSTALLATION MODULE (DS/HD 60364-7-705) =====
+
+var AGRI_BUILDING_TYPES = [
+  { k: 'cattle', da: 'Kvaegstald', en: 'Cattle house', ip: 'IP44', hazards: ['corrosive', 'conductive_floor', 'livestock'] },
+  { k: 'pig', da: 'Svinestald', en: 'Pig house', ip: 'IP44', hazards: ['corrosive', 'conductive_floor', 'livestock'] },
+  { k: 'poultry', da: 'Fjerkrae', en: 'Poultry', ip: 'IP44', hazards: ['dust', 'livestock'] },
+  { k: 'greenhouse', da: 'Drivhus', en: 'Greenhouse', ip: 'IP44', hazards: ['humidity'] },
+  { k: 'milking', da: 'Malkehal', en: 'Milking parlour', ip: 'IP55', hazards: ['corrosive', 'conductive_floor', 'livestock'] },
+  { k: 'feed', da: 'Foderforarbejdning', en: 'Feed processing', ip: 'IP54', hazards: ['dust', 'fire'] },
+  { k: 'grain', da: 'Kornlager', en: 'Grain storage', ip: 'IP54', hazards: ['dust', 'fire'] },
+  { k: 'workshop', da: 'Vaerksted', en: 'Workshop', ip: 'IP44', hazards: [] }
+];
+
+var AGRI_HAZARDS = {
+  corrosive: { da: 'Korrosiv atmosfaere (gyllegas)', en: 'Corrosive atmosphere (animal waste)' },
+  conductive_floor: { da: 'Ledende gulve (vaadt beton)', en: 'Conductive floors (wet concrete)' },
+  livestock: { da: 'Husdyr - max 25V AC', en: 'Livestock - contact voltage max 25V AC' },
+  dust: { da: 'Stoev (brandrisiko)', en: 'Dust (fire/explosion risk)' },
+  fire: { da: 'Brandrisiko (hoe/halm/korn)', en: 'Fire risk (hay/straw/grain)' },
+  humidity: { da: 'Hoej luftfugtighed', en: 'High humidity' }
+};
+
+var agriState = { buildingType: 'cattle', hasLivestock: true, hasEssentialLoads: true };
+
+function agriGetProtectionReqs(buildingType, hasLivestock) {
+  var bt = AGRI_BUILDING_TYPES.find(function(b) { return b.k === buildingType; });
+  var reqs = [];
+  reqs.push({ req: 'ALL circuits: 30mA RCD mandatory', clause: 'cl.705.411.3.3' });
+  reqs.push({ req: 'Automatic disconnection time: 0.2s', clause: 'cl.705.411.3.2' });
+  if (hasLivestock || (bt && bt.hazards.indexOf('livestock') >= 0)) {
+    reqs.push({ req: 'Touch voltage reduced to 25V AC / 60V DC for livestock', clause: 'cl.705.411.1' });
+    reqs.push({ req: 'Supplementary bonding ALL metalwork in livestock areas', clause: 'cl.705.415.2' });
+  }
+  if (bt && bt.hazards.indexOf('fire') >= 0) { reqs.push({ req: 'Fire-resistant cables required', clause: 'cl.705.52' }); }
+  if (bt && bt.hazards.indexOf('corrosive') >= 0) { reqs.push({ req: 'No PVC in ammonia environments - use H07RN-F or PE sheathed', clause: 'cl.705.52' }); }
+  return reqs;
+}
+
+function agriGetIPRating(buildingType) {
+  var bt = AGRI_BUILDING_TYPES.find(function(b) { return b.k === buildingType; });
+  return bt ? bt.ip : 'IP44';
+}
+
+function agriGetCableReqs(buildingType) {
+  var bt = AGRI_BUILDING_TYPES.find(function(b) { return b.k === buildingType; });
+  var reqs = [];
+  reqs.push({ req: 'Minimum copper conductor (no aluminium in livestock areas)', clause: 'cl.705.52' });
+  reqs.push({ req: 'Overhead wiring preferred (protected from animals)', clause: 'cl.705.52' });
+  if (bt && bt.hazards.indexOf('corrosive') >= 0) { reqs.push({ req: 'PVC not suitable - use H07RN-F or PE sheathed', clause: 'cl.705.52' }); }
+  if (bt && bt.hazards.indexOf('fire') >= 0) { reqs.push({ req: 'Fire-resistant cable (e.g. NHXH)', clause: 'cl.705.52' }); }
+  return reqs;
+}
+
+function agriGetBondingReqs(buildingType) {
+  var bt = AGRI_BUILDING_TYPES.find(function(b) { return b.k === buildingType; });
+  var items = [];
+  if (bt && bt.hazards.indexOf('livestock') >= 0) {
+    items.push({ da: 'Baase og skillevaegge', en: 'Stalls and partitions' });
+    items.push({ da: 'Vandroor og trug', en: 'Water pipes and troughs' });
+    items.push({ da: 'Fodertrug og skinner', en: 'Feeding troughs and rails' });
+    items.push({ da: 'Gulvriste', en: 'Floor grids' });
+    items.push({ da: 'Malkeudstyr', en: 'Milking equipment' });
+  }
+  items.push({ da: 'Alle metalroer', en: 'All metal pipe work' });
+  items.push({ da: 'Staalkonstruktioner', en: 'Structural steelwork' });
+  return { items: items, minConductor: 4, maxResistance: 0.5, clause: 'cl.705.415.2' };
+}
+
+function agriGetMotorReqs(hasEssentialLoads) {
+  var reqs = [];
+  if (hasEssentialLoads) {
+    reqs.push({ da: 'Malkning: automatisk genstart', en: 'Milking: automatic restart' });
+    reqs.push({ da: 'Ventilation: genstart obligatorisk', en: 'Ventilation: auto-restart mandatory' });
+    reqs.push({ da: 'Fodring: genstart for tidstyring', en: 'Feeding: auto-restart for timed ops' });
+  }
+  reqs.push({ da: 'Motorvaern: overbelastning + kortslutning', en: 'Motor protection: overload + short-circuit' });
+  return reqs;
+}
+
+function renderAgri() {
+  var bt = AGRI_BUILDING_TYPES.find(function(b) { return b.k === agriState.buildingType; });
+  var protReqs = agriGetProtectionReqs(agriState.buildingType, agriState.hasLivestock);
+  var ipRating = agriGetIPRating(agriState.buildingType);
+  var cableReqs = agriGetCableReqs(agriState.buildingType);
+  var bondingReqs = agriGetBondingReqs(agriState.buildingType);
+  var motorReqs = agriGetMotorReqs(agriState.hasEssentialLoads);
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Landbrugsinstallation (DS/HD 60364-7-705)', 'Agricultural Installation (DS/HD 60364-7-705)') + '</div>';
+  html += '<div class="info-row">' + tx('Elektriske installationer i landbrugsbygninger iht. DS/HD 60364-7-705', 'Electrical installations in agricultural buildings per DS/HD 60364-7-705') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Bygningstype', 'Building Type') + '</div><div class="select-grid">';
+  AGRI_BUILDING_TYPES.forEach(function(b) { html += '<button class="sel-btn' + (agriState.buildingType === b.k ? ' selected' : '') + '" onclick="agriState.buildingType=\'' + b.k + '\';agriState.hasLivestock=' + (b.hazards.indexOf('livestock')>=0) + ';renderModule(\'agri\')">' + tx(b.da, b.en) + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Kritiske laster', 'Essential Loads') + '</div><div class="select-grid">';
+  [true, false].forEach(function(v) { html += '<button class="sel-btn' + (agriState.hasEssentialLoads === v ? ' selected' : '') + '" onclick="agriState.hasEssentialLoads=' + v + ';renderModule(\'agri\')">' + (v ? tx('Ja','Yes') : tx('Nej','No')) + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Saerlige farer', 'Special Hazards') + '</div>';
+  if (bt && bt.hazards.length > 0) { bt.hazards.forEach(function(h) { var hz = AGRI_HAZARDS[h]; if(hz) html += '<div class="result-row"><span class="label">\u26A0\uFE0F</span><span class="value">' + tx(hz.da, hz.en) + '</span></div>'; }); }
+  else { html += '<div class="result-row"><span class="label">\u2705</span><span class="value">' + tx('Ingen saerlige farer', 'No special hazards') + '</span></div>'; }
+  html += '</div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('IP-klasse', 'IP Rating') + '</div>';
+  html += '<div class="result-row"><span class="label">Minimum</span><span class="value">' + ipRating + ' (cl.705.512.2)</span></div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Beskyttelse', 'Protection') + '</div>';
+  protReqs.forEach(function(r) { html += '<div class="result-row"><span class="label">' + r.clause + '</span><span class="value">' + r.req + '</span></div>'; });
+  html += '</div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Kabelkrav', 'Cable Reqs') + '</div>';
+  cableReqs.forEach(function(r) { html += '<div class="result-row"><span class="label">' + r.clause + '</span><span class="value">' + r.req + '</span></div>'; });
+  html += '</div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Potentialudligning (cl.705.415.2)', 'Bonding (cl.705.415.2)') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Min. leder', 'Min. conductor') + '</span><span class="value">' + bondingReqs.minConductor + ' mm\u00B2 Cu</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Maks. R', 'Max. R') + '</span><span class="value">' + bondingReqs.maxResistance + ' \u03A9</span></div>';
+  bondingReqs.items.forEach(function(item) { html += '<div class="result-row"><span class="label">\u2022</span><span class="value">' + tx(item.da, item.en) + '</span></div>'; });
+  html += '</div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Motorvaern', 'Motor Protection') + '</div>';
+  motorReqs.forEach(function(r) { html += '<div class="result-row"><span class="label">\u2022</span><span class="value">' + tx(r.da, r.en) + '</span></div>'; });
+  html += '</div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Lynbeskyttelse', 'Lightning') + '</div>';
+  html += '<div class="result-row"><span class="label">DS/EN 62305</span><span class="value">' + tx('Anbefalet for isolerede bygninger', 'Recommended for isolated buildings') + '</span></div></div>';
+  var verdictText = agriState.hasLivestock ? tx('Max 25V AC iht. cl.705.411.1. 30mA RCD + potentialudligning + 0.2s. ' + ipRating + '.', 'Max 25V AC per cl.705.411.1. 30mA RCD + bonding + 0.2s. ' + ipRating + '.') : tx('30mA RCD iht. cl.705.411.3.3. ' + ipRating + '. 0.2s frakoblingstid.', '30mA RCD per cl.705.411.3.3. ' + ipRating + '. 0.2s disconnection.');
+  html += renderVerdict(true, verdictText);
+  html += '</div>';
+  return html;
+}
+// ===== ARC FLASH MODULE (IEC 62271-200 / IEEE 1584) =====
+
+var arcflashState = { voltage: 400, faultCurrent: 10, clearingTime: 0.1, workingDistance: 455 };
+
+function arcflashCalcIncidentEnergy(voltage, faultCurrentKA, clearingTimeS, workingDistanceMM) {
+  var Cf = voltage <= 1000 ? 1.0 : 1.5;
+  var Iarc = faultCurrentKA * 1000;
+  var E = 0.0093 * Cf * Iarc * clearingTimeS * Math.pow(610 / workingDistanceMM, 2) / 10;
+  E = Math.ceil(E * 10) / 10;
+  return E;
+}
+
+function arcflashGetPPECategory(incidentEnergy) {
+  if (incidentEnergy < 1.2) return { category: 0, da: 'Kat. 0: Normal toej', en: 'Cat. 0: Normal work clothes', color: '#22c55e' };
+  if (incidentEnergy < 4) return { category: 1, da: 'Kat. 1: Lysbue-skjorte + visir', en: 'Cat. 1: Arc-rated shirt + face shield', color: '#84cc16' };
+  if (incidentEnergy < 8) return { category: 2, da: 'Kat. 2: Lysbue-toej + haette', en: 'Cat. 2: Arc clothing + hood', color: '#eab308' };
+  if (incidentEnergy < 25) return { category: 3, da: 'Kat. 3: Fuld lysbue-dragt', en: 'Cat. 3: Full arc flash suit', color: '#f97316' };
+  if (incidentEnergy < 40) return { category: 4, da: 'Kat. 4: Maksimal PPE', en: 'Cat. 4: Maximum PPE, multi-layer', color: '#ef4444' };
+  return { category: -1, da: 'FORBUDT - reducer energi', en: 'WORK PROHIBITED - reduce energy first', color: '#000000' };
+}
+
+function arcflashCalcBoundary(voltage, faultCurrentKA, clearingTimeS) {
+  var Cf = voltage <= 1000 ? 1.0 : 1.5;
+  var Iarc = faultCurrentKA * 1000;
+  var E_limit = 1.2;
+  var D_sq = 0.0093 * Cf * Iarc * clearingTimeS * 610 * 610 / (E_limit * 10);
+  return Math.ceil(Math.sqrt(D_sq));
+}
+
+function arcflashGetRiskReductions() {
+  return [
+    { da: 'Spaendingsloesgoer (foretrukket)', en: 'De-energize (preferred)', eff: 'Eliminates risk' },
+    { da: 'Fjernbetjening', en: 'Remote racking', eff: 'Eliminates exposure' },
+    { da: 'Stroembegraensende sikringer', en: 'Current-limiting fuses', eff: 'Reduces t <0.01s' },
+    { da: 'Vedligeholdelsestilstand', en: 'Maintenance mode', eff: 'Lower trip setting' },
+    { da: 'ZSI (Zoneselektiv)', en: 'Zone Selective Interlocking', eff: 'Faster clearing' },
+    { da: 'Lysbue-relae (optisk)', en: 'Arc flash relay (optical)', eff: 'Trip <35ms' }
+  ];
+}
+
+function renderArcFlash() {
+  var E = arcflashCalcIncidentEnergy(arcflashState.voltage, arcflashState.faultCurrent, arcflashState.clearingTime, arcflashState.workingDistance);
+  var ppe = arcflashGetPPECategory(E);
+  var boundary = arcflashCalcBoundary(arcflashState.voltage, arcflashState.faultCurrent, arcflashState.clearingTime);
+  var reductions = arcflashGetRiskReductions();
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Lysbue-risikovurdering (IEC 62271-200 / IEEE 1584)', 'Arc Flash Risk Assessment (IEC 62271-200 / IEEE 1584)') + '</div>';
+  html += '<div class="info-row">' + tx('Beregning af incident energi og PPE-krav. Arbejdstilsynet kraever risikovurdering.', 'Incident energy calculation and PPE requirements. Arbejdstilsynet requires risk assessment.') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Spaending [V]', 'Voltage [V]') + '</div><div class="select-grid">';
+  [230, 400, 690, 6000, 10000, 20000].forEach(function(v) { var l = v >= 1000 ? (v/1000)+'kV' : v+'V'; html += '<button class="sel-btn' + (arcflashState.voltage === v ? ' selected' : '') + '" onclick="arcflashState.voltage=' + v + ';renderModule(\'arcflash\')">' + l + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Fejlstroem [kA]', 'Fault Current [kA]') + '</div><div class="select-grid">';
+  [1, 2, 5, 10, 15, 20, 25, 35, 50, 65].forEach(function(ik) { html += '<button class="sel-btn' + (arcflashState.faultCurrent === ik ? ' selected' : '') + '" onclick="arcflashState.faultCurrent=' + ik + ';renderModule(\'arcflash\')">' + ik + ' kA</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Afbrydelsestid [s]', 'Clearing Time [s]') + '</div><div class="select-grid">';
+  [0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.5, 1.0, 2.0].forEach(function(t) { html += '<button class="sel-btn' + (arcflashState.clearingTime === t ? ' selected' : '') + '" onclick="arcflashState.clearingTime=' + t + ';renderModule(\'arcflash\')">' + t + 's</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Arbejdsafstand [mm]', 'Working Distance [mm]') + '</div><div class="select-grid">';
+  [{v:300,l:'300 (LV)'},{v:455,l:'455 (MV)'},{v:610,l:'610 (open)'}].forEach(function(d) { html += '<button class="sel-btn' + (arcflashState.workingDistance === d.v ? ' selected' : '') + '" onclick="arcflashState.workingDistance=' + d.v + ';renderModule(\'arcflash\')">' + d.l + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box" style="border-left:4px solid ' + ppe.color + '"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Incident energi', 'Incident Energy') + '</span><span class="value" style="font-size:1.3em;color:' + ppe.color + '">' + E.toFixed(1) + ' cal/cm\u00B2</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('PPE', 'PPE') + '</span><span class="value" style="color:' + ppe.color + '">' + tx(ppe.da, ppe.en) + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Graense', 'Boundary') + '</span><span class="value">' + boundary + ' mm (' + (boundary/1000).toFixed(2) + ' m)</span></div>';
+  html += '</div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('PPE-skala (cal/cm\u00B2)', 'PPE Scale (cal/cm\u00B2)') + '</div>';
+  html += '<div class="result-row"><span class="label" style="color:#22c55e">0: &lt;1.2</span><span class="value">' + tx('Normal toej', 'Normal clothes') + '</span></div>';
+  html += '<div class="result-row"><span class="label" style="color:#84cc16">1: 1.2-4</span><span class="value">' + tx('Lysbue-skjorte', 'Arc shirt') + '</span></div>';
+  html += '<div class="result-row"><span class="label" style="color:#eab308">2: 4-8</span><span class="value">' + tx('Lysbue-toej+haette', 'Arc clothing+hood') + '</span></div>';
+  html += '<div class="result-row"><span class="label" style="color:#f97316">3: 8-25</span><span class="value">' + tx('Fuld dragt', 'Full suit') + '</span></div>';
+  html += '<div class="result-row"><span class="label" style="color:#ef4444">4: 25-40</span><span class="value">' + tx('Maks PPE', 'Max PPE') + '</span></div>';
+  html += '<div class="result-row"><span class="label" style="color:#000">&gt;40</span><span class="value" style="color:red">' + tx('FORBUDT', 'PROHIBITED') + '</span></div>';
+  html += '</div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Risikoreduktion', 'Risk Reduction') + '</div>';
+  reductions.forEach(function(r) { html += '<div class="result-row"><span class="label">' + tx(r.da, r.en) + '</span><span class="value">' + r.eff + '</span></div>'; });
+  html += '</div>';
+  html += '<div class="result-box" style="border:2px solid ' + ppe.color + ';background:#fff3cd"><div class="result-title">\u26A1 ' + tx('Advarselsskilt', 'Warning Label') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Energi', 'Energy') + '</span><span class="value">' + E.toFixed(1) + ' cal/cm\u00B2</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Graense', 'Boundary') + '</span><span class="value">' + boundary + ' mm</span></div>';
+  html += '<div class="result-row"><span class="label">PPE</span><span class="value">' + (ppe.category >= 0 ? ppe.category : 'PROHIBITED') + '</span></div>';
+  html += '<div class="result-row"><span class="label">V / Ik</span><span class="value">' + arcflashState.voltage + 'V / ' + arcflashState.faultCurrent + ' kA</span></div>';
+  html += '</div>';
+  var safe = ppe.category >= 0 && ppe.category <= 4;
+  html += renderVerdict(safe, safe ? tx('Energi ' + E.toFixed(1) + ' cal/cm2. PPE Kat.' + ppe.category + '. Graense ' + boundary + 'mm. IEC 62271-200.', 'Energy ' + E.toFixed(1) + ' cal/cm2. PPE Cat.' + ppe.category + '. Boundary ' + boundary + 'mm. IEC 62271-200.') : tx('FORBUDT: ' + E.toFixed(1) + ' cal/cm2 > 40. Reducer energi.', 'PROHIBITED: ' + E.toFixed(1) + ' cal/cm2 > 40. Reduce energy.'));
+  html += '</div>';
+  return html;
+}
+// ===== CABLE AGEING & LIFETIME MODULE (IEC 60502 + DS/HD 60364) =====
+
+var CABLE_LIFE_TYPES = {
+  PVC: { maxTemp: 70, designLife: 35, halving: 8, da: 'PVC (70\u00B0C)', en: 'PVC (70\u00B0C max)' },
+  XLPE: { maxTemp: 90, designLife: 35, halving: 10, da: 'XLPE (90\u00B0C)', en: 'XLPE (90\u00B0C max)' },
+  EPR: { maxTemp: 90, designLife: 35, halving: 10, da: 'EPR (90\u00B0C)', en: 'EPR (90\u00B0C max)' },
+  PILC: { maxTemp: 65, designLife: 50, halving: 8, da: 'PILC (papir)', en: 'PILC (Paper, older)' }
+};
+
+var CABLE_LIFE_ENVIRONMENTS = [
+  { k: 'indoor', da: 'Indendoers', en: 'Indoor (controlled)', ambientTemp: 22 },
+  { k: 'outdoor', da: 'Udendoers (DK)', en: 'Outdoor (Denmark)', ambientTemp: 25 },
+  { k: 'underground', da: 'Nedgravet', en: 'Underground (buried)', ambientTemp: 17 },
+  { k: 'hot', da: 'Varmt miljoer', en: 'Hot environment', ambientTemp: 42 }
+];
+
+var CABLE_LIFE_ENV_FACTORS = [
+  { k: 'uv', da: 'UV-eksponering', en: 'UV exposure', reduction: 0.20 },
+  { k: 'chemical', da: 'Kemisk', en: 'Chemical exposure', reduction: 0.30 },
+  { k: 'moisture', da: 'Fugt/vand', en: 'Moisture', reduction: 0.15 },
+  { k: 'vibration', da: 'Vibration', en: 'Vibration', reduction: 0.10 },
+  { k: 'none', da: 'Ingen', en: 'None', reduction: 0.00 }
+];
+
+var cablelifeState = { cableType: 'PVC', environment: 'indoor', operatingTemp: 60, loadFactor: 0.8, envFactor: 'none', cableAge: 10 };
+
+function cablelifeCalcConductorTemp(ambientTemp, loadFactor, ratedTempRise) {
+  return ambientTemp + (loadFactor * loadFactor * ratedTempRise);
+}
+
+function cablelifeCalcThermalLife(cableType, operatingTemp) {
+  var cable = CABLE_LIFE_TYPES[cableType];
+  if (!cable) return { totalYears: 0, clause: 'IEC 60502' };
+  var deltaT = cable.maxTemp - operatingTemp;
+  var life = cable.designLife * Math.pow(2, deltaT / cable.halving);
+  life = Math.floor(life);
+  return { totalYears: Math.max(1, life), ratedTemp: cable.maxTemp, designLife: cable.designLife, halvingInterval: cable.halving, clause: 'IEC 60502 / Arrhenius' };
+}
+
+function cablelifeCalcRemainingLife(totalLifeYears, cableAge, envFactor) {
+  var envReduction = 0;
+  var factor = CABLE_LIFE_ENV_FACTORS.find(function(f) { return f.k === envFactor; });
+  if (factor) envReduction = factor.reduction;
+  var adjustedLife = Math.floor(totalLifeYears * (1 - envReduction));
+  var remaining = Math.max(0, adjustedLife - cableAge);
+  var percentUsed = Math.min(100, Math.ceil((cableAge / Math.max(1, adjustedLife)) * 100));
+  return { adjustedLife: adjustedLife, remaining: remaining, percentUsed: percentUsed, envReduction: envReduction };
+}
+
+function cablelifeGetPriority(percentUsed) {
+  if (percentUsed <= 30) return { priority: 'green', da: 'Groen: Fortsaet overvaagning', en: 'Green: Continue monitoring', color: '#22c55e' };
+  if (percentUsed <= 70) return { priority: 'yellow', da: 'Gul: Planlaeg udskiftning', en: 'Yellow: Plan replacement', color: '#eab308' };
+  if (percentUsed <= 100) return { priority: 'red', da: 'Roed: Udskift snarest', en: 'Red: Schedule replacement', color: '#ef4444' };
+  return { priority: 'black', da: 'Sort: Oejeblikkeligt eftersyn', en: 'Black: Immediate assessment', color: '#000000' };
+}
+
+function cablelifeGetTestFrequency(priority) {
+  if (priority === 'green') return { years: 6, da: 'Hvert 6. aar', en: 'Every 6 years' };
+  if (priority === 'yellow') return { years: 3, da: 'Hvert 3. aar', en: 'Every 3 years' };
+  if (priority === 'red') return { years: 1, da: 'Hvert aar', en: 'Every year' };
+  return { years: 0, da: 'Oejeblikkeligt', en: 'Immediate' };
+}
+
+function cablelifeGetInsulationThresholds() {
+  return { newCable: '> 100 MOhm (1km, 500V DC)', agingThreshold: '< 1 MOhm = replace', clause: 'IEC 60502' };
+}
+
+function renderCableLife() {
+  var cableData = CABLE_LIFE_TYPES[cablelifeState.cableType];
+  var thermalLife = cablelifeCalcThermalLife(cablelifeState.cableType, cablelifeState.operatingTemp);
+  var remaining = cablelifeCalcRemainingLife(thermalLife.totalYears, cablelifeState.cableAge, cablelifeState.envFactor);
+  var priority = cablelifeGetPriority(remaining.percentUsed);
+  var testFreq = cablelifeGetTestFrequency(priority.priority);
+  var insThresh = cablelifeGetInsulationThresholds();
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Kabellevetid (IEC 60502 / DS/HD 60364)', 'Cable Ageing & Lifetime (IEC 60502 / DS/HD 60364)') + '</div>';
+  html += '<div class="info-row">' + tx('Termisk aldring (Arrhenius) og restlevetid', 'Thermal ageing (Arrhenius) and remaining lifetime assessment') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Kabeltype', 'Cable Type') + '</div><div class="select-grid">';
+  Object.keys(CABLE_LIFE_TYPES).forEach(function(k) { html += '<button class="sel-btn' + (cablelifeState.cableType === k ? ' selected' : '') + '" onclick="cablelifeState.cableType=\'' + k + '\';renderModule(\'cablelife\')">' + tx(CABLE_LIFE_TYPES[k].da, CABLE_LIFE_TYPES[k].en) + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Miljoer', 'Environment') + '</div><div class="select-grid">';
+  CABLE_LIFE_ENVIRONMENTS.forEach(function(e) { html += '<button class="sel-btn' + (cablelifeState.environment === e.k ? ' selected' : '') + '" onclick="cablelifeState.environment=\'' + e.k + '\';renderModule(\'cablelife\')">' + tx(e.da, e.en) + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Driftstemperatur [\u00B0C]', 'Operating Temp [\u00B0C]') + '</div><div class="select-grid">';
+  [40, 50, 60, 70, 80, 90].forEach(function(t) { html += '<button class="sel-btn' + (cablelifeState.operatingTemp === t ? ' selected' : '') + '" onclick="cablelifeState.operatingTemp=' + t + ';renderModule(\'cablelife\')">' + t + '\u00B0C</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Belastningsfaktor', 'Load Factor') + '</div><div class="select-grid">';
+  [0.5, 0.6, 0.7, 0.8, 0.9, 1.0].forEach(function(lf) { html += '<button class="sel-btn' + (cablelifeState.loadFactor === lf ? ' selected' : '') + '" onclick="cablelifeState.loadFactor=' + lf + ';renderModule(\'cablelife\')">' + lf + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Miljoefaktor', 'Env. Factor') + '</div><div class="select-grid">';
+  CABLE_LIFE_ENV_FACTORS.forEach(function(f) { html += '<button class="sel-btn' + (cablelifeState.envFactor === f.k ? ' selected' : '') + '" onclick="cablelifeState.envFactor=\'' + f.k + '\';renderModule(\'cablelife\')">' + tx(f.da, f.en) + (f.reduction > 0 ? ' -' + Math.round(f.reduction*100) + '%' : '') + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Alder [aar]', 'Age [years]') + '</div><div class="select-grid">';
+  [0, 5, 10, 15, 20, 25, 30, 35, 40, 50].forEach(function(a) { html += '<button class="sel-btn' + (cablelifeState.cableAge === a ? ' selected' : '') + '" onclick="cablelifeState.cableAge=' + a + ';renderModule(\'cablelife\')">' + a + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Arrhenius-model', 'Arrhenius Model') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Maks temp', 'Rated temp') + '</span><span class="value">' + cableData.maxTemp + '\u00B0C</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Designlevetid', 'Design life') + '</span><span class="value">' + cableData.designLife + ' ' + tx('aar','yr') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Halvering', 'Halving') + '</span><span class="value">\u0394' + cableData.halving + '\u00B0C</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Est. levetid', 'Est. life') + '</span><span class="value" style="font-weight:bold">' + thermalLife.totalYears + ' ' + tx('aar','yr') + '</span></div>';
+  html += '</div>';
+  html += '<div class="result-box" style="border-left:4px solid ' + priority.color + '"><div class="result-title">' + tx('Restlevetid', 'Remaining Life') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Justeret', 'Adjusted') + '</span><span class="value">' + remaining.adjustedLife + ' ' + tx('aar','yr') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Alder', 'Age') + '</span><span class="value">' + cablelifeState.cableAge + ' ' + tx('aar','yr') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Rest', 'Remaining') + '</span><span class="value" style="font-size:1.2em;color:' + priority.color + '">' + remaining.remaining + ' ' + tx('aar','yr') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Brugt', 'Used') + '</span><span class="value">' + remaining.percentUsed + '%</span></div>';
+  html += '<div style="background:#e5e7eb;border-radius:4px;height:12px;margin:8px 0;overflow:hidden"><div style="background:' + priority.color + ';height:100%;width:' + Math.min(100,remaining.percentUsed) + '%"></div></div>';
+  html += '</div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Status', 'Status') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Prioritet', 'Priority') + '</span><span class="value" style="color:' + priority.color + ';font-weight:bold">' + tx(priority.da, priority.en) + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Test', 'Test') + '</span><span class="value">' + tx(testFreq.da, testFreq.en) + '</span></div>';
+  html += '</div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Isolation', 'Insulation') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Nyt', 'New') + '</span><span class="value">' + insThresh.newCable + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Graense', 'Threshold') + '</span><span class="value">' + insThresh.agingThreshold + '</span></div>';
+  html += '<div class="result-row"><span class="label">Ref.</span><span class="value">' + insThresh.clause + '</span></div>';
+  html += '</div>';
+  var safe = remaining.remaining > 0 && remaining.percentUsed < 100;
+  html += renderVerdict(safe, safe ? tx('Rest: ' + remaining.remaining + ' aar (' + remaining.percentUsed + '%). ' + priority.da + '. IEC 60502.', 'Remaining: ' + remaining.remaining + ' yr (' + remaining.percentUsed + '%). ' + priority.en + '. IEC 60502.') : tx('ADVARSEL: Overskrider designlevetid. Oejeblikkeligt eftersyn. IEC 60502.', 'WARNING: Exceeds design life. Immediate assessment. IEC 60502.'));
   html += '</div>';
   return html;
 }

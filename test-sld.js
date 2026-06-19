@@ -5370,6 +5370,503 @@ test('All 5 new render functions return non-empty HTML', function() {
   assert(earthHtml.length > 100, 'renderEarthsys too short');
 });
 
+// =====================================================
+// === SWIMMING POOL & FOUNTAIN MODULE TESTS (12+) ===
+// =====================================================
+console.log('\n--- Swimming Pool & Fountain Module (DS/HD 60364-7-702) ---');
+
+test('Pool: module translations exist for pool', function() {
+  assert(T.da.modules.pool, 'Danish pool missing');
+  assert(T.en.modules.pool, 'English pool missing');
+  assert(T.fa.modules.pool, 'Farsi pool missing');
+});
+
+test('Pool: POOL_ZONES has 3 zones (0,1,2)', function() {
+  assert(POOL_ZONES[0], 'Zone 0 missing');
+  assert(POOL_ZONES[1], 'Zone 1 missing');
+  assert(POOL_ZONES[2], 'Zone 2 missing');
+  assert.strictEqual(POOL_ZONES[0].ip, 'IPX8');
+  assert.strictEqual(POOL_ZONES[0].maxV, 12);
+});
+
+test('Pool: submersible luminaire allowed in Zone 0 (SELV only)', function() {
+  var r = poolCheckEquipment(0, 'submersible_luminaire');
+  assert.strictEqual(r.allowed, true);
+  assert(r.reason.indexOf('SELV') >= 0, 'Must mention SELV');
+  assert(r.clause.indexOf('702') >= 0, 'Must cite cl.702');
+  assert.strictEqual(r.ipRequired, 'IPX8');
+});
+
+test('Pool: circulation pump NOT allowed in Zone 0', function() {
+  var r = poolCheckEquipment(0, 'circulation_pump');
+  assert.strictEqual(r.allowed, false);
+  assert(r.clause.indexOf('702') >= 0);
+});
+
+test('Pool: circulation pump NOT allowed in Zone 1', function() {
+  var r = poolCheckEquipment(1, 'circulation_pump');
+  assert.strictEqual(r.allowed, false);
+});
+
+test('Pool: circulation pump allowed in Zone 2 with bonding', function() {
+  var r = poolCheckEquipment(2, 'circulation_pump');
+  assert.strictEqual(r.allowed, true);
+  assert(r.reason.indexOf('bonding') >= 0 || r.reason.indexOf('Class II') >= 0);
+});
+
+test('Pool: socket outlet NOT allowed in Zone 0 or 1', function() {
+  assert.strictEqual(poolCheckEquipment(0, 'socket_outlet').allowed, false);
+  assert.strictEqual(poolCheckEquipment(1, 'socket_outlet').allowed, false);
+});
+
+test('Pool: socket outlet allowed in Zone 2 with RCD', function() {
+  var r = poolCheckEquipment(2, 'socket_outlet');
+  assert.strictEqual(r.allowed, true);
+  assert(r.reason.indexOf('RCD') >= 0 || r.clause.indexOf('411.3.3') >= 0);
+});
+
+test('Pool: switchgear NOT allowed in Zone 0 or 1', function() {
+  assert.strictEqual(poolCheckEquipment(0, 'switchgear').allowed, false);
+  assert.strictEqual(poolCheckEquipment(1, 'switchgear').allowed, false);
+});
+
+test('Pool: heating cable NOT allowed in Zone 0, allowed in Zone 1 with sheath', function() {
+  assert.strictEqual(poolCheckEquipment(0, 'heating_cable').allowed, false);
+  var r1 = poolCheckEquipment(1, 'heating_cable');
+  assert.strictEqual(r1.allowed, true);
+  assert(r1.reason.indexOf('metallic sheath') >= 0 || r1.clause.indexOf('702.753') >= 0);
+});
+
+test('Pool: protection reqs include RCD 30mA for all zones', function() {
+  var reqs = poolGetProtectionReqs(0, 'indoor');
+  assert(reqs.some(function(r) { return r.req.indexOf('RCD 30mA') >= 0; }), 'RCD 30mA missing');
+  assert(reqs.some(function(r) { return r.req.indexOf('bonding') >= 0; }), 'Bonding missing');
+});
+
+test('Pool: fountain type adds SELV requirement for public access', function() {
+  var reqs = poolGetProtectionReqs(0, 'fountain');
+  assert(reqs.some(function(r) { return r.req.indexOf('fountain') >= 0 || r.req.indexOf('SELV') >= 0; }));
+});
+
+test('Pool: bonding conductor 4mm2 with protection, 6mm2 without', function() {
+  assert.strictEqual(poolGetMinBondingConductor(true), 4);
+  assert.strictEqual(poolGetMinBondingConductor(false), 6);
+});
+
+test('Pool: renderPool returns HTML with no text inputs', function() {
+  var html = renderPool();
+  assert(html.length > 500, 'Pool HTML too short');
+  assert(html.indexOf('sel-btn') > 0, 'Must use sel-btn');
+  assert(html.indexOf('type="text"') < 0, 'No text inputs');
+  assert(html.indexOf("type='text'") < 0, 'No text inputs');
+  assert(html.indexOf('<textarea') < 0, 'No textarea');
+  assert(html.indexOf('702') > 0, 'Must reference 702');
+});
+
+// =====================================================
+// === CONSTRUCTION SITE MODULE TESTS (12+) ===
+// =====================================================
+console.log('\n--- Construction Site Module (DS/HD 60364-7-704) ---');
+
+test('Construction: module translations exist', function() {
+  assert(T.da.modules.construction, 'Danish construction missing');
+  assert(T.en.modules.construction, 'English construction missing');
+  assert(T.fa.modules.construction, 'Farsi construction missing');
+});
+
+test('Construction: calcLoad with empty equipment returns 0', function() {
+  var r = constructionCalcLoad([], 0.5);
+  assert.strictEqual(r.totalKW, 0);
+  assert.strictEqual(r.diversifiedKW, 0);
+  assert.strictEqual(r.current3ph, 0);
+});
+
+test('Construction: calcLoad with crane (75kW) at diversity 0.5', function() {
+  var r = constructionCalcLoad(['crane'], 0.5);
+  assert.strictEqual(r.totalKW, 75);
+  assert.strictEqual(r.diversifiedKW, 37.5);
+  assert(r.current3ph > 0, 'Current must be positive');
+  // 37500 / (400 * 1.732 * 0.85) = ~63.7 -> ceil = 64
+  assert(r.current3ph >= 63, 'Current should be >= 63A');
+});
+
+test('Construction: calcLoad uses ceiling for conservative current', function() {
+  var r = constructionCalcLoad(['power_tools'], 1.0);
+  // 5000 / (400*1.732*0.85) = 8.49 -> ceil = 9
+  assert.strictEqual(r.current3ph, Math.ceil(5000 / (400 * Math.sqrt(3) * 0.85)));
+});
+
+test('Construction: selectCable returns H07RN-F type', function() {
+  var c = constructionSelectCable(50);
+  assert.strictEqual(c.type, 'H07RN-F');
+  assert(c.iz >= 50, 'Iz must be >= current');
+  assert(c.clause.indexOf('704') >= 0);
+});
+
+test('Construction: selectCable for 100A returns at least 25mm2', function() {
+  var c = constructionSelectCable(100);
+  assert(c.mm2 >= 25, 'Must be at least 25mm2 for 100A');
+  assert(c.iz >= 100);
+});
+
+test('Construction: protection reqs include 30mA RCD and 0.2s', function() {
+  var reqs = constructionGetProtectionReqs();
+  assert(reqs.some(function(r) { return r.req.indexOf('30mA RCD') >= 0; }));
+  assert(reqs.some(function(r) { return r.req.indexOf('0.2s') >= 0; }));
+  assert(reqs.some(function(r) { return r.req.indexOf('IP44') >= 0; }));
+  assert(reqs.some(function(r) { return r.req.indexOf('No PVC') >= 0 || r.req.indexOf('H07RN-F') >= 0; }));
+});
+
+test('Construction: cable reqs mention 6m clearance and 0.6m depth', function() {
+  var reqs = constructionGetCableReqs();
+  assert(reqs.some(function(r) { return r.req.indexOf('6m') >= 0; }));
+  assert(reqs.some(function(r) { return r.req.indexOf('0.6m') >= 0; }));
+});
+
+test('Construction: inspection schedule includes before first use and 3 months', function() {
+  var sched = constructionGetInspectionSchedule();
+  assert(sched.length >= 3);
+  assert(sched.some(function(s) { return s.en.indexOf('first use') >= 0; }));
+  assert(sched.some(function(s) { return s.interval.indexOf('3 months') >= 0; }));
+});
+
+test('Construction: multiple equipment load summed correctly', function() {
+  var r = constructionCalcLoad(['crane', 'concrete_pump', 'welding'], 0.7);
+  assert.strictEqual(r.totalKW, 75 + 55 + 40);
+  assert(Math.abs(r.diversifiedKW - 170 * 0.7) < 0.1);
+});
+
+test('Construction: renderConstruction returns valid HTML', function() {
+  var html = renderConstruction();
+  assert(html.length > 500);
+  assert(html.indexOf('sel-btn') > 0);
+  assert(html.indexOf('type="text"') < 0);
+  assert(html.indexOf('704') > 0);
+});
+
+test('Construction: 500mA RCD requirement for >32A sockets', function() {
+  var reqs = constructionGetProtectionReqs();
+  assert(reqs.some(function(r) { return r.req.indexOf('500mA') >= 0 && r.req.indexOf('>') >= 0; }));
+});
+
+// =====================================================
+// === AGRICULTURAL INSTALLATION MODULE TESTS (12+) ===
+// =====================================================
+console.log('\n--- Agricultural Installation Module (DS/HD 60364-7-705) ---');
+
+test('Agri: module translations exist', function() {
+  assert(T.da.modules.agri, 'Danish agri missing');
+  assert(T.en.modules.agri, 'English agri missing');
+  assert(T.fa.modules.agri, 'Farsi agri missing');
+});
+
+test('Agri: cattle house has livestock hazard and corrosive atmosphere', function() {
+  var bt = AGRI_BUILDING_TYPES.find(function(b) { return b.k === 'cattle'; });
+  assert(bt.hazards.indexOf('livestock') >= 0);
+  assert(bt.hazards.indexOf('corrosive') >= 0);
+  assert.strictEqual(bt.ip, 'IP44');
+});
+
+test('Agri: milking parlour requires IP55', function() {
+  assert.strictEqual(agriGetIPRating('milking'), 'IP55');
+});
+
+test('Agri: grain storage requires IP54', function() {
+  assert.strictEqual(agriGetIPRating('grain'), 'IP54');
+});
+
+test('Agri: livestock areas require 25V AC touch voltage', function() {
+  var reqs = agriGetProtectionReqs('cattle', true);
+  assert(reqs.some(function(r) { return r.req.indexOf('25V') >= 0; }));
+  assert(reqs.some(function(r) { return r.clause.indexOf('705.411.1') >= 0; }));
+});
+
+test('Agri: all circuits require 30mA RCD per cl.705.411.3.3', function() {
+  var reqs = agriGetProtectionReqs('workshop', false);
+  assert(reqs.some(function(r) { return r.req.indexOf('30mA RCD') >= 0 && r.clause.indexOf('705.411.3.3') >= 0; }));
+});
+
+test('Agri: disconnection time 0.2s per cl.705.411.3.2', function() {
+  var reqs = agriGetProtectionReqs('cattle', true);
+  assert(reqs.some(function(r) { return r.req.indexOf('0.2s') >= 0; }));
+});
+
+test('Agri: cable reqs include copper only and overhead preferred', function() {
+  var reqs = agriGetCableReqs('cattle');
+  assert(reqs.some(function(r) { return r.req.indexOf('copper') >= 0; }));
+  assert(reqs.some(function(r) { return r.req.indexOf('Overhead') >= 0 || r.req.indexOf('overhead') >= 0; }));
+});
+
+test('Agri: corrosive atmosphere requires no PVC', function() {
+  var reqs = agriGetCableReqs('cattle');
+  assert(reqs.some(function(r) { return r.req.indexOf('PVC') >= 0 && r.req.indexOf('not suitable') >= 0; }));
+});
+
+test('Agri: bonding reqs include 4mm2 Cu and 0.5 Ohm max', function() {
+  var bonding = agriGetBondingReqs('cattle');
+  assert.strictEqual(bonding.minConductor, 4);
+  assert.strictEqual(bonding.maxResistance, 0.5);
+  assert(bonding.items.length >= 5, 'Livestock bonding should have 5+ items');
+});
+
+test('Agri: essential loads require auto-restart', function() {
+  var reqs = agriGetMotorReqs(true);
+  assert(reqs.some(function(r) { return r.en.indexOf('restart') >= 0 || r.en.indexOf('Milking') >= 0; }));
+  assert(reqs.some(function(r) { return r.en.indexOf('Ventilation') >= 0; }));
+});
+
+test('Agri: renderAgri returns valid HTML with no text inputs', function() {
+  var html = renderAgri();
+  assert(html.length > 500);
+  assert(html.indexOf('sel-btn') > 0);
+  assert(html.indexOf('type="text"') < 0);
+  assert(html.indexOf('705') > 0);
+});
+
+test('Agri: fire hazard buildings require fire-resistant cables', function() {
+  var reqs = agriGetProtectionReqs('grain', false);
+  assert(reqs.some(function(r) { return r.req.indexOf('Fire-resistant') >= 0 || r.req.indexOf('fire') >= 0; }));
+});
+
+// =====================================================
+// === ARC FLASH MODULE TESTS (13+) ===
+// =====================================================
+console.log('\n--- Arc Flash Module (IEC 62271-200 / IEEE 1584) ---');
+
+test('ArcFlash: module translations exist', function() {
+  assert(T.da.modules.arcflash, 'Danish arcflash missing');
+  assert(T.en.modules.arcflash, 'English arcflash missing');
+  assert(T.fa.modules.arcflash, 'Farsi arcflash missing');
+});
+
+test('ArcFlash: low energy (400V, 1kA, 0.01s) gives Category 0', function() {
+  var E = arcflashCalcIncidentEnergy(400, 1, 0.01, 455);
+  var ppe = arcflashGetPPECategory(E);
+  assert.strictEqual(ppe.category, 0);
+  assert(E < 1.2, 'Energy should be < 1.2 for Cat 0');
+});
+
+test('ArcFlash: uses ceiling rounding (conservative)', function() {
+  var E = arcflashCalcIncidentEnergy(400, 10, 0.1, 455);
+  // Check it is a multiple of 0.1 (ceiling to 1 decimal)
+  assert.strictEqual(E, Math.ceil(E * 10) / 10);
+});
+
+test('ArcFlash: higher voltage uses Cf=1.5 factor', function() {
+  var E_lv = arcflashCalcIncidentEnergy(400, 10, 0.1, 455);
+  var E_mv = arcflashCalcIncidentEnergy(6000, 10, 0.1, 455);
+  assert(E_mv > E_lv, 'MV should have higher energy than LV');
+  // MV uses Cf=1.5 vs LV Cf=1.0, so ratio ~ 1.5
+  assert(E_mv / E_lv >= 1.4, 'MV/LV ratio should be ~1.5');
+});
+
+test('ArcFlash: energy increases with fault current', function() {
+  var E1 = arcflashCalcIncidentEnergy(400, 5, 0.1, 455);
+  var E2 = arcflashCalcIncidentEnergy(400, 20, 0.1, 455);
+  assert(E2 > E1, 'Higher fault current = more energy');
+});
+
+test('ArcFlash: energy increases with clearing time', function() {
+  var E1 = arcflashCalcIncidentEnergy(400, 10, 0.05, 455);
+  var E2 = arcflashCalcIncidentEnergy(400, 10, 0.5, 455);
+  assert(E2 > E1, 'Longer clearing = more energy');
+});
+
+test('ArcFlash: closer working distance = more energy', function() {
+  var E1 = arcflashCalcIncidentEnergy(400, 10, 0.1, 610);
+  var E2 = arcflashCalcIncidentEnergy(400, 10, 0.1, 300);
+  assert(E2 > E1, 'Closer distance = more energy');
+});
+
+test('ArcFlash: PPE categories correct thresholds', function() {
+  assert.strictEqual(arcflashGetPPECategory(0.5).category, 0);
+  assert.strictEqual(arcflashGetPPECategory(1.2).category, 1);
+  assert.strictEqual(arcflashGetPPECategory(3.9).category, 1);
+  assert.strictEqual(arcflashGetPPECategory(4.0).category, 2);
+  assert.strictEqual(arcflashGetPPECategory(7.9).category, 2);
+  assert.strictEqual(arcflashGetPPECategory(8.0).category, 3);
+  assert.strictEqual(arcflashGetPPECategory(24.9).category, 3);
+  assert.strictEqual(arcflashGetPPECategory(25.0).category, 4);
+  assert.strictEqual(arcflashGetPPECategory(39.9).category, 4);
+  assert.strictEqual(arcflashGetPPECategory(40.0).category, -1);
+});
+
+test('ArcFlash: boundary calculation returns positive mm value', function() {
+  var b = arcflashCalcBoundary(400, 10, 0.1);
+  assert(b > 0, 'Boundary must be positive');
+  assert(b === Math.ceil(b), 'Boundary must use ceiling');
+});
+
+test('ArcFlash: boundary increases with fault current', function() {
+  var b1 = arcflashCalcBoundary(400, 5, 0.1);
+  var b2 = arcflashCalcBoundary(400, 20, 0.1);
+  assert(b2 > b1, 'Higher current = larger boundary');
+});
+
+test('ArcFlash: risk reductions include de-energize and ZSI', function() {
+  var r = arcflashGetRiskReductions();
+  assert(r.length >= 5);
+  assert(r.some(function(x) { return x.en.indexOf('energize') >= 0; }));
+  assert(r.some(function(x) { return x.en.indexOf('ZSI') >= 0 || x.en.indexOf('Zone') >= 0; }));
+});
+
+test('ArcFlash: > 40 cal/cm2 gives WORK PROHIBITED', function() {
+  // 400V, 65kA, 2.0s, 300mm = very high energy
+  var E = arcflashCalcIncidentEnergy(400, 65, 2.0, 300);
+  var ppe = arcflashGetPPECategory(E);
+  assert.strictEqual(ppe.category, -1);
+  assert(ppe.en.indexOf('PROHIBITED') >= 0);
+});
+
+test('ArcFlash: renderArcFlash returns valid HTML', function() {
+  var html = renderArcFlash();
+  assert(html.length > 500);
+  assert(html.indexOf('sel-btn') > 0);
+  assert(html.indexOf('type="text"') < 0);
+  assert(html.indexOf('IEC 62271') > 0 || html.indexOf('IEEE 1584') > 0);
+});
+
+// =====================================================
+// === CABLE LIFETIME MODULE TESTS (13+) ===
+// =====================================================
+console.log('\n--- Cable Lifetime Module (IEC 60502) ---');
+
+test('CableLife: module translations exist', function() {
+  assert(T.da.modules.cablelife, 'Danish cablelife missing');
+  assert(T.en.modules.cablelife, 'English cablelife missing');
+  assert(T.fa.modules.cablelife, 'Farsi cablelife missing');
+});
+
+test('CableLife: PVC at rated temp (70C) gives design life 35 years', function() {
+  var r = cablelifeCalcThermalLife('PVC', 70);
+  assert.strictEqual(r.totalYears, 35);
+});
+
+test('CableLife: PVC at 78C (8C above rated) halves life to ~17 years', function() {
+  var r = cablelifeCalcThermalLife('PVC', 78);
+  // 35 * 2^((70-78)/8) = 35 * 0.5 = 17.5 -> floor = 17
+  assert.strictEqual(r.totalYears, 17);
+});
+
+test('CableLife: PVC at 62C (8C below rated) doubles life to 70 years', function() {
+  var r = cablelifeCalcThermalLife('PVC', 62);
+  // 35 * 2^((70-62)/8) = 35 * 2 = 70
+  assert.strictEqual(r.totalYears, 70);
+});
+
+test('CableLife: XLPE at rated temp (90C) gives 35 years', function() {
+  var r = cablelifeCalcThermalLife('XLPE', 90);
+  assert.strictEqual(r.totalYears, 35);
+});
+
+test('CableLife: XLPE at 80C gives longer life (10C below rated)', function() {
+  var r = cablelifeCalcThermalLife('XLPE', 80);
+  // 35 * 2^((90-80)/10) = 35 * 2 = 70
+  assert.strictEqual(r.totalYears, 70);
+});
+
+test('CableLife: uses floor rounding for conservative life estimate', function() {
+  var r = cablelifeCalcThermalLife('PVC', 65);
+  // 35 * 2^((70-65)/8) = 35 * 2^0.625 = 35 * 1.5422 = 53.98 -> floor = 53
+  assert.strictEqual(r.totalYears, Math.floor(35 * Math.pow(2, 5/8)));
+});
+
+test('CableLife: remaining life with no env factor', function() {
+  var r = cablelifeCalcRemainingLife(35, 10, 'none');
+  assert.strictEqual(r.adjustedLife, 35);
+  assert.strictEqual(r.remaining, 25);
+  assert.strictEqual(r.envReduction, 0);
+});
+
+test('CableLife: UV factor reduces life by 20%', function() {
+  var r = cablelifeCalcRemainingLife(35, 0, 'uv');
+  assert.strictEqual(r.adjustedLife, Math.floor(35 * 0.8));
+  assert.strictEqual(r.envReduction, 0.20);
+});
+
+test('CableLife: chemical factor reduces life by 30%', function() {
+  var r = cablelifeCalcRemainingLife(100, 0, 'chemical');
+  assert.strictEqual(r.adjustedLife, Math.floor(100 * 0.7));
+});
+
+test('CableLife: priority green for < 30% used', function() {
+  var p = cablelifeGetPriority(20);
+  assert.strictEqual(p.priority, 'green');
+});
+
+test('CableLife: priority yellow for 30-70% used', function() {
+  var p = cablelifeGetPriority(50);
+  assert.strictEqual(p.priority, 'yellow');
+});
+
+test('CableLife: priority red for 70-100% used', function() {
+  var p = cablelifeGetPriority(85);
+  assert.strictEqual(p.priority, 'red');
+});
+
+test('CableLife: priority black for > 100% used', function() {
+  var p = cablelifeGetPriority(110);
+  assert.strictEqual(p.priority, 'black');
+});
+
+test('CableLife: test frequency 6 years for green, 3 for yellow, 1 for red', function() {
+  assert.strictEqual(cablelifeGetTestFrequency('green').years, 6);
+  assert.strictEqual(cablelifeGetTestFrequency('yellow').years, 3);
+  assert.strictEqual(cablelifeGetTestFrequency('red').years, 1);
+  assert.strictEqual(cablelifeGetTestFrequency('black').years, 0);
+});
+
+test('CableLife: conductor temp calculation', function() {
+  // ambient=25, loadFactor=1.0, ratedRise=40 -> 25 + 1*1*40 = 65
+  var temp = cablelifeCalcConductorTemp(25, 1.0, 40);
+  assert.strictEqual(temp, 65);
+  // ambient=25, loadFactor=0.5, ratedRise=40 -> 25 + 0.25*40 = 35
+  var temp2 = cablelifeCalcConductorTemp(25, 0.5, 40);
+  assert.strictEqual(temp2, 35);
+});
+
+test('CableLife: renderCableLife returns valid HTML', function() {
+  var html = renderCableLife();
+  assert(html.length > 500);
+  assert(html.indexOf('sel-btn') > 0);
+  assert(html.indexOf('type="text"') < 0);
+  assert(html.indexOf('IEC 60502') > 0 || html.indexOf('Arrhenius') > 0);
+});
+
+// =====================================================
+// === CROSS-MODULE INTEGRATION TESTS ===
+// =====================================================
+console.log('\n--- Cross-module Integration Tests ---');
+
+test('All 5 new modules render non-empty HTML', function() {
+  var p = renderPool();
+  var c = renderConstruction();
+  var a = renderAgri();
+  var af = renderArcFlash();
+  var cl = renderCableLife();
+  assert(p.length > 200, 'Pool HTML too short');
+  assert(c.length > 200, 'Construction HTML too short');
+  assert(a.length > 200, 'Agri HTML too short');
+  assert(af.length > 200, 'ArcFlash HTML too short');
+  assert(cl.length > 200, 'CableLife HTML too short');
+});
+
+test('No text input fields in any new module render', function() {
+  var all = renderPool() + renderConstruction() + renderAgri() + renderArcFlash() + renderCableLife();
+  assert(all.indexOf('type="text"') < 0, 'Found type="text"');
+  assert(all.indexOf("type='text'") < 0, "Found type='text'");
+  assert(all.indexOf('<textarea') < 0, 'Found textarea');
+  assert(all.indexOf('<input') < 0 || all.indexOf('type="range"') >= 0 || all.indexOf('type="hidden"') >= 0, 'Only range/hidden inputs allowed');
+});
+
+test('All new modules cite relevant standards', function() {
+  assert(renderPool().indexOf('60364-7-702') > 0, 'Pool must cite 60364-7-702');
+  assert(renderConstruction().indexOf('60364-7-704') > 0, 'Construction must cite 60364-7-704');
+  assert(renderAgri().indexOf('60364-7-705') > 0, 'Agri must cite 60364-7-705');
+  assert(renderArcFlash().indexOf('62271') > 0 || renderArcFlash().indexOf('1584') > 0, 'Arc must cite IEC 62271 or IEEE 1584');
+  assert(renderCableLife().indexOf('60502') > 0 || renderCableLife().indexOf('Arrhenius') > 0, 'CableLife must cite IEC 60502');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
