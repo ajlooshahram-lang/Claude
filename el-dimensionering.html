@@ -676,7 +676,12 @@ const T = {
       construction: 'Byggeplads',
       agri: 'Landbrug',
       arcflash: 'Lysbue-risiko',
-      cablelife: 'Kabellevetid'
+      cablelife: 'Kabellevetid',
+      bess: 'Batterilager',
+      emc: 'EMC',
+      metering: 'Energim\u00e5ling',
+      atex: 'ATEX / Ex',
+      smartgrid: 'Smart Grid'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -811,7 +816,12 @@ const T = {
       construction: 'Construction Site',
       agri: 'Agricultural',
       arcflash: 'Arc Flash Risk',
-      cablelife: 'Cable Lifetime'
+      cablelife: 'Cable Lifetime',
+      bess: 'Battery Storage',
+      emc: 'EMC Design',
+      metering: 'Metering',
+      atex: 'ATEX / Explosive',
+      smartgrid: 'Smart Grid'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -938,7 +948,12 @@ const T = {
       construction: 'کارگاه ساختمانی',
       agri: 'تاسیسات کشاورزی',
       arcflash: 'خطر قوس الکتریکی',
-      cablelife: 'عمر کابل'
+      cablelife: 'عمر کابل',
+      bess: 'ذخیره‌سازی باتری',
+      emc: 'سازگاری الکترومغناطیسی',
+      metering: 'اندازه‌گیری انرژی',
+      atex: 'محیط انفجاری',
+      smartgrid: 'شبکه هوشمند'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -1707,7 +1722,86 @@ const _FA = {
   'Remaining Life': 'عمر باقیمانده',
   'Replacement Priority': 'اولویت تعویض',
   'Next Test Date': 'تاریخ آزمون بعدی',
-  'Insulation Resistance': 'مقاومت عایقی'
+  'Insulation Resistance': 'مقاومت عایقی',
+  // BESS - Battery Storage translations
+  'Battery Storage': 'ذخیره‌سازی باتری',
+  'System Type': 'نوع سیستم',
+  'Chemistry': 'شیمی باتری',
+  'Capacity': 'ظرفیت',
+  'System Voltage': 'ولتاژ سیستم',
+  'Inverter Size': 'اندازه اینورتر',
+  'DC Cable': 'کابل DC',
+  'AC Cable': 'کابل AC',
+  'DC Disconnect': 'قطع‌کننده DC',
+  'BMS': 'سیستم مدیریت باتری',
+  'Ventilation': 'تهویه',
+  'Fire Suppression': 'اطفای حریق',
+  'Room Requirements': 'الزامات اتاق',
+  'Discharge Hours': 'ساعات تخلیه',
+  'Battery Current DC': 'جریان DC باتری',
+  'Inverter Rating': 'توان اینورتر',
+  'Protection Devices': 'تجهیزات حفاظتی',
+  'Safety Systems': 'سیستم‌های ایمنی',
+  'Thermal Runaway': 'فرار حرارتی',
+  'Gas Detection': 'تشخیص گاز',
+  // EMC translations
+  'EMC Design': 'طراحی EMC',
+  'EMC Zone': 'منطقه EMC',
+  'Interference Sources': 'منابع تداخل',
+  'Mitigation Measures': 'اقدامات کاهشی',
+  'Cable Separation': 'جداسازی کابل',
+  'Shielded Cable': 'کابل شیلددار',
+  'EMC Filter': 'فیلتر EMC',
+  'Ferrite Core': 'هسته فریت',
+  'Cable Segregation': 'طبقه‌بندی کابل',
+  'Minimum Separation': 'حداقل فاصله',
+  'Compliance': 'انطباق',
+  'Emission Level': 'سطح انتشار',
+  'Sensitive': 'حساس',
+  'Heavy Industrial': 'صنعتی سنگین',
+  // Metering translations
+  'Metering': 'اندازه‌گیری',
+  'Meter Type': 'نوع کنتور',
+  'CT Ratio': 'نسبت CT',
+  'Accuracy Class': 'کلاس دقت',
+  'Communication': 'ارتباطات',
+  'Number of Meters': 'تعداد کنتور',
+  'Billing': 'صورتحساب',
+  'Sub-metering': 'زیرسنجش',
+  'Energy Monitoring': 'پایش انرژی',
+  'Direct Connected': 'اتصال مستقیم',
+  'CT Connected': 'اتصال با CT',
+  'Installation Requirements': 'الزامات نصب',
+  'Cost Estimate': 'تخمین هزینه',
+  // ATEX translations
+  'ATEX / Explosive': 'محیط انفجاری',
+  'Zone Classification': 'طبقه‌بندی مناطق',
+  'Substance Type': 'نوع ماده',
+  'Temperature Class': 'کلاس دمایی',
+  'Equipment Protection': 'حفاظت تجهیزات',
+  'Protection Type': 'نوع حفاظت',
+  'IP Rating': 'درجه IP',
+  'Inspection Schedule': 'برنامه بازرسی',
+  'Flameproof': 'ضد انفجار',
+  'Intrinsic Safety': 'ایمنی ذاتی',
+  'Increased Safety': 'ایمنی افزایش‌یافته',
+  'Armoured Cable': 'کابل زره‌دار',
+  'Cable Gland': 'گلند کابل',
+  // Smart Grid translations
+  'Smart Grid': 'شبکه هوشمند',
+  'Flex Assets': 'دارایی‌های انعطاف‌پذیر',
+  'Flex Capacity': 'ظرفیت انعطاف',
+  'Tariff Structure': 'ساختار تعرفه',
+  'Grid Connection': 'اتصال شبکه',
+  'Annual Savings': 'صرفه‌جویی سالانه',
+  'Peak': 'اوج',
+  'Off-peak': 'کم‌بار',
+  'Shiftable Load': 'بار قابل جابجایی',
+  'Price Spread': 'اختلاف قیمت',
+  'Frequency Response': 'پاسخ فرکانسی',
+  'Anti-islanding': 'ضد جزیره‌ای',
+  'Aggregator': 'تجمیع‌کننده',
+  'Prosumer': 'تولیدکننده-مصرف‌کننده'
 };
 function tx(da, en) { if(lang === 'da') return da; if(lang === 'fa') return _FA[en] || en; return en; }
 function tl(obj, prefix) { return obj[prefix + '_' + lang] || obj[prefix + '_en'] || ''; }
@@ -4700,6 +4794,11 @@ function renderModule(mod) {
     case 'agri': content = renderAgri(); break;
     case 'arcflash': content = renderArcFlash(); break;
     case 'cablelife': content = renderCableLife(); break;
+    case 'bess': content = renderBESS(); break;
+    case 'emc': content = renderEMC(); break;
+    case 'metering': content = renderMetering(); break;
+    case 'atex': content = renderATEX(); break;
+    case 'smartgrid': content = renderSmartGrid(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -15181,6 +15280,702 @@ function renderCableLife() {
   html += '</div>';
   var safe = remaining.remaining > 0 && remaining.percentUsed < 100;
   html += renderVerdict(safe, safe ? tx('Rest: ' + remaining.remaining + ' aar (' + remaining.percentUsed + '%). ' + priority.da + '. IEC 60502.', 'Remaining: ' + remaining.remaining + ' yr (' + remaining.percentUsed + '%). ' + priority.en + '. IEC 60502.') : tx('ADVARSEL: Overskrider designlevetid. Oejeblikkeligt eftersyn. IEC 60502.', 'WARNING: Exceeds design life. Immediate assessment. IEC 60502.'));
+  html += '</div>';
+  return html;
+}
+
+
+// ===== BESS - BATTERY ENERGY STORAGE SYSTEM (DS/EN 62619 + DS/HD 60364-5-56) =====
+
+var bessState = {
+  systemType: 'residential',
+  chemistry: 'LFP',
+  capacityKWh: 13.5,
+  voltDC: 400,
+  dischargeHours: 4
+};
+
+var BESS_SYSTEMS = {
+  residential: {da:'Bolig (5-20 kWh)', en:'Residential (5-20 kWh)', minKWh:5, maxKWh:20},
+  commercial: {da:'Erhverv (50-500 kWh)', en:'Commercial (50-500 kWh)', minKWh:50, maxKWh:500},
+  industrial: {da:'Industri (500-5000 kWh)', en:'Industrial (500-5000 kWh)', minKWh:500, maxKWh:5000},
+  container: {da:'Container (1-10 MWh)', en:'Container (1-10 MWh)', minKWh:1000, maxKWh:10000}
+};
+
+var BESS_CHEMISTRY = {
+  LFP: {da:'LFP (LiFePO4)', en:'LFP (LiFePO4, safest)', fire:'water_mist', ventACH:5, maxTemp:60, thermalRisk:'low'},
+  NMC: {da:'NMC (Li-NiMnCo)', en:'NMC (Li-NiMnCo, high density)', fire:'inert_gas', ventACH:8, maxTemp:55, thermalRisk:'high'},
+  VRLA: {da:'Bly-syre (VRLA)', en:'Lead-acid (VRLA)', fire:'water', ventACH:10, maxTemp:45, thermalRisk:'medium'},
+  Flow: {da:'Flow (Vanadium)', en:'Flow (Vanadium, long-duration)', fire:'water', ventACH:5, maxTemp:40, thermalRisk:'low'}
+};
+
+var BESS_CAPACITIES = [5, 10, 13.5, 15, 20, 30, 50, 100, 200, 500, 1000, 2000, 5000];
+var BESS_VOLTAGES = [48, 96, 192, 400, 800];
+
+function bessCalcInverterSize(capacityKWh, dischargeHours) {
+  var kW = Math.ceil(capacityKWh / dischargeHours);
+  var standardSizes = [3, 5, 8, 10, 15, 20, 25, 30, 50, 75, 100, 125, 150, 200, 250, 300, 400, 500];
+  for (var i = 0; i < standardSizes.length; i++) {
+    if (standardSizes[i] >= kW) return {kW: standardSizes[i], clause: 'DS/EN 62619 cl.6.2'};
+  }
+  return {kW: standardSizes[standardSizes.length - 1], clause: 'DS/EN 62619 cl.6.2'};
+}
+
+function bessCalcDCCurrent(powerKW, voltDC) {
+  var idc = Math.ceil((powerKW * 1000) / voltDC * 1.25);
+  return {current: idc, clause: 'DS/HD 60364-5-56 cl.551.4'};
+}
+
+function bessCalcDCCable(currentA) {
+  var sizes = [{mm2:2.5, iz:21},{mm2:4, iz:28},{mm2:6, iz:36},{mm2:10, iz:50},{mm2:16, iz:68},{mm2:25, iz:89},{mm2:35, iz:111},{mm2:50, iz:133},{mm2:70, iz:171},{mm2:95, iz:207},{mm2:120, iz:239},{mm2:150, iz:272},{mm2:185, iz:310},{mm2:240, iz:364}];
+  for (var i = 0; i < sizes.length; i++) {
+    if (sizes[i].iz >= currentA) return {mm2: sizes[i].mm2, iz: sizes[i].iz, clause: 'DS/HD 60364-5-52 Table B.52.4'};
+  }
+  return {mm2: 240, iz: 364, clause: 'DS/HD 60364-5-52 Table B.52.4'};
+}
+
+function bessCalcACCable(inverterKW) {
+  var iac = Math.ceil(inverterKW * 1000 / (400 * Math.sqrt(3) * 0.95));
+  return bessCalcDCCable(iac);
+}
+
+function bessGetProtection(voltDC, dcCurrent, inverterKW) {
+  var dcDisconnect = {required: true, rating: Math.ceil(dcCurrent * 1.25), clause: 'DS/HD 60364-5-56 cl.551.4'};
+  var dcFuse = {required: true, rating: Math.ceil(dcCurrent * 1.1), voltRating: voltDC, clause: 'DS/HD 60364-5-56 cl.551.7'};
+  var acMCB = {rating: Math.ceil(inverterKW * 1000 / (400 * Math.sqrt(3) * 0.95) * 1.1), curve: 'C', clause: 'DS/HD 60364-4-43'};
+  var rcd = {type: 'B', rating: 30, clause: 'DS/HD 60364-5-56 cl.551.7 (DC component)'};
+  return {dcDisconnect: dcDisconnect, dcFuse: dcFuse, acMCB: acMCB, rcd: rcd};
+}
+
+function bessGetSafety(chemistry) {
+  var chem = BESS_CHEMISTRY[chemistry];
+  var bms = {required: true, clause: 'DS/EN 62619 cl.6.3'};
+  var thermalProtection = {gasDetection: true, ventilation: true, clause: 'DS/EN 62619 cl.6.4'};
+  var fireSuppression = chem.fire === 'water_mist' ? 'Water mist (LFP)' : chem.fire === 'inert_gas' ? 'Inert gas (NMC - no water)' : 'Water/foam';
+  var ventilation = {minACH: chem.ventACH, explosiveGas: chemistry === 'VRLA', clause: 'DS/EN 62619 cl.6.5'};
+  var room = {fireRating: 'EI60', tempRange: '15-25 C', noIgnition: true, clause: 'DS/HD 60364-5-56 cl.551.8'};
+  return {bms: bms, thermalProtection: thermalProtection, fireSuppression: fireSuppression, ventilation: ventilation, room: room};
+}
+
+function renderBESS() {
+  var inv = bessCalcInverterSize(bessState.capacityKWh, bessState.dischargeHours);
+  var dcI = bessCalcDCCurrent(inv.kW, bessState.voltDC);
+  var dcCable = bessCalcDCCable(dcI.current);
+  var acCable = bessCalcACCable(inv.kW);
+  var prot = bessGetProtection(bessState.voltDC, dcI.current, inv.kW);
+  var safety = bessGetSafety(bessState.chemistry);
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Batterilager (DS/EN 62619 + DS/HD 60364-5-56)', 'Battery Storage (DS/EN 62619 + DS/HD 60364-5-56)') + '</div>';
+  html += '<div class="info-row">' + tx('Dimensionering af energilagersystem iht. DS/EN 62619', 'Battery energy storage system sizing per DS/EN 62619') + '</div>';
+  // System Type
+  html += '<div class="select-group"><div class="select-label">' + tx('Systemtype', 'System Type') + '</div><div class="select-grid">';
+  Object.keys(BESS_SYSTEMS).forEach(function(k) { html += '<button class="sel-btn' + (bessState.systemType === k ? ' selected' : '') + '" onclick="bessState.systemType=\'' + k + '\';renderModule(\'bess\')">' + tx(BESS_SYSTEMS[k].da, BESS_SYSTEMS[k].en) + '</button>'; });
+  html += '</div></div>';
+  // Chemistry
+  html += '<div class="select-group"><div class="select-label">' + tx('Kemi', 'Chemistry') + '</div><div class="select-grid">';
+  Object.keys(BESS_CHEMISTRY).forEach(function(k) { html += '<button class="sel-btn' + (bessState.chemistry === k ? ' selected' : '') + '" onclick="bessState.chemistry=\'' + k + '\';renderModule(\'bess\')">' + tx(BESS_CHEMISTRY[k].da, BESS_CHEMISTRY[k].en) + '</button>'; });
+  html += '</div></div>';
+  // Capacity
+  html += '<div class="select-group"><div class="select-label">' + tx('Kapacitet [kWh]', 'Capacity [kWh]') + '</div><div class="select-grid">';
+  BESS_CAPACITIES.forEach(function(c) { html += '<button class="sel-btn' + (bessState.capacityKWh === c ? ' selected' : '') + '" onclick="bessState.capacityKWh=' + c + ';renderModule(\'bess\')">' + c + '</button>'; });
+  html += '</div></div>';
+  // Voltage
+  html += '<div class="select-group"><div class="select-label">' + tx('Systemspaending [V DC]', 'System Voltage [V DC]') + '</div><div class="select-grid">';
+  BESS_VOLTAGES.forEach(function(v) { html += '<button class="sel-btn' + (bessState.voltDC === v ? ' selected' : '') + '" onclick="bessState.voltDC=' + v + ';renderModule(\'bess\')">' + v + 'V</button>'; });
+  html += '</div></div>';
+  // Discharge hours
+  html += '<div class="select-group"><div class="select-label">' + tx('Afladningstid [timer]', 'Discharge Hours') + '</div><div class="select-grid">';
+  [1, 2, 3, 4, 5, 6, 8, 10].forEach(function(h) { html += '<button class="sel-btn' + (bessState.dischargeHours === h ? ' selected' : '') + '" onclick="bessState.dischargeHours=' + h + ';renderModule(\'bess\')">' + h + 'h</button>'; });
+  html += '</div></div>';
+  // Results - Inverter
+  html += '<div class="result-box"><div class="result-title">' + tx('Inverter', 'Inverter') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Inverter stoerrelse', 'Inverter Size') + '</span><span class="value">' + inv.kW + ' kW</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('DC stroem', 'DC Current') + '</span><span class="value">' + dcI.current + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">Ref.</span><span class="value">' + inv.clause + '</span></div>';
+  html += '</div>';
+  // Results - Cables
+  html += '<div class="result-box"><div class="result-title">' + tx('Kabler', 'Cables') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('DC kabel', 'DC Cable') + '</span><span class="value">' + dcCable.mm2 + ' mm\u00B2 (Iz=' + dcCable.iz + 'A)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('AC kabel', 'AC Cable') + '</span><span class="value">' + acCable.mm2 + ' mm\u00B2 (Iz=' + acCable.iz + 'A)</span></div>';
+  html += '<div class="result-row"><span class="label">Ref.</span><span class="value">' + dcCable.clause + '</span></div>';
+  html += '</div>';
+  // Results - Protection
+  html += '<div class="result-box"><div class="result-title">' + tx('Beskyttelse', 'Protection') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('DC afbryder', 'DC Disconnect') + '</span><span class="value">' + prot.dcDisconnect.rating + 'A (' + prot.dcDisconnect.clause + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('DC sikring', 'DC Fuse') + '</span><span class="value">' + prot.dcFuse.rating + 'A / ' + prot.dcFuse.voltRating + 'V DC</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('AC MCB', 'AC MCB') + '</span><span class="value">' + prot.acMCB.rating + 'A kurve ' + prot.acMCB.curve + '</span></div>';
+  html += '<div class="result-row"><span class="label">RCD</span><span class="value">' + tx('Type B', 'Type B') + ' ' + prot.rcd.rating + 'mA (' + prot.rcd.clause + ')</span></div>';
+  html += '</div>';
+  // Results - Safety
+  html += '<div class="result-box"><div class="result-title">' + tx('Sikkerhed', 'Safety') + '</div>';
+  html += '<div class="result-row"><span class="label">BMS</span><span class="value">' + tx('Obligatorisk', 'Mandatory') + ' (' + safety.bms.clause + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Brandsluk.', 'Fire Suppr.') + '</span><span class="value">' + safety.fireSuppression + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Ventilation', 'Ventilation') + '</span><span class="value">' + safety.ventilation.minACH + ' ACH min' + (safety.ventilation.explosiveGas ? ' + H\u2082 detektion' : '') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Rum', 'Room') + '</span><span class="value">' + safety.room.fireRating + ', ' + safety.room.tempRange + '</span></div>';
+  html += '<div class="result-row"><span class="label">Ref.</span><span class="value">' + safety.room.clause + '</span></div>';
+  html += '</div>';
+  var safe = bessState.voltDC <= 800 && dcI.current <= dcCable.iz;
+  html += renderVerdict(safe, safe ? tx('Systemet er korrekt dimensioneret iht. DS/EN 62619 + DS/HD 60364-5-56', 'System correctly sized per DS/EN 62619 + DS/HD 60364-5-56') : tx('ADVARSEL: Kabelkapacitet overskredet. DS/HD 60364-5-56.', 'WARNING: Cable capacity exceeded. DS/HD 60364-5-56.'));
+  html += '</div>';
+  return html;
+}
+
+// ===== EMC - ELECTROMAGNETIC COMPATIBILITY (IEC 61000 + DS/EN 50174) =====
+
+var emcState = {
+  zone: 1,
+  sources: ['vfd'],
+  cableCatA: 'A',
+  cableCatB: 'D'
+};
+
+var EMC_ZONES = [
+  {id:1, da:'Zone 1: Foelsom (IT, hospital, lab)', en:'Zone 1: Sensitive (IT, hospital, lab)', maxVm:1},
+  {id:2, da:'Zone 2: Kontor/erhverv', en:'Zone 2: Office/commercial', maxVm:3},
+  {id:3, da:'Zone 3: Industri', en:'Zone 3: Industrial', maxVm:10},
+  {id:4, da:'Zone 4: Tung industri (VFD, svejser)', en:'Zone 4: Heavy industrial (VFD, welder)', maxVm:30}
+];
+
+var EMC_SOURCES = [
+  {id:'vfd', da:'Frekvensomformer (VFD)', en:'VFD / Frequency converter', emission:25, freqRange:'150kHz-30MHz'},
+  {id:'welder', da:'Svejsemaskine', en:'Welding machine', emission:20, freqRange:'9kHz-150kHz'},
+  {id:'smps', da:'Switch-mode PSU', en:'Switched-mode PSU', emission:8, freqRange:'150kHz-30MHz'},
+  {id:'led', da:'LED-driver', en:'LED driver', emission:6, freqRange:'150kHz-5MHz'},
+  {id:'motor_brushed', da:'Motor (boerste)', en:'Electric motor (brushed)', emission:15, freqRange:'150kHz-30MHz'},
+  {id:'ups', da:'UPS', en:'UPS', emission:12, freqRange:'150kHz-30MHz'},
+  {id:'fluorescent', da:'Lysstofrør forkobling', en:'Fluorescent ballast', emission:5, freqRange:'9kHz-30MHz'},
+  {id:'ev_charger', da:'Elbil-lader', en:'EV charger', emission:18, freqRange:'150kHz-30MHz'}
+];
+
+var EMC_CABLE_CATEGORIES = [
+  {id:'A', da:'Kat. A: Uskærmet telekom', en:'Cat. A: Unscreened telecom'},
+  {id:'B', da:'Kat. B: Skærmet telekom', en:'Cat. B: Screened telecom'},
+  {id:'C', da:'Kat. C: Net <20A', en:'Cat. C: Mains power <20A'},
+  {id:'D', da:'Kat. D: Net >20A, lyn, gen.', en:'Cat. D: Mains >20A, lightning, gen'},
+  {id:'E', da:'Kat. E: Motor, VFD udgang', en:'Cat. E: Motor, VFD output'}
+];
+
+var EMC_SEPARATION = {
+  'A-C': 100, 'A-D': 200, 'A-E': 300,
+  'B-C': 50, 'B-D': 100, 'B-E': 200,
+  'C-D': 50, 'C-E': 100,
+  'D-E': 50,
+  'A-B': 0, 'C-C': 0, 'D-D': 0, 'E-E': 0
+};
+
+function emcGetSeparation(catA, catB) {
+  var key1 = catA + '-' + catB;
+  var key2 = catB + '-' + catA;
+  var dist = EMC_SEPARATION[key1] !== undefined ? EMC_SEPARATION[key1] : (EMC_SEPARATION[key2] !== undefined ? EMC_SEPARATION[key2] : 0);
+  return {distance_mm: dist, clause: 'DS/EN 50174-2 Table 1'};
+}
+
+function emcGetMitigations(zoneId, sources) {
+  var zone = EMC_ZONES.find(function(z){return z.id === zoneId;});
+  var maxEmission = 0;
+  sources.forEach(function(sId) {
+    var src = EMC_SOURCES.find(function(s){return s.id === sId;});
+    if (src) maxEmission = Math.max(maxEmission, src.emission);
+  });
+  var mitigations = [];
+  if (maxEmission > zone.maxVm) {
+    mitigations.push({measure: 'Cable separation', required: true, clause: 'DS/EN 50174-2'});
+    if (maxEmission > zone.maxVm * 3) {
+      mitigations.push({measure: 'Shielded cables', required: true, clause: 'IEC 61000-5-2'});
+      mitigations.push({measure: 'EMC filters on VFD', required: true, clause: 'IEC 61000-6-2'});
+    }
+    if (maxEmission > zone.maxVm * 5) {
+      mitigations.push({measure: 'Ferrite cores', required: true, clause: 'IEC 61000-4-6'});
+      mitigations.push({measure: 'Shielded enclosure', required: true, clause: 'IEC 61000-5-7'});
+    }
+    mitigations.push({measure: '360 deg cable termination', required: true, clause: 'IEC 61000-5-2 cl.7'});
+    mitigations.push({measure: 'Cross cables at 90 deg', required: true, clause: 'DS/EN 50174-2 cl.6'});
+  }
+  if (mitigations.length === 0) mitigations.push({measure: 'No special measures needed', required: false, clause: 'IEC 61000-6-2'});
+  return {mitigations: mitigations, maxEmission: maxEmission, zoneLimit: zone.maxVm, exceeded: maxEmission > zone.maxVm};
+}
+
+function emcGetCompliance(zoneId) {
+  var tests = [];
+  tests.push({test: 'EN 55011/55032 (emissions)', required: true});
+  tests.push({test: 'EN 61000-4-2 (ESD immunity)', required: true});
+  tests.push({test: 'EN 61000-4-3 (radiated immunity)', required: zoneId <= 2});
+  tests.push({test: 'EN 61000-4-4 (EFT/burst)', required: true});
+  tests.push({test: 'EN 61000-4-5 (surge)', required: true});
+  tests.push({test: 'EN 61000-4-6 (conducted immunity)', required: zoneId <= 3});
+  return {tests: tests, clause: 'IEC 61000 series'};
+}
+
+function renderEMC() {
+  var mit = emcGetMitigations(emcState.zone, emcState.sources);
+  var sep = emcGetSeparation(emcState.cableCatA, emcState.cableCatB);
+  var comp = emcGetCompliance(emcState.zone);
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('EMC-design (IEC 61000 + DS/EN 50174)', 'EMC Design (IEC 61000 + DS/EN 50174)') + '</div>';
+  html += '<div class="info-row">' + tx('Elektromagnetisk kompatibilitet og kabeladskillelse', 'Electromagnetic compatibility and cable segregation design') + '</div>';
+  // Zone selection
+  html += '<div class="select-group"><div class="select-label">' + tx('EMC-zone', 'EMC Zone') + '</div><div class="select-grid">';
+  EMC_ZONES.forEach(function(z) { html += '<button class="sel-btn' + (emcState.zone === z.id ? ' selected' : '') + '" onclick="emcState.zone=' + z.id + ';renderModule(\'emc\')">' + tx(z.da, z.en) + '</button>'; });
+  html += '</div></div>';
+  // Sources
+  html += '<div class="select-group"><div class="select-label">' + tx('Interferenskilder (klik for tilfoej/fjern)', 'Interference Sources (click to add/remove)') + '</div><div class="select-grid">';
+  EMC_SOURCES.forEach(function(s) {
+    var active = emcState.sources.indexOf(s.id) >= 0;
+    html += '<button class="sel-btn' + (active ? ' selected' : '') + '" onclick="var i=emcState.sources.indexOf(\'' + s.id + '\');if(i>=0)emcState.sources.splice(i,1);else emcState.sources.push(\'' + s.id + '\');renderModule(\'emc\')">' + tx(s.da, s.en) + '</button>';
+  });
+  html += '</div></div>';
+  // Cable categories
+  html += '<div class="select-group"><div class="select-label">' + tx('Kabel A kategori', 'Cable A Category') + '</div><div class="select-grid">';
+  EMC_CABLE_CATEGORIES.forEach(function(c) { html += '<button class="sel-btn' + (emcState.cableCatA === c.id ? ' selected' : '') + '" onclick="emcState.cableCatA=\'' + c.id + '\';renderModule(\'emc\')">' + tx(c.da, c.en) + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Kabel B kategori', 'Cable B Category') + '</div><div class="select-grid">';
+  EMC_CABLE_CATEGORIES.forEach(function(c) { html += '<button class="sel-btn' + (emcState.cableCatB === c.id ? ' selected' : '') + '" onclick="emcState.cableCatB=\'' + c.id + '\';renderModule(\'emc\')">' + tx(c.da, c.en) + '</button>'; });
+  html += '</div></div>';
+  // Results - Separation
+  html += '<div class="result-box"><div class="result-title">' + tx('Kabeladskillelse', 'Cable Separation') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Min. afstand', 'Min. Separation') + '</span><span class="value">' + sep.distance_mm + ' mm</span></div>';
+  html += '<div class="result-row"><span class="label">Ref.</span><span class="value">' + sep.clause + '</span></div>';
+  html += '</div>';
+  // Results - Mitigations
+  html += '<div class="result-box"><div class="result-title">' + tx('Foranstaltninger', 'Mitigation Measures') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Max emission', 'Max Emission') + '</span><span class="value">' + mit.maxEmission + ' V/m (limit: ' + mit.zoneLimit + ' V/m)</span></div>';
+  mit.mitigations.forEach(function(m) { html += '<div class="result-row"><span class="label">' + m.measure + '</span><span class="value">' + m.clause + '</span></div>'; });
+  html += '</div>';
+  // Results - Compliance
+  html += '<div class="result-box"><div class="result-title">' + tx('EMC test krav', 'EMC Test Requirements') + '</div>';
+  comp.tests.forEach(function(t) { if(t.required) html += '<div class="result-row"><span class="label">' + t.test + '</span><span class="value">' + (t.required ? tx('Paakraevet','Required') : tx('Anbefalet','Recommended')) + '</span></div>'; });
+  html += '</div>';
+  var safe = !mit.exceeded || mit.mitigations.length > 1;
+  html += renderVerdict(safe, safe ? tx('EMC krav kan opfyldes med angivne foranstaltninger. IEC 61000.', 'EMC requirements achievable with listed mitigations. IEC 61000.') : tx('ADVARSEL: Emission overskrider zone-graense. IEC 61000.', 'WARNING: Emission exceeds zone limit. IEC 61000.'));
+  html += '</div>';
+  return html;
+}
+
+// ===== METERING & SUB-METERING (DS/EN 50470 + MID) =====
+
+var meteringState = {
+  purpose: 'billing',
+  meterType: 'direct',
+  ctRatio: '100/5',
+  accuracy: 'B',
+  communication: 'modbus_tcp',
+  numMeters: 1
+};
+
+var METERING_PURPOSES = [
+  {id:'billing', da:'Afregning (MID-certificeret)', en:'Utility billing (MID-certified)'},
+  {id:'tenant', da:'Lejermaaling (B+D)', en:'Tenant sub-metering (B+D)'},
+  {id:'cost', da:'Omkostningsfordeling', en:'Cost allocation'},
+  {id:'monitoring', da:'Energioverblik', en:'Energy monitoring (non-billing)'}
+];
+
+var METERING_CT_RATIOS = ['100/5','150/5','200/5','250/5','300/5','400/5','500/5','600/5','800/5','1000/5','1500/5','2000/5'];
+
+var METERING_ACCURACY = [
+  {id:'05', da:'Kl. 0.5 (>100kW afregning)', en:'Class 0.5 (>100kW billing)', limit:0.5},
+  {id:'B', da:'Kl. B / 1% (afregning MID)', en:'Class B / 1% (billing MID)', limit:1.0},
+  {id:'1', da:'Kl. 1 (undermaaling)', en:'Class 1 (sub-metering)', limit:1.0},
+  {id:'2', da:'Kl. 2 (overvaagning)', en:'Class 2 (monitoring)', limit:2.0}
+];
+
+var METERING_COMM = [
+  {id:'modbus_rtu', da:'Modbus RTU', en:'Modbus RTU'},
+  {id:'modbus_tcp', da:'Modbus TCP', en:'Modbus TCP'},
+  {id:'mbus', da:'M-Bus', en:'M-Bus'},
+  {id:'wmbus', da:'Traadloes M-Bus', en:'Wireless M-Bus'},
+  {id:'pulse', da:'Pulsudgang', en:'Pulse output'},
+  {id:'bacnet', da:'BACnet', en:'BACnet'}
+];
+
+var METERING_NUM_OPTIONS = [1,2,3,4,5,6,8,10,12,15,20,25,30,40,50];
+
+function meteringGetRequiredAccuracy(purpose) {
+  if (purpose === 'billing') return {accuracy:'B', clause:'MID 2014/32/EU Annex V'};
+  if (purpose === 'tenant') return {accuracy:'1', clause:'DS/EN 50470-3'};
+  return {accuracy:'2', clause:'DS/EN 50470-1'};
+}
+
+function meteringGetMeterType(purpose, currentA) {
+  if (currentA <= 63) return {type:'direct', maxA:63, clause:'DS/EN 50470-3 cl.4'};
+  return {type:'ct', maxA:currentA, clause:'DS/EN 50470-3 cl.5'};
+}
+
+function meteringCalcCTSize(loadA) {
+  var ratios = [100,150,200,250,300,400,500,600,800,1000,1500,2000];
+  for (var i = 0; i < ratios.length; i++) {
+    if (ratios[i] >= loadA * 1.2) return {primary: ratios[i], secondary:5, ratio: ratios[i]+'/5', clause:'DS/EN 61869-2'};
+  }
+  return {primary:2000, secondary:5, ratio:'2000/5', clause:'DS/EN 61869-2'};
+}
+
+function meteringCalcCost(meterType, numMeters, hasCT) {
+  var meterCost = meterType === 'direct' ? 2500 : 4500;
+  var ctCost = hasCT ? 1800 : 0;
+  var cabinetCost = numMeters <= 4 ? 3500 : (numMeters <= 12 ? 8000 : 15000);
+  var installCost = numMeters * 1500;
+  var total = (meterCost + ctCost) * numMeters + cabinetCost + installCost;
+  return {meterCost: meterCost, ctCost: ctCost, cabinetCost: cabinetCost, installCost: installCost, total: total, clause:'DS/EN 50470'};
+}
+
+function meteringGetInstallReqs(purpose) {
+  var reqs = [];
+  reqs.push({req: tx('Tilgaengelig placering','Accessible location'), clause:'DS/EN 50470 cl.6'});
+  reqs.push({req: tx('Separat maalerskab','Separate meter compartment'), clause:'DS/EN 50470 cl.6.2'});
+  if (purpose === 'billing') {
+    reqs.push({req: tx('Plombering paakraevet','Sealing required'), clause:'MID 2014/32/EU'});
+    reqs.push({req: tx('Kamstrup OMNIA eller tilsvarende','Kamstrup OMNIA or equivalent'), clause:'Radius/Cerius krav'});
+    reqs.push({req: tx('Timeaflaest (flex-tarif)','Hourly settlement (flex-tariff)'), clause:'Energinet krav'});
+  }
+  if (purpose === 'tenant') {
+    reqs.push({req: tx('Individuel maaler per lejer','Individual meter per tenant'), clause:'BEK 563'});
+    reqs.push({req: tx('GDPR - dataminimering','GDPR - data minimization'), clause:'GDPR Art. 5'});
+  }
+  return reqs;
+}
+
+function renderMetering() {
+  var reqAcc = meteringGetRequiredAccuracy(meteringState.purpose);
+  var isCT = meteringState.meterType === 'ct';
+  var cost = meteringCalcCost(meteringState.meterType, meteringState.numMeters, isCT);
+  var installReqs = meteringGetInstallReqs(meteringState.purpose);
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Energimaaling (DS/EN 50470 + MID)', 'Metering & Sub-metering (DS/EN 50470 + MID)') + '</div>';
+  html += '<div class="info-row">' + tx('Valg af energimaaler, CT og kommunikation iht. DS/EN 50470', 'Energy meter, CT and communication selection per DS/EN 50470') + '</div>';
+  // Purpose
+  html += '<div class="select-group"><div class="select-label">' + tx('Formaal', 'Purpose') + '</div><div class="select-grid">';
+  METERING_PURPOSES.forEach(function(p) { html += '<button class="sel-btn' + (meteringState.purpose === p.id ? ' selected' : '') + '" onclick="meteringState.purpose=\'' + p.id + '\';renderModule(\'metering\')">' + tx(p.da, p.en) + '</button>'; });
+  html += '</div></div>';
+  // Meter type
+  html += '<div class="select-group"><div class="select-label">' + tx('Maalertype', 'Meter Type') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (meteringState.meterType === 'direct' ? ' selected' : '') + '" onclick="meteringState.meterType=\'direct\';renderModule(\'metering\')">' + tx('Direkte (op til 63A)','Direct (up to 63A)') + '</button>';
+  html += '<button class="sel-btn' + (meteringState.meterType === 'ct' ? ' selected' : '') + '" onclick="meteringState.meterType=\'ct\';renderModule(\'metering\')">' + tx('CT-tilsluttet (over 63A)','CT-connected (above 63A)') + '</button>';
+  html += '</div></div>';
+  // CT Ratio (only if CT)
+  if (isCT) {
+    html += '<div class="select-group"><div class="select-label">' + tx('CT forhold', 'CT Ratio') + '</div><div class="select-grid">';
+    METERING_CT_RATIOS.forEach(function(r) { html += '<button class="sel-btn' + (meteringState.ctRatio === r ? ' selected' : '') + '" onclick="meteringState.ctRatio=\'' + r + '\';renderModule(\'metering\')">' + r + ' A</button>'; });
+    html += '</div></div>';
+  }
+  // Accuracy
+  html += '<div class="select-group"><div class="select-label">' + tx('Noejagtighedsklasse', 'Accuracy Class') + '</div><div class="select-grid">';
+  METERING_ACCURACY.forEach(function(a) { html += '<button class="sel-btn' + (meteringState.accuracy === a.id ? ' selected' : '') + '" onclick="meteringState.accuracy=\'' + a.id + '\';renderModule(\'metering\')">' + tx(a.da, a.en) + '</button>'; });
+  html += '</div></div>';
+  // Communication
+  html += '<div class="select-group"><div class="select-label">' + tx('Kommunikation', 'Communication') + '</div><div class="select-grid">';
+  METERING_COMM.forEach(function(c) { html += '<button class="sel-btn' + (meteringState.communication === c.id ? ' selected' : '') + '" onclick="meteringState.communication=\'' + c.id + '\';renderModule(\'metering\')">' + tx(c.da, c.en) + '</button>'; });
+  html += '</div></div>';
+  // Number of meters
+  html += '<div class="select-group"><div class="select-label">' + tx('Antal maalere', 'Number of Meters') + '</div><div class="select-grid">';
+  METERING_NUM_OPTIONS.forEach(function(n) { html += '<button class="sel-btn' + (meteringState.numMeters === n ? ' selected' : '') + '" onclick="meteringState.numMeters=' + n + ';renderModule(\'metering\')">' + n + '</button>'; });
+  html += '</div></div>';
+  // Results
+  html += '<div class="result-box"><div class="result-title">' + tx('Specifikation', 'Specification') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kraevet klasse', 'Required Class') + '</span><span class="value">' + reqAcc.accuracy + ' (' + reqAcc.clause + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Maalertype', 'Meter Type') + '</span><span class="value">' + (isCT ? 'CT: ' + meteringState.ctRatio + ' A' : tx('Direkte','Direct') + ' <= 63A') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kommunikation', 'Communication') + '</span><span class="value">' + meteringState.communication.replace('_',' ').toUpperCase() + '</span></div>';
+  html += '</div>';
+  // Cost
+  html += '<div class="result-box"><div class="result-title">' + tx('Prisestimat', 'Cost Estimate') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Maaler x' + meteringState.numMeters, 'Meter x' + meteringState.numMeters) + '</span><span class="value">' + (cost.meterCost * meteringState.numMeters).toLocaleString() + ' DKK</span></div>';
+  if (isCT) html += '<div class="result-row"><span class="label">CT x' + meteringState.numMeters + '</span><span class="value">' + (cost.ctCost * meteringState.numMeters).toLocaleString() + ' DKK</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Skab', 'Cabinet') + '</span><span class="value">' + cost.cabinetCost.toLocaleString() + ' DKK</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Installation', 'Installation') + '</span><span class="value">' + cost.installCost.toLocaleString() + ' DKK</span></div>';
+  html += '<div class="result-row"><span class="label" style="font-weight:bold">' + tx('Total', 'Total') + '</span><span class="value" style="font-weight:bold">' + cost.total.toLocaleString() + ' DKK</span></div>';
+  html += '</div>';
+  // Installation requirements
+  html += '<div class="result-box"><div class="result-title">' + tx('Installationskrav', 'Installation Requirements') + '</div>';
+  installReqs.forEach(function(r) { html += '<div class="result-row"><span class="label">' + r.req + '</span><span class="value">' + r.clause + '</span></div>'; });
+  html += '</div>';
+  var safe = true;
+  html += renderVerdict(safe, tx('Maalerinstallation specificeret iht. DS/EN 50470 + MID 2014/32/EU', 'Metering installation specified per DS/EN 50470 + MID 2014/32/EU'));
+  html += '</div>';
+  return html;
+}
+
+// ===== ATEX - EXPLOSIVE ATMOSPHERES (DS/EN 60079 + ATEX 2014/34/EU) =====
+
+var atexState = {
+  zoneType: 'gas',
+  zone: 1,
+  substance: 'IIA',
+  tempClass: 'T3',
+  protectionType: 'Ex_d'
+};
+
+var ATEX_ZONE_TYPES = [
+  {id:'gas', da:'Gas', en:'Gas'},
+  {id:'dust', da:'Stoev', en:'Dust'}
+];
+
+var ATEX_GAS_ZONES = [
+  {id:0, da:'Zone 0 (vedvarende)', en:'Zone 0 (continuous)', epl:'Ga'},
+  {id:1, da:'Zone 1 (sandsynligt)', en:'Zone 1 (likely)', epl:'Gb'},
+  {id:2, da:'Zone 2 (usandsynligt)', en:'Zone 2 (not likely)', epl:'Gc'}
+];
+
+var ATEX_DUST_ZONES = [
+  {id:20, da:'Zone 20 (vedvarende)', en:'Zone 20 (continuous)', epl:'Da'},
+  {id:21, da:'Zone 21 (sandsynligt)', en:'Zone 21 (likely)', epl:'Db'},
+  {id:22, da:'Zone 22 (usandsynligt)', en:'Zone 22 (not likely)', epl:'Dc'}
+];
+
+var ATEX_SUBSTANCES = [
+  {id:'IIA', da:'Benzin/gasolin (IIA)', en:'Petrol/gasoline (IIA)'},
+  {id:'IIB', da:'Ethylen (IIB)', en:'Ethylene (IIB)'},
+  {id:'IIC', da:'Hydrogen/Acetylen (IIC)', en:'Hydrogen/Acetylene (IIC)'},
+  {id:'dust', da:'Braendbart stoev', en:'Combustible dust'}
+];
+
+var ATEX_TEMP_CLASSES = [
+  {id:'T1', maxTemp:450, da:'T1 (450 C)', en:'T1 (450 C)'},
+  {id:'T2', maxTemp:300, da:'T2 (300 C)', en:'T2 (300 C)'},
+  {id:'T3', maxTemp:200, da:'T3 (200 C)', en:'T3 (200 C)'},
+  {id:'T4', maxTemp:135, da:'T4 (135 C)', en:'T4 (135 C)'},
+  {id:'T5', maxTemp:100, da:'T5 (100 C)', en:'T5 (100 C)'},
+  {id:'T6', maxTemp:85, da:'T6 (85 C)', en:'T6 (85 C)'}
+];
+
+var ATEX_PROTECTION_TYPES = [
+  {id:'Ex_d', da:'Ex d: Trykfast kapsling', en:'Ex d: Flameproof enclosure', zones:[1,2]},
+  {id:'Ex_e', da:'Ex e: Forhoejet sikkerhed', en:'Ex e: Increased safety', zones:[1,2]},
+  {id:'Ex_i', da:'Ex i: Egensikkerhed', en:'Ex i: Intrinsic safety', zones:[0,1,2]},
+  {id:'Ex_p', da:'Ex p: Tryksaetning', en:'Ex p: Pressurized', zones:[1,2]},
+  {id:'Ex_n', da:'Ex n: Ikke-gnistdannende', en:'Ex n: Non-sparking', zones:[2]},
+  {id:'Ex_t', da:'Ex t: Stoevbeskyttelse', en:'Ex t: Dust protection', zones:[20,21,22]}
+];
+
+function atexGetEPL(zoneType, zone) {
+  if (zoneType === 'gas') {
+    if (zone === 0) return {epl:'Ga', clause:'DS/EN 60079-14 cl.5.2'};
+    if (zone === 1) return {epl:'Gb', clause:'DS/EN 60079-14 cl.5.3'};
+    return {epl:'Gc', clause:'DS/EN 60079-14 cl.5.4'};
+  } else {
+    if (zone === 20) return {epl:'Da', clause:'DS/EN 60079-14 cl.5.2'};
+    if (zone === 21) return {epl:'Db', clause:'DS/EN 60079-14 cl.5.3'};
+    return {epl:'Dc', clause:'DS/EN 60079-14 cl.5.4'};
+  }
+}
+
+function atexGetAllowedProtection(zone) {
+  return ATEX_PROTECTION_TYPES.filter(function(p) { return p.zones.indexOf(zone) >= 0; });
+}
+
+function atexGetCableReqs(zone, zoneType) {
+  var reqs = [];
+  if (zone <= 1 || zone === 20 || zone === 21) {
+    reqs.push({req: tx('Armeret kabel paakraevet','Armoured cable required'), clause:'DS/EN 60079-14 cl.9.3'});
+    reqs.push({req: tx('Ex-certificerede forskruninger','Ex-certified cable glands'), clause:'DS/EN 60079-14 cl.9.4'});
+    reqs.push({req: tx('Compound-fyldte forskruninger','Compound-filled glands'), clause:'DS/EN 60079-14 cl.9.4.3'});
+  }
+  if (zone === 2 || zone === 22) {
+    reqs.push({req: tx('Mekanisk beskyttelse anbefales','Mechanical protection recommended'), clause:'DS/EN 60079-14 cl.9.2'});
+  }
+  reqs.push({req: tx('Ingen PVC over temperaturklasse','No PVC exceeding temp rating'), clause:'DS/EN 60079-14 cl.9.1'});
+  return reqs;
+}
+
+function atexGetIPRating(zone, zoneType) {
+  if (zoneType === 'dust') return {rating:'IP65', clause:'DS/EN 60079-31 cl.5'};
+  if (zone <= 1) return {rating:'IP54', clause:'DS/EN 60079-14 cl.7'};
+  return {rating:'IP54', clause:'DS/EN 60079-14 cl.7'};
+}
+
+function atexGetInspection(zone) {
+  if (zone === 0 || zone === 20) return {grade:'A', interval: tx('Kontinuerlig overvaagning','Continuous monitoring'), clause:'DS/EN 60079-17 cl.4.2'};
+  if (zone === 1 || zone === 21) return {grade:'B', interval: tx('1-3 aar','1-3 years'), clause:'DS/EN 60079-17 cl.4.3'};
+  return {grade:'C', interval: tx('Max 3 aar','Max 3 years'), clause:'DS/EN 60079-17 cl.4.4'};
+}
+
+function renderATEX() {
+  var epl = atexGetEPL(atexState.zoneType, atexState.zone);
+  var allowed = atexGetAllowedProtection(atexState.zone);
+  var cableReqs = atexGetCableReqs(atexState.zone, atexState.zoneType);
+  var ipReq = atexGetIPRating(atexState.zone, atexState.zoneType);
+  var inspection = atexGetInspection(atexState.zone);
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('ATEX / Eksplosionsfarlige omraader (DS/EN 60079)', 'ATEX / Explosive Atmospheres (DS/EN 60079)') + '</div>';
+  html += '<div class="info-row">' + tx('Zoneklassificering og udstyrskrav iht. DS/EN 60079 + ATEX 2014/34/EU', 'Zone classification and equipment requirements per DS/EN 60079 + ATEX 2014/34/EU') + '</div>';
+  // Zone type
+  html += '<div class="select-group"><div class="select-label">' + tx('Atmosfaeretype', 'Atmosphere Type') + '</div><div class="select-grid">';
+  ATEX_ZONE_TYPES.forEach(function(t) { html += '<button class="sel-btn' + (atexState.zoneType === t.id ? ' selected' : '') + '" onclick="atexState.zoneType=\'' + t.id + '\';if(atexState.zoneType===\'dust\'&&atexState.zone<20)atexState.zone=22;if(atexState.zoneType===\'gas\'&&atexState.zone>=20)atexState.zone=2;renderModule(\'atex\')">' + tx(t.da, t.en) + '</button>'; });
+  html += '</div></div>';
+  // Zone
+  var zones = atexState.zoneType === 'gas' ? ATEX_GAS_ZONES : ATEX_DUST_ZONES;
+  html += '<div class="select-group"><div class="select-label">' + tx('Zone', 'Zone') + '</div><div class="select-grid">';
+  zones.forEach(function(z) { html += '<button class="sel-btn' + (atexState.zone === z.id ? ' selected' : '') + '" onclick="atexState.zone=' + z.id + ';renderModule(\'atex\')">' + tx(z.da, z.en) + '</button>'; });
+  html += '</div></div>';
+  // Substance
+  html += '<div class="select-group"><div class="select-label">' + tx('Stoftype', 'Substance Type') + '</div><div class="select-grid">';
+  ATEX_SUBSTANCES.forEach(function(s) { html += '<button class="sel-btn' + (atexState.substance === s.id ? ' selected' : '') + '" onclick="atexState.substance=\'' + s.id + '\';renderModule(\'atex\')">' + tx(s.da, s.en) + '</button>'; });
+  html += '</div></div>';
+  // Temp class
+  html += '<div class="select-group"><div class="select-label">' + tx('Temperaturklasse', 'Temperature Class') + '</div><div class="select-grid">';
+  ATEX_TEMP_CLASSES.forEach(function(tc) { html += '<button class="sel-btn' + (atexState.tempClass === tc.id ? ' selected' : '') + '" onclick="atexState.tempClass=\'' + tc.id + '\';renderModule(\'atex\')">' + tx(tc.da, tc.en) + '</button>'; });
+  html += '</div></div>';
+  // Protection type
+  html += '<div class="select-group"><div class="select-label">' + tx('Beskyttelsestype', 'Protection Type') + '</div><div class="select-grid">';
+  ATEX_PROTECTION_TYPES.forEach(function(p) {
+    var isAllowed = p.zones.indexOf(atexState.zone) >= 0;
+    html += '<button class="sel-btn' + (atexState.protectionType === p.id ? ' selected' : '') + (isAllowed ? '' : ' disabled') + '" onclick="' + (isAllowed ? "atexState.protectionType='" + p.id + "';renderModule('atex')" : '') + '">' + tx(p.da, p.en) + '</button>';
+  });
+  html += '</div></div>';
+  // Results
+  html += '<div class="result-box"><div class="result-title">' + tx('Klassificering', 'Classification') + '</div>';
+  html += '<div class="result-row"><span class="label">EPL</span><span class="value">' + epl.epl + ' (' + epl.clause + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Min. IP', 'Min. IP') + '</span><span class="value">' + ipReq.rating + ' (' + ipReq.clause + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Temperatur', 'Temperature') + '</span><span class="value">' + atexState.tempClass + ' (max ' + ATEX_TEMP_CLASSES.find(function(t){return t.id===atexState.tempClass;}).maxTemp + ' C)</span></div>';
+  html += '</div>';
+  // Allowed protection
+  html += '<div class="result-box"><div class="result-title">' + tx('Tilladte beskyttelsestyper', 'Allowed Protection Types') + '</div>';
+  allowed.forEach(function(a) { html += '<div class="result-row"><span class="label">' + tx(a.da, a.en) + '</span><span class="value">' + (a.id === atexState.protectionType ? '&#10004; ' + tx('Valgt','Selected') : '') + '</span></div>'; });
+  html += '</div>';
+  // Cable requirements
+  html += '<div class="result-box"><div class="result-title">' + tx('Kabelkrav', 'Cable Requirements') + '</div>';
+  cableReqs.forEach(function(r) { html += '<div class="result-row"><span class="label">' + r.req + '</span><span class="value">' + r.clause + '</span></div>'; });
+  html += '</div>';
+  // Inspection
+  html += '<div class="result-box"><div class="result-title">' + tx('Inspektion', 'Inspection') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Grad', 'Grade') + '</span><span class="value">' + inspection.grade + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Interval', 'Interval') + '</span><span class="value">' + inspection.interval + '</span></div>';
+  html += '<div class="result-row"><span class="label">Ref.</span><span class="value">' + inspection.clause + '</span></div>';
+  html += '</div>';
+  var protAllowed = allowed.some(function(a){return a.id === atexState.protectionType;});
+  html += renderVerdict(protAllowed, protAllowed ? tx('Beskyttelsestype godkendt for valgt zone iht. DS/EN 60079 + ATEX 2014/34/EU', 'Protection type approved for selected zone per DS/EN 60079 + ATEX 2014/34/EU') : tx('ADVARSEL: Beskyttelsestype IKKE godkendt for denne zone. DS/EN 60079.', 'WARNING: Protection type NOT approved for this zone. DS/EN 60079.'));
+  html += '</div>';
+  return html;
+}
+
+// ===== SMART GRID - DEMAND RESPONSE (DS/EN 50549 + Energinet) =====
+
+var smartgridState = {
+  installationType: 'residential',
+  assets: ['heatpump', 'ev'],
+  tariffSpread: 0.50
+};
+
+var SMARTGRID_INSTALL_TYPES = [
+  {id:'residential', da:'Bolig-prosumer', en:'Residential prosumer'},
+  {id:'commercial', da:'Erhvervs-prosumer', en:'Commercial prosumer'},
+  {id:'demand_response', da:'Fleksibilitetsaktiv', en:'Demand response participant'},
+  {id:'microgrid', da:'Mikrogrid', en:'Microgrid'}
+];
+
+var SMARTGRID_ASSETS = [
+  {id:'heatpump', da:'Varmepumpe', en:'Heat pump', kW:8, flexHours:4, dailyKWh:32},
+  {id:'ev', da:'Elbil-lader', en:'EV charger', kW:11, flexHours:8, dailyKWh:88},
+  {id:'battery', da:'Batteri', en:'Battery storage', kW:5, flexHours:24, dailyKWh:120},
+  {id:'boiler', da:'Elkedel', en:'Electric boiler', kW:6, flexHours:6, dailyKWh:36},
+  {id:'pool_pump', da:'Poolpumpe', en:'Pool pump', kW:2, flexHours:12, dailyKWh:24},
+  {id:'ventilation', da:'Ventilation (VAV)', en:'Ventilation (variable)', kW:3, flexHours:2, dailyKWh:6}
+];
+
+var SMARTGRID_TARIFF = {
+  peak: {hours:'17-20', rate: 1.20, da:'Spidslast (17-20)', en:'Peak (17-20)'},
+  shoulder: {hours:'6-17, 20-24', rate: 0.80, da:'Mellemlast (6-17, 20-24)', en:'Shoulder (6-17, 20-24)'},
+  offpeak: {hours:'0-6', rate: 0.40, da:'Lavlast (0-6)', en:'Off-peak (0-6)'}
+};
+
+function smartgridCalcFlexCapacity(assetIds) {
+  var totalKW = 0;
+  var totalDailyKWh = 0;
+  assetIds.forEach(function(id) {
+    var a = SMARTGRID_ASSETS.find(function(x){return x.id===id;});
+    if (a) { totalKW += a.kW; totalDailyKWh += a.dailyKWh; }
+  });
+  return {totalKW: totalKW, totalDailyKWh: totalDailyKWh, annualKWh: Math.round(totalDailyKWh * 365), clause: 'DS/EN 50549-1 cl.4'};
+}
+
+function smartgridCalcAnnualSavings(assetIds, priceSpread) {
+  var flex = smartgridCalcFlexCapacity(assetIds);
+  var shiftedKWh = Math.round(flex.annualKWh * 0.6);
+  var savings = Math.round(shiftedKWh * priceSpread);
+  var peakReduction = Math.round(flex.totalKW * 0.7 * 12 * 50);
+  return {shiftedKWh: shiftedKWh, flexRevenue: savings, peakReduction: peakReduction, totalSavings: savings + peakReduction, clause: 'Energinet flex-tarif'};
+}
+
+function smartgridGetGridReqs(installationType, totalKW) {
+  var reqs = [];
+  reqs.push({req: tx('Anti-oedrift (obligatorisk)','Anti-islanding (mandatory)'), clause:'DS/EN 50549-1 cl.4.10'});
+  if (totalKW > 11) {
+    reqs.push({req: tx('Frekvensrespons: reduceret ved f>50.2Hz','Frequency response: reduce at f>50.2Hz'), clause:'DS/EN 50549-1 cl.4.6'});
+  }
+  if (totalKW > 16) {
+    reqs.push({req: tx('Spaendingsgennemkoersel','Voltage ride-through'), clause:'DS/EN 50549-1 cl.4.7'});
+  }
+  reqs.push({req: tx('Reaktiv effekt Q/Pmax: -0.1 til +0.1','Reactive power Q/Pmax: -0.1 to +0.1'), clause:'DS/EN 50549-1 cl.4.5'});
+  reqs.push({req: tx('PCC elkvaltiet EN 50160','PCC power quality EN 50160'), clause:'EN 50160'});
+  return reqs;
+}
+
+function smartgridGetCommunication(installationType) {
+  var comms = [];
+  comms.push({protocol:'HAN/P1', da:'Smart meter P1 port', en:'Smart meter P1 port'});
+  if (installationType === 'residential' || installationType === 'commercial') {
+    comms.push({protocol:'SG-Ready', da:'SG-Ready (varmepumpe)', en:'SG-Ready (heat pump)'});
+    comms.push({protocol:'OCPP', da:'OCPP (elbil)', en:'OCPP (EV charger)'});
+  }
+  if (installationType === 'commercial' || installationType === 'demand_response') {
+    comms.push({protocol:'EnergyAPI', da:'EnergiAPI (Energinet)', en:'EnergyAPI (Energinet)'});
+  }
+  if (installationType === 'demand_response' || installationType === 'microgrid') {
+    comms.push({protocol:'Flexpower', da:'Flexpower / Power Hub', en:'Flexpower / Power Hub'});
+  }
+  return comms;
+}
+
+function renderSmartGrid() {
+  var flex = smartgridCalcFlexCapacity(smartgridState.assets);
+  var savings = smartgridCalcAnnualSavings(smartgridState.assets, smartgridState.tariffSpread);
+  var gridReqs = smartgridGetGridReqs(smartgridState.installationType, flex.totalKW);
+  var comms = smartgridGetCommunication(smartgridState.installationType);
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Smart Grid & Demand Response (DS/EN 50549 + Energinet)', 'Smart Grid & Demand Response (DS/EN 50549 + Energinet)') + '</div>';
+  html += '<div class="info-row">' + tx('Fleksibilitet, tarifoptimering og netkrav iht. DS/EN 50549', 'Flexibility, tariff optimization and grid requirements per DS/EN 50549') + '</div>';
+  // Installation type
+  html += '<div class="select-group"><div class="select-label">' + tx('Installationstype', 'Installation Type') + '</div><div class="select-grid">';
+  SMARTGRID_INSTALL_TYPES.forEach(function(t) { html += '<button class="sel-btn' + (smartgridState.installationType === t.id ? ' selected' : '') + '" onclick="smartgridState.installationType=\'' + t.id + '\';renderModule(\'smartgrid\')">' + tx(t.da, t.en) + '</button>'; });
+  html += '</div></div>';
+  // Flex assets
+  html += '<div class="select-group"><div class="select-label">' + tx('Flex-aktiver (klik tilfoej/fjern)', 'Flex Assets (click to add/remove)') + '</div><div class="select-grid">';
+  SMARTGRID_ASSETS.forEach(function(a) {
+    var active = smartgridState.assets.indexOf(a.id) >= 0;
+    html += '<button class="sel-btn' + (active ? ' selected' : '') + '" onclick="var i=smartgridState.assets.indexOf(\'' + a.id + '\');if(i>=0)smartgridState.assets.splice(i,1);else smartgridState.assets.push(\'' + a.id + '\');renderModule(\'smartgrid\')">' + tx(a.da, a.en) + ' (' + a.kW + 'kW)</button>';
+  });
+  html += '</div></div>';
+  // Tariff spread
+  html += '<div class="select-group"><div class="select-label">' + tx('Prisspredning [DKK/kWh]', 'Price Spread [DKK/kWh]') + '</div><div class="select-grid">';
+  [0.30, 0.40, 0.50, 0.60, 0.70, 0.80].forEach(function(s) { html += '<button class="sel-btn' + (smartgridState.tariffSpread === s ? ' selected' : '') + '" onclick="smartgridState.tariffSpread=' + s + ';renderModule(\'smartgrid\')">' + s.toFixed(2) + '</button>'; });
+  html += '</div></div>';
+  // Results - Tariff
+  html += '<div class="result-box"><div class="result-title">' + tx('Dansk tarifstruktur (Energinet 2024)', 'Danish Tariff Structure (Energinet 2024)') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx(SMARTGRID_TARIFF.peak.da, SMARTGRID_TARIFF.peak.en) + '</span><span class="value">' + SMARTGRID_TARIFF.peak.rate.toFixed(2) + ' DKK/kWh</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx(SMARTGRID_TARIFF.shoulder.da, SMARTGRID_TARIFF.shoulder.en) + '</span><span class="value">' + SMARTGRID_TARIFF.shoulder.rate.toFixed(2) + ' DKK/kWh</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx(SMARTGRID_TARIFF.offpeak.da, SMARTGRID_TARIFF.offpeak.en) + '</span><span class="value">' + SMARTGRID_TARIFF.offpeak.rate.toFixed(2) + ' DKK/kWh</span></div>';
+  html += '</div>';
+  // Results - Flex
+  html += '<div class="result-box"><div class="result-title">' + tx('Fleksibilitetskapacitet', 'Flex Capacity') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Total flytbar last', 'Total Shiftable Load') + '</span><span class="value">' + flex.totalKW + ' kW</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Daglig fleksibilitet', 'Daily Flexibility') + '</span><span class="value">' + flex.totalDailyKWh + ' kWh/dag</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Aarlig fleksibilitet', 'Annual Flexibility') + '</span><span class="value">' + flex.annualKWh.toLocaleString() + ' kWh/aar</span></div>';
+  html += '<div class="result-row"><span class="label">Ref.</span><span class="value">' + flex.clause + '</span></div>';
+  html += '</div>';
+  // Results - Savings
+  html += '<div class="result-box"><div class="result-title">' + tx('Aarlig besparelse', 'Annual Savings') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Flyttet energi', 'Shifted Energy') + '</span><span class="value">' + savings.shiftedKWh.toLocaleString() + ' kWh</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Flex-indtaegt', 'Flex Revenue') + '</span><span class="value">' + savings.flexRevenue.toLocaleString() + ' DKK</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Spidslast-reduktion', 'Peak Reduction') + '</span><span class="value">' + savings.peakReduction.toLocaleString() + ' DKK</span></div>';
+  html += '<div class="result-row"><span class="label" style="font-weight:bold">' + tx('Total besparelse', 'Total Savings') + '</span><span class="value" style="font-weight:bold;color:#22c55e">' + savings.totalSavings.toLocaleString() + ' DKK/aar</span></div>';
+  html += '</div>';
+  // Grid requirements
+  html += '<div class="result-box"><div class="result-title">' + tx('Netkrav (DS/EN 50549)', 'Grid Requirements (DS/EN 50549)') + '</div>';
+  gridReqs.forEach(function(r) { html += '<div class="result-row"><span class="label">' + r.req + '</span><span class="value">' + r.clause + '</span></div>'; });
+  html += '</div>';
+  // Communication
+  html += '<div class="result-box"><div class="result-title">' + tx('Kommunikation', 'Communication') + '</div>';
+  comms.forEach(function(c) { html += '<div class="result-row"><span class="label">' + c.protocol + '</span><span class="value">' + tx(c.da, c.en) + '</span></div>'; });
+  html += '</div>';
+  var safe = true;
+  html += renderVerdict(safe, tx('Fleksibilitetssystem konfigureret iht. DS/EN 50549 + Energinet krav', 'Flexibility system configured per DS/EN 50549 + Energinet requirements'));
   html += '</div>';
   return html;
 }

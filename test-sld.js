@@ -5867,6 +5867,484 @@ test('All new modules cite relevant standards', function() {
   assert(renderCableLife().indexOf('60502') > 0 || renderCableLife().indexOf('Arrhenius') > 0, 'CableLife must cite IEC 60502');
 });
 
+
+// =====================================================
+// === BESS MODULE TESTS ===
+// =====================================================
+console.log('\n--- BESS (Battery Storage) Module Tests ---');
+
+test('BESS: bessCalcInverterSize returns correct size for 13.5kWh/4h', function() {
+  var result = bessCalcInverterSize(13.5, 4);
+  assert.strictEqual(result.kW, 5); // ceil(13.5/4) = 4, next standard = 5
+  assert(result.clause.indexOf('62619') > 0);
+});
+
+test('BESS: bessCalcInverterSize for large industrial 5000kWh/5h', function() {
+  var result = bessCalcInverterSize(5000, 5);
+  // ceil(5000/5)=1000, but largest standard inverter is 500kW - returns max available
+  assert.strictEqual(result.kW, 500); // capped at largest standard size
+});
+
+test('BESS: bessCalcDCCurrent applies 1.25 derating', function() {
+  var result = bessCalcDCCurrent(10, 400);
+  // ceil(10*1000/400*1.25) = ceil(31.25) = 32
+  assert.strictEqual(result.current, 32);
+  assert(result.clause.indexOf('551.4') > 0);
+});
+
+test('BESS: bessCalcDCCable selects adequate cable', function() {
+  var result = bessCalcDCCable(50);
+  assert(result.iz >= 50);
+  assert.strictEqual(result.mm2, 10); // 10mm2 has iz=50
+  assert(result.clause.indexOf('B.52.4') > 0);
+});
+
+test('BESS: bessCalcDCCable for high current', function() {
+  var result = bessCalcDCCable(200);
+  assert(result.iz >= 200);
+  assert(result.mm2 >= 70);
+});
+
+test('BESS: bessGetProtection includes RCD Type B', function() {
+  var result = bessGetProtection(400, 50, 10);
+  assert.strictEqual(result.rcd.type, 'B');
+  assert.strictEqual(result.rcd.rating, 30);
+  assert(result.dcDisconnect.required === true);
+});
+
+test('BESS: bessGetSafety returns BMS mandatory', function() {
+  var result = bessGetSafety('LFP');
+  assert(result.bms.required === true);
+  assert(result.bms.clause.indexOf('62619') > 0);
+  assert.strictEqual(result.ventilation.minACH, 5);
+});
+
+test('BESS: bessGetSafety NMC requires inert gas', function() {
+  var result = bessGetSafety('NMC');
+  assert(result.fireSuppression.indexOf('Inert') >= 0 || result.fireSuppression.indexOf('inert') >= 0);
+  assert.strictEqual(result.ventilation.minACH, 8);
+});
+
+test('BESS: bessGetSafety VRLA has hydrogen detection', function() {
+  var result = bessGetSafety('VRLA');
+  assert(result.ventilation.explosiveGas === true);
+  assert.strictEqual(result.ventilation.minACH, 10);
+});
+
+test('BESS: bessGetSafety room requires EI60', function() {
+  var result = bessGetSafety('LFP');
+  assert.strictEqual(result.room.fireRating, 'EI60');
+  assert(result.room.clause.indexOf('551.8') > 0);
+});
+
+test('BESS: renderBESS returns valid HTML without text inputs', function() {
+  var html = renderBESS();
+  assert(html.length > 500);
+  assert(html.indexOf('sel-btn') > 0);
+  assert(html.indexOf('type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+  assert(html.indexOf('62619') > 0 || html.indexOf('60364') > 0);
+});
+
+test('BESS: renderBESS cites DS/EN 62619', function() {
+  var html = renderBESS();
+  assert(html.indexOf('62619') > 0);
+  assert(html.indexOf('60364-5-56') > 0);
+});
+
+test('BESS: bessCalcACCable returns valid cable size', function() {
+  var result = bessCalcACCable(10);
+  assert(result.mm2 > 0);
+  assert(result.iz > 0);
+});
+
+test('BESS: DC current calculation conservative (ceiling)', function() {
+  // 5kW at 48V: ceil(5000/48*1.25) = ceil(130.2) = 131
+  var result = bessCalcDCCurrent(5, 48);
+  assert.strictEqual(result.current, 131);
+});
+
+// =====================================================
+// === EMC MODULE TESTS ===
+// =====================================================
+console.log('\n--- EMC (Electromagnetic Compatibility) Module Tests ---');
+
+test('EMC: emcGetSeparation A-E returns 300mm', function() {
+  var result = emcGetSeparation('A', 'E');
+  assert.strictEqual(result.distance_mm, 300);
+  assert(result.clause.indexOf('50174') > 0);
+});
+
+test('EMC: emcGetSeparation B-D returns 100mm', function() {
+  var result = emcGetSeparation('B', 'D');
+  assert.strictEqual(result.distance_mm, 100);
+});
+
+test('EMC: emcGetSeparation same category returns 0', function() {
+  var result = emcGetSeparation('C', 'C');
+  assert.strictEqual(result.distance_mm, 0);
+});
+
+test('EMC: emcGetSeparation is commutative', function() {
+  var r1 = emcGetSeparation('A', 'D');
+  var r2 = emcGetSeparation('D', 'A');
+  assert.strictEqual(r1.distance_mm, r2.distance_mm);
+});
+
+test('EMC: emcGetMitigations detects exceedance in zone 1', function() {
+  var result = emcGetMitigations(1, ['vfd']); // VFD emits 25 V/m, zone 1 limit = 1
+  assert(result.exceeded === true);
+  assert(result.mitigations.length > 0);
+  assert(result.maxEmission === 25);
+  assert(result.zoneLimit === 1);
+});
+
+test('EMC: emcGetMitigations zone 4 with low source passes', function() {
+  var result = emcGetMitigations(4, ['led']); // LED 6 V/m, zone 4 limit 30
+  assert(result.exceeded === false);
+});
+
+test('EMC: emcGetMitigations recommends shielded cables for high emission', function() {
+  var result = emcGetMitigations(1, ['vfd', 'welder']); // high emission vs 1 V/m limit
+  var hasShielded = result.mitigations.some(function(m){return m.measure.indexOf('Shielded') >= 0 || m.measure.indexOf('shield') >= 0;});
+  assert(hasShielded, 'Should recommend shielded cables');
+});
+
+test('EMC: emcGetCompliance returns relevant tests', function() {
+  var result = emcGetCompliance(1);
+  assert(result.tests.length >= 5);
+  assert(result.tests[0].test.indexOf('55011') > 0 || result.tests[0].test.indexOf('55032') > 0);
+});
+
+test('EMC: emcGetMitigations cites IEC 61000', function() {
+  var result = emcGetMitigations(1, ['vfd']);
+  var hasCitation = result.mitigations.some(function(m){return m.clause.indexOf('61000') >= 0 || m.clause.indexOf('50174') >= 0;});
+  assert(hasCitation);
+});
+
+test('EMC: renderEMC returns valid HTML without text inputs', function() {
+  var html = renderEMC();
+  assert(html.length > 500);
+  assert(html.indexOf('sel-btn') > 0);
+  assert(html.indexOf('type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+});
+
+test('EMC: renderEMC cites IEC 61000', function() {
+  var html = renderEMC();
+  assert(html.indexOf('61000') > 0 || html.indexOf('50174') > 0);
+});
+
+test('EMC: emcGetMitigations empty sources no exceedance', function() {
+  var result = emcGetMitigations(4, []);
+  assert(result.exceeded === false);
+  assert(result.maxEmission === 0);
+});
+
+test('EMC: separation table covers critical pairs', function() {
+  assert.strictEqual(emcGetSeparation('A', 'C').distance_mm, 100);
+  assert.strictEqual(emcGetSeparation('C', 'E').distance_mm, 100);
+  assert.strictEqual(emcGetSeparation('D', 'E').distance_mm, 50);
+});
+
+// =====================================================
+// === METERING MODULE TESTS ===
+// =====================================================
+console.log('\n--- Metering (Energy Metering) Module Tests ---');
+
+test('Metering: meteringGetRequiredAccuracy billing requires class B', function() {
+  var result = meteringGetRequiredAccuracy('billing');
+  assert.strictEqual(result.accuracy, 'B');
+  assert(result.clause.indexOf('MID') >= 0);
+});
+
+test('Metering: meteringGetRequiredAccuracy monitoring allows class 2', function() {
+  var result = meteringGetRequiredAccuracy('monitoring');
+  assert.strictEqual(result.accuracy, '2');
+});
+
+test('Metering: meteringCalcCTSize selects adequate ratio', function() {
+  var result = meteringCalcCTSize(200);
+  assert(result.primary >= 240); // 200 * 1.2 = 240
+  assert.strictEqual(result.primary, 250);
+  assert.strictEqual(result.secondary, 5);
+});
+
+test('Metering: meteringCalcCTSize for 80A', function() {
+  var result = meteringCalcCTSize(80);
+  assert(result.primary >= 96); // 80*1.2=96
+  assert.strictEqual(result.primary, 100);
+});
+
+test('Metering: meteringCalcCost direct meter costs', function() {
+  var result = meteringCalcCost('direct', 1, false);
+  assert(result.total > 0);
+  assert.strictEqual(result.ctCost, 0);
+  assert(result.meterCost === 2500);
+});
+
+test('Metering: meteringCalcCost CT meter more expensive', function() {
+  var direct = meteringCalcCost('direct', 1, false);
+  var ct = meteringCalcCost('ct', 1, true);
+  assert(ct.total > direct.total);
+});
+
+test('Metering: meteringCalcCost scales with num meters', function() {
+  var one = meteringCalcCost('direct', 1, false);
+  var ten = meteringCalcCost('direct', 10, false);
+  assert(ten.total > one.total * 3); // More than 3x due to cabinet
+});
+
+test('Metering: meteringGetInstallReqs billing requires sealing', function() {
+  var result = meteringGetInstallReqs('billing');
+  var hasSealing = result.some(function(r){return r.req.indexOf('lombering') >= 0 || r.req.indexOf('ealing') >= 0;});
+  assert(hasSealing);
+});
+
+test('Metering: meteringGetInstallReqs tenant mentions individual', function() {
+  var result = meteringGetInstallReqs('tenant');
+  var hasIndividual = result.some(function(r){return r.req.indexOf('ndividuel') >= 0 || r.req.indexOf('ndividual') >= 0;});
+  assert(hasIndividual);
+});
+
+test('Metering: renderMetering returns valid HTML without text inputs', function() {
+  var html = renderMetering();
+  assert(html.length > 500);
+  assert(html.indexOf('sel-btn') > 0);
+  assert(html.indexOf('type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+});
+
+test('Metering: renderMetering cites DS/EN 50470', function() {
+  var html = renderMetering();
+  assert(html.indexOf('50470') > 0 || html.indexOf('MID') > 0);
+});
+
+test('Metering: meteringGetMeterType direct for small loads', function() {
+  var result = meteringGetMeterType('billing', 32);
+  assert.strictEqual(result.type, 'direct');
+  assert(result.maxA === 63);
+});
+
+test('Metering: meteringGetMeterType CT for large loads', function() {
+  var result = meteringGetMeterType('billing', 200);
+  assert.strictEqual(result.type, 'ct');
+});
+
+// =====================================================
+// === ATEX MODULE TESTS ===
+// =====================================================
+console.log('\n--- ATEX (Explosive Atmospheres) Module Tests ---');
+
+test('ATEX: atexGetEPL zone 0 gas returns Ga', function() {
+  var result = atexGetEPL('gas', 0);
+  assert.strictEqual(result.epl, 'Ga');
+  assert(result.clause.indexOf('60079') > 0);
+});
+
+test('ATEX: atexGetEPL zone 1 gas returns Gb', function() {
+  var result = atexGetEPL('gas', 1);
+  assert.strictEqual(result.epl, 'Gb');
+});
+
+test('ATEX: atexGetEPL zone 22 dust returns Dc', function() {
+  var result = atexGetEPL('dust', 22);
+  assert.strictEqual(result.epl, 'Dc');
+});
+
+test('ATEX: atexGetAllowedProtection zone 0 includes Ex i only', function() {
+  var result = atexGetAllowedProtection(0);
+  assert(result.some(function(p){return p.id === 'Ex_i';}));
+  assert(!result.some(function(p){return p.id === 'Ex_n';}));
+});
+
+test('ATEX: atexGetAllowedProtection zone 2 includes Ex n', function() {
+  var result = atexGetAllowedProtection(2);
+  assert(result.some(function(p){return p.id === 'Ex_n';}));
+});
+
+test('ATEX: atexGetAllowedProtection zone 1 includes Ex d and Ex e', function() {
+  var result = atexGetAllowedProtection(1);
+  assert(result.some(function(p){return p.id === 'Ex_d';}));
+  assert(result.some(function(p){return p.id === 'Ex_e';}));
+  assert(!result.some(function(p){return p.id === 'Ex_n';})); // Zone 2 only
+});
+
+test('ATEX: atexGetCableReqs zone 1 requires armoured', function() {
+  var result = atexGetCableReqs(1, 'gas');
+  var hasArmoured = result.some(function(r){return r.req.indexOf('rmeret') >= 0 || r.req.indexOf('rmoured') >= 0;});
+  assert(hasArmoured);
+});
+
+test('ATEX: atexGetIPRating dust requires IP65', function() {
+  var result = atexGetIPRating(22, 'dust');
+  assert.strictEqual(result.rating, 'IP65');
+});
+
+test('ATEX: atexGetIPRating gas zone 1 requires IP54', function() {
+  var result = atexGetIPRating(1, 'gas');
+  assert.strictEqual(result.rating, 'IP54');
+});
+
+test('ATEX: atexGetInspection zone 0 requires continuous', function() {
+  var result = atexGetInspection(0);
+  assert.strictEqual(result.grade, 'A');
+  assert(result.clause.indexOf('60079-17') > 0);
+});
+
+test('ATEX: atexGetInspection zone 2 max 3 years', function() {
+  var result = atexGetInspection(2);
+  assert.strictEqual(result.grade, 'C');
+});
+
+test('ATEX: renderATEX returns valid HTML without text inputs', function() {
+  var html = renderATEX();
+  assert(html.length > 500);
+  assert(html.indexOf('sel-btn') > 0);
+  assert(html.indexOf('type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+});
+
+test('ATEX: renderATEX cites DS/EN 60079', function() {
+  var html = renderATEX();
+  assert(html.indexOf('60079') > 0);
+  assert(html.indexOf('ATEX') > 0);
+});
+
+test('ATEX: atexGetCableReqs zone 2 recommends mechanical protection', function() {
+  var result = atexGetCableReqs(2, 'gas');
+  var hasMech = result.some(function(r){return r.req.indexOf('ekanisk') >= 0 || r.req.indexOf('echanical') >= 0;});
+  assert(hasMech);
+});
+
+// =====================================================
+// === SMART GRID MODULE TESTS ===
+// =====================================================
+console.log('\n--- Smart Grid (Demand Response) Module Tests ---');
+
+test('SmartGrid: smartgridCalcFlexCapacity sums assets correctly', function() {
+  var result = smartgridCalcFlexCapacity(['heatpump', 'ev']);
+  assert.strictEqual(result.totalKW, 19); // 8 + 11
+  assert.strictEqual(result.totalDailyKWh, 120); // 32 + 88
+  assert.strictEqual(result.annualKWh, 43800); // 120 * 365
+});
+
+test('SmartGrid: smartgridCalcFlexCapacity empty returns zero', function() {
+  var result = smartgridCalcFlexCapacity([]);
+  assert.strictEqual(result.totalKW, 0);
+  assert.strictEqual(result.totalDailyKWh, 0);
+});
+
+test('SmartGrid: smartgridCalcFlexCapacity single asset', function() {
+  var result = smartgridCalcFlexCapacity(['battery']);
+  assert.strictEqual(result.totalKW, 5);
+  assert.strictEqual(result.totalDailyKWh, 120);
+});
+
+test('SmartGrid: smartgridCalcAnnualSavings positive', function() {
+  var result = smartgridCalcAnnualSavings(['heatpump', 'ev'], 0.50);
+  assert(result.totalSavings > 0);
+  assert(result.shiftedKWh > 0);
+  assert(result.flexRevenue > 0);
+  assert(result.peakReduction > 0);
+});
+
+test('SmartGrid: smartgridCalcAnnualSavings higher spread = more savings', function() {
+  var low = smartgridCalcAnnualSavings(['heatpump'], 0.30);
+  var high = smartgridCalcAnnualSavings(['heatpump'], 0.80);
+  assert(high.flexRevenue > low.flexRevenue);
+});
+
+test('SmartGrid: smartgridGetGridReqs includes anti-islanding', function() {
+  var result = smartgridGetGridReqs('residential', 5);
+  var hasAntiIsland = result.some(function(r){return r.req.indexOf('anti') >= 0 || r.req.indexOf('Anti') >= 0 || r.req.indexOf('oedrift') >= 0;});
+  assert(hasAntiIsland);
+});
+
+test('SmartGrid: smartgridGetGridReqs >11kW requires freq response', function() {
+  var result = smartgridGetGridReqs('commercial', 20);
+  var hasFreq = result.some(function(r){return r.req.indexOf('50.2') >= 0 || r.req.indexOf('rekvens') >= 0 || r.req.indexOf('requency') >= 0;});
+  assert(hasFreq);
+});
+
+test('SmartGrid: smartgridGetGridReqs >16kW requires voltage ride-through', function() {
+  var result = smartgridGetGridReqs('commercial', 25);
+  var hasVRT = result.some(function(r){return r.req.indexOf('ride-through') >= 0 || r.req.indexOf('gennemkoersel') >= 0;});
+  assert(hasVRT);
+});
+
+test('SmartGrid: smartgridGetCommunication residential includes SG-Ready', function() {
+  var result = smartgridGetCommunication('residential');
+  var hasSG = result.some(function(c){return c.protocol.indexOf('SG-Ready') >= 0;});
+  assert(hasSG);
+});
+
+test('SmartGrid: smartgridGetCommunication demand_response includes Flexpower', function() {
+  var result = smartgridGetCommunication('demand_response');
+  var hasFlex = result.some(function(c){return c.protocol.indexOf('Flexpower') >= 0;});
+  assert(hasFlex);
+});
+
+test('SmartGrid: renderSmartGrid returns valid HTML without text inputs', function() {
+  var html = renderSmartGrid();
+  assert(html.length > 500);
+  assert(html.indexOf('sel-btn') > 0);
+  assert(html.indexOf('type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+});
+
+test('SmartGrid: renderSmartGrid cites DS/EN 50549', function() {
+  var html = renderSmartGrid();
+  assert(html.indexOf('50549') > 0);
+  assert(html.indexOf('Energinet') > 0);
+});
+
+test('SmartGrid: smartgridCalcFlexCapacity cites DS/EN 50549', function() {
+  var result = smartgridCalcFlexCapacity(['ev']);
+  assert(result.clause.indexOf('50549') > 0);
+});
+
+test('SmartGrid: all flex assets have positive kW and hours', function() {
+  SMARTGRID_ASSETS.forEach(function(a) {
+    assert(a.kW > 0, a.id + ' must have positive kW');
+    assert(a.flexHours > 0, a.id + ' must have positive flexHours');
+    assert(a.dailyKWh > 0, a.id + ' must have positive dailyKWh');
+  });
+});
+
+// =====================================================
+// === CROSS-MODULE INTEGRATION TESTS (New 5 modules) ===
+// =====================================================
+console.log('\n--- New 5 Modules Integration Tests ---');
+
+test('All 5 new modules (bess/emc/metering/atex/smartgrid) render non-empty HTML', function() {
+  var b = renderBESS();
+  var e = renderEMC();
+  var m = renderMetering();
+  var a = renderATEX();
+  var s = renderSmartGrid();
+  assert(b.length > 200, 'BESS HTML too short');
+  assert(e.length > 200, 'EMC HTML too short');
+  assert(m.length > 200, 'Metering HTML too short');
+  assert(a.length > 200, 'ATEX HTML too short');
+  assert(s.length > 200, 'SmartGrid HTML too short');
+});
+
+test('No text input fields in any of the 5 new module renders', function() {
+  var all = renderBESS() + renderEMC() + renderMetering() + renderATEX() + renderSmartGrid();
+  assert(all.indexOf('type="text"') < 0, 'Found type="text"');
+  assert(all.indexOf("type='text'") < 0, "Found type='text'");
+  assert(all.indexOf('<textarea') < 0, 'Found textarea');
+});
+
+test('All 5 new modules cite relevant standards', function() {
+  assert(renderBESS().indexOf('62619') > 0, 'BESS must cite DS/EN 62619');
+  assert(renderEMC().indexOf('61000') > 0 || renderEMC().indexOf('50174') > 0, 'EMC must cite IEC 61000 or DS/EN 50174');
+  assert(renderMetering().indexOf('50470') > 0 || renderMetering().indexOf('MID') > 0, 'Metering must cite DS/EN 50470 or MID');
+  assert(renderATEX().indexOf('60079') > 0, 'ATEX must cite DS/EN 60079');
+  assert(renderSmartGrid().indexOf('50549') > 0, 'SmartGrid must cite DS/EN 50549');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
