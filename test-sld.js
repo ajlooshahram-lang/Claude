@@ -8249,6 +8249,122 @@ test('Appearance: dark-mode neon is driven by intensity/colour variables (calmer
   assert(html.indexOf('0 0 18px rgba(0,229,255,0.75)') < 0, 'old harsh full-strength sel-btn glow removed');
 });
 
+// ============================================================================
+// OFFICIAL PRODUCT DEEP-LINKS (no-remote-image ordering feature)
+// Click-only links to each manufacturer's OWN official product/series page so
+// the user sees the REAL component photo + datasheet before ordering. No remote
+// images, no AI image generation, no typed prompt() flows.
+// ============================================================================
+
+test('Deeplinks: every PRODUCTS entry resolves to a verified official product link', function() {
+  let total = 0, mapped = 0; const uniq = {}, uniqMapped = {}; const gaps = [];
+  Object.keys(PRODUCTS).forEach(function(cat) {
+    PRODUCTS[cat].forEach(function(p) {
+      total++; const key = p.brand + '|' + p.model; uniq[key] = 1;
+      const link = getProductLink(p);
+      if (link && link.productUrl) { mapped++; uniqMapped[key] = 1; }
+      else gaps.push(cat + '/' + p.id + ' (' + p.brand + '|' + p.model + ')');
+    });
+  });
+  console.log('        [coverage] products ' + mapped + '/' + total
+    + ', unique brand|model ' + Object.keys(uniqMapped).length + '/' + Object.keys(uniq).length);
+  assert.strictEqual(mapped, total, 'every PRODUCTS entry must resolve to an official link. Gaps: ' + gaps.join(', '));
+});
+
+test('Deeplinks: every link is https AND on the official-domain allowlist (0 off-allowlist)', function() {
+  assert(Array.isArray(OFFICIAL_PRODUCT_DOMAINS) && OFFICIAL_PRODUCT_DOMAINS.length > 0, 'allowlist of official domains exists');
+  const urls = {}; const off = [];
+  Object.keys(PRODUCTS).forEach(function(cat) {
+    PRODUCTS[cat].forEach(function(p) {
+      const l = getProductLink(p); if (!l) return;
+      [l.productUrl, l.datasheetUrl].filter(Boolean).forEach(function(u) { urls[u] = 1; });
+    });
+  });
+  Object.keys(urls).forEach(function(u) {
+    if (!/^https:\/\//.test(u)) { off.push('non-https: ' + u); return; }
+    let host; try { host = new URL(u).hostname; } catch (e) { off.push('bad-url: ' + u); return; }
+    const ok = OFFICIAL_PRODUCT_DOMAINS.some(function(d) { return host === d || host.endsWith('.' + d); });
+    if (!ok) off.push('off-allowlist host: ' + host);
+  });
+  console.log('        [allowlist] unique URLs ' + Object.keys(urls).length + ', off-allowlist/non-https ' + off.length);
+  assert.strictEqual(off.length, 0, 'all links must be https and on the official-domain allowlist. Offenders: ' + off.join(', '));
+});
+
+test('Deeplinks: no remote <img>, no Wikimedia hot-links, no AI image endpoint, removed configs', function() {
+  assert(!/<img[^>]+src\s*=\s*["'`]?\s*https?:/i.test(html), 'no remote <img src="http...">');
+  assert(html.indexOf('commons.wikimedia') < 0, 'no Wikimedia Commons hot-links');
+  assert(html.indexOf('Special:FilePath') < 0, 'no Wikimedia Special:FilePath links');
+  assert(html.indexOf('COMPONENT_PHOTOS') < 0, 'legacy COMPONENT_PHOTOS map removed');
+  assert(!/images\/generations/.test(html), 'no DALL-E / OpenAI image-generation endpoint');
+  // typed-prompt / AI-image entry points removed (typeof on an undeclared id is safe)
+  assert(typeof genAiPainting === 'undefined', 'genAiPainting (DALL-E generator) removed');
+  assert(typeof configAiImg === 'undefined', 'configAiImg removed');
+  assert(typeof configurePhotos === 'undefined', 'configurePhotos (prompt image-feed) removed');
+  assert(typeof configurePriceFeed === 'undefined', 'configurePriceFeed (prompt price-feed) removed');
+  assert(typeof photoUrlFor === 'undefined', 'remote photoUrlFor resolver removed');
+  // UI entry points removed
+  assert(html.indexOf('onclick="configurePhotos()"') < 0, 'no configurePhotos button wired');
+  assert(html.indexOf('genAiPainting()') < 0, 'no genAiPainting button wired');
+  assert(html.indexOf('configAiImg()') < 0, 'no configAiImg button wired');
+});
+
+test('Deeplinks: no active prompt() free-text flows (any prompt( only in removal comments)', function() {
+  const offending = [];
+  html.split('\n').forEach(function(line, i) {
+    if (line.indexOf('prompt(') >= 0) {
+      const t = line.trim();
+      const isComment = t.indexOf('//') === 0 || t.indexOf('*') === 0 || t.indexOf('/*') === 0;
+      if (!isComment) offending.push((i + 1) + ': ' + t.slice(0, 70));
+    }
+  });
+  console.log('        [prompt] active prompt() calls: ' + offending.length);
+  assert.strictEqual(offending.length, 0, 'no active prompt() typed flows allowed. Found: ' + offending.join(' | '));
+});
+
+test('Deeplinks: renderProductLinks is click-only (anchor + new-tab + safe rel, no inputs/img)', function() {
+  let sample = null;
+  Object.keys(PRODUCTS).some(function(cat) {
+    return PRODUCTS[cat].some(function(p) { if (getProductLink(p)) { sample = p; return true; } return false; });
+  });
+  assert(sample, 'a sample linked product exists');
+  const prevLang = lang; lang = 'en';
+  const out = renderProductLinks(sample);
+  lang = prevLang;
+  assert(out.indexOf('<a ') >= 0, 'renders an anchor (link)');
+  assert(out.indexOf('target="_blank"') >= 0, 'opens in a new tab');
+  assert(out.indexOf('rel="noopener noreferrer"') >= 0, 'uses rel="noopener noreferrer"');
+  assert(out.indexOf('View product') >= 0, 'shows the View product label (en)');
+  ['<input', '<textarea', '<img', 'contenteditable', 'type="text"', 'type="number"'].forEach(function(bad) {
+    assert(out.indexOf(bad) < 0, 'product links must be click-only and image-free (found ' + bad + ')');
+  });
+});
+
+test('Deeplinks: new strings are trilingual (da authoritative, en secondary, fa via _FA)', function() {
+  ['View product', 'Datasheet', '(series)', 'official product page', 'official series page',
+   'Opens the manufacturer official page in a new tab', 'Opens the official datasheet in a new tab',
+   'Official series page on the manufacturer own domain (variants share the page)',
+   'Component image'].forEach(function(k) {
+    assert.ok(_FA[k] && _FA[k].length > 0, 'Farsi (_FA) translation present for new string: ' + k);
+  });
+  const prevLang = lang;
+  lang = 'da'; assert.strictEqual(tx('Se produkt', 'View product'), 'Se produkt', 'Danish authoritative label');
+  lang = 'en'; assert.strictEqual(tx('Se produkt', 'View product'), 'View product', 'English secondary label');
+  lang = 'fa'; assert.strictEqual(tx('Se produkt', 'View product'), _FA['View product'], 'Farsi label routed via _FA');
+  lang = prevLang;
+});
+
+test('Deeplinks GUARD: core calc math unchanged (officialIz + IB regression) with deeplinks loaded', function() {
+  // Reuses the verified-engine regression values; asserts the deep-link layer
+  // coexists without redefining or perturbing the calculation engine.
+  const cu25 = { material: 'Cu', mm2: 2.5, model: '', iz: 999 };
+  assert.strictEqual(officialIz(cu25), 23, 'officialIz(Cu 2.5mm2 PVC) == 23A (Table C.52.1)');
+  const cu16 = { material: 'Cu', mm2: 16, model: '', iz: 1 };
+  assert.strictEqual(officialIz(cu16), 73, 'officialIz(Cu 16mm2 PVC) == 73A');
+  const ib = sldCalcNodeIB({ type:'final_circuit', power_kW:3.68, cosPhi:0.95, phases:'1x230', voltage:230 });
+  assert(Math.abs(ib - 16.84) < 0.05, 'IB regression ~16.84A, got ' + ib.toFixed(2));
+  assert(typeof getProductLink === 'function' && typeof officialIz === 'function', 'deep-link layer + engine coexist');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

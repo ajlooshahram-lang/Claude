@@ -1282,6 +1282,17 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // Official product links (deep-link feature) — Persian
+  'View product': '\u0645\u0634\u0627\u0647\u062F\u0647 \u0645\u062D\u0635\u0648\u0644',
+  'Datasheet': '\u0628\u0631\u06AF\u0647 \u062F\u0627\u062F\u0647',
+  '(series)': '(\u0633\u0631\u06CC)',
+  'official product page': '\u0635\u0641\u062D\u0647 \u0631\u0633\u0645\u06CC \u0645\u062D\u0635\u0648\u0644',
+  'official series page': '\u0635\u0641\u062D\u0647 \u0631\u0633\u0645\u06CC \u0633\u0631\u06CC',
+  'Opens the manufacturer official page in a new tab': '\u0635\u0641\u062D\u0647 \u0631\u0633\u0645\u06CC \u0633\u0627\u0632\u0646\u062F\u0647 \u0631\u0627 \u062F\u0631 \u0632\u0628\u0627\u0646\u0647 \u062C\u062F\u06CC\u062F \u0628\u0627\u0632 \u0645\u06CC\u200C\u06A9\u0646\u062F',
+  'Opens the official datasheet in a new tab': '\u0628\u0631\u06AF\u0647 \u062F\u0627\u062F\u0647 \u0631\u0633\u0645\u06CC \u0631\u0627 \u062F\u0631 \u0632\u0628\u0627\u0646\u0647 \u062C\u062F\u06CC\u062F \u0628\u0627\u0632 \u0645\u06CC\u200C\u06A9\u0646\u062F',
+  'Official series page on the manufacturer own domain (variants share the page)': '\u0635\u0641\u062D\u0647 \u0631\u0633\u0645\u06CC \u0633\u0631\u06CC \u062F\u0631 \u062F\u0627\u0645\u0646\u0647 \u062E\u0648\u062F \u0633\u0627\u0632\u0646\u062F\u0647 (\u0627\u0646\u0648\u0627\u0639 \u062F\u0631 \u06CC\u06A9 \u0635\u0641\u062D\u0647 \u0645\u0634\u062A\u0631\u06A9\u200C\u0627\u0646\u062F)',
+  'Component image': '\u062A\u0635\u0648\u06CC\u0631 \u0642\u0637\u0639\u0647',
+  'Product (official link)': '\u0645\u062D\u0635\u0648\u0644 (\u067E\u06CC\u0648\u0646\u062F \u0631\u0633\u0645\u06CC)',
   // Appearance / theme picker (this UX feature)
   'Appearance': '\u0638\u0627\u0647\u0631',
   'Theme': '\u067E\u0648\u0633\u062A\u0647',
@@ -6564,93 +6575,203 @@ function renderStandards() {
 let bankCategory = 'cables';
 let bankBrand = 'all';
 
-// ===== REAL PHOTO SYSTEM =====
-// Shows ACTUAL product photographs via <img>, with SVG illustration as automatic
-// fallback when a photo URL is missing or fails to load (offline/broken link).
-//
-// Photos are loaded from a licensed image source you configure (e.g. your B2B
-// wholesaler product feed - Lemvigh-Müller / Solar - or a folder of licensed photos).
-// Per-product photos can be set via the product's `img` field; per-category
-// defaults live in COMPONENT_PHOTOS. Nothing copyrighted is bundled in the file.
+// ============================================================================
+// OFFICIAL PRODUCT LINKS (deep-link approach)
+// ----------------------------------------------------------------------------
+// Click-only links to each manufacturer's OWN official product / series page so
+// the user can see the REAL component photo and datasheet before ordering.
+// NO remote images are embedded or hot-linked; only
+// <a target="_blank" rel="noopener noreferrer"> links are rendered.
+// Every URL is https and on the allow-listed official manufacturer domain below,
+// and was VERIFIED by hand (web search) against the manufacturer's own site.
+// Links are NEVER auto-constructed from a model string. Where an exact-model page
+// could not be verified, the official product-SERIES/category page on the same
+// manufacturer domain is used and marked level:'series' for full transparency.
+// ============================================================================
+const OFFICIAL_PRODUCT_DOMAINS = ['nkt.com','se.com','lk.dk','abb.com','eaton.com','siemens.com','hager.com','dehn-international.com','dehn.de','cellpack.com','wavin.com','wavin.dk','wago.com','phoenixcontact.com','doepke.de'];
 
-let PHOTO_BASE = localStorage.getItem('photoBase') || ''; // optional: your own per-model feed
-let PHOTOS_ENABLED = localStorage.getItem('photosEnabled') !== '0'; // real photos ON by default
-
-// Real, Creative-Commons-licensed product photographs (Wikimedia Commons).
-// Special:FilePath redirects to the actual image file; ?width thumbnails for speed.
-// Images CC BY-SA / CC0 via Wikimedia Commons. SVG illustration is the offline fallback.
-const WM = 'https://commons.wikimedia.org/wiki/Special:FilePath/';
-const COMPONENT_PHOTOS = {
-  cables: WM + 'Copper%20cable%205G16.JPG?width=200',
-  mcbs: WM + 'MCB%20Hager%20C10.jpg?width=200',
-  mccbs: WM + 'MCCB%20Merlin%20Gerin%20compact%20NS100N%20(front%20side).jpg?width=200',
-  fuses: WM + 'NH%20000%2000.jpg?width=200',
-  rcds: WM + 'Differential%20residual%20current%20circuit%20interrupter.JPG?width=200',
-  rcbos: WM + 'ABB%20RCBO.jpg?width=200',
-  spds: WM + '1-phase%20surge%20arrester.JPG?width=200',
-  contactors: WM + 'GE%20MC2A310AT1.JPG?width=200',
-  mpcbs: WM + 'Motor%20protective%20circuit%20breaker%20with%20symbol.JPG?width=200',
-  overloadRelays: WM + 'GE%20MTO3N.JPG?width=200',
-  wiringDevices: WM + 'Danish%20type%20K%20Power%20Socket.jpg?width=200'
+// Verified official manufacturer anchors.
+//   level:'model'  = the page is the exact product/series page for that model.
+//   level:'series' = official series/category page (model variants share one page).
+const PRODUCT_LINK_ANCHORS = {
+  // --- NKT (cables) — nkt.com ---
+  nkt_noiklx90:{ productUrl:'https://www.nkt.com/products-solutions/low-voltage-cable/building-wires/noiklx-90-dca', level:'model' },
+  nkt_noik_al:{ productUrl:'https://www.nkt.com/products-solutions/low-voltage-cable/building-wires', level:'series' },
+  nkt_n1xv:{ productUrl:'https://www.nkt.com/products-solutions/low-voltage-cable/1-kv-cables/n1xv-0-6-1-kv', level:'series' },
+  nkt_nayy:{ productUrl:'https://www.nkt.com/products-solutions/low-voltage-cable/1-kv-cables', level:'series' },
+  // --- Schneider Electric — se.com (incl. Wibe, a Schneider brand) ---
+  se_acti9_ic60:{ productUrl:'https://www.se.com/ww/en/product-range/7556-acti9-ic60/', level:'series' },
+  se_multi9_c60:{ productUrl:'https://www.se.com/ww/en/product/M9F14206/', level:'series' },
+  se_nsx:{ productUrl:'https://www.se.com/sg/en/product-range/1887-compact-nsx/', level:'series' },
+  se_acti9_iid:{ productUrl:'https://www.se.com/my/en/product-range/7559-acti-9-iid/', level:'series' },
+  se_acti9_icv40:{ productUrl:'https://www.se.com/ww/en/product-range/65400-acti9-icv40/', level:'series' },
+  se_acti9_spd:{ productUrl:'https://www.se.com/ww/en/product-subcategory/1615-acti9-surge-protection-devices---spds/', level:'series' },
+  se_tesys_contactor:{ productUrl:'https://www.se.com/us/en/product/LC1D09F7/', level:'series' },
+  se_tesys_overload:{ productUrl:'https://www.se.com/ww/en/product-range/1983-local-tesys-thermal-overload-relays/', level:'series' },
+  se_tesys_gv2:{ productUrl:'https://www.se.com/uk/en/product/GV2ME10/', level:'series' },
+  se_tesys_gv3:{ productUrl:'https://www.se.com/il/en/product/GV3P50/', level:'series' },
+  se_wibe:{ productUrl:'https://www.se.com/ww/en/product-range/61283-wibe-cable-trays/', level:'series', datasheetUrl:'https://www.se.com/ww/en/download/document/LSB03032_Wibe_Cable_Trays/' },
+  // --- Lauritz Knudsen / LK (FUGA, IHC, OPUS) — lk.dk (official brand site) ---
+  lk_all:{ productUrl:'https://www.lk.dk/', level:'series' },
+  // --- ABB — abb.com / new.abb.com / electrification.us.abb.com ---
+  abb_s200:{ productUrl:'https://new.abb.com/products/en/2CDS251001R0427/s201-k10', level:'series' },
+  abb_s200m:{ productUrl:'https://new.abb.com/products/2CDS272001R0427/s202m-k10', level:'series' },
+  abb_af:{ productUrl:'https://electrification.us.abb.com/products/contactors-starters/af-3-pole-contactors', level:'series' },
+  abb_ovr:{ productUrl:'https://electrification.us.abb.com/products/surge-protective-devices/', level:'series' },
+  abb_dry_tr:{ productUrl:'https://electrification.us.abb.com/products/transformers-low-voltage-dry-type/low-voltage-dry-type-vented-transformers', level:'series' },
+  abb_oil_tr:{ productUrl:'https://new.abb.com/medium-voltage', level:'series' },
+  abb_b23:{ productUrl:'https://electrification.us.abb.com/products/measuring-monitoring/b23-ul-energy-meters-b23-112-500-b23-312-500', level:'series' },
+  abb_a44:{ productUrl:'https://electrification.us.abb.com/products/measuring-monitoring', level:'series' },
+  abb_ct:{ productUrl:'https://electrification.us.abb.com/products/instrument-transformers-sensors', level:'series' },
+  // --- Eaton (Bussmann fuses) — eaton.com ---
+  eaton_d0:{ productUrl:'https://www.eaton.com/gb/en-gb/catalog/electrical-circuit-protection/bussmann-low-voltage-d-and-do-fuses-fuse-bases-and-accessories.html', level:'series' },
+  eaton_nh:{ productUrl:'https://www.eaton.com/in/en-us/catalog/electrical-circuit-protection/bussmann-low-voltage-nh-fuses.html', level:'series' },
+  // --- Siemens (SENTRON fuses) — siemens.com ---
+  sie_3na:{ productUrl:'https://www.siemens.com/global/en/products/energy/low-voltage/components/sentron-protection-devices/fuse-systems/lv-hrc-fuse-link-com.html', level:'series' },
+  sie_5se2:{ productUrl:'https://mall.industry.siemens.com/mall/en/us/Catalog/Product/5SE2302', level:'series' },
+  // --- Hager (RCBO / RCCB) — hager.com ---
+  hager_rcbo:{ productUrl:'https://hager.com/uk/products/commercial-distribution/devices/rcbos/rcbo-single-pole-single-module', level:'series' },
+  hager_rccb:{ productUrl:'https://hager.com/uk/products/commercial-distribution/devices/rccbs', level:'series' },
+  // --- DEHN (earthing) — dehn-international.com ---
+  dehn_rod:{ productUrl:'https://www.dehn-international.com/store/h/en-SG/H2947/earth-rods', level:'series' },
+  dehn_clamp:{ productUrl:'https://www.dehn-international.com/store/h/en-AE/H3336/components-for-earth-rods', level:'series' },
+  dehn_plate:{ productUrl:'https://www.dehn-international.com/store/h/en-AE/H3339/equipotential-bonding', level:'series' },
+  dehn_strip:{ productUrl:'https://www.dehn-international.com/store/h/en-AE/H3339/equipotential-bonding', level:'series' },
+  // --- Cellpack (cable joints) — cellpack.com ---
+  cellpack_all:{ productUrl:'https://www.cellpack.com/', level:'series' },
+  // --- Wavin (cable ducts) — wavin.com ---
+  wavin_all:{ productUrl:'https://wavin.com/ie/s/C08_F025_S100/duct-pipe-and-fittings', level:'series' },
+  // --- WAGO (terminals) — wago.com ---
+  wago_all:{ productUrl:'https://www.wago.com/ca-en/rail-mount-terminal-blocks/topjobs-feedthrough-terminal-block/p/2002-1201', level:'series' },
+  // --- Phoenix Contact (terminals) — phoenixcontact.com ---
+  phoenix_all:{ productUrl:'https://www.phoenixcontact.com/en-gb/products/terminal-blocks', level:'series' },
+  // --- TYTAN (made by Doepke) — doepke.de ---
+  tytan_all:{ productUrl:'https://www.doepke.de/', level:'series' }
 };
 
-// Resolves a photo URL and whether it is the EXACT product photo or a
-// REPRESENTATIVE category photo. Returns { url, exact } or null.
-function photoUrlFor(category, p) {
-  if (!PHOTOS_ENABLED) return null;
-  // 1) explicit per-product photo (exact)
-  if (p && p.img) return { url: /^https?:/.test(p.img) ? p.img : (PHOTO_BASE + p.img), exact: true };
-  // 2) connected feed -> resolve the EXACT photo per model.
-  //    PHOTO_BASE may be a pattern with placeholders {id} {ref} {brand} {model},
-  //    or a plain base URL to which "<id>.jpg" is appended.
-  if (PHOTO_BASE && p) {
-    let url;
-    if (PHOTO_BASE.indexOf('{') >= 0) {
-      url = PHOTO_BASE
-        .replace(/\{id\}/g, encodeURIComponent(p.id || ''))
-        .replace(/\{ref\}/g, encodeURIComponent(p.ref || p.id || ''))
-        .replace(/\{brand\}/g, encodeURIComponent(p.brand || ''))
-        .replace(/\{model\}/g, encodeURIComponent(p.model || ''));
-    } else {
-      url = PHOTO_BASE + encodeURIComponent(p.ref || p.id || '') + '.jpg';
-    }
-    return { url, exact: true };
+// Resolve which verified anchor applies to a product (by brand + model/series/category).
+// Pure mapping logic — never builds a URL from the model string.
+function productLinkAnchorKey(p){
+  const b=p.brand, m=p.model||'', s=p.series||'', c=p._cat||'';
+  if(b==='NKT'){
+    if(m==='NOIKLX 90 Dca') return 'nkt_noiklx90';
+    if(m==='NOIK-AL-M') return 'nkt_noik_al';
+    if(m.indexOf('N1XV')===0) return 'nkt_n1xv';
+    if(m.indexOf('NAYY')===0) return 'nkt_nayy';
   }
-  // 3) per-category default (representative, not the exact model)
-  const c = COMPONENT_PHOTOS[category];
-  if (c) return { url: /^https?:/.test(c) ? c : (PHOTO_BASE + c), exact: false };
+  if(b==='Schneider'){
+    if(m==='iC60N'||m==='iC60H') return 'se_acti9_ic60';
+    if(m==='C60N') return 'se_multi9_c60';
+    if(m.indexOf('NSX')===0) return 'se_nsx';
+    if(m==='Acti9 iID'||m==='Acti9 iID Type B') return 'se_acti9_iid';
+    if(m==='Acti9 iCV40'||m==='Acti9 iC60H RCBO') return 'se_acti9_icv40';
+    if(m.indexOf('Acti9 iPRD')===0||m.indexOf('Acti9 iPRF')===0) return 'se_acti9_spd';
+    if(m.indexOf('LC1D')===0) return 'se_tesys_contactor';
+    if(m.indexOf('LRD')===0) return 'se_tesys_overload';
+    if(m.indexOf('GV2')===0) return 'se_tesys_gv2';
+    if(m.indexOf('GV3')===0) return 'se_tesys_gv3';
+  }
+  if(b==='ABB'){
+    if(c==='mcbs'&&s==='S200') return 'abb_s200';
+    if(c==='mcbs'&&s==='S200M') return 'abb_s200m';
+    if(m.indexOf('AF')===0) return 'abb_af';
+    if(m.indexOf('OVR')===0) return 'abb_ovr';
+    if(m.indexOf('Dry DTR')===0) return 'abb_dry_tr';
+    if(m.indexOf('Oil DTR')===0) return 'abb_oil_tr';
+    if(m.indexOf('B23')===0) return 'abb_b23';
+    if(m.indexOf('A44')===0) return 'abb_a44';
+    if(m.indexOf('CT PRO')===0) return 'abb_ct';
+  }
+  if(b==='Eaton'){
+    if(m.indexOf('D01')===0||m.indexOf('D02')===0) return 'eaton_d0';
+    if(m.indexOf('NH')===0) return 'eaton_nh';
+  }
+  if(b==='Siemens'){
+    if(m.indexOf('3NA')===0) return 'sie_3na';
+    if(m.indexOf('5SE2')===0) return 'sie_5se2';
+  }
+  if(b==='Hager'){
+    if(m.indexOf('ADA')===0) return 'hager_rcbo';
+    if(m.indexOf('CDA')===0||m.indexOf('CDC')===0) return 'hager_rccb';
+  }
+  if(b==='LK (Lauritz Knudsen)') return 'lk_all';
+  if(b==='DEHN'){
+    if(m.indexOf('Jordspaer')===0) return 'dehn_rod';
+    if(m.indexOf('Jordklemme')===0) return 'dehn_clamp';
+    if(m.indexOf('Jordplade')===0) return 'dehn_plate';
+    if(m.indexOf('Jordb')===0) return 'dehn_strip';
+  }
+  if(b==='Cellpack') return 'cellpack_all';
+  if(b==='Wavin') return 'wavin_all';
+  if(b==='Wibe') return 'se_wibe';
+  if(b==='Wago') return 'wago_all';
+  if(b==='Phoenix Contact') return 'phoenix_all';
+  if(b==='TYTAN') return 'tytan_all';
   return null;
 }
 
-// Returns a real <img> photo (with SVG fallback) or the SVG illustration.
-// Representative (non-exact) photos get an honest "~" badge.
-function getComponentVisual(category, p) {
-  const res = photoUrlFor(category, p);
-  const svg = getComponentSvg(category, p);
-  if (!res) return svg;
-  const fid = 'ph' + Math.random().toString(36).slice(2, 9);
-  const badge = res.exact ? '' :
-    `<span title="${tx('Repr\u00E6sentativt billede (ikke n\u00F8jagtig model)', 'Representative image (not the exact model)')}"
-       style="position:absolute;bottom:-3px;right:-3px;background:var(--warning);color:#5a4500;font-size:8px;font-weight:700;padding:1px 3px;border-radius:4px;line-height:1.2">~</span>`;
-  return `<span style="position:relative;display:inline-flex;flex-shrink:0">
-    <img src="${res.url}" alt="${(p && p.model) || ''}" width="56" height="56" loading="lazy"
-      style="object-fit:cover;border-radius:8px;border:1px solid var(--border)"
-      onerror="this.style.display='none';var f=document.getElementById('${fid}');if(f)f.style.display='inline-flex'">
-    <span id="${fid}" style="display:none">${svg}</span>
-    ${badge}
-  </span>`;
+// Build the keyed link map: brand|model -> link (+ product-id alias). Auditable & append-only.
+const PRODUCT_LINKS = (function buildProductLinks(){
+  const map = {};
+  Object.keys(PRODUCTS).forEach(function(cat){
+    PRODUCTS[cat].forEach(function(p){
+      const ak = productLinkAnchorKey(Object.assign({ _cat: cat }, p));
+      const a = ak && PRODUCT_LINK_ANCHORS[ak];
+      if(!a) return;
+      const entry = { productUrl: a.productUrl, level: a.level || 'series', anchor: ak };
+      if(a.datasheetUrl) entry.datasheetUrl = a.datasheetUrl;
+      map[p.brand + '|' + p.model] = entry;
+      map[p.id] = entry; // direct-by-id alias
+    });
+  });
+  return map;
+})();
+
+// Lookup helper: by product object (brand|model first, then id).
+function getProductLink(p){
+  if(!p) return null;
+  return PRODUCT_LINKS[p.brand + '|' + p.model] || PRODUCT_LINKS[p.id] || null;
 }
 
-function configurePhotos() {
-  const msg = tx('Indtast URL-m\u00F8nster til dit licenserede billedfeed, s\u00E5 hvert produkt viser SIT eget foto.\n\nBrug pladsholdere: {ref} {id} {brand} {model}\nEksempel: https://feed.lemu.dk/img/{ref}.jpg\n\n(Tomt = brug repr\u00E6sentative fotos)', 'Enter a URL pattern for your licensed image feed so each product shows ITS OWN photo.\n\nUse placeholders: {ref} {id} {brand} {model}\nExample: https://feed.lemu.dk/img/{ref}.jpg\n\n(Empty = use representative photos)');
-  const base = prompt(msg, PHOTO_BASE);
-  if (base === null) return;
-  PHOTO_BASE = base.trim();
-  PHOTOS_ENABLED = true; // representative photos still show when base is empty
-  localStorage.setItem('photoBase', PHOTO_BASE);
-  localStorage.setItem('photosEnabled', '1');
-  renderModule(activeModule);
+// Click-only "View product / Datasheet" links for a product (trilingual da/en/fa).
+// Opens the manufacturer's official page in a new tab. No <img>, no typing.
+function renderProductLinks(p){
+  const link = getProductLink(p);
+  if(!link) return '';
+  const lvTitle = link.level === 'model'
+    ? tx('officiel produktside', 'official product page')
+    : tx('officiel serieside', 'official series page');
+  let h = '<span class="product-links" style="display:inline-flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:3px">';
+  h += '<a class="sel-btn" style="padding:2px 9px;text-decoration:none;display:inline-flex;align-items:center;gap:4px" '
+    + 'href="' + link.productUrl + '" target="_blank" rel="noopener noreferrer" '
+    + 'title="' + tx('\u00C5bner producentens officielle side i ny fane', 'Opens the manufacturer official page in a new tab') + ' \u2014 ' + lvTitle + '">'
+    + '\uD83D\uDD17 ' + tx('Se produkt', 'View product') + '</a>';
+  if(link.datasheetUrl){
+    h += '<a class="sel-btn" style="padding:2px 9px;text-decoration:none;display:inline-flex;align-items:center;gap:4px" '
+      + 'href="' + link.datasheetUrl + '" target="_blank" rel="noopener noreferrer" '
+      + 'title="' + tx('\u00C5bner officielt datablad i ny fane', 'Opens the official datasheet in a new tab') + '">'
+      + '\uD83D\uDCC4 ' + tx('Datablad', 'Datasheet') + '</a>';
+  }
+  if(link.level !== 'model'){
+    h += '<span style="font-size:0.68rem;color:var(--text-muted)" title="'
+      + tx('Officiel serieside p\u00E5 producentens eget dom\u00E6ne (varianter deler side)', 'Official series page on the manufacturer own domain (variants share the page)')
+      + '">' + tx('(serie)', '(series)') + '</span>';
+  }
+  h += '</span>';
+  return h;
 }
+
+// Returns a license-safe, offline, code-generated SVG illustration of the
+// component type. No remote images are ever hot-linked, and no misleading
+// "representative" badge is shown. To see the REAL product photo, the UI links
+// to the manufacturer's official page (see renderProductLinks()).
+function getComponentVisual(category, p) {
+  return getComponentSvg(category, p);
+}
+
+// (Removed: configurePhotos — used prompt() free-text + remote image feed, which
+// violated the click-only and no-remote-image rules. Replaced by official links.)
+
 
 // ===== COMPONENT VISUALS (code-generated SVG illustrations - fallback) =====
 // License-safe, offline, scalable illustrations of each real component type.
@@ -6773,6 +6894,7 @@ function renderBank() {
             <span class="value">${spec}</span>
           </div>
           ${useText ? `<span style="font-size:0.75rem;color:var(--text-muted)">${useText}</span>` : ''}
+          ${renderProductLinks(p)}
         </div>
       </div>
     `;
@@ -6784,12 +6906,8 @@ function renderBank() {
       <div class="info-row">${tx('Komplet bank over elektriske komponenter tilg\u00E6ngelige i Danmark (NKT, Schneider, ABB, Eaton, Hager, LK). Klik for at filtrere.', 'Complete bank of electrical components available in Denmark (NKT, Schneider, ABB, Eaton, Hager, LK). Click to filter.')}</div>
 
       <div class="select-group">
-        <div class="select-label">${tx('Billeder', 'Photos')}</div>
-        <div class="select-grid">
-          <button class="sel-btn ${PHOTOS_ENABLED ? 'selected' : ''}" onclick="${PHOTOS_ENABLED ? "PHOTOS_ENABLED=false;localStorage.setItem('photosEnabled','0');renderModule('bank')" : "PHOTOS_ENABLED=true;localStorage.setItem('photosEnabled','1');renderModule('bank')"}">\uD83D\uDCF7 ${PHOTOS_ENABLED ? (tx('Rigtige fotos: TIL', 'Real photos: ON')) : (tx('Rigtige fotos: FRA', 'Real photos: OFF'))}</button>
-          <button class="sel-btn" onclick="configurePhotos()">\u2699\uFE0F ${tx('Eget billedfeed', 'Own image feed')}</button>
-        </div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px">${PHOTOS_ENABLED ? (tx('Viser rigtige fotos (Wikimedia Commons, CC-licens). Tilslut "Eget billedfeed" for eksakte modelfotos.', 'Showing real photos (Wikimedia Commons, CC-licensed). Connect "Own image feed" for exact model photos.')) : (tx('Viser SVG-illustrationer.', 'Showing SVG illustrations.'))}</div>
+        <div class="select-label">${tx('Komponentbillede', 'Component image')}</div>
+        <div style="font-size:0.72rem;color:var(--text-muted)">${tx('Viser licens-sikre SVG-illustrationer. Klik "Se produkt" ved hvert produkt for det rigtige foto p\u00E5 producentens officielle side.', 'Showing license-safe SVG illustrations. Click "View product" on each item for the real photo on the manufacturer official page.')}</div>
       </div>
 
       <div class="select-group">
@@ -7009,6 +7127,7 @@ function elforsyningBomLines() {
 // Structured export object (also used by the JSON download).
 function elforsyningExportData() {
   const lines = elforsyningBomLines().map(function(l) {
+    const link = getProductLink(l.product);
     return {
       id: l.id,
       category: l.category,
@@ -7017,6 +7136,9 @@ function elforsyningExportData() {
       spec: bankSpec(l.category, l.product),
       standard: elforsyningStandard(l.product),
       approval: elforsyningApproval(l.product),
+      productUrl: link ? link.productUrl : null,
+      datasheetUrl: link && link.datasheetUrl ? link.datasheetUrl : null,
+      linkLevel: link ? link.level : null,
       qty: l.qty
     };
   });
@@ -7176,6 +7298,7 @@ function renderElforsyningBom() {
       h += '<span style="font-size:0.75rem;color:var(--text-muted)">' + bankSpec(cat, p)
         + ' \u00B7 ' + tx('Standard', 'Standard') + ': ' + elforsyningStandard(p)
         + ' \u00B7 ' + elforsyningApproval(p) + '</span>';
+      h += renderProductLinks(p);
       h += '</div>';
       h += elforsyningRenderQtyControl(l.id, l.qty);
       h += '<button class="sel-btn" style="padding:2px 9px;min-width:auto" title="' + tx('Fjern', 'Remove') + '" onclick="elforsyningRemove(\'' + l.id + '\')">\u2715</button>';
@@ -7496,15 +7619,10 @@ function submitAiQuestion() {
 }
 
 function configureAI() {
-  const cfg = JSON.parse(localStorage.getItem('aiElectricianCfg') || '{}');
-  const endpoint = prompt(tx('AI endpoint URL (OpenAI-kompatibel):', 'AI endpoint URL (OpenAI-compatible):'), cfg.endpoint || 'https://api.openai.com/v1/chat/completions');
-  if (endpoint === null) return;
-  const key = prompt(tx('API-nøgle:', 'API key:'), cfg.key || '');
-  if (key === null) return;
-  const model = prompt(tx('Model:', 'Model:'), cfg.model || 'gpt-4o-mini');
-  if (model === null) return;
-  localStorage.setItem('aiElectricianCfg', JSON.stringify({ endpoint, key, model }));
-  renderModule('ai');
+  // Online-AI configuration via free-text prompt() was removed (click-only rule),
+  // along with the bundled api.openai.com endpoint default. Online mode now
+  // requires an endpoint configured at setup; the UI never asks the user to type.
+  if (typeof alert === 'function') alert(tx('Online AI skal konfigureres ved ops\u00E6tning (ingen fri tekst i app\u2019en). Brug den klik-baserede AI-vidensbase.', 'Online AI must be configured at setup (no free text in the app). Use the click-based AI knowledge base.'));
 }
 
 function renderAiElectrician() {
@@ -7800,10 +7918,11 @@ async function checkLawUpdates(manual) {
 }
 
 function configureLawSource() {
-  const url = prompt(tx('URL til JSON-manifest med nyeste standarder (lad tom for at sl\u00E5 fra):', 'URL to JSON manifest with latest standards (leave empty to disable):'), LAW_MANIFEST_URL);
-  if (url === null) return;
-  localStorage.setItem('lawManifestUrl', url.trim() === '' ? 'off' : url.trim());
-  location.reload();
+  // Click-only toggle (no free-text URL entry): switch the official update source
+  // between the built-in default manifest and OFF. Removes the prior prompt().
+  const isOff = localStorage.getItem('lawManifestUrl') === 'off';
+  localStorage.setItem('lawManifestUrl', isOff ? '' : 'off');
+  if (typeof location !== 'undefined' && location.reload) location.reload();
 }
 
 // Auto-check once per day when online
@@ -7997,7 +8116,6 @@ function renderBid() {
 
       <div class="select-grid" style="margin-bottom:8px">
         <button class="sel-btn selected" onclick="bidAutoFill()">\u26A1 ${tx('Auto-udfyld fra dimensionering', 'Auto-fill from dimensioning')}</button>
-        <button class="sel-btn" onclick="configurePriceFeed()">\uD83D\uDD17 ${tx('Tilslut prisfeed', 'Connect price feed')}</button>
         ${bidState.basket.length ? `<button class="sel-btn" onclick="bidState.basket=[];renderModule('bid')">\uD83D\uDDD1\uFE0F ${tx('Ryd', 'Clear')}</button>` : ''}
       </div>
     </div>
@@ -8082,20 +8200,9 @@ function renderBid() {
   `;
 }
 
-function configurePriceFeed() {
-  const w = bidState.wholesaler;
-  const cur = WHOLESALERS[w].feed || '';
-  const url = prompt(lang === 'da'
-    ? 'URL-m\u00F8nster til ' + w + ' B2B-prisfeed (pladsholdere {elnr} {ref} {id}).\nKompatibel med EG Sigma / EG Kalkia prisfiler (EL-nr).\nF.eks.: https://api.lemu.dk/price/{elnr}\n(Tomt = vejledende priser)'
-    : 'URL pattern for ' + w + ' B2B price feed (placeholders {elnr} {ref} {id}).\nCompatible with EG Sigma / EG Kalkia price files (EL-nr).\nE.g.: https://api.lemu.dk/price/{elnr}\n(Empty = indicative prices)', cur);
-  if (url === null) return;
-  WHOLESALERS[w].feed = url.trim();
-  try { localStorage.setItem('priceFeeds', JSON.stringify(Object.fromEntries(Object.entries(WHOLESALERS).map(([k,v]) => [k, v.feed])))); } catch(e){}
-  alert(lang === 'da'
-    ? (url.trim() ? 'Prisfeed gemt for ' + w + '. Live priser kr\u00E6ver gyldig B2B-adgang (som i EG Sigma/Kalkia).' : 'Bruger vejledende priser for ' + w + '.')
-    : (url.trim() ? 'Price feed saved for ' + w + '. Live prices require valid B2B access (as in EG Sigma/Kalkia).' : 'Using indicative prices for ' + w + '.'));
-  renderModule('bid');
-}
+// (Removed: configurePriceFeed — used prompt() free-text to enter a B2B price-feed
+// URL, violating the click-only rule. Prices remain indicative; no typing.)
+
 // Restore saved price feeds
 (function restorePriceFeeds() {
   try {
@@ -8526,35 +8633,11 @@ function buildSLD(){
   + `</svg></div>`;
 }
 
-// Optional online AI painting
-async function genAiPainting(){
-  const cfg = JSON.parse(localStorage.getItem('aiElectricianCfg')||'{}');
-  const imgCfg = JSON.parse(localStorage.getItem('aiImgCfg')||'{}');
-  const box = document.getElementById('aiImgBox');
-  if(!imgCfg.endpoint || !imgCfg.key){
-    if(box) box.innerHTML = '<div class="info-row">'+(tx('Online AI-billede ikke konfigureret. Klik "Indstil AI-billede".', 'Online AI image not configured. Click "Configure AI image".'))+'</div>';
-    return;
-  }
-  if(box) box.innerHTML = '<div class="info-row">'+(tx('Genererer AI-maleri…', 'Generating AI painting…'))+'</div>';
-  const sch = calcLoadSchedule();
-  const prompt = (tx('Fotorealistisk maleri af en dansk eltavle-installation: ', 'Photorealistic painting of a Danish electrical switchboard installation: '))
-    + (loadList.length?loadList.length:4)+' grupper, '+(TRAFO_SIZES.find(t=>t>=sch.kVA)||630)+' kVA transformer, neon blue glow, clean industrial, professional';
-  try{
-    const res = await fetch(imgCfg.endpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+imgCfg.key},
-      body:JSON.stringify({model:imgCfg.model||'dall-e-3',prompt:prompt,n:1,size:'1024x1024'})});
-    const data = await res.json();
-    const url = data.data && data.data[0] && (data.data[0].url || ('data:image/png;base64,'+data.data[0].b64_json));
-    if(box) box.innerHTML = url ? '<img src="'+url+'" style="width:100%;border-radius:12px;border:1px solid var(--line)">' : '<div class="info-row">'+(tx('Intet billede modtaget.', 'No image received.'))+'</div>';
-  }catch(e){ if(box) box.innerHTML = '<div class="info-row">'+(tx('Fejl: ', 'Error: '))+e.message+'</div>'; }
-}
-function configAiImg(){
-  const cur = JSON.parse(localStorage.getItem('aiImgCfg')||'{}');
-  const ep = prompt(tx('Billede-API endpoint (OpenAI-kompatibel images):', 'Image API endpoint (OpenAI-compatible images):'), cur.endpoint||'https://api.openai.com/v1/images/generations');
-  if(ep===null) return; const key = prompt('API key:', cur.key||''); if(key===null) return;
-  const model = prompt('Model:', cur.model||'dall-e-3'); if(model===null) return;
-  localStorage.setItem('aiImgCfg', JSON.stringify({endpoint:ep.trim(),key:key.trim(),model:model.trim()}));
-  alert(tx('Gemt. Klik "Generér AI-maleri".', 'Saved. Click "Generate AI painting".'));
-}
+// (Removed: genAiPainting + configAiImg — generated images via an external AI
+// image endpoint (OpenAI/DALL-E) using prompt() free-text. This violated the
+// no-AI-image-generation, no-external-network and click-only rules. The real
+// component photos are now reached via official manufacturer links instead.)
+
 
 // ===== GENERATIVE 3D INSTALLATION DRAWING (highest quality) =====
 // Data-driven: draws ANY installation from a composable node graph.
@@ -8626,7 +8709,7 @@ function build3D(){
 function renderDrawing(){
   const nodes=getDrawNodes(), typeKeys=Object.keys(NODE_TYPES);
   const nodeEditor=`<div class="select-group"><div class="select-label">${tx('Installationens noder (tilf\u00F8j/fjern/flyt)', 'Installation nodes (add/remove/move)')}</div>${nodes.map((n,i)=>{const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;return `<div style="display:inline-flex;align-items:center;gap:4px;margin:3px 4px;padding:5px 9px;border:1.5px solid ${nt.color};border-radius:8px;font-size:.78rem;background:rgba(0,0,0,0.25)"><span>${nt.icon}</span><span style="color:${nt.color};font-weight:700">${tp(nt)}</span><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},-1)">\u25C0</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},1)">\u25B6</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem;color:var(--danger)" onclick="drawNodeRemove(${i})">\u2715</button></div>`;}).join('')}</div><div class="select-group"><div class="select-label">${tx('Tilf\u00F8j node', 'Add node')}</div><div class="select-grid">${typeKeys.map(k=>`<button class="sel-btn" onclick="drawNodeAdd('${k}')">${NODE_TYPES[k].icon} ${tp(NODE_TYPES[k])}</button>`).join('')}<button class="sel-btn" onclick="drawNodeReset()">\u21BA ${tx('Nulstil', 'Reset')}</button></div></div>`;
-  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${tx('Tegning af installationen', 'Installation drawing')}</div><div class="info-row">${tx('Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.', 'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.')}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${tx('Enstregsdiagram', 'Single-line')}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${tx('3D-skitse', '3D scene')}</button></div>${drawStyle==='iso'?build3D():buildSLD()}${drawStyle==='iso'?nodeEditor:''}</div><div class="card fade-in"><div class="card-title">\uD83C\uDFA8 ${tx('AI-maleri', 'AI painting')}</div><div class="info-row">${tx('Gener\u00E9r et foto-realistisk billede via online billed-AI.', 'Generate a photorealistic image via online image AI.')}</div><div class="select-grid"><button class="sel-btn selected" onclick="genAiPainting()">\uD83C\uDFA8 ${tx('Gener\u00E9r', 'Generate')}</button><button class="sel-btn" onclick="configAiImg()">\u2699\uFE0F ${tx('Indstil', 'Configure')}</button></div><div id="aiImgBox" style="margin-top:12px"></div></div>`;
+  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${tx('Tegning af installationen', 'Installation drawing')}</div><div class="info-row">${tx('Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.', 'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.')}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${tx('Enstregsdiagram', 'Single-line')}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${tx('3D-skitse', '3D scene')}</button></div>${drawStyle==='iso'?build3D():buildSLD()}${drawStyle==='iso'?nodeEditor:''}</div>`;
 }
 
 // ===== EXAM SIMULATOR (data + engine) =====
