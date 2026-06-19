@@ -510,6 +510,7 @@
           </div>
           <div class="globe-detail" id="globeDetail" hidden></div>
           <div class="globe-spend" id="globeSpend" hidden>
+            <button class="gd-close globe-spend-close" id="globeSpendClose" type="button" aria-label="Close">×</button>
             <div class="globe-spend-title">Spending over time</div>
             <div class="globe-spend-chart" id="globeSpendChart"></div>
             <div class="globe-spend-title globe-online-title">Countries coming online</div>
@@ -564,8 +565,9 @@
     const deployMeta = $("#globeDeployMeta");
     if (deployBar) deployBar.hidden = false;
     let deployDone = false;  // one-shot guard for the 'build complete' toast
-    if (deployPlay) deployPlay.addEventListener("click", () => G.toggleDeployment());
-    if (deployRange) deployRange.addEventListener("input", () => G.setDeployment(Number(deployRange.value) || 0));
+    let userStartedDeploy = false; // only show spend panel on explicit user interaction
+    if (deployPlay) deployPlay.addEventListener("click", () => { userStartedDeploy = true; G.toggleDeployment(); });
+    if (deployRange) deployRange.addEventListener("input", () => { userStartedDeploy = true; G.setDeployment(Number(deployRange.value) || 0); });
     if (deployExit) deployExit.addEventListener("click", () => G.exitDeployment());
     // Spending-over-time S-curve overlay (fills as the A–Z build plays).
     const spendBox = $("#globeSpend"), spendChart = $("#globeSpendChart");
@@ -587,6 +589,9 @@
         if (c) { e.preventDefault(); focusFromChip(c); }
       });
     }
+    // Close button for the spend/online overlay
+    const spendClose = $("#globeSpendClose");
+    if (spendClose) spendClose.addEventListener("click", () => { if (spendBox) spendBox.hidden = true; userStartedDeploy = false; });
     const updateSpend = st => {
       if (!st || !st.budgetUsd) return;
       const x = spendX(st.g), y = spendY(st.costUsd / st.budgetUsd);
@@ -633,7 +638,7 @@
           deployMeta.textContent = `Month ${st.month} of ${st.monthsTotal} · about ${fmtUsd(st.costUsd)} committed (${st.costPct}%) · ${st.online} of ${st.stations} countries live`;
         }
       }
-      if (spendBox) spendBox.hidden = !st.mode;
+      if (spendBox) spendBox.hidden = !(st.mode && userStartedDeploy);
       updateSpend(st);
       // Notify once when the A–Z build finishes.
       if (st.mode && (st.pct >= 100 || st.laid >= st.total)) {

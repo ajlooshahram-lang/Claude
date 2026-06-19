@@ -669,6 +669,9 @@ tr.row-dragover td{border-top:2px solid var(--blue)!important;background:rgba(46
 .globe-spend{position:absolute;right:14px;top:14px;z-index:3;width:248px;max-width:calc(100% - 28px);
   background:rgba(12,22,42,.82);border:1px solid rgba(125,167,240,.26);border-radius:14px;padding:11px 13px 6px;
   backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 10px 36px rgba(0,0,0,.42);animation:gdIn .22s ease both}
+.globe-spend .globe-spend-close{position:absolute;right:8px;top:6px;width:24px;height:24px;border:none;border-radius:6px;cursor:pointer;
+  background:transparent;color:#9fb0cf;font-size:19px;line-height:1;z-index:1}
+.globe-spend .globe-spend-close:hover{background:rgba(125,167,240,.16);color:#fff}
 .globe-spend-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9fb0cf;margin-bottom:4px}
 .globe-spend-chart{line-height:0}
 .spend-svg{width:100%;height:auto;display:block;overflow:visible}
