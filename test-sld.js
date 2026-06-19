@@ -6899,6 +6899,225 @@ test('KLS: all 14 views still render non-empty with NO text input/textarea after
   assert(all.indexOf('<textarea') < 0, 'no <textarea>');
 });
 
+// ===== KLS v4: audit-readiness engine, pre-audit gap report, audit-ready print =====
+
+// Build a synthetic fully-compliant KLS state from defaults (click-only fields).
+function klsCompliantState() {
+  var s = JSON.parse(JSON.stringify(klsDefaults()));
+  var i;
+  for (i = 0; i < s.reviewPts.length; i++) s.reviewPts[i] = 'OK';     // all 12 review points rated
+  for (i = 0; i < s.annual.length; i++) s.annual[i] = 'Ja';           // all 8 annual = Ja (LOVKRAV satisfied)
+  for (i = 0; i < s.calStatus.length; i++) s.calStatus[i] = 'Kalibreret OK';
+  // procStatus / docStatus already all set by defaults
+  s.devStatus = [];                                                    // no demo deviations
+  s.devLog = [];                                                       // no open deviations
+  s.expiryMonths = 12;                                                 // > 3 months, no godkendt date
+  s.godkendtYear = ''; s.godkendtMonth = '';
+  // a recent meeting date so the "within 12 months" check passes
+  var now = new Date();
+  s.moedeYear = String(now.getFullYear());
+  s.moedeMonth = ('0' + (now.getMonth() + 1)).slice(-2);
+  // one documented (approved) slutkontrol so "logs exist" is satisfied with no orphan
+  s.elLog = [{ sagsnr: '2025-001', date: '2025-01-01', type: 'EL', status: 'Godkendt' }];
+  return s;
+}
+
+test('KLS: klsAuditReadiness on default state — low pct, structured items, verdict string', function() {
+  var r = klsAuditReadiness(klsDefaults());
+  assert(typeof r.score === 'number' && typeof r.max === 'number', 'score/max numeric');
+  assert(typeof r.pct === 'number', 'pct numeric');
+  assert(Array.isArray(r.items) && r.items.length >= 8, 'items array with >=8 checks');
+  r.items.forEach(function(it) {
+    assert(typeof it.weight === 'number', 'item has weight');
+    assert(typeof it.ok === 'boolean', 'item has ok boolean');
+    assert(it.severity === 'LOVKRAV' || it.severity === 'VIGTIGT', 'item severity tag');
+    assert(typeof it.label_da === 'string' && typeof it.label_en === 'string', 'item bilingual labels');
+    assert(typeof it.detail_da === 'string' && typeof it.detail_en === 'string', 'item bilingual detail');
+  });
+  assert(['Klar til audit', 'Næsten klar', 'Ikke klar'].indexOf(r.verdict) >= 0, 'verdict is a known string');
+  assert(r.pct < 70, 'default state is not audit-ready (got ' + r.pct + '%)');
+  assert.strictEqual(r.passLovkrav, false, 'default state fails LOVKRAV (review/annual/deviations not done)');
+});
+
+test('KLS: klsAuditReadiness on a fully-compliant state — passLovkrav, Klar til audit, pct>=90', function() {
+  var r = klsAuditReadiness(klsCompliantState());
+  assert.strictEqual(r.passLovkrav, true, 'all LOVKRAV ok');
+  assert(r.pct >= 90, 'pct >= 90, got ' + r.pct);
+  assert.strictEqual(r.verdict, 'Klar til audit');
+  var failing = r.items.filter(function(it) { return !it.ok; });
+  assert.strictEqual(failing.length, 0, 'no failing items in compliant state');
+});
+
+test('KLS: breaking one LOVKRAV (calStatus Udløbet) flips passLovkrav and lists the item', function() {
+  var s = klsCompliantState();
+  s.calStatus[0] = 'Udløbet';
+  var r = klsAuditReadiness(s);
+  assert.strictEqual(r.passLovkrav, false, 'passLovkrav flips to false');
+  var inst = r.items.filter(function(it) { return it.id === 'instruments'; })[0];
+  assert.strictEqual(inst.ok, false, 'instruments item not ok');
+  assert.strictEqual(inst.severity, 'LOVKRAV', 'instruments is LOVKRAV');
+  assert(inst.detail_da.indexOf('1') >= 0, 'detail mentions 1 instrument');
+  assert.notStrictEqual(r.verdict, 'Klar til audit', 'verdict no longer ready');
+});
+
+test('KLS: breaking annual LOVKRAV (one Nej) flips passLovkrav and flags annual item', function() {
+  var s = klsCompliantState();
+  // set the first LOVKRAV annual answer to Nej
+  for (var i = 0; i < KLS_ANNUAL.length; i++) { if (KLS_ANNUAL[i].tag === 'LOVKRAV') { s.annual[i] = 'Nej'; break; } }
+  var r = klsAuditReadiness(s);
+  assert.strictEqual(r.passLovkrav, false);
+  var ann = r.items.filter(function(it) { return it.id === 'annual'; })[0];
+  assert.strictEqual(ann.ok, false);
+  assert.strictEqual(ann.severity, 'LOVKRAV');
+});
+
+test('KLS: an open deviation flips the deviations LOVKRAV item to failing', function() {
+  var s = klsCompliantState();
+  s.devLog = [{ id: 'AFV-001', sagsnr: '2025-001', area: 'EL', type: 'Udførelsesfejl', status: 'Åben', date: '2025-01-01' }];
+  // the el entry is now an Afvigelse linked to that deviation so "logs" stays ok
+  s.elLog = [{ sagsnr: '2025-001', date: '2025-01-01', type: 'EL', status: 'Afvigelse' }];
+  var r = klsAuditReadiness(s);
+  var dev = r.items.filter(function(it) { return it.id === 'deviations'; })[0];
+  assert.strictEqual(dev.ok, false, 'open deviation => not ok');
+  assert.strictEqual(dev.severity, 'LOVKRAV');
+  assert(dev.detail_da.indexOf('1') >= 0, 'detail mentions 1 open deviation');
+  assert.strictEqual(r.passLovkrav, false);
+});
+
+test('KLS: orphan Afvigelse (no linked deviation) flags the logs LOVKRAV item', function() {
+  var s = klsCompliantState();
+  s.elLog = [{ sagsnr: '2025-009', date: '2025-01-01', type: 'EL', status: 'Afvigelse' }];
+  s.devLog = []; // no matching deviation -> orphan
+  var r = klsAuditReadiness(s);
+  var logs = r.items.filter(function(it) { return it.id === 'logs'; })[0];
+  assert.strictEqual(logs.ok, false, 'orphan Afvigelse => logs not ok');
+  assert.strictEqual(logs.severity, 'LOVKRAV');
+});
+
+test('KLS: pct math is score/max rounded to nearest integer', function() {
+  var r = klsAuditReadiness(klsDefaults());
+  assert.strictEqual(r.pct, Math.round(r.score / r.max * 100), 'pct equals rounded score/max*100');
+  var c = klsAuditReadiness(klsCompliantState());
+  assert.strictEqual(c.score, c.max, 'compliant: score == max');
+  assert.strictEqual(c.pct, 100, 'compliant pct is 100');
+});
+
+test('KLS: klsAuditVerdict threshold boundaries at 90 and 70 (named constants)', function() {
+  assert.strictEqual(KLS_AUDIT_READY_PCT, 90);
+  assert.strictEqual(KLS_AUDIT_ALMOST_PCT, 70);
+  assert.strictEqual(klsAuditVerdict(90, true), 'Klar til audit', '90% + LOVKRAV => Klar');
+  assert.strictEqual(klsAuditVerdict(90, false), 'Næsten klar', '90% but LOVKRAV fail => Næsten');
+  assert.strictEqual(klsAuditVerdict(89, true), 'Næsten klar', 'just below 90 => Næsten');
+  assert.strictEqual(klsAuditVerdict(70, false), 'Næsten klar', '70% boundary => Næsten');
+  assert.strictEqual(klsAuditVerdict(69, true), 'Ikke klar', 'below 70 => Ikke klar');
+  assert.strictEqual(klsAuditVerdict(100, true), 'Klar til audit');
+});
+
+test('KLS: klsAuditReadiness is pure (does not mutate klsState)', function() {
+  var beforeReview = JSON.stringify(klsState.reviewPts);
+  var beforeAnnual = JSON.stringify(klsState.annual);
+  var beforeView = klsState.view;
+  klsAuditReadiness(klsState);
+  klsAuditReadiness(klsCompliantState());
+  assert.strictEqual(JSON.stringify(klsState.reviewPts), beforeReview, 'reviewPts unchanged');
+  assert.strictEqual(JSON.stringify(klsState.annual), beforeAnnual, 'annual unchanged');
+  assert.strictEqual(klsState.view, beforeView, 'view unchanged');
+});
+
+test('KLS: LOVKRAV items are weighted heavier than VIGTIGT items', function() {
+  var r = klsAuditReadiness(klsDefaults());
+  var lov = r.items.filter(function(it) { return it.severity === 'LOVKRAV'; })[0];
+  var vig = r.items.filter(function(it) { return it.severity === 'VIGTIGT'; })[0];
+  assert(lov.weight > vig.weight, 'LOVKRAV weight > VIGTIGT weight');
+  assert.strictEqual(lov.weight, KLS_AUDIT_W_LOVKRAV);
+  assert.strictEqual(vig.weight, KLS_AUDIT_W_VIGTIGT);
+});
+
+test('KLS: dashboard shows readiness % and lists a failing item when gaps exist', function() {
+  klsClearLogs();
+  var savedView = klsState.view;
+  var savedReview = klsState.reviewPts.slice();
+  var savedAnnual = klsState.annual.slice();
+  for (var i = 0; i < klsState.reviewPts.length; i++) klsState.reviewPts[i] = null;
+  for (var j = 0; j < klsState.annual.length; j++) klsState.annual[j] = null;
+  klsState.view = 'dashboard';
+  var html = renderKLS();
+  var r = klsAuditReadiness(klsState);
+  klsState.view = savedView;
+  klsState.reviewPts = savedReview;
+  klsState.annual = savedAnnual;
+  assert(html.indexOf('Pre-audit') >= 0, 'dashboard shows pre-audit readiness section');
+  assert(html.indexOf(r.pct + '%') >= 0, 'dashboard shows the readiness percentage');
+  assert(html.indexOf('[LOVKRAV]') >= 0, 'dashboard lists at least one failing LOVKRAV item');
+  assert(html.indexOf('klsPrintReport()') >= 0, 'dashboard has the Vis pre-audit rapport button');
+});
+
+test('KLS: dashboard shows the no-gaps verdict when fully compliant', function() {
+  var savedView = klsState.view;
+  var savedReview = klsState.reviewPts.slice();
+  var savedAnnual = klsState.annual.slice();
+  var savedCal = klsState.calStatus.slice();
+  var savedDevStatus = klsState.devStatus.slice();
+  var savedDevLog = klsState.devLog.slice();
+  var savedEl = klsState.elLog.slice();
+  var savedExpiry = klsState.expiryMonths;
+  var savedMY = klsState.moedeYear, savedMM = klsState.moedeMonth;
+  var now = new Date();
+  var i;
+  for (i = 0; i < klsState.reviewPts.length; i++) klsState.reviewPts[i] = 'OK';
+  for (i = 0; i < klsState.annual.length; i++) klsState.annual[i] = 'Ja';
+  for (i = 0; i < klsState.calStatus.length; i++) klsState.calStatus[i] = 'Kalibreret OK';
+  klsState.devStatus = []; klsState.devLog = [];
+  klsState.elLog = [{ sagsnr: '2025-001', date: '2025-01-01', type: 'EL', status: 'Godkendt' }];
+  klsState.expiryMonths = 12; klsState.godkendtYear = ''; klsState.godkendtMonth = '';
+  klsState.moedeYear = String(now.getFullYear());
+  klsState.moedeMonth = ('0' + (now.getMonth() + 1)).slice(-2);
+  klsState.view = 'dashboard';
+  var html = renderKLS();
+  // restore
+  klsState.view = savedView; klsState.reviewPts = savedReview; klsState.annual = savedAnnual;
+  klsState.calStatus = savedCal; klsState.devStatus = savedDevStatus; klsState.devLog = savedDevLog;
+  klsState.elLog = savedEl; klsState.expiryMonths = savedExpiry;
+  klsState.moedeYear = savedMY; klsState.moedeMonth = savedMM;
+  assert(html.indexOf('Ingen mangler') >= 0 || html.indexOf('No gaps') >= 0, 'shows the no-gaps verdict');
+});
+
+test('KLS: klsReportHtml contains the readiness section, gap table and @media print CSS', function() {
+  var report = klsReportHtml();
+  assert(report.indexOf('@media print') >= 0, 'print stylesheet present');
+  assert(report.indexOf('page-break-before') >= 0, 'paginated sections present');
+  assert(report.indexOf('page-break-inside') >= 0, 'avoid breaking inside rows present');
+  assert(report.indexOf('Pre-audit klarhed') >= 0, 'readiness section present');
+  assert(report.indexOf('report-header') >= 0, 'header present');
+  assert(report.indexOf('report-footer') >= 0, 'footer present');
+  // legal references in the footer
+  assert(report.indexOf('Autorisationsloven') >= 0, 'footer cites Autorisationsloven');
+  assert(report.indexOf('DS 432:2020') >= 0, 'footer cites DS 432:2020');
+  assert(report.indexOf('DS/HD 60364-6:2016') >= 0, 'footer cites DS/HD 60364-6:2016');
+  assert(report.indexOf('BEK 725') >= 0, 'footer cites BEK 725');
+});
+
+test('KLS: print report stays dependency-free / CSP-safe (no remote assets or scripts)', function() {
+  var report = klsReportHtml();
+  assert(report.indexOf('http://') < 0 && report.indexOf('https://') < 0, 'no remote URLs');
+  assert(report.toLowerCase().indexOf('<script') < 0, 'no scripts in printed report');
+});
+
+test('KLS: all 14 views still render non-empty with NO text input/textarea after v4 changes', function() {
+  klsClearLogs();
+  klsState.elIso = '<1'; klsState.elJord = 'OK'; klsState.elHpfi = 'OK';
+  klsSaveElEntry();
+  var views = ['forside', 'politik', 'organisation', 'procedurer', 'el', 'vvs', 'kloak',
+    'afvigelse', 'efterproevning', 'kompetence', 'maaleudstyr', 'tilsyn', 'dokument', 'dashboard'];
+  var saved = klsState.view;
+  var all = '';
+  views.forEach(function(v) { klsState.view = v; var html = renderKLS(); assert(html.length > 200, 'view ' + v + ' too short'); all += html; });
+  klsState.view = saved;
+  assert(all.indexOf('<input type="text"') < 0, 'no <input type="text">');
+  assert(all.indexOf("<input type='text'") < 0, "no <input type='text'>");
+  assert(all.indexOf('<textarea') < 0, 'no <textarea>');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

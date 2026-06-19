@@ -1036,6 +1036,20 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // KLS audit-readiness / pre-audit gap report (new)
+  'Pre-audit readiness (Phase 1 Pre-audit)': '\u0622\u0645\u0627\u062F\u06AF\u06CC \u067E\u06CC\u0634\u200C\u0645\u0645\u06CC\u0632\u06CC (\u0641\u0627\u0632 \u06F1 \u067E\u06CC\u0634\u200C\u0645\u0645\u06CC\u0632\u06CC)',
+  'Readiness score': '\u0627\u0645\u062A\u06CC\u0627\u0632 \u0622\u0645\u0627\u062F\u06AF\u06CC',
+  'Legal requirements met': '\u0627\u0644\u0632\u0627\u0645\u0627\u062A \u0642\u0627\u0646\u0648\u0646\u06CC \u0628\u0631\u0622\u0648\u0631\u062F\u0647 \u0634\u062F\u0647',
+  'Weighted score': '\u0627\u0645\u062A\u06CC\u0627\u0632 \u0648\u0632\u0646\u06CC',
+  'No gaps found — ready for the inspection body': '\u0647\u06CC\u0686 \u06A9\u0645\u0628\u0648\u062F\u06CC \u06CC\u0627\u0641\u062A \u0646\u0634\u062F \u2014 \u0622\u0645\u0627\u062F\u0647 \u0628\u0631\u0627\u06CC \u0646\u0647\u0627\u062F \u0628\u0627\u0632\u0631\u0633\u06CC',
+  'Gaps before audit': '\u06A9\u0645\u0628\u0648\u062F\u0647\u0627 \u067E\u06CC\u0634 \u0627\u0632 \u0645\u0645\u06CC\u0632\u06CC',
+  'Show pre-audit report': '\u0646\u0645\u0627\u06CC\u0634 \u06AF\u0632\u0627\u0631\u0634 \u067E\u06CC\u0634\u200C\u0645\u0645\u06CC\u0632\u06CC',
+  'Ready for audit': '\u0622\u0645\u0627\u062F\u0647 \u0628\u0631\u0627\u06CC \u0645\u0645\u06CC\u0632\u06CC',
+  'Almost ready': '\u062A\u0642\u0631\u06CC\u0628\u0627\u064B \u0622\u0645\u0627\u062F\u0647',
+  'Not ready': '\u0622\u0645\u0627\u062F\u0647 \u0646\u06CC\u0633\u062A',
+  'Printed': '\u0686\u0627\u067E\u200C\u0634\u062F\u0647',
+  'Yes': '\u0628\u0644\u0647',
+  'No': '\u062E\u06CC\u0631',
   // KLS append-only log controls (new)
   'Remove last': '\u062D\u0630\u0641 \u0622\u062E\u0631\u06CC\u0646',
   'Remove the last entry in this log?': '\u0622\u062E\u0631\u06CC\u0646 \u0645\u0648\u0631\u062F \u0627\u06CC\u0646 \u06AF\u0632\u0627\u0631\u0634 \u062D\u0630\u0641 \u0634\u0648\u062F\u061F',
@@ -16325,6 +16339,179 @@ function klsDashboardCompliance(annualAnswers) {
   return true;
 }
 
+// ===== KLS AUDIT-READINESS ENGINE (pure, testable) =====
+// Pre-audit gap analysis. Mirrors the kontrolinstans' "Fase 1 Præaudit
+// (dokumentgennemgang)": it scores the REAL KLS state against the legal/quality
+// requirements an auditor checks. LOVKRAV (legal) items are weighted heavier than
+// VIGTIGT (important) items, because a single failed legal requirement can block
+// approval entirely. Pure: no DOM, no mutation of the passed state.
+var KLS_AUDIT_READY_PCT = 90;    // pct >= this AND every LOVKRAV ok -> "Klar til audit"
+var KLS_AUDIT_ALMOST_PCT = 70;   // pct >= this -> "Næsten klar"
+var KLS_AUDIT_W_LOVKRAV = 2;     // weight of a legal-requirement item
+var KLS_AUDIT_W_VIGTIGT = 1;     // weight of an important (non-legal) item
+
+// Pure verdict mapping — exposed so the threshold boundaries (90 / 70) are testable.
+function klsAuditVerdict(pct, passLovkrav) {
+  if (pct >= KLS_AUDIT_READY_PCT && passLovkrav) return 'Klar til audit';
+  if (pct >= KLS_AUDIT_ALMOST_PCT) return 'Næsten klar';
+  return 'Ikke klar';
+}
+
+function klsAuditReadiness(state) {
+  state = state || klsState;
+  var L = KLS_AUDIT_W_LOVKRAV, V = KLS_AUDIT_W_VIGTIGT;
+  var items = [];
+
+  // --- 1. Ledelsens evaluering (Intern Efterprøvning) gennemført — LOVKRAV (BEK 725 §8) ---
+  var reviewPts = state.reviewPts || [];
+  var ratedCount = 0;
+  for (var ri = 0; ri < reviewPts.length; ri++) { if (reviewPts[ri]) ratedCount++; }
+  var totalReview = reviewPts.length || 12;
+  var allRated = totalReview > 0 && ratedCount >= totalReview;
+  var reviewWithin12 = true; // use the stored meeting date when present, else rely on "all points answered"
+  var my = parseInt(state.moedeYear, 10), mm = parseInt(state.moedeMonth, 10);
+  if (my && mm) {
+    var nowR = new Date();
+    var monthsSince = (nowR.getFullYear() - my) * 12 + (nowR.getMonth() + 1 - mm);
+    reviewWithin12 = monthsSince >= 0 && monthsSince <= 12;
+  }
+  var reviewOk = allRated && reviewWithin12;
+  var missingReview = totalReview - ratedCount;
+  items.push({
+    id: 'review', weight: L, ok: reviewOk, severity: 'LOVKRAV',
+    label_da: 'Ledelsens evaluering gennemført', label_en: 'Management review completed',
+    detail_da: reviewOk ? 'Alle ' + totalReview + ' punkter gennemgået inden for 12 måneder.'
+      : (!allRated ? 'Ledelsens evaluering ikke gennemført — ' + missingReview + ' punkter mangler.'
+                   : 'Ledelsens evaluering er ældre end 12 måneder — skal gentages.'),
+    detail_en: reviewOk ? 'All ' + totalReview + ' points reviewed within 12 months.'
+      : (!allRated ? 'Management review not completed — ' + missingReview + ' points missing.'
+                   : 'Management review is older than 12 months — must be repeated.')
+  });
+
+  // --- 2. Slutkontroller dokumenteret og sporbare — LOVKRAV ---
+  var elLog = state.elLog || [], vvsLog = state.vvsLog || [], kloakLog = state.kloakLog || [];
+  var allLogs = elLog.concat(vvsLog).concat(kloakLog);
+  var devLog = state.devLog || [];
+  var devSagsnr = {};
+  devLog.forEach(function(d) { if (d && d.sagsnr) devSagsnr[d.sagsnr] = true; });
+  var missingStatus = 0, orphanAfvigelser = 0;
+  allLogs.forEach(function(e) {
+    if (!e || !e.status) missingStatus++;
+    else if (e.status === 'Afvigelse' && !devSagsnr[e.sagsnr]) orphanAfvigelser++;
+  });
+  var logsOk = allLogs.length > 0 && missingStatus === 0 && orphanAfvigelser === 0;
+  items.push({
+    id: 'logs', weight: L, ok: logsOk, severity: 'LOVKRAV',
+    label_da: 'Slutkontroller dokumenteret', label_en: 'Final inspections documented',
+    detail_da: allLogs.length === 0 ? 'Ingen slutkontroller dokumenteret endnu.'
+      : (missingStatus > 0 ? missingStatus + ' slutkontrol-poster mangler status.'
+      : (orphanAfvigelser > 0 ? orphanAfvigelser + ' afvigelse(r) i slutkontrollen mangler tilknyttet afvigelsesrapport.'
+      : allLogs.length + ' slutkontroller dokumenteret og sporbare.')),
+    detail_en: allLogs.length === 0 ? 'No final inspections documented yet.'
+      : (missingStatus > 0 ? missingStatus + ' final-inspection records missing a status.'
+      : (orphanAfvigelser > 0 ? orphanAfvigelser + ' deviation(s) in final inspection without a linked deviation report.'
+      : allLogs.length + ' final inspections documented and traceable.'))
+  });
+
+  // --- 3. Afvigelser fulgt op (ingen åbne) — LOVKRAV ---
+  var devStatuses = (devLog.length) ? devLog.map(function(d) { return d.status; }) : (state.devStatus || []);
+  var devStats = klsDeviationStats(devStatuses);
+  var devOk = devStats.open === 0;
+  items.push({
+    id: 'deviations', weight: L, ok: devOk, severity: 'LOVKRAV',
+    label_da: 'Afvigelser afsluttet', label_en: 'Deviations closed out',
+    detail_da: devOk ? 'Ingen åbne afvigelser (' + devStats.closed + ' afsluttet, ' + devStats.started + ' igangsat).'
+      : devStats.open + ' åbne afvigelser ikke afsluttet.',
+    detail_en: devOk ? 'No open deviations (' + devStats.closed + ' closed, ' + devStats.started + ' in progress).'
+      : devStats.open + ' open deviations not closed out.'
+  });
+
+  // --- 4. Måleudstyr kalibreret (ingen udløbet/mangler) — LOVKRAV ---
+  var calStatus = state.calStatus || [];
+  var calOk = klsCalOkCount(calStatus);
+  var calMissing = calStatus.length - calOk;
+  var calAllOk = calStatus.length > 0 && calMissing === 0;
+  items.push({
+    id: 'instruments', weight: L, ok: calAllOk, severity: 'LOVKRAV',
+    label_da: 'Måleudstyr kalibreret', label_en: 'Measuring equipment calibrated',
+    detail_da: calAllOk ? 'Alle ' + calStatus.length + ' instrumenter kalibreret OK.'
+      : calMissing + ' instrumenter mangler kalibrering (udløbet/mangler) — målinger ugyldige.',
+    detail_en: calAllOk ? 'All ' + calStatus.length + ' instruments calibrated OK.'
+      : calMissing + ' instruments lack valid calibration (expired/missing) — measurements invalid.'
+  });
+
+  // --- 5. KLS-godkendelse udløber ikke inden 3 måneder — LOVKRAV ---
+  var months = (state.godkendtYear && state.godkendtMonth) ? klsExpiryMonths(state) : state.expiryMonths;
+  var expiry = klsExpiryStatus(months);
+  var expiryOk = expiry.level !== 'red';
+  items.push({
+    id: 'expiry', weight: L, ok: expiryOk, severity: 'LOVKRAV',
+    label_da: 'KLS-godkendelse gyldig (> 3 mdr.)', label_en: 'KLS approval valid (> 3 months)',
+    detail_da: expiryOk ? 'KLS udløber om ' + months + ' måneder.'
+      : 'KLS udløber inden for 3 måneder (' + months + ' mdr.) — kontakt STRAKS kontrolinstansen.',
+    detail_en: expiryOk ? 'KLS expires in ' + months + ' months.'
+      : 'KLS expires within 3 months (' + months + ' mo.) — contact the inspection body IMMEDIATELY.'
+  });
+
+  // --- 6. Årlig tjekliste: alle 8 besvaret OG alle LOVKRAV = Ja — LOVKRAV ---
+  var annual = state.annual || [];
+  var annualAnswered = klsAnnualAnsweredCount(annual);
+  var annualCompliant = klsDashboardCompliance(annual);
+  var annualOk = annualAnswered >= KLS_ANNUAL.length && annualCompliant;
+  var annualMissing = KLS_ANNUAL.length - annualAnswered;
+  items.push({
+    id: 'annual', weight: L, ok: annualOk, severity: 'LOVKRAV',
+    label_da: 'Årlig tjekliste opfyldt', label_en: 'Annual checklist satisfied',
+    detail_da: annualOk ? 'Alle ' + KLS_ANNUAL.length + ' punkter besvaret og alle lovkrav = Ja.'
+      : (annualMissing > 0 ? annualMissing + ' af ' + KLS_ANNUAL.length + ' punkter i den årlige tjekliste mangler svar.'
+                           : 'Et eller flere lovkrav i den årlige tjekliste er ikke besvaret Ja.'),
+    detail_en: annualOk ? 'All ' + KLS_ANNUAL.length + ' items answered and every legal item = Yes.'
+      : (annualMissing > 0 ? annualMissing + ' of ' + KLS_ANNUAL.length + ' annual-checklist items unanswered.'
+                           : 'One or more legal items in the annual checklist are not answered Yes.')
+  });
+
+  // --- 7. Procedurer har status (ingen blanke) — VIGTIGT ---
+  var procStatus = state.procStatus || [];
+  var procBlank = 0;
+  procStatus.forEach(function(s) { if (!s) procBlank++; });
+  var procOk = procStatus.length > 0 && procBlank === 0;
+  items.push({
+    id: 'procedures', weight: V, ok: procOk, severity: 'VIGTIGT',
+    label_da: 'Alle procedurer har status', label_en: 'All procedures have a status',
+    detail_da: procOk ? 'Alle ' + procStatus.length + ' procedurer er sat (Aktiv/Under revision/Udgået).'
+      : procBlank + ' procedurer mangler status.',
+    detail_en: procOk ? 'All ' + procStatus.length + ' procedures set (Active/Under revision/Retired).'
+      : procBlank + ' procedures missing a status.'
+  });
+
+  // --- 8. Dokumentregister komplet (ingen blanke) — VIGTIGT ---
+  var docStatus = state.docStatus || [];
+  var docBlank = 0;
+  docStatus.forEach(function(s) { if (!s) docBlank++; });
+  var docOk = docStatus.length > 0 && docBlank === 0;
+  items.push({
+    id: 'documents', weight: V, ok: docOk, severity: 'VIGTIGT',
+    label_da: 'Dokumentregister komplet', label_en: 'Document register complete',
+    detail_da: docOk ? 'Alle ' + docStatus.length + ' dokumenter har status (Aktiv/Under revision/Udgået).'
+      : docBlank + ' dokumenter mangler status.',
+    detail_en: docOk ? 'All ' + docStatus.length + ' documents have a status (Active/Under revision/Retired).'
+      : docBlank + ' documents missing a status.'
+  });
+
+  // --- Aggregate (weighted) ---
+  var score = 0, max = 0, passLovkrav = true;
+  items.forEach(function(it) {
+    max += it.weight;
+    if (it.ok) score += it.weight;
+    if (it.severity === 'LOVKRAV' && !it.ok) passLovkrav = false;
+  });
+  var pct = max > 0 ? Math.round(score / max * 100) : 0;
+  return {
+    score: score, max: max, pct: pct, items: items,
+    passLovkrav: passLovkrav, verdict: klsAuditVerdict(pct, passLovkrav)
+  };
+}
+
 // ===== KLS DATE / ID / LOG HELPERS =====
 function klsPad(n) { var s = '' + n; return s.length < 2 ? '0' + s : s; }
 function klsCurrentYear() { return new Date().getFullYear(); }
@@ -16615,9 +16802,42 @@ function klsReportHtml() {
     return '<table><thead><tr><th>Dato</th><th>Sagsnr</th><th>Type</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table>';
   }
   var h = '<!doctype html><html><head><meta charset="utf-8"><title>KLS-rapport</title>';
-  h += '<style>body{font-family:Arial,Helvetica,sans-serif;color:#102030;margin:32px;line-height:1.5}h1{color:#0f4c75;margin-bottom:4px}h2{color:#0f4c75;margin-top:24px;border-bottom:2px solid #3282b8;padding-bottom:4px}table{border-collapse:collapse;width:100%;margin-top:8px}th,td{border:1px solid #ccd;padding:6px 10px;text-align:left}th{background:#0f4c75;color:#fff}.muted{color:#667}.ok{color:#1a7f37;font-weight:bold}.bad{color:#c0271c;font-weight:bold}.warn{background:#fff6e0;border:1px solid #e0b000;padding:10px;border-radius:6px;margin-top:20px;font-size:.9em}</style></head><body>';
+  h += '<style>body{font-family:Arial,Helvetica,sans-serif;color:#102030;margin:32px;line-height:1.5}h1{color:#0f4c75;margin-bottom:4px}h2{color:#0f4c75;margin-top:24px;border-bottom:2px solid #3282b8;padding-bottom:4px}table{border-collapse:collapse;width:100%;margin-top:8px}th,td{border:1px solid #ccd;padding:6px 10px;text-align:left}th{background:#0f4c75;color:#fff}.muted{color:#667}.ok{color:#1a7f37;font-weight:bold}.bad{color:#c0271c;font-weight:bold}.warn{background:#fff6e0;border:1px solid #e0b000;padding:10px;border-radius:6px;margin-top:20px;font-size:.9em}'
+    + '.report-header{font-size:.95em;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #0f4c75;font-weight:bold}'
+    + '.report-footer{margin-top:24px;padding-top:8px;border-top:1px solid #0f4c75;font-size:.8em;color:#445}'
+    + '.gauge{font-size:1.4em;font-weight:bold}'
+    + '@media print{'
+    + '@page{margin:14mm}'
+    + 'body{margin:0;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    + 'nav,.app-nav,.sel-btn,button,.no-print{display:none !important}'
+    + 'h1,h2{color:#000}'
+    + 'h2{page-break-before:always}'
+    + 'h2:first-of-type{page-break-before:avoid}'
+    + 'table{page-break-inside:auto}'
+    + 'tr{page-break-inside:avoid}'
+    + 'thead{display:table-header-group}'
+    + '.report-header{border-bottom:2px solid #000}'
+    + '.report-footer{border-top:1px solid #000;color:#000}'
+    + '.warn{page-break-inside:avoid}'
+    + '}'
+    + '</style></head><body>';
+  var virksomhed = '\u2014';
+  h += '<div class="report-header">' + esc(virksomhed) + ' &middot; KLS-rapport &middot; ' + tx('Udskrevet', 'Printed') + ': ' + new Date().toLocaleDateString() + '</div>';
   h += '<h1>📋 KLS Kvalitetsledelsessystem — rapport</h1>';
   h += '<div class="muted">Genereret: ' + new Date().toLocaleString() + ' · Kontrolinstans: VALIDAN ApS</div>';
+  // ---- Pre-audit readiness (Fase 1 Præaudit) — executive summary, first section ----
+  var ready = klsAuditReadiness(klsState);
+  h += '<h2>Pre-audit klarhed (Fase 1 Præaudit)</h2>';
+  h += '<p class="gauge ' + (ready.pct >= 90 && ready.passLovkrav ? 'ok' : 'bad') + '">' + ready.pct + '%</p>';
+  h += '<p>Vægtet score: ' + ready.score + ' / ' + ready.max + ' · Lovkrav opfyldt: <span class="' + (ready.passLovkrav ? 'ok' : 'bad') + '">' + (ready.passLovkrav ? 'JA' : 'NEJ') + '</span> · Vurdering: <b>' + esc(ready.verdict) + '</b></p>';
+  h += '<table><thead><tr><th>Krav</th><th>Type</th><th>Status</th><th>Detalje</th></tr></thead><tbody>';
+  ready.items.forEach(function(it) {
+    h += '<tr><td>' + esc(it.label_da) + '</td><td>' + esc(it.severity) + '</td><td class="' + (it.ok ? 'ok' : 'bad') + '">' + (it.ok ? 'OK' : 'MANGEL') + '</td><td>' + esc(it.detail_da) + '</td></tr>';
+  });
+  h += '</tbody></table>';
+  var gaps = ready.items.filter(function(it) { return !it.ok; });
+  if (!gaps.length) h += '<p class="ok">Ingen mangler fundet — klar til kontrolinstans.</p>';
+  else h += '<p class="bad">' + gaps.length + ' mangel/mangler skal udbedres inden audit.</p>';
   h += '<h2>Stamdata</h2><table><tbody>';
   h += '<tr><td>Autorisationstype</td><td>' + esc(klsState.autType) + '</td></tr>';
   h += '<tr><td>KLS godkendt dato</td><td>' + esc(klsGodkendtStr()) + '</td></tr>';
@@ -16645,6 +16865,7 @@ function klsReportHtml() {
   h += '<p class="' + (compliant ? 'ok' : 'bad') + '">KLS-status: ' + (compliant ? 'GRØN — alle lovkrav opfyldt' : 'RØD — et eller flere lovkrav ikke opfyldt') + '.</p>';
   h += '<p>KLS-udløb: ' + esc(expiry.msg) + '.</p>';
   h += '<div class="warn">Forbehold: Bekendtgørelsesnumre bør verificeres på sik.dk. De stabile grundreferencer er Autorisationsloven, DS/HD 60364-6:2016 og DS 432:2020.</div>';
+  h += '<div class="report-footer">Lovgrundlag: ' + KLS_LEGAL.map(function(l) { return esc(l.ref); }).join(' · ') + ' · DS/HD 60364-6:2016 (el-verifikation) · DS 432:2020 + Till.:2022 (kloak) · BEK 725/724/722 af 12. juni 2024. Kontrolinstans: VALIDAN ApS.</div>';
   h += '</body></html>';
   return h;
 }
@@ -16800,7 +17021,7 @@ function klsRenderVvs() {
   h += klsSelectGroup(tx('Trykprøve (varmtvand 1,5× driftstryk)', 'Pressure test (hot water 1.5× operating)'), ['OK', 'Ikke OK', 'N/A'], klsState.vvsTryk, 'vvsTryk');
   h += klsSelectGroup(tx('Tæthedsprøve (gas BEK nr. 30)', 'Leak test (gas BEK no. 30)'), ['OK', 'Ikke OK', 'N/A'], klsState.vvsTaethed, 'vvsTaethed');
   h += klsSelectGroup(tx('Temperatur ved beholder', 'Temperature at tank'), ['<55°C', '55-60°C', '>60°C'], klsState.vvsTemp, 'vvsTemp');
-  h += '<div class="result-box"><div class="result-row"><span class="label">' + tx('Regel: ≥ 60°C ved beholder / ≤ 50°C ved udtag. Undgå Legionella-vækstzonen 25–45°C.', 'Rule: ≥ 60°C at tank / ≤ 50°C at outlet. Avoid the Legionella growth zone 25–45°C.') + '</span></div></div>';
+  h += '<div class="result-box"><div class="result-row"><span class="label">' + tx('Regel: ≥ 60°C ved beholder / ≥ 50°C ved udtag. Undgå Legionella-vækstzonen 25–45°C.', 'Rule: ≥ 60°C at tank / ≥ 50°C at outlet. Avoid the Legionella growth zone 25–45°C.') + '</span></div></div>';
   h += klsSaveButton('klsSaveVvsEntry', status);
   h += klsLogSection('vvsLog', tx('Loggede slutkontroller VVS', 'Logged final inspections plumbing'), function(e) { return tx('tryk', 'pressure') + ' ' + e.tryk + ' · ' + tx('tæthed', 'leak') + ' ' + e.taethed + ' · ' + e.temp + ' · ' + e.workType; });
   h += klsLogStatsBox(klsState.vvsLog);
@@ -16944,6 +17165,49 @@ function klsRenderDokument() {
   return h;
 }
 
+// Colour for the readiness gauge: green only when ready (>=90 & all LOVKRAV ok),
+// amber when "almost" (>=70), red otherwise.
+function klsAuditColor(pct, passLovkrav) {
+  if (pct >= KLS_AUDIT_READY_PCT && passLovkrav) return 'var(--success)';
+  if (pct >= KLS_AUDIT_ALMOST_PCT) return '#b8860b';
+  return 'var(--danger)';
+}
+
+// Pre-audit gap report (Fase 1 Præaudit) — readiness gauge + ONLY the failing items.
+function klsRenderAuditReadiness() {
+  var r = klsAuditReadiness(klsState);
+  var color = klsAuditColor(r.pct, r.passLovkrav);
+  var ready = r.pct >= KLS_AUDIT_READY_PCT && r.passLovkrav;
+  var verdictTx = r.verdict === 'Klar til audit' ? tx('Klar til audit', 'Ready for audit')
+    : (r.verdict === 'Næsten klar' ? tx('Næsten klar', 'Almost ready') : tx('Ikke klar', 'Not ready'));
+
+  var h = '<div class="result-box" style="border-left:4px solid ' + color + '"><div class="result-title">' + tx('Pre-audit klarhed (Fase 1 Præaudit)', 'Pre-audit readiness (Phase 1 Pre-audit)') + '</div>';
+  h += '<div class="result-row"><span class="label">' + tx('Klarhedsscore', 'Readiness score') + '</span><span class="value" style="color:' + color + ';font-weight:bold;font-size:1.3em">' + r.pct + '%</span></div>';
+  h += '<div style="background:rgba(255,255,255,0.08);border-radius:6px;height:14px;margin:6px 0;overflow:hidden"><div style="height:100%;width:' + r.pct + '%;background:' + color + '"></div></div>';
+  h += klsResultRow(tx('Lovkrav opfyldt', 'Legal requirements met'), r.passLovkrav ? tx('Ja', 'Yes') : tx('Nej', 'No'), r.passLovkrav ? 'var(--success)' : 'var(--danger)');
+  h += klsResultRow(tx('Vægtet score', 'Weighted score'), r.score + ' / ' + r.max);
+  h += '</div>';
+
+  h += renderVerdict(ready, verdictTx + ' — ' + r.pct + '%');
+
+  var failing = r.items.filter(function(it) { return !it.ok; });
+  if (failing.length === 0) {
+    h += renderVerdict(true, tx('Ingen mangler fundet — klar til kontrolinstans', 'No gaps found — ready for the inspection body'));
+  } else {
+    h += '<div class="result-box"><div class="result-title">' + tx('Mangler før audit', 'Gaps before audit') + ' (' + failing.length + ')</div>';
+    failing.forEach(function(it) {
+      var badgeColor = it.severity === 'LOVKRAV' ? 'var(--danger)' : '#b8860b';
+      h += '<div class="result-row" style="border-bottom:1px solid rgba(255,255,255,0.05);padding:6px 0">';
+      h += '<span class="label"><b>' + tx(it.label_da, it.label_en) + '</b> <span style="color:' + badgeColor + ';font-weight:bold;font-size:0.8em">[' + it.severity + ']</span><br><small style="color:#888">' + tx(it.detail_da, it.detail_en) + '</small></span>';
+      h += '<span class="value" style="color:' + badgeColor + ';font-weight:bold">\u2717</span></div>';
+    });
+    h += '</div>';
+  }
+  // The pre-audit report is included in the printable export (klsReportHtml).
+  h += '<div class="select-group"><div class="select-grid"><button class="sel-btn" onclick="klsPrintReport()">📋 ' + tx('Vis pre-audit rapport', 'Show pre-audit report') + '</button></div></div>';
+  return h;
+}
+
 function klsRenderDashboard() {
   var elStats = klsLogStats(klsState.elLog);
   var vvsStats = klsLogStats(klsState.vvsLog);
@@ -16970,6 +17234,8 @@ function klsRenderDashboard() {
 
   var h = '<div class="result-box"><div class="result-title">' + tx('Dashboard — live status', 'Dashboard — live status') + '</div>';
   h += '<div class="info-row">' + tx('Aggregeret live fra de loggede slutkontroller, afvigelseslog og statusarrays.', 'Aggregated live from the logged final inspections, deviation log and status arrays.') + '</div></div>';
+  // Pre-audit readiness gauge + gap report (prominent, top of dashboard)
+  h += klsRenderAuditReadiness();
   // Slutkontrol aggregates (live from logs)
   h += statBlock(tx('Slutkontrol EL (DS/HD 60364-6:2016)', 'Final inspection EL (DS/HD 60364-6:2016)'), elStats);
   h += statBlock(tx('Slutkontrol VVS', 'Final inspection plumbing'), vvsStats);
