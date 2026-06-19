@@ -385,7 +385,7 @@
       try {
         if (THREE.ACESFilmicToneMapping) {
           renderer.toneMapping = THREE.ACESFilmicToneMapping;
-          renderer.toneMappingExposure = 1.6;
+          renderer.toneMappingExposure = 1.15;
         }
       } catch (e) {}
       renderer.domElement.style.display = "block";
@@ -427,26 +427,21 @@
       scene.add(world);
 
       // ---- Earth -----------------------------------------------------------
-      var globeMat = new THREE.MeshPhongMaterial({
+      // Unlit material so the Earth shows its full daytime texture brightly and
+      // evenly across the WHOLE globe (Google-Earth style) — no dark night side,
+      // no dependence on light direction. The light fallback colour means it is
+      // never black even if the texture is slow to decode.
+      var globeMat = new THREE.MeshBasicMaterial({
         map: dayTex,
-        normalMap: normalTex,
-        specularMap: specularTex,
-        specular: new THREE.Color(0x404a5a),  // oceans glint, land stays matte
-        shininess: 18
+        color: new THREE.Color(0xeaf0f8)
       });
-      if (globeMat.normalScale && globeMat.normalScale.set) globeMat.normalScale.set(0.85, 0.85);
       var globeGeo = new THREE.SphereGeometry(GLOBE_R, 96, 96);
       var globe = new THREE.Mesh(globeGeo, globeMat);
       world.add(globe);
       disposables.push(globeMat, globeGeo);
 
-      // ---- night city lights (additive, dark-side only) --------------------
+      // ---- night city lights: disabled (Earth is evenly lit, no dark side) -
       var night = null;
-      try {
-        night = makeNightLights(THREE, lightsTex, sunDir);
-        world.add(night);
-        disposables.push(night.geometry, night.material);
-      } catch (e) { night = null; }
 
       // ---- clouds (transparent, rotate a touch faster than the surface) ----
       var clouds = null;
