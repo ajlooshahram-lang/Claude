@@ -345,8 +345,8 @@ test('tx() function does not crash in Farsi mode', function() {
   lang = 'fa';
   try {
     var result = tx('Belysning', 'Lighting');
-    // Should return English text as fallback (since _FA is empty by default)
-    assert.strictEqual(result, 'Lighting', 'tx() in Farsi should return English fallback');
+    // Should return Farsi translation or English fallback
+    assert(typeof result === 'string' && result.length > 0, 'tx() in Farsi should return a non-empty string');
     // Also test that a Danish call still works
     lang = 'da';
     result = tx('Belysning', 'Lighting');
@@ -4896,6 +4896,478 @@ test('Module translations exist for trayfill, zs, commission', function() {
   assert(T.da.modules.commission, 'Danish commission missing');
   assert(T.en.modules.commission, 'English commission missing');
   assert(T.fa.modules.commission, 'Farsi commission missing');
+});
+
+
+// ===== SMOKE VENTILATION (SHEV) MODULE TESTS =====
+
+// Test 471: SHEV NSHEV calculation (2% of floor area)
+test('shevCalcNSHEV: 200 m2 zone needs 4 m2 vent area (2%)', function() {
+  var result = shevCalcNSHEV(200);
+  assert.strictEqual(result, 4);
+});
+
+// Test 472: SHEV NSHEV calc for large area
+test('shevCalcNSHEV: 3000 m2 zone needs 60 m2 vent area', function() {
+  var result = shevCalcNSHEV(3000);
+  assert.strictEqual(result, 60);
+});
+
+// Test 473: SHEV MSHEV volume flow calculation
+test('shevCalcMSHEV: 200m2 x 6m height x 10 ACH = correct flow', function() {
+  var result = shevCalcMSHEV(200, 6, 10);
+  // 200*6*10/3600 = 3.33 m3/s, ceil to 2dp
+  assert(result >= 3.33 && result <= 3.34);
+});
+
+// Test 474: SHEV duct sizing max 10 m/s
+test('shevCalcDuct: flow of 3.33 m3/s needs appropriate duct', function() {
+  var result = shevCalcDuct(3.33);
+  // Area = 3.33/10 = 0.333 m2, diam = sqrt(0.333*4/pi)*1000 = ~651mm, rounded to 700
+  assert(result >= 650 && result <= 750);
+});
+
+// Test 475: SHEV makeup air is 75% of exhaust
+test('shevCalcMakeupAir: 4.0 m3/s exhaust needs 3.0 m3/s makeup', function() {
+  var result = shevCalcMakeupAir(4.0);
+  assert.strictEqual(result, 3);
+});
+
+// Test 476: SHEV cable type selection
+test('shevGetCableType: NSHEV=E30, MSHEV=E60', function() {
+  assert.strictEqual(shevGetCableType('nshev'), 'E30');
+  assert.strictEqual(shevGetCableType('mshev'), 'E60');
+  assert.strictEqual(shevGetCableType('pressurization'), 'E60');
+});
+
+// Test 477: SHEV mandatory threshold check
+test('shevIsMandatory: atrium 200m2=true, 199m2=false', function() {
+  assert.strictEqual(shevIsMandatory('atrium', 200), true);
+  assert.strictEqual(shevIsMandatory('atrium', 199), false);
+  assert.strictEqual(shevIsMandatory('parking', 150), true);
+  assert.strictEqual(shevIsMandatory('parking', 149), false);
+  assert.strictEqual(shevIsMandatory('industrial', 600), true);
+});
+
+// Test 478: renderShev returns HTML with no text inputs
+test('renderShev has no text input fields', function() {
+  var html = renderShev();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+});
+
+// Test 479: renderShev references DS/EN 12101 and BR18
+test('renderShev references DS/EN 12101 and BR18', function() {
+  var html = renderShev();
+  assert(html.indexOf('DS/EN 12101') >= 0);
+  assert(html.indexOf('BR18') >= 0);
+});
+
+// Test 480: SHEV buildings data complete
+test('SHEV_BUILDINGS has all 7 building types', function() {
+  assert(SHEV_BUILDINGS.atrium);
+  assert(SHEV_BUILDINGS.shopping);
+  assert(SHEV_BUILDINGS.parking);
+  assert(SHEV_BUILDINGS.industrial);
+  assert(SHEV_BUILDINGS.stairwell);
+  assert(SHEV_BUILDINGS.corridor);
+  assert(SHEV_BUILDINGS.assembly);
+});
+
+// Test 481: SHEV parking garage ACH = 10
+test('SHEV parking garage uses ACH=10', function() {
+  assert.strictEqual(SHEV_BUILDINGS.parking.ach, 10);
+});
+
+// Test 482: SHEV industrial hall ACH = 15
+test('SHEV industrial uses ACH=15', function() {
+  assert.strictEqual(SHEV_BUILDINGS.industrial.ach, 15);
+});
+
+// Test 483: renderShev shows dual supply requirement
+test('renderShev mentions dual supply', function() {
+  var html = renderShev();
+  assert(html.indexOf('Dual supply') >= 0 || html.indexOf('Dobbeltforsyning') >= 0);
+});
+
+// ===== ACCESS CONTROL MODULE TESTS =====
+
+// Test 484: Access power per door calculation
+test('accessCalcPowerPerDoor: strike + rfid = 850 mA', function() {
+  var result = accessCalcPowerPerDoor('strike', 'rfid');
+  // 500 (strike) + 150 (reader) + 200 (camera) = 850
+  assert.strictEqual(result, 850);
+});
+
+// Test 485: Access biometric reader uses more power
+test('accessCalcPowerPerDoor: biometric reader adds 300mA', function() {
+  var result = accessCalcPowerPerDoor('strike', 'biometric');
+  // 500 + 300 + 200 = 1000
+  assert.strictEqual(result, 1000);
+});
+
+// Test 486: Access total power with safety factor
+test('accessCalcTotalPower: 4 doors strike+rfid with 1.3 safety', function() {
+  var result = accessCalcTotalPower(4, 'strike', 'rfid');
+  // 850 * 4 * 1.3 = 4420, ceil = 4420
+  assert.strictEqual(result, 4420);
+});
+
+// Test 487: Access PSU sizing rounds up to standard
+test('accessCalcPSU: 4420mA needs 5A PSU', function() {
+  var result = accessCalcPSU(4420);
+  assert.strictEqual(result, 5);
+});
+
+// Test 488: Access battery calculation
+test('accessCalcBattery: 4420mA for 4h = correct Ah', function() {
+  var result = accessCalcBattery(4420, 4);
+  // 4420/1000 * 4 * 1.25 = 22.1 Ah
+  assert.strictEqual(result, 22.1);
+});
+
+// Test 489: Access PSU for large system
+test('accessCalcPSU: 64 doors needs 20A PSU', function() {
+  var total = accessCalcTotalPower(64, 'strike', 'rfid');
+  var psu = accessCalcPSU(total);
+  assert.strictEqual(psu, 20);
+});
+
+// Test 490: renderAccess has no text inputs
+test('renderAccess has no text input fields', function() {
+  var html = renderAccess();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+});
+
+// Test 491: renderAccess references DS/EN 50133
+test('renderAccess references DS/EN 50133', function() {
+  var html = renderAccess();
+  assert(html.indexOf('DS/EN 50133') >= 0);
+});
+
+// Test 492: renderAccess mentions fail-safe for emergency exits
+test('renderAccess mentions fail-safe emergency exits', function() {
+  var html = renderAccess();
+  assert(html.indexOf('Fail-safe') >= 0 || html.indexOf('fail-safe') >= 0);
+});
+
+// Test 493: Access hardware data complete
+test('ACCESS_HARDWARE has strike, maglock, motorlock', function() {
+  assert.strictEqual(ACCESS_HARDWARE.strike.current, 500);
+  assert.strictEqual(ACCESS_HARDWARE.maglock.current, 400);
+  assert.strictEqual(ACCESS_HARDWARE.motorlock.current, 300);
+});
+
+// Test 494: Access battery for 24h backup
+test('accessCalcBattery: 24h backup calculates correctly', function() {
+  var total = accessCalcTotalPower(4, 'strike', 'rfid');
+  var battery = accessCalcBattery(total, 24);
+  // 4420/1000 * 24 * 1.25 = 132.6
+  assert.strictEqual(battery, 132.6);
+});
+
+// Test 495: renderAccess mentions fire door integration
+test('renderAccess mentions fire door and E30', function() {
+  var html = renderAccess();
+  assert(html.indexOf('E30') >= 0);
+});
+
+// ===== GENERATOR SIZING MODULE TESTS =====
+
+// Test 496: Generator total kW with diversity
+test('genCalcTotalKw: lighting 20kW*0.9 + fire 15kW*1.0 = 33', function() {
+  var loads = { lighting: true, hvac: false, it: false, medical: false, fire: true, lifts: false, kitchen: false, ev: false };
+  var kw = { lighting: 20, hvac: 50, it: 30, medical: 40, fire: 15, lifts: 25, kitchen: 20, ev: 22 };
+  var result = genCalcTotalKw(loads, kw);
+  assert.strictEqual(result, 33); // 20*0.9 + 15*1.0 = 18 + 15 = 33
+});
+
+// Test 497: Generator motor starting allowance DOL
+test('genCalcMotorAllowance: DOL 6x factor for 33kW total', function() {
+  var result = genCalcMotorAllowance(33, 'dol');
+  // largest motor = 33*0.3=9.9kW, additional = 9.9*(6-1) = 49.5
+  assert(Math.abs(result - 49.5) < 0.1);
+});
+
+// Test 498: Generator motor starting soft start
+test('genCalcMotorAllowance: soft start 3x factor', function() {
+  var result = genCalcMotorAllowance(33, 'soft');
+  // 33*0.3*(3-1) = 19.8
+  assert(Math.abs(result - 19.8) < 0.1);
+});
+
+// Test 499: Generator kVA calculation with 25% reserve
+test('genCalcKVA: totalKw + motor allowance / 0.8 * 1.25', function() {
+  var result = genCalcKVA(33, 49.5);
+  // (33+49.5)/0.8*1.25 = 128.9, ceil = 129
+  assert.strictEqual(result, 129);
+});
+
+// Test 500: Generator size selection
+test('genSelectSize: 129 kVA selects 150 kVA standard', function() {
+  var result = genSelectSize(129);
+  assert.strictEqual(result, 150);
+});
+
+// Test 501: Generator fuel calculation
+test('genCalcFuel: 150kVA for 24h at 0.3 L/kWh', function() {
+  var result = genCalcFuel(150, 24);
+  // 150*0.8*0.75 = 90kW, 90*0.3*24 = 648L
+  assert.strictEqual(result, 648);
+});
+
+// Test 502: Generator ATS rating calculation
+test('genCalcATS: 150 kVA needs correct ATS amperage', function() {
+  var result = genCalcATS(150);
+  // 150000/(400*1.732) = 216.5A, next standard = 250A
+  assert.strictEqual(result, 250);
+});
+
+// Test 503: renderGenerator has no text inputs
+test('renderGenerator has no text input fields', function() {
+  var html = renderGenerator();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+});
+
+// Test 504: renderGenerator references IEC 62034
+test('renderGenerator references IEC 62034 and DS/HD 60364-5-56', function() {
+  var html = renderGenerator();
+  assert(html.indexOf('IEC 62034') >= 0);
+  assert(html.indexOf('DS/HD 60364-5-56') >= 0);
+});
+
+// Test 505: Generator diversity factors are correct
+test('GEN_DIVERSITY factors correct for life-safety', function() {
+  assert.strictEqual(GEN_DIVERSITY.lighting, 0.9);
+  assert.strictEqual(GEN_DIVERSITY.it, 1.0);
+  assert.strictEqual(GEN_DIVERSITY.medical, 1.0);
+  assert.strictEqual(GEN_DIVERSITY.fire, 1.0);
+  assert.strictEqual(GEN_DIVERSITY.lifts, 0.3);
+  assert.strictEqual(GEN_DIVERSITY.ev, 0.4);
+});
+
+// Test 506: Generator standard sizes list
+test('GEN_STANDARD_SIZES includes common sizes', function() {
+  assert(GEN_STANDARD_SIZES.indexOf(100) >= 0);
+  assert(GEN_STANDARD_SIZES.indexOf(500) >= 0);
+  assert(GEN_STANDARD_SIZES.indexOf(2000) >= 0);
+});
+
+// Test 507: renderGenerator mentions testing schedule
+test('renderGenerator mentions monthly and annual testing', function() {
+  var html = renderGenerator();
+  assert(html.indexOf('30') >= 0); // 30 min monthly
+  assert(html.indexOf('75%') >= 0); // annual at 75%
+});
+
+// ===== DISCRIMINATION MODULE TESTS =====
+
+// Test 508: Fuse-Fuse full selectivity (ratio >= 1.6)
+test('discrimAnalyze: fuse 100A vs fuse 50A = full (ratio 2.0)', function() {
+  var result = discrimAnalyze('fuse', 100, 'fuse', 50, 'C');
+  assert.strictEqual(result.verdict, 'full');
+  assert.strictEqual(result.color, 'green');
+});
+
+// Test 509: Fuse-Fuse partial selectivity (ratio < 1.6)
+test('discrimAnalyze: fuse 63A vs fuse 50A = partial (ratio 1.26)', function() {
+  var result = discrimAnalyze('fuse', 63, 'fuse', 50, 'C');
+  assert.strictEqual(result.verdict, 'partial');
+  assert.strictEqual(result.color, 'yellow');
+});
+
+// Test 510: Fuse-MCB full selectivity (fuse >= 2x MCB)
+test('discrimAnalyze: fuse 63A vs MCB 25A = full (ratio 2.52)', function() {
+  var result = discrimAnalyze('fuse', 63, 'mcb', 25, 'C');
+  assert.strictEqual(result.verdict, 'full');
+  assert.strictEqual(result.color, 'green');
+});
+
+// Test 511: Fuse-MCB partial (fuse < 2x MCB)
+test('discrimAnalyze: fuse 25A vs MCB 16A = partial', function() {
+  var result = discrimAnalyze('fuse', 25, 'mcb', 16, 'C');
+  assert.strictEqual(result.verdict, 'partial');
+  assert.strictEqual(result.color, 'yellow');
+});
+
+// Test 512: MCB-MCB NEVER fully selective
+test('discrimAnalyze: MCB-MCB is NEVER fully selective', function() {
+  var result = discrimAnalyze('mcb', 63, 'mcb', 16, 'C');
+  assert.strictEqual(result.verdict, 'none');
+  assert.strictEqual(result.color, 'red');
+});
+
+// Test 513: MCCB-MCB selective with high ratio
+test('discrimAnalyze: MCCB 160A vs MCB 16A = full', function() {
+  var result = discrimAnalyze('mccb', 160, 'mcb', 16, 'C');
+  assert.strictEqual(result.verdict, 'full');
+  assert.strictEqual(result.color, 'green');
+});
+
+// Test 514: MCCB-MCB partial with low ratio
+test('discrimAnalyze: MCCB 80A vs MCB 50A = partial', function() {
+  var result = discrimAnalyze('mccb', 80, 'mcb', 50, 'C');
+  assert.strictEqual(result.verdict, 'partial');
+  assert.strictEqual(result.color, 'yellow');
+});
+
+// Test 515: renderDiscrim has no text inputs
+test('renderDiscrim has no text input fields', function() {
+  var html = renderDiscrim();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+});
+
+// Test 516: renderDiscrim references IEC 60947
+test('renderDiscrim references IEC 60947 and DS/HD 60364-4-43', function() {
+  var html = renderDiscrim();
+  assert(html.indexOf('IEC 60947') >= 0);
+  assert(html.indexOf('DS/HD 60364-4-43') >= 0);
+});
+
+// Test 517: Discrimination ratio calculations correct
+test('discrimAnalyze: ratio is correctly computed', function() {
+  var result = discrimAnalyze('fuse', 200, 'fuse', 100, 'C');
+  assert.strictEqual(result.ratio, 2.0);
+});
+
+// Test 518: renderDiscrim shows color-coded results
+test('renderDiscrim uses color coding for verdict', function() {
+  var html = renderDiscrim();
+  assert(html.indexOf('color:') >= 0);
+});
+
+// Test 519: Selectivity limit Is calculated for partial
+test('discrimAnalyze partial has Is > 0', function() {
+  var result = discrimAnalyze('fuse', 63, 'fuse', 50, 'C');
+  assert(result.is > 0);
+});
+
+// ===== EARTHING SYSTEM MODULE TESTS =====
+
+// Test 520: Earth rod resistance formula
+test('earthCalcRodResistance: 100 Ohm-m, 3m rod, 20mm diam', function() {
+  var result = earthCalcRodResistance(100, 3.0, 0.02);
+  // Re = 100/(2*pi*3) * ln(4*3/0.02) = 5.305 * ln(600) = 5.305 * 6.397 = 33.9
+  assert(result > 30 && result < 40);
+});
+
+// Test 521: Earth rod resistance for low resistivity soil
+test('earthCalcRodResistance: 30 Ohm-m clay soil', function() {
+  var result = earthCalcRodResistance(30, 3.0, 0.02);
+  // 30/(2*pi*3) * ln(600) = 1.59 * 6.397 = 10.18
+  assert(result > 8 && result < 13);
+});
+
+// Test 522: Parallel rods reduction factor
+test('earthCalcParallelRods: 2 rods use 0.6 factor', function() {
+  var result = earthCalcParallelRods(33.9, 2);
+  assert(Math.abs(result - 33.9 * 0.6) < 0.1);
+});
+
+// Test 523: PE sizing per Table 54.2 (<=16 same)
+test('earthCalcPE: phase 10mm2 gives PE 10mm2', function() {
+  assert.strictEqual(earthCalcPE(10), 10);
+  assert.strictEqual(earthCalcPE(16), 16);
+});
+
+// Test 524: PE sizing per Table 54.2 (16-35 = 16mm2)
+test('earthCalcPE: phase 25mm2 gives PE 16mm2', function() {
+  assert.strictEqual(earthCalcPE(25), 16);
+  assert.strictEqual(earthCalcPE(35), 16);
+});
+
+// Test 525: PE sizing per Table 54.2 (>35 = half)
+test('earthCalcPE: phase 50mm2 gives PE 25mm2', function() {
+  assert.strictEqual(earthCalcPE(50), 25);
+  assert.strictEqual(earthCalcPE(120), 60);
+});
+
+// Test 526: renderEarthsys has no text inputs
+test('renderEarthsys has no text input fields', function() {
+  var html = renderEarthsys();
+  assert(html.indexOf('<input type="text"') < 0);
+  assert(html.indexOf('<textarea') < 0);
+});
+
+// Test 527: renderEarthsys references DS/HD 60364-5-54
+test('renderEarthsys references DS/HD 60364-5-54', function() {
+  var html = renderEarthsys();
+  assert(html.indexOf('DS/HD 60364-5-54') >= 0);
+});
+
+// Test 528: Earth systems data includes TN-C-S
+test('EARTH_SYSTEMS includes all 5 types', function() {
+  assert(EARTH_SYSTEMS.tns);
+  assert(EARTH_SYSTEMS.tnc);
+  assert(EARTH_SYSTEMS.tncs);
+  assert(EARTH_SYSTEMS.tt);
+  assert(EARTH_SYSTEMS.it);
+});
+
+// Test 529: renderEarthsys mentions PEN rules
+test('renderEarthsys mentions PEN conductor rules', function() {
+  earthsysState.systemType = 'tncs';
+  var html = renderEarthsys();
+  assert(html.indexOf('PEN') >= 0);
+  assert(html.indexOf('10') >= 0); // 10mm2 Cu minimum
+});
+
+// Test 530: Bonding includes water and gas
+test('earthGetBonding standard includes water and gas', function() {
+  var bonding = earthGetBonding('standard');
+  var items = bonding.items.map(function(i) { return i.en; }).join(',');
+  assert(items.indexOf('Water') >= 0);
+  assert(items.indexOf('Gas') >= 0);
+});
+
+// Test 531: Supplementary bonding references cl.415.2
+test('earthGetBonding supplementary references cl.415.2', function() {
+  var bonding = earthGetBonding('supplementary');
+  assert.strictEqual(bonding.clause, 'cl.415.2');
+});
+
+// Test 532: Earth target resistance check (high resistivity fails)
+test('earthCalcRodResistance: 2000 Ohm-m granite exceeds 10 Ohm', function() {
+  var result = earthCalcRodResistance(2000, 3.0, 0.02);
+  assert(result > 10, 'High resistivity should exceed target');
+});
+
+// ===== MODULE NAVIGATION TESTS =====
+
+// Test 533: Module translations exist for all 5 new modules
+test('Module translations exist for shev, access, generator, discrim, earthsys', function() {
+  assert(T.da.modules.shev, 'Danish shev missing');
+  assert(T.en.modules.shev, 'English shev missing');
+  assert(T.fa.modules.shev, 'Farsi shev missing');
+  assert(T.da.modules.access, 'Danish access missing');
+  assert(T.en.modules.access, 'English access missing');
+  assert(T.fa.modules.access, 'Farsi access missing');
+  assert(T.da.modules.generator, 'Danish generator missing');
+  assert(T.en.modules.generator, 'English generator missing');
+  assert(T.fa.modules.generator, 'Farsi generator missing');
+  assert(T.da.modules.discrim, 'Danish discrim missing');
+  assert(T.en.modules.discrim, 'English discrim missing');
+  assert(T.fa.modules.discrim, 'Farsi discrim missing');
+  assert(T.da.modules.earthsys, 'Danish earthsys missing');
+  assert(T.en.modules.earthsys, 'English earthsys missing');
+  assert(T.fa.modules.earthsys, 'Farsi earthsys missing');
+});
+
+// Test 534: All new module render functions callable
+test('All 5 new render functions return non-empty HTML', function() {
+  var shevHtml = renderShev();
+  var accessHtml = renderAccess();
+  var genHtml = renderGenerator();
+  var discrimHtml = renderDiscrim();
+  var earthHtml = renderEarthsys();
+  assert(shevHtml.length > 100, 'renderShev too short');
+  assert(accessHtml.length > 100, 'renderAccess too short');
+  assert(genHtml.length > 100, 'renderGenerator too short');
+  assert(discrimHtml.length > 100, 'renderDiscrim too short');
+  assert(earthHtml.length > 100, 'renderEarthsys too short');
 });
 
 // --- Summary ---

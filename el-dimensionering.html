@@ -666,7 +666,12 @@ const T = {
       pfc: 'PF-korrektion',
       trayfill: 'Kabelbakke',
       zs: 'Fejlsløjfe Zs',
-      commission: 'Idriftsættelse'
+      commission: 'Idriftsættelse',
+      shev: 'Røgventilation',
+      access: 'Adgangskontrol',
+      generator: 'Nødgenerator',
+      discrim: 'Selektivitet',
+      earthsys: 'Jordingssystem'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -791,7 +796,12 @@ const T = {
       pfc: 'Power Factor Correction',
       trayfill: 'Cable Tray Fill',
       zs: 'Earth Fault Loop',
-      commission: 'Commissioning'
+      commission: 'Commissioning',
+      shev: 'Smoke Ventilation',
+      access: 'Access Control',
+      generator: 'Generator Sizing',
+      discrim: 'Discrimination',
+      earthsys: 'Earthing System'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -908,7 +918,12 @@ const T = {
       pfc: 'اصلاح ضریب توان',
       trayfill: 'سینی کابل',
       zs: 'امپدانس حلقه خطا',
-      commission: 'راه‌اندازی'
+      commission: 'راه‌اندازی',
+      shev: 'تهویه دود',
+      access: 'کنترل دسترسی',
+      generator: 'ژنراتور اضطراری',
+      discrim: 'انتخاب‌پذیری',
+      earthsys: 'سیستم ارتینگ'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -1507,7 +1522,106 @@ const _FA = {
   'Testing': 'آزمایش',
   'Certificate / Summary': 'گواهینامه / خلاصه',
   'Required Instruments': 'ابزار مورد نیاز',
-  'Electrician Declaration': 'اعلامیه برقکار'
+  'Electrician Declaration': 'اعلامیه برقکار',
+  // Smoke Ventilation (SHEV) module
+  'Smoke Ventilation Design': 'طراحی تهویه دود',
+  'System Type': 'نوع سیستم',
+  'Natural (NSHEV)': 'طبیعی (NSHEV)',
+  'Mechanical (MSHEV)': 'مکانیکی (MSHEV)',
+  'Pressurization': 'تحت فشار',
+  'Building Type': 'نوع ساختمان',
+  'Atrium': 'آتریوم',
+  'Shopping center': 'مرکز خرید',
+  'Parking garage': 'پارکینگ',
+  'Industrial hall': 'سالن صنعتی',
+  'Stairwell': 'راه‌پله',
+  'Corridor': 'راهرو',
+  'Assembly hall': 'سالن اجتماعات',
+  'Smoke Zone Area': 'مساحت منطقه دود',
+  'Ceiling Height': 'ارتفاع سقف',
+  'Design Fire Size (HRR)': 'اندازه آتش طراحی (HRR)',
+  'Vent Area Required': 'مساحت دریچه مورد نیاز',
+  'Fan Capacity': 'ظرفیت فن',
+  'Duct Size': 'اندازه کانال',
+  'Power Supply': 'منبع تغذیه',
+  'Make-up Air': 'هوای جبرانی',
+  'Fire-resistant Cable': 'کابل مقاوم حریق',
+  'Dual supply mandatory': 'تغذیه دوگانه اجباری',
+  'SHEV Compliance': 'انطباق SHEV',
+  // Access Control module
+  'Access Control Design': 'طراحی کنترل دسترسی',
+  'Standalone': 'مستقل',
+  'Networked': 'شبکه‌ای',
+  'Video intercom': 'آیفون تصویری',
+  'Integrated': 'یکپارچه',
+  'Number of Doors': 'تعداد درب‌ها',
+  'Credential Type': 'نوع اعتبارسنجی',
+  'RFID': 'RFID',
+  'Mobile': 'موبایل',
+  'PIN': 'PIN',
+  'Biometric': 'بیومتریک',
+  'Combined': 'ترکیبی',
+  'Door Hardware': 'سخت‌افزار درب',
+  'Electric strike': 'قفل برقی',
+  'Magnetic lock': 'قفل مغناطیسی',
+  'Motor lock': 'قفل موتوری',
+  'Battery Backup': 'پشتیبان باتری',
+  'PSU Size': 'اندازه منبع تغذیه',
+  'Battery Capacity': 'ظرفیت باتری',
+  'Fire Door Integration': 'یکپارچگی درب ضد حریق',
+  'Emergency Exit': 'خروج اضطراری',
+  'Fail-safe (unlocks on power fail)': 'ایمن در خرابی (باز در قطع برق)',
+  // Generator Sizing module
+  'Generator Sizing Design': 'طراحی اندازه ژنراتور',
+  'Application': 'کاربرد',
+  'Emergency standby': 'آماده‌باش اضطراری',
+  'Peak shaving': 'حذف پیک',
+  'Prime power': 'توان اصلی',
+  'Construction site': 'کارگاه ساختمانی',
+  'Load Types': 'انواع بار',
+  'Lighting': 'روشنایی',
+  'HVAC': 'تهویه مطبوع',
+  'IT': 'فناوری اطلاعات',
+  'Medical': 'پزشکی',
+  'Fire systems': 'سیستم‌های آتش‌نشانی',
+  'Lifts': 'آسانسورها',
+  'Kitchen': 'آشپزخانه',
+  'EV charging': 'شارژ خودرو',
+  'Motor Starting': 'راه‌اندازی موتور',
+  'Generator kVA': 'ژنراتور kVA',
+  'ATS Rating': 'رتبه ATS',
+  'Fuel Tank': 'مخزن سوخت',
+  'Testing Schedule': 'برنامه آزمایش',
+  'Autonomy Hours': 'ساعات خودمختاری',
+  // Discrimination module
+  'Discrimination Analysis': 'تحلیل انتخاب‌پذیری',
+  'Upstream Device': 'دستگاه بالادست',
+  'Downstream Device': 'دستگاه پایین‌دست',
+  'Selectivity Verdict': 'حکم انتخاب‌پذیری',
+  'Full Selective': 'کاملا انتخاب‌پذیر',
+  'Partial Selective': 'جزئی انتخاب‌پذیر',
+  'Not Selective': 'غیر انتخاب‌پذیر',
+  'Selectivity Limit Is': 'حد انتخاب‌پذیری Is',
+  'Fuse gG': 'فیوز gG',
+  'Ratio': 'نسبت',
+  'Improvement': 'بهبود',
+  'Back-up Protection': 'حفاظت پشتیبان',
+  // Earthing System module
+  'Earthing System Design': 'طراحی سیستم ارتینگ',
+  'Earth Electrode': 'الکترود زمین',
+  'Rod (1.5m)': 'میله (1.5 متر)',
+  'Rod (3m)': 'میله (3 متر)',
+  'Strip': 'نوار',
+  'Ring': 'حلقه',
+  'Foundation': 'فونداسیون',
+  'Soil Resistivity': 'مقاومت ویژه خاک',
+  'Earth Resistance': 'مقاومت زمین',
+  'PE Sizing': 'ابعاد PE',
+  'Main Bonding': 'اتصال اصلی',
+  'Supplementary Bonding': 'اتصال تکمیلی',
+  'Parallel Rods': 'میله‌های موازی',
+  'Target Resistance': 'مقاومت هدف',
+  'Fault Current Path': 'مسیر جریان خطا'
 };
 function tx(da, en) { if(lang === 'da') return da; if(lang === 'fa') return _FA[en] || en; return en; }
 function tl(obj, prefix) { return obj[prefix + '_' + lang] || obj[prefix + '_en'] || ''; }
@@ -4490,6 +4604,11 @@ function renderModule(mod) {
     case 'trayfill': content = renderTrayFill(); break;
     case 'zs': content = renderZs(); break;
     case 'commission': content = renderCommission(); break;
+    case 'shev': content = renderShev(); break;
+    case 'access': content = renderAccess(); break;
+    case 'generator': content = renderGenerator(); break;
+    case 'discrim': content = renderDiscrim(); break;
+    case 'earthsys': content = renderEarthsys(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -13617,6 +13736,756 @@ function renderCommission() {
   return html;
 }
 
+
+
+// ===== SMOKE VENTILATION (SHEV) MODULE =====
+var shevState = {
+  systemType: 'nshev',
+  buildingType: 'atrium',
+  zoneArea: 200,
+  ceilingHeight: 6,
+  fireSize: 5
+};
+
+var SHEV_BUILDINGS = {
+  atrium: { da: 'Atrium', en: 'Atrium', mandatoryArea: 200, ach: 12 },
+  shopping: { da: 'Butikscenter', en: 'Shopping center', mandatoryArea: 300, ach: 12 },
+  parking: { da: 'Parkeringshus', en: 'Parking garage', mandatoryArea: 150, ach: 10 },
+  industrial: { da: 'Industrihal', en: 'Industrial hall', mandatoryArea: 600, ach: 15 },
+  stairwell: { da: 'Trapperum', en: 'Stairwell', mandatoryArea: 0, ach: 10 },
+  corridor: { da: 'Korridor', en: 'Corridor', mandatoryArea: 0, ach: 10 },
+  assembly: { da: 'Forsamlingssal', en: 'Assembly hall', mandatoryArea: 300, ach: 12 }
+};
+
+function shevCalcNSHEV(area) {
+  // BR18 §100: Av >= 2% of floor area minimum for NSHEV
+  return Math.ceil(area * 0.02 * 100) / 100;
+}
+
+function shevCalcMSHEV(area, height, ach) {
+  // Volume flow = zone volume * ACH / 3600 for m3/s
+  var volume = area * height;
+  var flowM3s = Math.ceil(volume * ach / 3600 * 100) / 100;
+  return flowM3s;
+}
+
+function shevCalcDuct(flowM3s) {
+  // Duct sizing: max velocity 10 m/s per DS/EN 12101-6
+  var areaM2 = flowM3s / 10;
+  var diamMm = Math.ceil(Math.sqrt(areaM2 * 4 / Math.PI) * 1000);
+  // Round up to nearest 50mm standard
+  diamMm = Math.ceil(diamMm / 50) * 50;
+  return diamMm;
+}
+
+function shevCalcMakeupAir(flowM3s) {
+  // Make-up air = 75% of exhaust minimum per DS/EN 12101-6
+  return Math.ceil(flowM3s * 0.75 * 100) / 100;
+}
+
+function shevGetCableType(systemType) {
+  if (systemType === 'nshev') return 'E30';
+  return 'E60'; // MSHEV and pressurization need E60 minimum
+}
+
+function shevIsMandatory(buildingType, area) {
+  var bld = SHEV_BUILDINGS[buildingType];
+  if (!bld || bld.mandatoryArea === 0) return false;
+  return area >= bld.mandatoryArea;
+}
+
+function renderShev() {
+  var bld = SHEV_BUILDINGS[shevState.buildingType];
+  var ach = bld ? bld.ach : 10;
+  var volume = shevState.zoneArea * shevState.ceilingHeight;
+
+  // Calculations
+  var nshevArea = shevCalcNSHEV(shevState.zoneArea);
+  var mshevFlow = shevCalcMSHEV(shevState.zoneArea, shevState.ceilingHeight, ach);
+  var ductDiam = shevCalcDuct(mshevFlow);
+  var makeupAir = shevCalcMakeupAir(mshevFlow);
+  var cableType = shevGetCableType(shevState.systemType);
+  var mandatory = shevIsMandatory(shevState.buildingType, shevState.zoneArea);
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Røgventilation (DS/EN 12101 + BR18)', 'Smoke Ventilation Design (DS/EN 12101 + BR18)') + '</div>';
+  html += '<div class="info-row">' + tx('Dimensionering af røgventilationssystem iht. DS/EN 12101 og BR18 §100-103', 'Smoke ventilation system design per DS/EN 12101 and BR18 §100-103') + '</div>';
+
+  // System type
+  html += '<div class="select-group"><div class="select-label">' + tx('Systemtype', 'System Type') + '</div><div class="select-grid">';
+  ['nshev','mshev','pressurization'].forEach(function(st) {
+    var labels = { nshev: ['Naturlig (NSHEV)', 'Natural (NSHEV)'], mshev: ['Mekanisk (MSHEV)', 'Mechanical (MSHEV)'], pressurization: ['Tryksætning', 'Pressurization'] };
+    html += '<button class="sel-btn' + (shevState.systemType === st ? ' selected' : '') + '" onclick="shevState.systemType=\'' + st + '\';renderModule(\'shev\')">' + tx(labels[st][0], labels[st][1]) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Building type
+  html += '<div class="select-group"><div class="select-label">' + tx('Bygningstype', 'Building Type') + '</div><div class="select-grid">';
+  Object.keys(SHEV_BUILDINGS).forEach(function(key) {
+    var b = SHEV_BUILDINGS[key];
+    html += '<button class="sel-btn' + (shevState.buildingType === key ? ' selected' : '') + '" onclick="shevState.buildingType=\'' + key + '\';renderModule(\'shev\')">' + tx(b.da, b.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Zone area
+  html += '<div class="select-group"><div class="select-label">' + tx('Røgzone areal [m²]', 'Smoke Zone Area [m²]') + '</div><div class="select-grid">';
+  [50,100,150,200,300,400,500,600,800,1000,1500,2000,3000].forEach(function(a) {
+    html += '<button class="sel-btn' + (shevState.zoneArea === a ? ' selected' : '') + '" onclick="shevState.zoneArea=' + a + ';renderModule(\'shev\')">' + a + '</button>';
+  });
+  html += '</div></div>';
+
+  // Ceiling height
+  html += '<div class="select-group"><div class="select-label">' + tx('Lofthøjde [m]', 'Ceiling Height [m]') + '</div><div class="select-grid">';
+  [3,4,5,6,7,8,9,10,12,14,16,18,20].forEach(function(h) {
+    html += '<button class="sel-btn' + (shevState.ceilingHeight === h ? ' selected' : '') + '" onclick="shevState.ceilingHeight=' + h + ';renderModule(\'shev\')">' + h + '</button>';
+  });
+  html += '</div></div>';
+
+  // Fire size HRR
+  html += '<div class="select-group"><div class="select-label">' + tx('Designbrand (HRR) [MW]', 'Design Fire Size (HRR) [MW]') + '</div><div class="select-grid">';
+  [1,2,3,4,5,6,8,10,12,15,20].forEach(function(f) {
+    html += '<button class="sel-btn' + (shevState.fireSize === f ? ' selected' : '') + '" onclick="shevState.fireSize=' + f + ';renderModule(\'shev\')">' + f + '</button>';
+  });
+  html += '</div></div>';
+
+  // Results
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Resultater', 'Results') + ' - DS/EN 12101 + BR18 §100</div>';
+
+  if (shevState.systemType === 'nshev') {
+    html += '<div class="result-row"><span class="label">' + tx('Påkrævet ventilationsareal (Av)', 'Required Vent Area (Av)') + '</span><span class="value">' + nshevArea.toFixed(2) + ' m²</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Minimum iht. BR18 §100 (2%)', 'Minimum per BR18 §100 (2%)') + '</span><span class="value">2% af ' + shevState.zoneArea + ' m² = ' + nshevArea.toFixed(2) + ' m²</span></div>';
+  } else {
+    html += '<div class="result-row"><span class="label">' + tx('Volumenstrøm', 'Volume Flow') + '</span><span class="value">' + mshevFlow.toFixed(2) + ' m³/s (' + (mshevFlow * 3600).toFixed(0) + ' m³/h)</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Luftskifte (ACH)', 'Air Changes (ACH)') + '</span><span class="value">' + ach + '/h</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Kanaldiameter (max 10 m/s)', 'Duct Diameter (max 10 m/s)') + '</span><span class="value">' + ductDiam + ' mm</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Erstatningsluft (75%)', 'Make-up Air (75%)') + '</span><span class="value">' + makeupAir.toFixed(2) + ' m³/s</span></div>';
+  }
+
+  html += '<div class="result-row"><span class="label">' + tx('Brandsikker kabeltype', 'Fire-resistant Cable') + '</span><span class="value">' + cableType + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Forsyning', 'Power Supply') + '</span><span class="value">' + tx('Dobbeltforsyning påkrævet', 'Dual supply mandatory') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Dedikeret kredsløb', 'Dedicated Circuit') + '</span><span class="value">' + tx('Ja - DS/EN 12101-10', 'Yes - DS/EN 12101-10') + '</span></div>';
+
+  // BR18 mandatory check
+  html += '<div class="result-row"><span class="label">' + tx('BR18 krav', 'BR18 Requirement') + '</span><span class="value">' + (mandatory ? tx('PÅKRÆVET (areal ≥ tærskel)', 'MANDATORY (area >= threshold)') : tx('Ikke påkrævet af BR18', 'Not required by BR18')) + '</span></div>';
+  html += '</div>';
+
+  // Compliance verdict
+  var safe = true;
+  var verdictText = '';
+  if (shevState.systemType === 'nshev' && nshevArea < shevState.zoneArea * 0.02) {
+    safe = false;
+    verdictText = tx('FEJL: Ventilationsareal utilstrækkeligt iht. BR18 §100', 'FAIL: Vent area insufficient per BR18 §100');
+  } else {
+    verdictText = tx('OK: Røgventilation dimensioneret iht. DS/EN 12101 + BR18 §100-103. Dobbeltforsyning og ' + cableType + ' kabel påkrævet.', 'OK: Smoke ventilation designed per DS/EN 12101 + BR18 §100-103. Dual supply and ' + cableType + ' cable required.');
+  }
+  html += renderVerdict(safe, verdictText);
+  html += '</div>';
+  return html;
+}
+// ===== ACCESS CONTROL MODULE =====
+var accessState = {
+  systemType: 'standalone',
+  numDoors: 4,
+  credential: 'rfid',
+  doorHardware: 'strike',
+  backupHours: 4
+};
+
+var ACCESS_HARDWARE = {
+  strike: { da: 'Elektrisk slutblik (500mA)', en: 'Electric strike (500mA)', current: 500 },
+  maglock: { da: 'Magnetlås (400mA)', en: 'Magnetic lock (400mA)', current: 400 },
+  motorlock: { da: 'Motorlås (300mA)', en: 'Motor lock (300mA)', current: 300 }
+};
+
+function accessCalcPowerPerDoor(hardware, credential) {
+  var hw = ACCESS_HARDWARE[hardware];
+  var lockCurrent = hw ? hw.current : 500;
+  var readerCurrent = 150; // mA typical
+  if (credential === 'biometric') readerCurrent = 300;
+  if (credential === 'combined') readerCurrent = 250;
+  var cameraCurrent = 200; // mA for video systems
+  return lockCurrent + readerCurrent + cameraCurrent;
+}
+
+function accessCalcTotalPower(numDoors, hardware, credential) {
+  var perDoor = accessCalcPowerPerDoor(hardware, credential);
+  var total = perDoor * numDoors;
+  // 1.3 safety factor per DS/EN 50133
+  return Math.ceil(total * 1.3);
+}
+
+function accessCalcPSU(totalMa) {
+  // Standard PSU sizes: 2A, 3A, 5A, 10A, 20A
+  var totalA = totalMa / 1000;
+  var sizes = [2, 3, 5, 10, 20];
+  for (var i = 0; i < sizes.length; i++) {
+    if (sizes[i] >= totalA) return sizes[i];
+  }
+  return 20;
+}
+
+function accessCalcBattery(totalMa, hours) {
+  // Battery Ah = (total mA * hours) / 1000 * 1.25 (aging factor)
+  return Math.ceil(totalMa / 1000 * hours * 1.25 * 10) / 10;
+}
+
+function renderAccess() {
+  var totalMa = accessCalcTotalPower(accessState.numDoors, accessState.doorHardware, accessState.credential);
+  var psu = accessCalcPSU(totalMa);
+  var battery = accessCalcBattery(totalMa, accessState.backupHours);
+  var perDoor = accessCalcPowerPerDoor(accessState.doorHardware, accessState.credential);
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Adgangskontrol (DS/EN 50133 + DS/EN 50486)', 'Access Control Design (DS/EN 50133 + DS/EN 50486)') + '</div>';
+  html += '<div class="info-row">' + tx('Dimensionering af adgangskontrolsystem iht. DS/EN 50133 og DS/EN 50486', 'Access control system design per DS/EN 50133 and DS/EN 50486') + '</div>';
+
+  // System type
+  html += '<div class="select-group"><div class="select-label">' + tx('Systemtype', 'System Type') + '</div><div class="select-grid">';
+  var sysTypes = {standalone:['Standalone','Standalone'], networked:['Netværk','Networked'], video:['Video intercom','Video intercom'], integrated:['Integreret','Integrated']};
+  Object.keys(sysTypes).forEach(function(key) {
+    html += '<button class="sel-btn' + (accessState.systemType === key ? ' selected' : '') + '" onclick="accessState.systemType=\'' + key + '\';renderModule(\'access\')">' + tx(sysTypes[key][0], sysTypes[key][1]) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Number of doors
+  html += '<div class="select-group"><div class="select-label">' + tx('Antal døre', 'Number of Doors') + '</div><div class="select-grid">';
+  [1,2,4,6,8,10,12,16,20,24,32,48,64].forEach(function(n) {
+    html += '<button class="sel-btn' + (accessState.numDoors === n ? ' selected' : '') + '" onclick="accessState.numDoors=' + n + ';renderModule(\'access\')">' + n + '</button>';
+  });
+  html += '</div></div>';
+
+  // Credential type
+  html += '<div class="select-group"><div class="select-label">' + tx('Adgangsmetode', 'Credential Type') + '</div><div class="select-grid">';
+  var creds = {rfid:['RFID','RFID'], mobile:['Mobil','Mobile'], pin:['PIN','PIN'], biometric:['Biometrisk','Biometric'], combined:['Kombineret','Combined']};
+  Object.keys(creds).forEach(function(key) {
+    html += '<button class="sel-btn' + (accessState.credential === key ? ' selected' : '') + '" onclick="accessState.credential=\'' + key + '\';renderModule(\'access\')">' + tx(creds[key][0], creds[key][1]) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Door hardware
+  html += '<div class="select-group"><div class="select-label">' + tx('Dørhardware', 'Door Hardware') + '</div><div class="select-grid">';
+  Object.keys(ACCESS_HARDWARE).forEach(function(key) {
+    var hw = ACCESS_HARDWARE[key];
+    html += '<button class="sel-btn' + (accessState.doorHardware === key ? ' selected' : '') + '" onclick="accessState.doorHardware=\'' + key + '\';renderModule(\'access\')">' + tx(hw.da, hw.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Battery backup hours
+  html += '<div class="select-group"><div class="select-label">' + tx('Batteribackup [timer]', 'Battery Backup [hours]') + '</div><div class="select-grid">';
+  [4,8,12,24].forEach(function(h) {
+    html += '<button class="sel-btn' + (accessState.backupHours === h ? ' selected' : '') + '" onclick="accessState.backupHours=' + h + ';renderModule(\'access\')">' + h + 'h</button>';
+  });
+  html += '</div></div>';
+
+  // Results
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Resultater', 'Results') + ' - DS/EN 50133</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Strøm per dør', 'Current per Door') + '</span><span class="value">' + perDoor + ' mA</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Total strøm (× 1.3 sikkerhed)', 'Total Current (x 1.3 safety)') + '</span><span class="value">' + totalMa + ' mA</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('PSU størrelse', 'PSU Size') + '</span><span class="value">' + psu + ' A (24 VDC)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Batterikapacitet (' + accessState.backupHours + 'h)', 'Battery Capacity (' + accessState.backupHours + 'h)') + '</span><span class="value">' + battery.toFixed(1) + ' Ah</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kabel per dør', 'Cable per Door') + '</span><span class="value">2×0.75 mm² + 2×0.5 mm² (data)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Branddørsintegration', 'Fire Door Integration') + '</span><span class="value">' + tx('Hold-åben med brandalarmudløsning, E30 kabel', 'Hold-open with fire alarm release, E30 cable') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Nødudgang (DS/EN 179/1125)', 'Emergency Exit (DS/EN 179/1125)') + '</span><span class="value">' + tx('Fail-safe - låser op ved strømsvigt/brand', 'Fail-safe - unlocks on power fail/fire') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Standard', 'Standard') + '</span><span class="value">DS/EN 50133 + DS/EN 50486</span></div>';
+  html += '</div>';
+
+  // Verdict
+  var safe = psu <= 20 && battery <= 200;
+  var verdictText = safe ?
+    tx('OK: Adgangskontrol dimensioneret iht. DS/EN 50133. PSU ' + psu + 'A, batteri ' + battery.toFixed(1) + 'Ah. Nødudgange fail-safe.', 'OK: Access control sized per DS/EN 50133. PSU ' + psu + 'A, battery ' + battery.toFixed(1) + 'Ah. Emergency exits fail-safe.') :
+    tx('ADVARSEL: System overskrider standard PSU kapacitet', 'WARNING: System exceeds standard PSU capacity');
+  html += renderVerdict(safe, verdictText);
+  html += '</div>';
+  return html;
+}
+// ===== GENERATOR SIZING MODULE =====
+var generatorState = {
+  application: 'emergency',
+  loads: { lighting: true, hvac: false, it: false, medical: false, fire: true, lifts: false, kitchen: false, ev: false },
+  loadKw: { lighting: 20, hvac: 50, it: 30, medical: 40, fire: 15, lifts: 25, kitchen: 20, ev: 22 },
+  motorStart: 'dol',
+  autonomy: 24
+};
+
+var GEN_DIVERSITY = {
+  lighting: 0.9, hvac: 0.8, it: 1.0, medical: 1.0, fire: 1.0, lifts: 0.3, kitchen: 0.6, ev: 0.4
+};
+
+var GEN_LOAD_LABELS = {
+  lighting: { da: 'Belysning (0.9)', en: 'Lighting (0.9)' },
+  hvac: { da: 'HVAC (0.8)', en: 'HVAC (0.8)' },
+  it: { da: 'IT (1.0)', en: 'IT (1.0)' },
+  medical: { da: 'Medicinsk (1.0)', en: 'Medical (1.0)' },
+  fire: { da: 'Brand (1.0)', en: 'Fire (1.0)' },
+  lifts: { da: 'Elevatorer (0.3)', en: 'Lifts (0.3)' },
+  kitchen: { da: 'Køkken (0.6)', en: 'Kitchen (0.6)' },
+  ev: { da: 'Elbil (0.4)', en: 'EV (0.4)' }
+};
+
+var GEN_STANDARD_SIZES = [20, 30, 40, 50, 60, 80, 100, 125, 150, 200, 250, 300, 350, 400, 500, 600, 750, 800, 1000, 1250, 1500, 2000];
+
+function genCalcTotalKw(loads, loadKw) {
+  var total = 0;
+  Object.keys(loads).forEach(function(key) {
+    if (loads[key]) {
+      total += (loadKw[key] || 0) * (GEN_DIVERSITY[key] || 1.0);
+    }
+  });
+  return total;
+}
+
+function genCalcMotorAllowance(totalKw, startMethod) {
+  // Motor starting: 6x for DOL, 3x for soft start
+  var factor = startMethod === 'dol' ? 6 : 3;
+  // Largest motor assumed as 30% of total load
+  var largestMotor = totalKw * 0.3;
+  return largestMotor * (factor - 1); // Additional kW needed for starting
+}
+
+function genCalcKVA(totalKw, motorAllowance) {
+  // Generator kVA = (total kW + motor allowance) / 0.8 pf * 1.25 reserve
+  return Math.ceil((totalKw + motorAllowance) / 0.8 * 1.25);
+}
+
+function genSelectSize(requiredKva) {
+  for (var i = 0; i < GEN_STANDARD_SIZES.length; i++) {
+    if (GEN_STANDARD_SIZES[i] >= requiredKva) return GEN_STANDARD_SIZES[i];
+  }
+  return GEN_STANDARD_SIZES[GEN_STANDARD_SIZES.length - 1];
+}
+
+function genCalcFuel(kva, hours) {
+  // Diesel: 0.3 L/kWh at 75% load
+  var kw = kva * 0.8 * 0.75;
+  return Math.ceil(kw * 0.3 * hours);
+}
+
+function genCalcATS(kva) {
+  // ATS rating >= generator rating, standard sizes
+  var sizes = [63, 100, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3200];
+  var amps = Math.ceil(kva * 1000 / (400 * 1.732));
+  for (var i = 0; i < sizes.length; i++) {
+    if (sizes[i] >= amps) return sizes[i];
+  }
+  return sizes[sizes.length - 1];
+}
+
+function renderGenerator() {
+  var totalKw = genCalcTotalKw(generatorState.loads, generatorState.loadKw);
+  var motorAllowance = genCalcMotorAllowance(totalKw, generatorState.motorStart);
+  var requiredKva = genCalcKVA(totalKw, motorAllowance);
+  var selectedKva = genSelectSize(requiredKva);
+  var atsRating = genCalcATS(selectedKva);
+  var fuel = genCalcFuel(selectedKva, generatorState.autonomy);
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Nødgenerator dimensionering (IEC 62034 + DS/HD 60364-5-56)', 'Generator Sizing (IEC 62034 + DS/HD 60364-5-56)') + '</div>';
+  html += '<div class="info-row">' + tx('Dimensionering af nødgenerator iht. IEC 62034 og DS/HD 60364-5-56', 'Emergency generator sizing per IEC 62034 and DS/HD 60364-5-56') + '</div>';
+
+  // Application
+  html += '<div class="select-group"><div class="select-label">' + tx('Anvendelse', 'Application') + '</div><div class="select-grid">';
+  var apps = {emergency:['Nødstrøm','Emergency standby'], peakshaving:['Spidslastreduktion','Peak shaving'], prime:['Primær strøm','Prime power'], construction:['Byggeplads','Construction site']};
+  Object.keys(apps).forEach(function(key) {
+    html += '<button class="sel-btn' + (generatorState.application === key ? ' selected' : '') + '" onclick="generatorState.application=\'' + key + '\';renderModule(\'generator\')">' + tx(apps[key][0], apps[key][1]) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Load types (toggle buttons)
+  html += '<div class="select-group"><div class="select-label">' + tx('Belastningstyper', 'Load Types') + '</div><div class="select-grid">';
+  Object.keys(GEN_LOAD_LABELS).forEach(function(key) {
+    var lbl = GEN_LOAD_LABELS[key];
+    var active = generatorState.loads[key];
+    html += '<button class="sel-btn' + (active ? ' selected' : '') + '" onclick="generatorState.loads.' + key + '=!generatorState.loads.' + key + ';renderModule(\'generator\')">' + tx(lbl.da, lbl.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Load kW for active loads
+  var activeLoads = Object.keys(generatorState.loads).filter(function(k) { return generatorState.loads[k]; });
+  activeLoads.forEach(function(key) {
+    var lbl = GEN_LOAD_LABELS[key];
+    html += '<div class="select-group"><div class="select-label">' + tx(lbl.da.split(' (')[0] + ' [kW]', lbl.en.split(' (')[0] + ' [kW]') + '</div><div class="select-grid">';
+    [5,10,15,20,25,30,40,50,60,75,100,125,150,200].forEach(function(kw) {
+      html += '<button class="sel-btn' + (generatorState.loadKw[key] === kw ? ' selected' : '') + '" onclick="generatorState.loadKw.' + key + '=' + kw + ';renderModule(\'generator\')">' + kw + '</button>';
+    });
+    html += '</div></div>';
+  });
+
+  // Motor starting method
+  html += '<div class="select-group"><div class="select-label">' + tx('Motorstart metode', 'Motor Starting Method') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (generatorState.motorStart === 'dol' ? ' selected' : '') + '" onclick="generatorState.motorStart=\'dol\';renderModule(\'generator\')">' + tx('DOL (6× Istart)', 'DOL (6x Istart)') + '</button>';
+  html += '<button class="sel-btn' + (generatorState.motorStart === 'soft' ? ' selected' : '') + '" onclick="generatorState.motorStart=\'soft\';renderModule(\'generator\')">' + tx('Soft start (3× Istart)', 'Soft start (3x Istart)') + '</button>';
+  html += '</div></div>';
+
+  // Autonomy hours
+  html += '<div class="select-group"><div class="select-label">' + tx('Autonomi [timer]', 'Autonomy [hours]') + '</div><div class="select-grid">';
+  [8,12,24,48,72].forEach(function(h) {
+    html += '<button class="sel-btn' + (generatorState.autonomy === h ? ' selected' : '') + '" onclick="generatorState.autonomy=' + h + ';renderModule(\'generator\')">' + h + 'h</button>';
+  });
+  html += '</div></div>';
+
+  // Results
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Resultater', 'Results') + ' - IEC 62034 + DS/HD 60364-5-56</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Total belastning (med diversitet)', 'Total Load (with diversity)') + '</span><span class="value">' + totalKw.toFixed(1) + ' kW</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Motorstarttillæg (' + (generatorState.motorStart === 'dol' ? '6×' : '3×') + ')', 'Motor Start Allowance (' + (generatorState.motorStart === 'dol' ? '6x' : '3x') + ')') + '</span><span class="value">' + motorAllowance.toFixed(1) + ' kW</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Beregnet kVA (÷0.8 ×1.25)', 'Required kVA (/0.8 x1.25)') + '</span><span class="value">' + requiredKva + ' kVA</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Valgt generator', 'Selected Generator') + '</span><span class="value">' + selectedKva + ' kVA</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('ATS omskifter', 'ATS Transfer Switch') + '</span><span class="value">' + atsRating + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('ATS omskiftningstid', 'ATS Transfer Time') + '</span><span class="value">' + (generatorState.application === 'emergency' ? '< 10s' : '< 1s (UPS bridge)') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Brændstofforbrug (diesel 0.3 L/kWh)', 'Fuel Consumption (diesel 0.3 L/kWh)') + '</span><span class="value">' + fuel + ' L / ' + generatorState.autonomy + 'h</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Testplan', 'Testing Schedule') + '</span><span class="value">' + tx('Månedlig 30 min tomgang + Årlig 1h ved 75%', 'Monthly 30min no-load + Annual 1h at 75%') + '</span></div>';
+  html += '</div>';
+
+  // Verdict
+  var safe = selectedKva >= requiredKva;
+  var verdictText = safe ?
+    tx('OK: Generator ' + selectedKva + ' kVA dimensioneret med 25% reserve iht. DS/HD 60364-5-56. ATS ' + atsRating + 'A.', 'OK: Generator ' + selectedKva + ' kVA sized with 25% reserve per DS/HD 60364-5-56. ATS ' + atsRating + 'A.') :
+    tx('FEJL: Ingen standardstørrelse tilgængelig', 'FAIL: No standard size available');
+  html += renderVerdict(safe, verdictText);
+  html += '</div>';
+  return html;
+}
+// ===== DISCRIMINATION / SELECTIVITY MODULE =====
+var discrimState = {
+  upstreamType: 'fuse',
+  upstreamRating: 100,
+  downstreamType: 'mcb',
+  downstreamRating: 16,
+  downstreamCurve: 'C'
+};
+
+var DISCRIM_UPSTREAM_FUSE = [25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400];
+var DISCRIM_UPSTREAM_MCB = [10, 13, 16, 20, 25, 32, 40, 50, 63];
+var DISCRIM_UPSTREAM_MCCB = [63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630];
+var DISCRIM_DOWNSTREAM_MCB = [6, 10, 13, 16, 20, 25, 32];
+var DISCRIM_DOWNSTREAM_FUSE = [6, 10, 16, 20, 25, 32, 40, 50, 63];
+
+function discrimAnalyze(upType, upRating, downType, downRating, downCurve) {
+  var result = { verdict: 'none', color: 'red', ratio: 0, is: 0, recommendation: '' };
+
+  if (upType === 'fuse' && downType === 'fuse') {
+    // Fuse-Fuse: ratio >= 1.6:1 = full selective per IEC 60269
+    result.ratio = upRating / downRating;
+    if (result.ratio >= 1.6) {
+      result.verdict = 'full';
+      result.color = 'green';
+      result.is = 999999;
+      result.recommendation = tx('Fuld selektivitet opnået (forhold ≥ 1.6:1)', 'Full selectivity achieved (ratio >= 1.6:1)');
+    } else {
+      result.verdict = 'partial';
+      result.color = 'yellow';
+      result.is = Math.round(downRating * 10 * result.ratio);
+      result.recommendation = tx('Øg opstrøms sikring til min. ' + Math.ceil(downRating * 1.6) + 'A for fuld selektivitet', 'Increase upstream fuse to min. ' + Math.ceil(downRating * 1.6) + 'A for full selectivity');
+    }
+  } else if (upType === 'fuse' && downType === 'mcb') {
+    // Fuse-MCB: fuse >= 2x MCB = selective per IEC 60947
+    result.ratio = upRating / downRating;
+    if (result.ratio >= 2) {
+      result.verdict = 'full';
+      result.color = 'green';
+      result.is = 999999;
+      result.recommendation = tx('Fuld selektivitet: sikring ≥ 2× automatsikring', 'Full selectivity: fuse >= 2x MCB');
+    } else {
+      result.verdict = 'partial';
+      result.color = 'yellow';
+      result.is = Math.round(downRating * 10 * (downCurve === 'B' ? 5 : 10));
+      result.recommendation = tx('Øg opstrøms sikring til min. ' + (downRating * 2) + 'A', 'Increase upstream fuse to min. ' + (downRating * 2) + 'A');
+    }
+  } else if (upType === 'mcb' && downType === 'mcb') {
+    // MCB-MCB: NEVER fully selective (same type) per IEC 60947-2
+    result.ratio = upRating / downRating;
+    result.verdict = 'none';
+    result.color = 'red';
+    result.is = 0;
+    result.recommendation = tx('MCB-MCB er ALDRIG fuldt selektiv. Brug sikring eller MCCB opstrøms.', 'MCB-MCB is NEVER fully selective. Use fuse or MCCB upstream.');
+  } else if (upType === 'mccb' && downType === 'mcb') {
+    // MCCB-MCB: selective with time delay (LSI)
+    result.ratio = upRating / downRating;
+    if (result.ratio >= 2.5) {
+      result.verdict = 'full';
+      result.color = 'green';
+      result.is = Math.round(upRating * 10);
+      result.recommendation = tx('Fuld selektivitet med LSI tidsforsinkelse', 'Full selectivity with LSI time delay');
+    } else {
+      result.verdict = 'partial';
+      result.color = 'yellow';
+      result.is = Math.round(upRating * 5);
+      result.recommendation = tx('Delvis selektivitet - juster Isd tidsforsinkelse', 'Partial selectivity - adjust Isd time delay');
+    }
+  } else if (upType === 'mccb' && downType === 'fuse') {
+    result.ratio = upRating / downRating;
+    if (result.ratio >= 2) {
+      result.verdict = 'full';
+      result.color = 'green';
+      result.is = 999999;
+      result.recommendation = tx('Fuld selektivitet opnået', 'Full selectivity achieved');
+    } else {
+      result.verdict = 'partial';
+      result.color = 'yellow';
+      result.is = Math.round(downRating * 8);
+      result.recommendation = tx('Øg MCCB indstilling eller reducer nedstrøms sikring', 'Increase MCCB setting or reduce downstream fuse');
+    }
+  } else {
+    result.ratio = upRating / downRating;
+    result.verdict = 'none';
+    result.color = 'red';
+    result.recommendation = tx('Kombination ikke understøttet', 'Combination not supported');
+  }
+
+  return result;
+}
+
+function renderDiscrim() {
+  var analysis = discrimAnalyze(discrimState.upstreamType, discrimState.upstreamRating, discrimState.downstreamType, discrimState.downstreamRating, discrimState.downstreamCurve);
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Selektivitetsanalyse (IEC 60947 + DS/HD 60364-4-43)', 'Discrimination Analysis (IEC 60947 + DS/HD 60364-4-43)') + '</div>';
+  html += '<div class="info-row">' + tx('Selektivitetskontrol mellem opstrøms og nedstrøms beskyttelsesudstyr', 'Selectivity check between upstream and downstream protection devices') + '</div>';
+
+  // Upstream device type
+  html += '<div class="select-group"><div class="select-label">' + tx('Opstrøms enhed', 'Upstream Device') + '</div><div class="select-grid">';
+  var upTypes = {fuse:['Sikring gG','Fuse gG'], mcb:['Automatsikring','MCB'], mccb:['MCCB','MCCB']};
+  Object.keys(upTypes).forEach(function(key) {
+    html += '<button class="sel-btn' + (discrimState.upstreamType === key ? ' selected' : '') + '" onclick="discrimState.upstreamType=\'' + key + '\';renderModule(\'discrim\')">' + tx(upTypes[key][0], upTypes[key][1]) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Upstream rating
+  var upRatings = discrimState.upstreamType === 'fuse' ? DISCRIM_UPSTREAM_FUSE : (discrimState.upstreamType === 'mcb' ? DISCRIM_UPSTREAM_MCB : DISCRIM_UPSTREAM_MCCB);
+  html += '<div class="select-group"><div class="select-label">' + tx('Opstrøms mærkestrøm [A]', 'Upstream Rating [A]') + '</div><div class="select-grid">';
+  upRatings.forEach(function(r) {
+    html += '<button class="sel-btn' + (discrimState.upstreamRating === r ? ' selected' : '') + '" onclick="discrimState.upstreamRating=' + r + ';renderModule(\'discrim\')">' + r + '</button>';
+  });
+  html += '</div></div>';
+
+  // Downstream device type
+  html += '<div class="select-group"><div class="select-label">' + tx('Nedstrøms enhed', 'Downstream Device') + '</div><div class="select-grid">';
+  var downTypes = {mcb:['Automatsikring','MCB'], fuse:['Sikring gG','Fuse gG']};
+  Object.keys(downTypes).forEach(function(key) {
+    html += '<button class="sel-btn' + (discrimState.downstreamType === key ? ' selected' : '') + '" onclick="discrimState.downstreamType=\'' + key + '\';renderModule(\'discrim\')">' + tx(downTypes[key][0], downTypes[key][1]) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Downstream rating
+  var downRatings = discrimState.downstreamType === 'mcb' ? DISCRIM_DOWNSTREAM_MCB : DISCRIM_DOWNSTREAM_FUSE;
+  html += '<div class="select-group"><div class="select-label">' + tx('Nedstrøms mærkestrøm [A]', 'Downstream Rating [A]') + '</div><div class="select-grid">';
+  downRatings.forEach(function(r) {
+    html += '<button class="sel-btn' + (discrimState.downstreamRating === r ? ' selected' : '') + '" onclick="discrimState.downstreamRating=' + r + ';renderModule(\'discrim\')">' + r + '</button>';
+  });
+  html += '</div></div>';
+
+  // Downstream curve (only for MCB)
+  if (discrimState.downstreamType === 'mcb') {
+    html += '<div class="select-group"><div class="select-label">' + tx('Nedstrøms kurve', 'Downstream Curve') + '</div><div class="select-grid">';
+    ['B','C','D'].forEach(function(c) {
+      html += '<button class="sel-btn' + (discrimState.downstreamCurve === c ? ' selected' : '') + '" onclick="discrimState.downstreamCurve=\'' + c + '\';renderModule(\'discrim\')">' + c + '</button>';
+    });
+    html += '</div></div>';
+  }
+
+  // Results
+  var verdictColors = { green: 'var(--success, #22c55e)', yellow: '#b8860b', red: 'var(--danger, #ef4444)' };
+  var verdictLabels = { full: tx('FULD SELEKTIVITET','FULL SELECTIVE'), partial: tx('DELVIS SELEKTIVITET','PARTIAL SELECTIVE'), none: tx('INGEN SELEKTIVITET','NOT SELECTIVE') };
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Resultater', 'Results') + ' - IEC 60947 + DS/HD 60364-4-43</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Selektivitetsdom', 'Selectivity Verdict') + '</span><span class="value" style="color:' + verdictColors[analysis.color] + ';font-weight:bold">' + verdictLabels[analysis.verdict] + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Strømforhold', 'Current Ratio') + '</span><span class="value">' + analysis.ratio.toFixed(2) + ':1</span></div>';
+  if (analysis.is > 0 && analysis.is < 999999) {
+    html += '<div class="result-row"><span class="label">' + tx('Selektivitetsgrænse Is', 'Selectivity Limit Is') + '</span><span class="value">' + analysis.is + ' A</span></div>';
+  }
+  html += '<div class="result-row"><span class="label">' + tx('Anbefaling', 'Recommendation') + '</span><span class="value">' + analysis.recommendation + '</span></div>';
+
+  // Rules reference
+  html += '<div class="result-row"><span class="label">' + tx('Regler', 'Rules') + '</span><span class="value">';
+  html += tx('Sikring-Sikring: ≥1.6:1 | Sikring-MCB: ≥2:1 | MCB-MCB: Aldrig fuldt | MCCB-MCB: Med tidsforsinkelse', 'Fuse-Fuse: >=1.6:1 | Fuse-MCB: >=2:1 | MCB-MCB: Never full | MCCB-MCB: With time delay');
+  html += '</span></div>';
+  html += '</div>';
+
+  // Verdict
+  var safe = analysis.verdict === 'full';
+  var verdictText = safe ?
+    tx('OK: Fuld selektivitet opnået iht. IEC 60947 og DS/HD 60364-4-43', 'OK: Full selectivity achieved per IEC 60947 and DS/HD 60364-4-43') :
+    analysis.recommendation;
+  html += renderVerdict(safe, verdictText);
+  html += '</div>';
+  return html;
+}
+// ===== EARTHING SYSTEM MODULE =====
+var earthsysState = {
+  systemType: 'tncs',
+  electrode: 'rod3',
+  soilResistivity: 100,
+  phaseSize: 16,
+  bonding: 'standard',
+  numRods: 1
+};
+
+var EARTH_SYSTEMS = {
+  tns: { da: 'TN-S', en: 'TN-S', desc_da: 'Separat PE og N hele vejen', desc_en: 'Separate PE and N throughout' },
+  tnc: { da: 'TN-C', en: 'TN-C', desc_da: 'Kombineret PEN leder', desc_en: 'Combined PEN conductor' },
+  tncs: { da: 'TN-C-S (mest alm. DK)', en: 'TN-C-S (most common DK)', desc_da: 'PEN opdeles til PE+N ved hovedtavle', desc_en: 'PEN split to PE+N at main panel' },
+  tt: { da: 'TT', en: 'TT', desc_da: 'Lokal jordelektrode', desc_en: 'Local earth electrode' },
+  it: { da: 'IT', en: 'IT', desc_da: 'Isoleret eller impedansjordet', desc_en: 'Isolated or impedance earthed' }
+};
+
+var EARTH_ELECTRODES = {
+  rod15: { da: 'Stang (1.5m)', en: 'Rod (1.5m)', length: 1.5, diameter: 0.02 },
+  rod3: { da: 'Stang (3m)', en: 'Rod (3m)', length: 3.0, diameter: 0.02 },
+  strip: { da: 'Bånd', en: 'Strip', length: 10, diameter: 0.03 },
+  ring: { da: 'Ring', en: 'Ring', length: 20, diameter: 0.03 },
+  foundation: { da: 'Fundament', en: 'Foundation', length: 15, diameter: 0.05 }
+};
+
+var EARTH_SOILS = [
+  { value: 10, da: 'Mose/sump (10 Ω·m)', en: 'Marsh/swamp (10 Ohm-m)' },
+  { value: 30, da: 'Ler (30 Ω·m)', en: 'Clay (30 Ohm-m)' },
+  { value: 100, da: 'Muld/sand (100 Ω·m)', en: 'Loam/sand (100 Ohm-m)' },
+  { value: 300, da: 'Grus (300 Ω·m)', en: 'Gravel (300 Ohm-m)' },
+  { value: 500, da: 'Kalksten (500 Ω·m)', en: 'Limestone (500 Ohm-m)' },
+  { value: 1000, da: 'Sandsten (1000 Ω·m)', en: 'Sandstone (1000 Ohm-m)' },
+  { value: 2000, da: 'Granit (2000 Ω·m)', en: 'Granite (2000 Ohm-m)' }
+];
+
+function earthCalcRodResistance(resistivity, length, diameter) {
+  // Re = rho/(2*pi*L) * ln(4L/d) per DS/HD 60364-5-54
+  return resistivity / (2 * Math.PI * length) * Math.log(4 * length / diameter);
+}
+
+function earthCalcParallelRods(singleRe, numRods) {
+  // Factor: 1 rod=1.0, 2 rods=0.6, 3 rods=0.4, 4 rods=0.33
+  var factors = [1.0, 0.6, 0.4, 0.33, 0.28, 0.25];
+  var factor = numRods <= 6 ? factors[numRods - 1] : 0.2;
+  return singleRe * factor;
+}
+
+function earthCalcPE(phaseSize) {
+  // PE sizing per Table 54.2 of DS/HD 60364-5-54
+  if (phaseSize <= 16) return phaseSize;
+  if (phaseSize <= 35) return 16;
+  return Math.ceil(phaseSize / 2);
+}
+
+function earthGetBonding(bondType) {
+  var standard = {
+    items: [
+      { da: 'Vandforsyning (metalrør)', en: 'Water supply (metal pipes)' },
+      { da: 'Gasforsyning (metalrør)', en: 'Gas supply (metal pipes)' },
+      { da: 'Stålkonstruktion', en: 'Structural steel' },
+      { da: 'HVAC kanaler', en: 'HVAC ducts' },
+      { da: 'Lynafledning', en: 'Lightning protection' }
+    ],
+    clause: 'cl.411.3.1.2'
+  };
+  var supplementary = {
+    items: [
+      { da: 'Badeværelse (alle metal dele)', en: 'Bathroom (all metal parts)' },
+      { da: 'Svømmehal', en: 'Swimming pool' },
+      { da: 'Landbrugsanlæg', en: 'Agricultural premises' }
+    ],
+    clause: 'cl.415.2'
+  };
+  if (bondType === 'supplementary') return supplementary;
+  return standard;
+}
+
+function renderEarthsys() {
+  var electrode = EARTH_ELECTRODES[earthsysState.electrode];
+  var singleRe = earthCalcRodResistance(earthsysState.soilResistivity, electrode.length, electrode.diameter);
+  var totalRe = earthCalcParallelRods(singleRe, earthsysState.numRods);
+  var peSize = earthCalcPE(earthsysState.phaseSize);
+  var bondingInfo = earthGetBonding(earthsysState.bonding);
+  var targetMet = totalRe <= 10;
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Jordingssystem (DS/HD 60364-5-54 + IEC 60364-1)', 'Earthing System Design (DS/HD 60364-5-54 + IEC 60364-1)') + '</div>';
+  html += '<div class="info-row">' + tx('Dimensionering af jordingssystem iht. DS/HD 60364-5-54 og IEC 60364-1', 'Earthing system design per DS/HD 60364-5-54 and IEC 60364-1') + '</div>';
+
+  // System type
+  html += '<div class="select-group"><div class="select-label">' + tx('Systemtype (IEC 60364-1)', 'System Type (IEC 60364-1)') + '</div><div class="select-grid">';
+  Object.keys(EARTH_SYSTEMS).forEach(function(key) {
+    var sys = EARTH_SYSTEMS[key];
+    html += '<button class="sel-btn' + (earthsysState.systemType === key ? ' selected' : '') + '" onclick="earthsysState.systemType=\'' + key + '\';renderModule(\'earthsys\')">' + tx(sys.da, sys.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Electrode type
+  html += '<div class="select-group"><div class="select-label">' + tx('Jordelektrode', 'Earth Electrode') + '</div><div class="select-grid">';
+  Object.keys(EARTH_ELECTRODES).forEach(function(key) {
+    var el = EARTH_ELECTRODES[key];
+    html += '<button class="sel-btn' + (earthsysState.electrode === key ? ' selected' : '') + '" onclick="earthsysState.electrode=\'' + key + '\';renderModule(\'earthsys\')">' + tx(el.da, el.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Soil resistivity
+  html += '<div class="select-group"><div class="select-label">' + tx('Jordmodstand [Ω·m]', 'Soil Resistivity [Ohm-m]') + '</div><div class="select-grid">';
+  EARTH_SOILS.forEach(function(s) {
+    html += '<button class="sel-btn' + (earthsysState.soilResistivity === s.value ? ' selected' : '') + '" onclick="earthsysState.soilResistivity=' + s.value + ';renderModule(\'earthsys\')">' + tx(s.da, s.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Number of rods
+  html += '<div class="select-group"><div class="select-label">' + tx('Antal stænger (parallel)', 'Number of Rods (parallel)') + '</div><div class="select-grid">';
+  [1,2,3,4,5,6].forEach(function(n) {
+    html += '<button class="sel-btn' + (earthsysState.numRods === n ? ' selected' : '') + '" onclick="earthsysState.numRods=' + n + ';renderModule(\'earthsys\')">' + n + '</button>';
+  });
+  html += '</div></div>';
+
+  // Phase conductor size (for PE calculation)
+  html += '<div class="select-group"><div class="select-label">' + tx('Faseleders tværsnit [mm²]', 'Phase Conductor Size [mm²]') + '</div><div class="select-grid">';
+  [1.5,2.5,4,6,10,16,25,35,50,70,95,120,150,185,240].forEach(function(sz) {
+    html += '<button class="sel-btn' + (earthsysState.phaseSize === sz ? ' selected' : '') + '" onclick="earthsysState.phaseSize=' + sz + ';renderModule(\'earthsys\')">' + sz + '</button>';
+  });
+  html += '</div></div>';
+
+  // Bonding type
+  html += '<div class="select-group"><div class="select-label">' + tx('Potentialudligning', 'Equipotential Bonding') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (earthsysState.bonding === 'standard' ? ' selected' : '') + '" onclick="earthsysState.bonding=\'standard\';renderModule(\'earthsys\')">' + tx('Hoved (cl.411.3.1.2)', 'Main (cl.411.3.1.2)') + '</button>';
+  html += '<button class="sel-btn' + (earthsysState.bonding === 'supplementary' ? ' selected' : '') + '" onclick="earthsysState.bonding=\'supplementary\';renderModule(\'earthsys\')">' + tx('Supplerende (cl.415.2)', 'Supplementary (cl.415.2)') + '</button>';
+  html += '</div></div>';
+
+  // Results
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Resultater', 'Results') + ' - DS/HD 60364-5-54</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Enkelt elektrode modstand', 'Single Electrode Resistance') + '</span><span class="value">' + singleRe.toFixed(2) + ' Ω</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Total modstand (' + earthsysState.numRods + ' stang' + (earthsysState.numRods > 1 ? 'e' : '') + ')', 'Total Resistance (' + earthsysState.numRods + ' rod' + (earthsysState.numRods > 1 ? 's' : '') + ')') + '</span><span class="value">' + totalRe.toFixed(2) + ' Ω</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Målmodstand', 'Target Resistance') + '</span><span class="value">≤ 10 Ω ' + (targetMet ? '✓' : '✗') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('PE leder (Tabel 54.2)', 'PE Conductor (Table 54.2)') + '</span><span class="value">' + peSize + ' mm² Cu</span></div>';
+
+  // PEN rules
+  var sys = EARTH_SYSTEMS[earthsysState.systemType];
+  html += '<div class="result-row"><span class="label">' + tx('System', 'System') + '</span><span class="value">' + tx(sys.da, sys.en) + ' - ' + tx(sys.desc_da, sys.desc_en) + '</span></div>';
+  if (earthsysState.systemType === 'tnc' || earthsysState.systemType === 'tncs') {
+    html += '<div class="result-row"><span class="label">' + tx('PEN krav', 'PEN Requirements') + '</span><span class="value">' + tx('Min. 10 mm² Cu / 16 mm² Al, må ikke afbrydes', 'Min. 10 mm² Cu / 16 mm² Al, cannot be switched') + '</span></div>';
+  }
+  html += '</div>';
+
+  // Bonding requirements
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Potentialudligningskrav', 'Bonding Requirements') + ' - ' + bondingInfo.clause + '</div>';
+  bondingInfo.items.forEach(function(item) {
+    html += '<div class="result-row"><span class="label">• ' + tx(item.da, item.en) + '</span></div>';
+  });
+  html += '</div>';
+
+  // Testing requirements
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Testkrav', 'Testing Requirements') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Jordmodstandsmåling', 'Earth resistance measurement') + '</span><span class="value">' + tx('Wenner 4-punkt eller klemmetang', '4-point Wenner or clamp-on') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kontinuitetstest PE', 'PE continuity test') + '</span><span class="value">< 1 Ω</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Periodisk gentest', 'Periodic retest') + '</span><span class="value">' + tx('Hvert 5. år (boliger), hvert 3. år (erhverv)', 'Every 5 years (domestic), every 3 years (commercial)') + '</span></div>';
+  html += '</div>';
+
+  // Verdict
+  var safe = targetMet;
+  var verdictText = safe ?
+    tx('OK: Jordmodstand ' + totalRe.toFixed(2) + ' Ω ≤ 10 Ω. PE ' + peSize + ' mm² iht. DS/HD 60364-5-54 Tabel 54.2.', 'OK: Earth resistance ' + totalRe.toFixed(2) + ' Ohm <= 10 Ohm. PE ' + peSize + ' mm2 per DS/HD 60364-5-54 Table 54.2.') :
+    tx('FEJL: Jordmodstand ' + totalRe.toFixed(2) + ' Ω > 10 Ω. Tilføj flere parallelstænger eller brug længere elektroder.', 'FAIL: Earth resistance ' + totalRe.toFixed(2) + ' Ohm > 10 Ohm. Add more parallel rods or use longer electrodes.');
+  html += renderVerdict(safe, verdictText);
+  html += '</div>';
+  return html;
+}
 
 // ===== INIT =====
 renderNav();
