@@ -1744,11 +1744,25 @@ if (window.QIDisplay) {
 (function testCriticalConsistency() {
   var byPriority = S.validCases().filter(function (c) { return c.priority === "1-CRITICAL"; }).length;
   ok(S.kpis().crit === byPriority, "kpis.crit equals the 1-CRITICAL count (no 5-vs-7 mismatch)");
+  // Dashboard KPI must show the SAME critical number AND must not carry the old
+  // misleading "(RPN>=200)" label while displaying the priority-critical count.
+  var dnav = doc.querySelector('.nav-item[data-view="dashboard"]');
+  if (dnav) dnav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  var dhtml = doc.querySelector(".content").innerHTML;
+  ok(!/\(RPN\s*(?:&ge;|≥|>=)\s*200\)/i.test(dhtml), "dashboard no longer mislabels the critical KPI as '(RPN>=200)'");
+  ok(/Critical priority/.test(dhtml), "dashboard critical KPI uses the unified 'Critical priority' label");
   // Risk Register heading states the total + critical so the badge can't be mistaken for the list size.
   var rnav = doc.querySelector('.nav-item[data-view="risks"]');
   if (rnav) rnav.dispatchEvent(new window.Event("click", { bubbles: true }));
   var html = doc.querySelector(".content").innerHTML;
   ok(/risks? in the register/.test(html), "Risk Register heading shows the total count, not just the critical badge");
+  // The register heading's critical number must equal the unified kpis.crit.
+  var m = html.match(/<b>(\d+)<\/b>\s*critical/i);
+  ok(m && Number(m[1]) === S.kpis().crit, "Risk Register 'N critical' matches kpis.crit (badge/KPI/register all agree)");
+  // No "(RPN>=200)" critical mislabel anywhere in the AI status summary either.
+  var ainav = doc.querySelector('.nav-item[data-view="ai"]');
+  if (ainav) ainav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(!/\(RPN\s*(?:&ge;|≥|>=)\s*200\)/i.test(doc.querySelector(".content").innerHTML), "AI status summary no longer mislabels critical as the '(RPN>=200)' threshold");
 })();
 
 // Step 117: Cinematic Tour — distinct theme + live HUD caption are wired

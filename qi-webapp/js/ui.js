@@ -2266,7 +2266,7 @@
       <div class="grid kpis" style="margin-bottom:16px">
         ${kpi("navy", "Total Cases", k.total)}
         ${kpi("blue", "Open / Active", k.open)}
-        ${kpi("red", "Critical (RPN&ge;200)", k.crit)}
+        ${kpi("red", "Critical priority", k.crit)}
         ${kpi("gold", "Avg RPN", k.avgRpn)}
         ${kpi("green", "Avg % Done", pct(k.avgDone))}
         ${kpi("teal", "Blocked", k.blocked)}
@@ -2960,7 +2960,7 @@
     const k = S.kpis(), top = S.topRisks(10), e = S.validCases();
     const topExp = e.length ? e.slice().sort((a, b) => (b.rpn || 0) - (a.rpn || 0))[0] : null;
     const summary = `You are tracking ${k.total} case(s). ` +
-      (k.crit ? `${k.crit} are CRITICAL (RPN&ge;200) and must be escalated today. ` : "No critical risks — good. ") +
+      (k.crit ? `${k.crit} are CRITICAL priority and must be escalated today. ` : "No critical risks — good. ") +
       (k.blocked ? `${k.blocked} case(s) are BLOCKED — clear these first. ` : "") +
       `Average completion is ${pct(k.avgDone)}. ` +
       (topExp ? `Top exposure: "${esc(topExp.problem)}". ` : "") +
