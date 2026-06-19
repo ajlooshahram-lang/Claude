@@ -682,7 +682,8 @@ const T = {
       metering: 'Energim\u00e5ling',
       atex: 'ATEX / Ex',
       smartgrid: 'Smart Grid',
-      kls: 'KLS Kvalitetssystem'
+      kls: 'KLS Kvalitetssystem',
+      kritisk: '\uD83E\uDDE0 Projekt + Kritisk Hjerne'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -823,7 +824,8 @@ const T = {
       metering: 'Metering',
       atex: 'ATEX / Explosive',
       smartgrid: 'Smart Grid',
-      kls: 'KLS Quality System'
+      kls: 'KLS Quality System',
+      kritisk: '\uD83E\uDDE0 Project + Critical Mind'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -956,7 +958,8 @@ const T = {
       metering: 'اندازه‌گیری انرژی',
       atex: 'محیط انفجاری',
       smartgrid: 'شبکه هوشمند',
-      kls: 'سیستم کیفیت KLS'
+      kls: 'سیستم کیفیت KLS',
+      kritisk: '\uD83E\uDDE0 پروژه + ذهن انتقادی'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -1036,6 +1039,29 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // Unified Project + Critical Mind safety auditor — new feature
+  'Project + Critical Mind': '\u067E\u0631\u0648\u0698\u0647 + \u0630\u0647\u0646 \u0627\u0646\u062A\u0642\u0627\u062F\u06CC',
+  'Unified Project': '\u067E\u0631\u0648\u0698\u0647 \u06CC\u06A9\u067E\u0627\u0631\u0686\u0647',
+  'Run the Critical Mind': '\u0627\u062C\u0631\u0627\u06CC \u0630\u0647\u0646 \u0627\u0646\u062A\u0642\u0627\u062F\u06CC',
+  'The Critical Mind (safety audit)': '\u0630\u0647\u0646 \u0627\u0646\u062A\u0642\u0627\u062F\u06CC (\u0645\u0645\u06CC\u0632\u06CC \u0627\u06CC\u0645\u0646\u06CC)',
+  'Supply transformer': '\u062A\u0631\u0627\u0646\u0633\u0641\u0648\u0631\u0645\u0627\u062A\u0648\u0631 \u062A\u0623\u0645\u06CC\u0646',
+  'Earthing system': '\u0633\u06CC\u0633\u062A\u0645 \u0627\u062A\u0635\u0627\u0644 \u0632\u0645\u06CC\u0646',
+  'Supply cable': '\u06A9\u0627\u0628\u0644 \u062A\u0623\u0645\u06CC\u0646',
+  'Main device': '\u0648\u0633\u06CC\u0644\u0647 \u0627\u0635\u0644\u06CC',
+  'Final circuits': '\u0645\u062F\u0627\u0631\u0647\u0627\u06CC \u0646\u0647\u0627\u06CC\u06CC',
+  'Add final circuit': '\u0627\u0641\u0632\u0648\u062F\u0646 \u0645\u062F\u0627\u0631 \u0646\u0647\u0627\u06CC\u06CC',
+  'Safe': '\u0627\u06CC\u0645\u0646',
+  'Warning': '\u0647\u0634\u062F\u0627\u0631',
+  'Dangerous': '\u062E\u0637\u0631\u0646\u0627\u06A9',
+  'Incomplete': '\u0646\u0627\u0642\u0635',
+  'Verdict': '\u062D\u06A9\u0645',
+  'Length': '\u0637\u0648\u0644',
+  'Clear project': '\u067E\u0627\u06A9 \u06A9\u0631\u062F\u0646 \u067E\u0631\u0648\u0698\u0647',
+  'Recommendation': '\u062A\u0648\u0635\u06CC\u0647',
+  'Short-circuit at board (Ik3max)': '\u0627\u062A\u0635\u0627\u0644 \u06A9\u0648\u062A\u0627\u0647 \u062F\u0631 \u062A\u0627\u0628\u0644\u0648 (Ik3max)',
+  'Short-circuit at far end (Ik1min)': '\u0627\u062A\u0635\u0627\u0644 \u06A9\u0648\u062A\u0627\u0647 \u062F\u0631 \u0627\u0646\u062A\u0647\u0627 (Ik1min)',
+  'No supply transformer selected.': '\u0647\u06CC\u0686 \u062A\u0631\u0627\u0646\u0633\u0641\u0648\u0631\u0645\u0627\u062A\u0648\u0631 \u062A\u0623\u0645\u06CC\u0646 \u0627\u0646\u062A\u062E\u0627\u0628 \u0646\u0634\u062F\u0647 \u0627\u0633\u062A.',
+
   // Elforsyning BOM (supply-side bill of materials) — new feature
   'Elforsyning materials': '\u0645\u0648\u0627\u062F \u062A\u0623\u0645\u06CC\u0646 \u0628\u0631\u0642',
   'Pick all elforsyning materials': '\u0627\u0646\u062A\u062E\u0627\u0628 \u0647\u0645\u0647 \u0645\u0648\u0627\u062F \u062A\u0623\u0645\u06CC\u0646 \u0628\u0631\u0642',
@@ -4922,12 +4948,13 @@ function renderModule(mod) {
     case 'atex': content = renderATEX(); break;
     case 'smartgrid': content = renderSmartGrid(); break;
     case 'kls': content = renderKLS(); break;
+    case 'kritisk': content = renderKritisk(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
   // Append QI validation summary if enough data exists
   const qi = runQiValidation();
-  const noQi = ['standards','bank','ai','bid','projekt','verify','draw','exam'];
+  const noQi = ['standards','bank','ai','bid','projekt','verify','draw','exam','kritisk'];
   if (qi.passed.length + qi.issues.length > 0 && noQi.indexOf(mod) < 0) {
     content += renderQiCard(qi);
   }
@@ -17692,6 +17719,448 @@ function renderKLS() {
   }
   html += '</div>';
   return html;
+}
+
+// ===== UNIFIED PROJECT MODEL + "DEN KRITISKE HJERNE" (Critical-Mind safety auditor) =====
+// One canonical project object is the single source of truth for the whole app:
+//   chosen supply transformer (kVA + uk%)  ->  short-circuit calc (Ik3max at board,
+//   Ik1min at far end)  ->  device breaking-capacity (Icu >= Ikmax) + auto-disconnection.
+// LIFE-SAFETY: every selection references a REAL CE-marked product already in PRODUCTS.
+// 100% CLICK-ONLY: pickers are <select>/<button> only — there is NO text input anywhere.
+// CONSERVATIVE always: derated officialIz (never nominal product.iz), IEC 60909 c-factors,
+// Cmin applied to U0/U for disconnection, round toward danger, recommend the safer option.
+
+const UNIFIED_PROJECT_KEY = 'el_unified_project';
+const UNIFIED_PROJECT_VERSION = 1;
+const UP_EARTHING_SYSTEMS = ['TN', 'TT', 'IT'];
+const UP_DEVICE_CATEGORIES = ['mcbs', 'mccbs', 'fuses', 'mainFuses'];
+const UP_CABLE_CATEGORIES = ['cables', 'supplyCables'];
+const UP_LENGTH_PRESETS = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200];
+const UP_LOAD_PRESETS = [1, 2, 3, 3.68, 5, 7.36, 11, 16, 22, 30, 50, 80, 120];
+const UP_COSPHI_PRESETS = [0.8, 0.85, 0.9, 0.95, 1.0];
+const UP_RCD_PRESETS_MA = [30, 100, 300, 500];
+const UP_PHASES = ['1x230', '3x400'];
+// IEC 60909-0 voltage factors + Danish conservative practice
+const UP_CMAX = 1.05;
+const UP_CMIN = 0.95;
+const UP_SAFETY_REF = 'Sikkerhedsstyrelsen (sikkerhedsstyrelsen.dk) \u00B7 DS/HD 60364';
+
+function upDefaultProject() {
+  return {
+    version: UNIFIED_PROJECT_VERSION,
+    earthing: 'TN',
+    transformerId: null,
+    supply: { cableId: null, length_m: 30, deviceId: null, deviceIn: null },
+    finals: []
+  };
+}
+
+// --- Resolvers (re-resolve every id through PRODUCTS; mirror elforsyningProductById) ---
+function upCableById(id) {
+  for (let i = 0; i < UP_CABLE_CATEGORIES.length; i++) {
+    const cat = UP_CABLE_CATEGORIES[i];
+    const arr = PRODUCTS[cat] || [];
+    for (let j = 0; j < arr.length; j++) { if (arr[j].id === id) return { product: arr[j], category: cat }; }
+  }
+  return null;
+}
+function upCableProduct(id) { const f = upCableById(id); return f ? f.product : null; }
+
+function upDeviceById(id) {
+  for (let i = 0; i < UP_DEVICE_CATEGORIES.length; i++) {
+    const cat = UP_DEVICE_CATEGORIES[i];
+    const arr = PRODUCTS[cat] || [];
+    for (let j = 0; j < arr.length; j++) { if (arr[j].id === id) return { product: arr[j], category: cat }; }
+  }
+  return null;
+}
+
+// Normalises a device into { id, category, product, In, icuKA, curve, kind }.
+function upResolveDevice(deviceId, deviceIn) {
+  const f = upDeviceById(deviceId);
+  if (!f) return null;
+  const p = f.product;
+  let In, icuKA, curve, kind;
+  if (f.category === 'mccbs') {
+    const opts = p.inOptions || [];
+    const wanted = Number(deviceIn);
+    In = (opts.indexOf(wanted) >= 0) ? wanted : (opts.length ? Math.min.apply(null, opts) : 0);
+    icuKA = p.icu; curve = null; kind = 'mccb';
+  } else {
+    In = p.rating; icuKA = p.icu; curve = p.curve || null;
+    kind = (f.category === 'fuses' || f.category === 'mainFuses') ? 'fuse' : 'mcb';
+  }
+  return { id: p.id, category: f.category, product: p, In: In, icuKA: icuKA, curve: curve, kind: kind };
+}
+
+function upTransformer(project) {
+  if (!project || !project.transformerId) return null;
+  const f = elforsyningProductById(project.transformerId);
+  return (f && f.category === 'transformers') ? f.product : null;
+}
+
+// DERATED Iz per DS/HD 60364-5-52 Table C.52.1 — ALWAYS officialIz, never nominal product.iz.
+function upDeratedIz(cable) { return cable ? officialIz(cable) : 0; }
+
+function upMagneticMultiple(curve) { if (curve === 'C') return 10; if (curve === 'D') return 20; return 5; }
+
+// Conservative single-segment voltage drop in % (r,x in ohm/km, L in m).
+function upSegmentVdropPct(cable, length_m, ib, phases, cosPhi) {
+  if (!cable || !(length_m > 0) || !(ib > 0)) return 0;
+  const r = cable.r || 0, x = cable.x || 0;
+  const cos = cosPhi || 0.9; const sin = Math.sqrt(Math.max(0, 1 - cos * cos));
+  const L = length_m;
+  if (phases === '3x400') return Math.sqrt(3) * ib * L * (r * cos + x * sin) / (400 * 10);
+  return 2 * ib * L * (r * cos + x * sin) / (230 * 10);
+}
+
+// --- Persistence (NEW key; load re-resolves every id and DROPS unknowns, like elforsyningLoadBom) ---
+function upValidateProject(data) {
+  const clean = upDefaultProject();
+  if (!data || typeof data !== 'object') return clean;
+  if (UP_EARTHING_SYSTEMS.indexOf(data.earthing) >= 0) clean.earthing = data.earthing;
+  if (data.transformerId) {
+    const f = elforsyningProductById(data.transformerId);
+    if (f && f.category === 'transformers') clean.transformerId = data.transformerId; // unknown -> dropped
+  }
+  const s = data.supply || {};
+  if (s.cableId && upCableById(s.cableId)) clean.supply.cableId = s.cableId;
+  const L = Number(s.length_m); if (L > 0 && L <= 100000) clean.supply.length_m = L;
+  if (s.deviceId) { const dv = upResolveDevice(s.deviceId, s.deviceIn); if (dv) { clean.supply.deviceId = dv.id; clean.supply.deviceIn = dv.In; } }
+  if (Array.isArray(data.finals)) {
+    data.finals.forEach(function(fc) {
+      if (!fc || typeof fc !== 'object') return;
+      const out = { id: 'fc', name_da: 'Slutkreds', name_en: 'Final circuit', cableId: null, length_m: 25, deviceId: null, deviceIn: null, loadKW: 0, phases: '1x230', cosPhi: 0.95, rcdMa: null };
+      if (typeof fc.id === 'string') out.id = fc.id;
+      if (typeof fc.name_da === 'string') out.name_da = fc.name_da;
+      if (typeof fc.name_en === 'string') out.name_en = fc.name_en;
+      if (fc.cableId && upCableById(fc.cableId)) out.cableId = fc.cableId; // unknown -> dropped
+      const fl = Number(fc.length_m); if (fl > 0 && fl <= 100000) out.length_m = fl;
+      if (fc.deviceId) { const dv = upResolveDevice(fc.deviceId, fc.deviceIn); if (dv) { out.deviceId = dv.id; out.deviceIn = dv.In; } }
+      const kw = Number(fc.loadKW); if (kw >= 0 && kw < 100000) out.loadKW = kw;
+      if (UP_PHASES.indexOf(fc.phases) >= 0) out.phases = fc.phases;
+      const cp = Number(fc.cosPhi); if (cp > 0 && cp <= 1) out.cosPhi = cp;
+      if (fc.rcdMa != null) { const r = Number(fc.rcdMa); if (UP_RCD_PRESETS_MA.indexOf(r) >= 0) out.rcdMa = r; }
+      clean.finals.push(out);
+    });
+  }
+  return clean;
+}
+function upLoadProject() {
+  try {
+    const raw = localStorage.getItem(UNIFIED_PROJECT_KEY);
+    if (!raw) return upDefaultProject();
+    return upValidateProject(JSON.parse(raw));
+  } catch (e) { return upDefaultProject(); }
+}
+function upSaveProject() { try { localStorage.setItem(UNIFIED_PROJECT_KEY, JSON.stringify(upProject)); } catch (e) {} }
+
+let upProject = upLoadProject();
+let upAuditState = { lastAudit: null };
+
+// --- Build an SLD-style tree from the unified project to reuse the verified calc engine ---
+function upBuildTree(project) {
+  if (!project || !project.transformerId) return null;
+  const tf = upTransformer(project);
+  if (!tf) return null;
+  const tree = { nodes: {}, rootId: null };
+  const tId = 'up-t';
+  tree.nodes[tId] = { id: tId, type: 'transformer', parentId: null, childIds: [], power_kVA: tf.kva, uk_pct: tf.ukPct };
+  tree.rootId = tId;
+  const bId = 'up-b';
+  const sup = project.supply || {};
+  const supCable = sup.cableId ? upCableProduct(sup.cableId) : null;
+  tree.nodes[bId] = { id: bId, type: 'main_board', parentId: tId, childIds: [], cable: supCable, length_m: sup.length_m || 0 };
+  tree.nodes[tId].childIds.push(bId);
+  const finalIds = [];
+  (project.finals || []).forEach(function(fc, i) {
+    const fId = 'up-f' + i;
+    const cab = fc.cableId ? upCableProduct(fc.cableId) : null;
+    const is3 = fc.phases === '3x400';
+    tree.nodes[fId] = {
+      id: fId, type: 'final_circuit', parentId: bId, childIds: [],
+      cable: cab, length_m: fc.length_m || 0,
+      power_kW: fc.loadKW || 0, cosPhi: fc.cosPhi || 0.95,
+      phases: fc.phases || '1x230', voltage: is3 ? 400 : 230
+    };
+    tree.nodes[bId].childIds.push(fId);
+    finalIds.push(fId);
+  });
+  return { tree: tree, boardId: bId, transformerId: tId, finalIds: finalIds };
+}
+
+// --- The auditor finding helpers (clause strings reused from sldVerifyNode) ---
+function upCheckOverload(findings, label, ib, In, iz) {
+  const base = 'IB=' + ib.toFixed(1) + 'A, In=' + In + 'A, Iz=' + iz.toFixed(0) + 'A';
+  if (ib <= In && In <= iz) {
+    findings.push({ scope: label, rule: 'IB \u2264 In \u2264 Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'ok', detail: base, recommendation: '' });
+  } else if (ib > In) {
+    findings.push({ scope: label, rule: 'IB \u2264 In \u2264 Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'fail', detail: tx('Overbelastning: ', 'Overload: ') + 'IB=' + ib.toFixed(1) + 'A > In=' + In + 'A', recommendation: tx('Forst\u00F8r beskyttelsen eller reducer belastningen.', 'Increase protection rating or reduce load.') });
+  } else {
+    findings.push({ scope: label, rule: 'IB \u2264 In \u2264 Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'fail', detail: tx('Kabel underdimensioneret: ', 'Cable undersized: ') + 'In=' + In + 'A > Iz=' + iz.toFixed(0) + 'A (derateret/officialIz)', recommendation: tx('V\u00E6lg st\u00F8rre kabeltv\u00E6rsnit (h\u00F8jere Iz) eller mindre afbryder.', 'Choose a larger cable cross-section (higher Iz) or a smaller device.') });
+  }
+}
+function upCheckIcu(findings, label, dev, ikBoardA) {
+  const icuA = (dev.icuKA || 0) * 1000;
+  const detail = 'Icu=' + dev.icuKA.toFixed(1) + 'kA, Ik3max=' + (ikBoardA / 1000).toFixed(2) + 'kA';
+  if (icuA >= ikBoardA) {
+    findings.push({ scope: label, rule: 'Icu \u2265 Ikmax', clause: 'DS/HD 60364-4-43 cl. 434.5.1', status: 'ok', detail: detail + ' ' + tx('(ved klemmer)', '(at terminals)'), recommendation: '' });
+  } else {
+    findings.push({ scope: label, rule: 'Icu \u2265 Ikmax', clause: 'DS/HD 60364-4-43 cl. 434.5.1', status: 'fail', detail: tx('Brydeevne for lav: ', 'Breaking capacity too low: ') + detail, recommendation: tx('V\u00E6lg en afbryder med h\u00F8jere Icu eller anvend backup-sikring (kaskade).', 'Choose a device with higher Icu or use a back-up fuse (cascading).') });
+  }
+}
+function upCheckDisconnection(findings, label, earthing, zs, dev, fc) {
+  const In = dev.In;
+  const isSmallFinal = In <= 32;
+  let ia, timeReq, clauseRef;
+  if (isSmallFinal) { ia = upMagneticMultiple(dev.curve || 'B') * In; timeReq = '0.4s'; clauseRef = 'DS/HD 60364-4-41 Table 41.1'; }
+  else { ia = 5 * In; timeReq = '5s'; clauseRef = 'DS/HD 60364-4-41 cl. 411.3.2.3'; }
+  if (earthing === 'TT') {
+    const clauseTT = 'DS/HD 60364-4-41 cl. 411.5.3';
+    if (!fc.rcdMa) {
+      findings.push({ scope: label, rule: tx('Fejlbeskyttelse TT (HPFI)', 'Fault protection TT (RCD)'), clause: clauseTT, status: 'fail', detail: tx('TT uden HPFI: ingen sikker udkobling.', 'TT without an RCD: no safe disconnection.'), recommendation: tx('Tilf\u00F8j HPFI (RCD) \u2014 typisk 30 mA p\u00E5 slutkredse.', 'Add an RCD \u2014 typically 30 mA on final circuits.') });
+      return;
+    }
+    const touch = zs * (fc.rcdMa / 1000);
+    const detail = 'Zs\u00B7I\u0394n=' + touch.toFixed(1) + 'V, I\u0394n=' + fc.rcdMa + 'mA, Zs=' + zs.toFixed(2) + '\u03A9';
+    if (touch <= 50) {
+      findings.push({ scope: label, rule: 'Zs\u00B7I\u0394n \u2264 50V', clause: clauseTT, status: 'ok', detail: detail, recommendation: '' });
+    } else {
+      findings.push({ scope: label, rule: 'Zs\u00B7I\u0394n \u2264 50V', clause: clauseTT, status: 'fail', detail: tx('Ber\u00F8ringssp\u00E6nding for h\u00F8j: ', 'Touch voltage too high: ') + detail, recommendation: tx('V\u00E6lg HPFI med lavere I\u0394n (30 mA) eller forbedr jordelektrode (lavere RA).', 'Use an RCD with lower I\u0394n (30 mA) or improve the earth electrode (lower RA).') });
+    }
+    return;
+  }
+  if (earthing === 'IT') {
+    const clauseIT = 'DS/HD 60364-4-41 cl. 411.6.4';
+    const lhs = 2 * zs * ia; const rhs = UP_CMIN * 400;
+    const detail = '2\u00B7Zs\u00B7Ia=' + lhs.toFixed(0) + 'V \u2264 Cmin\u00B7U=' + rhs.toFixed(0) + 'V (Zs=' + zs.toFixed(2) + '\u03A9, Ia=' + ia.toFixed(0) + 'A)';
+    findings.push({ scope: label, rule: tx('IT 2. fejl: 2\u00B7Zs\u00B7Ia \u2264 Cmin\u00B7U', 'IT 2nd fault: 2\u00B7Zs\u00B7Ia \u2264 Cmin\u00B7U'), clause: clauseIT, status: (lhs <= rhs) ? 'ok' : 'fail', detail: (lhs <= rhs ? '' : tx('For h\u00F8j loop ved 2. fejl: ', 'Loop too high at 2nd fault: ')) + detail, recommendation: (lhs <= rhs) ? '' : tx('Reducer Zs (st\u00F8rre/kortere kabel) eller hurtigere afbryder; overvej HPFI.', 'Reduce Zs (larger/shorter cable) or a faster device; consider an RCD.') });
+    return;
+  }
+  // TN — conservative: Cmin applied to U0
+  const u0 = UP_CMIN * 230;
+  const zsIa = zs * ia;
+  const detail = 'Zs\u00B7Ia=' + zsIa.toFixed(0) + 'V \u2264 Cmin\u00B7U0=' + u0.toFixed(0) + 'V (Zs=' + zs.toFixed(2) + '\u03A9, Ia=' + ia.toFixed(0) + 'A, ' + timeReq + ')';
+  if (zsIa <= u0) {
+    findings.push({ scope: label, rule: 'Zs\u00B7Ia \u2264 U0 (' + timeReq + ')', clause: clauseRef, status: 'ok', detail: detail, recommendation: '' });
+  } else {
+    findings.push({ scope: label, rule: 'Zs\u00B7Ia \u2264 U0 (' + timeReq + ')', clause: clauseRef, status: 'fail', detail: tx('Udkobling ikke sikret: ', 'Disconnection not ensured: ') + detail, recommendation: tx('V\u00E6lg hurtigere/mere f\u00F8lsom afbryder, st\u00F8rre kabel (lavere Zs) eller tilf\u00F8j HPFI.', 'Choose a faster/more sensitive device, larger cable (lower Zs) or add an RCD.') });
+  }
+}
+function upCheckVdrop(findings, label, vdropPct) {
+  const detail = '\u0394U=' + vdropPct.toFixed(2) + '%';
+  if (vdropPct <= 4) {
+    findings.push({ scope: label, rule: '\u0394U \u2264 4%', clause: 'DS/HD 60364-5-52 cl. 525', status: 'ok', detail: detail, recommendation: '' });
+  } else if (vdropPct <= 5) {
+    findings.push({ scope: label, rule: '\u0394U \u2264 4%', clause: 'DS/HD 60364-5-52 cl. 525', status: 'warning', detail: detail + ' ' + tx('(marginal, >4%)', '(marginal, >4%)'), recommendation: tx('Overvej st\u00F8rre tv\u00E6rsnit; 5% er absolut gr\u00E6nse.', 'Consider a larger cross-section; 5% is the absolute limit.') });
+  } else {
+    findings.push({ scope: label, rule: '\u0394U \u2264 4%', clause: 'DS/HD 60364-5-52 cl. 525', status: 'fail', detail: detail + ' (>5%)', recommendation: tx('Forst\u00F8r kabeltv\u00E6rsnit eller reducer l\u00E6ngde/belastning.', 'Increase cable cross-section or reduce length/load.') });
+  }
+}
+function upComputeVerdict(findings) {
+  let hasFail = false, hasWarn = false, hasCheck = false;
+  findings.forEach(function(f) {
+    if (f.status === 'fail') { hasFail = true; hasCheck = true; }
+    else if (f.status === 'warning') { hasWarn = true; hasCheck = true; }
+    else if (f.status === 'ok') { hasCheck = true; }
+  });
+  if (hasFail) return 'red';
+  if (hasWarn) return 'yellow';
+  if (hasCheck) return 'green';
+  return 'incomplete';
+}
+
+// --- THE AUDITOR: sweeps the unified project, returns verdict + findings (each cites a clause) ---
+function upAuditProject(project) {
+  const findings = [];
+  const built = upBuildTree(project);
+  if (!built) {
+    findings.push({ scope: tx('Forsyning', 'Supply'), rule: tx('Forsyningstransformer', 'Supply transformer'), clause: 'DS/HD 60364-4-41', status: 'warning', detail: tx('Ingen forsyningstransformer valgt.', 'No supply transformer selected.'), recommendation: tx('V\u00E6lg en CE-m\u00E6rket transformer for at beregne Ik og auditere.', 'Select a CE-marked transformer to compute Ik and audit.') });
+    return { verdict: 'incomplete', findings: findings, ikBoardA: 0 };
+  }
+  const tree = built.tree;
+  const ikBoardA = sldCalcNodeIk(tree, built.boardId).ikmax; // Ik3max at board (3-phase, c=1.05)
+  findings.push({ scope: tx('Tavle', 'Board'), rule: tx('Kortslutning ved tavle (Ik3max)', 'Short-circuit at board (Ik3max)'), clause: 'IEC 60909-0 (c=1.05) \u00B7 DS/HD 60364', status: 'info', detail: 'Ik3max = ' + (ikBoardA / 1000).toFixed(2) + ' kA', recommendation: '' });
+
+  let ibBoard = 0;
+  built.finalIds.forEach(function(fId) { ibBoard += sldCalcNodeIB(tree.nodes[fId]); });
+
+  const sup = project.supply || {};
+  const supDev = upResolveDevice(sup.deviceId, sup.deviceIn);
+  const supCable = sup.cableId ? upCableProduct(sup.cableId) : null;
+  const supLabel = tx('Forsyningskabel', 'Supply cable');
+  if (supCable && supDev) {
+    upCheckOverload(findings, supLabel, ibBoard, supDev.In, upDeratedIz(supCable));
+  } else {
+    findings.push({ scope: tx('Forsyning', 'Supply'), rule: 'IB \u2264 In \u2264 Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'warning', detail: tx('Forsyningskabel eller hovedafbryder mangler.', 'Supply cable or main device missing.'), recommendation: tx('V\u00E6lg b\u00E5de forsyningskabel og hovedafbryder.', 'Select both a supply cable and a main device.') });
+  }
+  if (supDev) upCheckIcu(findings, tx('Hovedafbryder', 'Main device') + ' (' + supDev.product.brand + ' ' + supDev.product.model + ')', supDev, ikBoardA);
+
+  built.finalIds.forEach(function(fId, idx) {
+    const fc = project.finals[idx];
+    const node = tree.nodes[fId];
+    const name = (lang === 'da' ? (fc.name_da || 'Slutkreds') : (fc.name_en || 'Final circuit')) + ' #' + (idx + 1);
+    const dev = upResolveDevice(fc.deviceId, fc.deviceIn);
+    const cab = fc.cableId ? upCableProduct(fc.cableId) : null;
+    const ibF = sldCalcNodeIB(node);
+    const ikMinF = sldCalcNodeIk(tree, fId).ikmin; // Ik1min at far end (c=0.95, x1.5 conservative)
+    findings.push({ scope: name, rule: tx('Kortslutning ved enden (Ik1min)', 'Short-circuit at far end (Ik1min)'), clause: 'IEC 60909-0 (c=0.95) \u00B7 DS/HD 60364', status: 'info', detail: 'Ik1min = ' + (ikMinF / 1000).toFixed(2) + ' kA', recommendation: '' });
+    if (cab && dev) upCheckOverload(findings, name + ' \u2014 ' + tx('kabel', 'cable'), ibF, dev.In, upDeratedIz(cab));
+    else findings.push({ scope: name, rule: 'IB \u2264 In \u2264 Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'warning', detail: tx('Kabel eller beskyttelse mangler.', 'Cable or protective device missing.'), recommendation: tx('V\u00E6lg kabel og beskyttelse.', 'Select a cable and a protective device.') });
+    if (dev) upCheckIcu(findings, name + ' (' + dev.product.brand + ' ' + dev.product.model + ')', dev, ikBoardA);
+    if (dev) upCheckDisconnection(findings, name, project.earthing, sldCalcNodeZs(tree, fId), dev, fc);
+    if (cab) {
+      const supDrop = upSegmentVdropPct(supCable, (sup.length_m || 0), ibBoard, '3x400', 0.9);
+      const finDrop = upSegmentVdropPct(cab, (fc.length_m || 0), ibF, fc.phases, fc.cosPhi);
+      upCheckVdrop(findings, name, supDrop + finDrop);
+    }
+  });
+
+  if (project.earthing === 'IT') {
+    findings.push({ scope: tx('System', 'System'), rule: tx('Isolationsoverv\u00E5gning (IMD)', 'Insulation monitoring (IMD)'), clause: 'DS/HD 60364-4-41 cl. 411.6.3.1', status: 'warning', detail: tx('IT-system kr\u00E6ver en isolationsoverv\u00E5gningsenhed (IMD) der melder f\u00F8rste fejl.', 'IT system requires an insulation monitoring device (IMD) that signals the first fault.'), recommendation: tx('Installer IMD med akustisk/visuel alarm; udbedr f\u00F8rste fejl straks.', 'Install an IMD with audible/visual alarm; clear the first fault promptly.') });
+  }
+
+  return { verdict: upComputeVerdict(findings), findings: findings, ikBoardA: ikBoardA };
+}
+
+function upVerdictMeta(v) {
+  if (v === 'green') return { color: 'var(--success)', icon: '\u2705', label: tx('Sikkert', 'Safe') };
+  if (v === 'yellow') return { color: '#b8860b', icon: '\u26A0\uFE0F', label: tx('Advarsel', 'Warning') };
+  if (v === 'red') return { color: 'var(--danger)', icon: '\u26D4', label: tx('Farligt', 'Dangerous') };
+  return { color: 'var(--text-muted)', icon: '\u2139\uFE0F', label: tx('Ufuldst\u00E6ndigt', 'Incomplete') };
+}
+
+// --- Click-only action handlers (every one persists + re-renders; no typing) ---
+function upSetTransformer(id) { upProject.transformerId = id || null; upSaveProject(); renderModule('kritisk'); }
+function upSetEarthing(sys) { if (UP_EARTHING_SYSTEMS.indexOf(sys) >= 0) { upProject.earthing = sys; upSaveProject(); renderModule('kritisk'); } }
+function upSetSupplyCable(id) { upProject.supply.cableId = id || null; upSaveProject(); renderModule('kritisk'); }
+function upSetSupplyLength(m) { const L = Number(m); if (L > 0) upProject.supply.length_m = L; upSaveProject(); renderModule('kritisk'); }
+function upSetSupplyDevice(id) { const dv = upResolveDevice(id, null); if (dv) { upProject.supply.deviceId = dv.id; upProject.supply.deviceIn = dv.In; } else { upProject.supply.deviceId = null; upProject.supply.deviceIn = null; } upSaveProject(); renderModule('kritisk'); }
+function upSetSupplyDeviceIn(v) { upProject.supply.deviceIn = Number(v); upSaveProject(); renderModule('kritisk'); }
+function upAddFinal() { upProject.finals.push({ id: 'fc' + (Date.now()), name_da: 'Slutkreds', name_en: 'Final circuit', cableId: null, length_m: 25, deviceId: null, deviceIn: null, loadKW: 3.68, phases: '1x230', cosPhi: 0.95, rcdMa: null }); upSaveProject(); renderModule('kritisk'); }
+function upRemoveFinal(i) { upProject.finals.splice(i, 1); upSaveProject(); renderModule('kritisk'); }
+function upSetFinalCable(i, id) { if (upProject.finals[i]) upProject.finals[i].cableId = id || null; upSaveProject(); renderModule('kritisk'); }
+function upSetFinalLength(i, m) { const L = Number(m); if (upProject.finals[i] && L > 0) upProject.finals[i].length_m = L; upSaveProject(); renderModule('kritisk'); }
+function upSetFinalDevice(i, id) { if (!upProject.finals[i]) return; const dv = upResolveDevice(id, null); if (dv) { upProject.finals[i].deviceId = dv.id; upProject.finals[i].deviceIn = dv.In; } else { upProject.finals[i].deviceId = null; upProject.finals[i].deviceIn = null; } upSaveProject(); renderModule('kritisk'); }
+function upSetFinalDeviceIn(i, v) { if (upProject.finals[i]) upProject.finals[i].deviceIn = Number(v); upSaveProject(); renderModule('kritisk'); }
+function upSetFinalLoad(i, kw) { if (upProject.finals[i]) upProject.finals[i].loadKW = Number(kw); upSaveProject(); renderModule('kritisk'); }
+function upSetFinalPhases(i, p) { if (upProject.finals[i] && UP_PHASES.indexOf(p) >= 0) upProject.finals[i].phases = p; upSaveProject(); renderModule('kritisk'); }
+function upSetFinalCos(i, c) { if (upProject.finals[i]) upProject.finals[i].cosPhi = Number(c); upSaveProject(); renderModule('kritisk'); }
+function upSetFinalRcd(i, ma) { if (upProject.finals[i]) { const r = Number(ma); upProject.finals[i].rcdMa = (UP_RCD_PRESETS_MA.indexOf(r) >= 0) ? r : null; } upSaveProject(); renderModule('kritisk'); }
+function upClearProject() { if (typeof confirm === 'function' && !confirm(tx('Ryd hele projektet?', 'Clear the entire project?'))) return; upProject = upDefaultProject(); upAuditState.lastAudit = null; upSaveProject(); renderModule('kritisk'); }
+function upRunAudit() { upAuditState.lastAudit = upAuditProject(upProject); renderModule('kritisk'); }
+
+// --- Render (100% click-only: <select> + <button>, never <input type=text>/<textarea>) ---
+function upSelect(onchange, current, opts, placeholder) {
+  let h = '<select class="sel-btn" style="padding:4px 8px;max-width:100%" onchange="' + onchange + '">';
+  h += '<option value="">' + (placeholder || '\u2014') + '</option>';
+  opts.forEach(function(o) {
+    h += '<option value="' + o.value + '"' + (String(o.value) === String(current) ? ' selected' : '') + '>' + o.label + '</option>';
+  });
+  h += '</select>';
+  return h;
+}
+function upCableOpts(cat) { return (PRODUCTS[cat] || []).map(function(p) { return { value: p.id, label: p.brand + ' ' + p.model + ' \u2014 ' + bankSpec(cat, p) }; }); }
+function upDeviceOpts(cats) { let out = []; cats.forEach(function(cat) { (PRODUCTS[cat] || []).forEach(function(p) { out.push({ value: p.id, label: p.brand + ' ' + p.model + ' \u2014 ' + bankSpec(cat, p) }); }); }); return out; }
+function upPresetOpts(arr, suffix) { return arr.map(function(v) { return { value: v, label: v + (suffix || '') }; }); }
+
+function renderKritisk() {
+  const p = upProject;
+  const transformerOpts = (PRODUCTS.transformers || []).map(function(t) { return { value: t.id, label: t.brand + ' ' + t.model + ' \u2014 ' + bankSpec('transformers', t) }; });
+  const supDev = upResolveDevice(p.supply.deviceId, p.supply.deviceIn);
+
+  let h = '<div class="card fade-in">';
+  h += '<div class="card-title">\uD83E\uDDE0 ' + tx('Samlet Projekt', 'Unified Project') + '</div>';
+  h += '<div class="info-row">' + tx(
+    '\u00C9t projekt er sandheden: valgt transformer (kVA + uk%) \u2192 kortslutning (Ik3max ved tavle, Ik1min ved enden) \u2192 brydeevne (Icu \u2265 Ikmax) og udkobling. 100% klik \u2014 ingen indtastning. Kun reelle CE-m\u00E6rkede produkter. Reference: ' + UP_SAFETY_REF + '.',
+    'One project is the truth: chosen transformer (kVA + uk%) \u2192 short-circuit (Ik3max at board, Ik1min at far end) \u2192 breaking capacity (Icu \u2265 Ikmax) and disconnection. 100% click \u2014 no typing. Only real CE-marked products. Reference: ' + UP_SAFETY_REF + '.') + '</div>';
+
+  // Supply transformer
+  h += '<div class="select-group"><div class="select-label">' + tx('Forsyningstransformer', 'Supply transformer') + '</div>';
+  h += upSelect('upSetTransformer(this.value)', p.transformerId || '', transformerOpts, tx('V\u00E6lg transformer', 'Select transformer')) + '</div>';
+
+  // Earthing system
+  h += '<div class="select-group"><div class="select-label">' + tx('Jordingssystem', 'Earthing system') + '</div><div class="select-grid">';
+  UP_EARTHING_SYSTEMS.forEach(function(sys) {
+    h += '<button class="sel-btn ' + (p.earthing === sys ? 'selected' : '') + '" onclick="upSetEarthing(\'' + sys + '\')">' + sys + '</button>';
+  });
+  h += '</div></div>';
+
+  // Supply cable + length + main device
+  h += '<div class="select-group"><div class="select-label">' + tx('Forsyningskabel', 'Supply cable') + '</div>';
+  h += upSelect('upSetSupplyCable(this.value)', p.supply.cableId || '', upCableOpts('supplyCables'), tx('V\u00E6lg forsyningskabel', 'Select supply cable')) + '</div>';
+  h += '<div class="select-group"><div class="select-label">' + tx('L\u00E6ngde', 'Length') + ' (m)</div>';
+  h += upSelect('upSetSupplyLength(this.value)', p.supply.length_m, upPresetOpts(UP_LENGTH_PRESETS, ' m'), '\u2014') + '</div>';
+  h += '<div class="select-group"><div class="select-label">' + tx('Hovedafbryder', 'Main device') + '</div>';
+  h += upSelect('upSetSupplyDevice(this.value)', p.supply.deviceId || '', upDeviceOpts(['mainFuses', 'mccbs']), tx('V\u00E6lg hovedafbryder', 'Select main device'));
+  if (supDev && supDev.kind === 'mccb') {
+    h += '<div style="margin-top:6px">' + upSelect('upSetSupplyDeviceIn(this.value)', p.supply.deviceIn, upPresetOpts(supDev.product.inOptions || [], 'A'), 'In') + '</div>';
+  }
+  h += '</div>';
+  h += '</div>'; // end project card
+
+  // Final circuits
+  h += '<div class="card fade-in"><div class="card-title">' + tx('Slutkredse', 'Final circuits') + ' (' + p.finals.length + ')</div>';
+  h += '<div class="select-grid"><button class="sel-btn selected" onclick="upAddFinal()">\u2795 ' + tx('Tilf\u00F8j slutkreds', 'Add final circuit') + '</button>';
+  if (p.finals.length) h += '<button class="sel-btn" onclick="upClearProject()">\uD83D\uDDD1\uFE0F ' + tx('Ryd projekt', 'Clear project') + '</button>';
+  h += '</div>';
+  p.finals.forEach(function(fc, i) {
+    const dev = upResolveDevice(fc.deviceId, fc.deviceIn);
+    h += '<div class="result-box" style="margin-top:10px"><div class="result-title">' + tx('Slutkreds', 'Final circuit') + ' #' + (i + 1) + '</div>';
+    h += '<div class="result-row" style="flex-wrap:wrap;gap:6px">';
+    h += '<span style="min-width:120px">' + tx('Kabel', 'Cable') + '</span>' + upSelect('upSetFinalCable(' + i + ',this.value)', fc.cableId || '', upCableOpts('cables'), tx('V\u00E6lg kabel', 'Select cable'));
+    h += '</div><div class="result-row" style="flex-wrap:wrap;gap:6px">';
+    h += '<span style="min-width:120px">' + tx('Beskyttelse', 'Protection') + '</span>' + upSelect('upSetFinalDevice(' + i + ',this.value)', fc.deviceId || '', upDeviceOpts(['mcbs', 'fuses', 'mccbs']), tx('V\u00E6lg beskyttelse', 'Select device'));
+    if (dev && dev.kind === 'mccb') h += upSelect('upSetFinalDeviceIn(' + i + ',this.value)', fc.deviceIn, upPresetOpts(dev.product.inOptions || [], 'A'), 'In');
+    h += '</div><div class="result-row" style="flex-wrap:wrap;gap:6px">';
+    h += '<span style="min-width:120px">' + tx('L\u00E6ngde', 'Length') + '</span>' + upSelect('upSetFinalLength(' + i + ',this.value)', fc.length_m, upPresetOpts(UP_LENGTH_PRESETS, ' m'), '\u2014');
+    h += '<span style="min-width:60px">' + tx('Last', 'Load') + '</span>' + upSelect('upSetFinalLoad(' + i + ',this.value)', fc.loadKW, upPresetOpts(UP_LOAD_PRESETS, ' kW'), '\u2014');
+    h += '</div><div class="result-row" style="flex-wrap:wrap;gap:6px">';
+    h += '<span style="min-width:120px">' + tx('Faser / cos\u03C6', 'Phases / cos\u03C6') + '</span>';
+    UP_PHASES.forEach(function(ph) { h += '<button class="sel-btn ' + (fc.phases === ph ? 'selected' : '') + '" onclick="upSetFinalPhases(' + i + ',\'' + ph + '\')">' + ph + '</button>'; });
+    h += upSelect('upSetFinalCos(' + i + ',this.value)', fc.cosPhi, upPresetOpts(UP_COSPHI_PRESETS, ''), 'cos\u03C6');
+    h += '</div><div class="result-row" style="flex-wrap:wrap;gap:6px">';
+    h += '<span style="min-width:120px">HPFI / RCD' + (p.earthing === 'TT' ? ' \u2605' : '') + '</span>' + upSelect('upSetFinalRcd(' + i + ',this.value)', (fc.rcdMa == null ? '' : fc.rcdMa), upPresetOpts(UP_RCD_PRESETS_MA, ' mA'), tx('ingen', 'none'));
+    h += '<button class="sel-btn" style="color:var(--danger)" onclick="upRemoveFinal(' + i + ')">\uD83D\uDDD1\uFE0F ' + tx('Fjern', 'Remove') + '</button>';
+    h += '</div></div>';
+  });
+  h += '</div>'; // end finals card
+
+  // The Critical Mind button + verdict
+  h += '<div class="card fade-in"><div class="card-title">\uD83E\uDDE0 ' + tx('Den Kritiske Hjerne (sikkerhedsaudit)', 'The Critical Mind (safety audit)') + '</div>';
+  h += '<div class="info-row">' + tx(
+    'Konservativ kontrol af hele projektet: derateret Iz, IEC 60909 c-faktorer, Cmin p\u00E5 U0/U, og runder mod faren. Hver konklusion citerer den pr\u00E6cise DS/HD 60364-bestemmelse. Kilde: ' + UP_SAFETY_REF + '.',
+    'Conservative sweep of the whole project: derated Iz, IEC 60909 c-factors, Cmin on U0/U, rounding toward danger. Every finding cites the exact DS/HD 60364 clause. Source: ' + UP_SAFETY_REF + '.') + '</div>';
+  h += '<div class="select-grid"><button class="sel-btn selected" onclick="upRunAudit()">\uD83E\uDDE0 ' + tx('K\u00F8r Den Kritiske Hjerne', 'Run the Critical Mind') + '</button></div>';
+  if (upAuditState.lastAudit) h += upRenderAudit(upAuditState.lastAudit);
+  h += '</div>';
+  return h;
+}
+
+function upRenderAudit(audit) {
+  const meta = upVerdictMeta(audit.verdict);
+  let h = '<div class="result-box" style="margin-top:12px;border-left:6px solid ' + meta.color + '">';
+  h += '<div class="result-title" style="color:' + meta.color + '">' + meta.icon + ' ' + tx('Konklusion', 'Verdict') + ': ' + meta.label + '</div>';
+  const order = ['fail', 'warning', 'ok', 'info'];
+  const labels = { fail: '\u26D4 ' + tx('Farligt', 'Dangerous'), warning: '\u26A0\uFE0F ' + tx('Advarsel', 'Warning'), ok: '\u2705 ' + tx('OK', 'OK'), info: '\u2139\uFE0F ' + tx('Info', 'Info') };
+  order.forEach(function(st) {
+    const group = audit.findings.filter(function(f) { return f.status === st; });
+    if (!group.length) return;
+    h += '<div style="margin-top:8px;font-weight:600">' + labels[st] + ' (' + group.length + ')</div>';
+    group.forEach(function(f) {
+      h += '<div class="result-row" style="flex-direction:column;align-items:flex-start;gap:2px;border-top:1px solid var(--border);padding-top:6px">';
+      h += '<span class="label"><strong>' + f.scope + '</strong> \u2014 ' + f.rule + '</span>';
+      h += '<span style="font-size:0.78rem">' + f.detail + '</span>';
+      h += '<span style="font-size:0.72rem;color:var(--text-muted)">' + f.clause + '</span>';
+      if (f.recommendation) h += '<span style="font-size:0.74rem;color:var(--primary)">\u2192 ' + tx('Anbefaling', 'Recommendation') + ': ' + f.recommendation + '</span>';
+      h += '</div>';
+    });
+  });
+  h += '<div class="info-row" style="margin-top:10px">' + tx(
+    'Konservativt resultat. Verificer altid mod g\u00E6ldende DS/HD 60364 og ' + UP_SAFETY_REF + '. Ved tvivl: v\u00E6lg den sikrere l\u00F8sning (st\u00F8rre kabel / hurtigere afbryder / ekstra HPFI).',
+    'Conservative result. Always verify against the current DS/HD 60364 and ' + UP_SAFETY_REF + '. When in doubt: choose the safer option (larger cable / faster device / extra RCD).') + '</div>';
+  h += '</div>';
+  return h;
 }
 
 // ===== INIT =====

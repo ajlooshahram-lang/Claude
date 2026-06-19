@@ -7341,6 +7341,135 @@ test('Elforsyning: Legionella rule is a MINIMUM at the tap (>=50C), not a maximu
   lang = savedLang;
 });
 
+// ===== Unified Project + "Den Kritiske Hjerne" (Critical-Mind safety auditor) =====
+function upSnapshot() { return JSON.stringify(upProject); }
+function upRestore(s) { upProject = JSON.parse(s); upSaveProject(); }
+
+test('Unified Project: default project is TN with empty supply/finals', function() {
+  var d = upDefaultProject();
+  assert.strictEqual(d.earthing, 'TN');
+  assert.strictEqual(d.transformerId, null);
+  assert.deepStrictEqual(d.finals, []);
+  assert.strictEqual(d.supply.length_m, 30);
+});
+
+test('Critical Mind: transformer kVA+uk% -> correct Ik3max at board (630kVA uk5%)', function() {
+  var saved = upSnapshot();
+  upProject = { version: 1, earthing: 'TN', transformerId: 'TR-ONAN-630', supply: { cableId: null, length_m: 0, deviceId: null, deviceIn: null }, finals: [] };
+  // Hand calc: Zt = (uk/100)*U^2/Sn ; Ik3max = cmax*U / (sqrt3 * Zt)
+  var Zt = (5 / 100) * 400 * 400 / 630000;
+  var ikHand = 1.05 * 400 / (Math.sqrt(3) * Zt);
+  var audit = upAuditProject(upProject);
+  assert(Math.abs(audit.ikBoardA - ikHand) < 1, 'auditor Ik3max=' + audit.ikBoardA.toFixed(0) + 'A matches hand calc=' + ikHand.toFixed(0) + 'A');
+  assert(Math.abs(ikHand / 1000 - 19.10) < 0.05, 'hand Ik3max approx 19.10 kA, got ' + (ikHand / 1000).toFixed(2));
+  var built = upBuildTree(upProject);
+  assert(Math.abs(sldCalcNodeIk(built.tree, built.boardId).ikmax - ikHand) < 1, 'tree board Ik3max matches');
+  upRestore(saved);
+});
+
+test('Critical Mind: flags undersized cable (In > derated Iz, cl.433.1)', function() {
+  var saved = upSnapshot();
+  upProject = { version: 1, earthing: 'TN', transformerId: 'TR-ONAN-630',
+    supply: { cableId: 'SC-AL-95', length_m: 10, deviceId: 'MF-NH00-100', deviceIn: 100 },
+    finals: [{ cableId: 'NKT-NOIKLX-1.5', length_m: 10, deviceId: 'SE-iC60N-B40', deviceIn: 40, loadKW: 5, phases: '1x230', cosPhi: 0.95, rcdMa: null }] };
+  var audit = upAuditProject(upProject);
+  var f = audit.findings.filter(function(x) { return x.clause.indexOf('433.1') >= 0 && x.status === 'fail'; });
+  assert(f.length >= 1, 'an undersize/overload failure is flagged at cl.433.1');
+  assert(/Iz/.test(f[0].detail), 'detail mentions Iz (derated officialIz=22A for 1.5mm2 XLPE vs In=40A)');
+  assert.strictEqual(audit.verdict, 'red', 'undersized cable yields RED verdict');
+  upRestore(saved);
+});
+
+test('Critical Mind: flags failing auto-disconnection (Zs*Ia > U0, DS/HD 60364-4-41)', function() {
+  var saved = upSnapshot();
+  upProject = { version: 1, earthing: 'TN', transformerId: 'TR-ONAN-630',
+    supply: { cableId: 'SC-AL-95', length_m: 5, deviceId: 'MF-NH00-100', deviceIn: 100 },
+    finals: [{ cableId: 'NKT-NOIKLX-1.5', length_m: 200, deviceId: 'SE-iC60N-B16', deviceIn: 16, loadKW: 1, phases: '1x230', cosPhi: 0.95, rcdMa: null }] };
+  var audit = upAuditProject(upProject);
+  var f = audit.findings.filter(function(x) { return /Zs.Ia/.test(x.rule) && x.status === 'fail'; });
+  assert(f.length >= 1, 'a disconnection failure is flagged');
+  assert(/41\.1|411/.test(f[0].clause), 'cites a DS/HD 60364-4-41 clause: ' + f[0].clause);
+  upRestore(saved);
+});
+
+test('Critical Mind: flags Icu < Ikmax (breaking capacity, cl.434.5.1)', function() {
+  var saved = upSnapshot();
+  // 630kVA straight to board => ~19kA; a 6kA MCB cannot break it.
+  upProject = { version: 1, earthing: 'TN', transformerId: 'TR-ONAN-630',
+    supply: { cableId: null, length_m: 0, deviceId: null, deviceIn: null },
+    finals: [{ cableId: 'NKT-NOIKLX-2.5', length_m: 10, deviceId: 'SE-iC60N-B16', deviceIn: 16, loadKW: 2, phases: '1x230', cosPhi: 0.95, rcdMa: null }] };
+  var audit = upAuditProject(upProject);
+  var f = audit.findings.filter(function(x) { return x.clause.indexOf('434.5.1') >= 0 && x.status === 'fail'; });
+  assert(f.length >= 1, 'Icu<Ikmax failure flagged');
+  assert(/Icu/.test(f[0].detail), 'detail mentions Icu vs Ik3max');
+  assert.strictEqual(audit.verdict, 'red');
+  upRestore(saved);
+});
+
+test('Critical Mind: TT without RCD is flagged dangerous (cl.411.5.3)', function() {
+  var saved = upSnapshot();
+  upProject = { version: 1, earthing: 'TT', transformerId: 'TR-ONAN-250',
+    supply: { cableId: 'SC-AL-50', length_m: 30, deviceId: 'MF-NH00-100', deviceIn: 100 },
+    finals: [{ cableId: 'NKT-NOIKLX-2.5', length_m: 20, deviceId: 'SE-iC60N-B16', deviceIn: 16, loadKW: 3, phases: '1x230', cosPhi: 0.95, rcdMa: null }] };
+  var audit = upAuditProject(upProject);
+  var f = audit.findings.filter(function(x) { return x.clause.indexOf('411.5.3') >= 0 && x.status === 'fail'; });
+  assert(f.length >= 1, 'TT without RCD flagged');
+  upProject.finals[0].rcdMa = 30;
+  var audit2 = upAuditProject(upProject);
+  var ttOk = audit2.findings.filter(function(x) { return /I\u0394n/.test(x.rule) && x.status === 'ok'; });
+  assert(ttOk.length >= 1, 'TT with 30mA RCD passes touch-voltage check');
+  upRestore(saved);
+});
+
+test('Unified Project: persistence round-trips and rejects unknown product ids', function() {
+  var saved = upSnapshot();
+  upProject = { version: 1, earthing: 'TT', transformerId: 'TR-ONAN-630',
+    supply: { cableId: 'SC-AL-95', length_m: 30, deviceId: 'MF-NH2-400', deviceIn: 400 },
+    finals: [{ cableId: 'NKT-NOIKLX-2.5', length_m: 20, deviceId: 'SE-iC60N-B16', deviceIn: 16, loadKW: 3.68, phases: '1x230', cosPhi: 0.95, rcdMa: 30 }] };
+  upSaveProject();
+  var loaded = upLoadProject();
+  assert.strictEqual(loaded.earthing, 'TT');
+  assert.strictEqual(loaded.transformerId, 'TR-ONAN-630');
+  assert.strictEqual(loaded.supply.cableId, 'SC-AL-95');
+  assert.strictEqual(loaded.supply.deviceId, 'MF-NH2-400');
+  assert.strictEqual(loaded.finals[0].cableId, 'NKT-NOIKLX-2.5');
+  assert.strictEqual(loaded.finals[0].rcdMa, 30);
+  // unknown ids must be DROPPED (never resurrected), mirroring elforsyningLoadBom
+  upProject = { version: 1, earthing: 'TN', transformerId: 'BOGUS-XYZ', supply: { cableId: 'NOPE', length_m: 30, deviceId: 'NOPE2', deviceIn: 50 }, finals: [{ cableId: 'NOPE3', deviceId: 'NOPE4', loadKW: 5, phases: '1x230', cosPhi: 0.9 }] };
+  upSaveProject();
+  var l2 = upLoadProject();
+  assert.strictEqual(l2.transformerId, null, 'unknown transformer dropped');
+  assert.strictEqual(l2.supply.cableId, null, 'unknown supply cable dropped');
+  assert.strictEqual(l2.supply.deviceId, null, 'unknown main device dropped');
+  assert.strictEqual(l2.finals[0].cableId, null, 'unknown final cable dropped');
+  assert.strictEqual(l2.finals[0].deviceId, null, 'unknown final device dropped');
+  upRestore(saved);
+});
+
+test('Critical Mind: pick transformer -> Ik -> audit -> verdict renders in BOTH da and en', function() {
+  var saved = upSnapshot();
+  var savedLang = lang;
+  upProject = { version: 1, earthing: 'TN', transformerId: 'TR-ONAN-250',
+    supply: { cableId: 'SC-AL-50', length_m: 30, deviceId: 'MF-NH00-100', deviceIn: 100 },
+    finals: [{ cableId: 'NKT-NOIKLX-2.5', length_m: 20, deviceId: 'SE-iC60N-B16', deviceIn: 16, loadKW: 3, phases: '1x230', cosPhi: 0.95, rcdMa: null }] };
+  upAuditState.lastAudit = upAuditProject(upProject);
+  assert.strictEqual(upAuditState.lastAudit.verdict, 'green', 'well-formed conservative design is GREEN');
+  lang = 'da';
+  var da = renderKritisk();
+  assert(da.indexOf('Sikkert') >= 0, 'da verdict label "Sikkert"');
+  assert(da.indexOf('434.5.1') >= 0, 'da cites Icu clause 434.5.1');
+  assert(da.indexOf('Sikkerhedsstyrelsen') >= 0, 'da cites Sikkerhedsstyrelsen');
+  assert(da.indexOf('<input') < 0 && da.indexOf('<textarea') < 0, 'da is 100% click-only (no input/textarea)');
+  lang = 'en';
+  var en = renderKritisk();
+  assert(en.indexOf('Safe') >= 0, 'en verdict label "Safe"');
+  assert(en.indexOf('433.1') >= 0 && en.indexOf('525') >= 0, 'en cites 433.1 and 525 clauses');
+  assert(en.indexOf('<input') < 0 && en.indexOf('<textarea') < 0, 'en is 100% click-only');
+  lang = savedLang;
+  upAuditState.lastAudit = null;
+  upRestore(saved);
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
