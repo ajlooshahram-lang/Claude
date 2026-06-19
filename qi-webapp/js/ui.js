@@ -3395,17 +3395,46 @@
   // app is useful out of the box. Everything is plain-language for non-PM users.
   function verdictClass(v) { v = String(v || "").toLowerCase(); if (v === "go") return "b-ontrack"; if (v.indexOf("caution") >= 0) return "b-critical"; return "b-high"; }
   function bindGo() { document.querySelectorAll("[data-go]").forEach(b => { if (b._goBound) return; b._goBound = true; b.addEventListener("click", () => go(b.dataset.go)); }); }
+  // Snapshot of the LIVE project state so AI-generated views (Advisor, Brief,
+  // frameworks) stay in sync with what's actually in the app right now.
+  function liveMetrics() {
+    try {
+      var k = (S.kpis && S.kpis()) || {};
+      var lm = {
+        total: k.total || 0, open: k.open || 0, crit: k.crit || 0, blocked: k.blocked || 0,
+        avgDone: k.avgDone || 0, pctSpent: k.pctSpent || 0
+      };
+      if (S.updatesList) { try { lm.updatesCount = S.updatesList().length; } catch (e) { lm.updatesCount = 0; } }
+      return lm;
+    } catch (e) { return null; }
+  }
+
   function fwBundle() {
+    const live = liveMetrics();
     if (uiState.brainPlan && uiState.brainPlan.frameworks) {
-      return { frameworks: uiState.brainPlan.frameworks, advice: uiState.brainPlan.advice, analysed: true, title: uiState.brainPlan.summary.title, scope: (uiState.brainPlan.countryIntel || []).length };
+      var bp = uiState.brainPlan;
+      // Recompute the advice from the analysed frameworks PLUS the live project
+      // state every time, so the Advisor reflects current cases/risks/budget/
+      // progress rather than a frozen snapshot from analysis time.
+      var bpAdvice = bp.advice;
+      if (window.QIBrain && QIBrain.buildAdvice) {
+        try {
+          bpAdvice = QIBrain.buildAdvice({
+            frameworks: bp.frameworks, risks: bp.risks || [],
+            countryIntel: bp.countryIntel || [], live: live
+          });
+        } catch (e) { bpAdvice = bp.advice; }
+      }
+      return { frameworks: bp.frameworks, advice: bpAdvice, analysed: true,
+        title: bp.summary.title, scope: (bp.countryIntel || []).length, live: live };
     }
     const CD = window.QICountryData;
     if (!CD || typeof CD.list !== "function" || typeof CD.marketEntryFramework !== "function") return null;
     const all = CD.list();
     const frameworks = { marketEntry: CD.marketEntryFramework(all), licensing: CD.licensingFramework(all), landingPartners: CD.landingPartnerFramework(all) };
     let advice = null;
-    if (window.QIBrain && QIBrain.buildAdvice) advice = QIBrain.buildAdvice({ frameworks, risks: CD.riskCases(all), countryIntel: CD.summarize(all) });
-    return { frameworks, advice, analysed: false, scope: all.length };
+    if (window.QIBrain && QIBrain.buildAdvice) advice = QIBrain.buildAdvice({ frameworks, risks: CD.riskCases(all), countryIntel: CD.summarize(all), live: live });
+    return { frameworks, advice, analysed: false, scope: all.length, live: live };
   }
   function fwBanner(b) {
     const analysed = b && b.analysed;

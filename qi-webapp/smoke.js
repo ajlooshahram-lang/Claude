@@ -1612,5 +1612,21 @@ if (window.QIDisplay) {
   ok(window.QII18n.getLang() === "en", "reset to en after tests");
 })();
 
+// Step 108: AI-generated views update when project data changes (live sync)
+(function testLiveAISync() {
+  if (!window.QIBrain || typeof window.QIBrain.buildAdvice !== "function") { ok(false, "QIBrain available for live-sync test"); return; }
+  var fw = { marketEntry: { countries: [] }, licensing: { countries: [] }, landingPartners: { countries: [] } };
+  var base = window.QIBrain.buildAdvice({ frameworks: fw, risks: [], countryIntel: [] });
+  var withLive = window.QIBrain.buildAdvice({ frameworks: fw, risks: [], countryIntel: [], live: { total: 20, open: 8, crit: 5, blocked: 3, avgDone: 0.40, pctSpent: 0.90 } });
+  ok(withLive.recommendations.length > base.recommendations.length, "advisor adds recommendations from live project state");
+  ok(/Live status/.test(withLive.headline), "advisor headline reports the live project status");
+  ok(withLive.recommendations.some(function (r) { return /blocked/i.test(r.title); }), "advisor flags blocked items from live data");
+  ok(withLive.recommendations.some(function (r) { return /critical/i.test(r.title); }), "advisor flags critical items from live data");
+  ok(withLive.recommendations.some(function (r) { return /ahead of progress/i.test(r.title); }), "advisor flags overspend from live data");
+  // A finished project gets a different recommendation than a blocked one.
+  var nearDone = window.QIBrain.buildAdvice({ frameworks: fw, risks: [], countryIntel: [], live: { total: 10, open: 2, crit: 0, blocked: 0, avgDone: 0.9, pctSpent: 0.5 } });
+  ok(nearDone.recommendations.some(function (r) { return /push the last items/i.test(r.title); }), "advisor changes advice as project nears completion");
+})();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

@@ -485,15 +485,59 @@
       why: "Typhoon and monsoon seasons stop ships from working safely, so the calendar \u2014 not the budget \u2014 often controls these stretches."
     });
 
+    // 6) LIVE project state — keeps the advice in sync with what's actually in
+    // the app right now (cases added/edited, risks scored, budget spent,
+    // progress logged). This is what makes the Advisor update as the project
+    // changes, not just at first analysis.
+    const live = input.live || null;
+    if (live && live.total > 0) {
+      if (live.blocked > 0) {
+        recs.unshift({
+          priority: "Do first",
+          title: "Clear what's blocked",
+          text: live.blocked + " item" + (live.blocked === 1 ? " is" : "s are") + " marked blocked right now.",
+          why: "Blocked work holds up everything that depends on it, so unblocking these frees the most progress for the least effort."
+        });
+        nextSteps.unshift("Review the " + live.blocked + " blocked item" + (live.blocked === 1 ? "" : "s") + " and decide who removes each blocker.");
+      }
+      if (live.crit > 0) {
+        recs.push({
+          priority: "Mitigate",
+          title: "Tackle the critical items",
+          text: live.crit + " item" + (live.crit === 1 ? " is" : "s are") + " scored critical (very high risk) in your project right now.",
+          why: "Critical items are the most likely to cause delay or cost overrun, so they deserve attention and a named owner before lower-risk work."
+        });
+      }
+      if (live.pctSpent > (live.avgDone + 0.15)) {
+        recs.push({
+          priority: "Watch",
+          title: "Spending is running ahead of progress",
+          text: "About " + Math.round(live.pctSpent * 100) + "% of the budget is used, but only about " + Math.round(live.avgDone * 100) + "% of the work is done.",
+          why: "When money is spent faster than work is finished, the project can run out of budget before it's complete. Check the costliest open items."
+        });
+      }
+      if (live.avgDone >= 0.8 && live.open > 0) {
+        recs.push({
+          priority: "Quick win",
+          title: "Push the last items to done",
+          text: "The project is about " + Math.round(live.avgDone * 100) + "% complete with " + live.open + " item" + (live.open === 1 ? "" : "s") + " still open.",
+          why: "You're close — finishing the remaining open items now locks in the result and lets you formally close the project."
+        });
+      }
+    }
+
     if (nextSteps.indexOf("Review the auto-built plan, then click \u201cApply\u201d to load it into the project.") === -1) {
       nextSteps.push("Review the auto-built plan, then click \u201cApply\u201d to load it into the project.");
     }
 
-    const headline = recs.length
+    let headline = recs.length
       ? "Here is how to get the best result \u2014 " + recs.length + " priority moves, most important first. The app worked these out from your description."
       : "Add a project description (name the countries, or use the word \u201csubmarine\u201d) and the advisor will tell you exactly what to do first.";
+    if (live && live.total > 0) {
+      headline += " Live status: " + live.total + " item" + (live.total === 1 ? "" : "s") + ", " + live.open + " open, " + live.crit + " critical, about " + Math.round((live.avgDone || 0) * 100) + "% done.";
+    }
 
-    return { headline, recommendations: recs, nextSteps };
+    return { headline, recommendations: recs, nextSteps, live: live || null };
   }
 
   /**
