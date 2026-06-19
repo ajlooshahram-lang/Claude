@@ -1681,5 +1681,18 @@ if (window.QIDisplay) {
   ok(lab && /\u2014/.test(lab.textContent), "dashboard health card shows the verdict label");
 })();
 
+// Step 112: Auto Executive Summary (plain-language narrative for decision-makers)
+(function testExecSummary() {
+  var dnav = doc.querySelector('.nav-item[data-view="dashboard"]');
+  if (dnav) dnav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  var es = doc.querySelector(".exec-summary");
+  ok(!!es, "dashboard shows an auto Executive Summary card");
+  if (es) {
+    var txt = es.querySelector("p") ? es.querySelector("p").textContent : "";
+    ok(txt.length > 30, "executive summary contains a plain-language narrative");
+    ok(/health|track|attention|risk/i.test(txt), "executive summary states the project health verdict");
+  }
+})();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

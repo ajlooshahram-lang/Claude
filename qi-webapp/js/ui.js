@@ -2198,7 +2198,41 @@
         '<div class="kd-row"><span class="kd-label">Latest target</span><span class="kd-value">' + esc(fmtD(latest)) + '</span></div>' +
         '</div>';
     })();
-    return tourBanner + progressCard + nextCard + quickWinsCard + keyDatesCard + dqCard + healthCard + `
+    // Auto-generated plain-language Executive Summary — ties scope, health, the
+    // #1 next move and the biggest saving into 2-4 sentences for decision-makers.
+    const execSummaryCard = (function () {
+      var bp = uiState.brainPlan;
+      var hs = (S.healthScore && S.healthScore()) || null;
+      if (!bp && (!hs || hs.score == null)) return "";
+      var parts = [];
+      if (bp && bp.summary) {
+        var sc = bp.summary.scale || {};
+        var nC = (bp.countryIntel || []).length;
+        var scope = "This is a " + esc(bp.summary.domainLabel || "project");
+        if (nC) scope += " connecting " + nC + " countr" + (nC === 1 ? "y" : "ies");
+        var bits = [];
+        if (sc.routeKm) bits.push(Number(sc.routeKm).toLocaleString() + " km");
+        if (sc.durationMonths) bits.push(sc.durationMonths + " months");
+        if (bits.length) scope += " \u2014 " + bits.join(", ");
+        parts.push(scope + ".");
+      }
+      if (hs && hs.score != null) {
+        parts.push("Overall it's <b>" + esc(hs.verdict) + "</b> (health " + hs.score + "/100): " + esc(hs.reasons.slice(0, 2).join(", ")) + ".");
+      }
+      try {
+        var fb = fwBundle();
+        if (fb && fb.advice && fb.advice.recommendations && fb.advice.recommendations.length) {
+          var r0 = fb.advice.recommendations[0];
+          parts.push("Do first: <b>" + esc(r0.title) + "</b> \u2014 " + esc(r0.text));
+        }
+      } catch (e) { /* ignore */ }
+      if (bp && bp.optimization && bp.optimization.items && bp.optimization.items.length) {
+        parts.push("Biggest saving: " + esc(bp.optimization.items[0].title) + " (est. " + bp.optimization.estCostSavingPct + "% cost, " + bp.optimization.estEnergySavingPct + "% energy).");
+      }
+      if (!parts.length) return "";
+      return '<div class="card exec-summary"><div class="card-head"><h3>\uD83D\uDCCB In plain words</h3><span class="tag">auto-summary</span></div><p style="line-height:1.65;margin:0">' + parts.join(" ") + '</p></div>';
+    })();
+    return execSummaryCard + tourBanner + progressCard + nextCard + quickWinsCard + keyDatesCard + dqCard + healthCard + `
       <div class="dash-toolbar" style="display:flex;gap:8px;margin-bottom:12px"><button class="btn btn-sm" id="emailSummary" type="button">\u2709 Copy status email</button><button class="btn btn-sm" id="meetingAgenda" type="button">\uD83D\uDCCB Copy meeting agenda</button></div>
       <div class="grid kpis" style="margin-bottom:16px">
         ${kpi("navy", "Total Cases", k.total)}

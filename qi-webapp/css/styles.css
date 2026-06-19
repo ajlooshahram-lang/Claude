@@ -1452,3 +1452,8 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 
 /* Plain-language verdict line under the programme health score */
 .health-why{display:block;font-size:11px;color:var(--muted);margin-top:2px;max-width:220px}
+
+
+/* Dashboard auto Executive Summary */
+.exec-summary{border-left:4px solid var(--accent);background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 6%,transparent),transparent)}
+.exec-summary p b{color:var(--accent)}
