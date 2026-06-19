@@ -645,7 +645,10 @@ const T = {
       brain: 'El-Hjerne',
       pdf: 'Dokumentation',
       tcc: 'Kaskade-TCC',
-      panel: 'Tavlebygger'
+      panel: 'Tavlebygger',
+      thermal: 'Termisk Sim.',
+      cable3d: '3D Kabelfoering',
+      energy: 'Energi Monitor'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -749,7 +752,10 @@ const T = {
       brain: 'Brain',
       pdf: 'Documentation',
       tcc: 'Cascade TCC',
-      panel: 'Panel Builder'
+      panel: 'Panel Builder',
+      thermal: 'Thermal Sim',
+      cable3d: '3D Cable Routing',
+      energy: 'Energy Monitor'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -845,7 +851,10 @@ const T = {
       brain: 'مغز برقی',
       pdf: 'مستندات',
       tcc: 'TCC آبشاری',
-      panel: 'ساخت تابلو'
+      panel: 'ساخت تابلو',
+      thermal: 'شبیه‌سازی حرارتی',
+      cable3d: 'مسیر کابل سه‌بعدی',
+      energy: 'مانیتور انرژی'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -965,7 +974,84 @@ const _FA = {
   'Zs Path (transformer to device)': '\u0645\u0633\u06CC\u0631 Zs (\u062A\u0631\u0627\u0646\u0633\u0641\u0648\u0631\u0645\u0627\u062A\u0648\u0631 \u062A\u0627 \u062F\u0633\u062A\u06AF\u0627\u0647)',
   'Details': '\u062C\u0632\u0626\u06CC\u0627\u062A',
   'Standard': '\u0627\u0633\u062A\u0627\u0646\u062F\u0627\u0631\u062F',
-  'Missing protection device - cannot analyze selectivity': '\u062F\u0633\u062A\u06AF\u0627\u0647 \u062D\u0641\u0627\u0638\u062A\u06CC \u0646\u0627\u0645\u0648\u062C\u0648\u062F - \u0627\u0645\u06A9\u0627\u0646 \u062A\u062D\u0644\u06CC\u0644 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u067E\u0630\u06CC\u0631\u06CC \u0646\u06CC\u0633\u062A'
+  'Missing protection device - cannot analyze selectivity': '\u062F\u0633\u062A\u06AF\u0627\u0647 \u062D\u0641\u0627\u0638\u062A\u06CC \u0646\u0627\u0645\u0648\u062C\u0648\u062F - \u0627\u0645\u06A9\u0627\u0646 \u062A\u062D\u0644\u06CC\u0644 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u067E\u0630\u06CC\u0631\u06CC \u0646\u06CC\u0633\u062A',
+  // Thermal Simulation translations
+  'Thermal Simulation': '\u0634\u0628\u06CC\u0647\u200C\u0633\u0627\u0632\u06CC \u062D\u0631\u0627\u0631\u062A\u06CC',
+  'Ambient Temperature': '\u062F\u0645\u0627\u06CC \u0645\u062D\u06CC\u0637',
+  'Load Factor': '\u0636\u0631\u06CC\u0628 \u0628\u0627\u0631',
+  'Grouping Count': '\u062A\u0639\u062F\u0627\u062F \u06AF\u0631\u0648\u0647',
+  'Cable Type': '\u0646\u0648\u0639 \u06A9\u0627\u0628\u0644',
+  'Installation Method': '\u0631\u0648\u0634 \u0646\u0635\u0628',
+  'Temperature Rise': '\u0627\u0641\u0632\u0627\u06CC\u0634 \u062F\u0645\u0627',
+  'Current Temperature': '\u062F\u0645\u0627\u06CC \u0641\u0639\u0644\u06CC',
+  'Maximum Temperature': '\u062D\u062F\u0627\u06A9\u062B\u0631 \u062F\u0645\u0627',
+  'Safety Margin': '\u062D\u0627\u0634\u06CC\u0647 \u0627\u06CC\u0645\u0646\u06CC',
+  'Derating Factor': '\u0636\u0631\u06CC\u0628 \u06A9\u0627\u0647\u0634',
+  'I2t Energy': '\u0627\u0646\u0631\u0698\u06CC I2t',
+  'Trip Time': '\u0632\u0645\u0627\u0646 \u0642\u0637\u0639',
+  'Let-through Energy': '\u0627\u0646\u0631\u0698\u06CC \u0639\u0628\u0648\u0631\u06CC',
+  'DANGER - Overheated': '\u062E\u0637\u0631 - \u062F\u0627\u063A \u0634\u062F\u0647',
+  'SAFE': '\u0627\u06CC\u0645\u0646',
+  'WARNING': '\u0647\u0634\u062F\u0627\u0631',
+  'Per DS/HD 60364-5-52 Table B.52.14/15': '\u0637\u0628\u0642 DS/HD 60364-5-52 \u062C\u062F\u0648\u0644 B.52.14/15',
+  'Thermal Color Scale': '\u0645\u0642\u06CC\u0627\u0633 \u0631\u0646\u06AF \u062D\u0631\u0627\u0631\u062A\u06CC',
+  'On tray (perforated)': '\u0631\u0648\u06CC \u0633\u06CC\u0646\u06CC (\u0633\u0648\u0631\u0627\u062E\u062F\u0627\u0631)',
+  'In conduit': '\u062F\u0631 \u0644\u0648\u0644\u0647',
+  'Direct buried': '\u062F\u0641\u0646 \u0645\u0633\u062A\u0642\u06CC\u0645',
+  'Clipped direct': '\u0646\u0635\u0628 \u0645\u0633\u062A\u0642\u06CC\u0645',
+  // 3D Cable Routing translations
+  '3D Cable Routing': '\u0645\u0633\u06CC\u0631 \u06A9\u0627\u0628\u0644 \u0633\u0647\u200C\u0628\u0639\u062F\u06CC',
+  'Tray Type': '\u0646\u0648\u0639 \u0633\u06CC\u0646\u06CC',
+  'Perforated Tray': '\u0633\u06CC\u0646\u06CC \u0633\u0648\u0631\u0627\u062E\u062F\u0627\u0631',
+  'Wire Mesh': '\u0633\u06CC\u0646\u06CC \u0645\u0634\u0628\u06A9',
+  'Solid Tray': '\u0633\u06CC\u0646\u06CC \u062A\u0648\u067E\u0631',
+  'Conduit': '\u0644\u0648\u0644\u0647',
+  'Fill Rate': '\u0646\u0631\u062E \u067E\u0631\u0634\u062F\u06AF\u06CC',
+  'Max 45% per Table 52.3': '\u062D\u062F\u0627\u06A9\u062B\u0631 45% \u0637\u0628\u0642 \u062C\u062F\u0648\u0644 52.3',
+  'Bend Radius': '\u0634\u0639\u0627\u0639 \u062E\u0645\u0634',
+  'Violation': '\u062A\u062E\u0644\u0641',
+  'OK': '\u0642\u0628\u0648\u0644',
+  'Heat Dissipation': '\u0627\u062A\u0644\u0627\u0641 \u062D\u0631\u0627\u0631\u062A\u06CC',
+  'Cables in Tray': '\u06A9\u0627\u0628\u0644\u200C\u0647\u0627 \u062F\u0631 \u0633\u06CC\u0646\u06CC',
+  'Add Cable': '\u0627\u0641\u0632\u0648\u062F\u0646 \u06A9\u0627\u0628\u0644',
+  'Remove Cable': '\u062D\u0630\u0641 \u06A9\u0627\u0628\u0644',
+  'View Angle': '\u0632\u0627\u0648\u06CC\u0647 \u062F\u06CC\u062F',
+  'Grouping Derating': '\u06A9\u0627\u0647\u0634 \u06AF\u0631\u0648\u0647\u06CC',
+  'Per DS/HD 60364-5-52 Table B.52.17': '\u0637\u0628\u0642 DS/HD 60364-5-52 \u062C\u062F\u0648\u0644 B.52.17',
+  'Cross Section': '\u0645\u0642\u0637\u0639 \u0639\u0631\u0636\u06CC',
+  'XLPE min 8x diameter': 'XLPE \u062D\u062F\u0627\u0642\u0644 8 \u0628\u0631\u0627\u0628\u0631 \u0642\u0637\u0631',
+  'PVC min 6x diameter': 'PVC \u062D\u062F\u0627\u0642\u0644 6 \u0628\u0631\u0627\u0628\u0631 \u0642\u0637\u0631',
+  // Energy Monitor translations
+  'Energy Monitor': '\u0645\u0627\u0646\u06CC\u062A\u0648\u0631 \u0627\u0646\u0631\u0698\u06CC',
+  'Building Type': '\u0646\u0648\u0639 \u0633\u0627\u062E\u062A\u0645\u0627\u0646',
+  'Residential': '\u0645\u0633\u06A9\u0648\u0646\u06CC',
+  'Office': '\u0627\u062F\u0627\u0631\u06CC',
+  'Industrial': '\u0635\u0646\u0639\u062A\u06CC',
+  'Hour of Day': '\u0633\u0627\u0639\u062A \u0631\u0648\u0632',
+  'Power Factor': '\u0636\u0631\u06CC\u0628 \u062A\u0648\u0627\u0646',
+  'Capacitor Bank': '\u0628\u0627\u0646\u06A9 \u062E\u0627\u0632\u0646',
+  'Target PF': '\u0636\u0631\u06CC\u0628 \u062A\u0648\u0627\u0646 \u0647\u062F\u0641',
+  'Required kvar': 'kvar \u0645\u0648\u0631\u062F \u0646\u06CC\u0627\u0632',
+  'Harmonic Spectrum': '\u0637\u06CC\u0641 \u0647\u0627\u0631\u0645\u0648\u0646\u06CC\u06A9',
+  'THD%': 'THD%',
+  'Daily Energy Cost': '\u0647\u0632\u06CC\u0646\u0647 \u0631\u0648\u0632\u0627\u0646\u0647 \u0627\u0646\u0631\u0698\u06CC',
+  'Nettarif': '\u062A\u0639\u0631\u0641\u0647 \u0634\u0628\u06A9\u0647',
+  'Systemtarif': '\u062A\u0639\u0631\u0641\u0647 \u0633\u06CC\u0633\u062A\u0645',
+  'Elafgift': '\u0639\u0648\u0627\u0631\u0636 \u0628\u0631\u0642',
+  'Peak Shaving': '\u06A9\u0627\u0647\u0634 \u067E\u06CC\u06A9',
+  'Power Quality': '\u06A9\u06CC\u0641\u06CC\u062A \u062A\u0648\u0627\u0646',
+  'Voltage': '\u0648\u0644\u062A\u0627\u0698',
+  'Frequency': '\u0641\u0631\u06A9\u0627\u0646\u0633',
+  'Flicker': '\u0641\u0644\u06CC\u06A9\u0631',
+  'Unbalance': '\u0639\u062F\u0645 \u062A\u0639\u0627\u062F\u0644',
+  'Per EN 50160': '\u0637\u0628\u0642 EN 50160',
+  'Per DS/HD 60364-5-52 cl.523': '\u0637\u0628\u0642 DS/HD 60364-5-52 \u0628\u0646\u062F 523',
+  'DKK/day': 'DKK/\u0631\u0648\u0632',
+  'Load Profile (24h)': '\u067E\u0631\u0648\u0641\u0627\u06CC\u0644 \u0628\u0627\u0631 (24 \u0633\u0627\u0639\u062A\u0647)',
+  'Shift recommended': '\u062A\u0648\u0635\u06CC\u0647 \u0628\u0647 \u0627\u0646\u062A\u0642\u0627\u0644',
+  'Good': '\u062E\u0648\u0628',
+  'Acceptable': '\u0642\u0627\u0628\u0644 \u0642\u0628\u0648\u0644',
+  'Poor': '\u0636\u0639\u06CC\u0641'
 };
 function tx(da, en) { if(lang === 'da') return da; if(lang === 'fa') return _FA[en] || en; return en; }
 function tl(obj, prefix) { return obj[prefix + '_' + lang] || obj[prefix + '_en'] || ''; }
@@ -2720,6 +2806,9 @@ function renderModule(mod) {
     case 'pdf': content = renderPDF(); break;
     case 'tcc': content = renderCascadeTCC(); break;
     case 'panel': content = renderPanel(); break;
+    case 'thermal': content = renderThermal(); break;
+    case 'cable3d': content = renderCable3D(); break;
+    case 'energy': content = renderEnergy(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -9040,6 +9129,1018 @@ function renderPanel() {
   html += '</div>';
 
   html += '</div>';
+  return html;
+}
+
+// ===== THERMAL SIMULATION ENGINE =====
+// Real-time thermal model per DS/HD 60364-5-52
+
+var THERMAL_CABLE_DATA = {
+  PVC: {
+    maxTemp: 70,    // DS/HD 60364-5-52 Table 52.1
+    ambient: 30,    // Reference ambient per Table B.52.14
+    resistivity: 0.0225, // Ohm.mm2/m at 20C for copper
+    tempCoeff: 0.00393,  // per degree C
+    label: 'PVC (70\u00B0C)'
+  },
+  XLPE: {
+    maxTemp: 90,    // DS/HD 60364-5-52 Table 52.1
+    ambient: 30,    // Reference ambient per Table B.52.14
+    resistivity: 0.0225,
+    tempCoeff: 0.00393,
+    label: 'XLPE (90\u00B0C)'
+  }
+};
+
+// Ambient temperature derating factors per DS/HD 60364-5-52 Table B.52.14
+var THERMAL_AMBIENT_FACTORS = {
+  PVC:  { 10: 1.22, 15: 1.17, 20: 1.12, 25: 1.06, 30: 1.00, 35: 0.94, 40: 0.87, 45: 0.79, 50: 0.71, 55: 0.61, 60: 0.50 },
+  XLPE: { 10: 1.15, 15: 1.12, 20: 1.08, 25: 1.04, 30: 1.00, 35: 0.96, 40: 0.91, 45: 0.87, 50: 0.82, 55: 0.76, 60: 0.71 }
+};
+
+// Grouping derating factors per DS/HD 60364-5-52 Table B.52.17
+var THERMAL_GROUP_FACTORS = {
+  tray:    { 1: 1.00, 2: 0.88, 3: 0.82, 4: 0.77, 5: 0.75, 6: 0.73, 7: 0.72, 8: 0.71, 9: 0.70 },
+  conduit: { 1: 1.00, 2: 0.80, 3: 0.70, 4: 0.65, 5: 0.60, 6: 0.57, 7: 0.54, 8: 0.52, 9: 0.50 },
+  clipped: { 1: 1.00, 2: 0.85, 3: 0.79, 4: 0.75, 5: 0.73, 6: 0.72, 7: 0.71, 8: 0.70, 9: 0.70 },
+  buried:  { 1: 1.00, 2: 0.75, 3: 0.65, 4: 0.60, 5: 0.57, 6: 0.54, 7: 0.52, 8: 0.50, 9: 0.48 }
+};
+
+var thermalState = {
+  ambientTemp: 25,
+  loadFactor: 0.8,
+  selectedCableType: 'PVC',
+  installMethod: 'tray',
+  groupingCount: 1,
+  simRunning: false,
+  simTime: 0,
+  ratedCurrent: 32   // In [A] - typical circuit
+};
+
+function thermalCalcDerating(ambientC, groupCount, installMethod) {
+  // Per DS/HD 60364-5-52 Table B.52.14/15 and B.52.17
+  var cableType = thermalState.selectedCableType;
+  var ambientFactors = THERMAL_AMBIENT_FACTORS[cableType];
+  var groupFactors = THERMAL_GROUP_FACTORS[installMethod] || THERMAL_GROUP_FACTORS.tray;
+
+  // Interpolate ambient factor
+  var temps = Object.keys(ambientFactors).map(Number).sort(function(a,b){return a-b;});
+  var ambFactor = 1.0;
+  if (ambientC <= temps[0]) {
+    ambFactor = ambientFactors[temps[0]];
+  } else if (ambientC >= temps[temps.length - 1]) {
+    ambFactor = ambientFactors[temps[temps.length - 1]];
+  } else {
+    for (var i = 0; i < temps.length - 1; i++) {
+      if (ambientC >= temps[i] && ambientC <= temps[i+1]) {
+        var ratio = (ambientC - temps[i]) / (temps[i+1] - temps[i]);
+        ambFactor = ambientFactors[temps[i]] + ratio * (ambientFactors[temps[i+1]] - ambientFactors[temps[i]]);
+        break;
+      }
+    }
+  }
+
+  // Group factor - conservative: use minimum available if count exceeds table
+  var gc = Math.min(Math.max(groupCount, 1), 9);
+  var grpFactor = groupFactors[gc];
+
+  // Combined derating is product of individual factors (conservative)
+  var combined = ambFactor * grpFactor;
+
+  return {
+    ambientFactor: Math.round(ambFactor * 1000) / 1000,
+    groupFactor: Math.round(grpFactor * 1000) / 1000,
+    combined: Math.round(combined * 1000) / 1000,
+    clause: 'DS/HD 60364-5-52 Table B.52.14/15 + B.52.17'
+  };
+}
+
+function thermalCalcTemp(cableType, In, Iz, ambientC, groupFactor) {
+  // Calculate cable temperature based on load
+  // T_cable = T_ambient + (T_max - T_ref_ambient) * (I_actual / I_z_derated)^2
+  // Per DS/HD 60364-5-52 clause 523
+  var data = THERMAL_CABLE_DATA[cableType];
+  var maxTemp = data.maxTemp;
+  var refAmbient = data.ambient;
+
+  // Derated current capacity
+  var IzDerated = Iz * groupFactor;
+  // Actual current
+  var Iactual = In * thermalState.loadFactor;
+
+  // Temperature rise proportional to I^2
+  var loadRatio = IzDerated > 0 ? Iactual / IzDerated : 999;
+  var tempRise = (maxTemp - refAmbient) * Math.pow(loadRatio, 2);
+  var currentTemp = ambientC + tempRise;
+
+  // Safety margin (conservative - always round up temperature)
+  currentTemp = Math.ceil(currentTemp * 10) / 10;
+  var margin = maxTemp - currentTemp;
+
+  return {
+    currentTemp: currentTemp,
+    maxTemp: maxTemp,
+    margin: Math.round(margin * 10) / 10,
+    loadRatio: Math.round(loadRatio * 1000) / 1000,
+    overloaded: currentTemp > maxTemp,
+    clause: 'DS/HD 60364-5-52 Table 52.1, cl.523'
+  };
+}
+
+function thermalCalcI2t(In, tripTime) {
+  // I2t energy calculation for fault let-through
+  // I2t = I^2 * t (A^2s)
+  // Per DS/HD 60364-4-43 for cable protection
+  var i2t = Math.pow(In, 2) * tripTime;
+  return {
+    i2t: Math.round(i2t),
+    current: In,
+    time: tripTime,
+    clause: 'DS/HD 60364-4-43 cl.434.5.2'
+  };
+}
+
+function thermalGetColor(tempC, maxC) {
+  // Color gradient: blue (cold) -> green (normal) -> yellow (warm) -> red (hot) -> darkred (danger)
+  var ratio = tempC / maxC;
+  if (ratio <= 0.5) return '#2196F3';      // Blue - cool
+  if (ratio <= 0.7) return '#4CAF50';      // Green - normal
+  if (ratio <= 0.85) return '#FFC107';     // Yellow - warm
+  if (ratio <= 1.0) return '#FF5722';      // Red - hot
+  return '#B71C1C';                         // Dark red - DANGER
+}
+
+function thermalSetAmbient(val) {
+  thermalState.ambientTemp = parseInt(val);
+  renderModule('thermal');
+}
+
+function thermalSetLoadFactor(val) {
+  thermalState.loadFactor = parseFloat(val) / 100;
+  renderModule('thermal');
+}
+
+function thermalSetCableType(type) {
+  thermalState.selectedCableType = type;
+  renderModule('thermal');
+}
+
+function thermalSetInstallMethod(method) {
+  thermalState.installMethod = method;
+  renderModule('thermal');
+}
+
+function thermalSetGrouping(count) {
+  thermalState.groupingCount = count;
+  renderModule('thermal');
+}
+
+function thermalSetRatedCurrent(val) {
+  thermalState.ratedCurrent = parseInt(val);
+  renderModule('thermal');
+}
+
+function renderThermal() {
+  var st = thermalState;
+  var derating = thermalCalcDerating(st.ambientTemp, st.groupingCount, st.installMethod);
+  // Iz base current capacity (typical for cable type at rated current)
+  var IzBase = st.ratedCurrent * 1.45; // MCB must trip at 1.45*In per IEC 60898
+  var tempResult = thermalCalcTemp(st.selectedCableType, st.ratedCurrent, IzBase, st.ambientTemp, derating.combined);
+  var color = thermalGetColor(tempResult.currentTemp, tempResult.maxTemp);
+  var i2tResult = thermalCalcI2t(st.ratedCurrent * 5, 0.1); // Fault at 5x In for 100ms
+
+  var statusClass = tempResult.overloaded ? 'error' : (tempResult.margin < 10 ? 'warning' : 'success');
+  var statusText = tempResult.overloaded ?
+    tx('FARE - Overophedet', 'DANGER - Overheated') :
+    (tempResult.margin < 10 ? tx('ADVARSEL', 'WARNING') : tx('SIKKER', 'SAFE'));
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Termisk Simulering', 'Thermal Simulation') + '</div>';
+  html += '<div class="info-row">' + tx('Realtids termisk model per DS/HD 60364-5-52', 'Real-time thermal model per DS/HD 60364-5-52') + '</div>';
+
+  // Ambient temperature slider
+  html += '<div class="select-group"><label>' + tx('Omgivelsestemperatur', 'Ambient Temperature') + ': <strong>' + st.ambientTemp + '\u00B0C</strong></label>';
+  html += '<input type="range" min="10" max="60" step="5" value="' + st.ambientTemp + '" oninput="thermalSetAmbient(this.value)" style="width:100%">';
+  html += '<div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#888"><span>10\u00B0C</span><span>60\u00B0C</span></div></div>';
+
+  // Load factor slider
+  html += '<div class="select-group"><label>' + tx('Belastningsfaktor', 'Load Factor') + ': <strong>' + Math.round(st.loadFactor * 100) + '%</strong></label>';
+  html += '<input type="range" min="10" max="150" step="5" value="' + Math.round(st.loadFactor * 100) + '" oninput="thermalSetLoadFactor(this.value)" style="width:100%">';
+  html += '<div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#888"><span>10%</span><span>150%</span></div></div>';
+
+  // Rated current slider
+  html += '<div class="select-group"><label>' + tx('Maerkestraem In', 'Rated Current In') + ': <strong>' + st.ratedCurrent + ' A</strong></label>';
+  html += '<input type="range" min="6" max="125" step="1" value="' + st.ratedCurrent + '" oninput="thermalSetRatedCurrent(this.value)" style="width:100%">';
+  html += '<div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#888"><span>6A</span><span>125A</span></div></div>';
+
+  // Cable type buttons
+  html += '<div class="select-group"><label>' + tx('Kabeltype', 'Cable Type') + '</label>';
+  html += '<div class="select-grid">';
+  html += '<button class="sel-btn' + (st.selectedCableType === 'PVC' ? ' active' : '') + '" onclick="thermalSetCableType(\'PVC\')">PVC (70\u00B0C)</button>';
+  html += '<button class="sel-btn' + (st.selectedCableType === 'XLPE' ? ' active' : '') + '" onclick="thermalSetCableType(\'XLPE\')">XLPE (90\u00B0C)</button>';
+  html += '</div></div>';
+
+  // Installation method buttons
+  html += '<div class="select-group"><label>' + tx('Installationsmetode', 'Installation Method') + '</label>';
+  html += '<div class="select-grid">';
+  var methods = [
+    { id: 'tray', da: 'Kabelkanal', en: 'On tray (perforated)' },
+    { id: 'conduit', da: 'I roer', en: 'In conduit' },
+    { id: 'buried', da: 'Nedgravet', en: 'Direct buried' },
+    { id: 'clipped', da: 'Direkte monteret', en: 'Clipped direct' }
+  ];
+  for (var m = 0; m < methods.length; m++) {
+    html += '<button class="sel-btn' + (st.installMethod === methods[m].id ? ' active' : '') + '" onclick="thermalSetInstallMethod(\'' + methods[m].id + '\')">' + tx(methods[m].da, methods[m].en) + '</button>';
+  }
+  html += '</div></div>';
+
+  // Grouping count buttons
+  html += '<div class="select-group"><label>' + tx('Antal kabler i gruppe', 'Grouping Count') + ': <strong>' + st.groupingCount + '</strong></label>';
+  html += '<div class="select-grid">';
+  for (var g = 1; g <= 9; g++) {
+    html += '<button class="sel-btn' + (st.groupingCount === g ? ' active' : '') + '" onclick="thermalSetGrouping(' + g + ')">' + g + '</button>';
+  }
+  html += '</div></div>';
+
+  html += '</div>';
+
+  // SVG Thermal Visualization
+  html += '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Termisk farveskala', 'Thermal Color Scale') + '</div>';
+  html += '<svg viewBox="0 0 400 120" style="width:100%;height:auto;border-radius:8px;background:#1a1a2e">';
+  // Cable representation with temperature color
+  html += '<rect x="30" y="40" width="340" height="40" rx="8" fill="' + color + '" stroke="#fff" stroke-width="1">';
+  html += '<animate attributeName="opacity" values="1;0.8;1" dur="2s" repeatCount="indefinite"/></rect>';
+  // Temperature markers
+  html += '<text x="200" y="66" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">' + tempResult.currentTemp + '\u00B0C / ' + tempResult.maxTemp + '\u00B0C</text>';
+  // Color scale at bottom
+  var scaleColors = ['#2196F3', '#4CAF50', '#FFC107', '#FF5722', '#B71C1C'];
+  for (var sc = 0; sc < 5; sc++) {
+    html += '<rect x="' + (30 + sc * 68) + '" y="95" width="68" height="10" fill="' + scaleColors[sc] + '"/>';
+  }
+  html += '<text x="30" y="115" fill="#aaa" font-size="9">0%</text>';
+  html += '<text x="370" y="115" fill="#aaa" font-size="9" text-anchor="end">100%+</text>';
+  html += '</svg></div>';
+
+  // I2t Race Condition Visualization
+  html += '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('I\u00B2t Energi', 'I\u00B2t Energy') + ' - ' + tx('Fejlsimulering', 'Fault Race') + '</div>';
+  var cableI2t = thermalCalcI2t(st.ratedCurrent * 5, 5.0); // Cable withstand 5s
+  var deviceI2t = thermalCalcI2t(st.ratedCurrent * 5, 0.04); // Device trips in 40ms
+  var cableBarWidth = Math.min(350, 350);
+  var deviceBarWidth = Math.min(350, 350 * (deviceI2t.i2t / cableI2t.i2t));
+  html += '<svg viewBox="0 0 400 80" style="width:100%;height:auto;border-radius:8px;background:#1a1a2e">';
+  html += '<text x="10" y="20" fill="#aaa" font-size="10">' + tx('Kabel taaleevne (k\u00B2S\u00B2)', 'Cable withstand (k\u00B2S\u00B2)') + ': ' + cableI2t.i2t.toLocaleString() + ' A\u00B2s</text>';
+  html += '<rect x="10" y="25" width="' + cableBarWidth + '" height="14" rx="3" fill="#FF5722" opacity="0.8"/>';
+  html += '<text x="10" y="55" fill="#aaa" font-size="10">' + tx('Enhed gennemslip', 'Device let-through') + ': ' + deviceI2t.i2t.toLocaleString() + ' A\u00B2s</text>';
+  html += '<rect x="10" y="60" width="' + deviceBarWidth + '" height="14" rx="3" fill="#4CAF50" opacity="0.8">';
+  html += '<animate attributeName="width" from="0" to="' + deviceBarWidth + '" dur="1.5s" fill="freeze"/></rect>';
+  html += '</svg>';
+  html += '<div style="font-size:0.8rem;color:#888;padding:0.3rem">' + tx('Ref: DS/HD 60364-4-43 kl.434.5.2', 'Ref: DS/HD 60364-4-43 cl.434.5.2') + '</div>';
+  html += '</div>';
+
+  // Results card
+  html += '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Resultater', 'Results') + '</div>';
+  html += '<div class="result-box ' + statusClass + '">';
+  html += '<div class="result-title">' + statusText + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Aktuel temperatur', 'Current Temperature') + '</span><span class="value">' + tempResult.currentTemp + ' \u00B0C</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Maks temperatur', 'Maximum Temperature') + '</span><span class="value">' + tempResult.maxTemp + ' \u00B0C</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Sikkerhedsmargin', 'Safety Margin') + '</span><span class="value">' + tempResult.margin + ' \u00B0C</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Belastningsforhold', 'Load Ratio') + '</span><span class="value">' + (tempResult.loadRatio * 100).toFixed(1) + '%</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Omgivelsesderating', 'Ambient Derating') + '</span><span class="value">' + derating.ambientFactor + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Grupperingsderating', 'Grouping Derating') + '</span><span class="value">' + derating.groupFactor + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kombineret derating', 'Combined Derating') + '</span><span class="value">' + derating.combined + '</span></div>';
+  html += '</div>';
+  html += '<div style="font-size:0.8rem;color:#888;padding:0.3rem">' + tx('Ref: ' + derating.clause, 'Ref: ' + derating.clause) + '</div>';
+  html += '</div>';
+
+  return html;
+}
+
+// ===== 3D CABLE ROUTING & CONTAINMENT =====
+// Per DS/HD 60364-5-52 Table 52.3 and IEC 60228
+
+var CABLE3D_CONTAINMENT = {
+  perforated: { label: 'Perforated Tray', maxFill: 0.50, method: 'tray', derating: 'tray' },
+  wireMesh:   { label: 'Wire Mesh Tray', maxFill: 0.50, method: 'tray', derating: 'tray' },
+  solid:      { label: 'Solid Tray', maxFill: 0.45, method: 'tray', derating: 'tray' },
+  conduit:    { label: 'Conduit', maxFill: 0.40, method: 'conduit', derating: 'conduit' }
+};
+
+// Minimum bend radius per cable type per IEC 60228
+var CABLE3D_BEND_RADIUS = {
+  PVC:  { factor: 6, desc: 'min 6x outer diameter' },
+  XLPE: { factor: 8, desc: 'min 8x outer diameter' }
+};
+
+// Cable sizes with outer diameters (mm) per IEC 60228
+var CABLE3D_CABLE_SIZES = [
+  { mm2: 1.5, outerDia: 7.2, color: '#FF6B6B', label: '1.5 mm\u00B2' },
+  { mm2: 2.5, outerDia: 8.0, color: '#4ECDC4', label: '2.5 mm\u00B2' },
+  { mm2: 4,   outerDia: 8.8, color: '#45B7D1', label: '4 mm\u00B2' },
+  { mm2: 6,   outerDia: 9.9, color: '#96CEB4', label: '6 mm\u00B2' },
+  { mm2: 10,  outerDia: 11.8, color: '#FFEAA7', label: '10 mm\u00B2' },
+  { mm2: 16,  outerDia: 13.8, color: '#DDA0DD', label: '16 mm\u00B2' },
+  { mm2: 25,  outerDia: 16.2, color: '#98D8C8', label: '25 mm\u00B2' },
+  { mm2: 35,  outerDia: 18.1, color: '#F7DC6F', label: '35 mm\u00B2' },
+  { mm2: 50,  outerDia: 20.5, color: '#BB8FCE', label: '50 mm\u00B2' },
+  { mm2: 70,  outerDia: 23.5, color: '#85C1E9', label: '70 mm\u00B2' },
+  { mm2: 95,  outerDia: 26.5, color: '#F1948A', label: '95 mm\u00B2' },
+  { mm2: 120, outerDia: 29.5, color: '#7DCEA0', label: '120 mm\u00B2' }
+];
+
+// Grouping derating per DS/HD 60364-5-52 Table B.52.17
+var CABLE3D_GROUP_DERATING = {
+  tray:    { 1: 1.00, 2: 0.88, 3: 0.82, 4: 0.77, 5: 0.75, 6: 0.73, 7: 0.72, 8: 0.71, 9: 0.70 },
+  conduit: { 1: 1.00, 2: 0.80, 3: 0.70, 4: 0.65, 5: 0.60, 6: 0.57, 7: 0.54, 8: 0.52, 9: 0.50 }
+};
+
+var cable3dState = {
+  selectedTray: 'perforated',
+  selectedCableType: 'PVC',
+  viewAngle: 30,
+  cables: [0, 1, 2],  // indices into CABLE3D_CABLE_SIZES
+  trayWidth: 200,     // mm
+  trayDepth: 60,      // mm
+  conduitDia: 32,     // mm
+  selectedSegment: null
+};
+
+function cable3dCalcFillRate(trayType, cables) {
+  // Calculate fill rate as ratio of cable area to containment area
+  // Per DS/HD 60364-5-52 Table 52.3
+  var containment = CABLE3D_CONTAINMENT[trayType];
+  var totalCableArea = 0;
+
+  for (var i = 0; i < cables.length; i++) {
+    var cableData = CABLE3D_CABLE_SIZES[cables[i]];
+    var radius = cableData.outerDia / 2;
+    totalCableArea += Math.PI * radius * radius;
+  }
+
+  var containmentArea;
+  if (trayType === 'conduit') {
+    // Circular cross-section
+    var condRadius = cable3dState.conduitDia / 2;
+    containmentArea = Math.PI * condRadius * condRadius;
+  } else {
+    // Rectangular cross-section
+    containmentArea = cable3dState.trayWidth * cable3dState.trayDepth;
+  }
+
+  var fillRate = containmentArea > 0 ? totalCableArea / containmentArea : 0;
+  // Conservative: round up fill rate
+  fillRate = Math.ceil(fillRate * 1000) / 1000;
+
+  return {
+    fillRate: fillRate,
+    fillPercent: Math.round(fillRate * 100 * 10) / 10,
+    maxFill: containment.maxFill,
+    maxFillPercent: Math.round(containment.maxFill * 100),
+    exceeded: fillRate > containment.maxFill,
+    totalCableArea: Math.round(totalCableArea * 10) / 10,
+    containmentArea: Math.round(containmentArea * 10) / 10,
+    clause: 'DS/HD 60364-5-52 Table 52.3'
+  };
+}
+
+function cable3dCalcGroupDerating(cableCount, trayType) {
+  // Per DS/HD 60364-5-52 Table B.52.17
+  var deratingTable = CABLE3D_GROUP_DERATING[CABLE3D_CONTAINMENT[trayType].derating] || CABLE3D_GROUP_DERATING.tray;
+  var count = Math.min(Math.max(cableCount, 1), 9);
+  var factor = deratingTable[count];
+
+  return {
+    factor: factor,
+    cableCount: cableCount,
+    method: trayType,
+    clause: 'DS/HD 60364-5-52 Table B.52.17'
+  };
+}
+
+function cable3dCheckBendRadius(cableType, diameter) {
+  // Per IEC 60228 minimum bend radius
+  var bendData = CABLE3D_BEND_RADIUS[cableType] || CABLE3D_BEND_RADIUS.PVC;
+  var minBendRadius = diameter * bendData.factor;
+
+  return {
+    minRadius: Math.ceil(minBendRadius * 10) / 10,  // Conservative: round up
+    factor: bendData.factor,
+    diameter: diameter,
+    desc: bendData.desc,
+    clause: 'IEC 60228, DS/HD 60364-5-52 cl.522.8'
+  };
+}
+
+function cable3dCalcHeatDissipation(cables) {
+  // Simplified heat dissipation based on cable count and sizes
+  // W/m per cable approximately I^2 * R / length
+  // Using typical load currents for cable sizes
+  var typicalCurrents = { 1.5: 15, 2.5: 21, 4: 28, 6: 36, 10: 50, 16: 66, 25: 84, 35: 104, 50: 125, 70: 160, 95: 194, 120: 225 };
+  var totalHeat = 0;
+
+  for (var i = 0; i < cables.length; i++) {
+    var cableData = CABLE3D_CABLE_SIZES[cables[i]];
+    var current = typicalCurrents[cableData.mm2] || 20;
+    // P = I^2 * R, R approx 0.0225/mm2 per meter (copper at 70C)
+    var resistance = 0.0225 / cableData.mm2;  // Ohm/m
+    var heat = Math.pow(current * 0.7, 2) * resistance; // 70% load assumed (conservative)
+    totalHeat += heat;
+  }
+
+  return {
+    totalWperM: Math.round(totalHeat * 100) / 100,
+    perCable: cables.length > 0 ? Math.round((totalHeat / cables.length) * 100) / 100 : 0,
+    cableCount: cables.length,
+    clause: 'DS/HD 60364-5-52 cl.523 (thermal effects)'
+  };
+}
+
+function cable3dSetTray(type) {
+  cable3dState.selectedTray = type;
+  renderModule('cable3d');
+}
+
+function cable3dSetCableType(type) {
+  cable3dState.selectedCableType = type;
+  renderModule('cable3d');
+}
+
+function cable3dSetViewAngle(val) {
+  cable3dState.viewAngle = parseInt(val);
+  renderModule('cable3d');
+}
+
+function cable3dAddCable(sizeIdx) {
+  if (cable3dState.cables.length < 12) {
+    cable3dState.cables.push(sizeIdx);
+  }
+  renderModule('cable3d');
+}
+
+function cable3dRemoveCable() {
+  if (cable3dState.cables.length > 0) {
+    cable3dState.cables.pop();
+  }
+  renderModule('cable3d');
+}
+
+function cable3dSetConduitDia(val) {
+  cable3dState.conduitDia = parseInt(val);
+  renderModule('cable3d');
+}
+
+function renderCable3D() {
+  var st = cable3dState;
+  var fillResult = cable3dCalcFillRate(st.selectedTray, st.cables);
+  var groupResult = cable3dCalcGroupDerating(st.cables.length, st.selectedTray);
+  var heatResult = cable3dCalcHeatDissipation(st.cables);
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('3D Kabelfoering & Kabelbanesystem', '3D Cable Routing & Containment') + '</div>';
+  html += '<div class="info-row">' + tx('Udfyldningsgrad og derating per DS/HD 60364-5-52', 'Fill rate and derating per DS/HD 60364-5-52') + '</div>';
+
+  // Tray type buttons
+  html += '<div class="select-group"><label>' + tx('Kabelbanetype', 'Tray Type') + '</label>';
+  html += '<div class="select-grid">';
+  var trayTypes = [
+    { id: 'perforated', da: 'Perforeret', en: 'Perforated Tray' },
+    { id: 'wireMesh', da: 'Traadbakke', en: 'Wire Mesh' },
+    { id: 'solid', da: 'Lukket bakke', en: 'Solid Tray' },
+    { id: 'conduit', da: 'Roer', en: 'Conduit' }
+  ];
+  for (var t = 0; t < trayTypes.length; t++) {
+    html += '<button class="sel-btn' + (st.selectedTray === trayTypes[t].id ? ' active' : '') + '" onclick="cable3dSetTray(\'' + trayTypes[t].id + '\')">' + tx(trayTypes[t].da, trayTypes[t].en) + '</button>';
+  }
+  html += '</div></div>';
+
+  // Cable type for bend radius
+  html += '<div class="select-group"><label>' + tx('Isoleringstype', 'Insulation Type') + '</label>';
+  html += '<div class="select-grid">';
+  html += '<button class="sel-btn' + (st.selectedCableType === 'PVC' ? ' active' : '') + '" onclick="cable3dSetCableType(\'PVC\')">PVC</button>';
+  html += '<button class="sel-btn' + (st.selectedCableType === 'XLPE' ? ' active' : '') + '" onclick="cable3dSetCableType(\'XLPE\')">XLPE</button>';
+  html += '</div></div>';
+
+  // Conduit diameter slider (only for conduit)
+  if (st.selectedTray === 'conduit') {
+    html += '<div class="select-group"><label>' + tx('Roerdiameter', 'Conduit Diameter') + ': <strong>' + st.conduitDia + ' mm</strong></label>';
+    html += '<input type="range" min="16" max="63" step="1" value="' + st.conduitDia + '" oninput="cable3dSetConduitDia(this.value)" style="width:100%">';
+    html += '</div>';
+  }
+
+  // View angle slider
+  html += '<div class="select-group"><label>' + tx('Synsvinkel', 'View Angle') + ': <strong>' + st.viewAngle + '\u00B0</strong></label>';
+  html += '<input type="range" min="0" max="60" step="5" value="' + st.viewAngle + '" oninput="cable3dSetViewAngle(this.value)" style="width:100%">';
+  html += '</div>';
+
+  // Add/Remove cable buttons
+  html += '<div class="select-group"><label>' + tx('Kabler i bane', 'Cables in Tray') + ' (' + st.cables.length + ')</label>';
+  html += '<div class="select-grid">';
+  for (var cs = 0; cs < Math.min(6, CABLE3D_CABLE_SIZES.length); cs++) {
+    html += '<button class="sel-btn" onclick="cable3dAddCable(' + cs + ')">+ ' + CABLE3D_CABLE_SIZES[cs].label + '</button>';
+  }
+  html += '<button class="sel-btn" style="background:#c0392b;color:#fff" onclick="cable3dRemoveCable()">' + tx('Fjern sidste', 'Remove Cable') + '</button>';
+  html += '</div></div>';
+
+  html += '</div>';
+
+  // 3D Isometric SVG View
+  html += '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('3D Isometrisk visning', '3D Isometric View') + ' - ' + tx('Tvaersnit', 'Cross Section') + '</div>';
+  var angle = st.viewAngle * Math.PI / 180;
+  var skewX = Math.sin(angle) * 0.5;
+  html += '<svg viewBox="0 0 400 250" style="width:100%;height:auto;border-radius:8px;background:#1a1a2e">';
+
+  // Draw containment cross-section
+  if (st.selectedTray === 'conduit') {
+    // Circular conduit
+    var cx = 200, cy = 130, cr = st.conduitDia * 1.5;
+    html += '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + cr + '" ry="' + (cr * Math.cos(angle)) + '" fill="none" stroke="#666" stroke-width="3"/>';
+    // Draw cables inside
+    var cablePositions = cable3dLayoutCircular(st.cables, cr * 0.8);
+    for (var ci = 0; ci < st.cables.length; ci++) {
+      var cData = CABLE3D_CABLE_SIZES[st.cables[ci]];
+      var pos = cablePositions[ci];
+      var cableR = cData.outerDia * 0.8;
+      html += '<circle cx="' + (cx + pos.x) + '" cy="' + (cy + pos.y * Math.cos(angle)) + '" r="' + cableR + '" fill="' + cData.color + '" stroke="#333" stroke-width="1"/>';
+    }
+  } else {
+    // Rectangular tray
+    var trayX = 100, trayY = 80, trayW = 200, trayH = 80;
+    // 3D effect with skew
+    html += '<polygon points="' + trayX + ',' + (trayY + trayH) + ' ' + (trayX + trayW) + ',' + (trayY + trayH) + ' ' + (trayX + trayW + skewX*30) + ',' + (trayY + trayH - 20) + ' ' + (trayX + skewX*30) + ',' + (trayY + trayH - 20) + '" fill="#333" stroke="#555" stroke-width="1"/>';
+    html += '<rect x="' + trayX + '" y="' + trayY + '" width="' + trayW + '" height="' + trayH + '" fill="none" stroke="#888" stroke-width="2" stroke-dasharray="' + (st.selectedTray === 'perforated' ? '4,2' : (st.selectedTray === 'wireMesh' ? '2,2' : 'none')) + '"/>';
+    // Draw cables
+    var xPos = trayX + 15;
+    for (var ci2 = 0; ci2 < st.cables.length; ci2++) {
+      var cData2 = CABLE3D_CABLE_SIZES[st.cables[ci2]];
+      var cableR2 = cData2.outerDia * 0.9;
+      html += '<circle cx="' + xPos + '" cy="' + (trayY + trayH - cableR2 - 5) + '" r="' + cableR2 + '" fill="' + cData2.color + '" stroke="#333" stroke-width="1"/>';
+      xPos += cableR2 * 2.5;
+      if (xPos > trayX + trayW - 15) xPos = trayX + 15; // wrap
+    }
+  }
+
+  // Fill rate gauge
+  var gaugeColor = fillResult.exceeded ? '#c0392b' : (fillResult.fillPercent > 35 ? '#f39c12' : '#27ae60');
+  html += '<rect x="30" y="210" width="340" height="16" rx="4" fill="#333"/>';
+  var fillWidth = Math.min(340, 340 * fillResult.fillRate / fillResult.maxFill);
+  html += '<rect x="30" y="210" width="' + fillWidth + '" height="16" rx="4" fill="' + gaugeColor + '"/>';
+  html += '<line x1="' + (30 + 340 * fillResult.maxFill / (fillResult.maxFill + 0.1)) + '" y1="208" x2="' + (30 + 340 * fillResult.maxFill / (fillResult.maxFill + 0.1)) + '" y2="228" stroke="#ff0" stroke-width="2"/>';
+  html += '<text x="200" y="222" text-anchor="middle" fill="#fff" font-size="10">' + fillResult.fillPercent + '% / ' + fillResult.maxFillPercent + '% max</text>';
+  html += '</svg></div>';
+
+  // Results
+  html += '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Resultater', 'Results') + '</div>';
+  var fillClass = fillResult.exceeded ? 'error' : (fillResult.fillPercent > 35 ? 'warning' : 'success');
+  html += '<div class="result-box ' + fillClass + '">';
+  html += '<div class="result-title">' + tx('Udfyldningsgrad', 'Fill Rate') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kabelareal', 'Cable Area') + '</span><span class="value">' + fillResult.totalCableArea + ' mm\u00B2</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Baneareal', 'Containment Area') + '</span><span class="value">' + fillResult.containmentArea + ' mm\u00B2</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Fyldningsgrad', 'Fill Rate') + '</span><span class="value">' + fillResult.fillPercent + '%</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Maks. tilladt', 'Max Allowed') + '</span><span class="value">' + fillResult.maxFillPercent + '%</span></div>';
+  html += '</div>';
+
+  // Grouping derating
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Grupperingsderating', 'Grouping Derating') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Antal kabler', 'Cable Count') + '</span><span class="value">' + groupResult.cableCount + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Deratingfaktor', 'Derating Factor') + '</span><span class="value">' + groupResult.factor + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">' + groupResult.clause + '</span></div>';
+  html += '</div>';
+
+  // Bend radius check
+  if (st.cables.length > 0) {
+    var largestCable = CABLE3D_CABLE_SIZES[st.cables[st.cables.length - 1]];
+    var bendResult = cable3dCheckBendRadius(st.selectedCableType, largestCable.outerDia);
+    html += '<div class="result-box">';
+    html += '<div class="result-title">' + tx('Boejningsradius', 'Bend Radius') + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Kabeldiameter', 'Cable Diameter') + '</span><span class="value">' + largestCable.outerDia + ' mm</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Min. radius', 'Min. Radius') + '</span><span class="value">' + bendResult.minRadius + ' mm</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Faktor', 'Factor') + '</span><span class="value">' + bendResult.factor + 'x ' + tx('diameter', 'diameter') + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">' + bendResult.clause + '</span></div>';
+    html += '</div>';
+  }
+
+  // Heat dissipation
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Varmeafledning', 'Heat Dissipation') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Total varme', 'Total Heat') + '</span><span class="value">' + heatResult.totalWperM + ' W/m</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Per kabel', 'Per Cable') + '</span><span class="value">' + heatResult.perCable + ' W/m</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">' + heatResult.clause + '</span></div>';
+  html += '</div>';
+  html += '</div>';
+
+  return html;
+}
+
+function cable3dLayoutCircular(cables, maxRadius) {
+  // Position cables in circular pattern for conduit view
+  var positions = [];
+  var count = cables.length;
+  if (count === 0) return positions;
+  if (count === 1) return [{ x: 0, y: 0 }];
+
+  var angleStep = (2 * Math.PI) / count;
+  var radius = maxRadius * 0.5;
+  for (var i = 0; i < count; i++) {
+    positions.push({
+      x: Math.cos(i * angleStep) * radius,
+      y: Math.sin(i * angleStep) * radius
+    });
+  }
+  return positions;
+}
+
+// ===== ENERGY MONITORING DASHBOARD =====
+// Per DS/HD 60364-5-52 cl.523 and EN 50160
+
+// Danish tariff structure 2024 (Energinet rates)
+// Time-dependent nettarif (DKK/kWh): low (night), high (day peak)
+var ENERGY_TARIFFS = {
+  nettarif_low: 0.11,     // 00-06 reduced rate
+  nettarif_mid: 0.34,     // 06-17, 20-00 standard rate
+  nettarif_high: 0.90,    // 17-20 peak rate
+  systemtarif: 0.061,     // Fixed system tariff
+  elafgift: 0.008,        // Electricity duty (reduced 2024)
+  transmissionstarif: 0.049, // Transmission grid tariff
+  getHourlyRate: function(hour) {
+    var net;
+    if (hour >= 0 && hour < 6) net = this.nettarif_low;
+    else if (hour >= 17 && hour < 20) net = this.nettarif_high;
+    else net = this.nettarif_mid;
+    return net + this.systemtarif + this.elafgift + this.transmissionstarif;
+  }
+};
+
+// Typical 24h load profiles (multiplier of peak load)
+var ENERGY_LOAD_PROFILES = {
+  residential: [0.3, 0.25, 0.2, 0.2, 0.2, 0.3, 0.5, 0.7, 0.6, 0.5, 0.4, 0.45, 0.5, 0.45, 0.4, 0.5, 0.7, 0.9, 1.0, 0.95, 0.8, 0.6, 0.5, 0.35],
+  office:      [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.3, 0.6, 0.9, 1.0, 1.0, 0.9, 0.7, 0.9, 1.0, 1.0, 0.9, 0.6, 0.3, 0.15, 0.1, 0.1, 0.1, 0.1],
+  industrial:  [0.4, 0.4, 0.4, 0.4, 0.5, 0.6, 0.8, 0.9, 1.0, 1.0, 1.0, 0.9, 0.8, 0.9, 1.0, 1.0, 1.0, 0.9, 0.7, 0.5, 0.4, 0.4, 0.4, 0.4]
+};
+
+// Harmonic sources - typical THD% per EN 50160
+var ENERGY_HARMONIC_SOURCES = {
+  led:       { thd: 20, label: 'LED Lighting', pf: 0.92 },
+  vfd:       { thd: 35, label: 'VFD/Inverter', pf: 0.95 },
+  pc:        { thd: 100, label: 'PC/Server', pf: 0.65 },
+  ev:        { thd: 8, label: 'EV Charger', pf: 0.99 },
+  motor:     { thd: 3, label: 'Motor (direct)', pf: 0.85 },
+  heating:   { thd: 0, label: 'Resistive Heat', pf: 1.0 },
+  heatpump:  { thd: 12, label: 'Heat Pump', pf: 0.95 }
+};
+
+var energyState = {
+  profileType: 'residential',
+  hour: 12,
+  peakKW: 50,
+  capacitorKvar: 0,
+  targetPF: 0.95,
+  selectedLoads: ['led', 'motor', 'pc'],  // active harmonic sources
+  simRunning: false
+};
+
+function energyCalcPowerFactor(loads) {
+  // Calculate weighted power factor from active loads
+  if (!loads || loads.length === 0) return { pf: 1.0, clause: 'DS/HD 60364-5-52 cl.523' };
+  var totalP = 0;
+  var totalS = 0;
+  for (var i = 0; i < loads.length; i++) {
+    var source = ENERGY_HARMONIC_SOURCES[loads[i]];
+    if (source) {
+      var p = 10; // assume 10kW per load for weighting
+      var s = p / source.pf;
+      totalP += p;
+      totalS += s;
+    }
+  }
+  var pf = totalS > 0 ? totalP / totalS : 1.0;
+  // Conservative: round down PF
+  pf = Math.floor(pf * 1000) / 1000;
+  return {
+    pf: pf,
+    totalP: totalP,
+    totalS: Math.round(totalS * 10) / 10,
+    clause: 'DS/HD 60364-5-52 cl.523'
+  };
+}
+
+function energyCalcCapacitorSize(currentPF, targetPF, kW) {
+  // Q_c = P * (tan(acos(pf1)) - tan(acos(pf2)))
+  // Per DS/HD 60364-5-52 cl.523 for reactive power compensation
+  if (currentPF >= targetPF) return { kvar: 0, clause: 'DS/HD 60364-5-52 cl.523' };
+  if (currentPF <= 0 || currentPF > 1) return { kvar: 0, clause: 'DS/HD 60364-5-52 cl.523' };
+  if (targetPF <= 0 || targetPF > 1) return { kvar: 0, clause: 'DS/HD 60364-5-52 cl.523' };
+
+  var phi1 = Math.acos(currentPF);
+  var phi2 = Math.acos(targetPF);
+  var qc = kW * (Math.tan(phi1) - Math.tan(phi2));
+  // Conservative: round up capacitor size
+  qc = Math.ceil(qc * 10) / 10;
+
+  return {
+    kvar: qc,
+    currentPF: currentPF,
+    targetPF: targetPF,
+    kW: kW,
+    clause: 'DS/HD 60364-5-52 cl.523'
+  };
+}
+
+function energyCalcTHD(loads) {
+  // Calculate total harmonic distortion (root sum of squares)
+  // Per EN 50160 limits: THD_V < 8% at PCC
+  if (!loads || loads.length === 0) return { thd: 0, status: 'good', clause: 'EN 50160 cl.4.2.6' };
+  var sumSq = 0;
+  for (var i = 0; i < loads.length; i++) {
+    var source = ENERGY_HARMONIC_SOURCES[loads[i]];
+    if (source) {
+      sumSq += Math.pow(source.thd, 2);
+    }
+  }
+  // Combined THD (conservative: assume partial vector addition with diversity 0.7)
+  var thd = Math.sqrt(sumSq) * 0.7;
+  // Conservative: round up THD
+  thd = Math.ceil(thd * 10) / 10;
+
+  var status = thd < 5 ? 'good' : (thd < 8 ? 'acceptable' : 'poor');
+  return {
+    thd: thd,
+    status: status,
+    limit: 8.0,
+    exceeded: thd > 8.0,
+    clause: 'EN 50160 cl.4.2.6'
+  };
+}
+
+function energyCalcDailyCost(profileType, tariffs, peakKW) {
+  // Calculate daily energy cost using hourly tariffs and load profile
+  var profile = ENERGY_LOAD_PROFILES[profileType] || ENERGY_LOAD_PROFILES.residential;
+  var totalCost = 0;
+  var totalKWh = 0;
+  var hourlyCosts = [];
+
+  for (var h = 0; h < 24; h++) {
+    var kWh = peakKW * profile[h]; // kW for that hour = kWh
+    var rate = tariffs.getHourlyRate(h);
+    var cost = kWh * rate;
+    totalCost += cost;
+    totalKWh += kWh;
+    hourlyCosts.push({ hour: h, kWh: kWh, rate: rate, cost: Math.round(cost * 100) / 100 });
+  }
+
+  return {
+    totalCost: Math.round(totalCost * 100) / 100,
+    totalKWh: Math.round(totalKWh * 10) / 10,
+    avgRate: totalKWh > 0 ? Math.round((totalCost / totalKWh) * 1000) / 1000 : 0,
+    hourlyCosts: hourlyCosts,
+    peakHour: hourlyCosts.reduce(function(max, h) { return h.cost > max.cost ? h : max; }, hourlyCosts[0]).hour,
+    clause: '2024 Energinet tariff structure'
+  };
+}
+
+function energyCalcPeakShaving(profileType) {
+  // Identify peak hours and recommend load shifting
+  var profile = ENERGY_LOAD_PROFILES[profileType] || ENERGY_LOAD_PROFILES.residential;
+  var avgLoad = profile.reduce(function(s, v) { return s + v; }, 0) / 24;
+  var recommendations = [];
+
+  for (var h = 0; h < 24; h++) {
+    if (profile[h] > avgLoad * 1.3 && ENERGY_TARIFFS.getHourlyRate(h) > 0.4) {
+      recommendations.push({
+        hour: h,
+        load: profile[h],
+        rate: ENERGY_TARIFFS.getHourlyRate(h),
+        saving: Math.round((ENERGY_TARIFFS.getHourlyRate(h) - ENERGY_TARIFFS.nettarif_low - ENERGY_TARIFFS.systemtarif - ENERGY_TARIFFS.elafgift - ENERGY_TARIFFS.transmissionstarif) * profile[h] * 100) / 100
+      });
+    }
+  }
+
+  return {
+    recommendations: recommendations,
+    potentialSaving: recommendations.reduce(function(s, r) { return s + r.saving; }, 0),
+    peakHours: recommendations.map(function(r) { return r.hour; }),
+    clause: 'Energinet tarifgruppe optimization'
+  };
+}
+
+function energyGetPQStatus(voltage, frequency, thd, flicker, unbalance) {
+  // Power quality traffic light per EN 50160
+  // Voltage: 230V +/- 10% (207-253V)
+  // Frequency: 50Hz +/- 1% (49.5-50.5Hz)
+  // THD: < 8%
+  // Flicker: Plt < 1.0
+  // Unbalance: < 2%
+  var result = {};
+
+  result.voltage = (voltage >= 207 && voltage <= 253) ? 'good' : ((voltage >= 195 && voltage <= 265) ? 'acceptable' : 'poor');
+  result.frequency = (frequency >= 49.5 && frequency <= 50.5) ? 'good' : ((frequency >= 49.0 && frequency <= 51.0) ? 'acceptable' : 'poor');
+  result.thd = thd < 5 ? 'good' : (thd < 8 ? 'acceptable' : 'poor');
+  result.flicker = flicker < 0.8 ? 'good' : (flicker < 1.0 ? 'acceptable' : 'poor');
+  result.unbalance = unbalance < 1.5 ? 'good' : (unbalance < 2.0 ? 'acceptable' : 'poor');
+
+  result.clause = 'EN 50160';
+  return result;
+}
+
+function energySetProfile(type) {
+  energyState.profileType = type;
+  renderModule('energy');
+}
+
+function energySetHour(val) {
+  energyState.hour = parseInt(val);
+  renderModule('energy');
+}
+
+function energySetPeakKW(val) {
+  energyState.peakKW = parseInt(val);
+  renderModule('energy');
+}
+
+function energySetTargetPF(val) {
+  energyState.targetPF = parseFloat(val) / 100;
+  renderModule('energy');
+}
+
+function energyToggleLoad(loadId) {
+  var idx = energyState.selectedLoads.indexOf(loadId);
+  if (idx >= 0) {
+    energyState.selectedLoads.splice(idx, 1);
+  } else {
+    energyState.selectedLoads.push(loadId);
+  }
+  renderModule('energy');
+}
+
+function renderEnergy() {
+  var st = energyState;
+  var pfResult = energyCalcPowerFactor(st.selectedLoads);
+  var capResult = energyCalcCapacitorSize(pfResult.pf, st.targetPF, st.peakKW);
+  var thdResult = energyCalcTHD(st.selectedLoads);
+  var costResult = energyCalcDailyCost(st.profileType, ENERGY_TARIFFS, st.peakKW);
+  var peakResult = energyCalcPeakShaving(st.profileType);
+  var pqResult = energyGetPQStatus(230, 50.0, thdResult.thd, 0.5, 1.0);
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Energiovervagning', 'Energy Monitor') + '</div>';
+  html += '<div class="info-row">' + tx('Daglig belastningsprofil og omkostningsoptimering', 'Daily load profile and cost optimization') + '</div>';
+
+  // Building type buttons
+  html += '<div class="select-group"><label>' + tx('Bygningstype', 'Building Type') + '</label>';
+  html += '<div class="select-grid">';
+  var profiles = [
+    { id: 'residential', da: 'Bolig', en: 'Residential' },
+    { id: 'office', da: 'Kontor', en: 'Office' },
+    { id: 'industrial', da: 'Industri', en: 'Industrial' }
+  ];
+  for (var p = 0; p < profiles.length; p++) {
+    html += '<button class="sel-btn' + (st.profileType === profiles[p].id ? ' active' : '') + '" onclick="energySetProfile(\'' + profiles[p].id + '\')">' + tx(profiles[p].da, profiles[p].en) + '</button>';
+  }
+  html += '</div></div>';
+
+  // Peak kW slider
+  html += '<div class="select-group"><label>' + tx('Spidsbelastning', 'Peak Load') + ': <strong>' + st.peakKW + ' kW</strong></label>';
+  html += '<input type="range" min="10" max="200" step="5" value="' + st.peakKW + '" oninput="energySetPeakKW(this.value)" style="width:100%">';
+  html += '</div>';
+
+  // Hour slider
+  html += '<div class="select-group"><label>' + tx('Time paa doegnet', 'Hour of Day') + ': <strong>' + st.hour + ':00</strong></label>';
+  html += '<input type="range" min="0" max="23" step="1" value="' + st.hour + '" oninput="energySetHour(this.value)" style="width:100%">';
+  html += '</div>';
+
+  // Target PF slider
+  html += '<div class="select-group"><label>' + tx('Maal effektfaktor', 'Target PF') + ': <strong>' + st.targetPF + '</strong></label>';
+  html += '<input type="range" min="85" max="99" step="1" value="' + Math.round(st.targetPF * 100) + '" oninput="energySetTargetPF(this.value)" style="width:100%">';
+  html += '</div>';
+
+  // Harmonic load toggles
+  html += '<div class="select-group"><label>' + tx('Harmoniske kilder', 'Harmonic Sources') + '</label>';
+  html += '<div class="select-grid">';
+  var loadKeys = Object.keys(ENERGY_HARMONIC_SOURCES);
+  for (var lk = 0; lk < loadKeys.length; lk++) {
+    var isActive = st.selectedLoads.indexOf(loadKeys[lk]) >= 0;
+    html += '<button class="sel-btn' + (isActive ? ' active' : '') + '" onclick="energyToggleLoad(\'' + loadKeys[lk] + '\')">' + ENERGY_HARMONIC_SOURCES[loadKeys[lk]].label + '</button>';
+  }
+  html += '</div></div>';
+
+  html += '</div>';
+
+  // 24h Load Profile SVG Chart
+  html += '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Belastningsprofil (24t)', 'Load Profile (24h)') + '</div>';
+  var profile = ENERGY_LOAD_PROFILES[st.profileType];
+  html += '<svg viewBox="0 0 400 150" style="width:100%;height:auto;border-radius:8px;background:#1a1a2e">';
+  // Grid lines
+  for (var gl = 0; gl <= 4; gl++) {
+    var gy = 20 + gl * 28;
+    html += '<line x1="35" y1="' + gy + '" x2="385" y2="' + gy + '" stroke="#333" stroke-width="0.5"/>';
+  }
+  // Bars for each hour
+  for (var bh = 0; bh < 24; bh++) {
+    var barH = profile[bh] * 100;
+    var barX = 38 + bh * 14.5;
+    var barColor = bh === st.hour ? '#e74c3c' : (ENERGY_TARIFFS.getHourlyRate(bh) > 0.5 ? '#f39c12' : '#3498db');
+    html += '<rect x="' + barX + '" y="' + (132 - barH) + '" width="12" height="' + barH + '" fill="' + barColor + '" rx="1"/>';
+  }
+  // Hour labels
+  for (var hl = 0; hl < 24; hl += 4) {
+    html += '<text x="' + (44 + hl * 14.5) + '" y="145" text-anchor="middle" fill="#aaa" font-size="8">' + hl + 'h</text>';
+  }
+  html += '<text x="15" y="35" fill="#aaa" font-size="8">100%</text>';
+  html += '<text x="15" y="135" fill="#aaa" font-size="8">0%</text>';
+  // Current hour indicator
+  html += '<line x1="' + (44 + st.hour * 14.5) + '" y1="15" x2="' + (44 + st.hour * 14.5) + '" y2="135" stroke="#e74c3c" stroke-width="1" stroke-dasharray="3,2"/>';
+  html += '</svg></div>';
+
+  // Power Factor & Capacitor Sizing
+  html += '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Effektfaktor & Kondensatordimensionering', 'Power Factor & Capacitor Sizing') + '</div>';
+  var pfClass = pfResult.pf >= 0.95 ? 'success' : (pfResult.pf >= 0.85 ? 'warning' : 'error');
+  html += '<div class="result-box ' + pfClass + '">';
+  html += '<div class="result-title">' + tx('Effektfaktor', 'Power Factor') + ': ' + pfResult.pf + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Aktiv effekt', 'Active Power') + '</span><span class="value">' + pfResult.totalP + ' kW</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Tilsyneladende effekt', 'Apparent Power') + '</span><span class="value">' + pfResult.totalS + ' kVA</span></div>';
+  if (capResult.kvar > 0) {
+    html += '<div class="result-row"><span class="label">' + tx('Noedvendig kompensation', 'Required Compensation') + '</span><span class="value">' + capResult.kvar + ' kvar</span></div>';
+  }
+  html += '<div class="result-row"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">' + pfResult.clause + '</span></div>';
+  html += '</div></div>';
+
+  // Harmonic Spectrum
+  html += '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Harmonisk spektrum', 'Harmonic Spectrum') + ' - THD: ' + thdResult.thd + '%</div>';
+  var thdClass = thdResult.status === 'good' ? 'success' : (thdResult.status === 'acceptable' ? 'warning' : 'error');
+  html += '<svg viewBox="0 0 400 100" style="width:100%;height:auto;border-radius:8px;background:#1a1a2e">';
+  // Draw harmonic bars for active loads
+  var barWidth = st.selectedLoads.length > 0 ? Math.min(40, 350 / st.selectedLoads.length) : 40;
+  for (var si = 0; si < st.selectedLoads.length; si++) {
+    var src = ENERGY_HARMONIC_SOURCES[st.selectedLoads[si]];
+    if (src) {
+      var hBarH = Math.min(70, src.thd * 0.7);
+      var hBarX = 40 + si * (barWidth + 8);
+      var hColor = src.thd > 30 ? '#e74c3c' : (src.thd > 10 ? '#f39c12' : '#27ae60');
+      html += '<rect x="' + hBarX + '" y="' + (80 - hBarH) + '" width="' + barWidth + '" height="' + hBarH + '" fill="' + hColor + '" rx="2"/>';
+      html += '<text x="' + (hBarX + barWidth/2) + '" y="93" text-anchor="middle" fill="#aaa" font-size="7">' + src.label.split(' ')[0] + '</text>';
+      html += '<text x="' + (hBarX + barWidth/2) + '" y="' + (77 - hBarH) + '" text-anchor="middle" fill="#fff" font-size="8">' + src.thd + '%</text>';
+    }
+  }
+  // EN 50160 limit line at 8%
+  var limitY = 80 - 8 * 0.7;
+  html += '<line x1="30" y1="' + limitY + '" x2="385" y2="' + limitY + '" stroke="#ff0" stroke-width="1" stroke-dasharray="4,2"/>';
+  html += '<text x="388" y="' + (limitY + 3) + '" fill="#ff0" font-size="8">8%</text>';
+  html += '</svg>';
+  html += '<div class="result-box ' + thdClass + '" style="margin-top:0.3rem">';
+  html += '<div class="result-row"><span class="label">THD</span><span class="value">' + thdResult.thd + '% (' + tx(thdResult.status === 'good' ? 'God' : thdResult.status === 'acceptable' ? 'Acceptabel' : 'Daarlig', thdResult.status === 'good' ? 'Good' : thdResult.status === 'acceptable' ? 'Acceptable' : 'Poor') + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Graense', 'Limit') + '</span><span class="value">8% (EN 50160)</span></div>';
+  html += '</div></div>';
+
+  // Energy Cost
+  html += '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Daglig energiomkostning', 'Daily Energy Cost') + '</div>';
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + costResult.totalCost + ' DKK/' + tx('dag', 'day') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Dagligt forbrug', 'Daily Consumption') + '</span><span class="value">' + costResult.totalKWh + ' kWh</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Gns. sats', 'Avg. Rate') + '</span><span class="value">' + costResult.avgRate + ' DKK/kWh</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Dyreste time', 'Peak Cost Hour') + '</span><span class="value">' + costResult.peakHour + ':00</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">' + costResult.clause + '</span></div>';
+  html += '</div></div>';
+
+  // Peak Shaving Recommendations
+  if (peakResult.recommendations.length > 0) {
+    html += '<div class="card fade-in">';
+    html += '<div class="card-title">' + tx('Peak Shaving Anbefalinger', 'Peak Shaving Recommendations') + '</div>';
+    html += '<div class="result-box warning">';
+    html += '<div class="result-title">' + tx('Potentiel besparelse', 'Potential Saving') + ': ' + peakResult.potentialSaving.toFixed(2) + ' DKK/' + tx('dag', 'day') + '</div>';
+    for (var ri = 0; ri < Math.min(5, peakResult.recommendations.length); ri++) {
+      var rec = peakResult.recommendations[ri];
+      html += '<div class="result-row"><span class="label">' + tx('Flyt belastning fra', 'Shift load from') + ' ' + rec.hour + ':00</span><span class="value">' + tx('Besparelse', 'Saving') + ': ' + rec.saving + ' DKK</span></div>';
+    }
+    html += '</div></div>';
+  }
+
+  // Power Quality Traffic Light
+  html += '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Stroemkvalitet (PQ)', 'Power Quality (PQ)') + ' - EN 50160</div>';
+  html += '<div class="result-box">';
+  var pqItems = [
+    { key: 'voltage', da: 'Spaending', en: 'Voltage', val: '230V', ref: '207-253V' },
+    { key: 'frequency', da: 'Frekvens', en: 'Frequency', val: '50.0Hz', ref: '49.5-50.5Hz' },
+    { key: 'thd', da: 'THD', en: 'THD', val: thdResult.thd + '%', ref: '<8%' },
+    { key: 'flicker', da: 'Flimmer', en: 'Flicker', val: 'Plt=0.5', ref: '<1.0' },
+    { key: 'unbalance', da: 'Ubalance', en: 'Unbalance', val: '1.0%', ref: '<2%' }
+  ];
+  for (var pqi = 0; pqi < pqItems.length; pqi++) {
+    var item = pqItems[pqi];
+    var statusColor = pqResult[item.key] === 'good' ? '#27ae60' : (pqResult[item.key] === 'acceptable' ? '#f39c12' : '#e74c3c');
+    var statusIcon = pqResult[item.key] === 'good' ? '\u2705' : (pqResult[item.key] === 'acceptable' ? '\u26A0\uFE0F' : '\u274C');
+    html += '<div class="result-row"><span class="label">' + statusIcon + ' ' + tx(item.da, item.en) + ' (' + item.val + ')</span><span class="value" style="color:' + statusColor + '">' + tx(pqResult[item.key] === 'good' ? 'God' : pqResult[item.key] === 'acceptable' ? 'Acceptabel' : 'Daarlig', pqResult[item.key] === 'good' ? 'Good' : pqResult[item.key] === 'acceptable' ? 'Acceptable' : 'Poor') + '</span></div>';
+  }
+  html += '</div></div>';
+
   return html;
 }
 

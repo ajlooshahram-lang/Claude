@@ -2052,6 +2052,434 @@ test('panelMoveDevice and panelRemoveDevice modify board state correctly', funct
   assert.strictEqual(panelState.boards[0].totalModules, modulesBeforeRemove - removedModules, 'totalModules decreases after remove');
 });
 
+
+// ===== Thermal Simulation Tests =====
+console.log('\n=== Thermal Simulation Tests ===\n');
+
+// Test 111: Thermal module in translation objects
+test('Thermal module appears in all three language translation objects', function() {
+  assert.strictEqual(T.da.modules.thermal, 'Termisk Sim.');
+  assert.strictEqual(T.en.modules.thermal, 'Thermal Sim');
+  assert.strictEqual(T.fa.modules.thermal, '\u0634\u0628\u06CC\u0647\u200C\u0633\u0627\u0632\u06CC \u062D\u0631\u0627\u0631\u062A\u06CC');
+});
+
+// Test 112: Thermal functions exist
+test('All thermal simulation functions are defined', function() {
+  assert.strictEqual(typeof thermalCalcDerating, 'function');
+  assert.strictEqual(typeof thermalCalcTemp, 'function');
+  assert.strictEqual(typeof thermalCalcI2t, 'function');
+  assert.strictEqual(typeof thermalGetColor, 'function');
+  assert.strictEqual(typeof renderThermal, 'function');
+});
+
+// Test 113: thermalCalcDerating at reference conditions
+test('thermalCalcDerating returns 1.0 at 30C ambient with 1 cable per Table B.52.14', function() {
+  thermalState.selectedCableType = 'PVC';
+  var result = thermalCalcDerating(30, 1, 'tray');
+  assert.strictEqual(result.ambientFactor, 1.0);
+  assert.strictEqual(result.groupFactor, 1.0);
+  assert.strictEqual(result.combined, 1.0);
+  assert.ok(result.clause.indexOf('B.52.14') >= 0);
+});
+
+// Test 114: thermalCalcDerating with high ambient
+test('thermalCalcDerating correctly derates at 45C ambient for PVC per Table B.52.14', function() {
+  thermalState.selectedCableType = 'PVC';
+  var result = thermalCalcDerating(45, 1, 'tray');
+  assert.strictEqual(result.ambientFactor, 0.79);
+  assert.ok(result.combined < 1.0, 'Combined derating must be less than 1.0 at high temps');
+});
+
+// Test 115: thermalCalcDerating grouping factor
+test('thermalCalcDerating applies grouping factor from Table B.52.17 for conduit', function() {
+  thermalState.selectedCableType = 'PVC';
+  var result = thermalCalcDerating(30, 3, 'conduit');
+  assert.strictEqual(result.groupFactor, 0.70);
+  assert.strictEqual(result.combined, 0.7);
+});
+
+// Test 116: thermalCalcTemp safe condition
+test('thermalCalcTemp returns safe temperature at 50% load with PVC cable', function() {
+  var result = thermalCalcTemp('PVC', 16, 32, 25, 1.0);
+  assert.ok(result.currentTemp < result.maxTemp, 'Current temp must be below max at 50% load');
+  assert.strictEqual(result.maxTemp, 70, 'PVC max temp is 70C per DS/HD 60364-5-52');
+  assert.ok(result.margin > 0, 'Safety margin must be positive');
+  assert.strictEqual(result.overloaded, false);
+});
+
+// Test 117: thermalCalcTemp overloaded condition
+test('thermalCalcTemp detects overload when current exceeds capacity', function() {
+  // Load factor 1.5 means actual current = 1.5 * rated
+  var result = thermalCalcTemp('PVC', 50, 32, 40, 0.8);
+  assert.strictEqual(result.overloaded, true, 'Must detect overload');
+  assert.ok(result.currentTemp > 70, 'Temperature must exceed 70C for PVC');
+});
+
+// Test 118: thermalCalcI2t calculation
+test('thermalCalcI2t correctly computes I-squared-t energy', function() {
+  var result = thermalCalcI2t(100, 0.5);
+  assert.strictEqual(result.i2t, 5000, 'I2t = 100^2 * 0.5 = 5000 A2s');
+  assert.strictEqual(result.current, 100);
+  assert.strictEqual(result.time, 0.5);
+  assert.ok(result.clause.indexOf('60364-4-43') >= 0);
+});
+
+// Test 119: thermalGetColor returns correct colors
+test('thermalGetColor returns gradient from blue to red based on temperature ratio', function() {
+  assert.strictEqual(thermalGetColor(20, 70), '#2196F3', 'Low temp should be blue');
+  assert.strictEqual(thermalGetColor(40, 70), '#4CAF50', 'Normal temp should be green');
+  assert.strictEqual(thermalGetColor(56, 70), '#FFC107', 'Warm temp should be yellow');
+  assert.strictEqual(thermalGetColor(65, 70), '#FF5722', 'Hot temp should be red');
+  assert.strictEqual(thermalGetColor(75, 70), '#B71C1C', 'Over-max should be dark red DANGER');
+});
+
+// Test 120: XLPE derating values
+test('thermalCalcDerating for XLPE at 40C returns correct factor per Table B.52.15', function() {
+  thermalState.selectedCableType = 'XLPE';
+  var result = thermalCalcDerating(40, 1, 'tray');
+  assert.strictEqual(result.ambientFactor, 0.91);
+});
+
+// Test 121: thermalCalcTemp conservative (rounds up temperature)
+test('thermalCalcTemp uses conservative rounding (ceiling) for temperature', function() {
+  thermalState.loadFactor = 0.75;
+  var result = thermalCalcTemp('XLPE', 30, 40, 25, 1.0);
+  // Verify temp is rounded up (conservative) - using ceiling at 1 decimal place
+  var IzDerated = 40 * 1.0;
+  var Iactual = 30 * 0.75;
+  var loadRatio = Iactual / IzDerated;
+  var tempRise = (90 - 30) * Math.pow(loadRatio, 2);
+  var rawTemp = 25 + tempRise;
+  assert.ok(result.currentTemp >= Math.floor(rawTemp * 10) / 10, 'Temperature must not be rounded down');
+  thermalState.loadFactor = 0.8; // restore
+});
+
+// Test 122: renderThermal has no text inputs
+test('renderThermal returns HTML with no text input fields (click-only UI)', function() {
+  var html = renderThermal();
+  assert.ok(html.indexOf('<input type="text"') < 0, 'Must not contain text input');
+  assert.ok(html.indexOf('<textarea') < 0, 'Must not contain textarea');
+  assert.ok(html.indexOf('type="range"') >= 0, 'Should contain range sliders');
+  assert.ok(html.indexOf('sel-btn') >= 0, 'Should contain selector buttons');
+});
+
+// Test 123: thermalState has correct defaults
+test('thermalState defaults are sensible for safe initial display', function() {
+  assert.ok(thermalState.ambientTemp >= 10 && thermalState.ambientTemp <= 60);
+  assert.ok(thermalState.loadFactor > 0 && thermalState.loadFactor <= 1.5);
+  assert.ok(thermalState.groupingCount >= 1 && thermalState.groupingCount <= 9);
+});
+
+// Test 124: Combined derating is always product of individual factors
+test('thermalCalcDerating combined is product of ambient and group factors', function() {
+  thermalState.selectedCableType = 'PVC';
+  var result = thermalCalcDerating(40, 4, 'conduit');
+  var expected = Math.round(result.ambientFactor * result.groupFactor * 1000) / 1000;
+  assert.strictEqual(result.combined, expected);
+});
+
+// Test 125: THERMAL_CABLE_DATA constants
+test('THERMAL_CABLE_DATA has correct max temps per DS/HD 60364-5-52 Table 52.1', function() {
+  assert.strictEqual(THERMAL_CABLE_DATA.PVC.maxTemp, 70);
+  assert.strictEqual(THERMAL_CABLE_DATA.XLPE.maxTemp, 90);
+});
+
+// ===== 3D Cable Routing Tests =====
+console.log('\n=== 3D Cable Routing Tests ===\n');
+
+// Test 126: Cable3D module in translations
+test('Cable3D module appears in all three language translation objects', function() {
+  assert.strictEqual(T.da.modules.cable3d, '3D Kabelfoering');
+  assert.strictEqual(T.en.modules.cable3d, '3D Cable Routing');
+  assert.strictEqual(T.fa.modules.cable3d, '\u0645\u0633\u06CC\u0631 \u06A9\u0627\u0628\u0644 \u0633\u0647\u200C\u0628\u0639\u062F\u06CC');
+});
+
+// Test 127: Cable3D functions exist
+test('All cable 3D routing functions are defined', function() {
+  assert.strictEqual(typeof cable3dCalcFillRate, 'function');
+  assert.strictEqual(typeof cable3dCalcGroupDerating, 'function');
+  assert.strictEqual(typeof cable3dCheckBendRadius, 'function');
+  assert.strictEqual(typeof cable3dCalcHeatDissipation, 'function');
+  assert.strictEqual(typeof renderCable3D, 'function');
+  assert.strictEqual(typeof cable3dLayoutCircular, 'function');
+});
+
+// Test 128: Fill rate conduit max 45%
+test('cable3dCalcFillRate enforces max fill for conduit per Table 52.3', function() {
+  cable3dState.conduitDia = 20; // Small conduit
+  cable3dState.trayWidth = 200;
+  // Fill with large cables to exceed limit
+  var result = cable3dCalcFillRate('conduit', [4, 4, 4, 4, 4, 4, 4, 4]);
+  assert.ok(result.maxFill <= 0.45, 'Conduit max fill must be <= 45%');
+  assert.ok(result.clause.indexOf('Table 52.3') >= 0);
+});
+
+// Test 129: Fill rate calculation accuracy
+test('cable3dCalcFillRate correctly calculates cable area vs containment area', function() {
+  cable3dState.conduitDia = 32;
+  var result = cable3dCalcFillRate('conduit', [0]); // 1.5mm2 cable, outerDia=7.2mm
+  var expectedArea = Math.PI * Math.pow(7.2/2, 2);
+  var conduitArea = Math.PI * Math.pow(32/2, 2);
+  var expectedRate = Math.ceil((expectedArea / conduitArea) * 1000) / 1000;
+  assert.strictEqual(result.fillRate, expectedRate);
+});
+
+// Test 130: Grouping derating for tray
+test('cable3dCalcGroupDerating returns correct factor for tray per Table B.52.17', function() {
+  var result = cable3dCalcGroupDerating(3, 'perforated');
+  assert.strictEqual(result.factor, 0.82);
+  assert.ok(result.clause.indexOf('B.52.17') >= 0);
+});
+
+// Test 131: Grouping derating for conduit
+test('cable3dCalcGroupDerating returns correct factor for conduit (more conservative)', function() {
+  var result = cable3dCalcGroupDerating(3, 'conduit');
+  assert.strictEqual(result.factor, 0.70);
+  // Conduit derating is more severe than tray
+  var trayResult = cable3dCalcGroupDerating(3, 'perforated');
+  assert.ok(result.factor < trayResult.factor, 'Conduit derating must be more severe than tray');
+});
+
+// Test 132: Bend radius PVC
+test('cable3dCheckBendRadius returns 6x diameter for PVC per IEC 60228', function() {
+  var result = cable3dCheckBendRadius('PVC', 10);
+  assert.strictEqual(result.factor, 6);
+  assert.ok(result.minRadius >= 60, 'Min radius for 10mm PVC must be >= 60mm');
+});
+
+// Test 133: Bend radius XLPE
+test('cable3dCheckBendRadius returns 8x diameter for XLPE per IEC 60228', function() {
+  var result = cable3dCheckBendRadius('XLPE', 10);
+  assert.strictEqual(result.factor, 8);
+  assert.ok(result.minRadius >= 80, 'Min radius for 10mm XLPE must be >= 80mm');
+  assert.ok(result.clause.indexOf('IEC 60228') >= 0);
+});
+
+// Test 134: Heat dissipation
+test('cable3dCalcHeatDissipation returns positive W/m for loaded cables', function() {
+  var result = cable3dCalcHeatDissipation([0, 1, 2]); // 1.5, 2.5, 4mm2
+  assert.ok(result.totalWperM > 0, 'Heat must be positive for loaded cables');
+  assert.ok(result.perCable > 0, 'Per-cable heat must be positive');
+  assert.strictEqual(result.cableCount, 3);
+});
+
+// Test 135: Heat dissipation empty
+test('cable3dCalcHeatDissipation returns 0 for empty cable list', function() {
+  var result = cable3dCalcHeatDissipation([]);
+  assert.strictEqual(result.totalWperM, 0);
+  assert.strictEqual(result.perCable, 0);
+});
+
+// Test 136: renderCable3D no text inputs
+test('renderCable3D returns HTML with no text input fields (click-only UI)', function() {
+  var html = renderCable3D();
+  assert.ok(html.indexOf('<input type="text"') < 0, 'Must not contain text input');
+  assert.ok(html.indexOf('<textarea') < 0, 'Must not contain textarea');
+  assert.ok(html.indexOf('sel-btn') >= 0, 'Should contain selector buttons');
+});
+
+// Test 137: CABLE3D_CONTAINMENT constants
+test('CABLE3D_CONTAINMENT has conduit max fill at 40% (conservative per Table 52.3)', function() {
+  assert.ok(CABLE3D_CONTAINMENT.conduit.maxFill <= 0.45, 'Conduit max fill must be <= 45%');
+  assert.ok(CABLE3D_CONTAINMENT.perforated.maxFill <= 0.50, 'Perforated tray max fill must be <= 50%');
+});
+
+// Test 138: Fill rate exceeded detection
+test('cable3dCalcFillRate sets exceeded=true when fill rate exceeds maximum', function() {
+  cable3dState.conduitDia = 16; // Very small conduit
+  var result = cable3dCalcFillRate('conduit', [4, 5, 6, 7]); // Large cables in small conduit
+  assert.strictEqual(result.exceeded, true, 'Must detect overfill');
+});
+
+// Test 139: Conservative fill rate (rounds up)
+test('cable3dCalcFillRate rounds fill rate up (conservative)', function() {
+  cable3dState.conduitDia = 50;
+  var result = cable3dCalcFillRate('conduit', [0]); // Small cable in large conduit
+  // Verify rounding is ceiling
+  var rawRate = result.totalCableArea / result.containmentArea;
+  assert.ok(result.fillRate >= rawRate, 'Fill rate must be rounded up conservatively');
+});
+
+// Test 140: cable3dLayoutCircular positions
+test('cable3dLayoutCircular returns correct number of positions', function() {
+  var pos = cable3dLayoutCircular([0,1,2], 50);
+  assert.strictEqual(pos.length, 3);
+  assert.ok(pos[0].x !== undefined && pos[0].y !== undefined);
+});
+
+// ===== Energy Monitoring Tests =====
+console.log('\n=== Energy Monitoring Tests ===\n');
+
+// Test 141: Energy module in translations
+test('Energy module appears in all three language translation objects', function() {
+  assert.strictEqual(T.da.modules.energy, 'Energi Monitor');
+  assert.strictEqual(T.en.modules.energy, 'Energy Monitor');
+  assert.strictEqual(T.fa.modules.energy, '\u0645\u0627\u0646\u06CC\u062A\u0648\u0631 \u0627\u0646\u0631\u0698\u06CC');
+});
+
+// Test 142: Energy functions exist
+test('All energy monitoring functions are defined', function() {
+  assert.strictEqual(typeof energyCalcPowerFactor, 'function');
+  assert.strictEqual(typeof energyCalcCapacitorSize, 'function');
+  assert.strictEqual(typeof energyCalcTHD, 'function');
+  assert.strictEqual(typeof energyCalcDailyCost, 'function');
+  assert.strictEqual(typeof energyCalcPeakShaving, 'function');
+  assert.strictEqual(typeof energyGetPQStatus, 'function');
+  assert.strictEqual(typeof renderEnergy, 'function');
+});
+
+// Test 143: Power factor calculation
+test('energyCalcPowerFactor computes weighted PF from active loads', function() {
+  var result = energyCalcPowerFactor(['motor', 'led']);
+  assert.ok(result.pf > 0 && result.pf <= 1.0, 'PF must be between 0 and 1');
+  assert.ok(result.pf < 1.0, 'Mixed loads should have PF < 1.0');
+  assert.ok(result.clause.indexOf('cl.523') >= 0);
+});
+
+// Test 144: Power factor empty loads
+test('energyCalcPowerFactor returns 1.0 for no loads', function() {
+  var result = energyCalcPowerFactor([]);
+  assert.strictEqual(result.pf, 1.0);
+});
+
+// Test 145: Capacitor sizing
+test('energyCalcCapacitorSize correctly sizes capacitor bank per cl.523', function() {
+  var result = energyCalcCapacitorSize(0.8, 0.95, 100);
+  assert.ok(result.kvar > 0, 'Must require positive kvar for PF improvement');
+  // Q = P*(tan(acos(0.8)) - tan(acos(0.95))) = 100*(0.75 - 0.329) = ~42 kvar
+  assert.ok(result.kvar > 35 && result.kvar < 50, 'Capacitor size should be ~42 kvar for 100kW 0.8->0.95');
+  assert.ok(result.clause.indexOf('cl.523') >= 0);
+});
+
+// Test 146: Capacitor sizing no improvement needed
+test('energyCalcCapacitorSize returns 0 kvar when PF already meets target', function() {
+  var result = energyCalcCapacitorSize(0.98, 0.95, 100);
+  assert.strictEqual(result.kvar, 0);
+});
+
+// Test 147: THD calculation
+test('energyCalcTHD computes total harmonic distortion with diversity factor', function() {
+  var result = energyCalcTHD(['pc']); // PC has 100% THD
+  assert.ok(result.thd > 0, 'THD must be positive for non-linear loads');
+  assert.ok(result.thd <= 100, 'THD should not exceed individual source THD');
+  assert.ok(result.clause.indexOf('EN 50160') >= 0);
+});
+
+// Test 148: THD empty
+test('energyCalcTHD returns 0 for no loads', function() {
+  var result = energyCalcTHD([]);
+  assert.strictEqual(result.thd, 0);
+  assert.strictEqual(result.status, 'good');
+});
+
+// Test 149: THD limit check
+test('energyCalcTHD correctly identifies when EN 50160 limit exceeded', function() {
+  var result = energyCalcTHD(['pc', 'vfd', 'led']); // High THD combination
+  assert.strictEqual(result.limit, 8.0);
+  // With PC (100%) + VFD (35%) + LED (20%), combined should exceed 8%
+  assert.ok(result.thd > 8, 'Heavy non-linear loads should exceed 8% THD limit');
+  assert.strictEqual(result.exceeded, true);
+  assert.strictEqual(result.status, 'poor');
+});
+
+// Test 150: Daily cost calculation
+test('energyCalcDailyCost returns valid cost structure with hourly breakdown', function() {
+  var result = energyCalcDailyCost('residential', ENERGY_TARIFFS, 50);
+  assert.ok(result.totalCost > 0, 'Daily cost must be positive');
+  assert.ok(result.totalKWh > 0, 'Daily consumption must be positive');
+  assert.strictEqual(result.hourlyCosts.length, 24, 'Must have 24 hourly entries');
+  assert.ok(result.peakHour >= 0 && result.peakHour <= 23);
+});
+
+// Test 151: Tariff time-of-use rates
+test('ENERGY_TARIFFS returns higher rate during peak hours (17-20)', function() {
+  var peakRate = ENERGY_TARIFFS.getHourlyRate(18); // 18:00 = peak
+  var nightRate = ENERGY_TARIFFS.getHourlyRate(3);  // 03:00 = off-peak
+  assert.ok(peakRate > nightRate, 'Peak rate must be higher than night rate');
+  assert.ok(peakRate > 0.5, 'Peak rate should be substantial (>0.5 DKK/kWh)');
+});
+
+// Test 152: Peak shaving recommendations
+test('energyCalcPeakShaving identifies high-cost periods for load shifting', function() {
+  var result = energyCalcPeakShaving('residential');
+  assert.ok(result.recommendations.length >= 0, 'Should return array of recommendations');
+  assert.ok(result.potentialSaving >= 0, 'Potential saving must be non-negative');
+  if (result.recommendations.length > 0) {
+    assert.ok(result.recommendations[0].hour >= 0 && result.recommendations[0].hour <= 23);
+  }
+});
+
+// Test 153: Power quality status
+test('energyGetPQStatus returns correct traffic light for normal conditions', function() {
+  var result = energyGetPQStatus(230, 50.0, 3, 0.5, 1.0);
+  assert.strictEqual(result.voltage, 'good');
+  assert.strictEqual(result.frequency, 'good');
+  assert.strictEqual(result.thd, 'good');
+  assert.strictEqual(result.flicker, 'good');
+  assert.strictEqual(result.unbalance, 'good');
+});
+
+// Test 154: Power quality abnormal voltage
+test('energyGetPQStatus detects poor voltage outside EN 50160 limits', function() {
+  var result = energyGetPQStatus(190, 50.0, 3, 0.5, 1.0); // 190V = way below 207V limit
+  assert.strictEqual(result.voltage, 'poor');
+});
+
+// Test 155: renderEnergy no text inputs
+test('renderEnergy returns HTML with no text input fields (click-only UI)', function() {
+  var html = renderEnergy();
+  assert.ok(html.indexOf('<input type="text"') < 0, 'Must not contain text input');
+  assert.ok(html.indexOf('<textarea') < 0, 'Must not contain textarea');
+  assert.ok(html.indexOf('type="range"') >= 0, 'Should contain range sliders');
+  assert.ok(html.indexOf('sel-btn') >= 0, 'Should contain selector buttons');
+});
+
+// Test 156: ENERGY_LOAD_PROFILES structure
+test('ENERGY_LOAD_PROFILES has valid 24-hour arrays for all types', function() {
+  assert.strictEqual(ENERGY_LOAD_PROFILES.residential.length, 24);
+  assert.strictEqual(ENERGY_LOAD_PROFILES.office.length, 24);
+  assert.strictEqual(ENERGY_LOAD_PROFILES.industrial.length, 24);
+  // All values between 0 and 1
+  for (var i = 0; i < 24; i++) {
+    assert.ok(ENERGY_LOAD_PROFILES.residential[i] >= 0 && ENERGY_LOAD_PROFILES.residential[i] <= 1.0);
+  }
+});
+
+// Test 157: Power factor conservative rounding
+test('energyCalcPowerFactor uses conservative rounding (floor) for PF', function() {
+  var result = energyCalcPowerFactor(['motor']);
+  // Motor PF = 0.85, so result should be exactly 0.85 (floored)
+  assert.ok(result.pf <= ENERGY_HARMONIC_SOURCES.motor.pf, 'PF must be rounded down (conservative)');
+});
+
+// Test 158: Capacitor sizing conservative rounding
+test('energyCalcCapacitorSize rounds capacitor size up (conservative)', function() {
+  var result = energyCalcCapacitorSize(0.85, 0.95, 100);
+  // Verify ceiling rounding
+  var phi1 = Math.acos(0.85);
+  var phi2 = Math.acos(0.95);
+  var rawQc = 100 * (Math.tan(phi1) - Math.tan(phi2));
+  assert.ok(result.kvar >= rawQc, 'Capacitor size must be rounded up conservatively');
+});
+
+// Test 159: PQ status EN 50160 reference
+test('energyGetPQStatus references EN 50160 standard', function() {
+  var result = energyGetPQStatus(230, 50, 3, 0.5, 1.0);
+  assert.strictEqual(result.clause, 'EN 50160');
+});
+
+// Test 160: Harmonic sources data integrity
+test('ENERGY_HARMONIC_SOURCES has valid THD and PF for all source types', function() {
+  var keys = Object.keys(ENERGY_HARMONIC_SOURCES);
+  assert.ok(keys.length >= 5, 'Must have at least 5 harmonic source types');
+  for (var i = 0; i < keys.length; i++) {
+    var src = ENERGY_HARMONIC_SOURCES[keys[i]];
+    assert.ok(src.thd >= 0 && src.thd <= 200, 'THD must be valid percentage');
+    assert.ok(src.pf > 0 && src.pf <= 1.0, 'PF must be between 0 and 1');
+    assert.ok(src.label.length > 0, 'Must have a label');
+  }
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

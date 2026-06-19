@@ -1,0 +1,7 @@
+{
+  "task_id": "task-thermal-cable-energy",
+  "task_description": "Add three new transformative modules to el-dimensionering.html: Real-Time Thermal Simulation Engine, 3D Cable Routing & Containment System, and Intelligent Energy Monitoring Dashboard. Each with full trilingual support, DS/HD 60364 compliance, conservative calculations, click-only UI, and comprehensive headless tests.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null
+}

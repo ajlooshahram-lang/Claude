@@ -1,0 +1,26 @@
+{
+  "project_type": "Single-file HTML application for Danish electrical dimensioning (life-safety critical)",
+  "language": "JavaScript (ES5/ES6 mix inside a single HTML file)",
+  "build_system": "None - single HTML file with inline CSS and JS. No bundler.",
+  "test_framework": "Custom headless test runner using Node.js assert module (test-sld.js). Pattern: eval extracted <script> from HTML, mock DOM, run test() functions.",
+  "build_command": "N/A (single HTML file)",
+  "test_command": "node test-sld.js",
+  "verification_instructions": "Run 'node test-sld.js' and confirm all tests pass (currently 110, will add 40-50 more). Verify no syntax errors in JS by successful eval.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "No setup needed - just needs Node.js to run tests",
+  "environment_constraints": "Sandbox environment. No external network. Node.js available for testing.",
+  "contribution_requirements": "Click-only UI (NO text input fields). All calculations cite DS/HD 60364. Conservative calculations always. CE-marked components. Trilingual (da/en/fa with RTL). Life-safety critical.",
+  "key_patterns": {
+    "module_registration": "Add module key to T.da.modules, T.en.modules, T.fa.modules objects, add case in renderModule() switch, create renderXxx() function",
+    "translation": "tx(danish_string, english_string) function - falls back to English if FA translation not in _FA dict. Also t(key) for structured translations.",
+    "state_management": "Global state variables (var xxxState = {...}), mutated by onclick handlers",
+    "rendering": "Functions return HTML strings, no React/Vue. String concatenation with template literals or + operator.",
+    "test_pattern": "test(name, fn) with assert. Section headers with console.log. Tests verify function existence, calculation correctness, and HTML output properties.",
+    "ui_pattern": "Cards with .card class, .result-box for results, .sel-btn for buttons, sliders via <input type='range'>, dropdowns via custom button grids"
+  },
+  "relevant_files": [
+    "/projects/sandbox/Claude/el-dimensionering.html",
+    "/projects/sandbox/Claude/test-sld.js"
+  ],
+  "directory_structure": "Flat - single HTML file at root with test file. All code inline in HTML."
+}
