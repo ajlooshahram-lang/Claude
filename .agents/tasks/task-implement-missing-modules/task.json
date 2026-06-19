@@ -1,0 +1,7 @@
+{
+  "task_id": "task-implement-missing-modules",
+  "task_description": "Implement all missing modules and product categories to make all 175 tests pass. This includes: Elforsyning product categories (8 new PRODUCTS entries), Thermal Simulation module, Cable 3D Routing module, Energy Monitoring module, PDF Documentation module, Cascade TCC module, and Panel Builder module.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}
