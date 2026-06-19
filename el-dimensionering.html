@@ -3197,6 +3197,167 @@ function syncAxes() {
   }
 }
 
+// ===== REACTIVE CROSS-MODULE PROPAGATION =====
+// REQUIREMENT (user, authoritative): "the app shall be dynamic and smart, so
+// every change in one of the modules must update all other relevant or maybe
+// relevant modules immediately" — i.e. ALL modules must be linked and contacted
+// together. This is the single-source-of-truth + dependency-propagation layer.
+//
+// LIFE-SAFETY RULE: when an upstream input changes, a downstream verdict must
+// EITHER be recomputed correctly OR be visibly invalidated/flagged — it must
+// NEVER be left showing a stale "OK". This layer is pure orchestration; it does
+// not change any DS/HD 60364 calc math (calcIB, recommendCables, recommendMCBs,
+// officialIz, voltage-drop, short-circuit, Zs, upAuditProject stay the truth).
+
+// Explicit dependency graph: changing the key on the left makes everything it
+// reaches (transitively) relevant. Order follows the safe-design chain:
+// load -> cable -> protection -> voltage-drop -> short-circuit/Zs -> downstream.
+const REACTIVE_LINKS = {
+  load:     ['cable','fuse','mcb','mccb','vdrop','scircuit','zs','thermal','cable3d','cablelife','energy','pfc','harmonic','motor','ev','heatpump','lighting','busbar'],
+  cable:    ['vdrop','scircuit','zs','thermal','cable3d','cablelife','trayfill','busbar'],
+  fuse:     ['scircuit','zs','tcc','discrim','arcflash'],
+  mcb:      ['scircuit','zs','tcc','discrim','arcflash'],
+  mccb:     ['scircuit','zs','tcc','discrim','arcflash'],
+  vdrop:    ['scircuit'],
+  scircuit: ['zs','arcflash','discrim'],
+  trafo:    ['scircuit','zs','arcflash','generator','energy'],
+  earthsys: ['zs','scircuit','bathroom','pool','agri'],
+  zs:       ['arcflash'],
+  thermal:  ['cablelife'],
+  motor:    ['vfd','pfc','harmonic'],
+  solar:    ['scircuit','energy','pfc'],
+  ev:       ['scircuit','energy','pfc']
+};
+
+// "May be relevant" broad subscribers: the safety brain, the unified-project
+// auditor (Den Kritiske Hjerne), the drawing, the documentation/BOM and the
+// project rollups must refresh on ANY change so they can never show a stale
+// verdict. This is what links ALL modules together (steering: every module
+// must be contacted on every change).
+const REACTIVE_ALWAYS = ['coordination','kritisk','sld','draw','pdf','bank','projekt','verify','brain','panel'];
+
+// Transitive closure of the dependency graph from a source key, then unioned
+// with the always-relevant rollups. Pure function (no DOM) — unit-testable.
+function reactiveAffected(sourceKey) {
+  const seen = {};
+  const out = [];
+  const queue = [sourceKey];
+  while (queue.length) {
+    const k = queue.shift();
+    const deps = REACTIVE_LINKS[k] || [];
+    for (let i = 0; i < deps.length; i++) {
+      const d = deps[i];
+      if (!seen[d] && d !== sourceKey) { seen[d] = true; out.push(d); queue.push(d); }
+    }
+  }
+  for (let j = 0; j < REACTIVE_ALWAYS.length; j++) {
+    const a = REACTIVE_ALWAYS[j];
+    if (!seen[a] && a !== sourceKey) { seen[a] = true; out.push(a); }
+  }
+  return out;
+}
+
+// The reactive bus: a lightweight pub/sub + verdict cache. A change in any
+// module calls Reactive.notify(sourceKey); every affected module is marked, all
+// registered live verdicts are recomputed (single source of truth), and any
+// affected verdict we cannot recompute synchronously is flagged stale so it can
+// never display a stale OK.
+const Reactive = {
+  _seq: 0,
+  _busy: false,
+  verdicts: {},      // moduleKey -> { status, detail, stamp, stale }
+  recomputers: {},   // moduleKey -> fn() -> { status, detail }
+  lastAffected: [],
+  lastSource: null,
+
+  register: function (key, fn) { this.recomputers[key] = fn; },
+
+  affected: function (sourceKey) { return reactiveAffected(sourceKey); },
+
+  // Map a verdict-bearing recompute result's status into a 4-state code.
+  // 'ok' | 'warning' | 'fail' | 'incomplete'.
+  notify: function (sourceKey) {
+    if (this._busy) return { affected: [], stamp: this._seq, source: sourceKey };
+    this._busy = true;
+    try {
+      const stamp = ++this._seq;
+      const affected = reactiveAffected(sourceKey);
+      this.lastAffected = affected;
+      this.lastSource = sourceKey;
+
+      // 1) Invalidate every affected verdict we cannot recompute right now.
+      //    NEVER leave a stale OK: an existing 'ok' is downgraded to stale
+      //    until the module is reopened/recomputed.
+      for (let i = 0; i < affected.length; i++) {
+        const k = affected[i];
+        if (!this.recomputers[k]) {
+          const v = this.verdicts[k] || (this.verdicts[k] = { status: 'unknown', detail: '', stamp: stamp, stale: true });
+          v.stale = true;
+          v.invalidatedBy = sourceKey;
+          v.stamp = stamp;
+        }
+      }
+
+      // 2) Recompute every registered live verdict from the single source of
+      //    truth so visible safety status is always fresh and correct.
+      const keys = Object.keys(this.recomputers);
+      for (let j = 0; j < keys.length; j++) {
+        const rk = keys[j];
+        let r;
+        try { r = this.recomputers[rk]() || {}; }
+        catch (e) { r = { status: 'incomplete', detail: '' }; }
+        this.verdicts[rk] = { status: r.status || 'incomplete', detail: r.detail || '', score: r.score, stamp: stamp, stale: false };
+      }
+
+      return { affected: affected, stamp: stamp, source: sourceKey };
+    } finally {
+      this._busy = false;
+    }
+  },
+
+  verdict: function (key) { return this.verdicts[key] || null; },
+
+  // Called at the top of renderModule for every render. Treating a render as a
+  // potential change is safe (recompute is idempotent) and guarantees the
+  // active module, the live badges and all linked rollups stay in sync without
+  // the user manually reopening a tab.
+  onRender: function (mod) { return this.notify(mod); }
+};
+
+// Live cross-module coordination verdict (IB <= In <= Iz, In <= Iz, voltage
+// drop, fuse/MCB coordination). Reuses the already-validated runQiValidation —
+// no new math. This is the always-visible safety status that updates live.
+Reactive.register('coordination', function () {
+  let qi;
+  try { qi = runQiValidation(); } catch (e) { qi = { issues: [], passed: [], score: 0 }; }
+  let status = 'incomplete';
+  const hasError = qi.issues.some(function (x) { return x.severity === 'error'; });
+  if (hasError) status = 'fail';
+  else if (qi.issues.length > 0) status = 'warning';
+  else if (qi.passed.length > 0) status = 'ok';
+  let ib = 0; try { ib = calcIB(); } catch (e) {}
+  return { status: status, detail: 'IB=' + ib.toFixed(1) + 'A', score: qi.score };
+});
+
+// Live unified-project safety verdict (Den Kritiske Hjerne). Reuses the
+// validated upAuditProject — no new math. Links the whole-project auditor into
+// the reactive layer so its status is never stale.
+Reactive.register('kritisk', function () {
+  let res;
+  try { res = upAuditProject(upProject); } catch (e) { res = { verdict: 'incomplete' }; }
+  const map = { green: 'ok', yellow: 'warning', red: 'fail', incomplete: 'incomplete' };
+  return { status: map[res.verdict] || 'incomplete', detail: res.verdict };
+});
+
+// Theme/RTL-safe presentation metadata for a reactive verdict.
+function reactiveVerdictMeta(status) {
+  if (status === 'ok') return { color: 'var(--success)', icon: '\u2705', label: tx('Sikker', 'Safe') };
+  if (status === 'warning') return { color: '#b8860b', icon: '\u26A0\uFE0F', label: tx('Advarsel', 'Warning') };
+  if (status === 'fail') return { color: 'var(--danger)', icon: '\u26D4', label: tx('Farlig', 'Danger') };
+  if (status === 'stale') return { color: 'var(--text-muted)', icon: '\u27F3', label: tx('Genberegnes', 'Recomputing') };
+  return { color: 'var(--text-muted)', icon: '\u2139\uFE0F', label: tx('Ufuldst\u00E6ndig', 'Incomplete') };
+}
+
 // ===== DANISH STANDARDS & REGULATIONS =====
 // Based on research of Danish electrical standards websites (elsikkerhed.dk, lovguiden.dk, Sikkerhedsstyrelsen)
 // Content was rephrased for compliance with licensing restrictions
@@ -4090,6 +4251,17 @@ function renderStatusBar() {
   const bar = document.getElementById('statusBar');
   const chips = [];
 
+  // Live cross-module safety verdict — always recomputed by the reactive layer
+  // before this runs, so it can never show a stale value. Click jumps to the
+  // unified-project safety auditor (Den Kritiske Hjerne).
+  if (typeof Reactive !== 'undefined') {
+    const cv = Reactive.verdict('coordination');
+    if (cv && (cv.status === 'ok' || cv.status === 'warning' || cv.status === 'fail')) {
+      const m = reactiveVerdictMeta(cv.stale ? 'stale' : cv.status);
+      chips.push({ label: m.icon + ' ' + tx('Sikkerhed', 'Safety'), value: m.label, mod: 'kritisk', color: m.color });
+    }
+  }
+
   // IB from load module
   const ib = calcIB();
   if (loadState.power > 0) {
@@ -4120,7 +4292,7 @@ function renderStatusBar() {
   }
 
   bar.innerHTML = chips.map(c =>
-    `<span class="status-chip has-value" onclick="switchModule('${c.mod}')"><span class="chip-label">${c.label}:</span><span class="chip-value">${c.value}</span></span>`
+    `<span class="status-chip has-value" onclick="switchModule('${c.mod}')"${c.color ? ` style="border-color:${c.color}"` : ''}><span class="chip-label">${c.label}:</span><span class="chip-value"${c.color ? ` style="color:${c.color}"` : ''}>${c.value}</span></span>`
   ).join('');
 }
 
@@ -5233,6 +5405,7 @@ function renderPanel() {
 }
 
 function renderModule(mod) {
+  if (typeof Reactive !== 'undefined') Reactive.onRender(mod); // reactive propagation: recompute all linked verdicts first
   syncAxes(); // Dynamic coordination
   const main = document.getElementById('mainContent');
   let content = '';

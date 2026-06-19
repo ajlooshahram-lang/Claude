@@ -7820,6 +7820,146 @@ test('Nav: renderNav builds a two-level grouped navigation (no flat tab wall)', 
   assert(captured.indexOf('nav-cat') >= 0, 'renders category buttons');
 });
 
+// ===== Reactive Cross-Module Propagation Tests =====
+// Feature: a change in ANY module immediately updates all relevant / maybe
+// relevant modules (single source of truth + dependency propagation), and a
+// downstream safety verdict is NEVER left showing a stale OK.
+
+console.log('\n=== Reactive Cross-Module Propagation Tests ===\n');
+
+test('Reactive: dependency graph links the safe-design chain from the load', function() {
+  const a = reactiveAffected('load');
+  ['cable', 'fuse', 'mcb', 'mccb', 'vdrop', 'scircuit', 'zs'].forEach(function (k) {
+    assert(a.indexOf(k) >= 0, 'a load change must reach ' + k);
+  });
+});
+
+test('Reactive: transitive closure reaches indirect dependents (load -> scircuit -> arcflash)', function() {
+  const a = reactiveAffected('load');
+  assert(a.indexOf('arcflash') >= 0, 'load change must transitively reach arcflash');
+});
+
+test('Reactive: ALL modules are linked — every change contacts the global rollups', function() {
+  ['load', 'cable', 'mcb', 'vdrop', 'scircuit', 'trafo', 'earthsys', 'motor', 'solar', 'ev'].forEach(function (src) {
+    const a = reactiveAffected(src);
+    ['kritisk', 'sld', 'pdf', 'bank', 'projekt', 'coordination'].forEach(function (roll) {
+      assert(a.indexOf(roll) >= 0, src + ' change must contact rollup ' + roll);
+    });
+  });
+});
+
+test('Reactive: a source never lists itself in its affected set (no self-loop)', function() {
+  assert(reactiveAffected('load').indexOf('load') < 0, 'closure must not include the source');
+});
+
+test('Reactive: notify returns the affected set and a monotonically increasing stamp', function() {
+  const r1 = Reactive.notify('load');
+  const r2 = Reactive.notify('cable');
+  assert(Array.isArray(r1.affected) && r1.affected.length > 0, 'affected set returned');
+  assert(r2.stamp > r1.stamp, 'stamp must increase on each notify');
+});
+
+test('Reactive: live verdict recomputers are registered (coordination + kritisk)', function() {
+  assert(typeof Reactive.recomputers.coordination === 'function', 'coordination recomputer registered');
+  assert(typeof Reactive.recomputers.kritisk === 'function', 'kritisk (safety brain) recomputer registered');
+});
+
+test('Reactive: a coordinated circuit reads OK, and changing the load propagates immediately', function() {
+  loadState.voltage = '1x230'; loadState.power = 3.68; loadState.cosPhi = 0.95; loadState.simFactor = 1; loadState.expFactor = 1;
+  mcbState.rating = 20; // IB ~16.8A <= 20A
+  cableState.crossSection = null; fuseState.size = null;
+  Reactive.notify('load');
+  const ok = Reactive.verdict('coordination');
+  assert(ok && ok.status === 'ok', 'coordinated load should read OK, got ' + (ok && ok.status));
+  assert(ok.stale === false, 'a freshly recomputed verdict is not stale');
+});
+
+test('Reactive: an overload NEVER leaves the safety verdict showing a stale OK', function() {
+  loadState.voltage = '1x230'; loadState.power = 3.68; loadState.cosPhi = 0.95; loadState.simFactor = 1; loadState.expFactor = 1;
+  mcbState.rating = 20; cableState.crossSection = null; fuseState.size = null;
+  Reactive.notify('load');
+  assert(Reactive.verdict('coordination').status === 'ok', 'precondition: OK');
+  // Upstream change: 10x the load on the same protective device.
+  loadState.power = 36.8; // IB ~168A >> In 20A => overload
+  Reactive.notify('load');
+  const after = Reactive.verdict('coordination');
+  assert(after.status !== 'ok', 'overloaded circuit must not stay OK (got ' + after.status + ')');
+  assert(after.status === 'fail', 'IB > In is a hard fail, got ' + after.status);
+  assert(after.stale === false, 'verdict must be freshly recomputed, never stale');
+});
+
+test('Reactive: a downstream verdict with no live recomputer is flagged stale (not stale-OK)', function() {
+  // Seed a fake "OK" verdict for a verdict-bearing downstream module.
+  Reactive.verdicts['arcflash'] = { status: 'ok', detail: '', stamp: 0, stale: false };
+  Reactive.notify('scircuit'); // scircuit -> arcflash
+  const v = Reactive.verdict('arcflash');
+  assert(v.stale === true, 'arcflash verdict must be flagged stale after an upstream short-circuit change');
+});
+
+test('Reactive: rendering ANY module propagates so linked verdicts are fresh without reopening', function() {
+  loadState.voltage = '1x230'; loadState.power = 3.68; loadState.cosPhi = 0.95; loadState.simFactor = 1; loadState.expFactor = 1;
+  mcbState.rating = 20; cableState.crossSection = null; fuseState.size = null;
+  // Render an UNRELATED module; the live safety verdict must already be fresh.
+  renderModule('guide');
+  const v = Reactive.verdict('coordination');
+  assert(v && !v.stale, 'live verdict recomputed on render of an unrelated module');
+  // Overload, then render the load module — downstream reflects immediately.
+  loadState.power = 36.8;
+  renderModule('load');
+  assert(Reactive.verdict('coordination').status !== 'ok', 'overload reflected immediately, no stale OK');
+});
+
+test('Reactive: status bar shows the live safety verdict chip linked to the auditor', function() {
+  loadState.voltage = '1x230'; loadState.power = 3.68; loadState.cosPhi = 0.95; loadState.simFactor = 1; loadState.expFactor = 1;
+  mcbState.rating = 20; cableState.crossSection = null; fuseState.size = null;
+  Reactive.notify('load');
+  let captured = '';
+  const realGet = document.getElementById;
+  document.getElementById = function (id) {
+    if (id === 'statusBar') return { set innerHTML(v) { captured = v; }, get innerHTML() { return captured; } };
+    return realGet(id);
+  };
+  try { renderStatusBar(); } finally { document.getElementById = realGet; }
+  assert(captured.indexOf('Sikkerhed') >= 0, 'Danish safety label present on the live chip');
+  assert(captured.indexOf("switchModule('kritisk')") >= 0, 'chip jumps to the unified-project safety auditor');
+});
+
+test('Reactive: verdict labels are trilingual (da/en/fa) and theme/RTL-safe (CSS vars)', function() {
+  const realLang = lang;
+  lang = 'da'; const daLabel = reactiveVerdictMeta('ok').label;
+  lang = 'en'; const enLabel = reactiveVerdictMeta('ok').label;
+  lang = 'fa'; const faLabel = reactiveVerdictMeta('ok').label;
+  lang = realLang;
+  assert(daLabel === 'Sikker', 'da Safe label, got ' + daLabel);
+  assert(enLabel === 'Safe', 'en Safe label, got ' + enLabel);
+  assert(typeof faLabel === 'string' && faLabel.length > 0, 'fa label resolves to a non-empty string');
+  // Colors are CSS vars / hex so they adapt to dark + light themes and RTL.
+  assert(reactiveVerdictMeta('ok').color.indexOf('var(') === 0, 'ok uses a theme CSS variable');
+  assert(reactiveVerdictMeta('fail').color.indexOf('var(') === 0, 'fail uses a theme CSS variable');
+  assert(reactiveVerdictMeta('stale').label.length > 0, 'stale state has a label so it is never blank/OK');
+});
+
+test('Reactive: click-only preserved — feature adds no text/number inputs or textareas', function() {
+  const htmlSrc = fs.readFileSync(__dirname + '/el-dimensionering.html', 'utf8');
+  const numberInputs = (htmlSrc.match(/type="number"/g) || []).length;
+  const textInputs = (htmlSrc.match(/type="text"/g) || []).length;
+  const textareas = (htmlSrc.match(/<textarea\s/g) || []).length;
+  assert.strictEqual(numberInputs, 0, 'no number inputs may exist (click-only)');
+  // Baseline pre-existing AI-assistant controls only (1 search box, 1 question box).
+  assert(textInputs <= 1, 'no NEW text inputs introduced by the reactive feature (found ' + textInputs + ')');
+  assert(textareas <= 1, 'no NEW textareas introduced by the reactive feature (found ' + textareas + ')');
+});
+
+test('Reactive: orchestration only — core calc functions are untouched and still callable', function() {
+  // The reactive layer must not redefine or shadow the verified calc engine.
+  assert(typeof calcIB === 'function', 'calcIB intact');
+  assert(typeof recommendCables === 'function', 'recommendCables intact');
+  assert(typeof recommendMCBs === 'function', 'recommendMCBs intact');
+  assert(typeof officialIz === 'function', 'officialIz intact');
+  assert(typeof upAuditProject === 'function', 'upAuditProject intact');
+  assert(typeof runQiValidation === 'function', 'runQiValidation intact');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
