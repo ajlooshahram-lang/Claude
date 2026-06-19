@@ -2169,7 +2169,10 @@
       return x.toFixed(1) + ',' + y.toFixed(1);
     }).join(' ');
     const sparkSVG = '<svg class="health-spark" viewBox="0 0 ' + sparkW + ' ' + sparkH + '" preserveAspectRatio="none" aria-label="Health trend"><polyline fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" points="' + sparkPoints + '"/></svg>';
-    const healthCard = `<div class="health-score health-${healthCls}"><span class="health-num">${healthScore}</span><span class="health-lab">Programme health</span>${sparkSVG}</div>`;
+    const hs = (S.healthScore && S.healthScore()) || null;
+    const hsVerdict = (hs && hs.verdict) ? hs.verdict : "";
+    const hsReason = (hs && hs.reasons && hs.reasons.length) ? hs.reasons.slice(0, 2).join(", ") : "";
+    const healthCard = `<div class="health-score health-${healthCls}"><span class="health-num">${healthScore}</span><span class="health-lab">Programme health${hsVerdict ? " \u2014 " + esc(hsVerdict) : ""}</span>${hsReason ? `<span class="health-why">${esc(hsReason)}</span>` : ""}${sparkSVG}</div>`;
     // Quick wins card (step 97) — up to 5 easiest items to close (OPEN, not critical, low RPN)
     const quickWinCandidates = cases.filter(function (c) {
       if (c.status !== "OPEN") return false;

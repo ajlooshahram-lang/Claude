@@ -1667,5 +1667,19 @@ if (window.QIDisplay) {
   ok(/Efficiency &amp; Savings|Efficiency & Savings/.test(doc.getElementById("brainOut").innerHTML), "Efficiency & Savings card renders in the Brain output");
 })();
 
+// Step 111: Plain-language project health verdict (for non-PM decision-makers)
+(function testHealthVerdict() {
+  if (!window.QIStore || typeof window.QIStore.healthScore !== "function") { ok(false, "S.healthScore available"); return; }
+  var hs = window.QIStore.healthScore();
+  ok(hs && (hs.score === null || (hs.score >= 0 && hs.score <= 100)), "healthScore returns a 0-100 score (or null when empty)");
+  ok(hs && /On track|Needs attention|At risk|No data/.test(hs.verdict), "healthScore gives a plain-language verdict");
+  ok(hs && Array.isArray(hs.reasons) && hs.reasons.length >= 1, "healthScore explains WHY in plain language");
+  // It renders on the dashboard health card.
+  var dnav = doc.querySelector('.nav-item[data-view="dashboard"]');
+  if (dnav) dnav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  var lab = doc.querySelector(".health-lab");
+  ok(lab && /\u2014/.test(lab.textContent), "dashboard health card shows the verdict label");
+})();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

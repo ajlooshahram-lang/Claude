@@ -695,6 +695,31 @@
       pctSpent: estTotal ? actTotal / estTotal : 0 };
   }
 
+  // Single plain-language project health score (0-100) for decision-makers who
+  // just want to know "is my project OK?". Derived from live KPIs; conservative
+  // (penalises blocked work, critical risks, and spending ahead of progress).
+  function healthScore() {
+    const k = kpis();
+    let score = 100;
+    const reasons = [];
+    if (k.total === 0) {
+      return { score: null, verdict: "No data yet", color: "#6b7686",
+        reasons: ["Upload a project description in the Project Brain to begin."] };
+    }
+    if (k.blocked > 0) { const p = Math.min(30, k.blocked * 8); score -= p; reasons.push(k.blocked + " blocked item" + (k.blocked === 1 ? "" : "s")); }
+    if (k.crit > 0) { const p = Math.min(30, k.crit * 5); score -= p; reasons.push(k.crit + " critical risk" + (k.crit === 1 ? "" : "s")); }
+    if (k.pctSpent > k.avgDone + 0.15) { score -= 15; reasons.push("spending is ahead of progress"); }
+    if (k.open > 0 && k.total > 0 && (k.open / k.total) > 0.8 && k.avgDone < 0.1) { score -= 5; reasons.push("work has not started on most items"); }
+    if (score < 0) score = 0; if (score > 100) score = 100;
+    score = Math.round(score);
+    let verdict, color;
+    if (score >= 80) { verdict = "On track"; color = "#27ae60"; }
+    else if (score >= 60) { verdict = "Needs attention"; color = "#e0a800"; }
+    else { verdict = "At risk"; color = "#e74c3c"; }
+    if (!reasons.length) reasons.push("No blockers or critical risks — looking good.");
+    return { score, verdict, color, reasons };
+  }
+
   function groupCounts(field) {
     const e = validCases(); const map = {};
     e.forEach(c => { const k = c[field] || "(none)"; map[k] = (map[k] || 0) + 1; });
@@ -878,6 +903,7 @@
     brand, setBrand, aiSettings, setAi, portfolio,
     regRows, regAdd, regUpdate, regDelete, regLabel, regBulkDelete, regTogglePin, evm: () => C.evm(validCases(), get().project),
     updatesList, addUpdate, deleteUpdate,
+    healthScore,
     gage, setGageCell, setGageConfig, gageResult, cashflow, setCashflow,
     xbar, setXbarCell, setXbarConfig, xbarResult, scorecard,
     spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy,
