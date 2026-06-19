@@ -7333,6 +7333,143 @@ test('Elforsyning: Farsi strings exist in _FA for the key visible controls', fun
   lang = savedLang;
 });
 
+// ===== PROJECT MODULE \u2014 supply-side (elforsyning) materials integration =====
+// Helper: collect every href="..." URL emitted by a rendered region.
+function projektExtractHrefs(htmlStr) {
+  var urls = [];
+  var re = /href="([^"]+)"/g, m;
+  while ((m = re.exec(htmlStr)) !== null) { urls.push(m[1]); }
+  return urls;
+}
+
+test('Projekt: supply-side materials section renders the picked elforsyning BOM with deep-links', function() {
+  elfReset();
+  elforsyningPickAll();
+  var savedLang = lang;
+  lang = 'da';
+  var da = renderProjekt();
+  assert(da.indexOf('Forsyningsmaterialer (elforsyning)') >= 0, 'da section title rendered');
+  assert(da.indexOf('Forsyningskabler') >= 0, 'da category label present');
+  assert(da.indexOf('Se produkt') >= 0, 'da deep-link "Se produkt" present');
+  lang = 'en';
+  var en = renderProjekt();
+  assert(en.indexOf('Supply-side materials (elforsyning)') >= 0, 'en section title rendered');
+  assert(en.indexOf('Supply Cables') >= 0, 'en category label present');
+  assert(en.indexOf('View product') >= 0, 'en deep-link "View product" present');
+  assert(en.indexOf('NKT') >= 0, 'a real brand surfaced');
+  assert(en.indexOf('CE-marked') >= 0, 'CE/approval status surfaced');
+  assert(en.indexOf('Standard') >= 0, 'applicable standard surfaced');
+  assert(en.indexOf('Grand total (all categories)') >= 0, 'grand total label present');
+  // brand + spec + deep-link anchors are all present in the projekt region
+  assert(en.indexOf('target="_blank"') >= 0 && en.indexOf('rel="noopener noreferrer"') >= 0, 'deep-links open safely in a new tab');
+  lang = savedLang;
+  elfRestore();
+});
+
+test('Projekt: per-category counts + grand total match the elforsyning aggregates', function() {
+  elfReset();
+  elforsyningPickAll();
+  var html = renderProjekt();
+  ELF_CATS.forEach(function(c) {
+    var label = elforsyningCatLabel(c);
+    assert(html.indexOf(label + ' (' + elforsyningCategoryCount(c) + ')') >= 0, 'group header + count for ' + c);
+  });
+  assert(html.indexOf('' + elforsyningTotalCount()) >= 0, 'grand total number present');
+  elfRestore();
+});
+
+test('Projekt: supply-side materials region is 100% click-only (no text input/number/textarea/prompt)', function() {
+  elfReset();
+  elforsyningPickAll();
+  var savedLang = lang;
+  ['da', 'en', 'fa'].forEach(function(L) {
+    lang = L;
+    var html = renderProjekt();
+    assert(html.indexOf('<input type="text"') < 0, 'no <input type="text"> (' + L + ')');
+    assert(html.indexOf('<input type="number"') < 0, 'no <input type="number"> (' + L + ')');
+    assert(html.indexOf('<textarea') < 0, 'no <textarea> (' + L + ')');
+    assert(html.indexOf('contenteditable') < 0, 'no contenteditable (' + L + ')');
+    assert(html.indexOf('prompt(') < 0, 'no inline prompt() (' + L + ')');
+  });
+  lang = savedLang;
+  elfRestore();
+});
+
+test('Projekt: supply-side materials introduce NO remote <img> / embedded product photos', function() {
+  elfReset();
+  elforsyningPickAll();
+  var html = renderProjekt();
+  assert(!/<img[^>]+src\s*=\s*["'`]?\s*https?:/i.test(html), 'no remote <img src="http...">');
+  assert(html.indexOf('<img') < 0, 'no <img> tags at all in the projekt region');
+  elfRestore();
+});
+
+test('Projekt: every deep-link rendered is https AND on the official-domain allowlist (0 off-allowlist)', function() {
+  elfReset();
+  elforsyningPickAll();
+  var html = renderProjekt();
+  var urls = projektExtractHrefs(html);
+  assert(urls.length > 0, 'at least one deep-link rendered in the projekt region');
+  var off = [];
+  urls.forEach(function(u) {
+    if (!/^https:\/\//.test(u)) { off.push('non-https: ' + u); return; }
+    var host; try { host = new URL(u).hostname; } catch (e) { off.push('bad-url: ' + u); return; }
+    var ok = OFFICIAL_PRODUCT_DOMAINS.some(function(d) { return host === d || host.endsWith('.' + d); });
+    if (!ok) off.push('off-allowlist host: ' + host);
+  });
+  console.log('        [projekt-allowlist] deep-links ' + urls.length + ', off-allowlist/non-https ' + off.length);
+  assert.strictEqual(off.length, 0, 'all projekt deep-links must be https + allowlisted. Offenders: ' + off.join(', '));
+  elfRestore();
+});
+
+test('Projekt: BOM-empty call-to-action is click-only and projektPickElforsyning() populates + re-renders', function() {
+  elfReset();
+  var savedLang = lang; lang = 'en';
+  var empty = renderProjekt();
+  assert(empty.indexOf('No elforsyning materials picked yet') >= 0, 'empty-state message shown');
+  assert(empty.indexOf('onclick="projektPickElforsyning()"') >= 0, 'click-only CTA wired to projektPickElforsyning()');
+  assert(empty.indexOf('type="text"') < 0 && empty.indexOf('type="number"') < 0 && empty.indexOf('<textarea') < 0 && empty.indexOf('prompt(') < 0, 'empty CTA is click-only, never a typed prompt');
+  // Activating the CTA populates the BOM with one line per supply-side product.
+  projektPickElforsyning();
+  assert.strictEqual(Object.keys(elforsyningBom).length, elfExpectedProductCount(), 'pick-all populated the BOM');
+  var filled = renderProjekt();
+  assert(filled.indexOf('No elforsyning materials picked yet') < 0, 'empty message gone after pick-all');
+  assert(filled.indexOf('Grand total (all categories)') >= 0, 'materials now listed with grand total');
+  lang = savedLang;
+  elfRestore();
+});
+
+test('Projekt: new supply-side strings are trilingual (da authoritative, en secondary, fa via _FA)', function() {
+  ['Supply-side materials (elforsyning)',
+   'The picked elforsyning bill of materials is shown here so you see the real component when ordering. Click a link to open the manufacturer official product or datasheet page.',
+   'No elforsyning materials picked yet. Add the real supply-side components so they appear on your order.'
+  ].forEach(function(k) {
+    assert.ok(_FA[k] && _FA[k].length > 0, 'Farsi (_FA) translation present for: ' + k.slice(0, 40));
+  });
+  var prevLang = lang;
+  lang = 'da'; assert.strictEqual(tx('Forsyningsmaterialer (elforsyning)', 'Supply-side materials (elforsyning)'), 'Forsyningsmaterialer (elforsyning)', 'Danish authoritative');
+  lang = 'en'; assert.strictEqual(tx('Forsyningsmaterialer (elforsyning)', 'Supply-side materials (elforsyning)'), 'Supply-side materials (elforsyning)', 'English secondary');
+  lang = 'fa'; assert.strictEqual(tx('Forsyningsmaterialer (elforsyning)', 'Supply-side materials (elforsyning)'), _FA['Supply-side materials (elforsyning)'], 'Farsi via _FA');
+  lang = prevLang;
+});
+
+test('Projekt: supply-side materials list is part of the PRINTED output (not no-print)', function() {
+  elfReset();
+  elforsyningPickAll();
+  var savedLang = lang; lang = 'en';
+  var html = renderProjekt();
+  // The materials grand-total lives in a printable result-box; locate it and confirm
+  // it is NOT inside a no-print wrapper (only the click-only action buttons are no-print).
+  var idx = html.indexOf('Grand total (all categories)');
+  assert(idx >= 0, 'grand total present');
+  var head = html.slice(0, idx);
+  var lastResultBox = head.lastIndexOf('result-box');
+  var lastNoPrint = head.lastIndexOf('no-print');
+  assert(lastResultBox > lastNoPrint, 'materials are rendered in a printable result-box, not a no-print region');
+  lang = savedLang;
+  elfRestore();
+});
+
 test('Elforsyning: Legionella rule is a MINIMUM at the tap (>=50C), not a maximum', function() {
   var savedLang = lang; lang = 'da';
   var html = klsRenderVvs();
