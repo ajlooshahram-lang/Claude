@@ -1711,5 +1711,21 @@ if (window.QIDisplay) {
   ok(/How complete is your description/.test(doc.getElementById("brainOut").innerHTML), "Description Quality coach renders in the Brain output");
 })();
 
+// Step 114: Robustness — EVERY view renders without error or emptiness
+(function testAllViewsRender() {
+  var navs = Array.from(doc.querySelectorAll('.nav-item[data-view]'));
+  ok(navs.length >= 40, "navigation exposes the full set of views (" + navs.length + ")");
+  var failed = [];
+  navs.forEach(function (n) {
+    var v = n.getAttribute("data-view");
+    try {
+      n.dispatchEvent(new window.Event("click", { bubbles: true }));
+      var content = doc.querySelector(".content");
+      if (!content || content.innerHTML.length < 50) failed.push(v + "(empty)");
+    } catch (e) { failed.push(v + "(" + (e.message || "err").slice(0, 30) + ")"); }
+  });
+  ok(failed.length === 0, "every view renders non-empty without throwing" + (failed.length ? " — failures: " + failed.join(", ") : ""));
+})();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
