@@ -681,7 +681,8 @@ const T = {
       emc: 'EMC',
       metering: 'Energim\u00e5ling',
       atex: 'ATEX / Ex',
-      smartgrid: 'Smart Grid'
+      smartgrid: 'Smart Grid',
+      kls: 'KLS Kvalitetssystem'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -821,7 +822,8 @@ const T = {
       emc: 'EMC Design',
       metering: 'Metering',
       atex: 'ATEX / Explosive',
-      smartgrid: 'Smart Grid'
+      smartgrid: 'Smart Grid',
+      kls: 'KLS Quality System'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -953,7 +955,8 @@ const T = {
       emc: 'سازگاری الکترومغناطیسی',
       metering: 'اندازه‌گیری انرژی',
       atex: 'محیط انفجاری',
-      smartgrid: 'شبکه هوشمند'
+      smartgrid: 'شبکه هوشمند',
+      kls: 'سیستم کیفیت KLS'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -1801,7 +1804,31 @@ const _FA = {
   'Frequency Response': 'پاسخ فرکانسی',
   'Anti-islanding': 'ضد جزیره‌ای',
   'Aggregator': 'تجمیع‌کننده',
-  'Prosumer': 'تولیدکننده-مصرف‌کننده'
+  'Prosumer': 'تولیدکننده-مصرف‌کننده',
+  // KLS Quality System translations
+  'KLS Quality System': 'سیستم کیفیت KLS',
+  'KLS sheets (click to open)': 'برگه‌های KLS (برای باز کردن کلیک کنید)',
+  'Quality Policy — 5 goals': 'سیاست کیفیت — ۵ هدف',
+  'Final Inspection EL': 'بازرسی نهایی برق',
+  'Final Inspection Plumbing': 'بازرسی نهایی تاسیسات آب',
+  'Final Inspection Drainage': 'بازرسی نهایی فاضلاب',
+  'Deviation Report': 'گزارش انحراف',
+  'Internal Review': 'بازنگری داخلی',
+  'Competence Sheet': 'برگه صلاحیت',
+  'Measuring Equipment': 'تجهیزات اندازه‌گیری',
+  'Supervision': 'نظارت',
+  'Document Control': 'کنترل مستندات',
+  'Dashboard': 'داشبورد',
+  'Approved': 'تایید شده',
+  'Deviations': 'انحرافات',
+  'Approval rate': 'نرخ تایید',
+  'Months to expiry': 'ماه تا انقضا',
+  'KLS expiry': 'انقضای KLS',
+  'Status': 'وضعیت',
+  'Active': 'فعال',
+  'Retired': 'بازنشسته',
+  'Open': 'باز',
+  'Closed': 'بسته شده'
 };
 function tx(da, en) { if(lang === 'da') return da; if(lang === 'fa') return _FA[en] || en; return en; }
 function tl(obj, prefix) { return obj[prefix + '_' + lang] || obj[prefix + '_en'] || ''; }
@@ -4799,6 +4826,7 @@ function renderModule(mod) {
     case 'metering': content = renderMetering(); break;
     case 'atex': content = renderATEX(); break;
     case 'smartgrid': content = renderSmartGrid(); break;
+    case 'kls': content = renderKLS(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -15976,6 +16004,564 @@ function renderSmartGrid() {
   html += '</div>';
   var safe = true;
   html += renderVerdict(safe, tx('Fleksibilitetssystem konfigureret iht. DS/EN 50549 + Energinet krav', 'Flexibility system configured per DS/EN 50549 + Energinet requirements'));
+  html += '</div>';
+  return html;
+}
+
+// ===== KLS QUALITY SYSTEM MODULE (Sikkerhedsstyrelsen · BEK 725/724/722 af 12. juni 2024) =====
+// Mandatory Danish Kvalitetsledelsessystem for authorized installers.
+// 14 click-selectable sub-views. All compliance logic in pure helper functions.
+
+var KLS_AUT_TYPES = ['El', 'VVS', 'Kloak', 'Gas', 'Asbest'];
+
+var KLS_SHEETS = [
+  { nr: 1, da: 'Forside', en: 'Cover', indhold: 'Stamdata og indeks', ansvar: 'Ledelse', view: 'forside' },
+  { nr: 2, da: 'Kvalitetspolitik', en: 'Quality Policy', indhold: 'Mål og lovgrundlag', ansvar: 'Ledelse', view: 'politik' },
+  { nr: 3, da: 'Organisation', en: 'Organisation', indhold: 'Medarbejdere og ansvar', ansvar: 'Ledelse', view: 'organisation' },
+  { nr: 4, da: 'Procedurer', en: 'Procedures', indhold: 'P-01 .. P-14', ansvar: 'KLS-ansvarlig', view: 'procedurer' },
+  { nr: 5, da: 'Slutkontrol EL', en: 'Final Inspection EL', indhold: 'Verifikation el (DS/HD 60364-6)', ansvar: 'FA el', view: 'el' },
+  { nr: 6, da: 'Slutkontrol VVS', en: 'Final Inspection Plumbing', indhold: 'Verifikation vvs', ansvar: 'FA vvs', view: 'vvs' },
+  { nr: 7, da: 'Slutkontrol Kloak', en: 'Final Inspection Drainage', indhold: 'Verifikation kloak (DS 432)', ansvar: 'FA kloak', view: 'kloak' },
+  { nr: 8, da: 'Afvigelsesrapport', en: 'Deviation Report', indhold: 'Afvigelser og opfølgning', ansvar: 'Faglig ansvarlig', view: 'afvigelse' },
+  { nr: 9, da: 'Intern Efterprøvning', en: 'Internal Review', indhold: 'Ledelsens evaluering (§8)', ansvar: 'Ledelse', view: 'efterproevning' },
+  { nr: 10, da: 'Kompetenceskema', en: 'Competence Sheet', indhold: 'Uddannelse og certifikater', ansvar: 'Ledelse', view: 'kompetence' },
+  { nr: 11, da: 'Måleudstyr', en: 'Measuring Equipment', indhold: 'Kalibrering', ansvar: 'FA el', view: 'maaleudstyr' },
+  { nr: 12, da: 'Tilsyn', en: 'Supervision', indhold: 'Audit og godkendelse', ansvar: 'Ledelse', view: 'tilsyn' },
+  { nr: 13, da: 'Dokumentstyring', en: 'Document Control', indhold: 'Versionsstyring (5 års historik)', ansvar: 'KLS-ansvarlig', view: 'dokument' },
+  { nr: 14, da: 'Dashboard', en: 'Dashboard', indhold: 'Status og årlig tjekliste', ansvar: 'Ledelse', view: 'dashboard' }
+];
+
+var KLS_POLICY_GOALS = [
+  'Vi udfører alle installationer iht. gældende lovgivning og standarder.',
+  'Vi sikrer løbende kompetenceudvikling af alle medarbejdere.',
+  'Vi registrerer og følger op på alle afvigelser for at undgå gentagelse.',
+  'Vi gennemfører ledelsens evaluering minimum én gang om året.',
+  'Vi vedligeholder og kalibrerer vores måleinstrumenter regelmæssigt.'
+];
+
+var KLS_LEGAL = [
+  { ref: 'BEK 725/2024', titel: 'Kvalitetsledelsessystemer — el, vvs og kloak' },
+  { ref: 'BEK 724/2024', titel: 'VVS-installationsområdet' },
+  { ref: 'BEK 722/2024', titel: 'Kloakinstallationsområdet' },
+  { ref: 'Autorisationsloven', titel: 'Lov om autorisation af elinstallatørvirksomheder m.v.' }
+];
+
+var KLS_PROCEDURES = [
+  { id: 'P-01', da: 'Indgåelse af arbejdsaftale og kundedokumentation', ansvar: 'Faglig ansvarlig' },
+  { id: 'P-02', da: 'Projektgennemgang og risikovurdering', ansvar: 'Faglig ansvarlig' },
+  { id: 'P-03', da: 'Udførelse af installation', ansvar: 'Installatør' },
+  { id: 'P-04', da: 'Slutkontrol og verifikation — el', ansvar: 'FA el' },
+  { id: 'P-05', da: 'Slutkontrol — VVS', ansvar: 'FA vvs' },
+  { id: 'P-06', da: 'Slutkontrol — kloak', ansvar: 'FA kloak' },
+  { id: 'P-07', da: 'Afvigelseshåndtering', ansvar: 'Faglig ansvarlig' },
+  { id: 'P-08', da: 'Intern efterprøvning [ledelsens evaluering]', ansvar: 'Ledelse' },
+  { id: 'P-09', da: 'Kompetencevurdering og kursusplanlægning', ansvar: 'Ledelse' },
+  { id: 'P-10', da: 'Kalibrering og kontrol af måleudstyr', ansvar: 'FA el' },
+  { id: 'P-11', da: 'Underleverandørstyring', ansvar: 'Faglig ansvarlig' },
+  { id: 'P-12', da: 'Kundeklager og reklamationer', ansvar: 'Ledelse' },
+  { id: 'P-13', da: 'Dokumentstyring og arkivering', ansvar: 'KLS-ansvarlig' },
+  { id: 'P-14', da: 'Beredskabsplan ved ulykker', ansvar: 'Ledelse' }
+];
+
+var KLS_REVIEW_POINTS = [
+  'Opfølgning fra forrige evaluering',
+  'KLS-dokumentation er opdateret og tilgængelig',
+  'Antal udførte installationer og slutkontroller',
+  'Afvigelser registreret og afsluttet',
+  'Medarbejderkompetencer og uddannelse',
+  'Tilstand og kalibrering af måleudstyr',
+  'Kundeklager og reklamationer',
+  'Underleverandørers præstation',
+  'Lovgivningsændringer siden sidst',
+  'Forbedringsforslag fra medarbejdere',
+  'Ressourcebehov og kapacitet',
+  'KLS systemets samlede effektivitet'
+];
+
+var KLS_INSTRUMENTS = [
+  { id: 'INV-001', da: 'Installationstester / HPFI-tester' },
+  { id: 'INV-002', da: 'Multimeter' },
+  { id: 'INV-003', da: 'Jordingsmåler' },
+  { id: 'INV-004', da: 'Lækagestrøms-amperemeter' },
+  { id: 'INV-005', da: 'Isolationstester (Megger)' },
+  { id: 'INV-006', da: 'Termostat-kalibreringsinstrument' },
+  { id: 'INV-007', da: 'Manometer (trykprøve VVS)' },
+  { id: 'INV-008', da: 'Rørinspektionskamera (Kloak)' }
+];
+
+var KLS_DOCUMENTS = [
+  { id: 'DOK-001', da: 'KLS Håndbog', ansvar: 'Ledelse' },
+  { id: 'DOK-002', da: 'Kvalitetspolitik', ansvar: 'Ledelse' },
+  { id: 'DOK-003', da: 'Organisationsdiagram', ansvar: 'Ledelse' },
+  { id: 'DOK-004', da: 'Procedurer P-01..P-14', ansvar: 'KLS-ansvarlig' },
+  { id: 'DOK-005', da: 'Slutkontrolskema EL', ansvar: 'FA el' },
+  { id: 'DOK-006', da: 'Slutkontrolskema VVS', ansvar: 'FA vvs' },
+  { id: 'DOK-007', da: 'Slutkontrolskema Kloak', ansvar: 'FA kloak' },
+  { id: 'DOK-008', da: 'Afvigelsesrapport skabelon', ansvar: 'KLS-ansvarlig' },
+  { id: 'DOK-009', da: 'Kompetencevurderingsskema', ansvar: 'Ledelse' },
+  { id: 'DOK-010', da: 'Måleudstyrsliste', ansvar: 'FA el' },
+  { id: 'DOK-011', da: 'Ledelsens evalueringsrapport', ansvar: 'Ledelse' },
+  { id: 'DOK-012', da: 'Kundeklage procedure', ansvar: 'Ledelse' },
+  { id: 'DOK-013', da: 'Underleverandørliste', ansvar: 'KLS-ansvarlig' },
+  { id: 'DOK-014', da: 'Beredskabsplan', ansvar: 'Ledelse' }
+];
+
+var KLS_ANNUAL = [
+  { da: 'Er ledelsens evaluering gennemført inden for de seneste 12 måneder?', tag: 'LOVKRAV' },
+  { da: 'Er alle slutkontroller dokumenteret og arkiveret?', tag: 'LOVKRAV' },
+  { da: 'Er alle afvigelsesrapporter oprettet og fulgt op?', tag: 'LOVKRAV' },
+  { da: 'Er medarbejdernes certifikater og kompetencer gyldige?', tag: 'VIGTIGT' },
+  { da: 'Er alt måleudstyr kalibreret inden for fristen?', tag: 'LOVKRAV' },
+  { da: 'Er KLS-dokumentationen opdateret med korrekte versioner?', tag: 'VIGTIGT' },
+  { da: 'Er kontrolinstansen kontaktet for gengodkendelse (inden 2 år)?', tag: 'LOVKRAV' },
+  { da: 'Er ændringer i lovgivning implementeret?', tag: 'VIGTIGT' }
+];
+
+var KLS_MASTER_FIELDS = [
+  'Virksomhedsnavn', 'CVR-nummer', 'Adresse', 'Postnr. & By', 'Telefon', 'E-mail',
+  'Autorisationsnummer', 'Fagligt ansvarlig', 'Kontrolinstans (VALIDAN ApS)',
+  'KLS godkendt dato', 'KLS udløbsdato', 'Version 1.0'
+];
+
+var klsState = {
+  view: 'forside',
+  autType: 'El',
+  procStatus: [],
+  devStatus: ['Åben', 'Igangsat', 'Afsluttet'],
+  devType: ['Udførelsesfejl', 'Dokumentationsfejl', 'Materialefejl'],
+  reviewPts: [],
+  calStatus: [],
+  docStatus: [],
+  annual: [],
+  tilsynStatus: 'Godkendt',
+  expiryMonths: 12,
+  elInstallType: 'Nyinstallation',
+  elIso: '2-5',
+  elJord: 'OK',
+  elHpfi: 'OK',
+  vvsType: 'Nyinstallation',
+  vvsTryk: 'OK',
+  vvsTaethed: 'OK',
+  vvsTemp: '55-60°C',
+  kloakType: 'Nyanlæg',
+  kloakTV: 'Udført',
+  kloakTaethed: 'OK',
+  kloakFald: '15-20‰'
+};
+(function() {
+  var i;
+  for (i = 0; i < 14; i++) klsState.procStatus.push('Aktiv');
+  for (i = 0; i < 12; i++) klsState.reviewPts.push(null);
+  for (i = 0; i < 8; i++) klsState.calStatus.push('Kalibreret OK');
+  for (i = 0; i < 14; i++) klsState.docStatus.push('Aktiv');
+  for (i = 0; i < 8; i++) klsState.annual.push(null);
+})();
+
+// ===== KLS PURE HELPER FUNCTIONS (compliance logic) =====
+function klsProcedureActiveCount(states) {
+  var c = 0;
+  for (var i = 0; i < states.length; i++) { if (states[i] === 'Aktiv') c++; }
+  return c;
+}
+
+function klsElStatus(isoBucket, jord, hpfi) {
+  // Godkendt only if isolation >= 1 MOhm AND jording OK AND HPFI OK. Only 'OK' passes.
+  if (isoBucket !== '<1' && jord === 'OK' && hpfi === 'OK') return 'Godkendt';
+  return 'Afvigelse';
+}
+
+function klsVvsStatus(tryk, taethed, tempBucket) {
+  if (tryk === 'OK' && taethed === 'OK' && tempBucket !== '<55°C') return 'Godkendt';
+  return 'Afvigelse';
+}
+
+function klsKloakFaldOk(bucket) {
+  // min 10 promille (DS 432); only '<10‰' fails.
+  return bucket !== '<10‰';
+}
+
+function klsKloakStatus(taethed, faldBucket) {
+  if (taethed === 'OK' && klsKloakFaldOk(faldBucket)) return 'Godkendt';
+  return 'Afvigelse';
+}
+
+function klsDeviationStats(list) {
+  var open = 0, started = 0, closed = 0;
+  list.forEach(function(s) {
+    if (s === 'Åben') open++;
+    else if (s === 'Igangsat') started++;
+    else if (s === 'Afsluttet') closed++;
+  });
+  return { open: open, started: started, closed: closed };
+}
+
+function klsExpiryStatus(months) {
+  if (months <= 3) return { level: 'red', msg: 'KLS udløber snart — kontakt STRAKS kontrolinstansen' };
+  if (months <= 6) return { level: 'amber', msg: 'Planlæg gengodkendelse hos kontrolinstansen' };
+  return { level: 'green', msg: 'KLS-status er gyldig' };
+}
+
+function klsCalOkCount(states) {
+  var c = 0;
+  states.forEach(function(s) { if (s === 'Kalibreret OK') c++; });
+  return c;
+}
+
+function klsDocStats(states) {
+  var a = 0, r = 0, u = 0;
+  states.forEach(function(s) {
+    if (s === 'Aktiv') a++;
+    else if (s === 'Under revision') r++;
+    else if (s === 'Udgået') u++;
+  });
+  return { active: a, revision: r, retired: u };
+}
+
+function klsReviewedCount(pts) {
+  var c = 0;
+  pts.forEach(function(p) { if (p) c++; });
+  return c;
+}
+
+function klsAnnualAnsweredCount(answers) {
+  var c = 0;
+  answers.forEach(function(a) { if (a) c++; });
+  return c;
+}
+
+function klsDashboardCompliance(annualAnswers) {
+  // GREEN only when every LOVKRAV item is 'Ja'.
+  for (var i = 0; i < KLS_ANNUAL.length; i++) {
+    if (KLS_ANNUAL[i].tag === 'LOVKRAV' && annualAnswers[i] !== 'Ja') return false;
+  }
+  return true;
+}
+
+// ===== KLS RENDER HELPERS =====
+function klsToggleButtons(arrName, idx, opts, current) {
+  var h = '';
+  opts.forEach(function(o) {
+    h += '<button class="sel-btn' + (current === o ? ' selected' : '') + '" style="padding:2px 8px;font-size:0.8em;margin-left:4px" onclick="klsState.' + arrName + '[' + idx + ']=\'' + o + '\';renderModule(\'kls\')">' + o + '</button>';
+  });
+  return h;
+}
+
+function klsSelectGroup(label, opts, current, field) {
+  var h = '<div class="select-group"><div class="select-label">' + label + '</div><div class="select-grid">';
+  opts.forEach(function(o) {
+    h += '<button class="sel-btn' + (current === o ? ' selected' : '') + '" onclick="klsState.' + field + '=\'' + o + '\';renderModule(\'kls\')">' + o + '</button>';
+  });
+  h += '</div></div>';
+  return h;
+}
+
+function klsResultRow(label, value, color) {
+  return '<div class="result-row"><span class="label">' + label + '</span><span class="value"' + (color ? ' style="color:' + color + '"' : '') + '>' + value + '</span></div>';
+}
+
+function klsNav() {
+  var h = '<div class="select-group"><div class="select-label">' + tx('KLS-ark (klik for at åbne)', 'KLS sheets (click to open)') + '</div><div class="select-grid">';
+  KLS_SHEETS.forEach(function(s) {
+    h += '<button class="sel-btn' + (klsState.view === s.view ? ' selected' : '') + '" onclick="klsState.view=\'' + s.view + '\';renderModule(\'kls\')">' + s.nr + '. ' + tx(s.da, s.en) + '</button>';
+  });
+  h += '</div></div>';
+  return h;
+}
+
+// ===== KLS SUB-VIEWS =====
+function klsRenderForside() {
+  var h = '<div class="result-box"><div class="result-title">KVALITETSLEDELSESSYSTEM · KLS</div>';
+  h += '<div class="info-row">' + tx('Ifølge Sikkerhedsstyrelsen · BEK nr. 725 / 724 / 722 af 12. juni 2024', 'Per Sikkerhedsstyrelsen · BEK no. 725 / 724 / 722 of 12 June 2024') + '</div>';
+  h += klsResultRow('Virksomhedsnavn', '—');
+  h += klsResultRow('CVR-nummer', '—');
+  h += klsResultRow('Adresse', '—');
+  h += klsResultRow('Postnr. & By', '—');
+  h += klsResultRow('Telefon', '—');
+  h += klsResultRow('E-mail', '—');
+  h += klsResultRow('Autorisationsnummer', '—');
+  h += klsResultRow('Fagligt ansvarlig', '—');
+  h += klsResultRow('Kontrolinstans', 'VALIDAN ApS');
+  h += klsResultRow('KLS godkendt dato', '—');
+  h += klsResultRow('KLS udløbsdato', '—');
+  h += klsResultRow('Version', '1.0');
+  h += '</div>';
+  // Autorisationstype dropdown (click-select)
+  h += klsSelectGroup(tx('Autorisationstype', 'Authorisation type'), KLS_AUT_TYPES, klsState.autType, 'autType');
+  // Warning
+  h += '<div class="result-box warning"><div class="result-title">⚠️ VIGTIGT LOVKRAV</div>';
+  h += '<div class="result-row"><span class="label">KLS SKAL fornyes inden 2-årsperiodens udløb. Der er ingen grace-periode.</span></div></div>';
+  // 14-sheet index
+  h += '<div class="result-box"><div class="result-title">' + tx('Indeks — 14 ark', 'Index — 14 sheets') + ' (Nr | Ark | Indhold | Ansvar)</div>';
+  KLS_SHEETS.forEach(function(s) {
+    h += '<div class="result-row"><span class="label">' + s.nr + '. ' + s.da + '</span><span class="value">' + s.indhold + ' · ' + s.ansvar + '</span></div>';
+  });
+  h += '</div>';
+  return h;
+}
+
+function klsRenderPolitik() {
+  var h = '<div class="result-box"><div class="result-title">' + tx('Kvalitetspolitik — 5 mål', 'Quality Policy — 5 goals') + '</div>';
+  KLS_POLICY_GOALS.forEach(function(g, i) {
+    h += '<div class="result-row"><span class="label">Mål ' + (i + 1) + '</span><span class="value">' + g + '</span></div>';
+  });
+  h += '</div>';
+  h += '<div class="result-box"><div class="result-title">LOVGRUNDLAG</div>';
+  KLS_LEGAL.forEach(function(l) {
+    h += klsResultRow(l.ref, l.titel);
+  });
+  h += '</div>';
+  h += '<div class="result-box"><div class="result-row"><span class="label">' + tx('Daglig leders underskrift (Navn / Dato / Underskrift) er obligatorisk.', "Manager's signature (Name / Date / Signature) is mandatory.") + '</span></div></div>';
+  h += '<div class="result-box warning"><div class="result-title">💡 FORBEDRING</div><div class="result-row"><span class="label">Bekendtgørelsesnumre bør verificeres på sik.dk — de stabile grundreferencer er Autorisationsloven, DS/HD 60364-6 (el-verifikation) og DS 432 (kloak).</span></div></div>';
+  return h;
+}
+
+function klsRenderOrganisation() {
+  var h = '<div class="result-box"><div class="result-title">' + tx('Medarbejdertabel — kolonner', 'Employee table — columns') + '</div>';
+  ['Navn', 'Stilling', 'Faglig kompetence', 'KLS-ansvar', 'Autoriseret', 'Telefon', 'E-mail', 'Ansættelsesdato'].forEach(function(c) {
+    h += '<div class="result-row"><span class="label">' + c + '</span><span class="value">—</span></div>';
+  });
+  h += '</div>';
+  h += '<div class="result-box"><div class="result-title">' + tx('Fagligt ansvarlige — kolonner', 'Technically responsible — columns') + '</div>';
+  ['Faglig ansvarlig', 'Fagområde', 'Autorisationsnummer', 'Udstedt', 'Udløber', 'Status'].forEach(function(c) {
+    h += '<div class="result-row"><span class="label">' + c + '</span><span class="value">—</span></div>';
+  });
+  h += '</div>';
+  h += '<div class="result-box warning"><div class="result-row"><span class="label">⚠️ Udløber en faglig ansvarlig persons certifikat, mister virksomheden sin autorisation for det pågældende fagområde øjeblikkeligt — sæt reminder 3 måneder inden udløb.</span></div></div>';
+  return h;
+}
+
+function klsRenderProcedurer() {
+  var active = klsProcedureActiveCount(klsState.procStatus);
+  var h = '<div class="result-box"><div class="result-title">' + tx('Procedurer P-01 .. P-14', 'Procedures P-01 .. P-14') + '</div>';
+  h += klsResultRow(tx('Aktive procedurer', 'Active procedures'), active + ' / 14', active === 14 ? 'var(--success)' : '#b8860b');
+  KLS_PROCEDURES.forEach(function(p, i) {
+    var st = klsState.procStatus[i];
+    var icon = st === 'Aktiv' ? '✅' : (st === 'Under revision' ? '🔧' : '⛔');
+    h += '<div class="result-row" style="border-bottom:1px solid rgba(255,255,255,0.05);padding:6px 0">';
+    h += '<span class="label">' + icon + ' ' + p.id + ' ' + p.da + '<br><small style="color:#888">' + p.ansvar + '</small></span>';
+    h += '<span class="value">' + klsToggleButtons('procStatus', i, ['Aktiv', 'Under revision', 'Udgået'], st) + '</span></div>';
+  });
+  h += '</div>';
+  return h;
+}
+
+function klsRenderEl() {
+  var status = klsElStatus(klsState.elIso, klsState.elJord, klsState.elHpfi);
+  var ok = status === 'Godkendt';
+  var h = '<div class="result-box"><div class="result-title">' + tx('Slutkontrol EL', 'Final Inspection EL') + '</div>';
+  h += '<div class="info-row">' + tx('Jf. DS/HD 60364-6 og BEK nr. 725 af 12. juni 2024', 'Per DS/HD 60364-6 and BEK no. 725 of 12 June 2024') + '</div></div>';
+  h += klsSelectGroup(tx('Installationstype', 'Installation type'), ['Nyinstallation', 'Udvidelse', 'Ændring', 'Fejlafhjælpning'], klsState.elInstallType, 'elInstallType');
+  h += klsSelectGroup(tx('Isolationsmodstand [MΩ]', 'Insulation resistance [MΩ]'), ['<1', '1-2', '2-5', '5-10', '>10'], klsState.elIso, 'elIso');
+  h += klsSelectGroup(tx('Jordingstest', 'Earthing test'), ['OK', 'Ikke OK', 'N/A'], klsState.elJord, 'elJord');
+  h += klsSelectGroup('HPFI / RCD', ['OK', 'Ikke OK', 'N/A'], klsState.elHpfi, 'elHpfi');
+  h += '<div class="result-box"><div class="result-title">' + tx('Kriterier', 'Criteria') + '</div>';
+  h += '<div class="result-row"><span class="label">Isolationsmodstand: krav min 1 MΩ for 230V (\'<1\' = afvigelse)</span></div>';
+  h += '<div class="result-row"><span class="label">HPFI skal udløse ved ≤ IΔn inden 300 ms (generelt) og inden 40 ms ved 5×IΔn (DS/HD 60364-6).</span></div></div>';
+  // Running stats demoed as 1 record
+  var godkendte = ok ? 1 : 0;
+  var afvigelser = ok ? 0 : 1;
+  var pct = Math.round(godkendte / 1 * 100);
+  h += '<div class="result-box"><div class="result-title">' + tx('Statistik (aktuel registrering)', 'Statistics (current record)') + '</div>';
+  h += klsResultRow(tx('Godkendte', 'Approved'), godkendte, 'var(--success)');
+  h += klsResultRow(tx('Afvigelser', 'Deviations'), afvigelser, afvigelser > 0 ? 'var(--danger)' : '');
+  h += klsResultRow(tx('Godkendelsesprocent', 'Approval rate'), pct + '%');
+  h += '</div>';
+  h += '<div class="result-box warning"><div class="result-row"><span class="label">⚠️ Udfyld STRAKS efter installationen — aldrig bagudrettet.</span></div></div>';
+  h += renderVerdict(ok, ok ? tx('Slutkontrol EL godkendt iht. DS/HD 60364-6', 'Final inspection EL approved per DS/HD 60364-6') : tx('Afvigelse — installation må ikke godkendes', 'Deviation — installation may not be approved'));
+  return h;
+}
+
+function klsRenderVvs() {
+  var status = klsVvsStatus(klsState.vvsTryk, klsState.vvsTaethed, klsState.vvsTemp);
+  var ok = status === 'Godkendt';
+  var h = '<div class="result-box"><div class="result-title">' + tx('Slutkontrol VVS', 'Final Inspection Plumbing') + '</div></div>';
+  h += klsSelectGroup(tx('Arbejdstype', 'Work type'), ['Nyinstallation', 'Udvidelse', 'Ændring'], klsState.vvsType, 'vvsType');
+  h += klsSelectGroup(tx('Trykprøve (varmtvand 1,5× driftstryk)', 'Pressure test (hot water 1.5× operating)'), ['OK', 'Ikke OK', 'N/A'], klsState.vvsTryk, 'vvsTryk');
+  h += klsSelectGroup(tx('Tæthedsprøve (gas BEK nr. 30)', 'Leak test (gas BEK no. 30)'), ['OK', 'Ikke OK', 'N/A'], klsState.vvsTaethed, 'vvsTaethed');
+  h += klsSelectGroup(tx('Temperatur ved beholder', 'Temperature at tank'), ['<55°C', '55-60°C', '>60°C'], klsState.vvsTemp, 'vvsTemp');
+  h += '<div class="result-box"><div class="result-row"><span class="label">' + tx('Regel: min 60°C ved beholder, max 50°C ved udtag (legionella).', 'Rule: min 60°C at tank, max 50°C at outlet (legionella).') + '</span></div></div>';
+  h += renderVerdict(ok, ok ? tx('Slutkontrol VVS godkendt', 'Final inspection plumbing approved') : tx('Afvigelse — udbedring krævet', 'Deviation — rectification required'));
+  return h;
+}
+
+function klsRenderKloak() {
+  var ok = klsKloakStatus(klsState.kloakTaethed, klsState.kloakFald) === 'Godkendt';
+  var faldOk = klsKloakFaldOk(klsState.kloakFald);
+  var h = '<div class="result-box"><div class="result-title">' + tx('Slutkontrol Kloak', 'Final Inspection Drainage') + '</div></div>';
+  h += klsSelectGroup(tx('Arbejdstype', 'Work type'), ['Nyanlæg', 'Renovering', 'Separering', 'Reparation'], klsState.kloakType, 'kloakType');
+  if (klsState.kloakType === 'Separering') {
+    h += '<div class="result-box warning"><div class="result-row"><span class="label">⚠️ Separering kræver kommunal godkendelse.</span></div></div>';
+  }
+  h += klsSelectGroup('TV-inspektion', ['Udført', 'Ikke relevant'], klsState.kloakTV, 'kloakTV');
+  h += klsSelectGroup(tx('Tæthedsprøve (DS 432: 50 mbar, 5 min)', 'Leak test (DS 432: 50 mbar, 5 min)'), ['OK', 'Ikke OK'], klsState.kloakTaethed, 'kloakTaethed');
+  h += klsSelectGroup(tx('Fald (min 10‰ — DS 432)', 'Fall (min 10‰ — DS 432)'), ['<10‰', '10-15‰', '15-20‰', '>20‰'], klsState.kloakFald, 'kloakFald');
+  h += klsResultRow(tx('Fald-krav', 'Fall requirement'), faldOk ? tx('Opfyldt', 'Met') : tx('IKKE opfyldt', 'NOT met'), faldOk ? 'var(--success)' : 'var(--danger)');
+  h += '<div class="result-box warning"><div class="result-row"><span class="label">⚠️ Slutkontrol skal udfyldes INDEN tildækning.</span></div></div>';
+  h += renderVerdict(ok, ok ? tx('Slutkontrol kloak godkendt iht. DS 432', 'Final inspection drainage approved per DS 432') : tx('Afvigelse — udbedring krævet', 'Deviation — rectification required'));
+  return h;
+}
+
+function klsRenderAfvigelse() {
+  var stats = klsDeviationStats(klsState.devStatus);
+  var h = '<div class="result-box"><div class="result-title">' + tx('Afvigelsesrapport', 'Deviation Report') + '</div>';
+  h += '<div class="result-row"><span class="label">' + tx('Rodårsagsanalyse: brug 5-whys (spørg "hvorfor" 5 gange) for at finde den egentlige årsag.', 'Root cause analysis: use 5-whys to find the true cause.') + '</span></div></div>';
+  h += '<div class="result-box"><div class="result-title">' + tx('Afvigelser', 'Deviations') + '</div>';
+  h += klsResultRow(tx('Åbne', 'Open'), stats.open, stats.open > 0 ? 'var(--danger)' : '');
+  h += klsResultRow(tx('Igangsatte', 'Started'), stats.started);
+  h += klsResultRow(tx('Afsluttede', 'Closed'), stats.closed, 'var(--success)');
+  klsState.devStatus.forEach(function(st, i) {
+    var id = 'AFV-00' + (i + 1);
+    h += '<div class="result-row" style="border-bottom:1px solid rgba(255,255,255,0.05);padding:6px 0">';
+    h += '<span class="label">' + id + ' · ' + klsState.devType[i] + '</span>';
+    h += '<span class="value">' + klsToggleButtons('devStatus', i, ['Åben', 'Igangsat', 'Afsluttet'], st) + '</span></div>';
+  });
+  h += '</div>';
+  h += '<div class="result-box warning"><div class="result-row"><span class="label">⚠️ Et TOMT afvigelsesark tolkes som at KLS-systemet ikke er implementeret.</span></div></div>';
+  return h;
+}
+
+function klsRenderEfterproevning() {
+  var done = klsReviewedCount(klsState.reviewPts);
+  var h = '<div class="result-box"><div class="result-title">' + tx('Intern Efterprøvning', 'Internal Review') + '</div>';
+  h += '<div class="info-row">' + tx('Lovkrav: Min. én gang om året — max. 12 måneders interval · BEK nr. 725 §8', 'Legal: min. once a year — max 12-month interval · BEK no. 725 §8') + '</div>';
+  h += klsResultRow(tx('Gennemgået', 'Reviewed'), done + ' af 12', done === 12 ? 'var(--success)' : '#b8860b');
+  KLS_REVIEW_POINTS.forEach(function(p, i) {
+    var st = klsState.reviewPts[i];
+    var icon = st === 'OK' ? '✅' : (st === 'Handling krævet' ? '⚠️' : (st === 'Ikke relevant' ? '➖' : '⭕'));
+    h += '<div class="result-row" style="border-bottom:1px solid rgba(255,255,255,0.05);padding:6px 0">';
+    h += '<span class="label">' + icon + ' ' + (i + 1) + '. ' + p + '</span>';
+    h += '<span class="value">' + klsToggleButtons('reviewPts', i, ['OK', 'Handling krævet', 'Ikke relevant'], st) + '</span></div>';
+  });
+  h += '</div>';
+  h += '<div class="result-box warning"><div class="result-row"><span class="label">⚠️ Mangler dokumentation = kritisk afvigelse ved audit.</span></div></div>';
+  return h;
+}
+
+function klsRenderKompetence() {
+  var h = '<div class="result-box"><div class="result-title">' + tx('Kompetenceskema — kolonner', 'Competence Sheet — columns') + '</div>';
+  ['Navn', 'Stilling', 'Grunduddannelse', 'El-cert', 'VVS-cert', 'Kloak-cert', 'Arbejdsmiljø [32t AMU]', 'Kursus', 'Niveau'].forEach(function(c) {
+    h += '<div class="result-row"><span class="label">' + c + '</span><span class="value">—</span></div>';
+  });
+  h += '</div>';
+  h += '<div class="result-box"><div class="result-row"><span class="label">' + tx('Certifikater angives som: Ja / Nej / Under uddannelse.', 'Certificates marked as: Yes / No / In training.') + '</span></div></div>';
+  return h;
+}
+
+function klsRenderMaaleudstyr() {
+  var okCount = klsCalOkCount(klsState.calStatus);
+  var h = '<div class="result-box"><div class="result-title">' + tx('Måleudstyr — kalibrering', 'Measuring Equipment — calibration') + '</div>';
+  h += klsResultRow(tx('Kalibreret OK', 'Calibrated OK'), okCount + ' / 8', okCount === 8 ? 'var(--success)' : 'var(--danger)');
+  KLS_INSTRUMENTS.forEach(function(inst, i) {
+    var st = klsState.calStatus[i];
+    var icon = st === 'Kalibreret OK' ? '✅' : (st === 'Udløbet' ? '⛔' : '⚠️');
+    h += '<div class="result-row" style="border-bottom:1px solid rgba(255,255,255,0.05);padding:6px 0">';
+    h += '<span class="label">' + icon + ' ' + inst.id + ' ' + inst.da + '</span>';
+    h += '<span class="value">' + klsToggleButtons('calStatus', i, ['Kalibreret OK', 'Udløbet', 'Mangler'], st) + '</span></div>';
+  });
+  h += '</div>';
+  h += '<div class="result-box"><div class="result-row"><span class="label">' + tx('Interval: 1 år elektrisk, 2 år mekanisk.', 'Interval: 1 year electrical, 2 years mechanical.') + '</span></div></div>';
+  h += '<div class="result-box warning"><div class="result-row"><span class="label">⚠️ Et instrument med udløbet kalibrering MÅ IKKE bruges til godkendelsesprøvninger.</span></div></div>';
+  return h;
+}
+
+function klsRenderTilsyn() {
+  var h = '<div class="result-box"><div class="result-title">' + tx('Tilsyn — cyklus', 'Supervision — cycle') + '</div>';
+  h += klsResultRow('Fase 1', tx('Præaudit (dokumentgennemgang)', 'Pre-audit (document review)'));
+  h += klsResultRow('Fase 2', tx('Godkendelse (fysisk besøg → Godkendt / Betinget godkendt / Ikke godkendt)', 'Approval (physical visit)'));
+  h += klsResultRow(tx('Gengodkendelse', 'Re-approval'), tx('Inden 2 år (kontakt min. 3 mdr før udløb)', 'Within 2 years (contact min. 3 months before expiry)'));
+  h += '</div>';
+  h += klsSelectGroup(tx('Aktuel KLS-status', 'Current KLS status'), ['Godkendt', 'Betinget godkendt', 'Ikke godkendt', 'Udløbet'], klsState.tilsynStatus, 'tilsynStatus');
+  h += '<div class="result-box warning"><div class="result-row"><span class="label">⚠️ Sikkerhedsstyrelsen kan til enhver tid foretage uanmeldt tilsyn.</span></div></div>';
+  h += renderVerdict(klsState.tilsynStatus === 'Godkendt', tx('KLS-status: ', 'KLS status: ') + klsState.tilsynStatus);
+  return h;
+}
+
+function klsRenderDokument() {
+  var stats = klsDocStats(klsState.docStatus);
+  var h = '<div class="result-box"><div class="result-title">' + tx('Dokumentstyring DOK-001 .. DOK-014', 'Document Control DOK-001 .. DOK-014') + '</div>';
+  h += klsResultRow(tx('Aktive', 'Active'), stats.active, 'var(--success)');
+  h += klsResultRow(tx('Under revision', 'Under revision'), stats.revision);
+  h += klsResultRow(tx('Udgåede', 'Retired'), stats.retired);
+  KLS_DOCUMENTS.forEach(function(d, i) {
+    var st = klsState.docStatus[i];
+    var icon = st === 'Aktiv' ? '✅' : (st === 'Under revision' ? '🔧' : '⛔');
+    h += '<div class="result-row" style="border-bottom:1px solid rgba(255,255,255,0.05);padding:6px 0">';
+    h += '<span class="label">' + icon + ' ' + d.id + ' ' + d.da + '<br><small style="color:#888">' + d.ansvar + '</small></span>';
+    h += '<span class="value">' + klsToggleButtons('docStatus', i, ['Aktiv', 'Under revision', 'Udgået'], st) + '</span></div>';
+  });
+  h += '</div>';
+  h += '<div class="result-box"><div class="result-row"><span class="label">' + tx('Note: aldrig slet — sæt "Udgået" (5 års historik).', 'Note: never delete — set "Retired" (5 years history).') + '</span></div></div>';
+  return h;
+}
+
+function klsRenderDashboard() {
+  var elOk = klsElStatus(klsState.elIso, klsState.elJord, klsState.elHpfi) === 'Godkendt';
+  var elGodk = elOk ? 1 : 0, elAfv = elOk ? 0 : 1;
+  var devStats = klsDeviationStats(klsState.devStatus);
+  var docStats = klsDocStats(klsState.docStatus);
+  var expiry = klsExpiryStatus(klsState.expiryMonths);
+  var compliant = klsDashboardCompliance(klsState.annual);
+  var expiryColor = expiry.level === 'red' ? 'var(--danger)' : (expiry.level === 'amber' ? '#b8860b' : 'var(--success)');
+
+  var h = '<div class="result-box"><div class="result-title">' + tx('Dashboard — live status', 'Dashboard — live status') + '</div></div>';
+  // EL aggregate
+  h += '<div class="result-box"><div class="result-title">EL (DS/HD 60364-6)</div>';
+  h += klsResultRow(tx('Godkendte', 'Approved'), elGodk, 'var(--success)');
+  h += klsResultRow(tx('Afvigelser', 'Deviations'), elAfv, elAfv > 0 ? 'var(--danger)' : '');
+  h += klsResultRow(tx('Godkendelsesprocent', 'Approval rate'), Math.round(elGodk / 1 * 100) + '%');
+  h += '</div>';
+  // Deviations aggregate
+  h += '<div class="result-box"><div class="result-title">' + tx('Afvigelser', 'Deviations') + '</div>';
+  h += klsResultRow(tx('Åbne', 'Open'), devStats.open, devStats.open > 0 ? 'var(--danger)' : '');
+  h += klsResultRow(tx('Under behandling', 'In progress'), devStats.started);
+  h += klsResultRow(tx('Afsluttede', 'Closed'), devStats.closed, 'var(--success)');
+  h += '</div>';
+  // Documents aggregate
+  h += '<div class="result-box"><div class="result-title">' + tx('Dokumenter', 'Documents') + '</div>';
+  h += klsResultRow(tx('Aktive', 'Active'), docStats.active, 'var(--success)');
+  h += klsResultRow(tx('Udgåede', 'Retired'), docStats.retired);
+  h += klsResultRow(tx('Under rev.', 'Under rev.'), docStats.revision);
+  h += '</div>';
+  // KLS expiry
+  h += klsSelectGroup(tx('Måneder til udløb', 'Months to expiry'), ['0', '1', '2', '3', '6', '9', '12', '18', '24'], String(klsState.expiryMonths), 'expiryMonths');
+  h += '<div class="result-box"><div class="result-title">' + tx('KLS udløb', 'KLS expiry') + '</div>';
+  h += klsResultRow(tx('Status', 'Status'), expiry.msg, expiryColor);
+  h += '</div>';
+  // Annual checklist
+  h += '<div class="result-box"><div class="result-title">' + tx('ÅRLIG TJEKLISTE — 8 punkter', 'ANNUAL CHECKLIST — 8 items') + '</div>';
+  KLS_ANNUAL.forEach(function(a, i) {
+    var st = klsState.annual[i];
+    h += '<div class="result-row" style="border-bottom:1px solid rgba(255,255,255,0.05);padding:6px 0">';
+    h += '<span class="label">' + (i + 1) + '. ' + a.da + ' [' + a.tag + ']</span>';
+    h += '<span class="value">' + klsToggleButtons('annual', i, ['Ja', 'Nej'], st) + '</span></div>';
+  });
+  h += '</div>';
+  h += renderVerdict(compliant, compliant ? tx('KLS-status GRØN — alle lovkrav opfyldt', 'KLS status GREEN — all legal requirements met') : tx('KLS-status RØD — et eller flere lovkrav ikke opfyldt', 'KLS status RED — one or more legal requirements not met'));
+  return h;
+}
+
+function renderKLS() {
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">📋 ' + tx('KLS Kvalitetssystem', 'KLS Quality System') + '</div>';
+  html += '<div class="info-row">' + tx('Lovpligtigt kvalitetsledelsessystem for autoriserede installatører · Sikkerhedsstyrelsen BEK 725 / 724 / 722 (2024)', 'Mandatory quality management system for authorized installers · Sikkerhedsstyrelsen BEK 725 / 724 / 722 (2024)') + '</div>';
+  html += klsNav();
+  switch (klsState.view) {
+    case 'forside': html += klsRenderForside(); break;
+    case 'politik': html += klsRenderPolitik(); break;
+    case 'organisation': html += klsRenderOrganisation(); break;
+    case 'procedurer': html += klsRenderProcedurer(); break;
+    case 'el': html += klsRenderEl(); break;
+    case 'vvs': html += klsRenderVvs(); break;
+    case 'kloak': html += klsRenderKloak(); break;
+    case 'afvigelse': html += klsRenderAfvigelse(); break;
+    case 'efterproevning': html += klsRenderEfterproevning(); break;
+    case 'kompetence': html += klsRenderKompetence(); break;
+    case 'maaleudstyr': html += klsRenderMaaleudstyr(); break;
+    case 'tilsyn': html += klsRenderTilsyn(); break;
+    case 'dokument': html += klsRenderDokument(); break;
+    case 'dashboard': html += klsRenderDashboard(); break;
+    default: html += klsRenderForside();
+  }
   html += '</div>';
   return html;
 }

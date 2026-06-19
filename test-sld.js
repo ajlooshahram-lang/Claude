@@ -6345,6 +6345,178 @@ test('All 5 new modules cite relevant standards', function() {
   assert(renderSmartGrid().indexOf('50549') > 0, 'SmartGrid must cite DS/EN 50549');
 });
 
+
+// =====================================================
+// === KLS QUALITY SYSTEM MODULE TESTS ===
+// =====================================================
+console.log('\n--- KLS Quality System Tests ---');
+
+test('KLS: klsElStatus <1 MOhm = Afvigelse', function() {
+  assert.strictEqual(klsElStatus('<1', 'OK', 'OK'), 'Afvigelse');
+});
+
+test('KLS: klsElStatus 2-5 MOhm all OK = Godkendt', function() {
+  assert.strictEqual(klsElStatus('2-5', 'OK', 'OK'), 'Godkendt');
+});
+
+test('KLS: klsElStatus bad earthing = Afvigelse', function() {
+  assert.strictEqual(klsElStatus('2-5', 'Ikke OK', 'OK'), 'Afvigelse');
+});
+
+test('KLS: klsElStatus bad HPFI = Afvigelse', function() {
+  assert.strictEqual(klsElStatus('2-5', 'OK', 'Ikke OK'), 'Afvigelse');
+});
+
+test('KLS: klsElStatus N/A treated as not-OK = Afvigelse', function() {
+  assert.strictEqual(klsElStatus('2-5', 'N/A', 'OK'), 'Afvigelse');
+  assert.strictEqual(klsElStatus('2-5', 'OK', 'N/A'), 'Afvigelse');
+});
+
+test('KLS: klsKloakFaldOk <10 promille = false', function() {
+  assert.strictEqual(klsKloakFaldOk('<10\u2030'), false);
+});
+
+test('KLS: klsKloakFaldOk 15-20 promille = true', function() {
+  assert.strictEqual(klsKloakFaldOk('15-20\u2030'), true);
+});
+
+test('KLS: klsProcedureActiveCount returns 14 when all Aktiv', function() {
+  var all = [];
+  for (var i = 0; i < 14; i++) all.push('Aktiv');
+  assert.strictEqual(klsProcedureActiveCount(all), 14);
+});
+
+test('KLS: klsProcedureActiveCount counts mixed states', function() {
+  assert.strictEqual(klsProcedureActiveCount(['Aktiv', 'Udgået', 'Aktiv', 'Under revision']), 2);
+});
+
+test('KLS: klsDeviationStats counts open/started/closed', function() {
+  var s = klsDeviationStats(['Åben', 'Åben', 'Igangsat', 'Afsluttet']);
+  assert.strictEqual(s.open, 2);
+  assert.strictEqual(s.started, 1);
+  assert.strictEqual(s.closed, 1);
+});
+
+test('KLS: klsExpiryStatus(2) = red', function() {
+  assert.strictEqual(klsExpiryStatus(2).level, 'red');
+});
+
+test('KLS: klsExpiryStatus(3) = red (boundary)', function() {
+  assert.strictEqual(klsExpiryStatus(3).level, 'red');
+});
+
+test('KLS: klsExpiryStatus(6) = amber (boundary)', function() {
+  assert.strictEqual(klsExpiryStatus(6).level, 'amber');
+});
+
+test('KLS: klsExpiryStatus(12) = green', function() {
+  assert.strictEqual(klsExpiryStatus(12).level, 'green');
+});
+
+test('KLS: klsDashboardCompliance GREEN only when all LOVKRAV = Ja', function() {
+  var answers = [];
+  for (var i = 0; i < KLS_ANNUAL.length; i++) {
+    answers.push(KLS_ANNUAL[i].tag === 'LOVKRAV' ? 'Ja' : null);
+  }
+  assert.strictEqual(klsDashboardCompliance(answers), true);
+});
+
+test('KLS: klsDashboardCompliance RED if any LOVKRAV = Nej', function() {
+  var answers = [];
+  for (var i = 0; i < KLS_ANNUAL.length; i++) {
+    answers.push('Ja');
+  }
+  // set first LOVKRAV item to Nej
+  for (var j = 0; j < KLS_ANNUAL.length; j++) {
+    if (KLS_ANNUAL[j].tag === 'LOVKRAV') { answers[j] = 'Nej'; break; }
+  }
+  assert.strictEqual(klsDashboardCompliance(answers), false);
+});
+
+test('KLS: klsVvsStatus all OK = Godkendt, cold temp bucket = Afvigelse', function() {
+  assert.strictEqual(klsVvsStatus('OK', 'OK', '55-60°C'), 'Godkendt');
+  assert.strictEqual(klsVvsStatus('OK', 'OK', '<55°C'), 'Afvigelse');
+});
+
+test('KLS: exactly 12 management-review points', function() {
+  assert.strictEqual(KLS_REVIEW_POINTS.length, 12);
+});
+
+test('KLS: exactly 14 procedures P-01..P-14', function() {
+  assert.strictEqual(KLS_PROCEDURES.length, 14);
+  assert.strictEqual(KLS_PROCEDURES[0].id, 'P-01');
+  assert.strictEqual(KLS_PROCEDURES[13].id, 'P-14');
+});
+
+test('KLS: exactly 14 documents DOK-001..DOK-014', function() {
+  assert.strictEqual(KLS_DOCUMENTS.length, 14);
+  assert.strictEqual(KLS_DOCUMENTS[0].id, 'DOK-001');
+  assert.strictEqual(KLS_DOCUMENTS[13].id, 'DOK-014');
+});
+
+test('KLS: exactly 8 measuring instruments', function() {
+  assert.strictEqual(KLS_INSTRUMENTS.length, 8);
+});
+
+test('KLS: exactly 14 sheets in index', function() {
+  assert.strictEqual(KLS_SHEETS.length, 14);
+});
+
+test('KLS: module registered in T.da/en/fa.modules', function() {
+  assert(T.da.modules.kls, 'kls missing in T.da.modules');
+  assert(T.en.modules.kls, 'kls missing in T.en.modules');
+  assert(T.fa.modules.kls, 'kls missing in T.fa.modules');
+});
+
+test('KLS: renderKLS returns non-empty HTML for all 14 views', function() {
+  var views = ['forside', 'politik', 'organisation', 'procedurer', 'el', 'vvs', 'kloak',
+    'afvigelse', 'efterproevning', 'kompetence', 'maaleudstyr', 'tilsyn', 'dokument', 'dashboard'];
+  var saved = klsState.view;
+  views.forEach(function(v) {
+    klsState.view = v;
+    var html = renderKLS();
+    assert(html.length > 200, 'View ' + v + ' HTML too short');
+  });
+  klsState.view = saved;
+});
+
+test('KLS: renderKLS output has NO text input or textarea (all views)', function() {
+  var views = ['forside', 'politik', 'organisation', 'procedurer', 'el', 'vvs', 'kloak',
+    'afvigelse', 'efterproevning', 'kompetence', 'maaleudstyr', 'tilsyn', 'dokument', 'dashboard'];
+  var saved = klsState.view;
+  var all = '';
+  views.forEach(function(v) { klsState.view = v; all += renderKLS(); });
+  klsState.view = saved;
+  assert(all.indexOf('<input type="text"') < 0, 'Found <input type="text"');
+  assert(all.indexOf("<input type='text'") < 0, "Found <input type='text'");
+  assert(all.indexOf('<textarea') < 0, 'Found <textarea');
+});
+
+test('KLS: rendered output cites DS/HD 60364-6, DS 432 and BEK 725', function() {
+  var saved = klsState.view;
+  klsState.view = 'el'; var elHtml = renderKLS();
+  klsState.view = 'kloak'; var kloakHtml = renderKLS();
+  klsState.view = 'forside'; var forsideHtml = renderKLS();
+  klsState.view = saved;
+  assert(elHtml.indexOf('DS/HD 60364-6') >= 0, 'EL view must cite DS/HD 60364-6');
+  assert(kloakHtml.indexOf('DS 432') >= 0, 'Kloak view must cite DS 432');
+  assert(forsideHtml.indexOf('BEK nr. 725') >= 0 || forsideHtml.indexOf('BEK 725') >= 0, 'Forside must cite BEK 725');
+});
+
+test('KLS: klsCalOkCount and klsDocStats aggregate correctly', function() {
+  assert.strictEqual(klsCalOkCount(['Kalibreret OK', 'Udløbet', 'Kalibreret OK']), 2);
+  var d = klsDocStats(['Aktiv', 'Aktiv', 'Under revision', 'Udgået']);
+  assert.strictEqual(d.active, 2);
+  assert.strictEqual(d.revision, 1);
+  assert.strictEqual(d.retired, 1);
+});
+
+test('KLS: renderModule case kls works via renderKLS', function() {
+  klsState.view = 'dashboard';
+  var html = renderKLS();
+  assert(html.indexOf('ÅRLIG TJEKLISTE') >= 0 || html.indexOf('ANNUAL CHECKLIST') >= 0, 'Dashboard must show annual checklist');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
