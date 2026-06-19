@@ -4165,6 +4165,378 @@ test('dataCalcPoeBudget: PoE++ Type 4 90W', function() {
   assert.strictEqual(result.totalW, 720); // 8 * 90
 });
 
+
+// ===== SURGE PROTECTION MODULE TESTS =====
+
+// Test 365: SPD collection area calculation
+test('spdCalcCollectionArea: 30x20x6m building', function() {
+  var result = spdCalcCollectionArea(30, 20, 6);
+  // Ac = (30 + 36)(20 + 36) * 1e-6 = 66*56*1e-6 = 0.003696 km2
+  assert.ok(Math.abs(result.ac - 0.003696) < 0.000001);
+  assert.ok(result.clause.indexOf('443.4') >= 0);
+});
+
+// Test 366: SPD collection area larger building
+test('spdCalcCollectionArea: 100x50x30m large building', function() {
+  var result = spdCalcCollectionArea(100, 50, 30);
+  // Ac = (100 + 180)(50 + 180) * 1e-6 = 280*230*1e-6 = 0.0644
+  assert.ok(Math.abs(result.ac - 0.0644) < 0.0001);
+});
+
+// Test 367: SPD expected strikes calculation - low risk
+test('spdCalcExpectedStrikes: low Ng urban', function() {
+  var ac = spdCalcCollectionArea(30, 20, 6).ac;
+  var result = spdCalcExpectedStrikes(0.5, ac, 0.25);
+  assert.ok(result.nd < 0.001);
+  assert.ok(result.nd > 0);
+});
+
+// Test 368: SPD expected strikes - high risk mountain large building
+test('spdCalcExpectedStrikes: high Ng mountain large building', function() {
+  var ac = spdCalcCollectionArea(100, 50, 30).ac;
+  var result = spdCalcExpectedStrikes(3.0, ac, 2.0);
+  assert.ok(result.nd > 0.3);
+  assert.ok(result.nd > 0.05, 'Should exceed mandatory threshold');
+});
+
+// Test 369: SPD risk assessment - below threshold
+test('spdAssessRisk: Nd below 0.05 not mandatory', function() {
+  var result = spdAssessRisk(0.01);
+  assert.strictEqual(result.mandatory, false);
+  assert.strictEqual(result.level, 'low');
+});
+
+// Test 370: SPD risk assessment - above threshold mandatory
+test('spdAssessRisk: Nd above 0.05 mandatory', function() {
+  var result = spdAssessRisk(0.15);
+  assert.strictEqual(result.mandatory, true);
+  assert.strictEqual(result.level, 'high');
+});
+
+// Test 371: SPD risk assessment - very high
+test('spdAssessRisk: Nd above 0.5 very high', function() {
+  var result = spdAssessRisk(0.6);
+  assert.strictEqual(result.mandatory, true);
+  assert.strictEqual(result.level, 'very_high');
+});
+
+// Test 372: SPD type selection with LPS
+test('spdSelectType: with LPS includes Type 1', function() {
+  var types = spdSelectType(true, false);
+  assert.ok(types.length >= 2);
+  assert.strictEqual(types[0].type, 'Type 1');
+  assert.strictEqual(types[1].type, 'Type 2');
+});
+
+// Test 373: SPD type selection with sensitive equipment
+test('spdSelectType: sensitive adds Type 3', function() {
+  var types = spdSelectType(false, true);
+  assert.ok(types.length === 2);
+  assert.strictEqual(types[0].type, 'Type 2');
+  assert.strictEqual(types[1].type, 'Type 3');
+});
+
+// Test 374: SPD specification Type 2
+test('spdGetSpecification: Type 2 correct values', function() {
+  var spec = spdGetSpecification('Type 2');
+  assert.strictEqual(spec.uc, 253);
+  assert.ok(spec.up <= 2.5);
+  assert.strictEqual(spec.inKA, 20);
+  assert.strictEqual(spec.imaxKA, 40);
+  assert.strictEqual(spec.backupFuse, '125A gG');
+});
+
+// Test 375: SPD specification Type 1
+test('spdGetSpecification: Type 1 higher ratings', function() {
+  var spec = spdGetSpecification('Type 1');
+  assert.strictEqual(spec.uc, 440);
+  assert.strictEqual(spec.imaxKA, 100);
+});
+
+// Test 376: SPD product recommendation with LPS
+test('spdRecommendProduct: with LPS recommends Type 1+2', function() {
+  var product = spdRecommendProduct({mandatory:true}, true);
+  assert.strictEqual(product.spdType, 'Type 1+2');
+});
+
+// Test 377: SPD product recommendation without LPS
+test('spdRecommendProduct: without LPS recommends Type 2', function() {
+  var product = spdRecommendProduct({mandatory:true}, false);
+  assert.strictEqual(product.spdType, 'Type 2');
+  assert.strictEqual(product.poles, '3P+N');
+});
+
+// Test 378: SPD coordination - no LPS no coordination needed
+test('spdCheckCoordination: no LPS not needed', function() {
+  var result = spdCheckCoordination(false, 5);
+  assert.strictEqual(result.needed, false);
+});
+
+// Test 379: SPD coordination - LPS distance > 10m needs decoupling
+test('spdCheckCoordination: LPS gt 10m decoupling', function() {
+  var result = spdCheckCoordination(true, 15);
+  assert.strictEqual(result.needed, true);
+  assert.strictEqual(result.decoupling, true);
+});
+
+// Test 380: SPD coordination - LPS distance < 10m no decoupling
+test('spdCheckCoordination: LPS lt 10m no decoupling', function() {
+  var result = spdCheckCoordination(true, 8);
+  assert.strictEqual(result.needed, true);
+  assert.strictEqual(result.decoupling, false);
+});
+
+// Test 381: renderSPD has no text inputs
+test('renderSPD has no text input fields', function() {
+  var html = renderSPD();
+  assert.strictEqual(html.indexOf('<input type="text"'), -1, 'No text inputs allowed');
+  assert.strictEqual(html.indexOf('<textarea'), -1, 'No textarea allowed');
+});
+
+// Test 382: renderSPD references correct standards
+test('renderSPD references DS/HD 60364', function() {
+  var html = renderSPD();
+  assert.ok(html.indexOf('60364') >= 0);
+  assert.ok(html.indexOf('534') >= 0 || html.indexOf('443') >= 0);
+});
+
+// ===== UPS SIZING MODULE TESTS =====
+
+// Test 383: UPS load calculation - single server
+test('upsCalcLoad: 2 servers = 1000W', function() {
+  var result = upsCalcLoad({ server: 2, desktop: 0, network: 0, router: 0, monitor: 0, medical: 0, security: 0, pos: 0 });
+  assert.strictEqual(result.totalW, 1000);
+  // VA = (500/0.8)*2 * 1.25 = 1562.5 -> ceil = 1563
+  assert.strictEqual(result.totalVA, 1563);
+});
+
+// Test 384: UPS load calculation - mixed equipment
+test('upsCalcLoad: mixed IT equipment', function() {
+  var result = upsCalcLoad({ server: 1, desktop: 2, network: 1, router: 1, monitor: 2, medical: 0, security: 0, pos: 0 });
+  assert.strictEqual(result.totalW, 1450);
+  assert.ok(result.totalVA > result.totalW, 'VA should be larger than W due to PF and margin');
+});
+
+// Test 385: UPS load calculation - empty load
+test('upsCalcLoad: empty equipment returns 0', function() {
+  var result = upsCalcLoad({ server: 0, desktop: 0, network: 0, router: 0, monitor: 0, medical: 0, security: 0, pos: 0 });
+  assert.strictEqual(result.totalW, 0);
+  assert.strictEqual(result.totalVA, 0);
+});
+
+// Test 386: UPS size selection - never > 80% loaded
+test('upsSelectSize: 1563VA selects 2000VA', function() {
+  var size = upsSelectSize(1563);
+  // minSize = ceil(1563 * 1.25) = 1954, next standard >= 1954 is 2000
+  assert.strictEqual(size, 2000);
+});
+
+// Test 387: UPS size selection - large load
+test('upsSelectSize: 50000VA selects 80000VA', function() {
+  var size = upsSelectSize(50000);
+  // minSize = ceil(50000 * 1.25) = 62500, next is 80000
+  assert.strictEqual(size, 80000);
+});
+
+// Test 388: UPS size selection - maximum
+test('upsSelectSize: very large returns 200000VA', function() {
+  var size = upsSelectSize(200000);
+  assert.strictEqual(size, 200000);
+});
+
+// Test 389: UPS battery calculation - AGM 1000W uses 48V
+test('upsCalcBattery: 1000W 15min AGM at 48V', function() {
+  var result = upsCalcBattery(1000, 15, 'agm');
+  // 1000W >= 1000 so voltage = 48V
+  assert.strictEqual(result.voltage, 48);
+  assert.strictEqual(result.blocks, 4);
+  // ah = ceil(1000 * 0.25 / (48 * 0.85 * 0.8)) = ceil(250 / 32.64) = ceil(7.66) = 8
+  assert.strictEqual(result.ah, 8);
+});
+
+// Test 390: UPS battery calculation - Li-ion higher DoD
+test('upsCalcBattery: 1000W 15min Li-ion at 48V', function() {
+  var result = upsCalcBattery(1000, 15, 'liion');
+  assert.strictEqual(result.voltage, 48);
+  // ah = ceil(1000 * 0.25 / (48 * 0.85 * 0.9)) = ceil(250 / 36.72) = ceil(6.81) = 7
+  assert.strictEqual(result.ah, 7);
+  assert.strictEqual(result.dod, 0.9);
+});
+
+// Test 391: UPS battery voltage tiers
+test('upsCalcBattery: voltage scales with load', function() {
+  var small = upsCalcBattery(500, 15, 'agm');
+  var medium = upsCalcBattery(5000, 15, 'agm');
+  var large = upsCalcBattery(50000, 15, 'agm');
+  assert.strictEqual(small.voltage, 24);
+  assert.strictEqual(medium.voltage, 96);
+  assert.strictEqual(large.voltage, 384);
+});
+
+// Test 392: UPS input cable
+test('upsCalcInputCable: returns cable with sufficient Iz', function() {
+  var result = upsCalcInputCable(10000, 230);
+  assert.ok(result.current > 0);
+  assert.ok(result.cable !== null);
+  assert.ok(result.cable.iz >= result.current);
+});
+
+// Test 393: UPS heat loss = 5%
+test('upsCalcHeatLoss: 5 percent of UPS VA', function() {
+  var result = upsCalcHeatLoss(10000);
+  assert.strictEqual(result.heatW, 500);
+  assert.strictEqual(result.ventRequired, true);
+});
+
+// Test 394: UPS heat loss - small UPS no ventilation
+test('upsCalcHeatLoss: small UPS no vent required', function() {
+  var result = upsCalcHeatLoss(2000);
+  assert.strictEqual(result.heatW, 100);
+  assert.strictEqual(result.ventRequired, false);
+});
+
+// Test 395: UPS bypass required
+test('upsNeedsBypass: online gt 3kVA needs bypass', function() {
+  assert.strictEqual(upsNeedsBypass('online', 5000), true);
+  assert.strictEqual(upsNeedsBypass('online', 2000), false);
+  assert.strictEqual(upsNeedsBypass('offline', 5000), false);
+});
+
+// Test 396: renderUPS has no text inputs
+test('renderUPS has no text input fields', function() {
+  var html = renderUPS();
+  assert.strictEqual(html.indexOf('<input type="text"'), -1, 'No text inputs allowed');
+  assert.strictEqual(html.indexOf('<textarea'), -1, 'No textarea allowed');
+});
+
+// Test 397: renderUPS references IEC 62040
+test('renderUPS references IEC 62040', function() {
+  var html = renderUPS();
+  assert.ok(html.indexOf('IEC 62040') >= 0);
+});
+
+// ===== POWER FACTOR CORRECTION MODULE TESTS =====
+
+// Test 398: PFC kvar calculation - basic
+test('pfcCalcKvar: 0.75 to 0.95 at 100kW', function() {
+  var result = pfcCalcKvar(0.75, 0.95, 100);
+  // tan(acos(0.75))=0.8819, tan(acos(0.95))=0.3287 => Qc=100*(0.8819-0.3287)=55.32 => ceil=56
+  assert.strictEqual(result.kvar, 56);
+  assert.ok(result.clause.indexOf('cl.523') >= 0);
+});
+
+// Test 399: PFC kvar - already at target
+test('pfcCalcKvar: already at target returns 0', function() {
+  var result = pfcCalcKvar(0.95, 0.95, 100);
+  assert.strictEqual(result.kvar, 0);
+});
+
+// Test 400: PFC kvar - above target returns 0
+test('pfcCalcKvar: above target returns 0', function() {
+  var result = pfcCalcKvar(0.98, 0.95, 100);
+  assert.strictEqual(result.kvar, 0);
+});
+
+// Test 401: PFC kvar - very low PF
+test('pfcCalcKvar: 0.50 to 0.95 at 500kW high kvar', function() {
+  var result = pfcCalcKvar(0.50, 0.95, 500);
+  assert.ok(result.kvar >= 700);
+  assert.ok(result.kvar <= 710);
+});
+
+// Test 402: PFC standard size selection
+test('pfcSelectStandardSize: 56 kvar selects 75', function() {
+  assert.strictEqual(pfcSelectStandardSize(56), 75);
+});
+
+// Test 403: PFC standard size - exact match
+test('pfcSelectStandardSize: 50 kvar selects 50', function() {
+  assert.strictEqual(pfcSelectStandardSize(50), 50);
+});
+
+// Test 404: PFC standard size - very large
+test('pfcSelectStandardSize: 450 kvar selects 500', function() {
+  assert.strictEqual(pfcSelectStandardSize(450), 500);
+});
+
+// Test 405: PFC resonance calculation - no risk
+test('pfcCalcResonance: 20MVA 75kvar no risk', function() {
+  var result = pfcCalcResonance(20, 75);
+  assert.ok(result.fr > 700);
+  assert.strictEqual(result.risk, false);
+});
+
+// Test 406: PFC resonance near 5th harmonic
+test('pfcCalcResonance: near 5th harmonic warns', function() {
+  var result = pfcCalcResonance(10, 400);
+  assert.strictEqual(result.risk, true);
+  assert.strictEqual(result.harmonicOrder, 5);
+});
+
+// Test 407: PFC resonance - zero kvar
+test('pfcCalcResonance: zero kvar no risk', function() {
+  var result = pfcCalcResonance(20, 0);
+  assert.strictEqual(result.fr, 0);
+  assert.strictEqual(result.risk, false);
+});
+
+// Test 408: PFC cable sizing - 1.5x factor
+test('pfcCalcCableSizing: includes 1.5x margin on raw current', function() {
+  var result = pfcCalcCableSizing(75, 400);
+  // Ic raw = 75000 / (sqrt(3) * 400) = 108.25 -> ic = ceil(108.25) = 109
+  assert.ok(result.ic >= 108);
+  assert.ok(result.icWithMargin > result.ic);
+  if (result.cable) assert.ok(result.cable.iz >= result.icWithMargin);
+});
+
+// Test 409: PFC protection - no RCD
+test('pfcCalcProtection: noRCD is true', function() {
+  var result = pfcCalcProtection(75, 400);
+  assert.strictEqual(result.noRCD, true);
+  assert.strictEqual(result.dischargeTime, 180);
+  assert.strictEqual(result.dischargeVoltage, 75);
+});
+
+// Test 410: PFC penalty - PF >= 0.90 no penalty
+test('pfcCalcPenalty: PF 0.92 no penalty', function() {
+  var result = pfcCalcPenalty(0.92, 0.95, 100);
+  assert.strictEqual(result.penalty, 0);
+});
+
+// Test 411: PFC penalty - PF < 0.90 has penalty
+test('pfcCalcPenalty: PF 0.70 has penalty', function() {
+  var result = pfcCalcPenalty(0.70, 0.95, 100);
+  assert.ok(result.penalty > 0);
+  assert.ok(result.savings > 0);
+});
+
+// Test 412: PFC detuning recommendation 7%
+test('pfcGetDetuningRecommendation: 7 pct gives 189Hz', function() {
+  var result = pfcGetDetuningRecommendation(7);
+  assert.strictEqual(result.tuningHz, 189);
+});
+
+// Test 413: PFC detuning recommendation 14%
+test('pfcGetDetuningRecommendation: 14 pct gives 134Hz', function() {
+  var result = pfcGetDetuningRecommendation(14);
+  assert.strictEqual(result.tuningHz, 134);
+});
+
+// Test 414: renderPFC has no text inputs
+test('renderPFC has no text input fields', function() {
+  var html = renderPFC();
+  assert.strictEqual(html.indexOf('<input type="text"'), -1, 'No text inputs allowed');
+  assert.strictEqual(html.indexOf('<textarea'), -1, 'No textarea allowed');
+});
+
+// Test 415: renderPFC references IEC 61921
+test('renderPFC references IEC 61921', function() {
+  var html = renderPFC();
+  assert.ok(html.indexOf('IEC 61921') >= 0);
+  assert.ok(html.indexOf('cl.523') >= 0 || html.indexOf('60364') >= 0);
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

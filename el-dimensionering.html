@@ -660,7 +660,10 @@ const T = {
       busbar: 'Skinnesystem',
       bathroom: 'Badevaerelse',
       firealarm: 'Brandalarm',
-      data: 'Datainstallation'
+      data: 'Datainstallation',
+      spd: 'Overspaending',
+      ups: 'UPS / Noedstroem',
+      pfc: 'PF-korrektion'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -779,7 +782,10 @@ const T = {
       busbar: 'Busbar Trunking',
       bathroom: 'Bathroom Zones',
       firealarm: 'Fire Alarm',
-      data: 'Structured Cabling'
+      data: 'Structured Cabling',
+      spd: 'Surge Protection',
+      ups: 'UPS Sizing',
+      pfc: 'Power Factor Correction'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -890,7 +896,10 @@ const T = {
       busbar: 'سیستم باسبار',
       bathroom: 'مناطق حمام',
       firealarm: 'سیستم اعلام حریق',
-      data: 'کابل‌کشی ساختاریافته'
+      data: 'کابل‌کشی ساختاریافته',
+      spd: 'حفاظت اضافه‌ولتاژ',
+      ups: 'یو‌پی‌اس / برق اضطراری',
+      pfc: 'اصلاح ضریب توان'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -1385,7 +1394,73 @@ const _FA = {
   'IoT Sensor': 'حسگر IoT',
   'Server Room': 'اتاق سرور',
   'Testing Required': 'نیاز به تست',
-  'Labeling Required': 'نیاز به برچسب‌گذاری'
+  'Labeling Required': 'نیاز به برچسب‌گذاری',
+  // SPD module translations
+  'Surge Protection Design (DS/HD 60364-5-534 + IEC 62305)': 'طراحی حفاظت اضافه‌ولتاژ (DS/HD 60364-5-534 + IEC 62305)',
+  'Risk Assessment per DS/HD 60364-4-443': 'ارزیابی ریسک طبق DS/HD 60364-4-443',
+  'Building Location': 'موقعیت ساختمان',
+  'Urban (low risk)': 'شهری (ریسک پایین)',
+  'Suburban (medium)': 'حومه شهر (متوسط)',
+  'Rural (high)': 'روستایی (بالا)',
+  'Mountain/exposed (very high)': 'کوهستانی/در معرض (بسیار بالا)',
+  'Lightning Flash Density Ng': 'چگالی رعد و برق Ng',
+  'Building Length [m]': 'طول ساختمان [m]',
+  'Building Width [m]': 'عرض ساختمان [m]',
+  'Building Height [m]': 'ارتفاع ساختمان [m]',
+  'Collection Area Ac': 'سطح جمع‌آوری Ac',
+  'Expected Direct Strikes Nd': 'ضربات مورد انتظار Nd',
+  'Risk Level': 'سطح ریسک',
+  'SPD Required (Nd > 0.05)': 'SPD اجباری (Nd > 0.05)',
+  'SPD Type and Specification': 'نوع و مشخصات SPD',
+  'Backup Fuse': 'فیوز پشتیبان',
+  'Recommended Product': 'محصول توصیه شده',
+  'Installation Rules': 'قوانین نصب',
+  'Connection Leads': 'سیم‌های اتصال',
+  'After main switch, before RCD': 'بعد از کلید اصلی، قبل از RCD',
+  // UPS module translations
+  'UPS Sizing (IEC 62040 + DS/HD 60364-5-56)': 'ابعاد‌سنجی UPS (IEC 62040 + DS/HD 60364-5-56)',
+  'UPS Topology': 'توپولوژی UPS',
+  'Offline/Standby (VI)': 'آفلاین/آماده‌به‌کار (VI)',
+  'Line-Interactive (VI)': 'تعاملی خطی (VI)',
+  'Online Double-Conversion (VFI)': 'آنلاین تبدیل دوگانه (VFI)',
+  'Server': 'سرور',
+  'Desktop PC': 'کامپیوتر رومیزی',
+  'Network Switch': 'سویچ شبکه',
+  'Router/Firewall': 'روتر/فایروال',
+  'LED Monitor': 'مانیتور LED',
+  'Medical Device': 'تجهیزات پزشکی',
+  'Security System': 'سیستم امنیتی',
+  'POS Terminal': 'پایانه فروش',
+  'Autonomy Time [min]': 'زمان پشتیبان [دقیقه]',
+  'Battery Type': 'نوع باتری',
+  'Load Calculation': 'محاسبه بار',
+  'Total Load': 'بار کل',
+  'Selected UPS': 'UPS انتخاب شده',
+  'UPS Size': 'اندازه UPS',
+  'Battery': 'باتری',
+  'Capacity': 'ظرفیت',
+  'Cable Sizing': 'ابعاد‌سنجی کابل',
+  'Input Current': 'جریان ورودی',
+  'Heat Loss': 'تلفات حرارتی',
+  'Ventilation Required': 'تهویه مورد نیاز',
+  'Bypass Switch': 'کلید بای‌پس',
+  // PFC module translations
+  'Power Factor Correction (IEC 61921 + DS/HD 60364-5-52)': 'اصلاح ضریب توان (IEC 61921 + DS/HD 60364-5-52)',
+  'Current Power Factor': 'ضریب توان فعلی',
+  'Target Power Factor': 'ضریب توان هدف',
+  'Active Power [kW]': 'توان اکتیو [kW]',
+  'Capacitor Bank Calculation': 'محاسبه بانک خازن',
+  'Correction Type': 'نوع اصلاح',
+  'Detuning Factor': 'ضریب دتیونینگ',
+  'Resonance Check': 'بررسی رزونانس',
+  'Resonance Frequency fr': 'فرکانس رزونانس fr',
+  'No Resonance Risk': 'بدون ریسک رزونانس',
+  'Resonance Risk': 'ریسک رزونانس',
+  'Cable and Protection': 'کابل و حفاظت',
+  'Capacitor Current Ic': 'جریان خازن Ic',
+  'Penalty Savings': 'صرفه‌جویی جریمه',
+  'Short-circuit Power Sk [MVA]': 'توان اتصال کوتاه Sk [MVA]',
+  'No penalty (cos φ ≥ 0.90)': 'بدون جریمه (cos φ ≥ 0.90)'
 };
 function tx(da, en) { if(lang === 'da') return da; if(lang === 'fa') return _FA[en] || en; return en; }
 function tl(obj, prefix) { return obj[prefix + '_' + lang] || obj[prefix + '_en'] || ''; }
@@ -4362,6 +4437,9 @@ function renderModule(mod) {
     case 'bathroom': content = renderBathroom(); break;
     case 'firealarm': content = renderFireAlarm(); break;
     case 'data': content = renderData(); break;
+    case 'spd': content = renderSPD(); break;
+    case 'ups': content = renderUPS(); break;
+    case 'pfc': content = renderPFC(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -12297,6 +12375,602 @@ function renderData() {
   // Verdict
   var allOk = distCheck.ok && (!fiberBudget || fiberBudget.distanceOk);
   html += renderVerdict(allOk, allOk ? tx('Datainstallation opfylder ISO 11801 + DS/EN 50173', 'Structured cabling complies with ISO 11801 + DS/EN 50173') : tx('Afstand overskrider graenser - brug fiber eller ekstra teknikrum', 'Distance exceeds limits - use fiber or additional telecom room'));
+
+  html += '</div>';
+  return html;
+}
+
+
+// ===== SURGE PROTECTION MODULE (DS/HD 60364-5-534 + IEC 62305) =====
+
+var spdState = {
+  location: 'urban',
+  ng: 1.0,
+  length: 30,
+  width: 20,
+  height: 6,
+  hasLPS: false,
+  hasSensitive: false
+};
+
+var SPD_LOCATIONS = {
+  urban: { cd: 0.25, da: 'By (lav risiko)', en: 'Urban (low risk)' },
+  suburban: { cd: 0.5, da: 'Forstad (middel)', en: 'Suburban (medium)' },
+  rural: { cd: 1.0, da: 'Landlig (hoej)', en: 'Rural (high)' },
+  mountain: { cd: 2.0, da: 'Bjerg/eksponeret (meget hoej)', en: 'Mountain/exposed (very high)' }
+};
+
+function spdCalcCollectionArea(length, width, height) {
+  // Ac = (L + 6H)(W + 6H) x 10^-6 km^2
+  var ac = (length + 6 * height) * (width + 6 * height) * 1e-6;
+  return { ac: ac, clause: 'DS/HD 60364-4-443 cl.443.4' };
+}
+
+function spdCalcExpectedStrikes(ng, ac, cd) {
+  // Nd = Ng x Ac x Cd x Ct (Ct = 1.0 for standard structure)
+  var ct = 1.0;
+  var nd = ng * ac * cd * ct;
+  return { nd: Math.ceil(nd * 10000) / 10000, clause: 'DS/HD 60364-4-443 cl.443.4' };
+}
+
+function spdAssessRisk(nd) {
+  // Threshold: if Nd > 0.05 then SPD is mandatory per cl.443.4
+  var mandatory = nd > 0.05;
+  var level = nd > 0.5 ? 'very_high' : nd > 0.1 ? 'high' : nd > 0.05 ? 'medium' : 'low';
+  return { mandatory: mandatory, level: level, threshold: 0.05, nd: nd, clause: 'DS/HD 60364-4-443 cl.443.4' };
+}
+
+function spdSelectType(hasLPS, hasSensitive) {
+  var types = [];
+  if (hasLPS) types.push({ type: 'Type 1', location: 'Service entrance', inKA: 25, imaxKA: 100, clause: 'DS/HD 60364-5-534 cl.534.4' });
+  types.push({ type: 'Type 2', location: 'Main distribution board', inKA: 20, imaxKA: 40, clause: 'DS/HD 60364-5-534 cl.534.4' });
+  if (hasSensitive) types.push({ type: 'Type 3', location: 'Sensitive equipment', inKA: 5, imaxKA: 10, clause: 'DS/HD 60364-5-534 cl.534.4' });
+  return types;
+}
+
+function spdGetSpecification(spdType) {
+  if (spdType === 'Type 1') {
+    return { uc: 440, up: 4.0, inKA: 25, imaxKA: 100, backupFuse: '160A gG', clause: 'DS/HD 60364-5-534 cl.534.4.4' };
+  } else if (spdType === 'Type 2') {
+    return { uc: 253, up: 2.5, inKA: 20, imaxKA: 40, backupFuse: '125A gG', clause: 'DS/HD 60364-5-534 cl.534.4.4' };
+  }
+  return { uc: 253, up: 1.5, inKA: 5, imaxKA: 10, backupFuse: '63A gG', clause: 'DS/HD 60364-5-534 cl.534.4.4' };
+}
+
+function spdRecommendProduct(risk, hasLPS) {
+  var spds = PRODUCTS.spds;
+  if (hasLPS) {
+    for (var i = 0; i < spds.length; i++) {
+      if (spds[i].spdType === 'Type 1+2') return spds[i];
+    }
+  }
+  for (var i = 0; i < spds.length; i++) {
+    if (spds[i].spdType === 'Type 2' && spds[i].poles === '3P+N') return spds[i];
+  }
+  return spds[0];
+}
+
+function spdCheckCoordination(hasLPS, distanceT1T2) {
+  if (!hasLPS) return { needed: false, decoupling: false, clause: 'DS/HD 60364-5-534 cl.534.4' };
+  var needDecoupling = distanceT1T2 > 10;
+  return { needed: true, decoupling: needDecoupling, distanceT1T2: distanceT1T2, clause: 'DS/HD 60364-5-534 cl.534.4' };
+}
+
+function renderSPD() {
+  var acResult = spdCalcCollectionArea(spdState.length, spdState.width, spdState.height);
+  var loc = SPD_LOCATIONS[spdState.location];
+  var strikeResult = spdCalcExpectedStrikes(spdState.ng, acResult.ac, loc.cd);
+  var risk = spdAssessRisk(strikeResult.nd);
+  var types = spdSelectType(spdState.hasLPS, spdState.hasSensitive);
+  var mainType = spdState.hasLPS ? 'Type 1' : 'Type 2';
+  var spec = spdGetSpecification(mainType);
+  var product = spdRecommendProduct(risk, spdState.hasLPS);
+  var coord = spdCheckCoordination(spdState.hasLPS, 15);
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Overspaendingsbeskyttelse (DS/HD 60364-5-534 + IEC 62305)', 'Surge Protection Design (DS/HD 60364-5-534 + IEC 62305)') + '</div>';
+  html += '<div class="info-row">' + tx('Risikovurdering og SPD-valg iht. DS/HD 60364-4-443', 'Risk assessment and SPD selection per DS/HD 60364-4-443') + '</div>';
+
+  // Building Location
+  html += '<div class="select-group"><div class="select-label">' + tx('Bygningsplacering', 'Building Location') + '</div><div class="select-grid">';
+  Object.keys(SPD_LOCATIONS).forEach(function(key) {
+    var l = SPD_LOCATIONS[key];
+    html += '<button class="sel-btn' + (spdState.location === key ? ' selected' : '') + '" onclick="spdState.location=\'' + key + '\';renderModule(\'spd\')">' + tx(l.da, l.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Lightning flash density
+  html += '<div class="select-group"><div class="select-label">' + tx('Lynnedslagstaethed Ng [pr. km2/aar]', 'Lightning Flash Density Ng [flashes/km2/year]') + '</div><div class="select-grid">';
+  [0.5, 1.0, 1.5, 2.0, 2.5, 3.0].forEach(function(n) {
+    html += '<button class="sel-btn' + (spdState.ng === n ? ' selected' : '') + '" onclick="spdState.ng=' + n + ';renderModule(\'spd\')">' + n + '</button>';
+  });
+  html += '</div></div>';
+
+  // Building dimensions - length
+  html += '<div class="select-group"><div class="select-label">' + tx('Bygningslaengde [m]', 'Building Length [m]') + '</div><div class="select-grid">';
+  [10, 20, 30, 40, 50, 60, 70, 80, 90, 100].forEach(function(v) {
+    html += '<button class="sel-btn' + (spdState.length === v ? ' selected' : '') + '" onclick="spdState.length=' + v + ';renderModule(\'spd\')">' + v + '</button>';
+  });
+  html += '</div></div>';
+
+  // Building dimensions - width
+  html += '<div class="select-group"><div class="select-label">' + tx('Bygningsbredde [m]', 'Building Width [m]') + '</div><div class="select-grid">';
+  [10, 15, 20, 25, 30, 35, 40, 45, 50].forEach(function(v) {
+    html += '<button class="sel-btn' + (spdState.width === v ? ' selected' : '') + '" onclick="spdState.width=' + v + ';renderModule(\'spd\')">' + v + '</button>';
+  });
+  html += '</div></div>';
+
+  // Building dimensions - height
+  html += '<div class="select-group"><div class="select-label">' + tx('Bygningshoejde [m]', 'Building Height [m]') + '</div><div class="select-grid">';
+  [3, 6, 9, 12, 15, 18, 21, 24, 27, 30].forEach(function(v) {
+    html += '<button class="sel-btn' + (spdState.height === v ? ' selected' : '') + '" onclick="spdState.height=' + v + ';renderModule(\'spd\')">' + v + '</button>';
+  });
+  html += '</div></div>';
+
+  // LPS toggle
+  html += '<div class="select-group"><div class="select-label">' + tx('Ekstern lynbeskyttelse (LPS) eller luftlinje', 'External Lightning Protection (LPS) or Overhead Supply') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (!spdState.hasLPS ? ' selected' : '') + '" onclick="spdState.hasLPS=false;renderModule(\'spd\')">' + tx('Nej', 'No') + '</button>';
+  html += '<button class="sel-btn' + (spdState.hasLPS ? ' selected' : '') + '" onclick="spdState.hasLPS=true;renderModule(\'spd\')">' + tx('Ja', 'Yes') + '</button>';
+  html += '</div></div>';
+
+  // Sensitive equipment toggle
+  html += '<div class="select-group"><div class="select-label">' + tx('Foelsomt udstyr (IT, medicinsk, data)', 'Sensitive Equipment (IT, medical, data)') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (!spdState.hasSensitive ? ' selected' : '') + '" onclick="spdState.hasSensitive=false;renderModule(\'spd\')">' + tx('Nej', 'No') + '</button>';
+  html += '<button class="sel-btn' + (spdState.hasSensitive ? ' selected' : '') + '" onclick="spdState.hasSensitive=true;renderModule(\'spd\')">' + tx('Ja', 'Yes') + '</button>';
+  html += '</div></div>';
+
+  // Results
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Risikovurdering', 'Risk Assessment') + ' - ' + acResult.clause + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Opsamlingsareal Ac', 'Collection Area Ac') + '</span><span class="value">' + (acResult.ac * 1e6).toFixed(0) + ' m\u00B2 (' + acResult.ac.toFixed(6) + ' km\u00B2)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Forventede direkte nedslag Nd', 'Expected Direct Strikes Nd') + '</span><span class="value">' + strikeResult.nd.toFixed(4) + ' /aar</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Risikoniveau', 'Risk Level') + '</span><span class="value">' + risk.level + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('SPD paakraevet (Nd > 0.05)', 'SPD Required (Nd > 0.05)') + '</span><span class="value">' + (risk.mandatory ? '\u2705 ' + tx('Ja, obligatorisk', 'Yes, mandatory') : '\u2B55 ' + tx('Anbefalet', 'Recommended')) + '</span></div>';
+  html += '</div>';
+
+  // SPD Type and specification
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('SPD-type og specifikation', 'SPD Type and Specification') + ' - ' + spec.clause + '</div>';
+  types.forEach(function(t) {
+    html += '<div class="result-row"><span class="label">' + t.type + '</span><span class="value">' + t.location + ' (In: ' + t.inKA + 'kA, Imax: ' + t.imaxKA + 'kA)</span></div>';
+  });
+  html += '<div class="result-row"><span class="label">Uc</span><span class="value">\u2265 ' + spec.uc + 'V</span></div>';
+  html += '<div class="result-row"><span class="label">Up</span><span class="value">\u2264 ' + spec.up + ' kV</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Backupsikring', 'Backup Fuse') + '</span><span class="value">' + spec.backupFuse + '</span></div>';
+  html += '</div>';
+
+  // Product recommendation
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Anbefalet produkt', 'Recommended Product') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Produkt', 'Product') + '</span><span class="value">' + product.brand + ' ' + product.model + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Type', 'Type') + '</span><span class="value">' + product.spdType + ' (' + product.poles + ')</span></div>';
+  html += '<div class="result-row"><span class="label">Imax</span><span class="value">' + product.imax + ' kA</span></div>';
+  html += '<div class="result-row"><span class="label">Up</span><span class="value">' + product.up + ' kV</span></div>';
+  html += '</div>';
+
+  // Coordination
+  if (coord.needed) {
+    html += '<div class="result-box">';
+    html += '<div class="result-title">' + tx('Koordinering T1-T2', 'Coordination T1-T2') + ' - ' + coord.clause + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Afkoblingsspole paakraevet', 'Decoupling Inductor Required') + '</span><span class="value">' + (coord.decoupling ? '\u2705 ' + tx('Ja (afstand > 10m)', 'Yes (distance > 10m)') : '\u274C ' + tx('Nej (afstand < 10m)', 'No (distance < 10m)')) + '</span></div>';
+    html += '</div>';
+  }
+
+  // Installation rules
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Installationsregler', 'Installation Rules') + ' - DS/HD 60364-5-534 cl.534.4.4</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Tilslutningsledere', 'Connection Leads') + '</span><span class="value">' + tx('Maks. 0.5m total (L + PE)', 'Max 0.5m total (L + PE)') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kabelforing', 'Wiring') + '</span><span class="value">' + tx('V-ledningsforing foretrukket', 'V-wiring preferred (shortest path)') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Placering', 'Position') + '</span><span class="value">' + tx('Efter hovedafbryder, foer HPFI', 'After main switch, before RCD') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Fjernsignalering', 'Remote Signaling') + '</span><span class="value">' + tx('Kontakt til BMS anbefalet', 'Contact for building management recommended') + '</span></div>';
+  html += '</div>';
+
+  // Verdict
+  html += renderVerdict(!risk.mandatory || types.length > 0, risk.mandatory ? tx('SPD obligatorisk iht. DS/HD 60364-4-443 cl.443.4 - ' + product.brand + ' ' + product.model + ' anbefalet', 'SPD mandatory per DS/HD 60364-4-443 cl.443.4 - ' + product.brand + ' ' + product.model + ' recommended') : tx('SPD anbefalet som god praksis', 'SPD recommended as good practice'));
+
+  html += '</div>';
+  return html;
+}
+
+
+// ===== UPS SIZING MODULE (IEC 62040 + DS/HD 60364-5-56) =====
+
+var UPS_EQUIPMENT = {
+  server: { w: 500, pf: 0.8, da: 'Server', en: 'Server' },
+  desktop: { w: 300, pf: 0.8, da: 'Desktop PC', en: 'Desktop PC' },
+  network: { w: 150, pf: 0.8, da: 'Netvaerksswitch', en: 'Network Switch' },
+  router: { w: 100, pf: 0.8, da: 'Router/Firewall', en: 'Router/Firewall' },
+  monitor: { w: 50, pf: 0.9, da: 'LED-skaerm', en: 'LED Monitor' },
+  medical: { w: 1000, pf: 0.8, da: 'Medicinsk udstyr', en: 'Medical Device' },
+  security: { w: 200, pf: 0.8, da: 'Sikkerhedssystem', en: 'Security System' },
+  pos: { w: 150, pf: 0.9, da: 'POS-terminal', en: 'POS Terminal' }
+};
+
+var UPS_TOPOLOGIES = {
+  offline: { switchMs: 10, da: 'Offline/Standby (VI)', en: 'Offline/Standby (VI)' },
+  lineint: { switchMs: 3, da: 'Linje-interaktiv (VI)', en: 'Line-Interactive (VI)' },
+  online: { switchMs: 0, da: 'Online Dobbeltkonvertering (VFI)', en: 'Online Double-Conversion (VFI)' }
+};
+
+var UPS_BATTERY_TYPES = {
+  agm: { dod: 0.8, life: '3-5', da: 'VRLA AGM (standard)', en: 'VRLA AGM (standard)' },
+  gel: { dod: 0.8, life: '5-8', da: 'VRLA Gel (hoej temp)', en: 'VRLA Gel (high temp)' },
+  liion: { dod: 0.9, life: '10-15', da: 'Li-ion LFP (lang levetid)', en: 'Li-ion LFP (long life)' }
+};
+
+var UPS_STANDARD_SIZES = [750, 1000, 1500, 2000, 3000, 5000, 6000, 10000, 15000, 20000, 30000, 40000, 60000, 80000, 100000, 120000, 160000, 200000];
+
+var upsState = {
+  topology: 'online',
+  equipment: { server: 0, desktop: 0, network: 0, router: 0, monitor: 0, medical: 0, security: 0, pos: 0 },
+  autonomy: 15,
+  batteryType: 'agm'
+};
+
+function upsCalcLoad(equipment) {
+  var totalW = 0;
+  var totalVA = 0;
+  Object.keys(equipment).forEach(function(key) {
+    var qty = equipment[key] || 0;
+    if (qty > 0 && UPS_EQUIPMENT[key]) {
+      var eq = UPS_EQUIPMENT[key];
+      totalW += eq.w * qty;
+      totalVA += (eq.w / eq.pf) * qty;
+    }
+  });
+  // 25% safety margin (conservative)
+  return { totalW: totalW, totalVA: Math.ceil(totalVA * 1.25), margin: 1.25, clause: 'IEC 62040-1' };
+}
+
+function upsSelectSize(requiredVA) {
+  // Never load UPS > 80% so multiply by 1.25
+  var minSize = Math.ceil(requiredVA * 1.25);
+  for (var i = 0; i < UPS_STANDARD_SIZES.length; i++) {
+    if (UPS_STANDARD_SIZES[i] >= minSize) return UPS_STANDARD_SIZES[i];
+  }
+  return UPS_STANDARD_SIZES[UPS_STANDARD_SIZES.length - 1];
+}
+
+function upsCalcBattery(loadW, autonomyMin, batteryType) {
+  var efficiency = 0.85;
+  var dod = UPS_BATTERY_TYPES[batteryType].dod;
+  var autonomyH = autonomyMin / 60;
+  var battVoltage = loadW < 1000 ? 24 : loadW < 3000 ? 48 : loadW < 10000 ? 96 : loadW < 30000 ? 192 : 384;
+  var ah = Math.ceil((loadW * autonomyH) / (battVoltage * efficiency * dod));
+  var blocks = battVoltage / 12;
+  return { ah: ah, voltage: battVoltage, blocks: blocks, efficiency: efficiency, dod: dod, clause: 'IEC 62040-1' };
+}
+
+function upsCalcInputCable(upsVA, voltage) {
+  var current = upsVA / (voltage * 0.95);
+  var currentWithMargin = Math.ceil(current * 1.25);
+  var cables = PRODUCTS.cables;
+  var selected = null;
+  for (var i = 0; i < cables.length; i++) {
+    if (cables[i].iz >= currentWithMargin && cables[i].material === 'Cu') {
+      selected = cables[i];
+      break;
+    }
+  }
+  return { current: Math.ceil(current), cable: selected, clause: 'DS/HD 60364-5-52' };
+}
+
+function upsCalcHeatLoss(upsVA) {
+  return { heatW: Math.ceil(upsVA * 0.05), ventRequired: upsVA > 3000, clause: 'IEC 62040-1' };
+}
+
+function upsNeedsBypass(topology, upsVA) {
+  return topology === 'online' && upsVA > 3000;
+}
+
+function renderUPS() {
+  var load = upsCalcLoad(upsState.equipment);
+  var upsSize = upsSelectSize(load.totalVA);
+  var battery = upsCalcBattery(load.totalW, upsState.autonomy, upsState.batteryType);
+  var inputCable = upsCalcInputCable(upsSize, 230);
+  var heat = upsCalcHeatLoss(upsSize);
+  var bypass = upsNeedsBypass(upsState.topology, upsSize);
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('UPS-dimensionering (IEC 62040 + DS/HD 60364-5-56)', 'UPS Sizing (IEC 62040 + DS/HD 60364-5-56)') + '</div>';
+  html += '<div class="info-row">' + tx('Dimensionering af UPS og batteri iht. IEC 62040', 'UPS and battery sizing per IEC 62040') + '</div>';
+
+  // Topology
+  html += '<div class="select-group"><div class="select-label">' + tx('UPS-topologi', 'UPS Topology') + '</div><div class="select-grid">';
+  Object.keys(UPS_TOPOLOGIES).forEach(function(key) {
+    var top = UPS_TOPOLOGIES[key];
+    html += '<button class="sel-btn' + (upsState.topology === key ? ' selected' : '') + '" onclick="upsState.topology=\'' + key + '\';renderModule(\'ups\')">' + tx(top.da, top.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Equipment - each type with quantity buttons
+  Object.keys(UPS_EQUIPMENT).forEach(function(key) {
+    var eq = UPS_EQUIPMENT[key];
+    html += '<div class="select-group"><div class="select-label">' + tx(eq.da, eq.en) + ' (' + eq.w + 'W)</div><div class="select-grid">';
+    [0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20].forEach(function(n) {
+      html += '<button class="sel-btn' + (upsState.equipment[key] === n ? ' selected' : '') + '" onclick="upsState.equipment.' + key + '=' + n + ';renderModule(\'ups\')">' + n + '</button>';
+    });
+    html += '</div></div>';
+  });
+
+  // Autonomy
+  html += '<div class="select-group"><div class="select-label">' + tx('Autonomitid [min]', 'Autonomy Time [min]') + '</div><div class="select-grid">';
+  [5, 10, 15, 20, 30, 45, 60].forEach(function(m) {
+    html += '<button class="sel-btn' + (upsState.autonomy === m ? ' selected' : '') + '" onclick="upsState.autonomy=' + m + ';renderModule(\'ups\')">' + m + '</button>';
+  });
+  html += '</div></div>';
+
+  // Battery Type
+  html += '<div class="select-group"><div class="select-label">' + tx('Batteritype', 'Battery Type') + '</div><div class="select-grid">';
+  Object.keys(UPS_BATTERY_TYPES).forEach(function(key) {
+    var bt = UPS_BATTERY_TYPES[key];
+    html += '<button class="sel-btn' + (upsState.batteryType === key ? ' selected' : '') + '" onclick="upsState.batteryType=\'' + key + '\';renderModule(\'ups\')">' + tx(bt.da, bt.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Results - Load Calculation
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Belastningsberegning', 'Load Calculation') + ' - ' + load.clause + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Total belastning', 'Total Load') + '</span><span class="value">' + load.totalW + ' W</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Total VA (inkl. 25% margin)', 'Total VA (incl. 25% margin)') + '</span><span class="value">' + load.totalVA + ' VA</span></div>';
+  html += '</div>';
+
+  // UPS Size
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Valgt UPS', 'Selected UPS') + ' - IEC 62040</div>';
+  html += '<div class="result-row"><span class="label">' + tx('UPS stoerrelse', 'UPS Size') + '</span><span class="value">' + (upsSize >= 1000 ? (upsSize / 1000) + ' kVA' : upsSize + ' VA') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Topologi', 'Topology') + '</span><span class="value">' + tx(UPS_TOPOLOGIES[upsState.topology].da, UPS_TOPOLOGIES[upsState.topology].en) + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Maks. belastning', 'Max Loading') + '</span><span class="value">80% (' + Math.ceil(upsSize * 0.8) + ' VA)</span></div>';
+  var loadPct = load.totalVA > 0 ? Math.ceil((load.totalVA / upsSize) * 100) : 0;
+  html += '<div class="result-row"><span class="label">' + tx('Aktuel belastning', 'Current Loading') + '</span><span class="value">' + loadPct + '%</span></div>';
+  html += '</div>';
+
+  // Battery
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Batteri', 'Battery') + ' - ' + battery.clause + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Batteritype', 'Battery Type') + '</span><span class="value">' + tx(UPS_BATTERY_TYPES[upsState.batteryType].da, UPS_BATTERY_TYPES[upsState.batteryType].en) + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kapacitet', 'Capacity') + '</span><span class="value">' + battery.ah + ' Ah</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Batterispaending', 'Battery Voltage') + '</span><span class="value">' + battery.voltage + ' V (' + battery.blocks + ' x 12V blokke)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Levetid', 'Lifespan') + '</span><span class="value">' + UPS_BATTERY_TYPES[upsState.batteryType].life + ' ' + tx('aar', 'years') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Autonomi', 'Autonomy') + '</span><span class="value">' + upsState.autonomy + ' min</span></div>';
+  html += '</div>';
+
+  // Cable
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Kabeldimensionering', 'Cable Sizing') + ' - ' + inputCable.clause + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Indgangsstrm', 'Input Current') + '</span><span class="value">' + inputCable.current + ' A</span></div>';
+  if (inputCable.cable) {
+    html += '<div class="result-row"><span class="label">' + tx('Anbefalet kabel', 'Recommended Cable') + '</span><span class="value">' + inputCable.cable.brand + ' ' + inputCable.cable.model + ' ' + inputCable.cable.mm2 + 'mm\u00B2 (Iz=' + inputCable.cable.iz + 'A)</span></div>';
+  }
+  html += '</div>';
+
+  // Heat & ventilation
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Ventilation og installation', 'Ventilation and Installation') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Varmetab', 'Heat Loss') + '</span><span class="value">' + heat.heatW + ' W</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Ventilation paakraevet', 'Ventilation Required') + '</span><span class="value">' + (heat.ventRequired ? '\u2705 ' + tx('Ja', 'Yes') : tx('Nej', 'No')) + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Bypass-afbryder', 'Bypass Switch') + '</span><span class="value">' + (bypass ? '\u2705 ' + tx('Obligatorisk (Online > 3kVA)', 'Mandatory (Online > 3kVA)') : tx('Ikke paakraevet', 'Not required')) + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Jording', 'Earthing') + '</span><span class="value">' + tx('Ren jord for foelsomt udstyr (IT jording)', 'Clean earth for sensitive equipment (IT earthing)') + '</span></div>';
+  html += '</div>';
+
+  // Verdict
+  var safe = load.totalVA > 0 && loadPct <= 80;
+  html += renderVerdict(safe, safe ? tx('UPS korrekt dimensioneret iht. IEC 62040 (belastning <= 80%)', 'UPS correctly sized per IEC 62040 (loading <= 80%)') : tx('Vaelg udstyr for at dimensionere UPS', 'Select equipment to size UPS'));
+
+  html += '</div>';
+  return html;
+}
+
+
+// ===== POWER FACTOR CORRECTION MODULE (IEC 61921 + DS/HD 60364-5-52) =====
+
+var PFC_STANDARD_SIZES = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 125, 150, 200, 250, 300, 400, 500];
+
+var pfcState = {
+  currentPF: 0.75,
+  targetPF: 0.95,
+  activePower: 100,
+  correctionType: 'auto',
+  detuning: 0,
+  skMVA: 20
+};
+
+function pfcCalcKvar(currentPF, targetPF, kW) {
+  if (currentPF >= targetPF) return { kvar: 0, clause: 'IEC 61921 + DS/HD 60364-5-52 cl.523' };
+  var phi1 = Math.acos(currentPF);
+  var phi2 = Math.acos(targetPF);
+  var tanPhi1 = Math.tan(phi1);
+  var tanPhi2 = Math.tan(phi2);
+  var qc = kW * (tanPhi1 - tanPhi2);
+  return { kvar: Math.ceil(qc), tanPhi1: tanPhi1, tanPhi2: tanPhi2, clause: 'IEC 61921 + DS/HD 60364-5-52 cl.523' };
+}
+
+function pfcSelectStandardSize(requiredKvar) {
+  for (var i = 0; i < PFC_STANDARD_SIZES.length; i++) {
+    if (PFC_STANDARD_SIZES[i] >= requiredKvar) return PFC_STANDARD_SIZES[i];
+  }
+  return PFC_STANDARD_SIZES[PFC_STANDARD_SIZES.length - 1];
+}
+
+function pfcCalcResonance(skMVA, qcKvar) {
+  var skKVA = skMVA * 1000;
+  if (qcKvar <= 0) return { fr: 0, harmonicOrder: 0, risk: false, clause: 'IEC 61921' };
+  var fr = 50 * Math.sqrt(skKVA / qcKvar);
+  var harmonics = [3, 5, 7, 11, 13];
+  var nearHarmonic = 0;
+  var risk = false;
+  for (var i = 0; i < harmonics.length; i++) {
+    var hf = harmonics[i] * 50;
+    if (Math.abs(fr - hf) < 30) {
+      nearHarmonic = harmonics[i];
+      risk = true;
+      break;
+    }
+  }
+  return { fr: Math.round(fr), harmonicOrder: nearHarmonic, risk: risk, clause: 'IEC 61921' };
+}
+
+function pfcCalcCableSizing(kvar, voltage) {
+  var ic = (kvar * 1000) / (Math.sqrt(3) * voltage);
+  var icWithMargin = Math.ceil(ic * 1.5);
+  var cables = PRODUCTS.cables;
+  var selected = null;
+  for (var i = 0; i < cables.length; i++) {
+    if (cables[i].iz >= icWithMargin && cables[i].material === 'Cu') {
+      selected = cables[i];
+      break;
+    }
+  }
+  return { ic: Math.ceil(ic), icWithMargin: icWithMargin, cable: selected, clause: 'IEC 61921 cl.7' };
+}
+
+function pfcCalcProtection(kvar, voltage) {
+  var ic = (kvar * 1000) / (Math.sqrt(3) * voltage);
+  var fuseRating = Math.ceil(ic * 1.5);
+  return { fuseRating: fuseRating, noRCD: true, dischargeTime: 180, dischargeVoltage: 75, clause: 'IEC 61921 + DS/HD 60364-5-52 cl.532.2' };
+}
+
+function pfcCalcPenalty(currentPF, targetPF, kW) {
+  if (currentPF >= 0.90) return { penalty: 0, savings: 0, clause: 'Cerius/Radius/N1 tariff' };
+  var phi1 = Math.acos(currentPF);
+  var kvar1 = kW * Math.tan(phi1);
+  var monthlyHours = 720;
+  var penaltyRate = 50;
+  var phi09 = Math.acos(0.90);
+  var kvarAllowed = kW * Math.tan(phi09);
+  var excessKvar = kvar1 - kvarAllowed;
+  var monthlyPenalty = Math.ceil(excessKvar * monthlyHours * penaltyRate / 1000);
+  return { penalty: monthlyPenalty, savings: monthlyPenalty, excessKvar: Math.ceil(excessKvar), clause: 'Cerius/Radius/N1 tariff' };
+}
+
+function pfcGetDetuningRecommendation(detuning) {
+  if (detuning === 7) return { tuningHz: 189, da: '7% (189 Hz) - moderat harmonisk (THD < 15%)', en: '7% (189 Hz) - moderate harmonics (THD < 15%)' };
+  if (detuning === 14) return { tuningHz: 134, da: '14% (134 Hz) - hoej harmonisk (THD 15-30%, mange VFD)', en: '14% (134 Hz) - high harmonics (THD 15-30%, many VFDs)' };
+  return { tuningHz: 0, da: 'Ingen aftemning - kun konstant lineaer belastning', en: 'No detuning - constant linear loads only' };
+}
+
+function renderPFC() {
+  var calc = pfcCalcKvar(pfcState.currentPF, pfcState.targetPF, pfcState.activePower);
+  var standardSize = calc.kvar > 0 ? pfcSelectStandardSize(calc.kvar) : 0;
+  var resonance = pfcCalcResonance(pfcState.skMVA, standardSize);
+  var cable = pfcCalcCableSizing(standardSize, 400);
+  var protection = pfcCalcProtection(standardSize, 400);
+  var penalty = pfcCalcPenalty(pfcState.currentPF, pfcState.targetPF, pfcState.activePower);
+  var detune = pfcGetDetuningRecommendation(pfcState.detuning);
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Effektfaktorkorrektion (IEC 61921 + DS/HD 60364-5-52)', 'Power Factor Correction (IEC 61921 + DS/HD 60364-5-52)') + '</div>';
+  html += '<div class="info-row">' + tx('Beregning af kondensatorbatteri og resonanskontrol', 'Capacitor bank calculation and resonance check') + '</div>';
+
+  // Current PF
+  html += '<div class="select-group"><div class="select-label">' + tx('Aktuel effektfaktor (cos \u03C6)', 'Current Power Factor (cos \u03C6)') + '</div><div class="select-grid">';
+  [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95].forEach(function(pf) {
+    html += '<button class="sel-btn' + (pfcState.currentPF === pf ? ' selected' : '') + '" onclick="pfcState.currentPF=' + pf + ';renderModule(\'pfc\')">' + pf.toFixed(2) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Target PF
+  html += '<div class="select-group"><div class="select-label">' + tx('Maal effektfaktor', 'Target Power Factor') + '</div><div class="select-grid">';
+  [0.90, 0.92, 0.95, 0.96, 0.98, 1.00].forEach(function(pf) {
+    html += '<button class="sel-btn' + (pfcState.targetPF === pf ? ' selected' : '') + '" onclick="pfcState.targetPF=' + pf + ';renderModule(\'pfc\')">' + pf.toFixed(2) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Active Power
+  html += '<div class="select-group"><div class="select-label">' + tx('Aktiv effekt [kW]', 'Active Power [kW]') + '</div><div class="select-grid">';
+  [10, 20, 30, 50, 75, 100, 150, 200, 300, 400, 500, 750, 1000].forEach(function(p) {
+    html += '<button class="sel-btn' + (pfcState.activePower === p ? ' selected' : '') + '" onclick="pfcState.activePower=' + p + ';renderModule(\'pfc\')">' + p + '</button>';
+  });
+  html += '</div></div>';
+
+  // Correction Type
+  html += '<div class="select-group"><div class="select-label">' + tx('Korrektionstype', 'Correction Type') + '</div><div class="select-grid">';
+  [{k:'fixed', da:'Fast (konstant belastning)', en:'Fixed (constant loads)'}, {k:'auto', da:'Automatisk/trinvis (varierende)', en:'Automatic/Stepped (varying)'}, {k:'detuned', da:'Afstemt m. reaktor (harmoniske)', en:'Detuned with reactor (harmonics)'}].forEach(function(ct) {
+    html += '<button class="sel-btn' + (pfcState.correctionType === ct.k ? ' selected' : '') + '" onclick="pfcState.correctionType=\'' + ct.k + '\';renderModule(\'pfc\')">' + tx(ct.da, ct.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Detuning Factor
+  html += '<div class="select-group"><div class="select-label">' + tx('Aftemningsfaktor', 'Detuning Factor') + '</div><div class="select-grid">';
+  [{v:0, da:'Ingen (0%)', en:'None (0%)'}, {v:7, da:'7% (189 Hz, THD<15%)', en:'7% (189 Hz, THD<15%)'}, {v:14, da:'14% (134 Hz, THD 15-30%)', en:'14% (134 Hz, THD 15-30%)'}].forEach(function(d) {
+    html += '<button class="sel-btn' + (pfcState.detuning === d.v ? ' selected' : '') + '" onclick="pfcState.detuning=' + d.v + ';renderModule(\'pfc\')">' + tx(d.da, d.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Short-circuit power
+  html += '<div class="select-group"><div class="select-label">' + tx('Kortslutningseffekt Sk [MVA]', 'Short-circuit Power Sk [MVA]') + '</div><div class="select-grid">';
+  [5, 10, 15, 20, 30, 40, 50, 75, 100, 150, 200].forEach(function(s) {
+    html += '<button class="sel-btn' + (pfcState.skMVA === s ? ' selected' : '') + '" onclick="pfcState.skMVA=' + s + ';renderModule(\'pfc\')">' + s + '</button>';
+  });
+  html += '</div></div>';
+
+  // Results - kvar calculation
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Kondensatorbankberegning', 'Capacitor Bank Calculation') + ' - ' + calc.clause + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Beregnet Qc', 'Calculated Qc') + '</span><span class="value">' + calc.kvar + ' kvar</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Standard bankstorrelse', 'Standard Bank Size') + '</span><span class="value">' + standardSize + ' kvar</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Korrektionstype', 'Correction Type') + '</span><span class="value">' + tx(pfcState.correctionType === 'fixed' ? 'Fast' : pfcState.correctionType === 'auto' ? 'Automatisk/trinvis' : 'Afstemt m. reaktor', pfcState.correctionType === 'fixed' ? 'Fixed' : pfcState.correctionType === 'auto' ? 'Automatic/Stepped' : 'Detuned with reactor') + '</span></div>';
+  if (pfcState.detuning > 0) {
+    html += '<div class="result-row"><span class="label">' + tx('Aftemning', 'Detuning') + '</span><span class="value">' + tx(detune.da, detune.en) + '</span></div>';
+  }
+  html += '</div>';
+
+  // Resonance check
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Resonanskontrol', 'Resonance Check') + ' - ' + resonance.clause + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Resonansfrekvens fr', 'Resonance Frequency fr') + '</span><span class="value">' + resonance.fr + ' Hz</span></div>';
+  if (resonance.risk) {
+    html += '<div class="result-row"><span class="label">\u26A0\uFE0F ' + tx('Resonansrisiko', 'Resonance Risk') + '</span><span class="value" style="color:var(--danger)">' + tx('Naer ' + resonance.harmonicOrder + '. harmoniske (' + (resonance.harmonicOrder * 50) + ' Hz) - afstemt reaktor anbefales!', 'Near ' + resonance.harmonicOrder + 'th harmonic (' + (resonance.harmonicOrder * 50) + ' Hz) - detuned reactor recommended!') + '</span></div>';
+  } else {
+    html += '<div class="result-row"><span class="label">\u2705 ' + tx('Ingen resonansrisiko', 'No Resonance Risk') + '</span><span class="value">' + tx('Resonansfrekvens er vaek fra harmoniske ordener', 'Resonance frequency is away from harmonic orders') + '</span></div>';
+  }
+  html += '</div>';
+
+  // Cable and protection
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Kabel og beskyttelse', 'Cable and Protection') + ' - ' + cable.clause + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kondensatorstroem Ic', 'Capacitor Current Ic') + '</span><span class="value">' + cable.ic + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kabel (1.5 x Ic)', 'Cable (1.5 x Ic)') + '</span><span class="value">' + (cable.cable ? cable.cable.brand + ' ' + cable.cable.model + ' ' + cable.cable.mm2 + 'mm\u00B2 (Iz=' + cable.cable.iz + 'A)' : tx('Standard forsyningskabel', 'Standard supply cable')) + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Sikring (1.5 x Ic)', 'Fuse (1.5 x Ic)') + '</span><span class="value">' + protection.fuseRating + ' A gG</span></div>';
+  html += '<div class="result-row"><span class="label">\u26A0\uFE0F ' + tx('HPFI/RCD', 'RCD') + '</span><span class="value" style="color:var(--danger)">' + tx('INGEN HPFI mellem kondensator og forsyning! (Ladestroemmen tripper HPFI)', 'NO RCD between capacitor and supply! (Charging current will trip RCD)') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Afladningsmodstand', 'Discharge Resistor') + '</span><span class="value">' + tx('Obligatorisk - afladning til < 75V inden 3 min (cl.532.2)', 'Mandatory - discharge to < 75V within 3 min (cl.532.2)') + '</span></div>';
+  html += '</div>';
+
+  // Penalty savings
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Besparelse (strafafgift)', 'Penalty Savings') + ' - ' + penalty.clause + '</div>';
+  if (penalty.penalty > 0) {
+    html += '<div class="result-row"><span class="label">' + tx('Maanedlig straf foer korrektion', 'Monthly Penalty Before Correction') + '</span><span class="value" style="color:var(--danger)">~' + penalty.penalty + ' DKK</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Estimeret maanedlig besparelse', 'Estimated Monthly Savings') + '</span><span class="value" style="color:var(--success)">~' + penalty.savings + ' DKK</span></div>';
+  } else {
+    html += '<div class="result-row"><span class="label">' + tx('Status', 'Status') + '</span><span class="value">\u2705 ' + tx('Ingen straf (cos \u03C6 >= 0.90)', 'No penalty (cos \u03C6 >= 0.90)') + '</span></div>';
+  }
+  html += '</div>';
+
+  // Controller
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Controller', 'Controller') + '</div>';
+  if (pfcState.correctionType === 'auto' || pfcState.correctionType === 'detuned') {
+    html += '<div class="result-row"><span class="label">' + tx('Anbefalet', 'Recommended') + '</span><span class="value">ABB RVC / Schneider Varlogic / Epcos BR6000 (6-12 trin)</span></div>';
+  } else {
+    html += '<div class="result-row"><span class="label">' + tx('Controller', 'Controller') + '</span><span class="value">' + tx('Ikke paakraevet (fast kompensation)', 'Not required (fixed compensation)') + '</span></div>';
+  }
+  html += '</div>';
+
+  // Verdict
+  var safe = calc.kvar > 0 && !resonance.risk;
+  var verdictText = '';
+  if (calc.kvar === 0) {
+    verdictText = tx('Effektfaktor allerede ved maal - ingen korrektion noedvendig', 'Power factor already at target - no correction needed');
+    safe = true;
+  } else if (resonance.risk && pfcState.detuning === 0) {
+    verdictText = tx('RESONANSRISIKO - afstemt reaktor paakraevet iht. IEC 61921', 'RESONANCE RISK - detuned reactor required per IEC 61921');
+    safe = false;
+  } else {
+    verdictText = tx('PF-korrektion dimensioneret iht. IEC 61921 og DS/HD 60364-5-52 cl.523', 'PF correction sized per IEC 61921 and DS/HD 60364-5-52 cl.523');
+    safe = true;
+  }
+  html += renderVerdict(safe, verdictText);
 
   html += '</div>';
   return html;
