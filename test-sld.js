@@ -3828,6 +3828,343 @@ test('Farsi translations exist for busbar module', function() {
   assert.ok(_FA['Diversity Factor'], 'Diversity Factor must have Farsi');
 });
 
+// ===== BATHROOM ZONES MODULE TESTS =====
+
+// Test 318: Bathroom module registered in translations
+test('Bathroom module registered in T.da, T.en, T.fa', function() {
+  assert.ok(T.da.modules.bathroom, 'bathroom must be in Danish');
+  assert.ok(T.en.modules.bathroom, 'bathroom must be in English');
+  assert.ok(T.fa.modules.bathroom, 'bathroom must be in Farsi');
+});
+
+// Test 319: Farsi translations for bathroom module
+test('Farsi translations exist for bathroom module', function() {
+  assert.ok(_FA['Bathroom Zones'], 'Bathroom Zones must have Farsi');
+  assert.ok(_FA['Zone Classification'], 'Zone Classification must have Farsi');
+  assert.ok(_FA['Equipment'], 'Equipment must have Farsi');
+  assert.ok(_FA['ALLOWED'], 'ALLOWED must have Farsi');
+  assert.ok(_FA['NOT ALLOWED'], 'NOT ALLOWED must have Farsi');
+});
+
+// Test 320: Zone 0 - no sockets allowed
+test('bathroomCheckEquipment: socket not allowed in Zone 0', function() {
+  var result = bathroomCheckEquipment(0, 'socket');
+  assert.strictEqual(result.allowed, false);
+  assert.ok(result.clause.indexOf('701') >= 0, 'Must reference clause 701');
+});
+
+// Test 321: Zone 0 - no luminaires
+test('bathroomCheckEquipment: luminaire not allowed in Zone 0', function() {
+  var result = bathroomCheckEquipment(0, 'luminaire');
+  assert.strictEqual(result.allowed, false);
+});
+
+// Test 322: Zone 1 - luminaire allowed with IPX4
+test('bathroomCheckEquipment: luminaire allowed in Zone 1', function() {
+  var result = bathroomCheckEquipment(1, 'luminaire');
+  assert.strictEqual(result.allowed, true);
+  assert.strictEqual(result.ipRequired, 'IPX4');
+});
+
+// Test 323: Zone 1 - no socket outlets
+test('bathroomCheckEquipment: socket not allowed in Zone 1', function() {
+  var result = bathroomCheckEquipment(1, 'socket');
+  assert.strictEqual(result.allowed, false);
+});
+
+// Test 324: Zone 2 - shaver socket allowed via isolating transformer
+test('bathroomCheckEquipment: shaver socket allowed in Zone 2', function() {
+  var result = bathroomCheckEquipment(2, 'shaversocket');
+  assert.strictEqual(result.allowed, true);
+  assert.ok(result.reason.indexOf('isolating transformer') >= 0);
+});
+
+// Test 325: Zone 3 (outside) - socket allowed with RCD
+test('bathroomCheckEquipment: socket allowed outside zones', function() {
+  var result = bathroomCheckEquipment(3, 'socket');
+  assert.strictEqual(result.allowed, true);
+  assert.ok(result.reason.indexOf('RCD 30mA') >= 0);
+});
+
+// Test 326: EV charger not allowed in any zone
+test('bathroomCheckEquipment: EV charger never allowed', function() {
+  assert.strictEqual(bathroomCheckEquipment(0, 'evcharger').allowed, false);
+  assert.strictEqual(bathroomCheckEquipment(1, 'evcharger').allowed, false);
+  assert.strictEqual(bathroomCheckEquipment(2, 'evcharger').allowed, false);
+  assert.strictEqual(bathroomCheckEquipment(3, 'evcharger').allowed, false);
+});
+
+// Test 327: IP ratings per zone correct
+test('bathroomGetZoneIP returns correct ratings', function() {
+  assert.strictEqual(bathroomGetZoneIP(0), 'IPX7');
+  assert.strictEqual(bathroomGetZoneIP(1), 'IPX4');
+  assert.strictEqual(bathroomGetZoneIP(2), 'IPX4');
+  assert.strictEqual(bathroomGetZoneIP(3), 'IPX1');
+});
+
+// Test 328: Protection requirements include RCD
+test('bathroomGetProtectionReqs includes RCD 30mA', function() {
+  var reqs = bathroomGetProtectionReqs(0);
+  var hasRCD = reqs.some(function(r) { return r.req.indexOf('RCD 30mA') >= 0; });
+  assert.ok(hasRCD, 'Must require RCD 30mA');
+});
+
+// Test 329: SELV requirement in Zone 0 and 1
+test('bathroomGetProtectionReqs includes SELV for Zone 0 and 1', function() {
+  var reqs0 = bathroomGetProtectionReqs(0);
+  var hasSELV0 = reqs0.some(function(r) { return r.req.indexOf('SELV') >= 0; });
+  assert.ok(hasSELV0, 'Zone 0 must require SELV');
+  var reqs1 = bathroomGetProtectionReqs(1);
+  var hasSELV1 = reqs1.some(function(r) { return r.req.indexOf('SELV') >= 0; });
+  assert.ok(hasSELV1, 'Zone 1 must require SELV');
+});
+
+// Test 330: Zone 2+ no SELV requirement
+test('bathroomGetProtectionReqs no SELV for Zone 2+', function() {
+  var reqs2 = bathroomGetProtectionReqs(2);
+  var hasSELV2 = reqs2.some(function(r) { return r.req.indexOf('SELV') >= 0; });
+  assert.strictEqual(hasSELV2, false, 'Zone 2 should not require SELV');
+});
+
+// Test 331: Underfloor heating allowed with conditions
+test('bathroomCheckUnderfloorHeating allowed with earthed grid', function() {
+  var ufh = bathroomCheckUnderfloorHeating(0);
+  assert.strictEqual(ufh.allowed, true);
+  assert.ok(ufh.condition.indexOf('earthed') >= 0 || ufh.condition.indexOf('Earthed') >= 0);
+  assert.strictEqual(ufh.clause, 'cl.701.753');
+});
+
+// Test 332: renderBathroom contains no text inputs
+test('renderBathroom has no text input fields', function() {
+  var html = renderBathroom();
+  assert.strictEqual(html.indexOf('<input type="text"'), -1, 'No text inputs allowed');
+  assert.strictEqual(html.indexOf('<textarea'), -1, 'No textarea allowed');
+});
+
+// Test 333: renderBathroom references DS/HD 60364-7-701
+test('renderBathroom references DS/HD 60364-7-701', function() {
+  var html = renderBathroom();
+  assert.ok(html.indexOf('60364-7-701') >= 0, 'Must reference DS/HD 60364-7-701');
+});
+
+// ===== FIRE ALARM MODULE TESTS =====
+
+// Test 334: Fire alarm module registered in translations
+test('Fire alarm module registered in T.da, T.en, T.fa', function() {
+  assert.ok(T.da.modules.firealarm, 'firealarm must be in Danish');
+  assert.ok(T.en.modules.firealarm, 'firealarm must be in English');
+  assert.ok(T.fa.modules.firealarm, 'firealarm must be in Farsi');
+});
+
+// Test 335: Farsi translations for fire alarm module
+test('Farsi translations exist for fire alarm module', function() {
+  assert.ok(_FA['Fire Alarm System'], 'Fire Alarm System must have Farsi');
+  assert.ok(_FA['Detector Type'], 'Detector Type must have Farsi');
+  assert.ok(_FA['Battery Sizing'], 'Battery Sizing must have Farsi');
+});
+
+// Test 336: Optical smoke detector coverage 60m2
+test('firealarmCalcDetectors: optical smoke covers 60m2', function() {
+  var result = firealarmCalcDetectors('optical_smoke', 100, 3.0);
+  assert.strictEqual(result.count, 2); // ceil(100/60) = 2
+  assert.strictEqual(result.coverage, 60);
+});
+
+// Test 337: Heat A1 detector coverage 30m2
+test('firealarmCalcDetectors: heat A1 covers 30m2', function() {
+  var result = firealarmCalcDetectors('heat_a1', 100, 3.0);
+  assert.strictEqual(result.count, 4); // ceil(100/30) = 4 (conservative with rounding)
+});
+
+// Test 338: Smoke detector height limit 12m
+test('firealarmCalcDetectors: smoke height limit 12m', function() {
+  var result = firealarmCalcDetectors('optical_smoke', 100, 15.0);
+  assert.strictEqual(result.heightOk, false);
+});
+
+// Test 339: Heat detector height limit 7.5m
+test('firealarmCalcDetectors: heat height limit 7.5m', function() {
+  var result = firealarmCalcDetectors('heat_a1', 100, 8.0);
+  assert.strictEqual(result.heightOk, false);
+});
+
+// Test 340: Large area needs multiple detectors
+test('firealarmCalcDetectors: 1000m2 needs many detectors', function() {
+  var result = firealarmCalcDetectors('optical_smoke', 1000, 3.0);
+  assert.ok(result.count >= 17, 'Should need at least 17 detectors for 1000m2'); // ceil(1000/60)=17
+});
+
+// Test 341: Loop design max 126 devices
+test('firealarmCalcLoopDesign: max 126 devices per loop', function() {
+  var result = firealarmCalcLoopDesign(200);
+  assert.ok(result.loops >= 2, 'Should need at least 2 loops for 200 devices');
+  assert.ok(result.devicesPerLoop <= 126, 'Should not exceed 126 per loop');
+});
+
+// Test 342: Battery sizing includes 72h standby
+test('firealarmCalcBattery: 72h standby + 30min alarm', function() {
+  var result = firealarmCalcBattery(10, 2);
+  assert.strictEqual(result.standbyH, 72);
+  assert.strictEqual(result.alarmMin, 30);
+  assert.strictEqual(result.voltage, 24);
+  assert.ok(result.batteryAh > 0, 'Battery capacity must be positive');
+});
+
+// Test 343: Call points max 30m travel
+test('firealarmCalcCallPoints: max 30m travel distance', function() {
+  var result = firealarmCalcCallPoints(100);
+  assert.strictEqual(result.maxTravel, 30);
+  assert.ok(result.count >= 2, 'Minimum 2 call points');
+});
+
+// Test 344: Manual call point calculation
+test('firealarmCalcDetectors: manual call point', function() {
+  var result = firealarmCalcDetectors('manual_cp', 100, 3.0);
+  assert.ok(result.count >= 1, 'At least 1 call point');
+  assert.strictEqual(result.standard, 'EN 54-11');
+});
+
+// Test 345: Sounders minimum 65 dBA
+test('firealarmCalcSounders: min 65 dBA', function() {
+  var result = firealarmCalcSounders(500);
+  assert.strictEqual(result.minDB, 65);
+  assert.ok(result.count >= 1);
+});
+
+// Test 346: renderFireAlarm has no text inputs
+test('renderFireAlarm has no text input fields', function() {
+  var html = renderFireAlarm();
+  assert.strictEqual(html.indexOf('<input type="text"'), -1, 'No text inputs allowed');
+  assert.strictEqual(html.indexOf('<textarea'), -1, 'No textarea allowed');
+});
+
+// Test 347: renderFireAlarm references DS/EN 54
+test('renderFireAlarm references DS/EN 54', function() {
+  var html = renderFireAlarm();
+  assert.ok(html.indexOf('EN 54') >= 0 || html.indexOf('DS/EN 54') >= 0, 'Must reference EN 54');
+});
+
+// Test 348: High ceiling derate for smoke detectors
+test('firealarmCalcDetectors: smoke derated above 6m ceiling', function() {
+  var normal = firealarmCalcDetectors('optical_smoke', 300, 3.0);
+  var high = firealarmCalcDetectors('optical_smoke', 300, 8.0);
+  assert.ok(high.count >= normal.count, 'Higher ceiling should need same or more detectors');
+});
+
+// ===== STRUCTURED CABLING MODULE TESTS =====
+
+// Test 349: Data module registered in translations
+test('Data module registered in T.da, T.en, T.fa', function() {
+  assert.ok(T.da.modules.data, 'data must be in Danish');
+  assert.ok(T.en.modules.data, 'data must be in English');
+  assert.ok(T.fa.modules.data, 'data must be in Farsi');
+});
+
+// Test 350: Farsi translations for data module
+test('Farsi translations exist for data module', function() {
+  assert.ok(_FA['Structured Cabling'], 'Structured Cabling must have Farsi');
+  assert.ok(_FA['Cable Category'], 'Cable Category must have Farsi');
+  assert.ok(_FA['PoE Budget'], 'PoE Budget must have Farsi');
+});
+
+// Test 351: Distance check - 50m Cat6A OK
+test('dataCalcDistance: 50m Cat6A within limits', function() {
+  var result = dataCalcDistance(50, 'cat6a');
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.permanentLink, 90);
+});
+
+// Test 352: Distance check - 100m Cat6A fails
+test('dataCalcDistance: 100m Cat6A exceeds permanent link', function() {
+  var result = dataCalcDistance(100, 'cat6a');
+  assert.strictEqual(result.ok, false);
+});
+
+// Test 353: Cat 8 max distance 30m
+test('dataCalcDistance: Cat 8 max 30m', function() {
+  var result = dataCalcDistance(35, 'cat8');
+  assert.strictEqual(result.ok, false);
+  assert.strictEqual(result.permanentLink, 30);
+});
+
+// Test 354: Outlet calculation for office
+test('dataCalcOutlets: office 200m2', function() {
+  var result = dataCalcOutlets(200, 'office');
+  assert.ok(result.outlets >= 2, 'Must have at least 2 outlets');
+  assert.strictEqual(result.perWorkspace, 2);
+  // 200 * 0.2 = 40 workspaces * 2 = 80 outlets
+  assert.strictEqual(result.outlets, 80);
+});
+
+// Test 355: Patch panel calculation
+test('dataCalcPatchPanels: 80 outlets needs 4 panels', function() {
+  var result = dataCalcPatchPanels(80, 24);
+  assert.strictEqual(result.panels, 4); // ceil(80/24) = 4
+  assert.strictEqual(result.rackUnits, 4);
+});
+
+// Test 356: PoE budget calculation
+test('dataCalcPoeBudget: 24 ports 802.3af', function() {
+  var result = dataCalcPoeBudget('af', 24);
+  assert.strictEqual(result.totalW, 369.6); // 24 * 15.4
+  assert.ok(result.deratedW < result.totalW, 'Derated should be less than total');
+  assert.strictEqual(result.derating, 0.6);
+});
+
+// Test 357: Switch port calculation with 20% spare
+test('dataCalcSwitchPorts: 20% spare included', function() {
+  var result = dataCalcSwitchPorts(80, 24);
+  assert.strictEqual(result.accessPorts, 80);
+  assert.strictEqual(result.sparePorts, 16); // ceil(80*0.2)
+  assert.strictEqual(result.totalPorts, 96);
+});
+
+// Test 358: Fiber budget calculation OS2
+test('dataCalcFiberBudget: OS2 1km', function() {
+  var result = dataCalcFiberBudget('os2', 1000, 2, 0);
+  assert.ok(result.totalLoss > 0);
+  assert.strictEqual(result.distanceOk, true);
+  assert.strictEqual(result.maxDistance, 10000);
+});
+
+// Test 359: Fiber budget OM3 exceeds 300m
+test('dataCalcFiberBudget: OM3 400m exceeds limit', function() {
+  var result = dataCalcFiberBudget('om3', 400, 2, 0);
+  assert.strictEqual(result.distanceOk, false);
+});
+
+// Test 360: Separation for U/UTP
+test('dataGetSeparation: U/UTP needs 200mm', function() {
+  var result = dataGetSeparation('uutp');
+  assert.strictEqual(result.separation, 200);
+});
+
+// Test 361: Separation for S/FTP less
+test('dataGetSeparation: S/FTP needs only 50mm', function() {
+  var result = dataGetSeparation('sftp');
+  assert.strictEqual(result.separation, 50);
+});
+
+// Test 362: renderData has no text inputs
+test('renderData has no text input fields', function() {
+  var html = renderData();
+  assert.strictEqual(html.indexOf('<input type="text"'), -1, 'No text inputs allowed');
+  assert.strictEqual(html.indexOf('<textarea'), -1, 'No textarea allowed');
+});
+
+// Test 363: renderData references ISO 11801
+test('renderData references ISO 11801', function() {
+  var html = renderData();
+  assert.ok(html.indexOf('ISO 11801') >= 0, 'Must reference ISO 11801');
+});
+
+// Test 364: PoE++ Type 4 = 90W per port
+test('dataCalcPoeBudget: PoE++ Type 4 90W', function() {
+  var result = dataCalcPoeBudget('bt4', 8);
+  assert.strictEqual(result.perPort, 90);
+  assert.strictEqual(result.totalW, 720); // 8 * 90
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

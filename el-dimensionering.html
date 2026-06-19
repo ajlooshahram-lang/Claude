@@ -657,7 +657,10 @@ const T = {
       vfd: 'Frekvensomformer',
       lighting: 'Belysning',
       heatpump: 'Varmepumpe',
-      busbar: 'Skinnesystem'
+      busbar: 'Skinnesystem',
+      bathroom: 'Badevaerelse',
+      firealarm: 'Brandalarm',
+      data: 'Datainstallation'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -773,7 +776,10 @@ const T = {
       vfd: 'VFD Sizing',
       lighting: 'Lighting Design',
       heatpump: 'Heat Pump',
-      busbar: 'Busbar Trunking'
+      busbar: 'Busbar Trunking',
+      bathroom: 'Bathroom Zones',
+      firealarm: 'Fire Alarm',
+      data: 'Structured Cabling'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -881,7 +887,10 @@ const T = {
       vfd: 'درایو فرکانس',
       lighting: 'طراحی روشنایی',
       heatpump: 'پمپ حرارتی',
-      busbar: 'سیستم باسبار'
+      busbar: 'سیستم باسبار',
+      bathroom: 'مناطق حمام',
+      firealarm: 'سیستم اعلام حریق',
+      data: 'کابل‌کشی ساختاریافته'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -1276,7 +1285,107 @@ const _FA = {
   'Fire Barrier': 'مانع آتش',
   'Supply MCCB': 'MCCB تغذیه',
   'Thermal Check': 'بررسی حرارتی',
-  'Voltage Drop per Meter': 'افت ولتاژ بر متر'
+  'Voltage Drop per Meter': 'افت ولتاژ بر متر',
+  // Bathroom Zones translations
+  'Bathroom Zones': 'مناطق حمام',
+  'Zone Classification': 'طبقه‌بندی مناطق',
+  'Bath Type': 'نوع وان',
+  'Bathtub': 'وان حمام',
+  'Shower with tray': 'دوش با سینی',
+  'Shower without tray': 'دوش بدون سینی',
+  'Combined bath+shower': 'وان + دوش ترکیبی',
+  'Room Width': 'عرض اتاق',
+  'Room Length': 'طول اتاق',
+  'Ceiling Height': 'ارتفاع سقف',
+  'Equipment Check': 'بررسی تجهیزات',
+  'Equipment': 'تجهیزات',
+  'Zone': 'منطقه',
+  'ALLOWED': 'مجاز',
+  'NOT ALLOWED': 'غیرمجاز',
+  'IP Rating Required': 'درجه حفاظت IP مورد نیاز',
+  'RCD 30mA mandatory': 'RCD 30mA اجباری',
+  'Supplementary Bonding': 'اتصال تکمیلی',
+  'SELV 12V max': 'SELV حداکثر 12 ولت',
+  'Underfloor Heating': 'گرمایش کف',
+  'Heated Towel Rail': 'حوله‌خشک‌کن',
+  'Luminaire': 'چراغ',
+  'Ventilator': 'هواکش',
+  'Socket outlet': 'پریز',
+  'Switch': 'کلید',
+  'Water heater': 'آبگرم‌کن',
+  'Washing machine': 'ماشین لباسشویی',
+  'Dryer': 'خشک‌کن',
+  'Towel rail': 'حوله‌خشک‌کن',
+  'Mirror heater': 'گرمکن آینه',
+  'Shaver socket': 'پریز ریش‌تراش',
+  'Compliance Checklist': 'چک‌لیست انطباق',
+  'Zone Diagram': 'نمودار مناطق',
+  // Fire Alarm translations
+  'Fire Alarm System': 'سیستم اعلام حریق',
+  'System Category': 'دسته سیستم',
+  'Building Type': 'نوع ساختمان',
+  'Detector Type': 'نوع آشکارساز',
+  'Optical smoke': 'دود اپتیکی',
+  'Heat detector': 'آشکارساز حرارتی',
+  'Multi-sensor': 'چند حسگره',
+  'Linear beam': 'پرتو خطی',
+  'Aspirating': 'مکشی',
+  'Flame detector': 'آشکارساز شعله',
+  'Manual call point': 'شستی اعلام حریق',
+  'Room Area': 'مساحت اتاق',
+  'Detector Count': 'تعداد آشکارساز',
+  'Max Spacing': 'حداکثر فاصله',
+  'Coverage per Detector': 'پوشش هر آشکارساز',
+  'Loop Design': 'طراحی حلقه',
+  'Max Devices per Loop': 'حداکثر دستگاه در حلقه',
+  'Loop Cable Length': 'طول کابل حلقه',
+  'Fire-resistant Cable': 'کابل مقاوم آتش',
+  'Call Point Spacing': 'فاصله شستی‌ها',
+  'Battery Sizing': 'ابعاد باتری',
+  'Standby Duration': 'مدت آماده‌باش',
+  'Alarm Duration': 'مدت آلارم',
+  'Hospital': 'بیمارستان',
+  'Hotel': 'هتل',
+  'Care home': 'مرکز مراقبت',
+  'School': 'مدرسه',
+  'Retail': 'فروشگاه',
+  'Storage': 'انبار',
+  'Assembly': 'محل اجتماع',
+  'Parking': 'پارکینگ',
+  'Sounder Coverage': 'پوشش آژیر',
+  'Power Supply': 'منبع تغذیه',
+  // Structured Cabling translations
+  'Structured Cabling': 'کابل‌کشی ساختاریافته',
+  'Cable Category': 'دسته کابل',
+  'Application': 'کاربرد',
+  'Cable Type': 'نوع کابل',
+  'Distance Check': 'بررسی فاصله',
+  'Permanent Link': 'لینک دائم',
+  'Channel': 'کانال',
+  'Fiber Link Budget': 'بودجه لینک فیبر',
+  'Outlet Density': 'تراکم پریز',
+  'Floor Area': 'مساحت طبقه',
+  'Number of Outlets': 'تعداد پریزها',
+  'Patch Panel': 'پچ پنل',
+  'Rack Units': 'واحد رک',
+  'PoE Budget': 'بودجه PoE',
+  'PoE Type': 'نوع PoE',
+  'Total PoE Power': 'توان کل PoE',
+  'Switch Ports': 'پورت‌های سوئیچ',
+  'Uplink': 'آپلینک',
+  'Cable Pathway': 'مسیر کابل',
+  'Bend Radius': 'شعاع خمش',
+  'Tray Fill': 'پرشدگی سینی',
+  'Fire Rating': 'رتبه آتش',
+  'Separation from Power': 'فاصله از کابل برق',
+  'Workplace': 'محل کار',
+  'WiFi AP': 'اکسس پوینت وایفای',
+  'IP Camera': 'دوربین IP',
+  'VoIP Phone': 'تلفن VoIP',
+  'IoT Sensor': 'حسگر IoT',
+  'Server Room': 'اتاق سرور',
+  'Testing Required': 'نیاز به تست',
+  'Labeling Required': 'نیاز به برچسب‌گذاری'
 };
 function tx(da, en) { if(lang === 'da') return da; if(lang === 'fa') return _FA[en] || en; return en; }
 function tl(obj, prefix) { return obj[prefix + '_' + lang] || obj[prefix + '_en'] || ''; }
@@ -4250,6 +4359,9 @@ function renderModule(mod) {
     case 'lighting': content = renderLighting(); break;
     case 'heatpump': content = renderHeatPump(); break;
     case 'busbar': content = renderBusbar(); break;
+    case 'bathroom': content = renderBathroom(); break;
+    case 'firealarm': content = renderFireAlarm(); break;
+    case 'data': content = renderData(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -11399,6 +11511,797 @@ function renderBusbar() {
   html += '</div>';
   return html;
 }
+// ===== BATHROOM ZONES MODULE (DS/HD 60364-7-701) =====
+var bathroomState = {
+  bathType: 'bathtub',
+  roomWidth: 2.5,
+  roomLength: 3.0,
+  ceilingHeight: 2.5,
+  selectedZone: 0,
+  selectedEquipment: 'luminaire'
+};
+
+var BATHROOM_ZONES = {
+  0: { da: 'Zone 0 (Inde i kar/brusekabine)', en: 'Zone 0 (Inside bath/shower)', ip: 'IPX7', selv_max_v: 12 },
+  1: { da: 'Zone 1 (Over Zone 0 til 2,25m)', en: 'Zone 1 (Above Zone 0 to 2.25m)', ip: 'IPX4', selv_max_v: 12 },
+  2: { da: 'Zone 2 (0,6m fra Zone 1)', en: 'Zone 2 (0.6m from Zone 1)', ip: 'IPX4', selv_max_v: null },
+  3: { da: 'Uden for zoner', en: 'Outside zones', ip: 'IPX1', selv_max_v: null }
+};
+
+var BATHROOM_EQUIPMENT = {
+  luminaire: { da: 'Armatur', en: 'Luminaire' },
+  ventilator: { da: 'Ventilator', en: 'Ventilator/fan' },
+  socket: { da: 'Stikkontakt', en: 'Socket outlet' },
+  switch_dev: { da: 'Afbryder', en: 'Switch' },
+  waterheater: { da: 'Vandvarmer', en: 'Water heater' },
+  washingmachine: { da: 'Vaskemaskine', en: 'Washing machine' },
+  dryer: { da: 'Torretumbler', en: 'Dryer' },
+  towelrail: { da: 'Haandklaederadiatorer', en: 'Towel rail' },
+  mirrorheater: { da: 'Spejlvarmer', en: 'Mirror heater' },
+  shaversocket: { da: 'Barberstikkontakt', en: 'Shaver socket' },
+  evcharger: { da: 'EV-lader', en: 'EV charger' }
+};
+
+function bathroomCheckEquipment(zone, equipment) {
+  // Returns {allowed: bool, reason: string, clause: string, ipRequired: string}
+  var z = parseInt(zone);
+  var ipReq = BATHROOM_ZONES[z].ip;
+  switch (equipment) {
+    case 'luminaire':
+      if (z === 0) return { allowed: false, reason: 'No luminaires in Zone 0', clause: 'cl.701.55', ipRequired: 'IPX7' };
+      if (z === 1) return { allowed: true, reason: 'IPX4 luminaire, SELV or Class II only', clause: 'cl.701.55', ipRequired: 'IPX4' };
+      if (z === 2) return { allowed: true, reason: 'IPX4 luminaire allowed', clause: 'cl.701.55', ipRequired: 'IPX4' };
+      return { allowed: true, reason: 'Normal luminaire with RCD 30mA', clause: 'cl.701.411.3.3', ipRequired: 'IPX1' };
+    case 'ventilator':
+      if (z === 0) return { allowed: false, reason: 'No equipment in Zone 0', clause: 'cl.701.55', ipRequired: 'IPX7' };
+      if (z === 1) return { allowed: true, reason: 'Class II, IPX4, SELV supply preferred', clause: 'cl.701.55', ipRequired: 'IPX4' };
+      if (z === 2) return { allowed: true, reason: 'IPX4, Class II or with RCD 30mA', clause: 'cl.701.55', ipRequired: 'IPX4' };
+      return { allowed: true, reason: 'Normal installation with RCD 30mA', clause: 'cl.701.411.3.3', ipRequired: 'IPX1' };
+    case 'socket':
+      if (z === 0) return { allowed: false, reason: 'No socket outlets in Zone 0', clause: 'cl.701.512.3', ipRequired: 'IPX7' };
+      if (z === 1) return { allowed: false, reason: 'No socket outlets in Zone 1', clause: 'cl.701.512.3', ipRequired: 'IPX4' };
+      if (z === 2) return { allowed: false, reason: 'No socket outlets in Zone 2 (except shaver via isolating transformer)', clause: 'cl.701.512.3', ipRequired: 'IPX4' };
+      return { allowed: true, reason: 'Allowed with RCD 30mA mandatory', clause: 'cl.701.411.3.3', ipRequired: 'IPX1' };
+    case 'switch_dev':
+      if (z === 0) return { allowed: false, reason: 'No switches in Zone 0', clause: 'cl.701.512.3', ipRequired: 'IPX7' };
+      if (z === 1) return { allowed: false, reason: 'No switches in Zone 1 (except SELV)', clause: 'cl.701.512.3', ipRequired: 'IPX4' };
+      if (z === 2) return { allowed: true, reason: 'Allowed if RCD 30mA protected', clause: 'cl.701.411.3.3', ipRequired: 'IPX4' };
+      return { allowed: true, reason: 'Normal switch with RCD 30mA', clause: 'cl.701.411.3.3', ipRequired: 'IPX1' };
+    case 'waterheater':
+      if (z === 0) return { allowed: false, reason: 'No water heaters in Zone 0', clause: 'cl.701.55', ipRequired: 'IPX7' };
+      if (z === 1) return { allowed: true, reason: 'Only if SELV or Class II, fixed installation', clause: 'cl.701.55', ipRequired: 'IPX4' };
+      if (z === 2) return { allowed: true, reason: 'Class I with RCD or Class II', clause: 'cl.701.55', ipRequired: 'IPX4' };
+      return { allowed: true, reason: 'Normal installation with RCD 30mA', clause: 'cl.701.411.3.3', ipRequired: 'IPX1' };
+    case 'washingmachine':
+      if (z <= 1) return { allowed: false, reason: 'Not allowed in Zone 0 or 1', clause: 'cl.701.55', ipRequired: ipReq };
+      if (z === 2) return { allowed: false, reason: 'Not allowed in Zone 2', clause: 'cl.701.55', ipRequired: 'IPX4' };
+      return { allowed: true, reason: 'Allowed outside zones with RCD 30mA', clause: 'cl.701.411.3.3', ipRequired: 'IPX1' };
+    case 'dryer':
+      if (z <= 2) return { allowed: false, reason: 'Not allowed in Zones 0-2', clause: 'cl.701.55', ipRequired: ipReq };
+      return { allowed: true, reason: 'Allowed outside zones with RCD 30mA', clause: 'cl.701.411.3.3', ipRequired: 'IPX1' };
+    case 'towelrail':
+      if (z <= 1) return { allowed: false, reason: 'Not allowed in Zone 0 or 1', clause: 'cl.701.55', ipRequired: ipReq };
+      if (z === 2) return { allowed: true, reason: 'Class I with RCD 30mA or Class II', clause: 'cl.701.55', ipRequired: 'IPX4' };
+      return { allowed: true, reason: 'Normal installation with RCD 30mA', clause: 'cl.701.411.3.3', ipRequired: 'IPX1' };
+    case 'mirrorheater':
+      if (z <= 1) return { allowed: false, reason: 'Not allowed in Zone 0 or 1', clause: 'cl.701.55', ipRequired: ipReq };
+      if (z === 2) return { allowed: true, reason: 'Class II only, IPX4', clause: 'cl.701.55', ipRequired: 'IPX4' };
+      return { allowed: true, reason: 'Normal with RCD 30mA', clause: 'cl.701.411.3.3', ipRequired: 'IPX1' };
+    case 'shaversocket':
+      if (z <= 1) return { allowed: false, reason: 'Not allowed in Zone 0 or 1', clause: 'cl.701.512.3', ipRequired: ipReq };
+      if (z === 2) return { allowed: true, reason: 'Only via isolating transformer EN 61558-2-5', clause: 'cl.701.512.3', ipRequired: 'IPX4' };
+      return { allowed: true, reason: 'Isolating transformer recommended', clause: 'cl.701.512.3', ipRequired: 'IPX1' };
+    case 'evcharger':
+      return { allowed: false, reason: 'EV chargers not allowed in bathroom areas', clause: 'cl.701.55', ipRequired: ipReq };
+    default:
+      return { allowed: false, reason: 'Unknown equipment', clause: 'cl.701.55', ipRequired: ipReq };
+  }
+}
+
+function bathroomCheckUnderfloorHeating(zone) {
+  // Per cl.701.753: allowed in all zones IF covered by earthed metallic grid or SELV
+  return {
+    allowed: true,
+    condition: 'Earthed metallic grid or SELV supply required',
+    clause: 'cl.701.753'
+  };
+}
+
+function bathroomGetZoneIP(zone) {
+  return BATHROOM_ZONES[parseInt(zone)].ip;
+}
+
+function bathroomGetProtectionReqs(zone) {
+  var z = parseInt(zone);
+  var reqs = [];
+  reqs.push({ req: 'RCD 30mA (HPFI) mandatory on all circuits', clause: 'cl.701.411.3.3' });
+  reqs.push({ req: 'Supplementary equipotential bonding required', clause: 'cl.701.415.2' });
+  if (z <= 1) {
+    reqs.push({ req: 'SELV max 12V AC / 30V DC only', clause: 'cl.701.414.4.5' });
+  }
+  return reqs;
+}
+
+function renderBathroom() {
+  var check = bathroomCheckEquipment(bathroomState.selectedZone, bathroomState.selectedEquipment);
+  var protReqs = bathroomGetProtectionReqs(bathroomState.selectedZone);
+  var ufh = bathroomCheckUnderfloorHeating(bathroomState.selectedZone);
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Badevaerelses-zoner (DS/HD 60364-7-701)', 'Bathroom Zones (DS/HD 60364-7-701)') + '</div>';
+  html += '<div class="info-row">' + tx('Zoneklassifikation og udstyrskrav iht. DS/HD 60364-7-701', 'Zone classification and equipment requirements per DS/HD 60364-7-701') + '</div>';
+
+  // Zone SVG diagram
+  html += '<div class="result-box"><div class="result-title">' + tx('Zonediagram', 'Zone Diagram') + '</div>';
+  html += '<svg viewBox="0 0 400 250" style="width:100%;max-width:400px;height:auto;display:block;margin:0 auto">';
+  html += '<rect x="10" y="10" width="380" height="230" fill="#f0f9ff" stroke="#333" stroke-width="1"/>';
+  html += '<text x="350" y="30" font-size="10" fill="#666">' + tx('Uden for zoner','Outside zones') + '</text>';
+  // Floor
+  html += '<line x1="10" y1="220" x2="390" y2="220" stroke="#333" stroke-width="2"/>';
+  // Bath/shower
+  html += '<rect x="50" y="160" width="80" height="60" fill="#0ea5e9" opacity="0.3" stroke="#0ea5e9" stroke-width="2"/>';
+  html += '<text x="70" y="195" font-size="11" fill="#0369a1">Zone 0</text>';
+  // Zone 1
+  html += '<rect x="50" y="30" width="80" height="130" fill="#38bdf8" opacity="0.15" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4"/>';
+  html += '<text x="60" y="80" font-size="11" fill="#0284c7">Zone 1</text>';
+  html += '<text x="55" y="50" font-size="9" fill="#0284c7">2.25m</text>';
+  // Zone 2
+  html += '<rect x="130" y="30" width="60" height="190" fill="#7dd3fc" opacity="0.1" stroke="#7dd3fc" stroke-width="1" stroke-dasharray="4"/>';
+  html += '<text x="140" y="130" font-size="11" fill="#0ea5e9">Zone 2</text>';
+  html += '<text x="135" y="150" font-size="9" fill="#0ea5e9">0.6m</text>';
+  // Dimensions
+  html += '<text x="200" y="245" font-size="9" fill="#333">' + tx('Gulv','Floor') + '</text>';
+  html += '<line x1="135" y1="225" x2="135" y2="235" stroke="#333"/>';
+  html += '<line x1="190" y1="225" x2="190" y2="235" stroke="#333"/>';
+  html += '<line x1="135" y1="230" x2="190" y2="230" stroke="#333"/>';
+  html += '<text x="150" y="243" font-size="8" fill="#333">0.6m</text>';
+  html += '</svg></div>';
+
+  // Bath Type
+  html += '<div class="select-group"><div class="select-label">' + tx('Badtype', 'Bath Type') + '</div><div class="select-grid">';
+  [{k:'bathtub', da:'Badekar', en:'Bathtub'}, {k:'shower_tray', da:'Bruser m. kar', en:'Shower with tray'}, {k:'shower_walkin', da:'Walk-in bruser', en:'Shower without tray'}, {k:'combined', da:'Kombineret bad+bruser', en:'Combined bath+shower'}].forEach(function(bt) {
+    html += '<button class="sel-btn' + (bathroomState.bathType === bt.k ? ' selected' : '') + '" onclick="bathroomState.bathType=\'' + bt.k + '\';renderModule(\'bathroom\')">' + tx(bt.da, bt.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Room Width
+  html += '<div class="select-group"><div class="select-label">' + tx('Rumbredde [m]', 'Room Width [m]') + '</div><div class="select-grid">';
+  [1.5, 2.0, 2.5, 3.0, 3.5, 4.0].forEach(function(w) {
+    html += '<button class="sel-btn' + (bathroomState.roomWidth === w ? ' selected' : '') + '" onclick="bathroomState.roomWidth=' + w + ';renderModule(\'bathroom\')">' + w + '</button>';
+  });
+  html += '</div></div>';
+
+  // Room Length
+  html += '<div class="select-group"><div class="select-label">' + tx('Rumlængde [m]', 'Room Length [m]') + '</div><div class="select-grid">';
+  [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0].forEach(function(l) {
+    html += '<button class="sel-btn' + (bathroomState.roomLength === l ? ' selected' : '') + '" onclick="bathroomState.roomLength=' + l + ';renderModule(\'bathroom\')">' + l + '</button>';
+  });
+  html += '</div></div>';
+
+  // Ceiling Height
+  html += '<div class="select-group"><div class="select-label">' + tx('Lofthoejde [m]', 'Ceiling Height [m]') + '</div><div class="select-grid">';
+  [2.3, 2.4, 2.5, 2.7, 3.0].forEach(function(h) {
+    html += '<button class="sel-btn' + (bathroomState.ceilingHeight === h ? ' selected' : '') + '" onclick="bathroomState.ceilingHeight=' + h + ';renderModule(\'bathroom\')">' + h + '</button>';
+  });
+  html += '</div></div>';
+
+  // Zone Selector
+  html += '<div class="select-group"><div class="select-label">' + tx('Vaelg zone', 'Select Zone') + '</div><div class="select-grid">';
+  [0, 1, 2, 3].forEach(function(z) {
+    html += '<button class="sel-btn' + (bathroomState.selectedZone === z ? ' selected' : '') + '" onclick="bathroomState.selectedZone=' + z + ';renderModule(\'bathroom\')">' + tx(BATHROOM_ZONES[z].da, BATHROOM_ZONES[z].en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Equipment Selector
+  html += '<div class="select-group"><div class="select-label">' + tx('Vaelg udstyr', 'Select Equipment') + '</div><div class="select-grid">';
+  Object.keys(BATHROOM_EQUIPMENT).forEach(function(key) {
+    var eq = BATHROOM_EQUIPMENT[key];
+    html += '<button class="sel-btn' + (bathroomState.selectedEquipment === key ? ' selected' : '') + '" onclick="bathroomState.selectedEquipment=\'' + key + '\';renderModule(\'bathroom\')">' + tx(eq.da, eq.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // IP Rating for selected zone
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('IP-krav for valgt zone', 'IP Rating Required for Selected Zone') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Zone', 'Zone') + '</span><span class="value">' + bathroomState.selectedZone + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Minimum IP', 'Minimum IP') + '</span><span class="value" style="font-size:1.3em;font-weight:bold">' + bathroomGetZoneIP(bathroomState.selectedZone) + '</span></div>';
+  html += '</div>';
+
+  // Equipment verdict
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Udstyrstjek', 'Equipment Check') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Udstyr', 'Equipment') + '</span><span class="value">' + tx(BATHROOM_EQUIPMENT[bathroomState.selectedEquipment].da, BATHROOM_EQUIPMENT[bathroomState.selectedEquipment].en) + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Zone', 'Zone') + '</span><span class="value">' + bathroomState.selectedZone + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('IP krav', 'IP Required') + '</span><span class="value">' + check.ipRequired + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Resultat', 'Result') + '</span><span class="value" style="font-weight:bold;color:' + (check.allowed ? '#16a34a' : '#dc2626') + '">' + (check.allowed ? tx('TILLADT', 'ALLOWED') : tx('IKKE TILLADT', 'NOT ALLOWED')) + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Begrundelse', 'Reason') + '</span><span class="value">' + check.reason + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">' + check.clause + ' (DS/HD 60364-7-701)</span></div>';
+  html += '</div>';
+
+  // Protection requirements
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Beskyttelseskrav', 'Protection Requirements') + '</div>';
+  protReqs.forEach(function(r) {
+    html += '<div class="result-row"><span class="label">' + r.clause + '</span><span class="value">' + r.req + '</span></div>';
+  });
+  html += '</div>';
+
+  // Underfloor heating
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Gulvvarme', 'Underfloor Heating') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Tilladt', 'Allowed') + '</span><span class="value" style="color:#16a34a">' + tx('Ja - med betingelser', 'Yes - with conditions') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Betingelse', 'Condition') + '</span><span class="value">' + ufh.condition + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">' + ufh.clause + ' (DS/HD 60364-7-701)</span></div>';
+  html += '</div>';
+
+  // Supplementary bonding
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Supplerende potentialudligning', 'Supplementary Equipotential Bonding') + ' - cl.701.415.2</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Krav', 'Requirement') + '</span><span class="value">' + tx('Alle metalliske dele forbindes', 'All metallic parts must be bonded') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Elementer', 'Elements') + '</span><span class="value">' + tx('Roer, metalkar, radiator, armering', 'Pipes, metallic bath, radiator, structural metalwork') + '</span></div>';
+  html += '</div>';
+
+  // Verdict
+  var safe = check.allowed;
+  html += renderVerdict(safe, safe ? tx('Udstyr tilladt i valgt zone iht. DS/HD 60364-7-701', 'Equipment allowed in selected zone per DS/HD 60364-7-701') : tx('Udstyr IKKE tilladt i valgt zone iht. DS/HD 60364-7-701', 'Equipment NOT allowed in selected zone per DS/HD 60364-7-701'));
+
+  html += '</div>';
+  return html;
+}
+
+// ===== FIRE ALARM MODULE (DS/EN 54 + DBI vejledning 36) =====
+var firealarmState = {
+  category: 1,
+  buildingType: 'hospital',
+  detectorType: 'optical_smoke',
+  roomArea: 100,
+  ceilingHeight: 3.0
+};
+
+var FIREALARM_CATEGORIES = {
+  1: { da: 'Kategori 1: Fuld daekning', en: 'Category 1: Full coverage', desc_en: 'All rooms, all areas' },
+  2: { da: 'Kategori 2: Udvidet daekning', en: 'Category 2: Extended coverage', desc_en: 'Specific fire compartments' },
+  3: { da: 'Kategori 3: Lokal daekning', en: 'Category 3: Local coverage', desc_en: 'Specific rooms only' },
+  4: { da: 'Kategori 4: Kun manuelt', en: 'Category 4: Manual only', desc_en: 'Break-glass call points only' }
+};
+
+var FIREALARM_BUILDING_TYPES = {
+  hospital: { da: 'Hospital', en: 'Hospital', cat: 1 },
+  hotel: { da: 'Hotel', en: 'Hotel/boarding', cat: 1 },
+  carehome: { da: 'Plejehjem', en: 'Care home', cat: 1 },
+  office: { da: 'Kontor', en: 'Office', cat: 2 },
+  school: { da: 'Skole', en: 'School', cat: 2 },
+  retail: { da: 'Butik', en: 'Retail', cat: 2 },
+  industrial: { da: 'Industri', en: 'Industrial', cat: 2 },
+  storage: { da: 'Lager', en: 'Storage', cat: 3 },
+  assembly: { da: 'Forsamling', en: 'Assembly', cat: 2 },
+  parking: { da: 'Parkering', en: 'Parking', cat: 3 }
+};
+
+var FIREALARM_DETECTORS = {
+  optical_smoke: { da: 'Optisk roeg (EN 54-7)', en: 'Optical smoke (EN 54-7)', coverage: 60, spacing: 7.5, maxHeight: 12, corridor: 15, standard: 'EN 54-7' },
+  heat_a1: { da: 'Varme A1 (EN 54-5)', en: 'Heat A1 (EN 54-5)', coverage: 30, spacing: 5.5, maxHeight: 7.5, corridor: 10.5, standard: 'EN 54-5' },
+  heat_a2: { da: 'Varme A2 (EN 54-5)', en: 'Heat A2 (EN 54-5)', coverage: 50, spacing: 7.5, maxHeight: 7.5, corridor: 15, standard: 'EN 54-5' },
+  multi_sensor: { da: 'Multi-sensor (roeg+varme)', en: 'Multi-sensor (smoke+heat)', coverage: 60, spacing: 7.5, maxHeight: 12, corridor: 15, standard: 'EN 54-29' },
+  linear_beam: { da: 'Lineaer straalede (EN 54-12)', en: 'Linear beam (EN 54-12)', coverage: 1000, spacing: 15, maxHeight: 25, corridor: 15, standard: 'EN 54-12' },
+  aspirating: { da: 'Aspirerende (EN 54-20)', en: 'Aspirating (EN 54-20)', coverage: 200, spacing: 10, maxHeight: 20, corridor: 10, standard: 'EN 54-20' },
+  flame: { da: 'Flamme (EN 54-10)', en: 'Flame (EN 54-10)', coverage: 100, spacing: 12, maxHeight: 30, corridor: 12, standard: 'EN 54-10' },
+  manual_cp: { da: 'Manuelt tryk (EN 54-11)', en: 'Manual call point (EN 54-11)', coverage: null, spacing: 30, maxHeight: null, corridor: null, standard: 'EN 54-11' }
+};
+
+function firealarmCalcDetectors(detectorType, roomArea, ceilingHeight) {
+  var det = FIREALARM_DETECTORS[detectorType];
+  if (!det || !det.coverage) {
+    // Manual call points: one per 30m travel distance
+    var callPoints = Math.ceil(Math.sqrt(roomArea) / 30) + 1;
+    return {
+      count: Math.max(1, callPoints),
+      coverage: null,
+      spacing: det ? det.spacing : 30,
+      heightOk: true,
+      maxHeight: null,
+      standard: det ? det.standard : 'EN 54-11',
+      clause: 'DS/EN 54-11 cl.6'
+    };
+  }
+  // Height check - conservative: if ceiling too high, detector not suitable
+  var heightOk = det.maxHeight ? ceilingHeight <= det.maxHeight : true;
+  // Effective coverage may reduce with height (conservative)
+  var effCoverage = det.coverage;
+  if (ceilingHeight > 6 && detectorType.indexOf('smoke') >= 0) {
+    effCoverage = Math.floor(det.coverage * 0.8); // Derate 20% above 6m
+  }
+  if (ceilingHeight > 4.5 && detectorType.indexOf('heat') >= 0) {
+    effCoverage = Math.floor(det.coverage * 0.75); // Derate 25% above 4.5m for heat
+  }
+  var count = Math.ceil(roomArea / effCoverage);
+  if (count < 1) count = 1;
+  return {
+    count: count,
+    coverage: effCoverage,
+    spacing: det.spacing,
+    heightOk: heightOk,
+    maxHeight: det.maxHeight,
+    standard: det.standard,
+    clause: 'DS/EN 54-14 + DBI retningslinje 232'
+  };
+}
+
+function firealarmCalcLoopDesign(detectorCount) {
+  var maxPerLoop = 126;
+  var loops = Math.ceil(detectorCount / maxPerLoop);
+  var cablePerLoop = Math.min(2000, detectorCount * 15); // ~15m average per detector run
+  return {
+    loops: loops,
+    maxPerLoop: maxPerLoop,
+    devicesPerLoop: Math.ceil(detectorCount / loops),
+    cableLengthM: cablePerLoop,
+    maxCableLength: 2000,
+    cableType: '2x1.5mm2 E30 fire-resistant',
+    clause: 'DS/EN 54-13'
+  };
+}
+
+function firealarmCalcBattery(detectorCount, sounderCount) {
+  // Battery = system load x 72h standby + 30min alarm
+  var standbyLoadW = detectorCount * 0.003 + 0.5; // ~3mA per detector + panel standby
+  var alarmLoadW = sounderCount * 0.05 + detectorCount * 0.005 + 1.0; // Sounders + LEDs + panel
+  var standbyAh = (standbyLoadW * 72); // Wh then /24V = Ah
+  var alarmAh = (alarmLoadW * 0.5); // 30 min alarm
+  var totalAh = Math.ceil((standbyAh + alarmAh) / 24 * 1.25); // /24V, 25% margin conservative
+  return {
+    standbyH: 72,
+    alarmMin: 30,
+    standbyLoadW: Math.ceil(standbyLoadW * 1000) / 1000,
+    alarmLoadW: Math.ceil(alarmLoadW * 1000) / 1000,
+    batteryAh: totalAh,
+    voltage: 24,
+    clause: 'DS/EN 54-4'
+  };
+}
+
+function firealarmCalcSounders(roomArea) {
+  // Min 65 dBA or 5 dBA above ambient. One per ~1000m2 open plan, 1 per room enclosed
+  var count = Math.ceil(roomArea / 1000);
+  if (count < 1) count = 1;
+  return {
+    count: count,
+    minDB: 65,
+    standard: 'DS/EN 54-3',
+    clause: 'DS/EN 54-3 cl.5'
+  };
+}
+
+function firealarmCalcCallPoints(roomArea) {
+  // Max 30m travel distance to nearest call point
+  var perimeterEstimate = 2 * (Math.sqrt(roomArea) + Math.sqrt(roomArea));
+  var count = Math.ceil(perimeterEstimate / 60) + 1; // One at each exit, roughly every 30m
+  if (count < 2) count = 2; // Minimum 2 for any building
+  return {
+    count: count,
+    maxTravel: 30,
+    standard: 'DS/EN 54-11',
+    clause: 'DS/EN 54-11 cl.6'
+  };
+}
+
+function renderFireAlarm() {
+  var calc = firealarmCalcDetectors(firealarmState.detectorType, firealarmState.roomArea, firealarmState.ceilingHeight);
+  var loop = firealarmCalcLoopDesign(calc.count);
+  var sounders = firealarmCalcSounders(firealarmState.roomArea);
+  var callPts = firealarmCalcCallPoints(firealarmState.roomArea);
+  var battery = firealarmCalcBattery(calc.count, sounders.count);
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Brandalarm (DS/EN 54 + DBI vejl. 36)', 'Fire Alarm System (DS/EN 54 + DBI Guidelines)') + '</div>';
+  html += '<div class="info-row">' + tx('Brandalarmsystem iht. DS/EN 54 og DBI retningslinje 232', 'Fire alarm system per DS/EN 54 and DBI guideline 232') + '</div>';
+
+  // System Category
+  html += '<div class="select-group"><div class="select-label">' + tx('Systemkategori (DBI retningslinje 232)', 'System Category (DBI guideline 232)') + '</div><div class="select-grid">';
+  [1,2,3,4].forEach(function(c) {
+    html += '<button class="sel-btn' + (firealarmState.category === c ? ' selected' : '') + '" onclick="firealarmState.category=' + c + ';renderModule(\'firealarm\')">' + tx(FIREALARM_CATEGORIES[c].da, FIREALARM_CATEGORIES[c].en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Building Type
+  html += '<div class="select-group"><div class="select-label">' + tx('Bygningstype', 'Building Type') + '</div><div class="select-grid">';
+  Object.keys(FIREALARM_BUILDING_TYPES).forEach(function(key) {
+    var bt = FIREALARM_BUILDING_TYPES[key];
+    html += '<button class="sel-btn' + (firealarmState.buildingType === key ? ' selected' : '') + '" onclick="firealarmState.buildingType=\'' + key + '\';renderModule(\'firealarm\')">' + tx(bt.da, bt.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Detector Type
+  html += '<div class="select-group"><div class="select-label">' + tx('Detektortype', 'Detector Type') + '</div><div class="select-grid">';
+  Object.keys(FIREALARM_DETECTORS).forEach(function(key) {
+    var dt = FIREALARM_DETECTORS[key];
+    html += '<button class="sel-btn' + (firealarmState.detectorType === key ? ' selected' : '') + '" onclick="firealarmState.detectorType=\'' + key + '\';renderModule(\'firealarm\')">' + tx(dt.da, dt.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Room Area
+  html += '<div class="select-group"><div class="select-label">' + tx('Rumareal [m2]', 'Room Area [m2]') + '</div><div class="select-grid">';
+  [10, 20, 30, 50, 75, 100, 150, 200, 300, 500, 750, 1000].forEach(function(a) {
+    html += '<button class="sel-btn' + (firealarmState.roomArea === a ? ' selected' : '') + '" onclick="firealarmState.roomArea=' + a + ';renderModule(\'firealarm\')">' + a + '</button>';
+  });
+  html += '</div></div>';
+
+  // Ceiling Height
+  html += '<div class="select-group"><div class="select-label">' + tx('Lofthoejde [m]', 'Ceiling Height [m]') + '</div><div class="select-grid">';
+  [2.4, 2.7, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 8.0, 10.0, 12.0].forEach(function(h) {
+    html += '<button class="sel-btn' + (firealarmState.ceilingHeight === h ? ' selected' : '') + '" onclick="firealarmState.ceilingHeight=' + h + ';renderModule(\'firealarm\')">' + h + '</button>';
+  });
+  html += '</div></div>';
+
+  // Results - Detector Count
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Detektorberegning', 'Detector Calculation') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Antal detektorer', 'Detector Count') + '</span><span class="value">' + calc.count + '</span></div>';
+  if (calc.coverage) {
+    html += '<div class="result-row"><span class="label">' + tx('Daekning pr. detektor', 'Coverage per Detector') + '</span><span class="value">' + calc.coverage + ' m2</span></div>';
+  }
+  html += '<div class="result-row"><span class="label">' + tx('Maks. afstand', 'Max Spacing') + '</span><span class="value">' + calc.spacing + ' m</span></div>';
+  if (calc.maxHeight !== null) {
+    html += '<div class="result-row"><span class="label">' + tx('Maks. lofthoejde', 'Max Ceiling Height') + '</span><span class="value">' + calc.maxHeight + ' m ' + (calc.heightOk ? '\u2705' : '\u274C') + '</span></div>';
+  }
+  html += '<div class="result-row"><span class="label">' + tx('Standard', 'Standard') + '</span><span class="value">' + calc.standard + '</span></div>';
+  html += '</div>';
+
+  // Loop Design
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Sloejfedesign', 'Loop Design') + ' - ' + loop.clause + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Antal sloejfer', 'Number of Loops') + '</span><span class="value">' + loop.loops + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Enheder pr. sloejfe', 'Devices per Loop') + '</span><span class="value">' + loop.devicesPerLoop + ' / ' + loop.maxPerLoop + ' max</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kabellangde', 'Cable Length') + '</span><span class="value">' + loop.cableLengthM + ' m (max ' + loop.maxCableLength + ' m)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kabeltype', 'Cable Type') + '</span><span class="value">' + loop.cableType + '</span></div>';
+  html += '</div>';
+
+  // Sounders
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Alarmgivere', 'Sounders/Alarm Devices') + ' - ' + sounders.clause + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Antal alarmgivere', 'Sounder Count') + '</span><span class="value">' + sounders.count + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Min. lydniveau', 'Min. Sound Level') + '</span><span class="value">' + sounders.minDB + ' dBA (' + tx('eller 5 dBA over baggrund', 'or 5 dBA above ambient') + ')</span></div>';
+  html += '</div>';
+
+  // Call Points
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Haandmelder-placering', 'Call Point Placement') + ' - ' + callPts.clause + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Antal haandmeldere', 'Call Point Count') + '</span><span class="value">' + callPts.count + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Maks. gangafstand', 'Max Travel Distance') + '</span><span class="value">' + callPts.maxTravel + ' m</span></div>';
+  html += '</div>';
+
+  // Battery
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Batteridimensionering', 'Battery Sizing') + ' - ' + battery.clause + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Standby', 'Standby') + '</span><span class="value">' + battery.standbyH + ' h</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Alarm', 'Alarm') + '</span><span class="value">' + battery.alarmMin + ' min</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Batterikapacitet', 'Battery Capacity') + '</span><span class="value">' + battery.batteryAh + ' Ah / ' + battery.voltage + 'V DC</span></div>';
+  html += '</div>';
+
+  // Compliance verdict
+  var compliant = calc.heightOk;
+  html += renderVerdict(compliant, compliant ? tx('Brandalarm opfylder DS/EN 54 + DBI retningslinje 232', 'Fire alarm complies with DS/EN 54 + DBI guideline 232') : tx('Lofthoejde overstiger detektorens maks - vaelg anden type', 'Ceiling height exceeds detector max - select different type'));
+
+  html += '</div>';
+  return html;
+}
+
+// ===== STRUCTURED CABLING MODULE (ISO 11801 + DS/EN 50173) =====
+var dataState = {
+  cableCategory: 'cat6a',
+  application: 'office',
+  cableType: 'uutp',
+  distance: 50,
+  floorArea: 200,
+  poeType: 'af',
+  poePortCount: 24,
+  fiberType: null
+};
+
+var DATA_CABLE_CATEGORIES = {
+  cat5e: { da: 'Cat 5e (100 MHz, 1 Gbit/s)', en: 'Cat 5e (100 MHz, 1 Gbit/s)', freq: 100, speed: '1 Gbit/s', maxDist: 90, recommended: false },
+  cat6: { da: 'Cat 6 (250 MHz, 1-10 Gbit/s)', en: 'Cat 6 (250 MHz, 1-10 Gbit/s)', freq: 250, speed: '10 Gbit/s (55m)', maxDist: 90, recommended: false },
+  cat6a: { da: 'Cat 6A (500 MHz, 10 Gbit/s)', en: 'Cat 6A (500 MHz, 10 Gbit/s)', freq: 500, speed: '10 Gbit/s', maxDist: 90, recommended: true },
+  cat7: { da: 'Cat 7 (600 MHz, S/FTP)', en: 'Cat 7 (600 MHz, S/FTP)', freq: 600, speed: '10 Gbit/s', maxDist: 90, recommended: false },
+  cat8: { da: 'Cat 8 (2000 MHz, 25/40G)', en: 'Cat 8 (2000 MHz, 25/40 Gbit/s)', freq: 2000, speed: '25/40 Gbit/s', maxDist: 30, recommended: false }
+};
+
+var DATA_APPLICATIONS = {
+  office: { da: 'Kontor/arbejdsplads', en: 'Office/workplace', outletsPerM2: 0.2 },
+  wifi: { da: 'WiFi access point', en: 'WiFi access point', outletsPerM2: 0.01 },
+  ipcamera: { da: 'IP-kamera (PoE)', en: 'IP camera (PoE)', outletsPerM2: 0.02 },
+  voip: { da: 'VoIP-telefon', en: 'VoIP phone', outletsPerM2: 0.1 },
+  iot: { da: 'IoT/BMS sensor', en: 'IoT/BMS sensor', outletsPerM2: 0.05 },
+  serverroom: { da: 'Serverrum', en: 'Server room', outletsPerM2: 1.0 },
+  industrial: { da: 'Industriel', en: 'Industrial', outletsPerM2: 0.05 },
+  residential: { da: 'Bolig', en: 'Residential', outletsPerM2: 0.1 }
+};
+
+var DATA_CABLE_TYPES = {
+  uutp: { da: 'U/UTP (uskærmet)', en: 'U/UTP (unshielded)', separation: 200, desc_en: 'Standard office' },
+  futp: { da: 'F/UTP (foliesk.)', en: 'F/UTP (foil shielded)', separation: 100, desc_en: 'EMI environments' },
+  sftp: { da: 'S/FTP (flettet+folie)', en: 'S/FTP (braided+foil)', separation: 50, desc_en: 'Industrial, near VFDs' }
+};
+
+var DATA_POE_TYPES = {
+  af: { da: 'PoE (802.3af) 15.4W', en: 'PoE (802.3af) 15.4W', portW: 15.4, deviceW: 12.95, standard: 'IEEE 802.3af' },
+  at: { da: 'PoE+ (802.3at) 30W', en: 'PoE+ (802.3at) 30W', portW: 30, deviceW: 25.5, standard: 'IEEE 802.3at' },
+  bt3: { da: 'PoE++ Type 3 (802.3bt) 60W', en: 'PoE++ Type 3 (802.3bt) 60W', portW: 60, deviceW: 51, standard: 'IEEE 802.3bt' },
+  bt4: { da: 'PoE++ Type 4 (802.3bt) 90W', en: 'PoE++ Type 4 (802.3bt) 90W', portW: 90, deviceW: 71.3, standard: 'IEEE 802.3bt' }
+};
+
+var DATA_FIBER_TYPES = {
+  om3: { da: 'OM3 Multimode (10G/300m)', en: 'OM3 Multimode (10G/300m)', maxDist10G: 300, lossPerKm: 3.5, type: 'multimode' },
+  om4: { da: 'OM4 Multimode (10G/400m)', en: 'OM4 Multimode (10G/400m)', maxDist10G: 400, lossPerKm: 3.5, type: 'multimode' },
+  os2: { da: 'OS2 Singlemode (10G/10km+)', en: 'OS2 Singlemode (10G/10km+)', maxDist10G: 10000, lossPerKm: 0.4, type: 'singlemode' }
+};
+
+function dataCalcDistance(distance, cableCategory) {
+  var cat = DATA_CABLE_CATEGORIES[cableCategory];
+  var maxPermanent = cat.maxDist; // 90m standard (30m for Cat 8)
+  var maxChannel = maxPermanent + 10; // +5m each end patch cords
+  var distOk = distance <= maxPermanent;
+  return {
+    permanentLink: maxPermanent,
+    channel: maxChannel,
+    actualDistance: distance,
+    ok: distOk,
+    recommendation: distOk ? 'Distance within limits' : 'Exceeds max - recommend fiber or additional TR',
+    clause: 'ISO 11801-1 cl.7'
+  };
+}
+
+function dataCalcOutlets(floorArea, application) {
+  var app = DATA_APPLICATIONS[application];
+  var outletsPerWS = 2; // Dual outlet recommended
+  var rawOutlets = Math.ceil(floorArea * app.outletsPerM2);
+  var totalOutlets = rawOutlets * outletsPerWS;
+  if (totalOutlets < 2) totalOutlets = 2;
+  return {
+    outlets: totalOutlets,
+    rawCount: rawOutlets,
+    perWorkspace: outletsPerWS,
+    density: app.outletsPerM2,
+    clause: 'DS/EN 50173-1'
+  };
+}
+
+function dataCalcPatchPanels(outlets, panelSize) {
+  var ps = panelSize || 24;
+  var panels = Math.ceil(outlets / ps);
+  var rackUnits = ps === 48 ? panels * 2 : panels;
+  return {
+    panels: panels,
+    panelSize: ps,
+    rackUnits: rackUnits,
+    totalPorts: panels * ps,
+    spare: (panels * ps) - outlets,
+    clause: 'ISO 14763-2'
+  };
+}
+
+function dataCalcPoeBudget(poeType, portCount) {
+  var poe = DATA_POE_TYPES[poeType];
+  var totalW = portCount * poe.portW;
+  var derating = 0.6; // 60% fill for bundled cable heat
+  var deratedW = Math.ceil(totalW * derating);
+  return {
+    totalW: totalW,
+    deratedW: deratedW,
+    perPort: poe.portW,
+    perDevice: poe.deviceW,
+    portCount: portCount,
+    derating: derating,
+    standard: poe.standard,
+    clause: 'DS/EN 50174-2'
+  };
+}
+
+function dataCalcSwitchPorts(dataOutlets, poePortCount) {
+  var spare = Math.ceil(dataOutlets * 0.2); // 20% spare
+  var totalAccess = dataOutlets + spare;
+  var uplinks = Math.ceil(totalAccess / 24); // 10G uplink per 24 access ports
+  return {
+    accessPorts: dataOutlets,
+    sparePorts: spare,
+    totalPorts: totalAccess,
+    uplinks: uplinks,
+    uplinkType: '10G SFP+',
+    clause: 'ISO 11801-1'
+  };
+}
+
+function dataCalcFiberBudget(fiberType, distance, connectors, splices) {
+  var fiber = DATA_FIBER_TYPES[fiberType];
+  if (!fiber) return null;
+  var connLoss = (connectors || 2) * 0.5; // 0.5 dB per connector
+  var spliceLoss = (splices || 0) * 0.1; // 0.1 dB per splice
+  var fiberLoss = (distance / 1000) * fiber.lossPerKm;
+  var totalLoss = Math.ceil((connLoss + spliceLoss + fiberLoss) * 10) / 10; // round up to 0.1
+  var distOk = distance <= fiber.maxDist10G;
+  return {
+    totalLoss: totalLoss,
+    connectorLoss: connLoss,
+    spliceLoss: spliceLoss,
+    fiberLoss: Math.ceil(fiberLoss * 100) / 100,
+    maxDistance: fiber.maxDist10G,
+    distanceOk: distOk,
+    type: fiber.type,
+    clause: 'ISO 11801-1 cl.8'
+  };
+}
+
+function dataGetSeparation(cableType) {
+  var ct = DATA_CABLE_TYPES[cableType];
+  return {
+    separation: ct.separation,
+    unit: 'mm',
+    note: ct.separation >= 200 ? 'From unscreened power cables' : (ct.separation >= 100 ? 'From power cables with divider' : 'Minimum with metallic tray divider'),
+    clause: 'DS/EN 50174-2 Table 1'
+  };
+}
+
+function dataGetPathway() {
+  return {
+    bendRadius: { uutp: '4x diameter', sftp: '8x diameter' },
+    trayFill: '50% max',
+    fireRating: { minimum: 'Dca', risers: 'Cca', plenums: 'B2ca' },
+    clause: 'DS/EN 50174-2'
+  };
+}
+
+function renderData() {
+  var distCheck = dataCalcDistance(dataState.distance, dataState.cableCategory);
+  var outlets = dataCalcOutlets(dataState.floorArea, dataState.application);
+  var panels = dataCalcPatchPanels(outlets.outlets, 24);
+  var poe = dataCalcPoeBudget(dataState.poeType, dataState.poePortCount);
+  var switchCalc = dataCalcSwitchPorts(outlets.outlets, dataState.poePortCount);
+  var separation = dataGetSeparation(dataState.cableType);
+  var pathway = dataGetPathway();
+  var fiberBudget = dataState.fiberType ? dataCalcFiberBudget(dataState.fiberType, dataState.distance, 2, 0) : null;
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Datainstallation (ISO 11801 + DS/EN 50173)', 'Structured Cabling (ISO 11801 + DS/EN 50173)') + '</div>';
+  html += '<div class="info-row">' + tx('Kabelinfrastruktur iht. ISO 11801 og DS/EN 50173', 'Cable infrastructure per ISO 11801 and DS/EN 50173') + '</div>';
+
+  // Cable Category
+  html += '<div class="select-group"><div class="select-label">' + tx('Kabelkategori', 'Cable Category') + '</div><div class="select-grid">';
+  Object.keys(DATA_CABLE_CATEGORIES).forEach(function(key) {
+    var c = DATA_CABLE_CATEGORIES[key];
+    html += '<button class="sel-btn' + (dataState.cableCategory === key ? ' selected' : '') + '" onclick="dataState.cableCategory=\'' + key + '\';renderModule(\'data\')">' + tx(c.da, c.en) + (c.recommended ? ' \u2605' : '') + '</button>';
+  });
+  html += '</div></div>';
+
+  // Application
+  html += '<div class="select-group"><div class="select-label">' + tx('Anvendelse', 'Application') + '</div><div class="select-grid">';
+  Object.keys(DATA_APPLICATIONS).forEach(function(key) {
+    var a = DATA_APPLICATIONS[key];
+    html += '<button class="sel-btn' + (dataState.application === key ? ' selected' : '') + '" onclick="dataState.application=\'' + key + '\';renderModule(\'data\')">' + tx(a.da, a.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Cable Type
+  html += '<div class="select-group"><div class="select-label">' + tx('Kabeltype', 'Cable Type') + '</div><div class="select-grid">';
+  Object.keys(DATA_CABLE_TYPES).forEach(function(key) {
+    var ct = DATA_CABLE_TYPES[key];
+    html += '<button class="sel-btn' + (dataState.cableType === key ? ' selected' : '') + '" onclick="dataState.cableType=\'' + key + '\';renderModule(\'data\')">' + tx(ct.da, ct.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Distance
+  html += '<div class="select-group"><div class="select-label">' + tx('Afstand [m]', 'Distance [m]') + '</div><div class="select-grid">';
+  [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 150, 200, 300].forEach(function(d) {
+    html += '<button class="sel-btn' + (dataState.distance === d ? ' selected' : '') + '" onclick="dataState.distance=' + d + ';renderModule(\'data\')">' + d + '</button>';
+  });
+  html += '</div></div>';
+
+  // Floor Area
+  html += '<div class="select-group"><div class="select-label">' + tx('Gulvareal [m2]', 'Floor Area [m2]') + '</div><div class="select-grid">';
+  [50, 100, 150, 200, 300, 500, 750, 1000].forEach(function(a) {
+    html += '<button class="sel-btn' + (dataState.floorArea === a ? ' selected' : '') + '" onclick="dataState.floorArea=' + a + ';renderModule(\'data\')">' + a + '</button>';
+  });
+  html += '</div></div>';
+
+  // PoE Type
+  html += '<div class="select-group"><div class="select-label">' + tx('PoE-type', 'PoE Type') + '</div><div class="select-grid">';
+  Object.keys(DATA_POE_TYPES).forEach(function(key) {
+    var p = DATA_POE_TYPES[key];
+    html += '<button class="sel-btn' + (dataState.poeType === key ? ' selected' : '') + '" onclick="dataState.poeType=\'' + key + '\';renderModule(\'data\')">' + tx(p.da, p.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // PoE Port Count
+  html += '<div class="select-group"><div class="select-label">' + tx('Antal PoE-porte', 'PoE Port Count') + '</div><div class="select-grid">';
+  [4, 8, 12, 16, 24, 48].forEach(function(n) {
+    html += '<button class="sel-btn' + (dataState.poePortCount === n ? ' selected' : '') + '" onclick="dataState.poePortCount=' + n + ';renderModule(\'data\')">' + n + '</button>';
+  });
+  html += '</div></div>';
+
+  // Fiber option
+  html += '<div class="select-group"><div class="select-label">' + tx('Fiber (valgfrit)', 'Fiber (optional)') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (dataState.fiberType === null ? ' selected' : '') + '" onclick="dataState.fiberType=null;renderModule(\'data\')">' + tx('Ingen fiber', 'No fiber') + '</button>';
+  Object.keys(DATA_FIBER_TYPES).forEach(function(key) {
+    var f = DATA_FIBER_TYPES[key];
+    html += '<button class="sel-btn' + (dataState.fiberType === key ? ' selected' : '') + '" onclick="dataState.fiberType=\'' + key + '\';renderModule(\'data\')">' + tx(f.da, f.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Results - Distance Check
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Afstandskontrol', 'Distance Check') + ' - ' + distCheck.clause + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Permanent link maks', 'Permanent Link Max') + '</span><span class="value">' + distCheck.permanentLink + ' m</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kanal maks', 'Channel Max') + '</span><span class="value">' + distCheck.channel + ' m</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Aktuel afstand', 'Actual Distance') + '</span><span class="value">' + distCheck.actualDistance + ' m ' + (distCheck.ok ? '\u2705' : '\u274C') + '</span></div>';
+  if (!distCheck.ok) {
+    html += '<div class="result-row"><span class="label">' + tx('Anbefaling', 'Recommendation') + '</span><span class="value" style="color:#dc2626">' + distCheck.recommendation + '</span></div>';
+  }
+  html += '</div>';
+
+  // Outlet Density
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Udtagsberegning', 'Outlet Calculation') + ' - ' + outlets.clause + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Gulvareal', 'Floor Area') + '</span><span class="value">' + dataState.floorArea + ' m2</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Antal udtag', 'Number of Outlets') + '</span><span class="value">' + outlets.outlets + ' (' + outlets.perWorkspace + ' pr. arbejdsplads)</span></div>';
+  html += '</div>';
+
+  // Patch Panels
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Patchpaneler', 'Patch Panels') + ' - ' + panels.clause + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Antal paneler', 'Number of Panels') + '</span><span class="value">' + panels.panels + ' x ' + panels.panelSize + '-port</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Rack-enheder', 'Rack Units') + '</span><span class="value">' + panels.rackUnits + 'U</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Reserve-porte', 'Spare Ports') + '</span><span class="value">' + panels.spare + '</span></div>';
+  html += '</div>';
+
+  // PoE Budget
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('PoE-budget', 'PoE Budget') + ' - ' + poe.clause + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Pr. port', 'Per Port') + '</span><span class="value">' + poe.perPort + ' W (' + poe.standard + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Total effekt', 'Total Power') + '</span><span class="value">' + poe.totalW + ' W</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Derated (60% bundt)', 'Derated (60% bundle)') + '</span><span class="value">' + poe.deratedW + ' W</span></div>';
+  html += '</div>';
+
+  // Switch Ports
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Switch-dimensionering', 'Switch Port Calculation') + ' - ' + switchCalc.clause + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Adgangsporte', 'Access Ports') + '</span><span class="value">' + switchCalc.accessPorts + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Reserve (20%)', 'Spare (20%)') + '</span><span class="value">' + switchCalc.sparePorts + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Uplinks', 'Uplinks') + '</span><span class="value">' + switchCalc.uplinks + ' x ' + switchCalc.uplinkType + '</span></div>';
+  html += '</div>';
+
+  // Separation & Pathway
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Adskillelse og foering', 'Separation & Pathway') + ' - ' + separation.clause + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Min. afstand fra el', 'Min. Separation from Power') + '</span><span class="value">' + separation.separation + ' mm</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Bakke-fyldningsgrad', 'Tray Fill Rate') + '</span><span class="value">' + pathway.trayFill + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Brandklasse', 'Fire Rating') + '</span><span class="value">Min. ' + pathway.fireRating.minimum + ', Stigstik: ' + pathway.fireRating.risers + ', Plenum: ' + pathway.fireRating.plenums + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Boejningsradius', 'Bend Radius') + '</span><span class="value">U/UTP: ' + pathway.bendRadius.uutp + ', S/FTP: ' + pathway.bendRadius.sftp + '</span></div>';
+  html += '</div>';
+
+  // Fiber budget (if selected)
+  if (fiberBudget) {
+    html += '<div class="result-box">';
+    html += '<div class="result-title">' + tx('Fiber link-budget', 'Fiber Link Budget') + ' - ' + fiberBudget.clause + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Totalt tab', 'Total Loss') + '</span><span class="value">' + fiberBudget.totalLoss + ' dB</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Maks. afstand', 'Max Distance') + '</span><span class="value">' + fiberBudget.maxDistance + ' m ' + (fiberBudget.distanceOk ? '\u2705' : '\u274C') + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Fibertype', 'Fiber Type') + '</span><span class="value">' + fiberBudget.type + '</span></div>';
+    html += '</div>';
+  }
+
+  // Testing & Labeling
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Test og maerkning', 'Testing & Labeling') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Test', 'Testing') + '</span><span class="value">' + tx('Alle links testes med feltester iht. ISO 11801 permanent link', 'All links tested with field tester per ISO 11801 permanent link') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Maerkning', 'Labeling') + '</span><span class="value">' + tx('Iht. TIA-606 / ISO 14763-1', 'Per TIA-606 / ISO 14763-1') + '</span></div>';
+  html += '</div>';
+
+  // Verdict
+  var allOk = distCheck.ok && (!fiberBudget || fiberBudget.distanceOk);
+  html += renderVerdict(allOk, allOk ? tx('Datainstallation opfylder ISO 11801 + DS/EN 50173', 'Structured cabling complies with ISO 11801 + DS/EN 50173') : tx('Afstand overskrider graenser - brug fiber eller ekstra teknikrum', 'Distance exceeds limits - use fiber or additional telecom room'));
+
+  html += '</div>';
+  return html;
+}
+
 // ===== INIT =====
 renderNav();
 renderStatusBar();
