@@ -6517,6 +6517,388 @@ test('KLS: renderModule case kls works via renderKLS', function() {
   assert(html.indexOf('ÅRLIG TJEKLISTE') >= 0 || html.indexOf('ANNUAL CHECKLIST') >= 0, 'Dashboard must show annual checklist');
 });
 
+// ===== KLS v2: persistence, append-able logs, auto-deviation, export/print =====
+function klsClearLogs() {
+  klsState.elLog = []; klsState.vvsLog = []; klsState.kloakLog = []; klsState.devLog = [];
+}
+
+test('KLS: klsLogStats empty log = zeros', function() {
+  var s = klsLogStats([]);
+  assert.strictEqual(s.approved, 0);
+  assert.strictEqual(s.deviations, 0);
+  assert.strictEqual(s.total, 0);
+  assert.strictEqual(s.ratePct, 0);
+});
+
+test('KLS: klsLogStats mixed log computes approved/deviations/ratePct', function() {
+  var log = [
+    { status: 'Godkendt' }, { status: 'Godkendt' }, { status: 'Godkendt' }, { status: 'Afvigelse' }
+  ];
+  var s = klsLogStats(log);
+  assert.strictEqual(s.approved, 3);
+  assert.strictEqual(s.deviations, 1);
+  assert.strictEqual(s.total, 4);
+  assert.strictEqual(s.ratePct, 75);
+});
+
+test('KLS: klsNextSagsnr generates zero-padded year-sequential numbers', function() {
+  assert.strictEqual(klsNextSagsnr(2025, 0), '2025-001');
+  assert.strictEqual(klsNextSagsnr(2025, 1), '2025-002');
+  assert.strictEqual(klsNextSagsnr(2025, 11), '2025-012');
+  assert.strictEqual(klsNextSagsnr(2024, 99), '2024-100');
+});
+
+test('KLS: klsNextDevId generates AFV-001 incrementing', function() {
+  assert.strictEqual(klsNextDevId(0), 'AFV-001');
+  assert.strictEqual(klsNextDevId(1), 'AFV-002');
+  assert.strictEqual(klsNextDevId(11), 'AFV-012');
+});
+
+test('KLS: saving EL entry with iso <1 yields Afvigelse and appends linked deviation', function() {
+  klsClearLogs();
+  klsState.elIso = '<1'; klsState.elJord = 'OK'; klsState.elHpfi = 'OK';
+  klsSaveElEntry();
+  assert.strictEqual(klsState.elLog.length, 1, 'one EL entry logged');
+  assert.strictEqual(klsState.elLog[0].status, 'Afvigelse', 'iso <1 => Afvigelse');
+  assert.strictEqual(klsState.devLog.length, 1, 'auto-deviation appended');
+  assert.strictEqual(klsState.devLog[0].id, 'AFV-001');
+  assert.strictEqual(klsState.devLog[0].sagsnr, klsState.elLog[0].sagsnr, 'deviation references the sagsnr');
+  assert.strictEqual(klsState.devLog[0].status, 'Åben', 'new deviation defaults to Åben');
+  assert(/^\d{4}-\d{3}$/.test(klsState.elLog[0].sagsnr), 'sagsnr format YYYY-NNN');
+});
+
+test('KLS: saving an approved EL entry does NOT create a deviation', function() {
+  klsClearLogs();
+  klsState.elIso = '2-5'; klsState.elJord = 'OK'; klsState.elHpfi = 'OK';
+  klsSaveElEntry();
+  assert.strictEqual(klsState.elLog[0].status, 'Godkendt');
+  assert.strictEqual(klsState.devLog.length, 0, 'no deviation for approved entry');
+});
+
+test('KLS: sagsnr increments sequentially across all three logs', function() {
+  klsClearLogs();
+  klsState.elIso = '2-5'; klsState.elJord = 'OK'; klsState.elHpfi = 'OK';
+  klsSaveElEntry();
+  klsState.vvsTryk = 'OK'; klsState.vvsTaethed = 'OK'; klsState.vvsTemp = '55-60°C';
+  klsSaveVvsEntry();
+  klsState.kloakTaethed = 'OK'; klsState.kloakFald = '20-30‰';
+  klsSaveKloakEntry();
+  assert.strictEqual(klsTotalLogCount(), 3);
+  var nums = [klsState.elLog[0].sagsnr, klsState.vvsLog[0].sagsnr, klsState.kloakLog[0].sagsnr];
+  var seq = nums.map(function(n) { return parseInt(n.split('-')[1], 10); });
+  assert.deepStrictEqual(seq, [1, 2, 3], 'sagsnr sequence 001,002,003 across logs');
+});
+
+test('KLS: klsKloakFaldOk false for <10 promille, true for 20-30 promille bucket', function() {
+  assert.strictEqual(klsKloakFaldOk('<10\u2030'), false);
+  assert.strictEqual(klsKloakFaldOk('20-30\u2030'), true);
+  assert.strictEqual(klsKloakFaldOk('10-20\u2030'), true);
+});
+
+test('KLS: kloak view renders the updated fall buckets', function() {
+  var saved = klsState.view;
+  klsState.view = 'kloak';
+  var html = renderKLS();
+  klsState.view = saved;
+  assert(html.indexOf('20-30\u2030') >= 0, 'fall bucket 20-30 promille present');
+  assert(html.indexOf('<10\u2030') >= 0, 'fall bucket <10 promille present');
+});
+
+test('KLS: persistence round-trip restores logs and deviations via klsSave/klsLoad', function() {
+  klsClearLogs();
+  klsState.elIso = '<1'; klsState.elJord = 'OK'; klsState.elHpfi = 'OK';
+  klsSaveElEntry(); // writes to localStorage via klsRerender -> klsSave
+  var elCount = klsState.elLog.length, devCount = klsState.devLog.length;
+  var sagsnr = klsState.elLog[0].sagsnr;
+  // wipe in-memory state then reload from storage
+  klsState.elLog = []; klsState.devLog = [];
+  klsLoad();
+  assert.strictEqual(klsState.elLog.length, elCount, 'elLog restored');
+  assert.strictEqual(klsState.devLog.length, devCount, 'devLog restored');
+  assert.strictEqual(klsState.elLog[0].sagsnr, sagsnr, 'sagsnr preserved across reload');
+});
+
+test('KLS: klsSerialize produces JSON containing the logs', function() {
+  var obj = JSON.parse(klsSerialize());
+  assert(Array.isArray(obj.elLog), 'elLog serialized as array');
+  assert(Array.isArray(obj.devLog), 'devLog serialized as array');
+});
+
+test('KLS: klsExpiryStatus from computed months still red<=3 / amber<=6 / green else', function() {
+  assert.strictEqual(klsExpiryStatus(0).level, 'red');
+  assert.strictEqual(klsExpiryStatus(3).level, 'red');
+  assert.strictEqual(klsExpiryStatus(4).level, 'amber');
+  assert.strictEqual(klsExpiryStatus(6).level, 'amber');
+  assert.strictEqual(klsExpiryStatus(7).level, 'green');
+  assert.strictEqual(klsExpiryStatus(24).level, 'green');
+});
+
+test('KLS: klsExpiryMonths computes from godkendt date (+2 years) and falls back to manual', function() {
+  var fallback = { godkendtYear: '', godkendtMonth: '', godkendtDay: '', expiryMonths: 9 };
+  assert.strictEqual(klsExpiryMonths(fallback), 9, 'falls back to manual expiryMonths');
+  // godkendt = first day of this month -> udløb = +2 years -> ~24 months away
+  var now = new Date();
+  var s = { godkendtYear: String(now.getFullYear()), godkendtMonth: ('0' + (now.getMonth() + 1)).slice(-2), godkendtDay: '01', expiryMonths: 0 };
+  var m = klsExpiryMonths(s);
+  assert(m >= 22 && m <= 24, 'computed months in expected ~24 range, got ' + m);
+});
+
+test('KLS: klsDashboardCompliance semantics unchanged (GREEN only when all LOVKRAV = Ja)', function() {
+  var answers = [];
+  for (var i = 0; i < KLS_ANNUAL.length; i++) answers.push(KLS_ANNUAL[i].tag === 'LOVKRAV' ? 'Ja' : null);
+  assert.strictEqual(klsDashboardCompliance(answers), true);
+  for (var j = 0; j < KLS_ANNUAL.length; j++) { if (KLS_ANNUAL[j].tag === 'LOVKRAV') { answers[j] = 'Nej'; break; } }
+  assert.strictEqual(klsDashboardCompliance(answers), false);
+});
+
+test('KLS: klsDeleteEntry removes a logged entry; klsSetDeviationStatus updates status', function() {
+  klsClearLogs();
+  klsState.elIso = '<1'; klsState.elJord = 'OK'; klsState.elHpfi = 'OK';
+  klsSaveElEntry();
+  klsSaveElEntry();
+  assert.strictEqual(klsState.elLog.length, 2);
+  klsDeleteEntry('elLog', 0); // confirm() is mocked true in harness
+  assert.strictEqual(klsState.elLog.length, 1, 'one entry deleted');
+  klsSetDeviationStatus(0, 'Afsluttet');
+  assert.strictEqual(klsState.devLog[0].status, 'Afsluttet', 'deviation status toggled via click helper');
+});
+
+test('KLS: klsAddDeviation auto-increments AFV ids and links sagsnr', function() {
+  klsClearLogs();
+  var id1 = klsAddDeviation('2025-005', 'EL', 'Udførelsesfejl');
+  var id2 = klsAddDeviation('2025-006', 'VVS', 'Materialefejl');
+  assert.strictEqual(id1, 'AFV-001');
+  assert.strictEqual(id2, 'AFV-002');
+  assert.strictEqual(klsState.devLog[1].sagsnr, '2025-006');
+});
+
+test('KLS: renderKLS returns non-empty HTML for all 14 views after seeding log + deviation data', function() {
+  klsClearLogs();
+  klsState.elIso = '<1'; klsState.elJord = 'OK'; klsState.elHpfi = 'OK';
+  klsSaveElEntry();
+  klsState.vvsTryk = 'OK'; klsState.vvsTaethed = 'OK'; klsState.vvsTemp = '55-60°C';
+  klsSaveVvsEntry();
+  klsState.kloakTaethed = 'OK'; klsState.kloakFald = '20-30‰';
+  klsSaveKloakEntry();
+  var views = ['forside', 'politik', 'organisation', 'procedurer', 'el', 'vvs', 'kloak',
+    'afvigelse', 'efterproevning', 'kompetence', 'maaleudstyr', 'tilsyn', 'dokument', 'dashboard'];
+  var saved = klsState.view;
+  views.forEach(function(v) {
+    klsState.view = v;
+    var html = renderKLS();
+    assert(html.length > 200, 'View ' + v + ' HTML too short');
+  });
+  klsState.view = saved;
+});
+
+test('KLS: seeded renderKLS output still has NO text input or textarea', function() {
+  klsClearLogs();
+  klsState.elIso = '<1'; klsState.elJord = 'OK'; klsState.elHpfi = 'OK';
+  klsSaveElEntry(); // creates an EL entry + deviation to exercise log/deviation tables
+  var views = ['forside', 'politik', 'organisation', 'procedurer', 'el', 'vvs', 'kloak',
+    'afvigelse', 'efterproevning', 'kompetence', 'maaleudstyr', 'tilsyn', 'dokument', 'dashboard'];
+  var saved = klsState.view;
+  var all = '';
+  views.forEach(function(v) { klsState.view = v; all += renderKLS(); });
+  klsState.view = saved;
+  assert(all.indexOf('<input type="text"') < 0, 'Found <input type="text"');
+  assert(all.indexOf("<input type='text'") < 0, "Found <input type='text'");
+  assert(all.indexOf('<textarea') < 0, 'Found <textarea');
+});
+
+test('KLS: rendered output cites DS 432:2020, DS/HD 60364-6:2016 and BEK 725', function() {
+  var views = ['forside', 'politik', 'el', 'vvs', 'kloak', 'dashboard'];
+  var saved = klsState.view;
+  var all = '';
+  views.forEach(function(v) { klsState.view = v; all += renderKLS(); });
+  klsState.view = saved;
+  assert(all.indexOf('DS 432:2020') >= 0, 'must cite DS 432:2020');
+  assert(all.indexOf('DS/HD 60364-6:2016') >= 0, 'must cite DS/HD 60364-6:2016');
+  assert(all.indexOf('BEK 725') >= 0 || all.indexOf('BEK nr. 725') >= 0, 'must cite BEK 725');
+});
+
+test('KLS: print/export entry points exist and report cites corrected standards', function() {
+  assert.strictEqual(typeof klsPrintReport, 'function');
+  assert.strictEqual(typeof klsExportJson, 'function');
+  assert.strictEqual(typeof klsImportJson, 'function');
+  assert.strictEqual(typeof klsReportHtml, 'function');
+  var report = klsReportHtml();
+  assert(report.length > 500, 'report html non-trivial');
+  assert(report.indexOf('DS 432:2020') >= 0, 'report cites DS 432:2020');
+  assert(report.indexOf('DS/HD 60364-6:2016') >= 0, 'report cites DS/HD 60364-6:2016');
+});
+
+test('KLS: klsReset restores defaults and clears the logs', function() {
+  klsClearLogs();
+  klsState.elIso = '<1'; klsState.elJord = 'OK'; klsState.elHpfi = 'OK';
+  klsSaveElEntry();
+  assert(klsState.elLog.length > 0 && klsState.devLog.length > 0);
+  klsReset(); // confirm() mocked true
+  assert.strictEqual(klsState.elLog.length, 0, 'logs cleared after reset');
+  assert.strictEqual(klsState.devLog.length, 0, 'deviations cleared after reset');
+  assert.strictEqual(klsState.kloakFald, '20-30\u2030', 'defaults restored');
+});
+
+// ===== KLS v3: pure deviation factory, classifyFn stats, spec-form sagsnr, remove-last, live dashboard =====
+
+test('KLS: klsMakeDeviationFromCheck builds a pure EL deviation (AFV-001, linked sagsnr, Åben)', function() {
+  var dev = klsMakeDeviationFromCheck('EL', '2025-001', 0);
+  assert.strictEqual(dev.id, 'AFV-001');
+  assert.strictEqual(dev.area, 'EL');
+  assert.strictEqual(dev.sagsnr, '2025-001');
+  assert.strictEqual(dev.status, 'Åben', 'must default to Åben (same-day registration)');
+  assert.strictEqual(dev.type, 'Udførelsesfejl');
+  assert(/^\d{4}-\d{2}-\d{2}$/.test(dev.date), 'date is ISO yyyy-mm-dd');
+});
+
+test('KLS: klsMakeDeviationFromCheck increments id from existingDevCount and is pure (no state change)', function() {
+  klsClearLogs();
+  var before = klsState.devLog.length;
+  var dev = klsMakeDeviationFromCheck('VVS', '2025-042', 5);
+  assert.strictEqual(dev.id, 'AFV-006', 'existingDevCount 5 => AFV-006');
+  assert.strictEqual(dev.area, 'VVS');
+  assert.strictEqual(klsState.devLog.length, before, 'pure helper must NOT mutate devLog');
+});
+
+test('KLS: klsMakeDeviationFromCheck handles Kloak register', function() {
+  var dev = klsMakeDeviationFromCheck('Kloak', '2024-100', 11);
+  assert.strictEqual(dev.id, 'AFV-012');
+  assert.strictEqual(dev.area, 'Kloak');
+  assert.strictEqual(dev.type, 'Udførelsesfejl');
+});
+
+test('KLS: klsAddDeviation delegates to klsMakeDeviationFromCheck (consistent object shape)', function() {
+  klsClearLogs();
+  var id = klsAddDeviation('2025-009', 'EL', 'Dokumentationsfejl');
+  assert.strictEqual(id, 'AFV-001');
+  var d = klsState.devLog[0];
+  assert.strictEqual(d.area, 'EL');
+  assert.strictEqual(d.sagsnr, '2025-009');
+  assert.strictEqual(d.type, 'Dokumentationsfejl', 'explicit type override preserved');
+  assert.strictEqual(d.status, 'Åben');
+});
+
+test('KLS: klsLogStats exposes spec key names {godkendte, afvigelser, pct} alongside legacy', function() {
+  var log = [{ status: 'Godkendt' }, { status: 'Godkendt' }, { status: 'Afvigelse' }, { status: 'Afvigelse' }];
+  var s = klsLogStats(log);
+  assert.strictEqual(s.total, 4);
+  assert.strictEqual(s.godkendte, 2);
+  assert.strictEqual(s.afvigelser, 2);
+  assert.strictEqual(s.pct, 50);
+  assert.strictEqual(s.godkendte, s.approved);
+  assert.strictEqual(s.afvigelser, s.deviations);
+  assert.strictEqual(s.pct, s.ratePct);
+});
+
+test('KLS: klsLogStats empty list -> pct 0 (consistent, never NaN)', function() {
+  var s = klsLogStats([]);
+  assert.strictEqual(s.total, 0);
+  assert.strictEqual(s.pct, 0);
+  assert.strictEqual(s.godkendte, 0);
+  assert.strictEqual(s.afvigelser, 0);
+});
+
+test('KLS: klsLogStats with classifyFn classifies via the status helpers (logic in one place)', function() {
+  var log = [
+    { iso: '2-5', jord: 'OK', hpfi: 'OK' },
+    { iso: '<1', jord: 'OK', hpfi: 'OK' },
+    { iso: '5-10', jord: 'Ikke OK', hpfi: 'OK' }
+  ];
+  var s = klsLogStats(log, function(r) { return klsElStatus(r.iso, r.jord, r.hpfi); });
+  assert.strictEqual(s.total, 3);
+  assert.strictEqual(s.godkendte, 1);
+  assert.strictEqual(s.afvigelser, 2);
+  assert.strictEqual(s.pct, 33);
+});
+
+test('KLS: klsNextSagsnr spec form (logArray, year) -> first 2025-001, year-aware, increments', function() {
+  assert.strictEqual(klsNextSagsnr([], 2025), '2025-001', 'empty log -> 001');
+  assert.strictEqual(klsNextSagsnr([{}, {}], 2025), '2025-003', '2 entries -> 003');
+  assert.strictEqual(klsNextSagsnr([{}], 2024), '2024-002', 'year-aware');
+});
+
+test('KLS: klsNextSagsnr legacy form (year, count) still works (regression)', function() {
+  assert.strictEqual(klsNextSagsnr(2025, 0), '2025-001');
+  assert.strictEqual(klsNextSagsnr(2025, 11), '2025-012');
+});
+
+test('KLS: klsRemoveLast removes only the most recent entry (click-only undo)', function() {
+  klsClearLogs();
+  klsState.elIso = '2-5'; klsState.elJord = 'OK'; klsState.elHpfi = 'OK';
+  klsSaveElEntry();
+  klsState.elIso = '<1';
+  klsSaveElEntry();
+  assert.strictEqual(klsState.elLog.length, 2);
+  var firstSagsnr = klsState.elLog[0].sagsnr;
+  klsRemoveLast('elLog');
+  assert.strictEqual(klsState.elLog.length, 1, 'last entry removed');
+  assert.strictEqual(klsState.elLog[0].sagsnr, firstSagsnr, 'earlier entry untouched');
+});
+
+test('KLS: klsRemoveLast on an empty log is a safe no-op', function() {
+  klsClearLogs();
+  klsRemoveLast('vvsLog');
+  assert.strictEqual(klsState.vvsLog.length, 0);
+});
+
+test('KLS: appending a Kloak Afvigelse auto-links a deviation (same-day registration)', function() {
+  klsClearLogs();
+  klsState.kloakTaethed = 'Ikke OK'; klsState.kloakFald = '<10‰';
+  klsSaveKloakEntry();
+  assert.strictEqual(klsState.kloakLog.length, 1);
+  assert.strictEqual(klsState.kloakLog[0].status, 'Afvigelse');
+  assert.strictEqual(klsState.devLog.length, 1, 'deviation auto-created for failed kloak check');
+  assert.strictEqual(klsState.devLog[0].area, 'Kloak');
+  assert.strictEqual(klsState.devLog[0].sagsnr, klsState.kloakLog[0].sagsnr);
+  assert.strictEqual(klsState.devLog[0].status, 'Åben');
+});
+
+test('KLS: dashboard view aggregates live stats from a populated elLog', function() {
+  klsClearLogs();
+  klsState.elJord = 'OK'; klsState.elHpfi = 'OK';
+  klsState.elIso = '2-5'; klsSaveElEntry();
+  klsState.elIso = '5-10'; klsSaveElEntry();
+  klsState.elIso = '>10'; klsSaveElEntry();
+  klsState.elIso = '<1'; klsSaveElEntry();
+  var stats = klsLogStats(klsState.elLog);
+  assert.strictEqual(stats.total, 4);
+  assert.strictEqual(stats.godkendte, 3);
+  assert.strictEqual(stats.afvigelser, 1);
+  assert.strictEqual(stats.pct, 75);
+  var saved = klsState.view;
+  klsState.view = 'dashboard';
+  var html = renderKLS();
+  klsState.view = saved;
+  assert(html.indexOf('75%') >= 0, 'dashboard shows live 75% approval rate from elLog');
+  assert(html.length > 200, 'dashboard non-empty');
+});
+
+test('KLS: EL log render shows the Remove-last control once entries exist', function() {
+  klsClearLogs();
+  klsState.elIso = '2-5'; klsState.elJord = 'OK'; klsState.elHpfi = 'OK';
+  klsSaveElEntry();
+  var saved = klsState.view;
+  klsState.view = 'el';
+  var html = renderKLS();
+  klsState.view = saved;
+  assert(html.indexOf('klsRemoveLast(') >= 0, 'remove-last button wired in EL log');
+});
+
+test('KLS: all 14 views still render non-empty with NO text input/textarea after v3 changes', function() {
+  klsClearLogs();
+  klsState.elIso = '<1'; klsState.elJord = 'OK'; klsState.elHpfi = 'OK';
+  klsSaveElEntry();
+  var views = ['forside', 'politik', 'organisation', 'procedurer', 'el', 'vvs', 'kloak',
+    'afvigelse', 'efterproevning', 'kompetence', 'maaleudstyr', 'tilsyn', 'dokument', 'dashboard'];
+  var saved = klsState.view;
+  var all = '';
+  views.forEach(function(v) { klsState.view = v; var html = renderKLS(); assert(html.length > 200, 'view ' + v + ' too short'); all += html; });
+  klsState.view = saved;
+  assert(all.indexOf('<input type="text"') < 0, 'no <input type="text">');
+  assert(all.indexOf("<input type='text'") < 0, "no <input type='text'>");
+  assert(all.indexOf('<textarea') < 0, 'no <textarea>');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

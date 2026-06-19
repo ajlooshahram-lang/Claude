@@ -1036,6 +1036,9 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // KLS append-only log controls (new)
+  'Remove last': '\u062D\u0630\u0641 \u0622\u062E\u0631\u06CC\u0646',
+  'Remove the last entry in this log?': '\u0622\u062E\u0631\u06CC\u0646 \u0645\u0648\u0631\u062F \u0627\u06CC\u0646 \u06AF\u0632\u0627\u0631\u0634 \u062D\u0630\u0641 \u0634\u0648\u062F\u061F',
   // Fault Simulation translations (Phase 3)
   'Fault Simulation': '\u0634\u0628\u06CC\u0647\u200C\u0633\u0627\u0632\u06CC \u062E\u0637\u0627',
   'Short-circuit': '\u0627\u062A\u0635\u0627\u0644 \u06A9\u0648\u062A\u0627\u0647',
@@ -1828,7 +1831,48 @@ const _FA = {
   'Active': 'فعال',
   'Retired': 'بازنشسته',
   'Open': 'باز',
-  'Closed': 'بسته شده'
+  'Closed': 'بسته شده',
+  // KLS — persistence, logs, dates, export/print (added)
+  'Save entry': 'ذخیره مورد',
+  'Delete': 'حذف',
+  'Print KLS report': 'چاپ گزارش KLS',
+  'Export (JSON)': 'برون‌سپاری (JSON)',
+  'Import (JSON)': 'درون‌ریزی (JSON)',
+  'Reset KLS': 'بازنشانی KLS',
+  'Date': 'تاریخ',
+  'Case no.': 'شماره پرونده',
+  'Type': 'نوع',
+  'Key measurements': 'اندازه‌گیری‌های کلیدی',
+  'Year': 'سال',
+  'Month': 'ماه',
+  'Day': 'روز',
+  'KLS approved date (click)': 'تاریخ تایید KLS (کلیک)',
+  'Expiry date is computed automatically as approved + 2 years.': 'تاریخ انقضا به‌طور خودکار به‌صورت تاریخ تایید + ۲ سال محاسبه می‌شود.',
+  'Current entry (preview)': 'مورد فعلی (پیش‌نمایش)',
+  'next case no.': 'شماره پرونده بعدی',
+  'Statistics (from log)': 'آمار (از گزارش)',
+  'Approved': 'تایید شده',
+  'Entries': 'تعداد موارد',
+  'Logged final inspections EL': 'بازرسی‌های نهایی ثبت‌شده برق',
+  'Logged final inspections plumbing': 'بازرسی‌های نهایی ثبت‌شده تاسیسات آب',
+  'Logged final inspections drainage': 'بازرسی‌های نهایی ثبت‌شده فاضلاب',
+  'No entries yet — build an entry above and click "Save entry".': 'هنوز موردی نیست — یک مورد را در بالا بسازید و روی «ذخیره مورد» کلیک کنید.',
+  'No entries.': 'موردی نیست.',
+  'Meeting date': 'تاریخ جلسه',
+  'Next evaluation': 'ارزیابی بعدی',
+  'Meeting date (click)': 'تاریخ جلسه (کلیک)',
+  'Next evaluation (click)': 'ارزیابی بعدی (کلیک)',
+  'Review points': 'نکات بازنگری',
+  'Expiry date': 'تاریخ انقضا',
+  'Months to expiry (manual)': 'ماه تا انقضا (دستی)',
+  'In progress': 'در حال انجام',
+  'System status': 'وضعیت سیستم',
+  'Active procedures': 'رویه‌های فعال',
+  'Active documents': 'مستندات فعال',
+  'Documents under revision': 'مستندات در حال بازنگری',
+  'Calibrated OK': 'کالیبراسیون تایید',
+  'Review completed': 'بازنگری انجام‌شده',
+  'A deviation automatically creates a deviation report.': 'یک انحراف به‌طور خودکار یک گزارش انحراف ایجاد می‌کند.'
 };
 function tx(da, en) { if(lang === 'da') return da; if(lang === 'fa') return _FA[en] || en; return en; }
 function tl(obj, prefix) { return obj[prefix + '_' + lang] || obj[prefix + '_en'] || ''; }
@@ -16019,9 +16063,9 @@ var KLS_SHEETS = [
   { nr: 2, da: 'Kvalitetspolitik', en: 'Quality Policy', indhold: 'Mål og lovgrundlag', ansvar: 'Ledelse', view: 'politik' },
   { nr: 3, da: 'Organisation', en: 'Organisation', indhold: 'Medarbejdere og ansvar', ansvar: 'Ledelse', view: 'organisation' },
   { nr: 4, da: 'Procedurer', en: 'Procedures', indhold: 'P-01 .. P-14', ansvar: 'KLS-ansvarlig', view: 'procedurer' },
-  { nr: 5, da: 'Slutkontrol EL', en: 'Final Inspection EL', indhold: 'Verifikation el (DS/HD 60364-6)', ansvar: 'FA el', view: 'el' },
+  { nr: 5, da: 'Slutkontrol EL', en: 'Final Inspection EL', indhold: 'Verifikation el (DS/HD 60364-6:2016)', ansvar: 'FA el', view: 'el' },
   { nr: 6, da: 'Slutkontrol VVS', en: 'Final Inspection Plumbing', indhold: 'Verifikation vvs', ansvar: 'FA vvs', view: 'vvs' },
-  { nr: 7, da: 'Slutkontrol Kloak', en: 'Final Inspection Drainage', indhold: 'Verifikation kloak (DS 432)', ansvar: 'FA kloak', view: 'kloak' },
+  { nr: 7, da: 'Slutkontrol Kloak', en: 'Final Inspection Drainage', indhold: 'Verifikation kloak (DS 432:2020)', ansvar: 'FA kloak', view: 'kloak' },
   { nr: 8, da: 'Afvigelsesrapport', en: 'Deviation Report', indhold: 'Afvigelser og opfølgning', ansvar: 'Faglig ansvarlig', view: 'afvigelse' },
   { nr: 9, da: 'Intern Efterprøvning', en: 'Internal Review', indhold: 'Ledelsens evaluering (§8)', ansvar: 'Ledelse', view: 'efterproevning' },
   { nr: 10, da: 'Kompetenceskema', en: 'Competence Sheet', indhold: 'Uddannelse og certifikater', ansvar: 'Ledelse', view: 'kompetence' },
@@ -16123,39 +16167,83 @@ var KLS_MASTER_FIELDS = [
   'KLS godkendt dato', 'KLS udløbsdato', 'Version 1.0'
 ];
 
-var klsState = {
-  view: 'forside',
-  autType: 'El',
-  procStatus: [],
-  devStatus: ['Åben', 'Igangsat', 'Afsluttet'],
-  devType: ['Udførelsesfejl', 'Dokumentationsfejl', 'Materialefejl'],
-  reviewPts: [],
-  calStatus: [],
-  docStatus: [],
-  annual: [],
-  tilsynStatus: 'Godkendt',
-  expiryMonths: 12,
-  elInstallType: 'Nyinstallation',
-  elIso: '2-5',
-  elJord: 'OK',
-  elHpfi: 'OK',
-  vvsType: 'Nyinstallation',
-  vvsTryk: 'OK',
-  vvsTaethed: 'OK',
-  vvsTemp: '55-60°C',
-  kloakType: 'Nyanlæg',
-  kloakTV: 'Udført',
-  kloakTaethed: 'OK',
-  kloakFald: '15-20‰'
-};
-(function() {
+var KLS_STORAGE_KEY = 'kls_state_v1';
+
+function klsDefaults() {
+  var s = {
+    view: 'forside',
+    autType: 'El',
+    procStatus: [],
+    devStatus: ['Åben', 'Igangsat', 'Afsluttet'],
+    devType: ['Udførelsesfejl', 'Dokumentationsfejl', 'Materialefejl'],
+    reviewPts: [],
+    calStatus: [],
+    docStatus: [],
+    annual: [],
+    tilsynStatus: 'Godkendt',
+    expiryMonths: 12,
+    // KLS godkendt-dato (klik-vælgere) — udløb beregnes automatisk som godkendt + 2 år
+    godkendtYear: '',
+    godkendtMonth: '',
+    godkendtDay: '',
+    // Ledelsens evaluering — mødedato + næste evaluering (klik-vælgere)
+    moedeYear: '',
+    moedeMonth: '',
+    naesteYear: '',
+    naesteMonth: '',
+    // Slutkontrol — aktuelle valg (bygges før "Gem post")
+    elInstallType: 'Nyinstallation',
+    elIso: '2-5',
+    elJord: 'OK',
+    elHpfi: 'OK',
+    vvsType: 'Nyinstallation',
+    vvsTryk: 'OK',
+    vvsTaethed: 'OK',
+    vvsTemp: '55-60°C',
+    kloakType: 'Nyanlæg',
+    kloakTV: 'Udført',
+    kloakTaethed: 'OK',
+    kloakFald: '20-30‰',
+    // Appenderbare slutkontrol-logs + afvigelseslog (overlever reload via localStorage)
+    elLog: [],
+    vvsLog: [],
+    kloakLog: [],
+    devLog: []
+  };
   var i;
-  for (i = 0; i < 14; i++) klsState.procStatus.push('Aktiv');
-  for (i = 0; i < 12; i++) klsState.reviewPts.push(null);
-  for (i = 0; i < 8; i++) klsState.calStatus.push('Kalibreret OK');
-  for (i = 0; i < 14; i++) klsState.docStatus.push('Aktiv');
-  for (i = 0; i < 8; i++) klsState.annual.push(null);
-})();
+  for (i = 0; i < 14; i++) s.procStatus.push('Aktiv');
+  for (i = 0; i < 12; i++) s.reviewPts.push(null);
+  for (i = 0; i < 8; i++) s.calStatus.push('Kalibreret OK');
+  for (i = 0; i < 14; i++) s.docStatus.push('Aktiv');
+  for (i = 0; i < 8; i++) s.annual.push(null);
+  return s;
+}
+
+var klsState = klsDefaults();
+
+// ===== KLS PERSISTENCE (same localStorage mechanism as the rest of the app) =====
+function klsSerialize() { return JSON.stringify(klsState); }
+function klsSave() {
+  try { localStorage.setItem(KLS_STORAGE_KEY, klsSerialize()); } catch (e) { /* storage may be unavailable */ }
+}
+function klsLoad() {
+  try {
+    var raw = localStorage.getItem(KLS_STORAGE_KEY);
+    if (!raw) return;
+    var saved = JSON.parse(raw);
+    if (!saved || typeof saved !== 'object') return;
+    // Merge saved over defaults: new fields keep their default, old saved data survives reload.
+    Object.keys(saved).forEach(function(k) { klsState[k] = saved[k]; });
+  } catch (e) { /* ignore malformed saved data */ }
+}
+function klsRerender() { klsSave(); renderModule('kls'); }
+function klsReset() {
+  if (typeof confirm === 'function' && !confirm(tx('Nulstil hele KLS-systemet? Alle loggede poster, afvigelser og statusser slettes permanent.', 'Reset the entire KLS system? All logged entries, deviations and statuses will be permanently deleted.'))) return;
+  try { localStorage.removeItem(KLS_STORAGE_KEY); } catch (e) {}
+  klsState = klsDefaults();
+  renderModule('kls');
+}
+klsLoad();
 
 // ===== KLS PURE HELPER FUNCTIONS (compliance logic) =====
 function klsProcedureActiveCount(states) {
@@ -16237,11 +16325,345 @@ function klsDashboardCompliance(annualAnswers) {
   return true;
 }
 
+// ===== KLS DATE / ID / LOG HELPERS =====
+function klsPad(n) { var s = '' + n; return s.length < 2 ? '0' + s : s; }
+function klsCurrentYear() { return new Date().getFullYear(); }
+function klsToday() { var d = new Date(); return d.getFullYear() + '-' + klsPad(d.getMonth() + 1) + '-' + klsPad(d.getDate()); }
+function klsDaysInMonth(year, month) {
+  var y = parseInt(year, 10), m = parseInt(month, 10);
+  if (!y || !m) return 31;
+  return new Date(y, m, 0).getDate();
+}
+function klsFormatDate(y, m, d) {
+  if (!y || !m) return '—';
+  return y + '-' + klsPad(m) + (d ? '-' + klsPad(d) : '');
+}
+// Auto sagsnr: YEAR-sequential, zero-padded to 3 digits.
+// Supports two call forms (both preserved):
+//   klsNextSagsnr(year, count)   [legacy] -> e.g. klsNextSagsnr(2025, 0) -> '2025-001'
+//   klsNextSagsnr(logArray, year)[spec]   -> e.g. klsNextSagsnr([], 2025) -> '2025-001' (count = logArray.length)
+function klsNextSagsnr(a, b) {
+  var year, count;
+  if (Array.isArray(a)) { count = a.length; year = b; }
+  else { year = a; count = b; }
+  var n = '' + (count + 1);
+  while (n.length < 3) n = '0' + n;
+  return year + '-' + n;
+}
+// Auto deviation id: AFV-001, AFV-002, ...
+function klsNextDevId(count) {
+  var n = '' + (count + 1);
+  while (n.length < 3) n = '0' + n;
+  return 'AFV-' + n;
+}
+// Pure aggregation over a slutkontrol log array.
+// klsLogStats(log)            -> classifies each record by its stored .status field.
+// klsLogStats(log, classifyFn) -> classifies each record via classifyFn(record) (e.g. klsElStatus-wrapper),
+//                                 keeping the verdict logic in one single place (the status helpers).
+// Returns BOTH naming conventions so callers/tests can use either:
+//   legacy: { approved, deviations, total, ratePct }
+//   spec:   { total, godkendte, afvigelser, pct }
+// Empty list -> pct/ratePct = 0 (consistent, never NaN/undefined).
+function klsLogStats(log, classifyFn) {
+  var approved = 0, deviations = 0, i, st;
+  log = log || [];
+  for (i = 0; i < log.length; i++) {
+    st = (typeof classifyFn === 'function') ? classifyFn(log[i]) : log[i].status;
+    if (st === 'Godkendt') approved++;
+    else if (st === 'Afvigelse') deviations++;
+  }
+  var total = log.length;
+  var pct = total > 0 ? Math.round(approved / total * 100) : 0;
+  return {
+    approved: approved, deviations: deviations, total: total, ratePct: pct,
+    godkendte: approved, afvigelser: deviations, pct: pct
+  };
+}
+function klsTotalLogCount() {
+  return klsState.elLog.length + klsState.vvsLog.length + klsState.kloakLog.length;
+}
+// Status-string list for klsDeviationStats: real devLog if present, else demo rows.
+function klsDevStatusList() {
+  if (klsState.devLog && klsState.devLog.length) return klsState.devLog.map(function(d) { return d.status; });
+  return klsState.devStatus;
+}
+// Months from today until KLS udløbsdato (godkendt + 2 years). Falls back to manual expiryMonths.
+function klsExpiryMonths(state) {
+  var y = parseInt(state.godkendtYear, 10), m = parseInt(state.godkendtMonth, 10);
+  if (!y || !m) return state.expiryMonths;
+  var d = parseInt(state.godkendtDay, 10) || 1;
+  var udloeb = new Date(y + 2, m - 1, d);
+  var now = new Date();
+  var months = (udloeb.getFullYear() - now.getFullYear()) * 12 + (udloeb.getMonth() - now.getMonth());
+  if (udloeb.getDate() < now.getDate()) months -= 1;
+  return months;
+}
+function klsGodkendtStr() { return klsFormatDate(klsState.godkendtYear, klsState.godkendtMonth, klsState.godkendtDay); }
+function klsUdloebStr() {
+  var y = parseInt(klsState.godkendtYear, 10), m = parseInt(klsState.godkendtMonth, 10);
+  if (!y || !m) return '—';
+  var d = parseInt(klsState.godkendtDay, 10) || 1;
+  var u = new Date(y + 2, m - 1, d);
+  return u.getFullYear() + '-' + klsPad(u.getMonth() + 1) + '-' + klsPad(u.getDate());
+}
+function klsUdloebColor() {
+  if (!klsState.godkendtYear || !klsState.godkendtMonth) return '';
+  var lvl = klsExpiryStatus(klsExpiryMonths(klsState)).level;
+  return lvl === 'red' ? 'var(--danger)' : (lvl === 'amber' ? '#b8860b' : 'var(--success)');
+}
+
+// ===== KLS LOG ACTIONS (mutate state + persist) =====
+// Pure helper: builds the deviation object that MUST be registered when a slutkontrol fails.
+// register: 'EL' | 'VVS' | 'Kloak'. No DOM, no state mutation — fully testable.
+// Realises the framework principle: an Afvigelse is registered the same day (date = today, status 'Åben').
+function klsMakeDeviationFromCheck(register, sagsnr, existingDevCount) {
+  var typeMap = { EL: 'Udførelsesfejl', VVS: 'Udførelsesfejl', Kloak: 'Udførelsesfejl' };
+  return {
+    id: klsNextDevId(existingDevCount || 0),
+    sagsnr: sagsnr,
+    area: register,
+    type: typeMap[register] || 'Udførelsesfejl',
+    status: 'Åben',
+    date: klsToday()
+  };
+}
+function klsAddDeviation(sagsnr, area, type) {
+  var dev = klsMakeDeviationFromCheck(area, sagsnr, klsState.devLog.length);
+  if (type) dev.type = type;
+  klsState.devLog.push(dev);
+  return dev.id;
+}
+function klsSaveElEntry() {
+  var status = klsElStatus(klsState.elIso, klsState.elJord, klsState.elHpfi);
+  var sagsnr = klsNextSagsnr(klsCurrentYear(), klsTotalLogCount());
+  klsState.elLog.push({ sagsnr: sagsnr, date: klsToday(), type: 'EL', installType: klsState.elInstallType, iso: klsState.elIso, jord: klsState.elJord, hpfi: klsState.elHpfi, status: status });
+  if (status === 'Afvigelse') klsAddDeviation(sagsnr, 'EL', 'Udførelsesfejl');
+  klsRerender();
+}
+function klsSaveVvsEntry() {
+  var status = klsVvsStatus(klsState.vvsTryk, klsState.vvsTaethed, klsState.vvsTemp);
+  var sagsnr = klsNextSagsnr(klsCurrentYear(), klsTotalLogCount());
+  klsState.vvsLog.push({ sagsnr: sagsnr, date: klsToday(), type: 'VVS', workType: klsState.vvsType, tryk: klsState.vvsTryk, taethed: klsState.vvsTaethed, temp: klsState.vvsTemp, status: status });
+  if (status === 'Afvigelse') klsAddDeviation(sagsnr, 'VVS', 'Udførelsesfejl');
+  klsRerender();
+}
+function klsSaveKloakEntry() {
+  var status = klsKloakStatus(klsState.kloakTaethed, klsState.kloakFald);
+  var sagsnr = klsNextSagsnr(klsCurrentYear(), klsTotalLogCount());
+  klsState.kloakLog.push({ sagsnr: sagsnr, date: klsToday(), type: 'Kloak', workType: klsState.kloakType, tv: klsState.kloakTV, taethed: klsState.kloakTaethed, fald: klsState.kloakFald, status: status });
+  if (status === 'Afvigelse') klsAddDeviation(sagsnr, 'Kloak', 'Udførelsesfejl');
+  klsRerender();
+}
+function klsDeleteEntry(logName, idx) {
+  if (typeof confirm === 'function' && !confirm(tx('Slet denne post?', 'Delete this entry?'))) return;
+  if (klsState[logName] && idx >= 0 && idx < klsState[logName].length) klsState[logName].splice(idx, 1);
+  klsRerender();
+}
+// Click-only undo: remove the most recently appended entry from an append-only log.
+function klsRemoveLast(logName) {
+  if (typeof confirm === 'function' && !confirm(tx('Fjern sidste post i denne log?', 'Remove the last entry in this log?'))) return;
+  if (klsState[logName] && klsState[logName].length) klsState[logName].pop();
+  klsRerender();
+}
+function klsDeleteDeviation(idx) {
+  if (typeof confirm === 'function' && !confirm(tx('Slet denne afvigelse?', 'Delete this deviation?'))) return;
+  if (klsState.devLog && idx >= 0 && idx < klsState.devLog.length) klsState.devLog.splice(idx, 1);
+  klsRerender();
+}
+function klsSetDeviationStatus(idx, status) {
+  if (klsState.devLog && klsState.devLog[idx]) klsState.devLog[idx].status = status;
+  klsRerender();
+}
+
+// ===== KLS STATUS BADGE + LOG TABLE RENDERERS =====
+function klsStatusBadge(status) {
+  var color = status === 'Godkendt' ? 'var(--success)' : (status === 'Afvigelse' ? 'var(--danger)' : '#b8860b');
+  return '<span style="color:' + color + ';font-weight:bold">' + status + '</span>';
+}
+function klsLogSection(logName, title, measFn) {
+  var log = klsState[logName] || [];
+  var h = '<div class="result-box"><div class="result-title">' + title + ' (' + log.length + ')</div>';
+  if (!log.length) {
+    h += '<div class="result-row"><span class="label">' + tx('Ingen poster endnu — byg en post ovenfor og klik "Gem post".', 'No entries yet — build an entry above and click "Save entry".') + '</span></div>';
+  } else {
+    h += '<div class="result-row" style="opacity:0.7"><span class="label"><b>' + tx('Dato', 'Date') + ' · ' + tx('Sagsnr', 'Case no.') + ' · ' + tx('Type', 'Type') + ' · ' + tx('Nøglemålinger', 'Key measurements') + '</b></span><span class="value"><b>' + tx('Status', 'Status') + '</b></span></div>';
+    log.forEach(function(e, i) {
+      h += '<div class="result-row" style="border-bottom:1px solid rgba(255,255,255,0.05);padding:6px 0">';
+      h += '<span class="label">' + e.date + ' · <b>' + e.sagsnr + '</b> · ' + e.type + '<br><small style="color:#888">' + measFn(e) + '</small></span>';
+      h += '<span class="value">' + klsStatusBadge(e.status) + ' <button class="sel-btn" style="padding:2px 8px;font-size:0.8em;margin-left:6px" onclick="klsDeleteEntry(\'' + logName + '\',' + i + ')">' + tx('Slet', 'Delete') + '</button></span>';
+      h += '</div>';
+    });
+  }
+  if (log.length) {
+    h += '<div class="select-group"><div class="select-grid"><button class="sel-btn" style="border-color:#b8860b;color:#b8860b" onclick="klsRemoveLast(\'' + logName + '\')">↩️ ' + tx('Fjern sidste', 'Remove last') + '</button></div></div>';
+  }
+  h += '</div>';
+  return h;
+}
+function klsSaveButton(fn, status) {
+  return '<div class="result-box"><div class="result-row"><span class="label">' + tx('Aktuel post (forhåndsvisning)', 'Current entry (preview)') + ' · ' + tx('næste sagsnr', 'next case no.') + ' <b>' + klsNextSagsnr(klsCurrentYear(), klsTotalLogCount()) + '</b></span><span class="value">' + klsStatusBadge(status) + '</span></div></div>'
+    + '<div class="select-group"><div class="select-grid"><button class="sel-btn" onclick="' + fn + '()">💾 ' + tx('Gem post', 'Save entry') + '</button></div></div>';
+}
+function klsLogStatsBox(log) {
+  var st = klsLogStats(log);
+  var h = '<div class="result-box"><div class="result-title">' + tx('Statistik (fra log)', 'Statistics (from log)') + '</div>';
+  h += klsResultRow(tx('Godkendte', 'Approved'), st.approved, 'var(--success)');
+  h += klsResultRow(tx('Afvigelser', 'Deviations'), st.deviations, st.deviations > 0 ? 'var(--danger)' : '');
+  h += klsResultRow(tx('Godkendelsesprocent', 'Approval rate'), st.total > 0 ? st.ratePct + '%' : '—');
+  h += '</div>';
+  return h;
+}
+
+// ===== KLS TOOLBAR + CLICK DATE PICKERS =====
+function klsToolbar() {
+  var h = '<div class="select-group"><div class="select-grid">';
+  h += '<button class="sel-btn" onclick="klsPrintReport()">🖨️ ' + tx('Print KLS-rapport', 'Print KLS report') + '</button>';
+  h += '<button class="sel-btn" onclick="klsExportJson()">⬇️ ' + tx('Eksportér (JSON)', 'Export (JSON)') + '</button>';
+  h += '<button class="sel-btn" onclick="klsImportJson()">⬆️ ' + tx('Importér (JSON)', 'Import (JSON)') + '</button>';
+  h += '<button class="sel-btn" style="border-color:var(--danger);color:var(--danger)" onclick="klsReset()">♻️ ' + tx('Nulstil KLS', 'Reset KLS') + '</button>';
+  h += '</div></div>';
+  return h;
+}
+function klsYearOptions() {
+  var y = klsCurrentYear(), a = [], i;
+  for (i = y - 3; i <= y + 1; i++) a.push('' + i);
+  return a;
+}
+function klsMonthOptions() {
+  var a = [], i;
+  for (i = 1; i <= 12; i++) a.push(klsPad(i));
+  return a;
+}
+function klsDayOptions(year, month) {
+  var days = klsDaysInMonth(year, month), a = [], i;
+  for (i = 1; i <= days; i++) a.push(klsPad(i));
+  return a;
+}
+function klsDatePickers(label, prefix, withDay) {
+  var h = '<div class="select-group"><div class="select-label">' + label + '</div>';
+  h += '<div class="select-label" style="font-size:0.8em;opacity:0.8">' + tx('År', 'Year') + '</div><div class="select-grid">';
+  klsYearOptions().forEach(function(y) {
+    h += '<button class="sel-btn' + (klsState[prefix + 'Year'] === y ? ' selected' : '') + '" onclick="klsState.' + prefix + 'Year=\'' + y + '\';klsRerender()">' + y + '</button>';
+  });
+  h += '</div>';
+  h += '<div class="select-label" style="font-size:0.8em;opacity:0.8">' + tx('Måned', 'Month') + '</div><div class="select-grid">';
+  klsMonthOptions().forEach(function(m) {
+    h += '<button class="sel-btn' + (klsState[prefix + 'Month'] === m ? ' selected' : '') + '" onclick="klsState.' + prefix + 'Month=\'' + m + '\';klsRerender()">' + m + '</button>';
+  });
+  h += '</div>';
+  if (withDay) {
+    h += '<div class="select-label" style="font-size:0.8em;opacity:0.8">' + tx('Dag', 'Day') + '</div><div class="select-grid">';
+    klsDayOptions(klsState[prefix + 'Year'], klsState[prefix + 'Month']).forEach(function(d) {
+      h += '<button class="sel-btn' + (klsState[prefix + 'Day'] === d ? ' selected' : '') + '" onclick="klsState.' + prefix + 'Day=\'' + d + '\';klsRerender()">' + d + '</button>';
+    });
+    h += '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+// ===== KLS EXPORT / IMPORT / PRINT (reuses app Blob/download + window.open print pattern) =====
+function klsExportJson() {
+  try {
+    var blob = new Blob([JSON.stringify(klsState, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'kls-kvalitetssystem-' + klsToday() + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {}
+}
+function klsImportJson() {
+  // File picker (no typing). Reads JSON and merges over current state.
+  try {
+    var inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = 'application/json,.json';
+    inp.onchange = function(ev) {
+      var file = ev.target.files && ev.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var data = JSON.parse(e.target.result);
+          if (data && typeof data === 'object') {
+            Object.keys(data).forEach(function(k) { klsState[k] = data[k]; });
+            klsSave();
+            renderModule('kls');
+          }
+        } catch (err) {
+          if (typeof alert === 'function') alert(tx('Ugyldig JSON-fil.', 'Invalid JSON file.'));
+        }
+      };
+      reader.readAsText(file);
+    };
+    inp.click();
+  } catch (e) {}
+}
+function klsReportHtml() {
+  var elS = klsLogStats(klsState.elLog), vvsS = klsLogStats(klsState.vvsLog), kloakS = klsLogStats(klsState.kloakLog);
+  var devStats = klsDeviationStats(klsDevStatusList());
+  var docStats = klsDocStats(klsState.docStatus);
+  var compliant = klsDashboardCompliance(klsState.annual);
+  var months = klsState.godkendtYear ? klsExpiryMonths(klsState) : klsState.expiryMonths;
+  var expiry = klsExpiryStatus(months);
+  function esc(s) { return ('' + s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function logTable(log) {
+    if (!log.length) return '<p class="muted">' + tx('Ingen poster.', 'No entries.') + '</p>';
+    var rows = log.map(function(e) { return '<tr><td>' + esc(e.date) + '</td><td>' + esc(e.sagsnr) + '</td><td>' + esc(e.type) + '</td><td>' + esc(e.status) + '</td></tr>'; }).join('');
+    return '<table><thead><tr><th>Dato</th><th>Sagsnr</th><th>Type</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+  var h = '<!doctype html><html><head><meta charset="utf-8"><title>KLS-rapport</title>';
+  h += '<style>body{font-family:Arial,Helvetica,sans-serif;color:#102030;margin:32px;line-height:1.5}h1{color:#0f4c75;margin-bottom:4px}h2{color:#0f4c75;margin-top:24px;border-bottom:2px solid #3282b8;padding-bottom:4px}table{border-collapse:collapse;width:100%;margin-top:8px}th,td{border:1px solid #ccd;padding:6px 10px;text-align:left}th{background:#0f4c75;color:#fff}.muted{color:#667}.ok{color:#1a7f37;font-weight:bold}.bad{color:#c0271c;font-weight:bold}.warn{background:#fff6e0;border:1px solid #e0b000;padding:10px;border-radius:6px;margin-top:20px;font-size:.9em}</style></head><body>';
+  h += '<h1>📋 KLS Kvalitetsledelsessystem — rapport</h1>';
+  h += '<div class="muted">Genereret: ' + new Date().toLocaleString() + ' · Kontrolinstans: VALIDAN ApS</div>';
+  h += '<h2>Stamdata</h2><table><tbody>';
+  h += '<tr><td>Autorisationstype</td><td>' + esc(klsState.autType) + '</td></tr>';
+  h += '<tr><td>KLS godkendt dato</td><td>' + esc(klsGodkendtStr()) + '</td></tr>';
+  h += '<tr><td>KLS udløbsdato (+2 år)</td><td>' + esc(klsUdloebStr()) + '</td></tr>';
+  h += '<tr><td>KLS-status</td><td>' + esc(klsState.tilsynStatus) + '</td></tr>';
+  h += '</tbody></table>';
+  h += '<h2>Kvalitetspolitik — 5 mål</h2><ol>' + KLS_POLICY_GOALS.map(function(g) { return '<li>' + esc(g) + '</li>'; }).join('') + '</ol>';
+  h += '<p class="muted">Lovgrundlag: Autorisationsloven · DS/HD 60364-6:2016 (el-verifikation) · DS 432:2020 + Till.:2022 (kloak) · BEK 725/724/722 af 12. juni 2024.</p>';
+  h += '<h2>Procedurer</h2><p>' + klsProcedureActiveCount(klsState.procStatus) + ' af 14 aktive.</p>';
+  h += '<h2>Slutkontrol EL (DS/HD 60364-6:2016)</h2><p>Godkendte: ' + elS.approved + ' · Afvigelser: ' + elS.deviations + ' · Godkendelsesprocent: ' + (elS.total ? elS.ratePct + '%' : '—') + '</p>' + logTable(klsState.elLog);
+  h += '<h2>Slutkontrol VVS</h2><p>Godkendte: ' + vvsS.approved + ' · Afvigelser: ' + vvsS.deviations + ' · Godkendelsesprocent: ' + (vvsS.total ? vvsS.ratePct + '%' : '—') + '</p>' + logTable(klsState.vvsLog);
+  h += '<h2>Slutkontrol Kloak (DS 432:2020)</h2><p>Godkendte: ' + kloakS.approved + ' · Afvigelser: ' + kloakS.deviations + ' · Godkendelsesprocent: ' + (kloakS.total ? kloakS.ratePct + '%' : '—') + '</p>' + logTable(klsState.kloakLog);
+  h += '<h2>Afvigelseslog</h2>';
+  if (klsState.devLog.length) {
+    h += '<table><thead><tr><th>ID</th><th>Sagsnr</th><th>Område</th><th>Type</th><th>Status</th></tr></thead><tbody>' + klsState.devLog.map(function(d) { return '<tr><td>' + esc(d.id) + '</td><td>' + esc(d.sagsnr || '—') + '</td><td>' + esc(d.area || '—') + '</td><td>' + esc(d.type) + '</td><td>' + esc(d.status) + '</td></tr>'; }).join('') + '</tbody></table>';
+  } else {
+    h += '<p class="muted">Ingen registrerede afvigelser.</p>';
+  }
+  h += '<p>Åbne: ' + devStats.open + ' · Igangsatte: ' + devStats.started + ' · Afsluttede: ' + devStats.closed + '</p>';
+  h += '<h2>Ledelsens evaluering</h2><p>Gennemgået: ' + klsReviewedCount(klsState.reviewPts) + ' af 12. Mødedato: ' + esc(klsFormatDate(klsState.moedeYear, klsState.moedeMonth)) + ' · Næste evaluering: ' + esc(klsFormatDate(klsState.naesteYear, klsState.naesteMonth)) + '.</p>';
+  h += '<h2>Måleudstyr — kalibrering</h2><p>' + klsCalOkCount(klsState.calStatus) + ' af 8 kalibreret OK.</p>';
+  h += '<h2>Dokumentregister</h2><p>Aktive: ' + docStats.active + ' · Under revision: ' + docStats.revision + ' · Udgåede: ' + docStats.retired + '.</p>';
+  h += '<h2>Årlig tjekliste</h2><table><thead><tr><th>#</th><th>Punkt</th><th>Tag</th><th>Svar</th></tr></thead><tbody>' + KLS_ANNUAL.map(function(a, i) { return '<tr><td>' + (i + 1) + '</td><td>' + esc(a.da) + '</td><td>' + esc(a.tag) + '</td><td>' + esc(klsState.annual[i] || '—') + '</td></tr>'; }).join('') + '</tbody></table>';
+  h += '<h2>Samlet vurdering</h2>';
+  h += '<p class="' + (compliant ? 'ok' : 'bad') + '">KLS-status: ' + (compliant ? 'GRØN — alle lovkrav opfyldt' : 'RØD — et eller flere lovkrav ikke opfyldt') + '.</p>';
+  h += '<p>KLS-udløb: ' + esc(expiry.msg) + '.</p>';
+  h += '<div class="warn">Forbehold: Bekendtgørelsesnumre bør verificeres på sik.dk. De stabile grundreferencer er Autorisationsloven, DS/HD 60364-6:2016 og DS 432:2020.</div>';
+  h += '</body></html>';
+  return h;
+}
+function klsPrintReport() {
+  try {
+    var w = window.open('', '_blank');
+    if (!w) { if (typeof alert === 'function') alert(tx('Tillad pop op-vinduer for at udskrive rapporten.', 'Allow pop-ups to print the report.')); return; }
+    w.document.write(klsReportHtml());
+    w.document.close();
+    w.focus();
+    setTimeout(function() { try { w.print(); } catch (e) {} }, 300);
+  } catch (e) {}
+}
+
 // ===== KLS RENDER HELPERS =====
 function klsToggleButtons(arrName, idx, opts, current) {
   var h = '';
   opts.forEach(function(o) {
-    h += '<button class="sel-btn' + (current === o ? ' selected' : '') + '" style="padding:2px 8px;font-size:0.8em;margin-left:4px" onclick="klsState.' + arrName + '[' + idx + ']=\'' + o + '\';renderModule(\'kls\')">' + o + '</button>';
+    h += '<button class="sel-btn' + (current === o ? ' selected' : '') + '" style="padding:2px 8px;font-size:0.8em;margin-left:4px" onclick="klsState.' + arrName + '[' + idx + ']=\'' + o + '\';klsRerender()">' + o + '</button>';
   });
   return h;
 }
@@ -16249,7 +16671,7 @@ function klsToggleButtons(arrName, idx, opts, current) {
 function klsSelectGroup(label, opts, current, field) {
   var h = '<div class="select-group"><div class="select-label">' + label + '</div><div class="select-grid">';
   opts.forEach(function(o) {
-    h += '<button class="sel-btn' + (current === o ? ' selected' : '') + '" onclick="klsState.' + field + '=\'' + o + '\';renderModule(\'kls\')">' + o + '</button>';
+    h += '<button class="sel-btn' + (current === o ? ' selected' : '') + '" onclick="klsState.' + field + '=\'' + o + '\';klsRerender()">' + o + '</button>';
   });
   h += '</div></div>';
   return h;
@@ -16262,7 +16684,7 @@ function klsResultRow(label, value, color) {
 function klsNav() {
   var h = '<div class="select-group"><div class="select-label">' + tx('KLS-ark (klik for at åbne)', 'KLS sheets (click to open)') + '</div><div class="select-grid">';
   KLS_SHEETS.forEach(function(s) {
-    h += '<button class="sel-btn' + (klsState.view === s.view ? ' selected' : '') + '" onclick="klsState.view=\'' + s.view + '\';renderModule(\'kls\')">' + s.nr + '. ' + tx(s.da, s.en) + '</button>';
+    h += '<button class="sel-btn' + (klsState.view === s.view ? ' selected' : '') + '" onclick="klsState.view=\'' + s.view + '\';klsRerender()">' + s.nr + '. ' + tx(s.da, s.en) + '</button>';
   });
   h += '</div></div>';
   return h;
@@ -16270,7 +16692,8 @@ function klsNav() {
 
 // ===== KLS SUB-VIEWS =====
 function klsRenderForside() {
-  var h = '<div class="result-box"><div class="result-title">KVALITETSLEDELSESSYSTEM · KLS</div>';
+  var h = klsToolbar();
+  h += '<div class="result-box"><div class="result-title">KVALITETSLEDELSESSYSTEM · KLS</div>';
   h += '<div class="info-row">' + tx('Ifølge Sikkerhedsstyrelsen · BEK nr. 725 / 724 / 722 af 12. juni 2024', 'Per Sikkerhedsstyrelsen · BEK no. 725 / 724 / 722 of 12 June 2024') + '</div>';
   h += klsResultRow('Virksomhedsnavn', '—');
   h += klsResultRow('CVR-nummer', '—');
@@ -16281,12 +16704,15 @@ function klsRenderForside() {
   h += klsResultRow('Autorisationsnummer', '—');
   h += klsResultRow('Fagligt ansvarlig', '—');
   h += klsResultRow('Kontrolinstans', 'VALIDAN ApS');
-  h += klsResultRow('KLS godkendt dato', '—');
-  h += klsResultRow('KLS udløbsdato', '—');
+  h += klsResultRow('KLS godkendt dato', klsGodkendtStr());
+  h += klsResultRow('KLS udløbsdato', klsUdloebStr(), klsUdloebColor());
   h += klsResultRow('Version', '1.0');
   h += '</div>';
   // Autorisationstype dropdown (click-select)
   h += klsSelectGroup(tx('Autorisationstype', 'Authorisation type'), KLS_AUT_TYPES, klsState.autType, 'autType');
+  // KLS godkendt dato — click pickers (udløb = godkendt + 2 år, beregnes automatisk)
+  h += klsDatePickers(tx('KLS godkendt dato (klik)', 'KLS approved date (click)'), 'godkendt', true);
+  h += '<div class="result-box"><div class="result-row"><span class="label">' + tx('Udløbsdato beregnes automatisk som godkendt + 2 år.', 'Expiry date is computed automatically as approved + 2 years.') + '</span><span class="value"' + (klsUdloebColor() ? ' style="color:' + klsUdloebColor() + '"' : '') + '>' + klsUdloebStr() + '</span></div></div>';
   // Warning
   h += '<div class="result-box warning"><div class="result-title">⚠️ VIGTIGT LOVKRAV</div>';
   h += '<div class="result-row"><span class="label">KLS SKAL fornyes inden 2-årsperiodens udløb. Der er ingen grace-periode.</span></div></div>';
@@ -16311,7 +16737,7 @@ function klsRenderPolitik() {
   });
   h += '</div>';
   h += '<div class="result-box"><div class="result-row"><span class="label">' + tx('Daglig leders underskrift (Navn / Dato / Underskrift) er obligatorisk.', "Manager's signature (Name / Date / Signature) is mandatory.") + '</span></div></div>';
-  h += '<div class="result-box warning"><div class="result-title">💡 FORBEDRING</div><div class="result-row"><span class="label">Bekendtgørelsesnumre bør verificeres på sik.dk — de stabile grundreferencer er Autorisationsloven, DS/HD 60364-6 (el-verifikation) og DS 432 (kloak).</span></div></div>';
+  h += '<div class="result-box warning"><div class="result-title">💡 FORBEDRING</div><div class="result-row"><span class="label">' + tx('Bekendtgørelsesnumre bør verificeres på sik.dk — de stabile grundreferencer er Autorisationsloven, DS/HD 60364-6:2016 (el-verifikation) og DS 432:2020 (kloak).', 'Statutory order numbers should be verified at sik.dk — the stable base references are the Authorisation Act, DS/HD 60364-6:2016 (electrical verification) and DS 432:2020 (drainage).') + '</span></div></div>';
   return h;
 }
 
@@ -16349,25 +16775,20 @@ function klsRenderEl() {
   var status = klsElStatus(klsState.elIso, klsState.elJord, klsState.elHpfi);
   var ok = status === 'Godkendt';
   var h = '<div class="result-box"><div class="result-title">' + tx('Slutkontrol EL', 'Final Inspection EL') + '</div>';
-  h += '<div class="info-row">' + tx('Jf. DS/HD 60364-6 og BEK nr. 725 af 12. juni 2024', 'Per DS/HD 60364-6 and BEK no. 725 of 12 June 2024') + '</div></div>';
+  h += '<div class="info-row">' + tx('Jf. DS/HD 60364-6:2016 og BEK nr. 725 af 12. juni 2024', 'Per DS/HD 60364-6:2016 and BEK no. 725 of 12 June 2024') + '</div></div>';
   h += klsSelectGroup(tx('Installationstype', 'Installation type'), ['Nyinstallation', 'Udvidelse', 'Ændring', 'Fejlafhjælpning'], klsState.elInstallType, 'elInstallType');
   h += klsSelectGroup(tx('Isolationsmodstand [MΩ]', 'Insulation resistance [MΩ]'), ['<1', '1-2', '2-5', '5-10', '>10'], klsState.elIso, 'elIso');
   h += klsSelectGroup(tx('Jordingstest', 'Earthing test'), ['OK', 'Ikke OK', 'N/A'], klsState.elJord, 'elJord');
   h += klsSelectGroup('HPFI / RCD', ['OK', 'Ikke OK', 'N/A'], klsState.elHpfi, 'elHpfi');
   h += '<div class="result-box"><div class="result-title">' + tx('Kriterier', 'Criteria') + '</div>';
-  h += '<div class="result-row"><span class="label">Isolationsmodstand: krav min 1 MΩ for 230V (\'<1\' = afvigelse)</span></div>';
-  h += '<div class="result-row"><span class="label">HPFI skal udløse ved ≤ IΔn inden 300 ms (generelt) og inden 40 ms ved 5×IΔn (DS/HD 60364-6).</span></div></div>';
-  // Running stats demoed as 1 record
-  var godkendte = ok ? 1 : 0;
-  var afvigelser = ok ? 0 : 1;
-  var pct = Math.round(godkendte / 1 * 100);
-  h += '<div class="result-box"><div class="result-title">' + tx('Statistik (aktuel registrering)', 'Statistics (current record)') + '</div>';
-  h += klsResultRow(tx('Godkendte', 'Approved'), godkendte, 'var(--success)');
-  h += klsResultRow(tx('Afvigelser', 'Deviations'), afvigelser, afvigelser > 0 ? 'var(--danger)' : '');
-  h += klsResultRow(tx('Godkendelsesprocent', 'Approval rate'), pct + '%');
-  h += '</div>';
-  h += '<div class="result-box warning"><div class="result-row"><span class="label">⚠️ Udfyld STRAKS efter installationen — aldrig bagudrettet.</span></div></div>';
-  h += renderVerdict(ok, ok ? tx('Slutkontrol EL godkendt iht. DS/HD 60364-6', 'Final inspection EL approved per DS/HD 60364-6') : tx('Afvigelse — installation må ikke godkendes', 'Deviation — installation may not be approved'));
+  h += '<div class="result-row"><span class="label">' + tx('Isolationsmodstand: krav min. 1 MΩ for 230 V (\'<1\' = afvigelse).', 'Insulation resistance: min. 1 MΩ required for 230 V (\'<1\' = deviation).') + '</span></div>';
+  h += '<div class="result-row"><span class="label">' + tx('HPFI udløser ved ≤ IΔn inden 300 ms (generelt) og ≤ 40 ms ved 5×IΔn (DS/HD 60364-6:2016).', 'RCD trips at ≤ IΔn within 300 ms (general) and ≤ 40 ms at 5×IΔn (DS/HD 60364-6:2016).') + '</span></div></div>';
+  // Append-able log: build entry above, then save
+  h += klsSaveButton('klsSaveElEntry', status);
+  h += klsLogSection('elLog', tx('Loggede slutkontroller EL', 'Logged final inspections EL'), function(e) { return 'ISO ' + e.iso + ' MΩ · ' + tx('jord', 'earth') + ' ' + e.jord + ' · HPFI ' + e.hpfi + ' · ' + e.installType; });
+  h += klsLogStatsBox(klsState.elLog);
+  h += '<div class="result-box warning"><div class="result-row"><span class="label">⚠️ ' + tx('Gem posten STRAKS efter installationen — aldrig bagudrettet. En afvigelse opretter automatisk en afvigelsesrapport.', 'Save the entry IMMEDIATELY after installation — never retroactively. A deviation automatically creates a deviation report.') + '</span></div></div>';
+  h += renderVerdict(ok, ok ? tx('Aktuelt valg ville blive godkendt iht. DS/HD 60364-6:2016', 'Current selection would be approved per DS/HD 60364-6:2016') : tx('Aktuelt valg = afvigelse — installation må ikke godkendes', 'Current selection = deviation — installation may not be approved'));
   return h;
 }
 
@@ -16379,8 +16800,12 @@ function klsRenderVvs() {
   h += klsSelectGroup(tx('Trykprøve (varmtvand 1,5× driftstryk)', 'Pressure test (hot water 1.5× operating)'), ['OK', 'Ikke OK', 'N/A'], klsState.vvsTryk, 'vvsTryk');
   h += klsSelectGroup(tx('Tæthedsprøve (gas BEK nr. 30)', 'Leak test (gas BEK no. 30)'), ['OK', 'Ikke OK', 'N/A'], klsState.vvsTaethed, 'vvsTaethed');
   h += klsSelectGroup(tx('Temperatur ved beholder', 'Temperature at tank'), ['<55°C', '55-60°C', '>60°C'], klsState.vvsTemp, 'vvsTemp');
-  h += '<div class="result-box"><div class="result-row"><span class="label">' + tx('Regel: min 60°C ved beholder, max 50°C ved udtag (legionella).', 'Rule: min 60°C at tank, max 50°C at outlet (legionella).') + '</span></div></div>';
-  h += renderVerdict(ok, ok ? tx('Slutkontrol VVS godkendt', 'Final inspection plumbing approved') : tx('Afvigelse — udbedring krævet', 'Deviation — rectification required'));
+  h += '<div class="result-box"><div class="result-row"><span class="label">' + tx('Regel: ≥ 60°C ved beholder / ≤ 50°C ved udtag. Undgå Legionella-vækstzonen 25–45°C.', 'Rule: ≥ 60°C at tank / ≤ 50°C at outlet. Avoid the Legionella growth zone 25–45°C.') + '</span></div></div>';
+  h += klsSaveButton('klsSaveVvsEntry', status);
+  h += klsLogSection('vvsLog', tx('Loggede slutkontroller VVS', 'Logged final inspections plumbing'), function(e) { return tx('tryk', 'pressure') + ' ' + e.tryk + ' · ' + tx('tæthed', 'leak') + ' ' + e.taethed + ' · ' + e.temp + ' · ' + e.workType; });
+  h += klsLogStatsBox(klsState.vvsLog);
+  h += '<div class="result-box warning"><div class="result-row"><span class="label">⚠️ ' + tx('En afvigelse opretter automatisk en afvigelsesrapport.', 'A deviation automatically creates a deviation report.') + '</span></div></div>';
+  h += renderVerdict(ok, ok ? tx('Aktuelt valg ville blive godkendt', 'Current selection would be approved') : tx('Aktuelt valg = afvigelse — udbedring krævet', 'Current selection = deviation — rectification required'));
   return h;
 }
 
@@ -16393,30 +16818,49 @@ function klsRenderKloak() {
     h += '<div class="result-box warning"><div class="result-row"><span class="label">⚠️ Separering kræver kommunal godkendelse.</span></div></div>';
   }
   h += klsSelectGroup('TV-inspektion', ['Udført', 'Ikke relevant'], klsState.kloakTV, 'kloakTV');
-  h += klsSelectGroup(tx('Tæthedsprøve (DS 432: 50 mbar, 5 min)', 'Leak test (DS 432: 50 mbar, 5 min)'), ['OK', 'Ikke OK'], klsState.kloakTaethed, 'kloakTaethed');
-  h += klsSelectGroup(tx('Fald (min 10‰ — DS 432)', 'Fall (min 10‰ — DS 432)'), ['<10‰', '10-15‰', '15-20‰', '>20‰'], klsState.kloakFald, 'kloakFald');
+  h += klsSelectGroup(tx('Tæthedsprøve (DS 432:2020: 50 mbar, 5 min)', 'Leak test (DS 432:2020: 50 mbar, 5 min)'), ['OK', 'Ikke OK'], klsState.kloakTaethed, 'kloakTaethed');
+  h += klsSelectGroup(tx('Fald — DS 432:2020', 'Fall — DS 432:2020'), ['<10‰', '10-20‰', '20-30‰', '>30‰'], klsState.kloakFald, 'kloakFald');
   h += klsResultRow(tx('Fald-krav', 'Fall requirement'), faldOk ? tx('Opfyldt', 'Met') : tx('IKKE opfyldt', 'NOT met'), faldOk ? 'var(--success)' : 'var(--danger)');
-  h += '<div class="result-box warning"><div class="result-row"><span class="label">⚠️ Slutkontrol skal udfyldes INDEN tildækning.</span></div></div>';
-  h += renderVerdict(ok, ok ? tx('Slutkontrol kloak godkendt iht. DS 432', 'Final inspection drainage approved per DS 432') : tx('Afvigelse — udbedring krævet', 'Deviation — rectification required'));
+  h += '<div class="result-box"><div class="result-row"><span class="label">' + tx('Vejledning: små grenledninger (DN≤75) kræver typisk ~20‰. ~10‰ kan accepteres for større dimensioner — verificér mod DS 432:2020 dimensionstabel (+ Till.:2022). <10‰ afvises.', 'Guidance: small branch lines (DN≤75) typically require ~20‰. ~10‰ may be accepted for larger dimensions — verify against the DS 432:2020 dimension table (+ Till.:2022). <10‰ is rejected.') + '</span></div></div>';
+  h += '<div class="result-box warning"><div class="result-row"><span class="label">⚠️ ' + tx('Slutkontrol skal udfyldes INDEN tildækning. En afvigelse opretter automatisk en afvigelsesrapport.', 'Final inspection must be completed BEFORE covering. A deviation automatically creates a deviation report.') + '</span></div></div>';
+  h += klsSaveButton('klsSaveKloakEntry', klsKloakStatus(klsState.kloakTaethed, klsState.kloakFald));
+  h += klsLogSection('kloakLog', tx('Loggede slutkontroller Kloak', 'Logged final inspections drainage'), function(e) { return tx('tæthed', 'leak') + ' ' + e.taethed + ' · ' + tx('fald', 'fall') + ' ' + e.fald + ' · TV ' + e.tv + ' · ' + e.workType; });
+  h += klsLogStatsBox(klsState.kloakLog);
+  h += renderVerdict(ok, ok ? tx('Aktuelt valg ville blive godkendt iht. DS 432:2020', 'Current selection would be approved per DS 432:2020') : tx('Aktuelt valg = afvigelse — udbedring krævet', 'Current selection = deviation — rectification required'));
   return h;
 }
 
 function klsRenderAfvigelse() {
-  var stats = klsDeviationStats(klsState.devStatus);
+  var stats = klsDeviationStats(klsDevStatusList());
   var h = '<div class="result-box"><div class="result-title">' + tx('Afvigelsesrapport', 'Deviation Report') + '</div>';
   h += '<div class="result-row"><span class="label">' + tx('Rodårsagsanalyse: brug 5-whys (spørg "hvorfor" 5 gange) for at finde den egentlige årsag.', 'Root cause analysis: use 5-whys to find the true cause.') + '</span></div></div>';
   h += '<div class="result-box"><div class="result-title">' + tx('Afvigelser', 'Deviations') + '</div>';
   h += klsResultRow(tx('Åbne', 'Open'), stats.open, stats.open > 0 ? 'var(--danger)' : '');
   h += klsResultRow(tx('Igangsatte', 'Started'), stats.started);
   h += klsResultRow(tx('Afsluttede', 'Closed'), stats.closed, 'var(--success)');
-  klsState.devStatus.forEach(function(st, i) {
-    var id = 'AFV-00' + (i + 1);
-    h += '<div class="result-row" style="border-bottom:1px solid rgba(255,255,255,0.05);padding:6px 0">';
-    h += '<span class="label">' + id + ' · ' + klsState.devType[i] + '</span>';
-    h += '<span class="value">' + klsToggleButtons('devStatus', i, ['Åben', 'Igangsat', 'Afsluttet'], st) + '</span></div>';
-  });
+  if (klsState.devLog && klsState.devLog.length) {
+    // Real logged deviations (auto-linked from slutkontrol-afvigelser)
+    klsState.devLog.forEach(function(d, i) {
+      var statusColor = d.status === 'Afsluttet' ? 'var(--success)' : (d.status === 'Igangsat' ? '#b8860b' : 'var(--danger)');
+      var toggles = '';
+      ['Åben', 'Igangsat', 'Afsluttet'].forEach(function(o) {
+        toggles += '<button class="sel-btn' + (d.status === o ? ' selected' : '') + '" style="padding:2px 8px;font-size:0.8em;margin-left:4px" onclick="klsSetDeviationStatus(' + i + ',\'' + o + '\')">' + o + '</button>';
+      });
+      h += '<div class="result-row" style="border-bottom:1px solid rgba(255,255,255,0.05);padding:6px 0">';
+      h += '<span class="label"><b>' + d.id + '</b> · ' + d.type + (d.sagsnr ? ' · ' + tx('sag', 'case') + ' ' + d.sagsnr : '') + (d.area ? ' · ' + d.area : '') + '<br><small style="color:' + statusColor + '">' + d.status + (d.date ? ' · ' + d.date : '') + '</small></span>';
+      h += '<span class="value">' + toggles + ' <button class="sel-btn" style="padding:2px 8px;font-size:0.8em;margin-left:6px" onclick="klsDeleteDeviation(' + i + ')">' + tx('Slet', 'Delete') + '</button></span></div>';
+    });
+  } else {
+    // Demo rows only when no real data exists yet
+    klsState.devStatus.forEach(function(st, i) {
+      var id = 'AFV-00' + (i + 1);
+      h += '<div class="result-row" style="border-bottom:1px solid rgba(255,255,255,0.05);padding:6px 0">';
+      h += '<span class="label">' + id + ' · ' + klsState.devType[i] + ' <small style="color:#888">(' + tx('demo', 'demo') + ')</small></span>';
+      h += '<span class="value">' + klsToggleButtons('devStatus', i, ['Åben', 'Igangsat', 'Afsluttet'], st) + '</span></div>';
+    });
+  }
   h += '</div>';
-  h += '<div class="result-box warning"><div class="result-row"><span class="label">⚠️ Et TOMT afvigelsesark tolkes som at KLS-systemet ikke er implementeret.</span></div></div>';
+  h += '<div class="result-box warning"><div class="result-row"><span class="label">⚠️ ' + tx('Et TOMT afvigelsesark tolkes som at KLS-systemet ikke er implementeret. Afvigelser fra slutkontrol oprettes automatisk.', 'An EMPTY deviation sheet is interpreted as the KLS system not being implemented. Deviations from final inspection are created automatically.') + '</span></div></div>';
   return h;
 }
 
@@ -16425,6 +16869,12 @@ function klsRenderEfterproevning() {
   var h = '<div class="result-box"><div class="result-title">' + tx('Intern Efterprøvning', 'Internal Review') + '</div>';
   h += '<div class="info-row">' + tx('Lovkrav: Min. én gang om året — max. 12 måneders interval · BEK nr. 725 §8', 'Legal: min. once a year — max 12-month interval · BEK no. 725 §8') + '</div>';
   h += klsResultRow(tx('Gennemgået', 'Reviewed'), done + ' af 12', done === 12 ? 'var(--success)' : '#b8860b');
+  h += klsResultRow(tx('Mødedato', 'Meeting date'), klsFormatDate(klsState.moedeYear, klsState.moedeMonth));
+  h += klsResultRow(tx('Næste evaluering', 'Next evaluation'), klsFormatDate(klsState.naesteYear, klsState.naesteMonth));
+  h += '</div>';
+  h += klsDatePickers(tx('Mødedato (klik)', 'Meeting date (click)'), 'moede', false);
+  h += klsDatePickers(tx('Næste evaluering (klik)', 'Next evaluation (click)'), 'naeste', false);
+  h += '<div class="result-box"><div class="result-title">' + tx('Gennemgangspunkter', 'Review points') + '</div>';
   KLS_REVIEW_POINTS.forEach(function(p, i) {
     var st = klsState.reviewPts[i];
     var icon = st === 'OK' ? '✅' : (st === 'Handling krævet' ? '⚠️' : (st === 'Ikke relevant' ? '➖' : '⭕'));
@@ -16495,36 +16945,56 @@ function klsRenderDokument() {
 }
 
 function klsRenderDashboard() {
-  var elOk = klsElStatus(klsState.elIso, klsState.elJord, klsState.elHpfi) === 'Godkendt';
-  var elGodk = elOk ? 1 : 0, elAfv = elOk ? 0 : 1;
-  var devStats = klsDeviationStats(klsState.devStatus);
+  var elStats = klsLogStats(klsState.elLog);
+  var vvsStats = klsLogStats(klsState.vvsLog);
+  var kloakStats = klsLogStats(klsState.kloakLog);
+  var devStats = klsDeviationStats(klsDevStatusList());
   var docStats = klsDocStats(klsState.docStatus);
-  var expiry = klsExpiryStatus(klsState.expiryMonths);
+  var procActive = klsProcedureActiveCount(klsState.procStatus);
+  var calOk = klsCalOkCount(klsState.calStatus);
+  var reviewed = klsReviewedCount(klsState.reviewPts);
+  var months = klsState.godkendtYear ? klsExpiryMonths(klsState) : klsState.expiryMonths;
+  var expiry = klsExpiryStatus(months);
   var compliant = klsDashboardCompliance(klsState.annual);
   var expiryColor = expiry.level === 'red' ? 'var(--danger)' : (expiry.level === 'amber' ? '#b8860b' : 'var(--success)');
 
-  var h = '<div class="result-box"><div class="result-title">' + tx('Dashboard — live status', 'Dashboard — live status') + '</div></div>';
-  // EL aggregate
-  h += '<div class="result-box"><div class="result-title">EL (DS/HD 60364-6)</div>';
-  h += klsResultRow(tx('Godkendte', 'Approved'), elGodk, 'var(--success)');
-  h += klsResultRow(tx('Afvigelser', 'Deviations'), elAfv, elAfv > 0 ? 'var(--danger)' : '');
-  h += klsResultRow(tx('Godkendelsesprocent', 'Approval rate'), Math.round(elGodk / 1 * 100) + '%');
-  h += '</div>';
-  // Deviations aggregate
+  function statBlock(title, stats) {
+    var s = '<div class="result-box"><div class="result-title">' + title + '</div>';
+    s += klsResultRow(tx('Godkendte', 'Approved'), stats.approved, 'var(--success)');
+    s += klsResultRow(tx('Afvigelser', 'Deviations'), stats.deviations, stats.deviations > 0 ? 'var(--danger)' : '');
+    s += klsResultRow(tx('Antal poster', 'Entries'), stats.total);
+    s += klsResultRow(tx('Godkendelsesprocent', 'Approval rate'), stats.total > 0 ? stats.ratePct + '%' : '—');
+    s += '</div>';
+    return s;
+  }
+
+  var h = '<div class="result-box"><div class="result-title">' + tx('Dashboard — live status', 'Dashboard — live status') + '</div>';
+  h += '<div class="info-row">' + tx('Aggregeret live fra de loggede slutkontroller, afvigelseslog og statusarrays.', 'Aggregated live from the logged final inspections, deviation log and status arrays.') + '</div></div>';
+  // Slutkontrol aggregates (live from logs)
+  h += statBlock(tx('Slutkontrol EL (DS/HD 60364-6:2016)', 'Final inspection EL (DS/HD 60364-6:2016)'), elStats);
+  h += statBlock(tx('Slutkontrol VVS', 'Final inspection plumbing'), vvsStats);
+  h += statBlock(tx('Slutkontrol Kloak (DS 432:2020)', 'Final inspection drainage (DS 432:2020)'), kloakStats);
+  // Deviations aggregate (from devLog)
   h += '<div class="result-box"><div class="result-title">' + tx('Afvigelser', 'Deviations') + '</div>';
   h += klsResultRow(tx('Åbne', 'Open'), devStats.open, devStats.open > 0 ? 'var(--danger)' : '');
   h += klsResultRow(tx('Under behandling', 'In progress'), devStats.started);
   h += klsResultRow(tx('Afsluttede', 'Closed'), devStats.closed, 'var(--success)');
   h += '</div>';
-  // Documents aggregate
-  h += '<div class="result-box"><div class="result-title">' + tx('Dokumenter', 'Documents') + '</div>';
-  h += klsResultRow(tx('Aktive', 'Active'), docStats.active, 'var(--success)');
-  h += klsResultRow(tx('Udgåede', 'Retired'), docStats.retired);
-  h += klsResultRow(tx('Under rev.', 'Under rev.'), docStats.revision);
+  // System status (procedures / documents / instruments / review)
+  h += '<div class="result-box"><div class="result-title">' + tx('Systemstatus', 'System status') + '</div>';
+  h += klsResultRow(tx('Aktive procedurer', 'Active procedures'), procActive + ' / 14', procActive === 14 ? 'var(--success)' : '#b8860b');
+  h += klsResultRow(tx('Aktive dokumenter', 'Active documents'), docStats.active + ' / 14', 'var(--success)');
+  h += klsResultRow(tx('Dokumenter under revision', 'Documents under revision'), docStats.revision);
+  h += klsResultRow(tx('Kalibreret OK', 'Calibrated OK'), calOk + ' / 8', calOk === 8 ? 'var(--success)' : 'var(--danger)');
+  h += klsResultRow(tx('Evaluering gennemgået', 'Review completed'), reviewed + ' / 12', reviewed === 12 ? 'var(--success)' : '#b8860b');
   h += '</div>';
-  // KLS expiry
-  h += klsSelectGroup(tx('Måneder til udløb', 'Months to expiry'), ['0', '1', '2', '3', '6', '9', '12', '18', '24'], String(klsState.expiryMonths), 'expiryMonths');
+  // KLS expiry — manual override only when no godkendt-dato is set
+  if (!klsState.godkendtYear || !klsState.godkendtMonth) {
+    h += klsSelectGroup(tx('Måneder til udløb (manuel)', 'Months to expiry (manual)'), ['0', '1', '2', '3', '6', '9', '12', '18', '24'], String(klsState.expiryMonths), 'expiryMonths');
+  }
   h += '<div class="result-box"><div class="result-title">' + tx('KLS udløb', 'KLS expiry') + '</div>';
+  h += klsResultRow(tx('Måneder til udløb', 'Months to expiry'), months);
+  if (klsState.godkendtYear && klsState.godkendtMonth) h += klsResultRow(tx('Udløbsdato', 'Expiry date'), klsUdloebStr());
   h += klsResultRow(tx('Status', 'Status'), expiry.msg, expiryColor);
   h += '</div>';
   // Annual checklist
