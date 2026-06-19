@@ -51,7 +51,18 @@
     "label.darkMode":"Toggle dark mode","label.runChecks":"Run all checks",
     "label.help":"Keyboard shortcuts","label.language":"Language",
     "label.savedHint":"Auto-saved locally","label.session":"Session: %sm",
-    "label.collapse":"Collapse sidebar","label.switchProject":"Switch project"
+    "label.collapse":"Collapse sidebar","label.switchProject":"Switch project",
+    "nav.previous":"Previous","nav.next":"Next",
+    "guide.title":"AI suggests next:","guide.goTo":"Go to",
+    "guide.start":"Start here \u2014 upload or paste your project description and the app builds the whole plan for you.",
+    "guide.advisor":"See the AI's top priorities \u2014 what to do first to get the best result.",
+    "guide.blocked":"item(s) are blocked right now \u2014 clear them first to unblock progress.",
+    "guide.critical":"critical risk(s) need a named owner and a mitigation plan.",
+    "guide.market":"Decide which countries to enter first.",
+    "guide.licensing":"Start the slowest permits now \u2014 they decide your timeline.",
+    "guide.timeline":"Check your milestones and target dates.",
+    "guide.globe":"See the route and build progress on the 3D map.",
+    "guide.brief":"Package it for investors and government stakeholders."
   };
 
   DICT.da = {
@@ -95,7 +106,18 @@
     "label.darkMode":"Skift m\u00f8rk tilstand","label.runChecks":"K\u00f8r alle tjek",
     "label.help":"Tastaturgenveje","label.language":"Sprog",
     "label.savedHint":"Auto-gemt lokalt","label.session":"Session: %sm",
-    "label.collapse":"Skjul sidebjælke","label.switchProject":"Skift projekt"
+    "label.collapse":"Skjul sidebjælke","label.switchProject":"Skift projekt",
+    "nav.previous":"Forrige","nav.next":"N\u00e6ste",
+    "guide.title":"AI foresl\u00e5r n\u00e6ste:","guide.goTo":"G\u00e5 til",
+    "guide.start":"Start her \u2014 upload eller inds\u00e6t din projektbeskrivelse, s\u00e5 bygger appen hele planen for dig.",
+    "guide.advisor":"Se AI'ens vigtigste prioriteter \u2014 hvad du skal g\u00f8re f\u00f8rst.",
+    "guide.blocked":"element(er) er blokeret lige nu \u2014 ryd dem f\u00f8rst for at frig\u00f8re fremdrift.",
+    "guide.critical":"kritisk(e) risici har brug for en ansvarlig og en handlingsplan.",
+    "guide.market":"Beslut hvilke lande der skal indtr\u00e6des f\u00f8rst.",
+    "guide.licensing":"Start de langsomste tilladelser nu \u2014 de afg\u00f8r din tidsplan.",
+    "guide.timeline":"Tjek dine milep\u00e6le og m\u00e5ldatoer.",
+    "guide.globe":"Se ruten og byggefremskridt p\u00e5 3D-kortet.",
+    "guide.brief":"Pak det sammen til investorer og myndigheder."
   };
 
   DICT.fa = {
@@ -139,7 +161,18 @@
     "label.darkMode":"\u062d\u0627\u0644\u062a \u062a\u0627\u0631\u06cc\u06a9","label.runChecks":"\u0627\u062c\u0631\u0627\u06cc \u0628\u0631\u0631\u0633\u06cc\u200c\u0647\u0627",
     "label.help":"\u0645\u06cc\u0627\u0646\u0628\u0631\u0647\u0627\u06cc \u0635\u0641\u062d\u0647 \u06a9\u0644\u06cc\u062f","label.language":"\u0632\u0628\u0627\u0646",
     "label.savedHint":"\u0630\u062e\u06cc\u0631\u0647 \u062e\u0648\u062f\u06a9\u0627\u0631 \u0645\u062d\u0644\u06cc","label.session":"\u062c\u0644\u0633\u0647: %s\u062f\u0642\u06cc\u0642\u0647",
-    "label.collapse":"\u0628\u0633\u062a\u0646 \u0646\u0648\u0627\u0631 \u06a9\u0646\u0627\u0631\u06cc","label.switchProject":"\u062a\u063a\u06cc\u06cc\u0631 \u067e\u0631\u0648\u0698\u0647"
+    "label.collapse":"\u0628\u0633\u062a\u0646 \u0646\u0648\u0627\u0631 \u06a9\u0646\u0627\u0631\u06cc","label.switchProject":"\u062a\u063a\u06cc\u06cc\u0631 \u067e\u0631\u0648\u0698\u0647",
+    "nav.previous":"\u0642\u0628\u0644\u06cc","nav.next":"\u0628\u0639\u062f\u06cc",
+    "guide.title":"\u067e\u06cc\u0634\u0646\u0647\u0627\u062f \u0647\u0648\u0634 \u0645\u0635\u0646\u0648\u0639\u06cc:","guide.goTo":"\u0628\u0631\u0648 \u0628\u0647",
+    "guide.start":"\u0627\u0632 \u0627\u06cc\u0646\u062c\u0627 \u0634\u0631\u0648\u0639 \u06a9\u0646\u06cc\u062f \u2014 \u062a\u0648\u0636\u06cc\u062d\u0627\u062a \u067e\u0631\u0648\u0698\u0647 \u0631\u0627 \u0628\u0627\u0631\u06af\u0630\u0627\u0631\u06cc \u06a9\u0646\u06cc\u062f \u062a\u0627 \u0628\u0631\u0646\u0627\u0645\u0647 \u06a9\u0627\u0645\u0644 \u0633\u0627\u062e\u062a\u0647 \u0634\u0648\u062f.",
+    "guide.advisor":"\u0627\u0648\u0644\u0648\u06cc\u062a\u200c\u0647\u0627\u06cc \u0627\u0635\u0644\u06cc \u0647\u0648\u0634 \u0645\u0635\u0646\u0648\u0639\u06cc \u0631\u0627 \u0628\u0628\u06cc\u0646\u06cc\u062f \u2014 \u0627\u0628\u062a\u062f\u0627 \u0686\u0647 \u06a9\u0627\u0631\u06cc \u0627\u0646\u062c\u0627\u0645 \u062f\u0647\u06cc\u062f.",
+    "guide.blocked":"\u0645\u0648\u0631\u062f \u0645\u0633\u062f\u0648\u062f \u0634\u062f\u0647 \u0627\u0633\u062a \u2014 \u0627\u0628\u062a\u062f\u0627 \u0622\u0646\u200c\u0647\u0627 \u0631\u0627 \u0631\u0641\u0639 \u06a9\u0646\u06cc\u062f.",
+    "guide.critical":"\u0631\u06cc\u0633\u06a9 \u0628\u062d\u0631\u0627\u0646\u06cc \u0628\u0647 \u0645\u0633\u0626\u0648\u0644 \u0648 \u0628\u0631\u0646\u0627\u0645\u0647 \u06a9\u0627\u0647\u0634 \u0646\u06cc\u0627\u0632 \u062f\u0627\u0631\u062f.",
+    "guide.market":"\u062a\u0635\u0645\u06cc\u0645 \u0628\u06af\u06cc\u0631\u06cc\u062f \u0627\u0628\u062a\u062f\u0627 \u0628\u0647 \u06a9\u062f\u0627\u0645 \u06a9\u0634\u0648\u0631\u0647\u0627 \u0648\u0627\u0631\u062f \u0634\u0648\u06cc\u062f.",
+    "guide.licensing":"\u0645\u062c\u0648\u0632\u0647\u0627\u06cc \u06a9\u0646\u062f \u0631\u0627 \u0627\u0644\u0627\u0646 \u0634\u0631\u0648\u0639 \u06a9\u0646\u06cc\u062f \u2014 \u0622\u0646\u200c\u0647\u0627 \u0632\u0645\u0627\u0646\u200c\u0628\u0646\u062f\u06cc \u0634\u0645\u0627 \u0631\u0627 \u062a\u0639\u06cc\u06cc\u0646 \u0645\u06cc\u200c\u06a9\u0646\u0646\u062f.",
+    "guide.timeline":"\u0645\u06cc\u0644\u0647\u200c\u0647\u0627 \u0648 \u062a\u0627\u0631\u06cc\u062e\u200c\u0647\u0627\u06cc \u0647\u062f\u0641 \u0631\u0627 \u0628\u0631\u0631\u0633\u06cc \u06a9\u0646\u06cc\u062f.",
+    "guide.globe":"\u0645\u0633\u06cc\u0631 \u0648 \u067e\u06cc\u0634\u0631\u0641\u062a \u0631\u0627 \u0631\u0648\u06cc \u0646\u0642\u0634\u0647 \u0633\u0647\u200c\u0628\u0639\u062f\u06cc \u0628\u0628\u06cc\u0646\u06cc\u062f.",
+    "guide.brief":"\u0622\u0646 \u0631\u0627 \u0628\u0631\u0627\u06cc \u0633\u0631\u0645\u0627\u06cc\u0647\u200c\u06af\u0630\u0627\u0631\u0627\u0646 \u0648 \u0645\u0642\u0627\u0645\u0627\u062a \u062f\u0648\u0644\u062a\u06cc \u0622\u0645\u0627\u062f\u0647 \u06a9\u0646\u06cc\u062f."
   };
 
   // --- API ---

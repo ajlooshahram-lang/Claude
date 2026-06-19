@@ -240,6 +240,55 @@
     }
   }
 
+  // i18n helper — module-level, falls back to built-in English if QII18n absent.
+  var GUIDE_FALLBACK = {
+    "guide.title": "AI suggests next:", "guide.goTo": "Go to",
+    "nav.previous": "Previous", "nav.next": "Next",
+    "guide.start": "Start here — upload or paste your project description and the app builds the whole plan for you.",
+    "guide.advisor": "See the AI's top priorities — what to do first to get the best result.",
+    "guide.blocked": "item(s) are blocked right now — clear them first to unblock progress.",
+    "guide.critical": "critical risk(s) need a named owner and a mitigation plan.",
+    "guide.market": "Decide which countries to enter first.",
+    "guide.licensing": "Start the slowest permits now — they decide your timeline.",
+    "guide.timeline": "Check your milestones and target dates.",
+    "guide.globe": "See the route and build progress on the 3D map.",
+    "guide.brief": "Package it for investors and government stakeholders."
+  };
+  function t(key) {
+    if (window.QII18n && typeof window.QII18n.t === "function") {
+      var v = window.QII18n.t(key);
+      if (v && v !== key) return v;
+    }
+    return GUIDE_FALLBACK[key] || key;
+  }
+
+  // AI-recommended next step: looks at the LIVE project state and returns the
+  // single most useful view to visit next to move the project forward. This is
+  // what makes the navigation feel like a guided assistant ("go here next, and
+  // here's why") rather than plain linear paging.
+  function recommendNextStep(currentView) {
+    var hasPlan = !!(uiState.brainPlan && uiState.brainPlan.frameworks);
+    var k = {}; try { k = (S.kpis && S.kpis()) || {}; } catch (e) { k = {}; }
+    var L = function (id) { return t("nav." + id); };
+    var steps = [];
+    if (!hasPlan && (k.total || 0) === 0) {
+      steps.push({ view: "brain", label: L("brain"), reason: t("guide.start") });
+    } else {
+      steps.push({ view: "advisor", label: L("advisor"), reason: t("guide.advisor") });
+      if ((k.blocked || 0) > 0) steps.push({ view: "kanban", label: L("kanban"), reason: k.blocked + " " + t("guide.blocked") });
+      if ((k.crit || 0) > 0) steps.push({ view: "risks", label: L("risks"), reason: k.crit + " " + t("guide.critical") });
+      steps.push({ view: "marketentry", label: L("marketentry"), reason: t("guide.market") });
+      steps.push({ view: "licensing", label: L("licensing"), reason: t("guide.licensing") });
+      steps.push({ view: "timeline", label: L("timeline"), reason: t("guide.timeline") });
+      steps.push({ view: "globe3d", label: L("globe3d"), reason: t("guide.globe") });
+      steps.push({ view: "investorbrief", label: L("investorbrief"), reason: t("guide.brief") });
+    }
+    for (var i = 0; i < steps.length; i++) {
+      if (steps[i].view !== currentView && RENDER[steps[i].view]) return steps[i];
+    }
+    return null;
+  }
+
   let current = "dashboard";
   function go(view, opts) {
     if (!RENDER[view]) view = "dashboard";
@@ -291,8 +340,11 @@
     content.classList.remove("view-enter");
     void content.offsetWidth;
     content.classList.add("view-enter");
-    if (AFTER[view]) AFTER[view]();
-    // Step 79: Previous / Next navigation footer
+    try { if (AFTER[view]) AFTER[view](); }
+    catch (afterErr) { try { console.warn("View post-render failed (continuing):", afterErr); } catch (e) {} }
+    // Step 79 + AI guide: Previous / Next + an AI-recommended "next step" that
+    // tells the user where to go next to execute the project, based on the live
+    // project state (acts like a guided assistant, not just linear paging).
     (function renderNavFooter() {
       var flat = VIEWS.filter(function(v) { return !!v.id; });
       var idx = -1;
@@ -301,20 +353,35 @@
       var prevView = idx > 0 ? flat[idx - 1] : null;
       var nextView = idx < flat.length - 1 ? flat[idx + 1] : null;
       var posText = (idx + 1) + " of " + flat.length;
+
+      // ---- AI-recommended next step (state-aware guided journey) ----
+      var rec = recommendNextStep(view);
+      var guideHtml = "";
+      if (rec) {
+        guideHtml = '<div class="nav-guide" id="navGuide">'
+          + '<span class="nav-guide-ico" aria-hidden="true">\uD83E\uDDED</span>'
+          + '<div class="nav-guide-txt"><b>' + esc(t("guide.title")) + '</b> ' + esc(rec.reason) + '</div>'
+          + '<button class="btn btn-primary nav-guide-btn" id="navGuideBtn" type="button" data-go="' + esc(rec.view) + '">'
+          + esc(t("guide.goTo")) + ' ' + esc(rec.label) + ' \u2192</button>'
+          + '</div>';
+      }
+
       var footerHtml = '<div class="nav-footer" id="navFooter">';
       if (prevView) {
-        footerHtml += '<button class="nav-prev" id="navPrev" type="button">\u2190 Previous: ' + esc(prevView.label) + '</button>';
+        footerHtml += '<button class="nav-prev" id="navPrev" type="button">\u2190 ' + esc(t("nav.previous")) + ': ' + esc(prevView.label) + '</button>';
       } else {
-        footerHtml += '<button class="nav-prev" id="navPrev" type="button" disabled>\u2190 Previous</button>';
+        footerHtml += '<button class="nav-prev" id="navPrev" type="button" disabled>\u2190 ' + esc(t("nav.previous")) + '</button>';
       }
       footerHtml += '<span class="nav-pos">' + esc(posText) + '</span>';
       if (nextView) {
-        footerHtml += '<button class="nav-next" id="navNext" type="button">Next: ' + esc(nextView.label) + ' \u2192</button>';
+        footerHtml += '<button class="nav-next" id="navNext" type="button">' + esc(t("nav.next")) + ': ' + esc(nextView.label) + ' \u2192</button>';
       } else {
-        footerHtml += '<button class="nav-next" id="navNext" type="button" disabled>Next \u2192</button>';
+        footerHtml += '<button class="nav-next" id="navNext" type="button" disabled>' + esc(t("nav.next")) + ' \u2192</button>';
       }
       footerHtml += '</div>';
-      content.insertAdjacentHTML('beforeend', footerHtml);
+      content.insertAdjacentHTML('beforeend', guideHtml + footerHtml);
+      var guideBtn = document.getElementById("navGuideBtn");
+      if (guideBtn && rec) guideBtn.addEventListener("click", function() { go(rec.view); });
       var prevBtn = document.getElementById("navPrev");
       var nextBtn = document.getElementById("navNext");
       if (prevBtn && prevView) prevBtn.addEventListener("click", function() { go(prevView.id); });

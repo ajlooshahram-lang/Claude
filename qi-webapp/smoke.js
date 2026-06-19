@@ -1628,5 +1628,20 @@ if (window.QIDisplay) {
   ok(nearDone.recommendations.some(function (r) { return /push the last items/i.test(r.title); }), "advisor changes advice as project nears completion");
 })();
 
+// Step 109: AI guided navigation — recommends the next view to execute the project
+(function testNavGuide() {
+  var dnav = doc.querySelector('.nav-item[data-view="dashboard"]');
+  if (dnav) dnav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  var guide = doc.getElementById("navGuide");
+  var btn = doc.getElementById("navGuideBtn");
+  ok(!!guide, "AI navigation guide bar renders on the view");
+  ok(!!btn && !!btn.getAttribute("data-go"), "guide has a 'go to next' button with a target view");
+  ok(guide && guide.querySelector(".nav-guide-txt").textContent.length > 10, "guide gives a plain-language reason for the next step");
+  // The recommendation is state-aware: it should not point at the current view.
+  ok(btn && btn.getAttribute("data-go") !== "dashboard", "guide recommends a DIFFERENT view than the current one");
+  // Footer prev/next still present alongside the guide.
+  ok(!!doc.getElementById("navFooter"), "Previous/Next footer still present alongside the AI guide");
+})();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

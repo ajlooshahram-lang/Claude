@@ -1395,3 +1395,15 @@ html.hi-contrast[data-theme="dark"]{--ink:#ffffff;--muted:#d2dcf0;--line:rgba(17
 [dir="rtl"] select,[dir="rtl"] input,[dir="rtl"] textarea{text-align:right}
 [dir="rtl"] .projswitch{direction:rtl}
 [dir="rtl"] .nav-footer{flex-direction:row-reverse}
+
+
+/* ---- AI guided-navigation bar ("go here next, and why") ---- */
+.nav-guide{display:flex;align-items:center;gap:12px;margin:18px 0 8px;padding:12px 16px;border-radius:12px;
+  background:linear-gradient(135deg,rgba(46,84,150,.12),rgba(31,138,138,.10));border:1.5px solid var(--accent,#2e5496)}
+.nav-guide-ico{font-size:22px;line-height:1;flex:0 0 auto}
+.nav-guide-txt{flex:1 1 auto;font-size:13px;line-height:1.45;color:var(--ink,#1a2336)}
+.nav-guide-txt b{color:var(--accent,#2e5496);margin-right:4px}
+.nav-guide-btn{flex:0 0 auto;white-space:nowrap}
+[data-theme="dark"] .nav-guide{background:linear-gradient(135deg,rgba(78,161,255,.16),rgba(66,214,164,.12));border-color:rgba(125,167,240,.5)}
+[dir="rtl"] .nav-guide{flex-direction:row-reverse}
+@media (max-width:560px){.nav-guide{flex-wrap:wrap}.nav-guide-btn{width:100%}}
