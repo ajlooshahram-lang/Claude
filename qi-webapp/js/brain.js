@@ -64,7 +64,7 @@
     const homes = firstQuantity(text, ["homes passed", "homes", "premises", "households", "subscribers", "customers"]);
     const cores = firstQuantity(text, ["core fibre", "core fiber", "cores", "core", "fibres", "fibers"]);
     const months = firstQuantity(text, ["months", "month"]);
-    const budget = firstQuantity(text, ["usd", "eur", "dkk", "million", "m usd", "budget"]);
+    const budget = firstQuantity(text, ["usd", "eur", "dkk", "billion", "bn", "million", "m usd", "budget"]);
     return {
       routeKm: routeKm || null,
       sites: sites || null,
@@ -637,6 +637,40 @@
     };
   }
 
+  // ---- Description quality coach -------------------------------------------
+  // After analysis, tells the user (in plain language) how complete their
+  // uploaded description was and exactly what to add for an even better plan.
+  // Strengthens the "one upload is the only input" goal by coaching the input.
+  function buildDescriptionQuality(input) {
+    input = input || {};
+    var s = input.scale || {};
+    var text = String(input.text || "");
+    var nCountries = (input.countryIntel || []).length;
+    var checks = [
+      { key: "scope", ok: text.trim().length >= 120, label: "A clear scope / description",
+        suggestion: "Describe what you're building in a sentence or two." },
+      { key: "domain", ok: input.profileId && input.profileId !== "generic-pm", label: "Recognised project type",
+        suggestion: "Mention words like \u201csubmarine\u201d, \u201cfibre\u201d or \u201ccable\u201d so the right plan is built." },
+      { key: "countries", ok: nCountries > 0, label: "Countries involved",
+        suggestion: "Name the countries so you get country-specific market, licensing and partner frameworks." },
+      { key: "route", ok: !!s.routeKm, label: "Route length (km)",
+        suggestion: "Add the route length (e.g. \u201c9,500 km\u201d) for accurate cable and civil estimates." },
+      { key: "budget", ok: !!s.statedBudget, label: "Budget",
+        suggestion: "Add a budget (e.g. \u201cbudget USD 1.3 billion\u201d) so the app can analyse cost and savings." },
+      { key: "duration", ok: !!s.durationMonths, label: "Timeline",
+        suggestion: "Add a duration (e.g. \u201cover 60 months\u201d) for a schedule and milestones." }
+    ];
+    var present = checks.filter(function (c) { return c.ok; });
+    var missing = checks.filter(function (c) { return !c.ok; });
+    var score = Math.round((present.length / checks.length) * 100);
+    var verdict = score >= 84 ? "Excellent" : score >= 50 ? "Good \u2014 a few additions would help" : "Add more detail for a stronger plan";
+    return {
+      score: score, verdict: verdict,
+      present: present.map(function (c) { return c.label; }),
+      missing: missing.map(function (c) { return { label: c.label, suggestion: c.suggestion }; })
+    };
+  }
+
   function analyzeProject(text, opts) {
     opts = opts || {};
     // Language-tolerant interpretation FIRST: clean up typos/grammar so the
@@ -700,6 +734,7 @@
     // actions — so a single uploaded description yields a ready next-step list.
     const advice = buildAdvice({ frameworks, risks, countryIntel });
     const optimization = buildOptimization({ scale, profileId: profile.id, countryIntel, budget: (budget && budget.total) || scale.statedBudget || 0 });
+    const descriptionQuality = buildDescriptionQuality({ text: interp.original || text, scale, countryIntel, profileId: profile.id });
 
     // Domain & scale warnings.
     if (picked.profile.id === "generic-pm") warnings.push("Domain not confidently detected — used the generic PM template. Add more detail (e.g. 'fibre', 'OTDR', 'route km') for a tailored plan.");
@@ -731,13 +766,14 @@
       frameworks,
       advice,
       optimization,
+      descriptionQuality,
       coverage: { profile: profile.id, confidence: Math.round(confidence * 100) / 100, matched: picked.matched, warnings },
     };
   }
 
   function listProfiles() { return PROFILES.map(p => ({ id: p.id, label: p.label })); }
 
-  const API = { analyzeProject, listProfiles, extractScale, buildAdvice, buildOptimization, interpretText, _profiles: PROFILES };
+  const API = { analyzeProject, listProfiles, extractScale, buildAdvice, buildOptimization, buildDescriptionQuality, interpretText, _profiles: PROFILES };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIBrain = API;
 })(typeof window !== "undefined" ? window : globalThis);

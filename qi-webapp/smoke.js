@@ -1694,5 +1694,22 @@ if (window.QIDisplay) {
   }
 })();
 
+// Step 113: Description Quality coach (coaches the single required input)
+(function testDescriptionQuality() {
+  if (!window.QIBrain || typeof window.QIBrain.buildDescriptionQuality !== "function") { ok(false, "QIBrain.buildDescriptionQuality available"); return; }
+  var rich = window.QIBrain.analyzeProject("Submarine fibre optic cable connecting Indonesia, Thailand, Vietnam, Taiwan, Philippines, Guam, Malaysia and Brunei. 9500 km over 60 months budget USD 1.3 billion.");
+  var sparse = window.QIBrain.analyzeProject("we want to build a cable");
+  ok(rich.descriptionQuality && rich.descriptionQuality.score > sparse.descriptionQuality.score, "richer descriptions score higher than sparse ones");
+  ok(sparse.descriptionQuality.missing.length > 0, "sparse description gets concrete improvement suggestions");
+  ok(rich.descriptionQuality.score >= 84, "a complete description scores well (" + rich.descriptionQuality.score + ")");
+  // Renders in the Brain output.
+  var bnav = doc.querySelector('.nav-item[data-view="brain"]');
+  if (bnav) bnav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  var ta = doc.getElementById("brainText");
+  if (ta) ta.value = "we want to build a cable";
+  var ab = doc.getElementById("brainAnalyze"); if (ab) ab.click();
+  ok(/How complete is your description/.test(doc.getElementById("brainOut").innerHTML), "Description Quality coach renders in the Brain output");
+})();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

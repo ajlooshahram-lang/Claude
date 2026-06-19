@@ -3395,6 +3395,12 @@
       </div>` : "";
     const adv = plan.advice;
     const opt = plan.optimization;
+    const dq = plan.descriptionQuality;
+    const dqBlock = dq ? `
+      <div class="card dq-card"><div class="card-head"><h3>\uD83D\uDCDD How complete is your description?</h3><span class="tag">${esc(String(dq.score))}/100</span></div>
+        <p style="margin:0 0 8px"><b>${esc(dq.verdict)}.</b></p>
+        ${dq.missing.length ? `<p class="muted" style="margin:0 0 6px">Add these for an even better plan:</p><ul style="margin:0;padding-left:18px;line-height:1.6">${dq.missing.map(m => `<li><b>${esc(m.label)}</b> — ${esc(m.suggestion)}</li>`).join("")}</ul>` : `<p class="muted" style="margin:0">Your description has everything the app needs — nice work.</p>`}
+      </div>` : "";
     const optBlock = opt && opt.items && opt.items.length ? `
       <div class="card" style="border-left:4px solid var(--teal,#1f8a8a)"><div class="card-head"><h3>\u267b\ufe0f Efficiency &amp; Savings \u2014 cut cost and energy</h3><span class="tag">AI \u00b7 estimate</span></div>
         <p style="line-height:1.6">${esc(opt.headline)}</p>
@@ -3414,6 +3420,7 @@
         </div></div>` : "";
     $("#brainOut").innerHTML = `
       ${interpBlock}
+      ${dqBlock}
       <div class="card"><div class="card-head"><h3>Analysis — ${esc(s.title)}</h3>
         <span class="tag">${esc(s.domainLabel)} · ${Math.round(plan.coverage.confidence * 100)}% confidence</span></div>
         <p class="muted">${scaleBits.length ? "Detected scale: " + esc(scaleBits.join(" · ")) : "No explicit scale detected."}</p>
