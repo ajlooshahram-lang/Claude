@@ -918,6 +918,7 @@ const T = {
     appTitle: 'El-Dimensionering',
     modules: {
       guide: '\uD83E\uDDED AI-Guider',
+      ref: '\uD83D\uDCD6 Symboler & forkortelser',
       load: 'Belastning',
       fuse: 'Sikringer',
       mcb: 'Automatsikring',
@@ -1061,6 +1062,7 @@ const T = {
     appTitle: 'Electrical Dimensioning',
     modules: {
       guide: '\uD83E\uDDED AI Guide',
+      ref: '\uD83D\uDCD6 Symbols & abbreviations',
       load: 'Load Calc',
       fuse: 'Fuses',
       mcb: 'MCB',
@@ -1196,6 +1198,7 @@ const T = {
     appTitle: 'ابعادسنجی برق',
     modules: {
       guide: '\uD83E\uDDED \u0631\u0627\u0647\u0646\u0645\u0627\u06CC AI',
+      ref: '\uD83D\uDCD6 \u0646\u0645\u0627\u062F\u0647\u0627 \u0648 \u0627\u062E\u062A\u0635\u0627\u0631\u0627\u062A',
       load: 'بار',
       fuse: 'فیوزها',
       mcb: 'کلید مینیاتوری',
@@ -4325,7 +4328,7 @@ const NAV_GROUPS = [
     da: 'Dokumentation & kvalitet', en: 'Documentation & quality', fa: '\u0645\u0633\u062A\u0646\u062F\u0627\u062A \u0648 \u06A9\u06CC\u0641\u06CC\u062A',
     descDa: 'Det der g\u00F8r projektet lovligt og f\u00E6rdigt: standarder, komponentbank, tilbud, KLS-kvalitetssikring, idrifts\u00E6ttelse, dokumentation \u2014 og eksamenstr\u00E6ning.',
     descEn: 'What makes the project legal and finished: standards, component bank, bids, KLS quality control, commissioning, documentation \u2014 and exam practice.',
-    keys: ['standards', 'bank', 'pdf', 'bid', 'kls', 'commission', 'verify', 'exam', 'ai']
+    keys: ['standards', 'bank', 'pdf', 'bid', 'kls', 'commission', 'verify', 'exam', 'ai', 'ref']
   }
 ];
 
@@ -5649,6 +5652,7 @@ function renderModule(mod) {
   let content = '';
   switch(mod) {
     case 'guide': content = renderGuide(); break;
+    case 'ref': content = renderRef(); break;
     case 'load': content = renderLoad(); break;
     case 'fuse': content = renderFuse(); break;
     case 'mcb': content = renderMCB(); break;
@@ -5713,7 +5717,7 @@ function renderModule(mod) {
   if (mod !== 'exam') content += renderAiAssistant(mod);
   // Append QI validation summary if enough data exists
   const qi = runQiValidation();
-  const noQi = ['standards','bank','ai','bid','projekt','verify','draw','exam','kritisk','guide'];
+  const noQi = ['standards','bank','ai','bid','projekt','verify','draw','exam','kritisk','guide','ref'];
   if (qi.passed.length + qi.issues.length > 0 && noQi.indexOf(mod) < 0) {
     content += renderQiCard(qi);
   }
@@ -8582,21 +8586,237 @@ function sldGen(x,y){ // generator: circle with G
   return `<g><circle cx="${x}" cy="${y}" r="14" fill="${SLD_C.face}" stroke="${SLD_C.src}" stroke-width="2"/>`
     +`<text x="${x}" y="${y+5}" text-anchor="middle" font-size="13" font-weight="800" fill="${SLD_C.src}">G</text></g>`;
 }
-// Legend glyphs + bilingual names (the key only lists symbols actually drawn)
-const SLD_LEGEND = {
-  source:{g:sldSource, da:'Forsyning', en:'Grid supply'},
-  trafo:{g:sldTrafo, da:'Transformer', en:'Transformer'},
-  meter:{g:sldMeter, da:'M\u00E5ler', en:'Meter'},
-  mainsw:{g:sldMainSwitch, da:'Hovedafbryder', en:'Main switch'},
-  bus:{g:(x,y)=>`<line x1="${x-12}" y1="${y}" x2="${x+12}" y2="${y}" stroke="${SLD_C.bus}" stroke-width="5" stroke-linecap="round"/>`, da:'Samleskinne', en:'Busbar (live)'},
-  mcb:{g:(x,y)=>sldBreaker(x,y,''), da:'Afbryder', en:'Circuit breaker'},
-  motor:{g:sldMotor, da:'Motor', en:'Motor'},
-  load:{g:sldLoad, da:'Forbruger', en:'Load'},
-  earth:{g:sldEarth, da:'Jord (PE)', en:'Earth (PE)'},
-  pv:{g:sldPV, da:'Solceller', en:'Solar PV'},
-  battery:{g:sldBattery, da:'Batteri', en:'Battery'},
-  gen:{g:sldGen, da:'Generator', en:'Generator'}
+// ===== EXAM SYMBOL & ABBREVIATION REFERENCE — SINGLE SOURCE OF TRUTH =====
+// The IEC 60617 glyph superset and the abbreviation table below are the ONE
+// authoritative source. SLD_LEGEND (used by buildSLD) and GUIDE_GLOSSARY (used
+// by the AI-Guider) DERIVE from these objects so the drawing, the guide and the
+// reference module can never drift. No calculation/engine/data logic is changed
+// here — only the symbol/term SOURCE is consolidated. The Danish terms follow
+// the authoritative DS/HD 60364 + autorisationspr\u00f8ve technical language.
+
+// ---- Extended IEC 60617 glyph helpers (superset) ----
+function sldFuse(x,y){ // gG/aM fuse link
+  return `<g><rect x="${x-8}" y="${y-14}" width="16" height="28" rx="2" fill="${SLD_C.face}" stroke="${SLD_C.dev}" stroke-width="1.8"/>`
+    +`<line x1="${x}" y1="${y-14}" x2="${x}" y2="${y+14}" stroke="${SLD_C.dev}" stroke-width="2"/></g>`;
+}
+function sldFuseSwitch(x,y){ // fuse-switch-disconnector (sikringslastadskiller)
+  return `<g><circle cx="${x}" cy="${y-15}" r="2.2" fill="${SLD_C.dev}"/>`
+    +`<line x1="${x}" y1="${y-15}" x2="${x-9}" y2="${y-2}" stroke="${SLD_C.dev}" stroke-width="2" stroke-linecap="round"/>`
+    +`<rect x="${x-6}" y="${y-1}" width="12" height="16" rx="1.5" fill="${SLD_C.face}" stroke="${SLD_C.dev}" stroke-width="1.6"/>`
+    +`<line x1="${x}" y1="${y-1}" x2="${x}" y2="${y+15}" stroke="${SLD_C.dev}" stroke-width="1.6"/></g>`;
+}
+function sldMccb(x,y){ // MCCB (moulded-case) thermal-magnetic
+  return `<g><rect x="${x-15}" y="${y-17}" width="30" height="34" rx="3" fill="${SLD_C.face}" stroke="${SLD_C.dev}" stroke-width="2.4"/>`
+    +`<circle cx="${x}" cy="${y+12}" r="2.2" fill="${SLD_C.dev}"/>`
+    +`<line x1="${x}" y1="${y+12}" x2="${x-11}" y2="${y-8}" stroke="${SLD_C.dev}" stroke-width="2.2" stroke-linecap="round"/>`
+    +`<path d="M ${x+3} ${y-13} q 4 3 0 6 q -4 3 0 6" fill="none" stroke="${SLD_C.dev}" stroke-width="1.4"/></g>`;
+}
+function sldRcd(x,y){ // RCD / HPFI — residual-current device (sum toroid)
+  return `<g><rect x="${x-15}" y="${y-16}" width="30" height="32" rx="3" fill="${SLD_C.face}" stroke="${SLD_C.dev}" stroke-width="1.8"/>`
+    +`<ellipse cx="${x}" cy="${y-3}" rx="10" ry="6" fill="none" stroke="${SLD_C.dev}" stroke-width="1.6"/>`
+    +`<text x="${x}" y="${y+13}" text-anchor="middle" font-size="8" font-weight="800" fill="${SLD_C.dev}">I\u0394</text></g>`;
+}
+function sldMms(x,y){ // motor-protective switch / manual motor starter
+  return `<g><rect x="${x-14}" y="${y-16}" width="28" height="32" rx="3" fill="${SLD_C.face}" stroke="${SLD_C.dev}" stroke-width="1.8"/>`
+    +`<path d="M ${x-7} ${y-9} h 6 l -4 7 h 6" fill="none" stroke="${SLD_C.dev}" stroke-width="1.4"/>`
+    +`<circle cx="${x+5}" cy="${y+8}" r="4" fill="none" stroke="${SLD_C.dev}" stroke-width="1.4"/></g>`;
+}
+function sldContactor(x,y){ // contactor (kontaktor)
+  return `<g><circle cx="${x}" cy="${y-14}" r="2.2" fill="${SLD_C.dev}"/>`
+    +`<line x1="${x}" y1="${y-14}" x2="${x-10}" y2="${y-1}" stroke="${SLD_C.dev}" stroke-width="2" stroke-linecap="round"/>`
+    +`<path d="M ${x-6} ${y+2} a 6 6 0 0 1 12 0" fill="none" stroke="${SLD_C.dev}" stroke-width="1.8"/>`
+    +`<circle cx="${x}" cy="${y+14}" r="2.2" fill="${SLD_C.dev}"/></g>`;
+}
+function sldCT(x,y){ // current transformer (str\u00f8mtransformer)
+  return `<g><line x1="${x-14}" y1="${y-3}" x2="${x+14}" y2="${y-3}" stroke="${SLD_C.dev}" stroke-width="2"/>`
+    +`<circle cx="${x}" cy="${y+6}" r="8" fill="none" stroke="${SLD_C.dev}" stroke-width="1.8"/></g>`;
+}
+function sldVT(x,y){ // voltage transformer (sp\u00e6ndingstransformer)
+  return `<g><circle cx="${x}" cy="${y-7}" r="9" fill="none" stroke="${SLD_C.src}" stroke-width="1.8"/>`
+    +`<circle cx="${x}" cy="${y+7}" r="9" fill="none" stroke="${SLD_C.src}" stroke-width="1.8"/></g>`;
+}
+function sldRelay(x,y){ // definite-time / line relay block
+  return `<g><rect x="${x-13}" y="${y-13}" width="26" height="26" rx="2" fill="${SLD_C.face}" stroke="${SLD_C.dev}" stroke-width="1.8"/>`
+    +`<text x="${x}" y="${y+5}" text-anchor="middle" font-size="10" font-weight="800" fill="${SLD_C.dev}">t&gt;</text></g>`;
+}
+function sldSpd(x,y){ // surge protective device / overvoltage arrester
+  return `<g><rect x="${x-10}" y="${y-14}" width="20" height="28" rx="2" fill="${SLD_C.face}" stroke="${SLD_C.dev}" stroke-width="1.8"/>`
+    +`<path d="M ${x-5} ${y-9} L ${x+3} ${y-1} L ${x-3} ${y-1} L ${x+5} ${y+8}" fill="none" stroke="${SLD_C.src}" stroke-width="1.8" stroke-linejoin="round"/></g>`;
+}
+function sldTransfer(x,y){ // transfer / changeover switch (omkobler)
+  return `<g><circle cx="${x-9}" cy="${y-13}" r="2.2" fill="${SLD_C.dev}"/>`
+    +`<circle cx="${x+9}" cy="${y-13}" r="2.2" fill="${SLD_C.dev}"/>`
+    +`<circle cx="${x}" cy="${y+13}" r="2.2" fill="${SLD_C.dev}"/>`
+    +`<line x1="${x}" y1="${y+13}" x2="${x-9}" y2="${y-9}" stroke="${SLD_C.dev}" stroke-width="2" stroke-linecap="round"/></g>`;
+}
+function sldBonding(x,y){ // equipotential bonding bar (udligningsskinne)
+  return `<g><rect x="${x-13}" y="${y-3}" width="26" height="6" rx="1" fill="${SLD_C.earth}"/>`
+    +`<line x1="${x-8}" y1="${y+3}" x2="${x-8}" y2="${y+11}" stroke="${SLD_C.earth}" stroke-width="1.6"/>`
+    +`<line x1="${x}" y1="${y+3}" x2="${x}" y2="${y+11}" stroke="${SLD_C.earth}" stroke-width="1.6"/>`
+    +`<line x1="${x+8}" y1="${y+3}" x2="${x+8}" y2="${y+11}" stroke="${SLD_C.earth}" stroke-width="1.6"/></g>`;
+}
+function sldPEN(x,y){ // PEN combined conductor
+  return `<g><line x1="${x-14}" y1="${y}" x2="${x+14}" y2="${y}" stroke="${SLD_C.earth}" stroke-width="2.6"/>`
+    +`<text x="${x}" y="${y-6}" text-anchor="middle" font-size="8.5" font-weight="800" fill="${SLD_C.earth}">PEN</text></g>`;
+}
+function sldNeutral(x,y){ // neutral conductor (nulleder)
+  return `<g><line x1="${x-14}" y1="${y}" x2="${x+14}" y2="${y}" stroke="${SLD_C.dim}" stroke-width="2" stroke-dasharray="4 3"/>`
+    +`<text x="${x}" y="${y-6}" text-anchor="middle" font-size="9" font-weight="800" fill="${SLD_C.dim}">N</text></g>`;
+}
+function sldCapacitor(x,y){ // PFC capacitor (kondensator)
+  return `<g><line x1="${x-10}" y1="${y-4}" x2="${x+10}" y2="${y-4}" stroke="${SLD_C.dev}" stroke-width="2.4"/>`
+    +`<line x1="${x-10}" y1="${y+4}" x2="${x+10}" y2="${y+4}" stroke="${SLD_C.dev}" stroke-width="2.4"/>`
+    +`<line x1="${x}" y1="${y-14}" x2="${x}" y2="${y-4}" stroke="${SLD_C.dev}" stroke-width="1.6"/>`
+    +`<line x1="${x}" y1="${y+4}" x2="${x}" y2="${y+14}" stroke="${SLD_C.dev}" stroke-width="1.6"/></g>`;
+}
+function sldEvCharge(x,y){ // EV charging point (ladestander)
+  return `<g><rect x="${x-11}" y="${y-14}" width="22" height="28" rx="3" fill="${SLD_C.face}" stroke="${SLD_C.bus}" stroke-width="1.8"/>`
+    +`<path d="M ${x+2} ${y-9} L ${x-4} ${y+1} L ${x} ${y+1} L ${x-2} ${y+9}" fill="none" stroke="${SLD_C.bus}" stroke-width="1.6" stroke-linejoin="round"/>`
+    +`<text x="${x}" y="${y+13}" text-anchor="middle" font-size="6.5" font-weight="800" fill="${SLD_C.bus}">EV</text></g>`;
+}
+function sldEarthTag(x,y,label,col){ // earthing-system marker TN/TT/IT
+  return `<g><circle cx="${x}" cy="${y}" r="14" fill="${SLD_C.face}" stroke="${col||SLD_C.earth}" stroke-width="1.8"/>`
+    +`<text x="${x}" y="${y+4}" text-anchor="middle" font-size="9" font-weight="800" fill="${col||SLD_C.earth}">${label}</text></g>`;
+}
+function sldDesig(x,y,letter){ // component designation letter (IEC 81346)
+  return `<g><rect x="${x-13}" y="${y-12}" width="26" height="24" rx="3" fill="${SLD_C.face}" stroke="${SLD_C.dim}" stroke-width="1.5"/>`
+    +`<text x="${x}" y="${y+5}" text-anchor="middle" font-size="12" font-weight="800" fill="${SLD_C.txt}">${letter}</text></g>`;
+}
+
+// ---- Reference groups (shared click-only filter for symbols + abbreviations) ----
+const REF_GROUPS = [
+  { id:'currents',   da:'Str\u00f8mme',                  en:'Currents' },
+  { id:'impedance',  da:'Impedans & kortslutning',       en:'Impedance & short-circuit' },
+  { id:'devices',    da:'Beskyttelsesudstyr',            en:'Protective devices' },
+  { id:'earthing',   da:'Jordingssystemer',              en:'Earthing systems' },
+  { id:'conductors', da:'Ledere',                        en:'Conductors' },
+  { id:'letters',    da:'Komponentbogstaver',            en:'Component letters' },
+  { id:'symbols',    da:'Symboler (IEC 60617)',          en:'Symbols (IEC 60617)' }
+];
+
+// ---- IEC 60617 symbol superset (single source; SLD_LEGEND derives from this) ----
+const REF_SYMBOLS = {
+  source:{g:sldSource, da:'Forsyning', en:'Grid supply', mDa:'Det offentlige el-net / AC-kilde.', mEn:'Public grid / AC source.', group:'symbols'},
+  trafo:{g:sldTrafo, da:'Transformer', en:'Transformer', mDa:'To-vikling, transformerer sp\u00e6ndingsniveau (fx 10/0,4 kV).', mEn:'Two-winding, transforms voltage level (e.g. 10/0.4 kV).', group:'symbols'},
+  meter:{g:sldMeter, da:'M\u00E5ler', en:'Meter', mDa:'Energim\u00e5ler (kWh).', mEn:'Energy meter (kWh).', group:'symbols'},
+  mainsw:{g:sldMainSwitch, da:'Hovedafbryder', en:'Main switch', mDa:'Lastadskiller/hovedafbryder for tavlen.', mEn:'Isolator / main switch for the board.', group:'devices'},
+  bus:{g:(x,y)=>`<line x1="${x-12}" y1="${y}" x2="${x+12}" y2="${y}" stroke="${SLD_C.bus}" stroke-width="5" stroke-linecap="round"/>`, da:'Samleskinne', en:'Busbar (live)', mDa:'Sp\u00e6ndingsf\u00f8rende samleskinne i tavlen.', mEn:'Live busbar in the board.', group:'conductors'},
+  mcb:{g:(x,y)=>sldBreaker(x,y,''), da:'Automatsikring (MCB)', en:'Circuit breaker (MCB)', mDa:'Lille automatsikring, kurve B/C/D (IEC 60898).', mEn:'Miniature circuit breaker, curve B/C/D (IEC 60898).', group:'devices'},
+  motor:{g:sldMotor, da:'Motor', en:'Motor', mDa:'Roterende maskine (M).', mEn:'Rotating machine (M).', group:'symbols'},
+  load:{g:sldLoad, da:'Forbruger', en:'Load', mDa:'Generel belastning/forbruger.', mEn:'Generic load/consumer.', group:'symbols'},
+  earth:{g:sldEarth, da:'Jord (PE)', en:'Earth (PE)', mDa:'Beskyttelsesjord / jordforbindelse.', mEn:'Protective earth / earth connection.', group:'earthing'},
+  pv:{g:sldPV, da:'Solceller', en:'Solar PV', mDa:'Solcelleanl\u00e6g (DC-kilde).', mEn:'Photovoltaic array (DC source).', group:'symbols'},
+  battery:{g:sldBattery, da:'Batteri', en:'Battery', mDa:'Batteri / energilager.', mEn:'Battery / energy store.', group:'symbols'},
+  gen:{g:sldGen, da:'Generator', en:'Generator', mDa:'Generator (G), fx n\u00f8dstr\u00f8m.', mEn:'Generator (G), e.g. standby.', group:'symbols'},
+  // --- superset glyphs added for the diagram + exam ---
+  fuse:{g:sldFuse, da:'Smeltesikring', en:'Fuse', mDa:'Smeltesikring, typisk gG. Smelter ved overstr\u00f8m.', mEn:'Fuse link, usually gG. Melts on overcurrent.', group:'devices'},
+  fuseswitch:{g:sldFuseSwitch, da:'Sikringslastadskiller', en:'Fuse-switch-disconnector', mDa:'Kombineret lastadskiller med sikring.', mEn:'Combined load-break switch with fuse.', group:'devices'},
+  mccb:{g:sldMccb, da:'Maksimalafbryder (MCCB)', en:'Moulded-case breaker (MCCB)', mDa:'St\u00f8rre effektafbryder (IEC 60947-2), ofte indstillelig.', mEn:'Larger power breaker (IEC 60947-2), often adjustable.', group:'devices'},
+  rcd:{g:sldRcd, da:'Fejlstr\u00f8msafbryder (HPFI/RCD)', en:'Residual-current device (RCD)', mDa:'Bryder ved fejlstr\u00f8m til jord (I\u0394n) \u2014 beskytter mod st\u00f8d.', mEn:'Trips on earth-fault current (I\u0394n) \u2014 shock protection.', group:'devices'},
+  mms:{g:sldMms, da:'Motorv\u00e6rn (MMS)', en:'Motor-protective switch (MMS)', mDa:'Termisk+magnetisk motorbeskyttelse, justerbar.', mEn:'Thermal+magnetic motor protection, adjustable.', group:'devices'},
+  contactor:{g:sldContactor, da:'Kontaktor', en:'Contactor', mDa:'Elektromekanisk afbryder til styring/start.', mEn:'Electromechanical switch for control/starting.', group:'devices'},
+  spd:{g:sldSpd, da:'Overspaendingsbeskyttelse (SPD)', en:'Surge protective device (SPD)', mDa:'Afleder transient overspaending (lyn/kobling).', mEn:'Diverts transient overvoltage (lightning/switching).', group:'devices'},
+  relay:{g:sldRelay, da:'Tidsrel\u00e6 / linjerel\u00e6', en:'Time / line relay', mDa:'Definit-tid beskyttelsesrel\u00e6 (t&gt;).', mEn:'Definite-time protection relay (t&gt;).', group:'devices'},
+  transfer:{g:sldTransfer, da:'Omkobler (transfer)', en:'Changeover/transfer switch', mDa:'Skifter mellem to forsyninger (net/n\u00f8dstr\u00f8m).', mEn:'Switches between two supplies (grid/standby).', group:'devices'},
+  ct:{g:sldCT, da:'Str\u00f8mtransformer (CT)', en:'Current transformer (CT)', mDa:'M\u00e5ler/skalerer str\u00f8m til m\u00e5ling/beskyttelse.', mEn:'Measures/scales current for metering/protection.', group:'symbols'},
+  vt:{g:sldVT, da:'Sp\u00e6ndingstransformer (VT)', en:'Voltage transformer (VT)', mDa:'M\u00e5ler/skalerer sp\u00e6nding til m\u00e5ling/beskyttelse.', mEn:'Measures/scales voltage for metering/protection.', group:'symbols'},
+  bonding:{g:sldBonding, da:'Udligningsforbindelse (PB)', en:'Equipotential bonding bar', mDa:'Potentialudligningsskinne (hovedjordskinne).', mEn:'Main equipotential bonding bar.', group:'earthing'},
+  pen:{g:sldPEN, da:'PEN-leder', en:'PEN conductor', mDa:'Kombineret PE+N (kun TN-C, f\u00f8r opsplitning).', mEn:'Combined PE+N (TN-C only, before split).', group:'conductors'},
+  neutral:{g:sldNeutral, da:'Nulleder (N)', en:'Neutral conductor (N)', mDa:'Tilbagef\u00f8ringsleder i 1- og 3-faset.', mEn:'Return conductor in single/three-phase.', group:'conductors'},
+  capacitor:{g:sldCapacitor, da:'Kondensator (PFC)', en:'Capacitor (PFC)', mDa:'Fasekompensering, h\u00e6ver cos\u03c6.', mEn:'Power-factor correction, raises cos\u03c6.', group:'symbols'},
+  evcharge:{g:sldEvCharge, da:'Ladestander (EV)', en:'EV charging point', mDa:'Ladepunkt til elbil, kontinuerlig last.', mEn:'EV charging point, continuous load.', group:'symbols'},
+  tn:{g:(x,y)=>sldEarthTag(x,y,'TN',SLD_C.bus), da:'TN-system', en:'TN system', mDa:'Nulpunkt jordet; PE f\u00f8res med (TN-C/-S/-C-S).', mEn:'Star point earthed; PE distributed (TN-C/-S/-C-S).', group:'earthing'},
+  tt:{g:(x,y)=>sldEarthTag(x,y,'TT',SLD_C.src), da:'TT-system', en:'TT system', mDa:'Lokal jordelektrode; kr\u00e6ver normalt HPFI.', mEn:'Local earth electrode; normally requires RCD.', group:'earthing'},
+  it:{g:(x,y)=>sldEarthTag(x,y,'IT',SLD_C.dev), da:'IT-system', en:'IT system', mDa:'Isoleret/impedansjordet; isolations\u00f8verv\u00e5gning.', mEn:'Isolated/impedance-earthed; insulation monitoring.', group:'earthing'},
+  dT:{g:(x,y)=>sldDesig(x,y,'T'), da:'-T Transformer', en:'-T Transformer', mDa:'Komponentbogstav: transformer.', mEn:'Designation letter: transformer.', group:'letters'},
+  dW:{g:(x,y)=>sldDesig(x,y,'W'), da:'-W Kabel/leder', en:'-W Cable/wiring', mDa:'Komponentbogstav: kabel/forbindelse.', mEn:'Designation letter: cable/wiring.', group:'letters'},
+  dF:{g:(x,y)=>sldDesig(x,y,'F'), da:'-F Beskyttelse', en:'-F Protection', mDa:'Komponentbogstav: sikring/beskyttelse.', mEn:'Designation letter: fuse/protection.', group:'letters'},
+  dA:{g:(x,y)=>sldDesig(x,y,'A'), da:'-A Samling/enhed', en:'-A Assembly/unit', mDa:'Komponentbogstav: samling/enhed (fx tavle).', mEn:'Designation letter: assembly/unit (e.g. board).', group:'letters'},
+  dM:{g:(x,y)=>sldDesig(x,y,'M'), da:'-M Motor', en:'-M Motor', mDa:'Komponentbogstav: motor.', mEn:'Designation letter: motor.', group:'letters'},
+  dG:{g:(x,y)=>sldDesig(x,y,'G'), da:'-G Generator/kilde', en:'-G Generator/source', mDa:'Komponentbogstav: generator/forsyning.', mEn:'Designation letter: generator/source.', group:'letters'},
+  dQ:{g:(x,y)=>sldDesig(x,y,'Q'), da:'-Q Effektafbryder', en:'-Q Power switching', mDa:'Komponentbogstav: effektafbryder/adskiller.', mEn:'Designation letter: power switch/disconnector.', group:'letters'},
+  dK:{g:(x,y)=>sldDesig(x,y,'K'), da:'-K Rel\u00e6/kontaktor', en:'-K Relay/contactor', mDa:'Komponentbogstav: rel\u00e6/kontaktor.', mEn:'Designation letter: relay/contactor.', group:'letters'}
 };
+
+// ---- Abbreviation / short-name superset (single source; GUIDE_GLOSSARY derives) ----
+// Fields: abbr, termDa (authoritative), termEn, fa (Farsi), unit, mDa/mEn (one-line
+// meaning), clause (DS/HD 60364 reference where useful), group, glossary (beginner).
+const REF_ABBREV = [
+  // ---- Currents ----
+  {abbr:'IB', termDa:'Belastningsstr\u00f8m', termEn:'Load current', fa:'\u062c\u0631\u06cc\u0627\u0646 \u0628\u0627\u0631', unit:'A', mDa:'Den str\u00f8m udstyret tr\u00e6kker under drift.', mEn:'The current the equipment draws when running.', clause:'DS/HD 60364-4-43 \u00a7433.1', group:'currents', glossary:true},
+  {abbr:'In', termDa:'M\u00e6rkestr\u00f8m', termEn:'Rated current', fa:'\u062c\u0631\u06cc\u0627\u0646 \u0646\u0627\u0645\u06cc', unit:'A', mDa:'Beskyttelsens m\u00e6rkestr\u00f8m (sikring/afbryder).', mEn:'Rated current of the protective device.', clause:'DS/HD 60364-4-43 \u00a7433.1', group:'currents', glossary:true},
+  {abbr:'Ir', termDa:'Indstillet overlastudl\u00f8ser', termEn:'Set overload current', fa:'\u062c\u0631\u06cc\u0627\u0646 \u062a\u0646\u0638\u06cc\u0645\u06cc', unit:'A', mDa:'Justeret langtidsudl\u00f8ser p\u00e5 en indstillelig afbryder.', mEn:'Adjusted long-time pickup on an adjustable breaker.', clause:'IEC 60947-2', group:'currents'},
+  {abbr:'Isd', termDa:'Korttidsforsinket udl\u00f8ser', termEn:'Short-time delay pickup', fa:'\u0622\u0633\u062a\u0627\u0646\u0647 \u062a\u0623\u062e\u06cc\u0631 \u06a9\u0648\u062a\u0627\u0647', unit:'A', mDa:'Magnetisk korttidsudl\u00f8ser; skal ligge under Ik min.', mEn:'Magnetic short-time pickup; must be below Ik min.', clause:'IEC 60947-2', group:'currents'},
+  {abbr:'Iz', termDa:'Str\u00f8mb\u00e6reevne (korrigeret)', termEn:'Cable ampacity (corrected)', fa:'\u0638\u0631\u0641\u06cc\u062a \u062c\u0631\u06cc\u0627\u0646 \u06a9\u0627\u0628\u0644', unit:'A', mDa:'Hvor meget str\u00f8m kablet kan f\u00f8re uden at blive for varmt, efter korrektion.', mEn:'Current the cable can carry without overheating, after correction.', clause:'DS/HD 60364-5-52 Tabel C.52.1', group:'currents', glossary:true},
+  {abbr:'Iz_tab', termDa:'Tabel-str\u00f8mb\u00e6reevne', termEn:'Tabulated ampacity', fa:'\u0638\u0631\u0641\u06cc\u062a \u062c\u062f\u0648\u0644\u06cc', unit:'A', mDa:'Ukorrigeret v\u00e6rdi fra tabel (30\u00b0C, enkelt kreds).', mEn:'Uncorrected value from the table (30\u00b0C, single circuit).', clause:'DS/HD 60364-5-52 Tabel C.52.x', group:'currents'},
+  {abbr:'I\u0394n', termDa:'M\u00e6rkefejlstr\u00f8m (HPFI)', termEn:'Rated residual operating current', fa:'\u062c\u0631\u06cc\u0627\u0646 \u0646\u0634\u062a\u06cc \u0646\u0627\u0645\u06cc', unit:'mA', mDa:'Den fejlstr\u00f8m hvor HPFI/RCD udl\u00f8ser (fx 30 mA).', mEn:'Residual current at which the RCD trips (e.g. 30 mA).', clause:'DS/HD 60364-4-41 \u00a7411.3.3', group:'currents'},
+  {abbr:'IB \u2264 In \u2264 Iz', termDa:'Grundregel for overbelastning', termEn:'Core overload rule', fa:'\u0642\u0627\u0639\u062f\u0647 \u0627\u0635\u0644\u06cc', unit:'', mDa:'Udstyret f\u00f8rst, s\u00e5 afbryderen, s\u00e5 kablet \u2014 i den r\u00e6kkef\u00f8lge.', mEn:'Equipment first, then device, then cable \u2014 in that order.', clause:'DS/HD 60364-4-43 \u00a7433.1', group:'currents', glossary:true},
+  {abbr:'Sf', termDa:'Samtidighedsfaktor', termEn:'Diversity/simultaneity factor', fa:'\u0636\u0631\u06cc\u0628 \u0647\u0645\u200c\u0632\u0645\u0627\u0646\u06cc', unit:'', mDa:'Andel af laster der k\u00f8rer samtidigt (\u2264 1).', mEn:'Share of loads running at the same time (\u2264 1).', clause:'DS/HD 60364-5-52', group:'currents'},
+  {abbr:'cos\u03c6', termDa:'Effektfaktor', termEn:'Power factor', fa:'\u0636\u0631\u06cc\u0628 \u062a\u0648\u0627\u0646', unit:'', mDa:'Forholdet mellem aktiv (P) og tilsyneladende (S) effekt.', mEn:'Ratio of active (P) to apparent (S) power.', clause:'\u2014', group:'currents'},
+  {abbr:'Ca (Kt)', termDa:'Temperaturkorrektion', termEn:'Ambient temperature factor', fa:'\u0636\u0631\u06cc\u0628 \u062f\u0645\u0627', unit:'', mDa:'Nedregner Iz ved h\u00f8j omgivelsestemperatur.', mEn:'Derates Iz at high ambient temperature.', clause:'DS/HD 60364-5-52 Tabel B.52.14', group:'currents'},
+  {abbr:'Cg (Ks)', termDa:'Gruppekorrektion', termEn:'Grouping factor', fa:'\u0636\u0631\u06cc\u0628 \u06af\u0631\u0648\u0647\u200c\u0628\u0646\u062f\u06cc', unit:'', mDa:'Nedregner Iz n\u00e5r flere kabler ligger sammen.', mEn:'Derates Iz when several cables are bunched.', clause:'DS/HD 60364-5-52 Tabel B.52.17', group:'currents'},
+  {abbr:'Ci (KJ)', termDa:'Korrektion for varmeisolering', termEn:'Thermal-insulation factor', fa:'\u0636\u0631\u06cc\u0628 \u0639\u0627\u06cc\u0642 \u062d\u0631\u0627\u0631\u062a\u06cc', unit:'', mDa:'Nedregner Iz n\u00e5r kablet er omgivet af isolering.', mEn:'Derates Iz when the cable is surrounded by insulation.', clause:'DS/HD 60364-5-52 \u00a7523.9', group:'currents'},
+  // ---- Impedance & short-circuit ----
+  {abbr:'Ik3max', termDa:'Maks. 3-faset kortslutningsstr\u00f8m', termEn:'Max 3-phase short-circuit current', fa:'\u062d\u062f\u0627\u06a9\u062b\u0631 \u062c\u0631\u06cc\u0627\u0646 \u0627\u062a\u0635\u0627\u0644 \u06a9\u0648\u062a\u0627\u0647 \u0633\u0647\u200c\u0641\u0627\u0632', unit:'kA', mDa:'Dimensionerer brydeevnen (Icu \u2265 Ik3max).', mEn:'Sizes the breaking capacity (Icu \u2265 Ik3max).', clause:'DS/HD 60364-4-43 \u00a7434.5; IEC 60909', group:'impedance'},
+  {abbr:'Ik1min', termDa:'Min. 1-faset kortslutningsstr\u00f8m', termEn:'Min 1-phase short-circuit current', fa:'\u062d\u062f\u0627\u0642\u0644 \u062c\u0631\u06cc\u0627\u0646 \u0627\u062a\u0635\u0627\u0644 \u06a9\u0648\u062a\u0627\u0647 \u062a\u06a9\u200c\u0641\u0627\u0632', unit:'A', mDa:'Sikrer at udl\u00f8seren n\u00e5r at koble ud (Isd \u2264 Ik1min).', mEn:'Ensures the trip operates (Isd \u2264 Ik1min).', clause:'DS/HD 60364-4-41 \u00a7411.4', group:'impedance'},
+  {abbr:'SKN', termDa:'Kortslutningsniveau ved tilslutning', termEn:'Network short-circuit level', fa:'\u0633\u0637\u062d \u0627\u062a\u0635\u0627\u0644 \u06a9\u0648\u062a\u0627\u0647 \u0634\u0628\u06a9\u0647', unit:'MVA / kA', mDa:'Nettets kortslutningsstyrke i tilslutningspunktet (oplyst af netselskab).', mEn:'Grid short-circuit strength at the connection point (given by the DSO).', clause:'IEC 60909', group:'impedance'},
+  {abbr:'Zs', termDa:'Fejlsl\u00f8jfeimpedans', termEn:'Earth-fault loop impedance', fa:'\u0627\u0645\u067e\u062f\u0627\u0646\u0633 \u062d\u0644\u0642\u0647 \u062e\u0637\u0627', unit:'\u03a9', mDa:'Modstand i fejlsl\u00f8jfen; lav Zs = hurtig sikker udkobling.', mEn:'Resistance of the fault loop; low Zs = fast, safe disconnection.', clause:'DS/HD 60364-4-41 Tabel 41.1', group:'impedance', glossary:true},
+  {abbr:'Z1', termDa:'Impedans frem til fejlstedet', termEn:'Impedance up to the fault point', fa:'\u0627\u0645\u067e\u062f\u0627\u0646\u0633 \u062a\u0627 \u0646\u0642\u0637\u0647 \u062e\u0637\u0627', unit:'\u03a9', mDa:'Summen af for-impedanser frem til kortslutningsstedet.', mEn:'Sum of upstream impedances up to the short-circuit point.', clause:'IEC 60909', group:'impedance'},
+  {abbr:'U0', termDa:'Nominel sp\u00e6nding fase-jord', termEn:'Nominal line-to-earth voltage', fa:'\u0648\u0644\u062a\u0627\u0698 \u0641\u0627\u0632 \u062a\u0627 \u0632\u0645\u06cc\u0646', unit:'V', mDa:'Fase-til-jord sp\u00e6nding (230 V i 400/230 V-net).', mEn:'Phase-to-earth voltage (230 V in a 400/230 V system).', clause:'DS/HD 60364-4-41', group:'impedance'},
+  {abbr:'Un', termDa:'Nominel sp\u00e6nding', termEn:'Nominal voltage', fa:'\u0648\u0644\u062a\u0627\u0698 \u0646\u0627\u0645\u06cc', unit:'V', mDa:'Anl\u00e6ggets nominelle sp\u00e6nding (fx 400 V mellem faser).', mEn:'Nominal system voltage (e.g. 400 V line-to-line).', clause:'\u2014', group:'impedance'},
+  {abbr:'Cmax', termDa:'Sp\u00e6ndingsfaktor (maks.)', termEn:'Voltage factor (max)', fa:'\u0636\u0631\u06cc\u0628 \u0648\u0644\u062a\u0627\u0698 \u0628\u06cc\u0634\u06cc\u0646\u0647', unit:'', mDa:'Faktor (\u22481,10) ved beregning af maks. kortslutning.', mEn:'Factor (\u22481.10) used for maximum short-circuit.', clause:'IEC 60909', group:'impedance'},
+  {abbr:'Cmin', termDa:'Sp\u00e6ndingsfaktor (min.)', termEn:'Voltage factor (min)', fa:'\u0636\u0631\u06cc\u0628 \u0648\u0644\u062a\u0627\u0698 \u06a9\u0645\u06cc\u0646\u0647', unit:'', mDa:'Faktor (\u22480,95) ved beregning af min. kortslutning.', mEn:'Factor (\u22480.95) used for minimum short-circuit.', clause:'IEC 60909', group:'impedance'},
+  {abbr:'uk%', termDa:'Kortslutningsimpedans (trafo)', termEn:'Transformer impedance voltage', fa:'\u0648\u0644\u062a\u0627\u0698 \u0627\u0645\u067e\u062f\u0627\u0646\u0633 \u062a\u0631\u0627\u0646\u0633', unit:'%', mDa:'Relativ trafoimpedans; bruges til Ik = In/uk.', mEn:'Relative transformer impedance; used for Ik = In/uk.', clause:'\u2014', group:'impedance'},
+  // ---- Protective devices ----
+  {abbr:'Icu', termDa:'Brydeevne (ultimativ)', termEn:'Breaking capacity (ultimate)', fa:'\u0638\u0631\u0641\u06cc\u062a \u0642\u0637\u0639 \u0646\u0647\u0627\u06cc\u06cc', unit:'kA', mDa:'St\u00f8rste kortslutning afbryderen sikkert kan slukke.', mEn:'Largest short-circuit the device can safely clear.', clause:'IEC 60947-2; DS/HD 60364-4-43 \u00a7434.5.1', group:'devices', glossary:true},
+  {abbr:'Ics', termDa:'Driftsbrydeevne', termEn:'Service breaking capacity', fa:'\u0638\u0631\u0641\u06cc\u062a \u0642\u0637\u0639 \u0633\u0631\u0648\u06cc\u0633', unit:'kA', mDa:'Brydeevne hvor afbryderen forbliver i drift bagefter.', mEn:'Breaking capacity after which the device stays serviceable.', clause:'IEC 60947-2', group:'devices'},
+  {abbr:'Icn', termDa:'M\u00e6rkebrydeevne (bolig)', termEn:'Rated breaking capacity (household)', fa:'\u0638\u0631\u0641\u06cc\u062a \u0642\u0637\u0639 \u0646\u0627\u0645\u06cc', unit:'kA', mDa:'Brydeevne for husholdnings-automatsikringer.', mEn:'Breaking capacity for household MCBs.', clause:'IEC 60898', group:'devices'},
+  {abbr:'k\u00b2S\u00b2', termDa:'Termisk t\u00e5levne (adiabatisk)', termEn:'Conductor thermal withstand', fa:'\u062a\u062d\u0645\u0644 \u062d\u0631\u0627\u0631\u062a\u06cc \u0647\u0627\u062f\u06cc', unit:'A\u00b2s', mDa:'Lederens energit\u00e5levne; krav: k\u00b2S\u00b2 \u2265 I\u00b2t.', mEn:'Conductor energy withstand; require k\u00b2S\u00b2 \u2265 I\u00b2t.', clause:'DS/HD 60364-4-43 \u00a7434.5.2', group:'devices'},
+  {abbr:'k', termDa:'Materialekonstant (k-faktor)', termEn:'Material constant (k-factor)', fa:'\u062b\u0627\u0628\u062a \u0645\u0627\u062f\u0647 \u0647\u0627\u062f\u06cc', unit:'A\u00b7s\u00bd/mm\u00b2', mDa:'Konstant for leder/isolering i adiabatisk ligning (fx 115 Cu/PVC).', mEn:'Constant for conductor/insulation in the adiabatic equation (e.g. 115 Cu/PVC).', clause:'DS/HD 60364-4-43 Tabel 43A', group:'devices'},
+  {abbr:'P0', termDa:'Tomgangstab (trafo)', termEn:'No-load loss (transformer)', fa:'\u062a\u0644\u0641\u0627\u062a \u0628\u06cc\u200c\u0628\u0627\u0631\u06cc', unit:'W', mDa:'Jerntab i transformeren ved tomgang.', mEn:'Iron (core) loss of the transformer at no load.', clause:'\u2014', group:'devices'},
+  {abbr:'Pcu', termDa:'Kobbertab (belastningstab)', termEn:'Copper (load) loss', fa:'\u062a\u0644\u0641\u0627\u062a \u0645\u0633\u06cc', unit:'W', mDa:'Resistivt tab i viklingerne ved belastning.', mEn:'Resistive winding loss under load.', clause:'\u2014', group:'devices'},
+  {abbr:'Pb', termDa:'Effekttab i leder', termEn:'Conductor power loss', fa:'\u062a\u0644\u0641\u0627\u062a \u062a\u0648\u0627\u0646 \u0647\u0627\u062f\u06cc', unit:'W', mDa:'Afsat varmeeffekt i kablet (I\u00b2R).', mEn:'Heat dissipated in the cable (I\u00b2R).', clause:'\u2014', group:'devices'},
+  {abbr:'gG', termDa:'Sikringskarakteristik (generel)', termEn:'Fuse class gG (general)', fa:'\u0641\u06cc\u0648\u0632 \u0639\u0645\u0648\u0645\u06cc', unit:'', mDa:'Fuldomr\u00e5de-sikring til kabel-/installationsbeskyttelse.', mEn:'Full-range fuse for cable/installation protection.', clause:'IEC 60269', group:'devices'},
+  {abbr:'aM', termDa:'Sikringskarakteristik (motor)', termEn:'Fuse class aM (motor)', fa:'\u0641\u06cc\u0648\u0632 \u0645\u0648\u062a\u0648\u0631', unit:'', mDa:'Back-up sikring til motorkredse (kun kortslutning).', mEn:'Back-up fuse for motor circuits (short-circuit only).', clause:'IEC 60269', group:'devices'},
+  {abbr:'B / C / D', termDa:'Automatsikringskurver', termEn:'MCB tripping curves', fa:'\u0645\u0646\u062d\u0646\u06cc\u200c\u0647\u0627\u06cc \u06a9\u0644\u06cc\u062f \u0645\u06cc\u0646\u06cc\u0627\u062a\u0648\u0631\u06cc', unit:'', mDa:'B 3\u20135\u00d7In, C 5\u201310\u00d7In, D 10\u201320\u00d7In (momentanudl\u00f8sning).', mEn:'B 3\u20135\u00d7In, C 5\u201310\u00d7In, D 10\u201320\u00d7In (instantaneous trip).', clause:'IEC 60898', group:'devices'},
+  {abbr:'MMS', termDa:'Motorv\u00e6rn', termEn:'Motor-protective switch', fa:'\u06a9\u0644\u06cc\u062f \u062d\u0641\u0627\u0638\u062a \u0645\u0648\u062a\u0648\u0631', unit:'', mDa:'Justerbar termisk+magnetisk motorbeskyttelse.', mEn:'Adjustable thermal+magnetic motor protection.', clause:'IEC 60947-4-1', group:'devices'},
+  {abbr:'RCD / HPFI', termDa:'Fejlstr\u00f8msafbryder', termEn:'Residual-current device', fa:'\u06a9\u0644\u06cc\u062f \u062c\u0631\u06cc\u0627\u0646 \u0646\u0634\u062a\u06cc', unit:'', mDa:'Slukker lynhurtigt hvis str\u00f8m l\u00e6kker til jord \u2014 beskytter mod st\u00f8d.', mEn:'Trips instantly if current leaks to earth \u2014 protects against shock.', clause:'DS/HD 60364-4-41 \u00a7411.3.3', group:'devices', glossary:true},
+  {abbr:'SPD', termDa:'Overspaendingsbeskyttelse', termEn:'Surge protective device', fa:'\u062d\u0641\u0627\u0638\u062a \u0627\u0636\u0627\u0641\u0647\u200c\u0648\u0644\u062a\u0627\u0698', unit:'', mDa:'Afleder transiente overspaendinger (lyn/kobling).', mEn:'Diverts transient overvoltages (lightning/switching).', clause:'DS/HD 60364-5-53 \u00a7534', group:'devices'},
+  {abbr:'Selektivitet', termDa:'Selektivitet', termEn:'Selectivity', fa:'\u0627\u0646\u062a\u062e\u0627\u0628\u200c\u067e\u0630\u06cc\u0631\u06cc', unit:'', mDa:'Kun den n\u00e6rmeste afbryder springer ved fejl \u2014 ikke hele tavlen.', mEn:'Only the nearest device trips on a fault \u2014 not the whole board.', clause:'DS/HD 60364-5-53', group:'devices', glossary:true},
+  // ---- Earthing systems ----
+  {abbr:'TN / TT / IT', termDa:'Jordingssystem', termEn:'Earthing system', fa:'\u0633\u06cc\u0633\u062a\u0645 \u0627\u0631\u062a\u06cc\u0646\u06af', unit:'', mDa:'Beskriver hvordan anl\u00e6gget er forbundet til jord \u2014 afg\u00f8r kr\u00e6vet beskyttelse.', mEn:'Describes how the installation connects to earth \u2014 decides required protection.', clause:'DS/HD 60364-1 \u00a7312.2', group:'earthing', glossary:true},
+  {abbr:'TN-C', termDa:'TN-C (f\u00e6lles PEN)', termEn:'TN-C (combined PEN)', fa:'TN-C', unit:'', mDa:'PE og N er kombineret i \u00e9n PEN-leder i hele systemet.', mEn:'PE and N combined in one PEN conductor throughout.', clause:'DS/HD 60364-1', group:'earthing'},
+  {abbr:'TN-S', termDa:'TN-S (adskilt PE og N)', termEn:'TN-S (separate PE and N)', fa:'TN-S', unit:'', mDa:'PE og N er adskilt i hele systemet (moderne installation).', mEn:'PE and N separated throughout (modern installation).', clause:'DS/HD 60364-1', group:'earthing'},
+  {abbr:'TN-C-S', termDa:'TN-C-S (PEN splittes)', termEn:'TN-C-S (PEN then split)', fa:'TN-C-S', unit:'', mDa:'F\u00e6lles PEN i forsyningen, splittes til PE+N ved indgang \u2014 mest udbredt i DK.', mEn:'Combined PEN in supply, split to PE+N at entry \u2014 most common in DK.', clause:'DS/HD 60364-1', group:'earthing'},
+  {abbr:'TT', termDa:'TT-system', termEn:'TT system', fa:'\u0633\u06cc\u0633\u062a\u0645 TT', unit:'', mDa:'Lokal jordelektrode hos forbruger; kr\u00e6ver normalt HPFI.', mEn:'Local earth electrode at the consumer; normally requires an RCD.', clause:'DS/HD 60364-4-41 \u00a7411.5', group:'earthing'},
+  {abbr:'IT', termDa:'IT-system', termEn:'IT system', fa:'\u0633\u06cc\u0633\u062a\u0645 IT', unit:'', mDa:'Isoleret/impedansjordet net med isolations\u00f8verv\u00e5gning.', mEn:'Isolated/impedance-earthed network with insulation monitoring.', clause:'DS/HD 60364-4-41 \u00a7411.6', group:'earthing'},
+  {abbr:'SELV', termDa:'Sikkerhedslavsp\u00e6nding (adskilt)', termEn:'Safety extra-low voltage', fa:'\u0648\u0644\u062a\u0627\u0698 \u0641\u0648\u0642 \u067e\u0627\u06cc\u06cc\u0646 \u0627\u06cc\u0645\u0646', unit:'', mDa:'\u2264 50 V AC, galvanisk adskilt, ingen jordforbindelse.', mEn:'\u2264 50 V AC, galvanically separated, not earthed.', clause:'DS/HD 60364-4-41 \u00a7414', group:'earthing'},
+  {abbr:'PELV', termDa:'Beskyttelseslavsp\u00e6nding', termEn:'Protective extra-low voltage', fa:'\u0648\u0644\u062a\u0627\u0698 \u0641\u0648\u0642 \u067e\u0627\u06cc\u06cc\u0646 \u062d\u0641\u0627\u0638\u062a\u06cc', unit:'', mDa:'\u2264 50 V AC som SELV, men kan v\u00e6re jordforbundet.', mEn:'\u2264 50 V AC like SELV but may be earthed.', clause:'DS/HD 60364-4-41 \u00a7414', group:'earthing'},
+  {abbr:'FELV', termDa:'Funktionslavsp\u00e6nding', termEn:'Functional extra-low voltage', fa:'\u0648\u0644\u062a\u0627\u0698 \u0641\u0648\u0642 \u067e\u0627\u06cc\u06cc\u0646 \u0639\u0645\u0644\u06a9\u0631\u062f\u06cc', unit:'', mDa:'Lavsp\u00e6nding uden fuld SELV/PELV-adskillelse \u2014 kr\u00e6ver ekstra beskyttelse.', mEn:'Low voltage without full SELV/PELV separation \u2014 needs extra protection.', clause:'DS/HD 60364-4-41 \u00a7411.7', group:'earthing'},
+  // ---- Conductors ----
+  {abbr:'PE', termDa:'Beskyttelsesleder', termEn:'Protective earth conductor', fa:'\u0647\u0627\u062f\u06cc \u062d\u0641\u0627\u0638\u062a\u06cc', unit:'', mDa:'Jordleder der forbinder udsatte dele til jord (gr\u00f8n/gul).', mEn:'Earth conductor bonding exposed parts to earth (green/yellow).', clause:'DS/HD 60364-5-54', group:'conductors'},
+  {abbr:'PEN', termDa:'Kombineret PE+N', termEn:'Combined PE+N conductor', fa:'\u0647\u0627\u062f\u06cc \u062a\u0631\u06a9\u06cc\u0628\u06cc PEN', unit:'', mDa:'\u00c9n leder der b\u00e5de er PE og N (kun TN-C, \u2265 10 mm\u00b2 Cu).', mEn:'One conductor acting as both PE and N (TN-C only, \u2265 10 mm\u00b2 Cu).', clause:'DS/HD 60364-5-54 \u00a7543.4', group:'conductors'},
+  {abbr:'N', termDa:'Nulleder', termEn:'Neutral conductor', fa:'\u0647\u0627\u062f\u06cc \u0646\u0648\u0644', unit:'', mDa:'Tilbagef\u00f8ringsleder; ved harmoniske >33% regnes den som belastet.', mEn:'Return conductor; with harmonics >33% it counts as loaded.', clause:'DS/HD 60364-5-52 \u00a7523.6.3', group:'conductors'},
+  // ---- Component designation letters (IEC 81346) ----
+  {abbr:'-T', termDa:'Transformer', termEn:'Transformer', fa:'\u062a\u0631\u0627\u0646\u0633\u0641\u0648\u0631\u0645\u0627\u062a\u0648\u0631', unit:'', mDa:'Komponentbogstav for transformere/omsaettere.', mEn:'Designation letter for transformers/converters.', clause:'IEC 81346-2', group:'letters'},
+  {abbr:'-W', termDa:'Kabel/leder', termEn:'Cable/wiring', fa:'\u06a9\u0627\u0628\u0644', unit:'', mDa:'Komponentbogstav for kabler og forbindelser.', mEn:'Designation letter for cables and wiring.', clause:'IEC 81346-2', group:'letters'},
+  {abbr:'-F', termDa:'Beskyttelse', termEn:'Protection', fa:'\u062d\u0641\u0627\u0638\u062a', unit:'', mDa:'Komponentbogstav for sikringer/beskyttelsesudstyr.', mEn:'Designation letter for fuses/protective devices.', clause:'IEC 81346-2', group:'letters'},
+  {abbr:'-A', termDa:'Samling/enhed', termEn:'Assembly/unit', fa:'\u0645\u062c\u0645\u0648\u0639\u0647', unit:'', mDa:'Komponentbogstav for samlinger (fx tavle/modul).', mEn:'Designation letter for assemblies (e.g. board/module).', clause:'IEC 81346-2', group:'letters'},
+  {abbr:'-M', termDa:'Motor', termEn:'Motor', fa:'\u0645\u0648\u062a\u0648\u0631', unit:'', mDa:'Komponentbogstav for motorer.', mEn:'Designation letter for motors.', clause:'IEC 81346-2', group:'letters'},
+  {abbr:'-G', termDa:'Generator/kilde', termEn:'Generator/source', fa:'\u0645\u0648\u0644\u062f', unit:'', mDa:'Komponentbogstav for generatorer/forsyninger/batterier.', mEn:'Designation letter for generators/supplies/batteries.', clause:'IEC 81346-2', group:'letters'},
+  {abbr:'-Q', termDa:'Effektafbryder', termEn:'Power switching device', fa:'\u06a9\u0644\u06cc\u062f \u0642\u062f\u0631\u062a', unit:'', mDa:'Komponentbogstav for effektafbrydere/adskillere.', mEn:'Designation letter for power breakers/disconnectors.', clause:'IEC 81346-2', group:'letters'},
+  {abbr:'-K', termDa:'Rel\u00e6/kontaktor', termEn:'Relay/contactor', fa:'\u0631\u0644\u0647/\u06a9\u0646\u062a\u0627\u06a9\u062a\u0648\u0631', unit:'', mDa:'Komponentbogstav for rel\u00e6er og kontaktorer.', mEn:'Designation letter for relays and contactors.', clause:'IEC 81346-2', group:'letters'}
+];
+
+// SLD_LEGEND derives from REF_SYMBOLS (single source of truth) so the drawing
+// and the reference module can never drift. buildSLD still reads SLD_LEGEND[k].g
+// /.da/.en exactly as before — only the symbol SOURCE is shared. No calc change.
+const SLD_LEGEND = (function(){
+  var keys = ['source','trafo','meter','mainsw','bus','mcb','motor','load','earth','pv','battery','gen'];
+  var o = {};
+  keys.forEach(function(k){ o[k] = REF_SYMBOLS[k]; });
+  return o;
+})();
 
 function buildSLD(){
   // ---- Data (presentation only; values come from the engine, never invented) ----
@@ -8826,7 +9046,7 @@ function build3D(){
 function renderDrawing(){
   const nodes=getDrawNodes(), typeKeys=Object.keys(NODE_TYPES);
   const nodeEditor=`<div class="select-group"><div class="select-label">${tx('Installationens noder (tilf\u00F8j/fjern/flyt)', 'Installation nodes (add/remove/move)')}</div>${nodes.map((n,i)=>{const nt=NODE_TYPES[n.type]||NODE_TYPES.custom;return `<div style="display:inline-flex;align-items:center;gap:4px;margin:3px 4px;padding:5px 9px;border:1.5px solid ${nt.color};border-radius:8px;font-size:.78rem;background:rgba(0,0,0,0.25)"><span>${nt.icon}</span><span style="color:${nt.color};font-weight:700">${tp(nt)}</span><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},-1)">\u25C0</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem" onclick="drawNodeMove(${i},1)">\u25B6</button><button class="sel-btn" style="padding:1px 5px;min-width:0;font-size:.7rem;color:var(--danger)" onclick="drawNodeRemove(${i})">\u2715</button></div>`;}).join('')}</div><div class="select-group"><div class="select-label">${tx('Tilf\u00F8j node', 'Add node')}</div><div class="select-grid">${typeKeys.map(k=>`<button class="sel-btn" onclick="drawNodeAdd('${k}')">${NODE_TYPES[k].icon} ${tp(NODE_TYPES[k])}</button>`).join('')}<button class="sel-btn" onclick="drawNodeReset()">\u21BA ${tx('Nulstil', 'Reset')}</button></div></div>`;
-  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${tx('Tegning af installationen', 'Installation drawing')}</div><div class="info-row">${tx('Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.', 'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.')}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${tx('Enstregsdiagram', 'Single-line')}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${tx('3D-skitse', '3D scene')}</button></div>${drawStyle==='iso'?build3D():buildSLD()}${drawStyle==='iso'?nodeEditor:''}</div>`;
+  return `<div class="card fade-in"><div class="card-title">\uD83D\uDDBC\uFE0F ${tx('Tegning af installationen', 'Installation drawing')}</div><div class="info-row">${tx('Tilf\u00F8j, fjern og flyt noder for at tegne ENHVER installation. 3D-skitsen opdateres automatisk.', 'Add, remove and move nodes to draw ANY installation. The 3D scene updates automatically.')}</div><div class="select-grid" style="margin-bottom:12px"><button class="sel-btn ${drawStyle==='schematic'?'selected':''}" onclick="drawStyle='schematic';renderModule('draw')">\uD83D\uDCCB ${tx('Enstregsdiagram', 'Single-line')}</button><button class="sel-btn ${drawStyle==='iso'?'selected':''}" onclick="drawStyle='iso';renderModule('draw')">\uD83C\uDFD7\uFE0F ${tx('3D-skitse', '3D scene')}</button></div>${drawStyle==='iso'?build3D():buildSLD()}<div class="select-grid" style="margin-top:10px"><button class="sel-btn" onclick="switchModule('ref')">\uD83D\uDCD6 ${tx('Symbolforklaring & forkortelser (fuld reference)', 'Symbol key & abbreviations (full reference)')} \u2192</button></div>${drawStyle==='iso'?nodeEditor:''}</div>`;
 }
 
 // ===== EXAM SIMULATOR (data + engine) =====
@@ -19972,17 +20192,17 @@ const GUIDE_STEP_LIB = {
 };
 
 // Beginner glossary: plain-language definitions, bilingual.
-const GUIDE_GLOSSARY = [
-  { termDa: 'IB \u2014 Belastningsstr\u00F8m', termEn: 'IB \u2014 Load current', da: 'Hvor mange ampere dit udstyr tr\u00E6kker, n\u00E5r det k\u00F8rer.', en: 'How many amperes your equipment draws when running.' },
-  { termDa: 'In \u2014 M\u00E6rkestr\u00F8m', termEn: 'In \u2014 Rated current', da: 'Den str\u00F8m sikringen/afbryderen er bygget til at bryde ved overbelastning.', en: 'The current the fuse/breaker is built to interrupt on overload.' },
-  { termDa: 'Iz \u2014 Kablets str\u00F8mevne', termEn: 'Iz \u2014 Cable current capacity', da: 'Hvor meget str\u00F8m kablet kan f\u00F8re uden at blive for varmt.', en: 'How much current the cable can carry without overheating.' },
-  { termDa: 'IB \u2264 In \u2264 Iz', termEn: 'IB \u2264 In \u2264 Iz', da: 'Grundreglen: udstyret f\u00F8rst, s\u00E5 afbryderen, s\u00E5 kablet \u2014 i den r\u00E6kkef\u00F8lge af str\u00F8mst\u00F8rrelser.', en: 'The golden rule: equipment first, then device, then cable \u2014 in that order of current sizes.' },
-  { termDa: 'Zs \u2014 Fejlsl\u00F8jfeimpedans', termEn: 'Zs \u2014 Earth-fault loop impedance', da: 'Modstanden i sl\u00F8jfen ved en jordfejl. Lav Zs = hurtig, sikker udkobling.', en: 'Resistance of the loop during an earth fault. Low Zs = fast, safe disconnection.' },
-  { termDa: 'RCD / HPFI \u2014 Fejlstr\u00F8msafbryder', termEn: 'RCD / HPFI \u2014 Residual-current device', da: 'En afbryder der slukker lynhurtigt hvis str\u00F8m l\u00E6kker til jord \u2014 beskytter mod st\u00F8d.', en: 'A device that trips instantly if current leaks to earth \u2014 protects against shock.' },
-  { termDa: 'TN / TT / IT \u2014 Jordingssystem', termEn: 'TN / TT / IT \u2014 Earthing system', da: 'Beskriver hvordan anl\u00E6gget er forbundet til jord. Det afg\u00F8r hvilken beskyttelse der kr\u00E6ves.', en: 'Describes how the installation is connected to earth. It decides which protection is required.' },
-  { termDa: 'Selektivitet', termEn: 'Selectivity', da: 'At kun den n\u00E6rmeste afbryder springer ved en fejl \u2014 ikke hele tavlen.', en: 'Only the nearest device trips on a fault \u2014 not the whole board.' },
-  { termDa: 'Kortslutning / Brydeevne (Icu)', termEn: 'Short-circuit / Breaking capacity (Icu)', da: 'Kortslutning = en meget stor fejlstr\u00F8m. Brydeevne = hvor stor en kortslutning afbryderen sikkert kan slukke.', en: 'Short-circuit = a very large fault current. Breaking capacity = how big a short-circuit the device can safely clear.' }
-];
+// GUIDE_GLOSSARY derives from the REF_ABBREV single source of truth (entries
+// flagged glossary:true). No duplicated term lists \u2014 the beginner glossary and
+// the full reference module can never drift apart.
+const GUIDE_GLOSSARY = REF_ABBREV.filter(function(e){ return e.glossary; }).map(function(e){
+  return {
+    termDa: e.abbr + ' \u2014 ' + e.termDa,
+    termEn: e.abbr + ' \u2014 ' + e.termEn,
+    da: e.mDa,
+    en: e.mEn
+  };
+});
 
 let guideState = { projectType: null, earthing: null, done: {}, glossaryOpen: false };
 
@@ -20034,6 +20254,67 @@ function guideBuildSteps(state) {
   if (t === 'installation') { keys.push('discrim'); keys.push('draw'); keys.push('kls'); }
   keys.push('kritisk');                           // FINAL safety audit
   return keys;
+}
+
+// ===== SYMBOL & ABBREVIATION REFERENCE MODULE (click-only, trilingual) =====
+// The single authoritative reference other modules cite. Reads ONLY from the
+// REF_SYMBOLS / REF_ABBREV single source of truth \u2014 no duplicated data.
+let refState = { cat: 'all' };
+function refSetCat(c){ refState.cat = c; renderModule('ref'); }
+
+function renderRef(){
+  var cat = refState.cat;
+  var h = '<div class="card fade-in">';
+  h += '<div class="card-title">\uD83D\uDCD6 ' + tx('Symboler & forkortelser', 'Symbols & abbreviations') + '</div>';
+  h += '<div class="info-row">' + tx(
+    '\u00c9n samlet, autoritativ reference for hele appen: IEC 60617-symboler og alle forkortelser med DS/HD 60364-henvisninger \u2014 i autorisationspr\u00f8vens tekniske sprog. Tegningen og AI-Guideren henter herfra, s\u00e5 intet kan afvige (\u00e9n kilde).',
+    'One unified, authoritative reference for the whole app: IEC 60617 symbols and every abbreviation with DS/HD 60364 references \u2014 in the language of the authorisation exam. The drawing and the AI guide derive from here, so nothing can drift (single source).') + '</div>';
+  // Click-only category filter (buttons only \u2014 no typed search box)
+  h += '<div class="select-grid" style="margin-top:8px">';
+  h += '<button class="sel-btn ' + (cat === 'all' ? 'selected' : '') + '" onclick="refSetCat(\'all\')">' + tx('Alle', 'All') + '</button>';
+  REF_GROUPS.forEach(function(g){
+    h += '<button class="sel-btn ' + (cat === g.id ? 'selected' : '') + '" onclick="refSetCat(\'' + g.id + '\')">' + tx(g.da, g.en) + '</button>';
+  });
+  h += '</div></div>';
+
+  // ---- IEC 60617 symbol reference (from REF_SYMBOLS) ----
+  var symKeys = Object.keys(REF_SYMBOLS).filter(function(k){ return cat === 'all' || REF_SYMBOLS[k].group === cat; });
+  if (symKeys.length){
+    h += '<div class="card fade-in"><div class="card-title">\uD83D\uDD23 ' + tx('IEC 60617-symboler', 'IEC 60617 symbols') + ' (' + symKeys.length + ')</div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:10px">';
+    symKeys.forEach(function(k){
+      var s = REF_SYMBOLS[k];
+      h += '<div class="result-box" style="margin:0"><div style="display:flex;align-items:center;gap:10px">';
+      h += '<svg width="46" height="46" viewBox="0 0 46 46" style="flex:0 0 auto;background:var(--bg);border-radius:8px;border:1px solid var(--border)" role="img" aria-label="' + tx(s.da, s.en) + '" xmlns="http://www.w3.org/2000/svg"><g transform="translate(23,23)">' + s.g(0, 0) + '</g></svg>';
+      h += '<div style="min-width:0"><div class="label" style="font-weight:700">' + tx(s.da, s.en) + '</div>';
+      h += '<div class="label" style="font-size:0.74rem;color:var(--text-muted)">' + tx(s.mDa, s.mEn) + '</div></div>';
+      h += '</div></div>';
+    });
+    h += '</div></div>';
+  }
+
+  // ---- Abbreviation / short-name table (from REF_ABBREV), grouped logically ----
+  var abbrs = REF_ABBREV.filter(function(e){ return cat === 'all' || e.group === cat; });
+  if (abbrs.length){
+    h += '<div class="card fade-in"><div class="card-title">\uD83D\uDCD0 ' + tx('Forkortelser & kortnavne', 'Abbreviations & short names') + ' (' + abbrs.length + ')</div>';
+    var order = (cat === 'all') ? REF_GROUPS.map(function(g){ return g.id; }) : [cat];
+    order.forEach(function(gid){
+      var rows = abbrs.filter(function(e){ return e.group === gid; });
+      if (!rows.length) return;
+      var gg = REF_GROUPS.filter(function(g){ return g.id === gid; })[0];
+      h += '<div class="result-title" style="margin-top:12px;color:var(--primary)">' + (gg ? tx(gg.da, gg.en) : gid) + '</div>';
+      rows.forEach(function(e){
+        var term = (lang === 'fa' && e.fa) ? e.fa : tx(e.termDa, e.termEn);
+        h += '<div class="result-box" style="margin-top:6px"><div class="result-row" style="flex-direction:column;align-items:flex-start;gap:3px">';
+        h += '<span class="label"><strong>' + e.abbr + '</strong> \u2014 ' + term + (e.unit ? (' <span style="color:var(--text-muted)">[' + e.unit + ']</span>') : '') + '</span>';
+        h += '<span class="label" style="font-size:0.8rem">' + tx(e.mDa, e.mEn) + '</span>';
+        if (e.clause && e.clause !== '\u2014') h += '<span class="label" style="font-size:0.7rem;color:var(--text-muted)">\uD83D\uDCD8 ' + e.clause + '</span>';
+        h += '</div></div>';
+      });
+    });
+    h += '</div>';
+  }
+  return h;
 }
 
 function renderGuide() {
@@ -20122,7 +20403,8 @@ function renderGuide() {
 
   // Beginner glossary (collapsible, click-only)
   h += '<div class="card fade-in"><div class="card-title">\uD83D\uDCDA ' + tx('Ordbog for begyndere', 'Beginner glossary') + '</div>';
-  h += '<div class="select-grid"><button class="sel-btn ' + (guideState.glossaryOpen ? 'selected' : '') + '" onclick="guideToggleGlossary()">' + (guideState.glossaryOpen ? '\u25BC ' + tx('Skjul ordbog', 'Hide glossary') : '\u25B6 ' + tx('Vis ordbog (klik)', 'Show glossary (click)')) + '</button></div>';
+  h += '<div class="select-grid"><button class="sel-btn ' + (guideState.glossaryOpen ? 'selected' : '') + '" onclick="guideToggleGlossary()">' + (guideState.glossaryOpen ? '\u25BC ' + tx('Skjul ordbog', 'Hide glossary') : '\u25B6 ' + tx('Vis ordbog (klik)', 'Show glossary (click)')) + '</button>';
+  h += '<button class="sel-btn" onclick="switchModule(\'ref\')">\uD83D\uDCD6 ' + tx('Fuld symbol- & forkortelsesreference', 'Full symbol & abbreviation reference') + ' \u2192</button></div>';
   if (guideState.glossaryOpen) {
     GUIDE_GLOSSARY.forEach(function(g) {
       h += '<div class="result-box" style="margin-top:8px"><div class="result-row" style="flex-direction:column;align-items:flex-start;gap:2px">';
