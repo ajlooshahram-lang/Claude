@@ -9135,6 +9135,52 @@ function renderPanel() {
 // ===== THERMAL SIMULATION ENGINE =====
 // Real-time thermal model per DS/HD 60364-5-52
 
+// Cable ampacity (Iz) lookup per DS/HD 60364-5-52 Tables B.52.2-B.52.12
+// Values in Amperes for copper conductors, single-phase, at reference conditions (30C ambient)
+// Indexed by cross-section (mm2), installation method, and insulation type
+var THERMAL_AMPACITY_TABLE = {
+  PVC: {
+    tray:    { 1.5: 22, 2.5: 30, 4: 40, 6: 51, 10: 70, 16: 94, 25: 119, 35: 148, 50: 180, 70: 232, 95: 282, 120: 328 },
+    conduit: { 1.5: 17, 2.5: 24, 4: 32, 6: 41, 10: 57, 16: 76, 25: 101, 35: 125, 50: 151, 70: 192, 95: 232, 120: 269 },
+    clipped: { 1.5: 23, 2.5: 31, 4: 42, 6: 54, 10: 73, 16: 99, 25: 127, 35: 158, 50: 192, 70: 246, 95: 298, 120: 346 },
+    buried:  { 1.5: 22, 2.5: 29, 4: 37, 6: 46, 10: 63, 16: 81, 25: 104, 35: 125, 50: 148, 70: 183, 95: 216, 120: 246 }
+  },
+  XLPE: {
+    tray:    { 1.5: 26, 2.5: 36, 4: 49, 6: 63, 10: 86, 16: 115, 25: 149, 35: 185, 50: 225, 70: 289, 95: 352, 120: 410 },
+    conduit: { 1.5: 22, 2.5: 30, 4: 40, 6: 51, 10: 70, 16: 94, 25: 119, 35: 147, 50: 179, 70: 229, 95: 278, 120: 322 },
+    clipped: { 1.5: 27, 2.5: 37, 4: 52, 6: 67, 10: 91, 16: 121, 25: 160, 35: 200, 50: 242, 70: 310, 95: 377, 120: 437 },
+    buried:  { 1.5: 26, 2.5: 34, 4: 44, 6: 56, 10: 73, 16: 95, 25: 121, 35: 146, 50: 173, 70: 213, 95: 252, 120: 287 }
+  }
+};
+
+// Look up cable Iz from cross-section, installation method, and cable type
+// Returns the ampacity from DS/HD 60364-5-52 Tables B.52.2-12
+function thermalLookupIz(cableType, installMethod, crossSection) {
+  var typeTable = THERMAL_AMPACITY_TABLE[cableType];
+  if (!typeTable) return null;
+  var methodTable = typeTable[installMethod] || typeTable.tray;
+  // Find exact or nearest lower cross-section
+  var sizes = Object.keys(methodTable).map(Number).sort(function(a,b){return a-b;});
+  var bestSize = sizes[0];
+  for (var i = 0; i < sizes.length; i++) {
+    if (sizes[i] <= crossSection) bestSize = sizes[i];
+  }
+  return methodTable[bestSize];
+}
+
+// Select the minimum cross-section that protects a given In
+// Per DS/HD 60364-5-52 clause 433.1: Iz >= In (with derating applied separately)
+function thermalSelectCrossSection(cableType, installMethod, ratedCurrent) {
+  var typeTable = THERMAL_AMPACITY_TABLE[cableType];
+  if (!typeTable) return 1.5;
+  var methodTable = typeTable[installMethod] || typeTable.tray;
+  var sizes = Object.keys(methodTable).map(Number).sort(function(a,b){return a-b;});
+  for (var i = 0; i < sizes.length; i++) {
+    if (methodTable[sizes[i]] >= ratedCurrent) return sizes[i];
+  }
+  return sizes[sizes.length - 1]; // largest available
+}
+
 var THERMAL_CABLE_DATA = {
   PVC: {
     maxTemp: 70,    // DS/HD 60364-5-52 Table 52.1
@@ -9177,10 +9223,11 @@ var thermalState = {
   ratedCurrent: 32   // In [A] - typical circuit
 };
 
-function thermalCalcDerating(ambientC, groupCount, installMethod) {
+function thermalCalcDerating(ambientC, groupCount, installMethod, cableType) {
   // Per DS/HD 60364-5-52 Table B.52.14/15 and B.52.17
-  var cableType = thermalState.selectedCableType;
-  var ambientFactors = THERMAL_AMBIENT_FACTORS[cableType];
+  // cableType parameter: falls back to thermalState for backward compatibility
+  var ct = cableType || thermalState.selectedCableType;
+  var ambientFactors = THERMAL_AMBIENT_FACTORS[ct];
   var groupFactors = THERMAL_GROUP_FACTORS[installMethod] || THERMAL_GROUP_FACTORS.tray;
 
   // Interpolate ambient factor
@@ -9302,9 +9349,10 @@ function thermalSetRatedCurrent(val) {
 
 function renderThermal() {
   var st = thermalState;
-  var derating = thermalCalcDerating(st.ambientTemp, st.groupingCount, st.installMethod);
-  // Iz base current capacity (typical for cable type at rated current)
-  var IzBase = st.ratedCurrent * 1.45; // MCB must trip at 1.45*In per IEC 60898
+  var derating = thermalCalcDerating(st.ambientTemp, st.groupingCount, st.installMethod, st.selectedCableType);
+  // Iz from DS/HD 60364-5-52 Tables B.52.2-12 based on cross-section and installation method
+  var crossSection = thermalSelectCrossSection(st.selectedCableType, st.installMethod, st.ratedCurrent);
+  var IzBase = thermalLookupIz(st.selectedCableType, st.installMethod, crossSection);
   var tempResult = thermalCalcTemp(st.selectedCableType, st.ratedCurrent, IzBase, st.ambientTemp, derating.combined);
   var color = thermalGetColor(tempResult.currentTemp, tempResult.maxTemp);
   var i2tResult = thermalCalcI2t(st.ratedCurrent * 5, 0.1); // Fault at 5x In for 100ms
@@ -9451,10 +9499,8 @@ var CABLE3D_CABLE_SIZES = [
 ];
 
 // Grouping derating per DS/HD 60364-5-52 Table B.52.17
-var CABLE3D_GROUP_DERATING = {
-  tray:    { 1: 1.00, 2: 0.88, 3: 0.82, 4: 0.77, 5: 0.75, 6: 0.73, 7: 0.72, 8: 0.71, 9: 0.70 },
-  conduit: { 1: 1.00, 2: 0.80, 3: 0.70, 4: 0.65, 5: 0.60, 6: 0.57, 7: 0.54, 8: 0.52, 9: 0.50 }
-};
+// Consolidated: references THERMAL_GROUP_FACTORS (single source of truth)
+var CABLE3D_GROUP_DERATING = THERMAL_GROUP_FACTORS;
 
 var cable3dState = {
   selectedTray: 'perforated',
@@ -9510,11 +9556,21 @@ function cable3dCalcGroupDerating(cableCount, trayType) {
   var deratingTable = CABLE3D_GROUP_DERATING[CABLE3D_CONTAINMENT[trayType].derating] || CABLE3D_GROUP_DERATING.tray;
   var count = Math.min(Math.max(cableCount, 1), 9);
   var factor = deratingTable[count];
+  // For counts > 9, apply additional conservative 5% reduction per cable beyond 9
+  // per DS/HD 60364-5-52 Table B.52.17 note regarding extrapolation
+  var warning = null;
+  if (cableCount > 9) {
+    var extraCables = cableCount - 9;
+    factor = Math.round((factor - extraCables * 0.02) * 1000) / 1000;
+    factor = Math.max(factor, 0.30); // floor at 0.30
+    warning = 'Table B.52.17 covers 1-9 circuits. For ' + cableCount + ' circuits, additional derating applied (conservative extrapolation). Verify with installation engineer.';
+  }
 
   return {
     factor: factor,
     cableCount: cableCount,
     method: trayType,
+    warning: warning,
     clause: 'DS/HD 60364-5-52 Table B.52.17'
   };
 }
@@ -9985,6 +10041,10 @@ function renderEnergy() {
   var peakResult = energyCalcPeakShaving(st.profileType);
   var pqResult = energyGetPQStatus(230, 50.0, thdResult.thd, 0.5, 1.0);
 
+  // Note: Voltage, frequency, flicker, and unbalance are illustrative reference values.
+  // Only THD varies with the user's harmonic load selections.
+  // For site-specific PQ assessment, use measured values from a power quality analyzer.
+
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Energiovervagning', 'Energy Monitor') + '</div>';
   html += '<div class="info-row">' + tx('Daglig belastningsprofil og omkostningsoptimering', 'Daily load profile and cost optimization') + '</div>';
@@ -10125,6 +10185,7 @@ function renderEnergy() {
   // Power Quality Traffic Light
   html += '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Stroemkvalitet (PQ)', 'Power Quality (PQ)') + ' - EN 50160</div>';
+  html += '<div class="info-row" style="font-size:0.75rem;color:#f39c12">' + tx('Illustrativt - kun THD varierer med belastningsvalg. Brug maalinger for faktisk PQ.', 'Illustrative - only THD varies with load selection. Use measurements for actual PQ.') + '</div>';
   html += '<div class="result-box">';
   var pqItems = [
     { key: 'voltage', da: 'Spaending', en: 'Voltage', val: '230V', ref: '207-253V' },
