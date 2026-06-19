@@ -33,6 +33,13 @@
   --radius-sm: 8px;
   --radius-lg: 16px;
   --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Dark-mode neon accent — themeable + intensity-controlled so the glow can be
+     calmed down (it was hurting eyes at full strength). --glow scales every glow
+     0 (off / calm) .. 1 (vivid). --neon-rgb / --neon-a / --neon-b drive the colour. */
+  --neon-rgb: 0,229,255;
+  --neon-a: #00c8ff;
+  --neon-b: #0080ff;
+  --glow: 0.45;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -253,8 +260,8 @@ body {
 
 body.dark .nav-cats { background: linear-gradient(180deg, rgba(0,200,255,0.06), transparent); }
 body.dark .nav-cat { background: #1a2535; color: #8ab4d0; border-color: #2a3f55; }
-body.dark .nav-cat:hover { border-color: #00e5ff; color: #e0f4ff; box-shadow: 0 0 8px rgba(0,229,255,0.3); }
-body.dark .nav-cat.active { background: linear-gradient(135deg, #00c8ff, #0080ff); color: #fff; border-color: transparent; box-shadow: 0 0 14px rgba(0,229,255,0.6); }
+body.dark .nav-cat:hover { border-color: rgba(var(--neon-rgb),0.85); color: #e0f4ff; box-shadow: 0 0 8px rgba(var(--neon-rgb), calc(0.6 * var(--glow))); }
+body.dark .nav-cat.active { background: linear-gradient(135deg, var(--neon-a), var(--neon-b)); color: #fff; border-color: transparent; box-shadow: 0 0 14px rgba(var(--neon-rgb), calc(0.9 * var(--glow))); }
 body.dark .nav-cat.start { background: rgba(46,230,168,0.12); color: #2ee6a8; border-color: rgba(46,230,168,0.4); }
 body.dark .nav-cat.start.active { background: linear-gradient(135deg, #00e5b0, #00b894); color: #04202a; }
 body.dark .nav-cat .cat-count { background: #0f1a26; color: #6aa8c8; }
@@ -704,18 +711,18 @@ body.dark {
   --shadow-lg: 0 10px 30px rgba(0,0,0,0.45);
 }
 body.dark .sel-btn { background: #1a2535; color: #b8d4e8; border-color: #2a3f55; }
-body.dark .sel-btn:hover { background: #1f3048; border-color: #00e5ff; color: #e0f4ff; box-shadow: 0 0 10px rgba(0,229,255,0.25); }
-body.dark .sel-btn.selected { background: linear-gradient(135deg, #00c8ff, #0080ff); color: #fff; border-color: transparent; box-shadow: 0 0 18px rgba(0,229,255,0.75), 0 0 4px rgba(0,200,255,0.9); text-shadow: 0 0 6px rgba(255,255,255,0.5); }
+body.dark .sel-btn:hover { background: #1f3048; border-color: rgba(var(--neon-rgb),0.85); color: #e0f4ff; box-shadow: 0 0 10px rgba(var(--neon-rgb), calc(0.55 * var(--glow))); }
+body.dark .sel-btn.selected { background: linear-gradient(135deg, var(--neon-a), var(--neon-b)); color: #fff; border-color: transparent; box-shadow: 0 0 16px rgba(var(--neon-rgb), calc(0.9 * var(--glow))), 0 0 4px rgba(var(--neon-rgb), var(--glow)); text-shadow: 0 0 6px rgba(255,255,255, calc(0.7 * var(--glow))); }
 body.dark .nav { background: #0f1a26; }
 body.dark .nav-btn { background: #1a2535; color: #8ab4d0; border-color: #2a3f55; }
-body.dark .nav-btn:hover { border-color: #00e5ff; color: #e0f4ff; box-shadow: 0 0 8px rgba(0,229,255,0.3); }
-body.dark .nav-btn.active { background: linear-gradient(135deg, #00c8ff, #0080ff); color: #fff; border-color: transparent; box-shadow: 0 0 14px rgba(0,229,255,0.7); }
+body.dark .nav-btn:hover { border-color: rgba(var(--neon-rgb),0.85); color: #e0f4ff; box-shadow: 0 0 8px rgba(var(--neon-rgb), calc(0.6 * var(--glow))); }
+body.dark .nav-btn.active { background: linear-gradient(135deg, var(--neon-a), var(--neon-b)); color: #fff; border-color: transparent; box-shadow: 0 0 14px rgba(var(--neon-rgb), calc(0.95 * var(--glow))); }
 body.dark .status-bar { background: linear-gradient(135deg, #161f2a, #1a2330); }
 body.dark .status-chip { background: #1a2535; border-color: #2a3f55; }
 body.dark .status-chip.has-value { background: rgba(0,200,255,0.12); border-color: rgba(0,229,255,0.4); }
-body.dark #aiSearchBox { background: #1a2535; color: #e0f4ff; border-color: #00c8ff; box-shadow: 0 0 8px rgba(0,200,255,0.2); }
+body.dark #aiSearchBox { background: #1a2535; color: #e0f4ff; border-color: #00c8ff; box-shadow: 0 0 8px rgba(var(--neon-rgb), calc(0.45 * var(--glow))); }
 body.dark .card { border-color: #1f3048; }
-body.dark .card-title { color: #00e5ff; text-shadow: 0 0 8px rgba(0,229,255,0.4); }
+body.dark .card-title { color: #00e5ff; text-shadow: 0 0 8px rgba(var(--neon-rgb), calc(0.85 * var(--glow))); }
 body.dark .result-box { background: rgba(10,25,40,0.8); border-color: #1f4060; }
 body.dark .result-box.warning { background: rgba(40,30,10,0.6); border-color: #7a5a00; }
 body.dark .result-box.error { background: rgba(40,10,20,0.6); border-color: #7a0025; }
@@ -743,6 +750,57 @@ body.dark img { filter: brightness(0.92); }
   transition: var(--transition);
 }
 .theme-btn:hover { background: rgba(255,255,255,0.25); }
+
+/* ===== APPEARANCE / THEME PICKER ===== */
+.appearance-wrap { position: relative; }
+.appearance-panel {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  z-index: 1200;
+  width: 240px;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 14px;
+  display: none;
+  text-align: left;
+}
+html[dir="rtl"] .appearance-panel { right: auto; left: 0; text-align: right; }
+.appearance-panel.open { display: block; }
+.appearance-panel .ap-group { margin-bottom: 12px; }
+.appearance-panel .ap-group:last-child { margin-bottom: 0; }
+.appearance-panel .ap-label {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.4px;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
+}
+.appearance-panel .ap-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.ap-btn {
+  flex: 1 1 auto;
+  min-width: 44px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-light);
+  border-radius: var(--radius-sm);
+  padding: 7px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.ap-btn:hover { border-color: var(--primary-light); color: var(--text); }
+.ap-btn.active { background: var(--primary); color: #fff; border-color: transparent; }
+.ap-swatch {
+  width: 30px; height: 30px; flex: 0 0 auto;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: var(--transition);
+}
+.ap-swatch.active { border-color: var(--text); box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--primary-light); }
 
 /* ===== PRINT / PDF ===== */
 @media print {
@@ -781,6 +839,10 @@ html[dir="rtl"] .lang-toggle { direction: ltr; }
     <span id="appSubtitle" style="font-size:0.64rem;font-weight:600;opacity:0.78;letter-spacing:0.3px"></span>
   </h1>
   <div style="display:flex;align-items:center;gap:10px">
+    <div class="appearance-wrap">
+      <button id="appearanceBtn" class="theme-btn" onclick="toggleAppearancePanel()" title="Appearance / Tema">🎨</button>
+      <div id="appearancePanel" class="appearance-panel"></div>
+    </div>
     <button id="themeBtn" class="theme-btn" onclick="toggleTheme()" title="Dark / Light">🌙</button>
     <div class="lang-toggle">
       <button class="lang-btn active" onclick="setLang('da')">DA</button>
@@ -1220,6 +1282,17 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // Appearance / theme picker (this UX feature)
+  'Appearance': '\u0638\u0627\u0647\u0631',
+  'Theme': '\u067E\u0648\u0633\u062A\u0647',
+  'Light': '\u0631\u0648\u0634\u0646',
+  'Dark': '\u062A\u0627\u0631\u06CC\u06A9',
+  'Glow': '\u062F\u0631\u062E\u0634\u0634',
+  'Accent color': '\u0631\u0646\u06AF \u062A\u0623\u06A9\u06CC\u062F\u06CC',
+  'Off': '\u062E\u0627\u0645\u0648\u0634',
+  'Soft': '\u0645\u0644\u0627\u06CC\u0645',
+  'Medium': '\u0645\u062A\u0648\u0633\u0637',
+  'Vivid': '\u0632\u0646\u062F\u0647',
   // Calculation provenance + signed professional report (this feature)
   'Calculation report \u2014 electrical installation': '\u06AF\u0632\u0627\u0631\u0634 \u0645\u062D\u0627\u0633\u0628\u0627\u062A \u2014 \u062A\u0623\u0633\u06CC\u0633\u0627\u062A \u0628\u0631\u0642\u06CC',
   'Designed and verified to DS/HD 60364:2022.': '\u0637\u0631\u0627\u062D\u06CC \u0648 \u062A\u0623\u06CC\u06CC\u062F \u0634\u062F\u0647 \u0637\u0628\u0642 DS/HD 60364:2022.',
@@ -5420,6 +5493,54 @@ function renderPanel() {
   return html;
 }
 
+// ===== Scroll-position retention across in-module re-renders =====
+// Almost every in-module click handler re-renders by calling renderModule(...)
+// (directly, via helpers like klsRerender(), or via inline onclick="...;renderModule('load')").
+// renderModule rebuilds the whole module DOM (main.innerHTML = content), which would
+// otherwise reset the scroll position to the top on EVERY value change ("jumping").
+// We track the module renderModule was last called with and, when the SAME module is
+// re-rendered in place, capture the scroll offset(s) before the rebuild and restore them
+// afterwards. A genuine module switch (a different key) keeps the deliberate reset-to-top.
+// Scroll is purely vertical here, so this is direction-agnostic (RTL-safe).
+var _lastRenderedModule = null;
+function _captureScrollState() {
+  var s = { win: 0, doc: 0, main: 0 };
+  try {
+    if (typeof window !== 'undefined') s.win = window.scrollY || window.pageYOffset || 0;
+    if (typeof document !== 'undefined' && document.scrollingElement) s.doc = document.scrollingElement.scrollTop || 0;
+    var mc = (typeof document !== 'undefined' && document.getElementById) ? document.getElementById('mainContent') : null;
+    if (mc) s.main = mc.scrollTop || 0;
+  } catch (e) { /* non-DOM/test env: no scroll to preserve */ }
+  return s;
+}
+function _restoreScrollState(s) {
+  if (!s) return;
+  try {
+    var mc = (typeof document !== 'undefined' && document.getElementById) ? document.getElementById('mainContent') : null;
+    if (mc && s.main) mc.scrollTop = s.main;
+    if (typeof document !== 'undefined' && document.scrollingElement && s.doc) document.scrollingElement.scrollTop = s.doc;
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+      var y = s.win || s.doc || 0;
+      if (y) _scrollWindowTo(y);
+    }
+  } catch (e) { /* ignore */ }
+}
+function _resetScrollTop() {
+  try {
+    var mc = (typeof document !== 'undefined' && document.getElementById) ? document.getElementById('mainContent') : null;
+    if (mc) mc.scrollTop = 0;
+    if (typeof document !== 'undefined' && document.scrollingElement) document.scrollingElement.scrollTop = 0;
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') _scrollWindowTo(0);
+  } catch (e) { /* ignore */ }
+}
+// Scroll the window instantly (behavior:'auto' beats the global scroll-behavior:smooth,
+// so restoring after a re-render never animates / flashes). Falls back to the positional
+// form for environments where the object form is not supported.
+function _scrollWindowTo(y) {
+  try { window.scrollTo({ top: y, left: 0, behavior: 'auto' }); }
+  catch (e) { try { window.scrollTo(0, y); } catch (e2) { /* ignore */ } }
+}
+
 function renderModule(mod) {
   if (typeof Reactive !== 'undefined') Reactive.onRender(mod); // reactive propagation: recompute all linked verdicts first
   syncAxes(); // Dynamic coordination
@@ -5495,7 +5616,20 @@ function renderModule(mod) {
   if (qi.passed.length + qi.issues.length > 0 && noQi.indexOf(mod) < 0) {
     content += renderQiCard(qi);
   }
+  // Same-module re-render (a value change within the current module) must keep the
+  // viewport where it is; a genuine module switch resets to the top as before.
+  const _sameModule = (_lastRenderedModule === mod);
+  const _savedScroll = _sameModule ? _captureScrollState() : null;
   main.innerHTML = content;
+  if (_sameModule) {
+    _restoreScrollState(_savedScroll);                       // synchronous restore (no visible flash)
+    if (typeof requestAnimationFrame === 'function') {       // and once more after layout settles
+      requestAnimationFrame(function () { _restoreScrollState(_savedScroll); });
+    }
+  } else {
+    _resetScrollTop();                                       // deliberate scroll-to-top on module switch
+  }
+  _lastRenderedModule = mod;
   renderStatusBar();
 }
 
@@ -7507,6 +7641,97 @@ function toggleTheme() {
   const saved = localStorage.getItem('theme');
   if (saved) { applyTheme(saved); }
   else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) { applyTheme('dark'); }
+})();
+
+// ===== APPEARANCE (theme + neon intensity + accent colour) =====
+// Click-only controls that let the user calm the dark-mode neon glow (it was too
+// harsh on the eyes) and re-colour the accent. Everything is driven by CSS custom
+// properties (--glow scales the glow 0..1; --neon-rgb/--neon-a/--neon-b set colour),
+// so this is presentation-only and never touches any calculation. RTL-safe.
+const ACCENT_PRESETS = [
+  { id:'cyan',   da:'Cyan',     en:'Cyan',   rgb:'0,229,255',   a:'#00c8ff', b:'#0080ff' },
+  { id:'teal',   da:'Teal',     en:'Teal',   rgb:'46,230,168',  a:'#00e5b0', b:'#00b894' },
+  { id:'blue',   da:'Bl\u00E5', en:'Blue',   rgb:'96,165,250',  a:'#3b82f6', b:'#2563eb' },
+  { id:'violet', da:'Violet',   en:'Violet', rgb:'167,139,250', a:'#8b5cf6', b:'#6d28d9' },
+  { id:'amber',  da:'Rav',      en:'Amber',  rgb:'251,191,36',  a:'#f59e0b', b:'#d97706' }
+];
+const GLOW_PRESETS = [
+  { id:'off',    da:'Fra',    en:'Off',    mult:0 },
+  { id:'soft',   da:'Bl\u00F8d', en:'Soft', mult:0.45 },
+  { id:'medium', da:'Medium', en:'Medium', mult:0.75 },
+  { id:'vivid',  da:'Klar',   en:'Vivid',  mult:1.0 }
+];
+let appearanceState = { accent: 'cyan', glow: 'soft' };
+
+function _apCssVar(name, value) {
+  try {
+    var de = (typeof document !== 'undefined') ? document.documentElement : null;
+    if (de && de.style && typeof de.style.setProperty === 'function') de.style.setProperty(name, value);
+  } catch (e) { /* non-DOM env */ }
+}
+function applyAppearance() {
+  var acc = ACCENT_PRESETS.filter(function (p) { return p.id === appearanceState.accent; })[0] || ACCENT_PRESETS[0];
+  var g = GLOW_PRESETS.filter(function (p) { return p.id === appearanceState.glow; })[0] || GLOW_PRESETS[1];
+  _apCssVar('--neon-rgb', acc.rgb);
+  _apCssVar('--neon-a', acc.a);
+  _apCssVar('--neon-b', acc.b);
+  _apCssVar('--glow', String(g.mult));
+  try { localStorage.setItem('appearance', JSON.stringify(appearanceState)); } catch (e) { /* ignore */ }
+}
+function setAccent(id) { appearanceState.accent = id; applyAppearance(); renderAppearancePanel(); }
+function setGlow(id) { appearanceState.glow = id; applyAppearance(); renderAppearancePanel(); }
+function renderAppearancePanel() {
+  var el = (typeof document !== 'undefined' && document.getElementById) ? document.getElementById('appearancePanel') : null;
+  if (!el) return;
+  var isDark = (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains)
+    ? document.body.classList.contains('dark') : false;
+  var html = '';
+  html += '<div class="ap-group"><div class="ap-label">' + tx('Tema', 'Theme') + '</div><div class="ap-row">';
+  html += '<button class="ap-btn ' + (!isDark ? 'active' : '') + '" onclick="applyTheme(\'light\');renderAppearancePanel()">\u2600\uFE0F ' + tx('Lys', 'Light') + '</button>';
+  html += '<button class="ap-btn ' + (isDark ? 'active' : '') + '" onclick="applyTheme(\'dark\');renderAppearancePanel()">\uD83C\uDF19 ' + tx('M\u00F8rk', 'Dark') + '</button>';
+  html += '</div></div>';
+  html += '<div class="ap-group"><div class="ap-label">' + tx('Gl\u00F8d', 'Glow') + '</div><div class="ap-row">';
+  GLOW_PRESETS.forEach(function (p) {
+    html += '<button class="ap-btn ' + (appearanceState.glow === p.id ? 'active' : '') + '" onclick="setGlow(\'' + p.id + '\')">' + tx(p.da, p.en) + '</button>';
+  });
+  html += '</div></div>';
+  html += '<div class="ap-group"><div class="ap-label">' + tx('Accentfarve', 'Accent color') + '</div><div class="ap-row">';
+  ACCENT_PRESETS.forEach(function (p) {
+    html += '<button class="ap-swatch ' + (appearanceState.accent === p.id ? 'active' : '') + '" title="' + tx(p.da, p.en) +
+      '" style="background:linear-gradient(135deg,' + p.a + ',' + p.b + ')" onclick="setAccent(\'' + p.id + '\')"></button>';
+  });
+  html += '</div></div>';
+  el.innerHTML = html;
+}
+function toggleAppearancePanel() {
+  var el = (typeof document !== 'undefined' && document.getElementById) ? document.getElementById('appearancePanel') : null;
+  if (!el) return;
+  renderAppearancePanel();
+  if (el.classList && el.classList.toggle) el.classList.toggle('open');
+}
+(function initAppearance() {
+  try {
+    var saved = localStorage.getItem('appearance');
+    if (saved) {
+      var o = JSON.parse(saved);
+      if (o && o.accent) appearanceState.accent = o.accent;
+      if (o && o.glow) appearanceState.glow = o.glow;
+    }
+  } catch (e) { /* ignore */ }
+  applyAppearance();
+  // Close the panel when clicking outside it (guarded for the headless test env).
+  try {
+    if (typeof document !== 'undefined' && document.addEventListener) {
+      document.addEventListener('click', function (ev) {
+        var panel = document.getElementById('appearancePanel');
+        var btn = document.getElementById('appearanceBtn');
+        if (!panel || !panel.classList) return;
+        var node = ev && ev.target, inside = false;
+        while (node) { if (node === panel || node === btn) { inside = true; break; } node = node.parentNode; }
+        if (!inside) panel.classList.remove('open');
+      });
+    }
+  } catch (e) { /* ignore */ }
 })();
 
 // ===== DYNAMIC LAW / STANDARDS UPDATE CHECK =====

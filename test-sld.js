@@ -8152,6 +8152,103 @@ test('Guard: core calc math is unchanged (officialIz + IB regression values)', f
   assert(typeof provBuildProject === 'function' && typeof officialIz === 'function', 'engine + provenance coexist');
 });
 
+test('UX: scroll position is preserved on same-module re-render, reset on module switch', function() {
+  const realGet = document.getElementById;
+  // Simulated scrollable container. Setting innerHTML mimics the browser behaviour
+  // of resetting scrollTop to 0 when the whole subtree is replaced.
+  const mc = {
+    _html: '',
+    scrollTop: 0,
+    get innerHTML() { return this._html; },
+    set innerHTML(v) { this._html = v; this.scrollTop = 0; }
+  };
+  document.getElementById = function (id) {
+    if (id === 'mainContent') return mc;
+    return realGet ? realGet(id) : { innerHTML:'', textContent:'', style:{}, classList:{add(){},remove(){},toggle(){}} };
+  };
+  // window scroll target
+  const realScrollTo = window.scrollTo;
+  let winY = 0;
+  window.scrollY = 0;
+  window.scrollTo = function (a, b) {
+    var y = (a && typeof a === 'object') ? a.top : b;   // supports scrollTo(0,y) and scrollTo({top:y})
+    winY = y; window.scrollY = y;
+  };
+  try {
+    // Deterministic baseline: a genuine switch into 'load' resets to top.
+    renderModule('cable');
+    renderModule('load');
+    assert(mc._html.length > 0, 'renderModule produced content for a module');
+    assert.strictEqual(mc.scrollTop, 0, 'fresh switch into load starts at top');
+
+    // User scrolls down, then a value change re-renders the SAME module.
+    mc.scrollTop = 540; window.scrollY = 540; winY = 540;
+    renderModule('load');
+    assert(mc._html.length > 0, 'renderModule still produced content on same-module re-render');
+    assert.strictEqual(mc.scrollTop, 540, 'container scrollTop restored after same-module re-render (got ' + mc.scrollTop + ')');
+    assert.strictEqual(winY, 540, 'window scroll restored after same-module re-render (got ' + winY + ')');
+
+    // User scrolls again, then switches to a DIFFERENT module -> reset to top.
+    mc.scrollTop = 800; window.scrollY = 800; winY = 800;
+    renderModule('cable');
+    assert.strictEqual(mc.scrollTop, 0, 'container scrollTop reset to top on module switch (got ' + mc.scrollTop + ')');
+    assert.strictEqual(winY, 0, 'window scroll reset to top on module switch (got ' + winY + ')');
+  } finally {
+    document.getElementById = realGet;
+    window.scrollTo = realScrollTo;
+  }
+});
+
+test('UX: renderModule scroll plumbing is null-safe and stays click-only', function() {
+  const out = renderLoad();
+  ['<input type="text"', '<input type="number"', '<textarea'].forEach(function (bad) {
+    assert(out.indexOf(bad) < 0, 'module content must remain click-only (no ' + bad + ')');
+  });
+  const src = renderModule.toString();
+  assert(src.indexOf('_captureScrollState') >= 0 && src.indexOf('_restoreScrollState') >= 0, 'scroll capture/restore wired into renderModule');
+  assert(src.indexOf('_resetScrollTop') >= 0, 'module switch still resets to top');
+  assert(src.indexOf('_lastRenderedModule') >= 0, 'tracks previously-rendered module for same-module detection');
+  assert(typeof _captureScrollState === 'function' && typeof _restoreScrollState === 'function', 'scroll helpers exist');
+  assert.doesNotThrow(function () { _restoreScrollState(null); _captureScrollState(); }, 'scroll helpers are null-safe');
+});
+
+test('Appearance: glow intensity + accent presets exist and apply without throwing', function() {
+  assert(Array.isArray(GLOW_PRESETS) && GLOW_PRESETS.length >= 3, 'glow intensity presets available');
+  assert(Array.isArray(ACCENT_PRESETS) && ACCENT_PRESETS.length >= 3, 'accent colour presets available');
+  const off = GLOW_PRESETS.filter(function (p) { return p.id === 'off'; })[0];
+  const soft = GLOW_PRESETS.filter(function (p) { return p.id === 'soft'; })[0];
+  assert(off && off.mult === 0, 'Off glow == 0 (no neon glow at all)');
+  assert(soft && soft.mult > 0 && soft.mult < 0.6, 'Soft glow is a gentle, eye-friendly level (got ' + (soft && soft.mult) + ')');
+  assert.doesNotThrow(function () { setGlow('off'); }, 'setGlow does not throw');
+  assert.strictEqual(appearanceState.glow, 'off', 'setGlow updates state');
+  assert.doesNotThrow(function () { setAccent('teal'); }, 'setAccent does not throw');
+  assert.strictEqual(appearanceState.accent, 'teal', 'setAccent updates state');
+  assert.doesNotThrow(function () { applyAppearance(); }, 'applyAppearance does not throw');
+  setGlow('soft'); setAccent('cyan');
+});
+
+test('Appearance: panel is click-only (buttons/swatches, no typed inputs)', function() {
+  const realGet = document.getElementById;
+  let captured = '';
+  document.getElementById = function (id) {
+    if (id === 'appearancePanel') return { set innerHTML(v) { captured = v; }, get innerHTML() { return captured; }, classList: { add(){}, remove(){}, toggle(){} } };
+    return realGet ? realGet(id) : { innerHTML:'', classList:{add(){},remove(){},toggle(){}} };
+  };
+  try { renderAppearancePanel(); } finally { document.getElementById = realGet; }
+  assert(captured.indexOf('onclick="setGlow(') >= 0, 'glow chosen by click');
+  assert(captured.indexOf('onclick="setAccent(') >= 0, 'accent chosen by click');
+  ['<input type="text"', '<input type="number"', '<textarea', 'type="range"'].forEach(function (bad) {
+    assert(captured.indexOf(bad) < 0, 'appearance panel must be click-only (no ' + bad + ')');
+  });
+});
+
+test('Appearance: dark-mode neon is driven by intensity/colour variables (calmer by default)', function() {
+  assert(html.indexOf('--glow:') >= 0, 'glow intensity variable defined in :root');
+  assert(html.indexOf('--neon-rgb:') >= 0, 'themeable neon colour variable defined');
+  assert(html.indexOf('rgba(var(--neon-rgb)') >= 0, 'dark-mode glows reference the themeable neon variable');
+  assert(html.indexOf('0 0 18px rgba(0,229,255,0.75)') < 0, 'old harsh full-strength sel-btn glow removed');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
