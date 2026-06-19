@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Animated 3D Fault Simulation Engine and UI for the SLD module. Implements fault injection, trip time calculation, animated visualization with 3D neon glow style, and results panel. Integrates into the existing SLD module with a Fault Simulation mode button.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "STEP 1 - Fault Simulation Calculation Engine: Add a function sldSimulateFault(tree, nodeId, faultType) that: (a) accepts faultType 'short_circuit' or 'earth_fault', (b) uses sldGetPath(tree, nodeId) to get the path from root to fault point, (c) uses sldCalcNodeIk(tree, nodeId) to get fault current at that point, (d) walks the path from fault point toward root to find which protection device trips FIRST by computing trip time for each device on the path using sldDeviceCurve() and interpolating the time at the computed fault current, (e) determines the required disconnection time per DS/HD 60364-4-41 (0.4s for final circuits <=32A at 230V, 5s for distribution/other), (f) checks if additional upstream devices also trip (selectivity failure), (g) returns a result object: {faultNodeId, faultType, ikFault, zsAtFault, path (array of nodeIds), trippingDeviceNodeId, tripTime, requiredTime, meetsStandard (bool), clause, selectivityIssues (array), verdict ('protected'|'failed'|'slow')}. Trip time calculation must be CONSERVATIVE: use tMax from device curve (worst-case trip time). For currents below the device's minimum operating threshold, report 'no_trip'.",
     "STEP 2 - Trip Time Interpolation Helper: Add function sldGetTripTime(device, In, Ifault, settings) that takes a protection device, its In rating, the fault current, and optional MCCB settings, calls sldDeviceCurve to get the curve, then interpolates tMax at Ifault. Use log-log interpolation between curve points. If Ifault is below the first point's current, return Infinity (device won't trip). If above the last point, return the last tMax. This is the conservative approach for life-safety.",
@@ -29,5 +29,5 @@
     "Grep for '_FA' additions to confirm Farsi translations were added"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 48 tests pass (39 existing + 9 new). Implementation adds ~330 lines of JS for the fault simulation engine, animation, results panel, and SLD integration. The sldRenderCanvasFaultMode function provides a separate SVG render path with dark theme and click-to-fault UX. Trip times are calculated conservatively using tMax (worst-case) from device curves. The test for selectivity issues (Test 46) works by using identical MCBs on both upstream and downstream, which naturally results in both devices tripping at the same time."
 }
