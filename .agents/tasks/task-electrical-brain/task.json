@@ -1,0 +1,7 @@
+{
+  "task_id": "task-electrical-brain",
+  "task_description": "Phase 4 - Electrical Brain: An auto-design module that generates full DS/HD 60364-compliant electrical installations from building type presets. Includes one-click compliance audit, auto-generated BOM with Danish wholesaler pricing, training/explanation with clause citations, and click-only trilingual UI.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null
+}

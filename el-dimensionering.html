@@ -641,7 +641,8 @@ const T = {
       projekt: 'Projekt',
       verify: 'Verifikation',
       draw: 'Tegning',
-      exam: '\uD83C\uDF93 Eksamen'
+      exam: '\uD83C\uDF93 Eksamen',
+      brain: 'El-Hjerne'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -741,7 +742,8 @@ const T = {
       projekt: 'Project',
       verify: 'Verify',
       draw: 'Drawing',
-      exam: '\uD83C\uDF93 Exam'
+      exam: '\uD83C\uDF93 Exam',
+      brain: 'Brain'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -833,7 +835,8 @@ const T = {
       projekt: 'پروژه',
       verify: 'صحت‌سنجی',
       draw: 'نقشه',
-      exam: '🎓 آزمون'
+      exam: '🎓 آزمون',
+      brain: 'مغز برقی'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -2704,6 +2707,7 @@ function renderModule(mod) {
     case 'draw': content = renderDrawing(); break;
     case 'sld': content = renderSLD(); break;
     case 'exam': content = renderExam(); break;
+    case 'brain': content = renderBrain(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -6904,6 +6908,731 @@ function sldRenderCanvasFaultMode(tree) {
 
   svg += '</svg>';
   return svg;
+}
+
+// ===== ELECTRICAL BRAIN - Auto-Design Engine =====
+
+const BRAIN_BUILDING_TYPES = {
+  residential: [
+    { id: 'parcelhus', name_da: 'Parcelhus', name_en: 'Detached House', name_fa: 'خانه ویلایی',
+      diversity: 0.5, defaultOptions: ['light_1','light_2','light_3','socket_1','socket_2','socket_3','socket_4','cooker','oven','dryer','washing','dishwasher','bathroom'] },
+    { id: 'lejlighed', name_da: 'Lejlighed', name_en: 'Apartment', name_fa: 'آپارتمان',
+      diversity: 0.5, defaultOptions: ['light_1','light_2','socket_1','socket_2','socket_3','cooker','washing','dishwasher','bathroom'] },
+    { id: 'raekkehus', name_da: 'Raekkehus', name_en: 'Terraced House', name_fa: 'خانه ردیفی',
+      diversity: 0.5, defaultOptions: ['light_1','light_2','light_3','socket_1','socket_2','socket_3','cooker','oven','dryer','washing','dishwasher','bathroom'] }
+  ],
+  commercial: [
+    { id: 'kontor', name_da: 'Kontor', name_en: 'Office', name_fa: 'دفتر',
+      diversity: 0.6, defaultOptions: ['light_office_1','light_office_2','light_office_3','socket_office_1','socket_office_2','socket_office_3','socket_office_4','server_room','ventilation','elevator'] },
+    { id: 'butik', name_da: 'Butik', name_en: 'Shop', name_fa: 'فروشگاه',
+      diversity: 0.6, defaultOptions: ['light_shop_1','light_shop_2','socket_shop_1','socket_shop_2','ventilation','sign_lighting','cooling'] },
+    { id: 'restaurant', name_da: 'Restaurant', name_en: 'Restaurant', name_fa: 'رستوران',
+      diversity: 0.7, defaultOptions: ['light_rest_1','light_rest_2','socket_rest_1','socket_rest_2','cooker_3phase','oven_commercial','dishwasher_commercial','ventilation_large','cooling'] }
+  ],
+  industrial: [
+    { id: 'vaerksted', name_da: 'Vaerksted', name_en: 'Workshop', name_fa: 'کارگاه',
+      diversity: 0.7, defaultOptions: ['light_ind_1','light_ind_2','socket_ind_1','socket_ind_2','socket_3phase_16','socket_3phase_32','compressor','ventilation'] },
+    { id: 'lager', name_da: 'Lager', name_en: 'Warehouse', name_fa: 'انبار',
+      diversity: 0.6, defaultOptions: ['light_ind_1','light_ind_2','light_ind_3','socket_ind_1','socket_ind_2','loading_dock','ventilation'] },
+    { id: 'produktion', name_da: 'Produktion', name_en: 'Production', name_fa: 'تولید',
+      diversity: 0.8, defaultOptions: ['light_ind_1','light_ind_2','light_ind_3','socket_ind_1','socket_ind_2','motor_7_5kw','motor_11kw','motor_22kw','compressor','ventilation_large'] }
+  ],
+  agricultural: [
+    { id: 'landbrug', name_da: 'Landbrug', name_en: 'Farm', name_fa: 'مزرعه',
+      diversity: 0.6, defaultOptions: ['light_agri_1','light_agri_2','socket_agri_1','socket_agri_2','feed_system','ventilation','grain_dryer'] },
+    { id: 'stald', name_da: 'Stald', name_en: 'Barn/Stable', name_fa: 'اصطبل',
+      diversity: 0.6, defaultOptions: ['light_agri_1','light_agri_2','socket_agri_1','milking_machine','ventilation','heating'] }
+  ]
+};
+
+const BRAIN_CIRCUIT_TEMPLATES = {
+  // Residential lighting
+  light_1: { id:'light_1', name_da:'Belysning gruppe 1', name_en:'Lighting group 1', name_fa:'روشنایی گروه 1', power_kW:0.8, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:18, rcdGroup:'lighting', rcdType:'A' },
+  light_2: { id:'light_2', name_da:'Belysning gruppe 2', name_en:'Lighting group 2', name_fa:'روشنایی گروه 2', power_kW:0.8, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:20, rcdGroup:'lighting', rcdType:'A' },
+  light_3: { id:'light_3', name_da:'Belysning gruppe 3', name_en:'Lighting group 3', name_fa:'روشنایی گروه 3', power_kW:0.6, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:15, rcdGroup:'lighting', rcdType:'A' },
+  // Residential sockets
+  socket_1: { id:'socket_1', name_da:'Stikkontakt gruppe 1', name_en:'Socket group 1', name_fa:'پریز گروه 1', power_kW:3.68, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:22, rcdGroup:'sockets', rcdType:'A' },
+  socket_2: { id:'socket_2', name_da:'Stikkontakt gruppe 2', name_en:'Socket group 2', name_fa:'پریز گروه 2', power_kW:3.68, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:25, rcdGroup:'sockets', rcdType:'A' },
+  socket_3: { id:'socket_3', name_da:'Stikkontakt gruppe 3', name_en:'Socket group 3', name_fa:'پریز گروه 3', power_kW:3.68, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:20, rcdGroup:'sockets', rcdType:'A' },
+  socket_4: { id:'socket_4', name_da:'Stikkontakt gruppe 4', name_en:'Socket group 4', name_fa:'پریز گروه 4', power_kW:3.68, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:28, rcdGroup:'sockets', rcdType:'A' },
+  // Residential dedicated
+  cooker: { id:'cooker', name_da:'Komfur', name_en:'Cooker', name_fa:'اجاق', power_kW:7.36, phases:'3x400', cosPhi:0.98, curve:'B', installMethod:'C', cableLength_m:12, rcdGroup:'dedicated', rcdType:'A' },
+  oven: { id:'oven', name_da:'Ovn', name_en:'Oven', name_fa:'فر', power_kW:3.5, phases:'1x230', cosPhi:0.98, curve:'B', installMethod:'C', cableLength_m:10, rcdGroup:'dedicated', rcdType:'A' },
+  dryer: { id:'dryer', name_da:'Torretumbler', name_en:'Dryer', name_fa:'خشک‌کن', power_kW:2.8, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:8, rcdGroup:'dedicated', rcdType:'A' },
+  washing: { id:'washing', name_da:'Vaskemaskine', name_en:'Washing Machine', name_fa:'ماشین لباسشویی', power_kW:2.2, phases:'1x230', cosPhi:0.85, curve:'B', installMethod:'C', cableLength_m:8, rcdGroup:'dedicated', rcdType:'A' },
+  dishwasher: { id:'dishwasher', name_da:'Opvaskemaskine', name_en:'Dishwasher', name_fa:'ماشین ظرفشویی', power_kW:2.2, phases:'1x230', cosPhi:0.90, curve:'B', installMethod:'C', cableLength_m:6, rcdGroup:'dedicated', rcdType:'A' },
+  bathroom: { id:'bathroom', name_da:'Badevaerelsesvarme', name_en:'Bathroom Heater', name_fa:'گرمایش حمام', power_kW:1.0, phases:'1x230', cosPhi:1.0, curve:'B', installMethod:'C', cableLength_m:12, rcdGroup:'dedicated', rcdType:'A' },
+  // Additional options
+  ev_charger_11: { id:'ev_charger_11', name_da:'EV-lader 11 kW', name_en:'EV Charger 11 kW', name_fa:'شارژر EV 11 kW', power_kW:11, phases:'3x400', cosPhi:0.99, curve:'C', installMethod:'C', cableLength_m:15, rcdGroup:'ev', rcdType:'B' },
+  ev_charger_22: { id:'ev_charger_22', name_da:'EV-lader 22 kW', name_en:'EV Charger 22 kW', name_fa:'شارژر EV 22 kW', power_kW:22, phases:'3x400', cosPhi:0.99, curve:'C', installMethod:'C', cableLength_m:15, rcdGroup:'ev', rcdType:'B' },
+  heat_pump_air: { id:'heat_pump_air', name_da:'Varmepumpe (luft-vand)', name_en:'Heat Pump (air-water)', name_fa:'پمپ حرارتی هوا-آب', power_kW:5.0, phases:'3x400', cosPhi:0.85, curve:'C', installMethod:'C', cableLength_m:20, rcdGroup:'dedicated', rcdType:'A' },
+  heat_pump_ground: { id:'heat_pump_ground', name_da:'Varmepumpe (jordvarme)', name_en:'Heat Pump (ground-source)', name_fa:'پمپ حرارتی زمینی', power_kW:8.0, phases:'3x400', cosPhi:0.85, curve:'C', installMethod:'C', cableLength_m:25, rcdGroup:'dedicated', rcdType:'A' },
+  induction_hob: { id:'induction_hob', name_da:'Induktionskogeplade', name_en:'Induction Hob', name_fa:'اجاق القایی', power_kW:7.4, phases:'3x400', cosPhi:0.97, curve:'B', installMethod:'C', cableLength_m:10, rcdGroup:'dedicated', rcdType:'A' },
+  sauna: { id:'sauna', name_da:'Sauna', name_en:'Sauna', name_fa:'سونا', power_kW:9.0, phases:'3x400', cosPhi:1.0, curve:'C', installMethod:'C', cableLength_m:12, rcdGroup:'dedicated', rcdType:'A' },
+  pool_pump: { id:'pool_pump', name_da:'Poolpumpe', name_en:'Pool Pump', name_fa:'پمپ استخر', power_kW:1.5, phases:'1x230', cosPhi:0.80, curve:'C', installMethod:'C', cableLength_m:30, rcdGroup:'dedicated', rcdType:'A' },
+  solar_pv: { id:'solar_pv', name_da:'Solcelle-inverter', name_en:'Solar PV Inverter', name_fa:'اینورتر خورشیدی', power_kW:6.0, phases:'3x400', cosPhi:0.99, curve:'B', installMethod:'C', cableLength_m:20, rcdGroup:'dedicated', rcdType:'A' },
+  battery_storage: { id:'battery_storage', name_da:'Batterilagring', name_en:'Battery Storage', name_fa:'ذخیره باتری', power_kW:5.0, phases:'3x400', cosPhi:0.99, curve:'B', installMethod:'C', cableLength_m:5, rcdGroup:'dedicated', rcdType:'B' },
+  floor_heating: { id:'floor_heating', name_da:'Gulvvarme', name_en:'Floor Heating', name_fa:'گرمایش کفی', power_kW:3.0, phases:'1x230', cosPhi:1.0, curve:'B', installMethod:'C', cableLength_m:15, rcdGroup:'dedicated', rcdType:'A' },
+  // Commercial
+  light_office_1: { id:'light_office_1', name_da:'Kontorbelysning 1', name_en:'Office Lighting 1', name_fa:'روشنایی دفتر 1', power_kW:1.5, phases:'1x230', cosPhi:0.92, curve:'B', installMethod:'C', cableLength_m:25, rcdGroup:'lighting', rcdType:'A' },
+  light_office_2: { id:'light_office_2', name_da:'Kontorbelysning 2', name_en:'Office Lighting 2', name_fa:'روشنایی دفتر 2', power_kW:1.5, phases:'1x230', cosPhi:0.92, curve:'B', installMethod:'C', cableLength_m:30, rcdGroup:'lighting', rcdType:'A' },
+  light_office_3: { id:'light_office_3', name_da:'Kontorbelysning 3', name_en:'Office Lighting 3', name_fa:'روشنایی دفتر 3', power_kW:1.2, phases:'1x230', cosPhi:0.92, curve:'B', installMethod:'C', cableLength_m:20, rcdGroup:'lighting', rcdType:'A' },
+  socket_office_1: { id:'socket_office_1', name_da:'Kontorgruppe 1', name_en:'Office Sockets 1', name_fa:'پریز دفتر 1', power_kW:3.68, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:20, rcdGroup:'sockets', rcdType:'A' },
+  socket_office_2: { id:'socket_office_2', name_da:'Kontorgruppe 2', name_en:'Office Sockets 2', name_fa:'پریز دفتر 2', power_kW:3.68, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:25, rcdGroup:'sockets', rcdType:'A' },
+  socket_office_3: { id:'socket_office_3', name_da:'Kontorgruppe 3', name_en:'Office Sockets 3', name_fa:'پریز دفتر 3', power_kW:3.68, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:30, rcdGroup:'sockets', rcdType:'A' },
+  socket_office_4: { id:'socket_office_4', name_da:'Kontorgruppe 4', name_en:'Office Sockets 4', name_fa:'پریز دفتر 4', power_kW:3.68, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:35, rcdGroup:'sockets', rcdType:'A' },
+  server_room: { id:'server_room', name_da:'Serverrum', name_en:'Server Room', name_fa:'اتاق سرور', power_kW:10.0, phases:'3x400', cosPhi:0.95, curve:'C', installMethod:'C', cableLength_m:15, rcdGroup:'dedicated', rcdType:'A' },
+  ventilation: { id:'ventilation', name_da:'Ventilation', name_en:'Ventilation', name_fa:'تهویه', power_kW:2.2, phases:'3x400', cosPhi:0.82, curve:'C', installMethod:'C', cableLength_m:20, rcdGroup:'motors', rcdType:'A' },
+  elevator: { id:'elevator', name_da:'Elevator', name_en:'Elevator', name_fa:'آسانسور', power_kW:15.0, phases:'3x400', cosPhi:0.85, curve:'C', installMethod:'C', cableLength_m:30, rcdGroup:'dedicated', rcdType:'A' },
+  light_shop_1: { id:'light_shop_1', name_da:'Butiksbelysning 1', name_en:'Shop Lighting 1', name_fa:'روشنایی فروشگاه 1', power_kW:2.0, phases:'1x230', cosPhi:0.92, curve:'B', installMethod:'C', cableLength_m:25, rcdGroup:'lighting', rcdType:'A' },
+  light_shop_2: { id:'light_shop_2', name_da:'Butiksbelysning 2', name_en:'Shop Lighting 2', name_fa:'روشنایی فروشگاه 2', power_kW:2.0, phases:'1x230', cosPhi:0.92, curve:'B', installMethod:'C', cableLength_m:30, rcdGroup:'lighting', rcdType:'A' },
+  socket_shop_1: { id:'socket_shop_1', name_da:'Butiksgruppe 1', name_en:'Shop Sockets 1', name_fa:'پریز فروشگاه 1', power_kW:3.68, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:20, rcdGroup:'sockets', rcdType:'A' },
+  socket_shop_2: { id:'socket_shop_2', name_da:'Butiksgruppe 2', name_en:'Shop Sockets 2', name_fa:'پریز فروشگاه 2', power_kW:3.68, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:25, rcdGroup:'sockets', rcdType:'A' },
+  sign_lighting: { id:'sign_lighting', name_da:'Skiltebelysning', name_en:'Sign Lighting', name_fa:'نور تابلو', power_kW:0.5, phases:'1x230', cosPhi:0.90, curve:'B', installMethod:'C', cableLength_m:15, rcdGroup:'lighting', rcdType:'A' },
+  cooling: { id:'cooling', name_da:'Koeling', name_en:'Cooling', name_fa:'خنک‌کننده', power_kW:4.0, phases:'3x400', cosPhi:0.82, curve:'C', installMethod:'C', cableLength_m:10, rcdGroup:'motors', rcdType:'A' },
+  light_rest_1: { id:'light_rest_1', name_da:'Restaurantbelysning 1', name_en:'Restaurant Lighting 1', name_fa:'روشنایی رستوران 1', power_kW:1.5, phases:'1x230', cosPhi:0.92, curve:'B', installMethod:'C', cableLength_m:20, rcdGroup:'lighting', rcdType:'A' },
+  light_rest_2: { id:'light_rest_2', name_da:'Restaurantbelysning 2', name_en:'Restaurant Lighting 2', name_fa:'روشنایی رستوران 2', power_kW:1.5, phases:'1x230', cosPhi:0.92, curve:'B', installMethod:'C', cableLength_m:25, rcdGroup:'lighting', rcdType:'A' },
+  socket_rest_1: { id:'socket_rest_1', name_da:'Restaurantgruppe 1', name_en:'Restaurant Sockets 1', name_fa:'پریز رستوران 1', power_kW:3.68, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:20, rcdGroup:'sockets', rcdType:'A' },
+  socket_rest_2: { id:'socket_rest_2', name_da:'Restaurantgruppe 2', name_en:'Restaurant Sockets 2', name_fa:'پریز رستوران 2', power_kW:3.68, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:25, rcdGroup:'sockets', rcdType:'A' },
+  cooker_3phase: { id:'cooker_3phase', name_da:'Industrikomfur', name_en:'Commercial Cooker', name_fa:'اجاق صنعتی', power_kW:15.0, phases:'3x400', cosPhi:0.98, curve:'C', installMethod:'C', cableLength_m:8, rcdGroup:'dedicated', rcdType:'A' },
+  oven_commercial: { id:'oven_commercial', name_da:'Industrlovn', name_en:'Commercial Oven', name_fa:'فر صنعتی', power_kW:12.0, phases:'3x400', cosPhi:0.98, curve:'C', installMethod:'C', cableLength_m:6, rcdGroup:'dedicated', rcdType:'A' },
+  dishwasher_commercial: { id:'dishwasher_commercial', name_da:'Industriopvaskemaskine', name_en:'Commercial Dishwasher', name_fa:'ماشین ظرفشویی صنعتی', power_kW:8.0, phases:'3x400', cosPhi:0.90, curve:'C', installMethod:'C', cableLength_m:6, rcdGroup:'dedicated', rcdType:'A' },
+  ventilation_large: { id:'ventilation_large', name_da:'Ventilation (stor)', name_en:'Ventilation (large)', name_fa:'تهویه بزرگ', power_kW:7.5, phases:'3x400', cosPhi:0.82, curve:'C', installMethod:'C', cableLength_m:25, rcdGroup:'motors', rcdType:'A' },
+  // Industrial
+  light_ind_1: { id:'light_ind_1', name_da:'Halbelysning 1', name_en:'Hall Lighting 1', name_fa:'روشنایی سالن 1', power_kW:2.0, phases:'1x230', cosPhi:0.92, curve:'B', installMethod:'C', cableLength_m:35, rcdGroup:'lighting', rcdType:'A' },
+  light_ind_2: { id:'light_ind_2', name_da:'Halbelysning 2', name_en:'Hall Lighting 2', name_fa:'روشنایی سالن 2', power_kW:2.0, phases:'1x230', cosPhi:0.92, curve:'B', installMethod:'C', cableLength_m:40, rcdGroup:'lighting', rcdType:'A' },
+  light_ind_3: { id:'light_ind_3', name_da:'Halbelysning 3', name_en:'Hall Lighting 3', name_fa:'روشنایی سالن 3', power_kW:2.0, phases:'1x230', cosPhi:0.92, curve:'B', installMethod:'C', cableLength_m:30, rcdGroup:'lighting', rcdType:'A' },
+  socket_ind_1: { id:'socket_ind_1', name_da:'Industristik 1', name_en:'Industrial Sockets 1', name_fa:'پریز صنعتی 1', power_kW:3.68, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:25, rcdGroup:'sockets', rcdType:'A' },
+  socket_ind_2: { id:'socket_ind_2', name_da:'Industristik 2', name_en:'Industrial Sockets 2', name_fa:'پریز صنعتی 2', power_kW:3.68, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:30, rcdGroup:'sockets', rcdType:'A' },
+  socket_3phase_16: { id:'socket_3phase_16', name_da:'3-faset stik 16A', name_en:'3-phase socket 16A', name_fa:'پریز 3 فاز 16A', power_kW:11.0, phases:'3x400', cosPhi:0.85, curve:'C', installMethod:'C', cableLength_m:20, rcdGroup:'sockets_3ph', rcdType:'A' },
+  socket_3phase_32: { id:'socket_3phase_32', name_da:'3-faset stik 32A', name_en:'3-phase socket 32A', name_fa:'پریز 3 فاز 32A', power_kW:22.0, phases:'3x400', cosPhi:0.85, curve:'C', installMethod:'C', cableLength_m:20, rcdGroup:'sockets_3ph', rcdType:'A' },
+  compressor: { id:'compressor', name_da:'Kompressor', name_en:'Compressor', name_fa:'کمپرسور', power_kW:5.5, phases:'3x400', cosPhi:0.80, curve:'C', installMethod:'C', cableLength_m:15, rcdGroup:'motors', rcdType:'A' },
+  motor_7_5kw: { id:'motor_7_5kw', name_da:'Motor 7.5 kW', name_en:'Motor 7.5 kW', name_fa:'موتور 7.5 kW', power_kW:7.5, phases:'3x400', cosPhi:0.82, curve:'C', installMethod:'C', cableLength_m:25, rcdGroup:'motors', rcdType:'A' },
+  motor_11kw: { id:'motor_11kw', name_da:'Motor 11 kW', name_en:'Motor 11 kW', name_fa:'موتور 11 kW', power_kW:11.0, phases:'3x400', cosPhi:0.85, curve:'C', installMethod:'C', cableLength_m:30, rcdGroup:'motors', rcdType:'A' },
+  motor_22kw: { id:'motor_22kw', name_da:'Motor 22 kW', name_en:'Motor 22 kW', name_fa:'موتور 22 kW', power_kW:22.0, phases:'3x400', cosPhi:0.87, curve:'C', installMethod:'C', cableLength_m:35, rcdGroup:'motors', rcdType:'A' },
+  loading_dock: { id:'loading_dock', name_da:'Lasterampe', name_en:'Loading Dock', name_fa:'بارانداز', power_kW:5.0, phases:'3x400', cosPhi:0.85, curve:'C', installMethod:'C', cableLength_m:30, rcdGroup:'dedicated', rcdType:'A' },
+  // Agricultural
+  light_agri_1: { id:'light_agri_1', name_da:'Staldbel. 1', name_en:'Barn Lighting 1', name_fa:'روشنایی اصطبل 1', power_kW:1.5, phases:'1x230', cosPhi:0.92, curve:'B', installMethod:'C', cableLength_m:30, rcdGroup:'lighting', rcdType:'A' },
+  light_agri_2: { id:'light_agri_2', name_da:'Staldbel. 2', name_en:'Barn Lighting 2', name_fa:'روشنایی اصطبل 2', power_kW:1.5, phases:'1x230', cosPhi:0.92, curve:'B', installMethod:'C', cableLength_m:35, rcdGroup:'lighting', rcdType:'A' },
+  socket_agri_1: { id:'socket_agri_1', name_da:'Landbrugsstik 1', name_en:'Farm Sockets 1', name_fa:'پریز مزرعه 1', power_kW:3.68, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:25, rcdGroup:'sockets', rcdType:'A' },
+  socket_agri_2: { id:'socket_agri_2', name_da:'Landbrugsstik 2', name_en:'Farm Sockets 2', name_fa:'پریز مزرعه 2', power_kW:3.68, phases:'1x230', cosPhi:0.95, curve:'B', installMethod:'C', cableLength_m:30, rcdGroup:'sockets', rcdType:'A' },
+  feed_system: { id:'feed_system', name_da:'Fodringssystem', name_en:'Feed System', name_fa:'سیستم تغذیه', power_kW:5.5, phases:'3x400', cosPhi:0.80, curve:'C', installMethod:'C', cableLength_m:35, rcdGroup:'motors', rcdType:'A' },
+  grain_dryer: { id:'grain_dryer', name_da:'Korntorrer', name_en:'Grain Dryer', name_fa:'خشک‌کن غلات', power_kW:15.0, phases:'3x400', cosPhi:0.90, curve:'C', installMethod:'C', cableLength_m:25, rcdGroup:'dedicated', rcdType:'A' },
+  milking_machine: { id:'milking_machine', name_da:'Malkemaskine', name_en:'Milking Machine', name_fa:'دستگاه شیردوش', power_kW:4.0, phases:'3x400', cosPhi:0.80, curve:'C', installMethod:'C', cableLength_m:20, rcdGroup:'motors', rcdType:'A' },
+  heating: { id:'heating', name_da:'Opvarmning', name_en:'Heating', name_fa:'گرمایش', power_kW:6.0, phases:'3x400', cosPhi:1.0, curve:'B', installMethod:'C', cableLength_m:15, rcdGroup:'dedicated', rcdType:'A' }
+};
+
+const BRAIN_EXTRA_OPTIONS = [
+  'ev_charger_11','ev_charger_22','heat_pump_air','heat_pump_ground',
+  'induction_hob','sauna','pool_pump','solar_pv','battery_storage','floor_heating'
+];
+
+// Brain state
+var brainState = { buildingType: null, selectedCategory: null, selectedOptions: [], generatedTree: null, auditResults: null, bomItems: [] };
+
+function brainGetBuildingType(id) {
+  var cats = Object.keys(BRAIN_BUILDING_TYPES);
+  for (var i = 0; i < cats.length; i++) {
+    var list = BRAIN_BUILDING_TYPES[cats[i]];
+    for (var j = 0; j < list.length; j++) {
+      if (list[j].id === id) return list[j];
+    }
+  }
+  return null;
+}
+
+function brainSelectBuilding(id) {
+  var bt = brainGetBuildingType(id);
+  if (!bt) return;
+  brainState.buildingType = bt;
+  brainState.selectedOptions = bt.defaultOptions.slice();
+  brainState.generatedTree = null;
+  brainState.auditResults = null;
+  brainState.bomItems = [];
+  renderModule('brain');
+}
+
+function brainToggleOption(optId) {
+  var idx = brainState.selectedOptions.indexOf(optId);
+  if (idx >= 0) brainState.selectedOptions.splice(idx, 1);
+  else brainState.selectedOptions.push(optId);
+  renderModule('brain');
+}
+
+function brainSelectCategory(cat) {
+  brainState.selectedCategory = cat;
+  renderModule('brain');
+}
+
+// Core auto-design engine
+function brainGenerateInstallation(buildingTypeId, optionIds) {
+  var bt = buildingTypeId ? brainGetBuildingType(buildingTypeId) : brainState.buildingType;
+  if (!bt && typeof buildingTypeId === 'string') bt = brainGetBuildingType(buildingTypeId);
+  if (!bt) return null;
+  var opts = (optionIds && optionIds.length > 0) ? optionIds : ((brainState.selectedOptions && brainState.selectedOptions.length > 0) ? brainState.selectedOptions : bt.defaultOptions);
+  var diversity = bt.diversity || 0.5;
+
+  // Collect circuit templates
+  var circuits = [];
+  for (var i = 0; i < opts.length; i++) {
+    var tmpl = BRAIN_CIRCUIT_TEMPLATES[opts[i]];
+    if (tmpl) circuits.push(Object.assign({}, tmpl));
+  }
+  if (circuits.length === 0) return null;
+
+  // Calculate total load with diversity
+  var totalPower = 0;
+  for (var c = 0; c < circuits.length; c++) {
+    totalPower += circuits[c].power_kW;
+  }
+  var diversifiedPower = totalPower * diversity;
+  var totalKVA = diversifiedPower / 0.9; // assume average cos phi 0.9
+
+  // Select transformer (conservative: next standard size up)
+  var trafoSize = TRAFO_SIZES.find(function(t) { return t >= totalKVA; }) || TRAFO_SIZES[TRAFO_SIZES.length - 1];
+  var uk = TRAFO_UK[trafoSize] || 4;
+
+  // Create SLD tree
+  var savedNextId = sldNextId;
+  var tree = { nodes: {}, rootId: null };
+
+  // Transformer
+  var trafo = sldCreateNode('transformer', null, { power_kVA: trafoSize, uk_pct: uk });
+  tree.nodes[trafo.id] = trafo;
+  tree.rootId = trafo.id;
+
+  // Main board
+  var mainCable = PRODUCTS.cables.find(function(c) { return c.material === 'Cu' && c.mm2 >= 50; }) || PRODUCTS.cables[8];
+  var mainIn = diversifiedPower * 1000 / (Math.sqrt(3) * 400 * 0.9);
+  var mainProtIn = [63, 80, 100, 125, 160, 200, 250, 315, 400].find(function(r) { return r >= mainIn; }) || 100;
+  var mainProtection = PRODUCTS.mccbs.find(function(m) { return Math.max.apply(null, m.inOptions) >= mainProtIn; }) || PRODUCTS.mccbs[0];
+
+  var mainBoard = sldCreateNode('main_board', trafo.id, {
+    power_kW: diversifiedPower,
+    cable: mainCable,
+    protection: mainProtection,
+    protectionIn: mainProtIn,
+    length_m: 5,
+    phases: '3x400'
+  });
+  tree.nodes[mainBoard.id] = mainBoard;
+  trafo.childIds.push(mainBoard.id);
+
+  // Group circuits by RCD group
+  var rcdGroups = {};
+  for (var g = 0; g < circuits.length; g++) {
+    var grp = circuits[g].rcdGroup || 'general';
+    if (!rcdGroups[grp]) rcdGroups[grp] = [];
+    rcdGroups[grp].push(circuits[g]);
+  }
+
+  // Phase balancing: assign phases to single-phase circuits
+  var phaseLoads = [0, 0, 0]; // L1, L2, L3
+  for (var p = 0; p < circuits.length; p++) {
+    if (circuits[p].phases === '1x230') {
+      // Assign to least loaded phase
+      var minPhase = 0;
+      if (phaseLoads[1] < phaseLoads[minPhase]) minPhase = 1;
+      if (phaseLoads[2] < phaseLoads[minPhase]) minPhase = 2;
+      circuits[p]._assignedPhase = minPhase + 1;
+      phaseLoads[minPhase] += circuits[p].power_kW;
+    } else {
+      // 3-phase loads contribute equally
+      phaseLoads[0] += circuits[p].power_kW / 3;
+      phaseLoads[1] += circuits[p].power_kW / 3;
+      phaseLoads[2] += circuits[p].power_kW / 3;
+    }
+  }
+
+  // Create sub-boards for each RCD group (max 6 circuits per RCD)
+  var rcdGroupKeys = Object.keys(rcdGroups);
+  for (var rg = 0; rg < rcdGroupKeys.length; rg++) {
+    var groupName = rcdGroupKeys[rg];
+    var groupCircuits = rcdGroups[groupName];
+    var rcdType = groupCircuits[0].rcdType || 'A';
+
+    // Split into sub-groups of max 6
+    var subGroupCount = Math.ceil(groupCircuits.length / 6);
+    for (var sg = 0; sg < subGroupCount; sg++) {
+      var subCircuits = groupCircuits.slice(sg * 6, (sg + 1) * 6);
+      var subPower = 0;
+      for (var sc = 0; sc < subCircuits.length; sc++) subPower += subCircuits[sc].power_kW;
+
+      // Create sub-board (RCD group node)
+      var subIn = subPower * 1000 / (Math.sqrt(3) * 400 * 0.9);
+      var stdRatings = [16, 20, 25, 32, 40, 50, 63];
+      var subProtIn = stdRatings.find(function(r) { return r >= subIn; }) || 40;
+      var subProtection = PRODUCTS.mcbs.find(function(m) { return m.rating >= subProtIn && m.curve === 'C'; }) || PRODUCTS.mcbs[9];
+      var subCable = PRODUCTS.cables.find(function(c) { return c.material === 'Cu' && c.iz >= subProtIn; }) || PRODUCTS.cables[3];
+
+      var rcdPoles = '4P';
+      var rcdRating = stdRatings.find(function(r) { return r >= subProtIn; }) || 40;
+      var rcdProduct = PRODUCTS.rcds.find(function(r) { return r.poles === rcdPoles && r.rating >= rcdRating && r.rcdType === rcdType; });
+      if (!rcdProduct) rcdProduct = PRODUCTS.rcds.find(function(r) { return r.poles === rcdPoles && r.rating >= rcdRating; });
+      if (!rcdProduct) rcdProduct = PRODUCTS.rcds[4]; // fallback
+
+      var subBoardName = groupName.replace(/_/g, ' ');
+      if (subGroupCount > 1) subBoardName += ' ' + (sg + 1);
+
+      var subBoard = sldCreateNode('sub_board', mainBoard.id, {
+        name_da: 'RCD ' + subBoardName,
+        name_en: 'RCD ' + subBoardName,
+        name_fa: 'RCD ' + subBoardName,
+        power_kW: subPower,
+        cable: subCable,
+        protection: subProtection,
+        protectionIn: subProtIn,
+        length_m: 3,
+        phases: '3x400',
+        _rcdProduct: rcdProduct,
+        _rcdType: rcdType
+      });
+      tree.nodes[subBoard.id] = subBoard;
+      mainBoard.childIds.push(subBoard.id);
+
+      // Create final circuits
+      for (var fc = 0; fc < subCircuits.length; fc++) {
+        var circ = subCircuits[fc];
+        var ib = brainCalcIB(circ);
+        var protRating = brainSelectProtectionRating(ib);
+        var cable = brainSelectCable(protRating, circ);
+        var protection = brainSelectMCB(ib, circ.curve);
+
+        var fcNode = sldCreateNode('final_circuit', subBoard.id, {
+          name_da: circ.name_da,
+          name_en: circ.name_en,
+          name_fa: circ.name_fa,
+          power_kW: circ.power_kW,
+          phases: circ.phases,
+          voltage: circ.phases === '3x400' ? 400 : 230,
+          cosPhi: circ.cosPhi,
+          cable: cable,
+          protection: protection,
+          protectionIn: protRating,
+          length_m: circ.cableLength_m,
+          installMethod: circ.installMethod || 'C',
+          temp: 30,
+          grouping: 1,
+          _assignedPhase: circ._assignedPhase || null,
+          _rcdType: circ.rcdType
+        });
+        tree.nodes[fcNode.id] = fcNode;
+        subBoard.childIds.push(fcNode.id);
+      }
+    }
+  }
+
+  // Propagate calculations
+  sldPropagateAll(tree);
+
+  // Check voltage drop and upsize cables if needed
+  var nodeIds = Object.keys(tree.nodes);
+  for (var v = 0; v < nodeIds.length; v++) {
+    var nd = tree.nodes[nodeIds[v]];
+    if (!nd || nd.type === 'transformer') continue;
+    if (nd._vdrop > 4.0 && nd.cable) {
+      // Upsize cable
+      var currentMm2 = nd.cable.mm2;
+      var biggerCable = PRODUCTS.cables.find(function(c) { return c.material === 'Cu' && c.mm2 > currentMm2; });
+      if (biggerCable) {
+        nd.cable = biggerCable;
+      }
+    }
+  }
+  // Re-propagate after cable upsizing
+  sldPropagateAll(tree);
+
+  // Store in state
+  brainState.generatedTree = tree;
+  brainState.auditResults = null;
+  brainState.bomItems = [];
+
+  // Also set global sldTree so SLD module can display it
+  if (typeof sldTree !== 'undefined') {
+    sldTree = tree;
+  }
+
+  return tree;
+}
+
+function brainCalcIB(circ) {
+  var P = circ.power_kW * 1000;
+  var cos = circ.cosPhi || 0.9;
+  if (circ.phases === '3x400') {
+    return P / (Math.sqrt(3) * 400 * cos);
+  }
+  return P / (230 * cos);
+}
+
+function brainSelectProtectionRating(ib) {
+  var stdRatings = [6, 10, 13, 16, 20, 25, 32, 40, 50, 63];
+  var rating = stdRatings.find(function(r) { return r >= ib; });
+  return rating || 63;
+}
+
+function brainSelectCable(protRating, circ) {
+  // IB <= In <= Iz: cable must have Iz >= In (protRating)
+  var cable = PRODUCTS.cables.find(function(c) {
+    return c.material === 'Cu' && c.iz >= protRating;
+  });
+  if (!cable) cable = PRODUCTS.cables[PRODUCTS.cables.length - 1];
+
+  // Verify voltage drop with this cable
+  var ib = brainCalcIB(circ);
+  var r = cable.r || 0;
+  var x = cable.x || 0;
+  var cos = circ.cosPhi || 0.9;
+  var sin = Math.sqrt(1 - cos * cos);
+  var L = circ.cableLength_m || 25;
+  var vdrop;
+  if (circ.phases === '3x400') {
+    vdrop = Math.sqrt(3) * ib * L * (r * cos + x * sin) / (400 * 10);
+  } else {
+    vdrop = 2 * ib * L * (r * cos + x * sin) / (230 * 10);
+  }
+
+  // If vdrop > 3.5% (conservative, leaving margin), upsize
+  if (vdrop > 3.5) {
+    var biggerCable = PRODUCTS.cables.find(function(c) {
+      return c.material === 'Cu' && c.mm2 > cable.mm2 && c.iz >= protRating;
+    });
+    if (biggerCable) cable = biggerCable;
+  }
+
+  return cable;
+}
+
+function brainSelectMCB(ib, curve) {
+  var c = curve || 'B';
+  var mcb = PRODUCTS.mcbs.find(function(m) {
+    return m.curve === c && m.rating >= ib;
+  });
+  if (!mcb) {
+    // Try any curve
+    mcb = PRODUCTS.mcbs.find(function(m) { return m.rating >= ib; });
+  }
+  return mcb || PRODUCTS.mcbs[3]; // fallback B16
+}
+
+// Compliance audit
+function brainRunAudit(tree) {
+  var t = tree || brainState.generatedTree;
+  if (!t) return { passed: [], failed: [], warnings: [], score: 0 };
+  sldPropagateAll(t);
+
+  var passed = [];
+  var failed = [];
+  var warnings = [];
+  var nodeIds = Object.keys(t.nodes);
+
+  for (var i = 0; i < nodeIds.length; i++) {
+    var results = sldVerifyNode(t, nodeIds[i]);
+    for (var r = 0; r < results.length; r++) {
+      var res = results[r];
+      res.nodeId = nodeIds[i];
+      res.nodeName = t.nodes[nodeIds[i]].name_da || t.nodes[nodeIds[i]].name_en || nodeIds[i];
+      if (res.status === 'ok') passed.push(res);
+      else if (res.status === 'fail') failed.push(res);
+      else warnings.push(res);
+    }
+  }
+
+  var total = passed.length + failed.length + warnings.length;
+  var score = total > 0 ? Math.round(100 * passed.length / total) : 100;
+
+  var audit = { passed: passed, failed: failed, warnings: warnings, score: score };
+  brainState.auditResults = audit;
+  return audit;
+}
+
+// BOM generation
+function brainGenerateBOM(tree) {
+  var t = tree || brainState.generatedTree;
+  if (!t) return [];
+  var bom = [];
+  var nodeIds = Object.keys(t.nodes);
+
+  for (var i = 0; i < nodeIds.length; i++) {
+    var node = t.nodes[nodeIds[i]];
+    if (!node || node.type === 'transformer') continue;
+
+    // Cable
+    if (node.cable && node.length_m > 0) {
+      var cablePrice = priceFor('cables', node.cable);
+      bom.push({
+        cat: 'cables',
+        product: node.cable,
+        qty: Math.ceil(node.length_m * 1.1), // 10% waste margin
+        unitPrice: cablePrice,
+        total: cablePrice * Math.ceil(node.length_m * 1.1),
+        nodeId: nodeIds[i],
+        nodeName: node.name_da || node.name_en
+      });
+    }
+
+    // Protection (MCB/MCCB)
+    if (node.protection) {
+      var protCat = node.protection.frame ? 'mccbs' : 'mcbs';
+      var protPrice = priceFor(protCat, node.protection);
+      bom.push({
+        cat: protCat,
+        product: node.protection,
+        qty: 1,
+        unitPrice: protPrice,
+        total: protPrice,
+        nodeId: nodeIds[i],
+        nodeName: node.name_da || node.name_en
+      });
+    }
+
+    // RCD (on sub-boards)
+    if (node._rcdProduct) {
+      var rcdPrice = priceFor('rcds', node._rcdProduct);
+      bom.push({
+        cat: 'rcds',
+        product: node._rcdProduct,
+        qty: 1,
+        unitPrice: rcdPrice,
+        total: rcdPrice,
+        nodeId: nodeIds[i],
+        nodeName: node.name_da || node.name_en
+      });
+    }
+  }
+
+  brainState.bomItems = bom;
+
+  // Also populate bid module basket
+  if (typeof bidState !== 'undefined') {
+    bidState.basket = [];
+    for (var b = 0; b < bom.length; b++) {
+      var item = bom[b];
+      if (item.product && item.product.id) {
+        addToBid(item.cat, item.product.id, item.qty);
+      }
+    }
+  }
+
+  return bom;
+}
+
+// Explain design choices with DS/HD 60364 clause citations
+function brainExplainChoice(nodeId, tree) {
+  var t = tree || brainState.generatedTree;
+  if (!t || !t.nodes[nodeId]) return null;
+  var node = t.nodes[nodeId];
+  if (node.type === 'transformer') return { transformer: { choice: node.power_kVA + ' kVA', reason: 'Next standard size up from calculated load per DS/HD 60364-5-52', clause: 'DS/HD 60364-5-52' } };
+
+  var ib = node._ib || sldCalcNodeIB(node);
+  var protIn = node.protectionIn || 0;
+  var iz = node.cable ? node.cable.iz : 0;
+  var explanation = {};
+
+  // Cable explanation
+  if (node.cable) {
+    explanation.cable = {
+      choice: node.cable.brand + ' ' + node.cable.model + ' ' + node.cable.mm2 + 'mm2',
+      reason: 'IB=' + ib.toFixed(1) + 'A, In=' + protIn + 'A, Iz=' + iz + 'A satisfies IB<=In<=Iz per cl.433.1. Installation method ' + (node.installMethod || 'C') + '.',
+      clause: 'DS/HD 60364-4-43 cl.433.1'
+    };
+  }
+
+  // Protection explanation
+  if (node.protection) {
+    var prot = node.protection;
+    var protDesc = prot.frame ? prot.frame : (prot.curve || 'B') + (prot.rating || protIn);
+    explanation.protection = {
+      choice: (prot.brand || '') + ' ' + (prot.model || '') + ' ' + protDesc,
+      reason: 'In=' + protIn + 'A >= IB=' + ib.toFixed(1) + 'A. Curve ' + (prot.curve || 'C') + ' selected for load type. Icu=' + (prot.icu || 6) + 'kA.',
+      clause: 'DS/HD 60364-4-43 cl.433.1, cl.434.5.1'
+    };
+  }
+
+  // RCD explanation
+  if (node._rcdType) {
+    var rcdReason = 'Type ' + node._rcdType + ' RCD required.';
+    if (node._rcdType === 'B') {
+      rcdReason = 'Type B RCD required for EV chargers and equipment with DC fault current components per DS/HD 60364-7-722.';
+    } else {
+      rcdReason = 'Type A 30mA RCD for personnel protection per DS/HD 60364-4-41 cl.411.3.3.';
+    }
+    explanation.rcd = {
+      choice: 'Type ' + node._rcdType + ' 30mA',
+      reason: rcdReason,
+      clause: node._rcdType === 'B' ? 'DS/HD 60364-7-722 cl.722.531.3.101' : 'DS/HD 60364-4-41 cl.411.3.3'
+    };
+  }
+
+  // Voltage drop
+  var vdrop = node._vdrop || sldCalcNodeVdrop(t, nodeId);
+  explanation.voltageDrop = {
+    value: vdrop.toFixed(2) + '%',
+    reason: 'Voltage drop ' + vdrop.toFixed(2) + '% <= 4% limit for final circuits.',
+    clause: 'DS/HD 60364-5-52 cl.525'
+  };
+
+  return explanation;
+}
+
+// Render Brain UI
+function renderBrain() {
+  var html = '';
+
+  // Title
+  html += '<div class="card"><h2 class="card-title">' + tx('El-Hjerne: Automatisk installationsdesign', 'Electrical Brain: Auto Installation Design') + '</h2>';
+  html += '<p class="info-row">' + tx('Klik-baseret design - vaelg bygningstype og tilvalg', 'Click-based design - select building type and options') + '</p></div>';
+
+  // Category selection
+  html += '<div class="card"><div class="card-title">' + tx('1. Vaelg kategori', '1. Select Category') + '</div>';
+  html += '<div class="select-grid">';
+  var cats = [{id:'residential',da:'Bolig',en:'Residential',fa:'مسکونی'},{id:'commercial',da:'Erhverv',en:'Commercial',fa:'تجاری'},{id:'industrial',da:'Industri',en:'Industrial',fa:'صنعتی'},{id:'agricultural',da:'Landbrug',en:'Agricultural',fa:'کشاورزی'}];
+  for (var ci = 0; ci < cats.length; ci++) {
+    var c = cats[ci];
+    var sel = brainState.selectedCategory === c.id ? ' selected' : '';
+    html += '<button class="sel-btn' + sel + '" onclick="brainSelectCategory(\'' + c.id + '\')">' + tx(c.da, c.en) + '</button>';
+  }
+  html += '</div></div>';
+
+  // Building type selection (if category selected)
+  if (brainState.selectedCategory && BRAIN_BUILDING_TYPES[brainState.selectedCategory]) {
+    var types = BRAIN_BUILDING_TYPES[brainState.selectedCategory];
+    html += '<div class="card"><div class="card-title">' + tx('2. Vaelg bygningstype', '2. Select Building Type') + '</div>';
+    html += '<div class="select-grid">';
+    for (var ti = 0; ti < types.length; ti++) {
+      var bt = types[ti];
+      var btSel = brainState.buildingType && brainState.buildingType.id === bt.id ? ' selected' : '';
+      html += '<button class="sel-btn' + btSel + '" onclick="brainSelectBuilding(\'' + bt.id + '\')">' + tx(bt.name_da, bt.name_en) + '</button>';
+    }
+    html += '</div></div>';
+  }
+
+  // Options (if building type selected)
+  if (brainState.buildingType) {
+    html += '<div class="card"><div class="card-title">' + tx('3. Kredse (klik for at til-/fravaelge)', '3. Circuits (click to add/remove)') + '</div>';
+    html += '<div class="select-grid">';
+    var allOpts = brainState.buildingType.defaultOptions.concat(BRAIN_EXTRA_OPTIONS);
+    var seen = {};
+    for (var oi = 0; oi < allOpts.length; oi++) {
+      var optId = allOpts[oi];
+      if (seen[optId]) continue;
+      seen[optId] = true;
+      var tmpl = BRAIN_CIRCUIT_TEMPLATES[optId];
+      if (!tmpl) continue;
+      var oSel = brainState.selectedOptions.indexOf(optId) >= 0 ? ' selected' : '';
+      html += '<button class="sel-btn' + oSel + '" onclick="brainToggleOption(\'' + optId + '\')">' + tx(tmpl.name_da, tmpl.name_en) + '</button>';
+    }
+    html += '</div>';
+
+    // Generate button
+    html += '<div style="margin-top:1rem;text-align:center">';
+    html += '<button class="sel-btn" style="font-size:1.2rem;padding:1rem 2rem;background:var(--accent);color:#fff;border-radius:8px" onclick="brainDoGenerate()">' + tx('Generer Installation', 'Generate Installation') + '</button>';
+    html += '</div></div>';
+  }
+
+  // Results (if generated)
+  if (brainState.generatedTree) {
+    var tree = brainState.generatedTree;
+    sldPropagateAll(tree);
+    var nodeIds = Object.keys(tree.nodes);
+    var totalPower = 0;
+    var circuitCount = 0;
+    var trafoNode = tree.nodes[tree.rootId];
+    for (var ni = 0; ni < nodeIds.length; ni++) {
+      var nd = tree.nodes[nodeIds[ni]];
+      if (nd && nd.type === 'final_circuit') { totalPower += nd.power_kW; circuitCount++; }
+    }
+
+    // Summary card
+    html += '<div class="card"><div class="card-title">' + tx('Resultat: Installationsoversigt', 'Result: Installation Summary') + '</div>';
+    html += '<div class="result-box">';
+    html += '<div class="info-row">' + tx('Transformer', 'Transformer') + ': <strong>' + (trafoNode ? trafoNode.power_kVA : '?') + ' kVA</strong></div>';
+    html += '<div class="info-row">' + tx('Antal kredse', 'Circuit count') + ': <strong>' + circuitCount + '</strong></div>';
+    html += '<div class="info-row">' + tx('Total belastning', 'Total load') + ': <strong>' + totalPower.toFixed(1) + ' kW</strong></div>';
+    html += '<div class="info-row">' + tx('Diversificeret belastning', 'Diversified load') + ': <strong>' + (totalPower * (brainState.buildingType ? brainState.buildingType.diversity : 0.5)).toFixed(1) + ' kW</strong></div>';
+    html += '</div>';
+
+    // Audit button
+    html += '<div style="margin-top:1rem"><button class="sel-btn" style="background:var(--accent);color:#fff" onclick="brainDoAudit()">' + tx('Kbr DS/HD 60364 Compliance Audit', 'Run DS/HD 60364 Compliance Audit') + '</button>';
+    html += ' <button class="sel-btn" style="background:#27ae60;color:#fff" onclick="brainDoBOM()">' + tx('Generer BOM/Tilbud', 'Generate BOM/Quote') + '</button></div>';
+    html += '</div>';
+  }
+
+  // Audit results
+  if (brainState.auditResults) {
+    var audit = brainState.auditResults;
+    html += '<div class="card"><div class="card-title">' + tx('Compliance Audit', 'Compliance Audit') + ' - ' + audit.score + '%</div>';
+    html += '<div class="result-box">';
+    html += '<div class="info-row" style="color:#27ae60">' + tx('Bestaaet', 'Passed') + ': ' + audit.passed.length + '</div>';
+    html += '<div class="info-row" style="color:#e74c3c">' + tx('Fejlet', 'Failed') + ': ' + audit.failed.length + '</div>';
+    if (audit.failed.length > 0) {
+      html += '<div style="margin-top:0.5rem">';
+      for (var fi = 0; fi < audit.failed.length; fi++) {
+        var f = audit.failed[fi];
+        html += '<div style="color:#e74c3c;font-size:0.85rem;margin:0.25rem 0">- ' + f.nodeName + ': ' + f.rule + ' (' + f.clause + ') - ' + f.detail + '</div>';
+      }
+      html += '</div>';
+    }
+    html += '</div></div>';
+  }
+
+  // BOM results
+  if (brainState.bomItems && brainState.bomItems.length > 0) {
+    var bom = brainState.bomItems;
+    var totalCost = 0;
+    for (var bi = 0; bi < bom.length; bi++) totalCost += bom[bi].total;
+    html += '<div class="card"><div class="card-title">' + tx('Stykliste (BOM)', 'Bill of Materials (BOM)') + '</div>';
+    html += '<div class="result-box">';
+    html += '<table style="width:100%;font-size:0.85rem;border-collapse:collapse">';
+    html += '<tr style="border-bottom:1px solid #444"><th style="text-align:left">' + tx('Komponent', 'Component') + '</th><th>' + tx('Antal', 'Qty') + '</th><th>' + tx('Enhed DKK', 'Unit DKK') + '</th><th>' + tx('Total DKK', 'Total DKK') + '</th></tr>';
+    for (var bj = 0; bj < bom.length; bj++) {
+      var item = bom[bj];
+      var prodName = item.product ? ((item.product.brand || '') + ' ' + (item.product.model || '') + ' ' + (item.product.mm2 ? item.product.mm2 + 'mm2' : (item.product.rating ? item.product.rating + 'A' : ''))).trim() : 'Unknown';
+      html += '<tr><td>' + prodName + '</td><td style="text-align:center">' + item.qty + '</td><td style="text-align:right">' + item.unitPrice + '</td><td style="text-align:right">' + item.total + '</td></tr>';
+    }
+    html += '<tr style="border-top:2px solid #666;font-weight:bold"><td colspan="3">' + tx('Total (Solar)', 'Total (Solar)') + '</td><td style="text-align:right">' + Math.round(totalCost * 1.02) + ' DKK</td></tr>';
+    html += '<tr style="font-weight:bold"><td colspan="3">' + tx('Total (Lemvigh-Mueller)', 'Total (Lemvigh-Mueller)') + '</td><td style="text-align:right">' + Math.round(totalCost) + ' DKK</td></tr>';
+    html += '</table></div></div>';
+  }
+
+  // Explanation section (show for first circuit)
+  if (brainState.generatedTree) {
+    var treeN = brainState.generatedTree;
+    var firstCircuit = null;
+    var nids = Object.keys(treeN.nodes);
+    for (var ei = 0; ei < nids.length; ei++) {
+      if (treeN.nodes[nids[ei]].type === 'final_circuit') { firstCircuit = nids[ei]; break; }
+    }
+    if (firstCircuit) {
+      var expl = brainExplainChoice(firstCircuit, treeN);
+      if (expl) {
+        html += '<div class="card"><div class="card-title">' + tx('Designforklaring (eksempel)', 'Design Explanation (example)') + ' - ' + (treeN.nodes[firstCircuit].name_da || '') + '</div>';
+        html += '<div class="result-box">';
+        var explKeys = Object.keys(expl);
+        for (var ek = 0; ek < explKeys.length; ek++) {
+          var exp = expl[explKeys[ek]];
+          html += '<div style="margin:0.4rem 0"><strong>' + explKeys[ek] + ':</strong> ' + (exp.choice || exp.value || '') + '<br><span style="font-size:0.8rem;color:#aaa">' + exp.reason + ' [' + exp.clause + ']</span></div>';
+        }
+        html += '</div></div>';
+      }
+    }
+  }
+
+  return html;
+}
+
+function brainDoGenerate() {
+  brainGenerateInstallation();
+  renderModule('brain');
+}
+
+function brainDoAudit() {
+  brainRunAudit();
+  renderModule('brain');
+}
+
+function brainDoBOM() {
+  brainGenerateBOM();
+  renderModule('brain');
 }
 
 // ===== INIT =====

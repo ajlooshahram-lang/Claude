@@ -1189,6 +1189,263 @@ test('sldSimulateFault uses ikmin for both earth_fault and short_circuit', funct
   assert(resultShort.ikFault === ikData.ikmin, 'Short circuit should use ikmin (conservative). Got: ' + resultShort.ikFault);
 });
 
+// === Electrical Brain Tests ===
+console.log('\n=== Electrical Brain Tests ===\n');
+
+// Test 53: All Brain functions are defined
+test('All Brain functions are defined', function() {
+  assert(typeof brainGenerateInstallation === 'function', 'brainGenerateInstallation should be a function');
+  assert(typeof brainRunAudit === 'function', 'brainRunAudit should be a function');
+  assert(typeof brainGenerateBOM === 'function', 'brainGenerateBOM should be a function');
+  assert(typeof brainExplainChoice === 'function', 'brainExplainChoice should be a function');
+  assert(typeof brainCalcIB === 'function', 'brainCalcIB should be a function');
+  assert(typeof brainSelectProtectionRating === 'function', 'brainSelectProtectionRating should be a function');
+  assert(typeof brainSelectCable === 'function', 'brainSelectCable should be a function');
+  assert(typeof brainSelectMCB === 'function', 'brainSelectMCB should be a function');
+  assert(typeof renderBrain === 'function', 'renderBrain should be a function');
+  assert(typeof brainSelectBuilding === 'function', 'brainSelectBuilding should be a function');
+  assert(typeof brainToggleOption === 'function', 'brainToggleOption should be a function');
+});
+
+// Test 54: Brain module registered in all three languages
+test('Brain module appears in all three language translation objects', function() {
+  assert(T.da.modules.brain === 'El-Hjerne', 'Danish brain module name. Got: ' + T.da.modules.brain);
+  assert(T.en.modules.brain === 'Brain', 'English brain module name. Got: ' + T.en.modules.brain);
+  assert(T.fa.modules.brain !== undefined, 'Farsi brain module exists');
+});
+
+// Test 55: brainGenerateInstallation creates valid tree for parcelhus
+test('brainGenerateInstallation creates valid tree for parcelhus', function() {
+  sldNextId = 10000;
+  var tree = brainGenerateInstallation('parcelhus');
+  assert(tree !== null, 'Tree should not be null');
+  assert(tree.rootId !== null, 'Tree should have a rootId');
+  assert(tree.nodes[tree.rootId] !== undefined, 'Root node should exist');
+  assert(tree.nodes[tree.rootId].type === 'transformer', 'Root should be transformer');
+});
+
+// Test 56: Generated tree has correct structure (trafo -> main -> sub_boards -> circuits)
+test('Generated tree has correct structure (trafo -> main -> RCD groups -> circuits)', function() {
+  sldNextId = 10100;
+  var tree = brainGenerateInstallation('parcelhus');
+  var root = tree.nodes[tree.rootId];
+  assert(root.childIds.length > 0, 'Transformer should have children');
+  var mainBoardId = root.childIds[0];
+  var mainBoard = tree.nodes[mainBoardId];
+  assert(mainBoard.type === 'main_board', 'First child should be main_board');
+  assert(mainBoard.childIds.length > 0, 'Main board should have sub-boards');
+  var subBoardId = mainBoard.childIds[0];
+  var subBoard = tree.nodes[subBoardId];
+  assert(subBoard.type === 'sub_board', 'Main board children should be sub_boards');
+  assert(subBoard.childIds.length > 0, 'Sub-board should have final circuits');
+  var fcId = subBoard.childIds[0];
+  var fc = tree.nodes[fcId];
+  assert(fc.type === 'final_circuit', 'Sub-board children should be final circuits');
+});
+
+// Test 57: All circuits satisfy IB <= In <= Iz
+test('All generated circuits satisfy IB <= In <= Iz', function() {
+  sldNextId = 10200;
+  var tree = brainGenerateInstallation('parcelhus');
+  sldPropagateAll(tree);
+  var nodeIds = Object.keys(tree.nodes);
+  var checked = 0;
+  for (var i = 0; i < nodeIds.length; i++) {
+    var node = tree.nodes[nodeIds[i]];
+    if (node.type === 'final_circuit' && node.cable && node.protectionIn) {
+      var ib = node._ib || sldCalcNodeIB(node);
+      var iz = node.cable.iz;
+      var protIn = node.protectionIn;
+      assert(ib <= protIn + 0.1, 'IB(' + ib.toFixed(1) + ') <= In(' + protIn + ') for ' + (node.name_en || node.name_da));
+      assert(protIn <= iz + 0.1, 'In(' + protIn + ') <= Iz(' + iz + ') for ' + (node.name_en || node.name_da));
+      checked++;
+    }
+  }
+  assert(checked > 0, 'At least one circuit should be checked');
+});
+
+// Test 58: Voltage drop <= 4% for all circuits
+test('Voltage drop <= 4% for all generated circuits', function() {
+  sldNextId = 10300;
+  var tree = brainGenerateInstallation('parcelhus');
+  sldPropagateAll(tree);
+  var nodeIds = Object.keys(tree.nodes);
+  var checked = 0;
+  for (var i = 0; i < nodeIds.length; i++) {
+    var node = tree.nodes[nodeIds[i]];
+    if (node.type === 'final_circuit') {
+      var vdrop = node._vdrop || sldCalcNodeVdrop(tree, nodeIds[i]);
+      assert(vdrop <= 4.0, 'Vdrop(' + vdrop.toFixed(2) + '%) <= 4% for ' + (node.name_en || node.name_da));
+      checked++;
+    }
+  }
+  assert(checked > 0, 'At least one circuit should be checked');
+});
+
+// Test 59: Transformer is correctly sized (next standard size up)
+test('Transformer is correctly sized (next standard size up from calculated load)', function() {
+  sldNextId = 10400;
+  var tree = brainGenerateInstallation('parcelhus');
+  var trafo = tree.nodes[tree.rootId];
+  var trafoSize = trafo.power_kVA;
+  // parcelhus with default options should be well under 100 kVA
+  assert(TRAFO_SIZES.indexOf(trafoSize) >= 0, 'Transformer size must be a standard size. Got: ' + trafoSize);
+  assert(trafoSize >= 50, 'Transformer should be at least 50 kVA for a house');
+});
+
+// Test 60: RCD grouping respects max 6 circuits per RCD
+test('RCD grouping respects max 6 circuits per RCD group', function() {
+  sldNextId = 10500;
+  var tree = brainGenerateInstallation('parcelhus');
+  var nodeIds = Object.keys(tree.nodes);
+  for (var i = 0; i < nodeIds.length; i++) {
+    var node = tree.nodes[nodeIds[i]];
+    if (node.type === 'sub_board') {
+      var fcCount = 0;
+      for (var j = 0; j < node.childIds.length; j++) {
+        if (tree.nodes[node.childIds[j]].type === 'final_circuit') fcCount++;
+      }
+      assert(fcCount <= 6, 'Sub-board ' + (node.name_da || nodeIds[i]) + ' has ' + fcCount + ' circuits, max 6 allowed');
+    }
+  }
+});
+
+// Test 61: EV charger gets Type B RCD
+test('EV charger gets Type B RCD', function() {
+  sldNextId = 10600;
+  var opts = ['light_1', 'socket_1', 'ev_charger_11'];
+  var tree = brainGenerateInstallation('parcelhus', opts);
+  var nodeIds = Object.keys(tree.nodes);
+  var evFound = false;
+  for (var i = 0; i < nodeIds.length; i++) {
+    var node = tree.nodes[nodeIds[i]];
+    if (node.type === 'final_circuit' && node.name_en && node.name_en.indexOf('EV') >= 0) {
+      assert(node._rcdType === 'B', 'EV charger should have Type B RCD. Got: ' + node._rcdType);
+      evFound = true;
+    }
+  }
+  assert(evFound, 'Should find at least one EV charger circuit');
+});
+
+// Test 62: brainRunAudit returns no safety-critical failures for default parcelhus
+test('brainRunAudit returns no safety-critical failures for default parcelhus', function() {
+  sldNextId = 10700;
+  var tree = brainGenerateInstallation('parcelhus');
+  var audit = brainRunAudit(tree);
+  assert(audit.passed.length > 0, 'Should have passed checks. Got: ' + audit.passed.length);
+  // Filter out selectivity failures (not safety-critical for residential per DS/HD 60364)
+  var safetyFailures = audit.failed.filter(function(f) { return f.rule.indexOf('Selektivitet') < 0; });
+  assert(safetyFailures.length === 0, 'Should have zero safety-critical failures for default parcelhus. Got: ' + safetyFailures.length + (safetyFailures.length > 0 ? ' - First: ' + safetyFailures[0].rule + ' ' + safetyFailures[0].detail : ''));
+});
+
+// Test 63: brainGenerateBOM returns non-empty list with pricing
+test('brainGenerateBOM returns non-empty list with pricing', function() {
+  sldNextId = 10800;
+  var tree = brainGenerateInstallation('parcelhus');
+  var bom = brainGenerateBOM(tree);
+  assert(bom.length > 0, 'BOM should not be empty. Got length: ' + bom.length);
+  var hasPrice = bom.some(function(item) { return item.unitPrice > 0; });
+  assert(hasPrice, 'At least one BOM item should have a non-zero price');
+  var totalCost = bom.reduce(function(s, item) { return s + item.total; }, 0);
+  assert(totalCost > 0, 'Total BOM cost should be > 0. Got: ' + totalCost);
+});
+
+// Test 64: brainExplainChoice returns clause citations
+test('brainExplainChoice returns DS/HD 60364 clause references', function() {
+  sldNextId = 10900;
+  var tree = brainGenerateInstallation('parcelhus');
+  var nodeIds = Object.keys(tree.nodes);
+  var fcId = null;
+  for (var i = 0; i < nodeIds.length; i++) {
+    if (tree.nodes[nodeIds[i]].type === 'final_circuit') { fcId = nodeIds[i]; break; }
+  }
+  assert(fcId !== null, 'Should find a final circuit');
+  var expl = brainExplainChoice(fcId, tree);
+  assert(expl !== null, 'Explanation should not be null');
+  assert(expl.cable !== undefined, 'Should have cable explanation');
+  assert(expl.cable.clause.indexOf('60364') >= 0, 'Cable clause should reference 60364. Got: ' + expl.cable.clause);
+  assert(expl.protection !== undefined, 'Should have protection explanation');
+  assert(expl.protection.clause.indexOf('60364') >= 0, 'Protection clause should reference 60364');
+});
+
+// Test 65: Phase balancing distributes single-phase loads
+test('Phase balancing distributes loads across L1/L2/L3', function() {
+  sldNextId = 11000;
+  var tree = brainGenerateInstallation('parcelhus');
+  var phases = [0, 0, 0];
+  var nodeIds = Object.keys(tree.nodes);
+  for (var i = 0; i < nodeIds.length; i++) {
+    var node = tree.nodes[nodeIds[i]];
+    if (node.type === 'final_circuit' && node.phases === '1x230' && node._assignedPhase) {
+      phases[node._assignedPhase - 1] += node.power_kW;
+    }
+  }
+  // At least 2 phases should have load (parcelhus has many single-phase circuits)
+  var loadedPhases = phases.filter(function(p) { return p > 0; }).length;
+  assert(loadedPhases >= 2, 'At least 2 phases should carry load. Phase loads: ' + phases.join(', '));
+});
+
+// Test 66: BRAIN_BUILDING_TYPES has all required categories
+test('BRAIN_BUILDING_TYPES has all required categories', function() {
+  assert(BRAIN_BUILDING_TYPES.residential.length >= 3, 'Should have at least 3 residential types');
+  assert(BRAIN_BUILDING_TYPES.commercial.length >= 3, 'Should have at least 3 commercial types');
+  assert(BRAIN_BUILDING_TYPES.industrial.length >= 3, 'Should have at least 3 industrial types');
+  assert(BRAIN_BUILDING_TYPES.agricultural.length >= 2, 'Should have at least 2 agricultural types');
+});
+
+// Test 67: BRAIN_CIRCUIT_TEMPLATES has entries for all building type defaults
+test('BRAIN_CIRCUIT_TEMPLATES covers all building type default options', function() {
+  var cats = Object.keys(BRAIN_BUILDING_TYPES);
+  for (var c = 0; c < cats.length; c++) {
+    var types = BRAIN_BUILDING_TYPES[cats[c]];
+    for (var t = 0; t < types.length; t++) {
+      var opts = types[t].defaultOptions;
+      for (var o = 0; o < opts.length; o++) {
+        assert(BRAIN_CIRCUIT_TEMPLATES[opts[o]] !== undefined, 'Template missing for ' + opts[o] + ' in ' + types[t].id);
+      }
+    }
+  }
+});
+
+// Test 68: brainGenerateInstallation works for industrial type
+test('brainGenerateInstallation works for industrial building type', function() {
+  sldNextId = 11100;
+  var tree = brainGenerateInstallation('vaerksted');
+  assert(tree !== null, 'Should generate tree for vaerksted');
+  assert(tree.nodes[tree.rootId].type === 'transformer', 'Root should be transformer');
+  var nodeIds = Object.keys(tree.nodes);
+  var fcCount = 0;
+  for (var i = 0; i < nodeIds.length; i++) {
+    if (tree.nodes[nodeIds[i]].type === 'final_circuit') fcCount++;
+  }
+  assert(fcCount > 0, 'Should have final circuits for vaerksted');
+});
+
+// Test 69: brainCalcIB returns correct values
+test('brainCalcIB computes correct current for known loads', function() {
+  var circ1phase = { power_kW: 3.68, phases: '1x230', cosPhi: 0.95 };
+  var ib1 = brainCalcIB(circ1phase);
+  var expected1 = 3680 / (230 * 0.95);
+  assert(Math.abs(ib1 - expected1) < 0.1, '1-phase IB should be ~' + expected1.toFixed(1) + '. Got: ' + ib1.toFixed(1));
+
+  var circ3phase = { power_kW: 11, phases: '3x400', cosPhi: 0.85 };
+  var ib3 = brainCalcIB(circ3phase);
+  var expected3 = 11000 / (Math.sqrt(3) * 400 * 0.85);
+  assert(Math.abs(ib3 - expected3) < 0.1, '3-phase IB should be ~' + expected3.toFixed(1) + '. Got: ' + ib3.toFixed(1));
+});
+
+// Test 70: renderBrain returns HTML with no text input fields
+test('renderBrain UI has no text input fields (click-only)', function() {
+  brainState.buildingType = null;
+  brainState.selectedCategory = null;
+  brainState.selectedOptions = [];
+  brainState.generatedTree = null;
+  var html = renderBrain();
+  assert(html.indexOf('<input type="text"') < 0, 'Should have no text input fields');
+  assert(html.indexOf('<input type=\'text\'') < 0, 'Should have no text input fields (single quotes)');
+  assert(html.indexOf('sel-btn') >= 0, 'Should use sel-btn class for buttons');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

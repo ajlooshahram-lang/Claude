@@ -1,0 +1,31 @@
+{
+  "project_type": "Single-file HTML/CSS/JS electrical dimensioning app (Danish market)",
+  "language": "JavaScript (ES6, inline in HTML)",
+  "build_system": "None - single HTML file, no bundler",
+  "test_framework": "Custom headless test runner (node test-sld.js) using assert module, with DOM mocks",
+  "build_command": "node -e \"const fs=require('fs'); const html=fs.readFileSync('el-dimensionering.html','utf8'); const m=html.match(/<script>([\\s\\S]*?)<\\/script>/); if(!m){process.exit(1)} const c=m[1].replace(/^const /gm,'var ').replace(/^let /gm,'var ').replace(/renderNav.*renderModule.*activeModule.*;/,'').replace(/\\(function.*verBadge.*\\)\\(\\);/,''); try{eval(c);console.log('Syntax OK')}catch(e){console.error(e);process.exit(1)}\"",
+  "test_command": "node test-sld.js",
+  "verification_instructions": "1. Run node test-sld.js - all 52 existing tests must pass plus new Brain tests. 2. Verify the HTML file can be parsed by extracting and eval-ing the script block.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "No setup needed - pure single-file app. Node.js is pre-installed for testing.",
+  "environment_constraints": "Open internet available. No npm packages needed - everything is inline.",
+  "contribution_requirements": "All code goes in el-dimensionering.html inline. Tests go in test-sld.js. No external dependencies. Click-only UI (zero typing). Trilingual (da/en/fa with RTL). Life-safety critical calculations must be conservative.",
+  "key_patterns": {
+    "module_registration": "Modules are registered in T.da.modules, T.en.modules, T.fa.modules objects. Nav renders from these. renderModule() switch statement routes to render functions.",
+    "translation": "T object with .da, .en, .fa keys. t(key) returns T[lang][key]. tx(da, en) shorthand for inline bilingual text. fa translations follow same pattern.",
+    "state_management": "Module state in global variables (e.g., loadState, mcbState). No framework.",
+    "rendering": "Functions like renderLoad(), renderFuse() return HTML strings. renderModule() sets innerHTML.",
+    "sld_tree": "sldCreateNode(type, parentId, overrides) creates nodes. sldCreateTree() makes default tree. sldPropagateAll(tree) computes derived values (_ib, _zs, _vdrop, _ikmax, _ikmin).",
+    "products": "PRODUCTS object has: cables, mcbs, mccbs, fuses, contactors, rcds, rcbos, spds, mpcbs, overloadRelays, wiringDevices",
+    "recommend_functions": "recommendCables(ib, material), recommendMCBs(ib, ikmax), recommendMCCBs(ib, ikmax), recommendFuses(ib), recommendRCDs(ib, phases)",
+    "bid_module": "priceFor(cat, product), addToBid(cat, id, qty), WHOLESALERS object, bidState with basket array",
+    "verification": "sldVerifyNode(tree, nodeId) returns array of {rule, clause, status, detail} objects checking DS/HD 60364 compliance",
+    "styling": "CSS custom properties, card-based layout, .sel-btn for selection buttons, .select-grid for button grids, .result-box for results",
+    "data_version": "DATA_VERSION global string for version badge"
+  },
+  "relevant_files": [
+    "/projects/sandbox/Claude/el-dimensionering.html",
+    "/projects/sandbox/Claude/test-sld.js"
+  ],
+  "directory_structure": "Single HTML file app at /projects/sandbox/Claude/el-dimensionering.html with test file at /projects/sandbox/Claude/test-sld.js. All code is inline in the HTML file's <script> tag."
+}
