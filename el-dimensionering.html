@@ -1528,6 +1528,10 @@ const _FA = {
   'Product page': '\u0635\u0641\u062D\u0647 \u0645\u062D\u0635\u0648\u0644',
   'Datasheet': '\u062F\u06CC\u062A\u0627\u0634\u06CC\u062A',
   'The list is empty.': '\u0641\u0647\u0631\u0633\u062A \u062E\u0627\u0644\u06CC \u0627\u0633\u062A.',
+  'Standards check': '\u0628\u0631\u0631\u0633\u06CC \u0627\u0633\u062A\u0627\u0646\u062F\u0627\u0631\u062F',
+  'all': '\u0647\u0645\u0647',
+  'products cite a recognised IEC/EN/DS standard for their category.': '\u0645\u062D\u0635\u0648\u0644\u0627\u062A \u06CC\u06A9 \u0627\u0633\u062A\u0627\u0646\u062F\u0627\u0631\u062F \u0634\u0646\u0627\u062E\u062A\u0647\u200C\u0634\u062F\u0647 IEC/EN/DS \u0631\u0627 \u0628\u0631\u0627\u06CC \u062F\u0633\u062A\u0647 \u062E\u0648\u062F \u0630\u06A9\u0631 \u0645\u06CC\u200C\u06A9\u0646\u0646\u062F.',
+  'products lack a recognised standard.': '\u0645\u062D\u0635\u0648\u0644\u0627\u062A \u0641\u0627\u0642\u062F \u06CC\u06A9 \u0627\u0633\u062A\u0627\u0646\u062F\u0627\u0631\u062F \u0634\u0646\u0627\u062E\u062A\u0647\u200C\u0634\u062F\u0647 \u0647\u0633\u062A\u0646\u062F.',
   'Generated': '\u062A\u0648\u0644\u06CC\u062F\u200C\u0634\u062F\u0647',
   'Reference': '\u0645\u0631\u062C\u0639',
   'Allow pop-ups to print.': '\u0628\u0631\u0627\u06CC \u0686\u0627\u067E\u060C \u067E\u0646\u062C\u0631\u0647\u200C\u0647\u0627\u06CC \u0628\u0627\u0632\u0634\u0648 \u0631\u0627 \u0645\u062C\u0627\u0632 \u06A9\u0646\u06CC\u062F.',
@@ -2980,13 +2984,19 @@ const PRODUCTS = {
   ],
 
   // === CABLE JOINTS ===
+  // STANDARD CORRECTION (flagged, grounded): these are LV 0,6/1 kV distribution-cable
+  // accessories (joints/muffer) sized 16-240 mm2 for the N1XV/NAYY supply cables above.
+  // The applicable product standard is EN 50393 (test methods & requirements for
+  // accessories on distribution cables of rated voltage 0,6/1,0 kV; CENELEC lineage HD 623).
+  // The previous citation IEC 60840 applies ONLY to HV cables/accessories ABOVE 30 kV
+  // (Um=36 kV) up to 150 kV — i.e. the wrong voltage class for these LV joints.
   cableJoints: [
-    { id: 'CJ-HEAT-16', brand: 'Cellpack', model: 'SRH2 16mm2', cat: 'heat-shrink', mm2: 16, use_da: 'Krympemuffe 16mm2', use_en: 'Heat-shrink joint 16mm2', standard: 'IEC 60840' },
-    { id: 'CJ-HEAT-35', brand: 'Cellpack', model: 'SRH2 35mm2', cat: 'heat-shrink', mm2: 35, use_da: 'Krympemuffe 35mm2', use_en: 'Heat-shrink joint 35mm2', standard: 'IEC 60840' },
-    { id: 'CJ-HEAT-95', brand: 'Cellpack', model: 'SRH2 95mm2', cat: 'heat-shrink', mm2: 95, use_da: 'Krympemuffe 95mm2', use_en: 'Heat-shrink joint 95mm2', standard: 'IEC 60840' },
-    { id: 'CJ-COLD-50', brand: 'Cellpack', model: 'SRCE 50mm2', cat: 'cold-shrink', mm2: 50, use_da: 'Koldkrympemuffe 50mm2', use_en: 'Cold-shrink joint 50mm2', standard: 'IEC 60840' },
-    { id: 'CJ-COLD-120', brand: 'Cellpack', model: 'SRCE 120mm2', cat: 'cold-shrink', mm2: 120, use_da: 'Koldkrympemuffe 120mm2', use_en: 'Cold-shrink joint 120mm2', standard: 'IEC 60840' },
-    { id: 'CJ-RESIN-240', brand: 'Cellpack', model: 'RSMA 240mm2', cat: 'resin', mm2: 240, use_da: 'Stoebningsmuffe 240mm2', use_en: 'Resin joint 240mm2', standard: 'IEC 60840' }
+    { id: 'CJ-HEAT-16', brand: 'Cellpack', model: 'SRH2 16mm2', cat: 'heat-shrink', mm2: 16, use_da: 'Krympemuffe 16mm2', use_en: 'Heat-shrink joint 16mm2', standard: 'EN 50393' },
+    { id: 'CJ-HEAT-35', brand: 'Cellpack', model: 'SRH2 35mm2', cat: 'heat-shrink', mm2: 35, use_da: 'Krympemuffe 35mm2', use_en: 'Heat-shrink joint 35mm2', standard: 'EN 50393' },
+    { id: 'CJ-HEAT-95', brand: 'Cellpack', model: 'SRH2 95mm2', cat: 'heat-shrink', mm2: 95, use_da: 'Krympemuffe 95mm2', use_en: 'Heat-shrink joint 95mm2', standard: 'EN 50393' },
+    { id: 'CJ-COLD-50', brand: 'Cellpack', model: 'SRCE 50mm2', cat: 'cold-shrink', mm2: 50, use_da: 'Koldkrympemuffe 50mm2', use_en: 'Cold-shrink joint 50mm2', standard: 'EN 50393' },
+    { id: 'CJ-COLD-120', brand: 'Cellpack', model: 'SRCE 120mm2', cat: 'cold-shrink', mm2: 120, use_da: 'Koldkrympemuffe 120mm2', use_en: 'Cold-shrink joint 120mm2', standard: 'EN 50393' },
+    { id: 'CJ-RESIN-240', brand: 'Cellpack', model: 'RSMA 240mm2', cat: 'resin', mm2: 240, use_da: 'Stoebningsmuffe 240mm2', use_en: 'Resin joint 240mm2', standard: 'EN 50393' }
   ],
 
   // === CABLE DUCTS (Danish color codes: red=power, blue=telecom, green=fiber) ===
@@ -3001,18 +3011,23 @@ const PRODUCTS = {
   ],
 
   // === TRANSFORMERS (ONAN=oil, AN=dry) ===
+  // STANDARD CORRECTION (flagged, grounded): cited under EN 50588-1 "Medium power
+  // transformers 50 Hz, Um <= 36 kV" (5 kVA..40 MVA), the current unified CENELEC
+  // product standard that covers BOTH oil-immersed and dry-type units. It supersedes
+  // the withdrawn EN 50464-1 (oil-immersed only — which also did NOT cover the dry-type
+  // AN units listed here). No numeric rating (kVA/uk%/losses) was changed.
   transformers: [
-    { id: 'TR-ONAN-50', brand: 'ABB', model: 'Oil DTR 50kVA', cooling: 'ONAN', kva: 50, ukPct: 4.0, pkW: 1.1, p0W: 190, use_da: '50kVA oliekoelet transformer', use_en: '50kVA oil-cooled transformer', standard: 'EN 50464-1' },
-    { id: 'TR-ONAN-100', brand: 'ABB', model: 'Oil DTR 100kVA', cooling: 'ONAN', kva: 100, ukPct: 4.0, pkW: 1.75, p0W: 320, use_da: '100kVA oliekoelet transformer', use_en: '100kVA oil-cooled transformer', standard: 'EN 50464-1' },
-    { id: 'TR-ONAN-250', brand: 'ABB', model: 'Oil DTR 250kVA', cooling: 'ONAN', kva: 250, ukPct: 4.5, pkW: 3.25, p0W: 650, use_da: '250kVA oliekoelet transformer', use_en: '250kVA oil-cooled transformer', standard: 'EN 50464-1' },
-    { id: 'TR-ONAN-400', brand: 'ABB', model: 'Oil DTR 400kVA', cooling: 'ONAN', kva: 400, ukPct: 4.5, pkW: 4.6, p0W: 930, use_da: '400kVA oliekoelet transformer', use_en: '400kVA oil-cooled transformer', standard: 'EN 50464-1' },
-    { id: 'TR-ONAN-630', brand: 'ABB', model: 'Oil DTR 630kVA', cooling: 'ONAN', kva: 630, ukPct: 5.0, pkW: 6.5, p0W: 1300, use_da: '630kVA oliekoelet transformer', use_en: '630kVA oil-cooled transformer', standard: 'EN 50464-1' },
-    { id: 'TR-ONAN-1000', brand: 'ABB', model: 'Oil DTR 1000kVA', cooling: 'ONAN', kva: 1000, ukPct: 5.5, pkW: 10.5, p0W: 1700, use_da: '1000kVA oliekoelet transformer', use_en: '1000kVA oil-cooled transformer', standard: 'EN 50464-1' },
-    { id: 'TR-ONAN-2500', brand: 'ABB', model: 'Oil DTR 2500kVA', cooling: 'ONAN', kva: 2500, ukPct: 6.0, pkW: 24.0, p0W: 3800, use_da: '2500kVA oliekoelet transformer', use_en: '2500kVA oil-cooled transformer', standard: 'EN 50464-1' },
-    { id: 'TR-AN-100', brand: 'ABB', model: 'Dry DTR 100kVA', cooling: 'AN', kva: 100, ukPct: 4.5, pkW: 2.15, p0W: 480, use_da: '100kVA toertype transformer', use_en: '100kVA dry-type transformer', standard: 'EN 50464-1' },
-    { id: 'TR-AN-250', brand: 'ABB', model: 'Dry DTR 250kVA', cooling: 'AN', kva: 250, ukPct: 5.0, pkW: 4.2, p0W: 850, use_da: '250kVA toertype transformer', use_en: '250kVA dry-type transformer', standard: 'EN 50464-1' },
-    { id: 'TR-AN-630', brand: 'ABB', model: 'Dry DTR 630kVA', cooling: 'AN', kva: 630, ukPct: 5.5, pkW: 8.0, p0W: 1700, use_da: '630kVA toertype transformer', use_en: '630kVA dry-type transformer', standard: 'EN 50464-1' },
-    { id: 'TR-AN-1000', brand: 'ABB', model: 'Dry DTR 1000kVA', cooling: 'AN', kva: 1000, ukPct: 6.0, pkW: 12.0, p0W: 2500, use_da: '1000kVA toertype transformer', use_en: '1000kVA dry-type transformer', standard: 'EN 50464-1' }
+    { id: 'TR-ONAN-50', brand: 'ABB', model: 'Oil DTR 50kVA', cooling: 'ONAN', kva: 50, ukPct: 4.0, pkW: 1.1, p0W: 190, use_da: '50kVA oliekoelet transformer', use_en: '50kVA oil-cooled transformer', standard: 'EN 50588-1' },
+    { id: 'TR-ONAN-100', brand: 'ABB', model: 'Oil DTR 100kVA', cooling: 'ONAN', kva: 100, ukPct: 4.0, pkW: 1.75, p0W: 320, use_da: '100kVA oliekoelet transformer', use_en: '100kVA oil-cooled transformer', standard: 'EN 50588-1' },
+    { id: 'TR-ONAN-250', brand: 'ABB', model: 'Oil DTR 250kVA', cooling: 'ONAN', kva: 250, ukPct: 4.5, pkW: 3.25, p0W: 650, use_da: '250kVA oliekoelet transformer', use_en: '250kVA oil-cooled transformer', standard: 'EN 50588-1' },
+    { id: 'TR-ONAN-400', brand: 'ABB', model: 'Oil DTR 400kVA', cooling: 'ONAN', kva: 400, ukPct: 4.5, pkW: 4.6, p0W: 930, use_da: '400kVA oliekoelet transformer', use_en: '400kVA oil-cooled transformer', standard: 'EN 50588-1' },
+    { id: 'TR-ONAN-630', brand: 'ABB', model: 'Oil DTR 630kVA', cooling: 'ONAN', kva: 630, ukPct: 5.0, pkW: 6.5, p0W: 1300, use_da: '630kVA oliekoelet transformer', use_en: '630kVA oil-cooled transformer', standard: 'EN 50588-1' },
+    { id: 'TR-ONAN-1000', brand: 'ABB', model: 'Oil DTR 1000kVA', cooling: 'ONAN', kva: 1000, ukPct: 5.5, pkW: 10.5, p0W: 1700, use_da: '1000kVA oliekoelet transformer', use_en: '1000kVA oil-cooled transformer', standard: 'EN 50588-1' },
+    { id: 'TR-ONAN-2500', brand: 'ABB', model: 'Oil DTR 2500kVA', cooling: 'ONAN', kva: 2500, ukPct: 6.0, pkW: 24.0, p0W: 3800, use_da: '2500kVA oliekoelet transformer', use_en: '2500kVA oil-cooled transformer', standard: 'EN 50588-1' },
+    { id: 'TR-AN-100', brand: 'ABB', model: 'Dry DTR 100kVA', cooling: 'AN', kva: 100, ukPct: 4.5, pkW: 2.15, p0W: 480, use_da: '100kVA toertype transformer', use_en: '100kVA dry-type transformer', standard: 'EN 50588-1' },
+    { id: 'TR-AN-250', brand: 'ABB', model: 'Dry DTR 250kVA', cooling: 'AN', kva: 250, ukPct: 5.0, pkW: 4.2, p0W: 850, use_da: '250kVA toertype transformer', use_en: '250kVA dry-type transformer', standard: 'EN 50588-1' },
+    { id: 'TR-AN-630', brand: 'ABB', model: 'Dry DTR 630kVA', cooling: 'AN', kva: 630, ukPct: 5.5, pkW: 8.0, p0W: 1700, use_da: '630kVA toertype transformer', use_en: '630kVA dry-type transformer', standard: 'EN 50588-1' },
+    { id: 'TR-AN-1000', brand: 'ABB', model: 'Dry DTR 1000kVA', cooling: 'AN', kva: 1000, ukPct: 6.0, pkW: 12.0, p0W: 2500, use_da: '1000kVA toertype transformer', use_en: '1000kVA dry-type transformer', standard: 'EN 50588-1' }
   ],
 
   // === TERMINALS ===
@@ -8112,7 +8127,7 @@ function elforsyningProductById(id) {
 }
 
 // Applicable standard for a line: every supply-side product carries its own `standard`
-// field (e.g. IEC 60269-2, IEC 60228, IEC 60840, DS/HD 60364-5-54). Falls back to the
+// field (e.g. IEC 60269-2, IEC 60228, EN 50393, DS/HD 60364-5-54). Falls back to the
 // installation standard so the column is never blank.
 function elforsyningStandard(p) {
   return (p && p.standard) ? p.standard : ELFORSYNING_STD_REF;
@@ -8123,6 +8138,70 @@ function elforsyningStandard(p) {
 // We never fabricate certificate numbers.
 function elforsyningApproval(p) {
   return tx('CE-m\u00E6rket', 'CE-marked');
+}
+
+// --- Standards verification registry (life-safety: every line must cite the correct
+// IEC/EN/DS clause for its category). This is the executable, permanent form of the
+// standards audit: a registry of the standards that are RECOGNISED as applicable to
+// each of the 8 supply-side categories, plus a checker that flags any product whose
+// `standard` field is missing or not recognised for its category. It never invents a
+// certificate — it only confirms the cited clause belongs to the right family.
+//   supplyCables   DS/HD 60364-5-52  selection & erection of wiring systems (installation)
+//   metering       IEC 61869-2 (CT) / IEC 62053-22 (active-energy meter) / IEC 61557-12 (PMD)
+//   mainFuses      IEC 60269-2       LV fuses for use by authorised persons (gG NH/utility-sealed)
+//   earthing       DS/HD 60364-5-54  earthing arrangements & protective conductors
+//   cableJoints    EN 50393          accessories for 0,6/1,0 kV distribution cables (LV)
+//   cableDucts     DS 475 (buried duct laying norm) / IEC 61537 (cable tray/ladder systems)
+//   transformers   EN 50588-1        medium power transformers Um<=36 kV (oil + dry)
+//   terminals      IEC 60947-7-1     terminal blocks for copper conductors
+const ELFORSYNING_EXPECTED_STANDARDS = {
+  supplyCables: ['DS/HD 60364-5-52'],
+  metering: ['IEC 61869-2', 'IEC 62053-22', 'IEC 61557-12'],
+  mainFuses: ['IEC 60269-2'],
+  earthing: ['DS/HD 60364-5-54'],
+  cableJoints: ['EN 50393'],
+  cableDucts: ['DS 475', 'IEC 61537'],
+  transformers: ['EN 50588-1'],
+  terminals: ['IEC 60947-7-1']
+};
+
+// Checks every product in the 8 categories: does its `standard` field cite a standard
+// that is recognised as applicable to that category? Returns a structured result with
+// any anomalies so the UI/report/export can prove "all lines cite a recognised standard".
+function elforsyningVerifyStandards() {
+  const anomalies = [];
+  let total = 0, verified = 0;
+  ELFORSYNING_CATEGORIES.forEach(function(cat) {
+    const expected = ELFORSYNING_EXPECTED_STANDARDS[cat] || [];
+    (PRODUCTS[cat] || []).forEach(function(p) {
+      total++;
+      const std = p && p.standard;
+      if (!std) {
+        anomalies.push({ id: p.id, category: cat, brand: p.brand, model: p.model, standard: null, reason: 'missing' });
+      } else if (expected.indexOf(std) < 0) {
+        anomalies.push({ id: p.id, category: cat, brand: p.brand, model: p.model, standard: std, reason: 'unrecognised' });
+      } else {
+        verified++;
+      }
+    });
+  });
+  return { ok: anomalies.length === 0, total: total, verified: verified, anomalies: anomalies };
+}
+
+// One-line trilingual summary of the standards check, for the UI and the print report.
+// Built from static translatable fragments (numbers concatenated separately) so the
+// Farsi (_FA) lookup resolves cleanly for every fragment.
+function elforsyningStandardsSummary() {
+  const v = elforsyningVerifyStandards();
+  if (v.ok) {
+    return '\u2713 ' + tx('Standardtjek', 'Standards check') + ': '
+      + tx('alle', 'all') + ' ' + v.verified + ' '
+      + tx('produkter citerer en anerkendt IEC/EN/DS-standard for deres kategori.',
+           'products cite a recognised IEC/EN/DS standard for their category.');
+  }
+  return '\u26A0 ' + tx('Standardtjek', 'Standards check') + ': '
+    + v.anomalies.length + ' / ' + v.total + ' '
+    + tx('produkter mangler en anerkendt standard.', 'products lack a recognised standard.');
 }
 
 // --- Persistence (NEW localStorage key, no collision with existing keys) ---
@@ -8280,6 +8359,10 @@ function elforsyningExportData() {
     categoryDistinctCounts: categoryDistinctCounts,
     distinctCount: elforsyningDistinctCount(),
     totalCount: elforsyningTotalCount(),
+    standardsCheck: (function() {
+      const v = elforsyningVerifyStandards();
+      return { ok: v.ok, total: v.total, verified: v.verified, anomalies: v.anomalies };
+    })(),
     lines: lines
   };
 }
@@ -8388,6 +8471,7 @@ function elforsyningReportHtml() {
     + ' &middot; ' + esc(tx('Reference', 'Reference')) + ': ' + esc(ELFORSYNING_STD_REF) + '</div>';
   h += '<p>' + esc(tx('Varelinjer (forskellige produkter)', 'Line items (distinct products)')) + ': <b>' + elforsyningDistinctCount() + '</b>'
     + ' &middot; ' + esc(tx('Antal i alt', 'Total quantity')) + ': <b>' + elforsyningTotalCount() + '</b></p>';
+  h += '<p class="muted">' + esc(elforsyningStandardsSummary()) + '</p>';
   if (!lines.length) {
     h += '<p class="muted">' + esc(tx('Listen er tom.', 'The list is empty.')) + '</p>';
   } else {
@@ -8502,7 +8586,8 @@ function renderElforsyningBom() {
     + '<span class="value"><strong>' + elforsyningDistinctCount() + '</strong></span></div>'
     + '<div class="result-row">'
     + '<span class="label"><strong>' + tx('I alt (alle kategorier)', 'Grand total (all categories)') + '</strong></span>'
-    + '<span class="value"><strong>' + total + '</strong></span></div></div>';
+    + '<span class="value"><strong>' + total + '</strong></span></div>'
+    + '<div class="result-row"><span class="label">' + elforsyningStandardsSummary() + '</span></div></div>';
   h += '<div class="info-row" style="margin-top:8px">' + tx(
     'Bem\u00E6rk: Verificer aktuelle priser mod danske grossistkataloger (' + ELFORSYNING_WHOLESALERS.join(', ') + '). Datoer genereres automatisk.',
     'Note: Verify current prices against Danish wholesaler catalogs (' + ELFORSYNING_WHOLESALERS.join(', ') + '). Dates are auto-generated.') + '</div>';

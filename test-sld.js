@@ -2550,13 +2550,13 @@ test('Supply cable Iz values are conservative for method D underground', functio
   }
 });
 
-// Test 166: Transformer impedance values within EN 50464-1 ranges
-test('Transformer ukPct values within EN 50464-1 standard ranges', function() {
+// Test 166: Transformer impedance values within EN 50588-1 ranges
+test('Transformer ukPct values within EN 50588-1 standard ranges', function() {
   var trafos = PRODUCTS.transformers;
   for (var i = 0; i < trafos.length; i++) {
     var t = trafos[i];
     assert.ok(t.ukPct >= 3.5 && t.ukPct <= 8.0, t.id + ' ukPct=' + t.ukPct + ' must be 3.5-8.0%');
-    // EN 50464-1: up to 630 kVA typically 4%, above 630 kVA typically 6%
+    // EN 50588-1: up to 630 kVA typically 4%, above 630 kVA typically 6%
     if (t.kva <= 630) assert.ok(t.ukPct >= 4.0 && t.ukPct <= 6.0, t.id + ' <=630kVA: ukPct should be 4-6%');
     if (t.kva > 630) assert.ok(t.ukPct >= 5.0 && t.ukPct <= 7.0, t.id + ' >630kVA: ukPct should be 5-7%');
     // Load losses must be positive and proportional to kVA
@@ -7474,6 +7474,106 @@ test('Elforsyning: Farsi strings exist in _FA for the key visible controls', fun
   var savedLang = lang; lang = 'fa';
   assert.strictEqual(tx('V\u00E6lg alle elforsyningsmaterialer', 'Pick all elforsyning materials'), _FA['Pick all elforsyning materials']);
   lang = savedLang;
+});
+
+// ===== Standards verification layer (life-safety: correct IEC/EN/DS clause per line) =====
+test('Elforsyning: EVERY product across the 8 categories cites a recognised IEC/EN/DS standard', function() {
+  var v = elforsyningVerifyStandards();
+  assert.strictEqual(v.total, elfExpectedProductCount(), 'checks every product in the 8 categories');
+  assert.deepStrictEqual(v.anomalies, [], 'no product has a missing/unrecognised standard: ' + JSON.stringify(v.anomalies));
+  assert.strictEqual(v.ok, true, 'overall standards check is OK');
+  assert.strictEqual(v.verified, v.total, 'verified count equals total');
+});
+
+test('Elforsyning: expected-standards registry covers all 8 categories with non-empty sets', function() {
+  ELF_CATS.forEach(function(c) {
+    assert(Array.isArray(ELFORSYNING_EXPECTED_STANDARDS[c]) && ELFORSYNING_EXPECTED_STANDARDS[c].length >= 1,
+      'registry has standards for ' + c);
+  });
+});
+
+test('Elforsyning: cable joints cite EN 50393 (LV 0,6/1kV accessories) — NOT IEC 60840 (>30kV HV)', function() {
+  // IEC 60840 applies only to HV cables/accessories above 30 kV (Um=36 kV) up to 150 kV.
+  // These joints are 16-240 mm2 for 0,6/1 kV distribution cables -> EN 50393 is correct.
+  PRODUCTS.cableJoints.forEach(function(p) {
+    assert.strictEqual(p.standard, 'EN 50393', p.id + ' cites EN 50393');
+    assert.notStrictEqual(p.standard, 'IEC 60840', p.id + ' must NOT cite HV IEC 60840');
+  });
+});
+
+test('Elforsyning: transformers cite EN 50588-1 (oil+dry, Um<=36kV) — NOT withdrawn EN 50464-1', function() {
+  PRODUCTS.transformers.forEach(function(p) {
+    assert.strictEqual(p.standard, 'EN 50588-1', p.id + ' cites EN 50588-1');
+    assert.notStrictEqual(p.standard, 'EN 50464-1', p.id + ' must NOT cite withdrawn oil-only EN 50464-1');
+  });
+});
+
+test('Elforsyning: no supply-side line cites the HV-only IEC 60840 clause anywhere', function() {
+  ELF_CATS.forEach(function(c) {
+    (PRODUCTS[c] || []).forEach(function(p) {
+      assert.notStrictEqual(p.standard, 'IEC 60840', c + '/' + p.id + ' must not cite IEC 60840 (HV >30kV)');
+    });
+  });
+});
+
+test('Elforsyning: verifier DETECTS a missing or unrecognised standard (negative test, restores data)', function() {
+  var sample = PRODUCTS.terminals[0];
+  var original = sample.standard;
+  // Inject an unrecognised standard and confirm the verifier flags exactly that line.
+  sample.standard = 'IEC 99999-1';
+  var v1 = elforsyningVerifyStandards();
+  assert.strictEqual(v1.ok, false, 'unrecognised standard breaks the check');
+  var hit1 = v1.anomalies.filter(function(a) { return a.id === sample.id; });
+  assert(hit1.length === 1 && hit1[0].reason === 'unrecognised', 'flags the injected line as unrecognised');
+  // Now remove the standard entirely and confirm it is flagged as missing.
+  delete sample.standard;
+  var v2 = elforsyningVerifyStandards();
+  var hit2 = v2.anomalies.filter(function(a) { return a.id === sample.id; });
+  assert(hit2.length === 1 && hit2[0].reason === 'missing', 'flags the line with no standard as missing');
+  // Restore the original data so no other test is affected.
+  sample.standard = original;
+  assert.strictEqual(elforsyningVerifyStandards().ok, true, 'data restored, check OK again');
+});
+
+test('Elforsyning: JSON export carries a standardsCheck summary (ok + counts + anomalies)', function() {
+  elfReset();
+  elforsyningPickAll();
+  var data = elforsyningExportData();
+  assert(data.standardsCheck && typeof data.standardsCheck === 'object', 'standardsCheck present');
+  assert.strictEqual(data.standardsCheck.ok, true, 'export reports a passing standards check');
+  assert.strictEqual(data.standardsCheck.total, elfExpectedProductCount(), 'total counted');
+  assert.deepStrictEqual(data.standardsCheck.anomalies, [], 'no anomalies in export');
+  elfRestore();
+});
+
+test('Elforsyning: standards-check line renders in the BOM UI in BOTH da and en (and fa fragment)', function() {
+  elfReset();
+  elforsyningPickAll();
+  var savedLang = lang;
+  lang = 'da';
+  var da = renderElforsyningBom();
+  assert(da.indexOf('Standardtjek') >= 0, 'da standards-check label');
+  assert(da.indexOf('\u2713') >= 0, 'da shows the pass checkmark');
+  lang = 'en';
+  var en = renderElforsyningBom();
+  assert(en.indexOf('Standards check') >= 0, 'en standards-check label');
+  assert(en.indexOf('recognised IEC/EN/DS standard') >= 0, 'en explains recognised standard');
+  lang = 'fa';
+  var fa = renderElforsyningBom();
+  assert(fa.indexOf(_FA['Standards check']) >= 0, 'fa standards-check label rendered');
+  lang = savedLang;
+  elfRestore();
+});
+
+test('Elforsyning: print report includes the standards-check summary line', function() {
+  elfReset();
+  elforsyningPickAll();
+  var savedLang = lang; lang = 'en';
+  var report = elforsyningReportHtml();
+  assert(report.indexOf('Standards check') >= 0, 'report shows standards-check line');
+  assert(report.indexOf('\u2713') >= 0, 'report shows the pass checkmark');
+  lang = savedLang;
+  elfRestore();
 });
 
 test('Elforsyning: Legionella rule is a MINIMUM at the tap (>=50C), not a maximum', function() {
