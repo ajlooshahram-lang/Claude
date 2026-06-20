@@ -1425,6 +1425,7 @@ const _FA = {
   'voltage U': '\u0648\u0644\u062A\u0627\u0698 U',
   'current I': '\u062C\u0631\u06CC\u0627\u0646 I',
   'power factor cos\u03C6': '\u0636\u0631\u06CC\u0628 \u062A\u0648\u0627\u0646 cos\u03C6',
+  'Fine-tune with the step buttons (\u2212\u2212 / \u2212 / + / ++) to reach any value \u2014 entirely without typing.': '\u0628\u0627 \u062F\u06A9\u0645\u0647\u200C\u0647\u0627\u06CC \u06AF\u0627\u0645 (\u2212\u2212 / \u2212 / + / ++) \u0628\u0631\u0627\u06CC \u0631\u0633\u06CC\u062F\u0646 \u0628\u0647 \u0647\u0631 \u0645\u0642\u062F\u0627\u0631\u06CC \u062A\u0646\u0638\u06CC\u0645 \u062F\u0642\u06CC\u0642 \u06A9\u0646\u06CC\u062F \u2014 \u06A9\u0627\u0645\u0644\u0627\u064B \u0628\u062F\u0648\u0646 \u062A\u0627\u06CC\u067E.',
   // ===== Phase-1 solver-formulas additions (symbols/cards/legends) =====
   'Symbol legend': '\u0631\u0627\u0647\u0646\u0645\u0627\u06CC \u0646\u0645\u0627\u062F\u0647\u0627',
   'show': '\u0646\u0645\u0627\u06CC\u0634',
@@ -7953,6 +7954,19 @@ function trafoSolvePower(inp) {
   };
 }
 
+// Click-only stepper handler for the Power & Current Solver (no typing).
+// Adjusts a trafoState.ps* field by a delta in BASE SI units. cosphi clamps to
+// [0,1]; every other quantity clamps to >= 0. null ("not given") is treated as 0
+// so the first click seeds a value. Purely additive: does NOT touch solver math.
+function psBump(field, delta) {
+  var cur = (typeof trafoState[field] === 'number') ? trafoState[field] : 0;
+  var next = cur + delta;
+  if (field === 'psCos') { next = Math.min(1, Math.max(0, next)); }
+  else if (!(next >= 0)) { next = 0; }
+  trafoState[field] = Math.round(next * 1000000) / 1000000;
+  renderModule('trafo');
+}
+
 // Vector group data
 var TRAFO_VECTOR_GROUPS = {
   'Yy0': { shift: 0, primary: 'Y', secondary: 'y', desc_da: 'Ingen faseforskydning. Bruges til belysning/IT.', desc_en: 'No phase shift. Used for lighting/IT loads.' },
@@ -8033,12 +8047,14 @@ function renderTrafoSizing() {
 
 function renderTrafoPowerSolve() {
   // Click-only value presets (no typing). Stored in base SI units; null = "not given".
-  var uPresets = (trafoState.psPhase === '1') ? [230, 400, 690] : [400, 690, 3000, 6000, 10000, 20000];
-  var iPresets = [10, 16, 25, 50, 63, 100, 160, 250, 400, 630, 1000];
-  var sPresetsKVA = [50, 100, 160, 250, 400, 630, 1000, 1600];
-  var pPresetsKW = [10, 50, 100, 200, 400, 630, 1000];
-  var cosPresets = [0.7, 0.8, 0.85, 0.9, 0.95, 1.0];
-  var qPresetsKVAR = [10, 50, 100, 200, 400];
+  // Presets cover the full standard engineering range so common values (e.g. 800 A,
+  // 2500 kVA) are directly clickable; the per-row stepper below reaches ANY value.
+  var uPresets = (trafoState.psPhase === '1') ? [230, 400, 525, 690] : [400, 525, 690, 1000, 3000, 6000, 10000, 15000, 20000];
+  var iPresets = [10, 16, 25, 32, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000];
+  var sPresetsKVA = [10, 25, 50, 75, 100, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500];
+  var pPresetsKW = [10, 25, 50, 75, 100, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500];
+  var cosPresets = [0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0];
+  var qPresetsKVAR = [10, 25, 50, 75, 100, 160, 200, 250, 315, 400, 500, 630, 800, 1000];
 
   var res = trafoSolvePower({
     phase: trafoState.psPhase, U: trafoState.psU, I: trafoState.psI,
@@ -8046,14 +8062,30 @@ function renderTrafoPowerSolve() {
   });
 
   // Build a click-only value-selector row. mult converts a display preset into base SI units.
-  function selRow(label, field, presets, mult, fmtFn) {
+  // When `step` (in DISPLAY units) is given, a click-only stepper [\u2212\u2212][\u2212] value [+][++]
+  // is appended so ANY exact value is reachable without typing (fine = step, coarse = step x 10).
+  function selRow(label, field, presets, mult, fmtFn, step) {
     var h = '<div class="select-group"><div class="select-label">' + label + '</div><div class="select-grid">';
     h += '<button class="sel-btn' + (trafoState[field] === null ? ' selected' : '') + '" onclick="trafoState.' + field + '=null;renderModule(\'trafo\')">' + tx('\u2014 ikke angivet', '\u2014 not given') + '</button>';
     presets.forEach(function(p) {
       var stored = p * mult;
       h += '<button class="sel-btn' + (trafoState[field] === stored ? ' selected' : '') + '" onclick="trafoState.' + field + '=' + stored + ';renderModule(\'trafo\')">' + fmtFn(p) + '</button>';
     });
-    h += '</div></div>';
+    h += '</div>';
+    if (step) {
+      var stepBase = step * mult;
+      var coarse = stepBase * 10;
+      var cur = trafoState[field];
+      var dispNum = (cur === null || cur === undefined) ? null : Math.round((cur / mult) * 1000) / 1000;
+      h += '<div class="select-grid" style="align-items:center;gap:4px;grid-template-columns:auto auto 1fr auto auto;margin-top:4px">';
+      h += '<button class="sel-btn" onclick="psBump(\'' + field + '\',' + (-coarse) + ')">\u2212\u2212</button>';
+      h += '<button class="sel-btn" onclick="psBump(\'' + field + '\',' + (-stepBase) + ')">\u2212</button>';
+      h += '<span class="sel-btn selected" style="text-align:center">' + (dispNum === null ? tx('\u2014 ikke angivet', '\u2014 not given') : fmtFn(dispNum)) + '</span>';
+      h += '<button class="sel-btn" onclick="psBump(\'' + field + '\',' + stepBase + ')">+</button>';
+      h += '<button class="sel-btn" onclick="psBump(\'' + field + '\',' + coarse + ')">++</button>';
+      h += '</div>';
+    }
+    h += '</div>';
     return h;
   }
   function fmtVal(x, unit, scale, digits) {
@@ -8080,12 +8112,13 @@ function renderTrafoPowerSolve() {
   html += '<button class="sel-btn' + (trafoState.psPhase === '1' ? ' selected' : '') + '" onclick="trafoState.psPhase=\'1\';renderModule(\'trafo\')">' + tx('1-faset', '1-phase') + '</button>';
   html += '</div></div>';
 
-  html += selRow(tx('Sp\u00E6nding U [V]' + (trafoState.psPhase === '3' ? ' (linje)' : ''), 'Voltage U [V]' + (trafoState.psPhase === '3' ? ' (line)' : '')), 'psU', uPresets, 1, function(p) { return p + ' V'; });
-  html += selRow(tx('Str\u00F8m I [A]' + (trafoState.psPhase === '3' ? ' (linje)' : ''), 'Current I [A]' + (trafoState.psPhase === '3' ? ' (line)' : '')), 'psI', iPresets, 1, function(p) { return p + ' A'; });
-  html += selRow(tx('Tilsyneladende effekt S [kVA]', 'Apparent power S [kVA]'), 'psS', sPresetsKVA, 1000, function(p) { return p + ' kVA'; });
-  html += selRow(tx('Aktiv effekt P [kW]', 'Active power P [kW]'), 'psP', pPresetsKW, 1000, function(p) { return p + ' kW'; });
-  html += selRow('cos\u03C6', 'psCos', cosPresets, 1, function(p) { return '' + p; });
-  html += selRow(tx('Reaktiv effekt Q [kvar]', 'Reactive power Q [kvar]'), 'psQ', qPresetsKVAR, 1000, function(p) { return p + ' kvar'; });
+  html += selRow(tx('Sp\u00E6nding U [V]' + (trafoState.psPhase === '3' ? ' (linje)' : ''), 'Voltage U [V]' + (trafoState.psPhase === '3' ? ' (line)' : '')), 'psU', uPresets, 1, function(p) { return p + ' V'; }, 1);
+  html += selRow(tx('Str\u00F8m I [A]' + (trafoState.psPhase === '3' ? ' (linje)' : ''), 'Current I [A]' + (trafoState.psPhase === '3' ? ' (line)' : '')), 'psI', iPresets, 1, function(p) { return p + ' A'; }, 1);
+  html += selRow(tx('Tilsyneladende effekt S [kVA]', 'Apparent power S [kVA]'), 'psS', sPresetsKVA, 1000, function(p) { return p + ' kVA'; }, 1);
+  html += selRow(tx('Aktiv effekt P [kW]', 'Active power P [kW]'), 'psP', pPresetsKW, 1000, function(p) { return p + ' kW'; }, 1);
+  html += selRow('cos\u03C6', 'psCos', cosPresets, 1, function(p) { return '' + p; }, 0.01);
+  html += selRow(tx('Reaktiv effekt Q [kvar]', 'Reactive power Q [kvar]'), 'psQ', qPresetsKVAR, 1000, function(p) { return p + ' kvar'; }, 1);
+  html += '<div class="info-row">' + tx('Finjust\u00E9r med trinknapperne (\u2212\u2212 / \u2212 / + / ++) for at ramme en hvilken som helst v\u00E6rdi \u2014 helt uden indtastning.', 'Fine-tune with the step buttons (\u2212\u2212 / \u2212 / + / ++) to reach any value \u2014 entirely without typing.') + '</div>';
 
   if (res.sufficient) {
     html += '<div class="result-box"><div class="result-title">' + tx('Resultat (udledt)', 'Result (derived)') + '</div>';
