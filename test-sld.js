@@ -10096,6 +10096,267 @@ test('Analyzer: module registered in nav and renderModule switch', function() {
   assert(startGroup.keys.indexOf('analyzer') >= 0, 'analyzer in start nav group');
 });
 
+// ===== LYS (LIGHTING / LUMEN) MODULE TESTS =====
+
+test('Lys: lysCalcRoomIndex computes correctly', function() {
+  var k = lysCalcRoomIndex(6, 4, 2.5);
+  assert(Math.abs(k - 0.96) < 0.01, 'k = 6*4/(2.5*(6+4)) = 0.96, got ' + k);
+});
+
+test('Lys: lysCalcRoomIndex handles zero height', function() {
+  assert(lysCalcRoomIndex(6, 4, 0) === 0, 'zero height returns 0');
+});
+
+test('Lys: lysCalcTotalFlux computes correctly', function() {
+  var phi = lysCalcTotalFlux(500, 24, 0.5, 0.8);
+  assert(Math.abs(phi - 30000) < 1, 'Phi = 500*24/(0.5*0.8) = 30000, got ' + phi);
+});
+
+test('Lys: lysCalcNumLuminaires rounds up', function() {
+  assert(lysCalcNumLuminaires(30000, 3600) === 9, 'ceil(30000/3600) = 9');
+  assert(lysCalcNumLuminaires(3600, 3600) === 1, 'exact = 1');
+  assert(lysCalcNumLuminaires(3601, 3600) === 2, 'just over = 2');
+});
+
+test('Lys: lysCalcPointIlluminance at zero angle', function() {
+  var E = lysCalcPointIlluminance(1500, 3, 0);
+  assert(Math.abs(E - 166.67) < 0.1, 'E = 1500*1/(3^2) = 166.67, got ' + E);
+});
+
+test('Lys: lysCalcPointIlluminance at angle', function() {
+  var E = lysCalcPointIlluminance(1000, 4, 30);
+  // cos(30) = 0.866, r = 4/0.866 = 4.619, E = 1000*0.866/4.619^2 = 40.6
+  assert(E > 40 && E < 41, 'E at 30 degrees correct, got ' + E);
+});
+
+test('Lys: lysCalcEfficacy', function() {
+  assert(lysCalcEfficacy(3600, 36) === 100, '3600/36 = 100 lm/W');
+  assert(lysCalcEfficacy(0, 36) === 0, '0 lumens = 0');
+  assert(lysCalcEfficacy(100, 0) === 0, '0 watts = 0');
+});
+
+test('Lys: lysCalcCircuitCurrent', function() {
+  var I = lysCalcCircuitCurrent(1000, 230, 0.95);
+  assert(Math.abs(I - 4.578) < 0.01, '1000/(230*0.95) = 4.578, got ' + I);
+});
+
+test('Lys: lysUtilizationFactor returns valid range', function() {
+  var uf1 = lysUtilizationFactor(0.5, 0.7, 0.5);
+  var uf2 = lysUtilizationFactor(5.0, 0.7, 0.5);
+  assert(uf1 >= 0.2 && uf1 <= 0.85, 'UF in valid range for low k');
+  assert(uf2 >= 0.2 && uf2 <= 0.85, 'UF in valid range for high k');
+  assert(uf2 > uf1, 'higher k gives higher UF');
+});
+
+test('Lys: renderLys produces valid HTML', function() {
+  var html = renderLys();
+  assert(html.indexOf('Lumen') >= 0 || html.indexOf('lumen') >= 0, 'has lumen reference');
+  assert(html.indexOf('<input') < 0, 'no text inputs');
+  assert(html.indexOf('sel-btn') >= 0, 'has click buttons');
+});
+
+test('Lys: renderLys lumen mode shows calcDetail', function() {
+  lysState.calcType = 'lumen';
+  var html = renderLys();
+  assert(html.indexOf('calc-detail') >= 0, 'has calcDetail element');
+  assert(html.indexOf('DS/EN 12464-1') >= 0, 'references standard');
+});
+
+test('Lys: renderLys point mode', function() {
+  lysState.calcType = 'point';
+  var html = renderLys();
+  assert(html.indexOf('lux') >= 0, 'shows lux result');
+  lysState.calcType = 'lumen';
+});
+
+test('Lys: renderLys efficacy mode', function() {
+  lysState.calcType = 'efficacy';
+  var html = renderLys();
+  assert(html.indexOf('lm/W') >= 0, 'shows lm/W');
+  lysState.calcType = 'lumen';
+});
+
+test('Lys: module registered in nav theory group', function() {
+  var theoryGroup = NAV_GROUPS.find(function(g) { return g.id === 'theory'; });
+  assert(theoryGroup.keys.indexOf('lys') >= 0, 'lys in theory group');
+});
+
+// ===== TRANSFORMER EXTENDED MODULE TESTS =====
+
+test('Trafo: trafoCalcEMF computes E = 4.44*f*N*Bmax*A', function() {
+  var E = trafoCalcEMF(50, 300, 1.2, 0.01);
+  assert(Math.abs(E - 799.2) < 0.1, '4.44*50*300*1.2*0.01 = 799.2, got ' + E);
+});
+
+test('Trafo: trafoCalcSC computes er% and ex%', function() {
+  var sc = trafoCalcSC(6900, 4, 400);
+  assert(Math.abs(sc.erPct - 1.725) < 0.01, 'er% = 6900/(400*1000)*100 = 1.725, got ' + sc.erPct);
+  assert(sc.exPct > 0, 'ex% > 0');
+  // verify uk^2 = er^2 + ex^2
+  var ukCalc = Math.sqrt(sc.erPct * sc.erPct + sc.exPct * sc.exPct);
+  assert(Math.abs(ukCalc - 4) < 0.01, 'uk = sqrt(er^2+ex^2) = 4');
+});
+
+test('Trafo: trafoCalcRegulation inductive', function() {
+  var reg = trafoCalcRegulation(1.725, 3.608, 0.8, 'inductive');
+  // dU = 1.725*0.8 + 3.608*0.6 = 1.38 + 2.165 = 3.545
+  assert(reg.dU_pct > 3.5 && reg.dU_pct < 3.6, 'inductive regulation ~3.5%, got ' + reg.dU_pct);
+});
+
+test('Trafo: trafoCalcRegulation capacitive gives lower value', function() {
+  var regI = trafoCalcRegulation(1.725, 3.608, 0.8, 'inductive');
+  var regC = trafoCalcRegulation(1.725, 3.608, 0.8, 'capacitive');
+  assert(regC.dU_pct < regI.dU_pct, 'capacitive < inductive');
+});
+
+test('Trafo: trafoCalcEfficiency computes eta', function() {
+  var eff = trafoCalcEfficiency(400, 610, 6900, 75, 0.85);
+  assert(eff.eta > 0.95 && eff.eta < 1.0, 'efficiency between 95-100%, got ' + (eff.eta*100).toFixed(2));
+  assert(eff.optLoad > 0 && eff.optLoad < 1, 'optimal load between 0-100%');
+});
+
+test('Trafo: trafoCalcEfficiency optimal load = sqrt(P0/Pcu)', function() {
+  var eff = trafoCalcEfficiency(400, 610, 6900, 75, 0.85);
+  var expected = Math.sqrt(610 / 6900);
+  assert(Math.abs(eff.optLoad - expected) < 0.001, 'opt load = sqrt(P0/Pcu)');
+});
+
+test('Trafo: trafoCalcParallel distributes load', function() {
+  var par = trafoCalcParallel(400, 4, 630, 6, 500);
+  assert(Math.abs(par.S1_load + par.S2_load - 500) < 0.01, 'total = S1+S2');
+  // S1/uk1 = 400/4=100, S2/uk2 = 630/6=105. S2 takes slightly more.
+  assert(Math.abs(par.ratio1 - 100/205) < 0.01, 'ratio1 = 100/205');
+  assert(Math.abs(par.ratio2 - 105/205) < 0.01, 'ratio2 = 105/205');
+});
+
+test('Trafo: TRAFO_VECTOR_GROUPS has Dy11', function() {
+  assert(TRAFO_VECTOR_GROUPS['Dy11'], 'Dy11 exists');
+  assert(TRAFO_VECTOR_GROUPS['Dy11'].shift === 330, 'Dy11 shift = 330');
+});
+
+test('Trafo: renderTrafo produces valid HTML', function() {
+  var html = renderTrafo();
+  assert(html.indexOf('Transformer') >= 0 || html.indexOf('Trafo') >= 0, 'has title');
+  assert(html.indexOf('<input') < 0, 'no text inputs');
+  assert(html.indexOf('sel-btn') >= 0, 'has click buttons');
+});
+
+test('Trafo: renderTrafo sizing mode shows calcDetail', function() {
+  trafoState.calcType = 'sizing';
+  var html = renderTrafo();
+  assert(html.indexOf('calc-detail') >= 0, 'has calcDetail');
+  assert(html.indexOf('IEC') >= 0, 'references standard');
+});
+
+test('Trafo: renderTrafo EMF mode', function() {
+  trafoState.calcType = 'emf';
+  var html = renderTrafo();
+  assert(html.indexOf('4.44') >= 0 || html.indexOf('4,44') >= 0, 'shows EMF formula');
+  trafoState.calcType = 'sizing';
+});
+
+test('Trafo: renderTrafo efficiency mode', function() {
+  trafoState.calcType = 'efficiency';
+  var html = renderTrafo();
+  assert(html.indexOf('%') >= 0, 'shows percentage');
+  trafoState.calcType = 'sizing';
+});
+
+test('Trafo: renderTrafo vectorgroup mode', function() {
+  trafoState.calcType = 'vectorgroup';
+  var html = renderTrafo();
+  assert(html.indexOf('Dy11') >= 0, 'shows Dy11');
+  trafoState.calcType = 'sizing';
+});
+
+// ===== MAGNETIC CIRCUIT MODULE TESTS =====
+
+test('Magnet: magnetCalcMMF computes N*I', function() {
+  assert(magnetCalcMMF(500, 2) === 1000, '500*2 = 1000');
+  assert(magnetCalcMMF(0, 5) === 0, '0*5 = 0');
+});
+
+test('Magnet: magnetCalcB computes Phi/A', function() {
+  assert(Math.abs(magnetCalcB(0.001, 0.001) - 1.0) < 0.001, '0.001/0.001 = 1.0 T');
+  assert(magnetCalcB(0.001, 0) === 0, 'zero area = 0');
+});
+
+test('Magnet: magnetCalcH computes B/(u0*ur)', function() {
+  var H = magnetCalcH(1.0, 2000);
+  // H = 1.0 / (4pi*1e-7 * 2000) = 1.0 / 2.513e-3 = 397.9
+  assert(H > 397 && H < 399, 'H ~ 398 A/m, got ' + H);
+});
+
+test('Magnet: magnetCalcReluctance', function() {
+  var Rm = magnetCalcReluctance(0.5, 2000, 0.001);
+  // Rm = 0.5 / (4pi*1e-7 * 2000 * 0.001) = 0.5 / 2.513e-6 = 198943
+  assert(Rm > 198000 && Rm < 200000, 'Rm ~ 199000, got ' + Rm);
+});
+
+test('Magnet: magnetCalcGapReluctance', function() {
+  var Rm = magnetCalcGapReluctance(0.001, 0.001);
+  // Rm = 0.001 / (4pi*1e-7 * 0.001) = 0.001 / 1.257e-9 = 795775
+  assert(Rm > 795000 && Rm < 796000, 'gap Rm ~ 795775, got ' + Rm);
+});
+
+test('Magnet: magnetCalcFaradayEMF', function() {
+  assert(Math.abs(magnetCalcFaradayEMF(200, 0.01) - 2.0) < 0.001, '200*0.01 = 2V');
+});
+
+test('Magnet: magnetCalcMotionalEMF', function() {
+  assert(Math.abs(magnetCalcMotionalEMF(1.0, 0.5, 10) - 5.0) < 0.001, '1*0.5*10 = 5V');
+});
+
+test('Magnet: magnetCalcInductance', function() {
+  var L = magnetCalcInductance(500, 2000, 0.001, 0.5);
+  // L = 500^2 * 4pi*1e-7 * 2000 * 0.001 / 0.5 = 250000 * 2.513e-6 / 0.5 = 1.257
+  assert(L > 1.25 && L < 1.27, 'L ~ 1.257 H, got ' + L);
+});
+
+test('Magnet: magnetCalcForce', function() {
+  assert(Math.abs(magnetCalcForce(1.0, 5, 0.3) - 1.5) < 0.001, '1*5*0.3 = 1.5 N');
+});
+
+test('Magnet: magnetCalcEnergy', function() {
+  assert(Math.abs(magnetCalcEnergy(0.1, 5) - 1.25) < 0.001, '0.5*0.1*25 = 1.25 J');
+});
+
+test('Magnet: renderMagnet produces valid HTML', function() {
+  var html = renderMagnet();
+  assert(html.indexOf('Magnet') >= 0 || html.indexOf('magnet') >= 0, 'has title');
+  assert(html.indexOf('<input') < 0, 'no text inputs');
+  assert(html.indexOf('sel-btn') >= 0, 'has click buttons');
+});
+
+test('Magnet: renderMagnet MMF mode shows calcDetail', function() {
+  magnetState.calcType = 'mmf';
+  var html = renderMagnet();
+  assert(html.indexOf('calc-detail') >= 0, 'has calcDetail');
+  assert(html.indexOf('Opgavesamling') >= 0, 'references source');
+});
+
+test('Magnet: renderMagnet inductance shows XL link', function() {
+  magnetState.calcType = 'inductance';
+  var html = renderMagnet();
+  assert(html.indexOf('XL') >= 0, 'shows XL cross-link to impedance');
+  magnetState.calcType = 'mmf';
+});
+
+test('Magnet: module registered in nav theory group', function() {
+  var theoryGroup = NAV_GROUPS.find(function(g) { return g.id === 'theory'; });
+  assert(theoryGroup.keys.indexOf('magnet') >= 0, 'magnet in theory group');
+});
+
+test('Magnet: MAGNET_MU0 is correct', function() {
+  assert(Math.abs(MAGNET_MU0 - 1.2566e-6) < 1e-9, 'mu0 = 4pi*1e-7');
+});
+
+test('Magnet: air gap dominates reluctance', function() {
+  var Rm_core = magnetCalcReluctance(0.5, 2000, 0.001);
+  var Rm_gap = magnetCalcGapReluctance(0.001, 0.001);
+  assert(Rm_gap > Rm_core, 'air gap reluctance >> core reluctance');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

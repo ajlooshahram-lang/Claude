@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Implement Lys (Lumen method), extended Trafo (transformer theory), and Magnet (magnetic circuit) solver modules for Opgavesamling coverage.",
+  "status": "in_progress",
+  "steps": [
+    "1. Add module translations for 'lys' and 'magnet' to T.da.modules, T.en.modules, T.fa.modules",
+    "2. Add 'lys' and 'magnet' to NAV_GROUPS 'theory' keys array",
+    "3. Add case statements for 'lys' and 'magnet' in renderModule switch",
+    "4. Implement Lys module with lumen method, point illuminance, room factor, utilization factor, luminaire count",
+    "5. Extend Trafo module with EMF equation, OC/SC tests, voltage regulation, efficiency, parallel operation, vector groups",
+    "6. Implement Magnet module with MMF, flux density, field strength, reluctance, air gap, Faraday induction, self-inductance, force, energy",
+    "7. All calculations must use calcDetail() for full step-by-step working",
+    "8. Add comprehensive tests to test-sld.js"
+  ],
+  "acceptance_criteria": [
+    "All existing 1059 tests continue to pass",
+    "New tests pass for lys, trafo extensions, and magnet modules",
+    "All render functions return HTML with no <input type='text'> or <textarea>",
+    "All calculations use calcDetail() for showing full working",
+    "Lys module covers: point illuminance, lumen method, room factor, utilization factor, luminaire count",
+    "Trafo module covers: EMF, OC/SC tests, voltage regulation, efficiency, parallel operation, vector groups",
+    "Magnet module covers: MMF, B, H, reluctance, air gap, induction, inductance, force, energy"
+  ],
+  "verification": [
+    "node /projects/sandbox/Claude/test-sld.js 2>&1 | grep 'Results:' should show increased passed count, 0 failed"
+  ],
+  "blocked_reason": null,
+  "findings": null
+}

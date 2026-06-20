@@ -983,6 +983,8 @@ const T = {
       relay: 'HV Rele',
       fault: 'Fejlberegning',
       dc: 'DC / Ohms lov',
+      lys: 'Lys / Lumen',
+      magnet: 'Magnetkreds',
       analyzer: '\uD83D\uDD0D Projektanalysator'
     },
     // Load module
@@ -1133,6 +1135,8 @@ const T = {
       relay: 'HV Relay',
       fault: 'Fault Calculation',
       dc: 'DC / Ohm\'s Law',
+      lys: 'Lighting / Lumen',
+      magnet: 'Magnetic Circuit',
       analyzer: '\uD83D\uDD0D Project Analyzer'
     },
     loadTitle: 'Load Calculation',
@@ -1275,6 +1279,8 @@ const T = {
       relay: 'رله HV',
       fault: 'محاسبه خطا',
       dc: 'DC / قانون اهم',
+      lys: 'روشنایی / لومن',
+      magnet: 'مدار مغناطیسی',
       analyzer: '\uD83D\uDD0D تحلیلگر پروژه'
     },
     loadTitle: 'محاسبه بار',
@@ -4383,7 +4389,7 @@ const NAV_GROUPS = [
     da: 'Elektroteknisk teori', en: 'Electrotechnics theory', fa: '\u062A\u0626\u0648\u0631\u06CC \u0628\u0631\u0642',
     descDa: 'Grundl\u00E6ggende elektroteknisk teori og beregninger fra Elektroteknik Opgavesamling \u2014 Ohms lov, DC-kredsl\u00F8b, impedans, resonans, fasevinkel, effekttrekant, tidskonstanter, 3-faset systemer og motorteori. Dine formler, klik-for-klik.',
     descEn: 'Fundamental electrotechnics theory and calculations from Elektroteknik Opgavesamling \u2014 Ohm\'s law, DC circuits, impedance, resonance, phase angle, power triangle, time constants, 3-phase systems and motor theory. Your formulas, click by click.',
-    keys: ['impedans', 'trefase', 'motorteori', 'dc']
+    keys: ['impedans', 'trefase', 'motorteori', 'dc', 'lys', 'magnet']
   },
   {
     id: 'docs', icon: '\uD83D\uDCCB',
@@ -5779,6 +5785,8 @@ function renderModule(mod) {
     case 'relay': content = renderRelay(); break;
     case 'fault': content = renderFault(); break;
     case 'dc': content = renderDC(); break;
+    case 'lys': content = renderLys(); break;
+    case 'magnet': content = renderMagnet(); break;
     case 'analyzer': content = renderAnalyzer(); break;
   }
   // Append AI assistant to every module
@@ -6718,91 +6726,299 @@ function renderShortCircuit() {
       ${calcDetailIk(scState.zNet, scState.zTrafo, zCable, Un, cFactor, ikMax3ph, ikMin2ph, zTotal, selectedCable ? (cableState.type + ' ' + cableState.crossSection + ' mm\u00B2 \u00D7 ' + vdropState.length + ' m') : '')}
     </div>
   `;
-}// ===== TRANSFORMER MODULE =====
-// Data from 1.-Dim-af-trafo.ppx.pptx
-let trafoState = { size: 400, voltage: '10/0.4', loadPercent: 75 };
+}// ===== TRANSFORMER MODULE (Extended - Opgavesamling Ch. 9) =====
+// Data from 1.-Dim-af-trafo.ppx.pptx + Elektroteknik Opgavesamling 4. udgave
+let trafoState = {
+  size: 400, voltage: '10/0.4', loadPercent: 75,
+  calcType: 'sizing',  // sizing, emf, ocsc, regulation, efficiency, parallel, vectorgroup
+  // EMF
+  emfFreq: 50, emfN: 300, emfBmax: 1.2, emfArea: 0.01,
+  // OC/SC test
+  ocP0: 610, ocI0pct: 2.5, scPcu: 6900, scUkPct: 4,
+  // Voltage regulation
+  regErPct: 1.5, regExPct: 3.5, regCosPhi: 0.8, regLoad: 'inductive',
+  // Efficiency
+  effLoadPct: 75, effCosPhi: 0.85,
+  // Parallel
+  parTrafo2size: 630, parTrafo2uk: 6,
+  // Vector group
+  vecGroup: 'Dy11'
+};
+
+// --- Transformer calculation functions (unit-testable, no DOM) ---
+
+// EMF equation: E = 4.44 * f * N * Bmax * A
+function trafoCalcEMF(f, N, Bmax, A) {
+  return 4.44 * f * N * Bmax * A;
+}
+
+// Short-circuit test: gives Pcu, ek%, er%, ex%
+function trafoCalcSC(Pcu, ukPct, SN) {
+  var IN = (SN * 1000) / (Math.sqrt(3) * 400);
+  var erPct = (Pcu / (SN * 1000)) * 100;
+  var exPct = Math.sqrt(Math.max(0, ukPct * ukPct - erPct * erPct));
+  return { Pcu: Pcu, ukPct: ukPct, erPct: erPct, exPct: exPct, IN: IN };
+}
+
+// Voltage regulation: dU = er*cos(phi) +/- ex*sin(phi)
+function trafoCalcRegulation(erPct, exPct, cosPhi, loadType) {
+  var sinPhi = Math.sqrt(1 - cosPhi * cosPhi);
+  var dU;
+  if (loadType === 'capacitive') {
+    dU = erPct * cosPhi - exPct * sinPhi;
+  } else {
+    dU = erPct * cosPhi + exPct * sinPhi;
+  }
+  return { dU_pct: dU, erPct: erPct, exPct: exPct, cosPhi: cosPhi, sinPhi: sinPhi };
+}
+
+// Efficiency: eta = P2 / (P2 + P0 + Pcu*(S/SN)^2)
+function trafoCalcEfficiency(SN, P0, Pcu, loadPct, cosPhi) {
+  var loadFactor = loadPct / 100;
+  var P2 = SN * 1000 * loadFactor * cosPhi;
+  var Plosses = P0 + Pcu * loadFactor * loadFactor;
+  var eta = (P2 > 0) ? P2 / (P2 + Plosses) : 0;
+  var optLoad = (Pcu > 0) ? Math.sqrt(P0 / Pcu) : 0;
+  return { eta: eta, P2: P2, Plosses: Plosses, P0: P0, Pcu_load: Pcu * loadFactor * loadFactor, optLoad: optLoad };
+}
+
+// Parallel operation: load sharing proportional to SN/ek
+function trafoCalcParallel(S1, uk1, S2, uk2, totalLoad_kVA) {
+  var share1 = (S1 / uk1);
+  var share2 = (S2 / uk2);
+  var total = share1 + share2;
+  var S1_load = totalLoad_kVA * (share1 / total);
+  var S2_load = totalLoad_kVA * (share2 / total);
+  return { S1_load: S1_load, S2_load: S2_load, ratio1: share1 / total, ratio2: share2 / total, totalCapacity: S1 + S2 };
+}
+
+// Vector group data
+var TRAFO_VECTOR_GROUPS = {
+  'Yy0': { shift: 0, primary: 'Y', secondary: 'y', desc_da: 'Ingen faseforskydning. Bruges til belysning/IT.', desc_en: 'No phase shift. Used for lighting/IT loads.' },
+  'Dy11': { shift: 330, primary: 'D', secondary: 'y', desc_da: '30 grader forspring sekundaer. Standard DK distributionstransformator.', desc_en: '30 deg secondary leading. Standard DK distribution transformer.' },
+  'Yd11': { shift: 330, primary: 'Y', secondary: 'd', desc_da: '30 grader forspring sekundaer. Industri hoejeffekt.', desc_en: '30 deg secondary leading. High-power industrial.' },
+  'Dz0': { shift: 0, primary: 'D', secondary: 'z', desc_da: 'Zigzag sekundaer - god til ubalanceret belastning.', desc_en: 'Zigzag secondary - good for unbalanced loads.' },
+  'Dy5': { shift: 150, primary: 'D', secondary: 'y', desc_da: '150 grader faseforskydning.', desc_en: '150 degrees phase shift.' },
+  'Yy6': { shift: 180, primary: 'Y', secondary: 'y', desc_da: '180 grader faseforskydning.', desc_en: '180 degrees phase shift.' }
+};
 
 function renderTrafo() {
-  const S = trafoState.size;
-  const uk = TRAFO_UK[S] || 4;
-  const losses = TRAFO_LOSSES[S] || { p0: 0, pk: 0 };
-  const loadFactor = trafoState.loadPercent / 100;
-
-  // Full load current (secondary)
-  const Ifl = (S * 1000) / (Math.sqrt(3) * 400);
-  // Actual load current
-  const Iload = Ifl * loadFactor;
-  // Transformer impedance in mOhm (secondary side)
-  const Ztrafo = (uk / 100) * (400 * 400) / (S * 1000) * 1000; // mOhm
-  // Short-circuit current at secondary busbar
-  const Ik = (S * 1000) / (Math.sqrt(3) * 400 * (uk / 100));
-  // Total losses at given load
-  const Ploss = losses.p0 + losses.pk * loadFactor * loadFactor;
-
-  const voltageOptions = ['10/0.4', '20/0.4', '50/10', '30/10'];
-  const loadSteps = [25, 50, 60, 70, 75, 80, 85, 90, 95, 100];
-
-  return `
-    <div class="card fade-in">
-      <div class="card-title">${tx('Transformerdimensionering', 'Transformer Dimensioning')}</div>
-      <div class="info-row">${tx('Vælg trafostørrelse og belastningsgrad. Baseret på Fællesregulativet 2019.', 'Select transformer size and load level. Based on Fællesregulativet 2019.')}</div>
-
-      <div class="select-group">
-        <div class="select-label">${tx('Trafostørrelse [kVA]', 'Transformer Size [kVA]')}</div>
-        <div class="select-grid">
-          ${TRAFO_SIZES.map(s =>
-            `<button class="sel-btn ${trafoState.size === s ? 'selected' : ''}" onclick="trafoState.size=${s};renderModule('trafo')">${s}</button>`
-          ).join('')}
-        </div>
-      </div>
-
-      <div class="select-group">
-        <div class="select-label">${tx('Omsætningsforhold [kV]', 'Voltage Ratio [kV]')}</div>
-        <div class="select-grid">
-          ${voltageOptions.map(v =>
-            `<button class="sel-btn ${trafoState.voltage === v ? 'selected' : ''}" onclick="trafoState.voltage='${v}';renderModule('trafo')">${v}</button>`
-          ).join('')}
-        </div>
-      </div>
-
-      <div class="select-group">
-        <div class="select-label">${tx('Belastningsgrad [%]', 'Load Level [%]')}</div>
-        <div class="select-grid">
-          ${loadSteps.map(l =>
-            `<button class="sel-btn ${trafoState.loadPercent === l ? 'selected' : ''}" onclick="trafoState.loadPercent=${l};renderModule('trafo')">${l}%</button>`
-          ).join('')}
-        </div>
-      </div>
-    </div>
-
-    <div class="card fade-in">
-      <div class="card-title">${tx('Trafodata', 'Transformer Data')}</div>
-      <div class="result-box">
-        <div class="result-title">${tx('Resultat', 'Result')}</div>
-        <div class="result-row"><span class="label">${tx('Størrelse', 'Size')}</span><span class="value">${S} kVA</span></div>
-        <div class="result-row"><span class="label">${tx('Omsætning', 'Ratio')}</span><span class="value">${trafoState.voltage} kV</span></div>
-        <div class="result-row"><span class="label">uk%</span><span class="value">${uk} %</span></div>
-        <div class="result-row"><span class="label">${tx('Fuldlaststrøm (sek.)', 'Full-load current (sec.)')}</span><span class="value">${Ifl.toFixed(1)} A</span></div>
-        <div class="result-row"><span class="label">${tx('Aktuel belastning', 'Actual load')}</span><span class="value">${Iload.toFixed(1)} A (${trafoState.loadPercent}%)</span></div>
-        <div class="result-row"><span class="label">Z trafo</span><span class="value">${Ztrafo.toFixed(2)} mΩ</span></div>
-        <div class="result-row"><span class="label">${tx('Ik (sekundær skinne)', 'Ik (secondary busbar)')}</span><span class="value">${(Ik/1000).toFixed(2)} kA</span></div>
-        <div class="result-row"><span class="label">${tx('Tab (tomgang)', 'Losses (no-load)')}</span><span class="value">${losses.p0} W</span></div>
-        <div class="result-row"><span class="label">${tx('Tab (belastning)', 'Losses (load)')}</span><span class="value">${(losses.pk * loadFactor * loadFactor).toFixed(0)} W</span></div>
-        <div class="result-row"><span class="label">${tx('Totale tab', 'Total losses')}</span><span class="value">${Ploss.toFixed(0)} W</span></div>
-      </div>
-    </div>
-
-    <div class="card fade-in">
-      <div class="card-title">${tx('Strømtransformer til måling', 'Current Transformer for Metering')}</div>
-      <div class="result-box" style="background:var(--primary-glow);border-color:var(--primary-light)">
-        <div class="result-title">${tx('Anbefaling', 'Recommendation')}</div>
-        <div class="result-row"><span class="label">${tx('CT primær', 'CT primary')}</span><span class="value">${Math.ceil(Ifl / 50) * 50} / 5 A</span></div>
-        <div class="result-row"><span class="label">${tx('CT klasse', 'CT class')}</span><span class="value">0.5 (${tx('måling', 'metering')})</span></div>
-        <div class="result-row"><span class="label">${tx('Sikringselement', 'Fuse element')}</span><span class="value">${tx('NH sikring', 'NH fuse')} ${Math.ceil(Ifl / 50) * 50 > 250 ? 'NH 2' : 'NH 1'}</span></div>
-      </div>
-    </div>
-  `;
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Transformerteori (Opgavesamling Kap. 9)', 'Transformer Theory (Opgavesamling Ch. 9)') + '</div>';
+  html += '<div class="info-row">' + tx('Komplet transformerberegner: dimensionering, EMF, tomgangs-/kortslutningsproeve, spaendingsregulering, virkningsgrad, paralleldrift og vektorgrupper.', 'Complete transformer calculator: sizing, EMF, OC/SC tests, voltage regulation, efficiency, parallel operation and vector groups.') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Beregningstype', 'Calculation Type') + '</div><div class="select-grid">';
+  var trafoTypes = [
+    { key: 'sizing', da: 'Dimensionering', en: 'Sizing' },
+    { key: 'emf', da: 'EMF-ligning', en: 'EMF Equation' },
+    { key: 'ocsc', da: 'Tomgangs-/kortsl.proeve', en: 'OC/SC Test' },
+    { key: 'regulation', da: 'Spaendingsregulering', en: 'Voltage Regulation' },
+    { key: 'efficiency', da: 'Virkningsgrad', en: 'Efficiency' },
+    { key: 'parallel', da: 'Paralleldrift', en: 'Parallel Operation' },
+    { key: 'vectorgroup', da: 'Vektorgruppe', en: 'Vector Group' }
+  ];
+  trafoTypes.forEach(function(ct) {
+    html += '<button class="sel-btn' + (trafoState.calcType === ct.key ? ' selected' : '') + '" onclick="trafoState.calcType=\'' + ct.key + '\';renderModule(\'trafo\')">' + tx(ct.da, ct.en) + '</button>';
+  });
+  html += '</div></div></div>';
+  if (trafoState.calcType === 'sizing') html += renderTrafoSizing();
+  else if (trafoState.calcType === 'emf') html += renderTrafoEMF();
+  else if (trafoState.calcType === 'ocsc') html += renderTrafoOCSC();
+  else if (trafoState.calcType === 'regulation') html += renderTrafoRegulation();
+  else if (trafoState.calcType === 'efficiency') html += renderTrafoEfficiency();
+  else if (trafoState.calcType === 'parallel') html += renderTrafoParallel();
+  else if (trafoState.calcType === 'vectorgroup') html += renderTrafoVectorGroup();
+  return html;
 }
+
+function renderTrafoSizing() {
+  var S = trafoState.size;
+  var uk = TRAFO_UK[S] || 4;
+  var losses = TRAFO_LOSSES[S] || { p0: 0, pk: 0 };
+  var loadFactor = trafoState.loadPercent / 100;
+  var Ifl = (S * 1000) / (Math.sqrt(3) * 400);
+  var Iload = Ifl * loadFactor;
+  var Ztrafo = (uk / 100) * (400 * 400) / (S * 1000) * 1000;
+  var Ik = (S * 1000) / (Math.sqrt(3) * 400 * (uk / 100));
+  var Ploss = losses.p0 + losses.pk * loadFactor * loadFactor;
+  var voltageOptions = ['10/0.4', '20/0.4', '50/10', '30/10'];
+  var loadSteps = [25, 50, 60, 70, 75, 80, 85, 90, 95, 100];
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Trafodimensionering', 'Transformer Sizing') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Trafostoerrelse [kVA]', 'Transformer Size [kVA]') + '</div><div class="select-grid">';
+  TRAFO_SIZES.forEach(function(s) { html += '<button class="sel-btn' + (trafoState.size === s ? ' selected' : '') + '" onclick="trafoState.size=' + s + ';renderModule(\'trafo\')">' + s + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Omsaetningsforhold [kV]', 'Voltage Ratio [kV]') + '</div><div class="select-grid">';
+  voltageOptions.forEach(function(v) { html += '<button class="sel-btn' + (trafoState.voltage === v ? ' selected' : '') + '" onclick="trafoState.voltage=\'' + v + '\';renderModule(\'trafo\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Belastningsgrad [%]', 'Load Level [%]') + '</div><div class="select-grid">';
+  loadSteps.forEach(function(l) { html += '<button class="sel-btn' + (trafoState.loadPercent === l ? ' selected' : '') + '" onclick="trafoState.loadPercent=' + l + ';renderModule(\'trafo\')">' + l + '%</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Stoerrelse', 'Size') + '</span><span class="value">' + S + ' kVA</span></div>';
+  html += '<div class="result-row"><span class="label">uk%</span><span class="value">' + uk + ' %</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Fuldlaststroem (sek.)', 'Full-load current (sec.)') + '</span><span class="value">' + Ifl.toFixed(1) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Aktuel belastning', 'Actual load') + '</span><span class="value">' + Iload.toFixed(1) + ' A (' + trafoState.loadPercent + '%)</span></div>';
+  html += '<div class="result-row"><span class="label">Z trafo</span><span class="value">' + Ztrafo.toFixed(2) + ' m\u03A9</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Ik (sekundaer skinne)', 'Ik (secondary busbar)') + '</span><span class="value">' + (Ik/1000).toFixed(2) + ' kA</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Totale tab', 'Total losses') + '</span><span class="value">' + Ploss.toFixed(0) + ' W</span></div>';
+  html += '</div>';
+  html += calcDetail({ name: tx('Fuldlaststroem', 'Full-load current'), formula: 'I_fl = S_N / (\u221A3 \u00D7 U2)', variables: [{ name: 'S_N', symbol: 'S_N', value: S, unit: 'kVA', source: tx('Valgt', 'Selected') }, { name: 'U2', symbol: 'U2', value: 400, unit: 'V', source: tx('Sekundaer', 'Secondary') }], substitution: S + '*1000 / (\u221A3 \u00D7 400)', result: { value: Ifl, unit: 'A' }, reference: 'IEC 60076-1' });
+  html += calcDetail({ name: tx('Kortslutningsstroem', 'Short-circuit current'), formula: 'Ik = S_N / (\u221A3 \u00D7 U2 \u00D7 uk/100)', variables: [{ name: 'S_N', symbol: 'S_N', value: S, unit: 'kVA' }, { name: 'uk', symbol: 'uk', value: uk, unit: '%' }], substitution: S + '*1000 / (\u221A3 \u00D7 400 \u00D7 ' + uk + '/100)', result: { value: Ik/1000, unit: 'kA' }, reference: 'IEC 60909' });
+  html += '</div>';
+  return html;
+}
+
+
+function renderTrafoEMF() {
+  var freqPresets = [50, 60];
+  var nPresets = [100, 200, 300, 400, 500, 600, 800, 1000, 1200, 1500, 2000];
+  var bmaxPresets = [0.8, 1.0, 1.2, 1.4, 1.5, 1.6, 1.7, 1.8];
+  var areaPresets = [0.001, 0.002, 0.005, 0.008, 0.01, 0.015, 0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.1];
+  var E = trafoCalcEMF(trafoState.emfFreq, trafoState.emfN, trafoState.emfBmax, trafoState.emfArea);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('EMF-ligning: E = 4,44 \u00D7 f \u00D7 N \u00D7 Bmax \u00D7 A', 'EMF Equation: E = 4.44 \u00D7 f \u00D7 N \u00D7 Bmax \u00D7 A') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Frekvens f [Hz]', 'Frequency f [Hz]') + '</div><div class="select-grid">';
+  freqPresets.forEach(function(f) { html += '<button class="sel-btn' + (trafoState.emfFreq === f ? ' selected' : '') + '" onclick="trafoState.emfFreq=' + f + ';renderModule(\'trafo\')">' + f + ' Hz</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Vindingstal N', 'Number of turns N') + '</div><div class="select-grid">';
+  nPresets.forEach(function(n) { html += '<button class="sel-btn' + (trafoState.emfN === n ? ' selected' : '') + '" onclick="trafoState.emfN=' + n + ';renderModule(\'trafo\')">' + n + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Max. fluxdensitet Bmax [T]', 'Max. flux density Bmax [T]') + '</div><div class="select-grid">';
+  bmaxPresets.forEach(function(b) { html += '<button class="sel-btn' + (trafoState.emfBmax === b ? ' selected' : '') + '" onclick="trafoState.emfBmax=' + b + ';renderModule(\'trafo\')">' + b + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Kernetvaersnit A [m\u00B2]', 'Core area A [m\u00B2]') + '</div><div class="select-grid">';
+  areaPresets.forEach(function(a) { html += '<button class="sel-btn' + (trafoState.emfArea === a ? ' selected' : '') + '" onclick="trafoState.emfArea=' + a + ';renderModule(\'trafo\')">' + (a*10000).toFixed(0) + ' cm\u00B2</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">E (EMF)</span><span class="value">' + E.toFixed(2) + ' V</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Flux', 'Flux') + ' \u03A6_max</span><span class="value">' + (trafoState.emfBmax * trafoState.emfArea * 1000).toFixed(3) + ' mWb</span></div>';
+  html += '</div>';
+  html += calcDetail({ name: tx('EMF-ligning', 'EMF equation'), formula: 'E = 4.44 \u00D7 f \u00D7 N \u00D7 Bmax \u00D7 A', variables: [{ name: 'f', symbol: 'f', value: trafoState.emfFreq, unit: 'Hz', source: tx('Valgt', 'Selected') }, { name: 'N', symbol: 'N', value: trafoState.emfN, unit: tx('vindinger', 'turns') }, { name: 'Bmax', symbol: 'Bmax', value: trafoState.emfBmax, unit: 'T' }, { name: 'A', symbol: 'A', value: trafoState.emfArea, unit: 'm\u00B2' }], substitution: '4.44 \u00D7 ' + trafoState.emfFreq + ' \u00D7 ' + trafoState.emfN + ' \u00D7 ' + trafoState.emfBmax + ' \u00D7 ' + trafoState.emfArea, result: { value: E, unit: 'V' }, reference: 'Opgavesamling Kap. 9 / IEC 60076' });
+  html += '</div>';
+  return html;
+}
+
+function renderTrafoOCSC() {
+  var S = trafoState.size;
+  var losses = TRAFO_LOSSES[S] || { p0: 610, pk: 6900 };
+  var uk = TRAFO_UK[S] || 4;
+  var P0 = losses.p0;
+  var Pcu = losses.pk;
+  var sc = trafoCalcSC(Pcu, uk, S);
+  var I0pct = trafoState.ocI0pct;
+  var I0_A = I0pct / 100 * sc.IN;
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Tomgangs- og kortslutningsproeve', 'Open-Circuit & Short-Circuit Test') + '</div>';
+  html += '<div class="info-row">' + tx('Vaerdier fra valgt trafo (' + S + ' kVA). Skift stoerrelse under Dimensionering.', 'Values from selected transformer (' + S + ' kVA). Change size under Sizing.') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Magnetiseringsstroem I0 [%]', 'Magnetizing current I0 [%]') + '</div><div class="select-grid">';
+  [1, 1.5, 2, 2.5, 3, 3.5, 4, 5].forEach(function(v) { html += '<button class="sel-btn' + (trafoState.ocI0pct === v ? ' selected' : '') + '" onclick="trafoState.ocI0pct=' + v + ';renderModule(\'trafo\')">' + v + '%</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Tomgangsproeve (OC)', 'Open-Circuit Test') + '</div>';
+  html += '<div class="result-row"><span class="label">P0 (' + tx('jerntab', 'iron loss') + ')</span><span class="value">' + P0 + ' W</span></div>';
+  html += '<div class="result-row"><span class="label">I0</span><span class="value">' + I0_A.toFixed(2) + ' A (' + I0pct + '%)</span></div>';
+  html += '<div class="result-row"><span class="label">IN</span><span class="value">' + sc.IN.toFixed(1) + ' A</span></div>';
+  html += '</div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Kortslutningsproeve (SC)', 'Short-Circuit Test') + '</div>';
+  html += '<div class="result-row"><span class="label">Pcu</span><span class="value">' + Pcu + ' W</span></div>';
+  html += '<div class="result-row"><span class="label">uk%</span><span class="value">' + uk + ' %</span></div>';
+  html += '<div class="result-row"><span class="label">er%</span><span class="value">' + sc.erPct.toFixed(2) + ' %</span></div>';
+  html += '<div class="result-row"><span class="label">ex%</span><span class="value">' + sc.exPct.toFixed(2) + ' %</span></div>';
+  html += '</div>';
+  html += calcDetail({ name: tx('Resistiv komponent er%', 'Resistive component er%'), formula: 'er% = Pcu / (SN \u00D7 1000) \u00D7 100', variables: [{ name: 'Pcu', symbol: 'Pcu', value: Pcu, unit: 'W' }, { name: 'SN', symbol: 'SN', value: S, unit: 'kVA' }], substitution: Pcu + ' / (' + S + ' \u00D7 1000) \u00D7 100', result: { value: sc.erPct, unit: '%' }, reference: 'Opgavesamling Kap. 9' });
+  html += calcDetail({ name: tx('Reaktiv komponent ex%', 'Reactive component ex%'), formula: 'ex% = \u221A(uk%\u00B2 - er%\u00B2)', variables: [{ name: 'uk%', symbol: 'uk', value: uk, unit: '%' }, { name: 'er%', symbol: 'er', value: sc.erPct, unit: '%' }], substitution: '\u221A(' + uk + '\u00B2 - ' + sc.erPct.toFixed(2) + '\u00B2)', result: { value: sc.exPct, unit: '%' }, reference: 'Opgavesamling Kap. 9' });
+  html += '</div>';
+  return html;
+}
+
+function renderTrafoRegulation() {
+  var S = trafoState.size;
+  var losses = TRAFO_LOSSES[S] || { p0: 610, pk: 6900 };
+  var uk = TRAFO_UK[S] || 4;
+  var sc = trafoCalcSC(losses.pk, uk, S);
+  var cosPhiPresets = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0];
+  var reg = trafoCalcRegulation(sc.erPct, sc.exPct, trafoState.regCosPhi, trafoState.regLoad);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Spaendingsregulering', 'Voltage Regulation') + '</div>';
+  html += '<div class="info-row">' + tx('Baseret paa ' + S + ' kVA trafo (er%=' + sc.erPct.toFixed(2) + ', ex%=' + sc.exPct.toFixed(2) + ')', 'Based on ' + S + ' kVA transformer (er%=' + sc.erPct.toFixed(2) + ', ex%=' + sc.exPct.toFixed(2) + ')') + '</div>';
+  html += '<div class="select-group"><div class="select-label">cos\u03C6</div><div class="select-grid">';
+  cosPhiPresets.forEach(function(c) { html += '<button class="sel-btn' + (trafoState.regCosPhi === c ? ' selected' : '') + '" onclick="trafoState.regCosPhi=' + c + ';renderModule(\'trafo\')">' + c + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Belastningstype', 'Load type') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (trafoState.regLoad === 'inductive' ? ' selected' : '') + '" onclick="trafoState.regLoad=\'inductive\';renderModule(\'trafo\')">' + tx('Induktiv', 'Inductive') + '</button>';
+  html += '<button class="sel-btn' + (trafoState.regLoad === 'capacitive' ? ' selected' : '') + '" onclick="trafoState.regLoad=\'capacitive\';renderModule(\'trafo\')">' + tx('Kapacitiv', 'Capacitive') + '</button>';
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">\u0394U%</span><span class="value">' + reg.dU_pct.toFixed(3) + ' %</span></div>';
+  html += '<div class="result-row"><span class="label">\u0394U (400 V)</span><span class="value">' + (reg.dU_pct / 100 * 400).toFixed(2) + ' V</span></div>';
+  html += '<div class="result-row"><span class="label">U2 (' + tx('ved belastning', 'under load') + ')</span><span class="value">' + (400 - reg.dU_pct / 100 * 400).toFixed(1) + ' V</span></div>';
+  html += '</div>';
+  var sign = trafoState.regLoad === 'capacitive' ? ' - ' : ' + ';
+  html += calcDetail({ name: tx('Spaendingsregulering', 'Voltage regulation'), formula: '\u0394U% = er%\u00D7cos\u03C6' + sign + 'ex%\u00D7sin\u03C6', variables: [{ name: 'er%', symbol: 'er', value: sc.erPct, unit: '%' }, { name: 'ex%', symbol: 'ex', value: sc.exPct, unit: '%' }, { name: 'cos\u03C6', symbol: 'cos\u03C6', value: trafoState.regCosPhi }, { name: 'sin\u03C6', symbol: 'sin\u03C6', value: reg.sinPhi }], substitution: sc.erPct.toFixed(2) + '\u00D7' + trafoState.regCosPhi + sign + sc.exPct.toFixed(2) + '\u00D7' + reg.sinPhi.toFixed(4), result: { value: reg.dU_pct, unit: '%' }, reference: 'Opgavesamling Kap. 9' });
+  html += '</div>';
+  return html;
+}
+
+function renderTrafoEfficiency() {
+  var S = trafoState.size;
+  var losses = TRAFO_LOSSES[S] || { p0: 610, pk: 6900 };
+  var loadSteps = [25, 50, 60, 70, 75, 80, 85, 90, 95, 100];
+  var cosPhiPresets = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0];
+  var eff = trafoCalcEfficiency(S, losses.p0, losses.pk, trafoState.effLoadPct, trafoState.effCosPhi);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Virkningsgrad', 'Efficiency') + '</div>';
+  html += '<div class="info-row">' + tx('Baseret paa ' + S + ' kVA (P0=' + losses.p0 + ' W, Pcu=' + losses.pk + ' W)', 'Based on ' + S + ' kVA (P0=' + losses.p0 + ' W, Pcu=' + losses.pk + ' W)') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Belastning [%]', 'Load [%]') + '</div><div class="select-grid">';
+  loadSteps.forEach(function(l) { html += '<button class="sel-btn' + (trafoState.effLoadPct === l ? ' selected' : '') + '" onclick="trafoState.effLoadPct=' + l + ';renderModule(\'trafo\')">' + l + '%</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">cos\u03C6</div><div class="select-grid">';
+  cosPhiPresets.forEach(function(c) { html += '<button class="sel-btn' + (trafoState.effCosPhi === c ? ' selected' : '') + '" onclick="trafoState.effCosPhi=' + c + ';renderModule(\'trafo\')">' + c + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">\u03B7</span><span class="value" style="font-weight:700;font-size:1.1em">' + (eff.eta * 100).toFixed(2) + ' %</span></div>';
+  html += '<div class="result-row"><span class="label">P2</span><span class="value">' + (eff.P2/1000).toFixed(2) + ' kW</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Tab', 'Losses') + '</span><span class="value">' + eff.Plosses.toFixed(0) + ' W</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Optimal belastning', 'Optimum load') + '</span><span class="value">' + (eff.optLoad * 100).toFixed(1) + '% (' + (eff.optLoad * S).toFixed(0) + ' kVA)</span></div>';
+  html += '</div>';
+  html += calcDetail({ name: tx('Virkningsgrad', 'Efficiency'), formula: '\u03B7 = P2 / (P2 + P0 + Pcu\u00D7(S/SN)\u00B2)', variables: [{ name: 'P2', symbol: 'P2', value: eff.P2, unit: 'W' }, { name: 'P0', symbol: 'P0', value: losses.p0, unit: 'W' }, { name: 'Pcu', symbol: 'Pcu', value: losses.pk, unit: 'W' }, { name: 'S/SN', symbol: 'S/SN', value: trafoState.effLoadPct/100 }], substitution: eff.P2.toFixed(0) + ' / (' + eff.P2.toFixed(0) + ' + ' + losses.p0 + ' + ' + eff.Pcu_load.toFixed(0) + ')', result: { value: eff.eta * 100, unit: '%' }, reference: 'Opgavesamling Kap. 9' });
+  html += calcDetail({ name: tx('Optimal belastning', 'Optimum load'), formula: 'S_opt/SN = \u221A(P0/Pcu)', variables: [{ name: 'P0', symbol: 'P0', value: losses.p0, unit: 'W' }, { name: 'Pcu', symbol: 'Pcu', value: losses.pk, unit: 'W' }], substitution: '\u221A(' + losses.p0 + '/' + losses.pk + ')', result: { value: eff.optLoad * 100, unit: '% af SN' }, reference: 'Opgavesamling Kap. 9' });
+  html += '</div>';
+  return html;
+}
+
+function renderTrafoParallel() {
+  var S1 = trafoState.size;
+  var uk1 = TRAFO_UK[S1] || 4;
+  var S2sizes = [100, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600];
+  var totalLoad = (S1 + trafoState.parTrafo2size) * trafoState.loadPercent / 100;
+  var par = trafoCalcParallel(S1, uk1, trafoState.parTrafo2size, trafoState.parTrafo2uk, totalLoad);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Paralleldrift', 'Parallel Operation') + '</div>';
+  html += '<div class="info-row">' + tx('Trafo 1: ' + S1 + ' kVA (uk=' + uk1 + '%)', 'Transformer 1: ' + S1 + ' kVA (uk=' + uk1 + '%)') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Trafo 2 [kVA]', 'Transformer 2 [kVA]') + '</div><div class="select-grid">';
+  S2sizes.forEach(function(s) { var u2 = (s >= 630 ? 6 : 4); html += '<button class="sel-btn' + (trafoState.parTrafo2size === s ? ' selected' : '') + '" onclick="trafoState.parTrafo2size=' + s + ';trafoState.parTrafo2uk=' + u2 + ';renderModule(\'trafo\')">' + s + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Belastningsfordeling', 'Load Sharing') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kapacitet', 'Capacity') + '</span><span class="value">' + par.totalCapacity + ' kVA</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Total belastning', 'Total load') + '</span><span class="value">' + totalLoad.toFixed(0) + ' kVA</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Trafo 1', 'Trafo 1') + '</span><span class="value">' + par.S1_load.toFixed(1) + ' kVA (' + (par.ratio1*100).toFixed(1) + '%)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Trafo 2', 'Trafo 2') + '</span><span class="value">' + par.S2_load.toFixed(1) + ' kVA (' + (par.ratio2*100).toFixed(1) + '%)</span></div>';
+  html += '</div>';
+  html += calcDetail({ name: tx('Belastningsfordeling', 'Load sharing'), formula: 'S1_load = S_total \u00D7 (S1/uk1) / (S1/uk1 + S2/uk2)', variables: [{ name: 'S1', symbol: 'S1', value: S1, unit: 'kVA' }, { name: 'uk1', symbol: 'uk1', value: uk1, unit: '%' }, { name: 'S2', symbol: 'S2', value: trafoState.parTrafo2size, unit: 'kVA' }, { name: 'uk2', symbol: 'uk2', value: trafoState.parTrafo2uk, unit: '%' }], substitution: totalLoad.toFixed(0) + ' \u00D7 (' + S1 + '/' + uk1 + ') / (' + S1 + '/' + uk1 + ' + ' + trafoState.parTrafo2size + '/' + trafoState.parTrafo2uk + ')', result: { value: par.S1_load, unit: 'kVA' }, reference: 'Opgavesamling Kap. 9' });
+  html += '</div>';
+  return html;
+}
+
+function renderTrafoVectorGroup() {
+  var groups = Object.keys(TRAFO_VECTOR_GROUPS);
+  var vg = TRAFO_VECTOR_GROUPS[trafoState.vecGroup] || TRAFO_VECTOR_GROUPS['Dy11'];
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Vektorgrupper', 'Vector Groups') + '</div>';
+  html += '<div class="info-row">' + tx('Faseforskydning mellem primaer og sekundaer. Dy11 er standard i DK.', 'Phase shift between primary and secondary. Dy11 is standard in DK.') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Vektorgruppe', 'Vector Group') + '</div><div class="select-grid">';
+  groups.forEach(function(g) { html += '<button class="sel-btn' + (trafoState.vecGroup === g ? ' selected' : '') + '" onclick="trafoState.vecGroup=\'' + g + '\';renderModule(\'trafo\')">' + g + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + trafoState.vecGroup + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Primaer', 'Primary') + '</span><span class="value">' + vg.primary + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Sekundaer', 'Secondary') + '</span><span class="value">' + vg.secondary + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Faseforskydning', 'Phase shift') + '</span><span class="value">' + vg.shift + '\u00B0 (urtal ' + (vg.shift/30) + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Beskrivelse', 'Description') + '</span><span class="value">' + tx(vg.desc_da, vg.desc_en) + '</span></div>';
+  html += '</div></div>';
+  return html;
+}
+
 
 // ===== STANDARDS MODULE =====
 function renderStandards() {
@@ -22616,6 +22832,467 @@ function renderDCEmf() {
   html += '</div></div>';
   return html;
 }
+
+// ===== LIGHTING / LUMEN METHOD MODULE (Opgavesamling Ch. 12) =====
+// Interconnected: uses cable module Iz values, MCB ratings for circuit design
+
+var lysState = {
+  calcType: 'lumen',
+  roomType: 'office',
+  roomLength: 6,
+  roomWidth: 4,
+  mountHeight: 2.5,
+  ceilingRef: 0.7,
+  wallRef: 0.5,
+  floorRef: 0.2,
+  lampType: 'led_panel',
+  mf: 0.8,
+  ptI: 1500,
+  ptH: 3,
+  ptAngle: 0
+};
+
+var LYS_ROOM_TYPES = {
+  office: { lux: 500, da: 'Kontor', en: 'Office' },
+  classroom: { lux: 500, da: 'Klasselokale', en: 'Classroom' },
+  workshop: { lux: 500, da: 'Vaerksted', en: 'Workshop' },
+  corridor: { lux: 100, da: 'Gang/korridor', en: 'Corridor' },
+  staircase: { lux: 150, da: 'Trappe', en: 'Staircase' },
+  toilet: { lux: 200, da: 'Toilet/bad', en: 'Toilet/bathroom' },
+  warehouse: { lux: 200, da: 'Lager', en: 'Warehouse' },
+  retail: { lux: 500, da: 'Butik', en: 'Retail shop' },
+  hospital: { lux: 500, da: 'Hospital', en: 'Hospital' },
+  operating: { lux: 1000, da: 'Operationsstue', en: 'Operating theatre' },
+  parking: { lux: 75, da: 'Parkeringshus', en: 'Parking garage' },
+  outdoor: { lux: 50, da: 'Udendoers', en: 'Outdoor' }
+};
+
+var LYS_LAMP_TYPES = {
+  led_panel: { lumens: 3600, watt: 36, da: 'LED panel 600x600', en: 'LED panel 600x600' },
+  led_tube: { lumens: 2200, watt: 22, da: 'LED roer T8 1200mm', en: 'LED tube T8 1200mm' },
+  led_downlight: { lumens: 1200, watt: 12, da: 'LED downlight', en: 'LED downlight' },
+  fluorescent_2x36: { lumens: 5400, watt: 72, da: 'Lysstoef 2x36W', en: 'Fluorescent 2x36W' },
+  fluorescent_1x58: { lumens: 5000, watt: 58, da: 'Lysstoef 1x58W', en: 'Fluorescent 1x58W' },
+  hps_150: { lumens: 14000, watt: 150, da: 'Hoejtryknatrium 150W', en: 'HPS 150W' },
+  metal_halide: { lumens: 8500, watt: 100, da: 'Metalhalogen 100W', en: 'Metal halide 100W' },
+  led_high_bay: { lumens: 20000, watt: 150, da: 'LED High Bay 150W', en: 'LED High Bay 150W' }
+};
+
+function lysUtilizationFactor(k, ceilingRef, wallRef) {
+  var baseUF;
+  if (k < 0.8) baseUF = 0.30;
+  else if (k < 1.0) baseUF = 0.38;
+  else if (k < 1.25) baseUF = 0.44;
+  else if (k < 1.5) baseUF = 0.49;
+  else if (k < 2.0) baseUF = 0.55;
+  else if (k < 2.5) baseUF = 0.60;
+  else if (k < 3.0) baseUF = 0.64;
+  else if (k < 4.0) baseUF = 0.68;
+  else baseUF = 0.72;
+  var refAdj = (ceilingRef - 0.7) * 0.1 + (wallRef - 0.5) * 0.08;
+  return Math.max(0.2, Math.min(0.85, baseUF + refAdj));
+}
+
+// --- Lys calculation functions (unit-testable, no DOM) ---
+function lysCalcRoomIndex(l, b, hm) {
+  if (hm <= 0 || (l + b) <= 0) return 0;
+  return (l * b) / (hm * (l + b));
+}
+
+function lysCalcTotalFlux(E_lux, area, UF, MF) {
+  if (UF <= 0 || MF <= 0) return 0;
+  return (E_lux * area) / (UF * MF);
+}
+
+function lysCalcNumLuminaires(phiTotal, phiLamp) {
+  if (phiLamp <= 0) return 0;
+  return Math.ceil(phiTotal / phiLamp);
+}
+
+function lysCalcPointIlluminance(I_cd, h, angleDeg) {
+  if (h <= 0) return 0;
+  var angleRad = angleDeg * Math.PI / 180;
+  var cosTheta = Math.cos(angleRad);
+  if (cosTheta <= 0) return 0;
+  var r = h / cosTheta;
+  return (I_cd * cosTheta) / (r * r);
+}
+
+function lysCalcEfficacy(lumens, watts) {
+  if (watts <= 0) return 0;
+  return lumens / watts;
+}
+
+function lysCalcCircuitPower(n, wattPerLuminaire) {
+  return n * wattPerLuminaire;
+}
+
+function lysCalcCircuitCurrent(totalWatt, voltage, cosPhi) {
+  if (voltage <= 0 || cosPhi <= 0) return 0;
+  return totalWatt / (voltage * cosPhi);
+}
+
+
+function renderLys() {
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Belysningsberegner (Opgavesamling Kap. 12)', 'Lighting Calculator (Opgavesamling Ch. 12)') + '</div>';
+  html += '<div class="info-row">' + tx('Lumen-metoden, punktbelysning og lysvirkningsgrad. Resultater linkes til kabel-/MCB-moduler for kredsdesign.', 'Lumen method, point illuminance and luminous efficacy. Results link to cable/MCB modules for circuit design.') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Beregningstype', 'Calculation Type') + '</div><div class="select-grid">';
+  var lysTypes = [
+    { key: 'lumen', da: 'Lumen-metoden', en: 'Lumen Method' },
+    { key: 'point', da: 'Punktbelysning', en: 'Point Illuminance' },
+    { key: 'efficacy', da: 'Lysvirkningsgrad', en: 'Luminous Efficacy' }
+  ];
+  lysTypes.forEach(function(ct) {
+    html += '<button class="sel-btn' + (lysState.calcType === ct.key ? ' selected' : '') + '" onclick="lysState.calcType=\'' + ct.key + '\';renderModule(\'lys\')">' + tx(ct.da, ct.en) + '</button>';
+  });
+  html += '</div></div></div>';
+  if (lysState.calcType === 'lumen') html += renderLysLumen();
+  else if (lysState.calcType === 'point') html += renderLysPoint();
+  else if (lysState.calcType === 'efficacy') html += renderLysEfficacy();
+  return html;
+}
+
+function renderLysLumen() {
+  var lengthPresets = [3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 18, 20, 25, 30];
+  var widthPresets = [3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 18, 20];
+  var heightPresets = [2.0, 2.2, 2.5, 2.8, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 8.0, 10.0];
+  var mfPresets = [0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9];
+  var room = LYS_ROOM_TYPES[lysState.roomType] || LYS_ROOM_TYPES.office;
+  var lamp = LYS_LAMP_TYPES[lysState.lampType] || LYS_LAMP_TYPES.led_panel;
+  var area = lysState.roomLength * lysState.roomWidth;
+  var k = lysCalcRoomIndex(lysState.roomLength, lysState.roomWidth, lysState.mountHeight);
+  var UF = lysUtilizationFactor(k, lysState.ceilingRef, lysState.wallRef);
+  var phiTotal = lysCalcTotalFlux(room.lux, area, UF, lysState.mf);
+  var nLum = lysCalcNumLuminaires(phiTotal, lamp.lumens);
+  var totalW = lysCalcCircuitPower(nLum, lamp.watt);
+  var Ib = lysCalcCircuitCurrent(totalW, 230, 0.95);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Lumen-metoden', 'Lumen Method') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Rumtype (DS/EN 12464-1)', 'Room type (DS/EN 12464-1)') + '</div><div class="select-grid">';
+  Object.keys(LYS_ROOM_TYPES).forEach(function(rt) { var r = LYS_ROOM_TYPES[rt]; html += '<button class="sel-btn' + (lysState.roomType === rt ? ' selected' : '') + '" onclick="lysState.roomType=\'' + rt + '\';renderModule(\'lys\')">' + tx(r.da, r.en) + ' (' + r.lux + ' lx)</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Laengde l [m]', 'Length l [m]') + '</div><div class="select-grid">';
+  lengthPresets.forEach(function(v) { html += '<button class="sel-btn' + (lysState.roomLength === v ? ' selected' : '') + '" onclick="lysState.roomLength=' + v + ';renderModule(\'lys\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Bredde b [m]', 'Width b [m]') + '</div><div class="select-grid">';
+  widthPresets.forEach(function(v) { html += '<button class="sel-btn' + (lysState.roomWidth === v ? ' selected' : '') + '" onclick="lysState.roomWidth=' + v + ';renderModule(\'lys\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Montagehoeijde hm [m]', 'Mounting height hm [m]') + '</div><div class="select-grid">';
+  heightPresets.forEach(function(v) { html += '<button class="sel-btn' + (lysState.mountHeight === v ? ' selected' : '') + '" onclick="lysState.mountHeight=' + v + ';renderModule(\'lys\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Loftreflektans', 'Ceiling reflectance') + '</div><div class="select-grid">';
+  [0.3, 0.5, 0.7, 0.8].forEach(function(v) { html += '<button class="sel-btn' + (lysState.ceilingRef === v ? ' selected' : '') + '" onclick="lysState.ceilingRef=' + v + ';renderModule(\'lys\')">' + (v*100) + '%</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Vaegreflektans', 'Wall reflectance') + '</div><div class="select-grid">';
+  [0.1, 0.3, 0.5, 0.7].forEach(function(v) { html += '<button class="sel-btn' + (lysState.wallRef === v ? ' selected' : '') + '" onclick="lysState.wallRef=' + v + ';renderModule(\'lys\')">' + (v*100) + '%</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Armaturtype', 'Luminaire type') + '</div><div class="select-grid">';
+  Object.keys(LYS_LAMP_TYPES).forEach(function(lt) { var l = LYS_LAMP_TYPES[lt]; html += '<button class="sel-btn' + (lysState.lampType === lt ? ' selected' : '') + '" onclick="lysState.lampType=\'' + lt + '\';renderModule(\'lys\')">' + tx(l.da, l.en) + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Vedligeholdelsesfaktor MF', 'Maintenance factor MF') + '</div><div class="select-grid">';
+  mfPresets.forEach(function(v) { html += '<button class="sel-btn' + (lysState.mf === v ? ' selected' : '') + '" onclick="lysState.mf=' + v + ';renderModule(\'lys\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kraevet belysning', 'Required illuminance') + '</span><span class="value">' + room.lux + ' lux</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Areal', 'Area') + '</span><span class="value">' + area + ' m\u00B2</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Rumindeks k', 'Room index k') + '</span><span class="value">' + k.toFixed(2) + '</span></div>';
+  html += '<div class="result-row"><span class="label">UF</span><span class="value">' + UF.toFixed(2) + '</span></div>';
+  html += '<div class="result-row"><span class="label">\u03A6_total</span><span class="value">' + Math.round(phiTotal) + ' lm</span></div>';
+  html += '<div class="result-row"><span class="label" style="font-weight:700">' + tx('Antal armaturer', 'Number of luminaires') + '</span><span class="value" style="font-weight:700;font-size:1.1em">' + nLum + ' stk</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Samlet effekt', 'Total power') + '</span><span class="value">' + totalW + ' W</span></div>';
+  html += '<div class="result-row"><span class="label">IB (230V)</span><span class="value">' + Ib.toFixed(2) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('MCB', 'MCB') + '</span><span class="value">' + (Ib <= 10 ? '10A' : Ib <= 16 ? '16A' : '20A') + ' B</span></div>';
+  html += '</div>';
+  html += calcDetail({ name: tx('Rumindeks', 'Room index'), formula: 'k = l\u00D7b / (hm\u00D7(l+b))', variables: [{ name: 'l', symbol: 'l', value: lysState.roomLength, unit: 'm' }, { name: 'b', symbol: 'b', value: lysState.roomWidth, unit: 'm' }, { name: 'hm', symbol: 'hm', value: lysState.mountHeight, unit: 'm' }], substitution: lysState.roomLength + '\u00D7' + lysState.roomWidth + ' / (' + lysState.mountHeight + '\u00D7(' + lysState.roomLength + '+' + lysState.roomWidth + '))', result: { value: k, unit: '' }, reference: 'DS/EN 12464-1, Opgavesamling Kap. 12' });
+  html += calcDetail({ name: tx('Total lysflux', 'Total luminous flux'), formula: '\u03A6_total = E\u00D7A / (UF\u00D7MF)', variables: [{ name: 'E', symbol: 'E', value: room.lux, unit: 'lux', source: 'DS/EN 12464-1' }, { name: 'A', symbol: 'A', value: area, unit: 'm\u00B2' }, { name: 'UF', symbol: 'UF', value: UF }, { name: 'MF', symbol: 'MF', value: lysState.mf }], substitution: room.lux + '\u00D7' + area + ' / (' + UF.toFixed(2) + '\u00D7' + lysState.mf + ')', result: { value: phiTotal, unit: 'lm' }, reference: 'Opgavesamling Kap. 12' });
+  html += calcDetail({ name: tx('Antal armaturer', 'Number of luminaires'), formula: 'n = \u03A6_total / \u03A6_armatur (rund op)', variables: [{ name: '\u03A6_total', symbol: '\u03A6_tot', value: Math.round(phiTotal), unit: 'lm' }, { name: '\u03A6_arm', symbol: '\u03A6_arm', value: lamp.lumens, unit: 'lm' }], substitution: Math.round(phiTotal) + ' / ' + lamp.lumens, result: { value: nLum, unit: 'stk' }, reference: 'Opgavesamling Kap. 12' });
+  html += '</div>';
+  return html;
+}
+
+function renderLysPoint() {
+  var iPresets = [100, 200, 500, 750, 1000, 1500, 2000, 3000, 5000, 8000, 10000];
+  var hPresets = [2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 8.0, 10.0, 12.0, 15.0];
+  var anglePresets = [0, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60];
+  var E = lysCalcPointIlluminance(lysState.ptI, lysState.ptH, lysState.ptAngle);
+  var angleRad = lysState.ptAngle * Math.PI / 180;
+  var cosTheta = Math.cos(angleRad);
+  var r = lysState.ptH / (cosTheta > 0 ? cosTheta : 1);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Punktbelysning: E = I\u00D7cos\u03B8 / r\u00B2', 'Point Illuminance: E = I\u00D7cos\u03B8 / r\u00B2') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Lysstyrke I [cd]', 'Luminous intensity I [cd]') + '</div><div class="select-grid">';
+  iPresets.forEach(function(v) { html += '<button class="sel-btn' + (lysState.ptI === v ? ' selected' : '') + '" onclick="lysState.ptI=' + v + ';renderModule(\'lys\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Hoejde h [m]', 'Height h [m]') + '</div><div class="select-grid">';
+  hPresets.forEach(function(v) { html += '<button class="sel-btn' + (lysState.ptH === v ? ' selected' : '') + '" onclick="lysState.ptH=' + v + ';renderModule(\'lys\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Vinkel \u03B8 [\u00B0]', 'Angle \u03B8 [\u00B0]') + '</div><div class="select-grid">';
+  anglePresets.forEach(function(v) { html += '<button class="sel-btn' + (lysState.ptAngle === v ? ' selected' : '') + '" onclick="lysState.ptAngle=' + v + ';renderModule(\'lys\')">' + v + '\u00B0</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">E</span><span class="value" style="font-weight:700">' + E.toFixed(2) + ' lux</span></div>';
+  html += '<div class="result-row"><span class="label">r</span><span class="value">' + r.toFixed(2) + ' m</span></div>';
+  html += '</div>';
+  html += calcDetail({ name: tx('Punktbelysning', 'Point illuminance'), formula: 'E = I\u00D7cos\u03B8 / r\u00B2', variables: [{ name: 'I', symbol: 'I', value: lysState.ptI, unit: 'cd' }, { name: 'h', symbol: 'h', value: lysState.ptH, unit: 'm' }, { name: '\u03B8', symbol: '\u03B8', value: lysState.ptAngle, unit: '\u00B0' }], substitution: lysState.ptI + '\u00D7' + cosTheta.toFixed(4) + ' / ' + r.toFixed(2) + '\u00B2', steps: [{ desc: 'r = h/cos\u03B8', expr: lysState.ptH + '/' + cosTheta.toFixed(4), result: r }], result: { value: E, unit: 'lux' }, reference: 'Opgavesamling Kap. 12' });
+  html += '</div>';
+  return html;
+}
+
+function renderLysEfficacy() {
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Lysvirkningsgrad (lm/W)', 'Luminous Efficacy (lm/W)') + '</div>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-top:10px">';
+  html += '<tr style="background:var(--border-light);font-weight:600"><td style="padding:6px">' + tx('Type', 'Type') + '</td><td style="padding:6px">Lumen</td><td style="padding:6px">Watt</td><td style="padding:6px">lm/W</td></tr>';
+  Object.keys(LYS_LAMP_TYPES).forEach(function(lt) { var l = LYS_LAMP_TYPES[lt]; var eff = lysCalcEfficacy(l.lumens, l.watt); html += '<tr style="border-bottom:1px solid var(--border-light)' + (lysState.lampType === lt ? ';background:var(--primary-glow)' : '') + '"><td style="padding:6px"><button class="sel-btn' + (lysState.lampType === lt ? ' selected' : '') + '" onclick="lysState.lampType=\'' + lt + '\';renderModule(\'lys\')" style="font-size:0.8rem">' + tx(l.da, l.en) + '</button></td><td style="padding:6px">' + l.lumens + '</td><td style="padding:6px">' + l.watt + '</td><td style="padding:6px;font-weight:700">' + eff.toFixed(1) + '</td></tr>'; });
+  html += '</table>';
+  var selLamp = LYS_LAMP_TYPES[lysState.lampType]; var selEff = lysCalcEfficacy(selLamp.lumens, selLamp.watt);
+  html += calcDetail({ name: tx('Lysvirkningsgrad', 'Luminous efficacy'), formula: '\u03B7 = \u03A6 / P', variables: [{ name: '\u03A6', symbol: '\u03A6', value: selLamp.lumens, unit: 'lm' }, { name: 'P', symbol: 'P', value: selLamp.watt, unit: 'W' }], substitution: selLamp.lumens + ' / ' + selLamp.watt, result: { value: selEff, unit: 'lm/W' }, reference: 'Opgavesamling Kap. 12' });
+  html += '</div>';
+  return html;
+}
+
+
+// ===== MAGNETIC CIRCUIT MODULE (Opgavesamling Ch. 5) =====
+// Interconnected: links to impedance module (XL=2*pi*f*L) and transformer (EMF/flux)
+
+var magnetState = {
+  calcType: 'mmf',
+  material: 'sheet_steel',
+  mmfN: 500, mmfI: 2,
+  fluxPhi: 0.001, fluxArea: 0.001,
+  relLength: 0.5, relArea: 0.001, relGap: 0.001,
+  indN: 200, indDphiDt: 0.01, indB: 1.0, indL: 0.5, indV: 10,
+  inductN: 500, inductLength: 0.5, inductArea: 0.001,
+  forceI: 5, forceL: 0.3, forceB: 1.0,
+  energyL: 0.1, energyI: 5
+};
+
+var MAGNET_MATERIALS = {
+  cast_iron: { muR: 200, da: 'Stoebejern (ur~200)', en: 'Cast iron (ur~200)' },
+  sheet_steel: { muR: 2000, da: 'Transformerplader (ur~2000)', en: 'Sheet steel (ur~2000)' },
+  silicon_steel: { muR: 4000, da: 'Siliciumstaal (ur~4000)', en: 'Silicon steel (ur~4000)' },
+  permalloy: { muR: 50000, da: 'Permalloy (ur~50000)', en: 'Permalloy (ur~50000)' },
+  ferrite: { muR: 1000, da: 'Ferrit (ur~1000)', en: 'Ferrite (ur~1000)' },
+  air: { muR: 1, da: 'Luft (ur=1)', en: 'Air (ur=1)' }
+};
+
+var MAGNET_MU0 = 4 * Math.PI * 1e-7;
+
+function magnetCalcMMF(N, I) { return N * I; }
+function magnetCalcB(Phi, A) { return (A > 0) ? Phi / A : 0; }
+function magnetCalcH(B, muR) { return (muR > 0) ? B / (MAGNET_MU0 * muR) : 0; }
+function magnetCalcReluctance(l, muR, A) { return (A > 0 && muR > 0) ? l / (MAGNET_MU0 * muR * A) : Infinity; }
+function magnetCalcGapReluctance(l_gap, A) { return (A > 0) ? l_gap / (MAGNET_MU0 * A) : Infinity; }
+function magnetCalcFaradayEMF(N, dPhiDt) { return N * dPhiDt; }
+function magnetCalcMotionalEMF(B, l, v) { return B * l * v; }
+function magnetCalcInductance(N, muR, A, l) { return (l > 0) ? N * N * MAGNET_MU0 * muR * A / l : 0; }
+function magnetCalcForce(B, I, l) { return B * I * l; }
+function magnetCalcEnergy(L, I) { return 0.5 * L * I * I; }
+
+function renderMagnet() {
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Magnetkreds (Opgavesamling Kap. 5)', 'Magnetic Circuit (Opgavesamling Ch. 5)') + '</div>';
+  html += '<div class="info-row">' + tx('MMF, fluxdensitet, reluktans, induktion, induktans, kraft og energi. Linket til impedans (XL) og trafo (EMF).', 'MMF, flux density, reluctance, induction, inductance, force and energy. Linked to impedance (XL) and transformer (EMF).') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Beregningstype', 'Calculation Type') + '</div><div class="select-grid">';
+  var magTypes = [
+    { key: 'mmf', da: 'MMF (Fm=NI)', en: 'MMF (Fm=NI)' },
+    { key: 'flux', da: 'Fluxdensitet (B)', en: 'Flux density (B)' },
+    { key: 'reluctance', da: 'Reluktans (Rm)', en: 'Reluctance (Rm)' },
+    { key: 'induction', da: 'Induktion (e)', en: 'Induction (e)' },
+    { key: 'inductance', da: 'Induktans (L)', en: 'Inductance (L)' },
+    { key: 'force', da: 'Kraft (F=BIl)', en: 'Force (F=BIl)' },
+    { key: 'energy', da: 'Energi (W)', en: 'Energy (W)' }
+  ];
+  magTypes.forEach(function(ct) {
+    html += '<button class="sel-btn' + (magnetState.calcType === ct.key ? ' selected' : '') + '" onclick="magnetState.calcType=\'' + ct.key + '\';renderModule(\'magnet\')">' + tx(ct.da, ct.en) + '</button>';
+  });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Kernemateriale', 'Core material') + '</div><div class="select-grid">';
+  Object.keys(MAGNET_MATERIALS).forEach(function(mk) { var m = MAGNET_MATERIALS[mk]; html += '<button class="sel-btn' + (magnetState.material === mk ? ' selected' : '') + '" onclick="magnetState.material=\'' + mk + '\';renderModule(\'magnet\')">' + tx(m.da, m.en) + '</button>'; });
+  html += '</div></div></div>';
+  if (magnetState.calcType === 'mmf') html += renderMagnetMMF();
+  else if (magnetState.calcType === 'flux') html += renderMagnetFlux();
+  else if (magnetState.calcType === 'reluctance') html += renderMagnetReluctance();
+  else if (magnetState.calcType === 'induction') html += renderMagnetInduction();
+  else if (magnetState.calcType === 'inductance') html += renderMagnetInductance();
+  else if (magnetState.calcType === 'force') html += renderMagnetForce();
+  else if (magnetState.calcType === 'energy') html += renderMagnetEnergy();
+  return html;
+}
+
+
+function renderMagnetMMF() {
+  var nPresets = [50, 100, 150, 200, 300, 400, 500, 600, 800, 1000, 1500, 2000];
+  var iPresets = [0.1, 0.2, 0.5, 1, 2, 3, 4, 5, 8, 10, 15, 20];
+  var Fm = magnetCalcMMF(magnetState.mmfN, magnetState.mmfI);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('MMF: Fm = N x I', 'MMF: Fm = N x I') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Vindingstal N', 'Turns N') + '</div><div class="select-grid">';
+  nPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.mmfN === v ? ' selected' : '') + '" onclick="magnetState.mmfN=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Stroem I [A]', 'Current I [A]') + '</div><div class="select-grid">';
+  iPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.mmfI === v ? ' selected' : '') + '" onclick="magnetState.mmfI=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">Fm</span><span class="value" style="font-weight:700">' + Fm + ' A</span></div></div>';
+  html += calcDetail({ name: 'MMF', formula: 'Fm = N \u00D7 I', variables: [{ name: 'N', symbol: 'N', value: magnetState.mmfN, unit: tx('vindinger', 'turns') }, { name: 'I', symbol: 'I', value: magnetState.mmfI, unit: 'A' }], substitution: magnetState.mmfN + ' \u00D7 ' + magnetState.mmfI, result: { value: Fm, unit: 'A' }, reference: 'Opgavesamling Kap. 5' });
+  html += '</div>';
+  return html;
+}
+
+function renderMagnetFlux() {
+  var phiPresets = [0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.003, 0.005, 0.008, 0.01, 0.02, 0.05];
+  var areaPresets = [0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.003, 0.005, 0.008, 0.01, 0.02, 0.05];
+  var B = magnetCalcB(magnetState.fluxPhi, magnetState.fluxArea);
+  var muR = MAGNET_MATERIALS[magnetState.material].muR;
+  var H = magnetCalcH(B, muR);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Fluxdensitet: B = Phi/A', 'Flux density: B = Phi/A') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Flux [Wb]', 'Flux [Wb]') + '</div><div class="select-grid">';
+  phiPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.fluxPhi === v ? ' selected' : '') + '" onclick="magnetState.fluxPhi=' + v + ';renderModule(\'magnet\')">' + (v*1000).toFixed(1) + ' mWb</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Areal A', 'Area A') + '</div><div class="select-grid">';
+  areaPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.fluxArea === v ? ' selected' : '') + '" onclick="magnetState.fluxArea=' + v + ';renderModule(\'magnet\')">' + (v*10000).toFixed(1) + ' cm2</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">B</span><span class="value" style="font-weight:700">' + B.toFixed(3) + ' T</span></div>';
+  html += '<div class="result-row"><span class="label">H</span><span class="value">' + H.toFixed(1) + ' A/m</span></div></div>';
+  html += calcDetail({ name: tx('Fluxdensitet', 'Flux density'), formula: 'B = \u03A6 / A', variables: [{ name: '\u03A6', symbol: '\u03A6', value: magnetState.fluxPhi*1000, unit: 'mWb' }, { name: 'A', symbol: 'A', value: magnetState.fluxArea*10000, unit: 'cm2' }], substitution: magnetState.fluxPhi + ' / ' + magnetState.fluxArea, result: { value: B, unit: 'T' }, reference: 'Opgavesamling Kap. 5' });
+  html += calcDetail({ name: tx('Feltstyrke', 'Field strength'), formula: 'H = B / (u0*ur)', variables: [{ name: 'B', symbol: 'B', value: B, unit: 'T' }, { name: 'ur', symbol: 'ur', value: muR }], substitution: B.toFixed(3) + ' / (4pi*1e-7*' + muR + ')', result: { value: H, unit: 'A/m' }, reference: 'Opgavesamling Kap. 5' });
+  html += '</div>';
+  return html;
+}
+
+
+function renderMagnetReluctance() {
+  var lengthPresets = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0];
+  var areaPresets = [0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.003, 0.005, 0.008, 0.01, 0.02];
+  var gapPresets = [0, 0.0005, 0.001, 0.002, 0.003, 0.005, 0.008, 0.01, 0.015, 0.02];
+  var muR = MAGNET_MATERIALS[magnetState.material].muR;
+  var Rm_core = magnetCalcReluctance(magnetState.relLength, muR, magnetState.relArea);
+  var Rm_gap = (magnetState.relGap > 0) ? magnetCalcGapReluctance(magnetState.relGap, magnetState.relArea) : 0;
+  var Rm_total = Rm_core + Rm_gap;
+  var Fm = magnetCalcMMF(magnetState.mmfN, magnetState.mmfI);
+  var Phi = (Rm_total > 0 && isFinite(Rm_total)) ? Fm / Rm_total : 0;
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Reluktans', 'Reluctance') + '</div>';
+  html += '<div class="info-row">' + tx('Bruger N=' + magnetState.mmfN + ', I=' + magnetState.mmfI + ' fra MMF', 'Uses N=' + magnetState.mmfN + ', I=' + magnetState.mmfI + ' from MMF') + '</div>';
+  html += '<div class="select-group"><div class="select-label">l [m]</div><div class="select-grid">';
+  lengthPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.relLength === v ? ' selected' : '') + '" onclick="magnetState.relLength=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">A</div><div class="select-grid">';
+  areaPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.relArea === v ? ' selected' : '') + '" onclick="magnetState.relArea=' + v + ';renderModule(\'magnet\')">' + (v*10000).toFixed(1) + ' cm2</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Luftgab', 'Air gap') + '</div><div class="select-grid">';
+  gapPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.relGap === v ? ' selected' : '') + '" onclick="magnetState.relGap=' + v + ';renderModule(\'magnet\')">' + (v === 0 ? '0' : (v*1000).toFixed(1) + 'mm') + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">Rm_core</span><span class="value">' + Rm_core.toExponential(2) + ' A/Wb</span></div>';
+  if (magnetState.relGap > 0) html += '<div class="result-row"><span class="label">Rm_gap</span><span class="value">' + Rm_gap.toExponential(2) + ' A/Wb</span></div>';
+  html += '<div class="result-row"><span class="label">Rm_total</span><span class="value" style="font-weight:700">' + Rm_total.toExponential(2) + ' A/Wb</span></div>';
+  html += '<div class="result-row"><span class="label">\u03A6</span><span class="value">' + (Phi*1000).toFixed(4) + ' mWb</span></div></div>';
+  html += calcDetail({ name: tx('Kernereluktans', 'Core reluctance'), formula: 'Rm = l/(u0*ur*A)', variables: [{ name: 'l', symbol: 'l', value: magnetState.relLength, unit: 'm' }, { name: 'ur', symbol: 'ur', value: muR }, { name: 'A', symbol: 'A', value: magnetState.relArea, unit: 'm2' }], substitution: magnetState.relLength + '/(4pi*1e-7*' + muR + '*' + magnetState.relArea + ')', result: { value: Rm_core, unit: 'A/Wb' }, reference: 'Opgavesamling Kap. 5' });
+  html += '</div>';
+  return html;
+}
+
+function renderMagnetInduction() {
+  var nPresets = [50, 100, 200, 300, 400, 500, 800, 1000, 1500, 2000];
+  var dphiPresets = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0];
+  var bPresets = [0.1, 0.2, 0.3, 0.5, 0.8, 1.0, 1.2, 1.5, 1.8, 2.0];
+  var lPresets = [0.1, 0.2, 0.3, 0.5, 0.8, 1.0, 1.5, 2.0];
+  var vPresets = [1, 2, 3, 5, 8, 10, 15, 20, 30, 50];
+  var eFaraday = magnetCalcFaradayEMF(magnetState.indN, magnetState.indDphiDt);
+  var eMotional = magnetCalcMotionalEMF(magnetState.indB, magnetState.indL, magnetState.indV);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Induktion', 'Induction') + '</div>';
+  html += '<div class="result-box" style="background:var(--primary-glow)"><div class="result-title">Faraday: e = N*d\u03A6/dt</div>';
+  html += '<div class="select-group"><div class="select-label">N</div><div class="select-grid">';
+  nPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.indN === v ? ' selected' : '') + '" onclick="magnetState.indN=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">d\u03A6/dt [Wb/s]</div><div class="select-grid">';
+  dphiPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.indDphiDt === v ? ' selected' : '') + '" onclick="magnetState.indDphiDt=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-row"><span class="label">e</span><span class="value" style="font-weight:700">' + eFaraday.toFixed(3) + ' V</span></div></div>';
+  html += '<div class="result-box"><div class="result-title">e = B*l*v</div>';
+  html += '<div class="select-group"><div class="select-label">B [T]</div><div class="select-grid">';
+  bPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.indB === v ? ' selected' : '') + '" onclick="magnetState.indB=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">l [m]</div><div class="select-grid">';
+  lPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.indL === v ? ' selected' : '') + '" onclick="magnetState.indL=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">v [m/s]</div><div class="select-grid">';
+  vPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.indV === v ? ' selected' : '') + '" onclick="magnetState.indV=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-row"><span class="label">e</span><span class="value" style="font-weight:700">' + eMotional.toFixed(3) + ' V</span></div></div>';
+  html += calcDetail({ name: 'Faraday', formula: 'e = N*d\u03A6/dt', variables: [{ name: 'N', symbol: 'N', value: magnetState.indN }, { name: 'd\u03A6/dt', symbol: 'd\u03A6/dt', value: magnetState.indDphiDt, unit: 'Wb/s' }], substitution: magnetState.indN + '*' + magnetState.indDphiDt, result: { value: eFaraday, unit: 'V' }, reference: 'Opgavesamling Kap. 5' });
+  html += calcDetail({ name: tx('Bevaegelses-EMF', 'Motional EMF'), formula: 'e = B*l*v', variables: [{ name: 'B', symbol: 'B', value: magnetState.indB, unit: 'T' }, { name: 'l', symbol: 'l', value: magnetState.indL, unit: 'm' }, { name: 'v', symbol: 'v', value: magnetState.indV, unit: 'm/s' }], substitution: magnetState.indB + '*' + magnetState.indL + '*' + magnetState.indV, result: { value: eMotional, unit: 'V' }, reference: 'Opgavesamling Kap. 5' });
+  html += '</div>';
+  return html;
+}
+
+
+function renderMagnetInductance() {
+  var nPresets = [50, 100, 200, 300, 400, 500, 600, 800, 1000, 1500, 2000];
+  var lengthPresets = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2, 1.5];
+  var areaPresets = [0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.003, 0.005, 0.008, 0.01, 0.02];
+  var muR = MAGNET_MATERIALS[magnetState.material].muR;
+  var L = magnetCalcInductance(magnetState.inductN, muR, magnetState.inductArea, magnetState.inductLength);
+  var XL = 2 * Math.PI * 50 * L;
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Induktans: L = N2*u0*ur*A/l', 'Inductance: L = N2*u0*ur*A/l') + '</div>';
+  html += '<div class="info-row">' + tx('Link: XL = 2*pi*f*L (impedansmodul)', 'Link: XL = 2*pi*f*L (impedance module)') + '</div>';
+  html += '<div class="select-group"><div class="select-label">N</div><div class="select-grid">';
+  nPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.inductN === v ? ' selected' : '') + '" onclick="magnetState.inductN=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">l [m]</div><div class="select-grid">';
+  lengthPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.inductLength === v ? ' selected' : '') + '" onclick="magnetState.inductLength=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">A</div><div class="select-grid">';
+  areaPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.inductArea === v ? ' selected' : '') + '" onclick="magnetState.inductArea=' + v + ';renderModule(\'magnet\')">' + (v*10000).toFixed(1) + ' cm2</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">L</span><span class="value" style="font-weight:700">' + (L >= 1 ? L.toFixed(3) + ' H' : L >= 0.001 ? (L*1000).toFixed(2) + ' mH' : (L*1e6).toFixed(1) + ' uH') + '</span></div>';
+  html += '<div class="result-row"><span class="label">XL (50Hz)</span><span class="value">' + XL.toFixed(3) + ' \u03A9</span></div></div>';
+  html += calcDetail({ name: tx('Selvinduktans', 'Self-inductance'), formula: 'L = N2*u0*ur*A/l', variables: [{ name: 'N', symbol: 'N', value: magnetState.inductN }, { name: 'ur', symbol: 'ur', value: muR }, { name: 'A', symbol: 'A', value: magnetState.inductArea, unit: 'm2' }, { name: 'l', symbol: 'l', value: magnetState.inductLength, unit: 'm' }], substitution: magnetState.inductN + '2*4pi*1e-7*' + muR + '*' + magnetState.inductArea + '/' + magnetState.inductLength, result: { value: L, unit: 'H' }, reference: 'Opgavesamling Kap. 5' });
+  html += calcDetail({ name: 'XL (link)', formula: 'XL = 2*pi*f*L', variables: [{ name: 'f', symbol: 'f', value: 50, unit: 'Hz' }, { name: 'L', symbol: 'L', value: L, unit: 'H' }], substitution: '2*pi*50*' + L.toExponential(3), result: { value: XL, unit: '\u03A9' }, reference: 'Kap. 4' });
+  html += '</div>';
+  return html;
+}
+
+function renderMagnetForce() {
+  var bPresets = [0.1, 0.2, 0.3, 0.5, 0.8, 1.0, 1.2, 1.5, 1.8, 2.0];
+  var iPresets = [0.5, 1, 2, 3, 5, 8, 10, 15, 20, 30, 50];
+  var lPresets = [0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.8, 1.0, 1.5, 2.0];
+  var F = magnetCalcForce(magnetState.forceB, magnetState.forceI, magnetState.forceL);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Kraft: F = B*I*l', 'Force: F = B*I*l') + '</div>';
+  html += '<div class="select-group"><div class="select-label">B [T]</div><div class="select-grid">';
+  bPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.forceB === v ? ' selected' : '') + '" onclick="magnetState.forceB=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">I [A]</div><div class="select-grid">';
+  iPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.forceI === v ? ' selected' : '') + '" onclick="magnetState.forceI=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">l [m]</div><div class="select-grid">';
+  lPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.forceL === v ? ' selected' : '') + '" onclick="magnetState.forceL=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">F</span><span class="value" style="font-weight:700">' + F.toFixed(3) + ' N</span></div></div>';
+  html += calcDetail({ name: tx('Lorentz-kraft', 'Lorentz force'), formula: 'F = B*I*l', variables: [{ name: 'B', symbol: 'B', value: magnetState.forceB, unit: 'T' }, { name: 'I', symbol: 'I', value: magnetState.forceI, unit: 'A' }, { name: 'l', symbol: 'l', value: magnetState.forceL, unit: 'm' }], substitution: magnetState.forceB + '*' + magnetState.forceI + '*' + magnetState.forceL, result: { value: F, unit: 'N' }, reference: 'Opgavesamling Kap. 5' });
+  html += '</div>';
+  return html;
+}
+
+function renderMagnetEnergy() {
+  var lPresets = [0.001, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0];
+  var iPresets = [0.5, 1, 2, 3, 5, 8, 10, 15, 20, 30, 50];
+  var W = magnetCalcEnergy(magnetState.energyL, magnetState.energyI);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Energi: W = 0.5*L*I2', 'Energy: W = 0.5*L*I2') + '</div>';
+  html += '<div class="select-group"><div class="select-label">L [H]</div><div class="select-grid">';
+  lPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.energyL === v ? ' selected' : '') + '" onclick="magnetState.energyL=' + v + ';renderModule(\'magnet\')">' + (v >= 1 ? v + ' H' : v >= 0.001 ? (v*1000) + ' mH' : (v*1e6) + ' uH') + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">I [A]</div><div class="select-grid">';
+  iPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.energyI === v ? ' selected' : '') + '" onclick="magnetState.energyI=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">W</span><span class="value" style="font-weight:700">' + (W >= 1 ? W.toFixed(2) + ' J' : (W*1000).toFixed(3) + ' mJ') + '</span></div></div>';
+  html += calcDetail({ name: tx('Magnetisk energi', 'Magnetic energy'), formula: 'W = 0.5*L*I2', variables: [{ name: 'L', symbol: 'L', value: magnetState.energyL, unit: 'H' }, { name: 'I', symbol: 'I', value: magnetState.energyI, unit: 'A' }], substitution: '0.5*' + magnetState.energyL + '*' + magnetState.energyI + '2', result: { value: W, unit: 'J' }, reference: 'Opgavesamling Kap. 5' });
+  html += '</div>';
+  return html;
+}
+
 
 // ===== PROJECT ANALYZER MODULE =====
 // Deterministic offline parser for exam/project descriptions.
