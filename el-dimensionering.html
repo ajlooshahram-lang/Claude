@@ -1400,6 +1400,31 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // Transformer dynamic power/current solver (this feature) — Persian
+  'Power/Current Solver': '\u062D\u0644\u200C\u06A9\u0646\u0646\u062F\u0647 \u062A\u0648\u0627\u0646/\u062C\u0631\u06CC\u0627\u0646',
+  'Power & Current Solver (dynamic)': '\u062D\u0644\u200C\u06A9\u0646\u0646\u062F\u0647 \u062A\u0648\u0627\u0646 \u0648 \u062C\u0631\u06CC\u0627\u0646 (\u067E\u0648\u06CC\u0627)',
+  'Select the quantities you HAVE (click). The app derives the rest automatically \u2014 whether you start from power, current, voltage or anything else. If data is missing, it shows exactly what is missing (nothing is guessed).': '\u06A9\u0645\u06CC\u062A\u200C\u0647\u0627\u06CC\u06CC \u06A9\u0647 \u062F\u0627\u0631\u06CC\u062F \u0631\u0627 \u0627\u0646\u062A\u062E\u0627\u0628 \u06A9\u0646\u06CC\u062F (\u06A9\u0644\u06CC\u06A9). \u0628\u0631\u0646\u0627\u0645\u0647 \u0628\u0642\u06CC\u0647 \u0631\u0627 \u062E\u0648\u062F\u06A9\u0627\u0631 \u0628\u0647 \u062F\u0633\u062A \u0645\u06CC\u200C\u0622\u0648\u0631\u062F \u2014 \u0686\u0647 \u0627\u0632 \u062A\u0648\u0627\u0646\u060C \u0686\u0647 \u062C\u0631\u06CC\u0627\u0646\u060C \u0686\u0647 \u0648\u0644\u062A\u0627\u0698 \u0634\u0631\u0648\u0639 \u06A9\u0646\u06CC\u062F. \u0627\u06AF\u0631 \u062F\u0627\u062F\u0647\u200C\u0627\u06CC \u06A9\u0645 \u0628\u0627\u0634\u062F\u060C \u062F\u0642\u06CC\u0642\u0627\u064B \u0646\u0634\u0627\u0646 \u0645\u06CC\u200C\u062F\u0647\u062F \u0686\u0647 \u0686\u06CC\u0632\u06CC \u06A9\u0645 \u0627\u0633\u062A (\u0686\u06CC\u0632\u06CC \u062D\u062F\u0633 \u0632\u062F\u0647 \u0646\u0645\u06CC\u200C\u0634\u0648\u062F).',
+  'Phase system': '\u0633\u06CC\u0633\u062A\u0645 \u0641\u0627\u0632',
+  '3-phase': '\u0633\u0647\u200C\u0641\u0627\u0632',
+  '1-phase': '\u062A\u06A9\u200C\u0641\u0627\u0632',
+  '\u2014 not given': '\u2014 \u0648\u0627\u0631\u062F \u0646\u0634\u062F\u0647',
+  '\u2014 unknown': '\u2014 \u0646\u0627\u0645\u0639\u0644\u0648\u0645',
+  'Apparent power S [kVA]': '\u062A\u0648\u0627\u0646 \u0638\u0627\u0647\u0631\u06CC S [kVA]',
+  'Active power P [kW]': '\u062A\u0648\u0627\u0646 \u0627\u06A9\u062A\u06CC\u0648 P [kW]',
+  'Reactive power Q [kvar]': '\u062A\u0648\u0627\u0646 \u0631\u0627\u06A9\u062A\u06CC\u0648 Q [kvar]',
+  'Result (derived)': '\u0646\u062A\u06CC\u062C\u0647 (\u0627\u0633\u062A\u062E\u0631\u0627\u062C\u200C\u0634\u062F\u0647)',
+  'Partial result \u2014 missing input': '\u0646\u062A\u06CC\u062C\u0647 \u062C\u0632\u0626\u06CC \u2014 \u0648\u0631\u0648\u062F\u06CC \u0646\u0627\u0642\u0635',
+  'Cannot be derived yet': '\u0647\u0646\u0648\u0632 \u0642\u0627\u0628\u0644 \u0627\u0633\u062A\u062E\u0631\u0627\u062C \u0646\u06CC\u0633\u062A',
+  'Select one more quantity to unlock the rest (e.g. cos\u03C6 to obtain P and Q).': '\u06CC\u06A9 \u06A9\u0645\u06CC\u062A \u062F\u06CC\u06AF\u0631 \u0627\u0646\u062A\u062E\u0627\u0628 \u06A9\u0646\u06CC\u062F \u062A\u0627 \u0628\u0642\u06CC\u0647 \u0628\u0627\u0632 \u0634\u0648\u062F (\u0645\u062B\u0644\u0627\u064B cos\u03C6 \u0628\u0631\u0627\u06CC \u0628\u0647 \u062F\u0633\u062A \u0622\u0648\u0631\u062F\u0646 P \u0648 Q).',
+  'Insufficient input': '\u0648\u0631\u0648\u062F\u06CC \u0646\u0627\u06A9\u0627\u0641\u06CC',
+  'Missing': '\u0645\u0648\u0627\u0631\u062F \u06A9\u0645',
+  'Select a valid combination, e.g.: (U and I) \u00B7 (P and cos\u03C6) \u00B7 (S and U) \u00B7 (P, U and cos\u03C6) \u00B7 (I, U and cos\u03C6).': '\u06CC\u06A9 \u062A\u0631\u06A9\u06CC\u0628 \u0645\u0639\u062A\u0628\u0631 \u0627\u0646\u062A\u062E\u0627\u0628 \u06A9\u0646\u06CC\u062F\u060C \u0645\u062B\u0644\u0627\u064B: (U \u0648 I) \u00B7 (P \u0648 cos\u03C6) \u00B7 (S \u0648 U) \u00B7 (P\u060C U \u0648 cos\u03C6) \u00B7 (I\u060C U \u0648 cos\u03C6).',
+  'apparent power S': '\u062A\u0648\u0627\u0646 \u0638\u0627\u0647\u0631\u06CC S',
+  'active power P': '\u062A\u0648\u0627\u0646 \u0627\u06A9\u062A\u06CC\u0648 P',
+  'reactive power Q': '\u062A\u0648\u0627\u0646 \u0631\u0627\u06A9\u062A\u06CC\u0648 Q',
+  'voltage U': '\u0648\u0644\u062A\u0627\u0698 U',
+  'current I': '\u062C\u0631\u06CC\u0627\u0646 I',
+  'power factor cos\u03C6': '\u0636\u0631\u06CC\u0628 \u062A\u0648\u0627\u0646 cos\u03C6',
   // ===== Phase-1 solver-formulas additions (symbols/cards/legends) =====
   'Symbol legend': '\u0631\u0627\u0647\u0646\u0645\u0627\u06CC \u0646\u0645\u0627\u062F\u0647\u0627',
   'show': '\u0646\u0645\u0627\u06CC\u0634',
@@ -7804,7 +7829,10 @@ function renderShortCircuit() {
 // Data from 1.-Dim-af-trafo.ppx.pptx + Elektroteknik Opgavesamling 4. udgave
 let trafoState = {
   size: 400, voltage: '10/0.4', loadPercent: 75,
-  calcType: 'sizing',  // sizing, emf, ocsc, regulation, efficiency, parallel, vectorgroup
+  calcType: 'sizing',  // sizing, powersolve, emf, ocsc, regulation, efficiency, parallel, vectorgroup
+  // Dynamic power/current solver: derive S,P,Q,I,U,cosphi from ANY sufficient subset.
+  // Values stored in base SI units (U=V, I=A, S=VA, P=W, Q=var). null = "not given".
+  psPhase: '3', psU: 400, psI: 100, psS: null, psP: null, psCos: 0.9, psQ: null,
   // EMF
   emfFreq: 50, emfN: 300, emfBmax: 1.2, emfArea: 0.01,
   // OC/SC test
@@ -7866,6 +7894,65 @@ function trafoCalcParallel(S1, uk1, S2, uk2, totalLoad_kVA) {
   return { S1_load: S1_load, S2_load: S2_load, ratio1: share1 / total, ratio2: share2 / total, totalCapacity: S1 + S2 };
 }
 
+// --- Dynamic power/current solver (unit-testable, no DOM) -------------------
+// Derive apparent power S, active power P, reactive power Q, line current I,
+// voltage U and power factor cosphi from ANY sufficient subset of inputs.
+// Governing relationships (Opgavesamling Kap. 9 / IEC 60076-1, cf. DS/HD 60364):
+//   3-phase: S = sqrt(3) x U_line x I_line ; P = S x cosphi ; Q = S x sinphi ; I = S / (sqrt(3) x U)
+//   1-phase: S = U x I                     ; P = S x cosphi ; Q = S x sinphi ; I = S / U
+// Inputs object (any field may be null/undefined = unknown):
+//   { phase: '1'|'3', U:[V], I:[A], S:[VA], P:[W], Q:[var], cosphi:[0..1] }
+// Returns { phase, k, known, S,P,Q,U,I,cosphi,sinphi, sufficient, complete, missing[] }.
+// Never fabricates: a quantity stays undefined unless it can be derived exactly.
+function trafoSolvePower(inp) {
+  inp = inp || {};
+  var phase = (inp.phase === '1' || inp.phase === 1) ? '1' : '3';
+  var k = (phase === '3') ? Math.sqrt(3) : 1;
+  function num(x) { return (x === null || x === undefined || x === '' || isNaN(x)) ? undefined : Number(x); }
+  var v = { U: num(inp.U), I: num(inp.I), S: num(inp.S), P: num(inp.P), Q: num(inp.Q), cosphi: num(inp.cosphi) };
+  // Clamp power factor to its physical range so no derivation runs away.
+  if (v.cosphi !== undefined) v.cosphi = Math.min(1, Math.max(0, v.cosphi));
+  var known = {};
+  Object.keys(v).forEach(function(key) { if (v[key] !== undefined) known[key] = v[key]; });
+  var sinphi = (v.cosphi !== undefined) ? Math.sqrt(Math.max(0, 1 - v.cosphi * v.cosphi)) : undefined;
+  function set(key, val) {
+    if (val === undefined || val === null || isNaN(val) || !isFinite(val)) return false;
+    if (v[key] !== undefined) return false;
+    v[key] = val; return true;
+  }
+  // Fixed-point: keep applying exact relations until nothing new can be derived.
+  var changed = true, guard = 0;
+  while (changed && guard < 40) {
+    changed = false; guard++;
+    if (v.cosphi !== undefined) sinphi = Math.sqrt(Math.max(0, 1 - v.cosphi * v.cosphi));
+    // --- Apparent power S ---
+    if (v.U !== undefined && v.I !== undefined) changed = set('S', k * v.U * v.I) || changed;
+    if (v.P !== undefined && v.cosphi !== undefined && v.cosphi > 0) changed = set('S', v.P / v.cosphi) || changed;
+    if (v.P !== undefined && v.Q !== undefined) changed = set('S', Math.sqrt(v.P * v.P + v.Q * v.Q)) || changed;
+    if (v.Q !== undefined && sinphi !== undefined && sinphi > 0) changed = set('S', v.Q / sinphi) || changed;
+    // --- Power factor cosphi ---
+    if (v.P !== undefined && v.S !== undefined && v.S > 0) changed = set('cosphi', Math.min(1, v.P / v.S)) || changed;
+    if (v.P !== undefined && v.Q !== undefined) { var sPQ = Math.sqrt(v.P * v.P + v.Q * v.Q); if (sPQ > 0) changed = set('cosphi', Math.min(1, v.P / sPQ)) || changed; }
+    if (v.Q !== undefined && v.S !== undefined && v.S > 0) { var rQS = Math.min(1, v.Q / v.S); changed = set('cosphi', Math.sqrt(Math.max(0, 1 - rQS * rQS))) || changed; }
+    if (v.cosphi !== undefined) sinphi = Math.sqrt(Math.max(0, 1 - v.cosphi * v.cosphi));
+    // --- Active / reactive power ---
+    if (v.S !== undefined && v.cosphi !== undefined) changed = set('P', v.S * v.cosphi) || changed;
+    if (v.S !== undefined && sinphi !== undefined) changed = set('Q', v.S * sinphi) || changed;
+    if (v.S !== undefined && v.P !== undefined && v.S >= v.P) changed = set('Q', Math.sqrt(Math.max(0, v.S * v.S - v.P * v.P))) || changed;
+    // --- Current / voltage ---
+    if (v.S !== undefined && v.U !== undefined && v.U > 0) changed = set('I', v.S / (k * v.U)) || changed;
+    if (v.S !== undefined && v.I !== undefined && v.I > 0) changed = set('U', v.S / (k * v.I)) || changed;
+  }
+  if (v.cosphi !== undefined) sinphi = Math.sqrt(Math.max(0, 1 - v.cosphi * v.cosphi));
+  var canonical = ['S', 'P', 'Q', 'U', 'I', 'cosphi'];
+  var missing = canonical.filter(function(key) { return v[key] === undefined; });
+  return {
+    phase: phase, k: k, known: known,
+    S: v.S, P: v.P, Q: v.Q, U: v.U, I: v.I, cosphi: v.cosphi, sinphi: sinphi,
+    sufficient: (v.S !== undefined), complete: (missing.length === 0), missing: missing
+  };
+}
+
 // Vector group data
 var TRAFO_VECTOR_GROUPS = {
   'Yy0': { shift: 0, primary: 'Y', secondary: 'y', desc_da: 'Ingen faseforskydning. Bruges til belysning/IT.', desc_en: 'No phase shift. Used for lighting/IT loads.' },
@@ -7883,6 +7970,7 @@ function renderTrafo() {
   html += '<div class="select-group"><div class="select-label">' + tx('Beregningstype', 'Calculation Type') + '</div><div class="select-grid">';
   var trafoTypes = [
     { key: 'sizing', da: 'Dimensionering', en: 'Sizing' },
+    { key: 'powersolve', da: 'Effekt/str\u00F8m-l\u00F8ser', en: 'Power/Current Solver' },
     { key: 'emf', da: 'EMF-ligning', en: 'EMF Equation' },
     { key: 'ocsc', da: 'Tomgangs-/kortsl.proeve', en: 'OC/SC Test' },
     { key: 'regulation', da: 'Spaendingsregulering', en: 'Voltage Regulation' },
@@ -7895,6 +7983,7 @@ function renderTrafo() {
   });
   html += '</div></div></div>';
   if (trafoState.calcType === 'sizing') html += renderTrafoSizing();
+  else if (trafoState.calcType === 'powersolve') html += renderTrafoPowerSolve();
   else if (trafoState.calcType === 'emf') html += renderTrafoEMF();
   else if (trafoState.calcType === 'ocsc') html += renderTrafoOCSC();
   else if (trafoState.calcType === 'regulation') html += renderTrafoRegulation();
@@ -7937,6 +8026,102 @@ function renderTrafoSizing() {
   html += '</div>';
   html += calcDetail({ name: tx('Fuldlaststroem', 'Full-load current'), formula: 'I_fl = S_N / (\u221A3 \u00D7 U2)', variables: [{ name: 'S_N', symbol: 'S_N', value: S, unit: 'kVA', source: tx('Valgt', 'Selected') }, { name: 'U2', symbol: 'U2', value: 400, unit: 'V', source: tx('Sekundaer', 'Secondary') }], substitution: S + '*1000 / (\u221A3 \u00D7 400)', result: { value: Ifl, unit: 'A' }, reference: 'IEC 60076-1' });
   html += calcDetail({ name: tx('Kortslutningsstroem', 'Short-circuit current'), formula: 'Ik = S_N / (\u221A3 \u00D7 U2 \u00D7 uk/100)', variables: [{ name: 'S_N', symbol: 'S_N', value: S, unit: 'kVA' }, { name: 'uk', symbol: 'uk', value: uk, unit: '%' }], substitution: S + '*1000 / (\u221A3 \u00D7 400 \u00D7 ' + uk + '/100)', result: { value: Ik/1000, unit: 'kA' }, reference: 'IEC 60909' });
+  html += '</div>';
+  return html;
+}
+
+
+function renderTrafoPowerSolve() {
+  // Click-only value presets (no typing). Stored in base SI units; null = "not given".
+  var uPresets = (trafoState.psPhase === '1') ? [230, 400, 690] : [400, 690, 3000, 6000, 10000, 20000];
+  var iPresets = [10, 16, 25, 50, 63, 100, 160, 250, 400, 630, 1000];
+  var sPresetsKVA = [50, 100, 160, 250, 400, 630, 1000, 1600];
+  var pPresetsKW = [10, 50, 100, 200, 400, 630, 1000];
+  var cosPresets = [0.7, 0.8, 0.85, 0.9, 0.95, 1.0];
+  var qPresetsKVAR = [10, 50, 100, 200, 400];
+
+  var res = trafoSolvePower({
+    phase: trafoState.psPhase, U: trafoState.psU, I: trafoState.psI,
+    S: trafoState.psS, P: trafoState.psP, Q: trafoState.psQ, cosphi: trafoState.psCos
+  });
+
+  // Build a click-only value-selector row. mult converts a display preset into base SI units.
+  function selRow(label, field, presets, mult, fmtFn) {
+    var h = '<div class="select-group"><div class="select-label">' + label + '</div><div class="select-grid">';
+    h += '<button class="sel-btn' + (trafoState[field] === null ? ' selected' : '') + '" onclick="trafoState.' + field + '=null;renderModule(\'trafo\')">' + tx('\u2014 ikke angivet', '\u2014 not given') + '</button>';
+    presets.forEach(function(p) {
+      var stored = p * mult;
+      h += '<button class="sel-btn' + (trafoState[field] === stored ? ' selected' : '') + '" onclick="trafoState.' + field + '=' + stored + ';renderModule(\'trafo\')">' + fmtFn(p) + '</button>';
+    });
+    h += '</div></div>';
+    return h;
+  }
+  function fmtVal(x, unit, scale, digits) {
+    if (x === undefined || x === null) return tx('\u2014 ukendt', '\u2014 unknown');
+    return (x / scale).toFixed(digits) + ' ' + unit;
+  }
+  function row(label, value) { return '<div class="result-row"><span class="label">' + label + '</span><span class="value">' + value + '</span></div>'; }
+  var QNAMES = {
+    S: tx('tilsyneladende effekt S', 'apparent power S'),
+    P: tx('aktiv effekt P', 'active power P'),
+    Q: tx('reaktiv effekt Q', 'reactive power Q'),
+    U: tx('sp\u00E6nding U', 'voltage U'),
+    I: tx('str\u00F8m I', 'current I'),
+    cosphi: tx('effektfaktor cos\u03C6', 'power factor cos\u03C6')
+  };
+  function qName(key) { return QNAMES[key] || key; }
+
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Effekt- og str\u00F8ml\u00F8ser (dynamisk)', 'Power & Current Solver (dynamic)') + '</div>';
+  html += '<div class="info-row">' + tx('V\u00E6lg de st\u00F8rrelser du HAR (klik). Appen udleder automatisk resten \u2014 uanset om du starter med effekt, str\u00F8m, sp\u00E6nding eller andet. Mangler der data, vises det pr\u00E6cist hvad der mangler (intet gættes).', 'Select the quantities you HAVE (click). The app derives the rest automatically \u2014 whether you start from power, current, voltage or anything else. If data is missing, it shows exactly what is missing (nothing is guessed).') + '</div>';
+
+  // Phase system (drives sqrt(3) vs 1 in every formula)
+  html += '<div class="select-group"><div class="select-label">' + tx('Fasesystem', 'Phase system') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (trafoState.psPhase === '3' ? ' selected' : '') + '" onclick="trafoState.psPhase=\'3\';renderModule(\'trafo\')">' + tx('3-faset', '3-phase') + '</button>';
+  html += '<button class="sel-btn' + (trafoState.psPhase === '1' ? ' selected' : '') + '" onclick="trafoState.psPhase=\'1\';renderModule(\'trafo\')">' + tx('1-faset', '1-phase') + '</button>';
+  html += '</div></div>';
+
+  html += selRow(tx('Sp\u00E6nding U [V]' + (trafoState.psPhase === '3' ? ' (linje)' : ''), 'Voltage U [V]' + (trafoState.psPhase === '3' ? ' (line)' : '')), 'psU', uPresets, 1, function(p) { return p + ' V'; });
+  html += selRow(tx('Str\u00F8m I [A]' + (trafoState.psPhase === '3' ? ' (linje)' : ''), 'Current I [A]' + (trafoState.psPhase === '3' ? ' (line)' : '')), 'psI', iPresets, 1, function(p) { return p + ' A'; });
+  html += selRow(tx('Tilsyneladende effekt S [kVA]', 'Apparent power S [kVA]'), 'psS', sPresetsKVA, 1000, function(p) { return p + ' kVA'; });
+  html += selRow(tx('Aktiv effekt P [kW]', 'Active power P [kW]'), 'psP', pPresetsKW, 1000, function(p) { return p + ' kW'; });
+  html += selRow('cos\u03C6', 'psCos', cosPresets, 1, function(p) { return '' + p; });
+  html += selRow(tx('Reaktiv effekt Q [kvar]', 'Reactive power Q [kvar]'), 'psQ', qPresetsKVAR, 1000, function(p) { return p + ' kvar'; });
+
+  if (res.sufficient) {
+    html += '<div class="result-box"><div class="result-title">' + tx('Resultat (udledt)', 'Result (derived)') + '</div>';
+    html += row(tx('Fasesystem', 'Phase system'), res.phase === '3' ? tx('3-faset', '3-phase') : tx('1-faset', '1-phase'));
+    html += row('S', fmtVal(res.S, 'kVA', 1000, 3));
+    html += row('P', fmtVal(res.P, 'kW', 1000, 3));
+    html += row('Q', fmtVal(res.Q, 'kvar', 1000, 3));
+    html += row('U', fmtVal(res.U, 'V', 1, 1));
+    html += row('I', fmtVal(res.I, 'A', 1, 2));
+    html += row('cos\u03C6', (res.cosphi !== undefined) ? res.cosphi.toFixed(3) : tx('\u2014 ukendt', '\u2014 unknown'));
+    html += '</div>';
+    if (!res.complete) {
+      html += '<div class="result-box warning"><div class="result-title">' + tx('Delvist resultat \u2014 mangler input', 'Partial result \u2014 missing input') + '</div>';
+      html += row(tx('Kan ikke udledes endnu', 'Cannot be derived yet'), res.missing.map(qName).join(', '));
+      html += '<div class="info-row">' + tx('Tilf\u00F8j en st\u00F8rrelse mere for at l\u00E5se resten op (f.eks. cos\u03C6 for at f\u00E5 P og Q).', 'Select one more quantity to unlock the rest (e.g. cos\u03C6 to obtain P and Q).') + '</div>';
+      html += '</div>';
+    }
+    // Provenance: show the exact relationship used, consistent with the rest of the app.
+    var sForm = (res.phase === '3') ? 'S = \u221A3 \u00D7 U \u00D7 I' : 'S = U \u00D7 I';
+    if (res.known.U !== undefined && res.known.I !== undefined) {
+      html += calcDetail({ name: tx('Tilsyneladende effekt', 'Apparent power'), formula: sForm, variables: [{ name: 'U', symbol: 'U', value: res.U, unit: 'V', source: tx('Valgt', 'Selected') }, { name: 'I', symbol: 'I', value: res.I, unit: 'A', source: tx('Valgt', 'Selected') }], substitution: (res.phase === '3' ? '\u221A3 \u00D7 ' : '') + res.U + ' \u00D7 ' + res.I, result: { value: res.S / 1000, unit: 'kVA' }, reference: 'Opgavesamling Kap. 9 / IEC 60076-1' });
+    } else if (res.known.P !== undefined && res.known.cosphi !== undefined) {
+      html += calcDetail({ name: tx('Tilsyneladende effekt', 'Apparent power'), formula: 'S = P / cos\u03C6', variables: [{ name: 'P', symbol: 'P', value: res.P / 1000, unit: 'kW', source: tx('Valgt', 'Selected') }, { name: 'cos\u03C6', symbol: 'cos\u03C6', value: res.cosphi, source: tx('Valgt', 'Selected') }], substitution: (res.P / 1000).toFixed(3) + ' / ' + res.cosphi, result: { value: res.S / 1000, unit: 'kVA' }, reference: 'Opgavesamling Kap. 9' });
+    }
+    if (res.cosphi !== undefined && res.P !== undefined) {
+      html += calcDetail({ name: tx('Aktiv effekt', 'Active power'), formula: 'P = S \u00D7 cos\u03C6', variables: [{ name: 'S', symbol: 'S', value: res.S / 1000, unit: 'kVA' }, { name: 'cos\u03C6', symbol: 'cos\u03C6', value: res.cosphi }], substitution: (res.S / 1000).toFixed(3) + ' \u00D7 ' + res.cosphi.toFixed(3), result: { value: res.P / 1000, unit: 'kW' }, reference: 'Opgavesamling Kap. 9' });
+    }
+    if (res.I !== undefined && res.U !== undefined) {
+      html += calcDetail({ name: tx('Str\u00F8m', 'Current'), formula: (res.phase === '3') ? 'I = S / (\u221A3 \u00D7 U)' : 'I = S / U', variables: [{ name: 'S', symbol: 'S', value: res.S / 1000, unit: 'kVA' }, { name: 'U', symbol: 'U', value: res.U, unit: 'V' }], substitution: res.S + ' / (' + (res.phase === '3' ? '\u221A3 \u00D7 ' : '') + res.U + ')', result: { value: res.I, unit: 'A' }, reference: 'Opgavesamling Kap. 9 / IEC 60076-1' });
+    }
+  } else {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Utilstr\u00E6kkeligt input', 'Insufficient input') + '</div>';
+    html += row(tx('Mangler', 'Missing'), res.missing.map(qName).join(', '));
+    html += '<div class="info-row">' + tx('V\u00E6lg en gyldig kombination, f.eks.: (U og I) \u00B7 (P og cos\u03C6) \u00B7 (S og U) \u00B7 (P, U og cos\u03C6) \u00B7 (I, U og cos\u03C6).', 'Select a valid combination, e.g.: (U and I) \u00B7 (P and cos\u03C6) \u00B7 (S and U) \u00B7 (P, U and cos\u03C6) \u00B7 (I, U and cos\u03C6).') + '</div>';
+    html += '</div>';
+  }
   html += '</div>';
   return html;
 }
