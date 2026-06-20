@@ -7889,11 +7889,12 @@ test('Reactive: an overload NEVER leaves the safety verdict showing a stale OK',
 });
 
 test('Reactive: a downstream verdict with no live recomputer is flagged stale (not stale-OK)', function() {
-  // Seed a fake "OK" verdict for a verdict-bearing downstream module.
-  Reactive.verdicts['arcflash'] = { status: 'ok', detail: '', stamp: 0, stale: false };
-  Reactive.notify('scircuit'); // scircuit -> arcflash
-  const v = Reactive.verdict('arcflash');
-  assert(v.stale === true, 'arcflash verdict must be flagged stale after an upstream short-circuit change');
+  // Seed a fake "OK" verdict for a verdict-bearing downstream module that has
+  // NO live recomputer (discrim/selectivity chart — purely informational).
+  Reactive.verdicts['discrim'] = { status: 'ok', detail: '', stamp: 0, stale: false };
+  Reactive.notify('scircuit'); // scircuit -> discrim
+  const v = Reactive.verdict('discrim');
+  assert(v.stale === true, 'discrim verdict must be flagged stale after an upstream short-circuit change');
 });
 
 test('Reactive: rendering ANY module propagates so linked verdicts are fresh without reopening', function() {
@@ -10957,10 +10958,10 @@ test('RC: theory recomputers never throw and never emit a stale flag after notif
 });
 
 test('RC: registering recomputers did NOT regress the existing stale-flag guarantee', function() {
-  // arcflash has no recomputer -> must still be flagged stale (never stale-OK).
-  Reactive.verdicts['arcflash'] = { status: 'ok', detail: '', stamp: 0, stale: false };
+  // discrim (selectivity chart) has no recomputer -> must still be flagged stale (never stale-OK).
+  Reactive.verdicts['discrim'] = { status: 'ok', detail: '', stamp: 0, stale: false };
   Reactive.notify('scircuit');
-  assert(Reactive.verdict('arcflash').stale === true, 'modules without a recomputer are still flagged stale');
+  assert(Reactive.verdict('discrim').stale === true, 'modules without a recomputer are still flagged stale');
 });
 
 console.log('\n=== Analyzer Depth / Intelligence Tests ===\n');
@@ -11069,6 +11070,260 @@ test('AD: fault recomputer detail is trilingual-safe (da/en) when inputs are mis
   assert(da.status === 'incomplete' && en.status === 'incomplete', 'both languages report incomplete (no false OK)');
   assert(da.detail !== en.detail, 'detail string is localised (da != en)');
   lang = savedLang; faultState = JSON.parse(saved);
+});
+
+// ============================================================================
+// === NEW: completing the reactive graph — arcflash / zs / relay recomputers =
+// ============================================================================
+console.log('\n=== Reactive Completeness: arcflash / zs / relay recomputers ===\n');
+
+test('RC2: arcflash, zs and relay recomputers are registered as live verdicts', function() {
+  ['arcflash','zs','relay'].forEach(function(k){
+    assert(typeof Reactive.recomputers[k] === 'function', k + ' recomputer registered');
+  });
+});
+
+test('RC2: zs disconnection verdict is FRESH and correct (TN, B16, short cable)', function() {
+  var saved = JSON.stringify(zsState);
+  zsState.deviceType='mcbB'; zsState.device='B16'; zsState.ze=0.35; zsState.cableLength=20; zsState.cableSize=2.5;
+  Reactive.notify('zs');
+  var v = Reactive.verdict('zs');
+  assert(v.status === 'ok', 'short cable on B16 disconnection OK, got ' + v.status);
+  assert(v.stale === false, 'verdict is fresh (not stale)');
+  assert(v.detail.indexOf('Zs') >= 0, 'detail cites the loop impedance');
+  zsState = JSON.parse(saved);
+});
+
+test('RC2: an over-long cable flips the zs verdict to FAIL (never a stale OK)', function() {
+  var saved = JSON.stringify(zsState);
+  zsState.deviceType='mcbB'; zsState.device='B16'; zsState.ze=0.35; zsState.cableSize=2.5; zsState.cableLength=20;
+  Reactive.notify('zs');
+  assert(Reactive.verdict('zs').status === 'ok', 'precondition OK at 20 m');
+  zsState.cableLength = 400; // far beyond the max permissible loop length
+  Reactive.notify('zs');
+  var v = Reactive.verdict('zs');
+  assert(v.status === 'fail', 'over-long loop fails disconnection, got ' + v.status);
+  assert(v.stale === false, 'recomputed fresh, never a stale OK');
+  zsState = JSON.parse(saved);
+});
+
+test('RC2: zs verdict never shows a false OK when Zs,max is unknown (conservative)', function() {
+  var saved = JSON.stringify(zsState);
+  zsState.device = '__none__';
+  Reactive.notify('zs');
+  assert(Reactive.verdict('zs').status === 'incomplete', 'unknown device -> incomplete, never ok');
+  zsState = JSON.parse(saved);
+});
+
+test('RC2: arcflash incident-energy verdict is fresh and tracks the shared supply voltage', function() {
+  var saved = JSON.stringify(arcflashState);
+  var savedV = SharedQuantities.get('voltage_phase');
+  arcflashState.voltage=400; arcflashState.faultCurrent=10; arcflashState.clearingTime=0.1; arcflashState.workingDistance=455;
+  Reactive.notify('arcflash');
+  var v0 = Reactive.verdict('arcflash');
+  assert(v0.stale === false && v0.detail.indexOf('cal/cm') >= 0, 'fresh incident-energy detail, got ' + JSON.stringify(v0));
+  assert(['ok','warning','fail'].indexOf(v0.status) >= 0, 'valid status, got ' + v0.status);
+  // A supply-voltage change arriving on the bus updates the arc-flash input.
+  SharedQuantities.set('voltage_phase', 690, 'load');
+  assert(arcflashState.voltage === 690, 'arcflash voltage tracked the bus, got ' + arcflashState.voltage);
+  arcflashState = JSON.parse(saved);
+  if (savedV != null) SharedQuantities._values['voltage_phase'] = savedV;
+});
+
+test('RC2: a long clearing time pushes arc-flash energy into the danger band (fail)', function() {
+  var saved = JSON.stringify(arcflashState);
+  arcflashState.voltage=400; arcflashState.faultCurrent=50; arcflashState.clearingTime=2.0; arcflashState.workingDistance=300;
+  Reactive.notify('arcflash');
+  var v = Reactive.verdict('arcflash');
+  assert(v.status === 'fail', 'huge incident energy => work prohibited (fail), got ' + JSON.stringify(v));
+  arcflashState = JSON.parse(saved);
+});
+
+test('RC2: relay coordination verdict is fresh and tracks the transformer kVA on the bus', function() {
+  var saved = JSON.stringify(relayState);
+  var savedK = SharedQuantities.get('trafo_kva');
+  relayState.trafoKVA=630; relayState.primaryKV=10; relayState.tGt=0.5; relayState.egentid=0.04;
+  Reactive.notify('relay');
+  var v = Reactive.verdict('relay');
+  assert(v.stale === false && v.detail.indexOf('I1N=') >= 0, 'fresh relay detail, got ' + JSON.stringify(v));
+  assert(v.status === 'ok', 'tGt=0.5s rides through inrush => coordinated OK, got ' + v.status);
+  SharedQuantities.set('trafo_kva', 1000, 'trafo');
+  Reactive.notify('relay');
+  assert(relayState.trafoKVA === 1000, 'relay tracked the shared transformer kVA');
+  relayState = JSON.parse(saved);
+  if (savedK != null) SharedQuantities._values['trafo_kva'] = savedK;
+});
+
+test('RC2: relay flags nuisance-trip risk (warning) when too fast for inrush', function() {
+  var saved = JSON.stringify(relayState);
+  relayState.trafoKVA=630; relayState.primaryKV=10; relayState.tGt=0.05; relayState.egentid=0.04;
+  Reactive.notify('relay');
+  var v = Reactive.verdict('relay');
+  assert(v.status === 'warning', 'tGt(0.05) < inrush+egentid(0.14) => warning, got ' + v.status);
+  relayState = JSON.parse(saved);
+});
+
+test('RC2: arcflash/zs/relay recomputers never throw and never leave a stale flag after notify', function() {
+  Reactive.notify('load');
+  ['arcflash','zs','relay'].forEach(function(k){
+    var v = Reactive.verdict(k);
+    assert(v && v.stale === false, k + ' has a fresh (non-stale) verdict after a change');
+    assert(['ok','warning','fail','incomplete'].indexOf(v.status) >= 0, k + ' produces a valid status, got ' + (v&&v.status));
+  });
+});
+
+// ============================================================================
+// === NEW: full multi-Opgave exam paper — per-Opgave solving (mixed types) ===
+// ============================================================================
+console.log('\n=== Multi-Opgave Paper: per-Opgave solving (mixed types) ===\n');
+
+var EXAM_MULTI_OPGAVE = [
+  'Autorisationspr\u00F8ve 2024',
+  'Hele installationen forsynes 3-faset 400 V, TN-S.',
+  '',
+  'Opgave 1',
+  'En motor med effekt 37 kW ved 400 V, cos phi = 0,86.',
+  'Kablet er NOIKLX 16 mm\u00B2 med l\u00E6ngde 45 m. Installationsmetode: C.',
+  '1.1 Beregn belastningsstr\u00F8mmen IB.',
+  '1.2 Beregn sp\u00E6ndingsfaldet \u0394U.',
+  '',
+  'Opgave 2',
+  'En belysningskreds med effekt 5 kW ved 400 V, cos phi = 0,95.',
+  '2.1 Beregn belastningsstr\u00F8mmen IB.',
+  '',
+  'Opgave 3',
+  'Jordingssystem TN-S med Zs = 0,8 \u03A9. MCB kurve B In = 16 A.',
+  '3.1 Er fejlbeskyttelsen tilstr\u00E6kkelig?'
+].join('\n');
+
+test('Multi-Opgave: the paper segments into Opgave 1/2/3', function() {
+  analyzerRun(EXAM_MULTI_OPGAVE);
+  var sol = examBuildSolution(analyzerState);
+  var ids = sol.opgaver.map(function(o){return o.id;});
+  assert(ids.indexOf(1)>=0 && ids.indexOf(2)>=0 && ids.indexOf(3)>=0, 'Opgave 1,2,3 present, got ' + ids.join(','));
+});
+
+test('Multi-Opgave: each Opgave IB uses ITS OWN power (37 kW vs 5 kW), not the first match', function() {
+  analyzerRun(EXAM_MULTI_OPGAVE);
+  var sol = examBuildSolution(analyzerState);
+  function ibOf(opId){
+    var op = sol.opgaver.find(function(o){return o.id===opId;});
+    var q = op && op.questions.find(function(x){return x.type==='ib';});
+    return q ? parseFloat(q.value) : null;
+  }
+  var ib1 = ibOf(1), ib2 = ibOf(2);
+  var exp1 = 37000/(Math.sqrt(3)*400*0.86); // ~62.1 A
+  var exp2 = 5000/(Math.sqrt(3)*400*0.95);  // ~7.6 A
+  assert(ib1 && Math.abs(ib1-exp1) < 0.6, 'Opgave 1 IB ~' + exp1.toFixed(1) + ' A, got ' + ib1);
+  assert(ib2 && Math.abs(ib2-exp2) < 0.6, 'Opgave 2 IB ~' + exp2.toFixed(1) + ' A, got ' + ib2);
+  assert(Math.abs(ib1-ib2) > 40, 'the two Opgaver give clearly DIFFERENT IB (per-Opgave solving works)');
+});
+
+test('Multi-Opgave: Opgave 3 fault question is solved from its OWN Zs + device', function() {
+  analyzerRun(EXAM_MULTI_OPGAVE);
+  var sol = examBuildSolution(analyzerState);
+  var op3 = sol.opgaver.find(function(o){return o.id===3;});
+  var fq = op3.questions.find(function(x){return x.type==='fault';});
+  assert(fq, 'fault question detected in Opgave 3');
+  assert(fq.solved, 'fault solved');
+  // If = 230/0.8 = 287.5 A >= Ia(B16)=80 A -> sufficient
+  assert(fq.status === 'ok', 'fault protection sufficient (287.5A >= 80A), got ' + fq.status);
+  assert(fq.calcHtml.indexOf('calc-detail') >= 0, 'full calcDetail working present');
+});
+
+test('Multi-Opgave: Opgave 1 voltage-drop is solved with full working', function() {
+  analyzerRun(EXAM_MULTI_OPGAVE);
+  var sol = examBuildSolution(analyzerState);
+  var op1 = sol.opgaver.find(function(o){return o.id===1;});
+  var vq = op1.questions.find(function(x){return x.type==='vdrop';});
+  assert(vq && vq.solved, 'vdrop solved in Opgave 1');
+  assert(vq.value.indexOf('%') >= 0, 'voltage drop expressed as a percentage, got ' + vq.value);
+  assert(vq.calcHtml.indexOf('calc-detail') >= 0, 'full calcDetail working present');
+});
+
+test('Multi-Opgave: analyzerExtractMerged keeps own power but inherits paper-wide voltage', function() {
+  var global = analyzerExtract(EXAM_MULTI_OPGAVE);
+  var seg2 = analyzerExtractMerged('En belysningskreds med effekt 5 kW, cos phi = 0,95. 2.1 Beregn IB.', global);
+  assert(seg2.power_kW === 5, 'segment keeps its own 5 kW power');
+  assert(seg2.voltage === 400, 'segment inherits the paper-wide 400 V');
+  assert(seg2.phases === 3, 'segment inherits the paper-wide 3-phase context');
+});
+
+test('Multi-Opgave: per-Opgave solving stays click-only and trilingual (da/en/fa)', function() {
+  var savedLang = lang;
+  analyzerRun(EXAM_MULTI_OPGAVE);
+  ['da','en','fa'].forEach(function(L){
+    lang = L;
+    var html = examRenderSolution(examBuildSolution(analyzerState));
+    assert(html.indexOf('<input') < 0 && html.indexOf('<textarea') < 0, L + ' render is click-only');
+  });
+  lang = savedLang;
+});
+
+test('Multi-Opgave: result remains deterministic (same paste -> same coverage)', function() {
+  analyzerRun(EXAM_MULTI_OPGAVE);
+  var c1 = examBuildSolution(analyzerState).coverage;
+  analyzerRun(EXAM_MULTI_OPGAVE);
+  var c2 = examBuildSolution(analyzerState).coverage;
+  assert(c1.detected === c2.detected && c1.solved === c2.solved, 'deterministic coverage across runs');
+  assert(c1.solved + c1.needInput === c1.detected, 'solved + needInput == detected');
+});
+
+// ============================================================================
+// === NEW: deep extract->bus->verdict wiring (a paste drives the whole app) ==
+// ============================================================================
+console.log('\n=== Deep Wiring: a pasted exam drives the bus, verdicts and diagram ===\n');
+
+test('Wire: pasting an exam populates the reactive bus from the extracted quantities', function() {
+  var savedZ = SharedQuantities.get('zs_value');
+  analyzerRun(EXAM_MULTI_OPGAVE);
+  assert(analyzerState.busPopulated === true, 'bus marked populated');
+  assert(SharedQuantities.get('voltage_phase') === 400, 'supply voltage published to the bus');
+  assert(Math.abs(SharedQuantities.get('zs_value') - 0.8) < 1e-9, 'extracted Zs published to the bus');
+  if (savedZ != null) SharedQuantities._values['zs_value'] = savedZ;
+});
+
+test('Wire: a pasted exam immediately drives the LIVE fault verdict (fresh + correct)', function() {
+  var saved = JSON.stringify(faultState);
+  analyzerRun(EXAM_MULTI_OPGAVE); // TN-S, Zs=0.8, MCB B16
+  var v = Reactive.verdict('fault');
+  assert(v && v.stale === false, 'fault verdict is fresh after the paste');
+  // If = 230/0.8 = 287.5 A >= Ia(B16)=80 A -> OK
+  assert(v.status === 'ok', 'extracted Zs + device make disconnection OK, got ' + (v&&v.status));
+  faultState = JSON.parse(saved);
+});
+
+test('Wire: a pasted exam with a dangerously high Zs flips the live fault verdict to FAIL', function() {
+  var saved = JSON.stringify(faultState);
+  analyzerRun([
+    'Opgave 1',
+    'Jordingssystem TN-S. Zs = 9,5 \u03A9. MCB kurve B In = 16 A.',
+    '1.1 Er fejlbeskyttelsen tilstr\u00E6kkelig?'
+  ].join('\n'));
+  var v = Reactive.verdict('fault');
+  assert(v.status === 'fail', 'high Zs -> disconnection FAILS live, got ' + (v&&v.status));
+  assert(v.stale === false, 'never a stale OK');
+  faultState = JSON.parse(saved);
+});
+
+test('Wire: extracted frequency propagates to the live impedans verdict', function() {
+  var savedF = SharedQuantities.get('frequency');
+  var sI=impedansState.f, sM=motorteoriState.f, sP=motorteoriState.poles;
+  motorteoriState.poles = 4;
+  analyzerRun('Opgave 1\nEt kredsl\u00F8b k\u00F8rer ved frekvens 60 Hz. Beregn impedansen Z.');
+  assert(SharedQuantities.get('frequency') === 60, 'frequency published to the bus');
+  assert(impedansState.f === 60, 'impedans state updated to 60 Hz');
+  var iv = Reactive.verdict('impedans');
+  assert(iv.stale === false && iv.detail.indexOf('60Hz') >= 0, 'impedans verdict reflects 60 Hz, got ' + JSON.stringify(iv));
+  impedansState.f=sI; motorteoriState.f=sM; motorteoriState.poles=sP;
+  if (savedF != null) SharedQuantities._values['frequency'] = savedF;
+});
+
+test('Wire: a pasted exam auto-generates the single-line diagram alongside the verdict', function() {
+  analyzerRun(EXAM_MULTI_OPGAVE);
+  var sol = examBuildSolution(analyzerState);
+  assert(sol.sldHtml.indexOf('<svg') >= 0, 'SLD diagram generated for the pasted exam');
+  assert(sol.verdict && ['red','yellow','green','incomplete'].indexOf(sol.verdict.code) >= 0, 'a verdict is produced');
 });
 
 // --- Summary ---

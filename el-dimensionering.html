@@ -3913,6 +3913,68 @@ Reactive.register('lys', function () {
   } catch (e) { return { status: 'incomplete', detail: '' }; }
 });
 
+// ===== COMPLETE THE REACTIVE GRAPH: recomputers for the remaining modules that
+// hold shared quantities / a real verdict but were previously only stale-flagged.
+// Each reuses an ALREADY-VALIDATED pure-calc function (NO new math), can never
+// throw, and NEVER emits a false "OK": a genuine safety check resolves to
+// 'ok' | 'fail' | 'incomplete'; an exposure/coordination check that is not a
+// hard pass/fail resolves to 'warning' rather than a misleading OK.
+
+// Earth-fault loop impedance Zs — automatic-disconnection life-safety verdict.
+// Reuses zsCalcImpedance + zsGetMaxZs + zsCheckDisconnection (DS/HD 60364-4-41
+// Tab. 41.1 + 60364-6 verification). Recomputes fresh on ANY bus change so a
+// stale OK can never be shown after e.g. a cable/earthing change elsewhere.
+Reactive.register('zs', function () {
+  try {
+    if (typeof zsState === 'undefined') return { status: 'incomplete', detail: '' };
+    var r1r2 = (typeof ZS_R1R2_TABLE !== 'undefined' && ZS_R1R2_TABLE[zsState.cableSize] != null) ? ZS_R1R2_TABLE[zsState.cableSize] : 24.2;
+    var zsCalc = zsCalcImpedance(zsState.ze, r1r2, zsState.cableLength);
+    var zsMax = zsGetMaxZs(zsState.device);
+    if (!(zsMax > 0) || !isFinite(zsCalc) || zsCalc <= 0) return { status: 'incomplete', detail: tx('mangler Zs,max/Zs', 'missing Zs,max/Zs') };
+    var pass = zsCheckDisconnection(zsCalc, zsMax); // conservative: Zs <= 0.8*Zs,max
+    return { status: pass ? 'ok' : 'fail', detail: 'Zs=' + zsCalc.toFixed(2) + (pass ? '\u2264' : '>') + '0.8\u00B7Zs,max(' + zsMax.toFixed(2) + ')\u03A9' };
+  } catch (e) { return { status: 'incomplete', detail: '' }; }
+});
+
+// Arc-flash incident energy + PPE — Arbejdstilsynet risk-assessment verdict.
+// Reuses arcflashCalcIncidentEnergy + arcflashGetPPECategory (IEEE 1584).
+// Conservative mapping (never a false OK): <1.2 cal/cm2 -> ok (normal clothes),
+// 1.2..40 -> warning (arc-rated PPE required), >=40 -> fail (work prohibited).
+Reactive.register('arcflash', function () {
+  try {
+    if (typeof arcflashState === 'undefined') return { status: 'incomplete', detail: '' };
+    var s = arcflashState;
+    var E = arcflashCalcIncidentEnergy(s.voltage, s.faultCurrent, s.clearingTime, s.workingDistance);
+    if (!isFinite(E) || E < 0) return { status: 'incomplete', detail: '' };
+    var ppe = arcflashGetPPECategory(E);
+    var status = (E < 1.2) ? 'ok' : (E >= 40 ? 'fail' : 'warning');
+    return { status: status, detail: 'E=' + E.toFixed(1) + 'cal/cm\u00B2 (' + tx('Kat.', 'Cat.') + ' ' + (ppe.category < 0 ? 'X' : ppe.category) + ')' };
+  } catch (e) { return { status: 'incomplete', detail: '' }; }
+});
+
+// HV overcurrent relay — transformer-inrush coordination verdict. Reuses
+// relayCalcI1N + relayCalcInrush + relayCheckCoordination (Bind 5). The relay
+// must ride through magnetising inrush yet still protect: coordinated -> ok,
+// otherwise 'warning' (nuisance-trip risk), never a silent OK on a bus change.
+Reactive.register('relay', function () {
+  try {
+    if (typeof relayState === 'undefined') return { status: 'incomplete', detail: '' };
+    var I1N = relayCalcI1N(relayState.trafoKVA, relayState.primaryKV);
+    if (!isFinite(I1N) || I1N <= 0) return { status: 'incomplete', detail: '' };
+    var inrush = relayCalcInrush(I1N);
+    var coord = relayCheckCoordination(relayState.tGt, relayState.egentid, inrush.duration);
+    return { status: coord.coordinated ? 'ok' : 'warning', detail: 'I1N=' + I1N.toFixed(1) + 'A, t_rel\u00E6=' + coord.totalRelayTime + 's' };
+  } catch (e) { return { status: 'incomplete', detail: '' }; }
+});
+
+// Supply voltage propagates to the arc-flash assessment so a system-voltage
+// change anywhere immediately updates the incident-energy verdict.
+SharedQuantities.subscribe('voltage_phase', function (v, source) {
+  if (source !== 'arcflash' && typeof arcflashState !== 'undefined' && [230, 400, 690, 6000, 10000, 20000].indexOf(v) >= 0) {
+    arcflashState.voltage = v;
+  }
+});
+
 // Theme/RTL-safe presentation metadata for a reactive verdict.
 function reactiveVerdictMeta(status) {
   if (status === 'ok') return { color: 'var(--success)', icon: '\u2705', label: tx('Sikker', 'Safe') };
@@ -25283,6 +25345,13 @@ function analyzerRun(text) {
       faultState.earthSystem = eMap[d.earthSystem] || 'tncs';
     }
     if (d.zsValue) faultState.zsValue = d.zsValue;
+    // Drive the LIVE fault-protection verdict from the extracted device so a
+    // pasted exam immediately recomputes automatic-disconnection (DS/HD 60364-4-41).
+    if (d.deviceIn) {
+      faultState.deviceIn = d.deviceIn;
+      var curveTypeMap = { 'B': 'mcbB', 'C': 'mcbC', 'D': 'mcbD' };
+      if (d.deviceCurve && curveTypeMap[d.deviceCurve]) faultState.deviceType = curveTypeMap[d.deviceCurve];
+    }
     if (d.capacitance) { if (typeof kapacitorState !== 'undefined') kapacitorState.C = d.capacitance; impedansState.C = d.capacitance; }
   }
 
@@ -25583,6 +25652,31 @@ function examFindQuestionText(seg, type) {
   return ft.length > 200 ? ft.slice(0, 200) + '\u2026' : ft;
 }
 
+// Per-segment extraction for multi-Opgave papers. Each Opgave gets its OWN
+// parameters (its own load, cable, device, ...) while values that an exam states
+// once for the WHOLE paper (supply voltage, frequency, earthing, transformer,
+// install conditions) fall back to the globally-extracted context. This is what
+// lets a paper with several Opgaver of MIXED types map each sub-question to the
+// right solver with the right numbers. Reuses analyzerExtract (NO new math).
+var ANALYZER_GLOBAL_FALLBACK_FIELDS = [
+  'voltage', 'phases', 'cosPhi', 'eta', 'frequency', 'earthSystem',
+  'trafoKVA', 'trafoUk', 'trafoPcu', 'trafoP0', 'trafoPrimKV', 'trafoVecGroup',
+  'installMethod', 'temperature', 'grouping', 'deviceCurve'
+];
+function analyzerExtractMerged(segText, globalData) {
+  var d = analyzerExtract(segText || '');
+  if (globalData) {
+    for (var i = 0; i < ANALYZER_GLOBAL_FALLBACK_FIELDS.length; i++) {
+      var f = ANALYZER_GLOBAL_FALLBACK_FIELDS[i];
+      if ((d[f] === null || d[f] === undefined) && globalData[f] != null) {
+        d[f] = globalData[f];
+        if (d.confidence && globalData.confidence && globalData.confidence[f]) d.confidence[f] = 'inherited';
+      }
+    }
+  }
+  return d;
+}
+
 // Build the COMPLETE structured exam solution from the analyzer's parsed+solved state.
 // Pure (no persisted mutation) so it is deterministic and testable.
 function examBuildSolution(state) {
@@ -25603,12 +25697,26 @@ function examBuildSolution(state) {
   var detectedCount = 0, solvedCount = 0, needInputCount = 0;
   segments.forEach(function (seg) {
     var qs = analyzerDetectQuestions(seg.text || '');
+    // Per-Opgave solving: each segment is solved with ITS OWN extracted
+    // parameters (merged with the paper-wide context) so mixed-type Opgaver map
+    // each sub-question to the right value. Falls back to the global solve when
+    // a segment does not itself carry the data (e.g. a value stated once).
+    var segByType = {};
+    try {
+      if (seg && seg.text && extracted) {
+        var segData = analyzerExtractMerged(seg.text, extracted);
+        var segSolution = analyzerSolve(segData);
+        (segSolution.results || []).forEach(function (r) { if (r && r.type && !segByType[r.type]) segByType[r.type] = r; });
+      }
+    } catch (e) { segByType = {}; }
     var seen = {};
     var qBlocks = [];
     qs.forEach(function (q) {
       if (seen[q.type]) return; seen[q.type] = true;
       var resType = EXAM_SOLUTION_RESULT_ALIAS[q.type] || q.type;
-      var res = byType[resType] || byType[q.type] || null;
+      // Prefer this Opgave's own result; fall back to the global solve so a
+      // value stated once for the whole paper is still shown (never lost).
+      var res = segByType[resType] || segByType[q.type] || byType[resType] || byType[q.type] || null;
       var solved = !!(res && res.html);
       detectedCount++;
       if (solved) solvedCount++; else needInputCount++;
