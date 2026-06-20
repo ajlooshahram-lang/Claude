@@ -11717,6 +11717,234 @@ test('Wire: a pasted exam auto-generates the single-line diagram alongside the v
   assert(sol.verdict && ['red','yellow','green','incomplete'].indexOf(sol.verdict.code) >= 0, 'a verdict is produced');
 });
 
+// ============================================================================
+// ===== MARGIN-TO-DANGER / CLIFF-EDGE + WORST-DAY SIMULATION (this feature) =====
+// ============================================================================
+// Shared fixtures built from REAL products. 100 kVA keeps board Ik below the
+// iC60N 6 kA Icu so the breaking-capacity check (out of v1 scope) does not turn
+// the verdict red and mask the three in-scope verdicts.
+function mtdFinal(over) {
+  return Object.assign({ id: 'fcA', name_da: 'Slutkreds', name_en: 'Final circuit', cableId: 'NKT-NOIKLX-6', length_m: 10, deviceId: 'SE-iC60N-B40', deviceIn: 40, loadKW: 6, phases: '1x230', cosPhi: 0.95, rcdMa: null }, over || {});
+}
+function mtdProject(earthing, supplyCableId, fin) {
+  return { version: 1, earthing: earthing || 'TN',
+    transformerId: 'TR-ONAN-100',
+    supply: { cableId: supplyCableId || 'SC-AL-50', length_m: 10, deviceId: 'MF-NH00-100', deviceIn: 100 },
+    finals: [fin] };
+}
+// Green-marginal: overload sits below the worst-day Ca*Cg derating.
+var MTD_GREEN = mtdProject('TN', 'SC-AL-50', mtdFinal({ cableId: 'NKT-NOIKLX-6', deviceIn: 40, loadKW: 6 }));
+// Overload hand-calc fixture: supply has huge headroom (SC-AL-95) so the 2.5 mm2
+// final (officialIz 30, In 25) is the single binding overload constraint.
+var MTD_OVERLOAD = mtdProject('TN', 'SC-AL-95', mtdFinal({ cableId: 'NKT-NOIKLX-2.5', deviceId: 'SE-iC60N-B25', deviceIn: 25, loadKW: 3.68 }));
+// Zs voltage-only fixture: Zs*Ia just under U0 at baseline, flips at vF=0.90.
+var MTD_ZS = mtdProject('TN', 'SC-AL-50', mtdFinal({ cableId: 'NKT-NOIKLX-4', length_m: 105, deviceId: 'SE-iC60N-B40', deviceIn: 40, loadKW: 1.0 }));
+// Voltage-drop conductor-temp fixture: dU ~3.4% baseline, crosses 4% when hot.
+var MTD_VDROP = mtdProject('TN', 'SC-AL-50', mtdFinal({ cableId: 'NKT-NOIKLX-2.5', length_m: 40, deviceId: 'SE-iC60N-B16', deviceIn: 16, loadKW: 3.0 }));
+// Coupling fixture: one conductor-temp rise moves BOTH Zs and Vdrop.
+var MTD_COUPLE = mtdProject('TN', 'SC-AL-50', mtdFinal({ cableId: 'NKT-NOIKLX-4', length_m: 90, deviceId: 'SE-iC60N-B40', deviceIn: 40, loadKW: 2.2 }));
+function mtdS(audit, cat) { return upCategoryStatus(audit, cat); }
+
+test('Margin/WorstDay: TEMP_FACTORS/GROUP_FACTORS/alpha/voltage equal published reference values', function() {
+  assert.strictEqual(TEMP_FACTORS[40], 0.87, 'Ca(40C) = 0.87 (DS/HD 60364-5-52 Table B.52.14)');
+  assert.strictEqual(GROUP_FACTORS[4], 0.65, 'Cg(4 circuits) = 0.65 (Table B.52.17)');
+  assert.strictEqual(UP_ALPHA_CU, 0.00393, 'alpha_Cu = 0.00393/K (IEC 60228)');
+  assert.strictEqual(UP_ALPHA_AL, 0.00403, 'alpha_Al = 0.00403/K (IEC 60228)');
+  assert.strictEqual(UP_WORSTDAY_VF, 0.90, 'worst-day voltage override = 0.90 (CENELEC / EN 50160)');
+  assert.strictEqual(UP_CMIN, 0.95, 'baseline Cmin stays 0.95 (distinct from the 0.90 scenario override)');
+});
+
+test('Margin/WorstDay: neutral overlay is byte-identical to the baseline audit', function() {
+  var saved = upSnapshot();
+  [MTD_GREEN, MTD_ZS, MTD_VDROP, MTD_COUPLE, mtdProject('TT', 'SC-AL-50', mtdFinal({ rcdMa: 30 })), mtdProject('IT', 'SC-AL-50', mtdFinal({}))].forEach(function(p) {
+    var a = upAuditProject(p), b = upAuditWith(p, {});
+    assert.deepStrictEqual(b.findings, a.findings, 'neutral overlay findings identical');
+    assert.strictEqual(b.verdict, a.verdict, 'neutral overlay verdict identical');
+    assert.strictEqual(b.ikBoardA, a.ikBoardA, 'neutral overlay ikBoardA identical');
+  });
+  upRestore(saved);
+});
+
+test('Margin/WorstDay: overload margin search matches the hand calc within one step', function() {
+  // officialIz(2.5 XLPE Cu)=30, In=25 -> flip when 30*Ca < 25 -> Ca < 25/30.
+  var izTab = officialIz(upCableProduct('NKT-NOIKLX-2.5'));
+  assert.strictEqual(izTab, 30, 'reference officialIz for 2.5 mm2 XLPE Cu');
+  var target = 25 / izTab; // required Ca at the flip
+  // upTempFactor interpolates linearly between 40 (0.87) and 45 (0.79)
+  var handT = 40 + (target - 0.87) / (0.79 - 0.87) * 5;
+  assert(mtdS(upAuditProject(MTD_OVERLOAD), 'overload') === 'ok', 'overload OK at baseline');
+  var th = upBisectFlip(MTD_OVERLOAD, 'overload', 30, 55, function(v) { return { overlay: { ambientC: v } }; });
+  assert(th != null, 'a flip ambient is found within bounds');
+  assert(Math.abs(th - handT) <= 1.0, 'searched flip ambient ' + th.toFixed(2) + 'C matches hand ' + handT.toFixed(2) + 'C within one step');
+});
+
+test('Margin/WorstDay: conductor temp couples Vdrop AND Zs (r_eff feeds both)', function() {
+  var base = upAuditProject(MTD_COUPLE);
+  assert.strictEqual(mtdS(base, 'zs'), 'ok', 'Zs OK at baseline');
+  assert.strictEqual(mtdS(base, 'vdrop'), 'ok', 'Vdrop OK at baseline');
+  var hot = upAuditWith(MTD_COUPLE, { conductorTempC: 90 });
+  assert(upCatFlipped(hot, 'zs'), 'raising conductor temp flips Zs');
+  assert(upCatFlipped(hot, 'vdrop'), 'the SAME conductor-temp rise also flips Vdrop');
+  // a worst-day stack flips >= 2 findings together
+  var wd = upWorstDay(MTD_COUPLE);
+  assert(wd.flippedCount >= 2, 'worst-day stack flips >= 2 findings together, got ' + wd.flippedCount);
+});
+
+test('Margin/WorstDay: Worst-Day flips a known-marginal green design to red', function() {
+  var wd = upWorstDay(MTD_GREEN);
+  assert.strictEqual(wd.verdictBefore, 'green', 'design is GREEN at baseline');
+  assert.strictEqual(wd.verdictAfter, 'red', 'worst-day verdict turns RED');
+  assert(wd.flippedCount >= 1, 'at least one green->red flip');
+  assert(wd.flips.some(function(f) { return f.category === 'overload'; }), 'the overload verdict is among the flips');
+  assert(wd.flips.every(function(f) { return f.before.status === 'ok' && f.after.status === 'fail'; }), 'every flip is a genuine ok->fail');
+});
+
+test('Margin/WorstDay: each perturbation flips only its intended verdict (isolation)', function() {
+  // Ca-only and Cg-only -> overload only
+  var amb = upAuditWith(MTD_GREEN, { ambientC: 50 });
+  assert(upCatFlipped(amb, 'overload') && mtdS(amb, 'zs') === 'ok' && mtdS(amb, 'vdrop') === 'ok', 'ambient flips overload, leaves Zs+Vdrop');
+  var grp = upAuditWith(MTD_GREEN, { groupingN: 4 });
+  assert(upCatFlipped(grp, 'overload') && mtdS(grp, 'zs') === 'ok' && mtdS(grp, 'vdrop') === 'ok', 'grouping flips overload, leaves Zs+Vdrop');
+  // voltage -10% only -> Zs only
+  var volt = upAuditWith(MTD_ZS, { voltageFactor: 0.90 });
+  assert(upCatFlipped(volt, 'zs') && mtdS(volt, 'overload') === 'ok' && mtdS(volt, 'vdrop') === 'ok', 'voltage flips Zs, leaves overload+Vdrop');
+  // conductor temp only -> Vdrop here, leaves overload untouched
+  var hot = upAuditWith(MTD_VDROP, { conductorTempC: 90 });
+  assert(upCatFlipped(hot, 'vdrop') && mtdS(hot, 'overload') === 'ok', 'conductor temp flips Vdrop, leaves overload (unrelated)');
+});
+
+test('Margin/WorstDay: displayed margin is rounded TOWARD danger (never overstated)', function() {
+  var m = upMarginToDanger(MTD_OVERLOAD);
+  var flippingAxes = 0;
+  UP_MARGIN_CATS.forEach(function(cat) {
+    var c = m.cats[cat];
+    if (c.state !== 'ok') return;
+    c.axes.forEach(function(ax) {
+      if (!ax.flips) return;
+      flippingAxes++;
+      assert(ax.disp <= ax.raw + 1e-9, cat + '/' + ax.key + ' displayed (' + ax.disp + ') <= exact (' + ax.raw + ')');
+    });
+  });
+  assert(flippingAxes >= 1, 'at least one flipping axis was checked');
+  // explicit overload ambient: floor(12.29) = 12 <= 12.29
+  var amb = upMarginToDanger(MTD_OVERLOAD).cats.overload.axes.find(function(a) { return a.key === 'ambient'; });
+  assert(amb.flips && amb.disp === Math.floor(amb.raw) && amb.disp <= amb.raw, 'ambient headroom floored toward danger');
+});
+
+test('Margin/WorstDay: missing inputs -> "unresolved", never a false OK, no-transformer stays incomplete', function() {
+  // no transformer -> verdict incomplete, all margins unresolved
+  var noTf = mtdProject('TN', 'SC-AL-50', mtdFinal({}));
+  noTf.transformerId = null;
+  assert.strictEqual(upAuditProject(noTf).verdict, 'incomplete', 'no transformer -> incomplete');
+  var mNo = upMarginToDanger(noTf);
+  UP_MARGIN_CATS.forEach(function(cat) { assert.strictEqual(mNo.cats[cat].state, 'unresolved', cat + ' unresolved without transformer'); });
+  // no device on the final -> overload/Zs cannot be a false OK
+  var noDev = mtdProject('TN', 'SC-AL-50', mtdFinal({ deviceId: null, deviceIn: null }));
+  var mDev = upMarginToDanger(noDev);
+  assert(mDev.cats.overload.state !== 'ok', 'no device -> overload not a false OK (' + mDev.cats.overload.state + ')');
+  assert(mDev.cats.zs.state === 'unresolved', 'no device -> Zs unresolved');
+  // no cable on the final -> overload/Vdrop cannot be a false OK
+  var noCab = mtdProject('TN', 'SC-AL-50', mtdFinal({ cableId: null }));
+  var mCab = upMarginToDanger(noCab);
+  assert(mCab.cats.overload.state !== 'ok', 'no cable -> overload not a false OK');
+  assert(mCab.cats.vdrop.state === 'unresolved', 'no cable -> Vdrop unresolved');
+});
+
+test('Margin/WorstDay: empty project -> "no verdicts to test"; already-failing -> over the edge', function() {
+  var empty = upDefaultProject();
+  var wd = upWorstDay(empty);
+  assert.strictEqual(wd.testable, false, 'empty project has no green verdicts to test');
+  assert.strictEqual(wd.flippedCount, 0, 'no flips on an empty project');
+  assert.doesNotThrow(function() { upMarginToDanger(empty); }, 'margin on empty project does not throw');
+  // already-failing overload at baseline -> over-edge (margin 0)
+  var failing = mtdProject('TN', 'SC-AL-95', mtdFinal({ cableId: 'NKT-NOIKLX-1.5', deviceId: 'SE-iC60N-B40', deviceIn: 40, loadKW: 5 }));
+  assert.strictEqual(mtdS(upAuditProject(failing), 'overload'), 'fail', 'overload already fails at baseline');
+  assert.strictEqual(upMarginToDanger(failing).cats.overload.state, 'over-edge', 'already-failing overload -> over the edge');
+});
+
+test('Margin/WorstDay: soil/earth perturbation applies to TT only', function() {
+  var tt = mtdProject('TT', 'SC-AL-50', mtdFinal({ rcdMa: 100 }));
+  var tn = mtdProject('TN', 'SC-AL-50', mtdFinal({}));
+  // resolved overlay adds an earth-electrode resistance only conceptually; for TN
+  // the raAdd is ignored inside upAuditCore, so soil never changes a TN audit.
+  assert.deepStrictEqual(upAuditWith(tn, { soilRho: 2000 }).findings, upAuditProject(tn).findings, 'soil does not affect a TN audit');
+  // For TT a very dry soil raises Zs in the touch-voltage check (here with a 100 mA RCD).
+  var dry = upAuditWith(tt, { soilRho: 1000 });
+  var base = upAuditProject(tt);
+  var dryZs = base.findings.find(function(f) { return upFindingCategory(f) === 'zs'; });
+  assert(dryZs, 'TT has a Zs/touch-voltage finding');
+  assert(upResolveOverlay({ soilRho: 1000 }).raAdd > 0, 'soil resistivity resolves to a positive earth-electrode resistance');
+});
+
+test('Margin/WorstDay: search is PURE — no project / upProject / localStorage mutation', function() {
+  var saved = upSnapshot();
+  var p = mtdProject('TN', 'SC-AL-50', mtdFinal({}));
+  var before = JSON.stringify(p);
+  var upBefore = JSON.stringify(upProject);
+  var lsBefore = localStorage.getItem(UNIFIED_PROJECT_KEY);
+  upAuditWith(p, { ambientC: 55, groupingN: 6, voltageFactor: 0.90, conductorTempC: 90, soilRho: 2000 });
+  upMarginToDanger(p);
+  upWorstDay(p);
+  upBisectFlip(p, 'overload', 30, 55, function(v) { return { overlay: { ambientC: v } }; });
+  assert.strictEqual(JSON.stringify(p), before, 'input project is not mutated by the search');
+  assert.strictEqual(JSON.stringify(upProject), upBefore, 'global upProject is not mutated');
+  assert.strictEqual(localStorage.getItem(UNIFIED_PROJECT_KEY), lsBefore, 'localStorage is untouched');
+  // PRODUCTS catalog must never be mutated by the r_eff overlay
+  assert.strictEqual(upCableProduct('NKT-NOIKLX-4').r, 4.61, 'PRODUCTS cable resistance untouched by r_eff');
+  upRestore(saved);
+});
+
+test('Margin/WorstDay: trilingual — every new fragment resolves via _FA in Farsi', function() {
+  var saved = upSnapshot();
+  var savedLang = lang;
+  var savedState = { lastAudit: upAuditState.lastAudit, showMargins: upAuditState.showMargins, margins: upAuditState.margins, worstDay: upAuditState.worstDay, wd: upAuditState.wd };
+  upProject = MTD_COUPLE;
+  upAuditState.lastAudit = upAuditProject(upProject);
+  upAuditState.showMargins = true;
+  upAuditState.wd = upWorstDayDefault();
+  lang = 'fa';
+  upAuditState.margins = upMarginToDanger(upProject);
+  upAuditState.worstDay = upWorstDay(upProject, upAuditState.wd);
+  var hfa = renderKritisk();
+  var newEnglish = ['Margin to danger', 'Nearest cliff edge', 'Worst-Day simulation', 'currently-green verdicts turn red',
+    'Raise ambient temperature', 'Conductor at max operating temperature',
+    'Dry soil (high earth resistance)', 'Already over the edge', 'Arc-flash and selectivity are not included in this analysis',
+    'Ambient temperature', 'Conductor temperature', 'Run Worst-Day', 'Show margins'];
+  newEnglish.forEach(function(s) { assert(hfa.indexOf(s) < 0, 'no raw English leak in Farsi: "' + s + '"'); });
+  assert(hfa.indexOf('<input') < 0 && hfa.indexOf('<textarea') < 0, 'still 100% click-only (no text inputs)');
+  // positive: the new category names + out-of-scope statement render in Farsi
+  assert(hfa.indexOf(_FA['Overload']) >= 0, 'overload category name resolved to Farsi');
+  assert(hfa.indexOf(_FA['Voltage drop']) >= 0, 'voltage-drop category name resolved to Farsi');
+  assert(hfa.indexOf(_FA['Margin to danger']) >= 0, 'margin-to-danger heading resolved to Farsi');
+  assert(hfa.indexOf(_FA['Arc-flash and selectivity are not included in this analysis']) >= 0, 'out-of-scope statement surfaced in Farsi');
+  lang = savedLang;
+  upAuditState.lastAudit = savedState.lastAudit; upAuditState.showMargins = savedState.showMargins; upAuditState.margins = savedState.margins; upAuditState.worstDay = savedState.worstDay; upAuditState.wd = savedState.wd;
+  upRestore(saved);
+});
+
+test('Margin/WorstDay: UI is click-only and states arc-flash/selectivity are out of scope (da+en)', function() {
+  var saved = upSnapshot();
+  var savedLang = lang;
+  upProject = MTD_GREEN;
+  upAuditState.lastAudit = upAuditProject(upProject);
+  upAuditState.showMargins = true;
+  upAuditState.margins = upMarginToDanger(upProject);
+  upAuditState.wd = upWorstDayDefault();
+  upAuditState.worstDay = upWorstDay(upProject, upAuditState.wd);
+  ['da', 'en'].forEach(function(L) {
+    lang = L;
+    var h = renderKritisk();
+    assert(h.indexOf('<input') < 0 && h.indexOf('<textarea') < 0, L + ': no text inputs (click-only)');
+    assert(h.indexOf('upRunWorstDay()') >= 0, L + ': Worst-Day button present');
+    assert(h.indexOf('upToggleMargins()') >= 0, L + ': Show-margins toggle present');
+    var outOfScope = (L === 'da') ? 'Lysbue og selektivitet indg\u00E5r ikke' : 'Arc-flash and selectivity are not included';
+    assert(h.indexOf(outOfScope) >= 0, L + ': arc-flash/selectivity marked out of scope');
+  });
+  lang = savedLang;
+  upAuditState.lastAudit = null; upAuditState.showMargins = false; upAuditState.margins = null; upAuditState.worstDay = null;
+  upRestore(saved);
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

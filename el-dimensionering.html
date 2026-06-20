@@ -1370,6 +1370,46 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // Margin-to-Danger / Cliff-Edge + Worst-Day simulation (this feature) — Persian
+  'Overload': '\u0627\u0636\u0627\u0641\u0647\u200C\u0628\u0627\u0631',
+  'Disconnection (Zs)': '\u0642\u0637\u0639 \u062E\u0648\u062F\u06A9\u0627\u0631 (Zs)',
+  'Voltage drop': '\u0627\u0641\u062A \u0648\u0644\u062A\u0627\u0698',
+  'circuits': '\u0645\u062F\u0627\u0631',
+  'voltage factor': '\u0636\u0631\u06CC\u0628 \u0648\u0644\u062A\u0627\u0698',
+  'Margin to danger': '\u0641\u0627\u0635\u0644\u0647 \u062A\u0627 \u062E\u0637\u0631',
+  'How much headroom remains before each of the three coupled safety verdicts tips OK\u2192FAIL? Rounded toward danger (never overstated).': '\u0686\u0647 \u0627\u0646\u062F\u0627\u0632\u0647 \u0641\u0627\u0635\u0644\u0647 \u062A\u0627 \u0648\u0627\u0698\u06AF\u0648\u0646\u06CC \u0647\u0631 \u06CC\u06A9 \u0627\u0632 \u0633\u0647 \u0646\u062A\u06CC\u062C\u0647 \u0627\u06CC\u0645\u0646\u06CC \u0628\u0647\u200C\u0647\u0645\u200C\u067E\u06CC\u0648\u0633\u062A\u0647 (OK\u2192FAIL) \u0628\u0627\u0642\u06CC \u0645\u0627\u0646\u062F\u0647\u061F \u0628\u0647 \u0633\u0645\u062A \u062E\u0637\u0631 \u06AF\u0631\u062F \u0634\u062F\u0647 (\u0647\u0631\u06AF\u0632 \u0628\u06CC\u0634\u200C\u0628\u0631\u0622\u0648\u0631\u062F \u0646\u0634\u062F\u0647).',
+  'Already over the edge': '\u0647\u0645\u200C\u0627\u06A9\u0646\u0648\u0646 \u0627\u0632 \u0644\u0628\u0647 \u0639\u0628\u0648\u0631 \u06A9\u0631\u062F\u0647',
+  'Cannot compute margin \u2014 select a transformer, cable and device': '\u0645\u062D\u0627\u0633\u0628\u0647 \u062D\u0627\u0634\u06CC\u0647 \u0645\u0645\u06A9\u0646 \u0646\u06CC\u0633\u062A \u2014 \u062A\u0631\u0627\u0646\u0633\u0641\u0648\u0631\u0645\u0627\u062A\u0648\u0631\u060C \u06A9\u0627\u0628\u0644 \u0648 \u0648\u0633\u06CC\u0644\u0647 \u0631\u0627 \u0627\u0646\u062A\u062E\u0627\u0628 \u06A9\u0646\u06CC\u062F',
+  'no flip within realistic range': '\u0628\u062F\u0648\u0646 \u062A\u063A\u06CC\u06CC\u0631 \u062F\u0631 \u0645\u062D\u062F\u0648\u062F\u0647 \u0648\u0627\u0642\u0639\u200C\u06AF\u0631\u0627\u06CC\u0627\u0646\u0647',
+  'Nearest cliff edge': '\u0646\u0632\u062F\u06CC\u06A9\u200C\u062A\u0631\u06CC\u0646 \u0644\u0628\u0647 \u067E\u0631\u062A\u06AF\u0627\u0647',
+  'Dry soil (high earth resistance)': '\u062E\u0627\u06A9 \u062E\u0634\u06A9 (\u0645\u0642\u0627\u0648\u0645\u062A \u0632\u0645\u06CC\u0646 \u0628\u0627\u0644\u0627)',
+  'Soil': '\u062E\u0627\u06A9',
+  'not applicable (TT only)': '\u0642\u0627\u0628\u0644 \u0627\u0639\u0645\u0627\u0644 \u0646\u06CC\u0633\u062A (\u0641\u0642\u0637 TT)',
+  'Arc-flash and selectivity are not included in this analysis': '\u0642\u0648\u0633 \u0627\u0644\u06A9\u062A\u0631\u06CC\u06A9\u06CC \u0648 \u06AF\u0632\u06CC\u0646\u0634\u200C\u067E\u0630\u06CC\u0631\u06CC \u062F\u0631 \u0627\u06CC\u0646 \u062A\u062D\u0644\u06CC\u0644 \u0644\u062D\u0627\u0638 \u0646\u0634\u062F\u0647\u200C\u0627\u0646\u062F',
+  'Worst-Day simulation': '\u0634\u0628\u06CC\u0647\u200C\u0633\u0627\u0632\u06CC \u0628\u062F\u062A\u0631\u06CC\u0646 \u0631\u0648\u0632',
+  'Re-runs the whole installation under a realistic stacked Danish worst case. This is a scenario override, not the baseline.': '\u06A9\u0644 \u062A\u0623\u0633\u06CC\u0633\u0627\u062A \u0631\u0627 \u062A\u062D\u062A \u06CC\u06A9 \u0628\u062F\u062A\u0631\u06CC\u0646 \u062D\u0627\u0644\u062A \u0648\u0627\u0642\u0639\u200C\u06AF\u0631\u0627\u06CC\u0627\u0646\u0647 \u062F\u0627\u0646\u0645\u0627\u0631\u06A9\u06CC \u062F\u0648\u0628\u0627\u0631\u0647 \u0627\u062C\u0631\u0627 \u0645\u06CC\u200C\u06A9\u0646\u062F. \u0627\u06CC\u0646 \u06CC\u06A9 \u0628\u0627\u0632\u0646\u0648\u06CC\u0633\u06CC \u0633\u0646\u0627\u0631\u06CC\u0648 \u0627\u0633\u062A\u060C \u0646\u0647 \u0645\u0628\u0646\u0627.',
+  'Ambient temperature': '\u062F\u0645\u0627\u06CC \u0645\u062D\u06CC\u0637',
+  'Cable grouping': '\u06AF\u0631\u0648\u0647\u200C\u0628\u0646\u062F\u06CC \u06A9\u0627\u0628\u0644',
+  'Mains voltage factor': '\u0636\u0631\u06CC\u0628 \u0648\u0644\u062A\u0627\u0698 \u0634\u0628\u06A9\u0647',
+  'scenario override, not the baseline': '\u0628\u0627\u0632\u0646\u0648\u06CC\u0633\u06CC \u0633\u0646\u0627\u0631\u06CC\u0648\u060C \u0646\u0647 \u0645\u0628\u0646\u0627',
+  'Conductor temperature': '\u062F\u0645\u0627\u06CC \u0647\u0627\u062F\u06CC',
+  'Soil resistivity (TT only)': '\u0645\u0642\u0627\u0648\u0645\u062A \u0648\u06CC\u0698\u0647 \u062E\u0627\u06A9 (\u0641\u0642\u0637 TT)',
+  'not applicable': '\u0642\u0627\u0628\u0644 \u0627\u0639\u0645\u0627\u0644 \u0646\u06CC\u0633\u062A',
+  'Run Worst-Day': '\u0627\u062C\u0631\u0627\u06CC \u0628\u062F\u062A\u0631\u06CC\u0646 \u0631\u0648\u0632',
+  'No green verdicts to test': '\u0647\u06CC\u0686 \u0646\u062A\u06CC\u062C\u0647 \u0633\u0628\u0632\u06CC \u0628\u0631\u0627\u06CC \u0622\u0632\u0645\u0648\u0646 \u0646\u06CC\u0633\u062A',
+  'Worst-Day': '\u0628\u062F\u062A\u0631\u06CC\u0646 \u0631\u0648\u0632',
+  'currently-green verdicts turn red': '\u0646\u062A\u0627\u06CC\u062C \u0627\u06A9\u0646\u0648\u0646\u200C\u0633\u0628\u0632 \u0642\u0631\u0645\u0632 \u0645\u06CC\u200C\u0634\u0648\u0646\u062F',
+  'No change \u2014 all verdicts hold': '\u0628\u062F\u0648\u0646 \u062A\u063A\u06CC\u06CC\u0631 \u2014 \u0647\u0645\u0647 \u0646\u062A\u0627\u06CC\u062C \u067E\u0627\u0628\u0631\u062C\u0627',
+  'before': '\u067E\u06CC\u0634 \u0627\u0632',
+  'after': '\u067E\u0633 \u0627\u0632',
+  'Hide margins': '\u067E\u0646\u0647\u0627\u0646\u200C\u06A9\u0631\u062F\u0646 \u062D\u0627\u0634\u06CC\u0647\u200C\u0647\u0627',
+  'Show margins': '\u0646\u0645\u0627\u06CC\u0634 \u062D\u0627\u0634\u06CC\u0647\u200C\u0647\u0627',
+  'Raise ambient temperature': '\u0627\u0641\u0632\u0627\u06CC\u0634 \u062F\u0645\u0627\u06CC \u0645\u062D\u06CC\u0637',
+  'Conductor at max operating temperature': '\u0647\u0627\u062F\u06CC \u062F\u0631 \u062D\u062F\u0627\u06A9\u062B\u0631 \u062F\u0645\u0627\u06CC \u06A9\u0627\u0631\u06CC',
+  'Longer cable run': '\u0645\u0633\u06CC\u0631 \u06A9\u0627\u0628\u0644 \u0637\u0648\u0644\u0627\u0646\u06CC\u200C\u062A\u0631',
+  'Mains at lower limit (\u221210%)': '\u0634\u0628\u06A9\u0647 \u062F\u0631 \u062D\u062F \u067E\u0627\u06CC\u06CC\u0646 (\u221210\u066A)',
+  'Higher load': '\u0628\u0627\u0631 \u0628\u06CC\u0634\u062A\u0631',
+
   // Official product links (deep-link feature) — Persian
   'View product': '\u0645\u0634\u0627\u0647\u062F\u0647 \u0645\u062D\u0635\u0648\u0644',
   'Datasheet': '\u0628\u0631\u06AF\u0647 \u062F\u0627\u062F\u0647',
@@ -20363,7 +20403,7 @@ function upLoadProject() {
 function upSaveProject() { try { localStorage.setItem(UNIFIED_PROJECT_KEY, JSON.stringify(upProject)); } catch (e) {} }
 
 let upProject = upLoadProject();
-let upAuditState = { lastAudit: null };
+let upAuditState = { lastAudit: null, showMargins: false, margins: null, worstDay: null, wd: null };
 
 // --- Build an SLD-style tree from the unified project to reuse the verified calc engine ---
 function upBuildTree(project) {
@@ -20416,7 +20456,13 @@ function upCheckIcu(findings, label, dev, ikBoardA) {
     findings.push({ scope: label, rule: 'Icu \u2265 Ikmax', clause: 'DS/HD 60364-4-43 cl. 434.5.1', status: 'fail', detail: tx('Brydeevne for lav: ', 'Breaking capacity too low: ') + detail, recommendation: tx('V\u00E6lg en afbryder med h\u00F8jere Icu eller anvend backup-sikring (kaskade).', 'Choose a device with higher Icu or use a back-up fuse (cascading).') });
   }
 }
-function upCheckDisconnection(findings, label, earthing, zs, dev, fc) {
+function upCheckDisconnection(findings, label, earthing, zs, dev, fc, cmin) {
+  // cmin defaults to the baseline UP_CMIN (0.95). The overlay-aware audit path
+  // (upAuditCore / Worst-Day) passes a scenario voltageFactor (e.g. 0.90 = 230 V
+  // -10%, CENELEC / EN 50160) so a low-mains scenario can be re-run WITHOUT
+  // changing the default baseline behaviour. With no argument the behaviour is
+  // byte-identical to before.
+  cmin = (typeof cmin === 'number' && isFinite(cmin)) ? cmin : UP_CMIN;
   const In = dev.In;
   const isSmallFinal = In <= 32;
   let ia, timeReq, clauseRef;
@@ -20439,13 +20485,13 @@ function upCheckDisconnection(findings, label, earthing, zs, dev, fc) {
   }
   if (earthing === 'IT') {
     const clauseIT = 'DS/HD 60364-4-41 cl. 411.6.4';
-    const lhs = 2 * zs * ia; const rhs = UP_CMIN * 400;
+    const lhs = 2 * zs * ia; const rhs = cmin * 400;
     const detail = '2\u00B7Zs\u00B7Ia=' + lhs.toFixed(0) + 'V \u2264 Cmin\u00B7U=' + rhs.toFixed(0) + 'V (Zs=' + zs.toFixed(2) + '\u03A9, Ia=' + ia.toFixed(0) + 'A)';
     findings.push({ scope: label, rule: tx('IT 2. fejl: 2\u00B7Zs\u00B7Ia \u2264 Cmin\u00B7U', 'IT 2nd fault: 2\u00B7Zs\u00B7Ia \u2264 Cmin\u00B7U'), clause: clauseIT, status: (lhs <= rhs) ? 'ok' : 'fail', detail: (lhs <= rhs ? '' : tx('For h\u00F8j loop ved 2. fejl: ', 'Loop too high at 2nd fault: ')) + detail, recommendation: (lhs <= rhs) ? '' : tx('Reducer Zs (st\u00F8rre/kortere kabel) eller hurtigere afbryder; overvej HPFI.', 'Reduce Zs (larger/shorter cable) or a faster device; consider an RCD.') });
     return;
   }
   // TN — conservative: Cmin applied to U0
-  const u0 = UP_CMIN * 230;
+  const u0 = cmin * 230;
   const zsIa = zs * ia;
   const detail = 'Zs\u00B7Ia=' + zsIa.toFixed(0) + 'V \u2264 Cmin\u00B7U0=' + u0.toFixed(0) + 'V (Zs=' + zs.toFixed(2) + '\u03A9, Ia=' + ia.toFixed(0) + 'A, ' + timeReq + ')';
   if (zsIa <= u0) {
@@ -20478,7 +20524,21 @@ function upComputeVerdict(findings) {
 }
 
 // --- THE AUDITOR: sweeps the unified project, returns verdict + findings (each cites a clause) ---
-function upAuditProject(project) {
+// The single coupled re-run engine. `upAuditProject(p)` is the BASELINE (neutral
+// overlay); `upAuditCore(p, ov)` is the overlay-aware path used by the Margin /
+// Worst-Day layer. A NEUTRAL overlay (Ca=Cg=1, conductorTempC=20, voltageFactor
+// =UP_CMIN=0.95, raAdd=0) reproduces the baseline byte-for-byte — see the
+// "neutral overlay equivalence" test in test-sld.js.
+function upAuditProject(project) { return upAuditCore(project, upNeutralOverlay()); }
+
+function upAuditCore(project, ov) {
+  ov = ov || upNeutralOverlay();
+  const Ca = (typeof ov.Ca === 'number') ? ov.Ca : 1.0;
+  const Cg = (typeof ov.Cg === 'number') ? ov.Cg : 1.0;
+  const cTemp = (typeof ov.conductorTempC === 'number') ? ov.conductorTempC : 20;
+  const vF = (typeof ov.voltageFactor === 'number') ? ov.voltageFactor : UP_CMIN;
+  const raAdd = (typeof ov.raAdd === 'number') ? ov.raAdd : 0;
+
   const findings = [];
   const built = upBuildTree(project);
   if (!built) {
@@ -20486,6 +20546,18 @@ function upAuditProject(project) {
     return { verdict: 'incomplete', findings: findings, ikBoardA: 0 };
   }
   const tree = built.tree;
+  // Conductor-temperature overlay: R(theta) = R20*[1 + alpha*(theta-20)]
+  // (alpha_Cu=0.00393/K, alpha_Al=0.00403/K — IEC 60228 / IEC 60909-0). We copy
+  // each cable BEFORE adjusting r so PRODUCTS is never mutated (purity). r_eff
+  // then feeds BOTH the Zs (disconnection) and the voltage-drop chain, which is
+  // exactly how a single shared input couples the two verdicts. At cTemp==20 the
+  // multiplier is exactly 1.0, so the baseline is byte-identical.
+  if (cTemp !== 20) {
+    Object.keys(tree.nodes).forEach(function(id) {
+      const n = tree.nodes[id];
+      if (n && n.cable) { const c = Object.assign({}, n.cable); c.r = (c.r || 0) * upRMult(c.material, cTemp); n.cable = c; }
+    });
+  }
   const ikBoardA = sldCalcNodeIk(tree, built.boardId).ikmax; // Ik3max at board (3-phase, c=1.05)
   findings.push({ scope: tx('Tavle', 'Board'), rule: tx('Kortslutning ved tavle (Ik3max)', 'Short-circuit at board (Ik3max)'), clause: 'IEC 60909-0 (c=1.05) \u00B7 DS/HD 60364', status: 'info', detail: 'Ik3max = ' + (ikBoardA / 1000).toFixed(2) + ' kA', recommendation: '' });
 
@@ -20495,9 +20567,10 @@ function upAuditProject(project) {
   const sup = project.supply || {};
   const supDev = upResolveDevice(sup.deviceId, sup.deviceIn);
   const supCable = sup.cableId ? upCableProduct(sup.cableId) : null;
+  const effSupCable = tree.nodes[built.boardId] ? tree.nodes[built.boardId].cable : null; // r_eff-adjusted copy
   const supLabel = tx('Forsyningskabel', 'Supply cable');
   if (supCable && supDev) {
-    upCheckOverload(findings, supLabel, ibBoard, supDev.In, upDeratedIz(supCable));
+    upCheckOverload(findings, supLabel, ibBoard, supDev.In, upEffIz(supCable, Ca, Cg));
   } else {
     findings.push({ scope: tx('Forsyning', 'Supply'), rule: 'IB \u2264 In \u2264 Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'warning', detail: tx('Forsyningskabel eller hovedafbryder mangler.', 'Supply cable or main device missing.'), recommendation: tx('V\u00E6lg b\u00E5de forsyningskabel og hovedafbryder.', 'Select both a supply cable and a main device.') });
   }
@@ -20509,16 +20582,21 @@ function upAuditProject(project) {
     const name = (lang === 'da' ? (fc.name_da || 'Slutkreds') : (fc.name_en || 'Final circuit')) + ' #' + (idx + 1);
     const dev = upResolveDevice(fc.deviceId, fc.deviceIn);
     const cab = fc.cableId ? upCableProduct(fc.cableId) : null;
+    const effCab = node ? node.cable : null; // r_eff-adjusted copy
     const ibF = sldCalcNodeIB(node);
     const ikMinF = sldCalcNodeIk(tree, fId).ikmin; // Ik1min at far end (c=0.95, x1.5 conservative)
     findings.push({ scope: name, rule: tx('Kortslutning ved enden (Ik1min)', 'Short-circuit at far end (Ik1min)'), clause: 'IEC 60909-0 (c=0.95) \u00B7 DS/HD 60364', status: 'info', detail: 'Ik1min = ' + (ikMinF / 1000).toFixed(2) + ' kA', recommendation: '' });
-    if (cab && dev) upCheckOverload(findings, name + ' \u2014 ' + tx('kabel', 'cable'), ibF, dev.In, upDeratedIz(cab));
+    if (cab && dev) upCheckOverload(findings, name + ' \u2014 ' + tx('kabel', 'cable'), ibF, dev.In, upEffIz(cab, Ca, Cg));
     else findings.push({ scope: name, rule: 'IB \u2264 In \u2264 Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'warning', detail: tx('Kabel eller beskyttelse mangler.', 'Cable or protective device missing.'), recommendation: tx('V\u00E6lg kabel og beskyttelse.', 'Select a cable and a protective device.') });
     if (dev) upCheckIcu(findings, name + ' (' + dev.product.brand + ' ' + dev.product.model + ')', dev, ikBoardA);
-    if (dev) upCheckDisconnection(findings, name, project.earthing, sldCalcNodeZs(tree, fId), dev, fc);
+    if (dev) {
+      var zsEff = sldCalcNodeZs(tree, fId);
+      if (project.earthing === 'TT') zsEff += raAdd; // soil/earth-electrode overlay (TT only)
+      upCheckDisconnection(findings, name, project.earthing, zsEff, dev, fc, vF);
+    }
     if (cab) {
-      const supDrop = upSegmentVdropPct(supCable, (sup.length_m || 0), ibBoard, '3x400', 0.9);
-      const finDrop = upSegmentVdropPct(cab, (fc.length_m || 0), ibF, fc.phases, fc.cosPhi);
+      const supDrop = upSegmentVdropPct(effSupCable || supCable, (sup.length_m || 0), ibBoard, '3x400', 0.9);
+      const finDrop = upSegmentVdropPct(effCab || cab, (fc.length_m || 0), ibF, fc.phases, fc.cosPhi);
       upCheckVdrop(findings, name, supDrop + finDrop);
     }
   });
@@ -20528,6 +20606,455 @@ function upAuditProject(project) {
   }
 
   return { verdict: upComputeVerdict(findings), findings: findings, ikBoardA: ikBoardA };
+}
+
+// ============================================================================
+// ===== MARGIN-TO-DANGER / CLIFF-EDGE + WORST-DAY SIMULATION ("Den Kritiske Hjerne") =====
+// ============================================================================
+// An adversarial robustness layer over the SAME coupled re-run engine
+// (upAuditCore). It NEVER computes a per-verdict "distance" on its own; it
+// applies a realistic perturbation overlay to a CLONE of the project, re-runs
+// the whole-installation audit, and diffs the findings. That is how coupling
+// surfaces: one shared-input change (ambient / grouping / conductor temp /
+// mains voltage / soil) re-runs Iz, Zs and Vdrop together.
+//
+// SCOPE (LOCKED, v1): only the three verdicts that flow through upAuditCore —
+//   1. Overload          IB <= In <= Iz   (DS/HD 60364-4-43 cl. 433.1)
+//   2. Disconnection Zs                    (DS/HD 60364-4-41)
+//   3. Voltage drop      dU <= 4%          (DS/HD 60364-5-52 cl. 525)
+// Arc-flash and selectivity are deliberately OUT of v1 and the UI states so.
+//
+// PUBLISHED PHYSICS (cited in code AND surfaced text):
+//   - Conductor temp coefficient R(theta)=R20*[1+alpha*(theta-20)],
+//     alpha_Cu=0.00393/K, alpha_Al=0.00403/K (IEC 60228 / IEC 60909-0).
+//     XLPE max operating 90 C, PVC 70 C.
+//   - Worst-Day low-voltage override voltageFactor=0.90 (230 V -10%,
+//     CENELEC / EN 50160) — a SCENARIO override, distinct from baseline
+//     UP_CMIN=0.95.
+
+const UP_ALPHA_CU = 0.00393; // /K, copper temperature coefficient (IEC 60228 / 60909-0)
+const UP_ALPHA_AL = 0.00403; // /K, aluminium temperature coefficient (IEC 60228 / 60909-0)
+const UP_WORSTDAY_VF = 0.90; // 230 V -10% scenario override (CENELEC / EN 50160) — NOT the baseline
+const UP_XLPE_MAX_C = 90;    // XLPE max continuous conductor temperature (C)
+const UP_PVC_MAX_C = 70;     // PVC max continuous conductor temperature (C)
+
+// Conductor-temperature resistance multiplier R(theta)/R20.
+function upRMult(material, conductorTempC) {
+  const a = (material === 'Al') ? UP_ALPHA_AL : UP_ALPHA_CU;
+  return 1 + a * ((conductorTempC == null ? 20 : conductorTempC) - 20);
+}
+// Effective ampacity under ambient (Ca) and grouping (Cg) correction.
+// iz_eff = officialIz * Ca * Cg (DS/HD 60364-5-52 Tables B.52.14 / B.52.17).
+function upEffIz(cable, Ca, Cg) {
+  if (!cable) return 0;
+  return officialIz(cable) * (typeof Ca === 'number' ? Ca : 1) * (typeof Cg === 'number' ? Cg : 1);
+}
+// Max realistic conductor temperature for the cable's insulation.
+function upCableMaxTempC(cable) {
+  if (!cable) return UP_PVC_MAX_C;
+  const xlpe = /NOIKLX|NOIKX|NOIK-AL|NOSP/i.test(cable.model || '');
+  return xlpe ? UP_XLPE_MAX_C : UP_PVC_MAX_C;
+}
+
+// Ambient -> Ca, using the published TEMP_FACTORS table; linear interpolation
+// between tabulated points and a clamped linear extrapolation just above the
+// last point (50 C) so the bisection has a continuous, monotonic function.
+function upTempFactor(t) {
+  if (t == null) return 1.0;
+  if (TEMP_FACTORS[t] != null) return TEMP_FACTORS[t];
+  const keys = Object.keys(TEMP_FACTORS).map(Number).sort(function(a, b) { return a - b; });
+  if (t <= keys[0]) return TEMP_FACTORS[keys[0]];
+  if (t >= keys[keys.length - 1]) {
+    const a = keys[keys.length - 2], b = keys[keys.length - 1];
+    const slope = (TEMP_FACTORS[b] - TEMP_FACTORS[a]) / (b - a);
+    return Math.max(0.3, TEMP_FACTORS[b] + slope * (t - b));
+  }
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (t >= keys[i] && t <= keys[i + 1]) {
+      const fa = TEMP_FACTORS[keys[i]], fb = TEMP_FACTORS[keys[i + 1]];
+      return fa + (fb - fa) * (t - keys[i]) / (keys[i + 1] - keys[i]);
+    }
+  }
+  return 1.0;
+}
+// Grouping count -> Cg, using the published GROUP_FACTORS table (interpolated).
+function upGroupFactor(n) {
+  if (n == null) return 1.0;
+  if (GROUP_FACTORS[n] != null) return GROUP_FACTORS[n];
+  const keys = Object.keys(GROUP_FACTORS).map(Number).sort(function(a, b) { return a - b; });
+  if (n <= keys[0]) return GROUP_FACTORS[keys[0]];
+  if (n >= keys[keys.length - 1]) return GROUP_FACTORS[keys[keys.length - 1]];
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (n >= keys[i] && n <= keys[i + 1]) {
+      const fa = GROUP_FACTORS[keys[i]], fb = GROUP_FACTORS[keys[i + 1]];
+      return fa + (fb - fa) * (n - keys[i]) / (keys[i + 1] - keys[i]);
+    }
+  }
+  return 1.0;
+}
+
+// The neutral overlay — reproduces the baseline audit EXACTLY.
+function upNeutralOverlay() { return { Ca: 1.0, Cg: 1.0, conductorTempC: 20, voltageFactor: UP_CMIN, raAdd: 0 }; }
+
+// Deep, side-effect-free copy of a project (structuredClone, JSON fallback).
+function upCloneProject(p) {
+  try { if (typeof structuredClone === 'function') return structuredClone(p); } catch (e) {}
+  return JSON.parse(JSON.stringify(p));
+}
+
+// Resolve a human overlay { ambientC, groupingN, voltageFactor, conductorTempC,
+// soilRho } into the numeric factors upAuditCore consumes. Soil only affects TT
+// (added as an earth-electrode resistance via earthCalcRodResistance); for
+// TN/IT raAdd is ignored inside upAuditCore so it is "not applicable".
+function upResolveOverlay(overlay) {
+  overlay = overlay || {};
+  const ov = upNeutralOverlay();
+  if (overlay.ambientC != null) ov.Ca = upTempFactor(overlay.ambientC);
+  if (overlay.groupingN != null) ov.Cg = upGroupFactor(overlay.groupingN);
+  if (typeof overlay.voltageFactor === 'number') ov.voltageFactor = overlay.voltageFactor;
+  if (typeof overlay.conductorTempC === 'number') ov.conductorTempC = overlay.conductorTempC;
+  if (typeof overlay.soilRho === 'number' && overlay.soilRho > 0) {
+    // Standard 1.5 m / 16 mm earth rod (DS/HD 60364-5-54): Re = rho/(2*pi*L)*ln(4L/d).
+    ov.raAdd = earthCalcRodResistance(overlay.soilRho, 1.5, 0.016);
+  }
+  return ov;
+}
+
+// PUBLIC overlay-aware audit. A neutral/empty overlay is byte-identical to
+// upAuditProject(p). Operates on a CLONE — never mutates the input project,
+// never touches upProject / localStorage / the reactive bus.
+function upAuditWith(p, overlay) {
+  return upAuditCore(upCloneProject(p), upResolveOverlay(overlay));
+}
+
+// Run a full SCENARIO on a clone: a physics overlay plus optional structural
+// length/load multipliers (used by the margin search for the length & load
+// governing inputs). Pure — clone only.
+function upRunScenario(p, scenario) {
+  scenario = scenario || {};
+  const clone = upCloneProject(p);
+  const lm = (typeof scenario.lengthMult === 'number' && scenario.lengthMult > 0) ? scenario.lengthMult : 1;
+  const om = (typeof scenario.loadMult === 'number' && scenario.loadMult > 0) ? scenario.loadMult : 1;
+  if (lm !== 1) {
+    if (clone.supply) clone.supply.length_m = (clone.supply.length_m || 0) * lm;
+    (clone.finals || []).forEach(function(fc) { fc.length_m = (fc.length_m || 0) * lm; });
+  }
+  if (om !== 1) { (clone.finals || []).forEach(function(fc) { fc.loadKW = (fc.loadKW || 0) * om; }); }
+  return upAuditCore(clone, upResolveOverlay(scenario.overlay || {}));
+}
+
+// --- Classify each finding into one of the three in-scope categories ---
+const UP_MARGIN_CATS = ['overload', 'zs', 'vdrop'];
+function upFindingCategory(f) {
+  if (!f) return null;
+  const rule = String(f.rule || ''), clause = String(f.clause || '');
+  if (rule.indexOf('\u0394U') >= 0 || clause.indexOf('cl. 525') >= 0) return 'vdrop';
+  if (rule.indexOf('IB') >= 0 && rule.indexOf('In') >= 0 && rule.indexOf('Iz') >= 0) return 'overload';
+  // Disconnection: any DS/HD 60364-4-41 finding that is about Zs / the RCD / the
+  // TT touch-voltage. The IMD (insulation monitoring) warning also cites 4-41 but
+  // names neither Zs nor an RCD, so it is correctly excluded from this category.
+  if (clause.indexOf('60364-4-41') >= 0 && (rule.indexOf('Zs') >= 0 || /HPFI|RCD|TT/.test(rule))) return 'zs';
+  return null;
+}
+// Aggregate the worst status for a category across an audit's findings.
+// Returns: 'ok' | 'fail' | 'warning'(vdrop only) | 'unresolved' | 'absent'.
+function upCategoryStatus(audit, cat) {
+  let saw = false, fail = false, warn = false, ok = false;
+  (audit.findings || []).forEach(function(f) {
+    if (upFindingCategory(f) !== cat) return;
+    saw = true;
+    if (f.status === 'fail') fail = true;
+    else if (f.status === 'warning') warn = true;
+    else if (f.status === 'ok') ok = true;
+  });
+  if (!saw) return 'absent';
+  if (fail) return 'fail';
+  if (cat === 'vdrop') return warn ? 'warning' : 'ok';
+  // overload / zs: a 'warning' here is a missing-input notice -> unresolved
+  if (warn) return 'unresolved';
+  return ok ? 'ok' : 'unresolved';
+}
+// Has this category crossed the danger edge in the given audit?
+function upCatFlipped(audit, cat) {
+  const s = upCategoryStatus(audit, cat);
+  if (cat === 'vdrop') return s === 'fail' || s === 'warning';
+  return s === 'fail';
+}
+
+// Floor a headroom value TOWARD danger (never overstate remaining margin).
+function upFloorToward(x, step) {
+  step = step || 1;
+  return Math.floor(x / step) * step;
+}
+
+// Monotonic 1-D bisection on a single governing input. `makeScenario(v)` builds
+// the scenario at value v; worse conditions are at `hi`. Returns the threshold
+// value at which `cat` first flips, or null if it never flips within [lo,hi].
+function upBisectFlip(project, cat, lo, hi, makeScenario, iters) {
+  iters = iters || 24;
+  if (upCatFlipped(upRunScenario(project, makeScenario(lo)), cat)) return lo; // already over at the floor
+  if (!upCatFlipped(upRunScenario(project, makeScenario(hi)), cat)) return null; // safe across the whole range
+  let a = lo, b = hi;
+  for (let i = 0; i < iters; i++) {
+    const m = (a + b) / 2;
+    if (upCatFlipped(upRunScenario(project, makeScenario(m)), cat)) b = m; else a = m;
+  }
+  return b; // smallest value (within tolerance) that flips
+}
+// Discrete scan over integer grouping counts until the category flips.
+function upScanGrouping(project, cat, maxN) {
+  maxN = maxN || 9;
+  for (let n = 2; n <= maxN; n++) {
+    if (upCatFlipped(upRunScenario(project, { overlay: { groupingN: n } }), cat)) return n;
+  }
+  return null;
+}
+
+// --- The governing-input axes per category (each names its DS/HD clause) ---
+function upMarginAxes(project, cat) {
+  const axes = [];
+  // shared bound: max conductor temp across the project's cables
+  let maxTemp = UP_XLPE_MAX_C;
+  (project.finals || []).forEach(function(fc) { const c = fc.cableId ? upCableProduct(fc.cableId) : null; if (c) maxTemp = Math.min(maxTemp, upCableMaxTempC(c)); });
+  const maxLenMult = 8; // up to x8 length (covers UP_LENGTH_PRESETS 25 -> 200 m)
+
+  if (cat === 'overload') {
+    axes.push({ key: 'ambient', unit: '\u00B0C', base: 30, range: 25, step: 1,
+      labelDa: 'H\u00E6v omgivelsestemperatur', labelEn: 'Raise ambient temperature', clause: 'DS/HD 60364-5-52 Table B.52.14',
+      threshold: upBisectFlip(project, cat, 30, 55, function(v) { return { overlay: { ambientC: v } }; }) });
+    const gN = upScanGrouping(project, cat, 9);
+    axes.push({ key: 'grouping', unit: '', base: 1, range: 8, step: 1, discrete: true,
+      labelDa: 'Kabelgruppering', labelEn: 'Cable grouping', clause: 'DS/HD 60364-5-52 Table B.52.17',
+      threshold: gN });
+  } else if (cat === 'zs') {
+    axes.push({ key: 'conductorTemp', unit: '\u00B0C', base: 20, range: (maxTemp - 20), step: 1,
+      labelDa: 'Leder ved maks. driftstemperatur', labelEn: 'Conductor at max operating temperature', clause: 'IEC 60228 / IEC 60909-0',
+      threshold: upBisectFlip(project, cat, 20, maxTemp, function(v) { return { overlay: { conductorTempC: v } }; }) });
+    axes.push({ key: 'length', unit: '\u00D7', base: 1, range: (maxLenMult - 1), step: 0.1,
+      labelDa: 'L\u00E6ngere f\u00F8ringsvej', labelEn: 'Longer cable run', clause: 'DS/HD 60364-4-41',
+      threshold: upBisectFlip(project, cat, 1, maxLenMult, function(v) { return { lengthMult: v }; }) });
+    axes.push({ key: 'voltage', unit: '', base: 0.95, range: 0.05, step: 0.01, descending: true,
+      labelDa: 'Net p\u00E5 nedre gr\u00E6nse (\u221210%)', labelEn: 'Mains at lower limit (\u221210%)', clause: 'CENELEC / EN 50160',
+      threshold: upBisectFlip(project, cat, 0.95, 0.90, function(v) { return { overlay: { voltageFactor: v } }; }) });
+  } else if (cat === 'vdrop') {
+    axes.push({ key: 'conductorTemp', unit: '\u00B0C', base: 20, range: (maxTemp - 20), step: 1,
+      labelDa: 'Leder ved maks. driftstemperatur', labelEn: 'Conductor at max operating temperature', clause: 'IEC 60228 / IEC 60909-0',
+      threshold: upBisectFlip(project, cat, 20, maxTemp, function(v) { return { overlay: { conductorTempC: v } }; }) });
+    axes.push({ key: 'load', unit: '\u00D7', base: 1, range: 3, step: 0.05,
+      labelDa: 'H\u00F8jere belastning', labelEn: 'Higher load', clause: 'DS/HD 60364-5-52 cl. 525',
+      threshold: upBisectFlip(project, cat, 1, 4, function(v) { return { loadMult: v }; }) });
+    axes.push({ key: 'length', unit: '\u00D7', base: 1, range: (maxLenMult - 1), step: 0.1,
+      labelDa: 'L\u00E6ngere f\u00F8ringsvej', labelEn: 'Longer cable run', clause: 'DS/HD 60364-5-52 cl. 525',
+      threshold: upBisectFlip(project, cat, 1, maxLenMult, function(v) { return { lengthMult: v }; }) });
+  }
+  return axes;
+}
+
+// Build the margin report for one category. Conservative: rounds the headroom
+// TOWARD danger for DISPLAY (raw value retained for exact comparisons).
+function upCategoryMargin(project, cat) {
+  const baseStatus = upCategoryStatus(upAuditProject(project), cat);
+  if (baseStatus === 'fail' || (cat === 'vdrop' && baseStatus === 'warning')) {
+    return { cat: cat, state: 'over-edge', axes: [], nearest: null };
+  }
+  if (baseStatus === 'absent' || baseStatus === 'unresolved') {
+    return { cat: cat, state: 'unresolved', axes: [], nearest: null };
+  }
+  const axes = upMarginAxes(project, cat).map(function(ax) {
+    if (ax.threshold == null) return { key: ax.key, labelDa: ax.labelDa, labelEn: ax.labelEn, unit: ax.unit, clause: ax.clause, flips: false, raw: null, disp: null, norm: Infinity };
+    let raw, disp, norm;
+    if (ax.descending) {
+      raw = ax.base - ax.threshold;            // e.g. 0.95 -> 0.91 => 0.04 drop
+      disp = upFloorToward(raw, ax.step);
+      norm = raw / ax.range;
+    } else if (ax.discrete) {
+      raw = ax.threshold - ax.base;            // extra circuits before flip
+      disp = raw;
+      norm = raw / ax.range;
+    } else if (ax.key === 'length' || ax.key === 'load') {
+      raw = ax.threshold - ax.base;            // extra multiplier
+      disp = upFloorToward(raw, ax.step);
+      norm = raw / ax.range;
+    } else {
+      raw = ax.threshold - ax.base;            // e.g. +12.3 C ambient
+      disp = upFloorToward(raw, ax.step);
+      norm = raw / ax.range;
+    }
+    return { key: ax.key, labelDa: ax.labelDa, labelEn: ax.labelEn, unit: ax.unit, clause: ax.clause, flips: true, raw: raw, disp: disp, norm: norm };
+  });
+  let nearest = null;
+  axes.forEach(function(a) { if (a.flips && (!nearest || a.norm < nearest.norm)) nearest = a; });
+  return { cat: cat, state: 'ok', axes: axes, nearest: nearest };
+}
+
+// Full margin-to-danger report across the three in-scope verdicts. PURE.
+function upMarginToDanger(project) {
+  const out = { earthing: project ? project.earthing : null, cats: {} };
+  UP_MARGIN_CATS.forEach(function(cat) { out.cats[cat] = upCategoryMargin(project, cat); });
+  return out;
+}
+
+// --- Worst-Day stacked scenario (the published one-click worst case) ---
+function upWorstDayDefault() {
+  return { ambientC: 40, groupingN: 4, voltageFactor: UP_WORSTDAY_VF, conductorTempC: 90, soilRho: 1000 };
+}
+const UP_WD_AMBIENT_PRESETS = [40, 45, 50, 55];
+const UP_WD_GROUPING_PRESETS = [2, 3, 4, 6];
+const UP_WD_VOLTAGE_PRESETS = [0.95, 0.92, 0.90];
+const UP_WD_TEMP_PRESETS = [20, 70, 90];
+
+// Re-run the WHOLE installation under a stacked worst case and report which
+// currently-green verdicts turn red. PURE (clone only). Matches findings by
+// scope+rule between the baseline and the worst-day audit.
+function upWorstDay(project, intensity) {
+  intensity = intensity || upWorstDayDefault();
+  const base = upAuditProject(project);
+  const worst = upAuditWith(project, intensity);
+  const key = function(f) { return String(f.scope) + '||' + String(f.rule); };
+  const worstByKey = {};
+  worst.findings.forEach(function(f) { worstByKey[key(f)] = f; });
+  const flips = [];
+  base.findings.forEach(function(bf) {
+    const cat = upFindingCategory(bf);
+    if (!cat) return;                     // only the three in-scope verdicts
+    if (bf.status !== 'ok') return;       // only currently-green verdicts
+    const wf = worstByKey[key(bf)];
+    if (!wf) return;
+    const turnedRed = (cat === 'vdrop') ? (wf.status === 'fail' || wf.status === 'warning') : (wf.status === 'fail');
+    if (turnedRed) flips.push({ scope: bf.scope, rule: bf.rule, clause: wf.clause, category: cat, before: bf, after: wf });
+  });
+  const greenCount = base.findings.filter(function(f) { return upFindingCategory(f) && f.status === 'ok'; }).length;
+  return {
+    intensity: intensity, flippedCount: flips.length, flips: flips,
+    greenCount: greenCount,
+    verdictBefore: base.verdict, verdictAfter: worst.verdict,
+    baseAudit: base, worstAudit: worst,
+    testable: greenCount > 0
+  };
+}
+
+// ============================================================================
+// ===== MARGIN / WORST-DAY UI (click-only: buttons + upSelect dropdowns) =====
+// ============================================================================
+// Handlers operate ONLY on upAuditState (UI state) + render. They NEVER mutate
+// upProject, never call upSaveProject / Reactive.notify / localStorage, so the
+// adversarial search stays pure and is triggered only by an explicit click.
+function upWdIntensity() { if (!upAuditState.wd) upAuditState.wd = upWorstDayDefault(); return upAuditState.wd; }
+function upToggleMargins() {
+  upAuditState.showMargins = !upAuditState.showMargins;
+  upAuditState.margins = upAuditState.showMargins ? upMarginToDanger(upProject) : null;
+  renderModule('kritisk');
+}
+function upRunWorstDay() { upAuditState.worstDay = upWorstDay(upProject, upWdIntensity()); renderModule('kritisk'); }
+function upSetWdAmbient(v) { upWdIntensity().ambientC = Number(v); if (upAuditState.worstDay) upAuditState.worstDay = upWorstDay(upProject, upAuditState.wd); renderModule('kritisk'); }
+function upSetWdGrouping(v) { upWdIntensity().groupingN = Number(v); if (upAuditState.worstDay) upAuditState.worstDay = upWorstDay(upProject, upAuditState.wd); renderModule('kritisk'); }
+function upSetWdVoltage(v) { upWdIntensity().voltageFactor = Number(v); if (upAuditState.worstDay) upAuditState.worstDay = upWorstDay(upProject, upAuditState.wd); renderModule('kritisk'); }
+function upSetWdTemp(v) { upWdIntensity().conductorTempC = Number(v); if (upAuditState.worstDay) upAuditState.worstDay = upWorstDay(upProject, upAuditState.wd); renderModule('kritisk'); }
+function upSetWdSoil(v) { upWdIntensity().soilRho = (v === '' || v == null) ? null : Number(v); if (upAuditState.worstDay) upAuditState.worstDay = upWorstDay(upProject, upAuditState.wd); renderModule('kritisk'); }
+
+// Human-readable category name (trilingual).
+function upCatName(cat) {
+  if (cat === 'overload') return tx('Overbelastning', 'Overload');
+  if (cat === 'zs') return tx('Udkobling (Zs)', 'Disconnection (Zs)');
+  if (cat === 'vdrop') return tx('Sp\u00E6ndingsfald', 'Voltage drop');
+  return cat;
+}
+// Format one axis margin (number kept OUT of the tx fragment).
+function upFmtAxis(ax) {
+  const label = tx(ax.labelDa, ax.labelEn);
+  let val;
+  if (ax.key === 'ambient' || ax.key === 'conductorTemp') val = '+' + ax.disp + ' \u00B0C';
+  else if (ax.key === 'grouping') val = '+' + ax.disp + ' ' + tx('kredse', 'circuits');
+  else if (ax.key === 'voltage') val = '\u2212' + ax.disp.toFixed(2) + ' ' + tx('sp\u00E6ndingsfaktor', 'voltage factor');
+  else if (ax.key === 'length' || ax.key === 'load') val = '\u00D7' + (ax.base + ax.disp).toFixed(1);
+  else val = String(ax.disp);
+  return { label: label, val: val, clause: ax.clause };
+}
+
+// Render the Margin-to-Danger / Cliff-Edge block.
+function upRenderMargins(margins) {
+  if (!margins) return '';
+  let h = '<div class="result-box" style="margin-top:12px;border-left:6px solid var(--primary)">';
+  h += '<div class="result-title">\uD83D\uDCCF ' + tx('Margin til faren', 'Margin to danger') + '</div>';
+  h += '<div class="info-row" style="font-size:0.78rem">' + tx(
+    'Hvor meget headroom er der f\u00F8r hver af de tre koblede sikkerhedskonklusioner vipper OK\u2192FEJL? Afrundet mod faren (aldrig overvurderet).',
+    'How much headroom remains before each of the three coupled safety verdicts tips OK\u2192FAIL? Rounded toward danger (never overstated).') + '</div>';
+  UP_MARGIN_CATS.forEach(function(cat) {
+    const c = margins.cats[cat];
+    h += '<div class="result-row" style="flex-direction:column;align-items:flex-start;gap:2px;border-top:1px solid var(--border);padding-top:6px">';
+    h += '<span class="label"><strong>' + upCatName(cat) + '</strong></span>';
+    if (c.state === 'over-edge') {
+      h += '<span style="font-size:0.8rem;color:var(--danger)">\u26D4 ' + tx('Allerede over kanten', 'Already over the edge') + '</span>';
+    } else if (c.state === 'unresolved') {
+      h += '<span style="font-size:0.8rem;color:var(--text-muted)">' + tx('Kan ikke beregne margin \u2014 v\u00E6lg transformer, kabel og apparat', 'Cannot compute margin \u2014 select a transformer, cable and device') + '</span>';
+    } else {
+      c.axes.forEach(function(ax) {
+        if (cat === 'zs' && ax.key === 'voltage' && margins.earthing === 'TT') return; // voltage handled; soil note below
+        if (!ax.flips) {
+          h += '<span style="font-size:0.76rem;color:var(--text-muted)">' + tx(ax.labelDa, ax.labelEn) + ': ' + tx('ingen flip inden for realistisk r\u00E6kkevidde', 'no flip within realistic range') + '</span>';
+          return;
+        }
+        const f = upFmtAxis(ax);
+        const isNear = c.nearest && c.nearest.key === ax.key;
+        h += '<span style="font-size:0.78rem' + (isNear ? ';color:var(--danger);font-weight:600' : '') + '">' + (isNear ? '\u26A0\uFE0F ' + tx('N\u00E6rmeste kant', 'Nearest cliff edge') + ': ' : '') + f.label + ' ' + f.val + ' <span style="color:var(--text-muted)">(' + f.clause + ')</span></span>';
+      });
+      // Soil/earth perturbation note: only meaningful for TT.
+      if (cat === 'zs') {
+        if (margins.earthing === 'TT') h += '<span style="font-size:0.74rem;color:var(--text-muted)">' + tx('T\u00F8r jord (h\u00F8j jordmodstand)', 'Dry soil (high earth resistance)') + ' \u2014 DS/HD 60364-5-54</span>';
+        else h += '<span style="font-size:0.74rem;color:var(--text-muted)">' + tx('Jordbund', 'Soil') + ': ' + tx('ikke relevant (kun TT)', 'not applicable (TT only)') + '</span>';
+      }
+    }
+    h += '</div>';
+  });
+  h += '<div class="info-row" style="margin-top:8px;font-size:0.72rem">' + tx('Lysbue og selektivitet indg\u00E5r ikke i denne analyse', 'Arc-flash and selectivity are not included in this analysis') + '.</div>';
+  h += '</div>';
+  return h;
+}
+
+// Render the Worst-Day scenario controls + before/after result.
+function upRenderWorstDay() {
+  const wd = upWdIntensity();
+  let h = '<div class="result-box" style="margin-top:12px;border-left:6px solid #b8860b">';
+  h += '<div class="result-title">\uD83C\uDF29\uFE0F ' + tx('Worst-Day simulering', 'Worst-Day simulation') + '</div>';
+  h += '<div class="info-row" style="font-size:0.78rem">' + tx(
+    'K\u00F8rer hele installationen igen under et realistisk dansk stablet worst case. Dette er en scenarie-override, ikke baseline.',
+    'Re-runs the whole installation under a realistic stacked Danish worst case. This is a scenario override, not the baseline.') + '</div>';
+  // Scenario intensity (preset dropdowns only — defaulted to the published worst case => one click)
+  h += '<div class="select-group"><div class="select-label">' + tx('Omgivelsestemperatur', 'Ambient temperature') + ' (\u00B0C)</div>';
+  h += upSelect('upSetWdAmbient(this.value)', wd.ambientC, upPresetOpts(UP_WD_AMBIENT_PRESETS, ' \u00B0C'), '\u2014') + '</div>';
+  h += '<div class="select-group"><div class="select-label">' + tx('Kabelgruppering', 'Cable grouping') + '</div>';
+  h += upSelect('upSetWdGrouping(this.value)', wd.groupingN, upPresetOpts(UP_WD_GROUPING_PRESETS, ''), '\u2014') + '</div>';
+  h += '<div class="select-group"><div class="select-label">' + tx('Netsp\u00E6ndingsfaktor', 'Mains voltage factor') + ' (' + tx('scenarie-override, ikke baseline', 'scenario override, not the baseline') + ')</div>';
+  h += upSelect('upSetWdVoltage(this.value)', wd.voltageFactor, upPresetOpts(UP_WD_VOLTAGE_PRESETS, ''), '\u2014') + '</div>';
+  h += '<div class="select-group"><div class="select-label">' + tx('Ledertemperatur', 'Conductor temperature') + ' (\u00B0C)</div>';
+  h += upSelect('upSetWdTemp(this.value)', wd.conductorTempC, upPresetOpts(UP_WD_TEMP_PRESETS, ' \u00B0C'), '\u2014') + '</div>';
+  h += '<div class="select-group"><div class="select-label">' + tx('Jordmodstand (kun TT)', 'Soil resistivity (TT only)') + '</div>';
+  h += upSelect('upSetWdSoil(this.value)', (wd.soilRho == null ? '' : wd.soilRho), EARTH_SOILS.map(function(s) { return { value: s.value, label: s.value + ' \u03A9\u00B7m' }; }), tx('ikke relevant', 'not applicable')) + '</div>';
+  h += '<div class="select-grid"><button class="sel-btn selected" onclick="upRunWorstDay()">\uD83C\uDF29\uFE0F ' + tx('K\u00F8r Worst-Day', 'Run Worst-Day') + '</button></div>';
+
+  const r = upAuditState.worstDay;
+  if (r) {
+    if (!r.testable) {
+      h += '<div class="info-row" style="margin-top:10px">' + tx('Ingen gr\u00F8nne konklusioner at teste', 'No green verdicts to test') + '.</div>';
+    } else {
+      const color = r.flippedCount > 0 ? 'var(--danger)' : 'var(--success)';
+      // one-liner — number kept OUT of the tx fragment so every _FA fragment resolves
+      h += '<div class="result-title" style="margin-top:10px;color:' + color + '">' + tx('Worst-Day', 'Worst-Day') + ': ' + r.flippedCount + ' ' + tx('aktuelt gr\u00F8nne konklusioner bliver r\u00F8de', 'currently-green verdicts turn red') + '</div>';
+      if (r.flippedCount === 0) {
+        h += '<div class="info-row">' + tx('Ingen \u00E6ndring \u2014 alle konklusioner holder', 'No change \u2014 all verdicts hold') + '.</div>';
+      }
+      r.flips.forEach(function(fl) {
+        h += '<div class="result-row" style="flex-direction:column;align-items:flex-start;gap:2px;border-top:1px solid var(--border);padding-top:6px">';
+        h += '<span class="label"><strong>' + fl.scope + '</strong> \u2014 ' + fl.rule + '</span>';
+        h += '<span style="font-size:0.76rem">' + tx('f\u00F8r', 'before') + ': ' + fl.before.detail + '</span>';
+        h += '<span style="font-size:0.76rem;color:var(--danger)">' + tx('efter', 'after') + ': ' + fl.after.detail + '</span>';
+        h += '<span style="font-size:0.72rem;color:var(--text-muted)">' + fl.clause + '</span>';
+      });
+    }
+    h += '<div class="info-row" style="margin-top:8px;font-size:0.72rem">' + tx('Lysbue og selektivitet indg\u00E5r ikke i denne analyse', 'Arc-flash and selectivity are not included in this analysis') + '.</div>';
+  }
+  h += '</div>';
+  return h;
 }
 
 function upVerdictMeta(v) {
@@ -20638,8 +21165,11 @@ function renderKritisk() {
   h += '<div class="info-row">' + tx(
     'Konservativ kontrol af hele projektet: derateret Iz, IEC 60909 c-faktorer, Cmin p\u00E5 U0/U, og runder mod faren. Hver konklusion citerer den pr\u00E6cise DS/HD 60364-bestemmelse. Kilde: ' + UP_SAFETY_REF + '.',
     'Conservative sweep of the whole project: derated Iz, IEC 60909 c-factors, Cmin on U0/U, rounding toward danger. Every finding cites the exact DS/HD 60364 clause. Source: ' + UP_SAFETY_REF + '.') + '</div>';
-  h += '<div class="select-grid"><button class="sel-btn selected" onclick="upRunAudit()">\uD83E\uDDE0 ' + tx('K\u00F8r Den Kritiske Hjerne', 'Run the Critical Mind') + '</button></div>';
+  h += '<div class="select-grid"><button class="sel-btn selected" onclick="upRunAudit()">\uD83E\uDDE0 ' + tx('K\u00F8r Den Kritiske Hjerne', 'Run the Critical Mind') + '</button>';
+  h += '<button class="sel-btn ' + (upAuditState.showMargins ? 'selected' : '') + '" onclick="upToggleMargins()">\uD83D\uDCCF ' + (upAuditState.showMargins ? tx('Skjul marginer', 'Hide margins') : tx('Vis marginer', 'Show margins')) + '</button></div>';
   if (upAuditState.lastAudit) h += upRenderAudit(upAuditState.lastAudit);
+  if (upAuditState.showMargins) h += upRenderMargins(upAuditState.margins);
+  h += upRenderWorstDay();
   h += '</div>';
   return h;
 }
