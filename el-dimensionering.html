@@ -1492,6 +1492,10 @@ const _FA = {
   'Spec': '\u0645\u0634\u062E\u0635\u0627\u062A',
   'Approval': '\u062A\u0623\u06CC\u06CC\u062F',
   'Qty': '\u062A\u0639\u062F\u0627\u062F',
+  // Project module — supply-side (elforsyning) materials integration (this feature)
+  'Supply-side materials (elforsyning)': '\u0645\u0648\u0627\u062F \u0633\u0645\u062A \u062A\u0623\u0645\u06CC\u0646 (\u062A\u0623\u0645\u06CC\u0646 \u0628\u0631\u0642)',
+  'The picked elforsyning bill of materials is shown here so you see the real component when ordering. Click a link to open the manufacturer official product or datasheet page.': '\u0641\u0647\u0631\u0633\u062A \u0645\u0648\u0627\u062F \u062A\u0623\u0645\u06CC\u0646 \u0628\u0631\u0642 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u062F\u0631 \u0627\u06CC\u0646\u062C\u0627 \u0646\u0645\u0627\u06CC\u0634 \u062F\u0627\u062F\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F \u062A\u0627 \u0647\u0646\u06AF\u0627\u0645 \u0633\u0641\u0627\u0631\u0634 \u0642\u0637\u0639\u0647 \u0648\u0627\u0642\u0639\u06CC \u0631\u0627 \u0628\u0628\u06CC\u0646\u06CC\u062F. \u0631\u0648\u06CC \u067E\u06CC\u0648\u0646\u062F \u06A9\u0644\u06CC\u06A9 \u06A9\u0646\u06CC\u062F \u062A\u0627 \u0635\u0641\u062D\u0647 \u0631\u0633\u0645\u06CC \u0645\u062D\u0635\u0648\u0644 \u06CC\u0627 \u0628\u0631\u06AF\u0647 \u062F\u0627\u062F\u0647 \u0633\u0627\u0632\u0646\u062F\u0647 \u0628\u0627\u0632 \u0634\u0648\u062F.',
+  'No elforsyning materials picked yet. Add the real supply-side components so they appear on your order.': '\u0647\u0646\u0648\u0632 \u0647\u06CC\u0686 \u0645\u0627\u062F\u0647 \u062A\u0623\u0645\u06CC\u0646 \u0628\u0631\u0642\u06CC \u0627\u0646\u062A\u062E\u0627\u0628 \u0646\u0634\u062F\u0647 \u0627\u0633\u062A. \u0642\u0637\u0639\u0627\u062A \u0648\u0627\u0642\u0639\u06CC \u0633\u0645\u062A \u062A\u0623\u0645\u06CC\u0646 \u0631\u0627 \u0627\u0636\u0627\u0641\u0647 \u06A9\u0646\u06CC\u062F \u062A\u0627 \u062F\u0631 \u0633\u0641\u0627\u0631\u0634 \u0634\u0645\u0627 \u0638\u0627\u0647\u0631 \u0634\u0648\u0646\u062F.',
   'Total line items': '\u0645\u062C\u0645\u0648\u0639 \u0627\u0642\u0644\u0627\u0645',
   'The list is empty.': '\u0641\u0647\u0631\u0633\u062A \u062E\u0627\u0644\u06CC \u0627\u0633\u062A.',
   'Generated': '\u062A\u0648\u0644\u06CC\u062F\u200C\u0634\u062F\u0647',
@@ -9117,6 +9121,78 @@ function projectImport(input){
   const r = new FileReader(); r.onload = e => { try { projectState = JSON.parse(e.target.result); saveProject(); renderModule('projekt'); } catch(err){ alert('Import fejl: '+err.message); } }; r.readAsText(f);
 }
 
+// Pick-all entry point used from the Project module. Identical population logic to
+// elforsyningPickAll() but re-renders the Project view instead of the Component Bank,
+// so the user stays where they are. Click-only — never a typed prompt.
+function projektPickElforsyning() {
+  ELFORSYNING_CATEGORIES.forEach(function(cat) {
+    (PRODUCTS[cat] || []).forEach(function(p) {
+      if (!elforsyningBom[p.id]) elforsyningBom[p.id] = { category: cat, qty: 1 };
+    });
+  });
+  elforsyningSaveBom();
+  if (typeof renderModule === 'function') renderModule('projekt');
+}
+
+// Supply-side (elforsyning) materials section for the Project module. Surfaces the
+// picked elforsyning BOM read-only so the user sees the REAL component when ordering:
+// brand, model/spec, applicable standard, CE/approval, quantity, and the official
+// manufacturer product + datasheet DEEP-LINKS (no embedded photos). Grouped by the 8
+// supply-side categories with per-category and grand-total counts, consistent with
+// renderElforsyningBom(). Prints with the load schedule (the materials list is NOT
+// no-print); only the click-only action buttons are hidden from print.
+function renderProjektElforsyning() {
+  const lines = elforsyningBomLines();
+  const total = elforsyningTotalCount();
+  let h = '<div class="card fade-in">';
+  h += '<div class="card-title">\uD83D\uDD0C ' + tx('Forsyningsmaterialer (elforsyning)', 'Supply-side materials (elforsyning)') + '</div>';
+  h += '<div class="info-row">' + tx(
+    'Den valgte elforsyningsstykliste vises her, s\u00E5 du ser den reelle komponent ved bestilling. Klik p\u00E5 et link for at \u00E5bne producentens officielle produkt- eller databladsside.',
+    'The picked elforsyning bill of materials is shown here so you see the real component when ordering. Click a link to open the manufacturer official product or datasheet page.') + '</div>';
+
+  if (!lines.length) {
+    h += '<div class="result-box"><div class="result-row"><span class="label">'
+      + tx('Ingen elforsyningsmaterialer valgt endnu. Tilf\u00F8j de reelle forsyningskomponenter, s\u00E5 de fremg\u00E5r af din bestilling.',
+           'No elforsyning materials picked yet. Add the real supply-side components so they appear on your order.')
+      + '</span></div></div>';
+    h += '<div class="select-grid no-print" style="margin-top:8px"><button class="sel-btn selected" onclick="projektPickElforsyning()">\u2795 '
+      + tx('V\u00E6lg alle elforsyningsmaterialer', 'Pick all elforsyning materials') + '</button></div>';
+    h += '</div>';
+    return h;
+  }
+
+  // Grouped read-only listing by the 8 supply-side categories.
+  ELFORSYNING_CATEGORIES.forEach(function(cat) {
+    const catLines = lines.filter(function(l) { return l.category === cat; });
+    if (!catLines.length) return;
+    h += '<div class="result-box" style="margin-top:10px">';
+    h += '<div class="result-title">' + elforsyningCatLabel(cat) + ' (' + elforsyningCategoryCount(cat) + ')</div>';
+    catLines.forEach(function(l) {
+      const p = l.product;
+      h += '<div class="result-row" style="align-items:center;gap:8px;flex-wrap:wrap">';
+      h += '<div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:2px">';
+      h += '<span class="label"><strong>' + p.brand + '</strong> ' + p.model + '</span>';
+      h += '<span style="font-size:0.75rem;color:var(--text-muted)">' + bankSpec(cat, p)
+        + ' \u00B7 ' + tx('Standard', 'Standard') + ': ' + elforsyningStandard(p)
+        + ' \u00B7 ' + elforsyningApproval(p) + '</span>';
+      h += renderProductLinks(p);
+      h += '</div>';
+      h += '<span class="value" style="white-space:nowrap">' + tx('Antal', 'Qty') + ': <strong>' + l.qty + '</strong></span>';
+      h += '</div>';
+    });
+    h += '</div>';
+  });
+
+  h += '<div class="result-box" style="margin-top:10px"><div class="result-row">'
+    + '<span class="label"><strong>' + tx('I alt (alle kategorier)', 'Grand total (all categories)') + '</strong></span>'
+    + '<span class="value"><strong>' + total + '</strong></span></div></div>';
+  // Click-only top-up action, hidden from the printed schedule.
+  h += '<div class="select-grid no-print" style="margin-top:8px"><button class="sel-btn" onclick="projektPickElforsyning()">\u2795 '
+    + tx('V\u00E6lg alle elforsyningsmaterialer', 'Pick all elforsyning materials') + '</button></div>';
+  h += '</div>';
+  return h;
+}
+
 function renderProjekt() {
   // Phase balancing for belastningsskema
   const phases = { L1:0, L2:0, L3:0 };
@@ -9172,7 +9248,9 @@ function renderProjekt() {
         })()}
       </div>
       ` : '<div class="info-row">' + (tx('Ingen grupper endnu. G\u00E5 til "Belastning", dimensionér, og klik "Tilf\u00F8j aktuel gruppe".', 'No circuits yet. Go to "Load", dimension, and click "Add current circuit".')) + '</div>'}
-    </div>`;
+    </div>
+
+    ${renderProjektElforsyning()}`;
 }
 
 // ===== VERIFY / SELF-TEST MODULE (bulletproof) =====
