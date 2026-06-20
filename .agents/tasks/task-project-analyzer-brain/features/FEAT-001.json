@@ -1,0 +1,41 @@
+{
+  "id": "FEAT-001",
+  "type": "feature",
+  "description": "Project Analyzer module: deterministic offline parser for exam/project descriptions with auto-solving via existing calc engine functions and calcDetail() output.",
+  "status": "in_progress",
+  "steps": [
+    "Add 'analyzer' module key to NAV_GROUPS (start group), translations (DA/EN/FA), and renderModule switch",
+    "Create analyzerState and renderAnalyzer() function with file upload (.txt/.md) and paste textarea",
+    "Implement analyzerParseText() for text normalization (strip page numbers, headers, encoding)",
+    "Implement analyzerSegment() to split text by Opgave/sub-task structure",
+    "Implement analyzerExtract() with regex entity extraction for loads, cables, devices, transformer, earthing, temperatures, grouping",
+    "Implement analyzerMapQuestions() to detect question types and map to calc functions",
+    "Implement analyzerSolve() to auto-solve using engine functions (calcIB, officialIz, etc.)",
+    "Render results using calcDetail() for full exam-quality worked solutions",
+    "Implement safety gating: flag unparseable values with click-only confirmation chips",
+    "Implement completeness score tracking (solved vs needs-input)",
+    "Add tests verifying parser, extraction, question mapping, and solving"
+  ],
+  "acceptance_criteria": [
+    "Module registered as 'analyzer' in start nav group",
+    "File upload (.txt/.md) works via click-only file picker",
+    "Paste textarea available (the ONE exception to zero-typing rule)",
+    "Parser correctly normalizes text and segments by Opgave",
+    "Regex extraction handles Danish exam phrasing patterns",
+    "Questions are mapped to correct calc functions",
+    "Auto-solve produces correct results using existing engine",
+    "Results rendered with calcDetail() showing full formula/substitution/steps",
+    "Safety gating: unparseable values flagged, not guessed",
+    "Completeness score shown",
+    "All existing 1032 tests still pass",
+    "New tests verify parser end-to-end with synthetic exam snippets",
+    "Trilingual support maintained"
+  ],
+  "verification": [
+    "node test-sld.js passes with 0 failures",
+    "Analyzer module renders correctly",
+    "Parser tests exercise 2-3 synthetic exam snippets end-to-end"
+  ],
+  "blocked_reason": null,
+  "findings": null
+}

@@ -1,0 +1,7 @@
+{
+  "task_id": "task-project-analyzer-brain",
+  "task_description": "Create a Project Analyzer module that parses uploaded/pasted exam descriptions, extracts electrical parameters via regex, maps questions to existing calc functions, auto-solves them, and renders results with calcDetail() for full worked solutions.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null
+}

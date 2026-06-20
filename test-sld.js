@@ -7947,7 +7947,8 @@ test('Reactive: click-only preserved — feature adds no text/number inputs or t
   assert.strictEqual(numberInputs, 0, 'no number inputs may exist (click-only)');
   // Baseline pre-existing AI-assistant controls only (1 search box, 1 question box).
   assert(textInputs <= 1, 'no NEW text inputs introduced by the reactive feature (found ' + textInputs + ')');
-  assert(textareas <= 1, 'no NEW textareas introduced by the reactive feature (found ' + textareas + ')');
+  // Baseline: 1 (AI assistant) + 1 (project analyzer paste — user explicitly requested exception)
+  assert(textareas <= 2, 'no NEW textareas beyond AI + analyzer (found ' + textareas + ')');
 });
 
 test('Reactive: orchestration only — core calc functions are untouched and still callable', function() {
@@ -8482,7 +8483,7 @@ test('Smoothness: click-only preserved — no new typed inputs introduced by the
   const countTextarea = (html.match(/<textarea/g) || []).length;
   assert.strictEqual(countText, 0, 'still zero text inputs');
   assert.strictEqual(countNum, 0, 'still zero number inputs');
-  assert(countTextarea <= 2, 'no new <textarea> added by this pass (baseline 2: the AI question box + a comment, got ' + countTextarea + ')');
+  assert(countTextarea <= 3, 'no new <textarea> added by this pass (baseline 2: AI question box + comment + 1 project analyzer paste, got ' + countTextarea + ')');
   const realGet = document.getElementById;
   const panel = { innerHTML: '' };
   document.getElementById = function (id) {
@@ -9845,6 +9846,254 @@ test('calcDetail GUARD: core calc math unchanged (officialIz + IB regression)', 
   assert.strictEqual(officialIz(cu25), 23, 'officialIz(Cu 2.5mm2 PVC) == 23A unchanged');
   var ib1 = sldCalcNodeIB({ type: 'final_circuit', power_kW: 3.68, cosPhi: 0.95, phases: '1x230', voltage: 230 });
   assert(Math.abs(ib1 - 16.84) < 0.05, 'IB regression ~16.84A unchanged after calcDetail integration');
+});
+
+// ============================================================================
+// ===== PROJECT ANALYZER TESTS =====
+// ============================================================================
+
+test('Analyzer: analyzerNormalize strips page numbers and headers', function() {
+  var input = 'Side 3 af 12\nAutorisationsprove 2019\nHello world\n\n\n\nEnd';
+  var result = analyzerNormalize(input);
+  assert(result.indexOf('Side 3 af 12') < 0, 'page number stripped');
+  assert(result.indexOf('Hello world') >= 0, 'content preserved');
+  assert(result.indexOf('\n\n\n') < 0, 'multiple blank lines collapsed');
+});
+
+test('Analyzer: analyzerSegment splits by Opgave', function() {
+  var text = 'Opgave 1 Transformer\nData her\nOpgave 2 Kabler\nMere data';
+  var segs = analyzerSegment(text);
+  assert(segs.length >= 2, 'at least 2 segments (got ' + segs.length + ')');
+  assert.strictEqual(segs[0].id, 1, 'first segment is Opgave 1');
+  assert.strictEqual(segs[1].id, 2, 'second segment is Opgave 2');
+});
+
+test('Analyzer: analyzerSegment handles no-Opgave text', function() {
+  var segs = analyzerSegment('Simple description without Opgave headers');
+  assert(segs.length >= 1, 'returns at least 1 segment');
+});
+
+test('Analyzer: analyzerExtract finds power', function() {
+  var data = analyzerExtract('Belastning: 37 kW, 400 V, 3-faset');
+  assert.strictEqual(data.power_kW, 37, 'power extracted');
+  assert.strictEqual(data.voltage, 400, 'voltage extracted');
+  assert.strictEqual(data.phases, 3, 'phases extracted');
+});
+
+test('Analyzer: analyzerExtract finds cos phi with comma', function() {
+  var data = analyzerExtract('cos(phi) = 0,86');
+  assert(Math.abs(data.cosPhi - 0.86) < 0.001, 'cosPhi=0.86');
+});
+
+test('Analyzer: analyzerExtract finds eta', function() {
+  var data = analyzerExtract('eta = 0,93');
+  assert(Math.abs(data.eta - 0.93) < 0.001, 'eta=0.93');
+});
+
+test('Analyzer: analyzerExtract finds installation method', function() {
+  var data = analyzerExtract('Installationsmetode: C');
+  assert.strictEqual(data.installMethod, 'C', 'method C');
+});
+
+test('Analyzer: analyzerExtract finds temperature', function() {
+  var data = analyzerExtract('Omgivelsestemperatur: 35');
+  assert.strictEqual(data.temperature, 35, 'temp 35');
+});
+
+test('Analyzer: analyzerExtract finds grouping', function() {
+  var data = analyzerExtract('Antal belastede ledere: 3');
+  assert.strictEqual(data.grouping, 3, 'grouping 3');
+});
+
+test('Analyzer: analyzerExtract finds cable length', function() {
+  var data = analyzerExtract('Kabellængde: 45 m');
+  assert.strictEqual(data.cableLength, 45, 'length 45');
+});
+
+test('Analyzer: analyzerExtract finds cross-section', function() {
+  var data = analyzerExtract('tværsnit 16 mm²');
+  assert.strictEqual(data.cableMm2, 16, 'mm2=16');
+});
+
+test('Analyzer: analyzerExtract finds earthing system', function() {
+  var data = analyzerExtract('Systemet er TN-C-S med Zs = 1,2');
+  assert.strictEqual(data.earthSystem, 'TN-C-S', 'TN-C-S');
+  assert(Math.abs(data.zsValue - 1.2) < 0.01, 'Zs=1.2');
+});
+
+test('Analyzer: analyzerExtract finds MCB device', function() {
+  var data = analyzerExtract('MCB kurve B In = 25 A, Icu = 10 kA');
+  assert.strictEqual(data.deviceIn, 25, 'In=25');
+  assert.strictEqual(data.deviceIcu, 10, 'Icu=10');
+  assert.strictEqual(data.deviceCurve, 'B', 'curve B');
+});
+
+test('Analyzer: analyzerExtract finds transformer', function() {
+  var data = analyzerExtract('Transformer 630 kVA, uk = 4%, Pcu = 6500 W');
+  assert.strictEqual(data.trafoKVA, 630, 'trafo 630 kVA');
+  assert.strictEqual(data.trafoUk, 4, 'uk 4%');
+  assert.strictEqual(data.trafoPcu, 6500, 'Pcu 6500');
+});
+
+test('Analyzer: analyzerDetectQuestions detects IB question', function() {
+  var qs = analyzerDetectQuestions('Beregn belastningsstr\u00f8mmen IB');
+  assert(qs.some(function(q) { return q.type === 'ib'; }), 'IB detected');
+});
+
+test('Analyzer: analyzerDetectQuestions detects vdrop question', function() {
+  var qs = analyzerDetectQuestions('Beregn sp\u00e6ndingsfaldet');
+  assert(qs.some(function(q) { return q.type === 'vdrop'; }), 'vdrop detected');
+});
+
+test('Analyzer: analyzerDetectQuestions detects fault question', function() {
+  var qs = analyzerDetectQuestions('Er fejlbeskyttelsen tilstr\u00e6kkelig?');
+  assert(qs.some(function(q) { return q.type === 'fault'; }), 'fault detected');
+});
+
+test('Analyzer: analyzerSolve computes IB from power and cosPhi', function() {
+  var data = {
+    power_kW: 37, voltage: 400, phases: 3, cosPhi: 0.86, eta: 0.93,
+    installMethod: null, temperature: null, grouping: null,
+    cableLength: null, cableMm2: null, cableType: null,
+    deviceIn: null, deviceIcu: null, deviceCurve: null,
+    trafoKVA: null, trafoUk: null, trafoPcu: null, trafoP0: null,
+    earthSystem: null, zsValue: null, disconnectTime: null,
+    questions: [{ type: 'ib', label: 'Beregn IB' }], confidence: {}
+  };
+  var result = analyzerSolve(data);
+  assert(result.results.length > 0, 'has results');
+  var ibResult = result.results.find(function(r) { return r.type === 'ib'; });
+  assert(ibResult, 'IB result exists');
+  // IB = (37000 / 0.93) / (sqrt(3) * 400 * 0.86) = 39795.7 / 596.0 = 66.77 A
+  var expectedIB = (37000 / 0.93) / (Math.sqrt(3) * 400 * 0.86);
+  assert(ibResult.value.indexOf(expectedIB.toFixed(2)) >= 0, 'IB value correct (~' + expectedIB.toFixed(2) + 'A)');
+  assert(ibResult.asked === true, 'marked as asked question');
+});
+
+test('Analyzer: full end-to-end synthetic exam snippet 1', function() {
+  var examText = 'Opgave 2\n' +
+    'En 3-faset motor har folgende data:\n' +
+    'Belastning: 37 kW, 400 V, 3-faset, cos(phi) = 0,86, eta = 0,93\n' +
+    'Installationsmetode: C\n' +
+    'Omgivelsestemperatur: 35\n' +
+    'Antal belastede ledere: 3\n' +
+    'Kabellængde: 45 m\n' +
+    'Kabeltype: NOIKLX 5G16 mm²\n' +
+    'MCB kurve C In = 80 A\n' +
+    'Beregn belastningsstroemmen IB\n' +
+    'Beregn spaendingsfaldet';
+  analyzerRun(examText);
+  assert(analyzerState.results.length >= 3, 'at least 3 results computed (IB, Iz, vdrop + extras)');
+  var ibR = analyzerState.results.find(function(r) { return r.type === 'ib'; });
+  assert(ibR, 'IB computed');
+  assert(ibR.asked === true, 'IB was asked');
+  var vdR = analyzerState.results.find(function(r) { return r.type === 'vdrop'; });
+  assert(vdR, 'vdrop computed');
+  assert(vdR.asked === true, 'vdrop was asked');
+  // Bonus results should exist
+  var bonus = analyzerState.results.filter(function(r) { return r.bonus; });
+  assert(bonus.length > 0, 'bonus "nice to know" results generated');
+});
+
+test('Analyzer: full end-to-end synthetic exam snippet 2 (fault protection)', function() {
+  var examText = 'Opgave 3\n' +
+    'Jordingssystem: TN-S\n' +
+    'Fejlsloejfe Zs = 0,8 ohm\n' +
+    'MCB kurve B In = 16 A\n' +
+    'Er fejlbeskyttelsen tilstraekkelig?\n' +
+    'Belastning: 3,7 kW, 230 V, 1-faset, cos(phi) = 0,95\n' +
+    'Kabellængde: 25 m\n' +
+    'tværsnit 2,5 mm²';
+  analyzerRun(examText);
+  var faultR = analyzerState.results.find(function(r) { return r.type === 'fault'; });
+  assert(faultR, 'fault result exists');
+  assert(faultR.asked === true, 'fault was asked');
+  // If = 230/0.8 = 287.5 A, Ia = 5*16 = 80 A, 287.5 >= 80 => OK
+  assert(faultR.status === 'ok', 'fault protection sufficient (287.5A >= 80A)');
+  assert(faultR.html.indexOf('<details') >= 0, 'has calcDetail HTML');
+});
+
+test('Analyzer: full end-to-end synthetic exam snippet 3 (full dimensioning)', function() {
+  var examText = 'Opgave 2: Kabeldimensionering\n' +
+    'Belastning: 10 kW, 400 V, 3-faset\n' +
+    'cos(phi) = 0,9\n' +
+    'Installationsmetode: C\n' +
+    'Omgivelsestemperatur: 30\n' +
+    'Kabellængde: 50 m\n' +
+    'NOIKLX 5G4 mm²\n' +
+    'MCB kurve C In = 20 A\n' +
+    'Beregn IB\n' +
+    'Beregn Iz\n' +
+    'Beregn spaendingsfaldet\n' +
+    'Beregn kortslutningsstroemmen Ik';
+  analyzerRun(examText);
+  assert(analyzerState.results.length >= 5, 'at least 5 results (IB, Iz, vdrop, Ik, coord + bonus)');
+  var ibR = analyzerState.results.find(function(r) { return r.type === 'ib'; });
+  var izR = analyzerState.results.find(function(r) { return r.type === 'iz'; });
+  var vdR = analyzerState.results.find(function(r) { return r.type === 'vdrop'; });
+  var ikR = analyzerState.results.find(function(r) { return r.type === 'ik'; });
+  assert(ibR && ibR.asked, 'IB asked and computed');
+  assert(izR && izR.asked, 'Iz asked and computed');
+  assert(vdR && vdR.asked, 'vdrop asked and computed');
+  assert(ikR && ikR.asked, 'Ik asked and computed');
+  // IB = 10000 / (sqrt(3)*400*0.9) = 16.04 A
+  var expectedIB2 = 10000 / (Math.sqrt(3) * 400 * 0.9);
+  assert(Math.abs(parseFloat(ibR.value) - expectedIB2) < 0.1, 'IB value correct');
+  // Iz for 4mm2 XLPE = 40A (method C, 30deg, 1 cable) = 40*1*1*1 = 40A
+  assert(izR.value.indexOf('40') >= 0, 'Iz=40A for 4mm2 XLPE method C');
+  // Coordination: 16.04 <= 20 <= 40 => OK
+  var coordR = analyzerState.results.find(function(r) { return r.type === 'coord'; });
+  assert(coordR && coordR.status === 'ok', 'coordination OK');
+});
+
+test('Analyzer: renderAnalyzer produces valid HTML', function() {
+  analyzerState = { rawText: '', segments: [], extracted: null, results: [], completeness: { solved: 0, total: 0, flagged: [] }, mode: 'upload' };
+  var html = renderAnalyzer();
+  assert(html.indexOf('Projektanalysator') >= 0 || html.indexOf('Project Analyzer') >= 0, 'has title');
+  assert(html.indexOf('type="file"') >= 0, 'has file input');
+  assert(html.indexOf('analyzerHandleFile') >= 0, 'has file handler');
+});
+
+test('Analyzer: renderAnalyzer shows paste textarea in paste mode', function() {
+  analyzerState.mode = 'paste';
+  var html = renderAnalyzer();
+  assert(html.indexOf('analyzerPasteArea') >= 0, 'has paste area');
+  assert(html.indexOf('analyzerHandlePaste') >= 0, 'has paste handler');
+  analyzerState.mode = 'upload';
+});
+
+test('Analyzer: results use calcDetail for full working', function() {
+  var examText = 'Belastning: 10 kW, 400 V, 3-faset, cos(phi) = 0,9\nBeregn IB';
+  analyzerRun(examText);
+  var ibR = analyzerState.results.find(function(r) { return r.type === 'ib'; });
+  assert(ibR, 'IB result exists');
+  assert(ibR.html.indexOf('<details') >= 0, 'uses calcDetail expandable');
+  assert(ibR.html.indexOf('<summary') >= 0, 'has summary');
+  assert(ibR.html.indexOf('IB') >= 0, 'mentions IB');
+});
+
+test('Analyzer: safety gating flags missing data', function() {
+  var examText = 'Beregn IB';
+  analyzerRun(examText);
+  assert(analyzerState.completeness.flagged.length > 0, 'flags missing data for IB');
+});
+
+test('Analyzer: bonus results are computed even when not asked', function() {
+  var examText = 'Belastning: 10 kW, 400 V, 3-faset, cos(phi) = 0,9\nKabellængde: 30 m\ntværsnit 4 mm²';
+  analyzerRun(examText);
+  var bonus = analyzerState.results.filter(function(r) { return r.bonus; });
+  assert(bonus.length >= 1, 'at least 1 bonus result computed');
+  var pwrTriangle = analyzerState.results.find(function(r) { return r.type === 'power_triangle'; });
+  assert(pwrTriangle, 'power triangle bonus computed');
+});
+
+test('Analyzer: module registered in nav and renderModule switch', function() {
+  assert(typeof renderAnalyzer === 'function', 'renderAnalyzer exists');
+  assert(typeof analyzerExtract === 'function', 'analyzerExtract exists');
+  assert(typeof analyzerSolve === 'function', 'analyzerSolve exists');
+  // Check nav group
+  var startGroup = NAV_GROUPS.find(function(g) { return g.id === 'start'; });
+  assert(startGroup.keys.indexOf('analyzer') >= 0, 'analyzer in start nav group');
 });
 
 // --- Summary ---
