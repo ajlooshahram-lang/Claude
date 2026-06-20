@@ -1532,6 +1532,29 @@ const _FA = {
   'all': '\u0647\u0645\u0647',
   'products cite a recognised IEC/EN/DS standard for their category.': '\u0645\u062D\u0635\u0648\u0644\u0627\u062A \u06CC\u06A9 \u0627\u0633\u062A\u0627\u0646\u062F\u0627\u0631\u062F \u0634\u0646\u0627\u062E\u062A\u0647\u200C\u0634\u062F\u0647 IEC/EN/DS \u0631\u0627 \u0628\u0631\u0627\u06CC \u062F\u0633\u062A\u0647 \u062E\u0648\u062F \u0630\u06A9\u0631 \u0645\u06CC\u200C\u06A9\u0646\u0646\u062F.',
   'products lack a recognised standard.': '\u0645\u062D\u0635\u0648\u0644\u0627\u062A \u0641\u0627\u0642\u062F \u06CC\u06A9 \u0627\u0633\u062A\u0627\u0646\u062F\u0627\u0631\u062F \u0634\u0646\u0627\u062E\u062A\u0647\u200C\u0634\u062F\u0647 \u0647\u0633\u062A\u0646\u062F.',
+  // --- Coordination / coherence audit (life-safety: DS/HD 60364-4-43 / -5-54) ---
+  'Coordination check': '\u0628\u0631\u0631\u0633\u06CC \u0647\u0645\u0627\u0647\u0646\u06AF\u06CC',
+  'the list is empty \u2014 no components to coordinate.': '\u0641\u0647\u0631\u0633\u062A \u062E\u0627\u0644\u06CC \u0627\u0633\u062A \u2014 \u0647\u06CC\u0686 \u0642\u0637\u0639\u0647\u200C\u0627\u06CC \u0628\u0631\u0627\u06CC \u0647\u0645\u0627\u0647\u0646\u06AF\u06CC \u0648\u062C\u0648\u062F \u0646\u062F\u0627\u0631\u062F.',
+  'the picked supply components coordinate safely.': '\u0642\u0637\u0639\u0627\u062A \u062A\u0623\u0645\u06CC\u0646 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u0628\u0647\u200C\u0637\u0648\u0631 \u0627\u06CC\u0645\u0646 \u0647\u0645\u0627\u0647\u0646\u06AF \u0647\u0633\u062A\u0646\u062F.',
+  'coordination warning(s) \u2014 see report/export.': '\u0647\u0634\u062F\u0627\u0631(\u0647\u0627\u06CC) \u0647\u0645\u0627\u0647\u0646\u06AF\u06CC \u2014 \u06AF\u0632\u0627\u0631\u0634/\u062E\u0631\u0648\u062C\u06CC \u0631\u0627 \u0628\u0628\u06CC\u0646\u06CC\u062F.',
+  'A picked main fuse has no rating \u2014 overload coordination cannot be confirmed (DS/HD 60364-4-43).': '\u06CC\u06A9 \u0641\u06CC\u0648\u0632 \u0627\u0635\u0644\u06CC \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u0641\u0627\u0642\u062F \u062C\u0631\u06CC\u0627\u0646 \u0646\u0627\u0645\u06CC \u0627\u0633\u062A \u2014 \u0647\u0645\u0627\u0647\u0646\u06AF\u06CC \u0627\u0636\u0627\u0641\u0647\u200C\u0628\u0627\u0631 \u0642\u0627\u0628\u0644 \u062A\u0623\u06CC\u06CC\u062F \u0646\u06CC\u0633\u062A (DS/HD 60364-4-43).',
+  'No picked supply cable can carry the main fuse': '\u0647\u06CC\u0686 \u06A9\u0627\u0628\u0644 \u062A\u0623\u0645\u06CC\u0646 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647\u200C\u0627\u06CC \u0646\u0645\u06CC\u200C\u062A\u0648\u0627\u0646\u062F \u0641\u06CC\u0648\u0632 \u0627\u0635\u0644\u06CC \u0631\u0627 \u062A\u062D\u0645\u0644 \u06A9\u0646\u062F',
+  '(rule IB\u2264In\u2264Iz, DS/HD 60364-4-43).': '(\u0642\u0627\u0639\u062F\u0647 IB\u2264In\u2264Iz\u060C DS/HD 60364-4-43).',
+  'A picked supply cable has no ampacity Iz \u2014 coordination cannot be confirmed (DS/HD 60364-4-43).': '\u06CC\u06A9 \u06A9\u0627\u0628\u0644 \u062A\u0623\u0645\u06CC\u0646 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u0641\u0627\u0642\u062F \u0638\u0631\u0641\u06CC\u062A \u062C\u0631\u06CC\u0627\u0646 Iz \u0627\u0633\u062A \u2014 \u0647\u0645\u0627\u0647\u0646\u06AF\u06CC \u0642\u0627\u0628\u0644 \u062A\u0623\u06CC\u06CC\u062F \u0646\u06CC\u0633\u062A (DS/HD 60364-4-43).',
+  'Supply cable with Iz': '\u06A9\u0627\u0628\u0644 \u062A\u0623\u0645\u06CC\u0646 \u0628\u0627 Iz',
+  'is below the smallest picked fuse': '\u06A9\u0645\u062A\u0631 \u0627\u0632 \u06A9\u0648\u0686\u06A9\u200C\u062A\u0631\u06CC\u0646 \u0641\u06CC\u0648\u0632 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u0627\u0633\u062A',
+  'and could be overloaded (DS/HD 60364-4-43).': '\u0648 \u0645\u0645\u06A9\u0646 \u0627\u0633\u062A \u0627\u0636\u0627\u0641\u0647\u200C\u0628\u0627\u0631 \u0634\u0648\u062F (DS/HD 60364-4-43).',
+  'A picked transformer has no kVA \u2014 full-load current cannot be computed (DS/HD 60364).': '\u06CC\u06A9 \u062A\u0631\u0627\u0646\u0633\u0641\u0648\u0631\u0645\u0627\u062A\u0648\u0631 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u0641\u0627\u0642\u062F kVA \u0627\u0633\u062A \u2014 \u062C\u0631\u06CC\u0627\u0646 \u0628\u0627\u0631 \u06A9\u0627\u0645\u0644 \u0642\u0627\u0628\u0644 \u0645\u062D\u0627\u0633\u0628\u0647 \u0646\u06CC\u0633\u062A (DS/HD 60364).',
+  'The picked supply chain cannot carry the transformer full-load current': '\u0632\u0646\u062C\u06CC\u0631\u0647 \u062A\u0623\u0645\u06CC\u0646 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u0646\u0645\u06CC\u200C\u062A\u0648\u0627\u0646\u062F \u062C\u0631\u06CC\u0627\u0646 \u0628\u0627\u0631 \u06A9\u0627\u0645\u0644 \u062A\u0631\u0627\u0646\u0633\u0641\u0648\u0631\u0645\u0627\u062A\u0648\u0631 \u0631\u0627 \u062A\u062D\u0645\u0644 \u06A9\u0646\u062F',
+  'at 400 V (DS/HD 60364).': '\u062F\u0631 400 \u0648\u0644\u062A (DS/HD 60364).',
+  'A picked supply cable has no cross-section \u2014 PE conductor cannot be sized (DS/HD 60364-5-54 \u00A7543.1.2).': '\u06CC\u06A9 \u06A9\u0627\u0628\u0644 \u062A\u0623\u0645\u06CC\u0646 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u0641\u0627\u0642\u062F \u0633\u0637\u062D \u0645\u0642\u0637\u0639 \u0627\u0633\u062A \u2014 \u0647\u0627\u062F\u06CC PE \u0642\u0627\u0628\u0644 \u0627\u0646\u062F\u0627\u0632\u0647\u200C\u06AF\u06CC\u0631\u06CC \u0646\u06CC\u0633\u062A (DS/HD 60364-5-54 \u00A7543.1.2).',
+  'Main fuse': '\u0641\u06CC\u0648\u0632 \u0627\u0635\u0644\u06CC',
+  'is covered by a picked cable (Iz\u2265In, DS/HD 60364-4-43).': '\u062A\u0648\u0633\u0637 \u06CC\u06A9 \u06A9\u0627\u0628\u0644 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u067E\u0648\u0634\u0634 \u062F\u0627\u062F\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F (Iz\u2265In\u060C DS/HD 60364-4-43).',
+  'The transformer full-load current': '\u062C\u0631\u06CC\u0627\u0646 \u0628\u0627\u0631 \u06A9\u0627\u0645\u0644 \u062A\u0631\u0627\u0646\u0633\u0641\u0648\u0631\u0645\u0627\u062A\u0648\u0631',
+  'can be carried by the picked supply (DS/HD 60364).': '\u0645\u06CC\u200C\u062A\u0648\u0627\u0646\u062F \u062A\u0648\u0633\u0637 \u062A\u0623\u0645\u06CC\u0646 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u062A\u062D\u0645\u0644 \u0634\u0648\u062F (DS/HD 60364).',
+  'Supply cable': '\u06A9\u0627\u0628\u0644 \u062A\u0623\u0645\u06CC\u0646',
+  'requires a minimum PE cross-section of': '\u0628\u0647 \u062D\u062F\u0627\u0642\u0644 \u0633\u0637\u062D \u0645\u0642\u0637\u0639 PE \u0646\u06CC\u0627\u0632 \u062F\u0627\u0631\u062F',
+  '(DS/HD 60364-5-54 \u00A7543.1.2, table 54.7).': '(DS/HD 60364-5-54 \u00A7543.1.2\u060C \u062C\u062F\u0648\u0644 54.7).',
   'Generated': '\u062A\u0648\u0644\u06CC\u062F\u200C\u0634\u062F\u0647',
   'Reference': '\u0645\u0631\u062C\u0639',
   'Allow pop-ups to print.': '\u0628\u0631\u0627\u06CC \u0686\u0627\u067E\u060C \u067E\u0646\u062C\u0631\u0647\u200C\u0647\u0627\u06CC \u0628\u0627\u0632\u0634\u0648 \u0631\u0627 \u0645\u062C\u0627\u0632 \u06A9\u0646\u06CC\u062F.',
@@ -8204,6 +8227,179 @@ function elforsyningStandardsSummary() {
     + tx('produkter mangler en anerkendt standard.', 'products lack a recognised standard.');
 }
 
+// --- Engineering coordination / coherence audit (LIFE-SAFETY) ---
+// The standards layer above proves each line cites the right IEC/EN/DS clause. This layer
+// asks the harder, safety-critical question: do the components the user actually PICKED form
+// a SAFE, COORDINATED supply system? It reasons ONLY over the SET of currently-picked BOM
+// items (elforsyningBom via elforsyningBomLines()), never over the whole catalog. Three
+// conservative checks, each citing its DS/HD 60364 clause in code AND in the surfaced text:
+//   1. Overload coordination   DS/HD 60364-4-43   IB <= In <= Iz
+//        - every picked main fuse of rating In must have at least one picked supply cable
+//          with ampacity Iz >= In, otherwise that fuse cannot be carried by the list;
+//        - every picked cable whose Iz is below the SMALLEST picked fuse In could be left
+//          unprotected/overloaded by every fuse in the list.
+//   2. Transformer <-> supply  DS/HD 60364        rated secondary current at 400 V 3-phase
+//        I_fl = kVA*1000 / (sqrt(3)*400) = kVA * 1.443376 A. Each picked transformer's I_fl
+//        must be carryable by some picked cable Iz AND not exceed the largest picked fuse In.
+//   3. PE-conductor sizing      DS/HD 60364-5-54 §543.1.2, table 54.7 (line & PE same material)
+//        S <= 16 -> S_PE = S ;  16 < S <= 35 -> S_PE = 16 ;  S > 35 -> S_PE = S/2.
+//        Informational minimum-PE guidance per picked cable cross-section.
+// CONSERVATIVE (this is a life-safety app): if a required value is missing/unknown we do NOT
+// report OK for that check — we emit an "unresolved" warning. We never round in the dangerous
+// direction (I_fl is rounded to 0.1 A for DISPLAY only; every comparison uses the exact value).
+
+// Transformer rated secondary full-load current at 400 V three-phase: kVA*1000/(sqrt(3)*400).
+const ELFORSYNING_LV_FACTOR = 1000 / (Math.sqrt(3) * 400); // ~= 1.443376 A per kVA at 400 V
+function elforsyningRound1(x) { return Math.round(x * 10) / 10; }
+
+// Returns the transformer full-load secondary current in A, or null if kVA is missing/invalid
+// (conservative: a null forces the coordination check to treat the transformer as unresolved).
+function elforsyningTransformerFlc(kva) {
+  if (typeof kva !== 'number' || !isFinite(kva) || kva <= 0) return null;
+  return kva * ELFORSYNING_LV_FACTOR;
+}
+
+// Minimum PE-conductor cross-section per DS/HD 60364-5-54 §543.1.2 table 54.7 (line and PE of
+// the SAME material — these 4-core N1XV/NAYY supply cables carry a same-material PE). Returns
+// null if S is missing/invalid (conservative — we never guess a protective-conductor size).
+function elforsyningPeMinCrossSection(s) {
+  if (typeof s !== 'number' || !isFinite(s) || s <= 0) return null;
+  if (s <= 16) return s;
+  if (s <= 35) return 16;
+  return s / 2;
+}
+
+// The executable coordination audit. Returns a structured result over the PICKED set:
+//   { ok, empty, warnings:[{code,clause,...,text}], checks:[{code,clause,...,text}], counts }
+// ok is true ONLY when the list is non-empty AND there are zero warnings (empty != coordinated).
+function elforsyningVerifyCoordination() {
+  const lines = elforsyningBomLines();
+  const warnings = [];
+  const checks = [];
+
+  // Partition the picked set by category (products only).
+  const cables = lines.filter(function(l) { return l.category === 'supplyCables'; }).map(function(l) { return l.product; });
+  const fuses = lines.filter(function(l) { return l.category === 'mainFuses'; }).map(function(l) { return l.product; });
+  const transformers = lines.filter(function(l) { return l.category === 'transformers'; }).map(function(l) { return l.product; });
+
+  // Valid (resolved) ampacities / ratings among the picked items.
+  const cableIzs = cables.map(function(c) { return c.iz; }).filter(function(iz) { return typeof iz === 'number' && isFinite(iz) && iz > 0; });
+  const fuseIns = fuses.map(function(f) { return f.rating; }).filter(function(r) { return typeof r === 'number' && isFinite(r) && r > 0; });
+  const maxCableIz = cableIzs.length ? Math.max.apply(null, cableIzs) : null;
+  const minFuseIn = fuseIns.length ? Math.min.apply(null, fuseIns) : null;
+  const maxFuseIn = fuseIns.length ? Math.max.apply(null, fuseIns) : null;
+
+  // --- Check 1a: every picked fuse must be carryable by some picked cable (DS/HD 60364-4-43, In <= Iz). ---
+  fuses.forEach(function(f) {
+    const In = f.rating;
+    if (typeof In !== 'number' || !isFinite(In) || In <= 0) {
+      warnings.push({ code: 'fuse-rating-unresolved', clause: 'DS/HD 60364-4-43', id: f.id,
+        text: tx('En valgt hovedsikring mangler en m\u00E6rkestr\u00F8m \u2014 overbelastningskoordinering kan ikke bekr\u00E6ftes (DS/HD 60364-4-43).',
+                 'A picked main fuse has no rating \u2014 overload coordination cannot be confirmed (DS/HD 60364-4-43).') });
+      return;
+    }
+    const carriers = cables.filter(function(c) { return typeof c.iz === 'number' && isFinite(c.iz) && c.iz >= In; });
+    if (carriers.length === 0) {
+      warnings.push({ code: 'fuse-no-cable', clause: 'DS/HD 60364-4-43', id: f.id, rating: In,
+        text: tx('Ingen valgt forsyningskabel kan b\u00E6re hovedsikringen', 'No picked supply cable can carry the main fuse')
+          + ' ' + In + ' A '
+          + tx('(reglen IB\u2264In\u2264Iz, DS/HD 60364-4-43).', '(rule IB\u2264In\u2264Iz, DS/HD 60364-4-43).') });
+    } else {
+      checks.push({ code: 'overload-fuse-ok', clause: 'DS/HD 60364-4-43', id: f.id, rating: In, carriers: carriers.length,
+        text: tx('Hovedsikring', 'Main fuse') + ' ' + In + ' A '
+          + tx('er d\u00E6kket af et valgt kabel (Iz\u2265In, DS/HD 60364-4-43).', 'is covered by a picked cable (Iz\u2265In, DS/HD 60364-4-43).') });
+    }
+  });
+
+  // --- Check 1b: a picked cable whose Iz is below the SMALLEST picked fuse In is unprotected (DS/HD 60364-4-43). ---
+  cables.forEach(function(c) {
+    const Iz = c.iz;
+    if (typeof Iz !== 'number' || !isFinite(Iz) || Iz <= 0) {
+      warnings.push({ code: 'cable-iz-unresolved', clause: 'DS/HD 60364-4-43', id: c.id,
+        text: tx('Et valgt forsyningskabel mangler str\u00F8mb\u00E6reevne Iz \u2014 koordinering kan ikke bekr\u00E6ftes (DS/HD 60364-4-43).',
+                 'A picked supply cable has no ampacity Iz \u2014 coordination cannot be confirmed (DS/HD 60364-4-43).') });
+      return;
+    }
+    if (minFuseIn !== null && Iz < minFuseIn) {
+      warnings.push({ code: 'cable-unprotected', clause: 'DS/HD 60364-4-43', id: c.id, iz: Iz, minFuseIn: minFuseIn,
+        text: tx('Forsyningskabel med Iz', 'Supply cable with Iz') + ' ' + Iz + ' A '
+          + tx('er under den mindste valgte sikring', 'is below the smallest picked fuse') + ' ' + minFuseIn + ' A '
+          + tx('og kan overbelastes (DS/HD 60364-4-43).', 'and could be overloaded (DS/HD 60364-4-43).') });
+    }
+  });
+
+  // --- Check 2: each picked transformer's rated current must be carryable by the picked supply (DS/HD 60364). ---
+  transformers.forEach(function(t) {
+    const flc = elforsyningTransformerFlc(t.kva);
+    if (flc === null) {
+      warnings.push({ code: 'transformer-kva-unresolved', clause: 'DS/HD 60364', id: t.id,
+        text: tx('En valgt transformer mangler kVA \u2014 fuldlaststr\u00F8m kan ikke beregnes (DS/HD 60364).',
+                 'A picked transformer has no kVA \u2014 full-load current cannot be computed (DS/HD 60364).') });
+      return;
+    }
+    const flcShown = elforsyningRound1(flc);
+    // Conservative: no cables/fuses at all -> nothing can carry it -> treat as insufficient.
+    const cableInsufficient = (maxCableIz === null) || (flc > maxCableIz);
+    const fuseInsufficient = (maxFuseIn === null) || (flc > maxFuseIn);
+    if (cableInsufficient || fuseInsufficient) {
+      warnings.push({ code: 'transformer-supply-insufficient', clause: 'DS/HD 60364', id: t.id, kva: t.kva, flc: flcShown,
+        text: tx('Den valgte forsyningsk\u00E6de kan ikke f\u00F8re transformerens fuldlaststr\u00F8m',
+                 'The picked supply chain cannot carry the transformer full-load current') + ' ' + flcShown + ' A '
+          + tx('ved 400 V (DS/HD 60364).', 'at 400 V (DS/HD 60364).') });
+    } else {
+      checks.push({ code: 'transformer-supply-ok', clause: 'DS/HD 60364', id: t.id, kva: t.kva, flc: flcShown,
+        text: tx('Transformerens fuldlaststr\u00F8m', 'The transformer full-load current') + ' ' + flcShown + ' A '
+          + tx('kan f\u00F8res af den valgte forsyning (DS/HD 60364).', 'can be carried by the picked supply (DS/HD 60364).') });
+    }
+  });
+
+  // --- Check 3: minimum PE-conductor cross-section per picked cable (DS/HD 60364-5-54 §543.1.2, table 54.7). ---
+  cables.forEach(function(c) {
+    const S = c.mm2;
+    if (typeof S !== 'number' || !isFinite(S) || S <= 0) {
+      warnings.push({ code: 'cable-cross-section-unresolved', clause: 'DS/HD 60364-5-54 \u00A7543.1.2', id: c.id,
+        text: tx('Et valgt forsyningskabel mangler tv\u00E6rsnit \u2014 PE-leder kan ikke dimensioneres (DS/HD 60364-5-54 \u00A7543.1.2).',
+                 'A picked supply cable has no cross-section \u2014 PE conductor cannot be sized (DS/HD 60364-5-54 \u00A7543.1.2).') });
+      return;
+    }
+    const pe = elforsyningRound1(elforsyningPeMinCrossSection(S));
+    checks.push({ code: 'pe-sizing', clause: 'DS/HD 60364-5-54 \u00A7543.1.2', id: c.id, mm2: S, peMm2: pe,
+      text: tx('Forsyningskabel', 'Supply cable') + ' ' + S + ' mm\u00B2 '
+        + tx('kr\u00E6ver mindst PE-tv\u00E6rsnit', 'requires a minimum PE cross-section of') + ' ' + pe + ' mm\u00B2 '
+        + tx('(DS/HD 60364-5-54 \u00A7543.1.2, tabel 54.7).', '(DS/HD 60364-5-54 \u00A7543.1.2, table 54.7).') });
+  });
+
+  return {
+    ok: (lines.length > 0) && (warnings.length === 0),
+    empty: lines.length === 0,
+    warnings: warnings,
+    checks: checks,
+    counts: { cables: cables.length, fuses: fuses.length, transformers: transformers.length }
+  };
+}
+
+// One-line trilingual summary of the coordination audit, for the UI and the print report.
+// Built from static translatable fragments (numbers/clause-codes concatenated separately) so
+// the Farsi (_FA) lookup resolves for every fragment. Shows the pass mark ONLY when the list
+// is non-empty AND there are zero warnings; an empty list is stated plainly (never "coordinates").
+function elforsyningCoordinationSummary() {
+  const r = elforsyningVerifyCoordination();
+  if (r.empty) {
+    return tx('Koordineringstjek', 'Coordination check') + ': '
+      + tx('listen er tom \u2014 ingen komponenter at koordinere.',
+           'the list is empty \u2014 no components to coordinate.');
+  }
+  if (r.ok) {
+    return '\u2713 ' + tx('Koordineringstjek', 'Coordination check') + ' (DS/HD 60364-4-43 / -5-54): '
+      + tx('de valgte forsyningskomponenter koordinerer sikkert.',
+           'the picked supply components coordinate safely.');
+  }
+  return '\u26A0 ' + tx('Koordineringstjek', 'Coordination check') + ' (DS/HD 60364-4-43 / -5-54): '
+    + r.warnings.length + ' '
+    + tx('koordineringsadvarsel(er) \u2014 se rapport/eksport.',
+         'coordination warning(s) \u2014 see report/export.');
+}
+
 // --- Persistence (NEW localStorage key, no collision with existing keys) ---
 let elforsyningBom = elforsyningLoadBom();
 
@@ -8363,6 +8559,12 @@ function elforsyningExportData() {
       const v = elforsyningVerifyStandards();
       return { ok: v.ok, total: v.total, verified: v.verified, anomalies: v.anomalies };
     })(),
+    coordinationCheck: (function() {
+      // Engineering coordination/coherence audit over the PICKED set (DS/HD 60364-4-43 / -5-54).
+      const c = elforsyningVerifyCoordination();
+      return { ok: c.ok, empty: c.empty, warningCount: c.warnings.length,
+        warnings: c.warnings, checks: c.checks, counts: c.counts };
+    })(),
     lines: lines
   };
 }
@@ -8472,6 +8674,7 @@ function elforsyningReportHtml() {
   h += '<p>' + esc(tx('Varelinjer (forskellige produkter)', 'Line items (distinct products)')) + ': <b>' + elforsyningDistinctCount() + '</b>'
     + ' &middot; ' + esc(tx('Antal i alt', 'Total quantity')) + ': <b>' + elforsyningTotalCount() + '</b></p>';
   h += '<p class="muted">' + esc(elforsyningStandardsSummary()) + '</p>';
+  h += '<p class="muted">' + esc(elforsyningCoordinationSummary()) + '</p>';
   if (!lines.length) {
     h += '<p class="muted">' + esc(tx('Listen er tom.', 'The list is empty.')) + '</p>';
   } else {
@@ -8587,7 +8790,8 @@ function renderElforsyningBom() {
     + '<div class="result-row">'
     + '<span class="label"><strong>' + tx('I alt (alle kategorier)', 'Grand total (all categories)') + '</strong></span>'
     + '<span class="value"><strong>' + total + '</strong></span></div>'
-    + '<div class="result-row"><span class="label">' + elforsyningStandardsSummary() + '</span></div></div>';
+    + '<div class="result-row"><span class="label">' + elforsyningStandardsSummary() + '</span></div>'
+    + '<div class="result-row"><span class="label">' + elforsyningCoordinationSummary() + '</span></div></div>';
   h += '<div class="info-row" style="margin-top:8px">' + tx(
     'Bem\u00E6rk: Verificer aktuelle priser mod danske grossistkataloger (' + ELFORSYNING_WHOLESALERS.join(', ') + '). Datoer genereres automatisk.',
     'Note: Verify current prices against Danish wholesaler catalogs (' + ELFORSYNING_WHOLESALERS.join(', ') + '). Dates are auto-generated.') + '</div>';

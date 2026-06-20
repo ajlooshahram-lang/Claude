@@ -7576,6 +7576,154 @@ test('Elforsyning: print report includes the standards-check summary line', func
   elfRestore();
 });
 
+// ===== Coordination / coherence audit (life-safety: DS/HD 60364-4-43 overload, -5-54 PE) =====
+// Pick a specific SET of real product ids (click-only equivalent of toggling those lines on).
+function elfPick(ids) {
+  elforsyningBom = {};
+  ids.forEach(function(id) {
+    var found = elforsyningProductById(id);
+    assert(found, 'fixture product exists: ' + id);
+    elforsyningBom[id] = { category: found.category, qty: 1 };
+  });
+}
+
+test('Elforsyning coordination: transformer full-load current at 400V matches the 7 reference values (0.1A)', function() {
+  // I_fl = kVA*1000/(sqrt(3)*400) = kVA*1.443376 A. Reference set from DS/HD 60364 design tables.
+  var refs = [[50, 72.2], [100, 144.3], [250, 360.8], [400, 577.4], [630, 909.3], [1000, 1443.4], [2500, 3608.4]];
+  refs.forEach(function(pair) {
+    var got = elforsyningRound1(elforsyningTransformerFlc(pair[0]));
+    assert.strictEqual(got, pair[1], pair[0] + 'kVA -> ' + pair[1] + 'A (got ' + got + ')');
+  });
+  // Conservative: a missing/invalid kVA yields null (unresolved), never a fabricated current.
+  assert.strictEqual(elforsyningTransformerFlc(0), null, 'zero kVA unresolved');
+  assert.strictEqual(elforsyningTransformerFlc(undefined), null, 'missing kVA unresolved');
+  assert.strictEqual(elforsyningTransformerFlc(-5), null, 'negative kVA unresolved');
+});
+
+test('Elforsyning coordination: PE conductor sizing follows DS/HD 60364-5-54 §543.1.2 table 54.7', function() {
+  // S<=16 -> S ; 16<S<=35 -> 16 ; S>35 -> S/2 (line and PE same material).
+  var refs = [[16, 16], [25, 16], [35, 16], [50, 25], [95, 47.5], [240, 120]];
+  refs.forEach(function(p) {
+    assert.strictEqual(elforsyningPeMinCrossSection(p[0]), p[1], p[0] + 'mm2 -> PE ' + p[1] + 'mm2');
+  });
+  assert.strictEqual(elforsyningPeMinCrossSection(0), null, 'missing cross-section unresolved');
+  assert.strictEqual(elforsyningPeMinCrossSection(undefined), null, 'undefined cross-section unresolved');
+});
+
+test('Elforsyning coordination: a coherent picked set coordinates (ok:true, zero warnings)', function() {
+  elfReset();
+  // 95mm2 Cu cable Iz=220A, 160A NH fuse (220>=160), 100kVA transformer (I_fl=144.3A <=220 and <=160? no).
+  // 100kVA -> 144.3A: cable 220>=144.3 OK and fuse 160>=144.3 OK -> coordinated.
+  elfPick(['SC-CU-95', 'MF-NH00-160', 'TR-ONAN-100']);
+  var r = elforsyningVerifyCoordination();
+  assert.strictEqual(r.empty, false, 'not empty');
+  assert.strictEqual(r.warnings.length, 0, 'zero warnings: ' + JSON.stringify(r.warnings));
+  assert.strictEqual(r.ok, true, 'coordinated set is OK');
+  // PE guidance present for the 95mm2 cable (95/2 = 47.5).
+  var pe = r.checks.filter(function(c) { return c.code === 'pe-sizing' && c.id === 'SC-CU-95'; })[0];
+  assert(pe && pe.peMm2 === 47.5, 'PE 47.5mm2 for 95mm2 cable');
+  assert(r.checks.some(function(c) { return c.code === 'transformer-supply-ok'; }), 'transformer-carryable info present');
+  assert(r.checks.some(function(c) { return c.code === 'overload-fuse-ok'; }), 'fuse-covered info present');
+});
+
+test('Elforsyning coordination: WARNS when no picked cable can carry a picked fuse (DS/HD 60364-4-43)', function() {
+  elfReset();
+  elfPick(['SC-CU-25', 'MF-NH00-160']); // cable Iz=110A < fuse In=160A
+  var r = elforsyningVerifyCoordination();
+  assert.strictEqual(r.ok, false, 'uncarried fuse breaks coordination');
+  var w = r.warnings.filter(function(x) { return x.code === 'fuse-no-cable'; });
+  assert(w.length === 1 && w[0].rating === 160, 'flags the 160A fuse as uncarried');
+  assert(w[0].text.indexOf('60364-4-43') >= 0, 'warning cites the overload clause');
+});
+
+test('Elforsyning coordination: WARNS a cable below the smallest fuse could be overloaded (DS/HD 60364-4-43)', function() {
+  elfReset();
+  // 16mm2 Al cable Iz=68A and 95mm2 Cu cable Iz=220A, with a 100A fuse. Smallest fuse=100A.
+  // The 68A cable < 100A -> unprotected; the 220A cable carries the fuse so NO fuse-no-cable.
+  elfPick(['SC-AL-16', 'SC-CU-95', 'MF-NH00-100']);
+  var r = elforsyningVerifyCoordination();
+  var w = r.warnings.filter(function(x) { return x.code === 'cable-unprotected'; });
+  assert(w.length === 1 && w[0].id === 'SC-AL-16' && w[0].minFuseIn === 100, 'flags the 68A cable');
+  assert(r.warnings.filter(function(x) { return x.code === 'fuse-no-cable'; }).length === 0, '100A fuse IS carried by the 220A cable');
+  assert.strictEqual(r.ok, false, 'unprotected cable breaks coordination');
+});
+
+test('Elforsyning coordination: WARNS when the supply cannot carry a transformer rated current (DS/HD 60364)', function() {
+  elfReset();
+  // 25mm2 cable Iz=110A, 100A fuse, 630kVA transformer -> I_fl=909.3A >> 110A and > 100A.
+  elfPick(['SC-CU-25', 'MF-NH00-100', 'TR-ONAN-630']);
+  var r = elforsyningVerifyCoordination();
+  var w = r.warnings.filter(function(x) { return x.code === 'transformer-supply-insufficient'; });
+  assert(w.length === 1 && w[0].flc === 909.3, 'flags the 630kVA transformer (909.3A)');
+  assert(w[0].text.indexOf('60364') >= 0, 'warning cites the clause');
+  assert.strictEqual(r.ok, false, 'over-capacity transformer breaks coordination');
+});
+
+test('Elforsyning coordination: CONSERVATIVE — a missing required value is unresolved, never reported OK', function() {
+  elfReset();
+  elfPick(['SC-CU-95', 'MF-NH00-160', 'TR-ONAN-100']); // otherwise-coordinated set
+  var t = elforsyningProductById('TR-ONAN-100').product;
+  var origKva = t.kva;
+  delete t.kva; // simulate an unknown rating
+  var r = elforsyningVerifyCoordination();
+  assert.strictEqual(r.ok, false, 'unknown transformer kVA must NOT report OK');
+  assert(r.warnings.some(function(x) { return x.code === 'transformer-kva-unresolved'; }), 'flags missing kVA as unresolved');
+  t.kva = origKva; // restore so no other test is affected
+  assert.strictEqual(elforsyningVerifyCoordination().ok, true, 'restored data coordinates again');
+});
+
+test('Elforsyning coordination: empty BOM is stated plainly (not OK, not "coordinates")', function() {
+  elfReset();
+  var r = elforsyningVerifyCoordination();
+  assert.strictEqual(r.empty, true, 'empty flag set');
+  assert.strictEqual(r.ok, false, 'empty is never reported as coordinated');
+  assert.strictEqual(r.warnings.length, 0, 'no warnings on an empty list');
+  var savedLang = lang; lang = 'en';
+  var s = elforsyningCoordinationSummary();
+  assert(s.indexOf('the list is empty') >= 0, 'summary plainly says empty');
+  assert(s.indexOf('\u2713') < 0, 'no pass checkmark on an empty list');
+  lang = savedLang;
+});
+
+test('Elforsyning coordination: JSON export carries coordinationCheck (ok/empty/warnings/checks/counts)', function() {
+  elfReset();
+  elfPick(['SC-CU-95', 'MF-NH00-160', 'TR-ONAN-100']);
+  var data = elforsyningExportData();
+  assert(data.coordinationCheck && typeof data.coordinationCheck === 'object', 'coordinationCheck present');
+  assert.strictEqual(data.coordinationCheck.ok, true, 'coordinated set exports ok:true');
+  assert.strictEqual(data.coordinationCheck.empty, false, 'empty:false');
+  assert.strictEqual(data.coordinationCheck.warningCount, 0, 'no warnings exported');
+  assert(Array.isArray(data.coordinationCheck.checks) && data.coordinationCheck.checks.length >= 1, 'checks array exported');
+  assert.strictEqual(data.coordinationCheck.counts.cables, 1, 'cable count');
+  assert.strictEqual(data.coordinationCheck.counts.transformers, 1, 'transformer count');
+  // A non-coordinated set also serialises its warnings.
+  elfPick(['SC-CU-25', 'MF-NH00-160']);
+  var d2 = elforsyningExportData();
+  assert.strictEqual(d2.coordinationCheck.ok, false, 'non-coordinated set exports ok:false');
+  assert(d2.coordinationCheck.warningCount >= 1, 'warnings serialised');
+  elfRestore();
+});
+
+test('Elforsyning coordination: summary surfaces in BOM UI and print report (da/en/fa)', function() {
+  elfReset();
+  elfPick(['SC-CU-95', 'MF-NH00-160', 'TR-ONAN-100']);
+  var savedLang = lang;
+  lang = 'da';
+  var da = renderElforsyningBom();
+  assert(da.indexOf('Koordineringstjek') >= 0, 'da UI coordination label');
+  assert(elforsyningReportHtml().indexOf('Koordineringstjek') >= 0, 'da report coordination label');
+  lang = 'en';
+  var en = renderElforsyningBom();
+  assert(en.indexOf('Coordination check') >= 0, 'en UI coordination label');
+  assert(en.indexOf('coordinate safely') >= 0, 'en UI shows the coordinated state');
+  assert(elforsyningReportHtml().indexOf('Coordination check') >= 0, 'en report coordination label');
+  lang = 'fa';
+  var fa = renderElforsyningBom();
+  assert(fa.indexOf(_FA['Coordination check']) >= 0, 'fa UI coordination label rendered');
+  lang = savedLang;
+  elfRestore();
+});
+
 test('Elforsyning: Legionella rule is a MINIMUM at the tap (>=50C), not a maximum', function() {
   var savedLang = lang; lang = 'da';
   var html = klsRenderVvs();
