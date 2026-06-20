@@ -1400,6 +1400,39 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // ===== Smart Curve device-selection / validation (Phase 1) additions =====
+  'Smart curve selection': '\u0627\u0646\u062A\u062E\u0627\u0628 \u0647\u0648\u0634\u0645\u0646\u062F \u0645\u0646\u062D\u0646\u06CC',
+  'Recommend & validate device': '\u067E\u06CC\u0634\u0646\u0647\u0627\u062F \u0648 \u0627\u0639\u062A\u0628\u0627\u0631\u0633\u0646\u062C\u06CC \u062F\u0633\u062A\u06AF\u0627\u0647',
+  'Computed circuit inputs': '\u0648\u0631\u0648\u062F\u06CC\u200C\u0647\u0627\u06CC \u0645\u062D\u0627\u0633\u0628\u0647\u200C\u0634\u062F\u0647 \u0645\u062F\u0627\u0631',
+  'Required disconnection time': '\u0632\u0645\u0627\u0646 \u0642\u0637\u0639 \u0645\u0648\u0631\u062F \u0646\u06CC\u0627\u0632',
+  'Device type': '\u0646\u0648\u0639 \u062F\u0633\u062A\u06AF\u0627\u0647',
+  'Circuit breaker (MCB)': '\u06A9\u0644\u06CC\u062F \u062E\u0648\u062F\u06A9\u0627\u0631 (MCB)',
+  'Melting fuse (gG)': '\u0641\u06CC\u0648\u0632 \u0630\u0648\u0628\u200C\u0634\u0648\u0646\u062F\u0647 (gG)',
+  'Curve': '\u0645\u0646\u062D\u0646\u06CC',
+  'All': '\u0647\u0645\u0647',
+  'Recommended device': '\u062F\u0633\u062A\u06AF\u0627\u0647 \u067E\u06CC\u0634\u0646\u0647\u0627\u062F\u06CC',
+  'Verdict': '\u062D\u06A9\u0645',
+  'SAFE': '\u0627\u06CC\u0645\u0646',
+  'NO SAFE DEVICE FOUND': '\u0647\u06CC\u0686 \u062F\u0633\u062A\u06AF\u0627\u0647 \u0627\u06CC\u0645\u0646\u06CC \u06CC\u0627\u0641\u062A \u0646\u0634\u062F',
+  'Conservative choice': '\u0627\u0646\u062A\u062E\u0627\u0628 \u0645\u062D\u0627\u0641\u0638\u0647\u200C\u06A9\u0627\u0631\u0627\u0646\u0647',
+  'disconnects fastest with margin': '\u0633\u0631\u06CC\u0639\u200C\u062A\u0631\u06CC\u0646 \u0642\u0637\u0639 \u0628\u0627 \u062D\u0627\u0634\u06CC\u0647 \u0627\u06CC\u0645\u0646\u06CC',
+  'Change type/curve, choose a larger cable (lower Zs) or a faster device.': '\u0646\u0648\u0639/\u0645\u0646\u062D\u0646\u06CC \u0631\u0627 \u062A\u063A\u06CC\u06CC\u0631 \u062F\u0647\u06CC\u062F\u060C \u06A9\u0627\u0628\u0644 \u0628\u0632\u0631\u06AF\u200C\u062A\u0631 (Zs \u06A9\u0645\u062A\u0631) \u06CC\u0627 \u062F\u0633\u062A\u06AF\u0627\u0647 \u0633\u0631\u06CC\u0639\u200C\u062A\u0631 \u0627\u0646\u062A\u062E\u0627\u0628 \u06A9\u0646\u06CC\u062F.',
+  'Ranked candidates': '\u0646\u0627\u0645\u0632\u062F\u0647\u0627\u06CC \u0631\u062A\u0628\u0647\u200C\u0628\u0646\u062F\u06CC\u200C\u0634\u062F\u0647',
+  'trip ': '\u0642\u0637\u0639 ',
+  'Overload (IB <= In <= Iz)': '\u0627\u0636\u0627\u0641\u0647\u200C\u0628\u0627\u0631 (IB <= In <= Iz)',
+  'Fault-loop disconnection (Zs)': '\u0642\u0637\u0639 \u062D\u0644\u0642\u0647 \u062E\u0637\u0627 (Zs)',
+  'Clearing time at Ik,min': '\u0632\u0645\u0627\u0646 \u0642\u0637\u0639 \u062F\u0631 Ik,min',
+  'Breaking capacity (Icu >= Ik,max)': '\u0638\u0631\u0641\u06CC\u062A \u0642\u0637\u0639 (Icu >= Ik,max)',
+  'Missing IB/Iz': '\u0641\u0642\u062F\u0627\u0646 IB/Iz',
+  'Zs/ceiling not resolved': 'Zs/\u062D\u062F \u0628\u0627\u0644\u0627 \u062A\u0639\u06CC\u06CC\u0646 \u0646\u0634\u062F',
+  'Missing Ik,min': '\u0641\u0642\u062F\u0627\u0646 Ik,min',
+  'Missing Icu/Ik,max': '\u0641\u0642\u062F\u0627\u0646 Icu/Ik,max',
+  'Fails: ': '\u0646\u0627\u0645\u0648\u0641\u0642: ',
+  'Unresolved: ': '\u062D\u0644\u200C\u0646\u0634\u062F\u0647: ',
+  'All checks passed.': '\u062A\u0645\u0627\u0645 \u0628\u0631\u0631\u0633\u06CC\u200C\u0647\u0627 \u0645\u0648\u0641\u0642 \u0628\u0648\u062F.',
+  'Apply': '\u0627\u0639\u0645\u0627\u0644',
+  'Melting fuse is selected manually (outside MCB buttons).': '\u0641\u06CC\u0648\u0632 \u0630\u0648\u0628\u200C\u0634\u0648\u0646\u062F\u0647 \u0628\u0647 \u0635\u0648\u0631\u062A \u062F\u0633\u062A\u06CC \u0627\u0646\u062A\u062E\u0627\u0628 \u0645\u06CC\u200C\u0634\u0648\u062F (\u062E\u0627\u0631\u062C \u0627\u0632 \u062F\u06A9\u0645\u0647\u200C\u0647\u0627\u06CC MCB).',
+
   // ===== Phase-1 solver-formulas additions (symbols/cards/legends) =====
   'Symbol legend': '\u0631\u0627\u0647\u0646\u0645\u0627\u06CC \u0646\u0645\u0627\u062F\u0647\u0627',
   'show': '\u0646\u0645\u0627\u06CC\u0634',
@@ -11347,6 +11380,325 @@ function sldRenderCanvas(tree) {
 }
 
 // --- SLD Node Properties Panel ---
+// =====================================================================
+// SMART CURVE — protective-device SELECTION / VALIDATION (Phase 1)
+// Scope: MCB curve B/C/D (IEC 60898) + gG melting fuse (IEC 60269).
+// MCCB/MPCB are OUT of scope for Phase 1.
+//
+// SINGLE-SOURCE REUSE (NO parallel math is introduced here):
+//   * Time-current / trip-melt time : sldDeviceCurve + sldGetTripTime
+//   * Guaranteed trip current Ia     : upDisconnectionIa (via cvZsCeiling)
+//   * Zs disconnection ceiling       : cvZsCeiling  (TN/TT/IT)
+//   * Zs disconnection 0.8 margin    : zsCheckDisconnection
+//   * Overload IB<=In<=Iz            : same expression as sldVerifyNode
+// Everything below is purely additive and conservative (errs toward danger:
+// rejects when a check fails OR when an input is unresolved — never approves).
+// =====================================================================
+
+// Conservative derated Iz for a node, identical to the expression in
+// sldVerifyNode (DS/HD 60364-5-52 correction factors). NOT a new ampacity model.
+function smartNodeIz(node) {
+  if (!node || !node.cable) return 0;
+  var rawIz = node.cable.iz || 0;
+  var kInstall = (typeof INSTALL_METHODS !== 'undefined' && INSTALL_METHODS[node.installMethod]) || 1.0;
+  var kTemp = (typeof TEMP_FACTORS !== 'undefined' && TEMP_FACTORS[node.temp]) || 1.0;
+  var kGroup = (typeof GROUP_FACTORS !== 'undefined' && GROUP_FACTORS[node.grouping]) || 1.0;
+  return rawIz * kInstall * kTemp * kGroup;
+}
+
+// Gather ALREADY-COMPUTED circuit inputs from an SLD node/project state.
+// Does NOT prompt for typed input — pure read of the verified engine outputs.
+function smartBuildCtxFromNode(tree, nodeId) {
+  if (!tree || !nodeId || !tree.nodes[nodeId]) return null;
+  var node = tree.nodes[nodeId];
+  if (node.type === 'transformer') return null;
+  var isFinal = node.type === 'final_circuit';
+  // Disconnection time per DS/HD 60364-4-41 Table 41.1 (same rule as sldSimulateFault):
+  // all final circuits at U0=230V TN -> 0.4s; distribution circuits -> 5s.
+  var requiredTimeS = isFinal ? 0.4 : 5;
+  return {
+    nodeId: nodeId,
+    ib: node._ib || 0,
+    iz: smartNodeIz(node),
+    ikmax: node._ikmax || 0,
+    ikmin: node._ikmin || 0,
+    zs: node._zs || 0,
+    earthing: 'TN',            // the SLD installation model is TN (matches sldVerifyNode U0=230)
+    requiredTimeS: requiredTimeS,
+    isFinal: isFinal,
+    nodeType: node.type
+  };
+}
+
+// Normalise a catalog product into the shape the single-source Ia/curve helpers expect.
+function smartNormalizeDevice(device) {
+  if (!device) return null;
+  var kind = device.curve ? 'mcb' : (device.i5s ? 'fuse' : 'other');
+  return { In: device.rating, curve: device.curve || null, kind: kind, product: device };
+}
+
+// Run the ordered life-safety checks for a SPECIFIC device against a ctx.
+// Returns { checks:[...], verdict:'safe'|'unsafe'|'unresolved', In, kind, curve,
+//           tripTime, zsMargin, deviceStd }.
+function smartRunChecks(ctx, device) {
+  var norm = smartNormalizeDevice(device);
+  if (!ctx || !norm || norm.kind === 'other') {
+    return { checks: [], verdict: 'unresolved', In: norm ? norm.In : 0, kind: norm ? norm.kind : 'other', curve: null, tripTime: Infinity, zsMargin: -Infinity, deviceStd: null };
+  }
+  var In = norm.In;
+  var deviceStd = norm.kind === 'mcb' ? 'IEC 60898' : 'IEC 60269';
+  var dev = { In: In, curve: norm.curve };
+  var checks = [];
+
+  // ---- Check 1: Overload coordination IB <= In <= Iz (DS/HD 60364-4-43 cl. 433.1)
+  var overloadResolved = ctx.ib > 0 && ctx.iz > 0;
+  var overloadPass = overloadResolved && (ctx.ib <= In) && (In <= ctx.iz);
+  checks.push({
+    key: 'overload',
+    label: tx('Overbelastning (IB <= In <= Iz)', 'Overload (IB <= In <= Iz)'),
+    state: overloadResolved ? (overloadPass ? 'pass' : 'fail') : 'unresolved',
+    clause: 'DS/HD 60364-4-43 cl. 433.1',
+    deviceStd: deviceStd,
+    detail: !overloadResolved ? tx('Mangler IB/Iz', 'Missing IB/Iz')
+            : (ctx.ib.toFixed(1) + 'A <= ' + In + 'A <= ' + ctx.iz.toFixed(1) + 'A')
+  });
+
+  // ---- Check 2: Fault-loop disconnection Zs (DS/HD 60364-4-41) — SINGLE SOURCE
+  // cvZsCeiling -> upDisconnectionIa for Ia; zsCheckDisconnection for the 0.8 margin.
+  var zsInfo = cvZsCeiling(ctx.earthing, dev, {}, UP_CMIN);
+  var zsState, zsDetail, zsPass = false;
+  if (zsInfo.state !== 'resolved' || !(ctx.zs > 0)) {
+    zsState = 'unresolved';
+    zsDetail = tx('Zs/ceiling ikke bestemt', 'Zs/ceiling not resolved');
+  } else {
+    zsPass = zsCheckDisconnection(ctx.zs, zsInfo.zsMax);
+    zsState = zsPass ? 'pass' : 'fail';
+    zsDetail = 'Zs=' + (ctx.zs).toFixed(3) + '\u03A9 ' + (zsPass ? '<=' : '>') + ' 0.8\u00B7Zs,max=' + (zsInfo.zsMax * 0.8).toFixed(3) + '\u03A9 (Ia=' + (zsInfo.ia ? zsInfo.ia.toFixed(0) : '?') + 'A)';
+  }
+  checks.push({
+    key: 'zs',
+    label: tx('Fejlsloejfe-udkobling (Zs)', 'Fault-loop disconnection (Zs)'),
+    state: zsState,
+    clause: zsInfo.clause || 'DS/HD 60364-4-41',
+    deviceStd: deviceStd,
+    detail: zsDetail
+  });
+
+  // ---- Check 3: Short-circuit / disconnection clearing time at Ik,min — SINGLE SOURCE
+  // sldGetTripTime delegates to sldDeviceCurve (NO new curve formula).
+  var tripTime = sldGetTripTime(device, In, ctx.ikmin);
+  var clearResolved = ctx.ikmin > 0;
+  var clearPass = clearResolved && isFinite(tripTime) && tripTime <= ctx.requiredTimeS;
+  checks.push({
+    key: 'clearing',
+    label: tx('Udkoblingstid ved Ik,min', 'Clearing time at Ik,min'),
+    state: !clearResolved ? 'unresolved' : (clearPass ? 'pass' : 'fail'),
+    clause: ctx.isFinal ? 'DS/HD 60364-4-41 cl. 411.3.2.2' : 'DS/HD 60364-4-41 cl. 411.3.2.3',
+    deviceStd: deviceStd,
+    detail: !clearResolved ? tx('Mangler Ik,min', 'Missing Ik,min')
+            : ((isFinite(tripTime) ? tripTime.toFixed(3) + 's' : '\u221E') + (clearPass ? ' <= ' : ' > ') + ctx.requiredTimeS + 's @ Ik,min=' + (ctx.ikmin / 1000).toFixed(2) + 'kA')
+  });
+
+  // ---- Check 4 (conservative extra): Breaking capacity Icu >= Ik,max (DS/HD 60364-4-43 cl. 434.5.1)
+  var icuA = (device.icu || 0) * 1000;
+  var bcResolved = ctx.ikmax > 0 && icuA > 0;
+  var bcPass = bcResolved && icuA >= ctx.ikmax;
+  checks.push({
+    key: 'breaking',
+    label: tx('Brydeevne (Icu >= Ik,max)', 'Breaking capacity (Icu >= Ik,max)'),
+    state: !bcResolved ? 'unresolved' : (bcPass ? 'pass' : 'fail'),
+    clause: 'DS/HD 60364-4-43 cl. 434.5.1',
+    deviceStd: deviceStd,
+    detail: !bcResolved ? tx('Mangler Icu/Ik,max', 'Missing Icu/Ik,max')
+            : ((icuA / 1000).toFixed(1) + 'kA ' + (bcPass ? '>=' : '<') + ' ' + (ctx.ikmax / 1000).toFixed(1) + 'kA')
+  });
+
+  // Verdict — conservative: any FAIL => unsafe; else any UNRESOLVED => unresolved; else safe.
+  var verdict = 'safe';
+  for (var i = 0; i < checks.length; i++) {
+    if (checks[i].state === 'fail') { verdict = 'unsafe'; break; }
+  }
+  if (verdict === 'safe') {
+    for (var j = 0; j < checks.length; j++) {
+      if (checks[j].state === 'unresolved') { verdict = 'unresolved'; break; }
+    }
+  }
+  // zsMargin (higher = more headroom) only meaningful when resolved.
+  var zsMargin = (zsInfo.state === 'resolved' && ctx.zs > 0) ? (zsInfo.zsMax * 0.8 - ctx.zs) : -Infinity;
+  return { checks: checks, verdict: verdict, In: In, kind: norm.kind, curve: norm.curve, tripTime: tripTime, zsMargin: zsMargin, deviceStd: deviceStd };
+}
+
+// Validate a SPECIFIC chosen device. Never returns 'safe' unless ALL checks pass.
+function smartValidateDevice(ctx, device) {
+  var r = smartRunChecks(ctx, device);
+  var reasons = [];
+  var citations = [];
+  for (var i = 0; i < r.checks.length; i++) {
+    var c = r.checks[i];
+    if (citations.indexOf(c.clause) < 0) citations.push(c.clause);
+    if (c.deviceStd && citations.indexOf(c.deviceStd) < 0) citations.push(c.deviceStd);
+    if (c.state === 'fail') reasons.push(tx('Fejler: ', 'Fails: ') + c.label + ' — ' + c.detail + ' (' + c.clause + ')');
+    else if (c.state === 'unresolved') reasons.push(tx('Uafklaret: ', 'Unresolved: ') + c.label + ' — ' + c.detail);
+  }
+  if (r.verdict === 'safe') reasons.push(tx('Alle kontroller bestaaet.', 'All checks passed.'));
+  return {
+    device: device,
+    verdict: r.verdict,          // 'safe' | 'unsafe' | 'unresolved'
+    checks: r.checks,
+    reasons: reasons,
+    citations: citations,
+    tripTime: r.tripTime
+  };
+}
+
+// Iterate REAL catalog candidates and return a RANKED list with per-check results.
+// Conservative tie-breaking: smaller In (closer to IB), then more sensitive curve
+// (B before C before D), then faster trip, then larger Zs margin. Never the
+// optimistic pick. candidates = array of PRODUCTS entries (MCB and/or gG fuse).
+function smartSelectDevice(ctx, candidates) {
+  if (!ctx) return { ranked: [], best: null, ctx: ctx };
+  var list = candidates || (PRODUCTS.mcbs.slice().concat(PRODUCTS.fuses.slice()));
+  var curveRank = { 'B': 0, 'C': 1, 'D': 2 };
+  var ranked = list.map(function(dev) {
+    var r = smartRunChecks(ctx, dev);
+    return {
+      device: dev,
+      id: dev.id,
+      In: r.In,
+      kind: r.kind,
+      curve: r.curve,
+      verdict: r.verdict,
+      checks: r.checks,
+      tripTime: r.tripTime,
+      zsMargin: r.zsMargin,
+      safe: r.verdict === 'safe'
+    };
+  });
+  ranked.sort(function(a, b) {
+    // 1) safe devices first
+    if (a.safe !== b.safe) return a.safe ? -1 : 1;
+    if (a.safe && b.safe) {
+      // 2) smallest In (canonical "next size up from IB", also fastest/most sensitive)
+      if (a.In !== b.In) return a.In - b.In;
+      // 3) more sensitive curve (B<C<D); fuses (curve null) ranked after equal-In MCB? keep stable via 9
+      var ca = (a.curve && curveRank[a.curve] != null) ? curveRank[a.curve] : 9;
+      var cb = (b.curve && curveRank[b.curve] != null) ? curveRank[b.curve] : 9;
+      if (ca !== cb) return ca - cb;
+      // 4) faster trip
+      if (a.tripTime !== b.tripTime) return a.tripTime - b.tripTime;
+      // 5) larger Zs margin
+      return b.zsMargin - a.zsMargin;
+    }
+    // both unsafe/unresolved: rank by number of passing checks (more passes first), then In
+    var pa = a.checks.filter(function(c){ return c.state === 'pass'; }).length;
+    var pb = b.checks.filter(function(c){ return c.state === 'pass'; }).length;
+    if (pa !== pb) return pb - pa;
+    return a.In - b.In;
+  });
+  var best = (ranked.length && ranked[0].safe) ? ranked[0] : null;
+  return { ranked: ranked, best: best, ctx: ctx };
+}
+
+// --- Click-only Smart Curve panel state + actions ---
+var smartPanelOpen = false;
+var smartPanelNodeId = null;
+var smartKindFilter = 'mcb';   // 'mcb' | 'fuse'
+var smartCurveFilter = 'B';    // 'B' | 'C' | 'D' | 'all'
+
+function smartTogglePanel(nodeId) {
+  if (smartPanelOpen && smartPanelNodeId === nodeId) { smartPanelOpen = false; smartPanelNodeId = null; }
+  else { smartPanelOpen = true; smartPanelNodeId = nodeId; }
+  if (typeof renderModule === 'function') renderModule('sld');
+}
+function smartCloseSelection() { smartPanelOpen = false; smartPanelNodeId = null; if (typeof renderModule === 'function') renderModule('sld'); }
+function smartSetKindFilter(k) { smartKindFilter = k; if (typeof renderModule === 'function') renderModule('sld'); }
+function smartSetCurveFilter(c) { smartCurveFilter = c; if (typeof renderModule === 'function') renderModule('sld'); }
+
+// Build the candidate set for the current panel filters.
+function smartCandidatesForPanel(kind, curve) {
+  if (kind === 'fuse') return PRODUCTS.fuses.slice();
+  return PRODUCTS.mcbs.filter(function(m) { return (!curve || curve === 'all') ? true : m.curve === curve; });
+}
+
+function smartCheckIcon(state) {
+  return state === 'pass' ? '\u2705' : (state === 'fail' ? '\u274C' : '\u2753');
+}
+
+// Trilingual, 100% click-only selection/validation panel. Reuses sldRenderTCCChart.
+function smartRenderSelectionPanel(tree, nodeId) {
+  var ctx = smartBuildCtxFromNode(tree, nodeId);
+  if (!ctx) return '';
+  var html = '<div class="card fade-in" style="border-left:4px solid var(--accent,#2563eb)">';
+  html += '<div class="card-title" style="display:flex;justify-content:space-between;align-items:center">';
+  html += '<span>\uD83D\uDCC8 ' + tx('Smart kurve-valg', 'Smart curve selection') + '</span>';
+  html += '<button class="sel-btn" onclick="smartCloseSelection()" style="padding:2px 10px">\u2715</button>';
+  html += '</div>';
+
+  // Already-computed inputs (read-only display, no text inputs)
+  html += '<div class="result-box"><div class="result-title">' + tx('Beregnede indgangsv\u00E6rdier', 'Computed circuit inputs') + '</div>';
+  html += '<div class="result-row"><span class="label">IB / Iz</span><span class="value">' + ctx.ib.toFixed(1) + ' / ' + ctx.iz.toFixed(1) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">Ik,min / Ik,max</span><span class="value">' + (ctx.ikmin / 1000).toFixed(2) + ' / ' + (ctx.ikmax / 1000).toFixed(2) + ' kA</span></div>';
+  html += '<div class="result-row"><span class="label">Zs</span><span class="value">' + (ctx.zs * 1000).toFixed(1) + ' m\u2126</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kr\u00E6vet udkoblingstid', 'Required disconnection time') + '</span><span class="value">' + ctx.requiredTimeS + ' s (' + ctx.earthing + ')</span></div>';
+  html += '</div>';
+
+  // Click-only device-type + curve filters
+  html += '<div class="select-group"><div class="select-label">' + tx('Enhedstype', 'Device type') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn ' + (smartKindFilter === 'mcb' ? 'selected' : '') + '" onclick="smartSetKindFilter(\'mcb\')">' + tx('Automatsikring (MCB)', 'Circuit breaker (MCB)') + '</button>';
+  html += '<button class="sel-btn ' + (smartKindFilter === 'fuse' ? 'selected' : '') + '" onclick="smartSetKindFilter(\'fuse\')">' + tx('Smeltesikring (gG)', 'Melting fuse (gG)') + '</button>';
+  html += '</div></div>';
+  if (smartKindFilter === 'mcb') {
+    html += '<div class="select-group"><div class="select-label">' + tx('Karakteristik', 'Curve') + '</div><div class="select-grid">';
+    ['B', 'C', 'D', 'all'].forEach(function(cu) {
+      var lbl = cu === 'all' ? tx('Alle', 'All') : cu;
+      html += '<button class="sel-btn ' + (smartCurveFilter === cu ? 'selected' : '') + '" onclick="smartSetCurveFilter(\'' + cu + '\')">' + lbl + '</button>';
+    });
+    html += '</div></div>';
+  }
+
+  // Run selection over real catalog candidates
+  var candidates = smartCandidatesForPanel(smartKindFilter, smartCurveFilter);
+  var sel = smartSelectDevice(ctx, candidates);
+
+  // Recommended device verdict
+  html += '<div class="result-box" style="margin-top:8px"><div class="result-title">' + tx('Anbefalet enhed', 'Recommended device') + '</div>';
+  if (sel.best) {
+    var b = sel.best;
+    var bName = (b.device.model || '') + ' ' + (b.curve ? b.curve : '') + b.In + (b.kind === 'fuse' ? 'A gG' : 'A');
+    html += '<div class="result-row"><span class="label">\u2705 ' + tx('Verdikt', 'Verdict') + '</span><span class="value" style="color:var(--success,#28a745);font-weight:bold">' + tx('SIKKER', 'SAFE') + ' \u2014 ' + bName + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Konservativt valg', 'Conservative choice') + '</span><span class="value" style="font-size:.8em">' + tx('udkobler hurtigst med margin', 'disconnects fastest with margin') + '</span></div>';
+    // Per-check breakdown for the recommendation
+    b.checks.forEach(function(c) {
+      html += '<div class="result-row"><span class="label">' + smartCheckIcon(c.state) + ' ' + c.label + '</span><span class="value" style="font-size:.75em">' + c.clause + ' / ' + c.deviceStd + '<br>' + c.detail + '</span></div>';
+    });
+    // Reuse the existing chart engine (no new chart code)
+    html += '<div style="margin-top:8px">' + sldRenderTCCChart(sldDeviceCurve(b.device, b.In), null, null) + '</div>';
+    // Apply through the UNCHANGED sldSetNodeProtection (works for MCB catalog ids)
+    if (b.kind === 'mcb') {
+      html += '<div style="margin-top:6px"><button class="sel-btn" onclick="sldSetNodeProtection(\'' + nodeId + '\',\'' + b.device.id + '\')">' + tx('Anvend', 'Apply') + ' ' + bName + '</button></div>';
+    } else {
+      html += '<div style="margin-top:6px;font-size:.8em;color:var(--text-muted)">' + tx('Smeltesikring v\u00E6lges manuelt (uden for MCB-knapper).', 'Melting fuse is selected manually (outside MCB buttons).') + '</div>';
+    }
+  } else {
+    html += '<div class="result-row"><span class="label">\u274C ' + tx('Verdikt', 'Verdict') + '</span><span class="value" style="color:var(--danger,#dc3545);font-weight:bold">' + tx('INGEN SIKKER ENHED FUNDET', 'NO SAFE DEVICE FOUND') + '</span></div>';
+    html += '<div class="result-row"><span class="value" style="font-size:.8em">' + tx('Skift type/karakteristik, v\u00E6lg st\u00F8rre kabel (lavere Zs) eller hurtigere enhed.', 'Change type/curve, choose a larger cable (lower Zs) or a faster device.') + '</span></div>';
+  }
+  html += '</div>';
+
+  // Ranked candidate list (top 6)
+  html += '<div class="result-box" style="margin-top:8px"><div class="result-title">' + tx('Rangerede kandidater', 'Ranked candidates') + '</div>';
+  sel.ranked.slice(0, 6).forEach(function(r) {
+    var vIcon = r.verdict === 'safe' ? '\u2705' : (r.verdict === 'unsafe' ? '\u274C' : '\u2753');
+    var nm = (r.device.model || '') + ' ' + (r.curve ? r.curve : '') + r.In + 'A';
+    var tt = isFinite(r.tripTime) ? r.tripTime.toFixed(3) + 's' : '\u221E';
+    html += '<div class="result-row"><span class="label">' + vIcon + ' ' + nm + '</span><span class="value" style="font-size:.78em">' + tx('udkobl. ', 'trip ') + tt + '</span></div>';
+  });
+  html += '</div>';
+
+  html += '</div>';
+  return html;
+}
+
 function sldRenderNodePanel(tree, nodeId) {
   if (!tree || !nodeId) return '';
   const node = tree.nodes[nodeId];
@@ -11449,6 +11801,15 @@ function sldRenderNodePanel(tree, nodeId) {
         });
         html += '</div></div>';
       }
+    }
+
+    // Smart curve device-selection / validation (click-only) — beside the device-picker buttons
+    html += '<div class="select-group"><div class="select-label">' + tx('Smart kurve-valg', 'Smart curve selection') + '</div>';
+    html += '<div class="select-grid">';
+    html += '<button class="sel-btn ' + (smartPanelOpen && smartPanelNodeId === nodeId ? 'selected' : '') + '" onclick="smartTogglePanel(\'' + nodeId + '\')">\uD83D\uDCC8 ' + tx('Anbefal & valider enhed', 'Recommend & validate device') + '</button>';
+    html += '</div></div>';
+    if (smartPanelOpen && smartPanelNodeId === nodeId) {
+      html += smartRenderSelectionPanel(tree, nodeId);
     }
 
     if (node.type === 'final_circuit') {
