@@ -881,6 +881,33 @@ html[dir="rtl"] .info-row { text-align: right; }
 html[dir="rtl"] .select-label { text-align: right; }
 html[dir="rtl"] .status-bar { direction: rtl; }
 html[dir="rtl"] .lang-toggle { direction: ltr; }
+
+/* ===== Native MathML formula typesetting (Mathcad-like) ===== */
+/* Offline-safe system math-font stack (no CDN / no embedded WOFF2). */
+math,
+.mathml-formula math {
+  font-family: "Cambria Math", "STIX Two Math", "Latin Modern Math", "XITS Math", serif;
+  font-size: 1.06em;
+  font-style: normal;
+}
+.mathml-formula { display: inline-block; vertical-align: middle; position: relative; }
+.mathml-formula math { direction: ltr; }
+/* Units typeset in distinct blue bold, matching the engineering references. */
+.math-unit { color: #1565c0; font-weight: 700; }
+/* Visually-hidden ASCII twin: preserves the exact source for search/AT. */
+.mathml-alt {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+.mathml-fallback { font-family: monospace; }
+@media print {
+  math,
+  .mathml-formula math {
+    font-family: "Cambria Math", "STIX Two Math", "Latin Modern Math", "XITS Math", serif;
+  }
+  .mathml-formula math { display: inline; }
+  .math-unit { color: #1565c0; font-weight: bold; }
+}
 </style>
 </head>
 <body>
@@ -960,6 +987,7 @@ const T = {
       trayfill: 'Kabelbakke',
       zs: 'Fejlsløjfe Zs',
       commission: 'Idriftsættelse',
+      commissioning: 'Verifikation (60364-6)',
       shev: 'Røgventilation',
       access: 'Adgangskontrol',
       generator: 'Nødgenerator',
@@ -1115,6 +1143,7 @@ const T = {
       trayfill: 'Cable Tray Fill',
       zs: 'Earth Fault Loop',
       commission: 'Commissioning',
+      commissioning: 'Verification (60364-6)',
       shev: 'Smoke Ventilation',
       access: 'Access Control',
       generator: 'Generator Sizing',
@@ -1262,6 +1291,7 @@ const T = {
       trayfill: 'سینی کابل',
       zs: 'امپدانس حلقه خطا',
       commission: 'راه‌اندازی',
+      commissioning: 'تأیید (60364-6)',
       shev: 'تهویه دود',
       access: 'کنترل دسترسی',
       generator: 'ژنراتور اضطراری',
@@ -1370,6 +1400,110 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // MathML formula typesetting
+  'Typeset formula': '\u0641\u0631\u0645\u0648\u0644 \u062D\u0631\u0648\u0641\u200C\u0686\u06CC\u0646\u06CC\u200C\u0634\u062F\u0647',
+  // Commissioning / Verification companion (DS/HD 60364-6) — Persian
+  'Commissioning & verification': '\u0631\u0627\u0647\u200C\u0627\u0646\u062F\u0627\u0632\u06CC \u0648 \u062A\u0623\u06CC\u06CC\u062F',
+  'Turns the calculated design into DS/HD 60364-6 field acceptance targets: the Zs and RA ceilings are DERIVED by INVERTING the auditor\u2019s own disconnection inequalities (same Ia source), tightened for worst-day conductor temperature. 100% click \u2014 no typing.': '\u0637\u0631\u0627\u062D\u06CC \u0645\u062D\u0627\u0633\u0628\u0647\u200C\u0634\u062F\u0647 \u0631\u0627 \u0628\u0647 \u0627\u0647\u062F\u0627\u0641 \u067E\u0630\u06CC\u0631\u0634 \u0645\u06CC\u062F\u0627\u0646\u06CC DS/HD 60364-6 \u062A\u0628\u062F\u06CC\u0644 \u0645\u06CC\u200C\u06A9\u0646\u062F: \u0633\u0642\u0641\u200C\u0647\u0627\u06CC Zs \u0648 RA \u0628\u0627 \u0648\u0627\u0631\u0648\u0646\u200C\u0633\u0627\u0632\u06CC \u0646\u0627\u0628\u0631\u0627\u0628\u0631\u06CC\u200C\u0647\u0627\u06CC \u0642\u0637\u0639 \u062E\u0648\u062F \u0645\u0645\u06CC\u0632 \u0628\u0647\u200C\u062F\u0633\u062A \u0645\u06CC\u200C\u0622\u06CC\u062F (\u0647\u0645\u0627\u0646 \u0645\u0646\u0628\u0639 Ia)\u060C \u0628\u0631\u0627\u06CC \u062F\u0645\u0627\u06CC \u0647\u0627\u062F\u06CC \u062F\u0631 \u0628\u062F\u062A\u0631\u06CC\u0646 \u0631\u0648\u0632 \u0633\u062E\u062A\u200C\u06AF\u06CC\u0631\u0627\u0646\u0647 \u0634\u062F\u0647. \u06F1\u06F0\u06F0\u066A \u06A9\u0644\u06CC\u06A9 \u2014 \u0628\u062F\u0648\u0646 \u062A\u0627\u06CC\u067E.',
+  'Verification report (DS/HD 60364-6)': '\u06AF\u0632\u0627\u0631\u0634 \u062A\u0623\u06CC\u06CC\u062F (DS/HD 60364-6)',
+  'Verification': '\u062A\u0623\u06CC\u06CC\u062F',
+  'no test points yet.': '\u0647\u0646\u0648\u0632 \u0646\u0642\u0637\u0647 \u0622\u0632\u0645\u0648\u0646\u06CC \u0646\u06CC\u0633\u062A.',
+  'tests passed of': '\u0622\u0632\u0645\u0648\u0646 \u0642\u0628\u0648\u0644\u200C\u0634\u062F\u0647 \u0627\u0632',
+  'failed': '\u0645\u0631\u062F\u0648\u062F',
+  'unresolved': '\u0646\u0627\u0645\u0634\u062E\u0635',
+  'Loop impedance Zs': '\u0627\u0645\u067E\u062F\u0627\u0646\u0633 \u062D\u0644\u0642\u0647 Zs',
+  'Continuity R1+R2': '\u067E\u06CC\u0648\u0633\u062A\u06AF\u06CC R1+R2',
+  'Earth-electrode resistance RA': '\u0645\u0642\u0627\u0648\u0645\u062A \u0627\u0644\u06A9\u062A\u0631\u0648\u062F \u0632\u0645\u06CC\u0646 RA',
+  'Insulation resistance': '\u0645\u0642\u0627\u0648\u0645\u062A \u0639\u0627\u06CC\u0642\u06CC',
+  'RCD trip time': '\u0632\u0645\u0627\u0646 \u0642\u0637\u0639 RCD',
+  'at I\u0394n': '\u062F\u0631 I\u0394n',
+  'at 5\u00D7I\u0394n': '\u062F\u0631 5\u00D7I\u0394n',
+  'Polarity': '\u0642\u0637\u0628\u06CC\u062A',
+  'Phase sequence': '\u062A\u0648\u0627\u0644\u06CC \u0641\u0627\u0632',
+  'PE continuity': '\u067E\u06CC\u0648\u0633\u062A\u06AF\u06CC PE',
+  'Recorded value': '\u0645\u0642\u062F\u0627\u0631 \u062B\u0628\u062A\u200C\u0634\u062F\u0647',
+  'Required': '\u0645\u0648\u0631\u062F \u0646\u06CC\u0627\u0632',
+  'Result': '\u0646\u062A\u06CC\u062C\u0647',
+  'Test': '\u0622\u0632\u0645\u0648\u0646',
+  'PASS': '\u0642\u0628\u0648\u0644',
+  'FAIL': '\u0645\u0631\u062F\u0648\u062F',
+  'BEST\u00C5ET': '\u0642\u0628\u0648\u0644',
+  'over the edge \u2014 design fails hot': '\u0627\u0632 \u0644\u0628\u0647 \u06AF\u0630\u0634\u062A\u0647 \u2014 \u0637\u0631\u0627\u062D\u06CC \u062F\u0631 \u062F\u0645\u0627\u06CC \u0628\u0627\u0644\u0627 \u0645\u0631\u062F\u0648\u062F \u0645\u06CC\u200C\u0634\u0648\u062F',
+  'unresolved \u2014 select device, cable and RCD': '\u0646\u0627\u0645\u0634\u062E\u0635 \u2014 \u0648\u0633\u06CC\u0644\u0647\u060C \u06A9\u0627\u0628\u0644 \u0648 RCD \u0631\u0627 \u0627\u0646\u062A\u062E\u0627\u0628 \u06A9\u0646\u06CC\u062F',
+  'Record measured value (no typing)': '\u062B\u0628\u062A \u0645\u0642\u062F\u0627\u0631 \u0627\u0646\u062F\u0627\u0632\u0647\u200C\u06AF\u06CC\u0631\u06CC\u200C\u0634\u062F\u0647 (\u0628\u062F\u0648\u0646 \u062A\u0627\u06CC\u067E)',
+  'Expected Zs @20 \u00B0C': 'Zs \u0645\u0648\u0631\u062F \u0627\u0646\u062A\u0638\u0627\u0631 \u062F\u0631 \u06F2\u06F0 \u00B0C',
+  'Tightened for worst-day conductor temperature': '\u0633\u062E\u062A\u200C\u06AF\u06CC\u0631\u0627\u0646\u0647 \u0628\u0631\u0627\u06CC \u062F\u0645\u0627\u06CC \u0647\u0627\u062F\u06CC \u062F\u0631 \u0628\u062F\u062A\u0631\u06CC\u0646 \u0631\u0648\u0632',
+  'temperature-independent': '\u0645\u0633\u062A\u0642\u0644 \u0627\u0632 \u062F\u0645\u0627',
+  'Inversion: acceptance ceiling Zs (worst-day corrected)': '\u0648\u0627\u0631\u0648\u0646\u200C\u0633\u0627\u0632\u06CC: \u0633\u0642\u0641 \u067E\u0630\u06CC\u0631\u0634 Zs (\u062A\u0635\u062D\u06CC\u062D\u200C\u0634\u062F\u0647 \u0628\u0631\u0627\u06CC \u0628\u062F\u062A\u0631\u06CC\u0646 \u0631\u0648\u0632)',
+  'Ceiling (rounded toward danger)': '\u0633\u0642\u0641 (\u06AF\u0631\u062F\u200C\u0634\u062F\u0647 \u0628\u0647 \u0633\u0645\u062A \u062E\u0637\u0631)',
+  'Inspection (click OK / Fail)': '\u0628\u0627\u0632\u0631\u0633\u06CC (\u06A9\u0644\u06CC\u06A9 OK / \u062E\u0637\u0627)',
+  'OK': 'OK',
+  'Fail': '\u062E\u0637\u0627',
+  'RCD type': '\u0646\u0648\u0639 RCD',
+  'selective (type S)': '\u0627\u0646\u062A\u062E\u0627\u0628\u06CC (\u0646\u0648\u0639 S)',
+  'Insulation test class': '\u06A9\u0644\u0627\u0633 \u0622\u0632\u0645\u0648\u0646 \u0639\u0627\u06CC\u0642',
+  'SELV/PELV': 'SELV/PELV',
+  'Soil (predicted RA)': '\u062E\u0627\u06A9 (RA \u067E\u06CC\u0634\u200C\u0628\u06CC\u0646\u06CC\u200C\u0634\u062F\u0647)',
+  'Select a transformer and final circuits in the Unified Project to generate acceptance targets.': '\u0628\u0631\u0627\u06CC \u062A\u0648\u0644\u06CC\u062F \u0627\u0647\u062F\u0627\u0641 \u067E\u0630\u06CC\u0631\u0634\u060C \u062F\u0631 \u067E\u0631\u0648\u0698\u0647 \u06CC\u06A9\u067E\u0627\u0631\u0686\u0647 \u062A\u0631\u0627\u0646\u0633\u0641\u0648\u0631\u0645\u0627\u062A\u0648\u0631 \u0648 \u0645\u062F\u0627\u0631\u0647\u0627\u06CC \u0646\u0647\u0627\u06CC\u06CC \u0631\u0627 \u0627\u0646\u062A\u062E\u0627\u0628 \u06A9\u0646\u06CC\u062F.',
+  'Select a transformer and at least one final circuit.': '\u06CC\u06A9 \u062A\u0631\u0627\u0646\u0633\u0641\u0648\u0631\u0645\u0627\u062A\u0648\u0631 \u0648 \u062F\u0633\u062A\u200C\u06A9\u0645 \u06CC\u06A9 \u0645\u062F\u0627\u0631 \u0646\u0647\u0627\u06CC\u06CC \u0627\u0646\u062A\u062E\u0627\u0628 \u06A9\u0646\u06CC\u062F.',
+  'See also the visual inspection checklist in the Commissioning module': '\u0647\u0645\u0686\u0646\u06CC\u0646 \u0686\u06A9\u200C\u0644\u06CC\u0633\u062A \u0628\u0627\u0632\u0631\u0633\u06CC \u0628\u0635\u0631\u06CC \u0631\u0627 \u062F\u0631 \u0645\u0627\u0698\u0648\u0644 \u0631\u0627\u0647\u200C\u0627\u0646\u062F\u0627\u0632\u06CC \u0628\u0628\u06CC\u0646\u06CC\u062F',
+  'items': '\u0645\u0648\u0631\u062F',
+  'Show verification report': '\u0646\u0645\u0627\u06CC\u0634 \u06AF\u0632\u0627\u0631\u0634 \u062A\u0623\u06CC\u06CC\u062F',
+  'Hide report': '\u067E\u0646\u0647\u0627\u0646\u200C\u06A9\u0631\u062F\u0646 \u06AF\u0632\u0627\u0631\u0634',
+  'Overall verdict': '\u0646\u062A\u06CC\u062C\u0647 \u06A9\u0644\u06CC',
+  'APPROVED FOR ENERGISATION \u2014 all verification tests pass.': '\u062A\u0623\u06CC\u06CC\u062F \u0628\u0631\u0627\u06CC \u0628\u0631\u0642\u200C\u062F\u0627\u0631 \u06A9\u0631\u062F\u0646 \u2014 \u0647\u0645\u0647 \u0622\u0632\u0645\u0648\u0646\u200C\u0647\u0627\u06CC \u062A\u0623\u06CC\u06CC\u062F \u0642\u0628\u0648\u0644 \u0634\u062F\u0646\u062F.',
+  'NOT APPROVED \u2014 verification failures must be resolved.': '\u062A\u0623\u06CC\u06CC\u062F \u0646\u0634\u062F \u2014 \u062E\u0637\u0627\u0647\u0627\u06CC \u062A\u0623\u06CC\u06CC\u062F \u0628\u0627\u06CC\u062F \u0628\u0631\u0637\u0631\u0641 \u0634\u0648\u0646\u062F.',
+  'INCOMPLETE \u2014 unresolved test points; not valid as approval.': '\u0646\u0627\u0642\u0635 \u2014 \u0646\u0642\u0627\u0637 \u0622\u0632\u0645\u0648\u0646 \u0646\u0627\u0645\u0634\u062E\u0635\u061B \u0628\u0647 \u0639\u0646\u0648\u0627\u0646 \u062A\u0623\u06CC\u06CC\u062F \u0645\u0639\u062A\u0628\u0631 \u0646\u06CC\u0633\u062A.',
+  'Metadata': '\u0641\u0631\u0627\u062F\u0627\u062F\u0647',
+  'Inspection checklist': '\u0686\u06A9\u200C\u0644\u06CC\u0633\u062A \u0628\u0627\u0632\u0631\u0633\u06CC',
+  'Required vs recorded': '\u0645\u0648\u0631\u062F \u0646\u06CC\u0627\u0632 \u062F\u0631 \u0628\u0631\u0627\u0628\u0631 \u062B\u0628\u062A\u200C\u0634\u062F\u0647',
+  'Statement & signature': '\u0628\u06CC\u0627\u0646\u06CC\u0647 \u0648 \u0627\u0645\u0636\u0627',
+  'Designed and verified to ': '\u0637\u0631\u0627\u062D\u06CC \u0648 \u062A\u0623\u06CC\u06CC\u062F \u0634\u062F\u0647 \u0637\u0628\u0642 ',
+  'Item': '\u0645\u0648\u0631\u062F',
+  '(not valid as approval)': '(\u0628\u0647 \u0639\u0646\u0648\u0627\u0646 \u062A\u0623\u06CC\u06CC\u062F \u0645\u0639\u062A\u0628\u0631 \u0646\u06CC\u0633\u062A)',
+  'Conductor temperature (worst-day)': '\u062F\u0645\u0627\u06CC \u0647\u0627\u062F\u06CC (\u0628\u062F\u062A\u0631\u06CC\u0646 \u0631\u0648\u0632)',
+
+
+  // Margin-to-Danger / Cliff-Edge + Worst-Day simulation (this feature) — Persian
+  'Overload': '\u0627\u0636\u0627\u0641\u0647\u200C\u0628\u0627\u0631',
+  'Disconnection (Zs)': '\u0642\u0637\u0639 \u062E\u0648\u062F\u06A9\u0627\u0631 (Zs)',
+  'Voltage drop': '\u0627\u0641\u062A \u0648\u0644\u062A\u0627\u0698',
+  'circuits': '\u0645\u062F\u0627\u0631',
+  'voltage factor': '\u0636\u0631\u06CC\u0628 \u0648\u0644\u062A\u0627\u0698',
+  'Margin to danger': '\u0641\u0627\u0635\u0644\u0647 \u062A\u0627 \u062E\u0637\u0631',
+  'How much headroom remains before each of the three coupled safety verdicts tips OK\u2192FAIL? Rounded toward danger (never overstated).': '\u0686\u0647 \u0627\u0646\u062F\u0627\u0632\u0647 \u0641\u0627\u0635\u0644\u0647 \u062A\u0627 \u0648\u0627\u0698\u06AF\u0648\u0646\u06CC \u0647\u0631 \u06CC\u06A9 \u0627\u0632 \u0633\u0647 \u0646\u062A\u06CC\u062C\u0647 \u0627\u06CC\u0645\u0646\u06CC \u0628\u0647\u200C\u0647\u0645\u200C\u067E\u06CC\u0648\u0633\u062A\u0647 (OK\u2192FAIL) \u0628\u0627\u0642\u06CC \u0645\u0627\u0646\u062F\u0647\u061F \u0628\u0647 \u0633\u0645\u062A \u062E\u0637\u0631 \u06AF\u0631\u062F \u0634\u062F\u0647 (\u0647\u0631\u06AF\u0632 \u0628\u06CC\u0634\u200C\u0628\u0631\u0622\u0648\u0631\u062F \u0646\u0634\u062F\u0647).',
+  'Already over the edge': '\u0647\u0645\u200C\u0627\u06A9\u0646\u0648\u0646 \u0627\u0632 \u0644\u0628\u0647 \u0639\u0628\u0648\u0631 \u06A9\u0631\u062F\u0647',
+  'Cannot compute margin \u2014 select a transformer, cable and device': '\u0645\u062D\u0627\u0633\u0628\u0647 \u062D\u0627\u0634\u06CC\u0647 \u0645\u0645\u06A9\u0646 \u0646\u06CC\u0633\u062A \u2014 \u062A\u0631\u0627\u0646\u0633\u0641\u0648\u0631\u0645\u0627\u062A\u0648\u0631\u060C \u06A9\u0627\u0628\u0644 \u0648 \u0648\u0633\u06CC\u0644\u0647 \u0631\u0627 \u0627\u0646\u062A\u062E\u0627\u0628 \u06A9\u0646\u06CC\u062F',
+  'no flip within realistic range': '\u0628\u062F\u0648\u0646 \u062A\u063A\u06CC\u06CC\u0631 \u062F\u0631 \u0645\u062D\u062F\u0648\u062F\u0647 \u0648\u0627\u0642\u0639\u200C\u06AF\u0631\u0627\u06CC\u0627\u0646\u0647',
+  'Nearest cliff edge': '\u0646\u0632\u062F\u06CC\u06A9\u200C\u062A\u0631\u06CC\u0646 \u0644\u0628\u0647 \u067E\u0631\u062A\u06AF\u0627\u0647',
+  'Dry soil (high earth resistance)': '\u062E\u0627\u06A9 \u062E\u0634\u06A9 (\u0645\u0642\u0627\u0648\u0645\u062A \u0632\u0645\u06CC\u0646 \u0628\u0627\u0644\u0627)',
+  'Soil': '\u062E\u0627\u06A9',
+  'not applicable (TT only)': '\u0642\u0627\u0628\u0644 \u0627\u0639\u0645\u0627\u0644 \u0646\u06CC\u0633\u062A (\u0641\u0642\u0637 TT)',
+  'Arc-flash and selectivity are not included in this analysis': '\u0642\u0648\u0633 \u0627\u0644\u06A9\u062A\u0631\u06CC\u06A9\u06CC \u0648 \u06AF\u0632\u06CC\u0646\u0634\u200C\u067E\u0630\u06CC\u0631\u06CC \u062F\u0631 \u0627\u06CC\u0646 \u062A\u062D\u0644\u06CC\u0644 \u0644\u062D\u0627\u0638 \u0646\u0634\u062F\u0647\u200C\u0627\u0646\u062F',
+  'Worst-Day simulation': '\u0634\u0628\u06CC\u0647\u200C\u0633\u0627\u0632\u06CC \u0628\u062F\u062A\u0631\u06CC\u0646 \u0631\u0648\u0632',
+  'Re-runs the whole installation under a realistic stacked Danish worst case. This is a scenario override, not the baseline.': '\u06A9\u0644 \u062A\u0623\u0633\u06CC\u0633\u0627\u062A \u0631\u0627 \u062A\u062D\u062A \u06CC\u06A9 \u0628\u062F\u062A\u0631\u06CC\u0646 \u062D\u0627\u0644\u062A \u0648\u0627\u0642\u0639\u200C\u06AF\u0631\u0627\u06CC\u0627\u0646\u0647 \u062F\u0627\u0646\u0645\u0627\u0631\u06A9\u06CC \u062F\u0648\u0628\u0627\u0631\u0647 \u0627\u062C\u0631\u0627 \u0645\u06CC\u200C\u06A9\u0646\u062F. \u0627\u06CC\u0646 \u06CC\u06A9 \u0628\u0627\u0632\u0646\u0648\u06CC\u0633\u06CC \u0633\u0646\u0627\u0631\u06CC\u0648 \u0627\u0633\u062A\u060C \u0646\u0647 \u0645\u0628\u0646\u0627.',
+  'Ambient temperature': '\u062F\u0645\u0627\u06CC \u0645\u062D\u06CC\u0637',
+  'Cable grouping': '\u06AF\u0631\u0648\u0647\u200C\u0628\u0646\u062F\u06CC \u06A9\u0627\u0628\u0644',
+  'Mains voltage factor': '\u0636\u0631\u06CC\u0628 \u0648\u0644\u062A\u0627\u0698 \u0634\u0628\u06A9\u0647',
+  'scenario override, not the baseline': '\u0628\u0627\u0632\u0646\u0648\u06CC\u0633\u06CC \u0633\u0646\u0627\u0631\u06CC\u0648\u060C \u0646\u0647 \u0645\u0628\u0646\u0627',
+  'Conductor temperature': '\u062F\u0645\u0627\u06CC \u0647\u0627\u062F\u06CC',
+  'Soil resistivity (TT only)': '\u0645\u0642\u0627\u0648\u0645\u062A \u0648\u06CC\u0698\u0647 \u062E\u0627\u06A9 (\u0641\u0642\u0637 TT)',
+  'not applicable': '\u0642\u0627\u0628\u0644 \u0627\u0639\u0645\u0627\u0644 \u0646\u06CC\u0633\u062A',
+  'Run Worst-Day': '\u0627\u062C\u0631\u0627\u06CC \u0628\u062F\u062A\u0631\u06CC\u0646 \u0631\u0648\u0632',
+  'No green verdicts to test': '\u0647\u06CC\u0686 \u0646\u062A\u06CC\u062C\u0647 \u0633\u0628\u0632\u06CC \u0628\u0631\u0627\u06CC \u0622\u0632\u0645\u0648\u0646 \u0646\u06CC\u0633\u062A',
+  'Worst-Day': '\u0628\u062F\u062A\u0631\u06CC\u0646 \u0631\u0648\u0632',
+  'currently-green verdicts turn red': '\u0646\u062A\u0627\u06CC\u062C \u0627\u06A9\u0646\u0648\u0646\u200C\u0633\u0628\u0632 \u0642\u0631\u0645\u0632 \u0645\u06CC\u200C\u0634\u0648\u0646\u062F',
+  'No change \u2014 all verdicts hold': '\u0628\u062F\u0648\u0646 \u062A\u063A\u06CC\u06CC\u0631 \u2014 \u0647\u0645\u0647 \u0646\u062A\u0627\u06CC\u062C \u067E\u0627\u0628\u0631\u062C\u0627',
+  'before': '\u067E\u06CC\u0634 \u0627\u0632',
+  'after': '\u067E\u0633 \u0627\u0632',
+  'Hide margins': '\u067E\u0646\u0647\u0627\u0646\u200C\u06A9\u0631\u062F\u0646 \u062D\u0627\u0634\u06CC\u0647\u200C\u0647\u0627',
+  'Show margins': '\u0646\u0645\u0627\u06CC\u0634 \u062D\u0627\u0634\u06CC\u0647\u200C\u0647\u0627',
+  'Raise ambient temperature': '\u0627\u0641\u0632\u0627\u06CC\u0634 \u062F\u0645\u0627\u06CC \u0645\u062D\u06CC\u0637',
+  'Conductor at max operating temperature': '\u0647\u0627\u062F\u06CC \u062F\u0631 \u062D\u062F\u0627\u06A9\u062B\u0631 \u062F\u0645\u0627\u06CC \u06A9\u0627\u0631\u06CC',
+  'Longer cable run': '\u0645\u0633\u06CC\u0631 \u06A9\u0627\u0628\u0644 \u0637\u0648\u0644\u0627\u0646\u06CC\u200C\u062A\u0631',
+  'Mains at lower limit (\u221210%)': '\u0634\u0628\u06A9\u0647 \u062F\u0631 \u062D\u062F \u067E\u0627\u06CC\u06CC\u0646 (\u221210\u066A)',
+  'Higher load': '\u0628\u0627\u0631 \u0628\u06CC\u0634\u062A\u0631',
+
   // Official product links (deep-link feature) — Persian
   'View product': '\u0645\u0634\u0627\u0647\u062F\u0647 \u0645\u062D\u0635\u0648\u0644',
   'Datasheet': '\u0628\u0631\u06AF\u0647 \u062F\u0627\u062F\u0647',
@@ -1519,7 +1653,42 @@ const _FA = {
   'Approval': '\u062A\u0623\u06CC\u06CC\u062F',
   'Qty': '\u062A\u0639\u062F\u0627\u062F',
   'Total line items': '\u0645\u062C\u0645\u0648\u0639 \u0627\u0642\u0644\u0627\u0645',
+  'Export CSV': '\u062E\u0631\u0648\u062C\u06CC CSV',
+  'Line items (distinct products)': '\u0627\u0642\u0644\u0627\u0645 (\u0645\u062D\u0635\u0648\u0644\u0627\u062A \u0645\u062A\u0645\u0627\u06CC\u0632)',
+  'Total quantity': '\u062A\u0639\u062F\u0627\u062F \u06A9\u0644',
+  'items': '\u0642\u0644\u0645',
+  'pcs': '\u0639\u062F\u062F',
+  'Category': '\u062F\u0633\u062A\u0647',
+  'Product page': '\u0635\u0641\u062D\u0647 \u0645\u062D\u0635\u0648\u0644',
+  'Datasheet': '\u062F\u06CC\u062A\u0627\u0634\u06CC\u062A',
   'The list is empty.': '\u0641\u0647\u0631\u0633\u062A \u062E\u0627\u0644\u06CC \u0627\u0633\u062A.',
+  'Standards check': '\u0628\u0631\u0631\u0633\u06CC \u0627\u0633\u062A\u0627\u0646\u062F\u0627\u0631\u062F',
+  'all': '\u0647\u0645\u0647',
+  'products cite a recognised IEC/EN/DS standard for their category.': '\u0645\u062D\u0635\u0648\u0644\u0627\u062A \u06CC\u06A9 \u0627\u0633\u062A\u0627\u0646\u062F\u0627\u0631\u062F \u0634\u0646\u0627\u062E\u062A\u0647\u200C\u0634\u062F\u0647 IEC/EN/DS \u0631\u0627 \u0628\u0631\u0627\u06CC \u062F\u0633\u062A\u0647 \u062E\u0648\u062F \u0630\u06A9\u0631 \u0645\u06CC\u200C\u06A9\u0646\u0646\u062F.',
+  'products lack a recognised standard.': '\u0645\u062D\u0635\u0648\u0644\u0627\u062A \u0641\u0627\u0642\u062F \u06CC\u06A9 \u0627\u0633\u062A\u0627\u0646\u062F\u0627\u0631\u062F \u0634\u0646\u0627\u062E\u062A\u0647\u200C\u0634\u062F\u0647 \u0647\u0633\u062A\u0646\u062F.',
+  // --- Coordination / coherence audit (life-safety: DS/HD 60364-4-43 / -5-54) ---
+  'Coordination check': '\u0628\u0631\u0631\u0633\u06CC \u0647\u0645\u0627\u0647\u0646\u06AF\u06CC',
+  'the list is empty \u2014 no components to coordinate.': '\u0641\u0647\u0631\u0633\u062A \u062E\u0627\u0644\u06CC \u0627\u0633\u062A \u2014 \u0647\u06CC\u0686 \u0642\u0637\u0639\u0647\u200C\u0627\u06CC \u0628\u0631\u0627\u06CC \u0647\u0645\u0627\u0647\u0646\u06AF\u06CC \u0648\u062C\u0648\u062F \u0646\u062F\u0627\u0631\u062F.',
+  'the picked supply components coordinate safely.': '\u0642\u0637\u0639\u0627\u062A \u062A\u0623\u0645\u06CC\u0646 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u0628\u0647\u200C\u0637\u0648\u0631 \u0627\u06CC\u0645\u0646 \u0647\u0645\u0627\u0647\u0646\u06AF \u0647\u0633\u062A\u0646\u062F.',
+  'coordination warning(s) \u2014 see report/export.': '\u0647\u0634\u062F\u0627\u0631(\u0647\u0627\u06CC) \u0647\u0645\u0627\u0647\u0646\u06AF\u06CC \u2014 \u06AF\u0632\u0627\u0631\u0634/\u062E\u0631\u0648\u062C\u06CC \u0631\u0627 \u0628\u0628\u06CC\u0646\u06CC\u062F.',
+  'A picked main fuse has no rating \u2014 overload coordination cannot be confirmed (DS/HD 60364-4-43).': '\u06CC\u06A9 \u0641\u06CC\u0648\u0632 \u0627\u0635\u0644\u06CC \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u0641\u0627\u0642\u062F \u062C\u0631\u06CC\u0627\u0646 \u0646\u0627\u0645\u06CC \u0627\u0633\u062A \u2014 \u0647\u0645\u0627\u0647\u0646\u06AF\u06CC \u0627\u0636\u0627\u0641\u0647\u200C\u0628\u0627\u0631 \u0642\u0627\u0628\u0644 \u062A\u0623\u06CC\u06CC\u062F \u0646\u06CC\u0633\u062A (DS/HD 60364-4-43).',
+  'No picked supply cable can carry the main fuse': '\u0647\u06CC\u0686 \u06A9\u0627\u0628\u0644 \u062A\u0623\u0645\u06CC\u0646 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647\u200C\u0627\u06CC \u0646\u0645\u06CC\u200C\u062A\u0648\u0627\u0646\u062F \u0641\u06CC\u0648\u0632 \u0627\u0635\u0644\u06CC \u0631\u0627 \u062A\u062D\u0645\u0644 \u06A9\u0646\u062F',
+  '(rule IB\u2264In\u2264Iz, DS/HD 60364-4-43).': '(\u0642\u0627\u0639\u062F\u0647 IB\u2264In\u2264Iz\u060C DS/HD 60364-4-43).',
+  'A picked supply cable has no ampacity Iz \u2014 coordination cannot be confirmed (DS/HD 60364-4-43).': '\u06CC\u06A9 \u06A9\u0627\u0628\u0644 \u062A\u0623\u0645\u06CC\u0646 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u0641\u0627\u0642\u062F \u0638\u0631\u0641\u06CC\u062A \u062C\u0631\u06CC\u0627\u0646 Iz \u0627\u0633\u062A \u2014 \u0647\u0645\u0627\u0647\u0646\u06AF\u06CC \u0642\u0627\u0628\u0644 \u062A\u0623\u06CC\u06CC\u062F \u0646\u06CC\u0633\u062A (DS/HD 60364-4-43).',
+  'Supply cable with Iz': '\u06A9\u0627\u0628\u0644 \u062A\u0623\u0645\u06CC\u0646 \u0628\u0627 Iz',
+  'is below the smallest picked fuse': '\u06A9\u0645\u062A\u0631 \u0627\u0632 \u06A9\u0648\u0686\u06A9\u200C\u062A\u0631\u06CC\u0646 \u0641\u06CC\u0648\u0632 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u0627\u0633\u062A',
+  'and could be overloaded (DS/HD 60364-4-43).': '\u0648 \u0645\u0645\u06A9\u0646 \u0627\u0633\u062A \u0627\u0636\u0627\u0641\u0647\u200C\u0628\u0627\u0631 \u0634\u0648\u062F (DS/HD 60364-4-43).',
+  'A picked transformer has no kVA \u2014 full-load current cannot be computed (DS/HD 60364).': '\u06CC\u06A9 \u062A\u0631\u0627\u0646\u0633\u0641\u0648\u0631\u0645\u0627\u062A\u0648\u0631 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u0641\u0627\u0642\u062F kVA \u0627\u0633\u062A \u2014 \u062C\u0631\u06CC\u0627\u0646 \u0628\u0627\u0631 \u06A9\u0627\u0645\u0644 \u0642\u0627\u0628\u0644 \u0645\u062D\u0627\u0633\u0628\u0647 \u0646\u06CC\u0633\u062A (DS/HD 60364).',
+  'The picked supply chain cannot carry the transformer full-load current': '\u0632\u0646\u062C\u06CC\u0631\u0647 \u062A\u0623\u0645\u06CC\u0646 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u0646\u0645\u06CC\u200C\u062A\u0648\u0627\u0646\u062F \u062C\u0631\u06CC\u0627\u0646 \u0628\u0627\u0631 \u06A9\u0627\u0645\u0644 \u062A\u0631\u0627\u0646\u0633\u0641\u0648\u0631\u0645\u0627\u062A\u0648\u0631 \u0631\u0627 \u062A\u062D\u0645\u0644 \u06A9\u0646\u062F',
+  'at 400 V (DS/HD 60364).': '\u062F\u0631 400 \u0648\u0644\u062A (DS/HD 60364).',
+  'A picked supply cable has no cross-section \u2014 PE conductor cannot be sized (DS/HD 60364-5-54 \u00A7543.1.2).': '\u06CC\u06A9 \u06A9\u0627\u0628\u0644 \u062A\u0623\u0645\u06CC\u0646 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u0641\u0627\u0642\u062F \u0633\u0637\u062D \u0645\u0642\u0637\u0639 \u0627\u0633\u062A \u2014 \u0647\u0627\u062F\u06CC PE \u0642\u0627\u0628\u0644 \u0627\u0646\u062F\u0627\u0632\u0647\u200C\u06AF\u06CC\u0631\u06CC \u0646\u06CC\u0633\u062A (DS/HD 60364-5-54 \u00A7543.1.2).',
+  'Main fuse': '\u0641\u06CC\u0648\u0632 \u0627\u0635\u0644\u06CC',
+  'is covered by a picked cable (Iz\u2265In, DS/HD 60364-4-43).': '\u062A\u0648\u0633\u0637 \u06CC\u06A9 \u06A9\u0627\u0628\u0644 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u067E\u0648\u0634\u0634 \u062F\u0627\u062F\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F (Iz\u2265In\u060C DS/HD 60364-4-43).',
+  'The transformer full-load current': '\u062C\u0631\u06CC\u0627\u0646 \u0628\u0627\u0631 \u06A9\u0627\u0645\u0644 \u062A\u0631\u0627\u0646\u0633\u0641\u0648\u0631\u0645\u0627\u062A\u0648\u0631',
+  'can be carried by the picked supply (DS/HD 60364).': '\u0645\u06CC\u200C\u062A\u0648\u0627\u0646\u062F \u062A\u0648\u0633\u0637 \u062A\u0623\u0645\u06CC\u0646 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u062A\u062D\u0645\u0644 \u0634\u0648\u062F (DS/HD 60364).',
+  'Supply cable': '\u06A9\u0627\u0628\u0644 \u062A\u0623\u0645\u06CC\u0646',
+  'requires a minimum PE cross-section of': '\u0628\u0647 \u062D\u062F\u0627\u0642\u0644 \u0633\u0637\u062D \u0645\u0642\u0637\u0639 PE \u0646\u06CC\u0627\u0632 \u062F\u0627\u0631\u062F',
+  '(DS/HD 60364-5-54 \u00A7543.1.2, table 54.7).': '(DS/HD 60364-5-54 \u00A7543.1.2\u060C \u062C\u062F\u0648\u0644 54.7).',
   'Generated': '\u062A\u0648\u0644\u06CC\u062F\u200C\u0634\u062F\u0647',
   'Reference': '\u0645\u0631\u062C\u0639',
   'Allow pop-ups to print.': '\u0628\u0631\u0627\u06CC \u0686\u0627\u067E\u060C \u067E\u0646\u062C\u0631\u0647\u200C\u0647\u0627\u06CC \u0628\u0627\u0632\u0634\u0648 \u0631\u0627 \u0645\u062C\u0627\u0632 \u06A9\u0646\u06CC\u062F.',
@@ -2972,13 +3141,19 @@ const PRODUCTS = {
   ],
 
   // === CABLE JOINTS ===
+  // STANDARD CORRECTION (flagged, grounded): these are LV 0,6/1 kV distribution-cable
+  // accessories (joints/muffer) sized 16-240 mm2 for the N1XV/NAYY supply cables above.
+  // The applicable product standard is EN 50393 (test methods & requirements for
+  // accessories on distribution cables of rated voltage 0,6/1,0 kV; CENELEC lineage HD 623).
+  // The previous citation IEC 60840 applies ONLY to HV cables/accessories ABOVE 30 kV
+  // (Um=36 kV) up to 150 kV — i.e. the wrong voltage class for these LV joints.
   cableJoints: [
-    { id: 'CJ-HEAT-16', brand: 'Cellpack', model: 'SRH2 16mm2', cat: 'heat-shrink', mm2: 16, use_da: 'Krympemuffe 16mm2', use_en: 'Heat-shrink joint 16mm2', standard: 'IEC 60840' },
-    { id: 'CJ-HEAT-35', brand: 'Cellpack', model: 'SRH2 35mm2', cat: 'heat-shrink', mm2: 35, use_da: 'Krympemuffe 35mm2', use_en: 'Heat-shrink joint 35mm2', standard: 'IEC 60840' },
-    { id: 'CJ-HEAT-95', brand: 'Cellpack', model: 'SRH2 95mm2', cat: 'heat-shrink', mm2: 95, use_da: 'Krympemuffe 95mm2', use_en: 'Heat-shrink joint 95mm2', standard: 'IEC 60840' },
-    { id: 'CJ-COLD-50', brand: 'Cellpack', model: 'SRCE 50mm2', cat: 'cold-shrink', mm2: 50, use_da: 'Koldkrympemuffe 50mm2', use_en: 'Cold-shrink joint 50mm2', standard: 'IEC 60840' },
-    { id: 'CJ-COLD-120', brand: 'Cellpack', model: 'SRCE 120mm2', cat: 'cold-shrink', mm2: 120, use_da: 'Koldkrympemuffe 120mm2', use_en: 'Cold-shrink joint 120mm2', standard: 'IEC 60840' },
-    { id: 'CJ-RESIN-240', brand: 'Cellpack', model: 'RSMA 240mm2', cat: 'resin', mm2: 240, use_da: 'Stoebningsmuffe 240mm2', use_en: 'Resin joint 240mm2', standard: 'IEC 60840' }
+    { id: 'CJ-HEAT-16', brand: 'Cellpack', model: 'SRH2 16mm2', cat: 'heat-shrink', mm2: 16, use_da: 'Krympemuffe 16mm2', use_en: 'Heat-shrink joint 16mm2', standard: 'EN 50393' },
+    { id: 'CJ-HEAT-35', brand: 'Cellpack', model: 'SRH2 35mm2', cat: 'heat-shrink', mm2: 35, use_da: 'Krympemuffe 35mm2', use_en: 'Heat-shrink joint 35mm2', standard: 'EN 50393' },
+    { id: 'CJ-HEAT-95', brand: 'Cellpack', model: 'SRH2 95mm2', cat: 'heat-shrink', mm2: 95, use_da: 'Krympemuffe 95mm2', use_en: 'Heat-shrink joint 95mm2', standard: 'EN 50393' },
+    { id: 'CJ-COLD-50', brand: 'Cellpack', model: 'SRCE 50mm2', cat: 'cold-shrink', mm2: 50, use_da: 'Koldkrympemuffe 50mm2', use_en: 'Cold-shrink joint 50mm2', standard: 'EN 50393' },
+    { id: 'CJ-COLD-120', brand: 'Cellpack', model: 'SRCE 120mm2', cat: 'cold-shrink', mm2: 120, use_da: 'Koldkrympemuffe 120mm2', use_en: 'Cold-shrink joint 120mm2', standard: 'EN 50393' },
+    { id: 'CJ-RESIN-240', brand: 'Cellpack', model: 'RSMA 240mm2', cat: 'resin', mm2: 240, use_da: 'Stoebningsmuffe 240mm2', use_en: 'Resin joint 240mm2', standard: 'EN 50393' }
   ],
 
   // === CABLE DUCTS (Danish color codes: red=power, blue=telecom, green=fiber) ===
@@ -2993,18 +3168,23 @@ const PRODUCTS = {
   ],
 
   // === TRANSFORMERS (ONAN=oil, AN=dry) ===
+  // STANDARD CORRECTION (flagged, grounded): cited under EN 50588-1 "Medium power
+  // transformers 50 Hz, Um <= 36 kV" (5 kVA..40 MVA), the current unified CENELEC
+  // product standard that covers BOTH oil-immersed and dry-type units. It supersedes
+  // the withdrawn EN 50464-1 (oil-immersed only — which also did NOT cover the dry-type
+  // AN units listed here). No numeric rating (kVA/uk%/losses) was changed.
   transformers: [
-    { id: 'TR-ONAN-50', brand: 'ABB', model: 'Oil DTR 50kVA', cooling: 'ONAN', kva: 50, ukPct: 4.0, pkW: 1.1, p0W: 190, use_da: '50kVA oliekoelet transformer', use_en: '50kVA oil-cooled transformer', standard: 'EN 50464-1' },
-    { id: 'TR-ONAN-100', brand: 'ABB', model: 'Oil DTR 100kVA', cooling: 'ONAN', kva: 100, ukPct: 4.0, pkW: 1.75, p0W: 320, use_da: '100kVA oliekoelet transformer', use_en: '100kVA oil-cooled transformer', standard: 'EN 50464-1' },
-    { id: 'TR-ONAN-250', brand: 'ABB', model: 'Oil DTR 250kVA', cooling: 'ONAN', kva: 250, ukPct: 4.5, pkW: 3.25, p0W: 650, use_da: '250kVA oliekoelet transformer', use_en: '250kVA oil-cooled transformer', standard: 'EN 50464-1' },
-    { id: 'TR-ONAN-400', brand: 'ABB', model: 'Oil DTR 400kVA', cooling: 'ONAN', kva: 400, ukPct: 4.5, pkW: 4.6, p0W: 930, use_da: '400kVA oliekoelet transformer', use_en: '400kVA oil-cooled transformer', standard: 'EN 50464-1' },
-    { id: 'TR-ONAN-630', brand: 'ABB', model: 'Oil DTR 630kVA', cooling: 'ONAN', kva: 630, ukPct: 5.0, pkW: 6.5, p0W: 1300, use_da: '630kVA oliekoelet transformer', use_en: '630kVA oil-cooled transformer', standard: 'EN 50464-1' },
-    { id: 'TR-ONAN-1000', brand: 'ABB', model: 'Oil DTR 1000kVA', cooling: 'ONAN', kva: 1000, ukPct: 5.5, pkW: 10.5, p0W: 1700, use_da: '1000kVA oliekoelet transformer', use_en: '1000kVA oil-cooled transformer', standard: 'EN 50464-1' },
-    { id: 'TR-ONAN-2500', brand: 'ABB', model: 'Oil DTR 2500kVA', cooling: 'ONAN', kva: 2500, ukPct: 6.0, pkW: 24.0, p0W: 3800, use_da: '2500kVA oliekoelet transformer', use_en: '2500kVA oil-cooled transformer', standard: 'EN 50464-1' },
-    { id: 'TR-AN-100', brand: 'ABB', model: 'Dry DTR 100kVA', cooling: 'AN', kva: 100, ukPct: 4.5, pkW: 2.15, p0W: 480, use_da: '100kVA toertype transformer', use_en: '100kVA dry-type transformer', standard: 'EN 50464-1' },
-    { id: 'TR-AN-250', brand: 'ABB', model: 'Dry DTR 250kVA', cooling: 'AN', kva: 250, ukPct: 5.0, pkW: 4.2, p0W: 850, use_da: '250kVA toertype transformer', use_en: '250kVA dry-type transformer', standard: 'EN 50464-1' },
-    { id: 'TR-AN-630', brand: 'ABB', model: 'Dry DTR 630kVA', cooling: 'AN', kva: 630, ukPct: 5.5, pkW: 8.0, p0W: 1700, use_da: '630kVA toertype transformer', use_en: '630kVA dry-type transformer', standard: 'EN 50464-1' },
-    { id: 'TR-AN-1000', brand: 'ABB', model: 'Dry DTR 1000kVA', cooling: 'AN', kva: 1000, ukPct: 6.0, pkW: 12.0, p0W: 2500, use_da: '1000kVA toertype transformer', use_en: '1000kVA dry-type transformer', standard: 'EN 50464-1' }
+    { id: 'TR-ONAN-50', brand: 'ABB', model: 'Oil DTR 50kVA', cooling: 'ONAN', kva: 50, ukPct: 4.0, pkW: 1.1, p0W: 190, use_da: '50kVA oliekoelet transformer', use_en: '50kVA oil-cooled transformer', standard: 'EN 50588-1' },
+    { id: 'TR-ONAN-100', brand: 'ABB', model: 'Oil DTR 100kVA', cooling: 'ONAN', kva: 100, ukPct: 4.0, pkW: 1.75, p0W: 320, use_da: '100kVA oliekoelet transformer', use_en: '100kVA oil-cooled transformer', standard: 'EN 50588-1' },
+    { id: 'TR-ONAN-250', brand: 'ABB', model: 'Oil DTR 250kVA', cooling: 'ONAN', kva: 250, ukPct: 4.5, pkW: 3.25, p0W: 650, use_da: '250kVA oliekoelet transformer', use_en: '250kVA oil-cooled transformer', standard: 'EN 50588-1' },
+    { id: 'TR-ONAN-400', brand: 'ABB', model: 'Oil DTR 400kVA', cooling: 'ONAN', kva: 400, ukPct: 4.5, pkW: 4.6, p0W: 930, use_da: '400kVA oliekoelet transformer', use_en: '400kVA oil-cooled transformer', standard: 'EN 50588-1' },
+    { id: 'TR-ONAN-630', brand: 'ABB', model: 'Oil DTR 630kVA', cooling: 'ONAN', kva: 630, ukPct: 5.0, pkW: 6.5, p0W: 1300, use_da: '630kVA oliekoelet transformer', use_en: '630kVA oil-cooled transformer', standard: 'EN 50588-1' },
+    { id: 'TR-ONAN-1000', brand: 'ABB', model: 'Oil DTR 1000kVA', cooling: 'ONAN', kva: 1000, ukPct: 5.5, pkW: 10.5, p0W: 1700, use_da: '1000kVA oliekoelet transformer', use_en: '1000kVA oil-cooled transformer', standard: 'EN 50588-1' },
+    { id: 'TR-ONAN-2500', brand: 'ABB', model: 'Oil DTR 2500kVA', cooling: 'ONAN', kva: 2500, ukPct: 6.0, pkW: 24.0, p0W: 3800, use_da: '2500kVA oliekoelet transformer', use_en: '2500kVA oil-cooled transformer', standard: 'EN 50588-1' },
+    { id: 'TR-AN-100', brand: 'ABB', model: 'Dry DTR 100kVA', cooling: 'AN', kva: 100, ukPct: 4.5, pkW: 2.15, p0W: 480, use_da: '100kVA toertype transformer', use_en: '100kVA dry-type transformer', standard: 'EN 50588-1' },
+    { id: 'TR-AN-250', brand: 'ABB', model: 'Dry DTR 250kVA', cooling: 'AN', kva: 250, ukPct: 5.0, pkW: 4.2, p0W: 850, use_da: '250kVA toertype transformer', use_en: '250kVA dry-type transformer', standard: 'EN 50588-1' },
+    { id: 'TR-AN-630', brand: 'ABB', model: 'Dry DTR 630kVA', cooling: 'AN', kva: 630, ukPct: 5.5, pkW: 8.0, p0W: 1700, use_da: '630kVA toertype transformer', use_en: '630kVA dry-type transformer', standard: 'EN 50588-1' },
+    { id: 'TR-AN-1000', brand: 'ABB', model: 'Dry DTR 1000kVA', cooling: 'AN', kva: 1000, ukPct: 6.0, pkW: 12.0, p0W: 2500, use_da: '1000kVA toertype transformer', use_en: '1000kVA dry-type transformer', standard: 'EN 50588-1' }
   ],
 
   // === TERMINALS ===
@@ -3913,6 +4093,68 @@ Reactive.register('lys', function () {
   } catch (e) { return { status: 'incomplete', detail: '' }; }
 });
 
+// ===== COMPLETE THE REACTIVE GRAPH: recomputers for the remaining modules that
+// hold shared quantities / a real verdict but were previously only stale-flagged.
+// Each reuses an ALREADY-VALIDATED pure-calc function (NO new math), can never
+// throw, and NEVER emits a false "OK": a genuine safety check resolves to
+// 'ok' | 'fail' | 'incomplete'; an exposure/coordination check that is not a
+// hard pass/fail resolves to 'warning' rather than a misleading OK.
+
+// Earth-fault loop impedance Zs — automatic-disconnection life-safety verdict.
+// Reuses zsCalcImpedance + zsGetMaxZs + zsCheckDisconnection (DS/HD 60364-4-41
+// Tab. 41.1 + 60364-6 verification). Recomputes fresh on ANY bus change so a
+// stale OK can never be shown after e.g. a cable/earthing change elsewhere.
+Reactive.register('zs', function () {
+  try {
+    if (typeof zsState === 'undefined') return { status: 'incomplete', detail: '' };
+    var r1r2 = (typeof ZS_R1R2_TABLE !== 'undefined' && ZS_R1R2_TABLE[zsState.cableSize] != null) ? ZS_R1R2_TABLE[zsState.cableSize] : 24.2;
+    var zsCalc = zsCalcImpedance(zsState.ze, r1r2, zsState.cableLength);
+    var zsMax = zsGetMaxZs(zsState.device);
+    if (!(zsMax > 0) || !isFinite(zsCalc) || zsCalc <= 0) return { status: 'incomplete', detail: tx('mangler Zs,max/Zs', 'missing Zs,max/Zs') };
+    var pass = zsCheckDisconnection(zsCalc, zsMax); // conservative: Zs <= 0.8*Zs,max
+    return { status: pass ? 'ok' : 'fail', detail: 'Zs=' + zsCalc.toFixed(2) + (pass ? '\u2264' : '>') + '0.8\u00B7Zs,max(' + zsMax.toFixed(2) + ')\u03A9' };
+  } catch (e) { return { status: 'incomplete', detail: '' }; }
+});
+
+// Arc-flash incident energy + PPE — Arbejdstilsynet risk-assessment verdict.
+// Reuses arcflashCalcIncidentEnergy + arcflashGetPPECategory (IEEE 1584).
+// Conservative mapping (never a false OK): <1.2 cal/cm2 -> ok (normal clothes),
+// 1.2..40 -> warning (arc-rated PPE required), >=40 -> fail (work prohibited).
+Reactive.register('arcflash', function () {
+  try {
+    if (typeof arcflashState === 'undefined') return { status: 'incomplete', detail: '' };
+    var s = arcflashState;
+    var E = arcflashCalcIncidentEnergy(s.voltage, s.faultCurrent, s.clearingTime, s.workingDistance);
+    if (!isFinite(E) || E < 0) return { status: 'incomplete', detail: '' };
+    var ppe = arcflashGetPPECategory(E);
+    var status = (E < 1.2) ? 'ok' : (E >= 40 ? 'fail' : 'warning');
+    return { status: status, detail: 'E=' + E.toFixed(1) + 'cal/cm\u00B2 (' + tx('Kat.', 'Cat.') + ' ' + (ppe.category < 0 ? 'X' : ppe.category) + ')' };
+  } catch (e) { return { status: 'incomplete', detail: '' }; }
+});
+
+// HV overcurrent relay — transformer-inrush coordination verdict. Reuses
+// relayCalcI1N + relayCalcInrush + relayCheckCoordination (Bind 5). The relay
+// must ride through magnetising inrush yet still protect: coordinated -> ok,
+// otherwise 'warning' (nuisance-trip risk), never a silent OK on a bus change.
+Reactive.register('relay', function () {
+  try {
+    if (typeof relayState === 'undefined') return { status: 'incomplete', detail: '' };
+    var I1N = relayCalcI1N(relayState.trafoKVA, relayState.primaryKV);
+    if (!isFinite(I1N) || I1N <= 0) return { status: 'incomplete', detail: '' };
+    var inrush = relayCalcInrush(I1N);
+    var coord = relayCheckCoordination(relayState.tGt, relayState.egentid, inrush.duration);
+    return { status: coord.coordinated ? 'ok' : 'warning', detail: 'I1N=' + I1N.toFixed(1) + 'A, t_rel\u00E6=' + coord.totalRelayTime + 's' };
+  } catch (e) { return { status: 'incomplete', detail: '' }; }
+});
+
+// Supply voltage propagates to the arc-flash assessment so a system-voltage
+// change anywhere immediately updates the incident-energy verdict.
+SharedQuantities.subscribe('voltage_phase', function (v, source) {
+  if (source !== 'arcflash' && typeof arcflashState !== 'undefined' && [230, 400, 690, 6000, 10000, 20000].indexOf(v) >= 0) {
+    arcflashState.voltage = v;
+  }
+});
+
 // Theme/RTL-safe presentation metadata for a reactive verdict.
 function reactiveVerdictMeta(status) {
   if (status === 'ok') return { color: 'var(--success)', icon: '\u2705', label: tx('Sikker', 'Safe') };
@@ -4744,7 +4986,7 @@ const NAV_GROUPS = [
     da: 'Dokumentation & kvalitet', en: 'Documentation & quality', fa: '\u0645\u0633\u062A\u0646\u062F\u0627\u062A \u0648 \u06A9\u06CC\u0641\u06CC\u062A',
     descDa: 'Det der g\u00F8r projektet lovligt og f\u00E6rdigt: standarder, komponentbank, tilbud, KLS-kvalitetssikring, idrifts\u00E6ttelse, dokumentation \u2014 og eksamenstr\u00E6ning.',
     descEn: 'What makes the project legal and finished: standards, component bank, bids, KLS quality control, commissioning, documentation \u2014 and exam practice.',
-    keys: ['standards', 'bank', 'pdf', 'bid', 'kls', 'commission', 'verify', 'exam', 'ai']
+    keys: ['standards', 'bank', 'pdf', 'bid', 'kls', 'commission', 'commissioning', 'verify', 'exam', 'ai']
   }
 ];
 
@@ -6196,6 +6438,7 @@ function renderModule(mod) {
     case 'trayfill': content = renderTrayFill(); break;
     case 'zs': content = renderZs(); break;
     case 'commission': content = renderCommission(); break;
+    case 'commissioning': content = cvRender(); break;
     case 'shev': content = renderShev(); break;
     case 'access': content = renderAccess(); break;
     case 'generator': content = renderGenerator(); break;
@@ -6291,6 +6534,268 @@ function renderQiCard(qi) {
 }
 
 // ============================================================================
+// ===== NATIVE MathML FORMULA TYPESETTING (transpiler) =====
+// ============================================================================
+// Self-contained ASCII-math -> native MathML Core transpiler. NO external
+// library / CDN. Turns the formula/substitution conventions already used across
+// this codebase into Mathcad-style typeset math: dotted multi-part subscripts,
+// real radicals, stacked fractions, the define operator (:=), chained
+// inequalities, absolute-value bars, Danish-decimal numbers, Greek/symbols.
+//
+// PRESENTATION ONLY: it never changes a number, operator or meaning. Every
+// emitted <math> carries the EXACT original ASCII as an `alttext` attribute AND
+// as a visually-hidden span, so substring/text search still finds the source.
+// If parsing fails or the input looks like prose, it falls back to the escaped
+// raw text and NEVER throws to the page.
+//
+// Grammar guards (LOCKED): `^` is the ONLY superscript trigger (trailing digits
+// like Un/S1/SN stay part of the identifier, never auto-superscripted); `_` is
+// the ONLY subscript trigger and binds tighter than `/`; `/` is an
+// expression-level stacked fraction; `·`/`×`/`*` all render as `·`.
+// ============================================================================
+
+function mmlEsc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function mmlEscAttr(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Render a known/structured unit in the distinct blue "math unit" style.
+function mathmlUnit(u) {
+  if (u == null || u === '') return '';
+  return '<span class="math-unit">' + mmlEsc(u) + '</span>';
+}
+
+// Tokenize + parse an ASCII-math expression into a MathML fragment string.
+// Throws on prose/malformed input (caller falls back gracefully).
+function mathmlParse(raw) {
+  var s = String(raw);
+  var L = s.length;
+  var i = 0;
+  var toks = [];
+  var letterRe = /[A-Za-z\u00B5\u00C0-\u024F\u0391-\u03C9]/;
+  function isLetter(c) { return letterRe.test(c); }
+  function isDigit(c) { return c >= '0' && c <= '9'; }
+  function isIdentChar(c) { return isLetter(c) || isDigit(c) || c === '%'; }
+  function isSubChar(c) { return isLetter(c) || isDigit(c) || c === '.' || c === '%'; }
+  while (i < L) {
+    var c = s[i];
+    if (c === ' ' || c === '\t' || c === '\n' || c === '\r' || c === '\u00A0') { i++; continue; }
+    if (c === ':' && s[i + 1] === '=') { toks.push({ t: 'op', v: ':=' }); i += 2; continue; }
+    if (c === '<' && s[i + 1] === '=') { toks.push({ t: 'op', v: '\u2264' }); i += 2; continue; }
+    if (c === '>' && s[i + 1] === '=') { toks.push({ t: 'op', v: '\u2265' }); i += 2; continue; }
+    if (isDigit(c)) {
+      var jn = i + 1;
+      while (jn < L && isDigit(s[jn])) jn++;
+      if (jn < L && (s[jn] === '.' || s[jn] === ',') && jn + 1 < L && isDigit(s[jn + 1])) {
+        jn++; while (jn < L && isDigit(s[jn])) jn++;
+      }
+      toks.push({ t: 'num', v: s.slice(i, jn) }); i = jn; continue;
+    }
+    if (isLetter(c)) {
+      var je = i + 1;
+      while (je < L && isIdentChar(s[je])) je++;
+      var name = s.slice(i, je);
+      var primes = '';
+      while (je < L && s[je] === "'") { primes += "'"; je++; }
+      var sub = null;
+      if (je < L && s[je] === '_') {
+        var k = je + 1, sj = k;
+        while (sj < L && isSubChar(s[sj])) sj++;
+        if (sj > k) { sub = s.slice(k, sj); je = sj; }
+      }
+      var plain = (primes === '' && sub === null && /^[A-Za-z\u00C0-\u024F\u0391-\u03C9]{2,}$/.test(name));
+      toks.push({ t: 'id', name: name, primes: primes, sub: sub, plain: plain }); i = je; continue;
+    }
+    if (c === '\u00B7' || c === '\u00D7' || c === '*') { toks.push({ t: 'op', v: '*' }); i++; continue; }
+    if ('()|^/+-'.indexOf(c) >= 0) { toks.push({ t: 'op', v: c }); i++; continue; }
+    if (c === '\u221A') { toks.push({ t: 'op', v: '\u221A' }); i++; continue; }
+    if (c === '=') { toks.push({ t: 'op', v: '=' }); i++; continue; }
+    if (c === '<') { toks.push({ t: 'op', v: '<' }); i++; continue; }
+    if (c === '>') { toks.push({ t: 'op', v: '>' }); i++; continue; }
+    if (c === '\u2264' || c === '\u2265' || c === '\u2260') { toks.push({ t: 'op', v: c }); i++; continue; }
+    if (c === '\u00B2' || c === '\u00B3' || c === '\u00B9') {
+      toks.push({ t: 'op', v: 'usup', sup: (c === '\u00B2' ? '2' : c === '\u00B3' ? '3' : '1') }); i++; continue;
+    }
+    if (c === '%') { toks.push({ t: 'op', v: '%' }); i++; continue; }
+    if (c === '\u00B0') { toks.push({ t: 'op', v: '\u00B0' }); i++; continue; }
+    throw new Error('mathml: unrecognized character');
+  }
+
+  var p = 0;
+  var absDepth = 0;
+  function tk() { return toks[p]; }
+  function opIs(v) { var x = toks[p]; return !!x && x.t === 'op' && x.v === v; }
+  var RELOP = { '=': 1, ':=': 1, '\u2264': 1, '\u2265': 1, '\u2260': 1, '<': 1, '>': 1 };
+
+  function relML(op) {
+    if (op === '<') return '<mo>&lt;</mo>';
+    if (op === '>') return '<mo>&gt;</mo>';
+    return '<mo>' + op + '</mo>';
+  }
+
+  function isAtomStart(x) {
+    if (!x) return false;
+    if (x.t === 'num' || x.t === 'id') return true;
+    if (x.t === 'op' && (x.v === '(' || x.v === '\u221A')) return true;
+    if (x.t === 'op' && x.v === '|') return !(absDepth > 0);
+    return false;
+  }
+
+  function parseRel() {
+    var out = parseAdd().ml;
+    while (toks[p] && toks[p].t === 'op' && RELOP[toks[p].v]) {
+      var op = toks[p++].v;
+      out += relML(op) + parseAdd().ml;
+    }
+    return out;
+  }
+
+  function parseAdd() {
+    var left = parseTerm();
+    var ml = left.ml;
+    while (toks[p] && toks[p].t === 'op' && (toks[p].v === '+' || toks[p].v === '-')) {
+      var op = toks[p++].v;
+      ml += '<mo>' + op + '</mo>' + parseTerm().ml;
+    }
+    return { ml: ml, word: false, stripped: null };
+  }
+
+  function parseTerm() {
+    var left = parseFactor();
+    while (true) {
+      var x = toks[p];
+      if (!x) break;
+      if (x.t === 'op' && x.v === '*') { p++; var r1 = parseFactor(); left = { ml: left.ml + '<mo>\u00B7</mo>' + r1.ml, word: false, stripped: null }; continue; }
+      if (x.t === 'op' && x.v === '/') {
+        p++; var r2 = parseFactor();
+        var num = (left.stripped != null) ? left.stripped : left.ml;
+        var den = (r2.stripped != null) ? r2.stripped : r2.ml;
+        left = { ml: '<mfrac><mrow>' + num + '</mrow><mrow>' + den + '</mrow></mfrac>', word: false, stripped: null };
+        continue;
+      }
+      if (x.t === 'op' && x.v === '%') { p++; left = { ml: left.ml + '<mo>%</mo>', word: false, stripped: null }; continue; }
+      if (x.t === 'op' && x.v === '\u00B0') { p++; left = { ml: left.ml + '<mo>\u00B0</mo>', word: false, stripped: null }; continue; }
+      if (isAtomStart(x)) {
+        var r3 = parseFactor();
+        if (left.word && r3.word) throw new Error('mathml: prose juxtaposition');
+        left = { ml: left.ml + r3.ml, word: false, stripped: null };
+        continue;
+      }
+      break;
+    }
+    return left;
+  }
+
+  function parseFactor() {
+    var x = toks[p];
+    if (!x) throw new Error('mathml: unexpected end');
+    if (x.t === 'op' && (x.v === '+' || x.v === '-')) { p++; var f = parseFactor(); return { ml: '<mo>' + x.v + '</mo>' + f.ml, word: false, stripped: null }; }
+    var prim = parsePrimary();
+    var sup = null;
+    if (toks[p] && toks[p].t === 'op' && toks[p].v === '^') { p++; sup = parseExponent(); }
+    else if (toks[p] && toks[p].t === 'op' && toks[p].v === 'usup') { sup = '<mn>' + toks[p].sup + '</mn>'; p++; }
+    if (sup != null) {
+      if (prim.sub != null) return { ml: '<msubsup>' + prim.base + '<mrow>' + prim.sub + '</mrow><mrow>' + sup + '</mrow></msubsup>', word: false, stripped: null };
+      return { ml: '<msup><mrow>' + prim.base + '</mrow><mrow>' + sup + '</mrow></msup>', word: false, stripped: null };
+    }
+    if (prim.sub != null) return { ml: '<msub>' + prim.base + '<mrow>' + prim.sub + '</mrow></msub>', word: false, stripped: null };
+    return { ml: prim.base, word: prim.word, stripped: prim.isParen ? prim.inner : null };
+  }
+
+  function parseExponent() {
+    var x = toks[p];
+    if (!x) throw new Error('mathml: missing exponent');
+    if (x.t === 'op' && x.v === '(') {
+      p++; var inner = parseRel();
+      if (!opIs(')')) throw new Error('mathml: unbalanced exponent paren');
+      p++;
+      return '<mrow>' + inner + '</mrow>';
+    }
+    var prim = parsePrimary();
+    var ml = (prim.sub != null) ? '<msub>' + prim.base + '<mrow>' + prim.sub + '</mrow></msub>' : prim.base;
+    return '<mrow>' + ml + '</mrow>';
+  }
+
+  function parsePrimary() {
+    var x = toks[p];
+    if (!x) throw new Error('mathml: unexpected end');
+    if (x.t === 'num') { p++; return { base: '<mn>' + x.v + '</mn>', sub: null, isParen: false, word: false }; }
+    if (x.t === 'id') {
+      p++;
+      var baseName = '<mi>' + mmlEsc(x.name) + '</mi>';
+      var primeML = '';
+      if (x.primes === "'") primeML = '<mo>\u2032</mo>';
+      else if (x.primes.length === 2) primeML = '<mo>\u2033</mo>';
+      else if (x.primes.length >= 3) primeML = '<mo>\u2034</mo>';
+      var base = primeML ? '<mrow>' + baseName + primeML + '</mrow>' : baseName;
+      var sub = null;
+      if (x.sub != null && x.sub !== '') {
+        sub = /^[0-9]+$/.test(x.sub) ? '<mn>' + x.sub + '</mn>' : '<mi>' + mmlEsc(x.sub) + '</mi>';
+      }
+      return { base: base, sub: sub, isParen: false, word: x.plain };
+    }
+    if (x.t === 'op' && x.v === '(') {
+      p++; var inner1 = parseRel();
+      if (!opIs(')')) throw new Error('mathml: unbalanced paren');
+      p++;
+      return { base: '<mrow><mo>(</mo>' + inner1 + '<mo>)</mo></mrow>', sub: null, isParen: true, inner: '<mrow>' + inner1 + '</mrow>', word: false };
+    }
+    if (x.t === 'op' && x.v === '|') {
+      p++; absDepth++;
+      var inner2 = parseRel();
+      absDepth--;
+      if (!opIs('|')) throw new Error('mathml: unbalanced abs');
+      p++;
+      return { base: '<mrow><mo>|</mo>' + inner2 + '<mo>|</mo></mrow>', sub: null, isParen: false, word: false };
+    }
+    if (x.t === 'op' && x.v === '\u221A') {
+      p++;
+      if (toks[p] && toks[p].t === 'op' && toks[p].v === '(') {
+        p++; var inner3 = parseRel();
+        if (!opIs(')')) throw new Error('mathml: unbalanced radical');
+        p++;
+        return { base: '<msqrt><mrow>' + inner3 + '</mrow></msqrt>', sub: null, isParen: false, word: false };
+      }
+      var rad = parseFactor();
+      return { base: '<msqrt>' + rad.ml + '</msqrt>', sub: null, isParen: false, word: false };
+    }
+    throw new Error('mathml: unexpected token');
+  }
+
+  var result = parseRel();
+  if (p < toks.length) throw new Error('mathml: trailing tokens');
+  if (result === '') throw new Error('mathml: empty');
+  return result;
+}
+
+// Public entry point. Returns an HTML string: a <math> element (with the exact
+// ASCII preserved in `alttext` + a visually-hidden span) on success, or the
+// escaped raw text on failure (graceful fallback). Multi-line input (\n) is
+// transpiled line-by-line and joined with <br>.
+function mathml(expr, opts) {
+  opts = opts || {};
+  if (expr == null) return '';
+  var raw = String(expr);
+  if (raw.indexOf('\n') >= 0) {
+    return raw.split('\n').map(function (ln) { return mathml(ln, opts); }).join('<br>');
+  }
+  if (raw.trim() === '') return mmlEsc(raw);
+  try {
+    var inner = mathmlParse(raw);
+    var titleAttr = opts.title ? ' title="' + mmlEscAttr(opts.title) + '"' : '';
+    var h = '<span class="mathml-formula"' + titleAttr + '>';
+    h += '<math xmlns="http://www.w3.org/1998/Math/MathML" alttext="' + mmlEscAttr(raw) + '"><mrow>' + inner + '</mrow></math>';
+    h += '<span class="mathml-alt" aria-hidden="false" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">' + mmlEsc(raw) + '</span>';
+    h += '</span>';
+    return h;
+  } catch (e) {
+    return '<span class="mathml-fallback">' + mmlEsc(raw) + '</span>';
+  }
+}
+
+// ============================================================================
 // ===== UNIVERSAL CALCULATION DETAIL HELPER (calcDetail) =====
 // ============================================================================
 // Generic function that renders a standardized "calculation detail card" showing:
@@ -6316,7 +6821,7 @@ function calcDetail(calc) {
   h += '<summary style="cursor:pointer;padding:8px 12px;background:var(--primary-glow);font-weight:600;font-size:0.85rem;display:flex;align-items:center;gap:6px">';
   h += '<span style="flex:1">' + (calc.name || '') + '</span>';
   if (calc.result && calc.result.value != null) {
-    h += '<span style="font-family:monospace;color:var(--primary)">' + calcDetailFmtVal(calc.result.value) + (calc.result.unit ? ' ' + calc.result.unit : '') + '</span>';
+    h += '<span style="font-family:monospace;color:var(--primary)">' + calcDetailFmtVal(calc.result.value) + (calc.result.unit ? ' ' + mathmlUnit(calc.result.unit) : '') + '</span>';
   }
   h += '<span style="color:var(--text-muted);font-size:0.75rem;white-space:nowrap">' + tx('vis udregning', 'show working') + ' \u25BC</span>';
   h += '</summary>';
@@ -6324,7 +6829,7 @@ function calcDetail(calc) {
   h += '<div style="padding:10px 14px;font-size:0.82rem">';
   // Formula
   if (calc.formula) {
-    h += '<div style="margin-bottom:6px"><strong>' + tx('Formel', 'Formula') + ':</strong> <code style="font-size:0.9em;background:var(--border-light);padding:2px 6px;border-radius:4px">' + calc.formula + '</code></div>';
+    h += '<div style="margin-bottom:6px"><strong>' + tx('Formel', 'Formula') + ':</strong> <code style="font-size:0.9em;background:var(--border-light);padding:2px 6px;border-radius:4px">' + mathml(calc.formula, { title: tx('Typesat formel', 'Typeset formula') }) + '</code></div>';
   }
   // Variable table
   if (calc.variables && calc.variables.length) {
@@ -6336,7 +6841,7 @@ function calcDetail(calc) {
       h += '<tr style="border-bottom:1px solid var(--border-light)">';
       h += '<td style="padding:3px 6px">' + (v.name || v.symbol || '') + '</td>';
       h += '<td style="padding:3px 6px;font-family:monospace">' + (v.symbol || '') + '</td>';
-      h += '<td style="padding:3px 6px;font-family:monospace">' + calcDetailFmtVal(v.value) + (v.unit ? ' ' + v.unit : '') + '</td>';
+      h += '<td style="padding:3px 6px;font-family:monospace">' + calcDetailFmtVal(v.value) + (v.unit ? ' ' + mathmlUnit(v.unit) : '') + '</td>';
       h += '<td style="padding:3px 6px;color:var(--text-muted);font-size:0.78rem">' + (v.source || '') + '</td>';
       h += '</tr>';
     }
@@ -6344,7 +6849,7 @@ function calcDetail(calc) {
   }
   // Substitution line
   if (calc.substitution) {
-    h += '<div style="margin-bottom:6px"><strong>' + tx('Inds\u00E6tning', 'Substitution') + ':</strong> <code style="font-family:monospace;font-size:0.88em">' + calc.substitution + '</code></div>';
+    h += '<div style="margin-bottom:6px"><strong>' + tx('Inds\u00E6tning', 'Substitution') + ':</strong> <code style="font-family:monospace;font-size:0.88em">' + mathml(calc.substitution, { title: tx('Typesat formel', 'Typeset formula') }) + '</code></div>';
   }
   // Intermediate steps
   if (calc.steps && calc.steps.length) {
@@ -6368,7 +6873,7 @@ function calcDetail(calc) {
   if (calc.result) {
     h += '<div style="margin-top:6px;padding:6px 10px;background:var(--success-bg);border-radius:var(--radius-sm);font-weight:600">';
     h += '<strong>' + tx('Resultat', 'Result') + ':</strong> ';
-    h += '<span style="font-family:monospace;font-size:1.05em">' + calcDetailFmtVal(calc.result.value) + (calc.result.unit ? ' ' + calc.result.unit : '') + '</span>';
+    h += '<span style="font-family:monospace;font-size:1.05em">' + calcDetailFmtVal(calc.result.value) + (calc.result.unit ? ' ' + mathmlUnit(calc.result.unit) : '') + '</span>';
     if (calc.result.status) {
       var stColor = calc.result.status === 'ok' ? 'var(--success)' : (calc.result.status === 'fail' ? 'var(--danger)' : 'var(--warning)');
       var stIcon = calc.result.status === 'ok' ? '\u2705' : (calc.result.status === 'fail' ? '\u26D4' : '\u26A0\uFE0F');
@@ -8042,7 +8547,7 @@ function elforsyningProductById(id) {
 }
 
 // Applicable standard for a line: every supply-side product carries its own `standard`
-// field (e.g. IEC 60269-2, IEC 60228, IEC 60840, DS/HD 60364-5-54). Falls back to the
+// field (e.g. IEC 60269-2, IEC 60228, EN 50393, DS/HD 60364-5-54). Falls back to the
 // installation standard so the column is never blank.
 function elforsyningStandard(p) {
   return (p && p.standard) ? p.standard : ELFORSYNING_STD_REF;
@@ -8053,6 +8558,243 @@ function elforsyningStandard(p) {
 // We never fabricate certificate numbers.
 function elforsyningApproval(p) {
   return tx('CE-m\u00E6rket', 'CE-marked');
+}
+
+// --- Standards verification registry (life-safety: every line must cite the correct
+// IEC/EN/DS clause for its category). This is the executable, permanent form of the
+// standards audit: a registry of the standards that are RECOGNISED as applicable to
+// each of the 8 supply-side categories, plus a checker that flags any product whose
+// `standard` field is missing or not recognised for its category. It never invents a
+// certificate — it only confirms the cited clause belongs to the right family.
+//   supplyCables   DS/HD 60364-5-52  selection & erection of wiring systems (installation)
+//   metering       IEC 61869-2 (CT) / IEC 62053-22 (active-energy meter) / IEC 61557-12 (PMD)
+//   mainFuses      IEC 60269-2       LV fuses for use by authorised persons (gG NH/utility-sealed)
+//   earthing       DS/HD 60364-5-54  earthing arrangements & protective conductors
+//   cableJoints    EN 50393          accessories for 0,6/1,0 kV distribution cables (LV)
+//   cableDucts     DS 475 (buried duct laying norm) / IEC 61537 (cable tray/ladder systems)
+//   transformers   EN 50588-1        medium power transformers Um<=36 kV (oil + dry)
+//   terminals      IEC 60947-7-1     terminal blocks for copper conductors
+const ELFORSYNING_EXPECTED_STANDARDS = {
+  supplyCables: ['DS/HD 60364-5-52'],
+  metering: ['IEC 61869-2', 'IEC 62053-22', 'IEC 61557-12'],
+  mainFuses: ['IEC 60269-2'],
+  earthing: ['DS/HD 60364-5-54'],
+  cableJoints: ['EN 50393'],
+  cableDucts: ['DS 475', 'IEC 61537'],
+  transformers: ['EN 50588-1'],
+  terminals: ['IEC 60947-7-1']
+};
+
+// Checks every product in the 8 categories: does its `standard` field cite a standard
+// that is recognised as applicable to that category? Returns a structured result with
+// any anomalies so the UI/report/export can prove "all lines cite a recognised standard".
+function elforsyningVerifyStandards() {
+  const anomalies = [];
+  let total = 0, verified = 0;
+  ELFORSYNING_CATEGORIES.forEach(function(cat) {
+    const expected = ELFORSYNING_EXPECTED_STANDARDS[cat] || [];
+    (PRODUCTS[cat] || []).forEach(function(p) {
+      total++;
+      const std = p && p.standard;
+      if (!std) {
+        anomalies.push({ id: p.id, category: cat, brand: p.brand, model: p.model, standard: null, reason: 'missing' });
+      } else if (expected.indexOf(std) < 0) {
+        anomalies.push({ id: p.id, category: cat, brand: p.brand, model: p.model, standard: std, reason: 'unrecognised' });
+      } else {
+        verified++;
+      }
+    });
+  });
+  return { ok: anomalies.length === 0, total: total, verified: verified, anomalies: anomalies };
+}
+
+// One-line trilingual summary of the standards check, for the UI and the print report.
+// Built from static translatable fragments (numbers concatenated separately) so the
+// Farsi (_FA) lookup resolves cleanly for every fragment.
+function elforsyningStandardsSummary() {
+  const v = elforsyningVerifyStandards();
+  if (v.ok) {
+    return '\u2713 ' + tx('Standardtjek', 'Standards check') + ': '
+      + tx('alle', 'all') + ' ' + v.verified + ' '
+      + tx('produkter citerer en anerkendt IEC/EN/DS-standard for deres kategori.',
+           'products cite a recognised IEC/EN/DS standard for their category.');
+  }
+  return '\u26A0 ' + tx('Standardtjek', 'Standards check') + ': '
+    + v.anomalies.length + ' / ' + v.total + ' '
+    + tx('produkter mangler en anerkendt standard.', 'products lack a recognised standard.');
+}
+
+// --- Engineering coordination / coherence audit (LIFE-SAFETY) ---
+// The standards layer above proves each line cites the right IEC/EN/DS clause. This layer
+// asks the harder, safety-critical question: do the components the user actually PICKED form
+// a SAFE, COORDINATED supply system? It reasons ONLY over the SET of currently-picked BOM
+// items (elforsyningBom via elforsyningBomLines()), never over the whole catalog. Three
+// conservative checks, each citing its DS/HD 60364 clause in code AND in the surfaced text:
+//   1. Overload coordination   DS/HD 60364-4-43   IB <= In <= Iz
+//        - every picked main fuse of rating In must have at least one picked supply cable
+//          with ampacity Iz >= In, otherwise that fuse cannot be carried by the list;
+//        - every picked cable whose Iz is below the SMALLEST picked fuse In could be left
+//          unprotected/overloaded by every fuse in the list.
+//   2. Transformer <-> supply  DS/HD 60364        rated secondary current at 400 V 3-phase
+//        I_fl = kVA*1000 / (sqrt(3)*400) = kVA * 1.443376 A. Each picked transformer's I_fl
+//        must be carryable by some picked cable Iz AND not exceed the largest picked fuse In.
+//   3. PE-conductor sizing      DS/HD 60364-5-54 §543.1.2, table 54.7 (line & PE same material)
+//        S <= 16 -> S_PE = S ;  16 < S <= 35 -> S_PE = 16 ;  S > 35 -> S_PE = S/2.
+//        Informational minimum-PE guidance per picked cable cross-section.
+// CONSERVATIVE (this is a life-safety app): if a required value is missing/unknown we do NOT
+// report OK for that check — we emit an "unresolved" warning. We never round in the dangerous
+// direction (I_fl is rounded to 0.1 A for DISPLAY only; every comparison uses the exact value).
+
+// Transformer rated secondary full-load current at 400 V three-phase: kVA*1000/(sqrt(3)*400).
+const ELFORSYNING_LV_FACTOR = 1000 / (Math.sqrt(3) * 400); // ~= 1.443376 A per kVA at 400 V
+function elforsyningRound1(x) { return Math.round(x * 10) / 10; }
+
+// Returns the transformer full-load secondary current in A, or null if kVA is missing/invalid
+// (conservative: a null forces the coordination check to treat the transformer as unresolved).
+function elforsyningTransformerFlc(kva) {
+  if (typeof kva !== 'number' || !isFinite(kva) || kva <= 0) return null;
+  return kva * ELFORSYNING_LV_FACTOR;
+}
+
+// Minimum PE-conductor cross-section per DS/HD 60364-5-54 §543.1.2 table 54.7 (line and PE of
+// the SAME material — these 4-core N1XV/NAYY supply cables carry a same-material PE). Returns
+// null if S is missing/invalid (conservative — we never guess a protective-conductor size).
+function elforsyningPeMinCrossSection(s) {
+  if (typeof s !== 'number' || !isFinite(s) || s <= 0) return null;
+  if (s <= 16) return s;
+  if (s <= 35) return 16;
+  return s / 2;
+}
+
+// The executable coordination audit. Returns a structured result over the PICKED set:
+//   { ok, empty, warnings:[{code,clause,...,text}], checks:[{code,clause,...,text}], counts }
+// ok is true ONLY when the list is non-empty AND there are zero warnings (empty != coordinated).
+function elforsyningVerifyCoordination() {
+  const lines = elforsyningBomLines();
+  const warnings = [];
+  const checks = [];
+
+  // Partition the picked set by category (products only).
+  const cables = lines.filter(function(l) { return l.category === 'supplyCables'; }).map(function(l) { return l.product; });
+  const fuses = lines.filter(function(l) { return l.category === 'mainFuses'; }).map(function(l) { return l.product; });
+  const transformers = lines.filter(function(l) { return l.category === 'transformers'; }).map(function(l) { return l.product; });
+
+  // Valid (resolved) ampacities / ratings among the picked items.
+  const cableIzs = cables.map(function(c) { return c.iz; }).filter(function(iz) { return typeof iz === 'number' && isFinite(iz) && iz > 0; });
+  const fuseIns = fuses.map(function(f) { return f.rating; }).filter(function(r) { return typeof r === 'number' && isFinite(r) && r > 0; });
+  const maxCableIz = cableIzs.length ? Math.max.apply(null, cableIzs) : null;
+  const minFuseIn = fuseIns.length ? Math.min.apply(null, fuseIns) : null;
+  const maxFuseIn = fuseIns.length ? Math.max.apply(null, fuseIns) : null;
+
+  // --- Check 1a: every picked fuse must be carryable by some picked cable (DS/HD 60364-4-43, In <= Iz). ---
+  fuses.forEach(function(f) {
+    const In = f.rating;
+    if (typeof In !== 'number' || !isFinite(In) || In <= 0) {
+      warnings.push({ code: 'fuse-rating-unresolved', clause: 'DS/HD 60364-4-43', id: f.id,
+        text: tx('En valgt hovedsikring mangler en m\u00E6rkestr\u00F8m \u2014 overbelastningskoordinering kan ikke bekr\u00E6ftes (DS/HD 60364-4-43).',
+                 'A picked main fuse has no rating \u2014 overload coordination cannot be confirmed (DS/HD 60364-4-43).') });
+      return;
+    }
+    const carriers = cables.filter(function(c) { return typeof c.iz === 'number' && isFinite(c.iz) && c.iz >= In; });
+    if (carriers.length === 0) {
+      warnings.push({ code: 'fuse-no-cable', clause: 'DS/HD 60364-4-43', id: f.id, rating: In,
+        text: tx('Ingen valgt forsyningskabel kan b\u00E6re hovedsikringen', 'No picked supply cable can carry the main fuse')
+          + ' ' + In + ' A '
+          + tx('(reglen IB\u2264In\u2264Iz, DS/HD 60364-4-43).', '(rule IB\u2264In\u2264Iz, DS/HD 60364-4-43).') });
+    } else {
+      checks.push({ code: 'overload-fuse-ok', clause: 'DS/HD 60364-4-43', id: f.id, rating: In, carriers: carriers.length,
+        text: tx('Hovedsikring', 'Main fuse') + ' ' + In + ' A '
+          + tx('er d\u00E6kket af et valgt kabel (Iz\u2265In, DS/HD 60364-4-43).', 'is covered by a picked cable (Iz\u2265In, DS/HD 60364-4-43).') });
+    }
+  });
+
+  // --- Check 1b: a picked cable whose Iz is below the SMALLEST picked fuse In is unprotected (DS/HD 60364-4-43). ---
+  cables.forEach(function(c) {
+    const Iz = c.iz;
+    if (typeof Iz !== 'number' || !isFinite(Iz) || Iz <= 0) {
+      warnings.push({ code: 'cable-iz-unresolved', clause: 'DS/HD 60364-4-43', id: c.id,
+        text: tx('Et valgt forsyningskabel mangler str\u00F8mb\u00E6reevne Iz \u2014 koordinering kan ikke bekr\u00E6ftes (DS/HD 60364-4-43).',
+                 'A picked supply cable has no ampacity Iz \u2014 coordination cannot be confirmed (DS/HD 60364-4-43).') });
+      return;
+    }
+    if (minFuseIn !== null && Iz < minFuseIn) {
+      warnings.push({ code: 'cable-unprotected', clause: 'DS/HD 60364-4-43', id: c.id, iz: Iz, minFuseIn: minFuseIn,
+        text: tx('Forsyningskabel med Iz', 'Supply cable with Iz') + ' ' + Iz + ' A '
+          + tx('er under den mindste valgte sikring', 'is below the smallest picked fuse') + ' ' + minFuseIn + ' A '
+          + tx('og kan overbelastes (DS/HD 60364-4-43).', 'and could be overloaded (DS/HD 60364-4-43).') });
+    }
+  });
+
+  // --- Check 2: each picked transformer's rated current must be carryable by the picked supply (DS/HD 60364). ---
+  transformers.forEach(function(t) {
+    const flc = elforsyningTransformerFlc(t.kva);
+    if (flc === null) {
+      warnings.push({ code: 'transformer-kva-unresolved', clause: 'DS/HD 60364', id: t.id,
+        text: tx('En valgt transformer mangler kVA \u2014 fuldlaststr\u00F8m kan ikke beregnes (DS/HD 60364).',
+                 'A picked transformer has no kVA \u2014 full-load current cannot be computed (DS/HD 60364).') });
+      return;
+    }
+    const flcShown = elforsyningRound1(flc);
+    // Conservative: no cables/fuses at all -> nothing can carry it -> treat as insufficient.
+    const cableInsufficient = (maxCableIz === null) || (flc > maxCableIz);
+    const fuseInsufficient = (maxFuseIn === null) || (flc > maxFuseIn);
+    if (cableInsufficient || fuseInsufficient) {
+      warnings.push({ code: 'transformer-supply-insufficient', clause: 'DS/HD 60364', id: t.id, kva: t.kva, flc: flcShown,
+        text: tx('Den valgte forsyningsk\u00E6de kan ikke f\u00F8re transformerens fuldlaststr\u00F8m',
+                 'The picked supply chain cannot carry the transformer full-load current') + ' ' + flcShown + ' A '
+          + tx('ved 400 V (DS/HD 60364).', 'at 400 V (DS/HD 60364).') });
+    } else {
+      checks.push({ code: 'transformer-supply-ok', clause: 'DS/HD 60364', id: t.id, kva: t.kva, flc: flcShown,
+        text: tx('Transformerens fuldlaststr\u00F8m', 'The transformer full-load current') + ' ' + flcShown + ' A '
+          + tx('kan f\u00F8res af den valgte forsyning (DS/HD 60364).', 'can be carried by the picked supply (DS/HD 60364).') });
+    }
+  });
+
+  // --- Check 3: minimum PE-conductor cross-section per picked cable (DS/HD 60364-5-54 §543.1.2, table 54.7). ---
+  cables.forEach(function(c) {
+    const S = c.mm2;
+    if (typeof S !== 'number' || !isFinite(S) || S <= 0) {
+      warnings.push({ code: 'cable-cross-section-unresolved', clause: 'DS/HD 60364-5-54 \u00A7543.1.2', id: c.id,
+        text: tx('Et valgt forsyningskabel mangler tv\u00E6rsnit \u2014 PE-leder kan ikke dimensioneres (DS/HD 60364-5-54 \u00A7543.1.2).',
+                 'A picked supply cable has no cross-section \u2014 PE conductor cannot be sized (DS/HD 60364-5-54 \u00A7543.1.2).') });
+      return;
+    }
+    const pe = elforsyningRound1(elforsyningPeMinCrossSection(S));
+    checks.push({ code: 'pe-sizing', clause: 'DS/HD 60364-5-54 \u00A7543.1.2', id: c.id, mm2: S, peMm2: pe,
+      text: tx('Forsyningskabel', 'Supply cable') + ' ' + S + ' mm\u00B2 '
+        + tx('kr\u00E6ver mindst PE-tv\u00E6rsnit', 'requires a minimum PE cross-section of') + ' ' + pe + ' mm\u00B2 '
+        + tx('(DS/HD 60364-5-54 \u00A7543.1.2, tabel 54.7).', '(DS/HD 60364-5-54 \u00A7543.1.2, table 54.7).') });
+  });
+
+  return {
+    ok: (lines.length > 0) && (warnings.length === 0),
+    empty: lines.length === 0,
+    warnings: warnings,
+    checks: checks,
+    counts: { cables: cables.length, fuses: fuses.length, transformers: transformers.length }
+  };
+}
+
+// One-line trilingual summary of the coordination audit, for the UI and the print report.
+// Built from static translatable fragments (numbers/clause-codes concatenated separately) so
+// the Farsi (_FA) lookup resolves for every fragment. Shows the pass mark ONLY when the list
+// is non-empty AND there are zero warnings; an empty list is stated plainly (never "coordinates").
+function elforsyningCoordinationSummary() {
+  const r = elforsyningVerifyCoordination();
+  if (r.empty) {
+    return tx('Koordineringstjek', 'Coordination check') + ': '
+      + tx('listen er tom \u2014 ingen komponenter at koordinere.',
+           'the list is empty \u2014 no components to coordinate.');
+  }
+  if (r.ok) {
+    return '\u2713 ' + tx('Koordineringstjek', 'Coordination check') + ' (DS/HD 60364-4-43 / -5-54): '
+      + tx('de valgte forsyningskomponenter koordinerer sikkert.',
+           'the picked supply components coordinate safely.');
+  }
+  return '\u26A0 ' + tx('Koordineringstjek', 'Coordination check') + ' (DS/HD 60364-4-43 / -5-54): '
+    + r.warnings.length + ' '
+    + tx('koordineringsadvarsel(er) \u2014 se rapport/eksport.',
+         'coordination warning(s) \u2014 see report/export.');
 }
 
 // --- Persistence (NEW localStorage key, no collision with existing keys) ---
@@ -8147,6 +8889,22 @@ function elforsyningTotalCount() {
   return n;
 }
 
+// Distinct line items = number of different products on the list, irrespective of
+// their quantities. This is deliberately separate from elforsyningTotalCount() (the
+// sum of quantities) so procurement can see "how many different parts" vs "how many
+// pieces in total" — two genuinely different numbers on a bill of materials.
+function elforsyningDistinctCount() {
+  return Object.keys(elforsyningBom).length;
+}
+
+function elforsyningCategoryDistinctCount(cat) {
+  let n = 0;
+  Object.keys(elforsyningBom).forEach(function(id) {
+    if (elforsyningBom[id].category === cat) n++;
+  });
+  return n;
+}
+
 // Returns ordered BOM lines grouped by the 8 categories, preserving PRODUCTS order.
 function elforsyningBomLines() {
   const lines = [];
@@ -8180,6 +8938,8 @@ function elforsyningExportData() {
   });
   const categoryCounts = {};
   ELFORSYNING_CATEGORIES.forEach(function(cat) { categoryCounts[cat] = elforsyningCategoryCount(cat); });
+  const categoryDistinctCounts = {};
+  ELFORSYNING_CATEGORIES.forEach(function(cat) { categoryDistinctCounts[cat] = elforsyningCategoryDistinctCount(cat); });
   return {
     type: 'elforsyning_bom',
     version: 1,
@@ -8189,7 +8949,19 @@ function elforsyningExportData() {
     note_en: 'Verify current prices against Danish wholesaler catalogs (' + ELFORSYNING_WHOLESALERS.join(', ') + '). Prices are not included in this list.',
     categories: ELFORSYNING_CATEGORIES.slice(),
     categoryCounts: categoryCounts,
+    categoryDistinctCounts: categoryDistinctCounts,
+    distinctCount: elforsyningDistinctCount(),
     totalCount: elforsyningTotalCount(),
+    standardsCheck: (function() {
+      const v = elforsyningVerifyStandards();
+      return { ok: v.ok, total: v.total, verified: v.verified, anomalies: v.anomalies };
+    })(),
+    coordinationCheck: (function() {
+      // Engineering coordination/coherence audit over the PICKED set (DS/HD 60364-4-43 / -5-54).
+      const c = elforsyningVerifyCoordination();
+      return { ok: c.ok, empty: c.empty, warningCount: c.warnings.length,
+        warnings: c.warnings, checks: c.checks, counts: c.counts };
+    })(),
     lines: lines
   };
 }
@@ -8201,6 +8973,64 @@ function elforsyningExportJson() {
     const a = document.createElement('a');
     a.href = url;
     a.download = 'elforsyning-stykliste-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {}
+}
+
+// --- CSV export (click-only; for spreadsheets / Danish wholesaler import) ---
+// JSON serves machines; CSV serves the people who actually order the parts (Solar,
+// Lemvigh-Müller, Wexøe, Sanistål quotes are built in spreadsheets). Each row carries
+// the official product + datasheet deep-link so the buyer can verify the exact article.
+// RFC 4180 quoting. Prices are NEVER written (never invented).
+function elforsyningCsvCell(v) {
+  const s = (v === null || v === undefined) ? '' : ('' + v);
+  if (/[",\r\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+function elforsyningExportCsvText() {
+  const data = elforsyningExportData();
+  const NL = '\r\n';
+  const rows = [];
+  // Informational preamble (each line prefixed with # so importers can skip it).
+  rows.push('# ' + tx('Elforsyning \u2014 stykliste', 'Elforsyning \u2014 bill of materials'));
+  rows.push('# ' + tx('Standard', 'Standard') + ': ' + ELFORSYNING_STD_REF);
+  rows.push('# ' + tx('Genereret', 'Generated') + ': ' + data.generated);
+  rows.push('# ' + tx('Varelinjer (forskellige produkter)', 'Line items (distinct products)') + ': ' + data.distinctCount
+    + ' | ' + tx('Antal i alt', 'Total quantity') + ': ' + data.totalCount);
+  rows.push('# ' + (lang === 'da' ? data.note_da : data.note_en));
+  // Header row
+  rows.push([
+    tx('Kategori', 'Category'),
+    tx('M\u00E6rke', 'Brand'),
+    tx('Model', 'Model'),
+    tx('Specifikation', 'Spec'),
+    tx('Standard', 'Standard'),
+    tx('Godkendelse', 'Approval'),
+    tx('Antal', 'Qty'),
+    tx('Produktside', 'Product page'),
+    tx('Datablad', 'Datasheet')
+  ].map(elforsyningCsvCell).join(','));
+  // Data rows
+  data.lines.forEach(function(l) {
+    rows.push([
+      elforsyningCatLabel(l.category),
+      l.brand, l.model, l.spec, l.standard, l.approval, l.qty,
+      l.productUrl || '', l.datasheetUrl || ''
+    ].map(elforsyningCsvCell).join(','));
+  });
+  return rows.join(NL) + NL;
+}
+
+function elforsyningExportCsv() {
+  try {
+    // Leading UTF-8 BOM so Excel opens Danish characters (æøå) correctly.
+    const blob = new Blob(['\uFEFF' + elforsyningExportCsvText()], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'elforsyning-stykliste-' + new Date().toISOString().slice(0, 10) + '.csv';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
   } catch (e) {}
@@ -8238,14 +9068,18 @@ function elforsyningReportHtml() {
   h += '<h1>\uD83D\uDD0C ' + esc(tx('Elforsyningsmaterialer (stykliste)', 'Elforsyning materials (bill of materials)')) + '</h1>';
   h += '<div class="muted">' + esc(tx('Genereret', 'Generated')) + ': ' + new Date().toLocaleString()
     + ' &middot; ' + esc(tx('Reference', 'Reference')) + ': ' + esc(ELFORSYNING_STD_REF) + '</div>';
-  h += '<p>' + esc(tx('Antal varelinjer i alt', 'Total line items')) + ': <b>' + elforsyningTotalCount() + '</b></p>';
+  h += '<p>' + esc(tx('Varelinjer (forskellige produkter)', 'Line items (distinct products)')) + ': <b>' + elforsyningDistinctCount() + '</b>'
+    + ' &middot; ' + esc(tx('Antal i alt', 'Total quantity')) + ': <b>' + elforsyningTotalCount() + '</b></p>';
+  h += '<p class="muted">' + esc(elforsyningStandardsSummary()) + '</p>';
+  h += '<p class="muted">' + esc(elforsyningCoordinationSummary()) + '</p>';
   if (!lines.length) {
     h += '<p class="muted">' + esc(tx('Listen er tom.', 'The list is empty.')) + '</p>';
   } else {
     ELFORSYNING_CATEGORIES.forEach(function(cat) {
       const catLines = lines.filter(function(l) { return l.category === cat; });
       if (!catLines.length) return;
-      h += '<h2>' + esc(elforsyningCatLabel(cat)) + ' (' + elforsyningCategoryCount(cat) + ')</h2>';
+      h += '<h2>' + esc(elforsyningCatLabel(cat)) + ' (' + elforsyningCategoryDistinctCount(cat) + ' '
+        + esc(tx('varer', 'items')) + ' \u00B7 ' + elforsyningCategoryCount(cat) + ' ' + esc(tx('stk', 'pcs')) + ')</h2>';
       h += '<table><thead><tr><th>' + esc(tx('M\u00E6rke', 'Brand')) + '</th><th>' + esc(tx('Model', 'Model'))
         + '</th><th>' + esc(tx('Specifikation', 'Spec')) + '</th><th>' + esc(tx('Standard', 'Standard'))
         + '</th><th>' + esc(tx('Godkendelse', 'Approval')) + '</th><th>' + esc(tx('Antal', 'Qty')) + '</th></tr></thead><tbody>';
@@ -8311,6 +9145,7 @@ function renderElforsyningBom() {
   h += '<button class="sel-btn" onclick="elforsyningClearAll()">\uD83D\uDDD1\uFE0F ' + tx('Ryd alt', 'Clear all') + '</button>';
   h += '<button class="sel-btn" onclick="elforsyningPrintReport()">\uD83D\uDDA8\uFE0F ' + tx('Udskriv / PDF', 'Print / PDF') + '</button>';
   h += '<button class="sel-btn" onclick="elforsyningExportJson()">\u2B07\uFE0F ' + tx('Eksporter JSON', 'Export JSON') + '</button>';
+  h += '<button class="sel-btn" onclick="elforsyningExportCsv()">\uD83D\uDCCA ' + tx('Eksporter CSV', 'Export CSV') + '</button>';
   h += '</div></div>';
 
   if (!lines.length) {
@@ -8326,6 +9161,9 @@ function renderElforsyningBom() {
     if (!catLines.length) return;
     h += '<div class="result-box" style="margin-top:10px">';
     h += '<div class="result-title">' + elforsyningCatLabel(cat) + ' (' + elforsyningCategoryCount(cat) + ')</div>';
+    h += '<div style="font-size:0.72rem;color:var(--text-muted);margin:-2px 0 6px">'
+      + elforsyningCategoryDistinctCount(cat) + ' ' + tx('varer', 'items') + ' \u00B7 '
+      + elforsyningCategoryCount(cat) + ' ' + tx('stk', 'pcs') + '</div>';
     catLines.forEach(function(l) {
       const p = l.product;
       h += '<div class="result-row" style="align-items:center;gap:8px;flex-wrap:wrap">';
@@ -8343,9 +9181,14 @@ function renderElforsyningBom() {
     h += '</div>';
   });
 
-  h += '<div class="result-box" style="margin-top:10px"><div class="result-row">'
+  h += '<div class="result-box" style="margin-top:10px">'
+    + '<div class="result-row"><span class="label">' + tx('Varelinjer (forskellige produkter)', 'Line items (distinct products)') + '</span>'
+    + '<span class="value"><strong>' + elforsyningDistinctCount() + '</strong></span></div>'
+    + '<div class="result-row">'
     + '<span class="label"><strong>' + tx('I alt (alle kategorier)', 'Grand total (all categories)') + '</strong></span>'
-    + '<span class="value"><strong>' + total + '</strong></span></div></div>';
+    + '<span class="value"><strong>' + total + '</strong></span></div>'
+    + '<div class="result-row"><span class="label">' + elforsyningStandardsSummary() + '</span></div>'
+    + '<div class="result-row"><span class="label">' + elforsyningCoordinationSummary() + '</span></div></div>';
   h += '<div class="info-row" style="margin-top:8px">' + tx(
     'Bem\u00E6rk: Verificer aktuelle priser mod danske grossistkataloger (' + ELFORSYNING_WHOLESALERS.join(', ') + '). Datoer genereres automatisk.',
     'Note: Verify current prices against Danish wholesaler catalogs (' + ELFORSYNING_WHOLESALERS.join(', ') + '). Dates are auto-generated.') + '</div>';
@@ -19865,6 +20708,20 @@ function upDeratedIz(cable) { return cable ? officialIz(cable) : 0; }
 
 function upMagneticMultiple(curve) { if (curve === 'C') return 10; if (curve === 'D') return 20; return 5; }
 
+// SINGLE SOURCE OF TRUTH for the automatic-disconnection trip current Ia.
+// Logic is verbatim from DS/HD 60364-4-41 and is shared by BOTH the auditor
+// (upCheckDisconnection) and the Commissioning inverter (cvZsCeiling) so the
+// field acceptance ceiling can NEVER drift from the design check:
+//   In <= 32 A (small final circuit)  -> Ia = magnetic-multiple(curve) * In, t = 0.4 s
+//   In  > 32 A                        -> Ia = 5 * In,                       t = 5 s
+// Returns { ia, timeReq, timeReqS, clause, isSmallFinal }. Refactor is a pure
+// value-extraction: upCheckDisconnection still produces byte-identical findings.
+function upDisconnectionIa(dev) {
+  const In = dev.In;
+  if (In <= 32) return { ia: upMagneticMultiple(dev.curve || 'B') * In, timeReq: '0.4s', timeReqS: 0.4, clause: 'DS/HD 60364-4-41 Table 41.1', isSmallFinal: true };
+  return { ia: 5 * In, timeReq: '5s', timeReqS: 5, clause: 'DS/HD 60364-4-41 cl. 411.3.2.3', isSmallFinal: false };
+}
+
 // Conservative single-segment voltage drop in % (r,x in ohm/km, L in m).
 function upSegmentVdropPct(cable, length_m, ib, phases, cosPhi) {
   if (!cable || !(length_m > 0) || !(ib > 0)) return 0;
@@ -19917,7 +20774,7 @@ function upLoadProject() {
 function upSaveProject() { try { localStorage.setItem(UNIFIED_PROJECT_KEY, JSON.stringify(upProject)); } catch (e) {} }
 
 let upProject = upLoadProject();
-let upAuditState = { lastAudit: null };
+let upAuditState = { lastAudit: null, showMargins: false, margins: null, worstDay: null, wd: null };
 
 // --- Build an SLD-style tree from the unified project to reuse the verified calc engine ---
 function upBuildTree(project) {
@@ -19970,12 +20827,19 @@ function upCheckIcu(findings, label, dev, ikBoardA) {
     findings.push({ scope: label, rule: 'Icu \u2265 Ikmax', clause: 'DS/HD 60364-4-43 cl. 434.5.1', status: 'fail', detail: tx('Brydeevne for lav: ', 'Breaking capacity too low: ') + detail, recommendation: tx('V\u00E6lg en afbryder med h\u00F8jere Icu eller anvend backup-sikring (kaskade).', 'Choose a device with higher Icu or use a back-up fuse (cascading).') });
   }
 }
-function upCheckDisconnection(findings, label, earthing, zs, dev, fc) {
+function upCheckDisconnection(findings, label, earthing, zs, dev, fc, cmin) {
+  // cmin defaults to the baseline UP_CMIN (0.95). The overlay-aware audit path
+  // (upAuditCore / Worst-Day) passes a scenario voltageFactor (e.g. 0.90 = 230 V
+  // -10%, CENELEC / EN 50160) so a low-mains scenario can be re-run WITHOUT
+  // changing the default baseline behaviour. With no argument the behaviour is
+  // byte-identical to before.
+  cmin = (typeof cmin === 'number' && isFinite(cmin)) ? cmin : UP_CMIN;
   const In = dev.In;
   const isSmallFinal = In <= 32;
-  let ia, timeReq, clauseRef;
-  if (isSmallFinal) { ia = upMagneticMultiple(dev.curve || 'B') * In; timeReq = '0.4s'; clauseRef = 'DS/HD 60364-4-41 Table 41.1'; }
-  else { ia = 5 * In; timeReq = '5s'; clauseRef = 'DS/HD 60364-4-41 cl. 411.3.2.3'; }
+  // Ia / time / clause now come from the shared single source (upDisconnectionIa)
+  // so the auditor and the commissioning inverter can never disagree.
+  const _iaInfo = upDisconnectionIa(dev);
+  const ia = _iaInfo.ia, timeReq = _iaInfo.timeReq, clauseRef = _iaInfo.clause;
   if (earthing === 'TT') {
     const clauseTT = 'DS/HD 60364-4-41 cl. 411.5.3';
     if (!fc.rcdMa) {
@@ -19993,13 +20857,13 @@ function upCheckDisconnection(findings, label, earthing, zs, dev, fc) {
   }
   if (earthing === 'IT') {
     const clauseIT = 'DS/HD 60364-4-41 cl. 411.6.4';
-    const lhs = 2 * zs * ia; const rhs = UP_CMIN * 400;
+    const lhs = 2 * zs * ia; const rhs = cmin * 400;
     const detail = '2\u00B7Zs\u00B7Ia=' + lhs.toFixed(0) + 'V \u2264 Cmin\u00B7U=' + rhs.toFixed(0) + 'V (Zs=' + zs.toFixed(2) + '\u03A9, Ia=' + ia.toFixed(0) + 'A)';
     findings.push({ scope: label, rule: tx('IT 2. fejl: 2\u00B7Zs\u00B7Ia \u2264 Cmin\u00B7U', 'IT 2nd fault: 2\u00B7Zs\u00B7Ia \u2264 Cmin\u00B7U'), clause: clauseIT, status: (lhs <= rhs) ? 'ok' : 'fail', detail: (lhs <= rhs ? '' : tx('For h\u00F8j loop ved 2. fejl: ', 'Loop too high at 2nd fault: ')) + detail, recommendation: (lhs <= rhs) ? '' : tx('Reducer Zs (st\u00F8rre/kortere kabel) eller hurtigere afbryder; overvej HPFI.', 'Reduce Zs (larger/shorter cable) or a faster device; consider an RCD.') });
     return;
   }
   // TN — conservative: Cmin applied to U0
-  const u0 = UP_CMIN * 230;
+  const u0 = cmin * 230;
   const zsIa = zs * ia;
   const detail = 'Zs\u00B7Ia=' + zsIa.toFixed(0) + 'V \u2264 Cmin\u00B7U0=' + u0.toFixed(0) + 'V (Zs=' + zs.toFixed(2) + '\u03A9, Ia=' + ia.toFixed(0) + 'A, ' + timeReq + ')';
   if (zsIa <= u0) {
@@ -20032,7 +20896,21 @@ function upComputeVerdict(findings) {
 }
 
 // --- THE AUDITOR: sweeps the unified project, returns verdict + findings (each cites a clause) ---
-function upAuditProject(project) {
+// The single coupled re-run engine. `upAuditProject(p)` is the BASELINE (neutral
+// overlay); `upAuditCore(p, ov)` is the overlay-aware path used by the Margin /
+// Worst-Day layer. A NEUTRAL overlay (Ca=Cg=1, conductorTempC=20, voltageFactor
+// =UP_CMIN=0.95, raAdd=0) reproduces the baseline byte-for-byte — see the
+// "neutral overlay equivalence" test in test-sld.js.
+function upAuditProject(project) { return upAuditCore(project, upNeutralOverlay()); }
+
+function upAuditCore(project, ov) {
+  ov = ov || upNeutralOverlay();
+  const Ca = (typeof ov.Ca === 'number') ? ov.Ca : 1.0;
+  const Cg = (typeof ov.Cg === 'number') ? ov.Cg : 1.0;
+  const cTemp = (typeof ov.conductorTempC === 'number') ? ov.conductorTempC : 20;
+  const vF = (typeof ov.voltageFactor === 'number') ? ov.voltageFactor : UP_CMIN;
+  const raAdd = (typeof ov.raAdd === 'number') ? ov.raAdd : 0;
+
   const findings = [];
   const built = upBuildTree(project);
   if (!built) {
@@ -20040,6 +20918,18 @@ function upAuditProject(project) {
     return { verdict: 'incomplete', findings: findings, ikBoardA: 0 };
   }
   const tree = built.tree;
+  // Conductor-temperature overlay: R(theta) = R20*[1 + alpha*(theta-20)]
+  // (alpha_Cu=0.00393/K, alpha_Al=0.00403/K — IEC 60228 / IEC 60909-0). We copy
+  // each cable BEFORE adjusting r so PRODUCTS is never mutated (purity). r_eff
+  // then feeds BOTH the Zs (disconnection) and the voltage-drop chain, which is
+  // exactly how a single shared input couples the two verdicts. At cTemp==20 the
+  // multiplier is exactly 1.0, so the baseline is byte-identical.
+  if (cTemp !== 20) {
+    Object.keys(tree.nodes).forEach(function(id) {
+      const n = tree.nodes[id];
+      if (n && n.cable) { const c = Object.assign({}, n.cable); c.r = (c.r || 0) * upRMult(c.material, cTemp); n.cable = c; }
+    });
+  }
   const ikBoardA = sldCalcNodeIk(tree, built.boardId).ikmax; // Ik3max at board (3-phase, c=1.05)
   findings.push({ scope: tx('Tavle', 'Board'), rule: tx('Kortslutning ved tavle (Ik3max)', 'Short-circuit at board (Ik3max)'), clause: 'IEC 60909-0 (c=1.05) \u00B7 DS/HD 60364', status: 'info', detail: 'Ik3max = ' + (ikBoardA / 1000).toFixed(2) + ' kA', recommendation: '' });
 
@@ -20049,9 +20939,10 @@ function upAuditProject(project) {
   const sup = project.supply || {};
   const supDev = upResolveDevice(sup.deviceId, sup.deviceIn);
   const supCable = sup.cableId ? upCableProduct(sup.cableId) : null;
+  const effSupCable = tree.nodes[built.boardId] ? tree.nodes[built.boardId].cable : null; // r_eff-adjusted copy
   const supLabel = tx('Forsyningskabel', 'Supply cable');
   if (supCable && supDev) {
-    upCheckOverload(findings, supLabel, ibBoard, supDev.In, upDeratedIz(supCable));
+    upCheckOverload(findings, supLabel, ibBoard, supDev.In, upEffIz(supCable, Ca, Cg));
   } else {
     findings.push({ scope: tx('Forsyning', 'Supply'), rule: 'IB \u2264 In \u2264 Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'warning', detail: tx('Forsyningskabel eller hovedafbryder mangler.', 'Supply cable or main device missing.'), recommendation: tx('V\u00E6lg b\u00E5de forsyningskabel og hovedafbryder.', 'Select both a supply cable and a main device.') });
   }
@@ -20063,16 +20954,21 @@ function upAuditProject(project) {
     const name = (lang === 'da' ? (fc.name_da || 'Slutkreds') : (fc.name_en || 'Final circuit')) + ' #' + (idx + 1);
     const dev = upResolveDevice(fc.deviceId, fc.deviceIn);
     const cab = fc.cableId ? upCableProduct(fc.cableId) : null;
+    const effCab = node ? node.cable : null; // r_eff-adjusted copy
     const ibF = sldCalcNodeIB(node);
     const ikMinF = sldCalcNodeIk(tree, fId).ikmin; // Ik1min at far end (c=0.95, x1.5 conservative)
     findings.push({ scope: name, rule: tx('Kortslutning ved enden (Ik1min)', 'Short-circuit at far end (Ik1min)'), clause: 'IEC 60909-0 (c=0.95) \u00B7 DS/HD 60364', status: 'info', detail: 'Ik1min = ' + (ikMinF / 1000).toFixed(2) + ' kA', recommendation: '' });
-    if (cab && dev) upCheckOverload(findings, name + ' \u2014 ' + tx('kabel', 'cable'), ibF, dev.In, upDeratedIz(cab));
+    if (cab && dev) upCheckOverload(findings, name + ' \u2014 ' + tx('kabel', 'cable'), ibF, dev.In, upEffIz(cab, Ca, Cg));
     else findings.push({ scope: name, rule: 'IB \u2264 In \u2264 Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'warning', detail: tx('Kabel eller beskyttelse mangler.', 'Cable or protective device missing.'), recommendation: tx('V\u00E6lg kabel og beskyttelse.', 'Select a cable and a protective device.') });
     if (dev) upCheckIcu(findings, name + ' (' + dev.product.brand + ' ' + dev.product.model + ')', dev, ikBoardA);
-    if (dev) upCheckDisconnection(findings, name, project.earthing, sldCalcNodeZs(tree, fId), dev, fc);
+    if (dev) {
+      var zsEff = sldCalcNodeZs(tree, fId);
+      if (project.earthing === 'TT') zsEff += raAdd; // soil/earth-electrode overlay (TT only)
+      upCheckDisconnection(findings, name, project.earthing, zsEff, dev, fc, vF);
+    }
     if (cab) {
-      const supDrop = upSegmentVdropPct(supCable, (sup.length_m || 0), ibBoard, '3x400', 0.9);
-      const finDrop = upSegmentVdropPct(cab, (fc.length_m || 0), ibF, fc.phases, fc.cosPhi);
+      const supDrop = upSegmentVdropPct(effSupCable || supCable, (sup.length_m || 0), ibBoard, '3x400', 0.9);
+      const finDrop = upSegmentVdropPct(effCab || cab, (fc.length_m || 0), ibF, fc.phases, fc.cosPhi);
       upCheckVdrop(findings, name, supDrop + finDrop);
     }
   });
@@ -20082,6 +20978,455 @@ function upAuditProject(project) {
   }
 
   return { verdict: upComputeVerdict(findings), findings: findings, ikBoardA: ikBoardA };
+}
+
+// ============================================================================
+// ===== MARGIN-TO-DANGER / CLIFF-EDGE + WORST-DAY SIMULATION ("Den Kritiske Hjerne") =====
+// ============================================================================
+// An adversarial robustness layer over the SAME coupled re-run engine
+// (upAuditCore). It NEVER computes a per-verdict "distance" on its own; it
+// applies a realistic perturbation overlay to a CLONE of the project, re-runs
+// the whole-installation audit, and diffs the findings. That is how coupling
+// surfaces: one shared-input change (ambient / grouping / conductor temp /
+// mains voltage / soil) re-runs Iz, Zs and Vdrop together.
+//
+// SCOPE (LOCKED, v1): only the three verdicts that flow through upAuditCore —
+//   1. Overload          IB <= In <= Iz   (DS/HD 60364-4-43 cl. 433.1)
+//   2. Disconnection Zs                    (DS/HD 60364-4-41)
+//   3. Voltage drop      dU <= 4%          (DS/HD 60364-5-52 cl. 525)
+// Arc-flash and selectivity are deliberately OUT of v1 and the UI states so.
+//
+// PUBLISHED PHYSICS (cited in code AND surfaced text):
+//   - Conductor temp coefficient R(theta)=R20*[1+alpha*(theta-20)],
+//     alpha_Cu=0.00393/K, alpha_Al=0.00403/K (IEC 60228 / IEC 60909-0).
+//     XLPE max operating 90 C, PVC 70 C.
+//   - Worst-Day low-voltage override voltageFactor=0.90 (230 V -10%,
+//     CENELEC / EN 50160) — a SCENARIO override, distinct from baseline
+//     UP_CMIN=0.95.
+
+const UP_ALPHA_CU = 0.00393; // /K, copper temperature coefficient (IEC 60228 / 60909-0)
+const UP_ALPHA_AL = 0.00403; // /K, aluminium temperature coefficient (IEC 60228 / 60909-0)
+const UP_WORSTDAY_VF = 0.90; // 230 V -10% scenario override (CENELEC / EN 50160) — NOT the baseline
+const UP_XLPE_MAX_C = 90;    // XLPE max continuous conductor temperature (C)
+const UP_PVC_MAX_C = 70;     // PVC max continuous conductor temperature (C)
+
+// Conductor-temperature resistance multiplier R(theta)/R20.
+function upRMult(material, conductorTempC) {
+  const a = (material === 'Al') ? UP_ALPHA_AL : UP_ALPHA_CU;
+  return 1 + a * ((conductorTempC == null ? 20 : conductorTempC) - 20);
+}
+// Effective ampacity under ambient (Ca) and grouping (Cg) correction.
+// iz_eff = officialIz * Ca * Cg (DS/HD 60364-5-52 Tables B.52.14 / B.52.17).
+function upEffIz(cable, Ca, Cg) {
+  if (!cable) return 0;
+  return officialIz(cable) * (typeof Ca === 'number' ? Ca : 1) * (typeof Cg === 'number' ? Cg : 1);
+}
+// Max realistic conductor temperature for the cable's insulation.
+function upCableMaxTempC(cable) {
+  if (!cable) return UP_PVC_MAX_C;
+  const xlpe = /NOIKLX|NOIKX|NOIK-AL|NOSP/i.test(cable.model || '');
+  return xlpe ? UP_XLPE_MAX_C : UP_PVC_MAX_C;
+}
+
+// Ambient -> Ca, using the published TEMP_FACTORS table; linear interpolation
+// between tabulated points and a clamped linear extrapolation just above the
+// last point (50 C) so the bisection has a continuous, monotonic function.
+function upTempFactor(t) {
+  if (t == null) return 1.0;
+  if (TEMP_FACTORS[t] != null) return TEMP_FACTORS[t];
+  const keys = Object.keys(TEMP_FACTORS).map(Number).sort(function(a, b) { return a - b; });
+  if (t <= keys[0]) return TEMP_FACTORS[keys[0]];
+  if (t >= keys[keys.length - 1]) {
+    const a = keys[keys.length - 2], b = keys[keys.length - 1];
+    const slope = (TEMP_FACTORS[b] - TEMP_FACTORS[a]) / (b - a);
+    return Math.max(0.3, TEMP_FACTORS[b] + slope * (t - b));
+  }
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (t >= keys[i] && t <= keys[i + 1]) {
+      const fa = TEMP_FACTORS[keys[i]], fb = TEMP_FACTORS[keys[i + 1]];
+      return fa + (fb - fa) * (t - keys[i]) / (keys[i + 1] - keys[i]);
+    }
+  }
+  return 1.0;
+}
+// Grouping count -> Cg, using the published GROUP_FACTORS table (interpolated).
+function upGroupFactor(n) {
+  if (n == null) return 1.0;
+  if (GROUP_FACTORS[n] != null) return GROUP_FACTORS[n];
+  const keys = Object.keys(GROUP_FACTORS).map(Number).sort(function(a, b) { return a - b; });
+  if (n <= keys[0]) return GROUP_FACTORS[keys[0]];
+  if (n >= keys[keys.length - 1]) return GROUP_FACTORS[keys[keys.length - 1]];
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (n >= keys[i] && n <= keys[i + 1]) {
+      const fa = GROUP_FACTORS[keys[i]], fb = GROUP_FACTORS[keys[i + 1]];
+      return fa + (fb - fa) * (n - keys[i]) / (keys[i + 1] - keys[i]);
+    }
+  }
+  return 1.0;
+}
+
+// The neutral overlay — reproduces the baseline audit EXACTLY.
+function upNeutralOverlay() { return { Ca: 1.0, Cg: 1.0, conductorTempC: 20, voltageFactor: UP_CMIN, raAdd: 0 }; }
+
+// Deep, side-effect-free copy of a project (structuredClone, JSON fallback).
+function upCloneProject(p) {
+  try { if (typeof structuredClone === 'function') return structuredClone(p); } catch (e) {}
+  return JSON.parse(JSON.stringify(p));
+}
+
+// Resolve a human overlay { ambientC, groupingN, voltageFactor, conductorTempC,
+// soilRho } into the numeric factors upAuditCore consumes. Soil only affects TT
+// (added as an earth-electrode resistance via earthCalcRodResistance); for
+// TN/IT raAdd is ignored inside upAuditCore so it is "not applicable".
+function upResolveOverlay(overlay) {
+  overlay = overlay || {};
+  const ov = upNeutralOverlay();
+  if (overlay.ambientC != null) ov.Ca = upTempFactor(overlay.ambientC);
+  if (overlay.groupingN != null) ov.Cg = upGroupFactor(overlay.groupingN);
+  if (typeof overlay.voltageFactor === 'number') ov.voltageFactor = overlay.voltageFactor;
+  if (typeof overlay.conductorTempC === 'number') ov.conductorTempC = overlay.conductorTempC;
+  if (typeof overlay.soilRho === 'number' && overlay.soilRho > 0) {
+    // Standard 1.5 m / 16 mm earth rod (DS/HD 60364-5-54): Re = rho/(2*pi*L)*ln(4L/d).
+    ov.raAdd = earthCalcRodResistance(overlay.soilRho, 1.5, 0.016);
+  }
+  return ov;
+}
+
+// PUBLIC overlay-aware audit. A neutral/empty overlay is byte-identical to
+// upAuditProject(p). Operates on a CLONE — never mutates the input project,
+// never touches upProject / localStorage / the reactive bus.
+function upAuditWith(p, overlay) {
+  return upAuditCore(upCloneProject(p), upResolveOverlay(overlay));
+}
+
+// Run a full SCENARIO on a clone: a physics overlay plus optional structural
+// length/load multipliers (used by the margin search for the length & load
+// governing inputs). Pure — clone only.
+function upRunScenario(p, scenario) {
+  scenario = scenario || {};
+  const clone = upCloneProject(p);
+  const lm = (typeof scenario.lengthMult === 'number' && scenario.lengthMult > 0) ? scenario.lengthMult : 1;
+  const om = (typeof scenario.loadMult === 'number' && scenario.loadMult > 0) ? scenario.loadMult : 1;
+  if (lm !== 1) {
+    if (clone.supply) clone.supply.length_m = (clone.supply.length_m || 0) * lm;
+    (clone.finals || []).forEach(function(fc) { fc.length_m = (fc.length_m || 0) * lm; });
+  }
+  if (om !== 1) { (clone.finals || []).forEach(function(fc) { fc.loadKW = (fc.loadKW || 0) * om; }); }
+  return upAuditCore(clone, upResolveOverlay(scenario.overlay || {}));
+}
+
+// --- Classify each finding into one of the three in-scope categories ---
+const UP_MARGIN_CATS = ['overload', 'zs', 'vdrop'];
+function upFindingCategory(f) {
+  if (!f) return null;
+  const rule = String(f.rule || ''), clause = String(f.clause || '');
+  if (rule.indexOf('\u0394U') >= 0 || clause.indexOf('cl. 525') >= 0) return 'vdrop';
+  if (rule.indexOf('IB') >= 0 && rule.indexOf('In') >= 0 && rule.indexOf('Iz') >= 0) return 'overload';
+  // Disconnection: any DS/HD 60364-4-41 finding that is about Zs / the RCD / the
+  // TT touch-voltage. The IMD (insulation monitoring) warning also cites 4-41 but
+  // names neither Zs nor an RCD, so it is correctly excluded from this category.
+  if (clause.indexOf('60364-4-41') >= 0 && (rule.indexOf('Zs') >= 0 || /HPFI|RCD|TT/.test(rule))) return 'zs';
+  return null;
+}
+// Aggregate the worst status for a category across an audit's findings.
+// Returns: 'ok' | 'fail' | 'warning'(vdrop only) | 'unresolved' | 'absent'.
+function upCategoryStatus(audit, cat) {
+  let saw = false, fail = false, warn = false, ok = false;
+  (audit.findings || []).forEach(function(f) {
+    if (upFindingCategory(f) !== cat) return;
+    saw = true;
+    if (f.status === 'fail') fail = true;
+    else if (f.status === 'warning') warn = true;
+    else if (f.status === 'ok') ok = true;
+  });
+  if (!saw) return 'absent';
+  if (fail) return 'fail';
+  if (cat === 'vdrop') return warn ? 'warning' : 'ok';
+  // overload / zs: a 'warning' here is a missing-input notice -> unresolved
+  if (warn) return 'unresolved';
+  return ok ? 'ok' : 'unresolved';
+}
+// Has this category crossed the danger edge in the given audit?
+function upCatFlipped(audit, cat) {
+  const s = upCategoryStatus(audit, cat);
+  if (cat === 'vdrop') return s === 'fail' || s === 'warning';
+  return s === 'fail';
+}
+
+// Floor a headroom value TOWARD danger (never overstate remaining margin).
+function upFloorToward(x, step) {
+  step = step || 1;
+  return Math.floor(x / step) * step;
+}
+
+// Monotonic 1-D bisection on a single governing input. `makeScenario(v)` builds
+// the scenario at value v; worse conditions are at `hi`. Returns the threshold
+// value at which `cat` first flips, or null if it never flips within [lo,hi].
+function upBisectFlip(project, cat, lo, hi, makeScenario, iters) {
+  iters = iters || 24;
+  if (upCatFlipped(upRunScenario(project, makeScenario(lo)), cat)) return lo; // already over at the floor
+  if (!upCatFlipped(upRunScenario(project, makeScenario(hi)), cat)) return null; // safe across the whole range
+  let a = lo, b = hi;
+  for (let i = 0; i < iters; i++) {
+    const m = (a + b) / 2;
+    if (upCatFlipped(upRunScenario(project, makeScenario(m)), cat)) b = m; else a = m;
+  }
+  return b; // smallest value (within tolerance) that flips
+}
+// Discrete scan over integer grouping counts until the category flips.
+function upScanGrouping(project, cat, maxN) {
+  maxN = maxN || 9;
+  for (let n = 2; n <= maxN; n++) {
+    if (upCatFlipped(upRunScenario(project, { overlay: { groupingN: n } }), cat)) return n;
+  }
+  return null;
+}
+
+// --- The governing-input axes per category (each names its DS/HD clause) ---
+function upMarginAxes(project, cat) {
+  const axes = [];
+  // shared bound: max conductor temp across the project's cables
+  let maxTemp = UP_XLPE_MAX_C;
+  (project.finals || []).forEach(function(fc) { const c = fc.cableId ? upCableProduct(fc.cableId) : null; if (c) maxTemp = Math.min(maxTemp, upCableMaxTempC(c)); });
+  const maxLenMult = 8; // up to x8 length (covers UP_LENGTH_PRESETS 25 -> 200 m)
+
+  if (cat === 'overload') {
+    axes.push({ key: 'ambient', unit: '\u00B0C', base: 30, range: 25, step: 1,
+      labelDa: 'H\u00E6v omgivelsestemperatur', labelEn: 'Raise ambient temperature', clause: 'DS/HD 60364-5-52 Table B.52.14',
+      threshold: upBisectFlip(project, cat, 30, 55, function(v) { return { overlay: { ambientC: v } }; }) });
+    const gN = upScanGrouping(project, cat, 9);
+    axes.push({ key: 'grouping', unit: '', base: 1, range: 8, step: 1, discrete: true,
+      labelDa: 'Kabelgruppering', labelEn: 'Cable grouping', clause: 'DS/HD 60364-5-52 Table B.52.17',
+      threshold: gN });
+  } else if (cat === 'zs') {
+    axes.push({ key: 'conductorTemp', unit: '\u00B0C', base: 20, range: (maxTemp - 20), step: 1,
+      labelDa: 'Leder ved maks. driftstemperatur', labelEn: 'Conductor at max operating temperature', clause: 'IEC 60228 / IEC 60909-0',
+      threshold: upBisectFlip(project, cat, 20, maxTemp, function(v) { return { overlay: { conductorTempC: v } }; }) });
+    axes.push({ key: 'length', unit: '\u00D7', base: 1, range: (maxLenMult - 1), step: 0.1,
+      labelDa: 'L\u00E6ngere f\u00F8ringsvej', labelEn: 'Longer cable run', clause: 'DS/HD 60364-4-41',
+      threshold: upBisectFlip(project, cat, 1, maxLenMult, function(v) { return { lengthMult: v }; }) });
+    axes.push({ key: 'voltage', unit: '', base: 0.95, range: 0.05, step: 0.01, descending: true,
+      labelDa: 'Net p\u00E5 nedre gr\u00E6nse (\u221210%)', labelEn: 'Mains at lower limit (\u221210%)', clause: 'CENELEC / EN 50160',
+      threshold: upBisectFlip(project, cat, 0.95, 0.90, function(v) { return { overlay: { voltageFactor: v } }; }) });
+  } else if (cat === 'vdrop') {
+    axes.push({ key: 'conductorTemp', unit: '\u00B0C', base: 20, range: (maxTemp - 20), step: 1,
+      labelDa: 'Leder ved maks. driftstemperatur', labelEn: 'Conductor at max operating temperature', clause: 'IEC 60228 / IEC 60909-0',
+      threshold: upBisectFlip(project, cat, 20, maxTemp, function(v) { return { overlay: { conductorTempC: v } }; }) });
+    axes.push({ key: 'load', unit: '\u00D7', base: 1, range: 3, step: 0.05,
+      labelDa: 'H\u00F8jere belastning', labelEn: 'Higher load', clause: 'DS/HD 60364-5-52 cl. 525',
+      threshold: upBisectFlip(project, cat, 1, 4, function(v) { return { loadMult: v }; }) });
+    axes.push({ key: 'length', unit: '\u00D7', base: 1, range: (maxLenMult - 1), step: 0.1,
+      labelDa: 'L\u00E6ngere f\u00F8ringsvej', labelEn: 'Longer cable run', clause: 'DS/HD 60364-5-52 cl. 525',
+      threshold: upBisectFlip(project, cat, 1, maxLenMult, function(v) { return { lengthMult: v }; }) });
+  }
+  return axes;
+}
+
+// Build the margin report for one category. Conservative: rounds the headroom
+// TOWARD danger for DISPLAY (raw value retained for exact comparisons).
+function upCategoryMargin(project, cat) {
+  const baseStatus = upCategoryStatus(upAuditProject(project), cat);
+  if (baseStatus === 'fail' || (cat === 'vdrop' && baseStatus === 'warning')) {
+    return { cat: cat, state: 'over-edge', axes: [], nearest: null };
+  }
+  if (baseStatus === 'absent' || baseStatus === 'unresolved') {
+    return { cat: cat, state: 'unresolved', axes: [], nearest: null };
+  }
+  const axes = upMarginAxes(project, cat).map(function(ax) {
+    if (ax.threshold == null) return { key: ax.key, labelDa: ax.labelDa, labelEn: ax.labelEn, unit: ax.unit, clause: ax.clause, flips: false, raw: null, disp: null, norm: Infinity };
+    let raw, disp, norm;
+    if (ax.descending) {
+      raw = ax.base - ax.threshold;            // e.g. 0.95 -> 0.91 => 0.04 drop
+      disp = upFloorToward(raw, ax.step);
+      norm = raw / ax.range;
+    } else if (ax.discrete) {
+      raw = ax.threshold - ax.base;            // extra circuits before flip
+      disp = raw;
+      norm = raw / ax.range;
+    } else if (ax.key === 'length' || ax.key === 'load') {
+      raw = ax.threshold - ax.base;            // extra multiplier
+      disp = upFloorToward(raw, ax.step);
+      norm = raw / ax.range;
+    } else {
+      raw = ax.threshold - ax.base;            // e.g. +12.3 C ambient
+      disp = upFloorToward(raw, ax.step);
+      norm = raw / ax.range;
+    }
+    return { key: ax.key, labelDa: ax.labelDa, labelEn: ax.labelEn, unit: ax.unit, clause: ax.clause, flips: true, raw: raw, disp: disp, norm: norm };
+  });
+  let nearest = null;
+  axes.forEach(function(a) { if (a.flips && (!nearest || a.norm < nearest.norm)) nearest = a; });
+  return { cat: cat, state: 'ok', axes: axes, nearest: nearest };
+}
+
+// Full margin-to-danger report across the three in-scope verdicts. PURE.
+function upMarginToDanger(project) {
+  const out = { earthing: project ? project.earthing : null, cats: {} };
+  UP_MARGIN_CATS.forEach(function(cat) { out.cats[cat] = upCategoryMargin(project, cat); });
+  return out;
+}
+
+// --- Worst-Day stacked scenario (the published one-click worst case) ---
+function upWorstDayDefault() {
+  return { ambientC: 40, groupingN: 4, voltageFactor: UP_WORSTDAY_VF, conductorTempC: 90, soilRho: 1000 };
+}
+const UP_WD_AMBIENT_PRESETS = [40, 45, 50, 55];
+const UP_WD_GROUPING_PRESETS = [2, 3, 4, 6];
+const UP_WD_VOLTAGE_PRESETS = [0.95, 0.92, 0.90];
+const UP_WD_TEMP_PRESETS = [20, 70, 90];
+
+// Re-run the WHOLE installation under a stacked worst case and report which
+// currently-green verdicts turn red. PURE (clone only). Matches findings by
+// scope+rule between the baseline and the worst-day audit.
+function upWorstDay(project, intensity) {
+  intensity = intensity || upWorstDayDefault();
+  const base = upAuditProject(project);
+  const worst = upAuditWith(project, intensity);
+  const key = function(f) { return String(f.scope) + '||' + String(f.rule); };
+  const worstByKey = {};
+  worst.findings.forEach(function(f) { worstByKey[key(f)] = f; });
+  const flips = [];
+  base.findings.forEach(function(bf) {
+    const cat = upFindingCategory(bf);
+    if (!cat) return;                     // only the three in-scope verdicts
+    if (bf.status !== 'ok') return;       // only currently-green verdicts
+    const wf = worstByKey[key(bf)];
+    if (!wf) return;
+    const turnedRed = (cat === 'vdrop') ? (wf.status === 'fail' || wf.status === 'warning') : (wf.status === 'fail');
+    if (turnedRed) flips.push({ scope: bf.scope, rule: bf.rule, clause: wf.clause, category: cat, before: bf, after: wf });
+  });
+  const greenCount = base.findings.filter(function(f) { return upFindingCategory(f) && f.status === 'ok'; }).length;
+  return {
+    intensity: intensity, flippedCount: flips.length, flips: flips,
+    greenCount: greenCount,
+    verdictBefore: base.verdict, verdictAfter: worst.verdict,
+    baseAudit: base, worstAudit: worst,
+    testable: greenCount > 0
+  };
+}
+
+// ============================================================================
+// ===== MARGIN / WORST-DAY UI (click-only: buttons + upSelect dropdowns) =====
+// ============================================================================
+// Handlers operate ONLY on upAuditState (UI state) + render. They NEVER mutate
+// upProject, never call upSaveProject / Reactive.notify / localStorage, so the
+// adversarial search stays pure and is triggered only by an explicit click.
+function upWdIntensity() { if (!upAuditState.wd) upAuditState.wd = upWorstDayDefault(); return upAuditState.wd; }
+function upToggleMargins() {
+  upAuditState.showMargins = !upAuditState.showMargins;
+  upAuditState.margins = upAuditState.showMargins ? upMarginToDanger(upProject) : null;
+  renderModule('kritisk');
+}
+function upRunWorstDay() { upAuditState.worstDay = upWorstDay(upProject, upWdIntensity()); renderModule('kritisk'); }
+function upSetWdAmbient(v) { upWdIntensity().ambientC = Number(v); if (upAuditState.worstDay) upAuditState.worstDay = upWorstDay(upProject, upAuditState.wd); renderModule('kritisk'); }
+function upSetWdGrouping(v) { upWdIntensity().groupingN = Number(v); if (upAuditState.worstDay) upAuditState.worstDay = upWorstDay(upProject, upAuditState.wd); renderModule('kritisk'); }
+function upSetWdVoltage(v) { upWdIntensity().voltageFactor = Number(v); if (upAuditState.worstDay) upAuditState.worstDay = upWorstDay(upProject, upAuditState.wd); renderModule('kritisk'); }
+function upSetWdTemp(v) { upWdIntensity().conductorTempC = Number(v); if (upAuditState.worstDay) upAuditState.worstDay = upWorstDay(upProject, upAuditState.wd); renderModule('kritisk'); }
+function upSetWdSoil(v) { upWdIntensity().soilRho = (v === '' || v == null) ? null : Number(v); if (upAuditState.worstDay) upAuditState.worstDay = upWorstDay(upProject, upAuditState.wd); renderModule('kritisk'); }
+
+// Human-readable category name (trilingual).
+function upCatName(cat) {
+  if (cat === 'overload') return tx('Overbelastning', 'Overload');
+  if (cat === 'zs') return tx('Udkobling (Zs)', 'Disconnection (Zs)');
+  if (cat === 'vdrop') return tx('Sp\u00E6ndingsfald', 'Voltage drop');
+  return cat;
+}
+// Format one axis margin (number kept OUT of the tx fragment).
+function upFmtAxis(ax) {
+  const label = tx(ax.labelDa, ax.labelEn);
+  let val;
+  if (ax.key === 'ambient' || ax.key === 'conductorTemp') val = '+' + ax.disp + ' \u00B0C';
+  else if (ax.key === 'grouping') val = '+' + ax.disp + ' ' + tx('kredse', 'circuits');
+  else if (ax.key === 'voltage') val = '\u2212' + ax.disp.toFixed(2) + ' ' + tx('sp\u00E6ndingsfaktor', 'voltage factor');
+  else if (ax.key === 'length' || ax.key === 'load') val = '\u00D7' + (ax.base + ax.disp).toFixed(1);
+  else val = String(ax.disp);
+  return { label: label, val: val, clause: ax.clause };
+}
+
+// Render the Margin-to-Danger / Cliff-Edge block.
+function upRenderMargins(margins) {
+  if (!margins) return '';
+  let h = '<div class="result-box" style="margin-top:12px;border-left:6px solid var(--primary)">';
+  h += '<div class="result-title">\uD83D\uDCCF ' + tx('Margin til faren', 'Margin to danger') + '</div>';
+  h += '<div class="info-row" style="font-size:0.78rem">' + tx(
+    'Hvor meget headroom er der f\u00F8r hver af de tre koblede sikkerhedskonklusioner vipper OK\u2192FEJL? Afrundet mod faren (aldrig overvurderet).',
+    'How much headroom remains before each of the three coupled safety verdicts tips OK\u2192FAIL? Rounded toward danger (never overstated).') + '</div>';
+  UP_MARGIN_CATS.forEach(function(cat) {
+    const c = margins.cats[cat];
+    h += '<div class="result-row" style="flex-direction:column;align-items:flex-start;gap:2px;border-top:1px solid var(--border);padding-top:6px">';
+    h += '<span class="label"><strong>' + upCatName(cat) + '</strong></span>';
+    if (c.state === 'over-edge') {
+      h += '<span style="font-size:0.8rem;color:var(--danger)">\u26D4 ' + tx('Allerede over kanten', 'Already over the edge') + '</span>';
+    } else if (c.state === 'unresolved') {
+      h += '<span style="font-size:0.8rem;color:var(--text-muted)">' + tx('Kan ikke beregne margin \u2014 v\u00E6lg transformer, kabel og apparat', 'Cannot compute margin \u2014 select a transformer, cable and device') + '</span>';
+    } else {
+      c.axes.forEach(function(ax) {
+        if (cat === 'zs' && ax.key === 'voltage' && margins.earthing === 'TT') return; // voltage handled; soil note below
+        if (!ax.flips) {
+          h += '<span style="font-size:0.76rem;color:var(--text-muted)">' + tx(ax.labelDa, ax.labelEn) + ': ' + tx('ingen flip inden for realistisk r\u00E6kkevidde', 'no flip within realistic range') + '</span>';
+          return;
+        }
+        const f = upFmtAxis(ax);
+        const isNear = c.nearest && c.nearest.key === ax.key;
+        h += '<span style="font-size:0.78rem' + (isNear ? ';color:var(--danger);font-weight:600' : '') + '">' + (isNear ? '\u26A0\uFE0F ' + tx('N\u00E6rmeste kant', 'Nearest cliff edge') + ': ' : '') + f.label + ' ' + f.val + ' <span style="color:var(--text-muted)">(' + f.clause + ')</span></span>';
+      });
+      // Soil/earth perturbation note: only meaningful for TT.
+      if (cat === 'zs') {
+        if (margins.earthing === 'TT') h += '<span style="font-size:0.74rem;color:var(--text-muted)">' + tx('T\u00F8r jord (h\u00F8j jordmodstand)', 'Dry soil (high earth resistance)') + ' \u2014 DS/HD 60364-5-54</span>';
+        else h += '<span style="font-size:0.74rem;color:var(--text-muted)">' + tx('Jordbund', 'Soil') + ': ' + tx('ikke relevant (kun TT)', 'not applicable (TT only)') + '</span>';
+      }
+    }
+    h += '</div>';
+  });
+  h += '<div class="info-row" style="margin-top:8px;font-size:0.72rem">' + tx('Lysbue og selektivitet indg\u00E5r ikke i denne analyse', 'Arc-flash and selectivity are not included in this analysis') + '.</div>';
+  h += '</div>';
+  return h;
+}
+
+// Render the Worst-Day scenario controls + before/after result.
+function upRenderWorstDay() {
+  const wd = upWdIntensity();
+  let h = '<div class="result-box" style="margin-top:12px;border-left:6px solid #b8860b">';
+  h += '<div class="result-title">\uD83C\uDF29\uFE0F ' + tx('Worst-Day simulering', 'Worst-Day simulation') + '</div>';
+  h += '<div class="info-row" style="font-size:0.78rem">' + tx(
+    'K\u00F8rer hele installationen igen under et realistisk dansk stablet worst case. Dette er en scenarie-override, ikke baseline.',
+    'Re-runs the whole installation under a realistic stacked Danish worst case. This is a scenario override, not the baseline.') + '</div>';
+  // Scenario intensity (preset dropdowns only — defaulted to the published worst case => one click)
+  h += '<div class="select-group"><div class="select-label">' + tx('Omgivelsestemperatur', 'Ambient temperature') + ' (\u00B0C)</div>';
+  h += upSelect('upSetWdAmbient(this.value)', wd.ambientC, upPresetOpts(UP_WD_AMBIENT_PRESETS, ' \u00B0C'), '\u2014') + '</div>';
+  h += '<div class="select-group"><div class="select-label">' + tx('Kabelgruppering', 'Cable grouping') + '</div>';
+  h += upSelect('upSetWdGrouping(this.value)', wd.groupingN, upPresetOpts(UP_WD_GROUPING_PRESETS, ''), '\u2014') + '</div>';
+  h += '<div class="select-group"><div class="select-label">' + tx('Netsp\u00E6ndingsfaktor', 'Mains voltage factor') + ' (' + tx('scenarie-override, ikke baseline', 'scenario override, not the baseline') + ')</div>';
+  h += upSelect('upSetWdVoltage(this.value)', wd.voltageFactor, upPresetOpts(UP_WD_VOLTAGE_PRESETS, ''), '\u2014') + '</div>';
+  h += '<div class="select-group"><div class="select-label">' + tx('Ledertemperatur', 'Conductor temperature') + ' (\u00B0C)</div>';
+  h += upSelect('upSetWdTemp(this.value)', wd.conductorTempC, upPresetOpts(UP_WD_TEMP_PRESETS, ' \u00B0C'), '\u2014') + '</div>';
+  h += '<div class="select-group"><div class="select-label">' + tx('Jordmodstand (kun TT)', 'Soil resistivity (TT only)') + '</div>';
+  h += upSelect('upSetWdSoil(this.value)', (wd.soilRho == null ? '' : wd.soilRho), EARTH_SOILS.map(function(s) { return { value: s.value, label: s.value + ' \u03A9\u00B7m' }; }), tx('ikke relevant', 'not applicable')) + '</div>';
+  h += '<div class="select-grid"><button class="sel-btn selected" onclick="upRunWorstDay()">\uD83C\uDF29\uFE0F ' + tx('K\u00F8r Worst-Day', 'Run Worst-Day') + '</button></div>';
+
+  const r = upAuditState.worstDay;
+  if (r) {
+    if (!r.testable) {
+      h += '<div class="info-row" style="margin-top:10px">' + tx('Ingen gr\u00F8nne konklusioner at teste', 'No green verdicts to test') + '.</div>';
+    } else {
+      const color = r.flippedCount > 0 ? 'var(--danger)' : 'var(--success)';
+      // one-liner — number kept OUT of the tx fragment so every _FA fragment resolves
+      h += '<div class="result-title" style="margin-top:10px;color:' + color + '">' + tx('Worst-Day', 'Worst-Day') + ': ' + r.flippedCount + ' ' + tx('aktuelt gr\u00F8nne konklusioner bliver r\u00F8de', 'currently-green verdicts turn red') + '</div>';
+      if (r.flippedCount === 0) {
+        h += '<div class="info-row">' + tx('Ingen \u00E6ndring \u2014 alle konklusioner holder', 'No change \u2014 all verdicts hold') + '.</div>';
+      }
+      r.flips.forEach(function(fl) {
+        h += '<div class="result-row" style="flex-direction:column;align-items:flex-start;gap:2px;border-top:1px solid var(--border);padding-top:6px">';
+        h += '<span class="label"><strong>' + fl.scope + '</strong> \u2014 ' + fl.rule + '</span>';
+        h += '<span style="font-size:0.76rem">' + tx('f\u00F8r', 'before') + ': ' + fl.before.detail + '</span>';
+        h += '<span style="font-size:0.76rem;color:var(--danger)">' + tx('efter', 'after') + ': ' + fl.after.detail + '</span>';
+        h += '<span style="font-size:0.72rem;color:var(--text-muted)">' + fl.clause + '</span>';
+      });
+    }
+    h += '<div class="info-row" style="margin-top:8px;font-size:0.72rem">' + tx('Lysbue og selektivitet indg\u00E5r ikke i denne analyse', 'Arc-flash and selectivity are not included in this analysis') + '.</div>';
+  }
+  h += '</div>';
+  return h;
 }
 
 function upVerdictMeta(v) {
@@ -20192,8 +21537,11 @@ function renderKritisk() {
   h += '<div class="info-row">' + tx(
     'Konservativ kontrol af hele projektet: derateret Iz, IEC 60909 c-faktorer, Cmin p\u00E5 U0/U, og runder mod faren. Hver konklusion citerer den pr\u00E6cise DS/HD 60364-bestemmelse. Kilde: ' + UP_SAFETY_REF + '.',
     'Conservative sweep of the whole project: derated Iz, IEC 60909 c-factors, Cmin on U0/U, rounding toward danger. Every finding cites the exact DS/HD 60364 clause. Source: ' + UP_SAFETY_REF + '.') + '</div>';
-  h += '<div class="select-grid"><button class="sel-btn selected" onclick="upRunAudit()">\uD83E\uDDE0 ' + tx('K\u00F8r Den Kritiske Hjerne', 'Run the Critical Mind') + '</button></div>';
+  h += '<div class="select-grid"><button class="sel-btn selected" onclick="upRunAudit()">\uD83E\uDDE0 ' + tx('K\u00F8r Den Kritiske Hjerne', 'Run the Critical Mind') + '</button>';
+  h += '<button class="sel-btn ' + (upAuditState.showMargins ? 'selected' : '') + '" onclick="upToggleMargins()">\uD83D\uDCCF ' + (upAuditState.showMargins ? tx('Skjul marginer', 'Hide margins') : tx('Vis marginer', 'Show margins')) + '</button></div>';
   if (upAuditState.lastAudit) h += upRenderAudit(upAuditState.lastAudit);
+  if (upAuditState.showMargins) h += upRenderMargins(upAuditState.margins);
+  h += upRenderWorstDay();
   h += '</div>';
   return h;
 }
@@ -20592,7 +21940,7 @@ function provRenderEntry(e, expanded) {
   let h = '<details class="prov-entry"' + open + '>';
   h += '<summary style="cursor:pointer;font-weight:600">' + e.title + ' \u2014 ' + provVerdictBadge(e.verdict) + '<span style="color:var(--text-muted);font-weight:400"> \u00B7 ' + tx('vis udregning', 'show working') + '</span></summary>';
   h += '<div class="prov-body" style="padding:6px 0 10px 10px;font-size:0.82rem">';
-  h += '<div class="prov-formula" style="font-family:monospace"><strong>' + tx('Formel', 'Formula') + ':</strong> ' + e.formula + '</div>';
+  h += '<div class="prov-formula" style="font-family:monospace"><strong>' + tx('Formel', 'Formula') + ':</strong> ' + mathml(e.formula, { title: tx('Typesat formel', 'Typeset formula') }) + '</div>';
   if (e.inputs && e.inputs.length) {
     h += '<div style="margin-top:4px"><strong>' + tx('Inputv\u00E6rdier', 'Input values') + ':</strong><ul style="margin:2px 0 0 18px">';
     e.inputs.forEach(function (i) { h += '<li>' + i.sym + ' = ' + i.val + ' <span style="color:var(--text-muted)">(' + i.src + ')</span></li>'; });
@@ -20830,6 +22178,10 @@ function reportPrintCSS() {
     + '.prov-entry > summary{list-style:none}'
     + '.prov-entry[open]{page-break-inside:avoid}'
     + '.report-statement{border:1px solid #000;padding:6px;background:#f7f7f7}'
+    + 'math{font-family:"Cambria Math","STIX Two Math","Latin Modern Math","XITS Math",serif;display:inline}'
+    + '.mathml-formula{display:inline-block;position:relative}'
+    + '.math-unit{color:#1565c0;font-weight:bold}'
+    + '.mathml-alt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}'
     + '@page{margin:14mm}';
 }
 
@@ -20872,6 +22224,569 @@ function reportRenderUI() {
   h += '<div class="report-preview" style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">';
   h += reportRenderHTML(model, false);
   h += '</div></div>';
+  return h;
+}
+
+// ============================================================================
+// ===== COMMISSIONING / VERIFICATION COMPANION (DS/HD 60364-6) =====
+// ============================================================================
+// Turns the calculated design (upProject) into DS/HD 60364-6 FIELD-TEST
+// acceptance targets. The Zs / RA targets are DESIGN-DERIVED: we INVERT the
+// auditor's own disconnection inequalities (via the shared single-source
+// upDisconnectionIa) instead of quoting a generic table. The worst-day
+// conductor-temperature coupling (upRMult / upCableMaxTempC) TIGHTENS the field
+// cold-acceptance ceiling so a cold reading that passes still keeps the HOT loop
+// within Zs,max. 100% click-only capture; verdict-driven approval that can never
+// print "approved" while a test FAILs or is unresolved. Prefix: cv.
+const CV_STD = 'DS/HD 60364-6';
+const CV_STD_YEAR = 'DS/HD 60364-6:2018';
+// Insulation resistance — DS/HD 60364-6 cl.61.3.3 Table 6.1.
+const CV_INSULATION = [
+  { key: 'selv', testV: 250, minMohm: 0.5 },  // SELV/PELV
+  { key: 'lv',   testV: 500, minMohm: 1.0 },  // <=500 V incl 230/400 V
+  { key: 'hv',   testV: 1000, minMohm: 1.0 }  // >500 V
+];
+const CV_INSULATION_CLAUSE = 'DS/HD 60364-6 cl. 61.3.3 Table 6.1';
+// RCD trip-time limits (DS/HD 60364-6 cl.61.3.7), milliseconds. NOTE: the
+// pre-existing TEST_ITEMS t6 holds 200 ms at I\u0394n (covered by the baseline and
+// left untouched); this feature uses the 300 ms general value and adds type S.
+const CV_RCD_CLAUSE = 'DS/HD 60364-6 cl. 61.3.7';
+const CV_RCD_TYPES = ['AC', 'A', 'F', 'B'];
+// Meter resolution / display steps. Display rounds toward the stricter value;
+// PASS/FAIL uses the EXACT (un-rounded) value.
+const CV_STEP = { zs: 0.01, r1r2: 0.01, ir: 0.1, trip: 1, ra: 0.01 };
+// Common preset readings per test (click chips, no typing).
+const CV_PRESETS = {
+  zs: [0.1, 0.2, 0.3, 0.5, 0.8, 1.2, 2.0],
+  r1r2: [0.05, 0.1, 0.2, 0.4, 0.8, 1.2],
+  ra: [5, 10, 20, 50, 100, 200],
+  ir: [0.5, 1.0, 2.0, 5.0, 20, 100, 500],
+  rcd_idn: [10, 20, 40, 80, 130, 200, 300],
+  rcd_5x: [8, 15, 25, 40, 80, 150]
+};
+
+// --- UI-only state (NEVER persisted; never touches upProject/localStorage) ---
+// Keyed "circuitIdx:testKey" for recorded values; per-circuit for selectors.
+let cvState = { recorded: {}, rcdType: {}, rcdSelectiveS: {}, insulClass: {}, soilRho: {}, inspect: {}, expandReport: false };
+function cvKey(idx, testKey) { return idx + ':' + testKey; }
+function cvFmt(v) { if (v == null) return '\u2014'; const r = Math.round(v * 1000) / 1000; return String(r); }
+
+// --- Conservative rounding (display only) ----------------------------------
+// 'ceiling' (a <= limit) floors DOWN; 'floor' (a >= limit) ceils UP. Both move
+// the DISPLAYED limit toward the stricter (harder-to-pass) value.
+function cvRoundLimit(exact, step, kind) {
+  if (exact == null || !isFinite(exact)) return null;
+  step = step || 1;
+  const n = (kind === 'floor') ? Math.ceil(exact / step) : Math.floor(exact / step);
+  return Math.round(n * step * 1e6) / 1e6;
+}
+function cvCeilObj(exact, step) { return { _exact: exact, _display: cvRoundLimit(exact, step, 'ceiling') }; }
+function cvFloorObj(exact, step) { return { _exact: exact, _display: cvRoundLimit(exact, step, 'floor') }; }
+// PASS/FAIL on the EXACT value. kind 'ceiling' => recorded <= exact; 'floor' => >=.
+function cvResult(kind, exact, recorded) {
+  if (recorded == null || exact == null || !isFinite(exact)) return 'unresolved';
+  if (kind === 'floor') return (recorded >= exact) ? 'PASS' : 'FAIL';
+  return (recorded <= exact) ? 'PASS' : 'FAIL';
+}
+function cvResultBand(min, max, recorded) {
+  if (recorded == null || min == null || max == null) return 'unresolved';
+  return (recorded >= min && recorded <= max) ? 'PASS' : 'FAIL';
+}
+
+// ============================================================================
+// THE INVERSION ENGINE (reuses upDisconnectionIa / sldCalcNodeZs / upRMult).
+// ============================================================================
+// Acceptance ceiling for the earth-fault loop impedance Zs, obtained by
+// INVERTING the auditor's disconnection inequality. cmin is a PARAMETER
+// (defaults to UP_CMIN) so a worst-day voltage factor can be supplied.
+function cvZsCeiling(earthing, dev, fc, cmin) {
+  cmin = (typeof cmin === 'number' && isFinite(cmin)) ? cmin : UP_CMIN;
+  fc = fc || {};
+  if (!dev) return { state: 'unresolved', reason: 'no-device', ia: null, zsMax: null, timeReqS: null, clause: null };
+  const iaInfo = upDisconnectionIa(dev); // <-- SINGLE SOURCE shared with the auditor
+  const ia = iaInfo.ia;
+  if (earthing === 'TT') {
+    if (!fc.rcdMa) return { state: 'unresolved', reason: 'no-rcd', ia: ia, zsMax: null, timeReqS: 0.2, clause: 'DS/HD 60364-4-41 cl. 411.5.3' };
+    return { state: 'resolved', ia: ia, zsMax: 50000 / fc.rcdMa, timeReqS: 0.2, clause: 'DS/HD 60364-4-41 cl. 411.5.3', source: '50/(I\u0394n/1000)' };
+  }
+  if (earthing === 'IT') {
+    return { state: 'resolved', ia: ia, zsMax: cmin * 400 / (2 * ia), timeReqS: iaInfo.timeReqS, clause: 'DS/HD 60364-4-41 cl. 411.6.4', source: 'Cmin\u00B7U/(2\u00B7Ia)' };
+  }
+  // TN
+  return { state: 'resolved', ia: ia, zsMax: cmin * 230 / ia, timeReqS: iaInfo.timeReqS, clause: iaInfo.clause, source: 'Cmin\u00B7U0/Ia' };
+}
+
+// Expected (predicted) earth loop impedance at 20 \u00B0C (reuses the verified engine).
+function cvExpectedZs(tree, nodeId) { return sldCalcNodeZs(tree, nodeId); }
+
+// Expected continuity R1+R2 at 20 \u00B0C = \u03A3 2\u00B7L\u00B7r/1000 over the circuit path
+// (resistive only, cable r, NOT x). Also serves as R_cable20 for the worst-day
+// temperature correction of the Zs ceiling.
+function cvContinuityR1R2(tree, nodeId) {
+  const path = sldGetPath(tree, nodeId);
+  let r = 0;
+  for (let i = 0; i < path.length; i++) {
+    const n = tree.nodes[path[i]];
+    if (n && n.cable && n.length_m > 0) r += 2 * n.length_m * (n.cable.r || 0) / 1000;
+  }
+  return r;
+}
+// Worst-day temperature rise of the resistive loop: \u0394R_temp = R_cable20 * (upRMult-1).
+// The transformer term of Zs is temperature-independent and is excluded.
+function cvDeltaRTemp(rCable20, material, thetaC) { return rCable20 * (upRMult(material, thetaC) - 1); }
+// Field cold acceptance ceiling: a cold reading <= this keeps the HOT loop <= zsMax.
+function cvZsCeilingCold(zsMax, rCable20, material, thetaC) { return zsMax - cvDeltaRTemp(rCable20, material, thetaC); }
+
+function cvInsulationLimit(classKey) {
+  for (let i = 0; i < CV_INSULATION.length; i++) { if (CV_INSULATION[i].key === classKey) return { testV: CV_INSULATION[i].testV, minMohm: CV_INSULATION[i].minMohm, clause: CV_INSULATION_CLAUSE }; }
+  return { testV: 500, minMohm: 1.0, clause: CV_INSULATION_CLAUSE };
+}
+function cvRcdTripLimits(rcdType, selectiveS) {
+  if (!rcdType) return { state: 'unresolved', reason: 'no-type', clause: CV_RCD_CLAUSE };
+  if (selectiveS) return { state: 'resolved', selective: true, atIdnMin: 130, atIdnMax: 500, at5: 150, clause: CV_RCD_CLAUSE };
+  return { state: 'resolved', selective: false, atIdn: 300, at5: 40, clause: CV_RCD_CLAUSE };
+}
+function cvRaCeiling(earthing, fc) {
+  if (earthing !== 'TT') return { state: 'na' };
+  if (!fc || !fc.rcdMa) return { state: 'unresolved', reason: 'no-rcd', clause: 'DS/HD 60364-4-41 cl. 411.5.3' };
+  return { state: 'resolved', raMax: 50000 / fc.rcdMa, clause: 'DS/HD 60364-4-41 cl. 411.5.3' };
+}
+
+// Headline worst-day correction info (each circuit applies its own cable theta).
+function cvWorstDayInfo(project) {
+  let theta = UP_PVC_MAX_C;
+  (project && project.finals || []).forEach(function (fc) { const c = fc.cableId ? upCableProduct(fc.cableId) : null; if (c) theta = Math.max(theta, upCableMaxTempC(c)); });
+  return { appliedTo: 'zs', conductorTempC: theta, voltageFactor: UP_CMIN };
+}
+
+// ============================================================================
+// PER-TEST BUILDERS (each cites a clause; missing inputs => unresolved).
+// ============================================================================
+function cvRec(idx, testKey) { const k = cvKey(idx, testKey); return (typeof cvState.recorded[k] === 'number') ? cvState.recorded[k] : null; }
+
+function cvBuildZsTest(project, tree, fId, fc, dev, cab, idx) {
+  const recorded = cvRec(idx, 'zs');
+  const base = { key: 'zs', kind: 'measured', testKey: 'zs', unit: '\u03A9', clause: null, recorded: recorded, step: CV_STEP.zs };
+  if (!dev || !cab) { base.state = 'unresolved'; base.result = 'unresolved'; base.reason = 'missing'; base.ceiling = { _exact: null, _display: null }; return base; }
+  const ceil = cvZsCeiling(project.earthing, dev, fc);
+  base.clause = ceil.clause; base.ia = ceil.ia; base.source = ceil.source;
+  if (ceil.state !== 'resolved') { base.state = 'unresolved'; base.result = 'unresolved'; base.reason = ceil.reason; base.ceiling = { _exact: null, _display: null }; return base; }
+  const expectedZs20 = cvExpectedZs(tree, fId);
+  const rCable20 = cvContinuityR1R2(tree, fId);
+  const material = cab.material || 'Cu';
+  const thetaWd = upCableMaxTempC(cab);
+  const deltaR = cvDeltaRTemp(rCable20, material, thetaWd);
+  const zsMax = ceil.zsMax;
+  const zsCold = cvZsCeilingCold(zsMax, rCable20, material, thetaWd);
+  base.zsMax = zsMax; base.expectedZs20 = expectedZs20; base.deltaRTemp = deltaR; base.thetaWd = thetaWd; base.material = material;
+  base.ceiling = cvCeilObj(zsCold, CV_STEP.zs);
+  base.formula = 'Zs,max = Cmin\u00B7U0 / Ia ; ceiling = Zs,max \u2212 \u0394R_temp';
+  // Over-edge: the predicted COLD loop already exceeds the cold ceiling (i.e. the
+  // design fails hot) => never PASS.
+  if (!(zsCold > 0) || expectedZs20 > zsCold) { base.state = 'over-edge'; base.result = 'over-edge'; return base; }
+  base.state = 'resolved';
+  base.result = cvResult('ceiling', zsCold, recorded);
+  return base;
+}
+
+function cvBuildContinuityTest(tree, fId, dev, cab, idx) {
+  const recorded = cvRec(idx, 'r1r2');
+  const base = { key: 'r1r2', kind: 'measured', testKey: 'r1r2', unit: '\u03A9', clause: 'DS/HD 60364-6 cl. 61.3.2', recorded: recorded, step: CV_STEP.r1r2 };
+  if (!cab) { base.state = 'unresolved'; base.result = 'unresolved'; base.reason = 'missing'; base.ceiling = { _exact: null, _display: null }; return base; }
+  const r1r2 = cvContinuityR1R2(tree, fId);
+  base.expectedR1R2_20 = r1r2;
+  base.formula = 'R1+R2 = \u03A3 2\u00B7L\u00B7r/1000 (20 \u00B0C)';
+  if (!(r1r2 > 0)) { base.state = 'unresolved'; base.result = 'unresolved'; base.reason = 'no-length'; base.ceiling = { _exact: null, _display: null }; return base; }
+  base.ceiling = cvCeilObj(r1r2, CV_STEP.r1r2);
+  base.state = 'resolved';
+  base.result = cvResult('ceiling', r1r2, recorded);
+  return base;
+}
+
+function cvBuildRaTest(earthing, fc, idx) {
+  const recorded = cvRec(idx, 'ra');
+  const base = { key: 'ra', kind: 'measured', testKey: 'ra', unit: '\u03A9', clause: 'DS/HD 60364-4-41 cl. 411.5.3', recorded: recorded, step: CV_STEP.ra };
+  const ra = cvRaCeiling(earthing, fc);
+  if (ra.state === 'na') { base.state = 'na'; base.result = 'na'; base.ceiling = { _exact: null, _display: null }; return base; }
+  if (ra.state !== 'resolved') { base.state = 'unresolved'; base.result = 'unresolved'; base.reason = ra.reason; base.ceiling = { _exact: null, _display: null }; return base; }
+  base.ceiling = cvCeilObj(ra.raMax, CV_STEP.ra);
+  base.formula = 'RA,max = 50 / I\u0394n';
+  const soil = cvState.soilRho[idx];
+  if (soil) base.predictedRA = earthCalcRodResistance(soil, 1.5, 0.016);
+  base.state = 'resolved';
+  base.result = cvResult('ceiling', ra.raMax, recorded);
+  return base;
+}
+
+function cvBuildInsulationTest(fc, idx) {
+  const recorded = cvRec(idx, 'ir');
+  const classKey = cvState.insulClass[idx] || 'lv';
+  const lim = cvInsulationLimit(classKey);
+  const base = { key: 'ir', kind: 'fixed', testKey: 'ir', unit: 'M\u03A9', clause: lim.clause, recorded: recorded, step: CV_STEP.ir, testV: lim.testV, classKey: classKey };
+  base.floor = cvFloorObj(lim.minMohm, CV_STEP.ir);
+  base.formula = 'R_iso \u2265 ' + lim.minMohm + ' M\u03A9 @ ' + lim.testV + ' V';
+  base.state = 'resolved';
+  base.result = cvResult('floor', lim.minMohm, recorded);
+  return base;
+}
+
+function cvBuildRcdTest(fc, idx, point) {
+  const isIdn = (point === 'idn');
+  const testKey = isIdn ? 'rcd_idn' : 'rcd_5x';
+  const recorded = cvRec(idx, testKey);
+  const base = { key: testKey, kind: 'fixed', testKey: testKey, unit: 'ms', clause: CV_RCD_CLAUSE, recorded: recorded, step: CV_STEP.trip, at: isIdn ? 'idn' : '5x' };
+  const rcdType = cvState.rcdType[idx];
+  const selS = !!cvState.rcdSelectiveS[idx];
+  const lim = cvRcdTripLimits(rcdType, selS);
+  base.rcdType = rcdType || null; base.selective = !!(lim.selective);
+  if (lim.state !== 'resolved') { base.state = 'unresolved'; base.result = 'unresolved'; base.reason = 'no-type'; base.ceiling = { _exact: null, _display: null }; return base; }
+  if (lim.selective) {
+    if (isIdn) { base.band = { min: lim.atIdnMin, max: lim.atIdnMax }; base.ceiling = cvCeilObj(lim.atIdnMax, CV_STEP.trip); base.floorExact = lim.atIdnMin; base.result = cvResultBand(lim.atIdnMin, lim.atIdnMax, recorded); }
+    else { base.ceiling = cvCeilObj(lim.at5, CV_STEP.trip); base.result = cvResult('ceiling', lim.at5, recorded); }
+  } else {
+    const limit = isIdn ? lim.atIdn : lim.at5;
+    base.ceiling = cvCeilObj(limit, CV_STEP.trip);
+    base.result = cvResult('ceiling', limit, recorded);
+  }
+  base.state = 'resolved';
+  return base;
+}
+
+function cvBuildInspection(project, built) {
+  const items = [];
+  const has3ph = (project && project.finals || []).some(function (fc) { return fc.phases === '3x400'; });
+  items.push({ key: 'polarity', label: tx('Polaritet', 'Polarity'), clause: 'DS/HD 60364-6 cl. 61.3.6', status: cvState.inspect['polarity'] || null });
+  if (has3ph) items.push({ key: 'phaseseq', label: tx('Fasef\u00F8lge', 'Phase sequence'), clause: 'DS/HD 60364-6 cl. 61.3.9', status: cvState.inspect['phaseseq'] || null });
+  items.push({ key: 'pe', label: tx('PE-kontinuitet', 'PE continuity'), clause: 'DS/HD 60364-6 cl. 61.3.2', status: cvState.inspect['pe'] || null });
+  return items;
+}
+
+// ============================================================================
+// REPORT MODEL + VERDICT (verdict-driven approval; never "approved" on FAIL).
+// ============================================================================
+function cvBuildReport(project) {
+  project = project || upProject;
+  const earthing = project ? project.earthing : 'TN';
+  const built = upBuildTree(project);
+  const circuits = [];
+  const counts = { pass: 0, fail: 0, unresolved: 0, na: 0, total: 0 };
+  const wd = cvWorstDayInfo(project);
+  if (built) {
+    built.finalIds.forEach(function (fId, idx) {
+      const fc = project.finals[idx];
+      const dev = upResolveDevice(fc.deviceId, fc.deviceIn);
+      const cab = fc.cableId ? upCableProduct(fc.cableId) : null;
+      const name = (lang === 'da' ? (fc.name_da || 'Slutkreds') : (fc.name_en || 'Final circuit')) + ' #' + (idx + 1);
+      const tests = [];
+      tests.push(cvBuildZsTest(project, built.tree, fId, fc, dev, cab, idx));
+      tests.push(cvBuildContinuityTest(built.tree, fId, dev, cab, idx));
+      if (earthing === 'TT') tests.push(cvBuildRaTest(earthing, fc, idx));
+      tests.push(cvBuildInsulationTest(fc, idx));
+      if (fc.rcdMa || earthing === 'TT') { tests.push(cvBuildRcdTest(fc, idx, 'idn')); tests.push(cvBuildRcdTest(fc, idx, '5x')); }
+      tests.forEach(function (t) {
+        if (t.result === 'na') { counts.na++; return; }
+        counts.total++;
+        if (t.result === 'PASS') counts.pass++;
+        else if (t.result === 'FAIL' || t.result === 'over-edge') counts.fail++;
+        else counts.unresolved++;
+      });
+      circuits.push({
+        name: name, idx: idx,
+        device: dev ? (dev.product.brand + ' ' + dev.product.model + ' ' + dev.In + ' A' + (dev.curve ? (' ' + dev.curve) : '')) : null,
+        cable: cab ? (cab.brand + ' ' + cab.model + ' ' + cab.mm2 + ' mm\u00B2') : null,
+        length_m: fc.length_m || 0, phases: fc.phases || '1x230', tests: tests
+      });
+    });
+  }
+  const inspection = cvBuildInspection(project, built);
+  const model = {
+    type: 'commissioning_verification', version: 1,
+    generated: new Date().toISOString(), standard: CV_STD,
+    earthing: earthing, worstDay: wd, circuits: circuits,
+    inspection: inspection, visualRefCount: VISUAL_ITEMS.length, counts: counts
+  };
+  model.verdict = cvVerdict(model);
+  return model;
+}
+
+function cvVerdict(model) {
+  let any = false, anyFail = false, anyUnresolved = false;
+  model.circuits.forEach(function (c) { c.tests.forEach(function (t) { if (t.result === 'na') return; any = true; if (t.result === 'FAIL' || t.result === 'over-edge') anyFail = true; else if (t.result !== 'PASS') anyUnresolved = true; }); });
+  (model.inspection || []).forEach(function (it) { any = true; if (it.status === 'fail') anyFail = true; else if (it.status !== 'pass') anyUnresolved = true; });
+  if (!any) return 'incomplete';
+  if (anyFail) return 'fail';
+  if (anyUnresolved) return 'incomplete';
+  return 'pass';
+}
+
+// Approval line — NEVER says "approved" while a test FAILs or is unresolved.
+function cvApprovalText(verdict) {
+  if (verdict === 'pass') return { color: 'var(--success)', text: tx('GODKENDT TIL SP\u00C6NDINGSS\u00C6TNING \u2014 alle verifikationstests best\u00E5et.', 'APPROVED FOR ENERGISATION \u2014 all verification tests pass.') };
+  if (verdict === 'fail') return { color: 'var(--danger)', text: tx('IKKE GODKENDT \u2014 verifikationsfejl skal udbedres.', 'NOT APPROVED \u2014 verification failures must be resolved.') };
+  return { color: 'var(--text-muted)', text: tx('UFULDST\u00C6NDIGT \u2014 uafklarede testpunkter; ikke gyldig som godkendelse.', 'INCOMPLETE \u2014 unresolved test points; not valid as approval.') };
+}
+
+// Trilingual one-liner (numbers concatenated separately from the tx fragments).
+function cvSummaryLine(model) {
+  const c = model.counts;
+  if (!c.total) return tx('Verifikation', 'Verification') + ' (' + CV_STD + '): ' + tx('ingen testpunkter endnu.', 'no test points yet.');
+  const head = (model.verdict === 'pass') ? '\u2713 ' : (model.verdict === 'fail' ? '\u26D4 ' : '\u2026 ');
+  let s = head + tx('Verifikation', 'Verification') + ' (' + CV_STD + '): ' + c.pass + ' ' + tx('best\u00E5et af', 'tests passed of') + ' ' + c.total;
+  if (c.fail) s += ' \u00B7 ' + c.fail + ' ' + tx('fejlet', 'failed');
+  if (c.unresolved) s += ' \u00B7 ' + c.unresolved + ' ' + tx('uafklaret', 'unresolved');
+  return s + '.';
+}
+
+// --- Result badge (trilingual PASS/FAIL/unresolved) ---
+function cvResultMeta(result) {
+  if (result === 'PASS') return { color: 'var(--success)', label: tx('BEST\u00C5ET', 'PASS') };
+  if (result === 'FAIL') return { color: 'var(--danger)', label: tx('FEJLET', 'FAIL') };
+  if (result === 'over-edge') return { color: 'var(--danger)', label: '\u26D4 ' + tx('over kanten \u2014 designet fejler varmt', 'over the edge \u2014 design fails hot') };
+  if (result === 'na') return { color: 'var(--text-muted)', label: tx('ikke relevant', 'not applicable') };
+  return { color: 'var(--text-muted)', label: tx('uafklaret \u2014 v\u00E6lg apparat, kabel og HPFI', 'unresolved \u2014 select device, cable and RCD') };
+}
+function cvTestLabel(t) {
+  if (t.key === 'zs') return tx('Sl\u00F8jfeimpedans Zs', 'Loop impedance Zs');
+  if (t.key === 'r1r2') return tx('Kontinuitet R1+R2', 'Continuity R1+R2');
+  if (t.key === 'ra') return tx('Jordelektrodemodstand RA', 'Earth-electrode resistance RA');
+  if (t.key === 'ir') return tx('Isolationsmodstand', 'Insulation resistance');
+  if (t.key === 'rcd_idn') return tx('HPFI udl\u00F8sningstid', 'RCD trip time') + ' ' + tx('ved I\u0394n', 'at I\u0394n');
+  if (t.key === 'rcd_5x') return tx('HPFI udl\u00F8sningstid', 'RCD trip time') + ' ' + tx('ved 5\u00D7I\u0394n', 'at 5\u00D7I\u0394n');
+  return t.key;
+}
+function cvRequiredText(t) {
+  if (t.result === 'na') return tx('ikke relevant', 'not applicable');
+  if (t.ceiling && t.ceiling._display != null) {
+    if (t.band) return cvFmt(t.band.min) + '\u2013' + cvFmt(t.ceiling._display) + ' ' + t.unit;
+    return '\u2264 ' + cvFmt(t.ceiling._display) + ' ' + t.unit;
+  }
+  if (t.floor && t.floor._display != null) return '\u2265 ' + cvFmt(t.floor._display) + ' ' + t.unit;
+  return tx('uafklaret', 'unresolved');
+}
+
+// ============================================================================
+// REPORT HTML / PRINT / EXPORT (mirror the existing report + export stacks).
+// ============================================================================
+function cvRenderReportHTML(model, expanded) {
+  const ap = cvApprovalText(model.verdict);
+  const vMeta = cvResultMeta(model.verdict === 'pass' ? 'PASS' : (model.verdict === 'fail' ? 'FAIL' : 'unresolved'));
+  let h = '<div class="report-doc">';
+  h += '<div class="report-head"><h1 style="margin:0">' + tx('Verifikationsrapport (DS/HD 60364-6)', 'Verification report (DS/HD 60364-6)') + '</h1>';
+  h += '<div class="report-statement" style="font-weight:700">' + tx('Projekteret og verificeret iht. ', 'Designed and verified to ') + CV_STD_YEAR + '.</div>';
+  h += '<div style="font-size:0.8rem;color:var(--text-muted)">' + tx('Genereret', 'Generated') + ': ' + model.generated + ' \u00B7 ' + tx('Kilde', 'Source') + ': ' + UP_SAFETY_REF + '</div></div>';
+
+  // Verdict banner
+  h += '<div class="report-verdict" style="margin:10px 0;padding:8px;border-left:6px solid ' + vMeta.color + '">';
+  h += '<strong style="color:' + vMeta.color + '">' + tx('Samlet konklusion', 'Overall verdict') + ': ' + vMeta.label + '</strong>';
+  h += '<div style="margin-top:4px;color:' + ap.color + ';font-weight:700">' + ap.text + '</div></div>';
+
+  // 1. Metadata
+  h += '<h2>1. ' + tx('Metadata', 'Metadata') + '</h2><table class="report-table">';
+  h += '<tr><th>' + tx('Standard', 'Standard') + '</th><td>' + model.standard + '</td></tr>';
+  h += '<tr><th>' + tx('Jordingssystem', 'Earthing system') + '</th><td>' + model.earthing + '</td></tr>';
+  h += '<tr><th>' + tx('Ledertemperatur (worst-day)', 'Conductor temperature (worst-day)') + '</th><td>' + model.worstDay.conductorTempC + ' \u00B0C \u00B7 Cmin ' + model.worstDay.voltageFactor + '</td></tr>';
+  h += '</table>';
+
+  // 2. Inspection checklist
+  h += '<h2>2. ' + tx('Inspektionstjekliste', 'Inspection checklist') + '</h2><table class="report-table">';
+  h += '<tr><th>' + tx('Punkt', 'Item') + '</th><th>' + tx('Bestemmelse', 'Clause') + '</th><th>' + tx('Status', 'Status') + '</th></tr>';
+  model.inspection.forEach(function (it) {
+    const st = it.status === 'pass' ? ('\u2713 ' + tx('OK', 'OK')) : (it.status === 'fail' ? ('\u2717 ' + tx('Fejl', 'Fail')) : tx('uafklaret', 'unresolved'));
+    h += '<tr><td>' + it.label + '</td><td>' + it.clause + '</td><td>' + st + '</td></tr>';
+  });
+  h += '</table>';
+  h += '<div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">' + tx('Se desuden den visuelle inspektionstjekliste i Idrifts\u00E6ttelse-modulet', 'See also the visual inspection checklist in the Commissioning module') + ' (' + model.visualRefCount + ' ' + tx('punkter', 'items') + ').</div>';
+
+  // 3. Required vs recorded
+  h += '<h2>3. ' + tx('Kr\u00E6vet kontra m\u00E5lt', 'Required vs recorded') + '</h2>';
+  if (!model.circuits.length) h += '<div>' + tx('V\u00E6lg en transformer og mindst \u00E9n slutkreds.', 'Select a transformer and at least one final circuit.') + '</div>';
+  model.circuits.forEach(function (c) {
+    h += '<h3>' + c.name + ' \u2014 ' + (c.device || '\u2014') + ' \u00B7 ' + (c.cable || '\u2014') + ' \u00B7 ' + c.length_m + ' m</h3>';
+    h += '<table class="report-table"><tr><th>' + tx('Test', 'Test') + '</th><th>' + tx('Kr\u00E6vet', 'Required') + '</th><th>' + tx('M\u00E5lt', 'Recorded value') + '</th><th>' + tx('Bestemmelse', 'Clause') + '</th><th>' + tx('Resultat', 'Result') + '</th></tr>';
+    c.tests.forEach(function (t) {
+      const rm = cvResultMeta(t.result);
+      const rec = (t.recorded == null) ? '\u2014' : (cvFmt(t.recorded) + ' ' + t.unit);
+      h += '<tr><td>' + cvTestLabel(t) + '</td><td>' + cvRequiredText(t) + '</td><td>' + rec + '</td><td>' + (t.clause || '\u2014') + '</td><td style="color:' + rm.color + ';font-weight:700">' + rm.label + '</td></tr>';
+    });
+    h += '</table>';
+  });
+
+  // 4. Statement + signature
+  h += '<h2>4. ' + tx('Erkl\u00E6ring & underskrift', 'Statement & signature') + '</h2>';
+  h += '<div class="report-statement" style="font-weight:700">' + tx('Projekteret og verificeret iht. ', 'Designed and verified to ') + CV_STD_YEAR + '.</div>';
+  h += '<div style="margin-top:6px;color:' + ap.color + ';font-weight:700">' + ap.text + '</div>';
+  h += '<table class="report-table" style="margin-top:8px">';
+  h += '<tr><th>' + tx('Underskrift / stempel', 'Signature / stamp') + '</th><td>' + (model.verdict === 'pass' ? tx('___________________________', '___________________________') : tx('(ikke gyldig som godkendelse)', '(not valid as approval)')) + '</td></tr>';
+  h += '</table>';
+  h += '</div>';
+  return h;
+}
+
+function cvPrintReport() {
+  const model = cvBuildReport(upProject);
+  const html = cvRenderReportHTML(model, true);
+  const dir = (lang === 'fa') ? 'rtl' : 'ltr';
+  const w = window.open('', '_blank');
+  if (!w) return;
+  const doc = w.document;
+  doc.write('<!DOCTYPE html><html dir="' + dir + '" lang="' + lang + '"><head><meta charset="utf-8"><title>' + tx('Verifikationsrapport (DS/HD 60364-6)', 'Verification report (DS/HD 60364-6)') + '</title><style>' + reportPrintCSS() + '</style></head><body>' + html + '</body></html>');
+  doc.close();
+  w.focus();
+  try { w.print(); } catch (e) {}
+}
+
+function cvExportJson() {
+  try {
+    const blob = new Blob([JSON.stringify(cvBuildReport(upProject), null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'verifikation-60364-6-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {}
+}
+
+// ============================================================================
+// CLICK-ONLY HANDLERS + RENDER (no text/number inputs, no free-text areas).
+// ============================================================================
+function cvBump(key, delta) {
+  const cur = (typeof cvState.recorded[key] === 'number') ? cvState.recorded[key] : 0;
+  let next = cur + delta;
+  if (!(next >= 0)) next = 0;
+  cvState.recorded[key] = Math.round(next * 10000) / 10000;
+  renderModule('commissioning');
+}
+function cvSetReading(key, v) { const n = Number(v); if (isFinite(n) && n >= 0) cvState.recorded[key] = Math.round(n * 10000) / 10000; renderModule('commissioning'); }
+function cvSetRcdType(idx, type) { cvState.rcdType[idx] = (CV_RCD_TYPES.indexOf(type) >= 0) ? type : null; renderModule('commissioning'); }
+function cvToggleSelectiveS(idx) { cvState.rcdSelectiveS[idx] = !cvState.rcdSelectiveS[idx]; renderModule('commissioning'); }
+function cvSetInsulClass(idx, k) { cvState.insulClass[idx] = k; renderModule('commissioning'); }
+function cvSetSoil(idx, v) { cvState.soilRho[idx] = (v === '' || v == null) ? null : Number(v); renderModule('commissioning'); }
+function cvSetInspect(key, status) { cvState.inspect[key] = status; renderModule('commissioning'); }
+function cvToggleReport() { cvState.expandReport = !cvState.expandReport; renderModule('commissioning'); }
+
+// Click-only stepper: [\u2212\u2212][\u2212] value [+][++] (fine = meter step, coarse = decade).
+function cvStepper(key, step, unit) {
+  const v = (typeof cvState.recorded[key] === 'number') ? cvState.recorded[key] : null;
+  const coarse = step * 10;
+  let h = '<div class="select-grid" style="align-items:center;gap:4px;grid-template-columns:auto auto 1fr auto auto">';
+  h += '<button class="sel-btn" onclick="cvBump(\'' + key + '\',' + (-coarse) + ')">\u2212\u2212</button>';
+  h += '<button class="sel-btn" onclick="cvBump(\'' + key + '\',' + (-step) + ')">\u2212</button>';
+  h += '<span class="sel-btn selected" style="text-align:center">' + (v == null ? '\u2014' : (cvFmt(v) + (unit ? (' ' + unit) : ''))) + '</span>';
+  h += '<button class="sel-btn" onclick="cvBump(\'' + key + '\',' + step + ')">+</button>';
+  h += '<button class="sel-btn" onclick="cvBump(\'' + key + '\',' + coarse + ')">++</button>';
+  h += '</div>';
+  return h;
+}
+function cvPresetChips(key, presets, unit) {
+  if (!presets || !presets.length) return '';
+  let h = '<div class="select-grid" style="margin-top:4px">';
+  presets.forEach(function (p) { h += '<button class="sel-btn" onclick="cvSetReading(\'' + key + '\',' + p + ')">' + p + (unit ? (' ' + unit) : '') + '</button>'; });
+  h += '</div>';
+  return h;
+}
+
+// Render one measured/fixed test point with its live PASS/FAIL band + inversion working.
+function cvRenderTest(t, idx) {
+  const key = cvKey(idx, t.testKey);
+  const rm = cvResultMeta(t.result);
+  let h = '<div class="result-row" style="flex-direction:column;align-items:flex-start;gap:4px;border-top:1px solid var(--border);padding-top:8px">';
+  h += '<span class="label"><strong>' + cvTestLabel(t) + '</strong> <span style="color:var(--text-muted);font-size:0.74rem">' + (t.clause || '') + '</span></span>';
+  // live band
+  h += '<span style="font-size:0.82rem;color:' + rm.color + ';font-weight:700">' + rm.label + '</span>';
+  h += '<span style="font-size:0.78rem">' + tx('Kr\u00E6vet', 'Required') + ': ' + cvRequiredText(t) + '</span>';
+  if (t.kind === 'measured' && t.key === 'zs' && t.state === 'resolved') {
+    h += '<span style="font-size:0.74rem;color:var(--text-muted)">' + tx('Forventet Zs @20 \u00B0C', 'Expected Zs @20 \u00B0C') + ': ' + cvFmt(t.expectedZs20) + ' \u03A9 \u00B7 ' + tx('Sk\u00E6rpet for worst-day ledertemperatur', 'Tightened for worst-day conductor temperature') + ' (' + t.thetaWd + ' \u00B0C, \u0394R ' + cvFmt(Math.round(t.deltaRTemp * 1000) / 1000) + ' \u03A9)</span>';
+  }
+  // capture controls (only when there is a defined target)
+  if (t.state === 'resolved' || t.state === 'over-edge') {
+    h += '<span style="font-size:0.74rem;color:var(--text-muted)">' + tx('Registrer m\u00E5lt v\u00E6rdi (ingen indtastning)', 'Record measured value (no typing)') + '</span>';
+    h += cvStepper(key, t.step, t.unit);
+    h += cvPresetChips(key, CV_PRESETS[t.testKey], t.unit);
+  } else if (t.state === 'na') {
+    h += '<span style="font-size:0.76rem;color:var(--text-muted)">' + tx('ikke relevant', 'not applicable') + '</span>';
+  }
+  // inversion working (calcDetail) for the Zs ceiling
+  if (t.key === 'zs' && t.state === 'resolved') {
+    h += calcDetail({
+      name: tx('Inversion: acceptkriterie Zs (worst-day korrigeret)', 'Inversion: acceptance ceiling Zs (worst-day corrected)'),
+      formula: t.formula,
+      result: { value: t.ceiling._display, unit: '\u03A9' },
+      reference: t.clause,
+      steps: [
+        { desc: 'Ia', expression: t.source || 'Ia', result: cvFmt(t.ia) + ' A' },
+        { desc: 'Zs,max', expression: t.source || 'Zs,max', result: cvFmt(Math.round(t.zsMax * 1000) / 1000) + ' \u03A9' },
+        { desc: '\u0394R_temp = R_cable20\u00B7(upRMult(' + t.material + ',' + t.thetaWd + ')\u22121)', expression: '\u0394R_temp', result: cvFmt(Math.round(t.deltaRTemp * 1000) / 1000) + ' \u03A9' },
+        { desc: tx('Loftet (afrundet mod faren)', 'Ceiling (rounded toward danger)'), expression: 'Zs,max \u2212 \u0394R_temp', result: cvFmt(t.ceiling._display) + ' \u03A9' }
+      ]
+    });
+  }
+  h += '</div>';
+  return h;
+}
+
+function cvRender() {
+  const p = upProject;
+  const model = cvBuildReport(p);
+  let h = '<div class="card fade-in">';
+  h += '<div class="card-title">\uD83D\uDD0C\u2705 ' + tx('Idrifts\u00E6ttelse & verifikation', 'Commissioning & verification') + '</div>';
+  h += '<div class="info-row">' + tx(
+    'Forvandler det beregnede design til DS/HD 60364-6 acceptkriterier for feltm\u00E5linger: Zs- og RA-lofterne udledes ved at INVERTERE auditorens egne udkoblingsuligheder (samme Ia-kilde), sk\u00E6rpet for worst-day ledertemperatur. 100% klik \u2014 ingen indtastning.',
+    'Turns the calculated design into DS/HD 60364-6 field acceptance targets: the Zs and RA ceilings are DERIVED by INVERTING the auditor\u2019s own disconnection inequalities (same Ia source), tightened for worst-day conductor temperature. 100% click \u2014 no typing.') + '</div>';
+
+  // Summary one-liner
+  h += '<div class="result-box" style="margin-top:8px"><div class="result-title">' + cvSummaryLine(model) + '</div></div>';
+
+  if (!model.circuits.length) {
+    h += '<div class="info-row" style="margin-top:8px">' + tx('V\u00E6lg transformer og slutkredse i Samlet Projekt for at generere acceptkriterier.', 'Select a transformer and final circuits in the Unified Project to generate acceptance targets.') + '</div>';
+  }
+
+  // Inspection checklist (click OK/Fail)
+  h += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + tx('Inspektion (klik OK / Fejl)', 'Inspection (click OK / Fail)') + '</div>';
+  model.inspection.forEach(function (it) {
+    h += '<div class="result-row"><span class="label">' + it.label + ' <span style="color:var(--text-muted);font-size:0.74rem">' + it.clause + '</span></span><span class="select-grid" style="grid-template-columns:auto auto">';
+    h += '<button class="sel-btn ' + (it.status === 'pass' ? 'selected' : '') + '" onclick="cvSetInspect(\'' + it.key + '\',\'pass\')">' + tx('OK', 'OK') + '</button>';
+    h += '<button class="sel-btn ' + (it.status === 'fail' ? 'selected' : '') + '" onclick="cvSetInspect(\'' + it.key + '\',\'fail\')">' + tx('Fejl', 'Fail') + '</button>';
+    h += '</span></div>';
+  });
+  h += '<div class="info-row" style="font-size:0.74rem">' + tx('Se desuden den visuelle inspektionstjekliste i Idrifts\u00E6ttelse-modulet', 'See also the visual inspection checklist in the Commissioning module') + ' (' + model.visualRefCount + ' ' + tx('punkter', 'items') + ').</div>';
+  h += '</div>';
+
+  // Per-circuit acceptance + capture
+  model.circuits.forEach(function (c) {
+    h += '<div class="result-box" style="margin-top:12px;border-left:6px solid var(--primary)">';
+    h += '<div class="result-title">' + c.name + '</div>';
+    h += '<div class="info-row" style="font-size:0.76rem">' + (c.device || '\u2014') + ' \u00B7 ' + (c.cable || '\u2014') + ' \u00B7 ' + c.length_m + ' m \u00B7 ' + c.phases + '</div>';
+    // RCD type selector (click-only) when an RCD applies
+    const hasRcd = (p.finals[c.idx] && p.finals[c.idx].rcdMa) || p.earthing === 'TT';
+    if (hasRcd) {
+      h += '<div class="select-group"><div class="select-label">' + tx('HPFI-type', 'RCD type') + '</div><div class="select-grid">';
+      CV_RCD_TYPES.forEach(function (rt) { h += '<button class="sel-btn ' + (cvState.rcdType[c.idx] === rt ? 'selected' : '') + '" onclick="cvSetRcdType(' + c.idx + ',\'' + rt + '\')">' + rt + '</button>'; });
+      h += '<button class="sel-btn ' + (cvState.rcdSelectiveS[c.idx] ? 'selected' : '') + '" onclick="cvToggleSelectiveS(' + c.idx + ')">' + tx('selektiv (type S)', 'selective (type S)') + '</button>';
+      h += '</div></div>';
+    }
+    // Insulation test class selector
+    h += '<div class="select-group"><div class="select-label">' + tx('Isolationstestklasse', 'Insulation test class') + '</div><div class="select-grid">';
+    h += '<button class="sel-btn ' + ((cvState.insulClass[c.idx] || 'lv') === 'selv' ? 'selected' : '') + '" onclick="cvSetInsulClass(' + c.idx + ',\'selv\')">' + tx('SELV/PELV', 'SELV/PELV') + ' (250 V)</button>';
+    h += '<button class="sel-btn ' + ((cvState.insulClass[c.idx] || 'lv') === 'lv' ? 'selected' : '') + '" onclick="cvSetInsulClass(' + c.idx + ',\'lv\')">230/400 V (500 V)</button>';
+    h += '</div></div>';
+    if (p.earthing === 'TT') {
+      h += '<div class="select-group"><div class="select-label">' + tx('Jordbund (forventet RA)', 'Soil (predicted RA)') + '</div>';
+      h += upSelect('cvSetSoil(' + c.idx + ',this.value)', (cvState.soilRho[c.idx] == null ? '' : cvState.soilRho[c.idx]), EARTH_SOILS.map(function (s) { return { value: s.value, label: (lang === 'da' ? s.da : s.en) }; }), tx('ikke relevant', 'not applicable')) + '</div>';
+    }
+    c.tests.forEach(function (t) { h += cvRenderTest(t, c.idx); });
+    h += '</div>';
+  });
+
+  // Report + export
+  h += '<div class="select-grid" style="margin-top:12px">';
+  h += '<button class="sel-btn" onclick="cvToggleReport()">' + (cvState.expandReport ? tx('Skjul rapport', 'Hide report') : tx('Vis verifikationsrapport', 'Show verification report')) + '</button>';
+  h += '<button class="sel-btn selected" onclick="cvPrintReport()">\uD83D\uDDA8\uFE0F ' + tx('Udskriv / gem som PDF', 'Print / save as PDF') + '</button>';
+  h += '<button class="sel-btn" onclick="cvExportJson()">\u2B07\uFE0F ' + tx('Eksport\u00E9r JSON', 'Export JSON') + '</button>';
+  h += '</div>';
+  if (cvState.expandReport) { h += '<div class="report-preview" style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">' + cvRenderReportHTML(model, false) + '</div>'; }
+
+  h += '</div>';
   return h;
 }
 
@@ -25283,6 +27198,13 @@ function analyzerRun(text) {
       faultState.earthSystem = eMap[d.earthSystem] || 'tncs';
     }
     if (d.zsValue) faultState.zsValue = d.zsValue;
+    // Drive the LIVE fault-protection verdict from the extracted device so a
+    // pasted exam immediately recomputes automatic-disconnection (DS/HD 60364-4-41).
+    if (d.deviceIn) {
+      faultState.deviceIn = d.deviceIn;
+      var curveTypeMap = { 'B': 'mcbB', 'C': 'mcbC', 'D': 'mcbD' };
+      if (d.deviceCurve && curveTypeMap[d.deviceCurve]) faultState.deviceType = curveTypeMap[d.deviceCurve];
+    }
     if (d.capacitance) { if (typeof kapacitorState !== 'undefined') kapacitorState.C = d.capacitance; impedansState.C = d.capacitance; }
   }
 
@@ -25583,6 +27505,31 @@ function examFindQuestionText(seg, type) {
   return ft.length > 200 ? ft.slice(0, 200) + '\u2026' : ft;
 }
 
+// Per-segment extraction for multi-Opgave papers. Each Opgave gets its OWN
+// parameters (its own load, cable, device, ...) while values that an exam states
+// once for the WHOLE paper (supply voltage, frequency, earthing, transformer,
+// install conditions) fall back to the globally-extracted context. This is what
+// lets a paper with several Opgaver of MIXED types map each sub-question to the
+// right solver with the right numbers. Reuses analyzerExtract (NO new math).
+var ANALYZER_GLOBAL_FALLBACK_FIELDS = [
+  'voltage', 'phases', 'cosPhi', 'eta', 'frequency', 'earthSystem',
+  'trafoKVA', 'trafoUk', 'trafoPcu', 'trafoP0', 'trafoPrimKV', 'trafoVecGroup',
+  'installMethod', 'temperature', 'grouping', 'deviceCurve'
+];
+function analyzerExtractMerged(segText, globalData) {
+  var d = analyzerExtract(segText || '');
+  if (globalData) {
+    for (var i = 0; i < ANALYZER_GLOBAL_FALLBACK_FIELDS.length; i++) {
+      var f = ANALYZER_GLOBAL_FALLBACK_FIELDS[i];
+      if ((d[f] === null || d[f] === undefined) && globalData[f] != null) {
+        d[f] = globalData[f];
+        if (d.confidence && globalData.confidence && globalData.confidence[f]) d.confidence[f] = 'inherited';
+      }
+    }
+  }
+  return d;
+}
+
 // Build the COMPLETE structured exam solution from the analyzer's parsed+solved state.
 // Pure (no persisted mutation) so it is deterministic and testable.
 function examBuildSolution(state) {
@@ -25603,12 +27550,26 @@ function examBuildSolution(state) {
   var detectedCount = 0, solvedCount = 0, needInputCount = 0;
   segments.forEach(function (seg) {
     var qs = analyzerDetectQuestions(seg.text || '');
+    // Per-Opgave solving: each segment is solved with ITS OWN extracted
+    // parameters (merged with the paper-wide context) so mixed-type Opgaver map
+    // each sub-question to the right value. Falls back to the global solve when
+    // a segment does not itself carry the data (e.g. a value stated once).
+    var segByType = {};
+    try {
+      if (seg && seg.text && extracted) {
+        var segData = analyzerExtractMerged(seg.text, extracted);
+        var segSolution = analyzerSolve(segData);
+        (segSolution.results || []).forEach(function (r) { if (r && r.type && !segByType[r.type]) segByType[r.type] = r; });
+      }
+    } catch (e) { segByType = {}; }
     var seen = {};
     var qBlocks = [];
     qs.forEach(function (q) {
       if (seen[q.type]) return; seen[q.type] = true;
       var resType = EXAM_SOLUTION_RESULT_ALIAS[q.type] || q.type;
-      var res = byType[resType] || byType[q.type] || null;
+      // Prefer this Opgave's own result; fall back to the global solve so a
+      // value stated once for the whole paper is still shown (never lost).
+      var res = segByType[resType] || segByType[q.type] || byType[resType] || byType[q.type] || null;
       var solved = !!(res && res.html);
       detectedCount++;
       if (solved) solvedCount++; else needInputCount++;

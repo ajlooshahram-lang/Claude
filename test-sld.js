@@ -2550,13 +2550,13 @@ test('Supply cable Iz values are conservative for method D underground', functio
   }
 });
 
-// Test 166: Transformer impedance values within EN 50464-1 ranges
-test('Transformer ukPct values within EN 50464-1 standard ranges', function() {
+// Test 166: Transformer impedance values within EN 50588-1 ranges
+test('Transformer ukPct values within EN 50588-1 standard ranges', function() {
   var trafos = PRODUCTS.transformers;
   for (var i = 0; i < trafos.length; i++) {
     var t = trafos[i];
     assert.ok(t.ukPct >= 3.5 && t.ukPct <= 8.0, t.id + ' ukPct=' + t.ukPct + ' must be 3.5-8.0%');
-    // EN 50464-1: up to 630 kVA typically 4%, above 630 kVA typically 6%
+    // EN 50588-1: up to 630 kVA typically 4%, above 630 kVA typically 6%
     if (t.kva <= 630) assert.ok(t.ukPct >= 4.0 && t.ukPct <= 6.0, t.id + ' <=630kVA: ukPct should be 4-6%');
     if (t.kva > 630) assert.ok(t.ukPct >= 5.0 && t.ukPct <= 7.0, t.id + ' >630kVA: ukPct should be 5-7%');
     // Load losses must be positive and proportional to kVA
@@ -7316,6 +7316,149 @@ test('Elforsyning: print report has header(date)/DS-HD 60364 ref/grouped tables/
   elfRestore();
 });
 
+test('Elforsyning: distinct line items vs total quantity are tracked separately and correctly', function() {
+  elfReset();
+  elforsyningPickAll();
+  var distinctExpected = elfExpectedProductCount(); // one line per product
+  assert.strictEqual(elforsyningDistinctCount(), distinctExpected, 'distinct == number of products');
+  assert.strictEqual(elforsyningTotalCount(), distinctExpected, 'qty 1 each -> total == distinct initially');
+  // Bump one line to 10 pcs: distinct unchanged, total grows by 9.
+  var id = elforsyningBomLines()[0].id;
+  var cat = elforsyningBomLines()[0].category;
+  elforsyningSetQty(id, 10);
+  assert.strictEqual(elforsyningDistinctCount(), distinctExpected, 'distinct unaffected by qty change');
+  assert.strictEqual(elforsyningTotalCount(), distinctExpected + 9, 'total reflects qty bump');
+  // Per-category: distinct count is the product count; qty count includes the bump.
+  assert.strictEqual(elforsyningCategoryDistinctCount(cat), (PRODUCTS[cat] || []).length, 'category distinct == product count');
+  assert.strictEqual(elforsyningCategoryCount(cat), (PRODUCTS[cat] || []).length + 9, 'category qty includes bump');
+  elfRestore();
+});
+
+test('Elforsyning: export data carries distinctCount + per-category distinct counts (additive to JSON)', function() {
+  elfReset();
+  elforsyningPickAll();
+  var id = elforsyningBomLines()[0].id;
+  elforsyningSetQty(id, 5);
+  var data = elforsyningExportData();
+  assert.strictEqual(data.distinctCount, elforsyningDistinctCount(), 'distinctCount exported');
+  assert(data.distinctCount < data.totalCount, 'distinct (' + data.distinctCount + ') < total (' + data.totalCount + ') after a qty bump');
+  assert(data.categoryDistinctCounts && typeof data.categoryDistinctCounts === 'object', 'categoryDistinctCounts present');
+  ELF_CATS.forEach(function(c) {
+    assert.strictEqual(data.categoryDistinctCounts[c], elforsyningCategoryDistinctCount(c), 'distinct count for ' + c);
+  });
+  elfRestore();
+});
+
+test('Elforsyning: CSV export has metadata preamble, header row + one data row per BOM line', function() {
+  elfReset();
+  elforsyningPickAll();
+  var id = elforsyningBomLines()[0].id;
+  elforsyningSetQty(id, 3);
+  var csv = elforsyningExportCsvText();
+  var allLines = csv.split('\r\n').filter(function(l) { return l.length > 0; });
+  var preamble = allLines.filter(function(l) { return l.charAt(0) === '#'; });
+  assert(preamble.length === 5, 'five informational preamble lines (got ' + preamble.length + ')');
+  // header + data
+  var dataLines = allLines.filter(function(l) { return l.charAt(0) !== '#'; });
+  assert.strictEqual(dataLines.length, elforsyningDistinctCount() + 1, 'header + one row per distinct line item');
+  // RFC4180 line endings
+  assert(csv.indexOf('\r\n') >= 0, 'CRLF line endings');
+  // distinct + total surfaced in preamble
+  assert(csv.indexOf('' + elforsyningDistinctCount()) >= 0 && csv.indexOf('' + elforsyningTotalCount()) >= 0, 'distinct + total in preamble');
+  elfRestore();
+});
+
+test('Elforsyning: CSV header is correct and localizes (da/en); never contains a price column', function() {
+  elfReset();
+  elforsyningPickAll();
+  var savedLang = lang;
+  lang = 'da';
+  var da = elforsyningExportCsvText();
+  var daHeader = da.split('\r\n').filter(function(l) { return l.charAt(0) !== '#' && l.length; })[0];
+  assert.strictEqual(daHeader, 'Kategori,M\u00E6rke,Model,Specifikation,Standard,Godkendelse,Antal,Produktside,Datablad', 'da header');
+  lang = 'en';
+  var en = elforsyningExportCsvText();
+  var enHeader = en.split('\r\n').filter(function(l) { return l.charAt(0) !== '#' && l.length; })[0];
+  assert.strictEqual(enHeader, 'Category,Brand,Model,Spec,Standard,Approval,Qty,Product page,Datasheet', 'en header');
+  // No invented prices: there must be no price column and no currency amounts.
+  // (The wholesaler note legitimately contains the word "Prices are not included".)
+  assert(enHeader.toLowerCase().indexOf('price') < 0 && enHeader.toLowerCase().indexOf('pris') < 0, 'no price column in header');
+  assert(en.indexOf('kr.') < 0 && en.indexOf('DKK') < 0, 'no currency amounts in CSV');
+  // Wholesaler verification note carried in the preamble.
+  assert(en.indexOf('Solar') >= 0 && en.indexOf('Sanist\u00E5l') >= 0, 'wholesaler note in CSV preamble');
+  lang = savedLang;
+  elfRestore();
+});
+
+test('Elforsyning: CSV surfaces the official product/datasheet deep-links per line (procurement)', function() {
+  elfReset();
+  elforsyningPickAll();
+  var data = elforsyningExportData();
+  // Find a line that actually carries a deep-link in the export object.
+  var withUrl = data.lines.filter(function(l) { return l.productUrl; });
+  assert(withUrl.length >= 1, 'at least one line has an official product URL');
+  var csv = elforsyningExportCsvText();
+  assert(csv.indexOf(withUrl[0].productUrl) >= 0, 'product URL appears as a CSV cell');
+  // The deep-link must be a manufacturer https URL (never invented/relative).
+  assert(/^https:\/\//.test(withUrl[0].productUrl), 'deep-link is an https manufacturer URL');
+  elfRestore();
+});
+
+test('Elforsyning: CSV cell escaping is RFC4180-safe (quotes/commas/newlines)', function() {
+  assert.strictEqual(elforsyningCsvCell('plain'), 'plain', 'plain text untouched');
+  assert.strictEqual(elforsyningCsvCell('a,b'), '"a,b"', 'comma wrapped');
+  assert.strictEqual(elforsyningCsvCell('say "hi"'), '"say ""hi"""', 'inner quotes doubled + wrapped');
+  assert.strictEqual(elforsyningCsvCell('line1\r\nline2'), '"line1\r\nline2"', 'newline wrapped');
+  assert.strictEqual(elforsyningCsvCell(null), '', 'null -> empty');
+  assert.strictEqual(elforsyningCsvCell(7), '7', 'number stringified');
+});
+
+test('Elforsyning: render shows distinct-line-items + grand-total quantity rows in BOTH da and en', function() {
+  elfReset();
+  elforsyningPickAll();
+  var savedLang = lang;
+  lang = 'da';
+  var da = renderElforsyningBom();
+  assert(da.indexOf('Varelinjer (forskellige produkter)') >= 0, 'da distinct-line-items label');
+  assert(da.indexOf('Eksporter CSV') >= 0, 'da CSV export button');
+  assert(da.indexOf(' varer \u00B7 ') >= 0, 'da per-category distinct/qty subtitle');
+  lang = 'en';
+  var en = renderElforsyningBom();
+  assert(en.indexOf('Line items (distinct products)') >= 0, 'en distinct-line-items label');
+  assert(en.indexOf('Export CSV') >= 0, 'en CSV export button');
+  assert(en.indexOf(' items \u00B7 ') >= 0, 'en per-category distinct/qty subtitle');
+  assert(en.indexOf('Grand total') >= 0, 'grand total still present');
+  lang = savedLang;
+  elfRestore();
+});
+
+test('Elforsyning: print report distinguishes distinct line items from total quantity (no mislabel)', function() {
+  elfReset();
+  elforsyningPickAll();
+  var id = elforsyningBomLines()[0].id;
+  elforsyningSetQty(id, 8); // make total != distinct so the two numbers are visibly different
+  var savedLang = lang; lang = 'en';
+  var report = elforsyningReportHtml();
+  assert(report.indexOf('Line items (distinct products)') >= 0, 'distinct line-items label present');
+  assert(report.indexOf('Total quantity') >= 0, 'total-quantity label present');
+  assert(report.indexOf('>' + elforsyningDistinctCount() + '<') >= 0, 'distinct number rendered');
+  // The old, inaccurate "Total line items: <qty sum>" wording must be gone.
+  assert(report.indexOf('Total line items') < 0, 'mislabeled wording removed');
+  // CSV-style deep-links must still NOT leak into the printed report.
+  assert(report.indexOf('http://') < 0 && report.indexOf('https://') < 0, 'still no remote URLs in print');
+  lang = savedLang;
+  elfRestore();
+});
+
+test('Elforsyning: CSV export is click-only data (no markup/script/text-input injected)', function() {
+  elfReset();
+  elforsyningPickAll();
+  var csv = elforsyningExportCsvText();
+  assert(csv.toLowerCase().indexOf('<script') < 0, 'no script tag');
+  assert(csv.indexOf('<input') < 0 && csv.indexOf('<textarea') < 0, 'no form controls');
+  elfRestore();
+});
+
 test('Elforsyning: bankSpec is the single source of truth shared with the Component Bank list', function() {
   var sc = PRODUCTS.supplyCables[0];
   assert.strictEqual(bankSpec('supplyCables', sc), sc.mm2 + 'mm\u00B2 ' + sc.material + ' | Iz=' + sc.iz + 'A | Method ' + sc.method);
@@ -7331,6 +7474,254 @@ test('Elforsyning: Farsi strings exist in _FA for the key visible controls', fun
   var savedLang = lang; lang = 'fa';
   assert.strictEqual(tx('V\u00E6lg alle elforsyningsmaterialer', 'Pick all elforsyning materials'), _FA['Pick all elforsyning materials']);
   lang = savedLang;
+});
+
+// ===== Standards verification layer (life-safety: correct IEC/EN/DS clause per line) =====
+test('Elforsyning: EVERY product across the 8 categories cites a recognised IEC/EN/DS standard', function() {
+  var v = elforsyningVerifyStandards();
+  assert.strictEqual(v.total, elfExpectedProductCount(), 'checks every product in the 8 categories');
+  assert.deepStrictEqual(v.anomalies, [], 'no product has a missing/unrecognised standard: ' + JSON.stringify(v.anomalies));
+  assert.strictEqual(v.ok, true, 'overall standards check is OK');
+  assert.strictEqual(v.verified, v.total, 'verified count equals total');
+});
+
+test('Elforsyning: expected-standards registry covers all 8 categories with non-empty sets', function() {
+  ELF_CATS.forEach(function(c) {
+    assert(Array.isArray(ELFORSYNING_EXPECTED_STANDARDS[c]) && ELFORSYNING_EXPECTED_STANDARDS[c].length >= 1,
+      'registry has standards for ' + c);
+  });
+});
+
+test('Elforsyning: cable joints cite EN 50393 (LV 0,6/1kV accessories) — NOT IEC 60840 (>30kV HV)', function() {
+  // IEC 60840 applies only to HV cables/accessories above 30 kV (Um=36 kV) up to 150 kV.
+  // These joints are 16-240 mm2 for 0,6/1 kV distribution cables -> EN 50393 is correct.
+  PRODUCTS.cableJoints.forEach(function(p) {
+    assert.strictEqual(p.standard, 'EN 50393', p.id + ' cites EN 50393');
+    assert.notStrictEqual(p.standard, 'IEC 60840', p.id + ' must NOT cite HV IEC 60840');
+  });
+});
+
+test('Elforsyning: transformers cite EN 50588-1 (oil+dry, Um<=36kV) — NOT withdrawn EN 50464-1', function() {
+  PRODUCTS.transformers.forEach(function(p) {
+    assert.strictEqual(p.standard, 'EN 50588-1', p.id + ' cites EN 50588-1');
+    assert.notStrictEqual(p.standard, 'EN 50464-1', p.id + ' must NOT cite withdrawn oil-only EN 50464-1');
+  });
+});
+
+test('Elforsyning: no supply-side line cites the HV-only IEC 60840 clause anywhere', function() {
+  ELF_CATS.forEach(function(c) {
+    (PRODUCTS[c] || []).forEach(function(p) {
+      assert.notStrictEqual(p.standard, 'IEC 60840', c + '/' + p.id + ' must not cite IEC 60840 (HV >30kV)');
+    });
+  });
+});
+
+test('Elforsyning: verifier DETECTS a missing or unrecognised standard (negative test, restores data)', function() {
+  var sample = PRODUCTS.terminals[0];
+  var original = sample.standard;
+  // Inject an unrecognised standard and confirm the verifier flags exactly that line.
+  sample.standard = 'IEC 99999-1';
+  var v1 = elforsyningVerifyStandards();
+  assert.strictEqual(v1.ok, false, 'unrecognised standard breaks the check');
+  var hit1 = v1.anomalies.filter(function(a) { return a.id === sample.id; });
+  assert(hit1.length === 1 && hit1[0].reason === 'unrecognised', 'flags the injected line as unrecognised');
+  // Now remove the standard entirely and confirm it is flagged as missing.
+  delete sample.standard;
+  var v2 = elforsyningVerifyStandards();
+  var hit2 = v2.anomalies.filter(function(a) { return a.id === sample.id; });
+  assert(hit2.length === 1 && hit2[0].reason === 'missing', 'flags the line with no standard as missing');
+  // Restore the original data so no other test is affected.
+  sample.standard = original;
+  assert.strictEqual(elforsyningVerifyStandards().ok, true, 'data restored, check OK again');
+});
+
+test('Elforsyning: JSON export carries a standardsCheck summary (ok + counts + anomalies)', function() {
+  elfReset();
+  elforsyningPickAll();
+  var data = elforsyningExportData();
+  assert(data.standardsCheck && typeof data.standardsCheck === 'object', 'standardsCheck present');
+  assert.strictEqual(data.standardsCheck.ok, true, 'export reports a passing standards check');
+  assert.strictEqual(data.standardsCheck.total, elfExpectedProductCount(), 'total counted');
+  assert.deepStrictEqual(data.standardsCheck.anomalies, [], 'no anomalies in export');
+  elfRestore();
+});
+
+test('Elforsyning: standards-check line renders in the BOM UI in BOTH da and en (and fa fragment)', function() {
+  elfReset();
+  elforsyningPickAll();
+  var savedLang = lang;
+  lang = 'da';
+  var da = renderElforsyningBom();
+  assert(da.indexOf('Standardtjek') >= 0, 'da standards-check label');
+  assert(da.indexOf('\u2713') >= 0, 'da shows the pass checkmark');
+  lang = 'en';
+  var en = renderElforsyningBom();
+  assert(en.indexOf('Standards check') >= 0, 'en standards-check label');
+  assert(en.indexOf('recognised IEC/EN/DS standard') >= 0, 'en explains recognised standard');
+  lang = 'fa';
+  var fa = renderElforsyningBom();
+  assert(fa.indexOf(_FA['Standards check']) >= 0, 'fa standards-check label rendered');
+  lang = savedLang;
+  elfRestore();
+});
+
+test('Elforsyning: print report includes the standards-check summary line', function() {
+  elfReset();
+  elforsyningPickAll();
+  var savedLang = lang; lang = 'en';
+  var report = elforsyningReportHtml();
+  assert(report.indexOf('Standards check') >= 0, 'report shows standards-check line');
+  assert(report.indexOf('\u2713') >= 0, 'report shows the pass checkmark');
+  lang = savedLang;
+  elfRestore();
+});
+
+// ===== Coordination / coherence audit (life-safety: DS/HD 60364-4-43 overload, -5-54 PE) =====
+// Pick a specific SET of real product ids (click-only equivalent of toggling those lines on).
+function elfPick(ids) {
+  elforsyningBom = {};
+  ids.forEach(function(id) {
+    var found = elforsyningProductById(id);
+    assert(found, 'fixture product exists: ' + id);
+    elforsyningBom[id] = { category: found.category, qty: 1 };
+  });
+}
+
+test('Elforsyning coordination: transformer full-load current at 400V matches the 7 reference values (0.1A)', function() {
+  // I_fl = kVA*1000/(sqrt(3)*400) = kVA*1.443376 A. Reference set from DS/HD 60364 design tables.
+  var refs = [[50, 72.2], [100, 144.3], [250, 360.8], [400, 577.4], [630, 909.3], [1000, 1443.4], [2500, 3608.4]];
+  refs.forEach(function(pair) {
+    var got = elforsyningRound1(elforsyningTransformerFlc(pair[0]));
+    assert.strictEqual(got, pair[1], pair[0] + 'kVA -> ' + pair[1] + 'A (got ' + got + ')');
+  });
+  // Conservative: a missing/invalid kVA yields null (unresolved), never a fabricated current.
+  assert.strictEqual(elforsyningTransformerFlc(0), null, 'zero kVA unresolved');
+  assert.strictEqual(elforsyningTransformerFlc(undefined), null, 'missing kVA unresolved');
+  assert.strictEqual(elforsyningTransformerFlc(-5), null, 'negative kVA unresolved');
+});
+
+test('Elforsyning coordination: PE conductor sizing follows DS/HD 60364-5-54 §543.1.2 table 54.7', function() {
+  // S<=16 -> S ; 16<S<=35 -> 16 ; S>35 -> S/2 (line and PE same material).
+  var refs = [[16, 16], [25, 16], [35, 16], [50, 25], [95, 47.5], [240, 120]];
+  refs.forEach(function(p) {
+    assert.strictEqual(elforsyningPeMinCrossSection(p[0]), p[1], p[0] + 'mm2 -> PE ' + p[1] + 'mm2');
+  });
+  assert.strictEqual(elforsyningPeMinCrossSection(0), null, 'missing cross-section unresolved');
+  assert.strictEqual(elforsyningPeMinCrossSection(undefined), null, 'undefined cross-section unresolved');
+});
+
+test('Elforsyning coordination: a coherent picked set coordinates (ok:true, zero warnings)', function() {
+  elfReset();
+  // 95mm2 Cu cable Iz=220A, 160A NH fuse (220>=160), 100kVA transformer (I_fl=144.3A <=220 and <=160? no).
+  // 100kVA -> 144.3A: cable 220>=144.3 OK and fuse 160>=144.3 OK -> coordinated.
+  elfPick(['SC-CU-95', 'MF-NH00-160', 'TR-ONAN-100']);
+  var r = elforsyningVerifyCoordination();
+  assert.strictEqual(r.empty, false, 'not empty');
+  assert.strictEqual(r.warnings.length, 0, 'zero warnings: ' + JSON.stringify(r.warnings));
+  assert.strictEqual(r.ok, true, 'coordinated set is OK');
+  // PE guidance present for the 95mm2 cable (95/2 = 47.5).
+  var pe = r.checks.filter(function(c) { return c.code === 'pe-sizing' && c.id === 'SC-CU-95'; })[0];
+  assert(pe && pe.peMm2 === 47.5, 'PE 47.5mm2 for 95mm2 cable');
+  assert(r.checks.some(function(c) { return c.code === 'transformer-supply-ok'; }), 'transformer-carryable info present');
+  assert(r.checks.some(function(c) { return c.code === 'overload-fuse-ok'; }), 'fuse-covered info present');
+});
+
+test('Elforsyning coordination: WARNS when no picked cable can carry a picked fuse (DS/HD 60364-4-43)', function() {
+  elfReset();
+  elfPick(['SC-CU-25', 'MF-NH00-160']); // cable Iz=110A < fuse In=160A
+  var r = elforsyningVerifyCoordination();
+  assert.strictEqual(r.ok, false, 'uncarried fuse breaks coordination');
+  var w = r.warnings.filter(function(x) { return x.code === 'fuse-no-cable'; });
+  assert(w.length === 1 && w[0].rating === 160, 'flags the 160A fuse as uncarried');
+  assert(w[0].text.indexOf('60364-4-43') >= 0, 'warning cites the overload clause');
+});
+
+test('Elforsyning coordination: WARNS a cable below the smallest fuse could be overloaded (DS/HD 60364-4-43)', function() {
+  elfReset();
+  // 16mm2 Al cable Iz=68A and 95mm2 Cu cable Iz=220A, with a 100A fuse. Smallest fuse=100A.
+  // The 68A cable < 100A -> unprotected; the 220A cable carries the fuse so NO fuse-no-cable.
+  elfPick(['SC-AL-16', 'SC-CU-95', 'MF-NH00-100']);
+  var r = elforsyningVerifyCoordination();
+  var w = r.warnings.filter(function(x) { return x.code === 'cable-unprotected'; });
+  assert(w.length === 1 && w[0].id === 'SC-AL-16' && w[0].minFuseIn === 100, 'flags the 68A cable');
+  assert(r.warnings.filter(function(x) { return x.code === 'fuse-no-cable'; }).length === 0, '100A fuse IS carried by the 220A cable');
+  assert.strictEqual(r.ok, false, 'unprotected cable breaks coordination');
+});
+
+test('Elforsyning coordination: WARNS when the supply cannot carry a transformer rated current (DS/HD 60364)', function() {
+  elfReset();
+  // 25mm2 cable Iz=110A, 100A fuse, 630kVA transformer -> I_fl=909.3A >> 110A and > 100A.
+  elfPick(['SC-CU-25', 'MF-NH00-100', 'TR-ONAN-630']);
+  var r = elforsyningVerifyCoordination();
+  var w = r.warnings.filter(function(x) { return x.code === 'transformer-supply-insufficient'; });
+  assert(w.length === 1 && w[0].flc === 909.3, 'flags the 630kVA transformer (909.3A)');
+  assert(w[0].text.indexOf('60364') >= 0, 'warning cites the clause');
+  assert.strictEqual(r.ok, false, 'over-capacity transformer breaks coordination');
+});
+
+test('Elforsyning coordination: CONSERVATIVE — a missing required value is unresolved, never reported OK', function() {
+  elfReset();
+  elfPick(['SC-CU-95', 'MF-NH00-160', 'TR-ONAN-100']); // otherwise-coordinated set
+  var t = elforsyningProductById('TR-ONAN-100').product;
+  var origKva = t.kva;
+  delete t.kva; // simulate an unknown rating
+  var r = elforsyningVerifyCoordination();
+  assert.strictEqual(r.ok, false, 'unknown transformer kVA must NOT report OK');
+  assert(r.warnings.some(function(x) { return x.code === 'transformer-kva-unresolved'; }), 'flags missing kVA as unresolved');
+  t.kva = origKva; // restore so no other test is affected
+  assert.strictEqual(elforsyningVerifyCoordination().ok, true, 'restored data coordinates again');
+});
+
+test('Elforsyning coordination: empty BOM is stated plainly (not OK, not "coordinates")', function() {
+  elfReset();
+  var r = elforsyningVerifyCoordination();
+  assert.strictEqual(r.empty, true, 'empty flag set');
+  assert.strictEqual(r.ok, false, 'empty is never reported as coordinated');
+  assert.strictEqual(r.warnings.length, 0, 'no warnings on an empty list');
+  var savedLang = lang; lang = 'en';
+  var s = elforsyningCoordinationSummary();
+  assert(s.indexOf('the list is empty') >= 0, 'summary plainly says empty');
+  assert(s.indexOf('\u2713') < 0, 'no pass checkmark on an empty list');
+  lang = savedLang;
+});
+
+test('Elforsyning coordination: JSON export carries coordinationCheck (ok/empty/warnings/checks/counts)', function() {
+  elfReset();
+  elfPick(['SC-CU-95', 'MF-NH00-160', 'TR-ONAN-100']);
+  var data = elforsyningExportData();
+  assert(data.coordinationCheck && typeof data.coordinationCheck === 'object', 'coordinationCheck present');
+  assert.strictEqual(data.coordinationCheck.ok, true, 'coordinated set exports ok:true');
+  assert.strictEqual(data.coordinationCheck.empty, false, 'empty:false');
+  assert.strictEqual(data.coordinationCheck.warningCount, 0, 'no warnings exported');
+  assert(Array.isArray(data.coordinationCheck.checks) && data.coordinationCheck.checks.length >= 1, 'checks array exported');
+  assert.strictEqual(data.coordinationCheck.counts.cables, 1, 'cable count');
+  assert.strictEqual(data.coordinationCheck.counts.transformers, 1, 'transformer count');
+  // A non-coordinated set also serialises its warnings.
+  elfPick(['SC-CU-25', 'MF-NH00-160']);
+  var d2 = elforsyningExportData();
+  assert.strictEqual(d2.coordinationCheck.ok, false, 'non-coordinated set exports ok:false');
+  assert(d2.coordinationCheck.warningCount >= 1, 'warnings serialised');
+  elfRestore();
+});
+
+test('Elforsyning coordination: summary surfaces in BOM UI and print report (da/en/fa)', function() {
+  elfReset();
+  elfPick(['SC-CU-95', 'MF-NH00-160', 'TR-ONAN-100']);
+  var savedLang = lang;
+  lang = 'da';
+  var da = renderElforsyningBom();
+  assert(da.indexOf('Koordineringstjek') >= 0, 'da UI coordination label');
+  assert(elforsyningReportHtml().indexOf('Koordineringstjek') >= 0, 'da report coordination label');
+  lang = 'en';
+  var en = renderElforsyningBom();
+  assert(en.indexOf('Coordination check') >= 0, 'en UI coordination label');
+  assert(en.indexOf('coordinate safely') >= 0, 'en UI shows the coordinated state');
+  assert(elforsyningReportHtml().indexOf('Coordination check') >= 0, 'en report coordination label');
+  lang = 'fa';
+  var fa = renderElforsyningBom();
+  assert(fa.indexOf(_FA['Coordination check']) >= 0, 'fa UI coordination label rendered');
+  lang = savedLang;
+  elfRestore();
 });
 
 test('Elforsyning: Legionella rule is a MINIMUM at the tap (>=50C), not a maximum', function() {
@@ -7889,11 +8280,12 @@ test('Reactive: an overload NEVER leaves the safety verdict showing a stale OK',
 });
 
 test('Reactive: a downstream verdict with no live recomputer is flagged stale (not stale-OK)', function() {
-  // Seed a fake "OK" verdict for a verdict-bearing downstream module.
-  Reactive.verdicts['arcflash'] = { status: 'ok', detail: '', stamp: 0, stale: false };
-  Reactive.notify('scircuit'); // scircuit -> arcflash
-  const v = Reactive.verdict('arcflash');
-  assert(v.stale === true, 'arcflash verdict must be flagged stale after an upstream short-circuit change');
+  // Seed a fake "OK" verdict for a verdict-bearing downstream module that has
+  // NO live recomputer (discrim/selectivity chart — purely informational).
+  Reactive.verdicts['discrim'] = { status: 'ok', detail: '', stamp: 0, stale: false };
+  Reactive.notify('scircuit'); // scircuit -> discrim
+  const v = Reactive.verdict('discrim');
+  assert(v.stale === true, 'discrim verdict must be flagged stale after an upstream short-circuit change');
 });
 
 test('Reactive: rendering ANY module propagates so linked verdicts are fresh without reopening', function() {
@@ -10957,10 +11349,10 @@ test('RC: theory recomputers never throw and never emit a stale flag after notif
 });
 
 test('RC: registering recomputers did NOT regress the existing stale-flag guarantee', function() {
-  // arcflash has no recomputer -> must still be flagged stale (never stale-OK).
-  Reactive.verdicts['arcflash'] = { status: 'ok', detail: '', stamp: 0, stale: false };
+  // discrim (selectivity chart) has no recomputer -> must still be flagged stale (never stale-OK).
+  Reactive.verdicts['discrim'] = { status: 'ok', detail: '', stamp: 0, stale: false };
   Reactive.notify('scircuit');
-  assert(Reactive.verdict('arcflash').stale === true, 'modules without a recomputer are still flagged stale');
+  assert(Reactive.verdict('discrim').stale === true, 'modules without a recomputer are still flagged stale');
 });
 
 console.log('\n=== Analyzer Depth / Intelligence Tests ===\n');
@@ -11069,6 +11461,908 @@ test('AD: fault recomputer detail is trilingual-safe (da/en) when inputs are mis
   assert(da.status === 'incomplete' && en.status === 'incomplete', 'both languages report incomplete (no false OK)');
   assert(da.detail !== en.detail, 'detail string is localised (da != en)');
   lang = savedLang; faultState = JSON.parse(saved);
+});
+
+// ============================================================================
+// === NEW: completing the reactive graph — arcflash / zs / relay recomputers =
+// ============================================================================
+console.log('\n=== Reactive Completeness: arcflash / zs / relay recomputers ===\n');
+
+test('RC2: arcflash, zs and relay recomputers are registered as live verdicts', function() {
+  ['arcflash','zs','relay'].forEach(function(k){
+    assert(typeof Reactive.recomputers[k] === 'function', k + ' recomputer registered');
+  });
+});
+
+test('RC2: zs disconnection verdict is FRESH and correct (TN, B16, short cable)', function() {
+  var saved = JSON.stringify(zsState);
+  zsState.deviceType='mcbB'; zsState.device='B16'; zsState.ze=0.35; zsState.cableLength=20; zsState.cableSize=2.5;
+  Reactive.notify('zs');
+  var v = Reactive.verdict('zs');
+  assert(v.status === 'ok', 'short cable on B16 disconnection OK, got ' + v.status);
+  assert(v.stale === false, 'verdict is fresh (not stale)');
+  assert(v.detail.indexOf('Zs') >= 0, 'detail cites the loop impedance');
+  zsState = JSON.parse(saved);
+});
+
+test('RC2: an over-long cable flips the zs verdict to FAIL (never a stale OK)', function() {
+  var saved = JSON.stringify(zsState);
+  zsState.deviceType='mcbB'; zsState.device='B16'; zsState.ze=0.35; zsState.cableSize=2.5; zsState.cableLength=20;
+  Reactive.notify('zs');
+  assert(Reactive.verdict('zs').status === 'ok', 'precondition OK at 20 m');
+  zsState.cableLength = 400; // far beyond the max permissible loop length
+  Reactive.notify('zs');
+  var v = Reactive.verdict('zs');
+  assert(v.status === 'fail', 'over-long loop fails disconnection, got ' + v.status);
+  assert(v.stale === false, 'recomputed fresh, never a stale OK');
+  zsState = JSON.parse(saved);
+});
+
+test('RC2: zs verdict never shows a false OK when Zs,max is unknown (conservative)', function() {
+  var saved = JSON.stringify(zsState);
+  zsState.device = '__none__';
+  Reactive.notify('zs');
+  assert(Reactive.verdict('zs').status === 'incomplete', 'unknown device -> incomplete, never ok');
+  zsState = JSON.parse(saved);
+});
+
+test('RC2: arcflash incident-energy verdict is fresh and tracks the shared supply voltage', function() {
+  var saved = JSON.stringify(arcflashState);
+  var savedV = SharedQuantities.get('voltage_phase');
+  arcflashState.voltage=400; arcflashState.faultCurrent=10; arcflashState.clearingTime=0.1; arcflashState.workingDistance=455;
+  Reactive.notify('arcflash');
+  var v0 = Reactive.verdict('arcflash');
+  assert(v0.stale === false && v0.detail.indexOf('cal/cm') >= 0, 'fresh incident-energy detail, got ' + JSON.stringify(v0));
+  assert(['ok','warning','fail'].indexOf(v0.status) >= 0, 'valid status, got ' + v0.status);
+  // A supply-voltage change arriving on the bus updates the arc-flash input.
+  SharedQuantities.set('voltage_phase', 690, 'load');
+  assert(arcflashState.voltage === 690, 'arcflash voltage tracked the bus, got ' + arcflashState.voltage);
+  arcflashState = JSON.parse(saved);
+  if (savedV != null) SharedQuantities._values['voltage_phase'] = savedV;
+});
+
+test('RC2: a long clearing time pushes arc-flash energy into the danger band (fail)', function() {
+  var saved = JSON.stringify(arcflashState);
+  arcflashState.voltage=400; arcflashState.faultCurrent=50; arcflashState.clearingTime=2.0; arcflashState.workingDistance=300;
+  Reactive.notify('arcflash');
+  var v = Reactive.verdict('arcflash');
+  assert(v.status === 'fail', 'huge incident energy => work prohibited (fail), got ' + JSON.stringify(v));
+  arcflashState = JSON.parse(saved);
+});
+
+test('RC2: relay coordination verdict is fresh and tracks the transformer kVA on the bus', function() {
+  var saved = JSON.stringify(relayState);
+  var savedK = SharedQuantities.get('trafo_kva');
+  relayState.trafoKVA=630; relayState.primaryKV=10; relayState.tGt=0.5; relayState.egentid=0.04;
+  Reactive.notify('relay');
+  var v = Reactive.verdict('relay');
+  assert(v.stale === false && v.detail.indexOf('I1N=') >= 0, 'fresh relay detail, got ' + JSON.stringify(v));
+  assert(v.status === 'ok', 'tGt=0.5s rides through inrush => coordinated OK, got ' + v.status);
+  SharedQuantities.set('trafo_kva', 1000, 'trafo');
+  Reactive.notify('relay');
+  assert(relayState.trafoKVA === 1000, 'relay tracked the shared transformer kVA');
+  relayState = JSON.parse(saved);
+  if (savedK != null) SharedQuantities._values['trafo_kva'] = savedK;
+});
+
+test('RC2: relay flags nuisance-trip risk (warning) when too fast for inrush', function() {
+  var saved = JSON.stringify(relayState);
+  relayState.trafoKVA=630; relayState.primaryKV=10; relayState.tGt=0.05; relayState.egentid=0.04;
+  Reactive.notify('relay');
+  var v = Reactive.verdict('relay');
+  assert(v.status === 'warning', 'tGt(0.05) < inrush+egentid(0.14) => warning, got ' + v.status);
+  relayState = JSON.parse(saved);
+});
+
+test('RC2: arcflash/zs/relay recomputers never throw and never leave a stale flag after notify', function() {
+  Reactive.notify('load');
+  ['arcflash','zs','relay'].forEach(function(k){
+    var v = Reactive.verdict(k);
+    assert(v && v.stale === false, k + ' has a fresh (non-stale) verdict after a change');
+    assert(['ok','warning','fail','incomplete'].indexOf(v.status) >= 0, k + ' produces a valid status, got ' + (v&&v.status));
+  });
+});
+
+// ============================================================================
+// === NEW: full multi-Opgave exam paper — per-Opgave solving (mixed types) ===
+// ============================================================================
+console.log('\n=== Multi-Opgave Paper: per-Opgave solving (mixed types) ===\n');
+
+var EXAM_MULTI_OPGAVE = [
+  'Autorisationspr\u00F8ve 2024',
+  'Hele installationen forsynes 3-faset 400 V, TN-S.',
+  '',
+  'Opgave 1',
+  'En motor med effekt 37 kW ved 400 V, cos phi = 0,86.',
+  'Kablet er NOIKLX 16 mm\u00B2 med l\u00E6ngde 45 m. Installationsmetode: C.',
+  '1.1 Beregn belastningsstr\u00F8mmen IB.',
+  '1.2 Beregn sp\u00E6ndingsfaldet \u0394U.',
+  '',
+  'Opgave 2',
+  'En belysningskreds med effekt 5 kW ved 400 V, cos phi = 0,95.',
+  '2.1 Beregn belastningsstr\u00F8mmen IB.',
+  '',
+  'Opgave 3',
+  'Jordingssystem TN-S med Zs = 0,8 \u03A9. MCB kurve B In = 16 A.',
+  '3.1 Er fejlbeskyttelsen tilstr\u00E6kkelig?'
+].join('\n');
+
+test('Multi-Opgave: the paper segments into Opgave 1/2/3', function() {
+  analyzerRun(EXAM_MULTI_OPGAVE);
+  var sol = examBuildSolution(analyzerState);
+  var ids = sol.opgaver.map(function(o){return o.id;});
+  assert(ids.indexOf(1)>=0 && ids.indexOf(2)>=0 && ids.indexOf(3)>=0, 'Opgave 1,2,3 present, got ' + ids.join(','));
+});
+
+test('Multi-Opgave: each Opgave IB uses ITS OWN power (37 kW vs 5 kW), not the first match', function() {
+  analyzerRun(EXAM_MULTI_OPGAVE);
+  var sol = examBuildSolution(analyzerState);
+  function ibOf(opId){
+    var op = sol.opgaver.find(function(o){return o.id===opId;});
+    var q = op && op.questions.find(function(x){return x.type==='ib';});
+    return q ? parseFloat(q.value) : null;
+  }
+  var ib1 = ibOf(1), ib2 = ibOf(2);
+  var exp1 = 37000/(Math.sqrt(3)*400*0.86); // ~62.1 A
+  var exp2 = 5000/(Math.sqrt(3)*400*0.95);  // ~7.6 A
+  assert(ib1 && Math.abs(ib1-exp1) < 0.6, 'Opgave 1 IB ~' + exp1.toFixed(1) + ' A, got ' + ib1);
+  assert(ib2 && Math.abs(ib2-exp2) < 0.6, 'Opgave 2 IB ~' + exp2.toFixed(1) + ' A, got ' + ib2);
+  assert(Math.abs(ib1-ib2) > 40, 'the two Opgaver give clearly DIFFERENT IB (per-Opgave solving works)');
+});
+
+test('Multi-Opgave: Opgave 3 fault question is solved from its OWN Zs + device', function() {
+  analyzerRun(EXAM_MULTI_OPGAVE);
+  var sol = examBuildSolution(analyzerState);
+  var op3 = sol.opgaver.find(function(o){return o.id===3;});
+  var fq = op3.questions.find(function(x){return x.type==='fault';});
+  assert(fq, 'fault question detected in Opgave 3');
+  assert(fq.solved, 'fault solved');
+  // If = 230/0.8 = 287.5 A >= Ia(B16)=80 A -> sufficient
+  assert(fq.status === 'ok', 'fault protection sufficient (287.5A >= 80A), got ' + fq.status);
+  assert(fq.calcHtml.indexOf('calc-detail') >= 0, 'full calcDetail working present');
+});
+
+test('Multi-Opgave: Opgave 1 voltage-drop is solved with full working', function() {
+  analyzerRun(EXAM_MULTI_OPGAVE);
+  var sol = examBuildSolution(analyzerState);
+  var op1 = sol.opgaver.find(function(o){return o.id===1;});
+  var vq = op1.questions.find(function(x){return x.type==='vdrop';});
+  assert(vq && vq.solved, 'vdrop solved in Opgave 1');
+  assert(vq.value.indexOf('%') >= 0, 'voltage drop expressed as a percentage, got ' + vq.value);
+  assert(vq.calcHtml.indexOf('calc-detail') >= 0, 'full calcDetail working present');
+});
+
+test('Multi-Opgave: analyzerExtractMerged keeps own power but inherits paper-wide voltage', function() {
+  var global = analyzerExtract(EXAM_MULTI_OPGAVE);
+  var seg2 = analyzerExtractMerged('En belysningskreds med effekt 5 kW, cos phi = 0,95. 2.1 Beregn IB.', global);
+  assert(seg2.power_kW === 5, 'segment keeps its own 5 kW power');
+  assert(seg2.voltage === 400, 'segment inherits the paper-wide 400 V');
+  assert(seg2.phases === 3, 'segment inherits the paper-wide 3-phase context');
+});
+
+test('Multi-Opgave: per-Opgave solving stays click-only and trilingual (da/en/fa)', function() {
+  var savedLang = lang;
+  analyzerRun(EXAM_MULTI_OPGAVE);
+  ['da','en','fa'].forEach(function(L){
+    lang = L;
+    var html = examRenderSolution(examBuildSolution(analyzerState));
+    assert(html.indexOf('<input') < 0 && html.indexOf('<textarea') < 0, L + ' render is click-only');
+  });
+  lang = savedLang;
+});
+
+test('Multi-Opgave: result remains deterministic (same paste -> same coverage)', function() {
+  analyzerRun(EXAM_MULTI_OPGAVE);
+  var c1 = examBuildSolution(analyzerState).coverage;
+  analyzerRun(EXAM_MULTI_OPGAVE);
+  var c2 = examBuildSolution(analyzerState).coverage;
+  assert(c1.detected === c2.detected && c1.solved === c2.solved, 'deterministic coverage across runs');
+  assert(c1.solved + c1.needInput === c1.detected, 'solved + needInput == detected');
+});
+
+// ============================================================================
+// === NEW: deep extract->bus->verdict wiring (a paste drives the whole app) ==
+// ============================================================================
+console.log('\n=== Deep Wiring: a pasted exam drives the bus, verdicts and diagram ===\n');
+
+test('Wire: pasting an exam populates the reactive bus from the extracted quantities', function() {
+  var savedZ = SharedQuantities.get('zs_value');
+  analyzerRun(EXAM_MULTI_OPGAVE);
+  assert(analyzerState.busPopulated === true, 'bus marked populated');
+  assert(SharedQuantities.get('voltage_phase') === 400, 'supply voltage published to the bus');
+  assert(Math.abs(SharedQuantities.get('zs_value') - 0.8) < 1e-9, 'extracted Zs published to the bus');
+  if (savedZ != null) SharedQuantities._values['zs_value'] = savedZ;
+});
+
+test('Wire: a pasted exam immediately drives the LIVE fault verdict (fresh + correct)', function() {
+  var saved = JSON.stringify(faultState);
+  analyzerRun(EXAM_MULTI_OPGAVE); // TN-S, Zs=0.8, MCB B16
+  var v = Reactive.verdict('fault');
+  assert(v && v.stale === false, 'fault verdict is fresh after the paste');
+  // If = 230/0.8 = 287.5 A >= Ia(B16)=80 A -> OK
+  assert(v.status === 'ok', 'extracted Zs + device make disconnection OK, got ' + (v&&v.status));
+  faultState = JSON.parse(saved);
+});
+
+test('Wire: a pasted exam with a dangerously high Zs flips the live fault verdict to FAIL', function() {
+  var saved = JSON.stringify(faultState);
+  analyzerRun([
+    'Opgave 1',
+    'Jordingssystem TN-S. Zs = 9,5 \u03A9. MCB kurve B In = 16 A.',
+    '1.1 Er fejlbeskyttelsen tilstr\u00E6kkelig?'
+  ].join('\n'));
+  var v = Reactive.verdict('fault');
+  assert(v.status === 'fail', 'high Zs -> disconnection FAILS live, got ' + (v&&v.status));
+  assert(v.stale === false, 'never a stale OK');
+  faultState = JSON.parse(saved);
+});
+
+test('Wire: extracted frequency propagates to the live impedans verdict', function() {
+  var savedF = SharedQuantities.get('frequency');
+  var sI=impedansState.f, sM=motorteoriState.f, sP=motorteoriState.poles;
+  motorteoriState.poles = 4;
+  analyzerRun('Opgave 1\nEt kredsl\u00F8b k\u00F8rer ved frekvens 60 Hz. Beregn impedansen Z.');
+  assert(SharedQuantities.get('frequency') === 60, 'frequency published to the bus');
+  assert(impedansState.f === 60, 'impedans state updated to 60 Hz');
+  var iv = Reactive.verdict('impedans');
+  assert(iv.stale === false && iv.detail.indexOf('60Hz') >= 0, 'impedans verdict reflects 60 Hz, got ' + JSON.stringify(iv));
+  impedansState.f=sI; motorteoriState.f=sM; motorteoriState.poles=sP;
+  if (savedF != null) SharedQuantities._values['frequency'] = savedF;
+});
+
+test('Wire: a pasted exam auto-generates the single-line diagram alongside the verdict', function() {
+  analyzerRun(EXAM_MULTI_OPGAVE);
+  var sol = examBuildSolution(analyzerState);
+  assert(sol.sldHtml.indexOf('<svg') >= 0, 'SLD diagram generated for the pasted exam');
+  assert(sol.verdict && ['red','yellow','green','incomplete'].indexOf(sol.verdict.code) >= 0, 'a verdict is produced');
+});
+
+// ============================================================================
+// ===== MARGIN-TO-DANGER / CLIFF-EDGE + WORST-DAY SIMULATION (this feature) =====
+// ============================================================================
+// Shared fixtures built from REAL products. 100 kVA keeps board Ik below the
+// iC60N 6 kA Icu so the breaking-capacity check (out of v1 scope) does not turn
+// the verdict red and mask the three in-scope verdicts.
+function mtdFinal(over) {
+  return Object.assign({ id: 'fcA', name_da: 'Slutkreds', name_en: 'Final circuit', cableId: 'NKT-NOIKLX-6', length_m: 10, deviceId: 'SE-iC60N-B40', deviceIn: 40, loadKW: 6, phases: '1x230', cosPhi: 0.95, rcdMa: null }, over || {});
+}
+function mtdProject(earthing, supplyCableId, fin) {
+  return { version: 1, earthing: earthing || 'TN',
+    transformerId: 'TR-ONAN-100',
+    supply: { cableId: supplyCableId || 'SC-AL-50', length_m: 10, deviceId: 'MF-NH00-100', deviceIn: 100 },
+    finals: [fin] };
+}
+// Green-marginal: overload sits below the worst-day Ca*Cg derating.
+var MTD_GREEN = mtdProject('TN', 'SC-AL-50', mtdFinal({ cableId: 'NKT-NOIKLX-6', deviceIn: 40, loadKW: 6 }));
+// Overload hand-calc fixture: supply has huge headroom (SC-AL-95) so the 2.5 mm2
+// final (officialIz 30, In 25) is the single binding overload constraint.
+var MTD_OVERLOAD = mtdProject('TN', 'SC-AL-95', mtdFinal({ cableId: 'NKT-NOIKLX-2.5', deviceId: 'SE-iC60N-B25', deviceIn: 25, loadKW: 3.68 }));
+// Zs voltage-only fixture: Zs*Ia just under U0 at baseline, flips at vF=0.90.
+var MTD_ZS = mtdProject('TN', 'SC-AL-50', mtdFinal({ cableId: 'NKT-NOIKLX-4', length_m: 105, deviceId: 'SE-iC60N-B40', deviceIn: 40, loadKW: 1.0 }));
+// Voltage-drop conductor-temp fixture: dU ~3.4% baseline, crosses 4% when hot.
+var MTD_VDROP = mtdProject('TN', 'SC-AL-50', mtdFinal({ cableId: 'NKT-NOIKLX-2.5', length_m: 40, deviceId: 'SE-iC60N-B16', deviceIn: 16, loadKW: 3.0 }));
+// Coupling fixture: one conductor-temp rise moves BOTH Zs and Vdrop.
+var MTD_COUPLE = mtdProject('TN', 'SC-AL-50', mtdFinal({ cableId: 'NKT-NOIKLX-4', length_m: 90, deviceId: 'SE-iC60N-B40', deviceIn: 40, loadKW: 2.2 }));
+function mtdS(audit, cat) { return upCategoryStatus(audit, cat); }
+
+test('Margin/WorstDay: TEMP_FACTORS/GROUP_FACTORS/alpha/voltage equal published reference values', function() {
+  assert.strictEqual(TEMP_FACTORS[40], 0.87, 'Ca(40C) = 0.87 (DS/HD 60364-5-52 Table B.52.14)');
+  assert.strictEqual(GROUP_FACTORS[4], 0.65, 'Cg(4 circuits) = 0.65 (Table B.52.17)');
+  assert.strictEqual(UP_ALPHA_CU, 0.00393, 'alpha_Cu = 0.00393/K (IEC 60228)');
+  assert.strictEqual(UP_ALPHA_AL, 0.00403, 'alpha_Al = 0.00403/K (IEC 60228)');
+  assert.strictEqual(UP_WORSTDAY_VF, 0.90, 'worst-day voltage override = 0.90 (CENELEC / EN 50160)');
+  assert.strictEqual(UP_CMIN, 0.95, 'baseline Cmin stays 0.95 (distinct from the 0.90 scenario override)');
+});
+
+test('Margin/WorstDay: neutral overlay is byte-identical to the baseline audit', function() {
+  var saved = upSnapshot();
+  [MTD_GREEN, MTD_ZS, MTD_VDROP, MTD_COUPLE, mtdProject('TT', 'SC-AL-50', mtdFinal({ rcdMa: 30 })), mtdProject('IT', 'SC-AL-50', mtdFinal({}))].forEach(function(p) {
+    var a = upAuditProject(p), b = upAuditWith(p, {});
+    assert.deepStrictEqual(b.findings, a.findings, 'neutral overlay findings identical');
+    assert.strictEqual(b.verdict, a.verdict, 'neutral overlay verdict identical');
+    assert.strictEqual(b.ikBoardA, a.ikBoardA, 'neutral overlay ikBoardA identical');
+  });
+  upRestore(saved);
+});
+
+test('Margin/WorstDay: overload margin search matches the hand calc within one step', function() {
+  // officialIz(2.5 XLPE Cu)=30, In=25 -> flip when 30*Ca < 25 -> Ca < 25/30.
+  var izTab = officialIz(upCableProduct('NKT-NOIKLX-2.5'));
+  assert.strictEqual(izTab, 30, 'reference officialIz for 2.5 mm2 XLPE Cu');
+  var target = 25 / izTab; // required Ca at the flip
+  // upTempFactor interpolates linearly between 40 (0.87) and 45 (0.79)
+  var handT = 40 + (target - 0.87) / (0.79 - 0.87) * 5;
+  assert(mtdS(upAuditProject(MTD_OVERLOAD), 'overload') === 'ok', 'overload OK at baseline');
+  var th = upBisectFlip(MTD_OVERLOAD, 'overload', 30, 55, function(v) { return { overlay: { ambientC: v } }; });
+  assert(th != null, 'a flip ambient is found within bounds');
+  assert(Math.abs(th - handT) <= 1.0, 'searched flip ambient ' + th.toFixed(2) + 'C matches hand ' + handT.toFixed(2) + 'C within one step');
+});
+
+test('Margin/WorstDay: conductor temp couples Vdrop AND Zs (r_eff feeds both)', function() {
+  var base = upAuditProject(MTD_COUPLE);
+  assert.strictEqual(mtdS(base, 'zs'), 'ok', 'Zs OK at baseline');
+  assert.strictEqual(mtdS(base, 'vdrop'), 'ok', 'Vdrop OK at baseline');
+  var hot = upAuditWith(MTD_COUPLE, { conductorTempC: 90 });
+  assert(upCatFlipped(hot, 'zs'), 'raising conductor temp flips Zs');
+  assert(upCatFlipped(hot, 'vdrop'), 'the SAME conductor-temp rise also flips Vdrop');
+  // a worst-day stack flips >= 2 findings together
+  var wd = upWorstDay(MTD_COUPLE);
+  assert(wd.flippedCount >= 2, 'worst-day stack flips >= 2 findings together, got ' + wd.flippedCount);
+});
+
+test('Margin/WorstDay: Worst-Day flips a known-marginal green design to red', function() {
+  var wd = upWorstDay(MTD_GREEN);
+  assert.strictEqual(wd.verdictBefore, 'green', 'design is GREEN at baseline');
+  assert.strictEqual(wd.verdictAfter, 'red', 'worst-day verdict turns RED');
+  assert(wd.flippedCount >= 1, 'at least one green->red flip');
+  assert(wd.flips.some(function(f) { return f.category === 'overload'; }), 'the overload verdict is among the flips');
+  assert(wd.flips.every(function(f) { return f.before.status === 'ok' && f.after.status === 'fail'; }), 'every flip is a genuine ok->fail');
+});
+
+test('Margin/WorstDay: each perturbation flips only its intended verdict (isolation)', function() {
+  // Ca-only and Cg-only -> overload only
+  var amb = upAuditWith(MTD_GREEN, { ambientC: 50 });
+  assert(upCatFlipped(amb, 'overload') && mtdS(amb, 'zs') === 'ok' && mtdS(amb, 'vdrop') === 'ok', 'ambient flips overload, leaves Zs+Vdrop');
+  var grp = upAuditWith(MTD_GREEN, { groupingN: 4 });
+  assert(upCatFlipped(grp, 'overload') && mtdS(grp, 'zs') === 'ok' && mtdS(grp, 'vdrop') === 'ok', 'grouping flips overload, leaves Zs+Vdrop');
+  // voltage -10% only -> Zs only
+  var volt = upAuditWith(MTD_ZS, { voltageFactor: 0.90 });
+  assert(upCatFlipped(volt, 'zs') && mtdS(volt, 'overload') === 'ok' && mtdS(volt, 'vdrop') === 'ok', 'voltage flips Zs, leaves overload+Vdrop');
+  // conductor temp only -> Vdrop here, leaves overload untouched
+  var hot = upAuditWith(MTD_VDROP, { conductorTempC: 90 });
+  assert(upCatFlipped(hot, 'vdrop') && mtdS(hot, 'overload') === 'ok', 'conductor temp flips Vdrop, leaves overload (unrelated)');
+});
+
+test('Margin/WorstDay: displayed margin is rounded TOWARD danger (never overstated)', function() {
+  var m = upMarginToDanger(MTD_OVERLOAD);
+  var flippingAxes = 0;
+  UP_MARGIN_CATS.forEach(function(cat) {
+    var c = m.cats[cat];
+    if (c.state !== 'ok') return;
+    c.axes.forEach(function(ax) {
+      if (!ax.flips) return;
+      flippingAxes++;
+      assert(ax.disp <= ax.raw + 1e-9, cat + '/' + ax.key + ' displayed (' + ax.disp + ') <= exact (' + ax.raw + ')');
+    });
+  });
+  assert(flippingAxes >= 1, 'at least one flipping axis was checked');
+  // explicit overload ambient: floor(12.29) = 12 <= 12.29
+  var amb = upMarginToDanger(MTD_OVERLOAD).cats.overload.axes.find(function(a) { return a.key === 'ambient'; });
+  assert(amb.flips && amb.disp === Math.floor(amb.raw) && amb.disp <= amb.raw, 'ambient headroom floored toward danger');
+});
+
+test('Margin/WorstDay: missing inputs -> "unresolved", never a false OK, no-transformer stays incomplete', function() {
+  // no transformer -> verdict incomplete, all margins unresolved
+  var noTf = mtdProject('TN', 'SC-AL-50', mtdFinal({}));
+  noTf.transformerId = null;
+  assert.strictEqual(upAuditProject(noTf).verdict, 'incomplete', 'no transformer -> incomplete');
+  var mNo = upMarginToDanger(noTf);
+  UP_MARGIN_CATS.forEach(function(cat) { assert.strictEqual(mNo.cats[cat].state, 'unresolved', cat + ' unresolved without transformer'); });
+  // no device on the final -> overload/Zs cannot be a false OK
+  var noDev = mtdProject('TN', 'SC-AL-50', mtdFinal({ deviceId: null, deviceIn: null }));
+  var mDev = upMarginToDanger(noDev);
+  assert(mDev.cats.overload.state !== 'ok', 'no device -> overload not a false OK (' + mDev.cats.overload.state + ')');
+  assert(mDev.cats.zs.state === 'unresolved', 'no device -> Zs unresolved');
+  // no cable on the final -> overload/Vdrop cannot be a false OK
+  var noCab = mtdProject('TN', 'SC-AL-50', mtdFinal({ cableId: null }));
+  var mCab = upMarginToDanger(noCab);
+  assert(mCab.cats.overload.state !== 'ok', 'no cable -> overload not a false OK');
+  assert(mCab.cats.vdrop.state === 'unresolved', 'no cable -> Vdrop unresolved');
+});
+
+test('Margin/WorstDay: empty project -> "no verdicts to test"; already-failing -> over the edge', function() {
+  var empty = upDefaultProject();
+  var wd = upWorstDay(empty);
+  assert.strictEqual(wd.testable, false, 'empty project has no green verdicts to test');
+  assert.strictEqual(wd.flippedCount, 0, 'no flips on an empty project');
+  assert.doesNotThrow(function() { upMarginToDanger(empty); }, 'margin on empty project does not throw');
+  // already-failing overload at baseline -> over-edge (margin 0)
+  var failing = mtdProject('TN', 'SC-AL-95', mtdFinal({ cableId: 'NKT-NOIKLX-1.5', deviceId: 'SE-iC60N-B40', deviceIn: 40, loadKW: 5 }));
+  assert.strictEqual(mtdS(upAuditProject(failing), 'overload'), 'fail', 'overload already fails at baseline');
+  assert.strictEqual(upMarginToDanger(failing).cats.overload.state, 'over-edge', 'already-failing overload -> over the edge');
+});
+
+test('Margin/WorstDay: soil/earth perturbation applies to TT only', function() {
+  var tt = mtdProject('TT', 'SC-AL-50', mtdFinal({ rcdMa: 100 }));
+  var tn = mtdProject('TN', 'SC-AL-50', mtdFinal({}));
+  // resolved overlay adds an earth-electrode resistance only conceptually; for TN
+  // the raAdd is ignored inside upAuditCore, so soil never changes a TN audit.
+  assert.deepStrictEqual(upAuditWith(tn, { soilRho: 2000 }).findings, upAuditProject(tn).findings, 'soil does not affect a TN audit');
+  // For TT a very dry soil raises Zs in the touch-voltage check (here with a 100 mA RCD).
+  var dry = upAuditWith(tt, { soilRho: 1000 });
+  var base = upAuditProject(tt);
+  var dryZs = base.findings.find(function(f) { return upFindingCategory(f) === 'zs'; });
+  assert(dryZs, 'TT has a Zs/touch-voltage finding');
+  assert(upResolveOverlay({ soilRho: 1000 }).raAdd > 0, 'soil resistivity resolves to a positive earth-electrode resistance');
+});
+
+test('Margin/WorstDay: search is PURE — no project / upProject / localStorage mutation', function() {
+  var saved = upSnapshot();
+  var p = mtdProject('TN', 'SC-AL-50', mtdFinal({}));
+  var before = JSON.stringify(p);
+  var upBefore = JSON.stringify(upProject);
+  var lsBefore = localStorage.getItem(UNIFIED_PROJECT_KEY);
+  upAuditWith(p, { ambientC: 55, groupingN: 6, voltageFactor: 0.90, conductorTempC: 90, soilRho: 2000 });
+  upMarginToDanger(p);
+  upWorstDay(p);
+  upBisectFlip(p, 'overload', 30, 55, function(v) { return { overlay: { ambientC: v } }; });
+  assert.strictEqual(JSON.stringify(p), before, 'input project is not mutated by the search');
+  assert.strictEqual(JSON.stringify(upProject), upBefore, 'global upProject is not mutated');
+  assert.strictEqual(localStorage.getItem(UNIFIED_PROJECT_KEY), lsBefore, 'localStorage is untouched');
+  // PRODUCTS catalog must never be mutated by the r_eff overlay
+  assert.strictEqual(upCableProduct('NKT-NOIKLX-4').r, 4.61, 'PRODUCTS cable resistance untouched by r_eff');
+  upRestore(saved);
+});
+
+test('Margin/WorstDay: trilingual — every new fragment resolves via _FA in Farsi', function() {
+  var saved = upSnapshot();
+  var savedLang = lang;
+  var savedState = { lastAudit: upAuditState.lastAudit, showMargins: upAuditState.showMargins, margins: upAuditState.margins, worstDay: upAuditState.worstDay, wd: upAuditState.wd };
+  upProject = MTD_COUPLE;
+  upAuditState.lastAudit = upAuditProject(upProject);
+  upAuditState.showMargins = true;
+  upAuditState.wd = upWorstDayDefault();
+  lang = 'fa';
+  upAuditState.margins = upMarginToDanger(upProject);
+  upAuditState.worstDay = upWorstDay(upProject, upAuditState.wd);
+  var hfa = renderKritisk();
+  var newEnglish = ['Margin to danger', 'Nearest cliff edge', 'Worst-Day simulation', 'currently-green verdicts turn red',
+    'Raise ambient temperature', 'Conductor at max operating temperature',
+    'Dry soil (high earth resistance)', 'Already over the edge', 'Arc-flash and selectivity are not included in this analysis',
+    'Ambient temperature', 'Conductor temperature', 'Run Worst-Day', 'Show margins'];
+  newEnglish.forEach(function(s) { assert(hfa.indexOf(s) < 0, 'no raw English leak in Farsi: "' + s + '"'); });
+  assert(hfa.indexOf('<input') < 0 && hfa.indexOf('<textarea') < 0, 'still 100% click-only (no text inputs)');
+  // positive: the new category names + out-of-scope statement render in Farsi
+  assert(hfa.indexOf(_FA['Overload']) >= 0, 'overload category name resolved to Farsi');
+  assert(hfa.indexOf(_FA['Voltage drop']) >= 0, 'voltage-drop category name resolved to Farsi');
+  assert(hfa.indexOf(_FA['Margin to danger']) >= 0, 'margin-to-danger heading resolved to Farsi');
+  assert(hfa.indexOf(_FA['Arc-flash and selectivity are not included in this analysis']) >= 0, 'out-of-scope statement surfaced in Farsi');
+  lang = savedLang;
+  upAuditState.lastAudit = savedState.lastAudit; upAuditState.showMargins = savedState.showMargins; upAuditState.margins = savedState.margins; upAuditState.worstDay = savedState.worstDay; upAuditState.wd = savedState.wd;
+  upRestore(saved);
+});
+
+test('Margin/WorstDay: UI is click-only and states arc-flash/selectivity are out of scope (da+en)', function() {
+  var saved = upSnapshot();
+  var savedLang = lang;
+  upProject = MTD_GREEN;
+  upAuditState.lastAudit = upAuditProject(upProject);
+  upAuditState.showMargins = true;
+  upAuditState.margins = upMarginToDanger(upProject);
+  upAuditState.wd = upWorstDayDefault();
+  upAuditState.worstDay = upWorstDay(upProject, upAuditState.wd);
+  ['da', 'en'].forEach(function(L) {
+    lang = L;
+    var h = renderKritisk();
+    assert(h.indexOf('<input') < 0 && h.indexOf('<textarea') < 0, L + ': no text inputs (click-only)');
+    assert(h.indexOf('upRunWorstDay()') >= 0, L + ': Worst-Day button present');
+    assert(h.indexOf('upToggleMargins()') >= 0, L + ': Show-margins toggle present');
+    var outOfScope = (L === 'da') ? 'Lysbue og selektivitet indg\u00E5r ikke' : 'Arc-flash and selectivity are not included';
+    assert(h.indexOf(outOfScope) >= 0, L + ': arc-flash/selectivity marked out of scope');
+  });
+  lang = savedLang;
+  upAuditState.lastAudit = null; upAuditState.showMargins = false; upAuditState.margins = null; upAuditState.worstDay = null;
+  upRestore(saved);
+});
+
+// ============================================================================
+// ===== COMMISSIONING / VERIFICATION COMPANION (DS/HD 60364-6) — this feature =
+// ============================================================================
+test('Commissioning: Zs ceiling inverts the auditor (B16 TN \u2248 2.73, C16 \u2248 1.366, In>32 uses 5\u00B7In)', function() {
+  var fc = { rcdMa: null };
+  var b16 = cvZsCeiling('TN', { In: 16, curve: 'B' }, fc, 0.95);
+  assert(Math.abs(b16.zsMax - (0.95 * 230 / 80)) < 1e-9, 'B16 TN zsMax = 0.95*230/(5*16)');
+  assert(Math.abs(b16.zsMax - 2.73125) < 1e-4, 'B16 ~2.73, got ' + b16.zsMax);
+  var c16 = cvZsCeiling('TN', { In: 16, curve: 'C' }, fc, 0.95);
+  assert(Math.abs(c16.zsMax - (0.95 * 230 / 160)) < 1e-9, 'C16 zsMax = 0.95*230/(10*16)');
+  assert(Math.abs(c16.zsMax - 1.365625) < 1e-4, 'C16 ~1.366, got ' + c16.zsMax);
+  var big = cvZsCeiling('TN', { In: 63, curve: 'B' }, fc, 0.95);
+  assert(Math.abs(big.ia - 5 * 63) < 1e-9, 'In>32 -> Ia = 5*In');
+  assert(Math.abs(big.zsMax - (0.95 * 230 / (5 * 63))) < 1e-9, 'In>32 zsMax uses 5*In');
+});
+
+test('Commissioning: TT inversion 50000/I\u0394n (1666.7), missing RCD unresolved (no number), IT Cmin\u00B7400/(2\u00B7Ia)', function() {
+  var tt = cvZsCeiling('TT', { In: 16, curve: 'B' }, { rcdMa: 30 }, 0.95);
+  assert(Math.abs(tt.zsMax - (50000 / 30)) < 1e-9, 'TT zsMax = 50000/I\u0394n');
+  assert(Math.abs(tt.zsMax - 1666.6667) < 0.01, 'TT 30 mA -> 1666.7');
+  var ttNo = cvZsCeiling('TT', { In: 16, curve: 'B' }, { rcdMa: null }, 0.95);
+  assert.strictEqual(ttNo.state, 'unresolved', 'TT without RCD -> unresolved');
+  assert.strictEqual(ttNo.zsMax, null, 'unresolved carries NO number');
+  var it = cvZsCeiling('IT', { In: 16, curve: 'B' }, {}, 0.95);
+  assert(Math.abs(it.zsMax - (0.95 * 400 / (2 * 80))) < 1e-9, 'IT zsMax = Cmin*400/(2*Ia)');
+});
+
+test('Commissioning: upDisconnectionIa is the SINGLE SOURCE the auditor uses (B/C/D, In above/below 32) + byte-identical baseline', function() {
+  ['B', 'C', 'D'].forEach(function(curve) {
+    [10, 16, 25, 32].forEach(function(In) {
+      var info = upDisconnectionIa({ In: In, curve: curve });
+      assert(Math.abs(info.ia - upMagneticMultiple(curve) * In) < 1e-9, curve + In + ' small-final Ia = mult*In');
+      assert.strictEqual(info.timeReqS, 0.4, curve + In + ' small-final 0.4 s');
+    });
+    [40, 63, 100].forEach(function(In) {
+      var info = upDisconnectionIa({ In: In, curve: curve });
+      assert(Math.abs(info.ia - 5 * In) < 1e-9, curve + In + ' large Ia = 5*In');
+      assert.strictEqual(info.timeReqS, 5, curve + In + ' large 5 s');
+    });
+  });
+  var dev = upResolveDevice(MTD_GREEN.finals[0].deviceId, MTD_GREEN.finals[0].deviceIn);
+  var audit = upAuditProject(MTD_GREEN);
+  var zsF = audit.findings.find(function(f) { return upFindingCategory(f) === 'zs'; });
+  assert(zsF.detail.indexOf('Ia=' + upDisconnectionIa(dev).ia.toFixed(0)) >= 0, 'auditor Zs detail uses the shared Ia');
+  var saved = upSnapshot();
+  [MTD_GREEN, MTD_ZS, mtdProject('TT', 'SC-AL-50', mtdFinal({ rcdMa: 30 })), mtdProject('IT', 'SC-AL-50', mtdFinal({}))].forEach(function(p) {
+    assert.deepStrictEqual(upAuditWith(p, {}).findings, upAuditProject(p).findings, 'auditor findings byte-identical after Ia extraction');
+  });
+  upRestore(saved);
+});
+
+test('Commissioning: worst-day cold ceiling is stricter (\u0394R reuses upRMult exactly), equal at 20 \u00B0C', function() {
+  var R20 = 0.5, mat = 'Cu', zsMax = 2.0;
+  assert(cvZsCeilingCold(zsMax, R20, mat, 90) < cvZsCeilingCold(zsMax, R20, mat, 20), 'hotter -> stricter (lower) cold ceiling');
+  assert(Math.abs(cvZsCeilingCold(zsMax, R20, mat, 20) - zsMax) < 1e-12, 'no tightening at 20 \u00B0C (\u0394R=0)');
+  assert(Math.abs(cvDeltaRTemp(R20, mat, 75) - R20 * (upRMult(mat, 75) - 1)) < 1e-12, '\u0394R_temp == R_cable20*(upRMult-1) exactly (proves reuse)');
+  assert.strictEqual(cvZsCeilingCold(zsMax, 0, mat, 90), zsMax, 'L=0 -> R20=0 -> equal at any temp');
+});
+
+test('Commissioning: a circuit whose HOT Zs fails -> test point over-edge, never PASS', function() {
+  var saved = upSnapshot(); var savedRec = cvState.recorded;
+  cvState.recorded = {};
+  upProject = mtdProject('TN', 'SC-AL-50', mtdFinal({ cableId: 'NKT-NOIKLX-1.5', length_m: 200, deviceId: 'SE-iC60N-B16', deviceIn: 16, loadKW: 0.5 }));
+  var zsT = cvBuildReport(upProject).circuits[0].tests.find(function(t) { return t.key === 'zs'; });
+  assert.strictEqual(zsT.result, 'over-edge', 'predicted cold loop already exceeds the cold ceiling -> over-edge');
+  cvState.recorded[cvKey(0, 'zs')] = 0.01; // a "perfect" low reading must NOT rescue it
+  var zsT2 = cvBuildReport(upProject).circuits[0].tests.find(function(t) { return t.key === 'zs'; });
+  assert.strictEqual(zsT2.result, 'over-edge', 'over-edge stays over-edge regardless of recorded value');
+  assert(zsT2.result !== 'PASS', 'never PASS');
+  cvState.recorded = savedRec;
+  upRestore(saved);
+});
+
+test('Commissioning: displayed ceiling rounds DOWN toward danger; exact value retained', function() {
+  var c = cvCeilObj(2.73125, CV_STEP.zs);
+  assert(c._display <= c._exact, 'display <= exact');
+  assert(Math.abs(c._display - (Math.floor(2.73125 / 0.01) * 0.01)) < 1e-9, 'display = floor(exact/step)*step');
+  assert(Math.abs(c._display - 2.73) < 1e-9, '2.73125 -> 2.73');
+  var f = cvFloorObj(1.0, CV_STEP.ir);
+  assert(f._display >= f._exact - 1e-12, 'insulation floor display >= exact (stricter is higher)');
+});
+
+test('Commissioning: PASS/FAIL boundaries use the EXACT (un-rounded) value', function() {
+  var ceil = 2.73125;
+  assert.strictEqual(cvResult('ceiling', ceil, ceil), 'PASS', 'recorded == ceiling -> PASS (<=)');
+  assert.strictEqual(cvResult('ceiling', ceil, ceil + 1e-6), 'FAIL', 'ceiling + eps -> FAIL');
+  var floor = 1.0;
+  assert.strictEqual(cvResult('floor', floor, floor), 'PASS', 'insulation recorded == floor -> PASS (>=)');
+  assert.strictEqual(cvResult('floor', floor, floor - 1e-6), 'FAIL', 'floor - eps -> FAIL');
+  assert.strictEqual(cvResult('ceiling', ceil, null), 'unresolved', 'no recorded -> unresolved');
+  assert.strictEqual(cvResultBand(130, 500, 300), 'PASS', 'type-S band: inside -> PASS');
+  assert.strictEqual(cvResultBand(130, 500, 600), 'FAIL', 'type-S band: above -> FAIL');
+});
+
+test('Commissioning: missing device/cable/RCD/type -> unresolved, never PASS', function() {
+  var saved = upSnapshot(); var savedRec = cvState.recorded; var savedTypes = cvState.rcdType; var savedSel = cvState.rcdSelectiveS;
+  cvState.recorded = {}; cvState.rcdType = {}; cvState.rcdSelectiveS = {};
+  upProject = mtdProject('TN', 'SC-AL-50', mtdFinal({ cableId: null, deviceId: null, deviceIn: null }));
+  var zsT = cvBuildReport(upProject).circuits[0].tests.find(function(t) { return t.key === 'zs'; });
+  assert.strictEqual(zsT.result, 'unresolved', 'no device/cable -> Zs unresolved');
+  assert(!('zsMax' in zsT) || zsT.ceiling._exact == null, 'unresolved Zs carries no ceiling number');
+  upProject = mtdProject('TT', 'SC-AL-50', mtdFinal({ rcdMa: null }));
+  var zsTT = cvBuildReport(upProject).circuits[0].tests.find(function(t) { return t.key === 'zs'; });
+  assert.strictEqual(zsTT.result, 'unresolved', 'TT without rcdMa -> Zs unresolved');
+  upProject = mtdProject('TN', 'SC-AL-50', mtdFinal({ rcdMa: 30 }));
+  var trip = cvBuildReport(upProject).circuits[0].tests.find(function(t) { return t.key === 'rcd_idn'; });
+  assert.strictEqual(trip.result, 'unresolved', 'RCD present but type not selected -> unresolved');
+  cvState.recorded = savedRec; cvState.rcdType = savedTypes; cvState.rcdSelectiveS = savedSel;
+  upRestore(saved);
+});
+
+test('Commissioning: fixed limits equal the cited DS/HD 60364-6 clauses', function() {
+  assert.strictEqual(cvInsulationLimit('lv').minMohm, 1.0, '230/400 V -> 1.0 M\u03A9');
+  assert.strictEqual(cvInsulationLimit('lv').testV, 500, '230/400 V test at 500 V');
+  assert.strictEqual(cvInsulationLimit('selv').minMohm, 0.5, 'SELV/PELV -> 0.5 M\u03A9');
+  assert.strictEqual(cvInsulationLimit('selv').testV, 250, 'SELV/PELV test at 250 V');
+  var gen = cvRcdTripLimits('AC', false);
+  assert.strictEqual(gen.atIdn, 300, 'general RCD 300 ms @ I\u0394n');
+  assert.strictEqual(gen.at5, 40, 'general RCD 40 ms @ 5\u00D7I\u0394n');
+  var sel = cvRcdTripLimits('A', true);
+  assert.strictEqual(sel.at5, 150, 'type S 150 ms @ 5\u00D7I\u0394n');
+  assert.strictEqual(sel.atIdnMin, 130, 'type S 130 ms min @ I\u0394n');
+  assert.strictEqual(sel.atIdnMax, 500, 'type S 500 ms max @ I\u0394n');
+  assert.strictEqual(cvRcdTripLimits(null, false).state, 'unresolved', 'absent type -> unresolved (never PASS)');
+});
+
+test('Commissioning: cvBuildReport works in da/en/fa (clause+required+recorded), JSON carries _exact/_display/result, never "approved" on FAIL', function() {
+  var saved = upSnapshot(); var savedLang = lang; var savedRec = cvState.recorded;
+  cvState.recorded = {};
+  ['da', 'en', 'fa'].forEach(function(L) {
+    lang = L;
+    var m = cvBuildReport(MTD_GREEN);
+    assert.strictEqual(m.standard, 'DS/HD 60364-6', L + ': standard tagged');
+    assert(m.circuits.length > 0, L + ': has circuits');
+    m.circuits.forEach(function(c) { c.tests.forEach(function(t) {
+      assert('clause' in t && 'recorded' in t && 'result' in t, L + ': each test row has clause+recorded+result');
+    }); });
+    assert(cvRenderReportHTML(m, true).indexOf('DS/HD 60364-6') >= 0, L + ': report cites DS/HD 60364-6');
+  });
+  lang = 'en';
+  var zsT = cvBuildReport(MTD_GREEN).circuits[0].tests.find(function(t) { return t.key === 'zs'; });
+  assert('_exact' in zsT.ceiling && '_display' in zsT.ceiling, 'numeric ceiling carries _exact AND _display');
+  cvState.recorded[cvKey(0, 'zs')] = 9999; // force a FAIL
+  var failModel = cvBuildReport(MTD_GREEN);
+  assert.strictEqual(failModel.verdict, 'fail', 'recording a failing Zs -> verdict fail');
+  var failHtml = cvRenderReportHTML(failModel, true);
+  assert(failHtml.indexOf('APPROVED FOR ENERGISATION') < 0, 'never prints positive approval on FAIL');
+  assert(failHtml.indexOf('NOT APPROVED') >= 0, 'shows NOT APPROVED on fail');
+  cvState.recorded = savedRec; lang = savedLang;
+  upRestore(saved);
+});
+
+test('Commissioning: ceiling/report fns are PURE — no upProject / localStorage / PRODUCTS mutation', function() {
+  var saved = upSnapshot();
+  upProject = MTD_COUPLE;
+  var before = JSON.stringify(upProject);
+  var lsBefore = localStorage.getItem(UNIFIED_PROJECT_KEY);
+  cvBuildReport(upProject);
+  cvZsCeiling('TN', { In: 16, curve: 'B' }, { rcdMa: null }, 0.95);
+  cvBuildReport(MTD_ZS);
+  cvDeltaRTemp(0.5, 'Cu', 90);
+  assert.strictEqual(JSON.stringify(upProject), before, 'upProject not mutated');
+  assert.strictEqual(localStorage.getItem(UNIFIED_PROJECT_KEY), lsBefore, 'localStorage untouched');
+  assert.strictEqual(upCableProduct('NKT-NOIKLX-4').r, 4.61, 'PRODUCTS cable resistance untouched');
+  upRestore(saved);
+});
+
+test('Commissioning: rendered module is click-only (cvBump present, no text/number inputs, no textarea) in da/en/fa', function() {
+  var saved = upSnapshot(); var savedLang = lang; var savedRec = cvState.recorded;
+  cvState.recorded = {};
+  upProject = mtdProject('TT', 'SC-AL-50', mtdFinal({ rcdMa: 30, phases: '3x400' }));
+  ['da', 'en', 'fa'].forEach(function(L) {
+    lang = L;
+    var h = cvRender();
+    assert(h.indexOf('cvBump(') >= 0, L + ': stepper uses cvBump (continuous click capture)');
+    assert(h.indexOf('type="text"') < 0, L + ': no text input');
+    assert(h.indexOf('type="number"') < 0, L + ': no number input');
+    assert(h.indexOf('<textarea') < 0, L + ': no textarea');
+  });
+  lang = savedLang; cvState.recorded = savedRec;
+  upRestore(saved);
+});
+
+test('Commissioning: trilingual \u2014 every new fragment resolves via _FA in Farsi (no raw English leak)', function() {
+  var saved = upSnapshot(); var savedLang = lang; var savedRec = cvState.recorded; var savedTypes = cvState.rcdType; var savedExpand = cvState.expandReport;
+  cvState.recorded = {}; cvState.rcdType = {}; cvState.expandReport = true;
+  upProject = mtdProject('TT', 'SC-AL-50', mtdFinal({ rcdMa: 30, phases: '3x400' }));
+  lang = 'fa';
+  var hfa = cvRender();
+  var newEnglish = ['Commissioning & verification', 'Loop impedance Zs', 'Continuity R1+R2', 'Insulation resistance',
+    'RCD trip time', 'Earth-electrode resistance RA', 'Polarity', 'Phase sequence', 'PE continuity',
+    'Recorded value', 'Required', 'Record measured value (no typing)', 'Expected Zs @20 \u00B0C',
+    'Tightened for worst-day conductor temperature', 'Verification report (DS/HD 60364-6)', 'RCD type',
+    'selective (type S)', 'Inspection (click OK / Fail)', 'Overall verdict'];
+  newEnglish.forEach(function(s) { assert(hfa.indexOf(s) < 0, 'no raw English leak in Farsi: "' + s + '"'); });
+  assert(hfa.indexOf('<textarea') < 0 && hfa.indexOf('type="text"') < 0, 'still 100% click-only in Farsi');
+  assert(hfa.indexOf(_FA['Loop impedance Zs']) >= 0, 'Zs label resolved to Farsi');
+  assert(hfa.indexOf(_FA['Commissioning & verification']) >= 0, 'heading resolved to Farsi');
+  assert(hfa.indexOf(_FA['Earth-electrode resistance RA']) >= 0, 'RA label resolved to Farsi');
+  lang = savedLang; cvState.recorded = savedRec; cvState.rcdType = savedTypes; cvState.expandReport = savedExpand;
+  upRestore(saved);
+});
+
+test('Commissioning: module is registered in renderModule and renders without throwing', function() {
+  var saved = upSnapshot();
+  upProject = MTD_GREEN;
+  assert.strictEqual(typeof cvRender, 'function', 'cvRender exists');
+  assert.doesNotThrow(function() { renderModule('commissioning'); }, 'renderModule(\'commissioning\') does not throw');
+  upRestore(saved);
+});
+
+// ============================================================================
+// ===== NATIVE MathML FORMULA TYPESETTING TESTS (mathml transpiler) =====
+// ============================================================================
+console.log('\n=== MathML Formula Typesetting Tests ===\n');
+
+function mmlCount(hay, needle) {
+  var n = 0, idx = 0;
+  while ((idx = hay.indexOf(needle, idx)) >= 0) { n++; idx += needle.length; }
+  return n;
+}
+// Extract the inner <math>...</math> markup from a mathml() result (first match).
+function mmlInner(out) {
+  var a = out.indexOf('<math');
+  var b = out.indexOf('</math>');
+  return (a >= 0 && b >= 0) ? out.slice(a, b + 7) : '';
+}
+
+test('mathml: subscript with dotted multi-part subscript preserved', function() {
+  var out = mathml('I_K1s.fase');
+  var inner = mmlInner(out);
+  assert(inner.indexOf('<msub>') >= 0, 'has <msub>');
+  assert(inner.indexOf('<mi>I</mi>') >= 0, 'base is identifier I');
+  assert(inner.indexOf('K1s.fase') >= 0, 'dotted multi-part subscript preserved');
+});
+
+test('mathml: double-prime base + msub subscript', function() {
+  var out = mathml("t''_linje");
+  var inner = mmlInner(out);
+  assert(inner.indexOf('\u2033') >= 0, 'base carries double-prime \u2033');
+  assert(inner.indexOf('<msub>') >= 0, 'has msub');
+  assert(inner.indexOf('linje') >= 0, 'subscript linje present');
+  assert(inner.indexOf('<mi>t</mi>') >= 0, 'base identifier t present');
+});
+
+test('mathml: superscript via ^ incl fractional, and unicode square', function() {
+  var inner = mmlInner(mathml('s^(1/2)'));
+  assert(inner.indexOf('<msup>') >= 0, 's^(1/2) has <msup>');
+  assert(inner.indexOf('<mfrac>') >= 0, 'fractional exponent is an <mfrac> (1 over 2)');
+  assert(inner.indexOf('<mn>1</mn>') >= 0 && inner.indexOf('<mn>2</mn>') >= 0, 'mfrac 1 over 2');
+  var inner2 = mmlInner(mathml('x\u00B2'));
+  assert(inner2.indexOf('<msup>') >= 0, 'x\u00B2 has <msup>');
+  assert(inner2.indexOf('<mn>2</mn>') >= 0, 'unicode square -> exponent 2');
+});
+
+test('mathml: trailing-digit guard (Un, S1, SN render as identifiers)', function() {
+  ['Un', 'S1', 'SN'].forEach(function(id) {
+    var inner = mmlInner(mathml(id));
+    assert(inner.indexOf('<msup>') < 0, id + ' must NOT be superscripted');
+    assert(inner.indexOf('<msub>') < 0, id + ' must NOT be subscripted');
+    assert(inner.indexOf('<mi>' + id + '</mi>') >= 0, id + ' is a single identifier');
+  });
+});
+
+test('mathml: bare radical and radical over a fraction', function() {
+  var i3 = mmlInner(mathml('\u221A3'));
+  assert(i3.indexOf('<msqrt><mn>3</mn></msqrt>') >= 0, '\u221A3 -> msqrt over just 3');
+  assert(i3.indexOf('<mfrac>') < 0, 'no spurious fraction');
+  var is = mmlInner(mathml('\u221As'));
+  assert(is.indexOf('<msqrt><mi>s</mi></msqrt>') >= 0, '\u221As -> msqrt over just s');
+  var ip = mmlInner(mathml('\u221A(P0/Pcu)'));
+  assert(ip.indexOf('<msqrt>') >= 0 && ip.indexOf('<mfrac>') >= 0, '\u221A(P0/Pcu) -> msqrt over mfrac');
+});
+
+test('mathml: stacked fraction with correct numerator/denominator grouping', function() {
+  var inner = mmlInner(mathml('c \u00B7 Un / (\u221A3 \u00B7 Zt)'));
+  assert(inner.indexOf('<mfrac>') >= 0, 'has <mfrac>');
+  // numerator c·Un
+  assert(inner.indexOf('<mi>c</mi><mo>\u00B7</mo><mi>Un</mi>') >= 0, 'numerator is c \u00B7 Un');
+  // denominator √3 · Zt (parenthesised source -> grouped under the bar)
+  assert(inner.indexOf('<msqrt><mn>3</mn></msqrt><mo>\u00B7</mo><mi>Zt</mi>') >= 0, 'denominator is \u221A3 \u00B7 Zt');
+});
+
+test('mathml: absolute-value bars fence a subscripted identifier', function() {
+  var inner = mmlInner(mathml('|I_K3F.max.for|'));
+  assert(mmlCount(inner, '<mo>|</mo>') === 2, 'two fence bars');
+  assert(inner.indexOf('<msub>') >= 0, 'subscripted identifier inside bars');
+  assert(inner.indexOf('K3F.max.for') >= 0, 'dotted subscript preserved');
+});
+
+test('mathml: chained inequality (unicode and ASCII <= forms)', function() {
+  var inner = mmlInner(mathml('IB \u2264 In \u2264 Iz'));
+  assert(mmlCount(inner, '<mo>\u2264</mo>') === 2, 'two \u2264 operators');
+  assert(inner.indexOf('<mi>IB</mi>') >= 0 && inner.indexOf('<mi>In</mi>') >= 0 && inner.indexOf('<mi>Iz</mi>') >= 0, 'three operands');
+  var inner2 = mmlInner(mathml('IB <= In <= Iz'));
+  assert(mmlCount(inner2, '<mo>\u2264</mo>') === 2, 'ASCII <= maps to two \u2264 operators');
+});
+
+test('mathml: define operator := is distinct, and = evaluation form works', function() {
+  var inner = mmlInner(mathml('l_lang := l_1 + l_2 + l_3 + l_F'));
+  assert(inner.indexOf('<mo>:=</mo>') >= 0, ':= rendered distinctly');
+  assert(inner.indexOf('<mo>=</mo>') < 0, ':= must not collapse to plain =');
+  assert(inner.indexOf('<msub>') >= 0, 'l_1 etc are subscripted');
+  var ev = mmlInner(mathml('l_lang = 5'));
+  assert(ev.indexOf('<mo>=</mo>') >= 0 && ev.indexOf('<mn>5</mn>') >= 0, 'evaluation = 5 form works');
+});
+
+test('mathml: Danish-decimal numbers, parenthesised base, superscript exponent', function() {
+  var out = mathml('Pb = 0,834 \u00B7 (W\u00B7n)^0,89');
+  var inner = mmlInner(out);
+  assert(inner !== '', 'parses to <math> (does not fall back)');
+  assert(inner.indexOf('<mn>0,834</mn>') >= 0, 'Danish decimal 0,834 preserved');
+  assert(inner.indexOf('<mn>0,89</mn>') >= 0, 'Danish decimal exponent 0,89 preserved');
+  assert(inner.indexOf('<msup>') >= 0, 'has superscript');
+  assert(inner.indexOf('<mo>(</mo>') >= 0, 'parenthesised base preserved');
+});
+
+test('mathml: alttext fidelity (attribute + hidden span preserve exact ASCII)', function() {
+  var f = 'Ik3max = c \u00B7 Un / (\u221A3 \u00B7 Zt)';
+  var out = mathml(f);
+  assert(out.indexOf('alttext="' + f + '"') >= 0, 'exact ASCII in alttext attribute');
+  assert(out.indexOf('class="mathml-alt"') >= 0, 'has visually-hidden ASCII twin span');
+  assert(out.indexOf(f) >= 0, 'substring search for the ASCII still succeeds');
+  // hidden span carries the ASCII too
+  var spanIdx = out.indexOf('class="mathml-alt"');
+  assert(out.indexOf(f, spanIdx) >= 0, 'hidden span contains the exact ASCII');
+});
+
+test('mathml: graceful fallback never throws and returns escaped raw text', function() {
+  assert.doesNotThrow(function() { mathml('see note below'); }, 'prose does not throw');
+  assert.doesNotThrow(function() { mathml('a / ('); }, 'unbalanced does not throw');
+  var prose = mathml('see note below');
+  assert(prose.indexOf('<math') < 0, 'prose -> no broken <math>');
+  assert(prose.indexOf('see note below') >= 0, 'prose raw text preserved');
+  var bad = mathml('a / (');
+  assert(bad.indexOf('<math') < 0, 'unbalanced -> no broken <math>');
+  assert(bad.indexOf('a / (') >= 0, 'unbalanced raw text preserved');
+  // escaping in fallback
+  var esc = mathml('x < y & z');
+  assert(esc.indexOf('&lt;') >= 0 && esc.indexOf('&amp;') >= 0, 'fallback escapes < and &');
+});
+
+test('mathml: well-formedness for a battery of real codebase formulas', function() {
+  var formulas = [
+    'Iz = Iz_tab \u00B7 K_install \u00B7 K_temp \u00B7 K_group',
+    'Ik3max = c \u00B7 Un / (\u221A3 \u00B7 Zt)',
+    'IB \u2264 In \u2264 Iz',
+    'Icu \u2265 Ik3max',
+    '\u03B7 = P2 / (P2 + P0 + Pcu\u00D7(S/SN)\u00B2)',
+    'er% = Pcu / (SN \u00D7 1000) \u00D7 100',
+    'S_opt/SN = \u221A(P0/Pcu)',
+    '\u0394U% = (\u0394U / Un) \u00D7 100',
+    'I_fl = S_N / (\u221A3 \u00D7 U2)',
+    'k = l\u00D7b / (hm\u00D7(l+b))'
+  ];
+  var pairs = [['<math', '</math>'], ['<mrow>', '</mrow>'], ['<msub>', '</msub>'], ['<msup>', '</msup>'],
+    ['<msubsup>', '</msubsup>'], ['<mfrac>', '</mfrac>'], ['<msqrt>', '</msqrt>']];
+  formulas.forEach(function(f) {
+    var out = mathml(f);
+    assert(out.indexOf('<math') >= 0, 'formula typesets (no fallback): ' + f);
+    pairs.forEach(function(pr) {
+      assert.strictEqual(mmlCount(out, pr[0]), mmlCount(out, pr[1]), 'balanced ' + pr[0] + ' in: ' + f);
+    });
+    // no empty tags
+    assert(out.indexOf('<mi></mi>') < 0 && out.indexOf('<mn></mn>') < 0 && out.indexOf('<mrow></mrow>') < 0, 'no empty tags: ' + f);
+    // no raw ampersand outside known entities
+    var stripped = out.replace(/&(amp|lt|gt|quot);/g, '');
+    assert(stripped.indexOf('&') < 0, 'no unescaped ampersand: ' + f);
+  });
+});
+
+test('mathml: calcDetail regression keeps <math> AND original ASCII', function() {
+  var h1 = calcDetail({ name: 'Ik3max', formula: 'Ik3max = c \u00B7 Un / (\u221A3 \u00B7 Zt)', result: { value: 19.1, unit: 'kA' } });
+  assert(h1.indexOf('<math') >= 0, 'calcDetail render contains <math>');
+  assert(h1.indexOf('Ik3max = c \u00B7 Un / (\u221A3 \u00B7 Zt)') >= 0, 'original ASCII still present (alttext/hidden span)');
+  assert(h1.indexOf('<mfrac>') >= 0, 'fraction typeset inside the card');
+  var h2 = calcDetail({ name: 'Overload', formula: 'IB \u2264 In \u2264 Iz' });
+  assert(h2.indexOf('<math') >= 0, 'second formula typesets');
+  assert(h2.indexOf('IB \u2264 In \u2264 Iz') >= 0, 'original ASCII present for inequality');
+  // blue unit styling applied via structured unit field
+  assert(h1.indexOf('class="math-unit"') >= 0, 'units rendered in blue math-unit style');
+  // data object is not mutated by rendering
+  var calc = { name: 'X', formula: 'IB \u2264 In \u2264 Iz', substitution: '16 \u2264 16 \u2264 21' };
+  calcDetail(calc);
+  assert.strictEqual(calc.formula, 'IB \u2264 In \u2264 Iz', 'formula data field not mutated');
+  assert.strictEqual(calc.substitution, '16 \u2264 16 \u2264 21', 'substitution data field not mutated');
+});
+
+test('mathml: Mathcad font stack + blue units present on screen and print CSS', function() {
+  assert(html.indexOf('"Cambria Math"') >= 0, 'screen CSS has Cambria Math font stack');
+  assert(html.indexOf('"STIX Two Math"') >= 0, 'screen CSS has STIX Two Math fallback');
+  assert(html.indexOf('.math-unit') >= 0, 'screen CSS defines .math-unit');
+  assert(html.indexOf('#1565c0') >= 0, 'unit style is blue (#1565c0)');
+  var pcss = reportPrintCSS();
+  assert(pcss.indexOf('Cambria Math') >= 0, 'print CSS includes the math font stack');
+  assert(pcss.indexOf('math{') >= 0, 'print CSS targets <math>');
+  assert(pcss.indexOf('.math-unit') >= 0, 'print CSS keeps blue units');
+});
+
+test('mathml: new i18n label "Typeset formula" resolves via _FA under lang=fa', function() {
+  assert.ok(_FA['Typeset formula'], 'Typeset formula must have a Farsi translation');
+  var prev = lang;
+  lang = 'fa';
+  var resolved = tx('Typesat formel', 'Typeset formula');
+  lang = prev;
+  assert.strictEqual(resolved, _FA['Typeset formula'], 'tx() resolves the new label to Farsi');
+});
+
+test('mathml: non-invasive — pure presentation, no <math> when no formula', function() {
+  assert.strictEqual(typeof mathml, 'function', 'mathml is a hoisted top-level function');
+  assert.strictEqual(calcDetail(null), '', 'calcDetail(null) still returns empty (unchanged)');
+  var noFormula = calcDetail({ name: 'NoFormula', result: { value: 5, unit: 'A' } });
+  assert(noFormula.indexOf('<math') < 0, 'no formula/substitution -> no <math> injected');
+  // mathml is language-neutral: identifiers unchanged regardless of lang
+  var prev = lang; lang = 'fa';
+  var fa = mmlInner(mathml('IB \u2264 In \u2264 Iz'));
+  lang = prev;
+  assert(fa.indexOf('<mi>IB</mi>') >= 0, 'math identifiers are language-neutral');
 });
 
 // --- Summary ---
