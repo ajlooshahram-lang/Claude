@@ -10876,6 +10876,201 @@ test('Guard: exam solution feature does NOT change officialIz + IB regression', 
   assert(typeof examBuildSolution === 'function' && typeof examRenderSolution === 'function', 'capstone fns defined');
 });
 
+// ============================================================================
+// === NEW: Reactive completeness (live recomputers) + Analyzer depth tests ===
+// ============================================================================
+console.log('\n=== Reactive Completeness: Live Recomputers Tests ===\n');
+
+test('RC: theory + fault recomputers are registered as live verdicts', function() {
+  ['fault','impedans','trefase','motorteori','kapacitor','varme','dcmaskine','lys'].forEach(function(k){
+    assert(typeof Reactive.recomputers[k] === 'function', k + ' recomputer registered');
+  });
+});
+
+test('RC: fault disconnection verdict is FRESH and correct by default (TN, Zs=1.2)', function() {
+  var saved = JSON.stringify(faultState);
+  faultState.earthSystem = 'tncs'; faultState.deviceType = 'mcbB'; faultState.deviceIn = 16; faultState.zsValue = 1.2; faultState.voltage = 230;
+  Reactive.notify('fault');
+  var v = Reactive.verdict('fault');
+  assert(v.status === 'ok', 'TN with Zs·Ia=96V <= 230V is OK, got ' + v.status);
+  assert(v.stale === false, 'verdict is fresh (not stale)');
+  assert(v.detail.indexOf('Zs') >= 0, 'detail cites the loop impedance check');
+  faultState = JSON.parse(saved);
+});
+
+test('RC: raising Zs via the bus immediately flips fault verdict to FAIL (no stale OK)', function() {
+  var saved = JSON.stringify(faultState);
+  faultState.earthSystem = 'tncs'; faultState.deviceType = 'mcbB'; faultState.deviceIn = 16; faultState.voltage = 230;
+  SharedQuantities.set('zs_value', 1.0, 'fault'); Reactive.notify('fault');
+  assert(Reactive.verdict('fault').status === 'ok', 'precondition OK at Zs=1.0');
+  // A dangerously high loop impedance arrives from another module via the bus.
+  SharedQuantities.set('zs_value', 9.9, 'analyzer');
+  var after = Reactive.verdict('fault');
+  assert(after.status === 'fail', 'fault protection now FAILS (Zs·Ia=792V > 230V), got ' + after.status);
+  assert(after.stale === false, 'recomputed fresh, never a stale OK');
+  faultState = JSON.parse(saved);
+});
+
+test('RC: fault verdict never shows a false OK when Zs is missing (conservative)', function() {
+  var saved = JSON.stringify(faultState);
+  faultState.earthSystem = 'tncs'; faultState.deviceType = 'mcbB'; faultState.deviceIn = 16; faultState.zsValue = 0;
+  Reactive.notify('fault');
+  assert(Reactive.verdict('fault').status === 'incomplete', 'missing Zs -> incomplete, never ok');
+  faultState = JSON.parse(saved);
+});
+
+test('RC: a frequency change in ONE module propagates to impedans/trefase/motorteori with FRESH values', function() {
+  var savedF = SharedQuantities.get('frequency');
+  var sI = impedansState.f, sT = trefaseState.f, sM = motorteoriState.f, sPoles = motorteoriState.poles;
+  motorteoriState.poles = 4;
+  // Change frequency from the load module — every linked theory module must update.
+  SharedQuantities.set('frequency', 50, 'load');
+  SharedQuantities.set('frequency', 60, 'load');
+  assert(impedansState.f === 60 && trefaseState.f === 60 && motorteoriState.f === 60, 'all linked module states updated to 60 Hz');
+  var iv = Reactive.verdict('impedans'), mv = Reactive.verdict('motorteori');
+  assert(iv.stale === false && mv.stale === false, 'verdicts recomputed fresh');
+  assert(iv.detail.indexOf('60Hz') >= 0, 'impedans detail reflects the new 60 Hz, got ' + iv.detail);
+  assert(mv.detail.indexOf('ns=1800') >= 0, 'synchronous speed recomputed to 1800 rpm at 60 Hz/4 poles, got ' + mv.detail);
+  impedansState.f = sI; trefaseState.f = sT; motorteoriState.f = sM; motorteoriState.poles = sPoles;
+  if (savedF != null) SharedQuantities._values['frequency'] = savedF;
+});
+
+test('RC: capacitor reactance recomputes when capacitance arrives on the bus', function() {
+  var savedC = SharedQuantities.get('capacitance_F');
+  var sK = kapacitorState.C, sIc = impedansState.C;
+  SharedQuantities.set('capacitance_F', 1e-6, 'impedans');
+  assert(kapacitorState.C === 1e-6, 'capacitor module receives the shared capacitance');
+  Reactive.notify('kapacitor');
+  var v = Reactive.verdict('kapacitor');
+  assert(v.stale === false && v.detail.indexOf('XC=') >= 0, 'XC recomputed fresh, got ' + JSON.stringify(v));
+  kapacitorState.C = sK; impedansState.C = sIc;
+  if (savedC != null) SharedQuantities._values['capacitance_F'] = savedC;
+});
+
+test('RC: theory recomputers never throw and never emit a stale flag after notify', function() {
+  Reactive.notify('load');
+  ['impedans','trefase','motorteori','kapacitor','varme','dcmaskine','lys'].forEach(function(k){
+    var v = Reactive.verdict(k);
+    assert(v && v.stale === false, k + ' has a fresh (non-stale) verdict after a change');
+    assert(['ok','incomplete'].indexOf(v.status) >= 0, k + ' produces a valid status, got ' + (v && v.status));
+  });
+});
+
+test('RC: registering recomputers did NOT regress the existing stale-flag guarantee', function() {
+  // arcflash has no recomputer -> must still be flagged stale (never stale-OK).
+  Reactive.verdicts['arcflash'] = { status: 'ok', detail: '', stamp: 0, stale: false };
+  Reactive.notify('scircuit');
+  assert(Reactive.verdict('arcflash').stale === true, 'modules without a recomputer are still flagged stale');
+});
+
+console.log('\n=== Analyzer Depth / Intelligence Tests ===\n');
+
+test('AD: broadened verbs detect IB/Iz/vdrop (bestem/find/udregn/angiv)', function() {
+  assert(analyzerDetectQuestions('Bestem belastningsstr\u00f8mmen IB').some(function(q){return q.type==='ib';}), 'bestem IB');
+  assert(analyzerDetectQuestions('Find str\u00f8mb\u00e6reevnen Iz').some(function(q){return q.type==='iz';}), 'find Iz');
+  assert(analyzerDetectQuestions('Udregn sp\u00e6ndingsfaldet \u0394U').some(function(q){return q.type==='vdrop';}), 'udregn vdrop');
+});
+
+test('AD: recognises extended autorisationsprøve question types', function() {
+  var map = {
+    rcd: 'V\u00e6lg HPFI type A til kredsen',
+    energy: 'Beregn energiforbruget for installationen',
+    diversity: 'Bestem samtidighedsfaktor for tavlen',
+    varme: 'Beregn U-v\u00e6rdi og varmetab for v\u00e6ggen',
+    kapacitor: 'Beregn kondensatorens ladning og energi',
+    dcmaskine: 'Beregn ankerstr\u00f8mmen i j\u00e6vnstr\u00f8msmotoren',
+    power: 'Beregn den aktive effekt',
+    reactive_power: 'Beregn den reaktive effekt',
+    apparent_power: 'Beregn den tilsyneladende effekt'
+  };
+  Object.keys(map).forEach(function(t){
+    assert(analyzerDetectQuestions(map[t]).some(function(q){return q.type===t;}), 'detect ' + t + ' in: ' + map[t]);
+  });
+});
+
+test('AD: detected questions are de-duplicated by type (no duplicate chips)', function() {
+  // Text that triggers BOTH the original and the broadened IB pattern.
+  var qs = analyzerDetectQuestions('Beregn belastningsstr\u00f8mmen IB. Bestem belastningsstr\u00f8mmen IB igen.');
+  var ibCount = qs.filter(function(q){return q.type==='ib';}).length;
+  assert.strictEqual(ibCount, 1, 'IB appears exactly once after de-dup, got ' + ibCount);
+});
+
+test('AD: extracts more quantities (Q, S, kWh, simultaneity, homes, DC voltage)', function() {
+  var ex = analyzerExtract('Reaktiv effekt 8 kvar, S = 45 kVA, energiforbrug 8300 kWh, samtidighedsfaktor 0,8, 115 boliger, 48 V DC');
+  assert.strictEqual(ex.reactivePower_kvar, 8, 'reactive power kVAr');
+  assert.strictEqual(ex.apparentPower_kva, 45, 'apparent power kVA');
+  assert.strictEqual(ex.energy_kWh, 8300, 'energy kWh');
+  assert.strictEqual(ex.simFactor, 0.8, 'simultaneity factor');
+  assert.strictEqual(ex.homes, 115, 'number of homes');
+  assert.strictEqual(ex.dcVoltage, 48, 'DC voltage');
+});
+
+test('AD: extracts capacitance and pushes it onto the reactive bus + module states', function() {
+  var savedC = SharedQuantities.get('capacitance_F');
+  var sK = kapacitorState.C, sIc = impedansState.C;
+  analyzerRun('Kondensator C = 4,7 \u00B5F i kredsen. Beregn kondensatorens energi.');
+  assert(Math.abs(analyzerState.extracted.capacitance - 4.7e-6) < 1e-12, 'capacitance extracted as 4.7 µF');
+  assert(Math.abs(SharedQuantities.get('capacitance_F') - 4.7e-6) < 1e-12, 'capacitance published to the bus');
+  assert(Math.abs(kapacitorState.C - 4.7e-6) < 1e-12 && Math.abs(impedansState.C - 4.7e-6) < 1e-12, 'capacitor + impedance states updated');
+  kapacitorState.C = sK; impedansState.C = sIc;
+  if (savedC != null) SharedQuantities._values['capacitance_F'] = savedC;
+});
+
+test('AD: smarter "nice to know" — recommends a standard device when none is given', function() {
+  var d = analyzerExtract('Belastning: 20 kW, 400 V, 3-faset, cos(phi)=0,86, tv\u00e6rsnit 16 mm\u00B2, Installationsmetode: C, Omgivelsestemperatur: 30');
+  var sol = analyzerSolve(d);
+  var rec = sol.results.find(function(r){return r.type==='rec_device';});
+  assert(rec && rec.bonus, 'recommended device bonus present');
+  var n = parseInt(rec.value);
+  assert(n >= 1, 'a positive standard rating suggested, got ' + rec.value);
+  assert(rec.html.indexOf('60364-4-43') >= 0, 'cites overcurrent clause for device coordination');
+});
+
+test('AD: smarter "nice to know" — PFC capacitor + max Zs bonuses', function() {
+  // cos phi < 0.95 -> PFC suggestion; device given -> Zs,max for that device.
+  var d = analyzerExtract('Belastning: 20 kW, 400 V, 3-faset, cos(phi)=0,86, tv\u00e6rsnit 16 mm\u00B2, In = 32 A, kurve C');
+  var sol = analyzerSolve(d);
+  var pfc = sol.results.find(function(r){return r.type==='pfc_cap';});
+  var zsm = sol.results.find(function(r){return r.type==='zs_max';});
+  assert(pfc, 'PFC capacitor suggestion present when cos phi < 0.95');
+  assert(pfc.value.indexOf('kVAr') >= 0, 'PFC value expressed in kVAr');
+  assert(zsm && zsm.html.indexOf('60364-4-41') >= 0, 'Zs,max bonus present and cites the fault-protection clause');
+  // For MCB curve C 32A: Ia=320A, Zs,max = 230/320 = 0.719 Ω
+  assert(zsm.value.indexOf('0.719') >= 0 || zsm.value.indexOf('0.72') >= 0, 'Zs,max = 230/(10*32) ≈ 0.719 Ω, got ' + zsm.value);
+});
+
+test('AD: new question types are all mapped in EXAM_SOLUTION_RESULT_ALIAS', function() {
+  ['rcd','power','reactive_power','apparent_power','diversity','kapacitor','varme','dcmaskine'].forEach(function(t){
+    assert(typeof EXAM_SOLUTION_RESULT_ALIAS[t] === 'string', t + ' has a solution alias');
+  });
+});
+
+test('AD: analyzer remains fully deterministic + click-only after the depth upgrade', function() {
+  var txt = 'Opgave 1\nBelastning: 20 kW, 400 V, cos(phi)=0,86, tv\u00e6rsnit 16 mm\u00B2, In = 32 A, kurve C\nBestem belastningsstr\u00f8mmen IB. V\u00e6lg HPFI type A.';
+  analyzerRun(txt);
+  var n1 = analyzerState.results.length;
+  analyzerRun(txt);
+  var n2 = analyzerState.results.length;
+  assert.strictEqual(n1, n2, 'identical input yields identical result count (deterministic)');
+  var savedMode = analyzerState.mode;
+  analyzerState.mode = 'paste';
+  var html = renderAnalyzer();
+  assert.strictEqual((html.match(/<textarea/g) || []).length, 1, 'still exactly one textarea (analyzer paste)');
+  assert(html.indexOf('type="text"') < 0 && html.indexOf('type="number"') < 0, 'no free-text/number inputs added');
+  analyzerState.mode = savedMode;
+});
+
+test('AD: fault recomputer detail is trilingual-safe (da/en) when inputs are missing', function() {
+  var saved = JSON.stringify(faultState);
+  var savedLang = lang;
+  faultState.earthSystem = 'tncs'; faultState.zsValue = 0; faultState.deviceIn = 16; faultState.deviceType = 'mcbB';
+  lang = 'da'; var da = Reactive.recomputers['fault']();
+  lang = 'en'; var en = Reactive.recomputers['fault']();
+  assert(da.status === 'incomplete' && en.status === 'incomplete', 'both languages report incomplete (no false OK)');
+  assert(da.detail !== en.detail, 'detail string is localised (da != en)');
+  lang = savedLang; faultState = JSON.parse(saved);
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

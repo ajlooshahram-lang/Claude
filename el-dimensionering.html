@@ -3792,6 +3792,127 @@ Reactive.register('kritisk', function () {
   return { status: map[res.verdict] || 'incomplete', detail: res.verdict };
 });
 
+// ===== LIVE RECOMPUTERS FOR THE THEORY + FAULT MODULES =====================
+// Registering a recomputer means a cross-module change FRESHLY recomputes that
+// module's value/verdict on every Reactive.notify(), instead of only flagging
+// it stale. Each reuses an already-validated pure-calc function (NO new math),
+// can never throw, and NEVER emits a false "OK":
+//   - genuine safety checks (fault disconnection) -> 'ok' | 'fail' | 'incomplete'
+//   - informational theory results -> 'ok' only when the result is finite/valid,
+//     otherwise 'incomplete'. The detail string always carries the freshly
+//     recomputed value so a downstream change (e.g. frequency, voltage, cos phi,
+//     Zs, earthing) is reflected immediately and is never a stale value.
+// This is what makes "ALL modules connected" observable: change f/U/cos phi in
+// one module and impedans/trefase/motorteori/kapacitor recompute instantly.
+
+// Automatic disconnection of supply (fault protection) — the strongest
+// life-safety verdict. Reuses faultCalcIa + faultCalcTN (DS/HD 60364-4-41).
+Reactive.register('fault', function () {
+  try {
+    if (typeof faultState === 'undefined') return { status: 'incomplete', detail: '' };
+    var st = faultState;
+    var Ia = faultCalcIa(st.deviceType, st.deviceIn);
+    var sys = st.earthSystem;
+    var U0 = st.voltage || 230;
+    if (sys === 'tns' || sys === 'tnc' || sys === 'tncs') {
+      if (!(st.zsValue > 0) || !(Ia > 0)) return { status: 'incomplete', detail: tx('mangler Zs/Ia', 'missing Zs/Ia') };
+      var r = faultCalcTN(st.zsValue, Ia, U0);
+      return { status: r.ok ? 'ok' : 'fail', detail: 'Zs\u00B7Ia=' + r.ZsIa.toFixed(0) + (r.ok ? '\u2264' : '>') + U0 + 'V (Zs\u2264' + r.ZsMax.toFixed(2) + '\u03A9)' };
+    }
+    // TT/IT need RA which is not part of the default fault state -> stay
+    // conservative (never a false OK) until the user supplies it in the module.
+    return { status: 'incomplete', detail: tx('Angiv jordmodstand RA', 'Provide earth resistance RA') };
+  } catch (e) { return { status: 'incomplete', detail: '' }; }
+});
+
+// AC impedance |Z| — recomputes from the shared frequency/voltage immediately.
+Reactive.register('impedans', function () {
+  try {
+    if (typeof impedansState === 'undefined') return { status: 'incomplete', detail: '' };
+    var s = impedansState;
+    var XL = impedansCalcXL(s.f, s.L);
+    var XC = impedansCalcXC(s.f, s.C);
+    var Z = (s.connection === 'parallel')
+      ? impedansCalcZParallel(s.R, XL, XC, s.components || 'rlc')
+      : impedansCalcZSeries(s.R, XL, XC);
+    if (!isFinite(Z) || Z < 0) return { status: 'incomplete', detail: '' };
+    return { status: 'ok', detail: '|Z|=' + Z.toFixed(2) + '\u03A9 @ ' + s.f + 'Hz' };
+  } catch (e) { return { status: 'incomplete', detail: '' }; }
+});
+
+// Three-phase symmetric load — line current + power recompute from UL/Z/phi.
+Reactive.register('trefase', function () {
+  try {
+    if (typeof trefaseState === 'undefined') return { status: 'incomplete', detail: '' };
+    var s = trefaseState;
+    var r = (s.loadType === 'symDelta') ? trefaseCalcSymDelta(s.UL, s.Z, s.phi) : trefaseCalcSymStar(s.UL, s.Z, s.phi);
+    if (!isFinite(r.IL) || r.IL < 0) return { status: 'incomplete', detail: '' };
+    return { status: 'ok', detail: 'IL=' + r.IL.toFixed(1) + 'A, P=' + (r.P / 1000).toFixed(2) + 'kW' };
+  } catch (e) { return { status: 'incomplete', detail: '' }; }
+});
+
+// Induction motor — synchronous speed + slip recompute from the shared
+// frequency (e.g. a 50->60 Hz change anywhere updates ns instantly).
+Reactive.register('motorteori', function () {
+  try {
+    if (typeof motorteoriState === 'undefined') return { status: 'incomplete', detail: '' };
+    var r = motorteoriCalcAll(motorteoriState);
+    if (!isFinite(r.ns) || r.ns <= 0) return { status: 'incomplete', detail: '' };
+    return { status: 'ok', detail: 'ns=' + r.ns.toFixed(0) + 'rpm, s=' + r.slipPct.toFixed(1) + '%' };
+  } catch (e) { return { status: 'incomplete', detail: '' }; }
+});
+
+// Capacitor reactance XC — recomputes from the shared frequency + capacitance.
+Reactive.register('kapacitor', function () {
+  try {
+    if (typeof kapacitorState === 'undefined') return { status: 'incomplete', detail: '' };
+    var s = kapacitorState;
+    var fLink = (typeof s.freqLink === 'number' && s.freqLink > 0) ? s.freqLink
+      : (typeof SharedQuantities !== 'undefined' ? SharedQuantities.get('frequency', 50) : 50);
+    var XC = kapacitorCalcXC(fLink, s.C);
+    if (!isFinite(XC)) return { status: 'ok', detail: 'XC=\u221E (DC)' };
+    return { status: 'ok', detail: 'XC=' + XC.toFixed(1) + '\u03A9 @ ' + fLink + 'Hz' };
+  } catch (e) { return { status: 'incomplete', detail: '' }; }
+});
+
+// Room construction U-value — recomputes so the connected heat demand stays fresh.
+Reactive.register('varme', function () {
+  try {
+    if (typeof varmeState === 'undefined') return { status: 'incomplete', detail: '' };
+    var U = varmeCalcU(varmeState.Ri, varmeLayers(), varmeState.Ru);
+    if (!isFinite(U) || U <= 0) return { status: 'incomplete', detail: '' };
+    return { status: 'ok', detail: 'U=' + U.toFixed(3) + 'W/m\u00B2K' };
+  } catch (e) { return { status: 'incomplete', detail: '' }; }
+});
+
+// DC machine EMF / back-EMF — recomputes from the shared supply voltage.
+Reactive.register('dcmaskine', function () {
+  try {
+    if (typeof dcmaskineState === 'undefined') return { status: 'incomplete', detail: '' };
+    var s = dcmaskineState;
+    var E = (s.mode === 'motor') ? dcmaskineMotorBackEMF(s.U, s.Ia, s.Ra, s.Ubrush) : dcmaskineGenEMF(s.U, s.Ia, s.Ra, s.Ubrush);
+    if (!isFinite(E)) return { status: 'incomplete', detail: '' };
+    return { status: 'ok', detail: 'E=' + E.toFixed(1) + 'V' };
+  } catch (e) { return { status: 'incomplete', detail: '' }; }
+});
+
+// Lighting (lumen method) — fixture count recomputes from the room + lamp choice.
+Reactive.register('lys', function () {
+  try {
+    if (typeof lysState === 'undefined') return { status: 'incomplete', detail: '' };
+    var rt = LYS_ROOM_TYPES[lysState.roomType];
+    var lamp = LYS_LAMP_TYPES[lysState.lampType];
+    if (!rt || !lamp) return { status: 'incomplete', detail: '' };
+    var area = lysState.roomLength * lysState.roomWidth;
+    var k = lysCalcRoomIndex(lysState.roomLength, lysState.roomWidth, lysState.mountHeight);
+    var UF = lysUtilizationFactor(k, lysState.ceilingRef, lysState.wallRef);
+    var phiTotal = lysCalcTotalFlux(rt.lux, area, UF, lysState.mf);
+    var n = lysCalcNumLuminaires(phiTotal, lamp.lumens);
+    if (!isFinite(n) || n <= 0) return { status: 'incomplete', detail: '' };
+    return { status: 'ok', detail: 'n=' + n + ' \u00D7 ' + lamp.lumens + 'lm @ ' + rt.lux + 'lx' };
+  } catch (e) { return { status: 'incomplete', detail: '' }; }
+});
+
 // Theme/RTL-safe presentation metadata for a reactive verdict.
 function reactiveVerdictMeta(status) {
   if (status === 'ok') return { color: 'var(--success)', icon: '\u2705', label: tx('Sikker', 'Safe') };
@@ -24462,6 +24583,37 @@ function analyzerExtract(text) {
   var roomHMatch = text.match(/(?:l.fteh.jde|montage.*h.jde|mounting\s*height)\s*[:=]?\s*(\d+[.,]?\d*)\s*m/i);
   if (roomHMatch) { data.roomHeight = parseFloat(roomHMatch[1].replace(',', '.')); data.confidence.roomHeight = 'high'; }
 
+  // === EXTENDED QUANTITY EXTRACTION (autorisationsprøve corpus) ===
+  // Reactive power Q (kVAr): "Q = 12 kVAr", "reaktiv effekt 8 kvar"
+  var qMatch = text.match(/(?:reaktiv\s*effekt|Q)\s*[:=]?\s*(\d+[.,]?\d*)\s*k?[vV][aA]?[rR]/i);
+  if (qMatch) { data.reactivePower_kvar = parseFloat(qMatch[1].replace(',', '.')); data.confidence.reactivePower_kvar = 'medium'; }
+
+  // Apparent power S (kVA): "S = 45 kVA", "tilsyneladende effekt 45 kVA"
+  var sMatch = text.match(/(?:tilsyneladende\s*effekt|S)\s*[:=]?\s*(\d+[.,]?\d*)\s*kVA\b/i);
+  if (sMatch) { data.apparentPower_kva = parseFloat(sMatch[1].replace(',', '.')); data.confidence.apparentPower_kva = 'medium'; }
+
+  // Energy (kWh): "8300 kWh", "energiforbrug 12000 kWh"
+  var kwhMatch = text.match(/(\d+[.,]?\d*)\s*kWh\b/i);
+  if (kwhMatch) { data.energy_kWh = parseFloat(kwhMatch[1].replace(',', '.')); data.confidence.energy_kWh = 'high'; }
+
+  // Simultaneity / diversity factor: "samtidighedsfaktor 0,8", "diversitet 0.7"
+  var sfMatch = text.match(/(?:samtidighed(?:s?faktor)?|diversitet|sammenlagringsfaktor)\s*[:=]?\s*(\d+[.,]\d+)/i);
+  if (sfMatch) { var sfv = parseFloat(sfMatch[1].replace(',', '.')); if (sfv > 0 && sfv <= 1) { data.simFactor = sfv; data.confidence.simFactor = 'high'; } }
+
+  // Number of homes/consumers (housing-estate diversity): "115 boliger", "40 lejligheder"
+  var homesMatch = text.match(/(\d+)\s*(?:boliger|lejligheder|husstande|forbrugere)\b/i);
+  if (homesMatch) { data.homes = parseInt(homesMatch[1]); data.confidence.homes = 'high'; }
+
+  // DC / battery voltage: "48 V DC", "batterispænding 24 V", "DC 110 V"
+  var dcvMatch = text.match(/(?:DC|batteri(?:sp.nding)?|j.vnsp.nding)\s*[:=]?\s*(\d+)\s*V|(\d+)\s*V\s*DC\b/i);
+  if (dcvMatch) { var dcv = parseInt(dcvMatch[1] || dcvMatch[2]); if (dcv > 0) { data.dcVoltage = dcv; data.confidence.dcVoltage = 'medium'; } }
+
+  // Ambient/conductor operating temperature already captured as temperature.
+  // Reference standard mentions (for citation hinting, non-authoritative):
+  if (/60364-4-41/.test(text)) data.refClause = '4-41';
+  else if (/60364-4-43/.test(text)) data.refClause = '4-43';
+  else if (/60364-5-52/.test(text)) data.refClause = '5-52';
+
   // Detect questions
   data.questions = analyzerDetectQuestions(text);
 
@@ -24537,14 +24689,41 @@ function analyzerDetectQuestions(text) {
     { re: /energi.*tab|tab.*energi|efficiency/i, type: 'energy', label: 'Energitab', module: 'energy' },
     // === FULL INSTALLATION (multi-step) ===
     { re: /dimensioner\s+(?:den\s+)?(?:komplette|hele|samlede)\s+installation/i, type: 'full_install', label: 'Komplet installation', module: 'load' },
-    { re: /fra\s+transformer.*til.*(?:stik|forbruger|slutkreds)/i, type: 'full_install', label: 'Trafo til slutkreds', module: 'trafo' }
+    { re: /fra\s+transformer.*til.*(?:stik|forbruger|slutkreds)/i, type: 'full_install', label: 'Trafo til slutkreds', module: 'trafo' },
+    // === EXTENDED AUTORISATIONSPRØVE RECOGNITION =====================
+    // Broader Danish verbs (beregn/bestem/find/udregn/angiv/hvad er),
+    // abbreviations and symbols seen across the autorisationsprøve corpus.
+    // Distinct/new question types only (existing types kept above) so the
+    // analyzer recognises far more phrasings without losing precision.
+    { re: /(?:bestem|find|udregn|angiv|hvad\s+er)\s+(?:belastningsstr.{1,2}m(?:men)?|IB)\b/i, type: 'ib', label: 'Bestem IB', module: 'load' },
+    { re: /(?:bestem|find|udregn|angiv|hvad\s+er)\s+(?:str.{1,2}mb.{1,2}reevne[nr]?|Iz)\b/i, type: 'iz', label: 'Bestem Iz', module: 'cable' },
+    { re: /(?:bestem|find|udregn|angiv)\s+(?:sp.{1,2}ndingsfald|\u0394U)/i, type: 'vdrop', label: 'Bestem \u0394U%', module: 'vdrop' },
+    { re: /(?:v.{1,2}lg|bestem|dimensioner)\s+(?:HPFI|HFI|RCD|fejlstr.{1,2}msafbryder|fejlstr.{1,2}msrel.)/i, type: 'rcd', label: 'V\u00e6lg HPFI/RCD', module: 'fault' },
+    { re: /(?:beregn|bestem|find)\s+(?:energiforbrug(?:et)?|energien|det\s+\u00e5rlige\s+forbrug)|\bkWh\b/i, type: 'energy', label: 'Energiforbrug', module: 'energy' },
+    { re: /(?:beregn|bestem|find)\s+(?:effekten|den\s+aktive\s+effekt)|\bP\s*=\s*U/i, type: 'power', label: 'Beregn effekt P', module: 'load' },
+    { re: /(?:beregn|bestem|find)\s+(?:den\s+)?reaktive\s+effekt|\bkvar\b|\bkVAr\b/i, type: 'reactive_power', label: 'Reaktiv effekt Q', module: 'trefase' },
+    { re: /(?:beregn|bestem|find)\s+(?:den\s+)?tilsyneladende\s+effekt|\bkVA\b.*(?:beregn|bestem|find)/i, type: 'apparent_power', label: 'Tilsyneladende effekt S', module: 'trefase' },
+    { re: /samtidighed(?:s?faktor)?|diversitet|sammenlagring|sammenfald/i, type: 'diversity', label: 'Samtidighed/diversitet', module: 'load' },
+    { re: /(?:kondensator|kapacitor)\b|(?:beregn|bestem|find).{0,12}kapacitans|kondensatorens\s+(?:ladning|energi)/i, type: 'kapacitor', label: 'Kondensatorberegning', module: 'kapacitor' },
+    { re: /U-?v.{1,2}rdi|varmetab|transmissionstab|varmebehov|isoleringskrav/i, type: 'varme', label: 'U-v\u00e6rdi/varmetab', module: 'varme' },
+    { re: /(?:j.{1,2}vnstr.{1,2}ms?)(?:maskine|motor|generator)|ankerstr.{1,2}m|mod-?EMK|tv.{1,2}rmagnetisering/i, type: 'dcmaskine', label: 'DC-maskine', module: 'dcmaskine' },
+    { re: /(?:reaktans|impedans|str.{1,2}m).*kondensator|kondensator.*(?:reaktans|impedans)/i, type: 'xc', label: 'Kapacitiv reaktans XC', module: 'impedans' }
   ];
   for (var i = 0; i < patterns.length; i++) {
     if (patterns[i].re.test(text)) {
       questions.push({ type: patterns[i].type, label: patterns[i].label, module: patterns[i].module, source: 'detected' });
     }
   }
-  return questions;
+  // De-duplicate by type (keep the first/most specific match) so broadened
+  // phrasings never produce duplicate detected-question chips.
+  var seenType = {};
+  var deduped = [];
+  for (var d = 0; d < questions.length; d++) {
+    if (seenType[questions[d].type]) continue;
+    seenType[questions[d].type] = true;
+    deduped.push(questions[d]);
+  }
+  return deduped;
 }
 
 // Map extracted data + questions to calculation results
@@ -24749,6 +24928,85 @@ function analyzerSolve(data) {
       solved++;
       total++;
     }
+  }
+
+  // === "NICE TO KNOW": Recommended standard protective device when none given ===
+  // Conservative — suggests the SMALLEST standard rating In >= IB (never below
+  // the load current). Capped at the derated Iz when known so In <= Iz holds.
+  if (ib && !data.deviceIn) {
+    var STD_RATINGS = [6, 10, 13, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630];
+    var recIn = null;
+    for (var si = 0; si < STD_RATINGS.length; si++) {
+      if (STD_RATINGS[si] >= ib && (!izCorrected || STD_RATINGS[si] <= izCorrected)) { recIn = STD_RATINGS[si]; break; }
+    }
+    if (recIn) {
+      var recHtml = calcDetail({
+        name: tx('Anbefalet beskyttelse (bonus)', 'Recommended protective device (bonus)'),
+        formula: 'In = mindste standardv\u00e6rdi hvor IB \u2264 In' + (izCorrected ? ' \u2264 Iz' : ''),
+        variables: [
+          { name: 'IB', symbol: 'IB', value: ib.toFixed(1), unit: 'A', source: tx('beregnet', 'calculated') }
+        ].concat(izCorrected ? [{ name: 'Iz', symbol: 'Iz', value: izCorrected.toFixed(1), unit: 'A', source: tx('derateret', 'derated') }] : []),
+        substitution: 'IB=' + ib.toFixed(1) + 'A \u2192 In=' + recIn + 'A' + (izCorrected ? ' (\u2264 Iz=' + izCorrected.toFixed(1) + 'A)' : ''),
+        steps: [
+          { desc: tx('Mindste standard In \u2265 IB', 'Smallest standard In \u2265 IB'), expr: 'IB=' + ib.toFixed(1), result: recIn + ' A' }
+        ],
+        result: { value: recIn + ' A', unit: '', status: 'ok' },
+        reference: 'DS/HD 60364-4-43 cl. 433.1 + IEC 60898-1'
+      });
+      results.push({ type: 'rec_device', label: tx('Anbefalet sikring/MCB', 'Recommended fuse/MCB'), value: recIn + ' A', html: recHtml, asked: false, bonus: true });
+      solved++; total++;
+    } else if (izCorrected) {
+      // No standard rating fits between IB and Iz -> conservative flag (never invent).
+      flagged.push(tx('Ingen standard In passer mellem IB og Iz \u2014 v\u00e6lg st\u00f8rre kabel', 'No standard In fits between IB and Iz \u2014 choose a larger cable'));
+    }
+  }
+
+  // === "NICE TO KNOW": Power-factor correction capacitor to reach cos\u03C6=0.95 ===
+  if (data.power_kW && data.cosPhi && data.cosPhi < 0.95) {
+    var pfcRes = trefaseCalcPFC(data.power_kW * 1000, data.cosPhi, 0.95); // Qc in VAr
+    var Qc_kvar = pfcRes.Qc / 1000;
+    var pfcHtml = calcDetail({
+      name: tx('Fasekompensering til cos\u03C6=0.95 (bonus)', 'Power-factor correction to cos\u03C6=0.95 (bonus)'),
+      formula: 'Qc = P \u00B7 (tan\u03C6\u2081 \u2212 tan\u03C6\u2082)',
+      variables: [
+        { name: tx('Aktiv effekt', 'Active power'), symbol: 'P', value: data.power_kW, unit: 'kW', source: tx('opgivet', 'specified') },
+        { name: tx('Nuv\u00e6rende', 'Present'), symbol: 'cos\u03C6\u2081', value: data.cosPhi, unit: '', source: tx('opgivet', 'specified') },
+        { name: tx('M\u00e5l', 'Target'), symbol: 'cos\u03C6\u2082', value: 0.95, unit: '', source: tx('typisk netkrav', 'typical grid requirement') }
+      ],
+      substitution: 'Qc = ' + data.power_kW + ' \u00B7 (tan' + pfcRes.phi1Deg.toFixed(1) + '\u00B0 \u2212 tan' + pfcRes.phi2Deg.toFixed(1) + '\u00B0)',
+      steps: [
+        { desc: tx('Kompenseringsbehov', 'Compensation needed'), expr: 'P\u00B7(tan\u03C6\u2081\u2212tan\u03C6\u2082)', result: Qc_kvar.toFixed(2) + ' kVAr' }
+      ],
+      result: { value: Qc_kvar.toFixed(2) + ' kVAr', unit: '' },
+      reference: 'Bind 1 / Opgavesamling Kap. 6 (effektfaktorforbedring)'
+    });
+    results.push({ type: 'pfc_cap', label: tx('Kompenseringskondensator (cos\u03C6=0.95)', 'PFC capacitor (cos\u03C6=0.95)'), value: 'Qc=' + Qc_kvar.toFixed(2) + ' kVAr', html: pfcHtml, asked: hasQuestion(data, 'pfc'), bonus: !hasQuestion(data, 'pfc') });
+    solved++; total++;
+  }
+
+  // === "NICE TO KNOW": Maximum permissible loop impedance Zs,max for the device ===
+  if (data.deviceIn) {
+    var iaForZs = data.deviceIn * 5; // MCB curve B default
+    if (data.deviceCurve === 'C') iaForZs = data.deviceIn * 10;
+    else if (data.deviceCurve === 'D') iaForZs = data.deviceIn * 20;
+    var u0Zs = 230; // phase-to-earth
+    var zsMaxAllowed = u0Zs / iaForZs;
+    var zsMaxHtml = calcDetail({
+      name: tx('Maks. tilladt fejlsl\u00f8jfeimpedans Zs,max (bonus)', 'Max permissible loop impedance Zs,max (bonus)'),
+      formula: 'Zs,max = U0 / Ia',
+      variables: [
+        { name: tx('Fase-jord sp\u00e6nding', 'Phase-earth voltage'), symbol: 'U0', value: u0Zs, unit: 'V', source: 'TN' },
+        { name: tx('Udl\u00f8sestr\u00f8m', 'Trip current'), symbol: 'Ia', value: iaForZs, unit: 'A', source: 'MCB ' + (data.deviceCurve || 'B') + data.deviceIn }
+      ],
+      substitution: 'Zs,max = ' + u0Zs + ' / ' + iaForZs + ' = ' + zsMaxAllowed.toFixed(3) + ' \u03A9',
+      steps: [
+        { desc: 'Zs,max', expr: u0Zs + ' / ' + iaForZs, result: zsMaxAllowed.toFixed(3) + ' \u03A9' }
+      ],
+      result: { value: zsMaxAllowed.toFixed(3) + ' \u03A9', unit: '' },
+      reference: 'DS/HD 60364-4-41 cl. 411.4.4 (Tab. 41.1)'
+    });
+    results.push({ type: 'zs_max', label: tx('Maks. Zs for beskyttelse', 'Max Zs for device'), value: 'Zs,max=' + zsMaxAllowed.toFixed(3) + ' \u03A9', html: zsMaxHtml, asked: false, bonus: true });
+    solved++; total++;
   }
 
   // === TRANSFORMER CALCULATIONS (Bind 3 + 5) ===
@@ -25002,6 +25260,7 @@ function analyzerRun(text) {
     if (d.temperature) busMap.ambient_temp = d.temperature;
     if (d.grouping) busMap.cable_grouping = d.grouping;
     if (d.motorPower) busMap.motor_power_w = d.motorPower * 1000;
+    if (d.capacitance) busMap.capacitance_F = d.capacitance;
     if (Object.keys(busMap).length > 0) {
       SharedQuantities.populate(busMap, 'analyzer');
       analyzerState.busPopulated = true;
@@ -25024,6 +25283,7 @@ function analyzerRun(text) {
       faultState.earthSystem = eMap[d.earthSystem] || 'tncs';
     }
     if (d.zsValue) faultState.zsValue = d.zsValue;
+    if (d.capacitance) { if (typeof kapacitorState !== 'undefined') kapacitorState.C = d.capacitance; impedansState.C = d.capacitance; }
   }
 
   renderModule('analyzer');
@@ -25298,7 +25558,12 @@ var EXAM_SOLUTION_RESULT_ALIAS = {
   motor_torque: 'motorteori', motor_start: 'motorteori', motor_prot: 'motorteori',
   magnet: 'magnet', magnet_mmf: 'magnet', magnet_flux: 'magnet', magnet_rel: 'magnet',
   magnet_ind: 'magnet', lys: 'lys', lys_cd: 'lys', lys_ri: 'lys',
-  thermal: 'thermal', energy: 'energy', full_install: 'ib'
+  thermal: 'thermal', energy: 'energy', full_install: 'ib',
+  // Extended autorisationsprøve question types -> the produced result type.
+  rcd: 'fault', power: 'ib', reactive_power: 'power_triangle',
+  apparent_power: 'power_triangle', diversity: 'ib', kapacitor: 'impedans',
+  varme: 'iz', dcmaskine: 'motorteori', dc_ohm: 'impedans', dc_rnet: 'impedans',
+  dc_vdiv: 'impedans', dc_kirch: 'impedans', dc_equiv: 'impedans', relay_sel: 'coord'
 };
 
 // Find the most relevant question-text excerpt for a detected type inside a segment.
