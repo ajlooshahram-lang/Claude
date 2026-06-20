@@ -1519,6 +1519,14 @@ const _FA = {
   'Approval': '\u062A\u0623\u06CC\u06CC\u062F',
   'Qty': '\u062A\u0639\u062F\u0627\u062F',
   'Total line items': '\u0645\u062C\u0645\u0648\u0639 \u0627\u0642\u0644\u0627\u0645',
+  'Export CSV': '\u062E\u0631\u0648\u062C\u06CC CSV',
+  'Line items (distinct products)': '\u0627\u0642\u0644\u0627\u0645 (\u0645\u062D\u0635\u0648\u0644\u0627\u062A \u0645\u062A\u0645\u0627\u06CC\u0632)',
+  'Total quantity': '\u062A\u0639\u062F\u0627\u062F \u06A9\u0644',
+  'items': '\u0642\u0644\u0645',
+  'pcs': '\u0639\u062F\u062F',
+  'Category': '\u062F\u0633\u062A\u0647',
+  'Product page': '\u0635\u0641\u062D\u0647 \u0645\u062D\u0635\u0648\u0644',
+  'Datasheet': '\u062F\u06CC\u062A\u0627\u0634\u06CC\u062A',
   'The list is empty.': '\u0641\u0647\u0631\u0633\u062A \u062E\u0627\u0644\u06CC \u0627\u0633\u062A.',
   'Generated': '\u062A\u0648\u0644\u06CC\u062F\u200C\u0634\u062F\u0647',
   'Reference': '\u0645\u0631\u062C\u0639',
@@ -8209,6 +8217,22 @@ function elforsyningTotalCount() {
   return n;
 }
 
+// Distinct line items = number of different products on the list, irrespective of
+// their quantities. This is deliberately separate from elforsyningTotalCount() (the
+// sum of quantities) so procurement can see "how many different parts" vs "how many
+// pieces in total" — two genuinely different numbers on a bill of materials.
+function elforsyningDistinctCount() {
+  return Object.keys(elforsyningBom).length;
+}
+
+function elforsyningCategoryDistinctCount(cat) {
+  let n = 0;
+  Object.keys(elforsyningBom).forEach(function(id) {
+    if (elforsyningBom[id].category === cat) n++;
+  });
+  return n;
+}
+
 // Returns ordered BOM lines grouped by the 8 categories, preserving PRODUCTS order.
 function elforsyningBomLines() {
   const lines = [];
@@ -8242,6 +8266,8 @@ function elforsyningExportData() {
   });
   const categoryCounts = {};
   ELFORSYNING_CATEGORIES.forEach(function(cat) { categoryCounts[cat] = elforsyningCategoryCount(cat); });
+  const categoryDistinctCounts = {};
+  ELFORSYNING_CATEGORIES.forEach(function(cat) { categoryDistinctCounts[cat] = elforsyningCategoryDistinctCount(cat); });
   return {
     type: 'elforsyning_bom',
     version: 1,
@@ -8251,6 +8277,8 @@ function elforsyningExportData() {
     note_en: 'Verify current prices against Danish wholesaler catalogs (' + ELFORSYNING_WHOLESALERS.join(', ') + '). Prices are not included in this list.',
     categories: ELFORSYNING_CATEGORIES.slice(),
     categoryCounts: categoryCounts,
+    categoryDistinctCounts: categoryDistinctCounts,
+    distinctCount: elforsyningDistinctCount(),
     totalCount: elforsyningTotalCount(),
     lines: lines
   };
@@ -8263,6 +8291,64 @@ function elforsyningExportJson() {
     const a = document.createElement('a');
     a.href = url;
     a.download = 'elforsyning-stykliste-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {}
+}
+
+// --- CSV export (click-only; for spreadsheets / Danish wholesaler import) ---
+// JSON serves machines; CSV serves the people who actually order the parts (Solar,
+// Lemvigh-Müller, Wexøe, Sanistål quotes are built in spreadsheets). Each row carries
+// the official product + datasheet deep-link so the buyer can verify the exact article.
+// RFC 4180 quoting. Prices are NEVER written (never invented).
+function elforsyningCsvCell(v) {
+  const s = (v === null || v === undefined) ? '' : ('' + v);
+  if (/[",\r\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+function elforsyningExportCsvText() {
+  const data = elforsyningExportData();
+  const NL = '\r\n';
+  const rows = [];
+  // Informational preamble (each line prefixed with # so importers can skip it).
+  rows.push('# ' + tx('Elforsyning \u2014 stykliste', 'Elforsyning \u2014 bill of materials'));
+  rows.push('# ' + tx('Standard', 'Standard') + ': ' + ELFORSYNING_STD_REF);
+  rows.push('# ' + tx('Genereret', 'Generated') + ': ' + data.generated);
+  rows.push('# ' + tx('Varelinjer (forskellige produkter)', 'Line items (distinct products)') + ': ' + data.distinctCount
+    + ' | ' + tx('Antal i alt', 'Total quantity') + ': ' + data.totalCount);
+  rows.push('# ' + (lang === 'da' ? data.note_da : data.note_en));
+  // Header row
+  rows.push([
+    tx('Kategori', 'Category'),
+    tx('M\u00E6rke', 'Brand'),
+    tx('Model', 'Model'),
+    tx('Specifikation', 'Spec'),
+    tx('Standard', 'Standard'),
+    tx('Godkendelse', 'Approval'),
+    tx('Antal', 'Qty'),
+    tx('Produktside', 'Product page'),
+    tx('Datablad', 'Datasheet')
+  ].map(elforsyningCsvCell).join(','));
+  // Data rows
+  data.lines.forEach(function(l) {
+    rows.push([
+      elforsyningCatLabel(l.category),
+      l.brand, l.model, l.spec, l.standard, l.approval, l.qty,
+      l.productUrl || '', l.datasheetUrl || ''
+    ].map(elforsyningCsvCell).join(','));
+  });
+  return rows.join(NL) + NL;
+}
+
+function elforsyningExportCsv() {
+  try {
+    // Leading UTF-8 BOM so Excel opens Danish characters (æøå) correctly.
+    const blob = new Blob(['\uFEFF' + elforsyningExportCsvText()], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'elforsyning-stykliste-' + new Date().toISOString().slice(0, 10) + '.csv';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
   } catch (e) {}
@@ -8300,14 +8386,16 @@ function elforsyningReportHtml() {
   h += '<h1>\uD83D\uDD0C ' + esc(tx('Elforsyningsmaterialer (stykliste)', 'Elforsyning materials (bill of materials)')) + '</h1>';
   h += '<div class="muted">' + esc(tx('Genereret', 'Generated')) + ': ' + new Date().toLocaleString()
     + ' &middot; ' + esc(tx('Reference', 'Reference')) + ': ' + esc(ELFORSYNING_STD_REF) + '</div>';
-  h += '<p>' + esc(tx('Antal varelinjer i alt', 'Total line items')) + ': <b>' + elforsyningTotalCount() + '</b></p>';
+  h += '<p>' + esc(tx('Varelinjer (forskellige produkter)', 'Line items (distinct products)')) + ': <b>' + elforsyningDistinctCount() + '</b>'
+    + ' &middot; ' + esc(tx('Antal i alt', 'Total quantity')) + ': <b>' + elforsyningTotalCount() + '</b></p>';
   if (!lines.length) {
     h += '<p class="muted">' + esc(tx('Listen er tom.', 'The list is empty.')) + '</p>';
   } else {
     ELFORSYNING_CATEGORIES.forEach(function(cat) {
       const catLines = lines.filter(function(l) { return l.category === cat; });
       if (!catLines.length) return;
-      h += '<h2>' + esc(elforsyningCatLabel(cat)) + ' (' + elforsyningCategoryCount(cat) + ')</h2>';
+      h += '<h2>' + esc(elforsyningCatLabel(cat)) + ' (' + elforsyningCategoryDistinctCount(cat) + ' '
+        + esc(tx('varer', 'items')) + ' \u00B7 ' + elforsyningCategoryCount(cat) + ' ' + esc(tx('stk', 'pcs')) + ')</h2>';
       h += '<table><thead><tr><th>' + esc(tx('M\u00E6rke', 'Brand')) + '</th><th>' + esc(tx('Model', 'Model'))
         + '</th><th>' + esc(tx('Specifikation', 'Spec')) + '</th><th>' + esc(tx('Standard', 'Standard'))
         + '</th><th>' + esc(tx('Godkendelse', 'Approval')) + '</th><th>' + esc(tx('Antal', 'Qty')) + '</th></tr></thead><tbody>';
@@ -8373,6 +8461,7 @@ function renderElforsyningBom() {
   h += '<button class="sel-btn" onclick="elforsyningClearAll()">\uD83D\uDDD1\uFE0F ' + tx('Ryd alt', 'Clear all') + '</button>';
   h += '<button class="sel-btn" onclick="elforsyningPrintReport()">\uD83D\uDDA8\uFE0F ' + tx('Udskriv / PDF', 'Print / PDF') + '</button>';
   h += '<button class="sel-btn" onclick="elforsyningExportJson()">\u2B07\uFE0F ' + tx('Eksporter JSON', 'Export JSON') + '</button>';
+  h += '<button class="sel-btn" onclick="elforsyningExportCsv()">\uD83D\uDCCA ' + tx('Eksporter CSV', 'Export CSV') + '</button>';
   h += '</div></div>';
 
   if (!lines.length) {
@@ -8388,6 +8477,9 @@ function renderElforsyningBom() {
     if (!catLines.length) return;
     h += '<div class="result-box" style="margin-top:10px">';
     h += '<div class="result-title">' + elforsyningCatLabel(cat) + ' (' + elforsyningCategoryCount(cat) + ')</div>';
+    h += '<div style="font-size:0.72rem;color:var(--text-muted);margin:-2px 0 6px">'
+      + elforsyningCategoryDistinctCount(cat) + ' ' + tx('varer', 'items') + ' \u00B7 '
+      + elforsyningCategoryCount(cat) + ' ' + tx('stk', 'pcs') + '</div>';
     catLines.forEach(function(l) {
       const p = l.product;
       h += '<div class="result-row" style="align-items:center;gap:8px;flex-wrap:wrap">';
@@ -8405,7 +8497,10 @@ function renderElforsyningBom() {
     h += '</div>';
   });
 
-  h += '<div class="result-box" style="margin-top:10px"><div class="result-row">'
+  h += '<div class="result-box" style="margin-top:10px">'
+    + '<div class="result-row"><span class="label">' + tx('Varelinjer (forskellige produkter)', 'Line items (distinct products)') + '</span>'
+    + '<span class="value"><strong>' + elforsyningDistinctCount() + '</strong></span></div>'
+    + '<div class="result-row">'
     + '<span class="label"><strong>' + tx('I alt (alle kategorier)', 'Grand total (all categories)') + '</strong></span>'
     + '<span class="value"><strong>' + total + '</strong></span></div></div>';
   h += '<div class="info-row" style="margin-top:8px">' + tx(

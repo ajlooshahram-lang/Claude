@@ -7316,6 +7316,149 @@ test('Elforsyning: print report has header(date)/DS-HD 60364 ref/grouped tables/
   elfRestore();
 });
 
+test('Elforsyning: distinct line items vs total quantity are tracked separately and correctly', function() {
+  elfReset();
+  elforsyningPickAll();
+  var distinctExpected = elfExpectedProductCount(); // one line per product
+  assert.strictEqual(elforsyningDistinctCount(), distinctExpected, 'distinct == number of products');
+  assert.strictEqual(elforsyningTotalCount(), distinctExpected, 'qty 1 each -> total == distinct initially');
+  // Bump one line to 10 pcs: distinct unchanged, total grows by 9.
+  var id = elforsyningBomLines()[0].id;
+  var cat = elforsyningBomLines()[0].category;
+  elforsyningSetQty(id, 10);
+  assert.strictEqual(elforsyningDistinctCount(), distinctExpected, 'distinct unaffected by qty change');
+  assert.strictEqual(elforsyningTotalCount(), distinctExpected + 9, 'total reflects qty bump');
+  // Per-category: distinct count is the product count; qty count includes the bump.
+  assert.strictEqual(elforsyningCategoryDistinctCount(cat), (PRODUCTS[cat] || []).length, 'category distinct == product count');
+  assert.strictEqual(elforsyningCategoryCount(cat), (PRODUCTS[cat] || []).length + 9, 'category qty includes bump');
+  elfRestore();
+});
+
+test('Elforsyning: export data carries distinctCount + per-category distinct counts (additive to JSON)', function() {
+  elfReset();
+  elforsyningPickAll();
+  var id = elforsyningBomLines()[0].id;
+  elforsyningSetQty(id, 5);
+  var data = elforsyningExportData();
+  assert.strictEqual(data.distinctCount, elforsyningDistinctCount(), 'distinctCount exported');
+  assert(data.distinctCount < data.totalCount, 'distinct (' + data.distinctCount + ') < total (' + data.totalCount + ') after a qty bump');
+  assert(data.categoryDistinctCounts && typeof data.categoryDistinctCounts === 'object', 'categoryDistinctCounts present');
+  ELF_CATS.forEach(function(c) {
+    assert.strictEqual(data.categoryDistinctCounts[c], elforsyningCategoryDistinctCount(c), 'distinct count for ' + c);
+  });
+  elfRestore();
+});
+
+test('Elforsyning: CSV export has metadata preamble, header row + one data row per BOM line', function() {
+  elfReset();
+  elforsyningPickAll();
+  var id = elforsyningBomLines()[0].id;
+  elforsyningSetQty(id, 3);
+  var csv = elforsyningExportCsvText();
+  var allLines = csv.split('\r\n').filter(function(l) { return l.length > 0; });
+  var preamble = allLines.filter(function(l) { return l.charAt(0) === '#'; });
+  assert(preamble.length === 5, 'five informational preamble lines (got ' + preamble.length + ')');
+  // header + data
+  var dataLines = allLines.filter(function(l) { return l.charAt(0) !== '#'; });
+  assert.strictEqual(dataLines.length, elforsyningDistinctCount() + 1, 'header + one row per distinct line item');
+  // RFC4180 line endings
+  assert(csv.indexOf('\r\n') >= 0, 'CRLF line endings');
+  // distinct + total surfaced in preamble
+  assert(csv.indexOf('' + elforsyningDistinctCount()) >= 0 && csv.indexOf('' + elforsyningTotalCount()) >= 0, 'distinct + total in preamble');
+  elfRestore();
+});
+
+test('Elforsyning: CSV header is correct and localizes (da/en); never contains a price column', function() {
+  elfReset();
+  elforsyningPickAll();
+  var savedLang = lang;
+  lang = 'da';
+  var da = elforsyningExportCsvText();
+  var daHeader = da.split('\r\n').filter(function(l) { return l.charAt(0) !== '#' && l.length; })[0];
+  assert.strictEqual(daHeader, 'Kategori,M\u00E6rke,Model,Specifikation,Standard,Godkendelse,Antal,Produktside,Datablad', 'da header');
+  lang = 'en';
+  var en = elforsyningExportCsvText();
+  var enHeader = en.split('\r\n').filter(function(l) { return l.charAt(0) !== '#' && l.length; })[0];
+  assert.strictEqual(enHeader, 'Category,Brand,Model,Spec,Standard,Approval,Qty,Product page,Datasheet', 'en header');
+  // No invented prices: there must be no price column and no currency amounts.
+  // (The wholesaler note legitimately contains the word "Prices are not included".)
+  assert(enHeader.toLowerCase().indexOf('price') < 0 && enHeader.toLowerCase().indexOf('pris') < 0, 'no price column in header');
+  assert(en.indexOf('kr.') < 0 && en.indexOf('DKK') < 0, 'no currency amounts in CSV');
+  // Wholesaler verification note carried in the preamble.
+  assert(en.indexOf('Solar') >= 0 && en.indexOf('Sanist\u00E5l') >= 0, 'wholesaler note in CSV preamble');
+  lang = savedLang;
+  elfRestore();
+});
+
+test('Elforsyning: CSV surfaces the official product/datasheet deep-links per line (procurement)', function() {
+  elfReset();
+  elforsyningPickAll();
+  var data = elforsyningExportData();
+  // Find a line that actually carries a deep-link in the export object.
+  var withUrl = data.lines.filter(function(l) { return l.productUrl; });
+  assert(withUrl.length >= 1, 'at least one line has an official product URL');
+  var csv = elforsyningExportCsvText();
+  assert(csv.indexOf(withUrl[0].productUrl) >= 0, 'product URL appears as a CSV cell');
+  // The deep-link must be a manufacturer https URL (never invented/relative).
+  assert(/^https:\/\//.test(withUrl[0].productUrl), 'deep-link is an https manufacturer URL');
+  elfRestore();
+});
+
+test('Elforsyning: CSV cell escaping is RFC4180-safe (quotes/commas/newlines)', function() {
+  assert.strictEqual(elforsyningCsvCell('plain'), 'plain', 'plain text untouched');
+  assert.strictEqual(elforsyningCsvCell('a,b'), '"a,b"', 'comma wrapped');
+  assert.strictEqual(elforsyningCsvCell('say "hi"'), '"say ""hi"""', 'inner quotes doubled + wrapped');
+  assert.strictEqual(elforsyningCsvCell('line1\r\nline2'), '"line1\r\nline2"', 'newline wrapped');
+  assert.strictEqual(elforsyningCsvCell(null), '', 'null -> empty');
+  assert.strictEqual(elforsyningCsvCell(7), '7', 'number stringified');
+});
+
+test('Elforsyning: render shows distinct-line-items + grand-total quantity rows in BOTH da and en', function() {
+  elfReset();
+  elforsyningPickAll();
+  var savedLang = lang;
+  lang = 'da';
+  var da = renderElforsyningBom();
+  assert(da.indexOf('Varelinjer (forskellige produkter)') >= 0, 'da distinct-line-items label');
+  assert(da.indexOf('Eksporter CSV') >= 0, 'da CSV export button');
+  assert(da.indexOf(' varer \u00B7 ') >= 0, 'da per-category distinct/qty subtitle');
+  lang = 'en';
+  var en = renderElforsyningBom();
+  assert(en.indexOf('Line items (distinct products)') >= 0, 'en distinct-line-items label');
+  assert(en.indexOf('Export CSV') >= 0, 'en CSV export button');
+  assert(en.indexOf(' items \u00B7 ') >= 0, 'en per-category distinct/qty subtitle');
+  assert(en.indexOf('Grand total') >= 0, 'grand total still present');
+  lang = savedLang;
+  elfRestore();
+});
+
+test('Elforsyning: print report distinguishes distinct line items from total quantity (no mislabel)', function() {
+  elfReset();
+  elforsyningPickAll();
+  var id = elforsyningBomLines()[0].id;
+  elforsyningSetQty(id, 8); // make total != distinct so the two numbers are visibly different
+  var savedLang = lang; lang = 'en';
+  var report = elforsyningReportHtml();
+  assert(report.indexOf('Line items (distinct products)') >= 0, 'distinct line-items label present');
+  assert(report.indexOf('Total quantity') >= 0, 'total-quantity label present');
+  assert(report.indexOf('>' + elforsyningDistinctCount() + '<') >= 0, 'distinct number rendered');
+  // The old, inaccurate "Total line items: <qty sum>" wording must be gone.
+  assert(report.indexOf('Total line items') < 0, 'mislabeled wording removed');
+  // CSV-style deep-links must still NOT leak into the printed report.
+  assert(report.indexOf('http://') < 0 && report.indexOf('https://') < 0, 'still no remote URLs in print');
+  lang = savedLang;
+  elfRestore();
+});
+
+test('Elforsyning: CSV export is click-only data (no markup/script/text-input injected)', function() {
+  elfReset();
+  elforsyningPickAll();
+  var csv = elforsyningExportCsvText();
+  assert(csv.toLowerCase().indexOf('<script') < 0, 'no script tag');
+  assert(csv.indexOf('<input') < 0 && csv.indexOf('<textarea') < 0, 'no form controls');
+  elfRestore();
+});
+
 test('Elforsyning: bankSpec is the single source of truth shared with the Component Bank list', function() {
   var sc = PRODUCTS.supplyCables[0];
   assert.strictEqual(bankSpec('supplyCables', sc), sc.mm2 + 'mm\u00B2 ' + sc.material + ' | Iz=' + sc.iz + 'A | Method ' + sc.method);
