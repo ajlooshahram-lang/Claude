@@ -977,7 +977,9 @@ const T = {
       smartgrid: 'Smart Grid',
       kls: 'KLS Kvalitetssystem',
       kritisk: '\uD83E\uDDE0 Projekt + Kritisk Hjerne',
-      impedans: 'AC Impedans'
+      impedans: 'AC Impedans',
+      trefase: '3-faset Beregner',
+      motorteori: 'Motorteori'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1121,7 +1123,9 @@ const T = {
       smartgrid: 'Smart Grid',
       kls: 'KLS Quality System',
       kritisk: '\uD83E\uDDE0 Project + Critical Mind',
-      impedans: 'AC Impedance'
+      impedans: 'AC Impedance',
+      trefase: '3-Phase Calculator',
+      motorteori: 'Motor Theory'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -1257,7 +1261,9 @@ const T = {
       smartgrid: 'شبکه هوشمند',
       kls: 'سیستم کیفیت KLS',
       kritisk: '\uD83E\uDDE0 پروژه + ذهن انتقادی',
-      impedans: 'امپدانس AC'
+      impedans: 'امپدانس AC',
+      trefase: 'محاسبه سه‌فاز',
+      motorteori: 'تئوری موتور'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -4361,9 +4367,9 @@ const NAV_GROUPS = [
   {
     id: 'theory', icon: '\uD83D\uDCD6',
     da: 'Elektroteknisk teori', en: 'Electrotechnics theory', fa: '\u062A\u0626\u0648\u0631\u06CC \u0628\u0631\u0642',
-    descDa: 'Grundl\u00E6ggende AC-teori og beregninger fra Elektroteknik Opgavesamling \u2014 impedans, resonans, fasevinkel, effekttrekant og tidskonstanter. Dine formler, klik-for-klik.',
-    descEn: 'Fundamental AC theory and calculations from Elektroteknik Opgavesamling \u2014 impedance, resonance, phase angle, power triangle and time constants. Your formulas, click by click.',
-    keys: ['impedans']
+    descDa: 'Grundl\u00E6ggende AC-teori og beregninger fra Elektroteknik Opgavesamling \u2014 impedans, resonans, fasevinkel, effekttrekant, tidskonstanter, 3-faset systemer og motorteori. Dine formler, klik-for-klik.',
+    descEn: 'Fundamental AC theory and calculations from Elektroteknik Opgavesamling \u2014 impedance, resonance, phase angle, power triangle, time constants, 3-phase systems and motor theory. Your formulas, click by click.',
+    keys: ['impedans', 'trefase', 'motorteori']
   },
   {
     id: 'docs', icon: '\uD83D\uDCCB',
@@ -5754,6 +5760,8 @@ function renderModule(mod) {
     case 'kls': content = renderKLS(); break;
     case 'kritisk': content = renderKritisk(); break;
     case 'impedans': content = renderImpedans(); break;
+    case 'trefase': content = renderTrefase(); break;
+    case 'motorteori': content = renderMotorteori(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -20595,6 +20603,621 @@ function impedansRenderPhasor(res) {
   svg += '<text x="8" y="' + (h - 8) + '" font-size="9" fill="var(--text-muted)">' + tx('Gr\u00F8n=R, R\u00F8d=X, Bl\u00E5=Z', 'Green=R, Red=X, Blue=Z') + '</text>';
   svg += '</svg>';
   return svg;
+}
+// ===== 3-PHASE CALCULATOR MODULE (trefase) =====
+// Covers Opgavesamling Ch. 7: symmetric & asymmetric 3-phase systems
+
+var trefaseState = {
+  loadType: 'symStar',
+  UL: 400,
+  f: 50,
+  Z: 100,
+  phi: 0.5236,
+  Za: 100, phiA: 0,
+  Zb: 100, phiB: 0,
+  Zc: 100, phiC: 0,
+  pfcTarget: 0.95,
+  W1: 1500,
+  W2: 800
+};
+
+var TREFASE_UL_PRESETS = [230, 400, 690, 1000, 3000, 6000, 10000];
+var TREFASE_Z_PRESETS = [5, 10, 20, 30, 47, 50, 60, 80, 100, 150, 200, 300, 500, 1000];
+var TREFASE_PHI_PRESETS = [
+  { rad: 0, deg: 0, cos: 1.0 },
+  { rad: 0.3217, deg: 18.2, cos: 0.95 },
+  { rad: 0.5236, deg: 30, cos: 0.866 },
+  { rad: 0.6435, deg: 36.9, cos: 0.8 },
+  { rad: 0.7854, deg: 45, cos: 0.707 },
+  { rad: 0.9273, deg: 53.1, cos: 0.6 },
+  { rad: 1.0472, deg: 60, cos: 0.5 },
+  { rad: 1.2310, deg: 70.5, cos: 0.333 }
+];
+var TREFASE_W_PRESETS = [200, 500, 800, 1000, 1200, 1500, 2000, 2500, 3000, 4000, 5000, 7500, 10000];
+var TREFASE_PFC_PRESETS = [0.85, 0.90, 0.92, 0.95, 0.97, 0.99, 1.0];
+
+// --- 3-phase pure calculation functions (no DOM) ---
+
+function trefaseCalcSymStar(UL, Z, phi) {
+  var Up = UL / Math.sqrt(3);
+  var Ip = Up / Z;
+  var IL = Ip;
+  var P = 3 * Up * Ip * Math.cos(phi);
+  var Q = 3 * Up * Ip * Math.sin(phi);
+  var S = 3 * Up * Ip;
+  return { Up: Up, Ip: Ip, IL: IL, IN: 0, P: P, Q: Q, S: S, cosPhi: Math.cos(phi) };
+}
+
+function trefaseCalcSymDelta(UL, Z, phi) {
+  var Up = UL;
+  var Ip = Up / Z;
+  var IL = Math.sqrt(3) * Ip;
+  var P = 3 * Up * Ip * Math.cos(phi);
+  var Q = 3 * Up * Ip * Math.sin(phi);
+  var S = 3 * Up * Ip;
+  return { Up: Up, Ip: Ip, IL: IL, IN: 0, P: P, Q: Q, S: S, cosPhi: Math.cos(phi) };
+}
+
+function trefaseCalcAsymStar(UL, Za, phiA, Zb, phiB, Zc, phiC) {
+  var Up = UL / Math.sqrt(3);
+  var angA = 0;
+  var angB = -2 * Math.PI / 3;
+  var angC = 2 * Math.PI / 3;
+  var IaM = (Za > 0) ? Up / Za : 0;
+  var IbM = (Zb > 0) ? Up / Zb : 0;
+  var IcM = (Zc > 0) ? Up / Zc : 0;
+  var IaAng = angA - phiA;
+  var IbAng = angB - phiB;
+  var IcAng = angC - phiC;
+  var IaRe = IaM * Math.cos(IaAng);
+  var IaIm = IaM * Math.sin(IaAng);
+  var IbRe = IbM * Math.cos(IbAng);
+  var IbIm = IbM * Math.sin(IbAng);
+  var IcRe = IcM * Math.cos(IcAng);
+  var IcIm = IcM * Math.sin(IcAng);
+  var INRe = IaRe + IbRe + IcRe;
+  var INIm = IaIm + IbIm + IcIm;
+  var IN = Math.sqrt(INRe * INRe + INIm * INIm);
+  var Pa = Up * IaM * Math.cos(phiA);
+  var Pb = Up * IbM * Math.cos(phiB);
+  var Pc = Up * IcM * Math.cos(phiC);
+  var Qa = Up * IaM * Math.sin(phiA);
+  var Qb = Up * IbM * Math.sin(phiB);
+  var Qc = Up * IcM * Math.sin(phiC);
+  var P = Pa + Pb + Pc;
+  var Q = Qa + Qb + Qc;
+  var S = Math.sqrt(P * P + Q * Q);
+  return {
+    Up: Up, Ia: IaM, Ib: IbM, Ic: IcM, IN: IN,
+    IaAng: IaAng * 180 / Math.PI, IbAng: IbAng * 180 / Math.PI, IcAng: IcAng * 180 / Math.PI,
+    INAng: Math.atan2(INIm, INRe) * 180 / Math.PI,
+    Pa: Pa, Pb: Pb, Pc: Pc, Qa: Qa, Qb: Qb, Qc: Qc,
+    P: P, Q: Q, S: S
+  };
+}
+
+function trefaseCalcAsymDelta(UL, Zab, phiAB, Zbc, phiBC, Zca, phiCA) {
+  var Up = UL;
+  var angAB = 0;
+  var angBC = -2 * Math.PI / 3;
+  var angCA = 2 * Math.PI / 3;
+  var IabM = (Zab > 0) ? Up / Zab : 0;
+  var IbcM = (Zbc > 0) ? Up / Zbc : 0;
+  var IcaM = (Zca > 0) ? Up / Zca : 0;
+  var IabAng = angAB - phiAB;
+  var IbcAng = angBC - phiBC;
+  var IcaAng = angCA - phiCA;
+  var IabRe = IabM * Math.cos(IabAng);
+  var IabIm = IabM * Math.sin(IabAng);
+  var IbcRe = IbcM * Math.cos(IbcAng);
+  var IbcIm = IbcM * Math.sin(IbcAng);
+  var IcaRe = IcaM * Math.cos(IcaAng);
+  var IcaIm = IcaM * Math.sin(IcaAng);
+  var IaRe = IabRe - IcaRe;
+  var IaIm = IabIm - IcaIm;
+  var IbRe = IbcRe - IabRe;
+  var IbIm = IbcIm - IabIm;
+  var IcRe = IcaRe - IbcRe;
+  var IcIm = IcaIm - IbcIm;
+  var Ia = Math.sqrt(IaRe * IaRe + IaIm * IaIm);
+  var Ib = Math.sqrt(IbRe * IbRe + IbIm * IbIm);
+  var Ic = Math.sqrt(IcRe * IcRe + IcIm * IcIm);
+  var Pab = Up * IabM * Math.cos(phiAB);
+  var Pbc = Up * IbcM * Math.cos(phiBC);
+  var Pca = Up * IcaM * Math.cos(phiCA);
+  var Qab = Up * IabM * Math.sin(phiAB);
+  var Qbc = Up * IbcM * Math.sin(phiBC);
+  var Qca = Up * IcaM * Math.sin(phiCA);
+  var P = Pab + Pbc + Pca;
+  var Q = Qab + Qbc + Qca;
+  var S = Math.sqrt(P * P + Q * Q);
+  return { Up: Up, Iab: IabM, Ibc: IbcM, Ica: IcaM, Ia: Ia, Ib: Ib, Ic: Ic, IN: 0, P: P, Q: Q, S: S };
+}
+
+function trefaseCalcPFC(P, cosPhi1, cosPhi2) {
+  if (cosPhi1 >= 1 || cosPhi2 >= 1) return { Qc: 0, phi1Deg: 0, phi2Deg: 0 };
+  var phi1 = Math.acos(cosPhi1);
+  var phi2 = Math.acos(cosPhi2);
+  var Qc = P * (Math.tan(phi1) - Math.tan(phi2));
+  return { Qc: Math.abs(Qc), phi1Deg: phi1 * 180 / Math.PI, phi2Deg: phi2 * 180 / Math.PI };
+}
+
+function trefaseCalcCapStar(Qc, UL, f) {
+  var Up = UL / Math.sqrt(3);
+  var omega = 2 * Math.PI * f;
+  if (omega === 0 || Up === 0) return 0;
+  return Qc / (3 * Up * Up * omega);
+}
+
+function trefaseCalcCapDelta(Qc, UL, f) {
+  var omega = 2 * Math.PI * f;
+  if (omega === 0 || UL === 0) return 0;
+  return Qc / (3 * UL * UL * omega);
+}
+
+function trefaseCalcTwoWatt(W1, W2) {
+  var P = W1 + W2;
+  var Q = Math.sqrt(3) * (W1 - W2);
+  var S = Math.sqrt(P * P + Q * Q);
+  var cosPhi = (S > 0) ? P / S : 1;
+  var phi = Math.acos(Math.min(1, Math.max(-1, cosPhi)));
+  return { P: P, Q: Q, S: S, cosPhi: cosPhi, phiDeg: phi * 180 / Math.PI };
+}
+
+function renderTrefase() {
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('3-faset Beregner', '3-Phase Calculator') + '</div>';
+  html += '<div class="info-row">' + tx('Beregning iht. Elektroteknik Opgavesamling 4. udgave, Kap. 7', 'Calculation per Elektroteknik Opgavesamling 4th ed., Ch. 7') + '</div>';
+
+  // Load type selection
+  html += '<div class="select-group"><div class="select-label">' + tx('Belastningstype', 'Load Type') + '</div><div class="select-grid">';
+  var loadTypes = [
+    { key: 'symStar', da: 'Symmetrisk stjerne (Y)', en: 'Symmetric star (Y)' },
+    { key: 'symDelta', da: 'Symmetrisk trekant (\u0394)', en: 'Symmetric delta (\u0394)' },
+    { key: 'asymStar', da: 'Usymmetrisk stjerne (Y)', en: 'Asymmetric star (Y)' },
+    { key: 'asymDelta', da: 'Usymmetrisk trekant (\u0394)', en: 'Asymmetric delta (\u0394)' },
+    { key: 'twoWatt', da: 'To-wattmeter metode', en: 'Two-wattmeter method' },
+    { key: 'pfc', da: 'Effektfaktorkorrektion', en: 'Power factor correction' }
+  ];
+  loadTypes.forEach(function(lt) {
+    html += '<button class="sel-btn' + (trefaseState.loadType === lt.key ? ' selected' : '') + '" onclick="trefaseState.loadType=\'' + lt.key + '\';renderModule(\'trefase\')">' + tx(lt.da, lt.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Line voltage
+  html += '<div class="select-group"><div class="select-label">' + tx('Linjesp\u00E6nding U\u2097 [V]', 'Line Voltage U\u2097 [V]') + '</div><div class="select-grid">';
+  TREFASE_UL_PRESETS.forEach(function(u) {
+    html += '<button class="sel-btn' + (trefaseState.UL === u ? ' selected' : '') + '" onclick="trefaseState.UL=' + u + ';renderModule(\'trefase\')">' + u + ' V</button>';
+  });
+  html += '</div></div>';
+
+  // Frequency
+  html += '<div class="select-group"><div class="select-label">' + tx('Frekvens [Hz]', 'Frequency [Hz]') + '</div><div class="select-grid">';
+  [25, 50, 60].forEach(function(f) {
+    html += '<button class="sel-btn' + (trefaseState.f === f ? ' selected' : '') + '" onclick="trefaseState.f=' + f + ';renderModule(\'trefase\')">' + f + ' Hz</button>';
+  });
+  html += '</div></div>';
+
+  if (trefaseState.loadType === 'symStar' || trefaseState.loadType === 'symDelta') {
+    html += '<div class="select-group"><div class="select-label">' + tx('Impedans pr. fase Z [\u03A9]', 'Impedance per phase Z [\u03A9]') + '</div><div class="select-grid">';
+    TREFASE_Z_PRESETS.forEach(function(z) {
+      html += '<button class="sel-btn' + (trefaseState.Z === z ? ' selected' : '') + '" onclick="trefaseState.Z=' + z + ';renderModule(\'trefase\')">' + z + '</button>';
+    });
+    html += '</div></div>';
+    html += '<div class="select-group"><div class="select-label">' + tx('Fasevinkel \u03C6 (cos\u03C6)', 'Phase angle \u03C6 (cos\u03C6)') + '</div><div class="select-grid">';
+    TREFASE_PHI_PRESETS.forEach(function(p) {
+      html += '<button class="sel-btn' + (Math.abs(trefaseState.phi - p.rad) < 0.001 ? ' selected' : '') + '" onclick="trefaseState.phi=' + p.rad + ';renderModule(\'trefase\')">' + p.deg + '\u00B0 (cos\u03C6=' + p.cos + ')</button>';
+    });
+    html += '</div></div>';
+  } else if (trefaseState.loadType === 'asymStar' || trefaseState.loadType === 'asymDelta') {
+    var phases = (trefaseState.loadType === 'asymStar') ?
+      [{lbl:'A (R)',zKey:'Za',phiKey:'phiA'},{lbl:'B (S)',zKey:'Zb',phiKey:'phiB'},{lbl:'C (T)',zKey:'Zc',phiKey:'phiC'}] :
+      [{lbl:'AB',zKey:'Za',phiKey:'phiA'},{lbl:'BC',zKey:'Zb',phiKey:'phiB'},{lbl:'CA',zKey:'Zc',phiKey:'phiC'}];
+    phases.forEach(function(ph) {
+      html += '<div class="select-group"><div class="select-label">' + tx('Fase '+ph.lbl+' impedans [\u03A9]','Phase '+ph.lbl+' impedance [\u03A9]') + '</div><div class="select-grid">';
+      TREFASE_Z_PRESETS.forEach(function(z) {
+        html += '<button class="sel-btn' + (trefaseState[ph.zKey] === z ? ' selected' : '') + '" onclick="trefaseState.'+ph.zKey+'='+z+';renderModule(\'trefase\')">' + z + '</button>';
+      });
+      html += '</div></div>';
+      html += '<div class="select-group"><div class="select-label">' + tx('Fase '+ph.lbl+' vinkel \u03C6','Phase '+ph.lbl+' angle \u03C6') + '</div><div class="select-grid">';
+      TREFASE_PHI_PRESETS.forEach(function(p) {
+        html += '<button class="sel-btn' + (Math.abs(trefaseState[ph.phiKey]-p.rad)<0.001 ? ' selected' : '') + '" onclick="trefaseState.'+ph.phiKey+'='+p.rad+';renderModule(\'trefase\')">' + p.deg + '\u00B0</button>';
+      });
+      html += '</div></div>';
+    });
+  } else if (trefaseState.loadType === 'twoWatt') {
+    html += '<div class="select-group"><div class="select-label">' + tx('Wattmeter W\u2081 [W]','Wattmeter W\u2081 [W]') + '</div><div class="select-grid">';
+    TREFASE_W_PRESETS.forEach(function(w) {
+      html += '<button class="sel-btn' + (trefaseState.W1 === w ? ' selected' : '') + '" onclick="trefaseState.W1='+w+';renderModule(\'trefase\')">' + w + '</button>';
+    });
+    html += '</div></div>';
+    html += '<div class="select-group"><div class="select-label">' + tx('Wattmeter W\u2082 [W]','Wattmeter W\u2082 [W]') + '</div><div class="select-grid">';
+    TREFASE_W_PRESETS.forEach(function(w) {
+      html += '<button class="sel-btn' + (trefaseState.W2 === w ? ' selected' : '') + '" onclick="trefaseState.W2='+w+';renderModule(\'trefase\')">' + w + '</button>';
+    });
+    html += '</div></div>';
+  } else if (trefaseState.loadType === 'pfc') {
+    html += '<div class="select-group"><div class="select-label">' + tx('Aktiv effekt P [W]','Active Power P [W]') + '</div><div class="select-grid">';
+    TREFASE_W_PRESETS.forEach(function(w) {
+      html += '<button class="sel-btn' + (trefaseState.W1 === w ? ' selected' : '') + '" onclick="trefaseState.W1='+w+';renderModule(\'trefase\')">' + w + '</button>';
+    });
+    html += '</div></div>';
+    html += '<div class="select-group"><div class="select-label">' + tx('Nuv\u00E6rende cos\u03C6\u2081','Current cos\u03C6\u2081') + '</div><div class="select-grid">';
+    TREFASE_PHI_PRESETS.forEach(function(p) {
+      if (p.cos < 1) html += '<button class="sel-btn' + (Math.abs(trefaseState.phi-p.rad)<0.001 ? ' selected' : '') + '" onclick="trefaseState.phi='+p.rad+';renderModule(\'trefase\')">' + p.cos + '</button>';
+    });
+    html += '</div></div>';
+    html += '<div class="select-group"><div class="select-label">' + tx('\u00D8nsket cos\u03C6\u2082','Target cos\u03C6\u2082') + '</div><div class="select-grid">';
+    TREFASE_PFC_PRESETS.forEach(function(pf) {
+      html += '<button class="sel-btn' + (Math.abs(trefaseState.pfcTarget-pf)<0.001 ? ' selected' : '') + '" onclick="trefaseState.pfcTarget='+pf+';renderModule(\'trefase\')">' + pf + '</button>';
+    });
+    html += '</div></div>';
+  }
+
+  html += '</div>';
+
+  // Results card
+  html += '<div class="card fade-in"><div class="card-title">' + tx('Resultat','Results') + '</div>';
+
+  if (trefaseState.loadType === 'symStar') {
+    var r = trefaseCalcSymStar(trefaseState.UL, trefaseState.Z, trefaseState.phi);
+    html += '<div class="result-box"><div class="result-title">' + tx('Symmetrisk stjerneforbindelse','Symmetric Star Connection') + '</div>';
+    html += '<div class="result-row"><span class="label">U<sub>p</sub></span><span class="value">' + r.Up.toFixed(1) + ' V</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">U<sub>p</sub> = U<sub>L</sub>/\u221A3 = ' + trefaseState.UL + '/\u221A3 = ' + r.Up.toFixed(1) + ' V</span></div>';
+    html += '<div class="result-row"><span class="label">I<sub>p</sub> = I<sub>L</sub></span><span class="value">' + r.Ip.toFixed(2) + ' A</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">I<sub>p</sub> = U<sub>p</sub>/Z = ' + r.Up.toFixed(1) + '/' + trefaseState.Z + ' = ' + r.Ip.toFixed(2) + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">P</span><span class="value">' + r.P.toFixed(1) + ' W</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">P = \u221A3\u00B7U<sub>L</sub>\u00B7I<sub>L</sub>\u00B7cos\u03C6 = \u221A3\u00D7' + trefaseState.UL + '\u00D7' + r.IL.toFixed(2) + '\u00D7' + r.cosPhi.toFixed(4) + ' = ' + r.P.toFixed(1) + ' W</span></div>';
+    html += '<div class="result-row"><span class="label">Q</span><span class="value">' + r.Q.toFixed(1) + ' var</span></div>';
+    html += '<div class="result-row"><span class="label">S</span><span class="value">' + r.S.toFixed(1) + ' VA</span></div>';
+    html += '<div class="result-row"><span class="label">I<sub>N</sub></span><span class="value">' + r.IN.toFixed(2) + ' A</span></div>';
+    html += '</div>';
+  } else if (trefaseState.loadType === 'symDelta') {
+    var r = trefaseCalcSymDelta(trefaseState.UL, trefaseState.Z, trefaseState.phi);
+    html += '<div class="result-box"><div class="result-title">' + tx('Symmetrisk trekantforbindelse','Symmetric Delta Connection') + '</div>';
+    html += '<div class="result-row"><span class="label">U<sub>p</sub> = U<sub>L</sub></span><span class="value">' + r.Up.toFixed(1) + ' V</span></div>';
+    html += '<div class="result-row"><span class="label">I<sub>p</sub></span><span class="value">' + r.Ip.toFixed(2) + ' A</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">I<sub>p</sub> = U<sub>p</sub>/Z = ' + r.Up.toFixed(1) + '/' + trefaseState.Z + ' = ' + r.Ip.toFixed(2) + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">I<sub>L</sub></span><span class="value">' + r.IL.toFixed(2) + ' A</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">I<sub>L</sub> = \u221A3\u00B7I<sub>p</sub> = \u221A3\u00D7' + r.Ip.toFixed(2) + ' = ' + r.IL.toFixed(2) + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">P</span><span class="value">' + r.P.toFixed(1) + ' W</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">P = \u221A3\u00B7U<sub>L</sub>\u00B7I<sub>L</sub>\u00B7cos\u03C6 = \u221A3\u00D7' + trefaseState.UL + '\u00D7' + r.IL.toFixed(2) + '\u00D7' + r.cosPhi.toFixed(4) + ' = ' + r.P.toFixed(1) + ' W</span></div>';
+    html += '<div class="result-row"><span class="label">Q</span><span class="value">' + r.Q.toFixed(1) + ' var</span></div>';
+    html += '<div class="result-row"><span class="label">S</span><span class="value">' + r.S.toFixed(1) + ' VA</span></div>';
+    html += '</div>';
+  } else if (trefaseState.loadType === 'asymStar') {
+    var r = trefaseCalcAsymStar(trefaseState.UL, trefaseState.Za, trefaseState.phiA, trefaseState.Zb, trefaseState.phiB, trefaseState.Zc, trefaseState.phiC);
+    html += '<div class="result-box"><div class="result-title">' + tx('Usymmetrisk stjerne','Asymmetric Star') + '</div>';
+    html += '<div class="result-row"><span class="label">U<sub>p</sub></span><span class="value">' + r.Up.toFixed(1) + ' V</span></div>';
+    html += '<div class="result-row"><span class="label">I<sub>A</sub></span><span class="value">' + r.Ia.toFixed(2) + ' A \u2220' + r.IaAng.toFixed(1) + '\u00B0</span></div>';
+    html += '<div class="result-row"><span class="label">I<sub>B</sub></span><span class="value">' + r.Ib.toFixed(2) + ' A \u2220' + r.IbAng.toFixed(1) + '\u00B0</span></div>';
+    html += '<div class="result-row"><span class="label">I<sub>C</sub></span><span class="value">' + r.Ic.toFixed(2) + ' A \u2220' + r.IcAng.toFixed(1) + '\u00B0</span></div>';
+    html += '<div class="result-row" style="font-weight:700"><span class="label">I<sub>N</sub></span><span class="value">' + r.IN.toFixed(2) + ' A \u2220' + r.INAng.toFixed(1) + '\u00B0</span></div>';
+    html += '<div class="result-row"><span class="label">P<sub>total</sub></span><span class="value">' + r.P.toFixed(1) + ' W</span></div>';
+    html += '<div class="result-row"><span class="label">Q<sub>total</sub></span><span class="value">' + r.Q.toFixed(1) + ' var</span></div>';
+    html += '<div class="result-row"><span class="label">S<sub>total</sub></span><span class="value">' + r.S.toFixed(1) + ' VA</span></div>';
+    html += '</div>';
+  } else if (trefaseState.loadType === 'asymDelta') {
+    var r = trefaseCalcAsymDelta(trefaseState.UL, trefaseState.Za, trefaseState.phiA, trefaseState.Zb, trefaseState.phiB, trefaseState.Zc, trefaseState.phiC);
+    html += '<div class="result-box"><div class="result-title">' + tx('Usymmetrisk trekant','Asymmetric Delta') + '</div>';
+    html += '<div class="result-row"><span class="label">U<sub>p</sub>=U<sub>L</sub></span><span class="value">' + r.Up.toFixed(1) + ' V</span></div>';
+    html += '<div class="result-row"><span class="label">I<sub>AB</sub></span><span class="value">' + r.Iab.toFixed(2) + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">I<sub>BC</sub></span><span class="value">' + r.Ibc.toFixed(2) + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">I<sub>CA</sub></span><span class="value">' + r.Ica.toFixed(2) + ' A</span></div>';
+    html += '<div class="result-row" style="font-weight:700"><span class="label">I<sub>A</sub></span><span class="value">' + r.Ia.toFixed(2) + ' A</span></div>';
+    html += '<div class="result-row" style="font-weight:700"><span class="label">I<sub>B</sub></span><span class="value">' + r.Ib.toFixed(2) + ' A</span></div>';
+    html += '<div class="result-row" style="font-weight:700"><span class="label">I<sub>C</sub></span><span class="value">' + r.Ic.toFixed(2) + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">P<sub>total</sub></span><span class="value">' + r.P.toFixed(1) + ' W</span></div>';
+    html += '<div class="result-row"><span class="label">S<sub>total</sub></span><span class="value">' + r.S.toFixed(1) + ' VA</span></div>';
+    html += '</div>';
+  } else if (trefaseState.loadType === 'twoWatt') {
+    var r = trefaseCalcTwoWatt(trefaseState.W1, trefaseState.W2);
+    html += '<div class="result-box"><div class="result-title">' + tx('To-wattmeter metode','Two-Wattmeter Method') + '</div>';
+    html += '<div class="result-row"><span class="label">P</span><span class="value">' + r.P.toFixed(1) + ' W</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">P = W\u2081+W\u2082 = ' + trefaseState.W1 + '+' + trefaseState.W2 + ' = ' + r.P.toFixed(1) + ' W</span></div>';
+    html += '<div class="result-row"><span class="label">Q</span><span class="value">' + r.Q.toFixed(1) + ' var</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">Q = \u221A3\u00B7(W\u2081-W\u2082) = \u221A3\u00D7(' + trefaseState.W1 + '-' + trefaseState.W2 + ') = ' + r.Q.toFixed(1) + ' var</span></div>';
+    html += '<div class="result-row"><span class="label">S</span><span class="value">' + r.S.toFixed(1) + ' VA</span></div>';
+    html += '<div class="result-row"><span class="label">cos\u03C6</span><span class="value">' + r.cosPhi.toFixed(4) + '</span></div>';
+    html += '<div class="result-row"><span class="label">\u03C6</span><span class="value">' + r.phiDeg.toFixed(1) + '\u00B0</span></div>';
+    html += '</div>';
+  } else if (trefaseState.loadType === 'pfc') {
+    var cosPhi1 = Math.cos(trefaseState.phi);
+    var pfc = trefaseCalcPFC(trefaseState.W1, cosPhi1, trefaseState.pfcTarget);
+    var Cstar = trefaseCalcCapStar(pfc.Qc, trefaseState.UL, trefaseState.f);
+    var Cdelta = trefaseCalcCapDelta(pfc.Qc, trefaseState.UL, trefaseState.f);
+    html += '<div class="result-box"><div class="result-title">' + tx('Effektfaktorkorrektion','Power Factor Correction') + '</div>';
+    html += '<div class="result-row"><span class="label">P</span><span class="value">' + trefaseState.W1 + ' W</span></div>';
+    html += '<div class="result-row"><span class="label">cos\u03C6\u2081</span><span class="value">' + cosPhi1.toFixed(4) + '</span></div>';
+    html += '<div class="result-row"><span class="label">cos\u03C6\u2082</span><span class="value">' + trefaseState.pfcTarget.toFixed(4) + '</span></div>';
+    html += '<div class="result-row" style="font-weight:700"><span class="label">Q<sub>c</sub></span><span class="value">' + pfc.Qc.toFixed(1) + ' var</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">Q<sub>c</sub> = P\u00B7(tan\u03C6\u2081-tan\u03C6\u2082)</span></div>';
+    html += '<div class="result-row"><span class="label">C<sub>Y</sub> (' + tx('pr. fase, stjerne','per phase, star') + ')</span><span class="value">' + (Cstar*1e6).toFixed(1) + ' \u00B5F</span></div>';
+    html += '<div class="result-row"><span class="label">C<sub>\u0394</sub> (' + tx('pr. fase, trekant','per phase, delta') + ')</span><span class="value">' + (Cdelta*1e6).toFixed(1) + ' \u00B5F</span></div>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+// ===== MOTOR THEORY MODULE (motorteori) =====
+// Covers Opgavesamling Ch. 11: AC machines (induction motors)
+
+var motorteoriState = {
+  calcType: 'slip',
+  poles: 4,
+  f: 50,
+  n: 1440,
+  Prated: 7500,
+  U: 400,
+  I: 15,
+  cosPhi: 0.85,
+  eta: 0.88,
+  slip: 0.04,
+  startMethod: 'dol',
+  IstartRatio: 7
+};
+
+var MOTORTEORI_POLES_PRESETS = [2, 4, 6, 8, 10, 12];
+var MOTORTEORI_F_PRESETS = [50, 60];
+var MOTORTEORI_N_PRESETS = [720, 730, 740, 960, 970, 980, 1420, 1440, 1460, 1480, 2880, 2920, 2940, 2960];
+var MOTORTEORI_P_PRESETS = [370, 550, 750, 1100, 1500, 2200, 3000, 4000, 5500, 7500, 11000, 15000, 18500, 22000, 30000, 37000, 45000, 55000, 75000, 90000, 110000];
+var MOTORTEORI_U_PRESETS = [230, 400, 690, 3000, 6000, 10000];
+var MOTORTEORI_I_PRESETS = [1, 2, 3, 5, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 80, 100, 125, 150, 200];
+var MOTORTEORI_COSPHI_PRESETS = [0.70, 0.75, 0.80, 0.82, 0.85, 0.87, 0.89, 0.90, 0.92, 0.95];
+var MOTORTEORI_ETA_PRESETS = [0.75, 0.80, 0.83, 0.85, 0.87, 0.88, 0.89, 0.90, 0.91, 0.92, 0.93, 0.94, 0.95];
+var MOTORTEORI_SLIP_PRESETS = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.10, 0.15, 0.20];
+var MOTORTEORI_ISTART_PRESETS = [3, 4, 5, 6, 7, 8];
+
+// --- Motor theory pure calculation functions (no DOM) ---
+
+function motorteoriCalcNs(f, poles) {
+  return 120 * f / poles;
+}
+
+function motorteoriCalcSlip(ns, n) {
+  if (ns === 0) return 0;
+  return (ns - n) / ns;
+}
+
+function motorteoriCalcSpeedFromSlip(ns, slip) {
+  return ns * (1 - slip);
+}
+
+function motorteoriCalcTorque(P, n) {
+  if (n === 0) return 0;
+  return 9.55 * P / n;
+}
+
+function motorteoriCalcP1(U, I, cosPhi) {
+  return Math.sqrt(3) * U * I * cosPhi;
+}
+
+function motorteoriCalcEta(P2, P1) {
+  if (P1 === 0) return 0;
+  return P2 / P1;
+}
+
+function motorteoriCalcP2(P1, eta) {
+  return P1 * eta;
+}
+
+function motorteoriCalcP1FromP2(P2, eta) {
+  if (eta === 0) return 0;
+  return P2 / eta;
+}
+
+function motorteoriCalcRotorLoss(P2, slip) {
+  if (slip >= 1) return P2;
+  var Pag = P2 / (1 - slip);
+  return slip * Pag;
+}
+
+function motorteoriCalcAirGap(P2, slip) {
+  if (slip >= 1) return P2;
+  return P2 / (1 - slip);
+}
+
+function motorteoriCalcLosses(P1, P2) {
+  return P1 - P2;
+}
+
+function motorteoriCalcIstart(IN, ratio) {
+  return IN * ratio;
+}
+
+function motorteoriCalcIstartStarDelta(IN, ratio) {
+  return IN * ratio / 3;
+}
+
+function motorteoriCalcTstartStarDelta(Tdol) {
+  return Tdol / 3;
+}
+
+function motorteoriCalcRotorFreq(slip, f) {
+  return slip * f;
+}
+
+function motorteoriCalcAll(state) {
+  var ns = motorteoriCalcNs(state.f, state.poles);
+  var slip, n;
+
+  if (state.calcType === 'slip') {
+    n = state.n;
+    slip = motorteoriCalcSlip(ns, n);
+  } else {
+    slip = state.slip;
+    n = motorteoriCalcSpeedFromSlip(ns, slip);
+  }
+
+  var P1 = motorteoriCalcP1(state.U, state.I, state.cosPhi);
+  var P2 = state.Prated;
+  var eta = motorteoriCalcEta(P2, P1);
+
+  if (state.calcType === 'efficiency') {
+    eta = state.eta;
+    P1 = motorteoriCalcP1FromP2(P2, eta);
+  }
+
+  var torque = motorteoriCalcTorque(P2, n);
+  var Pag = motorteoriCalcAirGap(P2, slip);
+  var PcuRotor = motorteoriCalcRotorLoss(P2, slip);
+  var Ploss = motorteoriCalcLosses(P1, P2);
+  var f2 = motorteoriCalcRotorFreq(slip, state.f);
+
+  var IN = P2 / (Math.sqrt(3) * state.U * state.cosPhi * eta);
+  if (!isFinite(IN) || IN <= 0) IN = state.I;
+  var IstartDOL = motorteoriCalcIstart(IN, state.IstartRatio);
+  var IstartSD = motorteoriCalcIstartStarDelta(IN, state.IstartRatio);
+
+  return {
+    ns: ns, n: n, slip: slip, slipPct: slip * 100,
+    P1: P1, P2: P2, eta: eta, etaPct: eta * 100,
+    torque: torque, Pag: Pag, PcuRotor: PcuRotor, Ploss: Ploss,
+    f2: f2, IN: IN,
+    IstartDOL: IstartDOL, IstartSD: IstartSD,
+    cosPhi: state.cosPhi
+  };
+}
+
+function renderMotorteori() {
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Motorteori - Asynkronmotor', 'Motor Theory - Induction Motor') + '</div>';
+  html += '<div class="info-row">' + tx('Beregning iht. Elektroteknik Opgavesamling 4. udgave, Kap. 11', 'Calculation per Elektroteknik Opgavesamling 4th ed., Ch. 11') + '</div>';
+
+  html += '<div class="select-group"><div class="select-label">' + tx('Beregningstype','Calculation Type') + '</div><div class="select-grid">';
+  var calcTypes = [
+    { key: 'slip', da: 'Slip & omdrejningstal', en: 'Slip & speed' },
+    { key: 'torque', da: 'Moment & effekt', en: 'Torque & power' },
+    { key: 'efficiency', da: 'Virkningsgrad & tab', en: 'Efficiency & losses' },
+    { key: 'starting', da: 'Start & startstr\u00F8m', en: 'Starting & inrush' },
+    { key: 'power', da: 'Effektbalance', en: 'Power balance' }
+  ];
+  calcTypes.forEach(function(ct) {
+    html += '<button class="sel-btn' + (motorteoriState.calcType === ct.key ? ' selected' : '') + '" onclick="motorteoriState.calcType=\''+ct.key+'\';renderModule(\'motorteori\')">' + tx(ct.da, ct.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + tx('Poltal p','Number of poles p') + '</div><div class="select-grid">';
+  MOTORTEORI_POLES_PRESETS.forEach(function(p) {
+    var nsDisp = 120 * motorteoriState.f / p;
+    html += '<button class="sel-btn' + (motorteoriState.poles === p ? ' selected' : '') + '" onclick="motorteoriState.poles='+p+';renderModule(\'motorteori\')">' + p + 'P ('+nsDisp+' rpm)</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + tx('Frekvens f [Hz]','Frequency f [Hz]') + '</div><div class="select-grid">';
+  MOTORTEORI_F_PRESETS.forEach(function(f) {
+    html += '<button class="sel-btn' + (motorteoriState.f === f ? ' selected' : '') + '" onclick="motorteoriState.f='+f+';renderModule(\'motorteori\')">' + f + ' Hz</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + tx('Sp\u00E6nding U [V]','Voltage U [V]') + '</div><div class="select-grid">';
+  MOTORTEORI_U_PRESETS.forEach(function(u) {
+    html += '<button class="sel-btn' + (motorteoriState.U === u ? ' selected' : '') + '" onclick="motorteoriState.U='+u+';renderModule(\'motorteori\')">' + u + ' V</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + tx('M\u00E6rkeeffekt P\u2082 [W]','Rated Power P\u2082 [W]') + '</div><div class="select-grid">';
+  MOTORTEORI_P_PRESETS.forEach(function(p) {
+    var lbl = p >= 1000 ? (p/1000)+' kW' : p+' W';
+    html += '<button class="sel-btn' + (motorteoriState.Prated === p ? ' selected' : '') + '" onclick="motorteoriState.Prated='+p+';renderModule(\'motorteori\')">' + lbl + '</button>';
+  });
+  html += '</div></div>';
+
+  if (motorteoriState.calcType === 'slip') {
+    html += '<div class="select-group"><div class="select-label">' + tx('Omdrejningstal n [rpm]','Speed n [rpm]') + '</div><div class="select-grid">';
+    MOTORTEORI_N_PRESETS.forEach(function(n) {
+      html += '<button class="sel-btn' + (motorteoriState.n === n ? ' selected' : '') + '" onclick="motorteoriState.n='+n+';renderModule(\'motorteori\')">' + n + '</button>';
+    });
+    html += '</div></div>';
+  } else {
+    html += '<div class="select-group"><div class="select-label">' + tx('Slip s','Slip s') + '</div><div class="select-grid">';
+    MOTORTEORI_SLIP_PRESETS.forEach(function(s) {
+      html += '<button class="sel-btn' + (Math.abs(motorteoriState.slip-s)<0.001 ? ' selected' : '') + '" onclick="motorteoriState.slip='+s+';renderModule(\'motorteori\')">' + (s*100).toFixed(0) + '%</button>';
+    });
+    html += '</div></div>';
+  }
+
+  html += '<div class="select-group"><div class="select-label">' + tx('Str\u00F8m I [A]','Current I [A]') + '</div><div class="select-grid">';
+  MOTORTEORI_I_PRESETS.forEach(function(i) {
+    html += '<button class="sel-btn' + (motorteoriState.I === i ? ' selected' : '') + '" onclick="motorteoriState.I='+i+';renderModule(\'motorteori\')">' + i + ' A</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + tx('Effektfaktor cos\u03C6','Power factor cos\u03C6') + '</div><div class="select-grid">';
+  MOTORTEORI_COSPHI_PRESETS.forEach(function(c) {
+    html += '<button class="sel-btn' + (Math.abs(motorteoriState.cosPhi-c)<0.001 ? ' selected' : '') + '" onclick="motorteoriState.cosPhi='+c+';renderModule(\'motorteori\')">' + c + '</button>';
+  });
+  html += '</div></div>';
+
+  if (motorteoriState.calcType === 'efficiency') {
+    html += '<div class="select-group"><div class="select-label">' + tx('Virkningsgrad \u03B7','Efficiency \u03B7') + '</div><div class="select-grid">';
+    MOTORTEORI_ETA_PRESETS.forEach(function(e) {
+      html += '<button class="sel-btn' + (Math.abs(motorteoriState.eta-e)<0.001 ? ' selected' : '') + '" onclick="motorteoriState.eta='+e+';renderModule(\'motorteori\')">' + (e*100).toFixed(0) + '%</button>';
+    });
+    html += '</div></div>';
+  }
+
+  if (motorteoriState.calcType === 'starting') {
+    html += '<div class="select-group"><div class="select-label">' + tx('Startstr\u00F8msforhold I_s/I_n','Starting current ratio I_s/I_n') + '</div><div class="select-grid">';
+    MOTORTEORI_ISTART_PRESETS.forEach(function(r) {
+      html += '<button class="sel-btn' + (motorteoriState.IstartRatio === r ? ' selected' : '') + '" onclick="motorteoriState.IstartRatio='+r+';renderModule(\'motorteori\')">' + r + 'x</button>';
+    });
+    html += '</div></div>';
+  }
+
+  html += '</div>';
+
+  // Results
+  var res = motorteoriCalcAll(motorteoriState);
+  html += '<div class="card fade-in"><div class="card-title">' + tx('Resultat','Results') + '</div>';
+
+  html += '<div class="result-box"><div class="result-title">' + tx('Grunddata','Basic Data') + '</div>';
+  html += '<div class="result-row"><span class="label">n<sub>s</sub></span><span class="value">' + res.ns.toFixed(0) + ' rpm</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">n<sub>s</sub> = 120\u00B7f/p = 120\u00D7'+motorteoriState.f+'/'+motorteoriState.poles+' = '+res.ns.toFixed(0)+' rpm</span></div>';
+  html += '<div class="result-row"><span class="label">n</span><span class="value">' + res.n.toFixed(0) + ' rpm</span></div>';
+  html += '<div class="result-row"><span class="label">s</span><span class="value">' + res.slipPct.toFixed(2) + ' %</span></div>';
+  if (motorteoriState.calcType === 'slip') {
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">s = (n<sub>s</sub>-n)/n<sub>s</sub> = ('+res.ns.toFixed(0)+'-'+motorteoriState.n+')/'+res.ns.toFixed(0)+' = '+res.slipPct.toFixed(2)+'%</span></div>';
+  }
+  html += '<div class="result-row"><span class="label">f<sub>2</sub></span><span class="value">' + res.f2.toFixed(2) + ' Hz</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">f<sub>2</sub> = s\u00B7f\u2081 = '+res.slip.toFixed(4)+'\u00D7'+motorteoriState.f+' = '+res.f2.toFixed(2)+' Hz</span></div>';
+  html += '</div>';
+
+  html += '<div class="result-box"><div class="result-title">' + tx('Effekt & virkningsgrad','Power & Efficiency') + '</div>';
+  html += '<div class="result-row"><span class="label">P\u2081</span><span class="value">' + (res.P1/1000).toFixed(2) + ' kW</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">P\u2081 = \u221A3\u00B7U\u00B7I\u00B7cos\u03C6 = \u221A3\u00D7'+motorteoriState.U+'\u00D7'+motorteoriState.I+'\u00D7'+motorteoriState.cosPhi+' = '+(res.P1/1000).toFixed(2)+' kW</span></div>';
+  html += '<div class="result-row"><span class="label">P\u2082</span><span class="value">' + (res.P2/1000).toFixed(2) + ' kW</span></div>';
+  html += '<div class="result-row"><span class="label">\u03B7</span><span class="value">' + res.etaPct.toFixed(1) + ' %</span></div>';
+  html += '<div class="result-row"><span class="label">P<sub>tab</sub></span><span class="value">' + (res.Ploss/1000).toFixed(2) + ' kW</span></div>';
+  html += '</div>';
+
+  html += '<div class="result-box"><div class="result-title">' + tx('Moment','Torque') + '</div>';
+  html += '<div class="result-row"><span class="label">M</span><span class="value">' + res.torque.toFixed(1) + ' Nm</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">M = 9.55\u00B7P\u2082/n = 9.55\u00D7'+res.P2+'/'+res.n.toFixed(0)+' = '+res.torque.toFixed(1)+' Nm</span></div>';
+  html += '</div>';
+
+  html += '<div class="result-box"><div class="result-title">' + tx('Luftspalte & rotortab','Air Gap & Rotor Losses') + '</div>';
+  html += '<div class="result-row"><span class="label">P<sub>ag</sub></span><span class="value">' + (res.Pag/1000).toFixed(2) + ' kW</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">P<sub>ag</sub> = P\u2082/(1-s) = '+(res.P2/1000).toFixed(2)+'/(1-'+res.slip.toFixed(4)+') = '+(res.Pag/1000).toFixed(2)+' kW</span></div>';
+  html += '<div class="result-row"><span class="label">P<sub>Cu,rotor</sub></span><span class="value">' + (res.PcuRotor/1000).toFixed(3) + ' kW</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">P<sub>Cu,rotor</sub> = s\u00B7P<sub>ag</sub> = '+res.slip.toFixed(4)+'\u00D7'+(res.Pag/1000).toFixed(2)+' = '+(res.PcuRotor/1000).toFixed(3)+' kW</span></div>';
+  html += '</div>';
+
+  if (motorteoriState.calcType === 'starting') {
+    html += '<div class="result-box"><div class="result-title">' + tx('Startberegning','Starting Calculation') + '</div>';
+    html += '<div class="result-row"><span class="label">I<sub>N</sub></span><span class="value">' + res.IN.toFixed(1) + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">I<sub>start,DOL</sub></span><span class="value">' + res.IstartDOL.toFixed(1) + ' A ('+motorteoriState.IstartRatio+'\u00D7I<sub>N</sub>)</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">I<sub>start</sub> = '+motorteoriState.IstartRatio+'\u00D7'+res.IN.toFixed(1)+' = '+res.IstartDOL.toFixed(1)+' A</span></div>';
+    html += '<div class="result-row"><span class="label">I<sub>start,Y\u0394</sub></span><span class="value">' + res.IstartSD.toFixed(1) + ' A ('+motorteoriState.IstartRatio+'/3\u00D7I<sub>N</sub>)</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel','Formula') + '</span><span class="value">I<sub>Y\u0394</sub> = I<sub>DOL</sub>/3 = '+res.IstartDOL.toFixed(1)+'/3 = '+res.IstartSD.toFixed(1)+' A</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Reduktion','Reduction') + '</span><span class="value">' + tx('Str\u00F8m: 1/3, Moment: 1/3 af DOL','Current: 1/3, Torque: 1/3 of DOL') + '</span></div>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
 }
 // ===== INIT =====
 guideLoadProgress();

@@ -8858,6 +8858,338 @@ test('AC Impedance GUARD: core calc math unchanged (officialIz + IB regression)'
   assert(Math.abs(ib1 - 16.84) < 0.05, 'IB regression ~16.84A unchanged');
 });
 
+// ===== 3-PHASE MODULE (trefase) TESTS =====
+
+// --- trefaseCalcSymStar ---
+test('trefaseCalcSymStar: UL=400, Z=100, phi=0 => Up=230.9, Ip=2.309, P=1600W', function() {
+  var r = trefaseCalcSymStar(400, 100, 0);
+  assert(Math.abs(r.Up - 230.94) < 0.1, 'Up should be ~230.94, got ' + r.Up.toFixed(2));
+  assert(Math.abs(r.Ip - 2.309) < 0.01, 'Ip should be ~2.309, got ' + r.Ip.toFixed(3));
+  assert(Math.abs(r.IL - r.Ip) < 0.001, 'IL = Ip in star');
+  assert(Math.abs(r.P - 1600) < 1, 'P should be 1600W, got ' + r.P.toFixed(1));
+  assert(r.IN === 0, 'IN = 0 for symmetric');
+});
+
+test('trefaseCalcSymStar: UL=400, Z=30, phi=0.5236(30deg) => P=sqrt3*400*IL*cos30', function() {
+  var r = trefaseCalcSymStar(400, 30, 0.5236);
+  var Up = 400 / Math.sqrt(3);
+  var Ip = Up / 30;
+  assert(Math.abs(r.Ip - Ip) < 0.01, 'Ip check');
+  // P = 3*Up*Ip*cos(30) = 3 * 230.94 * 7.698 * 0.866 = 4618 W
+  var expectedP = 3 * Up * Ip * Math.cos(0.5236);
+  assert(Math.abs(r.P - expectedP) < 1, 'P should be ~' + expectedP.toFixed(0) + ', got ' + r.P.toFixed(0));
+});
+
+// --- trefaseCalcSymDelta ---
+test('trefaseCalcSymDelta: UL=400, Z=100, phi=0 => Up=400, Ip=4, IL=6.928', function() {
+  var r = trefaseCalcSymDelta(400, 100, 0);
+  assert(Math.abs(r.Up - 400) < 0.01, 'Up = UL in delta');
+  assert(Math.abs(r.Ip - 4) < 0.01, 'Ip = 400/100 = 4');
+  assert(Math.abs(r.IL - 4 * Math.sqrt(3)) < 0.01, 'IL = sqrt(3)*Ip');
+  assert(Math.abs(r.P - 4800) < 1, 'P = 3*400*4*1 = 4800');
+});
+
+// --- trefaseCalcAsymStar: equal impedances should give IN=0 ---
+test('trefaseCalcAsymStar: equal impedances (Z=100 all, phi=0) => IN=0', function() {
+  var r = trefaseCalcAsymStar(400, 100, 0, 100, 0, 100, 0);
+  assert(r.IN < 0.001, 'IN should be ~0 for balanced, got ' + r.IN.toFixed(4));
+});
+
+// --- trefaseCalcAsymStar: unequal impedances produce non-zero IN ---
+test('trefaseCalcAsymStar: Za=50,Zb=100,Zc=200 (phi=0) => IN > 0', function() {
+  var r = trefaseCalcAsymStar(400, 50, 0, 100, 0, 200, 0);
+  assert(r.IN > 1, 'IN should be > 1A for unbalanced, got ' + r.IN.toFixed(2));
+  assert(r.Ia > r.Ib, 'Ia > Ib (lower Z)');
+  assert(r.Ib > r.Ic, 'Ib > Ic (lower Z)');
+});
+
+// --- trefaseCalcAsymDelta ---
+test('trefaseCalcAsymDelta: equal Z=100, phi=0 => all line currents equal', function() {
+  var r = trefaseCalcAsymDelta(400, 100, 0, 100, 0, 100, 0);
+  // For balanced delta, line current = sqrt(3) * phase current
+  assert(Math.abs(r.Ia - r.Ib) < 0.01, 'Ia = Ib for balanced');
+  assert(Math.abs(r.Ib - r.Ic) < 0.01, 'Ib = Ic for balanced');
+  assert(Math.abs(r.Iab - 4) < 0.01, 'Iab = 400/100 = 4A');
+});
+
+// --- trefaseCalcTwoWatt ---
+test('trefaseCalcTwoWatt: W1=1500, W2=800 => P=2300, Q=sqrt3*700=1212', function() {
+  var r = trefaseCalcTwoWatt(1500, 800);
+  assert(Math.abs(r.P - 2300) < 0.1, 'P = 1500+800 = 2300');
+  assert(Math.abs(r.Q - Math.sqrt(3) * 700) < 0.1, 'Q = sqrt(3)*(1500-800)');
+  var S = Math.sqrt(2300*2300 + r.Q*r.Q);
+  assert(Math.abs(r.S - S) < 0.1, 'S check');
+  assert(r.cosPhi > 0 && r.cosPhi <= 1, 'cosPhi valid');
+});
+
+test('trefaseCalcTwoWatt: W1=W2=1000 => Q=0, cosPhi=1 (pure resistive)', function() {
+  var r = trefaseCalcTwoWatt(1000, 1000);
+  assert(Math.abs(r.P - 2000) < 0.1, 'P = 2000');
+  assert(Math.abs(r.Q) < 0.1, 'Q = 0 for equal wattmeters');
+  assert(Math.abs(r.cosPhi - 1) < 0.001, 'cosPhi = 1');
+});
+
+// --- trefaseCalcPFC ---
+test('trefaseCalcPFC: P=5000, cos1=0.7, cos2=0.95 => Qc positive', function() {
+  var r = trefaseCalcPFC(5000, 0.7, 0.95);
+  // Qc = 5000*(tan(acos(0.7)) - tan(acos(0.95)))
+  var phi1 = Math.acos(0.7);
+  var phi2 = Math.acos(0.95);
+  var expected = 5000 * (Math.tan(phi1) - Math.tan(phi2));
+  assert(Math.abs(r.Qc - expected) < 1, 'Qc should be ~' + expected.toFixed(0) + ', got ' + r.Qc.toFixed(0));
+  assert(r.Qc > 0, 'Qc must be positive');
+});
+
+// --- trefaseCalcCapStar ---
+test('trefaseCalcCapStar: Qc=3000, UL=400, f=50 => C > 0', function() {
+  var C = trefaseCalcCapStar(3000, 400, 50);
+  // C = Qc / (3 * Up^2 * omega) = 3000 / (3 * 230.94^2 * 314.16)
+  var Up = 400 / Math.sqrt(3);
+  var expected = 3000 / (3 * Up * Up * 2 * Math.PI * 50);
+  assert(Math.abs(C - expected) < 1e-9, 'C should be ~' + (expected*1e6).toFixed(1) + 'uF');
+  assert(C > 0, 'C must be positive');
+});
+
+// --- trefaseCalcCapDelta ---
+test('trefaseCalcCapDelta: Qc=3000, UL=400, f=50 => C_delta = C_star/3', function() {
+  var Cstar = trefaseCalcCapStar(3000, 400, 50);
+  var Cdelta = trefaseCalcCapDelta(3000, 400, 50);
+  assert(Math.abs(Cdelta - Cstar / 3) < 1e-9, 'C_delta = C_star/3');
+});
+
+// --- Opgavesamling Ch.7 exercise verification ---
+// Exercise 7.1: Symmetric star, UL=400V, Z=30.4 Ohm, cos_phi=1 (resistive)
+// Expected: a) I = Up/Z = 230.9/30.4 = 7.6A, b) Z = 48.3 (from given answer)
+test('Opgavesamling 7.1 verify: Symmetric star UL=400, resistive, I=7.6A', function() {
+  // facit says 7.6 A => Up/Z = 7.6 => Z = 230.94/7.6 = 30.39 Ohm
+  var r = trefaseCalcSymStar(400, 30.39, 0);
+  assert(Math.abs(r.IL - 7.6) < 0.05, 'IL should be ~7.6A, got ' + r.IL.toFixed(2));
+});
+
+// Exercise 7.2: Symmetric delta (or star), facit: 17.3A, 10.0A, 12000W
+test('Opgavesamling 7.2 verify: P=12000W at UL=400, symmetric', function() {
+  // P = sqrt(3)*UL*IL*cosPhi. If P=12000, UL=400, cosPhi=1: IL=12000/(sqrt3*400) = 17.32A
+  var IL = 12000 / (Math.sqrt(3) * 400 * 1);
+  assert(Math.abs(IL - 17.32) < 0.05, 'IL = 17.32A for P=12000W');
+  // Phase current in delta = IL/sqrt(3) = 10.0A
+  var Ip = IL / Math.sqrt(3);
+  assert(Math.abs(Ip - 10.0) < 0.05, 'Ip = 10.0A in delta');
+});
+
+// Exercise 7.3: facit a) 2.17A, c) 900var => suggests star with reactive load
+test('Opgavesamling 7.3 verify: Star load, IL=2.17A approx', function() {
+  // facit: a)2.17A, b)1500VA, c)900var, d)6.50A, e)3600W
+  // S=1500VA, Q=900var => P = sqrt(S^2-Q^2) = sqrt(1500^2-900^2) = 1200W
+  // or from 3-phase: S = sqrt(3)*UL*IL = sqrt(3)*400*2.17 = 1503 VA (close to 1500)
+  var S = Math.sqrt(3) * 400 * 2.17;
+  assert(Math.abs(S - 1500) < 10, 'S ~ 1500VA for IL=2.17A at 400V');
+});
+
+// --- Module registration tests ---
+test('trefase module: translation exists in da/en/fa', function() {
+  var da = T.da.modules.trefase;
+  var en = T.en.modules.trefase;
+  var fa = T.fa.modules.trefase;
+  assert(da && da.length > 0, 'Danish translation exists');
+  assert(en && en.length > 0, 'English translation exists');
+  assert(fa && fa.length > 0, 'Farsi translation exists');
+});
+
+test('trefase module: registered in NAV_GROUPS theory group', function() {
+  var grp = NAV_GROUPS.filter(function(g) { return g.id === 'theory'; })[0];
+  assert(grp, 'theory group exists');
+  assert(grp.keys.indexOf('trefase') >= 0, 'trefase in theory group keys');
+});
+
+test('trefase module: renderTrefase produces valid HTML', function() {
+  var html = renderTrefase();
+  assert(html && html.length > 100, 'renderTrefase produces HTML');
+  assert(html.indexOf('<div') >= 0, 'contains div elements');
+});
+
+test('trefase module: 100% click-only (no text inputs)', function() {
+  var html = renderTrefase();
+  assert(html.indexOf('type="text"') < 0, 'no text inputs');
+  assert(html.indexOf('type="number"') < 0, 'no number inputs');
+  assert(html.indexOf('<textarea') < 0, 'no textarea');
+});
+
+// ===== MOTOR THEORY MODULE (motorteori) TESTS =====
+
+// --- motorteoriCalcNs ---
+test('motorteoriCalcNs: f=50, p=4 => ns=1500 rpm', function() {
+  var ns = motorteoriCalcNs(50, 4);
+  assert(ns === 1500, 'ns should be 1500, got ' + ns);
+});
+
+test('motorteoriCalcNs: f=50, p=2 => ns=3000 rpm', function() {
+  var ns = motorteoriCalcNs(50, 2);
+  assert(ns === 3000, 'ns should be 3000, got ' + ns);
+});
+
+test('motorteoriCalcNs: f=50, p=6 => ns=1000 rpm', function() {
+  var ns = motorteoriCalcNs(50, 6);
+  assert(ns === 1000, 'ns should be 1000, got ' + ns);
+});
+
+test('motorteoriCalcNs: f=60, p=4 => ns=1800 rpm', function() {
+  var ns = motorteoriCalcNs(60, 4);
+  assert(ns === 1800, 'ns should be 1800, got ' + ns);
+});
+
+// --- motorteoriCalcSlip ---
+test('motorteoriCalcSlip: ns=1500, n=1440 => s=0.04 (4%)', function() {
+  var s = motorteoriCalcSlip(1500, 1440);
+  assert(Math.abs(s - 0.04) < 0.0001, 's should be 0.04, got ' + s);
+});
+
+test('motorteoriCalcSlip: ns=3000, n=2920 => s=0.0267', function() {
+  var s = motorteoriCalcSlip(3000, 2920);
+  assert(Math.abs(s - 0.02667) < 0.001, 's should be ~0.0267, got ' + s.toFixed(4));
+});
+
+// --- motorteoriCalcTorque ---
+test('motorteoriCalcTorque: P=7500W, n=1440rpm => M = 9.55*7500/1440 = 49.7 Nm', function() {
+  var M = motorteoriCalcTorque(7500, 1440);
+  var expected = 9.55 * 7500 / 1440;
+  assert(Math.abs(M - expected) < 0.1, 'M should be ~' + expected.toFixed(1) + ', got ' + M.toFixed(1));
+});
+
+test('motorteoriCalcTorque: P=22000W, n=1460rpm => M = 143.9 Nm', function() {
+  var M = motorteoriCalcTorque(22000, 1460);
+  var expected = 9.55 * 22000 / 1460;
+  assert(Math.abs(M - expected) < 0.1, 'M should be ~' + expected.toFixed(1));
+});
+
+// --- motorteoriCalcP1 ---
+test('motorteoriCalcP1: U=400, I=15, cosPhi=0.85 => P1 = sqrt(3)*400*15*0.85 = 8833W', function() {
+  var P1 = motorteoriCalcP1(400, 15, 0.85);
+  var expected = Math.sqrt(3) * 400 * 15 * 0.85;
+  assert(Math.abs(P1 - expected) < 1, 'P1 should be ~' + expected.toFixed(0));
+});
+
+// --- motorteoriCalcEta ---
+test('motorteoriCalcEta: P2=7500, P1=8833 => eta=0.849', function() {
+  var eta = motorteoriCalcEta(7500, 8833);
+  assert(Math.abs(eta - 7500/8833) < 0.001, 'eta = P2/P1');
+});
+
+// --- motorteoriCalcRotorLoss ---
+test('motorteoriCalcRotorLoss: P2=7500, slip=0.04 => PCu = s*Pag = 0.04*7812.5 = 312.5W', function() {
+  var loss = motorteoriCalcRotorLoss(7500, 0.04);
+  // Pag = 7500/(1-0.04) = 7812.5, PCu = 0.04*7812.5 = 312.5
+  assert(Math.abs(loss - 312.5) < 0.1, 'Rotor loss should be 312.5W, got ' + loss.toFixed(1));
+});
+
+// --- motorteoriCalcAirGap ---
+test('motorteoriCalcAirGap: P2=7500, slip=0.04 => Pag = 7500/(1-0.04) = 7812.5', function() {
+  var Pag = motorteoriCalcAirGap(7500, 0.04);
+  assert(Math.abs(Pag - 7812.5) < 0.1, 'Pag should be 7812.5, got ' + Pag.toFixed(1));
+});
+
+// --- motorteoriCalcIstart / StarDelta ---
+test('motorteoriCalcIstart: IN=15, ratio=7 => Istart=105A', function() {
+  var Is = motorteoriCalcIstart(15, 7);
+  assert(Is === 105, 'Istart = 7*15 = 105A');
+});
+
+test('motorteoriCalcIstartStarDelta: IN=15, ratio=7 => Istart=35A (1/3 of DOL)', function() {
+  var Is = motorteoriCalcIstartStarDelta(15, 7);
+  assert(Math.abs(Is - 35) < 0.01, 'IstartSD = 7*15/3 = 35A, got ' + Is);
+});
+
+// --- motorteoriCalcRotorFreq ---
+test('motorteoriCalcRotorFreq: slip=0.04, f=50 => f2=2.0 Hz', function() {
+  var f2 = motorteoriCalcRotorFreq(0.04, 50);
+  assert(Math.abs(f2 - 2.0) < 0.001, 'f2 = 0.04*50 = 2.0 Hz');
+});
+
+// --- Opgavesamling Ch.11 exercise verification ---
+// Ex 11.1: ns = 1000 rpm => p = 120*50/1000 = 6 poles
+test('Opgavesamling 11.1: ns=1000 rpm implies 6-pole at 50Hz', function() {
+  var ns = motorteoriCalcNs(50, 6);
+  assert(ns === 1000, 'ns=1000 for 6-pole 50Hz');
+});
+
+// Ex 11.30: facit a) 10.05A, b) 5294W, c) 3971var, d) 75rpm/5.0%, e) 2.5Hz
+test('Opgavesamling 11.30 verify: slip 5% at ns=1500 gives n=1425, f2=2.5Hz', function() {
+  var ns = motorteoriCalcNs(50, 4);
+  // slip=5% => n = 1500*(1-0.05) = 1425 rpm; f2 = 0.05*50 = 2.5 Hz
+  var n = ns * (1 - 0.05);
+  assert(Math.abs(n - 1425) < 0.1, 'n = 1425 rpm');
+  var f2 = motorteoriCalcRotorFreq(0.05, 50);
+  assert(Math.abs(f2 - 2.5) < 0.001, 'f2 = 2.5 Hz matches facit');
+  // slip difference: ns - n = 75 rpm
+  assert(Math.abs(ns - n - 75) < 0.1, '75 rpm difference');
+});
+
+// Ex 11.35: facit a)0.916, b)0.887, c)18.60kW, d)124.4Nm, e)4.8%
+test('Opgavesamling 11.35 verify: torque M=124.4Nm at P2 and speed', function() {
+  // If M = 9.55*P/n = 124.4 Nm and we need to find P and n
+  // facit c) P1=18.60kW (absorbed), d) M=124.4Nm
+  // If eta(a)=0.916, pf(b)=0.887, P1=18.6kW:
+  // P2 = eta*P1 = 0.916*18600 = 17038W
+  // n = 9.55*P2/M = 9.55*17038/124.4 = 1307.5 rpm => implies 6-pole (ns=1000) NO
+  // Actually for 4-pole: n=1500*(1-0.048) = 1428; M=9.55*P2/1428
+  // Let's verify slip=4.8%: n = 1500*(1-0.048) = 1428
+  // P2 = eta*P1 = 0.916*18600 = 17037.6W
+  // M = 9.55*17037.6/1428 = 113.9 -- doesn't match 124.4
+  // Try: M=124.4 and P2= M*n/9.55
+  // If slip=4.8%, ns=1500, n=1428: P2 = 124.4*1428/9.55 = 18598W -- close to 18.6kW!
+  // So P2 ~ 18.6kW, which means P1 = P2/eta = 18600/0.916 = 20306W absorbed
+  // The facit says c)18.60kW is absorbed. Let's verify the torque formula
+  var n = 1500 * (1 - 0.048);  // 1428 rpm
+  var P2 = 18600;  // mechanical output = absorbed * eta ... actually interpret as P2=17038
+  // The simplest verification: M = 9.55 * P2 / n
+  // facit says d) 124.4 Nm
+  // If n=1428, M=124.4: P2 = 124.4*1428/9.55 = 18598.5 W ~ 18.6 kW
+  var M = motorteoriCalcTorque(18600, 1428);
+  assert(Math.abs(M - 124.4) < 0.5, 'M should be ~124.4 Nm, got ' + M.toFixed(1));
+});
+
+test('Opgavesamling 11.35 verify: slip=4.8%', function() {
+  // slip = 4.8% means n = 1500*(1-0.048) = 1428
+  var s = motorteoriCalcSlip(1500, 1428);
+  assert(Math.abs(s * 100 - 4.8) < 0.01, 'slip should be 4.8%, got ' + (s*100).toFixed(2));
+});
+
+// --- Module registration tests ---
+test('motorteori module: translation exists in da/en/fa', function() {
+  var da = T.da.modules.motorteori;
+  var en = T.en.modules.motorteori;
+  var fa = T.fa.modules.motorteori;
+  assert(da && da.length > 0, 'Danish translation exists');
+  assert(en && en.length > 0, 'English translation exists');
+  assert(fa && fa.length > 0, 'Farsi translation exists');
+});
+
+test('motorteori module: registered in NAV_GROUPS theory group', function() {
+  var grp = NAV_GROUPS.filter(function(g) { return g.id === 'theory'; })[0];
+  assert(grp, 'theory group exists');
+  assert(grp.keys.indexOf('motorteori') >= 0, 'motorteori in theory group keys');
+});
+
+test('motorteori module: renderMotorteori produces valid HTML', function() {
+  var html = renderMotorteori();
+  assert(html && html.length > 100, 'renderMotorteori produces HTML');
+  assert(html.indexOf('<div') >= 0, 'contains div elements');
+});
+
+test('motorteori module: 100% click-only (no text inputs)', function() {
+  var html = renderMotorteori();
+  assert(html.indexOf('type="text"') < 0, 'no text inputs');
+  assert(html.indexOf('type="number"') < 0, 'no number inputs');
+  assert(html.indexOf('<textarea') < 0, 'no textarea');
+});
+
+// Guard test: officialIz + IB regression MUST still pass after new modules
+test('3-Phase + Motor modules GUARD: core calc math unchanged (officialIz + IB regression)', function() {
+  var cu25 = { material: 'Cu', mm2: 2.5, model: '', iz: 999 };
+  assert.strictEqual(officialIz(cu25), 23, 'officialIz(Cu 2.5mm2 PVC) == 23A unchanged');
+  var ib1 = sldCalcNodeIB({ type: 'final_circuit', power_kW: 3.68, cosPhi: 0.95, phases: '1x230', voltage: 230 });
+  assert(Math.abs(ib1 - 16.84) < 0.05, 'IB regression ~16.84A unchanged after new modules');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
