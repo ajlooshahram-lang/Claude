@@ -12365,6 +12365,146 @@ test('mathml: non-invasive — pure presentation, no <math> when no formula', fu
   assert(fa.indexOf('<mi>IB</mi>') >= 0, 'math identifiers are language-neutral');
 });
 
+// ============================================================================
+// ===== Phase 1: solver-formulas (PHYS_CONST, helpers, cards, legends) ========
+// ============================================================================
+
+// Test P1-1: PHYS_CONST values and non-empty sources
+test('PHYS_CONST: exact values per spec + every entry has a non-empty source', function() {
+  assert.strictEqual(PHYS_CONST.MU0.value, 4 * Math.PI * 1e-7, 'MU0');
+  assert.strictEqual(PHYS_CONST.EPS0.value, 8.854e-12, 'EPS0');
+  assert.strictEqual(PHYS_CONST.SQRT3.value, Math.sqrt(3), 'SQRT3');
+  assert.strictEqual(PHYS_CONST.C_WATER.value, 4186, 'C_WATER');
+  assert.strictEqual(PHYS_CONST.RHO_CU.value, 0.0175, 'RHO_CU');
+  assert.strictEqual(PHYS_CONST.RHO_AL.value, 0.029, 'RHO_AL');
+  assert.strictEqual(PHYS_CONST.TORQUE_K.value, 9.55, 'TORQUE_K');
+  assert.strictEqual(PHYS_CONST.EMF_K.value, 4.44, 'EMF_K');
+  assert.strictEqual(PHYS_CONST.ALPHA_CU.value, 0.004, 'ALPHA_CU');
+  assert.strictEqual(PHYS_CONST.ALPHA_AL.value, 0.0037, 'ALPHA_AL');
+  assert.strictEqual(PHYS_CONST.U_PHASE.value, 230, 'U_PHASE');
+  assert.strictEqual(PHYS_CONST.U_LINE.value, 400, 'U_LINE');
+  Object.keys(PHYS_CONST).forEach(function(k) {
+    assert(typeof PHYS_CONST[k].source === 'string' && PHYS_CONST[k].source.length > 0, k + ' must have a non-empty source');
+    assert(typeof PHYS_CONST[k].symbol === 'string' && PHYS_CONST[k].symbol.length > 0, k + ' must have a symbol');
+  });
+});
+
+// Test P1-2: numeric correctness of the new pure helpers
+test('Phase1 helpers: heating-energy and AC power numeric correctness', function() {
+  assert.strictEqual(varmeHeatEnergy(10, 4186, 50), 2093000, 'Q = m·c·ΔT (J)');
+  assert(Math.abs(varmeHeatTime(10, 4186, 50, 1000) - 2093) < 1e-9, 't = Q/P ≈ 2093 s');
+  assert.strictEqual(varmeEnergyKWh(1000, 1), 1, 'W[kWh] = P[W]·t[h]/1000');
+  var P = 1200, Q = 500;
+  var S = acApparentFromPQ(P, Q);
+  assert(Math.abs(S * S - (P * P + Q * Q)) < 1e-6, 'S² == P² + Q²');
+  assert.strictEqual(acApparentPower(230, 5), 1150, 'S = U·I');
+  assert.strictEqual(acActivePower(230, 5, 0.9), 1035, 'P = U·I·cosφ');
+  assert(Math.abs(acRmsFromPeak(325) - 229.8) < 0.05, 'U_rms = U_max/√2 ≈ 229.8 V');
+  assert(Math.abs(acAvgFromPeak(325) - (2 * 325 / Math.PI)) < 1e-9, 'U_avg = 2·U_max/π');
+  assert(Math.abs(acOmega(50) - 2 * Math.PI * 50) < 1e-9, 'ω = 2·π·f');
+});
+
+// Test P1-3: every NEW formula string typesets via mathml() (no fallback)
+test('Phase1 formulas typeset via mathml() with no fallback', function() {
+  // NOTE: subtraction uses ASCII '-' (the app's ASCII-math parser does not
+  // accept unicode minus U+2212), consistent with the strings actually rendered.
+  var formulas = [
+    'Q = m\u00B7c\u00B7\u0394T',
+    't = Q / P',
+    't = (m\u00B7c\u00B7\u0394T)/P',
+    'W = P\u00B7t',
+    'W_kWh = P\u00B7t/1000',
+    '\u03C9 = 2\u00B7\u03C0\u00B7f',
+    'U_rms = U_max/\u221A2',
+    'U_avg = 2\u00B7U_max/\u03C0',
+    'P = U\u00B7I\u00B7cos\u03C6',
+    'Q = U\u00B7I\u00B7sin\u03C6',
+    'S = U\u00B7I',
+    'S\u00B2 = P\u00B2 + Q\u00B2',
+    'E = c\u00B7\u03A6\u00B7n',
+    'M = k\u00B7\u03A6\u00B7I_a',
+    'n = (U - I_a\u00B7R_a)/(c\u00B7\u03A6)'
+  ];
+  formulas.forEach(function(f) {
+    var out = mathml(f);
+    assert(out.indexOf('<math') >= 0, 'typesets (has <math): ' + f);
+    assert(out.indexOf('mathml-fallback') < 0, 'no fallback: ' + f);
+    assert(out.indexOf(f) >= 0, 'original ASCII preserved: ' + f);
+  });
+});
+
+// Test P1-4: symbolLegend returns a collapsed <details> table; renders in da/en/fa
+test('symbolLegend: returns <details> table and renders for da/en/fa', function() {
+  var rows = [
+    { name: 'Spaending', symbol: 'U', unit: 'V' },
+    { name: 'Stroem', symbol: 'I', unit: 'A' }
+  ];
+  var prev = lang;
+  ['da', 'en', 'fa'].forEach(function(L) {
+    lang = L;
+    var out = symbolLegend(rows);
+    assert(out.indexOf('<details') >= 0, 'has <details> (' + L + ')');
+    assert(out.indexOf('<table') >= 0, 'has table (' + L + ')');
+    assert(out.indexOf('<math') >= 0, 'symbol typeset via mathml (' + L + ')');
+    assert(out.indexOf('class="math-unit"') >= 0, 'unit uses shared math-unit styling (' + L + ')');
+  });
+  lang = prev;
+  assert.strictEqual(symbolLegend([]), '', 'empty rows -> empty string');
+  assert.strictEqual(symbolLegend(null), '', 'null rows -> empty string');
+});
+
+// Test P1-5: source-presence guard for cards carrying PHYS_CONST values
+test('Phase1 cards: PHYS_CONST-backed variables carry a non-empty source', function() {
+  var prev = lang; lang = 'en';
+  var prevMode = dcmaskineState.mode;
+  dcmaskineState.mode = 'torque';
+  var torque = renderDcmaskine();
+  dcmaskineState.mode = prevMode;
+  assert(torque.indexOf(PHYS_CONST.TORQUE_K.source) >= 0, 'torque card cites PHYS_CONST.TORQUE_K.source');
+
+  var prevType = varmeState.calcType, prevSub = varmeState.substance;
+  varmeState.calcType = 'energy'; varmeState.substance = 'water';
+  var varme = renderVarme();
+  varmeState.calcType = prevType; varmeState.substance = prevSub;
+  assert(varme.indexOf(PHYS_CONST.C_WATER.source) >= 0, 'heating-energy water card cites PHYS_CONST.C_WATER.source');
+  lang = prev;
+});
+
+// Test P1-6: de-duplication of 8.854e-12 + byte-identical re-pointed locals
+test('Phase1 de-dup: single 8.854e-12 literal; KAP/MAGNET locals unchanged', function() {
+  var cnt = (html.match(/8\.854e-12/g) || []).length;
+  assert.strictEqual(cnt, 1, 'exactly one literal 8.854e-12 remains (the PHYS_CONST.EPS0 definition)');
+  assert.strictEqual(KAP_EPS0, 8.854e-12, 'KAP_EPS0 unchanged numerically');
+  assert.strictEqual(KAP_EPS0, PHYS_CONST.EPS0.value, 'KAP_EPS0 now references PHYS_CONST.EPS0');
+  assert.strictEqual(MAGNET_MU0, 4 * Math.PI * 1e-7, 'MAGNET_MU0 unchanged numerically');
+  assert.strictEqual(MAGNET_MU0, PHYS_CONST.MU0.value, 'MAGNET_MU0 now references PHYS_CONST.MU0');
+  assert(Math.abs(kapacitorCalcC(1, 0.01, 0.001) - (8.854e-12 * 1 * 0.01 / 0.001)) < 1e-30, 'kapacitorCalcC unchanged');
+});
+
+// Test P1-7: trilingual — new labels resolve via _FA under lang='fa'
+test('Phase1 i18n: new English labels resolve via _FA under lang=fa', function() {
+  var newLabels = [
+    'Symbol legend', 'Quantity', 'Unit', 'Heating energy (Q, t, W)', 'Sensible heat',
+    'Heating time', 'Electrical energy', 'Angular frequency', 'RMS voltage', 'Average voltage',
+    'Active power', 'Reactive power', 'Apparent power', 'Power triangle', 'Induced EMF',
+    'Machine constant', 'Flux', 'Torque constant', 'from machine data', 'DC-machine fundamentals',
+    'Single-phase AC power & quantities (Ch. 6)', 'Specific heat capacity'
+  ];
+  var prev = lang; lang = 'fa';
+  newLabels.forEach(function(en) {
+    assert(typeof _FA[en] === 'string' && _FA[en].length > 0, 'has Farsi: ' + en);
+    assert.strictEqual(tx('xx', en), _FA[en], 'tx() resolves to Farsi: ' + en);
+    assert.notStrictEqual(_FA[en], en, 'Farsi differs from raw English: ' + en);
+  });
+  lang = prev;
+});
+
+// Test P1-8: non-invasive — life-safety calc unchanged after additive changes
+test('Phase1 non-invasive: life-safety cvZsCeiling spot-check unchanged', function() {
+  var zsMax = cvZsCeiling('TN', { In: 16, curve: 'B' }, {}, 0.95).zsMax;
+  assert.strictEqual(zsMax, 2.73125, 'cvZsCeiling TN B16 zsMax unchanged');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

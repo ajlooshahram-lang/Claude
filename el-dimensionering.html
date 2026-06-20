@@ -1400,6 +1400,82 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // ===== Phase-1 solver-formulas additions (symbols/cards/legends) =====
+  'Symbol legend': '\u0631\u0627\u0647\u0646\u0645\u0627\u06CC \u0646\u0645\u0627\u062F\u0647\u0627',
+  'show': '\u0646\u0645\u0627\u06CC\u0634',
+  'Quantity': '\u06A9\u0645\u06CC\u062A',
+  'Symbol': '\u0646\u0645\u0627\u062F',
+  'Unit': '\u0648\u0627\u062D\u062F',
+  'Heating energy (Q, t, W)': '\u0627\u0646\u0631\u0698\u06CC \u06AF\u0631\u0645\u0627\u06CC\u0634 (Q, t, W)',
+  'Heating energy: Q = m\u00B7c\u00B7\u0394T': '\u0627\u0646\u0631\u0698\u06CC \u06AF\u0631\u0645\u0627\u06CC\u0634: Q = m\u00B7c\u00B7\u0394T',
+  'Sensible heat, heating time and electrical energy (Opgavesamling Ch. 13).': '\u06AF\u0631\u0645\u0627\u06CC \u0645\u062D\u0633\u0648\u0633\u060C \u0632\u0645\u0627\u0646 \u06AF\u0631\u0645\u0627\u06CC\u0634 \u0648 \u0627\u0646\u0631\u0698\u06CC \u0627\u0644\u06A9\u062A\u0631\u06CC\u06A9\u06CC (Opgavesamling \u0641\u0635\u0644 13).',
+  'Substance (c)': '\u0645\u0627\u062F\u0647 (c)',
+  'Water': '\u0622\u0628',
+  'Air': '\u0647\u0648\u0627',
+  'Aluminium': '\u0622\u0644\u0648\u0645\u06CC\u0646\u06CC\u0648\u0645',
+  'Copper': '\u0645\u0633',
+  'Steel/iron': '\u0641\u0648\u0644\u0627\u062F/\u0622\u0647\u0646',
+  'Mass m [kg]': '\u062C\u0631\u0645 m [kg]',
+  'Temperature rise \u0394T [K]': '\u0627\u0641\u0632\u0627\u06CC\u0634 \u062F\u0645\u0627 \u0394T [K]',
+  'Power P [W]': '\u062A\u0648\u0627\u0646 P [W]',
+  'Sensible heat': '\u06AF\u0631\u0645\u0627\u06CC \u0645\u062D\u0633\u0648\u0633',
+  'Mass': '\u062C\u0631\u0645',
+  'Specific heat capacity': '\u0638\u0631\u0641\u06CC\u062A \u06AF\u0631\u0645\u0627\u06CC\u06CC \u0648\u06CC\u0698\u0647',
+  'Temperature rise': '\u0627\u0641\u0632\u0627\u06CC\u0634 \u062F\u0645\u0627',
+  'Heating time': '\u0632\u0645\u0627\u0646 \u06AF\u0631\u0645\u0627\u06CC\u0634',
+  'Heat quantity': '\u0645\u0642\u062F\u0627\u0631 \u06AF\u0631\u0645\u0627',
+  'Applied power': '\u062A\u0648\u0627\u0646 \u0627\u0639\u0645\u0627\u0644\u200C\u0634\u062F\u0647',
+  'Electrical energy': '\u0627\u0646\u0631\u0698\u06CC \u0627\u0644\u06A9\u062A\u0631\u06CC\u06A9\u06CC',
+  'Time': '\u0632\u0645\u0627\u0646',
+  'Energy in kWh': '\u0627\u0646\u0631\u0698\u06CC \u0628\u0631 \u062D\u0633\u0628 kWh',
+  'Energy': '\u0627\u0646\u0631\u0698\u06CC',
+  'Single-phase AC power & quantities (Ch. 6)': '\u062A\u0648\u0627\u0646 \u0648 \u06A9\u0645\u06CC\u062A\u200C\u0647\u0627\u06CC AC \u062A\u06A9\u200C\u0641\u0627\u0632 (\u0641\u0635\u0644 6)',
+  'Angular frequency': '\u0641\u0631\u06A9\u0627\u0646\u0633 \u0632\u0627\u0648\u06CC\u0647\u200C\u0627\u06CC',
+  'Frequency': '\u0641\u0631\u06A9\u0627\u0646\u0633',
+  'RMS voltage': '\u0648\u0644\u062A\u0627\u0698 \u0645\u0624\u062B\u0631 (RMS)',
+  'Peak voltage': '\u0648\u0644\u062A\u0627\u0698 \u067E\u06CC\u06A9',
+  'Average voltage': '\u0648\u0644\u062A\u0627\u0698 \u0645\u062A\u0648\u0633\u0637',
+  'Active power': '\u062A\u0648\u0627\u0646 \u0627\u06A9\u062A\u06CC\u0648',
+  'Voltage': '\u0648\u0644\u062A\u0627\u0698',
+  'Current': '\u062C\u0631\u06CC\u0627\u0646',
+  'Power factor': '\u0636\u0631\u06CC\u0628 \u062A\u0648\u0627\u0646',
+  'Reactive power': '\u062A\u0648\u0627\u0646 \u0631\u0627\u06A9\u062A\u06CC\u0648',
+  'Sine of phase angle': '\u0633\u06CC\u0646\u0648\u0633 \u0632\u0627\u0648\u06CC\u0647 \u0641\u0627\u0632',
+  'Apparent power': '\u062A\u0648\u0627\u0646 \u0638\u0627\u0647\u0631\u06CC',
+  'Power triangle': '\u0645\u062B\u0644\u062B \u062A\u0648\u0627\u0646',
+  'Impedance': '\u0627\u0645\u067E\u062F\u0627\u0646\u0633',
+  'Reactance': '\u0631\u0627\u06A9\u062A\u0627\u0646\u0633',
+  'Phase angle': '\u0632\u0627\u0648\u06CC\u0647 \u0641\u0627\u0632',
+  'Line voltage': '\u0648\u0644\u062A\u0627\u0698 \u062E\u0637',
+  'Phase voltage': '\u0648\u0644\u062A\u0627\u0698 \u0641\u0627\u0632',
+  'Line current': '\u062C\u0631\u06CC\u0627\u0646 \u062E\u0637',
+  'Phase current': '\u062C\u0631\u06CC\u0627\u0646 \u0641\u0627\u0632',
+  'Impedance per phase': '\u0627\u0645\u067E\u062F\u0627\u0646\u0633 \u0647\u0631 \u0641\u0627\u0632',
+  'Square root of 3': '\u062C\u0630\u0631 3',
+  'Synchronous speed': '\u0633\u0631\u0639\u062A \u0633\u0646\u06A9\u0631\u0648\u0646',
+  'Speed': '\u0633\u0631\u0639\u062A',
+  'Slip': '\u0644\u063A\u0632\u0634',
+  'Number of poles': '\u062A\u0639\u062F\u0627\u062F \u0642\u0637\u0628\u200C\u0647\u0627',
+  'Torque': '\u06AF\u0634\u062A\u0627\u0648\u0631',
+  'Shaft power': '\u062A\u0648\u0627\u0646 \u0645\u062D\u0648\u0631',
+  'Efficiency': '\u0628\u0627\u0632\u062F\u0647',
+  'Resistance': '\u0645\u0642\u0627\u0648\u0645\u062A',
+  'Resistivity': '\u0645\u0642\u0627\u0648\u0645\u062A \u0648\u06CC\u0698\u0647',
+  'Length': '\u0637\u0648\u0644',
+  'Cross-section': '\u0633\u0637\u062D \u0645\u0642\u0637\u0639',
+  'Temperature coefficient': '\u0636\u0631\u06CC\u0628 \u062F\u0645\u0627\u06CC\u06CC',
+  'from machine data': '\u0627\u0632 \u062F\u0627\u062F\u0647\u200C\u0647\u0627\u06CC \u0645\u0627\u0634\u06CC\u0646',
+  'DC-machine fundamentals': '\u0645\u0628\u0627\u0646\u06CC \u0645\u0627\u0634\u06CC\u0646 DC',
+  'The machine constant c/k and the flux \u03A6 are design data \u2014 shown symbolically.': '\u062B\u0627\u0628\u062A \u0645\u0627\u0634\u06CC\u0646 c/k \u0648 \u0634\u0627\u0631 \u03A6 \u062F\u0627\u062F\u0647\u200C\u0647\u0627\u06CC \u0637\u0631\u0627\u062D\u06CC \u0647\u0633\u062A\u0646\u062F \u2014 \u0628\u0647\u200C\u0635\u0648\u0631\u062A \u0646\u0645\u0627\u062F\u06CC\u0646 \u0646\u0634\u0627\u0646 \u062F\u0627\u062F\u0647 \u0645\u06CC\u200C\u0634\u0648\u0646\u062F.',
+  'Induced EMF': '\u0646\u06CC\u0631\u0648\u06CC \u0645\u062D\u0631\u06A9\u0647 \u0627\u0644\u0642\u0627\u06CC\u06CC',
+  'Machine constant': '\u062B\u0627\u0628\u062A \u0645\u0627\u0634\u06CC\u0646',
+  'Flux': '\u0634\u0627\u0631',
+  'Torque constant': '\u062B\u0627\u0628\u062A \u06AF\u0634\u062A\u0627\u0648\u0631',
+  'Armature current': '\u062C\u0631\u06CC\u0627\u0646 \u0622\u0631\u0645\u06CC\u0686\u0631',
+  'Terminal voltage': '\u0648\u0644\u062A\u0627\u0698 \u062A\u0631\u0645\u06CC\u0646\u0627\u0644',
+  'Armature resistance': '\u0645\u0642\u0627\u0648\u0645\u062A \u0622\u0631\u0645\u06CC\u0686\u0631',
+  'Machine constant \u00D7 flux': '\u062B\u0627\u0628\u062A \u0645\u0627\u0634\u06CC\u0646 \u00D7 \u0634\u0627\u0631',
+  'Internal EMF': '\u0646\u06CC\u0631\u0648\u06CC \u0645\u062D\u0631\u06A9\u0647 \u062F\u0627\u062E\u0644\u06CC',
   // MathML formula typesetting
   'Typeset formula': '\u0641\u0631\u0645\u0648\u0644 \u062D\u0631\u0648\u0641\u200C\u0686\u06CC\u0646\u06CC\u200C\u0634\u062F\u0647',
   // Commissioning / Verification companion (DS/HD 60364-6) — Persian
@@ -6793,6 +6869,62 @@ function mathml(expr, opts) {
   } catch (e) {
     return '<span class="mathml-fallback">' + mmlEsc(raw) + '</span>';
   }
+}
+
+// ============================================================================
+// ===== SHARED PHYSICAL CONSTANTS (PHYS_CONST) ===============================
+// ============================================================================
+// ONE referenced object holding the curriculum physics/EE constants used by the
+// THEORY / EXERCISE solver modules (DC, AC-impedance, 3-phase, motor, DC-machine,
+// capacitor, magnet, heating). Each entry: { value, unit, symbol, source }.
+// Curriculum-rounded values are kept exactly as taught; the precise IEC/handbook
+// value is cited alongside in `source`. This object and the cards that read it are
+// ADDITIVE and presentational only — they are NOT used by any life-safety
+// dimensioning, protection, short-circuit, commissioning or audit path.
+const PHYS_CONST = {
+  MU0:      { value: 4 * Math.PI * 1e-7, unit: 'H/m', symbol: '\u03BC\u2080', source: 'SI / CODATA (4\u03C0\u00B710\u207B\u2077)' },
+  EPS0:     { value: 8.854e-12, unit: 'F/m', symbol: '\u03B5\u2080', source: 'CODATA 2018 (8.8541878e-12)' },
+  SQRT3:    { value: Math.sqrt(3), unit: '', symbol: '\u221A3', source: 'math' },
+  TORQUE_K: { value: 9.55, unit: '', symbol: '60/2\u03C0', source: 'P=M\u00B7\u03C9, \u03C9=2\u03C0n/60 \u2192 60/2\u03C0=9.5493 (rounded 9.55)' },
+  EMF_K:    { value: 4.44, unit: '', symbol: '\u03C0\u221A2', source: 'E_rms=2\u03C0fN\u03A6/\u221A2 \u2192 \u03C0\u221A2=4.4429 (rounded 4.44)' },
+  C_WATER:  { value: 4186, unit: 'J/(kg\u00B7K)', symbol: 'c_vand', source: 'Physics handbook (water ~4180\u20134190 J/(kg\u00B7K))' },
+  RHO_CU:   { value: 0.0175, unit: '\u03A9\u00B7mm\u00B2/m', symbol: '\u03C1_Cu', source: 'Elektroteknik-l\u00E6rebog @20\u00B0C (IEC 60228: 0.017241)' },
+  RHO_AL:   { value: 0.029, unit: '\u03A9\u00B7mm\u00B2/m', symbol: '\u03C1_Al', source: 'Elektroteknik-l\u00E6rebog @20\u00B0C (IEC 60228: 0.028264)' },
+  ALPHA_CU: { value: 0.004, unit: '1/K', symbol: '\u03B1_Cu', source: 'Physics handbook @20\u00B0C (\u22480.00393)' },
+  ALPHA_AL: { value: 0.0037, unit: '1/K', symbol: '\u03B1_Al', source: 'Physics handbook @20\u00B0C (\u22480.00390)' },
+  U_PHASE:  { value: 230, unit: 'V', symbol: 'U_f', source: 'HD 60038' },
+  U_LINE:   { value: 400, unit: 'V', symbol: 'U_L', source: 'HD 60038' }
+};
+
+// ============================================================================
+// ===== SYMBOL LEGEND HELPER (symbolLegend) ==================================
+// ============================================================================
+// Reusable click-only helper that renders a collapsed <details> table of
+// quantity / symbol / unit, sharing the same visual language as calcDetail().
+// `rows` entries are { name, symbol, unit }; `name` is expected to be already
+// localized via tx(da,en) by the caller. `symbol` is typeset through mathml()
+// for consistency; `unit` is rendered via the shared mathmlUnit() styling.
+// Collapsed by default. Presentation only.
+function symbolLegend(rows) {
+  if (!rows || !rows.length) return '';
+  var h = '<details class="calc-detail" style="margin-top:8px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">';
+  h += '<summary style="cursor:pointer;padding:8px 12px;background:var(--primary-glow);font-weight:600;font-size:0.85rem;display:flex;align-items:center;gap:6px">';
+  h += '<span style="flex:1">' + tx('Symbolforklaring', 'Symbol legend') + '</span>';
+  h += '<span style="color:var(--text-muted);font-size:0.75rem;white-space:nowrap">' + tx('vis', 'show') + ' \u25BC</span>';
+  h += '</summary>';
+  h += '<div style="padding:10px 14px;font-size:0.82rem">';
+  h += '<table style="width:100%;font-size:0.8rem;border-collapse:collapse">';
+  h += '<tr style="background:var(--border-light);font-weight:600"><td style="padding:3px 6px">' + tx('St\u00F8rrelse', 'Quantity') + '</td><td style="padding:3px 6px">' + tx('Symbol', 'Symbol') + '</td><td style="padding:3px 6px">' + tx('Enhed', 'Unit') + '</td></tr>';
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    h += '<tr style="border-bottom:1px solid var(--border-light)">';
+    h += '<td style="padding:3px 6px">' + (r.name || '') + '</td>';
+    h += '<td style="padding:3px 6px;font-family:monospace">' + mathml(r.symbol || '') + '</td>';
+    h += '<td style="padding:3px 6px">' + (r.unit ? mathmlUnit(r.unit) : '') + '</td>';
+    h += '</tr>';
+  }
+  h += '</table></div></details>';
+  return h;
 }
 
 // ============================================================================
@@ -23189,6 +23321,15 @@ function impedansCalcPower(U, Z, phi) {
   return { I: I, P: P, Q: Q, S: S };
 }
 
+// --- Single-phase AC fundamentals (Ch.6) pure helpers (unit-testable) ---
+function acOmega(f) { return 2 * Math.PI * f; }            // angular frequency [rad/s]
+function acRmsFromPeak(Umax) { return Umax / Math.SQRT2; } // U_rms = U_max/sqrt(2)
+function acAvgFromPeak(Umax) { return 2 * Umax / Math.PI; }// U_avg = 2*U_max/pi
+function acActivePower(U, I, cosPhi) { return U * I * cosPhi; }   // P = U*I*cosφ
+function acReactivePower(U, I, sinPhi) { return U * I * sinPhi; } // Q = U*I*sinφ
+function acApparentPower(U, I) { return U * I; }                  // S = U*I
+function acApparentFromPQ(P, Q) { return Math.sqrt(P * P + Q * Q); } // S = sqrt(P²+Q²)
+
 // Full impedance calculation bundle
 function impedansCalcAll(state) {
   var R = state.R;
@@ -23424,6 +23565,34 @@ function renderImpedans() {
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Fasevinkeldiagram (viserdiagram)', 'Phasor Diagram') + '</div>';
   html += impedansRenderPhasor(res);
+  html += '</div>';
+
+  // ===== Ch.6 single-phase AC fundamentals — typeset calcDetail cards =====
+  // Appended (auto-typeset via mathml). Reuses the module's already-computed
+  // values (res.*, impedansState.*) for substitution. Presentation only.
+  var _Umax = impedansState.U * Math.SQRT2;   // treat selected U as RMS -> peak
+  var _sinPhi = Math.sin(res.phi);
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Enfaset AC-effekt & st\u00F8rrelser (Kap. 6)', 'Single-phase AC power & quantities (Ch. 6)') + '</div>';
+  html += calcDetail({ name: tx('Vinkelfrekvens', 'Angular frequency'), formula: '\u03C9 = 2\u00B7\u03C0\u00B7f', variables: [{ name: tx('Frekvens', 'Frequency'), symbol: 'f', value: impedansState.f, unit: 'Hz' }], substitution: '2\u00B7\u03C0\u00B7' + impedansState.f, result: { value: acOmega(impedansState.f), unit: 'rad/s' }, reference: 'Elektroteknik Opgavesamling Kap. 6' });
+  html += calcDetail({ name: tx('RMS-sp\u00E6nding', 'RMS voltage'), formula: 'U_rms = U_max/\u221A2', variables: [{ name: tx('Spidssp\u00E6nding', 'Peak voltage'), symbol: 'U_max', value: _Umax, unit: 'V' }], substitution: _Umax.toFixed(2) + '/\u221A2', result: { value: impedansState.U, unit: 'V' }, reference: 'Elektroteknik Opgavesamling Kap. 6' });
+  html += calcDetail({ name: tx('Middelsp\u00E6nding', 'Average voltage'), formula: 'U_avg = 2\u00B7U_max/\u03C0', variables: [{ name: tx('Spidssp\u00E6nding', 'Peak voltage'), symbol: 'U_max', value: _Umax, unit: 'V' }], substitution: '2\u00B7' + _Umax.toFixed(2) + '/\u03C0', result: { value: acAvgFromPeak(_Umax), unit: 'V' }, reference: 'Elektroteknik Opgavesamling Kap. 6' });
+  html += calcDetail({ name: tx('Aktiv effekt', 'Active power'), formula: 'P = U\u00B7I\u00B7cos\u03C6', variables: [{ name: tx('Sp\u00E6nding', 'Voltage'), symbol: 'U', value: impedansState.U, unit: 'V' }, { name: tx('Str\u00F8m', 'Current'), symbol: 'I', value: res.I, unit: 'A' }, { name: tx('Effektfaktor', 'Power factor'), symbol: 'cos\u03C6', value: res.cosPhi, unit: '' }], substitution: impedansState.U + '\u00B7' + res.I.toFixed(4) + '\u00B7' + res.cosPhi.toFixed(4), result: { value: res.P, unit: 'W' }, reference: 'Elektroteknik Opgavesamling Kap. 6' });
+  html += calcDetail({ name: tx('Reaktiv effekt', 'Reactive power'), formula: 'Q = U\u00B7I\u00B7sin\u03C6', variables: [{ name: tx('Sp\u00E6nding', 'Voltage'), symbol: 'U', value: impedansState.U, unit: 'V' }, { name: tx('Str\u00F8m', 'Current'), symbol: 'I', value: res.I, unit: 'A' }, { name: tx('Sinus til fasevinkel', 'Sine of phase angle'), symbol: 'sin\u03C6', value: _sinPhi, unit: '' }], substitution: impedansState.U + '\u00B7' + res.I.toFixed(4) + '\u00B7' + _sinPhi.toFixed(4), result: { value: res.Q, unit: 'var' }, reference: 'Elektroteknik Opgavesamling Kap. 6' });
+  html += calcDetail({ name: tx('Tilsyneladende effekt', 'Apparent power'), formula: 'S = U\u00B7I', variables: [{ name: tx('Sp\u00E6nding', 'Voltage'), symbol: 'U', value: impedansState.U, unit: 'V' }, { name: tx('Str\u00F8m', 'Current'), symbol: 'I', value: res.I, unit: 'A' }], substitution: impedansState.U + '\u00B7' + res.I.toFixed(4), result: { value: res.S, unit: 'VA' }, reference: 'Elektroteknik Opgavesamling Kap. 6' });
+  html += calcDetail({ name: tx('Effekttrekant', 'Power triangle'), formula: 'S\u00B2 = P\u00B2 + Q\u00B2', variables: [{ name: tx('Aktiv effekt', 'Active power'), symbol: 'P', value: res.P, unit: 'W' }, { name: tx('Reaktiv effekt', 'Reactive power'), symbol: 'Q', value: res.Q, unit: 'var' }], substitution: res.P.toFixed(2) + '\u00B2 + ' + res.Q.toFixed(2) + '\u00B2', result: { value: acApparentFromPQ(res.P, res.Q), unit: 'VA' }, reference: 'Elektroteknik Opgavesamling Kap. 6' });
+  html += symbolLegend([
+    { name: tx('Sp\u00E6nding', 'Voltage'), symbol: 'U', unit: 'V' },
+    { name: tx('Str\u00F8m', 'Current'), symbol: 'I', unit: 'A' },
+    { name: tx('Frekvens', 'Frequency'), symbol: 'f', unit: 'Hz' },
+    { name: tx('Vinkelfrekvens', 'Angular frequency'), symbol: '\u03C9', unit: 'rad/s' },
+    { name: tx('Impedans', 'Impedance'), symbol: 'Z', unit: '\u03A9' },
+    { name: tx('Reaktans', 'Reactance'), symbol: 'X', unit: '\u03A9' },
+    { name: tx('Fasevinkel', 'Phase angle'), symbol: '\u03C6', unit: '\u00B0' },
+    { name: tx('Aktiv effekt', 'Active power'), symbol: 'P', unit: 'W' },
+    { name: tx('Reaktiv effekt', 'Reactive power'), symbol: 'Q', unit: 'var' },
+    { name: tx('Tilsyneladende effekt', 'Apparent power'), symbol: 'S', unit: 'VA' }
+  ]);
   html += '</div>';
 
   html += '</div>'; // close results card
@@ -23826,6 +23995,19 @@ function renderTrefase() {
     html += '</div>';
   }
 
+  html += symbolLegend([
+    { name: tx('Linjesp\u00E6nding', 'Line voltage'), symbol: 'U_L', unit: 'V' },
+    { name: tx('Fasesp\u00E6nding', 'Phase voltage'), symbol: 'U_f', unit: 'V' },
+    { name: tx('Linjestr\u00F8m', 'Line current'), symbol: 'I_L', unit: 'A' },
+    { name: tx('Fasestr\u00F8m', 'Phase current'), symbol: 'I_f', unit: 'A' },
+    { name: tx('Impedans pr. fase', 'Impedance per phase'), symbol: 'Z', unit: '\u03A9' },
+    { name: tx('Fasevinkel', 'Phase angle'), symbol: '\u03C6', unit: '\u00B0' },
+    { name: tx('Aktiv effekt', 'Active power'), symbol: 'P', unit: 'W' },
+    { name: tx('Reaktiv effekt', 'Reactive power'), symbol: 'Q', unit: 'var' },
+    { name: tx('Tilsyneladende effekt', 'Apparent power'), symbol: 'S', unit: 'VA' },
+    { name: tx('Kvadratrod af 3', 'Square root of 3'), symbol: '\u221A3', unit: '' }
+  ]);
+
   html += '</div>';
   return html;
 }
@@ -24104,6 +24286,18 @@ function renderMotorteori() {
     html += '<div class="result-row"><span class="label">' + tx('Reduktion','Reduction') + '</span><span class="value">' + tx('Str\u00F8m: 1/3, Moment: 1/3 af DOL','Current: 1/3, Torque: 1/3 of DOL') + '</span></div>';
     html += '</div>';
   }
+
+  html += symbolLegend([
+    { name: tx('Synkront omdrejningstal', 'Synchronous speed'), symbol: 'n_s', unit: 'rpm' },
+    { name: tx('Omdrejningstal', 'Speed'), symbol: 'n', unit: 'rpm' },
+    { name: tx('Slip', 'Slip'), symbol: 's', unit: '' },
+    { name: tx('Poltal', 'Number of poles'), symbol: 'p', unit: '' },
+    { name: tx('Frekvens', 'Frequency'), symbol: 'f', unit: 'Hz' },
+    { name: tx('Moment', 'Torque'), symbol: 'M', unit: 'Nm' },
+    { name: tx('Akseleffekt', 'Shaft power'), symbol: 'P', unit: 'W' },
+    { name: tx('Virkningsgrad', 'Efficiency'), symbol: '\u03B7', unit: '' },
+    { name: tx('Effektfaktor', 'Power factor'), symbol: 'cos\u03C6', unit: '' }
+  ]);
 
   html += '</div>';
   return html;
@@ -24921,6 +25115,18 @@ function renderDC() {
   else if (dcState.calcType === 'energy') html += renderDCEnergy();
   else if (dcState.calcType === 'emf') html += renderDCEmf();
 
+  html += symbolLegend([
+    { name: tx('Sp\u00E6nding', 'Voltage'), symbol: 'U', unit: 'V' },
+    { name: tx('Str\u00F8m', 'Current'), symbol: 'I', unit: 'A' },
+    { name: tx('Modstand', 'Resistance'), symbol: 'R', unit: '\u03A9' },
+    { name: tx('Effekt', 'Power'), symbol: 'P', unit: 'W' },
+    { name: tx('Energi', 'Energy'), symbol: 'W', unit: 'J' },
+    { name: tx('Resistivitet', 'Resistivity'), symbol: '\u03C1', unit: '\u03A9\u00B7mm\u00B2/m' },
+    { name: tx('L\u00E6ngde', 'Length'), symbol: 'l', unit: 'm' },
+    { name: tx('Tv\u00E6rsnit', 'Cross-section'), symbol: 'S', unit: 'mm\u00B2' },
+    { name: tx('Temperaturkoefficient', 'Temperature coefficient'), symbol: '\u03B1', unit: '1/K' }
+  ]);
+
   return html;
 }
 
@@ -25426,7 +25632,7 @@ var MAGNET_MATERIALS = {
   air: { muR: 1, da: 'Luft (ur=1)', en: 'Air (ur=1)' }
 };
 
-var MAGNET_MU0 = 4 * Math.PI * 1e-7;
+var MAGNET_MU0 = PHYS_CONST.MU0.value; // vacuum permeability [H/m] (shared from PHYS_CONST.MU0)
 
 function magnetCalcMMF(N, I) { return N * I; }
 function magnetCalcB(Phi, A) { return (A > 0) ? Phi / A : 0; }
@@ -25653,7 +25859,7 @@ function renderMagnetEnergy() {
 // 1/(2*pi*f*C)). Changing C here changes XC there and vice versa via the
 // SharedQuantities reactive bus (key 'capacitance_F').
 
-var KAP_EPS0 = 8.854e-12; // vacuum permittivity [F/m]
+var KAP_EPS0 = PHYS_CONST.EPS0.value; // vacuum permittivity [F/m] (shared from PHYS_CONST.EPS0)
 var KAP_COULOMB_K = 1 / (4 * Math.PI * KAP_EPS0); // Coulomb constant ~8.988e9
 
 var KAP_DIELECTRICS = {
@@ -25740,7 +25946,7 @@ function renderKapacitorC() {
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">C</span><span class="value" style="font-weight:700">' + impedansFmtC(C) + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('X_C ved 50 Hz (link til impedans)', 'X_C at 50 Hz (link to impedance)') + '</span><span class="value">' + (isFinite(XC50) ? XC50.toExponential(3) + ' \u03A9' : '\u221E') + '</span></div></div>';
-  html += calcDetail({ name: tx('Kapacitans', 'Capacitance'), formula: 'C = \u03B5\u2080\u00B7\u03B5\u1D63\u00B7A/d', variables: [{ name: tx('Vakuumpermittivitet', 'Vacuum permittivity'), symbol: '\u03B5\u2080', value: KAP_EPS0, unit: 'F/m' }, { name: tx('Relativ permittivitet', 'Relative permittivity'), symbol: '\u03B5\u1D63', value: er }, { name: tx('Areal', 'Area'), symbol: 'A', value: kapacitorState.area, unit: 'm\u00B2' }, { name: tx('Afstand', 'Distance'), symbol: 'd', value: kapacitorState.dist, unit: 'm' }], substitution: '8.854e-12 \u00D7 ' + er + ' \u00D7 ' + kapacitorState.area + ' / ' + kapacitorState.dist, result: { value: C, unit: 'F' }, reference: 'Opgavesamling Kap. 4' });
+  html += calcDetail({ name: tx('Kapacitans', 'Capacitance'), formula: 'C = \u03B5\u2080\u00B7\u03B5\u1D63\u00B7A/d', variables: [{ name: tx('Vakuumpermittivitet', 'Vacuum permittivity'), symbol: '\u03B5\u2080', value: KAP_EPS0, unit: 'F/m' }, { name: tx('Relativ permittivitet', 'Relative permittivity'), symbol: '\u03B5\u1D63', value: er }, { name: tx('Areal', 'Area'), symbol: 'A', value: kapacitorState.area, unit: 'm\u00B2' }, { name: tx('Afstand', 'Distance'), symbol: 'd', value: kapacitorState.dist, unit: 'm' }], substitution: PHYS_CONST.EPS0.value + ' \u00D7 ' + er + ' \u00D7 ' + kapacitorState.area + ' / ' + kapacitorState.dist, result: { value: C, unit: 'F' }, reference: 'Opgavesamling Kap. 4' });
   html += calcDetail({ name: tx('Kapacitiv reaktans (link)', 'Capacitive reactance (link)'), formula: 'X_C = 1/(2\u03C0fC)', variables: [{ name: tx('Frekvens', 'Frequency'), symbol: 'f', value: 50, unit: 'Hz' }, { name: tx('Kapacitans', 'Capacitance'), symbol: 'C', value: C, unit: 'F' }], substitution: '1/(2\u03C0 \u00D7 50 \u00D7 ' + C.toExponential(3) + ')', result: { value: XC50, unit: '\u03A9' }, reference: 'Opgavesamling Kap. 4' });
   html += '<div style="margin-top:8px"><button class="sel-btn" onclick="SharedQuantities.set(\'capacitance_F\',' + C + ',\'kapacitor\');renderModule(\'kapacitor\')">' + tx('\u2192 Send C til impedansmodul', '\u2192 Push C to impedance module') + '</button></div>';
   html += '</div>';
@@ -25846,7 +26052,7 @@ function renderKapacitorCoulomb() {
   html += '</div></div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">F</span><span class="value" style="font-weight:700">' + impedansFmtEng(F, 'N') + '</span></div></div>';
-  html += calcDetail({ name: tx('Coulomb-kraft', 'Coulomb force'), formula: 'F = Q\u2081\u00B7Q\u2082/(4\u03C0\u03B5\u2080\u00B7r\u00B2)', variables: [{ name: 'Q\u2081', symbol: 'Q\u2081', value: kapacitorState.q1, unit: 'C' }, { name: 'Q\u2082', symbol: 'Q\u2082', value: kapacitorState.q2, unit: 'C' }, { name: 'r', symbol: 'r', value: kapacitorState.r, unit: 'm' }, { name: 'k', symbol: 'k', value: KAP_COULOMB_K, unit: 'N\u00B7m\u00B2/C\u00B2' }], substitution: kapacitorState.q1.toExponential(2) + ' \u00D7 ' + kapacitorState.q2.toExponential(2) + ' / (4\u03C0 \u00D7 8.854e-12 \u00D7 ' + kapacitorState.r + '\u00B2)', result: { value: F, unit: 'N' }, reference: 'Opgavesamling Kap. 4' });
+  html += calcDetail({ name: tx('Coulomb-kraft', 'Coulomb force'), formula: 'F = Q\u2081\u00B7Q\u2082/(4\u03C0\u03B5\u2080\u00B7r\u00B2)', variables: [{ name: 'Q\u2081', symbol: 'Q\u2081', value: kapacitorState.q1, unit: 'C' }, { name: 'Q\u2082', symbol: 'Q\u2082', value: kapacitorState.q2, unit: 'C' }, { name: 'r', symbol: 'r', value: kapacitorState.r, unit: 'm' }, { name: 'k', symbol: 'k', value: KAP_COULOMB_K, unit: 'N\u00B7m\u00B2/C\u00B2' }], substitution: kapacitorState.q1.toExponential(2) + ' \u00D7 ' + kapacitorState.q2.toExponential(2) + ' / (4\u03C0 \u00D7 ' + PHYS_CONST.EPS0.value + ' \u00D7 ' + kapacitorState.r + '\u00B2)', result: { value: F, unit: 'N' }, reference: 'Opgavesamling Kap. 4' });
   html += '</div>';
   return html;
 }
@@ -25873,13 +26079,26 @@ var VARME_MATERIALS = {
 };
 
 var varmeState = {
-  calcType: 'uvalue', // uvalue | transmission | ventilation | total
+  calcType: 'uvalue', // uvalue | transmission | ventilation | total | energy
   Ri: 0.13, Ru: 0.04,
   l1mat: 'brick', l1d: 0.108,
   l2mat: 'mineral_wool', l2d: 0.10,
   l3mat: 'plaster', l3d: 0.013,
   A: 20, Tin: 20, Tout: -12,
-  n: 0.5, V: 125
+  n: 0.5, V: 125,
+  // Heating-energy (Ch.13) state
+  substance: 'water', mass: 10, dTheat: 50, Pheat: 1000, theat: 100
+};
+
+// Specific heat capacities c [J/(kg*K)] for the heating-energy cards.
+// Water is sourced from the shared PHYS_CONST.C_WATER; the rest are standard
+// physics-handbook values (cited per-entry). Used for teaching only.
+var VARME_SUBSTANCES = {
+  water:     { c: PHYS_CONST.C_WATER.value, da: 'Vand', en: 'Water', source: PHYS_CONST.C_WATER.source },
+  air:       { c: 1005, da: 'Luft', en: 'Air', source: 'Physics handbook (~1005 J/(kg\u00B7K))' },
+  aluminium: { c: 897,  da: 'Aluminium', en: 'Aluminium', source: 'Physics handbook (~897 J/(kg\u00B7K))' },
+  copper:    { c: 385,  da: 'Kobber', en: 'Copper', source: 'Physics handbook (~385 J/(kg\u00B7K))' },
+  steel:     { c: 450,  da: 'St\u00E5l/jern', en: 'Steel/iron', source: 'Physics handbook (~450 J/(kg\u00B7K))' }
 };
 
 function varmeLayers() {
@@ -25904,6 +26123,14 @@ function varmeCalcTransmission(U, A, dT) { return U * A * dT; }
 function varmeCalcVentilation(n, V, dT) { return 0.33 * n * V * dT; }
 function varmeCalcTotal(U, A, n, V, dT) { return varmeCalcTransmission(U, A, dT) + varmeCalcVentilation(n, V, dT); }
 
+// --- Heating-energy pure helpers (Ch.13, unit-testable, no DOM) ---
+// Sensible heat Q = m*c*dT  [J]
+function varmeHeatEnergy(m, c, dT) { return m * c * dT; }
+// Heating time t = Q/P = (m*c*dT)/P  [s]
+function varmeHeatTime(m, c, dT, P) { return (P > 0) ? (m * c * dT) / P : Infinity; }
+// Electrical energy W = P*t expressed in kWh: W[kWh] = P[W]*t[h]/1000
+function varmeEnergyKWh(P_W, t_h) { return P_W * t_h / 1000; }
+
 function renderVarme() {
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Rumvarme & U-v\u00E6rdi (Opgavesamling Kap. 13)', 'Room heating & U-value (Opgavesamling Ch. 13)') + '</div>';
@@ -25913,7 +26140,8 @@ function renderVarme() {
     { key: 'uvalue', da: 'U-v\u00E6rdi (U = 1/R_total)', en: 'U-value (U = 1/R_total)' },
     { key: 'transmission', da: 'Transmissionstab (Q)', en: 'Transmission loss (Q)' },
     { key: 'ventilation', da: 'Ventilationstab', en: 'Ventilation loss' },
-    { key: 'total', da: 'Samlet varmebehov', en: 'Total heat demand' }
+    { key: 'total', da: 'Samlet varmebehov', en: 'Total heat demand' },
+    { key: 'energy', da: 'Opvarmningsenergi (Q, t, W)', en: 'Heating energy (Q, t, W)' }
   ];
   types.forEach(function(ct) {
     html += '<button class="sel-btn' + (varmeState.calcType === ct.key ? ' selected' : '') + '" onclick="varmeState.calcType=\'' + ct.key + '\';renderModule(\'varme\')">' + tx(ct.da, ct.en) + '</button>';
@@ -25923,6 +26151,7 @@ function renderVarme() {
   else if (varmeState.calcType === 'transmission') html += renderVarmeTransmission();
   else if (varmeState.calcType === 'ventilation') html += renderVarmeVentilation();
   else if (varmeState.calcType === 'total') html += renderVarmeTotal();
+  else if (varmeState.calcType === 'energy') html += renderVarmeEnergy();
   return html;
 }
 
@@ -26066,6 +26295,53 @@ function renderVarmeTotal() {
 }
 
 
+// Heating-energy card group (Ch.13): sensible heat Q = m*c*dT, heating time
+// t = Q/P, and electrical energy W = P*t (kWh). Same module, no new tab.
+function renderVarmeEnergy() {
+  var massPresets = [1, 5, 10, 20, 50, 100, 200, 500, 1000];
+  var dTPresets = [10, 20, 30, 40, 50, 60, 70, 80, 90];
+  var PPresets = [500, 1000, 1500, 2000, 3000, 5000, 7500, 10000];
+  var sub = VARME_SUBSTANCES[varmeState.substance] || VARME_SUBSTANCES.water;
+  var c = sub.c;
+  var Q = varmeHeatEnergy(varmeState.mass, c, varmeState.dTheat);
+  var tHeat = varmeHeatTime(varmeState.mass, c, varmeState.dTheat, varmeState.Pheat);
+  var W = varmeState.Pheat * tHeat;            // W = P*t [J]
+  var kWh = varmeEnergyKWh(varmeState.Pheat, tHeat / 3600);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Opvarmningsenergi: Q = m\u00B7c\u00B7\u0394T', 'Heating energy: Q = m\u00B7c\u00B7\u0394T') + '</div>';
+  html += '<div class="info-row">' + tx('F\u00F8lbar varme, opvarmningstid og elektrisk energi (Opgavesamling Kap. 13).', 'Sensible heat, heating time and electrical energy (Opgavesamling Ch. 13).') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Stof (c)', 'Substance (c)') + '</div><div class="select-grid">';
+  Object.keys(VARME_SUBSTANCES).forEach(function(sk) { var s = VARME_SUBSTANCES[sk]; html += '<button class="sel-btn' + (varmeState.substance === sk ? ' selected' : '') + '" onclick="varmeState.substance=\'' + sk + '\';renderModule(\'varme\')">' + tx(s.da, s.en) + ' (' + s.c + ')</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Masse m [kg]', 'Mass m [kg]') + '</div><div class="select-grid">';
+  massPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.mass === v ? ' selected' : '') + '" onclick="varmeState.mass=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Temperaturstigning \u0394T [K]', 'Temperature rise \u0394T [K]') + '</div><div class="select-grid">';
+  dTPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.dTheat === v ? ' selected' : '') + '" onclick="varmeState.dTheat=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Effekt P [W]', 'Power P [W]') + '</div><div class="select-grid">';
+  PPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.Pheat === v ? ' selected' : '') + '" onclick="varmeState.Pheat=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">Q</span><span class="value" style="font-weight:700">' + (Q / 1000).toFixed(1) + ' kJ (' + Q.toFixed(0) + ' J)</span></div>';
+  html += '<div class="result-row"><span class="label">t</span><span class="value">' + tHeat.toFixed(0) + ' s (' + (tHeat / 60).toFixed(1) + ' min)</span></div>';
+  html += '<div class="result-row"><span class="label">W</span><span class="value">' + kWh.toFixed(4) + ' kWh</span></div></div>';
+  html += calcDetail({ name: tx('F\u00F8lbar varme', 'Sensible heat'), formula: 'Q = m\u00B7c\u00B7\u0394T', variables: [{ name: tx('Masse', 'Mass'), symbol: 'm', value: varmeState.mass, unit: 'kg' }, { name: tx('Specifik varmekapacitet', 'Specific heat capacity'), symbol: 'c', value: c, unit: 'J/(kg\u00B7K)', source: sub.source }, { name: tx('Temperaturstigning', 'Temperature rise'), symbol: '\u0394T', value: varmeState.dTheat, unit: 'K' }], substitution: varmeState.mass + ' \u00B7 ' + c + ' \u00B7 ' + varmeState.dTheat, result: { value: Q, unit: 'J' }, reference: 'Opgavesamling Kap. 13' });
+  html += calcDetail({ name: tx('Opvarmningstid', 'Heating time'), formula: 't = (m\u00B7c\u00B7\u0394T)/P', variables: [{ name: tx('Varmem\u00E6ngde', 'Heat quantity'), symbol: 'Q', value: Q, unit: 'J' }, { name: tx('Tilf\u00F8rt effekt', 'Applied power'), symbol: 'P', value: varmeState.Pheat, unit: 'W' }], substitution: '(' + varmeState.mass + ' \u00B7 ' + c + ' \u00B7 ' + varmeState.dTheat + ') / ' + varmeState.Pheat, result: { value: tHeat, unit: 's' }, reference: 'Opgavesamling Kap. 13' });
+  html += calcDetail({ name: tx('Elektrisk energi', 'Electrical energy'), formula: 'W = P\u00B7t', variables: [{ name: tx('Tilf\u00F8rt effekt', 'Applied power'), symbol: 'P', value: varmeState.Pheat, unit: 'W' }, { name: tx('Tid', 'Time'), symbol: 't', value: tHeat, unit: 's' }], substitution: varmeState.Pheat + ' \u00B7 ' + tHeat.toFixed(0), steps: [{ desc: tx('Energi i kWh', 'Energy in kWh'), expr: 'W_kWh = P\u00B7t/1000 = ' + varmeState.Pheat + '\u00B7' + (tHeat / 3600).toFixed(4) + '/1000', result: kWh.toFixed(4) + ' kWh' }], result: { value: W, unit: 'J' }, reference: 'Opgavesamling Kap. 13' });
+  html += symbolLegend([
+    { name: tx('Varmem\u00E6ngde', 'Heat quantity'), symbol: 'Q', unit: 'J' },
+    { name: tx('Masse', 'Mass'), symbol: 'm', unit: 'kg' },
+    { name: tx('Specifik varmekapacitet', 'Specific heat capacity'), symbol: 'c', unit: 'J/(kg\u00B7K)' },
+    { name: tx('Temperaturstigning', 'Temperature rise'), symbol: '\u0394T', unit: 'K' },
+    { name: tx('Effekt', 'Power'), symbol: 'P', unit: 'W' },
+    { name: tx('Tid', 'Time'), symbol: 't', unit: 's' },
+    { name: tx('Energi', 'Energy'), symbol: 'W', unit: 'J / kWh' }
+  ]);
+  html += '</div>';
+  return html;
+}
+
+
 // ============================================================================
 // ===== DC MACHINES MODULE (Opgavesamling Kap. 10) ===========================
 // ============================================================================
@@ -26092,7 +26368,7 @@ var dcmaskineState = {
 // --- Pure calculation functions (unit-testable, no DOM) ---
 function dcmaskineGenEMF(U, Ia, Ra, Ubrush) { return U + Ia * Ra + Ubrush; }
 function dcmaskineMotorBackEMF(U, Ia, Ra, Ubrush) { return U - Ia * Ra - Ubrush; }
-function dcmaskineTorque(P, n) { return (n > 0) ? 9.55 * P / n : 0; }
+function dcmaskineTorque(P, n) { return (n > 0) ? PHYS_CONST.TORQUE_K.value * P / n : 0; }
 function dcmaskineStartResistor(U, E, Ia) { return (Ia > 0) ? (U - E) / Ia : Infinity; }
 function dcmaskineEfficiency(Pout, Pin) { return (Pin > 0) ? Pout / Pin : 0; }
 function dcmaskineFieldCurrent(U, Rf) { return (Rf > 0) ? U / Rf : 0; }
@@ -26121,6 +26397,28 @@ function renderDcmaskine() {
   else if (dcmaskineState.mode === 'torque') html += renderDcmaskineTorque();
   else if (dcmaskineState.mode === 'starter') html += renderDcmaskineStarter();
   else if (dcmaskineState.mode === 'efficiency') html += renderDcmaskineEfficiency();
+
+  // ===== Ch.10 DC-machine fundamentals — typeset symbolic cards =====
+  // c (machine constant), k (torque constant) and Φ (flux) are DESIGN DATA;
+  // they are rendered SYMBOLICALLY (source: from machine data), never invented.
+  var _md = tx('fra maskindata', 'from machine data');
+  html += '<div class="card fade-in"><div class="card-title">' + tx('DC-maskine grundligninger', 'DC-machine fundamentals') + '</div>';
+  html += '<div class="info-row">' + tx('Maskinkonstanten c/k og fluxen \u03A6 er konstruktionsdata \u2014 vises symbolsk.', 'The machine constant c/k and the flux \u03A6 are design data \u2014 shown symbolically.') + '</div>';
+  html += calcDetail({ name: tx('Induceret sp\u00E6nding', 'Induced EMF'), formula: 'E = c\u00B7\u03A6\u00B7n', variables: [{ name: tx('Maskinkonstant', 'Machine constant'), symbol: 'c', source: _md }, { name: tx('Flux', 'Flux'), symbol: '\u03A6', unit: 'Wb', source: _md }, { name: tx('Omdrejningstal', 'Speed'), symbol: 'n', value: dcmaskineState.n, unit: 'o/min' }], reference: 'Opgavesamling Kap. 10' });
+  html += calcDetail({ name: tx('Moment (flux)', 'Torque (flux)'), formula: 'M = k\u00B7\u03A6\u00B7I_a', variables: [{ name: tx('Momentkonstant', 'Torque constant'), symbol: 'k', source: _md }, { name: tx('Flux', 'Flux'), symbol: '\u03A6', unit: 'Wb', source: _md }, { name: tx('Ankerstr\u00F8m', 'Armature current'), symbol: 'I_a', value: dcmaskineState.Ia, unit: 'A' }], reference: 'Opgavesamling Kap. 10' });
+  html += calcDetail({ name: tx('Omdrejningstal', 'Speed'), formula: 'n = (U - I_a\u00B7R_a)/(c\u00B7\u03A6)', variables: [{ name: tx('Klemsp\u00E6nding', 'Terminal voltage'), symbol: 'U', value: dcmaskineState.U, unit: 'V' }, { name: tx('Ankerstr\u00F8m', 'Armature current'), symbol: 'I_a', value: dcmaskineState.Ia, unit: 'A' }, { name: tx('Ankermodstand', 'Armature resistance'), symbol: 'R_a', value: dcmaskineState.Ra, unit: '\u03A9' }, { name: tx('Maskinkonstant \u00D7 flux', 'Machine constant \u00D7 flux'), symbol: 'c\u03A6', source: _md }], reference: 'Opgavesamling Kap. 10' });
+  html += symbolLegend([
+    { name: tx('Indre EMK', 'Internal EMF'), symbol: 'E', unit: 'V' },
+    { name: tx('Klemsp\u00E6nding', 'Terminal voltage'), symbol: 'U', unit: 'V' },
+    { name: tx('Ankerstr\u00F8m', 'Armature current'), symbol: 'I_a', unit: 'A' },
+    { name: tx('Ankermodstand', 'Armature resistance'), symbol: 'R_a', unit: '\u03A9' },
+    { name: tx('Moment', 'Torque'), symbol: 'M', unit: 'Nm' },
+    { name: tx('Omdrejningstal', 'Speed'), symbol: 'n', unit: 'o/min' },
+    { name: tx('Flux', 'Flux'), symbol: '\u03A6', unit: 'Wb' },
+    { name: tx('Maskinkonstant', 'Machine constant'), symbol: 'c', unit: '' },
+    { name: tx('Momentkonstant', 'Torque constant'), symbol: 'k', unit: '' }
+  ]);
+  html += '</div>';
   return html;
 }
 
@@ -26191,7 +26489,7 @@ function renderDcmaskineTorque() {
   html += '</div></div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">M</span><span class="value" style="font-weight:700">' + M.toFixed(2) + ' Nm</span></div></div>';
-  html += calcDetail({ name: tx('Aksiale moment', 'Shaft torque'), formula: 'M = 9.55\u00B7P/n', variables: [{ name: 'P', symbol: 'P', value: dcmaskineState.Pmech, unit: 'W', source: tx('Delt v\u00E6rdi', 'Shared value') }, { name: 'n', symbol: 'n', value: dcmaskineState.n, unit: 'o/min' }], substitution: '9.55 \u00D7 ' + dcmaskineState.Pmech + ' / ' + dcmaskineState.n, result: { value: M, unit: 'Nm' }, reference: 'Opgavesamling Kap. 10' });
+  html += calcDetail({ name: tx('Aksiale moment', 'Shaft torque'), formula: 'M = 9.55\u00B7P/n', variables: [{ name: 'P', symbol: 'P', value: dcmaskineState.Pmech, unit: 'W', source: tx('Delt v\u00E6rdi', 'Shared value') }, { name: 'n', symbol: 'n', value: dcmaskineState.n, unit: 'o/min' }, { name: tx('Momentkonstant', 'Torque constant'), symbol: PHYS_CONST.TORQUE_K.symbol, value: PHYS_CONST.TORQUE_K.value, unit: PHYS_CONST.TORQUE_K.unit, source: PHYS_CONST.TORQUE_K.source }], substitution: PHYS_CONST.TORQUE_K.value + ' \u00D7 ' + dcmaskineState.Pmech + ' / ' + dcmaskineState.n, result: { value: M, unit: 'Nm' }, reference: 'Opgavesamling Kap. 10' });
   html += '</div>';
   return html;
 }
