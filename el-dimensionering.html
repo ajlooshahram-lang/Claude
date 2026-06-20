@@ -881,6 +881,33 @@ html[dir="rtl"] .info-row { text-align: right; }
 html[dir="rtl"] .select-label { text-align: right; }
 html[dir="rtl"] .status-bar { direction: rtl; }
 html[dir="rtl"] .lang-toggle { direction: ltr; }
+
+/* ===== Native MathML formula typesetting (Mathcad-like) ===== */
+/* Offline-safe system math-font stack (no CDN / no embedded WOFF2). */
+math,
+.mathml-formula math {
+  font-family: "Cambria Math", "STIX Two Math", "Latin Modern Math", "XITS Math", serif;
+  font-size: 1.06em;
+  font-style: normal;
+}
+.mathml-formula { display: inline-block; vertical-align: middle; position: relative; }
+.mathml-formula math { direction: ltr; }
+/* Units typeset in distinct blue bold, matching the engineering references. */
+.math-unit { color: #1565c0; font-weight: 700; }
+/* Visually-hidden ASCII twin: preserves the exact source for search/AT. */
+.mathml-alt {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+.mathml-fallback { font-family: monospace; }
+@media print {
+  math,
+  .mathml-formula math {
+    font-family: "Cambria Math", "STIX Two Math", "Latin Modern Math", "XITS Math", serif;
+  }
+  .mathml-formula math { display: inline; }
+  .math-unit { color: #1565c0; font-weight: bold; }
+}
 </style>
 </head>
 <body>
@@ -1373,6 +1400,8 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // MathML formula typesetting
+  'Typeset formula': '\u0641\u0631\u0645\u0648\u0644 \u062D\u0631\u0648\u0641\u200C\u0686\u06CC\u0646\u06CC\u200C\u0634\u062F\u0647',
   // Commissioning / Verification companion (DS/HD 60364-6) — Persian
   'Commissioning & verification': '\u0631\u0627\u0647\u200C\u0627\u0646\u062F\u0627\u0632\u06CC \u0648 \u062A\u0623\u06CC\u06CC\u062F',
   'Turns the calculated design into DS/HD 60364-6 field acceptance targets: the Zs and RA ceilings are DERIVED by INVERTING the auditor\u2019s own disconnection inequalities (same Ia source), tightened for worst-day conductor temperature. 100% click \u2014 no typing.': '\u0637\u0631\u0627\u062D\u06CC \u0645\u062D\u0627\u0633\u0628\u0647\u200C\u0634\u062F\u0647 \u0631\u0627 \u0628\u0647 \u0627\u0647\u062F\u0627\u0641 \u067E\u0630\u06CC\u0631\u0634 \u0645\u06CC\u062F\u0627\u0646\u06CC DS/HD 60364-6 \u062A\u0628\u062F\u06CC\u0644 \u0645\u06CC\u200C\u06A9\u0646\u062F: \u0633\u0642\u0641\u200C\u0647\u0627\u06CC Zs \u0648 RA \u0628\u0627 \u0648\u0627\u0631\u0648\u0646\u200C\u0633\u0627\u0632\u06CC \u0646\u0627\u0628\u0631\u0627\u0628\u0631\u06CC\u200C\u0647\u0627\u06CC \u0642\u0637\u0639 \u062E\u0648\u062F \u0645\u0645\u06CC\u0632 \u0628\u0647\u200C\u062F\u0633\u062A \u0645\u06CC\u200C\u0622\u06CC\u062F (\u0647\u0645\u0627\u0646 \u0645\u0646\u0628\u0639 Ia)\u060C \u0628\u0631\u0627\u06CC \u062F\u0645\u0627\u06CC \u0647\u0627\u062F\u06CC \u062F\u0631 \u0628\u062F\u062A\u0631\u06CC\u0646 \u0631\u0648\u0632 \u0633\u062E\u062A\u200C\u06AF\u06CC\u0631\u0627\u0646\u0647 \u0634\u062F\u0647. \u06F1\u06F0\u06F0\u066A \u06A9\u0644\u06CC\u06A9 \u2014 \u0628\u062F\u0648\u0646 \u062A\u0627\u06CC\u067E.',
@@ -6505,6 +6534,268 @@ function renderQiCard(qi) {
 }
 
 // ============================================================================
+// ===== NATIVE MathML FORMULA TYPESETTING (transpiler) =====
+// ============================================================================
+// Self-contained ASCII-math -> native MathML Core transpiler. NO external
+// library / CDN. Turns the formula/substitution conventions already used across
+// this codebase into Mathcad-style typeset math: dotted multi-part subscripts,
+// real radicals, stacked fractions, the define operator (:=), chained
+// inequalities, absolute-value bars, Danish-decimal numbers, Greek/symbols.
+//
+// PRESENTATION ONLY: it never changes a number, operator or meaning. Every
+// emitted <math> carries the EXACT original ASCII as an `alttext` attribute AND
+// as a visually-hidden span, so substring/text search still finds the source.
+// If parsing fails or the input looks like prose, it falls back to the escaped
+// raw text and NEVER throws to the page.
+//
+// Grammar guards (LOCKED): `^` is the ONLY superscript trigger (trailing digits
+// like Un/S1/SN stay part of the identifier, never auto-superscripted); `_` is
+// the ONLY subscript trigger and binds tighter than `/`; `/` is an
+// expression-level stacked fraction; `·`/`×`/`*` all render as `·`.
+// ============================================================================
+
+function mmlEsc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function mmlEscAttr(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Render a known/structured unit in the distinct blue "math unit" style.
+function mathmlUnit(u) {
+  if (u == null || u === '') return '';
+  return '<span class="math-unit">' + mmlEsc(u) + '</span>';
+}
+
+// Tokenize + parse an ASCII-math expression into a MathML fragment string.
+// Throws on prose/malformed input (caller falls back gracefully).
+function mathmlParse(raw) {
+  var s = String(raw);
+  var L = s.length;
+  var i = 0;
+  var toks = [];
+  var letterRe = /[A-Za-z\u00B5\u00C0-\u024F\u0391-\u03C9]/;
+  function isLetter(c) { return letterRe.test(c); }
+  function isDigit(c) { return c >= '0' && c <= '9'; }
+  function isIdentChar(c) { return isLetter(c) || isDigit(c) || c === '%'; }
+  function isSubChar(c) { return isLetter(c) || isDigit(c) || c === '.' || c === '%'; }
+  while (i < L) {
+    var c = s[i];
+    if (c === ' ' || c === '\t' || c === '\n' || c === '\r' || c === '\u00A0') { i++; continue; }
+    if (c === ':' && s[i + 1] === '=') { toks.push({ t: 'op', v: ':=' }); i += 2; continue; }
+    if (c === '<' && s[i + 1] === '=') { toks.push({ t: 'op', v: '\u2264' }); i += 2; continue; }
+    if (c === '>' && s[i + 1] === '=') { toks.push({ t: 'op', v: '\u2265' }); i += 2; continue; }
+    if (isDigit(c)) {
+      var jn = i + 1;
+      while (jn < L && isDigit(s[jn])) jn++;
+      if (jn < L && (s[jn] === '.' || s[jn] === ',') && jn + 1 < L && isDigit(s[jn + 1])) {
+        jn++; while (jn < L && isDigit(s[jn])) jn++;
+      }
+      toks.push({ t: 'num', v: s.slice(i, jn) }); i = jn; continue;
+    }
+    if (isLetter(c)) {
+      var je = i + 1;
+      while (je < L && isIdentChar(s[je])) je++;
+      var name = s.slice(i, je);
+      var primes = '';
+      while (je < L && s[je] === "'") { primes += "'"; je++; }
+      var sub = null;
+      if (je < L && s[je] === '_') {
+        var k = je + 1, sj = k;
+        while (sj < L && isSubChar(s[sj])) sj++;
+        if (sj > k) { sub = s.slice(k, sj); je = sj; }
+      }
+      var plain = (primes === '' && sub === null && /^[A-Za-z\u00C0-\u024F\u0391-\u03C9]{2,}$/.test(name));
+      toks.push({ t: 'id', name: name, primes: primes, sub: sub, plain: plain }); i = je; continue;
+    }
+    if (c === '\u00B7' || c === '\u00D7' || c === '*') { toks.push({ t: 'op', v: '*' }); i++; continue; }
+    if ('()|^/+-'.indexOf(c) >= 0) { toks.push({ t: 'op', v: c }); i++; continue; }
+    if (c === '\u221A') { toks.push({ t: 'op', v: '\u221A' }); i++; continue; }
+    if (c === '=') { toks.push({ t: 'op', v: '=' }); i++; continue; }
+    if (c === '<') { toks.push({ t: 'op', v: '<' }); i++; continue; }
+    if (c === '>') { toks.push({ t: 'op', v: '>' }); i++; continue; }
+    if (c === '\u2264' || c === '\u2265' || c === '\u2260') { toks.push({ t: 'op', v: c }); i++; continue; }
+    if (c === '\u00B2' || c === '\u00B3' || c === '\u00B9') {
+      toks.push({ t: 'op', v: 'usup', sup: (c === '\u00B2' ? '2' : c === '\u00B3' ? '3' : '1') }); i++; continue;
+    }
+    if (c === '%') { toks.push({ t: 'op', v: '%' }); i++; continue; }
+    if (c === '\u00B0') { toks.push({ t: 'op', v: '\u00B0' }); i++; continue; }
+    throw new Error('mathml: unrecognized character');
+  }
+
+  var p = 0;
+  var absDepth = 0;
+  function tk() { return toks[p]; }
+  function opIs(v) { var x = toks[p]; return !!x && x.t === 'op' && x.v === v; }
+  var RELOP = { '=': 1, ':=': 1, '\u2264': 1, '\u2265': 1, '\u2260': 1, '<': 1, '>': 1 };
+
+  function relML(op) {
+    if (op === '<') return '<mo>&lt;</mo>';
+    if (op === '>') return '<mo>&gt;</mo>';
+    return '<mo>' + op + '</mo>';
+  }
+
+  function isAtomStart(x) {
+    if (!x) return false;
+    if (x.t === 'num' || x.t === 'id') return true;
+    if (x.t === 'op' && (x.v === '(' || x.v === '\u221A')) return true;
+    if (x.t === 'op' && x.v === '|') return !(absDepth > 0);
+    return false;
+  }
+
+  function parseRel() {
+    var out = parseAdd().ml;
+    while (toks[p] && toks[p].t === 'op' && RELOP[toks[p].v]) {
+      var op = toks[p++].v;
+      out += relML(op) + parseAdd().ml;
+    }
+    return out;
+  }
+
+  function parseAdd() {
+    var left = parseTerm();
+    var ml = left.ml;
+    while (toks[p] && toks[p].t === 'op' && (toks[p].v === '+' || toks[p].v === '-')) {
+      var op = toks[p++].v;
+      ml += '<mo>' + op + '</mo>' + parseTerm().ml;
+    }
+    return { ml: ml, word: false, stripped: null };
+  }
+
+  function parseTerm() {
+    var left = parseFactor();
+    while (true) {
+      var x = toks[p];
+      if (!x) break;
+      if (x.t === 'op' && x.v === '*') { p++; var r1 = parseFactor(); left = { ml: left.ml + '<mo>\u00B7</mo>' + r1.ml, word: false, stripped: null }; continue; }
+      if (x.t === 'op' && x.v === '/') {
+        p++; var r2 = parseFactor();
+        var num = (left.stripped != null) ? left.stripped : left.ml;
+        var den = (r2.stripped != null) ? r2.stripped : r2.ml;
+        left = { ml: '<mfrac><mrow>' + num + '</mrow><mrow>' + den + '</mrow></mfrac>', word: false, stripped: null };
+        continue;
+      }
+      if (x.t === 'op' && x.v === '%') { p++; left = { ml: left.ml + '<mo>%</mo>', word: false, stripped: null }; continue; }
+      if (x.t === 'op' && x.v === '\u00B0') { p++; left = { ml: left.ml + '<mo>\u00B0</mo>', word: false, stripped: null }; continue; }
+      if (isAtomStart(x)) {
+        var r3 = parseFactor();
+        if (left.word && r3.word) throw new Error('mathml: prose juxtaposition');
+        left = { ml: left.ml + r3.ml, word: false, stripped: null };
+        continue;
+      }
+      break;
+    }
+    return left;
+  }
+
+  function parseFactor() {
+    var x = toks[p];
+    if (!x) throw new Error('mathml: unexpected end');
+    if (x.t === 'op' && (x.v === '+' || x.v === '-')) { p++; var f = parseFactor(); return { ml: '<mo>' + x.v + '</mo>' + f.ml, word: false, stripped: null }; }
+    var prim = parsePrimary();
+    var sup = null;
+    if (toks[p] && toks[p].t === 'op' && toks[p].v === '^') { p++; sup = parseExponent(); }
+    else if (toks[p] && toks[p].t === 'op' && toks[p].v === 'usup') { sup = '<mn>' + toks[p].sup + '</mn>'; p++; }
+    if (sup != null) {
+      if (prim.sub != null) return { ml: '<msubsup>' + prim.base + '<mrow>' + prim.sub + '</mrow><mrow>' + sup + '</mrow></msubsup>', word: false, stripped: null };
+      return { ml: '<msup><mrow>' + prim.base + '</mrow><mrow>' + sup + '</mrow></msup>', word: false, stripped: null };
+    }
+    if (prim.sub != null) return { ml: '<msub>' + prim.base + '<mrow>' + prim.sub + '</mrow></msub>', word: false, stripped: null };
+    return { ml: prim.base, word: prim.word, stripped: prim.isParen ? prim.inner : null };
+  }
+
+  function parseExponent() {
+    var x = toks[p];
+    if (!x) throw new Error('mathml: missing exponent');
+    if (x.t === 'op' && x.v === '(') {
+      p++; var inner = parseRel();
+      if (!opIs(')')) throw new Error('mathml: unbalanced exponent paren');
+      p++;
+      return '<mrow>' + inner + '</mrow>';
+    }
+    var prim = parsePrimary();
+    var ml = (prim.sub != null) ? '<msub>' + prim.base + '<mrow>' + prim.sub + '</mrow></msub>' : prim.base;
+    return '<mrow>' + ml + '</mrow>';
+  }
+
+  function parsePrimary() {
+    var x = toks[p];
+    if (!x) throw new Error('mathml: unexpected end');
+    if (x.t === 'num') { p++; return { base: '<mn>' + x.v + '</mn>', sub: null, isParen: false, word: false }; }
+    if (x.t === 'id') {
+      p++;
+      var baseName = '<mi>' + mmlEsc(x.name) + '</mi>';
+      var primeML = '';
+      if (x.primes === "'") primeML = '<mo>\u2032</mo>';
+      else if (x.primes.length === 2) primeML = '<mo>\u2033</mo>';
+      else if (x.primes.length >= 3) primeML = '<mo>\u2034</mo>';
+      var base = primeML ? '<mrow>' + baseName + primeML + '</mrow>' : baseName;
+      var sub = null;
+      if (x.sub != null && x.sub !== '') {
+        sub = /^[0-9]+$/.test(x.sub) ? '<mn>' + x.sub + '</mn>' : '<mi>' + mmlEsc(x.sub) + '</mi>';
+      }
+      return { base: base, sub: sub, isParen: false, word: x.plain };
+    }
+    if (x.t === 'op' && x.v === '(') {
+      p++; var inner1 = parseRel();
+      if (!opIs(')')) throw new Error('mathml: unbalanced paren');
+      p++;
+      return { base: '<mrow><mo>(</mo>' + inner1 + '<mo>)</mo></mrow>', sub: null, isParen: true, inner: '<mrow>' + inner1 + '</mrow>', word: false };
+    }
+    if (x.t === 'op' && x.v === '|') {
+      p++; absDepth++;
+      var inner2 = parseRel();
+      absDepth--;
+      if (!opIs('|')) throw new Error('mathml: unbalanced abs');
+      p++;
+      return { base: '<mrow><mo>|</mo>' + inner2 + '<mo>|</mo></mrow>', sub: null, isParen: false, word: false };
+    }
+    if (x.t === 'op' && x.v === '\u221A') {
+      p++;
+      if (toks[p] && toks[p].t === 'op' && toks[p].v === '(') {
+        p++; var inner3 = parseRel();
+        if (!opIs(')')) throw new Error('mathml: unbalanced radical');
+        p++;
+        return { base: '<msqrt><mrow>' + inner3 + '</mrow></msqrt>', sub: null, isParen: false, word: false };
+      }
+      var rad = parseFactor();
+      return { base: '<msqrt>' + rad.ml + '</msqrt>', sub: null, isParen: false, word: false };
+    }
+    throw new Error('mathml: unexpected token');
+  }
+
+  var result = parseRel();
+  if (p < toks.length) throw new Error('mathml: trailing tokens');
+  if (result === '') throw new Error('mathml: empty');
+  return result;
+}
+
+// Public entry point. Returns an HTML string: a <math> element (with the exact
+// ASCII preserved in `alttext` + a visually-hidden span) on success, or the
+// escaped raw text on failure (graceful fallback). Multi-line input (\n) is
+// transpiled line-by-line and joined with <br>.
+function mathml(expr, opts) {
+  opts = opts || {};
+  if (expr == null) return '';
+  var raw = String(expr);
+  if (raw.indexOf('\n') >= 0) {
+    return raw.split('\n').map(function (ln) { return mathml(ln, opts); }).join('<br>');
+  }
+  if (raw.trim() === '') return mmlEsc(raw);
+  try {
+    var inner = mathmlParse(raw);
+    var titleAttr = opts.title ? ' title="' + mmlEscAttr(opts.title) + '"' : '';
+    var h = '<span class="mathml-formula"' + titleAttr + '>';
+    h += '<math xmlns="http://www.w3.org/1998/Math/MathML" alttext="' + mmlEscAttr(raw) + '"><mrow>' + inner + '</mrow></math>';
+    h += '<span class="mathml-alt" aria-hidden="false" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">' + mmlEsc(raw) + '</span>';
+    h += '</span>';
+    return h;
+  } catch (e) {
+    return '<span class="mathml-fallback">' + mmlEsc(raw) + '</span>';
+  }
+}
+
+// ============================================================================
 // ===== UNIVERSAL CALCULATION DETAIL HELPER (calcDetail) =====
 // ============================================================================
 // Generic function that renders a standardized "calculation detail card" showing:
@@ -6530,7 +6821,7 @@ function calcDetail(calc) {
   h += '<summary style="cursor:pointer;padding:8px 12px;background:var(--primary-glow);font-weight:600;font-size:0.85rem;display:flex;align-items:center;gap:6px">';
   h += '<span style="flex:1">' + (calc.name || '') + '</span>';
   if (calc.result && calc.result.value != null) {
-    h += '<span style="font-family:monospace;color:var(--primary)">' + calcDetailFmtVal(calc.result.value) + (calc.result.unit ? ' ' + calc.result.unit : '') + '</span>';
+    h += '<span style="font-family:monospace;color:var(--primary)">' + calcDetailFmtVal(calc.result.value) + (calc.result.unit ? ' ' + mathmlUnit(calc.result.unit) : '') + '</span>';
   }
   h += '<span style="color:var(--text-muted);font-size:0.75rem;white-space:nowrap">' + tx('vis udregning', 'show working') + ' \u25BC</span>';
   h += '</summary>';
@@ -6538,7 +6829,7 @@ function calcDetail(calc) {
   h += '<div style="padding:10px 14px;font-size:0.82rem">';
   // Formula
   if (calc.formula) {
-    h += '<div style="margin-bottom:6px"><strong>' + tx('Formel', 'Formula') + ':</strong> <code style="font-size:0.9em;background:var(--border-light);padding:2px 6px;border-radius:4px">' + calc.formula + '</code></div>';
+    h += '<div style="margin-bottom:6px"><strong>' + tx('Formel', 'Formula') + ':</strong> <code style="font-size:0.9em;background:var(--border-light);padding:2px 6px;border-radius:4px">' + mathml(calc.formula, { title: tx('Typesat formel', 'Typeset formula') }) + '</code></div>';
   }
   // Variable table
   if (calc.variables && calc.variables.length) {
@@ -6550,7 +6841,7 @@ function calcDetail(calc) {
       h += '<tr style="border-bottom:1px solid var(--border-light)">';
       h += '<td style="padding:3px 6px">' + (v.name || v.symbol || '') + '</td>';
       h += '<td style="padding:3px 6px;font-family:monospace">' + (v.symbol || '') + '</td>';
-      h += '<td style="padding:3px 6px;font-family:monospace">' + calcDetailFmtVal(v.value) + (v.unit ? ' ' + v.unit : '') + '</td>';
+      h += '<td style="padding:3px 6px;font-family:monospace">' + calcDetailFmtVal(v.value) + (v.unit ? ' ' + mathmlUnit(v.unit) : '') + '</td>';
       h += '<td style="padding:3px 6px;color:var(--text-muted);font-size:0.78rem">' + (v.source || '') + '</td>';
       h += '</tr>';
     }
@@ -6558,7 +6849,7 @@ function calcDetail(calc) {
   }
   // Substitution line
   if (calc.substitution) {
-    h += '<div style="margin-bottom:6px"><strong>' + tx('Inds\u00E6tning', 'Substitution') + ':</strong> <code style="font-family:monospace;font-size:0.88em">' + calc.substitution + '</code></div>';
+    h += '<div style="margin-bottom:6px"><strong>' + tx('Inds\u00E6tning', 'Substitution') + ':</strong> <code style="font-family:monospace;font-size:0.88em">' + mathml(calc.substitution, { title: tx('Typesat formel', 'Typeset formula') }) + '</code></div>';
   }
   // Intermediate steps
   if (calc.steps && calc.steps.length) {
@@ -6582,7 +6873,7 @@ function calcDetail(calc) {
   if (calc.result) {
     h += '<div style="margin-top:6px;padding:6px 10px;background:var(--success-bg);border-radius:var(--radius-sm);font-weight:600">';
     h += '<strong>' + tx('Resultat', 'Result') + ':</strong> ';
-    h += '<span style="font-family:monospace;font-size:1.05em">' + calcDetailFmtVal(calc.result.value) + (calc.result.unit ? ' ' + calc.result.unit : '') + '</span>';
+    h += '<span style="font-family:monospace;font-size:1.05em">' + calcDetailFmtVal(calc.result.value) + (calc.result.unit ? ' ' + mathmlUnit(calc.result.unit) : '') + '</span>';
     if (calc.result.status) {
       var stColor = calc.result.status === 'ok' ? 'var(--success)' : (calc.result.status === 'fail' ? 'var(--danger)' : 'var(--warning)');
       var stIcon = calc.result.status === 'ok' ? '\u2705' : (calc.result.status === 'fail' ? '\u26D4' : '\u26A0\uFE0F');
@@ -21649,7 +21940,7 @@ function provRenderEntry(e, expanded) {
   let h = '<details class="prov-entry"' + open + '>';
   h += '<summary style="cursor:pointer;font-weight:600">' + e.title + ' \u2014 ' + provVerdictBadge(e.verdict) + '<span style="color:var(--text-muted);font-weight:400"> \u00B7 ' + tx('vis udregning', 'show working') + '</span></summary>';
   h += '<div class="prov-body" style="padding:6px 0 10px 10px;font-size:0.82rem">';
-  h += '<div class="prov-formula" style="font-family:monospace"><strong>' + tx('Formel', 'Formula') + ':</strong> ' + e.formula + '</div>';
+  h += '<div class="prov-formula" style="font-family:monospace"><strong>' + tx('Formel', 'Formula') + ':</strong> ' + mathml(e.formula, { title: tx('Typesat formel', 'Typeset formula') }) + '</div>';
   if (e.inputs && e.inputs.length) {
     h += '<div style="margin-top:4px"><strong>' + tx('Inputv\u00E6rdier', 'Input values') + ':</strong><ul style="margin:2px 0 0 18px">';
     e.inputs.forEach(function (i) { h += '<li>' + i.sym + ' = ' + i.val + ' <span style="color:var(--text-muted)">(' + i.src + ')</span></li>'; });
@@ -21887,6 +22178,10 @@ function reportPrintCSS() {
     + '.prov-entry > summary{list-style:none}'
     + '.prov-entry[open]{page-break-inside:avoid}'
     + '.report-statement{border:1px solid #000;padding:6px;background:#f7f7f7}'
+    + 'math{font-family:"Cambria Math","STIX Two Math","Latin Modern Math","XITS Math",serif;display:inline}'
+    + '.mathml-formula{display:inline-block;position:relative}'
+    + '.math-unit{color:#1565c0;font-weight:bold}'
+    + '.mathml-alt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}'
     + '@page{margin:14mm}';
 }
 

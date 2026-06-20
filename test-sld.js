@@ -12156,6 +12156,215 @@ test('Commissioning: module is registered in renderModule and renders without th
   upRestore(saved);
 });
 
+// ============================================================================
+// ===== NATIVE MathML FORMULA TYPESETTING TESTS (mathml transpiler) =====
+// ============================================================================
+console.log('\n=== MathML Formula Typesetting Tests ===\n');
+
+function mmlCount(hay, needle) {
+  var n = 0, idx = 0;
+  while ((idx = hay.indexOf(needle, idx)) >= 0) { n++; idx += needle.length; }
+  return n;
+}
+// Extract the inner <math>...</math> markup from a mathml() result (first match).
+function mmlInner(out) {
+  var a = out.indexOf('<math');
+  var b = out.indexOf('</math>');
+  return (a >= 0 && b >= 0) ? out.slice(a, b + 7) : '';
+}
+
+test('mathml: subscript with dotted multi-part subscript preserved', function() {
+  var out = mathml('I_K1s.fase');
+  var inner = mmlInner(out);
+  assert(inner.indexOf('<msub>') >= 0, 'has <msub>');
+  assert(inner.indexOf('<mi>I</mi>') >= 0, 'base is identifier I');
+  assert(inner.indexOf('K1s.fase') >= 0, 'dotted multi-part subscript preserved');
+});
+
+test('mathml: double-prime base + msub subscript', function() {
+  var out = mathml("t''_linje");
+  var inner = mmlInner(out);
+  assert(inner.indexOf('\u2033') >= 0, 'base carries double-prime \u2033');
+  assert(inner.indexOf('<msub>') >= 0, 'has msub');
+  assert(inner.indexOf('linje') >= 0, 'subscript linje present');
+  assert(inner.indexOf('<mi>t</mi>') >= 0, 'base identifier t present');
+});
+
+test('mathml: superscript via ^ incl fractional, and unicode square', function() {
+  var inner = mmlInner(mathml('s^(1/2)'));
+  assert(inner.indexOf('<msup>') >= 0, 's^(1/2) has <msup>');
+  assert(inner.indexOf('<mfrac>') >= 0, 'fractional exponent is an <mfrac> (1 over 2)');
+  assert(inner.indexOf('<mn>1</mn>') >= 0 && inner.indexOf('<mn>2</mn>') >= 0, 'mfrac 1 over 2');
+  var inner2 = mmlInner(mathml('x\u00B2'));
+  assert(inner2.indexOf('<msup>') >= 0, 'x\u00B2 has <msup>');
+  assert(inner2.indexOf('<mn>2</mn>') >= 0, 'unicode square -> exponent 2');
+});
+
+test('mathml: trailing-digit guard (Un, S1, SN render as identifiers)', function() {
+  ['Un', 'S1', 'SN'].forEach(function(id) {
+    var inner = mmlInner(mathml(id));
+    assert(inner.indexOf('<msup>') < 0, id + ' must NOT be superscripted');
+    assert(inner.indexOf('<msub>') < 0, id + ' must NOT be subscripted');
+    assert(inner.indexOf('<mi>' + id + '</mi>') >= 0, id + ' is a single identifier');
+  });
+});
+
+test('mathml: bare radical and radical over a fraction', function() {
+  var i3 = mmlInner(mathml('\u221A3'));
+  assert(i3.indexOf('<msqrt><mn>3</mn></msqrt>') >= 0, '\u221A3 -> msqrt over just 3');
+  assert(i3.indexOf('<mfrac>') < 0, 'no spurious fraction');
+  var is = mmlInner(mathml('\u221As'));
+  assert(is.indexOf('<msqrt><mi>s</mi></msqrt>') >= 0, '\u221As -> msqrt over just s');
+  var ip = mmlInner(mathml('\u221A(P0/Pcu)'));
+  assert(ip.indexOf('<msqrt>') >= 0 && ip.indexOf('<mfrac>') >= 0, '\u221A(P0/Pcu) -> msqrt over mfrac');
+});
+
+test('mathml: stacked fraction with correct numerator/denominator grouping', function() {
+  var inner = mmlInner(mathml('c \u00B7 Un / (\u221A3 \u00B7 Zt)'));
+  assert(inner.indexOf('<mfrac>') >= 0, 'has <mfrac>');
+  // numerator c·Un
+  assert(inner.indexOf('<mi>c</mi><mo>\u00B7</mo><mi>Un</mi>') >= 0, 'numerator is c \u00B7 Un');
+  // denominator √3 · Zt (parenthesised source -> grouped under the bar)
+  assert(inner.indexOf('<msqrt><mn>3</mn></msqrt><mo>\u00B7</mo><mi>Zt</mi>') >= 0, 'denominator is \u221A3 \u00B7 Zt');
+});
+
+test('mathml: absolute-value bars fence a subscripted identifier', function() {
+  var inner = mmlInner(mathml('|I_K3F.max.for|'));
+  assert(mmlCount(inner, '<mo>|</mo>') === 2, 'two fence bars');
+  assert(inner.indexOf('<msub>') >= 0, 'subscripted identifier inside bars');
+  assert(inner.indexOf('K3F.max.for') >= 0, 'dotted subscript preserved');
+});
+
+test('mathml: chained inequality (unicode and ASCII <= forms)', function() {
+  var inner = mmlInner(mathml('IB \u2264 In \u2264 Iz'));
+  assert(mmlCount(inner, '<mo>\u2264</mo>') === 2, 'two \u2264 operators');
+  assert(inner.indexOf('<mi>IB</mi>') >= 0 && inner.indexOf('<mi>In</mi>') >= 0 && inner.indexOf('<mi>Iz</mi>') >= 0, 'three operands');
+  var inner2 = mmlInner(mathml('IB <= In <= Iz'));
+  assert(mmlCount(inner2, '<mo>\u2264</mo>') === 2, 'ASCII <= maps to two \u2264 operators');
+});
+
+test('mathml: define operator := is distinct, and = evaluation form works', function() {
+  var inner = mmlInner(mathml('l_lang := l_1 + l_2 + l_3 + l_F'));
+  assert(inner.indexOf('<mo>:=</mo>') >= 0, ':= rendered distinctly');
+  assert(inner.indexOf('<mo>=</mo>') < 0, ':= must not collapse to plain =');
+  assert(inner.indexOf('<msub>') >= 0, 'l_1 etc are subscripted');
+  var ev = mmlInner(mathml('l_lang = 5'));
+  assert(ev.indexOf('<mo>=</mo>') >= 0 && ev.indexOf('<mn>5</mn>') >= 0, 'evaluation = 5 form works');
+});
+
+test('mathml: Danish-decimal numbers, parenthesised base, superscript exponent', function() {
+  var out = mathml('Pb = 0,834 \u00B7 (W\u00B7n)^0,89');
+  var inner = mmlInner(out);
+  assert(inner !== '', 'parses to <math> (does not fall back)');
+  assert(inner.indexOf('<mn>0,834</mn>') >= 0, 'Danish decimal 0,834 preserved');
+  assert(inner.indexOf('<mn>0,89</mn>') >= 0, 'Danish decimal exponent 0,89 preserved');
+  assert(inner.indexOf('<msup>') >= 0, 'has superscript');
+  assert(inner.indexOf('<mo>(</mo>') >= 0, 'parenthesised base preserved');
+});
+
+test('mathml: alttext fidelity (attribute + hidden span preserve exact ASCII)', function() {
+  var f = 'Ik3max = c \u00B7 Un / (\u221A3 \u00B7 Zt)';
+  var out = mathml(f);
+  assert(out.indexOf('alttext="' + f + '"') >= 0, 'exact ASCII in alttext attribute');
+  assert(out.indexOf('class="mathml-alt"') >= 0, 'has visually-hidden ASCII twin span');
+  assert(out.indexOf(f) >= 0, 'substring search for the ASCII still succeeds');
+  // hidden span carries the ASCII too
+  var spanIdx = out.indexOf('class="mathml-alt"');
+  assert(out.indexOf(f, spanIdx) >= 0, 'hidden span contains the exact ASCII');
+});
+
+test('mathml: graceful fallback never throws and returns escaped raw text', function() {
+  assert.doesNotThrow(function() { mathml('see note below'); }, 'prose does not throw');
+  assert.doesNotThrow(function() { mathml('a / ('); }, 'unbalanced does not throw');
+  var prose = mathml('see note below');
+  assert(prose.indexOf('<math') < 0, 'prose -> no broken <math>');
+  assert(prose.indexOf('see note below') >= 0, 'prose raw text preserved');
+  var bad = mathml('a / (');
+  assert(bad.indexOf('<math') < 0, 'unbalanced -> no broken <math>');
+  assert(bad.indexOf('a / (') >= 0, 'unbalanced raw text preserved');
+  // escaping in fallback
+  var esc = mathml('x < y & z');
+  assert(esc.indexOf('&lt;') >= 0 && esc.indexOf('&amp;') >= 0, 'fallback escapes < and &');
+});
+
+test('mathml: well-formedness for a battery of real codebase formulas', function() {
+  var formulas = [
+    'Iz = Iz_tab \u00B7 K_install \u00B7 K_temp \u00B7 K_group',
+    'Ik3max = c \u00B7 Un / (\u221A3 \u00B7 Zt)',
+    'IB \u2264 In \u2264 Iz',
+    'Icu \u2265 Ik3max',
+    '\u03B7 = P2 / (P2 + P0 + Pcu\u00D7(S/SN)\u00B2)',
+    'er% = Pcu / (SN \u00D7 1000) \u00D7 100',
+    'S_opt/SN = \u221A(P0/Pcu)',
+    '\u0394U% = (\u0394U / Un) \u00D7 100',
+    'I_fl = S_N / (\u221A3 \u00D7 U2)',
+    'k = l\u00D7b / (hm\u00D7(l+b))'
+  ];
+  var pairs = [['<math', '</math>'], ['<mrow>', '</mrow>'], ['<msub>', '</msub>'], ['<msup>', '</msup>'],
+    ['<msubsup>', '</msubsup>'], ['<mfrac>', '</mfrac>'], ['<msqrt>', '</msqrt>']];
+  formulas.forEach(function(f) {
+    var out = mathml(f);
+    assert(out.indexOf('<math') >= 0, 'formula typesets (no fallback): ' + f);
+    pairs.forEach(function(pr) {
+      assert.strictEqual(mmlCount(out, pr[0]), mmlCount(out, pr[1]), 'balanced ' + pr[0] + ' in: ' + f);
+    });
+    // no empty tags
+    assert(out.indexOf('<mi></mi>') < 0 && out.indexOf('<mn></mn>') < 0 && out.indexOf('<mrow></mrow>') < 0, 'no empty tags: ' + f);
+    // no raw ampersand outside known entities
+    var stripped = out.replace(/&(amp|lt|gt|quot);/g, '');
+    assert(stripped.indexOf('&') < 0, 'no unescaped ampersand: ' + f);
+  });
+});
+
+test('mathml: calcDetail regression keeps <math> AND original ASCII', function() {
+  var h1 = calcDetail({ name: 'Ik3max', formula: 'Ik3max = c \u00B7 Un / (\u221A3 \u00B7 Zt)', result: { value: 19.1, unit: 'kA' } });
+  assert(h1.indexOf('<math') >= 0, 'calcDetail render contains <math>');
+  assert(h1.indexOf('Ik3max = c \u00B7 Un / (\u221A3 \u00B7 Zt)') >= 0, 'original ASCII still present (alttext/hidden span)');
+  assert(h1.indexOf('<mfrac>') >= 0, 'fraction typeset inside the card');
+  var h2 = calcDetail({ name: 'Overload', formula: 'IB \u2264 In \u2264 Iz' });
+  assert(h2.indexOf('<math') >= 0, 'second formula typesets');
+  assert(h2.indexOf('IB \u2264 In \u2264 Iz') >= 0, 'original ASCII present for inequality');
+  // blue unit styling applied via structured unit field
+  assert(h1.indexOf('class="math-unit"') >= 0, 'units rendered in blue math-unit style');
+  // data object is not mutated by rendering
+  var calc = { name: 'X', formula: 'IB \u2264 In \u2264 Iz', substitution: '16 \u2264 16 \u2264 21' };
+  calcDetail(calc);
+  assert.strictEqual(calc.formula, 'IB \u2264 In \u2264 Iz', 'formula data field not mutated');
+  assert.strictEqual(calc.substitution, '16 \u2264 16 \u2264 21', 'substitution data field not mutated');
+});
+
+test('mathml: Mathcad font stack + blue units present on screen and print CSS', function() {
+  assert(html.indexOf('"Cambria Math"') >= 0, 'screen CSS has Cambria Math font stack');
+  assert(html.indexOf('"STIX Two Math"') >= 0, 'screen CSS has STIX Two Math fallback');
+  assert(html.indexOf('.math-unit') >= 0, 'screen CSS defines .math-unit');
+  assert(html.indexOf('#1565c0') >= 0, 'unit style is blue (#1565c0)');
+  var pcss = reportPrintCSS();
+  assert(pcss.indexOf('Cambria Math') >= 0, 'print CSS includes the math font stack');
+  assert(pcss.indexOf('math{') >= 0, 'print CSS targets <math>');
+  assert(pcss.indexOf('.math-unit') >= 0, 'print CSS keeps blue units');
+});
+
+test('mathml: new i18n label "Typeset formula" resolves via _FA under lang=fa', function() {
+  assert.ok(_FA['Typeset formula'], 'Typeset formula must have a Farsi translation');
+  var prev = lang;
+  lang = 'fa';
+  var resolved = tx('Typesat formel', 'Typeset formula');
+  lang = prev;
+  assert.strictEqual(resolved, _FA['Typeset formula'], 'tx() resolves the new label to Farsi');
+});
+
+test('mathml: non-invasive — pure presentation, no <math> when no formula', function() {
+  assert.strictEqual(typeof mathml, 'function', 'mathml is a hoisted top-level function');
+  assert.strictEqual(calcDetail(null), '', 'calcDetail(null) still returns empty (unchanged)');
+  var noFormula = calcDetail({ name: 'NoFormula', result: { value: 5, unit: 'A' } });
+  assert(noFormula.indexOf('<math') < 0, 'no formula/substitution -> no <math> injected');
+  // mathml is language-neutral: identifiers unchanged regardless of lang
+  var prev = lang; lang = 'fa';
+  var fa = mmlInner(mathml('IB \u2264 In \u2264 Iz'));
+  lang = prev;
+  assert(fa.indexOf('<mi>IB</mi>') >= 0, 'math identifiers are language-neutral');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
