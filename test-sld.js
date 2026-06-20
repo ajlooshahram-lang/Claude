@@ -11945,6 +11945,217 @@ test('Margin/WorstDay: UI is click-only and states arc-flash/selectivity are out
   upRestore(saved);
 });
 
+// ============================================================================
+// ===== COMMISSIONING / VERIFICATION COMPANION (DS/HD 60364-6) — this feature =
+// ============================================================================
+test('Commissioning: Zs ceiling inverts the auditor (B16 TN \u2248 2.73, C16 \u2248 1.366, In>32 uses 5\u00B7In)', function() {
+  var fc = { rcdMa: null };
+  var b16 = cvZsCeiling('TN', { In: 16, curve: 'B' }, fc, 0.95);
+  assert(Math.abs(b16.zsMax - (0.95 * 230 / 80)) < 1e-9, 'B16 TN zsMax = 0.95*230/(5*16)');
+  assert(Math.abs(b16.zsMax - 2.73125) < 1e-4, 'B16 ~2.73, got ' + b16.zsMax);
+  var c16 = cvZsCeiling('TN', { In: 16, curve: 'C' }, fc, 0.95);
+  assert(Math.abs(c16.zsMax - (0.95 * 230 / 160)) < 1e-9, 'C16 zsMax = 0.95*230/(10*16)');
+  assert(Math.abs(c16.zsMax - 1.365625) < 1e-4, 'C16 ~1.366, got ' + c16.zsMax);
+  var big = cvZsCeiling('TN', { In: 63, curve: 'B' }, fc, 0.95);
+  assert(Math.abs(big.ia - 5 * 63) < 1e-9, 'In>32 -> Ia = 5*In');
+  assert(Math.abs(big.zsMax - (0.95 * 230 / (5 * 63))) < 1e-9, 'In>32 zsMax uses 5*In');
+});
+
+test('Commissioning: TT inversion 50000/I\u0394n (1666.7), missing RCD unresolved (no number), IT Cmin\u00B7400/(2\u00B7Ia)', function() {
+  var tt = cvZsCeiling('TT', { In: 16, curve: 'B' }, { rcdMa: 30 }, 0.95);
+  assert(Math.abs(tt.zsMax - (50000 / 30)) < 1e-9, 'TT zsMax = 50000/I\u0394n');
+  assert(Math.abs(tt.zsMax - 1666.6667) < 0.01, 'TT 30 mA -> 1666.7');
+  var ttNo = cvZsCeiling('TT', { In: 16, curve: 'B' }, { rcdMa: null }, 0.95);
+  assert.strictEqual(ttNo.state, 'unresolved', 'TT without RCD -> unresolved');
+  assert.strictEqual(ttNo.zsMax, null, 'unresolved carries NO number');
+  var it = cvZsCeiling('IT', { In: 16, curve: 'B' }, {}, 0.95);
+  assert(Math.abs(it.zsMax - (0.95 * 400 / (2 * 80))) < 1e-9, 'IT zsMax = Cmin*400/(2*Ia)');
+});
+
+test('Commissioning: upDisconnectionIa is the SINGLE SOURCE the auditor uses (B/C/D, In above/below 32) + byte-identical baseline', function() {
+  ['B', 'C', 'D'].forEach(function(curve) {
+    [10, 16, 25, 32].forEach(function(In) {
+      var info = upDisconnectionIa({ In: In, curve: curve });
+      assert(Math.abs(info.ia - upMagneticMultiple(curve) * In) < 1e-9, curve + In + ' small-final Ia = mult*In');
+      assert.strictEqual(info.timeReqS, 0.4, curve + In + ' small-final 0.4 s');
+    });
+    [40, 63, 100].forEach(function(In) {
+      var info = upDisconnectionIa({ In: In, curve: curve });
+      assert(Math.abs(info.ia - 5 * In) < 1e-9, curve + In + ' large Ia = 5*In');
+      assert.strictEqual(info.timeReqS, 5, curve + In + ' large 5 s');
+    });
+  });
+  var dev = upResolveDevice(MTD_GREEN.finals[0].deviceId, MTD_GREEN.finals[0].deviceIn);
+  var audit = upAuditProject(MTD_GREEN);
+  var zsF = audit.findings.find(function(f) { return upFindingCategory(f) === 'zs'; });
+  assert(zsF.detail.indexOf('Ia=' + upDisconnectionIa(dev).ia.toFixed(0)) >= 0, 'auditor Zs detail uses the shared Ia');
+  var saved = upSnapshot();
+  [MTD_GREEN, MTD_ZS, mtdProject('TT', 'SC-AL-50', mtdFinal({ rcdMa: 30 })), mtdProject('IT', 'SC-AL-50', mtdFinal({}))].forEach(function(p) {
+    assert.deepStrictEqual(upAuditWith(p, {}).findings, upAuditProject(p).findings, 'auditor findings byte-identical after Ia extraction');
+  });
+  upRestore(saved);
+});
+
+test('Commissioning: worst-day cold ceiling is stricter (\u0394R reuses upRMult exactly), equal at 20 \u00B0C', function() {
+  var R20 = 0.5, mat = 'Cu', zsMax = 2.0;
+  assert(cvZsCeilingCold(zsMax, R20, mat, 90) < cvZsCeilingCold(zsMax, R20, mat, 20), 'hotter -> stricter (lower) cold ceiling');
+  assert(Math.abs(cvZsCeilingCold(zsMax, R20, mat, 20) - zsMax) < 1e-12, 'no tightening at 20 \u00B0C (\u0394R=0)');
+  assert(Math.abs(cvDeltaRTemp(R20, mat, 75) - R20 * (upRMult(mat, 75) - 1)) < 1e-12, '\u0394R_temp == R_cable20*(upRMult-1) exactly (proves reuse)');
+  assert.strictEqual(cvZsCeilingCold(zsMax, 0, mat, 90), zsMax, 'L=0 -> R20=0 -> equal at any temp');
+});
+
+test('Commissioning: a circuit whose HOT Zs fails -> test point over-edge, never PASS', function() {
+  var saved = upSnapshot(); var savedRec = cvState.recorded;
+  cvState.recorded = {};
+  upProject = mtdProject('TN', 'SC-AL-50', mtdFinal({ cableId: 'NKT-NOIKLX-1.5', length_m: 200, deviceId: 'SE-iC60N-B16', deviceIn: 16, loadKW: 0.5 }));
+  var zsT = cvBuildReport(upProject).circuits[0].tests.find(function(t) { return t.key === 'zs'; });
+  assert.strictEqual(zsT.result, 'over-edge', 'predicted cold loop already exceeds the cold ceiling -> over-edge');
+  cvState.recorded[cvKey(0, 'zs')] = 0.01; // a "perfect" low reading must NOT rescue it
+  var zsT2 = cvBuildReport(upProject).circuits[0].tests.find(function(t) { return t.key === 'zs'; });
+  assert.strictEqual(zsT2.result, 'over-edge', 'over-edge stays over-edge regardless of recorded value');
+  assert(zsT2.result !== 'PASS', 'never PASS');
+  cvState.recorded = savedRec;
+  upRestore(saved);
+});
+
+test('Commissioning: displayed ceiling rounds DOWN toward danger; exact value retained', function() {
+  var c = cvCeilObj(2.73125, CV_STEP.zs);
+  assert(c._display <= c._exact, 'display <= exact');
+  assert(Math.abs(c._display - (Math.floor(2.73125 / 0.01) * 0.01)) < 1e-9, 'display = floor(exact/step)*step');
+  assert(Math.abs(c._display - 2.73) < 1e-9, '2.73125 -> 2.73');
+  var f = cvFloorObj(1.0, CV_STEP.ir);
+  assert(f._display >= f._exact - 1e-12, 'insulation floor display >= exact (stricter is higher)');
+});
+
+test('Commissioning: PASS/FAIL boundaries use the EXACT (un-rounded) value', function() {
+  var ceil = 2.73125;
+  assert.strictEqual(cvResult('ceiling', ceil, ceil), 'PASS', 'recorded == ceiling -> PASS (<=)');
+  assert.strictEqual(cvResult('ceiling', ceil, ceil + 1e-6), 'FAIL', 'ceiling + eps -> FAIL');
+  var floor = 1.0;
+  assert.strictEqual(cvResult('floor', floor, floor), 'PASS', 'insulation recorded == floor -> PASS (>=)');
+  assert.strictEqual(cvResult('floor', floor, floor - 1e-6), 'FAIL', 'floor - eps -> FAIL');
+  assert.strictEqual(cvResult('ceiling', ceil, null), 'unresolved', 'no recorded -> unresolved');
+  assert.strictEqual(cvResultBand(130, 500, 300), 'PASS', 'type-S band: inside -> PASS');
+  assert.strictEqual(cvResultBand(130, 500, 600), 'FAIL', 'type-S band: above -> FAIL');
+});
+
+test('Commissioning: missing device/cable/RCD/type -> unresolved, never PASS', function() {
+  var saved = upSnapshot(); var savedRec = cvState.recorded; var savedTypes = cvState.rcdType; var savedSel = cvState.rcdSelectiveS;
+  cvState.recorded = {}; cvState.rcdType = {}; cvState.rcdSelectiveS = {};
+  upProject = mtdProject('TN', 'SC-AL-50', mtdFinal({ cableId: null, deviceId: null, deviceIn: null }));
+  var zsT = cvBuildReport(upProject).circuits[0].tests.find(function(t) { return t.key === 'zs'; });
+  assert.strictEqual(zsT.result, 'unresolved', 'no device/cable -> Zs unresolved');
+  assert(!('zsMax' in zsT) || zsT.ceiling._exact == null, 'unresolved Zs carries no ceiling number');
+  upProject = mtdProject('TT', 'SC-AL-50', mtdFinal({ rcdMa: null }));
+  var zsTT = cvBuildReport(upProject).circuits[0].tests.find(function(t) { return t.key === 'zs'; });
+  assert.strictEqual(zsTT.result, 'unresolved', 'TT without rcdMa -> Zs unresolved');
+  upProject = mtdProject('TN', 'SC-AL-50', mtdFinal({ rcdMa: 30 }));
+  var trip = cvBuildReport(upProject).circuits[0].tests.find(function(t) { return t.key === 'rcd_idn'; });
+  assert.strictEqual(trip.result, 'unresolved', 'RCD present but type not selected -> unresolved');
+  cvState.recorded = savedRec; cvState.rcdType = savedTypes; cvState.rcdSelectiveS = savedSel;
+  upRestore(saved);
+});
+
+test('Commissioning: fixed limits equal the cited DS/HD 60364-6 clauses', function() {
+  assert.strictEqual(cvInsulationLimit('lv').minMohm, 1.0, '230/400 V -> 1.0 M\u03A9');
+  assert.strictEqual(cvInsulationLimit('lv').testV, 500, '230/400 V test at 500 V');
+  assert.strictEqual(cvInsulationLimit('selv').minMohm, 0.5, 'SELV/PELV -> 0.5 M\u03A9');
+  assert.strictEqual(cvInsulationLimit('selv').testV, 250, 'SELV/PELV test at 250 V');
+  var gen = cvRcdTripLimits('AC', false);
+  assert.strictEqual(gen.atIdn, 300, 'general RCD 300 ms @ I\u0394n');
+  assert.strictEqual(gen.at5, 40, 'general RCD 40 ms @ 5\u00D7I\u0394n');
+  var sel = cvRcdTripLimits('A', true);
+  assert.strictEqual(sel.at5, 150, 'type S 150 ms @ 5\u00D7I\u0394n');
+  assert.strictEqual(sel.atIdnMin, 130, 'type S 130 ms min @ I\u0394n');
+  assert.strictEqual(sel.atIdnMax, 500, 'type S 500 ms max @ I\u0394n');
+  assert.strictEqual(cvRcdTripLimits(null, false).state, 'unresolved', 'absent type -> unresolved (never PASS)');
+});
+
+test('Commissioning: cvBuildReport works in da/en/fa (clause+required+recorded), JSON carries _exact/_display/result, never "approved" on FAIL', function() {
+  var saved = upSnapshot(); var savedLang = lang; var savedRec = cvState.recorded;
+  cvState.recorded = {};
+  ['da', 'en', 'fa'].forEach(function(L) {
+    lang = L;
+    var m = cvBuildReport(MTD_GREEN);
+    assert.strictEqual(m.standard, 'DS/HD 60364-6', L + ': standard tagged');
+    assert(m.circuits.length > 0, L + ': has circuits');
+    m.circuits.forEach(function(c) { c.tests.forEach(function(t) {
+      assert('clause' in t && 'recorded' in t && 'result' in t, L + ': each test row has clause+recorded+result');
+    }); });
+    assert(cvRenderReportHTML(m, true).indexOf('DS/HD 60364-6') >= 0, L + ': report cites DS/HD 60364-6');
+  });
+  lang = 'en';
+  var zsT = cvBuildReport(MTD_GREEN).circuits[0].tests.find(function(t) { return t.key === 'zs'; });
+  assert('_exact' in zsT.ceiling && '_display' in zsT.ceiling, 'numeric ceiling carries _exact AND _display');
+  cvState.recorded[cvKey(0, 'zs')] = 9999; // force a FAIL
+  var failModel = cvBuildReport(MTD_GREEN);
+  assert.strictEqual(failModel.verdict, 'fail', 'recording a failing Zs -> verdict fail');
+  var failHtml = cvRenderReportHTML(failModel, true);
+  assert(failHtml.indexOf('APPROVED FOR ENERGISATION') < 0, 'never prints positive approval on FAIL');
+  assert(failHtml.indexOf('NOT APPROVED') >= 0, 'shows NOT APPROVED on fail');
+  cvState.recorded = savedRec; lang = savedLang;
+  upRestore(saved);
+});
+
+test('Commissioning: ceiling/report fns are PURE — no upProject / localStorage / PRODUCTS mutation', function() {
+  var saved = upSnapshot();
+  upProject = MTD_COUPLE;
+  var before = JSON.stringify(upProject);
+  var lsBefore = localStorage.getItem(UNIFIED_PROJECT_KEY);
+  cvBuildReport(upProject);
+  cvZsCeiling('TN', { In: 16, curve: 'B' }, { rcdMa: null }, 0.95);
+  cvBuildReport(MTD_ZS);
+  cvDeltaRTemp(0.5, 'Cu', 90);
+  assert.strictEqual(JSON.stringify(upProject), before, 'upProject not mutated');
+  assert.strictEqual(localStorage.getItem(UNIFIED_PROJECT_KEY), lsBefore, 'localStorage untouched');
+  assert.strictEqual(upCableProduct('NKT-NOIKLX-4').r, 4.61, 'PRODUCTS cable resistance untouched');
+  upRestore(saved);
+});
+
+test('Commissioning: rendered module is click-only (cvBump present, no text/number inputs, no textarea) in da/en/fa', function() {
+  var saved = upSnapshot(); var savedLang = lang; var savedRec = cvState.recorded;
+  cvState.recorded = {};
+  upProject = mtdProject('TT', 'SC-AL-50', mtdFinal({ rcdMa: 30, phases: '3x400' }));
+  ['da', 'en', 'fa'].forEach(function(L) {
+    lang = L;
+    var h = cvRender();
+    assert(h.indexOf('cvBump(') >= 0, L + ': stepper uses cvBump (continuous click capture)');
+    assert(h.indexOf('type="text"') < 0, L + ': no text input');
+    assert(h.indexOf('type="number"') < 0, L + ': no number input');
+    assert(h.indexOf('<textarea') < 0, L + ': no textarea');
+  });
+  lang = savedLang; cvState.recorded = savedRec;
+  upRestore(saved);
+});
+
+test('Commissioning: trilingual \u2014 every new fragment resolves via _FA in Farsi (no raw English leak)', function() {
+  var saved = upSnapshot(); var savedLang = lang; var savedRec = cvState.recorded; var savedTypes = cvState.rcdType; var savedExpand = cvState.expandReport;
+  cvState.recorded = {}; cvState.rcdType = {}; cvState.expandReport = true;
+  upProject = mtdProject('TT', 'SC-AL-50', mtdFinal({ rcdMa: 30, phases: '3x400' }));
+  lang = 'fa';
+  var hfa = cvRender();
+  var newEnglish = ['Commissioning & verification', 'Loop impedance Zs', 'Continuity R1+R2', 'Insulation resistance',
+    'RCD trip time', 'Earth-electrode resistance RA', 'Polarity', 'Phase sequence', 'PE continuity',
+    'Recorded value', 'Required', 'Record measured value (no typing)', 'Expected Zs @20 \u00B0C',
+    'Tightened for worst-day conductor temperature', 'Verification report (DS/HD 60364-6)', 'RCD type',
+    'selective (type S)', 'Inspection (click OK / Fail)', 'Overall verdict'];
+  newEnglish.forEach(function(s) { assert(hfa.indexOf(s) < 0, 'no raw English leak in Farsi: "' + s + '"'); });
+  assert(hfa.indexOf('<textarea') < 0 && hfa.indexOf('type="text"') < 0, 'still 100% click-only in Farsi');
+  assert(hfa.indexOf(_FA['Loop impedance Zs']) >= 0, 'Zs label resolved to Farsi');
+  assert(hfa.indexOf(_FA['Commissioning & verification']) >= 0, 'heading resolved to Farsi');
+  assert(hfa.indexOf(_FA['Earth-electrode resistance RA']) >= 0, 'RA label resolved to Farsi');
+  lang = savedLang; cvState.recorded = savedRec; cvState.rcdType = savedTypes; cvState.expandReport = savedExpand;
+  upRestore(saved);
+});
+
+test('Commissioning: module is registered in renderModule and renders without throwing', function() {
+  var saved = upSnapshot();
+  upProject = MTD_GREEN;
+  assert.strictEqual(typeof cvRender, 'function', 'cvRender exists');
+  assert.doesNotThrow(function() { renderModule('commissioning'); }, 'renderModule(\'commissioning\') does not throw');
+  upRestore(saved);
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
