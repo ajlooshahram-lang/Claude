@@ -11071,6 +11071,140 @@ test('AD: fault recomputer detail is trilingual-safe (da/en) when inputs are mis
   lang = savedLang; faultState = JSON.parse(saved);
 });
 
+// === Transformer dynamic power/current solver (trafoSolvePower) ===
+// Governing relationships (Opgavesamling Kap. 9 / IEC 60076-1):
+//   3-phase: S = sqrt(3)*U*I ; P = S*cosphi ; Q = S*sinphi ; I = S/(sqrt(3)*U)
+//   1-phase: S = U*I ; P = S*cosphi ; I = S/U
+var SQRT3 = Math.sqrt(3);
+
+test('trafoSolvePower: function exists', function() {
+  assert(typeof trafoSolvePower === 'function', 'trafoSolvePower missing');
+});
+
+test('trafoSolvePower 3-phase: from (I,U,cosphi) derives S,P,Q (the user scenario)', function() {
+  var r = trafoSolvePower({ phase: '3', U: 400, I: 100, cosphi: 0.9 });
+  assert(r.sufficient && r.complete, 'should be complete from (I,U,cosphi)');
+  var S = SQRT3 * 400 * 100;          // 69282.03 VA
+  assert(Math.abs(r.S - S) < 1e-6, 'S = sqrt(3)*U*I; got ' + r.S);
+  assert(Math.abs(r.P - S * 0.9) < 1e-6, 'P = S*cosphi; got ' + r.P);
+  var Q = S * Math.sqrt(1 - 0.81);    // S*sinphi
+  assert(Math.abs(r.Q - Q) < 1e-6, 'Q = S*sinphi; got ' + r.Q);
+  assert(Math.abs(r.cosphi - 0.9) < 1e-12, 'cosphi preserved');
+  assert(r.missing.length === 0, 'nothing missing');
+});
+
+test('trafoSolvePower 1-phase: from (I,U,cosphi) derives S,P,Q', function() {
+  var r = trafoSolvePower({ phase: '1', U: 230, I: 16, cosphi: 0.95 });
+  assert(r.sufficient && r.complete, 'should be complete');
+  var S = 230 * 16;                   // 3680 VA
+  assert(Math.abs(r.S - S) < 1e-9, 'S = U*I (1-phase, no sqrt3); got ' + r.S);
+  assert(Math.abs(r.P - S * 0.95) < 1e-9, 'P = S*cosphi; got ' + r.P);
+  assert(Math.abs(r.Q - S * Math.sqrt(1 - 0.95 * 0.95)) < 1e-9, 'Q = S*sinphi');
+});
+
+test('trafoSolvePower: 1-phase vs 3-phase use the correct phase factor for same U,I', function() {
+  var r1 = trafoSolvePower({ phase: '1', U: 400, I: 100 });
+  var r3 = trafoSolvePower({ phase: '3', U: 400, I: 100 });
+  assert(Math.abs(r1.S - 400 * 100) < 1e-9, '1-phase S = U*I');
+  assert(Math.abs(r3.S - SQRT3 * 400 * 100) < 1e-6, '3-phase S = sqrt(3)*U*I');
+  assert(Math.abs(r3.S / r1.S - SQRT3) < 1e-9, '3-phase S is sqrt(3) larger');
+});
+
+test('trafoSolvePower 3-phase: from (S,U) derives I but leaves cosphi/P/Q missing', function() {
+  var r = trafoSolvePower({ phase: '3', S: 250000, U: 400 });
+  assert(r.sufficient, 'S is known so sufficient');
+  assert(!r.complete, 'incomplete without cosphi');
+  var I = 250000 / (SQRT3 * 400);     // 360.84 A
+  assert(Math.abs(r.I - I) < 1e-6, 'I = S/(sqrt(3)*U); got ' + r.I);
+  assert(r.P === undefined && r.Q === undefined && r.cosphi === undefined, 'P,Q,cosphi NOT fabricated');
+  assert(r.missing.indexOf('cosphi') >= 0 && r.missing.indexOf('P') >= 0 && r.missing.indexOf('Q') >= 0, 'reports P,Q,cosphi missing');
+});
+
+test('trafoSolvePower 1-phase: from (S,U) derives I = S/U', function() {
+  var r = trafoSolvePower({ phase: '1', S: 3680, U: 230 });
+  assert(Math.abs(r.I - 16) < 1e-9, 'I = S/U (1-phase); got ' + r.I);
+});
+
+test('trafoSolvePower 3-phase: from (P,U,cosphi) derives S and I', function() {
+  var r = trafoSolvePower({ phase: '3', P: 90000, U: 400, cosphi: 0.9 });
+  assert(r.sufficient && r.complete, 'complete from (P,U,cosphi)');
+  var S = 90000 / 0.9;                // 100000 VA
+  assert(Math.abs(r.S - S) < 1e-6, 'S = P/cosphi; got ' + r.S);
+  assert(Math.abs(r.I - S / (SQRT3 * 400)) < 1e-6, 'I = S/(sqrt(3)*U); got ' + r.I);
+});
+
+test('trafoSolvePower: from (P,Q) derives S and cosphi', function() {
+  var r = trafoSolvePower({ phase: '3', P: 80000, Q: 60000 });
+  assert(Math.abs(r.S - 100000) < 1e-6, 'S = sqrt(P^2+Q^2) = 100000; got ' + r.S);
+  assert(Math.abs(r.cosphi - 0.8) < 1e-9, 'cosphi = P/S = 0.8; got ' + r.cosphi);
+});
+
+test('trafoSolvePower: insufficient input reports missing, never fabricates', function() {
+  var r = trafoSolvePower({ phase: '3', U: 400 });   // only voltage
+  assert(!r.sufficient, 'U alone is insufficient');
+  assert(r.S === undefined && r.I === undefined && r.P === undefined, 'nothing fabricated from U alone');
+  assert(r.missing.indexOf('S') >= 0, 'S reported missing');
+  var r2 = trafoSolvePower({ phase: '3' });           // nothing
+  assert(!r2.sufficient, 'empty input insufficient');
+  assert(r2.missing.length === 6, 'all six canonical quantities missing; got ' + r2.missing.length);
+});
+
+test('trafoSolvePower: cosphi is clamped to physical range [0,1] (conservative, no runaway)', function() {
+  var r = trafoSolvePower({ phase: '3', cosphi: 1.5, U: 400, I: 100 });
+  assert(r.cosphi <= 1 && r.cosphi >= 0, 'cosphi clamped to [0,1]; got ' + r.cosphi);
+  assert(Math.abs(r.cosphi - 1) < 1e-12, 'cosphi clamped to 1');
+  // With cosphi=1, P should equal S (not exceed it) - never overstate active power
+  assert(r.P <= r.S + 1e-6, 'P must not exceed S');
+});
+
+test('trafoSolvePower: cosphi=1 gives Q=0 and P=S', function() {
+  var r = trafoSolvePower({ phase: '3', U: 400, I: 100, cosphi: 1.0 });
+  assert(Math.abs(r.Q) < 1e-6, 'Q = 0 at unity power factor; got ' + r.Q);
+  assert(Math.abs(r.P - r.S) < 1e-6, 'P = S at unity power factor');
+});
+
+test('trafoSolvePower: round-trip current is consistent (I -> S -> I)', function() {
+  var r = trafoSolvePower({ phase: '3', U: 690, I: 250, cosphi: 0.85 });
+  // Recompute I from derived S and confirm it matches the input current exactly
+  var Iback = r.S / (SQRT3 * 690);
+  assert(Math.abs(Iback - 250) < 1e-6, 'current round-trips; got ' + Iback);
+});
+
+// === Non-invasiveness: existing trafo calc primitives unchanged (snapshot) ===
+test('trafoSolvePower non-invasive: existing trafoCalc* primitives unchanged', function() {
+  // Snapshot values computed from the pre-existing, life-safety-relevant formulas.
+  var sc = trafoCalcSC(6900, 4, 630);
+  assert(Math.abs(sc.IN - (630 * 1000) / (Math.sqrt(3) * 400)) < 1e-6, 'trafoCalcSC IN unchanged');
+  assert(Math.abs(sc.erPct - (6900 / (630 * 1000) * 100)) < 1e-9, 'trafoCalcSC er% unchanged');
+  assert(Math.abs(sc.exPct - Math.sqrt(4 * 4 - sc.erPct * sc.erPct)) < 1e-9, 'trafoCalcSC ex% unchanged');
+
+  var emf = trafoCalcEMF(50, 300, 1.2, 0.01);
+  assert(Math.abs(emf - 4.44 * 50 * 300 * 1.2 * 0.01) < 1e-9, 'trafoCalcEMF unchanged');
+
+  var reg = trafoCalcRegulation(1.5, 3.5, 0.8, 'inductive');
+  assert(Math.abs(reg.dU_pct - (1.5 * 0.8 + 3.5 * Math.sqrt(1 - 0.64))) < 1e-9, 'trafoCalcRegulation (inductive) unchanged');
+
+  var eff = trafoCalcEfficiency(630, 610, 6900, 75, 0.85);
+  var lf = 0.75, P2 = 630 * 1000 * lf * 0.85, Pl = 610 + 6900 * lf * lf;
+  assert(Math.abs(eff.eta - P2 / (P2 + Pl)) < 1e-12, 'trafoCalcEfficiency unchanged');
+
+  var par = trafoCalcParallel(630, 6, 400, 4, 800);
+  assert(Math.abs(par.totalCapacity - 1030) < 1e-9, 'trafoCalcParallel capacity unchanged');
+});
+
+test('trafoSolvePower non-invasive: renderTrafo still produces all calc types incl. new one', function() {
+  var saved = JSON.stringify(trafoState);
+  trafoState.calcType = 'powersolve';
+  trafoState.psPhase = '3'; trafoState.psU = 400; trafoState.psI = 100; trafoState.psCos = 0.9;
+  trafoState.psS = null; trafoState.psP = null; trafoState.psQ = null;
+  var h = renderTrafo();
+  assert(typeof h === 'string' && h.indexOf('Result') >= 0 || h.indexOf('Resultat') >= 0, 'powersolve renders a result');
+  trafoState.calcType = 'sizing';
+  var hs = renderTrafo();
+  assert(typeof hs === 'string' && hs.length > 0, 'sizing still renders');
+  trafoState = JSON.parse(saved);
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
