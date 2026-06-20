@@ -981,7 +981,8 @@ const T = {
       trefase: '3-faset Beregner',
       motorteori: 'Motorteori',
       relay: 'HV Rele',
-      fault: 'Fejlberegning'
+      fault: 'Fejlberegning',
+      dc: 'DC / Ohms lov'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1129,7 +1130,8 @@ const T = {
       trefase: '3-Phase Calculator',
       motorteori: 'Motor Theory',
       relay: 'HV Relay',
-      fault: 'Fault Calculation'
+      fault: 'Fault Calculation',
+      dc: 'DC / Ohm\'s Law'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -1269,7 +1271,8 @@ const T = {
       trefase: 'محاسبه سه‌فاز',
       motorteori: 'تئوری موتور',
       relay: 'رله HV',
-      fault: 'محاسبه خطا'
+      fault: 'محاسبه خطا',
+      dc: 'DC / قانون اهم'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -4375,9 +4378,9 @@ const NAV_GROUPS = [
   {
     id: 'theory', icon: '\uD83D\uDCD6',
     da: 'Elektroteknisk teori', en: 'Electrotechnics theory', fa: '\u062A\u0626\u0648\u0631\u06CC \u0628\u0631\u0642',
-    descDa: 'Grundl\u00E6ggende AC-teori og beregninger fra Elektroteknik Opgavesamling \u2014 impedans, resonans, fasevinkel, effekttrekant, tidskonstanter, 3-faset systemer og motorteori. Dine formler, klik-for-klik.',
-    descEn: 'Fundamental AC theory and calculations from Elektroteknik Opgavesamling \u2014 impedance, resonance, phase angle, power triangle, time constants, 3-phase systems and motor theory. Your formulas, click by click.',
-    keys: ['impedans', 'trefase', 'motorteori']
+    descDa: 'Grundl\u00E6ggende elektroteknisk teori og beregninger fra Elektroteknik Opgavesamling \u2014 Ohms lov, DC-kredsl\u00F8b, impedans, resonans, fasevinkel, effekttrekant, tidskonstanter, 3-faset systemer og motorteori. Dine formler, klik-for-klik.',
+    descEn: 'Fundamental electrotechnics theory and calculations from Elektroteknik Opgavesamling \u2014 Ohm\'s law, DC circuits, impedance, resonance, phase angle, power triangle, time constants, 3-phase systems and motor theory. Your formulas, click by click.',
+    keys: ['impedans', 'trefase', 'motorteori', 'dc']
   },
   {
     id: 'docs', icon: '\uD83D\uDCCB',
@@ -5772,6 +5775,7 @@ function renderModule(mod) {
     case 'motorteori': content = renderMotorteori(); break;
     case 'relay': content = renderRelay(); break;
     case 'fault': content = renderFault(); break;
+    case 'dc': content = renderDC(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -21825,6 +21829,484 @@ function renderFaultCSA() {
   html += tx('Ref: DS/HD 60364-5-54 cl.543.1, Tabel 54.4 (k-faktorer). For S > 300mm\u00B2 bruges reducerede k-vaerdier.', 'Ref: DS/HD 60364-5-54 cl.543.1, Table 54.4 (k-factors). For S > 300mm\u00B2 reduced k-values apply.');
   html += '</div>';
 
+  return html;
+}
+
+// ===== DC / OHM'S LAW CALCULATOR MODULE (Opgavesamling Ch.1 + Ch.2) =====
+
+// Material resistivity constants (Bilag B) in Ohm*mm2/m
+var DC_MATERIALS = {
+  cu: { rho: 0.0175, alpha: 0.004, da: 'Kobber (Cu)', en: 'Copper (Cu)', fa: '\u0645\u0633 (Cu)' },
+  al: { rho: 0.029, alpha: 0.0037, da: 'Aluminium (Al)', en: 'Aluminium (Al)', fa: '\u0622\u0644\u0648\u0645\u06CC\u0646\u06CC\u0648\u0645 (Al)' },
+  fe: { rho: 0.14, alpha: 0.005, da: 'Jern (Fe)', en: 'Iron (Fe)', fa: '\u0622\u0647\u0646 (Fe)' }
+};
+
+var dcState = {
+  calcType: 'ohm',       // ohm, resistivity, temperature, series_parallel, divider, power, energy, emf
+  // Ohm's law
+  ohmKnown: 'ri',        // 'ri' = know R+I solve U, 'ru' = know R+U solve I, 'ui' = know U+I solve R
+  ohmR: 10,
+  ohmI: 1,
+  ohmU: 230,
+  // Resistivity
+  resMaterial: 'cu',
+  resLength: 100,
+  resCrossSection: 2.5,
+  // Temperature
+  tempMaterial: 'cu',
+  tempR20: 10,
+  tempT: 75,
+  // Series/parallel
+  spMode: 'series',
+  spResistors: [10, 22, 47],
+  // Voltage divider
+  vdR1: 1000,
+  vdR2: 2200,
+  vdUin: 12,
+  // Current divider
+  cdR1: 100,
+  cdR2: 220,
+  cdItotal: 1,
+  // Power
+  powKnown: 'ui',        // 'ui', 'ri', 'ru'
+  powU: 230,
+  powI: 10,
+  powR: 23,
+  // Energy
+  enP: 2000,
+  enT: 3,
+  enTunit: 'h',
+  // EMF / internal resistance
+  emfE: 12,
+  emfRi: 0.5,
+  emfI: 2
+};
+
+// --- DC Pure calculation functions (unit-testable, no DOM) ---
+
+// Ohm's law: U = R * I
+function dcCalcOhm(known, R, I, U) {
+  if (known === 'ri') return { U: R * I, R: R, I: I };
+  if (known === 'ru') return { U: U, R: R, I: (R > 0) ? U / R : 0 };
+  if (known === 'ui') return { U: U, R: (I > 0) ? U / I : 0, I: I };
+  return { U: 0, R: 0, I: 0 };
+}
+
+// Resistivity: R = rho * l / S (rho in Ohm*mm2/m, l in m, S in mm2)
+function dcCalcResistivity(rho, length_m, crossSection_mm2) {
+  if (crossSection_mm2 <= 0) return Infinity;
+  return rho * length_m / crossSection_mm2;
+}
+
+// Temperature coefficient: R_T = R20 * (1 + alpha * (T - 20))
+function dcCalcTempResistance(R20, alpha, T) {
+  return R20 * (1 + alpha * (T - 20));
+}
+
+// Current density: J = I / S [A/mm2]
+function dcCalcCurrentDensity(I, S_mm2) {
+  if (S_mm2 <= 0) return 0;
+  return I / S_mm2;
+}
+
+// Series resistance: R_total = sum of all Ri
+function dcCalcSeries(resistors) {
+  var sum = 0;
+  for (var i = 0; i < resistors.length; i++) sum += resistors[i];
+  return sum;
+}
+
+// Parallel resistance: 1/R_total = sum(1/Ri)
+function dcCalcParallel(resistors) {
+  if (resistors.length === 0) return 0;
+  if (resistors.length === 1) return resistors[0];
+  var sumInv = 0;
+  for (var i = 0; i < resistors.length; i++) {
+    if (resistors[i] <= 0) return 0;
+    sumInv += 1 / resistors[i];
+  }
+  if (sumInv === 0) return Infinity;
+  return 1 / sumInv;
+}
+
+// Two-resistor parallel shortcut: R1*R2/(R1+R2)
+function dcCalcParallel2(R1, R2) {
+  if (R1 + R2 === 0) return 0;
+  return (R1 * R2) / (R1 + R2);
+}
+
+// Voltage divider: Uout = Uin * R2 / (R1 + R2)
+function dcCalcVoltageDivider(Uin, R1, R2) {
+  if (R1 + R2 === 0) return 0;
+  return Uin * R2 / (R1 + R2);
+}
+
+// Current divider: I1 = Itotal * R2 / (R1 + R2)
+function dcCalcCurrentDivider(Itotal, R1, R2) {
+  if (R1 + R2 === 0) return 0;
+  return Itotal * R2 / (R1 + R2);
+}
+
+// Power: P = U*I = I^2*R = U^2/R
+function dcCalcPower(known, U, I, R) {
+  if (known === 'ui') return { P: U * I, U: U, I: I, R: (I > 0) ? U / I : 0 };
+  if (known === 'ri') return { P: I * I * R, U: I * R, I: I, R: R };
+  if (known === 'ru') return { P: (R > 0) ? U * U / R : 0, U: U, I: (R > 0) ? U / R : 0, R: R };
+  return { P: 0, U: 0, I: 0, R: 0 };
+}
+
+// Energy: W = P * t
+function dcCalcEnergy(P, t_seconds) {
+  return P * t_seconds;
+}
+
+// Convert time to seconds based on unit
+function dcTimeToSeconds(t, unit) {
+  if (unit === 'h') return t * 3600;
+  if (unit === 'min') return t * 60;
+  return t;
+}
+
+// Energy in kWh
+function dcCalcEnergyKWh(P_watts, t_seconds) {
+  return (P_watts * t_seconds) / 3600000;
+}
+
+// EMF: U_terminal = E - I*Ri
+function dcCalcEMF(E, Ri, I) {
+  var Uterminal = E - I * Ri;
+  var P_load = Uterminal * I;
+  var P_internal = I * I * Ri;
+  var P_total = E * I;
+  return { Uterminal: Uterminal, I: I, P_load: P_load, P_internal: P_internal, P_total: P_total, Ri: Ri, E: E };
+}
+
+// DC presets for click-only UI
+var DC_R_PRESETS = [0.1, 0.3, 0.5, 1, 2.2, 4.7, 10, 22, 47, 100, 220, 470, 1000, 2200, 4700, 10000, 22000, 47000, 100000];
+var DC_I_PRESETS = [0.001, 0.005, 0.01, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 16, 20, 32, 50, 63, 80, 100];
+var DC_U_PRESETS = [1, 1.5, 3, 5, 6, 9, 12, 24, 48, 60, 110, 230, 400, 690, 1000];
+var DC_LENGTH_PRESETS = [1, 5, 10, 15, 20, 25, 30, 50, 75, 100, 150, 200, 300, 500, 750, 1000];
+var DC_CROSS_PRESETS = [0.5, 0.75, 1, 1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240];
+var DC_TEMP_PRESETS = [-20, 0, 10, 20, 30, 40, 50, 60, 70, 75, 80, 90, 100, 120, 150, 200];
+var DC_R20_PRESETS = [0.1, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
+var DC_P_PRESETS = [10, 25, 50, 100, 200, 500, 750, 1000, 1500, 2000, 2500, 3000, 5000, 7500, 10000];
+var DC_T_PRESETS = [0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 24];
+var DC_E_PRESETS = [1.5, 3, 4.5, 6, 9, 12, 24, 48];
+var DC_RI_PRESETS = [0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.5, 1, 2, 5];
+
+// Helper: format resistance for display
+function dcFmtR(r) {
+  if (r >= 1e6) return (r / 1e6).toFixed(1) + ' M\u03A9';
+  if (r >= 1e3) return (r / 1e3).toFixed(1) + ' k\u03A9';
+  if (r >= 1) return r + ' \u03A9';
+  return (r * 1e3).toFixed(1) + ' m\u03A9';
+}
+
+function dcFmtI(i) {
+  if (i >= 1) return i + ' A';
+  if (i >= 0.001) return (i * 1000).toFixed(0) + ' mA';
+  return (i * 1e6).toFixed(0) + ' \u00B5A';
+}
+
+// Add/remove resistor from series/parallel array
+function dcSpAdd(val) { dcState.spResistors.push(val); renderModule('dc'); }
+function dcSpRemove() { if (dcState.spResistors.length > 1) dcState.spResistors.pop(); renderModule('dc'); }
+function dcSpSet(i, val) { dcState.spResistors[i] = val; renderModule('dc'); }
+
+function renderDC() {
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('DC Beregner / Ohms lov', 'DC Calculator / Ohm\'s Law') + '</div>';
+  html += '<div class="info-row">' + tx('Grundlaeggende DC-kredsloebsberegninger fra Opgavesamling Kap. 1 + 2', 'Fundamental DC circuit calculations from Opgavesamling Ch. 1 + 2') + '</div>';
+
+  // Calculation type selector
+  html += '<div class="select-group"><div class="select-label">' + tx('Beregningstype', 'Calculation Type') + '</div><div class="select-grid">';
+  var calcTypes = [
+    { key: 'ohm', da: 'Ohms lov (U=RI)', en: 'Ohm\'s Law (U=RI)' },
+    { key: 'resistivity', da: 'Resistivitet (R=\u03C1l/S)', en: 'Resistivity (R=\u03C1l/S)' },
+    { key: 'temperature', da: 'Temperaturkoefficient', en: 'Temperature Coefficient' },
+    { key: 'series_parallel', da: 'Serie/Parallel', en: 'Series/Parallel' },
+    { key: 'divider', da: 'Spaendingsdeler', en: 'Voltage Divider' },
+    { key: 'power', da: 'Effekt (P)', en: 'Power (P)' },
+    { key: 'energy', da: 'Energi (W)', en: 'Energy (W)' },
+    { key: 'emf', da: 'EMK + indre modstand', en: 'EMF + Internal Resistance' }
+  ];
+  calcTypes.forEach(function(ct) {
+    html += '<button class="sel-btn' + (dcState.calcType === ct.key ? ' selected' : '') + '" onclick="dcState.calcType=\'' + ct.key + '\';renderModule(\'dc\')">' + tx(ct.da, ct.en) + '</button>';
+  });
+  html += '</div></div>';
+  html += '</div>'; // close config card
+
+  // Render specific calculation UI
+  if (dcState.calcType === 'ohm') html += renderDCOhm();
+  else if (dcState.calcType === 'resistivity') html += renderDCResistivity();
+  else if (dcState.calcType === 'temperature') html += renderDCTemperature();
+  else if (dcState.calcType === 'series_parallel') html += renderDCSeriesParallel();
+  else if (dcState.calcType === 'divider') html += renderDCDivider();
+  else if (dcState.calcType === 'power') html += renderDCPower();
+  else if (dcState.calcType === 'energy') html += renderDCEnergy();
+  else if (dcState.calcType === 'emf') html += renderDCEmf();
+
+  return html;
+}
+
+function renderDCOhm() {
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Ohms lov: U = R \u00D7 I', 'Ohm\'s Law: U = R \u00D7 I') + '</div>';
+  // Known values selector
+  html += '<div class="select-group"><div class="select-label">' + tx('Kendte vaerdier', 'Known Values') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (dcState.ohmKnown === 'ri' ? ' selected' : '') + '" onclick="dcState.ohmKnown=\'ri\';renderModule(\'dc\')">' + tx('R + I (find U)', 'R + I (find U)') + '</button>';
+  html += '<button class="sel-btn' + (dcState.ohmKnown === 'ru' ? ' selected' : '') + '" onclick="dcState.ohmKnown=\'ru\';renderModule(\'dc\')">' + tx('R + U (find I)', 'R + U (find I)') + '</button>';
+  html += '<button class="sel-btn' + (dcState.ohmKnown === 'ui' ? ' selected' : '') + '" onclick="dcState.ohmKnown=\'ui\';renderModule(\'dc\')">' + tx('U + I (find R)', 'U + I (find R)') + '</button>';
+  html += '</div></div>';
+  // R selector
+  if (dcState.ohmKnown === 'ri' || dcState.ohmKnown === 'ru') {
+    html += '<div class="select-group"><div class="select-label">' + tx('Modstand R [\u03A9]', 'Resistance R [\u03A9]') + '</div><div class="select-grid">';
+    DC_R_PRESETS.forEach(function(r) { html += '<button class="sel-btn' + (dcState.ohmR === r ? ' selected' : '') + '" onclick="dcState.ohmR=' + r + ';renderModule(\'dc\')">' + dcFmtR(r) + '</button>'; });
+    html += '</div></div>';
+  }
+  // I selector
+  if (dcState.ohmKnown === 'ri' || dcState.ohmKnown === 'ui') {
+    html += '<div class="select-group"><div class="select-label">' + tx('Stroem I [A]', 'Current I [A]') + '</div><div class="select-grid">';
+    DC_I_PRESETS.forEach(function(i) { html += '<button class="sel-btn' + (dcState.ohmI === i ? ' selected' : '') + '" onclick="dcState.ohmI=' + i + ';renderModule(\'dc\')">' + dcFmtI(i) + '</button>'; });
+    html += '</div></div>';
+  }
+  // U selector
+  if (dcState.ohmKnown === 'ru' || dcState.ohmKnown === 'ui') {
+    html += '<div class="select-group"><div class="select-label">' + tx('Spaending U [V]', 'Voltage U [V]') + '</div><div class="select-grid">';
+    DC_U_PRESETS.forEach(function(u) { html += '<button class="sel-btn' + (dcState.ohmU === u ? ' selected' : '') + '" onclick="dcState.ohmU=' + u + ';renderModule(\'dc\')">' + u + ' V</button>'; });
+    html += '</div></div>';
+  }
+  // Result
+  var res = dcCalcOhm(dcState.ohmKnown, dcState.ohmR, dcState.ohmI, dcState.ohmU);
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">U (' + tx('Spaending', 'Voltage') + ')</span><span class="value">' + res.U.toFixed(4) + ' V</span></div>';
+  html += '<div class="result-row"><span class="label">R (' + tx('Modstand', 'Resistance') + ')</span><span class="value">' + dcFmtR(res.R) + '</span></div>';
+  html += '<div class="result-row"><span class="label">I (' + tx('Stroem', 'Current') + ')</span><span class="value">' + res.I.toFixed(4) + ' A</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">U = R \u00D7 I = ' + res.R + ' \u00D7 ' + res.I + ' = ' + res.U.toFixed(4) + ' V</span></div>';
+  html += '</div></div>';
+  return html;
+}
+
+function renderDCResistivity() {
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Resistivitet: R = \u03C1 \u00D7 l / S', 'Resistivity: R = \u03C1 \u00D7 l / S') + '</div>';
+  // Material
+  html += '<div class="select-group"><div class="select-label">' + tx('Materiale', 'Material') + '</div><div class="select-grid">';
+  Object.keys(DC_MATERIALS).forEach(function(k) { var m = DC_MATERIALS[k]; html += '<button class="sel-btn' + (dcState.resMaterial === k ? ' selected' : '') + '" onclick="dcState.resMaterial=\'' + k + '\';renderModule(\'dc\')">' + tx(m.da, m.en) + ' (\u03C1=' + m.rho + ')</button>'; });
+  html += '</div></div>';
+  // Length
+  html += '<div class="select-group"><div class="select-label">' + tx('Laengde l [m]', 'Length l [m]') + '</div><div class="select-grid">';
+  DC_LENGTH_PRESETS.forEach(function(l) { html += '<button class="sel-btn' + (dcState.resLength === l ? ' selected' : '') + '" onclick="dcState.resLength=' + l + ';renderModule(\'dc\')">' + l + '</button>'; });
+  html += '</div></div>';
+  // Cross-section
+  html += '<div class="select-group"><div class="select-label">' + tx('Tvaersnit S [mm\u00B2]', 'Cross-section S [mm\u00B2]') + '</div><div class="select-grid">';
+  DC_CROSS_PRESETS.forEach(function(s) { html += '<button class="sel-btn' + (dcState.resCrossSection === s ? ' selected' : '') + '" onclick="dcState.resCrossSection=' + s + ';renderModule(\'dc\')">' + s + '</button>'; });
+  html += '</div></div>';
+  // Result
+  var mat = DC_MATERIALS[dcState.resMaterial];
+  var R = dcCalcResistivity(mat.rho, dcState.resLength, dcState.resCrossSection);
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">R</span><span class="value">' + R.toFixed(4) + ' \u03A9</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">R = \u03C1 \u00D7 l / S = ' + mat.rho + ' \u00D7 ' + dcState.resLength + ' / ' + dcState.resCrossSection + ' = ' + R.toFixed(4) + ' \u03A9</span></div>';
+  // Also show voltage drop for common currents
+  html += '<div class="result-row"><span class="label">' + tx('Stroemtaethed ved 10A', 'Current density at 10A') + '</span><span class="value">J = 10/' + dcState.resCrossSection + ' = ' + dcCalcCurrentDensity(10, dcState.resCrossSection).toFixed(2) + ' A/mm\u00B2</span></div>';
+  html += '</div></div>';
+  return html;
+}
+
+function renderDCTemperature() {
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Temperaturkoefficient: R_T = R\u2082\u2080 \u00D7 (1 + \u03B1 \u00D7 (T-20))', 'Temperature Coefficient: R_T = R\u2082\u2080 \u00D7 (1 + \u03B1 \u00D7 (T-20))') + '</div>';
+  // Material
+  html += '<div class="select-group"><div class="select-label">' + tx('Materiale', 'Material') + '</div><div class="select-grid">';
+  Object.keys(DC_MATERIALS).forEach(function(k) { var m = DC_MATERIALS[k]; html += '<button class="sel-btn' + (dcState.tempMaterial === k ? ' selected' : '') + '" onclick="dcState.tempMaterial=\'' + k + '\';renderModule(\'dc\')">' + tx(m.da, m.en) + ' (\u03B1=' + m.alpha + ')</button>'; });
+  html += '</div></div>';
+  // R20
+  html += '<div class="select-group"><div class="select-label">' + tx('Modstand ved 20\u00B0C R\u2082\u2080 [\u03A9]', 'Resistance at 20\u00B0C R\u2082\u2080 [\u03A9]') + '</div><div class="select-grid">';
+  DC_R20_PRESETS.forEach(function(r) { html += '<button class="sel-btn' + (dcState.tempR20 === r ? ' selected' : '') + '" onclick="dcState.tempR20=' + r + ';renderModule(\'dc\')">' + r + '</button>'; });
+  html += '</div></div>';
+  // Temperature
+  html += '<div class="select-group"><div class="select-label">' + tx('Temperatur T [\u00B0C]', 'Temperature T [\u00B0C]') + '</div><div class="select-grid">';
+  DC_TEMP_PRESETS.forEach(function(t) { html += '<button class="sel-btn' + (dcState.tempT === t ? ' selected' : '') + '" onclick="dcState.tempT=' + t + ';renderModule(\'dc\')">' + t + '\u00B0</button>'; });
+  html += '</div></div>';
+  // Result
+  var mat = DC_MATERIALS[dcState.tempMaterial];
+  var RT = dcCalcTempResistance(dcState.tempR20, mat.alpha, dcState.tempT);
+  var deltaR = RT - dcState.tempR20;
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">R<sub>T</sub> (' + tx('ved', 'at') + ' ' + dcState.tempT + '\u00B0C)</span><span class="value">' + RT.toFixed(4) + ' \u03A9</span></div>';
+  html += '<div class="result-row"><span class="label">\u0394R</span><span class="value">' + deltaR.toFixed(4) + ' \u03A9 (' + (deltaR >= 0 ? '+' : '') + ((deltaR / dcState.tempR20) * 100).toFixed(1) + '%)</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">R_T = ' + dcState.tempR20 + ' \u00D7 (1 + ' + mat.alpha + ' \u00D7 (' + dcState.tempT + ' - 20)) = ' + RT.toFixed(4) + ' \u03A9</span></div>';
+  html += '</div></div>';
+  return html;
+}
+
+function renderDCSeriesParallel() {
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Serie- og parallelmodstand', 'Series & Parallel Resistance') + '</div>';
+  // Mode
+  html += '<div class="select-group"><div class="select-label">' + tx('Forbindelse', 'Connection') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (dcState.spMode === 'series' ? ' selected' : '') + '" onclick="dcState.spMode=\'series\';renderModule(\'dc\')">' + tx('Serie: R = R1+R2+...', 'Series: R = R1+R2+...') + '</button>';
+  html += '<button class="sel-btn' + (dcState.spMode === 'parallel' ? ' selected' : '') + '" onclick="dcState.spMode=\'parallel\';renderModule(\'dc\')">' + tx('Parallel: 1/R = 1/R1+1/R2+...', 'Parallel: 1/R = 1/R1+1/R2+...') + '</button>';
+  html += '</div></div>';
+  // Resistor values
+  dcState.spResistors.forEach(function(r, idx) {
+    html += '<div class="select-group"><div class="select-label">R' + (idx + 1) + ' [\u03A9]</div><div class="select-grid">';
+    [1, 2.2, 4.7, 10, 22, 47, 100, 220, 470, 1000, 2200, 4700, 10000].forEach(function(v) {
+      html += '<button class="sel-btn' + (r === v ? ' selected' : '') + '" onclick="dcSpSet(' + idx + ',' + v + ')">' + dcFmtR(v) + '</button>';
+    });
+    html += '</div></div>';
+  });
+  // Add/remove buttons
+  html += '<div class="select-group"><div class="select-grid">';
+  html += '<button class="sel-btn" onclick="dcSpAdd(100)">' + tx('+ Tilfoej modstand', '+ Add resistor') + '</button>';
+  if (dcState.spResistors.length > 1) html += '<button class="sel-btn" onclick="dcSpRemove()">' + tx('- Fjern sidste', '- Remove last') + '</button>';
+  html += '</div></div>';
+  // Result
+  var Rtotal = (dcState.spMode === 'series') ? dcCalcSeries(dcState.spResistors) : dcCalcParallel(dcState.spResistors);
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">R<sub>total</sub></span><span class="value" style="font-weight:700">' + dcFmtR(Rtotal) + '</span></div>';
+  var formula = dcState.spResistors.join(' + ');
+  if (dcState.spMode === 'series') {
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">R = ' + formula + ' = ' + Rtotal.toFixed(4) + ' \u03A9</span></div>';
+  } else {
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">1/R = ' + dcState.spResistors.map(function(r) { return '1/' + r; }).join(' + ') + ' = ' + Rtotal.toFixed(4) + ' \u03A9</span></div>';
+    if (dcState.spResistors.length === 2) {
+      html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Genvej', 'Shortcut') + '</span><span class="value">R = R1\u00D7R2/(R1+R2) = ' + dcState.spResistors[0] + '\u00D7' + dcState.spResistors[1] + '/(' + dcState.spResistors[0] + '+' + dcState.spResistors[1] + ') = ' + dcCalcParallel2(dcState.spResistors[0], dcState.spResistors[1]).toFixed(4) + ' \u03A9</span></div>';
+    }
+  }
+  html += '</div></div>';
+  return html;
+}
+
+function renderDCDivider() {
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Spaendings- og stroemdeler', 'Voltage & Current Divider') + '</div>';
+  // R1
+  html += '<div class="select-group"><div class="select-label">R1 [\u03A9]</div><div class="select-grid">';
+  [100, 220, 330, 470, 680, 1000, 1500, 2200, 3300, 4700, 6800, 10000].forEach(function(r) {
+    html += '<button class="sel-btn' + (dcState.vdR1 === r ? ' selected' : '') + '" onclick="dcState.vdR1=' + r + ';dcState.cdR1=' + r + ';renderModule(\'dc\')">' + dcFmtR(r) + '</button>';
+  });
+  html += '</div></div>';
+  // R2
+  html += '<div class="select-group"><div class="select-label">R2 [\u03A9]</div><div class="select-grid">';
+  [100, 220, 330, 470, 680, 1000, 1500, 2200, 3300, 4700, 6800, 10000].forEach(function(r) {
+    html += '<button class="sel-btn' + (dcState.vdR2 === r ? ' selected' : '') + '" onclick="dcState.vdR2=' + r + ';dcState.cdR2=' + r + ';renderModule(\'dc\')">' + dcFmtR(r) + '</button>';
+  });
+  html += '</div></div>';
+  // Uin
+  html += '<div class="select-group"><div class="select-label">' + tx('Indgangsspaending U_in [V]', 'Input Voltage U_in [V]') + '</div><div class="select-grid">';
+  DC_U_PRESETS.forEach(function(u) { html += '<button class="sel-btn' + (dcState.vdUin === u ? ' selected' : '') + '" onclick="dcState.vdUin=' + u + ';renderModule(\'dc\')">' + u + ' V</button>'; });
+  html += '</div></div>';
+  // I_total
+  html += '<div class="select-group"><div class="select-label">' + tx('Total stroem I_total [A]', 'Total Current I_total [A]') + '</div><div class="select-grid">';
+  DC_I_PRESETS.forEach(function(i) { html += '<button class="sel-btn' + (dcState.cdItotal === i ? ' selected' : '') + '" onclick="dcState.cdItotal=' + i + ';renderModule(\'dc\')">' + dcFmtI(i) + '</button>'; });
+  html += '</div></div>';
+  // Voltage divider result
+  var Uout = dcCalcVoltageDivider(dcState.vdUin, dcState.vdR1, dcState.vdR2);
+  html += '<div class="result-box"><div class="result-title">' + tx('Spaendingsdeler', 'Voltage Divider') + '</div>';
+  html += '<div class="result-row"><span class="label">U<sub>out</sub></span><span class="value" style="font-weight:700">' + Uout.toFixed(4) + ' V</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">U<sub>out</sub> = U<sub>in</sub> \u00D7 R2/(R1+R2) = ' + dcState.vdUin + ' \u00D7 ' + dcState.vdR2 + '/(' + dcState.vdR1 + '+' + dcState.vdR2 + ') = ' + Uout.toFixed(4) + ' V</span></div>';
+  html += '</div>';
+  // Current divider result
+  var I1 = dcCalcCurrentDivider(dcState.cdItotal, dcState.cdR1, dcState.cdR2);
+  var I2 = dcState.cdItotal - I1;
+  html += '<div class="result-box"><div class="result-title">' + tx('Stroemdeler', 'Current Divider') + '</div>';
+  html += '<div class="result-row"><span class="label">I<sub>1</sub> (' + tx('gennem R1', 'through R1') + ')</span><span class="value">' + I1.toFixed(4) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">I<sub>2</sub> (' + tx('gennem R2', 'through R2') + ')</span><span class="value">' + I2.toFixed(4) + ' A</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">I<sub>1</sub> = I<sub>total</sub> \u00D7 R2/(R1+R2) = ' + dcState.cdItotal + ' \u00D7 ' + dcState.cdR2 + '/(' + dcState.cdR1 + '+' + dcState.cdR2 + ') = ' + I1.toFixed(4) + ' A</span></div>';
+  html += '</div></div>';
+  return html;
+}
+
+function renderDCPower() {
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Effekt: P = U\u00D7I = I\u00B2\u00D7R = U\u00B2/R', 'Power: P = U\u00D7I = I\u00B2\u00D7R = U\u00B2/R') + '</div>';
+  // Known values
+  html += '<div class="select-group"><div class="select-label">' + tx('Kendte vaerdier', 'Known Values') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (dcState.powKnown === 'ui' ? ' selected' : '') + '" onclick="dcState.powKnown=\'ui\';renderModule(\'dc\')">' + tx('U + I (P=UI)', 'U + I (P=UI)') + '</button>';
+  html += '<button class="sel-btn' + (dcState.powKnown === 'ri' ? ' selected' : '') + '" onclick="dcState.powKnown=\'ri\';renderModule(\'dc\')">' + tx('R + I (P=I\u00B2R)', 'R + I (P=I\u00B2R)') + '</button>';
+  html += '<button class="sel-btn' + (dcState.powKnown === 'ru' ? ' selected' : '') + '" onclick="dcState.powKnown=\'ru\';renderModule(\'dc\')">' + tx('R + U (P=U\u00B2/R)', 'R + U (P=U\u00B2/R)') + '</button>';
+  html += '</div></div>';
+  // U selector
+  if (dcState.powKnown === 'ui' || dcState.powKnown === 'ru') {
+    html += '<div class="select-group"><div class="select-label">' + tx('Spaending U [V]', 'Voltage U [V]') + '</div><div class="select-grid">';
+    DC_U_PRESETS.forEach(function(u) { html += '<button class="sel-btn' + (dcState.powU === u ? ' selected' : '') + '" onclick="dcState.powU=' + u + ';renderModule(\'dc\')">' + u + ' V</button>'; });
+    html += '</div></div>';
+  }
+  // I selector
+  if (dcState.powKnown === 'ui' || dcState.powKnown === 'ri') {
+    html += '<div class="select-group"><div class="select-label">' + tx('Stroem I [A]', 'Current I [A]') + '</div><div class="select-grid">';
+    DC_I_PRESETS.forEach(function(i) { html += '<button class="sel-btn' + (dcState.powI === i ? ' selected' : '') + '" onclick="dcState.powI=' + i + ';renderModule(\'dc\')">' + dcFmtI(i) + '</button>'; });
+    html += '</div></div>';
+  }
+  // R selector
+  if (dcState.powKnown === 'ri' || dcState.powKnown === 'ru') {
+    html += '<div class="select-group"><div class="select-label">' + tx('Modstand R [\u03A9]', 'Resistance R [\u03A9]') + '</div><div class="select-grid">';
+    DC_R_PRESETS.forEach(function(r) { html += '<button class="sel-btn' + (dcState.powR === r ? ' selected' : '') + '" onclick="dcState.powR=' + r + ';renderModule(\'dc\')">' + dcFmtR(r) + '</button>'; });
+    html += '</div></div>';
+  }
+  // Result
+  var res = dcCalcPower(dcState.powKnown, dcState.powU, dcState.powI, dcState.powR);
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">P (' + tx('Effekt', 'Power') + ')</span><span class="value" style="font-weight:700">' + res.P.toFixed(2) + ' W</span></div>';
+  if (res.P >= 1000) html += '<div class="result-row"><span class="label">P</span><span class="value">' + (res.P / 1000).toFixed(3) + ' kW</span></div>';
+  html += '<div class="result-row"><span class="label">U</span><span class="value">' + res.U.toFixed(2) + ' V</span></div>';
+  html += '<div class="result-row"><span class="label">I</span><span class="value">' + res.I.toFixed(4) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">R</span><span class="value">' + dcFmtR(res.R) + '</span></div>';
+  var formulaStr = (dcState.powKnown === 'ui') ? 'P = U\u00D7I = ' + res.U + '\u00D7' + res.I.toFixed(4) : (dcState.powKnown === 'ri') ? 'P = I\u00B2\u00D7R = ' + res.I + '\u00B2\u00D7' + res.R : 'P = U\u00B2/R = ' + res.U + '\u00B2/' + res.R;
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">' + formulaStr + ' = ' + res.P.toFixed(2) + ' W</span></div>';
+  html += '</div></div>';
+  return html;
+}
+
+function renderDCEnergy() {
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Energi: W = P \u00D7 t', 'Energy: W = P \u00D7 t') + '</div>';
+  // Power
+  html += '<div class="select-group"><div class="select-label">' + tx('Effekt P [W]', 'Power P [W]') + '</div><div class="select-grid">';
+  DC_P_PRESETS.forEach(function(p) { html += '<button class="sel-btn' + (dcState.enP === p ? ' selected' : '') + '" onclick="dcState.enP=' + p + ';renderModule(\'dc\')">' + (p >= 1000 ? (p/1000) + 'k' : p) + '</button>'; });
+  html += '</div></div>';
+  // Time
+  html += '<div class="select-group"><div class="select-label">' + tx('Tid t', 'Time t') + '</div><div class="select-grid">';
+  DC_T_PRESETS.forEach(function(t) { html += '<button class="sel-btn' + (dcState.enT === t ? ' selected' : '') + '" onclick="dcState.enT=' + t + ';renderModule(\'dc\')">' + t + '</button>'; });
+  html += '</div></div>';
+  // Time unit
+  html += '<div class="select-group"><div class="select-label">' + tx('Tidsenhed', 'Time Unit') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (dcState.enTunit === 's' ? ' selected' : '') + '" onclick="dcState.enTunit=\'s\';renderModule(\'dc\')">' + tx('Sekunder', 'Seconds') + '</button>';
+  html += '<button class="sel-btn' + (dcState.enTunit === 'min' ? ' selected' : '') + '" onclick="dcState.enTunit=\'min\';renderModule(\'dc\')">' + tx('Minutter', 'Minutes') + '</button>';
+  html += '<button class="sel-btn' + (dcState.enTunit === 'h' ? ' selected' : '') + '" onclick="dcState.enTunit=\'h\';renderModule(\'dc\')">' + tx('Timer', 'Hours') + '</button>';
+  html += '</div></div>';
+  // Result
+  var tSec = dcTimeToSeconds(dcState.enT, dcState.enTunit);
+  var W = dcCalcEnergy(dcState.enP, tSec);
+  var kWh = dcCalcEnergyKWh(dcState.enP, tSec);
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">W (' + tx('Energi', 'Energy') + ')</span><span class="value" style="font-weight:700">' + W.toFixed(0) + ' Ws (J)</span></div>';
+  html += '<div class="result-row"><span class="label">W</span><span class="value">' + kWh.toFixed(4) + ' kWh</span></div>';
+  if (kWh >= 1) html += '<div class="result-row"><span class="label">' + tx('Pris (ca. 2,5 kr/kWh)', 'Cost (approx. 2.5 DKK/kWh)') + '</span><span class="value">' + (kWh * 2.5).toFixed(2) + ' kr</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">W = P \u00D7 t = ' + dcState.enP + ' W \u00D7 ' + tSec + ' s = ' + W.toFixed(0) + ' J = ' + kWh.toFixed(4) + ' kWh</span></div>';
+  html += '</div></div>';
+  return html;
+}
+
+function renderDCEmf() {
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('EMK og indre modstand: U_kl = E - I\u00D7Ri', 'EMF and Internal Resistance: U_term = E - I\u00D7Ri') + '</div>';
+  // EMF
+  html += '<div class="select-group"><div class="select-label">' + tx('EMK E [V]', 'EMF E [V]') + '</div><div class="select-grid">';
+  DC_E_PRESETS.forEach(function(e) { html += '<button class="sel-btn' + (dcState.emfE === e ? ' selected' : '') + '" onclick="dcState.emfE=' + e + ';renderModule(\'dc\')">' + e + ' V</button>'; });
+  html += '</div></div>';
+  // Internal resistance
+  html += '<div class="select-group"><div class="select-label">' + tx('Indre modstand Ri [\u03A9]', 'Internal Resistance Ri [\u03A9]') + '</div><div class="select-grid">';
+  DC_RI_PRESETS.forEach(function(r) { html += '<button class="sel-btn' + (dcState.emfRi === r ? ' selected' : '') + '" onclick="dcState.emfRi=' + r + ';renderModule(\'dc\')">' + r + '</button>'; });
+  html += '</div></div>';
+  // Current
+  html += '<div class="select-group"><div class="select-label">' + tx('Stroem I [A]', 'Current I [A]') + '</div><div class="select-grid">';
+  DC_I_PRESETS.forEach(function(i) { html += '<button class="sel-btn' + (dcState.emfI === i ? ' selected' : '') + '" onclick="dcState.emfI=' + i + ';renderModule(\'dc\')">' + dcFmtI(i) + '</button>'; });
+  html += '</div></div>';
+  // Result
+  var res = dcCalcEMF(dcState.emfE, dcState.emfRi, dcState.emfI);
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">U<sub>kl</sub> (' + tx('Klemmesp\u00E6nding', 'Terminal Voltage') + ')</span><span class="value" style="font-weight:700">' + res.Uterminal.toFixed(3) + ' V</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Sp\u00E6ndingsfald over Ri', 'Voltage drop across Ri') + '</span><span class="value">' + (res.I * res.Ri).toFixed(3) + ' V</span></div>';
+  html += '<div class="result-row"><span class="label">P<sub>load</sub></span><span class="value">' + res.P_load.toFixed(3) + ' W</span></div>';
+  html += '<div class="result-row"><span class="label">P<sub>Ri</sub> (' + tx('varmetab', 'heat loss') + ')</span><span class="value">' + res.P_internal.toFixed(3) + ' W</span></div>';
+  html += '<div class="result-row"><span class="label">\u03B7 (' + tx('virkningsgrad', 'efficiency') + ')</span><span class="value">' + (res.P_total > 0 ? ((res.P_load / res.P_total) * 100).toFixed(1) : '0') + '%</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">U<sub>kl</sub> = E - I\u00D7Ri = ' + res.E + ' - ' + res.I + '\u00D7' + res.Ri + ' = ' + res.Uterminal.toFixed(3) + ' V</span></div>';
+  html += '</div></div>';
   return html;
 }
 

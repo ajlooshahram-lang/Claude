@@ -9362,6 +9362,268 @@ test('Protection modules GUARD: core calc math unchanged (officialIz + IB regres
   assert(Math.abs(ib1 - 16.84) < 0.05, 'IB regression ~16.84A unchanged after new modules');
 });
 
+// ========================================================================
+// DC / OHM'S LAW MODULE TESTS
+// Verifies calculations against Elektroteknik Opgavesamling 4. udgave Ch.1+2
+// ========================================================================
+
+console.log('\n=== DC / Ohm\'s Law Module Tests ===\n');
+
+// --- Ohm's law tests ---
+
+test('dcCalcOhm: R=10, I=2 => U=20V', function() {
+  var res = dcCalcOhm('ri', 10, 2, 0);
+  assert(Math.abs(res.U - 20) < 0.001, 'U should be 20V, got ' + res.U);
+});
+
+test('dcCalcOhm: R=0.3, I=1 => U=0.3V (Opgavesamling 1.1 pattern)', function() {
+  var res = dcCalcOhm('ri', 0.3, 1, 0);
+  assert(Math.abs(res.U - 0.3) < 0.001, 'U should be 0.3V, got ' + res.U);
+});
+
+test('dcCalcOhm: U=230, R=575 => I=0.4A (Opgavesamling 1.2 pattern)', function() {
+  var res = dcCalcOhm('ru', 575, 0, 230);
+  assert(Math.abs(res.I - 0.4) < 0.001, 'I should be 0.4A, got ' + res.I);
+});
+
+test('dcCalcOhm: U=12, I=3 => R=4 Ohm', function() {
+  var res = dcCalcOhm('ui', 0, 3, 12);
+  assert(Math.abs(res.R - 4) < 0.001, 'R should be 4, got ' + res.R);
+});
+
+test('dcCalcOhm: R=100, I=0.5 => U=50V', function() {
+  var res = dcCalcOhm('ri', 100, 0.5, 0);
+  assert(Math.abs(res.U - 50) < 0.001, 'U should be 50V, got ' + res.U);
+});
+
+// --- Resistivity tests ---
+
+test('dcCalcResistivity: Cu, 100m, 2.5mm2 => R=0.7 Ohm', function() {
+  var R = dcCalcResistivity(0.0175, 100, 2.5);
+  assert(Math.abs(R - 0.7) < 0.001, 'R should be 0.7, got ' + R.toFixed(4));
+});
+
+test('dcCalcResistivity: Al, 50m, 10mm2 => R=0.145 Ohm', function() {
+  var R = dcCalcResistivity(0.029, 50, 10);
+  assert(Math.abs(R - 0.145) < 0.001, 'R should be 0.145, got ' + R.toFixed(4));
+});
+
+test('dcCalcResistivity: Fe, 10m, 1mm2 => R=1.4 Ohm', function() {
+  var R = dcCalcResistivity(0.14, 10, 1);
+  assert(Math.abs(R - 1.4) < 0.001, 'R should be 1.4, got ' + R.toFixed(4));
+});
+
+test('dcCalcResistivity: Cu, 1000m, 50mm2 => R=0.35 Ohm', function() {
+  var R = dcCalcResistivity(0.0175, 1000, 50);
+  assert(Math.abs(R - 0.35) < 0.001, 'R should be 0.35, got ' + R.toFixed(4));
+});
+
+// Opgavesamling 1.10: identify material from rho. rho = R*S/l
+// If R=0.172, S=1, l=10 => rho = 0.172*1/10 = 0.0172 ~= Cu (0.0175)
+test('dcCalcResistivity: identify material (Opgavesamling 1.10 pattern) rho=0.172/10 => Cu', function() {
+  // Reverse: given R=0.172, l=10, S=1, what material? rho = R*S/l = 0.172*1/10 = 0.0172
+  var rho = 0.172 * 1 / 10;
+  assert(Math.abs(rho - 0.0172) < 0.001, 'rho should be ~0.0172 (Cu), got ' + rho);
+  // Closest to Cu = 0.0175
+  assert(Math.abs(rho - DC_MATERIALS.cu.rho) < 0.005, 'Should identify as copper');
+});
+
+// --- Temperature coefficient tests ---
+
+test('dcCalcTempResistance: Cu, R20=10, T=75 => R=12.2 Ohm', function() {
+  var RT = dcCalcTempResistance(10, 0.004, 75);
+  // R = 10*(1 + 0.004*(75-20)) = 10*(1 + 0.22) = 12.2
+  assert(Math.abs(RT - 12.2) < 0.001, 'RT should be 12.2, got ' + RT.toFixed(4));
+});
+
+test('dcCalcTempResistance: Al, R20=5, T=100 => R=6.48 Ohm', function() {
+  var RT = dcCalcTempResistance(5, 0.0037, 100);
+  // R = 5*(1 + 0.0037*(100-20)) = 5*(1 + 0.296) = 5*1.296 = 6.48
+  assert(Math.abs(RT - 6.48) < 0.01, 'RT should be 6.48, got ' + RT.toFixed(4));
+});
+
+test('dcCalcTempResistance: at 20C returns R20 unchanged', function() {
+  var RT = dcCalcTempResistance(100, 0.004, 20);
+  assert(Math.abs(RT - 100) < 0.001, 'RT at 20C should equal R20');
+});
+
+// --- Current density ---
+
+test('dcCalcCurrentDensity: I=16A, S=2.5mm2 => J=6.4 A/mm2', function() {
+  var J = dcCalcCurrentDensity(16, 2.5);
+  assert(Math.abs(J - 6.4) < 0.001, 'J should be 6.4, got ' + J.toFixed(4));
+});
+
+// --- Series/parallel tests ---
+
+test('dcCalcSeries: [10, 22, 47] => 79 Ohm (Opgavesamling 2.1 pattern)', function() {
+  var R = dcCalcSeries([10, 22, 47]);
+  assert(Math.abs(R - 79) < 0.001, 'R should be 79, got ' + R);
+});
+
+test('dcCalcSeries: [100, 200, 300] => 600 Ohm', function() {
+  var R = dcCalcSeries([100, 200, 300]);
+  assert(Math.abs(R - 600) < 0.001, 'R should be 600, got ' + R);
+});
+
+test('dcCalcParallel: [100, 100] => 50 Ohm (Opgavesamling 2.2 pattern)', function() {
+  var R = dcCalcParallel([100, 100]);
+  assert(Math.abs(R - 50) < 0.001, 'R should be 50, got ' + R);
+});
+
+test('dcCalcParallel: [10, 20, 30] => 5.455 Ohm', function() {
+  var R = dcCalcParallel([10, 20, 30]);
+  // 1/R = 1/10 + 1/20 + 1/30 = 0.1+0.05+0.0333 = 0.1833, R = 5.455
+  assert(Math.abs(R - 5.4545) < 0.01, 'R should be ~5.455, got ' + R.toFixed(4));
+});
+
+test('dcCalcParallel2: R1=100, R2=100 => 50 Ohm', function() {
+  var R = dcCalcParallel2(100, 100);
+  assert(Math.abs(R - 50) < 0.001, 'R should be 50, got ' + R);
+});
+
+test('dcCalcParallel2: R1=10, R2=40 => 8 Ohm (Opgavesamling 2.3 pattern)', function() {
+  var R = dcCalcParallel2(10, 40);
+  // R = 10*40/(10+40) = 400/50 = 8
+  assert(Math.abs(R - 8) < 0.001, 'R should be 8, got ' + R);
+});
+
+test('dcCalcParallel: [47, 100] => 31.97 Ohm (Opgavesamling 2.4 pattern)', function() {
+  var R = dcCalcParallel([47, 100]);
+  // 1/R = 1/47 + 1/100 = 0.02128 + 0.01 = 0.03128, R = 31.97
+  assert(Math.abs(R - 31.97) < 0.1, 'R should be ~31.97, got ' + R.toFixed(4));
+});
+
+test('dcCalcSeries + dcCalcParallel: mixed circuit (Opgavesamling 2.5 pattern)', function() {
+  // Two 100 Ohm in parallel = 50, then in series with 30 Ohm = 80
+  var Rpar = dcCalcParallel([100, 100]);
+  var Rtotal = dcCalcSeries([Rpar, 30]);
+  assert(Math.abs(Rtotal - 80) < 0.001, 'R should be 80, got ' + Rtotal);
+});
+
+// --- Voltage divider ---
+
+test('dcCalcVoltageDivider: Uin=12, R1=1000, R2=2200 => Uout=8.25V', function() {
+  var Uout = dcCalcVoltageDivider(12, 1000, 2200);
+  // Uout = 12*2200/(1000+2200) = 12*2200/3200 = 8.25
+  assert(Math.abs(Uout - 8.25) < 0.01, 'Uout should be 8.25V, got ' + Uout.toFixed(4));
+});
+
+test('dcCalcVoltageDivider: Uin=24, R1=R2=1000 => Uout=12V (half)', function() {
+  var Uout = dcCalcVoltageDivider(24, 1000, 1000);
+  assert(Math.abs(Uout - 12) < 0.001, 'Uout should be 12V, got ' + Uout);
+});
+
+// --- Current divider ---
+
+test('dcCalcCurrentDivider: Itotal=1, R1=100, R2=200 => I1=0.667A', function() {
+  var I1 = dcCalcCurrentDivider(1, 100, 200);
+  // I1 = 1*200/(100+200) = 200/300 = 0.6667
+  assert(Math.abs(I1 - 0.6667) < 0.001, 'I1 should be ~0.667A, got ' + I1.toFixed(4));
+});
+
+test('dcCalcCurrentDivider: Itotal=10, R1=R2=100 => I1=5A (equal split)', function() {
+  var I1 = dcCalcCurrentDivider(10, 100, 100);
+  assert(Math.abs(I1 - 5) < 0.001, 'I1 should be 5A, got ' + I1);
+});
+
+// --- Power tests ---
+
+test('dcCalcPower UI: U=230, I=10 => P=2300W (Opgavesamling 3.1 pattern)', function() {
+  var res = dcCalcPower('ui', 230, 10, 0);
+  assert(Math.abs(res.P - 2300) < 0.01, 'P should be 2300W, got ' + res.P);
+});
+
+test('dcCalcPower RI: I=5, R=100 => P=2500W', function() {
+  var res = dcCalcPower('ri', 0, 5, 100);
+  assert(Math.abs(res.P - 2500) < 0.01, 'P should be 2500W, got ' + res.P);
+});
+
+test('dcCalcPower RU: U=230, R=529 => P=100W', function() {
+  var res = dcCalcPower('ru', 230, 0, 529);
+  // P = 230^2/529 = 52900/529 = 100.0
+  assert(Math.abs(res.P - 100) < 0.1, 'P should be ~100W, got ' + res.P.toFixed(2));
+});
+
+// --- Energy tests ---
+
+test('dcCalcEnergy: P=2000W, t=3600s => W=7200000 J', function() {
+  var W = dcCalcEnergy(2000, 3600);
+  assert(Math.abs(W - 7200000) < 1, 'W should be 7200000J, got ' + W);
+});
+
+test('dcCalcEnergyKWh: P=2000W, t=3600s => 2 kWh', function() {
+  var kWh = dcCalcEnergyKWh(2000, 3600);
+  assert(Math.abs(kWh - 2) < 0.001, 'Should be 2 kWh, got ' + kWh);
+});
+
+test('dcTimeToSeconds: 3h => 10800s', function() {
+  assert(dcTimeToSeconds(3, 'h') === 10800, '3h = 10800s');
+  assert(dcTimeToSeconds(5, 'min') === 300, '5min = 300s');
+  assert(dcTimeToSeconds(10, 's') === 10, '10s = 10s');
+});
+
+// --- EMF tests ---
+
+test('dcCalcEMF: E=12, Ri=0.5, I=2 => Uterminal=11V', function() {
+  var res = dcCalcEMF(12, 0.5, 2);
+  assert(Math.abs(res.Uterminal - 11) < 0.001, 'Uterminal should be 11V, got ' + res.Uterminal);
+  assert(Math.abs(res.P_load - 22) < 0.01, 'P_load should be 22W');
+  assert(Math.abs(res.P_internal - 2) < 0.01, 'P_internal should be 2W');
+});
+
+test('dcCalcEMF: E=9, Ri=1, I=0 => Uterminal=9V (open circuit)', function() {
+  var res = dcCalcEMF(9, 1, 0);
+  assert(Math.abs(res.Uterminal - 9) < 0.001, 'Open circuit: Uterminal = E');
+});
+
+test('dcCalcEMF: E=24, Ri=2, I=5 => Uterminal=14V', function() {
+  var res = dcCalcEMF(24, 2, 5);
+  // U = 24 - 5*2 = 14
+  assert(Math.abs(res.Uterminal - 14) < 0.001, 'Uterminal should be 14V, got ' + res.Uterminal);
+  assert(Math.abs(res.P_total - 120) < 0.01, 'P_total = E*I = 24*5 = 120');
+});
+
+// --- Module integration tests ---
+
+test('dc module: renderDC produces HTML with card class', function() {
+  var html = renderDC();
+  assert(html.indexOf('card') >= 0, 'has card class');
+  assert(html.indexOf('Ohm') >= 0 || html.indexOf('ohm') >= 0 || html.indexOf('DC') >= 0, 'shows DC content');
+});
+
+test('dc module: 100% click-only (no text inputs)', function() {
+  // Test all calc types
+  var types = ['ohm', 'resistivity', 'temperature', 'series_parallel', 'divider', 'power', 'energy', 'emf'];
+  types.forEach(function(t) {
+    dcState.calcType = t;
+    var html = renderDC();
+    assert(html.indexOf('type="text"') < 0, 'no text inputs in ' + t);
+    assert(html.indexOf('type="number"') < 0, 'no number inputs in ' + t);
+    assert(html.indexOf('<textarea') < 0, 'no textarea in ' + t);
+  });
+  dcState.calcType = 'ohm'; // restore default
+});
+
+test('dc module: translation exists in da/en/fa', function() {
+  assert(T.da.modules.dc, 'da translation exists');
+  assert(T.en.modules.dc, 'en translation exists');
+  assert(T.fa.modules.dc, 'fa translation exists');
+});
+
+test('dc module in NAV_GROUPS theory group', function() {
+  var theoryGroup = NAV_GROUPS.filter(function(g) { return g.id === 'theory'; })[0];
+  assert(theoryGroup, 'theory group exists');
+  assert(theoryGroup.keys.indexOf('dc') >= 0, 'dc in theory group');
+});
+
+test('DC module GUARD: core calc math unchanged (officialIz + IB regression)', function() {
+  var cu25 = { material: 'Cu', mm2: 2.5, model: '', iz: 999 };
+  assert.strictEqual(officialIz(cu25), 23, 'officialIz(Cu 2.5mm2 PVC) == 23A unchanged');
+  var ib1 = sldCalcNodeIB({ type: 'final_circuit', power_kW: 3.68, cosPhi: 0.95, phases: '1x230', voltage: 230 });
+  assert(Math.abs(ib1 - 16.84) < 0.05, 'IB regression ~16.84A unchanged after DC module');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
