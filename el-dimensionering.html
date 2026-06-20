@@ -985,6 +985,9 @@ const T = {
       dc: 'DC / Ohms lov',
       lys: 'Lys / Lumen',
       magnet: 'Magnetkreds',
+      kapacitor: 'Kapacitor & RC',
+      varme: 'Rumvarme & U-v\u00e6rdi',
+      dcmaskine: 'Jaevnstr\u00f8msmaskiner',
       analyzer: '\uD83D\uDD0D Projektanalysator'
     },
     // Load module
@@ -1137,6 +1140,9 @@ const T = {
       dc: 'DC / Ohm\'s Law',
       lys: 'Lighting / Lumen',
       magnet: 'Magnetic Circuit',
+      kapacitor: 'Capacitor & RC',
+      varme: 'Room heating & U-value',
+      dcmaskine: 'DC machines',
       analyzer: '\uD83D\uDD0D Project Analyzer'
     },
     loadTitle: 'Load Calculation',
@@ -1281,6 +1287,9 @@ const T = {
       dc: 'DC / قانون اهم',
       lys: 'روشنایی / لومن',
       magnet: 'مدار مغناطیسی',
+      kapacitor: 'خازن و RC',
+      varme: 'گرمایش و مقدار U',
+      dcmaskine: 'ماشین‌های DC',
       analyzer: '\uD83D\uDD0D تحلیلگر پروژه'
     },
     loadTitle: 'محاسبه بار',
@@ -3428,7 +3437,7 @@ function syncAxes() {
 // load -> cable -> protection -> voltage-drop -> short-circuit/Zs -> downstream.
 const REACTIVE_LINKS = {
   // === CORE DIMENSIONING CHAIN ===
-  load:     ['cable','fuse','mcb','mccb','vdrop','scircuit','zs','thermal','cable3d','cablelife','energy','pfc','harmonic','motor','ev','heatpump','lighting','busbar','impedans','trefase','motorteori','analyzer'],
+  load:     ['cable','fuse','mcb','mccb','vdrop','scircuit','zs','thermal','cable3d','cablelife','energy','pfc','harmonic','motor','ev','heatpump','lighting','busbar','impedans','trefase','motorteori','varme','dcmaskine','analyzer'],
   cable:    ['vdrop','scircuit','zs','thermal','cable3d','cablelife','trayfill','busbar','impedans','fault'],
   fuse:     ['scircuit','zs','tcc','discrim','arcflash','relay','fault'],
   mcb:      ['scircuit','zs','tcc','discrim','arcflash','fault'],
@@ -3444,7 +3453,7 @@ const REACTIVE_LINKS = {
   ev:       ['scircuit','energy','pfc','load'],
   // === THEORY MODULES (fully cross-linked) ===
   // Changing frequency in impedans affects trefase (XL/XC), motorteori (sync speed), magnet (EMF)
-  impedans: ['trefase','motorteori','magnet','fault','scircuit','cable','lys','dc','analyzer'],
+  impedans: ['trefase','motorteori','magnet','fault','scircuit','cable','lys','dc','kapacitor','analyzer'],
   // Changing 3-phase parameters affects load currents, motor theory, power factor correction
   trefase:  ['load','impedans','motorteori','pfc','trafo','fault','cable','vdrop','analyzer'],
   // Motor theory: changes propagate to cable sizing, protection, VFD, harmonics
@@ -3459,8 +3468,15 @@ const REACTIVE_LINKS = {
   lys:      ['load','cable','vdrop','lighting','energy','trefase','analyzer'],
   // Magnetic circuits: transformer core design, relay coils, motor flux
   magnet:   ['trafo','motorteori','relay','impedans','dc','analyzer'],
+  // === OPGAVESAMLING THEORY MODULES (Ch.4 capacitor, Ch.13 heating, Ch.10 DC machines) ===
+  // Capacitor C is shared with impedance (XC); changes here re-evaluate impedance/dc/fault.
+  kapacitor: ['impedans','dc','fault','analyzer'],
+  // Room heat demand drives the connected load -> cable sizing -> energy -> heat pump.
+  varme:     ['load','cable','energy','heatpump','analyzer'],
+  // DC machine power feeds motor theory, the connected load and cable sizing.
+  dcmaskine: ['motorteori','motor','load','cable','analyzer'],
   // === ANALYZER: propagates solved values to all relevant modules ===
-  analyzer: ['load','cable','fuse','mcb','mccb','vdrop','scircuit','zs','trafo','earthsys','impedans','trefase','motorteori','relay','fault','dc','lys','magnet','thermal','pfc','harmonic']
+  analyzer: ['load','cable','fuse','mcb','mccb','vdrop','scircuit','zs','trafo','earthsys','impedans','trefase','motorteori','relay','fault','dc','lys','magnet','kapacitor','varme','dcmaskine','thermal','pfc','harmonic']
 };
 
 // ===== UNIVERSAL CROSS-MODULE STATE PROPAGATION =====
@@ -3610,6 +3626,33 @@ SharedQuantities.subscribe('motor_power_w', function(p, source) {
 SharedQuantities.subscribe('zs_value', function(zs, source) {
   if (source !== 'fault') faultState.zsValue = zs;
   if (source !== 'zs' && typeof zsState !== 'undefined') zsState.measured = zs;
+});
+
+// === Opgavesamling theory modules: cross-module links ===
+// Capacitance is shared between the capacitor module (Ch.4) and the impedance
+// module (XC = 1/(2*pi*f*C)). A change in one updates the other.
+SharedQuantities.subscribe('capacitance_F', function(C, source) {
+  if (source !== 'kapacitor' && typeof kapacitorState !== 'undefined') kapacitorState.C = C;
+  if (source !== 'impedans' && typeof impedansState !== 'undefined') impedansState.C = C;
+});
+// Frequency also drives the capacitor module's XC link.
+SharedQuantities.subscribe('frequency', function(f, source) {
+  if (source !== 'kapacitor' && typeof kapacitorState !== 'undefined') kapacitorState.freqLink = f;
+});
+// Supply voltage propagates to the capacitor (charge/energy) and DC machine modules.
+SharedQuantities.subscribe('voltage_phase', function(v, source) {
+  if (source !== 'kapacitor' && typeof kapacitorState !== 'undefined' && v >= 12) kapacitorState.U = v;
+  if (source !== 'dcmaskine' && typeof dcmaskineState !== 'undefined' && v >= 110) dcmaskineState.U = v;
+});
+// Load power feeds the room-heating and DC-machine modules so a change in the
+// connected load is reflected in their shared power figure.
+SharedQuantities.subscribe('load_power_kw', function(p, source) {
+  if (source !== 'varme' && typeof varmeState !== 'undefined') varmeState.linkedLoadKw = p;
+  if (source !== 'dcmaskine' && typeof dcmaskineState !== 'undefined') dcmaskineState.linkedLoadKw = p;
+});
+// Motor power links DC machines <-> motor theory.
+SharedQuantities.subscribe('motor_power_w', function(p, source) {
+  if (source !== 'dcmaskine' && typeof dcmaskineState !== 'undefined') dcmaskineState.Pmech = p;
 });
 
 // "May be relevant" broad subscribers: the safety brain, the unified-project
@@ -4556,7 +4599,7 @@ const NAV_GROUPS = [
     da: 'Elektroteknisk teori', en: 'Electrotechnics theory', fa: '\u062A\u0626\u0648\u0631\u06CC \u0628\u0631\u0642',
     descDa: 'Grundl\u00E6ggende elektroteknisk teori og beregninger fra Elektroteknik Opgavesamling \u2014 Ohms lov, DC-kredsl\u00F8b, impedans, resonans, fasevinkel, effekttrekant, tidskonstanter, 3-faset systemer og motorteori. Dine formler, klik-for-klik.',
     descEn: 'Fundamental electrotechnics theory and calculations from Elektroteknik Opgavesamling \u2014 Ohm\'s law, DC circuits, impedance, resonance, phase angle, power triangle, time constants, 3-phase systems and motor theory. Your formulas, click by click.',
-    keys: ['impedans', 'trefase', 'motorteori', 'dc', 'lys', 'magnet']
+    keys: ['impedans', 'kapacitor', 'trefase', 'motorteori', 'dcmaskine', 'dc', 'lys', 'magnet', 'varme']
   },
   {
     id: 'docs', icon: '\uD83D\uDCCB',
@@ -5943,6 +5986,25 @@ function syncSharedQuantities(mod) {
     case 'magnet':
       // Magnetic calculations are linked via transformer/motor theory
       break;
+    case 'kapacitor':
+      // Capacitance is shared with the impedance module (XC link)
+      SharedQuantities.set('capacitance_F', kapacitorState.C, 'kapacitor');
+      break;
+    case 'varme':
+      // Total heat demand contributes to the connected load (kW)
+      if (typeof varmeState !== 'undefined') {
+        var _vl = varmeCalcU(varmeState.Ri, varmeLayers(), varmeState.Ru);
+        var _vdt = varmeState.Tin - varmeState.Tout;
+        var _vq = varmeCalcTotal(_vl, varmeState.A, varmeState.n, varmeState.V, _vdt);
+        SharedQuantities.set('load_power_kw', parseFloat((_vq / 1000).toFixed(3)), 'varme');
+      }
+      break;
+    case 'dcmaskine':
+      // DC machine mechanical power feeds motor theory / load / cable
+      if (typeof dcmaskineState !== 'undefined') {
+        SharedQuantities.set('motor_power_w', dcmaskineState.Pmech, 'dcmaskine');
+      }
+      break;
   }
 }
 
@@ -6021,6 +6083,9 @@ function renderModule(mod) {
     case 'dc': content = renderDC(); break;
     case 'lys': content = renderLys(); break;
     case 'magnet': content = renderMagnet(); break;
+    case 'kapacitor': content = renderKapacitor(); break;
+    case 'varme': content = renderVarme(); break;
+    case 'dcmaskine': content = renderDcmaskine(); break;
     case 'analyzer': content = renderAnalyzer(); break;
   }
   // Append AI assistant to every module
@@ -23523,6 +23588,594 @@ function renderMagnetEnergy() {
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">W</span><span class="value" style="font-weight:700">' + (W >= 1 ? W.toFixed(2) + ' J' : (W*1000).toFixed(3) + ' mJ') + '</span></div></div>';
   html += calcDetail({ name: tx('Magnetisk energi', 'Magnetic energy'), formula: 'W = 0.5*L*I2', variables: [{ name: 'L', symbol: 'L', value: magnetState.energyL, unit: 'H' }, { name: 'I', symbol: 'I', value: magnetState.energyI, unit: 'A' }], substitution: '0.5*' + magnetState.energyL + '*' + magnetState.energyI + '2', result: { value: W, unit: 'J' }, reference: 'Opgavesamling Kap. 5' });
+  html += '</div>';
+  return html;
+}
+
+
+// ============================================================================
+// ===== CAPACITOR / RC CIRCUIT MODULE (Opgavesamling Kap. 4) =================
+// ============================================================================
+// Interconnected: capacitance C is shared with the impedance module (XC =
+// 1/(2*pi*f*C)). Changing C here changes XC there and vice versa via the
+// SharedQuantities reactive bus (key 'capacitance_F').
+
+var KAP_EPS0 = 8.854e-12; // vacuum permittivity [F/m]
+var KAP_COULOMB_K = 1 / (4 * Math.PI * KAP_EPS0); // Coulomb constant ~8.988e9
+
+var KAP_DIELECTRICS = {
+  vacuum:  { er: 1,   da: 'Vakuum/luft (er=1)', en: 'Vacuum/air (er=1)' },
+  paper:   { er: 3.5, da: 'Papir (er=3.5)',      en: 'Paper (er=3.5)' },
+  rubber:  { er: 3,   da: 'Gummi (er=3)',        en: 'Rubber (er=3)' },
+  glass:   { er: 5,   da: 'Glas (er=5)',         en: 'Glass (er=5)' },
+  mica:    { er: 6,   da: 'Glimmer (er=6)',      en: 'Mica (er=6)' },
+  ceramic: { er: 100, da: 'Keramik (er=100)',    en: 'Ceramic (er=100)' },
+  water:   { er: 80,  da: 'Vand (er=80)',        en: 'Water (er=80)' }
+};
+
+var kapacitorState = {
+  calcType: 'capacitance', // capacitance | charge | combo | rc | coulomb
+  dielectric: 'vacuum', area: 0.01, dist: 0.001,
+  C: 0.000001, U: 230,
+  combo: 'series', c1: 0.000001, c2: 0.000002, c3: 0,
+  R: 1000, t: 0.001, phase: 'charge',
+  q1: 0.000001, q2: 0.000001, r: 0.1
+};
+
+// --- Pure calculation functions (unit-testable, no DOM) ---
+function kapacitorCalcC(er, A, d) { return (d > 0) ? KAP_EPS0 * er * A / d : Infinity; }
+function kapacitorCalcQ(C, U) { return C * U; }
+function kapacitorCalcW(C, U) { return 0.5 * C * U * U; }
+function kapacitorCalcSeries(arr) { var s = 0; for (var i = 0; i < arr.length; i++) { if (arr[i] > 0) s += 1 / arr[i]; } return (s > 0) ? 1 / s : 0; }
+function kapacitorCalcParallel(arr) { var s = 0; for (var i = 0; i < arr.length; i++) { if (arr[i] > 0) s += arr[i]; } return s; }
+function kapacitorCalcTau(R, C) { return R * C; }
+function kapacitorCalcCharging(U, t, tau) { return (tau > 0) ? U * (1 - Math.exp(-t / tau)) : U; }
+function kapacitorCalcDischarging(U, t, tau) { return (tau > 0) ? U * Math.exp(-t / tau) : 0; }
+function kapacitorCalcCoulomb(q1, q2, r) { return (r > 0) ? q1 * q2 / (4 * Math.PI * KAP_EPS0 * r * r) : Infinity; }
+function kapacitorCalcXC(f, C) { return (f > 0 && C > 0) ? 1 / (2 * Math.PI * f * C) : Infinity; }
+
+// Format a charge value with SI prefix
+function kapacitorFmtQ(q) {
+  var a = Math.abs(q);
+  if (a >= 1) return q.toFixed(3) + ' C';
+  if (a >= 1e-3) return (q * 1e3).toFixed(2) + ' mC';
+  if (a >= 1e-6) return (q * 1e6).toFixed(2) + ' \u00B5C';
+  if (a >= 1e-9) return (q * 1e9).toFixed(2) + ' nC';
+  return (q * 1e12).toFixed(2) + ' pC';
+}
+
+function renderKapacitor() {
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Kapacitor & RC-kreds (Opgavesamling Kap. 4)', 'Capacitor & RC circuit (Opgavesamling Ch. 4)') + '</div>';
+  html += '<div class="info-row">' + tx('Kapacitans, ladning, energi, serie/parallel, RC-tidskonstant og Coulombs lov. Linket til impedans (XC) via den reaktive bus.', 'Capacitance, charge, energy, series/parallel, RC time constant and Coulomb law. Linked to impedance (XC) via the reactive bus.') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Beregningstype', 'Calculation Type') + '</div><div class="select-grid">';
+  var types = [
+    { key: 'capacitance', da: 'Pladekondensator (C)', en: 'Plate capacitor (C)' },
+    { key: 'charge', da: 'Ladning & energi (Q, W)', en: 'Charge & energy (Q, W)' },
+    { key: 'combo', da: 'Serie / parallel', en: 'Series / parallel' },
+    { key: 'rc', da: 'RC-tidskonstant', en: 'RC time constant' },
+    { key: 'coulomb', da: 'Coulombs lov (F)', en: 'Coulomb law (F)' }
+  ];
+  types.forEach(function(ct) {
+    html += '<button class="sel-btn' + (kapacitorState.calcType === ct.key ? ' selected' : '') + '" onclick="kapacitorState.calcType=\'' + ct.key + '\';renderModule(\'kapacitor\')">' + tx(ct.da, ct.en) + '</button>';
+  });
+  html += '</div></div></div>';
+  if (kapacitorState.calcType === 'capacitance') html += renderKapacitorC();
+  else if (kapacitorState.calcType === 'charge') html += renderKapacitorCharge();
+  else if (kapacitorState.calcType === 'combo') html += renderKapacitorCombo();
+  else if (kapacitorState.calcType === 'rc') html += renderKapacitorRC();
+  else if (kapacitorState.calcType === 'coulomb') html += renderKapacitorCoulomb();
+  return html;
+}
+
+function renderKapacitorC() {
+  var areaPresets = [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1];
+  var distPresets = [0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01];
+  var er = KAP_DIELECTRICS[kapacitorState.dielectric].er;
+  var C = kapacitorCalcC(er, kapacitorState.area, kapacitorState.dist);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Pladekondensator: C = \u03B5\u2080\u00B7\u03B5\u1D63\u00B7A/d', 'Plate capacitor: C = \u03B5\u2080\u00B7\u03B5\u1D63\u00B7A/d') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Dielektrikum (\u03B5\u1D63)', 'Dielectric (\u03B5\u1D63)') + '</div><div class="select-grid">';
+  Object.keys(KAP_DIELECTRICS).forEach(function(dk) { var d = KAP_DIELECTRICS[dk]; html += '<button class="sel-btn' + (kapacitorState.dielectric === dk ? ' selected' : '') + '" onclick="kapacitorState.dielectric=\'' + dk + '\';renderModule(\'kapacitor\')">' + tx(d.da, d.en) + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Pladeareal A', 'Plate area A') + '</div><div class="select-grid">';
+  areaPresets.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState.area === v ? ' selected' : '') + '" onclick="kapacitorState.area=' + v + ';renderModule(\'kapacitor\')">' + (v * 10000).toFixed(0) + ' cm\u00B2</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Pladeafstand d', 'Plate distance d') + '</div><div class="select-grid">';
+  distPresets.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState.dist === v ? ' selected' : '') + '" onclick="kapacitorState.dist=' + v + ';renderModule(\'kapacitor\')">' + (v * 1000).toFixed(1) + ' mm</button>'; });
+  html += '</div></div>';
+  var XC50 = kapacitorCalcXC(50, C);
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">C</span><span class="value" style="font-weight:700">' + impedansFmtC(C) + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('X_C ved 50 Hz (link til impedans)', 'X_C at 50 Hz (link to impedance)') + '</span><span class="value">' + (isFinite(XC50) ? XC50.toExponential(3) + ' \u03A9' : '\u221E') + '</span></div></div>';
+  html += calcDetail({ name: tx('Kapacitans', 'Capacitance'), formula: 'C = \u03B5\u2080\u00B7\u03B5\u1D63\u00B7A/d', variables: [{ name: tx('Vakuumpermittivitet', 'Vacuum permittivity'), symbol: '\u03B5\u2080', value: KAP_EPS0, unit: 'F/m' }, { name: tx('Relativ permittivitet', 'Relative permittivity'), symbol: '\u03B5\u1D63', value: er }, { name: tx('Areal', 'Area'), symbol: 'A', value: kapacitorState.area, unit: 'm\u00B2' }, { name: tx('Afstand', 'Distance'), symbol: 'd', value: kapacitorState.dist, unit: 'm' }], substitution: '8.854e-12 \u00D7 ' + er + ' \u00D7 ' + kapacitorState.area + ' / ' + kapacitorState.dist, result: { value: C, unit: 'F' }, reference: 'Opgavesamling Kap. 4' });
+  html += calcDetail({ name: tx('Kapacitiv reaktans (link)', 'Capacitive reactance (link)'), formula: 'X_C = 1/(2\u03C0fC)', variables: [{ name: tx('Frekvens', 'Frequency'), symbol: 'f', value: 50, unit: 'Hz' }, { name: tx('Kapacitans', 'Capacitance'), symbol: 'C', value: C, unit: 'F' }], substitution: '1/(2\u03C0 \u00D7 50 \u00D7 ' + C.toExponential(3) + ')', result: { value: XC50, unit: '\u03A9' }, reference: 'Opgavesamling Kap. 4' });
+  html += '<div style="margin-top:8px"><button class="sel-btn" onclick="SharedQuantities.set(\'capacitance_F\',' + C + ',\'kapacitor\');renderModule(\'kapacitor\')">' + tx('\u2192 Send C til impedansmodul', '\u2192 Push C to impedance module') + '</button></div>';
+  html += '</div>';
+  return html;
+}
+
+function renderKapacitorCharge() {
+  var er = KAP_DIELECTRICS[kapacitorState.dielectric].er;
+  var Q = kapacitorCalcQ(kapacitorState.C, kapacitorState.U);
+  var W = kapacitorCalcW(kapacitorState.C, kapacitorState.U);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Ladning & energi: Q = C\u00B7U, W = \u00BD\u00B7C\u00B7U\u00B2', 'Charge & energy: Q = C\u00B7U, W = \u00BD\u00B7C\u00B7U\u00B2') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Kapacitans C', 'Capacitance C') + '</div><div class="select-grid">';
+  IMPEDANS_C_PRESETS.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState.C === v ? ' selected' : '') + '" onclick="kapacitorState.C=' + v + ';SharedQuantities.set(\'capacitance_F\',' + v + ',\'kapacitor\');renderModule(\'kapacitor\')">' + impedansFmtC(v) + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Sp\u00E6nding U [V]', 'Voltage U [V]') + '</div><div class="select-grid">';
+  IMPEDANS_U_PRESETS.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState.U === v ? ' selected' : '') + '" onclick="kapacitorState.U=' + v + ';renderModule(\'kapacitor\')">' + v + ' V</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">Q</span><span class="value" style="font-weight:700">' + kapacitorFmtQ(Q) + '</span></div>';
+  html += '<div class="result-row"><span class="label">W</span><span class="value" style="font-weight:700">' + (W >= 1 ? W.toFixed(3) + ' J' : (W * 1000).toFixed(3) + ' mJ') + '</span></div></div>';
+  html += calcDetail({ name: tx('Ladning', 'Charge'), formula: 'Q = C\u00B7U', variables: [{ name: tx('Kapacitans', 'Capacitance'), symbol: 'C', value: kapacitorState.C, unit: 'F' }, { name: tx('Sp\u00E6nding', 'Voltage'), symbol: 'U', value: kapacitorState.U, unit: 'V', source: tx('Delt v\u00E6rdi', 'Shared value') }], substitution: kapacitorState.C.toExponential(3) + ' \u00D7 ' + kapacitorState.U, result: { value: Q, unit: 'C' }, reference: 'Opgavesamling Kap. 4' });
+  html += calcDetail({ name: tx('Oplagret energi', 'Stored energy'), formula: 'W = \u00BD\u00B7C\u00B7U\u00B2', variables: [{ name: tx('Kapacitans', 'Capacitance'), symbol: 'C', value: kapacitorState.C, unit: 'F' }, { name: tx('Sp\u00E6nding', 'Voltage'), symbol: 'U', value: kapacitorState.U, unit: 'V' }], substitution: '0.5 \u00D7 ' + kapacitorState.C.toExponential(3) + ' \u00D7 ' + kapacitorState.U + '\u00B2', result: { value: W, unit: 'J' }, reference: 'Opgavesamling Kap. 4' });
+  html += '</div>';
+  return html;
+}
+
+function renderKapacitorCombo() {
+  var presets = IMPEDANS_C_PRESETS;
+  var arr = [kapacitorState.c1, kapacitorState.c2];
+  if (kapacitorState.c3 > 0) arr.push(kapacitorState.c3);
+  var Cseries = kapacitorCalcSeries(arr);
+  var Cparallel = kapacitorCalcParallel(arr);
+  var Cres = (kapacitorState.combo === 'series') ? Cseries : Cparallel;
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Serie- / parallelkobling', 'Series / parallel combination') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Kobling', 'Connection') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (kapacitorState.combo === 'series' ? ' selected' : '') + '" onclick="kapacitorState.combo=\'series\';renderModule(\'kapacitor\')">' + tx('Serie (1/C = \u03A3 1/C\u1D62)', 'Series (1/C = \u03A3 1/C\u1D62)') + '</button>';
+  html += '<button class="sel-btn' + (kapacitorState.combo === 'parallel' ? ' selected' : '') + '" onclick="kapacitorState.combo=\'parallel\';renderModule(\'kapacitor\')">' + tx('Parallel (C = \u03A3 C\u1D62)', 'Parallel (C = \u03A3 C\u1D62)') + '</button>';
+  html += '</div></div>';
+  ['c1', 'c2', 'c3'].forEach(function(key, idx) {
+    var label = (idx === 2) ? tx('C\u2083 (valgfri, v\u00E6lg 0 = fra)', 'C\u2083 (optional, 0 = off)') : 'C' + (idx === 0 ? '\u2081' : '\u2082');
+    html += '<div class="select-group"><div class="select-label">' + label + '</div><div class="select-grid">';
+    if (idx === 2) html += '<button class="sel-btn' + (kapacitorState.c3 === 0 ? ' selected' : '') + '" onclick="kapacitorState.c3=0;renderModule(\'kapacitor\')">0</button>';
+    presets.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState[key] === v ? ' selected' : '') + '" onclick="kapacitorState.' + key + '=' + v + ';renderModule(\'kapacitor\')">' + impedansFmtC(v) + '</button>'; });
+    html += '</div></div>';
+  });
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">C_total</span><span class="value" style="font-weight:700">' + impedansFmtC(Cres) + '</span></div></div>';
+  var subParts = arr.map(function(c) { return impedansFmtC(c); }).join(kapacitorState.combo === 'series' ? ' , ' : ' + ');
+  if (kapacitorState.combo === 'series') {
+    html += calcDetail({ name: tx('Seriekapacitans', 'Series capacitance'), formula: '1/C = \u03A3 1/C\u1D62', variables: arr.map(function(c, i) { return { name: 'C' + (i + 1), symbol: 'C' + (i + 1), value: c, unit: 'F' }; }), substitution: '1/C = ' + arr.map(function(c) { return '1/' + c.toExponential(2); }).join(' + '), result: { value: Cres, unit: 'F' }, reference: 'Opgavesamling Kap. 4' });
+  } else {
+    html += calcDetail({ name: tx('Parallelkapacitans', 'Parallel capacitance'), formula: 'C = \u03A3 C\u1D62', variables: arr.map(function(c, i) { return { name: 'C' + (i + 1), symbol: 'C' + (i + 1), value: c, unit: 'F' }; }), substitution: subParts, result: { value: Cres, unit: 'F' }, reference: 'Opgavesamling Kap. 4' });
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderKapacitorRC() {
+  var rPresets = IMPEDANS_R_PRESETS;
+  var cPresets = IMPEDANS_C_PRESETS;
+  var tPresets = [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5];
+  var tau = kapacitorCalcTau(kapacitorState.R, kapacitorState.C);
+  var uCharge = kapacitorCalcCharging(kapacitorState.U, kapacitorState.t, tau);
+  var uDischarge = kapacitorCalcDischarging(kapacitorState.U, kapacitorState.t, tau);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('RC-tidskonstant: \u03C4 = R\u00B7C', 'RC time constant: \u03C4 = R\u00B7C') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Modstand R [\u03A9]', 'Resistance R [\u03A9]') + '</div><div class="select-grid">';
+  rPresets.forEach(function(v) { var label = v >= 1000 ? (v / 1000) + 'k' : v + ''; html += '<button class="sel-btn' + (kapacitorState.R === v ? ' selected' : '') + '" onclick="kapacitorState.R=' + v + ';renderModule(\'kapacitor\')">' + label + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Kapacitans C', 'Capacitance C') + '</div><div class="select-grid">';
+  cPresets.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState.C === v ? ' selected' : '') + '" onclick="kapacitorState.C=' + v + ';SharedQuantities.set(\'capacitance_F\',' + v + ',\'kapacitor\');renderModule(\'kapacitor\')">' + impedansFmtC(v) + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Sp\u00E6nding U [V]', 'Voltage U [V]') + '</div><div class="select-grid">';
+  IMPEDANS_U_PRESETS.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState.U === v ? ' selected' : '') + '" onclick="kapacitorState.U=' + v + ';renderModule(\'kapacitor\')">' + v + ' V</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Tid t [s]', 'Time t [s]') + '</div><div class="select-grid">';
+  tPresets.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState.t === v ? ' selected' : '') + '" onclick="kapacitorState.t=' + v + ';renderModule(\'kapacitor\')">' + (v >= 1 ? v + ' s' : (v * 1000) + ' ms') + '</button>'; });
+  html += '</div></div>';
+  var nTau = (tau > 0) ? kapacitorState.t / tau : 0;
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">\u03C4 (' + tx('tidskonstant', 'time constant') + ')</span><span class="value" style="font-weight:700">' + impedansFmtEng(tau, 's') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('t/\u03C4', 't/\u03C4') + '</span><span class="value">' + nTau.toFixed(3) + '</span></div>';
+  html += '<div class="result-row"><span class="label">u(t) ' + tx('opladning', 'charging') + '</span><span class="value">' + uCharge.toFixed(2) + ' V</span></div>';
+  html += '<div class="result-row"><span class="label">u(t) ' + tx('afladning', 'discharging') + '</span><span class="value">' + uDischarge.toFixed(2) + ' V</span></div></div>';
+  html += calcDetail({ name: tx('Tidskonstant', 'Time constant'), formula: '\u03C4 = R\u00B7C', variables: [{ name: 'R', symbol: 'R', value: kapacitorState.R, unit: '\u03A9' }, { name: 'C', symbol: 'C', value: kapacitorState.C, unit: 'F', source: tx('Delt v\u00E6rdi', 'Shared value') }], substitution: kapacitorState.R + ' \u00D7 ' + kapacitorState.C.toExponential(3), result: { value: tau, unit: 's' }, reference: 'Opgavesamling Kap. 4' });
+  html += calcDetail({ name: tx('Opladning', 'Charging'), formula: 'u(t) = U\u00B7(1 \u2212 e^(\u2212t/\u03C4))', variables: [{ name: 'U', symbol: 'U', value: kapacitorState.U, unit: 'V' }, { name: 't', symbol: 't', value: kapacitorState.t, unit: 's' }, { name: '\u03C4', symbol: '\u03C4', value: tau, unit: 's' }], substitution: kapacitorState.U + ' \u00D7 (1 \u2212 e^(\u2212' + kapacitorState.t + '/' + tau.toExponential(3) + '))', result: { value: uCharge, unit: 'V' }, reference: 'Opgavesamling Kap. 4' });
+  html += calcDetail({ name: tx('Afladning', 'Discharging'), formula: 'u(t) = U\u00B7e^(\u2212t/\u03C4)', variables: [{ name: 'U', symbol: 'U', value: kapacitorState.U, unit: 'V' }, { name: 't', symbol: 't', value: kapacitorState.t, unit: 's' }, { name: '\u03C4', symbol: '\u03C4', value: tau, unit: 's' }], substitution: kapacitorState.U + ' \u00D7 e^(\u2212' + kapacitorState.t + '/' + tau.toExponential(3) + ')', result: { value: uDischarge, unit: 'V' }, reference: 'Opgavesamling Kap. 4' });
+  html += '</div>';
+  return html;
+}
+
+function renderKapacitorCoulomb() {
+  var qPresets = [1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3];
+  var rPresets = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2];
+  var F = kapacitorCalcCoulomb(kapacitorState.q1, kapacitorState.q2, kapacitorState.r);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Coulombs lov: F = Q\u2081\u00B7Q\u2082/(4\u03C0\u03B5\u2080\u00B7r\u00B2)', 'Coulomb law: F = Q\u2081\u00B7Q\u2082/(4\u03C0\u03B5\u2080\u00B7r\u00B2)') + '</div>';
+  ['q1', 'q2'].forEach(function(key, idx) {
+    html += '<div class="select-group"><div class="select-label">Q' + (idx === 0 ? '\u2081' : '\u2082') + ' [C]</div><div class="select-grid">';
+    qPresets.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState[key] === v ? ' selected' : '') + '" onclick="kapacitorState.' + key + '=' + v + ';renderModule(\'kapacitor\')">' + kapacitorFmtQ(v) + '</button>'; });
+    html += '</div></div>';
+  });
+  html += '<div class="select-group"><div class="select-label">' + tx('Afstand r [m]', 'Distance r [m]') + '</div><div class="select-grid">';
+  rPresets.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState.r === v ? ' selected' : '') + '" onclick="kapacitorState.r=' + v + ';renderModule(\'kapacitor\')">' + v + ' m</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">F</span><span class="value" style="font-weight:700">' + impedansFmtEng(F, 'N') + '</span></div></div>';
+  html += calcDetail({ name: tx('Coulomb-kraft', 'Coulomb force'), formula: 'F = Q\u2081\u00B7Q\u2082/(4\u03C0\u03B5\u2080\u00B7r\u00B2)', variables: [{ name: 'Q\u2081', symbol: 'Q\u2081', value: kapacitorState.q1, unit: 'C' }, { name: 'Q\u2082', symbol: 'Q\u2082', value: kapacitorState.q2, unit: 'C' }, { name: 'r', symbol: 'r', value: kapacitorState.r, unit: 'm' }, { name: 'k', symbol: 'k', value: KAP_COULOMB_K, unit: 'N\u00B7m\u00B2/C\u00B2' }], substitution: kapacitorState.q1.toExponential(2) + ' \u00D7 ' + kapacitorState.q2.toExponential(2) + ' / (4\u03C0 \u00D7 8.854e-12 \u00D7 ' + kapacitorState.r + '\u00B2)', result: { value: F, unit: 'N' }, reference: 'Opgavesamling Kap. 4' });
+  html += '</div>';
+  return html;
+}
+
+
+// ============================================================================
+// ===== ROOM HEATING / U-VALUE MODULE (Opgavesamling Kap. 13) ================
+// ============================================================================
+// Interconnected: the total heat demand (kW) is published to the shared
+// 'load_power_kw' quantity so the load / cable / energy / heat-pump modules
+// react to a change in the building's thermal demand.
+
+var VARME_MATERIALS = {
+  none:         { lambda: 0,     da: '(intet lag)',        en: '(no layer)' },
+  brick:        { lambda: 0.50,  da: 'Tegl (0.50)',         en: 'Brick (0.50)' },
+  concrete:     { lambda: 1.70,  da: 'Beton (1.70)',        en: 'Concrete (1.70)' },
+  aerated:      { lambda: 0.15,  da: 'Letbeton (0.15)',     en: 'Aerated concrete (0.15)' },
+  wood:         { lambda: 0.13,  da: 'Tr\u00E6 (0.13)',     en: 'Wood (0.13)' },
+  plaster:      { lambda: 0.25,  da: 'Gips (0.25)',         en: 'Plaster board (0.25)' },
+  mineral_wool: { lambda: 0.037, da: 'Mineraluld (0.037)',  en: 'Mineral wool (0.037)' },
+  eps:          { lambda: 0.035, da: 'EPS/flamingo (0.035)', en: 'EPS (0.035)' },
+  pur:          { lambda: 0.024, da: 'PUR-skum (0.024)',    en: 'PUR foam (0.024)' },
+  glass:        { lambda: 1.00,  da: 'Glas (1.00)',         en: 'Glass (1.00)' }
+};
+
+var varmeState = {
+  calcType: 'uvalue', // uvalue | transmission | ventilation | total
+  Ri: 0.13, Ru: 0.04,
+  l1mat: 'brick', l1d: 0.108,
+  l2mat: 'mineral_wool', l2d: 0.10,
+  l3mat: 'plaster', l3d: 0.013,
+  A: 20, Tin: 20, Tout: -12,
+  n: 0.5, V: 125
+};
+
+function varmeLayers() {
+  return [
+    { mat: varmeState.l1mat, d: varmeState.l1d },
+    { mat: varmeState.l2mat, d: varmeState.l2d },
+    { mat: varmeState.l3mat, d: varmeState.l3d }
+  ];
+}
+
+// --- Pure calculation functions (unit-testable, no DOM) ---
+function varmeCalcRtotal(Ri, layers, Ru) {
+  var s = Ri + Ru;
+  for (var i = 0; i < layers.length; i++) {
+    var lam = (typeof layers[i].lambda === 'number') ? layers[i].lambda : (VARME_MATERIALS[layers[i].mat] ? VARME_MATERIALS[layers[i].mat].lambda : 0);
+    if (lam > 0 && layers[i].d > 0) s += layers[i].d / lam;
+  }
+  return s;
+}
+function varmeCalcU(Ri, layers, Ru) { var R = varmeCalcRtotal(Ri, layers, Ru); return (R > 0) ? 1 / R : Infinity; }
+function varmeCalcTransmission(U, A, dT) { return U * A * dT; }
+function varmeCalcVentilation(n, V, dT) { return 0.33 * n * V * dT; }
+function varmeCalcTotal(U, A, n, V, dT) { return varmeCalcTransmission(U, A, dT) + varmeCalcVentilation(n, V, dT); }
+
+function renderVarme() {
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Rumvarme & U-v\u00E6rdi (Opgavesamling Kap. 13)', 'Room heating & U-value (Opgavesamling Ch. 13)') + '</div>';
+  html += '<div class="info-row">' + tx('U-v\u00E6rdi, transmissionstab, ventilationstab og samlet varmebehov. Det samlede behov sendes til last/kabel/energi via den reaktive bus.', 'U-value, transmission loss, ventilation loss and total heat demand. The total demand is pushed to load/cable/energy via the reactive bus.') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Beregningstype', 'Calculation Type') + '</div><div class="select-grid">';
+  var types = [
+    { key: 'uvalue', da: 'U-v\u00E6rdi (U = 1/R_total)', en: 'U-value (U = 1/R_total)' },
+    { key: 'transmission', da: 'Transmissionstab (Q)', en: 'Transmission loss (Q)' },
+    { key: 'ventilation', da: 'Ventilationstab', en: 'Ventilation loss' },
+    { key: 'total', da: 'Samlet varmebehov', en: 'Total heat demand' }
+  ];
+  types.forEach(function(ct) {
+    html += '<button class="sel-btn' + (varmeState.calcType === ct.key ? ' selected' : '') + '" onclick="varmeState.calcType=\'' + ct.key + '\';renderModule(\'varme\')">' + tx(ct.da, ct.en) + '</button>';
+  });
+  html += '</div></div></div>';
+  if (varmeState.calcType === 'uvalue') html += renderVarmeUValue();
+  else if (varmeState.calcType === 'transmission') html += renderVarmeTransmission();
+  else if (varmeState.calcType === 'ventilation') html += renderVarmeVentilation();
+  else if (varmeState.calcType === 'total') html += renderVarmeTotal();
+  return html;
+}
+
+function varmeRenderLayerSelectors(html) {
+  var dPresets = [0, 0.013, 0.025, 0.05, 0.075, 0.10, 0.15, 0.20, 0.25, 0.30];
+  var RiPresets = [0.10, 0.13, 0.17];
+  var RuPresets = [0.04, 0.10, 0.13];
+  html += '<div class="select-group"><div class="select-label">' + tx('Indvendig overgangsmodstand R\u1D62', 'Internal surface resistance R\u1D62') + '</div><div class="select-grid">';
+  RiPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.Ri === v ? ' selected' : '') + '" onclick="varmeState.Ri=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
+  html += '</div></div>';
+  ['1', '2', '3'].forEach(function(idx) {
+    var matKey = 'l' + idx + 'mat', dKey = 'l' + idx + 'd';
+    html += '<div class="select-group"><div class="select-label">' + tx('Lag ' + idx + ' materiale (\u03BB)', 'Layer ' + idx + ' material (\u03BB)') + '</div><div class="select-grid">';
+    Object.keys(VARME_MATERIALS).forEach(function(mk) { var m = VARME_MATERIALS[mk]; html += '<button class="sel-btn' + (varmeState[matKey] === mk ? ' selected' : '') + '" onclick="varmeState.' + matKey + '=\'' + mk + '\';renderModule(\'varme\')">' + tx(m.da, m.en) + '</button>'; });
+    html += '</div></div>';
+    html += '<div class="select-group"><div class="select-label">' + tx('Lag ' + idx + ' tykkelse d', 'Layer ' + idx + ' thickness d') + '</div><div class="select-grid">';
+    dPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState[dKey] === v ? ' selected' : '') + '" onclick="varmeState.' + dKey + '=' + v + ';renderModule(\'varme\')">' + (v === 0 ? '0' : (v * 1000).toFixed(0) + ' mm') + '</button>'; });
+    html += '</div></div>';
+  });
+  html += '<div class="select-group"><div class="select-label">' + tx('Udvendig overgangsmodstand R\u1D64', 'External surface resistance R\u1D64') + '</div><div class="select-grid">';
+  RuPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.Ru === v ? ' selected' : '') + '" onclick="varmeState.Ru=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
+  html += '</div></div>';
+  return html;
+}
+
+function varmeUCalcDetail() {
+  var layers = varmeLayers();
+  var Rtot = varmeCalcRtotal(varmeState.Ri, layers, varmeState.Ru);
+  var U = varmeCalcU(varmeState.Ri, layers, varmeState.Ru);
+  var steps = [{ desc: 'R\u1D62', expr: 'R\u1D62', result: varmeState.Ri }];
+  layers.forEach(function(l, i) {
+    var m = VARME_MATERIALS[l.mat];
+    if (m && m.lambda > 0 && l.d > 0) steps.push({ desc: tx('Lag', 'Layer') + ' ' + (i + 1) + ' (d/\u03BB)', expr: l.d + '/' + m.lambda, result: l.d / m.lambda });
+  });
+  steps.push({ desc: 'R\u1D64', expr: 'R\u1D64', result: varmeState.Ru });
+  var h = calcDetail({ name: tx('Samlet varmemodstand', 'Total thermal resistance'), formula: 'R_total = R\u1D62 + \u03A3(d/\u03BB) + R\u1D64', variables: [{ name: 'R\u1D62', symbol: 'R\u1D62', value: varmeState.Ri, unit: 'm\u00B2K/W' }, { name: 'R\u1D64', symbol: 'R\u1D64', value: varmeState.Ru, unit: 'm\u00B2K/W' }], steps: steps, substitution: steps.map(function(s) { return (s.result).toFixed(3); }).join(' + '), result: { value: Rtot, unit: 'm\u00B2K/W' }, reference: 'Opgavesamling Kap. 13 / DS 418' });
+  h += calcDetail({ name: tx('U-v\u00E6rdi', 'U-value'), formula: 'U = 1/R_total', variables: [{ name: 'R_total', symbol: 'R_total', value: Rtot, unit: 'm\u00B2K/W' }], substitution: '1 / ' + Rtot.toFixed(3), result: { value: U, unit: 'W/m\u00B2K' }, reference: 'Opgavesamling Kap. 13 / DS 418' });
+  return { html: h, U: U, Rtot: Rtot };
+}
+
+function renderVarmeUValue() {
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('U-v\u00E6rdi: U = 1/R_total', 'U-value: U = 1/R_total') + '</div>';
+  html = varmeRenderLayerSelectors(html);
+  var u = varmeUCalcDetail();
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">R_total</span><span class="value">' + u.Rtot.toFixed(3) + ' m\u00B2K/W</span></div>';
+  html += '<div class="result-row"><span class="label">U</span><span class="value" style="font-weight:700">' + u.U.toFixed(3) + ' W/m\u00B2K</span></div></div>';
+  html += u.html;
+  html += '</div>';
+  return html;
+}
+
+function renderVarmeTransmission() {
+  var APresets = [5, 10, 15, 20, 30, 40, 50, 75, 100];
+  var TinPresets = [18, 20, 21, 22, 24];
+  var ToutPresets = [-12, -8, -5, 0, 5];
+  var layers = varmeLayers();
+  var U = varmeCalcU(varmeState.Ri, layers, varmeState.Ru);
+  var dT = varmeState.Tin - varmeState.Tout;
+  var Q = varmeCalcTransmission(U, varmeState.A, dT);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Transmissionstab: Q = U\u00B7A\u00B7\u0394T', 'Transmission loss: Q = U\u00B7A\u00B7\u0394T') + '</div>';
+  html += '<div class="info-row">' + tx('Bruger U = ' + U.toFixed(3) + ' W/m\u00B2K fra konstruktionen ovenfor.', 'Uses U = ' + U.toFixed(3) + ' W/m\u00B2K from the construction above.') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Areal A [m\u00B2]', 'Area A [m\u00B2]') + '</div><div class="select-grid">';
+  APresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.A === v ? ' selected' : '') + '" onclick="varmeState.A=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Indetemperatur', 'Indoor temperature') + '</div><div class="select-grid">';
+  TinPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.Tin === v ? ' selected' : '') + '" onclick="varmeState.Tin=' + v + ';renderModule(\'varme\')">' + v + '\u00B0C</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Udetemperatur', 'Outdoor temperature') + '</div><div class="select-grid">';
+  ToutPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.Tout === v ? ' selected' : '') + '" onclick="varmeState.Tout=' + v + ';renderModule(\'varme\')">' + v + '\u00B0C</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">\u0394T</span><span class="value">' + dT + ' K</span></div>';
+  html += '<div class="result-row"><span class="label">Q</span><span class="value" style="font-weight:700">' + Q.toFixed(1) + ' W</span></div></div>';
+  html += calcDetail({ name: tx('Transmissionstab', 'Transmission loss'), formula: 'Q = U\u00B7A\u00B7\u0394T', variables: [{ name: 'U', symbol: 'U', value: U, unit: 'W/m\u00B2K', source: tx('Fra konstruktion', 'From construction') }, { name: 'A', symbol: 'A', value: varmeState.A, unit: 'm\u00B2' }, { name: '\u0394T', symbol: '\u0394T', value: dT, unit: 'K' }], substitution: U.toFixed(3) + ' \u00D7 ' + varmeState.A + ' \u00D7 ' + dT, result: { value: Q, unit: 'W' }, reference: 'Opgavesamling Kap. 13' });
+  html += '</div>';
+  return html;
+}
+
+function renderVarmeVentilation() {
+  var nPresets = [0.3, 0.5, 0.7, 1.0, 1.5, 2.0];
+  var VPresets = [25, 50, 75, 100, 125, 150, 200, 300];
+  var TinPresets = [18, 20, 21, 22, 24];
+  var ToutPresets = [-12, -8, -5, 0, 5];
+  var dT = varmeState.Tin - varmeState.Tout;
+  var Qv = varmeCalcVentilation(varmeState.n, varmeState.V, dT);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Ventilationstab: Q = 0.33\u00B7n\u00B7V\u00B7\u0394T', 'Ventilation loss: Q = 0.33\u00B7n\u00B7V\u00B7\u0394T') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Luftskifte n [1/h]', 'Air change rate n [1/h]') + '</div><div class="select-grid">';
+  nPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.n === v ? ' selected' : '') + '" onclick="varmeState.n=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Rumvolumen V [m\u00B3]', 'Room volume V [m\u00B3]') + '</div><div class="select-grid">';
+  VPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.V === v ? ' selected' : '') + '" onclick="varmeState.V=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Indetemperatur', 'Indoor temperature') + '</div><div class="select-grid">';
+  TinPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.Tin === v ? ' selected' : '') + '" onclick="varmeState.Tin=' + v + ';renderModule(\'varme\')">' + v + '\u00B0C</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Udetemperatur', 'Outdoor temperature') + '</div><div class="select-grid">';
+  ToutPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.Tout === v ? ' selected' : '') + '" onclick="varmeState.Tout=' + v + ';renderModule(\'varme\')">' + v + '\u00B0C</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">\u0394T</span><span class="value">' + dT + ' K</span></div>';
+  html += '<div class="result-row"><span class="label">Q_vent</span><span class="value" style="font-weight:700">' + Qv.toFixed(1) + ' W</span></div></div>';
+  html += calcDetail({ name: tx('Ventilationstab', 'Ventilation loss'), formula: 'Q = 0.33\u00B7n\u00B7V\u00B7\u0394T', variables: [{ name: tx('Luftskifte', 'Air change'), symbol: 'n', value: varmeState.n, unit: '1/h' }, { name: tx('Volumen', 'Volume'), symbol: 'V', value: varmeState.V, unit: 'm\u00B3' }, { name: '\u0394T', symbol: '\u0394T', value: dT, unit: 'K' }], substitution: '0.33 \u00D7 ' + varmeState.n + ' \u00D7 ' + varmeState.V + ' \u00D7 ' + dT, result: { value: Qv, unit: 'W' }, reference: 'Opgavesamling Kap. 13' });
+  html += '</div>';
+  return html;
+}
+
+function renderVarmeTotal() {
+  var APresets = [5, 10, 15, 20, 30, 40, 50, 75, 100];
+  var nPresets = [0.3, 0.5, 0.7, 1.0, 1.5, 2.0];
+  var VPresets = [25, 50, 75, 100, 125, 150, 200, 300];
+  var ToutPresets = [-12, -8, -5, 0, 5];
+  var layers = varmeLayers();
+  var U = varmeCalcU(varmeState.Ri, layers, varmeState.Ru);
+  var dT = varmeState.Tin - varmeState.Tout;
+  var Qtrans = varmeCalcTransmission(U, varmeState.A, dT);
+  var Qvent = varmeCalcVentilation(varmeState.n, varmeState.V, dT);
+  var Qtotal = Qtrans + Qvent;
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Samlet varmebehov: Q = Q_trans + Q_vent', 'Total heat demand: Q = Q_trans + Q_vent') + '</div>';
+  html += '<div class="info-row">' + tx('Bruger U = ' + U.toFixed(3) + ' W/m\u00B2K fra konstruktionen.', 'Uses U = ' + U.toFixed(3) + ' W/m\u00B2K from the construction.') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Areal A [m\u00B2]', 'Area A [m\u00B2]') + '</div><div class="select-grid">';
+  APresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.A === v ? ' selected' : '') + '" onclick="varmeState.A=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Luftskifte n [1/h]', 'Air change rate n [1/h]') + '</div><div class="select-grid">';
+  nPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.n === v ? ' selected' : '') + '" onclick="varmeState.n=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Rumvolumen V [m\u00B3]', 'Room volume V [m\u00B3]') + '</div><div class="select-grid">';
+  VPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.V === v ? ' selected' : '') + '" onclick="varmeState.V=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Udetemperatur', 'Outdoor temperature') + '</div><div class="select-grid">';
+  ToutPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.Tout === v ? ' selected' : '') + '" onclick="varmeState.Tout=' + v + ';renderModule(\'varme\')">' + v + '\u00B0C</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">Q_trans</span><span class="value">' + Qtrans.toFixed(1) + ' W</span></div>';
+  html += '<div class="result-row"><span class="label">Q_vent</span><span class="value">' + Qvent.toFixed(1) + ' W</span></div>';
+  html += '<div class="result-row"><span class="label">Q_total</span><span class="value" style="font-weight:700">' + Qtotal.toFixed(1) + ' W (' + (Qtotal / 1000).toFixed(3) + ' kW)</span></div></div>';
+  html += calcDetail({ name: tx('Samlet varmebehov', 'Total heat demand'), formula: 'Q = U\u00B7A\u00B7\u0394T + 0.33\u00B7n\u00B7V\u00B7\u0394T', variables: [{ name: 'U', symbol: 'U', value: U, unit: 'W/m\u00B2K' }, { name: 'A', symbol: 'A', value: varmeState.A, unit: 'm\u00B2' }, { name: 'n', symbol: 'n', value: varmeState.n, unit: '1/h' }, { name: 'V', symbol: 'V', value: varmeState.V, unit: 'm\u00B3' }, { name: '\u0394T', symbol: '\u0394T', value: dT, unit: 'K' }], steps: [{ desc: 'Q_trans', expr: U.toFixed(3) + '\u00D7' + varmeState.A + '\u00D7' + dT, result: Qtrans }, { desc: 'Q_vent', expr: '0.33\u00D7' + varmeState.n + '\u00D7' + varmeState.V + '\u00D7' + dT, result: Qvent }], substitution: Qtrans.toFixed(1) + ' + ' + Qvent.toFixed(1), result: { value: Qtotal, unit: 'W' }, reference: 'Opgavesamling Kap. 13' });
+  html += '<div style="margin-top:8px"><button class="sel-btn" onclick="SharedQuantities.set(\'load_power_kw\',' + (Qtotal / 1000) + ',\'varme\');renderModule(\'varme\')">' + tx('\u2192 Send varmebehov (' + (Qtotal / 1000).toFixed(2) + ' kW) til last/kabel', '\u2192 Push heat demand (' + (Qtotal / 1000).toFixed(2) + ' kW) to load/cable') + '</button></div>';
+  html += '</div>';
+  return html;
+}
+
+
+// ============================================================================
+// ===== DC MACHINES MODULE (Opgavesamling Kap. 10) ===========================
+// ============================================================================
+// Interconnected: the machine power is published to the shared
+// 'motor_power_w' and 'load_power_kw' quantities, so motor theory, cable
+// sizing and the load module react to changes here.
+
+var DCMASKINE_TYPES = {
+  shunt:    { da: 'Shunt (parallel)',       en: 'Shunt (parallel)' },
+  series:   { da: 'Serie',                  en: 'Series' },
+  compound: { da: 'Compound',               en: 'Compound' },
+  separate: { da: 'Sepa. magnetisering',    en: 'Separately excited' }
+};
+
+var dcmaskineState = {
+  mode: 'generator', // generator | motor | torque | starter | efficiency
+  type: 'shunt',
+  U: 220, Ia: 40, Ra: 0.25, Ubrush: 2, Rf: 110,
+  Pmech: 5000, n: 1450,
+  E: 210,
+  Pout: 4500, Pin: 5200
+};
+
+// --- Pure calculation functions (unit-testable, no DOM) ---
+function dcmaskineGenEMF(U, Ia, Ra, Ubrush) { return U + Ia * Ra + Ubrush; }
+function dcmaskineMotorBackEMF(U, Ia, Ra, Ubrush) { return U - Ia * Ra - Ubrush; }
+function dcmaskineTorque(P, n) { return (n > 0) ? 9.55 * P / n : 0; }
+function dcmaskineStartResistor(U, E, Ia) { return (Ia > 0) ? (U - E) / Ia : Infinity; }
+function dcmaskineEfficiency(Pout, Pin) { return (Pin > 0) ? Pout / Pin : 0; }
+function dcmaskineFieldCurrent(U, Rf) { return (Rf > 0) ? U / Rf : 0; }
+
+function renderDcmaskine() {
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Jaevnstr\u00F8msmaskiner (Opgavesamling Kap. 10)', 'DC machines (Opgavesamling Ch. 10)') + '</div>';
+  html += '<div class="info-row">' + tx('Generator-EMK, motor-modEMK, moment, startmodstand og virkningsgrad. Maskineffekten sendes til motorteori/last/kabel via den reaktive bus.', 'Generator EMF, motor back-EMF, torque, starting resistor and efficiency. The machine power is pushed to motor theory/load/cable via the reactive bus.') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Beregningstype', 'Calculation Type') + '</div><div class="select-grid">';
+  var modes = [
+    { key: 'generator', da: 'Generator (E = U + Ia\u00B7Ra + Ub)', en: 'Generator (E = U + Ia\u00B7Ra + Ub)' },
+    { key: 'motor', da: 'Motor (U = E + Ia\u00B7Ra + Ub)', en: 'Motor (U = E + Ia\u00B7Ra + Ub)' },
+    { key: 'torque', da: 'Moment (M = 9.55\u00B7P/n)', en: 'Torque (M = 9.55\u00B7P/n)' },
+    { key: 'starter', da: 'Startmodstand (Rs)', en: 'Starting resistor (Rs)' },
+    { key: 'efficiency', da: 'Virkningsgrad (\u03B7)', en: 'Efficiency (\u03B7)' }
+  ];
+  modes.forEach(function(ct) {
+    html += '<button class="sel-btn' + (dcmaskineState.mode === ct.key ? ' selected' : '') + '" onclick="dcmaskineState.mode=\'' + ct.key + '\';renderModule(\'dcmaskine\')">' + tx(ct.da, ct.en) + '</button>';
+  });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Maskintype', 'Machine type') + '</div><div class="select-grid">';
+  Object.keys(DCMASKINE_TYPES).forEach(function(tk) { var ty = DCMASKINE_TYPES[tk]; html += '<button class="sel-btn' + (dcmaskineState.type === tk ? ' selected' : '') + '" onclick="dcmaskineState.type=\'' + tk + '\';renderModule(\'dcmaskine\')">' + tx(ty.da, ty.en) + '</button>'; });
+  html += '</div></div></div>';
+  if (dcmaskineState.mode === 'generator') html += renderDcmaskineGenerator();
+  else if (dcmaskineState.mode === 'motor') html += renderDcmaskineMotor();
+  else if (dcmaskineState.mode === 'torque') html += renderDcmaskineTorque();
+  else if (dcmaskineState.mode === 'starter') html += renderDcmaskineStarter();
+  else if (dcmaskineState.mode === 'efficiency') html += renderDcmaskineEfficiency();
+  return html;
+}
+
+function dcmaskineCommonSelectors(html, keys) {
+  var P = {
+    U: [110, 220, 230, 400, 440, 600],
+    Ia: [5, 10, 20, 30, 40, 50, 75, 100, 150, 200],
+    Ra: [0.05, 0.1, 0.15, 0.2, 0.25, 0.5, 0.75, 1.0],
+    Ubrush: [0, 1, 2, 3, 4],
+    Rf: [50, 80, 110, 150, 200, 300]
+  };
+  var labels = {
+    U: tx('Klemsp\u00E6nding U [V]', 'Terminal voltage U [V]'),
+    Ia: tx('Ankerstr\u00F8m Ia [A]', 'Armature current Ia [A]'),
+    Ra: tx('Ankermodstand Ra [\u03A9]', 'Armature resistance Ra [\u03A9]'),
+    Ubrush: tx('B\u00F8rstefald Ub [V]', 'Brush drop Ub [V]'),
+    Rf: tx('Feltmodstand Rf [\u03A9]', 'Field resistance Rf [\u03A9]')
+  };
+  keys.forEach(function(k) {
+    html += '<div class="select-group"><div class="select-label">' + labels[k] + '</div><div class="select-grid">';
+    P[k].forEach(function(v) { html += '<button class="sel-btn' + (dcmaskineState[k] === v ? ' selected' : '') + '" onclick="dcmaskineState.' + k + '=' + v + ';renderModule(\'dcmaskine\')">' + v + '</button>'; });
+    html += '</div></div>';
+  });
+  return html;
+}
+
+function renderDcmaskineGenerator() {
+  var E = dcmaskineGenEMF(dcmaskineState.U, dcmaskineState.Ia, dcmaskineState.Ra, dcmaskineState.Ubrush);
+  var If = (dcmaskineState.type === 'shunt' || dcmaskineState.type === 'separate') ? dcmaskineFieldCurrent(dcmaskineState.U, dcmaskineState.Rf) : 0;
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Generator: E = U + Ia\u00B7Ra + Ub', 'Generator: E = U + Ia\u00B7Ra + Ub') + '</div>';
+  html = dcmaskineCommonSelectors(html, ['U', 'Ia', 'Ra', 'Ubrush']);
+  if (dcmaskineState.type === 'shunt' || dcmaskineState.type === 'separate') html = dcmaskineCommonSelectors(html, ['Rf']);
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">E (' + tx('indre EMK', 'internal EMF') + ')</span><span class="value" style="font-weight:700">' + E.toFixed(2) + ' V</span></div>';
+  if (If > 0) html += '<div class="result-row"><span class="label">If (' + tx('feltstr\u00F8m', 'field current') + ')</span><span class="value">' + If.toFixed(3) + ' A</span></div></div>';
+  else html += '</div>';
+  html += calcDetail({ name: tx('Generator-EMK', 'Generator EMF'), formula: 'E = U + Ia\u00B7Ra + Ub', variables: [{ name: 'U', symbol: 'U', value: dcmaskineState.U, unit: 'V' }, { name: 'Ia', symbol: 'Ia', value: dcmaskineState.Ia, unit: 'A' }, { name: 'Ra', symbol: 'Ra', value: dcmaskineState.Ra, unit: '\u03A9' }, { name: 'Ub', symbol: 'Ub', value: dcmaskineState.Ubrush, unit: 'V' }], substitution: dcmaskineState.U + ' + ' + dcmaskineState.Ia + '\u00D7' + dcmaskineState.Ra + ' + ' + dcmaskineState.Ubrush, result: { value: E, unit: 'V' }, reference: 'Opgavesamling Kap. 10' });
+  if (If > 0) html += calcDetail({ name: tx('Feltstr\u00F8m', 'Field current'), formula: 'If = U/Rf', variables: [{ name: 'U', symbol: 'U', value: dcmaskineState.U, unit: 'V' }, { name: 'Rf', symbol: 'Rf', value: dcmaskineState.Rf, unit: '\u03A9' }], substitution: dcmaskineState.U + ' / ' + dcmaskineState.Rf, result: { value: If, unit: 'A' }, reference: 'Opgavesamling Kap. 10' });
+  html += '</div>';
+  return html;
+}
+
+function renderDcmaskineMotor() {
+  var E = dcmaskineMotorBackEMF(dcmaskineState.U, dcmaskineState.Ia, dcmaskineState.Ra, dcmaskineState.Ubrush);
+  var Pmech = E * dcmaskineState.Ia;
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Motor: U = E + Ia\u00B7Ra + Ub', 'Motor: U = E + Ia\u00B7Ra + Ub') + '</div>';
+  html = dcmaskineCommonSelectors(html, ['U', 'Ia', 'Ra', 'Ubrush']);
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">E (' + tx('modEMK', 'back-EMF') + ')</span><span class="value" style="font-weight:700">' + E.toFixed(2) + ' V</span></div>';
+  html += '<div class="result-row"><span class="label">P_mek = E\u00B7Ia</span><span class="value">' + Pmech.toFixed(0) + ' W</span></div></div>';
+  html += calcDetail({ name: tx('Motor mod-EMK', 'Motor back-EMF'), formula: 'E = U \u2212 Ia\u00B7Ra \u2212 Ub', variables: [{ name: 'U', symbol: 'U', value: dcmaskineState.U, unit: 'V' }, { name: 'Ia', symbol: 'Ia', value: dcmaskineState.Ia, unit: 'A' }, { name: 'Ra', symbol: 'Ra', value: dcmaskineState.Ra, unit: '\u03A9' }, { name: 'Ub', symbol: 'Ub', value: dcmaskineState.Ubrush, unit: 'V' }], substitution: dcmaskineState.U + ' \u2212 ' + dcmaskineState.Ia + '\u00D7' + dcmaskineState.Ra + ' \u2212 ' + dcmaskineState.Ubrush, result: { value: E, unit: 'V' }, reference: 'Opgavesamling Kap. 10' });
+  html += calcDetail({ name: tx('Indre mekanisk effekt', 'Internal mechanical power'), formula: 'P_mek = E\u00B7Ia', variables: [{ name: 'E', symbol: 'E', value: E, unit: 'V' }, { name: 'Ia', symbol: 'Ia', value: dcmaskineState.Ia, unit: 'A' }], substitution: E.toFixed(2) + ' \u00D7 ' + dcmaskineState.Ia, result: { value: Pmech, unit: 'W' }, reference: 'Opgavesamling Kap. 10' });
+  html += '<div style="margin-top:8px"><button class="sel-btn" onclick="SharedQuantities.set(\'motor_power_w\',' + Pmech + ',\'dcmaskine\');SharedQuantities.set(\'load_power_kw\',' + (Pmech / 1000) + ',\'dcmaskine\');renderModule(\'dcmaskine\')">' + tx('\u2192 Send effekt til motorteori/last', '\u2192 Push power to motor theory/load') + '</button></div>';
+  html += '</div>';
+  return html;
+}
+
+function renderDcmaskineTorque() {
+  var PPresets = [1000, 2000, 3000, 5000, 7500, 10000, 15000, 22000];
+  var nPresets = [500, 750, 1000, 1450, 1500, 2000, 3000];
+  var M = dcmaskineTorque(dcmaskineState.Pmech, dcmaskineState.n);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Moment: M = 9.55\u00B7P/n', 'Torque: M = 9.55\u00B7P/n') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Effekt P [W]', 'Power P [W]') + '</div><div class="select-grid">';
+  PPresets.forEach(function(v) { html += '<button class="sel-btn' + (dcmaskineState.Pmech === v ? ' selected' : '') + '" onclick="dcmaskineState.Pmech=' + v + ';SharedQuantities.set(\'motor_power_w\',' + v + ',\'dcmaskine\');renderModule(\'dcmaskine\')">' + (v >= 1000 ? (v / 1000) + ' kW' : v + ' W') + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Omdrejninger n [o/min]', 'Speed n [rpm]') + '</div><div class="select-grid">';
+  nPresets.forEach(function(v) { html += '<button class="sel-btn' + (dcmaskineState.n === v ? ' selected' : '') + '" onclick="dcmaskineState.n=' + v + ';renderModule(\'dcmaskine\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">M</span><span class="value" style="font-weight:700">' + M.toFixed(2) + ' Nm</span></div></div>';
+  html += calcDetail({ name: tx('Aksiale moment', 'Shaft torque'), formula: 'M = 9.55\u00B7P/n', variables: [{ name: 'P', symbol: 'P', value: dcmaskineState.Pmech, unit: 'W', source: tx('Delt v\u00E6rdi', 'Shared value') }, { name: 'n', symbol: 'n', value: dcmaskineState.n, unit: 'o/min' }], substitution: '9.55 \u00D7 ' + dcmaskineState.Pmech + ' / ' + dcmaskineState.n, result: { value: M, unit: 'Nm' }, reference: 'Opgavesamling Kap. 10' });
+  html += '</div>';
+  return html;
+}
+
+function renderDcmaskineStarter() {
+  var EPresets = [0, 50, 100, 150, 180, 200, 210, 215];
+  var E = dcmaskineState.E;
+  var Rs = dcmaskineStartResistor(dcmaskineState.U, E, dcmaskineState.Ia);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Startmodstand: Rs = (U \u2212 E)/Ia', 'Starting resistor: Rs = (U \u2212 E)/Ia') + '</div>';
+  html += '<div class="info-row">' + tx('Ved start er E lille (rotoren st\u00E5r stille), s\u00E5 Ia bliver stor uden Rs.', 'At start E is small (the rotor is stationary), so Ia becomes large without Rs.') + '</div>';
+  html = dcmaskineCommonSelectors(html, ['U', 'Ia']);
+  html += '<div class="select-group"><div class="select-label">' + tx('Mod-EMK E ved start [V]', 'Back-EMF E at start [V]') + '</div><div class="select-grid">';
+  EPresets.forEach(function(v) { html += '<button class="sel-btn' + (dcmaskineState.E === v ? ' selected' : '') + '" onclick="dcmaskineState.E=' + v + ';renderModule(\'dcmaskine\')">' + v + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">Rs</span><span class="value" style="font-weight:700">' + Rs.toFixed(3) + ' \u03A9</span></div></div>';
+  html += calcDetail({ name: tx('Startmodstand', 'Starting resistor'), formula: 'Rs = (U \u2212 E)/Ia', variables: [{ name: 'U', symbol: 'U', value: dcmaskineState.U, unit: 'V' }, { name: 'E', symbol: 'E', value: E, unit: 'V' }, { name: 'Ia', symbol: 'Ia', value: dcmaskineState.Ia, unit: 'A' }], substitution: '(' + dcmaskineState.U + ' \u2212 ' + E + ') / ' + dcmaskineState.Ia, result: { value: Rs, unit: '\u03A9' }, reference: 'Opgavesamling Kap. 10' });
+  html += '</div>';
+  return html;
+}
+
+function renderDcmaskineEfficiency() {
+  var PoutPresets = [900, 1800, 2700, 4500, 7000, 9000, 14000, 20000];
+  var PinPresets = [1000, 2000, 3000, 5000, 7500, 10000, 15000, 22000];
+  var eta = dcmaskineEfficiency(dcmaskineState.Pout, dcmaskineState.Pin);
+  var losses = dcmaskineState.Pin - dcmaskineState.Pout;
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Virkningsgrad: \u03B7 = P_ud/P_ind', 'Efficiency: \u03B7 = P_out/P_in') + '</div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Afgivet effekt P_ud [W]', 'Output power P_out [W]') + '</div><div class="select-grid">';
+  PoutPresets.forEach(function(v) { html += '<button class="sel-btn' + (dcmaskineState.Pout === v ? ' selected' : '') + '" onclick="dcmaskineState.Pout=' + v + ';SharedQuantities.set(\'load_power_kw\',' + (v / 1000) + ',\'dcmaskine\');renderModule(\'dcmaskine\')">' + (v >= 1000 ? (v / 1000) + ' kW' : v + ' W') + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="select-group"><div class="select-label">' + tx('Tilf\u00F8rt effekt P_ind [W]', 'Input power P_in [W]') + '</div><div class="select-grid">';
+  PinPresets.forEach(function(v) { html += '<button class="sel-btn' + (dcmaskineState.Pin === v ? ' selected' : '') + '" onclick="dcmaskineState.Pin=' + v + ';renderModule(\'dcmaskine\')">' + (v >= 1000 ? (v / 1000) + ' kW' : v + ' W') + '</button>'; });
+  html += '</div></div>';
+  html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+  html += '<div class="result-row"><span class="label">\u03B7</span><span class="value" style="font-weight:700">' + (eta * 100).toFixed(2) + ' %</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Tab', 'Losses') + '</span><span class="value">' + losses.toFixed(0) + ' W</span></div></div>';
+  html += calcDetail({ name: tx('Virkningsgrad', 'Efficiency'), formula: '\u03B7 = P_ud/P_ind', variables: [{ name: 'P_ud', symbol: 'P_ud', value: dcmaskineState.Pout, unit: 'W' }, { name: 'P_ind', symbol: 'P_ind', value: dcmaskineState.Pin, unit: 'W' }], substitution: dcmaskineState.Pout + ' / ' + dcmaskineState.Pin, result: { value: eta * 100, unit: '%' }, reference: 'Opgavesamling Kap. 10' });
   html += '</div>';
   return html;
 }

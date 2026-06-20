@@ -10357,6 +10357,326 @@ test('Magnet: air gap dominates reluctance', function() {
   assert(Rm_gap > Rm_core, 'air gap reluctance >> core reluctance');
 });
 
+// ============================================================================
+// === KAPACITOR / RC CIRCUIT MODULE TESTS (Opgavesamling Kap. 4) ============
+// ============================================================================
+console.log('\n=== Capacitor / RC Module Tests (Opgavesamling Ch. 4) ===\n');
+
+test('Kapacitor: parallel-plate capacitance C = eps0*er*A/d', function() {
+  // er=1, A=0.01 m2, d=0.001 m => 8.854e-12 * 1 * 0.01 / 0.001 = 8.854e-11 F
+  var C = kapacitorCalcC(1, 0.01, 0.001);
+  assert(Math.abs(C - 8.854e-11) < 1e-14, 'C ~ 88.54 pF, got ' + C);
+});
+
+test('Kapacitor: dielectric multiplies capacitance by er', function() {
+  var Cair = kapacitorCalcC(1, 0.01, 0.001);
+  var Cmica = kapacitorCalcC(6, 0.01, 0.001);
+  assert(Math.abs(Cmica - 6 * Cair) < 1e-15, 'mica (er=6) gives 6x air capacitance');
+});
+
+test('Kapacitor: charge Q = C*U', function() {
+  // 1uF at 230V => 2.3e-4 C
+  assert(Math.abs(kapacitorCalcQ(1e-6, 230) - 2.3e-4) < 1e-9, 'Q = 0.23 mC');
+});
+
+test('Kapacitor: energy W = 0.5*C*U^2', function() {
+  // 0.5 * 1e-6 * 230^2 = 0.026450 J
+  assert(Math.abs(kapacitorCalcW(1e-6, 230) - 0.026450) < 1e-6, 'W ~ 26.45 mJ');
+});
+
+test('Kapacitor: series caps 1/C = sum(1/Ci)', function() {
+  // 1uF and 2uF in series => 0.6667 uF
+  var C = kapacitorCalcSeries([1e-6, 2e-6]);
+  assert(Math.abs(C - 6.6667e-7) < 1e-10, 'series ~ 0.667 uF, got ' + C);
+});
+
+test('Kapacitor: parallel caps C = sum(Ci)', function() {
+  assert(Math.abs(kapacitorCalcParallel([1e-6, 2e-6]) - 3e-6) < 1e-12, 'parallel = 3 uF');
+});
+
+test('Kapacitor: RC time constant tau = R*C', function() {
+  assert(Math.abs(kapacitorCalcTau(1000, 1e-6) - 1e-3) < 1e-9, 'tau = 1 ms');
+});
+
+test('Kapacitor: charging u(t)=U*(1-e^(-t/tau)) at t=tau ~ 63.2%', function() {
+  var tau = kapacitorCalcTau(1000, 1e-6);
+  var u = kapacitorCalcCharging(230, tau, tau);
+  assert(Math.abs(u - 230 * (1 - Math.exp(-1))) < 0.01, 'u(tau) ~ 145.4 V, got ' + u.toFixed(2));
+});
+
+test('Kapacitor: discharging u(t)=U*e^(-t/tau) at t=tau ~ 36.8%', function() {
+  var tau = kapacitorCalcTau(1000, 1e-6);
+  var u = kapacitorCalcDischarging(230, tau, tau);
+  assert(Math.abs(u - 230 * Math.exp(-1)) < 0.01, 'u(tau) ~ 84.6 V, got ' + u.toFixed(2));
+});
+
+test('Kapacitor: charging+discharging always sum to U', function() {
+  var tau = kapacitorCalcTau(2200, 4.7e-7);
+  for (var t = 0; t <= 5 * tau; t += tau / 4) {
+    var sum = kapacitorCalcCharging(48, t, tau) + kapacitorCalcDischarging(48, t, tau);
+    assert(Math.abs(sum - 48) < 1e-9, 'uC(t)+uD(t)=U at t=' + t);
+  }
+});
+
+test('Kapacitor: Coulomb F = Q1*Q2/(4*pi*eps0*r^2)', function() {
+  // q1=q2=1uC, r=0.1m => k*1e-12/0.01 = 8.988e9*1e-10 = 0.8988 N
+  var F = kapacitorCalcCoulomb(1e-6, 1e-6, 0.1);
+  assert(Math.abs(F - 0.8988) < 0.01, 'F ~ 0.899 N, got ' + F.toFixed(4));
+});
+
+test('Kapacitor: XC link matches impedans XC formula', function() {
+  var C = 1e-6;
+  var xcKap = kapacitorCalcXC(50, C);
+  var xcImp = impedansCalcXC(50, C);
+  assert(Math.abs(xcKap - xcImp) < 1e-9, 'kapacitor XC must equal impedans XC');
+});
+
+test('Kapacitor: renderKapacitor produces valid click-only HTML', function() {
+  var html = renderKapacitor();
+  assert(html.indexOf('Kapacitor') >= 0 || html.indexOf('Capacitor') >= 0, 'has title');
+  assert(html.indexOf('<input') < 0, 'no text/number inputs');
+  assert(html.indexOf('<textarea') < 0, 'no textarea');
+  assert(html.indexOf('sel-btn') >= 0, 'has click buttons');
+});
+
+test('Kapacitor: every sub-mode renders a calcDetail block', function() {
+  ['capacitance', 'charge', 'combo', 'rc', 'coulomb'].forEach(function(m) {
+    kapacitorState.calcType = m;
+    var html = renderKapacitor();
+    assert(html.indexOf('calc-detail') >= 0, m + ' shows calcDetail working');
+    assert(html.indexOf('Opgavesamling Kap. 4') >= 0, m + ' references source');
+  });
+  kapacitorState.calcType = 'capacitance';
+});
+
+test('Kapacitor: trilingual labels resolve (da/en/fa)', function() {
+  var savedLang = lang;
+  lang = 'da'; assert(t('modules').kapacitor === 'Kapacitor & RC', 'da label');
+  lang = 'en'; assert(t('modules').kapacitor === 'Capacitor & RC', 'en label');
+  lang = 'fa'; assert(typeof t('modules').kapacitor === 'string' && t('modules').kapacitor.length > 0, 'fa label present');
+  lang = savedLang;
+});
+
+test('Kapacitor: registered in theory nav group', function() {
+  var theoryGroup = NAV_GROUPS.find(function(g) { return g.id === 'theory'; });
+  assert(theoryGroup.keys.indexOf('kapacitor') >= 0, 'kapacitor in theory group');
+});
+
+test('Kapacitor: capacitance_F bus link updates impedans.C and vice versa', function() {
+  var savedImp = impedansState.C, savedKap = kapacitorState.C;
+  SharedQuantities.set('capacitance_F', 4.7e-6, 'kapacitor');
+  assert(Math.abs(impedansState.C - 4.7e-6) < 1e-12, 'impedans.C updated from kapacitor');
+  SharedQuantities.set('capacitance_F', 2.2e-6, 'impedans');
+  assert(Math.abs(kapacitorState.C - 2.2e-6) < 1e-12, 'kapacitor.C updated from impedans');
+  impedansState.C = savedImp; kapacitorState.C = savedKap;
+});
+
+test('Kapacitor: in REACTIVE_LINKS and reaches impedans', function() {
+  assert(Array.isArray(REACTIVE_LINKS.kapacitor), 'kapacitor has links');
+  assert(reactiveAffected('kapacitor').indexOf('impedans') >= 0, 'kapacitor change reaches impedans');
+  assert(REACTIVE_LINKS.impedans.indexOf('kapacitor') >= 0, 'impedans links back to kapacitor');
+});
+
+// ============================================================================
+// === ROOM HEATING / U-VALUE MODULE TESTS (Opgavesamling Kap. 13) ===========
+// ============================================================================
+console.log('\n=== Room Heating / U-value Module Tests (Opgavesamling Ch. 13) ===\n');
+
+test('Varme: R_total = Ri + sum(d/lambda) + Ru', function() {
+  var layers = [{ mat: 'brick', d: 0.108 }, { mat: 'mineral_wool', d: 0.10 }, { mat: 'plaster', d: 0.013 }];
+  var R = varmeCalcRtotal(0.13, layers, 0.04);
+  // 0.13 + 0.108/0.5 + 0.10/0.037 + 0.013/0.25 + 0.04 = 3.1407
+  assert(Math.abs(R - 3.1407) < 0.01, 'R_total ~ 3.141, got ' + R.toFixed(4));
+});
+
+test('Varme: U = 1/R_total', function() {
+  var layers = [{ mat: 'brick', d: 0.108 }, { mat: 'mineral_wool', d: 0.10 }, { mat: 'plaster', d: 0.013 }];
+  var U = varmeCalcU(0.13, layers, 0.04);
+  assert(Math.abs(U - 0.3184) < 0.005, 'U ~ 0.318 W/m2K, got ' + U.toFixed(4));
+});
+
+test('Varme: none/zero layers are skipped in R_total', function() {
+  var R1 = varmeCalcRtotal(0.13, [{ mat: 'brick', d: 0.1 }, { mat: 'none', d: 0 }], 0.04);
+  var R2 = varmeCalcRtotal(0.13, [{ mat: 'brick', d: 0.1 }], 0.04);
+  assert(Math.abs(R1 - R2) < 1e-9, 'empty layer contributes nothing');
+});
+
+test('Varme: transmission Q = U*A*deltaT', function() {
+  // U=0.3, A=20, dT=32 => 192 W
+  assert(Math.abs(varmeCalcTransmission(0.3, 20, 32) - 192) < 0.01, 'Q = 192 W');
+});
+
+test('Varme: ventilation Q = 0.33*n*V*deltaT', function() {
+  // 0.33*0.5*125*32 = 660 W
+  assert(Math.abs(varmeCalcVentilation(0.5, 125, 32) - 660) < 0.01, 'Q_vent = 660 W');
+});
+
+test('Varme: total demand = transmission + ventilation', function() {
+  var tot = varmeCalcTotal(0.3, 20, 0.5, 125, 32);
+  assert(Math.abs(tot - (192 + 660)) < 0.01, 'total = 852 W');
+});
+
+test('Varme: better insulation lowers U-value', function() {
+  var thin = varmeCalcU(0.13, [{ mat: 'mineral_wool', d: 0.05 }], 0.04);
+  var thick = varmeCalcU(0.13, [{ mat: 'mineral_wool', d: 0.30 }], 0.04);
+  assert(thick < thin, 'thicker insulation => lower U');
+});
+
+test('Varme: renderVarme produces valid click-only HTML', function() {
+  var html = renderVarme();
+  assert(html.indexOf('U-v') >= 0 || html.indexOf('U-value') >= 0, 'has title');
+  assert(html.indexOf('<input') < 0, 'no text/number inputs');
+  assert(html.indexOf('<textarea') < 0, 'no textarea');
+  assert(html.indexOf('sel-btn') >= 0, 'has click buttons');
+});
+
+test('Varme: every sub-mode renders a calcDetail block', function() {
+  ['uvalue', 'transmission', 'ventilation', 'total'].forEach(function(m) {
+    varmeState.calcType = m;
+    var html = renderVarme();
+    assert(html.indexOf('calc-detail') >= 0, m + ' shows calcDetail working');
+    assert(html.indexOf('Opgavesamling Kap. 13') >= 0, m + ' references source');
+  });
+  varmeState.calcType = 'uvalue';
+});
+
+test('Varme: trilingual labels resolve (da/en/fa)', function() {
+  var savedLang = lang;
+  lang = 'da'; assert(t('modules').varme.indexOf('Rumvarme') >= 0, 'da label');
+  lang = 'en'; assert(t('modules').varme.indexOf('Room heating') >= 0, 'en label');
+  lang = 'fa'; assert(typeof t('modules').varme === 'string' && t('modules').varme.length > 0, 'fa label present');
+  lang = savedLang;
+});
+
+test('Varme: registered in theory nav group', function() {
+  var theoryGroup = NAV_GROUPS.find(function(g) { return g.id === 'theory'; });
+  assert(theoryGroup.keys.indexOf('varme') >= 0, 'varme in theory group');
+});
+
+test('Varme: total demand publishes load_power_kw on bus and reaches load/cable', function() {
+  var saved = SharedQuantities.get('load_power_kw');
+  varmeState.calcType = 'total';
+  syncSharedQuantities('varme');
+  assert(SharedQuantities.get('load_power_kw') > 0, 'heat demand published to load_power_kw');
+  assert(reactiveAffected('varme').indexOf('cable') >= 0, 'varme change reaches cable sizing');
+  assert(reactiveAffected('varme').indexOf('load') >= 0, 'varme change reaches load');
+  if (saved != null) SharedQuantities._values['load_power_kw'] = saved;
+});
+
+// ============================================================================
+// === DC MACHINES MODULE TESTS (Opgavesamling Kap. 10) ======================
+// ============================================================================
+console.log('\n=== DC Machines Module Tests (Opgavesamling Ch. 10) ===\n');
+
+test('Dcmaskine: generator E = U + Ia*Ra + Ubrush', function() {
+  // 220 + 40*0.25 + 2 = 232
+  assert(Math.abs(dcmaskineGenEMF(220, 40, 0.25, 2) - 232) < 0.001, 'E = 232 V');
+});
+
+test('Dcmaskine: motor back-EMF E = U - Ia*Ra - Ubrush', function() {
+  // 220 - 40*0.25 - 2 = 208
+  assert(Math.abs(dcmaskineMotorBackEMF(220, 40, 0.25, 2) - 208) < 0.001, 'E = 208 V');
+});
+
+test('Dcmaskine: torque M = 9.55*P/n', function() {
+  // 9.55*5000/1450 = 32.93 Nm
+  assert(Math.abs(dcmaskineTorque(5000, 1450) - 32.931) < 0.01, 'M ~ 32.93 Nm');
+});
+
+test('Dcmaskine: starting resistor Rs = (U-E)/Ia', function() {
+  // (220-0)/40 = 5.5 ohm at standstill
+  assert(Math.abs(dcmaskineStartResistor(220, 0, 40) - 5.5) < 0.001, 'Rs = 5.5 ohm at start');
+  // (220-210)/40 = 0.25 with back-emf present
+  assert(Math.abs(dcmaskineStartResistor(220, 210, 40) - 0.25) < 0.001, 'Rs = 0.25 ohm with E=210');
+});
+
+test('Dcmaskine: efficiency eta = Pout/Pin', function() {
+  assert(Math.abs(dcmaskineEfficiency(4500, 5000) - 0.9) < 1e-9, 'eta = 0.9');
+});
+
+test('Dcmaskine: shunt field current If = U/Rf', function() {
+  // 220/110 = 2 A
+  assert(Math.abs(dcmaskineFieldCurrent(220, 110) - 2) < 1e-9, 'If = 2 A');
+});
+
+test('Dcmaskine: generator EMF > terminal voltage, motor back-EMF < terminal voltage', function() {
+  var Egen = dcmaskineGenEMF(220, 50, 0.2, 2);
+  var Emot = dcmaskineMotorBackEMF(220, 50, 0.2, 2);
+  assert(Egen > 220, 'generator E above U');
+  assert(Emot < 220, 'motor back-EMF below U');
+});
+
+test('Dcmaskine: renderDcmaskine produces valid click-only HTML', function() {
+  var html = renderDcmaskine();
+  assert(html.indexOf('maskin') >= 0 || html.indexOf('machine') >= 0 || html.indexOf('DC') >= 0, 'has title');
+  assert(html.indexOf('<input') < 0, 'no text/number inputs');
+  assert(html.indexOf('<textarea') < 0, 'no textarea');
+  assert(html.indexOf('sel-btn') >= 0, 'has click buttons');
+});
+
+test('Dcmaskine: every sub-mode renders a calcDetail block', function() {
+  ['generator', 'motor', 'torque', 'starter', 'efficiency'].forEach(function(m) {
+    dcmaskineState.mode = m;
+    var html = renderDcmaskine();
+    assert(html.indexOf('calc-detail') >= 0, m + ' shows calcDetail working');
+    assert(html.indexOf('Opgavesamling Kap. 10') >= 0, m + ' references source');
+  });
+  dcmaskineState.mode = 'generator';
+});
+
+test('Dcmaskine: all four machine types are selectable', function() {
+  ['shunt', 'series', 'compound', 'separate'].forEach(function(ty) {
+    dcmaskineState.type = ty;
+    var html = renderDcmaskine();
+    assert(html.indexOf('sel-btn selected') >= 0, ty + ' selectable');
+  });
+  dcmaskineState.type = 'shunt';
+});
+
+test('Dcmaskine: trilingual labels resolve (da/en/fa)', function() {
+  var savedLang = lang;
+  lang = 'da'; assert(t('modules').dcmaskine.indexOf('Jaevnstr') >= 0, 'da label');
+  lang = 'en'; assert(t('modules').dcmaskine === 'DC machines', 'en label');
+  lang = 'fa'; assert(typeof t('modules').dcmaskine === 'string' && t('modules').dcmaskine.length > 0, 'fa label present');
+  lang = savedLang;
+});
+
+test('Dcmaskine: registered in theory nav group', function() {
+  var theoryGroup = NAV_GROUPS.find(function(g) { return g.id === 'theory'; });
+  assert(theoryGroup.keys.indexOf('dcmaskine') >= 0, 'dcmaskine in theory group');
+});
+
+test('Dcmaskine: power publishes motor_power_w and reaches motorteori/cable', function() {
+  dcmaskineState.Pmech = 7500;
+  syncSharedQuantities('dcmaskine');
+  assert(SharedQuantities.get('motor_power_w') === 7500, 'motor power published');
+  assert(reactiveAffected('dcmaskine').indexOf('motorteori') >= 0, 'reaches motor theory');
+  assert(reactiveAffected('dcmaskine').indexOf('cable') >= 0, 'reaches cable sizing');
+});
+
+test('Dcmaskine: motor_power_w bus link updates dcmaskineState.Pmech from motorteori', function() {
+  var saved = dcmaskineState.Pmech;
+  SharedQuantities.set('motor_power_w', 11000, 'motorteori');
+  assert(dcmaskineState.Pmech === 11000, 'dcmaskine.Pmech updated from motorteori');
+  dcmaskineState.Pmech = saved;
+});
+
+// ============================================================================
+// === GUARD: core engine math (officialIz + IB) unchanged by new modules ====
+// ============================================================================
+test('Guard: new theory modules do NOT change officialIz + IB regression', function() {
+  // Same authoritative values as the existing engine guard test.
+  var cu25 = { material: 'Cu', mm2: 2.5, model: '', iz: 999 };
+  assert.strictEqual(officialIz(cu25), 23, 'officialIz(Cu 2.5mm2 PVC) == 23A unchanged');
+  var cu16 = { material: 'Cu', mm2: 16, model: '', iz: 1 };
+  assert.strictEqual(officialIz(cu16), 73, 'officialIz(Cu 16mm2 PVC) == 73A unchanged');
+  var ib = sldCalcNodeIB({ type: 'final_circuit', power_kW: 3.68, cosPhi: 0.95, phases: '1x230', voltage: 230 });
+  assert(Math.abs(ib - 16.84) < 0.05, 'IB regression ~16.84A unchanged, got ' + ib.toFixed(2));
+  // The new module calc functions must coexist with the engine functions.
+  assert(typeof kapacitorCalcC === 'function' && typeof varmeCalcU === 'function' && typeof dcmaskineGenEMF === 'function', 'new calc fns defined');
+  assert(typeof calcIB === 'function' && typeof officialIz === 'function', 'engine fns intact');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
