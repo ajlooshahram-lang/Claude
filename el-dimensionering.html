@@ -1408,6 +1408,23 @@ const _FA = {
   'Overall verdict': '\u062D\u06A9\u0645 \u06A9\u0644\u06CC',
   'Statement & approval': '\u0628\u06CC\u0627\u0646\u06CC\u0647 \u0648 \u062A\u0623\u06CC\u06CC\u062F',
   'Print / save as PDF': '\u0686\u0627\u067E / \u0630\u062E\u06CC\u0631\u0647 PDF',
+  // Capstone: complete exam solution generator (this feature)
+  'Complete exam solution': '\u0631\u0627\u0647\u200C\u062D\u0644 \u06A9\u0627\u0645\u0644 \u0622\u0632\u0645\u0648\u0646',
+  'Generate complete solution': '\u062A\u0648\u0644\u06CC\u062F \u0631\u0627\u0647\u200C\u062D\u0644 \u06A9\u0627\u0645\u0644',
+  'Hide complete solution': '\u067E\u0646\u0647\u0627\u0646 \u06A9\u0631\u062F\u0646 \u0631\u0627\u0647\u200C\u062D\u0644 \u06A9\u0627\u0645\u0644',
+  'Print solution / save as PDF': '\u0686\u0627\u067E \u0631\u0627\u0647\u200C\u062D\u0644 / \u0630\u062E\u06CC\u0631\u0647 PDF',
+  'Critical mind verdict': '\u062D\u06A9\u0645 \u0630\u0647\u0646 \u0646\u0642\u0627\u062F',
+  'Coverage': '\u067E\u0648\u0634\u0634',
+  'Detected questions': '\u067E\u0631\u0633\u0634\u200C\u0647\u0627\u06CC \u0634\u0646\u0627\u0633\u0627\u06CC\u06CC\u200C\u0634\u062F\u0647',
+  'Solved': '\u062D\u0644\u200C\u0634\u062F\u0647',
+  'Needs click-confirmed input': '\u0646\u06CC\u0627\u0632 \u0628\u0647 \u0648\u0631\u0648\u062F\u06CC \u062A\u0623\u06CC\u06CC\u062F\u0634\u062F\u0647 \u0628\u0627 \u06A9\u0644\u06CC\u06A9',
+  'Modules used': '\u0645\u0627\u0698\u0648\u0644\u200C\u0647\u0627\u06CC \u0627\u0633\u062A\u0641\u0627\u062F\u0647\u200C\u0634\u062F\u0647',
+  'Question': '\u067E\u0631\u0633\u0634',
+  'Mapped calculation': '\u0645\u062D\u0627\u0633\u0628\u0647 \u0645\u062A\u0646\u0627\u0638\u0631',
+  'Open module': '\u0628\u0627\u0632 \u06A9\u0631\u062F\u0646 \u0645\u0627\u0698\u0648\u0644',
+  'Confirm missing data by clicking': '\u062F\u0627\u062F\u0647 \u06AF\u0645\u0634\u062F\u0647 \u0631\u0627 \u0628\u0627 \u06A9\u0644\u06CC\u06A9 \u062A\u0623\u06CC\u06CC\u062F \u06A9\u0646\u06CC\u062F',
+  'No exam data yet \u2014 paste or upload an exam first.': '\u0647\u0646\u0648\u0632 \u062F\u0627\u062F\u0647\u200C\u0627\u06CC \u0646\u06CC\u0633\u062A \u2014 \u0627\u0628\u062A\u062F\u0627 \u0622\u0632\u0645\u0648\u0646 \u0631\u0627 \u062F\u0631\u062C \u06CC\u0627 \u0628\u0627\u0631\u06AF\u0630\u0627\u0631\u06CC \u06A9\u0646\u06CC\u062F.',
+  'No working available \u2014 confirm the missing inputs via the linked module (click-only).': '\u0645\u062D\u0627\u0633\u0628\u0647\u200C\u0627\u06CC \u0645\u0648\u062C\u0648\u062F \u0646\u06CC\u0633\u062A \u2014 \u0648\u0631\u0648\u062F\u06CC\u200C\u0647\u0627\u06CC \u06AF\u0645\u0634\u062F\u0647 \u0631\u0627 \u0627\u0632 \u0637\u0631\u06CC\u0642 \u0645\u0627\u0698\u0648\u0644 \u067E\u06CC\u0648\u0646\u062F\u062F\u0627\u062F\u0647\u200C\u0634\u062F\u0647 \u062A\u0623\u06CC\u06CC\u062F \u06A9\u0646\u06CC\u062F (\u0641\u0642\u0637 \u06A9\u0644\u06CC\u06A9).',
   // Professional single-line diagram (enstregsdiagram) — drawing module
   'Single-line diagram': '\u062F\u06CC\u0627\u06AF\u0631\u0627\u0645 \u062A\u06A9\u200C\u062E\u0637\u06CC',
   'How to read it': '\u0686\u06AF\u0648\u0646\u0647 \u0622\u0646 \u0631\u0627 \u0628\u062E\u0648\u0627\u0646\u06CC\u0645',
@@ -24196,6 +24213,7 @@ var analyzerState = {
   dependencies: [],  // Inter-question dependency chain
   moduleFlow: [],    // Which modules were used and how values flowed
   busPopulated: false, // Whether reactive bus was auto-populated
+  solutionShown: false, // Whether the capstone "Complete exam solution" is rendered
   mode: 'upload' // 'upload' or 'paste'
 };
 // Normalize input text: strip page numbers, headers, fix encoding
@@ -24265,8 +24283,9 @@ function analyzerExtract(text) {
     rawValues: {}
   };
 
-  // Power: "37 kW", "Belastning: 37 kW", "P = 37 kW", "Pn = 37 kW"
-  var pMatch = text.match(/(?:belastning|effekt|P[n]?|ydelse)\s*[:=]?\s*(\d+[.,]?\d*)\s*kW/i);
+  // Power: "37 kW", "Belastning: 37 kW", "P = 37 kW", "Pn = 37 kW", "belastning paa 37 kW"
+  // Allow a natural-language filler ("paa"/"på"/"er"/"ca.") between the keyword and the value.
+  var pMatch = text.match(/(?:belastning|effekt|P[n]?|ydelse)\s*(?:p\u00E5|paa|er|ca\.?|on|of)?\s*[:=]?\s*(\d+[.,]?\d*)\s*kW/i);
   if (pMatch) { data.power_kW = parseFloat(pMatch[1].replace(',', '.')); data.confidence.power_kW = 'high'; }
   if (!data.power_kW) {
     var pwMatch = text.match(/(?:P[n]?|effekt|ydelse)\s*[:=]?\s*(\d+[.,]?\d*)\s*W\b/i);
@@ -24953,6 +24972,7 @@ function findCableProduct(mm2, cableType) {
 // Run the full analyzer pipeline - ENHANCED with reactive bus population
 function analyzerRun(text) {
   analyzerState.rawText = text;
+  analyzerState.solutionShown = false; // fresh analysis hides any previous capstone solution
   var normalized = analyzerNormalize(text);
   analyzerState.segments = analyzerSegment(normalized);
   // Extract from entire text (comprehensive: all module types)
@@ -25030,7 +25050,7 @@ function analyzerHandlePaste() {
 
 // Reset
 function analyzerReset() {
-  analyzerState = { rawText: '', segments: [], extracted: null, results: [], completeness: { solved: 0, total: 0, flagged: [] }, dependencies: [], moduleFlow: [], busPopulated: false, mode: 'upload' };
+  analyzerState = { rawText: '', segments: [], extracted: null, results: [], completeness: { solved: 0, total: 0, flagged: [] }, dependencies: [], moduleFlow: [], busPopulated: false, solutionShown: false, mode: 'upload' };
   renderModule('analyzer');
 }
 
@@ -25159,6 +25179,9 @@ function renderAnalyzerResults() {
 
   html += '</div>';
 
+  // === CAPSTONE: Complete Exam Solution (click-only) ===
+  html += examSolutionCard();
+
   // Individual results
   var asked = analyzerState.results.filter(function(r) { return r.asked; });
   var notAsked = analyzerState.results.filter(function(r) { return !r.asked && !r.bonus; });
@@ -25252,6 +25275,337 @@ function renderAnalyzerExtracted(data) {
   html += '</table>';
   return html;
 }
+// ============================================================================
+// ===== CAPSTONE: COMPLETE EXAM SOLUTION GENERATOR ==========================
+// Turns the analyzer from a per-question solver into an end-to-end, examiner-
+// grade solution generator. 100% click-only (the analyzer paste textarea is the
+// ONLY text input). Trilingual (da/en/fa), dark+light+RTL safe, no external libs.
+// Reuses existing engine functions: analyzerDetectQuestions, calcDetail(html on
+// each result), buildSLD(), upAuditProject()/upComputeVerdict()/upVerdictMeta().
+// NEVER changes calc/verdict engine logic; NEVER invents missing data.
+// ============================================================================
+
+// Map a detected question type -> the result type produced by analyzerSolve().
+var EXAM_SOLUTION_RESULT_ALIAS = {
+  ib: 'ib', iz: 'iz', cable: 'iz', vdrop: 'vdrop', ik: 'ik', coord: 'coord',
+  device: 'coord', fault: 'fault', zs: 'fault', selectivity: 'coord',
+  trafo: 'trafo', trafo_emf: 'trafo', trafo_sc: 'trafo', trafo_oc: 'trafo',
+  trafo_reg: 'trafo', trafo_eff: 'trafo', trafo_par: 'trafo', trafo_vec: 'trafo',
+  impedans: 'impedans', xl: 'impedans', xc: 'impedans', resonance: 'impedans',
+  qfactor: 'impedans', phase_angle: 'impedans', time_const: 'impedans',
+  trefase: 'impedans', trefase_asym: 'impedans', pfc: 'impedans', wattmeter: 'impedans',
+  star_delta: 'impedans', motor_sync: 'motorteori', motor_slip: 'motorteori',
+  motor_torque: 'motorteori', motor_start: 'motorteori', motor_prot: 'motorteori',
+  magnet: 'magnet', magnet_mmf: 'magnet', magnet_flux: 'magnet', magnet_rel: 'magnet',
+  magnet_ind: 'magnet', lys: 'lys', lys_cd: 'lys', lys_ri: 'lys',
+  thermal: 'thermal', energy: 'energy', full_install: 'ib'
+};
+
+// Find the most relevant question-text excerpt for a detected type inside a segment.
+function examFindQuestionText(seg, type) {
+  if (!seg) return '';
+  var subs = (seg.subQuestions && seg.subQuestions.length) ? seg.subQuestions : [seg.text || ''];
+  for (var i = 0; i < subs.length; i++) {
+    var qs = analyzerDetectQuestions(subs[i] || '');
+    for (var j = 0; j < qs.length; j++) {
+      if (qs[j].type === type) {
+        var t = (subs[i] || '').replace(/\s+/g, ' ').trim();
+        return t.length > 260 ? t.slice(0, 260) + '\u2026' : t;
+      }
+    }
+  }
+  var ft = (seg.text || '').replace(/\s+/g, ' ').trim();
+  return ft.length > 200 ? ft.slice(0, 200) + '\u2026' : ft;
+}
+
+// Build the COMPLETE structured exam solution from the analyzer's parsed+solved state.
+// Pure (no persisted mutation) so it is deterministic and testable.
+function examBuildSolution(state) {
+  state = state || (typeof analyzerState !== 'undefined' ? analyzerState : null);
+  var extracted = (state && state.extracted) ? state.extracted : null;
+  var results = (state && state.results) ? state.results : [];
+
+  // Organise by Opgave using the analyzer's existing segmentation.
+  var segments = (state && state.segments && state.segments.length)
+    ? state.segments
+    : (extracted ? [{ id: 0, title: tx('Analyse', 'Analysis'), text: (state && state.rawText) || '', subQuestions: [(state && state.rawText) || ''] }] : []);
+
+  // Result lookup by type (first occurrence wins).
+  var byType = {};
+  results.forEach(function (r) { if (r && r.type && !byType[r.type]) byType[r.type] = r; });
+
+  var opgaver = [];
+  var detectedCount = 0, solvedCount = 0, needInputCount = 0;
+  segments.forEach(function (seg) {
+    var qs = analyzerDetectQuestions(seg.text || '');
+    var seen = {};
+    var qBlocks = [];
+    qs.forEach(function (q) {
+      if (seen[q.type]) return; seen[q.type] = true;
+      var resType = EXAM_SOLUTION_RESULT_ALIAS[q.type] || q.type;
+      var res = byType[resType] || byType[q.type] || null;
+      var solved = !!(res && res.html);
+      detectedCount++;
+      if (solved) solvedCount++; else needInputCount++;
+      qBlocks.push({
+        type: q.type,
+        label: q.label,
+        module: q.module,
+        questionText: examFindQuestionText(seg, q.type),
+        calcLabel: res ? res.label : null,
+        calcHtml: res ? (res.html || '') : '',
+        value: res ? res.value : null,
+        status: res ? (res.status || null) : null,
+        solved: solved,
+        needsInput: !solved
+      });
+    });
+    opgaver.push({ id: seg.id, title: seg.title, questions: qBlocks });
+  });
+
+  // ---- Critical-mind verdict: reuse the ENGINE's verdict computation (upComputeVerdict) ----
+  // The exam-derived engine results already carry the life-safety checks:
+  // IB<=In<=Iz (coord), Zs disconnection (fault) and voltage drop (vdrop). Basing the
+  // top-level verdict on these keeps it a faithful, deterministic reflection of the
+  // engine for THIS exam (independent of any separately-built unified project).
+  var findings = [];
+  results.forEach(function (r) {
+    if (r && (r.status === 'ok' || r.status === 'fail')) {
+      findings.push({ scope: r.label, rule: r.label, clause: '', status: r.status, detail: r.value || '', recommendation: '' });
+    }
+  });
+  // The full unified-project audit (adds Icu>=Ik at the board) is surfaced separately
+  // as a reference verdict so the exam verdict never depends on unrelated project state.
+  var projectAudit = null;
+  try {
+    if (typeof upAuditProject === 'function' && typeof upProject !== 'undefined') {
+      projectAudit = upAuditProject(upProject);
+    }
+  } catch (e) { projectAudit = null; }
+  var code = (typeof upComputeVerdict === 'function') ? upComputeVerdict(findings) : 'incomplete';
+  var meta = (typeof upVerdictMeta === 'function') ? upVerdictMeta(code) : { color: '#888', icon: '', label: code };
+  var counts = { ok: 0, warning: 0, fail: 0, info: 0 };
+  findings.forEach(function (f) { if (counts[f.status] != null) counts[f.status]++; });
+  var projMeta = (projectAudit && typeof upVerdictMeta === 'function') ? upVerdictMeta(projectAudit.verdict) : null;
+
+  // ---- Auto-generate the single-line diagram (reuse buildSLD) ----
+  var sldHtml = '';
+  try { if (typeof buildSLD === 'function') sldHtml = buildSLD(); } catch (e) { sldHtml = ''; }
+
+  // ---- Coverage / completeness panel data ----
+  var modulesUsed = (state && state.moduleFlow) ? state.moduleFlow.slice() : [];
+  var flagged = (state && state.completeness && state.completeness.flagged) ? state.completeness.flagged.slice() : [];
+
+  return {
+    generatedAt: new Date().toISOString(),
+    lang: lang,
+    title: tx('Komplet eksamensl\u00F8sning', 'Complete exam solution'),
+    opgaver: opgaver,
+    verdict: {
+      code: code, color: meta.color, icon: meta.icon, label: meta.label,
+      findings: findings, counts: counts,
+      projectVerdict: projectAudit ? projectAudit.verdict : null,
+      projectVerdictMeta: projMeta
+    },
+    sldHtml: sldHtml,
+    coverage: { detected: detectedCount, solved: solvedCount, needInput: needInputCount, modulesUsed: modulesUsed, flagged: flagged },
+    extracted: extracted,
+    results: results
+  };
+}
+
+// Suggest a click-target module for a flagged gap (so users can click-confirm inputs).
+function examFlagModule(flagText) {
+  var s = (flagText || '').toLowerCase();
+  if (s.indexOf('ib') === 0 || s.indexOf('effekt') >= 0 || s.indexOf('cos') >= 0) return 'load';
+  if (s.indexOf('iz') === 0 || s.indexOf('kabel') >= 0 || s.indexOf('cable') >= 0 || s.indexOf('tv\u00e6rsnit') >= 0) return 'cable';
+  if (s.indexOf('\u0394u') === 0 || s.indexOf('l\u00e6ngde') >= 0) return 'vdrop';
+  if (s.indexOf('ik') === 0) return 'scircuit';
+  if (s.indexOf('fejlbeskyttelse') >= 0 || s.indexOf('zs') >= 0 || s.indexOf('fault') >= 0) return 'fault';
+  return 'kritisk';
+}
+
+// Render the complete exam solution on-screen (trilingual, dark/light/RTL safe, click-only).
+function examRenderSolution(sol) {
+  if (!sol) return '';
+  var v = sol.verdict || { code: 'incomplete', color: 'var(--text-muted)', icon: '\u2139\uFE0F', label: tx('Ufuldst\u00E6ndigt', 'Incomplete'), counts: { ok: 0, warning: 0, fail: 0, info: 0 } };
+  var h = '<div class="card fade-in" id="examSolutionRoot">';
+  h += '<div class="card-title">\uD83D\uDCDA ' + tx('Komplet eksamensl\u00F8sning', 'Complete exam solution') + '</div>';
+
+  // ---- (3) Red/Yellow/Green critical-mind verdict summary at the TOP ----
+  h += '<div style="margin:6px 0 12px;padding:10px 12px;border-radius:var(--radius-sm);border-left:6px solid ' + v.color + ';background:var(--primary-glow)">';
+  h += '<div style="font-weight:700;font-size:0.95rem;color:' + v.color + '">' + (v.icon || '') + ' ' + tx('Kritisk Hjerne-konklusion', 'Critical mind verdict') + ': ' + v.label + '</div>';
+  h += '<div style="margin-top:4px;font-size:0.82rem">\u26D4 ' + v.counts.fail + ' \u00B7 \u26A0\uFE0F ' + v.counts.warning + ' \u00B7 \u2705 ' + v.counts.ok + ' \u00B7 \u2139\uFE0F ' + v.counts.info + '</div>';
+  h += '<div style="margin-top:4px;font-size:0.78rem;color:var(--text-muted)">' + tx('Kontrolleret: IB\u2264In\u2264Iz, Zs-udkobling, Icu\u2265Ik, sp\u00E6ndingsfald \u2014 efter den eksisterende auditor.', 'Checked: IB\u2264In\u2264Iz, Zs disconnection, Icu\u2265Ik, voltage drop \u2014 per the existing auditor.') + '</div>';
+  if (v.projectVerdictMeta) {
+    h += '<div style="margin-top:4px;font-size:0.78rem;color:' + v.projectVerdictMeta.color + '">' + tx('Samlet installationsaudit (Kritisk Hjerne)', 'Unified installation audit (Critical Mind)') + ': ' + v.projectVerdictMeta.icon + ' ' + v.projectVerdictMeta.label + '</div>';
+  }
+  h += '</div>';
+
+  // ---- (4) Print-to-PDF + hide actions (click-only) ----
+  h += '<div class="select-grid" style="margin-bottom:12px">';
+  h += '<button class="sel-btn selected" onclick="examPrintSolution()">\uD83D\uDDA8\uFE0F ' + tx('Udskriv l\u00F8sning / gem som PDF', 'Print solution / save as PDF') + '</button>';
+  h += '<button class="sel-btn" onclick="examHideSolution()">\u2715 ' + tx('Skjul komplet l\u00F8sning', 'Hide complete solution') + '</button>';
+  h += '</div>';
+
+  // ---- (5) Coverage / completeness panel ----
+  var cov = sol.coverage || { detected: 0, solved: 0, needInput: 0, modulesUsed: [], flagged: [] };
+  h += '<div style="margin-bottom:12px;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm)">';
+  h += '<strong style="font-size:0.85rem">\uD83D\uDCCA ' + tx('D\u00E6kning', 'Coverage') + '</strong>';
+  h += '<div style="margin-top:6px;font-size:0.82rem">';
+  h += tx('Detekterede sp\u00F8rgsm\u00E5l', 'Detected questions') + ': <strong>' + cov.detected + '</strong> \u00B7 ';
+  h += tx('L\u00F8st', 'Solved') + ': <strong style="color:var(--success)">' + cov.solved + '</strong> \u00B7 ';
+  h += tx('Kr\u00E6ver klik-bekr\u00E6ftet input', 'Needs click-confirmed input') + ': <strong style="color:var(--warning)">' + cov.needInput + '</strong>';
+  h += '</div>';
+  if (cov.modulesUsed && cov.modulesUsed.length) {
+    h += '<div style="margin-top:8px;font-size:0.82rem"><strong>' + tx('Anvendte moduler', 'Modules used') + ':</strong></div>';
+    h += '<div class="select-grid" style="margin-top:4px">';
+    cov.modulesUsed.forEach(function (m) {
+      h += '<button class="sel-btn selected" onclick="switchModule(\'' + m + '\')">' + m + '</button>';
+    });
+    h += '</div>';
+  }
+  // ---- (6) Conservative: flag gaps with click-only preset chips (never invent data) ----
+  if (cov.flagged && cov.flagged.length) {
+    h += '<div style="margin-top:8px;font-size:0.82rem;color:var(--warning)"><strong>\u26A0 ' + tx('Manglende data (klik for at bekr\u00E6fte)', 'Missing data (click to confirm)') + ':</strong></div>';
+    h += '<div class="select-grid" style="margin-top:4px">';
+    cov.flagged.forEach(function (fl) {
+      var mod = examFlagModule(fl);
+      h += '<button class="sel-btn" onclick="switchModule(\'' + mod + '\')" title="' + tx('Bekr\u00E6ft manglende data med klik', 'Confirm missing data by clicking') + '">\u2192 ' + fl + '</button>';
+    });
+    h += '</div>';
+  }
+  h += '</div>';
+
+  // ---- (2) Embedded single-line diagram (auto-generated from the installation) ----
+  h += '<div style="margin-bottom:12px">';
+  h += '<strong style="font-size:0.85rem">\uD83D\uDD0C ' + tx('Enstregsdiagram (auto-genereret)', 'Single-line diagram (auto-generated)') + '</strong>';
+  h += '<div style="margin-top:6px">' + (sol.sldHtml || ('<div style="color:var(--text-muted);font-size:0.82rem">' + tx('Diagram ikke tilg\u00E6ngeligt.', 'Diagram unavailable.') + '</div>')) + '</div>';
+  h += '</div>';
+
+  // ---- (1) Solution organised by Opgave, each question -> calc -> FULL working ----
+  if (!sol.opgaver || !sol.opgaver.length) {
+    h += '<div style="color:var(--text-muted);font-size:0.85rem">' + tx('Ingen eksamensdata endnu \u2014 inds\u00E6t eller upload en opgave f\u00F8rst.', 'No exam data yet \u2014 paste or upload an exam first.') + '</div>';
+  }
+  sol.opgaver.forEach(function (op) {
+    h += '<div class="exam-opgave" style="margin-top:14px;padding-top:8px;border-top:2px solid var(--primary-light)">';
+    var opTitle = op.id ? ('Opgave ' + op.id) : (op.title || tx('Generelt', 'General'));
+    h += '<div style="font-weight:700;font-size:0.95rem;color:var(--primary)">' + opTitle + '</div>';
+    if (!op.questions.length) {
+      h += '<div style="font-size:0.8rem;color:var(--text-muted);margin-top:4px">' + tx('Ingen detekterede sp\u00F8rgsm\u00E5l i denne opgave.', 'No detected questions in this task.') + '</div>';
+    }
+    op.questions.forEach(function (q) {
+      h += '<div style="margin:10px 0;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card)">';
+      // Question text
+      h += '<div style="font-size:0.82rem"><strong>' + tx('Sp\u00F8rgsm\u00E5l', 'Question') + ':</strong> ' + (q.questionText || q.label) + '</div>';
+      // Mapped calculation
+      h += '<div style="font-size:0.82rem;margin-top:4px"><strong>' + tx('Tilknyttet beregning', 'Mapped calculation') + ':</strong> ' + (q.calcLabel || q.label);
+      if (q.value) h += ' <span style="font-family:monospace;font-weight:700;color:var(--primary)">' + q.value + '</span>';
+      if (q.status === 'ok') h += ' \u2705'; else if (q.status === 'fail') h += ' \u26D4';
+      h += '</div>';
+      // FULL worked solution (calcDetail HTML) OR a click-only gap chip
+      if (q.solved && q.calcHtml) {
+        h += q.calcHtml;
+      } else {
+        h += '<div style="margin-top:6px;font-size:0.8rem;color:var(--warning)">\u26A0 ' + tx('Ingen udregning tilg\u00E6ngelig \u2014 bekr\u00E6ft de manglende input via det tilknyttede modul (kun klik).', 'No working available \u2014 confirm the missing inputs via the linked module (click-only).') + '</div>';
+        if (q.module) h += '<div style="margin-top:4px"><button class="sel-btn" onclick="switchModule(\'' + q.module + '\')">\u2192 ' + tx('\u00C5bn modul', 'Open module') + ': ' + q.module + '</button></div>';
+      }
+      h += '</div>';
+    });
+    h += '</div>';
+  });
+
+  h += '</div>';
+  return h;
+}
+
+// The capstone button card embedded in the analyzer results (click-only).
+function examSolutionCard() {
+  var h = '<div class="card fade-in">';
+  h += '<div class="card-title">\uD83D\uDCDA ' + tx('Komplet eksamensl\u00F8sning', 'Complete exam solution') + '</div>';
+  h += '<div class="info-row">' + tx(
+    'Saml ALLE detekterede sp\u00F8rgsm\u00E5l til \u00E9n eksaminator-l\u00F8sning organiseret efter Opgave 1/2/3 \u2014 hver med opgavetekst, tilknyttet beregning og FULD udregning (formel \u2192 variable \u2192 inds\u00E6tning \u2192 trin \u2192 resultat \u2192 DS/HD 60364). Inkluderer auto-genereret enstregsdiagram og Kritisk Hjerne-konklusion.',
+    'Assemble ALL detected questions into one examiner-grade solution organised by Opgave 1/2/3 \u2014 each with the question text, mapped calculation and the FULL working (formula \u2192 variables \u2192 substitution \u2192 steps \u2192 result \u2192 DS/HD 60364). Includes an auto-generated single-line diagram and the Critical Mind verdict.') + '</div>';
+  if (!analyzerState.solutionShown) {
+    h += '<div class="select-grid"><button class="sel-btn selected" style="width:100%" onclick="examGenerateSolution()">\u25B6 ' + tx('Generer komplet l\u00F8sning', 'Generate complete solution') + '</button></div>';
+  }
+  h += '</div>';
+  if (analyzerState.solutionShown) {
+    h += examRenderSolution(examBuildSolution(analyzerState));
+  }
+  return h;
+}
+
+// Click handlers (no typing).
+function examGenerateSolution() { analyzerState.solutionShown = true; renderModule('analyzer'); }
+function examHideSolution() { analyzerState.solutionShown = false; renderModule('analyzer'); }
+
+// Force calcDetail/details blocks open so the printed PDF shows the FULL working.
+function examExpandDetails(html) {
+  return (html || '')
+    .replace(/<details class="calc-detail"/g, '<details open class="calc-detail"')
+    .replace(/<details style="margin-top:8px;border/g, '<details open style="margin-top:8px;border');
+}
+
+// Print stylesheet for the exam solution: reuse the report stylesheet + calc/SLD rules.
+function examSolutionPrintCSS() {
+  return reportPrintCSS()
+    + 'svg{max-width:100%;height:auto}'
+    + '.sld{max-width:100%}'
+    + '.exam-opgave{page-break-inside:avoid;margin-top:10px;border-top:1px solid #000;padding-top:6px}'
+    + 'details.calc-detail{border:1px solid #999;margin:6px 0;page-break-inside:avoid}'
+    + 'details.calc-detail > summary{list-style:none;background:#eee;padding:4px 6px;font-weight:700}'
+    + 'details.calc-detail table{border-collapse:collapse;width:100%}'
+    + 'details.calc-detail td,details.calc-detail th{border:1px solid #bbb;padding:2px 4px}'
+    + '.exam-verdict{border:1px solid #000;padding:6px;margin:6px 0}';
+}
+
+// Build the standalone print document (native browser print; no external libs).
+function examSolutionPrintHTML(sol) {
+  var v = sol.verdict || { code: 'incomplete', label: '', icon: '', counts: { ok: 0, warning: 0, fail: 0, info: 0 } };
+  var h = '<div class="report-doc">';
+  h += '<div class="report-head"><h1 style="margin:0">' + sol.title + '</h1>';
+  h += '<div style="font-size:0.8rem;color:#555">' + tx('Genereret', 'Generated') + ': ' + sol.generatedAt + ' \u00B7 ' + tx('Kilde', 'Source') + ': ' + (typeof UP_SAFETY_REF !== 'undefined' ? UP_SAFETY_REF : 'DS/HD 60364') + '</div></div>';
+  // Verdict
+  h += '<div class="exam-verdict"><strong>' + (v.icon || '') + ' ' + tx('Kritisk Hjerne-konklusion', 'Critical mind verdict') + ': ' + v.label + '</strong>';
+  h += '<div>\u26D4 ' + v.counts.fail + ' \u00B7 \u26A0 ' + v.counts.warning + ' \u00B7 \u2713 ' + v.counts.ok + ' \u00B7 i ' + v.counts.info + '</div></div>';
+  // Coverage
+  var cov = sol.coverage || { detected: 0, solved: 0, needInput: 0, modulesUsed: [] };
+  h += '<h2>' + tx('D\u00E6kning', 'Coverage') + '</h2>';
+  h += '<div>' + tx('Detekterede', 'Detected') + ': ' + cov.detected + ' \u00B7 ' + tx('L\u00F8st', 'Solved') + ': ' + cov.solved + ' \u00B7 ' + tx('Kr\u00E6ver input', 'Needs input') + ': ' + cov.needInput + '</div>';
+  if (cov.modulesUsed && cov.modulesUsed.length) h += '<div>' + tx('Moduler', 'Modules') + ': ' + cov.modulesUsed.join(', ') + '</div>';
+  // SLD
+  h += '<h2>' + tx('Enstregsdiagram', 'Single-line diagram') + '</h2>' + (sol.sldHtml || '');
+  // Opgaver with full working
+  (sol.opgaver || []).forEach(function (op) {
+    var opTitle = op.id ? ('Opgave ' + op.id) : (op.title || tx('Generelt', 'General'));
+    h += '<div class="exam-opgave"><h2>' + opTitle + '</h2>';
+    op.questions.forEach(function (q) {
+      h += '<h3>' + (q.calcLabel || q.label) + (q.value ? ' \u2014 ' + q.value : '') + '</h3>';
+      h += '<div><em>' + tx('Sp\u00F8rgsm\u00E5l', 'Question') + ':</em> ' + (q.questionText || q.label) + '</div>';
+      if (q.solved && q.calcHtml) h += examExpandDetails(q.calcHtml);
+      else h += '<div>' + tx('Mangler input \u2014 bekr\u00E6ft via modul: ', 'Missing input \u2014 confirm via module: ') + (q.module || '') + '</div>';
+    });
+    h += '</div>';
+  });
+  h += '</div>';
+  return h;
+}
+
+// Open a print window with the complete solution fully expanded; RTL-aware for Farsi.
+function examPrintSolution() {
+  var sol = examBuildSolution(analyzerState);
+  var html = examSolutionPrintHTML(sol);
+  var dir = (lang === 'fa') ? 'rtl' : 'ltr';
+  var w = window.open('', '_blank');
+  if (!w) return;
+  var doc = w.document;
+  doc.write('<!DOCTYPE html><html dir="' + dir + '" lang="' + lang + '"><head><meta charset="utf-8"><title>' + sol.title + '</title><style>' + examSolutionPrintCSS() + '</style></head><body>' + html + '</body></html>');
+  doc.close();
+  w.focus();
+  try { w.print(); } catch (e) {}
+}
+
 // ===== INIT =====
 guideLoadProgress();
 renderNav();

@@ -10677,6 +10677,205 @@ test('Guard: new theory modules do NOT change officialIz + IB regression', funct
   assert(typeof calcIB === 'function' && typeof officialIz === 'function', 'engine fns intact');
 });
 
+// ============================================================================
+// === CAPSTONE: COMPLETE EXAM SOLUTION GENERATOR TESTS =======================
+// === examBuildSolution(): end-to-end examiner-grade solution generator ======
+// ============================================================================
+console.log('\n=== Complete Exam Solution Generator Tests ===\n');
+
+// A representative multi-Opgave exam covering load, voltage drop, short-circuit,
+// device selection, transformer and fault protection.
+var EXAM_SAMPLE_TEXT = [
+  'Opgave 1',
+  'En 3-faset belastning med effekt 37 kW ved 400 V med cos phi = 0,86.',
+  '1.1 Beregn belastningsstroemmen IB.',
+  '1.2 Beregn spaendingsfaldet \u0394U naar kablet er NOIKLX 16 mm\u00B2 med laengde 45 m.',
+  'Installationsmetode: C. Omgivelsestemperatur: 35\u00B0C.',
+  '',
+  'Opgave 2',
+  'Transformer 630 kVA, uk = 4%.',
+  '2.1 Beregn kortslutningsstroemmen Ik.',
+  '2.2 Vaelg sikring MCB til kredsen. In = 25 A, kurve C.',
+  '',
+  'Opgave 3',
+  'Jordingssystem: TN-S. Zs = 0,8 \u03A9.',
+  '3.1 Er fejlbeskyttelsen tilstraekkelig?'
+].join('\n');
+
+test('examBuildSolution: produces a structured object with opgave sections', function() {
+  var savedLang = lang; lang = 'da';
+  analyzerRun(EXAM_SAMPLE_TEXT);
+  var sol = examBuildSolution(analyzerState);
+  assert(sol && typeof sol === 'object', 'returns an object');
+  assert(Array.isArray(sol.opgaver), 'has opgaver array');
+  assert(sol.opgaver.length >= 3, 'at least 3 opgave sections (got ' + sol.opgaver.length + ')');
+  var ids = sol.opgaver.map(function(o) { return o.id; });
+  assert(ids.indexOf(1) >= 0 && ids.indexOf(2) >= 0 && ids.indexOf(3) >= 0, 'sections for Opgave 1, 2 and 3');
+  var totalQ = sol.opgaver.reduce(function(n, o) { return n + o.questions.length; }, 0);
+  assert(totalQ >= 4, 'detected questions distributed across opgaver (got ' + totalQ + ')');
+  lang = savedLang;
+});
+
+test('examBuildSolution: each detected question carries text + mapped calculation', function() {
+  analyzerRun(EXAM_SAMPLE_TEXT);
+  var sol = examBuildSolution(analyzerState);
+  var anyWithText = false;
+  sol.opgaver.forEach(function(o) {
+    o.questions.forEach(function(q) {
+      assert(typeof q.questionText === 'string' && q.questionText.length > 0, 'question has text');
+      assert(typeof q.label === 'string' && q.label.length > 0, 'question has a mapped label');
+      if (q.questionText.length > 3) anyWithText = true;
+    });
+  });
+  assert(anyWithText, 'at least one question carries real question text');
+});
+
+test('examBuildSolution: each SOLVED question carries the FULL calcDetail working HTML', function() {
+  analyzerRun(EXAM_SAMPLE_TEXT);
+  var sol = examBuildSolution(analyzerState);
+  var solved = [];
+  sol.opgaver.forEach(function(o) { o.questions.forEach(function(q) { if (q.solved) solved.push(q); }); });
+  assert(solved.length > 0, 'at least one solved question exists');
+  solved.forEach(function(q) {
+    assert(q.calcHtml && q.calcHtml.indexOf('calc-detail') >= 0, q.label + ' carries calcDetail HTML');
+    assert(q.calcHtml.indexOf('Formel') >= 0 || q.calcHtml.indexOf('Formula') >= 0, q.label + ' shows a formula');
+    assert(q.calcHtml.indexOf('Resultat') >= 0 || q.calcHtml.indexOf('Result') >= 0, q.label + ' shows a result');
+  });
+});
+
+test('examBuildSolution: auto-generates and embeds the single-line diagram (reuses buildSLD)', function() {
+  analyzerRun(EXAM_SAMPLE_TEXT);
+  var sol = examBuildSolution(analyzerState);
+  assert(typeof sol.sldHtml === 'string' && sol.sldHtml.length > 0, 'sldHtml present');
+  assert(sol.sldHtml.indexOf('class="sld"') >= 0, 'embeds the SLD container');
+  assert(sol.sldHtml.indexOf('<svg') >= 0, 'SLD contains an SVG diagram');
+});
+
+test('examBuildSolution: verdict reflects the engine (reuses upComputeVerdict + auditor)', function() {
+  analyzerRun(EXAM_SAMPLE_TEXT);
+  var sol = examBuildSolution(analyzerState);
+  assert(sol.verdict && typeof sol.verdict.code === 'string', 'verdict has a code');
+  assert(['red', 'yellow', 'green', 'incomplete'].indexOf(sol.verdict.code) >= 0, 'valid traffic-light code');
+  assert.strictEqual(sol.verdict.code, upComputeVerdict(sol.verdict.findings), 'verdict == engine upComputeVerdict(findings)');
+  // IB (62 A) > In (25 A) -> coordination FAILS -> engine must report red.
+  assert.strictEqual(sol.verdict.code, 'red', 'overbelastning (IB>In) makes the verdict red');
+  assert(sol.verdict.counts.fail >= 1, 'at least one failing finding counted');
+});
+
+test('examBuildSolution: no engine failures => verdict not red (well-formed input)', function() {
+  var ok = [
+    'Opgave 1',
+    'En 1-faset belastning med effekt 2 kW ved 230 V med cos phi = 0,95.',
+    '1.1 Beregn belastningsstroemmen IB.',
+    '1.2 Vaelg sikring MCB. In = 16 A, kurve B.',
+    'Kablet er NOIKLX 2,5 mm\u00B2, laengde 20 m. Installationsmetode: C.',
+    'Jordingssystem: TN-S. Zs = 0,5 \u03A9.',
+    '3.1 Er fejlbeskyttelsen tilstraekkelig?'
+  ].join('\n');
+  analyzerRun(ok);
+  var sol = examBuildSolution(analyzerState);
+  assert.strictEqual(sol.verdict.code, upComputeVerdict(sol.verdict.findings), 'verdict == engine computation');
+  assert(sol.verdict.counts.fail === 0, 'no failing findings for a conservative circuit');
+});
+
+test('examBuildSolution: coverage panel reports solved / needs-input / modules used', function() {
+  analyzerRun(EXAM_SAMPLE_TEXT);
+  var sol = examBuildSolution(analyzerState);
+  assert(sol.coverage && typeof sol.coverage.detected === 'number', 'coverage.detected present');
+  assert(sol.coverage.solved + sol.coverage.needInput === sol.coverage.detected, 'solved + needInput == detected');
+  assert(Array.isArray(sol.coverage.modulesUsed), 'modulesUsed is an array');
+  assert(sol.coverage.modulesUsed.length > 0, 'at least one module used');
+});
+
+test('examRenderSolution: on-screen render is 100% click-only (no input/textarea)', function() {
+  analyzerRun(EXAM_SAMPLE_TEXT);
+  var sol = examBuildSolution(analyzerState);
+  var html = examRenderSolution(sol);
+  assert(html.indexOf('<input') < 0, 'no <input> in the solution render');
+  assert(html.indexOf('<textarea') < 0, 'no <textarea> in the solution render');
+  assert(html.indexOf('onclick=') >= 0, 'uses click-only controls');
+  assert(html.indexOf('calc-detail') >= 0, 'embeds full working blocks');
+  assert(html.indexOf('class="sld"') >= 0, 'embeds the single-line diagram');
+});
+
+test('examSolutionCard: analyzer button is click-only and toggles the solution', function() {
+  analyzerRun(EXAM_SAMPLE_TEXT);
+  analyzerState.solutionShown = false;
+  var card = examSolutionCard();
+  assert(card.indexOf('examGenerateSolution()') >= 0, 'shows the Generate button');
+  assert(card.indexOf('<input') < 0 && card.indexOf('<textarea') < 0, 'card is click-only');
+  examGenerateSolution();
+  assert.strictEqual(analyzerState.solutionShown, true, 'generate sets solutionShown true');
+  var shown = examSolutionCard();
+  assert(shown.indexOf('examPrintSolution()') >= 0, 'print action available when shown');
+  examHideSolution();
+  assert.strictEqual(analyzerState.solutionShown, false, 'hide resets solutionShown');
+});
+
+test('renderAnalyzer: the only text input remains the analyzer paste textarea', function() {
+  var savedMode = analyzerState.mode;
+  analyzerState.mode = 'paste';
+  analyzerRun(EXAM_SAMPLE_TEXT);
+  analyzerState.solutionShown = true;
+  var html = renderAnalyzer();
+  var taCount = (html.match(/<textarea/g) || []).length;
+  assert.strictEqual(taCount, 1, 'exactly one textarea (the analyzer paste area), got ' + taCount);
+  assert(html.indexOf('analyzerPasteArea') >= 0, 'the textarea is the analyzer paste area');
+  assert(html.indexOf('type="text"') < 0, 'no free-text inputs anywhere in the analyzer');
+  analyzerState.mode = savedMode;
+});
+
+test('examBuildSolution: trilingual (da/en/fa) keys resolve in the render', function() {
+  var savedLang = lang;
+  analyzerRun(EXAM_SAMPLE_TEXT);
+  lang = 'da'; var da = examRenderSolution(examBuildSolution(analyzerState));
+  lang = 'en'; var en = examRenderSolution(examBuildSolution(analyzerState));
+  lang = 'fa'; var fa = examRenderSolution(examBuildSolution(analyzerState));
+  assert(da.indexOf('Komplet eksamensl') >= 0, 'da title present');
+  assert(en.indexOf('Complete exam solution') >= 0, 'en title present');
+  assert(typeof _FA['Complete exam solution'] === 'string' && _FA['Complete exam solution'].length > 0, 'fa key for title');
+  assert(typeof _FA['Generate complete solution'] === 'string', 'fa key for generate');
+  assert(typeof _FA['Critical mind verdict'] === 'string', 'fa key for verdict');
+  assert(fa.indexOf(_FA['Complete exam solution']) >= 0, 'fa render uses the Persian title');
+  assert(fa.indexOf('<input') < 0 && fa.indexOf('<textarea') < 0, 'fa render stays click-only');
+  lang = savedLang;
+});
+
+test('examSolutionPrintHTML: expands calcDetail blocks so the PDF shows FULL working', function() {
+  analyzerRun(EXAM_SAMPLE_TEXT);
+  var sol = examBuildSolution(analyzerState);
+  var print = examSolutionPrintHTML(sol);
+  assert(print.indexOf('report-doc') >= 0, 'reuses the report document shell');
+  assert(print.indexOf('<details open class="calc-detail"') >= 0, 'calcDetail blocks forced open for print');
+  assert(print.indexOf('class="sld"') >= 0, 'SLD embedded in the print document');
+  assert(examSolutionPrintCSS().indexOf(reportPrintCSS()) === 0, 'print CSS extends reportPrintCSS()');
+});
+
+test('examBuildSolution: handles empty state without inventing data (conservative)', function() {
+  var emptyState = { rawText: '', segments: [], extracted: null, results: [], completeness: { solved: 0, total: 0, flagged: [] }, dependencies: [], moduleFlow: [], busPopulated: false, solutionShown: false, mode: 'paste' };
+  var sol = examBuildSolution(emptyState);
+  assert(sol && Array.isArray(sol.opgaver), 'returns a valid structure');
+  assert.strictEqual(sol.coverage.detected, 0, 'no detected questions when there is no data');
+  assert.strictEqual(sol.coverage.solved, 0, 'nothing solved when there is no data');
+  var html = examRenderSolution(sol);
+  assert(html.indexOf('<input') < 0 && html.indexOf('<textarea') < 0, 'empty render still click-only');
+});
+
+// ============================================================================
+// === GUARD: exam-solution feature must NOT change the calc/verdict engine ===
+// ============================================================================
+test('Guard: exam solution feature does NOT change officialIz + IB regression', function() {
+  var cu25 = { material: 'Cu', mm2: 2.5, model: '', iz: 999 };
+  assert.strictEqual(officialIz(cu25), 23, 'officialIz(Cu 2.5mm2 PVC) == 23A unchanged');
+  var cu16 = { material: 'Cu', mm2: 16, model: '', iz: 1 };
+  assert.strictEqual(officialIz(cu16), 73, 'officialIz(Cu 16mm2 PVC) == 73A unchanged');
+  var ib = sldCalcNodeIB({ type: 'final_circuit', power_kW: 3.68, cosPhi: 0.95, phases: '1x230', voltage: 230 });
+  assert(Math.abs(ib - 16.84) < 0.05, 'IB regression ~16.84A unchanged, got ' + ib.toFixed(2));
+  assert(typeof upComputeVerdict === 'function' && typeof upAuditProject === 'function', 'verdict engine intact');
+  assert(typeof calcDetail === 'function' && typeof buildSLD === 'function', 'calcDetail + buildSLD intact');
+  assert(typeof examBuildSolution === 'function' && typeof examRenderSolution === 'function', 'capstone fns defined');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
