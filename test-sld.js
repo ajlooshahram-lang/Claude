@@ -12505,6 +12505,212 @@ test('Phase1 non-invasive: life-safety cvZsCeiling spot-check unchanged', functi
   assert.strictEqual(zsMax, 2.73125, 'cvZsCeiling TN B16 zsMax unchanged');
 });
 
+// =====================================================================
+// SMART CURVE — device selection / validation (Phase 1) — ADDITIONS ONLY
+// =====================================================================
+console.log('\n=== Smart Curve Device-Selection Tests ===\n');
+
+// Shared representative ctx: final circuit, IB=14A, derated Iz=20A, low Zs, healthy Ik.
+function smartCtxRep(over) {
+  var base = { nodeId: 'rep', ib: 14, iz: 20, ikmax: 2000, ikmin: 1000, zs: 1.0,
+               earthing: 'TN', requiredTimeS: 0.4, isFinal: true, nodeType: 'final_circuit' };
+  if (over) { for (var k in over) base[k] = over[k]; }
+  return base;
+}
+function smartMcb(id) { return PRODUCTS.mcbs.find(function(m){ return m.id === id; }); }
+function smartFuse(id) { return PRODUCTS.fuses.find(function(f){ return f.id === id; }); }
+
+// SC-1: Ia anchors via the SINGLE SOURCE upDisconnectionIa (B16=80, C16=160, D16=320)
+test('SmartCurve: Ia anchors B16=80, C16=160, D16=320 (upDisconnectionIa)', function() {
+  assert.strictEqual(upDisconnectionIa({ In: 16, curve: 'B' }).ia, 80);
+  assert.strictEqual(upDisconnectionIa({ In: 16, curve: 'C' }).ia, 160);
+  assert.strictEqual(upDisconnectionIa({ In: 16, curve: 'D' }).ia, 320);
+});
+
+// SC-2: gG fuse 5s point equals catalog i5s — D02-63 (i5s=290) via sldGetTripTime/sldDeviceCurve
+test('SmartCurve: gG fuse D02-63 5s point equals catalog i5s=290', function() {
+  var f = smartFuse('EATON-D02-63');
+  assert.strictEqual(f.i5s, 290);
+  var t = sldGetTripTime(f, f.rating, f.i5s);
+  assert(Math.abs(t - 5) < 1e-6, 'trip time at i5s must be 5s, got ' + t);
+});
+
+// SC-3: a second gG fuse 5s point — D02-50 (i5s=230)
+test('SmartCurve: gG fuse D02-50 5s point equals catalog i5s=230', function() {
+  var f = smartFuse('EATON-D02-50');
+  assert.strictEqual(f.i5s, 230);
+  var t = sldGetTripTime(f, f.rating, f.i5s);
+  assert(Math.abs(t - 5) < 1e-6, 'trip time at i5s must be 5s, got ' + t);
+});
+
+// SC-4: smartBuildCtxFromNode reads already-computed engine outputs (no typed input)
+test('SmartCurve: smartBuildCtxFromNode gathers computed circuit inputs', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var fcId = Object.keys(tree.nodes).find(function(id){ return tree.nodes[id].type === 'final_circuit'; });
+  var ctx = smartBuildCtxFromNode(tree, fcId);
+  assert(ctx, 'ctx must be built');
+  assert(ctx.ib > 0, 'IB present');
+  assert(ctx.iz > 0, 'Iz present');
+  assert.strictEqual(ctx.requiredTimeS, 0.4, 'final circuit requires 0.4s');
+  assert.strictEqual(ctx.earthing, 'TN');
+  // transformer node yields null (out of scope for device selection)
+  assert.strictEqual(smartBuildCtxFromNode(tree, tree.rootId), null);
+});
+
+// SC-5: selection picks the correct device (B16) for the representative circuit
+test('SmartCurve: selector picks B16 for IB=14A representative circuit', function() {
+  var ctx = smartCtxRep();
+  var sel = smartSelectDevice(ctx, PRODUCTS.mcbs.filter(function(m){ return m.curve === 'B'; }));
+  assert(sel.best, 'a safe device must be recommended');
+  assert.strictEqual(sel.best.In, 16, 'smallest safe rating is 16A');
+  assert.strictEqual(sel.best.curve, 'B');
+});
+
+// SC-6: ranking places safe devices ahead of unsafe ones
+test('SmartCurve: ranking puts safe candidates before unsafe', function() {
+  var ctx = smartCtxRep();
+  var sel = smartSelectDevice(ctx, PRODUCTS.mcbs.filter(function(m){ return m.curve === 'B'; }));
+  var firstUnsafeIdx = sel.ranked.findIndex(function(r){ return !r.safe; });
+  if (firstUnsafeIdx >= 0) {
+    for (var i = 0; i < firstUnsafeIdx; i++) assert(sel.ranked[i].safe, 'all before first unsafe must be safe');
+  }
+});
+
+// SC-7: under-rated device (B10 < IB) is REJECTED as unsafe (overload) — no false approval
+test('SmartCurve: under-rated B10 rejected as unsafe (overload)', function() {
+  var ctx = smartCtxRep();
+  var v = smartValidateDevice(ctx, smartMcb('SE-iC60N-B10'));
+  assert.strictEqual(v.verdict, 'unsafe', 'B10 must be unsafe for IB=14A');
+  var overload = v.checks.find(function(c){ return c.key === 'overload'; });
+  assert.strictEqual(overload.state, 'fail');
+});
+
+// SC-8: too-slow device (low Ik,min -> clears > required time) is REJECTED as unsafe
+test('SmartCurve: too-slow device rejected as unsafe (clearing time)', function() {
+  var ctx = smartCtxRep({ ikmin: 30 }); // far below B16 magnetic threshold -> slow thermal trip
+  var v = smartValidateDevice(ctx, smartMcb('SE-iC60N-B16'));
+  assert.strictEqual(v.verdict, 'unsafe');
+  var clr = v.checks.find(function(c){ return c.key === 'clearing'; });
+  assert.strictEqual(clr.state, 'fail');
+});
+
+// SC-9: excessive Zs (disconnection ceiling exceeded) is REJECTED as unsafe
+test('SmartCurve: excessive Zs rejected as unsafe (fault-loop disconnection)', function() {
+  var ctx = smartCtxRep({ zs: 5 });
+  var v = smartValidateDevice(ctx, smartMcb('SE-iC60N-B16'));
+  assert.strictEqual(v.verdict, 'unsafe');
+  var zs = v.checks.find(function(c){ return c.key === 'zs'; });
+  assert.strictEqual(zs.state, 'fail');
+});
+
+// SC-10: a correct device passing ALL checks is verdict 'safe'
+test('SmartCurve: correct B16 validates as safe with all checks passing', function() {
+  var ctx = smartCtxRep();
+  var v = smartValidateDevice(ctx, smartMcb('SE-iC60N-B16'));
+  assert.strictEqual(v.verdict, 'safe');
+  v.checks.forEach(function(c){ assert.strictEqual(c.state, 'pass', c.key + ' must pass'); });
+});
+
+// SC-11: missing inputs -> 'unresolved' (NEVER a false 'safe' approval)
+test('SmartCurve: missing inputs yield unresolved (never false approval)', function() {
+  var ctx = { nodeId: 'm', ib: 14, iz: 20, ikmax: 0, ikmin: 0, zs: 0, earthing: 'TN', requiredTimeS: 0.4, isFinal: true };
+  var v = smartValidateDevice(ctx, smartMcb('SE-iC60N-B16'));
+  assert.strictEqual(v.verdict, 'unresolved');
+  assert.notStrictEqual(v.verdict, 'safe');
+});
+
+// SC-12 (property): verdict is NEVER 'safe' if any check fails (conservative invariant)
+test('SmartCurve: verdict never safe when any check fails (invariant)', function() {
+  var scenarios = [ smartCtxRep({ zs: 5 }), smartCtxRep({ ikmin: 30 }), smartCtxRep({ iz: 10 }) ];
+  scenarios.forEach(function(ctx) {
+    PRODUCTS.mcbs.forEach(function(dev) {
+      var v = smartValidateDevice(ctx, dev);
+      var anyFail = v.checks.some(function(c){ return c.state === 'fail'; });
+      if (anyFail) assert.notStrictEqual(v.verdict, 'safe', 'must not approve ' + dev.id);
+    });
+  });
+});
+
+// SC-13: every verdict cites a DS/HD 60364 clause AND the device standard
+test('SmartCurve: citations include DS/HD 60364 clause + device standard (IEC 60898)', function() {
+  var ctx = smartCtxRep();
+  var v = smartValidateDevice(ctx, smartMcb('SE-iC60N-B16'));
+  assert(v.citations.some(function(c){ return /60364/.test(c); }), 'must cite DS/HD 60364');
+  assert(v.citations.indexOf('IEC 60898') >= 0, 'MCB must cite IEC 60898');
+});
+
+// SC-14: gG fuse selection cites IEC 60269 and respects In >= IB
+test('SmartCurve: gG fuse candidate cites IEC 60269 and respects In>=IB', function() {
+  var ctx = smartCtxRep();
+  var v = smartValidateDevice(ctx, smartFuse('EATON-D02-20'));
+  assert(v.citations.indexOf('IEC 60269') >= 0, 'fuse must cite IEC 60269');
+  // overload check uses the fuse rating as In
+  var overload = v.checks.find(function(c){ return c.key === 'overload'; });
+  assert.strictEqual(overload.state, 'pass', '20A fuse >= IB=14A and <= Iz=20A');
+});
+
+// SC-15: NON-INVASIVE — cvZsCeiling unchanged (byte-identical)
+test('SmartCurve non-invasive: cvZsCeiling TN B16 zsMax === 2.73125', function() {
+  assert.strictEqual(cvZsCeiling('TN', { In: 16, curve: 'B' }, {}, 0.95).zsMax, 2.73125);
+});
+
+// SC-16: NON-INVASIVE — upDisconnectionIa unchanged for B16/C16/D16 (+ In>32 path)
+test('SmartCurve non-invasive: upDisconnectionIa unchanged for B16/C16/D16', function() {
+  assert.strictEqual(upDisconnectionIa({ In: 16, curve: 'B' }).ia, 80);
+  assert.strictEqual(upDisconnectionIa({ In: 16, curve: 'C' }).ia, 160);
+  assert.strictEqual(upDisconnectionIa({ In: 16, curve: 'D' }).ia, 320);
+  assert.strictEqual(upDisconnectionIa({ In: 16, curve: 'B' }).timeReqS, 0.4);
+  assert.strictEqual(upDisconnectionIa({ In: 63, curve: 'B' }).ia, 315); // In>32 -> 5*In
+});
+
+// SC-17: NON-INVASIVE — sldDeviceCurve output unchanged for a known device/In
+test('SmartCurve non-invasive: sldDeviceCurve B16 output unchanged (snapshot)', function() {
+  var b16 = smartMcb('SE-iC60N-B16');
+  var c = sldDeviceCurve(b16, 16);
+  assert.strictEqual(c.length, 12, 'curve point count unchanged');
+  assert.strictEqual(c[0].i, 18.08, 'first point current = 1.13*16');
+  assert.strictEqual(c[0].tMax, 288.9129649693033, 'first point tMax unchanged');
+  var mag = c.find(function(p){ return p.i === 51.2; });
+  assert(mag && mag.tMin === 0.004 && mag.tMax === 0.1, 'magnetic isdMin point unchanged');
+});
+
+// SC-18: NON-INVASIVE — MCB_CURVES and kritisk constants unchanged
+test('SmartCurve non-invasive: MCB_CURVES + UP_ALPHA/UP_CMIN constants unchanged', function() {
+  assert.strictEqual(MCB_CURVES.B.isdMin, 3.2);
+  assert.strictEqual(MCB_CURVES.B.isdMax, 4.8);
+  assert.strictEqual(MCB_CURVES.C.isdMin, 7);
+  assert.strictEqual(MCB_CURVES.C.isdMax, 10);
+  assert.strictEqual(MCB_CURVES.D.isdMin, 10);
+  assert.strictEqual(MCB_CURVES.D.isdMax, 20);
+  assert.strictEqual(UP_ALPHA_CU, 0.00393);
+  assert.strictEqual(UP_ALPHA_AL, 0.00403);
+  assert.strictEqual(UP_CMIN, 0.95);
+});
+
+// SC-19: TRILINGUAL — every new English label resolves via _FA under lang='fa'
+test('SmartCurve i18n: new English labels resolve via _FA under lang=fa', function() {
+  var newLabels = [
+    'Smart curve selection', 'Recommend & validate device', 'Computed circuit inputs',
+    'Required disconnection time', 'Device type', 'Circuit breaker (MCB)', 'Melting fuse (gG)',
+    'Curve', 'All', 'Recommended device', 'Verdict', 'SAFE', 'NO SAFE DEVICE FOUND',
+    'Conservative choice', 'disconnects fastest with margin', 'Ranked candidates', 'trip ',
+    'Overload (IB <= In <= Iz)', 'Fault-loop disconnection (Zs)', 'Clearing time at Ik,min',
+    'Breaking capacity (Icu >= Ik,max)', 'Missing IB/Iz', 'Zs/ceiling not resolved',
+    'Missing Ik,min', 'Missing Icu/Ik,max', 'Fails: ', 'Unresolved: ', 'All checks passed.',
+    'Apply', 'Melting fuse is selected manually (outside MCB buttons).',
+    'Change type/curve, choose a larger cable (lower Zs) or a faster device.'
+  ];
+  var prev = lang; lang = 'fa';
+  newLabels.forEach(function(en) {
+    assert(typeof _FA[en] === 'string' && _FA[en].length > 0, 'has Farsi: ' + en);
+    assert.strictEqual(tx('xx', en), _FA[en], 'tx() resolves to Farsi: ' + en);
+    assert.notStrictEqual(_FA[en], en, 'Farsi differs from raw English: ' + en);
+  });
+  lang = prev;
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
