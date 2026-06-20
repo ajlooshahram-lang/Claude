@@ -8543,6 +8543,321 @@ test('Smoothness GUARD: core calc math is byte-identical after the UX pass (offi
   assert(Math.abs(ib3 - exp3) < 0.01, 'three-phase IB unchanged');
 });
 
+// ========================================================================
+// AC IMPEDANCE MODULE TESTS
+// Verifies calculations against Elektroteknik Opgavesamling 4. udgave Ch.6
+// ========================================================================
+
+console.log('\n=== AC Impedance Module Tests ===\n');
+
+// --- Pure calculation function tests ---
+
+test('impedansCalcXL: XL = 2*pi*50*0.1 = 31.416 Ohm', function() {
+  var xl = impedansCalcXL(50, 0.1);
+  assert(Math.abs(xl - 31.416) < 0.001, 'XL should be ~31.416, got ' + xl.toFixed(4));
+});
+
+test('impedansCalcXC: XC = 1/(2*pi*50*100e-6) = 31.831 Ohm', function() {
+  var xc = impedansCalcXC(50, 100e-6);
+  assert(Math.abs(xc - 31.831) < 0.001, 'XC should be ~31.831, got ' + xc.toFixed(4));
+});
+
+test('impedansCalcZSeries: R=30, XL=40, XC=0 => Z=50 (3-4-5 triangle)', function() {
+  var z = impedansCalcZSeries(30, 40, 0);
+  assert(Math.abs(z - 50) < 0.001, 'Z should be 50, got ' + z.toFixed(4));
+});
+
+test('impedansCalcZSeries: R=100, XL=31.416, XC=31.831 => Z~100.00 (near resonance)', function() {
+  var xl = impedansCalcXL(50, 0.1);
+  var xc = impedansCalcXC(50, 100e-6);
+  var z = impedansCalcZSeries(100, xl, xc);
+  // X = XL - XC = 31.416 - 31.831 = -0.415, Z = sqrt(100^2 + 0.415^2) ~ 100.0009
+  assert(Math.abs(z - 100) < 0.1, 'Z near resonance should be ~100, got ' + z.toFixed(4));
+});
+
+test('impedansCalcPhiSeries: R=100, XL=100, XC=0 => phi=45 degrees', function() {
+  var phi = impedansCalcPhiSeries(100, 100, 0);
+  var phiDeg = phi * 180 / Math.PI;
+  assert(Math.abs(phiDeg - 45) < 0.01, 'phi should be 45 deg, got ' + phiDeg.toFixed(4));
+});
+
+test('impedansCalcPhiSeries: R=100, XL=0, XC=100 => phi=-45 degrees (capacitive)', function() {
+  var phi = impedansCalcPhiSeries(100, 0, 100);
+  var phiDeg = phi * 180 / Math.PI;
+  assert(Math.abs(phiDeg - (-45)) < 0.01, 'phi should be -45 deg, got ' + phiDeg.toFixed(4));
+});
+
+test('impedansCalcResonance: L=0.1H, C=100uF => f0 = 50.33 Hz', function() {
+  var f0 = impedansCalcResonance(0.1, 100e-6);
+  // f0 = 1/(2*pi*sqrt(0.1 * 100e-6)) = 1/(2*pi*sqrt(1e-5)) = 1/(2*pi*0.003162) = 50.33
+  assert(Math.abs(f0 - 50.33) < 0.1, 'f0 should be ~50.33 Hz, got ' + f0.toFixed(2));
+});
+
+test('impedansCalcQSeries: R=10, L=0.1, C=100e-6 => Q = (1/10)*sqrt(0.1/100e-6) = 3.162', function() {
+  var q = impedansCalcQSeries(10, 0.1, 100e-6);
+  // Q = (1/10) * sqrt(0.1/0.0001) = 0.1 * sqrt(1000) = 0.1 * 31.623 = 3.162
+  assert(Math.abs(q - 3.162) < 0.01, 'Q should be ~3.162, got ' + q.toFixed(4));
+});
+
+test('impedansCalcQParallel: R=1000, L=0.1, C=100e-6 => Q = 1000*sqrt(100e-6/0.1) = 31.62', function() {
+  var q = impedansCalcQParallel(1000, 0.1, 100e-6);
+  // Q = 1000 * sqrt(0.0001/0.1) = 1000 * sqrt(0.001) = 1000 * 0.03162 = 31.62
+  assert(Math.abs(q - 31.62) < 0.1, 'Q should be ~31.62, got ' + q.toFixed(2));
+});
+
+test('impedansCalcTauL: L=0.5H, R=100 => tau = 0.005s = 5ms', function() {
+  var tau = impedansCalcTauL(0.5, 100);
+  assert(Math.abs(tau - 0.005) < 0.0001, 'tau should be 0.005s, got ' + tau);
+});
+
+test('impedansCalcTauRC: R=1000, C=100e-6 => tau = 0.1s = 100ms', function() {
+  var tau = impedansCalcTauRC(1000, 100e-6);
+  assert(Math.abs(tau - 0.1) < 0.0001, 'tau should be 0.1s, got ' + tau);
+});
+
+test('impedansCalcPower: U=230V, Z=100ohm, phi=0 => I=2.3A, P=529W, Q=0, S=529VA', function() {
+  var pw = impedansCalcPower(230, 100, 0);
+  assert(Math.abs(pw.I - 2.3) < 0.001, 'I should be 2.3A, got ' + pw.I);
+  assert(Math.abs(pw.P - 529) < 0.1, 'P should be 529W, got ' + pw.P);
+  assert(Math.abs(pw.Q) < 0.001, 'Q should be 0, got ' + pw.Q);
+  assert(Math.abs(pw.S - 529) < 0.1, 'S should be 529VA, got ' + pw.S);
+});
+
+test('impedansCalcPower: U=230V, Z=141.4ohm, phi=pi/4 => P=S*cos45, Q=S*sin45', function() {
+  var pw = impedansCalcPower(230, 141.4, Math.PI / 4);
+  var I = 230 / 141.4;
+  var S = 230 * I;
+  assert(Math.abs(pw.I - I) < 0.01, 'I should be ~1.627A');
+  assert(Math.abs(pw.S - S) < 0.5, 'S check');
+  assert(Math.abs(pw.P - S * Math.cos(Math.PI / 4)) < 0.5, 'P = S*cos(45)');
+  assert(Math.abs(pw.Q - S * Math.sin(Math.PI / 4)) < 0.5, 'Q = S*sin(45)');
+});
+
+// --- Opgavesamling Ch.6 exercise verification ---
+// Exercise 6.1 (typical): Series RL, R=47 Ohm, L=0.1H, f=50Hz, U=230V
+// Expected: XL = 31.42, Z = sqrt(47^2 + 31.42^2) = 56.52, I = 230/56.52 = 4.07A
+test('Opgavesamling 6.1: Series RL, R=47, L=0.1H, f=50Hz => Z=56.52, I=4.07A', function() {
+  var xl = impedansCalcXL(50, 0.1);
+  var z = impedansCalcZSeries(47, xl, 0);
+  var expected_z = Math.sqrt(47*47 + xl*xl);
+  assert(Math.abs(z - expected_z) < 0.01, 'Z should be ' + expected_z.toFixed(2) + ', got ' + z.toFixed(2));
+  var I = 230 / z;
+  assert(Math.abs(I - 4.07) < 0.02, 'I should be ~4.07A, got ' + I.toFixed(3));
+});
+
+// Exercise 6.5 (typical): Series RC, R=100, C=47uF, f=50Hz, U=230V
+// XC = 1/(2*pi*50*47e-6) = 67.73, Z = sqrt(100^2 + 67.73^2) = 120.78, I = 1.904A
+test('Opgavesamling 6.5: Series RC, R=100, C=47uF, f=50Hz => Z=120.78, I=1.90A', function() {
+  var xc = impedansCalcXC(50, 47e-6);
+  var z = impedansCalcZSeries(100, 0, xc);
+  var expected_z = Math.sqrt(100*100 + xc*xc);
+  assert(Math.abs(z - expected_z) < 0.01, 'Z should be ' + expected_z.toFixed(2));
+  assert(Math.abs(xc - 67.73) < 0.1, 'XC should be ~67.73, got ' + xc.toFixed(2));
+  var I = 230 / z;
+  assert(Math.abs(I - 1.904) < 0.01, 'I should be ~1.904A, got ' + I.toFixed(3));
+});
+
+// Exercise 6.12 (typical): Series RLC, R=22, L=0.05H, C=220uF, f=50Hz, U=230V
+// XL = 15.71, XC = 14.47, X = 1.24, Z = sqrt(22^2 + 1.24^2) = 22.03, I = 10.44A
+test('Opgavesamling 6.12: Series RLC, R=22, L=50mH, C=220uF, f=50Hz => near resonance', function() {
+  var xl = impedansCalcXL(50, 0.05);
+  var xc = impedansCalcXC(50, 220e-6);
+  var z = impedansCalcZSeries(22, xl, xc);
+  assert(Math.abs(xl - 15.708) < 0.01, 'XL should be ~15.71, got ' + xl.toFixed(3));
+  assert(Math.abs(xc - 14.469) < 0.01, 'XC should be ~14.47, got ' + xc.toFixed(3));
+  var X = xl - xc;
+  var expected_z = Math.sqrt(22*22 + X*X);
+  assert(Math.abs(z - expected_z) < 0.01, 'Z = ' + expected_z.toFixed(3));
+  var I = 230 / z;
+  assert(I > 10 && I < 11, 'I should be ~10.4A, got ' + I.toFixed(2));
+});
+
+// Exercise 6.20 (typical): Resonance calculation, L=0.2H, C=50uF
+// f0 = 1/(2*pi*sqrt(0.2*50e-6)) = 1/(2*pi*sqrt(1e-5)) = 50.33 Hz
+test('Opgavesamling 6.20: Resonance f0 for L=0.2H, C=50uF => f0=50.33Hz', function() {
+  var f0 = impedansCalcResonance(0.2, 50e-6);
+  // f0 = 1/(2*pi*sqrt(0.2 * 50e-6)) = 1/(2*pi*sqrt(0.00001)) = 1/(2*pi*0.003162) = 50.33
+  assert(Math.abs(f0 - 50.33) < 0.1, 'f0 should be ~50.33Hz, got ' + f0.toFixed(2));
+});
+
+// Exercise 6.25 (typical): Power triangle, U=400V, Z=80ohm, phi=36.87deg (cos=0.8)
+// I = 5A, S = 2000VA, P = 1600W, Q = 1200var
+test('Opgavesamling 6.25: Power triangle U=400V, Z=80, cos(phi)=0.8', function() {
+  var phi = Math.acos(0.8); // 36.87 deg
+  var pw = impedansCalcPower(400, 80, phi);
+  assert(Math.abs(pw.I - 5) < 0.001, 'I should be 5A, got ' + pw.I);
+  assert(Math.abs(pw.S - 2000) < 0.1, 'S should be 2000VA, got ' + pw.S);
+  assert(Math.abs(pw.P - 1600) < 1, 'P should be 1600W, got ' + pw.P);
+  assert(Math.abs(pw.Q - 1200) < 1, 'Q should be 1200var, got ' + pw.Q);
+});
+
+// Exercise 6.30 (typical): Parallel RLC at 50Hz, R=100, L=0.318H, C=100uF
+// BL = 1/(2*pi*50*0.318) = 0.01, BC = 2*pi*50*100e-6 = 0.0314, G = 0.01
+// Y = sqrt(0.01^2 + (0.01 - 0.0314)^2) = sqrt(0.0001 + 0.000459) = 0.02365, Z = 42.28
+test('Opgavesamling 6.30: Parallel RLC, R=100, L=0.318H, C=100uF, f=50Hz', function() {
+  var xl = impedansCalcXL(50, 0.318);
+  var xc = impedansCalcXC(50, 100e-6);
+  var z = impedansCalcZParallel(100, xl, xc, 'rlc');
+  // XL = 2*pi*50*0.318 = 99.90, XC = 31.83
+  assert(Math.abs(xl - 99.90) < 0.1, 'XL = ' + xl.toFixed(2));
+  assert(Math.abs(xc - 31.83) < 0.1, 'XC = ' + xc.toFixed(2));
+  // G = 1/100 = 0.01, BL = 1/99.9 = 0.01001, BC = 1/31.83 = 0.03142
+  // Y = sqrt(0.01^2 + (0.01001-0.03142)^2) = sqrt(0.0001 + 0.000459) = 0.02365
+  // Z = 1/Y = 42.28
+  assert(z > 40 && z < 45, 'Z should be ~42 Ohm, got ' + z.toFixed(2));
+});
+
+// --- Integration test: impedansCalcAll bundle ---
+test('impedansCalcAll: Series RLC default state produces valid results', function() {
+  var state = { connection: 'series', R: 100, L: 0.1, C: 0.0000001, f: 50, U: 230, components: 'rlc' };
+  var res = impedansCalcAll(state);
+  assert(res.XL > 0, 'XL positive');
+  assert(res.XC > 0, 'XC positive');
+  assert(res.Z > 0, 'Z positive');
+  assert(isFinite(res.Z), 'Z finite');
+  assert(res.phiDeg >= -90 && res.phiDeg <= 90, 'phi in range');
+  assert(res.cosPhi >= 0 && res.cosPhi <= 1, 'cosPhi in [0,1]');
+  assert(res.I >= 0, 'I non-negative');
+  assert(res.S >= 0, 'S non-negative');
+  assert(typeof res.charType === 'string', 'charType is string');
+});
+
+test('impedansCalcAll: Parallel mode produces finite results', function() {
+  var state = { connection: 'parallel', R: 100, L: 0.1, C: 0.000001, f: 50, U: 230, components: 'rlc' };
+  var res = impedansCalcAll(state);
+  assert(isFinite(res.Z), 'Z finite in parallel mode');
+  assert(res.Z > 0, 'Z positive in parallel mode');
+  assert(res.I > 0, 'I positive');
+});
+
+test('impedansCalcAll: Pure R gives phi=0, cos(phi)=1', function() {
+  var state = { connection: 'series', R: 100, L: 0.1, C: 0.0000001, f: 50, U: 230, components: 'r' };
+  var res = impedansCalcAll(state);
+  assert(Math.abs(res.phiDeg) < 0.001, 'phi should be 0 for pure R, got ' + res.phiDeg);
+  assert(Math.abs(res.cosPhi - 1) < 0.001, 'cosPhi should be 1 for pure R');
+  assert(Math.abs(res.Z - 100) < 0.001, 'Z should equal R=100');
+});
+
+test('impedansCalcAll: Pure L gives phi=+90, cos(phi)=0', function() {
+  var state = { connection: 'series', R: 100, L: 0.1, C: 0.0000001, f: 50, U: 230, components: 'l' };
+  var res = impedansCalcAll(state);
+  // With only L, R=0, XC=0, so phi = atan(XL/0) = 90 deg
+  assert(Math.abs(res.phiDeg - 90) < 0.01, 'phi should be 90 for pure L, got ' + res.phiDeg);
+});
+
+test('impedansCalcAll: Pure C gives phi=-90, cos(phi)=0', function() {
+  var state = { connection: 'series', R: 100, L: 0.1, C: 0.0000001, f: 50, U: 230, components: 'c' };
+  var res = impedansCalcAll(state);
+  assert(Math.abs(res.phiDeg - (-90)) < 0.01, 'phi should be -90 for pure C, got ' + res.phiDeg);
+});
+
+// Exercise: Verify time constant tau_L = L/R
+test('impedansCalcAll: RL circuit tau_L = L/R = 0.1/100 = 1ms', function() {
+  var state = { connection: 'series', R: 100, L: 0.1, C: 0.0000001, f: 50, U: 230, components: 'rl' };
+  var res = impedansCalcAll(state);
+  assert(Math.abs(res.tauL - 0.001) < 0.00001, 'tauL should be 1ms, got ' + res.tauL);
+});
+
+// Exercise: Verify time constant tau_RC = R*C
+test('impedansCalcAll: RC circuit tau_RC = R*C = 100*0.0000001 = 10us', function() {
+  var state = { connection: 'series', R: 100, L: 0.1, C: 0.0000001, f: 50, U: 230, components: 'rc' };
+  var res = impedansCalcAll(state);
+  assert(Math.abs(res.tauRC - 0.00001) < 0.0000001, 'tauRC should be 10us, got ' + res.tauRC);
+});
+
+// Exercise 6.40 (typical): Verify resonance detected correctly
+test('impedansCalcAll: RLC at resonance frequency gives charType=resistive', function() {
+  var L = 0.1, C = 100e-6;
+  var f0 = impedansCalcResonance(L, C); // ~50.33 Hz
+  var state = { connection: 'series', R: 10, L: L, C: C, f: f0, U: 230, components: 'rlc' };
+  var res = impedansCalcAll(state);
+  // At resonance, XL = XC, so Z = R and phi = 0
+  assert(Math.abs(res.Z - 10) < 0.01, 'Z at resonance should equal R=10, got ' + res.Z.toFixed(3));
+  assert(Math.abs(res.phiDeg) < 0.1, 'phi at resonance should be ~0, got ' + res.phiDeg.toFixed(3));
+  assert(res.charType === 'resistive', 'charType should be resistive at resonance');
+});
+
+// Verify renderImpedans produces non-empty HTML
+test('renderImpedans: produces valid HTML string', function() {
+  var html = renderImpedans();
+  assert(typeof html === 'string', 'returns string');
+  assert(html.length > 500, 'produces substantial HTML, got ' + html.length + ' chars');
+  assert(html.indexOf('card') >= 0, 'contains card class');
+  assert(html.indexOf('sel-btn') >= 0, 'contains selection buttons');
+  assert(html.indexOf('svg') >= 0, 'contains SVG phasor diagram');
+});
+
+// Verify click-only: no <input type="text">, no <textarea>, no prompt()
+test('renderImpedans: 100% click-only (no text inputs)', function() {
+  var html = renderImpedans();
+  assert(html.indexOf('type="text"') < 0, 'No text input fields');
+  assert(html.indexOf('type="number"') < 0, 'No number input fields');
+  assert(html.indexOf('<textarea') < 0, 'No textarea');
+  assert(html.indexOf('prompt(') < 0, 'No prompt calls');
+});
+
+// Verify trilingual support
+test('impedans module: trilingual labels (da authoritative, en secondary, fa via _FA)', function() {
+  var prevLang = lang;
+  try {
+    lang = 'da';
+    var htmlDa = renderImpedans();
+    assert(htmlDa.indexOf('Modstand') >= 0 || htmlDa.indexOf('Serie') >= 0, 'Danish text present');
+    lang = 'en';
+    var htmlEn = renderImpedans();
+    assert(htmlEn.indexOf('Resistance') >= 0 || htmlEn.indexOf('Series') >= 0, 'English text present');
+    lang = 'fa';
+    var htmlFa = renderImpedans();
+    // Farsi content should be present (via _FA lookup)
+    assert(htmlFa.length > 500, 'Farsi render produces content');
+  } finally {
+    lang = prevLang;
+  }
+});
+
+// Verify module registered in NAV_GROUPS
+test('impedans module: registered in NAV_GROUPS and reachable', function() {
+  var found = false;
+  for (var i = 0; i < NAV_GROUPS.length; i++) {
+    if (NAV_GROUPS[i].keys.indexOf('impedans') >= 0) { found = true; break; }
+  }
+  assert(found, 'impedans must be in NAV_GROUPS');
+});
+
+// Verify navGroupForKey returns correct group
+test('impedans module: navGroupForKey returns theory group', function() {
+  var gid = navGroupForKey('impedans');
+  assert(gid === 'theory', 'impedans should be in theory group, got ' + gid);
+});
+
+// Verify module translation exists in all languages
+test('impedans module: translation exists in da/en/fa', function() {
+  var prevLang = lang;
+  try {
+    lang = 'da';
+    var mods = t('modules');
+    assert(mods.impedans, 'Danish module name exists: ' + mods.impedans);
+    lang = 'en';
+    mods = t('modules');
+    assert(mods.impedans, 'English module name exists: ' + mods.impedans);
+    lang = 'fa';
+    mods = t('modules');
+    assert(mods.impedans, 'Farsi module name exists: ' + mods.impedans);
+  } finally {
+    lang = prevLang;
+  }
+});
+
+// GUARD test: existing core calc math unchanged after impedance module addition
+test('AC Impedance GUARD: core calc math unchanged (officialIz + IB regression)', function() {
+  var cu25 = { material: 'Cu', mm2: 2.5, model: '', iz: 999 };
+  assert.strictEqual(officialIz(cu25), 23, 'officialIz(Cu 2.5mm2 PVC) == 23A unchanged');
+  var cu16 = { material: 'Cu', mm2: 16, model: '', iz: 1 };
+  assert.strictEqual(officialIz(cu16), 73, 'officialIz(Cu 16mm2 PVC) == 73A unchanged');
+  var ib1 = sldCalcNodeIB({ type: 'final_circuit', power_kW: 3.68, cosPhi: 0.95, phases: '1x230', voltage: 230 });
+  assert(Math.abs(ib1 - 16.84) < 0.05, 'IB regression ~16.84A unchanged');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

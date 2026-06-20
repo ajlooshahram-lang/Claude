@@ -976,7 +976,8 @@ const T = {
       atex: 'ATEX / Ex',
       smartgrid: 'Smart Grid',
       kls: 'KLS Kvalitetssystem',
-      kritisk: '\uD83E\uDDE0 Projekt + Kritisk Hjerne'
+      kritisk: '\uD83E\uDDE0 Projekt + Kritisk Hjerne',
+      impedans: 'AC Impedans'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1119,7 +1120,8 @@ const T = {
       atex: 'ATEX / Explosive',
       smartgrid: 'Smart Grid',
       kls: 'KLS Quality System',
-      kritisk: '\uD83E\uDDE0 Project + Critical Mind'
+      kritisk: '\uD83E\uDDE0 Project + Critical Mind',
+      impedans: 'AC Impedance'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -1254,7 +1256,8 @@ const T = {
       atex: 'محیط انفجاری',
       smartgrid: 'شبکه هوشمند',
       kls: 'سیستم کیفیت KLS',
-      kritisk: '\uD83E\uDDE0 پروژه + ذهن انتقادی'
+      kritisk: '\uD83E\uDDE0 پروژه + ذهن انتقادی',
+      impedans: 'امپدانس AC'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -2328,7 +2331,42 @@ const _FA = {
   'Documents under revision': 'مستندات در حال بازنگری',
   'Calibrated OK': 'کالیبراسیون تایید',
   'Review completed': 'بازنگری انجام‌شده',
-  'A deviation automatically creates a deviation report.': 'یک انحراف به‌طور خودکار یک گزارش انحراف ایجاد می‌کند.'
+  'A deviation automatically creates a deviation report.': 'یک انحراف به‌طور خودکار یک گزارش انحراف ایجاد می‌کند.',
+  // AC Impedance module
+  'AC Impedance Calculator': 'ماشین حساب امپدانس AC',
+  'Circuit Configuration': 'پیکربندی مدار',
+  'Connection': 'اتصال',
+  'Series': 'سری',
+  'Parallel': 'موازی',
+  'Resistance R': 'مقاومت R',
+  'Inductance L': 'اندوکتانس L',
+  'Capacitance C': 'خازن C',
+  'Frequency f': 'فرکانس f',
+  'Supply Voltage U': 'ولتاژ منبع U',
+  'Impedance Results': 'نتایج امپدانس',
+  'Inductive Reactance': 'راکتانس القایی',
+  'Capacitive Reactance': 'راکتانس خازنی',
+  'Total Impedance': 'امپدانس کل',
+  'Phase Angle': 'زاویه فاز',
+  'Power Factor': 'ضریب توان',
+  'Current': 'جریان',
+  'Power Triangle': 'مثلث توان',
+  'Active Power': 'توان اکتیو',
+  'Reactive Power': 'توان راکتیو',
+  'Apparent Power': 'توان ظاهری',
+  'Resonance': 'رزونانس',
+  'Resonance Frequency': 'فرکانس رزونانس',
+  'Quality Factor': 'ضریب کیفیت',
+  'Time Constants': 'ثابت‌های زمانی',
+  'Inductive time constant': 'ثابت زمانی القایی',
+  'Capacitive time constant': 'ثابت زمانی خازنی',
+  'Phasor Diagram': 'نمودار فازوری',
+  'Formula Provenance': 'استناد فرمول',
+  'inductive': 'القایی',
+  'capacitive': 'خازنی',
+  'resistive': 'اهمی',
+  'at resonance': 'در رزونانس',
+  'Calculation per IEC 60909 + Elektroteknik Opgavesamling 4. udgave': 'محاسبه طبق IEC 60909 + Elektroteknik Opgavesamling 4. udgave'
 };
 function tx(da, en) { if(lang === 'da') return da; if(lang === 'fa') return _FA[en] || en; return en; }
 function tl(obj, prefix) { return obj[prefix + '_' + lang] || obj[prefix + '_en'] || ''; }
@@ -4321,6 +4359,13 @@ const NAV_GROUPS = [
     keys: ['panel', 'busbar', 'sld', 'draw', 'cable3d', 'tcc', 'trayfill']
   },
   {
+    id: 'theory', icon: '\uD83D\uDCD6',
+    da: 'Elektroteknisk teori', en: 'Electrotechnics theory', fa: '\u062A\u0626\u0648\u0631\u06CC \u0628\u0631\u0642',
+    descDa: 'Grundl\u00E6ggende AC-teori og beregninger fra Elektroteknik Opgavesamling \u2014 impedans, resonans, fasevinkel, effekttrekant og tidskonstanter. Dine formler, klik-for-klik.',
+    descEn: 'Fundamental AC theory and calculations from Elektroteknik Opgavesamling \u2014 impedance, resonance, phase angle, power triangle and time constants. Your formulas, click by click.',
+    keys: ['impedans']
+  },
+  {
     id: 'docs', icon: '\uD83D\uDCCB',
     da: 'Dokumentation & kvalitet', en: 'Documentation & quality', fa: '\u0645\u0633\u062A\u0646\u062F\u0627\u062A \u0648 \u06A9\u06CC\u0641\u06CC\u062A',
     descDa: 'Det der g\u00F8r projektet lovligt og f\u00E6rdigt: standarder, komponentbank, tilbud, KLS-kvalitetssikring, idrifts\u00E6ttelse, dokumentation \u2014 og eksamenstr\u00E6ning.',
@@ -5708,6 +5753,7 @@ function renderModule(mod) {
     case 'smartgrid': content = renderSmartGrid(); break;
     case 'kls': content = renderKLS(); break;
     case 'kritisk': content = renderKritisk(); break;
+    case 'impedans': content = renderImpedans(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -20136,6 +20182,420 @@ function renderGuide() {
   return h;
 }
 
+// ===== AC IMPEDANCE CALCULATOR MODULE (Elektroteknik Opgavesamling Ch.6) =====
+
+// State for the AC impedance calculator — all user selections.
+var impedansState = {
+  connection: 'series',   // 'series' or 'parallel'
+  R: 100,                 // Ohm
+  L: 0.1,                // Henry
+  C: 0.0000001,          // Farad (100nF = 0.1uF)
+  f: 50,                 // Hz
+  U: 230,                // Volts (supply voltage for power triangle)
+  components: 'rlc'      // 'r', 'rl', 'rc', 'lc', 'rlc'
+};
+
+// Preset values for click-only selection
+var IMPEDANS_R_PRESETS = [1, 5, 10, 22, 47, 100, 220, 470, 1000, 2200, 4700, 10000];
+var IMPEDANS_L_PRESETS = [0.001, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10];
+var IMPEDANS_C_PRESETS = [0.000000001, 0.00000001, 0.0000001, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1];
+var IMPEDANS_F_PRESETS = [25, 50, 60, 100, 200, 400, 500, 1000, 2000, 5000, 10000, 50000];
+var IMPEDANS_U_PRESETS = [12, 24, 48, 110, 230, 400, 690, 1000];
+
+// --- Pure calculation functions (unit-testable, no DOM) ---
+
+// Inductive reactance: XL = 2*pi*f*L
+function impedansCalcXL(f, L) {
+  return 2 * Math.PI * f * L;
+}
+
+// Capacitive reactance: XC = 1 / (2*pi*f*C)
+function impedansCalcXC(f, C) {
+  if (C <= 0) return Infinity;
+  return 1 / (2 * Math.PI * f * C);
+}
+// Series impedance: Z = sqrt(R^2 + (XL - XC)^2)
+function impedansCalcZSeries(R, XL, XC) {
+  var X = XL - XC;
+  return Math.sqrt(R * R + X * X);
+}
+
+// Parallel impedance: 1/Z = sqrt((1/R)^2 + (1/XL - 1/XC)^2)
+// For parallel RLC: Y = sqrt(G^2 + (BL - BC)^2), Z = 1/Y
+function impedansCalcZParallel(R, XL, XC, components) {
+  var G = (components.indexOf('r') >= 0 && R > 0) ? 1 / R : 0;
+  var BL = (components.indexOf('l') >= 0 && XL > 0 && isFinite(XL)) ? 1 / XL : 0;
+  var BC = (components.indexOf('c') >= 0 && XC > 0 && isFinite(XC)) ? 1 / XC : 0;
+  var Y = Math.sqrt(G * G + (BL - BC) * (BL - BC));
+  if (Y === 0) return Infinity;
+  return 1 / Y;
+}
+
+// Phase angle for series: phi = atan((XL - XC) / R)
+function impedansCalcPhiSeries(R, XL, XC) {
+  if (R === 0) {
+    if (XL > XC) return Math.PI / 2;
+    if (XC > XL) return -Math.PI / 2;
+    return 0;
+  }
+  return Math.atan((XL - XC) / R);
+}
+
+// Phase angle for parallel: phi = -atan((BL - BC) / G) where B = 1/X, G = 1/R
+function impedansCalcPhiParallel(R, XL, XC, components) {
+  var G = (components.indexOf('r') >= 0 && R > 0) ? 1 / R : 0;
+  var BL = (components.indexOf('l') >= 0 && XL > 0 && isFinite(XL)) ? 1 / XL : 0;
+  var BC = (components.indexOf('c') >= 0 && XC > 0 && isFinite(XC)) ? 1 / XC : 0;
+  if (G === 0) {
+    if (BL > BC) return -Math.PI / 2;
+    if (BC > BL) return Math.PI / 2;
+    return 0;
+  }
+  return -Math.atan((BL - BC) / G);
+}
+// Resonance frequency: f0 = 1 / (2*pi*sqrt(L*C))
+function impedansCalcResonance(L, C) {
+  if (L <= 0 || C <= 0) return 0;
+  return 1 / (2 * Math.PI * Math.sqrt(L * C));
+}
+
+// Quality factor (series): Q = (1/R) * sqrt(L/C) = XL/R at resonance
+function impedansCalcQSeries(R, L, C) {
+  if (R <= 0 || C <= 0) return 0;
+  return (1 / R) * Math.sqrt(L / C);
+}
+
+// Quality factor (parallel): Q = R * sqrt(C/L) = R/XL at resonance
+function impedansCalcQParallel(R, L, C) {
+  if (L <= 0) return 0;
+  return R * Math.sqrt(C / L);
+}
+
+// Time constant (inductive): tau = L/R
+function impedansCalcTauL(L, R) {
+  if (R <= 0) return Infinity;
+  return L / R;
+}
+
+// Time constant (capacitive): tau = R*C
+function impedansCalcTauRC(R, C) {
+  return R * C;
+}
+
+// Power triangle: given U, Z, phi
+function impedansCalcPower(U, Z, phi) {
+  if (Z <= 0 || !isFinite(Z)) return { I: 0, P: 0, Q: 0, S: 0 };
+  var I = U / Z;
+  var S = U * I;           // Apparent power [VA]
+  var P = S * Math.cos(phi); // Active power [W]
+  var Q = S * Math.sin(phi); // Reactive power [var]
+  return { I: I, P: P, Q: Q, S: S };
+}
+
+// Full impedance calculation bundle
+function impedansCalcAll(state) {
+  var R = state.R;
+  var L = state.L;
+  var C = state.C;
+  var f = state.f;
+  var U = state.U;
+  var conn = state.connection;
+  var comp = state.components;
+
+  var XL = (comp.indexOf('l') >= 0) ? impedansCalcXL(f, L) : 0;
+  var XC = (comp.indexOf('c') >= 0) ? impedansCalcXC(f, C) : 0;
+  var Reff = (comp.indexOf('r') >= 0) ? R : 0;
+
+  var Z, phi;
+  if (conn === 'series') {
+    Z = impedansCalcZSeries(Reff, XL, XC);
+    phi = impedansCalcPhiSeries(Reff, XL, XC);
+  } else {
+    Z = impedansCalcZParallel(Reff, XL, XC, comp);
+    phi = impedansCalcPhiParallel(Reff, XL, XC, comp);
+  }
+
+  var power = impedansCalcPower(U, Z, phi);
+  var f0 = (comp.indexOf('l') >= 0 && comp.indexOf('c') >= 0) ? impedansCalcResonance(L, C) : 0;
+  var Qfactor = 0;
+  if (comp.indexOf('l') >= 0 && comp.indexOf('c') >= 0 && comp.indexOf('r') >= 0) {
+    Qfactor = (conn === 'series') ? impedansCalcQSeries(R, L, C) : impedansCalcQParallel(R, L, C);
+  }
+  var tauL = (comp.indexOf('l') >= 0 && comp.indexOf('r') >= 0) ? impedansCalcTauL(L, R) : 0;
+  var tauRC = (comp.indexOf('c') >= 0 && comp.indexOf('r') >= 0) ? impedansCalcTauRC(R, C) : 0;
+
+  return {
+    XL: XL,
+    XC: XC,
+    Z: Z,
+    phi: phi,
+    phiDeg: phi * 180 / Math.PI,
+    cosPhi: Math.cos(phi),
+    I: power.I,
+    P: power.P,
+    Q: power.Q,
+    S: power.S,
+    f0: f0,
+    Qfactor: Qfactor,
+    tauL: tauL,
+    tauRC: tauRC,
+    charType: (Math.abs(XL - XC) / (Math.max(XL, XC, 1)) < 1e-10) ? 'resistive' : (XL > XC) ? 'inductive' : 'capacitive'
+  };
+}
+// Format engineering values with SI prefix
+function impedansFmtEng(val, unit) {
+  if (!isFinite(val) || val === 0) return '0 ' + unit;
+  var abs = Math.abs(val);
+  if (abs >= 1e6) return (val / 1e6).toFixed(2) + ' M' + unit;
+  if (abs >= 1e3) return (val / 1e3).toFixed(2) + ' k' + unit;
+  if (abs >= 1) return val.toFixed(3) + ' ' + unit;
+  if (abs >= 1e-3) return (val * 1e3).toFixed(2) + ' m' + unit;
+  if (abs >= 1e-6) return (val * 1e6).toFixed(2) + ' \u00B5' + unit;
+  if (abs >= 1e-9) return (val * 1e9).toFixed(2) + ' n' + unit;
+  return val.toExponential(3) + ' ' + unit;
+}
+
+// Format capacitance for display
+function impedansFmtC(C) {
+  if (C >= 0.1) return C.toFixed(2) + ' F';
+  if (C >= 1e-3) return (C * 1e3).toFixed(1) + ' mF';
+  if (C >= 1e-6) return (C * 1e6).toFixed(1) + ' \u00B5F';
+  if (C >= 1e-9) return (C * 1e9).toFixed(1) + ' nF';
+  return (C * 1e12).toFixed(1) + ' pF';
+}
+
+// Format inductance for display
+function impedansFmtL(L) {
+  if (L >= 1) return L.toFixed(2) + ' H';
+  if (L >= 1e-3) return (L * 1e3).toFixed(1) + ' mH';
+  return (L * 1e6).toFixed(1) + ' \u00B5H';
+}
+
+// Format frequency for display
+function impedansFmtF(f) {
+  if (f >= 1e6) return (f / 1e6).toFixed(2) + ' MHz';
+  if (f >= 1e3) return (f / 1e3).toFixed(2) + ' kHz';
+  return f.toFixed(1) + ' Hz';
+}
+function renderImpedans() {
+  var res = impedansCalcAll(impedansState);
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('AC Impedansberegner', 'AC Impedance Calculator') + '</div>';
+  html += '<div class="info-row">' + tx('Beregning iht. IEC 60909 + Elektroteknik Opgavesamling 4. udgave', 'Calculation per IEC 60909 + Elektroteknik Opgavesamling 4. udgave') + '</div>';
+
+  // Component selection
+  html += '<div class="select-group"><div class="select-label">' + tx('Komponenttype', 'Circuit Configuration') + '</div><div class="select-grid">';
+  var compTypes = [
+    { key: 'r', da: 'R (ren modstand)', en: 'R (pure resistance)' },
+    { key: 'rl', da: 'RL (modstand + spole)', en: 'RL (resistance + inductor)' },
+    { key: 'rc', da: 'RC (modstand + kondensator)', en: 'RC (resistance + capacitor)' },
+    { key: 'lc', da: 'LC (spole + kondensator)', en: 'LC (inductor + capacitor)' },
+    { key: 'rlc', da: 'RLC (komplet)', en: 'RLC (complete)' }
+  ];
+  compTypes.forEach(function(ct) {
+    html += '<button class="sel-btn' + (impedansState.components === ct.key ? ' selected' : '') + '" onclick="impedansState.components=\'' + ct.key + '\';renderModule(\'impedans\')">' + tx(ct.da, ct.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Connection type
+  html += '<div class="select-group"><div class="select-label">' + tx('Forbindelse', 'Connection') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (impedansState.connection === 'series' ? ' selected' : '') + '" onclick="impedansState.connection=\'series\';renderModule(\'impedans\')">' + tx('Serie', 'Series') + '</button>';
+  html += '<button class="sel-btn' + (impedansState.connection === 'parallel' ? ' selected' : '') + '" onclick="impedansState.connection=\'parallel\';renderModule(\'impedans\')">' + tx('Parallel', 'Parallel') + '</button>';
+  html += '</div></div>';
+
+  // Resistance (if applicable)
+  if (impedansState.components.indexOf('r') >= 0) {
+    html += '<div class="select-group"><div class="select-label">' + tx('Modstand R [\u03A9]', 'Resistance R [\u03A9]') + '</div><div class="select-grid">';
+    IMPEDANS_R_PRESETS.forEach(function(r) {
+      var label = r >= 1000 ? (r / 1000) + 'k' : r + '';
+      html += '<button class="sel-btn' + (impedansState.R === r ? ' selected' : '') + '" onclick="impedansState.R=' + r + ';renderModule(\'impedans\')">' + label + '</button>';
+    });
+    html += '</div></div>';
+  }
+
+  // Inductance (if applicable)
+  if (impedansState.components.indexOf('l') >= 0) {
+    html += '<div class="select-group"><div class="select-label">' + tx('Induktans L', 'Inductance L') + '</div><div class="select-grid">';
+    IMPEDANS_L_PRESETS.forEach(function(l) {
+      html += '<button class="sel-btn' + (impedansState.L === l ? ' selected' : '') + '" onclick="impedansState.L=' + l + ';renderModule(\'impedans\')">' + impedansFmtL(l) + '</button>';
+    });
+    html += '</div></div>';
+  }
+
+  // Capacitance (if applicable)
+  if (impedansState.components.indexOf('c') >= 0) {
+    html += '<div class="select-group"><div class="select-label">' + tx('Kapacitans C', 'Capacitance C') + '</div><div class="select-grid">';
+    IMPEDANS_C_PRESETS.forEach(function(c) {
+      html += '<button class="sel-btn' + (impedansState.C === c ? ' selected' : '') + '" onclick="impedansState.C=' + c + ';renderModule(\'impedans\')">' + impedansFmtC(c) + '</button>';
+    });
+    html += '</div></div>';
+  }
+
+  // Frequency
+  html += '<div class="select-group"><div class="select-label">' + tx('Frekvens f', 'Frequency f') + '</div><div class="select-grid">';
+  IMPEDANS_F_PRESETS.forEach(function(f) {
+    html += '<button class="sel-btn' + (impedansState.f === f ? ' selected' : '') + '" onclick="impedansState.f=' + f + ';renderModule(\'impedans\')">' + impedansFmtF(f) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Supply voltage
+  html += '<div class="select-group"><div class="select-label">' + tx('Forsyningssp\u00E6nding U [V]', 'Supply Voltage U [V]') + '</div><div class="select-grid">';
+  IMPEDANS_U_PRESETS.forEach(function(u) {
+    html += '<button class="sel-btn' + (impedansState.U === u ? ' selected' : '') + '" onclick="impedansState.U=' + u + ';renderModule(\'impedans\')">' + u + ' V</button>';
+  });
+  html += '</div></div>';
+
+  html += '</div>'; // close config card
+  // Results card
+  html += '<div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Impedance Results') + '</div>';
+
+  // Reactances
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Reaktanser & Impedans', 'Reactances & Impedance') + '</div>';
+  if (impedansState.components.indexOf('l') >= 0) {
+    html += '<div class="result-row"><span class="label">X<sub>L</sub> (' + tx('Induktiv reaktans', 'Inductive Reactance') + ')</span><span class="value">' + impedansFmtEng(res.XL, '\u03A9') + '</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">X<sub>L</sub> = 2\u03C0fL = 2\u03C0\u00D7' + impedansState.f + '\u00D7' + impedansState.L + ' = ' + res.XL.toFixed(3) + ' \u03A9</span></div>';
+  }
+  if (impedansState.components.indexOf('c') >= 0) {
+    html += '<div class="result-row"><span class="label">X<sub>C</sub> (' + tx('Kapacitiv reaktans', 'Capacitive Reactance') + ')</span><span class="value">' + impedansFmtEng(res.XC, '\u03A9') + '</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">X<sub>C</sub> = 1/(2\u03C0fC) = 1/(2\u03C0\u00D7' + impedansState.f + '\u00D7' + impedansState.C + ') = ' + res.XC.toFixed(3) + ' \u03A9</span></div>';
+  }
+  html += '<div class="result-row"><span class="label">|Z| (' + tx('Total impedans', 'Total Impedance') + ')</span><span class="value" style="font-weight:700;font-size:1.1em">' + impedansFmtEng(res.Z, '\u03A9') + '</span></div>';
+  if (impedansState.connection === 'series') {
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">|Z| = \u221A(R\u00B2 + (X<sub>L</sub>\u2212X<sub>C</sub>)\u00B2) = \u221A(' + (impedansState.components.indexOf('r') >= 0 ? impedansState.R : 0) + '\u00B2 + (' + res.XL.toFixed(2) + '\u2212' + res.XC.toFixed(2) + ')\u00B2) = ' + res.Z.toFixed(3) + ' \u03A9</span></div>';
+  } else {
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">Y = \u221A(G\u00B2 + (B<sub>L</sub>\u2212B<sub>C</sub>)\u00B2), Z = 1/Y = ' + res.Z.toFixed(3) + ' \u03A9</span></div>';
+  }
+  html += '</div>';
+
+  // Phase & Power factor
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Fasevinkel & Effektfaktor', 'Phase Angle & Power Factor') + '</div>';
+  html += '<div class="result-row"><span class="label">\u03C6 (' + tx('Fasevinkel', 'Phase Angle') + ')</span><span class="value">' + res.phiDeg.toFixed(2) + '\u00B0</span></div>';
+  html += '<div class="result-row"><span class="label">cos(\u03C6) (' + tx('Effektfaktor', 'Power Factor') + ')</span><span class="value">' + res.cosPhi.toFixed(4) + '</span></div>';
+  var charLabel = res.charType === 'inductive' ? tx('induktiv', 'inductive') : res.charType === 'capacitive' ? tx('kapacitiv', 'capacitive') : tx('resistiv (resonans)', 'resistive (at resonance)');
+  html += '<div class="result-row"><span class="label">' + tx('Karakter', 'Character') + '</span><span class="value">' + charLabel + '</span></div>';
+  html += '</div>';
+  // Current & Power triangle
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Str\u00F8m & Effekttrekant', 'Current & Power Triangle') + '</div>';
+  html += '<div class="result-row"><span class="label">I (' + tx('Str\u00F8m', 'Current') + ')</span><span class="value">' + impedansFmtEng(res.I, 'A') + '</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">I = U/|Z| = ' + impedansState.U + '/' + res.Z.toFixed(3) + ' = ' + res.I.toFixed(4) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">P (' + tx('Aktiv effekt', 'Active Power') + ')</span><span class="value">' + impedansFmtEng(res.P, 'W') + '</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">P = U\u00B7I\u00B7cos(\u03C6) = ' + impedansState.U + '\u00D7' + res.I.toFixed(4) + '\u00D7' + res.cosPhi.toFixed(4) + ' = ' + res.P.toFixed(3) + ' W</span></div>';
+  html += '<div class="result-row"><span class="label">Q (' + tx('Reaktiv effekt', 'Reactive Power') + ')</span><span class="value">' + impedansFmtEng(Math.abs(res.Q), 'var') + (res.Q >= 0 ? ' (ind.)' : ' (cap.)') + '</span></div>';
+  html += '<div class="result-row"><span class="label">S (' + tx('Tilsyneladende effekt', 'Apparent Power') + ')</span><span class="value">' + impedansFmtEng(res.S, 'VA') + '</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">S = U\u00B7I = ' + impedansState.U + '\u00D7' + res.I.toFixed(4) + ' = ' + res.S.toFixed(3) + ' VA, S\u00B2 = P\u00B2 + Q\u00B2</span></div>';
+  html += '</div>';
+
+  // Resonance & Q-factor (only for LC or RLC)
+  if (impedansState.components.indexOf('l') >= 0 && impedansState.components.indexOf('c') >= 0) {
+    html += '<div class="result-box">';
+    html += '<div class="result-title">' + tx('Resonans & Q-faktor', 'Resonance & Quality Factor') + '</div>';
+    html += '<div class="result-row"><span class="label">f<sub>0</sub> (' + tx('Resonansfrekvens', 'Resonance Frequency') + ')</span><span class="value">' + impedansFmtF(res.f0) + '</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">f<sub>0</sub> = 1/(2\u03C0\u221A(LC)) = 1/(2\u03C0\u221A(' + impedansState.L + '\u00D7' + impedansState.C + ')) = ' + res.f0.toFixed(2) + ' Hz</span></div>';
+    if (impedansState.components.indexOf('r') >= 0) {
+      html += '<div class="result-row"><span class="label">Q (' + tx('Kvalitetsfaktor', 'Quality Factor') + ')</span><span class="value">' + res.Qfactor.toFixed(3) + '</span></div>';
+      if (impedansState.connection === 'series') {
+        html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">Q = (1/R)\u221A(L/C) = (1/' + impedansState.R + ')\u221A(' + impedansState.L + '/' + impedansState.C + ') = ' + res.Qfactor.toFixed(3) + '</span></div>';
+      } else {
+        html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">Q = R\u221A(C/L) = ' + impedansState.R + '\u221A(' + impedansState.C + '/' + impedansState.L + ') = ' + res.Qfactor.toFixed(3) + '</span></div>';
+      }
+    }
+    // Distance from resonance
+    var freqRatio = impedansState.f / res.f0;
+    var distLabel = freqRatio > 1 ? tx('over resonans', 'above resonance') : freqRatio < 1 ? tx('under resonans', 'below resonance') : tx('ved resonans', 'at resonance');
+    html += '<div class="result-row"><span class="label">' + tx('Afstand til resonans', 'Distance to resonance') + '</span><span class="value">f/f\u2080 = ' + freqRatio.toFixed(3) + ' (' + distLabel + ')</span></div>';
+    html += '</div>';
+  }
+  // Time constants (if applicable)
+  if (res.tauL > 0 || res.tauRC > 0) {
+    html += '<div class="result-box">';
+    html += '<div class="result-title">' + tx('Tidskonstanter', 'Time Constants') + '</div>';
+    if (res.tauL > 0) {
+      html += '<div class="result-row"><span class="label">\u03C4<sub>L</sub> (' + tx('Induktiv tidskonstant', 'Inductive time constant') + ')</span><span class="value">' + impedansFmtEng(res.tauL, 's') + '</span></div>';
+      html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">\u03C4 = L/R = ' + impedansState.L + '/' + impedansState.R + ' = ' + res.tauL.toFixed(6) + ' s</span></div>';
+    }
+    if (res.tauRC > 0) {
+      html += '<div class="result-row"><span class="label">\u03C4<sub>RC</sub> (' + tx('Kapacitiv tidskonstant', 'Capacitive time constant') + ')</span><span class="value">' + impedansFmtEng(res.tauRC, 's') + '</span></div>';
+      html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">\u03C4 = R\u00D7C = ' + impedansState.R + '\u00D7' + impedansState.C + ' = ' + res.tauRC.toFixed(6) + ' s</span></div>';
+    }
+    html += '</div>';
+  }
+
+  // Phasor diagram (SVG)
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Fasevinkeldiagram (viserdiagram)', 'Phasor Diagram') + '</div>';
+  html += impedansRenderPhasor(res);
+  html += '</div>';
+
+  html += '</div>'; // close results card
+  return html;
+}
+// Render SVG phasor diagram
+function impedansRenderPhasor(res) {
+  var w = 280, h = 200;
+  var cx = w / 2, cy = h / 2;
+  var maxLen = 80;
+  // Normalize: largest component gets full arrow length
+  var maxVal = Math.max(Math.abs(res.XL), Math.abs(res.XC), (impedansState.components.indexOf('r') >= 0 ? impedansState.R : 0), 1);
+  var scale = maxLen / maxVal;
+
+  var Reff = (impedansState.components.indexOf('r') >= 0) ? impedansState.R : 0;
+  var rLen = Reff * scale;
+  var xlLen = res.XL * scale;
+  var xcLen = res.XC * scale;
+  var xNet = (res.XL - res.XC) * scale;
+  var zLen = Math.sqrt(rLen * rLen + xNet * xNet);
+  if (zLen > maxLen) { var zScale = maxLen / zLen; rLen *= zScale; xlLen *= zScale; xcLen *= zScale; xNet *= zScale; zLen = maxLen; }
+
+  var svg = '<svg width="' + w + '" height="' + h + '" style="display:block;margin:0 auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += '<defs><marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="var(--primary)"/></marker>';
+  svg += '<marker id="ahR" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="var(--success)"/></marker>';
+  svg += '<marker id="ahX" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="var(--danger)"/></marker>';
+  svg += '<marker id="ahZ" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="var(--accent)"/></marker></defs>';
+
+  // R arrow (horizontal, green)
+  if (rLen > 2) {
+    svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + (cx + rLen) + '" y2="' + cy + '" stroke="var(--success)" stroke-width="2" marker-end="url(#ahR)"/>';
+    svg += '<text x="' + (cx + rLen / 2) + '" y="' + (cy - 8) + '" text-anchor="middle" font-size="11" fill="var(--success)">R</text>';
+  }
+
+  // X arrow (vertical from end of R, red) — up = inductive, down = capacitive
+  if (Math.abs(xNet) > 2) {
+    var xDir = xNet > 0 ? -1 : 1; // inductive = up in phasor convention (positive angle = lag = up)
+    svg += '<line x1="' + (cx + rLen) + '" y1="' + cy + '" x2="' + (cx + rLen) + '" y2="' + (cy + xDir * Math.abs(xNet)) + '" stroke="var(--danger)" stroke-width="2" marker-end="url(#ahX)"/>';
+    var xlabel = res.XL > res.XC ? 'X\u2097' : 'X\u1d04';
+    svg += '<text x="' + (cx + rLen + 14) + '" y="' + (cy + xDir * Math.abs(xNet) / 2) + '" text-anchor="start" font-size="11" fill="var(--danger)">' + xlabel + '</text>';
+  }
+
+  // Z arrow (diagonal, blue)
+  var phiRad = res.phi;
+  var zEndX = cx + zLen * Math.cos(-phiRad); // negate because screen Y is flipped
+  var zEndY = cy - zLen * Math.sin(phiRad); // positive phi = inductive = arrow goes up
+  svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + zEndX.toFixed(1) + '" y2="' + zEndY.toFixed(1) + '" stroke="var(--accent)" stroke-width="2.5" marker-end="url(#ahZ)"/>';
+  svg += '<text x="' + ((cx + zEndX) / 2 - 10).toFixed(1) + '" y="' + ((cy + zEndY) / 2 - 6).toFixed(1) + '" text-anchor="middle" font-size="12" font-weight="700" fill="var(--accent)">Z</text>';
+
+  // Angle arc
+  if (Math.abs(res.phiDeg) > 1) {
+    var arcR = 25;
+    var startAngle = 0;
+    var endAngle = -phiRad;
+    var x1a = cx + arcR * Math.cos(startAngle);
+    var y1a = cy - arcR * Math.sin(startAngle);
+    var x2a = cx + arcR * Math.cos(endAngle);
+    var y2a = cy - arcR * Math.sin(endAngle);
+    var largeArc = Math.abs(phiRad) > Math.PI ? 1 : 0;
+    var sweep = phiRad > 0 ? 0 : 1;
+    svg += '<path d="M' + x1a.toFixed(1) + ',' + y1a.toFixed(1) + ' A' + arcR + ',' + arcR + ' 0 ' + largeArc + ',' + sweep + ' ' + x2a.toFixed(1) + ',' + y2a.toFixed(1) + '" fill="none" stroke="var(--text-light)" stroke-width="1" stroke-dasharray="3,2"/>';
+    svg += '<text x="' + (cx + arcR + 4) + '" y="' + (cy + (phiRad > 0 ? -4 : 12)) + '" font-size="10" fill="var(--text-light)">\u03C6=' + res.phiDeg.toFixed(1) + '\u00B0</text>';
+  }
+
+  // Legend
+  svg += '<text x="8" y="' + (h - 8) + '" font-size="9" fill="var(--text-muted)">' + tx('Gr\u00F8n=R, R\u00F8d=X, Bl\u00E5=Z', 'Green=R, Red=X, Blue=Z') + '</text>';
+  svg += '</svg>';
+  return svg;
+}
 // ===== INIT =====
 guideLoadProgress();
 renderNav();
