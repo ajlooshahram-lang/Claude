@@ -12505,6 +12505,308 @@ test('Phase1 non-invasive: life-safety cvZsCeiling spot-check unchanged', functi
   assert.strictEqual(zsMax, 2.73125, 'cvZsCeiling TN B16 zsMax unchanged');
 });
 
+// ============================================================================
+// ===== PROJECT ANALYZER DOCUMENT INGESTION (PDF / DOCX) TESTS =====
+// Additive: exercises the new offline text-extraction path, the low-text
+// notice path, and proves existing analyzer + life-safety behavior unchanged.
+// ============================================================================
+console.log('\n=== Project Analyzer Document Ingestion (PDF/DOCX) Tests ===\n');
+
+var zlib = require('zlib');
+
+// --- Fixture builders (Node only; not part of the app) ----------------------
+function _w16(arr, v) { arr.push(v & 0xff, (v >> 8) & 0xff); }
+function _w32(arr, v) { arr.push(v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >>> 24) & 0xff); }
+
+// Build a minimal ZIP (one or more entries) with a real central directory.
+// entries: [{ name, content(Buffer), method(0=stored|8=deflate) }]
+function buildZip(entries) {
+  var out = [];
+  var central = [];
+  var records = entries.map(function (e) {
+    var raw = e.method === 8 ? zlib.deflateRawSync(e.content) : e.content;
+    return { name: e.name, method: e.method, raw: raw, uSize: e.content.length, offset: 0 };
+  });
+  records.forEach(function (r) {
+    r.offset = out.length;
+    _w32(out, 0x04034b50); _w16(out, 20); _w16(out, 0); _w16(out, r.method);
+    _w16(out, 0); _w16(out, 0); _w32(out, 0);
+    _w32(out, r.raw.length); _w32(out, r.uSize);
+    _w16(out, r.name.length); _w16(out, 0);
+    for (var i = 0; i < r.name.length; i++) out.push(r.name.charCodeAt(i));
+    for (var j = 0; j < r.raw.length; j++) out.push(r.raw[j]);
+  });
+  var cdStart = out.length;
+  records.forEach(function (r) {
+    _w32(central, 0x02014b50); _w16(central, 20); _w16(central, 20); _w16(central, 0); _w16(central, r.method);
+    _w16(central, 0); _w16(central, 0); _w32(central, 0);
+    _w32(central, r.raw.length); _w32(central, r.uSize);
+    _w16(central, r.name.length); _w16(central, 0); _w16(central, 0);
+    _w16(central, 0); _w16(central, 0); _w32(central, 0); _w32(central, r.offset);
+    for (var i = 0; i < r.name.length; i++) central.push(r.name.charCodeAt(i));
+  });
+  for (var k = 0; k < central.length; k++) out.push(central[k]);
+  var cdSize = central.length;
+  _w32(out, 0x06054b50); _w16(out, 0); _w16(out, 0);
+  _w16(out, records.length); _w16(out, records.length);
+  _w32(out, cdSize); _w32(out, cdStart); _w16(out, 0);
+  return new Uint8Array(out);
+}
+
+function buildDocx(bodyText, method) {
+  var paras = bodyText.split('\n').map(function (line) {
+    return '<w:p><w:r><w:t xml:space="preserve">' + line + '</w:t></w:r></w:p>';
+  }).join('');
+  var xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+    '<w:body>' + paras + '</w:body></w:document>';
+  return buildZip([
+    { name: '[Content_Types].xml', content: Buffer.from('<types/>', 'utf8'), method: 0 },
+    { name: 'word/document.xml', content: Buffer.from(xml, 'utf8'), method: method }
+  ]);
+}
+
+// Build a tiny PDF with one content stream. flate=true => FlateDecode (zlib).
+function buildPdf(streamText, flate) {
+  var streamBytes = flate ? zlib.deflateSync(Buffer.from(streamText, 'latin1')) : Buffer.from(streamText, 'latin1');
+  var head = '%PDF-1.4\n';
+  var dict = '<< /Length ' + streamBytes.length + (flate ? ' /Filter /FlateDecode' : '') + ' >>\n';
+  var pre = head + '1 0 obj\n' + dict + 'stream\n';
+  var post = '\nendstream\nendobj\n%%EOF';
+  var arr = [];
+  for (var i = 0; i < pre.length; i++) arr.push(pre.charCodeAt(i) & 0xff);
+  for (var j = 0; j < streamBytes.length; j++) arr.push(streamBytes[j]);
+  for (var k = 0; k < post.length; k++) arr.push(post.charCodeAt(k) & 0xff);
+  return new Uint8Array(arr);
+}
+
+test('Ingestion: analyzerInflateRaw round-trips raw DEFLATE', function () {
+  var original = 'Belastning: 37 kW, 400 V, 3-faset, cos(phi) = 0,86. '.repeat(40);
+  var deflated = new Uint8Array(zlib.deflateRawSync(Buffer.from(original, 'utf8')));
+  var inflated = analyzerBytesToText(analyzerInflateRaw(deflated));
+  assert.strictEqual(inflated, original, 'raw inflate matches original');
+});
+
+test('Ingestion: analyzerInflate handles zlib-wrapped DEFLATE (PDF FlateDecode)', function () {
+  var original = 'Transformer 630 kVA, uk = 4%, Pcu = 6500 W. Zs = 1,2 ohm. '.repeat(30);
+  var zwrapped = new Uint8Array(zlib.deflateSync(Buffer.from(original, 'utf8')));
+  var inflated = analyzerBytesToText(analyzerInflate(zwrapped));
+  assert.strictEqual(inflated, original, 'zlib inflate matches original');
+});
+
+test('Ingestion: analyzerInflateRaw decodes a stored (uncompressed) block', function () {
+  var original = 'Hello stored block 230V';
+  var stored = new Uint8Array(zlib.deflateRawSync(Buffer.from(original, 'utf8'), { level: 0 }));
+  assert.strictEqual(analyzerBytesToText(analyzerInflateRaw(stored)), original, 'stored block decoded');
+});
+
+test('Ingestion: analyzerExtractDocx extracts text from STORED docx', function () {
+  var docx = buildDocx('Opgave 2\nBelastning: 37 kW, 400 V, 3-faset\ncos(phi) = 0,86', 0);
+  var text = analyzerExtractDocx(docx);
+  assert(text.indexOf('Belastning: 37 kW') >= 0, 'body text extracted: ' + JSON.stringify(text.slice(0, 80)));
+  assert(text.indexOf('Opgave 2') >= 0, 'paragraph 1 present');
+  assert(text.indexOf('\n') >= 0, 'paragraphs separated by newlines');
+});
+
+test('Ingestion: analyzerExtractDocx extracts text from DEFLATE docx', function () {
+  var docx = buildDocx('Transformer 630 kVA, uk = 4%\nKabell\u00e6ngde: 45 m', 8);
+  var text = analyzerExtractDocx(docx);
+  assert(text.indexOf('Transformer 630 kVA') >= 0, 'deflated body extracted');
+  assert(text.indexOf('45 m') >= 0, 'second paragraph extracted');
+});
+
+test('Ingestion: analyzerExtractDocx decodes XML entities', function () {
+  var docx = buildDocx('R &amp; D &lt;test&gt; cos&#955;', 0);
+  var text = analyzerExtractDocx(docx);
+  assert(text.indexOf('R & D <test>') >= 0, 'entities decoded: ' + JSON.stringify(text));
+});
+
+test('Ingestion: DOCX text reaches the analysis pipeline (analyzerState.extracted)', function () {
+  var docx = buildDocx('Belastning: 37 kW, 400 V, 3-faset\ncos(phi) = 0,86\nBeregn IB', 8);
+  var text = analyzerExtractDocx(docx);
+  var ran = analyzerRunExtracted(text, 'docx');
+  assert.strictEqual(ran, true, 'pipeline ran on extracted docx text');
+  assert(analyzerState.extracted, 'analyzerState.extracted populated');
+  assert.strictEqual(analyzerState.extracted.power_kW, 37, 'power extracted into pipeline');
+  assert.strictEqual(analyzerState.extracted.voltage, 400, 'voltage extracted into pipeline');
+  assert(analyzerState.rawText.indexOf('37 kW') >= 0, 'rawText holds the extracted document text');
+});
+
+test('Ingestion: analyzerExtractPdf extracts text from uncompressed stream', function () {
+  var pdf = buildPdf('BT /F1 12 Tf (Belastning: 37 kW 400 V 3-faset) Tj ET', false);
+  var text = analyzerExtractPdf(pdf);
+  assert(text.indexOf('Belastning: 37 kW') >= 0, 'Tj text extracted: ' + JSON.stringify(text));
+});
+
+test('Ingestion: analyzerExtractPdf extracts text from FlateDecode stream', function () {
+  var pdf = buildPdf('BT (Transformer 630 kVA uk 4 procent) Tj ET', true);
+  var text = analyzerExtractPdf(pdf);
+  assert(text.indexOf('Transformer 630 kVA') >= 0, 'FlateDecode text extracted: ' + JSON.stringify(text));
+});
+
+test('Ingestion: analyzerExtractPdf handles TJ arrays and escaped parens', function () {
+  var pdf = buildPdf('BT [(Bel)-10(astning 37 kW \\(maks\\))] TJ ET', false);
+  var text = analyzerExtractPdf(pdf);
+  assert(text.indexOf('Belastning 37 kW') >= 0, 'TJ array joined: ' + JSON.stringify(text));
+  assert(text.indexOf('(maks)') >= 0, 'escaped parens preserved');
+});
+
+test('Ingestion: PDF text reaches the analysis pipeline', function () {
+  var pdf = buildPdf('BT (Belastning: 10 kW, 400 V, 3-faset cos\\(phi\\) = 0,9 Beregn IB) Tj ET', true);
+  var text = analyzerExtractPdf(pdf);
+  var ran = analyzerRunExtracted(text, 'pdf');
+  assert.strictEqual(ran, true, 'pipeline ran on extracted PDF text');
+  assert(analyzerState.extracted, 'extracted populated');
+  assert.strictEqual(analyzerState.extracted.power_kW, 10, 'power 10kW extracted from PDF into pipeline');
+});
+
+test('Ingestion: analyzerMeaningfulTextLength counts alphanumeric chars', function () {
+  assert.strictEqual(analyzerMeaningfulTextLength('   \n\t  '), 0, 'whitespace = 0');
+  assert.strictEqual(analyzerMeaningfulTextLength('abc 123'), 6, 'counts letters+digits');
+  assert(analyzerMeaningfulTextLength('\u00e6\u00f8\u00e5') >= 3, 'counts Danish letters');
+});
+
+test('Ingestion: empty/scanned PDF triggers trilingual notice (never silent empty)', function () {
+  analyzerReset();
+  var ran = analyzerRunExtracted('', 'pdf');
+  assert.strictEqual(ran, false, 'pipeline not run on empty extraction');
+  assert(analyzerState.notice, 'a user notice is set');
+  assert(analyzerState.notice.toLowerCase().indexOf('paste') >= 0 || analyzerState.notice.indexOf('Inds') >= 0, 'notice tells user to paste');
+  assert.strictEqual(analyzerState.results.length, 0, 'no results produced');
+});
+
+test('Ingestion: scanned-PDF notice resolves in Danish, English and Farsi', function () {
+  var prev = lang;
+  lang = 'da'; assert(analyzerLowTextMessage('pdf').indexOf('scannet') >= 0, 'Danish message');
+  lang = 'en'; assert(analyzerLowTextMessage('pdf').toLowerCase().indexOf('scanned') >= 0, 'English message');
+  lang = 'fa';
+  var fa = analyzerLowTextMessage('pdf');
+  assert(/[\u0600-\u06FF]/.test(fa), 'Farsi message contains Persian script');
+  lang = prev;
+});
+
+test('Ingestion: low-text DOCX also triggers the notice', function () {
+  analyzerReset();
+  var docx = buildDocx('x', 0);
+  var text = analyzerExtractDocx(docx);
+  var ran = analyzerRunExtracted(text, 'docx');
+  assert.strictEqual(ran, false, 'not run for near-empty docx');
+  assert(analyzerState.notice, 'notice set for low-text docx');
+});
+
+test('Ingestion: analyzerExtractDocx throws on non-zip bytes (caught by handler)', function () {
+  var threw = false;
+  try { analyzerExtractDocx(new Uint8Array([1, 2, 3, 4, 5])); } catch (e) { threw = true; }
+  assert(threw, 'invalid docx bytes raise an error for the handler to catch');
+});
+
+test('Ingestion: analyzerExtractPdf returns empty string for imageless garbage', function () {
+  var text = analyzerExtractPdf(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]));
+  assert.strictEqual(text, '', 'no text from non-PDF bytes');
+});
+
+test('Ingestion: renderAnalyzer advertises .pdf/.docx and offline extraction', function () {
+  analyzerReset();
+  var html = renderAnalyzer();
+  assert(html.indexOf('.pdf') >= 0 && html.indexOf('.docx') >= 0, 'accept/labels mention pdf+docx');
+  assert(html.indexOf('analyzerHandleFile') >= 0, 'file handler wired');
+  assert(html.indexOf('accept=".txt,.md,.text,.pdf,.docx,.doc"') >= 0, 'accept attribute updated');
+});
+
+test('Ingestion: renderAnalyzer shows progress feedback while extracting', function () {
+  analyzerReset();
+  analyzerState.extracting = true;
+  var html = renderAnalyzer();
+  assert(html.indexOf('analyzerProgress') >= 0, 'progress element rendered');
+  analyzerState.extracting = false;
+});
+
+test('Ingestion: renderAnalyzer surfaces the notice banner', function () {
+  analyzerReset();
+  analyzerState.notice = 'TEST_NOTICE_TOKEN';
+  var html = renderAnalyzer();
+  assert(html.indexOf('TEST_NOTICE_TOKEN') >= 0, 'notice rendered in UI');
+  analyzerReset();
+});
+
+test('Ingestion: analyzerHandleFile reports unsupported types via notice', function () {
+  analyzerReset();
+  analyzerHandleFile({ files: [{ name: 'archive.zip', type: 'application/zip' }] });
+  assert(analyzerState.notice, 'notice set for unsupported file');
+  assert(analyzerState.notice.indexOf('.docx') >= 0 || analyzerState.notice.indexOf('Inds') >= 0, 'guides user to supported formats/paste');
+});
+
+test('Ingestion: analyzerHandleFile flags legacy .doc as out-of-scope', function () {
+  analyzerReset();
+  analyzerHandleFile({ files: [{ name: 'gammel.doc', type: 'application/msword' }] });
+  assert(analyzerState.notice && (analyzerState.notice.indexOf('.docx') >= 0 || analyzerState.notice.toLowerCase().indexOf('legacy') >= 0 || analyzerState.notice.indexOf('\u00C6ldre') >= 0), 'legacy .doc message shown');
+});
+
+test('Ingestion non-invasive: pasted-text analysis identical to extracted-text analysis', function () {
+  var examText = 'Belastning: 37 kW, 400 V, 3-faset, cos(phi) = 0,86\nKabell\u00e6ngde: 45 m\ntv\u00e6rsnit 16 mm\u00b2\nBeregn IB';
+  analyzerReset();
+  analyzerRun(examText);
+  var direct = JSON.stringify(analyzerState.extracted);
+  analyzerReset();
+  analyzerRunExtracted(examText, 'docx');
+  var viaExtract = JSON.stringify(analyzerState.extracted);
+  assert.strictEqual(viaExtract, direct, 'extraction route yields identical extracted-data snapshot');
+});
+
+test('Ingestion non-invasive: analyzerRun for plain text path is untouched', function () {
+  analyzerReset();
+  analyzerRun('Belastning: 10 kW, 400 V, 3-faset, cos(phi) = 0,9\nBeregn IB');
+  var ibR = analyzerState.results.find(function (r) { return r.type === 'ib'; });
+  assert(ibR && ibR.asked === true, 'IB still computed for pasted text');
+  var expectedIB = 10000 / (Math.sqrt(3) * 400 * 0.9);
+  assert(Math.abs(parseFloat(ibR.value) - expectedIB) < 0.1, 'IB value unchanged (~' + expectedIB.toFixed(2) + 'A)');
+});
+
+test('Ingestion non-invasive: life-safety primitives (TEMP/GROUP factors, IB calc) unchanged', function () {
+  assert.strictEqual(TEMP_FACTORS[30], 1.0, 'TEMP_FACTORS[30] unchanged');
+  assert.strictEqual(GROUP_FACTORS[3], 0.7, 'GROUP_FACTORS[3] unchanged');
+  var node = { type: 'final_circuit', power_kW: 3.68, cosPhi: 0.95, phases: '1x230', voltage: 230 };
+  var ib = sldCalcNodeIB(node);
+  assert(Math.abs(ib - 3680 / (230 * 0.95)) < 0.01, 'sldCalcNodeIB unchanged');
+});
+
+test('Ingestion non-invasive: ingestion functions exist and pipeline functions intact', function () {
+  assert.strictEqual(typeof analyzerInflateRaw, 'function', 'inflater present');
+  assert.strictEqual(typeof analyzerExtractPdf, 'function', 'pdf extractor present');
+  assert.strictEqual(typeof analyzerExtractDocx, 'function', 'docx extractor present');
+  assert.strictEqual(typeof analyzerRunExtracted, 'function', 'extracted-router present');
+  assert.strictEqual(typeof analyzerRun, 'function', 'original analyzerRun intact');
+  assert.strictEqual(typeof analyzerExtract, 'function', 'analyzerExtract intact');
+  assert.strictEqual(typeof analyzerSolve, 'function', 'analyzerSolve intact');
+});
+
+test('Ingestion: analyzerCleanPdfText strips CID glyph-noise but keeps Danish text', function () {
+  var noisy = '\u00CD Generelle \u00CD0 oplysninger \u00AA\u00CE\u00DE\u00AA H\u00f8jsp\u00e6nding \u00CD@ 230 V';
+  var cleaned = analyzerCleanPdfText(noisy);
+  assert(cleaned.indexOf('Generelle') >= 0 && cleaned.indexOf('oplysninger') >= 0, 'real words kept');
+  assert(cleaned.indexOf('H\u00f8jsp\u00e6nding') >= 0, 'Danish word kept');
+  assert(cleaned.indexOf('230') >= 0, 'numbers kept');
+  assert(cleaned.indexOf('\u00AA\u00CE\u00DE\u00AA') < 0, 'glyph-junk token removed');
+  assert(cleaned.indexOf('\u00CD0') < 0 && cleaned.indexOf('\u00CD@') < 0, 'isolated glyph tokens removed');
+});
+
+test('Ingestion: PDF quality gate rejects broken-encoding (isolated single chars)', function () {
+  // Simulate a subset-font PDF whose glyphs decode to isolated single ASCII chars.
+  var junk = '';
+  for (var i = 0; i < 120; i++) junk += String.fromCharCode(65 + (i % 26)) + ' ';
+  var pdf = buildPdf('BT (' + junk.trim() + ') Tj ET', false);
+  var text = analyzerExtractPdf(pdf);
+  assert.strictEqual(text, '', 'broken single-char encoding rejected so user is told to paste');
+});
+
+test('Ingestion: PDF quality gate rejects non-readable (high-byte) dominated output', function () {
+  var hi = '';
+  for (var i = 0; i < 200; i++) hi += String.fromCharCode(0xC0 + (i % 30));
+  var pdf = buildPdf('BT (' + hi + ') Tj ET', false);
+  var text = analyzerExtractPdf(pdf);
+  assert.strictEqual(text, '', 'high-byte garbage rejected');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
