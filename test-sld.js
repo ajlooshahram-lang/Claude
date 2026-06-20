@@ -8543,6 +8543,131 @@ test('Smoothness GUARD: core calc math is byte-identical after the UX pass (offi
   assert(Math.abs(ib3 - exp3) < 0.01, 'three-phase IB unchanged');
 });
 
+// ===== EXAM SYMBOL & ABBREVIATION REFERENCE MODULE ('ref') =====
+test('Ref module: renderRef returns non-empty content in da, en AND fa', function() {
+  var saved = lang;
+  ['da', 'en', 'fa'].forEach(function(L) {
+    lang = L; refState.cat = 'all';
+    var out = renderRef();
+    assert(typeof out === 'string' && out.length > 800, 'renderRef non-empty in ' + L + ' (len=' + (out ? out.length : 0) + ')');
+    assert(out.indexOf('<svg') >= 0, 'renderRef renders IEC 60617 symbols in ' + L);
+    assert(out.indexOf('DS/HD 60364') >= 0, 'renderRef cites DS/HD 60364 clauses in ' + L);
+  });
+  lang = saved;
+});
+
+test('Ref module: registered in render dispatch and reachable as a real module key', function() {
+  assert(typeof renderRef === 'function', 'renderRef is a function');
+  assert(renderModule.toString().indexOf("case 'ref'") >= 0, "renderModule dispatch has case 'ref'");
+  assert(renderModule.toString().indexOf('renderRef()') >= 0, 'dispatch calls renderRef()');
+  ['da', 'en', 'fa'].forEach(function(L) {
+    assert(T[L].modules.ref && T[L].modules.ref.length > 0, 'module label for ref in ' + L);
+  });
+});
+
+test('Ref module: appears in the Documentation & quality nav group', function() {
+  var docs = NAV_GROUPS.filter(function(g) { return g.id === 'docs'; })[0];
+  assert(docs && docs.keys.indexOf('ref') >= 0, 'ref placed in docs (Documentation & quality) group');
+  assert(navGroupForKey('ref') === 'docs', 'navGroupForKey maps ref -> docs');
+});
+
+test('Ref module: every abbreviation entry has da term, en term, Farsi (_FA) and a meaning', function() {
+  assert(Array.isArray(REF_ABBREV) && REF_ABBREV.length >= 40, 'REF_ABBREV is a substantial array, got ' + REF_ABBREV.length);
+  REF_ABBREV.forEach(function(e) {
+    assert(e.abbr && e.abbr.length > 0, 'abbr non-empty');
+    assert(e.termDa && e.termDa.length > 0, 'da term for ' + e.abbr);
+    assert(e.termEn && e.termEn.length > 0, 'en term for ' + e.abbr);
+    assert(e.fa && e.fa.length > 0, 'Farsi translation for ' + e.abbr);
+    assert(e.mDa && e.mDa.length > 0 && e.mEn && e.mEn.length > 0, 'da+en meaning for ' + e.abbr);
+    assert(REF_GROUPS.some(function(g) { return g.id === e.group; }), 'valid group for ' + e.abbr);
+  });
+});
+
+test('Ref module: abbreviation table covers the required exam short-names', function() {
+  var keys = REF_ABBREV.map(function(e) { return e.abbr; }).join(' | ');
+  ['IB', 'In', 'Ir', 'Isd', 'Iz', 'Iz_tab', 'Sf', 'cos\u03c6', 'Ik3max', 'Ik1min', 'SKN', 'Zs', 'Z1', 'U0', 'Un', 'Cmax', 'Cmin', 'uk%', 'Icu', 'Ics', 'Icn', 'I\u0394n', 'k\u00b2S\u00b2', 'P0', 'Pcu', 'Pb', 'gG', 'aM', 'MMS', 'TN-C', 'TN-S', 'TN-C-S', 'TT', 'IT', 'PE', 'PEN', 'N', 'SELV', 'PELV', 'FELV', '-T', '-W', '-F', '-A', '-M', '-G', '-Q', '-K'].forEach(function(a) {
+    assert(keys.indexOf(a) >= 0, 'abbreviation table covers ' + a);
+  });
+});
+
+test('Ref module: every IEC 60617 symbol entry yields a non-empty inline SVG', function() {
+  var keys = Object.keys(REF_SYMBOLS);
+  assert(keys.length >= 30, 'symbol superset has >=30 glyphs, got ' + keys.length);
+  keys.forEach(function(k) {
+    var s = REF_SYMBOLS[k];
+    assert(s.da && s.en && s.mDa && s.mEn, 'names + meaning for ' + k);
+    assert(typeof s.g === 'function', 'glyph function for ' + k);
+    var svg = s.g(0, 0);
+    assert(typeof svg === 'string' && svg.indexOf('<') >= 0 && svg.length > 10, 'non-empty SVG for ' + k);
+  });
+});
+
+test('Ref module: is 100% click-only (no <input>/<textarea>/prompt)', function() {
+  var saved = lang;
+  ['da', 'en', 'fa'].forEach(function(L) {
+    lang = L; refState.cat = 'all';
+    var out = renderRef();
+    assert(out.indexOf('<input') < 0, 'no <input> in ' + L);
+    assert(out.indexOf('<textarea') < 0, 'no <textarea> in ' + L);
+    assert(out.indexOf('prompt(') < 0, 'no prompt() in ' + L);
+    assert(out.indexOf('contenteditable') < 0, 'no contenteditable in ' + L);
+    REF_GROUPS.forEach(function(g) { refState.cat = g.id; assert(renderRef().indexOf('<input') < 0, 'no input in category ' + g.id); });
+  });
+  refState.cat = 'all';
+  lang = saved;
+});
+
+test('Ref module: introduces NO external resources (no remote src/href, no CDN)', function() {
+  var saved = lang; lang = 'da'; refState.cat = 'all';
+  var out = renderRef();
+  lang = saved;
+  assert(out.indexOf('src="http') < 0 && out.indexOf("src='http") < 0, 'no remote src');
+  assert(out.indexOf('href="http') < 0 && out.indexOf("href='http") < 0, 'no remote href');
+  assert(out.indexOf('//cdn') < 0 && out.toLowerCase().indexOf('cdnjs') < 0 && out.toLowerCase().indexOf('unpkg') < 0, 'no CDN reference');
+  assert(out.indexOf('<script') < 0, 'no injected <script>');
+});
+
+test('Single source: SLD_LEGEND derives from REF_SYMBOLS (same objects, no drift)', function() {
+  var legKeys = Object.keys(SLD_LEGEND);
+  assert(legKeys.length === 12, 'legend still exposes the 12 drawn symbols, got ' + legKeys.length);
+  legKeys.forEach(function(k) {
+    assert(REF_SYMBOLS[k], 'legend key ' + k + ' exists in REF_SYMBOLS superset');
+    assert(SLD_LEGEND[k] === REF_SYMBOLS[k], 'legend entry ' + k + ' IS the REF_SYMBOLS object (no copy/drift)');
+  });
+  assert(Object.keys(REF_SYMBOLS).length > legKeys.length, 'REF_SYMBOLS is a superset of the drawn legend');
+});
+
+test('Single source: GUIDE_GLOSSARY derives from REF_ABBREV (no drift)', function() {
+  var flagged = REF_ABBREV.filter(function(e) { return e.glossary; });
+  assert(flagged.length >= 8, 'at least 8 beginner terms flagged, got ' + flagged.length);
+  assert(GUIDE_GLOSSARY.length === flagged.length, 'glossary count == flagged abbrev count');
+  GUIDE_GLOSSARY.forEach(function(g) {
+    var match = flagged.some(function(e) { return g.termEn.indexOf(e.termEn) >= 0 && g.en === e.mEn; });
+    assert(match, 'glossary entry derives from a flagged REF_ABBREV: ' + g.termEn);
+  });
+});
+
+test('Ref module: cross-links from AI-Guider glossary AND drawing legend jump to ref', function() {
+  var saved = lang; lang = 'da';
+  var guide = renderGuide();
+  assert(guide.indexOf("switchModule('ref')") >= 0, 'AI-Guider glossary links to ref module');
+  var draw = renderDrawing();
+  assert(draw.indexOf("switchModule('ref')") >= 0, 'drawing legend links to ref module');
+  lang = saved;
+});
+
+test('Ref GUARD: core calc math is byte-identical after the reference addition (officialIz + IB regression)', function() {
+  var cu25 = { material: 'Cu', mm2: 2.5, model: '', iz: 999 };
+  assert.strictEqual(officialIz(cu25), 23, 'officialIz(Cu 2.5mm2 PVC) == 23A (Table C.52.1) unchanged');
+  var cu16 = { material: 'Cu', mm2: 16, model: '', iz: 1 };
+  assert.strictEqual(officialIz(cu16), 73, 'officialIz(Cu 16mm2 PVC) == 73A unchanged');
+  var ib1 = sldCalcNodeIB({ type: 'final_circuit', power_kW: 3.68, cosPhi: 0.95, phases: '1x230', voltage: 230 });
+  assert(Math.abs(ib1 - 16.84) < 0.05, 'IB regression ~16.84A unchanged, got ' + ib1.toFixed(2));
+  var ib3 = sldCalcNodeIB({ type: 'final_circuit', power_kW: 7.36, cosPhi: 0.95, phases: '3x400', voltage: 400 });
+  var exp3 = 7360 / (Math.sqrt(3) * 400 * 0.95);
+  assert(Math.abs(ib3 - exp3) < 0.01, 'three-phase IB unchanged');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
