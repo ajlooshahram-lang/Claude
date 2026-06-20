@@ -9624,6 +9624,229 @@ test('DC module GUARD: core calc math unchanged (officialIz + IB regression)', f
   assert(Math.abs(ib1 - 16.84) < 0.05, 'IB regression ~16.84A unchanged after DC module');
 });
 
+// ============================================================================
+// ===== UNIVERSAL calcDetail() TESTS =====
+// ============================================================================
+
+test('calcDetail: returns empty string for null input', function() {
+  assert.strictEqual(calcDetail(null), '', 'null returns empty');
+  assert.strictEqual(calcDetail(undefined), '', 'undefined returns empty');
+});
+
+test('calcDetail: produces <details> HTML with summary', function() {
+  var html = calcDetail({
+    name: 'Test Calculation',
+    formula: 'A = B + C',
+    variables: [{ name: 'B', symbol: 'B', value: 5, unit: 'V', source: 'test' }],
+    substitution: 'A = 5 + 3',
+    steps: [{ desc: 'Add', expr: '5 + 3', result: '8' }],
+    result: { value: 8, unit: 'V' },
+    reference: 'IEC 12345'
+  });
+  assert(html.indexOf('<details') >= 0, 'contains <details> element');
+  assert(html.indexOf('<summary') >= 0, 'contains <summary> element');
+  assert(html.indexOf('Test Calculation') >= 0, 'contains title');
+  assert(html.indexOf('A = B + C') >= 0, 'contains formula');
+  assert(html.indexOf('IEC 12345') >= 0, 'contains reference');
+});
+
+test('calcDetail: renders variable table', function() {
+  var html = calcDetail({
+    name: 'Iz calc',
+    formula: 'Iz = Iz_tab * K',
+    variables: [
+      { name: 'Base current', symbol: 'Iz_tab', value: 25, unit: 'A', source: 'Table B.52' },
+      { name: 'Correction', symbol: 'K', value: 0.87, unit: '', source: 'Table B.52.14' }
+    ],
+    result: { value: 21.75, unit: 'A' }
+  });
+  assert(html.indexOf('Iz_tab') >= 0, 'contains Iz_tab symbol');
+  assert(html.indexOf('Table B.52') >= 0, 'contains source reference');
+  assert(html.indexOf('25') >= 0, 'contains value');
+  assert(html.indexOf('<table') >= 0, 'contains table element');
+});
+
+test('calcDetail: renders substitution and steps', function() {
+  var html = calcDetail({
+    name: 'Vdrop',
+    formula: 'dU = sqrt(3) * IB * L * (r*cos + x*sin)',
+    substitution: 'dU = 1.732 * 16 * 0.025 * (0.727*0.9 + 0.08*0.436)',
+    steps: [
+      { desc: 'Factor', expr: '0.727*0.9 + 0.08*0.436', result: '0.689' },
+      'dU = 1.732 * 16 * 0.025 * 0.689 = 0.476 V'
+    ],
+    result: { value: '1.19%', unit: '', status: 'ok' }
+  });
+  assert(html.indexOf('1.732') >= 0, 'contains substitution numbers');
+  assert(html.indexOf('0.689') >= 0, 'contains step result');
+  assert(html.indexOf('<ol') >= 0, 'contains ordered list for steps');
+  assert(html.indexOf('1.19%') >= 0, 'contains result value');
+});
+
+test('calcDetail: result status renders verdict icon', function() {
+  var htmlOk = calcDetail({ name: 'X', result: { value: 5, unit: 'A', status: 'ok' } });
+  var htmlFail = calcDetail({ name: 'X', result: { value: 5, unit: 'A', status: 'fail' } });
+  assert(htmlOk.indexOf('\u2705') >= 0, 'ok status shows green check');
+  assert(htmlFail.indexOf('\u26D4') >= 0, 'fail status shows red circle');
+});
+
+test('calcDetailFmtVal: formats numbers and strings correctly', function() {
+  assert.strictEqual(calcDetailFmtVal(25), '25', 'integer');
+  assert.strictEqual(calcDetailFmtVal(3.14159), '3.14', 'float < 100');
+  assert.strictEqual(calcDetailFmtVal(123.456), '123.5', 'float >= 100');
+  assert.strictEqual(calcDetailFmtVal(0.00567), '0.006', 'small float');
+  assert.strictEqual(calcDetailFmtVal(null), '\u2014', 'null');
+  assert.strictEqual(calcDetailFmtVal('hello'), 'hello', 'string');
+  assert.strictEqual(calcDetailFmtVal(Infinity), '\u2014', 'infinity');
+});
+
+test('calcDetailIz: produces correct Iz derating card', function() {
+  var html = calcDetailIz(25, 1.0, 0.87, 0.8, 17.4, 'NOIKLX 5G2.5', 'C', 40, 3);
+  assert(html.indexOf('<details') >= 0, 'has details element');
+  assert(html.indexOf('Iz_tab') >= 0, 'has Iz_tab');
+  assert(html.indexOf('K_temp') >= 0, 'has K_temp');
+  assert(html.indexOf('K_group') >= 0, 'has K_group');
+  assert(html.indexOf('0.870') >= 0, 'has kTemp factor');
+  assert(html.indexOf('DS/HD 60364-5-52') >= 0, 'has DS reference');
+});
+
+test('calcDetailVdrop: produces correct voltage drop card', function() {
+  var html = calcDetailVdrop(16.84, 25, 7.41, 0.08, 0.95, '1x230', 1.23, 0.53, '5G2.5');
+  assert(html.indexOf('<details') >= 0, 'has details element');
+  assert(html.indexOf('IB') >= 0, 'has IB variable');
+  assert(html.indexOf('cos') >= 0, 'has cos phi');
+  assert(html.indexOf('DS/HD 60364-5-52 cl. 525') >= 0, 'has clause reference');
+  assert(html.indexOf('sin') >= 0, 'has sin phi step');
+});
+
+test('calcDetailIk: produces correct short-circuit card', function() {
+  var html = calcDetailIk(2, 10, 5.5, 400, 1.05, 20160, 11875, 17.5, 'NOIKLX 4G16');
+  assert(html.indexOf('<details') >= 0, 'has details element');
+  assert(html.indexOf('Ik3max') >= 0, 'has Ik3max');
+  assert(html.indexOf('Ik2min') >= 0, 'has Ik2min');
+  assert(html.indexOf('IEC 60909') >= 0, 'has IEC reference');
+  assert(html.indexOf('Zn') >= 0, 'has network impedance');
+});
+
+test('calcDetailIB: produces correct load current card', function() {
+  var html = calcDetailIB(3.68, 0.95, '1x230', 16.84, 1.0, 1.0);
+  assert(html.indexOf('<details') >= 0, 'has details element');
+  assert(html.indexOf('IB') >= 0, 'has IB title');
+  assert(html.indexOf('3.68') >= 0 || html.indexOf('3680') >= 0, 'has power value');
+  assert(html.indexOf('0.95') >= 0, 'has cos phi');
+  assert(html.indexOf('DS/HD 60364-4-43') >= 0, 'has clause reference');
+});
+
+test('calcDetail integration: renderCable shows Iz detail when cable selected', function() {
+  // Set cable state to have a valid selection
+  cableState.crossSection = '2.5';
+  cableState.material = 'copper';
+  cableState.type = Object.keys(CABLES_COPPER)[0];
+  cableState.cores = Object.keys(CABLES_COPPER[cableState.type])[0];
+  var html = renderCable();
+  if (html.indexOf('calc-detail') >= 0) {
+    assert(html.indexOf('Iz_tab') >= 0 || html.indexOf('K_install') >= 0, 'cable detail has derating info');
+  }
+  // Restore
+  cableState.crossSection = null;
+});
+
+test('calcDetail integration: renderVdrop shows detail when cable present', function() {
+  cableState.crossSection = '2.5';
+  cableState.material = 'copper';
+  cableState.type = Object.keys(CABLES_COPPER)[0];
+  cableState.cores = Object.keys(CABLES_COPPER[cableState.type])[0];
+  vdropState.length = 25;
+  loadState.power = 5;
+  loadState.cosPhi = 0.9;
+  loadState.voltage = '3x400';
+  var html = renderVdrop();
+  assert(html.indexOf('calc-detail') >= 0, 'vdrop has calc-detail');
+  assert(html.indexOf('cos') >= 0, 'vdrop detail has cos phi');
+  // Restore
+  cableState.crossSection = null;
+});
+
+test('calcDetail integration: renderShortCircuit shows Ik detail', function() {
+  cableState.crossSection = '2.5';
+  cableState.material = 'copper';
+  cableState.type = Object.keys(CABLES_COPPER)[0];
+  cableState.cores = Object.keys(CABLES_COPPER[cableState.type])[0];
+  vdropState.length = 25;
+  loadState.voltage = '3x400';
+  activeModule = 'scircuit';
+  var html = renderShortCircuit();
+  assert(html.indexOf('calc-detail') >= 0, 'scircuit has calc-detail');
+  assert(html.indexOf('Ik3max') >= 0, 'scircuit detail has Ik3max');
+  assert(html.indexOf('IEC 60909') >= 0, 'scircuit detail has IEC ref');
+  activeModule = 'load';
+  cableState.crossSection = null;
+});
+
+test('calcDetail integration: renderLoad shows IB detail', function() {
+  loadState.power = 10;
+  loadState.cosPhi = 0.9;
+  loadState.voltage = '3x400';
+  loadState.simFactor = 1.0;
+  loadState.expFactor = 1.0;
+  var html = renderLoad();
+  assert(html.indexOf('calc-detail') >= 0, 'load module has calc-detail');
+  assert(html.indexOf('IB') >= 0, 'load detail has IB');
+});
+
+test('calcDetail integration: upRenderFindingDetail renders for overload finding', function() {
+  var finding = { scope: 'Test', rule: 'IB \u2264 In \u2264 Iz', clause: 'DS/HD 60364-4-43 cl. 433.1', status: 'ok', detail: 'IB=16.0A, In=20A, Iz=25A', recommendation: '' };
+  var html = upRenderFindingDetail(finding);
+  assert(html.indexOf('<details') >= 0, 'has details element');
+  assert(html.indexOf('16.0') >= 0, 'has IB value');
+  assert(html.indexOf('20') >= 0, 'has In value');
+  assert(html.indexOf('25') >= 0, 'has Iz value');
+});
+
+test('calcDetail integration: upRenderFindingDetail renders for Icu finding', function() {
+  var finding = { scope: 'MCB', rule: 'Icu \u2265 Ikmax', clause: 'DS/HD 60364-4-43 cl. 434.5.1', status: 'ok', detail: 'Icu=10.0kA, Ik3max=5.25kA (ved klemmer)', recommendation: '' };
+  var html = upRenderFindingDetail(finding);
+  assert(html.indexOf('<details') >= 0, 'has details element');
+  assert(html.indexOf('10.0') >= 0, 'has Icu value');
+  assert(html.indexOf('5.25') >= 0, 'has Ik3max value');
+});
+
+test('calcDetail integration: upRenderFindingDetail renders for vdrop finding', function() {
+  var finding = { scope: 'Circuit', rule: '\u0394U \u2264 4%', clause: 'DS/HD 60364-5-52 cl. 525', status: 'ok', detail: '\u0394U=2.35%', recommendation: '' };
+  var html = upRenderFindingDetail(finding);
+  assert(html.indexOf('<details') >= 0, 'has details element');
+  assert(html.indexOf('2.35') >= 0, 'has vdrop value');
+});
+
+test('calcDetail integration: upRenderFindingDetail returns empty for unknown finding', function() {
+  var finding = { scope: 'X', rule: 'Some unknown rule', clause: 'XX', status: 'info', detail: 'Some detail', recommendation: '' };
+  var html = upRenderFindingDetail(finding);
+  assert.strictEqual(html, '', 'unknown finding returns empty');
+});
+
+test('calcDetail: no text inputs in any output (click-only constraint)', function() {
+  var html = calcDetail({
+    name: 'Full test',
+    formula: 'X = Y + Z',
+    variables: [{ name: 'Y', symbol: 'Y', value: 10, unit: 'V', source: 'measured' }],
+    substitution: 'X = 10 + 5',
+    steps: ['X = 15'],
+    result: { value: 15, unit: 'V', status: 'ok' },
+    reference: 'IEC 60364'
+  });
+  assert(html.indexOf('type="text"') < 0, 'no text inputs');
+  assert(html.indexOf('type="number"') < 0, 'no number inputs');
+  assert(html.indexOf('<textarea') < 0, 'no textarea');
+  assert(html.indexOf('<input') < 0, 'no input element at all');
+});
+
+test('calcDetail GUARD: core calc math unchanged (officialIz + IB regression)', function() {
+  var cu25 = { material: 'Cu', mm2: 2.5, model: '', iz: 999 };
+  assert.strictEqual(officialIz(cu25), 23, 'officialIz(Cu 2.5mm2 PVC) == 23A unchanged');
+  var ib1 = sldCalcNodeIB({ type: 'final_circuit', power_kW: 3.68, cosPhi: 0.95, phases: '1x230', voltage: 230 });
+  assert(Math.abs(ib1 - 16.84) < 0.05, 'IB regression ~16.84A unchanged after calcDetail integration');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

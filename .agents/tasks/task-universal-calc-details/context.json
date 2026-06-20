@@ -1,0 +1,17 @@
+{
+  "project_type": "Single-file HTML application (el-dimensionering.html)",
+  "language": "JavaScript (ES5-compatible, no external deps)",
+  "build_system": "None (single HTML file)",
+  "test_framework": "Custom headless test runner (test-sld.js, run with node)",
+  "build_command": "N/A",
+  "test_command": "node test-sld.js",
+  "verification_instructions": "Run node test-sld.js and ensure all tests pass (baseline: 1012 passed on feat/dc-ohm-solver). New tests must also pass.",
+  "setup_instructions": "No setup needed. Just edit el-dimensionering.html and test-sld.js.",
+  "environment_constraints": "LIFE-SAFETY CRITICAL app. Every formula must be correct. 100% CLICK-ONLY (no text inputs). Trilingual: Danish authoritative, English secondary, Farsi via _FA. Dark + light theme, RTL safe.",
+  "key_patterns": "Module uses provBuildProject/provBuildSegment for provenance. calcDetail() should produce <details> click-expandable elements. Must be generic enough for any module to use.",
+  "relevant_files": [
+    "/projects/sandbox/Claude/el-dimensionering.html",
+    "/projects/sandbox/Claude/test-sld.js"
+  ],
+  "directory_structure": "/projects/sandbox/Claude"
+}

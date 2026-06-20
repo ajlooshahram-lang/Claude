@@ -1,0 +1,7 @@
+{
+  "task_id": "task-universal-calc-details",
+  "task_description": "Create a universal calcDetail() helper that renders standardized calculation detail cards showing formula name, symbolic formula, variable table, numeric substitution, intermediate steps, result with unit, and DS/HD 60364 reference. Apply to core modules (cable sizing, voltage drop, short-circuit, kritisk audit).",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null
+}

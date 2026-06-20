@@ -5841,6 +5841,214 @@ function renderQiCard(qi) {
   return html;
 }
 
+// ============================================================================
+// ===== UNIVERSAL CALCULATION DETAIL HELPER (calcDetail) =====
+// ============================================================================
+// Generic function that renders a standardized "calculation detail card" showing:
+//   1. Formula name (title)
+//   2. Symbolic formula
+//   3. Variable table (name, symbol, value, unit, source)
+//   4. Numeric substitution line
+//   5. Intermediate steps (desc + expression + result)
+//   6. Final result with unit
+//   7. Reference (DS/HD 60364 clause or standard)
+//
+// Usage: calcDetail({ name, formula, variables, substitution, steps, result, reference })
+// Returns: HTML string with a <details> expandable card (click-only, no typing).
+//
+// This is the GENERIC building block. The provenance system (provRenderEntry)
+// is specialized for the unified-project auditor; calcDetail() is for ANY module.
+// ============================================================================
+
+function calcDetail(calc) {
+  if (!calc) return '';
+  var h = '<details class="calc-detail" style="margin-top:8px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">';
+  // Summary line
+  h += '<summary style="cursor:pointer;padding:8px 12px;background:var(--primary-glow);font-weight:600;font-size:0.85rem;display:flex;align-items:center;gap:6px">';
+  h += '<span style="flex:1">' + (calc.name || '') + '</span>';
+  if (calc.result && calc.result.value != null) {
+    h += '<span style="font-family:monospace;color:var(--primary)">' + calcDetailFmtVal(calc.result.value) + (calc.result.unit ? ' ' + calc.result.unit : '') + '</span>';
+  }
+  h += '<span style="color:var(--text-muted);font-size:0.75rem;white-space:nowrap">' + tx('vis udregning', 'show working') + ' \u25BC</span>';
+  h += '</summary>';
+  // Body
+  h += '<div style="padding:10px 14px;font-size:0.82rem">';
+  // Formula
+  if (calc.formula) {
+    h += '<div style="margin-bottom:6px"><strong>' + tx('Formel', 'Formula') + ':</strong> <code style="font-size:0.9em;background:var(--border-light);padding:2px 6px;border-radius:4px">' + calc.formula + '</code></div>';
+  }
+  // Variable table
+  if (calc.variables && calc.variables.length) {
+    h += '<div style="margin-bottom:6px"><strong>' + tx('Variable', 'Variables') + ':</strong></div>';
+    h += '<table style="width:100%;font-size:0.8rem;border-collapse:collapse;margin-bottom:8px">';
+    h += '<tr style="background:var(--border-light);font-weight:600"><td style="padding:3px 6px">' + tx('Navn', 'Name') + '</td><td style="padding:3px 6px">' + tx('Symbol', 'Symbol') + '</td><td style="padding:3px 6px">' + tx('V\u00E6rdi', 'Value') + '</td><td style="padding:3px 6px">' + tx('Kilde', 'Source') + '</td></tr>';
+    for (var vi = 0; vi < calc.variables.length; vi++) {
+      var v = calc.variables[vi];
+      h += '<tr style="border-bottom:1px solid var(--border-light)">';
+      h += '<td style="padding:3px 6px">' + (v.name || v.symbol || '') + '</td>';
+      h += '<td style="padding:3px 6px;font-family:monospace">' + (v.symbol || '') + '</td>';
+      h += '<td style="padding:3px 6px;font-family:monospace">' + calcDetailFmtVal(v.value) + (v.unit ? ' ' + v.unit : '') + '</td>';
+      h += '<td style="padding:3px 6px;color:var(--text-muted);font-size:0.78rem">' + (v.source || '') + '</td>';
+      h += '</tr>';
+    }
+    h += '</table>';
+  }
+  // Substitution line
+  if (calc.substitution) {
+    h += '<div style="margin-bottom:6px"><strong>' + tx('Inds\u00E6tning', 'Substitution') + ':</strong> <code style="font-family:monospace;font-size:0.88em">' + calc.substitution + '</code></div>';
+  }
+  // Intermediate steps
+  if (calc.steps && calc.steps.length) {
+    h += '<div style="margin-bottom:6px"><strong>' + tx('Mellemregninger', 'Intermediate steps') + ':</strong></div>';
+    h += '<ol style="margin:2px 0 8px 20px;padding:0">';
+    for (var si = 0; si < calc.steps.length; si++) {
+      var step = calc.steps[si];
+      if (typeof step === 'string') {
+        h += '<li style="font-family:monospace;margin-bottom:3px">' + step + '</li>';
+      } else {
+        h += '<li style="margin-bottom:3px">';
+        if (step.desc) h += '<span>' + step.desc + ': </span>';
+        if (step.expr) h += '<code style="font-family:monospace">' + step.expr + '</code>';
+        if (step.result != null) h += ' = <strong style="font-family:monospace">' + calcDetailFmtVal(step.result) + '</strong>';
+        h += '</li>';
+      }
+    }
+    h += '</ol>';
+  }
+  // Result
+  if (calc.result) {
+    h += '<div style="margin-top:6px;padding:6px 10px;background:var(--success-bg);border-radius:var(--radius-sm);font-weight:600">';
+    h += '<strong>' + tx('Resultat', 'Result') + ':</strong> ';
+    h += '<span style="font-family:monospace;font-size:1.05em">' + calcDetailFmtVal(calc.result.value) + (calc.result.unit ? ' ' + calc.result.unit : '') + '</span>';
+    if (calc.result.status) {
+      var stColor = calc.result.status === 'ok' ? 'var(--success)' : (calc.result.status === 'fail' ? 'var(--danger)' : 'var(--warning)');
+      var stIcon = calc.result.status === 'ok' ? '\u2705' : (calc.result.status === 'fail' ? '\u26D4' : '\u26A0\uFE0F');
+      h += ' <span style="color:' + stColor + ';margin-left:8px">' + stIcon + '</span>';
+    }
+    h += '</div>';
+  }
+  // Reference
+  if (calc.reference) {
+    h += '<div style="margin-top:6px;font-size:0.78rem;color:var(--text-muted)"><strong>' + tx('Reference', 'Reference') + ':</strong> ' + calc.reference + '</div>';
+  }
+  h += '</div></details>';
+  return h;
+}
+
+// Helper: format a numeric/string value for display
+function calcDetailFmtVal(v) {
+  if (v == null) return '\u2014';
+  if (typeof v === 'number') return isFinite(v) ? (Number.isInteger(v) ? String(v) : v.toFixed(v >= 100 ? 1 : (v >= 1 ? 2 : 3))) : '\u2014';
+  return String(v);
+}
+
+// Convenience: build a calcDetail object for cable Iz derating
+function calcDetailIz(baseIz, kInstall, kTemp, kGroup, correctedIz, cableDesc, installMethod, temp, grouping) {
+  return calcDetail({
+    name: tx('Str\u00F8mb\u00E6reevne Iz (derateret)', 'Current-carrying capacity Iz (derated)'),
+    formula: 'Iz = Iz_tab \u00B7 K_install \u00B7 K_temp \u00B7 K_group',
+    variables: [
+      { name: tx('Basisstr\u00F8m', 'Base current'), symbol: 'Iz_tab', value: baseIz, unit: 'A', source: 'DS/HD 60364-5-52 Table B.52.2\u2013B.52.5' },
+      { name: tx('Fremf\u00F8ringsmetode', 'Installation method'), symbol: 'K_install', value: kInstall, unit: '', source: 'Table B.52.2 (' + (installMethod || 'C') + ')' },
+      { name: tx('Temperaturkorrektion', 'Temperature correction'), symbol: 'K_temp', value: kTemp, unit: '', source: 'Table B.52.14 (' + (temp || 30) + '\u00B0C)' },
+      { name: tx('Grupperingsfaktor', 'Grouping factor'), symbol: 'K_group', value: kGroup, unit: '', source: 'Table B.52.17 (' + (grouping || 1) + ' ' + tx('kabler', 'cables') + ')' }
+    ],
+    substitution: 'Iz = ' + baseIz + ' \u00B7 ' + kInstall.toFixed(3) + ' \u00B7 ' + kTemp.toFixed(3) + ' \u00B7 ' + kGroup.toFixed(3),
+    steps: [
+      { desc: tx('Korrektionsfaktor total', 'Total correction factor'), expr: 'K = ' + kInstall.toFixed(3) + ' \u00D7 ' + kTemp.toFixed(3) + ' \u00D7 ' + kGroup.toFixed(3), result: (kInstall * kTemp * kGroup).toFixed(3) },
+      { desc: tx('Derateret Iz', 'Derated Iz'), expr: baseIz + ' \u00D7 ' + (kInstall * kTemp * kGroup).toFixed(3), result: correctedIz.toFixed(1) + ' A' }
+    ],
+    result: { value: correctedIz, unit: 'A' },
+    reference: 'DS/HD 60364-5-52 cl. 523, Table B.52.2\u2013B.52.17 \u00B7 ' + tx('Kabel', 'Cable') + ': ' + (cableDesc || '')
+  });
+}
+
+// Convenience: build a calcDetail object for voltage drop
+function calcDetailVdrop(ib, length_m, r, x, cosPhi, voltage, vdrop, vdropPercent, cableDesc) {
+  var is3 = (voltage === '3x400' || voltage === 400);
+  var Un = is3 ? 400 : 230;
+  var sinPhi = Math.sqrt(1 - cosPhi * cosPhi);
+  var formulaStr = is3 ? '\u0394U = \u221A3 \u00B7 IB \u00B7 L \u00B7 (r\u00B7cos\u03C6 + x\u00B7sin\u03C6)' : '\u0394U = 2 \u00B7 IB \u00B7 L \u00B7 (r\u00B7cos\u03C6 + x\u00B7sin\u03C6)';
+  var prefix = is3 ? '\u221A3' : '2';
+  var L_km = length_m / 1000;
+  return calcDetail({
+    name: tx('Sp\u00E6ndingsfald \u0394U%', 'Voltage drop \u0394U%'),
+    formula: formulaStr + '\n\u0394U% = (\u0394U / Un) \u00D7 100',
+    variables: [
+      { name: tx('Belastningsstr\u00F8m', 'Load current'), symbol: 'IB', value: ib, unit: 'A', source: tx('beregnet fra last', 'computed from load') },
+      { name: tx('Kabelhovedl\u00E6ngde', 'Cable length'), symbol: 'L', value: length_m, unit: 'm', source: tx('valgt', 'selected') },
+      { name: tx('Resistans', 'Resistance'), symbol: 'r', value: r, unit: '\u03A9/km', source: tx('kabeltabel', 'cable table') },
+      { name: tx('Reaktans', 'Reactance'), symbol: 'x', value: x, unit: '\u03A9/km', source: tx('kabeltabel', 'cable table') },
+      { name: tx('Effektfaktor', 'Power factor'), symbol: 'cos\u03C6', value: cosPhi, unit: '', source: tx('valgt', 'selected') },
+      { name: tx('Nominel sp\u00E6nding', 'Nominal voltage'), symbol: 'Un', value: Un, unit: 'V', source: tx('systemsp\u00E6nding', 'system voltage') }
+    ],
+    substitution: '\u0394U = ' + prefix + ' \u00D7 ' + ib.toFixed(1) + ' \u00D7 ' + L_km.toFixed(3) + ' \u00D7 (' + r + '\u00D7' + cosPhi.toFixed(2) + ' + ' + x + '\u00D7' + sinPhi.toFixed(3) + ')',
+    steps: [
+      { desc: 'sin\u03C6', expr: 'sin(arccos(' + cosPhi.toFixed(2) + '))', result: sinPhi.toFixed(4) },
+      { desc: 'r\u00B7cos\u03C6 + x\u00B7sin\u03C6', expr: r + '\u00D7' + cosPhi.toFixed(2) + ' + ' + x + '\u00D7' + sinPhi.toFixed(3), result: (r * cosPhi + x * sinPhi).toFixed(4) + ' \u03A9/km' },
+      { desc: '\u0394U', expr: prefix + ' \u00D7 ' + ib.toFixed(1) + ' \u00D7 ' + L_km.toFixed(3) + ' \u00D7 ' + (r * cosPhi + x * sinPhi).toFixed(4), result: vdrop.toFixed(2) + ' V' },
+      { desc: '\u0394U%', expr: '(' + vdrop.toFixed(2) + ' / ' + Un + ') \u00D7 100', result: vdropPercent.toFixed(2) + ' %' }
+    ],
+    result: { value: vdropPercent.toFixed(2) + '%', unit: '(' + vdrop.toFixed(2) + ' V)', status: vdropPercent <= 4 ? 'ok' : (vdropPercent <= 5 ? 'warning' : 'fail') },
+    reference: 'DS/HD 60364-5-52 cl. 525 \u00B7 ' + tx('Gr\u00E6nse', 'Limit') + ': 4% (' + tx('belysning', 'lighting') + ' 3%, ' + tx('absolut', 'absolute') + ' 5%) \u00B7 ' + (cableDesc || '')
+  });
+}
+
+// Convenience: build a calcDetail object for short-circuit calculations
+function calcDetailIk(zNet, zTrafo, zCable, Un, cFactor, ikMax3ph, ikMin2ph, zTotal, cableDesc) {
+  var is3 = (Un === 400);
+  return calcDetail({
+    name: tx('Kortslutningsstr\u00F8m Ik', 'Short-circuit current Ik'),
+    formula: 'Ik3max = c \u00B7 Un / (\u221A3 \u00B7 Zt)\nIk2min = 0.95 \u00B7 Un / (2 \u00B7 Zt)',
+    variables: [
+      { name: tx('Netimpedans', 'Network impedance'), symbol: 'Zn', value: zNet, unit: 'm\u03A9', source: tx('forsyningsnet', 'supply network') },
+      { name: tx('Trafoimpedans', 'Transformer impedance'), symbol: 'Zt', value: zTrafo, unit: 'm\u03A9', source: tx('transformer uk%', 'transformer uk%') },
+      { name: tx('Kabelimpedans', 'Cable impedance'), symbol: 'Zk', value: zCable.toFixed(2), unit: 'm\u03A9', source: tx('kabel r,x + l\u00E6ngde', 'cable r,x + length') },
+      { name: tx('Sp\u00E6ndingsfaktor c', 'Voltage factor c'), symbol: 'c', value: cFactor, unit: '', source: 'IEC 60909-0' },
+      { name: tx('Nominel sp\u00E6nding', 'Nominal voltage'), symbol: 'Un', value: Un, unit: 'V', source: tx('systemsp\u00E6nding', 'system voltage') }
+    ],
+    substitution: 'Ik3max = ' + cFactor + ' \u00D7 ' + Un + ' / (\u221A3 \u00D7 ' + (zNet + zTrafo).toFixed(1) + ' m\u03A9)\nIk2min = 0.95 \u00D7 ' + Un + ' / (2 \u00D7 ' + zTotal.toFixed(1) + ' m\u03A9)',
+    steps: [
+      { desc: tx('Total impedans (tavle)', 'Total impedance (board)'), expr: 'Zt_board = ' + zNet + ' + ' + zTrafo + ' = ' + (zNet + zTrafo).toFixed(1) + ' m\u03A9', result: (zNet + zTrafo).toFixed(1) + ' m\u03A9' },
+      { desc: tx('Total impedans (ende)', 'Total impedance (far end)'), expr: 'Zt = ' + zNet + ' + ' + zTrafo + ' + ' + zCable.toFixed(2) + ' = ' + zTotal.toFixed(2) + ' m\u03A9', result: zTotal.toFixed(2) + ' m\u03A9' },
+      { desc: 'Ik3max (3-' + tx('faset', 'phase') + ')', expr: cFactor + ' \u00D7 ' + Un + ' / (\u221A3 \u00D7 ' + ((zNet + zTrafo) / 1000).toFixed(4) + ')', result: (ikMax3ph / 1000).toFixed(2) + ' kA' },
+      { desc: 'Ik2min (2-' + tx('faset', 'phase') + ', ' + tx('enden', 'far end') + ')', expr: '0.95 \u00D7 ' + Un + ' / (2 \u00D7 ' + (zTotal / 1000).toFixed(4) + ')', result: ikMin2ph.toFixed(0) + ' A' }
+    ],
+    result: { value: 'Ik3max=' + (ikMax3ph / 1000).toFixed(2) + ' kA, Ik2min=' + ikMin2ph.toFixed(0) + ' A', unit: '' },
+    reference: 'IEC 60909-0 \u00B7 DS/HD 60364-4-43 cl. 434 \u00B7 ' + (cableDesc || '')
+  });
+}
+
+// Convenience: build a calcDetail object for load current IB
+function calcDetailIB(power_kW, cosPhi, voltage, ib, sf, ef) {
+  var is3 = (voltage === '3x400');
+  var Un = is3 ? 400 : 230;
+  var formulaStr = is3 ? 'IB = P / (\u221A3 \u00B7 U \u00B7 cos\u03C6) \u00B7 SF \u00B7 EF' : 'IB = P / (U \u00B7 cos\u03C6) \u00B7 SF \u00B7 EF';
+  var P_W = power_kW * 1000;
+  var prefix = is3 ? '(\u221A3 \u00D7 ' + Un + ' \u00D7 ' + cosPhi.toFixed(2) + ')' : '(' + Un + ' \u00D7 ' + cosPhi.toFixed(2) + ')';
+  var denominator = is3 ? (Math.sqrt(3) * Un * cosPhi) : (Un * cosPhi);
+  var ibBase = P_W / denominator;
+  return calcDetail({
+    name: tx('Belastningsstr\u00F8m IB', 'Load current IB'),
+    formula: formulaStr,
+    variables: [
+      { name: tx('Effekt', 'Power'), symbol: 'P', value: power_kW, unit: 'kW', source: tx('valgt last', 'selected load') },
+      { name: tx('Sp\u00E6nding', 'Voltage'), symbol: 'U', value: Un, unit: 'V', source: tx('systemsp\u00E6nding', 'system voltage') },
+      { name: tx('Effektfaktor', 'Power factor'), symbol: 'cos\u03C6', value: cosPhi, unit: '', source: tx('valgt', 'selected') },
+      { name: tx('Samtidighedsfaktor', 'Simultaneity factor'), symbol: 'SF', value: sf || 1, unit: '', source: tx('valgt', 'selected') },
+      { name: tx('Udviddelsesfaktor', 'Expansion factor'), symbol: 'EF', value: ef || 1, unit: '', source: tx('valgt', 'selected') }
+    ],
+    substitution: 'IB = ' + P_W + ' W / ' + prefix + (sf !== 1 ? ' \u00D7 ' + sf : '') + (ef !== 1 ? ' \u00D7 ' + ef : ''),
+    steps: [
+      { desc: tx('N\u00E6vner', 'Denominator'), expr: prefix, result: denominator.toFixed(1) },
+      { desc: tx('Basisstr\u00F8m', 'Base current'), expr: P_W + ' / ' + denominator.toFixed(1), result: ibBase.toFixed(2) + ' A' },
+      { desc: tx('Med faktorer', 'With factors'), expr: ibBase.toFixed(2) + (sf !== 1 ? ' \u00D7 ' + sf : '') + (ef !== 1 ? ' \u00D7 ' + ef : ''), result: ib.toFixed(2) + ' A' }
+    ],
+    result: { value: ib, unit: 'A' },
+    reference: 'DS/HD 60364-4-43 cl. 433.1'
+  });
+}
+
 // ===== LOAD MODULE =====
 function renderLoad() {
   const ib = calcIB();
@@ -5924,6 +6132,7 @@ function renderLoad() {
         <div class="result-row"><span class="label">${t('voltage')}</span><span class="value">${loadState.voltage} V</span></div>
         <div class="result-row"><span class="label">${t('powerFactor')}</span><span class="value">${loadState.cosPhi}</span></div>
       </div>
+      ${calcDetailIB(loadState.power, loadState.cosPhi, loadState.voltage, ib, loadState.simFactor, loadState.expFactor)}
     </div>
 
     ${renderRecommendations(lang === 'da' ? 'Anbefalede kabler til IB = ' + ib.toFixed(1) + ' A' : 'Recommended cables for IB = ' + ib.toFixed(1) + ' A', recommendCables(ib), 'cable')}
@@ -6293,6 +6502,7 @@ function renderCable() {
         <div class="result-row"><span class="label">K (total)</span><span class="value">${kTotal.toFixed(3)}</span></div>
         <div class="result-row"><span class="label">${t('cableIz')} (${tx('korrigeret', 'corrected')})</span><span class="value">${correctedIz.toFixed(1)} A</span></div>
       </div>
+      ${calcDetailIz(baseIz, kInstall, kTemp, kGroup, correctedIz, cableState.type + ' ' + cableState.cores + ' ' + cableState.crossSection + ' mm\u00B2', cableState.installMethod, cableState.temp, cableState.grouping)}
     </div>
     ` : ''}
   `;
@@ -6363,9 +6573,10 @@ function renderVdrop() {
         <div class="result-row"><span class="label">${t('vdropPercent')}</span><span class="value">${vdropPercent.toFixed(2)} %</span></div>
         <div class="result-row"><span class="label">${t('vdropRemaining')}</span><span class="value">${(Un - vdrop).toFixed(1)} V</span></div>
         <div class="result-row"><span class="label">${t('vdropLimit')}</span><span class="value">${isOk ? '\u2713' : '\u2717'}</span></div>
-        <div class="result-row"><span class="label">${tx('Belysning ≤3%', 'Lighting ≤3%')}</span><span class="value"><span class="verify-badge ${isLighting ? 'ok' : 'fail'}">${isLighting ? (tx('OK', 'OK')) : (tx('Over 3%', 'Over 3%'))}</span></span></div>
-        <div class="result-row"><span class="label">${tx('Andre ≤5%', 'Other ≤5%')}</span><span class="value"><span class="verify-badge ${vdropPercent <= 5 ? 'ok' : 'fail'}">${vdropPercent <= 5 ? 'OK' : (tx('Over 5%', 'Over 5%'))}</span></span></div>
+        <div class="result-row"><span class="label">${tx('Belysning \u22643%', 'Lighting \u22643%')}</span><span class="value"><span class="verify-badge ${isLighting ? 'ok' : 'fail'}">${isLighting ? (tx('OK', 'OK')) : (tx('Over 3%', 'Over 3%'))}</span></span></div>
+        <div class="result-row"><span class="label">${tx('Andre \u22645%', 'Other \u22645%')}</span><span class="value"><span class="verify-badge ${vdropPercent <= 5 ? 'ok' : 'fail'}">${vdropPercent <= 5 ? 'OK' : (tx('Over 5%', 'Over 5%'))}</span></span></div>
       </div>
+      ${calcDetailVdrop(calcIB(), vdropState.length, selectedCable.r, selectedCable.x, loadState.cosPhi, loadState.voltage, vdrop, vdropPercent, cableState.type + ' ' + cableState.crossSection + ' mm\u00B2 \u00D7 ' + vdropState.length + ' m')}
     </div>
     ` : ''}
   `;
@@ -6500,11 +6711,10 @@ function renderShortCircuit() {
         <div class="result-row"><span class="label">${tx('V\u00E6lg beskyttelsesenhed (MCB/MCCB) for kontrolberegning', 'Select protection device (MCB/MCCB) for verification')}</span></div>
       </div>
       `}
+      ${calcDetailIk(scState.zNet, scState.zTrafo, zCable, Un, cFactor, ikMax3ph, ikMin2ph, zTotal, selectedCable ? (cableState.type + ' ' + cableState.crossSection + ' mm\u00B2 \u00D7 ' + vdropState.length + ' m') : '')}
     </div>
   `;
-}
-
-// ===== TRANSFORMER MODULE =====
+}// ===== TRANSFORMER MODULE =====
 // Data from 1.-Dim-af-trafo.ppx.pptx
 let trafoState = { size: 400, voltage: '10/0.4', loadPercent: 75 };
 
@@ -19331,6 +19541,97 @@ function renderKritisk() {
   return h;
 }
 
+// Per-finding inline calculation detail for the kritisk audit.
+// Uses calcDetail() to render the relevant formula/substitution for each finding type.
+function upRenderFindingDetail(finding) {
+  if (!finding || !finding.detail) return '';
+  var rule = finding.rule || '';
+  var detail = finding.detail || '';
+  var clause = finding.clause || '';
+
+  // Parse numbers from finding detail for display
+  // IB <= In <= Iz check
+  if (rule.indexOf('IB') >= 0 && rule.indexOf('In') >= 0 && rule.indexOf('Iz') >= 0) {
+    var m = detail.match(/IB=([\d.]+)A.*In=([\d.]+)A.*Iz=([\d.]+)A/);
+    if (m) {
+      return calcDetail({
+        name: tx('Overbelastningskontrol', 'Overload coordination'),
+        formula: 'IB \u2264 In \u2264 Iz',
+        variables: [
+          { symbol: 'IB', value: m[1], unit: 'A', source: tx('beregnet last', 'computed load') },
+          { symbol: 'In', value: m[2], unit: 'A', source: tx('beskyttelsesapparat', 'protective device') },
+          { symbol: 'Iz', value: m[3], unit: 'A', source: 'officialIz (DS/HD 60364-5-52)' }
+        ],
+        substitution: m[1] + ' A \u2264 ' + m[2] + ' A \u2264 ' + m[3] + ' A',
+        steps: [
+          { desc: 'IB \u2264 In', expr: m[1] + ' \u2264 ' + m[2], result: parseFloat(m[1]) <= parseFloat(m[2]) ? '\u2713' : '\u2717' },
+          { desc: 'In \u2264 Iz', expr: m[2] + ' \u2264 ' + m[3], result: parseFloat(m[2]) <= parseFloat(m[3]) ? '\u2713' : '\u2717' }
+        ],
+        result: { value: detail, status: finding.status === 'ok' ? 'ok' : 'fail' },
+        reference: clause
+      });
+    }
+  }
+  // Icu check
+  if (rule.indexOf('Icu') >= 0) {
+    var mi = detail.match(/Icu=([\d.]+)kA.*Ik3max=([\d.]+)kA/);
+    if (mi) {
+      return calcDetail({
+        name: tx('Brydeevne', 'Breaking capacity'),
+        formula: 'Icu \u2265 Ik3max',
+        variables: [
+          { symbol: 'Icu', value: mi[1], unit: 'kA', source: tx('apparat datablad', 'device datasheet') },
+          { symbol: 'Ik3max', value: mi[2], unit: 'kA', source: 'IEC 60909-0 (c=1.05)' }
+        ],
+        substitution: mi[1] + ' kA \u2265 ' + mi[2] + ' kA',
+        steps: [{ desc: tx('Kontrol', 'Check'), expr: mi[1] + ' \u2265 ' + mi[2], result: parseFloat(mi[1]) >= parseFloat(mi[2]) ? '\u2713 OK' : '\u2717 FAIL' }],
+        result: { value: detail, status: finding.status === 'ok' ? 'ok' : 'fail' },
+        reference: clause
+      });
+    }
+  }
+  // Voltage drop
+  if (rule.indexOf('\u0394U') >= 0 || rule.indexOf('U \u2264') >= 0) {
+    var mv = detail.match(/\u0394U=([\d.]+)%/);
+    if (mv) {
+      return calcDetail({
+        name: tx('Sp\u00E6ndingsfald', 'Voltage drop'),
+        formula: '\u0394U% \u2264 4% (' + tx('belysning', 'lighting') + ' \u2264 3%)',
+        variables: [{ symbol: '\u0394U%', value: mv[1], unit: '%', source: tx('beregnet', 'computed') }],
+        substitution: '\u0394U% = ' + mv[1] + '%',
+        steps: [{ desc: tx('Kontrol mod gr\u00E6nse', 'Check against limit'), expr: mv[1] + '% \u2264 4%', result: parseFloat(mv[1]) <= 4 ? '\u2713 OK' : '\u2717' }],
+        result: { value: mv[1] + '%', status: finding.status === 'ok' ? 'ok' : (finding.status === 'warning' ? 'warning' : 'fail') },
+        reference: clause
+      });
+    }
+  }
+  // Disconnection Zs.Ia
+  if (rule.indexOf('Zs') >= 0 && (rule.indexOf('Ia') >= 0 || rule.indexOf('I\u0394n') >= 0)) {
+    return calcDetail({
+      name: tx('Fejlbeskyttelse (udkobling)', 'Fault protection (disconnection)'),
+      formula: rule,
+      variables: [],
+      substitution: detail,
+      steps: [detail],
+      result: { value: detail, status: finding.status === 'ok' ? 'ok' : 'fail' },
+      reference: clause
+    });
+  }
+  // Ik info
+  if (rule.indexOf('Ik3max') >= 0 || rule.indexOf('Ik1min') >= 0) {
+    return calcDetail({
+      name: rule,
+      formula: rule.indexOf('Ik3max') >= 0 ? 'Ik3max = c \u00B7 U / (\u221A3 \u00B7 Z1)' : 'Ik1min = c \u00B7 U0 / (Zs \u00B7 1.5)',
+      variables: [],
+      substitution: detail,
+      steps: [detail],
+      result: { value: detail },
+      reference: clause
+    });
+  }
+  return '';
+}
+
 function upRenderAudit(audit) {
   const meta = upVerdictMeta(audit.verdict);
   let h = '<div class="result-box" style="margin-top:12px;border-left:6px solid ' + meta.color + '">';
@@ -19347,6 +19648,8 @@ function upRenderAudit(audit) {
       h += '<span style="font-size:0.78rem">' + f.detail + '</span>';
       h += '<span style="font-size:0.72rem;color:var(--text-muted)">' + f.clause + '</span>';
       if (f.recommendation) h += '<span style="font-size:0.74rem;color:var(--primary)">\u2192 ' + tx('Anbefaling', 'Recommendation') + ': ' + f.recommendation + '</span>';
+      // Per-finding calculation detail (inline expandable)
+      h += upRenderFindingDetail(f);
       h += '</div>';
     });
   });
