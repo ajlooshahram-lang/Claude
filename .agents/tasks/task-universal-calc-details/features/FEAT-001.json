@@ -1,0 +1,35 @@
+{
+  "id": "FEAT-001",
+  "type": "feature",
+  "description": "Universal calcDetail() helper function that renders standardized calculation detail cards, plus integration into core modules (cable sizing, voltage drop, short-circuit, kritisk audit).",
+  "status": "in_progress",
+  "steps": [
+    "Create calcDetail(calc) function that accepts a structured calculation object and returns an HTML string with <details> expandable cards",
+    "The calc object structure: { name, formula, variables: [{name, symbol, value, unit, source}], substitution, steps: [{desc, expr, result}], result: {value, unit}, reference }",
+    "Output format: formula name header, symbolic formula, variable table, numeric substitution line, intermediate steps, final result with unit, and reference clause",
+    "Integrate calcDetail() into cable sizing (officialIz, derating chain Iz = Iz_tab*Ca*Cg*Ci)",
+    "Integrate calcDetail() into voltage drop (deltaU% formula)",
+    "Integrate calcDetail() into short-circuit (Ik3max, Ik1min, ZT calculations)",
+    "Integrate calcDetail() into kritisk audit findings (show full substitution for each finding)",
+    "Add tests verifying calcDetail() produces correct HTML output",
+    "Add tests verifying the integration returns proper detail cards for each module"
+  ],
+  "acceptance_criteria": [
+    "calcDetail() function exists and is generic/reusable",
+    "Produces <details> expandable HTML with formula, variables table, substitution, steps, result, reference",
+    "Cable sizing module shows full derating calculation details",
+    "Voltage drop module shows full deltaU% calculation details",
+    "Short-circuit module shows full Ik3/Ik1/ZT calculation details",
+    "Kritisk audit shows full calculation substitution for each finding",
+    "All existing 1012 tests still pass",
+    "New tests verify calcDetail() output format and module integration",
+    "Click-only interface maintained (no text inputs introduced)",
+    "Trilingual support in detail cards"
+  ],
+  "verification": [
+    "node test-sld.js passes with 0 failures",
+    "calcDetail() output contains <details>, <summary>, variable tables, and formula substitutions"
+  ],
+  "blocked_reason": null,
+  "findings": null
+}
