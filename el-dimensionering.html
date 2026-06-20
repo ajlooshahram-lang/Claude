@@ -979,7 +979,9 @@ const T = {
       kritisk: '\uD83E\uDDE0 Projekt + Kritisk Hjerne',
       impedans: 'AC Impedans',
       trefase: '3-faset Beregner',
-      motorteori: 'Motorteori'
+      motorteori: 'Motorteori',
+      relay: 'HV Rele',
+      fault: 'Fejlberegning'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1125,7 +1127,9 @@ const T = {
       kritisk: '\uD83E\uDDE0 Project + Critical Mind',
       impedans: 'AC Impedance',
       trefase: '3-Phase Calculator',
-      motorteori: 'Motor Theory'
+      motorteori: 'Motor Theory',
+      relay: 'HV Relay',
+      fault: 'Fault Calculation'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -1263,7 +1267,9 @@ const T = {
       kritisk: '\uD83E\uDDE0 پروژه + ذهن انتقادی',
       impedans: 'امپدانس AC',
       trefase: 'محاسبه سه‌فاز',
-      motorteori: 'تئوری موتور'
+      motorteori: 'تئوری موتور',
+      relay: 'رله HV',
+      fault: 'محاسبه خطا'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -3418,6 +3424,8 @@ const REACTIVE_LINKS = {
   scircuit: ['zs','arcflash','discrim'],
   trafo:    ['scircuit','zs','arcflash','generator','energy'],
   earthsys: ['zs','scircuit','bathroom','pool','agri'],
+  relay: ['trafo','fuse','discrim'],
+  fault: ['zs','earthsys','scircuit'],
   zs:       ['arcflash'],
   thermal:  ['cablelife'],
   motor:    ['vfd','pfc','harmonic'],
@@ -4341,7 +4349,7 @@ const NAV_GROUPS = [
     da: 'Beskyttelse & jording', en: 'Protection & earthing', fa: '\u062D\u0641\u0627\u0638\u062A \u0648 \u0627\u062A\u0635\u0627\u0644 \u0632\u0645\u06CC\u0646',
     descDa: 'Hvordan mennesker og udstyr beskyttes mod st\u00F8d, overspaending og lysbue \u2014 og s\u00E6rlige omr\u00E5der med skrappere krav (bad, pool, byggeplads, landbrug, Ex).',
     descEn: 'How people and equipment are protected from shock, surges and arc flash \u2014 plus special locations with stricter rules (bathroom, pool, site, agriculture, Ex).',
-    keys: ['earthsys', 'spd', 'arcflash', 'bathroom', 'pool', 'construction', 'agri', 'atex']
+    keys: ['relay', 'fault', 'earthsys', 'spd', 'arcflash', 'bathroom', 'pool', 'construction', 'agri', 'atex']
   },
   {
     id: 'apps', icon: '\uD83D\uDD0C',
@@ -5762,6 +5770,8 @@ function renderModule(mod) {
     case 'impedans': content = renderImpedans(); break;
     case 'trefase': content = renderTrefase(); break;
     case 'motorteori': content = renderMotorteori(); break;
+    case 'relay': content = renderRelay(); break;
+    case 'fault': content = renderFault(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -21219,6 +21229,605 @@ function renderMotorteori() {
   html += '</div>';
   return html;
 }
+// ===== HV RELAY PROTECTION MODULE =====
+// Covers Opgave 1: transformer relay settings, inrush current coordination,
+// Ganzbereich (full-range) HV fuse selection per DS/HD 60364 + IEC 60255
+
+var relayState = {
+  relayType: 'definite',
+  trafoKVA: 630,
+  primaryKV: 10,
+  secondaryV: 400,
+  Igt: 5,
+  tGt: 0.5,
+  Igg: 20,
+  tGg: 0.1,
+  egentid: 0.04,
+  fuseType: 'gg63'
+};
+
+var RELAY_TRAFO_PRESETS = [100, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500];
+
+var RELAY_HV_FUSES = {
+  gg6:    { rating: 6,    Imin: 12,   Imax: 800,   da: '6A Ganzbereich',    en: '6A Full-range' },
+  gg10:   { rating: 10,   Imin: 24,   Imax: 1250,  da: '10A Ganzbereich',   en: '10A Full-range' },
+  gg16:   { rating: 16,   Imin: 38,   Imax: 2000,  da: '16A Ganzbereich',   en: '16A Full-range' },
+  gg20:   { rating: 20,   Imin: 48,   Imax: 2500,  da: '20A Ganzbereich',   en: '20A Full-range' },
+  gg25:   { rating: 25,   Imin: 60,   Imax: 3150,  da: '25A Ganzbereich',   en: '25A Full-range' },
+  gg31:   { rating: 31.5, Imin: 75,   Imax: 3150,  da: '31.5A Ganzbereich', en: '31.5A Full-range' },
+  gg40:   { rating: 40,   Imin: 96,   Imax: 4000,  da: '40A Ganzbereich',   en: '40A Full-range' },
+  gg50:   { rating: 50,   Imin: 120,  Imax: 5000,  da: '50A Ganzbereich',   en: '50A Full-range' },
+  gg63:   { rating: 63,   Imin: 152,  Imax: 6300,  da: '63A Ganzbereich',   en: '63A Full-range' },
+  gg80:   { rating: 80,   Imin: 192,  Imax: 8000,  da: '80A Ganzbereich',   en: '80A Full-range' },
+  gg100:  { rating: 100,  Imin: 240,  Imax: 10000, da: '100A Ganzbereich',  en: '100A Full-range' },
+  gg125:  { rating: 125,  Imin: 300,  Imax: 12500, da: '125A Ganzbereich',  en: '125A Full-range' },
+  gg160:  { rating: 160,  Imin: 384,  Imax: 16000, da: '160A Ganzbereich',  en: '160A Full-range' },
+  gg200:  { rating: 200,  Imin: 480,  Imax: 20000, da: '200A Ganzbereich',  en: '200A Full-range' }
+};
+
+var RELAY_IGT_PRESETS = [3, 4, 5, 6, 7, 8, 10, 12, 15, 20];
+var RELAY_TGT_PRESETS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0, 1.5, 2.0, 3.0, 5.0];
+var RELAY_IGG_PRESETS = [10, 12, 15, 20, 25, 30, 40, 50];
+var RELAY_TGG_PRESETS = [0.0, 0.05, 0.1, 0.15, 0.2, 0.3];
+var RELAY_EGENTID_PRESETS = [0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.10];
+
+function relayCalcI1N(kva, kv) {
+  return (kva * 1000) / (Math.sqrt(3) * kv * 1000);
+}
+
+function relayCalcInrush(I1N) {
+  return { Imin: 12 * I1N, Imax: 15 * I1N, duration: 0.1 };
+}
+
+function relayCalcPickup(I1N, Igt) {
+  return Igt * I1N;
+}
+
+function relayCalcInstant(I1N, Igg) {
+  return Igg * I1N;
+}
+
+function relayCheckCoordination(tGt, egentid, inrushDuration) {
+  var totalRelayTime = tGt;
+  var requiredTime = inrushDuration + egentid;
+  return { totalRelayTime: totalRelayTime, requiredTime: requiredTime, coordinated: totalRelayTime > requiredTime };
+}
+
+function relayCheckFuseCoordination(fuseKey, I1N) {
+  var fuse = RELAY_HV_FUSES[fuseKey];
+  if (!fuse) return { ok: false, reason: 'Unknown fuse' };
+  return { ok: fuse.rating >= I1N, fuseRating: fuse.rating, I1N: I1N, Imin: fuse.Imin, Imax: fuse.Imax };
+}
+
+function renderRelay() {
+  var I1N = relayCalcI1N(relayState.trafoKVA, relayState.primaryKV);
+  var inrush = relayCalcInrush(I1N);
+  var Ipickup = relayCalcPickup(I1N, relayState.Igt);
+  var Iinstant = relayCalcInstant(I1N, relayState.Igg);
+  var coord = relayCheckCoordination(relayState.tGt, relayState.egentid, inrush.duration);
+  var fuseCheck = relayCheckFuseCoordination(relayState.fuseType, I1N);
+  var fuse = RELAY_HV_FUSES[relayState.fuseType];
+
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('HV Relebeskyttelse (Opgave 1: Transformer + Linjerele)', 'HV Relay Protection (Opgave 1: Transformer + Line Relay)') + '</div>';
+  html += '<div class="info-row">' + tx('Konstanttidsrele (definite-time) og HV-sikringsvalg iht. IEC 60255 / DS/HD 60364', 'Definite-time relay and HV fuse selection per IEC 60255 / DS/HD 60364') + '</div>';
+
+  // Relay type
+  html += '<div class="select-group"><div class="select-label">' + tx('Reletype', 'Relay Type') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (relayState.relayType === 'definite' ? ' selected' : '') + '" onclick="relayState.relayType=\'definite\';renderModule(\'relay\')">' + tx('Konstanttid (definite-time)', 'Definite-time') + '</button>';
+  html += '<button class="sel-btn' + (relayState.relayType === 'inverse' ? ' selected' : '') + '" onclick="relayState.relayType=\'inverse\';renderModule(\'relay\')">' + tx('Invers tid (IDMT)', 'Inverse-time (IDMT)') + '</button>';
+  html += '</div></div>';
+
+  // Transformer kVA
+  html += '<div class="select-group"><div class="select-label">' + tx('Transformator [kVA]', 'Transformer [kVA]') + '</div><div class="select-grid">';
+  RELAY_TRAFO_PRESETS.forEach(function(kva) {
+    html += '<button class="sel-btn' + (relayState.trafoKVA === kva ? ' selected' : '') + '" onclick="relayState.trafoKVA=' + kva + ';renderModule(\'relay\')">' + kva + '</button>';
+  });
+  html += '</div></div>';
+
+  // Primary voltage
+  html += '<div class="select-group"><div class="select-label">' + tx('Primaer spaending [kV]', 'Primary Voltage [kV]') + '</div><div class="select-grid">';
+  [6, 10, 11, 15, 20, 30, 36, 50, 60, 110].forEach(function(kv) {
+    html += '<button class="sel-btn' + (relayState.primaryKV === kv ? ' selected' : '') + '" onclick="relayState.primaryKV=' + kv + ';renderModule(\'relay\')">' + kv + '</button>';
+  });
+  html += '</div></div>';
+
+  // I> pickup multiplier
+  html += '<div class="select-group"><div class="select-label">' + tx('I> indstilling (multipel af I1N)', 'I> setting (multiple of I1N)') + '</div><div class="select-grid">';
+  RELAY_IGT_PRESETS.forEach(function(v) {
+    html += '<button class="sel-btn' + (relayState.Igt === v ? ' selected' : '') + '" onclick="relayState.Igt=' + v + ';renderModule(\'relay\')">' + v + 'x</button>';
+  });
+  html += '</div></div>';
+
+  // t> time delay
+  html += '<div class="select-group"><div class="select-label">' + tx('t> tidsforsinkelse [s]', 't> time delay [s]') + '</div><div class="select-grid">';
+  RELAY_TGT_PRESETS.forEach(function(v) {
+    html += '<button class="sel-btn' + (relayState.tGt === v ? ' selected' : '') + '" onclick="relayState.tGt=' + v + ';renderModule(\'relay\')">' + v + '</button>';
+  });
+  html += '</div></div>';
+
+  // I>> instantaneous multiplier
+  html += '<div class="select-group"><div class="select-label">' + tx('I>> kortslutning (multipel af I1N)', 'I>> short-circuit (multiple of I1N)') + '</div><div class="select-grid">';
+  RELAY_IGG_PRESETS.forEach(function(v) {
+    html += '<button class="sel-btn' + (relayState.Igg === v ? ' selected' : '') + '" onclick="relayState.Igg=' + v + ';renderModule(\'relay\')">' + v + 'x</button>';
+  });
+  html += '</div></div>';
+
+  // t>> time
+  html += '<div class="select-group"><div class="select-label">' + tx('t>> tid [s]', 't>> time [s]') + '</div><div class="select-grid">';
+  RELAY_TGG_PRESETS.forEach(function(v) {
+    html += '<button class="sel-btn' + (relayState.tGg === v ? ' selected' : '') + '" onclick="relayState.tGg=' + v + ';renderModule(\'relay\')">' + v + '</button>';
+  });
+  html += '</div></div>';
+
+  // Egentid
+  html += '<div class="select-group"><div class="select-label">' + tx('Egentid (releets iboende tid) [s]', 'Inherent time (relay own delay) [s]') + '</div><div class="select-grid">';
+  RELAY_EGENTID_PRESETS.forEach(function(v) {
+    html += '<button class="sel-btn' + (relayState.egentid === v ? ' selected' : '') + '" onclick="relayState.egentid=' + v + ';renderModule(\'relay\')">' + (v * 1000) + ' ms</button>';
+  });
+  html += '</div></div>';
+
+  // HV Fuse
+  html += '<div class="select-group"><div class="select-label">' + tx('HV-sikring (Ganzbereich / Full-range)', 'HV Fuse (Ganzbereich / Full-range)') + '</div><div class="select-grid">';
+  Object.keys(RELAY_HV_FUSES).forEach(function(key) {
+    var f = RELAY_HV_FUSES[key];
+    html += '<button class="sel-btn' + (relayState.fuseType === key ? ' selected' : '') + '" onclick="relayState.fuseType=\'' + key + '\';renderModule(\'relay\')">' + tx(f.da, f.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Results
+  html += '<div class="result-box"><div class="result-title">' + tx('Beregningsresultater', 'Calculation Results') + '</div>';
+  html += '<div class="result-row"><span class="label">I<sub>1N</sub> (' + tx('primaer nominel', 'primary nominal') + ')</span><span class="value">' + I1N.toFixed(2) + ' A</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">I<sub>1N</sub> = S / (√3 · U<sub>1</sub>) = ' + relayState.trafoKVA + ' / (√3 · ' + relayState.primaryKV + ') = ' + I1N.toFixed(2) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">I> (' + tx('overstroemsindstilling', 'overcurrent pickup') + ')</span><span class="value">' + Ipickup.toFixed(2) + ' A = ' + relayState.Igt + ' × ' + I1N.toFixed(2) + '</span></div>';
+  html += '<div class="result-row"><span class="label">t></span><span class="value">' + relayState.tGt + ' s</span></div>';
+  html += '<div class="result-row"><span class="label">I>> (' + tx('kortslutning', 'instantaneous') + ')</span><span class="value">' + Iinstant.toFixed(1) + ' A = ' + relayState.Igg + ' × ' + I1N.toFixed(2) + '</span></div>';
+  html += '<div class="result-row"><span class="label">t>></span><span class="value">' + relayState.tGg + ' s</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Egentid', 'Inherent time') + '</span><span class="value">' + (relayState.egentid * 1000) + ' ms</span></div>';
+  html += '</div>';
+
+  // Inrush
+  html += '<div class="result-box"><div class="result-title">' + tx('Indkoblingsstroemskontrol', 'Inrush Current Check') + '</div>';
+  html += '<div class="result-row"><span class="label">I<sub>inrush,min</sub></span><span class="value">' + inrush.Imin.toFixed(1) + ' A (12 × I<sub>1N</sub>)</span></div>';
+  html += '<div class="result-row"><span class="label">I<sub>inrush,max</sub></span><span class="value">' + inrush.Imax.toFixed(1) + ' A (15 × I<sub>1N</sub>)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Varighed', 'Duration') + '</span><span class="value">≈ 0.1 s</span></div>';
+  var inrushOk = Ipickup > inrush.Imax;
+  html += '<div class="result-row"><span class="label">' + tx('I> > I_inrush,max?', 'I> > I_inrush,max?') + '</span><span class="value">' + (inrushOk ? '✅ ' + tx('Ja', 'Yes') + ' (' + Ipickup.toFixed(1) + ' > ' + inrush.Imax.toFixed(1) + ')' : '❌ ' + tx('Nej - rele tripper ved indkobling!', 'No - relay trips on energisation!') + ' (' + Ipickup.toFixed(1) + ' ≤ ' + inrush.Imax.toFixed(1) + ')') + '</span></div>';
+  html += '</div>';
+
+  // Coordination
+  html += '<div class="result-box' + (coord.coordinated ? '' : ' warning') + '"><div class="result-title">' + tx('Tidskoordinering', 'Time Coordination') + '</div>';
+  html += '<div class="result-row"><span class="label">t> (' + tx('indstillet', 'set') + ')</span><span class="value">' + coord.totalRelayTime + ' s</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kraevet min. tid', 'Required min. time') + '</span><span class="value">' + coord.requiredTime.toFixed(3) + ' s = t<sub>inrush</sub>(' + inrush.duration + ') + t<sub>egen</sub>(' + relayState.egentid + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Status', 'Status') + '</span><span class="value">' + (coord.coordinated ? '✅ ' + tx('Koordineret', 'Coordinated') : '❌ ' + tx('IKKE koordineret', 'NOT coordinated')) + '</span></div>';
+  html += '</div>';
+
+  // HV Fuse
+  html += '<div class="result-box' + (fuseCheck.ok ? '' : ' error') + '"><div class="result-title">' + tx('HV-sikring', 'HV Fuse') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Valgt', 'Selected') + '</span><span class="value">' + tx(fuse.da, fuse.en) + '</span></div>';
+  html += '<div class="result-row"><span class="label">I<sub>N,fuse</sub></span><span class="value">' + fuse.rating + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">I<sub>min</sub></span><span class="value">' + fuse.Imin + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">I<sub>max</sub></span><span class="value">' + fuse.Imax + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Sikring >= I1N?', 'Fuse >= I1N?') + '</span><span class="value">' + (fuseCheck.ok ? '✅ ' + fuse.rating + ' ≥ ' + I1N.toFixed(2) + ' A' : '❌ ' + fuse.rating + ' < ' + I1N.toFixed(2) + ' A') + '</span></div>';
+  html += '</div>';
+
+  // Overall verdict
+  var allOk = coord.coordinated && fuseCheck.ok && inrushOk;
+  var verdictText = allOk ? tx('Releindstillinger og sikring er koordinerede', 'Relay settings and fuse are coordinated') : tx('Juster indstillinger - se advarsler ovenfor', 'Adjust settings - see warnings above');
+  html += renderVerdict(allOk, verdictText);
+
+  html += '<div class="info-row" style="margin-top:12px;font-size:0.82em;opacity:0.7">';
+  html += tx('Ref: IEC 60255 (rele), IEC 60282-1 (HV-sikringer), DS/HD 60076 (trafo). Egentid = releets iboende mekaniske/elektroniske forsinkelse.', 'Ref: IEC 60255 (relay), IEC 60282-1 (HV fuses), DS/HD 60076 (transformer). Inherent time = relay own mechanical/electronic delay.');
+  html += '</div>';
+  html += '</div>';
+  return html;
+}
+
+// ===== FAULT CALCULATION MODULE =====
+// Covers Opgave 3: TN/TT/IT fault formulas, disconnection time verification,
+// Zs safety factor (0.8), and minimum protective conductor CSA (S = sqrt(I2t)/k)
+
+var faultState = {
+  earthSystem: 'tncs',
+  deviceType: 'mcbB',
+  deviceIn: 16,
+  zsValue: 1.2,
+  deltaIn: 0.03,
+  voltage: 230,
+  measuredZs: 0,
+  csaConductor: 'cuPVC',
+  csaManualI: 500,
+  csaManualT: 0.2,
+  calcMode: 'fault',
+  touchVoltage: 50
+};
+
+var FAULT_EARTH_SYSTEMS = {
+  tns:  { da: 'TN-S', en: 'TN-S', formula: 'Zs*Ia <= U0' },
+  tnc:  { da: 'TN-C', en: 'TN-C', formula: 'Zs*Ia <= U0' },
+  tncs: { da: 'TN-C-S', en: 'TN-C-S', formula: 'Zs*Ia <= U0' },
+  tt:   { da: 'TT', en: 'TT', formula: 'RA*I_delta_n <= 50V' },
+  it1:  { da: 'IT (1. fejl)', en: 'IT (1st fault)', formula: 'RA*Id <= 50V' },
+  it2:  { da: 'IT (dobbeltfejl)', en: 'IT (double fault)', formula: '2*Ia*Zs <= U' }
+};
+
+var FAULT_DEVICE_TYPES = {
+  mcbB: { da: 'MCB kurve B (5xIn)', en: 'MCB curve B (5xIn)', factor: 5 },
+  mcbC: { da: 'MCB kurve C (10xIn)', en: 'MCB curve C (10xIn)', factor: 10 },
+  mcbD: { da: 'MCB kurve D (20xIn)', en: 'MCB curve D (20xIn)', factor: 20 },
+  fuse: { da: 'Sikring (gG)', en: 'Fuse (gG)', factor: 0 },
+  rcd30: { da: 'RCD/HPFI 30mA', en: 'RCD 30mA', factor: 0 },
+  rcd100: { da: 'RCD/HPFI 100mA', en: 'RCD 100mA', factor: 0 },
+  rcd300: { da: 'RCD/HPFI 300mA', en: 'RCD 300mA', factor: 0 }
+};
+
+var FAULT_IN_PRESETS = [6, 10, 13, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250];
+var FAULT_ZS_PRESETS = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.5, 1.8, 2.0, 2.5, 3.0, 4.0, 5.0, 8.0, 10.0];
+var FAULT_DELTA_PRESETS = [0.01, 0.03, 0.1, 0.3, 0.5, 1.0];
+var FAULT_VOLTAGE_PRESETS = [230, 400];
+var FAULT_TOUCH_PRESETS = [25, 50];
+
+var FAULT_K_FACTORS = {
+  cuPVC:   { da: 'Cu / PVC (k=115)', en: 'Cu / PVC (k=115)', k: 115, kLarge: 103 },
+  cuXLPE:  { da: 'Cu / XLPE (k=143)', en: 'Cu / XLPE (k=143)', k: 143, kLarge: 132 },
+  alPVC:   { da: 'Al / PVC (k=76)', en: 'Al / PVC (k=76)', k: 76, kLarge: 68 },
+  alXLPE:  { da: 'Al / XLPE (k=94)', en: 'Al / XLPE (k=94)', k: 94, kLarge: 87 },
+  cuBare:  { da: 'Cu / bar (k=159)', en: 'Cu / bare (k=159)', k: 159, kLarge: 159 },
+  steel:   { da: 'Stal (k=52)', en: 'Steel (k=52)', k: 52, kLarge: 52 }
+};
+
+var FAULT_DISC_TIMES = {
+  tn_final_230: 0.4,
+  tn_dist_230: 5.0,
+  tn_final_400: 0.2,
+  tn_dist_400: 5.0,
+  tt_final: 0.2,
+  tt_dist: 1.0
+};
+
+function faultCalcIa(deviceType, In) {
+  var dev = FAULT_DEVICE_TYPES[deviceType];
+  if (!dev) return In * 5;
+  if (dev.factor > 0) return dev.factor * In;
+  if (deviceType === 'fuse') {
+    if (In <= 63) return 2.1 * In;
+    return 1.6 * In;
+  }
+  return In;
+}
+
+function faultCalcTN(Zs, Ia, U0) {
+  var ZsIa = Zs * Ia;
+  var ok = ZsIa <= U0;
+  var ZsMax = U0 / Ia;
+  return { ZsIa: ZsIa, U0: U0, ok: ok, Ia: Ia, ZsMax: ZsMax };
+}
+
+function faultCalcTT(RA, deltaIn, touchV) {
+  var product = RA * deltaIn;
+  var ok = product <= touchV;
+  var RAmax = touchV / deltaIn;
+  return { product: product, ok: ok, RAmax: RAmax, touchV: touchV };
+}
+
+function faultCalcIT1(RA, Id, touchV) {
+  var product = RA * Id;
+  var ok = product <= touchV;
+  return { product: product, ok: ok, touchV: touchV };
+}
+
+function faultCalcIT2(Ia, Zs, U, hasNeutral) {
+  var product = 2 * Ia * Zs;
+  var ok = product <= U;
+  return { product: product, U: U, ok: ok, hasNeutral: hasNeutral };
+}
+
+function faultCalcSafetyFactor(measuredZs, ZsMax) {
+  var limit = 0.8 * ZsMax;
+  var ok = measuredZs <= limit;
+  return { measuredZs: measuredZs, limit: limit, ZsMax: ZsMax, ok: ok };
+}
+
+function faultCalcMinCSA(I, t, kFactor) {
+  if (kFactor <= 0 || t <= 0) return 0;
+  return (I * Math.sqrt(t)) / kFactor;
+}
+
+function faultCalcKFromPrinciples(Qc, beta, rho20, thetaF, thetaI) {
+  // k = sqrt( Qc*(beta+20)/rho20 * 1e-12 * ln((beta+thetaF)/(beta+thetaI)) )
+  // The 1e-12 converts from m^2 to mm^2 (squared) in the cross-section units
+  // Qc in J/(m^3*K), rho20 in Ohm*m, temperatures in degC
+  if (rho20 <= 0) return 0;
+  var ratio = (beta + thetaF) / (beta + thetaI);
+  if (ratio <= 0) return 0;
+  return Math.sqrt((Qc * (beta + 20) / rho20) * 1e-12 * Math.log(ratio));
+}
+
+function renderFault() {
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Fejlberegning (Opgave 3: Beskyttelse mod elektrisk stoed)', 'Fault Calculation (Opgave 3: Protection against electric shock)') + '</div>';
+  html += '<div class="info-row">' + tx('Fejlsloejeberegning, frakobling og min. beskyttelsesleder iht. DS/HD 60364-4-41 + 5-54', 'Fault loop calculation, disconnection and min. protective conductor per DS/HD 60364-4-41 + 5-54') + '</div>';
+
+  html += '<div class="select-group"><div class="select-label">' + tx('Beregningstype', 'Calculation Mode') + '</div><div class="select-grid">';
+  html += '<button class="sel-btn' + (faultState.calcMode === 'fault' ? ' selected' : '') + '" onclick="faultState.calcMode=\'fault\';renderModule(\'fault\')">' + tx('Fejlsloejfe + frakobling', 'Fault loop + disconnection') + '</button>';
+  html += '<button class="sel-btn' + (faultState.calcMode === 'csa' ? ' selected' : '') + '" onclick="faultState.calcMode=\'csa\';renderModule(\'fault\')">' + tx('Min. PE-tvaersnit (S=√(I²t)/k)', 'Min. PE cross-section (S=√(I²t)/k)') + '</button>';
+  html += '</div></div>';
+
+  if (faultState.calcMode === 'fault') {
+    html += renderFaultLoop();
+  } else {
+    html += renderFaultCSA();
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function renderFaultLoop() {
+  var html = '';
+
+  // Earth system selector
+  html += '<div class="select-group"><div class="select-label">' + tx('Jordingssystem', 'Earthing System') + '</div><div class="select-grid">';
+  Object.keys(FAULT_EARTH_SYSTEMS).forEach(function(key) {
+    var sys = FAULT_EARTH_SYSTEMS[key];
+    html += '<button class="sel-btn' + (faultState.earthSystem === key ? ' selected' : '') + '" onclick="faultState.earthSystem=\'' + key + '\';renderModule(\'fault\')">' + tx(sys.da, sys.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  var isTN = faultState.earthSystem.indexOf('tn') === 0;
+  var isTT = faultState.earthSystem === 'tt';
+  var isIT1 = faultState.earthSystem === 'it1';
+  var isIT2 = faultState.earthSystem === 'it2';
+
+  if (isTN || isIT2) {
+    // Device type selector
+    html += '<div class="select-group"><div class="select-label">' + tx('Beskyttelsesudstyr', 'Protective Device') + '</div><div class="select-grid">';
+    Object.keys(FAULT_DEVICE_TYPES).forEach(function(key) {
+      var d = FAULT_DEVICE_TYPES[key];
+      html += '<button class="sel-btn' + (faultState.deviceType === key ? ' selected' : '') + '" onclick="faultState.deviceType=\'' + key + '\';renderModule(\'fault\')">' + tx(d.da, d.en) + '</button>';
+    });
+    html += '</div></div>';
+
+    // Device rating
+    html += '<div class="select-group"><div class="select-label">' + tx('Maerkestroemm In [A]', 'Rated current In [A]') + '</div><div class="select-grid">';
+    FAULT_IN_PRESETS.forEach(function(v) {
+      html += '<button class="sel-btn' + (faultState.deviceIn === v ? ' selected' : '') + '" onclick="faultState.deviceIn=' + v + ';renderModule(\'fault\')">' + v + '</button>';
+    });
+    html += '</div></div>';
+
+    // Zs value
+    html += '<div class="select-group"><div class="select-label">' + tx('Fejlsloejeimpedans Zs [\u03A9]', 'Fault loop impedance Zs [\u03A9]') + '</div><div class="select-grid">';
+    FAULT_ZS_PRESETS.forEach(function(v) {
+      html += '<button class="sel-btn' + (faultState.zsValue === v ? ' selected' : '') + '" onclick="faultState.zsValue=' + v + ';renderModule(\'fault\')">' + v + '</button>';
+    });
+    html += '</div></div>';
+
+    // Voltage
+    html += '<div class="select-group"><div class="select-label">' + tx('Spaending U0 [V]', 'Voltage U0 [V]') + '</div><div class="select-grid">';
+    FAULT_VOLTAGE_PRESETS.forEach(function(v) {
+      html += '<button class="sel-btn' + (faultState.voltage === v ? ' selected' : '') + '" onclick="faultState.voltage=' + v + ';renderModule(\'fault\')">' + v + '</button>';
+    });
+    html += '</div></div>';
+  }
+
+  if (isTT || isIT1) {
+    // RCD rating
+    html += '<div class="select-group"><div class="select-label">' + tx('I\u0394n (RCD/HPFI) [A]', 'I\u0394n (RCD) [A]') + '</div><div class="select-grid">';
+    FAULT_DELTA_PRESETS.forEach(function(v) {
+      html += '<button class="sel-btn' + (faultState.deltaIn === v ? ' selected' : '') + '" onclick="faultState.deltaIn=' + v + ';renderModule(\'fault\')">' + (v * 1000) + ' mA</button>';
+    });
+    html += '</div></div>';
+
+    // Touch voltage limit
+    html += '<div class="select-group"><div class="select-label">' + tx('Beroeringssp. graense [V]', 'Touch voltage limit [V]') + '</div><div class="select-grid">';
+    FAULT_TOUCH_PRESETS.forEach(function(v) {
+      html += '<button class="sel-btn' + (faultState.touchVoltage === v ? ' selected' : '') + '" onclick="faultState.touchVoltage=' + v + ';renderModule(\'fault\')">' + v + 'V' + (v === 25 ? ' (' + tx('vaat/medicinsk', 'wet/medical') + ')' : '') + '</button>';
+    });
+    html += '</div></div>';
+
+    // RA
+    html += '<div class="select-group"><div class="select-label">' + tx('RA (jordingsmodstand) [\u03A9]', 'RA (earth resistance) [\u03A9]') + '</div><div class="select-grid">';
+    FAULT_ZS_PRESETS.forEach(function(v) {
+      html += '<button class="sel-btn' + (faultState.zsValue === v ? ' selected' : '') + '" onclick="faultState.zsValue=' + v + ';renderModule(\'fault\')">' + v + '</button>';
+    });
+    html += '</div></div>';
+  }
+
+  // Measured Zs for Part 6
+  html += '<div class="select-group"><div class="select-label">' + tx('Maalt Zs (Part 6, 0.8-faktor) [\u03A9]', 'Measured Zs (Part 6, 0.8 factor) [\u03A9]') + '</div><div class="select-grid">';
+  [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0, 3.0, 5.0].forEach(function(v) {
+    html += '<button class="sel-btn' + (faultState.measuredZs === v ? ' selected' : '') + '" onclick="faultState.measuredZs=' + v + ';renderModule(\'fault\')">' + (v === 0 ? tx('Spring over', 'Skip') : v) + '</button>';
+  });
+  html += '</div></div>';
+
+  html += renderFaultResults(isTN, isTT, isIT1, isIT2);
+  return html;
+}
+
+function renderFaultResults(isTN, isTT, isIT1, isIT2) {
+  var html = '';
+  var overallOk = true;
+
+  if (isTN) {
+    var Ia = faultCalcIa(faultState.deviceType, faultState.deviceIn);
+    var tn = faultCalcTN(faultState.zsValue, Ia, faultState.voltage);
+    var dev = FAULT_DEVICE_TYPES[faultState.deviceType];
+
+    html += '<div class="result-box"><div class="result-title">' + tx('TN-system: Zs \u00B7 Ia \u2264 U0', 'TN system: Zs \u00B7 Ia \u2264 U0') + '</div>';
+    html += '<div class="result-row"><span class="label">Ia (' + tx('frakoblingsstroem', 'disconnection current') + ')</span><span class="value">' + Ia.toFixed(1) + ' A';
+    if (dev && dev.factor > 0) html += ' = ' + dev.factor + ' \u00D7 ' + faultState.deviceIn;
+    html += '</span></div>';
+    html += '<div class="result-row"><span class="label">Zs \u00B7 Ia</span><span class="value">' + tn.ZsIa.toFixed(1) + ' V</span></div>';
+    html += '<div class="result-row"><span class="label">U0</span><span class="value">' + tn.U0 + ' V</span></div>';
+    html += '<div class="result-row"><span class="label">Zs<sub>max</sub> = U0/Ia</span><span class="value">' + tn.ZsMax.toFixed(3) + ' \u03A9</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">Zs<sub>max</sub> = ' + faultState.voltage + ' / ' + Ia.toFixed(1) + ' = ' + tn.ZsMax.toFixed(3) + ' \u03A9</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Opfyldt?', 'Satisfied?') + '</span><span class="value">' + (tn.ok ? '\u2705 ' + tn.ZsIa.toFixed(1) + ' \u2264 ' + tn.U0 : '\u274C ' + tn.ZsIa.toFixed(1) + ' > ' + tn.U0) + '</span></div>';
+    html += '</div>';
+    overallOk = overallOk && tn.ok;
+
+    // Disconnection time table
+    var discKey = 'tn_final_' + faultState.voltage;
+    var discTime = FAULT_DISC_TIMES[discKey] || 0.4;
+    html += '<div class="result-box"><div class="result-title">' + tx('Frakoblingstid (Tabel 41.1)', 'Disconnection Time (Table 41.1)') + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Slutkreds (' + faultState.voltage + 'V TN)', 'Final circuit (' + faultState.voltage + 'V TN)') + '</span><span class="value">\u2264 ' + discTime + ' s</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Fordelingskreds (' + faultState.voltage + 'V TN)', 'Distribution circuit (' + faultState.voltage + 'V TN)') + '</span><span class="value">\u2264 5.0 s</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Ref', 'Ref') + '</span><span class="value">DS/HD 60364-4-41 Tabel 41.1</span></div>';
+    html += '</div>';
+
+    // 0.8 safety factor verification
+    if (faultState.measuredZs > 0) {
+      var sf = faultCalcSafetyFactor(faultState.measuredZs, tn.ZsMax);
+      html += '<div class="result-box' + (sf.ok ? '' : ' error') + '"><div class="result-title">' + tx('Part 6 verifikation (0.8-faktor)', 'Part 6 Verification (0.8 factor)') + '</div>';
+      html += '<div class="result-row"><span class="label">' + tx('Maalt Zs', 'Measured Zs') + '</span><span class="value">' + sf.measuredZs + ' \u03A9</span></div>';
+      html += '<div class="result-row"><span class="label">0.8 \u00D7 Zs<sub>max</sub></span><span class="value">' + sf.limit.toFixed(3) + ' \u03A9</span></div>';
+      html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">Zs<sub>maalt</sub> \u2264 0.8 \u00D7 Zs<sub>max</sub> = 0.8 \u00D7 ' + sf.ZsMax.toFixed(3) + ' = ' + sf.limit.toFixed(3) + ' \u03A9</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Status', 'Status') + '</span><span class="value">' + (sf.ok ? '\u2705 ' + sf.measuredZs + ' \u2264 ' + sf.limit.toFixed(3) : '\u274C ' + sf.measuredZs + ' > ' + sf.limit.toFixed(3)) + '</span></div>';
+      html += '</div>';
+      overallOk = overallOk && sf.ok;
+    }
+  }
+
+  if (isTT) {
+    var tt = faultCalcTT(faultState.zsValue, faultState.deltaIn, faultState.touchVoltage);
+    html += '<div class="result-box"><div class="result-title">' + tx('TT-system: RA \u00B7 I\u0394n \u2264 UL', 'TT system: RA \u00B7 I\u0394n \u2264 UL') + '</div>';
+    html += '<div class="result-row"><span class="label">R<sub>A</sub></span><span class="value">' + faultState.zsValue + ' \u03A9</span></div>';
+    html += '<div class="result-row"><span class="label">I<sub>\u0394n</sub></span><span class="value">' + (faultState.deltaIn * 1000) + ' mA</span></div>';
+    html += '<div class="result-row"><span class="label">R<sub>A</sub> \u00B7 I<sub>\u0394n</sub></span><span class="value">' + tt.product.toFixed(2) + ' V</span></div>';
+    html += '<div class="result-row"><span class="label">U<sub>L</sub></span><span class="value">' + tt.touchV + ' V</span></div>';
+    html += '<div class="result-row"><span class="label">R<sub>A,max</sub> = U<sub>L</sub>/I<sub>\u0394n</sub></span><span class="value">' + tt.RAmax.toFixed(0) + ' \u03A9</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">R<sub>A,max</sub> = ' + tt.touchV + ' / ' + faultState.deltaIn + ' = ' + tt.RAmax.toFixed(0) + ' \u03A9</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Opfyldt?', 'Satisfied?') + '</span><span class="value">' + (tt.ok ? '\u2705 ' + tt.product.toFixed(2) + ' \u2264 ' + tt.touchV : '\u274C ' + tt.product.toFixed(2) + ' > ' + tt.touchV) + '</span></div>';
+    html += '</div>';
+    overallOk = overallOk && tt.ok;
+  }
+
+  if (isIT1) {
+    var Id = faultState.voltage / 10000;
+    var it1 = faultCalcIT1(faultState.zsValue, Id, faultState.touchVoltage);
+    html += '<div class="result-box"><div class="result-title">' + tx('IT 1. fejl: RA \u00B7 Id \u2264 UL', 'IT 1st fault: RA \u00B7 Id \u2264 UL') + '</div>';
+    html += '<div class="result-row"><span class="label">R<sub>A</sub></span><span class="value">' + faultState.zsValue + ' \u03A9</span></div>';
+    html += '<div class="result-row"><span class="label">I<sub>d</sub></span><span class="value">' + (Id * 1000).toFixed(1) + ' mA</span></div>';
+    html += '<div class="result-row"><span class="label">R<sub>A</sub> \u00B7 I<sub>d</sub></span><span class="value">' + it1.product.toFixed(3) + ' V</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Opfyldt?', 'Satisfied?') + '</span><span class="value">' + (it1.ok ? '\u2705' : '\u274C') + ' ' + it1.product.toFixed(3) + (it1.ok ? ' \u2264 ' : ' > ') + it1.touchV + ' V</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Bem.', 'Note') + '</span><span class="value">' + tx('Isolationsovervaagning (IMD) kraeves iht. cl.411.6', 'Insulation monitoring device (IMD) required per cl.411.6') + '</span></div>';
+    html += '</div>';
+    overallOk = overallOk && it1.ok;
+  }
+
+  if (isIT2) {
+    var Ia2 = faultCalcIa(faultState.deviceType, faultState.deviceIn);
+    var U_it = faultState.voltage;
+    var it2 = faultCalcIT2(Ia2, faultState.zsValue, U_it, false);
+    html += '<div class="result-box"><div class="result-title">' + tx('IT dobbeltfejl: 2 \u00B7 Ia \u00B7 Zs \u2264 U', 'IT double fault: 2 \u00B7 Ia \u00B7 Zs \u2264 U') + '</div>';
+    html += '<div class="result-row"><span class="label">Ia</span><span class="value">' + Ia2.toFixed(1) + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">Zs</span><span class="value">' + faultState.zsValue + ' \u03A9</span></div>';
+    html += '<div class="result-row"><span class="label">2 \u00B7 Ia \u00B7 Zs</span><span class="value">' + it2.product.toFixed(1) + ' V</span></div>';
+    html += '<div class="result-row"><span class="label">U (' + tx('uden N', 'without N') + ')</span><span class="value">' + U_it + ' V</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">2 \u00D7 ' + Ia2.toFixed(1) + ' \u00D7 ' + faultState.zsValue + ' = ' + it2.product.toFixed(1) + ' V \u2264 ' + U_it + ' V?</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Opfyldt?', 'Satisfied?') + '</span><span class="value">' + (it2.ok ? '\u2705' : '\u274C') + ' ' + it2.product.toFixed(1) + (it2.ok ? ' \u2264 ' : ' > ') + U_it + '</span></div>';
+    html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Alt. med N', 'Alt. with N') + '</span><span class="value">2 \u00B7 Ia \u00B7 Z\'s \u2264 U0 (= ' + faultState.voltage + ' V)</span></div>';
+    html += '</div>';
+    overallOk = overallOk && it2.ok;
+  }
+
+  var verdictText = overallOk ? tx('Beskyttelse mod elektrisk stoed er opfyldt', 'Protection against electric shock is satisfied') : tx('Krav IKKE opfyldt - juster vaerdier', 'Requirement NOT met - adjust values');
+  html += renderVerdict(overallOk, verdictText);
+
+  html += '<div class="info-row" style="margin-top:12px;font-size:0.82em;opacity:0.7">';
+  html += tx('Ref: DS/HD 60364-4-41 (beskyttelse), Tabel 41.1 (frakoblingstider), DS/HD 60364-6 (verifikation, 0.8-faktor)', 'Ref: DS/HD 60364-4-41 (protection), Table 41.1 (disconnection times), DS/HD 60364-6 (verification, 0.8 factor)');
+  html += '</div>';
+
+  return html;
+}
+
+function renderFaultCSA() {
+  var html = '';
+
+  // Conductor/insulation type
+  html += '<div class="select-group"><div class="select-label">' + tx('Ledermateriale / isolering', 'Conductor / insulation') + '</div><div class="select-grid">';
+  Object.keys(FAULT_K_FACTORS).forEach(function(key) {
+    var kf = FAULT_K_FACTORS[key];
+    html += '<button class="sel-btn' + (faultState.csaConductor === key ? ' selected' : '') + '" onclick="faultState.csaConductor=\'' + key + '\';renderModule(\'fault\')">' + tx(kf.da, kf.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Fault current
+  html += '<div class="select-group"><div class="select-label">' + tx('Kortslutningsstroem I [A]', 'Fault current I [A]') + '</div><div class="select-grid">';
+  [100, 200, 300, 500, 800, 1000, 1500, 2000, 3000, 5000, 8000, 10000, 15000, 20000].forEach(function(v) {
+    html += '<button class="sel-btn' + (faultState.csaManualI === v ? ' selected' : '') + '" onclick="faultState.csaManualI=' + v + ';renderModule(\'fault\')">' + (v >= 1000 ? (v/1000) + 'k' : v) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Disconnection time
+  html += '<div class="select-group"><div class="select-label">' + tx('Afbrydertid t [s]', 'Disconnection time t [s]') + '</div><div class="select-grid">';
+  [0.01, 0.02, 0.04, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 2.0, 5.0].forEach(function(v) {
+    html += '<button class="sel-btn' + (faultState.csaManualT === v ? ' selected' : '') + '" onclick="faultState.csaManualT=' + v + ';renderModule(\'fault\')">' + v + '</button>';
+  });
+  html += '</div></div>';
+
+  // Calculate
+  var kfObj = FAULT_K_FACTORS[faultState.csaConductor];
+  var k = kfObj ? kfObj.k : 115;
+  var kLarge = kfObj ? kfObj.kLarge : 103;
+  var I = faultState.csaManualI;
+  var t = faultState.csaManualT;
+  var Smin = faultCalcMinCSA(I, t, k);
+  var SminLarge = faultCalcMinCSA(I, t, kLarge);
+  var I2t = I * I * t;
+
+  html += '<div class="result-box"><div class="result-title">' + tx('Min. beskyttelsesleder-tvaersnit', 'Min. Protective Conductor Cross-section') + '</div>';
+  html += '<div class="result-row"><span class="label">I</span><span class="value">' + I + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">t</span><span class="value">' + t + ' s</span></div>';
+  html += '<div class="result-row"><span class="label">I\u00B2t</span><span class="value">' + I2t.toFixed(0) + ' A\u00B2s</span></div>';
+  html += '<div class="result-row"><span class="label">k (S \u2264 300mm\u00B2)</span><span class="value">' + k + '</span></div>';
+  html += '<div class="result-row"><span class="label">S<sub>min</sub> = \u221A(I\u00B2t) / k</span><span class="value">' + Smin.toFixed(2) + ' mm\u00B2</span></div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">S = \u221A(' + I + '\u00B2 \u00D7 ' + t + ') / ' + k + ' = ' + I + '\u00D7\u221A' + t + ' / ' + k + ' = ' + Smin.toFixed(2) + ' mm\u00B2</span></div>';
+
+  if (Smin > 300) {
+    html += '<div class="result-row" style="color:var(--warning)"><span class="label">k (S > 300mm\u00B2)</span><span class="value">' + kLarge + '</span></div>';
+    html += '<div class="result-row" style="color:var(--warning)"><span class="label">S<sub>min</sub> (' + tx('korrigeret', 'corrected') + ')</span><span class="value">' + SminLarge.toFixed(2) + ' mm\u00B2</span></div>';
+  }
+
+  // Standard sizes
+  var stdSizes = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240, 300, 400, 500, 630];
+  var chosen = 0;
+  for (var i = 0; i < stdSizes.length; i++) {
+    if (stdSizes[i] >= Smin) { chosen = stdSizes[i]; break; }
+  }
+  if (chosen === 0 && Smin > 0) chosen = stdSizes[stdSizes.length - 1];
+  html += '<div class="result-row"><span class="label">' + tx('Naermeste standardtvaersnit', 'Nearest standard size') + '</span><span class="value">' + (chosen > 0 ? chosen + ' mm\u00B2' : '-') + '</span></div>';
+  html += '</div>';
+
+  // k-factor reference table
+  html += '<div class="result-box"><div class="result-title">' + tx('k-faktor tabel (DS/HD 60364-5-54, Tabel 54.4)', 'k-factor table (DS/HD 60364-5-54, Table 54.4)') + '</div>';
+  html += '<div class="result-row"><span class="label">Cu / PVC</span><span class="value">k = 115 (S\u2264300), k = 103 (S>300)</span></div>';
+  html += '<div class="result-row"><span class="label">Cu / XLPE</span><span class="value">k = 143 (S\u2264300), k = 132 (S>300)</span></div>';
+  html += '<div class="result-row"><span class="label">Al / PVC</span><span class="value">k = 76 (S\u2264300), k = 68 (S>300)</span></div>';
+  html += '<div class="result-row"><span class="label">Al / XLPE</span><span class="value">k = 94 (S\u2264300), k = 87 (S>300)</span></div>';
+  html += '<div class="result-row"><span class="label">Cu / ' + tx('bar', 'bare') + '</span><span class="value">k = 159</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Stal', 'Steel') + '</span><span class="value">k = 52</span></div>';
+  html += '</div>';
+
+  // k from first principles
+  html += '<div class="result-box"><div class="result-title">' + tx('k-faktor fra grundprincipper', 'k-factor from first principles') + '</div>';
+  html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">k = \u221A( Qc\u00B7(\u03B2+20)/\u03C1<sub>20</sub> \u00B7 ln((\u03B2+\u03B8<sub>f</sub>)/(\u03B2+\u03B8<sub>i</sub>)) )</span></div>';
+  html += '<div class="result-row"><span class="label">Qc (Cu)</span><span class="value">3.45 \u00D7 10\u2076 J/(m\u00B3\u00B7K)</span></div>';
+  html += '<div class="result-row"><span class="label">Qc (Al)</span><span class="value">2.5 \u00D7 10\u2076 J/(m\u00B3\u00B7K)</span></div>';
+  html += '<div class="result-row"><span class="label">\u03B2 (' + tx('temp.koeff.', 'temp coeff.') + ')</span><span class="value">234.5 (Cu), 228 (Al)</span></div>';
+  html += '<div class="result-row"><span class="label">\u03C1<sub>20</sub></span><span class="value">17.24 n\u03A9m (Cu), 28.26 n\u03A9m (Al)</span></div>';
+  html += '<div class="result-row"><span class="label">\u03B8<sub>i</sub> / \u03B8<sub>f</sub> (PVC)</span><span class="value">70\u00B0C / 160\u00B0C</span></div>';
+  html += '<div class="result-row"><span class="label">\u03B8<sub>i</sub> / \u03B8<sub>f</sub> (XLPE)</span><span class="value">90\u00B0C / 250\u00B0C</span></div>';
+  var kCalc = faultCalcKFromPrinciples(3.45e6, 234.5, 17.24e-9, 160, 70);
+  html += '<div class="result-row"><span class="label">' + tx('Eks. Cu/PVC', 'Ex. Cu/PVC') + '</span><span class="value">k = ' + kCalc.toFixed(1) + ' (\u2248 115)</span></div>';
+  html += '</div>';
+
+  html += '<div class="info-row" style="margin-top:12px;font-size:0.82em;opacity:0.7">';
+  html += tx('Ref: DS/HD 60364-5-54 cl.543.1, Tabel 54.4 (k-faktorer). For S > 300mm\u00B2 bruges reducerede k-vaerdier.', 'Ref: DS/HD 60364-5-54 cl.543.1, Table 54.4 (k-factors). For S > 300mm\u00B2 reduced k-values apply.');
+  html += '</div>';
+
+  return html;
+}
+
 // ===== INIT =====
 guideLoadProgress();
 renderNav();

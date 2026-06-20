@@ -9190,6 +9190,178 @@ test('3-Phase + Motor modules GUARD: core calc math unchanged (officialIz + IB r
   assert(Math.abs(ib1 - 16.84) < 0.05, 'IB regression ~16.84A unchanged after new modules');
 });
 
+// ===== HV RELAY MODULE TESTS =====
+test('relayCalcI1N: 630kVA 10kV => I1N = 36.37A', function() {
+  var I1N = relayCalcI1N(630, 10);
+  assert(Math.abs(I1N - 36.37) < 0.1, 'I1N = S/(sqrt3*U1) = 630000/(1.732*10000) = 36.37A, got ' + I1N.toFixed(2));
+});
+
+test('relayCalcInrush: I1N=36.37 => inrush 436-545A for 0.1s', function() {
+  var inrush = relayCalcInrush(36.37);
+  assert(Math.abs(inrush.Imin - 436.4) < 1, 'Imin = 12*36.37 = 436.4');
+  assert(Math.abs(inrush.Imax - 545.6) < 1, 'Imax = 15*36.37 = 545.6');
+  assert.strictEqual(inrush.duration, 0.1, 'duration = 0.1s');
+});
+
+test('relayCheckCoordination: tGt=0.5 > inrush(0.1)+egentid(0.04)=0.14 => coordinated', function() {
+  var c = relayCheckCoordination(0.5, 0.04, 0.1);
+  assert.strictEqual(c.coordinated, true);
+  assert(Math.abs(c.requiredTime - 0.14) < 0.001);
+});
+
+test('relayCheckCoordination: tGt=0.1 vs 0.1+0.04=0.14 => NOT coordinated', function() {
+  var c = relayCheckCoordination(0.1, 0.04, 0.1);
+  assert.strictEqual(c.coordinated, false);
+});
+
+test('relayCheckFuseCoordination: gg63 vs I1N=36.37 => ok (63>=36.37)', function() {
+  var r = relayCheckFuseCoordination('gg63', 36.37);
+  assert.strictEqual(r.ok, true);
+});
+
+test('relayCheckFuseCoordination: gg25 vs I1N=36.37 => NOT ok (25<36.37)', function() {
+  var r = relayCheckFuseCoordination('gg25', 36.37);
+  assert.strictEqual(r.ok, false);
+});
+
+test('relay module: renderRelay produces HTML', function() {
+  var html = renderRelay();
+  assert(html.indexOf('card') >= 0, 'has card class');
+  assert(html.indexOf('I<sub>1N</sub>') >= 0, 'shows I1N result');
+  assert(html.indexOf('Ganzbereich') >= 0 || html.indexOf('Full-range') >= 0, 'shows fuse info');
+});
+
+test('relay module: 100% click-only (no text inputs)', function() {
+  var html = renderRelay();
+  assert(html.indexOf('type="text"') < 0, 'no text inputs');
+  assert(html.indexOf('type="number"') < 0, 'no number inputs');
+  assert(html.indexOf('<textarea') < 0, 'no textarea');
+});
+
+test('relay module: translation exists in da/en/fa', function() {
+  assert(T.da.modules.relay, 'da translation exists');
+  assert(T.en.modules.relay, 'en translation exists');
+  assert(T.fa.modules.relay, 'fa translation exists');
+});
+
+// ===== FAULT CALCULATION MODULE TESTS =====
+test('faultCalcIa: MCB B 16A => Ia = 5*16 = 80A', function() {
+  var Ia = faultCalcIa('mcbB', 16);
+  assert.strictEqual(Ia, 80);
+});
+
+test('faultCalcIa: MCB C 32A => Ia = 10*32 = 320A', function() {
+  var Ia = faultCalcIa('mcbC', 32);
+  assert.strictEqual(Ia, 320);
+});
+
+test('faultCalcIa: MCB D 20A => Ia = 20*20 = 400A', function() {
+  var Ia = faultCalcIa('mcbD', 20);
+  assert.strictEqual(Ia, 400);
+});
+
+test('faultCalcTN: Zs=1.2, Ia=80, U0=230 => ZsIa=96 <= 230, ZsMax=2.875', function() {
+  var r = faultCalcTN(1.2, 80, 230);
+  assert(Math.abs(r.ZsIa - 96) < 0.1, 'ZsIa=96');
+  assert.strictEqual(r.ok, true);
+  assert(Math.abs(r.ZsMax - 2.875) < 0.001, 'ZsMax=230/80=2.875');
+});
+
+test('faultCalcTN: Zs=5.0, Ia=80, U0=230 => ZsIa=400 > 230, NOT ok', function() {
+  var r = faultCalcTN(5.0, 80, 230);
+  assert.strictEqual(r.ok, false);
+  assert(Math.abs(r.ZsIa - 400) < 0.1);
+});
+
+test('faultCalcTT: RA=100, deltaIn=0.03, touch=50 => 3V <= 50V, RAmax=1667', function() {
+  var r = faultCalcTT(100, 0.03, 50);
+  assert(Math.abs(r.product - 3.0) < 0.01);
+  assert.strictEqual(r.ok, true);
+  assert(Math.abs(r.RAmax - 1666.67) < 1);
+});
+
+test('faultCalcTT: RA=2000, deltaIn=0.03, touch=50 => 60V > 50V, NOT ok', function() {
+  var r = faultCalcTT(2000, 0.03, 50);
+  assert.strictEqual(r.ok, false);
+});
+
+test('faultCalcTT: wet/medical RA=1000, deltaIn=0.03, touch=25 => 30V > 25V, NOT ok', function() {
+  var r = faultCalcTT(1000, 0.03, 25);
+  assert.strictEqual(r.ok, false);
+});
+
+test('faultCalcIT2: 2*Ia*Zs: 2*80*1.2=192 <= 230, ok', function() {
+  var r = faultCalcIT2(80, 1.2, 230, false);
+  assert(Math.abs(r.product - 192) < 0.1);
+  assert.strictEqual(r.ok, true);
+});
+
+test('faultCalcSafetyFactor: measured=2.0, ZsMax=2.875 => limit=2.3, ok', function() {
+  var r = faultCalcSafetyFactor(2.0, 2.875);
+  assert(Math.abs(r.limit - 2.3) < 0.001);
+  assert.strictEqual(r.ok, true);
+});
+
+test('faultCalcSafetyFactor: measured=2.5, ZsMax=2.875 => limit=2.3, NOT ok', function() {
+  var r = faultCalcSafetyFactor(2.5, 2.875);
+  assert.strictEqual(r.ok, false);
+});
+
+test('faultCalcMinCSA: I=500, t=0.2, k=115 => S = 500*sqrt(0.2)/115 = 1.945mm2', function() {
+  var S = faultCalcMinCSA(500, 0.2, 115);
+  assert(Math.abs(S - 1.945) < 0.01, 'S = 500*0.4472/115 = 1.945, got ' + S.toFixed(3));
+});
+
+test('faultCalcMinCSA: I=3000, t=0.4, k=143 => S = 3000*sqrt(0.4)/143 = 13.27mm2', function() {
+  var S = faultCalcMinCSA(3000, 0.4, 143);
+  assert(Math.abs(S - 13.27) < 0.1, 'got ' + S.toFixed(2));
+});
+
+test('faultCalcKFromPrinciples: Cu/PVC => k approx 115', function() {
+  var k = faultCalcKFromPrinciples(3.45e6, 234.5, 17.24e-9, 160, 70);
+  assert(Math.abs(k - 115) < 3, 'Cu/PVC k from first principles should be ~115, got ' + k.toFixed(1));
+});
+
+test('fault module: renderFault produces HTML', function() {
+  var html = renderFault();
+  assert(html.indexOf('card') >= 0, 'has card class');
+  assert(html.indexOf('Zs') >= 0 || html.indexOf('fault') >= 0, 'shows fault content');
+});
+
+test('fault module: 100% click-only (no text inputs)', function() {
+  var html = renderFault();
+  assert(html.indexOf('type="text"') < 0, 'no text inputs');
+  assert(html.indexOf('type="number"') < 0, 'no number inputs');
+  assert(html.indexOf('<textarea') < 0, 'no textarea');
+});
+
+test('fault module: CSA mode produces HTML', function() {
+  faultState.calcMode = 'csa';
+  var html = renderFault();
+  assert(html.indexOf('k-faktor') >= 0 || html.indexOf('k-factor') >= 0, 'shows k-factor info');
+  faultState.calcMode = 'fault';
+});
+
+test('fault module: translation exists in da/en/fa', function() {
+  assert(T.da.modules.fault, 'da translation exists');
+  assert(T.en.modules.fault, 'en translation exists');
+  assert(T.fa.modules.fault, 'fa translation exists');
+});
+
+test('relay + fault modules in NAV_GROUPS protect group', function() {
+  var protectGroup = NAV_GROUPS.filter(function(g) { return g.id === 'protect'; })[0];
+  assert(protectGroup, 'protect group exists');
+  assert(protectGroup.keys.indexOf('relay') >= 0, 'relay in protect group');
+  assert(protectGroup.keys.indexOf('fault') >= 0, 'fault in protect group');
+});
+
+test('Protection modules GUARD: core calc math unchanged (officialIz + IB regression)', function() {
+  var cu25 = { material: 'Cu', mm2: 2.5, model: '', iz: 999 };
+  assert.strictEqual(officialIz(cu25), 23, 'officialIz(Cu 2.5mm2 PVC) == 23A unchanged');
+  var ib1 = sldCalcNodeIB({ type: 'final_circuit', power_kW: 3.68, cosPhi: 0.95, phases: '1x230', voltage: 230 });
+  assert(Math.abs(ib1 - 16.84) < 0.05, 'IB regression ~16.84A unchanged after new modules');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
