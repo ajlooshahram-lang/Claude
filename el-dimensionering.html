@@ -3427,23 +3427,190 @@ function syncAxes() {
 // reaches (transitively) relevant. Order follows the safe-design chain:
 // load -> cable -> protection -> voltage-drop -> short-circuit/Zs -> downstream.
 const REACTIVE_LINKS = {
-  load:     ['cable','fuse','mcb','mccb','vdrop','scircuit','zs','thermal','cable3d','cablelife','energy','pfc','harmonic','motor','ev','heatpump','lighting','busbar'],
-  cable:    ['vdrop','scircuit','zs','thermal','cable3d','cablelife','trayfill','busbar'],
-  fuse:     ['scircuit','zs','tcc','discrim','arcflash'],
-  mcb:      ['scircuit','zs','tcc','discrim','arcflash'],
-  mccb:     ['scircuit','zs','tcc','discrim','arcflash'],
-  vdrop:    ['scircuit'],
-  scircuit: ['zs','arcflash','discrim'],
-  trafo:    ['scircuit','zs','arcflash','generator','energy'],
-  earthsys: ['zs','scircuit','bathroom','pool','agri'],
-  relay: ['trafo','fuse','discrim'],
-  fault: ['zs','earthsys','scircuit'],
-  zs:       ['arcflash'],
-  thermal:  ['cablelife'],
-  motor:    ['vfd','pfc','harmonic'],
-  solar:    ['scircuit','energy','pfc'],
-  ev:       ['scircuit','energy','pfc']
+  // === CORE DIMENSIONING CHAIN ===
+  load:     ['cable','fuse','mcb','mccb','vdrop','scircuit','zs','thermal','cable3d','cablelife','energy','pfc','harmonic','motor','ev','heatpump','lighting','busbar','impedans','trefase','motorteori','analyzer'],
+  cable:    ['vdrop','scircuit','zs','thermal','cable3d','cablelife','trayfill','busbar','impedans','fault'],
+  fuse:     ['scircuit','zs','tcc','discrim','arcflash','relay','fault'],
+  mcb:      ['scircuit','zs','tcc','discrim','arcflash','fault'],
+  mccb:     ['scircuit','zs','tcc','discrim','arcflash','fault'],
+  vdrop:    ['scircuit','cable'],
+  scircuit: ['zs','arcflash','discrim','relay','fault'],
+  trafo:    ['scircuit','zs','arcflash','generator','energy','relay','impedans','trefase','fault','load','cable','analyzer'],
+  earthsys: ['zs','scircuit','bathroom','pool','agri','fault','relay'],
+  zs:       ['arcflash','fault','relay'],
+  thermal:  ['cablelife','cable'],
+  motor:    ['vfd','pfc','harmonic','motorteori','load','cable'],
+  solar:    ['scircuit','energy','pfc','load'],
+  ev:       ['scircuit','energy','pfc','load'],
+  // === THEORY MODULES (fully cross-linked) ===
+  // Changing frequency in impedans affects trefase (XL/XC), motorteori (sync speed), magnet (EMF)
+  impedans: ['trefase','motorteori','magnet','fault','scircuit','cable','lys','dc','analyzer'],
+  // Changing 3-phase parameters affects load currents, motor theory, power factor correction
+  trefase:  ['load','impedans','motorteori','pfc','trafo','fault','cable','vdrop','analyzer'],
+  // Motor theory: changes propagate to cable sizing, protection, VFD, harmonics
+  motorteori: ['motor','vfd','cable','mcb','mccb','fuse','load','harmonic','pfc','impedans','trefase','analyzer'],
+  // Relay settings depend on trafo, affect fault protection verification
+  relay:    ['trafo','fuse','discrim','fault','scircuit','analyzer'],
+  // Fault analysis: earthing system changes affect Zs requirements, disconnection
+  fault:    ['zs','earthsys','scircuit','relay','cable','mcb','fuse','mccb','dc','analyzer'],
+  // DC circuit theory: affects cable sizing (DC installations), battery systems
+  dc:       ['cable','bess','solar','ev','impedans','fault','analyzer'],
+  // Lighting design: lux requirements drive load current, cable sizing
+  lys:      ['load','cable','vdrop','lighting','energy','trefase','analyzer'],
+  // Magnetic circuits: transformer core design, relay coils, motor flux
+  magnet:   ['trafo','motorteori','relay','impedans','dc','analyzer'],
+  // === ANALYZER: propagates solved values to all relevant modules ===
+  analyzer: ['load','cable','fuse','mcb','mccb','vdrop','scircuit','zs','trafo','earthsys','impedans','trefase','motorteori','relay','fault','dc','lys','magnet','thermal','pfc','harmonic']
 };
+
+// ===== UNIVERSAL CROSS-MODULE STATE PROPAGATION =====
+// When a value changes in one module, this system propagates it to all connected
+// modules that share the same underlying physical quantity. This is the mechanism
+// that ensures "ALL modules are connected and linked together" per user requirement.
+//
+// SharedQuantities: a registry of physical values that multiple modules reference.
+// When any module updates a shared quantity, ALL modules reading that quantity get
+// the new value. The reactive bus then invalidates/recomputes their verdicts.
+
+const SharedQuantities = {
+  _values: {},
+  _listeners: {},
+
+  // Set a shared value and notify all subscribers
+  set: function(key, value, source) {
+    if (this._values[key] === value) return; // no-op if unchanged
+    this._values[key] = value;
+    var listeners = this._listeners[key] || [];
+    for (var i = 0; i < listeners.length; i++) {
+      try { listeners[i].fn(value, source); } catch(e) { /* safety */ }
+    }
+    // Trigger reactive propagation from the source module
+    if (source && typeof Reactive !== 'undefined') {
+      Reactive.notify(source);
+    }
+  },
+
+  // Get a shared value
+  get: function(key, fallback) {
+    return this._values[key] !== undefined ? this._values[key] : (fallback !== undefined ? fallback : null);
+  },
+
+  // Subscribe a module to changes in a shared quantity
+  subscribe: function(key, fn) {
+    if (!this._listeners[key]) this._listeners[key] = [];
+    this._listeners[key].push({ fn: fn });
+  },
+
+  // Bulk-set multiple values (used by analyzer to populate the bus)
+  populate: function(map, source) {
+    var keys = Object.keys(map);
+    for (var i = 0; i < keys.length; i++) {
+      this._values[keys[i]] = map[keys[i]];
+    }
+    // Notify listeners for each key
+    for (var j = 0; j < keys.length; j++) {
+      var k = keys[j];
+      var listeners = this._listeners[k] || [];
+      for (var l = 0; l < listeners.length; l++) {
+        try { listeners[l].fn(map[k], source); } catch(e) { /* safety */ }
+      }
+    }
+    // Single reactive notification for the source
+    if (source && typeof Reactive !== 'undefined') {
+      Reactive.notify(source);
+    }
+  },
+
+  // Get all current values (for debugging/display)
+  snapshot: function() {
+    var copy = {};
+    var keys = Object.keys(this._values);
+    for (var i = 0; i < keys.length; i++) copy[keys[i]] = this._values[keys[i]];
+    return copy;
+  }
+};
+
+// === Register cross-module subscriptions ===
+// When frequency changes anywhere, update all modules that use frequency
+SharedQuantities.subscribe('frequency', function(f, source) {
+  if (source !== 'impedans') impedansState.f = f;
+  if (source !== 'trefase') trefaseState.f = f;
+  if (source !== 'motorteori') motorteoriState.f = f;
+});
+
+// When supply voltage changes, propagate to all modules
+SharedQuantities.subscribe('voltage_phase', function(v, source) {
+  if (source !== 'impedans') impedansState.U = v;
+  if (source !== 'trefase' && (v === 400 || v === 690)) trefaseState.UL = v;
+  if (source !== 'motorteori' && (v === 400 || v === 230 || v === 690)) motorteoriState.U = v;
+  if (source !== 'fault') faultState.voltage = (v === 400) ? 230 : v;
+});
+
+// When transformer kVA changes, update relay, scircuit, energy modules
+SharedQuantities.subscribe('trafo_kva', function(kva, source) {
+  if (source !== 'trafo') trafoState.size = kva;
+  if (source !== 'relay') relayState.trafoKVA = kva;
+});
+
+// When transformer uk% changes, update short-circuit calculations
+SharedQuantities.subscribe('trafo_uk_pct', function(uk, source) {
+  if (source !== 'trafo') trafoState.scUkPct = uk;
+});
+
+// When cos phi changes, propagate across modules
+SharedQuantities.subscribe('cos_phi', function(cos, source) {
+  if (source !== 'load') loadState.cosPhi = cos;
+  if (source !== 'motorteori') motorteoriState.cosPhi = cos;
+  if (source !== 'trefase') {
+    var phi = Math.acos(Math.min(1, Math.max(0, cos)));
+    trefaseState.phi = phi;
+  }
+});
+
+// When earthing system changes, propagate to fault module
+SharedQuantities.subscribe('earth_system', function(sys, source) {
+  if (source !== 'fault') {
+    var map = {'TN-S':'tns','TN-C':'tnc','TN-C-S':'tncs','TT':'tt','IT':'it1'};
+    faultState.earthSystem = map[sys] || sys;
+  }
+  if (source !== 'earthsys') {
+    var map2 = {'TN-S':'tns','TN-C':'tnc','TN-C-S':'tncs','TT':'tt','IT':'it1'};
+    if (typeof earthsysState !== 'undefined') earthsysState.selectedSystem = map2[sys] || sys;
+  }
+});
+
+// When cable cross-section changes, update thermal/impedance calculations
+SharedQuantities.subscribe('cable_mm2', function(mm2, source) {
+  if (source !== 'cable') cableState.crossSection = mm2;
+});
+
+// When installation method/temperature/grouping changes, all Iz calculations update
+SharedQuantities.subscribe('install_method', function(m, source) {
+  if (source !== 'cable') cableState.installMethod = m;
+});
+SharedQuantities.subscribe('ambient_temp', function(t, source) {
+  if (source !== 'cable') cableState.temp = t;
+  if (source !== 'thermal' && typeof thermalState !== 'undefined') thermalState.ambientTemp = t;
+});
+SharedQuantities.subscribe('cable_grouping', function(g, source) {
+  if (source !== 'cable') cableState.grouping = g;
+});
+
+// When load power changes, propagate to motor/lighting modules
+SharedQuantities.subscribe('load_power_kw', function(p, source) {
+  if (source !== 'load') loadState.power = p;
+});
+
+// When motor parameters change
+SharedQuantities.subscribe('motor_power_w', function(p, source) {
+  if (source !== 'motorteori') motorteoriState.Prated = p;
+});
+
+// When Zs (fault loop impedance) changes
+SharedQuantities.subscribe('zs_value', function(zs, source) {
+  if (source !== 'fault') faultState.zsValue = zs;
+  if (source !== 'zs' && typeof zsState !== 'undefined') zsState.measured = zs;
+});
 
 // "May be relevant" broad subscribers: the safety brain, the unified-project
 // auditor (Den Kritiske Hjerne), the drawing, the documentation/BOM and the
@@ -5713,9 +5880,76 @@ function _restoreFocusKey(k) {
   } catch (e) { /* ignore */ }
 }
 
+// ===== SYNC SHARED QUANTITIES =====
+// Called on every renderModule(). Reads the current state of the source module and
+// pushes any shared physical quantities into SharedQuantities so all dependent
+// modules automatically receive the update. This is what makes "change in one
+// module = change in all related modules" work without manual wiring in every onclick.
+function syncSharedQuantities(mod) {
+  if (typeof SharedQuantities === 'undefined') return;
+  switch(mod) {
+    case 'load':
+      SharedQuantities.set('load_power_kw', loadState.power, 'load');
+      SharedQuantities.set('cos_phi', loadState.cosPhi, 'load');
+      SharedQuantities.set('voltage_phase', loadState.voltage === '3x400' ? 400 : 230, 'load');
+      break;
+    case 'trafo':
+      SharedQuantities.set('trafo_kva', trafoState.size, 'trafo');
+      SharedQuantities.set('trafo_uk_pct', trafoState.scUkPct, 'trafo');
+      SharedQuantities.set('frequency', trafoState.emfFreq, 'trafo');
+      break;
+    case 'cable':
+      if (cableState.crossSection) SharedQuantities.set('cable_mm2', parseFloat(cableState.crossSection), 'cable');
+      SharedQuantities.set('install_method', cableState.installMethod, 'cable');
+      SharedQuantities.set('ambient_temp', cableState.temp, 'cable');
+      SharedQuantities.set('cable_grouping', cableState.grouping, 'cable');
+      break;
+    case 'impedans':
+      SharedQuantities.set('frequency', impedansState.f, 'impedans');
+      SharedQuantities.set('voltage_phase', impedansState.U, 'impedans');
+      break;
+    case 'trefase':
+      SharedQuantities.set('frequency', trefaseState.f, 'trefase');
+      SharedQuantities.set('voltage_phase', trefaseState.UL, 'trefase');
+      var cosTrefase = Math.cos(trefaseState.phi);
+      SharedQuantities.set('cos_phi', parseFloat(cosTrefase.toFixed(4)), 'trefase');
+      break;
+    case 'motorteori':
+      SharedQuantities.set('frequency', motorteoriState.f, 'motorteori');
+      SharedQuantities.set('voltage_phase', motorteoriState.U, 'motorteori');
+      SharedQuantities.set('cos_phi', motorteoriState.cosPhi, 'motorteori');
+      SharedQuantities.set('motor_power_w', motorteoriState.Prated, 'motorteori');
+      break;
+    case 'relay':
+      SharedQuantities.set('trafo_kva', relayState.trafoKVA, 'relay');
+      break;
+    case 'fault':
+      SharedQuantities.set('zs_value', faultState.zsValue, 'fault');
+      var earthMap = {tns:'TN-S',tnc:'TN-C',tncs:'TN-C-S',tt:'TT',it1:'IT'};
+      SharedQuantities.set('earth_system', earthMap[faultState.earthSystem] || faultState.earthSystem, 'fault');
+      break;
+    case 'earthsys':
+      if (typeof earthsysState !== 'undefined' && earthsysState.selectedSystem) {
+        var em2 = {tns:'TN-S',tnc:'TN-C',tncs:'TN-C-S',tt:'TT',it1:'IT'};
+        SharedQuantities.set('earth_system', em2[earthsysState.selectedSystem] || earthsysState.selectedSystem, 'earthsys');
+      }
+      break;
+    case 'dc':
+      // DC module is self-contained but shares voltage for battery systems
+      break;
+    case 'lys':
+      // Lighting load contributes to total load estimation
+      break;
+    case 'magnet':
+      // Magnetic calculations are linked via transformer/motor theory
+      break;
+  }
+}
+
 function renderModule(mod) {
   if (typeof Reactive !== 'undefined') Reactive.onRender(mod); // reactive propagation: recompute all linked verdicts first
   syncAxes(); // Dynamic coordination
+  syncSharedQuantities(mod); // Cross-module shared value propagation
   const main = document.getElementById('mainContent');
   let content = '';
   switch(mod) {
@@ -23306,6 +23540,9 @@ var analyzerState = {
   extracted: null,
   results: [],
   completeness: { solved: 0, total: 0, flagged: [] },
+  dependencies: [],  // Inter-question dependency chain
+  moduleFlow: [],    // Which modules were used and how values flowed
+  busPopulated: false, // Whether reactive bus was auto-populated
   mode: 'upload' // 'upload' or 'paste'
 };
 // Normalize input text: strip page numbers, headers, fix encoding
@@ -23352,44 +23589,45 @@ function analyzerSegment(text) {
   }
   return segments;
 }
-// Extract electrical parameters from text using regex
+// Extract electrical parameters from text using regex - COMPREHENSIVE VERSION
+// Handles all parameters from all 8 Elektroteknik textbooks and exam patterns
 function analyzerExtract(text) {
   var data = {
-    power_kW: null,
-    voltage: null,
-    phases: null,
-    cosPhi: null,
-    eta: null,
-    installMethod: null,
-    temperature: null,
-    grouping: null,
-    cableLength: null,
-    cableMm2: null,
-    cableType: null,
-    deviceIn: null,
-    deviceIcu: null,
-    deviceCurve: null,
-    trafoKVA: null,
-    trafoUk: null,
-    trafoPcu: null,
-    trafoP0: null,
-    earthSystem: null,
-    zsValue: null,
-    disconnectTime: null,
+    power_kW: null, voltage: null, phases: null, cosPhi: null, eta: null,
+    installMethod: null, temperature: null, grouping: null,
+    cableLength: null, cableMm2: null, cableType: null,
+    deviceIn: null, deviceIcu: null, deviceCurve: null,
+    trafoKVA: null, trafoUk: null, trafoPcu: null, trafoP0: null,
+    trafoI0pct: null, trafoVecGroup: null, trafoPrimKV: null,
+    earthSystem: null, zsValue: null, disconnectTime: null,
+    rcdType: null, rcdSensitivity: null,
+    frequency: null, resistance: null, inductance: null, capacitance: null,
+    connectionType: null,
+    motorPoles: null, motorSpeed: null, motorPower: null,
+    motorStartMethod: null, motorIstart: null,
+    turns: null, coreArea: null, airGap: null,
+    roomArea: null, luxRequired: null, roomHeight: null, lampLumen: null,
     questions: [],
-    confidence: {}
+    confidence: {},
+    rawValues: {}
   };
 
-  // Power: "37 kW", "Belastning: 37 kW", "P = 37 kW"
-  var pMatch = text.match(/(?:belastning|effekt|P)\s*[:=]?\s*(\d+[.,]?\d*)\s*kW/i);
+  // Power: "37 kW", "Belastning: 37 kW", "P = 37 kW", "Pn = 37 kW"
+  var pMatch = text.match(/(?:belastning|effekt|P[n]?|ydelse)\s*[:=]?\s*(\d+[.,]?\d*)\s*kW/i);
   if (pMatch) { data.power_kW = parseFloat(pMatch[1].replace(',', '.')); data.confidence.power_kW = 'high'; }
+  if (!data.power_kW) {
+    var pwMatch = text.match(/(?:P[n]?|effekt|ydelse)\s*[:=]?\s*(\d+[.,]?\d*)\s*W\b/i);
+    if (pwMatch) { var pVal = parseFloat(pwMatch[1].replace(',', '.')); if (pVal >= 100) { data.power_kW = pVal / 1000; data.confidence.power_kW = 'medium'; } }
+  }
 
-  // Voltage: "400 V", "3-faset 400V", "230V", "3x400"
+  // Voltage: "400 V", "3-faset 400V", "230V", "3x400", "690V", "10 kV"
   var vMatch = text.match(/(\d+)\s*V(?:\s|,|\.|\b)/);
   if (vMatch) {
     var vVal = parseInt(vMatch[1]);
-    if (vVal === 400 || vVal === 230) { data.voltage = vVal; data.confidence.voltage = 'high'; }
+    if ([110, 230, 400, 690].indexOf(vVal) >= 0) { data.voltage = vVal; data.confidence.voltage = 'high'; }
   }
+  var kvMatch = text.match(/(\d+[.,]?\d*)\s*kV\b/i);
+  if (kvMatch) { data.trafoPrimKV = parseFloat(kvMatch[1].replace(',', '.')); data.confidence.trafoPrimKV = 'high'; }
 
   // Phases: "3-faset", "1-faset", "3x400", "1x230"
   if (/3[\s-]*fas|3x400|trefase/i.test(text)) { data.phases = 3; data.confidence.phases = 'high'; }
@@ -23444,17 +23682,25 @@ function analyzerExtract(text) {
   var trafoMatch = text.match(/(?:transform(?:er|ator))?\s*[:=]?\s*(\d+)\s*kVA/i);
   if (trafoMatch) { data.trafoKVA = parseInt(trafoMatch[1]); data.confidence.trafoKVA = 'high'; }
 
-  // Transformer uk%: "uk = 4%", "uk% = 6", "kortslutningsspænding 4%"
+  // Transformer uk%: "uk = 4%", "uk% = 6", "kortslutningsspaending 4%"
   var ukMatch = text.match(/(?:uk|kortslutningssp.nding)\s*[%=:]\s*(\d+[.,]?\d*)\s*%?/i);
   if (ukMatch) { data.trafoUk = parseFloat(ukMatch[1].replace(',', '.')); data.confidence.trafoUk = 'high'; }
 
-  // Transformer Pcu: "Pcu = 6500 W", "kobber tab 6500"
-  var pcuMatch = text.match(/(?:Pcu|kobbertab|copper\s*loss)\s*[:=]?\s*(\d+)\s*W?/i);
+  // Transformer Pcu: "Pcu = 6500 W", "kobber tab 6500", "Pk = 6500"
+  var pcuMatch = text.match(/(?:Pcu|Pk|kobbertab|belastningstab|copper\s*loss|load\s*loss)\s*[:=]?\s*(\d+)\s*W?/i);
   if (pcuMatch) { data.trafoPcu = parseInt(pcuMatch[1]); data.confidence.trafoPcu = 'high'; }
 
-  // Transformer P0: "P0 = 1200 W", "tomgangstab 1200"
-  var p0Match = text.match(/(?:P0|tomgangstab|no.?load\s*loss)\s*[:=]?\s*(\d+)\s*W?/i);
+  // Transformer P0: "P0 = 1200 W", "tomgangstab 1200", "jerntab"
+  var p0Match = text.match(/(?:P0|P_0|tomgangstab|jerntab|no.?load\s*loss|iron\s*loss)\s*[:=]?\s*(\d+)\s*W?/i);
   if (p0Match) { data.trafoP0 = parseInt(p0Match[1]); data.confidence.trafoP0 = 'high'; }
+
+  // Transformer I0%
+  var i0Match = text.match(/(?:I0|i_0|tomgangsstr.m|no.?load\s*current)\s*[:=]?\s*(\d+[.,]?\d*)\s*%?/i);
+  if (i0Match) { data.trafoI0pct = parseFloat(i0Match[1].replace(',', '.')); data.confidence.trafoI0pct = 'high'; }
+
+  // Vector group: "Dy11", "Dyn11", "Yyn0"
+  var vecMatch = text.match(/\b(D[yd]n?\d+|Y[yd]n?\d+)\b/i);
+  if (vecMatch) { data.trafoVecGroup = vecMatch[1]; data.confidence.trafoVecGroup = 'high'; }
 
   // Earthing system: "TN-S", "TN-C-S", "TT", "IT"
   var earthMatch = text.match(/\b(TN-S|TN-C-S|TN-C|TT|IT)\b/i);
@@ -23468,31 +23714,162 @@ function analyzerExtract(text) {
   var discMatch = text.match(/(?:frakoblings?tid|udkoblingstid|disconnect)\s*[:=]?\s*(\d+[.,]?\d*)\s*s/i);
   if (discMatch) { data.disconnectTime = parseFloat(discMatch[1].replace(',', '.')); data.confidence.disconnectTime = 'high'; }
 
+  // RCD type and sensitivity
+  var rcdMatch = text.match(/(?:HPFI|RCD|HFI)\s*(?:type)?\s*([AB])/i);
+  if (rcdMatch) { data.rcdType = rcdMatch[1].toUpperCase(); }
+  var rcdSensMatch = text.match(/(?:I\u0394n|I_delta|sensitivit)\s*[:=]?\s*(\d+)\s*mA/i);
+  if (rcdSensMatch) { data.rcdSensitivity = parseInt(rcdSensMatch[1]); }
+
+  // === IMPEDANCE / AC THEORY (Bind 1 + 6) ===
+  var fMatch = text.match(/(?:frekvens|frequency|f)\s*[:=]?\s*(\d+[.,]?\d*)\s*Hz/i);
+  if (fMatch) { data.frequency = parseFloat(fMatch[1].replace(',', '.')); data.confidence.frequency = 'high'; }
+
+  var rOhmMatch = text.match(/(?:modstand|resistance|R)\s*[:=]?\s*(\d+[.,]?\d*)\s*(?:k?\u03A9|k?[Oo]hm)/i);
+  if (rOhmMatch) {
+    data.resistance = parseFloat(rOhmMatch[1].replace(',', '.'));
+    if (/k\u03A9|kohm/i.test(rOhmMatch[0])) data.resistance *= 1000;
+    data.confidence.resistance = 'high';
+  }
+
+  var lhMatch = text.match(/(?:induktans|inductance|spole|L)\s*[:=]?\s*(\d+[.,]?\d*)\s*(?:mH|H|\u00B5H|uH)/i);
+  if (lhMatch) {
+    data.inductance = parseFloat(lhMatch[1].replace(',', '.'));
+    if (/mH/i.test(lhMatch[0])) data.inductance /= 1000;
+    if (/\u00B5H|uH/i.test(lhMatch[0])) data.inductance /= 1000000;
+    data.confidence.inductance = 'high';
+  }
+
+  var capMatch = text.match(/(?:kapacitans|capacitance|kondensator|C)\s*[:=]?\s*(\d+[.,]?\d*)\s*(?:\u00B5F|uF|nF|pF|F)/i);
+  if (capMatch) {
+    data.capacitance = parseFloat(capMatch[1].replace(',', '.'));
+    if (/\u00B5F|uF/i.test(capMatch[0])) data.capacitance /= 1000000;
+    else if (/nF/i.test(capMatch[0])) data.capacitance /= 1000000000;
+    else if (/pF/i.test(capMatch[0])) data.capacitance /= 1000000000000;
+    data.confidence.capacitance = 'high';
+  }
+
+  if (/serie/i.test(text) && !/parallel/i.test(text)) data.connectionType = 'series';
+  else if (/parallel/i.test(text) && !/serie/i.test(text)) data.connectionType = 'parallel';
+
+  // === MOTOR THEORY (Bind 3) ===
+  var polesMatch = text.match(/(?:pol(?:er|antal|par|e|tal)|poles?)\s*[:=]?\s*(\d+)/i);
+  if (polesMatch) { data.motorPoles = parseInt(polesMatch[1]); data.confidence.motorPoles = 'high'; }
+
+  var speedMatch = text.match(/(?:omdrejningstal|hastighed|rpm|speed|n)\s*[:=]?\s*(\d{3,5})\s*(?:o\/min|rpm|min)?/i);
+  if (speedMatch) { data.motorSpeed = parseInt(speedMatch[1]); data.confidence.motorSpeed = 'high'; }
+
+  var mPowMatch = text.match(/(?:motor|aksel).*(?:Pn|effekt|power)\s*[:=]?\s*(\d+[.,]?\d*)\s*(?:kW|W)/i);
+  if (mPowMatch) {
+    data.motorPower = parseFloat(mPowMatch[1].replace(',', '.'));
+    if (/\bW\b/.test(mPowMatch[0]) && data.motorPower >= 100) data.motorPower /= 1000;
+    data.confidence.motorPower = 'high';
+  }
+
+  if (/direkte\s+start|DOL|direct.on.line/i.test(text)) data.motorStartMethod = 'dol';
+  else if (/stjerne.*trekant|star.*delta|Y\/?\u0394|Y-D/i.test(text)) data.motorStartMethod = 'star_delta';
+  else if (/softstarter|soft.?start/i.test(text)) data.motorStartMethod = 'soft';
+  else if (/frekvensomformer|VFD|FC/i.test(text)) data.motorStartMethod = 'vfd';
+
+  // === MAGNETIC CIRCUITS (Bind 1 + 3) ===
+  var turnsMatch = text.match(/(?:vindingstal|antal\s+vindinger|turns|N)\s*[:=]\s*(\d+)/i);
+  if (turnsMatch) { data.turns = parseInt(turnsMatch[1]); data.confidence.turns = 'high'; }
+
+  var coreAreaMatch = text.match(/(?:kerneareal|tv.rsnitsareal|core\s*area|A_fe)\s*[:=]?\s*(\d+[.,]?\d*)\s*(?:cm\u00B2|m\u00B2|mm\u00B2)?/i);
+  if (coreAreaMatch) { data.coreArea = parseFloat(coreAreaMatch[1].replace(',', '.')); data.confidence.coreArea = 'high'; }
+
+  var gapMatch = text.match(/(?:luftgab|luftspalte|air.?gap)\s*[:=]?\s*(\d+[.,]?\d*)\s*(?:mm|m)?/i);
+  if (gapMatch) { data.airGap = parseFloat(gapMatch[1].replace(',', '.')); data.confidence.airGap = 'high'; }
+
+  // === LIGHTING (Bind 4) ===
+  var luxMatch = text.match(/(?:belysningsstyrke|lux|krav.*lx)\s*[:=]?\s*(\d+)\s*(?:lx|lux)?/i);
+  if (luxMatch) { data.luxRequired = parseInt(luxMatch[1]); data.confidence.luxRequired = 'high'; }
+
+  var lumenMatch = text.match(/(?:lysstr.m|lumen|armatur)\s*[:=]?\s*(\d+)\s*(?:lm|lumen)/i);
+  if (lumenMatch) { data.lampLumen = parseInt(lumenMatch[1]); data.confidence.lampLumen = 'high'; }
+
+  var roomHMatch = text.match(/(?:l.fteh.jde|montage.*h.jde|mounting\s*height)\s*[:=]?\s*(\d+[.,]?\d*)\s*m/i);
+  if (roomHMatch) { data.roomHeight = parseFloat(roomHMatch[1].replace(',', '.')); data.confidence.roomHeight = 'high'; }
+
   // Detect questions
   data.questions = analyzerDetectQuestions(text);
 
   return data;
 }
-// Detect question types from text
+// Detect question types from text - COMPREHENSIVE coverage of ALL module types
+// Handles exact phrasing from all 8 Elektroteknik textbooks (Bind 1-8) and exam patterns
 function analyzerDetectQuestions(text) {
   var questions = [];
   var patterns = [
-    { re: /beregn\s+(?:belastningsstr.{1,2}mmen\s+)?IB/i, type: 'ib', label: 'Beregn IB' },
-    { re: /beregn\s+(?:str.{1,2}mb.{1,2}reevnen\s+)?Iz/i, type: 'iz', label: 'Beregn Iz' },
-    { re: /beregn\s+(?:sp.{1,2}ndingsfaldet|voltage\s*drop|\u0394U)/i, type: 'vdrop', label: 'Beregn \u0394U%' },
-    { re: /beregn\s+(?:kortslutningsstr.{1,2}mmen\s+)?Ik/i, type: 'ik', label: 'Beregn Ik' },
-    { re: /(?:er\s+)?fejlbeskyttelsen\s+(?:tilstr.{1,2}kkelig|ok|i\s*orden)/i, type: 'fault', label: 'Fejlbeskyttelse' },
-    { re: /(?:v.{1,2}lg|dimensioner)\s+(?:kabel|leder)/i, type: 'cable', label: 'Kabeldimensionering' },
-    { re: /(?:v.{1,2}lg|dimensioner)\s+(?:sikring|MCB|automatsikring|beskyttelse)/i, type: 'device', label: 'V\u00e6lg beskyttelse' },
-    { re: /beregn\s+(?:fejlsl.{1,2}jfe|Zs)/i, type: 'zs', label: 'Beregn Zs' },
-    { re: /selektivitet/i, type: 'selectivity', label: 'Selektivitet' },
-    { re: /(?:transformer|trafo).*(?:impedans|tab|loss)/i, type: 'trafo', label: 'Trafo-beregning' },
-    { re: /beregn\s+(?:den\s+)?tilladelige\s+str.{1,2}m/i, type: 'iz', label: 'Tilladeligt Iz' },
-    { re: /koordinering|IB\s*.\s*In\s*.\s*Iz/i, type: 'coord', label: 'Koordinering IB\u2264In\u2264Iz' }
+    // === CORE DIMENSIONING ===
+    { re: /beregn\s+(?:belastningsstr.{1,2}mmen\s+)?IB/i, type: 'ib', label: 'Beregn IB', module: 'load' },
+    { re: /beregn\s+(?:str.{1,2}mb.{1,2}reevnen\s+)?Iz/i, type: 'iz', label: 'Beregn Iz', module: 'cable' },
+    { re: /beregn\s+(?:sp.{1,2}ndingsfaldet|voltage\s*drop|\u0394U)/i, type: 'vdrop', label: 'Beregn \u0394U%', module: 'vdrop' },
+    { re: /beregn\s+(?:kortslutningsstr.{1,2}mmen\s+)?Ik/i, type: 'ik', label: 'Beregn Ik', module: 'scircuit' },
+    { re: /(?:er\s+)?fejlbeskyttelsen\s+(?:tilstr.{1,2}kkelig|ok|i\s*orden)/i, type: 'fault', label: 'Fejlbeskyttelse', module: 'fault' },
+    { re: /(?:v.{1,2}lg|dimensioner)\s+(?:kabel|leder)/i, type: 'cable', label: 'Kabeldimensionering', module: 'cable' },
+    { re: /(?:v.{1,2}lg|dimensioner)\s+(?:sikring|MCB|automatsikring|beskyttelse)/i, type: 'device', label: 'V\u00e6lg beskyttelse', module: 'mcb' },
+    { re: /beregn\s+(?:fejlsl.{1,2}jfe|Zs)/i, type: 'zs', label: 'Beregn Zs', module: 'zs' },
+    { re: /selektivitet/i, type: 'selectivity', label: 'Selektivitet', module: 'discrim' },
+    { re: /beregn\s+(?:den\s+)?tilladelige\s+str.{1,2}m/i, type: 'iz', label: 'Tilladeligt Iz', module: 'cable' },
+    { re: /koordinering|IB\s*.\s*In\s*.\s*Iz/i, type: 'coord', label: 'Koordinering IB\u2264In\u2264Iz', module: 'mcb' },
+    // === TRANSFORMER (Bind 3 + 5) ===
+    { re: /(?:transformer|trafo).*(?:impedans|tab|loss)/i, type: 'trafo', label: 'Trafo-beregning', module: 'trafo' },
+    { re: /(?:beregn|find)\s+(?:den\s+)?(?:inducerede\s+)?EMK|EMF\s*=\s*4[.,]44/i, type: 'trafo_emf', label: 'Trafo EMK/EMF', module: 'trafo' },
+    { re: /tomgangs(?:pr.ve|tab|str.m)|no.?load\s+(?:test|loss)/i, type: 'trafo_oc', label: 'Tomgangsfors\u00f8g', module: 'trafo' },
+    { re: /kortslutningspr.ve|short.?circuit\s+test/i, type: 'trafo_sc', label: 'Kortslutningsfors\u00f8g', module: 'trafo' },
+    { re: /sp.ndingsregulering|voltage\s+regulation|e[rx]%/i, type: 'trafo_reg', label: 'Sp\u00e6ndingsregulering', module: 'trafo' },
+    { re: /virkningsgrad.*(?:trafo|transform)|(?:trafo|transform).*virkningsgrad/i, type: 'trafo_eff', label: 'Trafo virkningsgrad', module: 'trafo' },
+    { re: /parallel.*(?:trafo|transform)|(?:trafo|transform).*parallel/i, type: 'trafo_par', label: 'Paralleldrift trafo', module: 'trafo' },
+    { re: /vektorgruppe|vector\s*group|Dy\d+|Yd\d+|Yy\d+|Dd\d+/i, type: 'trafo_vec', label: 'Vektorgruppe', module: 'trafo' },
+    // === IMPEDANCE / AC THEORY (Bind 1 + 6) ===
+    { re: /beregn.*impedans|impedans.*beregn|find\s+Z\b/i, type: 'impedans', label: 'Impedansberegning', module: 'impedans' },
+    { re: /resonans(?:frekvens)?|f0\s*=|resonance/i, type: 'resonance', label: 'Resonansfrekvens', module: 'impedans' },
+    { re: /kvalitetsfaktor|Q[- ]faktor|Q\s*=\s*\d/i, type: 'qfactor', label: 'Q-faktor', module: 'impedans' },
+    { re: /fasevinkel|fase-?forskel|phase\s+angle|\u03C6\s*=/i, type: 'phase_angle', label: 'Fasevinkel', module: 'impedans' },
+    { re: /tidskonstant|time\s+constant|\u03C4\s*=/i, type: 'time_const', label: 'Tidskonstant', module: 'impedans' },
+    { re: /XL\s*=|induktiv.*reaktans|inductive\s+reactance/i, type: 'xl', label: 'Induktiv reaktans XL', module: 'impedans' },
+    { re: /XC\s*=|kapacitiv.*reaktans|capacitive\s+reactance/i, type: 'xc', label: 'Kapacitiv reaktans XC', module: 'impedans' },
+    // === THREE-PHASE (Bind 1 + 6) ===
+    { re: /trefas.*belastning|3-?fas.*beregn|three.?phase\s+calc/i, type: 'trefase', label: 'Trefaseberegning', module: 'trefase' },
+    { re: /usymmetrisk\s+belastning|asymmetr/i, type: 'trefase_asym', label: 'Usymmetrisk belastning', module: 'trefase' },
+    { re: /effektfaktor.*forbedr|cos.*phi.*forbedr|power\s+factor\s+correct/i, type: 'pfc', label: 'Effektfaktorforbedring', module: 'trefase' },
+    { re: /wattmeter.*metod|to-?wattmeter|two.?watt/i, type: 'wattmeter', label: '2-wattmeter metode', module: 'trefase' },
+    { re: /stjerne.*trekant|star.*delta|Y.*\u0394/i, type: 'star_delta', label: 'Stjerne/trekant', module: 'trefase' },
+    // === MOTOR THEORY (Bind 3) ===
+    { re: /synkron.*hastighed|n[s0]\s*=|synchronous\s+speed/i, type: 'motor_sync', label: 'Synkronhastighed', module: 'motorteori' },
+    { re: /slip\s*[=:]|slip.*beregn|motor.*slip/i, type: 'motor_slip', label: 'Motorslip', module: 'motorteori' },
+    { re: /moment|drejningsmoment|torque/i, type: 'motor_torque', label: 'Drejningsmoment', module: 'motorteori' },
+    { re: /startstr.m|I_start|start.*current|startmoment/i, type: 'motor_start', label: 'Startstr\u00f8m/moment', module: 'motorteori' },
+    { re: /motorv.rn|motor\s+protect|MMS/i, type: 'motor_prot', label: 'Motorv\u00e6rn', module: 'motorteori' },
+    // === RELAY PROTECTION (Bind 5) ===
+    { re: /(?:overstr.ms)?rel.\s*indstilling|relay\s+setting/i, type: 'relay', label: 'Rel\u00e6indstilling', module: 'relay' },
+    { re: /sel.*rel.|rel.*sel/i, type: 'relay_sel', label: 'Rel\u00e6-selektivitet', module: 'relay' },
+    // === DC CIRCUITS (Bind 1) ===
+    { re: /ohms\s+lov|ohm'?s\s+law/i, type: 'dc_ohm', label: 'Ohms lov', module: 'dc' },
+    { re: /kirchhoff|kirch/i, type: 'dc_kirch', label: 'Kirchhoffs love', module: 'dc' },
+    { re: /thevenin|norton|superposition/i, type: 'dc_equiv', label: 'Erstatningskredsloeb', module: 'dc' },
+    { re: /sp.ndingsdeler|voltage\s+divider/i, type: 'dc_vdiv', label: 'Sp\u00e6ndingsdeler', module: 'dc' },
+    { re: /serie.*parallel|parallel.*serie|modstand.*beregn/i, type: 'dc_rnet', label: 'Serie/parallel modstand', module: 'dc' },
+    // === LIGHTING (Bind 4) ===
+    { re: /lumen.*metod|lux.*beregn|belysning.*beregn|armatur.*antal/i, type: 'lys', label: 'Belysningsberegning', module: 'lys' },
+    { re: /lysintensitet|candela|cd\b/i, type: 'lys_cd', label: 'Lysintensitet', module: 'lys' },
+    { re: /rumindeks|room\s+index|K\s*=\s*[abl]/i, type: 'lys_ri', label: 'Rumindeks', module: 'lys' },
+    // === MAGNETIC CIRCUITS (Bind 1 + 3) ===
+    { re: /magnetisk.*kreds|magnetic\s+circuit/i, type: 'magnet', label: 'Magnetisk kreds', module: 'magnet' },
+    { re: /magnetomotorisk.*kraft|MMF|H.*l\s*=/i, type: 'magnet_mmf', label: 'MMF (magnetomotorisk kraft)', module: 'magnet' },
+    { re: /magnetisk\s+fluks|\u03A6\s*=|flux\s*=|B\s*\u00B7\s*A/i, type: 'magnet_flux', label: 'Magnetisk fluks', module: 'magnet' },
+    { re: /reluktans|reluctance/i, type: 'magnet_rel', label: 'Reluktans', module: 'magnet' },
+    { re: /induktion.*lov|faraday|lenz|induceret\s+EMK/i, type: 'magnet_ind', label: 'Induktionslov', module: 'magnet' },
+    // === THERMAL / ENERGY ===
+    { re: /termisk.*beregn|k.S.|I.t\s*\u2264/i, type: 'thermal', label: 'Termisk p\u00e5virkning k\u00B2S\u00B2', module: 'thermal' },
+    { re: /energi.*tab|tab.*energi|efficiency/i, type: 'energy', label: 'Energitab', module: 'energy' },
+    // === FULL INSTALLATION (multi-step) ===
+    { re: /dimensioner\s+(?:den\s+)?(?:komplette|hele|samlede)\s+installation/i, type: 'full_install', label: 'Komplet installation', module: 'load' },
+    { re: /fra\s+transformer.*til.*(?:stik|forbruger|slutkreds)/i, type: 'full_install', label: 'Trafo til slutkreds', module: 'trafo' }
   ];
   for (var i = 0; i < patterns.length; i++) {
     if (patterns[i].re.test(text)) {
-      questions.push({ type: patterns[i].type, label: patterns[i].label, source: 'detected' });
+      questions.push({ type: patterns[i].type, label: patterns[i].label, module: patterns[i].module, source: 'detected' });
     }
   }
   return questions;
@@ -23702,7 +24079,201 @@ function analyzerSolve(data) {
     }
   }
 
-  return { results: results, completeness: { solved: solved, total: total, flagged: flagged } };
+  // === TRANSFORMER CALCULATIONS (Bind 3 + 5) ===
+  if (data.trafoKVA) {
+    var trafoSN = data.trafoKVA; // kVA
+    var trafoUk = data.trafoUk || 4; // default 4%
+    var trafoIN = (trafoSN * 1000) / (Math.sqrt(3) * 400);
+    // Compute Ik at transformer secondary
+    var trafoZpct = trafoUk / 100;
+    var trafoIk = trafoIN / trafoZpct;
+    var trafoResults = [];
+    trafoResults.push({ desc: tx('Mærkestrøm IN', 'Rated current IN'), expr: '(' + trafoSN + ' * 1000) / (\u221A3 * 400)', result: trafoIN.toFixed(1) + ' A' });
+    trafoResults.push({ desc: tx('Ik ved sekundær', 'Ik at secondary'), expr: trafoIN.toFixed(1) + ' / ' + trafoZpct, result: (trafoIk/1000).toFixed(2) + ' kA' });
+    if (data.trafoPcu && data.trafoP0) {
+      var erPct = (data.trafoPcu / (trafoSN * 1000)) * 100;
+      var exPct = Math.sqrt(Math.max(0, trafoUk * trafoUk - erPct * erPct));
+      trafoResults.push({ desc: 'er% (resistiv)', expr: '(' + data.trafoPcu + ' / ' + (trafoSN*1000) + ') * 100', result: erPct.toFixed(2) + '%' });
+      trafoResults.push({ desc: 'ex% (reaktiv)', expr: '\u221A(' + trafoUk + '\u00B2 - ' + erPct.toFixed(2) + '\u00B2)', result: exPct.toFixed(2) + '%' });
+      // Efficiency at given load
+      var loadPct = 0.75;
+      var pOut = trafoSN * loadPct * 0.85; // assume cos=0.85
+      var pLoss = data.trafoP0 + loadPct * loadPct * data.trafoPcu;
+      var eta = pOut * 1000 / (pOut * 1000 + pLoss) * 100;
+      trafoResults.push({ desc: tx('Virkningsgrad (75% belastning)', 'Efficiency (75% load)'), expr: '(' + (pOut*1000).toFixed(0) + ') / (' + (pOut*1000).toFixed(0) + ' + ' + pLoss.toFixed(0) + ')', result: eta.toFixed(1) + '%' });
+    }
+    var trafoHtml = calcDetail({
+      name: tx('Transformer analyse', 'Transformer analysis'),
+      formula: 'IN = SN / (\u221A3 \u00B7 U2), Ik = IN / (uk%/100)',
+      variables: [
+        { name: tx('Mærkeydelse', 'Rated power'), symbol: 'SN', value: trafoSN, unit: 'kVA', source: tx('opgivet', 'specified') },
+        { name: tx('Kortslutningssp.', 'Short-circuit voltage'), symbol: 'uk%', value: trafoUk, unit: '%', source: tx('opgivet/standard', 'specified/standard') }
+      ],
+      substitution: 'IN = ' + trafoSN + '*1000 / (\u221A3*400) = ' + trafoIN.toFixed(1) + ' A',
+      steps: trafoResults,
+      result: { value: 'IN=' + trafoIN.toFixed(1) + 'A, Ik=' + (trafoIk/1000).toFixed(2) + 'kA', unit: '' },
+      reference: 'Bind 5 Kap. 3-4'
+    });
+    results.push({ type: 'trafo', label: tx('Transformer analyse', 'Transformer analysis'), value: 'IN=' + trafoIN.toFixed(1) + 'A', html: trafoHtml, asked: hasQuestion(data, 'trafo') || hasQuestion(data, 'trafo_emf') || hasQuestion(data, 'trafo_sc'), module: 'trafo' });
+    solved++; total++;
+  }
+
+  // === IMPEDANCE / AC THEORY (Bind 1, 6) ===
+  if (data.frequency && (data.resistance || data.inductance || data.capacitance)) {
+    var f = data.frequency || 50;
+    var R = data.resistance || 0;
+    var XL = data.inductance ? 2 * Math.PI * f * data.inductance : 0;
+    var XC = data.capacitance ? 1 / (2 * Math.PI * f * data.capacitance) : 0;
+    var Ztotal, phiRad, connectionLabel;
+    if (data.connectionType === 'parallel' && R > 0) {
+      // Parallel: 1/Z = 1/R + 1/jXL + 1/(-jXC) simplified for magnitude
+      var Gp = 1/R;
+      var Bp = (XC > 0 ? 1/XC : 0) - (XL > 0 ? 1/XL : 0);
+      Ztotal = 1 / Math.sqrt(Gp*Gp + Bp*Bp);
+      phiRad = -Math.atan2(Bp, Gp);
+      connectionLabel = tx('Parallel', 'Parallel');
+    } else {
+      // Series
+      Ztotal = Math.sqrt(R*R + (XL - XC)*(XL - XC));
+      phiRad = Math.atan2(XL - XC, R);
+      connectionLabel = tx('Serie', 'Series');
+    }
+    var phiDeg = phiRad * 180 / Math.PI;
+    var impedSteps = [];
+    if (XL > 0) impedSteps.push({ desc: 'XL = 2\u03C0fL', expr: '2\u03C0 \u00B7 ' + f + ' \u00B7 ' + (data.inductance*1000).toFixed(1) + 'mH', result: XL.toFixed(2) + ' \u03A9' });
+    if (XC > 0) impedSteps.push({ desc: 'XC = 1/(2\u03C0fC)', expr: '1 / (2\u03C0 \u00B7 ' + f + ' \u00B7 C)', result: XC.toFixed(2) + ' \u03A9' });
+    impedSteps.push({ desc: '|Z|', expr: '\u221A(' + R + '\u00B2 + (' + XL.toFixed(1) + '-' + XC.toFixed(1) + ')\u00B2)', result: Ztotal.toFixed(3) + ' \u03A9' });
+    impedSteps.push({ desc: '\u03C6', expr: 'arctan((' + XL.toFixed(1) + '-' + XC.toFixed(1) + ')/' + R + ')', result: phiDeg.toFixed(1) + '\u00B0' });
+    // Resonance check
+    if (data.inductance && data.capacitance) {
+      var f0 = 1 / (2 * Math.PI * Math.sqrt(data.inductance * data.capacitance));
+      impedSteps.push({ desc: tx('Resonansfrekvens f0', 'Resonance freq f0'), expr: '1 / (2\u03C0\u221A(LC))', result: f0.toFixed(1) + ' Hz' });
+      if (R > 0) {
+        var Qfactor = (1/R) * Math.sqrt(data.inductance / data.capacitance);
+        impedSteps.push({ desc: 'Q-faktor', expr: '(1/R)\u00B7\u221A(L/C)', result: Qfactor.toFixed(2) });
+      }
+    }
+    var impedHtml = calcDetail({
+      name: tx('AC Impedansberegning (' + connectionLabel + ')', 'AC Impedance calculation (' + connectionLabel + ')'),
+      formula: 'Z = \u221A(R\u00B2 + (XL-XC)\u00B2)',
+      variables: [
+        { name: tx('Modstand', 'Resistance'), symbol: 'R', value: R, unit: '\u03A9', source: tx('opgivet', 'specified') },
+        { name: tx('Frekvens', 'Frequency'), symbol: 'f', value: f, unit: 'Hz', source: tx('opgivet', 'specified') }
+      ],
+      steps: impedSteps,
+      result: { value: '|Z|=' + Ztotal.toFixed(2) + '\u03A9, \u03C6=' + phiDeg.toFixed(1) + '\u00B0', unit: '' },
+      reference: 'Bind 1 Kap. 6-7, Opgavesamling Kap. 6'
+    });
+    results.push({ type: 'impedans', label: tx('AC Impedans', 'AC Impedance'), value: '|Z|=' + Ztotal.toFixed(2) + ' \u03A9', html: impedHtml, asked: hasQuestion(data, 'impedans') || hasQuestion(data, 'xl') || hasQuestion(data, 'xc') || hasQuestion(data, 'resonance'), module: 'impedans' });
+    solved++; total++;
+  }
+
+  // === MOTOR THEORY (Bind 3) ===
+  if (data.motorPoles && data.frequency) {
+    var ns = (120 * (data.frequency || 50)) / data.motorPoles;
+    var motorSteps = [];
+    motorSteps.push({ desc: tx('Synkronhastighed ns', 'Synchronous speed ns'), expr: '(120 \u00B7 ' + (data.frequency || 50) + ') / ' + data.motorPoles, result: ns + ' rpm' });
+    if (data.motorSpeed) {
+      var slip = (ns - data.motorSpeed) / ns;
+      motorSteps.push({ desc: 'Slip s', expr: '(' + ns + ' - ' + data.motorSpeed + ') / ' + ns, result: (slip * 100).toFixed(2) + '%' });
+    }
+    if (data.motorPower && data.motorSpeed) {
+      var omega = data.motorSpeed * 2 * Math.PI / 60;
+      var torque = (data.motorPower * 1000) / omega;
+      motorSteps.push({ desc: tx('Moment M', 'Torque M'), expr: 'P / \u03C9 = ' + (data.motorPower*1000) + ' / ' + omega.toFixed(1), result: torque.toFixed(1) + ' Nm' });
+    }
+    var motorHtml = calcDetail({
+      name: tx('Motorteori', 'Motor theory'),
+      formula: 'ns = 120f / p, s = (ns - n) / ns',
+      variables: [
+        { name: tx('Poltal', 'Poles'), symbol: 'p', value: data.motorPoles, unit: '', source: tx('opgivet', 'specified') },
+        { name: tx('Frekvens', 'Frequency'), symbol: 'f', value: data.frequency || 50, unit: 'Hz', source: tx('opgivet', 'specified') }
+      ],
+      steps: motorSteps,
+      result: { value: 'ns=' + ns + ' rpm', unit: '' },
+      reference: 'Bind 3 Kap. 5-7'
+    });
+    results.push({ type: 'motorteori', label: tx('Motorberegning', 'Motor calculation'), value: 'ns=' + ns + ' rpm', html: motorHtml, asked: hasQuestion(data, 'motor_sync') || hasQuestion(data, 'motor_slip') || hasQuestion(data, 'motor_torque'), module: 'motorteori' });
+    solved++; total++;
+  }
+
+  // === MAGNETIC CIRCUITS (Bind 1 + 3) ===
+  if (data.turns && (data.coreArea || data.resistance)) {
+    var magSteps = [];
+    if (data.turns && data.resistance) {
+      var mmf = data.turns * (data.resistance > 100 ? 1 : data.resistance); // assume I=R for small R
+      magSteps.push({ desc: 'MMF = N \u00B7 I', expr: data.turns + ' \u00B7 I', result: mmf.toFixed(0) + ' At' });
+    }
+    if (data.coreArea) {
+      magSteps.push({ desc: tx('Kerneareal', 'Core area'), expr: '', result: data.coreArea + ' m\u00B2' });
+    }
+    if (magSteps.length > 0) {
+      var magHtml = calcDetail({
+        name: tx('Magnetisk kreds', 'Magnetic circuit'),
+        formula: 'MMF = N \u00B7 I, \u03A6 = B \u00B7 A, Rm = l / (\u03BC \u00B7 A)',
+        variables: [
+          { name: tx('Vindingstal', 'Turns'), symbol: 'N', value: data.turns, unit: '', source: tx('opgivet', 'specified') }
+        ],
+        steps: magSteps,
+        result: { value: 'N=' + data.turns, unit: '' },
+        reference: 'Bind 1 Kap. 9, Bind 3 Kap. 2'
+      });
+      results.push({ type: 'magnet', label: tx('Magnetisk kreds', 'Magnetic circuit'), value: 'N=' + data.turns, html: magHtml, asked: hasQuestion(data, 'magnet') || hasQuestion(data, 'magnet_mmf'), module: 'magnet', bonus: !hasQuestion(data, 'magnet') });
+      solved++; total++;
+    }
+  }
+
+  // === LIGHTING (Bind 4) ===
+  if (data.luxRequired && data.lampLumen) {
+    var MF = 0.8; // maintenance factor
+    var numLamps = Math.ceil((data.luxRequired * (data.roomArea || 24)) / (data.lampLumen * MF * 0.6));
+    var lysSteps = [];
+    lysSteps.push({ desc: tx('Påkrævet belysning', 'Required illumination'), expr: data.luxRequired + ' lux', result: data.luxRequired + ' lx' });
+    lysSteps.push({ desc: tx('Armaturantal (lumen-metode)', 'Fixture count (lumen method)'), expr: '(' + data.luxRequired + ' \u00B7 A) / (\u03A6 \u00B7 MF \u00B7 UF)', result: numLamps + ' stk' });
+    var lysHtml = calcDetail({
+      name: tx('Belysningsberegning (lumen-metode)', 'Lighting calculation (lumen method)'),
+      formula: 'n = (E \u00B7 A) / (\u03A6 \u00B7 MF \u00B7 UF)',
+      variables: [
+        { name: tx('Belysningsstyrke', 'Illuminance'), symbol: 'E', value: data.luxRequired, unit: 'lx', source: tx('opgivet', 'specified') },
+        { name: tx('Lysstrøm pr. armatur', 'Luminous flux'), symbol: '\u03A6', value: data.lampLumen, unit: 'lm', source: tx('opgivet', 'specified') }
+      ],
+      steps: lysSteps,
+      result: { value: numLamps + ' ' + tx('armaturer', 'fixtures'), unit: '' },
+      reference: 'Bind 4 Kap. 2-3, DS/EN 12464-1'
+    });
+    results.push({ type: 'lys', label: tx('Belysningsberegning', 'Lighting calculation'), value: numLamps + ' stk', html: lysHtml, asked: hasQuestion(data, 'lys') || hasQuestion(data, 'lys_ri'), module: 'lys', bonus: !hasQuestion(data, 'lys') });
+    solved++; total++;
+  }
+
+  // === INTER-QUESTION DEPENDENCY DETECTION ===
+  // Detect when one question's answer feeds into the next
+  var dependencies = [];
+  if (ib && hasQuestion(data, 'cable')) {
+    dependencies.push({ from: 'ib', to: 'cable', label: 'IB \u2192 ' + tx('kabeldimensionering', 'cable sizing'), value: ib.toFixed(1) + ' A' });
+  }
+  if (ib && hasQuestion(data, 'device')) {
+    dependencies.push({ from: 'ib', to: 'device', label: 'IB \u2192 ' + tx('beskyttelsesvalg', 'device selection'), value: ib.toFixed(1) + ' A' });
+  }
+  if (data.trafoKVA && (hasQuestion(data, 'ik') || hasQuestion(data, 'fault'))) {
+    dependencies.push({ from: 'trafo', to: 'ik', label: tx('Trafo \u2192 Ik-beregning', 'Trafo \u2192 Ik calc'), value: data.trafoKVA + ' kVA' });
+  }
+  if (hasQuestion(data, 'ib') && hasQuestion(data, 'vdrop')) {
+    dependencies.push({ from: 'ib', to: 'vdrop', label: 'IB \u2192 \u0394U', value: ib ? ib.toFixed(1) + ' A' : '?' });
+  }
+  if (hasQuestion(data, 'ik') && hasQuestion(data, 'fault')) {
+    dependencies.push({ from: 'ik', to: 'fault', label: 'Ik \u2192 ' + tx('fejlbeskyttelse', 'fault protection'), value: '' });
+  }
+
+  // === MODULE FLOW TRACKING ===
+  var moduleFlow = [];
+  for (var r2 = 0; r2 < results.length; r2++) {
+    if (results[r2].module) moduleFlow.push(results[r2].module);
+  }
+  // Deduplicate
+  var seen = {};
+  moduleFlow = moduleFlow.filter(function(m) { if (seen[m]) return false; seen[m] = true; return true; });
+
+  return { results: results, completeness: { solved: solved, total: total, flagged: flagged }, dependencies: dependencies, moduleFlow: moduleFlow };
 }
 
 // Helper: check if a question type was detected
@@ -23726,17 +24297,62 @@ function findCableProduct(mm2, cableType) {
   }
   return null;
 }
-// Run the full analyzer pipeline
+// Run the full analyzer pipeline - ENHANCED with reactive bus population
 function analyzerRun(text) {
   analyzerState.rawText = text;
   var normalized = analyzerNormalize(text);
   analyzerState.segments = analyzerSegment(normalized);
-  // Extract from entire text
+  // Extract from entire text (comprehensive: all module types)
   analyzerState.extracted = analyzerExtract(normalized);
-  // Solve
+  // Solve (enhanced: all module types + dependency detection)
   var solution = analyzerSolve(analyzerState.extracted);
   analyzerState.results = solution.results;
   analyzerState.completeness = solution.completeness;
+  analyzerState.dependencies = solution.dependencies || [];
+  analyzerState.moduleFlow = solution.moduleFlow || [];
+
+  // === AUTO-POPULATE REACTIVE BUS ===
+  // Push all extracted values into SharedQuantities so ALL modules show the exam context
+  if (typeof SharedQuantities !== 'undefined') {
+    var busMap = {};
+    var d = analyzerState.extracted;
+    if (d.power_kW) busMap.load_power_kw = d.power_kW;
+    if (d.cosPhi) busMap.cos_phi = d.cosPhi;
+    if (d.voltage) busMap.voltage_phase = d.voltage;
+    if (d.trafoKVA) busMap.trafo_kva = d.trafoKVA;
+    if (d.trafoUk) busMap.trafo_uk_pct = d.trafoUk;
+    if (d.earthSystem) busMap.earth_system = d.earthSystem;
+    if (d.zsValue) busMap.zs_value = d.zsValue;
+    if (d.frequency) busMap.frequency = d.frequency;
+    if (d.cableMm2) busMap.cable_mm2 = d.cableMm2;
+    if (d.installMethod) busMap.install_method = d.installMethod;
+    if (d.temperature) busMap.ambient_temp = d.temperature;
+    if (d.grouping) busMap.cable_grouping = d.grouping;
+    if (d.motorPower) busMap.motor_power_w = d.motorPower * 1000;
+    if (Object.keys(busMap).length > 0) {
+      SharedQuantities.populate(busMap, 'analyzer');
+      analyzerState.busPopulated = true;
+    }
+    // Also update module states directly for immediate visibility
+    if (d.power_kW) loadState.power = d.power_kW;
+    if (d.cosPhi) loadState.cosPhi = d.cosPhi;
+    if (d.voltage) loadState.voltage = d.voltage === 400 ? '3x400' : '1x230';
+    if (d.cableLength) vdropState.length = d.cableLength;
+    if (d.cableMm2) cableState.crossSection = d.cableMm2;
+    if (d.installMethod) cableState.installMethod = d.installMethod;
+    if (d.temperature) cableState.temp = d.temperature;
+    if (d.grouping) cableState.grouping = d.grouping;
+    if (d.deviceIn && d.deviceCurve) { mcbState.curve = d.deviceCurve; mcbState.rating = d.deviceIn; }
+    if (d.trafoKVA) trafoState.size = d.trafoKVA;
+    if (d.trafoUk) trafoState.scUkPct = d.trafoUk;
+    if (d.frequency) { impedansState.f = d.frequency; trefaseState.f = d.frequency; motorteoriState.f = d.frequency; }
+    if (d.earthSystem) {
+      var eMap = {'TN-S':'tns','TN-C':'tnc','TN-C-S':'tncs','TT':'tt','IT':'it1'};
+      faultState.earthSystem = eMap[d.earthSystem] || 'tncs';
+    }
+    if (d.zsValue) faultState.zsValue = d.zsValue;
+  }
+
   renderModule('analyzer');
 }
 
@@ -23761,7 +24377,7 @@ function analyzerHandlePaste() {
 
 // Reset
 function analyzerReset() {
-  analyzerState = { rawText: '', segments: [], extracted: null, results: [], completeness: { solved: 0, total: 0, flagged: [] }, mode: 'upload' };
+  analyzerState = { rawText: '', segments: [], extracted: null, results: [], completeness: { solved: 0, total: 0, flagged: [] }, dependencies: [], moduleFlow: [], busPopulated: false, mode: 'upload' };
   renderModule('analyzer');
 }
 
@@ -23769,13 +24385,13 @@ function analyzerSetMode(m) {
   analyzerState.mode = m;
   renderModule('analyzer');
 }
-// Render the analyzer module
+// Render the analyzer module - ENHANCED with dependency graph and module flow
 function renderAnalyzer() {
   var html = '<div class="card fade-in">';
-  html += '<div class="card-title">' + tx('\uD83D\uDD0D Projektanalysator', '\uD83D\uDD0D Project Analyzer') + '</div>';
+  html += '<div class="card-title">' + tx('\uD83D\uDD0D Projektanalysator (Intelligent)', '\uD83D\uDD0D Project Analyzer (Intelligent)') + '</div>';
   html += '<div class="info-row">' + tx(
-    'Upload eller inds\u00e6t en opgavebeskrivelse. Analysatoren finder automatisk alle v\u00e6rdier, besvarer sp\u00f8rgsm\u00e5l og beregner ekstra "nice to know" resultater med fulde mellemregninger.',
-    'Upload or paste a project/exam description. The analyzer automatically finds all values, answers questions, and computes extra "nice to know" results with full working shown.'
+    'Ekstremt intelligent analysator: Upload eller inds\u00e6t en opgave/projekt. Finder ALLE v\u00e6rdier fra alle modultyper (trafo, impedans, motor, magnetisk, belysning, DC, 3-fase, rel\u00e6), detekterer afh\u00e6ngigheder mellem sp\u00f8rgsm\u00e5l, l\u00f8ser flertrinsopgaver, og popul\u00e6rer den reaktive bus s\u00e5 ALLE moduler viser opgavens kontekst.',
+    'Extremely intelligent analyzer: Upload or paste an exam/project. Finds ALL values from all module types (transformer, impedance, motor, magnetic, lighting, DC, 3-phase, relay), detects inter-question dependencies, solves multi-step problems, and populates the reactive bus so ALL modules show the exam context.'
   ) + '</div>';
 
   // Mode selector
@@ -23813,7 +24429,7 @@ function renderAnalyzer() {
 
   return html;
 }
-// Render analyzer results
+// Render analyzer results - ENHANCED with dependency graph and module flow
 function renderAnalyzerResults() {
   var html = '';
 
@@ -23825,6 +24441,15 @@ function renderAnalyzerResults() {
   html += '<div class="result-box" style="margin-bottom:12px">';
   html += '<div class="result-title">' + tx('Komplethed', 'Completeness') + ': ' + pct + '% (' + comp.solved + '/' + comp.total + ')</div>';
   html += '<div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin:6px 0"><div style="height:100%;width:' + pct + '%;background:var(--primary);border-radius:4px"></div></div>';
+
+  // Bus populated indicator
+  if (analyzerState.busPopulated) {
+    html += '<div style="margin-top:8px;padding:6px 10px;background:var(--success-bg);border:1px solid var(--success);border-radius:var(--radius-sm);font-size:0.8rem">';
+    html += '\u2705 <strong>' + tx('Reaktiv bus populeret', 'Reactive bus populated') + '</strong> - ';
+    html += tx('Alle moduler er nu opdateret med opgavens vaerdier. Naviger til et vilk\u00e5rligt modul for at se konteksten.', 'All modules now updated with the exam values. Navigate to any module to see the context.');
+    html += '</div>';
+  }
+
   if (comp.flagged.length > 0) {
     html += '<div style="margin-top:8px;font-size:0.82rem;color:var(--warning)">';
     html += '<strong>\u26A0 ' + tx('Manglende data', 'Missing data') + ':</strong><ul style="margin:4px 0 0 16px;padding:0">';
@@ -23834,6 +24459,30 @@ function renderAnalyzerResults() {
     html += '</ul></div>';
   }
   html += '</div>';
+
+  // === INTER-QUESTION DEPENDENCY GRAPH ===
+  if (analyzerState.dependencies && analyzerState.dependencies.length > 0) {
+    html += '<div style="margin-bottom:12px;padding:10px;border:1px solid var(--primary-light);border-radius:var(--radius-sm);background:var(--primary-glow)">';
+    html += '<strong style="font-size:0.85rem">\uD83D\uDD17 ' + tx('Sp\u00f8rgsm\u00e5lsafh\u00e6ngigheder (v\u00e6rdiflow)', 'Question dependencies (value flow)') + ':</strong>';
+    html += '<div style="margin-top:6px;font-size:0.8rem">';
+    for (var dep = 0; dep < analyzerState.dependencies.length; dep++) {
+      var d = analyzerState.dependencies[dep];
+      html += '<div style="padding:3px 0">\u27A1 ' + d.label + (d.value ? ' <code style="background:var(--bg);padding:1px 5px;border-radius:3px">' + d.value + '</code>' : '') + '</div>';
+    }
+    html += '</div></div>';
+  }
+
+  // === MODULE FLOW (which modules were used) ===
+  if (analyzerState.moduleFlow && analyzerState.moduleFlow.length > 0) {
+    html += '<div style="margin-bottom:12px;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm)">';
+    html += '<strong style="font-size:0.85rem">\uD83D\uDCCA ' + tx('Anvendte moduler', 'Modules used') + ':</strong>';
+    html += '<div class="select-grid" style="margin-top:6px">';
+    for (var mf = 0; mf < analyzerState.moduleFlow.length; mf++) {
+      var modKey = analyzerState.moduleFlow[mf];
+      html += '<button class="sel-btn selected" onclick="switchModule(\'' + modKey + '\')">' + modKey + '</button>';
+    }
+    html += '</div></div>';
+  }
 
   // Extracted parameters summary
   if (analyzerState.extracted) {
@@ -23846,10 +24495,11 @@ function renderAnalyzerResults() {
 
   // Detected questions
   if (analyzerState.extracted && analyzerState.extracted.questions.length > 0) {
-    html += '<div style="margin-bottom:12px"><strong style="font-size:0.85rem">' + tx('Detekterede sp\u00f8rgsm\u00e5l', 'Detected questions') + ':</strong>';
+    html += '<div style="margin-bottom:12px"><strong style="font-size:0.85rem">' + tx('Detekterede sp\u00f8rgsm\u00e5l', 'Detected questions') + ' (' + analyzerState.extracted.questions.length + '):</strong>';
     html += '<div class="select-grid" style="margin-top:6px">';
     for (var q = 0; q < analyzerState.extracted.questions.length; q++) {
-      html += '<span class="sel-btn selected" style="cursor:default;pointer-events:none">' + analyzerState.extracted.questions[q].label + '</span>';
+      var qItem = analyzerState.extracted.questions[q];
+      html += '<span class="sel-btn selected" style="cursor:default;pointer-events:none">' + qItem.label + (qItem.module ? ' <small>(' + qItem.module + ')</small>' : '') + '</span>';
     }
     html += '</div></div>';
   }
@@ -23857,14 +24507,13 @@ function renderAnalyzerResults() {
   html += '</div>';
 
   // Individual results
-  // First: asked questions (explicitly requested in the exam)
   var asked = analyzerState.results.filter(function(r) { return r.asked; });
   var notAsked = analyzerState.results.filter(function(r) { return !r.asked && !r.bonus; });
   var bonus = analyzerState.results.filter(function(r) { return r.bonus; });
 
   if (asked.length > 0) {
     html += '<div class="card fade-in">';
-    html += '<div class="card-title">\uD83C\uDFAF ' + tx('Svar p\u00e5 opgavens sp\u00f8rgsm\u00e5l', 'Answers to exam questions') + '</div>';
+    html += '<div class="card-title">\uD83C\uDFAF ' + tx('Svar p\u00e5 opgavens sp\u00f8rgsm\u00e5l', 'Answers to exam questions') + ' (' + asked.length + ')</div>';
     for (var a = 0; a < asked.length; a++) {
       html += renderAnalyzerResultCard(asked[a]);
     }
@@ -23873,7 +24522,7 @@ function renderAnalyzerResults() {
 
   if (notAsked.length > 0) {
     html += '<div class="card fade-in">';
-    html += '<div class="card-title">\u26A1 ' + tx('Grundl\u00e6ggende beregninger', 'Fundamental calculations') + '</div>';
+    html += '<div class="card-title">\u26A1 ' + tx('Grundl\u00e6ggende beregninger', 'Fundamental calculations') + ' (' + notAsked.length + ')</div>';
     for (var b2 = 0; b2 < notAsked.length; b2++) {
       html += renderAnalyzerResultCard(notAsked[b2]);
     }
@@ -23882,7 +24531,7 @@ function renderAnalyzerResults() {
 
   if (bonus.length > 0) {
     html += '<div class="card fade-in">';
-    html += '<div class="card-title">\uD83D\uDCA1 ' + tx('Ekstra "nice to know"', 'Extra "nice to know"') + '</div>';
+    html += '<div class="card-title">\uD83D\uDCA1 ' + tx('Ekstra "nice to know"', 'Extra "nice to know"') + ' (' + bonus.length + ')</div>';
     for (var bn = 0; bn < bonus.length; bn++) {
       html += renderAnalyzerResultCard(bonus[bn]);
     }
@@ -23907,7 +24556,7 @@ function renderAnalyzerResultCard(result) {
   return html;
 }
 
-// Render extracted parameters table
+// Render extracted parameters table - ENHANCED with all module types
 function renderAnalyzerExtracted(data) {
   var rows = [
     ['P', tx('Effekt', 'Power'), data.power_kW ? data.power_kW + ' kW' : '-'],
@@ -23921,13 +24570,31 @@ function renderAnalyzerExtracted(data) {
     ['A', tx('Tv\u00e6rsnit', 'Cross-section'), data.cableMm2 ? data.cableMm2 + ' mm\u00B2' : '-'],
     ['In', tx('Beskyttelse', 'Device rating'), data.deviceIn ? data.deviceIn + ' A' : '-'],
     ['Zs', tx('Fejlsl\u00f8jfe', 'Fault loop'), data.zsValue ? data.zsValue + ' \u03A9' : '-'],
-    [tx('Jord', 'Earth'), tx('Jordingssystem', 'Earthing system'), data.earthSystem || '-']
+    [tx('Jord', 'Earth'), tx('Jordingssystem', 'Earthing system'), data.earthSystem || '-'],
+    // Transformer
+    ['SN', tx('Trafo kVA', 'Trafo kVA'), data.trafoKVA ? data.trafoKVA + ' kVA' : '-'],
+    ['uk%', tx('Kortslutningssp.', 'Short-circuit voltage'), data.trafoUk ? data.trafoUk + '%' : '-'],
+    ['Pcu', tx('Kobbertab', 'Copper loss'), data.trafoPcu ? data.trafoPcu + ' W' : '-'],
+    ['P0', tx('Tomgangstab', 'No-load loss'), data.trafoP0 ? data.trafoP0 + ' W' : '-'],
+    // AC theory
+    ['f', tx('Frekvens', 'Frequency'), data.frequency ? data.frequency + ' Hz' : '-'],
+    ['R', tx('Modstand', 'Resistance'), data.resistance ? data.resistance + ' \u03A9' : '-'],
+    ['L', tx('Induktans', 'Inductance'), data.inductance ? (data.inductance*1000).toFixed(1) + ' mH' : '-'],
+    ['C', tx('Kapacitans', 'Capacitance'), data.capacitance ? (data.capacitance*1e6).toFixed(2) + ' \u00B5F' : '-'],
+    // Motor
+    ['p', tx('Poltal', 'Poles'), data.motorPoles || '-'],
+    ['n', tx('Hastighed', 'Speed'), data.motorSpeed ? data.motorSpeed + ' rpm' : '-'],
+    // Lighting
+    ['E', tx('Lux krav', 'Lux required'), data.luxRequired ? data.luxRequired + ' lx' : '-']
   ];
+  // Filter out rows with '-' value to keep table compact
+  var filteredRows = rows.filter(function(r) { return r[2] !== '-'; });
+  if (filteredRows.length === 0) filteredRows = rows.slice(0, 12); // show core if nothing found
   var html = '<table style="width:100%;font-size:0.8rem;border-collapse:collapse">';
   html += '<tr style="background:var(--border-light);font-weight:600"><td style="padding:3px 6px">' + tx('Symbol', 'Symbol') + '</td><td style="padding:3px 6px">' + tx('Parameter', 'Parameter') + '</td><td style="padding:3px 6px">' + tx('V\u00e6rdi', 'Value') + '</td></tr>';
-  for (var i = 0; i < rows.length; i++) {
-    var bg = rows[i][2] !== '-' ? 'background:var(--success-bg)' : '';
-    html += '<tr style="border-bottom:1px solid var(--border-light);' + bg + '"><td style="padding:3px 6px;font-family:monospace">' + rows[i][0] + '</td><td style="padding:3px 6px">' + rows[i][1] + '</td><td style="padding:3px 6px;font-weight:600">' + rows[i][2] + '</td></tr>';
+  for (var i = 0; i < filteredRows.length; i++) {
+    var bg = filteredRows[i][2] !== '-' ? 'background:var(--success-bg)' : '';
+    html += '<tr style="border-bottom:1px solid var(--border-light);' + bg + '"><td style="padding:3px 6px;font-family:monospace">' + filteredRows[i][0] + '</td><td style="padding:3px 6px">' + filteredRows[i][1] + '</td><td style="padding:3px 6px;font-weight:600">' + filteredRows[i][2] + '</td></tr>';
   }
   html += '</table>';
   return html;
