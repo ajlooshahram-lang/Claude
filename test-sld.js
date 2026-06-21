@@ -13638,6 +13638,127 @@ test('renderUPS includes UPS simulator SVG', function() {
   assert(html.indexOf('DC/AC') >= 0, 'renderUPS should include UPS sim');
 });
 
+test('renderVFD includes VFD simulator SVG', function() {
+  var html = renderVFD();
+  assert(html.indexOf('sim-rotor') >= 0, 'renderVFD should include VFD sim with rotor');
+});
+
+test('renderBusbar includes busbar simulator SVG', function() {
+  var html = renderBusbar();
+  assert(html.indexOf('tap-offs') >= 0 || html.indexOf('T1') >= 0, 'renderBusbar should include busbar sim with tap-offs');
+});
+
+test('renderZs includes Zs simulator SVG', function() {
+  var html = renderZs();
+  assert(html.indexOf('PASS') >= 0 || html.indexOf('FAIL') >= 0, 'renderZs should include Zs sim with pass/fail');
+});
+
+test('renderSPD includes SPD simulator SVG', function() {
+  var html = renderSPD();
+  assert(html.indexOf('SPD') >= 0, 'renderSPD should include SPD sim');
+});
+
+test('renderArcFlash includes arc flash simulator SVG', function() {
+  var html = renderArcFlash();
+  assert(html.indexOf('sim-glow') >= 0, 'renderArcFlash should include arc flash sim with glow');
+});
+
+// --- renderVFDSim tests ---
+test('renderVFDSim returns SVG with sim-rotor for valid motor power', function() {
+  var svg = renderVFDSim(11, 24, 50, 1455);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-rotor') >= 0, 'should contain sim-rotor class for motor animation');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire for current flow');
+  assert(svg.indexOf('sim-value') >= 0, 'should contain sim-value class');
+  assert(svg.indexOf('VFD') >= 0, 'should show VFD label');
+  assert(svg.indexOf('11 kW') >= 0 || svg.indexOf('11kW') >= 0 || svg.indexOf('11 kW') >= 0, 'should show motor power');
+});
+
+test('renderVFDSim returns empty for zero motor power', function() {
+  assert.strictEqual(renderVFDSim(0, 24, 50, 1455), '');
+});
+
+test('renderVFDSim returns empty for zero current', function() {
+  assert.strictEqual(renderVFDSim(11, 0, 50, 1455), '');
+});
+
+// --- renderBusbarSim tests ---
+test('renderBusbarSim returns SVG with tap-off indicators for valid inputs', function() {
+  var svg = renderBusbarSim(630, 4, 65, 5, 35);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire for current flow');
+  assert(svg.indexOf('sim-value') >= 0, 'should contain sim-value class');
+  assert(svg.indexOf('T1') >= 0, 'should show tap-off indicator T1');
+  assert(svg.indexOf('630A') >= 0, 'should show rated current');
+});
+
+test('renderBusbarSim returns empty for zero rated current', function() {
+  assert.strictEqual(renderBusbarSim(0, 4, 65, 5, 35), '');
+});
+
+test('renderBusbarSim returns empty for zero tap-offs', function() {
+  assert.strictEqual(renderBusbarSim(630, 0, 65, 5, 35), '');
+});
+
+// --- renderZsSim tests ---
+test('renderZsSim returns SVG showing fault loop circuit with pass/fail coloring', function() {
+  var svg = renderZsSim(0.2, 24.2, 0.68, 1.37, 338, true);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire for fault current flow');
+  assert(svg.indexOf('sim-value') >= 0, 'should contain sim-value class');
+  assert(svg.indexOf('#4caf50') >= 0, 'should contain green color for pass');
+  assert(svg.indexOf('PASS') >= 0, 'should show PASS indicator');
+});
+
+test('renderZsSim shows fail coloring for failing loop', function() {
+  var svg = renderZsSim(0.8, 24.2, 2.5, 1.37, 92, false);
+  assert(svg.indexOf('#f44336') >= 0, 'should contain red color for fail');
+  assert(svg.indexOf('FAIL') >= 0, 'should show FAIL indicator');
+});
+
+test('renderZsSim returns empty for zero ze and zero zs', function() {
+  assert.strictEqual(renderZsSim(0, 0, 0, 1.37, 0, true), '');
+});
+
+// --- renderSPDSim tests ---
+test('renderSPDSim returns SVG with lightning animation for valid inputs', function() {
+  var svg = renderSPDSim(0.05, 'medium', 'Type 2', 20, 40, false);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-pulse') >= 0, 'should contain sim-pulse class for lightning animation');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire for surge path');
+  assert(svg.indexOf('sim-value') >= 0, 'should contain sim-value class');
+  assert(svg.indexOf('SPD') >= 0, 'should show SPD label');
+  assert(svg.indexOf('Type 2') >= 0, 'should show SPD type');
+});
+
+test('renderSPDSim returns SVG for zero nd value', function() {
+  var svg = renderSPDSim(0, 'low', 'Type 2', 20, 40, false);
+  assert(svg.indexOf('<svg') >= 0, 'should still render for nd=0');
+});
+
+test('renderSPDSim returns empty for undefined nd', function() {
+  assert.strictEqual(renderSPDSim(undefined, 'low', 'Type 2', 20, 40, false), '');
+});
+
+// --- renderArcFlashSim tests ---
+test('renderArcFlashSim returns SVG with energy boundary visualization', function() {
+  var svg = renderArcFlashSim(4.5, 2, 450, 400, 10);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-glow') >= 0, 'should contain sim-glow class for arc flash');
+  assert(svg.indexOf('sim-value') >= 0, 'should contain sim-value class');
+  assert(svg.indexOf('PPE 2') >= 0 || svg.indexOf('PPE Cat.2') >= 0, 'should show PPE category');
+  assert(svg.indexOf('boundary') >= 0, 'should show boundary label');
+  assert(svg.indexOf('4.5') >= 0, 'should show energy value');
+});
+
+test('renderArcFlashSim returns empty for no voltage and no fault current', function() {
+  assert.strictEqual(renderArcFlashSim(5, 2, 450, 0, 0), '');
+});
+
+test('renderArcFlashSim returns empty for undefined energy', function() {
+  assert.strictEqual(renderArcFlashSim(undefined, 2, 450, 400, 10), '');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
