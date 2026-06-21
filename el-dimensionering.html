@@ -1400,6 +1400,26 @@ function t(key) { return T[lang][key] || key; }
 // Populated entries provide Persian translations for tx()-routed strings.
 // Missing entries fall back to the English string gracefully.
 const _FA = {
+  // Arc Flash module (IEEE 1584-2018 / Lee) — Persian
+  'Arc Flash Risk Assessment (IEEE 1584-2018 / Lee)': '\u0627\u0631\u0632\u06CC\u0627\u0628\u06CC \u062E\u0637\u0631 \u0642\u0648\u0633 \u0627\u0644\u06A9\u062A\u0631\u06CC\u06A9\u06CC (IEEE 1584-2018 / Lee)',
+  'Conservative incident energy (worst of IEEE 1584-2018 and Ralph Lee) and PPE requirements. Arbejdstilsynet requires risk assessment.': '\u0627\u0646\u0631\u0698\u06CC \u0628\u0631\u062E\u0648\u0631\u062F \u0645\u062D\u0627\u0641\u0638\u0647\u200C\u06A9\u0627\u0631\u0627\u0646\u0647 (\u0628\u062F\u062A\u0631\u06CC\u0646 \u062D\u0627\u0644\u062A IEEE 1584-2018 \u0648 \u0631\u0627\u0644\u0641 \u0644\u06CC) \u0648 \u0627\u0644\u0632\u0627\u0645\u0627\u062A PPE. \u0627\u0631\u0632\u06CC\u0627\u0628\u06CC \u062E\u0637\u0631 \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A.',
+  'Electrode configuration': '\u067E\u06CC\u06A9\u0631\u0628\u0646\u062F\u06CC \u0627\u0644\u06A9\u062A\u0631\u0648\u062F',
+  'Conductor gap': '\u0641\u0627\u0635\u0644\u0647 \u0647\u0627\u062F\u06CC\u200C\u0647\u0627',
+  'Enclosure / equipment class': '\u0645\u062D\u0641\u0638\u0647 / \u06A9\u0644\u0627\u0633 \u062A\u062C\u0647\u06CC\u0632\u0627\u062A',
+  'Open air (no box)': '\u0647\u0648\u0627\u06CC \u0622\u0632\u0627\u062F (\u0628\u062F\u0648\u0646 \u0645\u062D\u0641\u0638\u0647)',
+  'Arcing current (full)': '\u062C\u0631\u06CC\u0627\u0646 \u0642\u0648\u0633 (\u06A9\u0627\u0645\u0644)',
+  'Arcing current (reduced)': '\u062C\u0631\u06CC\u0627\u0646 \u0642\u0648\u0633 (\u06A9\u0627\u0647\u0634\u200C\u06CC\u0627\u0641\u062A\u0647)',
+  'Method': '\u0631\u0648\u0634',
+  'IEEE 1584-2018 empirical model': '\u0645\u062F\u0644 \u062A\u062C\u0631\u0628\u06CC IEEE 1584-2018',
+  'Ralph Lee method (open-air, conservative)': '\u0631\u0648\u0634 \u0631\u0627\u0644\u0641 \u0644\u06CC (\u0647\u0648\u0627\u06CC \u0622\u0632\u0627\u062F\u060C \u0645\u062D\u0627\u0641\u0638\u0647\u200C\u06A9\u0627\u0631\u0627\u0646\u0647)',
+  'Outside IEEE 1584-2018 validity range \u2014 using Lee': '\u062E\u0627\u0631\u062C \u0627\u0632 \u0645\u062D\u062F\u0648\u062F\u0647 \u0627\u0639\u062A\u0628\u0627\u0631 IEEE 1584-2018 \u2014 \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0627\u0632 \u0644\u06CC',
+  'Lee cross-check governs (conservative)': '\u0628\u0627\u0632\u0628\u06CC\u0646\u06CC \u0645\u062A\u0642\u0627\u0628\u0644 \u0644\u06CC \u062A\u0639\u06CC\u06CC\u0646\u200C\u06A9\u0646\u0646\u062F\u0647 \u0627\u0633\u062A (\u0645\u062D\u0627\u0641\u0638\u0647\u200C\u06A9\u0627\u0631\u0627\u0646\u0647)',
+  'Reduced-current scenario evaluated at the same clearing time; verify clearing time at I_arc(reduced) on the device curve.': '\u0633\u0646\u0627\u0631\u06CC\u0648\u06CC \u062C\u0631\u06CC\u0627\u0646 \u06A9\u0627\u0647\u0634\u200C\u06CC\u0627\u0641\u062A\u0647 \u0628\u0627 \u0647\u0645\u0627\u0646 \u0632\u0645\u0627\u0646 \u0642\u0637\u0639 \u0627\u0631\u0632\u06CC\u0627\u0628\u06CC \u0634\u062F\u0647\u061B \u0632\u0645\u0627\u0646 \u0642\u0637\u0639 \u0631\u0627 \u062F\u0631 I_arc(\u06A9\u0627\u0647\u0634\u200C\u06CC\u0627\u0641\u062A\u0647) \u0631\u0648\u06CC \u0645\u0646\u062D\u0646\u06CC \u062F\u0633\u062A\u06AF\u0627\u0647 \u0628\u0631\u0631\u0633\u06CC \u06A9\u0646\u06CC\u062F.',
+  'Worst-case energy (100 % / reduced)': '\u0628\u062F\u062A\u0631\u06CC\u0646 \u062D\u0627\u0644\u062A \u0627\u0646\u0631\u0698\u06CC (\u06F1\u06F0\u06F0\u066A / \u06A9\u0627\u0647\u0634\u200C\u06CC\u0627\u0641\u062A\u0647)',
+  'Unresolved \u2014 check inputs': '\u062D\u0644\u200C\u0646\u0634\u062F\u0647 \u2014 \u0648\u0631\u0648\u062F\u06CC\u200C\u0647\u0627 \u0631\u0627 \u0628\u0631\u0631\u0633\u06CC \u06A9\u0646\u06CC\u062F',
+  'Arc flash boundary': '\u0645\u0631\u0632 \u0642\u0648\u0633 \u0627\u0644\u06A9\u062A\u0631\u06CC\u06A9\u06CC',
+  'Arc flash (IEEE 1584-2018)': '\u0642\u0648\u0633 \u0627\u0644\u06A9\u062A\u0631\u06CC\u06A9\u06CC (IEEE 1584-2018)',
+
   // Engine Verification (Golden Master) module — Persian
   'Engine Verification (Golden Master)': '\u062A\u0623\u06CC\u06CC\u062F \u0645\u0648\u062A\u0648\u0631 (\u0646\u0645\u0648\u0646\u0647 \u0637\u0644\u0627\u06CC\u06CC)',
   'Calculation engine verified': '\u0645\u0648\u062A\u0648\u0631 \u0645\u062D\u0627\u0633\u0628\u0647 \u062A\u0623\u06CC\u06CC\u062F \u0634\u062F',
@@ -10900,7 +10920,8 @@ const GOLDEN_CATEGORIES = [
   { key: 'sc',     da: 'Kortslutning',           en: 'Short circuit' },
   { key: 'rcd',    da: 'RCD / isolation',        en: 'RCD / insulation' },
   { key: 'ib',     da: 'Belastningsstr\u00F8m',  en: 'Load current' },
-  { key: 'vdrop',  da: 'Sp\u00E6ndingsfald',     en: 'Voltage drop' }
+  { key: 'vdrop',  da: 'Sp\u00E6ndingsfald',     en: 'Voltage drop' },
+  { key: 'arcflash', da: 'Lysbue (IEEE 1584-2018)', en: 'Arc flash (IEEE 1584-2018)' }
 ];
 
 // Each case: { id, categoryKey, titleDa, titleEn, fn:()=>Number, expected, unit, tol(relative;0=exact), clause, formula }.
@@ -10970,7 +10991,21 @@ const GOLDEN_CASES = [
   { id: 'ib-1ph-3.68', categoryKey: 'ib', titleDa: '1~ 3.68 kW cos1.0', titleEn: '1~ 3.68 kW cos1.0', fn: function () { loadState = { voltage: '1x230', power: 3.68, cosPhi: 1.0, simFactor: 1, expFactor: 1 }; return calcIB(); }, expected: 16.0, unit: 'A', tol: 0.02, clause: 'DS/HD 60364', formula: 'P/(230\u00B7cos\u03C6)' },
   { id: 'ib-3ph-22kw', categoryKey: 'ib', titleDa: '3~ 22 kW cos0.85', titleEn: '3~ 22 kW cos0.85', fn: function () { loadState = { voltage: '3x400', power: 22, cosPhi: 0.85, simFactor: 1, expFactor: 1 }; return calcIB(); }, expected: 37.36, unit: 'A', tol: 0.02, clause: 'DS/HD 60364', formula: 'P/(\u221A3\u00B7400\u00B7cos\u03C6)' },
   // --- K. Voltage drop (upSegmentVdropPct, real catalogue r/x) --------------
-  { id: 'vdrop-3ph-2.5', categoryKey: 'vdrop', titleDa: '3~ 16 A 50 m \u00B7 2.5 mm\u00B2 NOIKLX', titleEn: '3~ 16 A 50 m \u00B7 2.5 mm\u00B2 NOIKLX', fn: function () { var c = CABLES_COPPER['NOIKLX']['5G'][2.5]; return upSegmentVdropPct({ r: c.r, x: c.x }, 50, 16, '3x400', 0.9); }, expected: 2.326, unit: '%', tol: 0.02, clause: 'DS/HD 60364-5-52 (\u0394U)', formula: '\u221A3\u00B7Ib\u00B7L\u00B7(r\u00B7cos\u03C6+x\u00B7sin\u03C6)/(400\u00B710), r=7.41 x=0.105' }
+  { id: 'vdrop-3ph-2.5', categoryKey: 'vdrop', titleDa: '3~ 16 A 50 m \u00B7 2.5 mm\u00B2 NOIKLX', titleEn: '3~ 16 A 50 m \u00B7 2.5 mm\u00B2 NOIKLX', fn: function () { var c = CABLES_COPPER['NOIKLX']['5G'][2.5]; return upSegmentVdropPct({ r: c.r, x: c.x }, 50, 16, '3x400', 0.9); }, expected: 2.326, unit: '%', tol: 0.02, clause: 'DS/HD 60364-5-52 (\u0394U)', formula: '\u221A3\u00B7Ib\u00B7L\u00B7(r\u00B7cos\u03C6+x\u00B7sin\u03C6)/(400\u00B710), r=7.41 x=0.105' },
+  // --- L. Arc flash IEEE 1584-2018 + Ralph Lee (Annex D anchors [D.x] / MIT ref [ref] / Lee hand [hand]) ---
+  { id: 'af-mv-iarc600', categoryKey: 'arcflash', titleDa: 'I_arc 600 V \u00B7 4.16 kV VCB', titleEn: 'I_arc 600 V \u00B7 4.16 kV VCB', fn: function () { return arcflashIarcIntermediate('VCB', 0.6, 15, 104); }, expected: 11.117, unit: 'kA', tol: 0.002, clause: 'IEEE 1584-2018 Eq (1) Table 1', formula: 'Annex D.9: 10^(k1+k2 lg Ibf+k3 lg G)\u00B7poly(Ibf)' },
+  { id: 'af-mv-iarc', categoryKey: 'arcflash', titleDa: 'I_arc interpoleret \u00B7 4.16 kV', titleEn: 'I_arc interpolated \u00B7 4.16 kV', fn: function () { var a = arcflashIarcIntermediate('VCB', 0.6, 15, 104); var b = arcflashIarcIntermediate('VCB', 2.7, 15, 104); var c = arcflashIarcIntermediate('VCB', 14.3, 15, 104); return arcflashInterp(4.16, a, b, c); }, expected: 12.979, unit: 'kA', tol: 0.002, clause: 'IEEE 1584-2018 Eqs (16)-(18)', formula: 'Annex D.17 voltage interpolation' },
+  { id: 'af-mv-varcf', categoryKey: 'arcflash', titleDa: 'VarCf \u00B7 4.16 kV VCB', titleEn: 'VarCf \u00B7 4.16 kV VCB', fn: function () { return arcflashVarCf('VCB', 4.16); }, expected: 0.047, unit: '', tol: 0.03, clause: 'IEEE 1584-2018 Eq (2a) Table 2', formula: 'Annex D.43: poly(Voc)' },
+  { id: 'af-mv-cf', categoryKey: 'arcflash', titleDa: 'CF \u00B7 box 1143x762x508 VCB', titleEn: 'CF \u00B7 box 1143x762x508 VCB', fn: function () { return arcflashCF('VCB', 4.16, 1143, 762, 508).CF; }, expected: 1.284, unit: '', tol: 0.005, clause: 'IEEE 1584-2018 Eqs (11)-(15) Table 7', formula: 'Annex D.22 enclosure size correction' },
+  { id: 'af-mv-E', categoryKey: 'arcflash', titleDa: 'E \u00B7 4.16 kV VCB D=914.4 T=197 ms', titleEn: 'E \u00B7 4.16 kV VCB D=914.4 T=197 ms', fn: function () { var r = arcflashComputeIEEE('VCB', 4.16, 15, 104, 914.4, 197, { h: 1143, w: 762, d: 508 }, false); return r.ok ? r.E_full_cal * 4.184 : NaN; }, expected: 12.152, unit: 'J/cm\u00B2', tol: 0.005, clause: 'IEEE 1584-2018 Eqs (3)-(5)+interp', formula: 'Annex D.32 incident energy' },
+  { id: 'af-mv-E-cal', categoryKey: 'arcflash', titleDa: 'E (cal) \u00B7 4.16 kV VCB', titleEn: 'E (cal) \u00B7 4.16 kV VCB', fn: function () { var r = arcflashComputeIEEE('VCB', 4.16, 15, 104, 914.4, 197, { h: 1143, w: 762, d: 508 }, false); return r.ok ? r.E_full_cal : NaN; }, expected: 2.904, unit: 'cal/cm\u00B2', tol: 0.01, clause: 'IEEE 1584-2018 Annex D.32 / 4.184', formula: '12.152 J/cm\u00B2 \u00F7 4.184' },
+  { id: 'af-mv-afb', categoryKey: 'arcflash', titleDa: 'AFB \u00B7 4.16 kV VCB', titleEn: 'AFB \u00B7 4.16 kV VCB', fn: function () { var r = arcflashComputeIEEE('VCB', 4.16, 15, 104, 914.4, 197, { h: 1143, w: 762, d: 508 }, false); return r.ok ? r.AFB_mm : NaN; }, expected: 1606, unit: 'mm', tol: 0.01, clause: 'IEEE 1584-2018 Eqs (7)-(10)+interp', formula: 'Annex D.42 arc-flash boundary' },
+  { id: 'af-lv-E480', categoryKey: 'arcflash', titleDa: 'E \u00B7 480 V VCB G=32 Ibf=45 T=200 ms', titleEn: 'E \u00B7 480 V VCB G=32 Ibf=45 T=200 ms', fn: function () { var r = arcflashComputeIEEE('VCB', 0.48, 45, 32, 609.6, 200, { h: 610, w: 610, d: 254 }, false); return r.ok ? r.E_full_cal : NaN; }, expected: 9.034, unit: 'cal/cm\u00B2', tol: 0.01, clause: 'IEEE 1584-2018 Eq (6) Table 3', formula: 'LV path (Eq 25 + Eq 6), ref engine' },
+  { id: 'af-lv-reduced-governs', categoryKey: 'arcflash', titleDa: 'max(E_full@61.3ms, E_red@319ms)', titleEn: 'max(E_full@61.3ms, E_red@319ms)', fn: function () { var i600 = arcflashIarcIntermediate('VCB', 0.6, 45, 32); var ilv = arcflashIarcFinalLV(0.48, i600, 45); var vcf = arcflashVarCf('VCB', 0.48); var ired = arcflashIarcReduced(ilv, vcf); var cf = arcflashCF('VCB', 0.48, 610, 610, 254).CF; var ef = arcflashEIntermediate('VCB', 0.6, ilv, 45, 61.3, cf, 609.6, 32, i600) / 4.184; var er = arcflashEIntermediate('VCB', 0.6, ired, 45, 319, cf, 609.6, 32, i600) / 4.184; return Math.max(ef, er); }, expected: 12.705, unit: 'cal/cm\u00B2', tol: 0.01, clause: 'IEEE 1584-2018 Annex D.2 reduced governs', formula: 'device-derived T_full=61.3, T_red=319 ms' },
+  { id: 'af-lee-default', categoryKey: 'arcflash', titleDa: 'Lee \u00B7 0.40 kV 10 kA 0.1 s 455 mm', titleEn: 'Lee \u00B7 0.40 kV 10 kA 0.1 s 455 mm', fn: function () { return arcflashLeeE(0.40, 10, 0.1, 455).Ecal; }, expected: 0.989, unit: 'cal/cm\u00B2', tol: 0.005, clause: 'Ralph Lee (open-air)', formula: '2.142e6\u00B7V\u00B7Ibf\u00B7t/D\u00B2 / 4.184' },
+  { id: 'af-lee-oor-20kv', categoryKey: 'arcflash', titleDa: 'Lee \u00B7 20 kV (>15 kV \u2192 Lee)', titleEn: 'Lee \u00B7 20 kV (>15 kV \u2192 Lee)', fn: function () { return arcflashLeeE(20, 20, 0.5, 914.4).Ecal; }, expected: 122.46, unit: 'cal/cm\u00B2', tol: 0.005, clause: 'Ralph Lee out-of-range (PROHIBITED)', formula: '2.142e6\u00B720\u00B720\u00B70.5/914.4\u00B2 / 4.184' },
+  { id: 'af-lee-afb', categoryKey: 'arcflash', titleDa: 'AFB Lee \u00B7 0.69 kV 25 kA 0.2 s', titleEn: 'AFB Lee \u00B7 0.69 kV 25 kA 0.2 s', fn: function () { return arcflashLeeAFB(0.69, 25, 0.2); }, expected: 1213.2, unit: 'mm', tol: 0.005, clause: 'Ralph Lee boundary', formula: 'sqrt(2.142e6\u00B7V\u00B7Ibf\u00B7t/5.0208)' },
+  { id: 'af-lv-worst-of', categoryKey: 'arcflash', titleDa: 'Worst-of \u00B7 0.40 kV VCB LV Panel (shallow)', titleEn: 'Worst-of \u00B7 0.40 kV VCB LV Panel (shallow)', fn: function () { return arcflashIncident({ voltage: 400, faultCurrent: 10, clearingTime: 0.1, workingDistance: 455, electrodeConfig: 'VCB', gap: 25, enclosure: 'LV Panelboard (Shallow)' }).E_worst; }, expected: 1.063, unit: 'cal/cm\u00B2', tol: 0.02, clause: 'IEEE 1584-2018 vs Lee worst-of', formula: 'max(IEEE 1.062, Lee 0.989) \u2192 IEEE governs' }
 ];
 
 // Runs every golden case against the LIVE engine. Snapshots/restores all globals a
@@ -19601,16 +19636,373 @@ function renderAgri() {
   html += '</div>';
   return html;
 }
-// ===== ARC FLASH MODULE (IEC 62271-200 / IEEE 1584) =====
+// ===== ARC FLASH MODULE (IEEE 1584-2018 empirical model + Ralph Lee fallback) =====
+// Life-safety engine. Two models are always computed and the WORST (highest)
+// incident energy is reported, so the tool never outputs a falsely-safe low number.
+//  - IEEE 1584-2018 empirical model: primary inside its validity range (captures the
+//    LV arc-in-a-box focusing effect). Driven by the ARCING current, not bolted.
+//  - Ralph Lee (open-air, max-power): mandatory fallback outside the IEEE range
+//    (e.g. Voc > 15 kV) and an always-on conservative cross-check inside it.
+// Coefficient tables (Tables 1,2,3,4,5,7,8/10) are transcribed from IEEE 1584-2018
+// via the MIT-licensed reference LiaungYip/arcflash (validated bit-for-bit against
+// the standard's Annex D worked examples). Verify against a licensed standard.
+// Unit conventions: Voc in kV, Ibf/Iarc in kA, G/D in mm, T in ms (energy) / s (Lee),
+// E in J/cm2 internally; display converts with 1 cal = 4.184 J.
 
-var arcflashState = { voltage: 400, faultCurrent: 10, clearingTime: 0.1, workingDistance: 455 };
+// TABLE 1 - arcing current Eq(1) coefficients [k1..k10], keyed EC -> {Vref(kV): [..]}.
+var arcflashTable1 = {
+  VCB:  { 0.6:  [-0.04287, 1.035, -0.083, 0, 0, -4.783e-9, 1.962e-6, -0.000229, 0.003141, 1.092],
+          2.7:  [0.0065, 1.001, -0.024, -1.557e-12, 4.556e-10, -4.186e-8, 8.346e-7, 5.482e-5, -0.003191, 0.9729],
+          14.3: [0.005795, 1.015, -0.011, -1.557e-12, 4.556e-10, -4.186e-8, 8.346e-7, 5.482e-5, -0.003191, 0.9729] },
+  VCBB: { 0.6:  [-0.017432, 0.98, -0.05, 0, 0, -5.767e-9, 2.524e-6, -0.00034, 0.01187, 1.013],
+          2.7:  [0.002823, 0.995, -0.0125, 0, -9.204e-11, 2.901e-8, -3.262e-6, 0.0001569, -0.004003, 0.9825],
+          14.3: [0.014827, 1.01, -0.01, 0, -9.204e-11, 2.901e-8, -3.262e-6, 0.0001569, -0.004003, 0.9825] },
+  HCB:  { 0.6:  [0.054922, 0.988, -0.11, 0, 0, -5.382e-9, 2.316e-6, -0.000302, 0.0091, 0.9725],
+          2.7:  [0.001011, 1.003, -0.0249, 0, 0, 4.859e-10, -1.814e-7, -9.128e-6, -0.0007, 0.9881],
+          14.3: [0.008693, 0.999, -0.02, 0, -5.043e-11, 2.233e-8, -3.046e-6, 0.000116, -0.001145, 0.9839] },
+  VOA:  { 0.6:  [0.043785, 1.04, -0.18, 0, 0, -4.783e-9, 1.962e-6, -0.000229, 0.003141, 1.092],
+          2.7:  [-0.02395, 1.006, -0.0188, -1.557e-12, 4.556e-10, -4.186e-8, 8.346e-7, 5.482e-5, -0.003191, 0.9729],
+          14.3: [0.005371, 1.0102, -0.029, -1.557e-12, 4.556e-10, -4.186e-8, 8.346e-7, 5.482e-5, -0.003191, 0.9729] },
+  HOA:  { 0.6:  [0.111147, 1.008, -0.24, 0, 0, -3.895e-9, 1.641e-6, -0.000197, 0.002615, 1.1],
+          2.7:  [0.000435, 1.006, -0.038, 0, 0, 7.859e-10, -1.914e-7, -9.128e-6, -0.0007, 0.9981],
+          14.3: [0.000904, 0.999, -0.02, 0, 0, 7.859e-10, -1.914e-7, -9.128e-6, -0.0007, 0.9981] }
+};
 
+// TABLE 2 - arcing-current variation correction VarCf Eq(2a) [k1..k7], polynomial in Voc(kV).
+var arcflashTable2 = {
+  VCB:  [0, -1.4269e-6, 8.3137e-5, -0.0019382, 0.022366, -0.12645, 0.30226],
+  VCBB: [1.138e-6, -6.0287e-5, 0.0012758, -0.013778, 0.080217, -0.24066, 0.33524],
+  HCB:  [0, -3.097e-6, 1.6405e-4, -0.0033609, 0.033308, -0.16182, 0.34627],
+  VOA:  [9.5606e-7, -5.1543e-5, 0.0011161, -0.01242, 0.075125, -0.23584, 0.33696],
+  HOA:  [0, -3.1555e-6, 1.682e-4, -0.0034607, 0.034124, -0.1599, 0.34629]
+};
+
+// TABLE 3 (600 V) incident-energy Eq(3-6) coefficients [k1..k13], keyed EC.
+var arcflashTable3 = {
+  VCB:  [0.753364, 0.566, 1.752636, 0, 0, -4.783e-9, 1.962e-6, -0.000229, 0.003141, 1.092, 0, -1.598, 0.957],
+  VCBB: [3.068459, 0.26, -0.098107, 0, 0, -5.767e-9, 2.524e-6, -0.00034, 0.01187, 1.013, -0.06, -1.809, 1.19],
+  HCB:  [4.073745, 0.344, -0.370259, 0, 0, -5.382e-9, 2.316e-6, -0.000302, 0.0091, 0.9725, 0, -2.03, 1.036],
+  VOA:  [0.679294, 0.746, 1.222636, 0, 0, -4.783e-9, 1.962e-6, -0.000229, 0.003141, 1.092, 0, -1.598, 0.997],
+  HOA:  [3.470417, 0.465, -0.261863, 0, 0, -3.895e-9, 1.641e-6, -0.000197, 0.002615, 1.1, 0, -1.99, 1.04]
+};
+
+// TABLE 4 (2700 V) incident-energy coefficients [k1..k13], keyed EC.
+var arcflashTable4 = {
+  VCB:  [2.40021, 0.165, 0.354202, -1.557e-12, 4.556e-10, -4.186e-8, 8.346e-7, 5.482e-5, -0.003191, 0.9729, 0, -1.569, 0.9778],
+  VCBB: [3.870592, 0.185, -0.736618, 0, -9.204e-11, 2.901e-8, -3.262e-6, 0.0001569, -0.004003, 0.9825, 0, -1.742, 1.09],
+  HCB:  [3.486391, 0.177, -0.193101, 0, 0, 4.859e-10, -1.814e-7, -9.128e-6, -0.0007, 0.9881, 0.027, -1.723, 1.055],
+  VOA:  [3.880724, 0.105, -1.906033, -1.557e-12, 4.556e-10, -4.186e-8, 8.346e-7, 5.482e-5, -0.003191, 0.9729, 0, -1.515, 1.115],
+  HOA:  [3.616266, 0.149, -0.761561, 0, 0, 7.859e-10, -1.914e-7, -9.128e-6, -0.0007, 0.9981, 0, -1.639, 1.078]
+};
+
+// TABLE 5 (14300 V) incident-energy coefficients [k1..k13], keyed EC.
+var arcflashTable5 = {
+  VCB:  [3.825917, 0.11, -0.999749, -1.557e-12, 4.556e-10, -4.186e-8, 8.346e-7, 5.482e-5, -0.003191, 0.9729, 0, -1.568, 0.99],
+  VCBB: [3.644309, 0.215, -0.585522, 0, -9.204e-11, 2.901e-8, -3.262e-6, 0.0001569, -0.004003, 0.9825, 0, -1.677, 1.06],
+  HCB:  [3.044516, 0.125, 0.245106, 0, -5.043e-11, 2.233e-8, -3.046e-6, 0.000116, -0.001145, 0.9839, 0, -1.655, 1.084],
+  VOA:  [3.405454, 0.12, -0.93245, -1.557e-12, 4.556e-10, -4.186e-8, 8.346e-7, 5.482e-5, -0.003191, 0.9729, 0, -1.534, 0.979],
+  HOA:  [2.04049, 0.177, 1.005092, 0, 0, 7.859e-10, -1.914e-7, -9.128e-6, -0.0007, 0.9981, -0.05, -1.633, 1.151]
+};
+
+// TABLE 7 - enclosure size correction CF Eq(14/15) [b1,b2,b3], keyed (boxType|EC).
+var arcflashTable7 = {
+  'Typical|VCB':  [-0.000302, 0.03441, 0.4325],
+  'Typical|VCBB': [-0.0002976, 0.032, 0.479],
+  'Typical|HCB':  [-0.0001923, 0.01935, 0.6899],
+  'Shallow|VCB':  [0.002222, -0.02556, 0.6222],
+  'Shallow|VCBB': [-0.002778, 0.1194, -0.2778],
+  'Shallow|HCB':  [-0.0005556, 0.03722, 0.4778]
+};
+
+// TABLE 8/10 - typical equipment presets {G, h, w, d, D} in mm (drives the UI enclosure presets).
+var arcflashTable8_10 = {
+  '15kV Switchgear':         { G: 152, h: 1143, w: 762, d: 762, D: 914.4 },
+  '15kV MCC':                { G: 152, h: 914.4, w: 914.4, d: 914.4, D: 914.4 },
+  '5kV Switchgear':          { G: 104, h: 914.4, w: 914.4, d: 914.4, D: 914.4 },
+  '5kV MCC':                 { G: 104, h: 660.4, w: 660.4, d: 660.4, D: 914.4 },
+  'LV Switchgear':           { G: 32,  h: 508, w: 508, d: 508, D: 609.6 },
+  'LV MCC (Shallow)':        { G: 25,  h: 355.6, w: 304.8, d: 100, D: 457.2 },
+  'LV Panelboard (Shallow)': { G: 25,  h: 355.6, w: 304.8, d: 100, D: 457.2 },
+  'LV MCC':                  { G: 25,  h: 355.6, w: 304.8, d: 250, D: 457.2 },
+  'LV Panelboard':           { G: 25,  h: 355.6, w: 304.8, d: 250, D: 457.2 },
+  'Cable Junction Box':      { G: 13,  h: 355.6, w: 304.8, d: 250, D: 457.2 }
+};
+
+var arcflashState = {
+  voltage: 400,                // V  (existing button set; maps to Voc via /1000)
+  faultCurrent: 10,            // kA bolted fault current Ibf
+  clearingTime: 0.1,           // s
+  workingDistance: 455,        // mm
+  electrodeConfig: 'VCB',      // VCB | VCBB | HCB | VOA | HOA
+  gap: 25,                     // mm conductor gap G
+  enclosure: 'LV Panelboard'   // key into arcflashTable8_10, or 'Open air (no box)'
+};
+
+function arcflashLog10(x) { return Math.log(x) / Math.LN10; }
+
+// Box dimensions {h,w,d} for an enclosure preset; null for open air / unknown.
+function arcflashEnclosureDims(key) {
+  if (key === 'Open air (no box)') return null;
+  var b = arcflashTable8_10[key];
+  return b ? { h: b.h, w: b.w, d: b.d } : null;
+}
+
+// Eq(1): intermediate arcing current at a reference voltage. Returns kA (NaN on bad input).
+function arcflashIarcIntermediate(EC, Vref, Ibf, G) {
+  var t = arcflashTable1[EC]; if (!t) return NaN;
+  var k = t[Vref]; if (!k) return NaN;
+  if (!(Ibf > 0) || !(G > 0)) return NaN;
+  var lg = k[0] + k[1] * arcflashLog10(Ibf) + k[2] * arcflashLog10(G);
+  var poly = k[3] * Math.pow(Ibf, 6) + k[4] * Math.pow(Ibf, 5) + k[5] * Math.pow(Ibf, 4)
+           + k[6] * Math.pow(Ibf, 3) + k[7] * Math.pow(Ibf, 2) + k[8] * Ibf + k[9];
+  return Math.pow(10, lg) * poly;
+}
+
+// Eq(2a): arcing-current variation correction factor (polynomial in Voc kV).
+function arcflashVarCf(EC, Voc) {
+  var k = arcflashTable2[EC]; if (!k) return NaN;
+  return k[0] * Math.pow(Voc, 6) + k[1] * Math.pow(Voc, 5) + k[2] * Math.pow(Voc, 4)
+       + k[3] * Math.pow(Voc, 3) + k[4] * Math.pow(Voc, 2) + k[5] * Voc + k[6];
+}
+
+// Eq(2): reduced (min) arcing current scenario.
+function arcflashIarcReduced(Iarc, VarCf) { return Iarc * (1 - 0.5 * VarCf); }
+
+// Eq(25): final LV arcing current (Voc <= 0.6 kV) from the 600 V intermediate. kA / NaN.
+function arcflashIarcFinalLV(Voc, Iarc600, Ibf) {
+  if (!(Voc > 0) || !(Iarc600 > 0) || !(Ibf > 0)) return NaN;
+  var inner = Math.pow(0.6 / Voc, 2) * (1 / Math.pow(Iarc600, 2) - (0.36 - Voc * Voc) / (0.36 * Ibf * Ibf));
+  if (!(inner > 0)) return NaN;
+  return 1 / Math.sqrt(inner);
+}
+
+// Eqs(16-24): voltage interpolation across the 0.6 / 2.7 / 14.3 kV references.
+function arcflashInterp(Voc, x600, x2700, x14300) {
+  var x1 = ((x2700 - x600) / 2.1) * (Voc - 2.7) + x2700;
+  var x2 = ((x14300 - x2700) / 11.6) * (Voc - 14.3) + x14300;
+  var x3 = (x1 * (2.7 - Voc)) / 2.1 + (x2 * (Voc - 0.6)) / 2.1;
+  if (Voc > 2.7) return x2;
+  return x3;
+}
+
+function arcflashEnergyTable(Vref) {
+  if (Vref === 0.6) return arcflashTable3;
+  if (Vref === 2.7) return arcflashTable4;
+  return arcflashTable5;
+}
+
+// Eqs(3-6): intermediate incident energy [J/cm2] at a reference voltage.
+// For LV (Eq 6) pass Iarc600 (full 600 V current) as the numerator current; the k13
+// term still uses Iarc (the scenario current). For HV pass Iarc600 = null.
+function arcflashEIntermediate(EC, Vref, Iarc, Ibf, T, CF, D, G, Iarc600) {
+  var tbl = arcflashEnergyTable(Vref);
+  var k = tbl[EC]; if (!k) return NaN;
+  if (!(G > 0) || !(D > 0) || !(Ibf > 0) || !(Iarc > 0) || !(CF > 0) || !(T > 0)) return NaN;
+  var Inum = (Iarc600 != null) ? Iarc600 : Iarc;
+  var x2 = k[0] + k[1] * arcflashLog10(G);
+  var denom = k[3] * Math.pow(Ibf, 7) + k[4] * Math.pow(Ibf, 6) + k[5] * Math.pow(Ibf, 5)
+            + k[6] * Math.pow(Ibf, 4) + k[7] * Math.pow(Ibf, 3) + k[8] * Math.pow(Ibf, 2) + k[9] * Ibf;
+  if (denom === 0) return NaN;
+  var x3 = (k[2] * Inum) / denom;
+  var x4 = k[10] * arcflashLog10(Ibf) + k[12] * arcflashLog10(Iarc) + arcflashLog10(1 / CF);
+  var x5 = k[11] * arcflashLog10(D);
+  return (12.552 / 50) * T * Math.pow(10, x2 + x3 + x4 + x5);
+}
+
+// Eqs(7-10): arc-flash boundary [mm] from an intermediate E and distance exponent k12.
+function arcflashAfbFromE(EC, Vref, E_J, D) {
+  var tbl = arcflashEnergyTable(Vref);
+  var k = tbl[EC]; if (!k) return NaN;
+  var k12 = k[11];
+  if (!(E_J > 0) || !(D > 0) || !(k12 < 0)) return NaN;
+  var F = E_J / Math.pow(D, k12);
+  return Math.pow(5.0208 / F, 1 / k12);
+}
+
+// Eqs(11-15): enclosure size correction factor CF. Returns {CF, EES, type}.
+function arcflashCF(EC, Voc, h, w, d) {
+  if (EC === 'VOA' || EC === 'HOA') return { CF: 1.0, EES: null, type: 'Open air' };
+  var AB = { VCB: [4, 20], VCBB: [10, 24], HCB: [10, 22] }[EC];
+  if (!AB) return { CF: NaN, EES: null, type: null };
+  if (!(h > 0) || !(w > 0) || !(d > 0)) return { CF: NaN, EES: null, type: null };
+  var A = AB[0], B = AB[1];
+  var shallow = (Voc < 0.6 && h < 508 && w < 508 && d <= 203.2);
+  var type = shallow ? 'Shallow' : 'Typical';
+  function eqDim(dim) { return (660.4 + (dim - 660.4) * ((Voc + A) / B)) / 25.4; }
+  var width1;
+  if (w < 508) width1 = shallow ? 0.03937 * w : 20;
+  else if (w <= 660.4) width1 = 0.03937 * w;
+  else if (w <= 1244.6) width1 = eqDim(w);
+  else width1 = eqDim(1244.6);
+  var height1;
+  if (h < 508) height1 = shallow ? 0.03937 * h : 20;
+  else if (h <= 660.4) height1 = 0.03937 * h;
+  else if (h <= 1244.6) height1 = (EC === 'VCB') ? 0.03937 * h : eqDim(h);
+  else height1 = (EC === 'VCB') ? 49 : eqDim(1244.6);
+  var EES = (height1 + width1) / 2;
+  if (type === 'Typical' && EES < 20) EES = 20;
+  var b = arcflashTable7[type + '|' + EC];
+  if (!b) return { CF: NaN, EES: EES, type: type };
+  var poly = b[0] * EES * EES + b[1] * EES + b[2];
+  var CF = (type === 'Typical') ? poly : 1 / poly;
+  return { CF: CF, EES: EES, type: type };
+}
+
+// Ralph Lee (open-air, max power). Public domain. V kV, Ibf kA, t s, D mm.
+function arcflashLeeE(Voc, Ibf, t, D) {
+  if (!(Voc > 0) || !(Ibf > 0) || !(t > 0) || !(D > 0)) return { EJ: NaN, Ecal: NaN };
+  var EJ = 2.142e6 * Voc * Ibf * t / (D * D);
+  return { EJ: EJ, Ecal: EJ / 4.184 };
+}
+function arcflashLeeAFB(Voc, Ibf, t) {
+  if (!(Voc > 0) || !(Ibf > 0) || !(t > 0)) return NaN;
+  return Math.sqrt(2.142e6 * Voc * Ibf * t / 5.0208);
+}
+
+// IEEE 1584-2018 §4.2 validity-range classification. {ok, reasons[]}.
+function arcflashInValidityRange(state) {
+  var reasons = [];
+  var Voc = state.voltage / 1000, Ibf = state.faultCurrent, G = state.gap;
+  var D = state.workingDistance, EC = state.electrodeConfig;
+  if (['VCB', 'VCBB', 'HCB', 'VOA', 'HOA'].indexOf(EC) < 0) reasons.push('EC ' + EC);
+  if (Voc < 0.208) reasons.push('Voc ' + state.voltage + ' V < 208 V');
+  else if (Voc > 15.0) reasons.push('Voc ' + Voc + ' kV > 15 kV');
+  if (Voc <= 0.6) {
+    if (Ibf < 0.5 || Ibf > 106) reasons.push('Ibf ' + Ibf + ' kA outside 0.5-106 kA (LV)');
+    if (G < 6.35 || G > 76.2) reasons.push('G ' + G + ' mm outside 6.35-76.2 mm (LV)');
+  } else if (Voc <= 15.0) {
+    if (Ibf < 0.2 || Ibf > 65) reasons.push('Ibf ' + Ibf + ' kA outside 0.2-65 kA (HV)');
+    if (G < 19.05 || G > 254) reasons.push('G ' + G + ' mm outside 19.05-254 mm (HV)');
+  }
+  if (D < 305) reasons.push('D ' + D + ' mm < 305 mm');
+  var openAir = (EC === 'VOA' || EC === 'HOA' || state.enclosure === 'Open air (no box)');
+  if (!openAir) { var box = arcflashEnclosureDims(state.enclosure); if (box && box.w < 4 * G) reasons.push('enclosure width < 4*G'); }
+  return { ok: reasons.length === 0, reasons: reasons };
+}
+
+// Full IEEE 1584-2018 result for a state. Returns {ok, Iarc_full, Iarc_reduced, CF,
+// E_full_cal, E_reduced_cal, AFB_mm, VarCf} or {ok:false} when any equation is unusable.
+function arcflashComputeIEEE(EC, Voc, Ibf, G, D, T, box, openAir) {
+  var CF;
+  if (openAir || EC === 'VOA' || EC === 'HOA') CF = 1.0;
+  else {
+    if (!box) return { ok: false };
+    var cfRes = arcflashCF(EC, Voc, box.h, box.w, box.d);
+    CF = cfRes.CF;
+  }
+  if (!(CF > 0) || CF > 3 || !isFinite(CF)) return { ok: false };
+  var VarCf = arcflashVarCf(EC, Voc);
+  if (!isFinite(VarCf)) return { ok: false };
+  if (Voc <= 0.6) {
+    var Iarc600 = arcflashIarcIntermediate(EC, 0.6, Ibf, G);
+    var IarcLV = arcflashIarcFinalLV(Voc, Iarc600, Ibf);
+    if (!(Iarc600 > 0) || !(IarcLV > 0)) return { ok: false };
+    var IarcRedLV = arcflashIarcReduced(IarcLV, VarCf);
+    var EfullLV = arcflashEIntermediate(EC, 0.6, IarcLV, Ibf, T, CF, D, G, Iarc600);
+    var EredLV = arcflashEIntermediate(EC, 0.6, IarcRedLV, Ibf, T, CF, D, G, Iarc600);
+    var AFBlv = arcflashAfbFromE(EC, 0.6, EfullLV, D);
+    if (!(EfullLV > 0) || !isFinite(EfullLV)) return { ok: false };
+    return { ok: true, Iarc_full: IarcLV, Iarc_reduced: IarcRedLV, CF: CF, VarCf: VarCf,
+             E_full_cal: EfullLV / 4.184, E_reduced_cal: EredLV / 4.184, AFB_mm: AFBlv };
+  }
+  // HV path: per-reference Iarc/E/AFB then voltage-interpolate.
+  var refs = [0.6, 2.7, 14.3];
+  var IfRef = [], IrRef = [], EfRef = [], ErRef = [], AfbRef = [];
+  for (var i = 0; i < 3; i++) {
+    var Ir = arcflashIarcIntermediate(EC, refs[i], Ibf, G);
+    if (!(Ir > 0)) return { ok: false };
+    IfRef.push(Ir);
+    IrRef.push(arcflashIarcReduced(Ir, VarCf));
+  }
+  for (var j = 0; j < 3; j++) {
+    var ef = arcflashEIntermediate(EC, refs[j], IfRef[j], Ibf, T, CF, D, G, null);
+    var er = arcflashEIntermediate(EC, refs[j], IrRef[j], Ibf, T, CF, D, G, null);
+    if (!(ef > 0) || !isFinite(ef)) return { ok: false };
+    EfRef.push(ef); ErRef.push(er);
+    AfbRef.push(arcflashAfbFromE(EC, refs[j], ef, D));
+  }
+  var IarcFull = arcflashInterp(Voc, IfRef[0], IfRef[1], IfRef[2]);
+  var IarcRed = arcflashInterp(Voc, IrRef[0], IrRef[1], IrRef[2]);
+  var Efull = arcflashInterp(Voc, EfRef[0], EfRef[1], EfRef[2]);
+  var Ered = arcflashInterp(Voc, ErRef[0], ErRef[1], ErRef[2]);
+  var AFB = arcflashInterp(Voc, AfbRef[0], AfbRef[1], AfbRef[2]);
+  if (!(Efull > 0) || !isFinite(Efull)) return { ok: false };
+  return { ok: true, Iarc_full: IarcFull, Iarc_reduced: IarcRed, CF: CF, VarCf: VarCf,
+           E_full_cal: Efull / 4.184, E_reduced_cal: Ered / 4.184, AFB_mm: AFB };
+}
+
+// ORCHESTRATOR. Computes IEEE (when in range) + Lee and reports the worst-of energy.
+// Returns a structured, render-agnostic result. method is one of:
+//   'ieee' | 'lee' | 'lee_crosscheck' | 'unresolved'. notes are {key, detail?} codes.
+function arcflashIncident(state) {
+  var Voc = state.voltage / 1000, Ibf = state.faultCurrent, G = state.gap;
+  var D = state.workingDistance, EC = state.electrodeConfig, t = state.clearingTime;
+  var T = t * 1000;
+  var notes = [];
+  var openAir = (EC === 'VOA' || EC === 'HOA' || state.enclosure === 'Open air (no box)');
+  var box = arcflashEnclosureDims(state.enclosure);
+
+  var lee = arcflashLeeE(Voc, Ibf, t, D);
+  var leeAFB = arcflashLeeAFB(Voc, Ibf, t);
+  var leeCal = lee.Ecal;
+
+  var vr = arcflashInValidityRange(state);
+  var ieee = null;
+  if (vr.ok) {
+    ieee = arcflashComputeIEEE(EC, Voc, Ibf, G, D, T, box, openAir);
+    if (!ieee.ok) { ieee = null; notes.push({ key: 'oor', detail: 'IEEE equation unresolved for these inputs' }); }
+  } else {
+    notes.push({ key: 'oor', detail: vr.reasons.join('; ') });
+  }
+
+  var candidates = [];
+  if (ieee) {
+    candidates.push({ src: 'ieee_full', E: ieee.E_full_cal, AFB: ieee.AFB_mm });
+    candidates.push({ src: 'ieee_reduced', E: ieee.E_reduced_cal, AFB: ieee.AFB_mm });
+  }
+  if (isFinite(leeCal)) candidates.push({ src: 'lee', E: leeCal, AFB: leeAFB });
+  candidates = candidates.filter(function (c) { return isFinite(c.E) && c.E >= 0; });
+
+  if (candidates.length === 0) {
+    return { method: 'unresolved', inRange: vr.ok, E: null, E_worst: null,
+             Iarc_full: ieee ? ieee.Iarc_full : null, Iarc_reduced: ieee ? ieee.Iarc_reduced : null,
+             E_ieee_full: null, E_ieee_reduced: null, E_lee: isFinite(leeCal) ? leeCal : null,
+             governing: null, AFB: null, notes: notes };
+  }
+
+  var worst = candidates[0];
+  for (var i = 1; i < candidates.length; i++) if (candidates[i].E > worst.E) worst = candidates[i];
+
+  var method;
+  if (ieee && (worst.src === 'ieee_full' || worst.src === 'ieee_reduced')) method = 'ieee';
+  else if (ieee && worst.src === 'lee') { method = 'lee_crosscheck'; notes.push({ key: 'leeGoverns' }); }
+  else method = 'lee';
+  if (ieee) notes.push({ key: 'reducedCaution' });
+
+  return {
+    method: method, inRange: vr.ok,
+    Iarc_full: ieee ? ieee.Iarc_full : null,
+    Iarc_reduced: ieee ? ieee.Iarc_reduced : null,
+    E_ieee_full: ieee ? ieee.E_full_cal : null,
+    E_ieee_reduced: ieee ? ieee.E_reduced_cal : null,
+    E_lee: isFinite(leeCal) ? leeCal : null,
+    E_worst: worst.E, E: worst.E, governing: worst.src,
+    AFB: worst.AFB, notes: notes
+  };
+}
+
+// Back-compat shim (legacy 4-arg signature). Delegates to arcflashIncident and
+// returns the worst-of incident energy in cal/cm2 (raw, unrounded), NaN if unresolved.
 function arcflashCalcIncidentEnergy(voltage, faultCurrentKA, clearingTimeS, workingDistanceMM) {
-  var Cf = voltage <= 1000 ? 1.0 : 1.5;
-  var Iarc = faultCurrentKA * 1000;
-  var E = 0.0093 * Cf * Iarc * clearingTimeS * Math.pow(610 / workingDistanceMM, 2) / 10;
-  E = Math.ceil(E * 10) / 10;
-  return E;
+  var base = (typeof arcflashState !== 'undefined') ? arcflashState : {};
+  var s = {
+    voltage: voltage, faultCurrent: faultCurrentKA, clearingTime: clearingTimeS, workingDistance: workingDistanceMM,
+    electrodeConfig: base.electrodeConfig || 'VCB',
+    gap: base.gap || 25,
+    enclosure: base.enclosure || 'LV Panelboard'
+  };
+  var r = arcflashIncident(s);
+  return (r && r.E_worst != null && isFinite(r.E_worst)) ? r.E_worst : NaN;
 }
 
 function arcflashGetPPECategory(incidentEnergy) {
@@ -19622,12 +20014,30 @@ function arcflashGetPPECategory(incidentEnergy) {
   return { category: -1, da: 'FORBUDT - reducer energi', en: 'WORK PROHIBITED - reduce energy first', color: '#000000' };
 }
 
-function arcflashCalcBoundary(voltage, faultCurrentKA, clearingTimeS) {
-  var Cf = voltage <= 1000 ? 1.0 : 1.5;
-  var Iarc = faultCurrentKA * 1000;
-  var E_limit = 1.2;
-  var D_sq = 0.0093 * Cf * Iarc * clearingTimeS * 610 * 610 / (E_limit * 10);
-  return Math.ceil(Math.sqrt(D_sq));
+// Back-compat: arc-flash boundary [mm], now read from the worst-of arcflashIncident.
+function arcflashCalcBoundary(voltage, faultCurrentKA, clearingTimeS, workingDistanceMM) {
+  var base = (typeof arcflashState !== 'undefined') ? arcflashState : {};
+  var s = {
+    voltage: voltage, faultCurrent: faultCurrentKA, clearingTime: clearingTimeS,
+    workingDistance: workingDistanceMM || base.workingDistance || 455,
+    electrodeConfig: base.electrodeConfig || 'VCB', gap: base.gap || 25,
+    enclosure: base.enclosure || 'LV Panelboard'
+  };
+  var r = arcflashIncident(s);
+  return (r && r.AFB != null && isFinite(r.AFB)) ? Math.ceil(r.AFB) : NaN;
+}
+
+// Apply an equipment preset's typical conductor gap when an enclosure is selected
+// (the explicit gap buttons still override afterwards).
+function arcflashApplyEnclosure() {
+  var b = arcflashTable8_10[arcflashState.enclosure];
+  if (b) arcflashState.gap = b.G;
+}
+
+// Human-readable method label for the result box.
+function arcflashMethodLabel(method) {
+  if (method === 'ieee') return tx('IEEE 1584-2018 empirisk model', 'IEEE 1584-2018 empirical model');
+  return tx('Ralph Lee-metoden (friluft, konservativ)', 'Ralph Lee method (open-air, conservative)');
 }
 
 function arcflashGetRiskReductions() {
@@ -19642,30 +20052,85 @@ function arcflashGetRiskReductions() {
 }
 
 function renderArcFlash() {
-  var E = arcflashCalcIncidentEnergy(arcflashState.voltage, arcflashState.faultCurrent, arcflashState.clearingTime, arcflashState.workingDistance);
-  var ppe = arcflashGetPPECategory(E);
-  var boundary = arcflashCalcBoundary(arcflashState.voltage, arcflashState.faultCurrent, arcflashState.clearingTime);
+  var res = arcflashIncident(arcflashState);
   var reductions = arcflashGetRiskReductions();
+  var lvGaps = [13, 25, 32];
+  var hvGaps = [19, 104, 152, 254];
+  var isLV = (arcflashState.voltage <= 600);
+  var gaps = isLV ? lvGaps : hvGaps;
+  var enclosures = ['LV Panelboard', 'LV MCC', 'LV Switchgear', '5kV Switchgear', '15kV Switchgear', 'Open air (no box)'];
+  var openAir = (arcflashState.electrodeConfig === 'VOA' || arcflashState.electrodeConfig === 'HOA' || arcflashState.enclosure === 'Open air (no box)');
+
   var html = '<div class="card fade-in">';
-  html += '<div class="card-title">' + tx('Lysbue-risikovurdering (IEC 62271-200 / IEEE 1584)', 'Arc Flash Risk Assessment (IEC 62271-200 / IEEE 1584)') + '</div>';
-  html += '<div class="info-row">' + tx('Beregning af incident energi og PPE-krav. Arbejdstilsynet kraever risikovurdering.', 'Incident energy calculation and PPE requirements. Arbejdstilsynet requires risk assessment.') + '</div>';
+  html += '<div class="card-title">' + tx('Lysbue-risikovurdering (IEEE 1584-2018 / Lee)', 'Arc Flash Risk Assessment (IEEE 1584-2018 / Lee)') + '</div>';
+  html += '<div class="info-row">' + tx('Konservativ incident-energi (vaerste af IEEE 1584-2018 og Ralph Lee) og PPE-krav. Arbejdstilsynet kraever risikovurdering.', 'Conservative incident energy (worst of IEEE 1584-2018 and Ralph Lee) and PPE requirements. Arbejdstilsynet requires risk assessment.') + '</div>';
+
   html += '<div class="select-group"><div class="select-label">' + tx('Spaending [V]', 'Voltage [V]') + '</div><div class="select-grid">';
   [230, 400, 690, 6000, 10000, 20000].forEach(function(v) { var l = v >= 1000 ? (v/1000)+'kV' : v+'V'; html += '<button class="sel-btn' + (arcflashState.voltage === v ? ' selected' : '') + '" onclick="arcflashState.voltage=' + v + ';renderModule(\'arcflash\')">' + l + '</button>'; });
   html += '</div></div>';
+
   html += '<div class="select-group"><div class="select-label">' + tx('Fejlstroem [kA]', 'Fault Current [kA]') + '</div><div class="select-grid">';
   [1, 2, 5, 10, 15, 20, 25, 35, 50, 65].forEach(function(ik) { html += '<button class="sel-btn' + (arcflashState.faultCurrent === ik ? ' selected' : '') + '" onclick="arcflashState.faultCurrent=' + ik + ';renderModule(\'arcflash\')">' + ik + ' kA</button>'; });
   html += '</div></div>';
+
   html += '<div class="select-group"><div class="select-label">' + tx('Afbrydelsestid [s]', 'Clearing Time [s]') + '</div><div class="select-grid">';
   [0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.5, 1.0, 2.0].forEach(function(t) { html += '<button class="sel-btn' + (arcflashState.clearingTime === t ? ' selected' : '') + '" onclick="arcflashState.clearingTime=' + t + ';renderModule(\'arcflash\')">' + t + 's</button>'; });
   html += '</div></div>';
+
   html += '<div class="select-group"><div class="select-label">' + tx('Arbejdsafstand [mm]', 'Working Distance [mm]') + '</div><div class="select-grid">';
-  [{v:300,l:'300 (LV)'},{v:455,l:'455 (MV)'},{v:610,l:'610 (open)'}].forEach(function(d) { html += '<button class="sel-btn' + (arcflashState.workingDistance === d.v ? ' selected' : '') + '" onclick="arcflashState.workingDistance=' + d.v + ';renderModule(\'arcflash\')">' + d.l + '</button>'; });
+  [{v:305,l:'305 (LV)'},{v:455,l:'455 (MV)'},{v:610,l:'610 (open)'},{v:914,l:'914 (MV)'}].forEach(function(d) { html += '<button class="sel-btn' + (arcflashState.workingDistance === d.v ? ' selected' : '') + '" onclick="arcflashState.workingDistance=' + d.v + ';renderModule(\'arcflash\')">' + d.l + '</button>'; });
   html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + tx('Elektrodekonfiguration', 'Electrode configuration') + '</div><div class="select-grid">';
+  ['VCB', 'VCBB', 'HCB', 'VOA', 'HOA'].forEach(function(ec) { html += '<button class="sel-btn' + (arcflashState.electrodeConfig === ec ? ' selected' : '') + '" onclick="arcflashState.electrodeConfig=\'' + ec + '\';renderModule(\'arcflash\')">' + ec + '</button>'; });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + tx('Lederafstand (gap)', 'Conductor gap') + ' [mm]</div><div class="select-grid">';
+  gaps.forEach(function(g) { html += '<button class="sel-btn' + (arcflashState.gap === g ? ' selected' : '') + '" onclick="arcflashState.gap=' + g + ';renderModule(\'arcflash\')">' + g + ' mm</button>'; });
+  html += '</div></div>';
+
+  html += '<div class="select-group"><div class="select-label">' + tx('Kapsling / udstyrsklasse', 'Enclosure / equipment class') + '</div><div class="select-grid">';
+  enclosures.forEach(function(e) {
+    var lbl = (e === 'Open air (no box)') ? tx('Friluft (ingen kapsling)', 'Open air (no box)') : e;
+    var dis = (openAir && e !== 'Open air (no box)') ? ' style="opacity:0.5"' : '';
+    html += '<button class="sel-btn' + (arcflashState.enclosure === e ? ' selected' : '') + '"' + dis + ' onclick="arcflashState.enclosure=\'' + e + '\';arcflashApplyEnclosure();renderModule(\'arcflash\')">' + lbl + '</button>';
+  });
+  html += '</div></div>';
+
+  // Notes (validity / caution) rendered above the verdict; never green.
+  function noteText(note) {
+    if (note.key === 'oor') return tx('Uden for IEEE 1584-2018 gyldighedsomraade \u2014 bruger Lee', 'Outside IEEE 1584-2018 validity range \u2014 using Lee') + (note.detail ? ' (' + note.detail + ')' : '');
+    if (note.key === 'leeGoverns') return tx('Lee-krydstjek er styrende (konservativt)', 'Lee cross-check governs (conservative)');
+    if (note.key === 'reducedCaution') return tx('Reduceret-stroem scenarie er vurderet ved samme afbrydelsestid; kontroller afbrydelsestid ved I_arc(reduceret) paa enhedens karakteristik.', 'Reduced-current scenario evaluated at the same clearing time; verify clearing time at I_arc(reduced) on the device curve.');
+    return '';
+  }
+  var notesHtml = '';
+  (res.notes || []).forEach(function(n) { var t = noteText(n); if (t) notesHtml += '<div class="result-row"><span class="label">\u26A0\uFE0F</span><span class="value" style="color:#b8860b">' + t + '</span></div>'; });
+
+  if (res.method === 'unresolved' || res.E_worst == null || !isFinite(res.E_worst)) {
+    html += '<div class="result-box" style="border-left:4px solid #b8860b"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Incident energi', 'Incident Energy') + '</span><span class="value" style="color:#b8860b">' + tx('Uafklaret \u2014 kontroller inputs', 'Unresolved \u2014 check inputs') + '</span></div>';
+    html += notesHtml;
+    html += '</div></div>';
+    return html;
+  }
+
+  var Eraw = res.E_worst;
+  var E = Math.ceil(Eraw * 10) / 10;       // conservative round-up for display only
+  var EJ = Eraw * 4.184;
+  var ppe = arcflashGetPPECategory(E);
+  var boundary = (res.AFB != null && isFinite(res.AFB)) ? Math.ceil(res.AFB) : null;
+
   html += '<div class="result-box" style="border-left:4px solid ' + ppe.color + '"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
-  html += '<div class="result-row"><span class="label">' + tx('Incident energi', 'Incident Energy') + '</span><span class="value" style="font-size:1.3em;color:' + ppe.color + '">' + E.toFixed(1) + ' cal/cm\u00B2</span></div>';
+  if (res.Iarc_full != null && isFinite(res.Iarc_full)) html += '<div class="result-row"><span class="label">' + tx('Lysbuestroem (fuld)', 'Arcing current (full)') + '</span><span class="value">' + res.Iarc_full.toFixed(2) + ' kA</span></div>';
+  if (res.Iarc_reduced != null && isFinite(res.Iarc_reduced)) html += '<div class="result-row"><span class="label">' + tx('Lysbuestroem (reduceret)', 'Arcing current (reduced)') + '</span><span class="value">' + res.Iarc_reduced.toFixed(2) + ' kA</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Worst-case energi (100 % / reduceret)', 'Worst-case energy (100 % / reduced)') + '</span><span class="value" style="font-size:1.3em;color:' + ppe.color + '">' + E.toFixed(1) + ' cal/cm\u00B2 (' + EJ.toFixed(1) + ' J/cm\u00B2)</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('PPE', 'PPE') + '</span><span class="value" style="color:' + ppe.color + '">' + tx(ppe.da, ppe.en) + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Graense', 'Boundary') + '</span><span class="value">' + boundary + ' mm (' + (boundary/1000).toFixed(2) + ' m)</span></div>';
+  if (boundary != null) html += '<div class="result-row"><span class="label">' + tx('Lysbuegraense', 'Arc flash boundary') + '</span><span class="value">' + boundary + ' mm (' + (boundary/1000).toFixed(2) + ' m)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Metode', 'Method') + '</span><span class="value">' + arcflashMethodLabel(res.method) + ' \u00B7 ' + arcflashState.electrodeConfig + '</span></div>';
+  html += notesHtml;
   html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('PPE-skala (cal/cm\u00B2)', 'PPE Scale (cal/cm\u00B2)') + '</div>';
   html += '<div class="result-row"><span class="label" style="color:#22c55e">0: &lt;1.2</span><span class="value">' + tx('Normal toej', 'Normal clothes') + '</span></div>';
   html += '<div class="result-row"><span class="label" style="color:#84cc16">1: 1.2-4</span><span class="value">' + tx('Lysbue-skjorte', 'Arc shirt') + '</span></div>';
@@ -19674,17 +20139,21 @@ function renderArcFlash() {
   html += '<div class="result-row"><span class="label" style="color:#ef4444">4: 25-40</span><span class="value">' + tx('Maks PPE', 'Max PPE') + '</span></div>';
   html += '<div class="result-row"><span class="label" style="color:#000">&gt;40</span><span class="value" style="color:red">' + tx('FORBUDT', 'PROHIBITED') + '</span></div>';
   html += '</div>';
+
   html += '<div class="result-box"><div class="result-title">' + tx('Risikoreduktion', 'Risk Reduction') + '</div>';
   reductions.forEach(function(r) { html += '<div class="result-row"><span class="label">' + tx(r.da, r.en) + '</span><span class="value">' + r.eff + '</span></div>'; });
   html += '</div>';
+
   html += '<div class="result-box" style="border:2px solid ' + ppe.color + ';background:#fff3cd"><div class="result-title">\u26A1 ' + tx('Advarselsskilt', 'Warning Label') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Energi', 'Energy') + '</span><span class="value">' + E.toFixed(1) + ' cal/cm\u00B2</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Graense', 'Boundary') + '</span><span class="value">' + boundary + ' mm</span></div>';
+  if (boundary != null) html += '<div class="result-row"><span class="label">' + tx('Lysbuegraense', 'Arc flash boundary') + '</span><span class="value">' + boundary + ' mm</span></div>';
   html += '<div class="result-row"><span class="label">PPE</span><span class="value">' + (ppe.category >= 0 ? ppe.category : 'PROHIBITED') + '</span></div>';
   html += '<div class="result-row"><span class="label">V / Ik</span><span class="value">' + arcflashState.voltage + 'V / ' + arcflashState.faultCurrent + ' kA</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Metode', 'Method') + '</span><span class="value">' + arcflashMethodLabel(res.method) + '</span></div>';
   html += '</div>';
+
   var safe = ppe.category >= 0 && ppe.category <= 4;
-  html += renderVerdict(safe, safe ? tx('Energi ' + E.toFixed(1) + ' cal/cm2. PPE Kat.' + ppe.category + '. Graense ' + boundary + 'mm. IEC 62271-200.', 'Energy ' + E.toFixed(1) + ' cal/cm2. PPE Cat.' + ppe.category + '. Boundary ' + boundary + 'mm. IEC 62271-200.') : tx('FORBUDT: ' + E.toFixed(1) + ' cal/cm2 > 40. Reducer energi.', 'PROHIBITED: ' + E.toFixed(1) + ' cal/cm2 > 40. Reduce energy.'));
+  html += renderVerdict(safe, safe ? tx('Energi ' + E.toFixed(1) + ' cal/cm2. PPE Kat.' + ppe.category + '. Lysbuegraense ' + boundary + 'mm. ' + arcflashMethodLabel(res.method) + '.', 'Energy ' + E.toFixed(1) + ' cal/cm2. PPE Cat.' + ppe.category + '. Boundary ' + boundary + 'mm. ' + arcflashMethodLabel(res.method) + '.') : tx('FORBUDT: ' + E.toFixed(1) + ' cal/cm2 > 40. Reducer energi.', 'PROHIBITED: ' + E.toFixed(1) + ' cal/cm2 > 40. Reduce energy.'));
   html += '</div>';
   return html;
 }
