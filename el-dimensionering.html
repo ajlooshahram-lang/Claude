@@ -15616,6 +15616,8 @@ function renderLighting() {
   html += '<div class="result-row"><span class="label">\u26A0\uFE0F ' + tx('Noedbelysning', 'Emergency Lighting') + '</span><span class="value">' + tx('Se noedbelysningsmodulet for DS/EN 1838 krav', 'See Emergency Lighting module for DS/EN 1838 requirements') + '</span></div>';
   html += '</div>';
 
+  html += renderLightingSim(calc.count, calc.targetLux, lightingState.width, lightingState.length, lightingState.height, calc.spacingRatio <= 1.5 ? 0.7 : 0.4);
+
   // Verdict
   var allOk = calc.uniformityOk && calc.leniOk;
   html += renderVerdict(allOk, allOk ? tx('Belysningsdesign opfylder DS/EN 12464-1 + DS/EN 15193', 'Lighting design complies with DS/EN 12464-1 + DS/EN 15193') : tx('Tilpas layout - uniformitet eller energi overskrider graense', 'Adjust layout - uniformity or energy exceeds limit'));
@@ -19021,6 +19023,8 @@ function renderDiscrim() {
     html += '</div>';
   }
 
+  html += renderDiscrimSim(discrimState.upstreamType, discrimState.upstreamRating, discrimState.downstreamType, discrimState.downstreamRating, analysis.verdict === 'full', discrimState.ikMax);
+
   // Verdict badge
   var safe = analysis.verdict === 'full';
   var verdictText = safe ?
@@ -19194,6 +19198,8 @@ function renderEarthsys() {
   html += '<div class="result-row"><span class="label">' + tx('Kontinuitetstest PE', 'PE continuity test') + '</span><span class="value">< 1 Ω</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Periodisk gentest', 'Periodic retest') + '</span><span class="value">' + tx('Hvert 5. år (boliger), hvert 3. år (erhverv)', 'Every 5 years (domestic), every 3 years (commercial)') + '</span></div>';
   html += '</div>';
+
+  html += renderEarthsysSim(earthsysState.systemType, totalRe, earthsysState.numRods, earthsysState.soilResistivity, peSize);
 
   // Verdict
   var safe = targetMet;
@@ -19808,6 +19814,7 @@ function renderCableLife() {
   html += '<div class="result-row"><span class="label">' + tx('Graense', 'Threshold') + '</span><span class="value">' + insThresh.agingThreshold + '</span></div>';
   html += '<div class="result-row"><span class="label">Ref.</span><span class="value">' + insThresh.clause + '</span></div>';
   html += '</div>';
+  html += renderCableLifeSim(thermalLife.totalYears, remaining.remaining, remaining.percentUsed, cablelifeState.operatingTemp, cableData.maxTemp);
   var safe = remaining.remaining > 0 && remaining.percentUsed < 100;
   html += renderVerdict(safe, safe ? tx('Rest: ' + remaining.remaining + ' aar (' + remaining.percentUsed + '%). ' + priority.da + '. IEC 60502.', 'Remaining: ' + remaining.remaining + ' yr (' + remaining.percentUsed + '%). ' + priority.en + '. IEC 60502.') : tx('ADVARSEL: Overskrider designlevetid. Oejeblikkeligt eftersyn. IEC 60502.', 'WARNING: Exceeds design life. Immediate assessment. IEC 60502.'));
   html += '</div>';
@@ -20076,6 +20083,7 @@ function renderEMC() {
   html += '<div class="result-box"><div class="result-title">' + tx('EMC test krav', 'EMC Test Requirements') + '</div>';
   comp.tests.forEach(function(t) { if(t.required) html += '<div class="result-row"><span class="label">' + t.test + '</span><span class="value">' + (t.required ? tx('Paakraevet','Required') : tx('Anbefalet','Recommended')) + '</span></div>'; });
   html += '</div>';
+  html += renderEMCSim(emcState.zone, sep.distance_mm, mit.maxEmission, mit.exceeded);
   var safe = !mit.exceeded || mit.mitigations.length > 1;
   html += renderVerdict(safe, safe ? tx('EMC krav kan opfyldes med angivne foranstaltninger. IEC 61000.', 'EMC requirements achievable with listed mitigations. IEC 61000.') : tx('ADVARSEL: Emission overskrider zone-graense. IEC 61000.', 'WARNING: Emission exceeds zone limit. IEC 61000.'));
   html += '</div>';
@@ -27299,6 +27307,219 @@ function renderArcFlashSim(energy, ppeCategory, boundary, voltage, faultCurrent)
   svg += '<text x="150" y="18" text-anchor="middle" class="sim-label sim-value" font-size="9" fill="' + ppeColor + '">' + (typeof energy === 'number' ? energy.toFixed(1) : energy) + ' cal/cm\u00B2</text>';
   // Bottom info
   svg += '<text x="150" y="140" text-anchor="middle" class="sim-label sim-value" font-size="7">' + (voltage || 0) + 'V | ' + (faultCurrent || 0) + 'kA | PPE Cat.' + ppeCategory + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function renderLightingSim(nLuminaires, lux, roomW, roomL, mountH, uniformity) {
+  if (!nLuminaires || !lux) return '';
+  var svg = '<svg viewBox="0 0 300 150" width="300" height="150" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+  // Room cross-section outline
+  svg += '<rect x="30" y="20" width="240" height="110" rx="2" fill="none" stroke="var(--text)" stroke-width="1" stroke-dasharray="4,2"/>';
+  // Ceiling line
+  svg += '<line x1="30" y1="30" x2="270" y2="30" stroke="var(--text)" stroke-width="1.5"/>';
+  // Work plane (0.85m from floor typically)
+  var workPlaneY = 110;
+  svg += '<line x1="30" y1="' + workPlaneY + '" x2="270" y2="' + workPlaneY + '" stroke="#795548" stroke-width="2" stroke-dasharray="6,3"/>';
+  svg += '<text x="275" y="' + (workPlaneY + 4) + '" class="sim-label" font-size="5" fill="#795548">WP</text>';
+  // Luminaires on ceiling with light cones
+  var nShow = Math.min(nLuminaires, 6);
+  var spacing = 220 / (nShow + 1);
+  var luxRatio = Math.min(1, lux / 750);
+  var coneOpacity = (0.2 + 0.4 * luxRatio).toFixed(2);
+  for (var i = 0; i < nShow; i++) {
+    var cx = 50 + spacing * (i + 1);
+    // Luminaire fixture
+    svg += '<rect x="' + (cx - 10) + '" y="26" width="20" height="6" rx="2" fill="#ffb300" stroke="var(--text)" stroke-width="0.5"/>';
+    // Light cone (triangle from fixture to work plane)
+    var coneW = Math.min(35, 15 + mountH * 3);
+    svg += '<polygon points="' + (cx - 3) + ',32 ' + (cx - coneW) + ',' + workPlaneY + ' ' + (cx + coneW) + ',' + workPlaneY + ' ' + (cx + 3) + ',32" fill="#fff176" opacity="' + coneOpacity + '" class="sim-glow" style="animation-duration:' + (2 + i * 0.3).toFixed(1) + 's"/>';
+  }
+  if (nLuminaires > 6) {
+    svg += '<text x="270" y="45" class="sim-label" font-size="6">+' + (nLuminaires - 6) + '</text>';
+  }
+  // Lux level gradient on work plane
+  var luxColor = lux >= 500 ? '#4caf50' : (lux >= 300 ? '#ff9800' : '#f44336');
+  svg += '<rect x="40" y="' + (workPlaneY + 2) + '" width="220" height="6" rx="2" fill="' + luxColor + '" opacity="' + (0.3 + 0.5 * luxRatio).toFixed(2) + '"/>';
+  // Values
+  svg += '<text x="150" y="15" text-anchor="middle" class="sim-label sim-value" font-size="9">' + lux + ' lux | ' + nLuminaires + ' luminaires</text>';
+  var uniColor = uniformity >= 0.6 ? '#4caf50' : '#f44336';
+  svg += '<text x="150" y="140" text-anchor="middle" class="sim-label sim-value" font-size="7" fill="' + uniColor + '">Uniformity: ' + (typeof uniformity === 'number' ? uniformity.toFixed(2) : (uniformity || '?')) + ' | H=' + (mountH || '?') + 'm | ' + (roomW || '?') + 'x' + (roomL || '?') + 'm</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function renderEMCSim(zone, separation, emission, exceeded) {
+  if (!zone && zone !== 0) return '';
+  if (!separation && separation !== 0) return '';
+  var svg = '<svg viewBox="0 0 300 130" width="300" height="130" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+  var statusColor = exceeded ? '#f44336' : '#4caf50';
+  // Cable tray A (top)
+  svg += '<rect x="30" y="30" width="200" height="12" rx="2" fill="#546e7a" stroke="var(--text)" stroke-width="0.8"/>';
+  svg += '<text x="240" y="39" class="sim-label" font-size="6" fill="#546e7a">Tray A (Power)</text>';
+  // Cable tray B (bottom)
+  var sepPx = Math.min(60, Math.max(20, separation / 10));
+  var trayBY = 42 + sepPx;
+  svg += '<rect x="30" y="' + trayBY + '" width="200" height="12" rx="2" fill="#1565c0" stroke="var(--text)" stroke-width="0.8"/>';
+  svg += '<text x="240" y="' + (trayBY + 9) + '" class="sim-label" font-size="6" fill="#1565c0">Tray B (Data)</text>';
+  // EM field lines between trays (animated)
+  var fieldMidY = (42 + trayBY) / 2;
+  for (var i = 0; i < 5; i++) {
+    var fx = 50 + i * 40;
+    var fieldH = (trayBY - 42) * 0.7;
+    svg += '<ellipse cx="' + fx + '" cy="' + fieldMidY + '" rx="12" ry="' + (fieldH / 2) + '" fill="none" stroke="' + statusColor + '" stroke-width="0.8" stroke-dasharray="3,2" opacity="0.6" class="sim-field" style="animation-duration:' + (1.5 + i * 0.2).toFixed(1) + 's"/>';
+  }
+  // Separation distance indicator
+  svg += '<line x1="20" y1="42" x2="20" y2="' + trayBY + '" stroke="var(--text)" stroke-width="0.8" marker-start="url(#)" marker-end="url(#)"/>';
+  svg += '<line x1="16" y1="42" x2="24" y2="42" stroke="var(--text)" stroke-width="0.8"/>';
+  svg += '<line x1="16" y1="' + trayBY + '" x2="24" y2="' + trayBY + '" stroke="var(--text)" stroke-width="0.8"/>';
+  svg += '<text x="12" y="' + fieldMidY + '" text-anchor="middle" class="sim-label" font-size="5" transform="rotate(-90,12,' + fieldMidY + ')">' + separation + 'mm</text>';
+  // Shield indicator (if not exceeded)
+  if (!exceeded) {
+    svg += '<rect x="30" y="' + (trayBY - 4) + '" width="200" height="4" rx="1" fill="#4caf50" opacity="0.4"/>';
+    svg += '<text x="130" y="' + (trayBY - 6) + '" text-anchor="middle" class="sim-label" font-size="5" fill="#4caf50">Shield/Separation OK</text>';
+  }
+  // Zone label
+  svg += '<text x="150" y="15" text-anchor="middle" class="sim-label sim-value" font-size="9">Zone ' + zone + ' | ' + (emission || 0) + ' V/m</text>';
+  // Status
+  svg += '<text x="150" y="' + (trayBY + 30) + '" text-anchor="middle" class="sim-label sim-value" font-size="8" fill="' + statusColor + '">' + (exceeded ? 'EMISSION EXCEEDS LIMIT' : 'EMC COMPLIANT') + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function renderCableLifeSim(totalYears, remaining, percentUsed, operatingTemp, maxTemp) {
+  if (!totalYears && totalYears !== 0) return '';
+  var svg = '<svg viewBox="0 0 300 140" width="300" height="140" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+  // Cable cross-section (concentric circles: conductor, insulation, sheath)
+  var cx = 70, cy = 70;
+  var tempRatio = operatingTemp ? Math.min(1, operatingTemp / (maxTemp || 90)) : 0.5;
+  var insulColor = simHeatColor(operatingTemp || 50, maxTemp || 90);
+  // Outer sheath
+  svg += '<circle cx="' + cx + '" cy="' + cy + '" r="35" fill="#37474f" stroke="var(--text)" stroke-width="1"/>';
+  // Insulation layer (color indicates temperature/degradation)
+  svg += '<circle cx="' + cx + '" cy="' + cy + '" r="28" fill="' + insulColor + '" stroke="none" opacity="0.8"/>';
+  // Degradation cracks (if percent used is high)
+  if (percentUsed > 60) {
+    var nCracks = Math.min(8, Math.floor(percentUsed / 15));
+    for (var i = 0; i < nCracks; i++) {
+      var angle = (i / nCracks) * Math.PI * 2;
+      var x1 = cx + Math.cos(angle) * 20;
+      var y1 = cy + Math.sin(angle) * 20;
+      var x2 = cx + Math.cos(angle) * 28;
+      var y2 = cy + Math.sin(angle) * 28;
+      svg += '<line x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '" stroke="#f44336" stroke-width="0.8" opacity="' + (0.4 + percentUsed / 200).toFixed(2) + '"/>';
+    }
+  }
+  // Conductor core
+  svg += '<circle cx="' + cx + '" cy="' + cy + '" r="12" fill="#ff8f00" stroke="var(--text)" stroke-width="0.5"/>';
+  // Temperature gradient arrow
+  svg += '<text x="' + cx + '" y="' + (cy + 3) + '" text-anchor="middle" class="sim-label" font-size="7" fill="#fff">' + (operatingTemp || '?') + '\u00B0C</text>';
+  // Lifetime progress bar (right side)
+  var barX = 150, barY = 30, barW = 120, barH = 16;
+  var usedW = Math.min(barW, (percentUsed / 100) * barW);
+  var lifeColor = percentUsed >= 90 ? '#f44336' : (percentUsed >= 70 ? '#ff9800' : '#4caf50');
+  svg += '<rect x="' + barX + '" y="' + barY + '" width="' + barW + '" height="' + barH + '" rx="3" fill="#e0e0e0" stroke="var(--text)" stroke-width="0.5"/>';
+  svg += '<rect x="' + barX + '" y="' + barY + '" width="' + usedW + '" height="' + barH + '" rx="3" fill="' + lifeColor + '" opacity="0.8"/>';
+  svg += '<text x="' + (barX + barW / 2) + '" y="' + (barY + 12) + '" text-anchor="middle" class="sim-label" font-size="7">' + percentUsed + '% used</text>';
+  // Arrhenius curve indication (simplified exponential)
+  svg += '<text x="' + (barX + barW / 2) + '" y="' + (barY + 30) + '" text-anchor="middle" class="sim-label" font-size="6" fill="#666">Arrhenius: T\u2191 \u2192 Life\u2193</text>';
+  // Small curve sketch
+  svg += '<polyline points="155,80 170,82 190,86 210,94 230,108 250,125" fill="none" stroke="#666" stroke-width="1"/>';
+  svg += '<text x="155" y="78" class="sim-label" font-size="5">Life</text>';
+  svg += '<text x="252" y="128" class="sim-label" font-size="5">T</text>';
+  // Values
+  svg += '<text x="150" y="15" text-anchor="middle" class="sim-label sim-value" font-size="9">Life: ' + totalYears + 'yr | Remaining: ' + (remaining || 0) + 'yr</text>';
+  svg += '<text x="' + cx + '" y="120" text-anchor="middle" class="sim-label sim-value" font-size="6">Max ' + (maxTemp || '?') + '\u00B0C</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function renderEarthsysSim(systemType, re, numRods, soilResistivity, peSize) {
+  if (!re && re !== 0) return '';
+  if (!numRods) return '';
+  var svg = '<svg viewBox="0 0 300 150" width="300" height="150" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+  // Ground surface line
+  svg += '<line x1="10" y1="50" x2="290" y2="50" stroke="#795548" stroke-width="2"/>';
+  svg += '<text x="15" y="45" class="sim-label" font-size="5" fill="#795548">Ground Level</text>';
+  // Soil layers (colored by resistivity)
+  var soilColor = soilResistivity > 500 ? '#d7ccc8' : (soilResistivity > 100 ? '#a1887f' : '#6d4c41');
+  svg += '<rect x="10" y="50" width="280" height="95" fill="' + soilColor + '" opacity="0.3"/>';
+  svg += '<text x="280" y="142" text-anchor="end" class="sim-label" font-size="5" fill="' + soilColor + '">\u03C1=' + soilResistivity + ' \u03A9m</text>';
+  // Earth electrodes (rods driven into soil)
+  var rodSpacing = Math.min(80, 200 / (numRods + 1));
+  var rodStartX = 150 - (numRods - 1) * rodSpacing / 2;
+  // Connecting conductor along top
+  if (numRods > 1) {
+    var connX1 = rodStartX;
+    var connX2 = rodStartX + (numRods - 1) * rodSpacing;
+    svg += '<line x1="' + connX1 + '" y1="50" x2="' + connX2 + '" y2="50" stroke="#4caf50" stroke-width="3"/>';
+    svg += '<text x="' + ((connX1 + connX2) / 2) + '" y="46" text-anchor="middle" class="sim-label" font-size="5" fill="#4caf50">PE ' + peSize + 'mm\u00B2</text>';
+  }
+  for (var i = 0; i < Math.min(numRods, 6); i++) {
+    var rx = rodStartX + i * rodSpacing;
+    // Rod
+    svg += '<rect x="' + (rx - 2) + '" y="48" width="4" height="80" rx="1" fill="#616161" stroke="var(--text)" stroke-width="0.5"/>';
+    // Current flow from rod through soil (animated field lines)
+    svg += '<ellipse cx="' + rx + '" cy="95" rx="18" ry="25" fill="none" stroke="#ff9800" stroke-width="0.7" stroke-dasharray="3,3" opacity="0.5" class="sim-field" style="animation-duration:' + (2 + i * 0.3).toFixed(1) + 's"/>';
+    svg += '<ellipse cx="' + rx + '" cy="95" rx="10" ry="14" fill="none" stroke="#ff9800" stroke-width="0.5" stroke-dasharray="2,2" opacity="0.4" class="sim-field" style="animation-duration:' + (1.5 + i * 0.2).toFixed(1) + 's"/>';
+  }
+  // System type label
+  svg += '<text x="150" y="15" text-anchor="middle" class="sim-label sim-value" font-size="9">' + (systemType || '').toUpperCase() + ' | Re=' + (typeof re === 'number' ? re.toFixed(2) : re) + '\u03A9</text>';
+  // Resistance value with pass/fail
+  var reColor = re <= 10 ? '#4caf50' : '#f44336';
+  svg += '<text x="150" y="30" text-anchor="middle" class="sim-label sim-value" font-size="7" fill="' + reColor + '">' + numRods + ' rod' + (numRods > 1 ? 's' : '') + ' | Target \u226410\u03A9 ' + (re <= 10 ? '\u2713' : '\u2717') + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function renderDiscrimSim(upType, upRating, downType, downRating, coordinated, ikMax) {
+  if (!upRating || !downRating) return '';
+  var svg = '<svg viewBox="0 0 300 140" width="300" height="140" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+  var statusColor = coordinated ? '#4caf50' : '#f44336';
+  // Supply bus at top
+  svg += '<line x1="50" y1="20" x2="250" y2="20" stroke="var(--text)" stroke-width="3"/>';
+  svg += '<text x="150" y="14" text-anchor="middle" class="sim-label" font-size="6">Supply</text>';
+  // Upstream device
+  svg += '<line x1="150" y1="20" x2="150" y2="40" stroke="var(--text)" stroke-width="2" class="sim-wire" style="animation-duration:1.5s"/>';
+  svg += '<rect x="125" y="40" width="50" height="25" rx="3" fill="#1565c0" stroke="var(--text)" stroke-width="1"/>';
+  svg += '<text x="150" y="53" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">' + (upType || '').toUpperCase() + '</text>';
+  svg += '<text x="150" y="62" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">' + upRating + 'A</text>';
+  // Connection between devices
+  svg += '<line x1="150" y1="65" x2="150" y2="80" stroke="var(--text)" stroke-width="2" class="sim-wire" style="animation-duration:1.2s"/>';
+  // Downstream device
+  svg += '<rect x="125" y="80" width="50" height="25" rx="3" fill="#e65100" stroke="var(--text)" stroke-width="1"/>';
+  svg += '<text x="150" y="93" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">' + (downType || '').toUpperCase() + '</text>';
+  svg += '<text x="150" y="102" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">' + downRating + 'A</text>';
+  // Load/fault point
+  svg += '<line x1="150" y1="105" x2="150" y2="125" stroke="var(--text)" stroke-width="2" class="sim-wire" style="animation-duration:0.8s"/>';
+  svg += '<circle cx="150" cy="130" r="6" fill="' + statusColor + '" class="sim-glow" style="animation-duration:1s"/>';
+  svg += '<text x="150" y="133" text-anchor="middle" class="sim-label" fill="#fff" font-size="5">F</text>';
+  // Time-current curve indication (simplified, right side)
+  // Upstream TCC (higher curve)
+  svg += '<polyline points="210,110 220,95 235,75 250,55 265,40 280,30" fill="none" stroke="#1565c0" stroke-width="1.5"/>';
+  svg += '<text x="282" y="30" class="sim-label" font-size="5" fill="#1565c0">Up</text>';
+  // Downstream TCC (lower curve - should trip first)
+  svg += '<polyline points="210,110 218,100 230,85 242,68 255,52 268,42" fill="none" stroke="#e65100" stroke-width="1.5"/>';
+  svg += '<text x="270" y="42" class="sim-label" font-size="5" fill="#e65100">Dn</text>';
+  // Axis labels for TCC
+  svg += '<text x="210" y="120" class="sim-label" font-size="5">I\u2192</text>';
+  svg += '<text x="205" y="35" class="sim-label" font-size="5">t\u2191</text>';
+  // Trip indication arrow (downstream trips first if coordinated)
+  if (coordinated) {
+    svg += '<text x="95" y="95" text-anchor="end" class="sim-label" font-size="6" fill="#4caf50">TRIPS 1st \u2192</text>';
+  } else {
+    svg += '<text x="95" y="55" text-anchor="end" class="sim-label" font-size="6" fill="#f44336">BOTH TRIP \u2192</text>';
+  }
+  // Coordination status
+  svg += '<text x="150" y="12" text-anchor="middle" class="sim-label sim-value" font-size="8" fill="' + statusColor + '">' + (coordinated ? 'COORDINATED' : 'NOT SELECTIVE') + '</text>';
+  // Ik_max value
+  var ikDisplay = ikMax >= 1000 ? (ikMax / 1000) + 'kA' : ikMax + 'A';
+  svg += '<text x="40" y="133" class="sim-label sim-value" font-size="6">Ik=' + ikDisplay + '</text>';
   svg += '</svg>';
   return svg;
 }

@@ -13759,6 +13759,115 @@ test('renderArcFlashSim returns empty for undefined energy', function() {
   assert.strictEqual(renderArcFlashSim(undefined, 2, 450, 400, 10), '');
 });
 
+// --- renderLightingSim tests ---
+test('renderLightingSim returns SVG with simGlow class for luminaire light cones', function() {
+  var svg = renderLightingSim(12, 500, 8, 10, 3, 0.7);
+  assert.ok(svg.indexOf('<svg') >= 0, 'should contain svg element');
+  assert.ok(svg.indexOf('sim-glow') >= 0, 'should have simGlow animation for light cones');
+  assert.ok(svg.indexOf('sim-value') >= 0, 'should show values');
+  assert.ok(svg.indexOf('500 lux') >= 0, 'should show lux value');
+  assert.ok(svg.indexOf('12 luminaires') >= 0, 'should show luminaire count');
+});
+
+test('renderLightingSim returns empty for zero luminaires', function() {
+  assert.strictEqual(renderLightingSim(0, 500, 8, 10, 3, 0.7), '');
+});
+
+test('renderLightingSim returns empty for zero lux', function() {
+  assert.strictEqual(renderLightingSim(12, 0, 8, 10, 3, 0.7), '');
+});
+
+// --- renderEMCSim tests ---
+test('renderEMCSim returns SVG with sim-field showing electromagnetic interference', function() {
+  var svg = renderEMCSim(2, 150, 3.5, false);
+  assert.ok(svg.indexOf('<svg') >= 0, 'should contain svg element');
+  assert.ok(svg.indexOf('sim-field') >= 0, 'should have sim-field for EM field lines');
+  assert.ok(svg.indexOf('sim-value') >= 0, 'should show values');
+  assert.ok(svg.indexOf('Zone 2') >= 0, 'should show zone');
+  assert.ok(svg.indexOf('150mm') >= 0, 'should show separation distance');
+  assert.ok(svg.indexOf('COMPLIANT') >= 0, 'should show compliant status');
+});
+
+test('renderEMCSim shows exceeded status when limit exceeded', function() {
+  var svg = renderEMCSim(1, 50, 10, true);
+  assert.ok(svg.indexOf('EXCEEDS LIMIT') >= 0, 'should show exceeded status');
+});
+
+test('renderEMCSim returns empty for undefined zone and zero separation', function() {
+  assert.strictEqual(renderEMCSim(undefined, undefined, 3, false), '');
+});
+
+// --- renderCableLifeSim tests ---
+test('renderCableLifeSim returns SVG with thermal degradation visualization', function() {
+  var svg = renderCableLifeSim(40, 25, 37, 70, 90);
+  assert.ok(svg.indexOf('<svg') >= 0, 'should contain svg element');
+  assert.ok(svg.indexOf('sim-value') >= 0, 'should show values');
+  assert.ok(svg.indexOf('40yr') >= 0, 'should show total years');
+  assert.ok(svg.indexOf('25yr') >= 0, 'should show remaining years');
+  assert.ok(svg.indexOf('37%') >= 0, 'should show percent used');
+  assert.ok(svg.indexOf('Arrhenius') >= 0, 'should show Arrhenius indication');
+});
+
+test('renderCableLifeSim shows degradation cracks for high percent used', function() {
+  var svg = renderCableLifeSim(30, 2, 93, 85, 90);
+  assert.ok(svg.indexOf('#f44336') >= 0, 'should show red crack indicators for degraded cable');
+});
+
+test('renderCableLifeSim returns empty for undefined total years', function() {
+  assert.strictEqual(renderCableLifeSim(undefined, 25, 37, 70, 90), '');
+});
+
+// --- renderEarthsysSim tests ---
+test('renderEarthsysSim returns SVG showing electrode(s) in soil', function() {
+  var svg = renderEarthsysSim('tncs', 4.5, 2, 100, 16);
+  assert.ok(svg.indexOf('<svg') >= 0, 'should contain svg element');
+  assert.ok(svg.indexOf('sim-field') >= 0, 'should have sim-field for current flow');
+  assert.ok(svg.indexOf('sim-value') >= 0, 'should show values');
+  assert.ok(svg.indexOf('TNCS') >= 0, 'should show system type');
+  assert.ok(svg.indexOf('4.50') >= 0, 'should show resistance value');
+  assert.ok(svg.indexOf('2 rods') >= 0, 'should show number of rods');
+});
+
+test('renderEarthsysSim shows single rod', function() {
+  var svg = renderEarthsysSim('tt', 15.2, 1, 200, 10);
+  assert.ok(svg.indexOf('1 rod') >= 0, 'should show singular rod');
+  assert.ok(svg.indexOf('\u2717') >= 0, 'should show fail mark for resistance > 10');
+});
+
+test('renderEarthsysSim returns empty for zero numRods', function() {
+  assert.strictEqual(renderEarthsysSim('tncs', 5, 0, 100, 16), '');
+});
+
+test('renderEarthsysSim returns empty for undefined re', function() {
+  assert.strictEqual(renderEarthsysSim('tncs', undefined, 2, 100, 16), '');
+});
+
+// --- renderDiscrimSim tests ---
+test('renderDiscrimSim returns SVG with coordination pass indication', function() {
+  var svg = renderDiscrimSim('fuse', 100, 'mcb', 32, true, 6000);
+  assert.ok(svg.indexOf('<svg') >= 0, 'should contain svg element');
+  assert.ok(svg.indexOf('sim-wire') >= 0, 'should have animated wire');
+  assert.ok(svg.indexOf('sim-glow') >= 0, 'should have glow at fault point');
+  assert.ok(svg.indexOf('sim-value') >= 0, 'should show values');
+  assert.ok(svg.indexOf('COORDINATED') >= 0, 'should show coordinated status');
+  assert.ok(svg.indexOf('100A') >= 0, 'should show upstream rating');
+  assert.ok(svg.indexOf('32A') >= 0, 'should show downstream rating');
+});
+
+test('renderDiscrimSim shows not selective for failed coordination', function() {
+  var svg = renderDiscrimSim('mcb', 32, 'mcb', 25, false, 10000);
+  assert.ok(svg.indexOf('NOT SELECTIVE') >= 0, 'should show not selective');
+  assert.ok(svg.indexOf('#f44336') >= 0, 'should use red color for failure');
+});
+
+test('renderDiscrimSim returns empty for zero upstream rating', function() {
+  assert.strictEqual(renderDiscrimSim('fuse', 0, 'mcb', 32, true, 6000), '');
+});
+
+test('renderDiscrimSim returns empty for zero downstream rating', function() {
+  assert.strictEqual(renderDiscrimSim('fuse', 100, 'mcb', 0, true, 6000), '');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
