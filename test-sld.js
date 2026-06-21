@@ -13411,12 +13411,12 @@ test('renderTrafoSim returns empty for zero loadPercent', function() {
   assert.strictEqual(svg, '');
 });
 
-test('renderHarmonicSim returns SVG with polyline waveform and sim-wave', function() {
+test('renderHarmonicSim returns SVG with polyline waveform and sim-pulse', function() {
   var harmonics = { h3: 15, h5: 12, h7: 8, h11: 4, h13: 3 };
   var svg = renderHarmonicSim(22.5, harmonics, 'vfd');
   assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
   assert(svg.indexOf('polyline') >= 0, 'should contain polyline for waveform');
-  assert(svg.indexOf('sim-wave') >= 0, 'should contain sim-wave class');
+  assert(svg.indexOf('sim-pulse') >= 0, 'should contain sim-pulse class');
 });
 
 test('renderHarmonicSim returns empty for zero thd', function() {
