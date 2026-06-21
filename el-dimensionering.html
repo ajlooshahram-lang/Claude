@@ -9148,7 +9148,38 @@ function elforsyningCoordinationSummary() {
 }
 
 // --- Persistence (NEW localStorage key, no collision with existing keys) ---
-let elforsyningBom = elforsyningLoadBom();
+let elforsyningBom = elforsyningInitBom();
+
+// Builds the full "all picked" default map: every supply-side product across the 8
+// categories at quantity 1 — exactly the set elforsyningPickAll() would add to an
+// empty list (single source of truth: the live PRODUCTS catalogue).
+function elforsyningDefaultBom() {
+  const bom = {};
+  ELFORSYNING_CATEGORIES.forEach(function(cat) {
+    (PRODUCTS[cat] || []).forEach(function(p) {
+      bom[p.id] = { category: cat, qty: 1 };
+    });
+  });
+  return bom;
+}
+
+// First-ever load decision. The ONLY distinguishing signal is whether the storage key
+// EXISTS:
+//   • key ABSENT (getItem -> null) => never-seeded user => DEFAULT to all materials
+//     picked at qty 1, then persist ONCE so the seed never repeats on later reloads.
+//   • key PRESENT (even the empty "{}" left by a deliberate Clear All) => respect the
+//     saved state exactly and NEVER re-seed — a cleared list stays cleared.
+function elforsyningInitBom() {
+  let raw = null;
+  try { raw = localStorage.getItem(ELFORSYNING_BOM_KEY); } catch (e) { raw = null; }
+  if (raw === null || raw === undefined) {
+    const seeded = elforsyningDefaultBom();
+    try { localStorage.setItem(ELFORSYNING_BOM_KEY, JSON.stringify(seeded)); } catch (e) {}
+    return seeded;
+  }
+  // Key present (incl. empty object): load as-is through the robust cleaner below.
+  return elforsyningLoadBom();
+}
 
 function elforsyningLoadBom() {
   try {

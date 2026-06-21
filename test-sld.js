@@ -7226,6 +7226,82 @@ test('Elforsyning: load drops unknown product ids (never resurrects products not
   elfRestore();
 });
 
+// --- "Pick All" is the default state (first-ever load seeds all materials) ---------
+// The distinguishing signal is whether the storage key EXISTS, NOT whether it is empty.
+
+test('Elforsyning: default map = every supply-side product at qty 1 (matches Pick All set)', function() {
+  elfReset();
+  var def = elforsyningDefaultBom();
+  var expected = elfExpectedProductCount();
+  assert.strictEqual(expected, 67, 'v1 catalogue has 67 supply-side products');
+  assert.strictEqual(Object.keys(def).length, expected, 'default contains every product');
+  // Exactly the set Pick All would produce on an empty list.
+  elforsyningBom = {};
+  elforsyningPickAll();
+  assert.deepStrictEqual(Object.keys(def).sort(), Object.keys(elforsyningBom).sort(),
+    'default ids == Pick All ids');
+  Object.keys(def).forEach(function(id) {
+    assert.strictEqual(def[id].qty, 1, 'default qty 1 for ' + id);
+    assert(elforsyningProductById(id), 'default id is a real product: ' + id);
+  });
+  elfRestore();
+});
+
+test('Elforsyning (a): FIRST-EVER load (storage key ABSENT) defaults to ALL 67 materials picked at qty 1 and persists once', function() {
+  elfReset(); // empties bom + removes the storage key
+  assert.strictEqual(localStorage.getItem(ELFORSYNING_BOM_KEY), null, 'precondition: key absent');
+  var bom = elforsyningInitBom();
+  var expected = elfExpectedProductCount();
+  assert.strictEqual(Object.keys(bom).length, expected, 'all ' + expected + ' materials seeded');
+  Object.keys(bom).forEach(function(id) {
+    assert.strictEqual(bom[id].qty, 1, 'seeded line qty 1 for ' + id);
+  });
+  // The seed must be PERSISTED so it happens exactly once.
+  var raw = localStorage.getItem(ELFORSYNING_BOM_KEY);
+  assert(raw !== null, 'seed persisted: key now present');
+  var parsed = JSON.parse(raw);
+  assert.strictEqual(Object.keys(parsed).length, expected, 'persisted seed holds all materials');
+  // A subsequent init must NOT mutate the (now present) state.
+  var bom2 = elforsyningInitBom();
+  assert.strictEqual(Object.keys(bom2).length, expected, 'second init still full (idempotent)');
+  elfRestore();
+});
+
+test('Elforsyning (b): reload after deliberate Clear All (key present = "{}") stays EMPTY — no re-seed', function() {
+  elfReset();
+  // Simulate a user who pressed Clear All: bom emptied + persisted as the empty object.
+  elforsyningBom = {};
+  elforsyningSaveBom();
+  assert.strictEqual(localStorage.getItem(ELFORSYNING_BOM_KEY), '{}', 'cleared list persisted as "{}"');
+  // Reload: init must respect the present (empty) key and NOT re-seed.
+  var bom = elforsyningInitBom();
+  assert.strictEqual(Object.keys(bom).length, 0, 'cleared list stays cleared across reload');
+  assert.strictEqual(localStorage.getItem(ELFORSYNING_BOM_KEY), '{}', 'storage still empty object (not re-seeded)');
+  elfRestore();
+});
+
+test('Elforsyning (c): reload with a PARTIAL saved BOM is preserved exactly (qty respected, unknown ids dropped, no re-seed)', function() {
+  elfReset();
+  // Pick a couple of real ids from two different categories.
+  var ids = [];
+  ELF_CATS.forEach(function(c) {
+    var arr = PRODUCTS[c] || [];
+    if (arr.length && ids.length < 2) ids.push({ id: arr[0].id, category: c });
+  });
+  assert(ids.length === 2, 'have two real product ids for the partial set');
+  var saved = {};
+  saved[ids[0].id] = { category: ids[0].category, qty: 4 };
+  saved[ids[1].id] = { category: ids[1].category, qty: 1 };
+  saved['NOT-A-REAL-ID'] = { category: 'metering', qty: 9 }; // must be dropped
+  localStorage.setItem(ELFORSYNING_BOM_KEY, JSON.stringify(saved));
+  var bom = elforsyningInitBom();
+  assert.strictEqual(Object.keys(bom).length, 2, 'only the 2 real ids preserved (unknown dropped, no re-seed)');
+  assert.strictEqual(bom[ids[0].id].qty, 4, 'qty 4 respected');
+  assert.strictEqual(bom[ids[1].id].qty, 1, 'qty 1 respected');
+  assert(!bom['NOT-A-REAL-ID'], 'unknown id dropped');
+  elfRestore();
+});
+
 test('Elforsyning: render produces grouped rows with brand/spec/standard/CE in BOTH da and en', function() {
   elfReset();
   elforsyningPickAll();
