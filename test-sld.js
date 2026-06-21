@@ -14228,6 +14228,78 @@ test('renderSLD includes enhanced simulator SVG when not in fault mode', functio
   assert(html.indexOf('sim-wire') >= 0 || html.indexOf('sim-pulse') >= 0, 'parent should include sim');
 });
 
+// --- renderDistPlan tests ---
+test('renderDistPlan returns HTML with SVG when panelState has data', function() {
+  // Ensure panelState is populated
+  panelState.boards = [];
+  var tree = sldCreateTree();
+  panelAutoPopulate(tree);
+  var html = renderDistPlan();
+  assert(html.indexOf('<svg') >= 0, 'should contain SVG element');
+  assert(html.indexOf('card') >= 0, 'should contain card class');
+});
+
+test('renderDistPlan SVG contains busbar elements L1 L2 L3', function() {
+  panelState.boards = [];
+  var tree = sldCreateTree();
+  panelAutoPopulate(tree);
+  var html = renderDistPlan();
+  assert(html.indexOf('L1') >= 0, 'should contain L1 busbar label');
+  assert(html.indexOf('L2') >= 0, 'should contain L2 busbar label');
+  assert(html.indexOf('L3') >= 0, 'should contain L3 busbar label');
+});
+
+test('renderDistPlan handles empty panelState gracefully', function() {
+  panelState.boards = [];
+  panelState.selectedBoardIdx = 0;
+  // Clear sldTree so it creates a fresh one
+  sldTree = null;
+  var html = renderDistPlan();
+  assert(typeof html === 'string', 'should return a string');
+  assert(html.length > 0, 'should return non-empty string');
+  assert(html.indexOf('card') >= 0, 'should have card layout');
+});
+
+test('renderDistPlan contains DIN rail devices from panelState', function() {
+  panelState.boards = [{
+    name: 'TestBoard',
+    rails: [[{ nodeId: 't1', device: { curve: 'C', poles: '1P' }, In: 16, modules: 1, powerLoss: 2.5, position: 1, name: 'Light1' }]],
+    totalModules: 1,
+    totalPowerLoss: 2.5,
+    enclosure: { name: '2x12', modules: 24, rows: 2, modulesPerRow: 12, volume: 15 }
+  }];
+  panelState.selectedBoardIdx = 0;
+  var html = renderDistPlan();
+  assert(html.indexOf('16A') >= 0, 'should show device rating');
+  assert(html.indexOf('Light1') >= 0 || html.indexOf('Light') >= 0, 'should show circuit name');
+});
+
+test('renderDistPlan uses tx() for bilingual labels', function() {
+  panelState.boards = [];
+  var tree = sldCreateTree();
+  panelAutoPopulate(tree);
+  var html = renderDistPlan();
+  // The result-box should have some translated text
+  assert(html.indexOf('result-box') >= 0, 'should contain result-box');
+  assert(html.indexOf('result-row') >= 0, 'should contain result-row');
+});
+
+test('renderDistPlan contains animated sim-wire elements', function() {
+  panelState.boards = [];
+  var tree = sldCreateTree();
+  panelAutoPopulate(tree);
+  var html = renderDistPlan();
+  assert(html.indexOf('sim-wire') >= 0, 'should contain animated sim-wire class');
+});
+
+test('renderDistPlan contains sim-pulse flow arrows', function() {
+  panelState.boards = [];
+  var tree = sldCreateTree();
+  panelAutoPopulate(tree);
+  var html = renderDistPlan();
+  assert(html.indexOf('sim-pulse') >= 0, 'should contain sim-pulse animated arrows');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
