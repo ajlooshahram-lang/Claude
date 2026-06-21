@@ -27011,7 +27011,6 @@ function renderBESSSim(capacityKWh, powerKW, soc, chemistry, charging) {
   svg += '<rect x="40" y="30" width="22" height="10" rx="2" fill="#263238" stroke="' + chemColor + '" stroke-width="0.5"/>';
   svg += '<text x="51" y="38" text-anchor="middle" class="sim-label" fill="' + chemColor + '" font-size="5">BMS</text>';
   // Bidirectional arrows / power flow
-  var arrowDir = charging ? 1 : -1;
   var arrowX1 = charging ? 180 : 115;
   var arrowX2 = charging ? 115 : 180;
   svg += '<line x1="' + arrowX1 + '" y1="60" x2="' + arrowX2 + '" y2="60" stroke="' + chemColor + '" stroke-width="3" class="sim-wire" style="animation-duration:' + dur + 's"/>';
@@ -27225,7 +27224,7 @@ function renderZsSim(ze, r1r2, zs, zsMax, faultCurrent, pass) {
   svg += '<text x="35" y="85" text-anchor="middle" class="sim-label" font-size="6">Ze=' + (ze || 0) + '\u03A9</text>';
   // Zs value prominently in center
   svg += '<rect x="105" y="55" width="90" height="30" rx="4" fill="' + (pass ? '#e8f5e9' : '#ffebee') + '" stroke="' + loopColor + '" stroke-width="1.5"/>';
-  svg += '<text x="150" y="68" text-anchor="middle" class="sim-value" font-size="9" fill="' + loopColor + '">Zs = ' + (zs || 0).toFixed ? (zs || 0).toFixed(2) : (zs || 0) + ' \u03A9</text>';
+  svg += '<text x="150" y="68" text-anchor="middle" class="sim-value" font-size="9" fill="' + loopColor + '">Zs = ' + ((zs || 0).toFixed ? (zs || 0).toFixed(2) : (zs || 0)) + ' \u03A9</text>';
   svg += '<text x="150" y="80" text-anchor="middle" class="sim-label" font-size="6" fill="' + loopColor + '">max ' + (zsMax || 0) + '\u03A9 | If=' + (faultCurrent || 0) + 'A</text>';
   // Pass/fail indicator
   svg += '<text x="150" y="133" text-anchor="middle" class="sim-label sim-value" font-size="8" fill="' + loopColor + '">' + (pass ? '\u2705 PASS' : '\u274C FAIL') + '</text>';
