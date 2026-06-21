@@ -2422,6 +2422,27 @@ const _FA = {
   'Ratio': 'نسبت',
   'Improvement': 'بهبود',
   'Back-up Protection': 'حفاظت پشتیبان',
+  'Prospective fault current Ik_max [A]': 'جریان اتصال کوتاه مورد انتظار Ik_max [A]',
+  'Full selective (Is >= Ik_max)': 'کاملا انتخاب‌پذیر (Is >= Ik_max)',
+  'Selective up to Is': 'انتخاب‌پذیر تا Is',
+  'Unresolved -- verify with manufacturer selectivity table': 'حل‌نشده -- با جدول انتخاب‌پذیری سازنده تایید کنید',
+  'I2t Energy Diagram': 'نمودار انرژی I2t',
+  'Upstream I2t (total)': 'I2t بالادست (کل)',
+  'Downstream I2t (pre-arcing)': 'I2t پایین‌دست (پیش‌قوس)',
+  'Crossover point (Is)': 'نقطه تقاطع (Is)',
+  'Selectivity holds for all fault currents at this location': 'انتخاب‌پذیری برای تمام جریان‌های خطا در این محل برقرار است',
+  'Selectivity FAILS above': 'انتخاب‌پذیری بالای ... از بین می‌رود',
+  'Conservative: no data for this combination': 'محافظه‌کارانه: داده‌ای برای این ترکیب موجود نیست',
+  'Verify with manufacturer selectivity table': 'با جدول انتخاب‌پذیری سازنده تایید کنید',
+  'FULL SELECTIVE': 'کاملا انتخاب‌پذیر',
+  'SELECTIVE UP TO': 'انتخاب‌پذیر تا',
+  'NOT SELECTIVE': 'غیر انتخاب‌پذیر',
+  'UNRESOLVED': 'حل‌نشده',
+  'Upstream Curve': 'منحنی بالادست',
+  'Downstream Curve': 'منحنی پایین‌دست',
+  'Upstream Rating [A]': 'جریان نامی بالادست [A]',
+  'Downstream Rating [A]': 'جریان نامی پایین‌دست [A]',
+  'Diagram is illustrative - use manufacturer data for final verification': 'نمودار تقریبی است - از داده‌های سازنده برای تایید نهایی استفاده کنید',
   // Earthing System module
   'Earthing System Design': 'طراحی سیستم ارتینگ',
   'Earth Electrode': 'الکترود زمین',
@@ -18268,9 +18289,11 @@ function renderGenerator() {
 var discrimState = {
   upstreamType: 'fuse',
   upstreamRating: 100,
+  upstreamCurve: 'C',
   downstreamType: 'mcb',
   downstreamRating: 16,
-  downstreamCurve: 'C'
+  downstreamCurve: 'C',
+  ikMax: 10000
 };
 
 var DISCRIM_UPSTREAM_FUSE = [25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400];
@@ -18279,87 +18302,307 @@ var DISCRIM_UPSTREAM_MCCB = [63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630
 var DISCRIM_DOWNSTREAM_MCB = [6, 10, 13, 16, 20, 25, 32];
 var DISCRIM_DOWNSTREAM_FUSE = [6, 10, 16, 20, 25, 32, 40, 50, 63];
 
-function discrimAnalyze(upType, upRating, downType, downRating, downCurve) {
-  var result = { verdict: 'none', color: 'red', ratio: 0, is: 0, recommendation: '' };
+// I2t selectivity data tables (Is in amperes) from manufacturer publications
+// Sources: IEC 60269-2, Eaton Bussmann NH tables, ABB OFAF gG, Schneider iC60/NSX
+var DISCRIM_SELECTIVITY_TABLES = {
+  'fuse_fuse': {
+    '100_32': 28000, '100_63': 18000, '160_63': 38000, '160_100': 22000,
+    '200_100': 40000, '200_125': 25000, '250_160': 32000, '315_160': 50000,
+    '315_200': 35000, '400_200': 63000, '400_250': 40000, '63_32': 18000,
+    '63_25': 15000, '50_25': 12000, '32_25': 3000, '80_32': 22000,
+    '80_50': 15000, '125_63': 25000, '125_80': 18000
+  },
+  'fuse_mcb': {
+    '25_6_B': 6000, '25_10_B': 4000, '25_16_C': 3000, '32_10_B': 6000, '32_16_B': 4000,
+    '32_16_C': 3000, '40_16_B': 10000, '40_16_C': 6000, '50_16_B': 15000,
+    '50_16_C': 10000, '50_20_C': 6000, '50_25_C': 4000, '63_16_B': 20000,
+    '63_16_C': 15000, '63_20_C': 10000, '63_25_C': 6000, '63_32_C': 4000,
+    '80_20_C': 15000, '80_25_C': 10000, '80_32_C': 6000, '100_16_C': 25000,
+    '100_20_C': 20000, '100_25_C': 15000, '100_32_C': 10000, '100_40_C': 6000,
+    '100_50_C': 4000, '125_32_C': 15000, '125_40_C': 10000, '160_32_C': 25000,
+    '160_40_C': 20000, '160_63_C': 10000
+  },
+  'mccb_mcb': {
+    '100_16_C': 25000, '100_32_C': 15000, '100_63_C': 6000,
+    '160_16_C': 36000, '160_32_C': 25000, '160_63_C': 15000,
+    '250_16_C': 50000, '250_32_C': 36000, '250_63_C': 25000,
+    '400_32_C': 50000, '400_63_C': 36000, '630_63_C': 50000,
+    '250_16_B': 50000, '250_32_B': 50000
+  },
+  'mcb_mcb': {
+    '63_16_C_B': 3000, '63_16_C_C': 1500, '40_16_C_B': 2000,
+    '40_10_C_B': 3000, '32_10_C_B': 2000, '63_16_D_B': 4000,
+    '63_16_D_C': 3000, '50_20_C_B': 2000
+  }
+};
+
+function discrimEngine(upType, upRating, downType, downRating, downCurve, ikMax, upCurve) {
+  var result = {
+    verdict: 'unresolved', is: null, ratio: upRating / downRating,
+    i2tUp: null, i2tDown: null, recommendation: '', citation: '', chartData: null
+  };
+
+  // Determine table key and look up Is
+  var tableKey = null;
+  var isValue = null;
 
   if (upType === 'fuse' && downType === 'fuse') {
-    // Fuse-Fuse: ratio >= 1.6:1 = full selective per IEC 60269
-    result.ratio = upRating / downRating;
-    if (result.ratio >= 1.6) {
-      result.verdict = 'full';
-      result.color = 'green';
-      result.is = 999999;
-      result.recommendation = tx('Fuld selektivitet opnået (forhold ≥ 1.6:1)', 'Full selectivity achieved (ratio >= 1.6:1)');
-    } else {
-      result.verdict = 'partial';
-      result.color = 'yellow';
-      result.is = Math.round(downRating * 10 * result.ratio);
-      result.recommendation = tx('Øg opstrøms sikring til min. ' + Math.ceil(downRating * 1.6) + 'A for fuld selektivitet', 'Increase upstream fuse to min. ' + Math.ceil(downRating * 1.6) + 'A for full selectivity');
-    }
+    tableKey = upRating + '_' + downRating;
+    isValue = DISCRIM_SELECTIVITY_TABLES.fuse_fuse[tableKey];
+    result.citation = 'IEC 60269-2 cl.8.6 (selectivity by I2t coordination)';
   } else if (upType === 'fuse' && downType === 'mcb') {
-    // Fuse-MCB: fuse >= 2x MCB = selective per IEC 60947
-    result.ratio = upRating / downRating;
-    if (result.ratio >= 2) {
-      result.verdict = 'full';
-      result.color = 'green';
-      result.is = 999999;
-      result.recommendation = tx('Fuld selektivitet: sikring ≥ 2× automatsikring', 'Full selectivity: fuse >= 2x MCB');
-    } else {
-      result.verdict = 'partial';
-      result.color = 'yellow';
-      result.is = Math.round(downRating * 10 * (downCurve === 'B' ? 5 : 10));
-      result.recommendation = tx('Øg opstrøms sikring til min. ' + (downRating * 2) + 'A', 'Increase upstream fuse to min. ' + (downRating * 2) + 'A');
-    }
-  } else if (upType === 'mcb' && downType === 'mcb') {
-    // MCB-MCB: NEVER fully selective (same type) per IEC 60947-2
-    result.ratio = upRating / downRating;
-    result.verdict = 'none';
-    result.color = 'red';
-    result.is = 0;
-    result.recommendation = tx('MCB-MCB er ALDRIG fuldt selektiv. Brug sikring eller MCCB opstrøms.', 'MCB-MCB is NEVER fully selective. Use fuse or MCCB upstream.');
+    var curve = downCurve || 'C';
+    tableKey = upRating + '_' + downRating + '_' + curve;
+    isValue = DISCRIM_SELECTIVITY_TABLES.fuse_mcb[tableKey];
+    result.citation = 'IEC 60947-2 Annex A + manufacturer table';
   } else if (upType === 'mccb' && downType === 'mcb') {
-    // MCCB-MCB: selective with time delay (LSI)
-    result.ratio = upRating / downRating;
-    if (result.ratio >= 2.5) {
-      result.verdict = 'full';
-      result.color = 'green';
-      result.is = Math.round(upRating * 10);
-      result.recommendation = tx('Fuld selektivitet med LSI tidsforsinkelse', 'Full selectivity with LSI time delay');
-    } else {
-      result.verdict = 'partial';
-      result.color = 'yellow';
-      result.is = Math.round(upRating * 5);
-      result.recommendation = tx('Delvis selektivitet - juster Isd tidsforsinkelse', 'Partial selectivity - adjust Isd time delay');
+    var curve2 = downCurve || 'C';
+    tableKey = upRating + '_' + downRating + '_' + curve2;
+    isValue = DISCRIM_SELECTIVITY_TABLES.mccb_mcb[tableKey];
+    result.citation = 'IEC 60947-2 Annex A + manufacturer table';
+  } else if (upType === 'mcb' && downType === 'mcb') {
+    // Key format: upRating_downRating_upCurve_downCurve
+    // Use provided upCurve first, then try other curves as fallback
+    var upCurves = upCurve ? [upCurve] : ['B', 'C', 'D'];
+    if (upCurve && upCurves.indexOf('B') < 0) upCurves.push('B');
+    if (upCurve && upCurves.indexOf('C') < 0) upCurves.push('C');
+    if (upCurve && upCurves.indexOf('D') < 0) upCurves.push('D');
+    for (var ci = 0; ci < upCurves.length; ci++) {
+      var dCurve = downCurve || 'B';
+      tableKey = upRating + '_' + downRating + '_' + upCurves[ci] + '_' + dCurve;
+      isValue = DISCRIM_SELECTIVITY_TABLES.mcb_mcb[tableKey];
+      if (isValue != null) break;
     }
-  } else if (upType === 'mccb' && downType === 'fuse') {
-    result.ratio = upRating / downRating;
-    if (result.ratio >= 2) {
-      result.verdict = 'full';
-      result.color = 'green';
-      result.is = 999999;
-      result.recommendation = tx('Fuld selektivitet opnået', 'Full selectivity achieved');
-    } else {
-      result.verdict = 'partial';
-      result.color = 'yellow';
-      result.is = Math.round(downRating * 8);
-      result.recommendation = tx('Øg MCCB indstilling eller reducer nedstrøms sikring', 'Increase MCCB setting or reduce downstream fuse');
-    }
+    result.citation = 'IEC 60947-2 Annex A (partial selectivity possible)';
   } else {
-    result.ratio = upRating / downRating;
-    result.verdict = 'none';
-    result.color = 'red';
-    result.recommendation = tx('Kombination ikke understøttet', 'Combination not supported');
+    // Unknown combination (e.g., mcb upstream of fuse) -- no data
+    result.citation = 'DS/HD 60364-4-43 cl.435.1 (discrimination requirement)';
   }
+
+  // If no table entry found, return unresolved (conservative)
+  if (isValue == null) {
+    result.verdict = 'unresolved';
+    result.is = null;
+    result.recommendation = tx(
+      'Uafklaret - verificer med fabrikantens selektivitetstabel',
+      'Unresolved -- verify with manufacturer selectivity table'
+    );
+    if (!result.citation) {
+      result.citation = 'DS/HD 60364-4-43 cl.435.1 (discrimination requirement)';
+    }
+    return result;
+  }
+
+  result.is = isValue;
+
+  // Compute I2t values for energy diagram
+  // Fuse I2t: total = (FUSE_5S[rating])^2 * 5, pre-arcing ~ 0.4 * total
+  // MCB I2t: approx (Isd * In)^2 * 0.01 (10 ms trip in magnetic region)
+  // MCCB I2t: approx (Isd * In)^2 * 0.05 (50 ms short-time delay)
+  var i2tUp = null;
+  var i2tDown = null;
+
+  if (upType === 'fuse' && FUSE_5S[upRating]) {
+    i2tUp = Math.pow(FUSE_5S[upRating], 2) * 5;
+  } else if (upType === 'mcb') {
+    var isdUp = MCB_CURVES['C'] ? MCB_CURVES['C'].isdMin : 7;
+    i2tUp = Math.pow(isdUp * upRating, 2) * 0.01;
+  } else if (upType === 'mccb') {
+    i2tUp = Math.pow(8 * upRating, 2) * 0.05;
+  }
+
+  if (downType === 'fuse' && FUSE_5S[downRating]) {
+    i2tDown = Math.pow(FUSE_5S[downRating], 2) * 5 * 0.4;
+  } else if (downType === 'mcb') {
+    var dCurveObj = MCB_CURVES[downCurve || 'C'];
+    var isdDown = dCurveObj ? dCurveObj.isdMin : 5;
+    i2tDown = Math.pow(isdDown * downRating, 2) * 0.01;
+  }
+
+  result.i2tUp = i2tUp;
+  result.i2tDown = i2tDown;
+
+  // Verdict based on Is vs Ik_max comparison
+  if (isValue >= ikMax) {
+    result.verdict = 'full';
+    result.recommendation = tx(
+      'Fuld selektivitet: Is = ' + (isValue / 1000) + ' kA >= Ik_max = ' + (ikMax / 1000) + ' kA',
+      'Full selective: Is = ' + (isValue / 1000) + ' kA >= Ik_max = ' + (ikMax / 1000) + ' kA'
+    );
+  } else {
+    result.verdict = 'partial';
+    result.recommendation = tx(
+      'Selektiv op til Is = ' + (isValue / 1000) + ' kA < Ik_max = ' + (ikMax / 1000) + ' kA. Selektivitet fejler over ' + (isValue / 1000) + ' kA',
+      'Selective up to Is = ' + (isValue / 1000) + ' kA < Ik_max = ' + (ikMax / 1000) + ' kA. Selectivity FAILS above ' + (isValue / 1000) + ' kA'
+    );
+  }
+
+  // Build chart data for I2t energy diagram
+  var chartPoints = [];
+  var currents = [100, 200, 500, 1000, 2000, 3000, 5000, 8000, 10000, 15000, 20000, 30000, 50000, 80000, 100000];
+  for (var pi = 0; pi < currents.length; pi++) {
+    var If = currents[pi];
+    var upI2t = discrimComputeI2t(upType, upRating, null, If, true);
+    var downI2t = discrimComputeI2t(downType, downRating, downCurve, If, false);
+    chartPoints.push({ current: If, upI2t: upI2t, downI2t: downI2t });
+  }
+  result.chartData = { points: chartPoints, is: isValue, ikMax: ikMax };
 
   return result;
 }
 
+// Compute I2t at a given fault current for chart rendering
+function discrimComputeI2t(devType, rating, curve, faultCurrent, isUpstream) {
+  if (devType === 'fuse') {
+    // gG fuse I2t model: I2t_total = (I_5s)^2 * 5 at the 5-second point
+    // Scale with current squared for instantaneous region
+    var i5s = FUSE_5S[rating] || (rating * 5);
+    var i2tRef = Math.pow(i5s, 2) * 5;
+    // In instantaneous region (high current), I2t is roughly constant (current-limiting)
+    // In thermal region (low current), t = I2t/I^2
+    if (faultCurrent >= i5s * 3) {
+      // Current-limiting region: I2t roughly constant (slight increase)
+      var kLimit = isUpstream ? 1.0 : 0.4;
+      return i2tRef * kLimit * (1 + 0.1 * Math.log10(faultCurrent / (i5s * 3)));
+    } else if (faultCurrent >= i5s) {
+      // Transition region
+      var kTrans = isUpstream ? 1.0 : 0.4;
+      var frac = (faultCurrent - i5s) / (i5s * 2);
+      return i2tRef * kTrans * (1 + frac * 0.5);
+    } else {
+      // Thermal region: I2t increases with current
+      var kTherm = isUpstream ? 1.0 : 0.4;
+      return Math.pow(faultCurrent, 2) * 5 * kTherm;
+    }
+  } else if (devType === 'mcb') {
+    var curveData = MCB_CURVES[curve || 'C'] || MCB_CURVES['C'];
+    var iMag = curveData.isdMin * rating;
+    if (faultCurrent >= iMag) {
+      // Magnetic (instantaneous) region: ~10 ms trip
+      return Math.pow(faultCurrent, 2) * 0.01;
+    } else {
+      // Thermal region: inverse-time
+      var tTrip = Math.pow(rating / faultCurrent, 2) * 3600;
+      if (tTrip > 3600) tTrip = 3600;
+      return Math.pow(faultCurrent, 2) * Math.min(tTrip, 5);
+    }
+  } else if (devType === 'mccb') {
+    // MCCB: short-time delay ~ 50 ms, instantaneous at high multiples
+    var iInst = 8 * rating;
+    if (faultCurrent >= iInst) {
+      return Math.pow(faultCurrent, 2) * 0.02;
+    } else {
+      return Math.pow(faultCurrent, 2) * 0.05;
+    }
+  }
+  return Math.pow(faultCurrent, 2) * 0.01;
+}
+
+// I2t energy diagram SVG rendering
+function discrimRenderChart(chartData) {
+  if (!chartData || !chartData.points || chartData.points.length === 0) return '';
+  var w = 520, h = 340;
+  var marginL = 60, marginR = 20, marginT = 30, marginB = 40;
+  var plotW = w - marginL - marginR;
+  var plotH = h - marginT - marginB;
+
+  var logImin = Math.log10(100), logImax = Math.log10(100000);
+  var logEmin = 2, logEmax = 10; // log10(I2t) range: 100 to 10^10 A2s
+
+  // Find actual data range
+  var minE = Infinity, maxE = 0;
+  for (var i = 0; i < chartData.points.length; i++) {
+    var pt = chartData.points[i];
+    if (pt.upI2t > 0) { minE = Math.min(minE, pt.upI2t); maxE = Math.max(maxE, pt.upI2t); }
+    if (pt.downI2t > 0) { minE = Math.min(minE, pt.downI2t); maxE = Math.max(maxE, pt.downI2t); }
+  }
+  if (maxE > 0) {
+    logEmin = Math.floor(Math.log10(minE)) - 1;
+    logEmax = Math.ceil(Math.log10(maxE)) + 1;
+  }
+
+  function xPos(I) { return marginL + (Math.log10(I) - logImin) / (logImax - logImin) * plotW; }
+  function yPos(e) { return marginT + (1 - (Math.log10(e) - logEmin) / (logEmax - logEmin)) * plotH; }
+
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" style="max-width:100%;background:#fff;border:1px solid #ddd;border-radius:8px">';
+
+  // Grid lines
+  var gridCurrents = [100, 1000, 10000, 100000];
+  for (var gi = 0; gi < gridCurrents.length; gi++) {
+    var gx = xPos(gridCurrents[gi]);
+    svg += '<line x1="' + gx + '" y1="' + marginT + '" x2="' + gx + '" y2="' + (h - marginB) + '" stroke="#eee" stroke-width="1"/>';
+    var label = gridCurrents[gi] >= 1000 ? (gridCurrents[gi] / 1000) + 'k' : gridCurrents[gi];
+    svg += '<text x="' + gx + '" y="' + (h - marginB + 15) + '" text-anchor="middle" font-size="9" fill="#666">' + label + '</text>';
+  }
+
+  // Upstream curve (blue)
+  var upPath = '';
+  for (var ui = 0; ui < chartData.points.length; ui++) {
+    var pu = chartData.points[ui];
+    if (pu.upI2t > 0 && pu.current >= 100) {
+      var px = xPos(pu.current);
+      var py = yPos(pu.upI2t);
+      upPath += (upPath === '' ? 'M' : 'L') + px.toFixed(1) + ',' + py.toFixed(1);
+    }
+  }
+  if (upPath) svg += '<path d="' + upPath + '" fill="none" stroke="#2563eb" stroke-width="2.5"/>';
+
+  // Downstream curve (red)
+  var downPath = '';
+  for (var di = 0; di < chartData.points.length; di++) {
+    var pd = chartData.points[di];
+    if (pd.downI2t > 0 && pd.current >= 100) {
+      var dx = xPos(pd.current);
+      var dy = yPos(pd.downI2t);
+      downPath += (downPath === '' ? 'M' : 'L') + dx.toFixed(1) + ',' + dy.toFixed(1);
+    }
+  }
+  if (downPath) svg += '<path d="' + downPath + '" fill="none" stroke="#dc2626" stroke-width="2.5"/>';
+
+  // Is vertical dashed line (green)
+  if (chartData.is && chartData.is >= 100 && chartData.is <= 100000) {
+    var isX = xPos(chartData.is);
+    svg += '<line x1="' + isX + '" y1="' + marginT + '" x2="' + isX + '" y2="' + (h - marginB) + '" stroke="#059669" stroke-width="2" stroke-dasharray="6,3"/>';
+    var isLabel = chartData.is >= 1000 ? (chartData.is / 1000) + ' kA' : chartData.is + ' A';
+    svg += '<text x="' + (isX + 3) + '" y="' + (marginT + 12) + '" font-size="10" fill="#059669" font-weight="bold">Is=' + isLabel + '</text>';
+  }
+
+  // Ik_max vertical line (red)
+  if (chartData.ikMax && chartData.ikMax >= 100 && chartData.ikMax <= 100000) {
+    var ikX = xPos(chartData.ikMax);
+    svg += '<line x1="' + ikX + '" y1="' + marginT + '" x2="' + ikX + '" y2="' + (h - marginB) + '" stroke="#ef4444" stroke-width="2"/>';
+    var ikLabel = chartData.ikMax >= 1000 ? (chartData.ikMax / 1000) + ' kA' : chartData.ikMax + ' A';
+    svg += '<text x="' + (ikX + 3) + '" y="' + (marginT + 24) + '" font-size="10" fill="#ef4444" font-weight="bold">Ik=' + ikLabel + '</text>';
+  }
+
+  // Legend
+  svg += '<rect x="' + (marginL + 5) + '" y="' + (marginT + 3) + '" width="12" height="3" fill="#2563eb"/>';
+  svg += '<text x="' + (marginL + 20) + '" y="' + (marginT + 8) + '" font-size="9" fill="#2563eb">' + tx('Opstroems I2t', 'Upstream I2t') + '</text>';
+  svg += '<rect x="' + (marginL + 5) + '" y="' + (marginT + 15) + '" width="12" height="3" fill="#dc2626"/>';
+  svg += '<text x="' + (marginL + 20) + '" y="' + (marginT + 20) + '" font-size="9" fill="#dc2626">' + tx('Nedstroems I2t', 'Downstream I2t') + '</text>';
+
+  // Axes labels
+  svg += '<text x="' + (w / 2) + '" y="' + (h - 5) + '" text-anchor="middle" font-size="10" fill="#333">' + tx('Fejlstroem [A]', 'Fault Current [A]') + '</text>';
+  svg += '<text x="14" y="' + (h / 2) + '" text-anchor="middle" font-size="10" fill="#333" transform="rotate(-90,14,' + (h / 2) + ')">I\u00B2t [A\u00B2s]</text>';
+  svg += '</svg>';
+  return svg;
+}
+
 function renderDiscrim() {
-  var analysis = discrimAnalyze(discrimState.upstreamType, discrimState.upstreamRating, discrimState.downstreamType, discrimState.downstreamRating, discrimState.downstreamCurve);
+  var analysis = discrimEngine(discrimState.upstreamType, discrimState.upstreamRating, discrimState.downstreamType, discrimState.downstreamRating, discrimState.downstreamCurve, discrimState.ikMax, discrimState.upstreamCurve);
 
   var html = '<div class="card fade-in">';
-  html += '<div class="card-title">' + tx('Selektivitetsanalyse (IEC 60947 + DS/HD 60364-4-43)', 'Discrimination Analysis (IEC 60947 + DS/HD 60364-4-43)') + '</div>';
-  html += '<div class="info-row">' + tx('Selektivitetskontrol mellem opstrøms og nedstrøms beskyttelsesudstyr', 'Selectivity check between upstream and downstream protection devices') + '</div>';
+  html += '<div class="card-title">' + tx('Selektivitetsanalyse (I2t koordinering)', 'Discrimination Analysis (I2t Coordination)') + '</div>';
+  html += '<div class="info-row">' + tx('I2t energigennemgang-koordinering iht. IEC 60269-2 / IEC 60947-2 Annex A', 'I2t energy let-through coordination per IEC 60269-2 / IEC 60947-2 Annex A') + '</div>';
+
+  // Ik_max selection (prospective fault current)
+  html += '<div class="select-group"><div class="select-label">' + tx('Forventet kortslutningsstrøm Ik_max [A]', 'Prospective fault current Ik_max [A]') + '</div><div class="select-grid">';
+  var ikPresets = [1000, 3000, 6000, 10000, 15000, 25000, 50000];
+  ikPresets.forEach(function(ik) {
+    var label = (ik / 1000) + ' kA';
+    html += '<button class="sel-btn' + (discrimState.ikMax === ik ? ' selected' : '') + '" onclick="discrimState.ikMax=' + ik + ';renderModule(\'discrim\')">' + label + '</button>';
+  });
+  html += '</div></div>';
 
   // Upstream device type
   html += '<div class="select-group"><div class="select-label">' + tx('Opstrøms enhed', 'Upstream Device') + '</div><div class="select-grid">';
@@ -18376,6 +18619,15 @@ function renderDiscrim() {
     html += '<button class="sel-btn' + (discrimState.upstreamRating === r ? ' selected' : '') + '" onclick="discrimState.upstreamRating=' + r + ';renderModule(\'discrim\')">' + r + '</button>';
   });
   html += '</div></div>';
+
+  // Upstream curve (only for MCB)
+  if (discrimState.upstreamType === 'mcb') {
+    html += '<div class="select-group"><div class="select-label">' + tx('Opstrøms kurve', 'Upstream Curve') + '</div><div class="select-grid">';
+    ['B','C','D'].forEach(function(c) {
+      html += '<button class="sel-btn' + (discrimState.upstreamCurve === c ? ' selected' : '') + '" onclick="discrimState.upstreamCurve=\'' + c + '\';renderModule(\'discrim\')">' + c + '</button>';
+    });
+    html += '</div></div>';
+  }
 
   // Downstream device type
   html += '<div class="select-group"><div class="select-label">' + tx('Nedstrøms enhed', 'Downstream Device') + '</div><div class="select-grid">';
@@ -18403,27 +18655,52 @@ function renderDiscrim() {
   }
 
   // Results
-  var verdictColors = { green: 'var(--success, #22c55e)', yellow: '#b8860b', red: 'var(--danger, #ef4444)' };
-  var verdictLabels = { full: tx('FULD SELEKTIVITET','FULL SELECTIVE'), partial: tx('DELVIS SELEKTIVITET','PARTIAL SELECTIVE'), none: tx('INGEN SELEKTIVITET','NOT SELECTIVE') };
-  html += '<div class="result-box">';
-  html += '<div class="result-title">' + tx('Resultater', 'Results') + ' - IEC 60947 + DS/HD 60364-4-43</div>';
-  html += '<div class="result-row"><span class="label">' + tx('Selektivitetsdom', 'Selectivity Verdict') + '</span><span class="value" style="color:' + verdictColors[analysis.color] + ';font-weight:bold">' + verdictLabels[analysis.verdict] + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Strømforhold', 'Current Ratio') + '</span><span class="value">' + analysis.ratio.toFixed(2) + ':1</span></div>';
-  if (analysis.is > 0 && analysis.is < 999999) {
-    html += '<div class="result-row"><span class="label">' + tx('Selektivitetsgrænse Is', 'Selectivity Limit Is') + '</span><span class="value">' + analysis.is + ' A</span></div>';
-  }
-  html += '<div class="result-row"><span class="label">' + tx('Anbefaling', 'Recommendation') + '</span><span class="value">' + analysis.recommendation + '</span></div>';
+  var verdictColors = { full: 'var(--success, #22c55e)', partial: '#b8860b', none: 'var(--danger, #ef4444)', unresolved: '#b8860b' };
+  var verdictLabels = {
+    full: tx('FULD SELEKTIV', 'FULL SELECTIVE'),
+    partial: tx('SELEKTIV OP TIL Is', 'SELECTIVE UP TO Is'),
+    none: tx('INGEN SELEKTIVITET', 'NOT SELECTIVE'),
+    unresolved: tx('UAFKLARET', 'UNRESOLVED')
+  };
+  var vColor = verdictColors[analysis.verdict] || verdictColors.unresolved;
+  var vLabel = verdictLabels[analysis.verdict] || verdictLabels.unresolved;
 
-  // Rules reference
-  html += '<div class="result-row"><span class="label">' + tx('Regler', 'Rules') + '</span><span class="value">';
-  html += tx('Sikring-Sikring: ≥1.6:1 | Sikring-MCB: ≥2:1 | MCB-MCB: Aldrig fuldt | MCCB-MCB: Med tidsforsinkelse', 'Fuse-Fuse: >=1.6:1 | Fuse-MCB: >=2:1 | MCB-MCB: Never full | MCCB-MCB: With time delay');
-  html += '</span></div>';
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Resultater', 'Results') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Selektivitetsdom', 'Selectivity Verdict') + '</span><span class="value" style="color:' + vColor + ';font-weight:bold;font-size:1.1em">' + vLabel + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Stroemforhold', 'Current Ratio') + '</span><span class="value">' + analysis.ratio.toFixed(2) + ':1</span></div>';
+
+  // Is value (always shown as real finite number or null)
+  if (analysis.is !== null) {
+    var isDisplay = analysis.is >= 1000 ? (analysis.is / 1000) + ' kA' : analysis.is + ' A';
+    html += '<div class="result-row"><span class="label">' + tx('Selektivitetsgraense Is', 'Selectivity limit Is') + '</span><span class="value">' + isDisplay + '</span></div>';
+    // Ik_max vs Is comparison
+    var ikDisplay = discrimState.ikMax >= 1000 ? (discrimState.ikMax / 1000) + ' kA' : discrimState.ikMax + ' A';
+    if (analysis.verdict === 'full') {
+      html += '<div class="result-row"><span class="label">Is vs Ik_max</span><span class="value" style="color:var(--success,#22c55e)">Is = ' + isDisplay + ' >= Ik_max = ' + ikDisplay + ': ' + tx('Selektivitet gaelder for alle fejlstroemme', 'Selectivity holds for all fault currents at this location') + '</span></div>';
+    } else if (analysis.verdict === 'partial') {
+      html += '<div class="result-row"><span class="label">Is vs Ik_max</span><span class="value" style="color:#b8860b">Is = ' + isDisplay + ' < Ik_max = ' + ikDisplay + ': ' + tx('Selektivitet FEJLER over ' + isDisplay, 'Selectivity FAILS above ' + isDisplay) + '</span></div>';
+    }
+  } else {
+    html += '<div class="result-row"><span class="label">' + tx('Selektivitetsgraense Is', 'Selectivity limit Is') + '</span><span class="value" style="color:#b8860b">' + tx('Ingen data', 'No data') + '</span></div>';
+  }
+
+  html += '<div class="result-row"><span class="label">' + tx('Anbefaling', 'Recommendation') + '</span><span class="value">' + analysis.recommendation + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Reference', 'Citation') + '</span><span class="value" style="font-size:0.9em">' + analysis.citation + '</span></div>';
   html += '</div>';
 
-  // Verdict
+  // I2t Energy Diagram
+  if (analysis.chartData) {
+    html += '<div class="result-box"><div class="result-title">' + tx('I2t Energidiagram', 'I2t Energy Diagram') + '</div>';
+    html += '<div style="text-align:center;margin:8px 0">' + discrimRenderChart(analysis.chartData) + '</div>';
+    html += '<div style="text-align:center;font-size:0.85em;color:#666;margin-top:4px;font-style:italic">' + tx('Diagram er illustrativt - brug fabrikantdata til endelig verifikation', 'Diagram is illustrative - use manufacturer data for final verification') + '</div>';
+    html += '</div>';
+  }
+
+  // Verdict badge
   var safe = analysis.verdict === 'full';
   var verdictText = safe ?
-    tx('OK: Fuld selektivitet opnået iht. IEC 60947 og DS/HD 60364-4-43', 'OK: Full selectivity achieved per IEC 60947 and DS/HD 60364-4-43') :
+    tx('OK: Fuld selektivitet iht. ' + analysis.citation, 'OK: Full selectivity per ' + analysis.citation) :
     analysis.recommendation;
   html += renderVerdict(safe, verdictText);
   html += '</div>';
