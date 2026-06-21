@@ -685,6 +685,52 @@ body.motion-off .fade-in { will-change: auto; }
 .sim-glow { animation: simGlow 1.8s ease-in-out infinite; }
 .sim-wave { animation: simWave 2s linear infinite; }
 .sim-pulse { animation: simPulse 1.5s ease-in-out infinite; transform-origin: center; }
+
+/* ===== PREMIUM SIMULATOR ANIMATIONS ===== */
+/* Particle flowing along a motion path (offset-distance based) */
+@keyframes simParticle {
+  0%   { offset-distance: 0%; opacity: 1; }
+  85%  { opacity: 1; }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+/* Random flicker for arc/spark effects */
+@keyframes simSpark {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  10% { opacity: 0.4; transform: scale(0.8); }
+  20% { opacity: 0.9; transform: scale(1.1); }
+  35% { opacity: 0.3; transform: scale(0.7); }
+  50% { opacity: 1; transform: scale(1.05); }
+  65% { opacity: 0.5; transform: scale(0.9); }
+  80% { opacity: 0.8; transform: scale(1); }
+}
+/* Entrance scale+glow for newly energized elements */
+@keyframes simEnergize {
+  0%   { transform: scale(0.6); opacity: 0; filter: brightness(2); }
+  60%  { transform: scale(1.08); opacity: 1; filter: brightness(1.5); }
+  100% { transform: scale(1); opacity: 1; filter: brightness(1); }
+}
+/* Subtle scale oscillation for live components */
+@keyframes simBreath {
+  0%, 100% { transform: scale(0.98); }
+  50%      { transform: scale(1.02); }
+}
+/* Neon text/label glow pulse for dark mode */
+@keyframes simNeonPulse {
+  0%, 100% { opacity: 0.85; text-shadow: 0 0 4px rgba(0,229,255,0.6); }
+  50%      { opacity: 1; text-shadow: 0 0 8px rgba(0,229,255,0.9), 0 0 16px rgba(0,229,255,0.4); }
+}
+
+/* Premium animation classes */
+.sim-particle { offset-rotate: auto; animation: simParticle 2s linear infinite; }
+.sim-spark { animation: simSpark 0.8s steps(1) infinite; transform-origin: center; }
+.sim-energize { animation: simEnergize 0.6s ease-out forwards; transform-origin: center; }
+.sim-breath { animation: simBreath 3s ease-in-out infinite; transform-origin: center; }
+.sim-neon { animation: simNeonPulse 2.2s ease-in-out infinite; }
+
+/* Dark-mode simulator label and value neon styling */
+body.dark .sim-label { fill: #e0f4ff; }
+body.dark .sim-value { color: #00e5ff; fill: #00e5ff; }
+
 /* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .sim-wire { animation: none !important; stroke-dasharray: 4 3 1 3; }
@@ -692,12 +738,18 @@ body.motion-off .fade-in { will-change: auto; }
   .sim-resistor { transition: none !important; }
   .sim-source { transition: none !important; }
   .sim-charge, .sim-field, .sim-heat, .sim-glow, .sim-wave, .sim-pulse { animation: none !important; }
+  .sim-particle, .sim-spark, .sim-energize, .sim-breath, .sim-neon { animation: none !important; }
+  .sim-particle { offset-distance: 100%; }
+  .sim-energize { transform: scale(1); opacity: 1; filter: none; }
 }
 body.motion-off .sim-wire { animation: none !important; stroke-dasharray: 4 3 1 3; }
 body.motion-off .sim-rotor { animation: none !important; }
 body.motion-off .sim-resistor { transition: none !important; }
 body.motion-off .sim-source { transition: none !important; }
 body.motion-off .sim-charge, body.motion-off .sim-field, body.motion-off .sim-heat, body.motion-off .sim-glow, body.motion-off .sim-wave, body.motion-off .sim-pulse { animation: none !important; }
+body.motion-off .sim-particle, body.motion-off .sim-spark, body.motion-off .sim-energize, body.motion-off .sim-breath, body.motion-off .sim-neon { animation: none !important; }
+body.motion-off .sim-particle { offset-distance: 100%; }
+body.motion-off .sim-energize { transform: scale(1); opacity: 1; filter: none; }
 
 /* Info tooltip */
 .info-row {
@@ -26356,7 +26408,34 @@ function simSvgDefs() {
     '<stop offset="50%" stop-color="#ff9800"/>' +
     '<stop offset="100%" stop-color="#f44336"/>' +
     '</linearGradient>' +
+    '<filter id="neonGlow">' +
+    '<feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>' +
+    '<feComposite in="SourceGraphic" in2="blur" operator="over"/>' +
+    '</filter>' +
+    '<linearGradient id="copperGrad" x1="0%" y1="0%" x2="0%" y2="100%">' +
+    '<stop offset="0%" stop-color="#e8a865"/>' +
+    '<stop offset="30%" stop-color="#cd7f32"/>' +
+    '<stop offset="70%" stop-color="#b8690e"/>' +
+    '<stop offset="100%" stop-color="#a0522d"/>' +
+    '</linearGradient>' +
+    '<filter id="sparkFilter">' +
+    '<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" result="turb"/>' +
+    '<feDisplacementMap in="SourceGraphic" in2="turb" scale="4" xChannelSelector="R" yChannelSelector="G"/>' +
+    '</filter>' +
+    '<radialGradient id="energyPulse" cx="50%" cy="50%" r="50%">' +
+    '<stop offset="0%" stop-color="#00e5ff" stop-opacity="0.9"/>' +
+    '<stop offset="60%" stop-color="#0080ff" stop-opacity="0.4"/>' +
+    '<stop offset="100%" stop-color="#0040a0" stop-opacity="0"/>' +
+    '</radialGradient>' +
     '</defs>';
+}
+
+function simNeonFilter() {
+  return '<filter id="simNeon">' +
+    '<feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="glow"/>' +
+    '<feColorMatrix in="glow" type="matrix" values="0 0 0 0 0  0 0 0 0 0.9  0 0 0 0 1  0 0 0 1 0" result="cyan"/>' +
+    '<feMerge><feMergeNode in="cyan"/><feMergeNode in="SourceGraphic"/></feMerge>' +
+    '</filter>';
 }
 
 function simFlowDuration(I, Imax) {
