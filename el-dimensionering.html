@@ -11428,6 +11428,7 @@ function renderProjekt() {
 
 // ===== PROJECT ARCHIVE MODULE (multi-project save/load/switch/delete/export/import) =====
 var archiveState = { projects: [], activeProjectId: null, showList: true };
+var _archiveRestoring = false;
 
 // All module state variable names for snapshot/restore
 var ARCHIVE_MODULE_KEYS = [
@@ -11503,7 +11504,10 @@ function archiveRestoreModuleStates(snap) {
       if (target && typeof target === 'object' && source && typeof source === 'object' && !Array.isArray(target) && !Array.isArray(source)) {
         // Merge into existing object to preserve references
         var sk = Object.keys(source);
-        for (var j = 0; j < sk.length; j++) target[sk[j]] = source[sk[j]];
+        for (var j = 0; j < sk.length; j++) {
+          if (sk[j] === '__proto__' || sk[j] === 'constructor' || sk[j] === 'prototype') continue;
+          target[sk[j]] = source[sk[j]];
+        }
         // Remove keys not in source
         var tk = Object.keys(target);
         for (var j2 = 0; j2 < tk.length; j2++) { if (!(tk[j2] in source)) delete target[tk[j2]]; }
@@ -11530,14 +11534,20 @@ function archiveRestore(projectId) {
   archiveSave();
   // Set new active project
   archiveState.activeProjectId = projectId;
-  // Restore module states
-  if (proj.moduleStates) archiveRestoreModuleStates(proj.moduleStates);
-  // Restore circuits into projectState
-  projectState.name = proj.name || 'Projekt';
-  projectState.circuits = proj.circuits ? JSON.parse(JSON.stringify(proj.circuits)) : [];
-  saveProject();
-  // Trigger reactive updates
-  if (typeof Reactive !== 'undefined') Reactive.notify('archive');
+  // Guard against archiveAutoSave firing during restore
+  _archiveRestoring = true;
+  try {
+    // Restore module states
+    if (proj.moduleStates) archiveRestoreModuleStates(proj.moduleStates);
+    // Restore circuits into projectState
+    projectState.name = proj.name || 'Projekt';
+    projectState.circuits = proj.circuits ? JSON.parse(JSON.stringify(proj.circuits)) : [];
+    saveProject();
+    // Trigger reactive updates
+    if (typeof Reactive !== 'undefined') Reactive.notify('archive');
+  } finally {
+    _archiveRestoring = false;
+  }
   archivePersist();
   renderModule('archive');
 }
@@ -11617,6 +11627,7 @@ function archiveImportFile(input) {
 // Debounced auto-save: saves active project whenever a module change occurs
 var _archiveAutoSaveTimer = null;
 function archiveAutoSave() {
+  if (_archiveRestoring) return;
   if (!archiveState.activeProjectId) return;
   if (_archiveAutoSaveTimer) clearTimeout(_archiveAutoSaveTimer);
   _archiveAutoSaveTimer = setTimeout(function() {
