@@ -13392,6 +13392,105 @@ test('renderLysLumen includes simulator SVG', function() {
   assert(html.indexOf('sim-glow') >= 0, 'renderLysLumen should include lighting sim');
 });
 
+// ===== FEAT-003: Advanced Module Simulators =====
+
+test('renderTrafoSim returns SVG with sim-field class', function() {
+  var svg = renderTrafoSim(630, 4, 75, '10/0.4');
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-field') >= 0, 'should contain sim-field class for flux');
+  assert(svg.indexOf('630') >= 0, 'should show kVA value');
+});
+
+test('renderTrafoSim returns empty for zero S', function() {
+  var svg = renderTrafoSim(0, 4, 75, '10/0.4');
+  assert.strictEqual(svg, '');
+});
+
+test('renderTrafoSim returns empty for zero loadPercent', function() {
+  var svg = renderTrafoSim(630, 4, 0, '10/0.4');
+  assert.strictEqual(svg, '');
+});
+
+test('renderHarmonicSim returns SVG with polyline waveform and sim-wave', function() {
+  var harmonics = { h3: 15, h5: 12, h7: 8, h11: 4, h13: 3 };
+  var svg = renderHarmonicSim(22.5, harmonics, 'vfd');
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('polyline') >= 0, 'should contain polyline for waveform');
+  assert(svg.indexOf('sim-wave') >= 0, 'should contain sim-wave class');
+});
+
+test('renderHarmonicSim returns empty for zero thd', function() {
+  var svg = renderHarmonicSim(0, { h3: 0, h5: 0, h7: 0, h11: 0, h13: 0 }, 'vfd');
+  assert.strictEqual(svg, '');
+});
+
+test('renderHarmonicSim returns empty for null harmonics', function() {
+  var svg = renderHarmonicSim(10, null, 'vfd');
+  assert.strictEqual(svg, '');
+});
+
+test('renderPfcSim returns SVG with triangle path elements', function() {
+  var svg = renderPfcSim(0.75, 0.95, 50, 100);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('line') >= 0, 'should contain line elements for triangle');
+  assert(svg.indexOf('sim-pulse') >= 0, 'should contain sim-pulse class');
+  assert(svg.indexOf('kW') >= 0, 'should show power label');
+});
+
+test('renderPfcSim returns empty for zero kW', function() {
+  var svg = renderPfcSim(0.75, 0.95, 50, 0);
+  assert.strictEqual(svg, '');
+});
+
+test('renderPfcSim returns empty for PF=1', function() {
+  var svg = renderPfcSim(1, 0.95, 50, 100);
+  assert.strictEqual(svg, '');
+});
+
+test('renderRelaySim returns SVG with curve path and sim-glow', function() {
+  var svg = renderRelaySim(5.25, 26.25, 105, true);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('polyline') >= 0, 'should contain polyline for curve');
+  assert(svg.indexOf('sim-glow') >= 0, 'should contain sim-glow class');
+});
+
+test('renderRelaySim returns empty for zero I1N', function() {
+  var svg = renderRelaySim(0, 0, 0, true);
+  assert.strictEqual(svg, '');
+});
+
+test('renderRelaySim returns empty for zero pickup', function() {
+  var svg = renderRelaySim(5.25, 0, 105, true);
+  assert.strictEqual(svg, '');
+});
+
+test('renderFaultSim returns SVG with sim-wire class', function() {
+  var svg = renderFaultSim(1.2, 230, 192, 0.4);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire class for current');
+  assert(svg.indexOf('sim-glow') >= 0, 'should contain sim-glow for fault point');
+});
+
+test('renderFaultSim returns empty for zero Zs', function() {
+  var svg = renderFaultSim(0, 230, 0, 0.4);
+  assert.strictEqual(svg, '');
+});
+
+test('renderFaultSim returns empty for zero Uf', function() {
+  var svg = renderFaultSim(1.2, 0, 0, 0.4);
+  assert.strictEqual(svg, '');
+});
+
+test('renderTrafoSizing includes simulator SVG', function() {
+  var html = renderTrafoSizing();
+  assert(html.indexOf('sim-field') >= 0, 'renderTrafoSizing should include trafo sim');
+});
+
+test('renderRelay includes simulator SVG', function() {
+  var html = renderRelay();
+  assert(html.indexOf('sim-glow') >= 0, 'renderRelay should include relay sim');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
