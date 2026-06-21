@@ -12743,6 +12743,148 @@ test('powersolve: solver card introduces no typing affordances at all (click-onl
   });
 });
 
+// ============================================================================
+// UNIVERSAL CLICK-ONLY VALUE PICKER (shared valSelect/valStep/valBump/valSet)
+// Generalizes the trafo Power/Current Solver stepper (PR #62) across the app.
+// ============================================================================
+
+test('valpick: shared helper functions exist', function() {
+  ['valSelect', 'valStep', 'valStepFn', 'valBump', 'valSet', 'valClampNum', 'valRound', 'valRegister'].forEach(function (fn) {
+    assert(typeof eval(fn) === 'function', fn + ' must be defined');
+  });
+  assert(typeof VALPICK_REG === 'object' && VALPICK_REG !== null, 'VALPICK_REG registry must exist');
+});
+
+test('valClampNum: default clamps to >= 0; respects min/max; allows negatives when min=null', function() {
+  assert(valClampNum(-5, {}) === 0, 'default min is 0 (currents/powers/lengths)');
+  assert(valClampNum(5, {}) === 5, 'positive passes through');
+  assert(valClampNum(1.5, { min: 0, max: 1 }) === 1, 'clamps to max (e.g. cosphi)');
+  assert(valClampNum(-0.5, { min: 0, max: 1 }) === 0, 'clamps to min (e.g. cosphi)');
+  assert(valClampNum(-40, { min: null }) === -40, 'allows negatives when min=null (temperatures)');
+  assert(valClampNum(NaN, {}) === 0, 'NaN coerced to 0 (never fabricates/propagates garbage)');
+});
+
+test('valStep/valBump: renders click-only stepper and reaches arbitrary non-preset values', function() {
+  var st = { x: 0 };
+  var markup = valStep(st, 'x', 'dc', { step: 1, fmt: function (p) { return p + ' A'; }, clamp: { min: 0 } });
+  assert(markup.indexOf('<input') < 0 && markup.indexOf('<textarea') < 0 && markup.indexOf('contenteditable') < 0, 'stepper is click-only');
+  assert(markup.indexOf("valBump('dc:x',") >= 0, 'stepper wires valBump');
+  st.x = 0;
+  for (var i = 0; i < 83; i++) valBump('dc:x', 10);
+  for (var j = 0; j < 7; j++) valBump('dc:x', 1);
+  assert(st.x === 837, 'arbitrary 837 reachable purely by clicking; got ' + st.x);
+});
+
+test('valBump: seeds from null/undefined and clamps to >= 0', function() {
+  var st = { v: null };
+  valStep(st, 'v', 'dc', { step: 5, clamp: { min: 0 } });
+  valBump('dc:v', 5);
+  assert(st.v === 5, 'first click seeds from null; got ' + st.v);
+  valBump('dc:v', -100);
+  assert(st.v === 0, 'clamps to >= 0; got ' + st.v);
+});
+
+test('valBump: factor field clamps within [0,1] (cosphi/reflectance/efficiency)', function() {
+  var st = { k: 0.85 };
+  valStep(st, 'k', 'dc', { step: 0.01, clamp: { min: 0, max: 1 } });
+  valBump('dc:k', 0.5);
+  assert(st.k === 1, 'clamps up to 1; got ' + st.k);
+  valBump('dc:k', -5);
+  assert(st.k === 0, 'clamps down to 0; got ' + st.k);
+});
+
+test('valBump: temperature field may go negative (min=null)', function() {
+  var st = { t: 0 };
+  valStep(st, 't', 'varme', { step: 1, clamp: { min: null } });
+  valBump('varme:t', -25);
+  assert(st.t === -25, 'temperature allowed negative; got ' + st.t);
+});
+
+test('valSet: sets a preset value and the "not given" (null) option', function() {
+  var st = { y: 5 };
+  valStepFn('dc:y', 'dc', function () { return st.y; }, function (v) { st.y = v; }, { clamp: { min: 0 } });
+  valSet('dc:y', 42);
+  assert(st.y === 42, 'valSet stores the clicked value; got ' + st.y);
+  valSet('dc:y', null);
+  assert(st.y === null, 'valSet(null) clears to "not given"; got ' + st.y);
+});
+
+test('valStepFn: high-precision tiny SI values (e.g. capacitance) are not rounded to zero', function() {
+  var st = { C: 0.0000001 };
+  valStepFn('imp:C', 'impedans', function () { return st.C; }, function (v) { st.C = v; }, { step: 0.000000001, clamp: { min: 0 }, prec: 15 });
+  valBump('imp:C', 0.000000001);
+  assert(Math.abs(st.C - 0.000000101) < 1e-15, 'tiny capacitance step preserved; got ' + st.C);
+});
+
+(function () {
+  var moduleRenders = [
+    { mod: 'impedans', fn: 'renderImpedans', types: ['r', 'rl', 'rc', 'lc', 'rlc'], setType: function (c) { impedansState.components = c; } },
+    { mod: 'trefase', fn: 'renderTrefase', types: ['symStar', 'symDelta', 'asymStar', 'asymDelta', 'twoWatt', 'pfc'], setType: function (c) { trefaseState.loadType = c; } },
+    { mod: 'motorteori', fn: 'renderMotorteori', types: ['slip', 'power', 'torque', 'efficiency', 'starting'], setType: function (c) { motorteoriState.calcType = c; } },
+    { mod: 'magnet', fn: 'renderMagnet', types: ['mmf', 'flux', 'reluctance', 'induction', 'inductance', 'force', 'energy'], setType: function (c) { magnetState.calcType = c; } },
+    { mod: 'kapacitor', fn: 'renderKapacitor', types: ['capacitance', 'charge', 'combo', 'rc', 'coulomb'], setType: function (c) { kapacitorState.calcType = c; } },
+    { mod: 'varme', fn: 'renderVarme', types: ['uvalue', 'transmission', 'ventilation', 'total', 'energy'], setType: function (c) { varmeState.calcType = c; } },
+    { mod: 'dcmaskine', fn: 'renderDcmaskine', types: ['generator', 'motor', 'torque', 'starter', 'efficiency'], setType: function (c) { dcmaskineState.mode = c; } },
+    { mod: 'lys', fn: 'renderLys', types: ['lumen', 'point'], setType: function (c) { lysState.calcType = c; } },
+    { mod: 'dc', fn: 'renderDC', types: ['ohm', 'resistivity', 'temperature', 'series_parallel', 'divider', 'power', 'energy', 'emf'], setType: function (c) { dcState.calcType = c; } }
+  ];
+  moduleRenders.forEach(function (m) {
+    test('module ' + m.mod + ': every solver sub-view is click-only and exposes a stepper', function() {
+      m.types.forEach(function (c) {
+        m.setType(c);
+        var h = eval(m.fn)();
+        assert(h.indexOf('<input') < 0 && h.indexOf('<textarea') < 0 && h.indexOf('contenteditable') < 0, m.mod + '/' + c + ' must stay click-only (no typing)');
+        assert(h.indexOf('valBump(') >= 0, m.mod + '/' + c + ' must expose a click-only stepper');
+      });
+    });
+  });
+})();
+
+test('module dc: stepper hits an arbitrary current (9.3 A) without typing', function() {
+  dcState.calcType = 'ohm'; dcState.ohmKnown = 'ri';
+  renderDC();
+  dcState.ohmI = 0;
+  for (var i = 0; i < 93; i++) valBump('dc:ohmI', 0.1);
+  assert(Math.abs(dcState.ohmI - 9.3) < 1e-9, '9.3 A reachable without typing; got ' + dcState.ohmI);
+});
+
+test('module trefase: phase angle reachable in 1-degree clicks; clamps to [0, pi/2]', function() {
+  trefaseState.loadType = 'symStar'; renderTrefase();
+  trefaseState.phi = 0;
+  valBump('trefase:phi', Math.PI / 180);
+  assert(Math.abs(trefaseState.phi * 180 / Math.PI - 1) < 1e-4, 'phi steps in degrees; got ' + (trefaseState.phi * 180 / Math.PI));
+  valBump('trefase:phi', 1000);
+  assert(trefaseState.phi <= Math.PI / 2 + 1e-6, 'phi clamps to <= pi/2; got ' + trefaseState.phi);
+});
+
+test('regression: core calculation outputs are byte-identical (no math touched)', function() {
+  var ohm = dcCalcOhm('ri', 10, 2, 0);
+  assert(ohm.U === 20, 'dcCalcOhm U unchanged; got ' + ohm.U);
+  var r = trefaseCalcSymStar(400, 100, 0.5236);
+  assert(Math.abs(r.Up - 400 / Math.sqrt(3)) < 1e-9, 'trefaseCalcSymStar Up unchanged; got ' + r.Up);
+  assert(magnetCalcMMF(500, 2) === 1000, 'magnetCalcMMF unchanged');
+  var ib = sldCalcNodeIB({ type: 'final_circuit', power_kW: 7.36, cosPhi: 0.95, phases: '3x400', voltage: 400 });
+  assert(Math.abs(ib - 7360 / (Math.sqrt(3) * 400 * 0.95)) < 1e-6, 'sldCalcNodeIB unchanged; got ' + ib);
+  var ps = trafoSolvePower({ phase: '3', U: 400, I: 800, cosphi: 0.9 });
+  assert(Math.abs(ps.S - SQRT3 * 400 * 800) < 1e-6, 'trafoSolvePower S unchanged; got ' + ps.S);
+});
+
+test('regression: psBump (trafo) and cvBump (commissioning) keep identical behavior after consolidation', function() {
+  var saved = JSON.stringify(trafoState);
+  trafoState.psI = null; psBump('psI', 1);
+  assert(trafoState.psI === 1, 'psBump seeds psI from null; got ' + trafoState.psI);
+  trafoState.psI = 5; psBump('psI', -100);
+  assert(trafoState.psI === 0, 'psBump clamps current >= 0; got ' + trafoState.psI);
+  trafoState.psCos = 0.95; psBump('psCos', 1);
+  assert(trafoState.psCos === 1, 'psBump clamps cosphi to 1; got ' + trafoState.psCos);
+  trafoState = JSON.parse(saved);
+  cvState.recorded.__t = 0; cvBump('__t', 1.23456);
+  assert(cvState.recorded.__t === 1.2346, 'cvBump rounds to 4 decimals; got ' + cvState.recorded.__t);
+  cvState.recorded.__t = 1; cvBump('__t', -50);
+  assert(cvState.recorded.__t === 0, 'cvBump clamps >= 0; got ' + cvState.recorded.__t);
+  delete cvState.recorded.__t;
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

@@ -7954,16 +7954,153 @@ function trafoSolvePower(inp) {
   };
 }
 
+// ============================================================================
+// SHARED CLICK-ONLY VALUE PICKER (one reusable helper for the whole app).
+// Generalizes the trafo Power/Current Solver pattern (PR #62): dense standard
+// presets PLUS a click-only stepper [\u2212\u2212][\u2212] value [+][++] so ANY exact
+// value (e.g. 800 A, 837 A, 12.5 mm\u00B2, 9.3 kW) is reachable purely by
+// clicking \u2014 no typing anywhere. PURELY ADDITIVE: never touches any
+// calculation, protection, verdict or dimensioning math; it only seeds/edits
+// input state then re-renders. Values are stored in each module's own state
+// object via get/set closures registered per render in VALPICK_REG (keyed by a
+// module-scoped token), so the same helper works for every module without a
+// global name lookup.
+// ============================================================================
+var VALPICK_REG = {};
+
+// Clamp a numeric value to a quantity's physical range. Default is >= 0
+// (currents, powers, lengths, resistances, frequencies, etc.). Pass
+// { min: null } to allow negatives (e.g. temperatures), and { max: ... } /
+// { min: ... } for bounded factors such as cos\u03C6 \u2208 [0,1]. Pure clamp \u2014 never
+// rounds toward danger, never fabricates a value.
+function valClampNum(x, clamp) {
+  if (typeof x !== 'number' || !isFinite(x)) return 0;
+  clamp = clamp || {};
+  var min = (clamp.min === undefined) ? 0 : clamp.min;
+  var max = (clamp.max === undefined) ? null : clamp.max;
+  if (min !== null && min !== undefined && x < min) x = min;
+  if (max !== null && max !== undefined && x > max) x = max;
+  return x;
+}
+
+// Round to a sane precision without float dust (default 6 decimals).
+function valRound(x, prec) {
+  var f = Math.pow(10, (prec === undefined) ? 6 : prec);
+  return Math.round(x * f) / f;
+}
+
+// Register a (module-scoped) numeric field so valBump/valSet can mutate it.
+function valRegister(token, stateObj, field, module, clamp, prec) {
+  VALPICK_REG[token] = {
+    get: function () { return stateObj[field]; },
+    set: function (v) { stateObj[field] = v; },
+    module: module,
+    clamp: clamp || { min: 0 },
+    prec: (prec === undefined) ? 6 : prec
+  };
+}
+
+// Click-only stepper handler: adjust the registered field by delta (in STORED
+// units). null/undefined is treated as the clamp seed (default 0) so the first
+// click seeds a value. Clamps per the registered quantity, then re-renders.
+function valBump(token, delta) {
+  var e = VALPICK_REG[token];
+  if (!e) return;
+  var cur = e.get();
+  if (typeof cur !== 'number' || !isFinite(cur)) {
+    cur = (e.clamp && typeof e.clamp.seed === 'number') ? e.clamp.seed : 0;
+  }
+  e.set(valRound(valClampNum(cur + delta, e.clamp), e.prec));
+  if (e.module) renderModule(e.module);
+}
+
+// Click-only direct set (preset chips and the "\u2014 not given" option).
+function valSet(token, v) {
+  var e = VALPICK_REG[token];
+  if (!e) return;
+  if (v === null || v === undefined) { e.set(null); }
+  else { e.set(valRound(valClampNum(v, e.clamp), e.prec)); }
+  if (e.module) renderModule(e.module);
+}
+
+// Render ONLY the click-only stepper row, bound to arbitrary get/set closures
+// (e.g. an array element). Same [\u2212\u2212][\u2212] value [+][++] markup; registers
+// under an explicit token so valBump/valSet can address it via the onclick
+// string alone (no closures travel through HTML).
+function valStepFn(token, module, getFn, setFn, o) {
+  o = o || {};
+  var mult = o.mult || 1;
+  var fmt = o.fmt || function (p) { return '' + p + (o.unit ? (' ' + o.unit) : ''); };
+  VALPICK_REG[token] = { get: getFn, set: setFn, module: module, clamp: o.clamp || { min: 0 }, prec: (o.prec === undefined) ? 6 : o.prec };
+  var stepBase = (o.step || 1) * mult;
+  var coarse = stepBase * 10;
+  var cur = getFn();
+  var dispNum = (typeof cur === 'number' && isFinite(cur)) ? valRound(cur / mult, 6) : null;
+  var h = '<div class="select-grid" style="align-items:center;gap:4px;grid-template-columns:auto auto 1fr auto auto;margin-top:4px">';
+  h += '<button class="sel-btn" title="\u2212\u2212" onclick="valBump(\'' + token + '\',' + (-coarse) + ')">\u2212\u2212</button>';
+  h += '<button class="sel-btn" title="\u2212" onclick="valBump(\'' + token + '\',' + (-stepBase) + ')">\u2212</button>';
+  h += '<span class="sel-btn selected" style="text-align:center">' + (dispNum === null ? tx('\u2014 ikke angivet', '\u2014 not given') : fmt(dispNum)) + '</span>';
+  h += '<button class="sel-btn" title="+" onclick="valBump(\'' + token + '\',' + stepBase + ')">+</button>';
+  h += '<button class="sel-btn" title="++" onclick="valBump(\'' + token + '\',' + coarse + ')">++</button>';
+  h += '</div>';
+  return h;
+}
+
+// Render ONLY the click-only stepper row for an existing numeric picker.
+// Use this to AUGMENT a module that already has preset buttons: append one
+// stepper so any value between/around the presets is reachable without typing.
+//   o.step  : fine step in DISPLAY units (coarse = step x 10)
+//   o.mult  : display->stored multiplier (default 1)
+//   o.fmt   : function(displayNumber) -> label
+//   o.unit  : unit suffix used by the default fmt
+//   o.clamp : { min, max } in STORED units (default { min: 0 })
+//   o.prec  : rounding decimals (default 6)
+function valStep(stateObj, field, module, o) {
+  var token = module + ':' + field;
+  return valStepFn(token, module, function () { return stateObj[field]; }, function (v) { stateObj[field] = v; }, o);
+}
+
+// Render a COMPLETE click-only value picker: optional "\u2014 not given" chip, a
+// dense preset grid, and the stepper. Use for new pickers / where "not given"
+// is meaningful (solver inputs that may be unknown).
+//   o.state, o.field, o.module : where the value lives + module id
+//   o.label    : already-translated label HTML
+//   o.presets  : array of DISPLAY numbers
+//   o.allowNull: render the "\u2014 not given" chip (default false)
+//   (other keys as valStep)
+function valSelect(o) {
+  var mult = o.mult || 1;
+  var fmt = o.fmt || function (p) { return '' + p + (o.unit ? (' ' + o.unit) : ''); };
+  var allowNull = (o.allowNull === true);
+  var token = o.module + ':' + o.field;
+  valRegister(token, o.state, o.field, o.module, o.clamp || { min: 0 }, o.prec);
+  var cur = o.state[o.field];
+  var h = '<div class="select-group"><div class="select-label">' + o.label + '</div><div class="select-grid">';
+  if (allowNull) {
+    h += '<button class="sel-btn' + ((cur === null || cur === undefined) ? ' selected' : '') + '" onclick="valSet(\'' + token + '\',null)">' + tx('\u2014 ikke angivet', '\u2014 not given') + '</button>';
+  }
+  (o.presets || []).forEach(function (p) {
+    var stored = valRound(p * mult, 6);
+    var sel = (typeof cur === 'number' && Math.abs(cur - stored) < 1e-9) ? ' selected' : '';
+    h += '<button class="sel-btn' + sel + '" onclick="valSet(\'' + token + '\',' + stored + ')">' + fmt(p) + '</button>';
+  });
+  h += '</div>';
+  if (o.step) h += valStep(o.state, o.field, o.module, { step: o.step, mult: mult, fmt: fmt, clamp: o.clamp, prec: o.prec, unit: o.unit });
+  h += '</div>';
+  return h;
+}
+
 // Click-only stepper handler for the Power & Current Solver (no typing).
 // Adjusts a trafoState.ps* field by a delta in BASE SI units. cosphi clamps to
 // [0,1]; every other quantity clamps to >= 0. null ("not given") is treated as 0
 // so the first click seeds a value. Purely additive: does NOT touch solver math.
+// Now delegates clamping/rounding to the shared valClampNum/valRound core so the
+// trafo solver and the app-wide stepper share one implementation (supersedes the
+// trafo-only PR #62 stepper while keeping identical behavior).
 function psBump(field, delta) {
   var cur = (typeof trafoState[field] === 'number') ? trafoState[field] : 0;
-  var next = cur + delta;
-  if (field === 'psCos') { next = Math.min(1, Math.max(0, next)); }
-  else if (!(next >= 0)) { next = 0; }
-  trafoState[field] = Math.round(next * 1000000) / 1000000;
+  var clamp = (field === 'psCos') ? { min: 0, max: 1 } : { min: 0 };
+  trafoState[field] = valRound(valClampNum(cur + delta, clamp), 6);
   renderModule('trafo');
 }
 
@@ -23002,9 +23139,9 @@ function cvExportJson() {
 // ============================================================================
 function cvBump(key, delta) {
   const cur = (typeof cvState.recorded[key] === 'number') ? cvState.recorded[key] : 0;
-  let next = cur + delta;
-  if (!(next >= 0)) next = 0;
-  cvState.recorded[key] = Math.round(next * 10000) / 10000;
+  // Delegate clamp (>= 0) + rounding to the shared click-only core (4 decimals
+  // here, matching the original commissioning behavior). Purely additive.
+  cvState.recorded[key] = valRound(valClampNum(cur + delta, { min: 0 }), 4);
   renderModule('commissioning');
 }
 function cvSetReading(key, v) { const n = Number(v); if (isFinite(n) && n >= 0) cvState.recorded[key] = Math.round(n * 10000) / 10000; renderModule('commissioning'); }
@@ -23666,7 +23803,9 @@ function renderImpedans() {
       var label = r >= 1000 ? (r / 1000) + 'k' : r + '';
       html += '<button class="sel-btn' + (impedansState.R === r ? ' selected' : '') + '" onclick="impedansState.R=' + r + ';renderModule(\'impedans\')">' + label + '</button>';
     });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(impedansState, 'R', 'impedans', { step: 1, fmt: function(p){ return p >= 1000 ? (p/1000) + ' k\u03A9' : p + ' \u03A9'; }, clamp: { min: 0 } });
+    html += '</div>';
   }
 
   // Inductance (if applicable)
@@ -23675,7 +23814,9 @@ function renderImpedans() {
     IMPEDANS_L_PRESETS.forEach(function(l) {
       html += '<button class="sel-btn' + (impedansState.L === l ? ' selected' : '') + '" onclick="impedansState.L=' + l + ';renderModule(\'impedans\')">' + impedansFmtL(l) + '</button>';
     });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(impedansState, 'L', 'impedans', { step: 0.001, fmt: impedansFmtL, clamp: { min: 0 } });
+    html += '</div>';
   }
 
   // Capacitance (if applicable)
@@ -23684,7 +23825,9 @@ function renderImpedans() {
     IMPEDANS_C_PRESETS.forEach(function(c) {
       html += '<button class="sel-btn' + (impedansState.C === c ? ' selected' : '') + '" onclick="impedansState.C=' + c + ';renderModule(\'impedans\')">' + impedansFmtC(c) + '</button>';
     });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(impedansState, 'C', 'impedans', { step: 0.000000001, fmt: impedansFmtC, clamp: { min: 0 }, prec: 15 });
+    html += '</div>';
   }
 
   // Frequency
@@ -23692,14 +23835,18 @@ function renderImpedans() {
   IMPEDANS_F_PRESETS.forEach(function(f) {
     html += '<button class="sel-btn' + (impedansState.f === f ? ' selected' : '') + '" onclick="impedansState.f=' + f + ';renderModule(\'impedans\')">' + impedansFmtF(f) + '</button>';
   });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(impedansState, 'f', 'impedans', { step: 1, fmt: impedansFmtF, clamp: { min: 0 } });
+  html += '</div>';
 
   // Supply voltage
   html += '<div class="select-group"><div class="select-label">' + tx('Forsyningssp\u00E6nding U [V]', 'Supply Voltage U [V]') + '</div><div class="select-grid">';
   IMPEDANS_U_PRESETS.forEach(function(u) {
     html += '<button class="sel-btn' + (impedansState.U === u ? ' selected' : '') + '" onclick="impedansState.U=' + u + ';renderModule(\'impedans\')">' + u + ' V</button>';
   });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(impedansState, 'U', 'impedans', { step: 1, fmt: function(p){ return p + ' V'; }, clamp: { min: 0 } });
+  html += '</div>';
 
   html += '</div>'; // close config card
   // Results card
@@ -24065,26 +24212,34 @@ function renderTrefase() {
   TREFASE_UL_PRESETS.forEach(function(u) {
     html += '<button class="sel-btn' + (trefaseState.UL === u ? ' selected' : '') + '" onclick="trefaseState.UL=' + u + ';renderModule(\'trefase\')">' + u + ' V</button>';
   });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(trefaseState, 'UL', 'trefase', { step: 1, fmt: function(p){ return p + ' V'; }, clamp: { min: 0 } });
+  html += '</div>';
 
   // Frequency
   html += '<div class="select-group"><div class="select-label">' + tx('Frekvens [Hz]', 'Frequency [Hz]') + '</div><div class="select-grid">';
   [25, 50, 60].forEach(function(f) {
     html += '<button class="sel-btn' + (trefaseState.f === f ? ' selected' : '') + '" onclick="trefaseState.f=' + f + ';renderModule(\'trefase\')">' + f + ' Hz</button>';
   });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(trefaseState, 'f', 'trefase', { step: 1, fmt: function(p){ return p + ' Hz'; }, clamp: { min: 0 } });
+  html += '</div>';
 
   if (trefaseState.loadType === 'symStar' || trefaseState.loadType === 'symDelta') {
     html += '<div class="select-group"><div class="select-label">' + tx('Impedans pr. fase Z [\u03A9]', 'Impedance per phase Z [\u03A9]') + '</div><div class="select-grid">';
     TREFASE_Z_PRESETS.forEach(function(z) {
       html += '<button class="sel-btn' + (trefaseState.Z === z ? ' selected' : '') + '" onclick="trefaseState.Z=' + z + ';renderModule(\'trefase\')">' + z + '</button>';
     });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(trefaseState, 'Z', 'trefase', { step: 1, fmt: function(p){ return p + ' \u03A9'; }, clamp: { min: 0 } });
+    html += '</div>';
     html += '<div class="select-group"><div class="select-label">' + tx('Fasevinkel \u03C6 (cos\u03C6)', 'Phase angle \u03C6 (cos\u03C6)') + '</div><div class="select-grid">';
     TREFASE_PHI_PRESETS.forEach(function(p) {
       html += '<button class="sel-btn' + (Math.abs(trefaseState.phi - p.rad) < 0.001 ? ' selected' : '') + '" onclick="trefaseState.phi=' + p.rad + ';renderModule(\'trefase\')">' + p.deg + '\u00B0 (cos\u03C6=' + p.cos + ')</button>';
     });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(trefaseState, 'phi', 'trefase', { step: 1, mult: Math.PI/180, fmt: function(d){ return d.toFixed(1) + '\u00B0 (cos\u03C6=' + Math.cos(d*Math.PI/180).toFixed(3) + ')'; }, clamp: { min: 0, max: Math.PI/2 } });
+    html += '</div>';
   } else if (trefaseState.loadType === 'asymStar' || trefaseState.loadType === 'asymDelta') {
     var phases = (trefaseState.loadType === 'asymStar') ?
       [{lbl:'A (R)',zKey:'Za',phiKey:'phiA'},{lbl:'B (S)',zKey:'Zb',phiKey:'phiB'},{lbl:'C (T)',zKey:'Zc',phiKey:'phiC'}] :
@@ -24094,40 +24249,54 @@ function renderTrefase() {
       TREFASE_Z_PRESETS.forEach(function(z) {
         html += '<button class="sel-btn' + (trefaseState[ph.zKey] === z ? ' selected' : '') + '" onclick="trefaseState.'+ph.zKey+'='+z+';renderModule(\'trefase\')">' + z + '</button>';
       });
-      html += '</div></div>';
+      html += '</div>';
+      html += valStep(trefaseState, ph.zKey, 'trefase', { step: 1, fmt: function(p){ return p + ' \u03A9'; }, clamp: { min: 0 } });
+      html += '</div>';
       html += '<div class="select-group"><div class="select-label">' + tx('Fase '+ph.lbl+' vinkel \u03C6','Phase '+ph.lbl+' angle \u03C6') + '</div><div class="select-grid">';
       TREFASE_PHI_PRESETS.forEach(function(p) {
         html += '<button class="sel-btn' + (Math.abs(trefaseState[ph.phiKey]-p.rad)<0.001 ? ' selected' : '') + '" onclick="trefaseState.'+ph.phiKey+'='+p.rad+';renderModule(\'trefase\')">' + p.deg + '\u00B0</button>';
       });
-      html += '</div></div>';
+      html += '</div>';
+      html += valStep(trefaseState, ph.phiKey, 'trefase', { step: 1, mult: Math.PI/180, fmt: function(d){ return d.toFixed(1) + '\u00B0'; }, clamp: { min: 0, max: Math.PI/2 } });
+      html += '</div>';
     });
   } else if (trefaseState.loadType === 'twoWatt') {
     html += '<div class="select-group"><div class="select-label">' + tx('Wattmeter W\u2081 [W]','Wattmeter W\u2081 [W]') + '</div><div class="select-grid">';
     TREFASE_W_PRESETS.forEach(function(w) {
       html += '<button class="sel-btn' + (trefaseState.W1 === w ? ' selected' : '') + '" onclick="trefaseState.W1='+w+';renderModule(\'trefase\')">' + w + '</button>';
     });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(trefaseState, 'W1', 'trefase', { step: 10, fmt: function(p){ return p + ' W'; }, clamp: { min: null } });
+    html += '</div>';
     html += '<div class="select-group"><div class="select-label">' + tx('Wattmeter W\u2082 [W]','Wattmeter W\u2082 [W]') + '</div><div class="select-grid">';
     TREFASE_W_PRESETS.forEach(function(w) {
       html += '<button class="sel-btn' + (trefaseState.W2 === w ? ' selected' : '') + '" onclick="trefaseState.W2='+w+';renderModule(\'trefase\')">' + w + '</button>';
     });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(trefaseState, 'W2', 'trefase', { step: 10, fmt: function(p){ return p + ' W'; }, clamp: { min: null } });
+    html += '</div>';
   } else if (trefaseState.loadType === 'pfc') {
     html += '<div class="select-group"><div class="select-label">' + tx('Aktiv effekt P [W]','Active Power P [W]') + '</div><div class="select-grid">';
     TREFASE_W_PRESETS.forEach(function(w) {
       html += '<button class="sel-btn' + (trefaseState.W1 === w ? ' selected' : '') + '" onclick="trefaseState.W1='+w+';renderModule(\'trefase\')">' + w + '</button>';
     });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(trefaseState, 'W1', 'trefase', { step: 10, fmt: function(p){ return p + ' W'; }, clamp: { min: 0 } });
+    html += '</div>';
     html += '<div class="select-group"><div class="select-label">' + tx('Nuv\u00E6rende cos\u03C6\u2081','Current cos\u03C6\u2081') + '</div><div class="select-grid">';
     TREFASE_PHI_PRESETS.forEach(function(p) {
       if (p.cos < 1) html += '<button class="sel-btn' + (Math.abs(trefaseState.phi-p.rad)<0.001 ? ' selected' : '') + '" onclick="trefaseState.phi='+p.rad+';renderModule(\'trefase\')">' + p.cos + '</button>';
     });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(trefaseState, 'phi', 'trefase', { step: 1, mult: Math.PI/180, fmt: function(d){ return Math.cos(d*Math.PI/180).toFixed(3) + ' (' + d.toFixed(1) + '\u00B0)'; }, clamp: { min: 0, max: Math.PI/2 } });
+    html += '</div>';
     html += '<div class="select-group"><div class="select-label">' + tx('\u00D8nsket cos\u03C6\u2082','Target cos\u03C6\u2082') + '</div><div class="select-grid">';
     TREFASE_PFC_PRESETS.forEach(function(pf) {
       html += '<button class="sel-btn' + (Math.abs(trefaseState.pfcTarget-pf)<0.001 ? ' selected' : '') + '" onclick="trefaseState.pfcTarget='+pf+';renderModule(\'trefase\')">' + pf + '</button>';
     });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(trefaseState, 'pfcTarget', 'trefase', { step: 0.01, fmt: function(p){ return p.toFixed(2); }, clamp: { min: 0, max: 1 } });
+    html += '</div>';
   }
 
   html += '</div>';
@@ -24393,59 +24562,77 @@ function renderMotorteori() {
     var nsDisp = 120 * motorteoriState.f / p;
     html += '<button class="sel-btn' + (motorteoriState.poles === p ? ' selected' : '') + '" onclick="motorteoriState.poles='+p+';renderModule(\'motorteori\')">' + p + 'P ('+nsDisp+' rpm)</button>';
   });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(motorteoriState, 'poles', 'motorteori', { step: 2, fmt: function(p){ return p + 'P'; }, clamp: { min: 2 } });
+  html += '</div>';
 
   html += '<div class="select-group"><div class="select-label">' + tx('Frekvens f [Hz]','Frequency f [Hz]') + '</div><div class="select-grid">';
   MOTORTEORI_F_PRESETS.forEach(function(f) {
     html += '<button class="sel-btn' + (motorteoriState.f === f ? ' selected' : '') + '" onclick="motorteoriState.f='+f+';renderModule(\'motorteori\')">' + f + ' Hz</button>';
   });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(motorteoriState, 'f', 'motorteori', { step: 1, fmt: function(p){ return p + ' Hz'; }, clamp: { min: 0 } });
+  html += '</div>';
 
   html += '<div class="select-group"><div class="select-label">' + tx('Sp\u00E6nding U [V]','Voltage U [V]') + '</div><div class="select-grid">';
   MOTORTEORI_U_PRESETS.forEach(function(u) {
     html += '<button class="sel-btn' + (motorteoriState.U === u ? ' selected' : '') + '" onclick="motorteoriState.U='+u+';renderModule(\'motorteori\')">' + u + ' V</button>';
   });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(motorteoriState, 'U', 'motorteori', { step: 1, fmt: function(p){ return p + ' V'; }, clamp: { min: 0 } });
+  html += '</div>';
 
   html += '<div class="select-group"><div class="select-label">' + tx('M\u00E6rkeeffekt P\u2082 [W]','Rated Power P\u2082 [W]') + '</div><div class="select-grid">';
   MOTORTEORI_P_PRESETS.forEach(function(p) {
     var lbl = p >= 1000 ? (p/1000)+' kW' : p+' W';
     html += '<button class="sel-btn' + (motorteoriState.Prated === p ? ' selected' : '') + '" onclick="motorteoriState.Prated='+p+';renderModule(\'motorteori\')">' + lbl + '</button>';
   });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(motorteoriState, 'Prated', 'motorteori', { step: 100, fmt: function(p){ return p >= 1000 ? (p/1000) + ' kW' : p + ' W'; }, clamp: { min: 0 } });
+  html += '</div>';
 
   if (motorteoriState.calcType === 'slip') {
     html += '<div class="select-group"><div class="select-label">' + tx('Omdrejningstal n [rpm]','Speed n [rpm]') + '</div><div class="select-grid">';
     MOTORTEORI_N_PRESETS.forEach(function(n) {
       html += '<button class="sel-btn' + (motorteoriState.n === n ? ' selected' : '') + '" onclick="motorteoriState.n='+n+';renderModule(\'motorteori\')">' + n + '</button>';
     });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(motorteoriState, 'n', 'motorteori', { step: 10, fmt: function(p){ return p + ' rpm'; }, clamp: { min: 0 } });
+    html += '</div>';
   } else {
     html += '<div class="select-group"><div class="select-label">' + tx('Slip s','Slip s') + '</div><div class="select-grid">';
     MOTORTEORI_SLIP_PRESETS.forEach(function(s) {
       html += '<button class="sel-btn' + (Math.abs(motorteoriState.slip-s)<0.001 ? ' selected' : '') + '" onclick="motorteoriState.slip='+s+';renderModule(\'motorteori\')">' + (s*100).toFixed(0) + '%</button>';
     });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(motorteoriState, 'slip', 'motorteori', { step: 0.01, fmt: function(s){ return (s*100).toFixed(1) + '%'; }, clamp: { min: 0, max: 1 } });
+    html += '</div>';
   }
 
   html += '<div class="select-group"><div class="select-label">' + tx('Str\u00F8m I [A]','Current I [A]') + '</div><div class="select-grid">';
   MOTORTEORI_I_PRESETS.forEach(function(i) {
     html += '<button class="sel-btn' + (motorteoriState.I === i ? ' selected' : '') + '" onclick="motorteoriState.I='+i+';renderModule(\'motorteori\')">' + i + ' A</button>';
   });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(motorteoriState, 'I', 'motorteori', { step: 1, fmt: function(p){ return p + ' A'; }, clamp: { min: 0 } });
+  html += '</div>';
 
   html += '<div class="select-group"><div class="select-label">' + tx('Effektfaktor cos\u03C6','Power factor cos\u03C6') + '</div><div class="select-grid">';
   MOTORTEORI_COSPHI_PRESETS.forEach(function(c) {
     html += '<button class="sel-btn' + (Math.abs(motorteoriState.cosPhi-c)<0.001 ? ' selected' : '') + '" onclick="motorteoriState.cosPhi='+c+';renderModule(\'motorteori\')">' + c + '</button>';
   });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(motorteoriState, 'cosPhi', 'motorteori', { step: 0.01, fmt: function(p){ return p.toFixed(2); }, clamp: { min: 0, max: 1 } });
+  html += '</div>';
 
   if (motorteoriState.calcType === 'efficiency') {
     html += '<div class="select-group"><div class="select-label">' + tx('Virkningsgrad \u03B7','Efficiency \u03B7') + '</div><div class="select-grid">';
     MOTORTEORI_ETA_PRESETS.forEach(function(e) {
       html += '<button class="sel-btn' + (Math.abs(motorteoriState.eta-e)<0.001 ? ' selected' : '') + '" onclick="motorteoriState.eta='+e+';renderModule(\'motorteori\')">' + (e*100).toFixed(0) + '%</button>';
     });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(motorteoriState, 'eta', 'motorteori', { step: 0.01, fmt: function(e){ return (e*100).toFixed(1) + '%'; }, clamp: { min: 0, max: 1 } });
+    html += '</div>';
   }
 
   if (motorteoriState.calcType === 'starting') {
@@ -24453,7 +24640,9 @@ function renderMotorteori() {
     MOTORTEORI_ISTART_PRESETS.forEach(function(r) {
       html += '<button class="sel-btn' + (motorteoriState.IstartRatio === r ? ' selected' : '') + '" onclick="motorteoriState.IstartRatio='+r+';renderModule(\'motorteori\')">' + r + 'x</button>';
     });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(motorteoriState, 'IstartRatio', 'motorteori', { step: 0.5, fmt: function(p){ return p + 'x'; }, clamp: { min: 0 } });
+    html += '</div>';
   }
 
   html += '</div>';
@@ -25360,19 +25549,25 @@ function renderDCOhm() {
   if (dcState.ohmKnown === 'ri' || dcState.ohmKnown === 'ru') {
     html += '<div class="select-group"><div class="select-label">' + tx('Modstand R [\u03A9]', 'Resistance R [\u03A9]') + '</div><div class="select-grid">';
     DC_R_PRESETS.forEach(function(r) { html += '<button class="sel-btn' + (dcState.ohmR === r ? ' selected' : '') + '" onclick="dcState.ohmR=' + r + ';renderModule(\'dc\')">' + dcFmtR(r) + '</button>'; });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(dcState, 'ohmR', 'dc', { step: 1, fmt: dcFmtR, clamp: { min: 0 } });
+    html += '</div>';
   }
   // I selector
   if (dcState.ohmKnown === 'ri' || dcState.ohmKnown === 'ui') {
     html += '<div class="select-group"><div class="select-label">' + tx('Stroem I [A]', 'Current I [A]') + '</div><div class="select-grid">';
     DC_I_PRESETS.forEach(function(i) { html += '<button class="sel-btn' + (dcState.ohmI === i ? ' selected' : '') + '" onclick="dcState.ohmI=' + i + ';renderModule(\'dc\')">' + dcFmtI(i) + '</button>'; });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(dcState, 'ohmI', 'dc', { step: 0.1, fmt: dcFmtI, clamp: { min: 0 } });
+    html += '</div>';
   }
   // U selector
   if (dcState.ohmKnown === 'ru' || dcState.ohmKnown === 'ui') {
     html += '<div class="select-group"><div class="select-label">' + tx('Spaending U [V]', 'Voltage U [V]') + '</div><div class="select-grid">';
     DC_U_PRESETS.forEach(function(u) { html += '<button class="sel-btn' + (dcState.ohmU === u ? ' selected' : '') + '" onclick="dcState.ohmU=' + u + ';renderModule(\'dc\')">' + u + ' V</button>'; });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(dcState, 'ohmU', 'dc', { step: 1, fmt: function(p){ return p + ' V'; }, clamp: { min: 0 } });
+    html += '</div>';
   }
   // Result
   var res = dcCalcOhm(dcState.ohmKnown, dcState.ohmR, dcState.ohmI, dcState.ohmU);
@@ -25394,11 +25589,15 @@ function renderDCResistivity() {
   // Length
   html += '<div class="select-group"><div class="select-label">' + tx('Laengde l [m]', 'Length l [m]') + '</div><div class="select-grid">';
   DC_LENGTH_PRESETS.forEach(function(l) { html += '<button class="sel-btn' + (dcState.resLength === l ? ' selected' : '') + '" onclick="dcState.resLength=' + l + ';renderModule(\'dc\')">' + l + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(dcState, 'resLength', 'dc', { step: 1, fmt: function(p){ return p + ' m'; }, clamp: { min: 0 } });
+  html += '</div>';
   // Cross-section
   html += '<div class="select-group"><div class="select-label">' + tx('Tvaersnit S [mm\u00B2]', 'Cross-section S [mm\u00B2]') + '</div><div class="select-grid">';
   DC_CROSS_PRESETS.forEach(function(s) { html += '<button class="sel-btn' + (dcState.resCrossSection === s ? ' selected' : '') + '" onclick="dcState.resCrossSection=' + s + ';renderModule(\'dc\')">' + s + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(dcState, 'resCrossSection', 'dc', { step: 0.5, fmt: function(p){ return p + ' mm\u00B2'; }, clamp: { min: 0 } });
+  html += '</div>';
   // Result
   var mat = DC_MATERIALS[dcState.resMaterial];
   var R = dcCalcResistivity(mat.rho, dcState.resLength, dcState.resCrossSection);
@@ -25420,11 +25619,15 @@ function renderDCTemperature() {
   // R20
   html += '<div class="select-group"><div class="select-label">' + tx('Modstand ved 20\u00B0C R\u2082\u2080 [\u03A9]', 'Resistance at 20\u00B0C R\u2082\u2080 [\u03A9]') + '</div><div class="select-grid">';
   DC_R20_PRESETS.forEach(function(r) { html += '<button class="sel-btn' + (dcState.tempR20 === r ? ' selected' : '') + '" onclick="dcState.tempR20=' + r + ';renderModule(\'dc\')">' + r + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(dcState, 'tempR20', 'dc', { step: 0.5, fmt: function(p){ return p + ' \u03A9'; }, clamp: { min: 0 } });
+  html += '</div>';
   // Temperature
   html += '<div class="select-group"><div class="select-label">' + tx('Temperatur T [\u00B0C]', 'Temperature T [\u00B0C]') + '</div><div class="select-grid">';
   DC_TEMP_PRESETS.forEach(function(t) { html += '<button class="sel-btn' + (dcState.tempT === t ? ' selected' : '') + '" onclick="dcState.tempT=' + t + ';renderModule(\'dc\')">' + t + '\u00B0</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(dcState, 'tempT', 'dc', { step: 1, fmt: function(p){ return p + '\u00B0'; }, clamp: { min: -273.15 } });
+  html += '</div>';
   // Result
   var mat = DC_MATERIALS[dcState.tempMaterial];
   var RT = dcCalcTempResistance(dcState.tempR20, mat.alpha, dcState.tempT);
@@ -25450,7 +25653,9 @@ function renderDCSeriesParallel() {
     [1, 2.2, 4.7, 10, 22, 47, 100, 220, 470, 1000, 2200, 4700, 10000].forEach(function(v) {
       html += '<button class="sel-btn' + (r === v ? ' selected' : '') + '" onclick="dcSpSet(' + idx + ',' + v + ')">' + dcFmtR(v) + '</button>';
     });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStepFn('dc:spR' + idx, 'dc', (function(i){ return function(){ return dcState.spResistors[i]; }; })(idx), (function(i){ return function(v){ dcState.spResistors[i] = v; }; })(idx), { step: 1, fmt: dcFmtR, clamp: { min: 0 } });
+    html += '</div>';
   });
   // Add/remove buttons
   html += '<div class="select-group"><div class="select-grid">';
@@ -25491,11 +25696,15 @@ function renderDCDivider() {
   // Uin
   html += '<div class="select-group"><div class="select-label">' + tx('Indgangsspaending U_in [V]', 'Input Voltage U_in [V]') + '</div><div class="select-grid">';
   DC_U_PRESETS.forEach(function(u) { html += '<button class="sel-btn' + (dcState.vdUin === u ? ' selected' : '') + '" onclick="dcState.vdUin=' + u + ';renderModule(\'dc\')">' + u + ' V</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(dcState, 'vdUin', 'dc', { step: 1, fmt: function(p){ return p + ' V'; }, clamp: { min: 0 } });
+  html += '</div>';
   // I_total
   html += '<div class="select-group"><div class="select-label">' + tx('Total stroem I_total [A]', 'Total Current I_total [A]') + '</div><div class="select-grid">';
   DC_I_PRESETS.forEach(function(i) { html += '<button class="sel-btn' + (dcState.cdItotal === i ? ' selected' : '') + '" onclick="dcState.cdItotal=' + i + ';renderModule(\'dc\')">' + dcFmtI(i) + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(dcState, 'cdItotal', 'dc', { step: 0.1, fmt: dcFmtI, clamp: { min: 0 } });
+  html += '</div>';
   // Voltage divider result
   var Uout = dcCalcVoltageDivider(dcState.vdUin, dcState.vdR1, dcState.vdR2);
   html += '<div class="result-box"><div class="result-title">' + tx('Spaendingsdeler', 'Voltage Divider') + '</div>';
@@ -25525,19 +25734,25 @@ function renderDCPower() {
   if (dcState.powKnown === 'ui' || dcState.powKnown === 'ru') {
     html += '<div class="select-group"><div class="select-label">' + tx('Spaending U [V]', 'Voltage U [V]') + '</div><div class="select-grid">';
     DC_U_PRESETS.forEach(function(u) { html += '<button class="sel-btn' + (dcState.powU === u ? ' selected' : '') + '" onclick="dcState.powU=' + u + ';renderModule(\'dc\')">' + u + ' V</button>'; });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(dcState, 'powU', 'dc', { step: 1, fmt: function(p){ return p + ' V'; }, clamp: { min: 0 } });
+    html += '</div>';
   }
   // I selector
   if (dcState.powKnown === 'ui' || dcState.powKnown === 'ri') {
     html += '<div class="select-group"><div class="select-label">' + tx('Stroem I [A]', 'Current I [A]') + '</div><div class="select-grid">';
     DC_I_PRESETS.forEach(function(i) { html += '<button class="sel-btn' + (dcState.powI === i ? ' selected' : '') + '" onclick="dcState.powI=' + i + ';renderModule(\'dc\')">' + dcFmtI(i) + '</button>'; });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(dcState, 'powI', 'dc', { step: 0.1, fmt: dcFmtI, clamp: { min: 0 } });
+    html += '</div>';
   }
   // R selector
   if (dcState.powKnown === 'ri' || dcState.powKnown === 'ru') {
     html += '<div class="select-group"><div class="select-label">' + tx('Modstand R [\u03A9]', 'Resistance R [\u03A9]') + '</div><div class="select-grid">';
     DC_R_PRESETS.forEach(function(r) { html += '<button class="sel-btn' + (dcState.powR === r ? ' selected' : '') + '" onclick="dcState.powR=' + r + ';renderModule(\'dc\')">' + dcFmtR(r) + '</button>'; });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(dcState, 'powR', 'dc', { step: 1, fmt: dcFmtR, clamp: { min: 0 } });
+    html += '</div>';
   }
   // Result
   var res = dcCalcPower(dcState.powKnown, dcState.powU, dcState.powI, dcState.powR);
@@ -25558,11 +25773,15 @@ function renderDCEnergy() {
   // Power
   html += '<div class="select-group"><div class="select-label">' + tx('Effekt P [W]', 'Power P [W]') + '</div><div class="select-grid">';
   DC_P_PRESETS.forEach(function(p) { html += '<button class="sel-btn' + (dcState.enP === p ? ' selected' : '') + '" onclick="dcState.enP=' + p + ';renderModule(\'dc\')">' + (p >= 1000 ? (p/1000) + 'k' : p) + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(dcState, 'enP', 'dc', { step: 10, fmt: function(p){ return (p >= 1000 ? (p/1000) + ' kW' : p + ' W'); }, clamp: { min: 0 } });
+  html += '</div>';
   // Time
   html += '<div class="select-group"><div class="select-label">' + tx('Tid t', 'Time t') + '</div><div class="select-grid">';
   DC_T_PRESETS.forEach(function(t) { html += '<button class="sel-btn' + (dcState.enT === t ? ' selected' : '') + '" onclick="dcState.enT=' + t + ';renderModule(\'dc\')">' + t + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(dcState, 'enT', 'dc', { step: 0.5, fmt: function(p){ return '' + p; }, clamp: { min: 0 } });
+  html += '</div>';
   // Time unit
   html += '<div class="select-group"><div class="select-label">' + tx('Tidsenhed', 'Time Unit') + '</div><div class="select-grid">';
   html += '<button class="sel-btn' + (dcState.enTunit === 's' ? ' selected' : '') + '" onclick="dcState.enTunit=\'s\';renderModule(\'dc\')">' + tx('Sekunder', 'Seconds') + '</button>';
@@ -25587,15 +25806,21 @@ function renderDCEmf() {
   // EMF
   html += '<div class="select-group"><div class="select-label">' + tx('EMK E [V]', 'EMF E [V]') + '</div><div class="select-grid">';
   DC_E_PRESETS.forEach(function(e) { html += '<button class="sel-btn' + (dcState.emfE === e ? ' selected' : '') + '" onclick="dcState.emfE=' + e + ';renderModule(\'dc\')">' + e + ' V</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(dcState, 'emfE', 'dc', { step: 0.1, fmt: function(p){ return p + ' V'; }, clamp: { min: 0 } });
+  html += '</div>';
   // Internal resistance
   html += '<div class="select-group"><div class="select-label">' + tx('Indre modstand Ri [\u03A9]', 'Internal Resistance Ri [\u03A9]') + '</div><div class="select-grid">';
   DC_RI_PRESETS.forEach(function(r) { html += '<button class="sel-btn' + (dcState.emfRi === r ? ' selected' : '') + '" onclick="dcState.emfRi=' + r + ';renderModule(\'dc\')">' + r + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(dcState, 'emfRi', 'dc', { step: 0.1, fmt: function(p){ return p + ' \u03A9'; }, clamp: { min: 0 } });
+  html += '</div>';
   // Current
   html += '<div class="select-group"><div class="select-label">' + tx('Stroem I [A]', 'Current I [A]') + '</div><div class="select-grid">';
   DC_I_PRESETS.forEach(function(i) { html += '<button class="sel-btn' + (dcState.emfI === i ? ' selected' : '') + '" onclick="dcState.emfI=' + i + ';renderModule(\'dc\')">' + dcFmtI(i) + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(dcState, 'emfI', 'dc', { step: 0.1, fmt: dcFmtI, clamp: { min: 0 } });
+  html += '</div>';
   // Result
   var res = dcCalcEMF(dcState.emfE, dcState.emfRi, dcState.emfI);
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
@@ -25749,25 +25974,37 @@ function renderLysLumen() {
   html += '</div></div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Laengde l [m]', 'Length l [m]') + '</div><div class="select-grid">';
   lengthPresets.forEach(function(v) { html += '<button class="sel-btn' + (lysState.roomLength === v ? ' selected' : '') + '" onclick="lysState.roomLength=' + v + ';renderModule(\'lys\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(lysState, 'roomLength', 'lys', { step: 0.5, fmt: function(v){ return v + ' m'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Bredde b [m]', 'Width b [m]') + '</div><div class="select-grid">';
   widthPresets.forEach(function(v) { html += '<button class="sel-btn' + (lysState.roomWidth === v ? ' selected' : '') + '" onclick="lysState.roomWidth=' + v + ';renderModule(\'lys\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(lysState, 'roomWidth', 'lys', { step: 0.5, fmt: function(v){ return v + ' m'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Montagehoeijde hm [m]', 'Mounting height hm [m]') + '</div><div class="select-grid">';
   heightPresets.forEach(function(v) { html += '<button class="sel-btn' + (lysState.mountHeight === v ? ' selected' : '') + '" onclick="lysState.mountHeight=' + v + ';renderModule(\'lys\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(lysState, 'mountHeight', 'lys', { step: 0.1, fmt: function(v){ return v + ' m'; }, clamp: { min: 0.1 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Loftreflektans', 'Ceiling reflectance') + '</div><div class="select-grid">';
   [0.3, 0.5, 0.7, 0.8].forEach(function(v) { html += '<button class="sel-btn' + (lysState.ceilingRef === v ? ' selected' : '') + '" onclick="lysState.ceilingRef=' + v + ';renderModule(\'lys\')">' + (v*100) + '%</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(lysState, 'ceilingRef', 'lys', { step: 0.05, fmt: function(v){ return (v*100).toFixed(0) + '%'; }, clamp: { min: 0, max: 1 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Vaegreflektans', 'Wall reflectance') + '</div><div class="select-grid">';
   [0.1, 0.3, 0.5, 0.7].forEach(function(v) { html += '<button class="sel-btn' + (lysState.wallRef === v ? ' selected' : '') + '" onclick="lysState.wallRef=' + v + ';renderModule(\'lys\')">' + (v*100) + '%</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(lysState, 'wallRef', 'lys', { step: 0.05, fmt: function(v){ return (v*100).toFixed(0) + '%'; }, clamp: { min: 0, max: 1 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Armaturtype', 'Luminaire type') + '</div><div class="select-grid">';
   Object.keys(LYS_LAMP_TYPES).forEach(function(lt) { var l = LYS_LAMP_TYPES[lt]; html += '<button class="sel-btn' + (lysState.lampType === lt ? ' selected' : '') + '" onclick="lysState.lampType=\'' + lt + '\';renderModule(\'lys\')">' + tx(l.da, l.en) + '</button>'; });
   html += '</div></div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Vedligeholdelsesfaktor MF', 'Maintenance factor MF') + '</div><div class="select-grid">';
   mfPresets.forEach(function(v) { html += '<button class="sel-btn' + (lysState.mf === v ? ' selected' : '') + '" onclick="lysState.mf=' + v + ';renderModule(\'lys\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(lysState, 'mf', 'lys', { step: 0.05, fmt: function(v){ return v.toFixed(2); }, clamp: { min: 0, max: 1 } });
+  html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Kraevet belysning', 'Required illuminance') + '</span><span class="value">' + room.lux + ' lux</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Areal', 'Area') + '</span><span class="value">' + area + ' m\u00B2</span></div>';
@@ -25797,13 +26034,19 @@ function renderLysPoint() {
   var html = '<div class="card fade-in"><div class="card-title">' + tx('Punktbelysning: E = I\u00D7cos\u03B8 / r\u00B2', 'Point Illuminance: E = I\u00D7cos\u03B8 / r\u00B2') + '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Lysstyrke I [cd]', 'Luminous intensity I [cd]') + '</div><div class="select-grid">';
   iPresets.forEach(function(v) { html += '<button class="sel-btn' + (lysState.ptI === v ? ' selected' : '') + '" onclick="lysState.ptI=' + v + ';renderModule(\'lys\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(lysState, 'ptI', 'lys', { step: 10, fmt: function(v){ return v + ' cd'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Hoejde h [m]', 'Height h [m]') + '</div><div class="select-grid">';
   hPresets.forEach(function(v) { html += '<button class="sel-btn' + (lysState.ptH === v ? ' selected' : '') + '" onclick="lysState.ptH=' + v + ';renderModule(\'lys\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(lysState, 'ptH', 'lys', { step: 0.1, fmt: function(v){ return v + ' m'; }, clamp: { min: 0.1 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Vinkel \u03B8 [\u00B0]', 'Angle \u03B8 [\u00B0]') + '</div><div class="select-grid">';
   anglePresets.forEach(function(v) { html += '<button class="sel-btn' + (lysState.ptAngle === v ? ' selected' : '') + '" onclick="lysState.ptAngle=' + v + ';renderModule(\'lys\')">' + v + '\u00B0</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(lysState, 'ptAngle', 'lys', { step: 1, fmt: function(v){ return v + '\u00B0'; }, clamp: { min: 0, max: 89 } });
+  html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">E</span><span class="value" style="font-weight:700">' + E.toFixed(2) + ' lux</span></div>';
   html += '<div class="result-row"><span class="label">r</span><span class="value">' + r.toFixed(2) + ' m</span></div>';
@@ -25902,10 +26145,14 @@ function renderMagnetMMF() {
   var html = '<div class="card fade-in"><div class="card-title">' + tx('MMF: Fm = N x I', 'MMF: Fm = N x I') + '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Vindingstal N', 'Turns N') + '</div><div class="select-grid">';
   nPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.mmfN === v ? ' selected' : '') + '" onclick="magnetState.mmfN=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'mmfN', 'magnet', { step: 10, fmt: function(v){ return '' + v; }, clamp: { min: 1 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Stroem I [A]', 'Current I [A]') + '</div><div class="select-grid">';
   iPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.mmfI === v ? ' selected' : '') + '" onclick="magnetState.mmfI=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'mmfI', 'magnet', { step: 0.1, fmt: function(v){ return v + ' A'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">Fm</span><span class="value" style="font-weight:700">' + Fm + ' A</span></div></div>';
   html += calcDetail({ name: 'MMF', formula: 'Fm = N \u00D7 I', variables: [{ name: 'N', symbol: 'N', value: magnetState.mmfN, unit: tx('vindinger', 'turns') }, { name: 'I', symbol: 'I', value: magnetState.mmfI, unit: 'A' }], substitution: magnetState.mmfN + ' \u00D7 ' + magnetState.mmfI, result: { value: Fm, unit: 'A' }, reference: 'Opgavesamling Kap. 5' });
@@ -25922,10 +26169,14 @@ function renderMagnetFlux() {
   var html = '<div class="card fade-in"><div class="card-title">' + tx('Fluxdensitet: B = Phi/A', 'Flux density: B = Phi/A') + '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Flux [Wb]', 'Flux [Wb]') + '</div><div class="select-grid">';
   phiPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.fluxPhi === v ? ' selected' : '') + '" onclick="magnetState.fluxPhi=' + v + ';renderModule(\'magnet\')">' + (v*1000).toFixed(1) + ' mWb</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'fluxPhi', 'magnet', { step: 0.0001, fmt: function(v){ return (v*1000).toFixed(2) + ' mWb'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Areal A', 'Area A') + '</div><div class="select-grid">';
   areaPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.fluxArea === v ? ' selected' : '') + '" onclick="magnetState.fluxArea=' + v + ';renderModule(\'magnet\')">' + (v*10000).toFixed(1) + ' cm2</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'fluxArea', 'magnet', { step: 0.0001, fmt: function(v){ return (v*10000).toFixed(2) + ' cm2'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">B</span><span class="value" style="font-weight:700">' + B.toFixed(3) + ' T</span></div>';
   html += '<div class="result-row"><span class="label">H</span><span class="value">' + H.toFixed(1) + ' A/m</span></div></div>';
@@ -25950,13 +26201,19 @@ function renderMagnetReluctance() {
   html += '<div class="info-row">' + tx('Bruger N=' + magnetState.mmfN + ', I=' + magnetState.mmfI + ' fra MMF', 'Uses N=' + magnetState.mmfN + ', I=' + magnetState.mmfI + ' from MMF') + '</div>';
   html += '<div class="select-group"><div class="select-label">l [m]</div><div class="select-grid">';
   lengthPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.relLength === v ? ' selected' : '') + '" onclick="magnetState.relLength=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'relLength', 'magnet', { step: 0.05, fmt: function(v){ return v + ' m'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">A</div><div class="select-grid">';
   areaPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.relArea === v ? ' selected' : '') + '" onclick="magnetState.relArea=' + v + ';renderModule(\'magnet\')">' + (v*10000).toFixed(1) + ' cm2</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'relArea', 'magnet', { step: 0.0001, fmt: function(v){ return (v*10000).toFixed(2) + ' cm2'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Luftgab', 'Air gap') + '</div><div class="select-grid">';
   gapPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.relGap === v ? ' selected' : '') + '" onclick="magnetState.relGap=' + v + ';renderModule(\'magnet\')">' + (v === 0 ? '0' : (v*1000).toFixed(1) + 'mm') + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'relGap', 'magnet', { step: 0.0005, fmt: function(v){ return v === 0 ? '0' : (v*1000).toFixed(2) + ' mm'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">Rm_core</span><span class="value">' + Rm_core.toExponential(2) + ' A/Wb</span></div>';
   if (magnetState.relGap > 0) html += '<div class="result-row"><span class="label">Rm_gap</span><span class="value">' + Rm_gap.toExponential(2) + ' A/Wb</span></div>';
@@ -25979,21 +26236,31 @@ function renderMagnetInduction() {
   html += '<div class="result-box" style="background:var(--primary-glow)"><div class="result-title">Faraday: e = N*d\u03A6/dt</div>';
   html += '<div class="select-group"><div class="select-label">N</div><div class="select-grid">';
   nPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.indN === v ? ' selected' : '') + '" onclick="magnetState.indN=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'indN', 'magnet', { step: 10, fmt: function(v){ return '' + v; }, clamp: { min: 1 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">d\u03A6/dt [Wb/s]</div><div class="select-grid">';
   dphiPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.indDphiDt === v ? ' selected' : '') + '" onclick="magnetState.indDphiDt=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'indDphiDt', 'magnet', { step: 0.001, fmt: function(v){ return v + ' Wb/s'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="result-row"><span class="label">e</span><span class="value" style="font-weight:700">' + eFaraday.toFixed(3) + ' V</span></div></div>';
   html += '<div class="result-box"><div class="result-title">e = B*l*v</div>';
   html += '<div class="select-group"><div class="select-label">B [T]</div><div class="select-grid">';
   bPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.indB === v ? ' selected' : '') + '" onclick="magnetState.indB=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'indB', 'magnet', { step: 0.05, fmt: function(v){ return v + ' T'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">l [m]</div><div class="select-grid">';
   lPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.indL === v ? ' selected' : '') + '" onclick="magnetState.indL=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'indL', 'magnet', { step: 0.05, fmt: function(v){ return v + ' m'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">v [m/s]</div><div class="select-grid">';
   vPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.indV === v ? ' selected' : '') + '" onclick="magnetState.indV=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'indV', 'magnet', { step: 0.5, fmt: function(v){ return v + ' m/s'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="result-row"><span class="label">e</span><span class="value" style="font-weight:700">' + eMotional.toFixed(3) + ' V</span></div></div>';
   html += calcDetail({ name: 'Faraday', formula: 'e = N*d\u03A6/dt', variables: [{ name: 'N', symbol: 'N', value: magnetState.indN }, { name: 'd\u03A6/dt', symbol: 'd\u03A6/dt', value: magnetState.indDphiDt, unit: 'Wb/s' }], substitution: magnetState.indN + '*' + magnetState.indDphiDt, result: { value: eFaraday, unit: 'V' }, reference: 'Opgavesamling Kap. 5' });
   html += calcDetail({ name: tx('Bevaegelses-EMF', 'Motional EMF'), formula: 'e = B*l*v', variables: [{ name: 'B', symbol: 'B', value: magnetState.indB, unit: 'T' }, { name: 'l', symbol: 'l', value: magnetState.indL, unit: 'm' }, { name: 'v', symbol: 'v', value: magnetState.indV, unit: 'm/s' }], substitution: magnetState.indB + '*' + magnetState.indL + '*' + magnetState.indV, result: { value: eMotional, unit: 'V' }, reference: 'Opgavesamling Kap. 5' });
@@ -26013,13 +26280,19 @@ function renderMagnetInductance() {
   html += '<div class="info-row">' + tx('Link: XL = 2*pi*f*L (impedansmodul)', 'Link: XL = 2*pi*f*L (impedance module)') + '</div>';
   html += '<div class="select-group"><div class="select-label">N</div><div class="select-grid">';
   nPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.inductN === v ? ' selected' : '') + '" onclick="magnetState.inductN=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'inductN', 'magnet', { step: 10, fmt: function(v){ return '' + v; }, clamp: { min: 1 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">l [m]</div><div class="select-grid">';
   lengthPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.inductLength === v ? ' selected' : '') + '" onclick="magnetState.inductLength=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'inductLength', 'magnet', { step: 0.05, fmt: function(v){ return v + ' m'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">A</div><div class="select-grid">';
   areaPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.inductArea === v ? ' selected' : '') + '" onclick="magnetState.inductArea=' + v + ';renderModule(\'magnet\')">' + (v*10000).toFixed(1) + ' cm2</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'inductArea', 'magnet', { step: 0.0001, fmt: function(v){ return (v*10000).toFixed(2) + ' cm2'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">L</span><span class="value" style="font-weight:700">' + (L >= 1 ? L.toFixed(3) + ' H' : L >= 0.001 ? (L*1000).toFixed(2) + ' mH' : (L*1e6).toFixed(1) + ' uH') + '</span></div>';
   html += '<div class="result-row"><span class="label">XL (50Hz)</span><span class="value">' + XL.toFixed(3) + ' \u03A9</span></div></div>';
@@ -26037,13 +26310,19 @@ function renderMagnetForce() {
   var html = '<div class="card fade-in"><div class="card-title">' + tx('Kraft: F = B*I*l', 'Force: F = B*I*l') + '</div>';
   html += '<div class="select-group"><div class="select-label">B [T]</div><div class="select-grid">';
   bPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.forceB === v ? ' selected' : '') + '" onclick="magnetState.forceB=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'forceB', 'magnet', { step: 0.05, fmt: function(v){ return v + ' T'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">I [A]</div><div class="select-grid">';
   iPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.forceI === v ? ' selected' : '') + '" onclick="magnetState.forceI=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'forceI', 'magnet', { step: 0.5, fmt: function(v){ return v + ' A'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">l [m]</div><div class="select-grid">';
   lPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.forceL === v ? ' selected' : '') + '" onclick="magnetState.forceL=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'forceL', 'magnet', { step: 0.05, fmt: function(v){ return v + ' m'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">F</span><span class="value" style="font-weight:700">' + F.toFixed(3) + ' N</span></div></div>';
   html += calcDetail({ name: tx('Lorentz-kraft', 'Lorentz force'), formula: 'F = B*I*l', variables: [{ name: 'B', symbol: 'B', value: magnetState.forceB, unit: 'T' }, { name: 'I', symbol: 'I', value: magnetState.forceI, unit: 'A' }, { name: 'l', symbol: 'l', value: magnetState.forceL, unit: 'm' }], substitution: magnetState.forceB + '*' + magnetState.forceI + '*' + magnetState.forceL, result: { value: F, unit: 'N' }, reference: 'Opgavesamling Kap. 5' });
@@ -26058,10 +26337,14 @@ function renderMagnetEnergy() {
   var html = '<div class="card fade-in"><div class="card-title">' + tx('Energi: W = 0.5*L*I2', 'Energy: W = 0.5*L*I2') + '</div>';
   html += '<div class="select-group"><div class="select-label">L [H]</div><div class="select-grid">';
   lPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.energyL === v ? ' selected' : '') + '" onclick="magnetState.energyL=' + v + ';renderModule(\'magnet\')">' + (v >= 1 ? v + ' H' : v >= 0.001 ? (v*1000) + ' mH' : (v*1e6) + ' uH') + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'energyL', 'magnet', { step: 0.001, fmt: function(v){ return v >= 1 ? v + ' H' : (v*1000).toFixed(2) + ' mH'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">I [A]</div><div class="select-grid">';
   iPresets.forEach(function(v) { html += '<button class="sel-btn' + (magnetState.energyI === v ? ' selected' : '') + '" onclick="magnetState.energyI=' + v + ';renderModule(\'magnet\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(magnetState, 'energyI', 'magnet', { step: 0.5, fmt: function(v){ return v + ' A'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">W</span><span class="value" style="font-weight:700">' + (W >= 1 ? W.toFixed(2) + ' J' : (W*1000).toFixed(3) + ' mJ') + '</span></div></div>';
   html += calcDetail({ name: tx('Magnetisk energi', 'Magnetic energy'), formula: 'W = 0.5*L*I2', variables: [{ name: 'L', symbol: 'L', value: magnetState.energyL, unit: 'H' }, { name: 'I', symbol: 'I', value: magnetState.energyI, unit: 'A' }], substitution: '0.5*' + magnetState.energyL + '*' + magnetState.energyI + '2', result: { value: W, unit: 'J' }, reference: 'Opgavesamling Kap. 5' });
@@ -26156,10 +26439,14 @@ function renderKapacitorC() {
   html += '</div></div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Pladeareal A', 'Plate area A') + '</div><div class="select-grid">';
   areaPresets.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState.area === v ? ' selected' : '') + '" onclick="kapacitorState.area=' + v + ';renderModule(\'kapacitor\')">' + (v * 10000).toFixed(0) + ' cm\u00B2</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(kapacitorState, 'area', 'kapacitor', { step: 0.0001, fmt: function(v){ return (v*10000).toFixed(1) + ' cm\u00B2'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Pladeafstand d', 'Plate distance d') + '</div><div class="select-grid">';
   distPresets.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState.dist === v ? ' selected' : '') + '" onclick="kapacitorState.dist=' + v + ';renderModule(\'kapacitor\')">' + (v * 1000).toFixed(1) + ' mm</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(kapacitorState, 'dist', 'kapacitor', { step: 0.0001, fmt: function(v){ return (v*1000).toFixed(2) + ' mm'; }, clamp: { min: 0.00001 }, prec: 9 });
+  html += '</div>';
   var XC50 = kapacitorCalcXC(50, C);
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">C</span><span class="value" style="font-weight:700">' + impedansFmtC(C) + '</span></div>';
@@ -26178,10 +26465,14 @@ function renderKapacitorCharge() {
   var html = '<div class="card fade-in"><div class="card-title">' + tx('Ladning & energi: Q = C\u00B7U, W = \u00BD\u00B7C\u00B7U\u00B2', 'Charge & energy: Q = C\u00B7U, W = \u00BD\u00B7C\u00B7U\u00B2') + '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Kapacitans C', 'Capacitance C') + '</div><div class="select-grid">';
   IMPEDANS_C_PRESETS.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState.C === v ? ' selected' : '') + '" onclick="kapacitorState.C=' + v + ';SharedQuantities.set(\'capacitance_F\',' + v + ',\'kapacitor\');renderModule(\'kapacitor\')">' + impedansFmtC(v) + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(kapacitorState, 'C', 'kapacitor', { step: 0.000000001, fmt: impedansFmtC, clamp: { min: 0 }, prec: 15 });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Sp\u00E6nding U [V]', 'Voltage U [V]') + '</div><div class="select-grid">';
   IMPEDANS_U_PRESETS.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState.U === v ? ' selected' : '') + '" onclick="kapacitorState.U=' + v + ';renderModule(\'kapacitor\')">' + v + ' V</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(kapacitorState, 'U', 'kapacitor', { step: 1, fmt: function(p){ return p + ' V'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">Q</span><span class="value" style="font-weight:700">' + kapacitorFmtQ(Q) + '</span></div>';
   html += '<div class="result-row"><span class="label">W</span><span class="value" style="font-weight:700">' + (W >= 1 ? W.toFixed(3) + ' J' : (W * 1000).toFixed(3) + ' mJ') + '</span></div></div>';
@@ -26208,7 +26499,9 @@ function renderKapacitorCombo() {
     html += '<div class="select-group"><div class="select-label">' + label + '</div><div class="select-grid">';
     if (idx === 2) html += '<button class="sel-btn' + (kapacitorState.c3 === 0 ? ' selected' : '') + '" onclick="kapacitorState.c3=0;renderModule(\'kapacitor\')">0</button>';
     presets.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState[key] === v ? ' selected' : '') + '" onclick="kapacitorState.' + key + '=' + v + ';renderModule(\'kapacitor\')">' + impedansFmtC(v) + '</button>'; });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(kapacitorState, key, 'kapacitor', { step: 0.000000001, fmt: impedansFmtC, clamp: { min: 0 }, prec: 15 });
+    html += '</div>';
   });
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">C_total</span><span class="value" style="font-weight:700">' + impedansFmtC(Cres) + '</span></div></div>';
@@ -26232,16 +26525,24 @@ function renderKapacitorRC() {
   var html = '<div class="card fade-in"><div class="card-title">' + tx('RC-tidskonstant: \u03C4 = R\u00B7C', 'RC time constant: \u03C4 = R\u00B7C') + '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Modstand R [\u03A9]', 'Resistance R [\u03A9]') + '</div><div class="select-grid">';
   rPresets.forEach(function(v) { var label = v >= 1000 ? (v / 1000) + 'k' : v + ''; html += '<button class="sel-btn' + (kapacitorState.R === v ? ' selected' : '') + '" onclick="kapacitorState.R=' + v + ';renderModule(\'kapacitor\')">' + label + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(kapacitorState, 'R', 'kapacitor', { step: 1, fmt: function(v){ return v >= 1000 ? (v/1000) + ' k\u03A9' : v + ' \u03A9'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Kapacitans C', 'Capacitance C') + '</div><div class="select-grid">';
   cPresets.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState.C === v ? ' selected' : '') + '" onclick="kapacitorState.C=' + v + ';SharedQuantities.set(\'capacitance_F\',' + v + ',\'kapacitor\');renderModule(\'kapacitor\')">' + impedansFmtC(v) + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(kapacitorState, 'C', 'kapacitor', { step: 0.000000001, fmt: impedansFmtC, clamp: { min: 0 }, prec: 15 });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Sp\u00E6nding U [V]', 'Voltage U [V]') + '</div><div class="select-grid">';
   IMPEDANS_U_PRESETS.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState.U === v ? ' selected' : '') + '" onclick="kapacitorState.U=' + v + ';renderModule(\'kapacitor\')">' + v + ' V</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(kapacitorState, 'U', 'kapacitor', { step: 1, fmt: function(p){ return p + ' V'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Tid t [s]', 'Time t [s]') + '</div><div class="select-grid">';
   tPresets.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState.t === v ? ' selected' : '') + '" onclick="kapacitorState.t=' + v + ';renderModule(\'kapacitor\')">' + (v >= 1 ? v + ' s' : (v * 1000) + ' ms') + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(kapacitorState, 't', 'kapacitor', { step: 0.0001, fmt: function(v){ return v >= 1 ? v + ' s' : (v*1000).toFixed(2) + ' ms'; }, clamp: { min: 0 }, prec: 9 });
+  html += '</div>';
   var nTau = (tau > 0) ? kapacitorState.t / tau : 0;
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">\u03C4 (' + tx('tidskonstant', 'time constant') + ')</span><span class="value" style="font-weight:700">' + impedansFmtEng(tau, 's') + '</span></div>';
@@ -26263,11 +26564,15 @@ function renderKapacitorCoulomb() {
   ['q1', 'q2'].forEach(function(key, idx) {
     html += '<div class="select-group"><div class="select-label">Q' + (idx === 0 ? '\u2081' : '\u2082') + ' [C]</div><div class="select-grid">';
     qPresets.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState[key] === v ? ' selected' : '') + '" onclick="kapacitorState.' + key + '=' + v + ';renderModule(\'kapacitor\')">' + kapacitorFmtQ(v) + '</button>'; });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(kapacitorState, key, 'kapacitor', { step: 0.000000001, fmt: kapacitorFmtQ, clamp: { min: 0 }, prec: 15 });
+    html += '</div>';
   });
   html += '<div class="select-group"><div class="select-label">' + tx('Afstand r [m]', 'Distance r [m]') + '</div><div class="select-grid">';
   rPresets.forEach(function(v) { html += '<button class="sel-btn' + (kapacitorState.r === v ? ' selected' : '') + '" onclick="kapacitorState.r=' + v + ';renderModule(\'kapacitor\')">' + v + ' m</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(kapacitorState, 'r', 'kapacitor', { step: 0.01, fmt: function(v){ return v + ' m'; }, clamp: { min: 0.001 } });
+  html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">F</span><span class="value" style="font-weight:700">' + impedansFmtEng(F, 'N') + '</span></div></div>';
   html += calcDetail({ name: tx('Coulomb-kraft', 'Coulomb force'), formula: 'F = Q\u2081\u00B7Q\u2082/(4\u03C0\u03B5\u2080\u00B7r\u00B2)', variables: [{ name: 'Q\u2081', symbol: 'Q\u2081', value: kapacitorState.q1, unit: 'C' }, { name: 'Q\u2082', symbol: 'Q\u2082', value: kapacitorState.q2, unit: 'C' }, { name: 'r', symbol: 'r', value: kapacitorState.r, unit: 'm' }, { name: 'k', symbol: 'k', value: KAP_COULOMB_K, unit: 'N\u00B7m\u00B2/C\u00B2' }], substitution: kapacitorState.q1.toExponential(2) + ' \u00D7 ' + kapacitorState.q2.toExponential(2) + ' / (4\u03C0 \u00D7 ' + PHYS_CONST.EPS0.value + ' \u00D7 ' + kapacitorState.r + '\u00B2)', result: { value: F, unit: 'N' }, reference: 'Opgavesamling Kap. 4' });
@@ -26379,7 +26684,9 @@ function varmeRenderLayerSelectors(html) {
   var RuPresets = [0.04, 0.10, 0.13];
   html += '<div class="select-group"><div class="select-label">' + tx('Indvendig overgangsmodstand R\u1D62', 'Internal surface resistance R\u1D62') + '</div><div class="select-grid">';
   RiPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.Ri === v ? ' selected' : '') + '" onclick="varmeState.Ri=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(varmeState, 'Ri', 'varme', { step: 0.01, fmt: function(v){ return v.toFixed(2) + ' m\u00B2K/W'; }, clamp: { min: 0 } });
+  html += '</div>';
   ['1', '2', '3'].forEach(function(idx) {
     var matKey = 'l' + idx + 'mat', dKey = 'l' + idx + 'd';
     html += '<div class="select-group"><div class="select-label">' + tx('Lag ' + idx + ' materiale (\u03BB)', 'Layer ' + idx + ' material (\u03BB)') + '</div><div class="select-grid">';
@@ -26387,11 +26694,15 @@ function varmeRenderLayerSelectors(html) {
     html += '</div></div>';
     html += '<div class="select-group"><div class="select-label">' + tx('Lag ' + idx + ' tykkelse d', 'Layer ' + idx + ' thickness d') + '</div><div class="select-grid">';
     dPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState[dKey] === v ? ' selected' : '') + '" onclick="varmeState.' + dKey + '=' + v + ';renderModule(\'varme\')">' + (v === 0 ? '0' : (v * 1000).toFixed(0) + ' mm') + '</button>'; });
-    html += '</div></div>';
+    html += '</div>';
+    html += valStep(varmeState, dKey, 'varme', { step: 0.005, fmt: function(v){ return v === 0 ? '0' : (v*1000).toFixed(1) + ' mm'; }, clamp: { min: 0 } });
+    html += '</div>';
   });
   html += '<div class="select-group"><div class="select-label">' + tx('Udvendig overgangsmodstand R\u1D64', 'External surface resistance R\u1D64') + '</div><div class="select-grid">';
   RuPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.Ru === v ? ' selected' : '') + '" onclick="varmeState.Ru=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(varmeState, 'Ru', 'varme', { step: 0.01, fmt: function(v){ return v.toFixed(2) + ' m\u00B2K/W'; }, clamp: { min: 0 } });
+  html += '</div>';
   return html;
 }
 
@@ -26434,13 +26745,19 @@ function renderVarmeTransmission() {
   html += '<div class="info-row">' + tx('Bruger U = ' + U.toFixed(3) + ' W/m\u00B2K fra konstruktionen ovenfor.', 'Uses U = ' + U.toFixed(3) + ' W/m\u00B2K from the construction above.') + '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Areal A [m\u00B2]', 'Area A [m\u00B2]') + '</div><div class="select-grid">';
   APresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.A === v ? ' selected' : '') + '" onclick="varmeState.A=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(varmeState, 'A', 'varme', { step: 1, fmt: function(v){ return v + ' m\u00B2'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Indetemperatur', 'Indoor temperature') + '</div><div class="select-grid">';
   TinPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.Tin === v ? ' selected' : '') + '" onclick="varmeState.Tin=' + v + ';renderModule(\'varme\')">' + v + '\u00B0C</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(varmeState, 'Tin', 'varme', { step: 1, fmt: function(v){ return v + '\u00B0C'; }, clamp: { min: null } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Udetemperatur', 'Outdoor temperature') + '</div><div class="select-grid">';
   ToutPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.Tout === v ? ' selected' : '') + '" onclick="varmeState.Tout=' + v + ';renderModule(\'varme\')">' + v + '\u00B0C</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(varmeState, 'Tout', 'varme', { step: 1, fmt: function(v){ return v + '\u00B0C'; }, clamp: { min: null } });
+  html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">\u0394T</span><span class="value">' + dT + ' K</span></div>';
   html += '<div class="result-row"><span class="label">Q</span><span class="value" style="font-weight:700">' + Q.toFixed(1) + ' W</span></div></div>';
@@ -26459,16 +26776,24 @@ function renderVarmeVentilation() {
   var html = '<div class="card fade-in"><div class="card-title">' + tx('Ventilationstab: Q = 0.33\u00B7n\u00B7V\u00B7\u0394T', 'Ventilation loss: Q = 0.33\u00B7n\u00B7V\u00B7\u0394T') + '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Luftskifte n [1/h]', 'Air change rate n [1/h]') + '</div><div class="select-grid">';
   nPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.n === v ? ' selected' : '') + '" onclick="varmeState.n=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(varmeState, 'n', 'varme', { step: 0.1, fmt: function(v){ return v + ' /h'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Rumvolumen V [m\u00B3]', 'Room volume V [m\u00B3]') + '</div><div class="select-grid">';
   VPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.V === v ? ' selected' : '') + '" onclick="varmeState.V=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(varmeState, 'V', 'varme', { step: 1, fmt: function(v){ return v + ' m\u00B3'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Indetemperatur', 'Indoor temperature') + '</div><div class="select-grid">';
   TinPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.Tin === v ? ' selected' : '') + '" onclick="varmeState.Tin=' + v + ';renderModule(\'varme\')">' + v + '\u00B0C</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(varmeState, 'Tin', 'varme', { step: 1, fmt: function(v){ return v + '\u00B0C'; }, clamp: { min: null } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Udetemperatur', 'Outdoor temperature') + '</div><div class="select-grid">';
   ToutPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.Tout === v ? ' selected' : '') + '" onclick="varmeState.Tout=' + v + ';renderModule(\'varme\')">' + v + '\u00B0C</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(varmeState, 'Tout', 'varme', { step: 1, fmt: function(v){ return v + '\u00B0C'; }, clamp: { min: null } });
+  html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">\u0394T</span><span class="value">' + dT + ' K</span></div>';
   html += '<div class="result-row"><span class="label">Q_vent</span><span class="value" style="font-weight:700">' + Qv.toFixed(1) + ' W</span></div></div>';
@@ -26492,16 +26817,24 @@ function renderVarmeTotal() {
   html += '<div class="info-row">' + tx('Bruger U = ' + U.toFixed(3) + ' W/m\u00B2K fra konstruktionen.', 'Uses U = ' + U.toFixed(3) + ' W/m\u00B2K from the construction.') + '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Areal A [m\u00B2]', 'Area A [m\u00B2]') + '</div><div class="select-grid">';
   APresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.A === v ? ' selected' : '') + '" onclick="varmeState.A=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(varmeState, 'A', 'varme', { step: 1, fmt: function(v){ return v + ' m\u00B2'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Luftskifte n [1/h]', 'Air change rate n [1/h]') + '</div><div class="select-grid">';
   nPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.n === v ? ' selected' : '') + '" onclick="varmeState.n=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(varmeState, 'n', 'varme', { step: 0.1, fmt: function(v){ return v + ' /h'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Rumvolumen V [m\u00B3]', 'Room volume V [m\u00B3]') + '</div><div class="select-grid">';
   VPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.V === v ? ' selected' : '') + '" onclick="varmeState.V=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(varmeState, 'V', 'varme', { step: 1, fmt: function(v){ return v + ' m\u00B3'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Udetemperatur', 'Outdoor temperature') + '</div><div class="select-grid">';
   ToutPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.Tout === v ? ' selected' : '') + '" onclick="varmeState.Tout=' + v + ';renderModule(\'varme\')">' + v + '\u00B0C</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(varmeState, 'Tout', 'varme', { step: 1, fmt: function(v){ return v + '\u00B0C'; }, clamp: { min: null } });
+  html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">Q_trans</span><span class="value">' + Qtrans.toFixed(1) + ' W</span></div>';
   html += '<div class="result-row"><span class="label">Q_vent</span><span class="value">' + Qvent.toFixed(1) + ' W</span></div>';
@@ -26532,13 +26865,19 @@ function renderVarmeEnergy() {
   html += '</div></div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Masse m [kg]', 'Mass m [kg]') + '</div><div class="select-grid">';
   massPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.mass === v ? ' selected' : '') + '" onclick="varmeState.mass=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(varmeState, 'mass', 'varme', { step: 1, fmt: function(v){ return v + ' kg'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Temperaturstigning \u0394T [K]', 'Temperature rise \u0394T [K]') + '</div><div class="select-grid">';
   dTPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.dTheat === v ? ' selected' : '') + '" onclick="varmeState.dTheat=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(varmeState, 'dTheat', 'varme', { step: 1, fmt: function(v){ return v + ' K'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Effekt P [W]', 'Power P [W]') + '</div><div class="select-grid">';
   PPresets.forEach(function(v) { html += '<button class="sel-btn' + (varmeState.Pheat === v ? ' selected' : '') + '" onclick="varmeState.Pheat=' + v + ';renderModule(\'varme\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(varmeState, 'Pheat', 'varme', { step: 100, fmt: function(v){ return v >= 1000 ? (v/1000) + ' kW' : v + ' W'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">Q</span><span class="value" style="font-weight:700">' + (Q / 1000).toFixed(1) + ' kJ (' + Q.toFixed(0) + ' J)</span></div>';
   html += '<div class="result-row"><span class="label">t</span><span class="value">' + tHeat.toFixed(0) + ' s (' + (tHeat / 60).toFixed(1) + ' min)</span></div>';
@@ -26658,7 +26997,11 @@ function dcmaskineCommonSelectors(html, keys) {
   keys.forEach(function(k) {
     html += '<div class="select-group"><div class="select-label">' + labels[k] + '</div><div class="select-grid">';
     P[k].forEach(function(v) { html += '<button class="sel-btn' + (dcmaskineState[k] === v ? ' selected' : '') + '" onclick="dcmaskineState.' + k + '=' + v + ';renderModule(\'dcmaskine\')">' + v + '</button>'; });
-    html += '</div></div>';
+    html += '</div>';
+    var STEP = { U: 1, Ia: 1, Ra: 0.01, Ubrush: 0.5, Rf: 1 };
+    var UNIT = { U: 'V', Ia: 'A', Ra: '\u03A9', Ubrush: 'V', Rf: '\u03A9' };
+    html += valStep(dcmaskineState, k, 'dcmaskine', { step: STEP[k] || 1, unit: UNIT[k] || '', clamp: { min: 0 } });
+    html += '</div>';
   });
   return html;
 }
@@ -26701,10 +27044,14 @@ function renderDcmaskineTorque() {
   var html = '<div class="card fade-in"><div class="card-title">' + tx('Moment: M = 9.55\u00B7P/n', 'Torque: M = 9.55\u00B7P/n') + '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Effekt P [W]', 'Power P [W]') + '</div><div class="select-grid">';
   PPresets.forEach(function(v) { html += '<button class="sel-btn' + (dcmaskineState.Pmech === v ? ' selected' : '') + '" onclick="dcmaskineState.Pmech=' + v + ';SharedQuantities.set(\'motor_power_w\',' + v + ',\'dcmaskine\');renderModule(\'dcmaskine\')">' + (v >= 1000 ? (v / 1000) + ' kW' : v + ' W') + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(dcmaskineState, 'Pmech', 'dcmaskine', { step: 100, fmt: function(v){ return v >= 1000 ? (v/1000) + ' kW' : v + ' W'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Omdrejninger n [o/min]', 'Speed n [rpm]') + '</div><div class="select-grid">';
   nPresets.forEach(function(v) { html += '<button class="sel-btn' + (dcmaskineState.n === v ? ' selected' : '') + '" onclick="dcmaskineState.n=' + v + ';renderModule(\'dcmaskine\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(dcmaskineState, 'n', 'dcmaskine', { step: 10, fmt: function(v){ return v + ' o/min'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">M</span><span class="value" style="font-weight:700">' + M.toFixed(2) + ' Nm</span></div></div>';
   html += calcDetail({ name: tx('Aksiale moment', 'Shaft torque'), formula: 'M = 9.55\u00B7P/n', variables: [{ name: 'P', symbol: 'P', value: dcmaskineState.Pmech, unit: 'W', source: tx('Delt v\u00E6rdi', 'Shared value') }, { name: 'n', symbol: 'n', value: dcmaskineState.n, unit: 'o/min' }, { name: tx('Momentkonstant', 'Torque constant'), symbol: PHYS_CONST.TORQUE_K.symbol, value: PHYS_CONST.TORQUE_K.value, unit: PHYS_CONST.TORQUE_K.unit, source: PHYS_CONST.TORQUE_K.source }], substitution: PHYS_CONST.TORQUE_K.value + ' \u00D7 ' + dcmaskineState.Pmech + ' / ' + dcmaskineState.n, result: { value: M, unit: 'Nm' }, reference: 'Opgavesamling Kap. 10' });
@@ -26721,7 +27068,9 @@ function renderDcmaskineStarter() {
   html = dcmaskineCommonSelectors(html, ['U', 'Ia']);
   html += '<div class="select-group"><div class="select-label">' + tx('Mod-EMK E ved start [V]', 'Back-EMF E at start [V]') + '</div><div class="select-grid">';
   EPresets.forEach(function(v) { html += '<button class="sel-btn' + (dcmaskineState.E === v ? ' selected' : '') + '" onclick="dcmaskineState.E=' + v + ';renderModule(\'dcmaskine\')">' + v + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(dcmaskineState, 'E', 'dcmaskine', { step: 1, fmt: function(v){ return v + ' V'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">Rs</span><span class="value" style="font-weight:700">' + Rs.toFixed(3) + ' \u03A9</span></div></div>';
   html += calcDetail({ name: tx('Startmodstand', 'Starting resistor'), formula: 'Rs = (U \u2212 E)/Ia', variables: [{ name: 'U', symbol: 'U', value: dcmaskineState.U, unit: 'V' }, { name: 'E', symbol: 'E', value: E, unit: 'V' }, { name: 'Ia', symbol: 'Ia', value: dcmaskineState.Ia, unit: 'A' }], substitution: '(' + dcmaskineState.U + ' \u2212 ' + E + ') / ' + dcmaskineState.Ia, result: { value: Rs, unit: '\u03A9' }, reference: 'Opgavesamling Kap. 10' });
@@ -26737,10 +27086,14 @@ function renderDcmaskineEfficiency() {
   var html = '<div class="card fade-in"><div class="card-title">' + tx('Virkningsgrad: \u03B7 = P_ud/P_ind', 'Efficiency: \u03B7 = P_out/P_in') + '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Afgivet effekt P_ud [W]', 'Output power P_out [W]') + '</div><div class="select-grid">';
   PoutPresets.forEach(function(v) { html += '<button class="sel-btn' + (dcmaskineState.Pout === v ? ' selected' : '') + '" onclick="dcmaskineState.Pout=' + v + ';SharedQuantities.set(\'load_power_kw\',' + (v / 1000) + ',\'dcmaskine\');renderModule(\'dcmaskine\')">' + (v >= 1000 ? (v / 1000) + ' kW' : v + ' W') + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(dcmaskineState, 'Pout', 'dcmaskine', { step: 100, fmt: function(v){ return v >= 1000 ? (v/1000) + ' kW' : v + ' W'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="select-group"><div class="select-label">' + tx('Tilf\u00F8rt effekt P_ind [W]', 'Input power P_in [W]') + '</div><div class="select-grid">';
   PinPresets.forEach(function(v) { html += '<button class="sel-btn' + (dcmaskineState.Pin === v ? ' selected' : '') + '" onclick="dcmaskineState.Pin=' + v + ';renderModule(\'dcmaskine\')">' + (v >= 1000 ? (v / 1000) + ' kW' : v + ' W') + '</button>'; });
-  html += '</div></div>';
+  html += '</div>';
+  html += valStep(dcmaskineState, 'Pin', 'dcmaskine', { step: 100, fmt: function(v){ return v >= 1000 ? (v/1000) + ' kW' : v + ' W'; }, clamp: { min: 0 } });
+  html += '</div>';
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">\u03B7</span><span class="value" style="font-weight:700">' + (eta * 100).toFixed(2) + ' %</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Tab', 'Losses') + '</span><span class="value">' + losses.toFixed(0) + ' W</span></div></div>';
