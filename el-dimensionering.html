@@ -2438,6 +2438,11 @@ const _FA = {
   'SELECTIVE UP TO': 'انتخاب‌پذیر تا',
   'NOT SELECTIVE': 'غیر انتخاب‌پذیر',
   'UNRESOLVED': 'حل‌نشده',
+  'Upstream Curve': 'منحنی بالادست',
+  'Downstream Curve': 'منحنی پایین‌دست',
+  'Upstream Rating [A]': 'جریان نامی بالادست [A]',
+  'Downstream Rating [A]': 'جریان نامی پایین‌دست [A]',
+  'Diagram is illustrative - use manufacturer data for final verification': 'نمودار تقریبی است - از داده‌های سازنده برای تایید نهایی استفاده کنید',
   // Earthing System module
   'Earthing System Design': 'طراحی سیستم ارتینگ',
   'Earth Electrode': 'الکترود زمین',
@@ -18284,6 +18289,7 @@ function renderGenerator() {
 var discrimState = {
   upstreamType: 'fuse',
   upstreamRating: 100,
+  upstreamCurve: 'C',
   downstreamType: 'mcb',
   downstreamRating: 16,
   downstreamCurve: 'C',
@@ -18307,7 +18313,7 @@ var DISCRIM_SELECTIVITY_TABLES = {
     '80_50': 15000, '125_63': 25000, '125_80': 18000
   },
   'fuse_mcb': {
-    '25_6_B': 6000, '25_10_B': 4000, '32_10_B': 6000, '32_16_B': 4000,
+    '25_6_B': 6000, '25_10_B': 4000, '25_16_C': 3000, '32_10_B': 6000, '32_16_B': 4000,
     '32_16_C': 3000, '40_16_B': 10000, '40_16_C': 6000, '50_16_B': 15000,
     '50_16_C': 10000, '50_20_C': 6000, '50_25_C': 4000, '63_16_B': 20000,
     '63_16_C': 15000, '63_20_C': 10000, '63_25_C': 6000, '63_32_C': 4000,
@@ -18330,7 +18336,7 @@ var DISCRIM_SELECTIVITY_TABLES = {
   }
 };
 
-function discrimEngine(upType, upRating, downType, downRating, downCurve, ikMax) {
+function discrimEngine(upType, upRating, downType, downRating, downCurve, ikMax, upCurve) {
   var result = {
     verdict: 'unresolved', is: null, ratio: upRating / downRating,
     i2tUp: null, i2tDown: null, recommendation: '', citation: '', chartData: null
@@ -18356,8 +18362,11 @@ function discrimEngine(upType, upRating, downType, downRating, downCurve, ikMax)
     result.citation = 'IEC 60947-2 Annex A + manufacturer table';
   } else if (upType === 'mcb' && downType === 'mcb') {
     // Key format: upRating_downRating_upCurve_downCurve
-    // Upstream curve assumed C unless upstream is D (use C as default)
-    var upCurves = ['C', 'D'];
+    // Use provided upCurve first, then try other curves as fallback
+    var upCurves = upCurve ? [upCurve] : ['B', 'C', 'D'];
+    if (upCurve && upCurves.indexOf('B') < 0) upCurves.push('B');
+    if (upCurve && upCurves.indexOf('C') < 0) upCurves.push('C');
+    if (upCurve && upCurves.indexOf('D') < 0) upCurves.push('D');
     for (var ci = 0; ci < upCurves.length; ci++) {
       var dCurve = downCurve || 'B';
       tableKey = upRating + '_' + downRating + '_' + upCurves[ci] + '_' + dCurve;
@@ -18414,15 +18423,7 @@ function discrimEngine(upType, upRating, downType, downRating, downCurve, ikMax)
   result.i2tDown = i2tDown;
 
   // Verdict based on Is vs Ik_max comparison
-  // For fuse-fuse with ratio < 1.6, Is from table may be very low (e.g., 3000 for 32/25)
-  if (upType === 'fuse' && downType === 'fuse' && result.ratio < 1.6) {
-    // Not selective: energy curves cross at low currents
-    result.verdict = 'none';
-    result.recommendation = tx(
-      'Ikke selektiv: forholdet ' + result.ratio.toFixed(2) + ':1 < 1.6:1. Oeg opstroems sikring til min. ' + Math.ceil(downRating * 1.6) + ' A',
-      'Not selective: ratio ' + result.ratio.toFixed(2) + ':1 < 1.6:1. Increase upstream fuse to min. ' + Math.ceil(downRating * 1.6) + ' A'
-    );
-  } else if (isValue >= ikMax) {
+  if (isValue >= ikMax) {
     result.verdict = 'full';
     result.recommendation = tx(
       'Fuld selektivitet: Is = ' + (isValue / 1000) + ' kA >= Ik_max = ' + (ikMax / 1000) + ' kA',
@@ -18588,7 +18589,7 @@ function discrimRenderChart(chartData) {
 }
 
 function renderDiscrim() {
-  var analysis = discrimEngine(discrimState.upstreamType, discrimState.upstreamRating, discrimState.downstreamType, discrimState.downstreamRating, discrimState.downstreamCurve, discrimState.ikMax);
+  var analysis = discrimEngine(discrimState.upstreamType, discrimState.upstreamRating, discrimState.downstreamType, discrimState.downstreamRating, discrimState.downstreamCurve, discrimState.ikMax, discrimState.upstreamCurve);
 
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Selektivitetsanalyse (I2t koordinering)', 'Discrimination Analysis (I2t Coordination)') + '</div>';
@@ -18618,6 +18619,15 @@ function renderDiscrim() {
     html += '<button class="sel-btn' + (discrimState.upstreamRating === r ? ' selected' : '') + '" onclick="discrimState.upstreamRating=' + r + ';renderModule(\'discrim\')">' + r + '</button>';
   });
   html += '</div></div>';
+
+  // Upstream curve (only for MCB)
+  if (discrimState.upstreamType === 'mcb') {
+    html += '<div class="select-group"><div class="select-label">' + tx('Opstrøms kurve', 'Upstream Curve') + '</div><div class="select-grid">';
+    ['B','C','D'].forEach(function(c) {
+      html += '<button class="sel-btn' + (discrimState.upstreamCurve === c ? ' selected' : '') + '" onclick="discrimState.upstreamCurve=\'' + c + '\';renderModule(\'discrim\')">' + c + '</button>';
+    });
+    html += '</div></div>';
+  }
 
   // Downstream device type
   html += '<div class="select-group"><div class="select-label">' + tx('Nedstrøms enhed', 'Downstream Device') + '</div><div class="select-grid">';
@@ -18683,6 +18693,7 @@ function renderDiscrim() {
   if (analysis.chartData) {
     html += '<div class="result-box"><div class="result-title">' + tx('I2t Energidiagram', 'I2t Energy Diagram') + '</div>';
     html += '<div style="text-align:center;margin:8px 0">' + discrimRenderChart(analysis.chartData) + '</div>';
+    html += '<div style="text-align:center;font-size:0.85em;color:#666;margin-top:4px;font-style:italic">' + tx('Diagram er illustrativt - brug fabrikantdata til endelig verifikation', 'Diagram is illustrative - use manufacturer data for final verification') + '</div>';
     html += '</div>';
   }
 

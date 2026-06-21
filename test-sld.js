@@ -5172,10 +5172,10 @@ test('discrimAnalyze: fuse 100A vs fuse 50A = full (ratio 2.0)', function() {
 });
 
 // Test 509: Fuse-Fuse not selective (ratio < 1.6)
-test('discrimAnalyze: fuse 63A vs fuse 50A = partial (ratio 1.26)', function() {
-  // 63/50 ratio = 1.26 < 1.6, not in table -> unresolved (conservative)
+test('discrimAnalyze: fuse 63A vs fuse 50A = unresolved (no table entry)', function() {
+  // 63/50 not in table -> unresolved (conservative)
   var result = discrimEngine('fuse', 63, 'fuse', 50, null, 10000);
-  assert(result.verdict === 'unresolved' || result.verdict === 'none', 'ratio < 1.6 or no data -> none or unresolved');
+  assert.strictEqual(result.verdict, 'unresolved', 'no 63/50 entry -> unresolved');
 });
 
 // Test 510: Fuse-MCB full selectivity (table lookup)
@@ -5185,11 +5185,12 @@ test('discrimAnalyze: fuse 63A vs MCB 25A = full (ratio 2.52)', function() {
   assert.strictEqual(result.is, 6000);
 });
 
-// Test 511: Fuse-MCB (no table entry or partial)
-test('discrimAnalyze: fuse 25A vs MCB 16A = partial', function() {
-  // 25/16/C -> not in table, so unresolved (conservative)
+// Test 511: Fuse-MCB (25A/16A/C now in table with Is=3000)
+test('discrimAnalyze: fuse 25A vs MCB 16A/C = partial (Is=3000 < Ik=6000)', function() {
+  // 25/16/C -> Is=3000 from table, < Ik_max=6000 -> partial
   var result = discrimEngine('fuse', 25, 'mcb', 16, 'C', 6000);
-  assert(result.verdict === 'unresolved', 'no table entry for 25A fuse / 16A MCB C -> unresolved');
+  assert.strictEqual(result.verdict, 'partial', 'Is=3000 < ikMax=6000 -> partial');
+  assert.strictEqual(result.is, 3000, 'Is should be 3000');
 });
 
 // Test 512: MCB-MCB partial selectivity possible (not NEVER as old code claimed)
@@ -13007,10 +13008,10 @@ test('Discrim: MCCB 250A / MCB C32 @ Ik=25kA -> full (Is=36kA from Schneider NSX
   assert(result.chartData !== null, 'chartData must be present');
 });
 
-test('Discrim: gG 32A / gG 25A @ Ik=10kA -> none (ratio 1.28 < 1.6, not selective)', function() {
+test('Discrim: gG 32A / gG 25A @ Ik=10kA -> partial (Is=3000 < Ik=10kA)', function() {
   var result = discrimEngine('fuse', 32, 'fuse', 25, null, 10000);
-  assert.strictEqual(result.verdict, 'none', 'verdict should be none; got ' + result.verdict);
-  assert.strictEqual(result.is, 3000, 'Is should be 3000 (crossover at low current); got ' + result.is);
+  assert.strictEqual(result.verdict, 'partial', 'verdict should be partial; got ' + result.verdict);
+  assert.strictEqual(result.is, 3000, 'Is should be 3000 from manufacturer table; got ' + result.is);
   assert(result.citation.length > 0, 'citation must be non-empty');
   assert(result.chartData !== null, 'chartData must be present');
 });
@@ -13045,6 +13046,54 @@ test('Discrim: renderDiscrim produces Ik_max button grid (7 presets, click-only)
   assert(html.indexOf('<input') < 0, 'no <input> in discrim UI (click-only)');
   assert(html.indexOf('<textarea') < 0, 'no <textarea> in discrim UI (click-only)');
   assert(html.indexOf('svg') >= 0, 'must contain SVG energy diagram');
+});
+
+test('Discrim: upstream curve selector appears when upstream type is MCB', function() {
+  var prevType = discrimState.upstreamType;
+  discrimState.upstreamType = 'mcb';
+  var html = renderDiscrim();
+  assert(html.indexOf('Upstream Curve') >= 0 || html.indexOf('kurve') >= 0, 'must show Upstream Curve selector for MCB');
+  assert(html.indexOf('>B</button>') >= 0, 'must have B curve button');
+  assert(html.indexOf('>C</button>') >= 0, 'must have C curve button');
+  assert(html.indexOf('>D</button>') >= 0, 'must have D curve button');
+  discrimState.upstreamType = prevType;
+});
+
+test('Discrim: upstream curve selector does NOT appear for fuse upstream', function() {
+  var prevType = discrimState.upstreamType;
+  discrimState.upstreamType = 'fuse';
+  var html = renderDiscrim();
+  assert(html.indexOf('Upstream Curve') < 0, 'must NOT show Upstream Curve selector for fuse');
+  discrimState.upstreamType = prevType;
+});
+
+test('Discrim: I2t chart has illustrative disclaimer label', function() {
+  var prevType = discrimState.upstreamType;
+  discrimState.upstreamType = 'fuse';
+  discrimState.upstreamRating = 100;
+  discrimState.downstreamType = 'mcb';
+  discrimState.downstreamRating = 16;
+  var html = renderDiscrim();
+  assert(html.indexOf('illustrative') >= 0 || html.indexOf('illustrativt') >= 0, 'must have illustrative disclaimer');
+  discrimState.upstreamType = prevType;
+});
+
+test('Discrim: fuse 25A / MCB C16 returns Is=3000 (new table entry)', function() {
+  var result = discrimEngine('fuse', 25, 'mcb', 16, 'C', 6000);
+  assert.strictEqual(result.verdict, 'partial', 'Is=3000 < ikMax=6000 -> partial');
+  assert.strictEqual(result.is, 3000, 'Is should be 3000 from table');
+});
+
+test('Discrim: gG 32A / gG 25A @ Ik=2000 -> full (Is=3000 >= Ik=2000)', function() {
+  var result = discrimEngine('fuse', 32, 'fuse', 25, null, 2000);
+  assert.strictEqual(result.verdict, 'full', 'Is=3000 >= ikMax=2000 -> full');
+  assert.strictEqual(result.is, 3000, 'Is should be 3000 from table');
+});
+
+test('Discrim: MCB-MCB with explicit upCurve=C uses that curve', function() {
+  var result = discrimEngine('mcb', 63, 'mcb', 16, 'B', 6000, 'C');
+  assert.strictEqual(result.is, 3000, 'Is should be 3000 for 63_16_C_B entry');
+  assert.strictEqual(result.verdict, 'partial', 'Is=3000 < ikMax=6000 -> partial');
 });
 
 // --- Summary ---
