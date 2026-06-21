@@ -13491,6 +13491,41 @@ test('renderRelay includes simulator SVG', function() {
   assert(html.indexOf('sim-glow') >= 0, 'renderRelay should include relay sim');
 });
 
+// --- Font stack and sim-value CSS tests ---
+test('CSS :root contains --font-eng custom property', function() {
+  assert(html.indexOf('--font-eng:') >= 0 || html.indexOf('--font-eng :') >= 0, 'should define --font-eng CSS custom property');
+});
+
+test('CSS :root contains --font-mono-eng custom property', function() {
+  assert(html.indexOf('--font-mono-eng:') >= 0 || html.indexOf('--font-mono-eng :') >= 0, 'should define --font-mono-eng CSS custom property');
+});
+
+test('CSS contains .sim-value class definition', function() {
+  assert(html.indexOf('.sim-value') >= 0, 'should define .sim-value CSS class');
+  assert(html.indexOf('font-variant-numeric: tabular-nums') >= 0, 'sim-value should include tabular-nums');
+});
+
+test('body font-family uses var(--font-eng)', function() {
+  assert(html.indexOf('font-family: var(--font-eng)') >= 0, 'body should use var(--font-eng) for font-family');
+});
+
+test('renderDCOhmSim output contains sim-value class on numeric value elements', function() {
+  var svg = renderDCOhmSim(10, 5, 2, 20);
+  assert(svg.indexOf('sim-value') >= 0, 'renderDCOhmSim should use sim-value class on numeric values');
+  assert(svg.indexOf('I=') >= 0, 'should show current value');
+  assert(svg.indexOf('P=') >= 0, 'should show power value');
+});
+
+test('renderDCSeriesParallelSim output contains sim-value on R_total', function() {
+  var svg = renderDCSeriesParallelSim('series', [10, 22, 47], 79);
+  assert(svg.indexOf('sim-value') >= 0, 'should use sim-value on R_total label');
+});
+
+test('renderImpedansSim output contains sim-value on result line', function() {
+  var svg = renderImpedansSim({U: 230, R: 100, L: 0.1, C: 0.00001, components: 'rlc', topology: 'series'}, {Z: 105.3, I: 2.18, phiDeg: -18.4});
+  assert(svg.indexOf('sim-value') >= 0, 'should use sim-value on Z/I/phi results');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
