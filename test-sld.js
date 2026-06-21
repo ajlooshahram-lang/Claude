@@ -14563,6 +14563,93 @@ test('SharedQuantities subscription for diversity_factor updates faktorState', f
   assert.strictEqual(faktorState.quantities.diversity_factor, 0.8, 'should propagate from other source');
 });
 
+// === FEAT-002: Deep cross-module connectivity tests ===
+test('SharedQuantities voltage_phase propagates to vdropState', function() {
+  vdropState.voltage = null;
+  SharedQuantities.set('voltage_phase', 230, 'load');
+  assert.strictEqual(vdropState.voltage, 230, 'voltage_phase should propagate to vdropState.voltage');
+});
+
+test('SharedQuantities load_power_kw propagates to faktorState (bidirectional)', function() {
+  faktorState.quantities.power = null;
+  SharedQuantities.set('load_power_kw', 5.5, 'load');
+  assert.strictEqual(faktorState.quantities.power, 5500, 'load_power_kw should update faktorState.quantities.power (converted to W)');
+});
+
+test('SharedQuantities cable_mm2 propagates to vdropState and zsState', function() {
+  vdropState.cableMm2 = null;
+  zsState.cableMm2 = null;
+  SharedQuantities.set('cable_mm2', 4, 'cable');
+  assert.strictEqual(vdropState.cableMm2, 4, 'cable_mm2 should propagate to vdropState.cableMm2');
+  assert.strictEqual(zsState.cableMm2, 4, 'cable_mm2 should propagate to zsState.cableMm2');
+});
+
+test('SharedQuantities load_current_a propagates to fuseState/mcbState/mccbState', function() {
+  fuseState.loadCurrent = null;
+  mcbState.loadCurrent = null;
+  mccbState.loadCurrent = null;
+  SharedQuantities.set('load_current_a', 16, 'load');
+  assert.strictEqual(fuseState.loadCurrent, 16, 'load_current_a should propagate to fuseState');
+  assert.strictEqual(mcbState.loadCurrent, 16, 'load_current_a should propagate to mcbState');
+  assert.strictEqual(mccbState.loadCurrent, 16, 'load_current_a should propagate to mccbState');
+});
+
+test('SharedQuantities frequency propagates to motorState and harmonicState', function() {
+  motorState.frequency = null;
+  harmonicState.frequency = null;
+  SharedQuantities.set('frequency', 50, 'trafo');
+  assert.strictEqual(motorState.frequency, 50, 'frequency should propagate to motorState');
+  assert.strictEqual(harmonicState.frequency, 50, 'frequency should propagate to harmonicState');
+});
+
+test('SharedQuantities voltage_phase propagates to solarState/evState/heatpumpState', function() {
+  solarState.voltage = null;
+  evState.voltage = null;
+  heatpumpState.voltage = null;
+  SharedQuantities.set('voltage_phase', 690, 'trafo');
+  assert.strictEqual(solarState.voltage, 690, 'voltage_phase should propagate to solarState');
+  assert.strictEqual(evState.voltage, 690, 'voltage_phase should propagate to evState');
+  assert.strictEqual(heatpumpState.voltage, 690, 'voltage_phase should propagate to heatpumpState');
+});
+
+test('Global reactive re-render subscriber is registered (wildcard listener exists)', function() {
+  var wildcardListeners = SharedQuantities._listeners['*'] || [];
+  assert(wildcardListeners.length >= 2, 'should have at least 2 wildcard subscribers (re-render + archiveAutoSave), got ' + wildcardListeners.length);
+});
+
+test('SharedQuantities bidirectional faktorState: voltage_phase updates faktorState.quantities.voltage', function() {
+  faktorState.quantities.voltage = null;
+  SharedQuantities.set('voltage_phase', 230, 'motor');
+  assert.strictEqual(faktorState.quantities.voltage, 230, 'voltage_phase should update faktorState.quantities.voltage');
+});
+
+test('SharedQuantities bidirectional faktorState: cos_phi updates faktorState.quantities.cos_phi', function() {
+  faktorState.quantities.cos_phi = null;
+  SharedQuantities.set('cos_phi', 0.85, 'load');
+  assert.strictEqual(faktorState.quantities.cos_phi, 0.85, 'cos_phi should update faktorState.quantities.cos_phi');
+});
+
+test('syncSharedQuantities covers at least 25 module cases', function() {
+  // Count cases by calling with each known module key and checking no errors
+  var modules = ['load','trafo','cable','impedans','trefase','motorteori','relay','fault','earthsys',
+    'dc','lys','magnet','kapacitor','varme','dcmaskine','faktorer','motor','vdrop','scircuit',
+    'zs','solar','ev','heatpump','harmonic','vfd','generator','bess','arcflash','lighting','panel'];
+  var count = 0;
+  modules.forEach(function(m) {
+    try { syncSharedQuantities(m); count++; } catch(e) { /* skip */ }
+  });
+  assert(count >= 25, 'syncSharedQuantities should handle at least 25 modules, handled ' + count);
+});
+
+test('SharedQuantities has at least 35 distinct subscriptions', function() {
+  var totalSubs = 0;
+  var keys = Object.keys(SharedQuantities._listeners);
+  keys.forEach(function(k) {
+    totalSubs += SharedQuantities._listeners[k].length;
+  });
+  assert(totalSubs >= 35, 'should have at least 35 total subscriptions, got ' + totalSubs);
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

@@ -3941,14 +3941,27 @@ const REACTIVE_LINKS = {
 const SharedQuantities = {
   _values: {},
   _listeners: {},
+  _setDepth: 0,
 
   // Set a shared value and notify all subscribers
   set: function(key, value, source) {
     if (this._values[key] === value) return; // no-op if unchanged
     this._values[key] = value;
-    var listeners = this._listeners[key] || [];
-    for (var i = 0; i < listeners.length; i++) {
-      try { listeners[i].fn(value, source); } catch(e) { /* safety */ }
+    this._setDepth++;
+    try {
+      var listeners = this._listeners[key] || [];
+      for (var i = 0; i < listeners.length; i++) {
+        try { listeners[i].fn(value, source); } catch(e) { /* safety */ }
+      }
+      // Notify wildcard subscribers (only at top-level to avoid cascade)
+      if (this._setDepth === 1) {
+        var wildcardListeners = this._listeners['*'] || [];
+        for (var w = 0; w < wildcardListeners.length; w++) {
+          try { wildcardListeners[w].fn(key, value, source); } catch(e) { /* safety */ }
+        }
+      }
+    } finally {
+      this._setDepth--;
     }
     // Trigger reactive propagation from the source module
     if (source && typeof Reactive !== 'undefined') {
@@ -4174,6 +4187,159 @@ SharedQuantities.subscribe('diversity_factor', function(df, source) {
 // Angular velocity propagates to motor modules.
 SharedQuantities.subscribe('angular_velocity', function(w, source) {
   if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.angular_velocity = w;
+});
+
+// === Deep cross-module connectivity subscriptions ===
+// scState (short-circuit) receives voltage_phase, trafo_kva, trafo_uk_pct
+SharedQuantities.subscribe('voltage_phase', function(v, source) {
+  if (source !== 'scircuit' && typeof scircuitState !== 'undefined') scircuitState.voltage = v;
+});
+SharedQuantities.subscribe('trafo_kva', function(kva, source) {
+  if (source !== 'scircuit' && typeof scircuitState !== 'undefined') scircuitState.trafoKva = kva;
+});
+SharedQuantities.subscribe('trafo_uk_pct', function(uk, source) {
+  if (source !== 'scircuit' && typeof scircuitState !== 'undefined') scircuitState.trafoUk = uk;
+});
+
+// vdropState receives voltage_phase, cable_mm2, load_power_kw, cos_phi
+SharedQuantities.subscribe('voltage_phase', function(v, source) {
+  if (source !== 'vdrop' && typeof vdropState !== 'undefined') vdropState.voltage = v;
+});
+SharedQuantities.subscribe('cable_mm2', function(mm2, source) {
+  if (source !== 'vdrop' && typeof vdropState !== 'undefined') vdropState.cableMm2 = mm2;
+});
+SharedQuantities.subscribe('load_power_kw', function(p, source) {
+  if (source !== 'vdrop' && typeof vdropState !== 'undefined') vdropState.loadPowerKw = p;
+});
+SharedQuantities.subscribe('cos_phi', function(cos, source) {
+  if (source !== 'vdrop' && typeof vdropState !== 'undefined') vdropState.cosPhi = cos;
+});
+
+// fuseState/mcbState/mccbState receive load_current_a
+SharedQuantities.subscribe('load_current_a', function(i, source) {
+  if (source !== 'fuse' && typeof fuseState !== 'undefined') fuseState.loadCurrent = i;
+  if (source !== 'mcb' && typeof mcbState !== 'undefined') mcbState.loadCurrent = i;
+  if (source !== 'mccb' && typeof mccbState !== 'undefined') mccbState.loadCurrent = i;
+});
+
+// zsState receives earth_system, cable_mm2
+SharedQuantities.subscribe('earth_system', function(sys, source) {
+  if (source !== 'zs' && typeof zsState !== 'undefined') zsState.earthSystem = sys;
+});
+SharedQuantities.subscribe('cable_mm2', function(mm2, source) {
+  if (source !== 'zs' && typeof zsState !== 'undefined') zsState.cableMm2 = mm2;
+});
+
+// motorState receives frequency, voltage_phase
+SharedQuantities.subscribe('frequency', function(f, source) {
+  if (source !== 'motor' && typeof motorState !== 'undefined') motorState.frequency = f;
+});
+SharedQuantities.subscribe('voltage_phase', function(v, source) {
+  if (source !== 'motor' && typeof motorState !== 'undefined') motorState.voltage = v;
+});
+
+// harmonicState receives frequency
+SharedQuantities.subscribe('frequency', function(f, source) {
+  if (source !== 'harmonic' && typeof harmonicState !== 'undefined') harmonicState.frequency = f;
+});
+
+// solarState/evState/heatpumpState receive voltage_phase
+SharedQuantities.subscribe('voltage_phase', function(v, source) {
+  if (source !== 'solar' && typeof solarState !== 'undefined') solarState.voltage = v;
+  if (source !== 'ev' && typeof evState !== 'undefined') evState.voltage = v;
+  if (source !== 'heatpump' && typeof heatpumpState !== 'undefined') heatpumpState.voltage = v;
+});
+
+// panelState receives load updates from all circuit changes
+SharedQuantities.subscribe('load_power_kw', function(p, source) {
+  if (source !== 'panel' && typeof panelState !== 'undefined') panelState.lastLoadUpdate = p;
+});
+SharedQuantities.subscribe('load_current_a', function(i, source) {
+  if (source !== 'panel' && typeof panelState !== 'undefined') panelState.lastCurrentUpdate = i;
+});
+
+// generatorState receives load_power_kw
+SharedQuantities.subscribe('load_power_kw', function(p, source) {
+  if (source !== 'generator' && typeof generatorState !== 'undefined') generatorState.linkedLoadKw = p;
+});
+
+// bessState receives load_power_kw for sizing
+SharedQuantities.subscribe('load_power_kw', function(p, source) {
+  if (source !== 'bess' && typeof bessState !== 'undefined') bessState.linkedLoadKw = p;
+});
+
+// arcflashState receives short_circuit_current for incident energy
+SharedQuantities.subscribe('short_circuit_current', function(ik, source) {
+  if (source !== 'arcflash' && typeof arcflashState !== 'undefined') arcflashState.faultCurrent = ik;
+});
+
+// vfdState receives frequency, motor_power_w
+SharedQuantities.subscribe('frequency', function(f, source) {
+  if (source !== 'vfd' && typeof vfdState !== 'undefined') vfdState.inputFrequency = f;
+});
+SharedQuantities.subscribe('motor_power_w', function(p, source) {
+  if (source !== 'vfd' && typeof vfdState !== 'undefined') vfdState.linkedMotorPower = p;
+});
+
+// lightingState receives voltage_phase
+SharedQuantities.subscribe('voltage_phase', function(v, source) {
+  if (source !== 'lighting' && typeof lightingState !== 'undefined') lightingState.voltage = v;
+});
+
+// === Global SharedQuantities subscriber: reactive re-render of active module ===
+var _sqReRenderTimer = null;
+var _sqReRenderSource = null;
+var _sqReRenderBusy = false;
+SharedQuantities.subscribe('*', function(name, value, source) {
+  // Debounced re-render: if active module is different from source, re-render it
+  if (_sqReRenderBusy) return; // prevent re-entrant calls
+  if (typeof activeModule !== 'undefined' && activeModule !== source) {
+    _sqReRenderSource = source;
+    _sqReRenderTimer = setTimeout(function() {
+      if (_sqReRenderBusy) return;
+      _sqReRenderBusy = true;
+      try {
+        if (typeof renderModule === 'function' && typeof document !== 'undefined') {
+          var el = document.getElementById('mainContent');
+          if (el && el.tagName) renderModule(activeModule);
+        }
+      } finally {
+        _sqReRenderBusy = false;
+      }
+      _sqReRenderTimer = null;
+      _sqReRenderSource = null;
+    }, 150);
+  }
+});
+
+// === Global SharedQuantities subscriber: trigger archiveAutoSave on any change ===
+SharedQuantities.subscribe('*', function(name, value, source) {
+  if (typeof archiveAutoSave === 'function') {
+    archiveAutoSave();
+  }
+});
+
+// === Bidirectional faktorState wiring: update faktorState.quantities from SharedQuantities ===
+SharedQuantities.subscribe('voltage_phase', function(v, source) {
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.voltage = v;
+});
+SharedQuantities.subscribe('frequency', function(f, source) {
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.frequency = f;
+});
+SharedQuantities.subscribe('load_power_kw', function(p, source) {
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.power = p * 1000;
+});
+SharedQuantities.subscribe('cos_phi', function(cos, source) {
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.cos_phi = cos;
+});
+SharedQuantities.subscribe('load_current_a', function(i, source) {
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.current = i;
+});
+SharedQuantities.subscribe('cable_mm2', function(mm2, source) {
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.cross_section_mm2 = mm2;
+});
+SharedQuantities.subscribe('motor_power_w', function(p, source) {
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.motor_power_w = p;
 });
 
 // "May be relevant" broad subscribers: the safety brain, the unified-project
@@ -6778,6 +6944,74 @@ function syncSharedQuantities(mod) {
       // Heat pump module pushes power
       if (typeof heatpumpState !== 'undefined') {
         if (heatpumpState.heatingKW) SharedQuantities.set('load_power_kw', heatpumpState.heatingKW, 'heatpump');
+      }
+      break;
+    case 'harmonic':
+      // Harmonic module pushes THD and frequency
+      if (typeof harmonicState !== 'undefined') {
+        if (harmonicState.loadType && harmonicState.numLoads) {
+          var _hthd = harmonicCalcTHD(harmonicState.loadType, harmonicState.numLoads);
+          SharedQuantities.set('thd_pct', _hthd.thd * 100, 'harmonic');
+        }
+        if (harmonicState.frequency) SharedQuantities.set('frequency', harmonicState.frequency, 'harmonic');
+      }
+      break;
+    case 'vfd':
+      // VFD module pushes frequency output and motor power
+      if (typeof vfdState !== 'undefined') {
+        if (vfdState.motorKW) SharedQuantities.set('motor_power_w', vfdState.motorKW * 1000, 'vfd');
+        if (vfdState.inputFrequency) SharedQuantities.set('frequency', vfdState.inputFrequency, 'vfd');
+      }
+      break;
+    case 'generator':
+      // Generator module pushes power and voltage
+      if (typeof generatorState !== 'undefined') {
+        var _genTotal = 0;
+        var _genLoads = generatorState.loads || {};
+        var _genKw = generatorState.loadKw || {};
+        for (var _gk in _genLoads) {
+          if (_genLoads[_gk] && _genKw[_gk]) _genTotal += _genKw[_gk] * (GEN_DIVERSITY[_gk] || 1);
+        }
+        if (_genTotal > 0) SharedQuantities.set('load_power_kw', _genTotal, 'generator');
+        SharedQuantities.set('voltage_phase', 400, 'generator');
+      }
+      break;
+    case 'bess':
+      // BESS module pushes stored energy and power
+      if (typeof bessState !== 'undefined') {
+        if (bessState.capacityKWh) SharedQuantities.set('load_power_kw', bessState.capacityKWh / (bessState.dischargeHours || 4), 'bess');
+      }
+      break;
+    case 'arcflash':
+      // Arc flash module pushes incident energy
+      if (typeof arcflashState !== 'undefined') {
+        var _afE = arcflashCalcIncidentEnergy(arcflashState.voltage, arcflashState.faultCurrent, arcflashState.clearingTime, arcflashState.workingDistance);
+        SharedQuantities.set('incident_energy', _afE, 'arcflash');
+        SharedQuantities.set('short_circuit_current', arcflashState.faultCurrent, 'arcflash');
+      }
+      break;
+    case 'lighting':
+      // Lighting module pushes total watts and lux
+      if (typeof lightingState !== 'undefined') {
+        if (lightingState.wattage) SharedQuantities.set('load_power_kw', lightingState.wattage / 1000, 'lighting');
+        if (lightingState.length && lightingState.width && lightingState.height && lightingState.wattage && lightingState.source) {
+          var _lri = lightingCalcRoomIndex(lightingState.length, lightingState.width, lightingState.height);
+          var _luf = lightingGetUF(_lri);
+          var _lmf = lightingState.maintenanceFactor || 0.8;
+          var _la = lightingState.length * lightingState.width;
+          var _lsrc = (typeof LIGHTING_SOURCES !== 'undefined' && LIGHTING_SOURCES[lightingState.source]) ? LIGHTING_SOURCES[lightingState.source] : null;
+          if (_lsrc) {
+            var _llux = (lightingState.wattage * _lsrc.lmPerW * _luf * _lmf) / _la;
+            SharedQuantities.set('luminous_flux', Math.round(_llux), 'lighting');
+          }
+        }
+      }
+      break;
+    case 'panel':
+      // Panel/distribution board pushes total load
+      if (typeof panelState !== 'undefined' && panelState.boards && panelState.boards.length > 0) {
+        var _pBoard = panelState.boards[panelState.selectedBoardIdx || 0];
+        if (_pBoard && _pBoard.totalKw) SharedQuantities.set('load_power_kw', _pBoard.totalKw, 'panel');
       }
       break;
   }
