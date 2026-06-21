@@ -13096,6 +13096,186 @@ test('Discrim: MCB-MCB with explicit upCurve=C uses that curve', function() {
   assert.strictEqual(result.verdict, 'partial', 'Is=3000 < ikMax=6000 -> partial');
 });
 
+// ===== Smart Simulator Tests =====
+console.log('\n=== Smart Simulator Tests ===\n');
+
+test('simHeatColor returns rgb string', function() {
+  var c = simHeatColor(500, 1000);
+  assert(c.indexOf('rgb(') === 0, 'should start with rgb(');
+});
+
+test('simFlowDuration returns 0 for zero current', function() {
+  assert.strictEqual(simFlowDuration(0, 100), 0);
+});
+
+test('simFlowDuration returns positive for nonzero current', function() {
+  var d = parseFloat(simFlowDuration(10, 100));
+  assert(d > 0, 'duration should be positive');
+});
+
+test('renderDCOhmSim returns SVG string', function() {
+  var svg = renderDCOhmSim(10, 5, 2, 20);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire class');
+});
+
+test('renderDCOhmSim returns empty for all-zero inputs', function() {
+  var svg = renderDCOhmSim(0, 0, 0, 0);
+  assert.strictEqual(svg, '');
+});
+
+test('renderDCSeriesParallelSim series mode returns SVG', function() {
+  var svg = renderDCSeriesParallelSim('series', [10, 22, 47], 79);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('R1') >= 0, 'should label R1');
+  assert(svg.indexOf('R_total') >= 0, 'should show Rtotal');
+});
+
+test('renderDCSeriesParallelSim parallel mode returns SVG', function() {
+  var svg = renderDCSeriesParallelSim('parallel', [100, 200], 66.67);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+});
+
+test('renderDCSeriesParallelSim empty array returns empty', function() {
+  var svg = renderDCSeriesParallelSim('series', [], 0);
+  assert.strictEqual(svg, '');
+});
+
+test('renderDCDividerSim returns SVG with Uout', function() {
+  var svg = renderDCDividerSim(12, 1000, 2200, 8.25, 0.00375);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('U_out') >= 0, 'should show Uout label');
+  assert(svg.indexOf('R1') >= 0, 'should show R1');
+  assert(svg.indexOf('R2') >= 0, 'should show R2');
+});
+
+test('renderDCPowerSim returns SVG with power info', function() {
+  var svg = renderDCPowerSim(230, 10, 23, 2300);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should have animated wire');
+  assert(svg.indexOf('2300') >= 0, 'should show power value');
+});
+
+test('renderDCEmfSim returns SVG with voltage bar', function() {
+  var svg = renderDCEmfSim(12, 0.5, 2, 11, 2, 22);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('Ukl') >= 0, 'should show terminal voltage');
+  assert(svg.indexOf('Ri') >= 0, 'should show internal resistance');
+  assert(svg.indexOf('sim-wire') >= 0, 'should have animated flow');
+});
+
+test('renderImpedansSim returns SVG for RLC series', function() {
+  var state = { U: 230, R: 100, L: 0.1, C: 0.00001, components: 'rlc', topology: 'series' };
+  var res = { Z: 120, I: 1.92, phiDeg: -33.5, phi: -0.585 };
+  var svg = renderImpedansSim(state, res);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should have flow animation');
+});
+
+test('renderImpedansSim returns empty for null res', function() {
+  assert.strictEqual(renderImpedansSim({}, null), '');
+});
+
+test('renderTrefaseSim star returns SVG with neutral', function() {
+  var results = { Up: 231, IL: 2.31, P: 800, Q: 300, S: 900 };
+  var svg = renderTrefaseSim('symStar', results);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('N') >= 0, 'should show neutral point');
+  assert(svg.indexOf('L1') >= 0, 'should label L1');
+});
+
+test('renderTrefaseSim delta returns SVG', function() {
+  var results = { Up: 400, IL: 6.93, P: 4800 };
+  var svg = renderTrefaseSim('symDelta', results);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should have animated wires');
+});
+
+test('renderTrefaseSim returns empty for null results', function() {
+  assert.strictEqual(renderTrefaseSim('symStar', null), '');
+});
+
+test('renderVdropSim returns SVG with gradient', function() {
+  var svg = renderVdropSim(400, 8.5, 2.1, 50, 16);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('vdGrad') >= 0, 'should have gradient');
+  assert(svg.indexOf('sim-wire') >= 0, 'should have flow animation');
+});
+
+test('renderVdropSim returns empty for zero input', function() {
+  assert.strictEqual(renderVdropSim(0, 0, 0, 0, 0), '');
+});
+
+test('renderScircuitSim returns SVG with fault symbol', function() {
+  var svg = renderScircuitSim(2, 5, 3.5, 15000, 2500);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should have animated fault current');
+  assert(svg.indexOf('polygon') >= 0, 'should have lightning bolt');
+});
+
+test('renderScircuitSim returns empty for zero ikMax', function() {
+  assert.strictEqual(renderScircuitSim(2, 5, 3, 0, 0), '');
+});
+
+test('renderMotorSim returns SVG with rotor', function() {
+  var svg = renderMotorSim(1500, 1455, 0.03, 65.4);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-rotor') >= 0, 'should have spinning rotor');
+  assert(svg.indexOf('1500') >= 0, 'should show sync speed');
+  assert(svg.indexOf('1455') >= 0, 'should show actual speed');
+});
+
+test('renderMotorSim returns empty for zero ns', function() {
+  assert.strictEqual(renderMotorSim(0, 0, 0, 0), '');
+});
+
+test('renderDCOhm includes simulator SVG', function() {
+  var html = renderDCOhm();
+  assert(html.indexOf('<svg') >= 0, 'renderDCOhm should include simulator SVG');
+  assert(html.indexOf('sim-wire') >= 0, 'should have animated wire');
+});
+
+test('renderDCSeriesParallel includes simulator SVG', function() {
+  var html = renderDCSeriesParallel();
+  assert(html.indexOf('<svg') >= 0, 'renderDCSeriesParallel should include SVG');
+});
+
+test('renderDCPower includes simulator SVG', function() {
+  dcState.powKnown = 'ui';
+  dcState.powU = 230;
+  dcState.powI = 10;
+  var html = renderDCPower();
+  assert(html.indexOf('<svg') >= 0, 'renderDCPower should include SVG');
+  assert(html.indexOf('sim-wire') >= 0, 'should have animated wire');
+});
+
+test('renderDCEmf includes simulator SVG', function() {
+  var html = renderDCEmf();
+  assert(html.indexOf('<svg') >= 0, 'renderDCEmf should include SVG');
+  assert(html.indexOf('Ukl') >= 0, 'should show terminal voltage');
+});
+
+test('renderMotorteori includes motor simulator SVG', function() {
+  var html = renderMotorteori();
+  assert(html.indexOf('sim-rotor') >= 0, 'renderMotorteori should include rotor animation');
+});
+
+test('renderDCDivider includes simulator SVG', function() {
+  var html = renderDCDivider();
+  assert(html.indexOf('<svg') >= 0, 'renderDCDivider should include SVG');
+  assert(html.indexOf('U_out') >= 0, 'should show voltage divider output');
+});
+
+test('renderImpedans includes circuit simulator SVG', function() {
+  var html = renderImpedans();
+  assert(html.indexOf('sim-wire') >= 0, 'renderImpedans should include animated wire');
+});
+
+test('renderTrefase includes 3-phase simulator SVG', function() {
+  var html = renderTrefase();
+  assert(html.indexOf('sim-wire') >= 0, 'renderTrefase should include animated wires');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
