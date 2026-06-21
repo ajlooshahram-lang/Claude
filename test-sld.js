@@ -13868,6 +13868,184 @@ test('renderDiscrimSim returns empty for zero downstream rating', function() {
   assert.strictEqual(renderDiscrimSim('fuse', 100, 'mcb', 0, true, 6000), '');
 });
 
+// --- renderHeatPumpSim tests ---
+test('renderHeatPumpSim returns SVG with sim-wire class for valid inputs', function() {
+  var svg = renderHeatPumpSim(10, 3.5, 2.86, 12.4, 1);
+  assert(svg.indexOf('<svg') >= 0, 'should contain svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire class');
+  assert(svg.indexOf('sim-rotor') >= 0, 'should contain sim-rotor for compressor');
+  assert(svg.indexOf('COP=3.5') >= 0, 'should show COP value');
+});
+
+test('renderHeatPumpSim returns empty for zero heatingKW', function() {
+  assert.strictEqual(renderHeatPumpSim(0, 3.5, 0, 0, 1), '');
+});
+
+test('renderHeatPumpSim returns empty for zero cop', function() {
+  assert.strictEqual(renderHeatPumpSim(10, 0, 2.86, 12.4, 1), '');
+});
+
+test('renderHeatPump includes simulator SVG', function() {
+  var html = renderHeatPump();
+  assert(html.indexOf('sim-wire') >= 0 || html.indexOf('sim-rotor') >= 0, 'parent should include sim');
+});
+
+// --- renderNoedSim tests ---
+test('renderNoedSim returns SVG with sim-wire class for valid inputs', function() {
+  var svg = renderNoedSim('central', 8, 24, 3);
+  assert(svg.indexOf('<svg') >= 0, 'should contain svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire class');
+  assert(svg.indexOf('sim-pulse') >= 0, 'should contain sim-pulse for luminaires');
+  assert(svg.indexOf('CENTRAL') >= 0, 'should show system type');
+});
+
+test('renderNoedSim returns empty for zero luminaires', function() {
+  assert.strictEqual(renderNoedSim('central', 0, 24, 3), '');
+});
+
+test('renderNoedSim returns empty for negative luminaires', function() {
+  assert.strictEqual(renderNoedSim('self', -1, 10, 1), '');
+});
+
+test('renderNoed includes simulator SVG', function() {
+  var html = renderNoed();
+  assert(html.indexOf('sim-wire') >= 0 || html.indexOf('sim-pulse') >= 0, 'parent should include sim');
+});
+
+// --- renderFireAlarmSim tests ---
+test('renderFireAlarmSim returns SVG with sim-pulse class for valid inputs', function() {
+  var svg = renderFireAlarmSim(12, 2, 2, 'fire-rated');
+  assert(svg.indexOf('<svg') >= 0, 'should contain svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire class');
+  assert(svg.indexOf('sim-pulse') >= 0, 'should contain sim-pulse for detectors');
+  assert(svg.indexOf('12') >= 0, 'should show detector count');
+});
+
+test('renderFireAlarmSim returns empty for zero detectors', function() {
+  assert.strictEqual(renderFireAlarmSim(0, 1, 2, 'fire-rated'), '');
+});
+
+test('renderFireAlarmSim returns empty for negative detectors', function() {
+  assert.strictEqual(renderFireAlarmSim(-5, 1, 2, 'fire-rated'), '');
+});
+
+test('renderFireAlarm includes simulator SVG', function() {
+  var html = renderFireAlarm();
+  assert(html.indexOf('sim-wire') >= 0 || html.indexOf('sim-pulse') >= 0, 'parent should include sim');
+});
+
+// --- renderShevSim tests ---
+test('renderShevSim returns SVG with sim-wave class for valid inputs', function() {
+  var svg = renderShevSim('mshev', 5000, 400, 200);
+  assert(svg.indexOf('<svg') >= 0, 'should contain svg');
+  assert(svg.indexOf('sim-wave') >= 0, 'should contain sim-wave for smoke animation');
+  assert(svg.indexOf('MSHEV') >= 0, 'should show system type');
+});
+
+test('renderShevSim shows NSHEV for natural ventilation', function() {
+  var svg = renderShevSim('nshev', 0, 0, 150);
+  assert(svg.indexOf('NSHEV') >= 0, 'should show NSHEV type');
+});
+
+test('renderShevSim returns empty for zero zoneArea', function() {
+  assert.strictEqual(renderShevSim('mshev', 5000, 400, 0), '');
+});
+
+test('renderShev includes simulator SVG', function() {
+  var html = renderShev();
+  assert(html.indexOf('sim-wave') >= 0, 'parent should include sim');
+});
+
+// --- renderAccessSim tests ---
+test('renderAccessSim returns SVG with sim-pulse class for valid inputs', function() {
+  var svg = renderAccessSim(4, 1200, 2, 'networked');
+  assert(svg.indexOf('<svg') >= 0, 'should contain svg');
+  assert(svg.indexOf('sim-pulse') >= 0, 'should contain sim-pulse for data lines');
+  assert(svg.indexOf('NETWORKED') >= 0, 'should show system type');
+  assert(svg.indexOf('4') >= 0, 'should show door count');
+});
+
+test('renderAccessSim returns empty for zero doors', function() {
+  assert.strictEqual(renderAccessSim(0, 0, 0, 'standalone'), '');
+});
+
+test('renderAccessSim returns empty for negative doors', function() {
+  assert.strictEqual(renderAccessSim(-1, 100, 1, 'standalone'), '');
+});
+
+test('renderAccess includes simulator SVG', function() {
+  var html = renderAccess();
+  assert(html.indexOf('sim-pulse') >= 0, 'parent should include sim');
+});
+
+// --- renderDataSim tests ---
+test('renderDataSim returns SVG with sim-wire class for valid inputs', function() {
+  var svg = renderDataSim(24, 50, 'cat6a', 30);
+  assert(svg.indexOf('<svg') >= 0, 'should contain svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire class');
+  assert(svg.indexOf('CAT6A') >= 0, 'should show cable category');
+  assert(svg.indexOf('50m') >= 0, 'should show distance');
+});
+
+test('renderDataSim returns empty for zero outlets', function() {
+  assert.strictEqual(renderDataSim(0, 50, 'cat6a', 30), '');
+});
+
+test('renderDataSim shows PoE when watts provided', function() {
+  var svg = renderDataSim(12, 80, 'cat6a', 90);
+  assert(svg.indexOf('PoE') >= 0, 'should show PoE indicator');
+  assert(svg.indexOf('90W') >= 0, 'should show PoE wattage');
+});
+
+test('renderData includes simulator SVG', function() {
+  var html = renderData();
+  assert(html.indexOf('sim-wire') >= 0, 'parent should include sim');
+});
+
+// --- renderSmartGridSim tests ---
+test('renderSmartGridSim returns SVG with sim-wire class for valid inputs', function() {
+  var svg = renderSmartGridSim(15, 45, 3, 12000);
+  assert(svg.indexOf('<svg') >= 0, 'should contain svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire for power flow');
+  assert(svg.indexOf('sim-pulse') >= 0, 'should contain sim-pulse for meter');
+  assert(svg.indexOf('15kW') >= 0, 'should show total power');
+});
+
+test('renderSmartGridSim returns empty for zero totalKW', function() {
+  assert.strictEqual(renderSmartGridSim(0, 0, 0, 0), '');
+});
+
+test('renderSmartGridSim returns empty for negative totalKW', function() {
+  assert.strictEqual(renderSmartGridSim(-5, 10, 2, 1000), '');
+});
+
+test('renderSmartGrid includes simulator SVG', function() {
+  var html = renderSmartGrid();
+  assert(html.indexOf('sim-wire') >= 0 || html.indexOf('sim-pulse') >= 0, 'parent should include sim');
+});
+
+// --- renderMeteringSim tests ---
+test('renderMeteringSim returns SVG with sim-wire class for valid inputs', function() {
+  var svg = renderMeteringSim('ct', '100/5', 3, 'M-Bus');
+  assert(svg.indexOf('<svg') >= 0, 'should contain svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire for current flow');
+  assert(svg.indexOf('sim-pulse') >= 0, 'should contain sim-pulse for communication');
+  assert(svg.indexOf('M-Bus') >= 0, 'should show communication type');
+});
+
+test('renderMeteringSim returns empty for zero meters', function() {
+  assert.strictEqual(renderMeteringSim('direct', '100/5', 0, 'M-Bus'), '');
+});
+
+test('renderMeteringSim returns empty for negative meters', function() {
+  assert.strictEqual(renderMeteringSim('ct', '200/5', -1, 'Modbus'), '');
+});
+
+test('renderMetering includes simulator SVG', function() {
+  var html = renderMetering();
+  assert(html.indexOf('sim-wire') >= 0 || html.indexOf('sim-pulse') >= 0, 'parent should include sim');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
