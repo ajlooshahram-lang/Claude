@@ -7860,7 +7860,7 @@ let trafoState = {
   calcType: 'sizing',  // sizing, powersolve, emf, ocsc, regulation, efficiency, parallel, vectorgroup
   // Dynamic power/current solver: derive S,P,Q,I,U,cosphi from ANY sufficient subset.
   // Values stored in base SI units (U=V, I=A, S=VA, P=W, Q=var). null = "not given".
-  psPhase: '3', psU: 400, psI: 100, psS: null, psP: null, psCos: 0.9, psQ: null,
+  psPhase: '3', psU: null, psI: null, psS: null, psP: null, psCos: null, psQ: null,
   // EMF
   emfFreq: 50, emfN: 300, emfBmax: 1.2, emfArea: 0.01,
   // OC/SC test
