@@ -1,0 +1,22 @@
+{
+  "project_type": "Single-file offline HTML app (el-dimensionering.html) with Node.js test harness",
+  "language": "JavaScript (ES5-style, embedded in HTML)",
+  "build_system": "None - single HTML file, no build pipeline",
+  "test_framework": "Custom Node.js test runner (test-sld.js) with assert module",
+  "build_command": "N/A",
+  "test_command": "node test-sld.js",
+  "verification_instructions": "Run 'node test-sld.js' and confirm 0 failures. Currently 1344 tests on main.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "No setup needed - just Node.js for running tests",
+  "environment_constraints": "INTEGRATIONS_ONLY network - no npm install, no CDN. All code must be inline in the HTML file. The app is 100% offline/self-contained.",
+  "contribution_requirements": "Single-file HTML app, trilingual (Danish/English/Farsi), life-safety-critical, click-only UI (no typing affordances except the paste textarea). All libraries must be embedded inline.",
+  "key_patterns": "Functions prefixed with 'analyzer' for the Project Analyzer module. State object 'analyzerState'. Translation via tx() function with _FA dictionary for Farsi. Tests added as additive blocks at end of test-sld.js before the Summary section.",
+  "relevant_files": [
+    "el-dimensionering.html (lines 1613-1614 for _FA dict insertion point)",
+    "el-dimensionering.html (lines 27505-27517 for analyzerState)",
+    "el-dimensionering.html (lines 28476-28497 for analyzerHandleFile/Reset)",
+    "el-dimensionering.html (lines 28506-28540 for renderAnalyzer)",
+    "test-sld.js (tests added before // --- Summary --- at EOF)"
+  ],
+  "directory_structure": "Single-file app: el-dimensionering.html (~29106 lines), test-sld.js (~13264 lines after rebase)"
+}
