@@ -1123,7 +1123,10 @@ const T = {
       kapacitor: 'Kapacitor & RC',
       varme: 'Rumvarme & U-v\u00e6rdi',
       dcmaskine: 'Jaevnstr\u00f8msmaskiner',
-      analyzer: '\uD83D\uDD0D Projektanalysator'
+      analyzer: '\uD83D\uDD0D Projektanalysator',
+      distplan: 'Fordelingsplan',
+      elplan: 'Installationsplan',
+      controlpanel: 'Styretavle'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1279,7 +1282,10 @@ const T = {
       kapacitor: 'Capacitor & RC',
       varme: 'Room heating & U-value',
       dcmaskine: 'DC machines',
-      analyzer: '\uD83D\uDD0D Project Analyzer'
+      analyzer: '\uD83D\uDD0D Project Analyzer',
+      distplan: 'Distribution Plan',
+      elplan: 'Electrical Plan',
+      controlpanel: 'Control Panel'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -1427,7 +1433,10 @@ const T = {
       kapacitor: 'خازن و RC',
       varme: 'گرمایش و مقدار U',
       dcmaskine: 'ماشین‌های DC',
-      analyzer: '\uD83D\uDD0D تحلیلگر پروژه'
+      analyzer: '\uD83D\uDD0D تحلیلگر پروژه',
+      distplan: 'نقشه توزیع',
+      elplan: 'نقشه تاسیسات برقی',
+      controlpanel: 'تابلوی کنترل'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -5208,7 +5217,7 @@ const NAV_GROUPS = [
     da: 'Tavle, skinne & tegning', en: 'Panel, busbar & drawing', fa: '\u062A\u0627\u0628\u0644\u0648\u060C \u0634\u06CC\u0646\u0647 \u0648 \u0646\u0642\u0634\u0647',
     descDa: 'Saml installationen fysisk: tavle og skinnesystem, kabelbakke, og det enstregede diagram (tegning) der dokumenterer hvordan alt h\u00E6nger sammen.',
     descEn: 'Put the installation together physically: panel and busbar, cable tray, and the single-line diagram (drawing) that documents how everything connects.',
-    keys: ['panel', 'busbar', 'sld', 'draw', 'cable3d', 'tcc', 'trayfill']
+    keys: ['panel', 'busbar', 'sld', 'draw', 'cable3d', 'tcc', 'trayfill', 'distplan', 'elplan', 'controlpanel']
   },
   {
     id: 'theory', icon: '\uD83D\uDCD6',
@@ -6706,6 +6715,9 @@ function renderModule(mod) {
     case 'varme': content = renderVarme(); break;
     case 'dcmaskine': content = renderDcmaskine(); break;
     case 'analyzer': content = renderAnalyzer(); break;
+    case 'distplan': content = renderDistPlan(); break;
+    case 'elplan': content = renderElPlan(); break;
+    case 'controlpanel': content = renderControlPanel(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -8291,42 +8303,60 @@ function renderTrafoSim(S, uk, loadPercent, voltage) {
   var Ploss = losses.p0 + losses.pk * loadFrac * loadFrac;
   var PlossMax = losses.p0 + losses.pk;
   var coreColor = simHeatColor(Ploss, PlossMax > 0 ? PlossMax : 1);
-  var svg = '<svg viewBox="0 0 300 140" width="300" height="140" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  var svg = '<svg viewBox="0 0 300 150" width="300" height="150" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
-  // E-I core shape
-  svg += '<rect x="50" y="15" width="200" height="14" rx="2" fill="' + coreColor + '" stroke="var(--text)" stroke-width="1.2"/>'; // top bar
-  svg += '<rect x="50" y="15" width="14" height="110" rx="2" fill="' + coreColor + '" stroke="var(--text)" stroke-width="1.2"/>'; // left leg
-  svg += '<rect x="143" y="15" width="14" height="110" rx="2" fill="' + coreColor + '" stroke="var(--text)" stroke-width="1.2"/>'; // center leg
-  svg += '<rect x="236" y="15" width="14" height="110" rx="2" fill="' + coreColor + '" stroke="var(--text)" stroke-width="1.2"/>'; // right leg
-  svg += '<rect x="50" y="111" width="200" height="14" rx="2" fill="' + coreColor + '" stroke="var(--text)" stroke-width="1.2"/>'; // bottom bar
-  // Primary coil (left, blue zigzag)
-  var i;
-  for (i = 0; i < 7; i++) {
-    var py = 34 + i * 10;
-    svg += '<path d="M70,' + py + ' L82,' + (py + 5) + ' L70,' + (py + 10) + '" fill="none" stroke="#1565c0" stroke-width="2"/>';
+  var i, fluxOpacity;
+  // E-I core shape with breath animation when loaded
+  var breathClass = loadFrac > 0.3 ? ' class="sim-breath"' : '';
+  svg += '<g' + breathClass + '>';
+  svg += '<rect x="50" y="20" width="200" height="14" rx="2" fill="' + coreColor + '" stroke="var(--text)" stroke-width="1.2"/>';
+  svg += '<rect x="50" y="20" width="14" height="110" rx="2" fill="' + coreColor + '" stroke="var(--text)" stroke-width="1.2"/>';
+  svg += '<rect x="143" y="20" width="14" height="110" rx="2" fill="' + coreColor + '" stroke="var(--text)" stroke-width="1.2"/>';
+  svg += '<rect x="236" y="20" width="14" height="110" rx="2" fill="' + coreColor + '" stroke="var(--text)" stroke-width="1.2"/>';
+  svg += '<rect x="50" y="116" width="200" height="14" rx="2" fill="' + coreColor + '" stroke="var(--text)" stroke-width="1.2"/>';
+  svg += '</g>';
+  // Primary coil (left, blue spirals - proper winding turns)
+  for (i = 0; i < 8; i++) {
+    var py = 38 + i * 10;
+    svg += '<path d="M68,' + py + ' C62,' + py + ' 62,' + (py + 5) + ' 68,' + (py + 5) + ' C74,' + (py + 5) + ' 74,' + (py + 10) + ' 68,' + (py + 10) + '" fill="none" stroke="#1565c0" stroke-width="1.8"/>';
   }
-  svg += '<text x="76" y="132" text-anchor="middle" class="sim-label" font-size="8" fill="#1565c0">U1</text>';
-  // Secondary coil (right, red zigzag)
-  for (i = 0; i < 7; i++) {
-    var sy = 34 + i * 10;
-    svg += '<path d="M218,' + sy + ' L230,' + (sy + 5) + ' L218,' + (sy + 10) + '" fill="none" stroke="#c62828" stroke-width="2"/>';
+  // Primary terminal dots
+  svg += '<circle cx="68" cy="35" r="3" fill="#1565c0"/>';
+  svg += '<circle cx="68" cy="120" r="3" fill="#1565c0"/>';
+  svg += '<text x="76" y="140" text-anchor="middle" class="sim-label" font-size="8" fill="#1565c0">U1</text>';
+  // Secondary coil (right, red spirals - proper winding turns)
+  for (i = 0; i < 8; i++) {
+    var sy = 38 + i * 10;
+    svg += '<path d="M232,' + sy + ' C226,' + sy + ' 226,' + (sy + 5) + ' 232,' + (sy + 5) + ' C238,' + (sy + 5) + ' 238,' + (sy + 10) + ' 232,' + (sy + 10) + '" fill="none" stroke="#c62828" stroke-width="1.8"/>';
   }
-  svg += '<text x="224" y="132" text-anchor="middle" class="sim-label" font-size="8" fill="#c62828">U2</text>';
-  // Animated flux arrows through center leg
-  svg += '<line x1="150" y1="30" x2="150" y2="108" stroke="#ff9800" stroke-width="2" stroke-dasharray="4 6" class="sim-field" opacity="0.8"/>';
-  svg += '<polygon points="147,95 150,108 153,95" fill="#ff9800" opacity="0.8"/>';
-  svg += '<line x1="100" y1="108" x2="100" y2="30" stroke="#ff9800" stroke-width="1.5" stroke-dasharray="4 6" class="sim-field" opacity="0.5"/>';
-  svg += '<polygon points="97,42 100,30 103,42" fill="#ff9800" opacity="0.5"/>';
-  svg += '<line x1="200" y1="108" x2="200" y2="30" stroke="#ff9800" stroke-width="1.5" stroke-dasharray="4 6" class="sim-field" opacity="0.5"/>';
-  svg += '<polygon points="197,42 200,30 203,42" fill="#ff9800" opacity="0.5"/>';
+  // Secondary terminal dots
+  svg += '<circle cx="232" cy="35" r="3" fill="#c62828"/>';
+  svg += '<circle cx="232" cy="120" r="3" fill="#c62828"/>';
+  svg += '<text x="224" y="140" text-anchor="middle" class="sim-label" font-size="8" fill="#c62828">U2</text>';
+  // Animated flux arrows - density based on load
+  var numFlux = Math.max(2, Math.round(loadFrac * 5));
+  for (i = 0; i < numFlux; i++) {
+    fluxOpacity = (0.4 + loadFrac * 0.5).toFixed(2);
+    var fy = 35 + i * (75 / numFlux);
+    svg += '<line x1="150" y1="' + fy + '" x2="150" y2="' + (fy + 12) + '" stroke="#ff9800" stroke-width="2" stroke-dasharray="3 4" class="sim-field" opacity="' + fluxOpacity + '"/>';
+  }
+  svg += '<polygon points="147,105 150,115 153,105" fill="#ff9800" opacity="' + (0.5 + loadFrac * 0.4).toFixed(2) + '"/>';
+  // Return flux paths on outer legs
+  svg += '<line x1="100" y1="115" x2="100" y2="35" stroke="#ff9800" stroke-width="1.5" stroke-dasharray="3 5" class="sim-field" opacity="' + (0.3 + loadFrac * 0.3).toFixed(2) + '"/>';
+  svg += '<polygon points="97,47 100,35 103,47" fill="#ff9800" opacity="0.5"/>';
+  svg += '<line x1="200" y1="115" x2="200" y2="35" stroke="#ff9800" stroke-width="1.5" stroke-dasharray="3 5" class="sim-field" opacity="' + (0.3 + loadFrac * 0.3).toFixed(2) + '"/>';
+  svg += '<polygon points="197,47 200,35 203,47" fill="#ff9800" opacity="0.5"/>';
+  // IEC transformer symbol (two overlapping circles) as reference icon
+  svg += '<circle cx="22" cy="75" r="10" fill="none" stroke="#1565c0" stroke-width="1.2"/>';
+  svg += '<circle cx="22" cy="90" r="10" fill="none" stroke="#c62828" stroke-width="1.2"/>';
   // Load indicator bar on right
   var barH = Math.max(3, loadFrac * 80);
-  svg += '<rect x="270" y="' + (105 - barH) + '" width="12" height="' + barH + '" rx="2" fill="#4caf50" opacity="0.7"/>';
-  svg += '<rect x="270" y="25" width="12" height="80" rx="2" fill="none" stroke="var(--text-muted)" stroke-width="0.5"/>';
-  svg += '<text x="276" y="118" text-anchor="middle" class="sim-label" font-size="7">' + loadPercent + '%</text>';
+  svg += '<rect x="274" y="' + (110 - barH) + '" width="12" height="' + barH + '" rx="2" fill="#4caf50" opacity="0.7"/>';
+  svg += '<rect x="274" y="30" width="12" height="80" rx="2" fill="none" stroke="var(--text-muted)" stroke-width="0.5"/>';
+  svg += '<text x="280" y="125" text-anchor="middle" class="sim-label" font-size="7">' + loadPercent + '%</text>';
   // Labels
-  svg += '<text x="150" y="10" text-anchor="middle" class="sim-label sim-value" font-size="9">' + S + ' kVA  uk=' + uk + '%</text>';
-  if (voltage) svg += '<text x="150" y="138" text-anchor="middle" class="sim-label sim-value" font-size="8">' + voltage + ' kV</text>';
+  svg += '<text x="150" y="12" text-anchor="middle" class="sim-label sim-value sim-neon" font-size="9">' + S + ' kVA  uk=' + uk + '%</text>';
+  if (voltage) svg += '<text x="150" y="148" text-anchor="middle" class="sim-label sim-value" font-size="8">' + voltage + ' kV</text>';
   svg += '</svg>';
   return svg;
 }
@@ -15073,43 +15103,72 @@ function harmonicCalcCableDerating(loadType, numLoads) {
 // Shows distorted waveform as sum of fundamental + harmonics
 function renderHarmonicSim(thd, harmonics, loadType) {
   if (!thd || !harmonics) return '';
-  var svg = '<svg viewBox="0 0 320 100" width="320" height="100" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  var svg = '<svg viewBox="0 0 320 110" width="320" height="110" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
   // Determine color based on THD severity
   var waveColor = thd > 8 ? '#ef4444' : thd > 5 ? '#f59e0b' : '#22c55e';
   // Draw pure fundamental as gray dashed reference
   var refPoints = '';
   var distPoints = '';
+  var fillPoints = '';
   var h3 = (harmonics.h3 || 0) / 100;
   var h5 = (harmonics.h5 || 0) / 100;
   var h7 = (harmonics.h7 || 0) / 100;
   var h11 = (harmonics.h11 || 0) / 100;
   var h13 = (harmonics.h13 || 0) / 100;
-  var numPts = 80;
-  var i;
+  var numPts = 140;
+  var i, x, t, yRef, yDist;
   for (i = 0; i <= numPts; i++) {
-    var x = 10 + (i / numPts) * 230;
-    var t = (i / numPts) * 2 * Math.PI;
-    var yRef = 50 - 30 * Math.sin(t);
-    var yDist = 50 - 30 * (Math.sin(t) + h3 * Math.sin(3 * t) + h5 * Math.sin(5 * t) + h7 * Math.sin(7 * t) + h11 * Math.sin(11 * t) + h13 * Math.sin(13 * t));
+    x = 10 + (i / numPts) * 230;
+    t = (i / numPts) * 2 * Math.PI;
+    yRef = 50 - 30 * Math.sin(t);
+    yDist = 50 - 30 * (Math.sin(t) + h3 * Math.sin(3 * t) + h5 * Math.sin(5 * t) + h7 * Math.sin(7 * t) + h11 * Math.sin(11 * t) + h13 * Math.sin(13 * t));
     yDist = Math.max(5, Math.min(95, yDist));
     refPoints += (i === 0 ? '' : ' ') + x.toFixed(1) + ',' + yRef.toFixed(1);
     distPoints += (i === 0 ? '' : ' ') + x.toFixed(1) + ',' + yDist.toFixed(1);
+    fillPoints += (i === 0 ? '' : ' ') + x.toFixed(1) + ',' + yDist.toFixed(1);
   }
+  // Gradient fill under distorted waveform
+  svg += '<defs><linearGradient id="waveGrad' + Math.round(thd * 10) + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + waveColor + '" stop-opacity="0.3"/><stop offset="100%" stop-color="' + waveColor + '" stop-opacity="0.02"/></linearGradient></defs>';
+  svg += '<polygon points="10,50 ' + fillPoints + ' 240,50" fill="url(#waveGrad' + Math.round(thd * 10) + ')"/>';
+  // Reference waveform
   svg += '<polyline points="' + refPoints + '" fill="none" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="4 3" opacity="0.5"/>';
+  // Distorted waveform
   svg += '<g class="sim-pulse"><polyline points="' + distPoints + '" fill="none" stroke="' + waveColor + '" stroke-width="2"/></g>';
+  // Zero-crossing markers (small circles where waveform crosses y=50)
+  var prevY = 50;
+  for (i = 1; i <= numPts; i++) {
+    t = (i / numPts) * 2 * Math.PI;
+    yDist = 50 - 30 * (Math.sin(t) + h3 * Math.sin(3 * t) + h5 * Math.sin(5 * t) + h7 * Math.sin(7 * t) + h11 * Math.sin(11 * t) + h13 * Math.sin(13 * t));
+    yDist = Math.max(5, Math.min(95, yDist));
+    var prevT = ((i - 1) / numPts) * 2 * Math.PI;
+    var prevDist = 50 - 30 * (Math.sin(prevT) + h3 * Math.sin(3 * prevT) + h5 * Math.sin(5 * prevT) + h7 * Math.sin(7 * prevT) + h11 * Math.sin(11 * prevT) + h13 * Math.sin(13 * prevT));
+    prevDist = Math.max(5, Math.min(95, prevDist));
+    if ((prevDist - 50) * (yDist - 50) < 0) {
+      x = 10 + (i / numPts) * 230;
+      svg += '<circle cx="' + x.toFixed(1) + '" cy="50" r="2.5" fill="none" stroke="' + waveColor + '" stroke-width="1" opacity="0.7"/>';
+    }
+  }
+  // Zero line / frequency axis
+  svg += '<line x1="10" y1="50" x2="240" y2="50" stroke="var(--text-muted)" stroke-width="0.5" opacity="0.4"/>';
+  // Frequency axis labels
+  svg += '<text x="10" y="104" class="sim-label" font-size="5" fill="var(--text-muted)">0</text>';
+  svg += '<text x="67" y="104" text-anchor="middle" class="sim-label" font-size="5" fill="var(--text-muted)">\u03C0/2</text>';
+  svg += '<text x="125" y="104" text-anchor="middle" class="sim-label" font-size="5" fill="var(--text-muted)">\u03C0</text>';
+  svg += '<text x="182" y="104" text-anchor="middle" class="sim-label" font-size="5" fill="var(--text-muted)">3\u03C0/2</text>';
+  svg += '<text x="237" y="104" text-anchor="end" class="sim-label" font-size="5" fill="var(--text-muted)">2\u03C0</text>';
   // Harmonic amplitude bars on the right
   var bars = [{h: 3, v: harmonics.h3 || 0}, {h: 5, v: harmonics.h5 || 0}, {h: 7, v: harmonics.h7 || 0}, {h: 11, v: harmonics.h11 || 0}, {h: 13, v: harmonics.h13 || 0}];
   var maxBar = Math.max(bars[0].v, bars[1].v, bars[2].v, bars[3].v, bars[4].v, 1);
   for (i = 0; i < bars.length; i++) {
     var bx = 252 + i * 13;
-    var bh = Math.max(1, (bars[i].v / maxBar) * 50);
+    var bh = Math.max(1, (bars[i].v / maxBar) * 55);
     var barColor = bars[i].v > 8 ? '#ef4444' : bars[i].v > 5 ? '#f59e0b' : '#22c55e';
-    svg += '<rect x="' + bx + '" y="' + (80 - bh) + '" width="10" height="' + bh + '" rx="1" fill="' + barColor + '" opacity="0.8"/>';
-    svg += '<text x="' + (bx + 5) + '" y="92" text-anchor="middle" class="sim-label" font-size="7">H' + bars[i].h + '</text>';
+    svg += '<rect x="' + bx + '" y="' + (85 - bh) + '" width="10" height="' + bh + '" rx="1" fill="' + barColor + '" opacity="0.8"/>';
+    svg += '<text x="' + (bx + 5) + '" y="97" text-anchor="middle" class="sim-label" font-size="7">H' + bars[i].h + '</text>';
   }
-  // THD label
-  svg += '<text x="160" y="12" text-anchor="middle" class="sim-label sim-value" font-size="9">THD=' + thd.toFixed(1) + '%</text>';
+  // THD label with neon class for dark mode
+  svg += '<text x="160" y="12" text-anchor="middle" class="sim-label sim-value sim-neon" font-size="9">THD=' + thd.toFixed(1) + '%</text>';
   svg += '</svg>';
   return svg;
 }
@@ -17488,7 +17547,7 @@ function pfcGetDetuningRecommendation(detuning) {
 // Shows power triangle with P/Q/S vectors before and after correction
 function renderPfcSim(currentPF, targetPF, kvar, kW) {
   if (!currentPF || !kW || currentPF >= 1) return '';
-  var svg = '<svg viewBox="0 0 280 160" width="280" height="160" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  var svg = '<svg viewBox="0 0 280 170" width="280" height="170" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
   // Calculate triangle dimensions
   var phi1 = Math.acos(currentPF);
@@ -17498,48 +17557,73 @@ function renderPfcSim(currentPF, targetPF, kvar, kW) {
   var Q2 = targetPF < 1 ? kW * Math.tan(phi2) : 0;
   // Scale to fit
   var maxDim = Math.max(kW, Q1, S1);
-  var scale = 110 / (maxDim > 0 ? maxDim : 1);
-  var Px = Math.min(kW * scale, 180);
-  var Qy1 = Math.min(Q1 * scale, 110);
-  var Qy2 = Math.min(Q2 * scale, 110);
+  var scale = 100 / (maxDim > 0 ? maxDim : 1);
+  var Px = Math.min(kW * scale, 160);
+  var Qy1 = Math.min(Q1 * scale, 100);
+  var Qy2 = Math.min(Q2 * scale, 100);
   // Origin at top-left of triangle area
   var ox = 40;
-  var oy = 25;
+  var oy = 30;
   // Before-correction triangle (solid)
-  // P horizontal (green)
+  // P horizontal (green) with animated power flow arrow
   svg += '<line x1="' + ox + '" y1="' + oy + '" x2="' + (ox + Px) + '" y2="' + oy + '" stroke="#4caf50" stroke-width="2.5"/>';
   svg += '<polygon points="' + (ox + Px - 6) + ',' + (oy - 3) + ' ' + (ox + Px) + ',' + oy + ' ' + (ox + Px - 6) + ',' + (oy + 3) + '" fill="#4caf50"/>';
+  // Animated power flow dot along P axis
+  svg += '<circle cx="' + (ox + Px / 2) + '" cy="' + oy + '" r="2.5" fill="#69f0ae" class="sim-particle" opacity="0.8"/>';
   // Q vertical (red, pointing down for inductive)
   svg += '<line x1="' + (ox + Px) + '" y1="' + oy + '" x2="' + (ox + Px) + '" y2="' + (oy + Qy1) + '" stroke="#ef4444" stroke-width="2.5"/>';
   svg += '<polygon points="' + (ox + Px - 3) + ',' + (oy + Qy1 - 6) + ' ' + (ox + Px) + ',' + (oy + Qy1) + ' ' + (ox + Px + 3) + ',' + (oy + Qy1 - 6) + '" fill="#ef4444"/>';
   // S hypotenuse (blue)
   svg += '<line x1="' + ox + '" y1="' + oy + '" x2="' + (ox + Px) + '" y2="' + (oy + Qy1) + '" stroke="#1976d2" stroke-width="2"/>';
   svg += '<polygon points="' + (ox + Px - 5) + ',' + (oy + Qy1 - 5) + ' ' + (ox + Px) + ',' + (oy + Qy1) + ' ' + (ox + Px - 7) + ',' + (oy + Qy1 + 1) + '" fill="#1976d2"/>';
+  // Angle arc (SVG arc path instead of just text)
+  var arcR = 20;
+  var arcX1 = ox + arcR;
+  var arcY1 = oy;
+  var arcX2 = ox + arcR * Math.cos(phi1);
+  var arcY2 = oy + arcR * Math.sin(phi1);
+  svg += '<path d="M' + arcX1 + ',' + arcY1 + ' A' + arcR + ',' + arcR + ' 0 0 1 ' + arcX2.toFixed(1) + ',' + arcY2.toFixed(1) + '" fill="none" stroke="#ff9800" stroke-width="1.5"/>';
   // After-correction triangle (dashed overlay)
   if (targetPF < 1 && Qy2 < Qy1) {
     svg += '<line x1="' + (ox + Px) + '" y1="' + oy + '" x2="' + (ox + Px) + '" y2="' + (oy + Qy2) + '" stroke="#ff9800" stroke-width="1.5" stroke-dasharray="4 3"/>';
     svg += '<line x1="' + ox + '" y1="' + oy + '" x2="' + (ox + Px) + '" y2="' + (oy + Qy2) + '" stroke="#0288d1" stroke-width="1.5" stroke-dasharray="4 3"/>';
+    // Target angle arc
+    var arcR2 = 25;
+    var arcX2t = ox + arcR2 * Math.cos(phi2);
+    var arcY2t = oy + arcR2 * Math.sin(phi2);
+    svg += '<path d="M' + (ox + arcR2) + ',' + oy + ' A' + arcR2 + ',' + arcR2 + ' 0 0 1 ' + arcX2t.toFixed(1) + ',' + arcY2t.toFixed(1) + '" fill="none" stroke="#0288d1" stroke-width="1" stroke-dasharray="2 2"/>';
   } else if (targetPF >= 1) {
-    // Perfect PF: S aligns with P, no Q
     svg += '<text x="' + (ox + Px + 5) + '" y="' + (oy + 5) + '" class="sim-label" font-size="7" fill="#ff9800">Q=0</text>';
   }
-  // Capacitor symbol for correction
+  // IEC Capacitor symbol (curved plate)
   var capX = ox + Px + 18;
   var capY = oy + Qy2 + 5;
   svg += '<line x1="' + capX + '" y1="' + capY + '" x2="' + capX + '" y2="' + (capY + 16) + '" stroke="#ff9800" stroke-width="2"/>';
   svg += '<line x1="' + (capX - 6) + '" y1="' + (capY + 6) + '" x2="' + (capX + 6) + '" y2="' + (capY + 6) + '" stroke="#ff9800" stroke-width="2"/>';
-  svg += '<line x1="' + (capX - 6) + '" y1="' + (capY + 10) + '" x2="' + (capX + 6) + '" y2="' + (capY + 10) + '" stroke="#ff9800" stroke-width="2"/>';
+  svg += '<path d="M' + (capX - 6) + ',' + (capY + 10) + ' Q' + capX + ',' + (capY + 13) + ' ' + (capX + 6) + ',' + (capY + 10) + '" fill="none" stroke="#ff9800" stroke-width="2"/>';
+  // Small phasor diagram in corner (showing V/I angle)
+  var pdX = 230, pdY = 130;
+  var pdR = 18;
+  svg += '<circle cx="' + pdX + '" cy="' + pdY + '" r="' + pdR + '" fill="none" stroke="var(--text-muted)" stroke-width="0.5"/>';
+  // Voltage phasor (horizontal)
+  svg += '<line x1="' + pdX + '" y1="' + pdY + '" x2="' + (pdX + pdR) + '" y2="' + pdY + '" stroke="#4caf50" stroke-width="1.5"/>';
+  svg += '<text x="' + (pdX + pdR + 3) + '" y="' + (pdY + 3) + '" class="sim-label" font-size="5" fill="#4caf50">V</text>';
+  // Current phasor (lagging)
+  var iX = pdX + pdR * Math.cos(phi1);
+  var iY = pdY + pdR * Math.sin(phi1);
+  svg += '<line x1="' + pdX + '" y1="' + pdY + '" x2="' + iX.toFixed(1) + '" y2="' + iY.toFixed(1) + '" stroke="#ef4444" stroke-width="1.5"/>';
+  svg += '<text x="' + (iX + 3).toFixed(1) + '" y="' + (iY + 3).toFixed(1) + '" class="sim-label" font-size="5" fill="#ef4444">I</text>';
   // Labels
-  svg += '<text x="' + (ox + Px / 2) + '" y="' + (oy - 5) + '" text-anchor="middle" class="sim-label sim-value" font-size="9" fill="#4caf50">P=' + kW + ' kW</text>';
+  svg += '<text x="' + (ox + Px / 2) + '" y="' + (oy - 7) + '" text-anchor="middle" class="sim-label sim-value" font-size="9" fill="#4caf50">P=' + kW + ' kW</text>';
   svg += '<text x="' + (ox + Px + 14) + '" y="' + (oy + Qy1 / 2) + '" text-anchor="start" class="sim-label" font-size="8" fill="#ef4444">Q</text>';
   svg += '<text x="' + (ox + Px / 2 - 10) + '" y="' + (oy + Qy1 / 2 + 12) + '" text-anchor="middle" class="sim-label" font-size="8" fill="#1976d2">S</text>';
-  // Angle arcs
-  svg += '<text x="' + (ox + 20) + '" y="' + (oy + 14) + '" class="sim-label sim-value sim-pulse" font-size="8">\u03C6\u2081=' + (phi1 * 180 / Math.PI).toFixed(1) + '\u00B0</text>';
+  // Angle values
+  svg += '<text x="' + (ox + 28) + '" y="' + (oy + 16) + '" class="sim-label sim-value sim-pulse" font-size="8">\u03C6\u2081=' + (phi1 * 180 / Math.PI).toFixed(1) + '\u00B0</text>';
   if (targetPF < 1) {
-    svg += '<text x="' + (ox + 20) + '" y="' + (oy + 26) + '" class="sim-label sim-value" font-size="8" fill="#ff9800">\u03C6\u2082=' + (phi2 * 180 / Math.PI).toFixed(1) + '\u00B0</text>';
+    svg += '<text x="' + (ox + 28) + '" y="' + (oy + 28) + '" class="sim-label sim-value" font-size="8" fill="#ff9800">\u03C6\u2082=' + (phi2 * 180 / Math.PI).toFixed(1) + '\u00B0</text>';
   }
   // Kvar label
-  if (kvar > 0) svg += '<text x="' + (capX) + '" y="' + (capY + 30) + '" text-anchor="middle" class="sim-label sim-value" font-size="8" fill="#ff9800">' + kvar + ' kvar</text>';
+  if (kvar > 0) svg += '<text x="' + (capX) + '" y="' + (capY + 30) + '" text-anchor="middle" class="sim-label sim-value sim-neon" font-size="8" fill="#ff9800">' + kvar + ' kvar</text>';
   svg += '</svg>';
   return svg;
 }
@@ -26568,31 +26652,55 @@ function renderVarmeSim(U, dT, Q, layers) {
 // Shows room cross-section with light cone from ceiling fixture
 function renderLysSim(nLuminaires, lux, roomWidth, roomLength, mountHeight) {
   if (!nLuminaires || !lux || !mountHeight) return '';
-  var svg = '<svg viewBox="0 0 300 120" width="300" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  var svg = '<svg viewBox="0 0 300 130" width="300" height="130" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
-  // Room outline
-  svg += '<rect x="20" y="15" width="260" height="90" fill="none" stroke="var(--text)" stroke-width="1.5"/>';
+  var i;
+  // Room outline with wall reflections
+  svg += '<rect x="20" y="15" width="260" height="100" fill="none" stroke="var(--text)" stroke-width="1.5"/>';
+  // Wall reflections (lighter rectangles on walls)
+  svg += '<rect x="21" y="16" width="8" height="98" fill="#fff9c4" opacity="0.15"/>';
+  svg += '<rect x="271" y="16" width="8" height="98" fill="#fff9c4" opacity="0.15"/>';
   // Ceiling
   svg += '<line x1="20" y1="15" x2="280" y2="15" stroke="var(--text)" stroke-width="2"/>';
   // Floor
-  svg += '<line x1="20" y1="105" x2="280" y2="105" stroke="var(--text)" stroke-width="2"/>';
-  // Luminaires on ceiling (distribute evenly)
+  svg += '<line x1="20" y1="115" x2="280" y2="115" stroke="var(--text)" stroke-width="2"/>';
+  // Lux distribution gradient on floor (brighter below fixtures, dimmer between)
   var nShow = Math.min(nLuminaires, 5);
   var spacing = 260 / (nShow + 1);
-  for (var i = 0; i < nShow; i++) {
+  // Floor gradient zones
+  for (i = 0; i < nShow; i++) {
+    var gx = 20 + spacing * (i + 1);
+    var gw = spacing * 0.7;
+    svg += '<ellipse cx="' + gx + '" cy="112" rx="' + (gw / 2) + '" ry="4" fill="#fff9c4" opacity="0.35"/>';
+  }
+  // Luminaires on ceiling with realistic luminaire shapes
+  for (i = 0; i < nShow; i++) {
     var lx = 20 + spacing * (i + 1);
-    // Luminaire rectangle
-    svg += '<rect x="' + (lx - 10) + '" y="15" width="20" height="6" fill="#ffc107" stroke="#f57f17" stroke-width="1"/>';
-    // Light cone (triangle with gradient)
+    // Luminaire body (recessed/surface style based on mountHeight)
+    if (mountHeight > 3) {
+      // Pendant mounting (line + rectangle)
+      svg += '<line x1="' + lx + '" y1="15" x2="' + lx + '" y2="22" stroke="var(--text)" stroke-width="0.8"/>';
+      svg += '<rect x="' + (lx - 12) + '" y="22" width="24" height="5" rx="2" fill="#ffc107" stroke="#f57f17" stroke-width="1"/>';
+      svg += '<rect x="' + (lx - 8) + '" y="27" width="16" height="2" rx="0.5" fill="#fdd835" opacity="0.8"/>';
+    } else {
+      // Surface mounted (flush rectangle)
+      svg += '<rect x="' + (lx - 12) + '" y="15" width="24" height="6" rx="1" fill="#ffc107" stroke="#f57f17" stroke-width="1"/>';
+      svg += '<rect x="' + (lx - 8) + '" y="21" width="16" height="2" rx="0.5" fill="#fdd835" opacity="0.8"/>';
+    }
+    // Light cone (improved with gradient opacity)
     var coneW = Math.min(50, 20 + mountHeight * 5);
-    svg += '<polygon points="' + (lx - 3) + ',21 ' + (lx + 3) + ',21 ' + (lx + coneW / 2) + ',100 ' + (lx - coneW / 2) + ',100" fill="#fff9c4" opacity="0.4" class="sim-glow"/>';
-    svg += '<polygon points="' + (lx - 2) + ',21 ' + (lx + 2) + ',21 ' + (lx + coneW / 4) + ',80 ' + (lx - coneW / 4) + ',80" fill="#ffeb3b" opacity="0.3" class="sim-glow"/>';
+    var coneTop = mountHeight > 3 ? 29 : 23;
+    svg += '<polygon points="' + (lx - 3) + ',' + coneTop + ' ' + (lx + 3) + ',' + coneTop + ' ' + (lx + coneW / 2) + ',110 ' + (lx - coneW / 2) + ',110" fill="#fff9c4" opacity="0.3" class="sim-glow"/>';
+    svg += '<polygon points="' + (lx - 2) + ',' + coneTop + ' ' + (lx + 2) + ',' + coneTop + ' ' + (lx + coneW / 4) + ',85 ' + (lx - coneW / 4) + ',85" fill="#ffeb3b" opacity="0.25" class="sim-glow"/>';
   }
   // Lux value on floor
-  svg += '<text x="150" y="115" text-anchor="middle" class="sim-label sim-value" font-size="9">' + lux + ' lux | ' + nLuminaires + ' ' + tx('armaturer', 'luminaires') + '</text>';
+  svg += '<text x="150" y="127" text-anchor="middle" class="sim-label sim-value sim-neon" font-size="9">' + lux + ' lux | ' + nLuminaires + ' ' + tx('armaturer', 'luminaires') + '</text>';
   // Mount height label
-  svg += '<line x1="12" y1="21" x2="12" y2="105" stroke="var(--text-muted)" stroke-width="0.5" stroke-dasharray="2 2"/>';
-  svg += '<text x="10" y="65" text-anchor="middle" class="sim-label sim-value" font-size="7" transform="rotate(-90,10,65)">h=' + mountHeight + 'm</text>';
+  svg += '<line x1="12" y1="21" x2="12" y2="115" stroke="var(--text-muted)" stroke-width="0.5" stroke-dasharray="2 2"/>';
+  svg += '<text x="10" y="70" text-anchor="middle" class="sim-label sim-value" font-size="7" transform="rotate(-90,10,70)">h=' + mountHeight + 'm</text>';
+  // Mounting type indicator
+  var mountLabel = mountHeight > 3 ? tx('Pendel', 'Pendant') : tx('Loft', 'Surface');
+  svg += '<text x="270" y="127" text-anchor="end" class="sim-label" font-size="6" fill="var(--text-muted)">' + mountLabel + '</text>';
   svg += '</svg>';
   return svg;
 }
@@ -26657,18 +26765,39 @@ function renderDCOhmSim(U, R, I, P) {
   var dur = simFlowDuration(I, 100);
   var heatCol = simHeatColor(P, 5000);
   var flowStyle = (dur > 0) ? ' style="animation-duration:' + dur + 's"' : '';
-  var svg = '<svg viewBox="0 0 300 120" width="300" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  var svg = '<svg viewBox="0 0 300 130" width="300" height="130" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
   // Voltage source
   svg += '<circle cx="40" cy="60" r="18" fill="none" stroke="#4caf50" stroke-width="2"/>';
   svg += '<text x="40" y="55" text-anchor="middle" class="sim-label" font-size="9">+</text>';
   svg += '<text x="40" y="70" text-anchor="middle" class="sim-label" font-size="9">-</text>';
-  svg += '<text x="40" y="95" text-anchor="middle" class="sim-label sim-value">' + U.toFixed(1) + ' V</text>';
+  svg += '<text x="40" y="100" text-anchor="middle" class="sim-label sim-value">' + U.toFixed(1) + ' V</text>';
+  // Junction dots (filled circles at wire connections)
+  svg += '<circle cx="58" cy="42" r="3" fill="var(--primary)"/>';
+  svg += '<circle cx="58" cy="78" r="3" fill="var(--primary)"/>';
+  svg += '<circle cx="260" cy="42" r="3" fill="var(--primary)"/>';
+  svg += '<circle cx="260" cy="78" r="3" fill="var(--primary)"/>';
   // Top wire with current flow
-  svg += '<line x1="58" y1="42" x2="260" y2="42" stroke="var(--primary)" stroke-width="2" class="sim-wire"' + flowStyle + '/>';
-  // Resistor
-  svg += '<rect x="130" y="32" width="60" height="20" rx="3" fill="' + heatCol + '" stroke="var(--text)" stroke-width="1" class="sim-resistor"/>';
-  svg += '<text x="160" y="46" text-anchor="middle" class="sim-label" fill="#fff" font-size="9">R</text>';
+  svg += '<line x1="58" y1="42" x2="125" y2="42" stroke="var(--primary)" stroke-width="2" class="sim-wire"' + flowStyle + '/>';
+  svg += '<line x1="195" y1="42" x2="260" y2="42" stroke="var(--primary)" stroke-width="2" class="sim-wire"' + flowStyle + '/>';
+  // IEC Resistor symbol (zigzag path)
+  svg += '<path d="M125,42 L130,32 L140,52 L150,32 L160,52 L170,32 L180,52 L190,32 L195,42" fill="none" stroke="' + heatCol + '" stroke-width="2.5" stroke-linejoin="round"/>';
   svg += '<text x="160" y="25" text-anchor="middle" class="sim-label sim-value">' + (R >= 1000 ? (R/1000).toFixed(1) + 'k' : R.toFixed(1)) + ' \u03A9</text>';
+  // Heat waves above resistor when P is high
+  if (P > 500) {
+    var heatOpacity = Math.min(0.7, P / 5000).toFixed(2);
+    svg += '<path d="M140,22 C142,18 144,20 146,16" fill="none" stroke="#f44336" stroke-width="0.8" opacity="' + heatOpacity + '" class="sim-heat"/>';
+    svg += '<path d="M155,22 C157,18 159,20 161,16" fill="none" stroke="#f44336" stroke-width="0.8" opacity="' + heatOpacity + '" class="sim-heat"/>';
+    svg += '<path d="M170,22 C172,18 174,20 176,16" fill="none" stroke="#f44336" stroke-width="0.8" opacity="' + heatOpacity + '" class="sim-heat"/>';
+  }
+  // Electron dot animation (small circles flowing along wires)
+  if (dur > 0) {
+    svg += '<circle cx="80" cy="42" r="2" fill="#00e5ff" class="sim-particle" opacity="0.8"/>';
+    svg += '<circle cx="120" cy="42" r="2" fill="#00e5ff" class="sim-particle" opacity="0.8" style="animation-delay:0.3s"/>';
+    svg += '<circle cx="220" cy="42" r="2" fill="#00e5ff" class="sim-particle" opacity="0.8" style="animation-delay:0.6s"/>';
+    svg += '<circle cx="220" cy="78" r="2" fill="#00e5ff" class="sim-particle" opacity="0.8" style="animation-delay:0.9s"/>';
+    svg += '<circle cx="120" cy="78" r="2" fill="#00e5ff" class="sim-particle" opacity="0.8" style="animation-delay:1.2s"/>';
+  }
   // Bottom wire (return)
   svg += '<line x1="58" y1="78" x2="260" y2="78" stroke="var(--primary)" stroke-width="2" class="sim-wire"' + flowStyle + '/>';
   // Vertical connections
@@ -26676,9 +26805,9 @@ function renderDCOhmSim(U, R, I, P) {
   svg += '<line x1="40" y1="42" x2="58" y2="42" stroke="var(--primary)" stroke-width="1.5"/>';
   svg += '<line x1="40" y1="78" x2="58" y2="78" stroke="var(--primary)" stroke-width="1.5"/>';
   // Current label
-  svg += '<text x="230" y="65" text-anchor="middle" class="sim-label sim-value">I=' + I.toFixed(2) + ' A</text>';
+  svg += '<text x="260" y="65" text-anchor="middle" class="sim-label sim-value sim-neon">I=' + I.toFixed(2) + ' A</text>';
   // Power label
-  svg += '<text x="160" y="110" text-anchor="middle" class="sim-label sim-value">P=' + P.toFixed(1) + ' W</text>';
+  svg += '<text x="160" y="120" text-anchor="middle" class="sim-label sim-value">P=' + P.toFixed(1) + ' W</text>';
   svg += '</svg>';
   return svg;
 }
@@ -27001,24 +27130,41 @@ function renderScircuitSim(zNet, zTrafo, zCable, ikMax, ikMin) {
 
 function renderMotorSim(ns, n, slip, torque) {
   if (!ns) return '';
-  var svg = '<svg viewBox="0 0 240 140" width="240" height="140" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
-  var cx = 120, cy = 65;
+  var svg = '<svg viewBox="0 0 260 150" width="260" height="150" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+  var cx = 120, cy = 70;
+  var i, ang, sx, sy;
   // Stator (outer ring)
   svg += '<circle cx="' + cx + '" cy="' + cy + '" r="50" fill="none" stroke="#5c6bc0" stroke-width="6"/>';
   // Stator coils (6 rectangles around)
-  for (var i = 0; i < 6; i++) {
-    var ang = i * 60 * Math.PI / 180;
-    var sx = cx + 42 * Math.cos(ang);
-    var sy = cy + 42 * Math.sin(ang);
+  for (i = 0; i < 6; i++) {
+    ang = i * 60 * Math.PI / 180;
+    sx = cx + 42 * Math.cos(ang);
+    sy = cy + 42 * Math.sin(ang);
     svg += '<rect x="' + (sx - 5) + '" y="' + (sy - 4) + '" width="10" height="8" rx="1" fill="#7986cb" stroke="none" transform="rotate(' + (i * 60) + ' ' + sx + ' ' + sy + ')"/>';
+  }
+  // Terminal box (small rectangle on top of stator)
+  svg += '<rect x="' + (cx - 12) + '" y="' + (cy - 58) + '" width="24" height="10" rx="2" fill="#455a64" stroke="var(--text)" stroke-width="1"/>';
+  svg += '<circle cx="' + (cx - 5) + '" cy="' + (cy - 53) + '" r="1.5" fill="#ffc107"/>';
+  svg += '<circle cx="' + cx + '" cy="' + (cy - 53) + '" r="1.5" fill="#ffc107"/>';
+  svg += '<circle cx="' + (cx + 5) + '" cy="' + (cy - 53) + '" r="1.5" fill="#ffc107"/>';
+  // Rotating magnetic field lines (3 at 120-degree spacing)
+  var fieldDur = (ns > 0) ? (60 / ns).toFixed(2) : '0';
+  for (i = 0; i < 3; i++) {
+    ang = i * 120 * Math.PI / 180;
+    var fx1 = cx + 30 * Math.cos(ang);
+    var fy1 = cy + 30 * Math.sin(ang);
+    var fx2 = cx + 48 * Math.cos(ang);
+    var fy2 = cy + 48 * Math.sin(ang);
+    svg += '<line x1="' + fx1.toFixed(1) + '" y1="' + fy1.toFixed(1) + '" x2="' + fx2.toFixed(1) + '" y2="' + fy2.toFixed(1) + '" stroke="#42a5f5" stroke-width="2" opacity="0.6" class="sim-field" style="animation-delay:' + (i * 0.4).toFixed(1) + 's"/>';
   }
   // Rotor (inner ring) - spins
   var rotorDur = (ns > 0 && slip < 1 && n >= 10) ? (60 / n).toFixed(2) : '0';
-  var rotorStyle = (rotorDur > 0) ? ' style="animation-duration:' + rotorDur + 's"' : '';
+  var rotorStyle = (rotorDur > 0) ? ' style="animation-duration:' + rotorDur + 's;animation-timing-function:cubic-bezier(0.4,0,0.2,1)"' : '';
   svg += '<circle cx="' + cx + '" cy="' + cy + '" r="28" fill="none" stroke="#ff7043" stroke-width="4" class="sim-rotor"' + rotorStyle + '/>';
   // Rotor bars
-  for (var i = 0; i < 8; i++) {
-    var ang = i * 45 * Math.PI / 180;
+  for (i = 0; i < 8; i++) {
+    ang = i * 45 * Math.PI / 180;
     var rx1 = cx + 15 * Math.cos(ang);
     var ry1 = cy + 15 * Math.sin(ang);
     var rx2 = cx + 26 * Math.cos(ang);
@@ -27027,11 +27173,28 @@ function renderMotorSim(ns, n, slip, torque) {
   }
   // Shaft
   svg += '<circle cx="' + cx + '" cy="' + cy + '" r="5" fill="#ff7043"/>';
+  // Bearings (small circles at shaft ends)
+  svg += '<circle cx="' + (cx + 52) + '" cy="' + cy + '" r="4" fill="none" stroke="#78909c" stroke-width="2"/>';
+  svg += '<circle cx="' + (cx + 52) + '" cy="' + cy + '" r="1.5" fill="#78909c"/>';
+  // Shaft line extending to bearing
+  svg += '<line x1="' + (cx + 5) + '" y1="' + cy + '" x2="' + (cx + 48) + '" y2="' + cy + '" stroke="#ff7043" stroke-width="3"/>';
+  // Cooling fan on non-drive end (left side)
+  svg += '<circle cx="' + (cx - 55) + '" cy="' + cy + '" r="12" fill="none" stroke="#90a4ae" stroke-width="1"/>';
+  for (i = 0; i < 5; i++) {
+    ang = i * 72 * Math.PI / 180;
+    var bx = (cx - 55) + 8 * Math.cos(ang);
+    var by = cy + 8 * Math.sin(ang);
+    svg += '<line x1="' + (cx - 55) + '" y1="' + cy + '" x2="' + bx.toFixed(1) + '" y2="' + by.toFixed(1) + '" stroke="#90a4ae" stroke-width="1.5"/>';
+  }
+  // Bearing on non-drive end
+  svg += '<circle cx="' + (cx - 52) + '" cy="' + cy + '" r="4" fill="none" stroke="#78909c" stroke-width="2"/>';
+  svg += '<circle cx="' + (cx - 52) + '" cy="' + cy + '" r="1.5" fill="#78909c"/>';
+  svg += '<line x1="' + (cx - 5) + '" y1="' + cy + '" x2="' + (cx - 48) + '" y2="' + cy + '" stroke="#ff7043" stroke-width="3"/>';
   // Labels
-  svg += '<text x="20" y="15" class="sim-label sim-value" font-size="8">ns=' + ns.toFixed(0) + ' rpm</text>';
+  svg += '<text x="20" y="15" class="sim-label sim-value sim-neon" font-size="8">ns=' + ns.toFixed(0) + ' rpm</text>';
   svg += '<text x="20" y="28" class="sim-label sim-value" font-size="8">n=' + n.toFixed(0) + ' rpm</text>';
-  svg += '<text x="20" y="130" class="sim-label sim-value" font-size="8">s=' + (slip * 100).toFixed(1) + '%</text>';
-  if (torque) svg += '<text x="140" y="130" class="sim-label sim-value" font-size="8">T=' + torque.toFixed(1) + ' Nm</text>';
+  svg += '<text x="20" y="140" class="sim-label sim-value" font-size="8">s=' + (slip * 100).toFixed(1) + '%</text>';
+  if (torque) svg += '<text x="140" y="140" class="sim-label sim-value" font-size="8">T=' + torque.toFixed(1) + ' Nm</text>';
   svg += '</svg>';
   return svg;
 }
@@ -27109,36 +27272,57 @@ function renderSolarSim(kWp, panels, inverterKW, annualYield) {
 
 function renderBESSSim(capacityKWh, powerKW, soc, chemistry, charging) {
   if (!capacityKWh || !powerKW) return '';
-  var svg = '<svg viewBox="0 0 300 120" width="300" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  var svg = '<svg viewBox="0 0 300 130" width="300" height="130" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
   var chemColors = {lfp:'#4caf50', nmc:'#2196f3', lfp_blade:'#009688', sodium:'#ff9800'};
   var chemColor = chemColors[chemistry] || '#4caf50';
   var dur = simFlowDuration(powerKW, 50);
-  // Battery stack
-  svg += '<rect x="30" y="25" width="80" height="70" rx="5" fill="#37474f" stroke="' + chemColor + '" stroke-width="2"/>';
-  svg += '<rect x="60" y="18" width="20" height="8" rx="2" fill="' + chemColor + '"/>';
-  // Charge level fill
-  var fillH = Math.max(4, (soc / 100) * 60);
-  var fillY = 30 + (60 - fillH);
-  svg += '<rect x="35" y="' + fillY + '" width="70" height="' + fillH + '" rx="3" fill="' + chemColor + '" opacity="0.5" class="sim-field" style="animation-duration:2.5s"/>';
+  var i;
+  // Battery stack with cell detail
+  svg += '<rect x="25" y="20" width="85" height="75" rx="5" fill="#37474f" stroke="' + chemColor + '" stroke-width="2"/>';
+  svg += '<rect x="55" y="13" width="25" height="8" rx="2" fill="' + chemColor + '"/>';
+  // Individual battery cells (stacked with separator lines)
+  var numCells = 5;
+  var cellH = 60 / numCells;
+  for (i = 0; i < numCells; i++) {
+    var cellY = 28 + i * cellH;
+    svg += '<rect x="32" y="' + cellY + '" width="70" height="' + (cellH - 2) + '" rx="1" fill="#455a64" stroke="' + chemColor + '" stroke-width="0.5" opacity="0.6"/>';
+  }
+  // SOC level with color gradient (green > yellow > red)
+  var socColor = soc > 60 ? '#4caf50' : (soc > 30 ? '#ffc107' : '#f44336');
+  var fillH = Math.max(4, (soc / 100) * 62);
+  var fillY = 28 + (62 - fillH);
+  svg += '<rect x="33" y="' + fillY + '" width="68" height="' + fillH + '" rx="2" fill="' + socColor + '" opacity="0.4" class="sim-energize"/>';
+  // SOC percentage inside battery
+  svg += '<text x="67" y="63" text-anchor="middle" class="sim-label sim-value" font-size="10" fill="#fff">' + soc + '%</text>';
   // BMS indicator
-  svg += '<rect x="40" y="30" width="22" height="10" rx="2" fill="#263238" stroke="' + chemColor + '" stroke-width="0.5"/>';
-  svg += '<text x="51" y="38" text-anchor="middle" class="sim-label" fill="' + chemColor + '" font-size="5">BMS</text>';
-  // Bidirectional arrows / power flow
-  var arrowX1 = charging ? 180 : 115;
-  var arrowX2 = charging ? 115 : 180;
-  svg += '<line x1="' + arrowX1 + '" y1="60" x2="' + arrowX2 + '" y2="60" stroke="' + chemColor + '" stroke-width="3" class="sim-wire" style="animation-duration:' + dur + 's"/>';
+  svg += '<rect x="32" y="92" width="25" height="10" rx="2" fill="#263238" stroke="' + chemColor + '" stroke-width="0.5"/>';
+  svg += '<text x="44" y="100" text-anchor="middle" class="sim-label" fill="' + chemColor + '" font-size="5">BMS</text>';
+  // Temperature indicator
+  svg += '<rect x="62" y="92" width="25" height="10" rx="2" fill="#263238" stroke="#ff9800" stroke-width="0.5"/>';
+  svg += '<text x="74" y="100" text-anchor="middle" class="sim-label" fill="#ff9800" font-size="5">25\u00B0C</text>';
+  // Bidirectional power flow arrows
+  var arrowColor = charging ? '#4caf50' : '#ff9800';
+  svg += '<line x1="115" y1="57" x2="180" y2="57" stroke="' + arrowColor + '" stroke-width="3" class="sim-wire" style="animation-duration:' + dur + 's"/>';
+  // Charge/discharge direction indicators
+  if (charging) {
+    svg += '<polygon points="125,52 115,57 125,62" fill="' + arrowColor + '"/>';
+    svg += '<polygon points="145,52 135,57 145,62" fill="' + arrowColor + '" opacity="0.5"/>';
+  } else {
+    svg += '<polygon points="170,52 180,57 170,62" fill="' + arrowColor + '"/>';
+    svg += '<polygon points="150,52 160,57 150,62" fill="' + arrowColor + '" opacity="0.5"/>';
+  }
   // Inverter/charger box
-  svg += '<rect x="185" y="40" width="45" height="40" rx="4" fill="#1a237e" stroke="var(--text)" stroke-width="1"/>';
-  svg += '<text x="207" y="57" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">PCS</text>';
-  svg += '<text x="207" y="70" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">' + powerKW + 'kW</text>';
-  // AC grid connection
-  svg += '<line x1="230" y1="60" x2="275" y2="60" stroke="#42a5f5" stroke-width="2" class="sim-wire" style="animation-duration:1.5s"/>';
-  svg += '<circle cx="282" cy="60" r="7" fill="none" stroke="#42a5f5" stroke-width="1.5"/>';
-  svg += '<text x="282" y="63" text-anchor="middle" class="sim-label" font-size="7">~</text>';
+  svg += '<rect x="185" y="37" width="48" height="40" rx="4" fill="#1a237e" stroke="var(--text)" stroke-width="1"/>';
+  svg += '<text x="209" y="54" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">PCS</text>';
+  svg += '<text x="209" y="68" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">' + powerKW + 'kW</text>';
+  // AC grid connection with bidirectional arrows
+  svg += '<line x1="233" y1="57" x2="270" y2="57" stroke="#42a5f5" stroke-width="2" class="sim-wire" style="animation-duration:1.5s"/>';
+  svg += '<circle cx="280" cy="57" r="8" fill="none" stroke="#42a5f5" stroke-width="1.5"/>';
+  svg += '<text x="280" y="61" text-anchor="middle" class="sim-label" font-size="8">~</text>';
   // Labels
-  svg += '<text x="70" y="110" text-anchor="middle" class="sim-label sim-value" font-size="8">' + capacityKWh + ' kWh | SOC ' + soc + '%</text>';
-  svg += '<text x="230" y="110" text-anchor="middle" class="sim-label sim-value" font-size="8">' + (charging ? '\u2190 CHG' : 'DIS \u2192') + '</text>';
+  svg += '<text x="67" y="115" text-anchor="middle" class="sim-label sim-value sim-neon" font-size="8">' + capacityKWh + ' kWh</text>';
+  svg += '<text x="230" y="115" text-anchor="middle" class="sim-label sim-value" font-size="8">' + (charging ? '\u2190 CHG' : 'DIS \u2192') + '</text>';
   svg += '</svg>';
   return svg;
 }
@@ -27238,10 +27422,11 @@ function renderUPSSim(loadW, upsVA, autonomyMin, batteryAh, topology) {
 
 function renderVFDSim(motorKW, vfdCurrent, frequency, motorSpeed) {
   if (!motorKW || !vfdCurrent) return '';
-  var svg = '<svg viewBox="0 0 320 130" width="320" height="130" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  var svg = '<svg viewBox="0 0 320 140" width="320" height="140" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
   var dur = simFlowDuration(vfdCurrent, 100);
   var rotorDur = (1 + (1500 - Math.min(motorSpeed || 1450, 1500)) / 1500 * 3).toFixed(2);
+  var i, x, t, y;
   // 3-phase input
   svg += '<text x="15" y="30" text-anchor="middle" class="sim-label" font-size="7">L1</text>';
   svg += '<text x="15" y="55" text-anchor="middle" class="sim-label" font-size="7">L2</text>';
@@ -27249,27 +27434,54 @@ function renderVFDSim(motorKW, vfdCurrent, frequency, motorSpeed) {
   svg += '<line x1="25" y1="28" x2="60" y2="28" stroke="#f44336" stroke-width="1.5" class="sim-wire" style="animation-duration:' + dur + 's"/>';
   svg += '<line x1="25" y1="53" x2="60" y2="53" stroke="#ff9800" stroke-width="1.5" class="sim-wire" style="animation-duration:' + dur + 's"/>';
   svg += '<line x1="25" y1="78" x2="60" y2="78" stroke="#2196f3" stroke-width="1.5" class="sim-wire" style="animation-duration:' + dur + 's"/>';
-  // VFD box
-  svg += '<rect x="62" y="15" width="80" height="80" rx="5" fill="#1a237e" stroke="var(--text)" stroke-width="1.5"/>';
-  svg += '<text x="102" y="35" text-anchor="middle" class="sim-label" fill="#fff" font-size="8">VFD</text>';
-  svg += '<text x="102" y="50" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">' + motorKW + ' kW</text>';
-  // PWM waveform inside VFD box (stepped sine)
-  svg += '<polyline points="72,70 78,70 78,62 84,62 84,58 90,58 90,62 96,62 96,70 102,70 102,78 108,78 108,82 114,82 114,78 120,78 120,70 126,70 132,70" fill="none" stroke="#4fc3f7" stroke-width="1.5"/>';
+  // VFD box with heat sink fins on edges
+  svg += '<rect x="62" y="15" width="84" height="85" rx="5" fill="#1a237e" stroke="var(--text)" stroke-width="1.5"/>';
+  // Heat sink fins (left edge)
+  for (i = 0; i < 6; i++) {
+    var finY = 20 + i * 13;
+    svg += '<rect x="57" y="' + finY + '" width="5" height="8" fill="#37474f"/>';
+  }
+  // Heat sink fins (right edge)
+  for (i = 0; i < 6; i++) {
+    var finY2 = 20 + i * 13;
+    svg += '<rect x="146" y="' + finY2 + '" width="5" height="8" fill="#37474f"/>';
+  }
+  svg += '<text x="104" y="30" text-anchor="middle" class="sim-label" fill="#fff" font-size="8">VFD</text>';
+  svg += '<text x="104" y="43" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">' + motorKW + ' kW</text>';
+  // DC bus capacitor symbol inside VFD box
+  svg += '<line x1="78" y1="50" x2="78" y2="62" stroke="#4fc3f7" stroke-width="1"/>';
+  svg += '<line x1="73" y1="54" x2="83" y2="54" stroke="#4fc3f7" stroke-width="1.5"/>';
+  svg += '<path d="M73,58 Q78,60 83,58" fill="none" stroke="#4fc3f7" stroke-width="1.5"/>';
+  svg += '<text x="78" y="70" text-anchor="middle" class="sim-label" fill="#4fc3f7" font-size="5">DC</text>';
+  // Sinusoidal reference waveform (Math.sin, 40+ points) inside VFD box
+  var sinePoints = '';
+  var pwmPoints = '';
+  for (i = 0; i <= 44; i++) {
+    x = 90 + (i / 44) * 50;
+    t = (i / 44) * 2 * Math.PI;
+    y = 68 - 12 * Math.sin(t);
+    sinePoints += (i === 0 ? '' : ' ') + x.toFixed(1) + ',' + y.toFixed(1);
+    // PWM stepped approximation
+    var pwmVal = Math.sin(t) > 0.5 ? 56 : (Math.sin(t) > 0 ? 62 : (Math.sin(t) > -0.5 ? 74 : 80));
+    pwmPoints += (i === 0 ? '' : ' ') + x.toFixed(1) + ',' + pwmVal;
+  }
+  svg += '<polyline points="' + sinePoints + '" fill="none" stroke="#fff" stroke-width="0.7" stroke-dasharray="2 1" opacity="0.5"/>';
+  svg += '<polyline points="' + pwmPoints + '" fill="none" stroke="#4fc3f7" stroke-width="1.2"/>';
   // Output lines
-  svg += '<line x1="142" y1="28" x2="175" y2="28" stroke="#4caf50" stroke-width="1.5" class="sim-wire" style="animation-duration:' + dur + 's"/>';
-  svg += '<line x1="142" y1="53" x2="175" y2="53" stroke="#4caf50" stroke-width="1.5" class="sim-wire" style="animation-duration:' + dur + 's"/>';
-  svg += '<line x1="142" y1="78" x2="175" y2="78" stroke="#4caf50" stroke-width="1.5" class="sim-wire" style="animation-duration:' + dur + 's"/>';
+  svg += '<line x1="151" y1="28" x2="175" y2="28" stroke="#4caf50" stroke-width="1.5" class="sim-wire" style="animation-duration:' + dur + 's"/>';
+  svg += '<line x1="151" y1="53" x2="175" y2="53" stroke="#4caf50" stroke-width="1.5" class="sim-wire" style="animation-duration:' + dur + 's"/>';
+  svg += '<line x1="151" y1="78" x2="175" y2="78" stroke="#4caf50" stroke-width="1.5" class="sim-wire" style="animation-duration:' + dur + 's"/>';
   // Motor circle with rotor
   svg += '<circle cx="210" cy="55" r="30" fill="none" stroke="var(--text)" stroke-width="2"/>';
-  svg += '<text x="210" y="45" text-anchor="middle" class="sim-label" font-size="7">M</text>';
-  svg += '<text x="210" y="58" text-anchor="middle" class="sim-label" font-size="6">3~</text>';
+  svg += '<text x="210" y="48" text-anchor="middle" class="sim-label" font-size="7">M</text>';
+  svg += '<text x="210" y="60" text-anchor="middle" class="sim-label" font-size="6">3~</text>';
   svg += '<circle cx="210" cy="55" r="15" fill="none" stroke="#4caf50" stroke-width="2" class="sim-rotor" style="animation-duration:' + rotorDur + 's"/>';
   svg += '<line x1="210" y1="40" x2="210" y2="70" stroke="#4caf50" stroke-width="1.5" class="sim-rotor" style="animation-duration:' + rotorDur + 's"/>';
   svg += '<line x1="195" y1="55" x2="225" y2="55" stroke="#4caf50" stroke-width="1.5" class="sim-rotor" style="animation-duration:' + rotorDur + 's"/>';
-  // Speed/frequency display
-  svg += '<text x="210" y="95" text-anchor="middle" class="sim-label sim-value" font-size="7">' + (motorSpeed || 1450) + ' rpm</text>';
-  svg += '<text x="102" y="110" text-anchor="middle" class="sim-label sim-value" font-size="7">f=' + frequency + 'Hz | ' + vfdCurrent + 'A</text>';
-  svg += '<text x="270" y="55" text-anchor="start" class="sim-label" font-size="6">' + motorKW + 'kW</text>';
+  // Speed/frequency display with neon class
+  svg += '<text x="210" y="98" text-anchor="middle" class="sim-label sim-value sim-neon" font-size="7">' + (motorSpeed || 1450) + ' rpm</text>';
+  svg += '<text x="104" y="115" text-anchor="middle" class="sim-label sim-value sim-neon" font-size="7">f=' + frequency + 'Hz | ' + vfdCurrent + 'A</text>';
+  svg += '<text x="265" y="55" text-anchor="start" class="sim-label" font-size="6">' + motorKW + 'kW</text>';
   svg += '</svg>';
   return svg;
 }
@@ -27348,20 +27560,36 @@ function renderZsSim(ze, r1r2, zs, zsMax, faultCurrent, pass) {
 
 function renderSPDSim(nd, riskLevel, spdType, inKA, imaxKA, mandatory) {
   if (!nd && nd !== 0) return '';
-  var svg = '<svg viewBox="0 0 300 140" width="300" height="140" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  var svg = '<svg viewBox="0 0 300 150" width="300" height="150" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
   var riskColor = riskLevel === 'high' ? '#f44336' : (riskLevel === 'medium' ? '#ff9800' : '#4caf50');
   // Building outline
   svg += '<rect x="80" y="50" width="140" height="80" rx="3" fill="none" stroke="var(--text)" stroke-width="1.5"/>';
   svg += '<polygon points="80,50 150,20 220,50" fill="none" stroke="var(--text)" stroke-width="1.5"/>';
-  // Lightning bolt (top) with pulse animation
-  svg += '<polygon points="145,2 142,18 148,18 143,35 155,15 149,15 153,2" fill="#ffd600" stroke="#ff6f00" stroke-width="0.8" class="sim-pulse" style="animation-duration:1.5s"/>';
+  // Lightning bolt (top) with pulse and spark animation
+  svg += '<polygon points="145,2 142,18 148,18 143,35 155,15 149,15 153,2" fill="#ffd600" stroke="#ff6f00" stroke-width="0.8" class="sim-pulse sim-spark" style="animation-duration:1.5s"/>';
+  // Additional lightning indicator
+  svg += '<path d="M148,35 L146,42 L150,40 L147,48" fill="none" stroke="#ff6f00" stroke-width="1" opacity="0.6" class="sim-spark" style="animation-delay:0.3s"/>';
   // Surge path down to service entrance
   svg += '<line x1="148" y1="35" x2="148" y2="55" stroke="#ff6f00" stroke-width="2" class="sim-wire" style="animation-duration:0.5s"/>';
+  // Cascaded protection zones (Type 1/2/3 nested boundaries)
+  svg += '<rect x="85" y="55" width="130" height="70" rx="2" fill="none" stroke="#f44336" stroke-width="0.8" stroke-dasharray="3 2" opacity="0.5"/>';
+  svg += '<text x="88" y="63" class="sim-label" font-size="4" fill="#f44336">Zone 1</text>';
+  svg += '<rect x="100" y="65" width="100" height="55" rx="2" fill="none" stroke="#ff9800" stroke-width="0.8" stroke-dasharray="3 2" opacity="0.5"/>';
+  svg += '<text x="103" y="73" class="sim-label" font-size="4" fill="#ff9800">Zone 2</text>';
+  svg += '<rect x="115" y="80" width="70" height="35" rx="2" fill="none" stroke="#4caf50" stroke-width="0.8" stroke-dasharray="3 2" opacity="0.4"/>';
+  svg += '<text x="118" y="88" class="sim-label" font-size="4" fill="#4caf50">Zone 3</text>';
   // SPD device at service entrance
   svg += '<rect x="130" y="55" width="36" height="24" rx="3" fill="#1b5e20" stroke="#4caf50" stroke-width="1.5"/>';
   svg += '<text x="148" y="65" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">SPD</text>';
   svg += '<text x="148" y="75" text-anchor="middle" class="sim-label" fill="#fff" font-size="5">' + (spdType || 'Type 2') + '</text>';
+  // Varistor/MOV symbol (circle with line through it) inside SPD box
+  svg += '<circle cx="148" cy="68" r="4" fill="none" stroke="#a5d6a7" stroke-width="0.8"/>';
+  svg += '<line x1="145" y1="65" x2="151" y2="71" stroke="#a5d6a7" stroke-width="0.8"/>';
+  // Spark gap symbol detail (two electrodes)
+  svg += '<line x1="138" y1="55" x2="138" y2="51" stroke="#ffd600" stroke-width="1.5"/>';
+  svg += '<line x1="158" y1="55" x2="158" y2="51" stroke="#ffd600" stroke-width="1.5"/>';
+  svg += '<path d="M139,51 L141,49 L143,51" fill="none" stroke="#ffd600" stroke-width="0.8" class="sim-spark"/>';
   // Diversion to earth (surge being clamped)
   svg += '<line x1="148" y1="79" x2="148" y2="100" stroke="#4caf50" stroke-width="2" class="sim-wire" style="animation-duration:0.8s"/>';
   svg += '<line x1="138" y1="100" x2="158" y2="100" stroke="#4caf50" stroke-width="2"/>';
@@ -27373,17 +27601,17 @@ function renderSPDSim(nd, riskLevel, spdType, inKA, imaxKA, mandatory) {
   svg += '<line x1="30" y1="70" x2="80" y2="70" stroke="#f44336" stroke-width="2" class="sim-wire" style="animation-duration:1.5s"/>';
   svg += '<text x="40" y="62" class="sim-label" font-size="6">Supply</text>';
   // Internal loads (protected)
-  svg += '<rect x="175" y="85" width="30" height="20" rx="2" fill="#e3f2fd" stroke="#42a5f5" stroke-width="1"/>';
-  svg += '<text x="190" y="98" text-anchor="middle" class="sim-label" font-size="5">Load</text>';
-  // Risk level indicator
-  svg += '<circle cx="260" cy="30" r="12" fill="' + riskColor + '" opacity="0.3"/>';
-  svg += '<text x="260" y="33" text-anchor="middle" class="sim-label" font-size="6" fill="' + riskColor + '">' + (riskLevel || '?') + '</text>';
+  svg += '<rect x="175" y="90" width="30" height="20" rx="2" fill="#e3f2fd" stroke="#42a5f5" stroke-width="1"/>';
+  svg += '<text x="190" y="103" text-anchor="middle" class="sim-label" font-size="5">Load</text>';
+  // Risk level indicator with neon effect
+  svg += '<circle cx="260" cy="30" r="12" fill="' + riskColor + '" opacity="0.3" class="sim-breath"/>';
+  svg += '<text x="260" y="33" text-anchor="middle" class="sim-label sim-neon" font-size="6" fill="' + riskColor + '">' + (riskLevel || '?') + '</text>';
   // Specs
   svg += '<text x="260" y="70" text-anchor="middle" class="sim-label sim-value" font-size="6">In=' + (inKA || '?') + 'kA</text>';
   svg += '<text x="260" y="82" text-anchor="middle" class="sim-label sim-value" font-size="6">Imax=' + (imaxKA || '?') + 'kA</text>';
   // Nd value
-  svg += '<text x="50" y="135" class="sim-label sim-value" font-size="7">Nd=' + (typeof nd === 'number' ? nd.toFixed(2) : nd) + '</text>';
-  svg += '<text x="200" y="135" class="sim-label sim-value" font-size="7">' + (mandatory ? 'MANDATORY' : 'Recommended') + '</text>';
+  svg += '<text x="50" y="145" class="sim-label sim-value" font-size="7">Nd=' + (typeof nd === 'number' ? nd.toFixed(2) : nd) + '</text>';
+  svg += '<text x="200" y="145" class="sim-label sim-value sim-neon" font-size="7">' + (mandatory ? 'MANDATORY' : 'Recommended') + '</text>';
   svg += '</svg>';
   return svg;
 }
@@ -27640,30 +27868,52 @@ function renderDiscrimSim(upType, upRating, downType, downRating, coordinated, i
 // ===== HEAT PUMP SIMULATOR =====
 function renderHeatPumpSim(heatingKW, cop, electricalKW, flc, phase) {
   if (!heatingKW || !cop) return '';
-  var svg = '<svg viewBox="0 0 300 130" width="300" height="130" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  var svg = '<svg viewBox="0 0 300 145" width="300" height="145" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
   var dur = simFlowDuration(flc || 10, 50);
+  var i;
   // Evaporator (cold side - left)
-  svg += '<rect x="20" y="40" width="50" height="50" rx="5" fill="#1565c0" stroke="#0d47a1" stroke-width="1.5"/>';
-  svg += '<text x="45" y="60" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">EVAP</text>';
-  svg += '<text x="45" y="75" text-anchor="middle" class="sim-label" fill="#bbdefb" font-size="5">' + tx('Kold', 'Cold') + '</text>';
+  svg += '<rect x="20" y="40" width="55" height="55" rx="5" fill="#1565c0" stroke="#0d47a1" stroke-width="1.5"/>';
+  svg += '<text x="47" y="58" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">EVAP</text>';
+  svg += '<text x="47" y="72" text-anchor="middle" class="sim-label" fill="#bbdefb" font-size="5">' + tx('Kold', 'Cold') + '</text>';
+  // Temperature label on evaporator (blue/cold)
+  svg += '<text x="47" y="85" text-anchor="middle" class="sim-label" font-size="6" fill="#90caf9">~5\u00B0C</text>';
+  // Frost crystals on evaporator (small star shapes)
+  svg += '<text x="25" y="44" class="sim-label" font-size="7" fill="#e1f5fe">\u2744</text>';
+  svg += '<text x="60" y="44" class="sim-label" font-size="6" fill="#e1f5fe">\u2744</text>';
+  svg += '<text x="22" y="92" class="sim-label" font-size="5" fill="#e1f5fe">\u2744</text>';
   // Compressor (center)
-  svg += '<circle cx="150" cy="65" r="22" fill="#424242" stroke="var(--text)" stroke-width="1.5"/>';
-  svg += '<circle cx="150" cy="65" r="14" fill="none" stroke="#ff9800" stroke-width="2" class="sim-rotor" style="animation-duration:' + (dur || 2) + 's"/>';
-  svg += '<text x="150" y="69" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">COMP</text>';
+  svg += '<circle cx="150" cy="67" r="22" fill="#424242" stroke="var(--text)" stroke-width="1.5"/>';
+  svg += '<circle cx="150" cy="67" r="14" fill="none" stroke="#ff9800" stroke-width="2" class="sim-rotor" style="animation-duration:' + (dur || 2) + 's"/>';
+  svg += '<text x="150" y="71" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">COMP</text>';
   // Condenser (hot side - right)
   var heatColor = simHeatColor(heatingKW * 1000, 25000);
-  svg += '<rect x="230" y="40" width="50" height="50" rx="5" fill="' + heatColor + '" stroke="#b71c1c" stroke-width="1.5"/>';
-  svg += '<text x="255" y="60" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">COND</text>';
-  svg += '<text x="255" y="75" text-anchor="middle" class="sim-label" fill="#ffcdd2" font-size="5">' + tx('Varm', 'Hot') + '</text>';
-  // Refrigerant loop (top path - high pressure)
-  svg += '<path d="M70,50 Q110,20 150,20 Q190,20 230,50" fill="none" stroke="#f44336" stroke-width="2" class="sim-wire" style="animation-duration:' + (dur || 2) + 's"/>';
-  // Refrigerant loop (bottom path - low pressure)
-  svg += '<path d="M230,80 Q190,110 150,110 Q110,110 70,80" fill="none" stroke="#2196f3" stroke-width="2" class="sim-wire" style="animation-duration:' + (dur || 2) + 's"/>';
+  svg += '<rect x="225" y="40" width="55" height="55" rx="5" fill="' + heatColor + '" stroke="#b71c1c" stroke-width="1.5"/>';
+  svg += '<text x="252" y="58" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">COND</text>';
+  svg += '<text x="252" y="72" text-anchor="middle" class="sim-label" fill="#ffcdd2" font-size="5">' + tx('Varm', 'Hot') + '</text>';
+  // Temperature label on condenser (red/hot)
+  svg += '<text x="252" y="85" text-anchor="middle" class="sim-label" font-size="6" fill="#ffcdd2">~55\u00B0C</text>';
+  // Heat waves above condenser
+  svg += '<path d="M240,36 C242,32 244,34 246,30" fill="none" stroke="#f44336" stroke-width="0.8" opacity="0.6" class="sim-heat"/>';
+  svg += '<path d="M255,36 C257,32 259,34 261,30" fill="none" stroke="#f44336" stroke-width="0.8" opacity="0.6" class="sim-heat"/>';
+  svg += '<path d="M268,36 C270,32 272,34 274,30" fill="none" stroke="#f44336" stroke-width="0.8" opacity="0.5" class="sim-heat"/>';
+  // Expansion valve symbol (small triangle) between condenser and evaporator on bottom path
+  svg += '<polygon points="150,112 145,105 155,105" fill="#9c27b0" stroke="#7b1fa2" stroke-width="1"/>';
+  svg += '<text x="150" y="122" text-anchor="middle" class="sim-label" font-size="5" fill="#9c27b0">EXV</text>';
+  // Refrigerant loop (top path - high pressure, red)
+  svg += '<path d="M75,50 Q112,18 150,18 Q188,18 225,50" fill="none" stroke="#f44336" stroke-width="2" class="sim-wire" style="animation-duration:' + (dur || 2) + 's"/>';
+  // Refrigerant loop (bottom path - low pressure, blue)
+  svg += '<path d="M225,85 Q188,115 150,115 Q112,115 75,85" fill="none" stroke="#2196f3" stroke-width="2" class="sim-wire" style="animation-duration:' + (dur || 2) + 's"/>';
+  // Animated refrigerant particles along loop
+  for (i = 0; i < 4; i++) {
+    var pDelay = (i * 0.6).toFixed(1);
+    svg += '<circle cx="' + (85 + i * 35) + '" cy="25" r="2.5" fill="#ff5722" class="sim-particle" style="animation-delay:' + pDelay + 's" opacity="0.7"/>';
+    svg += '<circle cx="' + (215 - i * 35) + '" cy="110" r="2.5" fill="#42a5f5" class="sim-particle" style="animation-delay:' + pDelay + 's" opacity="0.7"/>';
+  }
   // COP value
-  svg += '<text x="150" y="15" text-anchor="middle" class="sim-label sim-value" font-size="9">COP=' + cop + ' | ' + heatingKW + 'kW\u2192' + (electricalKW || (heatingKW / cop).toFixed(1)) + 'kW</text>';
+  svg += '<text x="150" y="10" text-anchor="middle" class="sim-label sim-value sim-neon" font-size="9">COP=' + cop + ' | ' + heatingKW + 'kW\u2192' + (electricalKW || (heatingKW / cop).toFixed(1)) + 'kW</text>';
   // Phase and current info
-  svg += '<text x="150" y="125" text-anchor="middle" class="sim-label sim-value" font-size="7">' + (phase || 1) + '\u03C6 | FLC=' + (flc || '-') + 'A</text>';
+  svg += '<text x="150" y="140" text-anchor="middle" class="sim-label sim-value" font-size="7">' + (phase || 1) + '\u03C6 | FLC=' + (flc || '-') + 'A</text>';
   svg += '</svg>';
   return svg;
 }
@@ -31464,6 +31714,209 @@ function examPrintSolution() {
   doc.close();
   w.focus();
   try { w.print(); } catch (e) {}
+}
+
+// ===== DISTRIBUTION PLAN VISUALIZATION =====
+function renderDistPlan() {
+  // Ensure panelState has data
+  if (!panelState.boards || panelState.boards.length === 0) {
+    var tree = sldTree || sldCreateTree();
+    panelAutoPopulate(tree);
+  }
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Fordelingsplan', 'Distribution Plan') + '</div>';
+
+  // Board selector if multiple boards
+  if (panelState.boards.length > 1) {
+    html += '<div class="select-group"><div class="select-label">' + tx('Tavle', 'Board') + '</div><div class="select-grid">';
+    for (var bi = 0; bi < panelState.boards.length; bi++) {
+      html += '<button class="sel-btn' + (panelState.selectedBoardIdx === bi ? ' selected' : '') + '" onclick="panelState.selectedBoardIdx=' + bi + ';renderModule(\'distplan\')">' + (panelState.boards[bi].name || ('Board ' + (bi + 1))) + '</button>';
+    }
+    html += '</div></div>';
+  }
+
+  var boardIdx = panelState.selectedBoardIdx || 0;
+  if (boardIdx >= panelState.boards.length) boardIdx = 0;
+  var board = panelState.boards[boardIdx];
+
+  if (!board) {
+    html += '<div class="info-row"><span class="label">' + tx('Ingen tavledata tilgaengelig', 'No board data available') + '</span></div>';
+    html += '</div>';
+    return html;
+  }
+
+  var enc = board.enclosure || { name: '3x18', modules: 54, rows: 3, modulesPerRow: 18, volume: 30 };
+  var numRails = board.rails ? board.rails.length : enc.rows || 3;
+  var modulesPerRow = enc.modulesPerRow || 18;
+
+  // SVG dimensions
+  var svgW = 800, svgH = 600;
+  var panelX = 60, panelY = 40, panelW = 680, panelH = 520;
+  var busbarY = panelY + 30;
+  var railStartY = busbarY + 50;
+  var railH = Math.min(80, (panelH - 140) / Math.max(numRails, 1));
+  var railSpacing = railH + 12;
+
+  // Build SVG
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + svgW + ' ' + svgH + '" style="width:100%;max-width:800px;height:auto;display:block;margin:12px auto;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.5)">';
+  svg += simSvgDefs();
+  // Additional defs for distribution plan
+  svg += '<defs>';
+  svg += '<linearGradient id="dpBusL1" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#b71c1c"/><stop offset="100%" stop-color="#ef5350"/></linearGradient>';
+  svg += '<linearGradient id="dpBusL2" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#1b5e20"/><stop offset="100%" stop-color="#66bb6a"/></linearGradient>';
+  svg += '<linearGradient id="dpBusL3" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#0d47a1"/><stop offset="100%" stop-color="#42a5f5"/></linearGradient>';
+  svg += '<linearGradient id="dpBusN" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#1565c0"/><stop offset="100%" stop-color="#64b5f6"/></linearGradient>';
+  svg += '<linearGradient id="dpBusPE" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#827717"/><stop offset="100%" stop-color="#c0ca33"/></linearGradient>';
+  svg += '<filter id="dpGlow"><feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/><feComposite in="SourceGraphic" in2="blur" operator="over"/></filter>';
+  svg += '<filter id="dpDevShadow"><feDropShadow dx="1" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.4"/></filter>';
+  svg += '</defs>';
+
+  // Panel enclosure (door-open perspective)
+  svg += '<rect x="' + (panelX - 5) + '" y="' + (panelY - 5) + '" width="' + (panelW + 10) + '" height="' + (panelH + 10) + '" rx="6" fill="none" stroke="#546e7a" stroke-width="2" stroke-dasharray="8 4" opacity="0.5"/>';
+  svg += '<rect x="' + panelX + '" y="' + panelY + '" width="' + panelW + '" height="' + panelH + '" rx="4" fill="#1e272e" stroke="#78909c" stroke-width="2.5"/>';
+  // Door hinge indicator (left side)
+  svg += '<line x1="' + panelX + '" y1="' + (panelY + 40) + '" x2="' + panelX + '" y2="' + (panelY + panelH - 40) + '" stroke="#90a4ae" stroke-width="4" stroke-linecap="round"/>';
+  svg += '<circle cx="' + panelX + '" cy="' + (panelY + 50) + '" r="3" fill="#607d8b"/>';
+  svg += '<circle cx="' + panelX + '" cy="' + (panelY + panelH - 50) + '" r="3" fill="#607d8b"/>';
+  // Door handle indicator (right side)
+  svg += '<rect x="' + (panelX + panelW - 12) + '" y="' + (panelY + panelH / 2 - 20) + '" width="6" height="40" rx="3" fill="#455a64" stroke="#78909c" stroke-width="1"/>';
+
+  // Panel title
+  svg += '<text x="' + (panelX + panelW / 2) + '" y="' + (panelY + 20) + '" text-anchor="middle" font-size="14" fill="#e0e0e0" font-weight="bold">' + (board.name || tx('Hovedtavle', 'Main Board')) + '</text>';
+  svg += '<text x="' + (panelX + panelW - 20) + '" y="' + (panelY + 20) + '" text-anchor="end" font-size="9" fill="#78909c">' + enc.name + ' | IP54</text>';
+
+  // Busbars (L1, L2, L3, N, PE) at top
+  var busLabels = ['L1', 'L2', 'L3', 'N', 'PE'];
+  var busGrads = ['url(#dpBusL1)', 'url(#dpBusL2)', 'url(#dpBusL3)', 'url(#dpBusN)', 'url(#dpBusPE)'];
+  var busStartX = panelX + 40;
+  var busEndX = panelX + panelW - 40;
+  var busW = busEndX - busStartX;
+  for (var b = 0; b < 5; b++) {
+    var by = busbarY + b * 8;
+    svg += '<rect x="' + busStartX + '" y="' + by + '" width="' + busW + '" height="5" rx="1" fill="' + busGrads[b] + '" filter="url(#dpGlow)"/>';
+    // Animated flow line
+    svg += '<rect x="' + busStartX + '" y="' + by + '" width="' + busW + '" height="5" rx="1" fill="rgba(255,255,255,0.2)" class="sim-wire" style="animation-duration:' + (1.0 + b * 0.15).toFixed(2) + 's"/>';
+    // Label
+    svg += '<text x="' + (busStartX - 8) + '" y="' + (by + 4) + '" text-anchor="end" font-size="7" fill="#b0bec5" font-weight="bold">' + busLabels[b] + '</text>';
+  }
+  // Busbar connection terminals
+  for (var t = 0; t < 6; t++) {
+    var tx2 = busStartX + (t + 1) * (busW / 7);
+    svg += '<rect x="' + (tx2 - 2) + '" y="' + busbarY + '" width="4" height="38" rx="1" fill="#b87333" opacity="0.6"/>';
+  }
+
+  // DIN Rails with devices
+  for (var r = 0; r < numRails; r++) {
+    var ry = railStartY + r * railSpacing;
+    var railDevices = (board.rails && board.rails[r]) ? board.rails[r] : [];
+    var railX = panelX + 30;
+    var railW2 = panelW - 60;
+
+    // DIN rail background (35mm top-hat rail)
+    svg += '<rect x="' + railX + '" y="' + (ry + railH / 2 - 3) + '" width="' + railW2 + '" height="6" rx="1" fill="#9e9e9e" stroke="#757575" stroke-width="0.5"/>';
+    // Rail edges
+    svg += '<rect x="' + railX + '" y="' + (ry + railH / 2 - 5) + '" width="' + railW2 + '" height="2" rx="0.5" fill="#bdbdbd"/>';
+    svg += '<rect x="' + railX + '" y="' + (ry + railH / 2 + 3) + '" width="' + railW2 + '" height="2" rx="0.5" fill="#bdbdbd"/>';
+
+    // Rail label
+    svg += '<text x="' + (railX - 5) + '" y="' + (ry + railH / 2 + 3) + '" text-anchor="end" font-size="8" fill="#78909c">R' + (r + 1) + '</text>';
+
+    // Render devices on this rail
+    var devX = railX + 8;
+    for (var d = 0; d < railDevices.length; d++) {
+      var dev = railDevices[d];
+      var devModules = dev.modules || 1;
+      var devW = devModules * 28;
+      if (devX + devW > railX + railW2 - 8) break; // overflow protection
+
+      // Device color based on type
+      var devColor = '#2563eb'; // MCB blue default
+      var devLabel = 'MCB';
+      if (dev.device) {
+        if (dev.device.rcdType) { devColor = '#ea580c'; devLabel = 'RCD'; }
+        else if (dev.device.frame) { devColor = '#7c3aed'; devLabel = 'MCCB'; }
+        else if (dev.device.spdType) { devColor = '#059669'; devLabel = 'SPD'; }
+      }
+
+      // Device body with shadow
+      svg += '<rect x="' + devX + '" y="' + (ry + 4) + '" width="' + devW + '" height="' + (railH - 8) + '" rx="3" fill="' + devColor + '" filter="url(#dpDevShadow)" opacity="0.9"/>';
+      // Device inner detail
+      svg += '<rect x="' + (devX + 2) + '" y="' + (ry + 6) + '" width="' + (devW - 4) + '" height="' + (railH - 12) + '" rx="2" fill="rgba(255,255,255,0.08)"/>';
+
+      // Device-specific details
+      if (devLabel === 'MCB') {
+        // Toggle switch indicator
+        var toggleY = ry + 10;
+        svg += '<rect x="' + (devX + devW / 2 - 3) + '" y="' + toggleY + '" width="6" height="12" rx="2" fill="#1a237e"/>';
+        svg += '<rect x="' + (devX + devW / 2 - 2) + '" y="' + toggleY + '" width="4" height="6" rx="1" fill="#4caf50"/>';
+      } else if (devLabel === 'RCD') {
+        // Test button
+        svg += '<circle cx="' + (devX + devW / 2) + '" cy="' + (ry + 14) + '" r="4" fill="#fff3e0" stroke="#e65100" stroke-width="1"/>';
+        svg += '<text x="' + (devX + devW / 2) + '" y="' + (ry + 16) + '" text-anchor="middle" font-size="5" fill="#e65100">T</text>';
+      } else if (devLabel === 'MCCB') {
+        // Larger frame indicator
+        svg += '<rect x="' + (devX + 3) + '" y="' + (ry + 8) + '" width="' + (devW - 6) + '" height="10" rx="1" fill="rgba(255,255,255,0.15)"/>';
+        svg += '<text x="' + (devX + devW / 2) + '" y="' + (ry + 15) + '" text-anchor="middle" font-size="6" fill="#e1bee7">MCCB</text>';
+      } else if (devLabel === 'SPD') {
+        // Lightning indicator
+        svg += '<text x="' + (devX + devW / 2) + '" y="' + (ry + 16) + '" text-anchor="middle" font-size="10" fill="#ffff00">\u26A1</text>';
+      }
+
+      // Rating label
+      svg += '<text x="' + (devX + devW / 2) + '" y="' + (ry + railH - 22) + '" text-anchor="middle" font-size="8" fill="#fff" font-weight="bold">' + (dev.In || 0) + 'A</text>';
+      // Circuit name (truncated)
+      var circName = (dev.name || '').substring(0, 8);
+      svg += '<text x="' + (devX + devW / 2) + '" y="' + (ry + railH - 12) + '" text-anchor="middle" font-size="6" fill="#b0bec5">' + circName + '</text>';
+
+      devX += devW + 4;
+    }
+
+    // Show empty slots if rail has space
+    var remainingSlots = Math.floor((railX + railW2 - 8 - devX) / 28);
+    if (remainingSlots > 0 && remainingSlots < 20) {
+      for (var es = 0; es < Math.min(remainingSlots, 6); es++) {
+        svg += '<rect x="' + devX + '" y="' + (ry + 8) + '" width="24" height="' + (railH - 16) + '" rx="2" fill="none" stroke="#455a64" stroke-width="1" stroke-dasharray="3 3"/>';
+        devX += 28;
+      }
+    }
+  }
+
+  // Cable entry glands at bottom
+  var glandY = panelY + panelH - 35;
+  var numGlands = Math.min(board.rails ? board.rails.reduce(function(sum, rail) { return sum + rail.length; }, 0) : 4, 12);
+  if (numGlands < 3) numGlands = 3;
+  var glandSpacing = (panelW - 100) / (numGlands + 1);
+  svg += '<rect x="' + (panelX + 20) + '" y="' + (glandY - 5) + '" width="' + (panelW - 40) + '" height="30" rx="2" fill="#263238" stroke="#455a64" stroke-width="1"/>';
+  svg += '<text x="' + (panelX + panelW / 2) + '" y="' + (glandY - 8) + '" text-anchor="middle" font-size="7" fill="#78909c">' + tx('Kabelindfoering', 'Cable Entry') + '</text>';
+  for (var g = 0; g < numGlands; g++) {
+    var gx = panelX + 50 + (g + 1) * glandSpacing;
+    svg += '<circle cx="' + gx + '" cy="' + (glandY + 10) + '" r="8" fill="#37474f" stroke="#607d8b" stroke-width="1.5"/>';
+    svg += '<circle cx="' + gx + '" cy="' + (glandY + 10) + '" r="4" fill="#1a1a2e"/>';
+    // Cable indicator
+    svg += '<line x1="' + gx + '" y1="' + (glandY + 18) + '" x2="' + gx + '" y2="' + (glandY + 28) + '" stroke="#546e7a" stroke-width="3" stroke-linecap="round"/>';
+  }
+
+  // Power flow arrows on busbars (animated)
+  for (var af = 0; af < 3; af++) {
+    var arrowX = busStartX + 60 + af * 180;
+    var arrowY2 = busbarY + 2;
+    svg += '<polygon points="' + arrowX + ',' + (arrowY2 - 2) + ' ' + (arrowX + 8) + ',' + (arrowY2 + 2) + ' ' + arrowX + ',' + (arrowY2 + 6) + '" fill="#ffab00" class="sim-pulse" style="animation-duration:' + (0.8 + af * 0.3).toFixed(1) + 's"/>';
+  }
+
+  svg += '</svg>';
+  html += svg;
+
+  // Result box summary
+  html += '<div class="result-box"><div class="result-title">' + tx('Tavleoversigt', 'Board Summary') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Tavlenavn', 'Board Name') + '</span><span class="value">' + (board.name || tx('Hovedtavle', 'Main Board')) + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kapslingstype', 'Enclosure') + '</span><span class="value">' + enc.name + ' (' + enc.modules + ' ' + tx('moduler', 'modules') + ')</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Brugte moduler', 'Used Modules') + '</span><span class="value">' + (board.totalModules || 0) + ' / ' + enc.modules + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Effekttab', 'Power Loss') + '</span><span class="value">' + (board.totalPowerLoss || 0).toFixed(1) + ' W</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('DIN-skinner', 'DIN Rails') + '</span><span class="value">' + numRails + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kapslingsklasse', 'IP Rating') + '</span><span class="value">IP54</span></div>';
+  html += '</div>';
+
+  html += '</div>';
+  return html;
 }
 
 // ===== INIT =====
