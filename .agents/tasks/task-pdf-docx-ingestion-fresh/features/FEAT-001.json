@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Add PDF/DOCX drag-and-drop ingestion to the Project Analyzer module. This is a port of the implementation from branch feat/analyzer-pdf-docx-ingestion-rebased (commit 4e26d4b) onto current main. The implementation includes: (1) a self-contained RFC 1951 DEFLATE inflater, (2) ZIP parser for DOCX, (3) PDF text extractor, (4) drag-and-drop UI zone, (5) updated file handler, (6) Farsi translations, (7) comprehensive tests.",
+  "status": "in_progress",
+  "steps": [
+    "1. Create branch feat/analyzer-pdf-docx-ingestion-v2 from main",
+    "2. In el-dimensionering.html, add Farsi translation strings to the _FA dictionary (after line 1613 'Higher load' entry). Add these 10 translation keys: upload file label with new extensions, supported formats, offline extraction notice, extracting progress text, PDF extraction failure, generic extraction failure, legacy .doc format notice, corrupt file notice, file unreadable, unsupported file type.",
+    "3. In el-dimensionering.html, update analyzerState (line 27505) to add two new fields: 'notice: null' and 'extracting: false'. Change the trailing comment format to add a comma after mode: 'upload'.",
+    "4. In el-dimensionering.html, replace the 'File upload handler' function (analyzerHandleFile, starting line 28476) with the full document ingestion engine. This includes: (a) the DEFLATE inflater (analyzerInflateRaw with lookup tables _ANALYZER_LBASE, _ANALYZER_LEXT, etc.), (b) zlib wrapper (analyzerInflate), (c) UTF-8 decoder (analyzerBytesToText), (d) Latin-1 decoder (analyzerBytesToLatin1), (e) XML entity decoder (analyzerDecodeXmlEntities), (f) DOCX extractor (analyzerExtractDocx, analyzerDocxXmlToText, analyzerReadZipEntries), (g) PDF extractor (analyzerExtractPdf, analyzerCleanPdfText, analyzerPdfReadableRatio, analyzerPdfContentToText), (h) text validation and routing (analyzerRunExtracted), (i) updated analyzerHandleFile with file type detection and binary reading for PDF/DOCX. Use the implementation from commit 4e26d4b on branch remotes/origin/feat/analyzer-pdf-docx-ingestion-rebased as the reference - extract it with 'git show 4e26d4b:el-dimensionering.html' and port the section between the old 'File upload handler' comment and the 'Paste handler' comment.",
+    "5. Update the analyzerReset function (line 28497) to include notice: null and extracting: false in the reset state object.",
+    "6. Update renderAnalyzer (line 28506 area): (a) change the upload button label from '.txt/.md' to '.txt/.md/.pdf/.docx', (b) change the file input accept attribute to include .pdf,.docx,.doc, (c) change the supported formats text, (d) add the offline extraction notice text, (e) add the extracting progress indicator (shown when analyzerState.extracting is true), (f) add the notice display block (shown when analyzerState.notice is set). Also add drag-and-drop event handlers to the upload area.",
+    "7. In test-sld.js, add the PDF/DOCX ingestion test block before the '// --- Summary ---' line. Use 'git show 4e26d4b:test-sld.js' to get the test block from the old branch (it starts with '// ===== PROJECT ANALYZER DOCUMENT INGESTION (PDF / DOCX) TESTS =====' and includes ~300 lines of tests using Node's zlib module to build test fixtures).",
+    "8. Run 'node test-sld.js' and verify all tests pass (should be 1344+ from main plus the new PDF/DOCX tests)."
+  ],
+  "acceptance_criteria": [
+    "node test-sld.js passes with 0 failures",
+    "The new PDF/DOCX tests exercise analyzerInflateRaw, analyzerInflate, analyzerExtractDocx, analyzerExtractPdf, analyzerHandleFile logic",
+    "No typing affordances added (no <input type='text'>, no new <textarea> except the existing paste area)",
+    "All new English strings have corresponding _FA (Farsi) translations",
+    "The implementation is fully offline - no fetch(), no CDN, no external script references",
+    "The drag-and-drop zone accepts .txt, .md, .pdf, .docx files"
+  ],
+  "verification": [
+    "node test-sld.js (must show 0 failures)"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
