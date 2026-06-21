@@ -666,9 +666,13 @@ body.motion-off .fade-in { will-change: auto; }
 @media (prefers-reduced-motion: reduce) {
   .sim-wire { animation: none !important; stroke-dasharray: 6 8; }
   .sim-rotor { animation: none !important; }
+  .sim-resistor { transition: none !important; }
+  .sim-source { transition: none !important; }
 }
 body.motion-off .sim-wire { animation: none !important; stroke-dasharray: 6 8; }
 body.motion-off .sim-rotor { animation: none !important; }
+body.motion-off .sim-resistor { transition: none !important; }
+body.motion-off .sim-source { transition: none !important; }
 
 /* Info tooltip */
 .info-row {
@@ -25974,7 +25978,7 @@ function renderDC() {
 // Each takes calculated values and returns an SVG showing the circuit state.
 
 function simHeatColor(P, Pmax) {
-  if (!Pmax || Pmax <= 0) Pmax = 1000;
+  if (!Pmax || Pmax <= 0 || !isFinite(Pmax)) Pmax = 1000;
   var ratio = Math.min(1, Math.max(0, P / Pmax));
   var r = Math.round(60 + 195 * ratio);
   var g = Math.round(120 - 80 * ratio);
@@ -26271,17 +26275,18 @@ function renderTrefaseSim(loadType, results) {
 
 function renderVdropSim(Un, vdrop, vdropPercent, length, crossSection) {
   if (!Un || !length) return '';
+  var gradId = 'vdGrad_' + Math.random().toString(36).substr(2, 6);
   var svg = '<svg viewBox="0 0 300 80" width="300" height="80" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   // Cable as gradient rectangle
   var cableH = Math.min(16, Math.max(4, crossSection / 10));
   var ratio = Math.min(1, vdropPercent / 10);
   var endR = Math.round(100 + 155 * ratio);
   var endG = Math.round(200 - 100 * ratio);
-  svg += '<defs><linearGradient id="vdGrad" x1="0%" y1="0%" x2="100%" y2="0%">';
+  svg += '<defs><linearGradient id="' + gradId + '" x1="0%" y1="0%" x2="100%" y2="0%">';
   svg += '<stop offset="0%" stop-color="#66bb6a"/>';
   svg += '<stop offset="100%" stop-color="rgb(' + endR + ',' + endG + ',50)"/>';
   svg += '</linearGradient></defs>';
-  svg += '<rect x="40" y="' + (40 - cableH / 2) + '" width="220" height="' + cableH + '" rx="2" fill="url(#vdGrad)" stroke="var(--text)" stroke-width="0.5"/>';
+  svg += '<rect x="40" y="' + (40 - cableH / 2) + '" width="220" height="' + cableH + '" rx="2" fill="url(#' + gradId + ')" stroke="var(--text)" stroke-width="0.5"/>';
   // Current flow animation on top
   svg += '<line x1="40" y1="' + (40 - cableH / 2 - 3) + '" x2="260" y2="' + (40 - cableH / 2 - 3) + '" stroke="var(--primary)" stroke-width="1.5" class="sim-wire" style="animation-duration:1.5s"/>';
   // Source end
@@ -26349,8 +26354,8 @@ function renderMotorSim(ns, n, slip, torque) {
     svg += '<rect x="' + (sx - 5) + '" y="' + (sy - 4) + '" width="10" height="8" rx="1" fill="#7986cb" stroke="none" transform="rotate(' + (i * 60) + ' ' + sx + ' ' + sy + ')"/>';
   }
   // Rotor (inner ring) - spins
-  var rotorDur = (ns > 0 && slip < 1) ? (60 / Math.max(1, n)).toFixed(2) : '0';
-  var rotorStyle = (rotorDur > 0 && n > 0) ? ' style="animation-duration:' + rotorDur + 's"' : '';
+  var rotorDur = (ns > 0 && slip < 1 && n >= 10) ? (60 / n).toFixed(2) : '0';
+  var rotorStyle = (rotorDur > 0) ? ' style="animation-duration:' + rotorDur + 's"' : '';
   svg += '<circle cx="' + cx + '" cy="' + cy + '" r="28" fill="none" stroke="#ff7043" stroke-width="4" class="sim-rotor"' + rotorStyle + '/>';
   // Rotor bars
   for (var i = 0; i < 8; i++) {
