@@ -14107,6 +14107,9 @@ function renderEV() {
   }
   html += '</div>';
 
+  // Simulator
+  html += renderEVSim(evState.powerKW, current, evState.phases, evState.numChargers, vdrop);
+
   // Verdict
   var safe = vdropOk && !grid.overloaded && rcdTypeB;
   html += renderVerdict(safe, safe ? tx('Installation opfylder DS/HD 60364-7-722', 'Installation complies with DS/HD 60364-7-722') : tx('Krav IKKE opfyldt - se advarsler', 'Requirements NOT met - see warnings'));
@@ -14332,6 +14335,9 @@ function renderSolar() {
   html += '<div class="result-row"><span class="label">' + tx('Systemomkostning (estimat)', 'System cost (estimate)') + '</span><span class="value">' + payback.systemCost + ' DKK</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Tilbagebetalingstid', 'Payback period') + '</span><span class="value">~' + payback.paybackYears + ' ' + tx('aar', 'years') + '</span></div>';
   html += '</div>';
+
+  // Simulator
+  html += renderSolarSim(kWp, solarState.panelCount, inverter.recommended, annualYield);
 
   // Verdict
   var safe = stringCheck.ok;
@@ -17298,6 +17304,9 @@ function renderUPS() {
   html += '<div class="result-row"><span class="label">' + tx('Jording', 'Earthing') + '</span><span class="value">' + tx('Ren jord for foelsomt udstyr (IT jording)', 'Clean earth for sensitive equipment (IT earthing)') + '</span></div>';
   html += '</div>';
 
+  // Simulator
+  html += renderUPSSim(load.totalW, upsSize, upsState.autonomy, battery.ah, upsState.topology);
+
   // Verdict
   var safe = load.totalVA > 0 && loadPct <= 80;
   html += renderVerdict(safe, safe ? tx('UPS korrekt dimensioneret iht. IEC 62040 (belastning <= 80%)', 'UPS correctly sized per IEC 62040 (loading <= 80%)') : tx('Vaelg udstyr for at dimensionere UPS', 'Select equipment to size UPS'));
@@ -18574,6 +18583,10 @@ function renderGenerator() {
   html += '<div class="result-row"><span class="label">' + tx('Brændstofforbrug (diesel 0.3 L/kWh)', 'Fuel Consumption (diesel 0.3 L/kWh)') + '</span><span class="value">' + fuel + ' L / ' + generatorState.autonomy + 'h</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Testplan', 'Testing Schedule') + '</span><span class="value">' + tx('Månedlig 30 min tomgang + Årlig 1h ved 75%', 'Monthly 30min no-load + Annual 1h at 75%') + '</span></div>';
   html += '</div>';
+
+  // Simulator
+  var genLoadPct = selectedKva > 0 ? Math.round((totalKw / (selectedKva * 0.8)) * 100) : 0;
+  html += renderGeneratorSim(selectedKva, genLoadPct, fuel, generatorState.application);
 
   // Verdict
   var safe = selectedKva >= requiredKva;
@@ -19917,6 +19930,7 @@ function renderBESS() {
   html += '<div class="result-row"><span class="label">' + tx('Rum', 'Room') + '</span><span class="value">' + safety.room.fireRating + ', ' + safety.room.tempRange + '</span></div>';
   html += '<div class="result-row"><span class="label">Ref.</span><span class="value">' + safety.room.clause + '</span></div>';
   html += '</div>';
+  html += renderBESSSim(bessState.capacityKWh, inv.kW, 80, bessState.chemistry, true);
   var safe = bessState.voltDC <= 800 && dcI.current <= dcCable.iz;
   html += renderVerdict(safe, safe ? tx('Systemet er korrekt dimensioneret iht. DS/EN 62619 + DS/HD 60364-5-56', 'System correctly sized per DS/EN 62619 + DS/HD 60364-5-56') : tx('ADVARSEL: Kabelkapacitet overskredet. DS/HD 60364-5-56.', 'WARNING: Cable capacity exceeded. DS/HD 60364-5-56.'));
   html += '</div>';
@@ -26882,6 +26896,207 @@ function renderMotorSim(ns, n, slip, torque) {
   svg += '<text x="20" y="28" class="sim-label sim-value" font-size="8">n=' + n.toFixed(0) + ' rpm</text>';
   svg += '<text x="20" y="130" class="sim-label sim-value" font-size="8">s=' + (slip * 100).toFixed(1) + '%</text>';
   if (torque) svg += '<text x="140" y="130" class="sim-label sim-value" font-size="8">T=' + torque.toFixed(1) + ' Nm</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function renderEVSim(powerKW, current, phases, numChargers, vdrop) {
+  if (!powerKW || !current) return '';
+  var svg = '<svg viewBox="0 0 300 120" width="300" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+  var dur = simFlowDuration(current, 80);
+  var vdropColor = vdrop > 3 ? '#ff5722' : (vdrop > 2 ? '#ff9800' : '#4caf50');
+  // Charging station box
+  svg += '<rect x="20" y="25" width="50" height="70" rx="4" fill="#1565c0" stroke="var(--text)" stroke-width="1"/>';
+  svg += '<text x="45" y="50" text-anchor="middle" class="sim-label" fill="#fff" font-size="7">EVSE</text>';
+  svg += '<text x="45" y="65" text-anchor="middle" class="sim-label" fill="#fff" font-size="7">' + powerKW + 'kW</text>';
+  svg += '<text x="45" y="80" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">' + phases + 'P</text>';
+  // Cable with animated flow
+  svg += '<line x1="70" y1="60" x2="180" y2="60" stroke="' + vdropColor + '" stroke-width="4" class="sim-wire" style="animation-duration:' + dur + 's"/>';
+  // Car battery icon
+  svg += '<rect x="185" y="35" width="80" height="50" rx="6" fill="#263238" stroke="var(--text)" stroke-width="1"/>';
+  svg += '<rect x="265" y="50" width="8" height="20" rx="2" fill="#37474f"/>';
+  svg += '<rect x="195" y="45" width="60" height="30" rx="3" fill="none" stroke="#4caf50" stroke-width="1.5"/>';
+  // Charge indicator inside car
+  var chargeW = Math.min(56, Math.max(8, (current / 80) * 56));
+  svg += '<rect x="197" y="47" width="' + chargeW + '" height="26" rx="2" fill="#4caf50" opacity="0.6" class="sim-field" style="animation-duration:2s"/>';
+  // Multiple charger indicators
+  if (numChargers > 1) {
+    for (var i = 0; i < Math.min(numChargers, 4); i++) {
+      svg += '<circle cx="' + (30 + i * 12) + '" cy="100" r="3" fill="#64b5f6" stroke="none"/>';
+    }
+    svg += '<text x="80" y="103" class="sim-label" font-size="6">\u00D7' + numChargers + '</text>';
+  }
+  // Value labels
+  svg += '<text x="125" y="18" text-anchor="middle" class="sim-label sim-value" font-size="8">I=' + current.toFixed(1) + 'A</text>';
+  svg += '<text x="125" y="108" text-anchor="middle" class="sim-label sim-value" font-size="8" fill="' + vdropColor + '">\u0394U=' + vdrop.toFixed(2) + '%</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function renderSolarSim(kWp, panels, inverterKW, annualYield) {
+  if (!kWp || !panels) return '';
+  var svg = '<svg viewBox="0 0 300 130" width="300" height="130" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+  // Sun with glow animation
+  svg += '<circle cx="45" cy="25" r="14" fill="#ffc107" class="sim-glow" style="animation-duration:2s"/>';
+  svg += '<line x1="45" y1="5" x2="45" y2="0" stroke="#ffc107" stroke-width="1.5"/>';
+  svg += '<line x1="60" y1="12" x2="65" y2="8" stroke="#ffc107" stroke-width="1.5"/>';
+  svg += '<line x1="65" y1="25" x2="70" y2="25" stroke="#ffc107" stroke-width="1.5"/>';
+  // Solar panels (tilted rectangles)
+  var panelCols = Math.min(panels, 6);
+  for (var i = 0; i < panelCols; i++) {
+    var px = 20 + i * 22;
+    svg += '<rect x="' + px + '" y="45" width="20" height="30" rx="1" fill="#1a237e" stroke="#42a5f5" stroke-width="0.8" transform="skewY(-5)"/>';
+    svg += '<line x1="' + (px + 10) + '" y1="46" x2="' + (px + 10) + '" y2="74" stroke="#42a5f5" stroke-width="0.4" transform="skewY(-5)"/>';
+    svg += '<line x1="' + px + '" y1="60" x2="' + (px + 20) + '" y2="60" stroke="#42a5f5" stroke-width="0.4" transform="skewY(-5)"/>';
+  }
+  // DC cable with animated flow
+  svg += '<line x1="155" y1="60" x2="195" y2="60" stroke="#f44336" stroke-width="2" class="sim-wire" style="animation-duration:1.8s"/>';
+  svg += '<text x="175" y="55" text-anchor="middle" class="sim-label" font-size="6">DC</text>';
+  // Inverter box
+  svg += '<rect x="198" y="45" width="40" height="30" rx="3" fill="#4a148c" stroke="var(--text)" stroke-width="1"/>';
+  svg += '<text x="218" y="58" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">INV</text>';
+  svg += '<text x="218" y="69" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">' + inverterKW.toFixed(1) + 'kW</text>';
+  // AC output cable
+  svg += '<line x1="238" y1="60" x2="280" y2="60" stroke="#4caf50" stroke-width="2" class="sim-wire" style="animation-duration:1.5s"/>';
+  svg += '<text x="260" y="55" text-anchor="middle" class="sim-label" font-size="6">AC</text>';
+  // Grid connection symbol
+  svg += '<circle cx="287" cy="60" r="7" fill="none" stroke="#4caf50" stroke-width="1.5"/>';
+  svg += '<text x="287" y="63" text-anchor="middle" class="sim-label" font-size="7">~</text>';
+  // Labels
+  svg += '<text x="80" y="100" text-anchor="middle" class="sim-label sim-value" font-size="8">' + kWp.toFixed(1) + ' kWp (' + panels + ' pan.)</text>';
+  svg += '<text x="230" y="100" text-anchor="middle" class="sim-label sim-value" font-size="8">' + annualYield + ' kWh/yr</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function renderBESSSim(capacityKWh, powerKW, soc, chemistry, charging) {
+  if (!capacityKWh || !powerKW) return '';
+  var svg = '<svg viewBox="0 0 300 120" width="300" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+  var chemColors = {lfp:'#4caf50', nmc:'#2196f3', lfp_blade:'#009688', sodium:'#ff9800'};
+  var chemColor = chemColors[chemistry] || '#4caf50';
+  var dur = simFlowDuration(powerKW, 50);
+  // Battery stack
+  svg += '<rect x="30" y="25" width="80" height="70" rx="5" fill="#37474f" stroke="' + chemColor + '" stroke-width="2"/>';
+  svg += '<rect x="60" y="18" width="20" height="8" rx="2" fill="' + chemColor + '"/>';
+  // Charge level fill
+  var fillH = Math.max(4, (soc / 100) * 60);
+  var fillY = 30 + (60 - fillH);
+  svg += '<rect x="35" y="' + fillY + '" width="70" height="' + fillH + '" rx="3" fill="' + chemColor + '" opacity="0.5" class="sim-field" style="animation-duration:2.5s"/>';
+  // BMS indicator
+  svg += '<rect x="40" y="30" width="22" height="10" rx="2" fill="#263238" stroke="' + chemColor + '" stroke-width="0.5"/>';
+  svg += '<text x="51" y="38" text-anchor="middle" class="sim-label" fill="' + chemColor + '" font-size="5">BMS</text>';
+  // Bidirectional arrows / power flow
+  var arrowDir = charging ? 1 : -1;
+  var arrowX1 = charging ? 180 : 115;
+  var arrowX2 = charging ? 115 : 180;
+  svg += '<line x1="' + arrowX1 + '" y1="60" x2="' + arrowX2 + '" y2="60" stroke="' + chemColor + '" stroke-width="3" class="sim-wire" style="animation-duration:' + dur + 's"/>';
+  // Inverter/charger box
+  svg += '<rect x="185" y="40" width="45" height="40" rx="4" fill="#1a237e" stroke="var(--text)" stroke-width="1"/>';
+  svg += '<text x="207" y="57" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">PCS</text>';
+  svg += '<text x="207" y="70" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">' + powerKW + 'kW</text>';
+  // AC grid connection
+  svg += '<line x1="230" y1="60" x2="275" y2="60" stroke="#42a5f5" stroke-width="2" class="sim-wire" style="animation-duration:1.5s"/>';
+  svg += '<circle cx="282" cy="60" r="7" fill="none" stroke="#42a5f5" stroke-width="1.5"/>';
+  svg += '<text x="282" y="63" text-anchor="middle" class="sim-label" font-size="7">~</text>';
+  // Labels
+  svg += '<text x="70" y="110" text-anchor="middle" class="sim-label sim-value" font-size="8">' + capacityKWh + ' kWh | SOC ' + soc + '%</text>';
+  svg += '<text x="230" y="110" text-anchor="middle" class="sim-label sim-value" font-size="8">' + (charging ? '\u2190 CHG' : 'DIS \u2192') + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function renderGeneratorSim(kVA, loadPercent, fuelRate, application) {
+  if (!kVA) return '';
+  var svg = '<svg viewBox="0 0 300 130" width="300" height="130" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+  var rotorDur = (2 + (1 - Math.min(loadPercent, 100) / 100) * 2).toFixed(2);
+  // Engine block
+  svg += '<rect x="20" y="35" width="70" height="55" rx="4" fill="#455a64" stroke="var(--text)" stroke-width="1.5"/>';
+  svg += '<text x="55" y="55" text-anchor="middle" class="sim-label" fill="#fff" font-size="7">DIESEL</text>';
+  svg += '<text x="55" y="70" text-anchor="middle" class="sim-label" fill="#fff" font-size="7">' + kVA + ' kVA</text>';
+  // Exhaust animation
+  svg += '<circle cx="30" cy="30" r="4" fill="#78909c" opacity="0.6" class="sim-pulse" style="animation-duration:1.2s"/>';
+  svg += '<circle cx="40" cy="25" r="3" fill="#78909c" opacity="0.4" class="sim-pulse" style="animation-duration:1.5s"/>';
+  svg += '<circle cx="35" cy="18" r="2.5" fill="#78909c" opacity="0.3" class="sim-pulse" style="animation-duration:1.8s"/>';
+  // Rotor (generator coupling)
+  svg += '<circle cx="120" cy="62" r="22" fill="none" stroke="#ff7043" stroke-width="3" class="sim-rotor" style="animation-duration:' + rotorDur + 's"/>';
+  svg += '<circle cx="120" cy="62" r="5" fill="#ff7043"/>';
+  for (var i = 0; i < 6; i++) {
+    var ang = i * 60 * Math.PI / 180;
+    var rx1 = 120 + 8 * Math.cos(ang);
+    var ry1 = 62 + 8 * Math.sin(ang);
+    var rx2 = 120 + 20 * Math.cos(ang);
+    var ry2 = 62 + 20 * Math.sin(ang);
+    svg += '<line x1="' + rx1.toFixed(0) + '" y1="' + ry1.toFixed(0) + '" x2="' + rx2.toFixed(0) + '" y2="' + ry2.toFixed(0) + '" stroke="#ff7043" stroke-width="2" class="sim-rotor" style="animation-duration:' + rotorDur + 's"/>';
+  }
+  // ATS switch indicator
+  svg += '<rect x="160" y="45" width="35" height="35" rx="3" fill="#1b5e20" stroke="var(--text)" stroke-width="1"/>';
+  svg += '<text x="177" y="60" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">ATS</text>';
+  svg += '<text x="177" y="73" text-anchor="middle" class="sim-label" fill="#fff" font-size="5">' + (application === 'emergency' ? 'AUTO' : 'MAN') + '</text>';
+  // Output cable
+  svg += '<line x1="195" y1="62" x2="250" y2="62" stroke="#4caf50" stroke-width="3" class="sim-wire" style="animation-duration:1.5s"/>';
+  // Load bar
+  var barW = Math.max(4, Math.min(45, (loadPercent / 100) * 45));
+  var barColor = loadPercent > 80 ? '#f44336' : (loadPercent > 60 ? '#ff9800' : '#4caf50');
+  svg += '<rect x="250" y="50" width="45" height="24" rx="3" fill="none" stroke="var(--text)" stroke-width="1"/>';
+  svg += '<rect x="251" y="51" width="' + barW + '" height="22" rx="2" fill="' + barColor + '" opacity="0.7"/>';
+  svg += '<text x="272" y="65" text-anchor="middle" class="sim-label" font-size="6">' + loadPercent + '%</text>';
+  // Fuel gauge
+  svg += '<rect x="22" y="92" width="40" height="6" rx="2" fill="none" stroke="var(--text)" stroke-width="0.8"/>';
+  var fuelW = Math.max(2, Math.min(38, (1 - fuelRate / 500) * 38));
+  svg += '<rect x="23" y="93" width="' + fuelW + '" height="4" rx="1" fill="#ff9800"/>';
+  svg += '<text x="70" y="97" class="sim-label" font-size="5">' + fuelRate + 'L</text>';
+  // Labels
+  svg += '<text x="150" y="118" text-anchor="middle" class="sim-label sim-value" font-size="8">' + kVA + ' kVA | ' + loadPercent + '% load</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function renderUPSSim(loadW, upsVA, autonomyMin, batteryAh, topology) {
+  if (!loadW || !upsVA) return '';
+  var svg = '<svg viewBox="0 0 320 120" width="320" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+  var dur = simFlowDuration(loadW / 1000, 10);
+  var loadPct = Math.min(100, Math.round((loadW / (upsVA * 0.8)) * 100));
+  // Mains input
+  svg += '<circle cx="20" cy="55" r="10" fill="none" stroke="#42a5f5" stroke-width="1.5"/>';
+  svg += '<text x="20" y="58" text-anchor="middle" class="sim-label" font-size="8">~</text>';
+  svg += '<text x="20" y="75" text-anchor="middle" class="sim-label" font-size="6">Mains</text>';
+  // Input cable
+  svg += '<line x1="30" y1="55" x2="60" y2="55" stroke="#42a5f5" stroke-width="2" class="sim-wire" style="animation-duration:' + dur + 's"/>';
+  // Rectifier block
+  svg += '<rect x="62" y="40" width="35" height="30" rx="3" fill="#4a148c" stroke="var(--text)" stroke-width="1"/>';
+  svg += '<text x="79" y="53" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">AC/DC</text>';
+  svg += '<text x="79" y="64" text-anchor="middle" class="sim-label" fill="#fff" font-size="5">RECT</text>';
+  // DC bus
+  svg += '<line x1="97" y1="55" x2="135" y2="55" stroke="#f44336" stroke-width="2" class="sim-wire" style="animation-duration:' + dur + 's"/>';
+  // Battery branch (below DC bus)
+  svg += '<line x1="115" y1="55" x2="115" y2="85" stroke="#ff9800" stroke-width="1.5" class="sim-wire" style="animation-duration:2s"/>';
+  svg += '<rect x="95" y="87" width="40" height="22" rx="3" fill="#37474f" stroke="#ff9800" stroke-width="1.5"/>';
+  var batFill = Math.max(4, (autonomyMin / 60) * 34);
+  svg += '<rect x="98" y="90" width="' + batFill + '" height="16" rx="2" fill="#ff9800" opacity="0.5"/>';
+  svg += '<text x="115" y="102" text-anchor="middle" class="sim-label" font-size="5">' + batteryAh + 'Ah</text>';
+  // Inverter block
+  svg += '<rect x="138" y="40" width="35" height="30" rx="3" fill="#1b5e20" stroke="var(--text)" stroke-width="1"/>';
+  svg += '<text x="155" y="53" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">DC/AC</text>';
+  svg += '<text x="155" y="64" text-anchor="middle" class="sim-label" fill="#fff" font-size="5">INV</text>';
+  // Output cable
+  svg += '<line x1="173" y1="55" x2="220" y2="55" stroke="#4caf50" stroke-width="2" class="sim-wire" style="animation-duration:' + dur + 's"/>';
+  // Load block
+  svg += '<rect x="222" y="40" width="40" height="30" rx="3" fill="none" stroke="var(--text)" stroke-width="1.5"/>';
+  var lBarH = Math.max(4, Math.min(26, (loadPct / 100) * 26));
+  var lBarColor = loadPct > 80 ? '#f44336' : (loadPct > 60 ? '#ff9800' : '#4caf50');
+  svg += '<rect x="224" y="' + (68 - lBarH) + '" width="36" height="' + lBarH + '" rx="2" fill="' + lBarColor + '" opacity="0.6"/>';
+  svg += '<text x="242" y="58" text-anchor="middle" class="sim-label" font-size="6">' + loadPct + '%</text>';
+  // Topology label
+  var topoLabel = topology === 'online' ? 'Online (VFI)' : (topology === 'lineint' ? 'Line-Int (VI)' : 'Standby (VFD)');
+  svg += '<text x="160" y="18" text-anchor="middle" class="sim-label sim-value" font-size="8">' + topoLabel + '</text>';
+  // Bottom labels
+  svg += '<text x="80" y="118" class="sim-label sim-value" font-size="7">Load: ' + loadW + 'W / ' + upsVA + 'VA</text>';
+  svg += '<text x="230" y="118" class="sim-label sim-value" font-size="7">Aut: ' + autonomyMin + 'min</text>';
   svg += '</svg>';
   return svg;
 }

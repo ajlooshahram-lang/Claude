@@ -13526,6 +13526,118 @@ test('renderImpedansSim output contains sim-value on result line', function() {
   assert(svg.indexOf('sim-value') >= 0, 'should use sim-value on Z/I/phi results');
 });
 
+// --- EV, Solar, BESS, Generator, UPS Simulator Tests ---
+
+test('renderEVSim returns SVG with sim-wire class for valid inputs', function() {
+  var svg = renderEVSim(11, 16, 3, 2, 1.5);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire class for current flow');
+  assert(svg.indexOf('sim-value') >= 0, 'should contain sim-value class');
+  assert(svg.indexOf('EVSE') >= 0, 'should show EVSE label');
+  assert(svg.indexOf('11kW') >= 0, 'should show power level');
+});
+
+test('renderEVSim returns empty for zero power', function() {
+  assert.strictEqual(renderEVSim(0, 0, 3, 1, 0), '');
+});
+
+test('renderEVSim returns empty for zero current', function() {
+  assert.strictEqual(renderEVSim(11, 0, 3, 1, 1.5), '');
+});
+
+test('renderSolarSim returns SVG with simGlow animation for valid inputs', function() {
+  var svg = renderSolarSim(4.4, 10, 5.0, 4200);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-glow') >= 0, 'should contain sim-glow class for sun animation');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire for energy flow');
+  assert(svg.indexOf('sim-value') >= 0, 'should contain sim-value class');
+  assert(svg.indexOf('INV') >= 0, 'should show inverter label');
+});
+
+test('renderSolarSim returns empty for zero kWp', function() {
+  assert.strictEqual(renderSolarSim(0, 0, 0, 0), '');
+});
+
+test('renderSolarSim returns empty for zero panels', function() {
+  assert.strictEqual(renderSolarSim(4.4, 0, 5.0, 4200), '');
+});
+
+test('renderBESSSim returns SVG with battery visualization for valid capacity', function() {
+  var svg = renderBESSSim(10, 5, 80, 'lfp', true);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire for power flow');
+  assert(svg.indexOf('BMS') >= 0, 'should show BMS indicator');
+  assert(svg.indexOf('sim-value') >= 0, 'should contain sim-value class');
+  assert(svg.indexOf('PCS') >= 0, 'should show power conversion system');
+});
+
+test('renderBESSSim returns empty for zero capacity', function() {
+  assert.strictEqual(renderBESSSim(0, 5, 80, 'lfp', true), '');
+});
+
+test('renderBESSSim returns empty for zero power', function() {
+  assert.strictEqual(renderBESSSim(10, 0, 80, 'lfp', true), '');
+});
+
+test('renderGeneratorSim returns SVG with sim-rotor class for valid kVA', function() {
+  var svg = renderGeneratorSim(100, 65, 120, 'emergency');
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-rotor') >= 0, 'should contain sim-rotor class for rotating parts');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire for power output');
+  assert(svg.indexOf('ATS') >= 0, 'should show ATS switch indicator');
+  assert(svg.indexOf('DIESEL') >= 0, 'should show diesel engine label');
+  assert(svg.indexOf('sim-pulse') >= 0, 'should have exhaust animation');
+});
+
+test('renderGeneratorSim returns empty for zero kVA', function() {
+  assert.strictEqual(renderGeneratorSim(0, 0, 0, 'emergency'), '');
+});
+
+test('renderUPSSim returns SVG with sim-wire class showing power flow', function() {
+  var svg = renderUPSSim(2000, 3000, 30, 65, 'online');
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire class for current flow');
+  assert(svg.indexOf('AC/DC') >= 0, 'should show rectifier');
+  assert(svg.indexOf('DC/AC') >= 0, 'should show inverter');
+  assert(svg.indexOf('sim-value') >= 0, 'should contain sim-value class');
+  assert(svg.indexOf('Online (VFI)') >= 0, 'should show topology label');
+});
+
+test('renderUPSSim returns empty for zero load', function() {
+  assert.strictEqual(renderUPSSim(0, 3000, 30, 65, 'online'), '');
+});
+
+test('renderUPSSim returns empty for zero UPS VA', function() {
+  assert.strictEqual(renderUPSSim(2000, 0, 30, 65, 'online'), '');
+});
+
+test('renderEV includes EV simulator SVG', function() {
+  var html = renderEV();
+  assert(html.indexOf('sim-wire') >= 0, 'renderEV should include EV sim');
+});
+
+test('renderSolar includes solar simulator SVG', function() {
+  var html = renderSolar();
+  assert(html.indexOf('sim-glow') >= 0, 'renderSolar should include solar sim');
+});
+
+test('renderBESS includes BESS simulator SVG', function() {
+  var html = renderBESS();
+  assert(html.indexOf('BMS') >= 0, 'renderBESS should include BESS sim');
+});
+
+test('renderGenerator includes generator simulator SVG', function() {
+  var html = renderGenerator();
+  assert(html.indexOf('sim-rotor') >= 0, 'renderGenerator should include generator sim');
+});
+
+test('renderUPS includes UPS simulator SVG', function() {
+  upsState.equipment.server = 2;
+  var html = renderUPS();
+  upsState.equipment.server = 0;
+  assert(html.indexOf('DC/AC') >= 0, 'renderUPS should include UPS sim');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
