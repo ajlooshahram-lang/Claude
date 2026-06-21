@@ -1123,6 +1123,7 @@ const T = {
       kapacitor: 'Kapacitor & RC',
       varme: 'Rumvarme & U-v\u00e6rdi',
       dcmaskine: 'Jaevnstr\u00f8msmaskiner',
+      faktorer: 'Faktor-beregner',
       analyzer: '\uD83D\uDD0D Projektanalysator',
       distplan: 'Fordelingsplan',
       elplan: 'Installationsplan',
@@ -1282,6 +1283,7 @@ const T = {
       kapacitor: 'Capacitor & RC',
       varme: 'Room heating & U-value',
       dcmaskine: 'DC machines',
+      faktorer: 'Factor Calculator',
       analyzer: '\uD83D\uDD0D Project Analyzer',
       distplan: 'Distribution Plan',
       elplan: 'Electrical Plan',
@@ -1433,6 +1435,7 @@ const T = {
       kapacitor: 'خازن و RC',
       varme: 'گرمایش و مقدار U',
       dcmaskine: 'ماشین‌های DC',
+      faktorer: '\u0645\u062D\u0627\u0633\u0628\u0647\u200C\u06AF\u0631 \u0639\u0648\u0627\u0645\u0644',
       analyzer: '\uD83D\uDD0D تحلیلگر پروژه',
       distplan: 'نقشه توزیع',
       elplan: 'نقشه تاسیسات برقی',
@@ -3917,6 +3920,8 @@ const REACTIVE_LINKS = {
   varme:     ['load','cable','energy','heatpump','analyzer'],
   // DC machine power feeds motor theory, the connected load and cable sizing.
   dcmaskine: ['motorteori','motor','load','cable','analyzer'],
+  // Universal factor calculator: propagates solved values to ALL connected modules.
+  faktorer: ['load','cable','fuse','mcb','mccb','vdrop','scircuit','zs','trafo','impedans','trefase','motorteori','dc','lys','magnet','kapacitor','varme','dcmaskine','analyzer'],
   // === ANALYZER: propagates solved values to all relevant modules ===
   analyzer: ['load','cable','fuse','mcb','mccb','vdrop','scircuit','zs','trafo','earthsys','impedans','trefase','motorteori','relay','fault','dc','lys','magnet','kapacitor','varme','dcmaskine','thermal','pfc','harmonic']
 };
@@ -4095,6 +4100,38 @@ SharedQuantities.subscribe('load_power_kw', function(p, source) {
 // Motor power links DC machines <-> motor theory.
 SharedQuantities.subscribe('motor_power_w', function(p, source) {
   if (source !== 'dcmaskine' && typeof dcmaskineState !== 'undefined') dcmaskineState.Pmech = p;
+});
+
+// === Extended cross-module subscriptions for universal linking ===
+// Cable cross-section changes propagate to voltage-drop, short-circuit, thermal modules.
+SharedQuantities.subscribe('cable_mm2', function(mm2, source) {
+  if (source !== 'cable' && typeof cableState !== 'undefined' && mm2 > 0) cableState.crossSection = String(mm2);
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.cross_section_mm2 = mm2;
+});
+// Transformer kVA propagates to short-circuit Ik calculation.
+SharedQuantities.subscribe('trafo_kva', function(kva, source) {
+  if (source !== 'trafo' && typeof trafoState !== 'undefined') trafoState.size = kva;
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.trafo_kva = kva;
+});
+// Resistance propagates to impedance module.
+SharedQuantities.subscribe('resistance', function(r, source) {
+  if (source !== 'impedans' && typeof impedansState !== 'undefined') impedansState.R = r;
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.resistance = r;
+});
+// Inductance propagates to impedance module.
+SharedQuantities.subscribe('inductance', function(l, source) {
+  if (source !== 'impedans' && typeof impedansState !== 'undefined') impedansState.L = l;
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.inductance = l;
+});
+// Luminous flux propagates to lighting module.
+SharedQuantities.subscribe('luminous_flux', function(lm, source) {
+  if (source !== 'lys' && typeof lysState !== 'undefined') lysState.linkedFlux = lm;
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.luminous_flux = lm;
+});
+// Temperature propagates to cable derating.
+SharedQuantities.subscribe('temperature', function(temp, source) {
+  if (source !== 'cable' && typeof cableState !== 'undefined') cableState.temp = temp;
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.temperature = temp;
 });
 
 // "May be relevant" broad subscribers: the safety brain, the unified-project
@@ -4456,10 +4493,10 @@ const RCD_TYPES = {
 let activeModule = 'guide';
 
 // Load state
-let loadState = { voltage: '3x400', power: 10, cosPhi: 0.9, simFactor: 1.0, expFactor: 1.0 };
+let loadState = { voltage: null, power: null, cosPhi: null, simFactor: null, expFactor: null };
 // Housing-estate diversity (net-company experience formula, Fællesregulativet):
 // Pb = 0.834 * (W*n)^0.89  [kW], W = avg annual energy per home (MWh), n = homes
-let diversityState = { homes: 115, kwhPerHome: 8300, show: false };
+let diversityState = { homes: null, kwhPerHome: null, show: false };
 function calcDiversityPb() {
   const W = diversityState.kwhPerHome / 1000; // MWh per home
   return 0.834 * Math.pow(W * diversityState.homes, 0.89);
@@ -4550,17 +4587,17 @@ function renderLoadSchedule(){
 }
 
 // Fuse state
-let fuseState = { holder: 'D02', size: null };
+let fuseState = { holder: null, size: null };
 // MCB state
-let mcbState = { type: 'C60N', curve: 'B', rating: null, poles: 'multi' };
+let mcbState = { type: null, curve: null, rating: null, poles: null };
 // MCCB state
-let mccbState = { frame: 'NSX 400', trip: 'F', inVal: 400, ioMult: 0.8, isdMult: 2 };
+let mccbState = { frame: null, trip: null, inVal: null, ioMult: null, isdMult: null };
 // Cable state
-let cableState = { material: 'copper', type: 'NOIKLX', cores: '5G', crossSection: null, installMethod: 'C', temp: 30, grouping: 1 };
+let cableState = { material: null, type: null, cores: null, crossSection: null, installMethod: null, temp: null, grouping: null };
 // Voltage drop state
-let vdropState = { length: 50 };
+let vdropState = { length: null };
 // Short circuit state
-let scState = { zNet: 1, zTrafo: 5 };
+let scState = { zNet: null, zTrafo: null };
 // Standards state
 let rcdSelected = null;
 let rcdSensitivity = null;
@@ -5224,7 +5261,7 @@ const NAV_GROUPS = [
     da: 'Elektroteknisk teori', en: 'Electrotechnics theory', fa: '\u062A\u0626\u0648\u0631\u06CC \u0628\u0631\u0642',
     descDa: 'Grundl\u00E6ggende elektroteknisk teori og beregninger fra Elektroteknik Opgavesamling \u2014 Ohms lov, DC-kredsl\u00F8b, impedans, resonans, fasevinkel, effekttrekant, tidskonstanter, 3-faset systemer og motorteori. Dine formler, klik-for-klik.',
     descEn: 'Fundamental electrotechnics theory and calculations from Elektroteknik Opgavesamling \u2014 Ohm\'s law, DC circuits, impedance, resonance, phase angle, power triangle, time constants, 3-phase systems and motor theory. Your formulas, click by click.',
-    keys: ['impedans', 'kapacitor', 'trefase', 'motorteori', 'dcmaskine', 'dc', 'lys', 'magnet', 'varme']
+    keys: ['impedans', 'kapacitor', 'trefase', 'motorteori', 'dcmaskine', 'faktorer', 'dc', 'lys', 'magnet', 'varme']
   },
   {
     id: 'docs', icon: '\uD83D\uDCCB',
@@ -5362,10 +5399,10 @@ const THERMAL_CABLE_DATA = {
 };
 
 let thermalState = {
-  ambientTemp: 30,
-  groupingCount: 1,
-  selectedCableType: 'PVC',
-  installMethod: 'tray'
+  ambientTemp: null,
+  groupingCount: null,
+  selectedCableType: null,
+  installMethod: null
 };
 
 function thermalCalcDerating(ambientTemp, nCables, method) {
@@ -5478,9 +5515,9 @@ const CABLE3D_CONTAINMENT = {
 const CABLE3D_OUTER_DIA = [7.2, 8.4, 9.8, 10.8, 13.0, 15.4, 18.2, 20.6];
 
 let cable3dState = {
-  conduitDia: 32,
-  trayWidth: 200,
-  selectedCables: [0, 1]
+  conduitDia: null,
+  trayWidth: null,
+  selectedCables: []
 };
 
 function cable3dCalcFillRate(type, cableIndices) {
@@ -5604,10 +5641,10 @@ function renderCable3D() {
 
 // ===== ENERGY MONITORING MODULE =====
 let energyState = {
-  profile: 'residential',
-  powerKW: 50,
-  loads: ['motor', 'led'],
-  targetPF: 0.95
+  profile: null,
+  powerKW: null,
+  loads: [],
+  targetPF: null
 };
 
 const ENERGY_HARMONIC_SOURCES = {
@@ -6632,6 +6669,23 @@ function syncSharedQuantities(mod) {
         SharedQuantities.set('motor_power_w', dcmaskineState.Pmech, 'dcmaskine');
       }
       break;
+    case 'faktorer':
+      // Universal factor calculator propagates all known values
+      if (typeof faktorState !== 'undefined') {
+        var fq = faktorState.quantities;
+        if (fq.voltage !== null) SharedQuantities.set('voltage_phase', fq.voltage, 'faktorer');
+        if (fq.current !== null) SharedQuantities.set('load_current_a', fq.current, 'faktorer');
+        if (fq.resistance !== null) SharedQuantities.set('resistance', fq.resistance, 'faktorer');
+        if (fq.power !== null) SharedQuantities.set('load_power_kw', fq.power / 1000, 'faktorer');
+        if (fq.frequency !== null) SharedQuantities.set('frequency', fq.frequency, 'faktorer');
+        if (fq.capacitance !== null) SharedQuantities.set('capacitance_F', fq.capacitance, 'faktorer');
+        if (fq.inductance !== null) SharedQuantities.set('inductance', fq.inductance, 'faktorer');
+        if (fq.cos_phi !== null) SharedQuantities.set('cos_phi', fq.cos_phi, 'faktorer');
+        if (fq.temperature !== null) SharedQuantities.set('temperature', fq.temperature, 'faktorer');
+        if (fq.cross_section_mm2 !== null) SharedQuantities.set('cable_mm2', fq.cross_section_mm2, 'faktorer');
+        if (fq.luminous_flux !== null) SharedQuantities.set('luminous_flux', fq.luminous_flux, 'faktorer');
+      }
+      break;
   }
 }
 
@@ -6714,6 +6768,7 @@ function renderModule(mod) {
     case 'kapacitor': content = renderKapacitor(); break;
     case 'varme': content = renderVarme(); break;
     case 'dcmaskine': content = renderDcmaskine(); break;
+    case 'faktorer': content = renderFaktorer(); break;
     case 'analyzer': content = renderAnalyzer(); break;
     case 'distplan': content = renderDistPlan(); break;
     case 'elplan': content = renderElPlan(); break;
@@ -7882,10 +7937,12 @@ function renderShortCircuit() {
     // Or MCB
     if (mcbState.rating) {
       const mcb = MCB_TYPES[mcbState.type];
-      const mcbIcu = (mcbState.poles === '1p' ? mcb.icu1p : mcb.icuMp) * 1000;
-      if (mcbIcu > 0) {
-        deviceIcu = mcbIcu;
-        deviceIsd = MCB_CURVES[mcbState.curve].isdMax * mcbState.rating;
+      if (mcb) {
+        const mcbIcu = (mcbState.poles === '1p' ? mcb.icu1p : mcb.icuMp) * 1000;
+        if (mcbIcu > 0) {
+          deviceIcu = mcbIcu;
+          deviceIsd = MCB_CURVES[mcbState.curve].isdMax * mcbState.rating;
+        }
       }
     }
   }
@@ -7979,23 +8036,23 @@ function renderShortCircuit() {
 }// ===== TRANSFORMER MODULE (Extended - Opgavesamling Ch. 9) =====
 // Data from 1.-Dim-af-trafo.ppx.pptx + Elektroteknik Opgavesamling 4. udgave
 let trafoState = {
-  size: 400, voltage: '10/0.4', loadPercent: 75,
+  size: null, voltage: null, loadPercent: null,
   calcType: 'sizing',  // sizing, powersolve, emf, ocsc, regulation, efficiency, parallel, vectorgroup
   // Dynamic power/current solver: derive S,P,Q,I,U,cosphi from ANY sufficient subset.
   // Values stored in base SI units (U=V, I=A, S=VA, P=W, Q=var). null = "not given".
   psPhase: '3', psU: null, psI: null, psS: null, psP: null, psCos: null, psQ: null,
   // EMF
-  emfFreq: 50, emfN: 300, emfBmax: 1.2, emfArea: 0.01,
+  emfFreq: null, emfN: null, emfBmax: null, emfArea: null,
   // OC/SC test
-  ocP0: 610, ocI0pct: 2.5, scPcu: 6900, scUkPct: 4,
+  ocP0: null, ocI0pct: null, scPcu: null, scUkPct: null,
   // Voltage regulation
-  regErPct: 1.5, regExPct: 3.5, regCosPhi: 0.8, regLoad: 'inductive',
+  regErPct: null, regExPct: null, regCosPhi: null, regLoad: null,
   // Efficiency
-  effLoadPct: 75, effCosPhi: 0.85,
+  effLoadPct: null, effCosPhi: null,
   // Parallel
-  parTrafo2size: 630, parTrafo2uk: 6,
+  parTrafo2size: null, parTrafo2uk: null,
   // Vector group
-  vecGroup: 'Dy11'
+  vecGroup: null
 };
 
 // --- Transformer calculation functions (unit-testable, no DOM) ---
@@ -8297,7 +8354,9 @@ function renderTrafo() {
 // ===== TRANSFORMER SIMULATOR =====
 // Shows E-I core with primary/secondary coils and animated flux
 function renderTrafoSim(S, uk, loadPercent, voltage) {
-  if (!S || !loadPercent) return '';
+  if (!S || !loadPercent) {
+    return '<svg viewBox="0 0 300 150" width="300" height="150" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)"><circle cx="100" cy="75" r="20" fill="none" stroke="#1565c0" stroke-width="2"/><circle cx="100" cy="100" r="20" fill="none" stroke="#c62828" stroke-width="2"/><line x1="150" y1="45" x2="150" y2="105" stroke="#ff9800" stroke-width="2" stroke-dasharray="3 4" class="sim-field" opacity="0.5"/><text x="200" y="80" text-anchor="middle" class="sim-label" fill="#90a4ae" font-size="8">TRAFO</text></svg>';
+  }
   var loadFrac = loadPercent / 100;
   var losses = TRAFO_LOSSES[S] || { p0: 0, pk: 0 };
   var Ploss = losses.p0 + losses.pk * loadFrac * loadFrac;
@@ -14001,12 +14060,12 @@ function renderVerdict(safe, text) {
 // ===== EV CHARGING MODULE (DS/HD 60364-7-722) =====
 
 var evState = {
-  mode: 3,           // Mode 2, 3, 4
-  phases: 3,         // 1 or 3
-  powerKW: 11,       // 3.7, 7.4, 11, 22
-  numChargers: 1,    // 1-10
-  cableLength: 15,   // meters
-  mainFuse: 50       // A
+  mode: null,
+  phases: null,
+  powerKW: null,
+  numChargers: null,
+  cableLength: null,
+  mainFuse: null
 };
 
 // Simultaneity factor per DS/HD 60364-7-722 Annex A
@@ -14210,12 +14269,12 @@ function renderEV() {
 // ===== SOLAR PV & BATTERY MODULE (DS/EN 62446 + DS/HD 60364-7-712) =====
 
 var solarState = {
-  systemType: 'grid',    // 'grid', 'gridbat', 'hybrid'
-  panelCount: 10,        // number of panels
-  panelWp: 440,          // Wp per panel
-  batteryKWh: 10,        // kWh
-  selfConsumption: 50,   // % (30, 50, 70, 90)
-  inverterMaxVdc: 600    // typical inverter max Vdc
+  systemType: null,
+  panelCount: null,
+  panelWp: null,
+  batteryKWh: null,
+  selfConsumption: null,
+  inverterMaxVdc: null
 };
 
 // Constants for solar calculations
@@ -14439,13 +14498,13 @@ function renderSolar() {
 // ===== EMERGENCY LIGHTING MODULE (DS/EN 1838 + DS/EN 50172) =====
 
 var noedState = {
-  buildingType: 'office',  // residential, office, shop, assembly, industrial, parking, hospital
-  systemType: 'self',      // 'self' (self-contained), 'central', 'hybrid'
-  lightingType: 'escape',  // 'escape', 'antipanic', 'highrisk'
-  roomLength: 20,          // meters
-  roomWidth: 10,           // meters
-  roomHeight: 3.0,         // meters
-  duration: 1              // hours (1 or 3)
+  buildingType: null,
+  systemType: null,
+  lightingType: null,
+  roomLength: null,
+  roomWidth: null,
+  roomHeight: null,
+  duration: null
 };
 
 // Required lux levels per EN 1838
@@ -14633,6 +14692,7 @@ function renderNoed() {
 
   if (!calc.required) {
     html += '<div class="result-box"><div class="result-row"><span class="label">' + tx('Intet krav', 'No requirement') + '</span><span class="value">' + tx('Boliger har ikke krav om noedbelysning', 'Residential buildings have no emergency lighting requirement') + '</span></div></div>';
+    html += renderNoedSim(noedState.systemType || 'central', 0, 0, noedState.duration || 1);
   } else {
     // Luminaire result
     html += '<div class="result-box">';
@@ -14739,11 +14799,11 @@ var MOTOR_DUTY_DERATING = {
 };
 
 var motorState = {
-  kW: 7.5,
-  poles: 4,
-  startType: 'dol',
-  duty: 'S1',
-  cableLength: 30
+  kW: null,
+  poles: null,
+  startType: null,
+  duty: null,
+  cableLength: null
 };
 
 // Get motor full-load current
@@ -14840,19 +14900,6 @@ function motorCalcI2t(kW, poles, startType) {
 }
 
 function renderMotor() {
-  var flc = motorGetFLC(motorState.kW, motorState.poles);
-  var iStart = motorCalcStartCurrent(motorState.kW, motorState.poles, motorState.startType);
-  var vdip = motorCalcVoltageDip(motorState.kW, motorState.poles, motorState.startType, motorState.cableLength);
-  var mpcb = motorSelectMPCB(motorState.kW, flc);
-  var contactor = motorSelectContactor(motorState.kW);
-  var overload = motorSelectOverload(flc);
-  var cable = motorSelectCable(flc, motorState.duty);
-  var startTime = motorGetStartTime(motorState.startType);
-  var i2t = motorCalcI2t(motorState.kW, motorState.poles, motorState.startType);
-  var derating = MOTOR_DUTY_DERATING[motorState.duty];
-  var vdipOk = vdip <= 3.0;
-  var mult = MOTOR_START_MULTIPLIERS[motorState.startType];
-
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Motorstart-analyse', 'Motor Start Analysis') + '</div>';
   html += '<div class="info-row">' + tx('Beregning iht. IEC 60947 + DS/HD 60364-5-52', 'Calculation per IEC 60947 + DS/HD 60364-5-52') + '</div>';
@@ -14900,6 +14947,25 @@ function renderMotor() {
     html += '<button class="sel-btn' + (motorState.cableLength === len ? ' selected' : '') + '" onclick="motorState.cableLength=' + len + ';renderModule(\'motor\')">' + len + ' m</button>';
   });
   html += '</div></div>';
+
+  // Null guard: skip results if essential state is not yet selected
+  if (motorState.kW == null || motorState.poles == null || motorState.startType == null || motorState.duty == null || motorState.cableLength == null) {
+    html += '</div>';
+    return html;
+  }
+
+  var flc = motorGetFLC(motorState.kW, motorState.poles);
+  var iStart = motorCalcStartCurrent(motorState.kW, motorState.poles, motorState.startType);
+  var vdip = motorCalcVoltageDip(motorState.kW, motorState.poles, motorState.startType, motorState.cableLength);
+  var mpcb = motorSelectMPCB(motorState.kW, flc);
+  var contactor = motorSelectContactor(motorState.kW);
+  var overload = motorSelectOverload(flc);
+  var cable = motorSelectCable(flc, motorState.duty);
+  var startTime = motorGetStartTime(motorState.startType);
+  var i2t = motorCalcI2t(motorState.kW, motorState.poles, motorState.startType);
+  var derating = MOTOR_DUTY_DERATING[motorState.duty];
+  var vdipOk = vdip <= 3.0;
+  var mult = MOTOR_START_MULTIPLIERS[motorState.startType];
 
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
@@ -14970,9 +15036,9 @@ function harmonicDiversityFactor(n) {
 }
 
 var harmonicState = {
-  loadType: 'vfd',
-  numLoads: 1,
-  loadKW: 11
+  loadType: null,
+  numLoads: null,
+  loadKW: null
 };
 
 // Calculate THD: sqrt(sum(Ih/I1)^2) * 100%
@@ -15174,14 +15240,6 @@ function renderHarmonicSim(thd, harmonics, loadType) {
 }
 
 function renderHarmonic() {
-  var thdResult = harmonicCalcTHD(harmonicState.loadType, harmonicState.numLoads);
-  var kResult = harmonicCalcKFactor(harmonicState.loadType, harmonicState.numLoads);
-  var neutralResult = harmonicCalcNeutral(harmonicState.loadType, harmonicState.numLoads);
-  var filterResult = harmonicCalcFilter(harmonicState.loadType, harmonicState.numLoads, harmonicState.loadKW);
-  var deratingResult = harmonicCalcCableDerating(harmonicState.loadType, harmonicState.numLoads);
-  var spec = HARMONIC_SPECTRA[harmonicState.loadType];
-  var thdOk = !thdResult.exceeded;
-
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Harmonisk analyse', 'Harmonic Analysis') + '</div>';
   html += '<div class="info-row">' + tx('Beregning iht. EN 61000-3-2/12 + DS/HD 60364-5-52', 'Calculation per EN 61000-3-2/12 + DS/HD 60364-5-52') + '</div>';
@@ -15208,6 +15266,26 @@ function renderHarmonic() {
     html += '<button class="sel-btn' + (harmonicState.loadKW === kw ? ' selected' : '') + '" onclick="harmonicState.loadKW=' + kw + ';renderModule(\'harmonic\')">' + kw + '</button>';
   });
   html += '</div></div>';
+
+  // Null guard: skip results if essential state not selected
+  if (harmonicState.loadType == null || harmonicState.numLoads == null || harmonicState.loadKW == null) {
+    // Show placeholder SVG harmonic spectrum
+    html += '<div class="result-box"><div class="result-title">' + tx('Harmonisk spektrum', 'Harmonic Spectrum') + '</div>';
+    html += '<svg viewBox="0 0 300 120" style="width:100%;max-width:400px;height:auto">';
+    html += '<text x="150" y="65" text-anchor="middle" font-size="11" fill="#666">' + tx('Vaelg lasttype for spektrum', 'Select load type for spectrum') + '</text>';
+    html += '</svg></div>';
+    html += '<div class="info-row">' + tx('Graense iht. EN 50160 cl.4.2.5: max 8% THD', 'Limit per EN 50160 cl.4.2.5: max 8% THD') + '</div>';
+    html += '</div>';
+    return html;
+  }
+
+  var thdResult = harmonicCalcTHD(harmonicState.loadType, harmonicState.numLoads);
+  var kResult = harmonicCalcKFactor(harmonicState.loadType, harmonicState.numLoads);
+  var neutralResult = harmonicCalcNeutral(harmonicState.loadType, harmonicState.numLoads);
+  var filterResult = harmonicCalcFilter(harmonicState.loadType, harmonicState.numLoads, harmonicState.loadKW);
+  var deratingResult = harmonicCalcCableDerating(harmonicState.loadType, harmonicState.numLoads);
+  var spec = HARMONIC_SPECTRA[harmonicState.loadType];
+  var thdOk = !thdResult.exceeded;
 
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
@@ -15293,10 +15371,10 @@ var VFD_EMC_CATEGORIES = {
 };
 
 var vfdState = {
-  application: 'pump',
-  motorKW: 11,
-  cableLength: 25,
-  emcCategory: 'C2'
+  application: null,
+  motorKW: null,
+  cableLength: null,
+  emcCategory: null
 };
 
 // Calculate VFD rated current requirement
@@ -15422,16 +15500,6 @@ function vfdCalcPE(motorKW) {
 }
 
 function renderVFD() {
-  var sizing = vfdCalcRatedCurrent(vfdState.motorKW, vfdState.application);
-  var inputCable = vfdCalcInputCable(vfdState.motorKW, vfdState.application);
-  var outputCable = vfdCalcOutputCable(vfdState.motorKW, vfdState.application, vfdState.cableLength, vfdState.emcCategory);
-  var braking = vfdCalcBraking(vfdState.motorKW, vfdState.application);
-  var reactor = vfdCalcLineReactor(vfdState.motorKW);
-  var pe = vfdCalcPE(vfdState.motorKW);
-  var inputMCB = vfdSelectInputMCB(inputCable.inputCurrent);
-  var app = VFD_APPLICATIONS[vfdState.application];
-  var emc = VFD_EMC_CATEGORIES[vfdState.emcCategory];
-
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Frekvensomformer dimensionering', 'VFD Sizing') + '</div>';
   html += '<div class="info-row">' + tx('Beregning iht. IEC 61800 + DS/HD 60364-5-52', 'Calculation per IEC 61800 + DS/HD 60364-5-52') + '</div>';
@@ -15466,6 +15534,30 @@ function renderVFD() {
     html += '<button class="sel-btn' + (vfdState.cableLength === len ? ' selected' : '') + '" onclick="vfdState.cableLength=' + len + ';renderModule(\'vfd\')">' + len + ' m</button>';
   });
   html += '</div></div>';
+
+  // CRITICAL WARNING: No RCD on VFD output (always shown)
+  html += '<div class="result-box" style="border-left:4px solid #ef4444;background:#fef2f2">';
+  html += '<div class="result-row"><span class="label" style="color:#ef4444;font-weight:bold">\u26A0\uFE0F ' + tx('ADVARSEL', 'WARNING') + '</span><span class="value" style="color:#ef4444">' + tx('ALDRIG installér RCD mellem VFD og motor!', 'NEVER install RCD between VFD and motor!') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Årsag', 'Reason') + '</span><span class="value">' + tx('Højfrekvens lækstrøm udløser RCD (IEC 61800-5-1)', 'High-frequency leakage current trips RCD (IEC 61800-5-1)') + '</span></div>';
+  html += '</div>';
+
+  // Null guard: skip results if essential state not selected
+  if (vfdState.application == null || vfdState.motorKW == null || vfdState.cableLength == null || vfdState.emcCategory == null) {
+    // Minimal VFD sim SVG placeholder
+    html += renderVFDSim(0, 0, 50, 1455);
+    html += '</div>';
+    return html;
+  }
+
+  var sizing = vfdCalcRatedCurrent(vfdState.motorKW, vfdState.application);
+  var inputCable = vfdCalcInputCable(vfdState.motorKW, vfdState.application);
+  var outputCable = vfdCalcOutputCable(vfdState.motorKW, vfdState.application, vfdState.cableLength, vfdState.emcCategory);
+  var braking = vfdCalcBraking(vfdState.motorKW, vfdState.application);
+  var reactor = vfdCalcLineReactor(vfdState.motorKW);
+  var pe = vfdCalcPE(vfdState.motorKW);
+  var inputMCB = vfdSelectInputMCB(inputCable.inputCurrent);
+  var app = VFD_APPLICATIONS[vfdState.application];
+  var emc = VFD_EMC_CATEGORIES[vfdState.emcCategory];
 
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
@@ -15523,12 +15615,6 @@ function renderVFD() {
   }
   html += '</div>';
 
-  // CRITICAL WARNING: No RCD on VFD output
-  html += '<div class="result-box" style="border-left:4px solid #ef4444;background:#fef2f2">';
-  html += '<div class="result-row"><span class="label" style="color:#ef4444;font-weight:bold">\u26A0\uFE0F ' + tx('ADVARSEL', 'WARNING') + '</span><span class="value" style="color:#ef4444">' + tx('ALDRIG installér RCD mellem VFD og motor!', 'NEVER install RCD between VFD and motor!') + '</span></div>';
-  html += '<div class="result-row"><span class="label">' + tx('Årsag', 'Reason') + '</span><span class="value">' + tx('Højfrekvens lækstrøm udløser RCD (IEC 61800-5-1)', 'High-frequency leakage current trips RCD (IEC 61800-5-1)') + '</span></div>';
-  html += '</div>';
-
   // Simulator
   html += renderVFDSim(vfdState.motorKW, sizing.vfdCurrent, 50, Math.round(1500 * (1 - 0.03)));
 
@@ -15564,13 +15650,13 @@ var LIGHTING_SOURCES = {
 };
 
 var lightingState = {
-  roomType: 'office',
-  source: 'ledPanel',
-  wattage: 36,
-  length: 8,
-  width: 6,
-  height: 3.0,
-  maintenanceFactor: 0.7
+  roomType: null,
+  source: null,
+  wattage: null,
+  length: null,
+  width: null,
+  height: null,
+  maintenanceFactor: null
 };
 
 // Calculate room index k = L*W / (Hm * (L+W)), Hm = mounting height - work plane (0.85m)
@@ -15755,11 +15841,11 @@ var HEATPUMP_TYPES = {
 };
 
 var heatpumpState = {
-  type: 'airToWater',
-  heatingKW: 10,
-  cop: 3.5,
-  inrushFactor: 4,
-  cableLength: 15
+  type: null,
+  heatingKW: null,
+  cop: null,
+  inrushFactor: null,
+  cableLength: null
 };
 
 // Calculate electrical input from heating capacity and COP
@@ -15866,8 +15952,6 @@ function heatpumpCalcInstallation(type, heatingKW, cop, inrushFactor, cableLengt
   };
 }
 function renderHeatPump() {
-  var calc = heatpumpCalcInstallation(heatpumpState.type, heatpumpState.heatingKW, heatpumpState.cop, heatpumpState.inrushFactor, heatpumpState.cableLength);
-
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Varmepumpe-installation', 'Heat Pump Installation') + '</div>';
   html += '<div class="info-row">' + tx('Beregning iht. DS/HD 60364 + Installationsbekendtgoerelsen', 'Calculation per DS/HD 60364 + Installationsbekendtgoerelsen') + '</div>';
@@ -15907,6 +15991,15 @@ function renderHeatPump() {
     html += '<button class="sel-btn' + (heatpumpState.cableLength === len ? ' selected' : '') + '" onclick="heatpumpState.cableLength=' + len + ';renderModule(\'heatpump\')">' + len + '</button>';
   });
   html += '</div></div>';
+
+  // Null guard: skip calculations if essential state not selected
+  if (heatpumpState.heatingKW == null || heatpumpState.cop == null || heatpumpState.inrushFactor == null || heatpumpState.cableLength == null) {
+    html += renderHeatPumpSim(0, 0, 0, 0, 1);
+    html += '</div>';
+    return html;
+  }
+
+  var calc = heatpumpCalcInstallation(heatpumpState.type, heatpumpState.heatingKW, heatpumpState.cop, heatpumpState.inrushFactor, heatpumpState.cableLength);
 
   // Results - Electrical
   html += '<div class="result-box">';
@@ -15986,16 +16079,16 @@ var BUSBAR_INSTALL_DERATING = {
 };
 
 var busbarState = {
-  systemType: 'distribution',
-  ratedCurrent: 400,
-  brand: 'schneider',
-  ambientTemp: 35,
-  installMethod: 'horizontal_flat',
-  ipRating: 54,
-  tapOffCount: 6,
-  tapOffRating: 63,
-  sections: 5,
-  upstreamIk: 25
+  systemType: null,
+  ratedCurrent: null,
+  brand: null,
+  ambientTemp: null,
+  installMethod: null,
+  ipRating: null,
+  tapOffCount: null,
+  tapOffRating: null,
+  sections: null,
+  upstreamIk: null
 };
 
 // Calculate combined derating factor
@@ -16272,12 +16365,12 @@ function renderBusbar() {
 }
 // ===== BATHROOM ZONES MODULE (DS/HD 60364-7-701) =====
 var bathroomState = {
-  bathType: 'bathtub',
-  roomWidth: 2.5,
-  roomLength: 3.0,
-  ceilingHeight: 2.5,
-  selectedZone: 0,
-  selectedEquipment: 'luminaire'
+  bathType: null,
+  roomWidth: null,
+  roomLength: null,
+  ceilingHeight: null,
+  selectedZone: null,
+  selectedEquipment: null
 };
 
 var BATHROOM_ZONES = {
@@ -16382,10 +16475,6 @@ function bathroomGetProtectionReqs(zone) {
 }
 
 function renderBathroom() {
-  var check = bathroomCheckEquipment(bathroomState.selectedZone, bathroomState.selectedEquipment);
-  var protReqs = bathroomGetProtectionReqs(bathroomState.selectedZone);
-  var ufh = bathroomCheckUnderfloorHeating(bathroomState.selectedZone);
-
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Badevaerelses-zoner (DS/HD 60364-7-701)', 'Bathroom Zones (DS/HD 60364-7-701)') + '</div>';
   html += '<div class="info-row">' + tx('Zoneklassifikation og udstyrskrav iht. DS/HD 60364-7-701', 'Zone classification and equipment requirements per DS/HD 60364-7-701') + '</div>';
@@ -16459,6 +16548,17 @@ function renderBathroom() {
   });
   html += '</div></div>';
 
+  // Null guard: skip results if essential state not selected
+  if (bathroomState.selectedZone == null || bathroomState.selectedEquipment == null) {
+    html += renderBathroomSim(null, null, null);
+    html += '</div>';
+    return html;
+  }
+
+  var check = bathroomCheckEquipment(bathroomState.selectedZone, bathroomState.selectedEquipment);
+  var protReqs = bathroomGetProtectionReqs(bathroomState.selectedZone);
+  var ufh = bathroomCheckUnderfloorHeating(bathroomState.selectedZone);
+
   // IP Rating for selected zone
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('IP-krav for valgt zone', 'IP Rating Required for Selected Zone') + '</div>';
@@ -16513,11 +16613,11 @@ function renderBathroom() {
 
 // ===== FIRE ALARM MODULE (DS/EN 54 + DBI vejledning 36) =====
 var firealarmState = {
-  category: 1,
-  buildingType: 'hospital',
-  detectorType: 'optical_smoke',
-  roomArea: 100,
-  ceilingHeight: 3.0
+  category: null,
+  buildingType: null,
+  detectorType: null,
+  roomArea: null,
+  ceilingHeight: null
 };
 
 var FIREALARM_CATEGORIES = {
@@ -16752,13 +16852,13 @@ function renderFireAlarm() {
 
 // ===== STRUCTURED CABLING MODULE (ISO 11801 + DS/EN 50173) =====
 var dataState = {
-  cableCategory: 'cat6a',
-  application: 'office',
-  cableType: 'uutp',
-  distance: 50,
-  floorArea: 200,
-  poeType: 'af',
-  poePortCount: 24,
+  cableCategory: null,
+  application: null,
+  cableType: null,
+  distance: null,
+  floorArea: null,
+  poeType: null,
+  poePortCount: null,
   fiberType: null
 };
 
@@ -16915,15 +17015,6 @@ function dataGetPathway() {
 }
 
 function renderData() {
-  var distCheck = dataCalcDistance(dataState.distance, dataState.cableCategory);
-  var outlets = dataCalcOutlets(dataState.floorArea, dataState.application);
-  var panels = dataCalcPatchPanels(outlets.outlets, 24);
-  var poe = dataCalcPoeBudget(dataState.poeType, dataState.poePortCount);
-  var switchCalc = dataCalcSwitchPorts(outlets.outlets, dataState.poePortCount);
-  var separation = dataGetSeparation(dataState.cableType);
-  var pathway = dataGetPathway();
-  var fiberBudget = dataState.fiberType ? dataCalcFiberBudget(dataState.fiberType, dataState.distance, 2, 0) : null;
-
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Datainstallation (ISO 11801 + DS/EN 50173)', 'Structured Cabling (ISO 11801 + DS/EN 50173)') + '</div>';
   html += '<div class="info-row">' + tx('Kabelinfrastruktur iht. ISO 11801 og DS/EN 50173', 'Cable infrastructure per ISO 11801 and DS/EN 50173') + '</div>';
@@ -16989,6 +17080,22 @@ function renderData() {
     html += '<button class="sel-btn' + (dataState.fiberType === key ? ' selected' : '') + '" onclick="dataState.fiberType=\'' + key + '\';renderModule(\'data\')">' + tx(f.da, f.en) + '</button>';
   });
   html += '</div></div>';
+
+  // Null guard: skip results if essential state not selected
+  if (dataState.cableCategory == null || dataState.application == null || dataState.distance == null || dataState.floorArea == null || dataState.poeType == null || dataState.poePortCount == null || dataState.cableType == null) {
+    html += renderDataSim(0, null, 0, 0);
+    html += '</div>';
+    return html;
+  }
+
+  var distCheck = dataCalcDistance(dataState.distance, dataState.cableCategory);
+  var outlets = dataCalcOutlets(dataState.floorArea, dataState.application);
+  var panels = dataCalcPatchPanels(outlets.outlets, 24);
+  var poe = dataCalcPoeBudget(dataState.poeType, dataState.poePortCount);
+  var switchCalc = dataCalcSwitchPorts(outlets.outlets, dataState.poePortCount);
+  var separation = dataGetSeparation(dataState.cableType);
+  var pathway = dataGetPathway();
+  var fiberBudget = dataState.fiberType ? dataCalcFiberBudget(dataState.fiberType, dataState.distance, 2, 0) : null;
 
   // Results - Distance Check
   html += '<div class="result-box">';
@@ -17072,13 +17179,13 @@ function renderData() {
 // ===== SURGE PROTECTION MODULE (DS/HD 60364-5-534 + IEC 62305) =====
 
 var spdState = {
-  location: 'urban',
-  ng: 1.0,
-  length: 30,
-  width: 20,
-  height: 6,
-  hasLPS: false,
-  hasSensitive: false
+  location: null,
+  ng: null,
+  length: null,
+  width: null,
+  height: null,
+  hasLPS: null,
+  hasSensitive: null
 };
 
 var SPD_LOCATIONS = {
@@ -17145,16 +17252,6 @@ function spdCheckCoordination(hasLPS, distanceT1T2) {
 }
 
 function renderSPD() {
-  var acResult = spdCalcCollectionArea(spdState.length, spdState.width, spdState.height);
-  var loc = SPD_LOCATIONS[spdState.location];
-  var strikeResult = spdCalcExpectedStrikes(spdState.ng, acResult.ac, loc.cd);
-  var risk = spdAssessRisk(strikeResult.nd);
-  var types = spdSelectType(spdState.hasLPS, spdState.hasSensitive);
-  var mainType = spdState.hasLPS ? 'Type 1' : 'Type 2';
-  var spec = spdGetSpecification(mainType);
-  var product = spdRecommendProduct(risk, spdState.hasLPS);
-  var coord = spdCheckCoordination(spdState.hasLPS, 15);
-
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Overspaendingsbeskyttelse (DS/HD 60364-5-534 + IEC 62305)', 'Surge Protection Design (DS/HD 60364-5-534 + IEC 62305)') + '</div>';
   html += '<div class="info-row">' + tx('Risikovurdering og SPD-valg iht. DS/HD 60364-4-443', 'Risk assessment and SPD selection per DS/HD 60364-4-443') + '</div>';
@@ -17206,6 +17303,23 @@ function renderSPD() {
   html += '<button class="sel-btn' + (!spdState.hasSensitive ? ' selected' : '') + '" onclick="spdState.hasSensitive=false;renderModule(\'spd\')">' + tx('Nej', 'No') + '</button>';
   html += '<button class="sel-btn' + (spdState.hasSensitive ? ' selected' : '') + '" onclick="spdState.hasSensitive=true;renderModule(\'spd\')">' + tx('Ja', 'Yes') + '</button>';
   html += '</div></div>';
+
+  // Null guard: skip results if essential state not selected
+  if (spdState.location == null || spdState.ng == null || spdState.length == null || spdState.width == null || spdState.height == null || spdState.hasLPS == null || spdState.hasSensitive == null) {
+    html += renderSPDSim(0, false, 0);
+    html += '</div>';
+    return html;
+  }
+
+  var acResult = spdCalcCollectionArea(spdState.length, spdState.width, spdState.height);
+  var loc = SPD_LOCATIONS[spdState.location];
+  var strikeResult = spdCalcExpectedStrikes(spdState.ng, acResult.ac, loc.cd);
+  var risk = spdAssessRisk(strikeResult.nd);
+  var types = spdSelectType(spdState.hasLPS, spdState.hasSensitive);
+  var mainType = spdState.hasLPS ? 'Type 1' : 'Type 2';
+  var spec = spdGetSpecification(mainType);
+  var product = spdRecommendProduct(risk, spdState.hasLPS);
+  var coord = spdCheckCoordination(spdState.hasLPS, 15);
 
   // Results
   html += '<div class="result-box">';
@@ -17292,10 +17406,10 @@ var UPS_BATTERY_TYPES = {
 var UPS_STANDARD_SIZES = [750, 1000, 1500, 2000, 3000, 5000, 6000, 10000, 15000, 20000, 30000, 40000, 60000, 80000, 100000, 120000, 160000, 200000];
 
 var upsState = {
-  topology: 'online',
+  topology: null,
   equipment: { server: 0, desktop: 0, network: 0, router: 0, monitor: 0, medical: 0, security: 0, pos: 0 },
-  autonomy: 15,
-  batteryType: 'agm'
+  autonomy: null,
+  batteryType: null
 };
 
 function upsCalcLoad(equipment) {
@@ -17355,13 +17469,6 @@ function upsNeedsBypass(topology, upsVA) {
 }
 
 function renderUPS() {
-  var load = upsCalcLoad(upsState.equipment);
-  var upsSize = upsSelectSize(load.totalVA);
-  var battery = upsCalcBattery(load.totalW, upsState.autonomy, upsState.batteryType);
-  var inputCable = upsCalcInputCable(upsSize, 230);
-  var heat = upsCalcHeatLoss(upsSize);
-  var bypass = upsNeedsBypass(upsState.topology, upsSize);
-
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('UPS-dimensionering (IEC 62040 + DS/HD 60364-5-56)', 'UPS Sizing (IEC 62040 + DS/HD 60364-5-56)') + '</div>';
   html += '<div class="info-row">' + tx('Dimensionering af UPS og batteri iht. IEC 62040', 'UPS and battery sizing per IEC 62040') + '</div>';
@@ -17398,6 +17505,20 @@ function renderUPS() {
     html += '<button class="sel-btn' + (upsState.batteryType === key ? ' selected' : '') + '" onclick="upsState.batteryType=\'' + key + '\';renderModule(\'ups\')">' + tx(bt.da, bt.en) + '</button>';
   });
   html += '</div></div>';
+
+  // Null guard: skip results if essential state not selected
+  if (upsState.topology == null || upsState.autonomy == null || upsState.batteryType == null) {
+    html += renderUPSSim(0, 0, 0, 'online');
+    html += '</div>';
+    return html;
+  }
+
+  var load = upsCalcLoad(upsState.equipment);
+  var upsSize = upsSelectSize(load.totalVA);
+  var battery = upsCalcBattery(load.totalW, upsState.autonomy, upsState.batteryType);
+  var inputCable = upsCalcInputCable(upsSize, 230);
+  var heat = upsCalcHeatLoss(upsSize);
+  var bypass = upsNeedsBypass(upsState.topology, upsSize);
 
   // Results - Load Calculation
   html += '<div class="result-box">';
@@ -17461,12 +17582,12 @@ function renderUPS() {
 var PFC_STANDARD_SIZES = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 125, 150, 200, 250, 300, 400, 500];
 
 var pfcState = {
-  currentPF: 0.75,
-  targetPF: 0.95,
-  activePower: 100,
-  correctionType: 'auto',
-  detuning: 0,
-  skMVA: 20
+  currentPF: null,
+  targetPF: null,
+  activePower: null,
+  correctionType: null,
+  detuning: null,
+  skMVA: null
 };
 
 function pfcCalcKvar(currentPF, targetPF, kW) {
@@ -17806,8 +17927,8 @@ var TRAY_GROUPING_FACTORS = [
 ];
 
 var trayFillState = {
-  trayType: 'perforated',
-  traySize: 0,
+  trayType: null,
+  traySize: null,
   cables: {}
 };
 
@@ -17883,17 +18004,6 @@ function trayCountCircuits(cables) {
 }
 
 function renderTrayFill() {
-  var size = TRAY_SIZES[trayFillState.traySize];
-  var trayArea = trayCalcArea(size.w, size.h);
-  var cableArea = trayCalcCableArea(trayFillState.cables);
-  var fillRate = trayCalcFillRate(cableArea, trayArea);
-  var maxFill = TRAY_TYPES[trayFillState.trayType].maxFill;
-  var numCircuits = trayCountCircuits(trayFillState.cables);
-  var groupFactor = trayGetGroupingFactor(numCircuits);
-  var weight = trayCalcWeight(trayFillState.cables);
-  var spacing = trayGetSupportSpacing(weight);
-  var needsSeparation = trayCheckSeparation(trayFillState.cables);
-
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Kabelbakke Fyldningsberegning (DS/EN 50174-2 + DS/HD 60364-5-52)', 'Cable Tray Fill Calculator (DS/EN 50174-2 + DS/HD 60364-5-52)') + '</div>';
   html += '<div class="info-row">' + tx('Beregn fyldningsgrad, grupperingsfaktor og vaegt iht. standarder', 'Calculate fill rate, grouping factor and weight per standards') + '</div>';
@@ -17926,6 +18036,24 @@ function renderTrayFill() {
     html += '</div>';
   });
   html += '</div>';
+
+  // Null guard: skip results if essential state not selected
+  if (trayFillState.trayType == null || trayFillState.traySize == null) {
+    html += renderTrayFillSim(300, 60, 0, 18000, 0, 50);
+    html += '</div>';
+    return html;
+  }
+
+  var size = TRAY_SIZES[trayFillState.traySize];
+  var trayArea = trayCalcArea(size.w, size.h);
+  var cableArea = trayCalcCableArea(trayFillState.cables);
+  var fillRate = trayCalcFillRate(cableArea, trayArea);
+  var maxFill = TRAY_TYPES[trayFillState.trayType].maxFill;
+  var numCircuits = trayCountCircuits(trayFillState.cables);
+  var groupFactor = trayGetGroupingFactor(numCircuits);
+  var weight = trayCalcWeight(trayFillState.cables);
+  var spacing = trayGetSupportSpacing(weight);
+  var needsSeparation = trayCheckSeparation(trayFillState.cables);
 
   // Results
   html += '<div class="result-box">';
@@ -27091,7 +27219,7 @@ function renderVdropSim(Un, vdrop, vdropPercent, length, crossSection) {
 }
 
 function renderScircuitSim(zNet, zTrafo, zCable, ikMax, ikMin) {
-  if (!ikMax) return '';
+  if (!ikMax || zNet == null || zTrafo == null) return '';
   var svg = '<svg viewBox="0 0 320 90" width="320" height="90" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   var dur = simFlowDuration(ikMax / 1000, 50);
   var flowStyle = ' style="animation-duration:' + dur + 's"';
@@ -27129,7 +27257,9 @@ function renderScircuitSim(zNet, zTrafo, zCable, ikMax, ikMin) {
 }
 
 function renderMotorSim(ns, n, slip, torque) {
-  if (!ns) return '';
+  if (!ns) {
+    return '<svg viewBox="0 0 260 150" width="260" height="150" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)"><circle cx="120" cy="70" r="50" fill="none" stroke="#5c6bc0" stroke-width="6"/><circle cx="120" cy="70" r="28" fill="none" stroke="#ff7043" stroke-width="4" class="sim-rotor"/><circle cx="120" cy="70" r="5" fill="#ff7043"/></svg>';
+  }
   var svg = '<svg viewBox="0 0 260 150" width="260" height="150" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
   var cx = 120, cy = 70;
@@ -27375,7 +27505,9 @@ function renderGeneratorSim(kVA, loadPercent, fuelRate, application) {
 }
 
 function renderUPSSim(loadW, upsVA, autonomyMin, batteryAh, topology) {
-  if (!loadW || !upsVA) return '';
+  if (!loadW || !upsVA) {
+    return '<svg viewBox="0 0 320 120" width="320" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)"><rect x="100" y="25" width="120" height="70" rx="5" fill="#1b5e20" stroke="#2e7d32" stroke-width="1.5"/><text x="160" y="55" text-anchor="middle" class="sim-label" fill="#fff" font-size="8">UPS</text><text x="160" y="72" text-anchor="middle" class="sim-label" fill="#a5d6a7" font-size="7">AC/DC</text><text x="160" y="85" text-anchor="middle" class="sim-label" fill="#a5d6a7" font-size="7">DC/AC</text><line x1="80" y1="60" x2="100" y2="60" stroke="#42a5f5" stroke-width="2" class="sim-wire"/></svg>';
+  }
   var svg = '<svg viewBox="0 0 320 120" width="320" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
   var dur = simFlowDuration(loadW / 1000, 10);
@@ -27421,7 +27553,9 @@ function renderUPSSim(loadW, upsVA, autonomyMin, batteryAh, topology) {
 }
 
 function renderVFDSim(motorKW, vfdCurrent, frequency, motorSpeed) {
-  if (!motorKW || !vfdCurrent) return '';
+  if (!motorKW || !vfdCurrent) {
+    return '<svg viewBox="0 0 320 140" width="320" height="140" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)"><rect x="100" y="40" width="120" height="60" rx="6" fill="#263238" stroke="#546e7a" stroke-width="2"/><text x="160" y="75" text-anchor="middle" class="sim-label" fill="#90a4ae" font-size="9">VFD</text><circle cx="250" cy="70" r="25" fill="none" stroke="#90a4ae" stroke-width="3" class="sim-rotor"/></svg>';
+  }
   var svg = '<svg viewBox="0 0 320 140" width="320" height="140" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
   var dur = simFlowDuration(vfdCurrent, 100);
@@ -27487,7 +27621,9 @@ function renderVFDSim(motorKW, vfdCurrent, frequency, motorSpeed) {
 }
 
 function renderBusbarSim(ratedCurrent, tapOffs, loadPercent, sections, ambientTemp) {
-  if (!ratedCurrent || !tapOffs) return '';
+  if (!ratedCurrent || !tapOffs) {
+    return '<svg viewBox="0 0 320 120" width="320" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)"><rect x="30" y="50" width="260" height="20" rx="3" fill="#78909c" stroke="#546e7a" stroke-width="1.5"/><text x="160" y="64" text-anchor="middle" class="sim-label" fill="#fff" font-size="7">BUSBAR</text><text x="80" y="90" text-anchor="middle" class="sim-label" fill="#90a4ae" font-size="6">T1</text><line x1="80" y1="70" x2="80" y2="84" stroke="#90a4ae" stroke-width="1.5"/><text x="160" y="90" text-anchor="middle" class="sim-label" fill="#90a4ae" font-size="6">tap-offs</text></svg>';
+  }
   var svg = '<svg viewBox="0 0 320 120" width="320" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
   var dur = simFlowDuration(ratedCurrent, 5000);
@@ -27559,7 +27695,9 @@ function renderZsSim(ze, r1r2, zs, zsMax, faultCurrent, pass) {
 }
 
 function renderSPDSim(nd, riskLevel, spdType, inKA, imaxKA, mandatory) {
-  if (!nd && nd !== 0) return '';
+  if (!nd && nd !== 0) {
+    return '<svg viewBox="0 0 300 150" width="300" height="150" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)"><rect x="80" y="50" width="140" height="80" rx="3" fill="none" stroke="var(--text)" stroke-width="1.5"/><polygon points="80,50 150,20 220,50" fill="none" stroke="var(--text)" stroke-width="1.5"/><text x="150" y="95" text-anchor="middle" class="sim-label" fill="#90a4ae" font-size="8">SPD</text><line x1="150" y1="5" x2="150" y2="20" stroke="#ff9800" stroke-width="2" class="sim-wire"/></svg>';
+  }
   var svg = '<svg viewBox="0 0 300 150" width="300" height="150" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
   var riskColor = riskLevel === 'high' ? '#f44336' : (riskLevel === 'medium' ? '#ff9800' : '#4caf50');
@@ -27867,7 +28005,9 @@ function renderDiscrimSim(upType, upRating, downType, downRating, coordinated, i
 
 // ===== HEAT PUMP SIMULATOR =====
 function renderHeatPumpSim(heatingKW, cop, electricalKW, flc, phase) {
-  if (!heatingKW || !cop) return '';
+  if (!heatingKW || !cop) {
+    return '<svg viewBox="0 0 300 145" width="300" height="145" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)"><rect x="100" y="40" width="100" height="65" rx="5" fill="#263238" stroke="#546e7a" stroke-width="1.5"/><text x="150" y="70" text-anchor="middle" class="sim-label" fill="#90a4ae" font-size="8">HEAT PUMP</text><circle cx="150" cy="90" r="12" fill="none" stroke="#90a4ae" stroke-width="2" class="sim-rotor"/><line x1="60" y1="72" x2="100" y2="72" stroke="#42a5f5" stroke-width="2" class="sim-wire"/></svg>';
+  }
   var svg = '<svg viewBox="0 0 300 145" width="300" height="145" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
   var dur = simFlowDuration(flc || 10, 50);
@@ -27919,7 +28059,9 @@ function renderHeatPumpSim(heatingKW, cop, electricalKW, flc, phase) {
 }
 // ===== EMERGENCY LIGHTING SIMULATOR =====
 function renderNoedSim(systemType, numLuminaires, batteryCapacity, duration) {
-  if (!numLuminaires || numLuminaires <= 0) return '';
+  if (!numLuminaires || numLuminaires <= 0) {
+    return '<svg viewBox="0 0 300 120" width="300" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)"><rect x="15" y="35" width="40" height="50" rx="4" fill="#1b5e20" stroke="#2e7d32" stroke-width="1.5"/><text x="35" y="55" text-anchor="middle" class="sim-label" fill="#fff" font-size="5">CENTRAL</text><line x1="55" y1="60" x2="100" y2="60" stroke="#66bb6a" stroke-width="2" stroke-dasharray="4 3" class="sim-wire"/><circle cx="120" cy="60" r="8" fill="#fff176" opacity="0.4" class="sim-pulse"/></svg>';
+  }
   var svg = '<svg viewBox="0 0 300 120" width="300" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
   // Central unit / battery (left side)
@@ -28071,7 +28213,9 @@ function renderAccessSim(numDoors, totalMa, psu, systemType) {
 }
 // ===== STRUCTURED CABLING SIMULATOR =====
 function renderDataSim(outlets, distance, category, poeWatts) {
-  if (!outlets || outlets <= 0) return '';
+  if (!outlets || outlets <= 0) {
+    return '<svg viewBox="0 0 300 120" width="300" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)"><rect x="15" y="25" width="45" height="70" rx="3" fill="#212121" stroke="#424242" stroke-width="1.5"/><text x="37" y="60" text-anchor="middle" class="sim-label" fill="#90a4ae" font-size="6">SWITCH</text><line x1="60" y1="60" x2="120" y2="60" stroke="#1565c0" stroke-width="2" stroke-dasharray="6 3" class="sim-wire"/><rect x="130" y="50" width="20" height="20" rx="2" fill="none" stroke="#42a5f5" stroke-width="1.5"/></svg>';
+  }
   var svg = '<svg viewBox="0 0 300 120" width="300" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
   // Rack/switch (left side)
@@ -28185,7 +28329,9 @@ function renderMeteringSim(meterType, ctRatio, numMeters, communication) {
 }
 // ===== BATHROOM ZONE SIMULATOR =====
 function renderBathroomSim(selectedZone, bathType, roomWidth, ceilingHeight) {
-  if (selectedZone === undefined || selectedZone === null || !roomWidth) return '';
+  if (selectedZone === undefined || selectedZone === null || !roomWidth) {
+    return '<svg viewBox="0 0 300 130" width="300" height="130" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)"><line x1="10" y1="115" x2="290" y2="115" stroke="#333" stroke-width="2"/><rect x="30" y="75" width="60" height="40" fill="#0ea5e9" opacity="0.3" stroke="#0ea5e9" stroke-width="1.5"/><text x="60" y="98" text-anchor="middle" class="sim-label" fill="#0284c7" font-size="7">Zone 0</text><line x1="100" y1="75" x2="100" y2="115" stroke="#7dd3fc" stroke-width="1" stroke-dasharray="4" class="sim-pulse"/><circle cx="150" cy="50" r="10" fill="#fff176" opacity="0.5" class="sim-wave"/></svg>';
+  }
   var svg = '<svg viewBox="0 0 300 130" width="300" height="130" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
   // Floor
@@ -28406,7 +28552,9 @@ function renderATEXSim(zoneType, zone, substance, tempClass, protectionType) {
 }
 // ===== CABLE TRAY FILL SIMULATOR =====
 function renderTrayFillSim(trayWidth, trayHeight, cableArea, trayArea, fillRate, maxFill) {
-  if (!trayWidth || !trayHeight) return '';
+  if (!trayWidth || !trayHeight) {
+    return '<svg viewBox="0 0 300 130" width="300" height="130" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)"><rect x="50" y="40" width="200" height="50" rx="3" fill="none" stroke="#78909c" stroke-width="2"/><text x="150" y="70" text-anchor="middle" class="sim-label sim-value" fill="#90a4ae" font-size="8">CABLE TRAY</text></svg>';
+  }
   var svg = '<svg viewBox="0 0 300 130" width="300" height="130" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
   // Scale tray to fit viewport
@@ -30115,6 +30263,318 @@ function renderDcmaskineEfficiency() {
   html += calcDetail({ name: tx('Virkningsgrad', 'Efficiency'), formula: '\u03B7 = P_ud/P_ind', variables: [{ name: 'P_ud', symbol: 'P_ud', value: dcmaskineState.Pout, unit: 'W' }, { name: 'P_ind', symbol: 'P_ind', value: dcmaskineState.Pin, unit: 'W' }], substitution: dcmaskineState.Pout + ' / ' + dcmaskineState.Pin, result: { value: eta * 100, unit: '%' }, reference: 'Opgavesamling Kap. 10' });
   html += '</div>';
   return html;
+}
+
+
+// ===== UNIVERSAL FACTOR CALCULATOR MODULE =====
+// A universal electrical factor picker + equation solver.
+// The user clicks to select any electrical/physical quantity with standard values,
+// and the app derives all unknown quantities using fundamental relationships.
+
+var faktorState = {
+  quantities: {
+    voltage: null, current: null, resistance: null, power: null,
+    frequency: null, capacitance: null, inductance: null, impedance: null,
+    cos_phi: null, temperature: null, length: null, cross_section_mm2: null,
+    resistivity: null, magnetic_flux: null, luminous_flux: null,
+    reactive_power: null, apparent_power: null, energy: null,
+    trafo_kva: null
+  },
+  solved: {},
+  category: 'electrical',
+  selectedQty: null
+};
+
+// Quantity definitions: key, label (da/en), unit, category, presets, step
+var FAKTOR_QUANTITIES = {
+  // === Electrical ===
+  voltage:    { da: 'Sp\u00e6nding', en: 'Voltage', unit: 'V', cat: 'electrical', presets: [12, 24, 48, 110, 230, 400, 690, 1000], step: 1 },
+  current:    { da: 'Str\u00f8m', en: 'Current', unit: 'A', cat: 'electrical', presets: [6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630], step: 1 },
+  resistance: { da: 'Modstand', en: 'Resistance', unit: '\u03A9', cat: 'electrical', presets: [0.1, 0.5, 1, 2.2, 4.7, 10, 22, 47, 100, 220, 470, 1000], step: 0.1 },
+  power:      { da: 'Aktiv effekt', en: 'Active Power', unit: 'W', cat: 'electrical', presets: [100, 250, 500, 750, 1000, 1500, 2000, 3000, 5000, 7500, 10000, 15000, 20000], step: 100 },
+  reactive_power: { da: 'Reaktiv effekt', en: 'Reactive Power', unit: 'var', cat: 'electrical', presets: [100, 250, 500, 1000, 2000, 5000, 10000], step: 100 },
+  apparent_power: { da: 'Tilsyneladende effekt', en: 'Apparent Power', unit: 'VA', cat: 'electrical', presets: [100, 250, 500, 1000, 2000, 5000, 10000, 20000], step: 100 },
+  frequency:  { da: 'Frekvens', en: 'Frequency', unit: 'Hz', cat: 'electrical', presets: [50, 60, 100, 200, 400, 1000, 5000, 10000, 50000], step: 1 },
+  capacitance:{ da: 'Kapacitans', en: 'Capacitance', unit: '\u00B5F', cat: 'electrical', presets: [0.01, 0.1, 1, 4.7, 10, 22, 47, 100, 220, 470, 1000], step: 0.1, mult: 1e-6 },
+  inductance: { da: 'Induktans', en: 'Inductance', unit: 'mH', cat: 'electrical', presets: [0.01, 0.1, 0.5, 1, 2.2, 4.7, 10, 22, 47, 100, 220, 470, 1000], step: 0.1, mult: 1e-3 },
+  impedance:  { da: 'Impedans', en: 'Impedance', unit: '\u03A9', cat: 'electrical', presets: [0.1, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000], step: 0.1 },
+  cos_phi:    { da: 'cos \u03C6', en: 'cos \u03C6', unit: '', cat: 'electrical', presets: [0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.92, 0.95, 0.98, 1.0], step: 0.01, clamp: { min: 0, max: 1 } },
+  energy:     { da: 'Energi', en: 'Energy', unit: 'kWh', cat: 'electrical', presets: [1, 5, 10, 50, 100, 500, 1000, 5000, 10000], step: 1 },
+  // === Thermal ===
+  temperature:{ da: 'Temperatur', en: 'Temperature', unit: '\u00B0C', cat: 'thermal', presets: [-20, -10, 0, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80], step: 1, clamp: { min: -273 } },
+  resistivity:{ da: 'Resistivitet', en: 'Resistivity', unit: '\u03A9\u00B7mm\u00B2/m', cat: 'thermal', presets: [0.0175, 0.0178, 0.0283, 0.0287, 0.05, 0.1], step: 0.001, clamp: { min: 0 } },
+  // === Optical ===
+  luminous_flux: { da: 'Lysstr\u00f8m', en: 'Luminous Flux', unit: 'lm', cat: 'optical', presets: [250, 450, 800, 1100, 1600, 2600, 3000, 5000, 10000, 20000], step: 50, clamp: { min: 0 } },
+  // === Magnetic ===
+  magnetic_flux: { da: 'Magnetisk flux', en: 'Magnetic Flux', unit: 'Wb', cat: 'magnetic', presets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0], step: 0.001, clamp: { min: 0 } },
+  // === Mechanical/Cable ===
+  length:     { da: 'L\u00e6ngde', en: 'Length', unit: 'm', cat: 'mechanical', presets: [1, 2, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200], step: 1, clamp: { min: 0 } },
+  cross_section_mm2: { da: 'Tv\u00e6rsnit', en: 'Cross-section', unit: 'mm\u00B2', cat: 'mechanical', presets: [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240, 300], step: 0.5, clamp: { min: 0 } },
+  trafo_kva:  { da: 'Trafo st\u00f8rrelse', en: 'Transformer Size', unit: 'kVA', cat: 'mechanical', presets: [50, 100, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500], step: 10, clamp: { min: 0 } }
+};
+
+var FAKTOR_CATEGORIES = [
+  { key: 'electrical', da: '\u26A1 Elektrisk', en: '\u26A1 Electrical' },
+  { key: 'thermal', da: '\uD83C\uDF21\uFE0F Termisk', en: '\uD83C\uDF21\uFE0F Thermal' },
+  { key: 'optical', da: '\uD83D\uDCA1 Optisk', en: '\uD83D\uDCA1 Optical' },
+  { key: 'magnetic', da: '\uD83E\uDDF2 Magnetisk', en: '\uD83E\uDDF2 Magnetic' },
+  { key: 'mechanical', da: '\uD83D\uDD27 Kabel/Mek.', en: '\uD83D\uDD27 Cable/Mech.' }
+];
+
+// --- Equation solver: derives all unknowns from known quantities ---
+function solveFaktorer() {
+  var q = faktorState.quantities;
+  var solved = {};
+  var changed = true;
+  var iterations = 0;
+
+  // Helper: get a value (from user input OR already solved)
+  function val(key) {
+    if (q[key] !== null && q[key] !== undefined) return q[key];
+    if (solved[key] !== null && solved[key] !== undefined) return solved[key];
+    return null;
+  }
+  function set(key, v) {
+    if (v === null || v === undefined || !isFinite(v) || v < 0 && key !== 'temperature') return false;
+    if (solved[key] !== null && solved[key] !== undefined) return false; // already solved
+    if (q[key] !== null && q[key] !== undefined) return false; // user-set, don't override
+    solved[key] = v;
+    changed = true;
+    return true;
+  }
+
+  // Iterative solver: repeat until no new values are derived
+  while (changed && iterations < 10) {
+    changed = false;
+    iterations++;
+    var V = val('voltage');
+    var I = val('current');
+    var R = val('resistance');
+    var P = val('power');
+    var f = val('frequency');
+    var C = val('capacitance');
+    var L = val('inductance');
+    var Z = val('impedance');
+    var cosPhi = val('cos_phi');
+    var Q = val('reactive_power');
+    var S = val('apparent_power');
+
+    // Ohm's law: V = I * R
+    if (V !== null && I !== null && R === null) set('resistance', V / I);
+    if (V !== null && R !== null && I === null) set('current', V / R);
+    if (I !== null && R !== null && V === null) set('voltage', I * R);
+
+    // Power: P = V * I (single-phase, cos_phi=1 default if unknown)
+    if (V !== null && I !== null && P === null) {
+      var pf = cosPhi !== null ? cosPhi : 1;
+      set('power', V * I * pf);
+    }
+    if (P !== null && V !== null && I === null) {
+      var pf2 = cosPhi !== null ? cosPhi : 1;
+      if (pf2 > 0) set('current', P / (V * pf2));
+    }
+    if (P !== null && I !== null && V === null) {
+      var pf3 = cosPhi !== null ? cosPhi : 1;
+      if (I > 0 && pf3 > 0) set('voltage', P / (I * pf3));
+    }
+
+    // P = I^2 * R
+    if (I !== null && R !== null && P === null) set('power', I * I * R);
+    if (P !== null && R !== null && I === null && R > 0) set('current', Math.sqrt(P / R));
+    if (P !== null && I !== null && R === null && I > 0) set('resistance', P / (I * I));
+
+    // P = V^2 / R
+    if (V !== null && R !== null && P === null && R > 0) set('power', V * V / R);
+    if (P !== null && V !== null && R === null && P > 0) set('resistance', V * V / P);
+    if (P !== null && R !== null && V === null) set('voltage', Math.sqrt(P * R));
+
+    // Impedance: Z = V / I
+    if (V !== null && I !== null && Z === null && I > 0) set('impedance', V / I);
+    if (Z !== null && I !== null && V === null) set('voltage', Z * I);
+    if (Z !== null && V !== null && I === null && Z > 0) set('current', V / Z);
+
+    // Reactance: XL = 2*pi*f*L
+    if (f !== null && L !== null && Z === null && R !== null) {
+      var XL = 2 * Math.PI * f * L;
+      set('impedance', Math.sqrt(R * R + XL * XL));
+    }
+
+    // Reactance: XC = 1/(2*pi*f*C)
+    if (f !== null && C !== null && Z === null && R !== null) {
+      var XC = 1 / (2 * Math.PI * f * C);
+      set('impedance', Math.sqrt(R * R + XC * XC));
+    }
+
+    // Resonance: f0 = 1/(2*pi*sqrt(LC))
+    if (L !== null && C !== null && f === null) {
+      set('frequency', 1 / (2 * Math.PI * Math.sqrt(L * C)));
+    }
+    if (f !== null && C !== null && L === null) {
+      var denom = (2 * Math.PI * f);
+      if (denom > 0) set('inductance', 1 / (denom * denom * C));
+    }
+    if (f !== null && L !== null && C === null) {
+      var denom2 = (2 * Math.PI * f);
+      if (denom2 > 0) set('capacitance', 1 / (denom2 * denom2 * L));
+    }
+
+    // Power triangle: S = P / cos_phi, Q = P * tan(acos(cos_phi))
+    if (P !== null && cosPhi !== null && cosPhi > 0) {
+      if (S === null) set('apparent_power', P / cosPhi);
+      if (Q === null) { var sinPhi = Math.sqrt(1 - cosPhi * cosPhi); set('reactive_power', P * sinPhi / cosPhi); }
+    }
+    if (S !== null && P !== null && cosPhi === null && S > 0) set('cos_phi', P / S);
+    if (S !== null && cosPhi !== null && P === null) set('power', S * cosPhi);
+    if (P !== null && Q !== null && S === null) set('apparent_power', Math.sqrt(P * P + Q * Q));
+    if (S !== null && Q !== null && P === null) { var pp = S * S - Q * Q; if (pp >= 0) set('power', Math.sqrt(pp)); }
+    if (S !== null && P !== null && Q === null) { var qq = S * S - P * P; if (qq >= 0) set('reactive_power', Math.sqrt(qq)); }
+
+    // Energy = Power * time (1 hour default for kWh)
+    // Not solved automatically since time is not a parameter
+  }
+  faktorState.solved = solved;
+  return solved;
+}
+
+function renderFaktorer() {
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title" style="font-size:1.2em">\u26A1 ' + tx('Universal Faktor-beregner', 'Universal Factor Calculator') + '</div>';
+  html += '<div class="info-row" style="border-left:3px solid var(--accent);padding-left:10px;margin-bottom:12px">' + tx(
+    'Klik p\u00e5 en kategori, v\u00e6lg en st\u00f8rrelse, og angiv v\u00e6rdier. Alle afledte st\u00f8rrelser beregnes automatisk via Ohms lov, effekttrekant, impedans, resonans m.m. V\u00e6rdier propagerer til alle forbundne moduler.',
+    'Click a category, choose a quantity, and set values. All derivable quantities are computed automatically via Ohm\'s law, power triangle, impedance, resonance etc. Values propagate to all connected modules.'
+  ) + '</div>';
+
+  // --- Category buttons ---
+  html += '<div class="select-group"><div class="select-label">' + tx('Kategori', 'Category') + '</div><div class="select-grid">';
+  FAKTOR_CATEGORIES.forEach(function(cat) {
+    html += '<button class="sel-btn' + (faktorState.category === cat.key ? ' selected' : '') + '" onclick="faktorState.category=\'' + cat.key + '\';faktorState.selectedQty=null;renderModule(\'faktorer\')">' + tx(cat.da, cat.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // --- Quantity buttons for selected category ---
+  var qKeys = Object.keys(FAKTOR_QUANTITIES).filter(function(k) { return FAKTOR_QUANTITIES[k].cat === faktorState.category; });
+  html += '<div class="select-group"><div class="select-label">' + tx('V\u00e6lg st\u00f8rrelse', 'Select Quantity') + '</div><div class="select-grid">';
+  qKeys.forEach(function(k) {
+    var def = FAKTOR_QUANTITIES[k];
+    var hasVal = faktorState.quantities[k] !== null;
+    var sel = faktorState.selectedQty === k ? ' selected' : '';
+    var badge = hasVal ? ' \u2713' : '';
+    html += '<button class="sel-btn' + sel + '" style="' + (hasVal ? 'border-color:var(--accent);' : '') + '" onclick="faktorState.selectedQty=\'' + k + '\';renderModule(\'faktorer\')">' + tx(def.da, def.en) + (def.unit ? ' [' + def.unit + ']' : '') + badge + '</button>';
+  });
+  html += '</div></div>';
+
+  // --- Value picker for selected quantity ---
+  if (faktorState.selectedQty && FAKTOR_QUANTITIES[faktorState.selectedQty]) {
+    var qk = faktorState.selectedQty;
+    var qdef = FAKTOR_QUANTITIES[qk];
+    var mult = qdef.mult || 1;
+    html += '<div class="card fade-in" style="border-left:3px solid var(--accent)">';
+    html += '<div class="card-title">' + tx(qdef.da, qdef.en) + ' [' + (qdef.unit || '') + ']</div>';
+    html += valSelect({
+      state: faktorState.quantities, field: qk, module: 'faktorer',
+      label: tx('V\u00e6lg v\u00e6rdi', 'Select value'),
+      presets: qdef.presets,
+      allowNull: true,
+      step: qdef.step,
+      mult: mult,
+      unit: qdef.unit || '',
+      clamp: qdef.clamp || { min: 0 },
+      fmt: function(p) { return p + ' ' + (qdef.unit || ''); }
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // --- Currently set values summary ---
+  var knownKeys = Object.keys(faktorState.quantities).filter(function(k) { return faktorState.quantities[k] !== null; });
+  if (knownKeys.length > 0) {
+    html += '<div class="card fade-in"><div class="card-title">' + tx('Kendte v\u00e6rdier', 'Known Values') + '</div>';
+    html += '<div class="result-box">';
+    knownKeys.forEach(function(k) {
+      var def = FAKTOR_QUANTITIES[k];
+      if (!def) return;
+      var displayVal = faktorState.quantities[k];
+      if (def.mult) displayVal = displayVal / def.mult;
+      html += '<div class="result-row"><span class="label">' + tx(def.da, def.en) + '</span><span class="value">' + valRound(displayVal, 4) + ' ' + (def.unit || '') + '</span></div>';
+    });
+    html += '</div>';
+    // Clear all button
+    html += '<div style="margin-top:8px"><button class="sel-btn" onclick="var ks=Object.keys(faktorState.quantities);for(var i=0;i<ks.length;i++)faktorState.quantities[ks[i]]=null;faktorState.solved={};renderModule(\'faktorer\')">' + tx('\u274C Ryd alle', '\u274C Clear all') + '</button></div>';
+    html += '</div>';
+  }
+
+  // --- Solve and show results ---
+  var solved = solveFaktorer();
+  var solvedKeys = Object.keys(solved).filter(function(k) { return solved[k] !== null && solved[k] !== undefined; });
+
+  if (solvedKeys.length > 0) {
+    html += '<div class="card fade-in" style="border-left:3px solid var(--success)">';
+    html += '<div class="card-title" style="color:var(--success)">' + tx('Beregnede st\u00f8rrelser', 'Computed Quantities') + '</div>';
+    html += '<div class="result-box ok">';
+    solvedKeys.forEach(function(k) {
+      var def = FAKTOR_QUANTITIES[k];
+      if (!def) return;
+      var displayVal = solved[k];
+      if (def.mult) displayVal = displayVal / def.mult;
+      html += '<div class="result-row"><span class="label">' + tx(def.da, def.en) + '</span><span class="value" style="font-weight:700">' + valRound(displayVal, 4) + ' ' + (def.unit || '') + '</span></div>';
+    });
+    html += '</div>';
+
+    // Show formulas used
+    html += '<div style="margin-top:8px;opacity:0.85;font-size:0.9em">';
+    html += '<div class="select-label">' + tx('Anvendte formler', 'Formulas Used') + '</div>';
+    var V = faktorState.quantities.voltage !== null || solved.voltage !== undefined;
+    var Iv = faktorState.quantities.current !== null || solved.current !== undefined;
+    var Rv = faktorState.quantities.resistance !== null || solved.resistance !== undefined;
+    if (V && Iv && Rv) html += '<div>V = I \u00D7 R &nbsp;(Ohm)</div>';
+    var Pv = faktorState.quantities.power !== null || solved.power !== undefined;
+    if (Pv && V && Iv) html += '<div>P = V \u00D7 I \u00D7 cos\u03C6</div>';
+    var Sv = faktorState.quantities.apparent_power !== null || solved.apparent_power !== undefined;
+    if (Sv && Pv) html += '<div>S = P / cos\u03C6 &nbsp;| &nbsp;Q = \u221A(S\u00B2 \u2212 P\u00B2)</div>';
+    var Zv = faktorState.quantities.impedance !== null || solved.impedance !== undefined;
+    if (Zv) html += '<div>Z = V / I &nbsp;| &nbsp;Z = \u221A(R\u00B2 + X\u00B2)</div>';
+    var fv = faktorState.quantities.frequency !== null || solved.frequency !== undefined;
+    var Lv = faktorState.quantities.inductance !== null || solved.inductance !== undefined;
+    var Cv = faktorState.quantities.capacitance !== null || solved.capacitance !== undefined;
+    if (fv && Lv && Cv) html += '<div>f\u2080 = 1/(2\u03C0\u221A(LC)) &nbsp;(Resonans)</div>';
+    html += '</div>';
+    html += '</div>';
+  } else if (knownKeys.length > 0 && knownKeys.length < 2) {
+    html += '<div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Utilstr\u00e6kkelige data', 'Insufficient data') + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Angiv mindst 2 st\u00f8rrelser for at beregne ukendte.', 'Set at least 2 quantities to compute unknowns.') + '</span></div>';
+    html += '</div></div>';
+  }
+
+  // Propagate button
+  if (solvedKeys.length > 0 || knownKeys.length > 0) {
+    html += '<div class="card fade-in"><div class="card-title">' + tx('Propager v\u00e6rdier', 'Propagate Values') + '</div>';
+    html += '<div class="info-row">' + tx('Send alle kendte og beregnede v\u00e6rdier til de tilsluttede moduler via den reaktive bus.', 'Push all known and computed values to connected modules via the reactive bus.') + '</div>';
+    html += '<button class="sel-btn selected" onclick="faktorPropagate()">' + tx('\u2192 Send til alle moduler', '\u2192 Push to all modules') + '</button>';
+    html += '</div>';
+  }
+
+  return html;
+}
+
+// Propagate all known + solved values from the factor calculator to the reactive bus
+function faktorPropagate() {
+  var q = faktorState.quantities;
+  var s = faktorState.solved;
+  function v(key) { return q[key] !== null ? q[key] : (s[key] !== null && s[key] !== undefined ? s[key] : null); }
+  if (v('voltage') !== null) SharedQuantities.set('voltage_phase', v('voltage'), 'faktorer');
+  if (v('current') !== null) SharedQuantities.set('load_current_a', v('current'), 'faktorer');
+  if (v('resistance') !== null) SharedQuantities.set('resistance', v('resistance'), 'faktorer');
+  if (v('power') !== null) SharedQuantities.set('load_power_kw', v('power') / 1000, 'faktorer');
+  if (v('frequency') !== null) SharedQuantities.set('frequency', v('frequency'), 'faktorer');
+  if (v('capacitance') !== null) SharedQuantities.set('capacitance_F', v('capacitance'), 'faktorer');
+  if (v('inductance') !== null) SharedQuantities.set('inductance', v('inductance'), 'faktorer');
+  if (v('cos_phi') !== null) SharedQuantities.set('cos_phi', v('cos_phi'), 'faktorer');
+  if (v('temperature') !== null) SharedQuantities.set('temperature', v('temperature'), 'faktorer');
+  if (v('cross_section_mm2') !== null) SharedQuantities.set('cable_mm2', v('cross_section_mm2'), 'faktorer');
+  if (v('luminous_flux') !== null) SharedQuantities.set('luminous_flux', v('luminous_flux'), 'faktorer');
+  if (v('trafo_kva') !== null) SharedQuantities.set('trafo_kva', v('trafo_kva'), 'faktorer');
+  renderModule('faktorer');
 }
 
 
