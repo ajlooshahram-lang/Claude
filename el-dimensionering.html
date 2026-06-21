@@ -4340,10 +4340,10 @@ const RCD_TYPES = {
 let activeModule = 'guide';
 
 // Load state
-let loadState = { voltage: '3x400', power: 10, cosPhi: 0.9, simFactor: 1.0, expFactor: 1.0 };
+let loadState = { voltage: null, power: null, cosPhi: null, simFactor: null, expFactor: null };
 // Housing-estate diversity (net-company experience formula, Fællesregulativet):
 // Pb = 0.834 * (W*n)^0.89  [kW], W = avg annual energy per home (MWh), n = homes
-let diversityState = { homes: 115, kwhPerHome: 8300, show: false };
+let diversityState = { homes: null, kwhPerHome: null, show: false };
 function calcDiversityPb() {
   const W = diversityState.kwhPerHome / 1000; // MWh per home
   return 0.834 * Math.pow(W * diversityState.homes, 0.89);
@@ -4434,17 +4434,17 @@ function renderLoadSchedule(){
 }
 
 // Fuse state
-let fuseState = { holder: 'D02', size: null };
+let fuseState = { holder: null, size: null };
 // MCB state
-let mcbState = { type: 'C60N', curve: 'B', rating: null, poles: 'multi' };
+let mcbState = { type: null, curve: null, rating: null, poles: 'multi' };
 // MCCB state
-let mccbState = { frame: 'NSX 400', trip: 'F', inVal: 400, ioMult: 0.8, isdMult: 2 };
+let mccbState = { frame: null, trip: null, inVal: null, ioMult: null, isdMult: null };
 // Cable state
-let cableState = { material: 'copper', type: 'NOIKLX', cores: '5G', crossSection: null, installMethod: 'C', temp: 30, grouping: 1 };
+let cableState = { material: null, type: null, cores: null, crossSection: null, installMethod: null, temp: null, grouping: null };
 // Voltage drop state
-let vdropState = { length: 50 };
+let vdropState = { length: null };
 // Short circuit state
-let scState = { zNet: 1, zTrafo: 5 };
+let scState = { zNet: null, zTrafo: null };
 // Standards state
 let rcdSelected = null;
 let rcdSensitivity = null;
@@ -5246,10 +5246,10 @@ const THERMAL_CABLE_DATA = {
 };
 
 let thermalState = {
-  ambientTemp: 30,
-  groupingCount: 1,
-  selectedCableType: 'PVC',
-  installMethod: 'tray'
+  ambientTemp: null,
+  groupingCount: null,
+  selectedCableType: null,
+  installMethod: null
 };
 
 function thermalCalcDerating(ambientTemp, nCables, method) {
@@ -5343,6 +5343,14 @@ function renderThermal() {
         <button class="sel-btn ${thermalState.installMethod==='conduit'?'selected':''}" onclick="thermalState.installMethod='conduit';renderModule('thermal')">${tx('Roer','Conduit')}</button>
       </div>
     </div>
+
+  // Null guard
+  if (thermalState.ambientTemp === null || thermalState.groupingCount === null || thermalState.selectedCableType === null || thermalState.installMethod === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
     <div class="result-box">
       <div class="result-title">${tx('Derating resultat','Derating Result')}</div>
       <div class="result-row"><span class="label">${tx('Omgivelsesfaktor','Ambient factor')}</span><span class="value">${dr.ambientFactor}</span></div>
@@ -5362,9 +5370,9 @@ const CABLE3D_CONTAINMENT = {
 const CABLE3D_OUTER_DIA = [7.2, 8.4, 9.8, 10.8, 13.0, 15.4, 18.2, 20.6];
 
 let cable3dState = {
-  conduitDia: 32,
-  trayWidth: 200,
-  selectedCables: [0, 1]
+  conduitDia: null,
+  trayWidth: null,
+  selectedCables: []
 };
 
 function cable3dCalcFillRate(type, cableIndices) {
@@ -5467,6 +5475,14 @@ function renderCable3D() {
         <button class="sel-btn" onclick="cable3dState.selectedCables.push(7);renderModule('cable3d')">35mm\u00B2</button>
       </div>
     </div>
+
+  // Null guard
+  if (cable3dState.conduitDia === null || cable3dState.trayWidth === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
     <div class="result-box">
       <div class="result-title">${tx('Valgte kabler','Selected Cables')} (${cable3dState.selectedCables.length})</div>
       ${cableListHtml}
@@ -5488,10 +5504,10 @@ function renderCable3D() {
 
 // ===== ENERGY MONITORING MODULE =====
 let energyState = {
-  profile: 'residential',
-  powerKW: 50,
-  loads: ['motor', 'led'],
-  targetPF: 0.95
+  profile: null,
+  powerKW: null,
+  loads: [],
+  targetPF: null
 };
 
 const ENERGY_HARMONIC_SOURCES = {
@@ -5636,6 +5652,14 @@ function renderEnergy() {
         <button class="sel-btn ${energyState.loads.indexOf('charger')>=0?'selected':''}" onclick="var i=energyState.loads.indexOf('charger');if(i>=0)energyState.loads.splice(i,1);else energyState.loads.push('charger');renderModule('energy')">EV</button>
       </div>
     </div>
+
+  // Null guard
+  if (energyState.profile === null || energyState.powerKW === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
     <div class="result-box">
       <div class="result-title">${tx('Effektkvalitet','Power Quality')} - EN 50160</div>
       <div class="result-row"><span class="label">${tx('Spaending','Voltage')}</span><span class="value">${pq.voltage}</span></div>
@@ -7300,6 +7324,14 @@ function renderLoad() {
           ${[2000,3000,4300,5000,6000,8300,10000,12000].map(v=>`<button class="sel-btn ${diversityState.kwhPerHome===v?'selected':''}" onclick="diversityState.kwhPerHome=${v};renderModule('load')">${v}</button>`).join('')}
         </div>
       </div>
+
+  // Null guard
+  if (loadState.voltage === null || loadState.power === null || loadState.cosPhi === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
       <div class="result-box">
         <div class="result-title">${tx('Dimensionerende effekt', 'Design power')}</div>
         <div class="result-row"><span class="label">W \u00B7 n</span><span class="value">${(diversityState.kwhPerHome/1000*diversityState.homes).toFixed(0)} MWh/\u00E5r</span></div>
@@ -7631,6 +7663,14 @@ function renderCable() {
     ${cableState.crossSection && selectedCable ? `
     <div class="card fade-in">
       <div class="card-title">${t('cableResult')}</div>
+
+  // Null guard
+  if (cableState.material === null || cableState.type === null || cableState.cores === null || cableState.installMethod === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
       <div class="result-box">
         <div class="result-title">${t('result')}</div>
         <div class="result-row"><span class="label">${t('cableType')}</span><span class="value">${cableState.type} ${cableState.cores} ${cableState.crossSection} mm\u00B2</span></div>
@@ -7856,23 +7896,23 @@ function renderShortCircuit() {
 }// ===== TRANSFORMER MODULE (Extended - Opgavesamling Ch. 9) =====
 // Data from 1.-Dim-af-trafo.ppx.pptx + Elektroteknik Opgavesamling 4. udgave
 let trafoState = {
-  size: 400, voltage: '10/0.4', loadPercent: 75,
+  size: null, voltage: null, loadPercent: null,
   calcType: 'sizing',  // sizing, powersolve, emf, ocsc, regulation, efficiency, parallel, vectorgroup
   // Dynamic power/current solver: derive S,P,Q,I,U,cosphi from ANY sufficient subset.
   // Values stored in base SI units (U=V, I=A, S=VA, P=W, Q=var). null = "not given".
   psPhase: '3', psU: null, psI: null, psS: null, psP: null, psCos: null, psQ: null,
   // EMF
-  emfFreq: 50, emfN: 300, emfBmax: 1.2, emfArea: 0.01,
+  emfFreq: null, emfN: null, emfBmax: null, emfArea: null,
   // OC/SC test
-  ocP0: 610, ocI0pct: 2.5, scPcu: 6900, scUkPct: 4,
+  ocP0: null, ocI0pct: null, scPcu: null, scUkPct: null,
   // Voltage regulation
-  regErPct: 1.5, regExPct: 3.5, regCosPhi: 0.8, regLoad: 'inductive',
+  regErPct: null, regExPct: null, regCosPhi: null, regLoad: null,
   // Efficiency
-  effLoadPct: 75, effCosPhi: 0.85,
+  effLoadPct: null, effCosPhi: null,
   // Parallel
-  parTrafo2size: 630, parTrafo2uk: 6,
+  parTrafo2size: null, parTrafo2uk: null,
   // Vector group
-  vecGroup: 'Dy11'
+  vecGroup: null
 };
 
 // --- Transformer calculation functions (unit-testable, no DOM) ---
@@ -8193,6 +8233,14 @@ function renderTrafoSizing() {
   html += '<div class="select-group"><div class="select-label">' + tx('Belastningsgrad [%]', 'Load Level [%]') + '</div><div class="select-grid">';
   loadSteps.forEach(function(l) { html += '<button class="sel-btn' + (trafoState.loadPercent === l ? ' selected' : '') + '" onclick="trafoState.loadPercent=' + l + ';renderModule(\'trafo\')">' + l + '%</button>'; });
   html += '</div></div>';
+
+  // Null guard
+  if (trafoState.size === null || trafoState.voltage === null || trafoState.loadPercent === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Stoerrelse', 'Size') + '</span><span class="value">' + S + ' kVA</span></div>';
   html += '<div class="result-row"><span class="label">uk%</span><span class="value">' + uk + ' %</span></div>';
@@ -8422,6 +8470,14 @@ function renderTrafoEMF() {
   html += '<div class="select-group"><div class="select-label">' + tx('Kernetvaersnit A [m\u00B2]', 'Core area A [m\u00B2]') + '</div><div class="select-grid">';
   areaPresets.forEach(function(a) { html += '<button class="sel-btn' + (trafoState.emfArea === a ? ' selected' : '') + '" onclick="trafoState.emfArea=' + a + ';renderModule(\'trafo\')">' + (a*10000).toFixed(0) + ' cm\u00B2</button>'; });
   html += '</div></div>';
+
+  // Null guard
+  if (trafoState.emfFreq === null || trafoState.emfN === null || trafoState.emfBmax === null || trafoState.emfArea === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">E (EMF)</span><span class="value">' + E.toFixed(2) + ' V</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Flux', 'Flux') + ' \u03A6_max</span><span class="value">' + (trafoState.emfBmax * trafoState.emfArea * 1000).toFixed(3) + ' mWb</span></div>';
@@ -8445,6 +8501,14 @@ function renderTrafoOCSC() {
   html += '<div class="select-group"><div class="select-label">' + tx('Magnetiseringsstroem I0 [%]', 'Magnetizing current I0 [%]') + '</div><div class="select-grid">';
   [1, 1.5, 2, 2.5, 3, 3.5, 4, 5].forEach(function(v) { html += '<button class="sel-btn' + (trafoState.ocI0pct === v ? ' selected' : '') + '" onclick="trafoState.ocI0pct=' + v + ';renderModule(\'trafo\')">' + v + '%</button>'; });
   html += '</div></div>';
+
+  // Null guard
+  if (trafoState.size === null || trafoState.ocP0 === null || trafoState.ocI0pct === null || trafoState.scPcu === null || trafoState.scUkPct === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Tomgangsproeve (OC)', 'Open-Circuit Test') + '</div>';
   html += '<div class="result-row"><span class="label">P0 (' + tx('jerntab', 'iron loss') + ')</span><span class="value">' + P0 + ' W</span></div>';
   html += '<div class="result-row"><span class="label">I0</span><span class="value">' + I0_A.toFixed(2) + ' A (' + I0pct + '%)</span></div>';
@@ -8478,6 +8542,14 @@ function renderTrafoRegulation() {
   html += '<button class="sel-btn' + (trafoState.regLoad === 'inductive' ? ' selected' : '') + '" onclick="trafoState.regLoad=\'inductive\';renderModule(\'trafo\')">' + tx('Induktiv', 'Inductive') + '</button>';
   html += '<button class="sel-btn' + (trafoState.regLoad === 'capacitive' ? ' selected' : '') + '" onclick="trafoState.regLoad=\'capacitive\';renderModule(\'trafo\')">' + tx('Kapacitiv', 'Capacitive') + '</button>';
   html += '</div></div>';
+
+  // Null guard
+  if (trafoState.regErPct === null || trafoState.regExPct === null || trafoState.regCosPhi === null || trafoState.regLoad === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">\u0394U%</span><span class="value">' + reg.dU_pct.toFixed(3) + ' %</span></div>';
   html += '<div class="result-row"><span class="label">\u0394U (400 V)</span><span class="value">' + (reg.dU_pct / 100 * 400).toFixed(2) + ' V</span></div>';
@@ -8503,6 +8575,14 @@ function renderTrafoEfficiency() {
   html += '<div class="select-group"><div class="select-label">cos\u03C6</div><div class="select-grid">';
   cosPhiPresets.forEach(function(c) { html += '<button class="sel-btn' + (trafoState.effCosPhi === c ? ' selected' : '') + '" onclick="trafoState.effCosPhi=' + c + ';renderModule(\'trafo\')">' + c + '</button>'; });
   html += '</div></div>';
+
+  // Null guard
+  if (trafoState.size === null || trafoState.ocP0 === null || trafoState.scPcu === null || trafoState.effLoadPct === null || trafoState.effCosPhi === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">\u03B7</span><span class="value" style="font-weight:700;font-size:1.1em">' + (eff.eta * 100).toFixed(2) + ' %</span></div>';
   html += '<div class="result-row"><span class="label">P2</span><span class="value">' + (eff.P2/1000).toFixed(2) + ' kW</span></div>';
@@ -8526,6 +8606,14 @@ function renderTrafoParallel() {
   html += '<div class="select-group"><div class="select-label">' + tx('Trafo 2 [kVA]', 'Transformer 2 [kVA]') + '</div><div class="select-grid">';
   S2sizes.forEach(function(s) { var u2 = (s >= 630 ? 6 : 4); html += '<button class="sel-btn' + (trafoState.parTrafo2size === s ? ' selected' : '') + '" onclick="trafoState.parTrafo2size=' + s + ';trafoState.parTrafo2uk=' + u2 + ';renderModule(\'trafo\')">' + s + '</button>'; });
   html += '</div></div>';
+
+  // Null guard
+  if (trafoState.size === null || trafoState.scUkPct === null || trafoState.parTrafo2size === null || trafoState.parTrafo2uk === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Belastningsfordeling', 'Load Sharing') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Kapacitet', 'Capacity') + '</span><span class="value">' + par.totalCapacity + ' kVA</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Total belastning', 'Total load') + '</span><span class="value">' + totalLoad.toFixed(0) + ' kVA</span></div>';
@@ -8545,6 +8633,14 @@ function renderTrafoVectorGroup() {
   html += '<div class="select-group"><div class="select-label">' + tx('Vektorgruppe', 'Vector Group') + '</div><div class="select-grid">';
   groups.forEach(function(g) { html += '<button class="sel-btn' + (trafoState.vecGroup === g ? ' selected' : '') + '" onclick="trafoState.vecGroup=\'' + g + '\';renderModule(\'trafo\')">' + g + '</button>'; });
   html += '</div></div>';
+
+  // Null guard
+  if (trafoState.vecGroup === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + trafoState.vecGroup + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Primaer', 'Primary') + '</span><span class="value">' + vg.primary + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Sekundaer', 'Secondary') + '</span><span class="value">' + vg.secondary + '</span></div>';
@@ -10524,12 +10620,12 @@ function montagetidFor(cat) { return MONTAGETID[cat] || 10; }
 
 // Bid state (EG Sigma / Kalkia style)
 let bidState = {
-  wholesaler: 'Lemvigh-Müller',
-  laborMode: 'akkord', // 'akkord' = auto from montagetid, 'fast' = manual hours
-  laborHours: 8,       // used in 'fast' mode
-  hourlyRate: 550,
-  rabat: 40,           // wholesaler discount % off list (rabatgruppe)
-  markup: 15,          // dækningsbidrag / avance % on net materials
+  wholesaler: null,
+  laborMode: null,
+  laborHours: null,
+  hourlyRate: null,
+  rabat: null,
+  markup: null,
   basket: [], // { cat, id, qty }
   pickCat: 'cables'
 };
@@ -13805,12 +13901,12 @@ function renderVerdict(safe, text) {
 // ===== EV CHARGING MODULE (DS/HD 60364-7-722) =====
 
 var evState = {
-  mode: 3,           // Mode 2, 3, 4
-  phases: 3,         // 1 or 3
-  powerKW: 11,       // 3.7, 7.4, 11, 22
-  numChargers: 1,    // 1-10
-  cableLength: 15,   // meters
-  mainFuse: 50       // A
+  mode: null,
+  phases: null,
+  powerKW: null,
+  numChargers: null,
+  cableLength: null,
+  mainFuse: null
 };
 
 // Simultaneity factor per DS/HD 60364-7-722 Annex A
@@ -13954,6 +14050,14 @@ function renderEV() {
   });
   html += '</div></div>';
 
+
+  // Null guard - no results until user selects values
+  if (evState.mode === null || evState.phases === null || evState.powerKW === null || evState.numChargers === null || evState.cableLength === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-box">';
@@ -14011,12 +14115,12 @@ function renderEV() {
 // ===== SOLAR PV & BATTERY MODULE (DS/EN 62446 + DS/HD 60364-7-712) =====
 
 var solarState = {
-  systemType: 'grid',    // 'grid', 'gridbat', 'hybrid'
-  panelCount: 10,        // number of panels
-  panelWp: 440,          // Wp per panel
-  batteryKWh: 10,        // kWh
-  selfConsumption: 50,   // % (30, 50, 70, 90)
-  inverterMaxVdc: 600    // typical inverter max Vdc
+  systemType: null,
+  panelCount: null,
+  panelWp: null,
+  batteryKWh: null,
+  selfConsumption: null,
+  inverterMaxVdc: null
 };
 
 // Constants for solar calculations
@@ -14170,6 +14274,14 @@ function renderSolar() {
   });
   html += '</div></div>';
 
+
+  // Null guard - no results until user selects values
+  if (solarState.systemType === null || solarState.panelCount === null || solarState.panelWp === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
 
@@ -14237,13 +14349,13 @@ function renderSolar() {
 // ===== EMERGENCY LIGHTING MODULE (DS/EN 1838 + DS/EN 50172) =====
 
 var noedState = {
-  buildingType: 'office',  // residential, office, shop, assembly, industrial, parking, hospital
-  systemType: 'self',      // 'self' (self-contained), 'central', 'hybrid'
-  lightingType: 'escape',  // 'escape', 'antipanic', 'highrisk'
-  roomLength: 20,          // meters
-  roomWidth: 10,           // meters
-  roomHeight: 3.0,         // meters
-  duration: 1              // hours (1 or 3)
+  buildingType: null,
+  systemType: null,
+  lightingType: null,
+  roomLength: null,
+  roomWidth: null,
+  roomHeight: null,
+  duration: null
 };
 
 // Required lux levels per EN 1838
@@ -14426,6 +14538,14 @@ function renderNoed() {
   });
   html += '</div></div>';
 
+
+  // Null guard - no results until user selects values
+  if (noedState.buildingType === null || noedState.systemType === null || noedState.lightingType === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
 
@@ -14535,11 +14655,11 @@ var MOTOR_DUTY_DERATING = {
 };
 
 var motorState = {
-  kW: 7.5,
-  poles: 4,
-  startType: 'dol',
-  duty: 'S1',
-  cableLength: 30
+  kW: null,
+  poles: null,
+  startType: null,
+  duty: null,
+  cableLength: null
 };
 
 // Get motor full-load current
@@ -14636,19 +14756,6 @@ function motorCalcI2t(kW, poles, startType) {
 }
 
 function renderMotor() {
-  var flc = motorGetFLC(motorState.kW, motorState.poles);
-  var iStart = motorCalcStartCurrent(motorState.kW, motorState.poles, motorState.startType);
-  var vdip = motorCalcVoltageDip(motorState.kW, motorState.poles, motorState.startType, motorState.cableLength);
-  var mpcb = motorSelectMPCB(motorState.kW, flc);
-  var contactor = motorSelectContactor(motorState.kW);
-  var overload = motorSelectOverload(flc);
-  var cable = motorSelectCable(flc, motorState.duty);
-  var startTime = motorGetStartTime(motorState.startType);
-  var i2t = motorCalcI2t(motorState.kW, motorState.poles, motorState.startType);
-  var derating = MOTOR_DUTY_DERATING[motorState.duty];
-  var vdipOk = vdip <= 3.0;
-  var mult = MOTOR_START_MULTIPLIERS[motorState.startType];
-
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Motorstart-analyse', 'Motor Start Analysis') + '</div>';
   html += '<div class="info-row">' + tx('Beregning iht. IEC 60947 + DS/HD 60364-5-52', 'Calculation per IEC 60947 + DS/HD 60364-5-52') + '</div>';
@@ -14696,6 +14803,26 @@ function renderMotor() {
     html += '<button class="sel-btn' + (motorState.cableLength === len ? ' selected' : '') + '" onclick="motorState.cableLength=' + len + ';renderModule(\'motor\')">' + len + ' m</button>';
   });
   html += '</div></div>';
+
+  // Null guard: show nothing-selected message if required fields are null
+  if (motorState.kW === null || motorState.poles === null || motorState.startType === null || motorState.duty === null || motorState.cableLength === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
+  var flc = motorGetFLC(motorState.kW, motorState.poles);
+  var iStart = motorCalcStartCurrent(motorState.kW, motorState.poles, motorState.startType);
+  var vdip = motorCalcVoltageDip(motorState.kW, motorState.poles, motorState.startType, motorState.cableLength);
+  var mpcb = motorSelectMPCB(motorState.kW, flc);
+  var contactor = motorSelectContactor(motorState.kW);
+  var overload = motorSelectOverload(flc);
+  var cable = motorSelectCable(flc, motorState.duty);
+  var startTime = motorGetStartTime(motorState.startType);
+  var i2t = motorCalcI2t(motorState.kW, motorState.poles, motorState.startType);
+  var derating = MOTOR_DUTY_DERATING[motorState.duty];
+  var vdipOk = vdip <= 3.0;
+  var mult = MOTOR_START_MULTIPLIERS[motorState.startType];
 
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
@@ -14766,9 +14893,9 @@ function harmonicDiversityFactor(n) {
 }
 
 var harmonicState = {
-  loadType: 'vfd',
-  numLoads: 1,
-  loadKW: 11
+  loadType: null,
+  numLoads: null,
+  loadKW: null
 };
 
 // Calculate THD: sqrt(sum(Ih/I1)^2) * 100%
@@ -14931,6 +15058,13 @@ function renderHarmonic() {
   });
   html += '</div></div>';
 
+
+  // Null guard
+  if (harmonicState.loadType === null || harmonicState.numLoads === null || harmonicState.loadKW === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
 
@@ -15014,10 +15148,10 @@ var VFD_EMC_CATEGORIES = {
 };
 
 var vfdState = {
-  application: 'pump',
-  motorKW: 11,
-  cableLength: 25,
-  emcCategory: 'C2'
+  application: null,
+  motorKW: null,
+  cableLength: null,
+  emcCategory: null
 };
 
 // Calculate VFD rated current requirement
@@ -15188,6 +15322,13 @@ function renderVFD() {
   });
   html += '</div></div>';
 
+
+  // Null guard
+  if (vfdState.application === null || vfdState.motorKW === null || vfdState.cableLength === null || vfdState.emcCategory === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
   // Results
   html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
 
@@ -15282,13 +15423,13 @@ var LIGHTING_SOURCES = {
 };
 
 var lightingState = {
-  roomType: 'office',
-  source: 'ledPanel',
-  wattage: 36,
-  length: 8,
-  width: 6,
-  height: 3.0,
-  maintenanceFactor: 0.7
+  roomType: null,
+  source: null,
+  wattage: null,
+  length: null,
+  width: null,
+  height: null,
+  maintenanceFactor: null
 };
 
 // Calculate room index k = L*W / (Hm * (L+W)), Hm = mounting height - work plane (0.85m)
@@ -15423,6 +15564,14 @@ function renderLighting() {
   });
   html += '</div></div>';
 
+
+  // Null guard - no results until user selects values
+  if (lightingState.roomType === null || lightingState.source === null || lightingState.length === null || lightingState.width === null || lightingState.height === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Beregningsresultat', 'Calculation Results') + '</div>';
@@ -15471,11 +15620,11 @@ var HEATPUMP_TYPES = {
 };
 
 var heatpumpState = {
-  type: 'airToWater',
-  heatingKW: 10,
-  cop: 3.5,
-  inrushFactor: 4,
-  cableLength: 15
+  type: null,
+  heatingKW: null,
+  cop: null,
+  inrushFactor: null,
+  cableLength: null
 };
 
 // Calculate electrical input from heating capacity and COP
@@ -15624,6 +15773,14 @@ function renderHeatPump() {
   });
   html += '</div></div>';
 
+
+  // Null guard - no results until user selects values
+  if (heatpumpState.type === null || heatpumpState.heatingKW === null || heatpumpState.cop === null || heatpumpState.cableLength === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results - Electrical
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Elektrisk dimensionering', 'Electrical Sizing') + '</div>';
@@ -15700,16 +15857,16 @@ var BUSBAR_INSTALL_DERATING = {
 };
 
 var busbarState = {
-  systemType: 'distribution',
-  ratedCurrent: 400,
-  brand: 'schneider',
-  ambientTemp: 35,
-  installMethod: 'horizontal_flat',
-  ipRating: 54,
-  tapOffCount: 6,
-  tapOffRating: 63,
-  sections: 5,
-  upstreamIk: 25
+  systemType: null,
+  ratedCurrent: null,
+  brand: null,
+  ambientTemp: null,
+  installMethod: null,
+  ipRating: null,
+  tapOffCount: null,
+  tapOffRating: null,
+  sections: null,
+  upstreamIk: null
 };
 
 // Calculate combined derating factor
@@ -15922,6 +16079,14 @@ function renderBusbar() {
   });
   html += '</div></div>';
 
+
+  // Null guard - no results until user selects values
+  if (busbarState.systemType === null || busbarState.ratedCurrent === null || busbarState.brand === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results - Derating
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Dereringsfaktorer', 'Derating Factors') + '</div>';
@@ -15983,12 +16148,12 @@ function renderBusbar() {
 }
 // ===== BATHROOM ZONES MODULE (DS/HD 60364-7-701) =====
 var bathroomState = {
-  bathType: 'bathtub',
-  roomWidth: 2.5,
-  roomLength: 3.0,
-  ceilingHeight: 2.5,
-  selectedZone: 0,
-  selectedEquipment: 'luminaire'
+  bathType: null,
+  roomWidth: null,
+  roomLength: null,
+  ceilingHeight: null,
+  selectedZone: null,
+  selectedEquipment: null
 };
 
 var BATHROOM_ZONES = {
@@ -16093,10 +16258,6 @@ function bathroomGetProtectionReqs(zone) {
 }
 
 function renderBathroom() {
-  var check = bathroomCheckEquipment(bathroomState.selectedZone, bathroomState.selectedEquipment);
-  var protReqs = bathroomGetProtectionReqs(bathroomState.selectedZone);
-  var ufh = bathroomCheckUnderfloorHeating(bathroomState.selectedZone);
-
   var html = '<div class="card fade-in">';
   html += '<div class="card-title">' + tx('Badevaerelses-zoner (DS/HD 60364-7-701)', 'Bathroom Zones (DS/HD 60364-7-701)') + '</div>';
   html += '<div class="info-row">' + tx('Zoneklassifikation og udstyrskrav iht. DS/HD 60364-7-701', 'Zone classification and equipment requirements per DS/HD 60364-7-701') + '</div>';
@@ -16106,20 +16267,15 @@ function renderBathroom() {
   html += '<svg viewBox="0 0 400 250" style="width:100%;max-width:400px;height:auto;display:block;margin:0 auto">';
   html += '<rect x="10" y="10" width="380" height="230" fill="#f0f9ff" stroke="#333" stroke-width="1"/>';
   html += '<text x="350" y="30" font-size="10" fill="#666">' + tx('Uden for zoner','Outside zones') + '</text>';
-  // Floor
   html += '<line x1="10" y1="220" x2="390" y2="220" stroke="#333" stroke-width="2"/>';
-  // Bath/shower
   html += '<rect x="50" y="160" width="80" height="60" fill="#0ea5e9" opacity="0.3" stroke="#0ea5e9" stroke-width="2"/>';
   html += '<text x="70" y="195" font-size="11" fill="#0369a1">Zone 0</text>';
-  // Zone 1
   html += '<rect x="50" y="30" width="80" height="130" fill="#38bdf8" opacity="0.15" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4"/>';
   html += '<text x="60" y="80" font-size="11" fill="#0284c7">Zone 1</text>';
   html += '<text x="55" y="50" font-size="9" fill="#0284c7">2.25m</text>';
-  // Zone 2
   html += '<rect x="130" y="30" width="60" height="190" fill="#7dd3fc" opacity="0.1" stroke="#7dd3fc" stroke-width="1" stroke-dasharray="4"/>';
   html += '<text x="140" y="130" font-size="11" fill="#0ea5e9">Zone 2</text>';
   html += '<text x="135" y="150" font-size="9" fill="#0ea5e9">0.6m</text>';
-  // Dimensions
   html += '<text x="200" y="245" font-size="9" fill="#333">' + tx('Gulv','Floor') + '</text>';
   html += '<line x1="135" y1="225" x2="135" y2="235" stroke="#333"/>';
   html += '<line x1="190" y1="225" x2="190" y2="235" stroke="#333"/>';
@@ -16169,6 +16325,17 @@ function renderBathroom() {
     html += '<button class="sel-btn' + (bathroomState.selectedEquipment === key ? ' selected' : '') + '" onclick="bathroomState.selectedEquipment=\'' + key + '\';renderModule(\'bathroom\')">' + tx(eq.da, eq.en) + '</button>';
   });
   html += '</div></div>';
+
+  // Null guard
+  if (bathroomState.bathType === null || bathroomState.selectedZone === null || bathroomState.selectedEquipment === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
+  var check = bathroomCheckEquipment(bathroomState.selectedZone, bathroomState.selectedEquipment);
+  var protReqs = bathroomGetProtectionReqs(bathroomState.selectedZone);
+  var ufh = bathroomCheckUnderfloorHeating(bathroomState.selectedZone);
 
   // IP Rating for selected zone
   html += '<div class="result-box">';
@@ -16221,11 +16388,11 @@ function renderBathroom() {
 
 // ===== FIRE ALARM MODULE (DS/EN 54 + DBI vejledning 36) =====
 var firealarmState = {
-  category: 1,
-  buildingType: 'hospital',
-  detectorType: 'optical_smoke',
-  roomArea: 100,
-  ceilingHeight: 3.0
+  category: null,
+  buildingType: null,
+  detectorType: null,
+  roomArea: null,
+  ceilingHeight: null
 };
 
 var FIREALARM_CATEGORIES = {
@@ -16403,6 +16570,14 @@ function renderFireAlarm() {
   });
   html += '</div></div>';
 
+
+  // Null guard - no results until user selects values
+  if (firealarmState.category === null || firealarmState.buildingType === null || firealarmState.detectorType === null || firealarmState.roomArea === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results - Detector Count
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Detektorberegning', 'Detector Calculation') + '</div>';
@@ -16458,13 +16633,13 @@ function renderFireAlarm() {
 
 // ===== STRUCTURED CABLING MODULE (ISO 11801 + DS/EN 50173) =====
 var dataState = {
-  cableCategory: 'cat6a',
-  application: 'office',
-  cableType: 'uutp',
-  distance: 50,
-  floorArea: 200,
-  poeType: 'af',
-  poePortCount: 24,
+  cableCategory: null,
+  application: null,
+  cableType: null,
+  distance: null,
+  floorArea: null,
+  poeType: null,
+  poePortCount: null,
   fiberType: null
 };
 
@@ -16621,6 +16796,18 @@ function dataGetPathway() {
 }
 
 function renderData() {
+  // Null guard - early return if required values missing
+  if (dataState.cableCategory === null || dataState.application === null || dataState.distance === null) {
+    var html = '<div class="card fade-in">';
+    html += '<div class="card-title">' + tx('Datainstallation (ISO 11801 + DS/EN 50173)', 'Structured Cabling (ISO 11801 + DS/EN 50173)') + '</div>';
+    html += '<div class="info-row">' + tx('Kabelinfrastruktur iht. ISO 11801 og DS/EN 50173', 'Cable infrastructure per ISO 11801 and DS/EN 50173') + '</div>';
+    html += '<div class="select-group"><div class="select-label">' + tx('Kabelkategori', 'Cable Category') + '</div><div class="select-grid">';
+    Object.keys(DATA_CABLE_CATEGORIES).forEach(function(key) { var cat = DATA_CABLE_CATEGORIES[key]; html += '<button class="sel-btn' + (dataState.cableCategory === key ? ' selected' : '') + '" onclick="dataState.cableCategory=\'' + key + '\';renderModule(\'data\')">' + tx(cat.da, cat.en) + '</button>'; });
+    html += '</div></div>';
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
   var distCheck = dataCalcDistance(dataState.distance, dataState.cableCategory);
   var outlets = dataCalcOutlets(dataState.floorArea, dataState.application);
   var panels = dataCalcPatchPanels(outlets.outlets, 24);
@@ -16695,6 +16882,14 @@ function renderData() {
     html += '<button class="sel-btn' + (dataState.fiberType === key ? ' selected' : '') + '" onclick="dataState.fiberType=\'' + key + '\';renderModule(\'data\')">' + tx(f.da, f.en) + '</button>';
   });
   html += '</div></div>';
+
+
+  // Null guard - no results until user selects values
+  if (dataState.cableCategory === null || dataState.application === null || dataState.distance === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
 
   // Results - Distance Check
   html += '<div class="result-box">';
@@ -16776,13 +16971,13 @@ function renderData() {
 // ===== SURGE PROTECTION MODULE (DS/HD 60364-5-534 + IEC 62305) =====
 
 var spdState = {
-  location: 'urban',
-  ng: 1.0,
-  length: 30,
-  width: 20,
-  height: 6,
-  hasLPS: false,
-  hasSensitive: false
+  location: null,
+  ng: null,
+  length: null,
+  width: null,
+  height: null,
+  hasLPS: null,
+  hasSensitive: null
 };
 
 var SPD_LOCATIONS = {
@@ -16849,6 +17044,18 @@ function spdCheckCoordination(hasLPS, distanceT1T2) {
 }
 
 function renderSPD() {
+  // Null guard - early return if required values missing
+  if (spdState.location === null || spdState.length === null || spdState.width === null || spdState.height === null) {
+    var html = '<div class="card fade-in">';
+    html += '<div class="card-title">' + tx('Overspaendingsbeskyttelse (DS/HD 60364-5-534)', 'Surge Protection (DS/HD 60364-5-534)') + '</div>';
+    html += '<div class="info-row">' + tx('Risikovurdering og SPD-valg iht. DS/HD 60364-5-534 + IEC 62305', 'Risk assessment and SPD selection per DS/HD 60364-5-534 + IEC 62305') + '</div>';
+    html += '<div class="select-group"><div class="select-label">' + tx('Placering', 'Location') + '</div><div class="select-grid">';
+    Object.keys(SPD_LOCATIONS).forEach(function(key) { var l = SPD_LOCATIONS[key]; html += '<button class="sel-btn' + (spdState.location === key ? ' selected' : '') + '" onclick="spdState.location=\'' + key + '\';renderModule(\'spd\')">' + tx(l.da, l.en) + '</button>'; });
+    html += '</div></div>';
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
   var acResult = spdCalcCollectionArea(spdState.length, spdState.width, spdState.height);
   var loc = SPD_LOCATIONS[spdState.location];
   var strikeResult = spdCalcExpectedStrikes(spdState.ng, acResult.ac, loc.cd);
@@ -16910,6 +17117,14 @@ function renderSPD() {
   html += '<button class="sel-btn' + (!spdState.hasSensitive ? ' selected' : '') + '" onclick="spdState.hasSensitive=false;renderModule(\'spd\')">' + tx('Nej', 'No') + '</button>';
   html += '<button class="sel-btn' + (spdState.hasSensitive ? ' selected' : '') + '" onclick="spdState.hasSensitive=true;renderModule(\'spd\')">' + tx('Ja', 'Yes') + '</button>';
   html += '</div></div>';
+
+
+  // Null guard - no results until user selects values
+  if (spdState.location === null || spdState.length === null || spdState.width === null || spdState.height === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
 
   // Results
   html += '<div class="result-box">';
@@ -16993,10 +17208,10 @@ var UPS_BATTERY_TYPES = {
 var UPS_STANDARD_SIZES = [750, 1000, 1500, 2000, 3000, 5000, 6000, 10000, 15000, 20000, 30000, 40000, 60000, 80000, 100000, 120000, 160000, 200000];
 
 var upsState = {
-  topology: 'online',
+  topology: null,
   equipment: { server: 0, desktop: 0, network: 0, router: 0, monitor: 0, medical: 0, security: 0, pos: 0 },
-  autonomy: 15,
-  batteryType: 'agm'
+  autonomy: null,
+  batteryType: null
 };
 
 function upsCalcLoad(equipment) {
@@ -17056,6 +17271,18 @@ function upsNeedsBypass(topology, upsVA) {
 }
 
 function renderUPS() {
+  // Null guard - early return if required values missing
+  if (upsState.topology === null || upsState.autonomy === null || upsState.batteryType === null) {
+    var html = '<div class="card fade-in">';
+    html += '<div class="card-title">' + tx('UPS-dimensionering (IEC 62040 + DS/HD 60364-5-56)', 'UPS Sizing (IEC 62040 + DS/HD 60364-5-56)') + '</div>';
+    html += '<div class="info-row">' + tx('Dimensionering af UPS og batteri iht. IEC 62040', 'UPS and battery sizing per IEC 62040') + '</div>';
+    html += '<div class="select-group"><div class="select-label">' + tx('Topologi', 'Topology') + '</div><div class="select-grid">';
+    ['online','lineInteractive','offline'].forEach(function(t) { html += '<button class="sel-btn' + (upsState.topology === t ? ' selected' : '') + '" onclick="upsState.topology=\'' + t + '\';renderModule(\'ups\')">' + t + '</button>'; });
+    html += '</div></div>';
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
   var load = upsCalcLoad(upsState.equipment);
   var upsSize = upsSelectSize(load.totalVA);
   var battery = upsCalcBattery(load.totalW, upsState.autonomy, upsState.batteryType);
@@ -17099,6 +17326,14 @@ function renderUPS() {
     html += '<button class="sel-btn' + (upsState.batteryType === key ? ' selected' : '') + '" onclick="upsState.batteryType=\'' + key + '\';renderModule(\'ups\')">' + tx(bt.da, bt.en) + '</button>';
   });
   html += '</div></div>';
+
+
+  // Null guard - no results until user selects values
+  if (upsState.topology === null || upsState.autonomy === null || upsState.batteryType === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
 
   // Results - Load Calculation
   html += '<div class="result-box">';
@@ -17159,12 +17394,12 @@ function renderUPS() {
 var PFC_STANDARD_SIZES = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 125, 150, 200, 250, 300, 400, 500];
 
 var pfcState = {
-  currentPF: 0.75,
-  targetPF: 0.95,
-  activePower: 100,
-  correctionType: 'auto',
-  detuning: 0,
-  skMVA: 20
+  currentPF: null,
+  targetPF: null,
+  activePower: null,
+  correctionType: null,
+  detuning: null,
+  skMVA: null
 };
 
 function pfcCalcKvar(currentPF, targetPF, kW) {
@@ -17296,6 +17531,14 @@ function renderPFC() {
   });
   html += '</div></div>';
 
+
+  // Null guard - no results until user selects values
+  if (pfcState.currentPF === null || pfcState.targetPF === null || pfcState.activePower === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results - kvar calculation
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Kondensatorbankberegning', 'Capacitor Bank Calculation') + ' - ' + calc.clause + '</div>';
@@ -17418,8 +17661,8 @@ var TRAY_GROUPING_FACTORS = [
 ];
 
 var trayFillState = {
-  trayType: 'perforated',
-  traySize: 0,
+  trayType: null,
+  traySize: null,
   cables: {}
 };
 
@@ -17495,6 +17738,18 @@ function trayCountCircuits(cables) {
 }
 
 function renderTrayFill() {
+  // Null guard - early return if required values missing
+  if (trayFillState.trayType === null || trayFillState.traySize === null) {
+    var html = '<div class="card fade-in">';
+    html += '<div class="card-title">' + tx('Kabelbakke fyldningsgrad (DS/EN 50174-2 + DS/HD 60364-5-52)', 'Cable Tray Fill Rate (DS/EN 50174-2 + DS/HD 60364-5-52)') + '</div>';
+    html += '<div class="info-row">' + tx('Fyldning, gruppering og understoetn. iht. DS/EN 50174-2 og DS/HD 60364-5-52', 'Fill rate, grouping and support per DS/EN 50174-2 and DS/HD 60364-5-52') + '</div>';
+    html += '<div class="select-group"><div class="select-label">' + tx('Bakketype', 'Tray Type') + '</div><div class="select-grid">';
+    Object.keys(TRAY_TYPES).forEach(function(key) { var t = TRAY_TYPES[key]; html += '<button class="sel-btn' + (trayFillState.trayType === key ? ' selected' : '') + '" onclick="trayFillState.trayType=\'' + key + '\';renderModule(\'trayfill\')">' + tx(t.da, t.en) + '</button>'; });
+    html += '</div></div>';
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
   var size = TRAY_SIZES[trayFillState.traySize];
   var trayArea = trayCalcArea(size.w, size.h);
   var cableArea = trayCalcCableArea(trayFillState.cables);
@@ -17524,6 +17779,14 @@ function renderTrayFill() {
     html += '<button class="sel-btn' + (trayFillState.traySize === i ? ' selected' : '') + '" onclick="trayFillState.traySize=' + i + ';renderModule(\'trayfill\')">' + s.w + '\u00D7' + s.h + '</button>';
   });
   html += '</div></div>';
+
+
+  // Null guard - no results until user selects values
+  if (trayFillState.trayType === null || trayFillState.traySize === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
 
   // Cable entry
   html += '<div class="select-group"><div class="select-label">' + tx('Kabler (klik +/- for at tilfoeje/fjerne)', 'Cables (click +/- to add/remove)') + '</div>';
@@ -17614,11 +17877,11 @@ var ZS_DEVICE_TYPES = {
 };
 
 var zsState = {
-  deviceType: 'mcbB',
-  device: 'B16',
-  ze: 0.35,
-  cableLength: 20,
-  cableSize: 2.5
+  deviceType: null,
+  device: null,
+  ze: null,
+  cableLength: null,
+  cableSize: null
 };
 
 function zsCalcImpedance(ze, r1r2, length) {
@@ -17656,6 +17919,18 @@ function zsCheckInstantTrip(faultCurrent, device) {
 }
 
 function renderZs() {
+  // Null guard - early return if required values missing
+  if (zsState.deviceType === null || zsState.device === null || zsState.ze === null || zsState.cableLength === null || zsState.cableSize === null) {
+    var html = '<div class="card fade-in">';
+    html += '<div class="card-title">' + tx('Fejlsloejfeimpedans (DS/HD 60364-6 + Tabel 41.1-4)', 'Earth Fault Loop Impedance (DS/HD 60364-6 + Table 41.1-4)') + '</div>';
+    html += '<div class="info-row">' + tx('Verifikation af automatisk afbrydelse iht. DS/HD 60364-6 Table 41', 'Verification of automatic disconnection per DS/HD 60364-6 Table 41') + '</div>';
+    html += '<div class="select-group"><div class="select-label">' + tx('Beskyttelsesudstyr', 'Protective Device') + '</div><div class="select-grid">';
+    Object.keys(ZS_DEVICE_TYPES).forEach(function(key) { var d = ZS_DEVICE_TYPES[key]; html += '<button class="sel-btn' + (zsState.deviceType === key ? ' selected' : '') + '" onclick="zsState.deviceType=\'' + key + '\';renderModule(\'zs\')">' + tx(d.da, d.en) + '</button>'; });
+    html += '</div></div>';
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
   var r1r2 = ZS_R1R2_TABLE[zsState.cableSize] || 24.2;
   var zsCalc = zsCalcImpedance(zsState.ze, r1r2, zsState.cableLength);
   var zsMax = zsGetMaxZs(zsState.device);
@@ -17704,6 +17979,14 @@ function renderZs() {
     html += '<button class="sel-btn' + (zsState.cableSize === v ? ' selected' : '') + '" onclick="zsState.cableSize=' + v + ';renderModule(\'zs\')">' + v + '</button>';
   });
   html += '</div></div>';
+
+
+  // Null guard - no results until user selects values
+  if (zsState.deviceType === null || zsState.device === null || zsState.ze === null || zsState.cableLength === null || zsState.cableSize === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
 
   // Calculation results
   html += '<div class="result-box">';
@@ -17821,8 +18104,8 @@ var INSTRUMENTS = [
 ];
 
 var commissionState = {
-  installType: 'newInstall',
-  category: 'residential',
+  installType: null,
+  category: null,
   specials: [],
   itemStatus: {}
 };
@@ -17885,6 +18168,14 @@ function renderCommission() {
     html += '<button class="sel-btn' + (active ? ' selected' : '') + '" onclick="var i=commissionState.specials.indexOf(\'' + key + '\');if(i>=0)commissionState.specials.splice(i,1);else commissionState.specials.push(\'' + key + '\');renderModule(\'commission\')">' + tx(s.da, s.en) + '</button>';
   });
   html += '</div></div>';
+
+
+  // Null guard - no results until user selects values
+  if (commissionState.installType === null || commissionState.category === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
 
   // Visual inspection checklist
   html += '<div class="result-box">';
@@ -17963,11 +18254,11 @@ function renderCommission() {
 
 // ===== SMOKE VENTILATION (SHEV) MODULE =====
 var shevState = {
-  systemType: 'nshev',
-  buildingType: 'atrium',
-  zoneArea: 200,
-  ceilingHeight: 6,
-  fireSize: 5
+  systemType: null,
+  buildingType: null,
+  zoneArea: null,
+  ceilingHeight: null,
+  fireSize: null
 };
 
 var SHEV_BUILDINGS = {
@@ -18071,6 +18362,14 @@ function renderShev() {
   });
   html += '</div></div>';
 
+
+  // Null guard - no results until user selects values
+  if (shevState.systemType === null || shevState.buildingType === null || shevState.zoneArea === null || shevState.ceilingHeight === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Resultater', 'Results') + ' - DS/EN 12101 + BR18 §100</div>';
@@ -18108,11 +18407,11 @@ function renderShev() {
 }
 // ===== ACCESS CONTROL MODULE =====
 var accessState = {
-  systemType: 'standalone',
-  numDoors: 4,
-  credential: 'rfid',
-  doorHardware: 'strike',
-  backupHours: 4
+  systemType: null,
+  numDoors: null,
+  credential: null,
+  doorHardware: null,
+  backupHours: null
 };
 
 var ACCESS_HARDWARE = {
@@ -18201,6 +18500,14 @@ function renderAccess() {
   });
   html += '</div></div>';
 
+
+  // Null guard - no results until user selects values
+  if (accessState.systemType === null || accessState.numDoors === null || accessState.credential === null || accessState.doorHardware === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Resultater', 'Results') + ' - DS/EN 50133</div>';
@@ -18225,11 +18532,11 @@ function renderAccess() {
 }
 // ===== GENERATOR SIZING MODULE =====
 var generatorState = {
-  application: 'emergency',
-  loads: { lighting: true, hvac: false, it: false, medical: false, fire: true, lifts: false, kitchen: false, ev: false },
-  loadKw: { lighting: 20, hvac: 50, it: 30, medical: 40, fire: 15, lifts: 25, kitchen: 20, ev: 22 },
-  motorStart: 'dol',
-  autonomy: 24
+  application: null,
+  loads: { lighting: false, hvac: false, it: false, medical: false, fire: false, lifts: false, kitchen: false, ev: false },
+  loadKw: { lighting: null, hvac: null, it: null, medical: null, fire: null, lifts: null, kitchen: null, ev: null },
+  motorStart: null,
+  autonomy: null
 };
 
 var GEN_DIVERSITY = {
@@ -18348,6 +18655,14 @@ function renderGenerator() {
   });
   html += '</div></div>';
 
+
+  // Null guard - no results until user selects values
+  if (generatorState.application === null || generatorState.autonomy === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Resultater', 'Results') + ' - IEC 62034 + DS/HD 60364-5-56</div>';
@@ -18372,13 +18687,13 @@ function renderGenerator() {
 }
 // ===== DISCRIMINATION / SELECTIVITY MODULE =====
 var discrimState = {
-  upstreamType: 'fuse',
-  upstreamRating: 100,
-  upstreamCurve: 'C',
-  downstreamType: 'mcb',
-  downstreamRating: 16,
-  downstreamCurve: 'C',
-  ikMax: 10000
+  upstreamType: null,
+  upstreamRating: null,
+  upstreamCurve: null,
+  downstreamType: null,
+  downstreamRating: null,
+  downstreamCurve: null,
+  ikMax: null
 };
 
 var DISCRIM_UPSTREAM_FUSE = [25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400];
@@ -18739,6 +19054,14 @@ function renderDiscrim() {
     html += '</div></div>';
   }
 
+
+  // Null guard - no results until user selects values
+  if (discrimState.upstreamType === null || discrimState.upstreamRating === null || discrimState.downstreamType === null || discrimState.downstreamRating === null || discrimState.ikMax === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results
   var verdictColors = { full: 'var(--success, #22c55e)', partial: '#b8860b', none: 'var(--danger, #ef4444)', unresolved: '#b8860b' };
   var verdictLabels = {
@@ -18793,12 +19116,12 @@ function renderDiscrim() {
 }
 // ===== EARTHING SYSTEM MODULE =====
 var earthsysState = {
-  systemType: 'tncs',
-  electrode: 'rod3',
-  soilResistivity: 100,
-  phaseSize: 16,
-  bonding: 'standard',
-  numRods: 1
+  systemType: null,
+  electrode: null,
+  soilResistivity: null,
+  phaseSize: null,
+  bonding: null,
+  numRods: null
 };
 
 var EARTH_SYSTEMS = {
@@ -18870,6 +19193,18 @@ function earthGetBonding(bondType) {
 }
 
 function renderEarthsys() {
+  // Null guard - early return if required values missing
+  if (earthsysState.systemType === null || earthsysState.electrode === null || earthsysState.soilResistivity === null || earthsysState.phaseSize === null) {
+    var html = '<div class="card fade-in">';
+    html += '<div class="card-title">' + tx('Jordingssystem (DS/HD 60364-5-54 + IEC 60364-1)', 'Earthing System Design (DS/HD 60364-5-54 + IEC 60364-1)') + '</div>';
+    html += '<div class="info-row">' + tx('Dimensionering af jordingssystem iht. DS/HD 60364-5-54 og IEC 60364-1. PEN-leder regler: min. 10mm2 Cu / 16mm2 Al (cl.543.4).', 'Earthing system design per DS/HD 60364-5-54 and IEC 60364-1. PEN conductor rules: min. 10mm2 Cu / 16mm2 Al (cl.543.4).') + '</div>';
+    html += '<div class="select-group"><div class="select-label">' + tx('System', 'System') + '</div><div class="select-grid">';
+    Object.keys(EARTH_SYSTEMS).forEach(function(key) { var s = EARTH_SYSTEMS[key]; html += '<button class="sel-btn' + (earthsysState.systemType === key ? ' selected' : '') + '" onclick="earthsysState.systemType=\'' + key + '\';renderModule(\'earthsys\')">' + tx(s.da, s.en) + '</button>'; });
+    html += '</div></div>';
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
   var electrode = EARTH_ELECTRODES[earthsysState.electrode];
   var singleRe = earthCalcRodResistance(earthsysState.soilResistivity, electrode.length, electrode.diameter);
   var totalRe = earthCalcParallelRods(singleRe, earthsysState.numRods);
@@ -18923,6 +19258,14 @@ function renderEarthsys() {
   html += '<button class="sel-btn' + (earthsysState.bonding === 'standard' ? ' selected' : '') + '" onclick="earthsysState.bonding=\'standard\';renderModule(\'earthsys\')">' + tx('Hoved (cl.411.3.1.2)', 'Main (cl.411.3.1.2)') + '</button>';
   html += '<button class="sel-btn' + (earthsysState.bonding === 'supplementary' ? ' selected' : '') + '" onclick="earthsysState.bonding=\'supplementary\';renderModule(\'earthsys\')">' + tx('Supplerende (cl.415.2)', 'Supplementary (cl.415.2)') + '</button>';
   html += '</div></div>';
+
+
+  // Null guard - no results until user selects values
+  if (earthsysState.systemType === null || earthsysState.electrode === null || earthsysState.soilResistivity === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
 
   // Results
   html += '<div class="result-box">';
@@ -18993,10 +19336,10 @@ var POOL_EQUIPMENT = [
 ];
 
 var poolState = {
-  poolType: 'indoor',
-  selectedZone: 0,
-  selectedEquipment: 'submersible_luminaire',
-  bondingConductor: 4
+  poolType: null,
+  selectedZone: null,
+  selectedEquipment: null,
+  bondingConductor: null
 };
 
 function poolCheckEquipment(zone, equipment) {
@@ -19116,6 +19459,14 @@ function renderPool() {
   html += '<div class="select-group"><div class="select-label">' + tx('Bindingsleder [mm\u00B2 Cu]', 'Bonding Conductor [mm\u00B2 Cu]') + '</div><div class="select-grid">';
   [4, 6, 10, 16].forEach(function(s) { html += '<button class="sel-btn' + (poolState.bondingConductor === s ? ' selected' : '') + '" onclick="poolState.bondingConductor=' + s + ';renderModule(\'pool\')">' + s + ' mm\u00B2</button>'; });
   html += '</div></div>';
+
+  // Null guard - no results until user selects values
+  if (poolState.poolType === null || poolState.selectedZone === null || poolState.selectedEquipment === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Undervandsbelysning (cl.702.55)', 'Underwater Lighting (cl.702.55)') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Spaending', 'Voltage') + '</span><span class="value">SELV 12V AC ' + tx('obligatorisk i Zone 0','mandatory in Zone 0') + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Trafo', 'Transformer') + '</span><span class="value">' + tx('Uden for Zone 0 og 1','Outside Zone 0 and 1') + '</span></div>';
@@ -19146,7 +19497,7 @@ var CONSTRUCTION_EQUIPMENT = [
   { k: 'welfare', da: 'Skurvogn', en: 'Welfare unit', kw_min: 10, kw_max: 30, phases: 3 }
 ];
 
-var constructionState = { supplyType: 'csvb', supplyRating: 63, selectedEquipment: [], diversityFactor: 0.5 };
+var constructionState = { supplyType: null, supplyRating: null, selectedEquipment: [], diversityFactor: null };
 
 function constructionCalcLoad(equipment, diversityFactor) {
   var totalKW = 0;
@@ -19214,6 +19565,14 @@ function renderConstruction() {
   html += '<div class="select-group"><div class="select-label">' + tx('Samtidighedsfaktor', 'Diversity Factor') + '</div><div class="select-grid">';
   [0.5, 0.7, 1.0].forEach(function(d) { html += '<button class="sel-btn' + (constructionState.diversityFactor === d ? ' selected' : '') + '" onclick="constructionState.diversityFactor=' + d + ';renderModule(\'construction\')">' + d + '</button>'; });
   html += '</div></div>';
+
+  // Null guard - no results until user selects values
+  if (constructionState.supplyType === null || constructionState.supplyRating === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Belastning', 'Load') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Total', 'Total') + '</span><span class="value">' + load.totalKW + ' kW</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Diversificeret', 'Diversified') + '</span><span class="value">' + load.diversifiedKW.toFixed(1) + ' kW</span></div>';
@@ -19263,7 +19622,7 @@ var AGRI_HAZARDS = {
   humidity: { da: 'Hoej luftfugtighed', en: 'High humidity' }
 };
 
-var agriState = { buildingType: 'cattle', hasLivestock: true, hasEssentialLoads: true };
+var agriState = { buildingType: null, hasLivestock: null, hasEssentialLoads: null };
 
 function agriGetProtectionReqs(buildingType, hasLivestock) {
   var bt = AGRI_BUILDING_TYPES.find(function(b) { return b.k === buildingType; });
@@ -19336,6 +19695,14 @@ function renderAgri() {
   html += '<div class="select-group"><div class="select-label">' + tx('Kritiske laster', 'Essential Loads') + '</div><div class="select-grid">';
   [true, false].forEach(function(v) { html += '<button class="sel-btn' + (agriState.hasEssentialLoads === v ? ' selected' : '') + '" onclick="agriState.hasEssentialLoads=' + v + ';renderModule(\'agri\')">' + (v ? tx('Ja','Yes') : tx('Nej','No')) + '</button>'; });
   html += '</div></div>';
+
+  // Null guard - no results until user selects values
+  if (agriState.buildingType === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Saerlige farer', 'Special Hazards') + '</div>';
   if (bt && bt.hazards.length > 0) { bt.hazards.forEach(function(h) { var hz = AGRI_HAZARDS[h]; if(hz) html += '<div class="result-row"><span class="label">\u26A0\uFE0F</span><span class="value">' + tx(hz.da, hz.en) + '</span></div>'; }); }
   else { html += '<div class="result-row"><span class="label">\u2705</span><span class="value">' + tx('Ingen saerlige farer', 'No special hazards') + '</span></div>'; }
@@ -19365,7 +19732,7 @@ function renderAgri() {
 }
 // ===== ARC FLASH MODULE (IEC 62271-200 / IEEE 1584) =====
 
-var arcflashState = { voltage: 400, faultCurrent: 10, clearingTime: 0.1, workingDistance: 455 };
+var arcflashState = { voltage: null, faultCurrent: null, clearingTime: null, workingDistance: null };
 
 function arcflashCalcIncidentEnergy(voltage, faultCurrentKA, clearingTimeS, workingDistanceMM) {
   var Cf = voltage <= 1000 ? 1.0 : 1.5;
@@ -19423,6 +19790,14 @@ function renderArcFlash() {
   html += '<div class="select-group"><div class="select-label">' + tx('Arbejdsafstand [mm]', 'Working Distance [mm]') + '</div><div class="select-grid">';
   [{v:300,l:'300 (LV)'},{v:455,l:'455 (MV)'},{v:610,l:'610 (open)'}].forEach(function(d) { html += '<button class="sel-btn' + (arcflashState.workingDistance === d.v ? ' selected' : '') + '" onclick="arcflashState.workingDistance=' + d.v + ';renderModule(\'arcflash\')">' + d.l + '</button>'; });
   html += '</div></div>';
+
+  // Null guard - no results until user selects values
+  if (arcflashState.voltage === null || arcflashState.faultCurrent === null || arcflashState.clearingTime === null || arcflashState.workingDistance === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box" style="border-left:4px solid ' + ppe.color + '"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Incident energi', 'Incident Energy') + '</span><span class="value" style="font-size:1.3em;color:' + ppe.color + '">' + E.toFixed(1) + ' cal/cm\u00B2</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('PPE', 'PPE') + '</span><span class="value" style="color:' + ppe.color + '">' + tx(ppe.da, ppe.en) + '</span></div>';
@@ -19474,7 +19849,7 @@ var CABLE_LIFE_ENV_FACTORS = [
   { k: 'none', da: 'Ingen', en: 'None', reduction: 0.00 }
 ];
 
-var cablelifeState = { cableType: 'PVC', environment: 'indoor', operatingTemp: 60, loadFactor: 0.8, envFactor: 'none', cableAge: 10 };
+var cablelifeState = { cableType: null, environment: null, operatingTemp: null, loadFactor: null, envFactor: null, cableAge: null };
 
 function cablelifeCalcConductorTemp(ambientTemp, loadFactor, ratedTempRise) {
   return ambientTemp + (loadFactor * loadFactor * ratedTempRise);
@@ -19545,6 +19920,14 @@ function renderCableLife() {
   html += '<div class="select-group"><div class="select-label">' + tx('Alder [aar]', 'Age [years]') + '</div><div class="select-grid">';
   [0, 5, 10, 15, 20, 25, 30, 35, 40, 50].forEach(function(a) { html += '<button class="sel-btn' + (cablelifeState.cableAge === a ? ' selected' : '') + '" onclick="cablelifeState.cableAge=' + a + ';renderModule(\'cablelife\')">' + a + '</button>'; });
   html += '</div></div>';
+
+  // Null guard - no results until user selects values
+  if (cablelifeState.cableType === null || cablelifeState.environment === null || cablelifeState.operatingTemp === null || cablelifeState.loadFactor === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Arrhenius-model', 'Arrhenius Model') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Maks temp', 'Rated temp') + '</span><span class="value">' + cableData.maxTemp + '\u00B0C</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Designlevetid', 'Design life') + '</span><span class="value">' + cableData.designLife + ' ' + tx('aar','yr') + '</span></div>';
@@ -19577,11 +19960,11 @@ function renderCableLife() {
 // ===== BESS - BATTERY ENERGY STORAGE SYSTEM (DS/EN 62619 + DS/HD 60364-5-56) =====
 
 var bessState = {
-  systemType: 'residential',
-  chemistry: 'LFP',
-  capacityKWh: 13.5,
-  voltDC: 400,
-  dischargeHours: 4
+  systemType: null,
+  chemistry: null,
+  capacityKWh: null,
+  voltDC: null,
+  dischargeHours: null
 };
 
 var BESS_SYSTEMS = {
@@ -19647,6 +20030,18 @@ function bessGetSafety(chemistry) {
 }
 
 function renderBESS() {
+  // Null guard - early return if required values missing
+  if (bessState.systemType === null || bessState.chemistry === null || bessState.capacityKWh === null || bessState.voltDC === null || bessState.dischargeHours === null) {
+    var html = '<div class="card fade-in">';
+    html += '<div class="card-title">' + tx('Batterilager (DS/EN 62619 + DS/HD 60364-5-56)', 'Battery Storage (DS/EN 62619 + DS/HD 60364-5-56)') + '</div>';
+    html += '<div class="info-row">' + tx('Dimensionering af energilagersystem iht. DS/EN 62619', 'Battery energy storage system sizing per DS/EN 62619') + '</div>';
+    html += '<div class="select-group"><div class="select-label">' + tx('Systemtype', 'System Type') + '</div><div class="select-grid">';
+    Object.keys(BESS_SYSTEMS).forEach(function(key) { var s = BESS_SYSTEMS[key]; html += '<button class="sel-btn' + (bessState.systemType === key ? ' selected' : '') + '" onclick="bessState.systemType=\'' + key + '\';renderModule(\'bess\')">' + tx(s.da, s.en) + '</button>'; });
+    html += '</div></div>';
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
   var inv = bessCalcInverterSize(bessState.capacityKWh, bessState.dischargeHours);
   var dcI = bessCalcDCCurrent(inv.kW, bessState.voltDC);
   var dcCable = bessCalcDCCable(dcI.current);
@@ -19676,6 +20071,14 @@ function renderBESS() {
   html += '<div class="select-group"><div class="select-label">' + tx('Afladningstid [timer]', 'Discharge Hours') + '</div><div class="select-grid">';
   [1, 2, 3, 4, 5, 6, 8, 10].forEach(function(h) { html += '<button class="sel-btn' + (bessState.dischargeHours === h ? ' selected' : '') + '" onclick="bessState.dischargeHours=' + h + ';renderModule(\'bess\')">' + h + 'h</button>'; });
   html += '</div></div>';
+
+  // Null guard - no results until user selects values
+  if (bessState.systemType === null || bessState.chemistry === null || bessState.capacityKWh === null || bessState.voltDC === null || bessState.dischargeHours === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results - Inverter
   html += '<div class="result-box"><div class="result-title">' + tx('Inverter', 'Inverter') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Inverter stoerrelse', 'Inverter Size') + '</span><span class="value">' + inv.kW + ' kW</span></div>';
@@ -19712,10 +20115,10 @@ function renderBESS() {
 // ===== EMC - ELECTROMAGNETIC COMPATIBILITY (IEC 61000 + DS/EN 50174) =====
 
 var emcState = {
-  zone: 1,
-  sources: ['vfd'],
-  cableCatA: 'A',
-  cableCatB: 'D'
+  zone: null,
+  sources: [],
+  cableCatA: null,
+  cableCatB: null
 };
 
 var EMC_ZONES = [
@@ -19796,6 +20199,18 @@ function emcGetCompliance(zoneId) {
 }
 
 function renderEMC() {
+  // Null guard - early return if required values missing
+  if (emcState.zone === null) {
+    var html = '<div class="card fade-in">';
+    html += '<div class="card-title">' + tx('EMC-design (IEC 61000 + DS/EN 50174)', 'EMC Design (IEC 61000 + DS/EN 50174)') + '</div>';
+    html += '<div class="info-row">' + tx('Elektromagnetisk kompatibilitet og kabeladskillelse', 'Electromagnetic compatibility and cable segregation design') + '</div>';
+    html += '<div class="select-group"><div class="select-label">' + tx('EMC-zone', 'EMC Zone') + '</div><div class="select-grid">';
+    EMC_ZONES.forEach(function(z) { html += '<button class="sel-btn' + (emcState.zone === z.id ? ' selected' : '') + '" onclick="emcState.zone=' + z.id + ';renderModule(\'emc\')">' + tx(z.da, z.en) + '</button>'; });
+    html += '</div></div>';
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
   var mit = emcGetMitigations(emcState.zone, emcState.sources);
   var sep = emcGetSeparation(emcState.cableCatA, emcState.cableCatB);
   var comp = emcGetCompliance(emcState.zone);
@@ -19820,6 +20235,14 @@ function renderEMC() {
   html += '<div class="select-group"><div class="select-label">' + tx('Kabel B kategori', 'Cable B Category') + '</div><div class="select-grid">';
   EMC_CABLE_CATEGORIES.forEach(function(c) { html += '<button class="sel-btn' + (emcState.cableCatB === c.id ? ' selected' : '') + '" onclick="emcState.cableCatB=\'' + c.id + '\';renderModule(\'emc\')">' + tx(c.da, c.en) + '</button>'; });
   html += '</div></div>';
+
+  // Null guard - no results until user selects values
+  if (emcState.zone === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results - Separation
   html += '<div class="result-box"><div class="result-title">' + tx('Kabeladskillelse', 'Cable Separation') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Min. afstand', 'Min. Separation') + '</span><span class="value">' + sep.distance_mm + ' mm</span></div>';
@@ -19843,12 +20266,12 @@ function renderEMC() {
 // ===== METERING & SUB-METERING (DS/EN 50470 + MID) =====
 
 var meteringState = {
-  purpose: 'billing',
-  meterType: 'direct',
-  ctRatio: '100/5',
-  accuracy: 'B',
-  communication: 'modbus_tcp',
-  numMeters: 1
+  purpose: null,
+  meterType: null,
+  ctRatio: null,
+  accuracy: null,
+  communication: null,
+  numMeters: null
 };
 
 var METERING_PURPOSES = [
@@ -19957,6 +20380,14 @@ function renderMetering() {
   html += '<div class="select-group"><div class="select-label">' + tx('Antal maalere', 'Number of Meters') + '</div><div class="select-grid">';
   METERING_NUM_OPTIONS.forEach(function(n) { html += '<button class="sel-btn' + (meteringState.numMeters === n ? ' selected' : '') + '" onclick="meteringState.numMeters=' + n + ';renderModule(\'metering\')">' + n + '</button>'; });
   html += '</div></div>';
+
+  // Null guard - no results until user selects values
+  if (meteringState.purpose === null || meteringState.meterType === null || meteringState.accuracy === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results
   html += '<div class="result-box"><div class="result-title">' + tx('Specifikation', 'Specification') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Kraevet klasse', 'Required Class') + '</span><span class="value">' + reqAcc.accuracy + ' (' + reqAcc.clause + ')</span></div>';
@@ -19984,11 +20415,11 @@ function renderMetering() {
 // ===== ATEX - EXPLOSIVE ATMOSPHERES (DS/EN 60079 + ATEX 2014/34/EU) =====
 
 var atexState = {
-  zoneType: 'gas',
-  zone: 1,
-  substance: 'IIA',
-  tempClass: 'T3',
-  protectionType: 'Ex_d'
+  zoneType: null,
+  zone: null,
+  substance: null,
+  tempClass: null,
+  protectionType: null
 };
 
 var ATEX_ZONE_TYPES = [
@@ -20108,6 +20539,14 @@ function renderATEX() {
     html += '<button class="sel-btn' + (atexState.protectionType === p.id ? ' selected' : '') + (isAllowed ? '' : ' disabled') + '" onclick="' + (isAllowed ? "atexState.protectionType='" + p.id + "';renderModule('atex')" : '') + '">' + tx(p.da, p.en) + '</button>';
   });
   html += '</div></div>';
+
+  // Null guard - no results until user selects values
+  if (atexState.zoneType === null || atexState.zone === null || atexState.substance === null || atexState.tempClass === null || atexState.protectionType === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results
   html += '<div class="result-box"><div class="result-title">' + tx('Klassificering', 'Classification') + '</div>';
   html += '<div class="result-row"><span class="label">EPL</span><span class="value">' + epl.epl + ' (' + epl.clause + ')</span></div>';
@@ -20137,9 +20576,9 @@ function renderATEX() {
 // ===== SMART GRID - DEMAND RESPONSE (DS/EN 50549 + Energinet) =====
 
 var smartgridState = {
-  installationType: 'residential',
-  assets: ['heatpump', 'ev'],
-  tariffSpread: 0.50
+  installationType: null,
+  assets: [],
+  tariffSpread: null
 };
 
 var SMARTGRID_INSTALL_TYPES = [
@@ -20235,6 +20674,14 @@ function renderSmartGrid() {
   html += '<div class="select-group"><div class="select-label">' + tx('Prisspredning [DKK/kWh]', 'Price Spread [DKK/kWh]') + '</div><div class="select-grid">';
   [0.30, 0.40, 0.50, 0.60, 0.70, 0.80].forEach(function(s) { html += '<button class="sel-btn' + (smartgridState.tariffSpread === s ? ' selected' : '') + '" onclick="smartgridState.tariffSpread=' + s + ';renderModule(\'smartgrid\')">' + s.toFixed(2) + '</button>'; });
   html += '</div></div>';
+
+  // Null guard - no results until user selects values
+  if (smartgridState.installationType === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results - Tariff
   html += '<div class="result-box"><div class="result-title">' + tx('Dansk tarifstruktur (Energinet 2024)', 'Danish Tariff Structure (Energinet 2024)') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx(SMARTGRID_TARIFF.peak.da, SMARTGRID_TARIFF.peak.en) + '</span><span class="value">' + SMARTGRID_TARIFF.peak.rate.toFixed(2) + ' DKK/kWh</span></div>';
@@ -23964,11 +24411,11 @@ function renderGuide() {
 // State for the AC impedance calculator — all user selections.
 var impedansState = {
   connection: 'series',   // 'series' or 'parallel'
-  R: 100,                 // Ohm
-  L: 0.1,                // Henry
-  C: 0.0000001,          // Farad (100nF = 0.1uF)
-  f: 50,                 // Hz
-  U: 230,                // Volts (supply voltage for power triangle)
+  R: null,                 // Ohm
+  L: null,                // Henry
+  C: null,          // Farad (100nF = 0.1uF)
+  f: null,                 // Hz
+  U: null,                // Volts (supply voltage for power triangle)
   components: 'rlc'      // 'r', 'rl', 'rc', 'lc', 'rlc'
 };
 
@@ -24242,6 +24689,14 @@ function renderImpedans() {
   html += '</div>';
 
   html += '</div>'; // close config card
+
+  // Null guard
+  if (impedansState.R === null || impedansState.L === null || impedansState.C === null || impedansState.f === null || impedansState.U === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results card
   html += '<div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Impedance Results') + '</div>';
 
@@ -24425,16 +24880,16 @@ function impedansRenderPhasor(res) {
 
 var trefaseState = {
   loadType: 'symStar',
-  UL: 400,
-  f: 50,
-  Z: 100,
-  phi: 0.5236,
-  Za: 100, phiA: 0,
-  Zb: 100, phiB: 0,
-  Zc: 100, phiC: 0,
-  pfcTarget: 0.95,
-  W1: 1500,
-  W2: 800
+  UL: null,
+  f: null,
+  Z: null,
+  phi: null,
+  Za: null, phiA: null,
+  Zb: null, phiB: null,
+  Zc: null, phiC: null,
+  pfcTarget: null,
+  W1: null,
+  W2: null
 };
 
 var TREFASE_UL_PRESETS = [230, 400, 690, 1000, 3000, 6000, 10000];
@@ -24694,6 +25149,14 @@ function renderTrefase() {
 
   html += '</div>';
 
+
+  // Null guard
+  if (trefaseState.UL === null || trefaseState.f === null || trefaseState.Z === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results card
   html += '<div class="card fade-in"><div class="card-title">' + tx('Resultat','Results') + '</div>';
 
@@ -24797,17 +25260,17 @@ function renderTrefase() {
 
 var motorteoriState = {
   calcType: 'slip',
-  poles: 4,
-  f: 50,
-  n: 1440,
-  Prated: 7500,
-  U: 400,
-  I: 15,
-  cosPhi: 0.85,
-  eta: 0.88,
-  slip: 0.04,
-  startMethod: 'dol',
-  IstartRatio: 7
+  poles: null,
+  f: null,
+  n: null,
+  Prated: null,
+  U: null,
+  I: null,
+  cosPhi: null,
+  eta: null,
+  slip: null,
+  startMethod: null,
+  IstartRatio: null
 };
 
 var MOTORTEORI_POLES_PRESETS = [2, 4, 6, 8, 10, 12];
@@ -25040,6 +25503,14 @@ function renderMotorteori() {
 
   html += '</div>';
 
+
+  // Null guard
+  if (motorteoriState.poles === null || motorteoriState.f === null || motorteoriState.n === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results
   var res = motorteoriCalcAll(motorteoriState);
   html += '<div class="card fade-in"><div class="card-title">' + tx('Resultat','Results') + '</div>';
@@ -25107,16 +25578,16 @@ function renderMotorteori() {
 // Ganzbereich (full-range) HV fuse selection per DS/HD 60364 + IEC 60255
 
 var relayState = {
-  relayType: 'definite',
-  trafoKVA: 630,
-  primaryKV: 10,
-  secondaryV: 400,
-  Igt: 5,
-  tGt: 0.5,
-  Igg: 20,
-  tGg: 0.1,
-  egentid: 0.04,
-  fuseType: 'gg63'
+  relayType: null,
+  trafoKVA: null,
+  primaryKV: null,
+  secondaryV: null,
+  Igt: null,
+  tGt: null,
+  Igg: null,
+  tGg: null,
+  egentid: null,
+  fuseType: null
 };
 
 var RELAY_TRAFO_PRESETS = [100, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500];
@@ -25248,6 +25719,14 @@ function renderRelay() {
   });
   html += '</div></div>';
 
+
+  // Null guard
+  if (relayState.relayType === null || relayState.trafoKVA === null || relayState.primaryKV === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   // Results
   html += '<div class="result-box"><div class="result-title">' + tx('Beregningsresultater', 'Calculation Results') + '</div>';
   html += '<div class="result-row"><span class="label">I<sub>1N</sub> (' + tx('primaer nominel', 'primary nominal') + ')</span><span class="value">' + I1N.toFixed(2) + ' A</span></div>';
@@ -25301,18 +25780,18 @@ function renderRelay() {
 // Zs safety factor (0.8), and minimum protective conductor CSA (S = sqrt(I2t)/k)
 
 var faultState = {
-  earthSystem: 'tncs',
-  deviceType: 'mcbB',
-  deviceIn: 16,
-  zsValue: 1.2,
-  deltaIn: 0.03,
-  voltage: 230,
-  measuredZs: 0,
-  csaConductor: 'cuPVC',
-  csaManualI: 500,
-  csaManualT: 0.2,
+  earthSystem: null,
+  deviceType: null,
+  deviceIn: null,
+  zsValue: null,
+  deltaIn: null,
+  voltage: null,
+  measuredZs: null,
+  csaConductor: null,
+  csaManualI: null,
+  csaManualT: null,
   calcMode: 'fault',
-  touchVoltage: 50
+  touchVoltage: null
 };
 
 var FAULT_EARTH_SYSTEMS = {
@@ -25447,6 +25926,12 @@ function renderFaultLoop() {
   });
   html += '</div></div>';
 
+  // Null guard
+  if (faultState.earthSystem === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    return html;
+  }
+
   var isTN = faultState.earthSystem.indexOf('tn') === 0;
   var isTT = faultState.earthSystem === 'tt';
   var isIT1 = faultState.earthSystem === 'it1';
@@ -25520,6 +26005,12 @@ function renderFaultLoop() {
 function renderFaultResults(isTN, isTT, isIT1, isIT2) {
   var html = '';
   var overallOk = true;
+
+  // Null guard
+  if (faultState.deviceType === null || faultState.deviceIn === null || faultState.voltage === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    return html;
+  }
 
   if (isTN) {
     var Ia = faultCalcIa(faultState.deviceType, faultState.deviceIn);
@@ -25648,6 +26139,14 @@ function renderFaultCSA() {
   var SminLarge = faultCalcMinCSA(I, t, kLarge);
   var I2t = I * I * t;
 
+
+  // Null guard
+  if (faultState.csaConductor === null || faultState.csaManualI === null || faultState.csaManualT === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Min. beskyttelsesleder-tvaersnit', 'Min. Protective Conductor Cross-section') + '</div>';
   html += '<div class="result-row"><span class="label">I</span><span class="value">' + I + ' A</span></div>';
   html += '<div class="result-row"><span class="label">t</span><span class="value">' + t + ' s</span></div>';
@@ -25714,41 +26213,41 @@ var dcState = {
   calcType: 'ohm',       // ohm, resistivity, temperature, series_parallel, divider, power, energy, emf
   // Ohm's law
   ohmKnown: 'ri',        // 'ri' = know R+I solve U, 'ru' = know R+U solve I, 'ui' = know U+I solve R
-  ohmR: 10,
-  ohmI: 1,
-  ohmU: 230,
+  ohmR: null,
+  ohmI: null,
+  ohmU: null,
   // Resistivity
   resMaterial: 'cu',
-  resLength: 100,
-  resCrossSection: 2.5,
+  resLength: null,
+  resCrossSection: null,
   // Temperature
   tempMaterial: 'cu',
-  tempR20: 10,
-  tempT: 75,
+  tempR20: null,
+  tempT: null,
   // Series/parallel
   spMode: 'series',
-  spResistors: [10, 22, 47],
+  spResistors: [],
   // Voltage divider
-  vdR1: 1000,
-  vdR2: 2200,
-  vdUin: 12,
+  vdR1: null,
+  vdR2: null,
+  vdUin: null,
   // Current divider
-  cdR1: 100,
-  cdR2: 220,
-  cdItotal: 1,
+  cdR1: null,
+  cdR2: null,
+  cdItotal: null,
   // Power
   powKnown: 'ui',        // 'ui', 'ri', 'ru'
-  powU: 230,
-  powI: 10,
-  powR: 23,
+  powU: null,
+  powI: null,
+  powR: null,
   // Energy
-  enP: 2000,
-  enT: 3,
+  enP: null,
+  enT: null,
   enTunit: 'h',
   // EMF / internal resistance
-  emfE: 12,
-  emfRi: 0.5,
-  emfI: 2
+  emfE: null,
+  emfRi: null,
+  emfI: null
 };
 
 // --- DC Pure calculation functions (unit-testable, no DOM) ---
@@ -25964,6 +26463,14 @@ function renderDCOhm() {
   }
   // Result
   var res = dcCalcOhm(dcState.ohmKnown, dcState.ohmR, dcState.ohmI, dcState.ohmU);
+
+  // Null guard
+  if (dcState.ohmR === null || dcState.ohmI === null || dcState.ohmU === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">U (' + tx('Spaending', 'Voltage') + ')</span><span class="value">' + res.U.toFixed(4) + ' V</span></div>';
   html += '<div class="result-row"><span class="label">R (' + tx('Modstand', 'Resistance') + ')</span><span class="value">' + dcFmtR(res.R) + '</span></div>';
@@ -25994,6 +26501,14 @@ function renderDCResistivity() {
   // Result
   var mat = DC_MATERIALS[dcState.resMaterial];
   var R = dcCalcResistivity(mat.rho, dcState.resLength, dcState.resCrossSection);
+
+  // Null guard
+  if (dcState.resLength === null || dcState.resCrossSection === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">R</span><span class="value">' + R.toFixed(4) + ' \u03A9</span></div>';
   html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">R = \u03C1 \u00D7 l / S = ' + mat.rho + ' \u00D7 ' + dcState.resLength + ' / ' + dcState.resCrossSection + ' = ' + R.toFixed(4) + ' \u03A9</span></div>';
@@ -26025,6 +26540,14 @@ function renderDCTemperature() {
   var mat = DC_MATERIALS[dcState.tempMaterial];
   var RT = dcCalcTempResistance(dcState.tempR20, mat.alpha, dcState.tempT);
   var deltaR = RT - dcState.tempR20;
+
+  // Null guard
+  if (dcState.tempR20 === null || dcState.tempT === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">R<sub>T</sub> (' + tx('ved', 'at') + ' ' + dcState.tempT + '\u00B0C)</span><span class="value">' + RT.toFixed(4) + ' \u03A9</span></div>';
   html += '<div class="result-row"><span class="label">\u0394R</span><span class="value">' + deltaR.toFixed(4) + ' \u03A9 (' + (deltaR >= 0 ? '+' : '') + ((deltaR / dcState.tempR20) * 100).toFixed(1) + '%)</span></div>';
@@ -26100,6 +26623,14 @@ function renderDCDivider() {
   html += '</div>';
   // Voltage divider result
   var Uout = dcCalcVoltageDivider(dcState.vdUin, dcState.vdR1, dcState.vdR2);
+
+  // Null guard
+  if (dcState.vdR1 === null || dcState.vdR2 === null || dcState.vdUin === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Spaendingsdeler', 'Voltage Divider') + '</div>';
   html += '<div class="result-row"><span class="label">U<sub>out</sub></span><span class="value" style="font-weight:700">' + Uout.toFixed(4) + ' V</span></div>';
   html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Formel', 'Formula') + '</span><span class="value">U<sub>out</sub> = U<sub>in</sub> \u00D7 R2/(R1+R2) = ' + dcState.vdUin + ' \u00D7 ' + dcState.vdR2 + '/(' + dcState.vdR1 + '+' + dcState.vdR2 + ') = ' + Uout.toFixed(4) + ' V</span></div>';
@@ -26149,6 +26680,14 @@ function renderDCPower() {
   }
   // Result
   var res = dcCalcPower(dcState.powKnown, dcState.powU, dcState.powI, dcState.powR);
+
+  // Null guard
+  if (dcState.powU === null || dcState.powI === null || dcState.powR === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">P (' + tx('Effekt', 'Power') + ')</span><span class="value" style="font-weight:700">' + res.P.toFixed(2) + ' W</span></div>';
   if (res.P >= 1000) html += '<div class="result-row"><span class="label">P</span><span class="value">' + (res.P / 1000).toFixed(3) + ' kW</span></div>';
@@ -26185,6 +26724,14 @@ function renderDCEnergy() {
   var tSec = dcTimeToSeconds(dcState.enT, dcState.enTunit);
   var W = dcCalcEnergy(dcState.enP, tSec);
   var kWh = dcCalcEnergyKWh(dcState.enP, tSec);
+
+  // Null guard
+  if (dcState.enP === null || dcState.enT === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">W (' + tx('Energi', 'Energy') + ')</span><span class="value" style="font-weight:700">' + W.toFixed(0) + ' Ws (J)</span></div>';
   html += '<div class="result-row"><span class="label">W</span><span class="value">' + kWh.toFixed(4) + ' kWh</span></div>';
@@ -26216,6 +26763,14 @@ function renderDCEmf() {
   html += '</div>';
   // Result
   var res = dcCalcEMF(dcState.emfE, dcState.emfRi, dcState.emfI);
+
+  // Null guard
+  if (dcState.emfE === null || dcState.emfRi === null || dcState.emfI === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">U<sub>kl</sub> (' + tx('Klemmesp\u00E6nding', 'Terminal Voltage') + ')</span><span class="value" style="font-weight:700">' + res.Uterminal.toFixed(3) + ' V</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Sp\u00E6ndingsfald over Ri', 'Voltage drop across Ri') + '</span><span class="value">' + (res.I * res.Ri).toFixed(3) + ' V</span></div>';
@@ -26232,18 +26787,18 @@ function renderDCEmf() {
 
 var lysState = {
   calcType: 'lumen',
-  roomType: 'office',
-  roomLength: 6,
-  roomWidth: 4,
-  mountHeight: 2.5,
-  ceilingRef: 0.7,
-  wallRef: 0.5,
-  floorRef: 0.2,
-  lampType: 'led_panel',
-  mf: 0.8,
-  ptI: 1500,
-  ptH: 3,
-  ptAngle: 0
+  roomType: null,
+  roomLength: null,
+  roomWidth: null,
+  mountHeight: null,
+  ceilingRef: null,
+  wallRef: null,
+  floorRef: null,
+  lampType: null,
+  mf: null,
+  ptI: null,
+  ptH: null,
+  ptAngle: null
 };
 
 var LYS_ROOM_TYPES = {
@@ -26398,6 +26953,14 @@ function renderLysLumen() {
   html += '</div>';
   html += valStep(lysState, 'mf', 'lys', { step: 0.05, fmt: function(v){ return v.toFixed(2); }, clamp: { min: 0, max: 1 } });
   html += '</div>';
+
+  // Null guard
+  if (lysState.roomType === null || lysState.roomLength === null || lysState.roomWidth === null || lysState.mountHeight === null || lysState.lampType === null || lysState.mf === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">' + tx('Kraevet belysning', 'Required illuminance') + '</span><span class="value">' + room.lux + ' lux</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Areal', 'Area') + '</span><span class="value">' + area + ' m\u00B2</span></div>';
@@ -26440,6 +27003,14 @@ function renderLysPoint() {
   html += '</div>';
   html += valStep(lysState, 'ptAngle', 'lys', { step: 1, fmt: function(v){ return v + '\u00B0'; }, clamp: { min: 0, max: 89 } });
   html += '</div>';
+
+  // Null guard
+  if (lysState.ptI === null || lysState.ptH === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">E</span><span class="value" style="font-weight:700">' + E.toFixed(2) + ' lux</span></div>';
   html += '<div class="result-row"><span class="label">r</span><span class="value">' + r.toFixed(2) + ' m</span></div>';
@@ -26467,14 +27038,14 @@ function renderLysEfficacy() {
 
 var magnetState = {
   calcType: 'mmf',
-  material: 'sheet_steel',
-  mmfN: 500, mmfI: 2,
-  fluxPhi: 0.001, fluxArea: 0.001,
-  relLength: 0.5, relArea: 0.001, relGap: 0.001,
-  indN: 200, indDphiDt: 0.01, indB: 1.0, indL: 0.5, indV: 10,
-  inductN: 500, inductLength: 0.5, inductArea: 0.001,
-  forceI: 5, forceL: 0.3, forceB: 1.0,
-  energyL: 0.1, energyI: 5
+  material: null,
+  mmfN: null, mmfI: null,
+  fluxPhi: null, fluxArea: null,
+  relLength: null, relArea: null, relGap: null,
+  indN: null, indDphiDt: null, indB: null, indL: null, indV: null,
+  inductN: null, inductLength: null, inductArea: null,
+  forceI: null, forceL: null, forceB: null,
+  energyL: null, energyI: null
 };
 
 var MAGNET_MATERIALS = {
@@ -26546,6 +27117,14 @@ function renderMagnetMMF() {
   html += '</div>';
   html += valStep(magnetState, 'mmfI', 'magnet', { step: 0.1, fmt: function(v){ return v + ' A'; }, clamp: { min: 0 } });
   html += '</div>';
+
+  // Null guard
+  if (magnetState.material === null || magnetState.mmfN === null || magnetState.mmfI === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">Fm</span><span class="value" style="font-weight:700">' + Fm + ' A</span></div></div>';
   html += calcDetail({ name: 'MMF', formula: 'Fm = N \u00D7 I', variables: [{ name: 'N', symbol: 'N', value: magnetState.mmfN, unit: tx('vindinger', 'turns') }, { name: 'I', symbol: 'I', value: magnetState.mmfI, unit: 'A' }], substitution: magnetState.mmfN + ' \u00D7 ' + magnetState.mmfI, result: { value: Fm, unit: 'A' }, reference: 'Opgavesamling Kap. 5' });
@@ -26570,6 +27149,14 @@ function renderMagnetFlux() {
   html += '</div>';
   html += valStep(magnetState, 'fluxArea', 'magnet', { step: 0.0001, fmt: function(v){ return (v*10000).toFixed(2) + ' cm2'; }, clamp: { min: 0 } });
   html += '</div>';
+
+  // Null guard
+  if (magnetState.fluxPhi === null || magnetState.fluxArea === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">B</span><span class="value" style="font-weight:700">' + B.toFixed(3) + ' T</span></div>';
   html += '<div class="result-row"><span class="label">H</span><span class="value">' + H.toFixed(1) + ' A/m</span></div></div>';
@@ -26607,6 +27194,14 @@ function renderMagnetReluctance() {
   html += '</div>';
   html += valStep(magnetState, 'relGap', 'magnet', { step: 0.0005, fmt: function(v){ return v === 0 ? '0' : (v*1000).toFixed(2) + ' mm'; }, clamp: { min: 0 } });
   html += '</div>';
+
+  // Null guard
+  if (magnetState.material === null || magnetState.relLength === null || magnetState.relArea === null || magnetState.relGap === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">Rm_core</span><span class="value">' + Rm_core.toExponential(2) + ' A/Wb</span></div>';
   if (magnetState.relGap > 0) html += '<div class="result-row"><span class="label">Rm_gap</span><span class="value">' + Rm_gap.toExponential(2) + ' A/Wb</span></div>';
@@ -26623,6 +27218,13 @@ function renderMagnetInduction() {
   var bPresets = [0.1, 0.2, 0.3, 0.5, 0.8, 1.0, 1.2, 1.5, 1.8, 2.0];
   var lPresets = [0.1, 0.2, 0.3, 0.5, 0.8, 1.0, 1.5, 2.0];
   var vPresets = [1, 2, 3, 5, 8, 10, 15, 20, 30, 50];
+  // Null guard
+  if (magnetState.indN === null || magnetState.indDphiDt === null) {
+    var html = '<div class="card fade-in"><div class="card-title">' + tx('Induktion', 'Induction') + '</div>';
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
   var eFaraday = magnetCalcFaradayEMF(magnetState.indN, magnetState.indDphiDt);
   var eMotional = magnetCalcMotionalEMF(magnetState.indB, magnetState.indL, magnetState.indV);
   var html = '<div class="card fade-in"><div class="card-title">' + tx('Induktion', 'Induction') + '</div>';
@@ -26686,6 +27288,14 @@ function renderMagnetInductance() {
   html += '</div>';
   html += valStep(magnetState, 'inductArea', 'magnet', { step: 0.0001, fmt: function(v){ return (v*10000).toFixed(2) + ' cm2'; }, clamp: { min: 0 } });
   html += '</div>';
+
+  // Null guard
+  if (magnetState.material === null || magnetState.inductN === null || magnetState.inductLength === null || magnetState.inductArea === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">L</span><span class="value" style="font-weight:700">' + (L >= 1 ? L.toFixed(3) + ' H' : L >= 0.001 ? (L*1000).toFixed(2) + ' mH' : (L*1e6).toFixed(1) + ' uH') + '</span></div>';
   html += '<div class="result-row"><span class="label">XL (50Hz)</span><span class="value">' + XL.toFixed(3) + ' \u03A9</span></div></div>';
@@ -26716,6 +27326,14 @@ function renderMagnetForce() {
   html += '</div>';
   html += valStep(magnetState, 'forceL', 'magnet', { step: 0.05, fmt: function(v){ return v + ' m'; }, clamp: { min: 0 } });
   html += '</div>';
+
+  // Null guard
+  if (magnetState.forceI === null || magnetState.forceL === null || magnetState.forceB === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">F</span><span class="value" style="font-weight:700">' + F.toFixed(3) + ' N</span></div></div>';
   html += calcDetail({ name: tx('Lorentz-kraft', 'Lorentz force'), formula: 'F = B*I*l', variables: [{ name: 'B', symbol: 'B', value: magnetState.forceB, unit: 'T' }, { name: 'I', symbol: 'I', value: magnetState.forceI, unit: 'A' }, { name: 'l', symbol: 'l', value: magnetState.forceL, unit: 'm' }], substitution: magnetState.forceB + '*' + magnetState.forceI + '*' + magnetState.forceL, result: { value: F, unit: 'N' }, reference: 'Opgavesamling Kap. 5' });
@@ -26738,6 +27356,14 @@ function renderMagnetEnergy() {
   html += '</div>';
   html += valStep(magnetState, 'energyI', 'magnet', { step: 0.5, fmt: function(v){ return v + ' A'; }, clamp: { min: 0 } });
   html += '</div>';
+
+  // Null guard
+  if (magnetState.energyL === null || magnetState.energyI === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">W</span><span class="value" style="font-weight:700">' + (W >= 1 ? W.toFixed(2) + ' J' : (W*1000).toFixed(3) + ' mJ') + '</span></div></div>';
   html += calcDetail({ name: tx('Magnetisk energi', 'Magnetic energy'), formula: 'W = 0.5*L*I2', variables: [{ name: 'L', symbol: 'L', value: magnetState.energyL, unit: 'H' }, { name: 'I', symbol: 'I', value: magnetState.energyI, unit: 'A' }], substitution: '0.5*' + magnetState.energyL + '*' + magnetState.energyI + '2', result: { value: W, unit: 'J' }, reference: 'Opgavesamling Kap. 5' });
@@ -26768,11 +27394,11 @@ var KAP_DIELECTRICS = {
 
 var kapacitorState = {
   calcType: 'capacitance', // capacitance | charge | combo | rc | coulomb
-  dielectric: 'vacuum', area: 0.01, dist: 0.001,
-  C: 0.000001, U: 230,
-  combo: 'series', c1: 0.000001, c2: 0.000002, c3: 0,
-  R: 1000, t: 0.001, phase: 'charge',
-  q1: 0.000001, q2: 0.000001, r: 0.1
+  dielectric: null, area: null, dist: null,
+  C: null, U: null,
+  combo: 'series', c1: null, c2: null, c3: null,
+  R: null, t: null, phase: 'charge',
+  q1: null, q2: null, r: null
 };
 
 // --- Pure calculation functions (unit-testable, no DOM) ---
@@ -26822,6 +27448,16 @@ function renderKapacitor() {
 }
 
 function renderKapacitorC() {
+  // Null guard
+  if (kapacitorState.dielectric === null || kapacitorState.area === null || kapacitorState.dist === null) {
+    var html = '<div class="card fade-in"><div class="card-title">' + tx('Pladekondensator: C = \u03B5\u2080\u00B7\u03B5\u1D63\u00B7A/d', 'Plate capacitor: C = \u03B5\u2080\u00B7\u03B5\u1D63\u00B7A/d') + '</div>';
+    html += '<div class="select-group"><div class="select-label">' + tx('Dielektrikum (\u03B5\u1D63)', 'Dielectric (\u03B5\u1D63)') + '</div><div class="select-grid">';
+    Object.keys(KAP_DIELECTRICS).forEach(function(dk) { var d = KAP_DIELECTRICS[dk]; html += '<button class="sel-btn' + (kapacitorState.dielectric === dk ? ' selected' : '') + '" onclick="kapacitorState.dielectric=\'' + dk + '\';renderModule(\'kapacitor\')">' + tx(d.da, d.en) + '</button>'; });
+    html += '</div></div>';
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
   var areaPresets = [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1];
   var distPresets = [0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01];
   var er = KAP_DIELECTRICS[kapacitorState.dielectric].er;
@@ -26841,6 +27477,14 @@ function renderKapacitorC() {
   html += valStep(kapacitorState, 'dist', 'kapacitor', { step: 0.0001, fmt: function(v){ return (v*1000).toFixed(2) + ' mm'; }, clamp: { min: 0.00001 }, prec: 9 });
   html += '</div>';
   var XC50 = kapacitorCalcXC(50, C);
+
+  // Null guard
+  if (kapacitorState.dielectric === null || kapacitorState.area === null || kapacitorState.dist === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">C</span><span class="value" style="font-weight:700">' + impedansFmtC(C) + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('X_C ved 50 Hz (link til impedans)', 'X_C at 50 Hz (link to impedance)') + '</span><span class="value">' + (isFinite(XC50) ? XC50.toExponential(3) + ' \u03A9' : '\u221E') + '</span></div></div>';
@@ -26866,6 +27510,14 @@ function renderKapacitorCharge() {
   html += '</div>';
   html += valStep(kapacitorState, 'U', 'kapacitor', { step: 1, fmt: function(p){ return p + ' V'; }, clamp: { min: 0 } });
   html += '</div>';
+
+  // Null guard
+  if (kapacitorState.C === null || kapacitorState.U === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">Q</span><span class="value" style="font-weight:700">' + kapacitorFmtQ(Q) + '</span></div>';
   html += '<div class="result-row"><span class="label">W</span><span class="value" style="font-weight:700">' + (W >= 1 ? W.toFixed(3) + ' J' : (W * 1000).toFixed(3) + ' mJ') + '</span></div></div>';
@@ -26896,6 +27548,14 @@ function renderKapacitorCombo() {
     html += valStep(kapacitorState, key, 'kapacitor', { step: 0.000000001, fmt: impedansFmtC, clamp: { min: 0 }, prec: 15 });
     html += '</div>';
   });
+
+  // Null guard
+  if (kapacitorState.c1 === null || kapacitorState.c2 === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">C_total</span><span class="value" style="font-weight:700">' + impedansFmtC(Cres) + '</span></div></div>';
   var subParts = arr.map(function(c) { return impedansFmtC(c); }).join(kapacitorState.combo === 'series' ? ' , ' : ' + ');
@@ -26937,6 +27597,14 @@ function renderKapacitorRC() {
   html += valStep(kapacitorState, 't', 'kapacitor', { step: 0.0001, fmt: function(v){ return v >= 1 ? v + ' s' : (v*1000).toFixed(2) + ' ms'; }, clamp: { min: 0 }, prec: 9 });
   html += '</div>';
   var nTau = (tau > 0) ? kapacitorState.t / tau : 0;
+
+  // Null guard
+  if (kapacitorState.R === null || kapacitorState.C === null || kapacitorState.t === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">\u03C4 (' + tx('tidskonstant', 'time constant') + ')</span><span class="value" style="font-weight:700">' + impedansFmtEng(tau, 's') + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('t/\u03C4', 't/\u03C4') + '</span><span class="value">' + nTau.toFixed(3) + '</span></div>';
@@ -26966,6 +27634,14 @@ function renderKapacitorCoulomb() {
   html += '</div>';
   html += valStep(kapacitorState, 'r', 'kapacitor', { step: 0.01, fmt: function(v){ return v + ' m'; }, clamp: { min: 0.001 } });
   html += '</div>';
+
+  // Null guard
+  if (kapacitorState.q1 === null || kapacitorState.q2 === null || kapacitorState.r === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">F</span><span class="value" style="font-weight:700">' + impedansFmtEng(F, 'N') + '</span></div></div>';
   html += calcDetail({ name: tx('Coulomb-kraft', 'Coulomb force'), formula: 'F = Q\u2081\u00B7Q\u2082/(4\u03C0\u03B5\u2080\u00B7r\u00B2)', variables: [{ name: 'Q\u2081', symbol: 'Q\u2081', value: kapacitorState.q1, unit: 'C' }, { name: 'Q\u2082', symbol: 'Q\u2082', value: kapacitorState.q2, unit: 'C' }, { name: 'r', symbol: 'r', value: kapacitorState.r, unit: 'm' }, { name: 'k', symbol: 'k', value: KAP_COULOMB_K, unit: 'N\u00B7m\u00B2/C\u00B2' }], substitution: kapacitorState.q1.toExponential(2) + ' \u00D7 ' + kapacitorState.q2.toExponential(2) + ' / (4\u03C0 \u00D7 ' + PHYS_CONST.EPS0.value + ' \u00D7 ' + kapacitorState.r + '\u00B2)', result: { value: F, unit: 'N' }, reference: 'Opgavesamling Kap. 4' });
@@ -26996,14 +27672,14 @@ var VARME_MATERIALS = {
 
 var varmeState = {
   calcType: 'uvalue', // uvalue | transmission | ventilation | total | energy
-  Ri: 0.13, Ru: 0.04,
-  l1mat: 'brick', l1d: 0.108,
-  l2mat: 'mineral_wool', l2d: 0.10,
-  l3mat: 'plaster', l3d: 0.013,
-  A: 20, Tin: 20, Tout: -12,
-  n: 0.5, V: 125,
+  Ri: null, Ru: null,
+  l1mat: null, l1d: null,
+  l2mat: null, l2d: null,
+  l3mat: null, l3d: null,
+  A: null, Tin: null, Tout: null,
+  n: null, V: null,
   // Heating-energy (Ch.13) state
-  substance: 'water', mass: 10, dTheat: 50, Pheat: 1000, theat: 100
+  substance: null, mass: null, dTheat: null, Pheat: null, theat: null
 };
 
 // Specific heat capacities c [J/(kg*K)] for the heating-energy cards.
@@ -27116,8 +27792,17 @@ function varmeUCalcDetail() {
 
 function renderVarmeUValue() {
   var html = '<div class="card fade-in"><div class="card-title">' + tx('U-v\u00E6rdi: U = 1/R_total', 'U-value: U = 1/R_total') + '</div>';
+
+  // Null guard
+  if (varmeState.Ri === null || varmeState.Ru === null || varmeState.l1mat === null || varmeState.l1d === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html = varmeRenderLayerSelectors(html);
   var u = varmeUCalcDetail();
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">R_total</span><span class="value">' + u.Rtot.toFixed(3) + ' m\u00B2K/W</span></div>';
   html += '<div class="result-row"><span class="label">U</span><span class="value" style="font-weight:700">' + u.U.toFixed(3) + ' W/m\u00B2K</span></div></div>';
@@ -27151,6 +27836,14 @@ function renderVarmeTransmission() {
   html += '</div>';
   html += valStep(varmeState, 'Tout', 'varme', { step: 1, fmt: function(v){ return v + '\u00B0C'; }, clamp: { min: null } });
   html += '</div>';
+
+  // Null guard
+  if (varmeState.A === null || varmeState.Tin === null || varmeState.Tout === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">\u0394T</span><span class="value">' + dT + ' K</span></div>';
   html += '<div class="result-row"><span class="label">Q</span><span class="value" style="font-weight:700">' + Q.toFixed(1) + ' W</span></div></div>';
@@ -27187,6 +27880,14 @@ function renderVarmeVentilation() {
   html += '</div>';
   html += valStep(varmeState, 'Tout', 'varme', { step: 1, fmt: function(v){ return v + '\u00B0C'; }, clamp: { min: null } });
   html += '</div>';
+
+  // Null guard
+  if (varmeState.n === null || varmeState.V === null || varmeState.Tin === null || varmeState.Tout === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">\u0394T</span><span class="value">' + dT + ' K</span></div>';
   html += '<div class="result-row"><span class="label">Q_vent</span><span class="value" style="font-weight:700">' + Qv.toFixed(1) + ' W</span></div></div>';
@@ -27228,6 +27929,14 @@ function renderVarmeTotal() {
   html += '</div>';
   html += valStep(varmeState, 'Tout', 'varme', { step: 1, fmt: function(v){ return v + '\u00B0C'; }, clamp: { min: null } });
   html += '</div>';
+
+  // Null guard
+  if (varmeState.A === null || varmeState.Tin === null || varmeState.Tout === null || varmeState.n === null || varmeState.V === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">Q_trans</span><span class="value">' + Qtrans.toFixed(1) + ' W</span></div>';
   html += '<div class="result-row"><span class="label">Q_vent</span><span class="value">' + Qvent.toFixed(1) + ' W</span></div>';
@@ -27271,6 +27980,14 @@ function renderVarmeEnergy() {
   html += '</div>';
   html += valStep(varmeState, 'Pheat', 'varme', { step: 100, fmt: function(v){ return v >= 1000 ? (v/1000) + ' kW' : v + ' W'; }, clamp: { min: 0 } });
   html += '</div>';
+
+  // Null guard
+  if (varmeState.substance === null || varmeState.mass === null || varmeState.dTheat === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">Q</span><span class="value" style="font-weight:700">' + (Q / 1000).toFixed(1) + ' kJ (' + Q.toFixed(0) + ' J)</span></div>';
   html += '<div class="result-row"><span class="label">t</span><span class="value">' + tHeat.toFixed(0) + ' s (' + (tHeat / 60).toFixed(1) + ' min)</span></div>';
@@ -27308,11 +28025,11 @@ var DCMASKINE_TYPES = {
 
 var dcmaskineState = {
   mode: 'generator', // generator | motor | torque | starter | efficiency
-  type: 'shunt',
-  U: 220, Ia: 40, Ra: 0.25, Ubrush: 2, Rf: 110,
-  Pmech: 5000, n: 1450,
-  E: 210,
-  Pout: 4500, Pin: 5200
+  type: null,
+  U: null, Ia: null, Ra: null, Ubrush: null, Rf: null,
+  Pmech: null, n: null,
+  E: null,
+  Pout: null, Pin: null
 };
 
 // --- Pure calculation functions (unit-testable, no DOM) ---
@@ -27405,6 +28122,14 @@ function renderDcmaskineGenerator() {
   var html = '<div class="card fade-in"><div class="card-title">' + tx('Generator: E = U + Ia\u00B7Ra + Ub', 'Generator: E = U + Ia\u00B7Ra + Ub') + '</div>';
   html = dcmaskineCommonSelectors(html, ['U', 'Ia', 'Ra', 'Ubrush']);
   if (dcmaskineState.type === 'shunt' || dcmaskineState.type === 'separate') html = dcmaskineCommonSelectors(html, ['Rf']);
+
+  // Null guard
+  if (dcmaskineState.type === null || dcmaskineState.U === null || dcmaskineState.Ia === null || dcmaskineState.Ra === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">E (' + tx('indre EMK', 'internal EMF') + ')</span><span class="value" style="font-weight:700">' + E.toFixed(2) + ' V</span></div>';
   if (If > 0) html += '<div class="result-row"><span class="label">If (' + tx('feltstr\u00F8m', 'field current') + ')</span><span class="value">' + If.toFixed(3) + ' A</span></div></div>';
@@ -27420,6 +28145,14 @@ function renderDcmaskineMotor() {
   var Pmech = E * dcmaskineState.Ia;
   var html = '<div class="card fade-in"><div class="card-title">' + tx('Motor: U = E + Ia\u00B7Ra + Ub', 'Motor: U = E + Ia\u00B7Ra + Ub') + '</div>';
   html = dcmaskineCommonSelectors(html, ['U', 'Ia', 'Ra', 'Ubrush']);
+
+  // Null guard
+  if (dcmaskineState.type === null || dcmaskineState.U === null || dcmaskineState.Ia === null || dcmaskineState.Ra === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">E (' + tx('modEMK', 'back-EMF') + ')</span><span class="value" style="font-weight:700">' + E.toFixed(2) + ' V</span></div>';
   html += '<div class="result-row"><span class="label">P_mek = E\u00B7Ia</span><span class="value">' + Pmech.toFixed(0) + ' W</span></div></div>';
@@ -27445,6 +28178,14 @@ function renderDcmaskineTorque() {
   html += '</div>';
   html += valStep(dcmaskineState, 'n', 'dcmaskine', { step: 10, fmt: function(v){ return v + ' o/min'; }, clamp: { min: 0 } });
   html += '</div>';
+
+  // Null guard
+  if (dcmaskineState.Pmech === null || dcmaskineState.n === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">M</span><span class="value" style="font-weight:700">' + M.toFixed(2) + ' Nm</span></div></div>';
   html += calcDetail({ name: tx('Aksiale moment', 'Shaft torque'), formula: 'M = 9.55\u00B7P/n', variables: [{ name: 'P', symbol: 'P', value: dcmaskineState.Pmech, unit: 'W', source: tx('Delt v\u00E6rdi', 'Shared value') }, { name: 'n', symbol: 'n', value: dcmaskineState.n, unit: 'o/min' }, { name: tx('Momentkonstant', 'Torque constant'), symbol: PHYS_CONST.TORQUE_K.symbol, value: PHYS_CONST.TORQUE_K.value, unit: PHYS_CONST.TORQUE_K.unit, source: PHYS_CONST.TORQUE_K.source }], substitution: PHYS_CONST.TORQUE_K.value + ' \u00D7 ' + dcmaskineState.Pmech + ' / ' + dcmaskineState.n, result: { value: M, unit: 'Nm' }, reference: 'Opgavesamling Kap. 10' });
@@ -27464,6 +28205,14 @@ function renderDcmaskineStarter() {
   html += '</div>';
   html += valStep(dcmaskineState, 'E', 'dcmaskine', { step: 1, fmt: function(v){ return v + ' V'; }, clamp: { min: 0 } });
   html += '</div>';
+
+  // Null guard
+  if (dcmaskineState.U === null || dcmaskineState.E === null || dcmaskineState.Ia === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">Rs</span><span class="value" style="font-weight:700">' + Rs.toFixed(3) + ' \u03A9</span></div></div>';
   html += calcDetail({ name: tx('Startmodstand', 'Starting resistor'), formula: 'Rs = (U \u2212 E)/Ia', variables: [{ name: 'U', symbol: 'U', value: dcmaskineState.U, unit: 'V' }, { name: 'E', symbol: 'E', value: E, unit: 'V' }, { name: 'Ia', symbol: 'Ia', value: dcmaskineState.Ia, unit: 'A' }], substitution: '(' + dcmaskineState.U + ' \u2212 ' + E + ') / ' + dcmaskineState.Ia, result: { value: Rs, unit: '\u03A9' }, reference: 'Opgavesamling Kap. 10' });
@@ -27487,6 +28236,14 @@ function renderDcmaskineEfficiency() {
   html += '</div>';
   html += valStep(dcmaskineState, 'Pin', 'dcmaskine', { step: 100, fmt: function(v){ return v >= 1000 ? (v/1000) + ' kW' : v + ' W'; }, clamp: { min: 0 } });
   html += '</div>';
+
+  // Null guard
+  if (dcmaskineState.Pout === null || dcmaskineState.Pin === null) {
+    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">\u03B7</span><span class="value" style="font-weight:700">' + (eta * 100).toFixed(2) + ' %</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Tab', 'Losses') + '</span><span class="value">' + losses.toFixed(0) + ' W</span></div></div>';

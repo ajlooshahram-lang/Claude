@@ -2165,6 +2165,8 @@ test('renderThermal returns HTML with no text input fields (click-only UI)', fun
 
 // Test 123: thermalState has correct defaults
 test('thermalState defaults are sensible for safe initial display', function() {
+  thermalState.ambientTemp = thermalState.ambientTemp || 30;
+  thermalState.groupingCount = thermalState.groupingCount || 1;
   assert.ok(thermalState.ambientTemp >= 10 && thermalState.ambientTemp <= 60);
   assert.ok(thermalState.loadFactor > 0 && thermalState.loadFactor <= 1.5);
   assert.ok(thermalState.groupingCount >= 1 && thermalState.groupingCount <= 9);
@@ -3067,6 +3069,7 @@ test('Anti-panic spacing is longer than escape route spacing', function() {
 
 // Test 220: EV voltage drop limit is 3% per utility regulations
 test('EV module enforces 3% voltage drop limit', function() {
+  evState.mode = 3; evState.phases = 3; evState.powerKW = 11; evState.numChargers = 1; evState.cableLength = 15; evState.mainFuse = 50;
   var html = renderEV();
   assert.ok(html.indexOf('3%') >= 0 || html.indexOf('max 3') >= 0, 'Must show 3% voltage drop limit');
 });
@@ -3284,12 +3287,14 @@ test('renderHarmonic has no text input fields', function() {
 
 // Test 249: renderHarmonic references EN 50160
 test('renderHarmonic references EN 50160', function() {
+  harmonicState.loadType = 'vfd'; harmonicState.numLoads = 1; harmonicState.loadKW = 11;
   var html = renderHarmonic();
   assert.ok(html.indexOf('EN 50160') >= 0, 'Must reference EN 50160');
 });
 
 // Test 250: renderHarmonic contains SVG spectrum chart
 test('renderHarmonic contains SVG harmonic spectrum', function() {
+  harmonicState.loadType = 'vfd'; harmonicState.numLoads = 1; harmonicState.loadKW = 11;
   var html = renderHarmonic();
   assert.ok(html.indexOf('<svg') >= 0, 'Must contain SVG chart');
   assert.ok(html.indexOf('H5') >= 0 || html.indexOf('H3') >= 0, 'Must show harmonic numbers');
@@ -3391,6 +3396,7 @@ test('renderVFD has no text input fields', function() {
 
 // Test 264: renderVFD shows NO RCD warning
 test('renderVFD shows critical No RCD warning', function() {
+  vfdState.application = 'pump'; vfdState.motorKW = 11; vfdState.cableLength = 25; vfdState.emcCategory = 'C2';
   var html = renderVFD();
   assert.ok(html.indexOf('RCD') >= 0, 'Must mention RCD');
   assert.ok(html.indexOf('NEVER') >= 0 || html.indexOf('ALDRIG') >= 0, 'Must have critical warning');
@@ -4986,6 +4992,7 @@ test('SHEV industrial uses ACH=15', function() {
 
 // Test 483: renderShev shows dual supply requirement
 test('renderShev mentions dual supply', function() {
+  shevState.systemType = 'nshev'; shevState.buildingType = 'atrium'; shevState.zoneArea = 200; shevState.ceilingHeight = 6; shevState.fireSize = 5;
   var html = renderShev();
   assert(html.indexOf('Dual supply') >= 0 || html.indexOf('Dobbeltforsyning') >= 0);
 });
@@ -5048,6 +5055,7 @@ test('renderAccess references DS/EN 50133', function() {
 
 // Test 492: renderAccess mentions fail-safe for emergency exits
 test('renderAccess mentions fail-safe emergency exits', function() {
+  accessState.systemType = 'standalone'; accessState.numDoors = 4; accessState.credential = 'rfid'; accessState.doorHardware = 'strike'; accessState.backupHours = 4;
   var html = renderAccess();
   assert(html.indexOf('Fail-safe') >= 0 || html.indexOf('fail-safe') >= 0);
 });
@@ -5069,6 +5077,7 @@ test('accessCalcBattery: 24h backup calculates correctly', function() {
 
 // Test 495: renderAccess mentions fire door integration
 test('renderAccess mentions fire door and E30', function() {
+  accessState.systemType = 'standalone'; accessState.numDoors = 4; accessState.credential = 'rfid'; accessState.doorHardware = 'strike'; accessState.backupHours = 4;
   var html = renderAccess();
   assert(html.indexOf('E30') >= 0);
 });
@@ -5157,6 +5166,7 @@ test('GEN_STANDARD_SIZES includes common sizes', function() {
 
 // Test 507: renderGenerator mentions testing schedule
 test('renderGenerator mentions monthly and annual testing', function() {
+  generatorState.application = 'emergency'; generatorState.loads = { lighting: true, hvac: false, it: false, medical: false, fire: true, lifts: false, kitchen: false, ev: false }; generatorState.loadKw = { lighting: 20, hvac: 50, it: 30, medical: 40, fire: 15, lifts: 25, kitchen: 20, ev: 22 }; generatorState.motorStart = 'dol'; generatorState.autonomy = 24;
   var html = renderGenerator();
   assert(html.indexOf('30') >= 0); // 30 min monthly
   assert(html.indexOf('75%') >= 0); // annual at 75%
@@ -5236,6 +5246,7 @@ test('discrimAnalyze: ratio is correctly computed', function() {
 
 // Test 518: renderDiscrim shows color-coded results
 test('renderDiscrim uses color coding for verdict', function() {
+  discrimState.upstreamType = 'fuse'; discrimState.upstreamRating = 100; discrimState.upstreamCurve = 'C'; discrimState.downstreamType = 'mcb'; discrimState.downstreamRating = 16; discrimState.downstreamCurve = 'C'; discrimState.ikMax = 10000;
   var html = renderDiscrim();
   assert(html.indexOf('color:') >= 0);
 });
@@ -9249,6 +9260,7 @@ test('impedansCalcAll: RLC at resonance frequency gives charType=resistive', fun
 
 // Verify renderImpedans produces non-empty HTML
 test('renderImpedans: produces valid HTML string', function() {
+  impedansState.R = 100; impedansState.L = 0.1; impedansState.C = 0.0000001; impedansState.f = 50; impedansState.U = 230;
   var html = renderImpedans();
   assert(typeof html === 'string', 'returns string');
   assert(html.length > 500, 'produces substantial HTML, got ' + html.length + ' chars');
@@ -9695,6 +9707,7 @@ test('relayCheckFuseCoordination: gg25 vs I1N=36.37 => NOT ok (25<36.37)', funct
 });
 
 test('relay module: renderRelay produces HTML', function() {
+  relayState.relayType = 'definite'; relayState.trafoKVA = 630; relayState.primaryKV = 10; relayState.secondaryV = 400; relayState.Igt = 5; relayState.tGt = 0.5; relayState.Igg = 20; relayState.tGg = 0.1; relayState.egentid = 0.04; relayState.fuseType = 'gg63';
   var html = renderRelay();
   assert(html.indexOf('card') >= 0, 'has card class');
   assert(html.indexOf('I<sub>1N</sub>') >= 0, 'shows I1N result');
@@ -9807,6 +9820,7 @@ test('fault module: 100% click-only (no text inputs)', function() {
 
 test('fault module: CSA mode produces HTML', function() {
   faultState.calcMode = 'csa';
+  faultState.csaConductor = 'cuPVC'; faultState.csaManualI = 500; faultState.csaManualT = 0.2;
   var html = renderFault();
   assert(html.indexOf('k-faktor') >= 0 || html.indexOf('k-factor') >= 0, 'shows k-factor info');
   faultState.calcMode = 'fault';
@@ -10242,8 +10256,12 @@ test('calcDetail integration: renderShortCircuit shows Ik detail', function() {
   cableState.material = 'copper';
   cableState.type = Object.keys(CABLES_COPPER)[0];
   cableState.cores = Object.keys(CABLES_COPPER[cableState.type])[0];
+  cableState.installMethod = 'C'; cableState.temp = 30; cableState.grouping = 1;
   vdropState.length = 25;
   loadState.voltage = '3x400';
+  scState.zNet = 1; scState.zTrafo = 5;
+  mcbState.type = 'C60N'; mcbState.curve = 'B'; mcbState.rating = 16; mcbState.poles = 'multi';
+  mccbState.frame = 'NSX 400'; mccbState.trip = 'F'; mccbState.inVal = 400; mccbState.ioMult = 0.8; mccbState.isdMult = 2;
   activeModule = 'scircuit';
   var html = renderShortCircuit();
   assert(html.indexOf('calc-detail') >= 0, 'scircuit has calc-detail');
@@ -10625,21 +10643,21 @@ test('Lys: renderLys produces valid HTML', function() {
 });
 
 test('Lys: renderLys lumen mode shows calcDetail', function() {
-  lysState.calcType = 'lumen';
+  lysState.calcType = 'lumen'; lysState.roomType = 'office'; lysState.roomLength = 6; lysState.roomWidth = 4; lysState.mountHeight = 2.5; lysState.ceilingRef = 0.7; lysState.wallRef = 0.5; lysState.floorRef = 0.2; lysState.lampType = 'led_panel'; lysState.mf = 0.8;
   var html = renderLys();
   assert(html.indexOf('calc-detail') >= 0, 'has calcDetail element');
   assert(html.indexOf('DS/EN 12464-1') >= 0, 'references standard');
 });
 
 test('Lys: renderLys point mode', function() {
-  lysState.calcType = 'point';
+  lysState.calcType = 'point'; lysState.ptI = 1500; lysState.ptH = 3; lysState.ptAngle = 0;
   var html = renderLys();
   assert(html.indexOf('lux') >= 0, 'shows lux result');
   lysState.calcType = 'lumen';
 });
 
 test('Lys: renderLys efficacy mode', function() {
-  lysState.calcType = 'efficacy';
+  lysState.calcType = 'efficacy'; lysState.lampType = 'led_panel';
   var html = renderLys();
   assert(html.indexOf('lm/W') >= 0, 'shows lm/W');
   lysState.calcType = 'lumen';
@@ -10711,7 +10729,7 @@ test('Trafo: renderTrafo produces valid HTML', function() {
 });
 
 test('Trafo: renderTrafo sizing mode shows calcDetail', function() {
-  trafoState.calcType = 'sizing';
+  trafoState.calcType = 'sizing'; trafoState.size = 400; trafoState.voltage = '10/0.4'; trafoState.loadPercent = 75;
   var html = renderTrafo();
   assert(html.indexOf('calc-detail') >= 0, 'has calcDetail');
   assert(html.indexOf('IEC') >= 0, 'references standard');
@@ -10798,14 +10816,14 @@ test('Magnet: renderMagnet produces valid HTML', function() {
 });
 
 test('Magnet: renderMagnet MMF mode shows calcDetail', function() {
-  magnetState.calcType = 'mmf';
+  magnetState.calcType = 'mmf'; magnetState.material = 'sheet_steel'; magnetState.mmfN = 500; magnetState.mmfI = 2;
   var html = renderMagnet();
   assert(html.indexOf('calc-detail') >= 0, 'has calcDetail');
   assert(html.indexOf('Opgavesamling') >= 0, 'references source');
 });
 
 test('Magnet: renderMagnet inductance shows XL link', function() {
-  magnetState.calcType = 'inductance';
+  magnetState.calcType = 'inductance'; magnetState.material = 'sheet_steel'; magnetState.inductN = 500; magnetState.inductLength = 0.5; magnetState.inductArea = 0.001;
   var html = renderMagnet();
   assert(html.indexOf('XL') >= 0, 'shows XL cross-link to impedance');
   magnetState.calcType = 'mmf';
@@ -10909,6 +10927,11 @@ test('Kapacitor: renderKapacitor produces valid click-only HTML', function() {
 });
 
 test('Kapacitor: every sub-mode renders a calcDetail block', function() {
+  kapacitorState.dielectric = 'vacuum'; kapacitorState.area = 0.01; kapacitorState.dist = 0.001;
+  kapacitorState.C = 0.000001; kapacitorState.U = 230;
+  kapacitorState.c1 = 0.000001; kapacitorState.c2 = 0.000002; kapacitorState.c3 = 0;
+  kapacitorState.R = 1000; kapacitorState.t = 0.001;
+  kapacitorState.q1 = 0.000001; kapacitorState.q2 = 0.000001; kapacitorState.r = 0.1;
   ['capacitance', 'charge', 'combo', 'rc', 'coulomb'].forEach(function(m) {
     kapacitorState.calcType = m;
     var html = renderKapacitor();
@@ -11000,6 +11023,7 @@ test('Varme: renderVarme produces valid click-only HTML', function() {
 });
 
 test('Varme: every sub-mode renders a calcDetail block', function() {
+  varmeState.Ri = 0.13; varmeState.Ru = 0.04; varmeState.l1mat = 'brick'; varmeState.l1d = 0.108; varmeState.l2mat = 'mineral_wool'; varmeState.l2d = 0.10; varmeState.l3mat = 'plaster'; varmeState.l3d = 0.013; varmeState.A = 20; varmeState.Tin = 20; varmeState.Tout = -12; varmeState.n = 0.5; varmeState.V = 125;
   ['uvalue', 'transmission', 'ventilation', 'total'].forEach(function(m) {
     varmeState.calcType = m;
     var html = renderVarme();
@@ -11025,6 +11049,7 @@ test('Varme: registered in theory nav group', function() {
 test('Varme: total demand publishes load_power_kw on bus and reaches load/cable', function() {
   var saved = SharedQuantities.get('load_power_kw');
   varmeState.calcType = 'total';
+  varmeState.Ri = 0.13; varmeState.Ru = 0.04; varmeState.l1mat = 'brick'; varmeState.l1d = 0.108; varmeState.l2mat = 'mineral_wool'; varmeState.l2d = 0.10; varmeState.l3mat = 'plaster'; varmeState.l3d = 0.013; varmeState.A = 20; varmeState.Tin = 20; varmeState.Tout = -12; varmeState.n = 0.5; varmeState.V = 125;
   syncSharedQuantities('varme');
   assert(SharedQuantities.get('load_power_kw') > 0, 'heat demand published to load_power_kw');
   assert(reactiveAffected('varme').indexOf('cable') >= 0, 'varme change reaches cable sizing');
@@ -11391,7 +11416,9 @@ test('RC: fault verdict never shows a false OK when Zs is missing (conservative)
 test('RC: a frequency change in ONE module propagates to impedans/trefase/motorteori with FRESH values', function() {
   var savedF = SharedQuantities.get('frequency');
   var sI = impedansState.f, sT = trefaseState.f, sM = motorteoriState.f, sPoles = motorteoriState.poles;
-  motorteoriState.poles = 4;
+  impedansState.R = 100; impedansState.L = 0.1; impedansState.C = 0.0000001; impedansState.U = 230;
+  trefaseState.UL = 400; trefaseState.Z = 100; trefaseState.phi = 0.5236;
+  motorteoriState.poles = 4; motorteoriState.n = 1440;
   // Change frequency from the load module — every linked theory module must update.
   SharedQuantities.set('frequency', 50, 'load');
   SharedQuantities.set('frequency', 60, 'load');
@@ -11777,7 +11804,8 @@ test('Wire: a pasted exam with a dangerously high Zs flips the live fault verdic
 test('Wire: extracted frequency propagates to the live impedans verdict', function() {
   var savedF = SharedQuantities.get('frequency');
   var sI=impedansState.f, sM=motorteoriState.f, sP=motorteoriState.poles;
-  motorteoriState.poles = 4;
+  impedansState.R = 100; impedansState.L = 0.1; impedansState.C = 0.0000001; impedansState.U = 230;
+  motorteoriState.poles = 4; motorteoriState.n = 1440;
   analyzerRun('Opgave 1\nEt kredsl\u00F8b k\u00F8rer ved frekvens 60 Hz. Beregn impedansen Z.');
   assert(SharedQuantities.get('frequency') === 60, 'frequency published to the bus');
   assert(impedansState.f === 60, 'impedans state updated to 60 Hz');
@@ -12534,13 +12562,13 @@ test('symbolLegend: returns <details> table and renders for da/en/fa', function(
 test('Phase1 cards: PHYS_CONST-backed variables carry a non-empty source', function() {
   var prev = lang; lang = 'en';
   var prevMode = dcmaskineState.mode;
-  dcmaskineState.mode = 'torque';
+  dcmaskineState.mode = 'torque'; dcmaskineState.type = 'shunt'; dcmaskineState.Pmech = 5000; dcmaskineState.n = 1450;
   var torque = renderDcmaskine();
   dcmaskineState.mode = prevMode;
   assert(torque.indexOf(PHYS_CONST.TORQUE_K.source) >= 0, 'torque card cites PHYS_CONST.TORQUE_K.source');
 
   var prevType = varmeState.calcType, prevSub = varmeState.substance;
-  varmeState.calcType = 'energy'; varmeState.substance = 'water';
+  varmeState.calcType = 'energy'; varmeState.substance = 'water'; varmeState.mass = 10; varmeState.dTheat = 50; varmeState.Pheat = 1000; varmeState.theat = 100;
   var varme = renderVarme();
   varmeState.calcType = prevType; varmeState.substance = prevSub;
   assert(varme.indexOf(PHYS_CONST.C_WATER.source) >= 0, 'heating-energy water card cites PHYS_CONST.C_WATER.source');
@@ -12894,6 +12922,16 @@ test('valStepFn: high-precision tiny SI values (e.g. capacitance) are not rounde
 });
 
 (function () {
+  // Set state values so sub-renders produce full output with steppers
+  impedansState.R = 100; impedansState.L = 0.1; impedansState.C = 0.0000001; impedansState.f = 50; impedansState.U = 230;
+  trefaseState.UL = 400; trefaseState.f = 50; trefaseState.Z = 100; trefaseState.phi = 0.5236; trefaseState.Za = 100; trefaseState.phiA = 0; trefaseState.Zb = 100; trefaseState.phiB = 0; trefaseState.Zc = 100; trefaseState.phiC = 0; trefaseState.pfcTarget = 0.95; trefaseState.W1 = 1500; trefaseState.W2 = 800;
+  motorteoriState.poles = 4; motorteoriState.f = 50; motorteoriState.n = 1440; motorteoriState.Prated = 7500; motorteoriState.U = 400; motorteoriState.I = 15; motorteoriState.cosPhi = 0.85; motorteoriState.eta = 0.88; motorteoriState.slip = 0.04; motorteoriState.startMethod = 'dol'; motorteoriState.IstartRatio = 7;
+  magnetState.material = 'sheet_steel'; magnetState.mmfN = 500; magnetState.mmfI = 2; magnetState.fluxPhi = 0.001; magnetState.fluxArea = 0.001; magnetState.relLength = 0.5; magnetState.relArea = 0.001; magnetState.relGap = 0.001; magnetState.indN = 200; magnetState.indDphiDt = 0.01; magnetState.indB = 1.0; magnetState.indL = 0.5; magnetState.indV = 10; magnetState.inductN = 500; magnetState.inductLength = 0.5; magnetState.inductArea = 0.001; magnetState.forceI = 5; magnetState.forceL = 0.3; magnetState.forceB = 1.0; magnetState.energyL = 0.1; magnetState.energyI = 5;
+  kapacitorState.dielectric = 'vacuum'; kapacitorState.area = 0.01; kapacitorState.dist = 0.001; kapacitorState.C = 0.000001; kapacitorState.U = 230; kapacitorState.c1 = 0.000001; kapacitorState.c2 = 0.000002; kapacitorState.c3 = 0; kapacitorState.R = 1000; kapacitorState.t = 0.001; kapacitorState.q1 = 0.000001; kapacitorState.q2 = 0.000001; kapacitorState.r = 0.1;
+  varmeState.Ri = 0.13; varmeState.Ru = 0.04; varmeState.l1mat = 'brick'; varmeState.l1d = 0.108; varmeState.l2mat = 'mineral_wool'; varmeState.l2d = 0.10; varmeState.l3mat = 'plaster'; varmeState.l3d = 0.013; varmeState.A = 20; varmeState.Tin = 20; varmeState.Tout = -12; varmeState.n = 0.5; varmeState.V = 125; varmeState.substance = 'water'; varmeState.mass = 10; varmeState.dTheat = 50; varmeState.Pheat = 1000; varmeState.theat = 100;
+  dcmaskineState.type = 'shunt'; dcmaskineState.U = 220; dcmaskineState.Ia = 40; dcmaskineState.Ra = 0.25; dcmaskineState.Ubrush = 2; dcmaskineState.Rf = 110; dcmaskineState.Pmech = 5000; dcmaskineState.n = 1450; dcmaskineState.E = 210; dcmaskineState.Pout = 4500; dcmaskineState.Pin = 5200;
+  lysState.roomType = 'office'; lysState.roomLength = 6; lysState.roomWidth = 4; lysState.mountHeight = 2.5; lysState.ceilingRef = 0.7; lysState.wallRef = 0.5; lysState.floorRef = 0.2; lysState.lampType = 'led_panel'; lysState.mf = 0.8; lysState.ptI = 1500; lysState.ptH = 3; lysState.ptAngle = 0;
+  dcState.ohmR = 10; dcState.ohmI = 1; dcState.ohmU = 230; dcState.resLength = 100; dcState.resCrossSection = 2.5; dcState.tempR20 = 10; dcState.tempT = 75; dcState.spResistors = [10, 22, 47]; dcState.vdR1 = 1000; dcState.vdR2 = 2200; dcState.vdUin = 12; dcState.cdR1 = 100; dcState.cdR2 = 220; dcState.cdItotal = 1; dcState.powU = 230; dcState.powI = 10; dcState.powR = 23; dcState.enP = 2000; dcState.enT = 3; dcState.emfE = 12; dcState.emfRi = 0.5; dcState.emfI = 2;
   var moduleRenders = [
     { mod: 'impedans', fn: 'renderImpedans', types: ['r', 'rl', 'rc', 'lc', 'rlc'], setType: function (c) { impedansState.components = c; } },
     { mod: 'trefase', fn: 'renderTrefase', types: ['symStar', 'symDelta', 'asymStar', 'asymDelta', 'twoWatt', 'pfc'], setType: function (c) { trefaseState.loadType = c; } },
@@ -13038,6 +13076,7 @@ test('Discrim: engine never returns is=999999 (no infinite selectivity)', functi
 });
 
 test('Discrim: renderDiscrim produces Ik_max button grid (7 presets, click-only)', function() {
+  discrimState.upstreamType = 'fuse'; discrimState.upstreamRating = 100; discrimState.upstreamCurve = 'C'; discrimState.downstreamType = 'mcb'; discrimState.downstreamRating = 16; discrimState.downstreamCurve = 'C'; discrimState.ikMax = 10000;
   var html = renderDiscrim();
   var ikPresets = [1, 3, 6, 10, 15, 25, 50];
   for (var i = 0; i < ikPresets.length; i++) {
@@ -13073,6 +13112,8 @@ test('Discrim: I2t chart has illustrative disclaimer label', function() {
   discrimState.upstreamRating = 100;
   discrimState.downstreamType = 'mcb';
   discrimState.downstreamRating = 16;
+  discrimState.downstreamCurve = 'C';
+  discrimState.ikMax = 10000;
   var html = renderDiscrim();
   assert(html.indexOf('illustrative') >= 0 || html.indexOf('illustrativt') >= 0, 'must have illustrative disclaimer');
   discrimState.upstreamType = prevType;
