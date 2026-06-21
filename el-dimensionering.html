@@ -14588,6 +14588,8 @@ function renderNoed() {
     html += '<div class="result-row"><span class="label">' + tx('Dokumentation', 'Documentation') + '</span><span class="value">' + tx('Logbog paakraevet per DS/EN 50172 cl.6', 'Logbook required per DS/EN 50172 cl.6') + '</span></div>';
     html += '</div>';
 
+    html += renderNoedSim(noedState.systemType, calc.luminaireCount, calc.battery ? calc.battery.ah : 0, noedState.duration);
+
     // Verdict
     var safe = calc.required && calc.luminaireCount > 0;
     html += renderVerdict(safe, safe ? tx('Design opfylder DS/EN 1838 + DS/EN 50172', 'Design complies with DS/EN 1838 + DS/EN 50172') : tx('Utilstraekkeligt design', 'Insufficient design'));
@@ -15827,6 +15829,8 @@ function renderHeatPump() {
   html += '<div class="result-row"><span class="label">' + tx('SPD Type 2 (cl.534)', 'SPD Type 2 (cl.534)') + '</span><span class="value">\u2705 ' + tx('Anbefalet for udendoers installation', 'Recommended for outdoor installation') + '</span></div>';
   html += '</div>';
 
+  html += renderHeatPumpSim(heatpumpState.heatingKW, heatpumpState.cop, calc.electricalKW, calc.flc, calc.phase);
+
   // Verdict
   var allOk = calc.vdrop.ok;
   html += renderVerdict(allOk, allOk ? tx('Varmepumpeinstallation opfylder DS/HD 60364', 'Heat pump installation complies with DS/HD 60364') : tx('Spaendingsfald for hoejt - vaelg stoerre kabel eller kortere laengde', 'Voltage drop too high - select larger cable or shorter length'));
@@ -16615,6 +16619,8 @@ function renderFireAlarm() {
   html += '<div class="result-row"><span class="label">' + tx('Batterikapacitet', 'Battery Capacity') + '</span><span class="value">' + battery.batteryAh + ' Ah / ' + battery.voltage + 'V DC</span></div>';
   html += '</div>';
 
+  html += renderFireAlarmSim(calc.count, loop.loops, firealarmState.category, loop.cableType);
+
   // Compliance verdict
   var compliant = calc.heightOk;
   html += renderVerdict(compliant, compliant ? tx('Brandalarm opfylder DS/EN 54 + DBI retningslinje 232', 'Fire alarm complies with DS/EN 54 + DBI guideline 232') : tx('Lofthoejde overstiger detektorens maks - vaelg anden type', 'Ceiling height exceeds detector max - select different type'));
@@ -16930,6 +16936,8 @@ function renderData() {
   html += '<div class="result-row"><span class="label">' + tx('Test', 'Testing') + '</span><span class="value">' + tx('Alle links testes med feltester iht. ISO 11801 permanent link', 'All links tested with field tester per ISO 11801 permanent link') + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Maerkning', 'Labeling') + '</span><span class="value">' + tx('Iht. TIA-606 / ISO 14763-1', 'Per TIA-606 / ISO 14763-1') + '</span></div>';
   html += '</div>';
+
+  html += renderDataSim(outlets.outlets, dataState.distance, dataState.cableCategory, poe.totalW || 0);
 
   // Verdict
   var allOk = distCheck.ok && (!fiberBudget || fiberBudget.distanceOk);
@@ -18330,6 +18338,8 @@ function renderShev() {
   html += '<div class="result-row"><span class="label">' + tx('BR18 krav', 'BR18 Requirement') + '</span><span class="value">' + (mandatory ? tx('PÅKRÆVET (areal ≥ tærskel)', 'MANDATORY (area >= threshold)') : tx('Ikke påkrævet af BR18', 'Not required by BR18')) + '</span></div>';
   html += '</div>';
 
+  html += renderShevSim(shevState.systemType, mshevFlow, ductDiam, shevState.zoneArea);
+
   // Compliance verdict
   var safe = true;
   var verdictText = '';
@@ -18450,6 +18460,8 @@ function renderAccess() {
   html += '<div class="result-row"><span class="label">' + tx('Nødudgang (DS/EN 179/1125)', 'Emergency Exit (DS/EN 179/1125)') + '</span><span class="value">' + tx('Fail-safe - låser op ved strømsvigt/brand', 'Fail-safe - unlocks on power fail/fire') + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Standard', 'Standard') + '</span><span class="value">DS/EN 50133 + DS/EN 50486</span></div>';
   html += '</div>';
+
+  html += renderAccessSim(accessState.numDoors, totalMa, psu, accessState.systemType);
 
   // Verdict
   var safe = psu <= 20 && battery <= 200;
@@ -20225,6 +20237,7 @@ function renderMetering() {
   html += '<div class="result-box"><div class="result-title">' + tx('Installationskrav', 'Installation Requirements') + '</div>';
   installReqs.forEach(function(r) { html += '<div class="result-row"><span class="label">' + r.req + '</span><span class="value">' + r.clause + '</span></div>'; });
   html += '</div>';
+  html += renderMeteringSim(meteringState.meterType, meteringState.ctRatio, meteringState.numMeters, meteringState.communication);
   var safe = true;
   html += renderVerdict(safe, tx('Maalerinstallation specificeret iht. DS/EN 50470 + MID 2014/32/EU', 'Metering installation specified per DS/EN 50470 + MID 2014/32/EU'));
   html += '</div>';
@@ -20513,6 +20526,7 @@ function renderSmartGrid() {
   html += '<div class="result-box"><div class="result-title">' + tx('Kommunikation', 'Communication') + '</div>';
   comms.forEach(function(c) { html += '<div class="result-row"><span class="label">' + c.protocol + '</span><span class="value">' + tx(c.da, c.en) + '</span></div>'; });
   html += '</div>';
+  html += renderSmartGridSim(flex.totalKW, flex.totalDailyKWh, smartgridState.assets.length, savings.totalSavings);
   var safe = true;
   html += renderVerdict(safe, tx('Fleksibilitetssystem konfigureret iht. DS/EN 50549 + Energinet krav', 'Flexibility system configured per DS/EN 50549 + Energinet requirements'));
   html += '</div>';
@@ -27523,6 +27537,302 @@ function renderDiscrimSim(upType, upRating, downType, downRating, coordinated, i
   return svg;
 }
 
+// ===== HEAT PUMP SIMULATOR =====
+function renderHeatPumpSim(heatingKW, cop, electricalKW, flc, phase) {
+  if (!heatingKW || !cop) return '';
+  var svg = '<svg viewBox="0 0 300 130" width="300" height="130" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+  var dur = simFlowDuration(flc || 10, 50);
+  // Evaporator (cold side - left)
+  svg += '<rect x="20" y="40" width="50" height="50" rx="5" fill="#1565c0" stroke="#0d47a1" stroke-width="1.5"/>';
+  svg += '<text x="45" y="60" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">EVAP</text>';
+  svg += '<text x="45" y="75" text-anchor="middle" class="sim-label" fill="#bbdefb" font-size="5">' + tx('Kold', 'Cold') + '</text>';
+  // Compressor (center)
+  svg += '<circle cx="150" cy="65" r="22" fill="#424242" stroke="var(--text)" stroke-width="1.5"/>';
+  svg += '<circle cx="150" cy="65" r="14" fill="none" stroke="#ff9800" stroke-width="2" class="sim-rotor" style="animation-duration:' + (dur || 2) + 's"/>';
+  svg += '<text x="150" y="69" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">COMP</text>';
+  // Condenser (hot side - right)
+  var heatColor = simHeatColor(heatingKW * 1000, 25000);
+  svg += '<rect x="230" y="40" width="50" height="50" rx="5" fill="' + heatColor + '" stroke="#b71c1c" stroke-width="1.5"/>';
+  svg += '<text x="255" y="60" text-anchor="middle" class="sim-label" fill="#fff" font-size="6">COND</text>';
+  svg += '<text x="255" y="75" text-anchor="middle" class="sim-label" fill="#ffcdd2" font-size="5">' + tx('Varm', 'Hot') + '</text>';
+  // Refrigerant loop (top path - high pressure)
+  svg += '<path d="M70,50 Q110,20 150,20 Q190,20 230,50" fill="none" stroke="#f44336" stroke-width="2" class="sim-wire" style="animation-duration:' + (dur || 2) + 's"/>';
+  // Refrigerant loop (bottom path - low pressure)
+  svg += '<path d="M230,80 Q190,110 150,110 Q110,110 70,80" fill="none" stroke="#2196f3" stroke-width="2" class="sim-wire" style="animation-duration:' + (dur || 2) + 's"/>';
+  // COP value
+  svg += '<text x="150" y="15" text-anchor="middle" class="sim-label sim-value" font-size="9">COP=' + cop + ' | ' + heatingKW + 'kW\u2192' + (electricalKW || (heatingKW / cop).toFixed(1)) + 'kW</text>';
+  // Phase and current info
+  svg += '<text x="150" y="125" text-anchor="middle" class="sim-label sim-value" font-size="7">' + (phase || 1) + '\u03C6 | FLC=' + (flc || '-') + 'A</text>';
+  svg += '</svg>';
+  return svg;
+}
+// ===== EMERGENCY LIGHTING SIMULATOR =====
+function renderNoedSim(systemType, numLuminaires, batteryCapacity, duration) {
+  if (!numLuminaires || numLuminaires <= 0) return '';
+  var svg = '<svg viewBox="0 0 300 120" width="300" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+  // Central unit / battery (left side)
+  svg += '<rect x="15" y="35" width="40" height="50" rx="4" fill="#1b5e20" stroke="#2e7d32" stroke-width="1.5"/>';
+  svg += '<text x="35" y="55" text-anchor="middle" class="sim-label" fill="#fff" font-size="5">' + (systemType === 'central' ? 'CENTRAL' : systemType === 'hybrid' ? 'HYBRID' : 'SELF') + '</text>';
+  svg += '<text x="35" y="68" text-anchor="middle" class="sim-label" fill="#a5d6a7" font-size="5">' + (batteryCapacity || 0) + 'Ah</text>';
+  svg += '<text x="35" y="80" text-anchor="middle" class="sim-label" fill="#a5d6a7" font-size="4">' + (duration || 1) + 'h</text>';
+  // Bus wiring
+  svg += '<line x1="55" y1="60" x2="280" y2="60" stroke="#4caf50" stroke-width="2" class="sim-wire" style="animation-duration:2s"/>';
+  // Luminaires along escape route
+  var lumCount = Math.min(numLuminaires, 6);
+  var spacing = 220 / (lumCount + 1);
+  for (var i = 0; i < lumCount; i++) {
+    var lx = 60 + (i + 1) * spacing;
+    // Drop line from bus
+    svg += '<line x1="' + lx + '" y1="60" x2="' + lx + '" y2="40" stroke="#4caf50" stroke-width="1"/>';
+    // Luminaire symbol (circle with rays)
+    svg += '<circle cx="' + lx + '" cy="35" r="7" fill="#ffeb3b" stroke="#f57f17" stroke-width="1" class="sim-pulse" style="animation-duration:' + (1.5 + i * 0.2).toFixed(1) + 's"/>';
+    svg += '<line x1="' + lx + '" y1="26" x2="' + lx + '" y2="22" stroke="#f57f17" stroke-width="0.7"/>';
+    svg += '<line x1="' + (lx - 4) + '" y1="28" x2="' + (lx - 6) + '" y2="25" stroke="#f57f17" stroke-width="0.7"/>';
+    svg += '<line x1="' + (lx + 4) + '" y1="28" x2="' + (lx + 6) + '" y2="25" stroke="#f57f17" stroke-width="0.7"/>';
+  }
+  // Escape route floor
+  svg += '<rect x="55" y="90" width="230" height="8" rx="2" fill="#e8f5e9" stroke="#a5d6a7" stroke-width="0.5"/>';
+  svg += '<text x="170" y="96" text-anchor="middle" class="sim-label" font-size="4" fill="#2e7d32">' + tx('Flugtvej', 'Escape Route') + '</text>';
+  // Arrow along route
+  svg += '<path d="M70,94 L270,94" fill="none" stroke="#2e7d32" stroke-width="1" stroke-dasharray="4,3" class="sim-wire" style="animation-duration:3s"/>';
+  // Title
+  svg += '<text x="150" y="115" text-anchor="middle" class="sim-label sim-value" font-size="7">' + numLuminaires + ' ' + tx('armaturer', 'luminaires') + ' | ' + (systemType || '').toUpperCase() + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+// ===== FIRE ALARM SIMULATOR =====
+function renderFireAlarmSim(detectorCount, loops, category, cableType) {
+  if (!detectorCount || detectorCount <= 0) return '';
+  var svg = '<svg viewBox="0 0 300 120" width="300" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+  // Fire alarm panel (left)
+  svg += '<rect x="15" y="30" width="45" height="60" rx="4" fill="#b71c1c" stroke="#d32f2f" stroke-width="1.5"/>';
+  svg += '<text x="37" y="50" text-anchor="middle" class="sim-label" fill="#fff" font-size="5">PANEL</text>';
+  svg += '<text x="37" y="62" text-anchor="middle" class="sim-label" fill="#ffcdd2" font-size="5">CAT ' + (category || 1) + '</text>';
+  svg += '<rect x="25" y="70" width="25" height="10" rx="2" fill="#212121" stroke="#616161" stroke-width="0.5"/>';
+  svg += '<circle cx="32" cy="75" r="2" fill="#4caf50" class="sim-glow" style="animation-duration:1s"/>';
+  svg += '<circle cx="42" cy="75" r="2" fill="#f44336" class="sim-pulse" style="animation-duration:2s"/>';
+  // Loop wiring
+  var loopCount = Math.min(loops || 1, 3);
+  for (var lp = 0; lp < loopCount; lp++) {
+    var loopY = 40 + lp * 20;
+    var detectorsOnLoop = Math.min(Math.ceil(detectorCount / loopCount), 5);
+    // Outgoing wire
+    svg += '<line x1="60" y1="' + loopY + '" x2="280" y2="' + loopY + '" stroke="#f44336" stroke-width="1.5" class="sim-wire" style="animation-duration:' + (1.5 + lp * 0.3).toFixed(1) + 's"/>';
+    // Return wire
+    svg += '<line x1="280" y1="' + loopY + '" x2="280" y2="' + (loopY + 10) + '" stroke="#ff9800" stroke-width="1"/>';
+    svg += '<line x1="280" y1="' + (loopY + 10) + '" x2="60" y2="' + (loopY + 10) + '" stroke="#ff9800" stroke-width="1" stroke-dasharray="3,2"/>';
+    // Detectors on loop
+    var dSpacing = 200 / (detectorsOnLoop + 1);
+    for (var d = 0; d < detectorsOnLoop; d++) {
+      var dx = 80 + d * dSpacing;
+      svg += '<circle cx="' + dx + '" cy="' + loopY + '" r="5" fill="#fff" stroke="#f44336" stroke-width="1.2" class="sim-pulse" style="animation-duration:' + (2 + d * 0.4).toFixed(1) + 's"/>';
+      svg += '<circle cx="' + dx + '" cy="' + loopY + '" r="2" fill="#f44336"/>';
+    }
+  }
+  // Cable type label
+  svg += '<text x="150" y="110" text-anchor="middle" class="sim-label sim-value" font-size="7">' + detectorCount + ' ' + tx('detektorer', 'detectors') + ' | ' + (loops || 1) + ' loop' + ((loops || 1) > 1 ? 's' : '') + ' | ' + (cableType || 'fire-rated') + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+// ===== SMOKE VENTILATION SIMULATOR =====
+function renderShevSim(systemType, flowRate, ductDiam, zoneArea) {
+  if (!zoneArea || zoneArea <= 0) return '';
+  var svg = '<svg viewBox="0 0 300 130" width="300" height="130" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+  // Building cross-section
+  svg += '<rect x="40" y="30" width="220" height="80" rx="2" fill="none" stroke="var(--text)" stroke-width="1.5"/>';
+  // Floor
+  svg += '<line x1="40" y1="110" x2="260" y2="110" stroke="var(--text)" stroke-width="2"/>';
+  // Smoke layer (top portion)
+  svg += '<rect x="42" y="32" width="216" height="30" rx="1" fill="#757575" opacity="0.4" class="sim-wave" style="animation-duration:3s"/>';
+  svg += '<rect x="42" y="38" width="216" height="20" rx="1" fill="#9e9e9e" opacity="0.3" class="sim-wave" style="animation-duration:4s"/>';
+  if (systemType === 'mshev') {
+    // Mechanical fan on roof
+    svg += '<rect x="130" y="15" width="40" height="18" rx="3" fill="#1565c0" stroke="var(--text)" stroke-width="1"/>';
+    svg += '<circle cx="150" cy="24" r="6" fill="none" stroke="#fff" stroke-width="1.5" class="sim-rotor" style="animation-duration:0.8s"/>';
+    svg += '<text x="150" y="12" text-anchor="middle" class="sim-label" font-size="5" fill="#1565c0">MSHEV</text>';
+    // Duct from building to fan
+    svg += '<rect x="145" y="30" width="10" height="5" fill="#90a4ae"/>';
+    // Exhaust arrows (upward)
+    svg += '<line x1="145" y1="20" x2="135" y2="8" stroke="#f44336" stroke-width="1.5" marker-end=""/>';
+    svg += '<line x1="155" y1="20" x2="165" y2="8" stroke="#f44336" stroke-width="1.5"/>';
+    svg += '<text x="150" y="7" text-anchor="middle" class="sim-label" font-size="4" fill="#f44336">' + (flowRate || 0) + ' m\u00B3/h</text>';
+  } else {
+    // NSHEV - natural openings on roof
+    svg += '<rect x="100" y="28" width="30" height="6" rx="1" fill="#4caf50" stroke="var(--text)" stroke-width="0.5"/>';
+    svg += '<rect x="170" y="28" width="30" height="6" rx="1" fill="#4caf50" stroke="var(--text)" stroke-width="0.5"/>';
+    svg += '<text x="150" y="25" text-anchor="middle" class="sim-label" font-size="5" fill="#4caf50">NSHEV</text>';
+    // Upward arrows from openings
+    svg += '<line x1="115" y1="28" x2="115" y2="18" stroke="#f44336" stroke-width="1" class="sim-wave" style="animation-duration:2s"/>';
+    svg += '<line x1="185" y1="28" x2="185" y2="18" stroke="#f44336" stroke-width="1" class="sim-wave" style="animation-duration:2.5s"/>';
+  }
+  // Makeup air inlet (bottom)
+  svg += '<rect x="40" y="85" width="12" height="20" rx="1" fill="#81c784" stroke="var(--text)" stroke-width="0.5"/>';
+  svg += '<text x="30" y="97" text-anchor="middle" class="sim-label" font-size="4" fill="#4caf50">' + tx('Luft', 'Air') + '</text>';
+  // Airflow arrows inside
+  svg += '<path d="M55,95 L80,80 L110,70" fill="none" stroke="#2196f3" stroke-width="1" stroke-dasharray="3,2" class="sim-wire" style="animation-duration:2s"/>';
+  // Title and specs
+  svg += '<text x="150" y="125" text-anchor="middle" class="sim-label sim-value" font-size="7">' + (systemType || '').toUpperCase() + ' | ' + (zoneArea || 0) + 'm\u00B2 | \u00D8' + (ductDiam || 0) + 'mm</text>';
+  svg += '</svg>';
+  return svg;
+}
+// ===== ACCESS CONTROL SIMULATOR =====
+function renderAccessSim(numDoors, totalMa, psu, systemType) {
+  if (!numDoors || numDoors <= 0) return '';
+  var svg = '<svg viewBox="0 0 300 120" width="300" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+  // Controller (center)
+  svg += '<rect x="120" y="35" width="60" height="40" rx="4" fill="#1565c0" stroke="#0d47a1" stroke-width="1.5"/>';
+  svg += '<text x="150" y="52" text-anchor="middle" class="sim-label" fill="#fff" font-size="5">' + (systemType || '').toUpperCase() + '</text>';
+  svg += '<text x="150" y="65" text-anchor="middle" class="sim-label" fill="#bbdefb" font-size="5">PSU ' + (psu || 0) + 'A</text>';
+  // Status LED
+  svg += '<circle cx="170" cy="40" r="2" fill="#4caf50" class="sim-glow" style="animation-duration:1s"/>';
+  // Door nodes
+  var doorCount = Math.min(numDoors, 6);
+  var topDoors = Math.ceil(doorCount / 2);
+  var botDoors = doorCount - topDoors;
+  // Top row of doors
+  var topSpacing = 240 / (topDoors + 1);
+  for (var i = 0; i < topDoors; i++) {
+    var dx = 30 + (i + 1) * topSpacing;
+    // RS-485/IP line
+    svg += '<line x1="150" y1="35" x2="' + dx + '" y2="15" stroke="#ff9800" stroke-width="1" class="sim-pulse" style="animation-duration:' + (1.5 + i * 0.3).toFixed(1) + 's"/>';
+    // Door icon
+    svg += '<rect x="' + (dx - 8) + '" y="5" width="16" height="12" rx="2" fill="#fff" stroke="var(--text)" stroke-width="1"/>';
+    svg += '<circle cx="' + (dx + 5) + '" cy="11" r="1.5" fill="#ff9800"/>';
+  }
+  // Bottom row of doors
+  if (botDoors > 0) {
+    var botSpacing = 240 / (botDoors + 1);
+    for (var j = 0; j < botDoors; j++) {
+      var bx = 30 + (j + 1) * botSpacing;
+      svg += '<line x1="150" y1="75" x2="' + bx + '" y2="95" stroke="#ff9800" stroke-width="1" class="sim-pulse" style="animation-duration:' + (1.8 + j * 0.3).toFixed(1) + 's"/>';
+      svg += '<rect x="' + (bx - 8) + '" y="93" width="16" height="12" rx="2" fill="#fff" stroke="var(--text)" stroke-width="1"/>';
+      svg += '<circle cx="' + (bx + 5) + '" cy="99" r="1.5" fill="#ff9800"/>';
+    }
+  }
+  // Title
+  svg += '<text x="150" y="115" text-anchor="middle" class="sim-label sim-value" font-size="7">' + numDoors + ' ' + tx('doere', 'doors') + ' | ' + (totalMa || 0) + 'mA | ' + (systemType || '') + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+// ===== STRUCTURED CABLING SIMULATOR =====
+function renderDataSim(outlets, distance, category, poeWatts) {
+  if (!outlets || outlets <= 0) return '';
+  var svg = '<svg viewBox="0 0 300 120" width="300" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+  // Rack/switch (left side)
+  svg += '<rect x="15" y="25" width="45" height="70" rx="3" fill="#212121" stroke="#424242" stroke-width="1.5"/>';
+  svg += '<rect x="20" y="30" width="35" height="12" rx="1" fill="#1565c0"/>';
+  svg += '<text x="37" y="39" text-anchor="middle" class="sim-label" fill="#fff" font-size="4">SWITCH</text>';
+  svg += '<rect x="20" y="45" width="35" height="12" rx="1" fill="#4527a0"/>';
+  svg += '<text x="37" y="54" text-anchor="middle" class="sim-label" fill="#fff" font-size="4">PATCH</text>';
+  // Status LEDs on switch
+  for (var led = 0; led < 4; led++) {
+    svg += '<circle cx="' + (24 + led * 8) + '" cy="62" r="1.5" fill="#4caf50" class="sim-glow" style="animation-duration:' + (0.8 + led * 0.2).toFixed(1) + 's"/>';
+  }
+  // Horizontal cabling to outlets
+  var outletCount = Math.min(outlets, 5);
+  var outletSpacing = 80 / (outletCount + 1);
+  for (var i = 0; i < outletCount; i++) {
+    var oy = 30 + (i + 1) * outletSpacing;
+    // Cable run
+    svg += '<line x1="60" y1="' + oy + '" x2="230" y2="' + oy + '" stroke="#1565c0" stroke-width="1.5" class="sim-wire" style="animation-duration:' + (1.5 + i * 0.3).toFixed(1) + 's"/>';
+    // Outlet (RJ45 symbol)
+    svg += '<rect x="230" y="' + (oy - 5) + '" width="14" height="10" rx="1" fill="#fff" stroke="var(--text)" stroke-width="0.8"/>';
+    svg += '<rect x="232" y="' + (oy - 3) + '" width="10" height="6" rx="0.5" fill="#e0e0e0" stroke="#9e9e9e" stroke-width="0.3"/>';
+  }
+  // Distance indicator
+  svg += '<line x1="70" y1="100" x2="220" y2="100" stroke="var(--text)" stroke-width="0.5"/>';
+  svg += '<line x1="70" y1="97" x2="70" y2="103" stroke="var(--text)" stroke-width="0.5"/>';
+  svg += '<line x1="220" y1="97" x2="220" y2="103" stroke="var(--text)" stroke-width="0.5"/>';
+  svg += '<text x="145" y="98" text-anchor="middle" class="sim-label" font-size="5">' + (distance || 0) + 'm</text>';
+  // PoE indicator (if applicable)
+  if (poeWatts > 0) {
+    svg += '<text x="265" y="55" text-anchor="middle" class="sim-label" font-size="5" fill="#ff9800">PoE</text>';
+    svg += '<text x="265" y="65" text-anchor="middle" class="sim-label" font-size="5" fill="#ff9800">' + poeWatts + 'W</text>';
+  }
+  // Title
+  svg += '<text x="150" y="115" text-anchor="middle" class="sim-label sim-value" font-size="7">' + outlets + ' ' + tx('udtag', 'outlets') + ' | ' + (category || '').toUpperCase() + ' | ' + (distance || 0) + 'm</text>';
+  svg += '</svg>';
+  return svg;
+}
+// ===== SMART GRID SIMULATOR =====
+function renderSmartGridSim(totalKW, flexKWh, assets, savings) {
+  if (!totalKW || totalKW <= 0) return '';
+  var svg = '<svg viewBox="0 0 300 120" width="300" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+  // Grid (left)
+  svg += '<rect x="15" y="35" width="40" height="50" rx="3" fill="#1565c0" stroke="#0d47a1" stroke-width="1.5"/>';
+  svg += '<text x="35" y="55" text-anchor="middle" class="sim-label" fill="#fff" font-size="5">GRID</text>';
+  svg += '<text x="35" y="68" text-anchor="middle" class="sim-label" fill="#bbdefb" font-size="4">Energinet</text>';
+  // Bidirectional arrows (grid to meter)
+  svg += '<line x1="55" y1="55" x2="100" y2="55" stroke="#4caf50" stroke-width="2" class="sim-wire" style="animation-duration:1.5s"/>';
+  svg += '<line x1="55" y1="65" x2="100" y2="65" stroke="#f44336" stroke-width="2" class="sim-wire" style="animation-duration:2s"/>';
+  // Smart meter (center)
+  svg += '<rect x="100" y="40" width="40" height="40" rx="3" fill="#424242" stroke="var(--text)" stroke-width="1"/>';
+  svg += '<rect x="105" y="45" width="30" height="15" rx="1" fill="#000" stroke="#616161" stroke-width="0.5"/>';
+  svg += '<text x="120" y="55" text-anchor="middle" class="sim-label" fill="#4caf50" font-size="5">' + totalKW + 'kW</text>';
+  svg += '<text x="120" y="73" text-anchor="middle" class="sim-label" fill="#fff" font-size="4">METER</text>';
+  svg += '<circle cx="130" cy="73" r="2" fill="#4caf50" class="sim-pulse" style="animation-duration:1s"/>';
+  // Bidirectional arrows (meter to house)
+  svg += '<line x1="140" y1="55" x2="185" y2="55" stroke="#ff9800" stroke-width="2" class="sim-wire" style="animation-duration:1.8s"/>';
+  svg += '<line x1="140" y1="65" x2="185" y2="65" stroke="#2196f3" stroke-width="2" class="sim-wire" style="animation-duration:2.2s"/>';
+  // House with flex assets (right)
+  svg += '<path d="M185,60 L215,30 L245,60 Z" fill="none" stroke="var(--text)" stroke-width="1.5"/>';
+  svg += '<rect x="195" y="60" width="40" height="30" rx="1" fill="none" stroke="var(--text)" stroke-width="1.5"/>';
+  // Flex asset icons inside house
+  svg += '<text x="215" y="50" text-anchor="middle" class="sim-label" font-size="5" fill="#ff9800">' + (assets || 0) + ' ' + tx('aktiver', 'assets') + '</text>';
+  svg += '<text x="215" y="80" text-anchor="middle" class="sim-label" font-size="5" fill="#4caf50">' + (flexKWh || 0) + ' kWh/d</text>';
+  // Savings indicator
+  var savingsColor = savings > 0 ? '#22c55e' : '#9e9e9e';
+  svg += '<text x="260" y="55" class="sim-label sim-value" font-size="6" fill="' + savingsColor + '">' + (savings || 0) + '</text>';
+  svg += '<text x="260" y="65" class="sim-label" font-size="5" fill="' + savingsColor + '">DKK/yr</text>';
+  // Title
+  svg += '<text x="150" y="115" text-anchor="middle" class="sim-label sim-value" font-size="7">Smart Grid | ' + totalKW + 'kW flex | ' + (flexKWh || 0) + 'kWh/d</text>';
+  svg += '</svg>';
+  return svg;
+}
+// ===== METERING SIMULATOR =====
+function renderMeteringSim(meterType, ctRatio, numMeters, communication) {
+  if (!numMeters || numMeters <= 0) return '';
+  var svg = '<svg viewBox="0 0 300 120" width="300" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+  // Conductor (main bus bar)
+  svg += '<line x1="20" y1="60" x2="280" y2="60" stroke="#f44336" stroke-width="4"/>';
+  svg += '<text x="20" y="53" class="sim-label" font-size="5" fill="#f44336">L1</text>';
+  // Current flow animation on conductor
+  svg += '<line x1="20" y1="60" x2="280" y2="60" stroke="#ff9800" stroke-width="2" class="sim-wire" style="animation-duration:1.5s"/>';
+  // CT donut(s) around conductor
+  var meterCount = Math.min(numMeters, 4);
+  var meterSpacing = 220 / (meterCount + 1);
+  for (var i = 0; i < meterCount; i++) {
+    var mx = 50 + (i + 1) * meterSpacing;
+    // CT donut
+    svg += '<ellipse cx="' + mx + '" cy="60" rx="12" ry="15" fill="none" stroke="#1565c0" stroke-width="2.5"/>';
+    svg += '<ellipse cx="' + mx + '" cy="60" rx="8" ry="10" fill="var(--border-light)" stroke="#1565c0" stroke-width="1"/>';
+    if (meterType === 'ct') {
+      svg += '<text x="' + mx + '" y="42" text-anchor="middle" class="sim-label" font-size="4" fill="#1565c0">CT ' + (ctRatio || '100/5') + '</text>';
+    }
+    // Meter box below CT
+    svg += '<line x1="' + mx + '" y1="75" x2="' + mx + '" y2="85" stroke="#616161" stroke-width="1"/>';
+    svg += '<rect x="' + (mx - 12) + '" y="85" width="24" height="18" rx="2" fill="#424242" stroke="var(--text)" stroke-width="1"/>';
+    svg += '<rect x="' + (mx - 9) + '" y="88" width="18" height="8" rx="1" fill="#000"/>';
+    svg += '<text x="' + mx + '" y="94" text-anchor="middle" class="sim-label" fill="#4caf50" font-size="4">kWh</text>';
+    // Communication indicator
+    svg += '<circle cx="' + (mx + 8) + '" cy="100" r="1.5" fill="#ff9800" class="sim-pulse" style="animation-duration:' + (1 + i * 0.3).toFixed(1) + 's"/>';
+  }
+  // Communication bus
+  svg += '<line x1="50" y1="108" x2="250" y2="108" stroke="#ff9800" stroke-width="1" stroke-dasharray="3,2" class="sim-pulse" style="animation-duration:2s"/>';
+  svg += '<text x="150" y="106" text-anchor="middle" class="sim-label" font-size="4" fill="#ff9800">' + (communication || 'M-Bus') + '</text>';
+  // Title
+  svg += '<text x="150" y="20" text-anchor="middle" class="sim-label sim-value" font-size="7">' + (meterType || 'direct').toUpperCase() + ' | ' + numMeters + ' ' + tx('maalere', 'meters') + ' | ' + (communication || 'M-Bus') + '</text>';
+  svg += '</svg>';
+  return svg;
+}
 function renderDCOhm() {
   var html = '<div class="card fade-in"><div class="card-title">' + tx('Ohms lov: U = R \u00D7 I', 'Ohm\'s Law: U = R \u00D7 I') + '</div>';
   // Known values selector
