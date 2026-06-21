@@ -5630,9 +5630,9 @@ test('Agri: fire hazard buildings require fire-resistant cables', function() {
 });
 
 // =====================================================
-// === ARC FLASH MODULE TESTS (13+) ===
+// === ARC FLASH MODULE TESTS (IEEE 1584-2018 + Ralph Lee) ===
 // =====================================================
-console.log('\n--- Arc Flash Module (IEC 62271-200 / IEEE 1584) ---');
+console.log('\n--- Arc Flash Module (IEEE 1584-2018 + Ralph Lee) ---');
 
 test('ArcFlash: module translations exist', function() {
   assert(T.da.modules.arcflash, 'Danish arcflash missing');
@@ -5640,45 +5640,54 @@ test('ArcFlash: module translations exist', function() {
   assert(T.fa.modules.arcflash, 'Farsi arcflash missing');
 });
 
-test('ArcFlash: low energy (400V, 1kA, 0.01s) gives Category 0', function() {
-  var E = arcflashCalcIncidentEnergy(400, 1, 0.01, 455);
-  var ppe = arcflashGetPPECategory(E);
-  assert.strictEqual(ppe.category, 0);
-  assert(E < 1.2, 'Energy should be < 1.2 for Cat 0');
+// --- Annex-D anchors (authoritative correctness proof) ---
+test('ArcFlash: Annex D I_arc_600 (4.16 kV VCB) = 11.117 kA', function() {
+  var v = arcflashIarcIntermediate('VCB', 0.6, 15, 104);
+  assert(Math.abs(v - 11.117) <= 0.002 * 11.117, 'got ' + v);
 });
 
-test('ArcFlash: uses ceiling rounding (conservative)', function() {
-  var E = arcflashCalcIncidentEnergy(400, 10, 0.1, 455);
-  // Check it is a multiple of 0.1 (ceiling to 1 decimal)
-  assert.strictEqual(E, Math.ceil(E * 10) / 10);
+test('ArcFlash: Annex D interpolated I_arc (4.16 kV) = 12.979 kA', function() {
+  var a = arcflashIarcIntermediate('VCB', 0.6, 15, 104);
+  var b = arcflashIarcIntermediate('VCB', 2.7, 15, 104);
+  var c = arcflashIarcIntermediate('VCB', 14.3, 15, 104);
+  var v = arcflashInterp(4.16, a, b, c);
+  assert(Math.abs(v - 12.979) <= 0.002 * 12.979, 'got ' + v);
 });
 
-test('ArcFlash: higher voltage uses Cf=1.5 factor', function() {
-  var E_lv = arcflashCalcIncidentEnergy(400, 10, 0.1, 455);
-  var E_mv = arcflashCalcIncidentEnergy(6000, 10, 0.1, 455);
-  assert(E_mv > E_lv, 'MV should have higher energy than LV');
-  // MV uses Cf=1.5 vs LV Cf=1.0, so ratio ~ 1.5
-  assert(E_mv / E_lv >= 1.4, 'MV/LV ratio should be ~1.5');
+test('ArcFlash: Annex D CF (box 1143x762x508, VCB) = 1.284', function() {
+  var v = arcflashCF('VCB', 4.16, 1143, 762, 508).CF;
+  assert(Math.abs(v - 1.284) <= 0.005 * 1.284, 'got ' + v);
 });
 
-test('ArcFlash: energy increases with fault current', function() {
-  var E1 = arcflashCalcIncidentEnergy(400, 5, 0.1, 455);
-  var E2 = arcflashCalcIncidentEnergy(400, 20, 0.1, 455);
-  assert(E2 > E1, 'Higher fault current = more energy');
+test('ArcFlash: Annex D incident energy = 12.152 J/cm2', function() {
+  var r = arcflashComputeIEEE('VCB', 4.16, 15, 104, 914.4, 197, { h: 1143, w: 762, d: 508 }, false);
+  var ej = r.E_full_cal * 4.184;
+  assert(Math.abs(ej - 12.152) <= 0.005 * 12.152, 'got ' + ej);
 });
 
-test('ArcFlash: energy increases with clearing time', function() {
-  var E1 = arcflashCalcIncidentEnergy(400, 10, 0.05, 455);
-  var E2 = arcflashCalcIncidentEnergy(400, 10, 0.5, 455);
-  assert(E2 > E1, 'Longer clearing = more energy');
+test('ArcFlash: Annex D arc-flash boundary = 1606 mm', function() {
+  var r = arcflashComputeIEEE('VCB', 4.16, 15, 104, 914.4, 197, { h: 1143, w: 762, d: 508 }, false);
+  assert(Math.abs(r.AFB_mm - 1606) <= 0.01 * 1606, 'got ' + r.AFB_mm);
 });
 
-test('ArcFlash: closer working distance = more energy', function() {
-  var E1 = arcflashCalcIncidentEnergy(400, 10, 0.1, 610);
-  var E2 = arcflashCalcIncidentEnergy(400, 10, 0.1, 300);
-  assert(E2 > E1, 'Closer distance = more energy');
+// --- Ralph Lee closed-form (hand arithmetic) ---
+test('ArcFlash: Lee default 0.40 kV/10 kA/0.1 s/455 mm = 0.989 cal/cm2', function() {
+  var v = arcflashLeeE(0.40, 10, 0.1, 455).Ecal;
+  assert(Math.abs(v - 0.989) <= 0.005 * 0.989, 'got ' + v);
 });
 
+test('ArcFlash: Lee out-of-range 20 kV = 122.46 cal/cm2 (PROHIBITED)', function() {
+  var v = arcflashLeeE(20, 20, 0.5, 914.4).Ecal;
+  assert(Math.abs(v - 122.46) <= 0.005 * 122.46, 'got ' + v);
+  assert.strictEqual(arcflashGetPPECategory(v).category, -1);
+});
+
+test('ArcFlash: Lee boundary 0.69 kV/25 kA/0.2 s = 1213.2 mm', function() {
+  var v = arcflashLeeAFB(0.69, 25, 0.2);
+  assert(Math.abs(v - 1213.2) <= 0.005 * 1213.2, 'got ' + v);
+});
+
+// --- PPE thresholds (bands unchanged) ---
 test('ArcFlash: PPE categories correct thresholds', function() {
   assert.strictEqual(arcflashGetPPECategory(0.5).category, 0);
   assert.strictEqual(arcflashGetPPECategory(1.2).category, 1);
@@ -5692,18 +5701,72 @@ test('ArcFlash: PPE categories correct thresholds', function() {
   assert.strictEqual(arcflashGetPPECategory(40.0).category, -1);
 });
 
-test('ArcFlash: boundary calculation returns positive mm value', function() {
-  var b = arcflashCalcBoundary(400, 10, 0.1);
-  assert(b > 0, 'Boundary must be positive');
-  assert(b === Math.ceil(b), 'Boundary must use ceiling');
+// --- New-API monotonicity guards (worst-of incident energy) ---
+test('ArcFlash: energy increases with fault current', function() {
+  var E1 = arcflashCalcIncidentEnergy(400, 5, 0.1, 455);
+  var E2 = arcflashCalcIncidentEnergy(400, 20, 0.1, 455);
+  assert(E2 > E1, 'higher fault current = more energy (' + E1 + ' -> ' + E2 + ')');
 });
 
-test('ArcFlash: boundary increases with fault current', function() {
-  var b1 = arcflashCalcBoundary(400, 5, 0.1);
-  var b2 = arcflashCalcBoundary(400, 20, 0.1);
-  assert(b2 > b1, 'Higher current = larger boundary');
+test('ArcFlash: energy increases with clearing time', function() {
+  var E1 = arcflashCalcIncidentEnergy(400, 10, 0.05, 455);
+  var E2 = arcflashCalcIncidentEnergy(400, 10, 0.5, 455);
+  assert(E2 > E1, 'longer clearing = more energy (' + E1 + ' -> ' + E2 + ')');
 });
 
+test('ArcFlash: closer working distance = more energy', function() {
+  var E1 = arcflashCalcIncidentEnergy(400, 10, 0.1, 610);
+  var E2 = arcflashCalcIncidentEnergy(400, 10, 0.1, 455);
+  assert(E2 > E1, 'closer distance = more energy (' + E1 + ' -> ' + E2 + ')');
+});
+
+test('ArcFlash: reduced scenario <= full at equal clearing time', function() {
+  var r = arcflashIncident({ voltage: 480, faultCurrent: 45, clearingTime: 0.2, workingDistance: 609.6, electrodeConfig: 'VCB', gap: 32, enclosure: 'LV Switchgear' });
+  assert(r.E_ieee_reduced <= r.E_ieee_full + 1e-9, 'reduced ' + r.E_ieee_reduced + ' must be <= full ' + r.E_ieee_full);
+});
+
+// --- Conservatism (worst-of) invariant across an in-range sweep ---
+test('ArcFlash: reported energy >= every component (worst-of invariant)', function() {
+  var sweep = [
+    [400, 10, 0.1, 455, 'VCB', 25, 'LV Panelboard'],
+    [480, 45, 0.2, 609.6, 'VCB', 32, 'LV Switchgear'],
+    [690, 20, 0.3, 610, 'VCBB', 32, 'LV Switchgear'],
+    [6000, 15, 0.2, 914, 'HCB', 104, '5kV Switchgear']
+  ];
+  sweep.forEach(function(p) {
+    var r = arcflashIncident({ voltage: p[0], faultCurrent: p[1], clearingTime: p[2], workingDistance: p[3], electrodeConfig: p[4], gap: p[5], enclosure: p[6] });
+    [r.E_ieee_full, r.E_ieee_reduced, r.E_lee].forEach(function(c) {
+      if (c != null && isFinite(c)) assert(r.E_worst >= c - 1e-9, p.join('/') + ': worst ' + r.E_worst + ' < component ' + c);
+    });
+  });
+});
+
+// --- Out-of-range -> Lee fallback ---
+test('ArcFlash: Voc=20 kV is out of IEEE range and falls back to Lee', function() {
+  var r = arcflashIncident({ voltage: 20000, faultCurrent: 20, clearingTime: 0.5, workingDistance: 914, electrodeConfig: 'VCB', gap: 152, enclosure: '15kV Switchgear' });
+  assert.strictEqual(r.inRange, false, 'must be flagged out of range');
+  assert(r.E_ieee_full == null, 'IEEE must not be evaluated out of range');
+  assert(r.method === 'lee', 'method must be Lee, got ' + r.method);
+  assert(r.notes.some(function(n) { return n.key === 'oor'; }), 'must carry out-of-range note');
+});
+
+// --- Unresolved (never a falsely-safe number) ---
+test('ArcFlash: invalid input renders Unresolved, never green', function() {
+  // D=0 makes Lee divide-by-zero and IEEE out of range -> no candidate.
+  var r = arcflashIncident({ voltage: 400, faultCurrent: 10, clearingTime: 0.1, workingDistance: 0, electrodeConfig: 'VCB', gap: 25, enclosure: 'LV Panelboard' });
+  assert.strictEqual(r.method, 'unresolved');
+  assert.strictEqual(r.E_worst, null);
+});
+
+// --- > 40 cal/cm2 -> WORK PROHIBITED ---
+test('ArcFlash: > 40 cal/cm2 gives WORK PROHIBITED', function() {
+  var E = arcflashCalcIncidentEnergy(400, 65, 2.0, 455);
+  var ppe = arcflashGetPPECategory(E);
+  assert.strictEqual(ppe.category, -1);
+  assert(ppe.en.indexOf('PROHIBITED') >= 0);
+});
+
+// --- Risk-reduction list (unchanged) ---
 test('ArcFlash: risk reductions include de-energize and ZSI', function() {
   var r = arcflashGetRiskReductions();
   assert(r.length >= 5);
@@ -5711,20 +5774,32 @@ test('ArcFlash: risk reductions include de-energize and ZSI', function() {
   assert(r.some(function(x) { return x.en.indexOf('ZSI') >= 0 || x.en.indexOf('Zone') >= 0; }));
 });
 
-test('ArcFlash: > 40 cal/cm2 gives WORK PROHIBITED', function() {
-  // 400V, 65kA, 2.0s, 300mm = very high energy
-  var E = arcflashCalcIncidentEnergy(400, 65, 2.0, 300);
-  var ppe = arcflashGetPPECategory(E);
-  assert.strictEqual(ppe.category, -1);
-  assert(ppe.en.indexOf('PROHIBITED') >= 0);
+// --- Boundary positivity ---
+test('ArcFlash: boundary calculation returns positive mm value', function() {
+  var b = arcflashCalcBoundary(400, 10, 0.1, 455);
+  assert(b > 0, 'Boundary must be positive, got ' + b);
+  assert(b === Math.ceil(b), 'Boundary must use ceiling');
 });
 
-test('ArcFlash: renderArcFlash returns valid HTML', function() {
+// --- Honest citation: cite IEEE 1584-2018, never IEC 62271 ---
+test('ArcFlash: renderArcFlash returns valid HTML citing IEEE 1584-2018 (not IEC 62271)', function() {
   var html = renderArcFlash();
   assert(html.length > 500);
   assert(html.indexOf('sel-btn') > 0);
   assert(html.indexOf('type="text"') < 0);
-  assert(html.indexOf('IEC 62271') > 0 || html.indexOf('IEEE 1584') > 0);
+  assert(html.indexOf('IEEE 1584-2018') > 0, 'must cite IEEE 1584-2018');
+  assert(html.indexOf('IEC 62271') < 0, 'must NOT cite IEC 62271');
+});
+
+// --- Trilingual: new English strings have non-empty _FA entries ---
+test('ArcFlash: new English strings have Persian (_FA) translations', function() {
+  ['Arc Flash Risk Assessment (IEEE 1584-2018 / Lee)', 'Electrode configuration', 'Conductor gap',
+   'Enclosure / equipment class', 'Open air (no box)', 'Arcing current (full)', 'Arcing current (reduced)',
+   'Method', 'IEEE 1584-2018 empirical model', 'Ralph Lee method (open-air, conservative)',
+   'Outside IEEE 1584-2018 validity range \u2014 using Lee', 'Lee cross-check governs (conservative)',
+   'Worst-case energy (100 % / reduced)', 'Unresolved \u2014 check inputs', 'Arc flash boundary'].forEach(function(en) {
+    assert(typeof _FA[en] === 'string' && _FA[en].length > 0, 'missing/empty _FA for: ' + en);
+  });
 });
 
 // =====================================================
@@ -5864,7 +5939,7 @@ test('All new modules cite relevant standards', function() {
   assert(renderPool().indexOf('60364-7-702') > 0, 'Pool must cite 60364-7-702');
   assert(renderConstruction().indexOf('60364-7-704') > 0, 'Construction must cite 60364-7-704');
   assert(renderAgri().indexOf('60364-7-705') > 0, 'Agri must cite 60364-7-705');
-  assert(renderArcFlash().indexOf('62271') > 0 || renderArcFlash().indexOf('1584') > 0, 'Arc must cite IEC 62271 or IEEE 1584');
+  assert(renderArcFlash().indexOf('1584') > 0 && renderArcFlash().indexOf('IEC 62271') < 0, 'Arc must cite IEEE 1584-2018, not IEC 62271');
   assert(renderCableLife().indexOf('60502') > 0 || renderCableLife().indexOf('Arrhenius') > 0, 'CableLife must cite IEC 60502');
 });
 
@@ -13095,6 +13170,186 @@ test('Discrim: MCB-MCB with explicit upCurve=C uses that curve', function() {
   assert.strictEqual(result.is, 3000, 'Is should be 3000 for 63_16_C_B entry');
   assert.strictEqual(result.verdict, 'partial', 'Is=3000 < ikMax=6000 -> partial');
 });
+
+// ============================================================================
+// GOLDEN-MASTER VALIDATION SUITE TESTS (additive, verify module)
+// ============================================================================
+
+// Independent re-derivation of every golden expected value (NOT reusing the
+// engine), keyed by case id. Each test asserts (1) the live engine result is ok
+// and (2) the stored expected matches this independent derivation within tol.
+const GM_REDERIVE = {
+  // A. Zs ceilings: Cmin*U0/Ia (TN), 50000/Idn (TT), Cmin*U/(2*Ia) (IT)
+  'zsmax-tn-b16': 0.95 * 230 / (5 * 16),
+  'zsmax-tn-c16': 0.95 * 230 / (10 * 16),
+  'zsmax-tn-b40': 0.95 * 230 / (5 * 40),
+  'zsmax-tt-30': 50000 / 30,
+  'zsmax-tt-300': 50000 / 300,
+  'zsmax-it-b16': 0.95 * 400 / (2 * 5 * 16),
+  // B. Conductor-temperature multiplier 1 + alpha*(theta-20)
+  'rmult-cu-90': 1 + 0.00393 * (90 - 20),
+  'rmult-cu-70': 1 + 0.00393 * (70 - 20),
+  'rmult-al-90': 1 + 0.00403 * (90 - 20),
+  'rmult-base-20': 1 + 0.00393 * (20 - 20),
+  // C. Derating
+  'ca-40': 0.87, 'ca-50': 0.71, 'cg-2': 0.80, 'cg-6': 0.57, 'effiz-derate': 94 * 0.87 * 0.80,
+  // D. PE table 54.7
+  'pe-10': 10, 'pe-16': 16, 'pe-25': 16, 'pe-35': 16, 'pe-50': 50 / 2, 'pe-95': 95 / 2, 'pe-240': 240 / 2,
+  // E. Transformer FLC = kVA*1000/(sqrt(3)*400)
+  'flc-50': 50 * 1000 / (Math.sqrt(3) * 400),
+  'flc-400': 400 * 1000 / (Math.sqrt(3) * 400),
+  'flc-630': 630 * 1000 / (Math.sqrt(3) * 400),
+  'flc-2500': 2500 * 1000 / (Math.sqrt(3) * 400),
+  // F. Iz tables
+  'iz-cu-pvc-16': 73, 'iz-cu-xlpe-16': 94, 'iz-cu-xlpe-240': 500, 'iz-al-pvc-25': 73, 'iz-al-xlpe-16': 73,
+  // G. Device anchors
+  'mcb-b-isd': 4.8 * 16, 'mcb-c-isd': 10 * 16, 'ia-b16': 5 * 16, 'ia-b40': 5 * 40,
+  'gg-5s-16': 72, 'gg-5s-160': 750, 'zsmax-table-b16': 2.88,
+  // H. c-factors & engine Ik
+  'c-cmax': 1.05, 'c-cmin': 0.95,
+  'trafo-zs-400-4': (4 / 100) * 400 * 400 / (400 * 1000),
+  'trafo-ik3max-400-4': 1.05 * 400 / (Math.sqrt(3) * ((4 / 100) * 400 * 400 / (400 * 1000))) / 1000,
+  // I. RCD / insulation
+  'rcd-ac-idn': 300, 'rcd-ac-5x': 40, 'rcd-sel-idnmin': 130, 'rcd-sel-idnmax': 500, 'rcd-sel-5x': 150,
+  'insul-lv-v': 500, 'insul-lv-mohm': 1.0, 'insul-selv-v': 250, 'insul-selv-mohm': 0.5,
+  // J. IB
+  'ib-3ph-10kw': 10000 / (Math.sqrt(3) * 400 * 0.9),
+  'ib-1ph-3.68': 3680 / (230 * 1.0),
+  'ib-3ph-22kw': 22000 / (Math.sqrt(3) * 400 * 0.85),
+  // K. Voltage drop (re-derived from the real catalogue r/x)
+  'vdrop-3ph-2.5': (function () { var c = CABLES_COPPER['NOIKLX']['5G'][2.5]; var cos = 0.9, sin = Math.sqrt(1 - cos * cos); return Math.sqrt(3) * 16 * 50 * (c.r * cos + c.x * sin) / (400 * 10); })(),
+  // L. Arc flash: IEEE 1584-2018 Annex D printed values [D.x] (gold) and Lee closed-form [hand]
+  'af-mv-iarc600': 11.117,
+  'af-mv-iarc': 12.979,
+  'af-mv-varcf': 0.047,
+  'af-mv-cf': 1.284,
+  'af-mv-E': 12.152,
+  'af-mv-E-cal': 12.152 / 4.184,
+  'af-mv-afb': 1606,
+  'af-lv-E480': 9.034,
+  'af-lv-reduced-governs': 12.705,
+  'af-lee-default': 2.142e6 * 0.40 * 10 * 0.1 / (455 * 455) / 4.184,
+  'af-lee-oor-20kv': 2.142e6 * 20 * 20 * 0.5 / (914.4 * 914.4) / 4.184,
+  'af-lee-afb': Math.sqrt(2.142e6 * 0.69 * 25 * 0.2 / 5.0208),
+  'af-lv-worst-of': 1.063
+};
+
+function gmMatch(actual, expected, tol) {
+  if (typeof actual !== 'number' || !isFinite(actual)) return false;
+  return (tol === 0) ? (actual === expected) : (Math.abs(actual - expected) <= tol * Math.abs(expected || 1));
+}
+
+// a. Per-category: re-derive each expected and confirm the live engine reproduces it.
+GOLDEN_CATEGORIES.forEach(function (cat) {
+  test('golden-master category "' + cat.en + '" reproduces independently re-derived references', function () {
+    var live = runGoldenSuite();
+    var cases = GOLDEN_CASES.filter(function (c) { return c.categoryKey === cat.key; });
+    assert(cases.length > 0, 'category ' + cat.key + ' must have at least one case');
+    cases.forEach(function (c) {
+      // independent re-derivation must match the stored expected within tol
+      assert(Object.prototype.hasOwnProperty.call(GM_REDERIVE, c.id), 'missing re-derivation for ' + c.id);
+      var reDerived = GM_REDERIVE[c.id];
+      assert(gmMatch(reDerived, c.expected, c.tol), c.id + ': re-derived ' + reDerived + ' != expected ' + c.expected + ' (tol ' + c.tol + ')');
+      // the live engine result must be ok (green)
+      var lr = live.find(function (r) { return r.id === c.id; });
+      assert(lr, 'live result missing for ' + c.id);
+      assert.strictEqual(lr.ok, true, c.id + ' should pass: actual=' + lr.actual + ' expected=' + c.expected + (lr.err ? ' err=' + lr.err : ''));
+    });
+  });
+});
+
+// b. No-tautology / no-fake-green guards.
+test('golden-master: every case has a callable fn and a numeric expected', function () {
+  GOLDEN_CASES.forEach(function (c) {
+    assert(typeof c.fn === 'function', c.id + ' must have a fn');
+    assert(typeof c.expected === 'number' && isFinite(c.expected), c.id + ' must have a numeric expected');
+    assert(typeof c.tol === 'number' && c.tol >= 0, c.id + ' must have a numeric tol');
+  });
+});
+
+test('golden-master: the verify region contains NO literal pass:true (fake-green removed)', function () {
+  var m = html.match(/GOLDEN_SUITE_REGION_START[\s\S]*?function renderVerify[\s\S]*?\n  return html;\n\}/);
+  assert(m, 'could not locate the verify region in the HTML');
+  var region = m[0];
+  assert(!/pass\s*:\s*true/.test(region), 'verify region must not contain a literal pass:true');
+  // also assert it across the whole file (the old fake-green line is gone)
+  assert(!/IEC 60909 cmax \(LV\)', exp:'1.05', act:'1.05', pass:true/.test(html), 'old fake-green line must be gone');
+});
+
+test('golden-master: flipping a case expected makes ok false (verdict is computed, not hard-coded)', function () {
+  var live = runGoldenSuite();
+  // pick a representative resolved case and emulate the runner verdict on a doubled expected
+  var sample = live.find(function (r) { return r.id === 'zsmax-tn-b16'; });
+  assert(sample && sample.ok === true, 'baseline case must pass');
+  var flippedExpected = sample.expected * 2;
+  var tol = sample.tol;
+  var okFlipped = (tol === 0) ? (sample.actual === flippedExpected) : (Math.abs(sample.actual - flippedExpected) <= tol * Math.abs(flippedExpected || 1));
+  assert.strictEqual(okFlipped, false, 'doubling the expected must flip ok to false');
+});
+
+// c. Purity: runGoldenSuite must not mutate global state or data tables.
+test('golden-master: runGoldenSuite is side-effect free (loadState/zsState/cableState unchanged)', function () {
+  var beforeLoad = JSON.stringify(loadState);
+  var beforeZs = (typeof zsState !== 'undefined') ? JSON.stringify(zsState) : null;
+  var beforeCable = (typeof cableState !== 'undefined') ? JSON.stringify(cableState) : null;
+  var cableR = (function () { for (var i = 0; i < PRODUCTS.cables.length; i++) { if (PRODUCTS.cables[i].id === 'NKT-NOIKLX-2.5') return PRODUCTS.cables[i].r; } return null; })();
+  runGoldenSuite();
+  assert.strictEqual(JSON.stringify(loadState), beforeLoad, 'loadState must be restored');
+  if (beforeZs != null) assert.strictEqual(JSON.stringify(zsState), beforeZs, 'zsState must be restored');
+  if (beforeCable != null) assert.strictEqual(JSON.stringify(cableState), beforeCable, 'cableState must be restored');
+  var cableR2 = (function () { for (var i = 0; i < PRODUCTS.cables.length; i++) { if (PRODUCTS.cables[i].id === 'NKT-NOIKLX-2.5') return PRODUCTS.cables[i].r; } return null; })();
+  assert.strictEqual(cableR2, cableR, 'a representative PRODUCTS cable r-value must be unchanged (7.41)');
+  assert.strictEqual(cableR2, 7.41, 'NOIKLX 2.5mm2 r must remain 7.41 ohm/km');
+});
+
+// d. Trilingual: every new English UI string and category label has a non-empty _FA entry.
+var GM_NEW_STRINGS = [
+  'Engine Verification (Golden Master)', 'Calculation engine verified', 'control cases passed',
+  'FAILURE: engine is NOT verified',
+  'Each control case runs a real audited engine function and compares it against an independently known reference value and its standard clause.',
+  'Filter category', 'All', 'Expected', 'Computed', 'Unresolved (no green)', 'Show details', 'Hide details'
+];
+GOLDEN_CATEGORIES.forEach(function (c) { GM_NEW_STRINGS.push(c.en); });
+test('golden-master: every new English string + category label has a non-empty _FA translation', function () {
+  GM_NEW_STRINGS.forEach(function (en) {
+    assert(typeof _FA[en] === 'string' && _FA[en].length > 0, 'missing/empty _FA for: ' + en);
+  });
+});
+test('golden-master: Farsi mode returns translated (non-English) text for new keys', function () {
+  var prev = lang;
+  lang = 'fa';
+  try {
+    GM_NEW_STRINGS.forEach(function (en) {
+      var out = tx('xx', en);
+      assert(out !== en, 'tx in fa should not fall back to English for: ' + en);
+    });
+  } finally { lang = prev; }
+});
+
+// e. No new typing affordances / external resources in the new verify region.
+test('golden-master: new verify region introduces no inputs or external resources', function () {
+  var m = html.match(/GOLDEN_SUITE_REGION_START[\s\S]*?function renderVerify[\s\S]*?\n  return html;\n\}/);
+  assert(m, 'could not locate the verify region');
+  var region = m[0];
+  ['<input', '<textarea', 'contenteditable', '<script src', 'fetch(', 'XMLHttpRequest', 'WebSocket', '@import'].forEach(function (tok) {
+    assert.strictEqual(region.indexOf(tok), -1, 'verify region must not contain forbidden token: ' + tok);
+  });
+});
+
+// f. Engine-unchanged regression (the audited primitives still produce baseline values).
+test('golden-master: audited engine primitives unchanged (regression)', function () {
+  var savedLoad = JSON.parse(JSON.stringify(loadState));
+  loadState = { voltage: '3x400', power: 10, cosPhi: 0.9, simFactor: 1, expFactor: 1 };
+  assert(Math.abs(calcIB() - 16.04) < 0.02 * 16.04, 'calcIB 3~ 10kW should be ~16.04');
+  loadState = savedLoad;
+  var tree = { rootId: 'gtr', nodes: { gtr: { id: 'gtr', parentId: null, type: 'transformer', power_kVA: 400, uk_pct: 4, cable: null, length_m: 0, childIds: ['gbd'] }, gbd: { id: 'gbd', parentId: 'gtr', type: 'main_board', phases: '3x400', cable: null, length_m: 0, childIds: [] } } };
+  assert(Math.abs(sldCalcNodeZs(tree, 'gbd') - 0.016) < 1e-9, 'transformer Zs should be 0.016');
+  assert(Math.abs(elforsyningTransformerFlc(400) - 577.35) < 0.05, 'FLC(400) should be ~577.35');
+  assert(Math.abs(upRMult('Cu', 90) - 1.2751) < 1e-4, 'upRMult Cu@90 should be ~1.2751');
+  assert(Math.abs(cvZsCeiling('TN', { In: 16, curve: 'B' }).zsMax - 2.731) < 0.005 * 2.731, 'cvZsCeiling TN B16 ~2.731');
+  assert.strictEqual(MCB_CURVES.B.isdMax, 4.8, 'MCB B isdMax must remain 4.8');
+});
+
 
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
