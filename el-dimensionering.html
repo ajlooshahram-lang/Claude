@@ -6,17 +6,17 @@
 <title>El-Dimensionering / Electrical Dimensioning</title>
 <style>
 :root {
-  --primary: #0f4c75;
-  --primary-light: #3282b8;
-  --primary-glow: rgba(50,130,184,0.15);
-  --accent: #00b4d8;
-  --accent-soft: #90e0ef;
-  --success: #06d6a0;
-  --success-bg: rgba(6,214,160,0.08);
-  --danger: #ef476f;
-  --danger-bg: rgba(239,71,111,0.08);
-  --warning: #ffd166;
-  --warning-bg: rgba(255,209,102,0.1);
+  --primary: #0a1e3d;
+  --primary-light: #1a4a7a;
+  --primary-glow: rgba(0,180,255,0.12);
+  --accent: #00b4ff;
+  --accent-soft: #80daff;
+  --success: #00e676;
+  --success-bg: rgba(0,230,118,0.08);
+  --danger: #ff5252;
+  --danger-bg: rgba(255,82,82,0.08);
+  --warning: #ffc107;
+  --warning-bg: rgba(255,193,7,0.1);
   --bg: #f0f4f8;
   --bg-gradient: linear-gradient(180deg, #e8eef5 0%, #f0f4f8 100%);
   --card: #ffffff;
@@ -36,9 +36,9 @@
   /* Dark-mode neon accent — themeable + intensity-controlled so the glow can be
      calmed down (it was hurting eyes at full strength). --glow scales every glow
      0 (off / calm) .. 1 (vivid). --neon-rgb / --neon-a / --neon-b drive the colour. */
-  --neon-rgb: 0,229,255;
-  --neon-a: #00c8ff;
-  --neon-b: #0080ff;
+  --neon-rgb: 0,180,255;
+  --neon-a: #00b4ff;
+  --neon-b: #7c4dff;
   --glow: 0.45;
   --font-eng: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono-eng: 'JetBrains Mono', 'SF Mono', SFMono-Regular, ui-monospace, 'Cascadia Mono', 'Fira Code', 'Roboto Mono', Menlo, Consolas, monospace;
@@ -842,27 +842,27 @@ body.motion-off .sim-energize { transform: scale(1); opacity: 1; filter: none; }
 
 /* ===== DARK MODE ===== */
 body.dark {
-  --primary: #4a9fd4;
-  --primary-light: #6bb6e0;
-  --primary-glow: rgba(74,159,212,0.18);
-  --accent: #2ec7e0;
-  --bg: #0f1620;
-  --bg-gradient: linear-gradient(180deg, #0b1119 0%, #0f1620 100%);
-  --card: #1a2330;
+  --primary: #00b4ff;
+  --primary-light: #4dc9ff;
+  --primary-glow: rgba(0,180,255,0.18);
+  --accent: #00b4ff;
+  --bg: #0a1628;
+  --bg-gradient: linear-gradient(180deg, #060f1e 0%, #0a1628 100%);
+  --card: #0f1f35;
   --text: #e6edf3;
   --text-light: #aab8c5;
   --text-muted: #718595;
-  --border: #2a3645;
-  --border-light: #232e3b;
-  --success: #2ee6a8;
-  --success-bg: rgba(46,230,168,0.10);
-  --danger: #ff6b8a;
-  --danger-bg: rgba(255,107,138,0.10);
-  --warning: #ffd27a;
-  --warning-bg: rgba(255,210,122,0.12);
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
-  --shadow: 0 4px 12px rgba(0,0,0,0.35);
-  --shadow-lg: 0 10px 30px rgba(0,0,0,0.45);
+  --border: #1a3050;
+  --border-light: #152540;
+  --success: #00e676;
+  --success-bg: rgba(0,230,118,0.10);
+  --danger: #ff5252;
+  --danger-bg: rgba(255,82,82,0.10);
+  --warning: #ffc107;
+  --warning-bg: rgba(255,193,7,0.12);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow: 0 4px 12px rgba(0,0,0,0.45);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.55);
 }
 body.dark .sel-btn { background: #1a2535; color: #b8d4e8; border-color: #2a3f55; }
 body.dark .sel-btn:hover { background: #1f3048; border-color: rgba(var(--neon-rgb),0.85); color: #e0f4ff; box-shadow: 0 0 10px rgba(var(--neon-rgb), calc(0.55 * var(--glow))); }
@@ -4137,6 +4137,45 @@ SharedQuantities.subscribe('temperature', function(temp, source) {
   if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.temperature = temp;
 });
 
+// Short-circuit current propagates to protection modules.
+SharedQuantities.subscribe('short_circuit_current', function(ik, source) {
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.short_circuit_current = ik;
+  if (source !== 'scircuit' && typeof scircuitState !== 'undefined') scircuitState.ikResult = ik;
+});
+
+// Earth fault loop impedance propagates to fault and Zs modules.
+SharedQuantities.subscribe('earth_fault_loop_impedance', function(zs, source) {
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.earth_fault_loop_impedance = zs;
+  if (source !== 'zs' && typeof zsState !== 'undefined') zsState.measured = zs;
+  if (source !== 'fault' && typeof faultState !== 'undefined') faultState.zsValue = zs;
+});
+
+// Voltage drop percentage propagates to vdrop module.
+SharedQuantities.subscribe('voltage_drop_pct', function(vd, source) {
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.voltage_drop_pct = vd;
+  if (source !== 'vdrop' && typeof vdropState !== 'undefined') vdropState.vdropPct = vd;
+});
+
+// Efficiency propagates to motor modules.
+SharedQuantities.subscribe('efficiency', function(eff, source) {
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.efficiency = eff;
+});
+
+// Torque propagates to motor modules.
+SharedQuantities.subscribe('torque', function(t, source) {
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.torque = t;
+});
+
+// Diversity factor propagates to load calculations.
+SharedQuantities.subscribe('diversity_factor', function(df, source) {
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.diversity_factor = df;
+});
+
+// Angular velocity propagates to motor modules.
+SharedQuantities.subscribe('angular_velocity', function(w, source) {
+  if (source !== 'faktorer' && typeof faktorState !== 'undefined') faktorState.quantities.angular_velocity = w;
+});
+
 // "May be relevant" broad subscribers: the safety brain, the unified-project
 // auditor (Den Kritiske Hjerne), the drawing, the documentation/BOM and the
 // project rollups must refresh on ANY change so they can never show a stale
@@ -6687,6 +6726,58 @@ function syncSharedQuantities(mod) {
         if (fq.temperature !== null) SharedQuantities.set('temperature', fq.temperature, 'faktorer');
         if (fq.cross_section_mm2 !== null) SharedQuantities.set('cable_mm2', fq.cross_section_mm2, 'faktorer');
         if (fq.luminous_flux !== null) SharedQuantities.set('luminous_flux', fq.luminous_flux, 'faktorer');
+        if (fq.short_circuit_current !== null) SharedQuantities.set('short_circuit_current', fq.short_circuit_current, 'faktorer');
+        if (fq.earth_fault_loop_impedance !== null) SharedQuantities.set('earth_fault_loop_impedance', fq.earth_fault_loop_impedance, 'faktorer');
+        if (fq.voltage_drop_pct !== null) SharedQuantities.set('voltage_drop_pct', fq.voltage_drop_pct, 'faktorer');
+        if (fq.efficiency !== null) SharedQuantities.set('efficiency', fq.efficiency, 'faktorer');
+        if (fq.torque !== null) SharedQuantities.set('torque', fq.torque, 'faktorer');
+        if (fq.diversity_factor !== null) SharedQuantities.set('diversity_factor', fq.diversity_factor, 'faktorer');
+        if (fq.angular_velocity !== null) SharedQuantities.set('angular_velocity', fq.angular_velocity, 'faktorer');
+      }
+      break;
+    case 'motor':
+      // Motor module pushes motor power, efficiency, and torque
+      if (typeof motorState !== 'undefined') {
+        if (motorState.power) SharedQuantities.set('motor_power_w', motorState.power * 1000, 'motor');
+        if (motorState.efficiency) SharedQuantities.set('efficiency', motorState.efficiency, 'motor');
+        if (motorState.torque) SharedQuantities.set('torque', motorState.torque, 'motor');
+      }
+      break;
+    case 'vdrop':
+      // Voltage drop module pushes voltage_drop_pct
+      if (typeof vdropState !== 'undefined') {
+        if (vdropState.vdropPct) SharedQuantities.set('voltage_drop_pct', vdropState.vdropPct, 'vdrop');
+      }
+      break;
+    case 'scircuit':
+      // Short circuit module pushes short_circuit_current
+      if (typeof scircuitState !== 'undefined') {
+        if (scircuitState.ikResult) SharedQuantities.set('short_circuit_current', scircuitState.ikResult, 'scircuit');
+      }
+      break;
+    case 'zs':
+      // Zs module pushes earth_fault_loop_impedance
+      if (typeof zsState !== 'undefined') {
+        if (zsState.measured) SharedQuantities.set('earth_fault_loop_impedance', zsState.measured, 'zs');
+        SharedQuantities.set('zs_value', zsState.measured, 'zs');
+      }
+      break;
+    case 'solar':
+      // Solar module pushes power and energy
+      if (typeof solarState !== 'undefined') {
+        if (solarState.peakKW) SharedQuantities.set('load_power_kw', solarState.peakKW, 'solar');
+      }
+      break;
+    case 'ev':
+      // EV module pushes power
+      if (typeof evState !== 'undefined') {
+        if (evState.power) SharedQuantities.set('load_power_kw', evState.power, 'ev');
+      }
+      break;
+    case 'heatpump':
+      // Heat pump module pushes power
+      if (typeof heatpumpState !== 'undefined') {
+        if (heatpumpState.heatingKW) SharedQuantities.set('load_power_kw', heatpumpState.heatingKW, 'heatpump');
       }
       break;
   }
@@ -27842,7 +27933,7 @@ function renderUPSSim(loadW, upsVA, autonomyMin, batteryAh, topology) {
 
 function renderVFDSim(motorKW, vfdCurrent, frequency, motorSpeed) {
   if (!motorKW || !vfdCurrent) {
-    return '<svg viewBox="0 0 320 140" width="320" height="140" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)"><rect x="100" y="40" width="120" height="60" rx="6" fill="#263238" stroke="#546e7a" stroke-width="2"/><text x="160" y="75" text-anchor="middle" class="sim-label" fill="#90a4ae" font-size="9">VFD</text><circle cx="250" cy="70" r="25" fill="none" stroke="#90a4ae" stroke-width="3" class="sim-rotor"/></svg>';
+    return '';
   }
   var svg = '<svg viewBox="0 0 320 140" width="320" height="140" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
@@ -27910,7 +28001,7 @@ function renderVFDSim(motorKW, vfdCurrent, frequency, motorSpeed) {
 
 function renderBusbarSim(ratedCurrent, tapOffs, loadPercent, sections, ambientTemp) {
   if (!ratedCurrent || !tapOffs) {
-    return '<svg viewBox="0 0 320 120" width="320" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)"><rect x="30" y="50" width="260" height="20" rx="3" fill="#78909c" stroke="#546e7a" stroke-width="1.5"/><text x="160" y="64" text-anchor="middle" class="sim-label" fill="#fff" font-size="7">BUSBAR</text><text x="80" y="90" text-anchor="middle" class="sim-label" fill="#90a4ae" font-size="6">T1</text><line x1="80" y1="70" x2="80" y2="84" stroke="#90a4ae" stroke-width="1.5"/><text x="160" y="90" text-anchor="middle" class="sim-label" fill="#90a4ae" font-size="6">tap-offs</text></svg>';
+    return '';
   }
   var svg = '<svg viewBox="0 0 320 120" width="320" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
@@ -27984,7 +28075,7 @@ function renderZsSim(ze, r1r2, zs, zsMax, faultCurrent, pass) {
 
 function renderSPDSim(nd, riskLevel, spdType, inKA, imaxKA, mandatory) {
   if (!nd && nd !== 0) {
-    return '<svg viewBox="0 0 300 150" width="300" height="150" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)"><rect x="80" y="50" width="140" height="80" rx="3" fill="none" stroke="var(--text)" stroke-width="1.5"/><polygon points="80,50 150,20 220,50" fill="none" stroke="var(--text)" stroke-width="1.5"/><text x="150" y="95" text-anchor="middle" class="sim-label" fill="#90a4ae" font-size="8">SPD</text><line x1="150" y1="5" x2="150" y2="20" stroke="#ff9800" stroke-width="2" class="sim-wire"/></svg>';
+    return '';
   }
   var svg = '<svg viewBox="0 0 300 150" width="300" height="150" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
@@ -28294,7 +28385,7 @@ function renderDiscrimSim(upType, upRating, downType, downRating, coordinated, i
 // ===== HEAT PUMP SIMULATOR =====
 function renderHeatPumpSim(heatingKW, cop, electricalKW, flc, phase) {
   if (!heatingKW || !cop) {
-    return '<svg viewBox="0 0 300 145" width="300" height="145" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)"><rect x="100" y="40" width="100" height="65" rx="5" fill="#263238" stroke="#546e7a" stroke-width="1.5"/><text x="150" y="70" text-anchor="middle" class="sim-label" fill="#90a4ae" font-size="8">HEAT PUMP</text><circle cx="150" cy="90" r="12" fill="none" stroke="#90a4ae" stroke-width="2" class="sim-rotor"/><line x1="60" y1="72" x2="100" y2="72" stroke="#42a5f5" stroke-width="2" class="sim-wire"/></svg>';
+    return '<svg viewBox="0 0 300 60" width="300" height="60" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">' + simSvgDefs() + '<line x1="30" y1="30" x2="270" y2="30" stroke="#90a4ae" stroke-width="1.5" class="sim-wire" style="animation-duration:3s"/><text x="150" y="45" text-anchor="middle" class="sim-label" font-size="6" fill="#90a4ae">' + tx('Varmepumpe - v\u00e6lg v\u00e6rdier', 'Heat Pump - select values') + '</text></svg>';
   }
   var svg = '<svg viewBox="0 0 300 145" width="300" height="145" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
@@ -28348,7 +28439,7 @@ function renderHeatPumpSim(heatingKW, cop, electricalKW, flc, phase) {
 // ===== EMERGENCY LIGHTING SIMULATOR =====
 function renderNoedSim(systemType, numLuminaires, batteryCapacity, duration) {
   if (!numLuminaires || numLuminaires <= 0) {
-    return '<svg viewBox="0 0 300 120" width="300" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)"><rect x="15" y="35" width="40" height="50" rx="4" fill="#1b5e20" stroke="#2e7d32" stroke-width="1.5"/><text x="35" y="55" text-anchor="middle" class="sim-label" fill="#fff" font-size="5">CENTRAL</text><line x1="55" y1="60" x2="100" y2="60" stroke="#66bb6a" stroke-width="2" stroke-dasharray="4 3" class="sim-wire"/><circle cx="120" cy="60" r="8" fill="#fff176" opacity="0.4" class="sim-pulse"/></svg>';
+    return '<svg viewBox="0 0 300 60" width="300" height="60" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">' + simSvgDefs() + '<line x1="30" y1="30" x2="270" y2="30" stroke="#4caf50" stroke-width="1.5" class="sim-wire" style="animation-duration:3s"/><text x="150" y="45" text-anchor="middle" class="sim-label" font-size="6" fill="#4caf50">' + tx('N\u00f8dbelysning - v\u00e6lg armaturer', 'Emergency Lighting - select luminaires') + '</text></svg>';
   }
   var svg = '<svg viewBox="0 0 300 120" width="300" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
@@ -28502,7 +28593,7 @@ function renderAccessSim(numDoors, totalMa, psu, systemType) {
 // ===== STRUCTURED CABLING SIMULATOR =====
 function renderDataSim(outlets, distance, category, poeWatts) {
   if (!outlets || outlets <= 0) {
-    return '<svg viewBox="0 0 300 120" width="300" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)"><rect x="15" y="25" width="45" height="70" rx="3" fill="#212121" stroke="#424242" stroke-width="1.5"/><text x="37" y="60" text-anchor="middle" class="sim-label" fill="#90a4ae" font-size="6">SWITCH</text><line x1="60" y1="60" x2="120" y2="60" stroke="#1565c0" stroke-width="2" stroke-dasharray="6 3" class="sim-wire"/><rect x="130" y="50" width="20" height="20" rx="2" fill="none" stroke="#42a5f5" stroke-width="1.5"/></svg>';
+    return '<svg viewBox="0 0 300 60" width="300" height="60" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">' + simSvgDefs() + '<line x1="30" y1="30" x2="270" y2="30" stroke="#1565c0" stroke-width="1.5" class="sim-wire" style="animation-duration:3s"/><text x="150" y="45" text-anchor="middle" class="sim-label" font-size="6" fill="#1565c0">' + tx('Datanetv\u00e6rk - v\u00e6lg udtag', 'Structured Cabling - select outlets') + '</text></svg>';
   }
   var svg = '<svg viewBox="0 0 300 120" width="300" height="120" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
@@ -28618,7 +28709,7 @@ function renderMeteringSim(meterType, ctRatio, numMeters, communication) {
 // ===== BATHROOM ZONE SIMULATOR =====
 function renderBathroomSim(selectedZone, bathType, roomWidth, ceilingHeight) {
   if (selectedZone === undefined || selectedZone === null || !roomWidth) {
-    return '<svg viewBox="0 0 300 130" width="300" height="130" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)"><line x1="10" y1="115" x2="290" y2="115" stroke="#333" stroke-width="2"/><rect x="30" y="75" width="60" height="40" fill="#0ea5e9" opacity="0.3" stroke="#0ea5e9" stroke-width="1.5"/><text x="60" y="98" text-anchor="middle" class="sim-label" fill="#0284c7" font-size="7">Zone 0</text><line x1="100" y1="75" x2="100" y2="115" stroke="#7dd3fc" stroke-width="1" stroke-dasharray="4" class="sim-pulse"/><circle cx="150" cy="50" r="10" fill="#fff176" opacity="0.5" class="sim-wave"/></svg>';
+    return '<svg viewBox="0 0 300 60" width="300" height="60" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">' + simSvgDefs() + '<line x1="30" y1="30" x2="270" y2="30" stroke="#0ea5e9" stroke-width="1.5" class="sim-wire" style="animation-duration:3s"/><circle cx="150" cy="30" r="8" fill="none" stroke="#0ea5e9" stroke-width="1" class="sim-pulse" style="animation-duration:2s"/><text x="150" y="50" text-anchor="middle" class="sim-label" font-size="6" fill="#0ea5e9">' + tx('Baderum - v\u00e6lg zone', 'Bathroom - select zone') + '</text></svg>';
   }
   var svg = '<svg viewBox="0 0 300 130" width="300" height="130" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
@@ -28841,7 +28932,7 @@ function renderATEXSim(zoneType, zone, substance, tempClass, protectionType) {
 // ===== CABLE TRAY FILL SIMULATOR =====
 function renderTrayFillSim(trayWidth, trayHeight, cableArea, trayArea, fillRate, maxFill) {
   if (!trayWidth || !trayHeight) {
-    return '<svg viewBox="0 0 300 130" width="300" height="130" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)"><rect x="50" y="40" width="200" height="50" rx="3" fill="none" stroke="#78909c" stroke-width="2"/><text x="150" y="70" text-anchor="middle" class="sim-label sim-value" fill="#90a4ae" font-size="8">CABLE TRAY</text></svg>';
+    return '';
   }
   var svg = '<svg viewBox="0 0 300 130" width="300" height="130" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
@@ -30566,7 +30657,14 @@ var faktorState = {
     cos_phi: null, temperature: null, length: null, cross_section_mm2: null,
     resistivity: null, magnetic_flux: null, luminous_flux: null,
     reactive_power: null, apparent_power: null, energy: null,
-    trafo_kva: null
+    trafo_kva: null,
+    torque: null, angular_velocity: null, efficiency: null, slip: null,
+    short_circuit_current: null, breaking_capacity: null,
+    earth_fault_loop_impedance: null, power_factor_angle: null,
+    voltage_drop_pct: null, cable_resistance_per_m: null,
+    diversity_factor: null, demand_factor: null, utilization_factor: null,
+    skin_depth: null, wavelength: null, time_constant_RC: null, time_constant_RL: null,
+    charge: null, magnetic_field_strength: null, electric_field_strength: null
   },
   solved: {},
   category: 'electrical',
@@ -30598,7 +30696,31 @@ var FAKTOR_QUANTITIES = {
   // === Mechanical/Cable ===
   length:     { da: 'L\u00e6ngde', en: 'Length', unit: 'm', cat: 'mechanical', presets: [1, 2, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200], step: 1, clamp: { min: 0 } },
   cross_section_mm2: { da: 'Tv\u00e6rsnit', en: 'Cross-section', unit: 'mm\u00B2', cat: 'mechanical', presets: [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240, 300], step: 0.5, clamp: { min: 0 } },
-  trafo_kva:  { da: 'Trafo st\u00f8rrelse', en: 'Transformer Size', unit: 'kVA', cat: 'mechanical', presets: [50, 100, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500], step: 10, clamp: { min: 0 } }
+  trafo_kva:  { da: 'Trafo st\u00f8rrelse', en: 'Transformer Size', unit: 'kVA', cat: 'mechanical', presets: [50, 100, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500], step: 10, clamp: { min: 0 } },
+  // === Motor ===
+  torque:     { da: 'Drejningsmoment', en: 'Torque', unit: 'Nm', cat: 'motor', presets: [0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000], step: 0.1, clamp: { min: 0 } },
+  angular_velocity: { da: 'Vinkelhastighed', en: 'Angular Velocity', unit: 'rad/s', cat: 'motor', presets: [10, 25, 50, 100, 150, 200, 300, 314], step: 1, clamp: { min: 0 } },
+  efficiency: { da: 'Virkningsgrad', en: 'Efficiency', unit: '%', cat: 'motor', presets: [50, 60, 70, 75, 80, 85, 88, 90, 92, 94, 95, 96, 97], step: 0.5, clamp: { min: 0, max: 100 } },
+  slip:       { da: 'Slip', en: 'Slip', unit: '', cat: 'motor', presets: [0.01, 0.02, 0.03, 0.04, 0.05, 0.08, 0.10, 0.15, 0.20], step: 0.005, clamp: { min: 0, max: 1 } },
+  // === Protection ===
+  short_circuit_current: { da: 'Kortslutningsstr\u00f8m', en: 'Short-circuit Current', unit: 'kA', cat: 'protection', presets: [1, 2, 3, 4.5, 6, 10, 15, 20, 25, 35, 50, 65, 80, 100], step: 0.5, clamp: { min: 0 } },
+  breaking_capacity: { da: 'Brydeevne', en: 'Breaking Capacity', unit: 'kA', cat: 'protection', presets: [6, 10, 15, 20, 25, 36, 50, 65, 80, 100, 120, 150], step: 1, clamp: { min: 0 } },
+  earth_fault_loop_impedance: { da: 'Fejlsl\u00f8jfeimpedans', en: 'Earth Fault Loop Impedance', unit: '\u03A9', cat: 'protection', presets: [0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0], step: 0.05, clamp: { min: 0 } },
+  power_factor_angle: { da: 'Fasevinkel', en: 'Power Factor Angle', unit: '\u00B0', cat: 'protection', presets: [0, 10, 15, 20, 25, 30, 36.87, 45, 53.13, 60, 75, 90], step: 1, clamp: { min: 0, max: 90 } },
+  // === Installation ===
+  voltage_drop_pct: { da: 'Sp\u00e6ndingsfald', en: 'Voltage Drop', unit: '%', cat: 'installation', presets: [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8], step: 0.1, clamp: { min: 0 } },
+  cable_resistance_per_m: { da: 'Kabelmodstand/m', en: 'Cable Resistance/m', unit: '\u03A9/m', cat: 'installation', presets: [0.001, 0.002, 0.005, 0.008, 0.012, 0.018, 0.025, 0.05, 0.1], step: 0.001, clamp: { min: 0 } },
+  diversity_factor: { da: 'Diversitetsfaktor', en: 'Diversity Factor', unit: '', cat: 'installation', presets: [0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0], step: 0.01, clamp: { min: 0, max: 1 } },
+  demand_factor: { da: 'Behovsfaktor', en: 'Demand Factor', unit: '', cat: 'installation', presets: [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0], step: 0.01, clamp: { min: 0, max: 1 } },
+  utilization_factor: { da: 'Udnyttelsesfaktor', en: 'Utilization Factor', unit: '', cat: 'installation', presets: [0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0], step: 0.01, clamp: { min: 0, max: 1 } },
+  // === Wave/Field ===
+  skin_depth:  { da: 'Skindybde', en: 'Skin Depth', unit: 'm', cat: 'electrical', presets: [0.001, 0.005, 0.009, 0.01, 0.05, 0.1, 0.5, 1], step: 0.001, clamp: { min: 0 } },
+  wavelength:  { da: 'B\u00f8lgel\u00e6ngde', en: 'Wavelength', unit: 'm', cat: 'electrical', presets: [0.001, 0.01, 0.1, 1, 10, 100, 1000, 5000], step: 0.1, clamp: { min: 0 } },
+  time_constant_RC: { da: 'Tidskonstant RC', en: 'Time Constant RC', unit: 's', cat: 'electrical', presets: [0.001, 0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10], step: 0.001, clamp: { min: 0 } },
+  time_constant_RL: { da: 'Tidskonstant RL', en: 'Time Constant RL', unit: 's', cat: 'electrical', presets: [0.0001, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1], step: 0.0001, clamp: { min: 0 } },
+  charge:      { da: 'Ladning', en: 'Charge', unit: 'C', cat: 'electrical', presets: [0.001, 0.01, 0.1, 1, 5, 10, 50, 100], step: 0.01, clamp: { min: 0 } },
+  magnetic_field_strength: { da: 'Magnetisk feltstyrke', en: 'Magnetic Field Strength', unit: 'A/m', cat: 'magnetic', presets: [1, 5, 10, 50, 100, 500, 1000, 5000, 10000], step: 1, clamp: { min: 0 } },
+  electric_field_strength: { da: 'Elektrisk feltstyrke', en: 'Electric Field Strength', unit: 'V/m', cat: 'electrical', presets: [1, 10, 50, 100, 500, 1000, 3000, 5000, 10000], step: 1, clamp: { min: 0 } }
 };
 
 var FAKTOR_CATEGORIES = [
@@ -30606,7 +30728,10 @@ var FAKTOR_CATEGORIES = [
   { key: 'thermal', da: '\uD83C\uDF21\uFE0F Termisk', en: '\uD83C\uDF21\uFE0F Thermal' },
   { key: 'optical', da: '\uD83D\uDCA1 Optisk', en: '\uD83D\uDCA1 Optical' },
   { key: 'magnetic', da: '\uD83E\uDDF2 Magnetisk', en: '\uD83E\uDDF2 Magnetic' },
-  { key: 'mechanical', da: '\uD83D\uDD27 Kabel/Mek.', en: '\uD83D\uDD27 Cable/Mech.' }
+  { key: 'mechanical', da: '\uD83D\uDD27 Kabel/Mek.', en: '\uD83D\uDD27 Cable/Mech.' },
+  { key: 'motor', da: '\u2699\uFE0F Motor', en: '\u2699\uFE0F Motor' },
+  { key: 'protection', da: '\uD83D\uDEE1\uFE0F Beskyttelse', en: '\uD83D\uDEE1\uFE0F Protection' },
+  { key: 'installation', da: '\uD83C\uDFE0 Installation', en: '\uD83C\uDFE0 Installation' }
 ];
 
 // --- Equation solver: derives all unknowns from known quantities ---
@@ -30719,6 +30844,118 @@ function solveFaktorer() {
 
     // Energy = Power * time (1 hour default for kWh)
     // Not solved automatically since time is not a parameter
+
+    // === NEW FORMULAS: Skin depth, time constants, wavelength, torque, efficiency ===
+    var rho = val('resistivity');
+    var Len = val('length');
+    var A = val('cross_section_mm2');
+
+    // Skin depth: delta = sqrt(rho / (pi * f * mu0))
+    // resistivity in ohm*mm2/m = 1e-6 ohm*m, mu0 = 4*pi*1e-7
+    if (rho !== null && f !== null && val('skin_depth') === null) {
+      var rhoSI = rho * 1e-6; // convert from ohm*mm2/m to ohm*m
+      var mu0 = 4 * Math.PI * 1e-7;
+      var sd = Math.sqrt(rhoSI / (Math.PI * f * mu0));
+      set('skin_depth', sd);
+    }
+
+    // Time constant RC: tau = R * C
+    if (R !== null && C !== null && val('time_constant_RC') === null) {
+      set('time_constant_RC', R * C);
+    }
+    if (val('time_constant_RC') !== null && R !== null && C === null) {
+      var tauRC = val('time_constant_RC');
+      if (R > 0) set('capacitance', tauRC / R);
+    }
+    if (val('time_constant_RC') !== null && C !== null && R === null) {
+      var tauRC2 = val('time_constant_RC');
+      if (C > 0) set('resistance', tauRC2 / C);
+    }
+
+    // Time constant RL: tau = L / R
+    if (L !== null && R !== null && val('time_constant_RL') === null && R > 0) {
+      set('time_constant_RL', L / R);
+    }
+    if (val('time_constant_RL') !== null && R !== null && L === null) {
+      set('inductance', val('time_constant_RL') * R);
+    }
+    if (val('time_constant_RL') !== null && L !== null && R === null) {
+      var tauRL = val('time_constant_RL');
+      if (tauRL > 0) set('resistance', L / tauRL);
+    }
+
+    // Wavelength: lambda = c / f (EM waves in free space)
+    if (f !== null && val('wavelength') === null) {
+      set('wavelength', 299792458 / f);
+    }
+    if (val('wavelength') !== null && f === null) {
+      var wl = val('wavelength');
+      if (wl > 0) set('frequency', 299792458 / wl);
+    }
+
+    // Torque: T = P / omega
+    var torque = val('torque');
+    var omega = val('angular_velocity');
+    if (P !== null && omega !== null && torque === null && omega > 0) {
+      set('torque', P / omega);
+    }
+    if (torque !== null && omega !== null && P === null) {
+      set('power', torque * omega);
+    }
+    if (P !== null && torque !== null && omega === null && torque > 0) {
+      set('angular_velocity', P / torque);
+    }
+
+    // Efficiency: eta = Pout/Pin * 100
+    // If power is "output" and we know efficiency, we can get input (or vice versa)
+    // We treat 'power' as output for motor context
+    var eff = val('efficiency');
+    if (P !== null && eff !== null && val('apparent_power') === null && S === null) {
+      // Pin = Pout / (eff/100)
+      var Pin = P / (eff / 100);
+      set('apparent_power', Pin);
+    }
+
+    // Slip: s = (ns - nr) / ns; ns = 120*f/p (for 2-pole: ns_rad = 2*pi*f)
+    // If omega and f are known, slip = (2*pi*f - omega) / (2*pi*f)
+    if (omega !== null && f !== null && val('slip') === null) {
+      var ns_rad = 2 * Math.PI * f; // synchronous speed in rad/s (for 1 pole-pair)
+      if (ns_rad > 0) {
+        var s = (ns_rad - omega) / ns_rad;
+        if (s >= 0 && s <= 1) set('slip', s);
+      }
+    }
+
+    // Voltage drop %: Vdrop% = (I * R/m * L * 2) / V * 100
+    var cableRm = val('cable_resistance_per_m');
+    var vdropPct = val('voltage_drop_pct');
+    if (I !== null && cableRm !== null && Len !== null && V !== null && vdropPct === null && V > 0) {
+      set('voltage_drop_pct', (I * cableRm * Len * 2) / V * 100);
+    }
+
+    // Cable resistance per meter: R/m = rho / A (rho in ohm*mm2/m, A in mm2)
+    if (rho !== null && A !== null && cableRm === null && A > 0) {
+      set('cable_resistance_per_m', rho / A);
+    }
+
+    // Charge: Q = I * t (use time_constant_RC as time proxy if available)
+    if (I !== null && val('time_constant_RC') !== null && val('charge') === null) {
+      set('charge', I * val('time_constant_RC'));
+    }
+
+    // Power factor angle: phi = acos(cos_phi)
+    if (cosPhi !== null && val('power_factor_angle') === null) {
+      set('power_factor_angle', Math.acos(Math.min(1, Math.max(0, cosPhi))) * 180 / Math.PI);
+    }
+    if (val('power_factor_angle') !== null && cosPhi === null) {
+      var phi = val('power_factor_angle');
+      set('cos_phi', Math.cos(phi * Math.PI / 180));
+    }
+
+    // Electric field strength: E = V / d (distance = length)
+    if (V !== null && Len !== null && val('electric_field_strength') === null && Len > 0) {
+      set('electric_field_strength', V / Len);
+    }
   }
   faktorState.solved = solved;
   return solved;
@@ -32661,6 +32898,238 @@ function renderDistPlan() {
   html += '<div class="result-row"><span class="label">' + tx('Effekttab', 'Power Loss') + '</span><span class="value">' + (board.totalPowerLoss || 0).toFixed(1) + ' W</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('DIN-skinner', 'DIN Rails') + '</span><span class="value">' + numRails + '</span></div>';
   html += '<div class="result-row"><span class="label">' + tx('Kapslingsklasse', 'IP Rating') + '</span><span class="value">IP54</span></div>';
+  html += '</div>';
+
+  html += '</div>';
+  return html;
+}
+
+// ===== ELECTRICAL INSTALLATION PLAN =====
+function renderElPlan() {
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title" style="font-size:1.2em">' + tx('Installationsplan', 'Electrical Installation Plan') + '</div>';
+  html += '<div class="info-row" style="border-left:3px solid var(--accent);padding-left:10px;margin-bottom:12px">' + tx(
+    'Floorplan-visning af elektrisk installation med kredsfordelinger, stikkontakter, lysudtag og udstyr.',
+    'Floor-plan view of electrical installation with circuit routes, socket outlets, lighting points, and equipment.'
+  ) + '</div>';
+
+  // Build SVG floor plan
+  var svg = '<svg viewBox="0 0 600 400" width="100%" height="400" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+
+  // Room outline
+  svg += '<rect x="30" y="30" width="540" height="340" fill="none" stroke="var(--text)" stroke-width="2"/>';
+  svg += '<text x="300" y="20" text-anchor="middle" class="sim-label" font-size="10" fill="var(--text)">' + tx('Plantegning', 'Floor Plan') + '</text>';
+
+  // Consumer unit / distribution board (top-left)
+  svg += '<rect x="40" y="40" width="80" height="50" rx="4" fill="#1565c0" stroke="#0d47a1" stroke-width="2"/>';
+  svg += '<text x="80" y="60" text-anchor="middle" class="sim-label" fill="#fff" font-size="7">' + tx('Gruppetavle', 'Consumer Unit') + '</text>';
+  svg += '<text x="80" y="75" text-anchor="middle" class="sim-label" fill="#bbdefb" font-size="6">CU-01</text>';
+
+  // Main feeder from CU
+  svg += '<line x1="120" y1="65" x2="180" y2="65" stroke="#f44336" stroke-width="3" class="sim-wire" style="animation-duration:2s"/>';
+  svg += '<line x1="80" y1="90" x2="80" y2="140" stroke="#f44336" stroke-width="2.5" class="sim-wire" style="animation-duration:2.2s"/>';
+
+  // Circuit 1: Lighting circuit (top route)
+  svg += '<line x1="180" y1="65" x2="180" y2="100" stroke="#ff9800" stroke-width="1.5" class="sim-wire" style="animation-duration:2.5s"/>';
+  svg += '<line x1="180" y1="100" x2="500" y2="100" stroke="#ff9800" stroke-width="1.5" class="sim-wire" style="animation-duration:3s"/>';
+  // Lighting points along circuit 1
+  var lightPositions = [220, 300, 380, 460];
+  for (var li = 0; li < lightPositions.length; li++) {
+    var lx = lightPositions[li];
+    svg += '<line x1="' + lx + '" y1="100" x2="' + lx + '" y2="80" stroke="#ff9800" stroke-width="1"/>';
+    svg += '<circle cx="' + lx + '" cy="75" r="8" fill="#fff3e0" stroke="#ff9800" stroke-width="1.5"/>';
+    svg += '<line x1="' + (lx - 4) + '" y1="75" x2="' + (lx + 4) + '" y2="75" stroke="#ff9800" stroke-width="1"/>';
+    svg += '<line x1="' + lx + '" y1="71" x2="' + lx + '" y2="79" stroke="#ff9800" stroke-width="1"/>';
+    svg += '<text x="' + lx + '" y="90" text-anchor="middle" class="sim-label" font-size="5" fill="#ff9800">L' + (li + 1) + '</text>';
+  }
+  svg += '<text x="340" y="115" text-anchor="middle" class="sim-label" font-size="6" fill="#ff9800">' + tx('Kredsgruppe 1: Lys', 'Circuit 1: Lighting') + '</text>';
+
+  // Circuit 2: Socket circuit (middle route)
+  svg += '<line x1="80" y1="140" x2="80" y2="200" stroke="#f44336" stroke-width="2.5" class="sim-wire" style="animation-duration:2.2s"/>';
+  svg += '<line x1="80" y1="200" x2="140" y2="200" stroke="#4caf50" stroke-width="1.5" class="sim-wire" style="animation-duration:2.5s"/>';
+  svg += '<line x1="140" y1="200" x2="520" y2="200" stroke="#4caf50" stroke-width="1.5" class="sim-wire" style="animation-duration:3s"/>';
+  // Socket outlets along circuit 2
+  var socketPositions = [200, 280, 360, 440, 520];
+  for (var si = 0; si < socketPositions.length; si++) {
+    var sx = socketPositions[si];
+    svg += '<line x1="' + sx + '" y1="200" x2="' + sx + '" y2="220" stroke="#4caf50" stroke-width="1"/>';
+    svg += '<rect x="' + (sx - 7) + '" y="220" width="14" height="10" rx="2" fill="#e8f5e9" stroke="#4caf50" stroke-width="1.2"/>';
+    svg += '<circle cx="' + (sx - 3) + '" cy="225" r="1.5" fill="#4caf50"/>';
+    svg += '<circle cx="' + (sx + 3) + '" cy="225" r="1.5" fill="#4caf50"/>';
+    svg += '<text x="' + sx + '" y="240" text-anchor="middle" class="sim-label" font-size="5" fill="#4caf50">S' + (si + 1) + '</text>';
+  }
+  svg += '<text x="340" y="255" text-anchor="middle" class="sim-label" font-size="6" fill="#4caf50">' + tx('Kredsgruppe 2: Stik 16A', 'Circuit 2: Sockets 16A') + '</text>';
+
+  // Circuit 3: Heavy appliance circuit (bottom route)
+  svg += '<line x1="80" y1="200" x2="80" y2="300" stroke="#f44336" stroke-width="2.5" class="sim-wire" style="animation-duration:2.2s"/>';
+  svg += '<line x1="80" y1="300" x2="160" y2="300" stroke="#9c27b0" stroke-width="2" class="sim-wire" style="animation-duration:2s"/>';
+  // Oven/cooker
+  svg += '<rect x="160" y="280" width="50" height="40" rx="4" fill="#f3e5f5" stroke="#9c27b0" stroke-width="1.5"/>';
+  svg += '<circle cx="175" cy="295" r="6" fill="none" stroke="#9c27b0" stroke-width="1"/>';
+  svg += '<circle cx="195" cy="295" r="6" fill="none" stroke="#9c27b0" stroke-width="1"/>';
+  svg += '<circle cx="175" cy="312" r="6" fill="none" stroke="#9c27b0" stroke-width="1"/>';
+  svg += '<circle cx="195" cy="312" r="6" fill="none" stroke="#9c27b0" stroke-width="1"/>';
+  svg += '<text x="185" y="335" text-anchor="middle" class="sim-label" font-size="6" fill="#9c27b0">' + tx('Komfur 3x16A', 'Cooker 3x16A') + '</text>';
+
+  // Circuit 4: EV charger (bottom right)
+  svg += '<line x1="80" y1="300" x2="80" y2="350" stroke="#f44336" stroke-width="2" class="sim-wire" style="animation-duration:2.2s"/>';
+  svg += '<line x1="80" y1="350" x2="400" y2="350" stroke="#2196f3" stroke-width="2" class="sim-wire" style="animation-duration:3s"/>';
+  svg += '<rect x="400" y="330" width="60" height="40" rx="6" fill="#e3f2fd" stroke="#2196f3" stroke-width="1.5"/>';
+  svg += '<text x="430" y="348" text-anchor="middle" class="sim-label" fill="#2196f3" font-size="6">EV</text>';
+  svg += '<text x="430" y="360" text-anchor="middle" class="sim-label" fill="#1565c0" font-size="5">22kW</text>';
+  svg += '<text x="430" y="380" text-anchor="middle" class="sim-label" font-size="5" fill="#2196f3">' + tx('Ladestation', 'EV Charger') + '</text>';
+
+  // Earth conductor (green/yellow)
+  svg += '<line x1="40" y1="90" x2="40" y2="370" stroke="#4caf50" stroke-width="1.5" stroke-dasharray="4,2" class="sim-wire" style="animation-duration:4s"/>';
+  svg += '<text x="25" y="370" class="sim-label" font-size="5" fill="#4caf50">PE</text>';
+
+  // RCD symbol at CU
+  svg += '<circle cx="120" cy="50" r="5" fill="#fff" stroke="#f44336" stroke-width="1"/>';
+  svg += '<text x="120" y="53" text-anchor="middle" class="sim-label" font-size="5" fill="#f44336">R</text>';
+  svg += '<text x="130" y="47" class="sim-label" font-size="4" fill="#f44336">30mA</text>';
+
+  // Legend
+  svg += '<rect x="440" y="40" width="120" height="45" rx="4" fill="var(--card)" stroke="var(--border)" stroke-width="0.5" opacity="0.9"/>';
+  svg += '<text x="500" y="52" text-anchor="middle" class="sim-label" font-size="5" fill="var(--text)">' + tx('Forklaring', 'Legend') + '</text>';
+  svg += '<line x1="450" y1="60" x2="470" y2="60" stroke="#ff9800" stroke-width="1.5"/>';
+  svg += '<text x="475" y="63" class="sim-label" font-size="4.5" fill="var(--text)">' + tx('Lys', 'Lighting') + '</text>';
+  svg += '<line x1="450" y1="70" x2="470" y2="70" stroke="#4caf50" stroke-width="1.5"/>';
+  svg += '<text x="475" y="73" class="sim-label" font-size="4.5" fill="var(--text)">' + tx('Stik', 'Sockets') + '</text>';
+  svg += '<line x1="450" y1="80" x2="470" y2="80" stroke="#9c27b0" stroke-width="1.5"/>';
+  svg += '<text x="475" y="83" class="sim-label" font-size="4.5" fill="var(--text)">' + tx('Tunge', 'Heavy') + '</text>';
+
+  svg += '</svg>';
+  html += svg;
+
+  // Summary
+  html += '<div class="result-box"><div class="result-title">' + tx('Installationsoversigt', 'Installation Summary') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kredsgrupper', 'Circuits') + '</span><span class="value">4</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Lysudtag', 'Lighting Points') + '</span><span class="value">4</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Stikkontakter', 'Socket Outlets') + '</span><span class="value">5</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Tunge forbrugere', 'Heavy Loads') + '</span><span class="value">2</span></div>';
+  html += '</div>';
+
+  html += '</div>';
+  return html;
+}
+
+// ===== CONTROL PANEL / AUTOMATION VISUALIZATION =====
+function renderControlPanel() {
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title" style="font-size:1.2em">' + tx('Styretavle / Automation', 'Control Panel / Automation') + '</div>';
+  html += '<div class="info-row" style="border-left:3px solid var(--accent);padding-left:10px;margin-bottom:12px">' + tx(
+    'PLC/rel\u00e6-logikdiagram med inputs (sensorer, kontakter) og outputs (kontaktorer, motorer, lys) forbundet med animerede signallinjer.',
+    'PLC/relay logic diagram with inputs (sensors, switches) and outputs (contactors, motors, lights) connected by animated signal flow lines.'
+  ) + '</div>';
+
+  // Build SVG control panel diagram
+  var svg = '<svg viewBox="0 0 600 350" width="100%" height="350" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
+  svg += simSvgDefs();
+
+  // Title
+  svg += '<text x="300" y="20" text-anchor="middle" class="sim-label" font-size="10" fill="var(--text)">' + tx('PLC Styring', 'PLC Control') + '</text>';
+
+  // === INPUT SECTION (left) ===
+  svg += '<rect x="20" y="40" width="150" height="280" rx="6" fill="rgba(33,150,243,0.05)" stroke="#2196f3" stroke-width="1" stroke-dasharray="4"/>';
+  svg += '<text x="95" y="55" text-anchor="middle" class="sim-label" font-size="7" fill="#2196f3">' + tx('Indgange', 'Inputs') + '</text>';
+
+  // Input devices
+  var inputs = [
+    { y: 75, label: tx('Temperatur', 'Temperature'), type: 'AI', color: '#f44336' },
+    { y: 120, label: tx('Tryk', 'Pressure'), type: 'AI', color: '#ff9800' },
+    { y: 165, label: tx('Startknap', 'Start Button'), type: 'DI', color: '#4caf50' },
+    { y: 210, label: tx('Stopknap', 'Stop Button'), type: 'DI', color: '#f44336' },
+    { y: 255, label: tx('Niveaum\u00e5ler', 'Level Sensor'), type: 'AI', color: '#9c27b0' },
+    { y: 290, label: tx('Overstr\u00f8m', 'Overcurrent'), type: 'DI', color: '#ff5722' }
+  ];
+
+  for (var ii = 0; ii < inputs.length; ii++) {
+    var inp = inputs[ii];
+    // Sensor symbol
+    svg += '<circle cx="55" cy="' + inp.y + '" r="12" fill="#fff" stroke="' + inp.color + '" stroke-width="1.5"/>';
+    svg += '<text x="55" y="' + (inp.y + 3) + '" text-anchor="middle" class="sim-label" font-size="5" fill="' + inp.color + '">' + inp.type + '</text>';
+    svg += '<text x="95" y="' + (inp.y + 3) + '" class="sim-label" font-size="5" fill="var(--text)">' + inp.label + '</text>';
+    // Signal line to PLC
+    svg += '<line x1="67" y1="' + inp.y + '" x2="220" y2="' + inp.y + '" stroke="' + inp.color + '" stroke-width="1.2" class="sim-wire" style="animation-duration:' + (1.5 + ii * 0.3).toFixed(1) + 's"/>';
+    // Arrow at PLC input
+    svg += '<polygon points="218,' + (inp.y - 3) + ' 224,' + inp.y + ' 218,' + (inp.y + 3) + '" fill="' + inp.color + '" class="sim-pulse" style="animation-duration:' + (1 + ii * 0.2).toFixed(1) + 's"/>';
+  }
+
+  // === PLC (center) ===
+  svg += '<rect x="220" y="50" width="160" height="260" rx="8" fill="#263238" stroke="#455a64" stroke-width="2"/>';
+  svg += '<rect x="230" y="60" width="140" height="30" rx="4" fill="#37474f"/>';
+  svg += '<text x="300" y="78" text-anchor="middle" class="sim-label" fill="#00e676" font-size="8">PLC CPU</text>';
+  // Status LEDs
+  svg += '<circle cx="240" cy="100" r="4" fill="#4caf50" class="sim-glow" style="animation-duration:1s"/>';
+  svg += '<circle cx="252" cy="100" r="4" fill="#ff9800" class="sim-glow" style="animation-duration:1.5s"/>';
+  svg += '<circle cx="264" cy="100" r="4" fill="#2196f3" class="sim-glow" style="animation-duration:2s"/>';
+  svg += '<text x="240" y="112" class="sim-label" font-size="4" fill="#a5d6a7">RUN</text>';
+  svg += '<text x="252" y="112" class="sim-label" font-size="4" fill="#ffe082">COM</text>';
+  svg += '<text x="264" y="112" class="sim-label" font-size="4" fill="#90caf9">I/O</text>';
+  // Logic blocks
+  svg += '<rect x="235" y="120" width="60" height="25" rx="3" fill="#1b5e20" stroke="#2e7d32" stroke-width="1"/>';
+  svg += '<text x="265" y="136" text-anchor="middle" class="sim-label" fill="#a5d6a7" font-size="5">AND / OR</text>';
+  svg += '<rect x="235" y="150" width="60" height="25" rx="3" fill="#0d47a1" stroke="#1565c0" stroke-width="1"/>';
+  svg += '<text x="265" y="166" text-anchor="middle" class="sim-label" fill="#90caf9" font-size="5">TIMER</text>';
+  svg += '<rect x="235" y="180" width="60" height="25" rx="3" fill="#4a148c" stroke="#7b1fa2" stroke-width="1"/>';
+  svg += '<text x="265" y="196" text-anchor="middle" class="sim-label" fill="#ce93d8" font-size="5">PID</text>';
+  svg += '<rect x="305" y="120" width="60" height="25" rx="3" fill="#b71c1c" stroke="#d32f2f" stroke-width="1"/>';
+  svg += '<text x="335" y="136" text-anchor="middle" class="sim-label" fill="#ef9a9a" font-size="5">COMPARE</text>';
+  svg += '<rect x="305" y="150" width="60" height="25" rx="3" fill="#e65100" stroke="#f57c00" stroke-width="1"/>';
+  svg += '<text x="335" y="166" text-anchor="middle" class="sim-label" fill="#ffcc80" font-size="5">COUNTER</text>';
+  svg += '<rect x="305" y="180" width="60" height="25" rx="3" fill="#1a237e" stroke="#283593" stroke-width="1"/>';
+  svg += '<text x="335" y="196" text-anchor="middle" class="sim-label" fill="#9fa8da" font-size="5">SR LATCH</text>';
+
+  // I/O labels
+  svg += '<text x="240" y="225" class="sim-label" font-size="5" fill="#aaa">DI: 0-5</text>';
+  svg += '<text x="240" y="237" class="sim-label" font-size="5" fill="#aaa">AI: 0-2</text>';
+  svg += '<text x="320" y="225" class="sim-label" font-size="5" fill="#aaa">DO: 0-5</text>';
+  svg += '<text x="320" y="237" class="sim-label" font-size="5" fill="#aaa">AO: 0-1</text>';
+
+  // Communication bus
+  svg += '<rect x="235" y="250" width="130" height="20" rx="3" fill="#004d40" stroke="#00897b" stroke-width="1"/>';
+  svg += '<text x="300" y="264" text-anchor="middle" class="sim-label" fill="#80cbc4" font-size="5">Modbus / Profinet</text>';
+  svg += '<line x1="235" y1="260" x2="365" y2="260" stroke="#00e676" stroke-width="0.8" class="sim-wire" style="animation-duration:1s"/>';
+
+  // === OUTPUT SECTION (right) ===
+  svg += '<rect x="430" y="40" width="150" height="280" rx="6" fill="rgba(76,175,80,0.05)" stroke="#4caf50" stroke-width="1" stroke-dasharray="4"/>';
+  svg += '<text x="505" y="55" text-anchor="middle" class="sim-label" font-size="7" fill="#4caf50">' + tx('Udgange', 'Outputs') + '</text>';
+
+  // Output devices
+  var outputs = [
+    { y: 80, label: tx('Motor M1', 'Motor M1'), symbol: 'M', color: '#1565c0' },
+    { y: 130, label: tx('Motor M2', 'Motor M2'), symbol: 'M', color: '#1565c0' },
+    { y: 180, label: tx('Ventil V1', 'Valve V1'), symbol: 'V', color: '#9c27b0' },
+    { y: 230, label: tx('Lampe H1', 'Light H1'), symbol: 'H', color: '#ff9800' },
+    { y: 280, label: tx('Alarm', 'Alarm'), symbol: 'A', color: '#f44336' }
+  ];
+
+  for (var oi = 0; oi < outputs.length; oi++) {
+    var out = outputs[oi];
+    // Signal line from PLC
+    svg += '<line x1="380" y1="' + out.y + '" x2="480" y2="' + out.y + '" stroke="' + out.color + '" stroke-width="1.5" class="sim-wire" style="animation-duration:' + (1.8 + oi * 0.3).toFixed(1) + 's"/>';
+    svg += '<polygon points="478,' + (out.y - 3) + ' 484,' + out.y + ' 478,' + (out.y + 3) + '" fill="' + out.color + '" class="sim-pulse" style="animation-duration:' + (1.2 + oi * 0.2).toFixed(1) + 's"/>';
+    // Contactor/actuator symbol
+    svg += '<rect x="484" y="' + (out.y - 14) + '" width="28" height="28" rx="4" fill="#fff" stroke="' + out.color + '" stroke-width="1.5"/>';
+    svg += '<text x="498" y="' + (out.y + 4) + '" text-anchor="middle" class="sim-label" font-size="9" fill="' + out.color + '">' + out.symbol + '</text>';
+    // Label
+    svg += '<text x="540" y="' + (out.y + 3) + '" class="sim-label" font-size="5" fill="var(--text)">' + out.label + '</text>';
+  }
+
+  // Power supply indicator
+  svg += '<rect x="250" y="285" width="100" height="20" rx="3" fill="#ff6f00" stroke="#e65100" stroke-width="1"/>';
+  svg += '<text x="300" y="298" text-anchor="middle" class="sim-label" fill="#fff" font-size="5">24V DC ' + tx('Forsyning', 'Supply') + '</text>';
+
+  svg += '</svg>';
+  html += svg;
+
+  // Summary
+  html += '<div class="result-box"><div class="result-title">' + tx('Styringsoversigt', 'Control Summary') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Digitale indgange', 'Digital Inputs') + '</span><span class="value">3 (DI)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Analoge indgange', 'Analog Inputs') + '</span><span class="value">3 (AI)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Digitale udgange', 'Digital Outputs') + '</span><span class="value">5 (DO)</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kommunikation', 'Communication') + '</span><span class="value">Modbus RTU / Profinet</span></div>';
   html += '</div>';
 
   html += '</div>';
