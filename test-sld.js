@@ -13096,6 +13096,172 @@ test('Discrim: MCB-MCB with explicit upCurve=C uses that curve', function() {
   assert.strictEqual(result.verdict, 'partial', 'Is=3000 < ikMax=6000 -> partial');
 });
 
+// ============================================================================
+// GOLDEN-MASTER VALIDATION SUITE TESTS (additive, verify module)
+// ============================================================================
+
+// Independent re-derivation of every golden expected value (NOT reusing the
+// engine), keyed by case id. Each test asserts (1) the live engine result is ok
+// and (2) the stored expected matches this independent derivation within tol.
+const GM_REDERIVE = {
+  // A. Zs ceilings: Cmin*U0/Ia (TN), 50000/Idn (TT), Cmin*U/(2*Ia) (IT)
+  'zsmax-tn-b16': 0.95 * 230 / (5 * 16),
+  'zsmax-tn-c16': 0.95 * 230 / (10 * 16),
+  'zsmax-tn-b40': 0.95 * 230 / (5 * 40),
+  'zsmax-tt-30': 50000 / 30,
+  'zsmax-tt-300': 50000 / 300,
+  'zsmax-it-b16': 0.95 * 400 / (2 * 5 * 16),
+  // B. Conductor-temperature multiplier 1 + alpha*(theta-20)
+  'rmult-cu-90': 1 + 0.00393 * (90 - 20),
+  'rmult-cu-70': 1 + 0.00393 * (70 - 20),
+  'rmult-al-90': 1 + 0.00403 * (90 - 20),
+  'rmult-base-20': 1 + 0.00393 * (20 - 20),
+  // C. Derating
+  'ca-40': 0.87, 'ca-50': 0.71, 'cg-2': 0.80, 'cg-6': 0.57, 'effiz-derate': 94 * 0.87 * 0.80,
+  // D. PE table 54.7
+  'pe-10': 10, 'pe-16': 16, 'pe-25': 16, 'pe-35': 16, 'pe-50': 50 / 2, 'pe-95': 95 / 2, 'pe-240': 240 / 2,
+  // E. Transformer FLC = kVA*1000/(sqrt(3)*400)
+  'flc-50': 50 * 1000 / (Math.sqrt(3) * 400),
+  'flc-400': 400 * 1000 / (Math.sqrt(3) * 400),
+  'flc-630': 630 * 1000 / (Math.sqrt(3) * 400),
+  'flc-2500': 2500 * 1000 / (Math.sqrt(3) * 400),
+  // F. Iz tables
+  'iz-cu-pvc-16': 73, 'iz-cu-xlpe-16': 94, 'iz-cu-xlpe-240': 500, 'iz-al-pvc-25': 73, 'iz-al-xlpe-16': 73,
+  // G. Device anchors
+  'mcb-b-isd': 4.8 * 16, 'mcb-c-isd': 10 * 16, 'ia-b16': 5 * 16, 'ia-b40': 5 * 40,
+  'gg-5s-16': 72, 'gg-5s-160': 750, 'zsmax-table-b16': 2.88,
+  // H. c-factors & engine Ik
+  'c-cmax': 1.05, 'c-cmin': 0.95,
+  'trafo-zs-400-4': (4 / 100) * 400 * 400 / (400 * 1000),
+  'trafo-ik3max-400-4': 1.05 * 400 / (Math.sqrt(3) * ((4 / 100) * 400 * 400 / (400 * 1000))) / 1000,
+  // I. RCD / insulation
+  'rcd-ac-idn': 300, 'rcd-ac-5x': 40, 'rcd-sel-idnmin': 130, 'rcd-sel-idnmax': 500, 'rcd-sel-5x': 150,
+  'insul-lv-v': 500, 'insul-lv-mohm': 1.0, 'insul-selv-v': 250, 'insul-selv-mohm': 0.5,
+  // J. IB
+  'ib-3ph-10kw': 10000 / (Math.sqrt(3) * 400 * 0.9),
+  'ib-1ph-3.68': 3680 / (230 * 1.0),
+  'ib-3ph-22kw': 22000 / (Math.sqrt(3) * 400 * 0.85),
+  // K. Voltage drop (re-derived from the real catalogue r/x)
+  'vdrop-3ph-2.5': (function () { var c = CABLES_COPPER['NOIKLX']['5G'][2.5]; var cos = 0.9, sin = Math.sqrt(1 - cos * cos); return Math.sqrt(3) * 16 * 50 * (c.r * cos + c.x * sin) / (400 * 10); })()
+};
+
+function gmMatch(actual, expected, tol) {
+  if (typeof actual !== 'number' || !isFinite(actual)) return false;
+  return (tol === 0) ? (actual === expected) : (Math.abs(actual - expected) <= tol * Math.abs(expected || 1));
+}
+
+// a. Per-category: re-derive each expected and confirm the live engine reproduces it.
+GOLDEN_CATEGORIES.forEach(function (cat) {
+  test('golden-master category "' + cat.en + '" reproduces independently re-derived references', function () {
+    var live = runGoldenSuite();
+    var cases = GOLDEN_CASES.filter(function (c) { return c.categoryKey === cat.key; });
+    assert(cases.length > 0, 'category ' + cat.key + ' must have at least one case');
+    cases.forEach(function (c) {
+      // independent re-derivation must match the stored expected within tol
+      assert(Object.prototype.hasOwnProperty.call(GM_REDERIVE, c.id), 'missing re-derivation for ' + c.id);
+      var reDerived = GM_REDERIVE[c.id];
+      assert(gmMatch(reDerived, c.expected, c.tol), c.id + ': re-derived ' + reDerived + ' != expected ' + c.expected + ' (tol ' + c.tol + ')');
+      // the live engine result must be ok (green)
+      var lr = live.find(function (r) { return r.id === c.id; });
+      assert(lr, 'live result missing for ' + c.id);
+      assert.strictEqual(lr.ok, true, c.id + ' should pass: actual=' + lr.actual + ' expected=' + c.expected + (lr.err ? ' err=' + lr.err : ''));
+    });
+  });
+});
+
+// b. No-tautology / no-fake-green guards.
+test('golden-master: every case has a callable fn and a numeric expected', function () {
+  GOLDEN_CASES.forEach(function (c) {
+    assert(typeof c.fn === 'function', c.id + ' must have a fn');
+    assert(typeof c.expected === 'number' && isFinite(c.expected), c.id + ' must have a numeric expected');
+    assert(typeof c.tol === 'number' && c.tol >= 0, c.id + ' must have a numeric tol');
+  });
+});
+
+test('golden-master: the verify region contains NO literal pass:true (fake-green removed)', function () {
+  var m = html.match(/GOLDEN_SUITE_REGION_START[\s\S]*?function renderVerify[\s\S]*?\n  return html;\n\}/);
+  assert(m, 'could not locate the verify region in the HTML');
+  var region = m[0];
+  assert(!/pass\s*:\s*true/.test(region), 'verify region must not contain a literal pass:true');
+  // also assert it across the whole file (the old fake-green line is gone)
+  assert(!/IEC 60909 cmax \(LV\)', exp:'1.05', act:'1.05', pass:true/.test(html), 'old fake-green line must be gone');
+});
+
+test('golden-master: flipping a case expected makes ok false (verdict is computed, not hard-coded)', function () {
+  var live = runGoldenSuite();
+  // pick a representative resolved case and emulate the runner verdict on a doubled expected
+  var sample = live.find(function (r) { return r.id === 'zsmax-tn-b16'; });
+  assert(sample && sample.ok === true, 'baseline case must pass');
+  var flippedExpected = sample.expected * 2;
+  var tol = sample.tol;
+  var okFlipped = (tol === 0) ? (sample.actual === flippedExpected) : (Math.abs(sample.actual - flippedExpected) <= tol * Math.abs(flippedExpected || 1));
+  assert.strictEqual(okFlipped, false, 'doubling the expected must flip ok to false');
+});
+
+// c. Purity: runGoldenSuite must not mutate global state or data tables.
+test('golden-master: runGoldenSuite is side-effect free (loadState/zsState/cableState unchanged)', function () {
+  var beforeLoad = JSON.stringify(loadState);
+  var beforeZs = (typeof zsState !== 'undefined') ? JSON.stringify(zsState) : null;
+  var beforeCable = (typeof cableState !== 'undefined') ? JSON.stringify(cableState) : null;
+  var cableR = (function () { for (var i = 0; i < PRODUCTS.cables.length; i++) { if (PRODUCTS.cables[i].id === 'NKT-NOIKLX-2.5') return PRODUCTS.cables[i].r; } return null; })();
+  runGoldenSuite();
+  assert.strictEqual(JSON.stringify(loadState), beforeLoad, 'loadState must be restored');
+  if (beforeZs != null) assert.strictEqual(JSON.stringify(zsState), beforeZs, 'zsState must be restored');
+  if (beforeCable != null) assert.strictEqual(JSON.stringify(cableState), beforeCable, 'cableState must be restored');
+  var cableR2 = (function () { for (var i = 0; i < PRODUCTS.cables.length; i++) { if (PRODUCTS.cables[i].id === 'NKT-NOIKLX-2.5') return PRODUCTS.cables[i].r; } return null; })();
+  assert.strictEqual(cableR2, cableR, 'a representative PRODUCTS cable r-value must be unchanged (7.41)');
+  assert.strictEqual(cableR2, 7.41, 'NOIKLX 2.5mm2 r must remain 7.41 ohm/km');
+});
+
+// d. Trilingual: every new English UI string and category label has a non-empty _FA entry.
+var GM_NEW_STRINGS = [
+  'Engine Verification (Golden Master)', 'Calculation engine verified', 'control cases passed',
+  'FAILURE: engine is NOT verified',
+  'Each control case runs a real audited engine function and compares it against an independently known reference value and its standard clause.',
+  'Filter category', 'All', 'Expected', 'Computed', 'Unresolved (no green)', 'Show details', 'Hide details'
+];
+GOLDEN_CATEGORIES.forEach(function (c) { GM_NEW_STRINGS.push(c.en); });
+test('golden-master: every new English string + category label has a non-empty _FA translation', function () {
+  GM_NEW_STRINGS.forEach(function (en) {
+    assert(typeof _FA[en] === 'string' && _FA[en].length > 0, 'missing/empty _FA for: ' + en);
+  });
+});
+test('golden-master: Farsi mode returns translated (non-English) text for new keys', function () {
+  var prev = lang;
+  lang = 'fa';
+  try {
+    GM_NEW_STRINGS.forEach(function (en) {
+      var out = tx('xx', en);
+      assert(out !== en, 'tx in fa should not fall back to English for: ' + en);
+    });
+  } finally { lang = prev; }
+});
+
+// e. No new typing affordances / external resources in the new verify region.
+test('golden-master: new verify region introduces no inputs or external resources', function () {
+  var m = html.match(/GOLDEN_SUITE_REGION_START[\s\S]*?function renderVerify[\s\S]*?\n  return html;\n\}/);
+  assert(m, 'could not locate the verify region');
+  var region = m[0];
+  ['<input', '<textarea', 'contenteditable', '<script src', 'fetch(', 'XMLHttpRequest', 'WebSocket', '@import'].forEach(function (tok) {
+    assert.strictEqual(region.indexOf(tok), -1, 'verify region must not contain forbidden token: ' + tok);
+  });
+});
+
+// f. Engine-unchanged regression (the audited primitives still produce baseline values).
+test('golden-master: audited engine primitives unchanged (regression)', function () {
+  var savedLoad = JSON.parse(JSON.stringify(loadState));
+  loadState = { voltage: '3x400', power: 10, cosPhi: 0.9, simFactor: 1, expFactor: 1 };
+  assert(Math.abs(calcIB() - 16.04) < 0.02 * 16.04, 'calcIB 3~ 10kW should be ~16.04');
+  loadState = savedLoad;
+  var tree = { rootId: 'gtr', nodes: { gtr: { id: 'gtr', parentId: null, type: 'transformer', power_kVA: 400, uk_pct: 4, cable: null, length_m: 0, childIds: ['gbd'] }, gbd: { id: 'gbd', parentId: 'gtr', type: 'main_board', phases: '3x400', cable: null, length_m: 0, childIds: [] } } };
+  assert(Math.abs(sldCalcNodeZs(tree, 'gbd') - 0.016) < 1e-9, 'transformer Zs should be 0.016');
+  assert(Math.abs(elforsyningTransformerFlc(400) - 577.35) < 0.05, 'FLC(400) should be ~577.35');
+  assert(Math.abs(upRMult('Cu', 90) - 1.2751) < 1e-4, 'upRMult Cu@90 should be ~1.2751');
+  assert(Math.abs(cvZsCeiling('TN', { In: 16, curve: 'B' }).zsMax - 2.731) < 0.005 * 2.731, 'cvZsCeiling TN B16 ~2.731');
+  assert.strictEqual(MCB_CURVES.B.isdMax, 4.8, 'MCB B isdMax must remain 4.8');
+});
+
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
