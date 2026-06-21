@@ -1127,7 +1127,8 @@ const T = {
       analyzer: '\uD83D\uDD0D Projektanalysator',
       distplan: 'Fordelingsplan',
       elplan: 'Installationsplan',
-      controlpanel: 'Styretavle'
+      controlpanel: 'Styretavle',
+      archive: 'Projektarkiv'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1287,7 +1288,8 @@ const T = {
       analyzer: '\uD83D\uDD0D Project Analyzer',
       distplan: 'Distribution Plan',
       elplan: 'Electrical Plan',
-      controlpanel: 'Control Panel'
+      controlpanel: 'Control Panel',
+      archive: 'Project Archive'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -1439,7 +1441,8 @@ const T = {
       analyzer: '\uD83D\uDD0D تحلیلگر پروژه',
       distplan: 'نقشه توزیع',
       elplan: 'نقشه تاسیسات برقی',
-      controlpanel: 'تابلوی کنترل'
+      controlpanel: 'تابلوی کنترل',
+      archive: 'آرشیو پروژه'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -4139,7 +4142,7 @@ SharedQuantities.subscribe('temperature', function(temp, source) {
 // project rollups must refresh on ANY change so they can never show a stale
 // verdict. This is what links ALL modules together (steering: every module
 // must be contacted on every change).
-const REACTIVE_ALWAYS = ['coordination','kritisk','sld','draw','pdf','bank','projekt','verify','brain','panel'];
+const REACTIVE_ALWAYS = ['coordination','kritisk','sld','draw','pdf','bank','projekt','verify','brain','panel','archive'];
 
 // Transitive closure of the dependency graph from a source key, then unioned
 // with the always-relevant rollups. Pure function (no DOM) — unit-testable.
@@ -5268,7 +5271,7 @@ const NAV_GROUPS = [
     da: 'Dokumentation & kvalitet', en: 'Documentation & quality', fa: '\u0645\u0633\u062A\u0646\u062F\u0627\u062A \u0648 \u06A9\u06CC\u0641\u06CC\u062A',
     descDa: 'Det der g\u00F8r projektet lovligt og f\u00E6rdigt: standarder, komponentbank, tilbud, KLS-kvalitetssikring, idrifts\u00E6ttelse, dokumentation \u2014 og eksamenstr\u00E6ning.',
     descEn: 'What makes the project legal and finished: standards, component bank, bids, KLS quality control, commissioning, documentation \u2014 and exam practice.',
-    keys: ['standards', 'bank', 'pdf', 'bid', 'kls', 'commission', 'commissioning', 'verify', 'exam', 'ai']
+    keys: ['standards', 'bank', 'pdf', 'bid', 'kls', 'commission', 'commissioning', 'verify', 'exam', 'ai', 'archive']
   }
 ];
 
@@ -6773,12 +6776,13 @@ function renderModule(mod) {
     case 'distplan': content = renderDistPlan(); break;
     case 'elplan': content = renderElPlan(); break;
     case 'controlpanel': content = renderControlPanel(); break;
+    case 'archive': content = renderArchive(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
   // Append QI validation summary if enough data exists
   const qi = runQiValidation();
-  const noQi = ['standards','bank','ai','bid','projekt','verify','draw','exam','kritisk','guide'];
+  const noQi = ['standards','bank','ai','bid','projekt','verify','draw','exam','kritisk','guide','archive'];
   if (qi.passed.length + qi.issues.length > 0 && noQi.indexOf(mod) < 0) {
     content += renderQiCard(qi);
   }
@@ -11068,7 +11072,9 @@ function renderProjekt() {
         <button class="sel-btn" onclick="projectExport()">\u2B07\uFE0F ${tx('Eksport', 'Export')}</button>
         <label class="sel-btn" style="cursor:pointer">\u2B06\uFE0F ${tx('Import', 'Import')}<input type="file" accept="application/json" style="display:none" onchange="projectImport(this)"></label>
         ${projectState.circuits.length?`<button class="sel-btn" onclick="projectClear()">\uD83D\uDDD1\uFE0F ${tx('Ryd', 'Clear')}</button>`:''}
+        <button class="sel-btn" onclick="switchModule('archive')">\uD83D\uDDC4\uFE0F ${tx('Projektarkiv', 'Project Archive')}</button>
       </div>
+      ${archiveState.activeProjectId ? `<div class="info-row" style="margin-top:6px;font-size:0.78rem;color:var(--text-muted)">\uD83D\uDCC1 ${tx('Aktivt projekt', 'Active project')}: <strong>${(archiveState.projects.find(p=>p.id===archiveState.activeProjectId)||{}).name||'-'}</strong></div>` : ''}
     </div>
 
     <div class="card fade-in">
@@ -11093,6 +11099,288 @@ function renderProjekt() {
       </div>
       ` : '<div class="info-row">' + (tx('Ingen grupper endnu. G\u00E5 til "Belastning", dimensionér, og klik "Tilf\u00F8j aktuel gruppe".', 'No circuits yet. Go to "Load", dimension, and click "Add current circuit".')) + '</div>'}
     </div>`;
+}
+
+// ===== PROJECT ARCHIVE MODULE (multi-project save/load/switch/delete/export/import) =====
+var archiveState = { projects: [], activeProjectId: null, showList: true };
+
+// All module state variable names for snapshot/restore
+var ARCHIVE_MODULE_KEYS = [
+  'loadState', 'fuseState', 'mcbState', 'mccbState', 'cableState', 'vdropState',
+  'scState', 'trafoState', 'thermalState', 'energyState', 'cable3dState', 'pdfState',
+  'tccState', 'panelState', 'evState', 'solarState', 'noedState', 'motorState',
+  'harmonicState', 'vfdState', 'lightingState', 'heatpumpState', 'busbarState',
+  'bathroomState', 'firealarmState', 'dataState', 'spdState', 'upsState', 'pfcState',
+  'trayFillState', 'zsState', 'commissionState', 'shevState', 'accessState',
+  'generatorState', 'discrimState', 'earthsysState', 'poolState', 'constructionState',
+  'agriState', 'arcflashState', 'cablelifeState', 'bessState', 'emcState',
+  'meteringState', 'atexState', 'smartgridState', 'klsState', 'impedansState',
+  'trefaseState', 'motorteoriState', 'relayState', 'faultState', 'dcState',
+  'lysState', 'magnetState', 'kapacitorState', 'varmeState', 'dcmaskineState',
+  'faktorState', 'analyzerState', 'bidState', 'examState', 'brainState',
+  'guideState', 'diversityState'
+];
+
+// Restore archive from localStorage
+(function restoreArchive() {
+  try {
+    var saved = JSON.parse(localStorage.getItem('elArchive') || 'null');
+    if (saved && saved.projects) {
+      archiveState = saved;
+    } else {
+      // Migrate existing elProject data into archive as first project
+      try {
+        var oldProj = JSON.parse(localStorage.getItem('elProject') || 'null');
+        if (oldProj && oldProj.circuits && oldProj.circuits.length > 0) {
+          var migratedId = 'proj_' + Date.now();
+          archiveState.projects.push({
+            id: migratedId,
+            name: oldProj.name || 'Projekt 1',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            metadata: { installationType: 'Bolig', address: '' },
+            moduleStates: {},
+            circuits: oldProj.circuits || []
+          });
+          archiveState.activeProjectId = migratedId;
+          archivePersist();
+        }
+      } catch (e) { /* migration failed silently */ }
+    }
+  } catch (e) { /* parse failure */ }
+})();
+
+function archivePersist() {
+  try { localStorage.setItem('elArchive', JSON.stringify(archiveState)); } catch (e) { /* quota */ }
+}
+
+function archiveCollectModuleStates() {
+  var snap = {};
+  for (var i = 0; i < ARCHIVE_MODULE_KEYS.length; i++) {
+    var k = ARCHIVE_MODULE_KEYS[i];
+    try {
+      var val = (typeof window !== 'undefined' && window[k] !== undefined) ? window[k] : eval(k);
+      if (val !== undefined) snap[k] = JSON.parse(JSON.stringify(val));
+    } catch (e) { /* skip unserializable */ }
+  }
+  return snap;
+}
+
+function archiveRestoreModuleStates(snap) {
+  if (!snap) return;
+  var keys = Object.keys(snap);
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    try {
+      var target;
+      try { target = eval(k); } catch(e2) { continue; }
+      var source = snap[k];
+      if (target && typeof target === 'object' && source && typeof source === 'object' && !Array.isArray(target) && !Array.isArray(source)) {
+        // Merge into existing object to preserve references
+        var sk = Object.keys(source);
+        for (var j = 0; j < sk.length; j++) target[sk[j]] = source[sk[j]];
+        // Remove keys not in source
+        var tk = Object.keys(target);
+        for (var j2 = 0; j2 < tk.length; j2++) { if (!(tk[j2] in source)) delete target[tk[j2]]; }
+      } else if (typeof window !== 'undefined') {
+        window[k] = source;
+      }
+    } catch (e) { /* skip */ }
+  }
+}
+
+function archiveSave() {
+  var proj = archiveState.projects.find(function(p) { return p.id === archiveState.activeProjectId; });
+  if (!proj) return;
+  proj.moduleStates = archiveCollectModuleStates();
+  proj.circuits = JSON.parse(JSON.stringify(projectState.circuits || []));
+  proj.updatedAt = new Date().toISOString();
+  archivePersist();
+}
+
+function archiveRestore(projectId) {
+  var proj = archiveState.projects.find(function(p) { return p.id === projectId; });
+  if (!proj) return;
+  // Save current project first
+  archiveSave();
+  // Set new active project
+  archiveState.activeProjectId = projectId;
+  // Restore module states
+  if (proj.moduleStates) archiveRestoreModuleStates(proj.moduleStates);
+  // Restore circuits into projectState
+  projectState.name = proj.name || 'Projekt';
+  projectState.circuits = proj.circuits ? JSON.parse(JSON.stringify(proj.circuits)) : [];
+  saveProject();
+  // Trigger reactive updates
+  if (typeof Reactive !== 'undefined') Reactive.notify('archive');
+  archivePersist();
+  renderModule('archive');
+}
+
+function archiveDelete(projectId) {
+  archiveState.projects = archiveState.projects.filter(function(p) { return p.id !== projectId; });
+  if (archiveState.activeProjectId === projectId) {
+    archiveState.activeProjectId = archiveState.projects.length > 0 ? archiveState.projects[0].id : null;
+  }
+  archivePersist();
+  renderModule('archive');
+}
+
+function archiveNew(presetName) {
+  // Save current project first
+  if (archiveState.activeProjectId) archiveSave();
+  var newId = 'proj_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+  var metaType = presetName || 'Projekt';
+  archiveState.projects.push({
+    id: newId,
+    name: presetName || ('Projekt ' + (archiveState.projects.length + 1)),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    metadata: { installationType: metaType, address: '' },
+    moduleStates: {},
+    circuits: []
+  });
+  archiveState.activeProjectId = newId;
+  // Reset all module states to blank defaults for new project
+  projectState.name = presetName || ('Projekt ' + archiveState.projects.length);
+  projectState.circuits = [];
+  saveProject();
+  archivePersist();
+  renderModule('archive');
+}
+
+function archiveExport(projectId) {
+  var proj = archiveState.projects.find(function(p) { return p.id === projectId; });
+  if (!proj) return;
+  // Update module states before export if it's the active project
+  if (projectId === archiveState.activeProjectId) archiveSave();
+  proj = archiveState.projects.find(function(p) { return p.id === projectId; });
+  var blob = new Blob([JSON.stringify(proj, null, 2)], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (proj.name || 'projekt').replace(/\s+/g, '_') + '_archive.json';
+  a.click();
+}
+
+function archiveImportFile(input) {
+  var f = input && input.files && input.files[0];
+  if (!f) return;
+  var r = new FileReader();
+  r.onload = function(e) {
+    try {
+      var data = JSON.parse(e.target.result);
+      if (!data.id) data.id = 'proj_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+      if (!data.name) data.name = 'Importeret Projekt';
+      if (!data.createdAt) data.createdAt = new Date().toISOString();
+      data.updatedAt = new Date().toISOString();
+      if (!data.metadata) data.metadata = { installationType: 'Import', address: '' };
+      if (!data.moduleStates) data.moduleStates = {};
+      if (!data.circuits) data.circuits = [];
+      // Avoid duplicate IDs
+      var existing = archiveState.projects.find(function(p) { return p.id === data.id; });
+      if (existing) data.id = 'proj_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+      archiveState.projects.push(data);
+      archivePersist();
+      renderModule('archive');
+    } catch (err) {
+      if (typeof alert !== 'undefined') alert('Import error: ' + err.message);
+    }
+  };
+  r.readAsText(f);
+}
+
+// Debounced auto-save: saves active project whenever a module change occurs
+var _archiveAutoSaveTimer = null;
+function archiveAutoSave() {
+  if (!archiveState.activeProjectId) return;
+  if (_archiveAutoSaveTimer) clearTimeout(_archiveAutoSaveTimer);
+  _archiveAutoSaveTimer = setTimeout(function() {
+    archiveSave();
+  }, 3000);
+}
+
+// Hook auto-save into module renders (lightweight - only schedules a debounced save)
+var _origRenderModule_archive;
+(function hookArchiveAutoSave() {
+  // We hook into the save mechanism by calling archiveAutoSave after saveProject
+  var _origSaveProject = (typeof saveProject === 'function') ? saveProject : null;
+  if (_origSaveProject) {
+    // Override saveProject to also trigger archive auto-save
+    var __origSP = saveProject;
+    saveProject = function() { __origSP(); archiveAutoSave(); };
+  }
+})();
+
+function renderArchive() {
+  var activeProj = archiveState.projects.find(function(p) { return p.id === archiveState.activeProjectId; });
+
+  // Preset name buttons for new projects (click-only, no text input)
+  var presetNames = [
+    { da: 'Bolig installation', en: 'Residential Installation' },
+    { da: 'Erhverv tavle', en: 'Commercial Panel' },
+    { da: 'Industri motor', en: 'Industrial Motor' },
+    { da: 'EV lader', en: 'EV Charger' },
+    { da: 'Solcelle anlaeg', en: 'Solar PV System' },
+    { da: 'Varmepumpe', en: 'Heat Pump System' },
+    { da: 'Noedstroem', en: 'Emergency Power' },
+    { da: 'Belysning', en: 'Lighting Design' },
+    { da: 'Data / IT', en: 'Data / IT' },
+    { da: 'Brandalarm', en: 'Fire Alarm' },
+    { da: 'Landbrug', en: 'Agriculture' },
+    { da: 'Byggeplads', en: 'Construction Site' }
+  ];
+
+  var presetGrid = presetNames.map(function(p) {
+    return '<button class="sel-btn" onclick="archiveNew(\'' + tx(p.da, p.en).replace(/'/g, "\\'") + '\')">' + tx(p.da, p.en) + '</button>';
+  }).join('');
+
+  // Project list
+  var projectListHtml = '';
+  if (archiveState.projects.length === 0) {
+    projectListHtml = '<div class="info-row">' + tx('Ingen projekter endnu. Opret et nyt projekt nedenfor.', 'No projects yet. Create a new project below.') + '</div>';
+  } else {
+    projectListHtml = archiveState.projects.map(function(p) {
+      var isActive = p.id === archiveState.activeProjectId;
+      var created = p.createdAt ? new Date(p.createdAt).toLocaleDateString('da-DK') : '-';
+      var updated = p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('da-DK') : '-';
+      var nCircuits = (p.circuits || []).length;
+      var nModules = p.moduleStates ? Object.keys(p.moduleStates).length : 0;
+      var metaType = (p.metadata && p.metadata.installationType) || '';
+      return '<div class="result-box" style="margin-bottom:8px;cursor:pointer;border-color:' + (isActive ? 'var(--primary)' : 'var(--border)') + ';background:' + (isActive ? 'var(--primary-glow)' : 'var(--card-bg)') + '" onclick="archiveRestore(\'' + p.id + '\')">' +
+        '<div class="result-row"><span class="label" style="font-weight:700;font-size:0.92rem">' + (isActive ? '\uD83D\uDFE2 ' : '\u26AA ') + p.name + '</span><span class="value"><span class="verify-badge ok" style="font-size:0.68rem">' + metaType + '</span></span></div>' +
+        '<div class="result-row"><span class="label" style="font-size:0.72rem;color:var(--text-muted)">' + tx('Oprettet', 'Created') + ': ' + created + ' | ' + tx('Opdateret', 'Updated') + ': ' + updated + '</span><span class="value" style="font-size:0.72rem">' + nCircuits + ' ' + tx('grupper', 'circuits') + ' | ' + nModules + ' ' + tx('moduler', 'modules') + '</span></div>' +
+        '<div class="select-grid" style="margin-top:6px" onclick="event.stopPropagation()">' +
+          (isActive ? '<button class="sel-btn selected" style="padding:2px 10px;min-width:0">\u2705 ' + tx('Aktiv', 'Active') + '</button>' : '<button class="sel-btn" style="padding:2px 10px;min-width:0" onclick="archiveRestore(\'' + p.id + '\')">\uD83D\uDD04 ' + tx('Skift til', 'Switch to') + '</button>') +
+          '<button class="sel-btn" style="padding:2px 10px;min-width:0" onclick="archiveExport(\'' + p.id + '\')">\u2B07\uFE0F ' + tx('Eksport', 'Export') + '</button>' +
+          '<button class="sel-btn" style="padding:2px 10px;min-width:0;color:var(--danger)" onclick="archiveDelete(\'' + p.id + '\')">\uD83D\uDDD1\uFE0F ' + tx('Slet', 'Delete') + '</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  return '\n' +
+    '<div class="card fade-in">\n' +
+    '  <div class="card-title">\uD83D\uDDC4\uFE0F ' + tx('Projektarkiv', 'Project Archive') + '</div>\n' +
+    '  <div class="info-row">' + tx('Administrer flere projekter. Gem, skift, eksporter og importer hele projektopsaetninger med alle modulvaerdier.', 'Manage multiple projects. Save, switch, export and import full project setups with all module values.') + '</div>\n' +
+    (activeProj ? '  <div class="result-box" style="margin-top:8px;border-color:var(--primary);background:var(--primary-glow)"><div class="result-row"><span class="label">\uD83D\uDCC1 ' + tx('Aktivt projekt', 'Active project') + '</span><span class="value" style="font-weight:700">' + activeProj.name + '</span></div></div>\n' : '') +
+    '</div>\n' +
+    '<div class="card fade-in">\n' +
+    '  <div class="card-title">' + tx('Gemte projekter', 'Saved Projects') + ' (' + archiveState.projects.length + ')</div>\n' +
+    projectListHtml + '\n' +
+    '</div>\n' +
+    '<div class="card fade-in">\n' +
+    '  <div class="card-title">\u2795 ' + tx('Nyt projekt', 'New Project') + '</div>\n' +
+    '  <div class="info-row">' + tx('Vaelg en skabelon for at oprette et nyt projekt (klik-only):', 'Choose a template to create a new project (click-only):') + '</div>\n' +
+    '  <div class="select-grid">' + presetGrid + '</div>\n' +
+    '</div>\n' +
+    '<div class="card fade-in">\n' +
+    '  <div class="card-title">' + tx('Handlinger', 'Actions') + '</div>\n' +
+    '  <div class="select-grid">\n' +
+    '    <button class="sel-btn" onclick="archiveSave()">\uD83D\uDCBE ' + tx('Gem aktivt projekt', 'Save active project') + '</button>\n' +
+    '    <label class="sel-btn" style="cursor:pointer">\u2B06\uFE0F ' + tx('Importer projekt', 'Import project') + '<input type="file" accept="application/json" style="display:none" onchange="archiveImportFile(this)"></label>\n' +
+    '    <button class="sel-btn" onclick="switchModule(\'projekt\')">\uD83D\uDCCB ' + tx('Tilbage til Projekt', 'Back to Project') + '</button>\n' +
+    '  </div>\n' +
+    '</div>\n';
 }
 
 // ===== VERIFY / SELF-TEST MODULE (bulletproof) =====
