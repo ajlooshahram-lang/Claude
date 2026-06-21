@@ -1061,7 +1061,59 @@
     xbar, setXbarCell, setXbarConfig, xbarResult, scorecard,
     spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy,
     ROUTE_PHASES, ROUTE_STATUS, routeProgress, setRoutePhase, setRouteLaidKm, routeOverall, routePhaseFraction, routeRollup,
-    whatIf };
+    whatIf, weeklySummary };
+
+  // --- Feature #7: Weekly project summary snapshot ---
+  // Stores a KPI snapshot each week and generates a plain-language comparison
+  // between now and the previous saved snapshot. Designed for zero-PM users.
+  var WSNAP_KEY = "qi_weekly_snap";
+  function _loadWeeklySnap() {
+    try { var raw = localStorage.getItem(WSNAP_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+  }
+  function _saveWeeklySnap(snap) {
+    try { localStorage.setItem(WSNAP_KEY, JSON.stringify(snap)); } catch (e) {}
+  }
+  function weeklySummary() {
+    var now = kpis();
+    var hs = healthScore();
+    var prev = _loadWeeklySnap();
+    var today = new Date();
+    var dayMs = 86400000;
+    // Decide if we should save a new snapshot (once every 7 days max)
+    var shouldSave = !prev || !prev.ts || (today.getTime() - prev.ts > 6 * dayMs);
+    var summary = { generated: today.toISOString(), current: now, health: hs, prev: prev, delta: null, text: "" };
+    if (prev && prev.kpis) {
+      var d = {};
+      d.total = (now.total || 0) - (prev.kpis.total || 0);
+      d.open = (now.open || 0) - (prev.kpis.open || 0);
+      d.crit = (now.crit || 0) - (prev.kpis.crit || 0);
+      d.blocked = (now.blocked || 0) - (prev.kpis.blocked || 0);
+      d.avgDone = Math.round(((now.avgDone || 0) - (prev.kpis.avgDone || 0)) * 100);
+      d.healthDelta = (hs.score || 0) - (prev.healthScore || 0);
+      summary.delta = d;
+      // Build plain-language text
+      var parts = [];
+      if (d.healthDelta > 0) parts.push("Health improved by " + d.healthDelta + " points (now " + (hs.score || 0) + "/100).");
+      else if (d.healthDelta < 0) parts.push("Health dropped " + Math.abs(d.healthDelta) + " points to " + (hs.score || 0) + "/100 - needs attention.");
+      else parts.push("Health is steady at " + (hs.score || 0) + "/100.");
+      if (d.total > 0) parts.push(d.total + " new item" + (d.total === 1 ? "" : "s") + " added.");
+      if (d.crit > 0) parts.push(d.crit + " more critical risk" + (d.crit === 1 ? "" : "s") + " appeared.");
+      else if (d.crit < 0) parts.push(Math.abs(d.crit) + " critical risk" + (Math.abs(d.crit) === 1 ? "" : "s") + " resolved.");
+      if (d.blocked > 0) parts.push(d.blocked + " more item" + (d.blocked === 1 ? " is" : "s are") + " now blocked.");
+      else if (d.blocked < 0) parts.push(Math.abs(d.blocked) + " blocked item" + (Math.abs(d.blocked) === 1 ? "" : "s") + " cleared.");
+      if (d.avgDone > 0) parts.push("Average completion up " + d.avgDone + " percentage points.");
+      if (!parts.length) parts.push("No significant changes since last week.");
+      summary.text = parts.join(" ");
+    } else {
+      summary.text = "This is the first snapshot. Next week, the app will compare and tell you what changed.";
+    }
+    // Save new snapshot if enough time has passed
+    if (shouldSave) {
+      _saveWeeklySnap({ ts: today.getTime(), kpis: now, healthScore: hs.score || 0 });
+    }
+    return summary;
+  }
+
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);

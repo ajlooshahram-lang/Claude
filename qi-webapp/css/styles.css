@@ -420,6 +420,16 @@ table:focus-within thead th{box-shadow:inset 0 -2px 0 var(--blue)}
   .brief-todo-item{page-break-inside:avoid}
   .brief-compare,.brief-filter,.no-print{display:none!important}
   .prog-bar{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  /* Feature #6: Enhanced PDF export — clean page headers for board meetings */
+  .brief-section{page-break-before:auto;margin-top:20px}
+  .brief-section h3{font-size:14px;margin-top:0;border-bottom:2px solid #2e5496;padding-bottom:4px}
+  .brief-head{page-break-after:avoid}
+  .brief-stats{page-break-inside:avoid}
+  .brief-country{border:1px solid #ccc;padding:12px;margin:8px 0;border-radius:8px}
+  .brief-table{font-size:11px}
+  .brief-table th{font-size:10px;background:#eee!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  .brief-pdf-header{display:block!important;text-align:right;font-size:9px;color:#666;border-bottom:1px solid #ccc;padding-bottom:4px;margin-bottom:12px}
+  .brief-toolbar{display:none!important}
 }
 
 /* drag-and-drop overlay */
@@ -1530,6 +1540,59 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 .onboard-card{max-width:460px;width:90%;padding:36px 32px;border-radius:18px;
   background:linear-gradient(145deg,#162240,#1a2d52);border:1px solid rgba(125,167,240,.25);
   box-shadow:0 24px 60px rgba(0,0,0,.5);text-align:center}
+
+/* ---- Feature #3: Progress ring card ---- */
+.progress-ring-card{margin-bottom:16px}
+.progress-ring-wrap{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.progress-ring-svg{flex:none}
+.progress-ring-info h3{margin:0 0 4px;font-size:15px}
+.progress-ring-verdict{margin:0;font-size:13.5px;color:var(--muted,#6b7892);line-height:1.5}
+.progress-ring-text{font-family:'Segoe UI',Arial,sans-serif}
+
+/* ---- Feature #4: 2D animated fallback map ---- */
+.fallback-map-wrap{padding:12px}
+.fallback-map-title{margin:0 0 4px;font-size:16px}
+.fallback-map-sub{margin:0 0 12px;font-size:12px;color:var(--muted,#6b7892)}
+.fallback-map-svg{width:100%;height:auto;border-radius:10px;border:1px solid var(--line,#e3e8f0)}
+.fallback-label{font-size:9px;font-weight:600;fill:var(--ink,#1d2736);font-family:'Segoe UI',Arial,sans-serif}
+.fallback-station-dot{transition:r .2s}
+.fallback-legend{display:flex;gap:14px;margin-top:10px;font-size:12px;color:var(--muted,#6b7892)}
+.fallback-leg{display:inline-flex;align-items:center;gap:5px}
+@keyframes dashFlow{0%{stroke-dashoffset:28}100%{stroke-dashoffset:0}}
+.fallback-cable-dash{animation:dashFlow 1.2s linear infinite;stroke-linecap:round}
+
+/* ---- Feature #5: Narrated tour captions ---- */
+.tour-fact{display:block;font-size:12px;font-weight:400;color:rgba(255,255,255,.85);margin-top:3px;line-height:1.4;max-width:340px}
+.globe-tourhud-place{display:flex;flex-direction:column}
+
+/* ---- Feature #7: Weekly summary card ---- */
+.weekly-summary-card{margin-bottom:16px}
+.ws-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.ws-chip{font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;display:inline-flex;align-items:center;gap:4px}
+.ws-chip--up{background:rgba(39,174,96,.12);color:#1d8e6a;border:1px solid rgba(39,174,96,.3)}
+.ws-chip--down{background:rgba(231,76,60,.1);color:#c0392b;border:1px solid rgba(231,76,60,.3)}
+.ws-chip--neutral{background:rgba(46,84,150,.08);color:var(--accent,#2e5496);border:1px solid rgba(46,84,150,.2)}
+.ws-text{margin:0;font-size:13.5px;line-height:1.6;color:var(--ink,#1d2736)}
+
+/* ---- Feature #8: Keyboard shortcuts floating widget ---- */
+.shortcuts-fab{position:fixed;bottom:80px;right:20px;z-index:900;width:36px;height:36px;border-radius:50%;
+  background:var(--accent,#2e5496);color:#fff;border:none;font-size:16px;font-weight:700;cursor:pointer;
+  box-shadow:0 3px 12px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;
+  transition:transform .15s,box-shadow .15s}
+.shortcuts-fab:hover{transform:scale(1.1);box-shadow:0 5px 16px rgba(0,0,0,.35)}
+.shortcuts-fab.is-active{background:#e74c3c}
+.shortcuts-panel{position:fixed;bottom:124px;right:20px;z-index:901;width:260px;
+  background:var(--card,#fff);border:1px solid var(--line,#e3e8f0);border-radius:12px;
+  box-shadow:0 8px 32px rgba(0,0,0,.18);overflow:hidden;animation:fadeIn .2s ease}
+.shortcuts-panel-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;
+  border-bottom:1px solid var(--line,#e3e8f0);background:var(--bg2,#f4f6fb)}
+.shortcuts-panel-head h4{margin:0;font-size:13px}
+.shortcuts-panel-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted,#6b7892);line-height:1}
+.shortcuts-panel-body{padding:8px 14px;max-height:280px;overflow-y:auto}
+.shortcuts-panel-body .shortcut-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;
+  font-size:12px;border-bottom:1px solid var(--line,#e3e8f0)}
+.shortcuts-panel-body .shortcut-row:last-child{border-bottom:none}
+@media print{.shortcuts-fab,.shortcuts-panel{display:none!important}}
 .onboard-step{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:12px}
 .onboard-card h2{margin:0 0 12px;font-size:20px;color:#fff}
 .onboard-card p{margin:0 0 22px;font-size:14px;line-height:1.65;color:#cbd6ee}

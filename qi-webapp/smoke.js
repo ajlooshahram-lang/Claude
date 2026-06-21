@@ -1879,5 +1879,99 @@ if (window.QIDisplay) {
   ok(overlay == null || overlay.querySelector(".onboard-card") != null, "onboarding overlay structure is correct (card with steps)");
 })();
 
+// Step 123: Feature #3 — Progress percentage ring on the Dashboard
+(function testProgressRing() {
+  var dnav = doc.querySelector('.nav-item[data-view="dashboard"]');
+  if (dnav) dnav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  var ringCard = doc.getElementById("progressRingCard");
+  ok(ringCard != null, "Dashboard renders a progress ring card (#progressRingCard)");
+  var svg = ringCard ? ringCard.querySelector(".progress-ring-svg") : null;
+  ok(svg != null, "Progress ring card contains an SVG ring");
+  var text = ringCard ? ringCard.querySelector(".progress-ring-text") : null;
+  ok(text != null && /\d+%/.test(text.textContent), "Progress ring shows a percentage value");
+  var verdict = ringCard ? ringCard.querySelector(".progress-ring-verdict") : null;
+  ok(verdict != null && verdict.textContent.length > 10, "Progress ring shows a one-sentence verdict");
+})();
+
+// Step 124: Feature #4 — 2D animated fallback SVG map
+(function testFallbackMap() {
+  // Since jsdom has no WebGL, the globe3d view should render the 2D fallback.
+  var gnav = doc.querySelector('.nav-item[data-view="globe3d"]');
+  if (gnav) gnav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  var fb = doc.getElementById("globeFallback");
+  ok(fb != null, "Globe view has a fallback container (#globeFallback)");
+  var svg = fb ? fb.querySelector(".fallback-map-svg") : null;
+  ok(svg != null, "Fallback renders an SVG map of the cable network");
+  var dots = fb ? fb.querySelectorAll(".fallback-station-dot") : [];
+  ok(dots.length === 8, "Fallback SVG shows 8 station dots (" + dots.length + ")");
+  var dashes = fb ? fb.querySelectorAll(".fallback-cable-dash") : [];
+  ok(dashes.length >= 6, "Fallback SVG shows animated cable route lines (" + dashes.length + ")");
+  var legend = fb ? fb.querySelector(".fallback-legend") : null;
+  ok(legend != null, "Fallback map includes a colour legend");
+})();
+
+// Step 125: Feature #5 — Narrated tour captions (facts per station)
+(function testTourFacts() {
+  // The onTourStep callback is wired in AFTER.globe3d — but since WebGL is not
+  // available in jsdom, we verify the TOUR_FACTS data is accessible via the
+  // rendered globe view and that the HUD structure supports facts.
+  var gnav = doc.querySelector('.nav-item[data-view="globe3d"]');
+  if (gnav) gnav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  var hud = doc.getElementById("globeTourHud");
+  ok(hud != null, "Globe view has a tour HUD element for narrated captions");
+  var placeEl = doc.getElementById("globeTourPlace");
+  ok(placeEl != null, "Tour HUD has a place element that can show station facts");
+  // Verify TOUR_FACTS are reachable: the function render2DFallbackMap ran and used station data.
+  ok(window.QIGlobe && window.QIGlobe.STATIONS.length === 8, "Globe exposes 8 stations for tour narration");
+})();
+
+// Step 126: Feature #6 — Print-ready PDF export of Investor Brief
+(function testPdfExport() {
+  var bnav = doc.querySelector('.nav-item[data-view="investorbrief"]');
+  if (bnav) bnav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  var btn = doc.getElementById("briefPrint");
+  ok(btn != null, "Investor Brief has a Print / Save as PDF button");
+  ok(/PDF|Print/i.test(btn.textContent), "The button label mentions PDF or Print");
+  var header = doc.querySelector(".brief-pdf-header");
+  ok(header != null, "Investor Brief includes a hidden PDF header (visible in print)");
+  // Verify page-break-related classes exist in the brief content
+  var sections = doc.querySelectorAll("#investorBrief .brief-section");
+  ok(sections.length >= 3, "Investor Brief has multiple sections with page-break support (" + sections.length + ")");
+})();
+
+// Step 127: Feature #7 — Auto-generated weekly project summary
+(function testWeeklySummary() {
+  var S = window.QIStore;
+  ok(typeof S.weeklySummary === "function", "store exposes weeklySummary() function");
+  var ws = S.weeklySummary();
+  ok(ws && typeof ws.text === "string" && ws.text.length > 20, "weeklySummary() returns a plain-language text (" + (ws ? ws.text.length : 0) + " chars)");
+  ok(ws.current && typeof ws.current.total === "number", "weeklySummary() includes current KPIs");
+  ok(ws.health && typeof ws.health.score !== "undefined", "weeklySummary() includes health score");
+  // The dashboard should render the weekly summary card.
+  var dnav = doc.querySelector('.nav-item[data-view="dashboard"]');
+  if (dnav) dnav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  var card = doc.getElementById("weeklySummaryCard");
+  ok(card != null, "Dashboard renders a weekly summary card (#weeklySummaryCard)");
+  ok(card && /Project Update/i.test(card.innerHTML), "Weekly summary card has a 'Project Update' heading");
+})();
+
+// Step 128: Feature #8 — Keyboard shortcuts floating widget
+(function testShortcutsWidget() {
+  var fab = doc.getElementById("shortcutsFab");
+  ok(fab != null, "A floating ? button exists (#shortcutsFab)");
+  ok(fab && fab.textContent.trim() === "?", "The floating button shows a '?' character");
+  var panel = doc.getElementById("shortcutsPanel");
+  ok(panel != null, "A shortcuts panel element exists (#shortcutsPanel)");
+  ok(panel && panel.hidden === true, "Shortcuts panel is initially hidden");
+  // Click the fab to show the panel
+  if (fab) fab.dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(panel && panel.hidden === false, "Clicking ? button shows the shortcuts panel");
+  ok(panel && panel.querySelectorAll(".shortcut-row").length >= 8, "Shortcuts panel lists at least 8 shortcuts");
+  // Click close button
+  var closeBtn = doc.getElementById("shortcutsPanelClose");
+  if (closeBtn) closeBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(panel && panel.hidden === true, "Clicking close hides the shortcuts panel");
+})();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

@@ -622,6 +622,52 @@
         </aside>
       </div>`;
   };
+  // Feature #4: 2D animated fallback SVG map (SE Asia with 8 stations + route lines)
+  function render2DFallbackMap(container) {
+    var G = window.QIGlobe || {};
+    var stations = G.STATIONS || [];
+    var cables = G.CABLES || [];
+    var SC = G.STATUS_COLOR || { "commissioned": { css: "#42d6a4" }, "in-progress": { css: "#4ea1ff" }, "planned": { css: "#e6b84a" } };
+    // Map lat/lon to SVG coordinates within a viewBox of 0,0 600,400.
+    // The region spans roughly lat -10 to 28, lon 95 to 150.
+    var minLat = -10, maxLat = 28, minLon = 95, maxLon = 150;
+    function toX(lon) { return 30 + ((lon - minLon) / (maxLon - minLon)) * 540; }
+    function toY(lat) { return 370 - ((lat - minLat) / (maxLat - minLat)) * 340; }
+    var stById = {}; stations.forEach(function (s) { stById[s.id] = s; });
+    // Build curved route paths with animated dashes
+    var pathsHtml = cables.map(function (c, i) {
+      var a = stById[c.from], b = stById[c.to];
+      if (!a || !b) return "";
+      var x1 = toX(a.lon), y1 = toY(a.lat), x2 = toX(b.lon), y2 = toY(b.lat);
+      var mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      // Offset control point to create a curve
+      var dx = x2 - x1, dy = y2 - y1;
+      var cx = mx - dy * 0.15, cy = my + dx * 0.15;
+      var color = (SC[c.status] || {}).css || "#888";
+      var d = "M" + x1.toFixed(1) + "," + y1.toFixed(1) + " Q" + cx.toFixed(1) + "," + cy.toFixed(1) + " " + x2.toFixed(1) + "," + y2.toFixed(1);
+      return '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2.5" stroke-opacity="0.5"/>' +
+        '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-dasharray="8 6" stroke-linecap="round" class="fallback-cable-dash" style="animation-delay:' + (i * 0.3) + 's"/>';
+    }).join("");
+    // Build station dots
+    var dotsHtml = stations.map(function (s) {
+      var x = toX(s.lon), y = toY(s.lat);
+      return '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="6" fill="var(--accent,#2e5496)" stroke="#fff" stroke-width="2" class="fallback-station-dot"/>' +
+        '<text x="' + (x + 9).toFixed(1) + '" y="' + (y + 4).toFixed(1) + '" class="fallback-label">' + esc(s.name) + '</text>';
+    }).join("");
+    container.innerHTML = '<div class="fallback-map-wrap">' +
+      '<h3 class="fallback-map-title">Submarine Cable Network Map</h3>' +
+      '<p class="fallback-map-sub">Interactive 2D fallback (WebGL not available on this device)</p>' +
+      '<svg class="fallback-map-svg" viewBox="0 0 600 400" preserveAspectRatio="xMidYMid meet" role="img" aria-label="2D map of SE Asia cable network">' +
+      '<rect width="600" height="400" fill="var(--bg2,#f4f6fb)" rx="8"/>' +
+      pathsHtml + dotsHtml +
+      '</svg>' +
+      '<div class="fallback-legend">' +
+      '<span class="fallback-leg"><span class="globe-dot" style="background:#42d6a4"></span> Commissioned</span>' +
+      '<span class="fallback-leg"><span class="globe-dot" style="background:#4ea1ff"></span> In progress</span>' +
+      '<span class="fallback-leg"><span class="globe-dot" style="background:#e6b84a"></span> Planned</span>' +
+      '</div></div>';
+  }
+
   AFTER.globe3d = function () {
     const stage = $("#globeStage");
     if (!stage || !window.QIGlobe) return;
@@ -633,7 +679,7 @@
     const tourBtn = $("#globeTour"), spinBtn = $("#globeSpin");
 
     if (!ok) {
-      if (fb) fb.style.display = "";
+      if (fb) { fb.style.display = ""; render2DFallbackMap(fb); }
       if (hint) hint.style.display = "none";
       return;   // 2D fallback + inventory panel only
     }
@@ -903,10 +949,22 @@
     });
     // Live caption that updates on every hop — an unmistakable, plain-language
     // confirmation that the tour is running and where it is right now.
+    // Feature #5: Narrated tour captions — one-line facts per stop.
+    const TOUR_FACTS = {
+      "jakarta": "Indonesia's main landing point — connects to 14 international cable systems, gateway to 270M people.",
+      "songkhla": "Thailand's Gulf coast CLS — links mainland SE Asia with a short terrestrial backhaul to Bangkok.",
+      "danang": "Vietnam's central coast — crosses the South China Sea, about 1,200 km, 20 fibre pairs to the next hop.",
+      "tamsui": "Taiwan's northern cable station — one of Asia's densest connectivity hubs, 5+ Tbps of lit capacity.",
+      "batangas": "Philippines' Luzon landing — the network's main junction, branching east to Guam and north to Taiwan.",
+      "piti": "Guam (US territory) — Pacific interconnect point, bridging Asia to the Americas via transpacific trunks.",
+      "mersing": "Malaysia's east-coast station — shortest link from Singapore/Jakarta up through the South China Sea.",
+      "bsb": "Brunei's landing station — a branch spur providing sovereign connectivity for Brunei Darussalam."
+    };
     G.onTourStep(s => {
       if (!s) return;
       if (tourStepEl) tourStepEl.textContent = "Stop " + s.step + " of " + s.total;
-      if (tourPlaceEl) tourPlaceEl.textContent = s.name + ", " + s.country;
+      var fact = TOUR_FACTS[s.id] || "";
+      if (tourPlaceEl) tourPlaceEl.innerHTML = '<strong>' + esc(s.name) + ', ' + esc(s.country) + '</strong>' + (fact ? '<span class="tour-fact">' + esc(fact) + '</span>' : '');
     });
     G.onSpin(spinning => {
       if (!spinBtn) return;
@@ -1269,6 +1327,7 @@
         <span class="muted">A plain-language one-pager you can hand to your board — built automatically from your project. No jargon.</span>
       </div>
       <div class="brief" id="investorBrief">
+        <div class="brief-pdf-header" style="display:none">${esc(title)} — Investor Brief — ${esc(today)}</div>
         <div class="brief-cover">
           <div class="brief-cover-mark">QI</div>
           <h1 class="brief-cover-title">${esc(title)}</h1>
@@ -2209,6 +2268,31 @@
     const hsVerdict = (hs && hs.verdict) ? hs.verdict : "";
     const hsReason = (hs && hs.reasons && hs.reasons.length) ? hs.reasons.slice(0, 2).join(", ") : "";
     const healthCard = `<div class="health-score health-${healthCls}"><span class="health-num">${healthScore}</span><span class="health-lab">Programme health${hsVerdict ? " \u2014 " + esc(hsVerdict) : ""}</span>${hsReason ? `<span class="health-why">${esc(hsReason)}</span>` : ""}${sparkSVG}</div>`;
+    // Feature #3: Progress percentage ring with one-sentence verdict
+    const ringPctVal = Math.round(pctClosed * 100);
+    const ringStrokeDash = Math.round(ringPctVal * 2.51327); // 2*PI*40 = 251.327 circumference, scaled to 0-251
+    const ringCircumference = 251;
+    const ringVerdict = (function () {
+      if (ringPctVal >= 90) return "Almost there - the project is nearly complete.";
+      if (ringPctVal >= 70) return "Good momentum - most items are resolved or closed.";
+      if (ringPctVal >= 40) return "Making progress - keep closing items to move the needle.";
+      if (ringPctVal >= 10) return "Early stages - focus on quick wins to build momentum.";
+      return "Just getting started - upload a project description to begin.";
+    })();
+    const ringColor = ringPctVal >= 70 ? "var(--green,#27ae60)" : ringPctVal >= 40 ? "var(--amber,#e0a800)" : "var(--red,#e74c3c)";
+    const progressRingCard = `<div class="card progress-ring-card" id="progressRingCard">
+  <div class="progress-ring-wrap">
+    <svg class="progress-ring-svg" viewBox="0 0 100 100" width="100" height="100">
+      <circle cx="50" cy="50" r="40" fill="none" stroke="var(--line,#e3e8f0)" stroke-width="8"></circle>
+      <circle class="progress-ring-circle" cx="50" cy="50" r="40" fill="none" stroke="${ringColor}" stroke-width="8" stroke-dasharray="${ringStrokeDash} ${ringCircumference}" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 50 50)"></circle>
+      <text x="50" y="54" text-anchor="middle" class="progress-ring-text" fill="var(--ink,#1d2736)" font-size="18" font-weight="700">${ringPctVal}%</text>
+    </svg>
+    <div class="progress-ring-info">
+      <h3>Project Completion</h3>
+      <p class="progress-ring-verdict">${esc(ringVerdict)}</p>
+    </div>
+  </div>
+</div>`;
     // Quick wins card (step 97) — up to 5 easiest items to close (OPEN, not critical, low RPN)
     const quickWinCandidates = cases.filter(function (c) {
       if (c.status !== "OPEN") return false;
@@ -2268,7 +2352,26 @@
       if (!parts.length) return "";
       return '<div class="card exec-summary"><div class="card-head"><h3>\uD83D\uDCCB In plain words</h3><span class="tag">auto-summary</span></div><p style="line-height:1.65;margin:0">' + parts.join(" ") + '</p></div>';
     })();
-    return execSummaryCard + tourBanner + progressCard + nextCard + quickWinsCard + keyDatesCard + dqCard + healthCard + `
+    // Feature #7: Weekly project summary — auto-generated comparison card
+    const weeklySummaryCard = (function () {
+      if (!S.weeklySummary) return "";
+      var ws = S.weeklySummary();
+      if (!ws || !ws.text) return "";
+      var deltaHtml = "";
+      if (ws.delta) {
+        var d = ws.delta;
+        var chips = [];
+        if (d.healthDelta > 0) chips.push('<span class="ws-chip ws-chip--up">Health +' + d.healthDelta + '</span>');
+        else if (d.healthDelta < 0) chips.push('<span class="ws-chip ws-chip--down">Health ' + d.healthDelta + '</span>');
+        if (d.total > 0) chips.push('<span class="ws-chip ws-chip--neutral">+' + d.total + ' items</span>');
+        if (d.crit !== 0) chips.push('<span class="ws-chip ws-chip--' + (d.crit > 0 ? "down" : "up") + '">Critical ' + (d.crit > 0 ? "+" : "") + d.crit + '</span>');
+        if (d.blocked !== 0) chips.push('<span class="ws-chip ws-chip--' + (d.blocked > 0 ? "down" : "up") + '">Blocked ' + (d.blocked > 0 ? "+" : "") + d.blocked + '</span>');
+        if (d.avgDone > 0) chips.push('<span class="ws-chip ws-chip--up">Progress +' + d.avgDone + '%</span>');
+        if (chips.length) deltaHtml = '<div class="ws-chips">' + chips.join("") + '</div>';
+      }
+      return '<div class="card weekly-summary-card" id="weeklySummaryCard"><div class="card-head"><h3>\uD83D\uDCC8 Project Update (this week)</h3><span class="tag">auto-generated</span></div>' + deltaHtml + '<p class="ws-text">' + esc(ws.text) + '</p></div>';
+    })();
+    return execSummaryCard + tourBanner + progressRingCard + weeklySummaryCard + progressCard + nextCard + quickWinsCard + keyDatesCard + dqCard + healthCard + `
       <div class="dash-toolbar" style="display:flex;gap:8px;margin-bottom:12px"><button class="btn btn-sm" id="emailSummary" type="button">\u2709 Copy status email</button><button class="btn btn-sm" id="meetingAgenda" type="button">\uD83D\uDCCB Copy meeting agenda</button></div>
       <div class="grid kpis" style="margin-bottom:16px">
         ${kpi("navy", "Total Cases", k.total)}
@@ -6285,6 +6388,42 @@
           bar.remove();
         });
       }, 3000);
+    })();
+
+    // Feature #8: Keyboard shortcuts floating widget (small ? button + cheat-sheet)
+    (function shortcutsWidget() {
+      var widget = document.createElement("button");
+      widget.className = "shortcuts-fab";
+      widget.id = "shortcutsFab";
+      widget.type = "button";
+      widget.setAttribute("aria-label", "Keyboard shortcuts");
+      widget.setAttribute("title", "Show keyboard shortcuts");
+      widget.textContent = "?";
+      document.body.appendChild(widget);
+      var panel = document.createElement("div");
+      panel.className = "shortcuts-panel";
+      panel.id = "shortcutsPanel";
+      panel.hidden = true;
+      panel.innerHTML = '<div class="shortcuts-panel-head"><h4>Keyboard Shortcuts</h4><button class="shortcuts-panel-close" id="shortcutsPanelClose" type="button" aria-label="Close">\u00d7</button></div>' +
+        '<div class="shortcuts-panel-body">' +
+        '<div class="shortcut-row"><span>Show this panel</span><span class="kbd">?</span></div>' +
+        '<div class="shortcut-row"><span>Command palette</span><span class="kbd">\u2318/Ctrl K</span></div>' +
+        '<div class="shortcut-row"><span>New case</span><span class="kbd">n</span></div>' +
+        '<div class="shortcut-row"><span>Dashboard</span><span class="kbd">d</span></div>' +
+        '<div class="shortcut-row"><span>Kanban board</span><span class="kbd">k</span></div>' +
+        '<div class="shortcut-row"><span>Portfolio</span><span class="kbd">p</span></div>' +
+        '<div class="shortcut-row"><span>Report Pack</span><span class="kbd">r</span></div>' +
+        '<div class="shortcut-row"><span>Run checks</span><span class="kbd">c</span></div>' +
+        '<div class="shortcut-row"><span>Cycle theme</span><span class="kbd">t</span></div>' +
+        '<div class="shortcut-row"><span>Close dialog</span><span class="kbd">Esc</span></div>' +
+        '</div>';
+      document.body.appendChild(panel);
+      widget.addEventListener("click", function () {
+        panel.hidden = !panel.hidden;
+        widget.classList.toggle("is-active", !panel.hidden);
+      });
+      var closeBtn = document.getElementById("shortcutsPanelClose");
+      if (closeBtn) closeBtn.addEventListener("click", function () { panel.hidden = true; widget.classList.remove("is-active"); });
     })();
 
     // ---- First-time onboarding wizard (3-step overlay) ----
