@@ -15030,7 +15030,7 @@ function renderHarmonicSim(thd, harmonics, loadType) {
     distPoints += (i === 0 ? '' : ' ') + x.toFixed(1) + ',' + yDist.toFixed(1);
   }
   svg += '<polyline points="' + refPoints + '" fill="none" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="4 3" opacity="0.5"/>';
-  svg += '<g class="sim-wave"><polyline points="' + distPoints + '" fill="none" stroke="' + waveColor + '" stroke-width="2"/></g>';
+  svg += '<g class="sim-pulse"><polyline points="' + distPoints + '" fill="none" stroke="' + waveColor + '" stroke-width="2"/></g>';
   // Harmonic amplitude bars on the right
   var bars = [{h: 3, v: harmonics.h3 || 0}, {h: 5, v: harmonics.h5 || 0}, {h: 7, v: harmonics.h7 || 0}, {h: 11, v: harmonics.h11 || 0}, {h: 13, v: harmonics.h13 || 0}];
   var maxBar = Math.max(bars[0].v, bars[1].v, bars[2].v, bars[3].v, bars[4].v, 1);
@@ -25430,7 +25430,7 @@ function renderRelaySim(I1N, pickup, instantTrip, isCoordinated) {
   }
   svg += '<polyline points="' + curvePts + '" fill="none" stroke="#1976d2" stroke-width="2" opacity="0.8"/>';
   // Pickup point marker
-  var pickupMult = pickup / I1N;
+  var pickupMult = Math.max(1, pickup / I1N);
   var pickupX = 70 + Math.min((Math.log(pickupMult) / Math.log(20)) * 160, 160);
   svg += '<circle cx="' + pickupX.toFixed(1) + '" cy="35" r="5" fill="none" stroke="#4caf50" stroke-width="2"/>';
   svg += '<circle cx="' + pickupX.toFixed(1) + '" cy="35" r="2" fill="#4caf50"/>';
@@ -25706,7 +25706,8 @@ function renderFaultSim(Zs, Uf, If, disconnectTime) {
   if (!Zs || !Uf) return '';
   var faultI = If || (Uf / Zs);
   var maxI = 1000;
-  var flowDur = simFlowDuration(faultI, maxI);
+  var dur = simFlowDuration(faultI, maxI);
+  var flowStyle = (dur > 0) ? ' style="animation-duration:' + dur + 's"' : '';
   var svg = '<svg viewBox="0 0 300 100" width="300" height="100" style="display:block;margin:8px auto;background:var(--border-light);border-radius:var(--radius-sm)">';
   svg += simSvgDefs();
   // Source (left) - transformer symbol
@@ -25714,19 +25715,19 @@ function renderFaultSim(Zs, Uf, If, disconnectTime) {
   svg += '<text x="30" y="44" text-anchor="middle" class="sim-label" font-size="10" fill="#1976d2">~</text>';
   svg += '<text x="30" y="65" text-anchor="middle" class="sim-label" font-size="7">' + Uf + 'V</text>';
   // Line conductor (top path with impedance)
-  svg += '<line x1="42" y1="35" x2="90" y2="35" stroke="var(--primary)" stroke-width="2" class="sim-wire" style="animation-duration:' + flowDur + '"/>';
+  svg += '<line x1="42" y1="35" x2="90" y2="35" stroke="var(--primary)" stroke-width="2" class="sim-wire"' + flowStyle + '/>';
   // Impedance element (zigzag resistor)
   svg += '<path d="M90,35 L98,28 L106,42 L114,28 L122,42 L130,28 L138,42 L146,35 L160,35" fill="none" stroke="var(--text)" stroke-width="1.5"/>';
   svg += '<text x="125" y="22" text-anchor="middle" class="sim-label sim-value" font-size="8">Zs=' + Zs + '\u03A9</text>';
   // Continuing wire to fault point
-  svg += '<line x1="160" y1="35" x2="220" y2="35" stroke="var(--primary)" stroke-width="2" class="sim-wire" style="animation-duration:' + flowDur + '"/>';
+  svg += '<line x1="160" y1="35" x2="220" y2="35" stroke="var(--primary)" stroke-width="2" class="sim-wire"' + flowStyle + '/>';
   // Fault point (spark/arc symbol)
   svg += '<circle cx="230" cy="40" r="8" fill="none" stroke="#ef4444" stroke-width="2" class="sim-glow"/>';
   svg += '<text x="230" y="44" text-anchor="middle" font-size="12" fill="#ef4444">\u26A1</text>';
   svg += '<text x="230" y="18" text-anchor="middle" class="sim-label sim-value" font-size="8" fill="#ef4444">If=' + faultI.toFixed(0) + 'A</text>';
   // Return path (PE conductor - bottom)
   svg += '<line x1="230" y1="48" x2="230" y2="75" stroke="#4caf50" stroke-width="1.5"/>';
-  svg += '<line x1="30" y1="75" x2="230" y2="75" stroke="#4caf50" stroke-width="2" class="sim-wire" style="animation-duration:' + flowDur + '"/>';
+  svg += '<line x1="30" y1="75" x2="230" y2="75" stroke="#4caf50" stroke-width="2" class="sim-wire"' + flowStyle + '/>';
   svg += '<line x1="30" y1="52" x2="30" y2="75" stroke="#4caf50" stroke-width="1.5"/>';
   svg += '<text x="130" y="87" text-anchor="middle" class="sim-label" font-size="7" fill="#4caf50">PE</text>';
   // Disconnect time badge
@@ -26270,6 +26271,11 @@ function simHeatColor(P, Pmax) {
   return 'rgb(' + r + ',' + g + ',' + b + ')';
 }
 
+// NOTE: simSvgDefs() is called per inline SVG, producing duplicate IDs (simBlur, simShadow,
+// simHeatGrad) across the DOM. Modern browsers scope url(#id) resolution to the containing
+// inline SVG element, so filters resolve correctly. Only a few sims actually reference these
+// IDs (capacitor uses url(#simShadow), heat uses url(#simBlur)). Refactoring to emit defs
+// once globally would be more complex without meaningful browser-compat benefit.
 function simSvgDefs() {
   return '<defs>' +
     '<filter id="simBlur"><feGaussianBlur stdDeviation="2"/></filter>' +
