@@ -4436,7 +4436,7 @@ function renderLoadSchedule(){
 // Fuse state
 let fuseState = { holder: null, size: null };
 // MCB state
-let mcbState = { type: null, curve: null, rating: null, poles: 'multi' };
+let mcbState = { type: null, curve: null, rating: null, poles: null };
 // MCCB state
 let mccbState = { frame: null, trip: null, inVal: null, ioMult: null, isdMult: null };
 // Cable state
@@ -5318,31 +5318,28 @@ function thermalGetColor(currentTemp, maxTemp) {
 }
 
 function renderThermal() {
-  const dr = thermalCalcDerating(thermalState.ambientTemp, thermalState.groupingCount, thermalState.installMethod);
-  return `<div class="card fade-in">
-    <div class="card-title">${tx('Termisk Simulering', 'Thermal Simulation')}</div>
-    <div class="select-group">
-      <div class="select-label">${tx('Isolering', 'Insulation')}</div>
-      <div class="select-grid">
-        <button class="sel-btn ${thermalState.selectedCableType==='PVC'?'selected':''}" onclick="thermalState.selectedCableType='PVC';renderModule('thermal')">PVC (70C)</button>
-        <button class="sel-btn ${thermalState.selectedCableType==='XLPE'?'selected':''}" onclick="thermalState.selectedCableType='XLPE';renderModule('thermal')">XLPE (90C)</button>
-      </div>
-    </div>
-    <div class="select-group">
-      <div class="select-label">${tx('Omgivelsestemperatur', 'Ambient Temperature')}: ${thermalState.ambientTemp}C</div>
-      <input type="range" min="10" max="60" step="5" value="${thermalState.ambientTemp}" onchange="thermalState.ambientTemp=+this.value;renderModule('thermal')">
-    </div>
-    <div class="select-group">
-      <div class="select-label">${tx('Antal kabler', 'Number of cables')}: ${thermalState.groupingCount}</div>
-      <input type="range" min="1" max="9" step="1" value="${thermalState.groupingCount}" onchange="thermalState.groupingCount=+this.value;renderModule('thermal')">
-    </div>
-    <div class="select-group">
-      <div class="select-label">${tx('Installationsmetode', 'Installation method')}</div>
-      <div class="select-grid">
-        <button class="sel-btn ${thermalState.installMethod==='tray'?'selected':''}" onclick="thermalState.installMethod='tray';renderModule('thermal')">${tx('Bakke','Tray')}</button>
-        <button class="sel-btn ${thermalState.installMethod==='conduit'?'selected':''}" onclick="thermalState.installMethod='conduit';renderModule('thermal')">${tx('Roer','Conduit')}</button>
-      </div>
-    </div>
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Termisk Simulering', 'Thermal Simulation') + '</div>';
+  html += '<div class="select-group">';
+  html += '<div class="select-label">' + tx('Isolering', 'Insulation') + '</div>';
+  html += '<div class="select-grid">';
+  html += '<button class="sel-btn' + (thermalState.selectedCableType === 'PVC' ? ' selected' : '') + '" onclick="thermalState.selectedCableType=\'PVC\';renderModule(\'thermal\')">PVC (70C)</button>';
+  html += '<button class="sel-btn' + (thermalState.selectedCableType === 'XLPE' ? ' selected' : '') + '" onclick="thermalState.selectedCableType=\'XLPE\';renderModule(\'thermal\')">XLPE (90C)</button>';
+  html += '</div></div>';
+  html += '<div class="select-group">';
+  html += '<div class="select-label">' + tx('Omgivelsestemperatur', 'Ambient Temperature') + ': ' + (thermalState.ambientTemp !== null ? thermalState.ambientTemp + 'C' : '-') + '</div>';
+  html += '<input type="range" min="10" max="60" step="5" value="' + (thermalState.ambientTemp !== null ? thermalState.ambientTemp : 30) + '" onchange="thermalState.ambientTemp=+this.value;renderModule(\'thermal\')">';
+  html += '</div>';
+  html += '<div class="select-group">';
+  html += '<div class="select-label">' + tx('Antal kabler', 'Number of cables') + ': ' + (thermalState.groupingCount !== null ? thermalState.groupingCount : '-') + '</div>';
+  html += '<input type="range" min="1" max="9" step="1" value="' + (thermalState.groupingCount !== null ? thermalState.groupingCount : 1) + '" onchange="thermalState.groupingCount=+this.value;renderModule(\'thermal\')">';
+  html += '</div>';
+  html += '<div class="select-group">';
+  html += '<div class="select-label">' + tx('Installationsmetode', 'Installation method') + '</div>';
+  html += '<div class="select-grid">';
+  html += '<button class="sel-btn' + (thermalState.installMethod === 'tray' ? ' selected' : '') + '" onclick="thermalState.installMethod=\'tray\';renderModule(\'thermal\')">' + tx('Bakke','Tray') + '</button>';
+  html += '<button class="sel-btn' + (thermalState.installMethod === 'conduit' ? ' selected' : '') + '" onclick="thermalState.installMethod=\'conduit\';renderModule(\'thermal\')">' + tx('Roer','Conduit') + '</button>';
+  html += '</div></div>';
 
   // Null guard
   if (thermalState.ambientTemp === null || thermalState.groupingCount === null || thermalState.selectedCableType === null || thermalState.installMethod === null) {
@@ -5351,14 +5348,15 @@ function renderThermal() {
     return html;
   }
 
-    <div class="result-box">
-      <div class="result-title">${tx('Derating resultat','Derating Result')}</div>
-      <div class="result-row"><span class="label">${tx('Omgivelsesfaktor','Ambient factor')}</span><span class="value">${dr.ambientFactor}</span></div>
-      <div class="result-row"><span class="label">${tx('Grupperingsfaktor','Grouping factor')}</span><span class="value">${dr.groupFactor}</span></div>
-      <div class="result-row"><span class="label">${tx('Kombineret','Combined')}</span><span class="value">${dr.combined}</span></div>
-      <div class="result-row"><span class="label">${tx('Reference','Reference')}</span><span class="value">${dr.clause}</span></div>
-    </div>
-  </div>`;
+  var dr = thermalCalcDerating(thermalState.ambientTemp, thermalState.groupingCount, thermalState.installMethod);
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Derating resultat','Derating Result') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Omgivelsesfaktor','Ambient factor') + '</span><span class="value">' + dr.ambientFactor + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Grupperingsfaktor','Grouping factor') + '</span><span class="value">' + dr.groupFactor + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kombineret','Combined') + '</span><span class="value">' + dr.combined + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Reference','Reference') + '</span><span class="value">' + dr.clause + '</span></div>';
+  html += '</div></div>';
+  return html;
 }
 
 // ===== CABLE 3D ROUTING MODULE =====
@@ -5442,64 +5440,63 @@ function cable3dLayoutCircular(cableIndices, radius) {
 }
 
 function renderCable3D() {
-  const fr = cable3dCalcFillRate('conduit', cable3dState.selectedCables);
-  const hd = cable3dCalcHeatDissipation(cable3dState.selectedCables);
-  const cableSizes = ['1.5', '2.5', '4', '6', '10', '16', '25', '35'];
-  let cableListHtml = '';
-  for (let i = 0; i < cable3dState.selectedCables.length; i++) {
-    const idx = cable3dState.selectedCables[i];
-    cableListHtml += `<div class="result-row"><span class="label">${cableSizes[idx]}mm\u00B2</span><span class="value"><button class="sel-btn" onclick="cable3dState.selectedCables.splice(${i},1);renderModule('cable3d')">${tx('Fjern','Remove')}</button></span></div>`;
-  }
-  return `<div class="card fade-in">
-    <div class="card-title">${tx('3D Kabelfoering', '3D Cable Routing')}</div>
-    <div class="select-group">
-      <div class="select-label">${tx('Roerdiameter','Conduit diameter')}: ${cable3dState.conduitDia}mm</div>
-      <div class="select-grid">
-        <button class="sel-btn ${cable3dState.conduitDia===16?'selected':''}" onclick="cable3dState.conduitDia=16;renderModule('cable3d')">16mm</button>
-        <button class="sel-btn ${cable3dState.conduitDia===20?'selected':''}" onclick="cable3dState.conduitDia=20;renderModule('cable3d')">20mm</button>
-        <button class="sel-btn ${cable3dState.conduitDia===25?'selected':''}" onclick="cable3dState.conduitDia=25;renderModule('cable3d')">25mm</button>
-        <button class="sel-btn ${cable3dState.conduitDia===32?'selected':''}" onclick="cable3dState.conduitDia=32;renderModule('cable3d')">32mm</button>
-        <button class="sel-btn ${cable3dState.conduitDia===50?'selected':''}" onclick="cable3dState.conduitDia=50;renderModule('cable3d')">50mm</button>
-      </div>
-    </div>
-    <div class="select-group">
-      <div class="select-label">${tx('Tilfoej kabel','Add cable')}</div>
-      <div class="select-grid">
-        <button class="sel-btn" onclick="cable3dState.selectedCables.push(0);renderModule('cable3d')">1.5mm\u00B2</button>
-        <button class="sel-btn" onclick="cable3dState.selectedCables.push(1);renderModule('cable3d')">2.5mm\u00B2</button>
-        <button class="sel-btn" onclick="cable3dState.selectedCables.push(2);renderModule('cable3d')">4mm\u00B2</button>
-        <button class="sel-btn" onclick="cable3dState.selectedCables.push(3);renderModule('cable3d')">6mm\u00B2</button>
-        <button class="sel-btn" onclick="cable3dState.selectedCables.push(4);renderModule('cable3d')">10mm\u00B2</button>
-        <button class="sel-btn" onclick="cable3dState.selectedCables.push(5);renderModule('cable3d')">16mm\u00B2</button>
-        <button class="sel-btn" onclick="cable3dState.selectedCables.push(6);renderModule('cable3d')">25mm\u00B2</button>
-        <button class="sel-btn" onclick="cable3dState.selectedCables.push(7);renderModule('cable3d')">35mm\u00B2</button>
-      </div>
-    </div>
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('3D Kabelfoering', '3D Cable Routing') + '</div>';
+  html += '<div class="select-group">';
+  html += '<div class="select-label">' + tx('Roerdiameter','Conduit diameter') + ': ' + (cable3dState.conduitDia !== null ? cable3dState.conduitDia + 'mm' : '-') + '</div>';
+  html += '<div class="select-grid">';
+  html += '<button class="sel-btn' + (cable3dState.conduitDia===16?' selected':'') + '" onclick="cable3dState.conduitDia=16;renderModule(\'cable3d\')">16mm</button>';
+  html += '<button class="sel-btn' + (cable3dState.conduitDia===20?' selected':'') + '" onclick="cable3dState.conduitDia=20;renderModule(\'cable3d\')">20mm</button>';
+  html += '<button class="sel-btn' + (cable3dState.conduitDia===25?' selected':'') + '" onclick="cable3dState.conduitDia=25;renderModule(\'cable3d\')">25mm</button>';
+  html += '<button class="sel-btn' + (cable3dState.conduitDia===32?' selected':'') + '" onclick="cable3dState.conduitDia=32;renderModule(\'cable3d\')">32mm</button>';
+  html += '<button class="sel-btn' + (cable3dState.conduitDia===50?' selected':'') + '" onclick="cable3dState.conduitDia=50;renderModule(\'cable3d\')">50mm</button>';
+  html += '</div></div>';
+  html += '<div class="select-group">';
+  html += '<div class="select-label">' + tx('Tilfoej kabel','Add cable') + '</div>';
+  html += '<div class="select-grid">';
+  html += '<button class="sel-btn" onclick="cable3dState.selectedCables.push(0);renderModule(\'cable3d\')">1.5mm\u00B2</button>';
+  html += '<button class="sel-btn" onclick="cable3dState.selectedCables.push(1);renderModule(\'cable3d\')">2.5mm\u00B2</button>';
+  html += '<button class="sel-btn" onclick="cable3dState.selectedCables.push(2);renderModule(\'cable3d\')">4mm\u00B2</button>';
+  html += '<button class="sel-btn" onclick="cable3dState.selectedCables.push(3);renderModule(\'cable3d\')">6mm\u00B2</button>';
+  html += '<button class="sel-btn" onclick="cable3dState.selectedCables.push(4);renderModule(\'cable3d\')">10mm\u00B2</button>';
+  html += '<button class="sel-btn" onclick="cable3dState.selectedCables.push(5);renderModule(\'cable3d\')">16mm\u00B2</button>';
+  html += '<button class="sel-btn" onclick="cable3dState.selectedCables.push(6);renderModule(\'cable3d\')">25mm\u00B2</button>';
+  html += '<button class="sel-btn" onclick="cable3dState.selectedCables.push(7);renderModule(\'cable3d\')">35mm\u00B2</button>';
+  html += '</div></div>';
 
   // Null guard
-  if (cable3dState.conduitDia === null || cable3dState.trayWidth === null) {
+  if (cable3dState.conduitDia === null || cable3dState.selectedCables.length === 0) {
     html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
     html += '</div>';
     return html;
   }
 
-    <div class="result-box">
-      <div class="result-title">${tx('Valgte kabler','Selected Cables')} (${cable3dState.selectedCables.length})</div>
-      ${cableListHtml}
-    </div>
-    <div class="result-box">
-      <div class="result-title">${tx('Fyldningsgrad','Fill Rate')}</div>
-      <div class="result-row"><span class="label">${tx('Fyldningsgrad','Fill rate')}</span><span class="value">${fr.fillRate}</span></div>
-      <div class="result-row"><span class="label">${tx('Max tilladt','Max allowed')}</span><span class="value">${fr.maxFill}</span></div>
-      <div class="result-row"><span class="label">${tx('Overskredet','Exceeded')}</span><span class="value">${fr.exceeded ? 'JA' : 'NEJ'}</span></div>
-      <div class="result-row"><span class="label">${tx('Reference','Reference')}</span><span class="value">${fr.clause}</span></div>
-    </div>
-    <div class="result-box">
-      <div class="result-title">${tx('Varmeafgivelse','Heat Dissipation')}</div>
-      <div class="result-row"><span class="label">${tx('Total','Total')} W/m</span><span class="value">${hd.totalWperM}</span></div>
-      <div class="result-row"><span class="label">${tx('Per kabel','Per cable')} W/m</span><span class="value">${hd.perCable}</span></div>
-    </div>
-  </div>`;
+  var fr = cable3dCalcFillRate('conduit', cable3dState.selectedCables);
+  var hd = cable3dCalcHeatDissipation(cable3dState.selectedCables);
+  var cableSizes = ['1.5', '2.5', '4', '6', '10', '16', '25', '35'];
+  var cableListHtml = '';
+  for (var i = 0; i < cable3dState.selectedCables.length; i++) {
+    var idx = cable3dState.selectedCables[i];
+    cableListHtml += '<div class="result-row"><span class="label">' + cableSizes[idx] + 'mm\u00B2</span><span class="value"><button class="sel-btn" onclick="cable3dState.selectedCables.splice(' + i + ',1);renderModule(\'cable3d\')">' + tx('Fjern','Remove') + '</button></span></div>';
+  }
+
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Valgte kabler','Selected Cables') + ' (' + cable3dState.selectedCables.length + ')</div>';
+  html += cableListHtml;
+  html += '</div>';
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Fyldningsgrad','Fill Rate') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Fyldningsgrad','Fill rate') + '</span><span class="value">' + fr.fillRate + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Max tilladt','Max allowed') + '</span><span class="value">' + fr.maxFill + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Overskredet','Exceeded') + '</span><span class="value">' + (fr.exceeded ? 'JA' : 'NEJ') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Reference','Reference') + '</span><span class="value">' + fr.clause + '</span></div>';
+  html += '</div>';
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Varmeafgivelse','Heat Dissipation') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Total','Total') + ' W/m</span><span class="value">' + hd.totalWperM + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Per kabel','Per cable') + ' W/m</span><span class="value">' + hd.perCable + '</span></div>';
+  html += '</div></div>';
+  return html;
 }
 
 // ===== ENERGY MONITORING MODULE =====
@@ -5622,36 +5619,29 @@ function energyGetPQStatus(voltage, freq, thd, flicker, unbalance) {
 }
 
 function renderEnergy() {
-  const pf = energyCalcPowerFactor(energyState.loads);
-  const pq = energyGetPQStatus(230, 50, energyCalcTHD(energyState.loads).thd, 0.5, 1.0);
-  const cost = energyCalcDailyCost(energyState.profile, ENERGY_TARIFFS, energyState.powerKW);
-  const peak = energyCalcPeakShaving(energyState.profile);
-  const capSize = energyCalcCapacitorSize(pf.pf, energyState.targetPF, energyState.powerKW);
-  return `<div class="card fade-in">
-    <div class="card-title">${tx('Energi Monitor', 'Energy Monitor')}</div>
-    <div class="select-group">
-      <div class="select-label">${tx('Lastprofil','Load Profile')}</div>
-      <div class="select-grid">
-        <button class="sel-btn ${energyState.profile==='residential'?'selected':''}" onclick="energyState.profile='residential';renderModule('energy')">${tx('Bolig','Residential')}</button>
-        <button class="sel-btn ${energyState.profile==='office'?'selected':''}" onclick="energyState.profile='office';renderModule('energy')">${tx('Kontor','Office')}</button>
-        <button class="sel-btn ${energyState.profile==='industrial'?'selected':''}" onclick="energyState.profile='industrial';renderModule('energy')">${tx('Industri','Industrial')}</button>
-      </div>
-    </div>
-    <div class="select-group">
-      <div class="select-label">${tx('Effekt','Power')}: ${energyState.powerKW} kW</div>
-      <input type="range" min="10" max="500" step="10" value="${energyState.powerKW}" onchange="energyState.powerKW=parseInt(this.value);renderModule('energy')">
-    </div>
-    <div class="select-group">
-      <div class="select-label">${tx('Belastningstyper','Load Types')}</div>
-      <div class="select-grid">
-        <button class="sel-btn ${energyState.loads.indexOf('motor')>=0?'selected':''}" onclick="var i=energyState.loads.indexOf('motor');if(i>=0)energyState.loads.splice(i,1);else energyState.loads.push('motor');renderModule('energy')">${tx('Motor','Motor')}</button>
-        <button class="sel-btn ${energyState.loads.indexOf('led')>=0?'selected':''}" onclick="var i=energyState.loads.indexOf('led');if(i>=0)energyState.loads.splice(i,1);else energyState.loads.push('led');renderModule('energy')">LED</button>
-        <button class="sel-btn ${energyState.loads.indexOf('pc')>=0?'selected':''}" onclick="var i=energyState.loads.indexOf('pc');if(i>=0)energyState.loads.splice(i,1);else energyState.loads.push('pc');renderModule('energy')">PC</button>
-        <button class="sel-btn ${energyState.loads.indexOf('vfd')>=0?'selected':''}" onclick="var i=energyState.loads.indexOf('vfd');if(i>=0)energyState.loads.splice(i,1);else energyState.loads.push('vfd');renderModule('energy')">VFD</button>
-        <button class="sel-btn ${energyState.loads.indexOf('welder')>=0?'selected':''}" onclick="var i=energyState.loads.indexOf('welder');if(i>=0)energyState.loads.splice(i,1);else energyState.loads.push('welder');renderModule('energy')">${tx('Svejser','Welder')}</button>
-        <button class="sel-btn ${energyState.loads.indexOf('charger')>=0?'selected':''}" onclick="var i=energyState.loads.indexOf('charger');if(i>=0)energyState.loads.splice(i,1);else energyState.loads.push('charger');renderModule('energy')">EV</button>
-      </div>
-    </div>
+  var html = '<div class="card fade-in">';
+  html += '<div class="card-title">' + tx('Energi Monitor', 'Energy Monitor') + '</div>';
+  html += '<div class="select-group">';
+  html += '<div class="select-label">' + tx('Lastprofil','Load Profile') + '</div>';
+  html += '<div class="select-grid">';
+  html += '<button class="sel-btn' + (energyState.profile==='residential'?' selected':'') + '" onclick="energyState.profile=\'residential\';renderModule(\'energy\')">' + tx('Bolig','Residential') + '</button>';
+  html += '<button class="sel-btn' + (energyState.profile==='office'?' selected':'') + '" onclick="energyState.profile=\'office\';renderModule(\'energy\')">' + tx('Kontor','Office') + '</button>';
+  html += '<button class="sel-btn' + (energyState.profile==='industrial'?' selected':'') + '" onclick="energyState.profile=\'industrial\';renderModule(\'energy\')">' + tx('Industri','Industrial') + '</button>';
+  html += '</div></div>';
+  html += '<div class="select-group">';
+  html += '<div class="select-label">' + tx('Effekt','Power') + ': ' + (energyState.powerKW !== null ? energyState.powerKW + ' kW' : '-') + '</div>';
+  html += '<input type="range" min="10" max="500" step="10" value="' + (energyState.powerKW !== null ? energyState.powerKW : 100) + '" onchange="energyState.powerKW=parseInt(this.value);renderModule(\'energy\')">';
+  html += '</div>';
+  html += '<div class="select-group">';
+  html += '<div class="select-label">' + tx('Belastningstyper','Load Types') + '</div>';
+  html += '<div class="select-grid">';
+  html += '<button class="sel-btn' + (energyState.loads.indexOf('motor')>=0?' selected':'') + '" onclick="var i=energyState.loads.indexOf(\'motor\');if(i>=0)energyState.loads.splice(i,1);else energyState.loads.push(\'motor\');renderModule(\'energy\')">' + tx('Motor','Motor') + '</button>';
+  html += '<button class="sel-btn' + (energyState.loads.indexOf('led')>=0?' selected':'') + '" onclick="var i=energyState.loads.indexOf(\'led\');if(i>=0)energyState.loads.splice(i,1);else energyState.loads.push(\'led\');renderModule(\'energy\')">LED</button>';
+  html += '<button class="sel-btn' + (energyState.loads.indexOf('pc')>=0?' selected':'') + '" onclick="var i=energyState.loads.indexOf(\'pc\');if(i>=0)energyState.loads.splice(i,1);else energyState.loads.push(\'pc\');renderModule(\'energy\')">PC</button>';
+  html += '<button class="sel-btn' + (energyState.loads.indexOf('vfd')>=0?' selected':'') + '" onclick="var i=energyState.loads.indexOf(\'vfd\');if(i>=0)energyState.loads.splice(i,1);else energyState.loads.push(\'vfd\');renderModule(\'energy\')">VFD</button>';
+  html += '<button class="sel-btn' + (energyState.loads.indexOf('welder')>=0?' selected':'') + '" onclick="var i=energyState.loads.indexOf(\'welder\');if(i>=0)energyState.loads.splice(i,1);else energyState.loads.push(\'welder\');renderModule(\'energy\')">' + tx('Svejser','Welder') + '</button>';
+  html += '<button class="sel-btn' + (energyState.loads.indexOf('charger')>=0?' selected':'') + '" onclick="var i=energyState.loads.indexOf(\'charger\');if(i>=0)energyState.loads.splice(i,1);else energyState.loads.push(\'charger\');renderModule(\'energy\')">EV</button>';
+  html += '</div></div>';
 
   // Null guard
   if (energyState.profile === null || energyState.powerKW === null) {
@@ -5660,26 +5650,32 @@ function renderEnergy() {
     return html;
   }
 
-    <div class="result-box">
-      <div class="result-title">${tx('Effektkvalitet','Power Quality')} - EN 50160</div>
-      <div class="result-row"><span class="label">${tx('Spaending','Voltage')}</span><span class="value">${pq.voltage}</span></div>
-      <div class="result-row"><span class="label">${tx('Frekvens','Frequency')}</span><span class="value">${pq.frequency}</span></div>
-      <div class="result-row"><span class="label">THD</span><span class="value">${pq.thd}</span></div>
-      <div class="result-row"><span class="label">${tx('Effektfaktor','Power Factor')}</span><span class="value">${pf.pf}</span></div>
-      <div class="result-row"><span class="label">${tx('Reference','Reference')}</span><span class="value">${pq.clause}</span></div>
-    </div>
-    <div class="result-box">
-      <div class="result-title">${tx('Daglig omkostning','Daily Cost')}</div>
-      <div class="result-row"><span class="label">${tx('Total','Total')} DKK</span><span class="value">${cost.totalCost}</span></div>
-      <div class="result-row"><span class="label">${tx('Total','Total')} kWh</span><span class="value">${cost.totalKWh}</span></div>
-      <div class="result-row"><span class="label">${tx('Spidstime','Peak hour')}</span><span class="value">${cost.peakHour}:00</span></div>
-    </div>
-    <div class="result-box">
-      <div class="result-title">${tx('Kompensering','Compensation')}</div>
-      <div class="result-row"><span class="label">${tx('Kondensator','Capacitor')} kvar</span><span class="value">${capSize.kvar}</span></div>
-      <div class="result-row"><span class="label">${tx('Besparelse','Saving')} DKK</span><span class="value">${peak.potentialSaving}</span></div>
-    </div>
-  </div>`;
+  var pf = energyCalcPowerFactor(energyState.loads);
+  var pq = energyGetPQStatus(230, 50, energyCalcTHD(energyState.loads).thd, 0.5, 1.0);
+  var cost = energyCalcDailyCost(energyState.profile, ENERGY_TARIFFS, energyState.powerKW);
+  var peak = energyCalcPeakShaving(energyState.profile);
+  var capSize = energyCalcCapacitorSize(pf.pf, energyState.targetPF, energyState.powerKW);
+
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Effektkvalitet','Power Quality') + ' - EN 50160</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Spaending','Voltage') + '</span><span class="value">' + pq.voltage + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Frekvens','Frequency') + '</span><span class="value">' + pq.frequency + '</span></div>';
+  html += '<div class="result-row"><span class="label">THD</span><span class="value">' + pq.thd + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Effektfaktor','Power Factor') + '</span><span class="value">' + pf.pf + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Reference','Reference') + '</span><span class="value">' + pq.clause + '</span></div>';
+  html += '</div>';
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Daglig omkostning','Daily Cost') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Total','Total') + ' DKK</span><span class="value">' + cost.totalCost + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Total','Total') + ' kWh</span><span class="value">' + cost.totalKWh + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Spidstime','Peak hour') + '</span><span class="value">' + cost.peakHour + ':00</span></div>';
+  html += '</div>';
+  html += '<div class="result-box">';
+  html += '<div class="result-title">' + tx('Kompensering','Compensation') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Kondensator','Capacitor') + ' kvar</span><span class="value">' + capSize.kvar + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Besparelse','Saving') + ' DKK</span><span class="value">' + peak.potentialSaving + '</span></div>';
+  html += '</div></div>';
+  return html;
 }
 
 // ===== PDF DOCUMENTATION MODULE =====
@@ -7288,16 +7284,17 @@ function renderLoad() {
 
     <div class="card fade-in">
       <div class="card-title">${t('loadResult')}</div>
-      <div class="result-box">
+      ${loadState.voltage === null || loadState.power === null || loadState.cosPhi === null ? '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>' : `<div class="result-box">
         <div class="result-title">${t('result')}</div>
         <div class="result-row"><span class="label">${t('ib')}</span><span class="value">${ib.toFixed(1)} A</span></div>
         <div class="result-row"><span class="label">${t('sApparent')}</span><span class="value">${S.toFixed(2)} kVA</span></div>
         <div class="result-row"><span class="label">${t('voltage')}</span><span class="value">${loadState.voltage} V</span></div>
         <div class="result-row"><span class="label">${t('powerFactor')}</span><span class="value">${loadState.cosPhi}</span></div>
       </div>
-      ${calcDetailIB(loadState.power, loadState.cosPhi, loadState.voltage, ib, loadState.simFactor, loadState.expFactor)}
+      ${calcDetailIB(loadState.power, loadState.cosPhi, loadState.voltage, ib, loadState.simFactor, loadState.expFactor)}`}
     </div>
 
+    ${loadState.voltage === null || loadState.power === null || loadState.cosPhi === null ? '' : `
     ${renderRecommendations(lang === 'da' ? 'Anbefalede kabler til IB = ' + ib.toFixed(1) + ' A' : 'Recommended cables for IB = ' + ib.toFixed(1) + ' A', recommendCables(ib), 'cable')}
     ${renderRecommendations(tx('Anbefalede sikringer', 'Recommended fuses'), recommendFuses(ib), 'fuse')}
     ${renderRecommendations(tx('Anbefalede automatsikringer', 'Recommended MCBs'), recommendMCBs(ib), 'mcb')}
@@ -7306,6 +7303,7 @@ function renderLoad() {
     ${renderRecommendations(tx('Anbefalede kontaktorer (motor)', 'Recommended contactors (motor)'), recommendContactors(ib), 'contactor')}
     ${renderRecommendations(tx('Anbefalet motorv\u00E6rn', 'Recommended motor protection'), recommendMPCBs(ib), 'mpcb')}
     ${renderRecommendations(tx('Anbefalet termorel\u00E6', 'Recommended overload relay'), recommendOverloadRelays(ib), 'relay')}
+    `}
 
     ${renderLoadSchedule()}
 
@@ -7325,19 +7323,12 @@ function renderLoad() {
         </div>
       </div>
 
-  // Null guard
-  if (loadState.voltage === null || loadState.power === null || loadState.cosPhi === null) {
-    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
-    html += '</div>';
-    return html;
-  }
-
-      <div class="result-box">
+      ${diversityState.homes !== null && diversityState.kwhPerHome !== null ? `<div class="result-box">
         <div class="result-title">${tx('Dimensionerende effekt', 'Design power')}</div>
         <div class="result-row"><span class="label">W \u00B7 n</span><span class="value">${(diversityState.kwhPerHome/1000*diversityState.homes).toFixed(0)} MWh/\u00E5r</span></div>
         <div class="result-row"><span class="label">Pb = 0,834 \u00B7 (W\u00B7n)^0,89</span><span class="value">${calcDiversityPb().toFixed(0)} kW</span></div>
         <div class="result-row"><span class="label">${tx('IB (cos\u03C6 0,95)', 'IB (cos\u03C6 0.95)')}</span><span class="value">${(calcDiversityPb()*1000/(Math.sqrt(3)*400*0.95)).toFixed(0)} A</span></div>
-      </div>
+      </div>` : '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg antal boliger og energi/bolig.', 'Select number of homes and energy/home.') + '</div></div>'}
     </div>
   `;
 }
@@ -7380,6 +7371,22 @@ function applyLoadPreset(key) {
 
 // ===== FUSE MODULE =====
 function renderFuse() {
+  if (fuseState.holder === null) {
+    return `
+    <div class="card fade-in">
+      <div class="card-title">${t('fuseTitle')}</div>
+      <div class="info-row">${t('infoClick')}</div>
+      <div class="select-group">
+        <div class="select-label">${t('fuseHolder')}</div>
+        <div class="select-grid">
+          ${Object.keys(FUSE_HOLDERS).map(h =>
+            `<button class="sel-btn" onclick="fuseState.holder='${h}';fuseState.size=null;renderModule('fuse')">${h}</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="result-box warning"><div class="result-title">${tx('Intet valgt endnu', 'Nothing selected yet')}</div><div class="info-row">${tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.')}</div></div>
+    </div>`;
+  }
   const holder = FUSE_HOLDERS[fuseState.holder];
   const sizes = holder.sizes;
 
@@ -7426,11 +7433,27 @@ function renderFuse() {
 
 // ===== MCB MODULE =====
 function renderMCB() {
+  if (mcbState.type === null) {
+    return `
+    <div class="card fade-in">
+      <div class="card-title">${t('mcbTitle')}</div>
+      <div class="info-row">${t('infoClick')}</div>
+      <div class="select-group">
+        <div class="select-label">${t('mcbType')}</div>
+        <div class="select-grid">
+          ${Object.keys(MCB_TYPES).map(tp =>
+            `<button class="sel-btn" onclick="mcbState.type='${tp}';mcbState.rating=null;renderModule('mcb')">${tp}</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="result-box warning"><div class="result-title">${tx('Intet valgt endnu', 'Nothing selected yet')}</div><div class="info-row">${tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.')}</div></div>
+    </div>`;
+  }
   const mcb = MCB_TYPES[mcbState.type];
-  const curve = MCB_CURVES[mcbState.curve];
+  const curve = MCB_CURVES[mcbState.curve] || null;
   const icu = mcbState.poles === '1p' ? mcb.icu1p : mcb.icuMp;
-  const isdMin = mcbState.rating ? (curve.isdMin * mcbState.rating).toFixed(0) : '—';
-  const isdMax = mcbState.rating ? (curve.isdMax * mcbState.rating).toFixed(0) : '—';
+  const isdMin = (mcbState.rating && curve) ? (curve.isdMin * mcbState.rating).toFixed(0) : '—';
+  const isdMax = (mcbState.rating && curve) ? (curve.isdMax * mcbState.rating).toFixed(0) : '—';
 
   return `
     <div class="card fade-in">
@@ -7493,6 +7516,22 @@ function renderMCB() {
 
 // ===== MCCB MODULE =====
 function renderMCCB() {
+  if (mccbState.frame === null) {
+    return `
+    <div class="card fade-in">
+      <div class="card-title">${t('mccbTitle')}</div>
+      <div class="info-row">${t('infoClick')}</div>
+      <div class="select-group">
+        <div class="select-label">${t('mccbFrame')}</div>
+        <div class="select-grid">
+          ${Object.keys(MCCB_FRAMES).map(f =>
+            `<button class="sel-btn" onclick="mccbState.frame='${f}';mccbState.trip=MCCB_FRAMES['${f}'].trips[0];mccbState.inVal=null;renderModule('mccb')">${f}</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="result-box warning"><div class="result-title">${tx('Intet valgt endnu', 'Nothing selected yet')}</div><div class="info-row">${tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.')}</div></div>
+    </div>`;
+  }
   const frame = MCCB_FRAMES[mccbState.frame];
   const icu = MCCB_TRIPS[mccbState.trip];
   const io = mccbState.inVal * mccbState.ioMult;
@@ -7552,6 +7591,7 @@ function renderMCCB() {
       </div>
     </div>
 
+    ${mccbState.inVal !== null && mccbState.trip !== null ? `
     <div class="card fade-in">
       <div class="card-title">${t('mccbResult')} — Micrologic 2.2</div>
       <div class="result-box">
@@ -7564,6 +7604,7 @@ function renderMCCB() {
         <div class="result-row"><span class="label">${t('mccbIi')}</span><span class="value">${ii} A</span></div>
       </div>
     </div>
+    ` : ''}
   `;
 }
 
@@ -7663,13 +7704,6 @@ function renderCable() {
     ${cableState.crossSection && selectedCable ? `
     <div class="card fade-in">
       <div class="card-title">${t('cableResult')}</div>
-
-  // Null guard
-  if (cableState.material === null || cableState.type === null || cableState.cores === null || cableState.installMethod === null) {
-    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
-    html += '</div>';
-    return html;
-  }
 
       <div class="result-box">
         <div class="result-title">${t('result')}</div>
@@ -7793,15 +7827,17 @@ function renderShortCircuit() {
   let deviceIcu = 0, deviceIsd = 0;
   if (activeModule === 'scircuit') {
     // Try MCCB first
-    deviceIcu = MCCB_TRIPS[mccbState.trip] * 1000; // A
-    const io = mccbState.inVal * mccbState.ioMult;
-    deviceIsd = io * mccbState.isdMult * 1.1;
+    if (mccbState.trip && MCCB_TRIPS[mccbState.trip]) {
+      deviceIcu = MCCB_TRIPS[mccbState.trip] * 1000; // A
+      const io = (mccbState.inVal || 0) * (mccbState.ioMult || 1);
+      deviceIsd = io * (mccbState.isdMult || 1) * 1.1;
+    }
 
     // Or MCB
-    if (mcbState.rating) {
+    if (mcbState.rating && mcbState.type && MCB_TYPES[mcbState.type]) {
       const mcb = MCB_TYPES[mcbState.type];
       const mcbIcu = (mcbState.poles === '1p' ? mcb.icu1p : mcb.icuMp) * 1000;
-      if (mcbIcu > 0) {
+      if (mcbIcu > 0 && mcbState.curve && MCB_CURVES[mcbState.curve]) {
         deviceIcu = mcbIcu;
         deviceIsd = MCB_CURVES[mcbState.curve].isdMax * mcbState.rating;
       }
@@ -7853,7 +7889,7 @@ function renderShortCircuit() {
 
     <div class="card fade-in">
       <div class="card-title">${t('scResult')}</div>
-      <div class="result-box">
+      ${scState.zNet === null || scState.zTrafo === null ? '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>' : `<div class="result-box">
         <div class="result-title">${t('result')}</div>
         <div class="result-row"><span class="label">${t('scIkmax')} (3-${tx('faset', 'phase')})</span><span class="value">${(ikMax3ph/1000).toFixed(2)} kA</span></div>
         <div class="result-row"><span class="label">${t('scIkmin')} (2-${tx('faset', 'phase')})</span><span class="value">${ikMin2ph.toFixed(0)} A</span></div>
@@ -7891,6 +7927,7 @@ function renderShortCircuit() {
       </div>
       `}
       ${calcDetailIk(scState.zNet, scState.zTrafo, zCable, Un, cFactor, ikMax3ph, ikMin2ph, zTotal, selectedCable ? (cableState.type + ' ' + cableState.crossSection + ' mm\u00B2 \u00D7 ' + vdropState.length + ' m') : '')}
+    `}
     </div>
   `;
 }// ===== TRANSFORMER MODULE (Extended - Opgavesamling Ch. 9) =====
@@ -10656,6 +10693,22 @@ function bidAutoFill() {
 
 function renderBid() {
   const wsKeys = Object.keys(WHOLESALERS);
+  if (bidState.wholesaler === null) {
+    return `
+    <div class="card fade-in">
+      <div class="card-title">\uD83D\uDCB0 ${tx('Tilbud / Projektpris', 'Bid / Project Price')}</div>
+      <div class="info-row">${tx('Genererer en indledende projektpris fra din materialeliste.', 'Generates an initial project price from your bill of materials.')}</div>
+      <div class="select-group">
+        <div class="select-label">${tx('Grossist', 'Wholesaler')}</div>
+        <div class="select-grid">
+          ${wsKeys.map(w =>
+            `<button class="sel-btn" onclick="bidState.wholesaler='${w}';renderModule('bid')">${w}</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="result-box warning"><div class="result-title">${tx('Intet valgt endnu', 'Nothing selected yet')}</div><div class="info-row">${tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.')}</div></div>
+    </div>`;
+  }
   const ws = WHOLESALERS[bidState.wholesaler];
   const hourlyOptions = [450, 500, 550, 600, 650, 750];
   const markupOptions = [0, 10, 15, 20, 25, 30];
@@ -10797,19 +10850,19 @@ function renderBid() {
 
     <div class="card fade-in">
       <div class="card-title">${tx('Tilbud (indledende projektpris)', 'Bid (initial project price)')}</div>
-      <div class="result-box">
+      ${bidState.hourlyRate === null || bidState.rabat === null || bidState.markup === null ? '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg rabat, timepris og avance ovenfor.', 'Select discount, hourly rate and markup above.') + '</div></div>' : `<div class="result-box">
         <div class="result-row"><span class="label">${tx('Materialer (listepris)', 'Materials (list price)')}</span><span class="value">${fmt(materialsList)} kr</span></div>
         <div class="result-row"><span class="label">${tx('Rabat', 'Discount')} (\u2212${bidState.rabat}%)</span><span class="value">\u2212${fmt(materialsList - materialsNet)} kr</span></div>
         <div class="result-row"><span class="label">${tx('Materialer netto', 'Materials net')}</span><span class="value">${fmt(materialsNet)} kr</span></div>
         <div class="result-row"><span class="label">${tx('Avance / DB', 'Markup / margin')} (+${bidState.markup}%)</span><span class="value">${fmt(markupAmt)} kr</span></div>
-        <div class="result-row"><span class="label">${tx('Arbejdsl\u00F8n', 'Labor')} (${(bidState.laborMode === 'akkord' ? akkordHours : bidState.laborHours).toFixed(1)} t \u00D7 ${bidState.hourlyRate}${bidState.laborMode === 'akkord' ? ', akkord' : ''})</span><span class="value">${fmt(labor)} kr</span></div>
+        <div class="result-row"><span class="label">${tx('Arbejdsl\u00F8n', 'Labor')} (${(bidState.laborMode === 'akkord' ? akkordHours : (bidState.laborHours || 0)).toFixed(1)} t \u00D7 ${bidState.hourlyRate}${bidState.laborMode === 'akkord' ? ', akkord' : ''})</span><span class="value">${fmt(labor)} kr</span></div>
         <div class="result-row"><span class="label">${tx('I alt ekskl. moms', 'Total excl. VAT')}</span><span class="value">${fmt(exVat)} kr</span></div>
         <div class="result-row"><span class="label">${tx('Moms 25%', 'VAT 25%')}</span><span class="value">${fmt(vat)} kr</span></div>
         <div class="result-row" style="border-top:2px solid var(--success);margin-top:6px;padding-top:10px">
           <span class="label" style="font-weight:800;color:var(--text)">${tx('TOTAL inkl. moms', 'TOTAL incl. VAT')}</span>
           <span class="value" style="font-size:1.15rem;color:var(--success)">${fmt(total)} kr</span>
         </div>
-      </div>
+      </div>`}
       <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px">${tx('Vejledende tilbud. Endelig pris afh\u00E6nger af grossistens dagspriser, rabatter og projektforhold.', 'Indicative bid. Final price depends on the wholesaler daily prices, discounts and project conditions.')}</div>
     </div>
   `;
@@ -17981,13 +18034,6 @@ function renderZs() {
   html += '</div></div>';
 
 
-  // Null guard - no results until user selects values
-  if (zsState.deviceType === null || zsState.device === null || zsState.ze === null || zsState.cableLength === null || zsState.cableSize === null) {
-    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
-    html += '</div>';
-    return html;
-  }
-
   // Calculation results
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Impedansberegning', 'Impedance Calculation') + ' - DS/HD 60364-6 cl.6.2.3.5</div>';
@@ -19260,13 +19306,6 @@ function renderEarthsys() {
   html += '</div></div>';
 
 
-  // Null guard - no results until user selects values
-  if (earthsysState.systemType === null || earthsysState.electrode === null || earthsysState.soilResistivity === null) {
-    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
-    html += '</div>';
-    return html;
-  }
-
   // Results
   html += '<div class="result-box">';
   html += '<div class="result-title">' + tx('Resultater', 'Results') + ' - DS/HD 60364-5-54</div>';
@@ -20071,13 +20110,6 @@ function renderBESS() {
   html += '<div class="select-group"><div class="select-label">' + tx('Afladningstid [timer]', 'Discharge Hours') + '</div><div class="select-grid">';
   [1, 2, 3, 4, 5, 6, 8, 10].forEach(function(h) { html += '<button class="sel-btn' + (bessState.dischargeHours === h ? ' selected' : '') + '" onclick="bessState.dischargeHours=' + h + ';renderModule(\'bess\')">' + h + 'h</button>'; });
   html += '</div></div>';
-
-  // Null guard - no results until user selects values
-  if (bessState.systemType === null || bessState.chemistry === null || bessState.capacityKWh === null || bessState.voltDC === null || bessState.dischargeHours === null) {
-    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
-    html += '</div>';
-    return html;
-  }
 
   // Results - Inverter
   html += '<div class="result-box"><div class="result-title">' + tx('Inverter', 'Inverter') + '</div>';
@@ -26462,14 +26494,15 @@ function renderDCOhm() {
     html += '</div>';
   }
   // Result
-  var res = dcCalcOhm(dcState.ohmKnown, dcState.ohmR, dcState.ohmI, dcState.ohmU);
-
-  // Null guard
-  if (dcState.ohmR === null || dcState.ohmI === null || dcState.ohmU === null) {
+  var ohmNeeded = { ri: ['ohmR','ohmI'], ru: ['ohmR','ohmU'], ui: ['ohmU','ohmI'] }[dcState.ohmKnown] || ['ohmR','ohmI'];
+  // Null guard - only check the two known variables based on mode
+  if (ohmNeeded.some(function(k) { return dcState[k] === null; })) {
     html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
     html += '</div>';
     return html;
   }
+
+  var res = dcCalcOhm(dcState.ohmKnown, dcState.ohmR, dcState.ohmI, dcState.ohmU);
 
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">U (' + tx('Spaending', 'Voltage') + ')</span><span class="value">' + res.U.toFixed(4) + ' V</span></div>';
@@ -26499,15 +26532,15 @@ function renderDCResistivity() {
   html += valStep(dcState, 'resCrossSection', 'dc', { step: 0.5, fmt: function(p){ return p + ' mm\u00B2'; }, clamp: { min: 0 } });
   html += '</div>';
   // Result
-  var mat = DC_MATERIALS[dcState.resMaterial];
-  var R = dcCalcResistivity(mat.rho, dcState.resLength, dcState.resCrossSection);
-
   // Null guard
   if (dcState.resLength === null || dcState.resCrossSection === null) {
     html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
     html += '</div>';
     return html;
   }
+
+  var mat = DC_MATERIALS[dcState.resMaterial];
+  var R = dcCalcResistivity(mat.rho, dcState.resLength, dcState.resCrossSection);
 
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">R</span><span class="value">' + R.toFixed(4) + ' \u03A9</span></div>';
@@ -26536,17 +26569,17 @@ function renderDCTemperature() {
   html += '</div>';
   html += valStep(dcState, 'tempT', 'dc', { step: 1, fmt: function(p){ return p + '\u00B0'; }, clamp: { min: -273.15 } });
   html += '</div>';
-  // Result
-  var mat = DC_MATERIALS[dcState.tempMaterial];
-  var RT = dcCalcTempResistance(dcState.tempR20, mat.alpha, dcState.tempT);
-  var deltaR = RT - dcState.tempR20;
-
   // Null guard
   if (dcState.tempR20 === null || dcState.tempT === null) {
     html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
     html += '</div>';
     return html;
   }
+
+  // Result
+  var mat = DC_MATERIALS[dcState.tempMaterial];
+  var RT = dcCalcTempResistance(dcState.tempR20, mat.alpha, dcState.tempT);
+  var deltaR = RT - dcState.tempR20;
 
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">R<sub>T</sub> (' + tx('ved', 'at') + ' ' + dcState.tempT + '\u00B0C)</span><span class="value">' + RT.toFixed(4) + ' \u03A9</span></div>';
@@ -26621,15 +26654,15 @@ function renderDCDivider() {
   html += '</div>';
   html += valStep(dcState, 'cdItotal', 'dc', { step: 0.1, fmt: dcFmtI, clamp: { min: 0 } });
   html += '</div>';
-  // Voltage divider result
-  var Uout = dcCalcVoltageDivider(dcState.vdUin, dcState.vdR1, dcState.vdR2);
-
   // Null guard
   if (dcState.vdR1 === null || dcState.vdR2 === null || dcState.vdUin === null) {
     html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
     html += '</div>';
     return html;
   }
+
+  // Voltage divider result
+  var Uout = dcCalcVoltageDivider(dcState.vdUin, dcState.vdR1, dcState.vdR2);
 
   html += '<div class="result-box"><div class="result-title">' + tx('Spaendingsdeler', 'Voltage Divider') + '</div>';
   html += '<div class="result-row"><span class="label">U<sub>out</sub></span><span class="value" style="font-weight:700">' + Uout.toFixed(4) + ' V</span></div>';
@@ -26679,14 +26712,15 @@ function renderDCPower() {
     html += '</div>';
   }
   // Result
-  var res = dcCalcPower(dcState.powKnown, dcState.powU, dcState.powI, dcState.powR);
-
-  // Null guard
-  if (dcState.powU === null || dcState.powI === null || dcState.powR === null) {
+  var powNeeded = { ui: ['powU','powI'], ri: ['powR','powI'], ru: ['powR','powU'] }[dcState.powKnown] || ['powU','powI'];
+  // Null guard - only check the two known variables based on mode
+  if (powNeeded.some(function(k) { return dcState[k] === null; })) {
     html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
     html += '</div>';
     return html;
   }
+
+  var res = dcCalcPower(dcState.powKnown, dcState.powU, dcState.powI, dcState.powR);
 
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">P (' + tx('Effekt', 'Power') + ')</span><span class="value" style="font-weight:700">' + res.P.toFixed(2) + ' W</span></div>';
@@ -26720,17 +26754,17 @@ function renderDCEnergy() {
   html += '<button class="sel-btn' + (dcState.enTunit === 'min' ? ' selected' : '') + '" onclick="dcState.enTunit=\'min\';renderModule(\'dc\')">' + tx('Minutter', 'Minutes') + '</button>';
   html += '<button class="sel-btn' + (dcState.enTunit === 'h' ? ' selected' : '') + '" onclick="dcState.enTunit=\'h\';renderModule(\'dc\')">' + tx('Timer', 'Hours') + '</button>';
   html += '</div></div>';
-  // Result
-  var tSec = dcTimeToSeconds(dcState.enT, dcState.enTunit);
-  var W = dcCalcEnergy(dcState.enP, tSec);
-  var kWh = dcCalcEnergyKWh(dcState.enP, tSec);
-
   // Null guard
   if (dcState.enP === null || dcState.enT === null) {
     html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
     html += '</div>';
     return html;
   }
+
+  // Result
+  var tSec = dcTimeToSeconds(dcState.enT, dcState.enTunit);
+  var W = dcCalcEnergy(dcState.enP, tSec);
+  var kWh = dcCalcEnergyKWh(dcState.enP, tSec);
 
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">W (' + tx('Energi', 'Energy') + ')</span><span class="value" style="font-weight:700">' + W.toFixed(0) + ' Ws (J)</span></div>';
@@ -26761,15 +26795,15 @@ function renderDCEmf() {
   html += '</div>';
   html += valStep(dcState, 'emfI', 'dc', { step: 0.1, fmt: dcFmtI, clamp: { min: 0 } });
   html += '</div>';
-  // Result
-  var res = dcCalcEMF(dcState.emfE, dcState.emfRi, dcState.emfI);
-
   // Null guard
   if (dcState.emfE === null || dcState.emfRi === null || dcState.emfI === null) {
     html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
     html += '</div>';
     return html;
   }
+
+  // Result
+  var res = dcCalcEMF(dcState.emfE, dcState.emfRi, dcState.emfI);
 
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">U<sub>kl</sub> (' + tx('Klemmesp\u00E6nding', 'Terminal Voltage') + ')</span><span class="value" style="font-weight:700">' + res.Uterminal.toFixed(3) + ' V</span></div>';
@@ -27477,13 +27511,6 @@ function renderKapacitorC() {
   html += valStep(kapacitorState, 'dist', 'kapacitor', { step: 0.0001, fmt: function(v){ return (v*1000).toFixed(2) + ' mm'; }, clamp: { min: 0.00001 }, prec: 9 });
   html += '</div>';
   var XC50 = kapacitorCalcXC(50, C);
-
-  // Null guard
-  if (kapacitorState.dielectric === null || kapacitorState.area === null || kapacitorState.dist === null) {
-    html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div><div class="info-row">' + tx('Vaelg vaerdier ovenfor for at se resultater.', 'Select values above to see results.') + '</div></div>';
-    html += '</div>';
-    return html;
-  }
 
   html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
   html += '<div class="result-row"><span class="label">C</span><span class="value" style="font-weight:700">' + impedansFmtC(C) + '</span></div>';
