@@ -13276,6 +13276,22 @@ test('renderTrefase includes 3-phase simulator SVG', function() {
   assert(html.indexOf('sim-wire') >= 0, 'renderTrefase should include animated wires');
 });
 
+test('simSvgDefs returns SVG defs with filters', function() {
+  var d = simSvgDefs();
+  assert(d.indexOf('simBlur') >= 0, 'should contain simBlur filter');
+  assert(d.indexOf('simShadow') >= 0, 'should contain simShadow filter');
+  assert(d.indexOf('simHeatGrad') >= 0, 'should contain simHeatGrad gradient');
+  assert(d.indexOf('<defs>') >= 0, 'should start with <defs>');
+});
+
+test('simSvgDefs returns valid SVG defs structure', function() {
+  var d = simSvgDefs();
+  assert(d.indexOf('</defs>') >= 0, 'should close defs tag');
+  assert(d.indexOf('feGaussianBlur') >= 0, 'should contain feGaussianBlur');
+  assert(d.indexOf('feDropShadow') >= 0, 'should contain feDropShadow');
+  assert(d.indexOf('linearGradient') >= 0, 'should contain linearGradient');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
