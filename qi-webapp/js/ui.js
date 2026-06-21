@@ -139,6 +139,7 @@
     { id: "licensing", label: "Licensing & Permits", icon: "📜" },
     { id: "landingpartners", label: "Landing Partners", icon: "🤝" },
     { id: "ai", label: "AI Assistant", icon: "✦" },
+    { id: "whatif", label: "What-If Simulator", icon: "⚡" },
     { id: "impact", label: "Change Impact", icon: "⇄" },
     { id: "scorecard", label: "KPI Scorecard", icon: "▣" },
     { id: "health", label: "Data Health", icon: "✚" },
@@ -4855,6 +4856,81 @@
         <p class="muted">Auto-calculated live from delivery, cost (EVM), quality (Sigma/NCR), risk and safety data. See the OKR register for objective tracking.</p></div>`;
   };
 
+  // ---------- What-If Scenario Simulator ----------
+  // Non-technical decision-makers ask "what happens if we skip X?" — this gives
+  // them an instant, plain-language answer with recalculated budget/timeline/risk.
+  RENDER.whatif = function () {
+    const G = window.QIGlobe || {};
+    const stations = (Array.isArray(G.STATIONS) ? G.STATIONS : []);
+    const cables = (Array.isArray(G.CABLES) ? G.CABLES : []);
+    // Build country toggle buttons
+    const countryBtns = stations.map(s => `
+      <button class="whatif-toggle is-on" data-station="${esc(s.id)}" type="button">${esc(s.name)} <small>${esc(s.country)}</small></button>`).join("");
+    // Cable toggle buttons
+    const cableBtns = cables.map(c => `
+      <button class="whatif-toggle is-on" data-cable="${esc(c.id)}" type="button">${esc(c.id)} <small>${esc(c.name)}</small></button>`).join("");
+    return `
+      <div class="card whatif-card">
+        <h2>⚡ What-If Simulator</h2>
+        <p>Toggle countries or cables on/off, adjust costs or permit delays, and <b>instantly see what happens</b> to your budget, timeline, and network. No change is saved — this is a safe sandbox for exploring scenarios.</p>
+      </div>
+      <div class="card whatif-controls">
+        <h3>Countries (click to exclude/include)</h3>
+        <div class="whatif-toggles" id="whatifCountries">${countryBtns}</div>
+        <h3>Cable segments</h3>
+        <div class="whatif-toggles" id="whatifCables">${cableBtns}</div>
+        <div class="whatif-sliders">
+          <label>Cost change: <span id="whatifCostLabel">0%</span>
+            <input type="range" id="whatifCost" min="-30" max="100" value="0" step="5" /></label>
+          <label>Extra permit delay: <span id="whatifDelayLabel">0 months</span>
+            <input type="range" id="whatifDelay" min="0" max="24" value="0" step="1" /></label>
+        </div>
+      </div>
+      <div class="card whatif-result" id="whatifResult">
+        <div class="whatif-verdict" id="whatifVerdict"></div>
+        <div class="whatif-grid" id="whatifGrid"></div>
+        <div class="whatif-risks" id="whatifRisks"></div>
+      </div>`;
+  };
+  AFTER.whatif = function () {
+    const countryBox = $("#whatifCountries"), cableBox = $("#whatifCables");
+    const costSlider = $("#whatifCost"), delaySlider = $("#whatifDelay");
+    const costLabel = $("#whatifCostLabel"), delayLabel = $("#whatifDelayLabel");
+    const verdictEl = $("#whatifVerdict"), gridEl = $("#whatifGrid"), risksEl = $("#whatifRisks");
+    function recalc() {
+      const exCountries = [], exCables = [];
+      if (countryBox) countryBox.querySelectorAll(".whatif-toggle:not(.is-on)").forEach(b => exCountries.push(b.dataset.station));
+      if (cableBox) cableBox.querySelectorAll(".whatif-toggle:not(.is-on)").forEach(b => exCables.push(b.dataset.cable));
+      const costPct = Number(costSlider && costSlider.value) || 0;
+      const delay = Number(delaySlider && delaySlider.value) || 0;
+      if (costLabel) costLabel.textContent = (costPct >= 0 ? "+" : "") + costPct + "%";
+      if (delayLabel) delayLabel.textContent = delay + " month" + (delay === 1 ? "" : "s");
+      const r = S.whatIf({ excludeCountries: exCountries, excludeCables: exCables, costMultiplier: 1 + costPct / 100, permitDelayMonths: delay });
+      if (verdictEl) verdictEl.textContent = r.verdict;
+      if (gridEl) gridEl.innerHTML = `
+        <div class="whatif-kpi"><span class="whatif-kpi-val">${esc(fmtM(r.budget.scenario))}</span><span class="whatif-kpi-lab">Budget${r.budget.saved > 0 ? " (save " + fmtM(r.budget.saved) + ")" : r.budget.saved < 0 ? " (+" + fmtM(Math.abs(r.budget.saved)) + ")" : ""}</span></div>
+        <div class="whatif-kpi"><span class="whatif-kpi-val">${r.timeline.scenario} mo</span><span class="whatif-kpi-lab">Timeline${r.timeline.permitDelay ? " (+" + r.timeline.permitDelay + " delay)" : ""}</span></div>
+        <div class="whatif-kpi"><span class="whatif-kpi-val">${r.network.stations}/${r.network.baseStations}</span><span class="whatif-kpi-lab">Countries connected</span></div>
+        <div class="whatif-kpi"><span class="whatif-kpi-val">${r.network.totalCap} Tbps</span><span class="whatif-kpi-lab">Capacity (was ${r.network.baseCap})</span></div>
+        <div class="whatif-kpi"><span class="whatif-kpi-val">${(r.network.totalKm || 0).toLocaleString()} km</span><span class="whatif-kpi-lab">Route (was ${(r.network.baseKm || 0).toLocaleString()})</span></div>
+        <div class="whatif-kpi"><span class="whatif-kpi-val">${r.network.cables}/${r.network.baseCables}</span><span class="whatif-kpi-lab">Cable segments</span></div>`;
+      if (risksEl) {
+        if (r.risks.length === 0) { risksEl.innerHTML = '<p class="whatif-ok">No new risks — this scenario looks safe.</p>'; }
+        else { risksEl.innerHTML = '<h4>Things to watch</h4><ul>' + r.risks.map(t => '<li>' + esc(t) + '</li>').join('') + '</ul>'; }
+      }
+    }
+    function fmtM(n) { n = Number(n) || 0; if (Math.abs(n) >= 1e9) return "USD " + (Math.round(n / 1e8) / 10) + "B"; if (Math.abs(n) >= 1e6) return "USD " + Math.round(n / 1e6) + "M"; return "USD " + Math.round(n / 1e3) + "K"; }
+    // Wire toggles
+    [countryBox, cableBox].forEach(box => { if (box) box.addEventListener("click", e => {
+      const b = e.target.closest(".whatif-toggle"); if (!b) return;
+      b.classList.toggle("is-on"); recalc();
+    }); });
+    if (costSlider) costSlider.addEventListener("input", recalc);
+    if (delaySlider) delaySlider.addEventListener("input", recalc);
+    // Initial calculation (baseline)
+    recalc();
+  };
+
   // ---------- Process Capability (Cp/Cpk) ----------
   RENDER.capability = function () {
     const sp = S.spec();
@@ -6180,6 +6256,72 @@
       if (window.QISync.syncEnabled()) {
         window.QISync.wsConnect();
       }
+    })();
+
+    // ---- Auto-backup reminder (weekly nudge) ----
+    // If it's been more than 7 days since the last Full Backup, show a gentle,
+    // dismissible banner. Non-blocking — never forces action, just reminds.
+    (function backupNudge() {
+      try { if (typeof localStorage === "undefined") return; } catch (e) { return; }
+      var NUDGE_KEY = "qi_last_backup_nudge";
+      var last = 0; try { last = Number(localStorage.getItem(NUDGE_KEY)) || 0; } catch (e) { return; }
+      var sevenDays = 7 * 24 * 3600 * 1000;
+      if (Date.now() - last < sevenDays) return;  // shown recently, skip
+      // Show the nudge after a short delay so it doesn't compete with the initial render.
+      setTimeout(function () {
+        var bar = document.createElement("div");
+        bar.className = "backup-nudge";
+        bar.innerHTML = '<span class="backup-nudge-text">💾 It\u2019s been a while — <b>back up your projects</b> so you never lose work.</span>' +
+          '<button class="btn btn-sm btn-primary backup-nudge-btn" id="nudgeBackup">Back up now</button>' +
+          '<button class="btn btn-sm backup-nudge-dismiss" id="nudgeDismiss">Remind me later</button>';
+        document.body.appendChild(bar);
+        document.getElementById("nudgeBackup").addEventListener("click", function () {
+          try { exportAllProjects(); } catch (e) {}
+          try { localStorage.setItem(NUDGE_KEY, String(Date.now())); } catch (e) {}
+          bar.remove();
+        });
+        document.getElementById("nudgeDismiss").addEventListener("click", function () {
+          try { localStorage.setItem(NUDGE_KEY, String(Date.now())); } catch (e) {}
+          bar.remove();
+        });
+      }, 3000);
+    })();
+
+    // ---- First-time onboarding wizard (3-step overlay) ----
+    // Only shows ONCE (first ever boot). Teaches: upload → Brain analyses → explore.
+    (function onboardingWizard() {
+      var OB_KEY = "qi_onboarded";
+      try { if (typeof localStorage === "undefined") return; } catch (e) { return; }
+      try { if (localStorage.getItem(OB_KEY)) return; } catch (e) { return; }
+      try { localStorage.setItem(OB_KEY, "1"); } catch (e) {}
+      var overlay = document.createElement("div");
+      overlay.className = "onboard-overlay";
+      overlay.id = "onboardOverlay";
+      var steps = [
+        { title: "Welcome to the QI Platform", body: "This app helps you manage a submarine fibre-optic programme from A to Z — even if you\u2019ve never done project management before. <b>One upload is all it needs.</b>", btn: "Show me how \u2192" },
+        { title: "Step 1: Upload your project", body: "Go to the <b>Project Brain</b> and paste or upload a project description (any language, any format — the Brain understands). It analyses everything and fills every module automatically.", btn: "What happens next? \u2192" },
+        { title: "Step 2: Explore the results", body: "The Dashboard, Risk Register, 3D Globe, Budget, Milestones — <b>everything is already populated</b>. Just click through the left menu. The AI Advisor tells you what to do next. <b>You\u2019re ready.</b>", btn: "Got it — let me start" }
+      ];
+      var idx = 0;
+      function render() {
+        var s = steps[idx];
+        overlay.innerHTML = '<div class="onboard-card">' +
+          '<div class="onboard-step">Step ' + (idx + 1) + ' of ' + steps.length + '</div>' +
+          '<h2>' + s.title + '</h2>' +
+          '<p>' + s.body + '</p>' +
+          '<button class="btn btn-primary onboard-next" id="onboardNext">' + s.btn + '</button>' +
+          (idx > 0 ? '<button class="btn btn-sm onboard-skip" id="onboardSkip">Skip intro</button>' : '') +
+          '</div>';
+        document.getElementById("onboardNext").addEventListener("click", function () {
+          idx++;
+          if (idx >= steps.length) { overlay.remove(); return; }
+          render();
+        });
+        var skip = document.getElementById("onboardSkip");
+        if (skip) skip.addEventListener("click", function () { overlay.remove(); });
+      }
+      document.body.appendChild(overlay);
+      render();
     })();
   };
 

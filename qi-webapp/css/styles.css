@@ -1488,3 +1488,51 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 /* Per-recommendation "go execute this duty" action button */
 .rec-card .rec-actions{margin-top:10px}
 .rec-card .rec-actions .btn{white-space:nowrap}
+
+/* ---- What-If Simulator ---- */
+.whatif-card h2{margin:0 0 6px;font-size:22px}
+.whatif-card p{margin:0;line-height:1.55;color:var(--muted)}
+.whatif-controls h3{margin:14px 0 8px;font-size:14px;font-weight:600}
+.whatif-toggles{display:flex;flex-wrap:wrap;gap:6px}
+.whatif-toggle{font:inherit;font-size:12px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);
+  background:var(--card);color:var(--text);cursor:pointer;transition:all .15s}
+.whatif-toggle.is-on{background:rgba(66,214,164,.15);border-color:rgba(66,214,164,.5);color:#42d6a4;font-weight:600}
+.whatif-toggle:not(.is-on){background:rgba(231,76,60,.10);border-color:rgba(231,76,60,.4);color:#e74c3c;text-decoration:line-through;opacity:.7}
+.whatif-toggle small{opacity:.7;margin-left:4px}
+.whatif-sliders{margin-top:14px;display:flex;flex-wrap:wrap;gap:18px}
+.whatif-sliders label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.whatif-sliders input[type="range"]{width:160px}
+.whatif-result{margin-top:12px}
+.whatif-verdict{font-size:15px;font-weight:600;line-height:1.5;padding:12px 0;border-bottom:1px solid var(--line)}
+.whatif-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:14px}
+.whatif-kpi{text-align:center;padding:14px 8px;border-radius:var(--radius);background:var(--bg);border:1px solid var(--line)}
+.whatif-kpi-val{display:block;font-size:20px;font-weight:700;color:var(--accent)}
+.whatif-kpi-lab{display:block;font-size:11px;color:var(--muted);margin-top:4px}
+.whatif-risks{margin-top:16px}
+.whatif-risks h4{margin:0 0 8px;font-size:14px;color:#e74c3c}
+.whatif-risks ul{margin:0;padding:0 0 0 18px;line-height:1.6;color:var(--text)}
+.whatif-risks li{margin-bottom:4px}
+.whatif-ok{color:#42d6a4;font-weight:600}
+
+/* ---- Backup nudge banner ---- */
+.backup-nudge{position:fixed;bottom:0;left:0;right:0;z-index:9999;display:flex;align-items:center;gap:12px;
+  padding:12px 20px;background:linear-gradient(90deg,#1a2a44,#1e3354);border-top:2px solid var(--accent);
+  box-shadow:0 -4px 20px rgba(0,0,0,.3);animation:nudgeIn .3s ease both}
+@keyframes nudgeIn{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.backup-nudge-text{flex:1;font-size:13.5px;color:#e6eaf3;line-height:1.4}
+.backup-nudge-text b{color:#fff}
+.backup-nudge-btn{white-space:nowrap}
+.backup-nudge-dismiss{color:var(--muted);white-space:nowrap}
+
+/* ---- Onboarding wizard overlay ---- */
+.onboard-overlay{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;
+  background:rgba(3,6,14,.88);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:fadeIn .3s ease}
+.onboard-card{max-width:460px;width:90%;padding:36px 32px;border-radius:18px;
+  background:linear-gradient(145deg,#162240,#1a2d52);border:1px solid rgba(125,167,240,.25);
+  box-shadow:0 24px 60px rgba(0,0,0,.5);text-align:center}
+.onboard-step{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:12px}
+.onboard-card h2{margin:0 0 12px;font-size:20px;color:#fff}
+.onboard-card p{margin:0 0 22px;font-size:14px;line-height:1.65;color:#cbd6ee}
+.onboard-card p b{color:#fff}
+.onboard-next{font-size:14px;padding:10px 24px}
+.onboard-skip{margin-top:10px;color:var(--muted)}

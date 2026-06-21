@@ -939,6 +939,113 @@
     };
   }
 
+  // ---- What-If Scenario Simulator ----
+  // Pure in-memory computation — never persists. The user toggles countries or
+  // cables on/off, slides permit delays or cost multipliers, and gets an instant
+  // recalculated snapshot (budget, timeline, capacity, risk assessment) compared
+  // to the baseline. Designed for non-PM decision-makers asking "what happens if…?"
+  function whatIf(scenario) {
+    scenario = scenario || {};
+    const G = root.QIGlobe || {};
+    const cables = (Array.isArray(G.CABLES) ? G.CABLES : []);
+    const stations = (Array.isArray(G.STATIONS) ? G.STATIONS : []);
+    const prog = G.PROGRAMME || { budgetUsd: 1300e6, durationMonths: 60 };
+
+    // scenario.excludeCountries: string[] of station ids to skip
+    // scenario.excludeCables: string[] of cable ids to skip
+    // scenario.costMultiplier: 1.0 = baseline, 1.2 = +20%
+    // scenario.permitDelayMonths: extra months added
+    const exC = (scenario.excludeCountries || []).map(s => String(s).toLowerCase());
+    const exCab = (scenario.excludeCables || []).map(s => String(s).toLowerCase());
+    const costMul = Math.max(0.5, Math.min(3, Number(scenario.costMultiplier) || 1));
+    const permitDelay = Math.max(0, Math.min(36, Number(scenario.permitDelayMonths) || 0));
+
+    // Determine which cables remain (a cable is excluded if either endpoint is
+    // excluded OR it's explicitly excluded).
+    const activeCables = cables.filter(function (c) {
+      if (exCab.indexOf(c.id.toLowerCase()) !== -1) return false;
+      if (exC.indexOf(c.from) !== -1 || exC.indexOf(c.to) !== -1) return false;
+      return true;
+    });
+
+    // Determine which stations remain (any station that still has at least one connected cable).
+    const liveStations = {};
+    activeCables.forEach(function (c) { liveStations[c.from] = true; liveStations[c.to] = true; });
+    const activeStations = stations.filter(function (s) { return !!liveStations[s.id]; });
+
+    // Budget & capacity
+    var baseW = 0, activeW = 0;
+    cables.forEach(function (c) { baseW += (c.lengthKm || 0) * (c.fibrePairs || 0); });
+    activeCables.forEach(function (c) { activeW += (c.lengthKm || 0) * (c.fibrePairs || 0); });
+    baseW = baseW || 1;
+    var baseBudget = prog.budgetUsd;
+    var scenarioBudget = Math.round(baseBudget * (activeW / baseW) * costMul);
+    var savedUsd = baseBudget - scenarioBudget;
+    var totalKm = activeCables.reduce(function (a, c) { return a + (c.lengthKm || 0); }, 0);
+    var totalCap = activeCables.reduce(function (a, c) { return a + (c.capacityTbps || 0); }, 0);
+    var baseCap = cables.reduce(function (a, c) { return a + (c.capacityTbps || 0); }, 0);
+    var baseKm = cables.reduce(function (a, c) { return a + (c.lengthKm || 0); }, 0);
+
+    // Timeline
+    var baseMonths = prog.durationMonths;
+    var scenarioMonths = Math.round(baseMonths * (activeCables.length / (cables.length || 1))) + permitDelay;
+
+    // Risk assessment (plain language)
+    var risks = [];
+    var removedCountries = stations.filter(function (s) { return !liveStations[s.id]; }).map(function (s) { return s.name + " (" + s.country + ")"; });
+    if (removedCountries.length > 0) {
+      risks.push("You lose connectivity to " + removedCountries.join(", ") + ".");
+    }
+    // Check for single points of failure (any station with only 1 cable left)
+    // — only flag this if the scenario actually removed something (otherwise these
+    // are inherent to the base topology, not a scenario-introduced risk).
+    if (exC.length > 0 || exCab.length > 0) {
+      var stationLinks = {};
+      activeCables.forEach(function (c) { stationLinks[c.from] = (stationLinks[c.from] || 0) + 1; stationLinks[c.to] = (stationLinks[c.to] || 0) + 1; });
+      var singles = activeStations.filter(function (s) { return (stationLinks[s.id] || 0) === 1; });
+      if (singles.length > 0) {
+        risks.push(singles.map(function (s) { return s.name; }).join(", ") + (singles.length === 1 ? " becomes" : " become") + " a single point of failure (only one cable \u2014 no redundancy).");
+      }
+    }
+    if (costMul > 1.15) {
+      risks.push("At +" + Math.round((costMul - 1) * 100) + "% cost increase, the budget may exceed lender comfort zones — consider phasing.");
+    }
+    if (permitDelay > 6) {
+      risks.push("A " + permitDelay + "-month permit delay pushes the timeline significantly — consider starting that approval immediately.");
+    }
+    if (activeCables.length < cables.length * 0.5) {
+      risks.push("You're cutting more than half the network — reconsider whether the remaining capacity justifies the programme overhead.");
+    }
+
+    // Plain-language verdict
+    var parts = [];
+    if (removedCountries.length > 0) parts.push("skip " + removedCountries.length + " countr" + (removedCountries.length === 1 ? "y" : "ies"));
+    if (costMul !== 1) parts.push((costMul > 1 ? "+" : "") + Math.round((costMul - 1) * 100) + "% on costs");
+    if (permitDelay > 0) parts.push("+" + permitDelay + " months permit delay");
+    var scenarioLabel = parts.length ? "If you " + parts.join(" and ") + ":" : "Baseline (no changes):";
+    var verdict = scenarioLabel + " about " + fmtUsdShort(scenarioBudget) + " total (" + (savedUsd >= 0 ? "save " : "add ") + fmtUsdShort(Math.abs(savedUsd)) + "), " + scenarioMonths + " months, " + activeStations.length + " of " + stations.length + " countries, " + Math.round(totalCap) + " Tbps capacity.";
+
+    return {
+      verdict: verdict,
+      label: scenarioLabel,
+      budget: { base: baseBudget, scenario: scenarioBudget, saved: savedUsd, multiplier: costMul },
+      timeline: { base: baseMonths, scenario: scenarioMonths, permitDelay: permitDelay },
+      network: { cables: activeCables.length, baseCables: cables.length, stations: activeStations.length, baseStations: stations.length, totalKm: totalKm, baseKm: baseKm, totalCap: totalCap, baseCap: baseCap },
+      risks: risks,
+      excludedCountries: removedCountries,
+      excludedCableIds: exCab,
+      activeCableIds: activeCables.map(function (c) { return c.id; }),
+      activeStationIds: activeStations.map(function (s) { return s.id; })
+    };
+  }
+  function fmtUsdShort(n) {
+    n = Math.abs(Number(n) || 0);
+    if (n >= 1e9) return "USD " + (Math.round(n / 1e8) / 10) + "B";
+    if (n >= 1e6) return "USD " + Math.round(n / 1e6) + "M";
+    if (n >= 1e3) return "USD " + Math.round(n / 1e3) + "K";
+    return "USD " + n;
+  }
+
   const API = { uid, seed, load, save, get, workspace, reset, replace, addCase, updateCase, deleteCase, moveStatus,
     undoDelete, clearUndo, hasUndo, bulkUpdate, bulkDelete, togglePin, reorderPin,
     enriched, validCases, kpis, groupCounts, rpnByCategory, topRisks, sigmaRows, budgetByCategory, health,
@@ -953,7 +1060,8 @@
     gage, setGageCell, setGageConfig, gageResult, cashflow, setCashflow,
     xbar, setXbarCell, setXbarConfig, xbarResult, scorecard,
     spec, setSpec, capabilityResult, prioritised, ncrPareto, ncrParetoBy,
-    ROUTE_PHASES, ROUTE_STATUS, routeProgress, setRoutePhase, setRouteLaidKm, routeOverall, routePhaseFraction, routeRollup };
+    ROUTE_PHASES, ROUTE_STATUS, routeProgress, setRoutePhase, setRouteLaidKm, routeOverall, routePhaseFraction, routeRollup,
+    whatIf };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.QIStore = API;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -1834,5 +1834,50 @@ if (window.QIDisplay) {
   ok(/data-act="restoreAll"/.test(chtml), "Settings shows a 'Restore from a full backup' button");
 })();
 
+// Step 121: What-If Scenario Simulator
+(function testWhatIfSimulator() {
+  ok(typeof S.whatIf === "function", "store exposes whatIf() scenario engine");
+  // Baseline (no exclusions) should equal the programme numbers.
+  var base = S.whatIf({});
+  ok(base && base.budget && base.budget.scenario === base.budget.base, "baseline scenario = programme budget (no change)");
+  ok(base.network.stations === 8 && base.network.cables === 8, "baseline has all 8 stations and 8 cables");
+  ok(base.risks.length === 0, "baseline scenario has no new risks");
+  // Exclude one country: should reduce stations and add a risk.
+  var ex = S.whatIf({ excludeCountries: ["bsb"] });
+  ok(ex.network.stations < 8, "excluding Brunei reduces stations (" + ex.network.stations + ")");
+  ok(ex.budget.scenario < ex.budget.base, "excluding a country reduces budget");
+  ok(ex.risks.length > 0, "excluding a country flags a risk");
+  ok(/Brunei|Bandar/.test(ex.risks.join(" ")), "the risk mentions the excluded country");
+  // Cost multiplier: should increase budget.
+  var cost = S.whatIf({ costMultiplier: 1.3 });
+  ok(cost.budget.scenario > cost.budget.base, "+30% cost multiplier increases the budget");
+  ok(cost.budget.saved < 0, "saved is negative (costs went up)");
+  // Permit delay: should extend timeline.
+  var delay = S.whatIf({ permitDelayMonths: 12 });
+  ok(delay.timeline.scenario > delay.timeline.base, "12-month permit delay extends the timeline");
+  // Verdict is always a non-empty plain-language string.
+  ok(typeof base.verdict === "string" && base.verdict.length > 20, "verdict is a plain-language sentence");
+  // The What-If view renders without error.
+  var wnav = doc.querySelector('.nav-item[data-view="whatif"]');
+  ok(wnav != null, "What-If Simulator nav item exists");
+  if (wnav) wnav.dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(doc.querySelector(".whatif-card") != null, "What-If Simulator view renders");
+  ok(doc.querySelectorAll(".whatif-toggle").length >= 8, "What-If shows country + cable toggle buttons");
+  ok(doc.getElementById("whatifCost") != null && doc.getElementById("whatifDelay") != null, "What-If has cost and delay sliders");
+  ok(doc.getElementById("whatifVerdict") != null, "What-If verdict area is present");
+})();
+
+// Step 122: Onboarding wizard exists (first-run overlay)
+(function testOnboarding() {
+  // The onboarding wizard fires only once (based on localStorage 'qi_onboarded')
+  // In our test env it already ran on boot. The key should be set.
+  ok(window.localStorage.getItem("qi_onboarded") === "1", "onboarding wizard fired and set the 'qi_onboarded' key");
+  // The overlay should have auto-rendered on boot (and been immediately available
+  // for the user to dismiss). Since our test doesn't click "Got it", it may
+  // still be in the DOM — that's fine.
+  var overlay = doc.getElementById("onboardOverlay");
+  ok(overlay == null || overlay.querySelector(".onboard-card") != null, "onboarding overlay structure is correct (card with steps)");
+})();
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
