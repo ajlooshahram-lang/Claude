@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Add PDF/DOCX drag-and-drop ingestion to the Project Analyzer module. This is a port of the implementation from branch feat/analyzer-pdf-docx-ingestion-rebased (commit 4e26d4b) onto current main. The implementation includes: (1) a self-contained RFC 1951 DEFLATE inflater, (2) ZIP parser for DOCX, (3) PDF text extractor, (4) drag-and-drop UI zone, (5) updated file handler, (6) Farsi translations, (7) comprehensive tests.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. Create branch feat/analyzer-pdf-docx-ingestion-v2 from main",
     "2. In el-dimensionering.html, add Farsi translation strings to the _FA dictionary (after line 1613 'Higher load' entry). Add these 10 translation keys: upload file label with new extensions, supported formats, offline extraction notice, extracting progress text, PDF extraction failure, generic extraction failure, legacy .doc format notice, corrupt file notice, file unreadable, unsupported file type.",
@@ -25,5 +25,5 @@
     "node test-sld.js (must show 0 failures)"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 1373 tests pass (29 new ingestion tests added on top of 1344 existing). No pre-existing test failures. The implementation was ported byte-for-byte from the reference branch. The pre-existing fetch() calls (lines 10107, 10422) are in other modules unrelated to the analyzer."
 }
