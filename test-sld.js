@@ -14046,6 +14046,188 @@ test('renderMetering includes simulator SVG', function() {
   assert(html.indexOf('sim-wire') >= 0 || html.indexOf('sim-pulse') >= 0, 'parent should include sim');
 });
 
+// --- renderBathroomSim tests ---
+test('renderBathroomSim returns SVG with sim-pulse for valid inputs', function() {
+  var svg = renderBathroomSim(1, 'bathtub', 3.0, 2.5);
+  assert(svg.indexOf('<svg') >= 0, 'should contain svg');
+  assert(svg.indexOf('sim-pulse') >= 0, 'should contain sim-pulse for zone highlight');
+  assert(svg.indexOf('sim-wave') >= 0, 'should contain sim-wave for water droplets');
+  assert(svg.indexOf('Zone 0') >= 0, 'should show zone 0 label');
+});
+
+test('renderBathroomSim returns empty for null selectedZone', function() {
+  assert.strictEqual(renderBathroomSim(null, 'bathtub', 3.0, 2.5), '');
+});
+
+test('renderBathroomSim returns empty for zero roomWidth', function() {
+  assert.strictEqual(renderBathroomSim(1, 'bathtub', 0, 2.5), '');
+});
+
+test('renderBathroomSim handles zone 0 selection', function() {
+  var svg = renderBathroomSim(0, 'shower_tray', 2.5, 2.4);
+  assert(svg.indexOf('<svg') >= 0, 'should contain svg');
+  assert(svg.indexOf('Zone 0') >= 0, 'should show zone 0');
+});
+
+test('renderBathroom includes simulator SVG', function() {
+  var html = renderBathroom();
+  assert(html.indexOf('sim-pulse') >= 0 || html.indexOf('sim-wave') >= 0, 'parent should include sim');
+});
+
+// --- renderPoolSim tests ---
+test('renderPoolSim returns SVG with sim-wire for valid inputs', function() {
+  var svg = renderPoolSim('swimming', 1, 6);
+  assert(svg.indexOf('<svg') >= 0, 'should contain svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire for bonding');
+  assert(svg.indexOf('sim-wave') >= 0, 'should contain sim-wave for water');
+  assert(svg.indexOf('Zone 0') >= 0, 'should show zone label');
+});
+
+test('renderPoolSim returns empty for null poolType', function() {
+  assert.strictEqual(renderPoolSim(null, 0, 4), '');
+});
+
+test('renderPoolSim returns empty for empty poolType', function() {
+  assert.strictEqual(renderPoolSim('', 1, 6), '');
+});
+
+test('renderPool includes simulator SVG', function() {
+  var html = renderPool();
+  assert(html.indexOf('sim-wire') >= 0 || html.indexOf('sim-wave') >= 0, 'parent should include sim');
+});
+
+// --- renderConstructionSim tests ---
+test('renderConstructionSim returns SVG with sim-wire for valid inputs', function() {
+  var svg = renderConstructionSim(63, 45, 'csvb', 3);
+  assert(svg.indexOf('<svg') >= 0, 'should contain svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire for current flow');
+  assert(svg.indexOf('H07RN-F') >= 0, 'should show cable type');
+  assert(svg.indexOf('63A') >= 0 || svg.indexOf('63') >= 0, 'should show supply rating');
+});
+
+test('renderConstructionSim returns empty for zero supplyRating', function() {
+  assert.strictEqual(renderConstructionSim(0, 45, 'csvb', 2), '');
+});
+
+test('renderConstructionSim returns empty for zero current', function() {
+  assert.strictEqual(renderConstructionSim(63, 0, 'csvb', 2), '');
+});
+
+test('renderConstruction includes simulator SVG', function() {
+  constructionState.selectedEquipment = ['crane'];
+  var html = renderConstruction();
+  assert(html.indexOf('sim-wire') >= 0, 'parent should include sim');
+  constructionState.selectedEquipment = [];
+});
+
+// --- renderAgriSim tests ---
+test('renderAgriSim returns SVG with sim-wire for valid inputs', function() {
+  var svg = renderAgriSim('cattle', true, 'IP44', 3);
+  assert(svg.indexOf('<svg') >= 0, 'should contain svg');
+  assert(svg.indexOf('sim-wire') >= 0 || svg.indexOf('sim-pulse') >= 0, 'should contain sim animation');
+  assert(svg.indexOf('25V AC') >= 0, 'should show livestock voltage limit');
+});
+
+test('renderAgriSim returns empty for null buildingType', function() {
+  assert.strictEqual(renderAgriSim(null, true, 'IP44', 2), '');
+});
+
+test('renderAgriSim returns empty for empty buildingType', function() {
+  assert.strictEqual(renderAgriSim('', false, 'IP44', 0), '');
+});
+
+test('renderAgri includes simulator SVG', function() {
+  var html = renderAgri();
+  assert(html.indexOf('sim-wire') >= 0 || html.indexOf('sim-pulse') >= 0, 'parent should include sim');
+});
+
+// --- renderATEXSim tests ---
+test('renderATEXSim returns SVG with sim-pulse for valid inputs', function() {
+  var svg = renderATEXSim('gas', 1, 'methane', 'T3', 'Ex d');
+  assert(svg.indexOf('<svg') >= 0, 'should contain svg');
+  assert(svg.indexOf('sim-pulse') >= 0, 'should contain sim-pulse for zone highlight');
+  assert(svg.indexOf('Zone 0') >= 0, 'should show zone 0 label');
+  assert(svg.indexOf('Ex') >= 0, 'should show Ex marking');
+});
+
+test('renderATEXSim returns empty for null zoneType', function() {
+  assert.strictEqual(renderATEXSim(null, 1, 'methane', 'T3', 'Ex d'), '');
+});
+
+test('renderATEXSim returns empty for empty zoneType', function() {
+  assert.strictEqual(renderATEXSim('', 0, 'gas', 'T2', 'Ex e'), '');
+});
+
+test('renderATEX includes simulator SVG', function() {
+  var html = renderATEX();
+  assert(html.indexOf('sim-pulse') >= 0, 'parent should include sim');
+});
+
+// --- renderTrayFillSim tests ---
+test('renderTrayFillSim returns SVG with sim-value for valid inputs', function() {
+  var svg = renderTrayFillSim(300, 60, 1200, 18000, 35.5, 50);
+  assert(svg.indexOf('<svg') >= 0, 'should contain svg');
+  assert(svg.indexOf('sim-value') >= 0, 'should contain sim-value for fill display');
+  assert(svg.indexOf('300') >= 0, 'should show tray width');
+});
+
+test('renderTrayFillSim returns empty for zero trayWidth', function() {
+  assert.strictEqual(renderTrayFillSim(0, 60, 100, 1000, 10, 50), '');
+});
+
+test('renderTrayFillSim returns empty for zero trayHeight', function() {
+  assert.strictEqual(renderTrayFillSim(300, 0, 100, 1000, 10, 50), '');
+});
+
+test('renderTrayFill includes simulator SVG', function() {
+  var html = renderTrayFill();
+  assert(html.indexOf('sim-value') >= 0 || html.indexOf('sim-label') >= 0, 'parent should include sim');
+});
+
+// --- renderPanelSim tests ---
+test('renderPanelSim returns SVG with sim-wire for valid inputs', function() {
+  var svg = renderPanelSim(24, 2, 85.5, 0);
+  assert(svg.indexOf('<svg') >= 0, 'should contain svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire for busbar flow');
+  assert(svg.indexOf('24') >= 0, 'should show module count');
+});
+
+test('renderPanelSim returns empty for zero totalModules', function() {
+  assert.strictEqual(renderPanelSim(0, 2, 50, 0), '');
+});
+
+test('renderPanelSim returns empty for null totalModules', function() {
+  assert.strictEqual(renderPanelSim(null, 1, 0, 0), '');
+});
+
+test('renderPanel includes simulator SVG', function() {
+  var html = renderPanel();
+  assert(html.indexOf('sim-wire') >= 0, 'parent should include sim');
+});
+
+// --- renderSLDEnhancedSim tests ---
+test('renderSLDEnhancedSim returns SVG with sim-wire for valid inputs', function() {
+  var svg = renderSLDEnhancedSim(5, 100, 10000, 'TN-S');
+  assert(svg.indexOf('<svg') >= 0, 'should contain svg');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire for power flow');
+  assert(svg.indexOf('sim-pulse') >= 0, 'should contain sim-pulse for flow arrows');
+  assert(svg.indexOf('TN-S') >= 0, 'should show system type');
+});
+
+test('renderSLDEnhancedSim returns empty for zero nodeCount', function() {
+  assert.strictEqual(renderSLDEnhancedSim(0, 0, 0, 'TN-S'), '');
+});
+
+test('renderSLDEnhancedSim returns empty for nodeCount less than 2', function() {
+  assert.strictEqual(renderSLDEnhancedSim(1, 100, 5000, 'TN-C-S'), '');
+});
+
+test('renderSLD includes enhanced simulator SVG when not in fault mode', function() {
+  sldFaultSimMode = false;
+  var html = renderSLD();
+  assert(html.indexOf('sim-wire') >= 0 || html.indexOf('sim-pulse') >= 0, 'parent should include sim');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
