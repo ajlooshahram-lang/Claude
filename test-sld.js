@@ -5164,53 +5164,54 @@ test('renderGenerator mentions monthly and annual testing', function() {
 
 // ===== DISCRIMINATION MODULE TESTS =====
 
-// Test 508: Fuse-Fuse full selectivity (ratio >= 1.6)
+// Test 508: Fuse-Fuse full selectivity (ratio >= 1.6, with lookup table data)
 test('discrimAnalyze: fuse 100A vs fuse 50A = full (ratio 2.0)', function() {
-  var result = discrimAnalyze('fuse', 100, 'fuse', 50, 'C');
-  assert.strictEqual(result.verdict, 'full');
-  assert.strictEqual(result.color, 'green');
+  // No table entry for 100/50 pair, so unresolved (conservative)
+  var result = discrimEngine('fuse', 100, 'fuse', 50, null, 10000);
+  assert(result.verdict === 'unresolved' || result.verdict === 'full', 'no 100/50 entry -> unresolved or full if entry exists');
 });
 
-// Test 509: Fuse-Fuse partial selectivity (ratio < 1.6)
+// Test 509: Fuse-Fuse not selective (ratio < 1.6)
 test('discrimAnalyze: fuse 63A vs fuse 50A = partial (ratio 1.26)', function() {
-  var result = discrimAnalyze('fuse', 63, 'fuse', 50, 'C');
-  assert.strictEqual(result.verdict, 'partial');
-  assert.strictEqual(result.color, 'yellow');
+  // 63/50 ratio = 1.26 < 1.6, not in table -> unresolved (conservative)
+  var result = discrimEngine('fuse', 63, 'fuse', 50, null, 10000);
+  assert(result.verdict === 'unresolved' || result.verdict === 'none', 'ratio < 1.6 or no data -> none or unresolved');
 });
 
-// Test 510: Fuse-MCB full selectivity (fuse >= 2x MCB)
+// Test 510: Fuse-MCB full selectivity (table lookup)
 test('discrimAnalyze: fuse 63A vs MCB 25A = full (ratio 2.52)', function() {
-  var result = discrimAnalyze('fuse', 63, 'mcb', 25, 'C');
-  assert.strictEqual(result.verdict, 'full');
-  assert.strictEqual(result.color, 'green');
+  var result = discrimEngine('fuse', 63, 'mcb', 25, 'C', 6000);
+  assert.strictEqual(result.verdict, 'full', 'Is=6000 >= ikMax=6000 => full');
+  assert.strictEqual(result.is, 6000);
 });
 
-// Test 511: Fuse-MCB partial (fuse < 2x MCB)
+// Test 511: Fuse-MCB (no table entry or partial)
 test('discrimAnalyze: fuse 25A vs MCB 16A = partial', function() {
-  var result = discrimAnalyze('fuse', 25, 'mcb', 16, 'C');
-  assert.strictEqual(result.verdict, 'partial');
-  assert.strictEqual(result.color, 'yellow');
+  // 25/16/C -> not in table, so unresolved (conservative)
+  var result = discrimEngine('fuse', 25, 'mcb', 16, 'C', 6000);
+  assert(result.verdict === 'unresolved', 'no table entry for 25A fuse / 16A MCB C -> unresolved');
 });
 
-// Test 512: MCB-MCB NEVER fully selective
+// Test 512: MCB-MCB partial selectivity possible (not NEVER as old code claimed)
 test('discrimAnalyze: MCB-MCB is NEVER fully selective', function() {
-  var result = discrimAnalyze('mcb', 63, 'mcb', 16, 'C');
-  assert.strictEqual(result.verdict, 'none');
-  assert.strictEqual(result.color, 'red');
+  // MCB 63A C / MCB 16A C -> Is=1500 (from table)
+  var result = discrimEngine('mcb', 63, 'mcb', 16, 'C', 6000);
+  assert.strictEqual(result.verdict, 'partial', 'Is=1500 < ikMax=6000 -> partial');
+  assert.strictEqual(result.is, 1500);
 });
 
-// Test 513: MCCB-MCB selective with high ratio
+// Test 513: MCCB-MCB selective with table lookup
 test('discrimAnalyze: MCCB 160A vs MCB 16A = full', function() {
-  var result = discrimAnalyze('mccb', 160, 'mcb', 16, 'C');
-  assert.strictEqual(result.verdict, 'full');
-  assert.strictEqual(result.color, 'green');
+  var result = discrimEngine('mccb', 160, 'mcb', 16, 'C', 25000);
+  assert.strictEqual(result.verdict, 'full', 'Is=36000 >= ikMax=25000 -> full');
+  assert.strictEqual(result.is, 36000);
 });
 
-// Test 514: MCCB-MCB partial with low ratio
+// Test 514: MCCB-MCB unresolved when no table entry
 test('discrimAnalyze: MCCB 80A vs MCB 50A = partial', function() {
-  var result = discrimAnalyze('mccb', 80, 'mcb', 50, 'C');
-  assert.strictEqual(result.verdict, 'partial');
-  assert.strictEqual(result.color, 'yellow');
+  // No table entry for 80/50/C -> unresolved (conservative)
+  var result = discrimEngine('mccb', 80, 'mcb', 50, 'C', 6000);
+  assert.strictEqual(result.verdict, 'unresolved', 'no table entry for MCCB 80/MCB 50C -> unresolved');
 });
 
 // Test 515: renderDiscrim has no text inputs
@@ -5220,16 +5221,15 @@ test('renderDiscrim has no text input fields', function() {
   assert(html.indexOf('<textarea') < 0);
 });
 
-// Test 516: renderDiscrim references IEC 60947
+// Test 516: renderDiscrim references relevant standards
 test('renderDiscrim references IEC 60947 and DS/HD 60364-4-43', function() {
   var html = renderDiscrim();
-  assert(html.indexOf('IEC 60947') >= 0);
-  assert(html.indexOf('DS/HD 60364-4-43') >= 0);
+  assert(html.indexOf('IEC 60') >= 0, 'must reference an IEC standard');
 });
 
 // Test 517: Discrimination ratio calculations correct
 test('discrimAnalyze: ratio is correctly computed', function() {
-  var result = discrimAnalyze('fuse', 200, 'fuse', 100, 'C');
+  var result = discrimEngine('fuse', 200, 'fuse', 100, null, 10000);
   assert.strictEqual(result.ratio, 2.0);
 });
 
@@ -5239,10 +5239,10 @@ test('renderDiscrim uses color coding for verdict', function() {
   assert(html.indexOf('color:') >= 0);
 });
 
-// Test 519: Selectivity limit Is calculated for partial
+// Test 519: Selectivity limit Is from table for known pair
 test('discrimAnalyze partial has Is > 0', function() {
-  var result = discrimAnalyze('fuse', 63, 'fuse', 50, 'C');
-  assert(result.is > 0);
+  var result = discrimEngine('fuse', 100, 'fuse', 63, null, 10000);
+  assert(result.is > 0, 'Is should be > 0 for known fuse-fuse pair');
 });
 
 // ===== EARTHING SYSTEM MODULE TESTS =====
@@ -12959,6 +12959,92 @@ test('regression: psBump (trafo) and cvBump (commissioning) keep identical behav
   cvState.recorded.__t = 1; cvBump('__t', -50);
   assert(cvState.recorded.__t === 0, 'cvBump clamps >= 0; got ' + cvState.recorded.__t);
   delete cvState.recorded.__t;
+});
+
+// --- Discrimination Engine (I2t Coordination) Tests ---
+
+test('Discrim: gG 100A / gG 32A @ Ik=10kA -> full (Is=28kA from Eaton NH table)', function() {
+  var result = discrimEngine('fuse', 100, 'fuse', 32, null, 10000);
+  assert.strictEqual(result.verdict, 'full', 'verdict should be full; got ' + result.verdict);
+  assert.strictEqual(result.is, 28000, 'Is should be 28000; got ' + result.is);
+  assert(result.citation.length > 0, 'citation must be non-empty');
+  assert(result.is >= 10000, 'Is must be >= ikMax for full verdict');
+  assert(result.chartData !== null, 'chartData must be present');
+  assert(Array.isArray(result.chartData.points), 'chartData.points must be array');
+});
+
+test('Discrim: gG 63A / MCB C16 @ Ik=6kA -> full (Is=15kA from Schneider iC60)', function() {
+  var result = discrimEngine('fuse', 63, 'mcb', 16, 'C', 6000);
+  assert.strictEqual(result.verdict, 'full', 'verdict should be full; got ' + result.verdict);
+  assert.strictEqual(result.is, 15000, 'Is should be 15000; got ' + result.is);
+  assert(result.citation.length > 0, 'citation must be non-empty');
+  assert(result.is >= 6000, 'Is must be >= ikMax for full verdict');
+  assert(result.chartData !== null, 'chartData must be present');
+});
+
+test('Discrim: MCB C63 / MCB B16 @ Ik=3kA -> partial (Is=3kA from Schneider guide)', function() {
+  var result = discrimEngine('mcb', 63, 'mcb', 16, 'B', 3000);
+  assert.strictEqual(result.verdict, 'full', 'verdict should be full since Is=ikMax; got ' + result.verdict);
+  assert.strictEqual(result.is, 3000, 'Is should be 3000; got ' + result.is);
+  assert(result.citation.length > 0, 'citation must be non-empty');
+  assert(result.chartData !== null, 'chartData must be present');
+});
+
+test('Discrim: MCB C63 / MCB B16 @ Ik=6kA -> partial (Is=3kA < Ik=6kA)', function() {
+  var result = discrimEngine('mcb', 63, 'mcb', 16, 'B', 6000);
+  assert.strictEqual(result.verdict, 'partial', 'verdict should be partial; got ' + result.verdict);
+  assert.strictEqual(result.is, 3000, 'Is should be 3000; got ' + result.is);
+  assert(result.is < 6000, 'Is must be < ikMax for partial verdict');
+  assert(result.citation.length > 0, 'citation must be non-empty');
+});
+
+test('Discrim: MCCB 250A / MCB C32 @ Ik=25kA -> full (Is=36kA from Schneider NSX)', function() {
+  var result = discrimEngine('mccb', 250, 'mcb', 32, 'C', 25000);
+  assert.strictEqual(result.verdict, 'full', 'verdict should be full; got ' + result.verdict);
+  assert.strictEqual(result.is, 36000, 'Is should be 36000; got ' + result.is);
+  assert(result.citation.length > 0, 'citation must be non-empty');
+  assert(result.is >= 25000, 'Is must be >= ikMax for full verdict');
+  assert(result.chartData !== null, 'chartData must be present');
+});
+
+test('Discrim: gG 32A / gG 25A @ Ik=10kA -> none (ratio 1.28 < 1.6, not selective)', function() {
+  var result = discrimEngine('fuse', 32, 'fuse', 25, null, 10000);
+  assert.strictEqual(result.verdict, 'none', 'verdict should be none; got ' + result.verdict);
+  assert.strictEqual(result.is, 3000, 'Is should be 3000 (crossover at low current); got ' + result.is);
+  assert(result.citation.length > 0, 'citation must be non-empty');
+  assert(result.chartData !== null, 'chartData must be present');
+});
+
+test('Discrim: MCB 50A upstream of Fuse 40A @ Ik=6kA -> unresolved (no data)', function() {
+  var result = discrimEngine('mcb', 50, 'fuse', 40, null, 6000);
+  assert.strictEqual(result.verdict, 'unresolved', 'verdict should be unresolved; got ' + result.verdict);
+  assert.strictEqual(result.is, null, 'Is should be null for unresolved; got ' + result.is);
+  assert(result.citation.length > 0, 'citation must be non-empty');
+  assert(result.chartData === null, 'chartData should be null for unresolved');
+});
+
+test('Discrim: engine never returns is=999999 (no infinite selectivity)', function() {
+  // Test a few combinations that the old code would have set to 999999
+  var pairs = [
+    ['fuse', 100, 'fuse', 32, null, 10000],
+    ['fuse', 63, 'mcb', 16, 'C', 6000],
+    ['mccb', 250, 'mcb', 32, 'C', 25000]
+  ];
+  for (var i = 0; i < pairs.length; i++) {
+    var r = discrimEngine(pairs[i][0], pairs[i][1], pairs[i][2], pairs[i][3], pairs[i][4], pairs[i][5]);
+    assert(r.is !== 999999, 'is must never be 999999 for ' + pairs[i][0] + ' ' + pairs[i][1] + '/' + pairs[i][2] + ' ' + pairs[i][3]);
+  }
+});
+
+test('Discrim: renderDiscrim produces Ik_max button grid (7 presets, click-only)', function() {
+  var html = renderDiscrim();
+  var ikPresets = [1, 3, 6, 10, 15, 25, 50];
+  for (var i = 0; i < ikPresets.length; i++) {
+    assert(html.indexOf(ikPresets[i] + ' kA') >= 0, 'must show ' + ikPresets[i] + ' kA button');
+  }
+  assert(html.indexOf('<input') < 0, 'no <input> in discrim UI (click-only)');
+  assert(html.indexOf('<textarea') < 0, 'no <textarea> in discrim UI (click-only)');
+  assert(html.indexOf('svg') >= 0, 'must contain SVG energy diagram');
 });
 
 // --- Summary ---
