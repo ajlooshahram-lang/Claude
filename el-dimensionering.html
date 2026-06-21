@@ -1426,6 +1426,12 @@ const _FA = {
   'current I': '\u062C\u0631\u06CC\u0627\u0646 I',
   'power factor cos\u03C6': '\u0636\u0631\u06CC\u0628 \u062A\u0648\u0627\u0646 cos\u03C6',
   'Fine-tune with the step buttons (\u2212\u2212 / \u2212 / + / ++) to reach any value \u2014 entirely without typing.': '\u0628\u0627 \u062F\u06A9\u0645\u0647\u200C\u0647\u0627\u06CC \u06AF\u0627\u0645 (\u2212\u2212 / \u2212 / + / ++) \u0628\u0631\u0627\u06CC \u0631\u0633\u06CC\u062F\u0646 \u0628\u0647 \u0647\u0631 \u0645\u0642\u062F\u0627\u0631\u06CC \u062A\u0646\u0638\u06CC\u0645 \u062F\u0642\u06CC\u0642 \u06A9\u0646\u06CC\u062F \u2014 \u06A9\u0627\u0645\u0644\u0627\u064B \u0628\u062F\u0648\u0646 \u062A\u0627\u06CC\u067E.',
+  // ===== Power/Current Solver - improved UX (wider presets + guide) =====
+  'Selected (confirmed)': '\u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 (\u062A\u0623\u06CC\u06CC\u062F\u0634\u062F\u0647)',
+  'What is missing?': '\u0686\u0647 \u0686\u06CC\u0632\u06CC \u06A9\u0645 \u0627\u0633\u062A\u061F',
+  'Nothing selected yet': '\u0647\u0646\u0648\u0632 \u0686\u06CC\u0632\u06CC \u0627\u0646\u062A\u062E\u0627\u0628 \u0646\u0634\u062F\u0647',
+  'Click one or more values above to start the calculation. A single selection (e.g. I = 800 A) is accepted immediately.': '\u06CC\u06A9 \u06CC\u0627 \u0686\u0646\u062F \u0645\u0642\u062F\u0627\u0631 \u0627\u0632 \u0628\u0627\u0644\u0627 \u06A9\u0644\u06CC\u06A9 \u06A9\u0646\u06CC\u062F. \u06CC\u06A9 \u0627\u0646\u062A\u062E\u0627\u0628 (\u0645\u062B\u0644\u0627\u064B I = 800 A) \u0641\u0648\u0631\u0627\u064B \u067E\u0630\u06CC\u0631\u0641\u062A\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F.',
+  'Add one more quantity to unlock the rest. Valid combinations: (U + I), (P + cos\u03C6), (S + U), (Q + cos\u03C6).': '\u06CC\u06A9 \u06A9\u0645\u06CC\u062A \u062F\u06CC\u06AF\u0631 \u0627\u0636\u0627\u0641\u0647 \u06A9\u0646\u06CC\u062F. \u062A\u0631\u06A9\u06CC\u0628\u200C\u0647\u0627\u06CC \u0645\u0639\u062A\u0628\u0631: (U + I)\u060C (P + cos\u03C6)\u060C (S + U)\u060C (Q + cos\u03C6).',
   // ===== Phase-1 solver-formulas additions (symbols/cards/legends) =====
   'Symbol legend': '\u0631\u0627\u0647\u0646\u0645\u0627\u06CC \u0646\u0645\u0627\u062F\u0647\u0627',
   'show': '\u0646\u0645\u0627\u06CC\u0634',
@@ -7854,7 +7860,7 @@ let trafoState = {
   calcType: 'sizing',  // sizing, powersolve, emf, ocsc, regulation, efficiency, parallel, vectorgroup
   // Dynamic power/current solver: derive S,P,Q,I,U,cosphi from ANY sufficient subset.
   // Values stored in base SI units (U=V, I=A, S=VA, P=W, Q=var). null = "not given".
-  psPhase: '3', psU: 400, psI: 100, psS: null, psP: null, psCos: 0.9, psQ: null,
+  psPhase: '3', psU: null, psI: null, psS: null, psP: null, psCos: null, psQ: null,
   // EMF
   emfFreq: 50, emfN: 300, emfBmax: 1.2, emfArea: 0.01,
   // OC/SC test
@@ -8205,14 +8211,17 @@ function renderTrafoSizing() {
 
 function renderTrafoPowerSolve() {
   // Click-only value presets (no typing). Stored in base SI units; null = "not given".
-  // Presets cover the full standard engineering range so common values (e.g. 800 A,
-  // 2500 kVA) are directly clickable; the per-row stepper below reaches ANY value.
-  var uPresets = (trafoState.psPhase === '1') ? [230, 400, 525, 690] : [400, 525, 690, 1000, 3000, 6000, 10000, 15000, 20000];
-  var iPresets = [10, 16, 25, 32, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000];
-  var sPresetsKVA = [10, 25, 50, 75, 100, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500];
-  var pPresetsKW = [10, 25, 50, 75, 100, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500];
+  // Presets cover the full standard engineering range (distribution + transmission)
+  // so common values (e.g. 800 A, 2500 kVA, 33 kV) are directly clickable; the
+  // per-row adaptive stepper below reaches ANY value between/beyond presets.
+  var uPresets = (trafoState.psPhase === '1')
+    ? [110, 127, 220, 230, 240, 400, 480, 525, 690, 1000]
+    : [400, 525, 690, 1000, 3000, 6000, 10000, 11000, 15000, 20000, 22000, 33000, 36000, 50000, 60000, 66000, 110000, 132000, 150000];
+  var iPresets = [10, 16, 25, 32, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000];
+  var sPresetsKVA = [10, 25, 50, 75, 100, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500, 16000, 20000, 25000, 31500, 40000, 50000, 63000];
+  var pPresetsKW = [10, 25, 50, 75, 100, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500, 16000, 20000, 25000, 31500, 40000, 50000, 63000];
   var cosPresets = [0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0];
-  var qPresetsKVAR = [10, 25, 50, 75, 100, 160, 200, 250, 315, 400, 500, 630, 800, 1000];
+  var qPresetsKVAR = [10, 25, 50, 75, 100, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500];
 
   var res = trafoSolvePower({
     phase: trafoState.psPhase, U: trafoState.psU, I: trafoState.psI,
@@ -8220,8 +8229,13 @@ function renderTrafoPowerSolve() {
   });
 
   // Build a click-only value-selector row. mult converts a display preset into base SI units.
-  // When `step` (in DISPLAY units) is given, a click-only stepper [\u2212\u2212][\u2212] value [+][++]
-  // is appended so ANY exact value is reachable without typing (fine = step, coarse = step x 10).
+  // When `step` (in DISPLAY units) is given, a click-only stepper [--][-] value [+][++]
+  // is appended so ANY exact value is reachable without typing.
+  // Adaptive step logic (except cosphi which uses fixed fine/coarse):
+  //   value < 100 : fine=1, coarse=10
+  //   100-999     : fine=10, coarse=100
+  //   1000-9999   : fine=100, coarse=1000
+  //   >= 10000    : fine=1000, coarse=10000
   function selRow(label, field, presets, mult, fmtFn, step) {
     var h = '<div class="select-group"><div class="select-label">' + label + '</div><div class="select-grid">';
     h += '<button class="sel-btn' + (trafoState[field] === null ? ' selected' : '') + '" onclick="trafoState.' + field + '=null;renderModule(\'trafo\')">' + tx('\u2014 ikke angivet', '\u2014 not given') + '</button>';
@@ -8231,10 +8245,25 @@ function renderTrafoPowerSolve() {
     });
     h += '</div>';
     if (step) {
-      var stepBase = step * mult;
-      var coarse = stepBase * 10;
       var cur = trafoState[field];
       var dispNum = (cur === null || cur === undefined) ? null : Math.round((cur / mult) * 1000) / 1000;
+      // Adaptive step: for cosphi (step < 0.1), keep fixed fine/coarse.
+      // For all other quantities, adapt based on the current display value.
+      var stepBase, coarse;
+      if (step < 0.1) {
+        // cosphi: fine=0.01, coarse=0.05 (fixed)
+        stepBase = step * mult;
+        coarse = 0.05 * mult;
+      } else {
+        var absDisp = (dispNum !== null) ? Math.abs(dispNum) : 0;
+        var fine, crs;
+        if (absDisp < 100) { fine = 1; crs = 10; }
+        else if (absDisp < 1000) { fine = 10; crs = 100; }
+        else if (absDisp < 10000) { fine = 100; crs = 1000; }
+        else { fine = 1000; crs = 10000; }
+        stepBase = fine * mult;
+        coarse = crs * mult;
+      }
       h += '<div class="select-grid" style="align-items:center;gap:4px;grid-template-columns:auto auto 1fr auto auto;margin-top:4px">';
       h += '<button class="sel-btn" onclick="psBump(\'' + field + '\',' + (-coarse) + ')">\u2212\u2212</button>';
       h += '<button class="sel-btn" onclick="psBump(\'' + field + '\',' + (-stepBase) + ')">\u2212</button>';
@@ -8308,10 +8337,66 @@ function renderTrafoPowerSolve() {
       html += calcDetail({ name: tx('Str\u00F8m', 'Current'), formula: (res.phase === '3') ? 'I = S / (\u221A3 \u00D7 U)' : 'I = S / U', variables: [{ name: 'S', symbol: 'S', value: res.S / 1000, unit: 'kVA' }, { name: 'U', symbol: 'U', value: res.U, unit: 'V' }], substitution: res.S + ' / (' + (res.phase === '3' ? '\u221A3 \u00D7 ' : '') + res.U + ')', result: { value: res.I, unit: 'A' }, reference: 'Opgavesamling Kap. 9 / IEC 60076-1' });
     }
   } else {
-    html += '<div class="result-box warning"><div class="result-title">' + tx('Utilstr\u00E6kkeligt input', 'Insufficient input') + '</div>';
-    html += row(tx('Mangler', 'Missing'), res.missing.map(qName).join(', '));
-    html += '<div class="info-row">' + tx('V\u00E6lg en gyldig kombination, f.eks.: (U og I) \u00B7 (P og cos\u03C6) \u00B7 (S og U) \u00B7 (P, U og cos\u03C6) \u00B7 (I, U og cos\u03C6).', 'Select a valid combination, e.g.: (U and I) \u00B7 (P and cos\u03C6) \u00B7 (S and U) \u00B7 (P, U and cos\u03C6) \u00B7 (I, U and cos\u03C6).') + '</div>';
-    html += '</div>';
+    // User has selected at least one quantity but it is not enough to derive S.
+    // Show what they selected + a helpful guide on what to add.
+    var givenKeys = Object.keys(res.known);
+    var hasAny = (givenKeys.length > 0);
+    if (hasAny) {
+      html += '<div class="result-box"><div class="result-title">' + tx('Valgt (bekraeftet)', 'Selected (confirmed)') + '</div>';
+      html += row(tx('Fasesystem', 'Phase system'), res.phase === '3' ? tx('3-faset', '3-phase') : tx('1-faset', '1-phase'));
+      if (res.known.U !== undefined) html += row('U', res.known.U + ' V');
+      if (res.known.I !== undefined) html += row('I', res.known.I + ' A');
+      if (res.known.S !== undefined) html += row('S', (res.known.S / 1000) + ' kVA');
+      if (res.known.P !== undefined) html += row('P', (res.known.P / 1000) + ' kW');
+      if (res.known.Q !== undefined) html += row('Q', (res.known.Q / 1000) + ' kvar');
+      if (res.known.cosphi !== undefined) html += row('cos\u03C6', '' + res.known.cosphi);
+      html += '</div>';
+      // Build a helpful context-aware guide
+      html += '<div class="result-box warning"><div class="result-title">' + tx('Hvad mangler?', 'What is missing?') + '</div>';
+      var guideLines = [];
+      if (res.known.I !== undefined && res.known.U === undefined && res.known.S === undefined) {
+        guideLines.push(tx(
+          'Du har valgt I = ' + res.known.I + ' A. Tilfoej spaending U for at udlede S, eller tilfoej S for at udlede U.',
+          'You have selected I = ' + res.known.I + ' A. Add voltage U to derive S, or add S to derive U.'
+        ));
+      }
+      if (res.known.U !== undefined && res.known.I === undefined && res.known.S === undefined && res.known.P === undefined) {
+        guideLines.push(tx(
+          'Du har valgt U = ' + res.known.U + ' V. Tilfoej stroem I for at udlede S, eller tilfoej S/P for at udlede I.',
+          'You have selected U = ' + res.known.U + ' V. Add current I to derive S, or add S/P to derive I.'
+        ));
+      }
+      if (res.known.cosphi !== undefined && res.known.S === undefined && res.known.P === undefined && res.known.U === undefined && res.known.I === undefined) {
+        guideLines.push(tx(
+          'Du har valgt cos\u03C6 = ' + res.known.cosphi + '. Tilfoej mindst to af: U, I, S eller P for at beregne effekttrekanten.',
+          'You have selected cos\u03C6 = ' + res.known.cosphi + '. Add at least two of: U, I, S or P to compute the power triangle.'
+        ));
+      }
+      if (res.known.P !== undefined && res.known.cosphi === undefined && res.known.S === undefined && res.known.Q === undefined) {
+        guideLines.push(tx(
+          'Du har valgt P = ' + (res.known.P / 1000) + ' kW. Tilfoej cos\u03C6 for at udlede S og Q, eller tilfoej Q direkte.',
+          'You have selected P = ' + (res.known.P / 1000) + ' kW. Add cos\u03C6 to derive S and Q, or add Q directly.'
+        ));
+      }
+      if (res.known.Q !== undefined && res.known.cosphi === undefined && res.known.S === undefined && res.known.P === undefined) {
+        guideLines.push(tx(
+          'Du har valgt Q = ' + (res.known.Q / 1000) + ' kvar. Tilfoej P eller cos\u03C6 for at udlede S.',
+          'You have selected Q = ' + (res.known.Q / 1000) + ' kvar. Add P or cos\u03C6 to derive S.'
+        ));
+      }
+      if (guideLines.length === 0) {
+        guideLines.push(tx(
+          'Tilfoej en stoerrelse mere for at laase resten op. Gyldige kombinationer: (U + I), (P + cos\u03C6), (S + U), (Q + cos\u03C6).',
+          'Add one more quantity to unlock the rest. Valid combinations: (U + I), (P + cos\u03C6), (S + U), (Q + cos\u03C6).'
+        ));
+      }
+      guideLines.forEach(function(line) { html += '<div class="info-row">' + line + '</div>'; });
+      html += '</div>';
+    } else {
+      html += '<div class="result-box warning"><div class="result-title">' + tx('Intet valgt endnu', 'Nothing selected yet') + '</div>';
+      html += '<div class="info-row">' + tx('Klik paa en eller flere vaerdier ovenfor for at starte beregningen. Et enkelt valg (f.eks. I = 800 A) accepteres straks.', 'Click one or more values above to start the calculation. A single selection (e.g. I = 800 A) is accepted immediately.') + '</div>';
+      html += '</div>';
+    }
   }
   html += '</div>';
   return html;
