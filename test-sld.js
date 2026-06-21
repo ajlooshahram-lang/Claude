@@ -13292,6 +13292,106 @@ test('simSvgDefs returns valid SVG defs structure', function() {
   assert(d.indexOf('linearGradient') >= 0, 'should contain linearGradient');
 });
 
+// === Module Simulator Tests (FEAT-002) ===
+
+test('renderKapacitorSim returns SVG with sim-charge class', function() {
+  var svg = renderKapacitorSim(0.000001, 230, 0.00023, 0.02645, 0.001);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-charge') >= 0, 'should contain sim-charge class');
+  assert(svg.indexOf('sim-field') >= 0, 'should contain sim-field class');
+});
+
+test('renderKapacitorSim returns empty for zero C', function() {
+  var svg = renderKapacitorSim(0, 230, 0, 0, 0);
+  assert.strictEqual(svg, '');
+});
+
+test('renderKapacitorSim returns empty for zero U', function() {
+  var svg = renderKapacitorSim(0.000001, 0, 0, 0, 0);
+  assert.strictEqual(svg, '');
+});
+
+test('renderMagnetSim returns SVG with sim-field class', function() {
+  var svg = renderMagnetSim(1000, 0, 0, 'sheet_steel');
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-field') >= 0, 'should contain sim-field class');
+});
+
+test('renderMagnetSim returns SVG with B value', function() {
+  var svg = renderMagnetSim(0, 1.5, 0.001, 'silicon_steel');
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('1.500') >= 0, 'should show B value');
+});
+
+test('renderMagnetSim returns empty for all zero inputs', function() {
+  var svg = renderMagnetSim(0, 0, 0, 'sheet_steel');
+  assert.strictEqual(svg, '');
+});
+
+test('renderVarmeSim returns SVG with gradient and sim-wire', function() {
+  var layers = [{ d: 0.1, mat: 'brick' }, { d: 0.05, mat: 'mineral_wool' }, { d: 0.013, mat: 'plaster' }];
+  var svg = renderVarmeSim(0.25, 32, 80, layers);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('simThermalGrad') >= 0, 'should contain thermal gradient');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire for heat flow');
+});
+
+test('renderVarmeSim returns empty for zero U', function() {
+  var svg = renderVarmeSim(0, 32, 0, []);
+  assert.strictEqual(svg, '');
+});
+
+test('renderVarmeSim returns empty for zero dT', function() {
+  var svg = renderVarmeSim(0.5, 0, 0, []);
+  assert.strictEqual(svg, '');
+});
+
+test('renderLysSim returns SVG with luminaire indicators', function() {
+  var svg = renderLysSim(6, 500, 8, 10, 3.0);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-glow') >= 0, 'should contain sim-glow for light cones');
+  assert(svg.indexOf('lux') >= 0, 'should show lux value');
+});
+
+test('renderLysSim returns empty for zero luminaires', function() {
+  var svg = renderLysSim(0, 500, 8, 10, 3.0);
+  assert.strictEqual(svg, '');
+});
+
+test('renderLysSim returns empty for zero mountHeight', function() {
+  var svg = renderLysSim(6, 500, 8, 10, 0);
+  assert.strictEqual(svg, '');
+});
+
+test('renderDcmaskineSim returns SVG with sim-rotor', function() {
+  var svg = renderDcmaskineSim('generator', 220, 40, 232, 1450);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-rotor') >= 0, 'should contain sim-rotor class');
+  assert(svg.indexOf('sim-wire') >= 0, 'should contain sim-wire for current');
+});
+
+test('renderDcmaskineSim motor mode shows mech output', function() {
+  var svg = renderDcmaskineSim('motor', 220, 40, 208, 1450);
+  assert(svg.indexOf('<svg') >= 0, 'should contain <svg');
+  assert(svg.indexOf('sim-rotor') >= 0, 'should contain sim-rotor');
+});
+
+test('renderDcmaskineSim returns empty for all-zero inputs', function() {
+  var svg = renderDcmaskineSim('generator', 0, 0, 0, 0);
+  assert.strictEqual(svg, '');
+});
+
+test('renderKapacitorCharge includes simulator SVG', function() {
+  var html = renderKapacitorCharge();
+  assert(html.indexOf('sim-charge') >= 0, 'renderKapacitorCharge should include capacitor sim');
+  assert(html.indexOf('sim-field') >= 0, 'should have field lines');
+});
+
+test('renderLysLumen includes simulator SVG', function() {
+  var html = renderLysLumen();
+  assert(html.indexOf('sim-glow') >= 0, 'renderLysLumen should include lighting sim');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
