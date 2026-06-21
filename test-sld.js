@@ -12639,6 +12639,110 @@ test('trafoSolvePower non-invasive: renderTrafo still produces all calc types in
   trafoState = JSON.parse(saved);
 });
 
+// === Power/Current Solver: widened presets + click-only stepper (this change) ===
+
+// Helper: render the powersolve card HTML with a given trafoState patch, then restore.
+function psRenderHtml(patch) {
+  var saved = JSON.stringify(trafoState);
+  trafoState.calcType = 'powersolve';
+  Object.keys(patch || {}).forEach(function (k) { trafoState[k] = patch[k]; });
+  var h = renderTrafoPowerSolve();
+  trafoState = JSON.parse(saved);
+  return h;
+}
+
+test('powersolve presets: 800 A is now directly selectable (the user request)', function() {
+  var h = psRenderHtml({ psPhase: '3', psU: 400, psI: null, psS: null, psP: null, psQ: null, psCos: 0.9 });
+  // The current-row stores I in base SI amps; 800 A => trafoState.psI=800.
+  assert(h.indexOf("trafoState.psI=800;") >= 0, '800 A current preset must be present and click-only');
+  assert(h.indexOf('>800 A<') >= 0, '800 A button label must render');
+});
+
+test('powersolve presets: dense standard current ratings present (incl. 32,80,125,315,500,1250..4000)', function() {
+  var h = psRenderHtml({ psPhase: '3' });
+  [10,16,25,32,50,63,80,100,125,160,200,250,315,400,500,630,800,1000,1250,1600,2000,2500,3150,4000].forEach(function (a) {
+    assert(h.indexOf("trafoState.psI=" + a + ";") >= 0, 'current preset ' + a + ' A must be selectable');
+  });
+});
+
+test('powersolve presets: active power P (kW) reaches up to 2500 kW (e.g. 800, 2500)', function() {
+  var h = psRenderHtml({ psPhase: '3' });
+  // kW stored as W (mult 1000): 800 kW => 800000, 2500 kW => 2500000
+  assert(h.indexOf("trafoState.psP=800000;") >= 0, '800 kW preset must be selectable');
+  assert(h.indexOf("trafoState.psP=2500000;") >= 0, '2500 kW preset must be selectable');
+});
+
+test('powersolve presets: apparent power S (kVA) reaches the 2500 kVA catalog max', function() {
+  var h = psRenderHtml({ psPhase: '3' });
+  assert(h.indexOf("trafoState.psS=800000;") >= 0, '800 kVA preset must be selectable');
+  assert(h.indexOf("trafoState.psS=2500000;") >= 0, '2500 kVA preset must be selectable');
+});
+
+test('powersolve presets: reactive power Q (kvar) widened (e.g. 630, 1000 kvar)', function() {
+  var h = psRenderHtml({ psPhase: '3' });
+  assert(h.indexOf("trafoState.psQ=630000;") >= 0, '630 kvar preset must be selectable');
+  assert(h.indexOf("trafoState.psQ=1000000;") >= 0, '1000 kvar preset must be selectable');
+});
+
+test('powersolve stepper: produces click-only [--][-]value[+][++] buttons via psBump (no inputs)', function() {
+  var h = psRenderHtml({ psPhase: '3', psI: 800 });
+  // Steppers exist for U, I, S, P, Q (and cosphi).
+  ['psU','psI','psS','psP','psQ','psCos'].forEach(function (f) {
+    assert(h.indexOf("psBump('" + f + "',") >= 0, 'stepper must exist for ' + f);
+  });
+  // The whole solver card must be 100% click-only: no typing affordances whatsoever.
+  assert(h.indexOf('<input') < 0, 'no <input> in solver card');
+  assert(h.indexOf('<textarea') < 0, 'no <textarea> in solver card');
+  assert(h.toLowerCase().indexOf('contenteditable') < 0, 'no contenteditable in solver card');
+});
+
+test('powersolve stepper: psBump exists, clamps, and seeds from null', function() {
+  assert(typeof psBump === 'function', 'psBump must be defined');
+  var saved = JSON.stringify(trafoState);
+  // Seed from "not given" (null) -> first + click sets one step (1 A).
+  trafoState.psI = null; psBump('psI', 1);
+  assert(trafoState.psI === 1, 'psBump seeds psI from null to 1 A; got ' + trafoState.psI);
+  // Never goes negative.
+  trafoState.psI = 5; psBump('psI', -100);
+  assert(trafoState.psI === 0, 'psBump clamps current to >= 0; got ' + trafoState.psI);
+  // cosphi clamps to [0,1].
+  trafoState.psCos = 0.95; psBump('psCos', 1);
+  assert(trafoState.psCos === 1, 'psBump clamps cosphi to 1; got ' + trafoState.psCos);
+  trafoState.psCos = 0.05; psBump('psCos', -1);
+  assert(trafoState.psCos === 0, 'psBump clamps cosphi to 0; got ' + trafoState.psCos);
+  trafoState = JSON.parse(saved);
+});
+
+test('powersolve stepper: a stepped current value still solves correctly through trafoSolvePower', function() {
+  var saved = JSON.stringify(trafoState);
+  // Reach 800 A by stepping (coarse +10 A x 80) starting from null, then solve with U=400, cos=0.9.
+  trafoState.psI = null;
+  for (var i = 0; i < 80; i++) { psBump('psI', 10); }
+  assert(trafoState.psI === 800, 'stepping reaches exactly 800 A; got ' + trafoState.psI);
+  var r = trafoSolvePower({ phase: '3', U: 400, I: trafoState.psI, cosphi: 0.9 });
+  var S = SQRT3 * 400 * 800;
+  assert(Math.abs(r.S - S) < 1e-6, 'S = sqrt(3)*U*I from stepped current; got ' + r.S);
+  assert(Math.abs(r.P - S * 0.9) < 1e-6, 'P = S*cosphi from stepped current; got ' + r.P);
+  trafoState = JSON.parse(saved);
+});
+
+test('powersolve stepper: arbitrary non-preset value (e.g. 837 A) reachable without typing', function() {
+  var saved = JSON.stringify(trafoState);
+  trafoState.psI = 800;              // start from preset
+  psBump('psI', 10); psBump('psI', 10); psBump('psI', 10); // ++ x3 via coarse => 830
+  psBump('psI', 1); psBump('psI', 1); psBump('psI', 1); psBump('psI', 1); psBump('psI', 1); psBump('psI', 1); psBump('psI', 1); // +7 => 837
+  assert(trafoState.psI === 837, 'arbitrary 837 A reachable by clicking; got ' + trafoState.psI);
+  trafoState = JSON.parse(saved);
+});
+
+test('powersolve: solver card introduces no typing affordances at all (click-only invariant)', function() {
+  // Render across both phase systems and a few states; assert never any input/textarea.
+  [{psPhase:'3'},{psPhase:'1'},{psPhase:'3',psU:null,psI:null,psS:null,psP:null,psQ:null,psCos:null}].forEach(function (patch) {
+    var h = psRenderHtml(patch);
+    assert(h.indexOf('<input') < 0 && h.indexOf('<textarea') < 0, 'no typing affordance in any solver state');
+  });
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);
