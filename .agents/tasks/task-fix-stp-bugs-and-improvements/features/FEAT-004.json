@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-004",
+  "type": "feat",
+  "description": "Add project-scoped globe filtering (Improvement 1): After Brain analysis detects N countries, inactive stations/cables on the 3D globe should be visually de-emphasized (dimmed/grey at opacity 0.2) rather than hidden. This gives context while making clear which segments are 'theirs'. Add QIGlobe.setActiveScope(stationIds) and call it from applyBrainPlan.",
+  "status": "in_progress",
+  "steps": [
+    "In qi-webapp/js/globe.js, add a new function setActiveScope(stationIds) exposed on the QIGlobe API surface. When stationIds is a non-empty array: dim station meshes not in the set (opacity 0.2 / grey), dim cable tubes where neither endpoint is in the set (opacity 0.2 / grey). When stationIds is null/empty/undefined, restore all to full opacity (default behavior). Store the active scope in a module-level variable so setProgress and the animation loop respect it.",
+    "In the QIGlobe API export object (around line 1340), add setActiveScope to the public surface, similar to setProgress.",
+    "In qi-webapp/js/ui.js, in the applyBrainPlan function (around line 3638), after the plan is applied, call QIGlobe.setActiveScope() with the station IDs corresponding to detected countries. The countryIntel array has `key` values that match station IDs (e.g. 'indonesia' -> 'jakarta'). Build the mapping: for each countryIntel entry, find the STATION whose country name matches (case-insensitive) or whose id matches the key.",
+    "Also call QIGlobe.setActiveScope(null) when no brainPlan is active (e.g. on project reset) to restore full opacity.",
+    "Make setActiveScope a safe no-op when the globe is not mounted (jsdom/no WebGL), following the same guarded pattern as setProgress.",
+    "Add smoke test assertions: (a) QIGlobe.setActiveScope is a function, (b) calling it with station IDs returns without throwing in jsdom (no-op guard), (c) calling with null also does not throw."
+  ],
+  "acceptance_criteria": [
+    "QIGlobe.setActiveScope(stationIds) exists and is callable.",
+    "When called with a subset of station IDs, non-active stations/cables are dimmed (opacity 0.2).",
+    "When called with null/undefined, all stations/cables restore to full opacity.",
+    "applyBrainPlan calls setActiveScope with the detected country station IDs.",
+    "The function is a safe no-op in jsdom (no throw when globe not mounted).",
+    "New smoke tests verify the API exists and is safe.",
+    "All existing smoke tests pass.",
+    "npm test passes."
+  ],
+  "verification": [
+    "cd /projects/sandbox/Claude/qi-webapp && npm test",
+    "cd /projects/sandbox/Claude/qi-webapp && node verify-standalone.js"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

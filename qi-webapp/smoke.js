@@ -2138,5 +2138,13 @@ if (window.QIDisplay) {
   ok(planAfterBoot && planAfterBoot.summary != null, "After QIBoot(), brainPlan has summary");
 })();
 
+// FEAT-004: QIGlobe.setActiveScope API — safe no-op when globe is not mounted
+ok(typeof window.QIGlobe.setActiveScope === "function", "QIGlobe.setActiveScope is a function");
+ok(window.QIGlobe.setActiveScope(["jakarta","batangas"]) === false, "setActiveScope([...]) returns false (safe no-op, globe not mounted)");
+ok(window.QIGlobe.setActiveScope(null) === false, "setActiveScope(null) returns false (safe no-op)");
+let scopeThrew = false;
+try { window.QIGlobe.setActiveScope(["jakarta"]); window.QIGlobe.setActiveScope(null); window.QIGlobe.setActiveScope([]); window.QIGlobe.setActiveScope(undefined); } catch (e) { scopeThrew = true; }
+ok(!scopeThrew, "setActiveScope never throws regardless of input");
+
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

@@ -3764,6 +3764,7 @@
     refreshHeader();
     try { if (typeof refreshBadges === "function") refreshBadges(); } catch (e) { /* ignore */ }
     try { if (window.QIGlobe && QIGlobe.setProgress) QIGlobe.setProgress(); } catch (e) { /* ignore */ }
+    try { if (window.QIGlobe && QIGlobe.setActiveScope) { var scopeIds = activeStationIds(); QIGlobe.setActiveScope(scopeIds); } } catch (e) { /* ignore */ }
     if (current !== "brain") go(current);
     return n;
   }

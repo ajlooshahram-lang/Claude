@@ -176,6 +176,7 @@
   /* ----------------------------------------------------------- internals --- */
   var GLOBE_R = 2;          // globe radius in scene units
   var state = null;         // holds live scene objects when mounted
+  var activeScope = null;   // array of station IDs in scope, or null for all
 
   // Persisted across init/dispose so the host UI can subscribe once and keep
   // its callbacks even if the scene is torn down and remounted.
@@ -1269,6 +1270,46 @@
     return true;
   }
 
+  /* ------------------------------------------------- project scope filter --- */
+  function setActiveScope(ids) {
+    activeScope = (Array.isArray(ids) && ids.length) ? ids : null;
+    if (!state) return false;
+    var THREE = window.THREE;
+    if (!THREE) return false;
+    // Dim/restore station meshes
+    if (state.stationMeshes) {
+      Object.keys(state.stationMeshes).forEach(function(k) {
+        var mesh = state.stationMeshes[k];
+        if (!mesh || !mesh.material) return;
+        if (activeScope && activeScope.indexOf(k) === -1) {
+          mesh.material.opacity = 0.2;
+          mesh.material.transparent = true;
+        } else {
+          mesh.material.opacity = 1.0;
+          mesh.material.transparent = false;
+        }
+        mesh.material.needsUpdate = true;
+      });
+    }
+    // Dim/restore cable tubes
+    if (state.cableTubes) {
+      state.cableTubes.forEach(function(t) {
+        if (!t.mat) return;
+        var cab = CABLES.find(function(c) { return c.id === t.id; });
+        if (!cab) return;
+        if (activeScope && activeScope.indexOf(cab.from) === -1 && activeScope.indexOf(cab.to) === -1) {
+          t.mat.opacity = 0.2;
+          t.mat.transparent = true;
+        } else {
+          t.mat.opacity = 1.0;
+          t.mat.transparent = false;
+        }
+        t.mat.needsUpdate = true;
+      });
+    }
+    return true;
+  }
+
   /* -------------------------------------------------------------- dispose --- */
   function dispose() {
     if (!state) return;
@@ -1324,6 +1365,7 @@
     init: init,
     dispose: dispose,
     setProgress: setProgress,
+    setActiveScope: setActiveScope,
     isSupported: function () { return typeof window.THREE !== "undefined" && hasWebGL(); },
     // selection / cinematic controls
     focusStation: function (id) { return apiCall("selectStation", id); },
