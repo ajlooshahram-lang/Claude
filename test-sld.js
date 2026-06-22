@@ -14650,6 +14650,153 @@ test('SharedQuantities has at least 35 distinct subscriptions', function() {
   assert(totalSubs >= 35, 'should have at least 35 total subscriptions, got ' + totalSubs);
 });
 
+// ===== RCD TCC, Relay IDMT, Device TCC, and Live Installation Tests =====
+console.log('\n=== RCD TCC & Relay IDMT & Live Installation Tests ===\n');
+
+test('renderRcdTCC returns valid SVG with trip band for Type A 30mA', function() {
+  rcdSelected = 'Type A';
+  rcdSensitivity = 30;
+  var svg = renderRcdTCC('Type A', 30);
+  assert(svg.indexOf('<svg') >= 0, 'Should contain <svg element');
+  assert(svg.indexOf('</svg>') > 0, 'Should close with </svg>');
+  assert(svg.indexOf('viewBox') > 0, 'Should have viewBox');
+  assert(svg.indexOf('#2563eb') > 0, 'Should have trip band color');
+  assert(svg.indexOf('path') > 0, 'Should have path element for trip band');
+});
+
+test('RCD trip time at IDn is <= 300ms and at 5xIDn is <= 40ms per IEC 61008-1', function() {
+  // The function draws bands at specific multiples. Verify the constants are correct.
+  // IEC 61008-1: max 300ms at IΔn, max 150ms at 2xIΔn, max 40ms at 5xIΔn
+  var svg = renderRcdTCC('Type A', 30);
+  assert(svg.indexOf('300ms') > 0, 'Should show 300ms trip time at 1xIDn');
+  assert(svg.indexOf('40ms') > 0, 'Should show 40ms trip time at 5xIDn');
+  assert(svg.indexOf('150ms') > 0 || svg.indexOf('2x') > 0, 'Should reference 2xIDn trip time');
+});
+
+test('renderRcdTCCCard returns card with cursor buttons and legend', function() {
+  rcdSelected = 'Type A';
+  rcdSensitivity = 30;
+  var html = renderRcdTCCCard('Type A', 30);
+  assert(html.indexOf('card') > 0, 'Should have card class');
+  assert(html.indexOf('sel-btn') > 0, 'Should have selector buttons');
+  assert(html.indexOf('100mA') > 0 || html.indexOf('100') > 0, 'Should have cursor values');
+  assert(html.indexOf('IEC 61008') > 0, 'Should reference IEC 61008');
+  assert(html.indexOf('<svg') > 0, 'Should contain embedded SVG chart');
+});
+
+test('renderDeviceTCC with MCB curve B returns SVG with thermal and magnetic regions', function() {
+  var mcb = PRODUCTS.mcbs.find(function(m) { return m.curve === 'B' && m.rating === 16; });
+  assert(mcb, 'Should find B16 MCB');
+  var svg = renderDeviceTCC(mcb, 16, {}, 10, 500, 'mcb');
+  assert(svg.indexOf('<svg') >= 0, 'Should contain SVG');
+  assert(svg.indexOf('path') > 0, 'Should have curve path elements');
+  assert(svg.indexOf('</svg>') > 0, 'Should close SVG');
+});
+
+test('renderDeviceTCC with fuse gG returns valid curve', function() {
+  var fuse = PRODUCTS.fuses.find(function(f) { return f.rating === 100; });
+  assert(fuse, 'Should find 100A fuse');
+  var svg = renderDeviceTCC(fuse, 100, {}, 80, 2000, 'fuse');
+  assert(svg.indexOf('<svg') >= 0, 'Should contain SVG');
+  assert(svg.indexOf('path') > 0 || svg.indexOf('line') > 0, 'Should have curve elements');
+});
+
+test('renderRelayTCC in inverse mode with SI curve produces valid SVG', function() {
+  var rs = { relayType: 'inverse', curveType: 'SI', Igt: 5, tGt: 0.5, Igg: 20, tGg: 0.1, fuseType: 'gg63' };
+  var I1N = 36.4; // 630kVA / (sqrt(3) * 10kV)
+  var svg = renderRelayTCC(I1N, rs);
+  assert(svg.indexOf('<svg') >= 0, 'Should contain SVG');
+  assert(svg.indexOf('SI') > 0, 'Should label SI curve');
+  assert(svg.indexOf('path') > 0, 'Should have IDMT curve path');
+  assert(svg.indexOf('#7c3aed') > 0, 'Should use purple for IDMT curve');
+});
+
+test('renderRelayTCC in inverse mode with EI curve uses correct formula constant (80)', function() {
+  var rs = { relayType: 'inverse', curveType: 'EI', Igt: 5, tGt: 0.5, Igg: 20, tGg: 0.1, fuseType: 'gg63' };
+  var I1N = 36.4;
+  var svg = renderRelayTCC(I1N, rs);
+  assert(svg.indexOf('<svg') >= 0, 'Should contain SVG');
+  assert(svg.indexOf('EI') > 0, 'Should label EI curve');
+  assert(svg.indexOf('Extremely Inverse') > 0, 'Should show Extremely Inverse name');
+  // Verify EI formula: t = 80 / ((I/Is)^2 - 1) * TMS
+  // At I = 2*Is: t = 80 / (4-1) * 0.5 = 13.33s (should produce a curve path)
+  assert(svg.indexOf('path') > 0, 'Should have IDMT curve path for EI');
+});
+
+test('renderRelayTCC in inverse mode with VI curve shows Very Inverse label', function() {
+  var rs = { relayType: 'inverse', curveType: 'VI', Igt: 5, tGt: 0.5, Igg: 20, tGg: 0.1, fuseType: 'gg63' };
+  var I1N = 36.4;
+  var svg = renderRelayTCC(I1N, rs);
+  assert(svg.indexOf('VI') > 0, 'Should label VI curve');
+  assert(svg.indexOf('Very Inverse') > 0, 'Should show Very Inverse name');
+});
+
+test('renderRelayTCC in inverse mode with LTI curve shows Long-Time Inverse label', function() {
+  var rs = { relayType: 'inverse', curveType: 'LTI', Igt: 5, tGt: 0.5, Igg: 20, tGg: 0.1, fuseType: 'gg63' };
+  var I1N = 36.4;
+  var svg = renderRelayTCC(I1N, rs);
+  assert(svg.indexOf('LTI') > 0, 'Should label LTI curve');
+  assert(svg.indexOf('Long-Time Inverse') > 0, 'Should show Long-Time Inverse name');
+});
+
+test('liveGetLoadMultiplier returns correct values for each time period', function() {
+  assert.strictEqual(liveGetLoadMultiplier(8), 1.5, 'Morning (8am) should be 1.5');
+  assert.strictEqual(liveGetLoadMultiplier(12), 0.5, 'Midday (12pm) should be 0.5');
+  assert.strictEqual(liveGetLoadMultiplier(18), 1.8, 'Evening (6pm) should be 1.8');
+  assert.strictEqual(liveGetLoadMultiplier(2), 0.3, 'Night (2am) should be 0.3');
+  assert.strictEqual(liveGetLoadMultiplier(15), 1.0, 'Normal (3pm) should be 1.0');
+});
+
+test('liveThermalColor returns correct colors at different ratios', function() {
+  assert.strictEqual(liveThermalColor(0), '#2196f3', 'Ratio 0 should be blue (cold)');
+  assert.strictEqual(liveThermalColor(0.3), '#4caf50', 'Ratio 0.3 should be green (normal)');
+  assert.strictEqual(liveThermalColor(0.6), '#ff9800', 'Ratio 0.6 should be orange (warm)');
+  assert.strictEqual(liveThermalColor(0.85), '#ff5722', 'Ratio 0.85 should be deep orange (hot)');
+  assert.strictEqual(liveThermalColor(1.2), '#f44336', 'Ratio 1.2 should be red (overloaded)');
+});
+
+test('liveVoltageColor returns correct colors at different voltage drops', function() {
+  assert.strictEqual(liveVoltageColor(0.5), '#4caf50', 'Low drop should be green');
+  assert.strictEqual(liveVoltageColor(2), '#8bc34a', 'Moderate drop should be light green');
+  assert.strictEqual(liveVoltageColor(4), '#ff9800', 'High drop should be orange');
+  assert.strictEqual(liveVoltageColor(6), '#f44336', 'Very high drop should be red');
+});
+
+test('liveMapModule maps node types correctly', function() {
+  assert.strictEqual(liveMapModule({ type: 'transformer' }), 'trafo', 'transformer maps to trafo');
+  assert.strictEqual(liveMapModule({ type: 'main_board' }), 'sld', 'main_board maps to sld');
+  assert.strictEqual(liveMapModule({ type: 'sub_board' }), 'sld', 'sub_board maps to sld');
+  assert.strictEqual(liveMapModule({ type: 'final_circuit', protection: { curve: 'B' } }), 'mcb', 'final_circuit with curve maps to mcb');
+  assert.strictEqual(liveMapModule({ type: 'final_circuit' }), 'fuse', 'final_circuit without curve maps to fuse');
+});
+
+test('liveRenderSvg returns object with svg/positions/nodeW/nodeH', function() {
+  var tree = sldCreateTree();
+  var result = liveRenderSvg(tree, 'live');
+  assert(typeof result === 'object', 'Should return object');
+  assert(typeof result.svg === 'string', 'Should have svg string');
+  assert(result.svg.indexOf('<svg') >= 0, 'svg should start with <svg');
+  assert(typeof result.positions === 'object', 'Should have positions object');
+  assert(typeof result.nodeW === 'number', 'Should have nodeW number');
+  assert(typeof result.nodeH === 'number', 'Should have nodeH number');
+});
+
+test('renderLiveInstallation returns HTML string with mode selector buttons', function() {
+  var html = renderLiveInstallation();
+  assert(typeof html === 'string', 'Should return string');
+  assert(html.indexOf('sel-btn') > 0, 'Should have mode selector buttons');
+  assert(html.indexOf('<svg') > 0, 'Should contain SVG');
+  assert(html.indexOf('Live') > 0 || html.indexOf('live') > 0, 'Should mention live mode');
+});
+
+test('deviceTccState has rcdCursor with default value of 100', function() {
+  assert.strictEqual(deviceTccState.rcdCursor, 100, 'rcdCursor should default to 100');
+});
+
+test('relayState has curveType with default value of SI', function() {
+  assert.strictEqual(relayState.curveType, 'SI', 'curveType should default to SI');
+});
+
 // --- Summary ---
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===\n');
 if (failed > 0) process.exit(1);

@@ -6360,11 +6360,12 @@ function tccSelectNode(nodeId) {
 }
 
 // ===== DEVICE TCC (per-module time-current curve) =====
-var deviceTccState = { mcbCursor: 500, fuseCursor: 500, mccbCursor: 1000, relayCursor: 50 };
+var deviceTccState = { mcbCursor: 500, fuseCursor: 500, mccbCursor: 1000, relayCursor: 50, rcdCursor: 100 };
 
 function deviceTccSetCursor(mod, current) {
   deviceTccState[mod + 'Cursor'] = current;
-  renderModule(mod);
+  if (mod === 'rcd') { renderModule('standards'); }
+  else { renderModule(mod); }
 }
 
 function renderDeviceTCC(device, In, settings, loadCurrent, faultCurrent, modKey) {
@@ -6440,12 +6441,22 @@ function renderDeviceTCC(device, In, settings, loadCurrent, faultCurrent, modKey
   var cursorCurrent = deviceTccState[modKey + 'Cursor'] || 500;
   var cursorX = xPos(cursorCurrent);
   svg += '<line x1="' + cursorX + '" y1="' + marginT + '" x2="' + cursorX + '" y2="' + (h - marginB) + '" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,2"/>';
-  // Find trip time at cursor current
+  // Find trip time at cursor current (log-log interpolation for accuracy on logarithmic scales)
   var tripTimeAtCursor = null;
   for (ci = 0; ci < validPts.length - 1; ci++) {
     if (validPts[ci].i <= cursorCurrent && validPts[ci + 1].i >= cursorCurrent) {
-      var frac = (cursorCurrent - validPts[ci].i) / (validPts[ci + 1].i - validPts[ci].i);
-      tripTimeAtCursor = { tMin: validPts[ci].tMin + frac * (validPts[ci + 1].tMin - validPts[ci].tMin), tMax: validPts[ci].tMax + frac * (validPts[ci + 1].tMax - validPts[ci].tMax) };
+      var logI1 = Math.log10(validPts[ci].i);
+      var logI2 = Math.log10(validPts[ci + 1].i);
+      var logCursor = Math.log10(cursorCurrent);
+      var frac = (logCursor - logI1) / (logI2 - logI1);
+      var logTMin1 = Math.log10(Math.max(validPts[ci].tMin, 0.001));
+      var logTMin2 = Math.log10(Math.max(validPts[ci + 1].tMin, 0.001));
+      var logTMax1 = Math.log10(Math.max(validPts[ci].tMax, 0.001));
+      var logTMax2 = Math.log10(Math.max(validPts[ci + 1].tMax, 0.001));
+      tripTimeAtCursor = {
+        tMin: Math.pow(10, logTMin1 + frac * (logTMin2 - logTMin1)),
+        tMax: Math.pow(10, logTMax1 + frac * (logTMax2 - logTMax1))
+      };
       break;
     }
   }
@@ -6532,14 +6543,19 @@ function renderRelayTCC(I1N, relState) {
   var Iinstant = relState.Igg * I1N;
 
   if (relState.relayType === 'inverse') {
-    // IDMT curve: t = 0.14 / ((I/Is)^0.02 - 1) * TMS
+    // IDMT curves per IEC 60255-151
     var TMS = relState.tGt; // Use t> as TMS
+    var cType = relState.curveType || 'SI';
+    var idmtConstants = { SI: { k: 0.14, a: 0.02 }, VI: { k: 13.5, a: 1 }, EI: { k: 80, a: 2 }, LTI: { k: 120, a: 1 } };
+    var cst = idmtConstants[cType] || idmtConstants.SI;
     var idmtPts = '';
-    for (var mi = 1; mi <= 40; mi++) {
-      var iVal = Ipickup * (1 + mi * 0.5);
+    for (var mi = 1; mi <= 60; mi++) {
+      var iVal = Ipickup * (1 + mi * 0.3);
       if (iVal > 5000) break;
       var ratio = iVal / Ipickup;
-      var tIDMT = (0.14 / (Math.pow(ratio, 0.02) - 1)) * TMS;
+      var denom = (cst.a === 1) ? (ratio - 1) : (Math.pow(ratio, cst.a) - 1);
+      if (denom <= 0) continue;
+      var tIDMT = (cst.k / denom) * TMS;
       if (tIDMT > 100 || tIDMT < 0.001) continue;
       var px = xPos(iVal), py = yPos(tIDMT);
       idmtPts += (idmtPts === '' ? 'M' : 'L') + px.toFixed(1) + ',' + py.toFixed(1);
@@ -6547,7 +6563,8 @@ function renderRelayTCC(I1N, relState) {
     if (idmtPts) {
       svg += '<path d="' + idmtPts + '" fill="none" stroke="#7c3aed" stroke-width="2.5"/>';
     }
-    svg += '<text x="' + (w - 60) + '" y="' + (marginT + 14) + '" font-size="9" fill="#7c3aed" font-weight="bold">IEC SI (IDMT)</text>';
+    var curveNames = { SI: 'IEC SI (Standard Inverse)', VI: 'IEC VI (Very Inverse)', EI: 'IEC EI (Extremely Inverse)', LTI: 'IEC LTI (Long-Time Inverse)' };
+    svg += '<text x="' + (w - 100) + '" y="' + (marginT + 14) + '" font-size="9" fill="#7c3aed" font-weight="bold">' + (curveNames[cType] || 'IEC SI (IDMT)') + '</text>';
   } else {
     // Definite-time: horizontal lines
     // I> level: horizontal line from Ipickup to Iinstant at t>
@@ -6585,7 +6602,7 @@ function renderRelayTCC(I1N, relState) {
     }
     if (fusePts) {
       svg += '<path d="' + fusePts + '" fill="none" stroke="#d97706" stroke-width="1.5" stroke-dasharray="5,3"/>';
-      svg += '<text x="' + (w - 60) + '" y="' + (marginT + 28) + '" font-size="9" fill="#d97706">' + tx('HV-sikring', 'HV Fuse') + ' ' + fuseData.rating + 'A</text>';
+      svg += '<text x="' + (w - 60) + '" y="' + (marginT + 28) + '" font-size="9" fill="#d97706">' + tx('HV-sikring', 'HV Fuse') + ' ' + fuseData.rating + 'A (' + tx('ca.', 'approx.') + ')</text>';
     }
   }
 
@@ -6627,6 +6644,160 @@ function renderRelayTCCCard(I1N, relState) {
     html += '<span style="color:#dc2626">\u2014 I>> (' + tx('kortslutning', 'instantaneous') + ')</span>';
   }
   html += '<span style="color:#d97706">--- ' + tx('HV-sikring', 'HV Fuse') + '</span>';
+  html += '<span style="color:#f59e0b">--- ' + tx('Cursor', 'Cursor') + '</span>';
+  html += '</div></div>';
+  return html;
+}
+
+// ===== RCD TCC (trip time vs residual current per IEC 61008-1) =====
+function renderRcdTCC(rcdType, sensitivityMA) {
+  if (!rcdType || !sensitivityMA) return '';
+  var iDn = sensitivityMA; // rated residual current in mA
+  var w = 540, h = 360;
+  var marginL = 58, marginR = 16, marginT = 28, marginB = 38;
+  var plotW = w - marginL - marginR;
+  var plotH = h - marginT - marginB;
+  // X-axis: residual current 1mA to 10000mA (10A), log scale
+  var logImin = Math.log10(1), logImax = Math.log10(10000);
+  // Y-axis: trip time 10ms to 1000ms, log scale
+  var logTmin = Math.log10(10), logTmax = Math.log10(1000);
+  function xPos(imA) { return marginL + (Math.log10(Math.max(1, imA)) - logImin) / (logImax - logImin) * plotW; }
+  function yPos(tms) { return marginT + (1 - (Math.log10(Math.max(10, tms)) - logTmin) / (logTmax - logTmin)) * plotH; }
+
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;max-width:540px;height:auto;display:block;margin:0 auto">';
+  svg += '<rect width="' + w + '" height="' + h + '" fill="var(--bg-card,#fff)" rx="6"/>';
+
+  // Grid lines
+  var gridI = [1, 5, 10, 30, 50, 100, 300, 500, 1000, 3000, 10000];
+  var gridT = [10, 20, 40, 100, 150, 300, 500, 1000];
+  var gi, gx, gy;
+  for (gi = 0; gi < gridI.length; gi++) {
+    gx = xPos(gridI[gi]);
+    svg += '<line x1="' + gx + '" y1="' + marginT + '" x2="' + gx + '" y2="' + (h - marginB) + '" stroke="var(--border-light,#eee)" stroke-width="0.5"/>';
+    var lbl = gridI[gi] >= 1000 ? (gridI[gi] / 1000) + 'A' : gridI[gi] + 'mA';
+    svg += '<text x="' + gx + '" y="' + (h - marginB + 14) + '" text-anchor="middle" font-size="8" fill="var(--text,#333)">' + lbl + '</text>';
+  }
+  for (gi = 0; gi < gridT.length; gi++) {
+    gy = yPos(gridT[gi]);
+    svg += '<line x1="' + marginL + '" y1="' + gy + '" x2="' + (w - marginR) + '" y2="' + gy + '" stroke="var(--border-light,#eee)" stroke-width="0.5"/>';
+    svg += '<text x="' + (marginL - 4) + '" y="' + (gy + 3) + '" text-anchor="end" font-size="8" fill="var(--text,#333)">' + gridT[gi] + 'ms</text>';
+  }
+
+  // IEC 61008-1 maximum trip times per RCD type
+  // Type AC/A/F: 300ms at IΔn, 150ms at 2xIΔn, 40ms at 5xIΔn
+  // Type B: 300ms at IΔn, 150ms at 2xIΔn, 40ms at 5xIΔn (same limits but extends to DC)
+  var tripPoints = [
+    { mult: 1, tMax: 300 },
+    { mult: 2, tMax: 150 },
+    { mult: 5, tMax: 40 }
+  ];
+
+  // Draw the trip band (maximum trip time envelope)
+  // Upper envelope (max allowed trip time)
+  var upperPts = '';
+  var lowerPts = '';
+  for (var ti = 0; ti < tripPoints.length; ti++) {
+    var iMa = iDn * tripPoints[ti].mult;
+    var tMax = tripPoints[ti].tMax;
+    var tMin = Math.max(10, tMax * 0.2); // typical minimum trip time
+    var px = xPos(iMa);
+    upperPts += (upperPts === '' ? 'M' : 'L') + px.toFixed(1) + ',' + yPos(tMax).toFixed(1);
+    lowerPts = px.toFixed(1) + ',' + yPos(tMin).toFixed(1) + (lowerPts === '' ? '' : 'L' + lowerPts);
+  }
+  // Extend upper envelope to right edge
+  var extendI = iDn * 10;
+  upperPts += 'L' + xPos(extendI).toFixed(1) + ',' + yPos(30).toFixed(1);
+  lowerPts = xPos(extendI).toFixed(1) + ',' + yPos(10).toFixed(1) + (lowerPts === '' ? '' : 'L' + lowerPts);
+
+  // Draw trip band area (filled)
+  svg += '<path d="' + upperPts + 'L' + lowerPts + 'Z" fill="rgba(37,99,235,0.15)" stroke="none"/>';
+  // Upper limit line (max trip time)
+  svg += '<path d="' + upperPts + '" fill="none" stroke="#2563eb" stroke-width="2"/>';
+  // Lower limit line (min trip time)
+  var lowerPath = '';
+  for (ti = 0; ti < tripPoints.length; ti++) {
+    var iMa2 = iDn * tripPoints[ti].mult;
+    var tMin2 = Math.max(10, tripPoints[ti].tMax * 0.2);
+    lowerPath += (lowerPath === '' ? 'M' : 'L') + xPos(iMa2).toFixed(1) + ',' + yPos(tMin2).toFixed(1);
+  }
+  lowerPath += 'L' + xPos(extendI).toFixed(1) + ',' + yPos(10).toFixed(1);
+  svg += '<path d="' + lowerPath + '" fill="none" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="4,3"/>';
+
+  // Mark trip time limit points
+  for (ti = 0; ti < tripPoints.length; ti++) {
+    var iMaPt = iDn * tripPoints[ti].mult;
+    var tMaxPt = tripPoints[ti].tMax;
+    var cx = xPos(iMaPt), cy = yPos(tMaxPt);
+    svg += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="4" fill="#2563eb"/>';
+    svg += '<text x="' + (cx + 6).toFixed(1) + '" y="' + (cy - 6).toFixed(1) + '" font-size="8" fill="#2563eb">' + tripPoints[ti].mult + 'x' + tx('IDn', 'IΔn') + ': ' + tMaxPt + 'ms</text>';
+  }
+
+  // Vertical line at rated sensitivity IΔn
+  var idnX = xPos(iDn);
+  svg += '<line x1="' + idnX + '" y1="' + marginT + '" x2="' + idnX + '" y2="' + (h - marginB) + '" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="4,3"/>';
+  svg += '<text x="' + (idnX + 3) + '" y="' + (h - marginB - 5) + '" font-size="8" fill="#16a34a">' + tx('IDn', 'IΔn') + '=' + iDn + 'mA</text>';
+
+  // Cursor line
+  var cursorCurrent = deviceTccState.rcdCursor || 100;
+  var cursorX = xPos(cursorCurrent);
+  svg += '<line x1="' + cursorX + '" y1="' + marginT + '" x2="' + cursorX + '" y2="' + (h - marginB) + '" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,2"/>';
+  var cursorLbl = cursorCurrent >= 1000 ? (cursorCurrent / 1000).toFixed(1) + 'A' : cursorCurrent + 'mA';
+  svg += '<text x="' + (cursorX + 4) + '" y="' + (marginT + 12) + '" font-size="8" fill="#f59e0b">' + cursorLbl + '</text>';
+
+  // RCD type label
+  svg += '<text x="' + (w - 60) + '" y="' + (marginT + 14) + '" font-size="9" fill="#2563eb" font-weight="bold">' + rcdType + '</text>';
+
+  // Axes labels
+  svg += '<text x="' + (w / 2) + '" y="' + (h - 4) + '" text-anchor="middle" font-size="10" fill="var(--text,#333)">' + tx('Reststrøm [mA]', 'Residual Current [mA]') + '</text>';
+  svg += '<text x="14" y="' + (h / 2) + '" text-anchor="middle" font-size="10" fill="var(--text,#333)" transform="rotate(-90,14,' + (h / 2) + ')">' + tx('Udløsningstid [ms]', 'Trip Time [ms]') + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function renderRcdTCCCard(rcdType, sensitivityMA) {
+  var chart = renderRcdTCC(rcdType, sensitivityMA);
+  if (!chart) return '';
+  var cursorCurrent = deviceTccState.rcdCursor || 100;
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('RCD TCC - Udloesningskarakteristik', 'RCD TCC - Trip Characteristic') + '</div>';
+  html += '<div class="info-row">' + tx('Udloesningstid vs. reststrøm iht. IEC 61008-1', 'Trip time vs. residual current per IEC 61008-1') + '</div>';
+
+  // RCD type selector
+  html += '<div class="select-group"><div class="select-label">' + tx('RCD Type', 'RCD Type') + '</div><div class="select-grid">';
+  var rcdTypes = ['Type AC', 'Type A', 'Type F', 'Type B'];
+  for (var ri = 0; ri < rcdTypes.length; ri++) {
+    var rSel = (rcdSelected === rcdTypes[ri]) ? ' selected' : '';
+    html += '<button class="sel-btn' + rSel + '" onclick="rcdSelected=\'' + rcdTypes[ri] + '\';renderModule(\'standards\')">' + rcdTypes[ri] + '</button>';
+  }
+  html += '</div></div>';
+
+  // Sensitivity selector
+  if (rcdSelected && RCD_TYPES[rcdSelected]) {
+    html += '<div class="select-group"><div class="select-label">' + tx('Foelsomhed [mA]', 'Sensitivity [mA]') + '</div><div class="select-grid">';
+    var sens = RCD_TYPES[rcdSelected].sensitivity;
+    for (var si = 0; si < sens.length; si++) {
+      var sSel = (rcdSensitivity === sens[si]) ? ' selected' : '';
+      html += '<button class="sel-btn' + sSel + '" onclick="rcdSensitivity=' + sens[si] + ';renderModule(\'standards\')">' + sens[si] + ' mA</button>';
+    }
+    html += '</div></div>';
+  }
+
+  // Cursor buttons
+  var cursors = [5, 10, 15, 30, 50, 100, 300, 500, 1000];
+  html += '<div class="select-group"><div class="select-label">' + tx('Strøm-cursor [mA]', 'Current Cursor [mA]') + '</div><div class="select-grid">';
+  for (var ci = 0; ci < cursors.length; ci++) {
+    var csel = (cursorCurrent === cursors[ci]) ? ' selected' : '';
+    var clbl = cursors[ci] >= 1000 ? (cursors[ci] / 1000) + 'A' : cursors[ci] + 'mA';
+    html += '<button class="sel-btn' + csel + '" onclick="deviceTccSetCursor(\'rcd\',' + cursors[ci] + ')">' + clbl + '</button>';
+  }
+  html += '</div></div>';
+
+  html += chart;
+
+  // Legend
+  html += '<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:8px;font-size:0.82em">';
+  html += '<span style="color:#2563eb">\u2588 ' + tx('Udloesningsbaand (maks)', 'Trip band (max)') + '</span>';
+  html += '<span style="color:#2563eb">--- ' + tx('Minimumstid', 'Minimum time') + '</span>';
+  html += '<span style="color:#16a34a">--- ' + tx('IDn (maerkestrøm)', 'IΔn (rated)') + '</span>';
   html += '<span style="color:#f59e0b">--- ' + tx('Cursor', 'Cursor') + '</span>';
   html += '</div></div>';
   return html;
@@ -7316,6 +7487,12 @@ function syncSharedQuantities(mod) {
 
 function renderModule(mod) {
   if (typeof Reactive !== 'undefined') Reactive.onRender(mod); // reactive propagation: recompute all linked verdicts first
+  // Clear timelapse interval when navigating away from live module
+  if (mod !== 'live' && liveState.timelapseInterval) {
+    clearInterval(liveState.timelapseInterval);
+    liveState.timelapseInterval = null;
+    liveState.timelapseRunning = false;
+  }
   syncAxes(); // Dynamic coordination
   syncSharedQuantities(mod); // Cross-module shared value propagation
   const main = document.getElementById('mainContent');
@@ -9547,6 +9724,8 @@ function renderStandards() {
         <div class="result-row"><span class="label">${tx('Krav', 'Requirement')}</span><span class="value">${getRcdRecommendation().note}</span></div>
       </div>
       ` : ''}
+
+      ${(rcdSelected && rcdSensitivity) ? renderRcdTCCCard(rcdSelected, rcdSensitivity) : ''}
     </div>
 
     <div class="card fade-in">
@@ -26594,6 +26773,7 @@ function renderMotorteori() {
 
 var relayState = {
   relayType: 'definite',
+  curveType: 'SI',
   trafoKVA: 630,
   primaryKV: 10,
   secondaryV: 400,
@@ -26734,6 +26914,16 @@ function renderRelay() {
   html += '<button class="sel-btn' + (relayState.relayType === 'definite' ? ' selected' : '') + '" onclick="relayState.relayType=\'definite\';renderModule(\'relay\')">' + tx('Konstanttid (definite-time)', 'Definite-time') + '</button>';
   html += '<button class="sel-btn' + (relayState.relayType === 'inverse' ? ' selected' : '') + '" onclick="relayState.relayType=\'inverse\';renderModule(\'relay\')">' + tx('Invers tid (IDMT)', 'Inverse-time (IDMT)') + '</button>';
   html += '</div></div>';
+
+  // IDMT curve type selection (only shown for inverse relay)
+  if (relayState.relayType === 'inverse') {
+    html += '<div class="select-group"><div class="select-label">' + tx('IDMT Kurvetype (IEC 60255-151)', 'IDMT Curve Type (IEC 60255-151)') + '</div><div class="select-grid">';
+    html += '<button class="sel-btn' + (relayState.curveType === 'SI' ? ' selected' : '') + '" onclick="relayState.curveType=\'SI\';renderModule(\'relay\')">SI</button>';
+    html += '<button class="sel-btn' + (relayState.curveType === 'VI' ? ' selected' : '') + '" onclick="relayState.curveType=\'VI\';renderModule(\'relay\')">VI</button>';
+    html += '<button class="sel-btn' + (relayState.curveType === 'EI' ? ' selected' : '') + '" onclick="relayState.curveType=\'EI\';renderModule(\'relay\')">EI</button>';
+    html += '<button class="sel-btn' + (relayState.curveType === 'LTI' ? ' selected' : '') + '" onclick="relayState.curveType=\'LTI\';renderModule(\'relay\')">LTI</button>';
+    html += '</div></div>';
+  }
 
   // Transformer kVA
   html += '<div class="select-group"><div class="select-label">' + tx('Transformator [kVA]', 'Transformer [kVA]') + '</div><div class="select-grid">';
@@ -34057,7 +34247,7 @@ function renderLiveInstallation() {
     html += '<div class="result-box" style="margin-bottom:12px"><div class="result-title">' + tx('Tidsforloeb - 24 timer', 'Time-Lapse - 24 hours') + '</div>';
     html += '<div class="result-row"><span class="label">' + tx('Klokkeslaet', 'Time') + '</span><span class="value" style="font-size:1.3em;font-weight:bold">' + (liveState.timelapseHour < 10 ? '0' : '') + liveState.timelapseHour + ':00</span></div>';
     var loadMult = liveGetLoadMultiplier(liveState.timelapseHour);
-    var loadLabel = loadMult >= 1.5 ? tx('Hoej belastning', 'High load') : (loadMult <= 0.5 ? tx('Lav belastning (sol)', 'Low load (solar)') : (loadMult <= 0.3 ? tx('Nat-grundlast', 'Night baseload') : tx('Normal', 'Normal')));
+    var loadLabel = loadMult >= 1.5 ? tx('Hoej belastning', 'High load') : (loadMult <= 0.3 ? tx('Nat-grundlast', 'Night baseload') : (loadMult <= 0.5 ? tx('Lav belastning (sol)', 'Low load (solar)') : tx('Normal', 'Normal')));
     html += '<div class="result-row"><span class="label">' + tx('Belastningsfaktor', 'Load factor') + '</span><span class="value">' + loadMult.toFixed(1) + 'x - ' + loadLabel + '</span></div>';
     html += '<div style="margin-top:8px">';
     if (!liveState.timelapseRunning) {
