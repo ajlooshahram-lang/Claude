@@ -1,0 +1,22 @@
+{
+  "id": "FEAT-002",
+  "type": "chore",
+  "description": "Rebuild standalone dist and ZIP package after all fixes are applied.",
+  "status": "completed",
+  "steps": [
+    "Run cd qi-webapp && npm run build:standalone to rebuild STP-Application.html",
+    "Run node verify-standalone.js to confirm the built file passes all 23 boot checks",
+    "Rebuild the ZIP: cp dist/STP-Application.html STP-Application.html && zip -9 dist/STP-Application-Package.zip dist/STP-Application.html samples/test-brief-asianet-express.md samples/test-brief-pacificlink.md samples/test-brief-transpacific-megagrid.md STP-Application.html && rm -f STP-Application.html"
+  ],
+  "acceptance_criteria": [
+    "dist/STP-Application.html exists and is the rebuilt standalone file",
+    "node verify-standalone.js passes all 23 checks against the dist file",
+    "dist/STP-Application-Package.zip exists and contains the HTML plus sample briefs"
+  ],
+  "verification": [
+    "cd qi-webapp && node verify-standalone.js",
+    "cd qi-webapp && ls -la dist/STP-Application.html dist/STP-Application-Package.zip"
+  ],
+  "blocked_reason": null,
+  "findings": "Dist rebuilt successfully. All 23 verify-standalone.js boot checks pass. ZIP package contains the HTML file plus all 3 sample briefs. The dist HTML build shows version a51e9c6 at 5.40 MB with 12 vendor libs, 10 app modules, 5 textures inlined."
+}
