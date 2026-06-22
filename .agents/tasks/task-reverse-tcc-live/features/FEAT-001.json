@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Implement Omvendt Dimensionering (Reverse Engineering Mode) - complete auto-solver with 100% click-only UI, iterative DS/HD 60364 validation, BOM generation, compliance report, and Live Twin SVG visualization. The module key 'reverse' is already registered in NAV_GROUPS (line 5457), translations (lines 1151/1314/1469), syncSharedQuantities (line 7488), and renderModule switch (line 7598). Only the implementation (reverseState + renderReverse + solver functions) is missing.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Step 1: Define the reverseState global state object near other module states (around line 4891 near liveState). Fields: loadType (null), power_kW (3.45), phases ('1x230'), voltage (230), installMethod ('C'), ambientTemp (30), cableLength_m (25), grouping (1), earthSystem ('TN-S'), cosPhi (0.95), cableMaterial ('Cu'), protectionType ('MCB'), result (null), iterations (0), solverLog ([]). Also define load presets array with common loads.",
     "Step 2: Implement reverseEngineerSolve() function. Algorithm: (a) Calc IB from power_kW/voltage/cosPhi/phases. (b) Select smallest protection device In >= IB from PRODUCTS (filter by protectionType). (c) Calc derating k = INSTALL_METHODS[method] * TEMP_FACTORS[temp] * GROUP_FACTORS[grouping]. (d) Select smallest cable where cable.iz * k >= In (filter by material). (e) Build sldTree: transformer -> main_board -> final_circuit with selected components. (f) Call sldPropagateAll. (g) Run sldVerifyNode to get compliance. (h) Check voltage drop <= 4% (DK_STANDARDS.vdropGeneral). (i) Check Zs*Ia <= U0. (j) Check Icu >= Ikmax. (k) If ANY check fails: upsize cable first, then protection, then try curve C, then MCCB. Max 20 iterations. (l) Store result object with all computed values, selected components, compliance results, BOM, optimization notes. Always err on safety side - pick larger component when ambiguous.",
@@ -31,5 +31,5 @@
     "Run: node --check el-dimensionering.html - expect no syntax errors"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 1626 tests pass (1598 existing + 28 new). The reverseState is at line 4891, solver functions at ~34271, renderReverse at ~34654. archiveCollectModuleStates integration at line 11977. SharedQuantities wiring already existed at line 7520. No issues encountered."
 }
