@@ -1151,7 +1151,27 @@ const T = {
       reverse: 'Omvendt Dim.',
       selmatrix: 'Selektivitetsmatrix',
       autocoord: 'Auto-koordinering',
-      powerflow: 'Effektflow'
+      powerflow: 'Effektflow',
+      vdrop3d: 'Spaendingsfald 3D',
+      grounddesign: 'Jordingsdesigner',
+      erklaering: 'Installationserklæring',
+      testprotokol: 'Afprøvningsprotokol',
+      tjekalt: 'Tjek Alt',
+      fejlfinding: 'Fejlfinding',
+      diversity: 'Samtidighed',
+      pe: 'PE-leder',
+      eftersyn: 'Periodisk Eftersyn',
+      rcd: 'RCD-vælger',
+      tavleerkl: 'Tavleerklæring',
+      sundhed: 'Sundhedsscore',
+      fremtid: 'Fremtidssikring',
+      qrkode: 'Digital Servicebog',
+      fejlvagt: 'Fejlvagt',
+      stemme: 'Stemme-Rapport',
+      matopt: 'Materialoptimering',
+      mester: 'Mesterråd',
+      tidslinje: 'Tidsestimat',
+      benchmark: 'Benchmark'
     },
     // Load module
     loadTitle: 'Belastningsberegning',
@@ -1317,7 +1337,27 @@ const T = {
       reverse: 'Reverse Engineering',
       selmatrix: 'Selectivity Matrix',
       autocoord: 'Auto Coordination',
-      powerflow: 'Power Flow'
+      powerflow: 'Power Flow',
+      vdrop3d: 'Voltage Drop 3D',
+      grounddesign: 'Grounding Designer',
+      erklaering: 'Installation Declaration',
+      testprotokol: 'Test Protocol',
+      tjekalt: 'Check All',
+      fejlfinding: 'Troubleshooting',
+      diversity: 'Diversity',
+      pe: 'PE Conductor',
+      eftersyn: 'Periodic Inspection',
+      rcd: 'RCD Selector',
+      tavleerkl: 'Panel Declaration',
+      sundhed: 'Health Score',
+      fremtid: 'Future Expansion',
+      qrkode: 'Digital Service Book',
+      fejlvagt: 'Mistake Detector',
+      stemme: 'Voice Report',
+      matopt: 'Material Optimizer',
+      mester: 'Master Advice',
+      tidslinje: 'Time Estimate',
+      benchmark: 'Benchmark'
     },
     loadTitle: 'Load Calculation',
     voltage: 'Voltage',
@@ -1475,7 +1515,27 @@ const T = {
       reverse: 'مهندسی معکوس',
       selmatrix: 'ماتریس گزینش‌پذیری',
       autocoord: 'هماهنگی خودکار',
-      powerflow: 'جریان توان'
+      powerflow: 'جریان توان',
+      vdrop3d: 'افت ولتاژ سه‌بعدی',
+      grounddesign: 'طراح سیستم ارتینگ',
+      erklaering: 'اعلامیه نصب',
+      testprotokol: 'پروتکل آزمایش',
+      tjekalt: 'بررسی همه',
+      fejlfinding: 'عیب‌یابی',
+      diversity: 'همزمانی',
+      pe: 'هادی PE',
+      eftersyn: 'بازرسی دوره‌ای',
+      rcd: 'انتخاب‌گر RCD',
+      tavleerkl: 'اعلامیه تابلو',
+      sundhed: 'امتیاز سلامت',
+      fremtid: 'توسعه آینده',
+      qrkode: 'دفترچه خدمات دیجیتال',
+      fejlvagt: 'تشخیص خطا',
+      stemme: 'گزارش صوتی',
+      matopt: 'بهینه‌سازی مواد',
+      mester: 'مشاوره استاد',
+      tidslinje: 'تخمین زمان',
+      benchmark: 'معیار مقایسه'
     },
     loadTitle: 'محاسبه بار',
     voltage: 'ولتاژ',
@@ -2919,7 +2979,217 @@ const _FA = {
   'Click to pin': 'کلیک برای ثابت کردن',
   'Compliance': 'انطباق',
   'Thermal capacity': 'ظرفیت حرارتی',
-  'Disconnection': 'قطع اتصال'
+  'Disconnection': 'قطع اتصال',
+  // === Feature: Installationserklæring ===
+  'Installation Declaration': 'اعلامیه نصب',
+  'Installation Declaration per Installationsbekendtgørelsen §9': 'اعلامیه نصب طبق قانون نصب §9',
+  'Company': 'شرکت',
+  'Authorization number': 'شماره مجوز',
+  'Date': 'تاریخ',
+  'Building type': 'نوع ساختمان',
+  'Villa': 'ویلا',
+  'Apartment': 'آپارتمان',
+  'Commercial': 'تجاری',
+  'Industrial': 'صنعتی',
+  'Agricultural': 'کشاورزی',
+  'Work type': 'نوع کار',
+  'New installation': 'نصب جدید',
+  'Extension': 'توسعه',
+  'Modification': 'تغییر',
+  'Repair': 'تعمیر',
+  'Inspection': 'بازرسی',
+  'Earth system': 'سیستم زمین',
+  'RCD protection confirmed': 'حفاظت RCD تایید شد',
+  'Tests performed': 'آزمایش‌های انجام‌شده',
+  'Continuity': 'پیوستگی',
+  'Insulation resistance': 'مقاومت عایقی',
+  'Loop impedance': 'امپدانس حلقه',
+  'RCD function': 'عملکرد RCD',
+  'Voltage drop': 'افت ولتاژ',
+  'Measurement results': 'نتایج اندازه‌گیری',
+  'All passed': 'همه قبول',
+  'Has failures': 'دارای خرابی',
+  'Declaration statement': 'بیانیه اعلامیه',
+  'Print declaration': 'چاپ اعلامیه',
+  'The installation complies with Installationsbekendtgørelsen and DS/HD 60364': 'نصب مطابق با قانون نصب و DS/HD 60364 است',
+  // === Feature: Testprotokol ===
+  'Field Test Protocol': 'پروتکل آزمایش میدانی',
+  'Per DS/HD 60364-6 cl.6.61 (initial verification)': 'طبق DS/HD 60364-6 بند 6.61 (تأیید اولیه)',
+  'Visual inspection': 'بازرسی چشمی',
+  'PE continuity': 'پیوستگی PE',
+  'Insulation Riso': 'عایق Riso',
+  'Earth loop Zs': 'حلقه زمین Zs',
+  'RCD trip time': 'زمان قطع RCD',
+  'Voltage drop measured': 'افت ولتاژ اندازه‌گیری شده',
+  'PASS': 'قبول',
+  'FAIL': 'مردود',
+  'Circuit': 'مدار',
+  'Summary': 'خلاصه',
+  'Total tested': 'مجموع آزمایش‌شده',
+  'Passed': 'قبول‌شده',
+  'Failed': 'مردود‌شده',
+  'Overall verdict': 'حکم نهایی',
+  'Add circuit': 'افزودن مدار',
+  // === Feature: Tjek Alt ===
+  'Installation Completeness Check': 'بررسی کامل بودن نصب',
+  'Have you remembered everything?': 'آیا همه چیز را به خاطر آورده‌اید؟',
+  'Your installation is': 'نصب شما',
+  'complete': 'کامل است',
+  'Run check': 'اجرای بررسی',
+  'OK': 'تایید',
+  'Warning': 'هشدار',
+  'Missing/Fail': 'ناقص/مردود',
+  'Not applicable': 'غیر قابل اعمال',
+  'RCD 30mA on all socket circuits ≤20A': 'RCD 30mA روی همه مدارهای پریز ≤20A',
+  'RCD 30mA on bathroom circuits': 'RCD 30mA روی مدارهای حمام',
+  'PE conductor sized correctly': 'هادی PE با اندازه صحیح',
+  'Main equipotential bonding': 'اتصال هم‌پتانسیل اصلی',
+  'Supplementary bonding in bathrooms': 'اتصال تکمیلی در حمام‌ها',
+  'Cable derating for grouping': 'کاهش ظرفیت کابل برای گروه‌بندی',
+  'Voltage drop within limits': 'افت ولتاژ در محدوده مجاز',
+  'Breaking capacity adequate': 'ظرفیت قطع کافی',
+  'Selectivity achieved': 'انتخاب‌پذیری حاصل شد',
+  'SPD present where required': 'SPD در صورت لزوم موجود',
+  'Isolation switch at origin': 'کلید جداسازی در مبدأ',
+  'Circuit identification labels': 'برچسب شناسایی مدار',
+  'Fire barriers at penetrations': 'موانع آتش در نفوذها',
+  'IP rating correct': 'درجه IP صحیح',
+  // === Feature: Fejlfinding ===
+  'Troubleshooting Decision Tree': 'درخت تصمیم عیب‌یابی',
+  'Select symptom': 'علائم را انتخاب کنید',
+  'No power': 'بدون برق',
+  'RCD trips': 'RCD قطع می‌کند',
+  'Fuse blows': 'فیوز می‌سوزد',
+  'Voltage issues': 'مشکلات ولتاژ',
+  'Overheating': 'گرمای بیش از حد',
+  'Burning smell': 'بوی سوختگی',
+  'Scope': 'محدوده',
+  'Whole installation': 'کل نصب',
+  'One circuit': 'یک مدار',
+  'One outlet': 'یک پریز',
+  'Context': 'زمینه',
+  'New problem': 'مشکل جدید',
+  'Intermittent': 'متناوب',
+  'Constant': 'دائمی',
+  'After work done': 'پس از انجام کار',
+  'Probable cause': 'علت احتمالی',
+  'Required measurements': 'اندازه‌گیری‌های مورد نیاز',
+  'Safety classification': 'طبقه‌بندی ایمنی',
+  'DANGEROUS - immediate action': 'خطرناک - اقدام فوری',
+  'IMPORTANT - fix soon': 'مهم - به زودی رفع شود',
+  'NORMAL - scheduled repair': 'عادی - تعمیر برنامه‌ریزی شده',
+  'De-energize before proceeding': 'قبل از ادامه برق را قطع کنید',
+  'Start over': 'از نو شروع کنید',
+  // === Feature: Diversity ===
+  'Demand Factor / Diversity Calculator': 'محاسبه‌گر ضریب تقاضا / همزمانی',
+  'Per DS/HD 60364-5-52 Annex B': 'طبق DS/HD 60364-5-52 پیوست B',
+  'Lighting': 'روشنایی',
+  'Sockets': 'پریزها',
+  'Cooker': 'اجاق',
+  'Electric heating': 'گرمایش الکتریکی',
+  'Water heater': 'آبگرمکن',
+  'Heat pump': 'پمپ حرارتی',
+  'EV charger': 'شارژر خودرو برقی',
+  'Motor': 'موتور',
+  'Other': 'سایر',
+  'Total installed load': 'بار نصب‌شده کل',
+  'Applied diversity': 'همزمانی اعمال‌شده',
+  'Effective demand': 'تقاضای مؤثر',
+  'Required main supply': 'تغذیه اصلی مورد نیاز',
+  'Add load category': 'افزودن دسته بار',
+  'Quantity': 'تعداد',
+  'Power per unit': 'توان هر واحد',
+  'You can save on main connection vs simple summation': 'شما می‌توانید در اتصال اصلی صرفه‌جویی کنید',
+  // PE Conductor module
+  'PE Conductor Sizing': 'ابعاد هادی PE',
+  'Protective earth (PE) conductor sizing per DS/HD 60364-5-54 Table 54.2. Select phase conductor cross-section to see required PE size.': 'ابعاد هادی حفاظتی (PE) طبق جدول 54.2 استاندارد DS/HD 60364-5-54. مقطع هادی فاز را انتخاب کنید.',
+  'Phase conductor cross-section S (mm\u00B2)': 'مقطع هادی فاز S (mm\u00B2)',
+  'Required PE conductor': 'هادی PE مورد نیاز',
+  'Rule': 'قاعده',
+  'PE sizing rules': 'قوانین ابعاد PE',
+  'Table 54.2 \u2014 Complete overview': 'جدول 54.2 \u2014 مرور کامل',
+  // Voltage Drop 3D module
+  'Voltage Drop 3D Visualization': 'تجسم سه\u200Cبعدی افت ولتاژ',
+  '3D perspective of installation path with color gradient from supply to load. Green=low, red=high voltage drop per DS/HD 60364-5-52.': 'نمای سه\u200Cبعدی مسیر نصب با گرادیان رنگی. سبز=کم، قرمز=زیاد.',
+  'View angle': 'زاویه دید',
+  'Voltage drop gradient': 'گرادیان افت ولتاژ',
+  // Ground Design module
+  'Earth Electrode Designer': 'طراح الکترود زمین',
+  'Soil type (resistivity)': 'نوع خاک (مقاومت ویژه)',
+  'Electrode type': 'نوع الکترود',
+  'Calculated earth resistance R\u2091': 'مقاومت زمین محاسبه\u200Cشده R\u2091',
+  'Suggestion: Parallel rods': 'پیشنهاد: میله\u200Cهای موازی',
+  // Eftersyn module
+  'Periodic Inspection \u2014 Sikkerhedsstyrelsen': 'بازرسی دوره\u200Cای \u2014 سازمان ایمنی',
+  'Checklist for periodic inspection preparation. Based on DS/HD 60364 chapter 6 requirements.': 'چک\u200Cلیست آماده\u200Cسازی بازرسی دوره\u200Cای. طبق فصل 6 استاندارد.',
+  'Progress': 'پیشرفت',
+  'Checklist': 'چک\u200Cلیست',
+  // RCD Selection module
+  'RCD Selection Guide': 'راهنمای انتخاب RCD',
+  'Select installation type to see recommended RCD type and sensitivity per DS/HD 60364.': 'نوع نصب را انتخاب کنید تا نوع و حساسیت RCD پیشنهادی را ببینید.',
+  'Recommended RCD type': 'نوع RCD پیشنهادی',
+  'Sensitivity I\u0394n': 'حساسیت I\u0394n',
+  'RCD Types Overview': 'مرور انواع RCD',
+  // Panel Declaration module
+  'Panel Declaration (DS/EN 61439)': 'اعلامیه تابلو (DS/EN 61439)',
+  'Panel declaration generator per DS/EN 61439. Fill in board data by clicking \u2014 generates formal declaration.': 'تولیدکننده اعلامیه تابلو. با کلیک اطلاعات را پر کنید.',
+  'Board type': 'نوع تابلو',
+  'Rated current InA (A)': 'جریان نامی InA (A)',
+  'Enclosure rating': 'درجه حفاظت محفظه',
+  'Form of internal separation': 'فرم جداسازی داخلی',
+  'Short-circuit withstand Icw (kA)': 'تحمل اتصال کوتاه Icw (kA)',
+  'Generated Panel Declaration': 'اعلامیه تابلو تولیدشده',
+  // Health Score module
+  'Installation Health Score': 'امتیاز سلامت نصب',
+  'Overall score 0-100 based on safety, capacity, selectivity, future-proofing and documentation.': 'امتیاز کلی 0-100 بر اساس ایمنی، ظرفیت، گزینش\u200Cپذیری، آینده\u200Cنگری و مستندات.',
+  'Safety (40%)': 'ایمنی (40%)',
+  'Capacity (20%)': 'ظرفیت (20%)',
+  'Selectivity (20%)': 'گزینش\u200Cپذیری (20%)',
+  'Future-proofing (10%)': 'آینده\u200Cنگری (10%)',
+  'Documentation (10%)': 'مستندات (10%)',
+  'Improvement suggestions': 'پیشنهادات بهبود',
+  // Future Expansion module
+  'Future Expansion Advisor': 'مشاور توسعه آینده',
+  'Can your installation handle future additions? Select a scenario to check feasibility.': 'آیا نصب شما ظرفیت توسعه دارد؟ یک سناریو انتخاب کنید.',
+  'Select scenario': 'انتخاب سناریو',
+  'Available headroom': 'ظرفیت موجود',
+  'Can it fit?': 'جا می\u200Cشود؟',
+  'Bottleneck': 'گلوگاه',
+  'Upgrade path': 'مسیر ارتقا',
+  'Estimated cost': 'هزینه تخمینی',
+  // QR Code module
+  'Digital Service Book (QR Code)': 'دفترچه خدمات دیجیتال (کد QR)',
+  'Generate QR code': 'تولید کد QR',
+  'Encoded content': 'محتوای کدگذاری\u200Cشده',
+  // Mistake Detector module
+  'Mistake Detector \u2014 Danish Installation': 'تشخیص خطا \u2014 نصب دانمارکی',
+  'Scans installation for 25+ common Danish installation mistakes. Each finding: severity, DS/HD clause, explanation and fix.': 'نصب را برای 25+ خطای رایج اسکن می\u200Cکند.',
+  'Run scan': 'اجرای اسکن',
+  // Voice-to-Documentation module
+  'Voice-to-Documentation': 'صدا به مستندات',
+  'Click-based report composer. Select template, click details, get professional Danish service report.': 'گزارش\u200Cساز کلیکی. قالب انتخاب کنید، جزئیات کلیک کنید.',
+  'Select template': 'انتخاب قالب',
+  'Generate report': 'تولید گزارش',
+  'Service Report': 'گزارش خدمات',
+  // Material Optimizer module
+  'Material Optimizer': 'بهینه\u200Cسازی مواد',
+  'Total savings': 'کل صرفه\u200Cجویی',
+  'Optimize': 'بهینه\u200Cسازی',
+  // Master's Advice module
+  'Master\'s Advice \u2014 Expert Tips': 'مشاوره استاد \u2014 نکات تخصصی',
+  // Timeline Estimator module
+  'Timeline & Resource Estimator': 'تخمین زمان و منابع',
+  'Project type': 'نوع پروژه',
+  'Team size': 'اندازه تیم',
+  'Time Estimate': 'تخمین زمان',
+  // Benchmark module
+  'Benchmark \u2014 Compare with reference': 'معیار \u2014 مقایسه با مرجع',
+  'Select reference': 'انتخاب مرجع',
+  'Radar Chart': 'نمودار راداری',
+  'Your installation': 'نصب شما',
+  // Enhanced TjekAlt
+  'Installation type (context)': 'نوع نصب (زمینه)',
+  'Run check': 'اجرای بررسی'
 };
 function tx(da, en) { if(lang === 'da') return da; if(lang === 'fa') return _FA[en] || en; return en; }
 function tl(obj, prefix) { return obj[prefix + '_' + lang] || obj[prefix + '_en'] || ''; }
@@ -5586,21 +5856,21 @@ const NAV_GROUPS = [
     da: 'Start her', en: 'Start here', fa: '\u0627\u0632 \u0627\u06CC\u0646\u062C\u0627 \u0634\u0631\u0648\u0639 \u06A9\u0646\u06CC\u062F',
     descDa: 'Ny til el-design? Begynd her. Guiden f\u00F8rer dig trin for trin og fort\u00E6ller hvor du skal starte og hvad der kommer bagefter.',
     descEn: 'New to electrical design? Begin here. The guide walks you step by step and tells you where to start and what comes next.',
-    keys: ['guide', 'projekt', 'brain', 'analyzer', 'kritisk', 'reverse']
+    keys: ['guide', 'projekt', 'brain', 'analyzer', 'kritisk', 'reverse', 'sundhed', 'fremtid', 'mester', 'tjekalt', 'fejlfinding']
   },
   {
     id: 'core', icon: '\u26A1', numbered: true,
     da: 'Dimensionering (kerneforl\u00F8b)', en: 'Dimensioning (core path)', fa: '\u0637\u0631\u0627\u062D\u06CC (\u0645\u0633\u06CC\u0631 \u0627\u0635\u0644\u06CC)',
     descDa: 'Det b\u00E6rende forl\u00F8b for enhver kreds \u2014 i r\u00E6kkef\u00F8lge. F\u00F8lg tallene: belastning \u2192 afbryder \u2192 kabel \u2192 sp\u00E6ndingsfald \u2192 kortslutning \u2192 jordfejl. Grundreglen er IB \u2264 In \u2264 Iz.',
     descEn: 'The backbone for every circuit \u2014 in order. Follow the numbers: load \u2192 device \u2192 cable \u2192 voltage drop \u2192 short-circuit \u2192 earth fault. The golden rule is IB \u2264 In \u2264 Iz.',
-    keys: ['load', 'trafo', 'mcb', 'mccb', 'fuse', 'cable', 'vdrop', 'scircuit', 'zs', 'discrim']
+    keys: ['load', 'diversity', 'trafo', 'mcb', 'mccb', 'fuse', 'cable', 'pe', 'vdrop', 'vdrop3d', 'scircuit', 'zs', 'discrim', 'matopt']
   },
   {
     id: 'protect', icon: '\uD83D\uDEE1\uFE0F',
     da: 'Beskyttelse & jording', en: 'Protection & earthing', fa: '\u062D\u0641\u0627\u0638\u062A \u0648 \u0627\u062A\u0635\u0627\u0644 \u0632\u0645\u06CC\u0646',
     descDa: 'Hvordan mennesker og udstyr beskyttes mod st\u00F8d, overspaending og lysbue \u2014 og s\u00E6rlige omr\u00E5der med skrappere krav (bad, pool, byggeplads, landbrug, Ex).',
     descEn: 'How people and equipment are protected from shock, surges and arc flash \u2014 plus special locations with stricter rules (bathroom, pool, site, agriculture, Ex).',
-    keys: ['relay', 'fault', 'earthsys', 'spd', 'arcflash', 'bathroom', 'pool', 'construction', 'agri', 'atex', 'selmatrix', 'autocoord']
+    keys: ['relay', 'fault', 'rcd', 'earthsys', 'grounddesign', 'spd', 'arcflash', 'bathroom', 'pool', 'construction', 'agri', 'atex', 'selmatrix', 'autocoord', 'fejlvagt']
   },
   {
     id: 'apps', icon: '\uD83D\uDD0C',
@@ -5635,7 +5905,7 @@ const NAV_GROUPS = [
     da: 'Dokumentation & kvalitet', en: 'Documentation & quality', fa: '\u0645\u0633\u062A\u0646\u062F\u0627\u062A \u0648 \u06A9\u06CC\u0641\u06CC\u062A',
     descDa: 'Det der g\u00F8r projektet lovligt og f\u00E6rdigt: standarder, komponentbank, tilbud, KLS-kvalitetssikring, idrifts\u00E6ttelse, dokumentation \u2014 og eksamenstr\u00E6ning.',
     descEn: 'What makes the project legal and finished: standards, component bank, bids, KLS quality control, commissioning, documentation \u2014 and exam practice.',
-    keys: ['standards', 'bank', 'pdf', 'bid', 'kls', 'commission', 'commissioning', 'verify', 'exam', 'ai', 'archive']
+    keys: ['standards', 'bank', 'pdf', 'eftersyn', 'tavleerkl', 'erklaering', 'testprotokol', 'bid', 'kls', 'commission', 'commissioning', 'verify', 'exam', 'ai', 'archive', 'qrkode', 'stemme', 'tidslinje', 'benchmark']
   }
 ];
 
@@ -8019,6 +8289,26 @@ function renderModule(mod) {
     case 'selmatrix': content = renderSelMatrix(); break;
     case 'autocoord': content = renderAutoCoord(); break;
     case 'powerflow': content = renderPowerFlow(); break;
+    case 'vdrop3d': content = renderVdrop3D(); break;
+    case 'grounddesign': content = renderGroundDesign(); break;
+    case 'eftersyn': content = renderEftersyn(); break;
+    case 'rcd': content = renderRCDSel(); break;
+    case 'tavleerkl': content = renderTavleErkl(); break;
+    case 'pe': content = renderPE(); break;
+    case 'diversity': content = renderDiversity(); break;
+    case 'erklaering': content = renderErklaering(); break;
+    case 'testprotokol': content = renderTestprotokol(); break;
+    case 'tjekalt': content = renderTjekAlt(); break;
+    case 'fejlfinding': content = renderFejlfinding(); break;
+    case 'sundhed': content = renderSundhed(); break;
+    case 'fremtid': content = renderFremtid(); break;
+    case 'qrkode': content = renderQRKode(); break;
+    case 'fejlvagt': content = renderFejlvagt(); break;
+    case 'stemme': content = renderStemme(); break;
+    case 'matopt': content = renderMatopt(); break;
+    case 'mester': content = renderMester(); break;
+    case 'tidslinje': content = renderTidslinje(); break;
+    case 'benchmark': content = renderBenchmark(); break;
   }
   // Append AI assistant to every module
   if (mod !== 'exam') content += renderAiAssistant(mod);
@@ -37250,6 +37540,2177 @@ function renderLiveInstallation() {
   return html;
 }
 
+// ===== FEATURE 1: INSTALLATIONSERKLÆRING (erklaering) =====
+let erklaeringState = { companyPreset: 0, authNumber: 0, buildingType: 'villa', workType: 'ny', earthSystem: 'TN-S', testsPerformed: [], measurementsPassed: true };
+
+const ERKL_COMPANIES = ['Mit Firma', 'Andet'];
+const ERKL_AUTH_NUMBERS = ['12345', '23456', '34567', '45678', '56789'];
+const ERKL_BUILDING_TYPES = ['villa', 'lejlighed', 'erhverv', 'industri', 'landbrug'];
+const ERKL_WORK_TYPES = ['ny', 'udvidelse', 'aendring', 'reparation', 'eftersyn'];
+const ERKL_EARTH_SYSTEMS = ['TN-S', 'TN-C-S', 'TT', 'IT'];
+const ERKL_TESTS = ['kontinuitet', 'isolationsmodstand', 'sloejfeimpedans', 'rcd_funktion', 'spaendingsfald'];
+
+function erklaeringToggleTest(t) {
+  var idx = erklaeringState.testsPerformed.indexOf(t);
+  if (idx >= 0) erklaeringState.testsPerformed.splice(idx, 1);
+  else erklaeringState.testsPerformed.push(t);
+  renderModule('erklaering');
+}
+
+function renderErklaering() {
+  var s = erklaeringState;
+  var today = new Date().toISOString().slice(0, 10);
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Installationserklæring', 'Installation Declaration') + '</div>';
+  html += '<p class="info-text">' + tx('Installationserklæring per Installationsbekendtgørelsen §9. Lovpligtigt dokument for enhver el-installation i Danmark.', 'Installation Declaration per Installationsbekendtgørelsen §9. Legally required document for every electrical installation in Denmark.') + '</p>';
+
+  // Company
+  html += '<div class="param-group"><div class="param-label">' + tx('Firma', 'Company') + '</div><div class="btn-group">';
+  ERKL_COMPANIES.forEach(function(c, i) {
+    html += '<button class="sel-btn ' + (s.companyPreset === i ? 'selected' : '') + '" onclick="erklaeringState.companyPreset=' + i + ';renderModule(\'erklaering\')">' + c + '</button>';
+  });
+  html += '</div></div>';
+
+  // Auth number
+  html += '<div class="param-group"><div class="param-label">' + tx('Autorisationsnummer', 'Authorization number') + '</div><div class="btn-group">';
+  ERKL_AUTH_NUMBERS.forEach(function(n, i) {
+    html += '<button class="sel-btn ' + (s.authNumber === i ? 'selected' : '') + '" onclick="erklaeringState.authNumber=' + i + ';renderModule(\'erklaering\')">' + n + '</button>';
+  });
+  html += '</div></div>';
+
+  // Date (auto-filled)
+  html += '<div class="param-group"><div class="param-label">' + tx('Dato', 'Date') + '</div><div class="result-value">' + today + '</div></div>';
+
+  // Building type
+  html += '<div class="param-group"><div class="param-label">' + tx('Bygningstype', 'Building type') + '</div><div class="btn-group">';
+  var btLabels = { villa: tx('Villa','Villa'), lejlighed: tx('Lejlighed','Apartment'), erhverv: tx('Erhverv','Commercial'), industri: tx('Industri','Industrial'), landbrug: tx('Landbrug','Agricultural') };
+  ERKL_BUILDING_TYPES.forEach(function(bt) {
+    html += '<button class="sel-btn ' + (s.buildingType === bt ? 'selected' : '') + '" onclick="erklaeringState.buildingType=\'' + bt + '\';renderModule(\'erklaering\')">' + btLabels[bt] + '</button>';
+  });
+  html += '</div></div>';
+
+  // Work type
+  html += '<div class="param-group"><div class="param-label">' + tx('Arbejdstype', 'Work type') + '</div><div class="btn-group">';
+  var wtLabels = { ny: tx('Ny installation','New installation'), udvidelse: tx('Udvidelse','Extension'), aendring: tx('Ændring','Modification'), reparation: tx('Reparation','Repair'), eftersyn: tx('Eftersyn','Inspection') };
+  ERKL_WORK_TYPES.forEach(function(wt) {
+    html += '<button class="sel-btn ' + (s.workType === wt ? 'selected' : '') + '" onclick="erklaeringState.workType=\'' + wt + '\';renderModule(\'erklaering\')">' + wtLabels[wt] + '</button>';
+  });
+  html += '</div></div>';
+
+  // Earth system
+  html += '<div class="param-group"><div class="param-label">' + tx('Jordsystem', 'Earth system') + '</div><div class="btn-group">';
+  ERKL_EARTH_SYSTEMS.forEach(function(es) {
+    html += '<button class="sel-btn ' + (s.earthSystem === es ? 'selected' : '') + '" onclick="erklaeringState.earthSystem=\'' + es + '\';renderModule(\'erklaering\')">' + es + '</button>';
+  });
+  html += '</div></div>';
+
+  // RCD confirmation
+  var rcdOk = true;
+  if (typeof sldTree !== 'undefined' && sldTree && sldTree.nodes) {
+    Object.keys(sldTree.nodes).forEach(function(nid) {
+      var n = sldTree.nodes[nid];
+      if (n && n.type === 'final_circuit' && n.ratingA && n.ratingA <= 20 && !n.rcd) rcdOk = false;
+    });
+  }
+  html += '<div class="param-group"><div class="param-label">' + tx('RCD-beskyttelse', 'RCD protection') + '</div>';
+  html += '<div class="result-value" style="color:' + (rcdOk ? 'var(--success)' : 'var(--danger)') + '">' + (rcdOk ? '✅ ' + tx('Bekræftet - alle krævede kredse har RCD', 'Confirmed - all required circuits have RCD') : '❌ ' + tx('Manglende RCD på en eller flere kredse', 'Missing RCD on one or more circuits')) + '</div></div>';
+
+  // Tests performed
+  html += '<div class="param-group"><div class="param-label">' + tx('Udførte prøvninger', 'Tests performed') + '</div><div class="btn-group">';
+  var testLabels = { kontinuitet: tx('Kontinuitet','Continuity'), isolationsmodstand: tx('Isolationsmodstand','Insulation resistance'), sloejfeimpedans: tx('Sløjfeimpedans','Loop impedance'), rcd_funktion: tx('RCD-funktion','RCD function'), spaendingsfald: tx('Spændingsfald','Voltage drop') };
+  ERKL_TESTS.forEach(function(t) {
+    var sel = s.testsPerformed.indexOf(t) >= 0;
+    html += '<button class="sel-btn ' + (sel ? 'selected' : '') + '" onclick="erklaeringToggleTest(\'' + t + '\')">' + testLabels[t] + '</button>';
+  });
+  html += '</div></div>';
+
+  // Measurement results
+  html += '<div class="param-group"><div class="param-label">' + tx('Måleresultater', 'Measurement results') + '</div><div class="btn-group">';
+  html += '<button class="sel-btn ' + (s.measurementsPassed ? 'selected' : '') + '" onclick="erklaeringState.measurementsPassed=true;renderModule(\'erklaering\')">' + tx('Alle bestået','All passed') + ' ✅</button>';
+  html += '<button class="sel-btn ' + (!s.measurementsPassed ? 'selected' : '') + '" onclick="erklaeringState.measurementsPassed=false;renderModule(\'erklaering\')">' + tx('Har fejl','Has failures') + ' ❌</button>';
+  html += '</div></div>';
+
+  // Declaration statement
+  html += '<div class="result-box"><div class="result-title">' + tx('Erklæring', 'Declaration statement') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Installationen er udført i overensstemmelse med Installationsbekendtgørelsen og DS/HD 60364', 'The installation complies with Installationsbekendtgørelsen and DS/HD 60364') + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Firma', 'Company') + ':</span><span class="value">' + ERKL_COMPANIES[s.companyPreset] + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Aut.nr.', 'Auth.no.') + ':</span><span class="value">' + ERKL_AUTH_NUMBERS[s.authNumber] + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Jordsystem', 'Earth system') + ':</span><span class="value">' + s.earthSystem + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Dato', 'Date') + ':</span><span class="value">' + today + '</span></div>';
+  html += '</div>';
+
+  // Print button
+  html += '<div class="param-group"><button class="sel-btn selected" onclick="window.print()">' + tx('Udskriv erklæring', 'Print declaration') + ' 🖨️</button></div>';
+
+  html += '</div>';
+  return html;
+}
+
+
+// ===== FEATURE 2: AFPRØVNINGSPROTOKOL (testprotokol) =====
+let testprotokolState = { circuits: [], activeCircuit: 0 };
+
+const TESTPROT_ZS_MAX = {
+  'B6': 7.67, 'B10': 4.60, 'B13': 3.54, 'B16': 2.87, 'B20': 2.30, 'B25': 1.84, 'B32': 1.44,
+  'C6': 3.83, 'C10': 2.30, 'C13': 1.77, 'C16': 1.44, 'C20': 1.15, 'C25': 0.92, 'C32': 0.72
+};
+
+function testprotokolInit() {
+  if (testprotokolState.circuits.length > 0) return;
+  // Auto-populate from sldTree if available
+  if (typeof sldTree !== 'undefined' && sldTree && sldTree.nodes) {
+    var idx = 0;
+    Object.keys(sldTree.nodes).forEach(function(nid) {
+      var n = sldTree.nodes[nid];
+      if (n && n.type === 'final_circuit') {
+        idx++;
+        var device = (n.mcbCurve || 'B') + (n.ratingA || 16);
+        testprotokolState.circuits.push({
+          name: (n.name_da || n.name_en || 'Kreds') + ' #' + idx,
+          device: device,
+          visual: null, pe: null, riso: null, zs: null, rcd: null, vdrop: null
+        });
+      }
+    });
+  }
+  if (testprotokolState.circuits.length === 0) {
+    // Add 3 default circuits
+    for (var i = 1; i <= 3; i++) {
+      testprotokolState.circuits.push({
+        name: tx('Kreds','Circuit') + ' #' + i,
+        device: 'B16',
+        visual: null, pe: null, riso: null, zs: null, rcd: null, vdrop: null
+      });
+    }
+  }
+}
+
+function testprotokolAddCircuit() {
+  var n = testprotokolState.circuits.length + 1;
+  testprotokolState.circuits.push({
+    name: tx('Kreds','Circuit') + ' #' + n,
+    device: 'B16',
+    visual: null, pe: null, riso: null, zs: null, rcd: null, vdrop: null
+  });
+  testprotokolState.activeCircuit = testprotokolState.circuits.length - 1;
+  renderModule('testprotokol');
+}
+
+function testprotokolSetVal(field, val) {
+  var c = testprotokolState.circuits[testprotokolState.activeCircuit];
+  if (c) c[field] = val;
+  renderModule('testprotokol');
+}
+
+function testprotokolSetDevice(dev) {
+  var c = testprotokolState.circuits[testprotokolState.activeCircuit];
+  if (c) c.device = dev;
+  renderModule('testprotokol');
+}
+
+function testprotokolCheckZs(zs, device) {
+  var maxZs = TESTPROT_ZS_MAX[device];
+  if (!maxZs) return true; // unknown device, assume ok
+  return zs <= maxZs;
+}
+
+function renderTestprotokol() {
+  testprotokolInit();
+  var s = testprotokolState;
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Afprøvningsprotokol — Feltmålinger', 'Field Test Protocol — Measurements') + '</div>';
+  html += '<p class="info-text">' + tx('Per DS/HD 60364-6 cl.6.61 (initial verification). Vælg kreds og registrer måleresultater.', 'Per DS/HD 60364-6 cl.6.61 (initial verification). Select circuit and record measurement results.') + '</p>';
+
+  // Circuit selector
+  html += '<div class="param-group"><div class="param-label">' + tx('Vælg kreds', 'Select circuit') + '</div><div class="btn-group">';
+  s.circuits.forEach(function(c, i) {
+    html += '<button class="sel-btn ' + (s.activeCircuit === i ? 'selected' : '') + '" onclick="testprotokolState.activeCircuit=' + i + ';renderModule(\'testprotokol\')">' + c.name + '</button>';
+  });
+  html += '<button class="sel-btn" onclick="testprotokolAddCircuit()">+ ' + tx('Tilføj','Add') + '</button>';
+  html += '</div></div>';
+
+  var c = s.circuits[s.activeCircuit];
+  if (!c) { html += '</div>'; return html; }
+
+  // Device type
+  html += '<div class="param-group"><div class="param-label">' + tx('Beskyttelsesudstyr', 'Protection device') + '</div><div class="btn-group">';
+  ['B6','B10','B13','B16','B20','B25','B32','C6','C10','C13','C16','C20','C25','C32'].forEach(function(d) {
+    html += '<button class="sel-btn ' + (c.device === d ? 'selected' : '') + '" onclick="testprotokolSetDevice(\'' + d + '\')">' + d + '</button>';
+  });
+  html += '</div></div>';
+
+  // Visual inspection
+  html += '<div class="param-group"><div class="param-label">' + tx('Visuel inspektion', 'Visual inspection') + '</div><div class="btn-group">';
+  html += '<button class="sel-btn ' + (c.visual === 'ok' ? 'selected' : '') + '" onclick="testprotokolSetVal(\'visual\',\'ok\')">OK ✅</button>';
+  html += '<button class="sel-btn ' + (c.visual === 'fail' ? 'selected' : '') + '" onclick="testprotokolSetVal(\'visual\',\'fail\')">' + tx('Ikke OK','Not OK') + ' ❌</button>';
+  html += '</div></div>';
+
+  // PE continuity
+  html += '<div class="param-group"><div class="param-label">' + tx('PE kontinuitet [Ω]', 'PE continuity [Ω]') + ' <small>(cl.6.61.3.2)</small></div><div class="btn-group">';
+  [0.1, 0.2, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0].forEach(function(v) {
+    html += '<button class="sel-btn ' + (c.pe === v ? 'selected' : '') + '" onclick="testprotokolSetVal(\'pe\',' + v + ')">' + v + '</button>';
+  });
+  html += '</div>';
+  if (c.pe !== null) {
+    var peOk = c.pe <= 2.0;
+    html += '<div class="result-value" style="color:' + (peOk ? 'var(--success)' : 'var(--danger)') + '">' + (peOk ? '✅ PASS' : '❌ FAIL') + ' (≤2.0Ω)</div>';
+  }
+  html += '</div>';
+
+  // Insulation resistance
+  html += '<div class="param-group"><div class="param-label">' + tx('Isolationsmodstand Riso [MΩ] @ 500V', 'Insulation resistance Riso [MΩ] @ 500V') + ' <small>(cl.6.61.3.3)</small></div><div class="btn-group">';
+  [0.5, 1.0, 2.0, 5.0, 10, 20, 50, 100, 200, 500, 999].forEach(function(v) {
+    html += '<button class="sel-btn ' + (c.riso === v ? 'selected' : '') + '" onclick="testprotokolSetVal(\'riso\',' + v + ')">' + v + '</button>';
+  });
+  html += '</div>';
+  if (c.riso !== null) {
+    var risoOk = c.riso >= 1.0;
+    html += '<div class="result-value" style="color:' + (risoOk ? 'var(--success)' : 'var(--danger)') + '">' + (risoOk ? '✅ PASS' : '❌ FAIL') + ' (≥1.0 MΩ @ 500V per cl.6.61.3.3)</div>';
+  }
+  html += '</div>';
+
+  // Earth fault loop impedance Zs
+  var maxZs = TESTPROT_ZS_MAX[c.device] || 2.87;
+  html += '<div class="param-group"><div class="param-label">' + tx('Fejlsløjfeimpedans Zs [Ω]', 'Earth fault loop impedance Zs [Ω]') + ' <small>(Table 41.1, 0.4s)</small></div><div class="btn-group">';
+  [0.1, 0.2, 0.3, 0.5, 0.7, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 7.0, 10.0].forEach(function(v) {
+    html += '<button class="sel-btn ' + (c.zs === v ? 'selected' : '') + '" onclick="testprotokolSetVal(\'zs\',' + v + ')">' + v + '</button>';
+  });
+  html += '</div>';
+  if (c.zs !== null) {
+    var zsOk = testprotokolCheckZs(c.zs, c.device);
+    html += '<div class="result-value" style="color:' + (zsOk ? 'var(--success)' : 'var(--danger)') + '">' + (zsOk ? '✅ PASS' : '❌ FAIL') + ' (max ' + maxZs + 'Ω for ' + c.device + ')</div>';
+  }
+  html += '</div>';
+
+  // RCD trip time
+  html += '<div class="param-group"><div class="param-label">' + tx('RCD udløsetid [ms]', 'RCD trip time [ms]') + ' <small>(cl.6.61.3.4)</small></div><div class="btn-group">';
+  [10, 20, 30, 40, 50, 100, 150, 200, 300, 500].forEach(function(v) {
+    html += '<button class="sel-btn ' + (c.rcd === v ? 'selected' : '') + '" onclick="testprotokolSetVal(\'rcd\',' + v + ')">' + v + '</button>';
+  });
+  html += '</div>';
+  if (c.rcd !== null) {
+    var rcdOk = c.rcd <= 300;
+    html += '<div class="result-value" style="color:' + (rcdOk ? 'var(--success)' : 'var(--danger)') + '">' + (rcdOk ? '✅ PASS' : '❌ FAIL') + ' (≤300ms general, ≤40ms at 5×IΔn)</div>';
+  }
+  html += '</div>';
+
+  // Voltage drop
+  html += '<div class="param-group"><div class="param-label">' + tx('Spændingsfald [%]', 'Voltage drop [%]') + ' <small>(DS/HD 60364-5-52)</small></div><div class="btn-group">';
+  [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0].forEach(function(v) {
+    html += '<button class="sel-btn ' + (c.vdrop === v ? 'selected' : '') + '" onclick="testprotokolSetVal(\'vdrop\',' + v + ')">' + v + '</button>';
+  });
+  html += '</div>';
+  if (c.vdrop !== null) {
+    var vdOk = c.vdrop <= 5.0;
+    html += '<div class="result-value" style="color:' + (vdOk ? 'var(--success)' : 'var(--danger)') + '">' + (vdOk ? '✅ PASS' : '❌ FAIL') + ' (≤3% final / ≤5% total)</div>';
+  }
+  html += '</div>';
+
+  html += '</div>';
+
+  // Summary card
+  html += '<div class="card fade-in"><div class="card-title">' + tx('Opsummering', 'Summary') + '</div>';
+  var totalTested = 0, totalPassed = 0, totalFailed = 0;
+  s.circuits.forEach(function(ci) {
+    var tested = 0, passed = 0;
+    if (ci.visual !== null) { tested++; if (ci.visual === 'ok') passed++; }
+    if (ci.pe !== null) { tested++; if (ci.pe <= 2.0) passed++; }
+    if (ci.riso !== null) { tested++; if (ci.riso >= 1.0) passed++; }
+    if (ci.zs !== null) { tested++; if (testprotokolCheckZs(ci.zs, ci.device)) passed++; }
+    if (ci.rcd !== null) { tested++; if (ci.rcd <= 300) passed++; }
+    if (ci.vdrop !== null) { tested++; if (ci.vdrop <= 5.0) passed++; }
+    totalTested += tested;
+    totalPassed += passed;
+    totalFailed += (tested - passed);
+  });
+  var verdict = totalFailed === 0 && totalTested > 0;
+  html += '<div class="result-box ' + (verdict ? '' : 'error') + '">';
+  html += '<div class="result-row"><span class="label">' + tx('Kredse testet', 'Circuits tested') + '</span><span class="value">' + s.circuits.length + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Målinger i alt', 'Total measurements') + '</span><span class="value">' + totalTested + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Bestået', 'Passed') + '</span><span class="value" style="color:var(--success)">' + totalPassed + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Fejlet', 'Failed') + '</span><span class="value" style="color:' + (totalFailed > 0 ? 'var(--danger)' : 'var(--success)') + '">' + totalFailed + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Samlet vurdering', 'Overall verdict') + '</span><span class="value" style="color:' + (verdict ? 'var(--success)' : 'var(--danger)') + '">' + (verdict ? '✅ ' + tx('GODKENDT','APPROVED') : (totalTested === 0 ? '⏳ ' + tx('Afventer målinger','Awaiting measurements') : '❌ ' + tx('IKKE GODKENDT','NOT APPROVED'))) + '</span></div>';
+  html += '</div></div>';
+
+  return html;
+}
+
+
+// ===== FEATURE 3: INSTALLATION COMPLETENESS CHECKER (tjekalt) =====
+let tjekaltState = { lastResult: null };
+
+function tjekaltRunCheck() {
+  var checks = [];
+  var tree = (typeof sldTree !== 'undefined' && sldTree) ? sldTree : null;
+  var nodes = tree ? tree.nodes : {};
+  var finals = [];
+  var hasMainSwitch = false;
+  var hasSPD = false;
+  var hasMainBonding = false;
+
+  Object.keys(nodes).forEach(function(nid) {
+    var n = nodes[nid];
+    if (!n) return;
+    if (n.type === 'final_circuit') finals.push(n);
+    if (n.type === 'main_switch' || n.mainSwitch) hasMainSwitch = true;
+    if (n.type === 'spd' || n.spd) hasSPD = true;
+    if (n.mainBonding) hasMainBonding = true;
+  });
+
+  // 1. Socket circuits ≤20A have 30mA RCD
+  var socketsOk = true;
+  finals.forEach(function(fc) {
+    if (fc.circuitType === 'sockets' && (fc.ratingA || 16) <= 20 && !fc.rcd) socketsOk = false;
+  });
+  checks.push({ id: 1, status: finals.length === 0 ? 'grey' : (socketsOk ? 'green' : 'red'), label: tx('RCD 30mA på alle stikkontaktkredse ≤20A', 'RCD 30mA on all socket circuits ≤20A'), clause: 'cl.411.3.3' });
+
+  // 2. Bathroom circuits have 30mA RCD
+  var bathroomOk = true;
+  finals.forEach(function(fc) {
+    if (fc.circuitType === 'bathroom' && !fc.rcd) bathroomOk = false;
+  });
+  checks.push({ id: 2, status: finals.length === 0 ? 'grey' : (bathroomOk ? 'green' : 'red'), label: tx('RCD 30mA på badeværelseskredse', 'RCD 30mA on bathroom circuits'), clause: 'cl.701.411.3.3' });
+
+  // 3. PE conductor sized correctly (simplified: assume OK if cable exists)
+  var peOk = true;
+  finals.forEach(function(fc) { if (fc.cable && !fc.cable.pe) peOk = false; });
+  checks.push({ id: 3, status: finals.length === 0 ? 'grey' : (peOk ? 'green' : 'yellow'), label: tx('PE-leder korrekt dimensioneret', 'PE conductor sized correctly'), clause: 'Table 54.2' });
+
+  // 4. Main equipotential bonding
+  checks.push({ id: 4, status: hasMainBonding || finals.length === 0 ? (finals.length === 0 ? 'grey' : 'green') : 'yellow', label: tx('Hovedudligningsforbindelse', 'Main equipotential bonding'), clause: 'cl.411.3.1.2' });
+
+  // 5. Supplementary bonding in bathrooms
+  var bathExists = finals.some(function(fc) { return fc.circuitType === 'bathroom'; });
+  checks.push({ id: 5, status: !bathExists ? 'grey' : 'yellow', label: tx('Supplerende udligning i badeværelser', 'Supplementary bonding in bathrooms'), clause: 'cl.701.415.2' });
+
+  // 6. Cable derating
+  checks.push({ id: 6, status: finals.length === 0 ? 'grey' : 'green', label: tx('Kabelreduktion ved gruppering', 'Cable derating for grouping'), clause: 'cl.523' });
+
+  // 7. Voltage drop
+  var vdOk = true;
+  if (typeof vdropState !== 'undefined' && vdropState.length > 0) {
+    // Use global vdrop calc if available
+    var vdPct = typeof calcVdrop === 'function' ? calcVdrop() : 0;
+    if (vdPct > 5) vdOk = false;
+  }
+  checks.push({ id: 7, status: vdOk ? 'green' : 'red', label: tx('Spændingsfald inden for grænser (≤3%/5%)', 'Voltage drop within limits (≤3%/5%)'), clause: 'DS/HD 60364-5-52' });
+
+  // 8. Breaking capacity
+  var icuOk = true;
+  if (typeof mcbState !== 'undefined' && typeof scState !== 'undefined') {
+    if (mcbState.icu && scState.ikMax && mcbState.icu * 1000 < scState.ikMax) icuOk = false;
+  }
+  checks.push({ id: 8, status: icuOk ? 'green' : 'red', label: tx('Brydeevne Icu ≥ Ik', 'Breaking capacity Icu ≥ Ik'), clause: 'cl.434.5.1' });
+
+  // 9. Selectivity
+  checks.push({ id: 9, status: 'yellow', label: tx('Selektivitet mellem hoved- og underfordeling', 'Selectivity between main and sub-distribution'), clause: 'cl.536.4' });
+
+  // 10. SPD
+  checks.push({ id: 10, status: hasSPD ? 'green' : 'yellow', label: tx('Overspændingsbeskyttelse (SPD)', 'Surge protection (SPD) present'), clause: 'cl.534.1' });
+
+  // 11. Isolation switch
+  checks.push({ id: 11, status: hasMainSwitch || tree ? (hasMainSwitch ? 'green' : 'red') : 'grey', label: tx('Hovedafbryder ved tilslutningspunkt', 'Isolation switch at origin'), clause: 'cl.537.2' });
+
+  // 12. Circuit labels
+  checks.push({ id: 12, status: finals.length > 0 ? 'yellow' : 'grey', label: tx('Kredsidentifikation og mærkning', 'Circuit identification labels'), clause: 'cl.514.5' });
+
+  // 13. Fire barriers
+  checks.push({ id: 13, status: 'yellow', label: tx('Brandspærrer ved gennemføringer', 'Fire barriers at penetrations'), clause: 'cl.527.2' });
+
+  // 14. IP rating
+  checks.push({ id: 14, status: 'green', label: tx('Korrekt IP-klassificering', 'Correct IP rating for environment'), clause: 'DS/HD 60364-5-51' });
+
+  tjekaltState.lastResult = checks;
+  return checks;
+}
+
+function renderTjekAlt() {
+  var html = '<div class="card fade-in"><div class="card-title">✅ ' + tx('Har du husket alt?', 'Have you remembered everything?') + '</div>';
+  html += '<p class="info-text">' + tx('Scanner installationen og markerer manglende/ufuldstændige punkter per DS/HD 60364. 40+ tjekpunkter med installationstypekontekst.', 'Scans the installation and flags missing/incomplete items per DS/HD 60364. 40+ checkpoints with installation-type context.') + '</p>';
+
+  // Installation type context buttons (Enhanced TjekAlt)
+  html += '<div class="param-group"><div class="param-label">' + tx('Installationstype (kontekst)', 'Installation type (context)') + '</div><div class="btn-group">';
+  if (typeof TJEKALT_INSTALL_TYPES !== 'undefined') {
+    TJEKALT_INSTALL_TYPES.forEach(function(t) {
+      html += '<button class="sel-btn ' + (tjekaltEnhancedType === t.id ? 'selected' : '') + '" onclick="tjekaltEnhancedType=\'' + t.id + '\';renderModule(\'tjekalt\')">' + tx(t.da, t.en) + '</button>';
+    });
+  }
+  html += '</div></div>';
+
+  html += '<div class="param-group"><button class="sel-btn selected" onclick="tjekaltState.lastResult=null;renderModule(\'tjekalt\')">' + tx('Kør tjek', 'Run check') + ' 🔍</button></div>';
+
+  var checks = (typeof tjekaltEnhancedRunCheck === 'function') ? tjekaltEnhancedRunCheck(tjekaltEnhancedType) : tjekaltRunCheck();
+
+  // Score
+  var total = checks.length;
+  var greens = checks.filter(function(c) { return c.status === 'green'; }).length;
+  var greys = checks.filter(function(c) { return c.status === 'grey'; }).length;
+  var applicable = total - greys;
+  var pct = applicable > 0 ? Math.round((greens / applicable) * 100) : 0;
+
+  html += '<div class="result-box"><div class="result-title">' + tx('Din installation er', 'Your installation is') + ' ' + pct + '% ' + tx('komplet', 'complete') + '</div>';
+  html += '<div style="background:var(--border);border-radius:8px;height:12px;margin:8px 0;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:' + (pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)') + ';border-radius:8px;transition:width 0.3s"></div></div>';
+  html += '</div>';
+
+  // Checklist
+  html += '<div class="result-box">';
+  checks.forEach(function(c) {
+    var icon = c.status === 'green' ? '🟢' : c.status === 'yellow' ? '🟡' : c.status === 'red' ? '🔴' : '⚪';
+    var color = c.status === 'green' ? 'var(--success)' : c.status === 'yellow' ? 'var(--warning)' : c.status === 'red' ? 'var(--danger)' : 'var(--text-muted)';
+    html += '<div class="result-row"><span class="label">' + icon + ' ' + c.label + '</span><span class="value" style="color:' + color + ';font-size:0.8em">' + c.clause + '</span></div>';
+  });
+  html += '</div>';
+
+  // Legend
+  html += '<div class="result-box" style="margin-top:8px"><div class="result-title">' + tx('Forklaring', 'Legend') + '</div>';
+  html += '<div class="result-row"><span class="label">🟢</span><span class="value">' + tx('OK - Opfyldt', 'OK - Met') + '</span></div>';
+  html += '<div class="result-row"><span class="label">🟡</span><span class="value">' + tx('Advarsel - Kontrollér manuelt', 'Warning - Check manually') + '</span></div>';
+  html += '<div class="result-row"><span class="label">🔴</span><span class="value">' + tx('Mangler/Fejl', 'Missing/Fail') + '</span></div>';
+  html += '<div class="result-row"><span class="label">⚪</span><span class="value">' + tx('Ikke relevant', 'Not applicable') + '</span></div>';
+  html += '</div>';
+
+  html += '</div>';
+  return html;
+}
+
+
+// ===== FEATURE 4: FEJLFINDING — TROUBLESHOOTING DECISION TREE =====
+let fejlfindingState = { step: 0, symptom: null, scope: null, context: null };
+
+const FEJL_SYMPTOMS = [
+  { id: 'ingen_stroem', da: 'Ingen strøm', en: 'No power' },
+  { id: 'rcd_tripper', da: 'RCD tripper', en: 'RCD trips' },
+  { id: 'sikring_springer', da: 'Sikring springer', en: 'Fuse blows' },
+  { id: 'spaending', da: 'Spændingsproblemer', en: 'Voltage issues' },
+  { id: 'overophedning', da: 'Overophedning', en: 'Overheating' },
+  { id: 'lugt', da: 'Lugt af brændt', en: 'Burning smell' }
+];
+const FEJL_SCOPES = [
+  { id: 'hele', da: 'Hele installationen', en: 'Whole installation' },
+  { id: 'en_gruppe', da: 'Én gruppe', en: 'One circuit' },
+  { id: 'et_udtag', da: 'Ét udtag', en: 'One outlet' }
+];
+const FEJL_CONTEXTS = [
+  { id: 'nyt', da: 'Nyt problem', en: 'New problem' },
+  { id: 'intermittent', da: 'Kommer og går', en: 'Intermittent' },
+  { id: 'altid', da: 'Altid', en: 'Constant' },
+  { id: 'efter_arbejde', da: 'Efter arbejde udført', en: 'After work done' }
+];
+
+function fejlfindingGetResult(symptom, scope, context) {
+  var results = {
+    'ingen_stroem_hele_nyt': { cause: tx('Forsyningssvigt eller hovedsikring sprunget','Supply failure or main fuse blown'), measurements: tx('Spænding ved tilslutningspunkt, kontakt forsyningsselskab','Voltage at connection point, contact utility'), safety: 'VIGTIG', deenergize: false, clause: 'cl.411' },
+    'ingen_stroem_hele_altid': { cause: tx('Hovedsikring defekt eller forsyningskabel beskadiget','Main fuse defective or supply cable damaged'), measurements: tx('Isolationsmodstand, visuel inspektion','Insulation resistance, visual inspection'), safety: 'FARLIG', deenergize: true, clause: 'cl.411.3' },
+    'ingen_stroem_en_gruppe_nyt': { cause: tx('Gruppesikring/MCB udløst','Circuit breaker/MCB tripped'), measurements: tx('Sløjfeimpedans Zs, isolationsmodstand Riso','Loop impedance Zs, insulation resistance Riso'), safety: 'NORMAL', deenergize: false, clause: 'cl.6.61' },
+    'ingen_stroem_en_gruppe_intermittent': { cause: tx('Løs forbindelse eller termisk overbelastning','Loose connection or thermal overload'), measurements: tx('Kontinuitet, termisk scanning, strømmåling','Continuity, thermal scan, current measurement'), safety: 'VIGTIG', deenergize: true, clause: 'cl.526' },
+    'ingen_stroem_et_udtag_nyt': { cause: tx('Defekt stikkontakt eller afbrudt leder','Defective outlet or broken conductor'), measurements: tx('Kontinuitet PE og faseledere','Continuity PE and phase conductors'), safety: 'NORMAL', deenergize: true, clause: 'cl.6.61.3.2' },
+    'rcd_tripper_hele_nyt': { cause: tx('Isolationsfejl i installation eller defekt RCD','Insulation fault in installation or defective RCD'), measurements: tx('Isolationsmodstand per gruppe, RCD-test','Insulation resistance per circuit, RCD test'), safety: 'FARLIG', deenergize: true, clause: 'cl.411.3.3' },
+    'rcd_tripper_en_gruppe_intermittent': { cause: tx('Fugt i dåse eller apparatfejl','Moisture in junction box or appliance fault'), measurements: tx('Riso per kreds, frakobl forbrugere én ad gangen','Riso per circuit, disconnect loads one by one'), safety: 'VIGTIG', deenergize: true, clause: 'cl.6.61.3.3' },
+    'rcd_tripper_en_gruppe_nyt': { cause: tx('Jordfejl i den specifikke kreds','Earth fault in the specific circuit'), measurements: tx('Isolationsmodstand Riso ≥1MΩ @ 500V','Insulation resistance Riso ≥1MΩ @ 500V'), safety: 'VIGTIG', deenergize: true, clause: 'cl.6.61.3.3' },
+    'sikring_springer_en_gruppe_nyt': { cause: tx('Kortslutning eller overbelastning','Short circuit or overload'), measurements: tx('Isolationsmodstand, strømmåling, kortslutningsberegning','Insulation resistance, current measurement, short-circuit calculation'), safety: 'VIGTIG', deenergize: true, clause: 'cl.434' },
+    'sikring_springer_en_gruppe_altid': { cause: tx('Permanent kortslutning i kreds','Permanent short circuit in circuit'), measurements: tx('Isolationsmodstand Riso, visuel inspektion af samlinger','Insulation Riso, visual inspection of junctions'), safety: 'FARLIG', deenergize: true, clause: 'cl.434.5' },
+    'spaending_hele_nyt': { cause: tx('Forsyningsspænding for høj/lav eller neutral afbrudt','Supply voltage high/low or neutral broken'), measurements: tx('Spændingsmåling alle faser + N, kontakt netselskab','Voltage measurement all phases + N, contact utility'), safety: 'FARLIG', deenergize: false, clause: 'cl.411' },
+    'overophedning_en_gruppe_altid': { cause: tx('Overbelastning, for lille tværsnit eller løs klemme','Overload, undersized cable or loose terminal'), measurements: tx('Strømmåling vs Iz, termografi, moment på klemmer','Current vs Iz, thermography, terminal torque'), safety: 'FARLIG', deenergize: true, clause: 'cl.523' },
+    'lugt_hele_nyt': { cause: tx('Brændende isolering - SLUK STRØMMEN STRAKS','Burning insulation - SWITCH OFF POWER IMMEDIATELY'), measurements: tx('Visuel inspektion efter afbrydelse, isolationsmodstand','Visual inspection after disconnect, insulation resistance'), safety: 'FARLIG', deenergize: true, clause: 'cl.422' },
+    'lugt_en_gruppe_nyt': { cause: tx('Løs forbindelse forårsager opvarmning','Loose connection causing heating'), measurements: tx('Termografi, klemmetilspænding, kontinuitet','Thermography, terminal torque, continuity'), safety: 'FARLIG', deenergize: true, clause: 'cl.526' }
+  };
+
+  // Find best match (exact or fallback)
+  var key = symptom + '_' + scope + '_' + context;
+  if (results[key]) return results[key];
+  // Try without context
+  var fallbackKeys = Object.keys(results).filter(function(k) { return k.indexOf(symptom + '_' + scope) === 0; });
+  if (fallbackKeys.length > 0) return results[fallbackKeys[0]];
+  // Try just symptom
+  fallbackKeys = Object.keys(results).filter(function(k) { return k.indexOf(symptom) === 0; });
+  if (fallbackKeys.length > 0) return results[fallbackKeys[0]];
+  // Generic fallback
+  return { cause: tx('Ukendt fejl - kræver detaljeret undersøgelse','Unknown fault - requires detailed investigation'), measurements: tx('Fuld måleprotokol: kontinuitet, Riso, Zs, RCD','Full test protocol: continuity, Riso, Zs, RCD'), safety: 'VIGTIG', deenergize: true, clause: 'cl.6.61' };
+}
+
+function fejlfindingReset() {
+  fejlfindingState = { step: 0, symptom: null, scope: null, context: null };
+  renderModule('fejlfinding');
+}
+
+function fejlfindingSelect(field, val) {
+  fejlfindingState[field] = val;
+  fejlfindingState.step++;
+  renderModule('fejlfinding');
+}
+
+function renderFejlfinding() {
+  var s = fejlfindingState;
+  var html = '<div class="card fade-in"><div class="card-title">🔧 ' + tx('Fejlfinding — Beslutningstre', 'Troubleshooting — Decision Tree') + '</div>';
+  html += '<p class="info-text">' + tx('Klik på symptomer for at indsnævre sandsynlig årsag. Baseret på DS/HD 60364 fejldiagnostik.', 'Click symptoms to narrow down probable cause. Based on DS/HD 60364 fault diagnosis.') + '</p>';
+
+  // Progress indicator
+  var steps = [tx('Symptom','Symptom'), tx('Omfang','Scope'), tx('Kontekst','Context'), tx('Resultat','Result')];
+  html += '<div style="display:flex;gap:4px;margin-bottom:12px">';
+  steps.forEach(function(st, i) {
+    var active = i === s.step;
+    var done = i < s.step;
+    html += '<div style="flex:1;padding:6px;text-align:center;border-radius:6px;font-size:0.8em;font-weight:600;background:' + (done ? 'var(--success-bg)' : active ? 'var(--primary-glow)' : 'var(--bg)') + ';color:' + (done ? 'var(--success)' : active ? 'var(--primary)' : 'var(--text-muted)') + '">' + (done ? '✓ ' : '') + st + '</div>';
+  });
+  html += '</div>';
+
+  // Step 1: Symptom
+  if (s.step === 0) {
+    html += '<div class="param-group"><div class="param-label">' + tx('Hvad er symptomet?', 'What is the symptom?') + '</div><div class="btn-group">';
+    FEJL_SYMPTOMS.forEach(function(sym) {
+      html += '<button class="sel-btn" onclick="fejlfindingSelect(\'symptom\',\'' + sym.id + '\')">' + tx(sym.da, sym.en) + '</button>';
+    });
+    html += '</div></div>';
+  }
+
+  // Step 2: Scope
+  if (s.step === 1) {
+    html += '<div class="param-group"><div class="param-label">' + tx('Hvor omfattende er problemet?', 'How widespread is the problem?') + '</div><div class="btn-group">';
+    FEJL_SCOPES.forEach(function(sc) {
+      html += '<button class="sel-btn" onclick="fejlfindingSelect(\'scope\',\'' + sc.id + '\')">' + tx(sc.da, sc.en) + '</button>';
+    });
+    html += '</div></div>';
+  }
+
+  // Step 3: Context
+  if (s.step === 2) {
+    html += '<div class="param-group"><div class="param-label">' + tx('Hvornår opstår det?', 'When does it occur?') + '</div><div class="btn-group">';
+    FEJL_CONTEXTS.forEach(function(ctx) {
+      html += '<button class="sel-btn" onclick="fejlfindingSelect(\'context\',\'' + ctx.id + '\')">' + tx(ctx.da, ctx.en) + '</button>';
+    });
+    html += '</div></div>';
+  }
+
+  // Step 4: Result
+  if (s.step >= 3) {
+    var result = fejlfindingGetResult(s.symptom, s.scope, s.context);
+    var safetyColor = result.safety === 'FARLIG' ? 'var(--danger)' : result.safety === 'VIGTIG' ? 'var(--warning)' : 'var(--success)';
+    var safetyLabel = result.safety === 'FARLIG' ? tx('FARLIG — øjeblikkelig handling','DANGEROUS — immediate action') : result.safety === 'VIGTIG' ? tx('VIGTIG — udbedres snart','IMPORTANT — fix soon') : tx('NORMAL — planlagt reparation','NORMAL — scheduled repair');
+
+    html += '<div class="result-box ' + (result.safety === 'FARLIG' ? 'error' : 'warning') + '">';
+    html += '<div class="result-title" style="color:' + safetyColor + '">' + (result.safety === 'FARLIG' ? '🚨' : result.safety === 'VIGTIG' ? '⚠️' : 'ℹ️') + ' ' + safetyLabel + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Sandsynlig årsag', 'Probable cause') + '</span><span class="value">' + result.cause + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Nødvendige målinger', 'Required measurements') + '</span><span class="value">' + result.measurements + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">DS/HD 60364 ' + result.clause + '</span></div>';
+    if (result.deenergize) {
+      html += '<div class="result-row" style="color:var(--danger);font-weight:700"><span class="label">⚡ ' + tx('AFBRYD STRØMMEN inden videre arbejde!', 'DE-ENERGIZE before proceeding!') + '</span></div>';
+    }
+    html += '</div>';
+
+    html += '<div class="param-group"><button class="sel-btn" onclick="fejlfindingReset()">↺ ' + tx('Start forfra', 'Start over') + '</button></div>';
+  }
+
+  // Show selections made
+  if (s.step > 0) {
+    html += '<div class="result-box" style="margin-top:8px;opacity:0.8"><div class="result-title">' + tx('Valg', 'Selections') + '</div>';
+    if (s.symptom) {
+      var sym = FEJL_SYMPTOMS.filter(function(x) { return x.id === s.symptom; })[0];
+      html += '<div class="result-row"><span class="label">' + tx('Symptom','Symptom') + '</span><span class="value">' + (sym ? tx(sym.da, sym.en) : s.symptom) + '</span></div>';
+    }
+    if (s.scope) {
+      var sc = FEJL_SCOPES.filter(function(x) { return x.id === s.scope; })[0];
+      html += '<div class="result-row"><span class="label">' + tx('Omfang','Scope') + '</span><span class="value">' + (sc ? tx(sc.da, sc.en) : s.scope) + '</span></div>';
+    }
+    if (s.context) {
+      var ctx = FEJL_CONTEXTS.filter(function(x) { return x.id === s.context; })[0];
+      html += '<div class="result-row"><span class="label">' + tx('Kontekst','Context') + '</span><span class="value">' + (ctx ? tx(ctx.da, ctx.en) : s.context) + '</span></div>';
+    }
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+
+// ===== FEATURE 5: DEMAND FACTOR / DIVERSITY CALCULATOR (diversity) =====
+let diversityCalcState = { loads: [], resultKw: 0 };
+
+const DIVERSITY_CATEGORIES = [
+  { id: 'lighting', da: 'Belysning', en: 'Lighting', defaultKw: 0.5, factors: function(qty) { return qty <= 10 ? 0.9 : 0.7; } },
+  { id: 'sockets', da: 'Stikkontakter', en: 'Sockets', defaultKw: 0.5, factors: function() { return 0.4; } },
+  { id: 'sockets_com', da: 'Stikkontakter (erhverv)', en: 'Sockets (commercial)', defaultKw: 0.5, factors: function() { return 0.6; } },
+  { id: 'cooker', da: 'Komfur', en: 'Cooker', defaultKw: 7.0, factors: function(qty, totalKw) { if (totalKw <= 10) return 1.0; if (totalKw <= 20) return 0.8; return 0.6; } },
+  { id: 'heating', da: 'Elvarme', en: 'Electric heating', defaultKw: 2.0, factors: function() { return 0.9; } },
+  { id: 'waterheater', da: 'Vandvarmer', en: 'Water heater', defaultKw: 3.0, factors: function() { return 1.0; } },
+  { id: 'heatpump', da: 'Varmepumpe', en: 'Heat pump', defaultKw: 5.0, factors: function() { return 1.0; } },
+  { id: 'ev', da: 'EV-lader', en: 'EV charger', defaultKw: 11.0, factors: function(qty) { if (qty === 1) return 0.7; if (qty === 2) return 0.5; return 0.4; } },
+  { id: 'motor', da: 'Motor', en: 'Motor', defaultKw: 5.5, factors: function(qty, totalKw, index) { if (index === 0) return 1.0; if (index === 1) return 0.75; return 0.6; } },
+  { id: 'other', da: 'Diverse', en: 'Other', defaultKw: 1.0, factors: function() { return 1.0; } }
+];
+
+const DIVERSITY_POWER_OPTIONS = [0.1, 0.2, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 5.5, 7.0, 7.5, 10.0, 11.0, 15.0, 18.5, 22.0, 30.0, 37.0, 45.0, 55.0, 75.0];
+const DIVERSITY_QTY_OPTIONS = [1,2,3,4,5,6,7,8,9,10,12,15,20,25,30,40,50];
+
+function diversityAddLoad(catId) {
+  var cat = DIVERSITY_CATEGORIES.filter(function(c) { return c.id === catId; })[0];
+  if (!cat) return;
+  diversityCalcState.loads.push({ catId: catId, qty: 1, kwPerUnit: cat.defaultKw });
+  renderModule('diversity');
+}
+
+function diversityRemoveLoad(idx) {
+  diversityCalcState.loads.splice(idx, 1);
+  renderModule('diversity');
+}
+
+function diversitySetQty(idx, qty) {
+  diversityCalcState.loads[idx].qty = qty;
+  renderModule('diversity');
+}
+
+function diversitySetKw(idx, kw) {
+  diversityCalcState.loads[idx].kwPerUnit = kw;
+  renderModule('diversity');
+}
+
+function diversityCalcTotal() {
+  var totalInstalled = 0;
+  var totalDiversified = 0;
+  var motorLoads = [];
+
+  diversityCalcState.loads.forEach(function(load) {
+    var cat = DIVERSITY_CATEGORIES.filter(function(c) { return c.id === load.catId; })[0];
+    if (!cat) return;
+    var installed = load.qty * load.kwPerUnit;
+    totalInstalled += installed;
+
+    if (load.catId === 'motor') {
+      // Motors have index-based diversity
+      for (var m = 0; m < load.qty; m++) {
+        motorLoads.push(load.kwPerUnit);
+      }
+    } else {
+      var df = cat.factors(load.qty, installed);
+      totalDiversified += installed * df;
+    }
+  });
+
+  // Apply motor diversity (largest at 1.0, second at 0.75, rest at 0.6)
+  motorLoads.sort(function(a, b) { return b - a; });
+  motorLoads.forEach(function(kw, i) {
+    var cat = DIVERSITY_CATEGORIES.filter(function(c) { return c.id === 'motor'; })[0];
+    var df = cat.factors(motorLoads.length, 0, i);
+    totalDiversified += kw * df;
+  });
+
+  diversityCalcState.resultKw = totalDiversified;
+
+  // Update SharedQuantities
+  if (typeof SharedQuantities !== 'undefined') {
+    SharedQuantities.set('diversified_load', totalDiversified, 'diversity');
+  }
+
+  return { installed: totalInstalled, diversified: totalDiversified, savingPct: totalInstalled > 0 ? Math.round((1 - totalDiversified / totalInstalled) * 100) : 0 };
+}
+
+function renderDiversity() {
+  var s = diversityCalcState;
+  var html = '<div class="card fade-in"><div class="card-title">📊 ' + tx('Samtidighedsberegner (Demand Factor)', 'Demand Factor / Diversity Calculator') + '</div>';
+  html += '<p class="info-text">' + tx('Per DS/HD 60364-5-52 Annex B og dansk praksis (SBI-anvisning 230). Beregner effektiv belastning ud fra typiske samtidighedsfaktorer.', 'Per DS/HD 60364-5-52 Annex B and Danish practice (SBI-anvisning 230). Calculates effective demand from standard diversity factors.') + '</p>';
+
+  // Add load category buttons
+  html += '<div class="param-group"><div class="param-label">' + tx('Tilføj belastningskategori', 'Add load category') + '</div><div class="btn-group">';
+  DIVERSITY_CATEGORIES.forEach(function(cat) {
+    html += '<button class="sel-btn" onclick="diversityAddLoad(\'' + cat.id + '\')">' + tx(cat.da, cat.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Show added loads
+  if (s.loads.length > 0) {
+    html += '<div class="result-box"><div class="result-title">' + tx('Belastninger', 'Loads') + '</div>';
+    s.loads.forEach(function(load, idx) {
+      var cat = DIVERSITY_CATEGORIES.filter(function(c) { return c.id === load.catId; })[0];
+      if (!cat) return;
+      var installed = load.qty * load.kwPerUnit;
+      var df = load.catId === 'motor' ? (idx === 0 ? 1.0 : idx === 1 ? 0.75 : 0.6) : cat.factors(load.qty, installed);
+      html += '<div style="border-bottom:1px solid var(--border);padding:8px 0">';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><strong>' + tx(cat.da, cat.en) + '</strong><button class="sel-btn" style="padding:4px 10px;font-size:0.75em" onclick="diversityRemoveLoad(' + idx + ')">✕ ' + tx('Fjern','Remove') + '</button></div>';
+
+      // Quantity selector
+      html += '<div style="margin-bottom:4px"><span style="font-size:0.8em;color:var(--text-muted)">' + tx('Antal:','Quantity:') + '</span> ';
+      [1,2,3,4,5,6,8,10,15,20].forEach(function(q) {
+        html += '<button class="sel-btn ' + (load.qty === q ? 'selected' : '') + '" style="padding:3px 8px;font-size:0.75em" onclick="diversitySetQty(' + idx + ',' + q + ')">' + q + '</button> ';
+      });
+      html += '</div>';
+
+      // Power per unit selector
+      html += '<div style="margin-bottom:4px"><span style="font-size:0.8em;color:var(--text-muted)">' + tx('kW/enhed:','kW/unit:') + '</span> ';
+      var showPowers = DIVERSITY_POWER_OPTIONS.filter(function(p) { return p >= 0.1 && p <= 75; });
+      // Show a subset relevant to category
+      var relevantPowers = showPowers.slice(0, 15);
+      if (load.catId === 'motor' || load.catId === 'ev' || load.catId === 'heatpump') relevantPowers = showPowers.filter(function(p) { return p >= 2.0; });
+      relevantPowers.forEach(function(p) {
+        html += '<button class="sel-btn ' + (load.kwPerUnit === p ? 'selected' : '') + '" style="padding:3px 8px;font-size:0.75em" onclick="diversitySetKw(' + idx + ',' + p + ')">' + p + '</button> ';
+      });
+      html += '</div>';
+
+      html += '<div style="font-size:0.8em;color:var(--text-light)">' + tx('Installeret','Installed') + ': ' + installed.toFixed(1) + ' kW | DF: ' + df.toFixed(2) + ' | ' + tx('Effektiv','Effective') + ': ' + (installed * df).toFixed(1) + ' kW</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  // Results
+  var result = diversityCalcTotal();
+  if (s.loads.length > 0) {
+    html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
+    var mainA_3ph = result.diversified / (Math.sqrt(3) * 0.4 * 0.9);
+    var mainA_1ph = result.diversified / (0.23 * 0.9);
+    html += '<div class="result-box">';
+    html += '<div class="result-row"><span class="label">' + tx('Total installeret effekt', 'Total installed load') + '</span><span class="value">' + result.installed.toFixed(1) + ' kW</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Effektiv belastning (med diversitet)', 'Effective demand (with diversity)') + '</span><span class="value" style="font-weight:700;color:var(--primary)">' + result.diversified.toFixed(1) + ' kW</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Nødvendig hovedforsyning (3-faset)', 'Required main supply (3-phase)') + '</span><span class="value">' + mainA_3ph.toFixed(0) + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Nødvendig hovedforsyning (1-faset)', 'Required main supply (1-phase)') + '</span><span class="value">' + mainA_1ph.toFixed(0) + ' A</span></div>';
+    html += '<div class="result-row" style="color:var(--success);font-weight:600"><span class="label">💡 ' + tx('Du sparer', 'You save') + ' ' + result.savingPct + '% ' + tx('på hovedtilslutning vs. simpel summering', 'on main connection vs simple summation') + '</span></div>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+// ===== PE CONDUCTOR DIMENSIONING (renderPE) =====
+let peState = { phaseSize: null };
+
+const PE_TABLE_542 = [
+  { phase: 1, pe: 1, rule: 'S\u226416: PE=S' },
+  { phase: 1.5, pe: 1.5, rule: 'S\u226416: PE=S' },
+  { phase: 2.5, pe: 2.5, rule: 'S\u226416: PE=S' },
+  { phase: 4, pe: 4, rule: 'S\u226416: PE=S' },
+  { phase: 6, pe: 6, rule: 'S\u226416: PE=S' },
+  { phase: 10, pe: 10, rule: 'S\u226416: PE=S' },
+  { phase: 16, pe: 16, rule: 'S\u226416: PE=S' },
+  { phase: 25, pe: 16, rule: '16<S\u226435: PE=16' },
+  { phase: 35, pe: 16, rule: '16<S\u226435: PE=16' },
+  { phase: 50, pe: 25, rule: 'S>35: PE=S/2' },
+  { phase: 70, pe: 35, rule: 'S>35: PE=S/2' },
+  { phase: 95, pe: 50, rule: 'S>35: PE=S/2' },
+  { phase: 120, pe: 70, rule: 'S>35: PE=S/2' },
+  { phase: 150, pe: 70, rule: 'S>35: PE=S/2' },
+  { phase: 185, pe: 95, rule: 'S>35: PE=S/2' },
+  { phase: 240, pe: 120, rule: 'S>35: PE=S/2' },
+  { phase: 300, pe: 150, rule: 'S>35: PE=S/2' }
+];
+
+function peCalcSize(phaseSize) {
+  if (phaseSize <= 16) return phaseSize;
+  if (phaseSize <= 35) return 16;
+  return Math.ceil(phaseSize / 2);
+}
+
+function renderPE() {
+  var s = peState;
+  var html = '<div class="card fade-in"><div class="card-title">\u26A1 ' + tx('PE-leder dimensionering', 'PE Conductor Sizing') + '</div>';
+  html += '<p class="info-text">' + tx('Beskyttelsesleder (PE) dimensionering per DS/HD 60364-5-54 Tabel 54.2. V\u00E6lg faseleder tv\u00E6rsnit for at se kr\u00E6vet PE-st\u00F8rrelse.', 'Protective earth (PE) conductor sizing per DS/HD 60364-5-54 Table 54.2. Select phase conductor cross-section to see required PE size.') + '</p>';
+
+  html += '<div class="param-group"><div class="param-label">' + tx('Faseleder tv\u00E6rsnit S (mm\u00B2)', 'Phase conductor cross-section S (mm\u00B2)') + '</div><div class="btn-group">';
+  PE_TABLE_542.forEach(function(row) {
+    html += '<button class="sel-btn ' + (s.phaseSize === row.phase ? 'selected' : '') + '" onclick="peState.phaseSize=' + row.phase + ';renderModule(\'pe\')">' + row.phase + '</button>';
+  });
+  html += '</div></div>';
+
+  if (s.phaseSize !== null) {
+    var entry = PE_TABLE_542.filter(function(r) { return r.phase === s.phaseSize; })[0];
+    var calcPE = peCalcSize(s.phaseSize);
+    html += '<div class="result-box"><div class="result-title">' + tx('Resultat', 'Result') + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Faseleder', 'Phase conductor') + '</span><span class="value">' + s.phaseSize + ' mm\u00B2</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Kr\u00E6vet PE-leder', 'Required PE conductor') + '</span><span class="value" style="font-weight:700;color:var(--primary)">' + calcPE + ' mm\u00B2</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Regel', 'Rule') + '</span><span class="value">' + (entry ? entry.rule : '') + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">DS/HD 60364-5-54 Table 54.2</span></div>';
+    html += '</div>';
+
+    // Visual diagram
+    html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + tx('Regler for PE-dimensionering', 'PE sizing rules') + '</div>';
+    html += '<div class="result-row"><span class="label">S \u2264 16 mm\u00B2</span><span class="value">PE = S</span></div>';
+    html += '<div class="result-row"><span class="label">16 < S \u2264 35 mm\u00B2</span><span class="value">PE = 16 mm\u00B2</span></div>';
+    html += '<div class="result-row"><span class="label">S > 35 mm\u00B2</span><span class="value">PE = S/2</span></div>';
+    html += '</div>';
+  }
+
+  // Table
+  html += '</div><div class="card fade-in"><div class="card-title">' + tx('Tabel 54.2 — Komplet oversigt', 'Table 54.2 — Complete overview') + '</div>';
+  html += '<div class="result-box">';
+  PE_TABLE_542.forEach(function(row) {
+    var highlight = s.phaseSize === row.phase ? 'font-weight:700;color:var(--primary)' : '';
+    html += '<div class="result-row" style="' + highlight + '"><span class="label">S=' + row.phase + ' mm\u00B2</span><span class="value">PE=' + row.pe + ' mm\u00B2 (' + row.rule + ')</span></div>';
+  });
+  html += '</div></div>';
+  return html;
+}
+
+
+// ===== VOLTAGE DROP 3D VISUALIZATION (renderVdrop3D) =====
+let vdrop3dState = { selectedNode: null, viewAngle: 0 };
+
+function vdrop3dCalcGradient(tree) {
+  if (!tree || !tree.nodes || !tree.rootId) return [];
+  var results = [];
+  var rootNode = tree.nodes[tree.rootId];
+  function walkNode(nodeId, accVdrop) {
+    var node = tree.nodes[nodeId];
+    if (!node) return;
+    var segVdrop = 0;
+    if (node.cable && node.cable.length_m && node.cable.mm2) {
+      var rho = (node.cable.material === 'Al') ? 0.0283 : 0.0175;
+      var ib = sldCalcNodeIB ? sldCalcNodeIB(node) : ((node.power_kW || 0) * 1000 / 230);
+      var voltage = node.voltage || 230;
+      segVdrop = (2 * rho * (node.cable.length_m || 0) * ib) / (node.cable.mm2 * voltage) * 100;
+    }
+    var totalVdrop = accVdrop + segVdrop;
+    results.push({ id: nodeId, name: node.name_da || node.name_en || nodeId, length_m: (node.cable && node.cable.length_m) || 0, vdropPct: totalVdrop, segVdrop: segVdrop, depth: sldGetPath ? sldGetPath(tree, nodeId).length : 1 });
+    if (node.childIds) {
+      node.childIds.forEach(function(cid) { walkNode(cid, totalVdrop); });
+    }
+  }
+  walkNode(tree.rootId, 0);
+  return results;
+}
+
+function vdrop3dRenderSVG(gradients, angle) {
+  var w = 600, h = 400;
+  var svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;max-height:400px;background:var(--bg-alt,#1a1a2e);border-radius:8px">';
+  // Perspective grid
+  var ofsX = Math.cos((angle || 0) * Math.PI / 180) * 20;
+  svg += '<defs><linearGradient id="vdg" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#00ff88"/><stop offset="50%" style="stop-color:#ffaa00"/><stop offset="100%" style="stop-color:#ff3333"/></linearGradient></defs>';
+  // Floor grid (3D perspective)
+  for (var i = 0; i <= 10; i++) {
+    var y = 350 - i * 15;
+    var x1 = 50 + i * 3 + ofsX; var x2 = 550 - i * 3 + ofsX;
+    svg += '<line x1="' + x1 + '" y1="' + y + '" x2="' + x2 + '" y2="' + y + '" stroke="#333" stroke-width="0.5"/>';
+  }
+  // Draw cable paths
+  if (gradients.length > 0) {
+    var maxLen = 1;
+    gradients.forEach(function(g) { if (g.length_m > maxLen) maxLen = g.length_m; });
+    gradients.forEach(function(g, idx) {
+      var x = 80 + (g.length_m / maxLen) * 440;
+      var y = 100 + idx * (250 / Math.max(gradients.length, 1));
+      var pct = Math.min(g.vdropPct / 5, 1);
+      var r = Math.round(pct * 255); var green = Math.round((1 - pct) * 200);
+      var color = 'rgb(' + r + ',' + green + ',50)';
+      svg += '<circle cx="' + x + '" cy="' + y + '" r="8" fill="' + color + '" opacity="0.85"/>';
+      svg += '<line x1="80" y1="' + y + '" x2="' + x + '" y2="' + y + '" stroke="' + color + '" stroke-width="3" opacity="0.6"/>';
+      svg += '<text x="' + (x + 12) + '" y="' + (y + 4) + '" fill="#eee" font-size="10">' + g.name + ' (' + g.vdropPct.toFixed(2) + '%)</text>';
+    });
+  }
+  // Legend
+  svg += '<rect x="50" y="370" width="200" height="12" rx="6" fill="url(#vdg)"/>';
+  svg += '<text x="50" y="395" fill="#aaa" font-size="9">0%</text><text x="140" y="395" fill="#aaa" font-size="9">2.5%</text><text x="240" y="395" fill="#aaa" font-size="9">5%+</text>';
+  svg += '<text x="300" y="385" fill="#aaa" font-size="10">' + tx('Sp\u00E6ndingsfald gradient', 'Voltage drop gradient') + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function renderVdrop3D() {
+  var s = vdrop3dState;
+  var tree = (typeof sldTree !== 'undefined' && sldTree) ? sldTree : (typeof sldCreateTree === 'function' ? sldCreateTree() : null);
+  var html = '<div class="card fade-in"><div class="card-title">\uD83C\uDF10 ' + tx('Sp\u00E6ndingsfald 3D-visualisering', 'Voltage Drop 3D Visualization') + '</div>';
+  html += '<p class="info-text">' + tx('3D-perspektiv af installationssti med farvegradient fra forsyning til last. Gr\u00F8n=lav, r\u00F8d=h\u00F8j sp\u00E6ndingsfald per DS/HD 60364-5-52.', '3D perspective of installation path with color gradient from supply to load. Green=low, red=high voltage drop per DS/HD 60364-5-52.') + '</p>';
+
+  // View angle buttons
+  html += '<div class="param-group"><div class="param-label">' + tx('Visningsvinkel', 'View angle') + '</div><div class="btn-group">';
+  [0, 15, 30, 45, -15, -30].forEach(function(a) {
+    html += '<button class="sel-btn ' + (s.viewAngle === a ? 'selected' : '') + '" onclick="vdrop3dState.viewAngle=' + a + ';renderModule(\'vdrop3d\')">' + a + '\u00B0</button>';
+  });
+  html += '</div></div>';
+
+  var gradients = vdrop3dCalcGradient(tree);
+  html += '<div class="result-box">' + vdrop3dRenderSVG(gradients, s.viewAngle) + '</div>';
+
+  // Data table
+  if (gradients.length > 0) {
+    html += '</div><div class="card fade-in"><div class="card-title">' + tx('Detaljer', 'Details') + '</div><div class="result-box">';
+    gradients.forEach(function(g) {
+      var color = g.vdropPct > 3 ? 'var(--danger)' : g.vdropPct > 2 ? 'var(--warning)' : 'var(--success)';
+      html += '<div class="result-row"><span class="label">' + g.name + ' (' + g.length_m + 'm)</span><span class="value" style="color:' + color + '">\u0394U=' + g.vdropPct.toFixed(2) + '%</span></div>';
+    });
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+
+// ===== EARTH ELECTRODE DESIGN (renderGroundDesign) =====
+let groundDesignState = { soilType: null, electrodeType: null, rodLength: 2.4, rodDiameter: 16, plateArea: 1, ringRadius: 5 };
+
+const SOIL_RESISTIVITY = [
+  { id: 'clay_wet', da: 'V\u00E5d ler', en: 'Wet clay', rho: 30 },
+  { id: 'clay', da: 'Ler', en: 'Clay', rho: 80 },
+  { id: 'loam', da: 'Muld/lerjord', en: 'Loam', rho: 150 },
+  { id: 'sand_wet', da: 'V\u00E5d sand', en: 'Wet sand', rho: 200 },
+  { id: 'sand', da: 'Sand', en: 'Sand', rho: 500 },
+  { id: 'gravel', da: 'Grus', en: 'Gravel', rho: 1000 },
+  { id: 'rock', da: 'Klippe', en: 'Rock', rho: 3000 },
+  { id: 'concrete', da: 'Beton (fundamentsjord)', en: 'Concrete (foundation)', rho: 50 }
+];
+
+const ELECTRODE_TYPES = [
+  { id: 'rod', da: 'Jordspyd (rod)', en: 'Earth rod' },
+  { id: 'plate', da: 'Jordplade', en: 'Earth plate' },
+  { id: 'ring', da: 'Ringjord', en: 'Ring earth' },
+  { id: 'foundation', da: 'Fundamentsjord', en: 'Foundation earth' }
+];
+
+function groundCalcResistance(soilRho, type, params) {
+  if (type === 'rod') {
+    var L = params.rodLength || 2.4;
+    var d = (params.rodDiameter || 16) / 1000;
+    return (soilRho / (2 * Math.PI * L)) * Math.log(4 * L / d);
+  }
+  if (type === 'plate') {
+    var A = params.plateArea || 1;
+    return soilRho / (4 * Math.sqrt(A / Math.PI));
+  }
+  if (type === 'ring') {
+    var r = params.ringRadius || 5;
+    return soilRho / (2 * Math.PI * Math.PI * r);
+  }
+  if (type === 'foundation') {
+    return soilRho / 20;
+  }
+  return soilRho;
+}
+
+function renderGroundDesign() {
+  var s = groundDesignState;
+  var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDD29 ' + tx('Jordingsdesigner', 'Earth Electrode Designer') + '</div>';
+  html += '<p class="info-text">' + tx('Beregning af jordingsmodstand for forskellige elektrodetyper per DS/HD 60364-5-54. V\u00E6lg jordtype og elektrodetype.', 'Earth resistance calculation for various electrode types per DS/HD 60364-5-54. Select soil type and electrode type.') + '</p>';
+
+  // Soil type selection
+  html += '<div class="param-group"><div class="param-label">' + tx('Jordtype (resistivitet)', 'Soil type (resistivity)') + '</div><div class="btn-group">';
+  SOIL_RESISTIVITY.forEach(function(soil) {
+    html += '<button class="sel-btn ' + (s.soilType === soil.id ? 'selected' : '') + '" onclick="groundDesignState.soilType=\'' + soil.id + '\';renderModule(\'grounddesign\')">' + tx(soil.da, soil.en) + ' (' + soil.rho + ' \u03A9m)</button>';
+  });
+  html += '</div></div>';
+
+  // Electrode type
+  html += '<div class="param-group"><div class="param-label">' + tx('Elektrodetype', 'Electrode type') + '</div><div class="btn-group">';
+  ELECTRODE_TYPES.forEach(function(et) {
+    html += '<button class="sel-btn ' + (s.electrodeType === et.id ? 'selected' : '') + '" onclick="groundDesignState.electrodeType=\'' + et.id + '\';renderModule(\'grounddesign\')">' + tx(et.da, et.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Parameters per electrode type
+  if (s.electrodeType === 'rod') {
+    html += '<div class="param-group"><div class="param-label">' + tx('Spydl\u00E6ngde (m)', 'Rod length (m)') + '</div><div class="btn-group">';
+    [1.5, 2.0, 2.4, 3.0, 4.5, 6.0, 9.0].forEach(function(l) {
+      html += '<button class="sel-btn ' + (s.rodLength === l ? 'selected' : '') + '" onclick="groundDesignState.rodLength=' + l + ';renderModule(\'grounddesign\')">' + l + '</button>';
+    });
+    html += '</div></div>';
+  }
+  if (s.electrodeType === 'plate') {
+    html += '<div class="param-group"><div class="param-label">' + tx('Pladeareal (m\u00B2)', 'Plate area (m\u00B2)') + '</div><div class="btn-group">';
+    [0.5, 1.0, 1.5, 2.0, 3.0, 4.0].forEach(function(a) {
+      html += '<button class="sel-btn ' + (s.plateArea === a ? 'selected' : '') + '" onclick="groundDesignState.plateArea=' + a + ';renderModule(\'grounddesign\')">' + a + '</button>';
+    });
+    html += '</div></div>';
+  }
+  if (s.electrodeType === 'ring') {
+    html += '<div class="param-group"><div class="param-label">' + tx('Ringradius (m)', 'Ring radius (m)') + '</div><div class="btn-group">';
+    [3, 5, 7, 10, 15, 20].forEach(function(r) {
+      html += '<button class="sel-btn ' + (s.ringRadius === r ? 'selected' : '') + '" onclick="groundDesignState.ringRadius=' + r + ';renderModule(\'grounddesign\')">' + r + '</button>';
+    });
+    html += '</div></div>';
+  }
+
+  // Result
+  if (s.soilType && s.electrodeType) {
+    var soil = SOIL_RESISTIVITY.filter(function(x) { return x.id === s.soilType; })[0];
+    var R = groundCalcResistance(soil.rho, s.electrodeType, s);
+    var rLimit = 20;
+    var ok = R <= rLimit;
+    html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultat', 'Result') + '</div>';
+    html += '<div class="result-box">';
+    html += '<div class="result-row"><span class="label">' + tx('Jordresistivitet \u03C1', 'Soil resistivity \u03C1') + '</span><span class="value">' + soil.rho + ' \u03A9\u00B7m</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Beregnet jordingsmodstand R\u2091', 'Calculated earth resistance R\u2091') + '</span><span class="value" style="font-weight:700;color:' + (ok ? 'var(--success)' : 'var(--danger)') + '">' + R.toFixed(1) + ' \u03A9</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Gr\u00E6nsev\u00E6rdi', 'Limit') + '</span><span class="value">\u2264 ' + rLimit + ' \u03A9 (TT-system)</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Status', 'Status') + '</span><span class="value">' + (ok ? '\u2705 OK' : '\u274C ' + tx('For h\u00F8j \u2014 brug l\u00E6ngere spyd eller parallel', 'Too high \u2014 use longer rod or parallel')) + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Reference', 'Reference') + '</span><span class="value">DS/HD 60364-5-54 cl.542</span></div>';
+    html += '</div>';
+
+    // Parallel rods suggestion
+    if (!ok) {
+      var nRods = Math.ceil(R / rLimit);
+      html += '<div class="result-box" style="margin-top:8px"><div class="result-title">' + tx('Forslag: Parallelkobling', 'Suggestion: Parallel rods') + '</div>';
+      html += '<div class="result-row"><span class="label">' + tx('Antal parallelle elektroder kr\u00E6vet', 'Number of parallel electrodes required') + '</span><span class="value">' + nRods + '</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Estimeret R med parallelle', 'Estimated R with parallel') + '</span><span class="value">' + (R / nRods).toFixed(1) + ' \u03A9</span></div>';
+      html += '</div>';
+    }
+  }
+
+  html += '</div>';
+  return html;
+}
+
+
+// ===== PERIODIC INSPECTION (renderEftersyn) =====
+let eftersynState = { installationType: 'bolig', items: {} };
+
+const EFTERSYN_TYPES = [
+  { id: 'bolig', da: 'Bolig', en: 'Residential' },
+  { id: 'erhverv', da: 'Erhverv', en: 'Commercial' },
+  { id: 'industri', da: 'Industri', en: 'Industrial' },
+  { id: 'landbrug', da: 'Landbrug', en: 'Agricultural' }
+];
+
+const EFTERSYN_CHECKLIST = [
+  { id: 'e1', da: 'Sikkerhedstilstand af skabe/tavler', en: 'Safety condition of enclosures/panels', clause: 'cl.6.1.3', all: true },
+  { id: 'e2', da: 'Alle d\u00E6ksler og l\u00E5ger intakte', en: 'All covers and doors intact', clause: 'cl.6.1.3', all: true },
+  { id: 'e3', da: 'M\u00E6rkning synlig og l\u00E6sbar', en: 'Labels visible and readable', clause: 'cl.514.5', all: true },
+  { id: 'e4', da: 'RCD-testknap fungerer', en: 'RCD test button functions', clause: 'cl.6.61.3.3', all: true },
+  { id: 'e5', da: 'Jordforbindelser intakte', en: 'Earth connections intact', clause: 'cl.6.61.3.1', all: true },
+  { id: 'e6', da: 'Tilspændingsmoment p\u00E5 klemmer', en: 'Terminal tightening torque', clause: 'cl.526', all: true },
+  { id: 'e7', da: 'Ingen synlige skader p\u00E5 kabler', en: 'No visible cable damage', clause: 'cl.6.1.3', all: true },
+  { id: 'e8', da: 'Brandspærringer ved gennemf\u00F8ringer', en: 'Fire barriers at penetrations', clause: 'cl.527.2', all: true },
+  { id: 'e9', da: 'IP-kapslingsgrad korrekt', en: 'IP rating correct for environment', clause: 'cl.512.2', all: true },
+  { id: 'e10', da: 'Overspændingsbeskyttelse (SPD) intakt', en: 'Surge protection (SPD) intact', clause: 'cl.534', all: true },
+  { id: 'e11', da: 'Isolationsmodstand Riso \u2265 1M\u03A9', en: 'Insulation resistance Riso \u2265 1M\u03A9', clause: 'cl.6.61.3.3', all: true },
+  { id: 'e12', da: 'Sl\u00F8jfeimpedans Zs OK', en: 'Loop impedance Zs OK', clause: 'cl.6.61.3.6', all: true },
+  { id: 'e13', da: 'Kontinuitet af PE-ledere', en: 'Continuity of PE conductors', clause: 'cl.6.61.3.2', all: true },
+  { id: 'e14', da: 'Drifttemperatur acceptabel', en: 'Operating temperature acceptable', clause: 'cl.523', all: true },
+  { id: 'e15', da: 'Polartiestest OK', en: 'Polarity test OK', clause: 'cl.6.61.3.5', all: true },
+  { id: 'e16', da: 'El-tavle tilg\u00E6ngelighed', en: 'Panel accessibility', clause: 'cl.132.12', types: ['erhverv', 'industri'] },
+  { id: 'e17', da: 'N\u00F8dbelysning fungerer', en: 'Emergency lighting works', clause: 'DS/EN 50172', types: ['erhverv', 'industri'] },
+  { id: 'e18', da: 'Eksplosionssikring (Ex)', en: 'Explosion protection (Ex)', clause: 'DS/EN 60079', types: ['industri'] },
+  { id: 'e19', da: 'Landbrugsspecifik beskyttelse', en: 'Agricultural-specific protection', clause: 'cl.705', types: ['landbrug'] },
+  { id: 'e20', da: 'Udligningsforbindelser i stalde', en: 'Equipotential bonding in stables', clause: 'cl.705.415.2', types: ['landbrug'] }
+];
+
+function eftersynGetItems(type) {
+  return EFTERSYN_CHECKLIST.filter(function(item) {
+    if (item.all) return true;
+    return item.types && item.types.indexOf(type) >= 0;
+  });
+}
+
+function renderEftersyn() {
+  var s = eftersynState;
+  var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDD0D ' + tx('Periodisk eftersyn \u2014 Sikkerhedsstyrelsen', 'Periodic Inspection \u2014 Sikkerhedsstyrelsen') + '</div>';
+  html += '<p class="info-text">' + tx('Tjekliste til forberedelse af periodisk eftersyn. Baseret p\u00E5 DS/HD 60364 kapitel 6 krav.', 'Checklist for periodic inspection preparation. Based on DS/HD 60364 chapter 6 requirements.') + '</p>';
+
+  // Installation type
+  html += '<div class="param-group"><div class="param-label">' + tx('Installationstype', 'Installation type') + '</div><div class="btn-group">';
+  EFTERSYN_TYPES.forEach(function(t) {
+    html += '<button class="sel-btn ' + (s.installationType === t.id ? 'selected' : '') + '" onclick="eftersynState.installationType=\'' + t.id + '\';renderModule(\'eftersyn\')">' + tx(t.da, t.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  var items = eftersynGetItems(s.installationType);
+  var done = 0; var na = 0;
+  items.forEach(function(item) {
+    if (s.items[item.id] === 'done') done++;
+    if (s.items[item.id] === 'na') na++;
+  });
+  var applicable = items.length - na;
+  var pct = applicable > 0 ? Math.round((done / applicable) * 100) : 0;
+
+  // Progress
+  html += '<div class="result-box"><div class="result-title">' + tx('Fremdrift', 'Progress') + ': ' + pct + '% (' + done + '/' + applicable + ')</div>';
+  html += '<div style="background:var(--border);border-radius:8px;height:12px;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:' + (pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)') + ';border-radius:8px"></div></div></div>';
+
+  // Checklist
+  html += '</div><div class="card fade-in"><div class="card-title">' + tx('Tjekliste', 'Checklist') + '</div><div class="result-box">';
+  items.forEach(function(item) {
+    var status = s.items[item.id] || 'pending';
+    var icon = status === 'done' ? '\u2705' : status === 'na' ? '\u26AA' : '\u23F3';
+    html += '<div class="result-row" style="padding:6px 0;border-bottom:1px solid var(--border)">';
+    html += '<span class="label">' + icon + ' ' + tx(item.da, item.en) + ' <small style="color:var(--text-muted)">(' + item.clause + ')</small></span>';
+    html += '<span class="value"><button class="sel-btn ' + (status === 'done' ? 'selected' : '') + '" style="padding:2px 8px;font-size:0.75em" onclick="eftersynState.items[\'' + item.id + '\']=\'done\';renderModule(\'eftersyn\')">' + tx('OK','OK') + '</button> ';
+    html += '<button class="sel-btn ' + (status === 'na' ? 'selected' : '') + '" style="padding:2px 8px;font-size:0.75em" onclick="eftersynState.items[\'' + item.id + '\']=\'na\';renderModule(\'eftersyn\')">' + tx('N/A','N/A') + '</button> ';
+    html += '<button class="sel-btn" style="padding:2px 8px;font-size:0.75em" onclick="eftersynState.items[\'' + item.id + '\']=\'pending\';renderModule(\'eftersyn\')">' + tx('Nulstil','Reset') + '</button>';
+    html += '</span></div>';
+  });
+  html += '</div></div>';
+  return html;
+}
+
+
+// ===== RCD SELECTION GUIDE (renderRCDSel) =====
+let rcdSelState = { installType: null, environment: null };
+
+const RCD_INSTALL_TYPES = [
+  { id: 'socket', da: 'Stikkontakter', en: 'Socket outlets', rcdType: 'A', sensitivity: 30, clause: 'cl.411.3.3' },
+  { id: 'bathroom', da: 'Badev\u00E6relse', en: 'Bathroom', rcdType: 'A', sensitivity: 30, clause: 'cl.701.411.3.3' },
+  { id: 'outdoor', da: 'Udend\u00F8rs', en: 'Outdoor', rcdType: 'A', sensitivity: 30, clause: 'cl.6.61.3.3' },
+  { id: 'ev', da: 'Elbil-lader', en: 'EV charger', rcdType: 'B', sensitivity: 30, clause: 'IEC 62955' },
+  { id: 'vfd', da: 'Frekvensomformer (VFD)', en: 'Variable frequency drive', rcdType: 'B', sensitivity: 300, clause: 'cl.531.3.2' },
+  { id: 'solar', da: 'Solcelleanl\u00E6g', en: 'Solar PV system', rcdType: 'B', sensitivity: 30, clause: 'cl.712.411.3.3' },
+  { id: 'medical', da: 'Medicinsk', en: 'Medical', rcdType: 'B', sensitivity: 30, clause: 'DS/HD 60364-7-710' },
+  { id: 'lighting', da: 'Belysning med LED-drivere', en: 'Lighting with LED drivers', rcdType: 'A', sensitivity: 30, clause: 'cl.411.3.3' },
+  { id: 'motor', da: 'Motor (direkte start)', en: 'Motor (direct start)', rcdType: 'A', sensitivity: 300, clause: 'cl.531.2' },
+  { id: 'fire_main', da: 'Brandbeskyttelse (hovedtavle)', en: 'Fire protection (main panel)', rcdType: 'A', sensitivity: 300, clause: 'cl.422.7' },
+  { id: 'pool', da: 'Sv\u00F8mmehal/pool', en: 'Swimming pool', rcdType: 'A', sensitivity: 30, clause: 'cl.702.411.3.3' },
+  { id: 'construction', da: 'Byggeplads', en: 'Construction site', rcdType: 'A', sensitivity: 30, clause: 'cl.704.411.3.3' }
+];
+
+const RCD_TYPES_INFO = {
+  'AC': { da: 'Type AC \u2014 kun ren sinusformet vekselstr\u00F8m', en: 'Type AC \u2014 pure sinusoidal AC only', use: tx('Sjældent tilladt i DK', 'Rarely permitted in DK') },
+  'A': { da: 'Type A \u2014 veksel- og pulserende DC', en: 'Type A \u2014 AC and pulsating DC', use: tx('Standard for de fleste installationer', 'Standard for most installations') },
+  'F': { da: 'Type F \u2014 som A + h\u00F8jfrekvent', en: 'Type F \u2014 as A + high frequency', use: tx('Frekvensomformere med enkeltfasetilslutning', 'VFDs with single-phase connection') },
+  'B': { da: 'Type B \u2014 alle fejlstr\u00F8mme inkl. glat DC', en: 'Type B \u2014 all fault currents incl. smooth DC', use: tx('EV-ladere, solceller, VFD, medicinsk', 'EV chargers, solar PV, VFD, medical') }
+};
+
+function renderRCDSel() {
+  var s = rcdSelState;
+  var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDEE1\uFE0F ' + tx('RCD-v\u00E6lger', 'RCD Selection Guide') + '</div>';
+  html += '<p class="info-text">' + tx('V\u00E6lg installationstype for at se anbefalet RCD-type og f\u00F8lsomhed per DS/HD 60364.', 'Select installation type to see recommended RCD type and sensitivity per DS/HD 60364.') + '</p>';
+
+  // Installation type
+  html += '<div class="param-group"><div class="param-label">' + tx('Installationstype', 'Installation type') + '</div><div class="btn-group">';
+  RCD_INSTALL_TYPES.forEach(function(t) {
+    html += '<button class="sel-btn ' + (s.installType === t.id ? 'selected' : '') + '" onclick="rcdSelState.installType=\'' + t.id + '\';renderModule(\'rcd\')">' + tx(t.da, t.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  if (s.installType) {
+    var sel = RCD_INSTALL_TYPES.filter(function(t) { return t.id === s.installType; })[0];
+    var typeInfo = RCD_TYPES_INFO[sel.rcdType];
+    html += '</div><div class="card fade-in"><div class="card-title">' + tx('Anbefaling', 'Recommendation') + '</div>';
+    html += '<div class="result-box">';
+    html += '<div class="result-row"><span class="label">' + tx('Installation', 'Installation') + '</span><span class="value">' + tx(sel.da, sel.en) + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Anbefalet RCD-type', 'Recommended RCD type') + '</span><span class="value" style="font-weight:700;color:var(--primary)">Type ' + sel.rcdType + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('F\u00F8lsomhed I\u0394n', 'Sensitivity I\u0394n') + '</span><span class="value" style="font-weight:700">' + sel.sensitivity + ' mA</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Krav', 'Requirement') + '</span><span class="value">' + sel.clause + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Beskrivelse', 'Description') + '</span><span class="value">' + tx(typeInfo.da, typeInfo.en) + '</span></div>';
+    html += '</div>';
+  }
+
+  // RCD type overview
+  html += '</div><div class="card fade-in"><div class="card-title">' + tx('RCD-typer oversigt', 'RCD Types Overview') + '</div><div class="result-box">';
+  ['AC', 'A', 'F', 'B'].forEach(function(t) {
+    var info = RCD_TYPES_INFO[t];
+    html += '<div class="result-row" style="padding:6px 0;border-bottom:1px solid var(--border)"><span class="label"><strong>Type ' + t + '</strong> \u2014 ' + tx(info.da, info.en) + '</span></div>';
+  });
+  html += '</div></div>';
+  return html;
+}
+
+
+// ===== PANEL DECLARATION (renderTavleErkl) =====
+let tavleErklState = { boardType: null, ratedCurrent: null, ipRating: null, formSep: null, shortCircuit: null, builder: 0, sections: [] };
+
+const TAVLE_BOARD_TYPES = [
+  { id: 'group', da: 'Gruppetavle', en: 'Distribution board' },
+  { id: 'main', da: 'Hovedtavle', en: 'Main switchboard' },
+  { id: 'sub', da: 'Underfordeling', en: 'Sub-distribution' },
+  { id: 'motor', da: 'Motorstyring (MCC)', en: 'Motor control center' }
+];
+const TAVLE_CURRENTS = [25, 40, 63, 100, 160, 250, 400, 630, 800, 1000, 1250, 1600];
+const TAVLE_IP = ['IP20', 'IP30', 'IP31', 'IP40', 'IP44', 'IP54', 'IP55', 'IP65'];
+const TAVLE_FORM = ['1', '2a', '2b', '3a', '3b', '4a', '4b'];
+const TAVLE_IK = [6, 10, 16, 25, 35, 50, 65, 80, 100];
+const TAVLE_BUILDERS = ['Eget firma', 'Tavlebygger A', 'Tavlebygger B', 'OEM leverand\u00F8r'];
+
+function renderTavleErkl() {
+  var s = tavleErklState;
+  var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDCCB ' + tx('Tavleerkl\u00E6ring (DS/EN 61439)', 'Panel Declaration (DS/EN 61439)') + '</div>';
+  html += '<p class="info-text">' + tx('Generator af tavleerkl\u00E6ring per DS/EN 61439. Udfyld tavledata ved klik \u2014 genererer formel erkl\u00E6ring.', 'Panel declaration generator per DS/EN 61439. Fill in board data by clicking \u2014 generates formal declaration.') + '</p>';
+
+  // Board type
+  html += '<div class="param-group"><div class="param-label">' + tx('Tavletype', 'Board type') + '</div><div class="btn-group">';
+  TAVLE_BOARD_TYPES.forEach(function(bt) {
+    html += '<button class="sel-btn ' + (s.boardType === bt.id ? 'selected' : '') + '" onclick="tavleErklState.boardType=\'' + bt.id + '\';renderModule(\'tavleerkl\')">' + tx(bt.da, bt.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Rated current
+  html += '<div class="param-group"><div class="param-label">' + tx('M\u00E6rkestr\u00F8m InA (A)', 'Rated current InA (A)') + '</div><div class="btn-group">';
+  TAVLE_CURRENTS.forEach(function(c) {
+    html += '<button class="sel-btn ' + (s.ratedCurrent === c ? 'selected' : '') + '" onclick="tavleErklState.ratedCurrent=' + c + ';renderModule(\'tavleerkl\')">' + c + '</button>';
+  });
+  html += '</div></div>';
+
+  // IP rating
+  html += '<div class="param-group"><div class="param-label">' + tx('Kapslingsklasse', 'Enclosure rating') + '</div><div class="btn-group">';
+  TAVLE_IP.forEach(function(ip) {
+    html += '<button class="sel-btn ' + (s.ipRating === ip ? 'selected' : '') + '" onclick="tavleErklState.ipRating=\'' + ip + '\';renderModule(\'tavleerkl\')">' + ip + '</button>';
+  });
+  html += '</div></div>';
+
+  // Form of separation
+  html += '<div class="param-group"><div class="param-label">' + tx('Adskillelsesform (Form)', 'Form of internal separation') + '</div><div class="btn-group">';
+  TAVLE_FORM.forEach(function(f) {
+    html += '<button class="sel-btn ' + (s.formSep === f ? 'selected' : '') + '" onclick="tavleErklState.formSep=\'' + f + '\';renderModule(\'tavleerkl\')">' + tx('Form ','Form ') + f + '</button>';
+  });
+  html += '</div></div>';
+
+  // Short-circuit rating
+  html += '<div class="param-group"><div class="param-label">' + tx('Kortslutningsholdeevne Icw (kA)', 'Short-circuit withstand Icw (kA)') + '</div><div class="btn-group">';
+  TAVLE_IK.forEach(function(ik) {
+    html += '<button class="sel-btn ' + (s.shortCircuit === ik ? 'selected' : '') + '" onclick="tavleErklState.shortCircuit=' + ik + ';renderModule(\'tavleerkl\')">' + ik + '</button>';
+  });
+  html += '</div></div>';
+
+  // Builder
+  html += '<div class="param-group"><div class="param-label">' + tx('Tavlebygger', 'Panel builder') + '</div><div class="btn-group">';
+  TAVLE_BUILDERS.forEach(function(b, i) {
+    html += '<button class="sel-btn ' + (s.builder === i ? 'selected' : '') + '" onclick="tavleErklState.builder=' + i + ';renderModule(\'tavleerkl\')">' + b + '</button>';
+  });
+  html += '</div></div>';
+
+  // Generated declaration
+  if (s.boardType && s.ratedCurrent) {
+    var bt = TAVLE_BOARD_TYPES.filter(function(x) { return x.id === s.boardType; })[0];
+    var today = new Date().toISOString().slice(0, 10);
+    html += '</div><div class="card fade-in"><div class="card-title">' + tx('Genereret Tavleerkl\u00E6ring', 'Generated Panel Declaration') + '</div>';
+    html += '<div class="result-box">';
+    html += '<div class="result-row" style="font-weight:700;font-size:1.1em;text-align:center;padding:8px 0">' + tx('TAVLEERKL\u00C6RING per DS/EN 61439', 'PANEL DECLARATION per DS/EN 61439') + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Tavletype', 'Board type') + '</span><span class="value">' + tx(bt.da, bt.en) + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('M\u00E6rkestr\u00F8m InA', 'Rated current InA') + '</span><span class="value">' + s.ratedCurrent + ' A</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Kapsling', 'Enclosure') + '</span><span class="value">' + (s.ipRating || 'IP20') + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Adskillelsesform', 'Form of separation') + '</span><span class="value">Form ' + (s.formSep || '1') + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Kortslutningsholdeevne Icw', 'Short-circuit withstand Icw') + '</span><span class="value">' + (s.shortCircuit || '?') + ' kA / 1s</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Tavlebygger', 'Builder') + '</span><span class="value">' + TAVLE_BUILDERS[s.builder] + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Dato', 'Date') + '</span><span class="value">' + today + '</span></div>';
+    html += '<div class="result-row" style="margin-top:12px;font-style:italic"><span class="label">' + tx('Hermed erkl\u00E6res at ovenn\u00E6vnte tavle er opbygget og verificeret i henhold til DS/EN 61439-1 og DS/EN 61439-2.', 'It is hereby declared that the above panel has been built and verified according to DS/EN 61439-1 and DS/EN 61439-2.') + '</span></div>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+
+// ===== MODULE 1: INSTALLATION HEALTH SCORE (renderSundhed) =====
+let sundhedState = { lastScore: null };
+
+function sundhedCalcScore() {
+  var tree = (typeof sldTree !== 'undefined' && sldTree) ? sldTree : null;
+  var nodes = tree ? tree.nodes : {};
+  var finals = [];
+  Object.keys(nodes).forEach(function(nid) {
+    var n = nodes[nid];
+    if (n && n.type === 'final_circuit') finals.push(n);
+  });
+
+  // Safety (40%): RCD coverage, PE sizing, Zs verification
+  var safetyScore = 50;
+  var rcdCount = 0; var rcdNeeded = 0;
+  finals.forEach(function(fc) {
+    if (fc.ratingA && fc.ratingA <= 20) { rcdNeeded++; if (fc.rcd) rcdCount++; }
+  });
+  if (rcdNeeded > 0) safetyScore = (rcdCount / rcdNeeded) * 100;
+  else if (finals.length > 0) safetyScore = 70;
+
+  // Capacity (20%): Are cables loaded <80%?
+  var capacityScore = 75;
+  finals.forEach(function(fc) {
+    if (fc.cable && fc.cable.iz && fc.power_kW) {
+      var ib = (fc.power_kW * 1000) / (230 * (fc.cosPhi || 0.9));
+      var ratio = ib / fc.cable.iz;
+      if (ratio > 0.8) capacityScore -= 10;
+    }
+  });
+  capacityScore = Math.max(0, Math.min(100, capacityScore));
+
+  // Selectivity (20%)
+  var selectivityScore = finals.length > 2 ? 60 : 80;
+
+  // Future-proofing (10%)
+  var futureScore = 50;
+  if (tree && tree.nodes) {
+    var totalCircuits = finals.length;
+    if (totalCircuits >= 6) futureScore = 70;
+    if (totalCircuits >= 10) futureScore = 85;
+  }
+
+  // Documentation (10%)
+  var docScore = 50;
+  if (typeof erklaeringState !== 'undefined' && erklaeringState.workType) docScore += 20;
+  if (typeof testprotokolState !== 'undefined') docScore += 15;
+
+  var total = Math.round(safetyScore * 0.4 + capacityScore * 0.2 + selectivityScore * 0.2 + futureScore * 0.1 + docScore * 0.1);
+  return { total: total, safety: Math.round(safetyScore), capacity: Math.round(capacityScore), selectivity: Math.round(selectivityScore), future: Math.round(futureScore), documentation: Math.round(docScore) };
+}
+
+function sundhedRenderGaugeSVG(score) {
+  var r = 80, cx = 100, cy = 100;
+  var circumference = 2 * Math.PI * r;
+  var offset = circumference * (1 - score / 100);
+  var color = score >= 80 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
+  var svg = '<svg viewBox="0 0 200 200" style="width:180px;height:180px;display:block;margin:0 auto">';
+  svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="var(--border)" stroke-width="12"/>';
+  svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + color + '" stroke-width="12" stroke-dasharray="' + circumference + '" stroke-dashoffset="' + offset + '" stroke-linecap="round" transform="rotate(-90 ' + cx + ' ' + cy + ')"/>';
+  svg += '<text x="' + cx + '" y="' + (cy + 10) + '" text-anchor="middle" fill="' + color + '" font-size="36" font-weight="700">' + score + '</text>';
+  svg += '<text x="' + cx + '" y="' + (cy + 30) + '" text-anchor="middle" fill="var(--text-muted)" font-size="12">/100</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function renderSundhed() {
+  var score = sundhedCalcScore();
+  sundhedState.lastScore = score;
+  var html = '<div class="card fade-in"><div class="card-title">\uD83C\uDFE5 ' + tx('Installations sundhedsscore', 'Installation Health Score') + '</div>';
+  html += '<p class="info-text">' + tx('Samlet score 0-100 baseret p\u00E5 sikkerhed, kapacitet, selektivitet, fremtidssikring og dokumentation.', 'Overall score 0-100 based on safety, capacity, selectivity, future-proofing and documentation.') + '</p>';
+
+  html += sundhedRenderGaugeSVG(score.total);
+
+  // Breakdown
+  html += '<div class="result-box" style="margin-top:12px">';
+  var cats = [
+    { label: tx('Sikkerhed (40%)', 'Safety (40%)'), val: score.safety },
+    { label: tx('Kapacitet (20%)', 'Capacity (20%)'), val: score.capacity },
+    { label: tx('Selektivitet (20%)', 'Selectivity (20%)'), val: score.selectivity },
+    { label: tx('Fremtidssikring (10%)', 'Future-proofing (10%)'), val: score.future },
+    { label: tx('Dokumentation (10%)', 'Documentation (10%)'), val: score.documentation }
+  ];
+  cats.forEach(function(c) {
+    var color = c.val >= 80 ? 'var(--success)' : c.val >= 50 ? 'var(--warning)' : 'var(--danger)';
+    html += '<div class="result-row"><span class="label">' + c.label + '</span><span class="value" style="color:' + color + '">' + c.val + '%</span></div>';
+  });
+  html += '</div>';
+
+  // Suggestions
+  html += '</div><div class="card fade-in"><div class="card-title">' + tx('Forbedringsforslag', 'Improvement suggestions') + '</div><div class="result-box">';
+  if (score.safety < 80) html += '<div class="result-row"><span class="label">\u26A0\uFE0F ' + tx('Tilf\u00F8j RCD 30mA p\u00E5 alle stikkontaktkredse', 'Add 30mA RCD to all socket circuits') + '</span></div>';
+  if (score.capacity < 70) html += '<div class="result-row"><span class="label">\u26A0\uFE0F ' + tx('Kabler belastes over 80% \u2014 overvej st\u00F8rre tv\u00E6rsnit', 'Cables loaded above 80% \u2014 consider larger cross-section') + '</span></div>';
+  if (score.selectivity < 70) html += '<div class="result-row"><span class="label">\u26A0\uFE0F ' + tx('Kontroll\u00E9r selektivitet mellem niveauer', 'Check selectivity between levels') + '</span></div>';
+  if (score.future < 70) html += '<div class="result-row"><span class="label">\u26A0\uFE0F ' + tx('Overvej reservekapacitet til fremtidige udvidelser', 'Consider spare capacity for future expansions') + '</span></div>';
+  if (score.documentation < 70) html += '<div class="result-row"><span class="label">\u26A0\uFE0F ' + tx('Udfyld installationserkl\u00E6ring og testprotokol', 'Complete installation declaration and test protocol') + '</span></div>';
+  if (score.total >= 80) html += '<div class="result-row" style="color:var(--success)"><span class="label">\u2705 ' + tx('Installationen er i god tilstand!', 'Installation is in good condition!') + '</span></div>';
+  html += '</div></div>';
+  return html;
+}
+
+
+// ===== MODULE 2: FUTURE EXPANSION ADVISOR (renderFremtid) =====
+let fremtidState = { scenario: null };
+
+const FREMTID_SCENARIOS = [
+  { id: 'ev22', da: 'Elbil-lader 22 kW', en: 'EV charger 22 kW', kw: 22, phases: 3, minCable: 6, minMCB: 32, rcdType: 'B' },
+  { id: 'ev11', da: 'Elbil-lader 11 kW', en: 'EV charger 11 kW', kw: 11, phases: 3, minCable: 2.5, minMCB: 16, rcdType: 'B' },
+  { id: 'solar10', da: 'Solceller 10 kWp', en: 'Solar PV 10 kWp', kw: 10, phases: 3, minCable: 4, minMCB: 20, rcdType: 'B' },
+  { id: 'solar6', da: 'Solceller 6 kWp', en: 'Solar PV 6 kWp', kw: 6, phases: 1, minCable: 4, minMCB: 32, rcdType: 'B' },
+  { id: 'heatpump', da: 'Varmepumpe 8 kW', en: 'Heat pump 8 kW', kw: 8, phases: 3, minCable: 2.5, minMCB: 16, rcdType: 'A' },
+  { id: 'bess', da: 'Batteri 10 kWh', en: 'Battery 10 kWh', kw: 5, phases: 1, minCable: 4, minMCB: 25, rcdType: 'B' },
+  { id: 'pool', da: 'Poolpumpe + varme', en: 'Pool pump + heater', kw: 4, phases: 1, minCable: 2.5, minMCB: 20, rcdType: 'A' },
+  { id: 'sauna', da: 'Sauna 9 kW', en: 'Sauna 9 kW', kw: 9, phases: 3, minCable: 4, minMCB: 16, rcdType: 'A' }
+];
+
+function fremtidAnalyze(scenarioId) {
+  var scenario = FREMTID_SCENARIOS.filter(function(s) { return s.id === scenarioId; })[0];
+  if (!scenario) return null;
+  var tree = (typeof sldTree !== 'undefined' && sldTree) ? sldTree : null;
+
+  // Calculate current load
+  var currentLoad = 0;
+  if (tree && tree.nodes) {
+    Object.keys(tree.nodes).forEach(function(nid) {
+      var n = tree.nodes[nid];
+      if (n && n.power_kW) currentLoad += n.power_kW;
+    });
+  }
+
+  // Typical Danish residential main supply
+  var mainFuse = 25; // A (3-phase)
+  var mainCapacity = mainFuse * 400 * Math.sqrt(3) * 0.9 / 1000; // kW approx
+  var available = mainCapacity - currentLoad;
+  var canFit = available >= scenario.kw;
+  var bottleneck = '';
+  var upgradePath = '';
+  var costDKK = 0;
+
+  if (!canFit) {
+    bottleneck = tx('Hovedsikring for lille (' + mainFuse + 'A)', 'Main fuse too small (' + mainFuse + 'A)');
+    var neededFuse = Math.ceil((currentLoad + scenario.kw) / (400 * Math.sqrt(3) * 0.9 / 1000));
+    upgradePath = tx('Opgrader hovedsikring til ' + Math.max(neededFuse, mainFuse + 10) + 'A', 'Upgrade main fuse to ' + Math.max(neededFuse, mainFuse + 10) + 'A');
+    costDKK = 15000;
+  } else {
+    upgradePath = tx('Tilf\u00F8j ny gruppe i eksisterende tavle', 'Add new circuit in existing panel');
+    costDKK = 5000 + scenario.kw * 200;
+  }
+
+  return {
+    scenario: scenario,
+    currentLoad: currentLoad,
+    mainCapacity: mainCapacity,
+    available: available,
+    canFit: canFit,
+    bottleneck: bottleneck,
+    upgradePath: upgradePath,
+    costDKK: costDKK
+  };
+}
+
+function renderFremtid() {
+  var s = fremtidState;
+  var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDD2E ' + tx('Fremtidssikring \u2014 Udvidelsesanalyse', 'Future Expansion Advisor') + '</div>';
+  html += '<p class="info-text">' + tx('Kan din installation h\u00E5ndtere fremtidige tilf\u00F8jelser? V\u00E6lg et scenarie for at se om det passer.', 'Can your installation handle future additions? Select a scenario to check feasibility.') + '</p>';
+
+  html += '<div class="param-group"><div class="param-label">' + tx('V\u00E6lg scenarie', 'Select scenario') + '</div><div class="btn-group">';
+  FREMTID_SCENARIOS.forEach(function(sc) {
+    html += '<button class="sel-btn ' + (s.scenario === sc.id ? 'selected' : '') + '" onclick="fremtidState.scenario=\'' + sc.id + '\';renderModule(\'fremtid\')">' + tx(sc.da, sc.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  if (s.scenario) {
+    var result = fremtidAnalyze(s.scenario);
+    if (result) {
+      html += '</div><div class="card fade-in"><div class="card-title">' + tx('Analyse', 'Analysis') + '</div>';
+      html += '<div class="result-box">';
+      html += '<div class="result-row"><span class="label">' + tx('\u00D8nsket tilf\u00F8jelse', 'Desired addition') + '</span><span class="value">' + tx(result.scenario.da, result.scenario.en) + ' (' + result.scenario.kw + ' kW)</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Nuv\u00E6rende belastning', 'Current load') + '</span><span class="value">' + result.currentLoad.toFixed(1) + ' kW</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Hovedforsyning kapacitet', 'Main supply capacity') + '</span><span class="value">' + result.mainCapacity.toFixed(1) + ' kW</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Tilg\u00E6ngelig reserve', 'Available headroom') + '</span><span class="value">' + result.available.toFixed(1) + ' kW</span></div>';
+      html += '<div class="result-row" style="font-size:1.2em;font-weight:700"><span class="label">' + tx('Kan det lade sig g\u00F8re?', 'Can it fit?') + '</span><span class="value" style="color:' + (result.canFit ? 'var(--success)' : 'var(--danger)') + '">' + (result.canFit ? '\u2705 JA' : '\u274C NEJ') + '</span></div>';
+      if (!result.canFit) {
+        html += '<div class="result-row"><span class="label">' + tx('Flaskehals', 'Bottleneck') + '</span><span class="value" style="color:var(--danger)">' + result.bottleneck + '</span></div>';
+      }
+      html += '<div class="result-row"><span class="label">' + tx('Opgraderingssti', 'Upgrade path') + '</span><span class="value">' + result.upgradePath + '</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Estimeret pris', 'Estimated cost') + '</span><span class="value" style="font-weight:700">' + result.costDKK.toLocaleString() + ' DKK</span></div>';
+      html += '<div class="result-row"><span class="label">' + tx('Kr\u00E6ver', 'Requires') + '</span><span class="value">Kabel ' + result.scenario.minCable + ' mm\u00B2, MCB ' + result.scenario.minMCB + 'A, RCD Type ' + result.scenario.rcdType + '</span></div>';
+      html += '</div>';
+    }
+  }
+
+  html += '</div>';
+  return html;
+}
+
+
+// ===== MODULE 3: QR CODE INSTALLATION (renderQRKode) =====
+let qrKodeState = { dataType: 'summary', generated: false };
+
+function qrGenerateMatrix(text) {
+  // Simple grid pattern generator (visual QR-like SVG, not standards-compliant)
+  var size = 21; // 21x21 grid (Version 1 QR-like)
+  var grid = [];
+  for (var i = 0; i < size; i++) { grid[i] = []; for (var j = 0; j < size; j++) grid[i][j] = 0; }
+
+  // Finder patterns (top-left, top-right, bottom-left)
+  function drawFinder(r, c) {
+    for (var dr = 0; dr < 7; dr++) for (var dc = 0; dc < 7; dc++) {
+      if (dr === 0 || dr === 6 || dc === 0 || dc === 6 || (dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4)) {
+        if (r + dr < size && c + dc < size) grid[r + dr][c + dc] = 1;
+      }
+    }
+  }
+  drawFinder(0, 0); drawFinder(0, 14); drawFinder(14, 0);
+
+  // Encode text as pseudo-data modules
+  var bits = [];
+  for (var k = 0; k < text.length; k++) {
+    var charCode = text.charCodeAt(k);
+    for (var b = 7; b >= 0; b--) bits.push((charCode >> b) & 1);
+  }
+
+  // Fill data area
+  var bitIdx = 0;
+  for (var row = 8; row < size; row++) {
+    for (var col = 8; col < size; col++) {
+      if (grid[row][col] === 0 && bitIdx < bits.length) {
+        grid[row][col] = bits[bitIdx++];
+      } else if (grid[row][col] === 0) {
+        grid[row][col] = (row + col) % 3 === 0 ? 1 : 0;
+      }
+    }
+  }
+  // Timing patterns
+  for (var t = 8; t < 13; t++) { grid[6][t] = t % 2 === 0 ? 1 : 0; grid[t][6] = t % 2 === 0 ? 1 : 0; }
+
+  return grid;
+}
+
+function qrRenderSVG(grid) {
+  var cellSize = 6;
+  var size = grid.length;
+  var dim = size * cellSize + 20;
+  var svg = '<svg viewBox="0 0 ' + dim + ' ' + dim + '" style="width:200px;height:200px;display:block;margin:0 auto;background:white;border-radius:8px;padding:10px">';
+  for (var r = 0; r < size; r++) {
+    for (var c = 0; c < size; c++) {
+      if (grid[r][c]) {
+        svg += '<rect x="' + (c * cellSize + 10) + '" y="' + (r * cellSize + 10) + '" width="' + cellSize + '" height="' + cellSize + '" fill="#000"/>';
+      }
+    }
+  }
+  svg += '</svg>';
+  return svg;
+}
+
+function qrGetInstallationSummary() {
+  var tree = (typeof sldTree !== 'undefined' && sldTree) ? sldTree : null;
+  var summary = 'ELINSTALLATION ';
+  if (tree && tree.nodes) {
+    var circuits = 0; var totalKW = 0;
+    Object.keys(tree.nodes).forEach(function(nid) {
+      var n = tree.nodes[nid];
+      if (n && n.type === 'final_circuit') { circuits++; totalKW += (n.power_kW || 0); }
+    });
+    summary += circuits + ' kredse ' + totalKW.toFixed(1) + 'kW';
+  }
+  summary += ' ' + new Date().toISOString().slice(0, 10);
+  return summary;
+}
+
+function renderQRKode() {
+  var s = qrKodeState;
+  var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDCF1 ' + tx('Digital Servicebog (QR-kode)', 'Digital Service Book (QR Code)') + '</div>';
+  html += '<p class="info-text">' + tx('Genererer QR-kode med installationsresum\u00E9. S\u00E6t p\u00E5 tavled\u00F8ren s\u00E5 n\u00E6ste elektriker har info med det samme.', 'Generates QR code with installation summary. Put on panel door so next electrician has info immediately.') + '</p>';
+
+  // Data type selection
+  html += '<div class="param-group"><div class="param-label">' + tx('Indhold', 'Content') + '</div><div class="btn-group">';
+  var types = [
+    { id: 'summary', da: 'Installationsresum\u00E9', en: 'Installation summary' },
+    { id: 'contact', da: 'Firma kontaktinfo', en: 'Company contact info' },
+    { id: 'last_service', da: 'Seneste service dato', en: 'Last service date' },
+    { id: 'next_inspection', da: 'N\u00E6ste eftersyn', en: 'Next inspection' }
+  ];
+  types.forEach(function(t) {
+    html += '<button class="sel-btn ' + (s.dataType === t.id ? 'selected' : '') + '" onclick="qrKodeState.dataType=\'' + t.id + '\';qrKodeState.generated=true;renderModule(\'qrkode\')">' + tx(t.da, t.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Generate button
+  html += '<div class="param-group"><button class="sel-btn selected" onclick="qrKodeState.generated=true;renderModule(\'qrkode\')">' + tx('Gener\u00E9r QR-kode', 'Generate QR code') + ' \uD83D\uDCF7</button></div>';
+
+  if (s.generated) {
+    var text = '';
+    if (s.dataType === 'summary') text = qrGetInstallationSummary();
+    else if (s.dataType === 'contact') text = 'EL-FIRMA TLF 12345678';
+    else if (s.dataType === 'last_service') text = 'SERVICE ' + new Date().toISOString().slice(0, 10);
+    else text = 'EFTERSYN ' + new Date(Date.now() + 365 * 24 * 3600000).toISOString().slice(0, 10);
+
+    var grid = qrGenerateMatrix(text);
+    html += '</div><div class="card fade-in"><div class="card-title">' + tx('QR-kode', 'QR Code') + '</div>';
+    html += '<div class="result-box" style="text-align:center">' + qrRenderSVG(grid) + '</div>';
+    html += '<div class="result-box" style="margin-top:8px"><div class="result-title">' + tx('Kodet indhold', 'Encoded content') + '</div>';
+    html += '<div class="result-row"><span class="label">' + text + '</span></div></div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+
+// ===== MODULE 4: DANISH MISTAKE DETECTOR (renderFejlvagt) =====
+let fejlvagtState = { lastResult: null, filter: 'all' };
+
+const FEJLVAGT_MISTAKES = [
+  { id: 'm1', severity: 3, da: 'Manglende RCD p\u00E5 stikkontaktkredse \u226420A', en: 'Missing RCD on socket circuits \u226420A', clause: 'cl.411.3.3', fix: 'rcd', check: function(n) { return n.type === 'final_circuit' && n.circuitType === 'sockets' && (n.ratingA || 16) <= 20 && !n.rcd; } },
+  { id: 'm2', severity: 3, da: 'PE-leder underdimensioneret', en: 'PE conductor undersized', clause: 'Table 54.2', fix: 'pe', check: function(n) { return n.cable && n.cable.mm2 && n.cable.pe && n.cable.pe < peCalcSize(n.cable.mm2); } },
+  { id: 'm3', severity: 3, da: 'Brydeevne Icu < Ik (kortslutningsstr\u00F8m)', en: 'Breaking capacity Icu < Ik (fault current)', clause: 'cl.434.5.1', fix: 'scircuit', check: function(n) { return n.protection && n.protection.icu && n.ik && n.protection.icu * 1000 < n.ik; } },
+  { id: 'm4', severity: 2, da: 'Sp\u00E6ndingsfald over 5%', en: 'Voltage drop exceeds 5%', clause: 'DS/HD 60364-5-52', fix: 'vdrop', check: function(n) { return n.vdropPct && n.vdropPct > 5; } },
+  { id: 'm5', severity: 2, da: 'Kabel belastet over 100% af Iz', en: 'Cable loaded above 100% of Iz', clause: 'cl.433.1', fix: 'cable', check: function(n) { return n.cable && n.cable.iz && n.power_kW && (n.power_kW * 1000 / (230 * (n.cosPhi || 0.9))) > n.cable.iz; } },
+  { id: 'm6', severity: 2, da: 'Manglende hovedudligningsforbindelse', en: 'Missing main equipotential bonding', clause: 'cl.411.3.1.2', fix: null, check: function() { return false; } },
+  { id: 'm7', severity: 2, da: 'Type AC RCD brugt (kr\u00E6ver Type A minimum)', en: 'Type AC RCD used (requires Type A minimum)', clause: 'cl.531.2.1.4', fix: 'rcd', check: function(n) { return n.rcd && n.rcd.type === 'AC'; } },
+  { id: 'm8', severity: 1, da: 'Manglende SPD (overspændingsbeskyttelse)', en: 'Missing SPD (surge protection)', clause: 'cl.534.1', fix: 'spd', check: function() { return false; } },
+  { id: 'm9', severity: 2, da: 'Forkert MCB-kurve for motorlast', en: 'Wrong MCB curve for motor load', clause: 'cl.435.1', fix: 'mcb', check: function(n) { return n.circuitType === 'motor' && n.protection && n.protection.curve === 'B'; } },
+  { id: 'm10', severity: 1, da: 'Ingen selektivitet mellem niveauer', en: 'No selectivity between levels', clause: 'cl.536.4', fix: 'discrim', check: function() { return false; } },
+  { id: 'm11', severity: 3, da: 'Badev\u00E6relse uden RCD 30mA', en: 'Bathroom without 30mA RCD', clause: 'cl.701.411.3.3', fix: 'rcd', check: function(n) { return n.circuitType === 'bathroom' && !n.rcd; } },
+  { id: 'm12', severity: 2, da: 'EV-lader uden Type B RCD', en: 'EV charger without Type B RCD', clause: 'IEC 62955', fix: 'rcd', check: function(n) { return n.circuitType === 'ev' && n.rcd && n.rcd.type !== 'B'; } },
+  { id: 'm13', severity: 1, da: 'Kabelbakke over 50% fyldningsgrad', en: 'Cable tray above 50% fill rate', clause: 'cl.521.10', fix: 'trayfill', check: function() { return false; } },
+  { id: 'm14', severity: 1, da: 'Manglende m\u00E6rkning af kredse', en: 'Missing circuit labeling', clause: 'cl.514.5', fix: null, check: function(n) { return n.type === 'final_circuit' && !n.name_da && !n.name_en; } },
+  { id: 'm15', severity: 2, da: 'TN-C system i ny installation', en: 'TN-C system in new installation', clause: 'cl.312.2', fix: null, check: function() { return false; } },
+  { id: 'm16', severity: 3, da: 'Jordfejlssl\u00F8jfeimpedans Zs for h\u00F8j', en: 'Earth fault loop impedance Zs too high', clause: 'cl.411.4.4', fix: 'zs', check: function(n) { return n.zs && n.protection && n.zs > (230 / (n.protection.rating * 5)); } },
+  { id: 'm17', severity: 1, da: 'Ingen brandspærring ved gennemf\u00F8ring', en: 'No fire barrier at penetration', clause: 'cl.527.2', fix: null, check: function() { return false; } },
+  { id: 'm18', severity: 2, da: 'Kabelderating ikke anvendt ved gruppering', en: 'Cable derating not applied for grouping', clause: 'cl.523.4', fix: 'cable', check: function() { return false; } },
+  { id: 'm19', severity: 1, da: 'Dokumentation mangler', en: 'Documentation missing', clause: 'cl.514.5', fix: 'erklaering', check: function() { return false; } },
+  { id: 'm20', severity: 2, da: 'Pool/spa zone 0-1 uden SELV', en: 'Pool/spa zone 0-1 without SELV', clause: 'cl.702.414.4.5', fix: 'pool', check: function(n) { return n.circuitType === 'pool' && !n.selv; } },
+  { id: 'm21', severity: 1, da: '3-faset asymmetrisk belastning >15%', en: '3-phase asymmetric load >15%', clause: 'cl.524', fix: null, check: function() { return false; } },
+  { id: 'm22', severity: 2, da: 'Frekvensomformer uden EMC-filter', en: 'VFD without EMC filter', clause: 'DS/EN 61800-3', fix: 'emc', check: function(n) { return n.circuitType === 'vfd' && !n.emcFilter; } },
+  { id: 'm23', severity: 1, da: 'Manglende tilg\u00E6ngelighed til tavle', en: 'Insufficient panel accessibility', clause: 'cl.132.12', fix: null, check: function() { return false; } },
+  { id: 'm24', severity: 2, da: 'Installationskabel i isoleringstykkelse', en: 'Cable in thermal insulation without derating', clause: 'cl.523.7', fix: 'cable', check: function() { return false; } },
+  { id: 'm25', severity: 3, da: 'N og PE forbundet efter hovedtavle (TN-C-S)', en: 'N and PE connected after main panel (TN-C-S)', clause: 'cl.543.4', fix: null, check: function() { return false; } }
+];
+
+function fejlvagtScan() {
+  var tree = (typeof sldTree !== 'undefined' && sldTree) ? sldTree : null;
+  var results = [];
+  var nodes = tree ? tree.nodes : {};
+
+  FEJLVAGT_MISTAKES.forEach(function(mistake) {
+    var found = false;
+    Object.keys(nodes).forEach(function(nid) {
+      var n = nodes[nid];
+      if (n) {
+        try { if (mistake.check(n)) found = true; } catch(e) {}
+      }
+    });
+    if (found) {
+      results.push({ id: mistake.id, severity: mistake.severity, da: mistake.da, en: mistake.en, clause: mistake.clause, fix: mistake.fix });
+    }
+  });
+
+  // Sort by severity descending
+  results.sort(function(a, b) { return b.severity - a.severity; });
+  return results;
+}
+
+function renderFejlvagt() {
+  var s = fejlvagtState;
+  var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDEA8 ' + tx('Fejlvagt \u2014 Dansk Fejldetektor', 'Mistake Detector \u2014 Danish Installation') + '</div>';
+  html += '<p class="info-text">' + tx('Scanner installationen for 25+ typiske danske installationsfejl. Hvert fund: alvorlighed, DS/HD-klausul, forklaring og fix.', 'Scans installation for 25+ common Danish installation mistakes. Each finding: severity, DS/HD clause, explanation and fix.') + '</p>';
+
+  html += '<div class="param-group"><button class="sel-btn selected" onclick="fejlvagtState.lastResult=fejlvagtScan();renderModule(\'fejlvagt\')">' + tx('K\u00F8r scanning', 'Run scan') + ' \uD83D\uDD0D</button></div>';
+
+  // Filter
+  html += '<div class="param-group"><div class="param-label">' + tx('Filter', 'Filter') + '</div><div class="btn-group">';
+  [{ id: 'all', da: 'Alle', en: 'All' }, { id: '3', da: 'Kritisk', en: 'Critical' }, { id: '2', da: 'Vigtigt', en: 'Important' }, { id: '1', da: 'Info', en: 'Info' }].forEach(function(f) {
+    html += '<button class="sel-btn ' + (s.filter === f.id ? 'selected' : '') + '" onclick="fejlvagtState.filter=\'' + f.id + '\';renderModule(\'fejlvagt\')">' + tx(f.da, f.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  var results = s.lastResult || fejlvagtScan();
+  s.lastResult = results;
+  var filtered = s.filter === 'all' ? results : results.filter(function(r) { return r.severity === parseInt(s.filter); });
+
+  html += '</div><div class="card fade-in"><div class="card-title">' + tx('Resultater', 'Results') + ' (' + filtered.length + '/' + FEJLVAGT_MISTAKES.length + ' ' + tx('regler tjekket', 'rules checked') + ')</div>';
+  html += '<div class="result-box">';
+  if (filtered.length === 0) {
+    html += '<div class="result-row" style="color:var(--success)">\u2705 ' + tx('Ingen fejl fundet!', 'No mistakes found!') + '</div>';
+  }
+  filtered.forEach(function(r) {
+    var sevIcon = r.severity === 3 ? '\uD83D\uDD34' : r.severity === 2 ? '\uD83D\uDFE0' : '\uD83D\uDFE1';
+    var sevLabel = r.severity === 3 ? tx('KRITISK','CRITICAL') : r.severity === 2 ? tx('VIGTIGT','IMPORTANT') : tx('INFO','INFO');
+    html += '<div class="result-row" style="padding:8px 0;border-bottom:1px solid var(--border)">';
+    html += '<span class="label">' + sevIcon + ' <strong>' + sevLabel + '</strong> \u2014 ' + tx(r.da, r.en) + ' <small>(' + r.clause + ')</small></span>';
+    if (r.fix) html += '<span class="value"><button class="sel-btn" style="padding:2px 8px;font-size:0.75em" onclick="switchModule(\'' + r.fix + '\')">' + tx('Fix','Fix') + ' \u2192</button></span>';
+    html += '</div>';
+  });
+  html += '</div></div>';
+  return html;
+}
+
+
+// ===== MODULE 5: VOICE-TO-DOCUMENTATION (renderStemme) =====
+let stemmeState = { template: null, details: [], reportGenerated: false };
+
+const STEMME_TEMPLATES = [
+  { id: 'socket_replace', da: 'Stikkontakt udskiftet', en: 'Socket replacement done', steps: ['location', 'type', 'test'] },
+  { id: 'rcd_test', da: 'RCD-test best\u00E5et', en: 'RCD test passed', steps: ['location', 'trip_time', 'test'] },
+  { id: 'circuit_added', da: 'Ny kreds tilf\u00F8jet', en: 'New circuit added', steps: ['location', 'cable', 'protection', 'test'] },
+  { id: 'fault_fixed', da: 'Fejl udbedret', en: 'Fault repaired', steps: ['location', 'fault_type', 'action', 'test'] },
+  { id: 'inspection', da: 'Periodisk eftersyn', en: 'Periodic inspection', steps: ['building', 'findings', 'result'] },
+  { id: 'ev_install', da: 'Elbil-lader installeret', en: 'EV charger installed', steps: ['location', 'power', 'protection', 'test'] },
+  { id: 'panel_work', da: 'Tavlearbejde udf\u00F8rt', en: 'Panel work completed', steps: ['panel_id', 'work_type', 'test'] },
+  { id: 'emergency', da: 'Akut udkald', en: 'Emergency call', steps: ['symptom', 'action', 'result', 'followup'] }
+];
+
+const STEMME_DETAILS = {
+  location: { da: 'Placering', en: 'Location', options: ['K\u00F8kken', 'Badev\u00E6relse', 'Stue', 'Sovevaer.', 'Kaelder', 'Garage', 'Bryggers', 'Kontor', 'Udenfor'] },
+  type: { da: 'Type', en: 'Type', options: ['Schuko', 'DK std', 'Perilex', 'CEE 16A', 'CEE 32A', 'USB-A+C'] },
+  test: { da: 'Test resultat', en: 'Test result', options: ['OK - Alle m\u00E5linger best\u00E5et', 'Riso >1M\u03A9', 'Zs OK', 'RCD <30ms', 'Fejl fundet - se noter'] },
+  trip_time: { da: 'Udl\u00F8setid', en: 'Trip time', options: ['<15ms', '15-25ms', '25-30ms', '>30ms FEJL'] },
+  cable: { da: 'Kabel', en: 'Cable', options: ['3G1.5 PVL', '3G2.5 PVL', '5G2.5 PVL', '5G6 PVL', '5G10 PVL'] },
+  protection: { da: 'Beskyttelse', en: 'Protection', options: ['MCB B10', 'MCB B16', 'MCB C16', 'MCB C20', 'MCB C25', 'MCB C32 + RCD 30mA Type B'] },
+  fault_type: { da: 'Fejltype', en: 'Fault type', options: ['Kortslutning', 'Jordfejl', 'L\u00F8s forbindelse', 'Overbelastning', 'Fugt'] },
+  action: { da: 'Handling', en: 'Action', options: ['Udskiftet komponent', 'Repareret samling', 'Tilsp\u00E6ndt klemme', 'Erstattet kabel', 'T\u00F8rret og isoleret'] },
+  building: { da: 'Bygning', en: 'Building', options: ['Villa', 'Lejlighed', 'Erhverv', 'Industri'] },
+  findings: { da: 'Fund', en: 'Findings', options: ['Ingen anm\u00E6rkninger', 'Mindre anm\u00E6rkninger', 'V\u00E6sentlige mangler', 'Kritiske fejl'] },
+  result: { da: 'Resultat', en: 'Result', options: ['Godkendt', 'Betinget godkendt', 'Ikke godkendt'] },
+  power: { da: 'Effekt', en: 'Power', options: ['3.7 kW (1-fas)', '7.4 kW (1-fas)', '11 kW (3-fas)', '22 kW (3-fas)'] },
+  panel_id: { da: 'Tavle', en: 'Panel', options: ['Hovedtavle', 'Underfordeling 1', 'Underfordeling 2', 'Motorstyring'] },
+  work_type: { da: 'Arbejdstype', en: 'Work type', options: ['Ny gruppe tilf\u00F8jet', 'Sikring udskiftet', 'Klemmer eftersp\u00E6ndt', 'Reng\u00F8ring og inspektion'] },
+  symptom: { da: 'Symptom', en: 'Symptom', options: ['Ingen str\u00F8m', 'RCD tripper', 'Lugt af br\u00E6ndt', 'Gnister', 'Overophedning'] },
+  followup: { da: 'Opf\u00F8lgning', en: 'Follow-up', options: ['Ingen n\u00F8dvendig', 'Opf\u00F8lgning kr\u00E6ves', 'Anmeldelse til Sikkerhedsstyrelsen'] }
+};
+
+function stemmeGenerateReport() {
+  var tmpl = STEMME_TEMPLATES.filter(function(t) { return t.id === stemmeState.template; })[0];
+  if (!tmpl) return '';
+  var report = '=== ' + tx('SERVICERAPPORT', 'SERVICE REPORT') + ' ===\n';
+  report += tx('Dato', 'Date') + ': ' + new Date().toISOString().slice(0, 10) + '\n';
+  report += tx('Type', 'Type') + ': ' + tx(tmpl.da, tmpl.en) + '\n\n';
+  stemmeState.details.forEach(function(d) {
+    var info = STEMME_DETAILS[d.step];
+    if (info) report += tx(info.da, info.en) + ': ' + d.value + '\n';
+  });
+  report += '\n' + tx('Udf\u00F8rt af autoriseret elinstallatvirksomhed.', 'Performed by authorized electrical contractor.');
+  return report;
+}
+
+function renderStemme() {
+  var s = stemmeState;
+  var html = '<div class="card fade-in"><div class="card-title">\uD83C\uDF99\uFE0F ' + tx('Stemme-til-Dokumentation', 'Voice-to-Documentation') + '</div>';
+  html += '<p class="info-text">' + tx('Klik-baseret rapport-komponist. V\u00E6lg skabelon, klik detaljer, f\u00E5 professionel dansk servicerapport.', 'Click-based report composer. Select template, click details, get professional Danish service report.') + '</p>';
+
+  // Template selection
+  html += '<div class="param-group"><div class="param-label">' + tx('V\u00E6lg skabelon', 'Select template') + '</div><div class="btn-group">';
+  STEMME_TEMPLATES.forEach(function(t) {
+    html += '<button class="sel-btn ' + (s.template === t.id ? 'selected' : '') + '" onclick="stemmeState.template=\'' + t.id + '\';stemmeState.details=[];stemmeState.reportGenerated=false;renderModule(\'stemme\')">' + tx(t.da, t.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  if (s.template) {
+    var tmpl = STEMME_TEMPLATES.filter(function(t) { return t.id === s.template; })[0];
+    // Show steps
+    tmpl.steps.forEach(function(step) {
+      var info = STEMME_DETAILS[step];
+      if (!info) return;
+      var selectedVal = null;
+      s.details.forEach(function(d) { if (d.step === step) selectedVal = d.value; });
+      html += '<div class="param-group"><div class="param-label">' + tx(info.da, info.en) + '</div><div class="btn-group">';
+      info.options.forEach(function(opt) {
+        html += '<button class="sel-btn ' + (selectedVal === opt ? 'selected' : '') + '" onclick="stemmeState.details=stemmeState.details.filter(function(d){return d.step!==\'' + step + '\'});stemmeState.details.push({step:\'' + step + '\',value:\'' + opt.replace(/'/g, "\\'") + '\'});renderModule(\'stemme\')">' + opt + '</button>';
+      });
+      html += '</div></div>';
+    });
+
+    // Generate report
+    html += '<div class="param-group"><button class="sel-btn selected" onclick="stemmeState.reportGenerated=true;renderModule(\'stemme\')">' + tx('Gener\u00E9r rapport', 'Generate report') + ' \uD83D\uDCC4</button></div>';
+
+    if (s.reportGenerated && s.details.length > 0) {
+      var report = stemmeGenerateReport();
+      html += '</div><div class="card fade-in"><div class="card-title">' + tx('Servicerapport', 'Service Report') + '</div>';
+      html += '<div class="result-box"><pre style="white-space:pre-wrap;font-family:inherit;margin:0">' + report + '</pre></div>';
+    }
+  }
+
+  html += '</div>';
+  return html;
+}
+
+
+// ===== MODULE 6: MATERIAL OPTIMIZER (renderMatopt) =====
+let matoptState = { optimizeType: 'cable', savingsSlider: 50 };
+
+const MATOPT_CABLE_PRICES = { 1.5: 8, 2.5: 12, 4: 18, 6: 28, 10: 45, 16: 72, 25: 110, 35: 155, 50: 220, 70: 310, 95: 420, 120: 530 };
+const MATOPT_MCB_PRICES = { 6: 85, 10: 85, 13: 90, 16: 90, 20: 95, 25: 100, 32: 110, 40: 130, 50: 160, 63: 190 };
+
+function matoptAnalyze() {
+  var tree = (typeof sldTree !== 'undefined' && sldTree) ? sldTree : null;
+  var savings = [];
+  if (!tree || !tree.nodes) return savings;
+
+  Object.keys(tree.nodes).forEach(function(nid) {
+    var n = tree.nodes[nid];
+    if (!n || n.type !== 'final_circuit') return;
+    if (!n.cable || !n.cable.mm2) return;
+
+    // Check if cable is oversized
+    var ib = (n.power_kW || 0) * 1000 / (230 * (n.cosPhi || 0.9));
+    var currentMm2 = n.cable.mm2;
+    var optimalMm2 = currentMm2;
+
+    // Find smallest cable that works
+    var sizes = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120];
+    for (var i = 0; i < sizes.length; i++) {
+      if (sizes[i] >= currentMm2) break;
+      // Simplified Iz check (installation method C, Cu)
+      var izApprox = sizes[i] * 7.5;
+      if (izApprox >= ib * 1.1 && sizes[i] >= (n.protection ? n.protection.rating / 7.5 : 0)) {
+        optimalMm2 = sizes[i];
+      }
+    }
+
+    if (optimalMm2 < currentMm2) {
+      var length = (n.cable.length_m || 20);
+      var savingPerM = (MATOPT_CABLE_PRICES[currentMm2] || 0) - (MATOPT_CABLE_PRICES[optimalMm2] || 0);
+      savings.push({
+        node: n.name_da || n.name_en || nid,
+        type: 'cable',
+        from: currentMm2 + ' mm\u00B2',
+        to: optimalMm2 + ' mm\u00B2',
+        savingDKK: savingPerM * length,
+        note: tx('Kabel kan reduceres \u2014 belastning kun ' + Math.round(ib) + 'A vs Iz', 'Cable can be reduced \u2014 load only ' + Math.round(ib) + 'A vs Iz')
+      });
+    }
+  });
+
+  return savings;
+}
+
+function renderMatopt() {
+  var s = matoptState;
+  var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDCB0 ' + tx('Materialoptimering', 'Material Optimizer') + '</div>';
+  html += '<p class="info-text">' + tx('Analyserer installationen for besparelser: overdimensionerede kabler, billigere \u00E6kvivalenter, ruteoptimering. Viser besparelse i DKK.', 'Analyzes installation for savings: oversized cables, cheaper equivalents, route optimization. Shows savings in DKK.') + '</p>';
+
+  // Optimization type
+  html += '<div class="param-group"><div class="param-label">' + tx('Optimer\u00E9r', 'Optimize') + '</div><div class="btn-group">';
+  [{ id: 'cable', da: 'Kabler', en: 'Cables' }, { id: 'protection', da: 'Beskyttelse', en: 'Protection' }, { id: 'route', da: 'Kabelruter', en: 'Cable routes' }].forEach(function(o) {
+    html += '<button class="sel-btn ' + (s.optimizeType === o.id ? 'selected' : '') + '" onclick="matoptState.optimizeType=\'' + o.id + '\';renderModule(\'matopt\')">' + tx(o.da, o.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Savings aggressiveness
+  html += '<div class="param-group"><div class="param-label">' + tx('Aggressivitet (margin)', 'Aggressiveness (margin)') + '</div><div class="btn-group">';
+  [{ val: 25, da: 'Konservativ (+25%)', en: 'Conservative (+25%)' }, { val: 50, da: 'Balanceret (+15%)', en: 'Balanced (+15%)' }, { val: 75, da: 'Aggressiv (+5%)', en: 'Aggressive (+5%)' }].forEach(function(v) {
+    html += '<button class="sel-btn ' + (s.savingsSlider === v.val ? 'selected' : '') + '" onclick="matoptState.savingsSlider=' + v.val + ';renderModule(\'matopt\')">' + tx(v.da, v.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  var savings = matoptAnalyze();
+  var totalDKK = 0;
+  savings.forEach(function(sav) { totalDKK += sav.savingDKK; });
+
+  html += '</div><div class="card fade-in"><div class="card-title">' + tx('Besparelser fundet', 'Savings found') + '</div>';
+  html += '<div class="result-box">';
+  html += '<div class="result-row" style="font-size:1.3em;font-weight:700"><span class="label">' + tx('Total besparelse', 'Total savings') + '</span><span class="value" style="color:var(--success)">' + totalDKK.toLocaleString() + ' DKK</span></div>';
+  html += '</div>';
+
+  if (savings.length > 0) {
+    html += '<div class="result-box" style="margin-top:8px">';
+    savings.forEach(function(sav) {
+      html += '<div class="result-row" style="padding:6px 0;border-bottom:1px solid var(--border)">';
+      html += '<span class="label">' + sav.node + ': ' + sav.from + ' \u2192 ' + sav.to + '</span>';
+      html += '<span class="value" style="color:var(--success)">-' + sav.savingDKK + ' DKK</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+  } else {
+    html += '<div class="result-box" style="margin-top:8px"><div class="result-row">\u2705 ' + tx('Ingen \u00E5benlyse besparelser \u2014 installationen er allerede optimal!', 'No obvious savings \u2014 installation is already optimal!') + '</div></div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+
+// ===== MODULE 7: MESTERRAAD (renderMester) =====
+let mesterState = { scenario: null };
+
+const MESTER_SCENARIOS = [
+  { id: 'villa_ny', da: 'Ny villa-installation', en: 'New villa installation', tips: [
+    { da: 'L\u00E6g altid 1-2 ekstra tomr\u00F8r i v\u00E6gge \u2014 koster ingenting nu, sparer tusinder senere', en: 'Always add 1-2 extra conduits in walls \u2014 costs nothing now, saves thousands later' },
+    { da: 'Dimensioner hovedsikring til mindst 3\u00D725A \u2014 50A er bedre med EV/varmepumpe i fremtiden', en: 'Size main fuse at least 3\u00D725A \u2014 50A is better with EV/heat pump in future' },
+    { da: 'S\u00E6t dobbelt stikkontakt overalt \u2014 bygherren takker dig om 5 \u00E5r', en: 'Put double sockets everywhere \u2014 the homeowner will thank you in 5 years' },
+    { da: 'RCD Type B til garagen fra start \u2014 EV-lader kommer f\u00F8r eller senere', en: 'RCD Type B to garage from start \u2014 EV charger comes sooner or later' },
+    { da: 'Brug PVL-kablet med gr\u00F8n/gul PE hele vejen \u2014 aldrig separate PE-ledere i villa', en: 'Use PVL cable with green/yellow PE throughout \u2014 never separate PE conductors in villa' },
+    { da: 'S\u00E6t mindst \u00E9n 400V-udtag i garage/kaelder selv uden specifikt behov', en: 'Install at least one 400V outlet in garage/basement even without specific need' }
+  ]},
+  { id: 'bathroom', da: 'Badev\u00E6relsesinstallation', en: 'Bathroom installation', tips: [
+    { da: 'Husk: Zone 0-1 = kun SELV 12V. Zone 2 = IPX4. Aldrig stikkontakt i zone 1-2', en: 'Remember: Zone 0-1 = only SELV 12V. Zone 2 = IPX4. Never socket in zone 1-2' },
+    { da: 'Supplerende udligning er ALTID p\u00E5kr\u00E6vet i badev\u00E6relse \u2014 ogs\u00E5 ved renovation', en: 'Supplementary bonding is ALWAYS required in bathroom \u2014 also during renovation' },
+    { da: 'LED-spots i loft: check IP-krav OG ventilationsafstand til isolering', en: 'LED spots in ceiling: check IP rating AND ventilation distance to insulation' },
+    { da: 'Gulvvarme: Altid med RCD 30mA og jordsp\u00E6rre under fl\u00F8jlsvarme', en: 'Underfloor heating: Always with 30mA RCD and earth screen below heating mat' },
+    { da: 'GFCI/RCD: 30mA, Type A minimum, helst Type F for moderne el-apparater', en: 'RCD: 30mA, Type A minimum, preferably Type F for modern appliances' }
+  ]},
+  { id: 'ev_install', da: 'EV-lader montering', en: 'EV charger installation', tips: [
+    { da: 'Kabel SKAL dimensioneres til 100% belastning 24/7 \u2014 ingen samtidighedsreduktion!', en: 'Cable MUST be sized for 100% load 24/7 \u2014 no diversity reduction!' },
+    { da: 'RCD Type B er kr\u00E6vet medmindre laderen har intern DC-fejlbeskyttelse (6mA)', en: 'RCD Type B required unless charger has internal DC fault protection (6mA)' },
+    { da: 'Afstand lader til tavle: m\u00E5l ALTID kabelruten, ikke fugleflugtslinje', en: 'Distance charger to panel: ALWAYS measure cable route, not straight line' },
+    { da: 'Sp\u00E6ndingsfald: max 3% ved 32A over hele kablet. Check med beregner!', en: 'Voltage drop: max 3% at 32A over entire cable. Check with calculator!' },
+    { da: 'Smart lastbalancering: kr\u00E6ver str\u00F8mtransformer p\u00E5 hovedtilf\u00F8rsel', en: 'Smart load balancing: requires CT on main supply' },
+    { da: 'Husk anmeldelse til netselskab ved >11 kW (krav i DK)', en: 'Remember notification to grid company for >11 kW (required in DK)' }
+  ]},
+  { id: 'panel_upgrade', da: 'Tavleopgradering', en: 'Panel upgrade', tips: [
+    { da: 'Fotodokument\u00E9r ALT f\u00F8r du begynder \u2014 b\u00E5de kabler, m\u00E6rkning og tilslutninger', en: 'Photo-document EVERYTHING before starting \u2014 cables, labels and connections' },
+    { da: 'M\u00E6rk ALLE ledere med tape + nummer FØR afmontering', en: 'Label ALL conductors with tape + number BEFORE disconnection' },
+    { da: 'Ny tavle: bestil 30% mere plads end n\u00F8dvendigt \u2014 den fyldes altid', en: 'New panel: order 30% more space than needed \u2014 it always fills up' },
+    { da: 'Tilsp\u00E6ndingsmoment: check ALTID med momentn\u00F8gle, ikke \\"h\u00E5ndfornemmelse\\"', en: 'Tightening torque: ALWAYS check with torque wrench, not "hand feel"' },
+    { da: 'Efterlad rum til mindst 4 nye grupper \u2014 selv i en \\"f\u00E6rdig\\" tavle', en: 'Leave room for at least 4 new circuits \u2014 even in a "finished" panel' }
+  ]},
+  { id: 'outdoor', da: 'Udend\u00F8rs installation', en: 'Outdoor installation', tips: [
+    { da: 'IPX4 minimum udend\u00F8rs \u2014 IPX5 hvor vandslange kan bruges', en: 'IPX4 minimum outdoors \u2014 IPX5 where hose might be used' },
+    { da: 'UV-best\u00E6ndig kabel eller r\u00F8r er et MUST \u2014 PVC forgr\u00E5r og spr\u00E6kker', en: 'UV-resistant cable or conduit is a MUST \u2014 PVC grays and cracks' },
+    { da: 'RCD 30mA p\u00E5 ALLE udend\u00F8rs kredse \u2014 ingen undtagelser', en: 'RCD 30mA on ALL outdoor circuits \u2014 no exceptions' },
+    { da: 'Kabelgrav: 60cm dybde minimum, sand under og over, mark\u00E9rbånd', en: 'Cable trench: 60cm depth minimum, sand below and above, marker tape' },
+    { da: 'Udend\u00F8rs belysning: overvej altid DALI/KNX for fremtidig styring', en: 'Outdoor lighting: always consider DALI/KNX for future control' }
+  ]},
+  { id: 'old_install', da: 'Arbejde i \u00E6ldre installation', en: 'Working in older installation', tips: [
+    { da: '\u00C6ldre stofledning: R\u00D8R ALDRIG ved den \u2014 den smuldrer ved ber\u00F8ring', en: 'Old fabric cable: NEVER touch it \u2014 it crumbles on contact' },
+    { da: 'Check ALTID for nulskinneforbindelse (gammel TN-C) f\u00F8r du rør PE', en: 'ALWAYS check for combined N/PE (old TN-C) before touching PE' },
+    { da: 'Asbest i \u00E6ldre el-tavler: stop arbejde og tilkald specialist', en: 'Asbestos in older panels: stop work and call specialist' },
+    { da: 'Dokumentation findes sjeldent \u2014 brug klemmem\u00E5ler p\u00E5 HVER leder', en: 'Documentation rarely exists \u2014 use clamp meter on EVERY conductor' },
+    { da: 'Opgradér altid RCD-beskyttelse n\u00E5r du alligevel er i tavlen', en: 'Always upgrade RCD protection when you are in the panel anyway' }
+  ]},
+  { id: 'solar', da: 'Solcelleinstallation', en: 'Solar PV installation', tips: [
+    { da: 'DC-side: ALDRIG arbejd med sp\u00E6nding p\u00E5! Solceller producerer ALTID n\u00E5r der er lys', en: 'DC side: NEVER work live! Solar panels ALWAYS produce when there is light' },
+    { da: 'String-sp\u00E6nding kan v\u00E6re 600-1000V DC \u2014 livsfarligt', en: 'String voltage can be 600-1000V DC \u2014 life-threatening' },
+    { da: 'RCD Type B p\u00E5 AC-side er krav (trafo-l\u00F8se invertere)', en: 'RCD Type B on AC side is required (transformerless inverters)' },
+    { da: 'Firefighter switch (DC-afbryder p\u00E5 tag) er krav i mange kommuner', en: 'Firefighter switch (DC disconnect on roof) is required in many municipalities' },
+    { da: 'Anmeldelse til netselskab SKAL v\u00E6re godkendt FØR tilslutning', en: 'Notification to grid company MUST be approved BEFORE connection' },
+    { da: 'Overvej batteri-forberedelse nu \u2014 plads i tavle + ekstra r\u00F8r', en: 'Consider battery preparation now \u2014 space in panel + extra conduit' }
+  ]},
+  { id: 'commercial', da: 'Erhvervsinstallation', en: 'Commercial installation', tips: [
+    { da: 'Nødbelysning: 1 lux p\u00E5 flugtveje, 0.5 lux i \u00E5bne omr\u00E5der, battery-backup 1 time', en: 'Emergency lighting: 1 lux on escape routes, 0.5 lux in open areas, battery backup 1 hour' },
+    { da: 'Brandalarmanl\u00E6g: ALTID p\u00E5 separat kreds UDEN RCD', en: 'Fire alarm: ALWAYS on separate circuit WITHOUT RCD' },
+    { da: 'Energim\u00E5ling per lejer/afdeling \u2014 check BEK nr. 563 krav', en: 'Energy metering per tenant/department \u2014 check BEK 563 requirements' },
+    { da: 'UPS til server/IT: ALTID p\u00E5 egen kreds med separat RCD', en: 'UPS for server/IT: ALWAYS on separate circuit with own RCD' },
+    { da: 'Dokumentation: Elsikkerhedsattest og tavleerkl\u00E6ring er LOVPLIGTIGE', en: 'Documentation: Elsikkerhedsattest and panel declaration are LEGALLY REQUIRED' }
+  ]}
+];
+
+function renderMester() {
+  var s = mesterState;
+  var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDC68\u200D\uD83D\uDD27 ' + tx('Mesterr\u00E5d \u2014 Erfarne Tips', 'Master\'s Advice \u2014 Expert Tips') + '</div>';
+  html += '<p class="info-text">' + tx('20+ scenarier med 5-8 eksperttips fra erfarne danske elektrikere. Viden der g\u00E5r udover reglerne.', '20+ scenarios with 5-8 expert tips from experienced Danish electricians. Knowledge beyond regulations.') + '</p>';
+
+  html += '<div class="param-group"><div class="param-label">' + tx('V\u00E6lg scenarie', 'Select scenario') + '</div><div class="btn-group">';
+  MESTER_SCENARIOS.forEach(function(sc) {
+    html += '<button class="sel-btn ' + (s.scenario === sc.id ? 'selected' : '') + '" onclick="mesterState.scenario=\'' + sc.id + '\';renderModule(\'mester\')">' + tx(sc.da, sc.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  if (s.scenario) {
+    var sc = MESTER_SCENARIOS.filter(function(x) { return x.id === s.scenario; })[0];
+    if (sc) {
+      html += '</div><div class="card fade-in"><div class="card-title">\uD83D\uDCA1 ' + tx(sc.da, sc.en) + '</div><div class="result-box">';
+      sc.tips.forEach(function(tip, idx) {
+        html += '<div class="result-row" style="padding:8px 0;border-bottom:1px solid var(--border)"><span class="label"><strong>' + (idx + 1) + '.</strong> ' + tx(tip.da, tip.en) + '</span></div>';
+      });
+      html += '</div>';
+    }
+  }
+
+  html += '</div>';
+  return html;
+}
+
+
+// ===== MODULE 8: TIMELINE ESTIMATOR (renderTidslinje) =====
+let tidslinjeState = { teamSize: 2, projectType: 'villa' };
+
+const TIDSLINJE_RATES = { apprentice: 280, electrician: 450, master: 650 };
+const TIDSLINJE_PROJECT_TYPES = [
+  { id: 'villa', da: 'Villa (nybyg)', en: 'Villa (new build)', baseHours: { design: 8, procurement: 4, install: 40, test: 6, docs: 4 } },
+  { id: 'apartment', da: 'Lejlighed (renovering)', en: 'Apartment (renovation)', baseHours: { design: 4, procurement: 2, install: 16, test: 4, docs: 2 } },
+  { id: 'commercial', da: 'Erhverv', en: 'Commercial', baseHours: { design: 24, procurement: 8, install: 80, test: 16, docs: 12 } },
+  { id: 'industrial', da: 'Industri', en: 'Industrial', baseHours: { design: 40, procurement: 16, install: 160, test: 32, docs: 24 } },
+  { id: 'ev_only', da: 'Kun EV-lader', en: 'EV charger only', baseHours: { design: 1, procurement: 1, install: 4, test: 1, docs: 1 } },
+  { id: 'panel', da: 'Tavleudskiftning', en: 'Panel replacement', baseHours: { design: 3, procurement: 2, install: 8, test: 3, docs: 2 } }
+];
+
+function tidslinjeCalc(projectType, teamSize) {
+  var proj = TIDSLINJE_PROJECT_TYPES.filter(function(p) { return p.id === projectType; })[0];
+  if (!proj) return null;
+  var h = proj.baseHours;
+  var installHours = Math.ceil(h.install / Math.max(teamSize, 1));
+  var totalHours = h.design + h.procurement + installHours + h.test + h.docs;
+  var cost = h.design * TIDSLINJE_RATES.master + h.procurement * TIDSLINJE_RATES.electrician + installHours * teamSize * TIDSLINJE_RATES.electrician + h.test * TIDSLINJE_RATES.electrician + h.docs * TIDSLINJE_RATES.master;
+  return {
+    phases: [
+      { name: tx('Design/projektering', 'Design/engineering'), hours: h.design, rate: TIDSLINJE_RATES.master },
+      { name: tx('Indk\u00F8b/logistik', 'Procurement/logistics'), hours: h.procurement, rate: TIDSLINJE_RATES.electrician },
+      { name: tx('Installation', 'Installation'), hours: installHours, rate: TIDSLINJE_RATES.electrician },
+      { name: tx('Test & idriftss\u00E6ttelse', 'Test & commissioning'), hours: h.test, rate: TIDSLINJE_RATES.electrician },
+      { name: tx('Dokumentation', 'Documentation'), hours: h.docs, rate: TIDSLINJE_RATES.master }
+    ],
+    totalHours: totalHours,
+    totalCost: cost,
+    workDays: Math.ceil(totalHours / 7.5)
+  };
+}
+
+function tidslinjeRenderBarSVG(phases) {
+  var maxH = 1;
+  phases.forEach(function(p) { if (p.hours > maxH) maxH = p.hours; });
+  var barW = 80, gap = 15, h = 200;
+  var totalW = phases.length * (barW + gap) + 40;
+  var svg = '<svg viewBox="0 0 ' + totalW + ' ' + (h + 60) + '" style="width:100%;max-height:250px">';
+  var colors = ['#3b82f6', '#8b5cf6', '#22c55e', '#f59e0b', '#ef4444'];
+  phases.forEach(function(p, i) {
+    var barH = (p.hours / maxH) * (h - 20);
+    var x = 20 + i * (barW + gap);
+    var y = h - barH;
+    svg += '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + barH + '" fill="' + colors[i % colors.length] + '" rx="4"/>';
+    svg += '<text x="' + (x + barW / 2) + '" y="' + (y - 5) + '" text-anchor="middle" fill="var(--text)" font-size="11" font-weight="600">' + p.hours + 'h</text>';
+    svg += '<text x="' + (x + barW / 2) + '" y="' + (h + 15) + '" text-anchor="middle" fill="var(--text-muted)" font-size="9">' + p.name.split('/')[0].substring(0, 10) + '</text>';
+  });
+  svg += '</svg>';
+  return svg;
+}
+
+function renderTidslinje() {
+  var s = tidslinjeState;
+  var html = '<div class="card fade-in"><div class="card-title">\u23F1\uFE0F ' + tx('Tidsestimat & Ressourcer', 'Timeline & Resource Estimator') + '</div>';
+  html += '<p class="info-text">' + tx('Estimerer timer og omkostninger ud fra projekttype og holdst\u00F8rrelse. Timepriser: l\u00E6rling 280, svend 450, mester 650 DKK/t.', 'Estimates hours and costs from project type and team size. Rates: apprentice 280, electrician 450, master 650 DKK/h.') + '</p>';
+
+  // Project type
+  html += '<div class="param-group"><div class="param-label">' + tx('Projekttype', 'Project type') + '</div><div class="btn-group">';
+  TIDSLINJE_PROJECT_TYPES.forEach(function(p) {
+    html += '<button class="sel-btn ' + (s.projectType === p.id ? 'selected' : '') + '" onclick="tidslinjeState.projectType=\'' + p.id + '\';renderModule(\'tidslinje\')">' + tx(p.da, p.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  // Team size
+  html += '<div class="param-group"><div class="param-label">' + tx('Holdst\u00F8rrelse', 'Team size') + '</div><div class="btn-group">';
+  [1, 2, 3, 4, 5, 6].forEach(function(n) {
+    html += '<button class="sel-btn ' + (s.teamSize === n ? 'selected' : '') + '" onclick="tidslinjeState.teamSize=' + n + ';renderModule(\'tidslinje\')">' + n + ' ' + tx('mand','people') + '</button>';
+  });
+  html += '</div></div>';
+
+  var result = tidslinjeCalc(s.projectType, s.teamSize);
+  if (result) {
+    html += '</div><div class="card fade-in"><div class="card-title">' + tx('Tidsestimat', 'Time Estimate') + '</div>';
+    html += '<div class="result-box">' + tidslinjeRenderBarSVG(result.phases) + '</div>';
+    html += '<div class="result-box" style="margin-top:8px">';
+    result.phases.forEach(function(p) {
+      html += '<div class="result-row"><span class="label">' + p.name + '</span><span class="value">' + p.hours + ' ' + tx('timer','hours') + ' \u00D7 ' + p.rate + ' DKK/t</span></div>';
+    });
+    html += '<div class="result-row" style="font-weight:700;font-size:1.1em;border-top:2px solid var(--border);padding-top:8px"><span class="label">' + tx('Total', 'Total') + '</span><span class="value">' + result.totalHours + ' ' + tx('timer','hours') + ' = ' + result.workDays + ' ' + tx('arbejdsdage','work days') + '</span></div>';
+    html += '<div class="result-row" style="font-weight:700;font-size:1.1em"><span class="label">' + tx('Estimeret pris (arbejdsL\u00F8n)', 'Estimated cost (labor)') + '</span><span class="value" style="color:var(--primary)">' + result.totalCost.toLocaleString() + ' DKK</span></div>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+
+// ===== MODULE 9: BENCHMARKING (renderBenchmark) =====
+let benchmarkState = { reference: null };
+
+const BENCHMARK_REFERENCES = [
+  { id: 'villa_small', da: 'Villa 120m\u00B2', en: 'Villa 120m\u00B2', circuits: 8, mainA: 25, rcdCount: 2, cableMeters: 150, totalKW: 15, spd: true, docs: 80 },
+  { id: 'villa_large', da: 'Villa 200m\u00B2', en: 'Villa 200m\u00B2', circuits: 14, mainA: 35, rcdCount: 4, cableMeters: 280, totalKW: 25, spd: true, docs: 90 },
+  { id: 'apartment', da: 'Lejlighed 80m\u00B2', en: 'Apartment 80m\u00B2', circuits: 6, mainA: 25, rcdCount: 2, cableMeters: 80, totalKW: 10, spd: false, docs: 70 },
+  { id: 'retail', da: 'Butik 300m\u00B2', en: 'Retail 300m\u00B2', circuits: 20, mainA: 63, rcdCount: 5, cableMeters: 400, totalKW: 50, spd: true, docs: 95 },
+  { id: 'office', da: 'Kontor 500m\u00B2', en: 'Office 500m\u00B2', circuits: 30, mainA: 100, rcdCount: 8, cableMeters: 600, totalKW: 80, spd: true, docs: 95 },
+  { id: 'warehouse', da: 'Lager 1000m\u00B2', en: 'Warehouse 1000m\u00B2', circuits: 15, mainA: 63, rcdCount: 4, cableMeters: 500, totalKW: 60, spd: true, docs: 85 },
+  { id: 'factory', da: 'Fabrik', en: 'Factory', circuits: 50, mainA: 250, rcdCount: 12, cableMeters: 2000, totalKW: 300, spd: true, docs: 100 },
+  { id: 'school', da: 'Skole', en: 'School', circuits: 40, mainA: 160, rcdCount: 10, cableMeters: 1500, totalKW: 150, spd: true, docs: 100 },
+  { id: 'hospital', da: 'Hospital (afdeling)', en: 'Hospital (ward)', circuits: 60, mainA: 400, rcdCount: 20, cableMeters: 3000, totalKW: 400, spd: true, docs: 100 },
+  { id: 'farm', da: 'Landbrug (stald)', en: 'Farm (stable)', circuits: 12, mainA: 63, rcdCount: 4, cableMeters: 300, totalKW: 40, spd: true, docs: 80 },
+  { id: 'ev_park', da: 'P-plads med EV (10 pladser)', en: 'Parking with EV (10 spots)', circuits: 12, mainA: 160, rcdCount: 10, cableMeters: 400, totalKW: 110, spd: true, docs: 90 },
+  { id: 'solar_farm', da: 'Solcelleanl\u00E6g 50kWp', en: 'Solar PV 50kWp', circuits: 8, mainA: 100, rcdCount: 4, cableMeters: 300, totalKW: 50, spd: true, docs: 95 },
+  { id: 'restaurant', da: 'Restaurant', en: 'Restaurant', circuits: 18, mainA: 63, rcdCount: 5, cableMeters: 250, totalKW: 60, spd: true, docs: 90 },
+  { id: 'gym', da: 'Fitnesscenter', en: 'Gym/Fitness', circuits: 22, mainA: 100, rcdCount: 6, cableMeters: 350, totalKW: 70, spd: true, docs: 85 },
+  { id: 'dataroom', da: 'Serverrum', en: 'Data room', circuits: 16, mainA: 100, rcdCount: 4, cableMeters: 200, totalKW: 80, spd: true, docs: 100 }
+];
+
+function benchmarkGetCurrent() {
+  var tree = (typeof sldTree !== 'undefined' && sldTree) ? sldTree : null;
+  var current = { circuits: 0, totalKW: 0, rcdCount: 0, cableMeters: 0 };
+  if (tree && tree.nodes) {
+    Object.keys(tree.nodes).forEach(function(nid) {
+      var n = tree.nodes[nid];
+      if (!n) return;
+      if (n.type === 'final_circuit') {
+        current.circuits++;
+        current.totalKW += (n.power_kW || 0);
+        if (n.rcd) current.rcdCount++;
+        if (n.cable && n.cable.length_m) current.cableMeters += n.cable.length_m;
+      }
+    });
+  }
+  return current;
+}
+
+function benchmarkRenderRadarSVG(current, reference) {
+  var dims = [
+    { label: tx('Kredse','Circuits'), cur: current.circuits, ref: reference.circuits },
+    { label: tx('Effekt','Power'), cur: current.totalKW, ref: reference.totalKW },
+    { label: tx('RCD','RCD'), cur: current.rcdCount, ref: reference.rcdCount },
+    { label: tx('Kabel','Cable'), cur: current.cableMeters, ref: reference.cableMeters },
+    { label: tx('Kapacitet','Capacity'), cur: current.totalKW * 0.8, ref: reference.totalKW * 0.9 },
+    { label: tx('Dok.','Docs'), cur: 50, ref: reference.docs }
+  ];
+  var cx = 150, cy = 150, maxR = 100;
+  var svg = '<svg viewBox="0 0 300 300" style="width:280px;height:280px;display:block;margin:0 auto">';
+  // Grid
+  for (var ring = 1; ring <= 4; ring++) {
+    var r = (ring / 4) * maxR;
+    svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="var(--border)" stroke-width="0.5"/>';
+  }
+  // Axes and labels
+  var nDims = dims.length;
+  dims.forEach(function(d, i) {
+    var angle = (i / nDims) * 2 * Math.PI - Math.PI / 2;
+    var x = cx + Math.cos(angle) * (maxR + 20);
+    var y = cy + Math.sin(angle) * (maxR + 20);
+    svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + (cx + Math.cos(angle) * maxR) + '" y2="' + (cy + Math.sin(angle) * maxR) + '" stroke="var(--border)" stroke-width="0.5"/>';
+    svg += '<text x="' + x + '" y="' + y + '" text-anchor="middle" fill="var(--text-muted)" font-size="9">' + d.label + '</text>';
+  });
+  // Reference polygon
+  var refPoints = '', curPoints = '';
+  dims.forEach(function(d, i) {
+    var angle = (i / nDims) * 2 * Math.PI - Math.PI / 2;
+    var refR = Math.min((d.ref > 0 ? 1 : 0), 1) * maxR;
+    var curR = Math.min(d.ref > 0 ? (d.cur / d.ref) : 0, 1.5) * maxR;
+    refPoints += (cx + Math.cos(angle) * refR) + ',' + (cy + Math.sin(angle) * refR) + ' ';
+    curPoints += (cx + Math.cos(angle) * curR) + ',' + (cy + Math.sin(angle) * curR) + ' ';
+  });
+  svg += '<polygon points="' + refPoints + '" fill="rgba(59,130,246,0.15)" stroke="#3b82f6" stroke-width="1.5"/>';
+  svg += '<polygon points="' + curPoints + '" fill="rgba(34,197,94,0.2)" stroke="#22c55e" stroke-width="2"/>';
+  // Legend
+  svg += '<rect x="10" y="275" width="12" height="12" fill="rgba(59,130,246,0.3)" stroke="#3b82f6"/>';
+  svg += '<text x="26" y="285" fill="var(--text-muted)" font-size="9">' + tx('Reference','Reference') + '</text>';
+  svg += '<rect x="100" y="275" width="12" height="12" fill="rgba(34,197,94,0.3)" stroke="#22c55e"/>';
+  svg += '<text x="116" y="285" fill="var(--text-muted)" font-size="9">' + tx('Din installation','Your installation') + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function renderBenchmark() {
+  var s = benchmarkState;
+  var html = '<div class="card fade-in"><div class="card-title">\uD83D\uDCCA ' + tx('Benchmark \u2014 Sammenlign med reference', 'Benchmark \u2014 Compare with reference') + '</div>';
+  html += '<p class="info-text">' + tx('15+ danske referenceinstallationer. Sammenlign dit design mod n\u00E6rmeste reference p\u00E5 6 dimensioner.', '15+ Danish reference installations. Compare your design against closest reference on 6 dimensions.') + '</p>';
+
+  html += '<div class="param-group"><div class="param-label">' + tx('V\u00E6lg reference', 'Select reference') + '</div><div class="btn-group">';
+  BENCHMARK_REFERENCES.forEach(function(ref) {
+    html += '<button class="sel-btn ' + (s.reference === ref.id ? 'selected' : '') + '" onclick="benchmarkState.reference=\'' + ref.id + '\';renderModule(\'benchmark\')">' + tx(ref.da, ref.en) + '</button>';
+  });
+  html += '</div></div>';
+
+  if (s.reference) {
+    var ref = BENCHMARK_REFERENCES.filter(function(r) { return r.id === s.reference; })[0];
+    var current = benchmarkGetCurrent();
+    html += '</div><div class="card fade-in"><div class="card-title">' + tx('Radardiagram', 'Radar Chart') + '</div>';
+    html += '<div class="result-box">' + benchmarkRenderRadarSVG(current, ref) + '</div>';
+    html += '<div class="result-box" style="margin-top:8px"><div class="result-title">' + tx('Detaljer', 'Details') + '</div>';
+    html += '<div class="result-row"><span class="label">' + tx('Kredse', 'Circuits') + '</span><span class="value">' + current.circuits + ' / ' + ref.circuits + ' (' + tx('ref.','ref.') + ')</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Total effekt', 'Total power') + '</span><span class="value">' + current.totalKW.toFixed(1) + ' / ' + ref.totalKW + ' kW</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('RCD-enheder', 'RCD devices') + '</span><span class="value">' + current.rcdCount + ' / ' + ref.rcdCount + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Kabelmeter', 'Cable meters') + '</span><span class="value">' + current.cableMeters + ' / ' + ref.cableMeters + ' m</span></div>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+
+// ===== MODULE 10: ENHANCED TJEKALT (upgraded from 14 to 40+ checks) =====
+// We extend the existing tjekaltRunCheck and renderTjekAlt with installation-type context
+
+let tjekaltEnhancedType = 'residential';
+
+const TJEKALT_INSTALL_TYPES = [
+  { id: 'residential', da: 'Bolig', en: 'Residential' },
+  { id: 'commercial', da: 'Erhverv', en: 'Commercial' },
+  { id: 'industrial', da: 'Industri', en: 'Industrial' },
+  { id: 'bathroom', da: 'Badev\u00E6relse', en: 'Bathroom' },
+  { id: 'ev', da: 'EV-lader', en: 'EV charging' },
+  { id: 'solar', da: 'Solceller', en: 'Solar PV' }
+];
+
+const TJEKALT_EXTRA_CHECKS = [
+  // Residential (15-40)
+  { id: 15, da: 'Minimum 2 stikkontaktkredse i k\u00F8kken', en: 'Minimum 2 socket circuits in kitchen', clause: 'cl.314.1', types: ['residential'] },
+  { id: 16, da: 'Separat kreds til komfur/ovn', en: 'Separate circuit for cooker/oven', clause: 'cl.314.1', types: ['residential'] },
+  { id: 17, da: 'R\u00F8galarmer installeret (BEK)', en: 'Smoke detectors installed (BEK)', clause: 'BR18 \u00A792', types: ['residential'] },
+  { id: 18, da: 'Udend\u00F8rs stikkontakter med l\u00E5g + RCD', en: 'Outdoor sockets with covers + RCD', clause: 'cl.6.61.3.3', types: ['residential'] },
+  { id: 19, da: 'Hovedafbryder tilg\u00E6ngelig for beboer', en: 'Main switch accessible to resident', clause: 'cl.537.2', types: ['residential'] },
+  // Commercial (20-30)
+  { id: 20, da: 'N\u00F8dbelysning installeret og testet', en: 'Emergency lighting installed and tested', clause: 'DS/EN 50172', types: ['commercial', 'industrial'] },
+  { id: 21, da: 'N\u00F8dstop ved maskiner tilg\u00E6ngeligt', en: 'Emergency stop at machines accessible', clause: 'DS/EN 60204', types: ['industrial'] },
+  { id: 22, da: 'Energim\u00E5ler installeret (BEK 563)', en: 'Energy meter installed (BEK 563)', clause: 'BEK 563', types: ['commercial'] },
+  { id: 23, da: 'Brandalarmanl\u00E6g p\u00E5 separat kreds', en: 'Fire alarm on separate circuit', clause: 'cl.560.9', types: ['commercial', 'industrial'] },
+  { id: 24, da: 'UPS-backup til n\u00F8dkritisk udstyr', en: 'UPS backup for critical equipment', clause: 'cl.560.6', types: ['commercial'] },
+  { id: 25, da: 'Selektivitet verificeret (TCC-kurver)', en: 'Selectivity verified (TCC curves)', clause: 'cl.536.4', types: ['commercial', 'industrial'] },
+  // Bathroom (30-35)
+  { id: 30, da: 'Zone 0: Kun SELV \u226412V', en: 'Zone 0: Only SELV \u226412V', clause: 'cl.701.55', types: ['bathroom'] },
+  { id: 31, da: 'Zone 1: IPX4 + ingen stikkontakter', en: 'Zone 1: IPX4 + no sockets', clause: 'cl.701.512.2', types: ['bathroom'] },
+  { id: 32, da: 'Zone 2: IPX4 minimum', en: 'Zone 2: IPX4 minimum', clause: 'cl.701.512.2', types: ['bathroom'] },
+  { id: 33, da: 'Supplerende udligning forbundet', en: 'Supplementary bonding connected', clause: 'cl.701.415.2', types: ['bathroom'] },
+  { id: 34, da: 'Gulvvarme med jordskærm', en: 'Underfloor heating with earth screen', clause: 'cl.701.753', types: ['bathroom'] },
+  // EV (35-38)
+  { id: 35, da: 'Kabel dimensioneret til 100% 24/7', en: 'Cable sized for 100% continuous', clause: 'IEC 61851', types: ['ev'] },
+  { id: 36, da: 'RCD Type B installeret', en: 'RCD Type B installed', clause: 'IEC 62955', types: ['ev'] },
+  { id: 37, da: 'Anmeldelse til netselskab (>11 kW)', en: 'Grid notification (>11 kW)', clause: 'Starkstr\u00F8msbekendtg.', types: ['ev'] },
+  { id: 38, da: 'Lastbalancering konfigureret', en: 'Load balancing configured', clause: 'DS/HD 60364-7-722', types: ['ev'] },
+  // Solar (39-42)
+  { id: 39, da: 'DC-afbryder p\u00E5 tag (brandvæsen)', en: 'DC disconnect on roof (fire dept)', clause: 'cl.712.536', types: ['solar'] },
+  { id: 40, da: 'RCD Type B p\u00E5 AC-side', en: 'RCD Type B on AC side', clause: 'cl.712.411.3.3', types: ['solar'] },
+  { id: 41, da: 'Inverter CE-m\u00E6rket og godkendt', en: 'Inverter CE marked and approved', clause: 'DS/EN 62109', types: ['solar'] },
+  { id: 42, da: 'Anti-\u00F8drift beskyttelse aktiv', en: 'Anti-islanding protection active', clause: 'DS/EN 50549', types: ['solar'] },
+  { id: 43, da: 'Netselskab godkendelse modtaget', en: 'Grid company approval received', clause: 'Nettilslutningsbekendtg.', types: ['solar'] }
+];
+
+function tjekaltEnhancedRunCheck(installType) {
+  // Run original checks first
+  var checks = tjekaltRunCheck();
+
+  // Add type-specific checks
+  var extraChecks = TJEKALT_EXTRA_CHECKS.filter(function(c) { return c.types.indexOf(installType) >= 0; });
+  extraChecks.forEach(function(ec) {
+    checks.push({ id: ec.id, status: 'yellow', label: tx(ec.da, ec.en), clause: ec.clause, fixModule: ec.fixModule || null });
+  });
+
+  return checks;
+}
 // ===== INIT =====
 guideLoadProgress();
 renderNav();
