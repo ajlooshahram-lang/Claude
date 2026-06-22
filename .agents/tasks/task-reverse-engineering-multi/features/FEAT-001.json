@@ -1,0 +1,36 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Implement full multi-circuit reverse engineering mode with click-only UI, trilingual strings, complete sldTree integration, BOM, compliance report, and optimization suggestions. Then add 30+ new tests.",
+  "status": "in_progress",
+  "steps": [
+    "Step 1 - Expand reverseState (around line 4908-4914 in el-dimensionering.html): Keep existing multiMode/selectedBuildingType/selectedCategory/selectedCircuits/multiResult/multiSolverLog/multiOptimizations fields. These are the state for the multi-circuit mode.",
+    "Step 2 - Add REVERSE_CIRCUIT_TEMPLATES constant (after REVERSE_PRESETS around line 4928): Define circuit templates for common loads (lighting, sockets, cooker, EV charger 11kW, EV charger 22kW, heat pump, motor 5.5kW, motor 11kW, motor 22kW, solar inverter, server/data, bathroom, outdoor). Each template has: id, name_da, name_en, name_fa, power_kW, cosPhi, phases, voltage, installMethod, cableLength_m, protectionType. This gives users click-to-add circuits.",
+    "Step 3 - Add REVERSE_BUILDING_PRESETS constant (after REVERSE_CIRCUIT_TEMPLATES): Define building presets like 'Parcelhus (villa)', 'Lejlighed (apartment)', 'Erhverv (commercial)', 'Industri (industrial)', 'Landbrug (agricultural)'. Each has a name_da/name_en/name_fa, a list of default circuit template IDs, an earthSystem default, and diversity factor.",
+    "Step 4 - Add reverseMultiSolve() function (after reverseEngineerSolve around line 34900): This is the core multi-circuit algorithm. It: (a) Iterates over reverseState.selectedCircuits, (b) For each circuit, runs the same IB->In->Iz->Vdrop->Ik->Zs algorithm as reverseEngineerSolve but parameterized per-circuit, (c) Builds a complete sldTree with transformer + main board + all final circuits using sldCreateNode, (d) Calls sldPropagateAll on the result tree, (e) Runs sldVerifyNode on each node to get compliance, (f) Generates combined BOM from all circuits, (g) Runs optimization analysis (checks if any cable could be downsized, if discrimination is achieved between devices, if grouping factor warnings apply). Store result in reverseState.multiResult.",
+    "Step 5 - Add reverseAddCircuit(templateId), reverseRemoveCircuit(index), reverseSetCircuitParam(index, key, value) helper functions: These modify reverseState.selectedCircuits array. Each circuit in the array is a copy of the template with possible user overrides (cable length, install method, temp, grouping can each be customized per circuit via click buttons).",
+    "Step 6 - Add reverseSelectBuilding(presetId) function: Loads a building preset, sets reverseState.selectedBuildingType, populates selectedCircuits from the preset's default circuit list, sets earthSystem.",
+    "Step 7 - Add reverseMultiOptimize(tree, circuits, results) function: Analyzes the solved tree for optimization opportunities. Checks: (a) could any cable be one size smaller and still pass? (b) are all MCBs/MCCBs achieving discrimination with upstream? (c) is total diversity factor applied? (d) could shared neutral reduce cable count? Returns array of optimization suggestion objects {type, circuit, suggestion_da, suggestion_en, saving_pct}.",
+    "Step 8 - Expand renderReverse() (line 35043): Add a mode toggle at the top: 'Enkelt kreds / Single Circuit' vs 'Hel installation / Whole Installation'. When multiMode is true, render the multi-circuit UI instead of single-circuit. The multi-circuit UI shows: (a) Building preset buttons (step 1), (b) Selected circuits list with per-circuit parameter adjustment buttons, (c) Add-circuit template buttons, (d) Remove-circuit buttons, (e) Earth system selector, (f) Solve button calling reverseMultiSolve(), (g) Results: installation SVG diagram, combined BOM, per-circuit compliance table, optimization suggestions. All click-only, no text inputs.",
+    "Step 9 - Add Farsi translations to _FA dictionary (around line 1548+): Add translations for all new English strings used in tx() calls: 'Whole Installation', 'Single Circuit', 'Add Circuit', 'Remove', 'Building Type', 'Circuits', 'Solve Whole Installation', 'Optimization Suggestions', 'Discrimination', 'Diversity Factor', 'Could downsize', etc.",
+    "Step 10 - Add SharedQuantities integration in syncSharedQuantities case 'reverse' (line 7751-7763): When multiMode is true and multiResult exists, push total installation power, circuit count, and overall compliance status to SharedQuantities.",
+    "Step 11 - Add 30+ new tests in test-sld.js: Append tests after the existing reverse engineering test block (after line ~15300, before the Summary section). Tests must cover: (a) REVERSE_CIRCUIT_TEMPLATES structure and content, (b) REVERSE_BUILDING_PRESETS structure, (c) reverseAddCircuit adds to selectedCircuits, (d) reverseRemoveCircuit removes correctly, (e) reverseSetCircuitParam updates specific circuit, (f) reverseSelectBuilding populates circuits from preset, (g) reverseMultiSolve with single circuit produces valid result, (h) reverseMultiSolve with villa preset (multiple circuits) finds compliant solutions, (i) reverseMultiSolve builds valid sldTree with correct node count, (j) reverseMultiSolve BOM includes entries for each circuit, (k) reverseMultiSolve compliance array has entries for each circuit, (l) reverseMultiSolve with challenging load (200m cable) triggers upsize, (m) reverseMultiSolve never exceeds iteration limits, (n) reverseMultiSolve with TT system adds RCD per circuit, (o) reverseMultiOptimize identifies downsizing opportunities, (p) reverseMultiOptimize checks discrimination, (q) multi-mode state toggle works, (r) renderReverse in multi mode produces HTML with circuit list, (s) renderReverse multi mode has no input/textarea elements, (t) IB calculation correctness for each preset circuit type, (u-z+) additional edge cases and safety verification tests."
+  ],
+  "acceptance_criteria": [
+    "Running `node test-sld.js` passes ALL tests (existing 1645 + 30+ new = 1675+ total)",
+    "reverseMultiSolve() builds a complete sldTree with transformer + main board + N final circuits",
+    "Each circuit in multi-mode passes sldVerifyNode() compliance checks (IB<=In<=Iz, Vdrop, Icu, Zs)",
+    "BOM output lists real products from PRODUCTS database for every circuit",
+    "Compliance report cites specific DS/HD 60364 clauses",
+    "Optimization suggestions array is populated when opportunities exist",
+    "All new UI strings have Farsi translations in _FA dictionary",
+    "renderReverse() in multi-mode produces HTML with zero <input> or <textarea> elements",
+    "No existing tests break - the 1645 current tests must still pass"
+  ],
+  "verification": [
+    "Run `node --check test-sld.js` to verify syntax",
+    "Run `node test-sld.js` and confirm 0 failures and total passed >= 1675"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
