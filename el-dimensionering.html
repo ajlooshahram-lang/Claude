@@ -34045,8 +34045,6 @@ function liveRenderNodes(tree, positions, nodeW, nodeH, mode) {
         extraClass = ' class="live-node live-thermal"';
       }
     }
-
-    // Click handler based on mode
     if (mode === 'fault') {
       onclick = ' onclick="liveInjectFault(\'' + id + '\')" style="cursor:crosshair"';
     } else {
@@ -34064,6 +34062,7 @@ function liveRenderNodes(tree, positions, nodeW, nodeH, mode) {
       if (disasterScenario === 'trafo_failure') {
         svg += '<line x1="' + (cx - 18) + '" y1="' + (cy - 18) + '" x2="' + (cx + 18) + '" y2="' + (cy + 18) + '" stroke="#f44336" stroke-width="3" class="live-disaster"/>';
         svg += '<line x1="' + (cx + 18) + '" y1="' + (cy - 18) + '" x2="' + (cx - 18) + '" y2="' + (cy + 18) + '" stroke="#f44336" stroke-width="3" class="live-disaster"/>';
+        svg += '<text x="' + (cx + 22) + '" y="' + (cy - 20) + '" font-size="7" fill="#4caf50" font-weight="bold">Gen</text>';
       }
     } else if (node.type === 'main_board' || node.type === 'sub_board') {
       svg += '<rect x="' + pos.x + '" y="' + pos.y + '" width="' + nodeW + '" height="' + nodeH + '" rx="4"' + extraClass + ' fill="' + fillColor + '" stroke="' + borderColor + '" stroke-width="2"/>';
@@ -34077,6 +34076,20 @@ function liveRenderNodes(tree, positions, nodeW, nodeH, mode) {
       // Voltage indicator
       var vColor = liveVoltageColor(vdrop);
       svg += '<text x="' + (pos.x + nodeW / 2) + '" y="' + (pos.y + 44) + '" text-anchor="middle" font-size="5.5" fill="' + vColor + '">Vd:' + vdrop.toFixed(1) + '%</text>';
+    }
+
+    // Disaster detail labels
+    if (disasterScenario === 'neutral_break' && node.phases === '1x230') {
+      svg += '<text x="' + (pos.x + nodeW + 3) + '" y="' + (pos.y + 12) + '" font-size="6" fill="#f44336" font-weight="bold">398V</text>';
+    }
+    if (disasterScenario === 'high_ambient') {
+      var hiDeratedIz = iz * 0.82;
+      if (ib > hiDeratedIz) {
+        svg += '<text x="' + (pos.x + nodeW + 3) + '" y="' + (pos.y + 12) + '" font-size="5.5" fill="#f44336">Iz\u2019=' + hiDeratedIz.toFixed(0) + 'A (0.82)</text>';
+      }
+    }
+    if (disasterScenario === 'harmonic' && (node.phases === '1x230' || node.type === 'main_board')) {
+      svg += '<text x="' + (pos.x + nodeW + 3) + '" y="' + (pos.y + 12) + '" font-size="5.5" fill="#ff5722">Nx1.73</text>';
     }
 
     svg += '</g>';
@@ -34258,7 +34271,31 @@ function renderLiveInstallation() {
     html += '<button class="sel-btn' + (liveState.timelapseSpeed === 1 ? ' selected' : '') + '" onclick="liveSetSpeed(1)">1x</button> ';
     html += '<button class="sel-btn' + (liveState.timelapseSpeed === 2 ? ' selected' : '') + '" onclick="liveSetSpeed(2)">2x</button> ';
     html += '<button class="sel-btn' + (liveState.timelapseSpeed === 4 ? ' selected' : '') + '" onclick="liveSetSpeed(4)">4x</button>';
-    html += '</div></div>';
+    html += '</div>';
+    // Summary indicators: max cable temp ratio, max voltage drop, total power demand
+    var tlMaxRatio = 0, tlMaxVdrop = 0, tlTotalPower = 0;
+    Object.keys(tree.nodes).forEach(function(nid) {
+      var n = tree.nodes[nid];
+      if (!n) return;
+      var nIb = (n._ib || 0) * loadMult;
+      var nIz = (n.cable) ? (n.cable.iz || 100) : 100;
+      var nRatio = nIz > 0 ? nIb / nIz : 0;
+      if (nRatio > tlMaxRatio) tlMaxRatio = nRatio;
+      var nVd = (n._vdrop || 0) * loadMult;
+      if (nVd > tlMaxVdrop) tlMaxVdrop = nVd;
+      if (n.type === 'final_circuit') {
+        tlTotalPower += (n.power_kW || (nIb * (n.voltage || 230) * (n.cosPhi || 0.9) / 1000));
+      }
+    });
+    var tempColor = tlMaxRatio < 0.75 ? '#4caf50' : (tlMaxRatio < 1.0 ? '#ff9800' : '#f44336');
+    var vdColor = tlMaxVdrop <= 3 ? '#4caf50' : (tlMaxVdrop <= 5 ? '#ff9800' : '#f44336');
+    var powColor = tlTotalPower < 100 ? '#4caf50' : (tlTotalPower < 300 ? '#ff9800' : '#f44336');
+    html += '<div style="margin-top:8px;display:flex;gap:12px;flex-wrap:wrap">';
+    html += '<span style="padding:2px 8px;border-radius:4px;background:' + tempColor + ';color:#fff;font-size:0.85em">' + tx('Maks temp', 'Max temp') + ': ' + (tlMaxRatio * 100).toFixed(0) + '%</span>';
+    html += '<span style="padding:2px 8px;border-radius:4px;background:' + vdColor + ';color:#fff;font-size:0.85em">' + tx('Maks Vd', 'Max Vd') + ': ' + tlMaxVdrop.toFixed(1) + '%</span>';
+    html += '<span style="padding:2px 8px;border-radius:4px;background:' + powColor + ';color:#fff;font-size:0.85em">' + tx('Total effekt', 'Total power') + ': ' + tlTotalPower.toFixed(1) + ' kW</span>';
+    html += '</div>';
+    html += '</div>';
   }
 
   if (mode === 'disasters') {
@@ -34296,6 +34333,26 @@ function renderLiveInstallation() {
   svg += '</svg>';
   html += svg;
 
+  // 24h load profile bar chart (time-lapse mode only)
+  if (mode === 'timelapse') {
+    html += '<div style="margin-top:10px"><div style="font-size:0.85em;font-weight:600;margin-bottom:4px">' + tx('24-timers belastningsprofil', '24h Load Profile') + '</div>';
+    html += '<svg width="100%" viewBox="0 0 288 60" style="border-radius:6px;background:var(--bg-secondary,#f8f9fa);max-height:80px">';
+    for (var bh = 0; bh < 24; bh++) {
+      var bMult = liveGetLoadMultiplier(bh);
+      var barH = Math.max(2, (bMult / 2.0) * 44);
+      var barColor = bMult <= 0.3 ? '#2196f3' : (bMult <= 1.0 ? '#4caf50' : (bMult <= 1.5 ? '#ff9800' : '#f44336'));
+      var barX = bh * 12 + 2;
+      var barY = 50 - barH;
+      var barOpacity = (bh === liveState.timelapseHour) ? '1' : '0.7';
+      var barStroke = (bh === liveState.timelapseHour) ? ' stroke="#333" stroke-width="1"' : '';
+      html += '<rect x="' + barX + '" y="' + barY + '" width="10" height="' + barH + '" rx="1" fill="' + barColor + '" opacity="' + barOpacity + '"' + barStroke + '/>';
+      if (bh % 6 === 0) {
+        html += '<text x="' + (barX + 5) + '" y="58" text-anchor="middle" font-size="5" fill="var(--text-muted,#666)">' + (bh < 10 ? '0' : '') + bh + '</text>';
+      }
+    }
+    html += '</svg></div>';
+  }
+
   // Legend
   html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + tx('Signaturforklaring', 'Legend') + '</div>';
   html += '<div class="result-row"><span class="label" style="color:#2196f3">\u2588</span><span class="value">' + tx('Kold (lav belastning)', 'Cold (low load)') + '</span></div>';
@@ -34305,6 +34362,27 @@ function renderLiveInstallation() {
   if (mode === 'live') {
     html += '<div class="result-row" style="opacity:0.7;font-size:0.85em"><span class="label">' + tx('Tip', 'Tip') + '</span><span class="value">' + tx('Klik paa en komponent for at navigere til modulet', 'Click a component to navigate to its module') + '</span></div>';
   }
+  html += '</div>';
+
+  // Statistics footer
+  var statNodeCount = 0, statTotalIb = 0, statCosPhi = 0, statCosPhiCount = 0, statMaxUtil = 0;
+  Object.keys(tree.nodes).forEach(function(nid) {
+    var n = tree.nodes[nid];
+    if (!n) return;
+    statNodeCount++;
+    var nIb = n._ib || 0;
+    if (n.childIds && n.childIds.length === 0) statTotalIb += nIb; // leaf nodes only
+    if (n.cosPhi && n.cosPhi > 0) { statCosPhi += n.cosPhi; statCosPhiCount++; }
+    var nIz = (n.cable) ? (n.cable.iz || 100) : 100;
+    var util = nIz > 0 ? nIb / nIz : 0;
+    if (util > statMaxUtil) statMaxUtil = util;
+  });
+  var avgPf = statCosPhiCount > 0 ? (statCosPhi / statCosPhiCount) : 0.9;
+  html += '<div class="result-box live-stats-footer" style="margin-top:10px;font-size:0.85em"><div class="result-title">' + tx('Statistik', 'Statistics') + '</div>';
+  html += '<div class="result-row"><span class="label">' + tx('Noder i alt', 'Total nodes') + '</span><span class="value">' + statNodeCount + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Total belastningsstroemme', 'Total load current') + '</span><span class="value">' + statTotalIb.toFixed(1) + ' A</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Gennemsnitlig effektfaktor', 'Average power factor') + '</span><span class="value">' + avgPf.toFixed(2) + '</span></div>';
+  html += '<div class="result-row"><span class="label">' + tx('Maks udnyttelsesgrad', 'Max utilization ratio') + '</span><span class="value" style="color:' + (statMaxUtil < 0.75 ? '#4caf50' : (statMaxUtil < 1.0 ? '#ff9800' : '#f44336')) + '">' + (statMaxUtil * 100).toFixed(0) + '%</span></div>';
   html += '</div>';
 
   html += '</div>';
