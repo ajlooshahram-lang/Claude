@@ -1,0 +1,26 @@
+{
+  "project_type": "Single-file offline webapp (QI Intelligence Platform / STP Application)",
+  "language": "JavaScript (browser, no build tools like webpack - custom build script)",
+  "build_system": "Custom Node.js build script (build-standalone.js) that inlines all vendor libs, app modules, CSS and textures into one HTML file. No webpack/bundler.",
+  "test_framework": "Custom Node.js tests using jsdom: test.js (unit), brain.test.js (brain analyzer), smoke.js (full headless boot + 735+ assertions). Playwright for E2E (verify-upload.mjs).",
+  "build_command": "cd /projects/sandbox/Claude/qi-webapp && node build-standalone.js",
+  "test_command": "cd /projects/sandbox/Claude/qi-webapp && npm test",
+  "verification_instructions": "1. npm test (runs test.js + brain.test.js + smoke.js). 2. node build-standalone.js. 3. node verify-standalone.js.",
+  "snapshot_or_generated_files": "qi-webapp/dist/STP-Application.html is the generated standalone build (committed separately after source changes).",
+  "setup_instructions": "cd /projects/sandbox/Claude/qi-webapp && npm install",
+  "environment_constraints": "Open internet available. Node.js v22 installed. Playwright available for E2E tests.",
+  "contribution_requirements": "Source commits first, then rebuild dist and commit dist separately. All smoke tests must pass. The app is CLICK-ONLY (no free-text/number inputs in data views). File size under 6MB for standalone HTML is acceptable.",
+  "key_patterns": "Vendor libs go in qi-webapp/vendor/<name>/*.min.js. Build script reads them in order from VENDOR array and inlines as <script> tags. App modules are IIFE/global style (window.QIBrain, window.QIStore, etc). The upload handler is in js/ui.js in the AFTER.brain function (line ~3343). The file input accept attribute is in the HTML template also in ui.js (line ~3242). Mammoth.js uses window.mammoth global. pdf.js legacy sets globalThis.pdfjsLib but also has ESM export statements that must be stripped for <script> tag use. The worker code must be inlined as a Blob URL.",
+  "relevant_files": [
+    "qi-webapp/js/ui.js (file upload handler at line ~3371, accept attribute at line ~3242)",
+    "qi-webapp/build-standalone.js (VENDOR array, inlining logic)",
+    "qi-webapp/smoke.js (headless tests - needs new assertions for DOCX/PDF routing)",
+    "qi-webapp/verify-upload.mjs (E2E upload test - needs new DOCX/PDF assertions)",
+    "qi-webapp/index.html (script load order)",
+    "qi-webapp/package.json (dependencies)",
+    "qi-webapp/node_modules/mammoth/mammoth.browser.min.js (635KB, browser-ready UMD global)",
+    "qi-webapp/node_modules/pdfjs-dist/legacy/build/pdf.min.mjs (509KB, needs export stripping)",
+    "qi-webapp/node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs (1.3MB, inlined as Blob URL)"
+  ],
+  "directory_structure": "qi-webapp/ is the app root. vendor/ has chartjs/ and three/. js/ has all app modules. css/ has styles. dist/ has the built standalone HTML. samples/ has test project descriptions. textures/ has earth images for the 3D globe."
+}

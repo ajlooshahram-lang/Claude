@@ -1,0 +1,7 @@
+{
+  "task_id": "task-add-pdf-docx-upload",
+  "task_description": "Add client-side PDF and DOCX text extraction to the Project Brain so users can upload Word/PDF project descriptions directly. The Brain then analyzes the extracted text to build plans, frameworks, and advisor recommendations - all offline, nothing leaves the device.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null
+}

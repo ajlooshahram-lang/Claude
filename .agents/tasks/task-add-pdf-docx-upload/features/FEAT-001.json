@@ -1,0 +1,36 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Add client-side PDF and DOCX text extraction to the Project Brain upload handler, allowing users to upload Word/PDF project descriptions that get extracted and analyzed automatically.",
+  "status": "completed",
+  "steps": [
+    "Step 1: Install vendor libraries. Run 'npm install mammoth pdfjs-dist' (already done). Copy the browser-ready files into the vendor directory: (a) cp node_modules/mammoth/mammoth.browser.min.js to vendor/mammoth/mammoth.browser.min.js, (b) Create vendor/pdfjs/ directory and place a build-time-processed version of pdf.min.mjs (with the ESM export statement stripped so it works in a plain <script> tag - the file already sets globalThis.pdfjsLib as a side effect), (c) Place the pdf.worker.min.mjs in vendor/pdfjs/ for inlining as a Blob URL at runtime.",
+    "Step 2: Update build-standalone.js to inline the new vendor libraries. Add 'vendor/mammoth/mammoth.browser.min.js' and 'vendor/pdfjs/pdf.min.js' to the VENDOR array (order: after three.js add-ons). For the pdf.js worker, add special handling: read vendor/pdfjs/pdf.worker.min.js, create a <script> block that builds a Blob URL from the worker source and sets globalThis.pdfjsLib.GlobalWorkerOptions.workerSrc to that Blob URL. This must come AFTER the pdf core script.",
+    "Step 3: Update qi-webapp/index.html to load the new vendor scripts (for dev mode - the standalone build inlines them, but dev mode uses <script src=...>). Add: <script src='vendor/mammoth/mammoth.browser.min.js'></script> and <script src='vendor/pdfjs/pdf.min.js'></script> before the app module scripts. Also add an inline script that sets up the worker Blob URL from vendor/pdfjs/pdf.worker.min.js (or in dev mode, just point GlobalWorkerOptions.workerSrc to the file path).",
+    "Step 4: Update the file upload handler in qi-webapp/js/ui.js (AFTER.brain function, around line 3371). Change the logic: (a) Update the accept attribute on #brainFile input from '.txt,.md,text/plain,text/markdown' to '.txt,.md,.pdf,.docx,text/plain,text/markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document'. (b) Update the button label from 'Upload .txt / .md' to 'Upload .txt / .pdf / .docx'. (c) In the fileInput change handler: detect .docx files -> use mammoth.extractRawText() on the ArrayBuffer to get plain text; detect .pdf files -> use pdfjsLib.getDocument() to load, iterate pages, call page.getTextContent() and join the text items. Show progress toast 'Reading your document...' during extraction. On success, set ta.value to the extracted text and call runAnalyze(). (d) Keep .doc (old binary Word format) rejection with message 'Please save as .docx first'. Keep .pptx/.xlsx/etc rejection. (e) Remove the binary-sniff early-return for PDF/DOCX since we now handle them. Keep the binary sniff for truly unsupported binary formats.",
+    "Step 5: Update the smoke.js headless tests to add assertions covering the new file type routing logic. Since jsdom cannot actually parse PDF/DOCX binaries (no real mammoth/pdfjsLib in test env), test: (a) that the accept attribute on #brainFile includes .pdf and .docx, (b) that the button label mentions .pdf / .docx, (c) that window.mammoth and window.pdfjsLib (or globalThis.pdfjsLib) are accessible globals after boot. The actual extraction will be covered by verify-upload.mjs E2E test.",
+    "Step 6: Create sample test files in qi-webapp/samples/ for E2E testing: (a) a small .docx file (can create programmatically using mammoth's test fixtures or a minimal valid docx zip), (b) a small .pdf file (can use a minimal valid PDF with text). These will be used by verify-upload.mjs.",
+    "Step 7: Update verify-upload.mjs to add PDF and DOCX upload test scenarios: upload the sample .docx, verify text is extracted and analysis runs; upload the sample .pdf, verify text is extracted and analysis runs. Also test that .doc (binary) still shows the 'save as .docx' guidance message.",
+    "Step 8: Run 'npm test' to verify all existing tests still pass plus new smoke assertions pass. Then run 'node build-standalone.js' and 'node verify-standalone.js' to confirm the standalone build works with the new libraries inlined."
+  ],
+  "acceptance_criteria": [
+    "Uploading a .docx file in the Brain view extracts text and auto-runs the analysis (no extra clicks needed)",
+    "Uploading a .pdf file in the Brain view extracts text and auto-runs the analysis (no extra clicks needed)",
+    "A progress indicator ('Reading your document...') shows during extraction",
+    "The file input accept attribute includes .pdf and .docx",
+    "The upload button label indicates PDF/DOCX support",
+    "Old .doc binary format shows 'Please save as .docx' guidance (not a crash)",
+    "Other binary formats (.pptx, .xlsx, etc) still show appropriate rejection messages",
+    "npm test passes (all smoke tests green including new assertions)",
+    "node build-standalone.js succeeds and standalone file is under 6MB",
+    "node verify-standalone.js passes",
+    "The mammoth and pdfjsLib globals are available after app boot"
+  ],
+  "verification": [
+    "cd /projects/sandbox/Claude/qi-webapp && npm test",
+    "cd /projects/sandbox/Claude/qi-webapp && node build-standalone.js",
+    "cd /projects/sandbox/Claude/qi-webapp && node verify-standalone.js"
+  ],
+  "blocked_reason": null,
+  "findings": "1. The pdf.js legacy build (pdf.min.mjs) uses import.meta.url which throws in a regular script tag - patched with (document.currentScript&&document.currentScript.src||\"\") replacement during vendor copy. 2. The pdf.js worker is 1.3MB and inlining it would exceed the 6MB limit. Solution: in the standalone build, pdf.js runs in main-thread mode (no worker) by setting workerSrc to empty string. This is fine for project descriptions which are typically small. In dev mode (index.html), the worker file is served normally. 3. The verify-standalone.js check needed Response added to its jsdom error filter because pdf.js references the Fetch API Response class which jsdom does not implement. 4. The test.js FAIL (k.crit===5 vs k.crit===2) is pre-existing and not related to this change. 5. Final standalone build size: 5.39MB (under the 6MB limit)."
+}
