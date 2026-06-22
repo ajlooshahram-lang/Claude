@@ -1312,6 +1312,7 @@
 
   /* -------------------------------------------------------------- dispose --- */
   function dispose() {
+    activeScope = null;
     if (!state) return;
     var s = state;
     state = null;

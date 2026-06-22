@@ -1073,9 +1073,22 @@
   // Stores a KPI snapshot each week and generates a plain-language comparison
   // between now and the previous saved snapshot. Designed for zero-PM users.
   var WSNAP_KEY = "qi_weekly_snap";
+  function _wsnapKey() {
+    return WSNAP_KEY + "_" + (ws && ws.activeId ? ws.activeId : "default");
+  }
   function _loadWeeklySnap() {
     try {
-      var raw = localStorage.getItem(WSNAP_KEY);
+      var key = _wsnapKey();
+      var raw = localStorage.getItem(key);
+      // Backward-compat: migrate old shared key to project-specific key
+      if (!raw) {
+        var legacy = localStorage.getItem(WSNAP_KEY);
+        if (legacy) {
+          localStorage.setItem(key, legacy);
+          localStorage.removeItem(WSNAP_KEY);
+          raw = legacy;
+        }
+      }
       if (!raw) return [];
       var parsed = JSON.parse(raw);
       // Backward-compat: migrate old single-object format to 1-element array
@@ -1089,7 +1102,7 @@
       var arr = _loadWeeklySnap();
       arr.push(snap);
       if (arr.length > 5) arr = arr.slice(arr.length - 5);
-      localStorage.setItem(WSNAP_KEY, JSON.stringify(arr));
+      localStorage.setItem(_wsnapKey(), JSON.stringify(arr));
     } catch (e) {}
   }
   function healthHistory() {

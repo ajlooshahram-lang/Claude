@@ -5929,7 +5929,7 @@
     else if (act === "delsnap") { S.deleteSnapshot(id); go("audit"); }
     else if (act === "clearaudit") { if (confirm("Clear the change-history log?")) { S.clearAudit(); go("audit"); } }
     else if (act === "diffSnaps") showDiffModal();
-    else if (act === "openproj") { S.switchProject(id); uiState.brainPlan = S.getBrainPlan() || null; refreshHeader(); go("dashboard"); toast("Switched project."); }
+    else if (act === "openproj") { S.switchProject(id); uiState.brainPlan = S.getBrainPlan() || null; try { if (window.QIGlobe && QIGlobe.setActiveScope) { QIGlobe.setActiveScope(activeStationIds()); } } catch(e) {} refreshHeader(); go("dashboard"); toast("Switched project."); }
     else if (act === "newproj") { openProjectNameModal({ title: "New project", okLabel: "Create", onPick: n => { S.addProject(n); refreshHeader(); go("dashboard"); toast("Project created."); } }); }
     else if (act === "renproj") { const cur = S.listProjects().find(x => x.id === id); openProjectNameModal({ title: "Rename project", current: cur ? cur.name : "", okLabel: "Rename", onPick: n => { S.renameProject(id, n); refreshHeader(); go("portfolio"); toast("Renamed."); } }); }
     else if (act === "dupproj") { S.duplicateProject(id); refreshHeader(); go("dashboard"); toast("Project duplicated."); }
@@ -6043,7 +6043,7 @@
       e.target.value = S.activeProjectId();
       openProjectNameModal({ title: "New project", okLabel: "Create", onPick: n => { S.addProject(n); refreshHeader(); go("dashboard"); toast("Project created."); } });
     }
-    else { S.switchProject(v); uiState.brainPlan = S.getBrainPlan() || null; refreshHeader(); go(current === "portfolio" ? "portfolio" : "dashboard"); }
+    else { S.switchProject(v); uiState.brainPlan = S.getBrainPlan() || null; try { if (window.QIGlobe && QIGlobe.setActiveScope) { QIGlobe.setActiveScope(activeStationIds()); } } catch(e) {} refreshHeader(); go(current === "portfolio" ? "portfolio" : "dashboard"); }
   });
   document.addEventListener("keydown", e => {
     if (e.key === "Escape") { closeModal(); return; }
