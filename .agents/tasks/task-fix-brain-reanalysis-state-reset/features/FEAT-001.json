@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "fix",
   "description": "Fix applyBrainPlan to fully reset route progress, persist brainPlan per project, and force a complete view re-render after analysis - so uploading a new project description properly clears old project state (especially route/cabling direction) and shows the fresh plan.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Step 1 - Reset routeProgress in applyBrainPlan (qi-webapp/js/ui.js line ~3632): In the 'clear previously generated content' block at the top of applyBrainPlan, add `st0.routeProgress = {};` to completely wipe the old route progress data. Currently only `S.setRouteLaidKm(cab.id, 0)` is called later (which sets km to 0 but preserves old phase statuses from the previous project). The full wipe ensures no stale route data from the previous project persists.",
     "Step 2 - Persist brainPlan per-project in the store (qi-webapp/js/store.js): Add a `brainPlan` field to the project state. In normalize(), ensure `s.brainPlan = s.brainPlan || null;`. Add two new API methods: `setBrainPlan(plan)` which sets `get().brainPlan = plan; save();` and `getBrainPlan()` which returns `get().brainPlan`. Export them on the Store API object.",
@@ -24,5 +24,5 @@
     "cd qi-webapp && npm run build:standalone && node verify-standalone.js"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Pre-existing bare FAIL in test.js (line 14, budget category test) exists on the base branch and is unrelated. The seedRouteEntry function in store.js sets cable phases based on cable.status (commissioned/in-progress), so applyBrainPlan now directly assigns fresh entries rather than using setRouteLaidKm to avoid re-seeding from cable status. The go(current) call is skipped when on the brain view to avoid wiping the preview DOM that renderBrainPreview just built."
 }
