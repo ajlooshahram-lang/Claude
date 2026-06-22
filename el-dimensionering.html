@@ -6392,6 +6392,101 @@ function tccSelectNode(nodeId) {
   renderModule('tcc');
 }
 
+// ===== I2t Let-Through Energy & Cable Damage Curve =====
+// DS/HD 60364-4-43 cl.434.5.2: Adiabatic equation for cable short-circuit protection
+
+function tccFormatI2t(value) {
+  // Format I2t value in engineering notation (A2s or kA2s)
+  if (!value || value <= 0) return '0 A\u00B2s';
+  if (value >= 1e6) return (value / 1e6).toFixed(1) + ' MA\u00B2s';
+  if (value >= 1e3) return (value / 1e3).toFixed(1) + ' kA\u00B2s';
+  return value.toFixed(0) + ' A\u00B2s';
+}
+
+function tccCalcI2t(device, In, current) {
+  // Returns {prearcing, total} I2t values in A2s at given current
+  // For fuses: total = i5s^2 * 5, prearcing = 0.65 * total
+  // For MCBs/MCCBs: I2t = I^2 * tMax from trip curve
+  if (!device || !In || !current || current <= 0) return { prearcing: 0, total: 0 };
+
+  if (device.i5s) {
+    // Fuse: I2t is device characteristic (constant let-through energy)
+    var totalI2t = device.i5s * device.i5s * 5;
+    var prearcI2t = totalI2t * 0.65;
+    return { prearcing: prearcI2t, total: totalI2t };
+  }
+
+  // MCB or MCCB: compute from trip curve
+  var curve = sldDeviceCurve(device, In, null);
+  if (!curve || curve.length === 0) return { prearcing: 0, total: 0 };
+  curve.sort(function(a, b) { return a.i - b.i; });
+
+  // Find tMax at given current via log-log interpolation
+  var tMax = null;
+  var tMin = null;
+  if (current < curve[0].i) return { prearcing: 0, total: 0 };
+  if (current >= curve[curve.length - 1].i) {
+    tMax = curve[curve.length - 1].tMax;
+    tMin = curve[curve.length - 1].tMin;
+  } else {
+    for (var k = 0; k < curve.length - 1; k++) {
+      if (current >= curve[k].i && current <= curve[k + 1].i) {
+        var logI1 = Math.log10(curve[k].i);
+        var logI2 = Math.log10(curve[k + 1].i);
+        var logC = Math.log10(current);
+        var frac = (logI2 - logI1) > 0 ? (logC - logI1) / (logI2 - logI1) : 0;
+        var logTMax1 = Math.log10(Math.max(curve[k].tMax, 0.001));
+        var logTMax2 = Math.log10(Math.max(curve[k + 1].tMax, 0.001));
+        var logTMin1 = Math.log10(Math.max(curve[k].tMin, 0.001));
+        var logTMin2 = Math.log10(Math.max(curve[k + 1].tMin, 0.001));
+        tMax = Math.pow(10, logTMax1 + frac * (logTMax2 - logTMax1));
+        tMin = Math.pow(10, logTMin1 + frac * (logTMin2 - logTMin1));
+        break;
+      }
+    }
+  }
+  if (tMax === null || tMax <= 0) return { prearcing: 0, total: 0 };
+  var total = current * current * tMax;
+  var prearcing = tMin ? current * current * tMin : total * 0.5;
+  return { prearcing: prearcing, total: total };
+}
+
+function tccCableDamageCurve(cable) {
+  // Returns array of {i, t} points for the adiabatic limit curve
+  // Formula: t = k^2 * S^2 / I^2 (DS/HD 60364-4-43 cl.434.5.2)
+  // k values: 115 (PVC/Cu), 143 (XLPE/Cu), 76 (PVC/Al), 94 (XLPE/Al)
+  if (!cable || !cable.mm2) return [];
+  var k;
+  if (cable.material === 'Cu') {
+    k = 143; // XLPE/Cu (NKT NOIKLX is XLPE insulated)
+  } else {
+    k = 94;  // XLPE/Al
+  }
+  var S = cable.mm2;
+  var k2S2 = k * k * S * S;
+  var points = [];
+  // Generate logarithmic points from 100A to 100000A
+  var logMin = Math.log10(100);
+  var logMax = Math.log10(100000);
+  var steps = 30;
+  for (var si = 0; si <= steps; si++) {
+    var logI = logMin + (logMax - logMin) * si / steps;
+    var I = Math.pow(10, logI);
+    var t = k2S2 / (I * I);
+    if (t > 0.0001 && t < 100000) {
+      points.push({ i: I, t: t });
+    }
+  }
+  return points;
+}
+
+function tccGetCableK(cable) {
+  // Return k factor for cable material/insulation per DS/HD 60364-4-43 cl.434.5.2
+  if (!cable) return 143;
+  if (cable.material === 'Cu') return 143; // XLPE/Cu
+  return 94; // XLPE/Al
+}
+
 // ===== DEVICE TCC (per-module time-current curve) =====
 var deviceTccState = { mcbCursor: 500, fuseCursor: 500, mccbCursor: 1000, relayCursor: 50, rcdCursor: 100 };
 
@@ -6497,6 +6592,9 @@ function renderDeviceTCC(device, In, settings, loadCurrent, faultCurrent, modKey
     var tripY = yPos(tripTimeAtCursor.tMax);
     svg += '<circle cx="' + cursorX + '" cy="' + tripY + '" r="4" fill="#f59e0b"/>';
     svg += '<text x="' + (cursorX + 6) + '" y="' + (tripY - 4) + '" font-size="9" fill="#f59e0b">' + (tripTimeAtCursor.tMin >= 1 ? tripTimeAtCursor.tMin.toFixed(2) + '-' + tripTimeAtCursor.tMax.toFixed(2) + 's' : (tripTimeAtCursor.tMin * 1000).toFixed(0) + '-' + (tripTimeAtCursor.tMax * 1000).toFixed(0) + 'ms') + '</text>';
+    // I2t energy at cursor position
+    var cursorI2t = cursorCurrent * cursorCurrent * tripTimeAtCursor.tMax;
+    svg += '<text x="' + (cursorX + 6) + '" y="' + (tripY + 10) + '" font-size="8" fill="#f59e0b">I\u00B2t=' + tccFormatI2t(cursorI2t) + '</text>';
   } else if (cursorCurrent > 0 && validPts.length > 0 && cursorCurrent > validPts[validPts.length - 1].i) {
     svg += '<text x="' + (cursorX + 4) + '" y="' + (h - marginB - 8) + '" font-size="9" fill="#f59e0b">' + tx('Instant udl.', 'Instant trip') + '</text>';
   }
@@ -6836,8 +6934,8 @@ function renderRcdTCCCard(rcdType, sensitivityMA) {
   return html;
 }
 
-function tccRenderCascadeChart(devices, cursorCurrent) {
-  var w = 600, h = 400;
+function tccRenderCascadeChart(devices, cursorCurrent, cable) {
+  var w = 600, h = 440;
   var marginL = 60, marginR = 20, marginT = 30, marginB = 40;
   var plotW = w - marginL - marginR;
   var plotH = h - marginT - marginB;
@@ -6848,32 +6946,84 @@ function tccRenderCascadeChart(devices, cursorCurrent) {
   function yPos(t) { return marginT + (1 - (Math.log10(t) - logTmin) / (logTmax - logTmin)) * plotH; }
 
   var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">';
+  svg += '<defs>';
+  svg += '<linearGradient id="selectiveGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(34,197,94,0.3)"/><stop offset="100%" stop-color="rgba(34,197,94,0.05)"/></linearGradient>';
+  svg += '<linearGradient id="nonselectiveGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(239,68,68,0.3)"/><stop offset="100%" stop-color="rgba(239,68,68,0.05)"/></linearGradient>';
+  svg += '</defs>';
   svg += '<rect width="' + w + '" height="' + h + '" fill="#fff"/>';
 
   // Grid
   var gridCurrents = [10, 100, 1000, 10000, 100000];
+  var gridTimes = [0.001, 0.01, 0.1, 1, 10, 100, 1000];
   for (var gi = 0; gi < gridCurrents.length; gi++) {
     var gx = xPos(gridCurrents[gi]);
     svg += '<line x1="' + gx + '" y1="' + marginT + '" x2="' + gx + '" y2="' + (h - marginB) + '" stroke="#eee" stroke-width="1"/>';
+    var gLabel = gridCurrents[gi] >= 1000 ? (gridCurrents[gi] / 1000) + 'k' : gridCurrents[gi];
+    svg += '<text x="' + gx + '" y="' + (h - marginB + 14) + '" text-anchor="middle" font-size="9" fill="#666">' + gLabel + '</text>';
+  }
+  for (gi = 0; gi < gridTimes.length; gi++) {
+    var gy = yPos(gridTimes[gi]);
+    svg += '<line x1="' + marginL + '" y1="' + gy + '" x2="' + (w - marginR) + '" y2="' + gy + '" stroke="#eee" stroke-width="0.5"/>';
+    var tLabel = gridTimes[gi] >= 1 ? gridTimes[gi] + 's' : (gridTimes[gi] * 1000) + 'ms';
+    svg += '<text x="' + (marginL - 4) + '" y="' + (gy + 3) + '" text-anchor="end" font-size="8" fill="#666">' + tLabel + '</text>';
   }
 
   // Device curves and selectivity zones
   var colors = ['#2563eb', '#dc2626', '#059669', '#7c3aed', '#d97706'];
   var tripOrder = tccGetTripOrder(devices, cursorCurrent);
-  // Determine selectivity zone color
+  // Determine selectivity
   var selective = true;
+  var marginMs = 0;
   if (tripOrder.length >= 2 && tripOrder[0].trips && tripOrder[1].trips) {
     selective = tripOrder[0].depth > tripOrder[1].depth;
+    marginMs = Math.abs(tripOrder[1].tMax - tripOrder[0].tMax) * 1000;
   }
-  var zoneColor = selective ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)';
-  // Draw selectivity zone
+
+  // Draw discrimination zone with gradient fill
   if (tripOrder.length >= 2 && tripOrder[0].trips && tripOrder[1].trips) {
     var zoneY1 = yPos(tripOrder[0].tMax);
     var zoneY2 = yPos(tripOrder[1].tMax);
     if (zoneY1 > zoneY2) { var tmp = zoneY1; zoneY1 = zoneY2; zoneY2 = tmp; }
-    svg += '<rect x="' + marginL + '" y="' + zoneY1 + '" width="' + plotW + '" height="' + (zoneY2 - zoneY1) + '" fill="' + zoneColor + '"/>';
+    var gradId = selective ? 'url(#selectiveGrad)' : 'url(#nonselectiveGrad)';
+    svg += '<rect class="tcc-discrimination-zone" x="' + marginL + '" y="' + zoneY1 + '" width="' + plotW + '" height="' + Math.max(1, zoneY2 - zoneY1) + '" fill="' + gradId + '"/>';
+    // Zone label
+    var zoneMidY = (zoneY1 + zoneY2) / 2;
+    var zoneText = selective ? tx('Selektiv', 'Selective') : tx('Ikke-selektiv', 'Non-selective');
+    var zoneTextColor = selective ? '#16a34a' : '#dc2626';
+    svg += '<text class="tcc-zone-label" x="' + (marginL + 6) + '" y="' + zoneMidY + '" font-size="10" fill="' + zoneTextColor + '" font-weight="bold">' + zoneText + '</text>';
+    svg += '<text x="' + (marginL + 6) + '" y="' + (zoneMidY + 13) + '" font-size="8" fill="' + zoneTextColor + '">\u0394t=' + marginMs.toFixed(0) + 'ms (DS/HD 60364-5-53 cl.536.4)</text>';
   }
 
+  // Cable damage curve (adiabatic limit) - DS/HD 60364-4-43 cl.434.5.2
+  var cableProtected = true;
+  if (cable && cable.mm2) {
+    var damageCurve = tccCableDamageCurve(cable);
+    if (damageCurve.length > 1) {
+      var damagePath = '';
+      for (var dci = 0; dci < damageCurve.length; dci++) {
+        var dp = damageCurve[dci];
+        if (dp.i < 10 || dp.t < 0.001 || dp.t > 1000) continue;
+        var dx = xPos(dp.i);
+        var dy = yPos(dp.t);
+        damagePath += (damagePath === '' ? 'M' : 'L') + dx.toFixed(1) + ',' + dy.toFixed(1);
+      }
+      if (damagePath) {
+        svg += '<path class="tcc-cable-damage" d="' + damagePath + '" fill="none" stroke="#dc2626" stroke-width="3" stroke-dasharray="8,4" opacity="0.8"/>';
+      }
+    }
+    // Check if any device curve crosses above cable damage curve at cursor
+    var kVal = tccGetCableK(cable);
+    var k2S2 = kVal * kVal * cable.mm2 * cable.mm2;
+    var cableTatCursor = k2S2 / (cursorCurrent * cursorCurrent);
+    for (var cpi = 0; cpi < tripOrder.length; cpi++) {
+      if (tripOrder[cpi].trips && tripOrder[cpi].tMax > cableTatCursor) {
+        cableProtected = false;
+        break;
+      }
+    }
+  }
+
+  // Draw device curves
   for (var di = 0; di < devices.length; di++) {
     var dev = devices[di];
     var color = colors[di % colors.length];
@@ -6892,8 +7042,35 @@ function tccRenderCascadeChart(devices, cursorCurrent) {
     if (pathD) {
       svg += '<path d="' + pathD + '" fill="none" stroke="' + color + '" stroke-width="2"/>';
     }
-    // Legend
-    svg += '<text x="' + (w - 150) + '" y="' + (marginT + 15 + di * 18) + '" font-size="11" fill="' + color + '">' + dev.name + ' (' + dev.In + 'A)</text>';
+
+    // I2t let-through overlay (dashed orange line)
+    var i2tPath = '';
+    for (ci = 0; ci < curve.length; ci++) {
+      pt = curve[ci];
+      if (pt.i < 10 || pt.tMax <= 0) continue;
+      var devI2t = pt.i * pt.i * pt.tMax;
+      // Show I2t as constant-energy hyperbola at each point
+      var i2tTime = devI2t / (pt.i * pt.i); // equals tMax at that point
+      if (i2tTime >= 0.001 && i2tTime <= 1000) {
+        var ix = xPos(pt.i);
+        var iy = yPos(i2tTime);
+        i2tPath += (i2tPath === '' ? 'M' : 'L') + ix.toFixed(1) + ',' + iy.toFixed(1);
+      }
+    }
+    if (i2tPath) {
+      svg += '<path class="tcc-i2t-overlay" d="' + i2tPath + '" fill="none" stroke="' + color + '" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>';
+    }
+
+    // Legend entry
+    var devI2tAtCursor = tccCalcI2t(dev.device, dev.In, cursorCurrent);
+    var legendY = marginT + 15 + di * 18;
+    svg += '<text x="' + (w - 18) + '" y="' + legendY + '" font-size="10" fill="' + color + '" text-anchor="end">' + dev.name + ' (' + dev.In + 'A) I\u00B2t=' + tccFormatI2t(devI2tAtCursor.total) + '</text>';
+  }
+
+  // Cable damage legend
+  if (cable && cable.mm2) {
+    var cableLegendY = marginT + 15 + devices.length * 18;
+    svg += '<text x="' + (w - 18) + '" y="' + cableLegendY + '" font-size="9" fill="#dc2626" text-anchor="end">' + tx('Kabelgraense', 'Cable limit') + ' k\u00B2S\u00B2/I\u00B2 (' + cable.material + ' ' + cable.mm2 + 'mm\u00B2)</text>';
   }
 
   // Cursor line
@@ -6902,11 +7079,17 @@ function tccRenderCascadeChart(devices, cursorCurrent) {
   var cursorLabel = cursorCurrent >= 1000 ? (cursorCurrent / 1000) + 'kA' : cursorCurrent + 'A';
   svg += '<text x="' + (cursorX + 4) + '" y="' + (marginT - 5) + '" font-size="11" fill="#f00">' + cursorLabel + '</text>';
 
+  // Cursor I2t info
+  if (tripOrder.length > 0 && tripOrder[0].trips) {
+    var cursorI2tVal = cursorCurrent * cursorCurrent * tripOrder[0].tMax;
+    svg += '<text class="tcc-cursor-i2t" x="' + (cursorX + 4) + '" y="' + (h - marginB - 6) + '" font-size="8" fill="#f00">I\u00B2t=' + tccFormatI2t(cursorI2tVal) + '</text>';
+  }
+
   // Axes labels
-  svg += '<text x="' + (w / 2) + '" y="' + (h - 5) + '" text-anchor="middle" font-size="11">Current [A]</text>';
-  svg += '<text x="12" y="' + (h / 2) + '" text-anchor="middle" font-size="11" transform="rotate(-90,12,' + (h / 2) + ')">Time [s]</text>';
+  svg += '<text x="' + (w / 2) + '" y="' + (h - 5) + '" text-anchor="middle" font-size="11" fill="#333">' + tx('Stroem [A]', 'Current [A]') + '</text>';
+  svg += '<text x="12" y="' + (h / 2) + '" text-anchor="middle" font-size="11" fill="#333" transform="rotate(-90,12,' + (h / 2) + ')">' + tx('Tid [s]', 'Time [s]') + '</text>';
   svg += '</svg>';
-  return svg;
+  return { svg: svg, cableProtected: cableProtected, marginMs: marginMs, selective: selective };
 }
 
 function renderCascadeTCC() {
@@ -6915,6 +7098,11 @@ function renderCascadeTCC() {
   var finals = tccGetFinalCircuits(tree);
   var html = '<div class="card fade-in"><div class="card-title">' + tx('Kaskade TCC - Selektivitetsanalyse','Cascade TCC - Selectivity Analysis') + '</div>';
   html += '<div class="info-row">' + tx('Tidsstroemkarakteristik iht. DS/HD 60364-5-53 cl.536.4 - koordineringsmarginer','Time-current characteristics per DS/HD 60364-5-53 cl.536.4 - grading margins') + '</div>';
+  // Info text explaining I2t and cable protection
+  html += '<div class="info-row" style="font-size:0.85em;opacity:0.85">' + tx(
+    'I\u00B2t (let-through energi) er den termiske belastning p\u00E5 kablen under en kortslutning. Kabelbeskyttelse iht. DS/HD 60364-4-43 cl.434.5.2: Enhedens I\u00B2t skal vaere mindre end kablens k\u00B2S\u00B2.',
+    'I\u00B2t (let-through energy) is the thermal stress on the cable during a short circuit. Cable protection per DS/HD 60364-4-43 cl.434.5.2: Device I\u00B2t must be less than cable k\u00B2S\u00B2.'
+  ) + '</div>';
   // Circuit selection buttons
   html += '<div class="select-group"><div class="select-label">' + tx('Vaelg slutkreds','Select Final Circuit') + '</div><div class="select-grid">';
   for (var fi = 0; fi < finals.length; fi++) {
@@ -6923,28 +7111,65 @@ function renderCascadeTCC() {
   }
   html += '</div></div>';
   if (tccState.selectedNodeId) {
+    var selectedNode = tree.nodes[tccState.selectedNodeId];
+    var cable = selectedNode ? selectedNode.cable : null;
     var devices = tccGetPathDevices(tree, tccState.selectedNodeId);
     var cursorCurrent = tccState.cursorCurrent || 1000;
-    // Cursor buttons
+    // Cursor buttons (logarithmic steps)
     html += '<div class="select-group"><div class="select-label">' + tx('Fejlstroem-cursor','Fault Current Cursor') + '</div><div class="select-grid">';
-    var cursors = [100, 500, 1000, 2000, 5000, 10000, 20000, 50000];
+    var cursors = [50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000];
     for (var ci = 0; ci < cursors.length; ci++) {
       var csel = (cursorCurrent === cursors[ci]) ? ' selected' : '';
       html += '<button class="sel-btn' + csel + '" onclick="tccSetCursor(' + cursors[ci] + ')">' + (cursors[ci] >= 1000 ? (cursors[ci] / 1000) + 'kA' : cursors[ci] + 'A') + '</button>';
     }
     html += '</div></div>';
+
+    // Cable info display
+    if (cable) {
+      html += '<div class="result-box"><div class="result-title">' + tx('Kabel under vurdering','Cable being evaluated') + ' - DS/HD 60364-4-43 cl.434.5.2</div>';
+      html += '<div class="result-row"><span class="label">' + tx('Kabel','Cable') + '</span><span class="value">' + cable.material + ' ' + cable.mm2 + ' mm\u00B2 (' + (cable.model || '') + ')</span></div>';
+      var kFactor = tccGetCableK(cable);
+      var k2s2 = kFactor * kFactor * cable.mm2 * cable.mm2;
+      html += '<div class="result-row"><span class="label">k</span><span class="value">' + kFactor + ' (' + (cable.material === 'Cu' ? 'XLPE/Cu' : 'XLPE/Al') + ')</span></div>';
+      html += '<div class="result-row"><span class="label">k\u00B2S\u00B2</span><span class="value">' + tccFormatI2t(k2s2) + '</span></div>';
+      html += '</div>';
+    }
+
     // SVG chart
-    html += tccRenderCascadeChart(devices, cursorCurrent);
+    var chartResult = tccRenderCascadeChart(devices, cursorCurrent, cable);
+    html += chartResult.svg;
+
+    // Legend
+    html += '<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:8px;font-size:0.82em">';
+    html += '<span style="color:#2563eb">\u2014 ' + tx('Beskyttelsesenhed','Protection device') + '</span>';
+    html += '<span style="color:#dc2626;border-bottom:2px dashed #dc2626">' + tx('Kabelgraense k\u00B2S\u00B2/I\u00B2','Cable limit k\u00B2S\u00B2/I\u00B2') + '</span>';
+    html += '<span style="color:#f59e0b">--- I\u00B2t ' + tx('gennemslip','let-through') + '</span>';
+    html += '</div>';
+
+    // Summary verdict
+    if (cable) {
+      html += '<div class="result-box" style="margin-top:12px"><div class="result-title">' + tx('Kabelbeskyttelsesdom','Cable Protection Verdict') + '</div>';
+      if (chartResult.cableProtected) {
+        html += '<div class="result-row" style="color:#16a34a;font-weight:bold"><span class="label">\u2705 ' + tx('Kabel fuldt beskyttet','Cable fully protected by device') + '</span><span class="value">DS/HD 60364-4-43 cl.434.5.2</span></div>';
+      } else {
+        html += '<div class="result-row" style="color:#dc2626;font-weight:bold"><span class="label">\u26A0\uFE0F ' + tx('ADVARSEL: Kabel IKKE beskyttet ved denne fejlstroem','WARNING: Cable NOT protected at this fault current') + '</span><span class="value">DS/HD 60364-4-43 cl.434.5.2</span></div>';
+      }
+      html += '</div>';
+    }
+
     // Trip order table
     var tripOrder = tccGetTripOrder(devices, cursorCurrent);
-    html += '<table class="result-table"><tr><th>' + tx('Enhed','Device') + '</th><th>In [A]</th><th>' + tx('Udloesningstid','Trip Time') + ' [s]</th><th>' + tx('Udloest','Trips') + '</th></tr>';
+    html += '<table class="result-table"><tr><th>' + tx('Enhed','Device') + '</th><th>In [A]</th><th>' + tx('Udloesningstid','Trip Time') + ' [s]</th><th>I\u00B2t [A\u00B2s]</th><th>' + tx('Udloest','Trips') + '</th></tr>';
     for (var ti = 0; ti < tripOrder.length; ti++) {
       var to = tripOrder[ti];
-      html += '<tr><td>' + to.name + '</td><td>' + to.In + '</td><td>' + (to.trips ? to.tMax.toFixed(3) : '-') + '</td><td>' + (to.trips ? 'Yes' : 'No') + '</td></tr>';
+      var toI2t = to.trips ? tccCalcI2t(to.device, to.In, cursorCurrent) : null;
+      html += '<tr><td>' + to.name + '</td><td>' + to.In + '</td><td>' + (to.trips ? to.tMax.toFixed(3) : '-') + '</td><td>' + (toI2t ? tccFormatI2t(toI2t.total) : '-') + '</td><td>' + (to.trips ? 'Yes' : 'No') + '</td></tr>';
     }
     html += '</table>';
     html += '<div class="result-box"><div class="result-title">' + tx('Koordineringsmargin','Grading Margin') + ' - DS/HD 60364-5-53 cl.536.4</div>';
-    html += '<div class="result-row"><span class="label">' + tx('Reference','Reference') + '</span><span class="value">cl.536.4</span></div></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Selektivitet','Selectivity') + '</span><span class="value">' + (chartResult.selective ? tx('Selektiv','Selective') : tx('Ikke-selektiv','Non-selective')) + '</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Margin','Margin') + '</span><span class="value">' + chartResult.marginMs.toFixed(0) + ' ms</span></div>';
+    html += '<div class="result-row"><span class="label">' + tx('Reference','Reference') + '</span><span class="value">DS/HD 60364-5-53 cl.536.4</span></div></div>';
   }
   html += '</div>';
   return html;

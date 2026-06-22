@@ -1730,7 +1730,8 @@ test('tccRenderCascadeChart returns SVG with device curves and legend', function
   sldPropagateAll(tree);
   var finals = tccGetFinalCircuits(tree);
   var devices = tccGetPathDevices(tree, finals[0].id);
-  var svg = tccRenderCascadeChart(devices, 1000);
+  var result = tccRenderCascadeChart(devices, 1000, null);
+  var svg = result.svg;
   assert(svg.indexOf('<svg') >= 0, 'Must return SVG');
   assert(svg.indexOf('path') >= 0, 'Must have path elements for curves');
   assert(svg.indexOf('line') >= 0, 'Must have cursor line');
@@ -1745,7 +1746,8 @@ test('tccRenderCascadeChart shows cursor line at the specified current', functio
   sldPropagateAll(tree);
   var finals = tccGetFinalCircuits(tree);
   var devices = tccGetPathDevices(tree, finals[0].id);
-  var svg = tccRenderCascadeChart(devices, 5000);
+  var result = tccRenderCascadeChart(devices, 5000, null);
+  var svg = result.svg;
   assert(svg.indexOf('5kA') >= 0, 'Must show 5kA cursor label');
   assert(svg.indexOf('stroke-dasharray') >= 0, 'Must have dashed cursor line');
 });
@@ -1814,11 +1816,11 @@ test('tccRenderCascadeChart includes selectivity zone highlighting', function() 
   sldPropagateAll(tree);
   var finals = tccGetFinalCircuits(tree);
   var devices = tccGetPathDevices(tree, finals[0].id);
-  var svg = tccRenderCascadeChart(devices, 1000);
-  // Should have zone rects with green (selective) or red (non-selective) colors
-  var hasGreenZone = svg.indexOf('rgba(34,197,94') >= 0;
-  var hasRedZone = svg.indexOf('rgba(239,68,68') >= 0;
-  assert(hasGreenZone || hasRedZone, 'Must have selectivity zone highlighting');
+  var result = tccRenderCascadeChart(devices, 1000, null);
+  var svg = result.svg;
+  // Should have zone with gradient fill
+  var hasGradient = svg.indexOf('selectiveGrad') >= 0 || svg.indexOf('nonselectiveGrad') >= 0;
+  assert(hasGradient, 'Must have selectivity zone with gradient highlighting');
 });
 
 // Test 96: Grading margin displayed in renderCascadeTCC
@@ -15294,6 +15296,213 @@ test('renderReverseCompliance renders verdicts with clauses', function() {
 
 test('ARCHIVE_MODULE_KEYS includes reverseState', function() {
   assert(ARCHIVE_MODULE_KEYS.indexOf('reverseState') >= 0, 'reverseState should be in archive keys');
+});
+
+// ===== FEAT-002: TCC Improvements Tests =====
+
+// Test: tccCalcI2t for MCB returns valid I2t
+test('tccCalcI2t for MCB B16 returns valid I2t values at 500A', function() {
+  var mcb = PRODUCTS.mcbs.find(function(m) { return m.rating === 16 && m.curve === 'B'; });
+  var result = tccCalcI2t(mcb, 16, 500);
+  assert(result.total > 0, 'Total I2t must be positive: ' + result.total);
+  assert(result.prearcing > 0, 'Prearcing I2t must be positive: ' + result.prearcing);
+  assert(result.prearcing < result.total, 'Prearcing must be less than total');
+});
+
+// Test: tccCalcI2t for MCB at high current (instant trip) returns low I2t
+test('tccCalcI2t for MCB C25 at 2000A returns I2t based on trip curve', function() {
+  var mcb = PRODUCTS.mcbs.find(function(m) { return m.rating === 25 && m.curve === 'C'; });
+  var result = tccCalcI2t(mcb, 25, 2000);
+  assert(result.total > 0, 'Total I2t must be positive');
+  // At high current, trip is fast so I2t = I^2 * t should be relatively small
+  assert(result.total < 2000 * 2000 * 10, 'I2t should be bounded (fast trip)');
+});
+
+// Test: tccCalcI2t for Fuse returns i5s-based I2t
+test('tccCalcI2t for Fuse 63A returns correct I2t from i5s', function() {
+  var fuse = PRODUCTS.fuses.find(function(f) { return f.rating === 63; });
+  var result = tccCalcI2t(fuse, 63, 1000);
+  var expectedTotal = fuse.i5s * fuse.i5s * 5;
+  assert(Math.abs(result.total - expectedTotal) < 1, 'Total I2t should equal i5s^2 * 5: got ' + result.total + ' expected ' + expectedTotal);
+  assert(Math.abs(result.prearcing - expectedTotal * 0.65) < 1, 'Prearcing should be 0.65 * total');
+});
+
+// Test: tccCalcI2t for MCCB returns valid I2t
+test('tccCalcI2t for MCCB NSX100 at 1000A returns valid I2t', function() {
+  var mccb = PRODUCTS.mccbs.find(function(m) { return m.frame === 'NSX 100'; });
+  var result = tccCalcI2t(mccb, 100, 1000);
+  assert(result.total > 0, 'Total I2t must be positive for MCCB');
+  assert(result.prearcing >= 0, 'Prearcing I2t must be non-negative');
+});
+
+// Test: tccCalcI2t with invalid inputs returns zero
+test('tccCalcI2t with null device returns zero I2t', function() {
+  var result = tccCalcI2t(null, 16, 500);
+  assert(result.total === 0, 'Should return 0 for null device');
+  assert(result.prearcing === 0, 'Should return 0 prearcing for null device');
+});
+
+// Test: tccCableDamageCurve returns valid descending time values
+test('tccCableDamageCurve returns valid descending time values for Cu 2.5mm2', function() {
+  var cable = { mm2: 2.5, material: 'Cu' };
+  var curve = tccCableDamageCurve(cable);
+  assert(curve.length > 10, 'Should have many points: ' + curve.length);
+  // Time should decrease as current increases (adiabatic equation)
+  for (var i = 1; i < curve.length; i++) {
+    assert(curve[i].t < curve[i - 1].t, 'Time must decrease: point ' + i + ' t=' + curve[i].t + ' vs prev=' + curve[i - 1].t);
+    assert(curve[i].i > curve[i - 1].i, 'Current must increase');
+  }
+});
+
+// Test: tccCableDamageCurve uses correct k value for Cu (143)
+test('tccCableDamageCurve uses k=143 for XLPE/Cu per DS/HD 60364-4-43', function() {
+  var cable = { mm2: 10, material: 'Cu' };
+  var curve = tccCableDamageCurve(cable);
+  // At 1000A: t = 143^2 * 10^2 / 1000^2 = 20449 * 100 / 1000000 = 2.0449s
+  var point1kA = curve.find(function(p) { return Math.abs(p.i - 1000) < 50; });
+  assert(point1kA, 'Should have a point near 1000A');
+  var expected = 143 * 143 * 10 * 10 / (point1kA.i * point1kA.i);
+  assert(Math.abs(point1kA.t - expected) < 0.01, 'Time should match k2S2/I2 formula: got ' + point1kA.t + ' expected ' + expected);
+});
+
+// Test: tccCableDamageCurve uses correct k value for Al (94)
+test('tccCableDamageCurve uses k=94 for XLPE/Al per DS/HD 60364-4-43', function() {
+  var cable = { mm2: 50, material: 'Al' };
+  var curve = tccCableDamageCurve(cable);
+  assert(curve.length > 10, 'Should have points for Al cable');
+  var point = curve[Math.floor(curve.length / 2)];
+  var expected = 94 * 94 * 50 * 50 / (point.i * point.i);
+  assert(Math.abs(point.t - expected) < 0.001, 'Al cable should use k=94');
+});
+
+// Test: tccCableDamageCurve with null cable returns empty array
+test('tccCableDamageCurve with null cable returns empty array', function() {
+  var curve = tccCableDamageCurve(null);
+  assert(curve.length === 0, 'Should return empty for null cable');
+  var curve2 = tccCableDamageCurve({});
+  assert(curve2.length === 0, 'Should return empty for cable without mm2');
+});
+
+// Test: Cable damage curve present in cascade chart SVG
+test('tccRenderCascadeChart includes cable damage curve when cable provided', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var finals = tccGetFinalCircuits(tree);
+  var devices = tccGetPathDevices(tree, finals[0].id);
+  var cable = { mm2: 2.5, material: 'Cu', model: 'NOIKLX' };
+  var result = tccRenderCascadeChart(devices, 1000, cable);
+  assert(result.svg.indexOf('tcc-cable-damage') >= 0, 'SVG must contain cable damage curve class');
+  assert(result.svg.indexOf('stroke-dasharray="8,4"') >= 0, 'Cable damage must be dashed');
+});
+
+// Test: Discrimination zone labels in SVG
+test('tccRenderCascadeChart includes discrimination zone labels', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var finals = tccGetFinalCircuits(tree);
+  var devices = tccGetPathDevices(tree, finals[0].id);
+  var result = tccRenderCascadeChart(devices, 1000, null);
+  // Should have zone label class and DS/HD reference
+  var svg = result.svg;
+  assert(svg.indexOf('tcc-zone-label') >= 0 || svg.indexOf('tcc-discrimination-zone') >= 0, 'Must have zone elements');
+  assert(svg.indexOf('cl.536.4') >= 0, 'Must reference DS/HD 60364-5-53 cl.536.4');
+});
+
+// Test: I2t overlay elements present in SVG
+test('tccRenderCascadeChart includes I2t overlay elements', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var finals = tccGetFinalCircuits(tree);
+  var devices = tccGetPathDevices(tree, finals[0].id);
+  var result = tccRenderCascadeChart(devices, 1000, null);
+  assert(result.svg.indexOf('tcc-i2t-overlay') >= 0, 'SVG must contain I2t overlay paths');
+});
+
+// Test: Cursor I2t display in cascade chart
+test('tccRenderCascadeChart shows cursor I2t value', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var finals = tccGetFinalCircuits(tree);
+  var devices = tccGetPathDevices(tree, finals[0].id);
+  var result = tccRenderCascadeChart(devices, 1000, null);
+  assert(result.svg.indexOf('tcc-cursor-i2t') >= 0, 'Must show cursor I2t class');
+  assert(result.svg.indexOf('I\u00B2t=') >= 0, 'Must show I2t= label');
+});
+
+// Test: Engineering notation formatting
+test('tccFormatI2t formats values in engineering notation', function() {
+  assert(tccFormatI2t(500) === '500 A\u00B2s', 'Should format 500 as 500 A2s: got ' + tccFormatI2t(500));
+  assert(tccFormatI2t(5000) === '5.0 kA\u00B2s', 'Should format 5000 as 5.0 kA2s: got ' + tccFormatI2t(5000));
+  assert(tccFormatI2t(2500000) === '2.5 MA\u00B2s', 'Should format 2500000 as 2.5 MA2s: got ' + tccFormatI2t(2500000));
+  assert(tccFormatI2t(0) === '0 A\u00B2s', 'Should format 0 as 0 A2s');
+});
+
+// Test: Clause references in renderCascadeTCC output
+test('renderCascadeTCC output references DS/HD 60364-4-43 cl.434.5.2', function() {
+  sldNextId = 1;
+  sldTree = sldCreateTree();
+  sldPropagateAll(sldTree);
+  var finals = tccGetFinalCircuits(sldTree);
+  tccState.selectedNodeId = finals[0].id;
+  tccState.cursorCurrent = 1000;
+  var html = renderCascadeTCC();
+  assert(html.indexOf('60364-4-43') >= 0, 'Must reference DS/HD 60364-4-43');
+  assert(html.indexOf('cl.434.5.2') >= 0, 'Must reference cl.434.5.2 for cable protection');
+  assert(html.indexOf('cl.536.4') >= 0, 'Must reference cl.536.4 for discrimination');
+});
+
+// Test: renderCascadeTCC shows I2t info text
+test('renderCascadeTCC includes I2t info text and cable protection explanation', function() {
+  sldNextId = 1;
+  sldTree = sldCreateTree();
+  sldPropagateAll(sldTree);
+  var finals = tccGetFinalCircuits(sldTree);
+  tccState.selectedNodeId = finals[0].id;
+  tccState.cursorCurrent = 1000;
+  var html = renderCascadeTCC();
+  assert(html.indexOf('I\u00B2t') >= 0, 'Must mention I2t in output');
+  assert(html.indexOf('k\u00B2S\u00B2') >= 0, 'Must mention k2S2 in output');
+});
+
+// Test: renderCascadeTCC shows cable protection verdict
+test('renderCascadeTCC shows cable protection verdict', function() {
+  sldNextId = 1;
+  sldTree = sldCreateTree();
+  sldPropagateAll(sldTree);
+  var finals = tccGetFinalCircuits(sldTree);
+  tccState.selectedNodeId = finals[0].id;
+  tccState.cursorCurrent = 1000;
+  var html = renderCascadeTCC();
+  // Should show either "protected" or "not protected" verdict
+  var hasVerdict = html.indexOf('Cable fully protected') >= 0 || html.indexOf('Kabel fuldt beskyttet') >= 0 ||
+                   html.indexOf('Cable NOT protected') >= 0 || html.indexOf('Kabel IKKE beskyttet') >= 0;
+  assert(hasVerdict, 'Must show cable protection verdict');
+});
+
+// Test: Cursor I2t in renderDeviceTCC
+test('renderDeviceTCC shows I2t energy at cursor position', function() {
+  var mcb = PRODUCTS.mcbs.find(function(m) { return m.rating === 16 && m.curve === 'B'; });
+  deviceTccState.mcbCursor = 50;
+  var svg = renderDeviceTCC(mcb, 16, null, 10, 3000, 'mcb');
+  assert(svg.indexOf('I\u00B2t=') >= 0, 'Must show I2t value at cursor');
+});
+
+// Test: tccRenderCascadeChart returns cableProtected flag
+test('tccRenderCascadeChart returns cableProtected status', function() {
+  sldNextId = 1;
+  var tree = sldCreateTree();
+  sldPropagateAll(tree);
+  var finals = tccGetFinalCircuits(tree);
+  var devices = tccGetPathDevices(tree, finals[0].id);
+  var cable = { mm2: 2.5, material: 'Cu', model: 'NOIKLX' };
+  var result = tccRenderCascadeChart(devices, 1000, cable);
+  assert(typeof result.cableProtected === 'boolean', 'Must return cableProtected boolean');
+  assert(typeof result.selective === 'boolean', 'Must return selective boolean');
+  assert(typeof result.marginMs === 'number', 'Must return marginMs number');
 });
 
 // --- Summary ---
