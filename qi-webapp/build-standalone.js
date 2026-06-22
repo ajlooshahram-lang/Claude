@@ -55,6 +55,8 @@ const TEXTURES = {
 // ---- vendored libraries (load order matters: three core before its add-ons) ----
 const VENDOR = [
   "vendor/chartjs/chart.umd.min.js",
+  "vendor/mammoth/mammoth.browser.min.js",
+  "vendor/pdfjs/pdf.min.js",
   "vendor/three/three.min.js",
   "vendor/three/examples/js/controls/OrbitControls.js",
   "vendor/three/examples/js/shaders/CopyShader.js",
@@ -94,6 +96,15 @@ function inlineModule(p) {
 const css = read("css/styles.css");
 
 const vendorScripts = VENDOR.map((p) => `<script>${safe(read(p))}</script>`).join("\n");
+
+// pdf.js worker: in standalone mode, disable the external worker so pdf.js runs
+// parsing on the main thread. This avoids inlining the 1.3MB worker source.
+// Performance is fine for the document sizes typical of project descriptions.
+const pdfWorkerSetup = `<script>
+(function() {
+  if (globalThis.pdfjsLib) globalThis.pdfjsLib.GlobalWorkerOptions.workerSrc = "";
+})();
+</script>`;
 
 const appScripts = APP.map((p) => {
   let src = inlineModule(p);
@@ -159,7 +170,7 @@ if (firstScriptIdx === -1 || closeBodyIdx === -1) {
 }
 htmlOut =
   htmlOut.slice(0, firstScriptIdx) +
-  vendorScripts + "\n" + appScripts + "\n" + bootDemo + "\n  " +
+  vendorScripts + "\n" + pdfWorkerSetup + "\n" + appScripts + "\n" + bootDemo + "\n  " +
   htmlOut.slice(closeBodyIdx);
 
 // Make the demo nature obvious in the tab title.

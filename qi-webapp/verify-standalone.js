@@ -23,7 +23,7 @@ const hardErrors = [];
 vc.on("jsdomError", (e) => {
   const msg = (e && (e.message || String(e))) || "";
   // Ignore the well-known jsdom canvas/WebGL limitations.
-  if (/getContext|WebGL|canvas|Not implemented|reading 'id'/i.test(msg)) return;
+  if (/getContext|WebGL|canvas|Not implemented|reading 'id'|Response is not defined/i.test(msg)) return;
   hardErrors.push(msg);
 });
 

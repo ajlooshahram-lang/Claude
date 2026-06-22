@@ -152,6 +152,14 @@
   <!-- Vendored locally (qi-webapp/vendor/) so the app works fully offline and
        honours a strict Content-Security-Policy (script-src 'self', no CDN). -->
   <script src="vendor/chartjs/chart.umd.min.js"></script>
+  <script src="vendor/mammoth/mammoth.browser.min.js"></script>
+  <script src="vendor/pdfjs/pdf.min.js"></script>
+  <script>
+    // Dev mode: point pdf.js worker to the local file
+    if (globalThis.pdfjsLib) {
+      globalThis.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdfjs/pdf.worker.min.js';
+    }
+  </script>
   <!-- Three.js r128 UMD + classic examples/js add-ons (all attach to global THREE.*).
        r128 is used because OrbitControls / EffectComposer / UnrealBloomPass ship as
        plain <script> globals at this version, enabling a no-build photoreal pipeline.

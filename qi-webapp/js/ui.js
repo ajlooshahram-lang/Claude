@@ -3238,8 +3238,8 @@
         <div class="toolbar" style="flex-wrap:wrap;gap:8px">
           <label class="muted" for="brainProfile">Domain</label>
           <select id="brainProfile" style="max-width:280px">${profOpts}</select>
-          <label class="btn btn-sm" for="brainFile">Upload .txt / .md</label>
-          <input id="brainFile" type="file" accept=".txt,.md,text/plain,text/markdown" hidden />
+          <label class="btn btn-sm" for="brainFile">Upload .txt / .pdf / .docx</label>
+          <input id="brainFile" type="file" accept=".txt,.md,.pdf,.docx,text/plain,text/markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden />
           <button class="btn btn-primary" id="brainExample" type="button">Try an example</button>
           <span class="muted" id="brainFileName"></span>
         </div>
@@ -3371,14 +3371,64 @@
     if (fileInput) fileInput.addEventListener("change", () => {
       const f = fileInput.files && fileInput.files[0]; if (!f) return;
       const name = (f.name || "").toLowerCase();
-      // Graceful guard: we only read plain text. Word/PDF/Office/binary files
-      // would dump garbage into the analyser, so we stop and guide the user.
-      if (/\.(docx?|pdf|pptx?|xlsx?|rtf|odt|pages|key|numbers|zip)$/.test(name)) {
-        nameEl.textContent = `${f.name} — can't read this type yet`;
+      // Old binary Word format (.doc) cannot be parsed client-side — guide the user.
+      if (/\.doc$/.test(name)) {
+        nameEl.textContent = `${f.name} — please save as .docx`;
         fileInput.value = "";
-        toast("I can't read Word/PDF files yet. Use \u201CBuild one with clicks\u201D below, or paste the text from the document.");
+        toast("That's the old Word format (.doc). Please save it as .docx first, then upload again.");
         return;
       }
+      // Unsupported binary formats (not PDF/DOCX/text).
+      if (/\.(pptx?|xlsx?|xlsm|rtf|odt|pages|key|numbers|zip)$/.test(name)) {
+        nameEl.textContent = `${f.name} — can't read this type yet`;
+        fileInput.value = "";
+        toast("I can't read that file type yet. Upload a .txt, .pdf, or .docx file instead, or use \u201CBuild one with clicks\u201D below.");
+        return;
+      }
+      // DOCX extraction via mammoth
+      if (/\.docx$/.test(name)) {
+        nameEl.textContent = f.name + " — reading\u2026";
+        toast("Reading your document\u2026");
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (!window.mammoth) { toast("Mammoth library not loaded. Cannot read .docx files."); return; }
+          window.mammoth.extractRawText({ arrayBuffer: reader.result }).then(result => {
+            const txt = (result.value || "").trim();
+            if (!txt) { toast("Could not extract any text from that .docx file."); nameEl.textContent = f.name + " — empty"; fileInput.value = ""; return; }
+            ta.value = txt;
+            nameEl.textContent = f.name;
+            if (runAnalyze({ scroll: true })) toast(`Analysed "${f.name}" \u2014 your plan & country frameworks are below.`);
+          }).catch(() => { toast("Failed to read that .docx file. Try saving it again or paste the text instead."); nameEl.textContent = f.name + " — error"; fileInput.value = ""; });
+        };
+        reader.onerror = () => { toast("Could not read that file."); nameEl.textContent = f.name + " — error"; fileInput.value = ""; };
+        reader.readAsArrayBuffer(f);
+        return;
+      }
+      // PDF extraction via pdf.js
+      if (/\.pdf$/.test(name)) {
+        nameEl.textContent = f.name + " — reading\u2026";
+        toast("Reading your document\u2026");
+        const reader = new FileReader();
+        reader.onload = () => {
+          var pdfjsLib = globalThis.pdfjsLib;
+          if (!pdfjsLib) { toast("PDF.js library not loaded. Cannot read .pdf files."); return; }
+          var data = new Uint8Array(reader.result);
+          pdfjsLib.getDocument({ data: data }).promise.then(pdf => {
+            var pages = []; for (var i = 1; i <= pdf.numPages; i++) pages.push(i);
+            return Promise.all(pages.map(num => pdf.getPage(num).then(page => page.getTextContent()).then(tc => tc.items.map(item => item.str).join(" "))));
+          }).then(pageTexts => {
+            const txt = pageTexts.join("\n").trim();
+            if (!txt) { toast("Could not extract any text from that PDF. It may be scanned/image-only."); nameEl.textContent = f.name + " — no text found"; fileInput.value = ""; return; }
+            ta.value = txt;
+            nameEl.textContent = f.name;
+            if (runAnalyze({ scroll: true })) toast(`Analysed "${f.name}" \u2014 your plan & country frameworks are below.`);
+          }).catch(() => { toast("Failed to read that PDF. It may be encrypted or corrupted."); nameEl.textContent = f.name + " — error"; fileInput.value = ""; });
+        };
+        reader.onerror = () => { toast("Could not read that file."); nameEl.textContent = f.name + " — error"; fileInput.value = ""; };
+        reader.readAsArrayBuffer(f);
+        return;
+      }
+      // Plain text / markdown — read as text
       nameEl.textContent = f.name;
       const reader = new FileReader();
       reader.onload = () => {
@@ -3387,7 +3437,7 @@
         if (/^PK\x03\x04/.test(txt) || /^%PDF/.test(txt) || /\x00\x00/.test(txt.slice(0, 4000))) {
           nameEl.textContent = `${f.name} — not plain text`;
           fileInput.value = "";
-          toast("That looks like a Word/PDF/binary file, not text. Use \u201CBuild one with clicks\u201D or paste the text instead.");
+          toast("That looks like a binary file, not text. Upload a .txt, .pdf, or .docx file instead.");
           return;
         }
         ta.value = txt;

@@ -11,6 +11,9 @@ const cssText = fs.readFileSync(path.join(root, "css/styles.css"), "utf8");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8")
   .replace('<link rel="stylesheet" href="css/styles.css" />', `<style>${cssText}</style>`)
   .replace('<script src="vendor/chartjs/chart.umd.min.js"></script>', `<script>${chartShim}</script>`)
+  .replace('<script src="vendor/mammoth/mammoth.browser.min.js"></script>', `<script>window.mammoth={extractRawText:function(o){return Promise.resolve({value:"stub text"})}};</script>`)
+  .replace('<script src="vendor/pdfjs/pdf.min.js"></script>', `<script>globalThis.pdfjsLib={getDocument:function(){return{promise:Promise.resolve({numPages:0})}},GlobalWorkerOptions:{workerSrc:""}};</script>`)
+  .replace(/\n\s*<script>\n\s*\/\/ Dev mode: point pdf\.js worker[^]*?<\/script>/, '')
   .replace('<script src="js/i18n.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/i18n.js"))}</script>`)
   .replace('<script src="js/auth.js"></script>', `<script>window.__SKIP_AUTH=true;${fs.readFileSync(path.join(root, "js/auth.js"))}</script>`)
   .replace('<script src="js/sync.js"></script>', `<script>${fs.readFileSync(path.join(root, "js/sync.js"))}</script>`)
@@ -2145,6 +2148,25 @@ ok(window.QIGlobe.setActiveScope(null) === false, "setActiveScope(null) returns 
 let scopeThrew = false;
 try { window.QIGlobe.setActiveScope(["jakarta"]); window.QIGlobe.setActiveScope(null); window.QIGlobe.setActiveScope([]); window.QIGlobe.setActiveScope(undefined); } catch (e) { scopeThrew = true; }
 ok(!scopeThrew, "setActiveScope never throws regardless of input");
+
+// FEAT-001: PDF/DOCX upload support — vendor globals and UI updates
+(function testPdfDocxUploadSupport() {
+  // mammoth and pdfjsLib globals are accessible
+  ok(window.mammoth != null && typeof window.mammoth.extractRawText === "function", "window.mammoth.extractRawText is available");
+  ok(window.pdfjsLib != null && typeof window.pdfjsLib.getDocument === "function", "globalThis.pdfjsLib.getDocument is available");
+  // Navigate to brain view and check the file input accept attribute and button label
+  doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  var brainFileInput = doc.getElementById("brainFile");
+  ok(brainFileInput != null, "#brainFile input exists");
+  var acceptAttr = brainFileInput ? brainFileInput.getAttribute("accept") : "";
+  ok(acceptAttr.indexOf(".pdf") !== -1, "#brainFile accept attribute includes .pdf");
+  ok(acceptAttr.indexOf(".docx") !== -1, "#brainFile accept attribute includes .docx");
+  // Button label mentions pdf/docx
+  var label = doc.querySelector('label[for="brainFile"]');
+  var labelText = label ? label.textContent : "";
+  ok(/\.pdf/.test(labelText), "Upload button label mentions .pdf");
+  ok(/\.docx/.test(labelText), "Upload button label mentions .docx");
+})();
 
 console.log(fails === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
