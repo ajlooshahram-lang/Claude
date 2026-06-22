@@ -100,6 +100,25 @@
     setTimeout(function () { if (container.parentNode) container.parentNode.removeChild(container); }, 4000);
   }
 
+  // ---------- country-scope helpers (Bugs 4-6) ----------
+  function activeStationIds() {
+    var bp = uiState.brainPlan;
+    if (!bp || !Array.isArray(bp.countryIntel) || !bp.countryIntel.length) return null;
+    var G = window.QIGlobe || {};
+    var stations = Array.isArray(G.STATIONS) ? G.STATIONS : [];
+    var names = bp.countryIntel.map(function(c) { return (c.name || "").toLowerCase(); });
+    var ids = [];
+    stations.forEach(function(s) {
+      if (names.indexOf((s.country || "").toLowerCase()) !== -1) ids.push(s.id);
+    });
+    return ids.length ? ids : null;
+  }
+  function activeCountryKeys() {
+    var bp = uiState.brainPlan;
+    if (!bp || !Array.isArray(bp.countryIntel) || !bp.countryIntel.length) return null;
+    return bp.countryIntel.map(function(c) { return c.key; });
+  }
+
   // ---------- views config ----------
   const VIEWS = [
     { g: "Overview" },
@@ -627,6 +646,11 @@
     var G = window.QIGlobe || {};
     var stations = G.STATIONS || [];
     var cables = G.CABLES || [];
+    var scopeIds = activeStationIds();
+    if (scopeIds) {
+      stations = stations.filter(function(s) { return scopeIds.indexOf(s.id) !== -1; });
+      cables = cables.filter(function(c) { return scopeIds.indexOf(c.from) !== -1 || scopeIds.indexOf(c.to) !== -1; });
+    }
     var SC = G.STATUS_COLOR || { "commissioned": { css: "#42d6a4" }, "in-progress": { css: "#4ea1ff" }, "planned": { css: "#e6b84a" } };
     // Map lat/lon to SVG coordinates within a viewBox of 0,0 600,400.
     // The region spans roughly lat -10 to 28, lon 95 to 150.
@@ -1138,7 +1162,9 @@
 
     // Pull every country's plain-language briefing from the Brain.
     const list = (CD && typeof CD.list === "function") ? CD.list() : [];
-    const briefs = list
+    const activeKeys = activeCountryKeys();
+    const filteredList = activeKeys ? list.filter(c => activeKeys.indexOf(c.key) !== -1) : list;
+    const briefs = filteredList
       .map(c => (CD && typeof CD.briefing === "function") ? CD.briefing(c.key + " " + c.name) : null)
       .filter(Boolean);
 
@@ -3892,9 +3918,12 @@
     if (!countries.length) {
       return `<div class="card"><p class="muted">Country intelligence data is not loaded.</p></div>`;
     }
+    const aKeys = activeCountryKeys();
+    const detected = aKeys ? countries.filter(c => aKeys.indexOf(c.key) !== -1) : countries;
+    const others = aKeys ? countries.filter(c => aKeys.indexOf(c.key) === -1) : [];
     const li = arr => (arr || []).map(x => `<li>${esc(x)}</li>`).join("");
-    const cards = countries.map(c => `
-      <div class="card country-card" data-country="${esc(c.key)}">
+    const buildCard = (c, dimmed) => `
+      <div class="card country-card${dimmed ? " country-card--other" : ""}" data-country="${esc(c.key)}">
         <div class="card-head">
           <h3>${esc(c.name)}</h3>
           <span class="tag">${esc(c.authority.abbrev)}</span>
@@ -3910,16 +3939,24 @@
           <div class="country-section"><h4>Geopolitical</h4><ul>${li(c.geopolitical)}</ul></div>
           <div class="country-section"><h4>Geographical / environmental hazards</h4><ul>${li(c.geographical)}</ul></div>
         </div>
-      </div>`).join("");
+      </div>`;
+    const detectedCards = detected.map(c => buildCard(c, false)).join("");
+    const otherCards = others.map(c => buildCard(c, true)).join("");
+    const othersSection = others.length ? `
+      <details class="country-others-section">
+        <summary class="country-others-heading">Other countries in the network <span class="tag">${others.length}</span></summary>
+        <div class="country-grid country-grid--other">${otherCards}</div>
+      </details>` : "";
     return `<div class="card">
-        <h3>Country &amp; Regulatory Intelligence <span class="tag">${countries.length} countries</span></h3>
+        <h3>Country &amp; Regulatory Intelligence <span class="tag">${detected.length} countries</span></h3>
         <p style="line-height:1.6">Real, named reference data for the Submarine Telecom Project's
         ${countries.length} countries/territories — the telecom regulator that issues cable-landing
         licences, the marine/environmental permitting body, and the dominant geopolitical and
         geographical hazards along each route. The Project Brain folds these into generated permit
         tasks and FMEA-scored risks when it detects a country in your description.</p>
       </div>
-      <div class="country-grid">${cards}</div>`;
+      <div class="country-grid">${detectedCards}</div>
+      ${othersSection}`;
   };
 
   RENDER.health = function () {
@@ -4992,11 +5029,14 @@
     const G = window.QIGlobe || {};
     const stations = (Array.isArray(G.STATIONS) ? G.STATIONS : []);
     const cables = (Array.isArray(G.CABLES) ? G.CABLES : []);
+    const scopeIds = activeStationIds();
+    const filteredStations = scopeIds ? stations.filter(s => scopeIds.indexOf(s.id) !== -1) : stations;
+    const filteredCables = scopeIds ? cables.filter(c => scopeIds.indexOf(c.from) !== -1 || scopeIds.indexOf(c.to) !== -1) : cables;
     // Build country toggle buttons
-    const countryBtns = stations.map(s => `
+    const countryBtns = filteredStations.map(s => `
       <button class="whatif-toggle is-on" data-station="${esc(s.id)}" type="button">${esc(s.name)} <small>${esc(s.country)}</small></button>`).join("");
     // Cable toggle buttons
-    const cableBtns = cables.map(c => `
+    const cableBtns = filteredCables.map(c => `
       <button class="whatif-toggle is-on" data-cable="${esc(c.id)}" type="button">${esc(c.id)} <small>${esc(c.name)}</small></button>`).join("");
     return `
       <div class="card whatif-card">

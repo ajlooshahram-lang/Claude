@@ -952,6 +952,60 @@ ok(S.validCases().length > ciCasesBefore, "Applying the plan adds the country-en
   ok(S.get().brainPlan != null, "brainPlan field exists in the persisted project state");
 })();
 
+// 39d) Country filtering in views (Bugs 4-6) — scope to detected countries when brainPlan exists
+(function testCountryFilteringViews() {
+  S.reset();
+  // Analyze a 3-country brief (Philippines, Taiwan, Indonesia)
+  doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  doc.getElementById("brainText").value =
+    "Submarine fibre cable, landing stations in the Philippines, Taiwan and Indonesia, 5000 km, 36 months";
+  doc.getElementById("brainAnalyze").click();
+  var plan = S.getBrainPlan();
+  ok(plan && plan.countryIntel && plan.countryIntel.length === 3, "Country filter test: brainPlan has 3 countries");
+
+  // Investor Brief: should show only 3 country cards
+  doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  var briefCards = doc.querySelectorAll(".brief-country[data-country-key]");
+  ok(briefCards.length === 3, "Investor Brief shows only 3 country cards when 3-country plan active (got " + briefCards.length + ")");
+  var briefKeys = Array.from(briefCards).map(function(el) { return el.getAttribute("data-country-key"); });
+  ok(briefKeys.indexOf("philippines") !== -1 && briefKeys.indexOf("taiwan") !== -1 && briefKeys.indexOf("indonesia") !== -1,
+    "Investor Brief shows Philippines, Taiwan and Indonesia");
+
+  // What-If Simulator: should show only filtered stations
+  doc.querySelector('.nav-item[data-view="whatif"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  var whatifBtns = doc.querySelectorAll("#whatifCountries .whatif-toggle");
+  ok(whatifBtns.length === 3, "What-If shows only 3 station toggles when 3-country plan active (got " + whatifBtns.length + ")");
+  var whatifIds = Array.from(whatifBtns).map(function(el) { return el.getAttribute("data-station"); });
+  ok(whatifIds.indexOf("batangas") !== -1 && whatifIds.indexOf("tamsui") !== -1 && whatifIds.indexOf("jakarta") !== -1,
+    "What-If toggle IDs match the 3 detected countries' stations");
+
+  // Country Intelligence: detected countries at top, others in secondary section
+  doc.querySelector('.nav-item[data-view="country"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  var primaryCards = doc.querySelectorAll(".country-grid:not(.country-grid--other) .country-card:not(.country-card--other)");
+  ok(primaryCards.length === 3, "Country Intelligence shows 3 primary country cards (got " + primaryCards.length + ")");
+  var othersSection = doc.querySelector(".country-others-section");
+  ok(othersSection != null, "Country Intelligence has 'Other countries in the network' section");
+  var otherCards = doc.querySelectorAll(".country-grid--other .country-card--other");
+  ok(otherCards.length === 5, "Country Intelligence shows 5 other country cards (got " + otherCards.length + ")");
+
+  // After reset (no plan), all 8 should appear
+  S.reset();
+  doc.querySelector('.nav-item[data-view="brain"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  var clearBtn = doc.getElementById("brainClear");
+  if (clearBtn) clearBtn.click();
+  doc.querySelector('.nav-item[data-view="investorbrief"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  var allBriefCards = doc.querySelectorAll(".brief-country[data-country-key]");
+  ok(allBriefCards.length === 8, "After reset, Investor Brief shows all 8 country cards (got " + allBriefCards.length + ")");
+  doc.querySelector('.nav-item[data-view="whatif"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  var allWhatifBtns = doc.querySelectorAll("#whatifCountries .whatif-toggle");
+  ok(allWhatifBtns.length === 8, "After reset, What-If shows all 8 station toggles (got " + allWhatifBtns.length + ")");
+  doc.querySelector('.nav-item[data-view="country"]').dispatchEvent(new window.Event("click", { bubbles: true }));
+  var allCountryCards = doc.querySelectorAll(".country-grid .country-card");
+  ok(allCountryCards.length === 8, "After reset, Country Intelligence shows all 8 cards (got " + allCountryCards.length + ")");
+  var noOthersSection = doc.querySelector(".country-others-section");
+  ok(noOthersSection == null, "After reset, no 'Other countries' section exists");
+})();
+
 // 40) Per-country briefing (powers the 3D map station drill-down) — pure data
 ok(typeof window.QICountryData.briefing === "function", "QICountryData.briefing() exposed for the 3D drill-down");
 const STN = [
