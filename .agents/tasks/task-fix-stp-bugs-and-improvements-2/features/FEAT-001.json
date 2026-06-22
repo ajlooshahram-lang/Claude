@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-001",
+  "type": "fix",
+  "description": "Fix 4 bugs and add 2 improvements to the STP Application: (1) auto-snapshot before applyBrainPlan, (2) persist and pre-fill project description, (3) filter Route Progress view by detected countries, (4) fix What-If timeline critical-path calculation, (5) show diff summary after re-analysis.",
+  "status": "completed",
+  "steps": [
+    "BUG 3 - Auto-snapshot before reanalysis: In qi-webapp/js/ui.js function applyBrainPlan (line ~3738), at the very top before clearing any data, add: if (S.get().cases && S.get().cases.length > 0) { S.takeSnapshot('Auto-snapshot before reanalysis'); }. This gives users a one-click restore point from History & Backups.",
+    "BUG 2 - Project description persistence: (a) In qi-webapp/js/store.js function normalize(), add: if (typeof s.brainDescription !== 'string') s.brainDescription = ''; (b) Add two new API functions: setBrainDescription(text) that sets state.brainDescription = text and calls save(), and getBrainDescription() that returns state.brainDescription. Export both in the API object. (c) In qi-webapp/js/ui.js AFTER.brain, after the existing plan restoration logic, add: if (S.getBrainDescription && S.getBrainDescription()) ta.value = S.getBrainDescription(); (d) In runAnalyze(), after 'const text = ta.value.trim()', add: if (S.setBrainDescription) S.setBrainDescription(text); (e) In the file upload handlers (DOCX, PDF, and plain text), after setting ta.value = txt, add: if (S.setBrainDescription) S.setBrainDescription(txt);",
+    "BUG 1 - Route Progress filtering: In qi-webapp/js/ui.js RENDER.routeprogress (line ~2064), after getting cables from G.CABLES, add filtering: const scopeIds = activeStationIds(); const filteredCables = scopeIds ? cables.filter(c => scopeIds.indexOf(c.from) !== -1 || scopeIds.indexOf(c.to) !== -1) : cables; Then use filteredCables for the cards rendering (the per-segment cards). Keep the unfiltered cables array available for the rollup chart which should show the full programme. Also filter in AFTER.routeprogress similarly.",
+    "BUG 4 - What-If timeline critical-path fix: In qi-webapp/js/store.js function whatIf(), replace the naive timeline calculation (var scenarioMonths = Math.round(baseMonths * (activeCables.length / (cables.length || 1))) + permitDelay;) with critical-path logic: (a) Identify trunk cables (IDs starting with 'STP-T') vs branch cables (IDs starting with 'STP-B'). (b) Count total trunk segments and remaining active trunk segments. (c) Timeline formula: scenarioMonths = Math.round(baseMonths * (activeTrunkCount / totalTrunkCount)) + permitDelay. (d) Branches run in parallel so removing them does NOT reduce the timeline. (e) When no trunk segments remain, timeline = permitDelay (all critical work is removed). (f) totalTrunkCount is the total number of trunk cables in the full cable set (5 for STP-T1 through STP-T5).",
+    "IMPROVEMENT 1 - Diff summary after re-analysis: In qi-webapp/js/ui.js function applyBrainPlan(), before clearing data, capture prevCounts = { cases: (st0.cases || []).length, milestones: (st0.registers.milestones || []).length, procurement: (st0.registers.procurement || []).length, stakeholders: (st0.stakeholders || []).length }. After the plan is applied, build a diffSummary string showing what changed: 'Plan regenerated: X tasks (was Y), Z milestones (was W)...' and 'Auto-snapshot saved - you can roll back from History & Backups if needed.' Store this as a return value or attach to the plan object so the toast or brain preview can show it. The existing toast in runAnalyze can be enhanced to mention the diff.",
+    "Add smoke test assertions: In qi-webapp/smoke.js, add tests for each fix: (a) Bug 3: after analyzing, verify snapshots exist with label containing 'reanalysis'. (b) Bug 2: verify setBrainDescription/getBrainDescription exist and persist text. (c) Bug 1: verify that RENDER.routeprogress filters cables when brainPlan.countryIntel is set. (d) Bug 4: verify whatIf() timeline math uses trunk-based critical path - removing a branch should not reduce timeline, removing a trunk should. (e) Improvement 1: verify applyBrainPlan returns or exposes a diff summary.",
+    "Run npm test to verify all existing 695+ assertions still pass plus the new ones. Run node verify-standalone.js to confirm boot checks pass."
+  ],
+  "acceptance_criteria": [
+    "Running npm test passes ALL existing assertions plus new assertions for each fix",
+    "S.takeSnapshot is called before clearing data in applyBrainPlan when cases.length > 0",
+    "setBrainDescription(text) persists and getBrainDescription() retrieves the project description text",
+    "AFTER.brain pre-fills the textarea with the persisted brainDescription",
+    "RENDER.routeprogress only shows cable segments connected to detected countries (uses activeStationIds())",
+    "whatIf() timeline uses trunk-based critical path: removing STP-B1 does NOT change timeline, removing STP-T3 DOES reduce timeline",
+    "applyBrainPlan captures previous counts and produces a diff summary showing what changed",
+    "node verify-standalone.js passes all 23 boot checks"
+  ],
+  "verification": [
+    "cd qi-webapp && npm test",
+    "cd qi-webapp && node verify-standalone.js"
+  ],
+  "blocked_reason": null,
+  "findings": "All 4 bug fixes and improvement implemented successfully. All existing smoke tests pass plus 28 new assertions. The whatIf timeline now uses trunk-based critical-path logic (STP-T* cables are sequential, STP-B* are parallel). Route progress cards are filtered by activeStationIds() when a brainPlan with countryIntel is present. Auto-snapshot is taken before reanalysis when cases exist. brainDescription is persisted and pre-filled. applyBrainPlan returns {count, diffSummary} instead of just a number."
+}
