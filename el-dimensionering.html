@@ -6359,6 +6359,279 @@ function tccSelectNode(nodeId) {
   renderModule('tcc');
 }
 
+// ===== DEVICE TCC (per-module time-current curve) =====
+var deviceTccState = { mcbCursor: 500, fuseCursor: 500, mccbCursor: 1000, relayCursor: 50 };
+
+function deviceTccSetCursor(mod, current) {
+  deviceTccState[mod + 'Cursor'] = current;
+  renderModule(mod);
+}
+
+function renderDeviceTCC(device, In, settings, loadCurrent, faultCurrent, modKey) {
+  if (!device || !In) return '';
+  var curve = sldDeviceCurve(device, In, settings);
+  if (!curve || curve.length === 0) return '';
+  curve.sort(function(a, b) { return a.i - b.i; });
+
+  var w = 540, h = 360;
+  var marginL = 58, marginR = 16, marginT = 28, marginB = 38;
+  var plotW = w - marginL - marginR;
+  var plotH = h - marginT - marginB;
+  var logImin = Math.log10(1), logImax = Math.log10(100000);
+  var logTmin = Math.log10(0.001), logTmax = Math.log10(10000);
+  function xPos(I) { return marginL + (Math.log10(Math.max(1, I)) - logImin) / (logImax - logImin) * plotW; }
+  function yPos(t) { return marginT + (1 - (Math.log10(Math.max(0.001, t)) - logTmin) / (logTmax - logTmin)) * plotH; }
+
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;max-width:540px;height:auto;display:block;margin:0 auto">';
+  svg += '<rect width="' + w + '" height="' + h + '" fill="var(--bg-card,#fff)" rx="6"/>';
+
+  // Grid lines
+  var gridI = [1, 10, 100, 1000, 10000, 100000];
+  var gridT = [0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000];
+  var gi, gx, gy;
+  for (gi = 0; gi < gridI.length; gi++) {
+    gx = xPos(gridI[gi]);
+    svg += '<line x1="' + gx + '" y1="' + marginT + '" x2="' + gx + '" y2="' + (h - marginB) + '" stroke="var(--border-light,#eee)" stroke-width="0.5"/>';
+    var ilbl = gridI[gi] >= 1000 ? (gridI[gi] / 1000) + 'k' : gridI[gi];
+    svg += '<text x="' + gx + '" y="' + (h - marginB + 14) + '" text-anchor="middle" font-size="9" fill="var(--text,#333)">' + ilbl + '</text>';
+  }
+  for (gi = 0; gi < gridT.length; gi++) {
+    gy = yPos(gridT[gi]);
+    svg += '<line x1="' + marginL + '" y1="' + gy + '" x2="' + (w - marginR) + '" y2="' + gy + '" stroke="var(--border-light,#eee)" stroke-width="0.5"/>';
+    var tlbl = gridT[gi] >= 1 ? gridT[gi] + 's' : (gridT[gi] >= 0.01 ? (gridT[gi] * 1000) + 'ms' : (gridT[gi] * 1000) + 'ms');
+    svg += '<text x="' + (marginL - 4) + '" y="' + (gy + 3) + '" text-anchor="end" font-size="9" fill="var(--text,#333)">' + tlbl + '</text>';
+  }
+
+  // Curve band (filled polygon between tMin and tMax)
+  var upperPath = '', lowerPath = '';
+  var validPts = [];
+  for (var ci = 0; ci < curve.length; ci++) {
+    var pt = curve[ci];
+    if (pt.i < 1 || pt.tMax <= 0) continue;
+    validPts.push(pt);
+  }
+  if (validPts.length > 1) {
+    for (ci = 0; ci < validPts.length; ci++) {
+      var ux = xPos(validPts[ci].i), uy = yPos(validPts[ci].tMax);
+      upperPath += (ci === 0 ? 'M' : 'L') + ux.toFixed(1) + ',' + uy.toFixed(1);
+    }
+    for (ci = validPts.length - 1; ci >= 0; ci--) {
+      var lx = xPos(validPts[ci].i), ly = yPos(validPts[ci].tMin);
+      lowerPath += 'L' + lx.toFixed(1) + ',' + ly.toFixed(1);
+    }
+    svg += '<path d="' + upperPath + lowerPath + 'Z" fill="rgba(37,99,235,0.18)" stroke="#2563eb" stroke-width="1.5"/>';
+  }
+
+  // Load current marker (IB) - green dashed line
+  if (loadCurrent && loadCurrent > 0) {
+    var lxp = xPos(loadCurrent);
+    svg += '<line x1="' + lxp + '" y1="' + marginT + '" x2="' + lxp + '" y2="' + (h - marginB) + '" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="6,3"/>';
+    svg += '<text x="' + (lxp + 3) + '" y="' + (marginT + 12) + '" font-size="9" fill="#16a34a" font-weight="bold">IB=' + loadCurrent.toFixed(1) + 'A</text>';
+  }
+
+  // Fault current marker (Ik) - red dashed line
+  if (faultCurrent && faultCurrent > 0) {
+    var fxp = xPos(faultCurrent);
+    svg += '<line x1="' + fxp + '" y1="' + marginT + '" x2="' + fxp + '" y2="' + (h - marginB) + '" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="6,3"/>';
+    svg += '<text x="' + (fxp + 3) + '" y="' + (marginT + 24) + '" font-size="9" fill="#dc2626" font-weight="bold">Ik=' + (faultCurrent >= 1000 ? (faultCurrent / 1000).toFixed(1) + 'kA' : faultCurrent.toFixed(0) + 'A') + '</text>';
+  }
+
+  // Cursor line
+  var cursorCurrent = deviceTccState[modKey + 'Cursor'] || 500;
+  var cursorX = xPos(cursorCurrent);
+  svg += '<line x1="' + cursorX + '" y1="' + marginT + '" x2="' + cursorX + '" y2="' + (h - marginB) + '" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,2"/>';
+  // Find trip time at cursor current
+  var tripTimeAtCursor = null;
+  for (ci = 0; ci < validPts.length - 1; ci++) {
+    if (validPts[ci].i <= cursorCurrent && validPts[ci + 1].i >= cursorCurrent) {
+      var frac = (cursorCurrent - validPts[ci].i) / (validPts[ci + 1].i - validPts[ci].i);
+      tripTimeAtCursor = { tMin: validPts[ci].tMin + frac * (validPts[ci + 1].tMin - validPts[ci].tMin), tMax: validPts[ci].tMax + frac * (validPts[ci + 1].tMax - validPts[ci].tMax) };
+      break;
+    }
+  }
+  if (tripTimeAtCursor) {
+    var tripY = yPos(tripTimeAtCursor.tMax);
+    svg += '<circle cx="' + cursorX + '" cy="' + tripY + '" r="4" fill="#f59e0b"/>';
+    svg += '<text x="' + (cursorX + 6) + '" y="' + (tripY - 4) + '" font-size="9" fill="#f59e0b">' + (tripTimeAtCursor.tMin >= 1 ? tripTimeAtCursor.tMin.toFixed(2) + '-' + tripTimeAtCursor.tMax.toFixed(2) + 's' : (tripTimeAtCursor.tMin * 1000).toFixed(0) + '-' + (tripTimeAtCursor.tMax * 1000).toFixed(0) + 'ms') + '</text>';
+  } else if (cursorCurrent > 0 && validPts.length > 0 && cursorCurrent > validPts[validPts.length - 1].i) {
+    svg += '<text x="' + (cursorX + 4) + '" y="' + (h - marginB - 8) + '" font-size="9" fill="#f59e0b">' + tx('Instant udl.', 'Instant trip') + '</text>';
+  }
+
+  // Axis labels
+  svg += '<text x="' + (w / 2) + '" y="' + (h - 4) + '" text-anchor="middle" font-size="10" fill="var(--text,#333)">' + tx('Stroem [A]', 'Current [A]') + '</text>';
+  svg += '<text x="14" y="' + (h / 2) + '" text-anchor="middle" font-size="10" fill="var(--text,#333)" transform="rotate(-90,14,' + (h / 2) + ')">' + tx('Tid [s]', 'Time [s]') + '</text>';
+
+  // Operating point warnings
+  if (loadCurrent && loadCurrent > 0 && validPts.length > 0) {
+    var curveStartI = validPts[0].i;
+    if (loadCurrent >= curveStartI) {
+      svg += '<text x="' + (w - 10) + '" y="' + (h - marginB - 6) + '" text-anchor="end" font-size="10" fill="#dc2626" font-weight="bold">' + tx('OVERBELASTNING', 'OVERLOAD') + '</text>';
+    }
+  }
+
+  svg += '</svg>';
+  return svg;
+}
+
+function renderDeviceTCCCard(device, In, settings, loadCurrent, faultCurrent, modKey, title) {
+  var chart = renderDeviceTCC(device, In, settings, loadCurrent, faultCurrent, modKey);
+  if (!chart) return '';
+  var cursorCurrent = deviceTccState[modKey + 'Cursor'] || 500;
+  var html = '<div class="card fade-in"><div class="card-title">' + title + '</div>';
+  html += '<div class="info-row">' + tx('Tidsstroemkarakteristik iht. IEC 60898 / IEC 60269 / IEC 60947-2', 'Time-current characteristic per IEC 60898 / IEC 60269 / IEC 60947-2') + '</div>';
+  // Cursor buttons
+  var cursors = [50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000];
+  html += '<div class="select-group"><div class="select-label">' + tx('Fejlstroem-cursor', 'Fault Current Cursor') + '</div><div class="select-grid">';
+  for (var ci = 0; ci < cursors.length; ci++) {
+    var csel = (cursorCurrent === cursors[ci]) ? ' selected' : '';
+    var clbl = cursors[ci] >= 1000 ? (cursors[ci] / 1000) + 'kA' : cursors[ci] + 'A';
+    html += '<button class="sel-btn' + csel + '" onclick="deviceTccSetCursor(\'' + modKey + '\',' + cursors[ci] + ')">' + clbl + '</button>';
+  }
+  html += '</div></div>';
+  html += chart;
+  // Legend
+  html += '<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:8px;font-size:0.82em">';
+  html += '<span style="color:#2563eb">\u2588 ' + tx('Udloesningsbaand', 'Trip band') + '</span>';
+  if (loadCurrent && loadCurrent > 0) html += '<span style="color:#16a34a">--- IB (' + tx('belastning', 'load') + ')</span>';
+  if (faultCurrent && faultCurrent > 0) html += '<span style="color:#dc2626">--- Ik (' + tx('kortslutning', 'fault') + ')</span>';
+  html += '<span style="color:#f59e0b">--- ' + tx('Cursor', 'Cursor') + '</span>';
+  html += '</div></div>';
+  return html;
+}
+
+function renderRelayTCC(I1N, relState) {
+  if (!I1N || I1N <= 0) return '';
+  var w = 540, h = 360;
+  var marginL = 58, marginR = 16, marginT = 28, marginB = 38;
+  var plotW = w - marginL - marginR;
+  var plotH = h - marginT - marginB;
+  var logImin = Math.log10(0.5), logImax = Math.log10(5000);
+  var logTmin = Math.log10(0.001), logTmax = Math.log10(100);
+  function xPos(I) { return marginL + (Math.log10(Math.max(0.5, I)) - logImin) / (logImax - logImin) * plotW; }
+  function yPos(t) { return marginT + (1 - (Math.log10(Math.max(0.001, t)) - logTmin) / (logTmax - logTmin)) * plotH; }
+
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;max-width:540px;height:auto;display:block;margin:0 auto">';
+  svg += '<rect width="' + w + '" height="' + h + '" fill="var(--bg-card,#fff)" rx="6"/>';
+
+  // Grid
+  var gridI = [1, 5, 10, 50, 100, 500, 1000, 5000];
+  var gridT = [0.001, 0.01, 0.1, 1, 10, 100];
+  var gi, gx, gy;
+  for (gi = 0; gi < gridI.length; gi++) {
+    gx = xPos(gridI[gi]);
+    svg += '<line x1="' + gx + '" y1="' + marginT + '" x2="' + gx + '" y2="' + (h - marginB) + '" stroke="var(--border-light,#eee)" stroke-width="0.5"/>';
+    svg += '<text x="' + gx + '" y="' + (h - marginB + 14) + '" text-anchor="middle" font-size="9" fill="var(--text,#333)">' + (gridI[gi] >= 1000 ? (gridI[gi] / 1000) + 'k' : gridI[gi]) + '</text>';
+  }
+  for (gi = 0; gi < gridT.length; gi++) {
+    gy = yPos(gridT[gi]);
+    svg += '<line x1="' + marginL + '" y1="' + gy + '" x2="' + (w - marginR) + '" y2="' + gy + '" stroke="var(--border-light,#eee)" stroke-width="0.5"/>';
+    svg += '<text x="' + (marginL - 4) + '" y="' + (gy + 3) + '" text-anchor="end" font-size="9" fill="var(--text,#333)">' + (gridT[gi] >= 1 ? gridT[gi] + 's' : (gridT[gi] * 1000) + 'ms') + '</text>';
+  }
+
+  var Ipickup = relState.Igt * I1N;
+  var Iinstant = relState.Igg * I1N;
+
+  if (relState.relayType === 'inverse') {
+    // IDMT curve: t = 0.14 / ((I/Is)^0.02 - 1) * TMS
+    var TMS = relState.tGt; // Use t> as TMS
+    var idmtPts = '';
+    for (var mi = 1; mi <= 40; mi++) {
+      var iVal = Ipickup * (1 + mi * 0.5);
+      if (iVal > 5000) break;
+      var ratio = iVal / Ipickup;
+      var tIDMT = (0.14 / (Math.pow(ratio, 0.02) - 1)) * TMS;
+      if (tIDMT > 100 || tIDMT < 0.001) continue;
+      var px = xPos(iVal), py = yPos(tIDMT);
+      idmtPts += (idmtPts === '' ? 'M' : 'L') + px.toFixed(1) + ',' + py.toFixed(1);
+    }
+    if (idmtPts) {
+      svg += '<path d="' + idmtPts + '" fill="none" stroke="#7c3aed" stroke-width="2.5"/>';
+    }
+    svg += '<text x="' + (w - 60) + '" y="' + (marginT + 14) + '" font-size="9" fill="#7c3aed" font-weight="bold">IEC SI (IDMT)</text>';
+  } else {
+    // Definite-time: horizontal lines
+    // I> level: horizontal line from Ipickup to Iinstant at t>
+    var y1 = yPos(relState.tGt);
+    var x1s = xPos(Ipickup), x1e = xPos(Math.min(Iinstant, 5000));
+    svg += '<line x1="' + x1s + '" y1="' + y1 + '" x2="' + x1e + '" y2="' + y1 + '" stroke="#2563eb" stroke-width="2.5"/>';
+    svg += '<text x="' + (x1s - 4) + '" y="' + (y1 - 5) + '" text-anchor="end" font-size="9" fill="#2563eb">t>=' + relState.tGt + 's</text>';
+    // I>> level: horizontal line from Iinstant onward at t>>
+    var y2 = yPos(Math.max(relState.tGg, 0.005));
+    var x2s = xPos(Iinstant), x2e = xPos(5000);
+    svg += '<line x1="' + x2s + '" y1="' + y2 + '" x2="' + x2e + '" y2="' + y2 + '" stroke="#dc2626" stroke-width="2.5"/>';
+    svg += '<text x="' + (x2s - 4) + '" y="' + (y2 - 5) + '" text-anchor="end" font-size="9" fill="#dc2626">t>>=' + relState.tGg + 's</text>';
+  }
+
+  // Vertical pickup lines
+  var pickX = xPos(Ipickup);
+  svg += '<line x1="' + pickX + '" y1="' + marginT + '" x2="' + pickX + '" y2="' + (h - marginB) + '" stroke="#2563eb" stroke-width="1" stroke-dasharray="4,3"/>';
+  svg += '<text x="' + (pickX + 3) + '" y="' + (h - marginB - 5) + '" font-size="9" fill="#2563eb">I>=' + Ipickup.toFixed(1) + 'A</text>';
+  var instX = xPos(Iinstant);
+  svg += '<line x1="' + instX + '" y1="' + marginT + '" x2="' + instX + '" y2="' + (h - marginB) + '" stroke="#dc2626" stroke-width="1" stroke-dasharray="4,3"/>';
+  svg += '<text x="' + (instX + 3) + '" y="' + (h - marginB - 16) + '" font-size="9" fill="#dc2626">I>>=' + Iinstant.toFixed(1) + 'A</text>';
+
+  // HV Fuse curve overlay
+  var fuseData = RELAY_HV_FUSES[relState.fuseType];
+  if (fuseData) {
+    var fuseI2t = fuseData.rating * fuseData.rating * 10; // Approximate I2t for HV fuse
+    var fusePts = '';
+    var fuseMultPts = [2, 3, 5, 8, 10, 15, 20, 30, 50, 80];
+    for (var fi = 0; fi < fuseMultPts.length; fi++) {
+      var fuseI = fuseData.rating * fuseMultPts[fi];
+      if (fuseI > 5000) break;
+      var fuseT = fuseI2t / (fuseI * fuseI);
+      if (fuseT > 100 || fuseT < 0.001) continue;
+      fusePts += (fusePts === '' ? 'M' : 'L') + xPos(fuseI).toFixed(1) + ',' + yPos(fuseT).toFixed(1);
+    }
+    if (fusePts) {
+      svg += '<path d="' + fusePts + '" fill="none" stroke="#d97706" stroke-width="1.5" stroke-dasharray="5,3"/>';
+      svg += '<text x="' + (w - 60) + '" y="' + (marginT + 28) + '" font-size="9" fill="#d97706">' + tx('HV-sikring', 'HV Fuse') + ' ' + fuseData.rating + 'A</text>';
+    }
+  }
+
+  // Cursor line
+  var cursorCurrent = deviceTccState.relayCursor || 50;
+  var cursorX = xPos(cursorCurrent);
+  svg += '<line x1="' + cursorX + '" y1="' + marginT + '" x2="' + cursorX + '" y2="' + (h - marginB) + '" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,2"/>';
+  var cursorLbl = cursorCurrent >= 1000 ? (cursorCurrent / 1000).toFixed(1) + 'kA' : cursorCurrent + 'A';
+  svg += '<text x="' + (cursorX + 4) + '" y="' + (marginT + 12) + '" font-size="9" fill="#f59e0b">' + cursorLbl + '</text>';
+
+  // Axes
+  svg += '<text x="' + (w / 2) + '" y="' + (h - 4) + '" text-anchor="middle" font-size="10" fill="var(--text,#333)">' + tx('Stroem [A]', 'Current [A]') + '</text>';
+  svg += '<text x="14" y="' + (h / 2) + '" text-anchor="middle" font-size="10" fill="var(--text,#333)" transform="rotate(-90,14,' + (h / 2) + ')">' + tx('Tid [s]', 'Time [s]') + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function renderRelayTCCCard(I1N, relState) {
+  var chart = renderRelayTCC(I1N, relState);
+  if (!chart) return '';
+  var cursorCurrent = deviceTccState.relayCursor || 50;
+  var html = '<div class="card fade-in"><div class="card-title">' + tx('Rele TCC - Tidsstroemkarakteristik', 'Relay TCC - Time-Current Characteristic') + '</div>';
+  html += '<div class="info-row">' + tx('Koordinering med HV-sikring iht. IEC 60255 / IEC 60282-1', 'Coordination with HV fuse per IEC 60255 / IEC 60282-1') + '</div>';
+  var cursors = [5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
+  html += '<div class="select-group"><div class="select-label">' + tx('Stroem-cursor', 'Current Cursor') + '</div><div class="select-grid">';
+  for (var ci = 0; ci < cursors.length; ci++) {
+    var csel = (cursorCurrent === cursors[ci]) ? ' selected' : '';
+    var clbl = cursors[ci] >= 1000 ? (cursors[ci] / 1000) + 'kA' : cursors[ci] + 'A';
+    html += '<button class="sel-btn' + csel + '" onclick="deviceTccSetCursor(\'relay\',' + cursors[ci] + ')">' + clbl + '</button>';
+  }
+  html += '</div></div>';
+  html += chart;
+  // Legend
+  html += '<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:8px;font-size:0.82em">';
+  if (relState.relayType === 'inverse') {
+    html += '<span style="color:#7c3aed">\u2014 IDMT</span>';
+  } else {
+    html += '<span style="color:#2563eb">\u2014 I> (' + tx('overstroemstrin', 'overcurrent stage') + ')</span>';
+    html += '<span style="color:#dc2626">\u2014 I>> (' + tx('kortslutning', 'instantaneous') + ')</span>';
+  }
+  html += '<span style="color:#d97706">--- ' + tx('HV-sikring', 'HV Fuse') + '</span>';
+  html += '<span style="color:#f59e0b">--- ' + tx('Cursor', 'Cursor') + '</span>';
+  html += '</div></div>';
+  return html;
+}
+
 function tccRenderCascadeChart(devices, cursorCurrent) {
   var w = 600, h = 400;
   var marginL = 60, marginR = 20, marginT = 30, marginB = 40;
@@ -7918,6 +8191,7 @@ function renderFuse() {
         <div class="result-row"><span class="label">${t('fuseBreaker')}</span><span class="value">${holder.breaker}</span></div>
       </div>
     </div>
+    ${renderDeviceTCCCard({i5s: FUSE_5S[fuseState.size], rating: fuseState.size}, fuseState.size, null, fuseState.loadCurrent || 0, (typeof scircuitState !== 'undefined' && scircuitState.ikResult) ? scircuitState.ikResult * 1000 : 0, 'fuse', tx('Sikring TCC - gG Karakteristik', 'Fuse TCC - gG Characteristic'))}
     ` : ''}
   `;
 }
@@ -7985,6 +8259,7 @@ function renderMCB() {
         <div class="result-row"><span class="label">${t('mcbPoles')}</span><span class="value">${mcbState.poles === '1p' ? '1P' : 'Multi-pole'}</span></div>
       </div>
     </div>
+    ${renderDeviceTCCCard({curve: mcbState.curve, rating: mcbState.rating}, mcbState.rating, null, mcbState.loadCurrent || 0, (typeof scircuitState !== 'undefined' && scircuitState.ikResult) ? scircuitState.ikResult * 1000 : 0, 'mcb', tx('MCB TCC - Kurve ' + mcbState.curve, 'MCB TCC - Curve ' + mcbState.curve))}
     ` : ''}
   `;
 }
@@ -8062,6 +8337,8 @@ function renderMCCB() {
         <div class="result-row"><span class="label">${t('mccbIi')}</span><span class="value">${ii} A</span></div>
       </div>
     </div>
+
+    ${renderDeviceTCCCard({frame: mccbState.frame, inOptions: frame.inOptions}, mccbState.inVal, {io: mccbState.ioMult, isd: mccbState.isdMult}, mccbState.loadCurrent || 0, (typeof scircuitState !== 'undefined' && scircuitState.ikResult) ? scircuitState.ikResult * 1000 : 0, 'mccb', tx('MCCB TCC - Micrologic 2.2', 'MCCB TCC - Micrologic 2.2'))}
   `;
 }
 
@@ -11460,7 +11737,7 @@ var ARCHIVE_MODULE_KEYS = [
   'loadState', 'fuseState', 'mcbState', 'mccbState', 'cableState', 'vdropState',
   'scState', 'trafoState', 'thermalState', 'energyState', 'cable3dState', 'pdfState',
   'tccState', 'panelState', 'evState', 'solarState', 'noedState', 'motorState',
-  'harmonicState', 'vfdState', 'lightingState', 'heatpumpState', 'busbarState',
+  'deviceTccState', 'harmonicState', 'vfdState', 'lightingState', 'heatpumpState', 'busbarState',
   'bathroomState', 'firealarmState', 'dataState', 'spdState', 'upsState', 'pfcState',
   'trayFillState', 'zsState', 'commissionState', 'shevState', 'accessState',
   'generatorState', 'discrimState', 'earthsysState', 'poolState', 'constructionState',
@@ -26556,6 +26833,7 @@ function renderRelay() {
   var verdictText = allOk ? tx('Releindstillinger og sikring er koordinerede', 'Relay settings and fuse are coordinated') : tx('Juster indstillinger - se advarsler ovenfor', 'Adjust settings - see warnings above');
   html += renderVerdict(allOk, verdictText);
   html += renderRelaySim(I1N, Ipickup, Iinstant, coord.coordinated);
+  html += renderRelayTCCCard(I1N, relayState);
 
   html += '<div class="info-row" style="margin-top:12px;font-size:0.82em;opacity:0.7">';
   html += tx('Ref: IEC 60255 (rele), IEC 60282-1 (HV-sikringer), DS/HD 60076 (trafo). Egentid = releets iboende mekaniske/elektroniske forsinkelse.', 'Ref: IEC 60255 (relay), IEC 60282-1 (HV fuses), DS/HD 60076 (transformer). Inherent time = relay own mechanical/electronic delay.');
