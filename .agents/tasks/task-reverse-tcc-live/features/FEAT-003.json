@@ -1,0 +1,34 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Live Installation Twin Enhancements: More detailed IEC 60617 symbols, better thermal visualization, interactive tooltips on hover, and additional disaster scenarios. Enhances existing liveRenderNodes() at line 34009, liveRenderSvg() at line 33933, and renderLiveInstallation() at line 34241.",
+  "status": "completed",
+  "steps": [
+    "Step 1: Add IEC 60617 symbol SVG definitions. Create a liveSvgSymbols() helper that returns SVG <defs> with proper IEC 60617 symbols for: transformer (circle pair with windings), MCB (rectangle with magnetic/thermal trip indicators), MCCB (larger rectangle with Micrologic indicator), fuse (thin rectangle), RCD (circle with test button), cable (parallel lines), busbar (thick horizontal bar), motor (circle with M), socket (circle with pins). These should be reusable via <use href='#sym-xxx'/>.",
+    "Step 2: Enhance liveRenderNodes() (line 34009) to use IEC 60617 symbols instead of plain rectangles. Each node type renders its appropriate symbol. Size symbols to fit within the existing nodeW/nodeH layout grid. Keep the thermal color-coding by applying fill colors to symbol sub-elements.",
+    "Step 3: Improve thermal visualization in liveRenderNodes and liveRenderConnections. (a) Add animated heat shimmer effect for nodes above 80% utilization (CSS animation on opacity). (b) Gradient cables that transition from cool to hot along their length (upstream to downstream). (c) Show temperature rise estimate next to heavily loaded cables (delta-T in degrees). (d) Add a thermal scale bar legend at the bottom of the SVG.",
+    "Step 4: Add interactive tooltip system. Create liveTooltipHtml(nodeId, tree, mode) helper that generates tooltip content for a node. Include: node name, type, IB/In/Iz values, utilization %, voltage drop, protection device, cable spec, compliance status, and applicable DS/HD 60364 clause. Tooltips appear via onmouseover/onmouseout on SVG node groups, positioned near the hovered node. Use a global tooltip <div> approach (set innerHTML and position on hover).",
+    "Step 5: Add new disaster scenarios to renderLiveInstallation(). Add to existing 4 scenarios: (a) 'earth_fault' - Earth fault on random circuit, shows Zs path and RCD operation. (b) 'overload_cascade' - Progressive overload starting from one circuit spreading to board. (c) 'voltage_sag' - Grid voltage dip to 85% showing motor stall risk. (d) 'cable_aging' - Simulates 20-year cable with increased resistance (+15%). Each scenario modifies the SVG rendering to show its effects visually.",
+    "Step 6: Enhance liveRenderNodes to show power flow direction indicators. Add small animated arrows on connections showing current direction. Arrow speed proportional to current magnitude. In fault mode, show fault current path with red pulsing arrows.",
+    "Step 7: Add a mini statistics dashboard to renderLiveInstallation() (enhance existing statistics footer). Show: total installation power, average utilization, worst-case voltage drop node, highest-temperature cable, overall safety verdict with colored indicator. Make each stat clickable to navigate to the relevant module.",
+    "Step 8: Add tests to test-sld.js for Live Twin enhancements. At least 15 tests: liveSvgSymbols returns valid SVG defs, liveTooltipHtml returns correct content for each node type, new disaster scenarios (earth_fault, overload_cascade, voltage_sag, cable_aging) produce valid SVG modifications, thermal gradient rendering for heavily loaded cables, IEC 60617 symbol references present in rendered SVG, power flow arrows present, statistics dashboard includes all metrics, liveRenderNodes with new symbols still returns valid SVG string."
+  ],
+  "acceptance_criteria": [
+    "IEC 60617 symbols render for transformer, MCB, MCCB, fuse, RCD, cable, motor",
+    "Thermal visualization shows heat shimmer on overloaded nodes and gradient cables",
+    "Tooltips appear on hover with node details including compliance status",
+    "4 new disaster scenarios functional (earth_fault, overload_cascade, voltage_sag, cable_aging)",
+    "Power flow direction arrows animate on connections",
+    "Enhanced statistics dashboard with clickable navigation",
+    "All rendering trilingual (da/en/fa via tx())",
+    "At least 15 new Live Twin tests pass",
+    "All existing tests continue to pass",
+    "node test-sld.js exits with 0 failures"
+  ],
+  "verification": [
+    "Run: node test-sld.js - expect 0 failures with new Live Twin tests passing",
+    "Run: node --check el-dimensionering.html - expect no syntax errors"
+  ],
+  "blocked_reason": null,
+  "findings": "All 1710 tests pass (1684 existing + 26 new). Enhanced liveSvgSymbols with IEC 60617 compliant symbols including sym-distboard. Added click-to-pin tooltip system with DS/HD 60364 compliance indicators. Added 4 new disaster scenarios (cable_fire, water_ingress, overload_cascade, lightning_strike). Enhanced thermal visualization with liveThermalCapacityPct, liveThermalGradientColor, and capacity bars. Updated liveThermalColor with finer gradient (8 color stops instead of 5) - required test update. Farsi translations added to _FA dictionary. The user instruction specified slightly different disaster scenarios than the feature file (cable_fire/water_ingress/overload_cascade/lightning_strike vs earth_fault/voltage_sag/cable_aging) - followed user instruction as authoritative."
+}
